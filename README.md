@@ -32,8 +32,14 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 - [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü)
 
 ## Kurulum
-Adım adım kurulum sihirbazı hazırlanıyor: Terminal'e yapıştırılacak tek satır, ardından tarayıcıda her adımı kendisi
-denetleyen bir rehber. Hazır olunca buraya eklenecek.
+Terminal'e yapıştır:
+```bash
+curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
+```
+Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı tarayıcıda açılır ve her adımı kendisi denetler.
+
+**Güncelleme:** `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
+belgelerine dokunmaz), sonra Chrome'da `chrome://extensions` → Suflor.me → yenile.
 
 ## Kullanım (kısaca)
 1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).

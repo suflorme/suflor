@@ -373,7 +373,7 @@
   // DEĞİNME ve DUYGU kartlarının metni burada gösterilmez (Teams sekmesi paylaşılırsa görünmesin); ⌥⇧H şeridi gizler/açar.
   if (window.top === window) {
     const KL = { sor: "Sor", belirt: "Belirt", deginme: "Değinme", dikkat: "Dikkat", cevap: "Cevap", bilgi: "Bilgi", duygu: "Duygu" };
-    const COL = { dikkat: "#c0362c", sor: "#2f6fd6", belirt: "#2e8a4f", cevap: "#0f7c8c", deginme: "#6e4bb8", bilgi: "#8c8b85", duygu: "#b26a00" }; // v0.9.1: panoyla aynı palet
+    const COL = { dikkat: "#c0503b", sor: "#1f7a5a", belirt: "#b0832e", cevap: "#2a8590", deginme: "#7a5fb0", bilgi: "#8b938d", duygu: "#b25a78" }; // v0.11.3: marka paleti (pano ile aynı türler; iki temada okunur ara tonlar)
     const PRI = ["dikkat", "sor", "belirt", "cevap", "deginme", "duygu", "bilgi"];
     const PRIVATE = ["deginme", "duygu"]; // metni şeritte gösterilmez: Teams sekmesi paylaşılırsa görünmesin
     let hidden = false, host = null, root = null, sig = "", first = true; const seen = new Set();
@@ -386,9 +386,9 @@
       root = host.attachShadow({ mode: "open" });
       // v0.9.1: sade görünüm — beyaz/koyu yüzey, ince kenar, tek renkli durum noktası; kart türü yalnız sol çizgi ve etiket rengiyle
       const st = el("style"); st.textContent = `
-        .w{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;color:#1d1d1b;
-          --s1:#fff;--s2:#fbfbfa;--tx:#1d1d1b;--t2:#5f5e5a;--t3:#8c8b85;--bd:rgba(0,0,0,.1);--bd2:rgba(0,0,0,.18);--hov:rgba(0,0,0,.05)}
-        @media (prefers-color-scheme:dark){.w{color:#ecebe7;--s1:#242423;--s2:#2a2a28;--tx:#ecebe7;--t2:#b3b1aa;--t3:#86847e;--bd:rgba(255,255,255,.1);--bd2:rgba(255,255,255,.2);--hov:rgba(255,255,255,.07)}}
+        .w{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;color:#18201c;
+          --s1:#fff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#8b938d;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.05)}
+        @media (prefers-color-scheme:dark){.w{color:#ecebe7;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#78807a;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.07)}}
         .pill{display:inline-flex;align-items:center;gap:7px;background:var(--s1);color:var(--tx);border:1px solid var(--bd2);border-radius:999px;padding:5px 12px 5px 10px;
           box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:default;user-select:none;font-size:12px;white-space:nowrap}
         .pill i{width:8px;height:8px;border-radius:50%;background:var(--pc,#8c8b85);flex:none}.pill b{font-weight:600}.pill .m{color:var(--t2)}.pill .c{color:var(--pc,var(--t2));font-weight:500}
@@ -442,7 +442,7 @@
       const top = PRI.find(k => cards.some(c => c.kind === k)) || "bilgi";
       const pill = root.querySelector(".pill"), list = root.querySelector(".list");
       // v0.9.1: hap = durum noktası + "Suflor" + kart sayısı (en önemli kartın renginde) + bekleyen soru, kanıt, kalan süre
-      const pc = (warn || dil) ? COL.dikkat : cards.length ? COL[top] : (kal != null && (kal <= 5 || sv.kayma >= 2)) ? COL.duygu : (live ? "#2e8a4f" : "#8c8b85");
+      const pc = (warn || dil) ? COL.dikkat : cards.length ? COL[top] : (kal != null && (kal <= 5 || sv.kayma >= 2)) ? "#c08a2a" : (live ? "#1f7a4f" : "#8b938d");
       pill.style.setProperty("--pc", pc); pill.replaceChildren(el("i"), el("b", null, "Suflor.me"));
       const parca = [];
       if (warn) parca.push(["c", "⚠ disk"]); if (dil) parca.push(["c", "⚠ dil"]);

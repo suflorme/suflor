@@ -44,6 +44,8 @@ if [ ! -e "$DESK" ] && [ -d "$(dirname "$DESK")" ]; then ln -s "$APP/canli" "$DE
 cp "$SRC/relay.py" "$APP/relay.py"
 cp "$SRC/ses-isci.py" "$APP/ses-isci.py"  # v0.8.4: duygu modeli + konuşmacı ayırma (ses-venv, ses-modeller ayrıca kurulu olmalı)
 cp "$SRC/whisper-isci.py" "$APP/whisper-isci.py"  # v0.8.0: yerel konuşma tanıma işçisi (whisper-venv ayrıca kurulu olmalı)
+# v0.11.3: pano ve hazırlık sayfası marka yazı tiplerini ve işareti aktarıcının yanından verir (launchd Masaüstü'nü okuyamaz)
+mkdir -p "$APP/marka/yazi"; cp "$SRC"/marka/*.svg "$APP/marka/" 2>/dev/null || true; cp "$SRC"/marka/yazi/*.woff2 "$APP/marka/yazi/" 2>/dev/null || true
 # v0.9.3: takvim yardımcısı (Mac Takvim → takvim.json). Kaynak değiştiyse derlenir; takvim izni uygulamaya verilir (ilk açılışta sorulur).
 TAK="$APP/Suflor Takvim.app"
 if command -v swiftc >/dev/null && { [ ! -x "$TAK/Contents/MacOS/SuflorTakvim" ] || [ "$SRC/takvim.swift" -nt "$TAK/Contents/MacOS/SuflorTakvim" ]; }; then

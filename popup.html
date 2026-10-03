@@ -1,10 +1,10 @@
 <!doctype html><html lang="tr"><meta charset="utf-8"><title>Suflor.me</title>
 <style>
-:root{color-scheme:light dark;--s1:#fff;--s2:#f6f6f4;--tx:#1d1d1b;--t2:#5f5e5a;--t3:#8c8b85;--bd:rgba(0,0,0,.09);--bd2:rgba(0,0,0,.16);--hov:rgba(0,0,0,.05);--ac:#2f6fd6;--ok:#2e8a4f;--wa:#b26a00;--er:#c0362c;--er-bg:#fbe9e7}
-@media (prefers-color-scheme:dark){:root{--s1:#242423;--s2:#1b1b1a;--tx:#ecebe7;--t2:#b3b1aa;--t3:#86847e;--bd:rgba(255,255,255,.09);--bd2:rgba(255,255,255,.18);--hov:rgba(255,255,255,.06);--ac:#7aa7f0;--ok:#6cc08a;--wa:#e5a64a;--er:#f08a80;--er-bg:#3d211e}}
+:root{color-scheme:light dark;--s1:#fff;--s2:#f4f5f1;--tx:#18201c;--t2:#5c655f;--t3:#8b938d;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.05);--ac:#175e46;--ok:#1f7a4f;--wa:#a86b12;--er:#b3412e;--er-bg:#f8e7e3}
+@media (prefers-color-scheme:dark){:root{--s1:#171d1a;--s2:#0f1412;--tx:#e8ebe6;--t2:#a5ada7;--t3:#78807a;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06);--ac:#2a8a66;--ok:#47b07c;--wa:#d9a03c;--er:#e0705c;--er-bg:#33201b}}
 *{box-sizing:border-box}
 body{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;width:330px;margin:0;padding:12px;background:var(--s2);color:var(--tx)}
-.hd{display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px}.brand{font-weight:600;display:flex;align-items:center;gap:6px}.brand i{width:9px;height:9px;border-radius:3px;background:var(--ac);display:inline-block;transform:rotate(45deg)}
+.hd{display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px}.brand{font-weight:300;font-size:16px;letter-spacing:-.02em;display:flex;align-items:center;gap:7px}.brand svg{width:20px;height:20px;flex:none}.brand .n{color:#c9973a}.brand .m{color:var(--t2)}
 .chip{font-size:11px;padding:1px 8px;border-radius:999px;background:var(--hov);color:var(--t2)}.chip.alan{background:var(--ac);color:#fff;font-weight:500}.chip.alan:empty{display:none}
 #sec{background:var(--s1);border:1px solid var(--ac);border-radius:10px;padding:10px 12px;margin-bottom:10px}.sec-t{font-weight:600;margin-bottom:8px}.sec-b{display:flex;gap:6px;flex-wrap:wrap}.sec-n{font-size:11px;color:var(--t3);margin-top:8px}
 .card{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:4px 12px}
@@ -22,7 +22,7 @@ details{margin-top:10px}summary{cursor:pointer;color:var(--t2);font-size:12px;li
 .set{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-top:8px;display:flex;flex-direction:column;gap:8px}
 .set label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--t2)}.set label.ck{flex-direction:row;align-items:center;gap:8px;color:var(--tx)}.set label.ck input{width:auto;margin:0;accent-color:var(--ac)}
 </style>
-<div class="hd"><span class="brand"><i></i>Suflor.me<span class="chip alan" id="alan" title="Bu Chrome'un yazdığı çalışma alanı"></span></span><span class="chip" id="ver"></span></div>
+<div class="hd"><span class="brand" aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class="n">.</span><span class="m">me</span></span><span class="chip alan" id="alan" title="Bu Chrome'un yazdığı çalışma alanı"></span></span><span class="chip" id="ver"></span></div>
 <div id="sec" hidden><div class="sec-t">Bu Chrome hangi çalışma alanına yazsın?</div><div class="sec-b" id="secb"></div><div class="sec-n">Bu Mac'te birden fazla Suflor.me aktarıcısı çalışıyor. Bir kez seç; Ayarlar'dan değiştirebilirsin.</div></div>
 <div id="uy"></div>
 <div class="card" id="baglanti">
