@@ -117,7 +117,10 @@ v0.7.0: `KANIT n`, paket altında `BAĞLAM · <sistem>`, `GÜNDEM ▶ i`. Ne yap
 - `KART ✕` gelen konuyu bir daha önerme; `👁` gelen kartı tekrar gönderme.
 
 ## 6. Toplantı bitince (panel kapanır ya da 5 dk satır gelmez)
-Monitor'ü durdur. `_canli/` altındaki bu toplantının `.md` dosyasından özet taslağı çıkar:
+Monitor'ü durdur. **Önce döküm dosyası (v0.12.6):** `python3 {{KOD}}/toplanti-claude.py dokum --kim "<kişi>"` →
+`gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>.md` ve `.vtt` (Suflor.me'nin kendi dökümü; Teams'in indirilen dökümüne gerek yok).
+`<kişi>` özet dosyasındakiyle aynı; "zaten var" derse aynı toplantıysa `--uzerine`. Dosya adını özetin başına yaz.
+Sonra `_canli/` altındaki bu toplantının `.md` dosyasından özet taslağı çıkar:
 Kaynak altyazıysa (başlıkta "Kaynak: Teams canlı altyazı") ya da konuşmacı çoğunlukla "?" ise özetin başına bunu yaz;
 kararları ve takip işlerini kişiye bağlama ("kim: belirtilmedi"), metinden emin olmadığın yeri "döküm belirsiz" diye işaretle.
 `dinleyici`/`katilimci`da özetin başı "kullanıcı için çıkanlar"dır: kullanıcıya verilen işler, onu etkileyen kararlar ve

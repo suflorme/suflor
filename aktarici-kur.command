@@ -69,16 +69,44 @@ PL
     echo "Takvim yardımcısı derlendi: $TAK"; [ "$DLOG" = /dev/null ] || rm -f "$DLOG"
   else echo "UYARI: takvim yardımcısı derlenemedi ($DLOG) — takvim özelliği kapalı kalır"; fi
 fi
-# v0.12.4: kalıcı yerel imza (yerel-imza.sh) — geçici imza her derlemede değişip takvim iznini düşürüyordu. Uygulama başka
+# v0.13.0: yerel ses yardımcısı (ses-yardimcisi.swift → "Suflor Ses.app"): toplantı uygulamasının sesini (karşı taraf) Core Audio
+# process tap ile alır, aktarıcıya verir — Option + Shift + W gerekmez. macOS 14.4+; izin "Sistem Sesi Kaydı" (yalnız sistem sesi) uygulamaya verilir.
+SES="$APP/Suflor Ses.app"; SES_YENI=0
+if command -v swiftc >/dev/null && sw_vers -productVersion | awk -F. '{exit !($1 > 14 || ($1 == 14 && $2 >= 4))}' && \
+   { [ ! -x "$SES/Contents/MacOS/SuflorSes" ] || [ "$SRC/ses-yardimcisi.swift" -nt "$SES/Contents/MacOS/SuflorSes" ]; }; then
+  mkdir -p "$SES/Contents/MacOS"
+  cat > "$SES/Contents/Info.plist" <<'PL'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>local.suflor.ses</string><key>CFBundleName</key><string>Suflor Ses</string>
+  <key>CFBundleExecutable</key><string>SuflorSes</string><key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.13.0</string><key>LSUIElement</key><true/><key>LSMinimumSystemVersion</key><string>14.4</string>
+  <key>NSAudioCaptureUsageDescription</key><string>Suflor.me toplantıdaki karşı tarafın sesini yazıya dökmek için toplantı uygulamasının sesini alır. Ses kaydedilmez, bu Mac dışına gönderilmez.</string>
+</dict></plist>
+PL
+  DLOG="$(mktemp "${TMPDIR:-/tmp}/suflor-ses-derleme.XXXXXX")" || DLOG=/dev/null
+  if swiftc -O -o "$SES/Contents/MacOS/SuflorSes" "$SRC/ses-yardimcisi.swift" 2>"$DLOG"; then
+    echo "Ses yardımcısı derlendi: $SES"; SES_YENI=1; [ "$DLOG" = /dev/null ] || rm -f "$DLOG"
+    pkill -u "$(id -u)" -x SuflorSes 2>/dev/null || true  # eski kopya kapanır, aktarıcı yenisini açar
+  else echo "UYARI: ses yardımcısı derlenemedi ($DLOG) — karşı ses için Option + Shift + W ile devam"; fi
+fi
+# v0.12.4: kalıcı yerel imza (yerel-imza.sh) — geçici imza her derlemede değişip izni (takvim, ses kaydı) düşürüyordu. Uygulama başka
 # imzayla imzalıysa (eski kurulum ya da yeni derleme) yeniden imzalanır; kimlik bir kez değişir, sonra hep aynı kalır.
-if [ -x "$TAK/Contents/MacOS/SuflorTakvim" ]; then
+for U in "$TAK" "$SES"; do
+  [ -d "$U/Contents/MacOS" ] || continue
   . "$SRC/yerel-imza.sh"; IMZA="$(yerel_imza)"
-  if [ "$IMZA" = "-" ] || ! codesign -dv --verbose=2 "$TAK" 2>&1 | grep -q "^Authority=$IMZA\$"; then
-    if codesign -s "$IMZA" --force "$TAK" >/dev/null 2>&1; then
-      [ "$IMZA" = "-" ] && echo "UYARI: yerel imza kurulamadı — geçici imza; takvim izni her derlemede yeniden istenebilir" \
-        || echo "Takvim yardımcısı kalıcı yerel imzayla imzalandı — takvim iznini bir kez yeniden ver (Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler)"
+  if [ "$IMZA" = "-" ] || ! codesign -dv --verbose=2 "$U" 2>&1 | grep -q "^Authority=$IMZA\$"; then
+    if codesign -s "$IMZA" --force "$U" >/dev/null 2>&1; then
+      [ "$IMZA" = "-" ] && echo "UYARI: yerel imza kurulamadı — geçici imza; izin her derlemede yeniden istenebilir ($(basename "$U"))" \
+        || echo "$(basename "$U") yerel imzayla imzalandı (izin aynı imzada korunur; ilk kez imzalandıysa macOS bir kez sorar)"
     fi
   fi
+done
+# v0.13.0: ilk kurulumda (ya da yeni derlemede) izin penceresi şimdi çıksın, toplantının ortasında değil
+if [ "$SES_YENI" = 1 ] && [ -x "$SES/Contents/MacOS/SuflorSes" ]; then
+  echo "Sistem sesi kaydı izni: macOS 'Suflor Ses' için izin sorarsa İzin Ver de (Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı)."
+  open -g -W -a "$SES" --args --izin 2>/dev/null || true
 fi
 
 cat > "$PL" <<EOF

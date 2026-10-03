@@ -206,13 +206,20 @@ def baglan():
       CREATE INDEX IF NOT EXISTS parca_yol ON parca(yol);
       CREATE VIRTUAL TABLE IF NOT EXISTS ara USING fts5(n, kimn, content='', prefix='3 4 5', tokenize='unicode61');""")
     return c
+def dokum_kopyasi(yol):
+    # v0.12.6: `toplanti-claude.py dokum` dosyası (<alan>-<kişi>-transkript-<YYYYMMDD>.md) aynı toplantının _canli/ dökümünün
+    # temiz kopyası — kaynağı _canli'de duruyorsa dizine ikinci kez girmez (ilk 3 sonuç aynı satırla dolmasın)
+    if not re.search(r"-transkript-\d{8}\.md$", yol): return False
+    try: m = re.search(r"Kaynak: `_canli/([^`]+)\.md`", open(yol, encoding="utf-8", errors="replace").read(800))
+    except OSError: return False
+    return bool(m) and os.path.exists(os.path.join(PROJE, "_canli", m.group(1) + ".jsonl"))
 def dosyalar():
     for kok, dirs, fs in os.walk(PROJE, followlinks=False):
         rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else rel
         dirs[:] = [d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC)]
         for f in fs:
             k = os.path.join(rel, f)
-            if os.path.splitext(f)[1].lower() in UZANTI and k not in HARIC and not f.startswith("~$"): yield os.path.join(kok, f), k
+            if os.path.splitext(f)[1].lower() in UZANTI and k not in HARIC and not f.startswith("~$") and not dokum_kopyasi(os.path.join(kok, f)): yield os.path.join(kok, f), k
     canli = os.path.join(PROJE, "_canli")  # kısayol: os.walk takip etmez, ayrıca gez
     if os.path.isdir(canli):
         for f in sorted(os.listdir(canli)):

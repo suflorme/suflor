@@ -8,9 +8,12 @@
 # Protokol (satır başına bir JSON):
 #   giriş : {"id": "...", "pcm": "<base64 int16, 16 kHz>", "kanal": "ben"|"karsi"}
 #   çıkış : {"hazir": true, "sn": yükleme} · {"id", "duygu": {"etiket", "p", "dagilim"}, "kume": "k1"|null, "benzerlik"} · {"id", "hata"}
+# v0.12.7 (kullanıcı, 3 Ekim: "duygu modelini kapat"): SUFLOR_DUYGU=1 değilse emotion2vec/FunASR hiç yüklenmez — bellekte
+# yalnız ECAPA kalır (16 GB'lık Mac swap'a düşüyordu; model gerçek toplantıda çoğunlukla "nötr" diyordu). Çıkışta "duygu" alanı olmaz.
 # FunASR, SpeechBrain'den önce içe aktarılmalı (tersinde FunASR'ın modül taraması SpeechBrain'in tembel modülüne takılıyor).
 import sys, os, json, time, base64
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
+DUYGU = os.environ.get("SUFLOR_DUYGU") == "1"
 MOD = os.environ.get("SUFLOR_SES_MODELLER") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ses-modeller")
 ETIKET = {"angry": "kizgin", "disgusted": "igrenmis", "fearful": "korkmus", "happy": "mutlu", "neutral": "notr",
           "other": "diger", "sad": "uzgun", "surprised": "saskin", "<unk>": "bilinmiyor", "unknown": "bilinmiyor"}
@@ -22,8 +25,9 @@ def main():
     try:
         import numpy as np, logging
         logging.disable(logging.WARNING)
-        from funasr import AutoModel
-        duygu = AutoModel(model=os.path.join(MOD, "emotion2vec_plus_base"), disable_update=True, device="cpu", log_level="ERROR")
+        if DUYGU:
+            from funasr import AutoModel
+            duygu = AutoModel(model=os.path.join(MOD, "emotion2vec_plus_base"), disable_update=True, device="cpu", log_level="ERROR")
         import torch
         from speechbrain.inference.speaker import EncoderClassifier
         from speechbrain.utils.fetching import LocalStrategy
@@ -33,10 +37,11 @@ def main():
         sv = d if os.access(d, os.W_OK) else os.path.expanduser("~/Library/Caches/Suflor/spkrec-ecapa-voxceleb")
         os.makedirs(sv, exist_ok=True)
         iz = EncoderClassifier.from_hparams(source=d, savedir=sv, overrides={"pretrained_path": d}, run_opts={"device": "cpu"}, local_strategy=LocalStrategy.NO_LINK)
-        duygu.generate(np.zeros(16000, np.float32), granularity="utterance", extract_embedding=False, disable_pbar=True)  # ısınma
+        if DUYGU: duygu.generate(np.zeros(16000, np.float32), granularity="utterance", extract_embedding=False, disable_pbar=True)  # ısınma
+        else: iz.encode_batch(torch.zeros(1, 16000))  # ısınma
     except Exception as e:
         out({"hata": f"model yüklenemedi: {e.__class__.__name__}: {str(e)[:200]}"}); return 1
-    out({"hazir": True, "sn": round(time.time() - t, 1)})
+    out({"hazir": True, "sn": round(time.time() - t, 1), "duygu": DUYGU})
     kumeler = {}  # kanal → [[ağırlık merkezi (birim vektör), sayı]]
     for satir in sys.stdin:
         if not satir.strip(): continue
@@ -45,10 +50,11 @@ def main():
         if p.get("sifirla"): kumeler.clear(); out({"id": p.get("id"), "sifirlandi": True}); continue  # yeni toplantı
         try:
             a = np.frombuffer(base64.b64decode(p["pcm"]), np.int16).astype(np.float32) / 32768; t = time.time(); o = {"id": p.get("id")}
-            r = duygu.generate(a, granularity="utterance", extract_embedding=False, disable_pbar=True)[0]
-            sk = sorted(zip(r["scores"], r["labels"]), reverse=True)
-            ad = lambda l: ETIKET.get(str(l).split("/")[-1], str(l).split("/")[-1])
-            o["duygu"] = {"etiket": ad(sk[0][1]), "p": round(float(sk[0][0]), 2), "dagilim": {ad(l): round(float(x), 2) for x, l in sk if x >= 0.05}}
+            if DUYGU:
+                r = duygu.generate(a, granularity="utterance", extract_embedding=False, disable_pbar=True)[0]
+                sk = sorted(zip(r["scores"], r["labels"]), reverse=True)
+                ad = lambda l: ETIKET.get(str(l).split("/")[-1], str(l).split("/")[-1])
+                o["duygu"] = {"etiket": ad(sk[0][1]), "p": round(float(sk[0][0]), 2), "dagilim": {ad(l): round(float(x), 2) for x, l in sk if x >= 0.05}}
             if p.get("kanal") == "karsi" and len(a) >= 16000 * 0.8:
                 e = iz.encode_batch(torch.tensor(a)[None]).squeeze().numpy(); e = e / (np.linalg.norm(e) + 1e-9)
                 ks = kumeler.setdefault("karsi", []); uzun = len(a) >= 16000 * KUME_MIN_SN

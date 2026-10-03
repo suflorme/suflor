@@ -44,7 +44,8 @@ belgelerine dokunmaz), sonra Chrome'da `chrome://extensions` → Suflor.me → y
 ## Kullanım (kısaca)
 1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).
    Claude gündemi kurar, hazır olunca toplantıya katılırsın.
-2. Teams sekmesinde bir kez **Option + Shift + W**: karşı tarafın sesi de yazıya dökülür.
+2. Karşı tarafın sesi kendiliğinden yazıya dökülür (Suflor Ses yardımcısı, macOS 14.4+; ilk kurulumda macOS "Sistem Sesi Kaydı" izni
+   sorar — İzin Ver). Yardımcı yoksa ya da izin verilmediyse Teams sekmesinde bir kez **Option + Shift + W**.
 3. Kartlar Teams'in sol altındaki küçük şeritte ve panoda görünür. ✓ yaptım · Okudum · ✕ gerek yok.
 4. Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + S** önemli an · **Option + Shift + O** son 1 dakikanın özeti.
 5. Toplantı bitince Claude özeti çıkarır ve sana sunar.
@@ -54,6 +55,7 @@ belgelerine dokunmaz), sonra Chrome'da `chrome://extensions` → Suflor.me → y
 |---|---|
 | Chrome eklentisi (`manifest.json`, `content.js`, `platform-teams.js`, …) | Teams sayfasından altyazı/döküm ve mikrofon sesini alır, şeridi gösterir |
 | Aktarıcı (`relay.py`) | Yerel sunucu: satırları dosyaya yazar, kartları tutar, panoyu sunar |
+| Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
 | Konuşma tanıma (`whisper-isci.py`, `ses-isci.py`) | Whisper large-v3-turbo (MLX) ve isteğe bağlı ses modeli |
 | Claude köprüsü (`toplanti-claude.py`, `baglam.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
 | Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |

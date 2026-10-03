@@ -69,7 +69,7 @@ def teshis_gonder(tur, ek, anahtar=None, zorla=False, onizle=False):
              "durum": {"toplanti_aktif": bool(aktif_dosya()), "satir": STATE.get("lines"), "eklenti_yas_sn": yas, "platform": x.get("platform"),
                        "panel": x.get("panel"), "altyazi": x.get("captions"), "toplantida": x.get("call"), "whisper": w.get("durum"),
                        "whisper_kuyruk": WH_Q.qsize() if "WH_Q" in globals() else None, "whisper_gecikme_sn": w.get("gecikme_sn"),
-                       "ses_modeli": sm.get("durum"), "disk_ok": STATE["disk"]["ok"], "disk_bos_mb": STATE["disk"]["free_mb"],
+                       "ses_modeli": sm.get("durum"), "yerel_ses": yerel_ses_durum() if "yerel_ses_durum" in globals() else None, "disk_ok": STATE["disk"]["ok"], "disk_bos_mb": STATE["disk"]["free_mb"],
                        "bellek_bos_gb": (bellek_view() or {}).get("bos_gb") if "bellek_view" in globals() else None,
                        "claude_yas_sn": round(simdi - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                        "calisma_dk": round((simdi - _BASLANGIC) / 60)},
@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.12.4"  # sürüm geçmişi: git log
+SURUM = "0.13.0"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -606,6 +606,8 @@ def ses_al(p):
     if w["durum"] == "yok": return {"ok": False, "kapali": True, "err": w.get("hata")}
     kanal = "ben" if p.get("kanal") in BEN_ESKI else ("karsi" if p.get("kanal") == "karsi" else None)
     if not kanal: return {"ok": False, "err": "kanal"}
+    # v0.13.0: yerel ses yardımcısı karşı sesi veriyorsa eklentinin (Option + Shift + W, sekme sesi) karşı parçaları atılır — çift satır olmasın
+    if kanal == "karsi" and p.get("kaynak") != "yerel" and time.time() - (STATE["yerel_ses"].get("son") or 0) < 3: return {"ok": True, "yerel": True}
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
     except Exception: return {"ok": False, "err": "pcm"}
     if len(pcm) > WH_SR * 2 * 10: return {"ok": False, "err": "parça çok büyük"}
@@ -634,7 +636,8 @@ def bellek_view():
     bos = _BELLEK["v"]
     if bos is None: return {"bos_gb": None, "uyari": ""}
     w = STATE["whisper"]; yuklu = w["durum"] == "hazir" and STATE["ses_model"]["durum"] in ("hazir", "yok")
-    gerek = 0 if yuklu else (1.6 if w["durum"] not in ("hazir", "yok") else 0) + (2.2 if STATE["ses_model"]["durum"] not in ("hazir", "yok") else 0)
+    # v0.13.0: gerek sayıları suflor-olcum ölçümünden (4 Ekim): Whisper ~2,4 GB, ses işçisi duygu kapalı ~0,4 / açık ~2,8 GB
+    gerek = 0 if yuklu else (2.4 if w["durum"] not in ("hazir", "yok") else 0) + ((2.8 if AYAR.get("duygu_modeli") else 0.4) if STATE["ses_model"]["durum"] not in ("hazir", "yok") else 0)
     az = bos < 1.5 or (gerek and bos < gerek + 0.5)
     sy = (lambda x: str(x)) if ARAYUZ_DILI == "en" else (lambda x: str(x).replace(".", ","))  # ondalık: en 3.1, tr 3,1
     return {"bos_gb": bos, "uyari": _t(f"Bellek az: ~{sy(bos)} GB boş", f"Low memory: ~{sy(bos)} GB free") + (_t(f" (Whisper ve ses modeli ~{sy(round(gerek, 1))} GB ister)", f" (Whisper and the voice model need ~{sy(round(gerek, 1))} GB)") if gerek else "") + _t(" — kullanmadığın uygulama ve sekmeleri kapat", " — close apps and tabs you aren't using") if az else ""}
@@ -650,7 +653,7 @@ def whisper_view():
     w = STATE["whisper"]; now = time.time()
     return {"durum": w["durum"], "ben": now - w["kanallar"].get("ben", 0) < WH_AKIS_SN, "ben_neden": ben_neden(), "karsi": now - w["kanallar"].get("karsi", 0) < WH_AKIS_SN,
             "kuyruk": WH_Q.qsize(), "satir": w["satir"], "gecikme_sn": w["gecikme_sn"], "hata": w["hata"],
-            "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
+            "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
 def ben_adi():
     a = agenda().get("ben")
     if a: return a
@@ -727,7 +730,7 @@ def _isci_dongu():
             print(f"WHISPER: parça çevrilemedi ({j['hata']}) — işçi yeniden başlatılacak"); w["hata"] = j["hata"]; _isci_kapat("hata"); continue
         hata_say = 0; metin = " ".join(str(j.get("text") or "").split())
         w.update(son_sn=j.get("sn"), gecikme_sn=round(time.time() - is_["t1"], 1)); w["atlanan"] += j.get("atlanan", 0)
-        if metin: whisper_yaz(is_, metin, j.get("ses"), ses_bekle(is_["id"]))
+        if metin: whisper_yaz(is_, metin, j.get("ses"), ses_bekle(is_["id"]) if DUYGU or is_["kanal"] != "ben" else None)  # v0.12.7: gönderilmeyen parçayı bekleme
 # --- Ses işçisi: duygu modeli + konuşmacı ayırma (v0.8.4, kullanıcı: "ikisini de indir ve kur") ----------------------------
 # ses-isci.py (ses-venv: PyTorch, FunASR emotion2vec+, SpeechBrain ECAPA; ses-modeller/) Whisper'a giden parçanın aynısını
 # paralel işler (~0,15 sn; Whisper ~1,1 sn sürdüğü için satır gecikmez). Sonuç satır kaydına: "duygu" {etiket, p, dagilim},
@@ -740,8 +743,12 @@ SES_MODELLER = _ilk(os.path.join(_ORT, "ses-modeller"), os.path.join(_UYG, "ses-
 STATE["ses_model"] = {"durum": "kapali", "hata": None, "sn": None, "parca": 0}
 SES_Q = queue.Queue(); SES_SONUC = {}; SES_KOSUL = threading.Condition(); _SES = {"p": None, "satirlar": None, "thread": None, "baslik": None}
 KUME_AD = {}; KUME_BEKLEYEN = []  # küme → {ad: oy}; (t0, t1, küme) son parçalar (altyazı oyu için)
+# v0.12.7 (kullanıcı, 3 Ekim): duygu modeli varsayılan kapalı (ayar "duygu_modeli": true açar). Kapalıyken işçide yalnız ECAPA
+# yüklenir ve ben kanalının parçaları işçiye gitmez (ben kanalı kümelenmiyor; işçi karşı ses gelince ya da ısınmada açılır).
+DUYGU = bool(AYAR.get("duygu_modeli"))
 def ses_gonder(is_):
     if STATE["ses_model"]["durum"] == "yok": return
+    if not DUYGU and is_.get("kanal") == "ben": return
     SES_Q.put(is_)
     with _ISCI["kilit"]:
         if not (_SES["thread"] and _SES["thread"].is_alive()): _SES["thread"] = threading.Thread(target=_ses_dongu, daemon=True); _SES["thread"].start()
@@ -755,7 +762,7 @@ def _ses_ac():
     if not (os.path.exists(SES_PY) and os.path.exists(SES_ISCI) and os.path.isdir(SES_MODELLER)):
         sm.update(durum="yok", hata=f"ses-venv / ses-isci.py / ses-modeller yok"); print(f"SES MODELİ: kullanılamıyor — {sm['hata']}"); return False
     sm.update(durum="yukleniyor", hata=None)
-    env = dict(os.environ, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", SUFLOR_SES_MODELLER=SES_MODELLER)
+    env = dict(os.environ, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", SUFLOR_SES_MODELLER=SES_MODELLER, SUFLOR_DUYGU="1" if DUYGU else "0")
     pr = subprocess.Popen([SES_PY, "-u", SES_ISCI], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
     q = queue.Queue()
     def oku():
@@ -767,7 +774,7 @@ def _ses_ac():
     if not j.get("hazir"):
         pr.kill(); sm.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"SES MODELİ: {sm['hata']}"); return False
     _SES.update(p=pr, satirlar=q, baslik=None); KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]
-    sm.update(durum="hazir", sn=j.get("sn")); print(f"SES MODELİ: hazır (emotion2vec+ · ECAPA, {j.get('sn')} sn)"); return True
+    sm.update(durum="hazir", sn=j.get("sn")); print(f"SES MODELİ: hazır ({'emotion2vec+ · ' if DUYGU else ''}ECAPA{'' if DUYGU else ', duygu kapalı'}, {j.get('sn')} sn)"); return True
 def _ses_kapat(neden):
     pr = _SES["p"]; _SES.update(p=None, satirlar=None)
     if pr:
@@ -1012,7 +1019,11 @@ def ingest(p):
             STATE["file_lines"][base_key] = STATE["file_lines"].get(base_key, 0) + 1
             if flags: STATE["flags"].append(rec)
         if golge_out: write([(md[:-3] + ".altyazi.log", "".join(golge_out))])
-        if not md_out and not jl_out: return
+        if not md_out and not jl_out:
+            # v0.12.6: ilk paket tümüyle gölgeye (altyazı, Whisper akarken) gittiyse başlık yazılmadı — sonraki pakette yazılsın
+            # (3 Ekim denemesinde .md başlıksız kaldı; toplantı adı ve devam ettirme başlıktan okunur)
+            if hdr: HEADERED.discard(md)
+            return
         write([(md, hdr), (md, pre_al(md)), (jl, "".join(jl_out)), (md, "".join(md_out))])  # tek grup: ya hepsi ya hiçbiri (v0.4.9)
         STATE["meeting"] = title; STATE["file"] = base_key; STATE["lines"] = STATE["file_lines"].get(base_key, 0)
         STATE["last"] = datetime.datetime.now().isoformat(timespec="seconds"); heartbeat()
@@ -1326,7 +1337,7 @@ const EN={"toplantı bekleniyor":"waiting for a meeting","Mini pano: her zaman �
 "Eklenti":"Extension","Sen":"You","Karşı":"Others","bağlı · v{v}":"connected · v{v}","sinyal yok — toplantıya Chrome'dan gir ya da sekmeyi yenile":"no signal — join the meeting in Chrome or reload the tab",
 "transkript paneli açık":"transcript panel open","canlı altyazı (konuşmacı adı olmayabilir)":"live captions (speaker names may be missing)","yalnız Whisper (ad için altyazıyı aç)":"Whisper only (turn on captions for names)",
 "toplantıdasın ama döküm/altyazı kapalı — ":"you're in a meeting but transcript/captions are off — ","toplantı yok":"no meeting","Whisper mikrofonunu yazıyor":"Whisper is transcribing your mic","mikrofon kanalı kapalı":"mic channel off",
-"Whisper toplantı sesini yazıyor":"Whisper is transcribing the meeting audio","karşı taraf sesi kapalı — toplantı sekmesinde Option + Shift + W":"other side's audio off — Option + Shift + W in the meeting tab",
+"Whisper toplantı sesini yazıyor":"Whisper is transcribing the meeting audio","Whisper toplantı sesini yazıyor (yerel yardımcı)":"Whisper is transcribing the meeting audio (local helper)","yerel yardımcı hazır — karşı taraf konuşunca yazılır":"local helper ready — transcribes when the other side speaks","Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses (şimdilik Option + Shift + W)":"System audio recording permission may be missing — System Settings → Privacy & Security → Screen & System Audio Recording → Suflor Ses (for now Option + Shift + W)","karşı taraf sesi kapalı — toplantı sekmesinde Option + Shift + W":"other side's audio off — Option + Shift + W in the meeting tab",
 "izliyor ({n} sn önce yokladı)":"watching (checked {n} s ago)","izlemiyor — Claude Code'da /toplanti":"not watching — run /toplanti in Claude Code",
 "Dil: ":"Language: ","Toplantıdasın ama satır gelmiyor — ":"You're in a meeting but no lines are coming in — ","altyazıyı aç":"turn on captions",
 "Mini pano açılamadı: açılır pencereye izin verin.":"Couldn't open the mini panel: allow pop-ups.","Claude son 1 dakikayı özetlesin":"Claude sums up the last minute","Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur":"Save the meeting screen as evidence; text in the box becomes its note",
@@ -1450,7 +1461,8 @@ function baglanti(s){
   const kay=ek&&x.panel?["ok",L("transkript paneli açık")]:ek&&x.captions?["ok",L("canlı altyazı (konuşmacı adı olmayabilir)")]:wak&&(w.ben||w.karsi)?["ok",L("yalnız Whisper (ad için altyazıyı aç)")]:ek&&x.call?["er",L("toplantıdasın ama döküm/altyazı kapalı — ")+yon]:["",L("toplantı yok")]
   out.push([L("Döküm"),kay[0],kay[1]])
   if(w.durum!=="yok"){out.push([L("Sen"),w.ben?"ok":(ek&&x.call?"wa":""),w.ben?L("Whisper mikrofonunu yazıyor"):(w.ben_neden||L("mikrofon kanalı kapalı"))+(w.hata?" ("+w.hata+")":"")])
-    out.push([L("Karşı"),w.karsi?"ok":(ek&&x.call?"wa":""),w.karsi?L("Whisper toplantı sesini yazıyor"):L("karşı taraf sesi kapalı — toplantı sekmesinde Option + Shift + W")])}
+    const yh=["bekliyor","dinliyor"].includes(w.yerel)  // v0.13.0: yerel ses yardımcısı
+    out.push([L("Karşı"),w.karsi?"ok":(ek&&x.call&&!yh?"wa":""),w.karsi?L(w.yerel_akiyor?"Whisper toplantı sesini yazıyor (yerel yardımcı)":"Whisper toplantı sesini yazıyor"):w.yerel==="izin"?L("Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses (şimdilik Option + Shift + W)"):yh?L("yerel yardımcı hazır — karşı taraf konuşunca yazılır"):L("karşı taraf sesi kapalı — toplantı sekmesinde Option + Shift + W")])}
   const ca=s.claude_age_s
   out.push(["Claude",ca!=null&&ca<30?"ok":(ca!=null&&ca<120?"wa":""),ca!=null&&ca<120?L("izliyor ({n} sn önce yokladı)",{n:ca}):L("izlemiyor — Claude Code'da /toplanti")])
   return out
@@ -1496,17 +1508,19 @@ document.getElementById("mini").onclick=openMini
   if(r.ok){m.value="";dd.textContent=L("Teşekkürler — gönderildi");setTimeout(()=>d.close(),1400)}else dd.textContent=L("Gönderilemedi — sonra yeniden denenecek")}}
 // v0.9.3: takvimden sıradaki toplantılar + panodan başlatma (Claude izlemiyorken görünür). Anahtar sunucu tarafından gömülür.
 const BAS_ANAHTAR="__BASLAT_ANAHTAR__"; let tkSecili=null, tkOlaylar=[]
+// v0.12.5: pano Chrome'da değilse (Safari varsayılan) toplantı ve hazırlık sekmesini aktarıcı Chrome'da açar — eklenti yalnız Chrome'da
+const CHROME=/Chrome\//.test(navigator.userAgent)&&!/Edg\/|OPR\//.test(navigator.userAgent), chromeAc=b=>j('/ac',{method:'POST',body:JSON.stringify(Object.assign({anahtar:BAS_ANAHTAR},b))}).catch(()=>{})
 function tkForm(o){tkSecili=o?o.id:null;const f=document.getElementById('tkf');f.hidden=false;document.getElementById('tkal').hidden=!(o&&o.baglanti);document.getElementById('tkk').value=o?o.baslik:'';document.getElementById('tkr').value=o&&o.ben_duzenleyen?'yurutucu':(o?'katilimci':'yurutucu');document.getElementById('tkd').value='tr';document.getElementById('tkm').textContent='';document.getElementById('tkk').focus()}
 document.getElementById('tke').onclick=()=>tkForm(null)
 document.getElementById('tki').onclick=()=>{document.getElementById('tkf').hidden=true}
-document.getElementById('tky2').onclick=ev=>{ev.preventDefault();const o=tkOlaylar.find(x=>x.id===tkSecili);if(o&&o.baglanti)window.open(o.baglanti,'_blank')}
+document.getElementById('tky2').onclick=ev=>{ev.preventDefault();const o=tkOlaylar.find(x=>x.id===tkSecili);if(o&&o.baglanti){if(CHROME)window.open(o.baglanti,'_blank');else chromeAc({olay:o.id})}}
 document.getElementById('tky').onclick=()=>{fetch('/takvim-yenile',{method:'POST',body:'{}'});document.getElementById('tkh').textContent=L('takvim yenileniyor…')}
 document.getElementById('tk').addEventListener('click',ev=>{const k=ev.target.closest('button[data-kat]');if(k&&/^https:\/\//.test(k.dataset.kat))return window.open(k.dataset.kat,'_blank');const b=ev.target.closest('button[data-bas]');if(b)tkForm(tkOlaylar.find(o=>o.id===b.dataset.bas))})
 document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=document.getElementById('tkm'),k=document.getElementById('tkk').value.trim();if(!k){m.className='er';m.textContent=L('Kişi ve konuyu yaz');return}
   b.disabled=true;m.className='';m.textContent=L('başlatılıyor…')
   // toplantı sekmesi tıklama anında açılır (yanıttan sonra açılırsa Chrome açılır pencere engelliyor), yanıt gelince bağlantıya gider
-  const o0=tkOlaylar.find(x=>x.id===tkSecili), w=o0&&o0.baglanti&&document.getElementById('tka').checked?window.open('/hazirlik','_blank'):null  // v0.9.5: hazırlık sekmesi, hazır olunca toplantıya geçer
-  try{const r=await j('/baslat',{method:'POST',body:JSON.stringify({olay:tkSecili,konu:k,rol:document.getElementById('tkr').value,dil:document.getElementById('tkd').value,anahtar:BAS_ANAHTAR})});if(r.err==='köken')r.err=L('Pano eski (aktarıcı güncellendi) — sayfayı yenileyip tekrar dene');if(w&&!r.ok)w.close();m.className=r.ok?'ok':'er';m.textContent=r.ok?L(w?"Başladı — hazırlık sekmesi Claude izleyince toplantıya geçer":"Başladı — Claude Terminal'de gündemi kurup izlemeye başlar"):(r.err||L('başlatılamadı'))}
+  const o0=tkOlaylar.find(x=>x.id===tkSecili), hz=o0&&o0.baglanti&&document.getElementById('tka').checked, w=hz&&CHROME?window.open('/hazirlik','_blank'):null  // v0.9.5: hazırlık sekmesi, hazır olunca toplantıya geçer
+  try{const r=await j('/baslat',{method:'POST',body:JSON.stringify({olay:tkSecili,konu:k,rol:document.getElementById('tkr').value,dil:document.getElementById('tkd').value,anahtar:BAS_ANAHTAR})});if(r.err==='köken')r.err=L('Pano eski (aktarıcı güncellendi) — sayfayı yenileyip tekrar dene');if(w&&!r.ok)w.close();if(hz&&!CHROME&&r.ok)chromeAc({hazirlik:true});m.className=r.ok?'ok':'er';m.textContent=r.ok?L(hz?"Başladı — hazırlık sekmesi Claude izleyince toplantıya geçer":"Başladı — Claude Terminal'de gündemi kurup izlemeye başlar"):(r.err||L('başlatılamadı'))}
   catch(e){if(w)w.close();m.className='er';m.textContent=L('aktarıcıya ulaşılamadı')}finally{setTimeout(()=>b.disabled=false,3000)}}
 function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks');sec.hidden=izliyor;if(izliyor)return
   tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh')
@@ -1595,6 +1609,65 @@ refresh();setInterval(refresh,2000)</script>
 })();
 </script></html>"""
 
+# --- v0.13.0: yerel ses yardımcısı ("Suflor Ses.app", ses-yardimcisi.swift) ----------------------------------------
+# Karşı tarafın sesini Core Audio process tap ile alır (Option + Shift + W gerekmez); mikrofon eklentide kalır. Aktarıcı yardımcıyı
+# başlatır ve nabzını izler (30 sn gelmezse yeniden açar). Yardımcı POST /ses-yerel ile gelir: Origin YOK (tarayıcı değil) +
+# X-Suflor-Anahtar (ses-anahtari.txt, 0600, aktarıcı yazar; komut satırında verilmez — diğer macOS hesabı ps ile görür). Ses yalnız
+# eklenti toplantı bildirirken (son 60 sn'de toplantı nabzı) işlenir; değilse {"bekle": true}. Ayar "yerel_ses": false kapatır.
+SES_APP = os.path.join(AYAR["uygulama"], "Suflor Ses.app")
+SES_KEY_FILE = os.path.join(AYAR["uygulama"], "ses-anahtari.txt")
+def _ses_anahtari():
+    try:
+        k = open(SES_KEY_FILE, encoding="utf-8").read().strip()
+        if len(k) >= 32: return k
+    except Exception: pass
+    k = secrets.token_hex(24); fd = os.open(SES_KEY_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f: f.write(k + "\n")
+    return k
+SES_KEY = _ses_anahtari()
+STATE["yerel_ses"] = {"durum": None, "nabiz_t": 0, "son": 0, "acildi": 0, "uygulama": None, "hata": None, "surum": None, "sifir_bas": None}
+def toplanti_var():  # eklenti son 60 sn'de toplantıda olduğunu bildirdi mi (iframe nabızları call=false gönderir, ayrı tutulur)
+    return time.time() - (STATE.get("_cagri_son") or 0) < 60
+def yerel_ses_durum():
+    # yok (kurulu değil) · kapali (ayar ya da nabız yok) · bekliyor (toplantı uygulaması mikrofonu kullanmıyor) · dinliyor · izin
+    y = STATE["yerel_ses"]; now = time.time()
+    if AYAR.get("yerel_ses") is False: return "kapali"
+    if not os.path.isdir(SES_APP): return "yok"
+    if now - y["nabiz_t"] > 20: return "kapali"
+    if y["durum"] == "dinliyor" and y["sifir_bas"] and now - y["sifir_bas"] > 60 and toplanti_var(): return "izin"  # 1 dk hep sıfır: izin yok olabilir
+    return y["durum"] or "kapali"
+def yerel_ses_view():
+    y = STATE["yerel_ses"]; now = time.time()
+    return {"durum": yerel_ses_durum(), "uygulama": y["uygulama"], "surum": y["surum"], "hata": y["hata"], "toplanti": toplanti_var(),
+            "son_sn": round(now - y["son"], 1) if y["son"] else None, "kurulu": os.path.isdir(SES_APP)}
+def yerel_ses_al(p):
+    y = STATE["yerel_ses"]; now = time.time()
+    if p.get("nabiz"):
+        once = yerel_ses_durum()
+        y.update(nabiz_t=now, durum=str(p.get("durum") or "")[:20] or None, uygulama=str(p.get("uygulama") or "")[:30] or None,
+                 surum=str(p.get("surum") or "")[:12] or None, hata=str(p.get("hata") or "")[:120] or None)
+        if y["durum"] != "dinliyor" or int(p.get("tepe") or 0) > 0: y["sifir_bas"] = None
+        elif not y["sifir_bas"]: y["sifir_bas"] = now
+        sonra = yerel_ses_durum()
+        if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else ""))
+        return {"ok": True, "toplanti": toplanti_var(), "tarayici": STATE.get("_tarayici") or "Chrome"}
+    if not toplanti_var(): return {"ok": True, "bekle": True}
+    y["son"] = now
+    return ses_al(dict(p, kanal="karsi", kaynak="yerel"))
+def _yerel_ses_dongu():
+    if AYAR.get("yerel_ses") is False: return
+    while True:
+        time.sleep(10)  # önce bekle: aktarıcı yeniden başladıysa çalışan yardımcının nabzı (5 sn) gelsin, boşuna kapatılmasın
+        y = STATE["yerel_ses"]; now = time.time()
+        if os.path.isdir(SES_APP) and now - y["nabiz_t"] > 30 and now - y["acildi"] > 60:
+            y["acildi"] = now
+            try:
+                # yanıt vermeyen eski kopya açıksa (open -a çalışanı yeniden açmaz) yalnız bu hesabınkini kapat
+                subprocess.run(["pkill", "-u", str(os.getuid()), "-x", "SuflorSes"], capture_output=True, timeout=5)
+                subprocess.run(["open", "-g", "-a", SES_APP, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE], capture_output=True, timeout=20)
+                print("YEREL SES: yardımcı başlatıldı")
+            except Exception as e: print(f"YEREL SES: hata başlatılamadı ({e})")
+
 # --- v0.9.3: takvim + panodan /toplanti başlatma ------------------------------------------------------------------
 # Mac Takvim (Takvim uygulamasına eklenmiş tüm hesaplar) "Suflor Takvim.app" yardımcısıyla okunur: aktarıcı 5 dk'da bir
 # çalıştırır, yardımcı takvim.json yazar (uygulama klasöründe; dizine girmez). Takvim izni yardımcıya verilir (ilk açılışta
@@ -1635,6 +1708,18 @@ def guvenli_baglanti(u):
     h = (x.hostname or "").lower()
     ok = x.scheme == "https" and (h in ("teams.microsoft.com", "teams.live.com", "teams.cloud.microsoft", "meet.google.com") or h == "zoom.us" or h.endswith(".zoom.us"))
     return str(u) if ok else None
+CHROME_APP = next((y for y in ("/Applications/Google Chrome.app", os.path.expanduser("~/Applications/Google Chrome.app")) if os.path.isdir(y)), None)
+def chrome_ac(p):
+    # v0.12.5 (kullanıcı, 3 Ekim denemesi): pano Safari'de açıkken takvimden toplantıya tıklayınca Teams Safari'de açıldı, eklenti
+    # sinyal vermedi. Varsayılan tarayıcı Safari kalır; toplantı bağlantısı ve hazırlık sekmesi Chrome'da açılır. Rastgele adres
+    # açılmaz: yalnız takvimdeki olayın (guvenli_baglanti'dan geçmiş) bağlantısı ya da kendi hazırlık sayfamız.
+    if p.get("hazirlik"): url = f"http://127.0.0.1:{A.port}/hazirlik"
+    else: url = (TAKVIM_TAM.get(str(p.get("olay") or "")) or {}).get("baglanti")
+    if not url: return {"ok": False, "err": "bağlantı yok"}
+    k = ["open", "-a", CHROME_APP, url] if CHROME_APP else ["open", url]
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): {' '.join(k[:-1])} <adres>"); return {"ok": True, "chrome": bool(CHROME_APP)}
+    subprocess.Popen(k, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return {"ok": True, "chrome": bool(CHROME_APP)}
 def takvim_view(tam=False):
     simdi = datetime.datetime.now().astimezone(); ol = []
     gece = simdi.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
@@ -1779,7 +1864,7 @@ class H(BaseHTTPRequestHandler):
         if self._koken() is None: return self._red()
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # v0.9.1: pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []  # v0.7.0
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []  # v0.8.1
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1831,6 +1916,11 @@ class H(BaseHTTPRequestHandler):
             if not (o in EKLENTI_KOKEN or pano):  # v0.12.3 (O4): başka eklenti Claude oturumu açtıramasın
                 print(f"KÖKEN: /baslat reddedildi · {o[:80] or '-'} (Suflor.me eklentisiyse kimliği ayara ekle: eklenti_kimlik)"); return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(baslat(p))
+        if self.path == "/ac":  # v0.12.5: takvim bağlantısı / hazırlık sekmesi Chrome'da — yalnız pano (anahtarla)
+            o = str(self.headers.get("Origin", ""))
+            if not (o in (f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}") and secrets.compare_digest(str(p.get("anahtar") or ""), BASLAT_KEY)):
+                return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(chrome_ac(p))
         if self.path == "/takvim-yenile":  # v0.9.3: panodaki ↻ — arka planda
             threading.Thread(target=takvim_yenile, daemon=True).start(); return self._json({"ok": True})
         if self.path == "/geri-bildirim":  # v0.12.0: panodan elle geri bildirim — kullanıcının metni + (isterse) teknik paket
@@ -1855,11 +1945,14 @@ class H(BaseHTTPRequestHandler):
             if p.get("tur") not in ("onemli", "ozet"): return self._json({"ok": False, "err": "tur: onemli | ozet"}, 400)
             komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"), "⌨ ")
             return self._json({"ok": True, "metin": STATE["komut"]["metin"]})
+        if self.path == "/ses-yerel":  # v0.13.0: yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar
+            if self.headers.get("Origin") or not secrets.compare_digest(self.headers.get("X-Suflor-Anahtar", ""), SES_KEY): return self._json({"ok": False, "err": "anahtar"}, 403)
+            return self._json(yerel_ses_al(p))
         if self.path == "/ses":  # v0.8.0: yalnız eklentiden (içerik betiği toplantı sitesi kökeniyle, offscreen chrome-extension:// ile)
             o = str(self.headers.get("Origin", ""))
             if not (o.startswith("chrome-extension://") or any(re.match(k, o) for k in PLATFORM_KOKEN)
                     or (os.environ.get("SUFLOR_TEST_KOKEN") and o == os.environ["SUFLOR_TEST_KOKEN"])): return self._json({"ok": False, "err": "köken"}, 403)  # test: sahte sayfa
-            return self._json(ses_al(p))
+            p.pop("kaynak", None); return self._json(ses_al(p))
         if self.path == "/olay":  # v0.8.0: eklentiden tanı satırı (kanıt hatası, Whisper kanalı açıldı/kapandı) → günlük
             print(f"EKLENTİ: {str(p.get('tur') or '?')[:40]} · {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})
         if self.path == "/agenda-aktif":  # v0.7.0: izle konuşulan gündem maddesini tahmin eder; pano ▶ gösterir (yalnız görünüm)
@@ -1870,6 +1963,9 @@ class H(BaseHTTPRequestHandler):
                 # ~7 dk kesinti vardı, nedeni (Chrome zamanlayıcı kısıtlaması mı, takılan istek mi) günlükten anlaşılmıyordu
                 simdi = time.time(); son = STATE.get("_ping_son") or 0; STATE["_ping_son"] = simdi
                 if 30 < simdi - son < 3600: print(f"EKLENTİ: nabız {round(simdi - son)} sn sonra geldi · {str(p.get('kim') or '?')[:20]} · sekme {str(p.get('vis') or '?')[:12]}")
+                if p.get("call") or p.get("panel") or p.get("captions"):  # v0.13.0: yerel ses yalnız toplantıdayken; tarayıcı yardımcıya ipucu
+                    ua = str(self.headers.get("User-Agent", "")); STATE["_cagri_son"] = simdi
+                    STATE["_tarayici"] = "Edge" if "Edg/" in ua else "Safari" if ("Safari/" in ua and "Chrome/" not in ua) else "Chrome"
                 if isinstance(p.get("mic"), dict): STATE["mic"] = {"on": bool(p["mic"].get("on")), "sessiz": bool(p["mic"].get("sessiz")), "hata": str(p["mic"].get("hata") or "")[:120], "t": simdi}
                 STATE["extension"] = {"ver": p.get("ver") or (STATE.get("extension") or {}).get("ver"), "seen": datetime.datetime.now().isoformat(timespec="seconds"), "panel": bool(p.get("panel")), "rows": p.get("rows", 0), "captions": bool(p.get("captions")), "call": bool(p.get("call")), "lang": p.get("lang") or p.get("capLang"), "langSrc": p.get("langSrc") or ("captions" if p.get("capLang") else None), "meeting": (p.get("meeting") or {}).get("title"), "sent": p.get("sent", 0), "capAuto": p.get("capAuto") or (STATE.get("extension") or {}).get("capAuto", ""), "platform": p.get("platform") or (STATE.get("extension") or {}).get("platform") or "teams", "yonerge": p.get("yonerge") or (STATE.get("extension") or {}).get("yonerge")}; heartbeat()  # v0.7.2: altyazıyı kendisi açma sonucu; iframe pingleri (all_frames) boş gönderir, üzerine yazmasın
             return self._json({"ok": True})
@@ -1886,6 +1982,7 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     restore_state(); load_cards()
     threading.Thread(target=_takvim_dongu, daemon=True).start()  # v0.9.3
+    threading.Thread(target=_yerel_ses_dongu, daemon=True).start()  # v0.13.0
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # v0.12.0: toplantı sonu teknik paketi
     print(f"Suflor.me aktarıcı çalışıyor → http://127.0.0.1:{A.port}/  · dosyalar: {BASE}"); heartbeat()
     class Sunucu(ThreadingHTTPServer):

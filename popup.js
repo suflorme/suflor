@@ -17,7 +17,7 @@ const EN = {"Bu Chrome'un yazdığı çalışma alanı":"The workspace this Chro
 "toplantı sekmesi yok":"no meeting tab","{p} · transkript açık":"{p} · transcript open","{p} · altyazı açık":"{p} · captions on","{p} · döküm/altyazı kapalı":"{p} · transcript/captions off",
 "{p} · toplantıda değil":"{p} · not in a meeting","Satır gelmiyor: ":"No lines coming in: ","altyazıyı aç":"turn on captions","Whisper kurulu değil":"Whisper not installed",
 "altyazıdan":"from captions","yazılıyor":"transcribing","toplantıda sessizdesin":"you're muted in the meeting","kapalı":"off",
-"Toplantı sekmesinde Option + Shift + W":"Option + Shift + W in the meeting tab","Aç":"Turn on","istendi…":"requested…","izliyor":"watching",
+"Toplantı sekmesinde Option + Shift + W":"Option + Shift + W in the meeting tab","yazılıyor (yerel yardımcı)":"transcribing (local helper)","yerel yardımcı hazır":"local helper ready","Sistem sesi kaydı izni yok olabilir (Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı)":"System audio recording permission may be missing (System Settings → Privacy & Security → Screen & System Audio Recording)","Aç":"Turn on","istendi…":"requested…","izliyor":"watching",
 "izlemiyor — /toplanti":"not watching — /toplanti","Dil: ":"Language: ","{n} satır aktarıcıya gönderilmeyi bekliyor.":"{n} lines waiting to be sent to the relay.",
 "Claude'a soruldu":"Asked Claude","Geçersiz aktarıcı adresi — yalnız http://127.0.0.1:<port> ya da http://localhost:<port>; varsayılan kullanılıyor.":"Invalid relay address — only http://127.0.0.1:<port> or http://localhost:<port>; using the default.","Not kaydedildi":"Note saved","Aktarıcıya ulaşılamadı":"Can't reach the relay"};
 function L(s, v) { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; }
@@ -91,7 +91,9 @@ async function durum() {
   if (w.durum === "yok") { satir("sn", "", L("Whisper kurulu değil")); satir("kr", "", L("altyazıdan")); }
   else {
     satir("sn", w.ben ? "ok" : (ek && x.call ? "wa" : ""), L(w.ben ? "yazılıyor" : (t && t.whisper && t.whisper.sessiz ? "toplantıda sessizdesin" : "kapalı")));
-    if (w.karsi) satir("kr", "ok", L("yazılıyor"));
+    if (w.karsi) satir("kr", "ok", L(w.yerel_akiyor ? "yazılıyor (yerel yardımcı)" : "yazılıyor"));
+    else if (["bekliyor", "dinliyor"].includes(w.yerel)) satir("kr", "", L("yerel yardımcı hazır"));  // v0.13.0
+    else if (w.yerel === "izin") satir("kr", "wa", L("Sistem sesi kaydı izni yok olabilir (Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı)"), [L("Aç"), () => { chrome.runtime.sendMessage({ type: "whisperKarsi" }); satir("kr", "wa", L("istendi…")); }]);
     else satir("kr", ek && x.call ? "wa" : "", L("Toplantı sekmesinde Option + Shift + W"), [L("Aç"), () => { chrome.runtime.sendMessage({ type: "whisperKarsi" }); satir("kr", "wa", L("istendi…")); }]);
   }
   const ca = s.claude_age_s;

@@ -113,7 +113,7 @@ _DURUMLAR = {"kapali", "yukleniyor", "hazir", "yok", "hata", "zaman_asimi", "bek
 SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim"},
          "kategori": {"whisper", "ses_modeli", "disk", "eklenti", "nabiz", "takvim", "baslat", "sozluk"},  # relay.py SORUN_RX
          "kaynak": {"aktarici", "claude"}, "platform": {"teams", "meet", "zoom"}, "rol": {"yurutucu", "katilimci", "dinleyici"},
-         "dil": {"tr", "en", "karisik"}, "arayuz": {"tr", "en"}, "durum": _DURUMLAR, "whisper": _DURUMLAR, "ses_modeli": _DURUMLAR,
+         "dil": {"tr", "en", "karisik"}, "arayuz": {"tr", "en"}, "durum": _DURUMLAR, "whisper": _DURUMLAR, "ses_modeli": _DURUMLAR, "yerel_ses": {"yok", "kapali", "bekliyor", "dinliyor", "izin"},  # v0.13.0
          "sebep": set(),  # bugün üreten kod yok
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"}}
 # v0.12.3 (D1b): sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için

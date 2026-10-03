@@ -23,8 +23,12 @@ Olaylarda `<ad>`: ayar dosyasındaki `ad`ın ilk sözcüğü (kullanıcı); Whis
   onun adı, yoksa "Karşı taraf". Whisper akarken o tarafın altyazısı `.altyazi.log`'a gider (çift satır yok); Whisper 90 sn
   satır üretmezse altyazı yeniden yazılır. Dil: `agenda.json` `dil` (tr/en; karisik → Whisper seçer); terimler sözlükten istem.
   10 dk ses gelmezse işçi kapanır (bellek); ilk satırda ~3 sn yükleme. Ses diske yazılmaz.
-- `izle` DURUM: `WHISPER … <ad> ✓ · karşı taraf ✗ (…)` (✗ ise yanında nedeni) — karşı ✗ ve altyazı da kapalıysa karşı tarafın satırları gelmez:
-  kullanıcıya bir kez `dikkat` kartı "Karşı tarafın sesi için ⌥⇧W". Whisper akarken DİL uyarısı gelmez (Teams dil ayarı önemsiz).
+- `izle` DURUM: `WHISPER … <ad> ✓ · karşı taraf ✗ (…)` — v0.13.0: karşı sesi önce yerel ses yardımcısı (Suflor Ses) alır.
+  `karşı taraf ✓ (yerel yardımcı)` normal. `✗ (yerel yardımcı hazır …)` → kart yok (karşı taraf henüz konuşmadı). `✗ (… Sistem sesi kaydı izni
+  yok olabilir …)` → bir kez `dikkat` kartı "Sistem sesi kaydı izni: Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses; şimdilik
+  Option + Shift + W". Yalnız `✗ (karşı ses kapalı — Option + Shift + W …)` (yardımcı yok/kapalı) ve altyazı da kapalıysa karşı
+  tarafın satırları gelmez: kullanıcıya bir kez `dikkat` kartı "Karşı tarafın sesi için Option + Shift + W". Whisper akarken DİL uyarısı
+  gelmez (Teams dil ayarı önemsiz).
 - **Ses komutuyla kanıt:** kullanıcı "ekran kaydı alalım / ekran görüntüsü al / kanıt alayım" gibi istek kipinde söyleyince
   (yalnız kullanıcı, 60 sn'de bir) aktarıcı kanıt ister; `KANIT n … · ses` olarak gelir, not alanında cümle ("ses: …"). Diğer
   KANIT olaylarıyla aynı işlem. Şerit 📷, pano 📷 ve Option + Shift + K aynen çalışır; 📷 hataları artık günlükte (`EKLENTİ: kanit · …`). v0.8.6: Teams
@@ -195,7 +199,8 @@ adımlar orada, kurallar burada). Port, klasörler ve kullanıcı adı ayar dosy
        Canlı altyazı". Toplantı başlamadan (lobi) gelebilir; ilk satırlar gelince kendiliğinden düzelir. v0.7.2: eklenti ~12 sn'de altyazıyı kendisi
        açmayı dener (öğrenilmiş yol, yoksa metinle); açamazsa DURUM'a "altyazıyı kendisi açamadı (…)" eklenir ve kullanıcıya
        Teams'te "bir kez elle aç, yolu öğrenirim" çıkar — o zaman dikkat kartında da "bir kez elle aç" de.
-5. Toplantı bitince (panel kapanır, 5 dk satır gelmez): Monitor'ü durdur, `…/_canli/<dosya>.md` üzerinden özet
+5. Toplantı bitince (panel kapanır, 5 dk satır gelmez): Monitor'ü durdur; v0.12.6: önce `dokum --kim "<kişi>"` (proje
+   klasörüne `<alan>-<kişi>-transkript-<YYYYMMDD>.md` + `.vtt`, Teams dökümüne gerek yok), sonra `…/_canli/<dosya>.md` üzerinden özet
    taslağı çıkar (kararlar, açık kalan gündem, yapılan/geçilen kartlar, takip işleri, v0.6.0: `acik` listesindeki
    cevapsız sorular, konuşma payı tek satır; v0.7.0: kanıtlar, esas belge önerileri, karne) ve kullanıcıya sun.
    - **Kanıtlar (v0.7.0):** `kanit` listesi + açıklamalar; açıklaması olmayanları Read ile aç ve yaz. kullanıcıya hangilerinin

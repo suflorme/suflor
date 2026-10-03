@@ -465,7 +465,8 @@
       else if (!v.komut && komutSon === undefined) komutSon = null;
       // v0.8.0: Whisper durumu; karşı tarafın sesi henüz verilmediyse toplantı başına bir kez ⌥⇧W hatırlatması
       whisperView = v.whisper || null;
-      if (whisperView && cfg.whisper && whisperView.durum !== "yok" && inCall() && !whisperView.karsi && karsiIpucu !== meetingInfo().title) {
+      // v0.13.0: yerel ses yardımcısı açıksa (bekliyor/dinliyor) karşı sesi o alır — hatırlatma yok
+      if (whisperView && cfg.whisper && whisperView.durum !== "yok" && inCall() && !whisperView.karsi && !["bekliyor", "dinliyor"].includes(whisperView.yerel) && karsiIpucu !== meetingInfo().title) {
         karsiIpucu = meetingInfo().title; toast(L("Suflor.me Whisper: senin sesin yazılıyor. Karşı tarafın sesi için bir kez Option + Shift + W'ye bas (ya da Suflor.me simgesi → Karşı taraf)"), "#1b6ef3", 12000);
       }
       const cards = v.cards || [], qs = v.questions || [], live = inMeeting();

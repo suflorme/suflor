@@ -78,6 +78,10 @@ hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi")
 ks = sub.add_parser("karsilastir", help="v0.7.2: Teams dökümü (.vtt/.docx/.txt) ile Suflor.me dökümünü karşılaştır")
 ks.add_argument("teams", help="Teams'ten indirilen döküm dosyası"); ks.add_argument("dosya", nargs="?", help="Suflor.me .md/.jsonl (yoksa en yenisi)")
 ks.add_argument("--n", type=int, default=12, help="en çok kaç kaçan bölüm listelensin"); ks.add_argument("--kaydet", action="store_true")
+dk = sub.add_parser("dokum", help="v0.12.6: temiz döküm dosyası (.md + .vtt) → <proje>/gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>")
+dk.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); dk.add_argument("--kim", default=None, help="dosya adındaki kişi/konu (yoksa toplantı başlığı)")
+dk.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)"); dk.add_argument("--uzerine", action="store_true", help="var olan dosyanın üzerine yaz")
+dk.add_argument("--goster", action="store_true", help="yazmadan .md'yi yazdır")
 kz = sub.add_parser("kesinlik", help="v0.8.3: toplantıda kesin söylenmeyen iddialar (özet için)"); kz.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)")
 kc = sub.add_parser("koc", help="v0.8.3: kullanıcının konuşma koçluğu (toplantı sonu)"); kc.add_argument("dosya", nargs="?")
 an = sub.add_parser("anlar", help="v0.8.3: öne çıkan anlar (toplantı sonu)"); an.add_argument("dosya", nargs="?"); an.add_argument("--n", type=int, default=5)
@@ -725,7 +729,10 @@ def izle():
             x = s.get("extension") or {}; ticks = s.get("agenda_ticks") or {}
             wv = s.get("whisper") or {}; wak = wv.get("durum") in ("hazir", "yukleniyor") and (wv.get("ben") or wv.get("karsi"))  # v0.8.0
             state = ("eklenti bağlı" if (x.get("age_s") is not None and x["age_s"] < 30) else "EKLENTİ SİNYALİ YOK") + \
-                    ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + ("✓" if wv.get("karsi") else "✗ (karşı ses kapalı — Option + Shift + W; karşı tarafın satırları " + ("altyazıdan" if (x.get("panel") or x.get("captions")) else "GELMİYOR") + ")")) if wak else
+                    ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + (("✓ (yerel yardımcı)" if wv.get("yerel_akiyor") else "✓") if wv.get("karsi") else  # v0.13.0: yerel ses yardımcısı
+                     "✗ (yerel yardımcı hazır, karşı ses henüz gelmedi — kart gönderme)" if wv.get("yerel") in ("bekliyor", "dinliyor") else
+                     "✗ (yerel yardımcıda Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses; şimdilik Option + Shift + W)" if wv.get("yerel") == "izin" else
+                     "✗ (karşı ses kapalı — Option + Shift + W; karşı tarafın satırları " + ("altyazıdan" if (x.get("panel") or x.get("captions")) else "GELMİYOR") + ")")) if wak else
                      (" · panel açık" if x.get("panel") else (" · YALNIZ ALTYAZI (konuşmacı adı olmayabilir; özette kişiye bağlama)" if x.get("captions") else
                      (f" · ⚠ TOPLANTIDA ama döküm/altyazı kapalı — satır gelmiyor ({PLATFORM_AD.get(x.get('platform'), 'Teams')}'te kullanıcıya uyarı çıktı; 2 dk sürerse dikkat kartı: \"{(x.get('yonerge') or {}).get('altyazi') or 'Diğer → Dil ve konuşma → Canlı altyazı'}\")" if x.get("call") else " · panel kapalı")))) + \
                     (f" · ⚠ WHISPER {wv['durum']}: {wv.get('hata')}" if wv.get("durum") == "hata" else "") + \
@@ -830,7 +837,9 @@ def toplanti_dosyasi(ad=None):
     if ad: return os.path.basename(ad).replace(".jsonl", ".md")
     try:
         f = get("/status").get("file")
-        if f: return f
+        # v0.12.5 (3 Ekim geri bildirimi): aynı kullanıcı ikinci kez katılınca aktarıcı yalnız altyazı günlüğü olan yeni bir
+        # "toplantı" açtı; rapor onu seçip boş çıktı. Dökümü (.jsonl) olmayan dosya seçilmez, en son dökümlü toplantıya düşülür.
+        if f and os.path.exists(os.path.join(A.dir, f.replace(".md", ".jsonl"))): return f
     except Exception: pass
     jls = sorted((f for f in os.listdir(A.dir) if f.endswith(".jsonl") and f[:2] == "20"), key=lambda f: os.path.getmtime(os.path.join(A.dir, f)))
     return jls[-1].replace(".jsonl", ".md") if jls else None
@@ -1038,6 +1047,97 @@ def teams_oku(yol):
     bitir()
     if any(x[0] is not None for x in out): out = [x for x in out if x[0] is not None]  # başlık/tarih satırları (ilk konuşmacıdan önce)
     return [x for x in out if x[2]]
+# --- v0.12.6: Suflor.me'nin kendi döküm dosyası ---------------------------------------------------------------------------
+# Kullanıcı (3 Ekim): "Altyazı/döküm dosyası için neden Teams'e ihtiyaç duyuyoruz?" Satırlar zaten yerel Whisper'dan, saniyeli
+# (t0/t1) ve konuşmacılı; Teams'in indirilen dökümü yerine toplantı sonunda proje klasörüne temiz döküm yazılır. .md okunur ve
+# proje aramasına girer; .vtt standart altyazı (Teams'inkiyle aynı biçim, karsilastir ve oynatıcılar okur). Aktarıcı yazamaz
+# (launchd Masaüstü'ne erişemez) — /toplanti bitişinde Claude çalıştırır. Ses, duygu ve ölçüm alanları girmez; kanıt ve notlar işaret.
+def toplanti_basligi(md):  # .md'nin başlığı; yoksa (v0.12.5 öncesi başlıksız dosyalar) dosya adından
+    try:
+        m = re.match(r"# Canlı transkript — (.+)$", open(os.path.join(A.dir, md), encoding="utf-8").readline().strip())
+        if m: return m.group(1)
+    except OSError: pass
+    return re.sub(r"^\d{4}-\d\d-\d\d-\d{4}-", "", md[:-3]).replace("-", " ")
+def dokum_satirlari(md):
+    son, sira, ek = {}, [], []
+    for r in kayitlar(md):
+        if "text" in r:
+            if r.get("id") not in son: sira.append(r.get("id"))
+            son[r.get("id")] = r  # Teams dökümü satırı düzeltebilir (revised): son sürüm geçer
+        elif "kanit" in r or "note" in r: ek.append(r)
+    def an(r):
+        if r.get("t0"): return float(r["t0"])
+        z = zaman(r.get("seen") or r.get("at")); return z.timestamp() if z else None
+    out = []
+    for i in sira:
+        r = son[i]; t = (r.get("text") or "").strip(); b = an(r)
+        if not t or b is None: continue
+        bt = float(r["t1"]) if r.get("t1") else None
+        kim = (r.get("speaker") or "").strip()
+        out.append({"t": b, "t1": bt, "kim": kim if kim and kim != "?" else "Bilinmeyen konuşmacı", "metin": t, "src": r.get("src") or r.get("source") or "?"})
+    for r in ek:
+        b = an(r)
+        if b is None: continue
+        if "kanit" in r: out.append({"t": b, "isaret": f"📷 Kanıt {r.get('n', '?')}" + (f" — {r['not']}" if r.get("not") and not str(r["not"]).startswith("ses:") else "")})
+        else: out.append({"t": b, "isaret": "📝 " + str(r.get("note") or "").strip()[:300]})
+    out.sort(key=lambda x: x["t"])
+    for k, x in enumerate(out):  # bitiş: Whisper'ın t1'i, yoksa sonraki satır (en çok 8 sn) ya da kelime başına ~0,4 sn
+        if "metin" in x and not x.get("t1"):
+            sonraki = next((y["t"] for y in out[k + 1:] if "metin" in y), None)
+            x["t1"] = min(sonraki or 1e18, x["t"] + max(1.5, min(8, 0.4 * len(x["metin"].split()))))
+    return out
+def dokum_cmd():
+    md = toplanti_dosyasi(A.dosya)
+    if not md: sys.exit("toplantı dosyası yok")
+    md = os.path.basename(md).replace(".jsonl", ".md")
+    sat = dokum_satirlari(md); met = [x for x in sat if "metin" in x]
+    if not met: sys.exit(f"{md}: dökümde satır yok")
+    baslik = toplanti_basligi(md)
+    t0, t1 = met[0]["t"], max(x["t1"] for x in met)
+    bas = datetime.datetime.fromtimestamp(t0).astimezone(); bit = datetime.datetime.fromtimestamp(t1).astimezone()
+    kisi = {}; kay = {}
+    for x in met: kisi[x["kim"]] = kisi.get(x["kim"], 0) + 1; kay[x["src"]] = kay.get(x["src"], 0) + 1
+    AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+    KAY = {"whisper": "yerel Whisper", "transcript": "Teams dökümü", "caption": "Teams altyazısı", "captions": "Teams altyazısı"}
+    L = [f"# Döküm — {baslik}", "",
+         "İç belge, kişi adı içerir. " + ("Suflor.me'nin kendi dökümü: yerel Whisper, ses Mac dışına çıkmadı." if set(kay) == {"whisper"} else
+                                           f"Suflor.me dökümü — kaynak: {', '.join(f'{KAY.get(k, k)} {n}' for k, n in kay.items())} satır."),
+         f"{bas.day} {AYLAR[bas.month - 1]} {bas.year}, {bas:%H:%M}–{bit:%H:%M} ({round((t1 - t0) / 60)} dk) · {len(met)} satır · "
+         + ", ".join(f"{k} {n}" for k, n in sorted(kisi.items(), key=lambda kv: -kv[1])),
+         "Saatler yerel saat. \"Karşı taraf n\": ses izinden ayrılan, adı bulunamayan konuşmacı; \"Bilinmeyen konuşmacı\": altyazıda ad yoktu. Kaynak: `_canli/" + md + "`", ""]
+    paragraf = None
+    def yaz():
+        if paragraf: L.extend([f"**[{datetime.datetime.fromtimestamp(paragraf['t']).astimezone():%H:%M:%S}] {paragraf['kim']}:** " + " ".join(paragraf["m"]), ""])
+    for x in sat:
+        if "isaret" in x:
+            yaz(); paragraf = None
+            L.extend([f"> {datetime.datetime.fromtimestamp(x['t']).astimezone():%H:%M:%S} · {x['isaret']}", ""]); continue
+        # aynı konuşmacının ardışık satırları (arada ≤ 15 sn, paragraf ≤ ~700 karakter) tek paragraf — Teams'in parça parça satırları okunmaz
+        if paragraf and paragraf["kim"] == x["kim"] and x["t"] - paragraf["son"] <= 15 and sum(len(m) for m in paragraf["m"]) < 700:
+            paragraf["m"].append(x["metin"]); paragraf["son"] = x["t1"]; continue
+        yaz(); paragraf = {"t": x["t"], "kim": x["kim"], "m": [x["metin"]], "son": x["t1"]}
+    yaz()
+    metin_md = "\n".join(L).rstrip() + "\n"
+    if A.goster: print(metin_md); return
+    def vz(s):
+        s = max(0.0, s); return f"{int(s // 3600):02d}:{int(s % 3600 // 60):02d}:{s % 60:06.3f}"
+    esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("-->", "→")
+    V = ["WEBVTT", f"NOTE {esc(baslik)} · {bas:%Y-%m-%d %H:%M} · Suflor.me (iç belge, kişi adı içerir)", ""]
+    for k, x in enumerate(met, 1):
+        V.extend([f"{k}", f"{vz(x['t'] - t0)} --> {vz(max(x['t1'], x['t'] + 0.5) - t0)}", f"<v {esc(x['kim'])}>{esc(x['metin'])}</v>", ""])
+    kim = A.kim or baslik
+    kim = re.sub(r"[^\w-]+", "-", kim, flags=re.UNICODE).strip("-")[:60] or "toplanti"
+    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(os.path.expanduser(AYAR["proje"]), "gorusmeler"), os.path.expanduser(AYAR["proje"])) if os.path.isdir(y))
+    os.makedirs(hedef, exist_ok=True)
+    kok = os.path.join(hedef, f"{AYAR.get('alan') or 'Suflor'}-{kim}-transkript-{bas:%Y%m%d}")
+    var = [y for y in (kok + ".md", kok + ".vtt") if os.path.exists(y)]
+    if var and not A.uzerine: sys.exit("zaten var (üzerine yazmak için --uzerine): " + ", ".join(var))
+    for y, m in ((kok + ".md", metin_md), (kok + ".vtt", "\n".join(V))):
+        tmp = y + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f: f.write(m)
+        os.replace(tmp, y)
+    print(f"Döküm yazıldı: {kok}.md · .vtt — {len(met)} satır, {round((t1 - t0) / 60)} dk, " + ", ".join(f"{k} {n}" for k, n in kisi.items()))
+
 def karsilastir_cmd():
     import baglam, difflib
     if not os.path.exists(A.teams): sys.exit(f"dosya yok: {A.teams}")
@@ -1209,6 +1309,9 @@ def saglik_cmd():  # v0.8.5: toplantıdan önce tek bakış; ⚠ satırları kul
     sat(wok and wv.get("durum") not in ("yok", "hata"), f"Whisper {'kurulu' if wok else 'KURULU DEĞİL'} · durum {wv.get('durum') or '?'}" + (f" · {wv.get('hata')}" if wv.get("hata") else ""), os.path.join(AYAR.get("kod") or "<kod klasörü>", "modeller-kur.command"))
     sok = os.path.exists(os.path.join(M, "ses-venv", "bin", "python")) and os.path.exists(os.path.join(M, "ses-modeller", "emotion2vec_plus_base", "model.pt")) and os.path.exists(os.path.join(APP, "ses-isci.py"))
     sat(sok and wv.get("ses_model") not in ("yok", "hata"), f"ses modeli (duygu + konuşmacı ayırma) {'kurulu' if sok else 'KURULU DEĞİL'} · durum {wv.get('ses_model') or '?'}", "modeller-kur.command, sonra aktarici-kur.command")
+    ys = (s or {}).get("yerel_ses") or {}  # v0.13.0: karşı sesi alan yerel yardımcı (Suflor Ses)
+    if ys: sat(ys.get("durum") in ("bekliyor", "dinliyor"), f"ses yardımcısı (karşı ses) {ys.get('durum')}" + (f" v{ys['surum']}" if ys.get("surum") else "") + (f" · {ys['hata']}" if ys.get("hata") else ""),
+               {"yok": "aktarici-kur.command derler (macOS 14.4+, swiftc)", "izin": "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses"}.get(ys.get("durum"), "aktarıcı 30 sn içinde yeniden açar; sürerse aktarici-kur.command — o zamana kadar Option + Shift + W"))
     try:
         vm = sp_.run(["vm_stat"], capture_output=True, text=True).stdout; sayfa = int(re.search(r"page size of (\d+)", vm).group(1))
         bos = sum(int(re.search(rf"{k}:\s+(\d+)", vm).group(1)) for k in ("Pages free", "Pages inactive", "Pages speculative", "Pages purgeable")) * sayfa / 2 ** 30
@@ -1257,9 +1360,7 @@ def _calistir(fn, **kw):
 def rapor_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
-    rs = kayitlar(md); baslik = ""
-    try: baslik = re.sub(r"^# Canlı transkript — ", "", open(os.path.join(A.dir, md), encoding="utf-8").readline().strip())
-    except OSError: pass
+    rs = kayitlar(md); baslik = toplanti_basligi(md)
     ort = lambda t: (t.replace(baslik, "<toplantı>") if baslik else t).replace(md[:-3], "<dosya>").replace(os.path.expanduser("~"), "~")
     try: st = get("/status")
     except Exception: st = {}
@@ -1371,5 +1472,5 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "karne": karne_cmd, "hazirlik": hazirlik_cmd,
-     "karsilastir": karsilastir_cmd, "kesinlik": kesinlik_cmd, "koc": koc_cmd, "anlar": anlar_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "geri-bildirim": geri_bildirim_cmd}[A.cmd]()
+     "karsilastir": karsilastir_cmd, "kesinlik": kesinlik_cmd, "koc": koc_cmd, "anlar": anlar_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

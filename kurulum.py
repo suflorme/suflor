@@ -223,7 +223,7 @@ def ac(hedef):
     elif hedef == "chrome-eklentiler": subprocess.Popen(["open", "-a", "Google Chrome", "chrome://extensions"])
     elif hedef == "eklenti-klasoru": subprocess.Popen(["open", "-R", os.path.join(KOD, "manifest.json")])
     elif hedef == "pano" and a.get("port"):
-        subprocess.Popen(["open", f"http://127.0.0.1:{a['port']}/?tur"]); threading.Timer(3, lambda: os._exit(0)).start()
+        subprocess.Popen(["open"] + (["-a", "Google Chrome"] if os.path.isdir("/Applications/Google Chrome.app") else []) + [f"http://127.0.0.1:{a['port']}/?tur"])  # v0.12.5: pano Chrome'da; threading.Timer(3, lambda: os._exit(0)).start()
 def klasor_sec():
     r = sh("osascript", "-e", 'POSIX path of (choose folder with prompt "Suflor.me proje klasörü")', zaman=300)
     return r.rstrip("/") if r else None
