@@ -36,7 +36,7 @@ class _Saatli:
         try: self.st.flush()
         except Exception: pass
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.10.1"  # sürüm geçmişi: git log
+SURUM = "0.11.1"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -1326,7 +1326,60 @@ document.querySelectorAll('#ag input').forEach(c=>c.onchange=()=>fetch('/agenda-
 wireBox(document.getElementById("n"),document.getElementById("b"))
 document.getElementById("oz").onclick=ev=>sendOzet(ev.currentTarget)
 document.getElementById("kz").onclick=ev=>sendKanit(ev.currentTarget,document.getElementById("n"))
-refresh();setInterval(refresh,2000)</script></html>"""
+refresh();setInterval(refresh,2000)</script>
+<style>
+/* v0.11.1: tanıtım turu (kurulumdan sonra ?tur ile; bir kez) — vurgulanan bölüm + baloncuk */
+#tur-perde{position:fixed;inset:0;z-index:9997;background:rgba(12,18,15,.46);transition:clip-path .35s cubic-bezier(.2,.7,.2,1)}
+#tur-vurgu{position:fixed;z-index:9998;border-radius:10px;box-shadow:0 0 0 2px #c9973a;pointer-events:none;transition:all .35s cubic-bezier(.2,.7,.2,1)}
+#tur-balon{position:fixed;z-index:9999;width:min(320px,calc(100vw - 32px));background:var(--s1);color:var(--tx);border-radius:14px;padding:16px 16px 12px;
+  box-shadow:0 18px 50px rgba(0,0,0,.28);font:13.5px/1.5 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;transition:top .35s,left .35s}
+#tur-balon b{display:block;font-size:15px;font-weight:600;margin-bottom:4px}
+#tur-balon p{margin:0;color:var(--t2)}
+#tur-balon .ta{display:flex;align-items:center;gap:8px;margin-top:14px}
+#tur-balon .ta span{flex:1;font:11px/1 ui-monospace,Menlo,monospace;color:var(--t3)}
+#tur-balon button{border:0;border-radius:999px;padding:7px 14px;font:500 13px/1 inherit;cursor:pointer;background:transparent;color:var(--t2)}
+#tur-balon button.ile{background:#175e46;color:#fff}
+#tur-balon::before{content:"";position:absolute;width:12px;height:12px;background:var(--s1);transform:rotate(45deg);left:var(--ok-x,24px)}
+#tur-balon.alt::before{top:-6px} #tur-balon.ust::before{bottom:-6px}
+@media (prefers-reduced-motion:reduce){#tur-perde,#tur-vurgu,#tur-balon{transition:none}}
+</style>
+<script>
+(()=>{
+  const ADIM=[
+    ["#conn","Bağlantılar","Eklenti, döküm, senin sesin, karşı tarafın sesi ve Claude. Yeşil nokta çalışıyor demek; üzerine gelince ne olduğunu söyler."],
+    ["#tks","Bugünkü toplantılar","Toplantıdan önce Başlat'a bas: Claude hazırlanır, gündemi kurar, sonra toplantıya katılırsın."],
+    ["main","Döküm","Toplantı başlayınca konuşma burada akar. Soluk satırlar henüz kesinleşmemiş taslaktır, birkaç saniyede yerini alır."],
+    ["#kc","Şimdi","Claude'un kartları: Sor, Belirt, Dikkat… ✓ yaptım, Okudum ya da ✕ gerek yok; Claude bu dönüşlerden öğrenir."],
+    ["#ag","Gündem","Claude konuşulan maddeyi işaretler; sen de tikleyebilirsin. Kalan süre ve kayma buna göre hesaplanır."],
+    ["#n","Tek kutu","Yazdığın not olur. ?, soru, Claude ya da iki boşlukla başlarsan Claude'a soru olur ve birkaç saniyede kartla cevaplanır."],
+    ["#oz","Son 1 dakika ve kanıt","Kaçırdığın anı Claude'a özetlet ya da toplantı ekranını kanıt olarak kaydet. Teams'te: Option + Shift + O ve Option + Shift + K."],
+    ["#mini","Mini pano","Teams'in yanında her zaman üstte duran küçük pencere: kartlar, son satırlar ve tek kutu. Tek ekranla çalışırken Teams'in yanına koy.","mini"]];
+  const q=new URLSearchParams(location.search); let gor=false; try{gor=localStorage.getItem("suflorTur")==="1"}catch(e){}
+  if(!q.has("tur")&&gor) return;
+  if(!q.has("tur")) return;  // yalnız kurulumdan sonra (sihirbaz ?tur ile açar) ya da elle ?tur
+  let i=0, v, b, pd;
+  const gorunur=sel=>{const e=document.querySelector(sel);if(!e)return null;const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.closest("[hidden]")?e:null};
+  const liste=()=>ADIM.filter(a=>gorunur(a[0]));
+  function kapat(){v&&v.remove();b&&b.remove();pd&&pd.remove();window.removeEventListener("resize",yerlestir);document.removeEventListener("keydown",tus);
+    try{localStorage.setItem("suflorTur","1")}catch(e){} history.replaceState(null,"",location.pathname)}
+  function yerlestir(){const L=liste();if(!L.length){kapat();return} i=Math.max(0,Math.min(i,L.length-1));const [sel,bas,ac]=L[i];
+    const e=document.querySelector(sel); e.scrollIntoView({block:"nearest"}); const r=e.getBoundingClientRect(), p=6;
+    Object.assign(v.style,{left:(r.left-p)+"px",top:(r.top-p)+"px",width:(r.width+2*p)+"px",height:(r.height+2*p)+"px"});
+    const x1=r.left-p,y1=r.top-p,x2=r.right+p,y2=r.bottom+p;  // perdede vurgulanan bölüm kadar delik (evenodd)
+    pd.style.clipPath=`polygon(evenodd,0 0,100% 0,100% 100%,0 100%,0 0,${x1}px ${y1}px,${x1}px ${y2}px,${x2}px ${y2}px,${x2}px ${y1}px,${x1}px ${y1}px)`;
+    b.innerHTML=`<b>${bas}</b><p>${ac}</p><div class=ta><span>${i+1} / ${L.length}</span>${i?'<button data-t=geri>Geri</button>':'<button data-t=kapat>Turu kapat</button>'}<button class=ile data-t=ileri>${i===L.length-1?(L[i][3]==="mini"?'Mini panoyu aç':'Bitir'):'İleri'}</button></div>`;
+    const W=b.offsetWidth,H=b.offsetHeight, alta=r.bottom+p+14+H<innerHeight;
+    const x=Math.max(16,Math.min(innerWidth-W-16,r.left+r.width/2-W/2)), y=alta?r.bottom+p+12:Math.max(16,r.top-p-12-H);
+    b.className=alta?"alt":"ust"; Object.assign(b.style,{left:x+"px",top:y+"px"}); b.style.setProperty("--ok-x",Math.max(14,Math.min(W-26,r.left+r.width/2-x-6))+"px");
+    b.querySelector(".ile").focus({preventScroll:true})}
+  function tus(e){if(e.key==="Escape")kapat();else if(e.key==="ArrowRight"||e.key==="Enter"){e.preventDefault();ileri()}else if(e.key==="ArrowLeft"&&i){i--;yerlestir()}}
+  function ileri(){const L=liste();if(i>=L.length-1){const m=L[i][3]==="mini";kapat();if(m)openMini()}else{i++;yerlestir()}}  // tıklama içinde: açılır pencere izni
+  function basla(){pd=document.createElement("div");pd.id="tur-perde";pd.onclick=()=>{};document.body.append(pd);v=document.createElement("div");v.id="tur-vurgu";b=document.createElement("div");b.id="tur-balon";b.setAttribute("role","dialog");b.setAttribute("aria-label","Suflor.me tanıtım turu");
+    document.body.append(v,b);b.addEventListener("click",e=>{const t=e.target.dataset.t;if(t==="ileri")ileri();else if(t==="geri"){i--;yerlestir()}else if(t==="kapat")kapat()});
+    window.addEventListener("resize",yerlestir);document.addEventListener("keydown",tus);yerlestir()}
+  setTimeout(basla,1200);  // pano ilk verisini çizsin (takvim bölümü görünür olsun)
+})();
+</script></html>"""
 
 # --- v0.9.3: takvim + panodan /toplanti başlatma ------------------------------------------------------------------
 # Mac Takvim (Takvim uygulamasına eklenmiş tüm hesaplar) "Suflor Takvim.app" yardımcısıyla okunur: aktarıcı 5 dk'da bir
@@ -1353,11 +1406,11 @@ def takvim_view(tam=False):
     simdi = datetime.datetime.now().astimezone(); ol = []
     gece = simdi.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
     for e in TAKVIM_TAM.values():
-        if e.get("tum_gun"): continue
+        if e.get("tum_gun") or f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []): continue  # ayar: izlenmeyen takvimler
         try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
         except (KeyError, ValueError): continue
         if s_ < simdi or b >= gece: continue  # v0.10.1 (kullanıcı): bugün içindekiler — sürenler ve gün sonuna kadar başlayacaklar
-        v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "yer")}
+        v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "hesap", "yer")}
         if v["ben_duzenleyen"] is None and not e.get("duzenleyen") and not e.get("kisi_sayisi"): v["ben_duzenleyen"] = True  # davetlisiz kendi etkinliğin
         v.update(saat=b.strftime("%H:%M"), bitis_saat=s_.strftime("%H:%M"), dk=round((b - simdi).total_seconds() / 60), suruyor=b <= simdi < s_,
                  katilimcilar=(e.get("katilimcilar") or [])[:30 if tam else 6], notlar_var=bool(e.get("notlar")))
