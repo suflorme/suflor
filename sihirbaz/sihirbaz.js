@@ -48,6 +48,10 @@
       tanidim_b: "Seni böyle tanıdım", tanidim_a: "Claude anlattıklarından bir çalışma notu çıkardı. Düzeltebilirsin; toplantıda kartlar buna göre yazılır.",
       tanidim_bekle: "Claude notunu hazırlıyor…", tanidim_yok: "Claude bağlı değil; notu kendin yazabilir ya da sonra tamamlayabilirsin.",
       tanidim_not: "Çalışma notu", tanidim_terim: "Öğrendiğim adlar ve terimler",
+      paylas_b: "Gelişmesine yardım et", paylas_a: "Suflor.me beta sürümünde. Bir şey aksarsa teknik bilgisi geliştiriciye gitsin mi? Toplantılarının içeriği hiçbir zaman bu Mac'ten çıkmaz.",
+      p_gider: "Gider", p_gider_a: "Sürümler, Mac modeli, hata türü ve kodun neresinde olduğu, gecikmeler ve sayılar (kaç satır, kaç kart).",
+      p_gitmez: "Asla gitmez", p_gitmez_a: "Döküm, kişi ve toplantı adları, kartlar, notlar, takvimin, belgelerin.",
+      p_evet: "Paylaş", p_hayir: "Paylaşma", p_not: "Sonradan ayarlardan değiştirebilirsin. Panodaki Geri bildirim düğmesi her zaman çalışır.",
       kur_b: "Kuruyorum", kur_a: "Ayarlarını yazıyor, arka plan hizmetini ve takvim yardımcısını kuruyorum.",
       k_ayar: "Ayarlar", k_proje: "Proje klasörü", k_not: "Çalışma notu ve sözlük", k_aktarici: "Arka plan hizmeti", k_modeller: "Konuşma tanıma modelleri",
       takvim_b: "Takvimini bağlayalım", takvim_a: "Toplantından birkaç dakika önce hatırlatır, gündemi ve katılımcıları davetten alır.",
@@ -109,6 +113,10 @@
       tanidim_b: "Here's how I see you", tanidim_a: "Claude drafted a working note from your answers. Edit it freely; cards in meetings follow it.",
       tanidim_bekle: "Claude is drafting your note…", tanidim_yok: "Claude isn't connected; write the note yourself or finish it later.",
       tanidim_not: "Working note", tanidim_terim: "Names and terms I picked up",
+      paylas_b: "Help make it better", paylas_a: "Suflor.me is in beta. If something breaks, may its technical details go to the developer? Your meeting content never leaves this Mac.",
+      p_gider: "Sent", p_gider_a: "Versions, Mac model, error type and where in the code it happened, delays and counts (how many lines, how many cards).",
+      p_gitmez: "Never sent", p_gitmez_a: "Transcripts, names of people and meetings, cards, notes, your calendar, your documents.",
+      p_evet: "Share", p_hayir: "Don't share", p_not: "You can change this later in settings. The Feedback button on the panel always works.",
       kur_b: "Setting up", kur_a: "Writing your settings and installing the background service and calendar helper.",
       k_ayar: "Settings", k_proje: "Project folder", k_not: "Working note and glossary", k_aktarici: "Background service", k_modeller: "Speech recognition models",
       takvim_b: "Connect your calendar", takvim_a: "It reminds you a few minutes before a meeting and takes the agenda and attendees from the invitation.",
@@ -237,6 +245,10 @@
         return `<div class="ozet"><h3>${esc(t.tanidim_not)}</h3><textarea id="profil_metin" data-cevap="profil_metin">${esc(C.profil_metin || "")}</textarea>
           ${C.kartsiz || D.profilDurum === "yok" ? `<div class="ipucu">${esc(t.tanidim_yok)}</div>` : ""}</div>
           ${(C.terimler || []).length ? `<div class="alan"><span class="etiket">${esc(t.tanidim_terim)}</span><div class="yongalar">${C.terimler.map(x => yonga("terim", x, !(C.terim_cikar || []).includes(x))).join("")}</div></div>` : ""}`; } },
+    { id: "paylas", simge: "isaret", b: "paylas_b", a: "paylas_a", hazir: () => typeof C.teshis === "boolean",
+      icerik: () => `<div class="liste">${satir("iyi", t.p_gider, t.p_gider_a)}${satir("kotu", t.p_gitmez, t.p_gitmez_a)}</div>
+        <div class="yongalar" style="justify-content:center">${yonga("teshis", t.p_evet, C.teshis === true)}${yonga("teshis", t.p_hayir, C.teshis === false)}</div>
+        <p class="dipnot">${esc(t.p_not)}</p>` },
     { id: "kur", simge: "kur", b: "kur_b", a: "kur_a", hazir: () => { const k = D.kurDurum || {}; return k.ayar === "iyi" && k.aktarici === "iyi"; },
       gir: async () => { D.kurDurum = { ayar: "bekle", proje: "bekle", not: "bekle", aktarici: "bekle" }; ciz();
         try { D.kurDurum = await api("kur/tamamla", { cevap: C, dil: D.dil }); } catch (e) { D.kurDurum = { ...D.kurDurum, hata: String(e.message || e) }; } await durumAl(); ciz(); },
@@ -312,7 +324,7 @@
     const y = e.target.closest(".yonga");
     if (y) {
       const g = y.dataset.grup, v = y.dataset.deger, on = y.getAttribute("aria-pressed") !== "true";
-      if (g === "alan") { C.is_alani = v; } else {
+      if (g === "alan") { C.is_alani = v; } else if (g === "teshis") { C.teshis = v === t.p_evet; } else {
         const anahtar = { arac: "araclar", terim: "terim_cikar", takvim: "takvim_cikar" }[g]; const l = new Set(C[anahtar] || []);
         if (g === "arac" ? on : !on) l.add(v); else l.delete(v); C[anahtar] = [...l];
       }

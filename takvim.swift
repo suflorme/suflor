@@ -32,7 +32,9 @@ func yaz(_ o: [String: Any]) {
 }
 
 // Toplantı bağlantısı: konum, adres alanı ya da davet metnindeki ilk Teams / Zoom / Meet adresi
-let baglantiRe = try! NSRegularExpression(pattern: "https://(teams\\.microsoft\\.com/l/meetup-join|teams\\.live\\.com/meet|teams\\.microsoft\\.com/meet|[a-z0-9.-]*zoom\\.us/(j|my|w)/|meet\\.google\\.com/)[^\\s<>\")]*", options: [.caseInsensitive])
+// v0.12.3 (güvenlik denetimi D2): alan adı tam eşleşir — eskiden [a-z0-9.-]*zoom\.us "evilzoom.us"u da kabul ediyordu.
+// Zoom yalnız zoom.us ya da alt alanı (us02web.zoom.us); ardından hemen "/" gelmeli (zoom.us.evil.com, @ ile kullanıcı adı geçmez).
+let baglantiRe = try! NSRegularExpression(pattern: "https://(teams\\.microsoft\\.com/l/meetup-join/|teams\\.microsoft\\.com/meet/|teams\\.live\\.com/meet/|teams\\.cloud\\.microsoft/|([a-z0-9-]+\\.)*zoom\\.us/(j|my|w)/|meet\\.google\\.com/)[^\\s<>\")]*", options: [.caseInsensitive])
 func baglanti(_ metinler: [String?]) -> String? {
   for m in metinler {
     guard let m = m, !m.isEmpty else { continue }
@@ -41,10 +43,10 @@ func baglanti(_ metinler: [String?]) -> String? {
   return nil
 }
 func platform(_ u: String?) -> String? {
-  guard let u = u?.lowercased() else { return nil }
-  if u.contains("teams.") { return "teams" }
-  if u.contains("zoom.us") { return "zoom" }
-  if u.contains("meet.google") { return "meet" }
+  guard let u = u, let h = URL(string: u)?.host?.lowercased() else { return nil }
+  if ["teams.microsoft.com", "teams.live.com", "teams.cloud.microsoft"].contains(h) { return "teams" }
+  if h == "zoom.us" || h.hasSuffix(".zoom.us") { return "zoom" }
+  if h == "meet.google.com" { return "meet" }
   return nil
 }
 

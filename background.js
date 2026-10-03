@@ -1,5 +1,21 @@
 // Servis çalışanı: rozet (badge), bildirim, v0.7.0 kanıt ekran görüntüsü
 let state = { ok: null, at: 0, meeting: "", failCount: 0, queued: 0 };
+// v0.12.2: arayüz dili (tr/en) — bildirim ve şerit toast metinleri. İçerik betiği ve popup aktarıcının /status "arayuz_dili"
+// alanını chrome.storage.local "dil"e yazar; burada yalnız okunur (yoksa "tr"). Aktarıcıya giden metinler (/olay) çevrilmez.
+let DIL = "tr";
+chrome.storage.local.get({ dil: "tr" }, v => { DIL = v.dil === "en" ? "en" : "tr"; });
+chrome.storage.onChanged.addListener((ch, alan) => { if (alan === "local" && ch.dil) DIL = ch.dil.newValue === "en" ? "en" : "tr"; });
+const EN = {"Suflor.me — hassas ifade":"Suflor.me — sensitive phrase","⭐ işaretlenemedi: ":"⭐ couldn't be marked: ","Özet istenemedi: ":"Couldn't request a summary: ",
+  "aktarıcıya ulaşılamadı (127.0.0.1:8765)":"can't reach the relay (127.0.0.1:8765)","Açık toplantı sekmesi yok (Teams).":"No open meeting tab (Teams).",
+  "Çalışma alanı seçilmedi — Suflor.me simgesine tıklayıp seç.":"No workspace selected — click the Suflor.me icon and pick one.",
+  "🎙 Karşı tarafın sesi zaten yazılıyor":"🎙 The other side's audio is already being transcribed",
+  "Toplantı sekmesini öne getirdim — karşı tarafın sesi için Option + Shift + W'ye bir kez daha bas":"I brought the meeting tab to the front — press Option + Shift + W once more for the other side's audio",
+  "🎙 Whisper: karşı tarafın sesi de yazılıyor":"🎙 Whisper: the other side's audio is now being transcribed too","Whisper karşı taraf açılamadı: ":"Couldn't start Whisper for the other side: ",
+  "Suflor.me — kanıt kaydedilemedi":"Suflor.me — couldn't save evidence","Toplantı penceresi simge durumunda — pencereyi açıp tekrar dene.":"The meeting window is minimised — restore it and try again.",
+  "Aktarıcıya ulaşılamadı (çalışma alanının aktarıcısı kapalı).":"Can't reach the relay (this workspace's relay is off).",
+  "{n} dk sonra başlıyor":"Starts in {n} min","Başlıyor":"Starting",". Suflor.me'yi başlatayım mı?":". Start Suflor.me?","Suflor.me'yi başlat":"Start Suflor.me","Panoyu aç":"Open panel",
+  "Suflor.me başlatılamadı":"Couldn't start Suflor.me","bilinmiyor":"unknown"};
+function L(s, v) { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; }
 // v0.9.0: toplantı sekmesi adresleri manifest'ten — platform dosyası (platform-*.js) yükleyen içerik betiği girdileri.
 // Yeni platform yalnız manifest'e eklenir. tabs.query kalıbında port olmaz (test sayfası 127.0.0.1:8797 → 127.0.0.1).
 const TOPLANTI_URL = [...new Set(chrome.runtime.getManifest().content_scripts
@@ -12,7 +28,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     chrome.action.setBadgeText({ text: queued ? String(Math.min(queued, 99)) : (msg.ok ? "●" : "!") });
     chrome.action.setBadgeBackgroundColor({ color: queued ? "#b00020" : (msg.ok ? "#1b8a3a" : "#b00020") });
   }
-  if (msg.type === "flag") { chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me — hassas ifade", message: (msg.flags || []).join(", ") + ": " + (msg.text || "").slice(0, 120) }); }
+  if (msg.type === "flag") { chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me — hassas ifade"), message: (msg.flags || []).join(", ") + ": " + (msg.text || "").slice(0, 120) }); }
   if (msg.type === "kanit") kanit(sender.tab, msg.kaynak, msg.istek, msg.not);
   if (msg.type === "whisperKarsi") karsiBaslat(null, "popup");       // v0.8.0: popup düğmesi (eklenti çağrıldı: izin var)
   if (msg.type === "whisperKarsiDur") offDur();                       // toplantıdan çıkıldı
@@ -28,7 +44,7 @@ async function komut(tur) {
     const r = await fetch((await relayAdr()) + "/komut", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur }) });
     if (!r.ok) throw new Error("aktarıcı HTTP " + r.status);
   } catch (e) {
-    chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me", message: (tur === "onemli" ? "⭐ işaretlenemedi: " : "Özet istenemedi: ") + (/Failed to fetch/i.test(String(e)) ? "aktarıcıya ulaşılamadı (127.0.0.1:8765)" : String(e.message || e)) });
+    chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me", message: L(tur === "onemli" ? "⭐ işaretlenemedi: " : "Özet istenemedi: ") + (/Failed to fetch/i.test(String(e)) ? L("aktarıcıya ulaşılamadı (127.0.0.1:8765)") : L(String(e.message || e))) });
   }
 }
 
@@ -43,37 +59,40 @@ async function offscreenAc() {
 function bilgi(tab, text, renk, ms) { if (tab) chrome.tabs.sendMessage(tab.id, { type: "bilgi", text, renk, ms }, { frameId: 0 }).catch(() => {}); }
 // v0.9.2: adres önce bu tarayıcının yerel ayarından (çalışma alanı seçimi), yoksa eski eşitlenen ayardan
 // Seçim yoksa aktarıcılar yoklanır: tek aktarıcı → o; birden fazla → hata (yanlış alana kanıt yazılmasın); hiç yok → eski ayar.
+// v0.12.3 (güvenlik denetimi O3): aktarıcı adresi yalnız bu Mac (127.0.0.1/localhost, port 1024–65535) — döküm başka yere gitmesin
+const RELAY_VARSAYILAN = "http://127.0.0.1:8765";
+function relayGecerli(a) { const m = /^http:\/\/(127\.0\.0\.1|localhost):(\d{4,5})\/?$/.exec(String(a || "").trim()); return m && +m[2] >= 1024 && +m[2] <= 65535 ? `http://${m[1]}:${m[2]}` : null; }
 async function relayAdr() {
-  const l = (await chrome.storage.local.get({ relay: null })).relay; if (l) return l;
+  const l = relayGecerli((await chrome.storage.local.get({ relay: null })).relay); if (l) return l;
   const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
   if (bul.length > 1) throw new Error("Çalışma alanı seçilmedi — Suflor.me simgesine tıklayıp seç.");
-  return bul[0] || (await chrome.storage.sync.get({ relay: "http://127.0.0.1:8765" })).relay;
+  return bul[0] || relayGecerli((await chrome.storage.sync.get({ relay: RELAY_VARSAYILAN })).relay) || RELAY_VARSAYILAN;
 }
 async function karsiBaslat(hint, kaynak) {
   const tab = await toplantiSekmesi(hint);
-  if (!tab) return chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me Whisper", message: "Açık toplantı sekmesi yok (Teams)." });
-  let relay; try { relay = await relayAdr(); } catch (e) { return bilgi(tab, e.message, "#b26a00", 10000); }  // v0.9.2: alan seçilmedi
+  if (!tab) return chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me Whisper", message: L("Açık toplantı sekmesi yok (Teams).") });
+  let relay; try { relay = await relayAdr(); } catch (e) { return bilgi(tab, L(e.message), "#b26a00", 10000); }  // v0.9.2: alan seçilmedi
   const olay = metin => fetch(relay + "/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur: "whisper-karsi", metin }) }).catch(() => {});
   // v0.8.6 (2 Ekim denemesi): ikinci basış "Cannot capture a tab with an active stream" kırmızısı veriyordu — zaten açık
-  if (karsiTab === tab.id) return bilgi(tab, "🎙 Karşı tarafın sesi zaten yazılıyor", "#1b8a3a", 3000);
+  if (karsiTab === tab.id) return bilgi(tab, L("🎙 Karşı tarafın sesi zaten yazılıyor"), "#1b8a3a", 3000);
   try {
     let id;
     try { id = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }); }
     catch (e) {
       // Chrome yalnız eklentinin çağrıldığı (öndeki) sekmeyi verir. Teams sekmesi arkadaysa öne getir, bir kez daha bastır.
-      if (/active stream/i.test(String(e))) { karsiTab = tab.id; return bilgi(tab, "🎙 Karşı tarafın sesi zaten yazılıyor", "#1b8a3a", 3000); }
+      if (/active stream/i.test(String(e))) { karsiTab = tab.id; return bilgi(tab, L("🎙 Karşı tarafın sesi zaten yazılıyor"), "#1b8a3a", 3000); }
       if (tab.active) throw e;
       await chrome.tabs.update(tab.id, { active: true }); await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
-      bilgi(tab, "Toplantı sekmesini öne getirdim — karşı tarafın sesi için Option + Shift + W'ye bir kez daha bas", "#1b6ef3", 10000);
+      bilgi(tab, L("Toplantı sekmesini öne getirdim — karşı tarafın sesi için Option + Shift + W'ye bir kez daha bas"), "#1b6ef3", 10000);
       return olay(`öne getirildi (${kaynak}): Teams sekmesi arkadaydı, ikinci basış bekleniyor`);
     }
     await offscreenAc();
     const title = (tab.title || "").replace(/^\(\d+\)\s*/, "").split("|").map(x => x.trim()).filter(Boolean).slice(-2, -1)[0] || "Toplantı";
     chrome.runtime.sendMessage({ type: "offBasla", id, relay, title }).catch(() => {});
-    karsiTab = tab.id; bilgi(tab, "🎙 Whisper: karşı tarafın sesi de yazılıyor", "#1b8a3a", 4000);
+    karsiTab = tab.id; bilgi(tab, L("🎙 Whisper: karşı tarafın sesi de yazılıyor"), "#1b8a3a", 4000);
   } catch (e) {
     const err = String(e.message || e).slice(0, 160);
-    bilgi(tab, "Whisper karşı taraf açılamadı: " + err, "#b00020", 8000);
+    bilgi(tab, L("Whisper karşı taraf açılamadı: ") + err, "#b00020", 8000);
     olay(`açılamadı (${kaynak}): ${err}`);
   }
 }
@@ -97,9 +116,9 @@ async function toplantiSekmesi(hint) {
   return (act.length ? act : tabs).sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
 }
 function hata(tab, err) {
-  kanitOlay("hata: " + err);
-  chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me — kanıt kaydedilemedi", message: err });
-  if (tab) chrome.tabs.sendMessage(tab.id, { type: "kanitBitti", ok: false, err }, { frameId: 0 }).catch(() => {});
+  kanitOlay("hata: " + err);  // aktarıcı günlüğüne Türkçe; kullanıcıya gösterilen hâli L() ile
+  chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me — kanıt kaydedilemedi"), message: L(err) });
+  if (tab) chrome.tabs.sendMessage(tab.id, { type: "kanitBitti", ok: false, err: L(err) }, { frameId: 0 }).catch(() => {});
 }
 // v0.8.0: 1 Ekim 22:5x şerit 📷 kanıtı aktarıcıya hiç ulaşmadı (günlükte iz yok) — olası neden: yanıtlanmayan bir mesaj
 // "busy"yi kilitli bıraktı. Artık 15 sn'de kilit açılır, şeridin hazırlık yanıtı 1,5 sn beklenir, her hata günlüğe gider.
@@ -169,8 +188,8 @@ async function takvimBak() {
       if (o.dk > 5 || o.dk < -2 || bildirilen.has(o.id)) continue;
       bildirilen.add(o.id);
       chrome.notifications.create("tk:" + o.id, { type: "basic", iconUrl: "icons/128.png", requireInteraction: true, priority: 2,
-        title: `${o.saat} · ${o.baslik}`.slice(0, 80), message: (o.dk > 0 ? `${o.dk} dk sonra başlıyor` : "Başlıyor") + (o.platform ? ` (${({ teams: "Teams", meet: "Google Meet", zoom: "Zoom" })[o.platform] || o.platform})` : "") + ". Suflor.me'yi başlatayım mı?",
-        buttons: [{ title: "Suflor.me'yi başlat" }, { title: "Panoyu aç" }] });
+        title: `${o.saat} · ${o.baslik}`.slice(0, 80), message: (o.dk > 0 ? L("{n} dk sonra başlıyor", { n: o.dk }) : L("Başlıyor")) + (o.platform ? ` (${({ teams: "Teams", meet: "Google Meet", zoom: "Zoom" })[o.platform] || o.platform})` : "") + L(". Suflor.me'yi başlatayım mı?"),
+        buttons: [{ title: L("Suflor.me'yi başlat") }, { title: L("Panoyu aç") }] });
     }
   } catch (e) { /* aktarıcı kapalı ya da alan seçilmedi */ }
 }
@@ -190,6 +209,6 @@ chrome.notifications.onButtonClicked.addListener(async (id, i) => {
     const r = await (await fetch(relay + "/baslat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ olay: id.slice(3) }) })).json();
     // v0.9.5: hazırlık sekmesi — Claude izlemeye başlayınca (en geç 3 dk / toplantı saatinde) kendisi toplantıya geçer
     if (r.ok) chrome.tabs.create({ url: relay + "/hazirlik" });
-    if (!r.ok) chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me başlatılamadı", message: r.err || "bilinmiyor" });
-  } catch (e) { chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me başlatılamadı", message: String(e.message || e).slice(0, 160) }); }
+    if (!r.ok) chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me başlatılamadı"), message: r.err || L("bilinmiyor") });
+  } catch (e) { chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me başlatılamadı"), message: L(String(e.message || e).slice(0, 160)) }); }
 });

@@ -163,7 +163,8 @@ def tamamla(c, dil):
               "rol": c.get("rol") or "", "sirket": c.get("sirket") or "", "is_alani": c.get("is_alani") or "", "kartsiz": bool(c.get("kartsiz")),
               "ek_sistem": list(dict.fromkeys((eski.get("ek_sistem") or []) + araclar)),
               "whisper_terimler": list(dict.fromkeys((eski.get("whisper_terimler") or []) + araclar + kisiler + terimler))[:60],
-              "takvim_haric": [x for x in (c.get("takvim_cikar") or [])]})
+              "takvim_haric": [x for x in (c.get("takvim_cikar") or [])],
+              "teshis": c.get("teshis") is True})  # v0.12.0 beta teşhis izni (teshis.py; adres teshis_adres ya da varsayılan)
     a.setdefault("claude_model", "sonnet")
     try: yaz_json(AYAR_YOL, a); sonuc["ayar"] = "iyi"
     except Exception as e: sonuc.update(ayar="kotu", hata=f"Ayar yazılamadı: {e}"); return sonuc
@@ -238,7 +239,11 @@ class H(BaseHTTPRequestHandler):
     def _kaynak(self):
         o = self.headers.get("Origin") or self.headers.get("Referer") or ""
         return not o or o.startswith((f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}"))
+    def _host(self):
+        # v0.12.3 (güvenlik denetimi D6): DNS rebinding — başka alan adı 127.0.0.1'e çözülse de Host başlığı o alan adı olur
+        return (self.headers.get("Host") or "").lower() in (f"127.0.0.1:{A.port}", f"localhost:{A.port}")
     def do_GET(self):
+        if not self._host(): return self._json({"hata": "host"}, 403)
         yol = self.path.split("?")[0]
         if yol == "/api/durum":
             a = ayar()
@@ -254,6 +259,7 @@ class H(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(b))); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(b); return
         self._json({"hata": "yok"}, 404)
     def do_POST(self):
+        if not self._host(): return self._json({"hata": "host"}, 403)
         if not self._kaynak(): return self._json({"hata": "köken"}, 403)  # yalnız sihirbaz sayfası
         yol, _, sorgu = self.path.partition("?"); n = int(self.headers.get("Content-Length") or 0); govde = self.rfile.read(n) if n else b""
         if yol == "/api/yukle":

@@ -114,7 +114,13 @@
   }
   globalThis.SuflorPlatform = {
     ad: "teams", etiket: "Teams",
-    yonerge: { altyazi: "Diğer (…) → Dil ve konuşma → Canlı altyazıyı aç", dokum: "Diğer → Kaydet ve transkript → Transkripti göster" },
+    // v0.12.2: kullanıcıya gösterilen yönerge arayüz diline göre (çekirdek P.dil'i "tr"/"en" yapar). Yalnız gösterilen metin;
+    // Teams menüsünü bulan kalıplar (altyaziAdimlari, seçiciler) Teams'in kendi diline bağlıdır, burada çevrilmez.
+    dil: "tr",
+    YONERGE: {
+      tr: { altyazi: "Diğer (…) → Dil ve konuşma → Canlı altyazıyı aç", dokum: "Diğer → Kaydet ve transkript → Transkripti göster" },
+      en: { altyazi: "More (…) → Language and speech → Turn on live captions", dokum: "More → Record and transcribe → Show transcript" } },
+    get yonerge() { return this.YONERGE[this.dil] || this.YONERGE.tr; },
     kur(yard) { Y = yard; },
     SKIP_RE, toplantiAdi, cagrida, micDugme, sessizMi, dokumPaneli, dokumSatirSayisi, dokumOku, altyaziKutusu, altyaziVar, altyaziOku,
     altyaziAdimlari: [  // metinle bulma: [seçici, metin/aria kalıbı]

@@ -45,6 +45,8 @@ cp "$SRC/relay.py" "$APP/relay.py"
 cp "$SRC/ses-isci.py" "$APP/ses-isci.py"  # v0.8.4: duygu modeli + konuşmacı ayırma (ses-venv, ses-modeller ayrıca kurulu olmalı)
 cp "$SRC/whisper-isci.py" "$APP/whisper-isci.py"  # v0.8.0: yerel konuşma tanıma işçisi (whisper-venv ayrıca kurulu olmalı)
 # v0.11.3: pano ve hazırlık sayfası marka yazı tiplerini ve işareti aktarıcının yanından verir (launchd Masaüstü'nü okuyamaz)
+# v0.12.0: beta teşhis süzgeci + sözlüğü (kodun kendi günlük metinlerinden üretilir)
+cp "$SRC/teshis.py" "$APP/teshis.py"; PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$SRC/teshis.py" --sozluk "$SRC" > "$APP/teshis-sozluk.txt" 2>/dev/null || true
 mkdir -p "$APP/marka/yazi"; cp "$SRC"/marka/*.svg "$APP/marka/" 2>/dev/null || true; cp "$SRC"/marka/yazi/*.woff2 "$APP/marka/yazi/" 2>/dev/null || true
 # v0.9.3: takvim yardımcısı (Mac Takvim → takvim.json). Kaynak değiştiyse derlenir; takvim izni uygulamaya verilir (ilk açılışta sorulur).
 TAK="$APP/Suflor Takvim.app"
@@ -61,9 +63,22 @@ if command -v swiftc >/dev/null && { [ ! -x "$TAK/Contents/MacOS/SuflorTakvim" ]
   <key>NSCalendarsUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak için takvimini okur. Hiçbir şey değiştirmez.</string>
 </dict></plist>
 PL
-  if swiftc -O -o "$TAK/Contents/MacOS/SuflorTakvim" "$SRC/takvim.swift" 2>/tmp/suflor-takvim-derleme.log; then
-    codesign -s - --force "$TAK" >/dev/null 2>&1 || true; echo "Takvim yardımcısı derlendi: $TAK"
-  else echo "UYARI: takvim yardımcısı derlenemedi (/tmp/suflor-takvim-derleme.log) — takvim özelliği kapalı kalır"; fi
+  # v0.12.3 (güvenlik denetimi D3): derleme günlüğü sabit /tmp yolunda değil, kullanıcının geçici klasöründe benzersiz dosyada
+  DLOG="$(mktemp "${TMPDIR:-/tmp}/suflor-takvim-derleme.XXXXXX")" || DLOG=/dev/null
+  if swiftc -O -o "$TAK/Contents/MacOS/SuflorTakvim" "$SRC/takvim.swift" 2>"$DLOG"; then
+    echo "Takvim yardımcısı derlendi: $TAK"; [ "$DLOG" = /dev/null ] || rm -f "$DLOG"
+  else echo "UYARI: takvim yardımcısı derlenemedi ($DLOG) — takvim özelliği kapalı kalır"; fi
+fi
+# v0.12.4: kalıcı yerel imza (yerel-imza.sh) — geçici imza her derlemede değişip takvim iznini düşürüyordu. Uygulama başka
+# imzayla imzalıysa (eski kurulum ya da yeni derleme) yeniden imzalanır; kimlik bir kez değişir, sonra hep aynı kalır.
+if [ -x "$TAK/Contents/MacOS/SuflorTakvim" ]; then
+  . "$SRC/yerel-imza.sh"; IMZA="$(yerel_imza)"
+  if [ "$IMZA" = "-" ] || ! codesign -dv --verbose=2 "$TAK" 2>&1 | grep -q "^Authority=$IMZA\$"; then
+    if codesign -s "$IMZA" --force "$TAK" >/dev/null 2>&1; then
+      [ "$IMZA" = "-" ] && echo "UYARI: yerel imza kurulamadı — geçici imza; takvim izni her derlemede yeniden istenebilir" \
+        || echo "Takvim yardımcısı kalıcı yerel imzayla imzalandı — takvim iznini bir kez yeniden ver (Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler)"
+    fi
+  fi
 fi
 
 cat > "$PL" <<EOF
