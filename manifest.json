@@ -1,0 +1,100 @@
+{
+  "manifest_version": 3,
+  "name": "Suflor.me — canlı toplantı asistanı",
+  "version": "0.10.0",
+  "description": "Toplantıyı canlı yazıya döker (Teams; Meet ve Zoom web sırada), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
+  "permissions": [
+    "storage",
+    "notifications",
+    "activeTab",
+    "tabCapture",
+    "offscreen",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://teams.microsoft.com/*",
+    "https://teams.cloud.microsoft/*",
+    "https://teams.live.com/*",
+    "http://127.0.0.1:8765/*",
+    "http://localhost:8765/*",
+    "<all_urls>"
+  ],
+  "commands": {
+    "kanit": {
+      "suggested_key": {
+        "default": "Alt+Shift+K",
+        "mac": "Alt+Shift+K"
+      },
+      "description": "Kanıt: Teams ekranının görüntüsünü kaydet"
+    },
+    "whisper": {
+      "suggested_key": {
+        "default": "Alt+Shift+W",
+        "mac": "Alt+Shift+W"
+      },
+      "description": "Whisper: karşı tarafın sesini (Teams sekmesi) yerel konuşma tanımaya ver"
+    },
+    "onemli": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "⭐ Önemli an: şu anı özette öne çıkar"
+    },
+    "ozet": {
+      "suggested_key": {
+        "default": "Alt+Shift+O",
+        "mac": "Alt+Shift+O"
+      },
+      "description": "Son 1 dakikanın özetini Claude'dan iste"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://teams.microsoft.com/*",
+        "https://teams.cloud.microsoft/*",
+        "https://teams.live.com/*"
+      ],
+      "all_frames": true,
+      "js": [
+        "platform-teams.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://teams.microsoft.com/*",
+        "https://teams.cloud.microsoft/*",
+        "https://teams.live.com/*"
+      ],
+      "js": [
+        "mic-main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://teams.microsoft.com/dl/launcher/*"
+      ],
+      "js": [
+        "launcher.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Suflor.me"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
+}
