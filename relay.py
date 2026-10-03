@@ -36,7 +36,7 @@ class _Saatli:
         try: self.st.flush()
         except Exception: pass
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.10.0"  # sürüm geçmişi: git log
+SURUM = "0.10.1"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -159,7 +159,10 @@ def load_cards():
 def cards_view():
     # v0.7.0 (kullanıcı): pano yeniden açılınca önceki toplantının kartları görünmez — yalnız süren toplantının (aktif dosya)
     # ve henüz dosyası belli olmayan (PRE'de bekleyen) kartlar
-    af = aktif_dosya(); bu = lambda r: r.get("file") is None or r.get("file") == af
+    # v0.10.1: dosyası belli olmayan kayıt (toplantı dışında sorulan soru, PRE kartı) yalnız 30 dk görünür — yoksa eski bir
+    # "test" sorusu panoda ve şeritte süresiz "1 soru bekliyor" diye kalıyordu
+    af = aktif_dosya(); yeni = lambda r: (datetime.datetime.now() - datetime.datetime.fromisoformat(r.get("at") or "2000-01-01T00:00:00")).total_seconds() < 1800
+    bu = lambda r: r.get("file") == af if r.get("file") is not None else yeni(r)
     cs = [c for c in CARDS if bu(c)]; qs_ = [q for q in QUESTIONS if bu(q)]
     answered = {c.get("reply_to") for c in CARDS if c.get("reply_to")}
     open_ = [c for c in cs if c.get("status") == "acik"]
@@ -928,6 +931,12 @@ def show(md, title):
         STATE["lines"] = STATE["file_lines"].get(base_key, 0)
     STATE["meeting"] = title
 AG = {"mtime": None, "data": {"title": "Gündem yok", "items": []}}
+def gundem_gorunur():
+    # v0.10.1 (kullanıcı, 3 Ekim): pano açılınca eski toplantının gündemi görünmesin. Gündem yalnız süren toplantıda, Claude
+    # izlerken/hazırlanırken (son 2 dk yoklama) ya da agenda.json son 30 dk'da yeni kurulduysa gösterilir; /agenda tam döner.
+    if aktif_dosya() or (STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 120): return True
+    try: return time.time() - os.path.getmtime(os.path.join(BASE, "agenda.json")) < 1800
+    except OSError: return False
 def agenda():
     # v0.6.0: dosya değişince yeniden okunur; maddeler değiştiyse (yeni toplantının gündemi) eski işaretler silinir —
     # yalnız "rol" değişince silinmez
@@ -1126,7 +1135,7 @@ textarea{width:100%;font:inherit;color:var(--tx);background:var(--s2);border:1px
 <main><div class=sh>Döküm <span id=st class=meta></span></div><div id=lines></div><div id=tsl></div><button id=live>↓ Canlıya dön</button></main>
 <div id=rz title="Sürükleyerek genişlet/daralt · çift tıkla: varsayılan"></div>
 <aside><div class=sc>
-<section id=tks hidden><div class=sh>Sıradaki toplantılar <span><button id=tke class="gh" title="Takvimde olmayan bir toplantı için">Elle başlat</button><button id=tky class="gh ib" title="Takvimi yenile">↻</button></span></div><div id=tkh class=hint></div><div id=tk></div>
+<section id=tks hidden><div class=sh>Bugünkü toplantılar <span><button id=tke class="gh" title="Takvimde olmayan bir toplantı için">Elle başlat</button><button id=tky class="gh ib" title="Takvimi yenile">↻</button></span></div><div id=tkh class=hint></div><div id=tk></div>
 <div id=tkf hidden><input id=tkk placeholder="Kişi — konu (ör. Ayşe — bütçe)"><div class=r2><select id=tkr><option value=yurutucu>Yürütücü (ben yönetiyorum)</option><option value=katilimci>Katılımcı</option><option value=dinleyici>Dinleyici</option></select><select id=tkd><option value=tr>Türkçe</option><option value=en>İngilizce</option><option value=karisik>Karışık</option></select></div>
 <label id=tkal class=hint style="display:flex;gap:6px;align-items:center"><input type=checkbox id=tka checked style="width:auto;margin:0"> Hazır olunca toplantıya katıl</label>
 <div class=bt><button id=tkb class=pri>Başlat</button><button id=tki class=gh>Vazgeç</button><span id=tkm></span></div><div class=hint>Sırayla: Claude Terminal'de açılır ve gündemi kurar, konuşma tanıma yüklenir, Claude izlemeye başlayınca toplantı Chrome'da açılır (en geç 3 dk ya da toplantı saatinde). <a href="#" id=tky2>Suflor.me olmadan yalnız katıl</a></div></div></section>
@@ -1288,7 +1297,7 @@ document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=doc
   catch(e){if(w)w.close();m.className='er';m.textContent='aktarıcıya ulaşılamadı'}finally{setTimeout(()=>b.disabled=false,3000)}}
 function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks');sec.hidden=izliyor;if(izliyor)return
   tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh')
-  h.textContent=!t.uygulama?'Takvim yardımcısı kurulu değil (aktarici-kur.command).':t.durum==='izin_yok'?'Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.':t.durum==='bekliyor'?'takvim okunuyor…':(t.durum&&t.durum!=='ok'?(t.hata||t.durum):(tkOlaylar.length?'':'Önümüzdeki saatlerde toplantı yok.'))
+  h.textContent=!t.uygulama?'Takvim yardımcısı kurulu değil (aktarici-kur.command).':t.durum==='izin_yok'?'Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.':t.durum==='bekliyor'?'takvim okunuyor…':(t.durum&&t.durum!=='ok'?(t.hata||t.durum):(tkOlaylar.length?'':'Bugün başka toplantı yok.'))
   setH(document.getElementById('tk'),tkOlaylar.slice(0,5).map(o=>`<div class="tko${(o.dk<=10&&o.dk>=-30)||o.suruyor?' yakin':''}"><div class=t><div><b>${esc(o.saat)}</b>${esc(o.baslik)}${o.platform?` <span class=chip>${PL[o.platform]||esc(o.platform)}</span>`:''}</div><div class=sp>${esc([o.suruyor?'şimdi':o.dk<=60?o.dk+' dk sonra':'',(o.katilimcilar||[]).slice(0,3).join(', ')+(o.kisi_sayisi>4?' +'+(o.kisi_sayisi-4):''),o.ben_duzenleyen?'düzenleyen sen':''].filter(Boolean).join(' · '))}</div></div><button data-bas="${esc(o.id)}" style="flex:none">Başlat</button></div>`).join(''))}
 async function refresh(){const s=await j('/status');last=s;const x=s.extension, ag=s.agenda||{items:[]}
 setH(document.getElementById('t'),s.aktif?esc(ag.title||s.meeting||'Toplantı'):'toplantı bekleniyor')
@@ -1311,7 +1320,7 @@ document.title=((s.cards||[]).length?`(${s.cards.length}) `:"")+"Suflor.me pano"
 // v0.6.0: gündem her yenilemede karşılaştırılır — Claude `gundem i` ile işaretleyince ya da agenda.json değişince görünsün
 {const sig=JSON.stringify([ag.items,s.agenda_ticks,s.agenda_aktif]);if(sig!==agSig){agSig=sig;agTotal=ag.items.length;const tk=s.agenda_ticks||{},n=ag.items.filter((_,i)=>tk[i]).length
 document.getElementById('agn').textContent=ag.items.length?`${n}/${ag.items.length}`:''
-document.getElementById('ag').innerHTML=ag.items.map((it,i)=>`<label class="${s.agenda_aktif===i&&!tk[i]?'ak-on':''}" title="${s.agenda_aktif===i?'Claude tahmini: şu an bu madde konuşuluyor':''}"><input type=checkbox data-i=${i} ${tk[i]?'checked':''}><span class="${tk[i]?'done':''}">${esc(it)}</span></label>`).join('')||'<div class=empty>Gündem yok (agenda.json)</div>'
+document.getElementById('ag').innerHTML=ag.items.map((it,i)=>`<label class="${s.agenda_aktif===i&&!tk[i]?'ak-on':''}" title="${s.agenda_aktif===i?'Claude tahmini: şu an bu madde konuşuluyor':''}"><input type=checkbox data-i=${i} ${tk[i]?'checked':''}><span class="${tk[i]?'done':''}">${esc(it)}</span></label>`).join('')||'<div class=empty>Toplantı başlayınca gündem burada görünür.</div>'
 document.querySelectorAll('#ag input').forEach(c=>c.onchange=()=>fetch('/agenda-tick',{method:'POST',body:JSON.stringify({i:c.dataset.i,v:c.checked,label:ag.items[c.dataset.i]})}).then(refresh))}}
 }
 wireBox(document.getElementById("n"),document.getElementById("b"))
@@ -1342,11 +1351,12 @@ def takvim_oku():
     STATE["takvim"] = {"durum": j.get("durum"), "hata": j.get("hata"), "guncel": j.get("guncel")}
 def takvim_view(tam=False):
     simdi = datetime.datetime.now().astimezone(); ol = []
+    gece = simdi.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
     for e in TAKVIM_TAM.values():
         if e.get("tum_gun"): continue
         try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
         except (KeyError, ValueError): continue
-        if s_ < simdi or b > simdi + datetime.timedelta(hours=18): continue
+        if s_ < simdi or b >= gece: continue  # v0.10.1 (kullanıcı): bugün içindekiler — sürenler ve gün sonuna kadar başlayacaklar
         v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "yer")}
         if v["ben_duzenleyen"] is None and not e.get("duzenleyen") and not e.get("kisi_sayisi"): v["ben_duzenleyen"] = True  # davetlisiz kendi etkinliğin
         v.update(saat=b.strftime("%H:%M"), bitis_saat=s_.strftime("%H:%M"), dk=round((b - simdi).total_seconds() / 60), suruyor=b <= simdi < s_,
@@ -1446,7 +1456,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # v0.9.1: pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda()
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []  # v0.7.0
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []  # v0.8.1
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []

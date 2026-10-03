@@ -1223,7 +1223,7 @@ def takvim_cmd():  # v0.9.3: aktarıcının takvimi (Suflor Takvim yardımcısı
     except Exception as e: sys.exit(f"aktarıcıya ulaşılamadı: {e}")
     if t.get("durum") != "ok": print(f"takvim: {t.get('durum')} — {t.get('hata') or ''}".strip(" —"))
     ol = [o for o in t.get("olaylar") or [] if not A.id or o.get("id") == A.id][:A.n]
-    if not ol: print("Önümüzdeki 18 saatte toplantı yok."); return
+    if not ol: print("Bugün başka toplantı yok."); return
     for o in ol:
         ne = "şimdi" if o.get("suruyor") else (f"{o['dk']} dk sonra" if o.get("dk", 0) <= 120 else "")
         print(f"## {o['saat']}–{o['bitis_saat']} {o['baslik']}" + (f"  ({ne})" if ne else "") + f"  · id {o['id']}")
