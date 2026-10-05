@@ -36,7 +36,8 @@ Terminal'e yapıştır:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 ```
-Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı tarayıcıda açılır ve her adımı kendisi denetler.
+Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı Chrome'da açılır (Chrome yoksa varsayılan tarayıcıda) ve her adımı kendisi denetler.
+Sihirbazı kapatırsan aynı komutu yeniden çalıştır; kaldığın adımdan sürer.
 
 **Güncelleme:** `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
 belgelerine dokunmaz), sonra Chrome'da `chrome://extensions` → Suflor.me → yenile.

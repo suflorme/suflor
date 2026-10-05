@@ -25,6 +25,10 @@
       c_kur: "Terminal'de kur ve giriş yap", c_denetle: "Yeniden denetle",
       c_aciklama: "Terminal açılır ve kurulum komutu hazır yazılı olur. Bitince açılan Claude'da hesabınla giriş yap, sonra buraya dön.",
       c_kartsiz: "Aboneliğim yok, kartsız devam et",
+      c_yol_yok: "Terminal'de claude komutu bulunmuyor", c_yol_ac: "Claude Code kurulu ama Terminal onu tanımıyor; /toplanti için gerekli.", c_yol_dug: "Terminal'e tanıt",
+      c_denetleniyor: "Denetleniyor… (en çok 90 sn)", c_giris_dug: "Terminal'de giriş yap",
+      c_n_giris: "Claude'da oturum açılmamış. Terminal'de giriş yap, sonra yeniden denetle.", c_n_zaman: "Claude 90 saniyede yanıt vermedi. İnternet bağlantına bakıp yeniden denetle.",
+      c_n_hata: "Claude denetimi başarısız: ", c_n_yok: "Claude Code bulunamadı.",
       c_kartsiz_a: "Kartsız kipte döküm, pano ve notlar çalışır; kart ve özet olmaz. Sonradan Claude bağlayabilirsin.",
       sen_b: "Seni tanıyalım", sen_a: "Kartlar senin bakışından yazılsın diye. Bu bilgiler yalnız bu Mac'te kalır.",
       ad: "Adın", ad_i: "Toplantılarda göründüğü gibi", rol: "Rolün ya da unvanın", sirket: "Şirketin (isteğe bağlı)", is_alani: "İş alanın",
@@ -90,6 +94,10 @@
       c_kur: "Install and sign in with Terminal", c_denetle: "Check again",
       c_aciklama: "Terminal opens with the install command ready. When it finishes, sign in to Claude, then come back here.",
       c_kartsiz: "No subscription, continue without cards",
+      c_yol_yok: "Terminal doesn't know the claude command", c_yol_ac: "Claude Code is installed but Terminal can't find it; /toplanti needs it.", c_yol_dug: "Add to Terminal",
+      c_denetleniyor: "Checking… (up to 90 s)", c_giris_dug: "Sign in with Terminal",
+      c_n_giris: "You're not signed in to Claude. Sign in with Terminal, then check again.", c_n_zaman: "Claude didn't answer within 90 seconds. Check your internet connection and try again.",
+      c_n_hata: "Claude check failed: ", c_n_yok: "Claude Code not found.",
       c_kartsiz_a: "Without cards you still get the transcript, the dashboard and notes; no cards or summaries. You can connect Claude later.",
       sen_b: "Tell us about you", sen_a: "So the cards are written from your point of view. This stays on this Mac.",
       ad: "Your name", ad_i: "As it appears in meetings", rol: "Your role or title", sirket: "Company (optional)", is_alani: "Your field",
@@ -217,9 +225,12 @@
     { id: "claude", simge: "claude", b: "claude_b", a: "claude_a", hazir: () => { const c = (D.durum || {}).claude || {}; return (c.kurulu && c.giris) || C.kartsiz; },
       gir: durumAl,
       icerik: () => { const c = (D.durum || {}).claude || {};
+        // v0.13.3: Terminal'de komut yoksa söyle; denetim başarısızsa nedeni (giriş, zaman aşımı, hata metni) satırın altında
+        const n = !c.giris && c.neden ? c.neden : null, nm = n ? (n.tur === "giris" ? t.c_n_giris : n.tur === "zaman" ? t.c_n_zaman : n.tur === "yok" ? t.c_n_yok : t.c_n_hata + (n.ham || "")) : "";
         return `<div class="liste">${satir(c.kurulu ? "iyi" : "kotu", c.kurulu ? t.c_kurulu : t.c_yok, c.surum || "", c.kurulu ? "" : dug("claude-kur", t.c_kur))}
-          ${satir(c.giris ? "iyi" : "uyari", c.giris ? t.c_giris : t.c_giris_yok, "", dug("claude-denetle", t.c_denetle))}</div>
-          ${c.kurulu && c.giris ? "" : `<p class="dipnot">${esc(t.c_aciklama)}</p><p class="dipnot">${dug("kartsiz", t.c_kartsiz)}<br>${esc(t.c_kartsiz_a)}</p>`}`; } },
+          ${c.kurulu && c.yolda === false ? satir("uyari", t.c_yol_yok, t.c_yol_ac, dug("claude-yol", t.c_yol_dug)) : ""}
+          ${satir(c.giris ? "iyi" : "uyari", c.giris ? t.c_giris : t.c_giris_yok, nm, (c.kurulu && !c.giris && n && n.tur === "giris" ? dug("claude-giris", t.c_giris_dug) : "") + dug("claude-denetle", t.c_denetle))}</div>
+          ${c.kurulu && c.giris ? "" : `${c.kurulu ? "" : `<p class="dipnot">${esc(t.c_aciklama)}</p>`}<p class="dipnot">${dug("kartsiz", t.c_kartsiz)}<br>${esc(t.c_kartsiz_a)}</p>`}`; } },
     { id: "sen", simge: "sen", b: "sen_b", a: "sen_a", hazir: () => (C.ad || "").trim().length > 1,
       gir: () => { if (!C.ad && D.durum && D.durum.varsayilan_ad) C.ad = D.durum.varsayilan_ad; },
       icerik: () => `${alan("ad", t.ad, t.ad_i)}<div class="iki">${alan("rol", t.rol)}${alan("sirket", t.sirket)}</div>
@@ -336,7 +347,8 @@
       if (n === "kartsiz") { C.kartsiz = true; kaydet(); ciz(); return; }
       if (n === "atla") { git(D.adim + 1); return; }
       if (n === "ornek") { C.ornek = !C.ornek; kaydet(); ciz(); return; }
-      if (n === "claude-denetle") { await api("claude/denetle", {}).catch(() => {}); await durumAl(); ciz(); return; }
+      if (n === "claude-denetle") { ey.disabled = true; ey.textContent = t.c_denetleniyor; await api("claude/denetle", {}).catch(() => {}); await durumAl(); ciz(); return; }
+      if (n === "claude-yol") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "klasor-sec") { const r = await api("klasor-sec", {}).catch(() => ({})); if (r.yol) { C.proje = r.yol; kaydet(); ciz(); } return; }
       if (n === "takvim-izin") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
       api("ac", { hedef: n }).catch(() => {});

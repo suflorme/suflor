@@ -5,7 +5,7 @@
 # ~/Library/Application Support/Suflor/kurulum.json'da: sekme kapanırsa sihirbaz kaldığı adımdan sürer.
 #   python3 kurulum.py [--port 8770] [--ac]     (--ac: tarayıcıda aç)
 # Deneme: SUFLOR_EV=<geçici klasör> ev klasörünü değiştirir (ayar, uygulama, proje oraya yazılır; aktarıcı kurulmaz).
-import argparse, datetime, getpass, json, os, platform, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
+import argparse, shlex, datetime, getpass, json, os, platform, re, secrets, shutil, subprocess, sys, tempfile, threading, time, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.dont_write_bytecode = True
 
@@ -46,23 +46,53 @@ def mac():
     return dict(_MAC, disk_gb=round(shutil.disk_usage(EV).free / 2 ** 30), chrome=os.path.isdir("/Applications/Google Chrome.app"), teams_uygulama=bool(teams))
 
 # ---------- Claude Code ----------
-CLAUDE = {"giris": None, "surum": None, "t": 0}
+CLAUDE = {"giris": None, "surum": None, "t": 0, "neden": None, "yol": None, "yol_t": 0}
 def claude_yolu():
     for p in (shutil.which("claude"), os.path.join(EV, ".local/bin/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"):
         if p and os.path.exists(p): return p
+# v0.13.3 (kişisel hesap kurulumu, 5 Ekim): Claude'un kurulum betiği ~/.local/bin'i Terminal'in arama yoluna eklemiyor — sihirbaz
+# programı tam yolundan bulup "kurulu" diyordu, Terminal'de `claude` "command not found" veriyordu. Kullanıcının kabuğu sorulur.
+def kabuk_rc():
+    k = os.path.basename(os.environ.get("SHELL") or "/bin/zsh")
+    return os.path.join(EV, ".bash_profile" if k == "bash" else ".zshrc"), ("/bin/bash" if k == "bash" else "/bin/zsh")
+def terminalde_var():
+    if time.time() - CLAUDE["yol_t"] > 60 or CLAUDE["yol"] is None:
+        ort = dict(os.environ, HOME=EV, ZDOTDIR=EV) if DENEME else None  # deneme: kabuk deneme ev klasörünün .zshrc'sini okur
+        try: v = subprocess.run([kabuk_rc()[1], "-lic", "command -v claude"], capture_output=True, text=True, timeout=10, env=ort, stdin=subprocess.DEVNULL).stdout.strip()
+        except Exception: v = ""
+        CLAUDE.update(yol=bool(v), yol_t=time.time())
+    return CLAUDE["yol"]
+YOL_SATIRI = 'export PATH="$HOME/.local/bin:$PATH"  # Suflor.me kurulumu: Claude Code komutu'
+def yola_ekle():
+    rc = kabuk_rc()[0]
+    try: eski = open(rc, encoding="utf-8").read()
+    except OSError: eski = ""
+    if YOL_SATIRI not in eski:
+        with open(rc, "a", encoding="utf-8") as f: f.write(("" if not eski or eski.endswith("\n") else "\n") + YOL_SATIRI + "\n")
+    CLAUDE["yol"] = None
 def claude_durum():
     p = claude_yolu()
     if p and (not CLAUDE["surum"] or time.time() - CLAUDE["t"] > 60): CLAUDE.update(surum=(sh(p, "--version", zaman=15).split() or [None])[0], t=time.time())
-    if CLAUDE["giris"] is None: CLAUDE["giris"] = oku_json(KAYIT).get("claude_giris")
-    return {"kurulu": bool(p), "surum": CLAUDE["surum"] if p else None, "giris": CLAUDE["giris"]}
+    if CLAUDE["giris"] is None: k = oku_json(KAYIT); CLAUDE.update(giris=k.get("claude_giris"), neden=k.get("claude_neden"))
+    return {"kurulu": bool(p), "surum": CLAUDE["surum"] if p else None, "giris": CLAUDE["giris"], "neden": CLAUDE["neden"],
+            "yolda": terminalde_var() if p else None}
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 def claude_denetle():
-    p = claude_yolu()
-    if not p: CLAUDE["giris"] = False; return
+    # v0.13.3: başarısızlığın nedeni saklanır ve sihirbazda gösterilir (önceden yalnız "oturum açılmamış ya da denetlenmedi")
+    p = claude_yolu(); neden = None
+    if not p: CLAUDE.update(giris=False, neden={"tur": "yok"}); return
     try:
-        r = subprocess.run([p, "-p", "Yalnız TAMAM yaz."], capture_output=True, text=True, timeout=90, cwd=tempfile.gettempdir())
-        CLAUDE["giris"] = r.returncode == 0 and "TAMAM" in r.stdout.upper()
-    except Exception: CLAUDE["giris"] = False
-    k = oku_json(KAYIT); k["claude_giris"] = CLAUDE["giris"]; yaz_json(KAYIT, k)  # sunucu yeniden başlasa da hatırlansın
+        r = subprocess.run([p, "-p", "Yalnız TAMAM yaz."], capture_output=True, text=True, timeout=90, cwd=tempfile.gettempdir(), stdin=subprocess.DEVNULL)
+        ok = r.returncode == 0 and "TAMAM" in r.stdout.upper()
+        if not ok:
+            satirlar = [x.strip() for x in _ANSI.sub("", (r.stderr or "") + "\n" + (r.stdout or "")).splitlines() if x.strip()]
+            ham = " · ".join(satirlar[-2:])[:240] or f"çıkış kodu {r.returncode}"
+            giris = re.search(r"log ?in|/login|not logged|authenticat|api key|oauth|credential|subscription|unauthori", ham, re.I)
+            neden = {"tur": "giris" if giris else "hata", "ham": ham}
+    except subprocess.TimeoutExpired: ok = False; neden = {"tur": "zaman"}
+    except Exception as e: ok = False; neden = {"tur": "hata", "ham": str(e)[:240]}
+    CLAUDE.update(giris=ok, neden=neden)
+    k = oku_json(KAYIT); k["claude_giris"] = ok; k["claude_neden"] = neden; yaz_json(KAYIT, k)  # sunucu yeniden başlasa da hatırlansın
 
 # ---------- modeller (arka planda modeller-kur.command) ----------
 MODEL = {"durum": None, "yuzde": 0, "mesaj": "", "p": None}
@@ -212,6 +242,12 @@ def ac(hedef):
         open(f, "w").write("#!/bin/bash\necho 'Suflor.me — Claude Code kuruluyor…'\ncurl -fsSL https://claude.ai/install.sh | bash\n"
                            "echo; echo 'Şimdi Claude açılıyor: hesabınla giriş yap, sonra bu pencereyi kapatıp kuruluma dön.'\n"
                            "\"$HOME/.local/bin/claude\" || claude\n")
+        os.chmod(f, 0o755); yola_ekle(); subprocess.Popen(["open", "-a", "Terminal", f])
+    elif hedef == "claude-yol": yola_ekle()  # v0.13.3
+    elif hedef == "claude-giris" and claude_yolu():  # v0.13.3: Claude'u Terminal'de açar; ilk açılışta giriş ister (oturum açıksa /login)
+        f = os.path.join(tempfile.gettempdir(), "suflor-claude-giris.command")
+        open(f, "w").write("#!/bin/bash\necho 'Suflor.me — Claude açılıyor. Giriş istemezse /login yaz. Girişten sonra bu pencereyi kapatıp kuruluma dön.'\n"
+                           f"exec {shlex.quote(claude_yolu())}\n")
         os.chmod(f, 0o755); subprocess.Popen(["open", "-a", "Terminal", f])
     elif hedef == "takvim-izin":
         uyg = os.path.join(gen(a.get("uygulama") or "~/Library/Application Support/Suflor"), "Suflor Takvim.app")
@@ -231,8 +267,24 @@ def klasor_sec():
 # ---------- sunucu ----------
 STATIK = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
           ".svg": "image/svg+xml", ".woff2": "font/woff2", ".png": "image/png"}
+# v0.13.3: yerel anahtar. 127.0.0.1 bu Mac'teki her kullanıcıya ve programa açık; Origin/Host denetimi tarayıcıyı durdurur ama
+# curl'ü durdurmaz (5 Ekim: diğer macOS hesabından kurulum durumu okunabildi). Sihirbazı açan süreç (kurulum.py --ac, bu kullanıcı)
+# adresi ?k=<anahtar> ile açar; sunucu anahtarı HttpOnly çereze koyup temiz adrese yönlendirir. /api/* ve sayfa çerez ister.
+ANAHTAR = secrets.token_urlsafe(24); CEREZ = "suflor_kurulum"
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
+    def _cerezli(self):
+        for p in (self.headers.get("Cookie") or "").split(";"):
+            k, _, v = p.strip().partition("=")
+            if k == CEREZ and secrets.compare_digest(v, ANAHTAR): return True
+        return False
+    def _kapali(self):
+        b = ("<!doctype html><meta charset=utf-8><title>Suflor.me</title><body style='font:15px/1.5 -apple-system,system-ui;max-width:520px;margin:15vh auto;padding:0 16px'>"
+             "<h2 style='font-weight:400'>Suflor.me kurulum sihirbazı</h2><p>Bu sayfa yalnız sihirbazı başlatan bağlantıyla açılır. Kaldığın adımdan sürdürmek için "
+             "kurulum komutunu Terminal'de yeniden çalıştır:</p><pre style='white-space:pre-wrap;background:#f1f1ee;padding:10px;border-radius:8px'>"
+             "curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash</pre>"
+             "<p style='color:#777'>To continue the setup wizard, run the install command above in Terminal again.</p>").encode()
+        self.send_response(403); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def _json(self, o, kod=200):
         b = json.dumps(o, ensure_ascii=False).encode(); self.send_response(kod); self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
@@ -244,7 +296,14 @@ class H(BaseHTTPRequestHandler):
         return (self.headers.get("Host") or "").lower() in (f"127.0.0.1:{A.port}", f"localhost:{A.port}")
     def do_GET(self):
         if not self._host(): return self._json({"hata": "host"}, 403)
-        yol = self.path.split("?")[0]
+        yol, _, sorgu = self.path.partition("?")
+        if yol in ("/", "/index.html", "/sihirbaz/index.html"):
+            k = dict(x.split("=", 1) for x in sorgu.split("&") if "=" in x).get("k")
+            if k and secrets.compare_digest(k, ANAHTAR):  # açılış bağlantısı: çerez + temiz adres (anahtar geçmişte kalmasın)
+                self.send_response(302); self.send_header("Set-Cookie", f"{CEREZ}={ANAHTAR}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400")
+                self.send_header("Location", "/" + ("?" + "&".join(x for x in sorgu.split("&") if not x.startswith("k=")) if "&" in sorgu else "")); self.end_headers(); return
+            if not self._cerezli(): return self._kapali()
+        elif yol.startswith("/api/") and not self._cerezli(): return self._json({"hata": "anahtar"}, 403)
         if yol == "/api/durum":
             a = ayar()
             return self._json({"mac": mac(), "claude": claude_durum(), "modeller": modeller_durum(), "eklenti": eklenti(), "takvim": takvim(),
@@ -261,6 +320,7 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._host(): return self._json({"hata": "host"}, 403)
         if not self._kaynak(): return self._json({"hata": "köken"}, 403)  # yalnız sihirbaz sayfası
+        if not self._cerezli(): return self._json({"hata": "anahtar"}, 403)  # v0.13.3
         yol, _, sorgu = self.path.partition("?"); n = int(self.headers.get("Content-Length") or 0); govde = self.rfile.read(n) if n else b""
         if yol == "/api/yukle":
             q = dict(x.split("=", 1) for x in sorgu.split("&") if "=" in x); tur = q.get("tur"); ad = os.path.basename(urllib.request.unquote(q.get("ad") or "dosya"))
@@ -279,7 +339,15 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.makedirs(DESTEK, exist_ok=True)
-    s = ThreadingHTTPServer(("127.0.0.1", A.port), H)
+    # v0.13.3: port doluysa (ör. diğer macOS hesabının sihirbazı) sonrakini dene — önceden ikinci sihirbaz açılmıyor, kur.sh
+    # tarayıcıda öbür hesabın sihirbazını açıyordu
+    for port in range(A.port, A.port + 10):
+        try: s = ThreadingHTTPServer(("127.0.0.1", port), H); A.port = port; break
+        except OSError: continue
+    else: sys.exit(f"Suflor.me kurulum sihirbazı: {A.port}–{A.port + 9} portlarının hepsi dolu")
     print(f"Suflor.me kurulum sihirbazı: http://127.0.0.1:{A.port}/" + ("  (deneme: " + EV + ")" if DENEME else ""), flush=True)
-    if A.ac: subprocess.Popen(["open", f"http://127.0.0.1:{A.port}/"])
+    if A.ac:  # v0.13.4: sihirbaz Chrome'da açılır (eklenti adımı Chrome ister; varsayılan tarayıcı Safari olabilir) — Chrome yoksa varsayılan
+        cr = next((y for y in ("/Applications/Google Chrome.app", os.path.join(EV, "Applications/Google Chrome.app")) if os.path.isdir(y)), None)
+        subprocess.Popen(["open"] + (["-a", cr] if cr else []) + [f"http://127.0.0.1:{A.port}/?k={ANAHTAR}"])
+    elif DENEME: print(f"  açılış: http://127.0.0.1:{A.port}/?k={ANAHTAR}", flush=True)
     s.serve_forever()

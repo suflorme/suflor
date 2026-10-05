@@ -27,10 +27,12 @@ chmod +x "$KOD"/*.command "$KOD"/*.sh 2>/dev/null || true
 xattr -dr com.apple.quarantine "$KOD" 2>/dev/null || true
 
 echo "→ Kurulum sihirbazı açılıyor"
-pkill -f "kurulum.py --port $PORT" >/dev/null 2>&1 || true
+pkill -u "$(id -u)" -f "kurulum.py --port" >/dev/null 2>&1 || true  # yalnız bu kullanıcının eski sihirbazı
 mkdir -p "$HOME/Library/Logs"
-cd "$KOD" && PYTHONDONTWRITEBYTECODE=1 nohup /usr/bin/python3 kurulum.py --port "$PORT" >"$HOME/Library/Logs/suflor-kurulum.log" 2>&1 &
-for i in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.5; done
-open "http://127.0.0.1:$PORT/"
-y "Sihirbaz tarayıcıda açıldı. Bu pencereyi kapatabilirsin."
-echo "Açılmadıysa tarayıcıda şu adrese git: http://127.0.0.1:$PORT/"
+# v0.13.3: sihirbazı kendisi açar (anahtarlı bağlantı; port doluysa sonrakini seçer; Chrome varsa Chrome'da). v0.13.4: tek komut olarak
+# arka plana (bekleyen ara kabuk kalmaz) — önceden bir sonraki kurulum eski sihirbazı kapatınca o kabuk "Terminated: 15" basıyordu
+cd "$KOD"
+( PYTHONDONTWRITEBYTECODE=1 nohup /usr/bin/python3 kurulum.py --port "$PORT" --ac >"$HOME/Library/Logs/suflor-kurulum.log" 2>&1 & )
+sleep 2
+y "Sihirbaz Chrome'da açıldı. Bu pencereyi kapatabilirsin."
+echo "Açılmadıysa bu komutu yeniden çalıştır; sihirbaz kaldığın adımdan sürer."
