@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.0"  # sürüm geçmişi: git log
+SURUM = "0.13.2"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -964,7 +964,20 @@ SES_TETIK = re.compile(r"(ekran(ın|ı)?\s*(kayd|görüntü|resm|fotoğraf|foto)
 _SES_SON = [0.0]
 def ses_tetik_mi(kim, metin):
     if not kim or sade(kim).split(" ")[0] != sade(ben_adi()).split(" ")[0]: return False
-    return bool(SES_TETIK.search(metin)) and time.time() - _SES_SON[0] >= 60
+    m = SES_TETIK.search(metin)
+    return bool(m) and time.time() - _SES_SON[0] >= 60 and not kart_okunuyor(metin, m)
+def kart_okunuyor(metin, m):
+    # v0.13.1: kullanıcı son 10 dk'daki bir kartı sesli okuyorsa ("Option + Shift + K ile kanıt al") tetik sayılmaz (3 Ekim denemesi).
+    # Tetik sözünün dışında kalan kelimelerin (≥ 3 harf, en az 2 tane) %60'ı tetik içeren bir kartta geçiyorsa okuma sayılır;
+    # yalnız "ekran görüntüsü alalım" demek (kart bunu söyletse bile) tetikler.
+    kalan = [w for w in re.findall(r"\w+", sade(metin[:m.start()] + " " + metin[m.end():])) if len(w) >= 3]
+    if len(kalan) < 2: return False
+    sinir = (datetime.datetime.now() - datetime.timedelta(minutes=10)).isoformat(timespec="seconds")
+    for c in CARDS[-30:]:
+        if c["at"] < sinir or not SES_TETIK.search(c["text"]): continue
+        kk = set(re.findall(r"\w+", sade(c["text"])))
+        if sum(w in kk for w in kalan) >= 0.6 * len(kalan): return True
+    return False
 # --- Kısayol komutları (v0.8.6) -------------------------------------------------------------------------------
 # v0.8.3'teki "Suflor, …" sesli komutları kaldırıldı (2 Ekim gerçek denemesi: Whisper "Suflor"u "Çok", "Sık dur",
 # "Teşekkürler" yazdı; komut karşı tarafa da duyuluyordu — kullanıcı: "kaldır, iki kısayolu ekle"). Kalan sesli tetik yalnız
@@ -1242,7 +1255,7 @@ main{overflow:auto;position:relative;min-width:0;padding:6px 20px 16px}
 aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--s2)}aside .sc{flex:1;overflow:auto;padding:6px 16px 16px}
 .sh{position:sticky;top:0;z-index:1;background:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;font:400 10.5px/1.4 var(--f-teknik);letter-spacing:.08em;text-transform:uppercase;color:var(--t3);padding:10px 0 6px}
 .sh button{font:12px/1.4 var(--f-govde);letter-spacing:0;text-transform:none}main .sh{background:var(--bg)}aside .sh{background:var(--s2)}.meta{font:400 11px/1.4 var(--f-govde);letter-spacing:0;text-transform:none;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-section+section{margin-top:6px}
+section+section{margin-top:6px}main .sh,aside .sh{top:-6px}  /* v0.13.2: kaydırınca satır başlığın üstündeki 6 px boşlukta görünmesin */
 .l{padding:7px 0;border-bottom:1px solid var(--bd);line-height:1.55;max-width:820px}.sp{color:var(--t3);font-size:11px}.sp .z{font-family:var(--f-teknik);font-size:10.5px}.sp b{color:var(--t2);font-weight:600}
 .f{background:var(--er-bg);border-radius:4px;padding-left:6px;padding-right:6px}.note{background:var(--wa-bg);border-radius:4px;padding:6px 8px;white-space:pre-wrap;border:0;margin:4px 0}
 .kn{background:var(--ok-bg);border-radius:4px;padding:6px 8px;border:0;margin:4px 0}.kn a{color:var(--ok)}
@@ -1306,7 +1319,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <section id=fls hidden><div class=sh>Hassas ifade <span class=meta title="Konuşmada şifre, parola, token, API anahtarı gibi bir kelime geçti. Değerin kendisi dosyaya yazılmaz; yalnız uyarı konur.">değer dosyaya yazılmaz</span></div><div id=fl></div></section>
 </div>
 <div class=nb><textarea id=n rows=2 placeholder="Not yaz · soru için başa ?, soru, Claude ya da iki boşluk — Enter: gönder" title="Baştaki ?, soru, Claude ya da iki boşluk: Claude'a soru. Gerisi not. ⌘Enter: her zaman soru."></textarea>
-<div class=bt><button id=b class=pri>Gönder</button><span class=sp1></span><button id=oz class=ib title="Claude son 1 dakikayı 1–2 cümleyle özetlesin (Teams'te Option + Shift + O)"></button><button id=kz class=ib title="Toplantı ekranını kanıt olarak kaydet (Teams'te Option + Shift + K). Kutuda yazı varsa kanıtın notu olur."></button></div></div></aside>
+<div class=bt><button id=b class=pri>Gönder</button><span class=sp1></span><button id=oz class=ib title="Claude son 1 dakikayı 1–2 cümleyle özetlesin (toplantı sekmesinde Option + Shift + O)"></button><button id=kz class=ib title="Toplantı ekranını kanıt olarak kaydet (toplantı sekmesinde Option + Shift + K). Kutuda yazı varsa kanıtın notu olur."></button></div></div></aside>
 </div>
 <script>
 // v0.11.3: arayüz dili (ayar "dil"; aktarıcı __DIL__ yerine yazar). Anahtar Türkçe metnin kendisi; İngilizcesi yoksa Türkçe kalır.
@@ -1322,8 +1335,8 @@ const EN={"toplantı bekleniyor":"waiting for a meeting","Mini pano: her zaman �
 "değer dosyaya yazılmaz":"value is never written to file","Konuşmada şifre, parola, token, API anahtarı gibi bir kelime geçti. Değerin kendisi dosyaya yazılmaz; yalnız uyarı konur.":"A word like password, token or API key came up. The value itself is never written to file; only a marker is.",
 "Not yaz · soru için başa ?, soru, Claude ya da iki boşluk — Enter: gönder":"Write a note · start with ?, Claude or two spaces to ask — Enter: send",
 "Baştaki ?, soru, Claude ya da iki boşluk: Claude'a soru. Gerisi not. ⌘Enter: her zaman soru.":"Leading ?, Claude or two spaces: a question for Claude. Anything else is a note. ⌘Enter: always a question.",
-"Gönder":"Send","Claude son 1 dakikayı 1–2 cümleyle özetlesin (Teams'te Option + Shift + O)":"Claude sums up the last minute in 1–2 sentences (in Teams: Option + Shift + O)",
-"Toplantı ekranını kanıt olarak kaydet (Teams'te Option + Shift + K). Kutuda yazı varsa kanıtın notu olur.":"Save the meeting screen as evidence (in Teams: Option + Shift + K). Text in the box becomes its note.",
+"Gönder":"Send","Claude son 1 dakikayı 1–2 cümleyle özetlesin (toplantı sekmesinde Option + Shift + O)":"Claude sums up the last minute in 1–2 sentences (in the meeting tab: Option + Shift + O)",
+"Toplantı ekranını kanıt olarak kaydet (toplantı sekmesinde Option + Shift + K). Kutuda yazı varsa kanıtın notu olur.":"Save the meeting screen as evidence (in the meeting tab: Option + Shift + K). Text in the box becomes its note.",
 "Son 1 dk":"Last 1 min","Kanıt":"Evidence","aç":"open","Toplantı başlayınca konuşma burada akar.":"Once the meeting starts, the conversation flows here.",
 "Taslak ({d}); kesin metin gelince yerine geçer":"Draft ({d}); replaced when the final text arrives","Whisper bekleniyor":"waiting for Whisper","konuşuluyor":"in progress","taslak":"draft",
 "Sor":"Ask","Belirt":"Say","Değinme":"Don't raise","Dikkat":"Caution","Cevap":"Answer","Bilgi":"Info","Duygu":"Mood",
@@ -1341,7 +1354,7 @@ const EN={"toplantı bekleniyor":"waiting for a meeting","Mini pano: her zaman �
 "izliyor ({n} sn önce yokladı)":"watching (checked {n} s ago)","izlemiyor — Claude Code'da /toplanti":"not watching — run /toplanti in Claude Code",
 "Dil: ":"Language: ","Toplantıdasın ama satır gelmiyor — ":"You're in a meeting but no lines are coming in — ","altyazıyı aç":"turn on captions",
 "Mini pano açılamadı: açılır pencereye izin verin.":"Couldn't open the mini panel: allow pop-ups.","Claude son 1 dakikayı özetlesin":"Claude sums up the last minute","Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur":"Save the meeting screen as evidence; text in the box becomes its note",
-"henüz satır yok":"no lines yet","son satır {a} önce · {k}":"last line {a} ago · {k}","{n} sn":"{n} s","{n} dk":"{n} min","gündem {a}/{b}":"agenda {a}/{b}","pay %{n}":"share {n}%",
+"henüz satır yok":"no lines yet","son satır {a} önce · {k}":"last line {a} ago · {k}","{n} sn":"{n} s","{n} dk":"{n} min","gündem {a}/{b}":"agenda {a}/{b}","pay %{n}":"share {n}%","{n} satır · 1 not · son satır {t}":"{n} lines · 1 note · last line {t}",
 "Takvim yardımcısı kurulu değil (aktarici-kur.command).":"Calendar helper isn't installed (aktarici-kur.command).","Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.":"No calendar access — System Settings → Privacy & Security → Calendars → Suflor Takvim.",
 "takvim okunuyor…":"reading calendar…","Bugün başka toplantı yok.":"No more meetings today.","şimdi":"now","{n} dk sonra":"in {n} min","düzenleyen sen":"you're the organizer","takvim yenileniyor…":"refreshing calendar…",
 "Kişi ve konuyu yaz":"Enter the person and topic","başlatılıyor…":"starting…","Pano eski (aktarıcı güncellendi) — sayfayı yenileyip tekrar dene":"The panel is out of date (relay updated) — reload the page and try again",
@@ -1355,8 +1368,8 @@ const EN={"toplantı bekleniyor":"waiting for a meeting","Mini pano: her zaman �
 "Claude'un kartları: Sor, Belirt, Dikkat… ✓ yaptım, Okudum ya da ✕ gerek yok; Claude bu dönüşlerden öğrenir.":"Claude's cards: Ask, Say, Caution… ✓ done, Seen or ✕ not needed; Claude learns from your responses.",
 "Claude konuşulan maddeyi işaretler; sen de tikleyebilirsin. Kalan süre ve kayma buna göre hesaplanır.":"Claude marks the item being discussed; you can tick it too. Time left and drift are based on this.",
 "Tek kutu":"One box","Yazdığın not olur. ?, soru, Claude ya da iki boşlukla başlarsan Claude'a soru olur ve birkaç saniyede kartla cevaplanır.":"What you type becomes a note. Start with ?, Claude or two spaces and it becomes a question; Claude answers with a card within seconds.",
-"Son 1 dakika ve kanıt":"Last minute and evidence","Kaçırdığın anı Claude'a özetlet ya da toplantı ekranını kanıt olarak kaydet. Teams'te: Option + Shift + O ve Option + Shift + K.":"Have Claude sum up what you missed, or save the meeting screen as evidence. In Teams: Option + Shift + O and Option + Shift + K.",
-"Mini pano":"Mini panel","Teams'in yanında her zaman üstte duran küçük pencere: kartlar, son satırlar ve tek kutu. Tek ekranla çalışırken Teams'in yanına koy.":"A small always-on-top window: cards, latest lines and the one box. On a single screen, put it next to Teams.",
+"Son 1 dakika ve kanıt":"Last minute and evidence","Kaçırdığın anı Claude'a özetlet ya da toplantı ekranını kanıt olarak kaydet. Toplantı sekmesinde: Option + Shift + O ve Option + Shift + K.":"Have Claude sum up what you missed, or save the meeting screen as evidence. In the meeting tab: Option + Shift + O and Option + Shift + K.",
+"Mini pano":"Mini panel","Toplantının yanında her zaman üstte duran küçük pencere: kartlar, son satırlar ve tek kutu. Tek ekranla çalışırken toplantı penceresinin yanına koy.":"A small always-on-top window: cards, latest lines and the one box. On a single screen, put it next to the meeting window.",
 "Geri":"Back","Turu kapat":"Close tour","Geri bildirim gönder":"Send feedback","Geri bildirim":"Feedback",
 "Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.":"Tell us what broke, what's missing or what you liked; it goes to the developer. Your text is sent as written: don't include names, passwords or meeting content.",
 "Ne oldu? Ne bekliyordun?":"What happened? What did you expect?","Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)":"Include technical info (versions, Mac, recent events — no meeting content)",
@@ -1440,7 +1453,8 @@ function sureTxt(s){const v=s.sure;if(!v)return["","",""];const k=v.kalan_dk;let
   const ti=L("bitiş {t}",{t:v.bitis})+(v.toplam?L(" · gündem {a}/{b}",{a:v.bitti,b:v.toplam})+(v.beklenen!=null?L(" (beklenen {n})",{n:v.beklenen}):""):"")
   if(v.kayma>=2)t+=L(" · {n} madde geride",{n:v.kayma})
   return[t,k<=0?"ac":(k<=5||v.kayma>=2?"uy":""),ti]}
-function payHtml(s){const p=s.pay;if(!p)return"";const f=l=>l.map(([k,v])=>k===p.ben?`<span class=ben>${esc(k)} %${v}</span>`:`${esc(k)} %${v}`).join(" · ")
+const yuz=v=>DIL==="en"?v+"%":"%"+v  // v0.13.2: İngilizcede 52%
+function payHtml(s){const p=s.pay;if(!p)return"";const f=l=>l.map(([k,v])=>k===p.ben?`<span class=ben>${esc(k)} ${yuz(v)}</span>`:`${esc(k)} ${yuz(v)}`).join(" · ")
   if(p.adsiz>=50)return L("Konuşma payı ölçülemiyor (konuşmacı adı gelmiyor)")
   return`${L("Konuşma payı")}${p.kelime_son?L(" (son 10 dk)"):``}: ${f(p.kelime_son?p.son:p.top)}${p.kelime_son?` <span class=hint>· ${L("toplam")}: ${f(p.top.slice(0,3))}</span>`:""}`}
 function payUy(s){const p=s.pay;return!!(p&&p.ben_son!=null&&p.ben_son>=60&&p.kelime_son>=150)}
@@ -1532,7 +1546,7 @@ setH(document.getElementById('chips'),(x&&x.platform?`<span class=chip>${PL[x.pl
 {const [t,c,ti]=sureTxt(s),e=document.getElementById('sure');setH(e,s.aktif&&t?ic('clock',esc(t)):"");e.className=c;e.title=ti}
 setH(document.getElementById('conn'),baglanti(s).map(([n,c,t])=>`<span title="${esc(n+': '+t)}"><i class="dot ${c}"></i>${n}</span>`).join(""))
 {const u=uyarilar(s),e=document.getElementById('alert');setH(e,u.map(([c,t])=>`<div>⚠ ${esc(t)}</div>`).join(""));e.className=u.length&&u.every(([c])=>c==="wa")?"wa":""}
-{const st=document.getElementById('st');st.textContent=s.aktif?L('{n} satır · {k} not · son satır {t}',{n:s.lines,k:s.notes,t:String(s.last||'-').slice(-8)}):(s.file?L('önceki toplantının dökümü gizli'):'');st.title=s.aktif?`dosya: ${s.file||'-'}${x&&x.panel?' · panel: '+x.rows+' satır görünür':''}`:(s.file?`${s.file} _canli içinde duruyor; yeni toplantı ayrı dosyaya yazılır`:'')}
+{const st=document.getElementById('st');st.textContent=s.aktif?L(s.notes===1?'{n} satır · 1 not · son satır {t}':'{n} satır · {k} not · son satır {t}',{n:s.lines,k:s.notes,t:String(s.last||'-').slice(-8)}):(s.file?L('önceki toplantının dökümü gizli'):'');st.title=s.aktif?`dosya: ${s.file||'-'}${x&&x.panel?' · panel: '+x.rows+' satır görünür':''}`:(s.file?`${s.file} _canli içinde duruyor; yeni toplantı ayrı dosyaya yazılır`:'')}
 const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
@@ -1580,8 +1594,8 @@ refresh();setInterval(refresh,2000)</script>
     ["#kc","Şimdi","Claude'un kartları: Sor, Belirt, Dikkat… ✓ yaptım, Okudum ya da ✕ gerek yok; Claude bu dönüşlerden öğrenir."],
     ["#ag","Gündem","Claude konuşulan maddeyi işaretler; sen de tikleyebilirsin. Kalan süre ve kayma buna göre hesaplanır."],
     ["#n","Tek kutu","Yazdığın not olur. ?, soru, Claude ya da iki boşlukla başlarsan Claude'a soru olur ve birkaç saniyede kartla cevaplanır."],
-    ["#oz","Son 1 dakika ve kanıt","Kaçırdığın anı Claude'a özetlet ya da toplantı ekranını kanıt olarak kaydet. Teams'te: Option + Shift + O ve Option + Shift + K."],
-    ["#mini","Mini pano","Teams'in yanında her zaman üstte duran küçük pencere: kartlar, son satırlar ve tek kutu. Tek ekranla çalışırken Teams'in yanına koy.","mini"]].map(([a,b,c,d])=>[a,L(b),L(c),d]);
+    ["#oz","Son 1 dakika ve kanıt","Kaçırdığın anı Claude'a özetlet ya da toplantı ekranını kanıt olarak kaydet. Toplantı sekmesinde: Option + Shift + O ve Option + Shift + K."],
+    ["#mini","Mini pano","Toplantının yanında her zaman üstte duran küçük pencere: kartlar, son satırlar ve tek kutu. Tek ekranla çalışırken toplantı penceresinin yanına koy.","mini"]].map(([a,b,c,d])=>[a,L(b),L(c),d]);
   const q=new URLSearchParams(location.search); let gor=false; try{gor=localStorage.getItem("suflorTur")==="1"}catch(e){}
   if(!q.has("tur")&&gor) return;
   if(!q.has("tur")) return;  // yalnız kurulumdan sonra (sihirbaz ?tur ile açar) ya da elle ?tur
@@ -1784,6 +1798,9 @@ def baslat(p):
     except Exception as e: print(f"BAŞLAT: model ısıtma hatası {e}")
     print(f"BAŞLAT: {konu} · rol {rol} · dil {dil}{' · takvimden' if olay else ''} → Terminal'de Claude"); return {"ok": True, "rol": rol, "dil": dil}
 
+def _durum_ad(d):  # v0.13.2: hazırlık sayfasında ham durum ("kapali", "hazir") yerine okunur sözcük
+    return {"hazir": _t("hazır", "ready"), "yukleniyor": _t("yükleniyor", "loading"), "kapali": _t("kapalı", "off"), "yok": _t("kurulu değil", "not installed"),
+            "hata": _t("hata", "error"), "bekliyor": _t("bekliyor", "waiting")}.get(d, d or "—")
 def hazirlik_view():  # v0.9.5: "Suflor hazırlanıyor" sekmesi bunu yoklar; adımlar bitince (ya da süre dolunca) toplantıya geçer
     b = STATE.get("baslatma") or {}; simdi = time.time(); at = b.get("at") or 0
     ca = (simdi - STATE["izle_seen"]) if STATE.get("izle_seen") else None
@@ -1795,7 +1812,7 @@ def hazirlik_view():  # v0.9.5: "Suflor hazırlanıyor" sekmesi bunu yoklar; ad�
     w, sm = STATE["whisper"].get("durum"), STATE["ses_model"].get("durum")
     adim = [{"ad": "Claude oturumu açıldı (Terminal)", "ok": bool(at)},
             {"ad": "Gündem hazırlandı", "ok": ag_t > at > 0},
-            {"ad": "Konuşma tanıma hazır", "ok": w in ("hazir", "yok") and sm in ("hazir", "yok", "hata"), "not": f"Whisper {w} · {_t('ses modeli', 'voice model')} {sm}"},
+            {"ad": "Konuşma tanıma hazır", "ok": w in ("hazir", "yok") and sm in ("hazir", "yok", "hata"), "not": f"Whisper {_durum_ad(w)} · {_t('ses modeli', 'voice model')} {_durum_ad(sm)}"},
             {"ad": "Claude izliyor", "ok": ca is not None and ca < 30 and at > 0 and STATE["izle_seen"] > at}]
     hazir = adim[3]["ok"]
     return {"konu": b.get("konu"), "baglanti": b.get("baglanti"), "adimlar": adim, "hazir": hazir, "kalan_sn": max(0, round(son - simdi)) if at else None,

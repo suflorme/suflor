@@ -30,7 +30,7 @@ Olaylarda `<ad>`: ayar dosyasındaki `ad`ın ilk sözcüğü (kullanıcı); Whis
   tarafın satırları gelmez: kullanıcıya bir kez `dikkat` kartı "Karşı tarafın sesi için Option + Shift + W". Whisper akarken DİL uyarısı
   gelmez (Teams dil ayarı önemsiz).
 - **Ses komutuyla kanıt:** kullanıcı "ekran kaydı alalım / ekran görüntüsü al / kanıt alayım" gibi istek kipinde söyleyince
-  (yalnız kullanıcı, 60 sn'de bir) aktarıcı kanıt ister; `KANIT n … · ses` olarak gelir, not alanında cümle ("ses: …"). Diğer
+  (yalnız kullanıcı, 60 sn'de bir; son 10 dk'daki bir kartı sesli okuyorsa sayılmaz — v0.13.1) aktarıcı kanıt ister; `KANIT n … · ses` olarak gelir, not alanında cümle ("ses: …"). Diğer
   KANIT olaylarıyla aynı işlem. Şerit 📷, pano 📷 ve Option + Shift + K aynen çalışır; 📷 hataları artık günlükte (`EKLENTİ: kanit · …`). v0.8.6: Teams
   sekmesi penceresinde arkadaysa (pano önde) eklenti onu bir an öne getirip çeker; karşı ses için öne getirir, ikinci basış ister.
   Kısayolları kart ve mesajlarda sembolsüz yaz ("Option + Shift + W").

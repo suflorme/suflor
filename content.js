@@ -58,7 +58,7 @@
     "metin yalnız mini panoda / panoda":"text only in the mini panel / panel","✓ Yaptım":"✓ Done","Okudum":"Seen","✕ Gerek yok":"✕ Not needed",
     "Önerileni yaptım":"I did what was suggested","Gördüm, kapat (reddetmiyorum)":"Seen, close it (not rejecting)","Bu konu gereksiz; Claude bir daha önermesin":"Not relevant; Claude won't suggest it again",
     "Son 1 dk özeti hazırlanıyor…":"Preparing the last-minute summary…","Claude'a soruldu: ":"Asked Claude: ",
-    "Option + Shift + H: şeridi gizle · Option + Shift + K: kanıt · Option + Shift + O: son 1 dk":"Option + Shift + H: hide strip · Option + Shift + K: evidence · Option + Shift + O: last 1 min",
+    "Option + Shift + H: şeridi gizle · Option + Shift + K: kanıt · Option + Shift + S: önemli an · Option + Shift + O: son 1 dk":"Option + Shift + H: hide strip · Option + Shift + K: evidence · Option + Shift + S: key moment · Option + Shift + O: last 1 min",
     "Claude şeridi gizlendi (Option + Shift + H ile geri aç)":"Claude strip hidden (Option + Shift + H to show it again)","Claude şeridi açık":"Claude strip shown"};
   const L = (s, v) => { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; };
   function dilAyarla(d) { DIL = d === "en" ? "en" : "tr"; P.dil = DIL; }
@@ -511,7 +511,7 @@
         k.append(a); list.append(k);
       });
       qs.forEach(q => list.append(el("div", "q", "⏳ " + (q.tur === "ozet" ? L("Son 1 dk özeti hazırlanıyor…") : L("Claude'a soruldu: ") + q.text))));
-      list.append(el("div", "hint", L("Option + Shift + H: şeridi gizle · Option + Shift + K: kanıt · Option + Shift + O: son 1 dk")));
+      list.append(el("div", "hint", L("Option + Shift + H: şeridi gizle · Option + Shift + K: kanıt · Option + Shift + S: önemli an · Option + Shift + O: son 1 dk")));
     }
     async function pollCards() {
       if (!cfg.enabled) { if (host) host.style.display = "none"; return; }

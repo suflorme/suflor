@@ -23,8 +23,9 @@ bellek, disk) önerisiyle birlikte kullanıcıya tek satırda ilet; "eklenti sin
   Döküm başlamadıysa birinin 'Transkripsiyonu başlat' demesi gerekir."
 - `extension.captions` true, `panel` false → altyazı modu: sorun değil (döküm yetkisi yoksa tek yol).
 - v0.8.0 `whisper` (yanıtta): `durum` "yok" → Whisper kurulu değil, altyazıyla devam. Toplantı başladıysa `whisper.ben` true
-  olmalı (kullanıcının sesi Whisper'a gidiyor); `whisper.karsi` false ise kullanıcıya tek satır: "Karşı tarafın sesi için Teams
-  sekmesinde bir kez ⌥⇧W". Whisper akarken Teams altyazısının açık olması yalnız karşı tarafın adı için gerekir.
+  olmalı (kullanıcının sesi Whisper'a gidiyor); `whisper.karsi` false ve `whisper.yerel` "bekliyor"/"dinliyor" değilse (v0.13.0:
+  yerel ses yardımcısı karşı sesi tuşsuz alır) kullanıcıya tek satır: "Karşı tarafın sesi için toplantı sekmesinde bir kez
+  Option + Shift + W"; `whisper.yerel` "izin" ise: "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses". Whisper akarken Teams altyazısının açık olması yalnız karşı tarafın adı için gerekir.
 - Yanıttaki `dil.uyari` doluysa (v0.6.1) kullanıcıya aynen yaz: konuşma dili yanlış ayarlı.
 - `python3 {{KOD}}/toplanti-claude.py sozluk | tail -3`: "UYARI: … daha yeni" görürsen
   `sozluk --birlestir` çalıştır (ayardaki dış sözlük kaynağı güncellenmiş). kullanıcıya yazmana gerek yok.
