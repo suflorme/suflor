@@ -45,6 +45,7 @@
     "Suflor.me: bu Mac'te birden fazla çalışma alanı var — Suflor.me simgesine tıklayıp bu Chrome'un alanını seç. O zamana kadar satırlar bekletiliyor.":
     "Suflor.me: there's more than one workspace on this Mac — click the Suflor.me icon and pick this Chrome's workspace. Lines are held until then.",
     "Suflor.me: canlı altyazı açıldı":"Suflor.me: live captions turned on",
+    "Suflor.me: altyazı konuşma dili {d} yapıldı (gündem dili)":"Suflor.me: caption spoken language set to {d} (agenda language)", "İngilizce":"English", "Türkçe":"Turkish",
     "Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim":"Suflor.me: couldn't turn on captions — turn them on once by hand ({y}) and I'll learn the way",
     "Suflor.me: toplantıdasın ama döküm/altyazı kapalı — satır kaydedilmiyor. ":"Suflor.me: you're in a meeting but transcript/captions are off — no lines are being saved. ",
     "⚠ Ekranda/konuşmada hassas ifade: ":"⚠ Sensitive phrase on screen/in conversation: ","📷 Kanıt {n} kaydedildi":"📷 Evidence {n} saved",
@@ -237,27 +238,40 @@
     const yol = son.map(k => k.d); chrome.storage.local.set({ ohCapPath: yol }); if (!capAuto.startsWith("acildi")) capAuto = "ogrenildi " + yol.map(d => d.text).join(" → ");
     console.log("Suflor.me: altyazı yolu öğrenildi", yol);
   }
-  function bul(adim) {
+  // v0.13.10: aria-labelledby ile adlanan öğe (Teams açılır listesi: görünen metni seçili değer, adı ayrı etikette)
+  const etiketBag = el => (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean).map(i => { const e = document.getElementById(i); return e ? (e.textContent || "").trim() : ""; }).join(" ");
+  function bul(adim, kok) {
     let aday;
     if (adim.tid) aday = [...document.querySelectorAll(`[data-tid="${CSS.escape(adim.tid)}"]`)];
     else if (adim.id) aday = [document.getElementById(adim.id)].filter(Boolean);
-    else aday = [...document.querySelectorAll(adim.sec || 'button, [role="menuitem"], [role="menuitemcheckbox"]')];
-    return aday.find(el => gorunur(el) && (adim.re ? adim.re.test(etiket(el)) : etiket(el) === adim.text) && !(TEHLIKE_RE.test(etiket(el)) && !ALTYAZI_RE.test(etiket(el)))
+    else aday = [...(kok || document).querySelectorAll(adim.sec || 'button, [role="menuitem"], [role="menuitemcheckbox"]')];
+    return aday.find(el => gorunur(el) && (adim.re ? adim.re.test(etiket(el)) || adim.re.test(etiketBag(el)) : etiket(el) === adim.text) && !(TEHLIKE_RE.test(etiket(el)) && !ALTYAZI_RE.test(etiket(el)))
       && !/kapat|turn off|hide|gizle/i.test(etiket(el)));
   }
   const bekle = ms => new Promise(r => setTimeout(r, ms));
-  async function oynat(adimlar) {
+  // v0.13.10: adım {istege} bulunamazsa atlanır; {zaten} seçili değer hedefse "zaten" döner (menü kapatılır); {kap} öğenin
+  // panelini hatırlar, {icinde} sonraki adımı yalnız o panelde arar. bitti: son denetim (altyazı için görünür mü; dil için yok)
+  async function oynat(adimlar, bitti = capSiki) {
+    let kap = null;
     for (let i = 0; i < adimlar.length; i++) {
-      let el = null; for (let t = 0; t < 20 && !(el = bul(adimlar[i])); t++) await bekle(150);
+      const a = adimlar[i], kok = a.icinde ? kap : null;
+      if (a.icinde && !kap) return `adım ${i + 1}: panel bulunamadı`;
+      let el = null; for (let t = 0; t < (a.istege ? 8 : 20) && !(el = bul(a, kok)); t++) await bekle(150);
+      if (!el && a.istege) continue;
       if (!el) {  // v0.7.5: görünen menü öğelerini de yaz — gerçek Teams'te adın/rolün ne olduğu görülsün
-        const gor = [...document.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="menu"] button')]
+        const gor = [...document.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="menu"] button, [role="option"], [role="combobox"], [role="dialog"] button')]
           .filter(gorunur).map(e => `${e.getAttribute("role") || e.tagName.toLowerCase()}:${etiket(e)}`).slice(0, 10);
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         return `adım ${i + 1} bulunamadı (menüde: ${gor.length ? gor.join(" | ") : "öğe yok"})`.slice(0, 400);
       }
+      if (a.kap) kap = el.closest('[role="dialog"], [role="complementary"], aside, [data-tid*="panel" i], [data-tid*="settings" i]') || el.parentElement;
+      if (a.zaten && a.zaten.test(((el.value || el.innerText || el.textContent) || "").trim())) {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); return "zaten";
+      }
       el.click(); await bekle(350);
     }
-    for (let t = 0; t < 20; t++) { if (capSiki()) return ""; await bekle(250); }
+    if (!bitti) return "";
+    for (let t = 0; t < 20; t++) { if (bitti()) return ""; await bekle(250); }
     return "tıklandı ama altyazı görünmedi";
   }
   async function altyaziAc(m) {
@@ -268,6 +282,27 @@
     capAuto = hata ? "basarisiz: " + hata : "acildi (" + yol + ")"; capBusy = false;
     if (!hata) toast(L("Suflor.me: canlı altyazı açıldı"), "#1b8a3a", 4000);
     else callWarned = m, toast(L("Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim", { y: P.yonerge.altyazi }), "#b26a00", 12000);
+  }
+
+  // v0.13.10: altyazının konuşma dili — aktarıcı "hedef" verirse (gündemde dil açıkça yazılı, agenda.json taze) altyazı
+  // göründükten 4 sn sonra Teams'in dil ayarına bakılır; farklıysa hedef seçilip Güncelle'ye basılır. Toplantı başına bir
+  // deneme; sonuç capAuto'ya ("dil: …") eklenir. Başarısızsa eskisi gibi dil uyarısı (dil_view) devrede kalır.
+  let dilHedef = null, dilTried = "", capGorundu = 0;
+  async function altyaziDili(m) {
+    if (capBusy || dilTried === m || !cfg.autoCaptions || !P.dilYollari) return;
+    const yollar = P.dilYollari(dilHedef); if (!yollar.length) return;
+    capBusy = true; dilTried = m; const hata = [];
+    let sonuc = "";
+    for (const y of yollar) { const h = await oynat(y, null); if (!h || h === "zaten") { sonuc = h ? "zaten " + dilHedef : "ayarlandi " + dilHedef; break; } hata.push(h); }
+    capBusy = false;
+    capAuto = (capAuto.split(" · dil:")[0] + " · dil: " + (sonuc || "basarisiz: " + hata.join("; "))).slice(0, 600);
+    if (sonuc.startsWith("ayarlandi")) toast(L("Suflor.me: altyazı konuşma dili {d} yapıldı (gündem dili)", { d: dilHedef === "en" ? L("İngilizce") : L("Türkçe") }), "#1b8a3a", 5000);
+  }
+  function dilBak() {
+    if (window.top !== window || !inCall() || !capSiki()) { capGorundu = 0; return; }
+    if (!dilHedef) return;
+    capGorundu = capGorundu || Date.now();
+    if (Date.now() - capGorundu > 4000) altyaziDili(meetingInfo().title);
   }
 
   // v0.8.0 Whisper: kullanıcının mikrofonu → aktarıcı (/ses, kanal "ben"; aktarıcı sessizliğe göre böler, Whisper metne çevirir).
@@ -317,12 +352,13 @@
     if (cfg.enabled && cfg.whisper && call && !(whisperView && whisperView.durum === "yok")) micBaslat(); else if (mic.on) micDurdur();
     if (callOnce && !call) chrome.runtime.sendMessage({ type: "whisperKarsiDur" }).catch(() => {});  // toplantıdan çıkınca karşı kanal da kapansın
     callOnce = call;
+    dilBak();  // v0.13.10
   }
   setInterval(whisperTick, 2000);
   function captureHint(panel, caps) {
     if (window.top !== window) return;
     const siki = capSiki(); if (siki && !capWas) ogren(); capWas = siki;
-    if (!inCall() && !capBusy) capTried = "";  // toplantıdan çıkıp yeniden girince yeniden dener
+    if (!inCall() && !capBusy) capTried = dilTried = "";  // toplantıdan çıkıp yeniden girince yeniden dener
     if (!inCall() || panel || siki) { callSince = 0; return; }  // gevşek findCaptions menüdeki "altyazı" öğesini de sayar
     callSince = callSince || Date.now(); const m = meetingInfo().title;
     if (Date.now() - callSince > 12000) altyaziAc(m);
@@ -485,6 +521,7 @@
       const cards = v.cards || [], qs = v.questions || [], live = inMeeting();
       const warn = v.uyari || ""; // v0.4.9: disk dolu / az yer — kart olmasa da şerit görünür
       const dil = (v.dil && v.dil.uyari) || ""; // v0.6.1: konuşma dili beklenenden farklı
+      dilHedef = (v.dil && v.dil.hedef) || null;  // v0.13.10
       if (dil && dil !== dilUyari) toast("⚠ " + dil); dilUyari = dil;
       if (hidden || !document.body || (!cards.length && !qs.length && !warn && !dil && !live)) { if (host) host.style.display = "none"; return; }
       ensure(); host.style.display = "block";

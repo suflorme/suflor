@@ -166,6 +166,9 @@ adımlar orada, kurallar burada). Port, klasörler ve kullanıcı adı ayar dosy
      gönder, DURUM'daki yönergeyle ("Altyazı İngilizce görünüyor — Altyazı ayarları → Konuşma dili: Türkçe"); uyarı
      düzelene kadar metinden çıkarım yapma, kart gönderme. Toplantı dili gerçekten değiştiyse (İngilizce konuşan biri
      katıldı) `dil`'i `karisik` yap, sohbete tek satır yaz. `karisik`ta uyarı gelmez; metin anlamsızlaşırsa sen fark et.
+     **v0.13.10:** `dil` `tr`/`en` ise eklenti altyazı açılınca Teams'in konuşma dilini kendisi gündem diline ayarlar (toplantı
+     başına bir deneme; herkes için değişir). Sonuç `/status` `extension.capAuto` içinde `dil: ayarlandi|zaten|basarisiz …`;
+     başarısızsa yukarıdaki uyarı yolu aynen geçerli. Bu yüzden `dil`'i gündeme yalnız gerçekten o dil konuşulacaksa yaz.
    - **v0.6.0 olayları:**
      - `ÖZET İSTEĞİ q…` (kullanıcı "⏱ Son 1 dk"ye bastı; son dakikanın satırları altında): SORU gibi önce bu, 30 sn içinde
        `kart cevap "…" --cevap q…`. 1–2 cümle, ≤ 200 karakter: ne konuşuldu, karar/iş çıktıysa o. Satır yoksa söyle.

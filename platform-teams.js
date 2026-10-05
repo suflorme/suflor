@@ -6,6 +6,7 @@
 //   dokumPaneli() · dokumOku(panel) → [{id, speaker, time, text}] | null (tanınmadı: çekirdek genel okuyucuyu dener)
 //   dokumSatirSayisi(panel) · altyaziKutusu() · altyaziVar() (sıkı: gerçek altyazı metni görünüyor) · altyaziOku(box)
 //   altyaziAdimlari: [[seçici, metin kalıbı]] — altyazıyı açan menü yolu (çekirdek güvenlik denetimiyle oynatır)
+//   dilYollari(hedef "tr"|"en") → [[{sec, re, zaten?, kap?, icinde?, istege?}]] — altyazı konuşma dilini ayarlayan yollar (v0.13.10)
 //   SKIP_RE: dökümde satır sayılmayacak sistem metinleri
 // Seçiciler Eylül–Ekim 2026 Teams DOM'u (teams.cloud.microsoft, Türkçe arayüz); ayrıntı BRIEF-devir.md §3.
 (() => {
@@ -127,5 +128,27 @@
       ['#callingButtons-showMoreBtn, [data-tid="more-button"], [data-tid="callingButtons-showMoreBtn"], button', /^(diğer|daha fazla|tümü|more)(\b|$)|^…$/i],  // 1 Ekim gerçek Teams (kanıt): çağrı çubuğunda "Tümü"
       ['[role="menuitem"], [role="menuitemcheckbox"], button', /^(dil ve konuşma|language and speech)/i],
       ['[role="menuitem"], [role="menuitemcheckbox"], button', /^(canlı altyazıları? aç|canlı altyazıyı aç|turn on live captions|show live captions)/i]],
+    dilYollari,
   };
+  // v0.13.10: altyazının konuşma dilini gündem diline ayarlama (5 Ekim kişisel deneme: Teams varsayılanı İngilizce (ABD) açıldı).
+  // Microsoft'un anlattığı yol: altyazı çubuğundaki Altyazı ayarları (dişli) → Dil ayarları → Toplantı konuşma dili → Güncelle;
+  // yedek yol Diğer → Dil ve konuşma → Dil ayarları. Gerçek Teams DOM'unda DOĞRULANMADI — adım bulunamazsa çekirdek menüde
+  // görünen öğeleri capAuto'ya yazar. Adım: {sec, re, zaten (seçili değer buna uyuyorsa dur), istege (yoksa atla)}.
+  // Konuşma dili toplantıdaki herkes için değişir (Teams kuralı); yalnız gündemde dil açıkça yazılıysa çağrılır.
+  function dilYollari(hedef) {
+    const R = { tr: /^(türkçe|turkish)\b/i, en: /^([iİ]ngilizce|english)\s*\((abd|amerika birleşik devletleri|united states|us)\)/i }[hedef];
+    if (!R) return [];
+    const MENU = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], button';
+    const sonu = [
+      { sec: MENU, re: /^(dil ayarları|language settings)/i },
+      { sec: '[role="combobox"], button[aria-haspopup="listbox"]', re: /konuşma dili|spoken language/i, zaten: R, kap: true },
+      { sec: '[role="option"], [role="menuitemradio"]', re: R },
+      // "Güncelle" yalnız dil panelinin içinde aranır (Teams'in uygulama güncelleme düğmesi sayfayı yeniler)
+      { sec: 'button', re: /^(güncelle|update|onayla|confirm|kaydet|save)$/i, icinde: true },
+      { sec: '[role="dialog"] button, [role="alertdialog"] button', re: /^(güncelle|update|onayla|confirm|evet|yes)$/i, istege: true }];  // "herkes için değişsin mi?" onayı
+    return [
+      [{ sec: 'button, [role="button"]', re: /^(altyazı ayarları|altyazı seçenekleri|captions? settings|captions? options)/i }, ...sonu],
+      [{ sec: '#callingButtons-showMoreBtn, [data-tid="more-button"], [data-tid="callingButtons-showMoreBtn"], button', re: /^(diğer|daha fazla|tümü|more)(\b|$)|^…$/i },
+       { sec: MENU, re: /^(dil ve konuşma|language and speech)/i }, ...sonu]];
+  }
 })();

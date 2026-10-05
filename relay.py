@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.9"  # sürüm geçmişi: git log
+SURUM = "0.13.10"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -1163,7 +1163,11 @@ DIL_AD = {"tr": "Türkçe", "en": "İngilizce"}
 def dil_view():
     bek = agenda().get("dil") or "tr"; x = STATE["extension"]
     alg = x.get("lang") if x and _yas_sn(x) < 60 else None
-    v = {"beklenen": bek, "algilanan": alg, "kaynak": x.get("langSrc") if x else None, "uyari": None}
+    # v0.13.10: "hedef" — eklenti Teams altyazısının konuşma dilini buna ayarlar. Yalnız gündemde dil açıkça yazılıysa ve
+    # agenda.json son 12 saatte yazıldıysa (eski toplantının gündemi ya da varsayılan "tr" İngilizce kullanıcıda dili bozmasın)
+    yeni = AG.get("mtime") and time.time() - AG["mtime"] < 12 * 3600
+    v = {"beklenen": bek, "algilanan": alg, "kaynak": x.get("langSrc") if x else None, "uyari": None,
+         "hedef": bek if yeni and agenda().get("dil") in DIL_AD else None}
     if whisper_akiyor("ben") or whisper_akiyor("karsi"): return v  # v0.8.0: satırlar Whisper'dan; Teams dil ayarı metni etkilemez
     # v0.7.4 (Faz 2.3): İngilizce toplantıda "karisik" de uyarır — Türkçe ayarla dökülen İngilizce konuşma yarı Türkçe yarı
     # İngilizce bozuk çıkar, eklenti onu çoğunlukla "karisik" ölçer (gerçek İngilizce hep "en": 20 dökümde 890/890 pencere)
