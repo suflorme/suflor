@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.4"  # sürüm geçmişi: git log
+SURUM = "0.13.6"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -1766,7 +1766,7 @@ def modelleri_isit():  # v0.9.5: panodan başlatınca Whisper ve ses modeli topl
     if STATE["whisper"].get("durum") != "yok": WH_Q.put({"isinma": True, "kuyruga": time.time()}); _isci_baslat()
     if STATE["ses_model"].get("durum") != "yok": ses_gonder({"isinma": True, "kuyruga": time.time()})
 def claude_yolu():
-    for y in [AYAR.get("claude"), os.path.expanduser("~/.local/bin/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude", shutil.which("claude")]:
+    for y in [AYAR.get("claude"), os.path.expanduser("~/.local/bin/claude"), os.path.expanduser("~/.claude/local/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude", shutil.which("claude")]:
         if y and os.path.isfile(os.path.expanduser(y)) and os.access(os.path.expanduser(y), os.X_OK): return os.path.expanduser(y)
     return None
 def baslat(p):
@@ -1881,7 +1881,7 @@ class H(BaseHTTPRequestHandler):
         if self._koken() is None: return self._red()
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # v0.9.1: pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []  # v0.7.0
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []  # v0.8.1
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1901,6 +1901,10 @@ class H(BaseHTTPRequestHandler):
         if self.path.split("?")[0] == "/hazirlik":
             b = sayfa(HAZIRLIK, self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if self.path.split("?")[0] == "/takvim":  # v0.9.3: ?tam=1 davet notları ve tüm katılımcılarla (toplanti-claude.py takvim)
+            # v0.13.5: eklentinin arka planı (Teams açık olmasa da) ?v=<sürüm> ile yoklar. Chrome bu istekte Origin göndermeyebilir;
+            # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)
+            m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
+            if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
             return self._json(dict(takvim_view("tam=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None))
         if self.path == "/agenda": return self._json(agenda())
         if self.path == "/cards": return self._json(cards_view())

@@ -40,9 +40,9 @@ chrome.storage.local.get({ dil: "tr" }, d => { DIL = d.dil === "en" ? "en" : "tr
 function baslat() { chrome.storage.sync.get(cfg, v => {
   cfg = v; $("ac").checked = v.autoCaptions; $("wh").checked = v.whisper; $("kw").value = v.keywords.join(", "); $("en").checked = v.enabled; $("stab").value = String(v.stableMs);
   cfg.relay = relayGecerli(cfg.relay) || RELAY_VARSAYILAN;
-  chrome.storage.local.get({ relay: null }, l => { cfg.secildi = !!relayGecerli(l.relay); if (cfg.secildi) cfg.relay = relayGecerli(l.relay); $("relay").value = cfg.relay; kesfet().then(() => { durum(); setInterval(durum, 3000); }); });
+  chrome.storage.local.get({ relay: null, relayOto: false }, l => { cfg.secildi = !!relayGecerli(l.relay); cfg.oto = !!l.relayOto; if (cfg.secildi) cfg.relay = relayGecerli(l.relay); $("relay").value = cfg.relay; kesfet().then(() => { durum(); setInterval(durum, 3000); }); });
 }); }
-function relaySec(adr) { adr = relayGecerli(adr) || RELAY_VARSAYILAN; cfg.relay = adr; cfg.secildi = true; $("relay").value = adr; chrome.storage.local.set({ relay: adr }); $("sec").hidden = true; durum(); }
+function relaySec(adr) { adr = relayGecerli(adr) || RELAY_VARSAYILAN; cfg.relay = adr; cfg.secildi = true; $("relay").value = adr; chrome.storage.local.set({ relay: adr, relayOto: false, relayOtoUyari: false }); cfg.oto = false; $("sec").hidden = true; durum(); }
 $("save").onclick = () => { chrome.storage.sync.set({ keywords: $("kw").value.split(",").map(s => s.trim()).filter(Boolean), enabled: $("en").checked, autoCaptions: $("ac").checked, whisper: $("wh").checked, stableMs: +$("stab").value });
   const gecerli = relayGecerli($("relay").value); relaySec($("relay").value);
   $("saveRes").textContent = gecerli ? L("Kaydedildi") : L("Geçersiz aktarıcı adresi — yalnız http://127.0.0.1:<port> ya da http://localhost:<port>; varsayılan kullanılıyor."); setTimeout(() => $("saveRes").textContent = "", gecerli ? 2500 : 6000); };
@@ -55,10 +55,10 @@ async function kesfet() {
   $("alansec").replaceChildren(...bulunan.map(b => { const o = document.createElement("option"); o.value = b.adr; o.textContent = `${b.alan} · port ${b.port}`; return o; }));
   if (bulunan.some(b => b.adr === cfg.relay)) $("alansec").value = cfg.relay;
   $("alansec").onchange = () => relaySec($("alansec").value);
-  if (bulunan.length > 1 && !cfg.secildi) {
+  if (bulunan.length > 1 && (!cfg.secildi || cfg.oto)) {  // v0.13.5: kendiliğinden seçilmişse de sor (gönderim sürer)
     $("secb").replaceChildren(...bulunan.map(b => { const x = document.createElement("button"); x.className = "pri"; x.textContent = b.alan; x.title = `${b.adr}${b.ad ? " · " + b.ad : ""}`; x.onclick = () => relaySec(b.adr); return x; }));
     $("sec").hidden = false;
-  } else if (bulunan.length === 1 && !cfg.secildi && bulunan[0].adr !== cfg.relay) relaySec(bulunan[0].adr);
+  } else if (bulunan.length === 1 && !cfg.secildi) { relaySec(bulunan[0].adr); chrome.storage.local.set({ relayOto: true }); cfg.oto = true; }
 }
 function satir(id, renk, metin, dugme) {
   $("d-" + id).className = "dot " + (renk || ""); const v = $("v-" + id); v.replaceChildren();

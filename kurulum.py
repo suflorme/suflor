@@ -46,10 +46,16 @@ def mac():
     return dict(_MAC, disk_gb=round(shutil.disk_usage(EV).free / 2 ** 30), chrome=os.path.isdir("/Applications/Google Chrome.app"), teams_uygulama=bool(teams))
 
 # ---------- Claude Code ----------
-CLAUDE = {"giris": None, "surum": None, "t": 0, "neden": None, "yol": None, "yol_t": 0}
+CLAUDE = {"giris": None, "surum": None, "t": 0, "neden": None, "yol": None, "yol_t": 0, "kabuk_yolu": None}
 def claude_yolu():
-    for p in (shutil.which("claude"), os.path.join(EV, ".local/bin/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"):
+    # v0.13.5: eski yerel kurulum (~/.claude/local) ve npm yolları da; hiçbiri yoksa kullanıcının kabuğuna sorulur
+    for p in (shutil.which("claude"), os.path.join(EV, ".local/bin/claude"), os.path.join(EV, ".claude/local/claude"), "/opt/homebrew/bin/claude",
+              "/usr/local/bin/claude", os.path.join(EV, ".npm-global/bin/claude")):
         if p and os.path.exists(p): return p
+    if not DENEME and CLAUDE.get("kabuk_yolu") is None:
+        v = sh(kabuk_rc()[1], "-lic", "command -v claude", zaman=10).splitlines()
+        CLAUDE["kabuk_yolu"] = v[-1].strip() if v and os.path.isabs(v[-1].strip()) and os.path.exists(v[-1].strip()) else ""
+    return CLAUDE.get("kabuk_yolu") or None
 # v0.13.3 (kişisel hesap kurulumu, 5 Ekim): Claude'un kurulum betiği ~/.local/bin'i Terminal'in arama yoluna eklemiyor — sihirbaz
 # programı tam yolundan bulup "kurulu" diyordu, Terminal'de `claude` "command not found" veriyordu. Kullanıcının kabuğu sorulur.
 def kabuk_rc():
@@ -87,8 +93,9 @@ def claude_denetle():
         if not ok:
             satirlar = [x.strip() for x in _ANSI.sub("", (r.stderr or "") + "\n" + (r.stdout or "")).splitlines() if x.strip()]
             ham = " · ".join(satirlar[-2:])[:240] or f"çıkış kodu {r.returncode}"
-            giris = re.search(r"log ?in|/login|not logged|authenticat|api key|oauth|credential|subscription|unauthori", ham, re.I)
-            neden = {"tur": "giris" if giris else "hata", "ham": ham}
+            abone = re.search(r"credit balance|subscription|usage limit|quota|billing|plan does not|upgrade", ham, re.I)  # v0.13.5
+            giris = re.search(r"log ?in|/login|not logged|authenticat|api key|oauth|credential|unauthori", ham, re.I)
+            neden = {"tur": "abonelik" if abone else "giris" if giris else "hata", "ham": ham}
     except subprocess.TimeoutExpired: ok = False; neden = {"tur": "zaman"}
     except Exception as e: ok = False; neden = {"tur": "hata", "ham": str(e)[:240]}
     CLAUDE.update(giris=ok, neden=neden)
@@ -108,15 +115,23 @@ def _boyut(yol):
             except OSError: pass
     return n
 _BOY = {"t": 0, "gb": 0}
+def _gunluk_son():
+    try: sat = [x.strip() for x in open(os.path.join(DESTEK, "modeller-kur.log"), encoding="utf-8", errors="replace").read().splitlines()[-40:] if x.strip()]
+    except OSError: return ""
+    son = [x for x in sat if re.search(r"hata|error|uyarı|not:|gerekli|failed|denied|no space", x, re.I)] or sat
+    return son[-1][:200] if son else ""
 def modeller_durum():
     if modeller_hazir(): return {"durum": "hazir", "yuzde": 100}
+    # v0.13.5: modeller ortak klasörde; başka macOS hesabı kurduysa ve eksikse bu hesap tamamlayamaz (yazma izni yok)
+    if os.path.isdir(ORTAK) and not os.access(ORTAK, os.W_OK) and not DENEME:
+        return {"durum": "hata", "yuzde": 0, "tur": "baska_hesap", "mesaj": ORTAK}
     if MODEL["p"] is None: return {"durum": "yok", "yuzde": 0}
     if MODEL["p"].poll() is not None and not modeller_hazir():
-        return {"durum": "hata", "yuzde": MODEL["yuzde"], "mesaj": "Modeller kurulamadı — internet bağlantısını denetleyip yeniden dene"}
+        return {"durum": "hata", "yuzde": MODEL["yuzde"], "tur": "kurulamadi", "mesaj": _gunluk_son()}
     if time.time() - _BOY["t"] > 5: _BOY.update(t=time.time(), gb=_boyut(ORTAK) / 2 ** 30)
     MODEL["yuzde"] = min(99, round(100 * _BOY["gb"] / GEREKEN_GB)); return {"durum": "iniyor", "yuzde": MODEL["yuzde"]}
 def modeller_baslat():
-    if modeller_hazir() or (MODEL["p"] and MODEL["p"].poll() is None): return
+    if modeller_hazir() or (MODEL["p"] and MODEL["p"].poll() is None): return  # biten (hatalı) işlem varsa yeniden başlatılır
     if DENEME: return
     os.makedirs(DESTEK, exist_ok=True)
     MODEL["p"] = subprocess.Popen([os.path.join(KOD, "modeller-kur.command")], stdout=open(os.path.join(DESTEK, "modeller-kur.log"), "a"),
@@ -129,8 +144,19 @@ def aktarici(yol):
     try: return json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}{yol}", timeout=2))
     except Exception: return None
 def eklenti():
-    s = aktarici("/status") or {}; x = s.get("extension") or {}
-    return {"bagli": x.get("age_s") is not None and x["age_s"] < 30, "surum": x.get("ver")}
+    # v0.13.5: önceden yalnız Teams sekmesindeki eklentinin nabzı sayılıyordu — Teams açık değilse sihirbaz bu adımda bekleyip kalıyordu.
+    # Eklentinin arka planı aktarıcıyı dakikada bir (ve yüklenince hemen) yoklar; aktarıcı bunu "eklenti_kurulu" olarak tutar.
+    s = aktarici("/status") or {}; x = s.get("extension") or {}; k = s.get("eklenti_kurulu") or {}
+    nabiz = x.get("age_s") is not None and x["age_s"] < 30; arka = k.get("age_s") is not None and k["age_s"] < 90
+    # v0.13.5: bu Mac'te başka hesabın aktarıcısı da çalışıyorsa eklenti hangisine yazacağını sorar (Suflor.me simgesi → alan seç)
+    coklu = sum(1 for p in range(8765, 8769) if p != ayar().get("port") and _acik(p)) > 0 if s else False
+    return {"bagli": nabiz or arka, "surum": (x.get("ver") if nabiz else k.get("ver")) if (nabiz or arka) else None, "coklu": coklu, "alan": s.get("alan")}
+def _acik(p):
+    try: urllib.request.urlopen(f"http://127.0.0.1:{p}/status", timeout=0.6); return True
+    except Exception: return False
+def yerel_ses():  # v0.13.5: karşı ses yardımcısı kuruldu mu (kur adımında gösterilir)
+    s = aktarici("/status") or {}; y = s.get("yerel_ses") or {}
+    return {"kurulu": bool(y.get("kurulu")), "durum": y.get("durum")} if s else None
 def takvim():
     t = aktarici("/takvim")
     if not t: return {"durum": "kurulmadi"}
@@ -196,6 +222,7 @@ def tamamla(c, dil):
               "takvim_haric": [x for x in (c.get("takvim_cikar") or [])],
               "teshis": c.get("teshis") is True})  # v0.12.0 beta teşhis izni (teshis.py; adres teshis_adres ya da varsayılan)
     a.setdefault("claude_model", "sonnet")
+    if claude_yolu() and not a.get("claude"): a["claude"] = claude_yolu()  # v0.13.5: aktarıcı panodan başlatırken aynı Claude
     try: yaz_json(AYAR_YOL, a); sonuc["ayar"] = "iyi"
     except Exception as e: sonuc.update(ayar="kotu", hata=f"Ayar yazılamadı: {e}"); return sonuc
     try:
@@ -227,6 +254,7 @@ def tamamla(c, dil):
     if DENEME: sonuc["aktarici"] = "iyi"; return sonuc
     r = subprocess.run([os.path.join(KOD, "aktarici-kur.command")], capture_output=True, text=True, timeout=300)
     sonuc["aktarici"] = "iyi" if r.returncode == 0 else "kotu"
+    sonuc["uyarilar"] = [x.strip()[:220] for x in (r.stdout + r.stderr).splitlines() if x.strip().startswith("UYARI")][:4]  # v0.13.5
     if r.returncode: sonuc["hata"] = "Arka plan hizmeti kurulamadı: " + (r.stdout + r.stderr).strip().splitlines()[-1][:200] if (r.stdout + r.stderr).strip() else "bilinmeyen hata"
     return sonuc
 def glob_ornek(dil):
@@ -244,16 +272,23 @@ def ac(hedef):
                            "\"$HOME/.local/bin/claude\" || claude\n")
         os.chmod(f, 0o755); yola_ekle(); subprocess.Popen(["open", "-a", "Terminal", f])
     elif hedef == "claude-yol": yola_ekle()  # v0.13.3
-    elif hedef == "claude-giris" and claude_yolu():  # v0.13.3: Claude'u Terminal'de açar; ilk açılışta giriş ister (oturum açıksa /login)
+    elif hedef == "claude-giris" and claude_yolu():  # v0.13.3: Claude'u tam yoluyla Terminal'de açar. v0.13.5: adımlar sihirbazın dilinde
+        en = oku_json(KAYIT).get("dil") == "en"
+        yonerge = ("Suflor.me — signing in to Claude Code\n  1. Claude opens below. If it asks you to sign in, follow the prompts;\n     if it doesn't, type /login and press Return.\n"
+                   "  2. Sign in with the account that has your Claude subscription (Pro or higher).\n  3. When it says you're signed in, type /exit.\n"
+                   "  4. Go back to the setup wizard; it checks again by itself.\n  Note: being signed in to the Claude desktop app doesn't count — Terminal needs its own sign-in.") if en else \
+                  ("Suflor.me — Claude Code'a giriş\n  1. Aşağıda Claude açılıyor. Giriş isterse yönergeyi izle;\n     istemezse /login yazıp Return'e bas.\n"
+                   "  2. Claude aboneliğinin olduğu hesapla (Pro ya da üstü) giriş yap.\n  3. Girişin tamamlandığını görünce /exit yaz.\n"
+                   "  4. Kurulum sihirbazına dön; kendisi yeniden denetler.\n  Not: Claude masaüstü uygulamasındaki giriş sayılmaz — Terminal'in kendi girişi gerekir.")
         f = os.path.join(tempfile.gettempdir(), "suflor-claude-giris.command")
-        open(f, "w").write("#!/bin/bash\necho 'Suflor.me — Claude açılıyor. Giriş istemezse /login yaz. Girişten sonra bu pencereyi kapatıp kuruluma dön.'\n"
-                           f"exec {shlex.quote(claude_yolu())}\n")
+        open(f, "w").write("#!/bin/bash\ncat <<'YONERGE'\n" + yonerge + "\nYONERGE\necho\n" + f"exec {shlex.quote(claude_yolu())}\n")
         os.chmod(f, 0o755); subprocess.Popen(["open", "-a", "Terminal", f])
     elif hedef == "takvim-izin":
         uyg = os.path.join(gen(a.get("uygulama") or "~/Library/Application Support/Suflor"), "Suflor Takvim.app")
         if os.path.isdir(uyg): subprocess.run(["open", "-W", "-a", uyg, "--args", "--cikti", os.path.join(os.path.dirname(uyg), "takvim.json")], timeout=150)
         try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{a.get('port')}/takvim-yenile", data=b"{}", method="POST"), timeout=3); time.sleep(4)
         except Exception: pass
+    elif hedef == "ses-izni": subprocess.Popen(["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture"])  # v0.13.5
     elif hedef == "internet-hesaplari": subprocess.Popen(["open", "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension"])
     elif hedef == "teams-dene": subprocess.Popen(["open", "-a", "Google Chrome", "https://teams.microsoft.com/v2/"])
     elif hedef == "chrome-eklentiler": subprocess.Popen(["open", "-a", "Google Chrome", "chrome://extensions"])
@@ -306,7 +341,7 @@ class H(BaseHTTPRequestHandler):
         elif yol.startswith("/api/") and not self._cerezli(): return self._json({"hata": "anahtar"}, 403)
         if yol == "/api/durum":
             a = ayar()
-            return self._json({"mac": mac(), "claude": claude_durum(), "modeller": modeller_durum(), "eklenti": eklenti(), "takvim": takvim(),
+            return self._json({"mac": mac(), "claude": claude_durum(), "modeller": modeller_durum(), "eklenti": eklenti(), "takvim": takvim(), "yerel_ses": yerel_ses(),
                                "kod": KOD, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
         if yol == "/api/kayit": return self._json(oku_json(KAYIT))
         if yol == "/api/profil": return self._json({k: PROFIL[k] for k in ("durum", "metin", "terimler")})

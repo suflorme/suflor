@@ -40,7 +40,9 @@
   // okunur), chrome.storage.local "dil"de saklanır; yoksa "tr". Anahtar Türkçe metnin kendisi, terimler panoyla aynı.
   // Aktarıcıya giden metinler (/olay, /komut) ve Claude'un kart metinleri çevrilmez.
   let DIL = "tr";
-  const EN = {"Suflor.me: bu Mac'te birden fazla çalışma alanı var — Suflor.me simgesine tıklayıp bu Chrome'un alanını seç. O zamana kadar satırlar bekletiliyor.":
+  const EN = {"Suflor.me: bu Mac'te başka bir çalışma alanı da var. Bu Chrome \"{a}\" alanına yazmaya devam ediyor; değiştirmek için Suflor.me simgesine tıkla.":
+    "Suflor.me: there's another workspace on this Mac. This Chrome keeps writing to \"{a}\"; click the Suflor.me icon to change it.",
+    "Suflor.me: bu Mac'te birden fazla çalışma alanı var — Suflor.me simgesine tıklayıp bu Chrome'un alanını seç. O zamana kadar satırlar bekletiliyor.":
     "Suflor.me: there's more than one workspace on this Mac — click the Suflor.me icon and pick this Chrome's workspace. Lines are held until then.",
     "Suflor.me: canlı altyazı açıldı":"Suflor.me: live captions turned on",
     "Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim":"Suflor.me: couldn't turn on captions — turn them on once by hand ({y}) and I'll learn the way",
@@ -66,16 +68,27 @@
 
   // v0.9.2: aktarıcı adresi yalnız bu tarayıcıda (storage.local) — iki macOS hesabının Chrome'u aynı Google hesabıyla eşitlenirse
   // adres karşı hesaba geçmesin (iki aktarıcı aynı anda açık, ikisine de 127.0.0.1'den ulaşılır). Eski sync değeri yalnız yedek.
-  // Seçim yoksa bu Mac'teki aktarıcılar yoklanır (8765–8768): tek aktarıcı varsa o kullanılır (kaydedilmez — sonra ikincisi
-  // kurulabilir), birden fazlaysa seçim yapılana kadar HİÇBİR ŞEY gönderilmez (satırlar kuyrukta bekler) ve bir kez uyarılır.
+  // Seçim yoksa bu Mac'teki aktarıcılar yoklanır (8765–8768). Birden fazlaysa seçim yapılana kadar HİÇBİR ŞEY gönderilmez (satırlar
+  // kuyrukta bekler) ve bir kez uyarılır. v0.13.5: tek aktarıcı varsa o "kendiliğinden" (relayOto) kaydedilir — önceden kaydedilmiyordu ve
+  // aynı Mac'e ikinci hesap kurulunca ilk hesabın Chrome'u sessizce göndermeyi bırakıyordu (5 Ekim). Sonradan ikinci alan belirirse
+  // gönderim sürer, bir kez "bu Chrome X alanına yazıyor; değiştirmek için simgeye tıkla" denir.
   let alanBekliyor = false, alanSecili = false, alanUyarildi = false, sonHata = "";
   async function alanKesfet() {
     if (alanSecili) return;
     const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
-    alanBekliyor = bul.length > 1; if (bul.length === 1) cfg.relay = bul[0];
+    alanBekliyor = bul.length > 1;
+    if (bul.length === 1) { cfg.relay = bul[0]; alanSecili = true; chrome.storage.local.set({ relay: bul[0], relayOto: true }); }
     if (alanBekliyor && !alanUyarildi && window.top === window) { alanUyarildi = true; toast(L("Suflor.me: bu Mac'te birden fazla çalışma alanı var — Suflor.me simgesine tıklayıp bu Chrome'un alanını seç. O zamana kadar satırlar bekletiliyor."), "#b26a00", 15000); }
   }
-  chrome.storage.sync.get(cfg, v => { cfg = Object.assign(cfg, v); chrome.storage.local.get({ relay: null }, l => { if (l.relay) { cfg.relay = l.relay; alanSecili = true; } else alanKesfet(); }); });
+  chrome.storage.sync.get(cfg, v => { cfg = Object.assign(cfg, v); chrome.storage.local.get({ relay: null, relayOto: false }, l => { if (l.relay) { cfg.relay = l.relay; alanSecili = true; if (l.relayOto) otoDenetle(); } else alanKesfet(); }); });
+  async function otoDenetle() {  // v0.13.5: kendiliğinden seçilmiş alan + bu Mac'te başka alan var → bir kez bilgi (gönderim durmaz)
+    if (window.top !== window) return;
+    const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok ? await r.json() : null; } catch (e) { return null; } }))).filter(Boolean);
+    if (bul.length < 2) return;
+    const { relayOtoUyari } = await chrome.storage.local.get({ relayOtoUyari: false }); if (relayOtoUyari) return;
+    const su = bul.find(s => cfg.relay && cfg.relay.endsWith(":" + s.port)); chrome.storage.local.set({ relayOtoUyari: true });
+    toast(L("Suflor.me: bu Mac'te başka bir çalışma alanı da var. Bu Chrome \"{a}\" alanına yazmaya devam ediyor; değiştirmek için Suflor.me simgesine tıkla.", { a: (su && su.alan) || cfg.relay }), "#b26a00", 15000);
+  }
   setInterval(alanKesfet, 30000);
   chrome.storage.onChanged.addListener((ch, alan) => {
     for (const k in ch) if (!(k === "relay" && alan === "sync")) cfg[k] = ch[k].newValue;

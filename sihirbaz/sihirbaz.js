@@ -21,14 +21,18 @@
       m_bellek_az: "16 GB önerilir; daha azında toplantıda diğer uygulamaları kapatman gerekebilir",
       indiriliyor: "Modeller iniyor", indi: "Modeller hazır",
       claude_b: "Claude'u bağlayalım", claude_a: "Kartları ve özetleri Claude yazar. Bunun için bu Mac'te Claude Code ve bir Claude aboneliği gerekiyor.",
-      c_kurulu: "Claude Code kurulu", c_yok: "Claude Code bulunamadı", c_giris: "Oturum açık", c_giris_yok: "Oturum açılmamış ya da denetlenmedi",
+      c_kurulu: "Claude Code kurulu", c_yok: "Claude Code bulunamadı", c_giris: "Oturum açık", c_giris_yok: "Oturum açılmamış ya da denetlenmedi", c_giris_degil: "Oturum açık değil",
       c_kur: "Terminal'de kur ve giriş yap", c_denetle: "Yeniden denetle",
       c_aciklama: "Terminal açılır ve kurulum komutu hazır yazılı olur. Bitince açılan Claude'da hesabınla giriş yap, sonra buraya dön.",
       c_kartsiz: "Aboneliğim yok, kartsız devam et",
       c_yol_yok: "Terminal'de claude komutu bulunmuyor", c_yol_ac: "Claude Code kurulu ama Terminal onu tanımıyor; /toplanti için gerekli.", c_yol_dug: "Terminal'e tanıt",
       c_denetleniyor: "Denetleniyor… (en çok 90 sn)", c_giris_dug: "Terminal'de giriş yap",
-      c_n_giris: "Claude'da oturum açılmamış. Terminal'de giriş yap, sonra yeniden denetle.", c_n_zaman: "Claude 90 saniyede yanıt vermedi. İnternet bağlantına bakıp yeniden denetle.",
+      c_n_giris: "Claude Code'da oturum açılmamış.", c_n_zaman: "Claude 90 saniyede yanıt vermedi. İnternet bağlantına bakıp yeniden denetle.",
       c_n_hata: "Claude denetimi başarısız: ", c_n_yok: "Claude Code bulunamadı.",
+      c_n_abonelik: "Hesabında Claude Code kullanımı yok ya da kullanım sınırın doldu. Pro ya da üstü abonelik gerekir; istersen kartsız devam edebilirsin.",
+      c_ga_b: "Terminal'de giriş", c_ga1: "\"Terminal'de giriş yap\"a bas: Claude, Terminal'de açılır.", c_ga2: "Giriş isterse yönergeyi izle; istemezse /login yazıp Return'e bas.",
+      c_ga3: "Claude aboneliğinin olduğu hesapla gir, girişi görünce /exit yaz.", c_ga4: "Buraya dön: sihirbaz kendisi yeniden denetler.",
+      c_masaustu: "Claude masaüstü uygulamasındaki giriş sayılmaz; Terminal'deki Claude ayrıca giriş ister.",
       c_kartsiz_a: "Kartsız kipte döküm, pano ve notlar çalışır; kart ve özet olmaz. Sonradan Claude bağlayabilirsin.",
       sen_b: "Seni tanıyalım", sen_a: "Kartlar senin bakışından yazılsın diye. Bu bilgiler yalnız bu Mac'te kalır.",
       ad: "Adın", ad_i: "Toplantılarda göründüğü gibi", rol: "Rolün ya da unvanın", sirket: "Şirketin (isteğe bağlı)", is_alani: "İş alanın",
@@ -56,8 +60,10 @@
       p_gider: "Gider", p_gider_a: "Sürümler, Mac modeli, hata türü ve kodun neresinde olduğu, gecikmeler ve sayılar (kaç satır, kaç kart).",
       p_gitmez: "Asla gitmez", p_gitmez_a: "Döküm, kişi ve toplantı adları, kartlar, notlar, takvimin, belgelerin.",
       p_evet: "Paylaş", p_hayir: "Paylaşma", p_not: "Sonradan ayarlardan değiştirebilirsin. Panodaki Geri bildirim düğmesi her zaman çalışır.",
-      kur_b: "Kuruyorum", kur_a: "Ayarlarını yazıyor, arka plan hizmetini ve takvim yardımcısını kuruyorum.",
+      kur_b: "Kuruyorum", kur_a: "Ayarlarını yazıyor, arka plan hizmetini, takvim ve ses yardımcılarını kuruyorum. macOS \"Suflor Ses\" için sistem sesi kaydı izni sorarsa İzin Ver de.",
       k_ayar: "Ayarlar", k_proje: "Proje klasörü", k_not: "Çalışma notu ve sözlük", k_aktarici: "Arka plan hizmeti", k_modeller: "Konuşma tanıma modelleri",
+      k_m_yeniden: "Yeniden dene", k_m_hata: "Modeller kurulamadı. İnternet bağlantını denetleyip yeniden dene.", k_m_baska: "Modeller bu Mac'teki başka bir hesabın klasöründe ve eksik. O hesapta Suflor.me'yi güncelle (guncelle.command), sonra burada yeniden dene.",
+      k_ses: "Karşı tarafın sesi (Suflor Ses)", k_ses_ok: "Hazır; ilk toplantıda izin istenebilir", k_ses_yok: "Kurulamadı; karşı ses için toplantı sekmesinde bir kez Option + Shift + W", k_ses_izin: "İzin ayarını aç",
       takvim_b: "Takvimini bağlayalım", takvim_a: "Toplantından birkaç dakika önce hatırlatır, gündemi ve katılımcıları davetten alır.",
       t_izin: "Erişim ver", t_izin_b: "Takvim izni", t_izin_a: "macOS bir izin penceresi açacak: \"Tam erişim\"i seç.",
       t_hesap_yok: "Mac'in Takvim uygulamasında hesap görünmüyor.", t_hesap_ekle: "Google, iCloud ya da Outlook hesabını ekle",
@@ -72,10 +78,12 @@
       e2: "\"Paketlenmemiş öğe yükle\"ye bas ve Suflor.me klasörünü seç.", e2d: "Klasörü Finder'da göster",
       e3: "Araç çubuğundaki yapboz simgesinden Suflor.me'yi sabitle.",
       e_bekle: "Eklentiyi bekliyorum…", e_bagli: "Eklenti bağlandı",
+      e_coklu: "Bu Mac'te başka bir hesabın Suflor.me'si de çalışıyor. Chrome'da Suflor.me simgesine tıkla ve bu hesabın alanını seç: ", e_profil: "Eklentiyi Teams'e girdiğin Chrome profiline ekle; birden fazla Chrome profilin varsa doğru pencerede olduğuna bak.",
       bitti_b: "Hazırsın", bitti_a: "Bir sonraki toplantından önce takvimdeki Başlat'a bas ya da Suflor.me simgesine tıkla.",
       b1: "Karşı tarafın sesi kendiliğinden yazılır (ilk toplantıda macOS sistem sesi kaydı izni ister). Yazılmazsa toplantı sekmesinde bir kez Option + Shift + W.",
       b2: "Option + Shift + K kanıt, Option + Shift + S önemli an, Option + Shift + O son bir dakikanın özeti.",
       b3: "Panoya ?, soru, Claude ya da iki boşlukla başlayan yazı Claude'a soru olur.",
+      b4: "İlk toplantıda Claude, Terminal'de proje klasörüne güvenip güvenmediğini sorar: \"Yes\" de.",
     },
     en: {
       geri: "Back", devam: "Continue", basla: "Get started", bitir: "Open Suflor.me", atla: "Skip for now",
@@ -90,14 +98,18 @@
       m_bellek_az: "16 GB recommended; with less you may need to close other apps during meetings",
       indiriliyor: "Downloading models", indi: "Models ready",
       claude_b: "Connect Claude", claude_a: "Claude writes the cards and summaries. This needs Claude Code on this Mac and a Claude subscription.",
-      c_kurulu: "Claude Code is installed", c_yok: "Claude Code not found", c_giris: "Signed in", c_giris_yok: "Not signed in or not checked yet",
+      c_kurulu: "Claude Code is installed", c_yok: "Claude Code not found", c_giris: "Signed in", c_giris_yok: "Not signed in or not checked yet", c_giris_degil: "Not signed in",
       c_kur: "Install and sign in with Terminal", c_denetle: "Check again",
       c_aciklama: "Terminal opens with the install command ready. When it finishes, sign in to Claude, then come back here.",
       c_kartsiz: "No subscription, continue without cards",
       c_yol_yok: "Terminal doesn't know the claude command", c_yol_ac: "Claude Code is installed but Terminal can't find it; /toplanti needs it.", c_yol_dug: "Add to Terminal",
       c_denetleniyor: "Checking… (up to 90 s)", c_giris_dug: "Sign in with Terminal",
-      c_n_giris: "You're not signed in to Claude. Sign in with Terminal, then check again.", c_n_zaman: "Claude didn't answer within 90 seconds. Check your internet connection and try again.",
+      c_n_giris: "You're not signed in to Claude Code.", c_n_zaman: "Claude didn't answer within 90 seconds. Check your internet connection and try again.",
       c_n_hata: "Claude check failed: ", c_n_yok: "Claude Code not found.",
+      c_n_abonelik: "Your account has no Claude Code access or has hit its usage limit. A Pro or higher subscription is needed; you can also continue without cards.",
+      c_ga_b: "Signing in with Terminal", c_ga1: "Press \"Sign in with Terminal\": Claude opens in Terminal.", c_ga2: "If it asks you to sign in, follow the prompts; if not, type /login and press Return.",
+      c_ga3: "Sign in with the account that has your Claude subscription, then type /exit.", c_ga4: "Come back here: the wizard checks again by itself.",
+      c_masaustu: "Being signed in to the Claude desktop app doesn't count; Claude in Terminal needs its own sign-in.",
       c_kartsiz_a: "Without cards you still get the transcript, the dashboard and notes; no cards or summaries. You can connect Claude later.",
       sen_b: "Tell us about you", sen_a: "So the cards are written from your point of view. This stays on this Mac.",
       ad: "Your name", ad_i: "As it appears in meetings", rol: "Your role or title", sirket: "Company (optional)", is_alani: "Your field",
@@ -125,8 +137,11 @@
       p_gider: "Sent", p_gider_a: "Versions, Mac model, error type and where in the code it happened, delays and counts (how many lines, how many cards).",
       p_gitmez: "Never sent", p_gitmez_a: "Transcripts, names of people and meetings, cards, notes, your calendar, your documents.",
       p_evet: "Share", p_hayir: "Don't share", p_not: "You can change this later in settings. The Feedback button on the panel always works.",
-      kur_b: "Setting up", kur_a: "Writing your settings and installing the background service and calendar helper.",
-      k_ayar: "Settings", k_proje: "Project folder", k_not: "Working note and glossary", k_aktarici: "Background service", k_modeller: "Speech recognition models",
+      kur_b: "Setting up", kur_a: "Writing your settings and installing the background service, calendar and audio helpers. If macOS asks for system audio recording permission for \"Suflor Ses\", choose Allow.",
+      k_ayar: "Settings", k_proje: "Project folder", k_not: "Working note and glossary", k_aktarici: "Background service", k_m_yeniden: "Try again", k_m_hata: "The models couldn't be installed. Check your internet connection and try again.",
+      k_m_baska: "The models are in another account's folder on this Mac and incomplete. Update Suflor.me in that account (guncelle.command), then try again here.",
+      k_ses: "Other side's audio (Suflor Ses)", k_ses_ok: "Ready; permission may be asked in your first meeting", k_ses_yok: "Couldn't be installed; press Option + Shift + W once in the meeting tab for the other side's audio", k_ses_izin: "Open permission settings",
+      k_modeller: "Speech recognition models",
       takvim_b: "Connect your calendar", takvim_a: "It reminds you a few minutes before a meeting and takes the agenda and attendees from the invitation.",
       t_izin: "Allow access", t_izin_b: "Calendar permission", t_izin_a: "macOS will ask for permission: choose \"Full Access\".",
       t_hesap_yok: "No accounts in the Mac Calendar app.", t_hesap_ekle: "Add your Google, iCloud or Outlook account",
@@ -141,10 +156,12 @@
       e2: "Click \"Load unpacked\" and choose the Suflor.me folder.", e2d: "Show the folder in Finder",
       e3: "Pin Suflor.me from the puzzle icon in the toolbar.",
       e_bekle: "Waiting for the extension…", e_bagli: "Extension connected",
+      e_coklu: "Another account's Suflor.me is also running on this Mac. Click the Suflor.me icon in Chrome and pick this account's workspace: ", e_profil: "Add the extension to the Chrome profile you use for Teams; if you have several profiles, make sure you're in the right window.",
       bitti_b: "You're all set", bitti_a: "Before your next meeting press Start in the calendar list or click the Suflor.me icon.",
       b1: "The other side is transcribed automatically (macOS asks for system audio recording permission in the first meeting). If not, press Option + Shift + W once in the meeting tab.",
       b2: "Option + Shift + K evidence, Option + Shift + S key moment, Option + Shift + O summary of the last minute.",
       b3: "Text on the dashboard starting with ?, \"soru\", Claude or two spaces becomes a question for Claude.",
+      b4: "In your first meeting, Claude asks in Terminal whether you trust the project folder: answer \"Yes\".",
     },
   };
   const ARACLAR = ["Microsoft 365", "Google Workspace", "Slack", "Jira", "Confluence", "Notion", "Asana", "Trello", "Salesforce", "HubSpot",
@@ -223,13 +240,19 @@
           ${satir(m.python ? "iyi" : "kotu", t.m_python, m.python ? m.python : t.m_python_ac, m.python ? "" : dug("python", t.m_python_dug))}
           ${satir(m.chrome ? "iyi" : "uyari", t.m_chrome, m.chrome ? "" : t.m_chrome_ac, m.chrome ? "" : dug("chrome-indir", t.m_chrome_dug))}</div>`; } },
     { id: "claude", simge: "claude", b: "claude_b", a: "claude_a", hazir: () => { const c = (D.durum || {}).claude || {}; return (c.kurulu && c.giris) || C.kartsiz; },
-      gir: durumAl,
+      // v0.13.5: adıma girince oturum bilinmiyorsa kendiliğinden denetler; Terminal'den dönünce (pencere odağı) yeniden denetler
+      gir: async () => { await durumAl(); const c = (D.durum || {}).claude || {}; if (c.kurulu && c.giris !== true) await claudeDenetle(); },
       icerik: () => { const c = (D.durum || {}).claude || {};
-        // v0.13.3: Terminal'de komut yoksa söyle; denetim başarısızsa nedeni (giriş, zaman aşımı, hata metni) satırın altında
-        const n = !c.giris && c.neden ? c.neden : null, nm = n ? (n.tur === "giris" ? t.c_n_giris : n.tur === "zaman" ? t.c_n_zaman : n.tur === "yok" ? t.c_n_yok : t.c_n_hata + (n.ham || "")) : "";
+        // v0.13.3: Terminal'de komut yoksa söyle; denetim başarısızsa nedeni. v0.13.5: oturum yoksa giriş düğmesi her zaman + adım adım yönerge
+        const n = !c.giris && c.neden ? c.neden : null;
+        const nm = n ? (n.tur === "giris" ? t.c_n_giris : n.tur === "abonelik" ? t.c_n_abonelik : n.tur === "zaman" ? t.c_n_zaman : n.tur === "yok" ? t.c_n_yok : t.c_n_hata + (n.ham || "")) : "";
+        const girisSatiri = D.claudeDen ? satir("bekle", t.c_denetleniyor)
+          : satir(c.giris ? "iyi" : "uyari", c.giris ? t.c_giris : n ? t.c_giris_degil : t.c_giris_yok, nm, (c.kurulu && !c.giris ? dug("claude-giris", t.c_giris_dug) : "") + dug("claude-denetle", t.c_denetle));
+        const adimlar = c.kurulu && !c.giris && !D.claudeDen && (!n || n.tur === "giris" || n.tur === "hata")
+          ? `<div class="alan"><span class="etiket">${esc(t.c_ga_b)}</span><ol class="adimlar"><li>${esc(t.c_ga1)}</li><li>${esc(t.c_ga2)}</li><li>${esc(t.c_ga3)}</li><li>${esc(t.c_ga4)}</li></ol><p class="dipnot">${esc(t.c_masaustu)}</p></div>` : "";
         return `<div class="liste">${satir(c.kurulu ? "iyi" : "kotu", c.kurulu ? t.c_kurulu : t.c_yok, c.surum || "", c.kurulu ? "" : dug("claude-kur", t.c_kur))}
           ${c.kurulu && c.yolda === false ? satir("uyari", t.c_yol_yok, t.c_yol_ac, dug("claude-yol", t.c_yol_dug)) : ""}
-          ${satir(c.giris ? "iyi" : "uyari", c.giris ? t.c_giris : t.c_giris_yok, nm, (c.kurulu && !c.giris && n && n.tur === "giris" ? dug("claude-giris", t.c_giris_dug) : "") + dug("claude-denetle", t.c_denetle))}</div>
+          ${c.kurulu ? girisSatiri : ""}</div>${adimlar}
           ${c.kurulu && c.giris ? "" : `${c.kurulu ? "" : `<p class="dipnot">${esc(t.c_aciklama)}</p>`}<p class="dipnot">${dug("kartsiz", t.c_kartsiz)}<br>${esc(t.c_kartsiz_a)}</p>`}`; } },
     { id: "sen", simge: "sen", b: "sen_b", a: "sen_a", hazir: () => (C.ad || "").trim().length > 1,
       gir: () => { if (!C.ad && D.durum && D.durum.varsayilan_ad) C.ad = D.durum.varsayilan_ad; },
@@ -263,10 +286,11 @@
     { id: "kur", simge: "kur", b: "kur_b", a: "kur_a", hazir: () => { const k = D.kurDurum || {}; return k.ayar === "iyi" && k.aktarici === "iyi"; },
       gir: async () => { D.kurDurum = { ayar: "bekle", proje: "bekle", not: "bekle", aktarici: "bekle" }; ciz();
         try { D.kurDurum = await api("kur/tamamla", { cevap: C, dil: D.dil }); } catch (e) { D.kurDurum = { ...D.kurDurum, hata: String(e.message || e) }; } await durumAl(); ciz(); },
-      icerik: () => { const k = D.kurDurum || {}, m = (D.durum || {}).modeller || {};
+      icerik: () => { const k = D.kurDurum || {}, m = (D.durum || {}).modeller || {}, ys = (D.durum || {}).yerel_ses;
         return `<div class="liste">${satir(k.ayar || "bekle", t.k_ayar)}${satir(k.proje || "bekle", t.k_proje, C.proje || "")}${satir(k.not || "bekle", t.k_not)}${satir(k.aktarici || "bekle", t.k_aktarici)}
-          ${satir(m.durum === "hazir" ? "iyi" : m.durum === "hata" ? "kotu" : "bekle", t.k_modeller, m.durum === "hazir" ? "" : m.durum === "hata" ? (m.mesaj || "") : `%${m.yuzde || 0}`)}</div>
-          ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div>` : ""}`; } },
+          ${satir(m.durum === "hazir" ? "iyi" : m.durum === "hata" ? "kotu" : "bekle", t.k_modeller, m.durum === "hazir" ? "" : m.durum === "hata" ? (m.tur === "baska_hesap" ? t.k_m_baska : t.k_m_hata + (m.mesaj ? " (" + m.mesaj + ")" : "")) : `%${m.yuzde || 0}`, m.durum === "hata" ? dug("modeller-yeniden", t.k_m_yeniden) : "")}
+          ${k.aktarici === "iyi" && ys ? satir(ys.kurulu ? "iyi" : "uyari", t.k_ses, ys.kurulu ? t.k_ses_ok : t.k_ses_yok, ys.kurulu ? dug("ses-izni", t.k_ses_izin) : "") : ""}</div>
+          ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div><p class="dipnot">${dug("kur-yeniden", t.k_m_yeniden)}</p>` : ""}${(k.uyarilar || []).map(u => `<div class="kart-not uyari">${esc(u)}</div>`).join("")}`; } },
     { id: "takvim", simge: "takvim", b: "takvim_b", a: "takvim_a", gir: durumAl,
       icerik: () => { const tk = (D.durum || {}).takvim || {};
         if (tk.durum !== "ok") return `<div class="liste">${satir(tk.durum === "izin_yok" ? "uyari" : "bos", t.t_izin_b, t.t_izin_a, dug("takvim-izin", t.t_izin))}</div>`;
@@ -281,9 +305,10 @@
         return `<ol class="adimlar"><li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e1)}<div class="eylem">${dug("chrome-eklentiler", t.e1d)}</div></div></li>
           <li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e2)}<div class="eylem">${dug("eklenti-klasoru", t.e2d)}</div></div></li><li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e3)}</div></li></ol>
           <div class="liste">${satir(e.bagli ? "iyi" : "bekle", e.bagli ? t.e_bagli : t.e_bekle, e.surum ? "v" + e.surum : "")}</div>
-          ${e.bagli ? "" : `<p class="dipnot">${dug("atla", t.atla)}</p>`}`; } },
+          ${!e.bagli && e.coklu ? `<div class="kart-not uyari">${esc(t.e_coklu + (e.alan || ""))}</div>` : ""}
+          ${e.bagli ? "" : `<p class="dipnot">${esc(t.e_profil)}</p><p class="dipnot">${dug("atla", t.atla)}</p>`}`; } },
     { id: "bitti", simge: "isaret", b: "bitti_b", a: "bitti_a", son: true,
-      icerik: () => `<ol class="adimlar"><li>${esc(t.b1)}</li><li>${esc(t.b2)}</li><li>${esc(t.b3)}</li></ol>` },
+      icerik: () => `<ol class="adimlar"><li>${esc(t.b1)}</li><li>${esc(t.b2)}</li><li>${esc(t.b3)}</li><li>${esc(t.b4)}</li></ol>` },
   ];
   const gorunen = () => ADIMLAR.filter(a => !a.kosul || a.kosul());
 
@@ -322,6 +347,14 @@
     }
     if (gorunen()[D.adim].id === "tanidim") ciz();
   }
+  async function claudeDenetle() {  // v0.13.5: tek yerden; aynı anda ikinci denetim başlamaz
+    if (D.claudeDen) return; D.claudeDen = true; D.sonDen = Date.now(); ciz();
+    try { await api("claude/denetle", {}); } catch (e) {} D.claudeDen = false; await durumAl(); ciz();
+  }
+  window.addEventListener("focus", () => {  // Terminal'de giriş yapıp dönünce
+    const a = gorunen()[D.adim], c = (D.durum || {}).claude || {};
+    if (a && a.id === "claude" && c.kurulu && !c.giris && !D.claudeDen && Date.now() - (D.sonDen || 0) > 15000) claudeDenetle();
+  });
   async function eklentiBekle() {
     while (gorunen()[D.adim] && gorunen()[D.adim].id === "eklenti") {
       await durumAl(); ciz(); if (((D.durum || {}).eklenti || {}).bagli) break; await new Promise(r => setTimeout(r, 3000));
@@ -347,7 +380,9 @@
       if (n === "kartsiz") { C.kartsiz = true; kaydet(); ciz(); return; }
       if (n === "atla") { git(D.adim + 1); return; }
       if (n === "ornek") { C.ornek = !C.ornek; kaydet(); ciz(); return; }
-      if (n === "claude-denetle") { ey.disabled = true; ey.textContent = t.c_denetleniyor; await api("claude/denetle", {}).catch(() => {}); await durumAl(); ciz(); return; }
+      if (n === "claude-denetle") { await claudeDenetle(); return; }
+      if (n === "kur-yeniden") { const a = gorunen()[D.adim]; if (a && a.gir) await a.gir(); return; }  // v0.13.5: kurulum adımı başarısızsa
+      if (n === "modeller-yeniden") { await api("modeller/baslat", {}).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "claude-yol") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "klasor-sec") { const r = await api("klasor-sec", {}).catch(() => ({})); if (r.yol) { C.proje = r.yol; kaydet(); ciz(); } return; }
       if (n === "takvim-izin") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }

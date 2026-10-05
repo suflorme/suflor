@@ -66,6 +66,7 @@ async function relayAdr() {
   const l = relayGecerli((await chrome.storage.local.get({ relay: null })).relay); if (l) return l;
   const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
   if (bul.length > 1) throw new Error("Çalışma alanı seçilmedi — Suflor.me simgesine tıklayıp seç.");
+  if (bul.length === 1) chrome.storage.local.set({ relay: bul[0], relayOto: true });  // v0.13.5: tek aktarıcı kendiliğinden kaydedilir (content.js ile aynı)
   return bul[0] || relayGecerli((await chrome.storage.sync.get({ relay: RELAY_VARSAYILAN })).relay) || RELAY_VARSAYILAN;
 }
 async function karsiBaslat(hint, kaynak) {
@@ -165,6 +166,8 @@ async function kanit(hint, kaynak, istek, not) {
 chrome.alarms.create("takvim", { periodInMinutes: 1 });
 const bildirilen = new Set();
 chrome.alarms.onAlarm.addListener(a => { if (a.name === "takvim") takvimBak(); if (a.name === "nabiz") nabizYokla(); });
+// v0.13.5: yüklenince ve Chrome açılınca hemen bir kez (sihirbazın eklenti adımı dakikayı beklemesin)
+chrome.runtime.onInstalled.addListener(() => takvimBak()); chrome.runtime.onStartup.addListener(() => takvimBak());
 // v0.9.6 — nabız yedeği: 3 Ekim denemesinde Teams sekmesinin nabzı ~7 dk kesildi (mikrofon sesi akarken). 30 sn'de bir her
 // toplantı sekmesinin üst çerçevesine "nabiz" mesajı; içerik betiği ping() atar (mesaj, kısılan zamanlayıcıyı beklemez).
 // Yanıt yoksa (betik yüklü değil / bağlam koptu) aktarıcı günlüğüne bir kez yazılır; sekme yeniden yanıt verince yine.
@@ -182,7 +185,7 @@ async function nabizYokla() {
 }
 async function takvimBak() {
   try {
-    const relay = await relayAdr(); const t = await (await fetch(relay + "/takvim")).json();
+    const relay = await relayAdr(); const t = await (await fetch(relay + "/takvim?v=" + chrome.runtime.getManifest().version)).json();  // v0.13.5: ?v= — sihirbaz eklentiyi Teams açık olmadan da görür
     if (t.claude_age_s != null && t.claude_age_s < 120) return;
     for (const o of t.olaylar || []) {
       if (o.dk > 5 || o.dk < -2 || bildirilen.has(o.id)) continue;

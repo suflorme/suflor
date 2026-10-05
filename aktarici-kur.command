@@ -106,7 +106,10 @@ done
 # v0.13.0: ilk kurulumda (ya da yeni derlemede) izin penceresi şimdi çıksın, toplantının ortasında değil
 if [ "$SES_YENI" = 1 ] && [ -x "$SES/Contents/MacOS/SuflorSes" ]; then
   echo "Sistem sesi kaydı izni: macOS 'Suflor Ses' için izin sorarsa İzin Ver de (Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı)."
-  open -g -W -a "$SES" --args --izin 2>/dev/null || true
+  # v0.13.5: en çok 2 dk bekle — izin penceresi yanıtlanmazsa kurulum (sihirbazın "Kuruyorum" adımı) takılıp kalmasın
+  open -g -W -a "$SES" --args --izin 2>/dev/null & IZ=$!
+  for _ in $(seq 1 120); do kill -0 "$IZ" 2>/dev/null || break; sleep 1; done
+  kill "$IZ" 2>/dev/null || true; wait "$IZ" 2>/dev/null || true
 fi
 
 cat > "$PL" <<EOF

@@ -29,7 +29,8 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 - En az 16 GB bellek (konuşma tanıma ve ses modeli toplantı sırasında ~4 GB kullanır)
 - ~7 GB boş disk (modeller ~5 GB)
 - Google Chrome
-- [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü)
+- [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü). Claude Code kurulu değilse sihirbaz kurar;
+  Terminal'de `claude` → `/login` ile giriş gerekir (Claude masaüstü uygulamasındaki giriş Terminal'e geçmez).
 
 ## Kurulum
 Terminal'e yapıştır:
