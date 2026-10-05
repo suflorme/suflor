@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.8"  # sürüm geçmişi: git log
+SURUM = "0.13.9"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -1303,7 +1303,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 .grid{grid-template-columns:minmax(0,1fr)}#rz{display:none}main{max-height:50vh;padding:6px 16px 12px;border-bottom:1px solid var(--bd)}aside .sc{padding:6px 16px 16px}}  /* v0.11.3: dar pencere — tek sütun */#tkm{font-size:12px}#tkm.er{color:var(--er)}#tkm.ok{color:var(--ok)}
 </style>
 <header><div class=hl><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span></div>
-<div class=hr><span id=sure></span><span id=conn></span><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
+<div class=hr><span id=sure></span><span id=conn></span><button id=gun hidden></button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
 <dialog id=gbd><form method=dialog id=gbf><b class=gbb>Geri bildirim</b><p class=hint>Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.</p>
 <textarea id=gbm rows=5 placeholder="Ne oldu? Ne bekliyordun?"></textarea>
 <label class=hint style="display:flex;gap:6px;align-items:center"><input type=checkbox id=gbt checked style="margin:0"> Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)</label>
@@ -1376,7 +1376,9 @@ const EN={"toplantı bekleniyor":"waiting for a meeting","Mini pano: her zaman �
 "Tek kutu":"One box","Yazdığın not olur. ?, soru, Claude ya da iki boşlukla başlarsan Claude'a soru olur ve birkaç saniyede kartla cevaplanır.":"What you type becomes a note. Start with ?, Claude or two spaces and it becomes a question; Claude answers with a card within seconds.",
 "Son 1 dakika ve kanıt":"Last minute and evidence","Kaçırdığın anı Claude'a özetlet ya da toplantı ekranını kanıt olarak kaydet. Toplantı sekmesinde: Option + Shift + O ve Option + Shift + K.":"Have Claude sum up what you missed, or save the meeting screen as evidence. In the meeting tab: Option + Shift + O and Option + Shift + K.",
 "Mini pano":"Mini panel","Toplantının yanında her zaman üstte duran küçük pencere: kartlar, son satırlar ve tek kutu. Tek ekranla çalışırken toplantı penceresinin yanına koy.":"A small always-on-top window: cards, latest lines and the one box. On a single screen, put it next to the meeting window.",
-"Geri":"Back","Turu kapat":"Close tour","Geri bildirim gönder":"Send feedback","Geri bildirim":"Feedback",
+"Geri":"Back","Turu kapat":"Close tour","Güncelle · v{v}":"Update · v{v}","Güncelleniyor…":"Updating…","Güncelleme başarısız — yeniden dene":"Update failed — try again",
+"Suflor.me v{v} sürümüne güncellensin mi? Aktarıcı birkaç saniye kapanıp açılır; Chrome eklentisi kendini yeniler.":"Update Suflor.me to v{v}? The relay restarts for a few seconds; the Chrome extension reloads itself.",
+"Suflor.me v{v} sürümüne güncellendi. Açık bir Teams sekmesi varsa yenile.":"Suflor.me was updated to v{v}. If a Teams tab is open, reload it.","Güncellenemedi: ":"Couldn't update: ","Geri bildirim gönder":"Send feedback","Geri bildirim":"Feedback",
 "Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.":"Tell us what broke, what's missing or what you liked; it goes to the developer. Your text is sent as written: don't include names, passwords or meeting content.",
 "Ne oldu? Ne bekliyordun?":"What happened? What did you expect?","Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)":"Include technical info (versions, Mac, recent events — no meeting content)",
 "Ne gidecek?":"What will be sent?","Önce ne olduğunu yaz":"Describe what happened first","gönderiliyor…":"sending…","Teşekkürler — gönderildi":"Thanks — sent","Gönderilemedi — sonra yeniden denenecek":"Couldn't send — will retry later","Mini panoyu aç":"Open mini panel","Bitir":"Finish","İleri":"Next","Suflor.me tanıtım turu":"Suflor.me tour"}
@@ -1488,6 +1490,7 @@ function baglanti(s){
   return out
 }
 function uyarilar(s){const a=[],x=s.extension
+  try{const g=JSON.parse(sessionStorage.getItem("guncellendi")||"null");if(g&&Date.now()-g.t<90000)a.push(["wa",L("Suflor.me v{v} sürümüne güncellendi. Açık bir Teams sekmesi varsa yenile.",{v:g.v})])}catch(e){}  // v0.13.9
   if(s.uyari)a.push(["er",s.uyari]); if(s.dil&&s.dil.uyari)a.push(["er",L("Dil: ")+s.dil.uyari]); if(s.bellek&&s.bellek.uyari)a.push(["wa",s.bellek.uyari])
   if(x&&x.age_s<30&&x.call&&!x.panel&&!x.captions&&!((s.whisper||{}).ben||(s.whisper||{}).karsi))a.push(["wa",L("Toplantıdasın ama satır gelmiyor — ")+((x.yonerge&&x.yonerge.altyazi)||L("altyazıyı aç"))])
   return a}
@@ -1546,7 +1549,17 @@ function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null
   tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh')
   h.textContent=!t.uygulama?L('Takvim yardımcısı kurulu değil (aktarici-kur.command).'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.'):t.durum==='bekliyor'?L('takvim okunuyor…'):(t.durum&&t.durum!=='ok'?(t.hata||t.durum):(tkOlaylar.length?'':L('Bugün başka toplantı yok.')))
   setH(document.getElementById('tk'),tkOlaylar.slice(0,5).map(o=>`<div class="tko${(o.dk<=10&&o.dk>=-30)||o.suruyor?' yakin':''}"><div class=t><div><b class=z>${esc(o.saat)}</b>${esc(o.baslik)}${o.platform?` <span class=chip>${PL[o.platform]||esc(o.platform)}</span>`:''}</div><div class=sp>${esc([o.suruyor?L('şimdi'):o.dk<=60?L('{n} dk sonra',{n:o.dk}):'',(o.katilimcilar||[]).slice(0,3).join(', ')+(o.kisi_sayisi>4?' +'+(o.kisi_sayisi-4):''),o.ben_duzenleyen?L('düzenleyen sen'):''].filter(Boolean).join(' · '))}</div></div><button data-bas="${esc(o.id)}" style="flex:none">${L('Başlat')}</button></div>`).join(''))}
-async function refresh(){const s=await j('/status');last=s;const x=s.extension, ag=s.agenda||{items:[]}
+// v0.13.9: panodan güncelleme düğmesi; aktarıcı yeni sürümle kalkınca pano kendini yeniler
+let ilkSurum=null
+function guncellemeCiz(s){const g=s.guncelleme||{},b=document.getElementById('gun')
+  if(!ilkSurum)ilkSurum=s.surum;else if(s.surum&&s.surum!==ilkSurum){try{sessionStorage.setItem("guncellendi",JSON.stringify({v:s.surum,t:Date.now()}))}catch(e){};location.reload();return}
+  const goster=g.durum==="calisiyor"||g.durum==="hata"||(g.durum==="var"&&!s.aktif);b.hidden=!goster;if(!goster)return
+  b.className=g.durum==="var"?"pri":"";b.disabled=g.durum==="calisiyor";b.title=g.durum==="hata"?(g.hata||""):""
+  b.textContent=g.durum==="var"?L("Güncelle · v{v}",{v:g.son}):g.durum==="calisiyor"?L("Güncelleniyor…"):L("Güncelleme başarısız — yeniden dene")}
+document.getElementById('gun').onclick=async ev=>{const g=(last&&last.guncelleme)||{};if(!confirm(L("Suflor.me v{v} sürümüne güncellensin mi? Aktarıcı birkaç saniye kapanıp açılır; Chrome eklentisi kendini yeniler.",{v:g.son||"?"})))return
+  const b=ev.currentTarget;b.disabled=true;b.textContent=L("Güncelleniyor…");let r={};try{r=await j('/guncelle',{method:'POST',body:JSON.stringify({anahtar:BAS_ANAHTAR})})}catch(e){}
+  if(!r.ok){b.disabled=false;alert(L("Güncellenemedi: ")+(r.err||"?"))}}
+async function refresh(){const s=await j('/status');last=s;guncellemeCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
 setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||s.meeting||'Toplantı')):L('toplantı bekleniyor'))
 setH(document.getElementById('chips'),(x&&x.platform?`<span class=chip>${PL[x.platform]||esc(x.platform)}</span> `:"")+(s.aktif&&ag.rol?`<span class=chip>${ROL[ag.rol]||esc(ag.rol)}</span>`:""))
 {const [t,c,ti]=sureTxt(s),e=document.getElementById('sure');setH(e,s.aktif&&t?ic('clock',esc(t)):"");e.className=c;e.title=ti}
@@ -1769,6 +1782,46 @@ def _takvim_dongu():
         except Exception as e: print(f"TAKVİM: hata {e}")
         # izin yok / izin penceresi yanıtlanmadı: macOS her denemede yeniden sormasın diye 30 dk bekle (panodaki ↻ hemen dener)
         time.sleep(TAKVIM_SN if STATE["takvim"].get("durum") in ("ok", "yok") else 1800)
+# --- v0.13.9: panodan güncelleme ---------------------------------------------------------------------------------
+# Aktarıcı 6 saatte bir açık deponun manifest.json'undaki sürüme bakar (yalnız okuma; Mac'ten bağlam bilgisi çıkmaz). Yeni sürüm varsa
+# pano "Güncelle" düğmesini gösterir; tıklanınca guncelle.command ayrı oturumda (setsid) çalışır — aktarici-kur aktarıcıyı yeniden
+# başlatırken ölmesin. Git klonu (geliştirici kurulumu) panodan güncellenmez. Toplantı sürerken başlamaz.
+GUN_DEPO = "suflorme/suflor"; GUN_LOG = os.path.expanduser("~/Library/Logs/suflor-guncelle.log")
+GUN = {"son": None, "durum": None, "hata": None, "p": None}
+def _kod_dir(): return os.path.expanduser(os.environ.get("SUFLOR_TEST_KOD") or str(AYAR.get("kod") or ""))
+def _surum_t(v):
+    try: return tuple(int(x) for x in str(v).split("."))
+    except ValueError: return ()
+def guncelleme_view():
+    k = _kod_dir()
+    if not k or not os.path.isfile(os.path.join(k, "guncelle.command")): return {"durum": "yok"}
+    if os.path.isdir(os.path.join(k, ".git")): return {"durum": "gelistirici"}
+    p = GUN["p"]
+    if p is not None and p.poll() is None: return {"durum": "calisiyor", "son": GUN["son"]}
+    if p is not None:  # bitti ama bu aktarıcı hâlâ ayakta: aktarıcı yeniden başlamadı → başarısız
+        try: sat = [x.strip() for x in open(GUN_LOG, encoding="utf-8", errors="replace").read().splitlines()[-30:] if x.strip()]
+        except OSError: sat = []
+        hata = next((x for x in reversed(sat) if re.search(r"UYARI|HATA|İndirilemedi|eksik", x)), sat[-1] if sat else "")
+        GUN.update(p=None, durum="hata", hata=hata[:200] or "bilinmeyen hata")
+    if GUN["durum"] == "hata": return {"durum": "hata", "hata": GUN["hata"], "son": GUN["son"]}
+    return {"durum": "var" if _surum_t(GUN["son"]) > _surum_t(SURUM) else "guncel", "son": GUN["son"]}
+def _guncelleme_dongu():
+    import urllib.request
+    while True:
+        try:
+            r = urllib.request.urlopen(f"https://raw.githubusercontent.com/{GUN_DEPO}/main/manifest.json", timeout=15)
+            GUN["son"] = str(json.loads(r.read().decode()).get("version") or "")[:12] or None
+        except Exception: pass  # çevrimdışı: sonra yeniden
+        time.sleep(6 * 3600)
+def guncelle_baslat():
+    v = guncelleme_view()
+    if v["durum"] not in ("var", "guncel", "hata"): return {"ok": False, "err": v["durum"]}
+    if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürüyor — bitince güncelle", "A meeting is in progress — update when it ends")}
+    k = _kod_dir(); log = open(GUN_LOG, "a", encoding="utf-8")
+    log.write(f"\n--- {datetime.datetime.now().isoformat(timespec='seconds')} panodan güncelleme (v{SURUM} → v{GUN['son'] or '?'})\n"); log.flush()
+    GUN.update(durum=None, hata=None, p=subprocess.Popen(["/bin/bash", os.path.join(k, "guncelle.command")], cwd=k, stdout=log, stderr=subprocess.STDOUT,
+                                                         stdin=subprocess.DEVNULL, start_new_session=True))
+    print(f"GÜNCELLEME: panodan başlatıldı (v{SURUM} → v{GUN['son'] or '?'})"); return {"ok": True}
 def modelleri_isit():  # v0.9.5: panodan başlatınca Whisper ve ses modeli toplantıdan önce yüklenir (~5 + ~12 sn)
     if STATE["whisper"].get("durum") != "yok": WH_Q.put({"isinma": True, "kuyruga": time.time()}); _isci_baslat()
     if STATE["ses_model"].get("durum") != "yok": ses_gonder({"isinma": True, "kuyruga": time.time()})
@@ -1888,7 +1941,7 @@ class H(BaseHTTPRequestHandler):
         if self._koken() is None: return self._red()
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # v0.9.1: pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []  # v0.7.0
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []  # v0.8.1
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1912,7 +1965,8 @@ class H(BaseHTTPRequestHandler):
             # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)
             m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
             if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
-            return self._json(dict(takvim_view("tam=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None))
+            return self._json(dict(takvim_view("tam=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
+                                   surum=SURUM, toplanti=toplanti_var()))  # v0.13.9: eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
         if self.path == "/cards": return self._json(cards_view())
         if self.path.startswith("/kanit/"):  # v0.7.0: yalnız kanit/ altındaki PNG
@@ -1944,6 +1998,11 @@ class H(BaseHTTPRequestHandler):
             if not (o in EKLENTI_KOKEN or pano):  # v0.12.3 (O4): başka eklenti Claude oturumu açtıramasın
                 print(f"KÖKEN: /baslat reddedildi · {o[:80] or '-'} (Suflor.me eklentisiyse kimliği ayara ekle: eklenti_kimlik)"); return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(baslat(p))
+        if self.path == "/guncelle":  # v0.13.9: panodan güncelleme — yalnız pano (aynı köken + pano anahtarı)
+            o = str(self.headers.get("Origin", ""))
+            if not (o in (f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}") and secrets.compare_digest(str(p.get("anahtar") or ""), BASLAT_KEY)):
+                return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(guncelle_baslat())
         if self.path == "/ac":  # v0.12.5: takvim bağlantısı / hazırlık sekmesi Chrome'da — yalnız pano (anahtarla)
             o = str(self.headers.get("Origin", ""))
             if not (o in (f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}") and secrets.compare_digest(str(p.get("anahtar") or ""), BASLAT_KEY)):
@@ -2011,6 +2070,7 @@ if __name__ == "__main__":
     restore_state(); load_cards()
     threading.Thread(target=_takvim_dongu, daemon=True).start()  # v0.9.3
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()  # v0.13.0
+    threading.Thread(target=_guncelleme_dongu, daemon=True).start()  # v0.13.9
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # v0.12.0: toplantı sonu teknik paketi
     print(f"Suflor.me aktarıcı çalışıyor → http://127.0.0.1:{A.port}/  · dosyalar: {BASE}"); heartbeat()
     class Sunucu(ThreadingHTTPServer):

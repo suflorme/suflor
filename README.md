@@ -40,8 +40,9 @@ curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı Chrome'da açılır (Chrome yoksa varsayılan tarayıcıda) ve her adımı kendisi denetler.
 Sihirbazı kapatırsan aynı komutu yeniden çalıştır; kaldığın adımdan sürer.
 
-**Güncelleme:** `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
-belgelerine dokunmaz), sonra Chrome'da `chrome://extensions` → Suflor.me → yenile.
+**Güncelleme:** yeni sürüm çıkınca panonun sağ üstünde **Güncelle** düğmesi belirir (toplantı yokken); tıklaman yeter, Chrome
+eklentisi de kendini yeniler. Elle: `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
+belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensions` → Suflor.me → yenile.
 
 ## Kullanım (kısaca)
 1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).

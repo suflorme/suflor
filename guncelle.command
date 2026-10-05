@@ -57,7 +57,7 @@ if a.get("komut_sablondan") and os.path.isdir(os.path.dirname(hedef)):  # kendi 
     open(hedef, "w", encoding="utf-8").write(s); print("✓ /toplanti komutu şablondan yenilendi")
 P
   fi
-  echo "Şimdi: Chrome → chrome://extensions → Suflor.me → yenile (⟳), sonra toplantı sekmesini yenile."
+  echo "Chrome eklentisi toplantı yokken bir dakika içinde kendini yeniler (v0.13.9). Açık bir Teams sekmesi varsa onu yenile."
 }
 
 main "$@"; exit

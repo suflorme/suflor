@@ -183,9 +183,16 @@ async function nabizYokla() {
     try { await fetch((await relayAdr()) + "/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur: "nabiz", metin: ok ? "toplantı sekmesi yeniden yanıt veriyor" : `toplantı sekmesi yanıt vermiyor (${(r && r.err) || "yanıt yok"}) — sekmeyi yenile` }) }); } catch (e) {}
   }
 }
+function surumBuyuk(a, b) { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; }
 async function takvimBak() {
   try {
     const relay = await relayAdr(); const t = await (await fetch(relay + "/takvim?v=" + chrome.runtime.getManifest().version)).json();  // v0.13.5: ?v= — sihirbaz eklentiyi Teams açık olmadan da görür
+    // v0.13.9: panodan güncellemeden sonra aktarıcı yeni sürümdeyse eklenti kendini diskten yeniler (Chrome'da elle ↻ gerekmez).
+    // Toplantı sürerken yenilenmez (Teams sekmesindeki betik kopar); her aktarıcı sürümü için en çok bir kez (klasör güncellenmediyse döngü olmasın).
+    if (t.surum && t.surum !== chrome.runtime.getManifest().version && !t.toplanti && surumBuyuk(t.surum, chrome.runtime.getManifest().version)) {
+      const { yenilenen } = await chrome.storage.local.get({ yenilenen: null });
+      if (yenilenen !== t.surum) { await chrome.storage.local.set({ yenilenen: t.surum }); chrome.runtime.reload(); return; }
+    }
     if (t.claude_age_s != null && t.claude_age_s < 120) return;
     for (const o of t.olaylar || []) {
       if (o.dk > 5 || o.dk < -2 || bildirilen.has(o.id)) continue;
