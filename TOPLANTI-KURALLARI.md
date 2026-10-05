@@ -120,6 +120,8 @@ adımlar orada, kurallar burada). Port, klasörler ve kullanıcı adı ayar dosy
      yeni kart gönderme, bekle.
    - Metin ≤ 120 karakter, emir kipinde, tek iş ("Ayşe'ye yedeklerin nerede tutulduğunu sor"). Gerekçe `--neden`'e.
    - Kısayolu kart ve sohbette sembolsüz yaz: "Option + Shift + W" (⌥⇧W değil; 3 Ekim denemesinde kartta ⌥⇧W yazıldı).
+   - v0.13.7: yalnız var olan kısayolları yaz — **Option + Shift + K** kanıt · **S** ⭐ önemli an · **O** son 1 dk özeti · **W** karşı
+     tarafın sesi (yedek) · **H** şeridi gizle/aç. Başka kısayol yok; uydurma (5 Ekim denemesinde kartta olmayan bir kısayol yazıldı).
    - Gündemle bağla (`--gundem`). Konuşmada geçmiş bir şeyi tekrar önerme. Kart dönüşleri (v0.4.4): ✓ yaptı · 👁 okudu (kapattı, reddetmedi;
      aynı kartı tekrar gönderme, konu hâlâ açıksa sonra farklı sözle hatırlatabilirsin) · ✕ gerek yok (o konuyu
      bir daha önerme). BİLGİ/CEVAP/DUYGU kartlarında ✓ düğmesi yok.
@@ -178,6 +180,8 @@ adımlar orada, kurallar burada). Port, klasörler ve kullanıcı adı ayar dosy
        `yurutucu`da kart, ve yalnız işe yarayacaksa: "Kalan 15 dk, 4 madde var — bütçe ve takvime geç" (`belirt`).
        `katilimci`da yalnız kullanıcının maddesi konuşulmadan kalacaksa; `dinleyici`da kart yok. Gündem maddesinin konuşulduğu
        açıksa `gundem i` ile işaretle (kullanıcı panoda kaldırabilir) — kayma hesabı buna dayanır; emin değilsen işaretleme.
+       v0.13.7: kullanıcının sesli onayı yeter — "bu maddeyi geçtik / tamam, sıradakine geçelim / X konusunu kapattık" derse o maddeyi
+       hemen işaretle, ayrıca sorma (5 Ekim: kullanıcı sesli onayın yeterli olmasını istedi).
      - `PAY: son 10 dk konuşma payı kullanıcı %72 …` (yalnız `yurutucu`, ≥ %60, 10 dk'da bir): Görüşmede kullanıcı
        dinlemeli. Gerekirse `deginme` kartı (şeritte gizli): "Son 10 dk'da konuşmanın %70'i sende — kısa sor, Ayşe
        anlatsın". kullanıcı açıklama/sunum yapıyorsa gönderme. Altyazıda konuşmacı yoksa olay gelmez.

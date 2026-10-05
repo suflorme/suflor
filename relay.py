@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.6"  # sürüm geçmişi: git log
+SURUM = "0.13.8"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -962,10 +962,16 @@ SES_TETIK = re.compile(r"(ekran(ın|ı)?\s*(kayd|görüntü|resm|fotoğraf|foto)
                        r"(al|alalım|alayım|alıyorum|alır\s*mısın|alsana|alın|alabilir\s*misin|kaydet|kaydedelim|kaydedeyim|çek|çekelim|çekeyim|take|grab)\b"
                        r"|\b(take|grab)\s+(a\s+)?screen\s?shot", re.I | re.U)
 _SES_SON = [0.0]
+# v0.13.7 (5 Ekim kişisel deneme): "Kanıt alma, kanıt alma, alıyorum hemen" tetikledi ve panodan az önce alınan kanıtın üstüne ikincisi
+# alındı. Olumsuz istek ("alma", "çekme", "kaydetme") tetiklemez; son 20 sn'de herhangi bir yoldan kanıt istendiyse ses ikincisini istemez.
+SES_OLUMSUZ = re.compile(r"(ekran\w*|kanıt\w*|screen\s?shot\w*)\W+(?:\w+\W+){0,2}?(alma|almayalım|almayın|almasın|çekme|çekmeyelim|kaydetme|kaydetmeyelim)\b"
+                         r"|\b(don'?t|do not)\s+(take|grab)\b", re.I | re.U)
 def ses_tetik_mi(kim, metin):
     if not kim or sade(kim).split(" ")[0] != sade(ben_adi()).split(" ")[0]: return False
     m = SES_TETIK.search(metin)
-    return bool(m) and time.time() - _SES_SON[0] >= 60 and not kart_okunuyor(metin, m)
+    if not m or SES_OLUMSUZ.search(metin): return False
+    son = (STATE.get("kanit_iste") or {}).get("t") or 0
+    return time.time() - _SES_SON[0] >= 60 and time.time() - son >= 20 and not kart_okunuyor(metin, m)
 def kart_okunuyor(metin, m):
     # v0.13.1: kullanıcı son 10 dk'daki bir kartı sesli okuyorsa ("Option + Shift + K ile kanıt al") tetik sayılmaz (3 Ekim denemesi).
     # Tetik sözünün dışında kalan kelimelerin (≥ 3 harf, en az 2 tane) %60'ı tetik içeren bir kartta geçiyorsa okuma sayılır;
@@ -1677,7 +1683,8 @@ def _yerel_ses_dongu():
             y["acildi"] = now
             try:
                 # yanıt vermeyen eski kopya açıksa (open -a çalışanı yeniden açmaz) yalnız bu hesabınkini kapat
-                subprocess.run(["pkill", "-u", str(os.getuid()), "-x", "SuflorSes"], capture_output=True, timeout=5)
+                # v0.13.8: yalnız normal kopya (--port) — kurulumun izin penceresini bekleyen kopyası (--izin) kapanmasın
+                subprocess.run(["pkill", "-u", str(os.getuid()), "-f", "MacOS/SuflorSes --port"], capture_output=True, timeout=5)
                 subprocess.run(["open", "-g", "-a", SES_APP, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE], capture_output=True, timeout=20)
                 print("YEREL SES: yardımcı başlatıldı")
             except Exception as e: print(f"YEREL SES: hata başlatılamadı ({e})")

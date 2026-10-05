@@ -243,7 +243,9 @@ def olcum():
         for r in rs:
             if "text" not in r and "file" in r and r.get("id") in byid: byid[r["id"]]["file"] = r["file"]
         return rs
-    qs = {q["id"]: q for q in jl("sorular.jsonl") if q.get("file") == md}
+    # v0.13.7: yalnız asıl kayıtlar — yama satırı ({"id","at","file"}; toplantıdan önce sorulan soruya sonradan dosya verir) sorunun
+    # zamanını eziyordu, SORU → CEVAP eksi çıkıyordu (5 Ekim kişisel deneme: ortanca −595 sn)
+    qs = {q["id"]: q for q in jl("sorular.jsonl") if "text" in q and q.get("file") == md}
     cards = [c for c in jl("kartlar.jsonl") if "text" in c and c.get("file") == md]
     rapor("SORU → CEVAP kartı", [(zaman(c["at"]) - zaman(qs[c["reply_to"]]["at"])).total_seconds() for c in cards if c.get("reply_to") in qs])
     om = jl("olcum.jsonl"); ids = {c["id"] for c in cards}

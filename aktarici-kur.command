@@ -72,6 +72,8 @@ fi
 # v0.13.0: yerel ses yardımcısı (ses-yardimcisi.swift → "Suflor Ses.app"): toplantı uygulamasının sesini (karşı taraf) Core Audio
 # process tap ile alır, aktarıcıya verir — Option + Shift + W gerekmez. macOS 14.4+; izin "Sistem Sesi Kaydı" (yalnız sistem sesi) uygulamaya verilir.
 SES="$APP/Suflor Ses.app"; SES_YENI=0
+# v0.13.8: izin penceresi yalnız ilk kurulumda — güncellemede yeniden derlenen yardımcı aynı yerel imzayla imzalanır, izin korunur
+[ -x "$SES/Contents/MacOS/SuflorSes" ] && SES_ILK=0 || SES_ILK=1
 if command -v swiftc >/dev/null && sw_vers -productVersion | awk -F. '{exit !($1 > 14 || ($1 == 14 && $2 >= 4))}' && \
    { [ ! -x "$SES/Contents/MacOS/SuflorSes" ] || [ "$SRC/ses-yardimcisi.swift" -nt "$SES/Contents/MacOS/SuflorSes" ]; }; then
   mkdir -p "$SES/Contents/MacOS"
@@ -103,15 +105,6 @@ for U in "$TAK" "$SES"; do
     fi
   fi
 done
-# v0.13.0: ilk kurulumda (ya da yeni derlemede) izin penceresi şimdi çıksın, toplantının ortasında değil
-if [ "$SES_YENI" = 1 ] && [ -x "$SES/Contents/MacOS/SuflorSes" ]; then
-  echo "Sistem sesi kaydı izni: macOS 'Suflor Ses' için izin sorarsa İzin Ver de (Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı)."
-  # v0.13.5: en çok 2 dk bekle — izin penceresi yanıtlanmazsa kurulum (sihirbazın "Kuruyorum" adımı) takılıp kalmasın
-  open -g -W -a "$SES" --args --izin 2>/dev/null & IZ=$!
-  for _ in $(seq 1 120); do kill -0 "$IZ" 2>/dev/null || break; sleep 1; done
-  kill "$IZ" 2>/dev/null || true; wait "$IZ" 2>/dev/null || true
-fi
-
 cat > "$PL" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -139,3 +132,13 @@ if curl -s -m 3 "http://127.0.0.1:$PORT/status" >/dev/null; then
 else
   echo "UYARI: aktarıcı yanıt vermiyor. Günlük: ~/Library/Logs/suflor-aktarici.log"; tail -5 "$HOME/Library/Logs/suflor-aktarici.log"; exit 1
 fi
+# v0.13.0: ilk kurulumda izin penceresi şimdi çıksın, toplantının ortasında değil. v0.13.8: aktarıcı yeniden başlatıldıktan SONRA —
+# önceden izin beklenirken pencere kapatılırsa aktarıcı eski sürümde kalıyordu (5 Ekim kişisel hesap)
+if [ "$SES_YENI" = 1 ] && [ "$SES_ILK" = 1 ] && [ -x "$SES/Contents/MacOS/SuflorSes" ]; then
+  echo "Sistem sesi kaydı izni: macOS 'Suflor Ses' için izin sorarsa İzin Ver de (Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı). En çok 2 dk beklenir; aktarıcı zaten çalışıyor."
+  # v0.13.5: en çok 2 dk bekle — izin penceresi yanıtlanmazsa kurulum (sihirbazın "Kuruyorum" adımı) takılıp kalmasın
+  open -g -W -a "$SES" --args --izin 2>/dev/null & IZ=$!
+  for _ in $(seq 1 120); do kill -0 "$IZ" 2>/dev/null || break; sleep 1; done
+  kill "$IZ" 2>/dev/null || true; wait "$IZ" 2>/dev/null || true
+fi
+

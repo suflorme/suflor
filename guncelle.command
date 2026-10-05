@@ -35,7 +35,16 @@ tar_ile() {
 main() {
   cd "$KOD"
   if [ -d "$KOD/.git" ]; then git_ile; else tar_ile; fi
-  "$KOD/aktarici-kur.command"
+  if ! "$KOD/aktarici-kur.command"; then
+    echo; echo "UYARI: aktarıcı kurulamadı — kod güncellendi ama çalışan aktarıcı eski sürümde kalmış olabilir."
+    echo "Bu pencerenin yukarısındaki hatayı geliştiriciye ilet ya da $KOD/aktarici-kur.command dosyasına çift tıkla."; exit 1
+  fi
+  # v0.13.7 (5 Ekim): kişisel hesapta kod v0.13.6 iken çalışan aktarıcı v0.13.2'de kalmıştı — sürümler karşılaştırılır
+  PORT_="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("port", 8765))' "$AYAR" 2>/dev/null || echo 8765)"
+  CALISAN="$(curl -s -m 3 "http://127.0.0.1:$PORT_/status" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("surum", "?"))' 2>/dev/null || echo "?")"
+  if [ "$CALISAN" != "$(surum "$KOD")" ]; then
+    echo "UYARI: çalışan aktarıcı v$CALISAN, kod v$(surum "$KOD"). $KOD/aktarici-kur.command dosyasına çift tıkla; düzelmezse Mac'i yeniden başlat."
+  else echo "✓ aktarıcı v$CALISAN çalışıyor"; fi
   if [ -f "$AYAR" ]; then
     /usr/bin/python3 - "$AYAR" "$KOD" <<'P'
 import json, os, shutil, sys

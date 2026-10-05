@@ -54,7 +54,8 @@ Rolü `_canli/agenda.json`'a `"rol": "yurutucu" | "katilimci" | "dinleyici"` ola
 **Süre (v0.6.0):** Takvimden (yukarıda) bulunduysa bu adımı atla. Bulunmadıysa: Takvim bağlantısında toplantıyı ara (Outlook ya da Google Takvim, bugün, konu/kişi adıyla; saat
 diliminin takvimin döndürdüğü dilim olduğuna dikkat — Mac yerel saatine çevir). Bulursan `agenda.json`'a
 `"baslangic": "HH:MM"`, `"bitis": "HH:MM"` yaz; bulamazsan rol sorusuyla aynı mesajda "bitiş saati?" diye sor.
-Bitiş yoksa kalan süre/kayma kapalı kalır, sorun değil. Maddelerin süresi farklıysa isteğe bağlı
+Bitiş yoksa kalan süre/kayma kapalı kalır. v0.13.7: soruya cevap gelmeden toplantı başlarsa (ilk `SATIRLAR`) `baslangic` = ilk satırın
+saati, `bitis` = +30 dk yaz ve sohbete tek satır: "Bitişi 30 dk sonra varsaydım — değiştirmek için 'Claude: bitiş 14:45' notu yaz". Maddelerin süresi farklıysa isteğe bağlı
 `"sureler": [dk, …]` (madde sayısı kadar). kullanıcının toplantıdaki adı ayar dosyasındaki adla ({{AD}}) başlamıyorsa `"ben": "<ad>"`.
 Yeni gündem yazınca `python3 {{KOD}}/toplanti-claude.py acik sifirla` (v0.7.0: önceki toplantının açık
 soruları silinmez, `acik-arsiv.jsonl`'e taşınır; aynı kişiyle sonraki hazırlıkta geri gelir). Kart sınırları rol
