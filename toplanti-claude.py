@@ -619,34 +619,6 @@ class Yorgunluk:
                     f"yürütücüde belirt kartı — kısa özet geçip kalan en önemli maddeye odaklan ya da 5 dk mola öner"]
         return []
 
-# --- v0.8.4: duygu modeli (emotion2vec+, ses işçisi) kişi başına -----------------------------------------------------
-# Whisper satırının "duygu" alanı {etiket, p}. Son DM_PENCERE_SN'de kişinin parçalarında aynı nötr dışı duygu baskınsa
-# (en az DM_MIN parça ve %40, ortalama güven ≥ DM_GUVEN) "DUYGU MODELİ · <kişi>" olayı; nötre dönünce bir kez. Kişi başına DM_ARALIK_SN'de bir.
-# Model oyuncu kayıtlarıyla eğitildi; Türkçe ve toplantı konuşmasında tahmin: kişi etiketi metin + SES ile birlikte verilir.
-DM_PENCERE_SN = 120; DM_MIN = 3; DM_GUVEN = 0.6; DM_ARALIK_SN = 180
-DM_AD = {"kizgin": "kızgın", "igrenmis": "tiksinmiş", "korkmus": "kaygılı/korkmuş", "mutlu": "mutlu", "uzgun": "üzgün", "saskin": "şaşkın", "notr": "nötr"}
-class DuyguModel:
-    def __init__(s): s.k = {}
-    def besle(s, r):
-        v = r.get("duygu"); kim = r.get("speaker") or "?"
-        if not v or kim in ("?", "Karşı taraf") or r.get("t1") is None: return []
-        d = s.k.setdefault(kim, {"p": [], "son": 0.0, "durum": "notr"}); t = r["t1"]
-        d["p"].append((t, v.get("etiket"), v.get("p") or 0)); d["p"] = [x for x in d["p"] if t - x[0] <= DM_PENCERE_SN]
-        xs = [x for x in d["p"] if x[1] not in ("diger", "bilinmiyor")]
-        if len(xs) < DM_MIN or t - d["son"] < DM_ARALIK_SN: return []
-        say = {}
-        for _, e, p in xs:
-            if e != "notr": say.setdefault(e, []).append(p)
-        bas = max(say, key=lambda e: len(say[e])) if say else None
-        if bas and len(say[bas]) >= DM_MIN and len(say[bas]) >= 0.4 * len(xs) and statistics.mean(say[bas]) >= DM_GUVEN:  # model çoğunlukla "nötr" der: %40 anlamlı
-            if d["durum"] == bas: return []
-            d.update(son=t, durum=bas)
-            return [f"DUYGU MODELİ · {kim}: son {DM_PENCERE_SN // 60} dk'da {len(say[bas])}/{len(xs)} parça \"{DM_AD.get(bas, bas)}\" "
-                    f"(ort. güven {statistics.mean(say[bas]):.2f}) → metin ve SES ile uyuşuyorsa kart duygu --kim \"{kim}\" --ton …; tek başına yetmez"]
-        if d["durum"] != "notr" and sum(1 for x in xs if x[1] == "notr") * 2 > len(xs):
-            d.update(son=t, durum="notr"); return [f"DUYGU MODELİ · {kim}: nötre döndü → açık kişi etiketi artık geçmiyorsa güncelle"]
-        return []
-
 def izle():
     import baglam  # v0.7.3: hazır kart tetiği kök karşılaştırması
     q_tail = Tail(os.path.join(A.dir, "sorular.jsonl")); k_tail = Tail(os.path.join(A.dir, "kartlar.jsonl"))
@@ -661,7 +633,7 @@ def izle():
     son_ara = {}; buf_recs = []; kokler = []; guclu = []; kok_pen = []; aktif_i = None; aktif_t = 0.0; kok_sig = None
     ses_iz = SesIz(); sesler = []  # v0.8.2
     kes = None  # v0.8.3: kesinlik ölçümü (ben adı ilk /status'tan sonra)
-    kesme = Kesme(BEN); yorgun = Yorgunluk(); dmodel = DuyguModel()  # v0.8.3, v0.8.4
+    kesme = Kesme(BEN); yorgun = Yorgunluk()  # v0.8.3
     import collections; konusan = collections.Counter()  # v0.7.3: karşıdaki kişi = kullanıcı dışında en çok konuşan
     sis_kok = frozenset(w[:5] for n in sis for w in n.split() if len(w) >= 3)
     def paket_baglam():
@@ -738,7 +710,7 @@ def izle():
                      (" · panel açık" if x.get("panel") else (" · YALNIZ ALTYAZI (konuşmacı adı olmayabilir; özette kişiye bağlama)" if x.get("captions") else
                      (f" · ⚠ TOPLANTIDA ama döküm/altyazı kapalı — satır gelmiyor ({PLATFORM_AD.get(x.get('platform'), 'Teams')}'te kullanıcıya uyarı çıktı; 2 dk sürerse dikkat kartı: \"{(x.get('yonerge') or {}).get('altyazi') or 'Diğer → Dil ve konuşma → Canlı altyazı'}\")" if x.get("call") else " · panel kapalı")))) + \
                     (f" · ⚠ WHISPER {wv['durum']}: {wv.get('hata')}" if wv.get("durum") == "hata" else "") + \
-                    (" · ⚠ SES MODELİ hata (duygu modeli/konuşmacı ayırma yok; Whisper çalışıyor)" if wv.get("ses_model") == "hata" else "") + \
+                    (" · ⚠ SES İZİ hata (konuşmacı ayırma yok; Whisper çalışıyor)" if wv.get("ses_model") == "hata" else "") + \
                     (f" · altyazıyı kendisi açamadı ({x['capAuto'][11:]})" if str(x.get("capAuto") or "").startswith("basarisiz") and not (x.get("panel") or x.get("captions") or wak) else "") + \
                     (f" · ⚠ DİL: {(s.get('dil') or {}).get('uyari')} → kullanıcıya dikkat kartı gönder; düzelene kadar metinden çıkarım yapma" if (s.get("dil") or {}).get("uyari") else "") + \
                     (f" · ⚠ {s['uyari']} (satırlar dosyaya gelmiyor; kullanıcıya dikkat kartı gönder)" if s.get("uyari") else "")
@@ -787,7 +759,7 @@ def izle():
                             if kes is None: kes = Kesinlik(agj.get("ben") or AYAR["ad"].split(" ")[0], sis)
                             sesler += kes.besle(dict(r, _file=cur))
                         except Exception: pass
-                        try: sesler += kesme.besle(r) + yorgun.besle(r) + dmodel.besle(r)  # v0.8.3, v0.8.4
+                        try: sesler += kesme.besle(r) + yorgun.besle(r)  # v0.8.3 (v0.13.12: duygu modeli kalktı)
                         except Exception: pass
                         buf_since = buf_since or time.time()
                         low = kucuk(r.get("text", "") + " " + r.get("raw", ""))  # v0.5.1: sözlük düzeltmesi öncesi hâl de
@@ -1251,8 +1223,6 @@ def koc_cmd():
     print(f"  soru: {len(sorular)} · açık uçlu {len(acik)} (%{round(len(acik) / max(1, len(sorular)) * 100)}) · 30 kelimeden uzun soru {len(uzun)}")
     if uzun: print(f"    en uzun soru: \"{max(uzun, key=lambda r: len(r['text']))['text'][:160]}\"")
     print(f"  söz kesme: {ben} karşı tarafı {n_m} kez kesti · karşı taraf {ben}'i {n_k} kez kesti · yankı {kz.yanki} parça")
-    dg = [r["duygu"]["etiket"] for r in mr if r.get("duygu")]  # v0.8.4: duygu modeli (tahmin)
-    if dg: print("  sesindeki duygu (model, tahmin): " + ", ".join(f"{DM_AD.get(e, e)} %{round(dg.count(e) / len(dg) * 100)}" for e in sorted(set(dg), key=dg.count, reverse=True)[:4]))
 def anlar_cmd():
     md = toplanti_dosyasi(A.dosya); rs = _jl_kayit(md); kes = []
     try: kes = [json.loads(l) for l in open(os.path.join(A.dir, "kesinlik.jsonl"), encoding="utf-8") if l.strip() and md in l]
@@ -1282,8 +1252,6 @@ def anlar_cmd():
             h0, d0 = tb[k]
             if h0 and v.get("hiz") and abs(v["hiz"] - h0) / h0 >= 0.3: ekle(r, 1, "hız değişimi")
             if v.get("db") is not None and v["db"] - d0 >= 4: ekle(r, 1, "ses yükseldi")
-        dm = r.get("duygu") or {}
-        if dm.get("etiket") not in (None, "notr", "diger", "bilinmiyor") and (dm.get("p") or 0) >= 0.7: ekle(r, 1, f"duygu: {DM_AD.get(dm['etiket'], dm['etiket'])}")
     for x in kes: ekle(x, 2, "kesin olmayan iddia")
     sec = sorted(dk.items(), key=lambda kv: -kv[1]["puan"])[:A.n]
     print(f"Öne çıkan anlar — {md} (ilk {len(sec)})")
@@ -1309,8 +1277,8 @@ def saglik_cmd():  # v0.8.5: toplantıdan önce tek bakış; ⚠ satırları kul
     M = next((d for d in (AYAR["ortak"], APP) if os.path.exists(os.path.join(d, "whisper-venv", "bin", "python"))), AYAR["ortak"])  # v0.9.2: önce ortak klasör
     wok = os.path.exists(os.path.join(M, "whisper-venv", "bin", "python")) and os.path.isdir(os.path.join(M, "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo"))
     sat(wok and wv.get("durum") not in ("yok", "hata"), f"Whisper {'kurulu' if wok else 'KURULU DEĞİL'} · durum {wv.get('durum') or '?'}" + (f" · {wv.get('hata')}" if wv.get("hata") else ""), os.path.join(AYAR.get("kod") or "<kod klasörü>", "modeller-kur.command"))
-    sok = os.path.exists(os.path.join(M, "ses-venv", "bin", "python")) and os.path.exists(os.path.join(M, "ses-modeller", "emotion2vec_plus_base", "model.pt")) and os.path.exists(os.path.join(APP, "ses-isci.py"))
-    sat(sok and wv.get("ses_model") not in ("yok", "hata"), f"ses modeli (duygu + konuşmacı ayırma) {'kurulu' if sok else 'KURULU DEĞİL'} · durum {wv.get('ses_model') or '?'}", "modeller-kur.command, sonra aktarici-kur.command")
+    sok = any(os.path.exists(y) for y in (os.path.join(M, "ses-modeller", "spkrec-ecapa-voxceleb", "ecapa-mlx.npz"), os.path.expanduser("~/Library/Caches/Suflor/ecapa-mlx.npz")))  # v0.13.12: Whisper işçisinde MLX
+    sat(sok and wv.get("ses_model") not in ("yok", "hata"), f"ses izi (konuşmacı ayırma) {'kurulu' if sok else 'KURULU DEĞİL'} · durum {wv.get('ses_model') or '?'}", "aktarici-kur.command (ağırlıkları dönüştürür); olmazsa modeller-kur.command")
     ys = (s or {}).get("yerel_ses") or {}  # v0.13.0: karşı sesi alan yerel yardımcı (Suflor Ses)
     if ys: sat(ys.get("durum") in ("bekliyor", "dinliyor"), f"ses yardımcısı (karşı ses) {ys.get('durum')}" + (f" v{ys['surum']}" if ys.get("surum") else "") + (f" · {ys['hata']}" if ys.get("hata") else ""),
                {"yok": "aktarici-kur.command derler (macOS 14.4+, swiftc)", "izin": "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses"}.get(ys.get("durum"), "aktarıcı 30 sn içinde yeniden açar; sürerse aktarici-kur.command — o zamana kadar Option + Shift + W"))

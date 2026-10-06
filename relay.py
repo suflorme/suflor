@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.11"  # sürüm geçmişi: git log
+SURUM = "0.13.14"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -552,8 +552,14 @@ WH_MODELLER = _ilk(os.path.join(_ORT, "whisper-modeller"), os.path.join(_UYG, "w
 # kilit dosyası yazamaz. Bulunamazsa eskisi gibi depo adı + HF_HOME.
 WH_MODEL = next(iter(sorted(glob.glob(os.path.join(WH_MODELLER, "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots", "*", "weights.safetensors")))), None)
 WH_MODEL = os.path.dirname(WH_MODEL) if WH_MODEL else None
+# v0.13.14 (6 Ekim): kurulumun yerelde ürettiği 8 bit turbo (aktarici-kur / modeller-kur) varsa o kullanılır — 0,6 GB daha az bellek,
+# aynı doğruluk, parça +0,06 sn. Ayar "whisper_model": "turbo" tam modele döndürür.
+_WH_Q8 = os.path.join(WH_MODELLER, "hub", "models--suflor--whisper-large-v3-turbo-q8", "snapshots", "yerel")
+if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(_WH_Q8, "weights.safetensors")): WH_MODEL = _WH_Q8
 WH_SR = 16000; WH_KARE = 320  # 20 ms
-WH_SESSIZ_MS = 700; WH_ON_MS = 300; WH_MAX_SN = 12; WH_MIN_KONUSMA_MS = 400; WH_BOSTA_KAPAT_SN = 600
+# v0.13.13 (Faz 1): parça üst sınırı 12 → 6 sn. Ölçüm (6 Ekim, 115 sn kesintisiz Türkçe, gerçek zamanlı): kelime → satır ortanca 7,7 → 4,6 sn,
+# %90 12,2 → 6,7 sn; WER 12 sn %16,0 · 8 sn %11,9 · 6 sn %15,6–18,1 (aynı ayarda tur farkı kadar — kesim noktasına bağlı gürültü)
+WH_SESSIZ_MS = 700; WH_ON_MS = 300; WH_MAX_SN = 6; WH_MIN_KONUSMA_MS = 400; WH_BOSTA_KAPAT_SN = 600
 WH_AKIS_SN = 20; WH_GUVENCE_SN = 90; WH_ATLA_SN = 120
 STATE["whisper"] = {"durum": "kapali", "model": None, "kuyruk": 0, "satir": 0, "atlanan": 0, "son_sn": None, "gecikme_sn": None,
                     "hata": None, "kanallar": {}, "kanal_son_satir": {}, "kanal_son_parca": {}, "gecikme_max": 0.0, "durgun_max": 0.0}
@@ -628,8 +634,8 @@ def whisper_akiyor(kanal):
 _BELLEK = {"t": 0, "v": None}
 def bellek_view():
     # v0.9.6: boş bellek panoda da uyarı (3 Ekim: saglik ~3,1 GB dedi, uyarı yalnız Claude sohbetinde kaldı). Ölçüm toplanti-claude.py
-    # saglik ile aynı (vm_stat: free + inactive + speculative + purgeable), 60 sn'de bir. Modeller yüklenmeden ~4 GB gerekir
-    # (Whisper ~1,6 + ses işçisi ~2,2); yüklendikten sonra yalnız 1,5 GB altı uyarılır (bellek takası, gecikme).
+    # saglik ile aynı (vm_stat: free + inactive + speculative + purgeable), 60 sn'de bir. Modeller yüklenmeden ~2,5 GB gerekir
+    # (Whisper ~2,4; v0.13.12: ses izi içinde); yüklendikten sonra yalnız 1,5 GB altı uyarılır (bellek takası, gecikme).
     if time.time() - _BELLEK["t"] > 60:
         _BELLEK["t"] = time.time()
         try:
@@ -638,9 +644,9 @@ def bellek_view():
         except Exception: _BELLEK["v"] = None
     bos = _BELLEK["v"]
     if bos is None: return {"bos_gb": None, "uyari": ""}
-    w = STATE["whisper"]; yuklu = w["durum"] == "hazir" and STATE["ses_model"]["durum"] in ("hazir", "yok")
-    # v0.13.0: gerek sayıları suflor-olcum ölçümünden (4 Ekim): Whisper ~2,4 GB, ses işçisi duygu kapalı ~0,4 / açık ~2,8 GB
-    gerek = 0 if yuklu else (2.4 if w["durum"] not in ("hazir", "yok") else 0) + ((2.8 if AYAR.get("duygu_modeli") else 0.4) if STATE["ses_model"]["durum"] not in ("hazir", "yok") else 0)
+    w = STATE["whisper"]; yuklu = w["durum"] in ("hazir", "yok")
+    # v0.13.0: gerek sayıları suflor-olcum ölçümünden (4 Ekim): Whisper ~2,4 GB; v0.13.12: ses izi Whisper işçisinde (~0,1 GB)
+    gerek = 0 if yuklu else 2.5
     az = bos < 1.5 or (gerek and bos < gerek + 0.5)
     sy = (lambda x: str(x)) if ARAYUZ_DILI == "en" else (lambda x: str(x).replace(".", ","))  # ondalık: en 3.1, tr 3,1
     return {"bos_gb": bos, "uyari": _t(f"Bellek az: ~{sy(bos)} GB boş", f"Low memory: ~{sy(bos)} GB free") + (_t(f" (Whisper ve ses modeli ~{sy(round(gerek, 1))} GB ister)", f" (Whisper and the voice model need ~{sy(round(gerek, 1))} GB)") if gerek else "") + _t(" — kullanmadığın uygulama ve sekmeleri kapat", " — close apps and tabs you aren't using") if az else ""}
@@ -675,7 +681,7 @@ def istem_metni():
     for d in ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []):  # ayar: alanın sık sistem adları
         if d not in adlar: adlar.append(d)
     return (", ".join(adlar))[:600] + "."
-_ISCI = {"p": None, "satirlar": None, "kilit": threading.Lock(), "thread": None}
+_ISCI = {"p": None, "satirlar": None, "kilit": threading.Lock(), "thread": None, "baslik": None}
 def _isci_baslat():
     with _ISCI["kilit"]:
         if _ISCI["thread"] and _ISCI["thread"].is_alive(): return
@@ -685,7 +691,8 @@ def _isci_ac():
     if not (os.path.exists(WH_PY) and os.path.exists(WH_ISCI)):
         w.update(durum="yok", hata=f"whisper-venv ya da whisper-isci.py yok ({WH_PY})"); print(f"WHISPER: kullanılamıyor — {w['hata']}"); return False
     w.update(durum="yukleniyor", hata=None); t = time.time()
-    env = dict(os.environ, HF_HOME=WH_MODELLER, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", **({"SUFLOR_WHISPER_MODEL": WH_MODEL} if WH_MODEL else {}))
+    env = dict(os.environ, HF_HOME=WH_MODELLER, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", **({"SUFLOR_WHISPER_MODEL": WH_MODEL} if WH_MODEL else {}),
+               **({"SUFLOR_ECAPA": ECAPA} if os.path.exists(ECAPA) else {}))
     pr = subprocess.Popen([WH_PY, "-u", WH_ISCI], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
     q = queue.Queue()
     def oku():
@@ -698,7 +705,9 @@ def _isci_ac():
     except ValueError: j = {}
     if not j.get("hazir"):
         pr.kill(); w.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"WHISPER: {w['hata']}"); return False
-    _ISCI.update(p=pr, satirlar=q); w.update(durum="hazir", model=j.get("model")); print(f"WHISPER: hazır ({j.get('model')}, {time.time() - t:.1f} sn)")
+    _ISCI.update(p=pr, satirlar=q, baslik=None); w.update(durum="hazir", model=j.get("model")); KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]
+    STATE["ses_model"].update(durum="hazir" if j.get("ecapa") else "yok", hata=None if j.get("ecapa") else f"ses izi ağırlıkları yok ({ECAPA})", sn=j.get("sn"))
+    print(f"WHISPER: hazır ({j.get('model')}, {time.time() - t:.1f} sn{', ses izi (ECAPA, MLX)' if j.get('ecapa') else ', ses izi yok'})")
     return True
 def _isci_kapat(neden):
     pr = _ISCI["p"]; _ISCI.update(p=None, satirlar=None)
@@ -706,12 +715,14 @@ def _isci_kapat(neden):
         try: pr.stdin.close(); pr.wait(timeout=5)
         except Exception: pr.kill()
     if STATE["whisper"]["durum"] == "hazir": STATE["whisper"]["durum"] = "kapali"
+    if STATE["ses_model"]["durum"] == "hazir": STATE["ses_model"]["durum"] = "kapali"
     print(f"WHISPER: işçi kapatıldı ({neden})")
 def _isci_dongu():
     w = STATE["whisper"]; hata_say = 0
     while True:
         try: is_ = WH_Q.get(timeout=WH_BOSTA_KAPAT_SN)
         except queue.Empty:
+            if toplanti_var(): continue  # v0.13.12 (G1): toplantı içinde uzun sessizlikte (ekran paylaşımı) kapanıp 5 sn yeniden yüklenmesin
             if _ISCI["p"]: _isci_kapat(f"{WH_BOSTA_KAPAT_SN // 60} dk ses yok, bellek boşaltıldı")
             return
         w["kuyruk"] = WH_Q.qsize()
@@ -726,8 +737,12 @@ def _isci_dongu():
                 if w["durum"] == "yok": return
                 hata_say += 1; time.sleep(min(60, 5 * hata_say)); continue
         dil = {"tr": "tr", "en": "en"}.get(agenda().get("dil") or "tr")  # karisik → None: Whisper dili kendisi seçer
-        k = KANALLAR.get(is_["kanal"]); ses_gonder(is_)  # v0.8.4: duygu modeli + konuşmacı ayırma paralel
-        istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem_metni(), "onceki": (k.onceki if k else "")[-150:]}
+        k = KANALLAR.get(is_["kanal"])
+        if _ISCI["baslik"] != is_["baslik"]:  # yeni toplantı: karşı kanal kümeleri ve adları sıfırlanır (işçi de başlık değişince sıfırlar)
+            if _ISCI["baslik"] is not None: KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]
+            _ISCI["baslik"] = is_["baslik"]
+        istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem_metni(), "onceki": (k.onceki if k else "")[-150:],
+                 "kanal": is_["kanal"], "baslik": is_["baslik"]}
         try:
             _ISCI["p"].stdin.write(json.dumps(istek) + "\n"); _ISCI["p"].stdin.flush()
             l = _ISCI["satirlar"].get(timeout=60); j = json.loads(l) if l else {"hata": "işçi kapandı"}
@@ -739,90 +754,19 @@ def _isci_dongu():
         w.update(son_sn=j.get("sn"), gecikme_sn=gec, gecikme_max=max(w.get("gecikme_max") or 0, gec)); w["atlanan"] += j.get("atlanan", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         if metin:
-            model = ses_bekle(is_["id"]) if DUYGU or is_["kanal"] != "ben" else None  # v0.12.7: gönderilmeyen parçayı bekleme
-            is_["t_ses"] = time.time(); whisper_yaz(is_, metin, j.get("ses"), model)
-# --- Ses işçisi: duygu modeli + konuşmacı ayırma (v0.8.4, kullanıcı: "ikisini de indir ve kur") ----------------------------
-# ses-isci.py (ses-venv: PyTorch, FunASR emotion2vec+, SpeechBrain ECAPA; ses-modeller/) Whisper'a giden parçanın aynısını
-# paralel işler (~0,15 sn; Whisper ~1,1 sn sürdüğü için satır gecikmez). Sonuç satır kaydına: "duygu" {etiket, p, dagilim},
-# karşı kanalda "kume" (k1, k2…). Kümenin adı altyazıdan oylanır: altyazı satırı konuşmadan 3–6 sn sonra geldiği için o anda
-# bekleyen parçalar geriye dönük oy alır. Ad yoksa tek kümede "Karşı taraf", çok kümede "Karşı taraf 2". ses-venv yoksa
-# durum "yok", Whisper aynen çalışır. 10 dk parça gelmezse işçi kapanır (~2,7 GB bellek).
-SES_PY = _ilk(os.path.join(_ORT, "ses-venv", "bin", "python"), os.path.join(_UYG, "ses-venv", "bin", "python"), os.path.join(_APP, "ses-venv", "bin", "python"))
-SES_ISCI = _ilk(os.path.join(_UYG, "ses-isci.py"), os.path.join(_APP, "ses-isci.py"))
-SES_MODELLER = _ilk(os.path.join(_ORT, "ses-modeller"), os.path.join(_UYG, "ses-modeller"), os.path.join(_APP, "ses-modeller"))
+            if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
+            if j.get("kume"): STATE["ses_model"]["parca"] += 1
+            is_["t_ses"] = time.time(); whisper_yaz(is_, metin, j.get("ses"), {"kume": j["kume"]} if j.get("kume") else None)
+# --- Konuşmacı ses izi (v0.8.4 ses işçisi → v0.13.12 Whisper işçisinin içinde) ------------------------------------------------
+# ECAPA (SpeechBrain VoxCeleb ağırlıkları, MLX) karşı kanal parçalarını kümeler: k1, k2… Kümenin adı altyazıdan oylanır: altyazı satırı
+# konuşmadan 3–6 sn sonra geldiği için o anda bekleyen parçalar geriye dönük oy alır. Ad yoksa tek kümede "Karşı taraf", çok kümede
+# "Karşı taraf 2". v0.13.12 (Faz 1, G4): ayrı ses işçisi (ses-venv: PyTorch, ~370 MB, 2,7 sn yükleme) ve duygu modeli (emotion2vec+)
+# kalktı; ağırlık dosyası (ecapa-mlx.npz, modeller-kur dönüştürür) yoksa durum "yok", Whisper aynen çalışır. STATE["ses_model"] adı
+# pano/teşhis/olcum uyumu için kaldı: ses izinin durumu.
+ECAPA = _ilk(*(os.path.join(d, "ses-modeller", "spkrec-ecapa-voxceleb", "ecapa-mlx.npz") for d in (_ORT, _UYG, _APP)),
+             os.path.expanduser("~/Library/Caches/Suflor/ecapa-mlx.npz"))  # ortak klasör yazılamıyorsa hesabın önbelleği (aktarici-kur)
 STATE["ses_model"] = {"durum": "kapali", "hata": None, "sn": None, "parca": 0}
-SES_Q = queue.Queue(); SES_SONUC = {}; SES_KOSUL = threading.Condition(); _SES = {"p": None, "satirlar": None, "thread": None, "baslik": None}
 KUME_AD = {}; KUME_BEKLEYEN = []  # küme → {ad: oy}; (t0, t1, küme) son parçalar (altyazı oyu için)
-# v0.12.7 (kullanıcı, 3 Ekim): duygu modeli varsayılan kapalı (ayar "duygu_modeli": true açar). Kapalıyken işçide yalnız ECAPA
-# yüklenir ve ben kanalının parçaları işçiye gitmez (ben kanalı kümelenmiyor; işçi karşı ses gelince ya da ısınmada açılır).
-DUYGU = bool(AYAR.get("duygu_modeli"))
-def ses_gonder(is_):
-    if STATE["ses_model"]["durum"] == "yok": return
-    if not DUYGU and is_.get("kanal") == "ben": return
-    SES_Q.put(is_)
-    with _ISCI["kilit"]:
-        if not (_SES["thread"] and _SES["thread"].is_alive()): _SES["thread"] = threading.Thread(target=_ses_dongu, daemon=True); _SES["thread"].start()
-def ses_bekle(i, sn=1.0):
-    son = time.time() + sn
-    with SES_KOSUL:
-        while i not in SES_SONUC and time.time() < son and STATE["ses_model"]["durum"] in ("hazir", "yukleniyor"): SES_KOSUL.wait(max(0.01, son - time.time()))
-        return SES_SONUC.pop(i, None)
-def _ses_ac():
-    sm = STATE["ses_model"]
-    if not (os.path.exists(SES_PY) and os.path.exists(SES_ISCI) and os.path.isdir(SES_MODELLER)):
-        sm.update(durum="yok", hata=f"ses-venv / ses-isci.py / ses-modeller yok"); print(f"SES MODELİ: kullanılamıyor — {sm['hata']}"); return False
-    sm.update(durum="yukleniyor", hata=None)
-    env = dict(os.environ, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", SUFLOR_SES_MODELLER=SES_MODELLER, SUFLOR_DUYGU="1" if DUYGU else "0")
-    pr = subprocess.Popen([SES_PY, "-u", SES_ISCI], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
-    q = queue.Queue()
-    def oku():
-        for l in pr.stdout: q.put(l)
-        q.put(None)
-    threading.Thread(target=oku, daemon=True).start()
-    try: j = json.loads(q.get(timeout=180) or "{}")
-    except (queue.Empty, ValueError): j = {}
-    if not j.get("hazir"):
-        pr.kill(); sm.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"SES MODELİ: {sm['hata']}"); return False
-    _SES.update(p=pr, satirlar=q, baslik=None); KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]
-    sm.update(durum="hazir", sn=j.get("sn")); print(f"SES MODELİ: hazır ({'emotion2vec+ · ' if DUYGU else ''}ECAPA{'' if DUYGU else ', duygu kapalı'}, {j.get('sn')} sn)"); return True
-def _ses_kapat(neden):
-    pr = _SES["p"]; _SES.update(p=None, satirlar=None)
-    if pr:
-        try: pr.stdin.close(); pr.wait(timeout=5)
-        except Exception: pr.kill()
-    if STATE["ses_model"]["durum"] == "hazir": STATE["ses_model"]["durum"] = "kapali"
-    with SES_KOSUL: SES_KOSUL.notify_all()
-    print(f"SES MODELİ: işçi kapatıldı ({neden})")
-def _ses_dongu():
-    sm = STATE["ses_model"]; hata_say = 0
-    while True:
-        try: is_ = SES_Q.get(timeout=WH_BOSTA_KAPAT_SN)
-        except queue.Empty:
-            if _SES["p"]: _ses_kapat(f"{WH_BOSTA_KAPAT_SN // 60} dk ses yok, bellek boşaltıldı")
-            return
-        if is_.get("isinma"):  # v0.9.5
-            if not _SES["p"] or _SES["p"].poll() is not None: _ses_ac()
-            continue
-        if time.time() - is_["kuyruga"] > 45: continue
-        if not _SES["p"] or _SES["p"].poll() is not None:
-            if not _ses_ac():
-                if sm["durum"] == "yok": return
-                hata_say += 1; time.sleep(min(60, 5 * hata_say)); continue
-        try:
-            if _SES["baslik"] != is_["baslik"]:  # yeni toplantı: karşı kanal kümeleri sıfırlanır
-                if _SES["baslik"] is not None:
-                    _SES["p"].stdin.write(json.dumps({"id": "sifirla", "sifirla": True}) + "\n"); _SES["p"].stdin.flush(); _SES["satirlar"].get(timeout=10)
-                    KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]
-                _SES["baslik"] = is_["baslik"]
-            _SES["p"].stdin.write(json.dumps({"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "kanal": is_["kanal"]}) + "\n"); _SES["p"].stdin.flush()
-            l = _SES["satirlar"].get(timeout=30); j = json.loads(l) if l else {"hata": "işçi kapandı"}
-        except Exception as e: j = {"hata": e.__class__.__name__}
-        if j.get("hata"): print(f"SES MODELİ: parça işlenemedi ({j['hata']})"); sm["hata"] = j["hata"]; _ses_kapat("hata"); continue
-        hata_say = 0; sm["parca"] += 1
-        with SES_KOSUL:
-            SES_SONUC[is_["id"]] = j
-            for k in list(SES_SONUC)[:-50]: SES_SONUC.pop(k, None)
-            SES_KOSUL.notify_all()
 CAP_OY = []  # (an, ad, taslak mı) son altyazı/taslak işaretleri
 def _oy_uyar(c, taslak, t0, t1):
     # taslak konuşurken gelir (≤ ~1 sn gecikme): parçanın içinde; sabit altyazı satırı konuşma bittikten 3–6 sn sonra
@@ -966,7 +910,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
             "entries": [{"id": is_["id"], "speaker": kim, "time": datetime.datetime.fromtimestamp(is_["t0"]).strftime("%H:%M:%S"), "text": metin,
                          "seen": datetime.datetime.utcfromtimestamp(is_["t1"]).isoformat(timespec="milliseconds") + "Z", "kanal": kanal,
                          "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2),
-                         **({"duygu": model["duygu"]} if (model or {}).get("duygu") else {}), **({"kume": kume} if kume else {}),  # v0.8.4  # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
+                         **({"kume": kume} if kume else {}),  # v0.8.4  # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
                          **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,
                          **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60))} if ses else {})}]})  # v0.8.2: ses sinyalleri + hız (kelime/dk)
 # --- Ses komutuyla kanıt (v0.8.0, kullanıcı) ---------------------------------------------------------------------------
@@ -1843,9 +1787,8 @@ def guncelle_baslat():
     GUN.update(durum=None, hata=None, p=subprocess.Popen(["/bin/bash", os.path.join(k, "guncelle.command")], cwd=k, stdout=log, stderr=subprocess.STDOUT,
                                                          stdin=subprocess.DEVNULL, start_new_session=True))
     print(f"GÜNCELLEME: panodan başlatıldı (v{SURUM} → v{GUN['son'] or '?'})"); return {"ok": True}
-def modelleri_isit():  # v0.9.5: panodan başlatınca Whisper ve ses modeli toplantıdan önce yüklenir (~5 + ~12 sn)
+def modelleri_isit():  # v0.9.5: panodan başlatınca Whisper (v0.13.12: ses izi içinde) toplantıdan önce yüklenir (~5 sn)
     if STATE["whisper"].get("durum") != "yok": WH_Q.put({"isinma": True, "kuyruga": time.time()}); _isci_baslat()
-    if STATE["ses_model"].get("durum") != "yok": ses_gonder({"isinma": True, "kuyruga": time.time()})
 def claude_yolu():
     for y in [AYAR.get("claude"), os.path.expanduser("~/.local/bin/claude"), os.path.expanduser("~/.claude/local/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude", shutil.which("claude")]:
         if y and os.path.isfile(os.path.expanduser(y)) and os.access(os.path.expanduser(y), os.X_OK): return os.path.expanduser(y)

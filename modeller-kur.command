@@ -1,10 +1,10 @@
 #!/bin/sh
 # Suflor.me — yerel modeller ve Python ortamları (v0.8.5). Yeni Mac'te ya da bozulunca bir kez çalıştır; olanı yeniden kurmaz.
 #   whisper-venv  : mlx-whisper (konuşma tanıma, Apple GPU)                    ~760 MB
-#   whisper-modeller: mlx-community/whisper-large-v3-turbo (Hugging Face)      ~1,6 GB
-#   ses-venv      : PyTorch + FunASR + SpeechBrain (duygu, konuşmacı ayırma)    ~860 MB
-#   ses-modeller  : emotion2vec/emotion2vec_plus_base (~1,0 GB) + speechbrain/spkrec-ecapa-voxceleb (~85 MB)
-# İnternet yalnız bu kurulumda gerekir; aktarıcı modelleri çevrimdışı açar (HF_HUB_OFFLINE=1). Toplam ~4,3 GB disk.
+#   whisper-modeller: mlx-community/whisper-large-v3-turbo (Hugging Face)      ~1,6 GB (+ yerelde 8 bit kopyası ~0,8 GB, v0.13.14)
+#   ses-modeller  : speechbrain/spkrec-ecapa-voxceleb (~85 MB) → ecapa-mlx.npz (konuşmacı ayırma, Whisper işçisinde MLX ile)
+# İnternet yalnız bu kurulumda gerekir; aktarıcı modelleri çevrimdışı açar (HF_HUB_OFFLINE=1). Toplam ~3,3 GB disk.
+# v0.13.12: ses-venv (PyTorch + FunASR + SpeechBrain) ve duygu modeli (emotion2vec+) kalktı; eski kurulumda duruyorlarsa kullanılmaz.
 # Sürümler 2 Ekim 2026'da çalışan kurulumdan sabitlendi. Sonra: ./aktarici-kur.command
 set -e
 # v0.9.2: modeller ve ortamlar iki macOS hesabında ortak: /Users/Shared/Suflor (ayar.json "ortak"). Başka hesap kurduysa
@@ -14,6 +14,7 @@ v={'ortak':'/Users/Shared/Suflor'}
 try: v.update(json.load(open(os.path.expanduser('~/Library/Application Support/Suflor/ayar.json'))))
 except Exception: pass
 print(os.path.expanduser(v['ortak']))")"; PY=/usr/bin/python3
+KOD="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$APP" 2>/dev/null || true; cd "$APP"
 if [ ! -w "$APP" ]; then echo "Not: $APP başka bir hesabın — yalnız denetlenecek, kurulum yapılmayacak."; fi
 bos=$(df -g "$HOME" | awk 'NR==2{print $4}')
@@ -43,40 +44,30 @@ else
   HF_HOME="$APP/whisper-modeller" "$APP/whisper-venv/bin/python" -c "from huggingface_hub import snapshot_download as s; s('mlx-community/whisper-large-v3-turbo')"; }
 fi
 
-if ok "$APP/ses-venv/bin/python" "import funasr, speechbrain, torch"; then echo "✓ ses-venv var"
+mkdir -p "$APP/ses-modeller"; EK="$APP/ses-modeller/spkrec-ecapa-voxceleb"
+if [ -f "$EK/embedding_model.ckpt" ]; then echo "✓ ses izi modeli var"
 else
-  echo "→ ses-venv kuruluyor (~860 MB)…"; $PY -m venv "$APP/ses-venv"
-  "$APP/ses-venv/bin/python" -m pip install -q --upgrade pip
-  "$APP/ses-venv/bin/python" -m pip install -q "torch==2.8.0" "torchaudio==2.8.0" "numpy==2.0.2" "speechbrain==1.1.1" "funasr==1.4.16"
+  echo "→ ses izi modeli Hugging Face'ten indiriliyor (~85 MB)…"
+  "$APP/whisper-venv/bin/python" -c "from huggingface_hub import snapshot_download as s; s('speechbrain/spkrec-ecapa-voxceleb', local_dir='$EK', allow_patterns=['embedding_model.ckpt', 'hyperparams.yaml'])"
 fi
-mkdir -p "$APP/ses-modeller"
-if [ -f "$APP/ses-modeller/emotion2vec_plus_base/model.pt" ] && [ -f "$APP/ses-modeller/spkrec-ecapa-voxceleb/embedding_model.ckpt" ]; then echo "✓ ses modelleri var"
-else
-  if ! rel_indir suflor-ses-modeller.tar; then
-  echo "→ ses modelleri Hugging Face'ten indiriliyor (~1,1 GB)…"
-  "$APP/ses-venv/bin/python" - <<'P'
-from huggingface_hub import snapshot_download
-for repo, desen in (("speechbrain/spkrec-ecapa-voxceleb", ["*.ckpt", "*.yaml", "*.json", "label_encoder.txt"]),
-                    ("emotion2vec/emotion2vec_plus_base", ["model.pt", "config.yaml", "configuration.json", "tokens.txt"])):
-    snapshot_download(repo, local_dir="ses-modeller/" + repo.split("/")[1], allow_patterns=desen)
-P
-  fi
+if [ -f "$EK/ecapa-mlx.npz" ]; then echo "✓ ses izi ağırlıkları (MLX) var"
+else PYTHONDONTWRITEBYTECODE=1 "$APP/whisper-venv/bin/python" "$KOD/whisper-isci.py" --ecapa-donustur "$EK/embedding_model.ckpt" "$EK/ecapa-mlx.npz" \
+       || echo "Not: ses izi ağırlıkları dönüştürülemedi — konuşmacı ayırma kapalı kalır, Whisper çalışır"
+fi
+
+ORT="$APP"
+# v0.13.14: Whisper turbo'nun 8 bit kopyası yerelde bir kez üretilir (indirme yok, ~1 dk, 824 MB); aktarıcı varsa onu kullanır
+T="$(ls -d "$ORT"/whisper-modeller/hub/models--mlx-community--whisper-large-v3-turbo/snapshots/* 2>/dev/null | head -1)"
+Q8="$ORT/whisper-modeller/hub/models--suflor--whisper-large-v3-turbo-q8/snapshots/yerel"
+if [ -n "$T" ] && [ ! -f "$Q8/weights.safetensors" ] && [ -w "$ORT/whisper-modeller/hub" ]; then
+  echo "→ Whisper 8 bit modeli hazırlanıyor (bir kez, ~1 dk)…"
+  HF_HUB_OFFLINE=1 PYTHONDONTWRITEBYTECODE=1 "$ORT/whisper-venv/bin/python" "$KOD/whisper-isci.py" --whisper-nicemle "$T" "$Q8" 2>/dev/null \
+    && chmod -R go+rX "$ORT/whisper-modeller/hub/models--suflor--whisper-large-v3-turbo-q8" 2>/dev/null \
+    || echo "Not: 8 bit model hazırlanamadı — tam model kullanılır"
 fi
 
 echo "→ Deneme: modeller çevrimdışı açılıyor mu…"
 HF_HOME="$APP/whisper-modeller" HF_HUB_OFFLINE=1 "$APP/whisper-venv/bin/python" -c "
 import numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), path_or_hf_repo='mlx-community/whisper-large-v3-turbo', language='tr'); print('✓ Whisper açılıyor')"
-HF_HUB_OFFLINE=1 SUFLOR_SES_MODELLER="$APP/ses-modeller" "$APP/ses-venv/bin/python" - <<'P' 2>/dev/null
-import os, sys, numpy as np
-sys.stdout = sys.stderr  # FunASR/SpeechBrain mesajları gizlensin (stderr kapalı), sonuç satırı __stdout__'a
-M = os.environ["SUFLOR_SES_MODELLER"]
-from funasr import AutoModel
-AutoModel(model=M + "/emotion2vec_plus_base", disable_update=True, device="cpu", log_level="ERROR")
-from speechbrain.inference.speaker import EncoderClassifier
-from speechbrain.utils.fetching import LocalStrategy
-d = M + "/spkrec-ecapa-voxceleb"
-EncoderClassifier.from_hparams(source=d, savedir=d, overrides={"pretrained_path": d}, run_opts={"device": "cpu"}, local_strategy=LocalStrategy.NO_LINK)
-sys.__stdout__.write("✓ duygu modeli ve konuşmacı ayırma açılıyor\n")
-P
 chmod -R go+rX "$APP" 2>/dev/null || true  # diğer hesap okuyabilsin
 echo "Tamam. Şimdi: ./aktarici-kur.command"

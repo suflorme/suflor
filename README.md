@@ -59,7 +59,7 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 | Chrome eklentisi (`manifest.json`, `content.js`, `platform-teams.js`, …) | Teams sayfasından altyazı/döküm ve mikrofon sesini alır, şeridi gösterir |
 | Aktarıcı (`relay.py`) | Yerel sunucu: satırları dosyaya yazar, kartları tutar, panoyu sunar |
 | Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
-| Konuşma tanıma (`whisper-isci.py`, `ses-isci.py`) | Whisper large-v3-turbo (MLX) ve isteğe bağlı ses modeli |
+| Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
 | Claude köprüsü (`toplanti-claude.py`, `baglam.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
 | Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
 

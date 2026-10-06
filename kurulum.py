@@ -103,10 +103,10 @@ def claude_denetle():
 
 # ---------- modeller (arka planda modeller-kur.command) ----------
 MODEL = {"durum": None, "yuzde": 0, "mesaj": "", "p": None}
-GEREKEN_GB = 4.3
+GEREKEN_GB = 3.3
 def modeller_hazir():
     return (os.path.exists(f"{ORTAK}/whisper-venv/bin/python") and os.path.isdir(f"{ORTAK}/whisper-modeller/hub") and
-            os.path.exists(f"{ORTAK}/ses-venv/bin/python") and os.path.exists(f"{ORTAK}/ses-modeller/emotion2vec_plus_base/model.pt"))
+            os.path.exists(f"{ORTAK}/ses-modeller/spkrec-ecapa-voxceleb/ecapa-mlx.npz"))  # v0.13.12: ses-venv yok
 def _boyut(yol):
     n = 0
     for k, _, fs in os.walk(yol):

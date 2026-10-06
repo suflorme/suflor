@@ -3,7 +3,7 @@
 #   1) bilgisayar denetimi (Apple Silicon / M serisi, Python, disk)
 #   2) hesabın ayar dosyası: ~/Library/Application Support/Suflor/ayar.json (alan adı, adın, port, proje klasörü)
 #   3) proje (bağlam) klasörü: CLAUDE.md, .claude/commands/toplanti.md, belgeler/, gorusmeler/, _kanit/, _arsiv/
-#   4) modeller ve Python ortamları: ortak klasörde (/Users/Shared/Suflor) varsa kullanılır, yoksa indirilir (~4,3 GB)
+#   4) modeller ve Python ortamları: ortak klasörde (/Users/Shared/Suflor) varsa kullanılır, yoksa indirilir (~3,3 GB)
 #   5) aktarıcı: Mac açılışında kendiliğinden başlar (aktarici-kur.command)
 # Yeniden çalıştırmak güvenlidir: var olan ayar ve dosyaların üzerine yazmadan önce sorar.
 set -e
@@ -57,10 +57,10 @@ doldur "$KOD/sablon/toplanti.md" "$PROJE/.claude/commands/toplanti.md"; echo "�
 
 # 4) Modeller (ortak klasör)
 ORT=/Users/Shared/Suflor
-if [ -x "$ORT/whisper-venv/bin/python" ] && [ -d "$ORT/whisper-modeller/hub" ] && [ -x "$ORT/ses-venv/bin/python" ] && [ -f "$ORT/ses-modeller/emotion2vec_plus_base/model.pt" ]; then
+if [ -x "$ORT/whisper-venv/bin/python" ] && [ -d "$ORT/whisper-modeller/hub" ] && [ -f "$ORT/ses-modeller/spkrec-ecapa-voxceleb/ecapa-mlx.npz" ]; then
   echo "✓ modeller ortak klasörde ($ORT) — indirme yok"
 else
-  echo "→ modeller kuruluyor (ortak klasöre, ~4,3 GB; internet gerekir)"; "$KOD/modeller-kur.command"
+  echo "→ modeller kuruluyor (ortak klasöre, ~3,3 GB; internet gerekir)"; "$KOD/modeller-kur.command"
 fi
 
 # Claude Code komut satırı (panodan başlatma ve /toplanti için)

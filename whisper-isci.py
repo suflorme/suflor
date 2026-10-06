@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-# Suflor.me — Whisper işçisi (v0.8.3). Aktarıcı (relay.py) bunu whisper-venv Python'uyla alt süreç olarak başlatır;
+# Suflor.me — Whisper işçisi (v0.8.3; v0.13.12 ses izi). Aktarıcı (relay.py) bunu whisper-venv Python'uyla alt süreç olarak başlatır;
 # model bir kez yüklenir, sonra stdin'den gelen konuşma parçalarını metne çevirir. Tamamen yerel: ağ yok (model diskten).
 # Protokol (satır başına bir JSON):
-#   giriş : {"id": "...", "pcm": "<base64 int16, 16 kHz, tek kanal>", "dil": "tr"|"en"|null, "istem": "terimler…", "onceki": "son metin"}
-#   çıkış : {"hazir": true, "model": "...", "sn": yükleme} · {"id": "...", "text": "...", "sn": süre, "dil": "tr", "atlanan": n} · {"id": "...", "hata": "..."}
+#   giriş : {"id": "...", "pcm": "<base64 int16, 16 kHz, tek kanal>", "dil": "tr"|"en"|null, "istem": "terimler…", "onceki": "son metin",
+#            "kanal": "ben"|"karsi", "baslik": "toplantı"}
+#   çıkış : {"hazir": true, "model": "...", "sn": yükleme, "ecapa": bool} · {"id": "...", "text": "...", "sn": süre, "dil": "tr", "atlanan": n,
+#            "kume": "k1"|null, "benzerlik"} · {"id": "...", "hata": "..."}
+# v0.13.12 (Faz 1, G4): konuşmacı ses izi (ECAPA-TDNN, SpeechBrain VoxCeleb ağırlıkları) bu süreçte MLX ile çalışır — ayrı ses işçisi,
+# PyTorch ve duygu modeli (emotion2vec+) kalktı. Ağırlıklar modeller-kur'un bir kez dönüştürdüğü ecapa-mlx.npz (SUFLOR_ECAPA); yoksa
+# kümeleme olmaz, Whisper aynen çalışır. SpeechBrain'le aynı sonuç (6 Ekim, 18 parça: kosinüs ≥ 0,99999), parça başına ~25 ms.
 # Uydurma süzgeci: sessiz/gürültülü parçada Whisper altyazı kalıpları üretir ("Altyazı M.K.", "İzlediğiniz için
 # teşekkürler") — 1 Ekim yapay ses denemesinde görüldü. Kalıp + düşük güven + tekrar oranıyla atılır.
 import sys, os, json, time, base64, re
@@ -35,6 +40,63 @@ def ses_olc(a, np, sr=16000):
         st = st[np.abs(st) < 12]  # oktav hatası
         o.update(f0=round(m, 1), f0_oyn=round(float(st.std()), 2))
     return o
+# --- ECAPA (MLX). SpeechBrain'in Fbank'ı (25 ms Hamming, 10 ms adım, 80 mel, dB, üst 80 dB) + cümle ortalaması + ECAPA_TDNN
+# (1024 kanal, Res2Net ölçek 8, SE 128, dikkatli istatistik havuzu); Conv1d "same" + yansıtmalı dolgu, BatchNorm çıkarım istatistiği.
+SR, NFFT, HOP = 16000, 400, 160
+KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den (v0.8.4) aynen
+class Ecapa:
+    def __init__(s, yol, np, mx):
+        s.np, s.mx = np, mx
+        mel = lambda h: 2595 * np.log10(1 + h / 700); hz = 700 * (10 ** (np.linspace(mel(0), mel(SR // 2), 82, dtype=np.float32) / 2595) - 1)
+        f = np.linspace(0, SR // 2, NFFT // 2 + 1, dtype=np.float32)[:, None]; e = (f - hz[1:-1]) / (hz[1:] - hz[:-1])[:-1]
+        s.mel = np.maximum(0, np.minimum(e + 1, 1 - e)).astype(np.float32); s.pen = (0.54 - 0.46 * np.cos(2 * np.pi * np.arange(NFFT) / NFFT)).astype(np.float32)
+        w = dict(np.load(yol)); s.w = {}
+        for k, v in w.items():
+            if k.endswith("conv.weight"): s.w[k] = mx.array(v.transpose(0, 2, 1))  # torch (çıkış, giriş, k) → MLX (çıkış, k, giriş)
+            elif k.endswith("conv.bias"): s.w[k] = mx.array(v)
+            elif k.endswith("norm.weight"):
+                b = k[:-len("weight")]; sc = v / np.sqrt(w[b + "running_var"] + 1e-5)
+                s.w[b + "sc"] = mx.array(sc); s.w[b + "sh"] = mx.array(w[b + "bias"] - w[b + "running_mean"] * sc)
+    def fbank(s, a):
+        np = s.np; x = np.pad(a.astype(np.float32), NFFT // 2); n = 1 + (len(x) - NFFT) // HOP
+        kar = np.lib.stride_tricks.as_strided(x, (n, NFFT), (x.strides[0] * HOP, x.strides[0])) * s.pen
+        with np.errstate(all="ignore"):  # macOS Accelerate matmul'ü yersiz taşma uyarısı veriyor; sonuç doğru
+            db = 10 * np.log10(np.maximum((np.abs(np.fft.rfft(kar, NFFT)) ** 2) @ s.mel, 1e-10))
+        db = np.maximum(db, db.max() - 80); return db - db.mean(0)
+    def conv(s, x, p, dil=1):
+        mx = s.mx; w = s.w[p + ".conv.weight"]; q = dil * (w.shape[1] - 1) // 2
+        if q:
+            L = x.shape[1]; i = s.np.concatenate([s.np.arange(q, 0, -1), s.np.arange(L), s.np.arange(L - 2, L - 2 - q, -1)])
+            x = mx.take(x, mx.array(i), axis=1)
+        return mx.conv1d(x, w, dilation=dil) + s.w[p + ".conv.bias"]
+    def tdnn(s, x, p, dil=1): return s.mx.maximum(s.conv(x, p + ".conv", dil), 0) * s.w[p + ".norm.norm.sc"] + s.w[p + ".norm.norm.sh"]
+    def blok(s, x, p, dil):
+        mx = s.mx; r = x; xs = mx.split(s.tdnn(x, p + ".tdnn1"), 8, axis=2); y = [xs[0]]
+        for i in range(1, 8): y.append(s.tdnn(xs[i] if i == 1 else xs[i] + y[-1], f"{p}.res2net_block.blocks.{i - 1}", dil))
+        x = s.tdnn(mx.concatenate(y, axis=2), p + ".tdnn2")
+        z = mx.maximum(s.conv(x.mean(axis=1, keepdims=True), p + ".se_block.conv1"), 0)
+        return x * mx.sigmoid(s.conv(z, p + ".se_block.conv2")) + r
+    def __call__(s, a):
+        mx = s.mx; x = s.tdnn(mx.array(s.fbank(a))[None], "blocks.0"); xl = []
+        for i in (1, 2, 3): x = s.blok(x, f"blocks.{i}", i + 1); xl.append(x)
+        x = s.tdnn(mx.concatenate(xl, axis=2), "mfa")
+        m = x.mean(axis=1, keepdims=True); sd = mx.sqrt(mx.maximum(((x - m) ** 2).mean(axis=1, keepdims=True), 1e-12))
+        at = mx.concatenate([x, mx.broadcast_to(m, x.shape), mx.broadcast_to(sd, x.shape)], axis=2)
+        at = mx.softmax(s.conv(mx.tanh(s.tdnn(at, "asp.tdnn")), "asp.conv"), axis=1)
+        m = (at * x).sum(axis=1, keepdims=True); sd = mx.sqrt(mx.maximum((at * (x - m) ** 2).sum(axis=1, keepdims=True), 1e-12))
+        e = s.np.array(s.conv(mx.concatenate([m, sd], axis=2) * s.w["asp_bn.norm.sc"] + s.w["asp_bn.norm.sh"], "fc")[0, 0])
+        return e / (s.np.linalg.norm(e) + 1e-9)
+def kumele(iz, ks, a, np):
+    # karşı kanal (Teams sekmesinin/uygulamasının sesi, birden çok kişi karışık): parça en yakın kümeye; yoksa yeni küme (k1, k2…)
+    e = iz(a); uzun = len(a) >= SR * KUME_MIN_SN
+    sim = [float(np.dot(e, k[0])) for k in ks]; j = int(np.argmax(sim)) if sim else -1
+    if j >= 0 and sim[j] >= (KUME_ESIK if uzun else KUME_KISA_ESIK):
+        if uzun and sim[j] >= KUME_GUNCELLE:
+            c = ks[j][0] * ks[j][1] + e; ks[j][0] = c / (np.linalg.norm(c) + 1e-9); ks[j][1] += 1
+        return {"kume": f"k{j + 1}", "benzerlik": round(sim[j], 2)}
+    if uzun and len(ks) < KUME_EN_COK:
+        ks.append([e, 1]); return {"kume": f"k{len(ks)}", "benzerlik": round(max(sim), 2) if sim else None}
+    return {"kume": None}
 def out(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
 def main():
     t = time.time()
@@ -43,7 +105,18 @@ def main():
         mlx_whisper.transcribe(np.zeros(16000, np.float32), path_or_hf_repo=MODEL, language="tr")  # ısınma: model belleğe
     except Exception as e:
         out({"hata": f"model yüklenemedi: {e.__class__.__name__}: {str(e)[:200]}"}); return 1
-    out({"hazir": True, "model": MODEL, "sn": round(time.time() - t, 1)})
+    # v0.13.13 (Faz 1): MLX ara bellek önbelleği kapalı. Sınırsızken parça boyları değiştikçe önbellek büyüyor: 47 parçalık oturumda
+    # işçi 5 805 MB'a çıktı (kısa ölçüm 2 700 gösteriyordu — toplantıdaki swap'ın asıl nedeni); 0 ile 2 449 MB, parça 1,15 → 1,19 sn,
+    # metin aynı (6 Ekim). SUFLOR_MLX_ONBELLEK_MB ile değiştirilebilir.
+    try:
+        import mlx.core as mx; mx.set_cache_limit(int(os.environ.get("SUFLOR_MLX_ONBELLEK_MB") or 0) * 2 ** 20)
+    except Exception: pass
+    iz = None; ey = os.environ.get("SUFLOR_ECAPA")
+    if ey and os.path.exists(ey):
+        try: import mlx.core as mx; iz = Ecapa(ey, np, mx); iz(np.zeros(16000, np.float32))  # ısınma
+        except Exception as e: iz = None; sys.stderr.write(f"ECAPA yüklenemedi: {e}\n")
+    out({"hazir": True, "model": MODEL, "sn": round(time.time() - t, 1), "ecapa": bool(iz)})
+    kumeler = []; baslik = None  # karşı kanal kümeleri; yeni toplantıda sıfırlanır
     for satir in sys.stdin:
         if not satir.strip(): continue
         try: p = json.loads(satir)
@@ -65,9 +138,39 @@ def main():
             if istem and metin and metin.lower().strip(" .") in istem.lower(): metin = ""; atla += 1  # istemi geri okuma
             try: ses = ses_olc(a, np) if metin else None
             except Exception: ses = None
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"ses": ses} if ses else {})})
+            km = {}
+            if p.get("baslik") != baslik: kumeler = []; baslik = p.get("baslik")
+            if iz and metin and p.get("kanal") == "karsi" and len(a) >= SR * 0.8:
+                try: km = kumele(iz, kumeler, a, np)
+                except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"ses": ses} if ses else {}), **km})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0
+def ecapa_donustur(ckpt, hedef):
+    # kurulumda bir kez (aktarici-kur / modeller-kur): SpeechBrain ağırlıkları (torch dosyası) → numpy .npz. torch yalnız burada gerekir
+    # (whisper-venv'de mlx-whisper'ın bağımlılığı olarak var); işçi çalışırken torch içe aktarılmaz.
+    import numpy as np, torch
+    sd = torch.load(ckpt, map_location="cpu"); gec = hedef + ".tmp.npz"
+    np.savez(gec, **{k: v.numpy().astype(np.float32) for k, v in sd.items() if not k.endswith("num_batches_tracked")})
+    Ecapa(gec, np, __import__("mlx.core", fromlist=["core"]))(np.zeros(16000, np.float32)); os.replace(gec, hedef)  # açılmıyorsa yazılmaz
+    print(f"✓ ses izi ağırlıkları dönüştürüldü: {hedef}")
+def whisper_nicemle(kaynak, hedef, bit=8):
+    # v0.13.14 (6 Ekim): turbo modeli kurulumda bir kez yerelde 8 bite nicemlenir (indirme yok). Ölçüm (47 aynı parça, önbellek 0):
+    # turbo 2 449 MB · parça 1,19 sn · WER %13,6/9,2 → q8 1 838 MB · 1,25 sn · %14,0/8,8. q4 doğruluk kaybettirdi (%16,9/10,7), kullanılmaz.
+    import mlx.core as mx, mlx.nn as nn
+    from mlx.utils import tree_flatten
+    from mlx_whisper.load_models import load_model
+    m = load_model(kaynak, dtype=mx.float16)
+    nn.quantize(m, group_size=64, bits=bit, class_predicate=lambda p, x: isinstance(x, (nn.Linear, nn.Embedding)) and x.weight.shape[-1] % 64 == 0)
+    gec = hedef + ".tmp"; os.makedirs(gec, exist_ok=True)
+    mx.save_safetensors(os.path.join(gec, "weights.safetensors"), dict(tree_flatten(m.parameters())))
+    c = json.load(open(os.path.join(kaynak, "config.json"))); c["quantization"] = {"group_size": 64, "bits": bit}
+    json.dump(c, open(os.path.join(gec, "config.json"), "w"))
+    import numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), path_or_hf_repo=gec, language="tr")  # açılmıyorsa yerine konmaz
+    if os.path.isdir(hedef): import shutil; shutil.rmtree(hedef)
+    os.replace(gec, hedef); print(f"✓ Whisper {bit} bit modeli hazır: {hedef}")
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--ecapa-donustur"]: ecapa_donustur(sys.argv[2], sys.argv[3]); sys.exit(0)
+    if sys.argv[1:2] == ["--whisper-nicemle"]: whisper_nicemle(sys.argv[2], sys.argv[3]); sys.exit(0)
     sys.exit(main())

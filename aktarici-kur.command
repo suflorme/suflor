@@ -42,8 +42,26 @@ mkdir -p "$APP/canli"
 # v0.9.2: yeni hesapta proje klasöründe _canli kısayolu yoksa kur (Claude geçmiş toplantıları oradan arar)
 if [ ! -e "$DESK" ] && [ -d "$(dirname "$DESK")" ]; then ln -s "$APP/canli" "$DESK" && echo "Kısayol: $DESK → $APP/canli"; fi
 cp "$SRC/relay.py" "$APP/relay.py"
-cp "$SRC/ses-isci.py" "$APP/ses-isci.py"  # v0.8.4: duygu modeli + konuşmacı ayırma (ses-venv, ses-modeller ayrıca kurulu olmalı)
 cp "$SRC/whisper-isci.py" "$APP/whisper-isci.py"  # v0.8.0: yerel konuşma tanıma işçisi (whisper-venv ayrıca kurulu olmalı)
+rm -f "$APP/ses-isci.py"  # v0.13.12: ayrı ses işçisi kalktı (ses izi Whisper işçisinde)
+# v0.13.12: ses izi (ECAPA) ağırlıkları MLX için bir kez dönüştürülür; ortak klasör yazılamıyorsa hesabın önbelleğine
+ORT="$(ayar ortak)"; EK="$ORT/ses-modeller/spkrec-ecapa-voxceleb"
+if [ -f "$EK/embedding_model.ckpt" ] && [ ! -f "$EK/ecapa-mlx.npz" ] && [ ! -f "$HOME/Library/Caches/Suflor/ecapa-mlx.npz" ] && [ -x "$ORT/whisper-venv/bin/python" ]; then
+  HEDEF="$EK/ecapa-mlx.npz"; [ -w "$EK" ] || { mkdir -p "$HOME/Library/Caches/Suflor"; HEDEF="$HOME/Library/Caches/Suflor/ecapa-mlx.npz"; }
+  PYTHONDONTWRITEBYTECODE=1 "$ORT/whisper-venv/bin/python" "$SRC/whisper-isci.py" --ecapa-donustur "$EK/embedding_model.ckpt" "$HEDEF" 2>/dev/null \
+    || echo "Not: ses izi ağırlıkları dönüştürülemedi — konuşmacı ayırma kapalı, Whisper çalışır (modeller-kur.command dener)"
+  chmod go+r "$HEDEF" 2>/dev/null || true
+fi
+# v0.13.14: Whisper turbo'nun 8 bit kopyası yerelde bir kez üretilir (indirme yok, ~1 dk, 824 MB); aktarıcı varsa onu kullanır
+T="$(ls -d "$ORT"/whisper-modeller/hub/models--mlx-community--whisper-large-v3-turbo/snapshots/* 2>/dev/null | head -1)"
+Q8="$ORT/whisper-modeller/hub/models--suflor--whisper-large-v3-turbo-q8/snapshots/yerel"
+if [ -n "$T" ] && [ ! -f "$Q8/weights.safetensors" ] && [ -w "$ORT/whisper-modeller/hub" ]; then
+  echo "→ Whisper 8 bit modeli hazırlanıyor (bir kez, ~1 dk)…"
+  HF_HUB_OFFLINE=1 PYTHONDONTWRITEBYTECODE=1 "$ORT/whisper-venv/bin/python" "$SRC/whisper-isci.py" --whisper-nicemle "$T" "$Q8" 2>/dev/null \
+    && chmod -R go+rX "$ORT/whisper-modeller/hub/models--suflor--whisper-large-v3-turbo-q8" 2>/dev/null \
+    || echo "Not: 8 bit model hazırlanamadı — tam model kullanılır"
+fi
+
 # v0.11.3: pano ve hazırlık sayfası marka yazı tiplerini ve işareti aktarıcının yanından verir (launchd Masaüstü'nü okuyamaz)
 # v0.12.0: beta teşhis süzgeci + sözlüğü (kodun kendi günlük metinlerinden üretilir)
 cp "$SRC/teshis.py" "$APP/teshis.py"; PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$SRC/teshis.py" --sozluk "$SRC" > "$APP/teshis-sozluk.txt" 2>/dev/null || true

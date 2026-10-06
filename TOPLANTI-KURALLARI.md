@@ -18,7 +18,7 @@ Olaylarda `<ad>`: ayar dosyasındaki `ad`ın ilk sözcüğü (kullanıcı); Whis
 - Satır metni artık yerel Whisper'dan (`whisper-large-v3-turbo`, Mac'te; 1 Ekim 2026 ölçümü:
   Türkçe kelime hatası Teams %25 → Whisper %8). Eklenti kullanıcının mikrofonunu (`mic-main.js`, Teams sayfa bağlamı; Teams'te
   "Sesi aç" görünüyorsa göndermez) ve ⌥⇧W/popup ile Teams sekmesinin sesini (`offscreen.js`, karşı taraf) `/ses`'e verir.
-  Aktarıcı sessizliğe göre böler (≤ 12 sn), `whisper-isci.py`'yi (whisper-venv, App Support) alt süreç çalıştırır, satırı
+  Aktarıcı sessizliğe göre böler (≤ 6 sn, v0.13.13), `whisper-isci.py`'yi (whisper-venv, App Support) alt süreç çalıştırır, satırı
   `src: "whisper"` + `kanal: ben|karsi` ile yazar. Karşı tarafın adı Teams altyazısından (açıksa), tek karşı konuşmacı varsa
   onun adı, yoksa "Karşı taraf". Whisper akarken o tarafın altyazısı `.altyazi.log`'a gider (çift satır yok); Whisper 90 sn
   satır üretmezse altyazı yeniden yazılır. Dil: `agenda.json` `dil` (tr/en; karisik → Whisper seçer); terimler sözlükten istem.
@@ -58,15 +58,13 @@ Olaylarda `<ad>`: ayar dosyasındaki `ad`ın ilk sözcüğü (kullanıcı); Whis
   söz kesme, yankı — "## Konuşma koçluğu" 3–5 satır, bir öneri), `anlar` (öne çıkan dakikalar: ⭐, karar/tarih, ses değişimi,
   kesin olmayan iddia, kanıt — "## Öne çıkan anlar"), `kesinlik` ("## Kesinleşmesi gereken iddialar", kime ne sorulacak).
 
-## Duygu modeli + konuşmacı ayırma (v0.8.4, 2 Ekim — kullanıcı: "ikisini de indir ve kur")
-- `ses-isci.py` (`ses-venv`: PyTorch 2.8, FunASR emotion2vec+ base, SpeechBrain ECAPA; modeller `ses-modeller/`, App Support)
-  Whisper'a giden parçanın aynısını paralel işler; satır kaydına `duygu` {etiket, p, dagilim} ve karşı kanalda `kume` (k1…).
-  Çevrimdışı (`HF_HUB_OFFLINE=1`). Yükleme ~8 sn, parça ~0,15 sn, bellek ~2,7 GB; 10 dk ses yoksa kapanır. Yoksa Whisper aynen çalışır.
-- Karşı kanalda konuşmacı = ses izi kümesi; adı konuşma sırasında gelen taslağın (altyazı) adıyla oylanır. Altyazı yoksa
+## Konuşmacı ayırma — ses izi (v0.8.4; v0.13.12'de duygu modeli kalktı)
+- v0.13.12 (Faz 1, 6 Ekim): ses izi (ECAPA, SpeechBrain VoxCeleb ağırlıkları) `whisper-isci.py`'nin içinde MLX ile çalışır; ayrı ses
+  işçisi, `ses-venv` (PyTorch) ve duygu modeli (emotion2vec+) kalktı. Satırda `duygu` alanı ve `DUYGU MODELİ` olayı artık gelmez;
+  kişi etiketi metin ve `SES` sinyallerinden (kullanıcının istediği kişi başına etiket sürer). Ağırlıklar `ses-modeller/spkrec-ecapa-voxceleb/ecapa-mlx.npz`
+  (aktarici-kur dönüştürür); yoksa kümeleme olmaz, Whisper aynen çalışır. Karşı kanal parçasına ~0,03 sn ekler.
+- Karşı kanalda konuşmacı = ses izi kümesi (k1…); adı konuşma sırasında gelen taslağın (altyazı) adıyla oylanır. Altyazı yoksa
   "Karşı taraf 1/2…" — iki kişiyi karıştırma, özette de bu adları kullan; kullanıcı adlarını biliyorsa özette eşle.
-- `DUYGU MODELİ · <kişi>: son 2 dk'da 3/7 parça "kızgın" …` ve "nötre döndü": kişi etiketi için üçüncü kaynak. Model oyuncu
-  kayıtlarıyla eğitildi, gerçek toplantıda çoğunlukla "nötr" der; tek başına kart verme — metin ya da `SES` ile uyuşunca
-  `kart duygu --kim`. Etiketler (metin/ses/model) özete girmez; `koc` kullanıcının kendi ses duygu dağılımını yazar (yalnız ona).
 
 ## Toplantı modu (v0.7.0) — kullanıcı `/toplanti` ya da "toplantıyı izle" deyince
 Komut: alanın proje klasöründeki `.claude/commands/toplanti.md` (o klasörde açılmış Claude Code oturumunda çalışır;
