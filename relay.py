@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.14"  # sürüm geçmişi: git log
+SURUM = "0.13.18"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -278,6 +278,25 @@ def cards_view():
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view(), "dil": dil_view(),
             "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
             "whisper": whisper_view(), "komut": STATE.get("komut")}
+# v0.13.15 (Faz 1, G6): şerit uzun yoklaması — GET /cards?bekle=25&imza=<son> şeridin gösterdiği durum değişene kadar (en çok 25 sn)
+# bekler, değişince hemen döner. Her POST (kart, ✓/✕, soru, kanıt isteği, komut, satır) bekleyenleri uyandırır; POST dışı değişiklik
+# (süre, Whisper satırı) en geç 1 sn'de yakalanır. Ölçüm (headless, 12 kart): kart → şerit ortanca 2,1 sn → bkz. BRIEF.
+KART_KOSUL = threading.Condition()
+def kart_bildir():
+    with KART_KOSUL: KART_KOSUL.notify_all()
+def serit_imza(v):
+    import hashlib
+    sv = v.get("sure") or {}
+    x = [[(c.get("id"), c.get("status")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
+         (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), (v.get("komut") or {}).get("id")]
+    return hashlib.sha1(json.dumps(x, default=str, sort_keys=True).encode()).hexdigest()[:16]
+def cards_bekle(imza, sn):
+    son = time.time() + max(0, min(sn, 25))
+    while True:
+        v = cards_view(); v["imza"] = serit_imza(v)
+        kalan = son - time.time()
+        if v["imza"] != imza or kalan <= 0: return v
+        with KART_KOSUL: KART_KOSUL.wait(min(1.0, kalan))
 def add_card(p):
     kind = p.get("kind") if p.get("kind") in CARD_KINDS else "bilgi"
     text = " ".join(str(p.get("text") or "").split())[:400]
@@ -631,7 +650,31 @@ def whisper_akiyor(kanal):
     # saatsiz). Son satır yerine son KUYRUĞA GİREN parçaya da bakılır: parça kuyruktaysa Whisper onu yazacak demektir.
     son = max(w["kanal_son_satir"].get(kanal, 0), w["kanal_son_parca"].get(kanal, 0))
     return now - bas < 60 or now - son < WH_GUVENCE_SN
-_BELLEK = {"t": 0, "v": None}
+_BELLEK = {"t": 0, "v": None, "en_cok": []}
+BELLEK_AD = {"Google Chrome": "Chrome", "Microsoft Teams": "Teams", "Microsoft Edge": "Edge", "claude": "Claude Code", "Claude": ("Claude uygulaması", "Claude app"),
+             "com.apple.WebKit.WebContent": ("Safari sekmeleri", "Safari tabs"), "Code Helper": "VS Code"}
+def bellek_ad(k):  # ham ad → arayüz dilinde ad (önbellekte ham ad durur; dil sonradan değişebilir)
+    if k.startswith("@"): return _t(f"diğer macOS hesabı ({k[1:]})", f"other macOS account ({k[1:]})")
+    a = BELLEK_AD.get(k, k); return _t(*a) if isinstance(a, tuple) else a
+def bellek_kullananlar(en_cok=3, esik_gb=0.3):
+    # v0.13.18 (Faz 1, "bellek uyarısı adla"): bellek az uyarısında neyi kapatacağını söyle — süreçler uygulama paketine (.app) göre
+    # toplanır (Chrome'un yardımcı süreçleri tek "Chrome"); diğer macOS hesabının süreçleri tek kalem; sistem (root, _hesaplar) ve
+    # Suflor'un kendi süreçleri (aktarıcı, Whisper işçisi, Suflor Ses) dışarıda. RSS paylaşılan belleği iki kez sayabilir: gösterge, ölçüm değil.
+    import pwd
+    try: ben = pwd.getpwuid(os.getuid()).pw_name
+    except Exception: ben = os.environ.get("USER", "")
+    kendi = {os.getpid()} | ({_ISCI["p"].pid} if _ISCI.get("p") else set())
+    g = {}
+    for l in subprocess.run(["ps", "-axo", "pid=,user=,rss=,comm="], capture_output=True, text=True, timeout=5).stdout.splitlines():
+        try: pid, u, r, c = l.strip().split(None, 3); pid = int(pid); gb = int(r) / 2 ** 20
+        except ValueError: continue
+        if u == "root" or u.startswith("_") or pid in kendi: continue
+        if u != ben: ad = "@" + u
+        else:
+            m = re.search(r"/([^/]+)\.app/", c); ad = m.group(1) if m else os.path.basename(c)
+            if ad.startswith("Suflor") or "whisper-venv" in c: continue
+        g[ad] = g.get(ad, 0) + gb
+    return [(a, round(v, 1)) for a, v in sorted(g.items(), key=lambda kv: -kv[1]) if v >= esik_gb][:en_cok]
 def bellek_view():
     # v0.9.6: boş bellek panoda da uyarı (3 Ekim: saglik ~3,1 GB dedi, uyarı yalnız Claude sohbetinde kaldı). Ölçüm toplanti-claude.py
     # saglik ile aynı (vm_stat: free + inactive + speculative + purgeable), 60 sn'de bir. Modeller yüklenmeden ~2,5 GB gerekir
@@ -642,14 +685,21 @@ def bellek_view():
             vm = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=5).stdout; sayfa = int(re.search(r"page size of (\d+)", vm).group(1))
             _BELLEK["v"] = round(sum(int(re.search(rf"{k}:\s+(\d+)", vm).group(1)) for k in ("Pages free", "Pages inactive", "Pages speculative", "Pages purgeable")) * sayfa / 2 ** 30, 1)
         except Exception: _BELLEK["v"] = None
+        try: _BELLEK["en_cok"] = bellek_kullananlar()
+        except Exception: _BELLEK["en_cok"] = []
     bos = _BELLEK["v"]
     if bos is None: return {"bos_gb": None, "uyari": ""}
     w = STATE["whisper"]; yuklu = w["durum"] in ("hazir", "yok")
     # v0.13.0: gerek sayıları suflor-olcum ölçümünden (4 Ekim): Whisper ~2,4 GB; v0.13.12: ses izi Whisper işçisinde (~0,1 GB)
-    gerek = 0 if yuklu else 2.5
+    gerek = 0 if yuklu else (2.0 if WH_MODEL == _WH_Q8 else 2.5)  # v0.13.14 q8 ~1,8 GB, tam turbo ~2,4 GB
     az = bos < 1.5 or (gerek and bos < gerek + 0.5)
     sy = (lambda x: str(x)) if ARAYUZ_DILI == "en" else (lambda x: str(x).replace(".", ","))  # ondalık: en 3.1, tr 3,1
-    return {"bos_gb": bos, "uyari": _t(f"Bellek az: ~{sy(bos)} GB boş", f"Low memory: ~{sy(bos)} GB free") + (_t(f" (Whisper ve ses modeli ~{sy(round(gerek, 1))} GB ister)", f" (Whisper and the voice model need ~{sy(round(gerek, 1))} GB)") if gerek else "") + _t(" — kullanmadığın uygulama ve sekmeleri kapat", " — close apps and tabs you aren't using") if az else ""}
+    ec = [(bellek_ad(a), v) for a, v in _BELLEK.get("en_cok") or []]
+    adlar = ", ".join(f"{a} ~{sy(v)} GB" for a, v in ec)
+    son = (_t(f" — en çok: {adlar}; kullanmadığını kapat", f" — biggest: {adlar}; close what you don't need") if adlar else
+           _t(" — kullanmadığın uygulama ve sekmeleri kapat", " — close apps and tabs you aren't using"))
+    return {"bos_gb": bos, "en_cok": [{"ad": a, "gb": v} for a, v in ec],
+            "uyari": _t(f"Bellek az: ~{sy(bos)} GB boş", f"Low memory: ~{sy(bos)} GB free") + (_t(f" (Whisper ~{sy(round(gerek, 1))} GB ister)", f" (Whisper needs ~{sy(round(gerek, 1))} GB)") if gerek else "") + son if az else ""}
 def ben_neden():
     # v0.9.6: ben kanalı ✗ iken neden — eklentinin son nabzındaki mikrofon durumu (sessizlikte de ses akar; ✗ = ses gelmiyor)
     m = STATE.get("mic") or {}
@@ -1551,7 +1601,11 @@ document.querySelectorAll('#ag input').forEach(c=>c.onchange=()=>fetch('/agenda-
 wireBox(document.getElementById("n"),document.getElementById("b"))
 document.getElementById("oz").onclick=ev=>sendOzet(ev.currentTarget)
 document.getElementById("kz").onclick=ev=>sendKanit(ev.currentTarget,document.getElementById("n"))
-refresh();setInterval(refresh,2000)</script>
+refresh();setInterval(refresh,2000)
+// v0.13.17: kart/✓/soru/kanıt isteği değişince pano ve mini pano hemen yenilenir (aktarıcıda uzun yoklama, şeritle aynı imza);
+// 2 sn yenileme diğer alanlar için sürer. Eski aktarıcıda (imza yok) döngü kapanır.
+let kImza="";(async function kartBekle(){for(;;){try{const v=await (await fetch('/cards?bekle=25&imza='+encodeURIComponent(kImza),{signal:AbortSignal.timeout(35000)})).json()
+if(!v.imza)return;if(v.imza!==kImza){const ilk=!kImza;kImza=v.imza;if(!ilk)refresh().catch(()=>{})}}catch(e){await new Promise(r=>setTimeout(r,3000))}}})()</script>
 <style>
 /* v0.11.1: tanıtım turu (kurulumdan sonra ?tur ile; bir kez) — vurgulanan bölüm + baloncuk */
 #tur-perde{position:fixed;inset:0;z-index:9997;background:rgba(12,18,15,.46);transition:clip-path .35s cubic-bezier(.2,.7,.2,1)}
@@ -1932,7 +1986,13 @@ class H(BaseHTTPRequestHandler):
             return self._json(dict(takvim_view("tam=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # v0.13.9: eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
-        if self.path == "/cards": return self._json(cards_view())
+        if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); return self._json(v)
+        if self.path.startswith("/cards?"):  # v0.13.15: uzun yoklama
+            from urllib.parse import urlsplit, parse_qs
+            q = parse_qs(urlsplit(self.path).query)
+            try: sn = float((q.get("bekle") or ["0"])[0])
+            except ValueError: sn = 0
+            return self._json(cards_bekle((q.get("imza") or [""])[0], sn))
         if self.path.startswith("/kanit/"):  # v0.7.0: yalnız kanit/ altındaki PNG
             import urllib.parse
             fp = os.path.realpath(os.path.join(BASE, urllib.parse.unquote(self.path.split("?")[0].lstrip("/"))))
@@ -1941,6 +2001,9 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": False}, 404)
         b = sayfa(DASH.replace("__BASLAT_ANAHTAR__", BASLAT_KEY), self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def do_POST(self):
+        try: return self._post()
+        finally: kart_bildir()  # v0.13.15: şeridin uzun yoklamasını uyandır
+    def _post(self):
         if self._koken() is None: return self._red()
         # v0.12.3 (D5): gövde sınırı — ses parçası ve kanıt PNG'si büyük, diğerleri küçük; bozuk JSON 400 (hata paketi değil)
         try: n = int(self.headers.get("Content-Length", 0))

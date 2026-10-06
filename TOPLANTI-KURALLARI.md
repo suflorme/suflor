@@ -74,7 +74,9 @@ adımlar orada, kurallar burada). Port, klasörler ve kullanıcı adı ayar dosy
    `NOT (<ad>)`, `SORU q…`, `KART ✓/👁/✕`, `HAZIR hN` (hazir.json'daki kartın tetiği konuşmada geçti),
    v0.6.0: `ÖZET İSTEĞİ q…`, `AÇIK SORU aN`, `SÜRE`, `PAY`, `ROL`; v0.7.0: `KANIT n`, `BAĞLAM · <sistem>`
    (paketin altında), `GÜNDEM ▶ i` (ayrıntı madde 4'ün sonunda).
-   v0.4.7: satırlar 20 sn'de bir ya da 30 satırda bir toplu gelir; kart dönüşleri bu pakete eklenir. `SORU` beklemez:
+   v0.13.16 (kapıcı): satırda kart adayı (soru, sistem adı, rakamlı/kesin iddia) varsa paket hemen gelir (iki paket arası ≥ 10 sn),
+   başlıkta `SATIRLAR (n, kart adayı: soru/iddia/sistem)` — önce o satıra bak, kart gerekiyorsa hemen ver; aday yoksa paket 45 sn'de
+   ya da 30 satırda gelir (önce 20 sn). Kart dönüşleri bu pakete eklenir. `SORU` beklemez:
    o ana kadar biriken satırlarla birlikte hemen gelir ("← ÖNCE BUNU CEVAPLA").
 2. Kart gönder: `python3 toplanti-claude.py kart <tür> "<metin>" [--neden "…"] [--gundem i] [--cevap q…]`.
    Türler: `sor` (kullanıcının şimdi sorması gereken), `belirt` (söylemesi gereken), `deginme` (açmaması gereken),

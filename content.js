@@ -573,9 +573,25 @@
       qs.forEach(q => list.append(el("div", "q", "⏳ " + (q.tur === "ozet" ? L("Son 1 dk özeti hazırlanıyor…") : L("Claude'a soruldu: ") + q.text))));
       list.append(el("div", "hint", L("Option + Shift + H: şeridi gizle · Option + Shift + K: kanıt · Option + Shift + S: önemli an · Option + Shift + O: son 1 dk")));
     }
-    async function pollCards() {
-      if (!cfg.enabled) { if (host) host.style.display = "none"; return; }
-      try { const r = await rf("/cards"); if (r.ok) paint(await r.json()); } catch (e) { /* aktarıcı kapalı: şerit değişmez */ }
+    // v0.13.15 (Faz 1, G6): toplantıdaki sekmede uzun yoklama — aktarıcı kart/✓/kanıt isteği değişince hemen döner (önce 3 sn yoklama,
+    // kart → şerit ortanca 2,1 sn). Yanıtta "imza" yoksa (eski aktarıcı) ya da hata olursa 3 sn'lik yoklamaya döner.
+    let imza = "", uzunAcik = false;
+    async function pollCards(uzun) {
+      if (!cfg.enabled) { if (host) host.style.display = "none"; return false; }
+      try {
+        const r = uzun === true ? await rf("/cards?bekle=25&imza=" + encodeURIComponent(imza), { signal: AbortSignal.timeout(35000) }) : await rf("/cards");
+        if (r.ok) { const v = await r.json(); imza = v.imza || ""; paint(v); return !!v.imza; }
+      } catch (e) { /* aktarıcı kapalı: şerit değişmez */ }
+      return false;
+    }
+    async function uzunDongu() {
+      if (uzunAcik) return; uzunAcik = true;
+      try {
+        while (cfg.enabled && (inMeeting() || inCall())) {
+          const t = Date.now(); if (!(await pollCards(true))) break;
+          if (Date.now() - t < 200) await new Promise(r => setTimeout(r, 200));  // aynı anda çok değişiklikte dönmesin
+        }
+      } finally { uzunAcik = false; }
     }
     window.addEventListener("keydown", ev => {
       if (ev.altKey && ev.shiftKey && ev.code === "KeyH") {
@@ -583,7 +599,7 @@
         toast(L(hidden ? "Claude şeridi gizlendi (Option + Shift + H ile geri aç)" : "Claude şeridi açık")); pollCards();
       }
     }, true);
-    setInterval(pollCards, 3000); setTimeout(pollCards, 1000);
+    setInterval(() => { if (uzunAcik) return; pollCards(); if (cfg.enabled && (inMeeting() || inCall())) uzunDongu(); }, 3000); setTimeout(pollCards, 1000);
   }
   setTimeout(adoptQueues, 3000); // v0.7.0: önceki sekmeden kalan bekleyen satırlar
   log("yüklendi");

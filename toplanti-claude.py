@@ -44,7 +44,8 @@ ap.add_argument("--dir", default=DEF_DIR); ap.add_argument("--relay", default=f"
 sub = ap.add_subparsers(dest="cmd", required=True)
 # v0.4.7: 5 sn / 4 satır → 20 sn / 30 satır. 30 Eylül testinde 461 olay üretildi, Claude her birine yazdı ve
 # SORU'lar kuyrukta kaldı (ortanca 34 sn, en kötü 218 sn). SORU artık beklemez: biriken satırlarla birlikte hemen gider.
-iz = sub.add_parser("izle"); iz.add_argument("--aralik", type=int, default=20, help="satırları en geç kaç sn'de bir toplu yaz")
+iz = sub.add_parser("izle"); iz.add_argument("--aralik", type=int, default=45, help="kart adayı yokken satırları en geç kaç sn'de bir toplu yaz (v0.13.16: 20 → 45)")
+iz.add_argument("--bosluk", type=int, default=10, help="v0.13.16: kart adayı gelince paket hemen gider; iki paket arası en az bu kadar sn")
 iz.add_argument("--paket", type=int, default=30, help="bu kadar satır birikince beklemeden yaz")
 ka = sub.add_parser("kart"); ka.add_argument("tur", choices=["sor", "belirt", "deginme", "dikkat", "cevap", "bilgi", "duygu"])
 ka.add_argument("metin"); ka.add_argument("--neden", default=""); ka.add_argument("--cevap", default=None, help="cevaplanan soru kimliği (q…)")
@@ -619,10 +620,21 @@ class Yorgunluk:
                     f"yürütücüde belirt kartı — kısa özet geçip kalan en önemli maddeye odaklan ya da 5 dk mola öner"]
         return []
 
+def kart_adayi(r, sis):
+    # v0.13.16 kapıcı: satır kart çıkarabilir mi — soru (❓ ile aynı kural), projedeki sistem adı, rakam/kesinlik iddiası (IDDIA_RX)
+    t = r.get("text", ""); o = set()
+    if soru_mu(t): o.add("soru")
+    if IDDIA_RX.search(kucuk(t)): o.add("iddia")
+    if sis:
+        import baglam
+        n = " ".join(baglam.kelimeler(t))
+        if any(rx.search(n) for rx in sis.values()): o.add("sistem")
+    return o
 def izle():
     import baglam  # v0.7.3: hazır kart tetiği kök karşılaştırması
     q_tail = Tail(os.path.join(A.dir, "sorular.jsonl")); k_tail = Tail(os.path.join(A.dir, "kartlar.jsonl"))
     cur = None; t_tail = None; buf = []; acks = []; buf_since = None; last_state = None; texts = {}; aday = None; aday_t = 0.0
+    kart_aday = set(); son_paket = 0.0  # v0.13.16 kapıcı: tampondaki kart adaylarının türü (soru/sistem/iddia), son paket anı
     hz_path = os.path.join(A.dir, "hazir.json"); hz_mtime = None; hz = []; hz_seen = set()
     ag_path = os.path.join(A.dir, "agenda.json"); ag_mtime = None; agj = {}
     ac_mtime = None; acik = []; ac_son = {}  # açık soru kimliği → son hatırlatma anı
@@ -762,6 +774,7 @@ def izle():
                         try: sesler += kesme.besle(r) + yorgun.besle(r)  # v0.8.3 (v0.13.12: duygu modeli kalktı)
                         except Exception: pass
                         buf_since = buf_since or time.time()
+                        kart_aday |= kart_adayi(r, sis)  # v0.13.16
                         low = kucuk(r.get("text", "") + " " + r.get("raw", ""))  # v0.5.1: sözlük düzeltmesi öncesi hâl de
                         for q in acik:  # v0.6.0: cevapsız soru konusu yeniden açıldı — soru başına 5 dk'da bir
                             t = next((t for t in q.get("tetik", []) if tetik_var(t, low)), None)
@@ -797,13 +810,19 @@ def izle():
                 return [f"SORU {q.get('id')}: {q.get('text')}   ← ÖNCE BUNU CEVAPLA (30 sn)", *soru_baglam(q.get('text') or ''), *taslak_satir()]
             emit(*[l for q in qs for l in soru_olay(q)], *acks, *sesler,
                  *([f"SATIRLAR ({len(buf)}, soruya kadar):", *buf] if buf else []), *paket_baglam())
-            buf = []; acks = []; sesler = []; buf_since = None
+            buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
         for k in k_tail.new():
             if "text" in k: texts[k["id"]] = f"[{k.get('kind')}] {k.get('text')}"
             elif "status" in k: acks.append(f"KART {({'yapildi': '✓ yaptı', 'okundu': '👁 okudu (reddetmedi)', 'gecildi': '✕ gerek yok (bir daha önerme)', 'yenilendi': '↻ yenilendi'}).get(k['status'], k['status'])}: {texts.get(k.get('id'), k.get('id'))}")
         if acks and not buf_since: buf_since = time.time()  # kart dönüşü acil değil: sıradaki paketle gider
-        if (buf or acks) and (len(buf) >= A.paket or time.time() - buf_since >= A.aralik):
-            emit(*acks, *sesler, *([f"SATIRLAR ({len(buf)}):", *buf] if buf else []), *paket_baglam()); buf = []; acks = []; sesler = []; buf_since = None
+        # v0.13.16 (Faz 1, kapıcı): kart adayı (soru, sistem adı, rakamlı/kesin iddia) varsa paket hemen gider — iki paket arası en az
+        # A.bosluk sn; yoksa A.aralik (45 sn) ya da A.paket satır. Geçmiş 21 toplantı benzetimi: aday satırı → Claude ortanca 14,1 → 2,0 sn
+        # (%90 21,8 → 7,1); diğer satırlar ortanca aynı (~14 sn), %90 22 → 41 sn; paket/saat 106 → 129. Cevap dışı kartların %83'ünün
+        # 40 sn öncesinde aday vardı (kalanı kaybolmaz, sakin paketle gelir).
+        acil = bool(kart_aday) and bool(buf) and time.time() - son_paket >= A.bosluk
+        if (buf or acks) and (acil or len(buf) >= A.paket or time.time() - buf_since >= A.aralik):
+            emit(*acks, *sesler, *([f"SATIRLAR ({len(buf)}" + (f", kart adayı: {'/'.join(sorted(kart_aday))}" if kart_aday else "") + "):", *buf] if buf else []), *paket_baglam())
+            buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
         time.sleep(2)
 
 # --- v0.7.0: kanıt listesi / açıklama ----------------------------------------------------------------------------
@@ -1285,8 +1304,10 @@ def saglik_cmd():  # v0.8.5: toplantıdan önce tek bakış; ⚠ satırları kul
     try:
         vm = sp_.run(["vm_stat"], capture_output=True, text=True).stdout; sayfa = int(re.search(r"page size of (\d+)", vm).group(1))
         bos = sum(int(re.search(rf"{k}:\s+(\d+)", vm).group(1)) for k in ("Pages free", "Pages inactive", "Pages speculative", "Pages purgeable")) * sayfa / 2 ** 30
-        # Whisper turbo ~1,6 GB + ses işçisi ~2,2 GB (1-2 Ekim ölçümü) + pay
-        sat(bos >= 4.5, f"kullanılabilir bellek ~{bos:.1f} GB", "Whisper + ses modeli ~4 GB ister: kullanılmayan uygulamaları (Chrome sekmeleri) kapat")
+        # v0.13.18: Whisper q8 + ses izi ~1,9 GB (6 Ekim ölçümü) + pay; az ise en çok yer kaplayanlar adıyla (aktarıcının /status bellek.en_cok)
+        ec = ((s or {}).get("bellek") or {}).get("en_cok") or []
+        sat(bos >= 3.0, f"kullanılabilir bellek ~{bos:.1f} GB" + (" · en çok: " + ", ".join(f"{x['ad']} ~{x['gb']} GB" for x in ec) if ec else ""),
+            "Whisper ~2 GB ister: " + (f"önce {ec[0]['ad']}'ı kapat ya da küçült" if ec else "kullanılmayan uygulamaları (Chrome sekmeleri) kapat"))
     except Exception: print("· bellek ölçülemedi")
     d = shutil.disk_usage(os.path.expanduser("~")).free / 2 ** 30; sat(d >= 3, f"disk boş {d:.0f} GB", "en az 3 GB aç (döküm, kanıt görüntüleri)")
     sat(os.path.exists(os.path.join(APP, "dizin.sqlite")), "proje arama dizini", "ilk `ara` kendisi kurar")
