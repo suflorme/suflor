@@ -47,6 +47,7 @@
     "Suflor.me: canlı altyazı açıldı":"Suflor.me: live captions turned on",
     "Suflor.me: altyazı konuşma dili {d} yapıldı (gündem dili)":"Suflor.me: caption spoken language set to {d} (agenda language)", "İngilizce":"English", "Türkçe":"Turkish",
     "Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim":"Suflor.me: couldn't turn on captions — turn them on once by hand ({y}) and I'll learn the way",
+    "Suflor.me: altyazıyı aç (konuşmacı adları için) — {y}":"Suflor.me: turn on captions (for speaker names) — {y}",
     "Suflor.me: toplantıdasın ama döküm/altyazı kapalı — satır kaydedilmiyor. ":"Suflor.me: you're in a meeting but transcript/captions are off — no lines are being saved. ",
     "⚠ Ekranda/konuşmada hassas ifade: ":"⚠ Sensitive phrase on screen/in conversation: ","📷 Kanıt {n} kaydedildi":"📷 Evidence {n} saved",
     "📷 Kanıt kaydedilemedi: ":"📷 Couldn't save evidence: ","bilinmiyor":"unknown",
@@ -288,6 +289,10 @@
   // göründükten 4 sn sonra Teams'in dil ayarına bakılır; farklıysa hedef seçilip Güncelle'ye basılır. Toplantı başına bir
   // deneme; sonuç capAuto'ya ("dil: …") eklenir. Başarısızsa eskisi gibi dil uyarısı (dil_view) devrede kalır.
   let dilHedef = null, dilTried = "", capGorundu = 0;
+  // v0.13.11 (6 Ekim ilk gerçek iki kişilik deneme, kullanıcı kararı): Teams menüsüne tıklayan otomasyonlar kapalı. Dil yolu dişliyi bulamadı,
+  // yedek yol katılımcı menüsünü açtı; altyazı açma gerçek Teams'te hiç çalışmadı. Kod kalır; altyazı açmayı OTO_ALTYAZI, dil ayarını
+  // aktarıcının "altyazi_dili_ayarla" ayarı açar (dilHedef ancak o zaman gelir). Yerine 45 sn'de tek satır "altyazıyı aç" uyarısı.
+  const OTO_ALTYAZI = false;
   async function altyaziDili(m) {
     if (capBusy || dilTried === m || !cfg.autoCaptions || !P.dilYollari) return;
     const yollar = P.dilYollari(dilHedef); if (!yollar.length) return;
@@ -361,8 +366,13 @@
     if (!inCall() && !capBusy) capTried = dilTried = "";  // toplantıdan çıkıp yeniden girince yeniden dener
     if (!inCall() || panel || siki) { callSince = 0; return; }  // gevşek findCaptions menüdeki "altyazı" öğesini de sayar
     callSince = callSince || Date.now(); const m = meetingInfo().title;
-    if (Date.now() - callSince > 12000) altyaziAc(m);
-    if (Date.now() - callSince > 45000 && !caps && callWarned !== m) { callWarned = m; toast(L("Suflor.me: toplantıdasın ama döküm/altyazı kapalı — satır kaydedilmiyor. ") + P.yonerge.altyazi, "#b26a00", 15000); }
+    if (OTO_ALTYAZI && Date.now() - callSince > 12000) altyaziAc(m);
+    // v0.13.11: Whisper yazıyorsa satırlar kaydediliyor; altyazı yalnız karşı tarafın adı için gerekir — uyarı buna göre, tek satır
+    const whAkiyor = whisperView && whisperView.durum !== "yok" && (whisperView.ben || whisperView.karsi);
+    // v0.13.11: gevşek findCaptions menüdeki "altyazıyı aç" öğesini de altyazı sanıyordu (uyarıyı otomasyonun hata tostu taşıyordu);
+    // buraya ancak sıkı seçici (capSiki) altyazı görmediyse gelinir, ek koşul yok
+    if (Date.now() - callSince > 45000 && callWarned !== m) { callWarned = m;
+      toast(whAkiyor ? L("Suflor.me: altyazıyı aç (konuşmacı adları için) — {y}", { y: P.yonerge.altyazi }) : L("Suflor.me: toplantıdasın ama döküm/altyazı kapalı — satır kaydedilmiyor. ") + P.yonerge.altyazi, "#b26a00", 12000); }
   }
   function tick() {
     if (!cfg.enabled) return;

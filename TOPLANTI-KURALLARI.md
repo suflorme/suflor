@@ -82,6 +82,10 @@ adımlar orada, kurallar burada). Port, klasörler ve kullanıcı adı ayar dosy
    Türler: `sor` (kullanıcının şimdi sorması gereken), `belirt` (söylemesi gereken), `deginme` (açmaması gereken),
    `dikkat` (acil: ekranda sır, yanlış bilgi, kayıt/paylaşım riski), `cevap` (SORU'ya cevap), `bilgi`,
    `duygu --ton olumlu|notr|gergin|olumsuz` (konuşmanın tonu, tahmin; pano/mini pano başlığında renkli işaret).
+   **Muhatap kuralı (v0.13.11, 6 Ekim gerçek deneme):** `sor` kartı yalnız karşıdaki kişinin cevaplayabileceği soru içindir.
+   Karşı taraf bir soruyu kendisi sorduysa onu ona geri sorma (6 Ekim: "benim sorduğum soruyu bana tekrar sormuş"). Cevabı
+   toplantıda olmayan biri biliyorsa (sahiplik, karar yetkisi) kartta muhatabı yaz — "Bunu pazarlama yöneticisi cevaplar — açık soruya al" —
+   ya da `acik ekle … --kim <kişi>` ile açık soruya at; `sor` kartı yapma.
    Hazır kart: `python3 toplanti-claude.py hazir hN [--cevap q…]` — `_canli/hazir.json`'daki metni olduğu gibi gönderir.
    Gecikme raporu: `python3 toplanti-claude.py olcum [dosya]` (v0.4.6) — eklenti sabitlemesi, SORU→CEVAP, HAZIR→kart.
    v0.6.0: `gundem <i> [--geri]` (madde bitti işareti), `acik ekle "<soru>" --tetik a,b [--kim X] [--gundem i]`,
@@ -166,9 +170,9 @@ adımlar orada, kurallar burada). Port, klasörler ve kullanıcı adı ayar dosy
      gönder, DURUM'daki yönergeyle ("Altyazı İngilizce görünüyor — Altyazı ayarları → Konuşma dili: Türkçe"); uyarı
      düzelene kadar metinden çıkarım yapma, kart gönderme. Toplantı dili gerçekten değiştiyse (İngilizce konuşan biri
      katıldı) `dil`'i `karisik` yap, sohbete tek satır yaz. `karisik`ta uyarı gelmez; metin anlamsızlaşırsa sen fark et.
-     **v0.13.10:** `dil` `tr`/`en` ise eklenti altyazı açılınca Teams'in konuşma dilini kendisi gündem diline ayarlar (toplantı
-     başına bir deneme; herkes için değişir). Sonuç `/status` `extension.capAuto` içinde `dil: ayarlandi|zaten|basarisiz …`;
-     başarısızsa yukarıdaki uyarı yolu aynen geçerli. Bu yüzden `dil`'i gündeme yalnız gerçekten o dil konuşulacaksa yaz.
+     **v0.13.11:** eklenti Teams menüsüne tıklamaz — altyazıyı kendisi açmaz, konuşma dilini kendisi ayarlamaz (gerçek denemede dil yolu
+     katılımcı menüsünü açtı). Altyazı kapalıysa eklenti 45 sn'de tek satır "altyazıyı aç (konuşmacı adları için)" der; DURUM'daki
+     dil uyarısının yönergesini kullanıcıya aynen ilet (aktarıcı ayarı `altyazi_dili_ayarla: true` eski davranışı açar; varsayılan kapalı).
    - **v0.6.0 olayları:**
      - `ÖZET İSTEĞİ q…` (kullanıcı "⏱ Son 1 dk"ye bastı; son dakikanın satırları altında): SORU gibi önce bu, 30 sn içinde
        `kart cevap "…" --cevap q…`. 1–2 cümle, ≤ 200 karakter: ne konuşuldu, karar/iş çıktıysa o. Satır yoksa söyle.

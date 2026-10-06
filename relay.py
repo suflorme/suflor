@@ -138,7 +138,7 @@ sys.excepthook = lambda t, v, tb: (_yakalanmayan(t, v, tb), _eski_hook(t, v, tb)
 _eski_thook = threading.excepthook
 threading.excepthook = lambda a: (_yakalanmayan(a.exc_type, a.exc_value, a.exc_traceback), _eski_thook(a))
 sys.stdout = _Saatli(sys.stdout); sys.stderr = _Saatli(sys.stderr)
-SURUM = "0.13.10"  # sürüm geçmişi: git log
+SURUM = "0.13.11"  # sürüm geçmişi: git log
 LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı (v0.4.9) ---------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
@@ -554,9 +554,9 @@ WH_MODEL = next(iter(sorted(glob.glob(os.path.join(WH_MODELLER, "hub", "models--
 WH_MODEL = os.path.dirname(WH_MODEL) if WH_MODEL else None
 WH_SR = 16000; WH_KARE = 320  # 20 ms
 WH_SESSIZ_MS = 700; WH_ON_MS = 300; WH_MAX_SN = 12; WH_MIN_KONUSMA_MS = 400; WH_BOSTA_KAPAT_SN = 600
-WH_AKIS_SN = 20; WH_GUVENCE_SN = 90
+WH_AKIS_SN = 20; WH_GUVENCE_SN = 90; WH_ATLA_SN = 120
 STATE["whisper"] = {"durum": "kapali", "model": None, "kuyruk": 0, "satir": 0, "atlanan": 0, "son_sn": None, "gecikme_sn": None,
-                    "hata": None, "kanallar": {}, "kanal_son_satir": {}}
+                    "hata": None, "kanallar": {}, "kanal_son_satir": {}, "kanal_son_parca": {}, "gecikme_max": 0.0, "durgun_max": 0.0}
 W_LOCK = threading.Lock(); WH_Q = queue.Queue(); ALTYAZI_SON = []  # (epoch, konuşmacı) son 10 dk
 def _rms(b):
     if audioop: return audioop.rms(b, 2)
@@ -597,7 +597,7 @@ class Kanal:
             pcm = bytes(self.parca[:len(self.parca) - fazla] if fazla else self.parca)
             WH_Q.put({"id": f"w-{self.ad}-{int(self.t0 * 1000)}", "kanal": self.ad, "t0": self.t0, "t1": self.t0 + len(pcm) / 2 / WH_SR,
                       "pcm": pcm, "baslik": baslik, "kuyruga": time.time()})
-            STATE["whisper"]["kuyruk"] = WH_Q.qsize()
+            STATE["whisper"]["kuyruk"] = WH_Q.qsize(); STATE["whisper"]["kanal_son_parca"][self.ad] = time.time()  # v0.13.11
         self.reset()
 KANALLAR = {}
 def ses_al(p):
@@ -621,7 +621,10 @@ def whisper_akiyor(kanal):
     w = STATE["whisper"]; now = time.time()
     if w["durum"] not in ("hazir", "yukleniyor") or now - w["kanallar"].get(kanal, 0) > WH_AKIS_SN: return False
     k = KANALLAR.get(kanal); bas = k.baslangic if k else now
-    return now - bas < 60 or now - w["kanal_son_satir"].get(kanal, 0) < WH_GUVENCE_SN
+    # v0.13.11 (6 Ekim): Whisper 47 sn tıkanınca "ben"in son satırı 100 sn önceydi, koruma düştü, altyazı satırları döküme sızdı (çift,
+    # saatsiz). Son satır yerine son KUYRUĞA GİREN parçaya da bakılır: parça kuyruktaysa Whisper onu yazacak demektir.
+    son = max(w["kanal_son_satir"].get(kanal, 0), w["kanal_son_parca"].get(kanal, 0))
+    return now - bas < 60 or now - son < WH_GUVENCE_SN
 _BELLEK = {"t": 0, "v": None}
 def bellek_view():
     # v0.9.6: boş bellek panoda da uyarı (3 Ekim: saglik ~3,1 GB dedi, uyarı yalnız Claude sohbetinde kaldı). Ölçüm toplanti-claude.py
@@ -653,6 +656,7 @@ def whisper_view():
     w = STATE["whisper"]; now = time.time()
     return {"durum": w["durum"], "ben": now - w["kanallar"].get("ben", 0) < WH_AKIS_SN, "ben_neden": ben_neden(), "karsi": now - w["kanallar"].get("karsi", 0) < WH_AKIS_SN,
             "kuyruk": WH_Q.qsize(), "satir": w["satir"], "gecikme_sn": w["gecikme_sn"], "hata": w["hata"],
+            "atlanan": w.get("atlanan", 0), "son_sn": w.get("son_sn"), "gecikme_max": w.get("gecikme_max"), "durgun_max": w.get("durgun_max"),  # v0.13.11
             "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
 def ben_adi():
     a = agenda().get("ben")
@@ -714,7 +718,9 @@ def _isci_dongu():
         if is_.get("isinma"):  # v0.9.5: toplantıdan önce modeli belleğe al (ilk cümle beklemesin)
             if not _ISCI["p"] or _ISCI["p"].poll() is not None: _isci_ac()
             continue
-        if time.time() - is_["kuyruga"] > 45: w["atlanan"] += 1; continue  # çok geride kaldı: canlıda işe yaramaz
+        # v0.13.11: eşik 45 → 120 sn — altyazı gölgedeyken atlanan parça dökümden tamamen kayboluyordu (6 Ekim: en kötü 45,6 sn)
+        if time.time() - is_["kuyruga"] > WH_ATLA_SN: w["atlanan"] += 1; continue
+        is_["t_al"] = time.time(); is_["q_n"] = WH_Q.qsize()  # v0.13.11 gecikme bileşenleri
         if not _ISCI["p"] or _ISCI["p"].poll() is not None:
             if not _isci_ac():
                 if w["durum"] == "yok": return
@@ -728,9 +734,13 @@ def _isci_dongu():
         except Exception as e: j = {"hata": f"{e.__class__.__name__}"}
         if j.get("hata"):
             print(f"WHISPER: parça çevrilemedi ({j['hata']}) — işçi yeniden başlatılacak"); w["hata"] = j["hata"]; _isci_kapat("hata"); continue
-        hata_say = 0; metin = " ".join(str(j.get("text") or "").split())
-        w.update(son_sn=j.get("sn"), gecikme_sn=round(time.time() - is_["t1"], 1)); w["atlanan"] += j.get("atlanan", 0)
-        if metin: whisper_yaz(is_, metin, j.get("ses"), ses_bekle(is_["id"]) if DUYGU or is_["kanal"] != "ben" else None)  # v0.12.7: gönderilmeyen parçayı bekleme
+        hata_say = 0; metin = " ".join(str(j.get("text") or "").split()); is_["t_wh"] = time.time(); is_["isci_sn"] = j.get("sn")
+        gec = round(time.time() - is_["t1"], 1)
+        w.update(son_sn=j.get("sn"), gecikme_sn=gec, gecikme_max=max(w.get("gecikme_max") or 0, gec)); w["atlanan"] += j.get("atlanan", 0)
+        w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
+        if metin:
+            model = ses_bekle(is_["id"]) if DUYGU or is_["kanal"] != "ben" else None  # v0.12.7: gönderilmeyen parçayı bekleme
+            is_["t_ses"] = time.time(); whisper_yaz(is_, metin, j.get("ses"), model)
 # --- Ses işçisi: duygu modeli + konuşmacı ayırma (v0.8.4, kullanıcı: "ikisini de indir ve kur") ----------------------------
 # ses-isci.py (ses-venv: PyTorch, FunASR emotion2vec+, SpeechBrain ECAPA; ses-modeller/) Whisper'a giden parçanın aynısını
 # paralel işler (~0,15 sn; Whisper ~1,1 sn sürdüğü için satır gecikmez). Sonuç satır kaydına: "duygu" {etiket, p, dagilim},
@@ -947,12 +957,17 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
     if kume: kume_parca(is_["t0"], is_["t1"], kume)
     kim = ben_adi() if kanal == "ben" else (kume_adi(kume) if kume else None) or konusmaci_karsi(is_["t0"], is_["t1"], kume)
     ta = taslak_tuket(kanal, is_["t1"])  # v0.8.1
+    # v0.13.11 (G12): satır başına gecikme bileşenleri (sn) — kuyruk bekleme, işçiye gidiş-dönüş, işçinin kendi süresi, ses işçisi
+    # bekleme, yankı bekletmesi, toplam (parça sonu → yazım). olcum.py toplanti bunları ayrı ayrı özetler.
+    t_now = time.time(); g = lambda a, b: round(is_[b] - is_[a], 2) if is_.get(a) and is_.get(b) else None
+    gec = {"kuyruk": g("kuyruga", "t_al"), "whisper": g("t_al", "t_wh"), "isci": is_.get("isci_sn"), "ses": g("t_wh", "t_ses"),
+           "yanki": round(t_now - is_["t_ses"], 2) if is_.get("t_ses") else None, "toplam": round(t_now - is_["t1"], 2), "q": is_.get("q_n")}
     ingest({"meeting": {"title": is_["baslik"]}, "source": "whisper", "capturedAt": datetime.datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
             "entries": [{"id": is_["id"], "speaker": kim, "time": datetime.datetime.fromtimestamp(is_["t0"]).strftime("%H:%M:%S"), "text": metin,
                          "seen": datetime.datetime.utcfromtimestamp(is_["t1"]).isoformat(timespec="milliseconds") + "Z", "kanal": kanal,
                          "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2),
                          **({"duygu": model["duygu"]} if (model or {}).get("duygu") else {}), **({"kume": kume} if kume else {}),  # v0.8.4  # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
-                         **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}),
+                         **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,
                          **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60))} if ses else {})}]})  # v0.8.2: ses sinyalleri + hız (kelime/dk)
 # --- Ses komutuyla kanıt (v0.8.0, kullanıcı) ---------------------------------------------------------------------------
 # kullanıcı "ekran kaydı alalım", "ekran görüntüsü al", "kanıt alayım" gibi bir şey söyleyince kanıt kendiliğinden istenir
@@ -1029,7 +1044,7 @@ def ingest(p):
             rec = {"at": p.get("capturedAt"), "id": e.get("id"), "revised": bool(e.get("revised")), "time": e.get("time"), "speaker": e.get("speaker"), "text": text, "flags": flags, "src": p.get("source")}
             if e.get("kanal"): rec["kanal"] = e["kanal"]  # v0.8.0: whisper ben/karsi
             if soz: rec["raw"] = raw; rec["sozluk"] = soz
-            for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume"):  # v0.8.2: ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
+            for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume", "gec"):  # v0.8.2: ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
                 if e.get(k) is not None: rec[k] = e[k]
             jl_out.append(json.dumps(rec, ensure_ascii=False) + "\n")
             # satır sayısı dosya bazında tutulur (STATE["lines"] tek bir global sayaç olursa, yeni bir
@@ -1165,7 +1180,9 @@ def dil_view():
     alg = x.get("lang") if x and _yas_sn(x) < 60 else None
     # v0.13.10: "hedef" — eklenti Teams altyazısının konuşma dilini buna ayarlar. Yalnız gündemde dil açıkça yazılıysa ve
     # agenda.json son 12 saatte yazıldıysa (eski toplantının gündemi ya da varsayılan "tr" İngilizce kullanıcıda dili bozmasın)
-    yeni = AG.get("mtime") and time.time() - AG["mtime"] < 12 * 3600
+    # v0.13.11 (6 Ekim gerçek deneme: dişli bulunamadı, yedek yol katılımcı menüsünü açtı; karar: Teams menü otomasyonları kapalı):
+    # yalnız ayar "altyazi_dili_ayarla": true ise
+    yeni = AYAR.get("altyazi_dili_ayarla") is True and AG.get("mtime") and time.time() - AG["mtime"] < 12 * 3600
     v = {"beklenen": bek, "algilanan": alg, "kaynak": x.get("langSrc") if x else None, "uyari": None,
          "hedef": bek if yeni and agenda().get("dil") in DIL_AD else None}
     if whisper_akiyor("ben") or whisper_akiyor("karsi"): return v  # v0.8.0: satırlar Whisper'dan; Teams dil ayarı metni etkilemez
@@ -1278,7 +1295,7 @@ section+section{margin-top:6px}main .sh,aside .sh{top:-6px}  /* v0.13.2: kaydır
 .k-sor{--kc:var(--ac)}.k-belirt{--kc:var(--br-tx)}.k-deginme{--kc:var(--vi)}.k-dikkat{--kc:var(--er);background:var(--er-bg)}.k-cevap{--kc:var(--te)}.k-duygu{--kc:var(--ro)}.k-bilgi{--kc:var(--gr)}
 .kc{font-size:12px;color:var(--t3);padding:3px 0 3px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kq{font-size:12px;color:var(--t2);background:var(--ac-bg);border-radius:var(--r);padding:7px 10px;margin:0 0 8px;white-space:pre-wrap}
-.yeni{animation:pulse 1s 3}@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(201,151,58,.6)}100%{box-shadow:0 0 0 9px rgba(201,151,58,0)}}
+.yeni{animation:nabiz 1s 3}@keyframes nabiz{0%{box-shadow:0 0 0 0 rgba(201,151,58,.6)}100%{box-shadow:0 0 0 9px rgba(201,151,58,0)}}
 #tone{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .tn{font:500 11px/1.5 var(--f-govde);letter-spacing:0;text-transform:none;padding:1px 8px 1px 6px;border-radius:999px;background:var(--gr-bg);color:var(--t2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .tn::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--tc,var(--t3))}
