@@ -29,7 +29,7 @@ xattr -dr com.apple.quarantine "$KOD" 2>/dev/null || true
 echo "→ Kurulum sihirbazı açılıyor"
 pkill -u "$(id -u)" -f "kurulum.py --port" >/dev/null 2>&1 || true  # yalnız bu kullanıcının eski sihirbazı
 mkdir -p "$HOME/Library/Logs"
-# v0.13.3: sihirbazı kendisi açar (anahtarlı bağlantı; port doluysa sonrakini seçer; Chrome varsa Chrome'da). v0.13.4: tek komut olarak
+# sihirbazı kendisi açar (anahtarlı bağlantı; port doluysa sonrakini seçer; Chrome varsa Chrome'da). v0.13.4: tek komut olarak
 # arka plana (bekleyen ara kabuk kalmaz) — önceden bir sonraki kurulum eski sihirbazı kapatınca o kabuk "Terminated: 15" basıyordu
 cd "$KOD"
 ( PYTHONDONTWRITEBYTECODE=1 nohup /usr/bin/python3 kurulum.py --port "$PORT" --ac >"$HOME/Library/Logs/suflor-kurulum.log" 2>&1 & )

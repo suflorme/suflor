@@ -6,7 +6,7 @@
 #            "kanal": "ben"|"karsi", "baslik": "toplantı"}
 #   çıkış : {"hazir": true, "model": "...", "sn": yükleme, "ecapa": bool} · {"id": "...", "text": "...", "sn": süre, "dil": "tr", "atlanan": n,
 #            "kume": "k1"|null, "benzerlik"} · {"id": "...", "hata": "..."}
-# v0.13.12 (Faz 1, G4): konuşmacı ses izi (ECAPA-TDNN, SpeechBrain VoxCeleb ağırlıkları) bu süreçte MLX ile çalışır — ayrı ses işçisi,
+# konuşmacı ses izi (ECAPA-TDNN, SpeechBrain VoxCeleb ağırlıkları) bu süreçte MLX ile çalışır — ayrı ses işçisi,
 # PyTorch ve duygu modeli (emotion2vec+) kalktı. Ağırlıklar modeller-kur'un bir kez dönüştürdüğü ecapa-mlx.npz (SUFLOR_ECAPA); yoksa
 # kümeleme olmaz, Whisper aynen çalışır. SpeechBrain'le aynı sonuç (6 Ekim, 18 parça: kosinüs ≥ 0,99999), parça başına ~25 ms.
 # Uydurma süzgeci: sessiz/gürültülü parçada Whisper altyazı kalıpları üretir ("Altyazı M.K.", "İzlediğiniz için
@@ -17,7 +17,7 @@ MODEL = os.environ.get("SUFLOR_WHISPER_MODEL", "mlx-community/whisper-large-v3-t
 UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|abone ol(mayı|un)|beğenmeyi unutma|bir sonraki videoda|"
                      r"thanks? (you )?for watching|subtitles? by|please subscribe|amara\.org|transcribed by|"
                      r"^\W*(müzik|music|alkış|applause|\[.*\]|\(.*\))\W*$", re.I)
-# v0.8.2 ses sinyalleri (kullanıcı, 2 Ekim: kişiye özel duygu): parçanın ses yüksekliği, perdesi (F0, otokorelasyon) ve perde
+# ses sinyalleri (kullanıcı, 2 Ekim: kişiye özel duygu): parçanın ses yüksekliği, perdesi (F0, otokorelasyon) ve perde
 # dalgalanması. Kişinin kendi tabanıyla karşılaştırma toplanti-claude.py izle'de. Yalnız sayılar döner; ses saklanmaz.
 def ses_olc(a, np, sr=16000):
     fl, hop = 640, 320  # 40 ms pencere, 20 ms adım
@@ -43,7 +43,7 @@ def ses_olc(a, np, sr=16000):
 # --- ECAPA (MLX). SpeechBrain'in Fbank'ı (25 ms Hamming, 10 ms adım, 80 mel, dB, üst 80 dB) + cümle ortalaması + ECAPA_TDNN
 # (1024 kanal, Res2Net ölçek 8, SE 128, dikkatli istatistik havuzu); Conv1d "same" + yansıtmalı dolgu, BatchNorm çıkarım istatistiği.
 SR, NFFT, HOP = 16000, 400, 160
-KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den (v0.8.4) aynen
+KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den aynen
 class Ecapa:
     def __init__(s, yol, np, mx):
         s.np, s.mx = np, mx
@@ -105,7 +105,7 @@ def main():
         mlx_whisper.transcribe(np.zeros(16000, np.float32), path_or_hf_repo=MODEL, language="tr")  # ısınma: model belleğe
     except Exception as e:
         out({"hata": f"model yüklenemedi: {e.__class__.__name__}: {str(e)[:200]}"}); return 1
-    # v0.13.13 (Faz 1): MLX ara bellek önbelleği kapalı. Sınırsızken parça boyları değiştikçe önbellek büyüyor: 47 parçalık oturumda
+    # MLX ara bellek önbelleği kapalı. Sınırsızken parça boyları değiştikçe önbellek büyüyor: 47 parçalık oturumda
     # işçi 5 805 MB'a çıktı (kısa ölçüm 2 700 gösteriyordu — toplantıdaki swap'ın asıl nedeni); 0 ile 2 449 MB, parça 1,15 → 1,19 sn,
     # metin aynı (6 Ekim). SUFLOR_MLX_ONBELLEK_MB ile değiştirilebilir.
     try:
@@ -156,7 +156,7 @@ def ecapa_donustur(ckpt, hedef):
     Ecapa(gec, np, __import__("mlx.core", fromlist=["core"]))(np.zeros(16000, np.float32)); os.replace(gec, hedef)  # açılmıyorsa yazılmaz
     print(f"✓ ses izi ağırlıkları dönüştürüldü: {hedef}")
 def whisper_nicemle(kaynak, hedef, bit=8):
-    # v0.13.14 (6 Ekim): turbo modeli kurulumda bir kez yerelde 8 bite nicemlenir (indirme yok). Ölçüm (47 aynı parça, önbellek 0):
+    # turbo modeli kurulumda bir kez yerelde 8 bite nicemlenir (indirme yok). Ölçüm (47 aynı parça, önbellek 0):
     # turbo 2 449 MB · parça 1,19 sn · WER %13,6/9,2 → q8 1 838 MB · 1,25 sn · %14,0/8,8. q4 doğruluk kaybettirdi (%16,9/10,7), kullanılmaz.
     import mlx.core as mx, mlx.nn as nn
     from mlx.utils import tree_flatten

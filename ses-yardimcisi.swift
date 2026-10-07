@@ -1,5 +1,5 @@
 // Suflor.me v0.13.0 — yerel ses yardımcısı ("Suflor Ses.app"). Toplantı uygulamasının çıkardığı sesi (karşı tarafın sesi) Core
-// Audio process tap ile alır, 16 kHz tek kanal Int16'ya indirip aktarıcıya POST /ses-yerel ile verir. Option + Shift + W gerekmez.
+// Audio process tap ile alır, 16 kHz tek kanal Int16'ya indirip aktarıcıya POST /ses-yerel ile verir. Eklentiden açmak gerekmez.
 // Mikrofonu ALMAZ: o eklentide kalır (toplantının sessiz bilgisi + tarayıcının yankı engellemesi). Apple ses işleme
 // (VoiceProcessingIO) kullanılmaz: diğer sesleri ~9 dB kısıyor (4 Ekim ön denemesi). Ses diske yazılmaz; ağ yalnız 127.0.0.1.
 // Toplantı anlama iki sinyalle: (1) aktarıcının nabız yanıtı — eklenti toplantıda ("toplanti": true) ve hangi tarayıcıda

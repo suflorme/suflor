@@ -63,7 +63,7 @@
       kur_b: "Kuruyorum", kur_a: "Ayarlarını yazıyor, arka plan hizmetini, takvim ve ses yardımcılarını kuruyorum. macOS \"Suflor Ses\" için sistem sesi kaydı izni sorarsa İzin Ver de.",
       k_ayar: "Ayarlar", k_proje: "Proje klasörü", k_not: "Çalışma notu ve sözlük", k_aktarici: "Arka plan hizmeti", k_modeller: "Konuşma tanıma modelleri",
       k_m_yeniden: "Yeniden dene", k_m_hata: "Modeller kurulamadı. İnternet bağlantını denetleyip yeniden dene.", k_m_baska: "Modeller bu Mac'teki başka bir hesabın klasöründe ve eksik. O hesapta Suflor.me'yi güncelle (guncelle.command), sonra burada yeniden dene.",
-      k_ses: "Karşı tarafın sesi (Suflor Ses)", k_ses_ok: "Hazır; ilk toplantıda izin istenebilir", k_ses_yok: "Kurulamadı; karşı ses için toplantı sekmesinde bir kez Option + Shift + W", k_ses_izin: "İzin ayarını aç",
+      k_ses: "Karşı tarafın sesi (Suflor Ses)", k_ses_ok: "Hazır; ilk toplantıda izin istenebilir", k_ses_yok: "Kurulamadı; karşı ses için Suflor.me simgesi → Karşı taraf → Aç", k_ses_izin: "İzin ayarını aç",
       takvim_b: "Takvimini bağlayalım", takvim_a: "Toplantından birkaç dakika önce hatırlatır, gündemi ve katılımcıları davetten alır.",
       t_izin: "Erişim ver", t_izin_b: "Takvim izni", t_izin_a: "macOS bir izin penceresi açacak: \"Tam erişim\"i seç.",
       t_hesap_yok: "Mac'in Takvim uygulamasında hesap görünmüyor.", t_hesap_ekle: "Google, iCloud ya da Outlook hesabını ekle",
@@ -80,8 +80,8 @@
       e_bekle: "Eklentiyi bekliyorum…", e_bagli: "Eklenti bağlandı",
       e_coklu: "Bu Mac'te başka bir hesabın Suflor.me'si de çalışıyor. Chrome'da Suflor.me simgesine tıkla ve bu hesabın alanını seç: ", e_profil: "Eklentiyi Teams'e girdiğin Chrome profiline ekle; birden fazla Chrome profilin varsa doğru pencerede olduğuna bak.",
       bitti_b: "Hazırsın", bitti_a: "Bir sonraki toplantından önce takvimdeki Başlat'a bas ya da Suflor.me simgesine tıkla.",
-      b1: "Karşı tarafın sesi kendiliğinden yazılır (ilk toplantıda macOS sistem sesi kaydı izni ister). Yazılmazsa toplantı sekmesinde bir kez Option + Shift + W.",
-      b2: "Option + Shift + K kanıt, Option + Shift + S önemli an, Option + Shift + O son bir dakikanın özeti.",
+      b1: "Karşı tarafın sesi kendiliğinden yazılır (ilk toplantıda macOS sistem sesi kaydı izni ister). Yazılmazsa Suflor.me simgesi → Karşı taraf → Aç.",
+      b2: "Option + Shift + K kanıt, Option + Shift + O son bir dakikanın özeti; ⭐ önemli an panoda.",
       b3: "Panoya ?, soru, Claude ya da iki boşlukla başlayan yazı Claude'a soru olur.",
       b4: "İlk toplantıda Claude, Terminal'de proje klasörüne güvenip güvenmediğini sorar: \"Yes\" de.",
     },
@@ -110,7 +110,7 @@
       c_ga_b: "Signing in with Terminal", c_ga1: "Press \"Sign in with Terminal\": Claude opens in Terminal.", c_ga2: "If it asks you to sign in, follow the prompts; if not, type /login and press Return.",
       c_ga3: "Sign in with the account that has your Claude subscription, then type /exit.", c_ga4: "Come back here: the wizard checks again by itself.",
       c_masaustu: "Being signed in to the Claude desktop app doesn't count; Claude in Terminal needs its own sign-in.",
-      c_kartsiz_a: "Without cards you still get the transcript, the dashboard and notes; no cards or summaries. You can connect Claude later.",
+      c_kartsiz_a: "Without cards you still get the transcript, the panel and notes; no cards or summaries. You can connect Claude later.",
       sen_b: "Tell us about you", sen_a: "So the cards are written from your point of view. This stays on this Mac.",
       ad: "Your name", ad_i: "As it appears in meetings", rol: "Your role or title", sirket: "Company (optional)", is_alani: "Your field",
       alanlar: ["E-commerce", "Software", "Consulting", "Finance", "Healthcare", "Education", "Manufacturing", "Public sector", "Other"],
@@ -140,7 +140,7 @@
       kur_b: "Setting up", kur_a: "Writing your settings and installing the background service, calendar and audio helpers. If macOS asks for system audio recording permission for \"Suflor Ses\", choose Allow.",
       k_ayar: "Settings", k_proje: "Project folder", k_not: "Working note and glossary", k_aktarici: "Background service", k_m_yeniden: "Try again", k_m_hata: "The models couldn't be installed. Check your internet connection and try again.",
       k_m_baska: "The models are in another account's folder on this Mac and incomplete. Update Suflor.me in that account (guncelle.command), then try again here.",
-      k_ses: "Other side's audio (Suflor Ses)", k_ses_ok: "Ready; permission may be asked in your first meeting", k_ses_yok: "Couldn't be installed; press Option + Shift + W once in the meeting tab for the other side's audio", k_ses_izin: "Open permission settings",
+      k_ses: "Other side's audio (Suflor Ses)", k_ses_ok: "Ready; permission may be asked in your first meeting", k_ses_yok: "Couldn't be installed; for the other side's audio: Suflor.me icon → Other side → Open", k_ses_izin: "Open permission settings",
       k_modeller: "Speech recognition models",
       takvim_b: "Connect your calendar", takvim_a: "It reminds you a few minutes before a meeting and takes the agenda and attendees from the invitation.",
       t_izin: "Allow access", t_izin_b: "Calendar permission", t_izin_a: "macOS will ask for permission: choose \"Full Access\".",
@@ -149,7 +149,7 @@
       teams_b: "The Teams app is installed", teams_a: "Suflor.me follows Teams in Chrome. If the invitation opens in the app, it can't help.",
       tm1: "Join from the link in the invitation; if Chrome asks to open Microsoft Teams, don't tick \"Always allow\" and choose Cancel.",
       tm2: "On Teams' landing page choose \"Continue on this browser\". The Suflor.me extension also picks it for you.",
-      tm3: "The Join button on the dashboard always opens the meeting in the browser.",
+      tm3: "The Join button on the panel always opens the meeting in the browser.",
       tm_dene: "Open a test link", tm_tamam: "Got it",
       ek_b: "Add the Chrome extension", ek_a: "The extension takes sound and captions from the Teams page and shows the cards in a corner of the screen.",
       e1: "Open Chrome's extensions page and switch on Developer mode at the top right.", e1d: "Open extensions page",
@@ -158,9 +158,9 @@
       e_bekle: "Waiting for the extension…", e_bagli: "Extension connected",
       e_coklu: "Another account's Suflor.me is also running on this Mac. Click the Suflor.me icon in Chrome and pick this account's workspace: ", e_profil: "Add the extension to the Chrome profile you use for Teams; if you have several profiles, make sure you're in the right window.",
       bitti_b: "You're all set", bitti_a: "Before your next meeting press Start in the calendar list or click the Suflor.me icon.",
-      b1: "The other side is transcribed automatically (macOS asks for system audio recording permission in the first meeting). If not, press Option + Shift + W once in the meeting tab.",
-      b2: "Option + Shift + K evidence, Option + Shift + S key moment, Option + Shift + O summary of the last minute.",
-      b3: "Text on the dashboard starting with ?, \"soru\", Claude or two spaces becomes a question for Claude.",
+      b1: "The other side is transcribed automatically (macOS asks for system audio recording permission in the first meeting). If not: Suflor.me icon → Other side → Open.",
+      b2: "Option + Shift + K evidence, Option + Shift + O summary of the last minute; ⭐ key moment on the panel.",
+      b3: "Text on the panel starting with ?, \"soru\", Claude or two spaces becomes a question for Claude.",
       b4: "In your first meeting, Claude asks in Terminal whether you trust the project folder: answer \"Yes\".",
     },
   };
@@ -240,10 +240,10 @@
           ${satir(m.python ? "iyi" : "kotu", t.m_python, m.python ? m.python : t.m_python_ac, m.python ? "" : dug("python", t.m_python_dug))}
           ${satir(m.chrome ? "iyi" : "uyari", t.m_chrome, m.chrome ? "" : t.m_chrome_ac, m.chrome ? "" : dug("chrome-indir", t.m_chrome_dug))}</div>`; } },
     { id: "claude", simge: "claude", b: "claude_b", a: "claude_a", hazir: () => { const c = (D.durum || {}).claude || {}; return (c.kurulu && c.giris) || C.kartsiz; },
-      // v0.13.5: adıma girince oturum bilinmiyorsa kendiliğinden denetler; Terminal'den dönünce (pencere odağı) yeniden denetler
+      // adıma girince oturum bilinmiyorsa kendiliğinden denetler; Terminal'den dönünce (pencere odağı) yeniden denetler
       gir: async () => { await durumAl(); const c = (D.durum || {}).claude || {}; if (c.kurulu && c.giris !== true) await claudeDenetle(); },
       icerik: () => { const c = (D.durum || {}).claude || {};
-        // v0.13.3: Terminal'de komut yoksa söyle; denetim başarısızsa nedeni. v0.13.5: oturum yoksa giriş düğmesi her zaman + adım adım yönerge
+        // Terminal'de komut yoksa söyle; denetim başarısızsa nedeni. v0.13.5: oturum yoksa giriş düğmesi her zaman + adım adım yönerge
         const n = !c.giris && c.neden ? c.neden : null;
         const nm = n ? (n.tur === "giris" ? t.c_n_giris : n.tur === "abonelik" ? t.c_n_abonelik : n.tur === "zaman" ? t.c_n_zaman : n.tur === "yok" ? t.c_n_yok : t.c_n_hata + (n.ham || "")) : "";
         const girisSatiri = D.claudeDen ? satir("bekle", t.c_denetleniyor)
@@ -347,7 +347,7 @@
     }
     if (gorunen()[D.adim].id === "tanidim") ciz();
   }
-  async function claudeDenetle() {  // v0.13.5: tek yerden; aynı anda ikinci denetim başlamaz
+  async function claudeDenetle() {  // tek yerden; aynı anda ikinci denetim başlamaz
     if (D.claudeDen) return; D.claudeDen = true; D.sonDen = Date.now(); ciz();
     try { await api("claude/denetle", {}); } catch (e) {} D.claudeDen = false; await durumAl(); ciz();
   }
@@ -381,7 +381,7 @@
       if (n === "atla") { git(D.adim + 1); return; }
       if (n === "ornek") { C.ornek = !C.ornek; kaydet(); ciz(); return; }
       if (n === "claude-denetle") { await claudeDenetle(); return; }
-      if (n === "kur-yeniden") { const a = gorunen()[D.adim]; if (a && a.gir) await a.gir(); return; }  // v0.13.5: kurulum adımı başarısızsa
+      if (n === "kur-yeniden") { const a = gorunen()[D.adim]; if (a && a.gir) await a.gir(); return; }  // kurulum adımı başarısızsa
       if (n === "modeller-yeniden") { await api("modeller/baslat", {}).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "claude-yol") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "klasor-sec") { const r = await api("klasor-sec", {}).catch(() => ({})); if (r.yol) { C.proje = r.yol; kaydet(); ciz(); } return; }

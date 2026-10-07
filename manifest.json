@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suflor.me — canlı toplantı asistanı",
-  "version": "0.13.18",
+  "version": "0.13.30",
   "description": "Toplantıyı canlı yazıya döker (Teams; Meet ve Zoom web sırada), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
   "permissions": [
     "storage",
@@ -26,20 +26,6 @@
         "mac": "Alt+Shift+K"
       },
       "description": "Kanıt: Teams ekranının görüntüsünü kaydet"
-    },
-    "whisper": {
-      "suggested_key": {
-        "default": "Alt+Shift+W",
-        "mac": "Alt+Shift+W"
-      },
-      "description": "Whisper: karşı tarafın sesini (Teams sekmesi) yerel konuşma tanımaya ver"
-    },
-    "onemli": {
-      "suggested_key": {
-        "default": "Alt+Shift+S",
-        "mac": "Alt+Shift+S"
-      },
-      "description": "⭐ Önemli an: şu anı özette öne çıkar"
     },
     "ozet": {
       "suggested_key": {

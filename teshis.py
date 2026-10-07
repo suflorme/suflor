@@ -66,7 +66,7 @@ _YOL = re.compile(r"""(?:~|/|[A-Za-z]:\\)[^\s'",)]*|[^\s'",(]*\.(?:md|jsonl|json
 _TIRNAK = re.compile(r"\"[^\"]*\"|“[^”]*”|'[^'\s][^']*'")
 _URL = re.compile(r"https?://\S+")
 _SAYI = re.compile(r"^[v]?\d[\d.,:%+-]*(sn|dk|ms|kb|mb|gb|s)?$", re.I)
-# v0.12.3 (güvenlik denetimi D1): boşluk/tire/nokta ile ayrılmış rakam dizisi (telefon, kart, IBAN, kimlik no) toplam 7+
+# (güvenlik denetimi D1) boşluk/tire/nokta ile ayrılmış rakam dizisi (telefon, kart, IBAN, kimlik no) toplam 7+
 # rakamsa "N". Saat (iki nokta) ve ISO tarih (2026-10-03) ayraç sayılmaz; sürüm (0.12.2) ve IP 7 rakamın altında kalır.
 _RAKAM_DIZI = re.compile(r"(?<![\w.-])\d+(?:[ .-]\d+)+(?![\w:])")
 _ISO_TARIH = re.compile(r"\d{4}-\d\d-\d\d")
@@ -105,23 +105,23 @@ KALIP = {"kurulum": r"[0-9a-f]{12}", "surum": r"v?\d{1,3}(\.\d{1,4}){0,3}|\?", "
          "python": r"\d{1,2}\.\d{1,2}\.\d{1,3}[a-z0-9]{0,4}", "zaman": r"[\d:T+.-]{10,32}",
          "claude_model": r"(claude-)?(opus|sonnet|haiku|fable)[a-z0-9.-]{0,30}|varsayilan|default|\?",
          "islev": r"[\w<>.-]{1,40}", "parmak": r"[0-9a-f]{12}", "toplanti_kimlik": r"[0-9a-f]{12}", "isim": r"[A-Za-z_]\w{0,40}",
-         "isabet": r"\d{1,4}/\d{1,4}"}  # v0.12.3: kart isabeti "yapıldı/(yapıldı+geçildi)" — eskiden "/1" yol sanılıyordu
-# v0.12.3 (D1c): kalıba uyan serbest küçük harfli değer ("gizli_proje_kartal") geçmesin — bu alanlar yalnız kodda gerçekten
+         "isabet": r"\d{1,4}/\d{1,4}"}  # kart isabeti "yapıldı/(yapıldı+geçildi)" — eskiden "/1" yol sanılıyordu
+# kalıba uyan serbest küçük harfli değer ("gizli_proje_kartal") geçmesin — bu alanlar yalnız kodda gerçekten
 # üretilen değerleri alır (relay.py, toplanti-claude.py, content.js taranarak toplandı); bilinmeyen değer "?". Yeni değer
 # üreten kod yazınca buraya ekle.
 _DURUMLAR = {"kapali", "yukleniyor", "hazir", "yok", "hata", "zaman_asimi", "bekliyor", "ok", "izin_yok"}
 SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim"},
          "kategori": {"whisper", "ses_modeli", "disk", "eklenti", "nabiz", "takvim", "baslat", "sozluk"},  # relay.py SORUN_RX
          "kaynak": {"aktarici", "claude"}, "platform": {"teams", "meet", "zoom"}, "rol": {"yurutucu", "katilimci", "dinleyici"},
-         "dil": {"tr", "en", "karisik"}, "arayuz": {"tr", "en"}, "durum": _DURUMLAR, "whisper": _DURUMLAR, "ses_modeli": _DURUMLAR, "yerel_ses": {"yok", "kapali", "bekliyor", "dinliyor", "izin"},  # v0.13.0
+         "dil": {"tr", "en", "karisik"}, "arayuz": {"tr", "en"}, "durum": _DURUMLAR, "whisper": _DURUMLAR, "ses_modeli": _DURUMLAR, "yerel_ses": {"yok", "kapali", "bekliyor", "dinliyor", "izin"},
          "sebep": set(),  # bugün üreten kod yok
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"}}
-# v0.12.3 (D1b): sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için
+# sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için
 # (kaynak, kanal, kart türü, dönüş, karne boyutu) yalnız bilinen değerler. Uymayan anahtar "?<sıra>" olur (değer yine süzülür).
 ANAHTAR = re.compile(r"[a-z_][a-z0-9_]{0,39}")
 ANAHTAR_CEVIR = {"?": "bilinmeyen", "gündem": "gundem", "açık sorular": "acik_sorular", "konuşma payı": "konusma_payi", "takip sahipli": "takip_sahipli"}
 SAYIM = {"kaynak": {"transcript", "captions", "whisper", "bilinmeyen"}, "kanal": {"ben", "karsi"},
-         "tur": {"sor", "belirt", "deginme", "dikkat", "cevap", "bilgi", "duygu"},  # relay.py CARD_KINDS
+         "tur": {"soyle", "dur", "cevap", "not", "sor", "belirt", "deginme", "dikkat", "bilgi"},  # relay.py CARD_KINDS (+ eski adlar)
          "donus": {"acik", "yenilendi", "yapildi", "okundu", "gecildi"},
          "boyut": {"gundem", "zaman", "acik_sorular", "konusma_payi", "takip_sahipli"}}
 SERBEST = {"kullanici_metni"}  # kullanıcının panoda yazdığı metin (gönderilmeden önce gösterilir); v0.12.3: gozlem artık sade()'den geçer
@@ -135,7 +135,7 @@ def temizle(x, anahtar=None):
     if isinstance(x, bool) or x is None or isinstance(x, (int, float)): return x
     s = str(x)
     if anahtar in SERBEST: return s[:4000]
-    if anahtar == "gozlem": return sade(s, 3000)  # v0.12.3 (O2): Claude'un toplantı sonu gözlemi — ad/içerik kaçmasın
+    if anahtar == "gozlem": return sade(s, 3000)  # Claude'un toplantı sonu gözlemi — ad/içerik kaçmasın
     if anahtar in SABIT: return s if s in SABIT[anahtar] or s == "?" else "?"
     if anahtar in KALIP: return s if re.fullmatch(KALIP[anahtar], s) else sade(s, 60)
     return sade(s)

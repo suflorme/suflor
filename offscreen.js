@@ -1,5 +1,5 @@
 // Suflor.me v0.8.0 — offscreen belgesi: Teams sekmesinin sesi (diğer katılımcılar) → aktarıcı /ses, kanal "karsi".
-// Arka plan betiği ⌥⇧W ya da popup ile chrome.tabCapture akış kimliğini alır, buraya gönderir. Sekme sesi yakalanınca
+// Arka plan betiği popup düğmesiyle chrome.tabCapture akış kimliğini alır, buraya gönderir. Sekme sesi yakalanınca
 // Chrome sekmeyi kullanıcıya susturur — bu yüzden ses ayrı bir AudioContext ile hoparlöre geri verilir (kullanıcı duymaya
 // devam eder). İşleme 16 kHz'te; parçalar 1 sn. Ses diske yazılmaz, yalnız 127.0.0.1'e gider.
 let ak = null;

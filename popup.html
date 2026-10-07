@@ -21,28 +21,17 @@ textarea:focus,input:focus,select:focus{border-color:var(--ac)}
 details{margin-top:10px}summary{cursor:pointer;color:var(--t2);font-size:12px;list-style:none;display:flex;align-items:center;gap:6px}summary::-webkit-details-marker{display:none}summary::before{content:"›";display:inline-block;transition:transform .15s}details[open] summary::before{transform:rotate(90deg)}
 .set{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-top:8px;display:flex;flex-direction:column;gap:8px}
 .set label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--t2)}.set label.ck{flex-direction:row;align-items:center;gap:8px;color:var(--tx)}.set label.ck input{width:auto;margin:0;accent-color:var(--ac)}
+.durum{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.durum .c{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500}.durum .a{font-size:12px;color:var(--t2);padding-left:16px}.durum .a:empty{display:none}
+.durum.ok .c{color:var(--ok)}.durum.wa{border-color:var(--wa)}.durum.wa .c{color:var(--wa)}.durum.er{border-color:var(--er)}.durum.er .c{color:var(--er)}
+.durum .e{padding-left:16px;margin-top:4px}.durum .e:empty{display:none}
 </style>
-<div class="hd"><span class="brand" aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class="n">.</span><span class="m">me</span></span><span class="chip alan" id="alan" title="Bu Chrome'un yazdığı çalışma alanı"></span></span><span class="chip" id="ver"></span></div>
+<div class="hd"><span class="brand" aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class="n">.</span><span class="m">me</span></span><span class="chip alan" id="alan" title="Bu Chrome'un yazdığı çalışma alanı"></span></span></div>
 <div id="sec" hidden><div class="sec-t">Bu Chrome hangi çalışma alanına yazsın?</div><div class="sec-b" id="secb"></div><div class="sec-n">Bu Mac'te birden fazla Suflor.me aktarıcısı çalışıyor. Bir kez seç; Ayarlar'dan değiştirebilirsin.</div></div>
-<div id="uy"></div>
-<div class="card" id="baglanti">
-  <div class="row"><span class="n"><span class="dot" id="d-ak"></span>Aktarıcı</span><span class="v" id="v-ak">bakılıyor…</span></div>
-  <div class="row"><span class="n"><span class="dot" id="d-tp"></span>Toplantı</span><span class="v" id="v-tp"></span></div>
-  <div class="row"><span class="n"><span class="dot" id="d-sn"></span>Senin sesin</span><span class="v" id="v-sn"></span></div>
-  <div class="row"><span class="n"><span class="dot" id="d-kr"></span>Karşı taraf</span><span class="v" id="v-kr"></span></div>
-  <div class="row"><span class="n"><span class="dot" id="d-cl"></span>Claude</span><span class="v" id="v-cl"></span></div>
-</div>
+<div class="durum nt" id="durum" role="status"><div class="c"><span class="dot" id="dd"></span><span id="dm">bakılıyor…</span></div><div class="a" id="da"></div><div class="e" id="de"></div></div>
 <div class="bt"><button class="pri grow" id="pano">Panoyu aç</button></div>
-<div class="not"><textarea id="note" rows="2" placeholder="Not düş · soru için başa ?, soru, Claude ya da iki boşluk (Enter: gönder)"></textarea>
-<div class="bt"><button id="send">Gönder</button><span class="ok-t" id="noteRes"></span></div></div>
 <details><summary>Ayarlar</summary><div class="set">
-  <label class="ck"><input type="checkbox" id="en"> Aktarım açık</label>
-  <label class="ck"><input type="checkbox" id="wh"> Whisper: konuşmayı bu Mac'te yazıya çevir</label>
-  <label class="ck" hidden><input type="checkbox" id="ac"> Toplantıya girince altyazıyı kendisi açsın</label><!-- v0.13.11: otomasyon kapalı -->
-  <label>Satırı göndermeden önce bekleme<select id="stab"><option value="3000">3 sn (hızlı)</option><option value="6000">6 sn</option></select></label>
-  <label>Uyarı kelimeleri (virgülle)<input id="kw"></label>
-  <label>Çalışma alanı<select id="alansec"></select></label>
-  <label>Aktarıcı adresi<input id="relay"></label>
-  <div class="bt"><button id="save">Kaydet</button><span class="ok-t" id="saveRes"></span></div>
+  <label class="ck"><input type="checkbox" id="wh"> Sesi Mac'te yazıya çevir</label>
+  <label id="alanl" hidden>Çalışma alanı<select id="alansec"></select></label>
 </div></details>
 <script src="popup.js"></script></html>

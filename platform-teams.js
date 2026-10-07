@@ -23,7 +23,7 @@
     const parts = t.split("|").map(s => s.trim()).filter(Boolean);
     return parts.length >= 2 ? parts[parts.length - 2] : parts[0] || "Toplantı";
   }
-  // v0.7.0: toplantıda mı (çağrı denetimleri görünüyor). Seçiciler gerçek Teams'te kısmen doğrulandı (ayrıl düğmesi).
+  // toplantıda mı (çağrı denetimleri görünüyor). Seçiciler gerçek Teams'te kısmen doğrulandı (ayrıl düğmesi).
   function cagrida() { return !!document.querySelector('[data-tid="hangup-main-btn"], [data-tid="call-hangup"], #hangup-button, button[aria-label^="Ayrıl"], button[aria-label^="Leave"], [data-tid="call-control-bar"]'); }
   function micDugme() { return document.querySelector('[data-tid="microphone-button"], #microphone-button, [data-tid="toggle-mute"], button[aria-label*="Sesi aç"], button[aria-label*="Sesi kapat"], button[aria-label*="Unmute"], button[aria-label*="Mute"]'); }
   function sessizMi() {
@@ -82,7 +82,7 @@
     return entries;
   }
   function altyaziKutusu() {
-    // v0.4.8: önce altyazı metninin kendisi — eski seçici "caption" geçen ilk düğümü (ör. bir menü düğmesini) alabiliyordu
+    // önce altyazı metninin kendisi — eski seçici "caption" geçen ilk düğümü (ör. bir menü düğmesini) alabiliyordu
     const r = document.querySelector('[data-tid="closed-captions-renderer"], [data-tid="closed-caption-v2-window-wrapper"]');
     if (r) return r;
     if (document.querySelector('[data-tid="closed-caption-text"]')) return document.body;
@@ -115,7 +115,7 @@
   }
   globalThis.SuflorPlatform = {
     ad: "teams", etiket: "Teams",
-    // v0.12.2: kullanıcıya gösterilen yönerge arayüz diline göre (çekirdek P.dil'i "tr"/"en" yapar). Yalnız gösterilen metin;
+    // kullanıcıya gösterilen yönerge arayüz diline göre (çekirdek P.dil'i "tr"/"en" yapar). Yalnız gösterilen metin;
     // Teams menüsünü bulan kalıplar (altyaziAdimlari, seçiciler) Teams'in kendi diline bağlıdır, burada çevrilmez.
     dil: "tr",
     YONERGE: {
@@ -130,7 +130,7 @@
       ['[role="menuitem"], [role="menuitemcheckbox"], button', /^(canlı altyazıları? aç|canlı altyazıyı aç|turn on live captions|show live captions)/i]],
     dilYollari,
   };
-  // v0.13.10: altyazının konuşma dilini gündem diline ayarlama (5 Ekim kişisel deneme: Teams varsayılanı İngilizce (ABD) açıldı).
+  // altyazının konuşma dilini gündem diline ayarlama (5 Ekim kişisel deneme: Teams varsayılanı İngilizce (ABD) açıldı).
   // Microsoft'un anlattığı yol: altyazı çubuğundaki Altyazı ayarları (dişli) → Dil ayarları → Toplantı konuşma dili → Güncelle;
   // yedek yol Diğer → Dil ve konuşma → Dil ayarları. Gerçek Teams DOM'unda DOĞRULANMADI — adım bulunamazsa çekirdek menüde
   // görünen öğeleri capAuto'ya yazar. Adım: {sec, re, zaten (seçili değer buna uyuyorsa dur), istege (yoksa atla)}.

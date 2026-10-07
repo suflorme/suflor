@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Suflor.me — proje bağlamı araması (v0.5.0). Yalnız yerel dosya; ağ yok, stdlib dışı bağımlılık yok.
+# Suflor.me — proje bağlamı araması. Yalnız yerel dosya; ağ yok, stdlib dışı bağımlılık yok.
 # Proje klasörünün tamamını (görüşme dökümleri, canlı toplantılar, .md/.txt/.html/.json/.jsonl/.tsv/.csv, .xlsx, .docx)
 # SQLite FTS5 dizinine koyar; Claude toplantı sırasında "Ayşe geçen ay yedekler için ne demişti?" gibi sorulara
 # ve kartlara buradan dayanır. Dizin <uygulama klasörü>/dizin.sqlite (proje klasörüne yazmaz);
@@ -9,7 +9,7 @@
 # Sözlük (sozluk.json + ayardaki sozluk_kaynagi tsv'si): doğru adı arayınca dökümlerdeki yanlış yazımları da bulunur.
 import argparse, collections, datetime, glob, html, json, os, re, sqlite3, sys, time, unicodedata, zipfile
 
-# v0.9.2: hesap başına ayar (relay.py ile aynı kural): ~/Library/Application Support/Suflor/ayar.json; yoksa varsayılanlar
+# hesap başına ayar (relay.py ile aynı kural): ~/Library/Application Support/Suflor/ayar.json; yoksa varsayılanlar
 AYAR_YOL = os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json")  # SUFLOR_AYAR: deneme için
 def ayar_oku():
     v = {"alan": "Suflor", "ad": "", "port": 8765, "uygulama": "~/Library/Application Support/Suflor", "proje": "~/Suflor", "ortak": "/Users/Shared/Suflor",
@@ -19,17 +19,17 @@ def ayar_oku():
     for k in ("uygulama", "proje", "ortak"): v[k] = os.path.expanduser(str(v[k]))
     return v
 AYAR = ayar_oku()
-PROJE = AYAR["proje"]  # v0.9.2: hesabın proje (bağlam) klasörü
+PROJE = AYAR["proje"]  # hesabın proje (bağlam) klasörü
 DB = os.path.join(AYAR["uygulama"], "dizin.sqlite")
 SOZLUK = os.path.join(AYAR.get("sozluk_kaynagi") or "-", "duzeltme_sozlugu_oneri.tsv")
-SUFLOR_SOZLUK = os.path.join(AYAR["uygulama"], "canli", "sozluk.json")  # v0.5.1: esas sözlük
+SUFLOR_SOZLUK = os.path.join(AYAR["uygulama"], "canli", "sozluk.json")  # esas sözlük
 # Dizine girmeyenler (proje köküne göre): yedekler, arşiv, kod klasörü; alan kendi listesini ayarın "haric"ine yazar
 # (ör. bir dökümün anonim kopyası çift sonuç verir, ara çıktılar ilk sonuçları kapar).
 # (1 Ekim: .xlsx'in eski .md dışa aktarımları silindi, zip'i _arsiv/'de; _arsiv dizine girmez.)
-# v0.9.2: her alanda: _yedek, _arsiv, .claude, .git, Suflor kod klasörü; ayar.json "haric" ile alan kendi listesini ekler
+# her alanda: _yedek, _arsiv, .claude, .git, Suflor kod klasörü; ayar.json "haric" ile alan kendi listesini ekler
 HARIC_GENEL = ["_yedek", "_arsiv", ".claude", ".git", "suflor", os.path.basename(str(AYAR.get("kod") or "").rstrip("/")) or "suflor"]
 HARIC = list(dict.fromkeys(HARIC_GENEL + list(AYAR.get("haric") or [])))  # ayar "haric": alanın kendi listesi (proje köküne göre)
-CANLI_HARIC = {"takvim-secilen.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "agenda.json", "hazir.json", "karneler.jsonl", "karsilastirmalar.jsonl"}  # v0.7.0: karne · v0.7.2: karşılaştırma
+CANLI_HARIC = {"takvim-secilen.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "agenda.json", "hazir.json", "karneler.jsonl", "karsilastirmalar.jsonl"}  # karne · v0.7.2: karşılaştırma
 UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx"}
 PARCA = 700  # bir parçanın hedef uzunluğu (karakter)
 
@@ -207,7 +207,7 @@ def baglan():
       CREATE VIRTUAL TABLE IF NOT EXISTS ara USING fts5(n, kimn, content='', prefix='3 4 5', tokenize='unicode61');""")
     return c
 def dokum_kopyasi(yol):
-    # v0.12.6: `toplanti-claude.py dokum` dosyası (<alan>-<kişi>-transkript-<YYYYMMDD>.md) aynı toplantının _canli/ dökümünün
+    # `toplanti-claude.py dokum` dosyası (<alan>-<kişi>-transkript-<YYYYMMDD>.md) aynı toplantının _canli/ dökümünün
     # temiz kopyası — kaynağı _canli'de duruyorsa dizine ikinci kez girmez (ilk 3 sonuç aynı satırla dolmasın)
     if not re.search(r"-transkript-\d{8}\.md$", yol): return False
     try: m = re.search(r"Kaynak: `_canli/([^`]+)\.md`", open(yol, encoding="utf-8", errors="replace").read(800))
@@ -262,7 +262,7 @@ def sozluk():
     return _SOZ[0]
 def _sozluk_oku():
     # [(doğru biçim, [biçimler…])] — biçimler sadeleştirilmiş; doğru biçim de biçimlerden biri.
-    # v0.5.1: önce Suflor sözlüğü (sozluk.json, kullanıcının kararları); dış sözlük önerilerinden yalnız onunla çakışmayanlar
+    # önce Suflor sözlüğü (sozluk.json, kullanıcının kararları); dış sözlük önerilerinden yalnız onunla çakışmayanlar
     # (dış sözlük bir adı ters yönde düzeltebilir; doğru ad kullanıcının kararıdır).
     out, gor = [], set(); grup = {}
     try:
@@ -281,7 +281,7 @@ def _sozluk_oku():
             out.append((dogru, sorted(bicim, key=len, reverse=True)))
     except FileNotFoundError: pass
     return out
-# v0.7.3: Türkçe soru, İngilizce döküm — kelime kökü eşleşirse İngilizce kökler de VEYA'lanır
+# Türkçe soru, İngilizce döküm — kelime kökü eşleşirse İngilizce kökler de VEYA'lanır
 CEVIRI = {"kontr": "check", "erisi": "acces", "musteri": "custo", "fatur": "invoi", "odeme": "payme",
           "sifre": "passw", "hesap": "accou", "teslim": "deliv", "iptal": "cance", "durum": "statu", "bilgi": "infor",
           "takip": "track follo", "sorun": "issue probl", "egiti": "train", "not": "notes", "gecik": "delay",
@@ -310,7 +310,7 @@ def konusmacilar(c):
     for (k,) in c.execute("SELECT DISTINCT kim FROM parca WHERE kim != ''"):
         for w in kelimeler(k):
             if len(w) >= 3 and not re.fullmatch(r"[kg]\d+|not", w) and w != norm(BEN): ad.add(w)
-    # v0.7.3: dökümün dosya adı → o dökümde en çok konuşan (kullanıcı dışı) kişi: dosya adı "Can" diye sorulur, konuşmacı "John Smith"
+    # dökümün dosya adı → o dökümde en çok konuşan (kullanıcı dışı) kişi: dosya adı "Can" diye sorulur, konuşmacı "John Smith"
     for (yol,) in c.execute("SELECT yol FROM dosya WHERE tur = 'gorusme'"):
         if not yol.startswith(GORUSME): continue
         kok = kelimeler(os.path.basename(yol).rsplit(".", 1)[0])
@@ -324,7 +324,7 @@ TAKMA = {}
 def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2):
     c = baglan(); guncelle(c)
     if not kim:
-        # v0.5.0: "Ayşe yedekler için ne demişti?" → önce Ayşe'nin konuştuğu parçalar, sonra genel sonuçlar
+        # "Ayşe yedekler için ne demişti?" → önce Ayşe'nin konuştuğu parçalar, sonra genel sonuçlar
         adlar = konusmacilar(c); bulunan = [w for w in kelimeler(q) if w in adlar]
         if bulunan:
             kalan = " ".join(w for w in kelimeler(q) if w not in bulunan)
@@ -341,7 +341,7 @@ def ara_ic(c, q, kim, turler, son, n, dosya_basina):
     if turler: kosul.append("d.tur IN (%s)" % ",".join("?" * len(turler))); arg += turler
     if son: kosul.append("d.tarih >= ?"); arg.append((datetime.date.today() - datetime.timedelta(days=son)).isoformat())
     def calis(eslesme):
-        kk = kelimeler(kim)[0] if kim and kelimeler(kim) else None  # v0.7.3: parantez — "a OR b AND kimn:x" b'ye bağlanıyordu
+        kk = kelimeler(kim)[0] if kim and kelimeler(kim) else None  # parantez — "a OR b AND kimn:x" b'ye bağlanıyordu
         m = ((f"({eslesme}) AND " if eslesme else "") + f"kimn : {terim(TAKMA.get(kk, kk))}") if kk else eslesme
         m = m.strip() or "*"
         sql = ("SELECT p.id, p.yol, p.konum, p.kim, p.metin, d.tur, d.tarih, d.baslik, bm25(ara, 1.0, 0.3) AS s FROM ara "

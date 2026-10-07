@@ -1,0 +1,597 @@
+{
+ "surum_maskeli": true,
+ "dosyalar": {
+  "<TARIH>-Deneme-toplantısı-altyapı.jsonl": [
+   "{\"at\": null, \"id\": \"o/1\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Merhaba, bugün yedekleri, AWS tarafını ve GitHub erişimini konuşacağız.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/2\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Merhaba, hazırım. Nereden başlayalım?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/3\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Yedeklerden başlayalım. Yedekler şu an nerede tutuluyor?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/4\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Veritabanı yedekleri her gece alınıyor, bir kopyası ofisteki diskte duruyor.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/5\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Bulutta da bir kopya var ama onu kimin kontrol ettiğinden emin değilim.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/6\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Peki geri yükleme hiç denendi mi?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/7\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Kesinlikle her ay deniyoruz, yüzde yüz çalışıyor.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/8\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Anladım. Bunu kim yapıyor, bir kayıt tutuluyor mu?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/9\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Bir tabloya yazıyoruz sanırım, bakmam lazım.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/10\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Tamam, yedek konusunu not alıyorum.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/11\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Şifreler de Bitwarden'da duruyor, oradan paylaşıyoruz.\", \"flags\": [\"şifre\"], \"src\": \"transcript\", \"raw\": \"Şifreler de Bitvarden'da duruyor, oradan paylaşıyoruz.\", \"sozluk\": [{\"bicim\": \"Bitvarden'da\", \"dogru\": \"Bitwarden\", \"durum\": \"duzeltildi\"}]}",
+   "{\"at\": null, \"id\": \"o/12\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Güzel. AWS tarafına geçelim, IAM kullanıcıları kaç tane?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/13\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Yaklaşık on iki IAM kullanıcısı var, bazıları eski çalışanlardan kalma.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/14\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"MFA hepsinde açık değil, iki üç kişide kapalı olabilir.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/15\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Root hesabında MFA açık mı?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/16\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Root hesabı açık, onu ben yönetiyorum.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"note\": \"Root hesabı tek kişide — yedek yönetici yok\"}",
+   "{\"at\": null, \"id\": \"o/17\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Eski çalışanların kullanıcıları ne zaman silinecek?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/18\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Bu ay içinde temizlemeyi planlıyoruz.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/19\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Bunun sahibi kim olacak, tarih verebilir miyiz?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/20\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Ben sahiplenirim, ayın yirmisine kadar.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": \"<AN>\", \"note\": \"⭐ ÖNEMLİ AN\"}",
+   "{\"at\": null, \"id\": \"o/21\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"GitHub organizasyonuna geçelim, üyeler kimler?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/22\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"GitHub'da on beş üye var, ikisi dış ajans.\", \"flags\": [], \"src\": \"transcript\", \"raw\": \"Git hab'da on beş üye var, ikisi dış ajans.\", \"sozluk\": [{\"bicim\": \"Git hab'da\", \"dogru\": \"GitHub\", \"durum\": \"duzeltildi\"}]}",
+   "{\"at\": null, \"id\": \"o/23\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Bazıları kişisel hesaplarıyla bağlı, şirket hesabı açmadık.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/24\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Dış ajansın erişimi hangi depolarda?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"w/25\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 0\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"karsi\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"w/26\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Evet ama önce ajansın listesine bakalım 0\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"ben\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"w/27\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 1\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"karsi\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"w/28\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Evet ama önce ajansın listesine bakalım 1\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"ben\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"o/29\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Hepsinde yazma yetkisi var galiba, kontrol etmem lazım.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"w/30\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 2\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"karsi\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"w/31\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Evet ama önce ajansın listesine bakalım 2\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"ben\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"w/32\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 3\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"karsi\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"w/33\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Evet ama önce ajansın listesine bakalım 3\", \"flags\": [], \"src\": \"whisper\", \"kanal\": \"ben\", \"t0\": <EPOCH>, \"t1\": <EPOCH>}",
+   "{\"at\": null, \"id\": \"o/34\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Bunu sınırlamamız gerekecek.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/35\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Katılıyorum, sadece ilgili depolara verelim.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/36\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Yedeklere bir daha dönelim: geri yükleme kaydı nerede tutuluyor?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/37\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Kayıt ortak klasördeki tabloda, ben sana gönderirim.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/38\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Süper. Özetle: IAM temizliği senin, ayın yirmisi.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/39\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Evet, GitHub üyelerini de aynı hafta gözden geçiririm.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/40\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Başka eklemek istediğin bir şey var mı?\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/41\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Yok, teşekkürler.\", \"flags\": [], \"src\": \"transcript\"}",
+   "{\"at\": null, \"id\": \"o/42\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Teşekkürler, görüşmek üzere.\", \"flags\": [], \"src\": \"transcript\"}"
+  ],
+  "<TARIH>-Deneme-toplantısı-altyapı.md": [
+   "# Canlı transkript — Deneme toplantısı — altyapı",
+   "",
+   "**Başlangıç: ? · Kaynak: Teams transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir) · Aktarıcı: Suflor.me**",
+   "**Gizlilik: iç belge, kişi adı içerir.**",
+   "",
+   "| Saat | Konuşmacı | Metin | İşaret |",
+   "|---|---|---|---|",
+   "| <SAAT> | Deniz Test | Merhaba, bugün yedekleri, AWS tarafını ve GitHub erişimini konuşacağız. |  |",
+   "| <SAAT> | Ayla Örnek | Merhaba, hazırım. Nereden başlayalım? |  |",
+   "| <SAAT> | Deniz Test | Yedeklerden başlayalım. Yedekler şu an nerede tutuluyor? |  |",
+   "| <SAAT> | Ayla Örnek | Veritabanı yedekleri her gece alınıyor, bir kopyası ofisteki diskte duruyor. |  |",
+   "| <SAAT> | Ayla Örnek | Bulutta da bir kopya var ama onu kimin kontrol ettiğinden emin değilim. |  |",
+   "| <SAAT> | Deniz Test | Peki geri yükleme hiç denendi mi? |  |",
+   "| <SAAT> | Ayla Örnek | Kesinlikle her ay deniyoruz, yüzde yüz çalışıyor. |  |",
+   "| <SAAT> | Deniz Test | Anladım. Bunu kim yapıyor, bir kayıt tutuluyor mu? |  |",
+   "| <SAAT> | Ayla Örnek | Bir tabloya yazıyoruz sanırım, bakmam lazım. |  |",
+   "| <SAAT> | Deniz Test | Tamam, yedek konusunu not alıyorum. |  |",
+   "| <SAAT> | Ayla Örnek | Şifreler de Bitwarden'da duruyor, oradan paylaşıyoruz. | ⚠ şifre ✎ Bitvarden'da=Bitwarden |",
+   "| <SAAT> | Deniz Test | Güzel. AWS tarafına geçelim, IAM kullanıcıları kaç tane? |  |",
+   "| <SAAT> | **CLAUDE’A SORU** | Yedeklerin bulut kopyasını kim kontrol ediyor? | |",
+   "| <SAAT> | Ayla Örnek | Yaklaşık on iki IAM kullanıcısı var, bazıları eski çalışanlardan kalma. |  |",
+   "| <SAAT> | Ayla Örnek | MFA hepsinde açık değil, iki üç kişide kapalı olabilir. |  |",
+   "| <SAAT> | Deniz Test | Root hesabında MFA açık mı? |  |",
+   "| <SAAT> | Ayla Örnek | Root hesabı açık, onu ben yönetiyorum. |  |",
+   "| <SAAT> | **DENİZ NOTU** | Root hesabı tek kişide — yedek yönetici yok | ✎ |",
+   "| <SAAT> | Deniz Test | Eski çalışanların kullanıcıları ne zaman silinecek? |  |",
+   "| <SAAT> | Ayla Örnek | Bu ay içinde temizlemeyi planlıyoruz. |  |",
+   "| <SAAT> | **CLAUDE · SÖYLE** | Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne? | |",
+   "| <SAAT> | **CLAUDE · DUR** | Root hesabını toplantıda paylaşma | |",
+   "| <SAAT> | **CLAUDE · NOT** | IAM kullanıcılarının listesi Ayla'da | |",
+   "| <SAAT> | Deniz Test | Bunun sahibi kim olacak, tarih verebilir miyiz? |  |",
+   "| <SAAT> | **DUYGU** | Ayla Örnek: tedirgin (tahmin) | |",
+   "| <SAAT> | Ayla Örnek | Ben sahiplenirim, ayın yirmisine kadar. |  |",
+   "| <SAAT> | **KART ✓ yaptım** | Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne? | |",
+   "| <SAAT> | **CLAUDE · CEVAP** | Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı. | |",
+   "| <SAAT> | **GÜNDEM** | ✓ Yedekler: nerede tutuluyor, kim kontrol ediyor (Claude) | |",
+   "| <SAAT> | **DENİZ NOTU** | ⭐ ÖNEMLİ AN | ✎ |",
+   "| <SAAT> | Deniz Test | GitHub organizasyonuna geçelim, üyeler kimler? |  |",
+   "| <SAAT> | Ayla Örnek | GitHub'da on beş üye var, ikisi dış ajans. | ✎ Git hab'da=GitHub |",
+   "| <SAAT> | Ayla Örnek | Bazıları kişisel hesaplarıyla bağlı, şirket hesabı açmadık. |  |",
+   "| <SAAT> | Deniz Test | Dış ajansın erişimi hangi depolarda? |  |",
+   "| <SAAT> | Ayla Örnek | Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 0 |  |",
+   "| <SAAT> | Deniz Test | Evet ama önce ajansın listesine bakalım 0 |  |",
+   "| <SAAT> | Ayla Örnek | Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 1 |  |",
+   "| <SAAT> | Deniz Test | Evet ama önce ajansın listesine bakalım 1 |  |",
+   "| <SAAT> | Ayla Örnek | Hepsinde yazma yetkisi var galiba, kontrol etmem lazım. |  |",
+   "| <SAAT> | Ayla Örnek | Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 2 |  |",
+   "| <SAAT> | Deniz Test | Evet ama önce ajansın listesine bakalım 2 |  |",
+   "| <SAAT> | Ayla Örnek | Depoların erişimini tek tek gözden geçirmemiz gerekiyor bence bu hafta 3 |  |",
+   "| <SAAT> | Deniz Test | Evet ama önce ajansın listesine bakalım 3 |  |",
+   "| <SAAT> | Deniz Test | Bunu sınırlamamız gerekecek. |  |",
+   "| <SAAT> | Ayla Örnek | Katılıyorum, sadece ilgili depolara verelim. |  |",
+   "| <SAAT> | Deniz Test | Yedeklere bir daha dönelim: geri yükleme kaydı nerede tutuluyor? |  |",
+   "| <SAAT> | Ayla Örnek | Kayıt ortak klasördeki tabloda, ben sana gönderirim. |  |",
+   "| <SAAT> | **SON 1 DK ÖZETİ İSTENDİ** | Son 1 dakikanın kısa özeti | |",
+   "| <SAAT> | Deniz Test | Süper. Özetle: IAM temizliği senin, ayın yirmisi. |  |",
+   "| <SAAT> | Ayla Örnek | Evet, GitHub üyelerini de aynı hafta gözden geçiririm. |  |",
+   "| <SAAT> | Deniz Test | Başka eklemek istediğin bir şey var mı? |  |",
+   "| <SAAT> | Ayla Örnek | Yok, teşekkürler. |  |",
+   "| <SAAT> | Deniz Test | Teşekkürler, görüşmek üzere. |  |"
+  ],
+  "acik.json": [
+   "{",
+   " \"sorular\": [",
+   "  {",
+   "   \"id\": \"a1\",",
+   "   \"at\": \"<AN>\",",
+   "   \"metin\": \"Bulut yedeğinin geri yükleme kaydı nerede?\",",
+   "   \"tetik\": [",
+   "    \"geri yükleme\",",
+   "    \"kayıt\"",
+   "   ],",
+   "   \"kim\": \"\",",
+   "   \"gundem\": null,",
+   "   \"durum\": \"acik\",",
+   "   \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\"",
+   "  }",
+   " ]",
+   "}"
+  ],
+  "agenda.json": [
+   "{\"title\": \"Deneme toplantısı — altyapı\", \"items\": [\"Yedekler: nerede tutuluyor, kim kontrol ediyor\", \"AWS: IAM kullanıcıları ve MFA\", \"GitHub: organizasyon üyeleri ve erişim\"], \"baslangic\": \"<AN>\", \"bitis\": \"<AN>\", \"dil\": \"tr\"}"
+  ],
+  "gundemler/<TARIH>-Deneme-toplantısı-altyapı.json": [
+   "{",
+   " \"title\": \"Deneme toplantısı — altyapı\",",
+   " \"items\": [",
+   "  \"Yedekler: nerede tutuluyor, kim kontrol ediyor\",",
+   "  \"AWS: IAM kullanıcıları ve MFA\",",
+   "  \"GitHub: organizasyon üyeleri ve erişim\"",
+   " ],",
+   " \"baslangic\": \"<AN>\",",
+   " \"bitis\": \"<AN>\",",
+   " \"dil\": \"tr\"",
+   "}"
+  ],
+  "hazir.json": [
+   "{\"toplanti\": \"Deneme toplantısı — altyapı\", \"kartlar\": [{\"id\": \"h1\", \"gundem\": 1, \"tetik\": [\"mfa\"], \"tur\": \"sor\", \"metin\": \"MFA zorunlu mu, kimde kapalı?\", \"neden\": \"Gündem 2'nin özü\"}, {\"id\": \"h2\", \"gundem\": 2, \"tetik\": [\"organizasyon\"], \"tur\": \"belirt\", \"metin\": \"Organizasyonda kişisel hesaplar kalmasın\", \"neden\": \"Erişim kuralı\"}]}"
+  ],
+  "heartbeat.json": "<var>",
+  "kart-anahtari.txt": "<var>",
+  "kartlar.jsonl": [
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"soyle\", \"text\": \"Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne?\", \"why\": \"Sahip ve tarih belirsiz\", \"status\": \"acik\", \"agenda_i\": 1}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"dur\", \"text\": \"Root hesabını toplantıda paylaşma\", \"why\": \"\", \"status\": \"acik\", \"gizli\": true}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"not\", \"text\": \"IAM kullanıcılarının listesi Ayla'da\", \"why\": \"\", \"status\": \"acik\"}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"duygu\", \"ton\": \"tedirgin\", \"text\": \"\", \"status\": \"etiket\", \"kim\": \"Ayla Örnek\"}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"status\": \"yapildi\"}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"cevap\", \"text\": \"Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı.\", \"why\": \"\", \"status\": \"acik\", \"reply_to\": \"<ID>\", \"q\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}"
+  ],
+  "olcum.jsonl": "<var>",
+  "sorular.jsonl": [
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Son 1 dakikanın kısa özeti\", \"tur\": \"ozet\"}"
+  ],
+  "sozluk.json": [
+   "{\"terimler\": [{\"dogru\": \"GitHub\", \"yanlis\": [\"git hab\", \"gidhab\"]}, {\"dogru\": \"Bitwarden\", \"yanlis\": [\"bitvarden\"]}]}"
+  ]
+ },
+ "http": {
+  "/": {
+   "uzunluk": 62117,
+   "sha": "78baf14b4d059d0d"
+  },
+  "/hazirlik": {
+   "uzunluk": 8513,
+   "sha": "9199bf424537c157"
+  },
+  "/mini": {
+   "uzunluk": 62117,
+   "sha": "78baf14b4d059d0d"
+  },
+  "/status": {
+   "_ping_son": "float",
+   "acik": [
+    {
+     "at": "str",
+     "id": "str",
+     "kim": "str",
+     "metin": "str"
+    }
+   ],
+   "ad": "str",
+   "agenda": {
+    "baslangic": "str",
+    "bitis": "str",
+    "dil": "str",
+    "items": [
+     "str"
+    ],
+    "title": "str"
+   },
+   "agenda_aktif": "int",
+   "agenda_ticks": {
+    "0": "bool"
+   },
+   "aktif": "bool",
+   "alan": "str",
+   "arayuz_dili": "str",
+   "bellek": {
+    "bos_gb": "float",
+    "en_cok": [
+     {
+      "ad": "str",
+      "gb": "float"
+     }
+    ],
+    "uyari": "str"
+   },
+   "cards": [
+    {
+     "at": "str",
+     "file": "str",
+     "gizli": "bool",
+     "id": "str",
+     "kind": "str",
+     "status": "str",
+     "text": "str",
+     "why": "str"
+    }
+   ],
+   "claude_age_s": "int",
+   "closed": [
+    {
+     "acted_at": "str",
+     "agenda_i": "int",
+     "at": "str",
+     "file": "str",
+     "id": "str",
+     "kind": "str",
+     "status": "str",
+     "text": "str",
+     "why": "str"
+    }
+   ],
+   "dil": {
+    "algilanan": "NoneType",
+    "beklenen": "str",
+    "hedef": "NoneType",
+    "kaynak": "NoneType",
+    "uyari": "NoneType"
+   },
+   "disk": {
+    "err": "NoneType",
+    "free_mb": "int",
+    "held": "int",
+    "lost": "int",
+    "low": "bool",
+    "ok": "bool",
+    "since": "NoneType"
+   },
+   "eklenti_kurulu": "NoneType",
+   "extension": {
+    "age_s": "int",
+    "call": "bool",
+    "capAuto": "str",
+    "captions": "bool",
+    "lang": "NoneType",
+    "langSrc": "NoneType",
+    "meeting": "str",
+    "panel": "bool",
+    "platform": "str",
+    "rows": "int",
+    "seen": "str",
+    "sent": "int",
+    "ver": "str",
+    "yonerge": "NoneType"
+   },
+   "file": "str",
+   "file_last": {
+    "<TARIH>-Deneme-toplantısı-altyapı.md": "float"
+   },
+   "file_lines": {
+    "<TARIH>-Deneme-toplantısı-altyapı.md": "int"
+   },
+   "file_start": {
+    "<TARIH>-Deneme-toplantısı-altyapı.md": "str"
+   },
+   "flags": [
+    {
+     "at": "NoneType",
+     "flags": [
+      "str"
+     ],
+     "id": "str",
+     "raw": "str",
+     "revised": "bool",
+     "sozluk": [
+      {
+       "bicim": "str",
+       "dogru": "str",
+       "durum": "str"
+      }
+     ],
+     "speaker": "str",
+     "src": "str",
+     "text": "str",
+     "time": "str"
+    }
+   ],
+   "guncelleme": {
+    "durum": "str"
+   },
+   "kanit_iste": "NoneType",
+   "kanit_n": "int",
+   "kanitlar": [],
+   "komut": {
+    "at": "str",
+    "id": "str",
+    "metin": "str",
+    "tur": "str"
+   },
+   "last": "str",
+   "lines": "int",
+   "meeting": "str",
+   "meeting_files": {
+    "Deneme toplantısı — altyapı": "str"
+   },
+   "notes": "int",
+   "pay": {
+    "adsiz": "int",
+    "ben": "str",
+    "ben_son": "int",
+    "ben_top": "int",
+    "kelime": "int",
+    "kelime_son": "int",
+    "son": [
+     [
+      "str"
+     ]
+    ],
+    "top": [
+     [
+      "str"
+     ]
+    ]
+   },
+   "port": "int",
+   "questions": [
+    {
+     "at": "str",
+     "file": "str",
+     "id": "str",
+     "text": "str",
+     "tur": "str"
+    }
+   ],
+   "ses_model": {
+    "durum": "str",
+    "hata": "NoneType",
+    "parca": "int",
+    "sn": "NoneType"
+   },
+   "started": "str",
+   "sure": {
+    "acik": [
+     "int"
+    ],
+    "beklenen": "int",
+    "bitis": "str",
+    "bitti": "int",
+    "gecen_dk": "int",
+    "kalan_dk": "int",
+    "kayma": "int",
+    "toplam": "int",
+    "toplam_dk": "int"
+   },
+   "surum": "str",
+   "tail": [
+    {
+     "at": "NoneType",
+     "flags": [],
+     "id": "str",
+     "revised": "bool",
+     "speaker": "str",
+     "src": "str",
+     "text": "str",
+     "time": "str"
+    }
+   ],
+   "takvim": {
+    "durum": "str",
+    "guncel": "NoneType",
+    "hata": "str",
+    "olaylar": [],
+    "uygulama": "bool"
+   },
+   "taslak": [],
+   "tone": "NoneType",
+   "tone_kisi": {
+    "Ayla Örnek": {
+     "at": "str",
+     "ton": "str"
+    }
+   },
+   "uyari": "NoneType",
+   "whisper": {
+    "atlanan": "int",
+    "ben": "bool",
+    "ben_kod": "str",
+    "ben_neden": "str",
+    "durgun_max": "float",
+    "durum": "str",
+    "gecikme_max": "float",
+    "gecikme_sn": "NoneType",
+    "hata": "NoneType",
+    "karsi": "bool",
+    "kumeler": {},
+    "kuyruk": "int",
+    "satir": "int",
+    "ses_model": "str",
+    "son_sn": "NoneType",
+    "yanki": "int",
+    "yerel": "str",
+    "yerel_akiyor": "bool"
+   },
+   "yerel_ses": {
+    "durum": "str",
+    "hata": "NoneType",
+    "kurulu": "bool",
+    "son_sn": "NoneType",
+    "surum": "NoneType",
+    "toplanti": "bool",
+    "uygulama": "NoneType"
+   }
+  },
+  "/cards": {
+   "acik": [
+    {
+     "at": "str",
+     "id": "str",
+     "kim": "str",
+     "metin": "str"
+    }
+   ],
+   "cards": [
+    {
+     "at": "str",
+     "file": "str",
+     "gizli": "bool",
+     "id": "str",
+     "kind": "str",
+     "status": "str",
+     "text": "str",
+     "why": "str"
+    }
+   ],
+   "closed": [
+    {
+     "acted_at": "str",
+     "agenda_i": "int",
+     "at": "str",
+     "file": "str",
+     "id": "str",
+     "kind": "str",
+     "status": "str",
+     "text": "str",
+     "why": "str"
+    }
+   ],
+   "dil": {
+    "algilanan": "NoneType",
+    "beklenen": "str",
+    "hedef": "NoneType",
+    "kaynak": "NoneType",
+    "uyari": "NoneType"
+   },
+   "imza": "str",
+   "kanit_iste": "NoneType",
+   "kanit_n": "int",
+   "komut": {
+    "at": "str",
+    "id": "str",
+    "metin": "str",
+    "tur": "str"
+   },
+   "pay": {
+    "adsiz": "int",
+    "ben": "str",
+    "ben_son": "int",
+    "ben_top": "int",
+    "kelime": "int",
+    "kelime_son": "int",
+    "son": [
+     [
+      "str"
+     ]
+    ],
+    "top": [
+     [
+      "str"
+     ]
+    ]
+   },
+   "questions": [
+    {
+     "at": "str",
+     "file": "str",
+     "id": "str",
+     "text": "str",
+     "tur": "str"
+    }
+   ],
+   "sure": {
+    "acik": [
+     "int"
+    ],
+    "beklenen": "int",
+    "bitis": "str",
+    "bitti": "int",
+    "gecen_dk": "int",
+    "kalan_dk": "int",
+    "kayma": "int",
+    "toplam": "int",
+    "toplam_dk": "int"
+   },
+   "tone": "NoneType",
+   "tone_kisi": {
+    "Ayla Örnek": {
+     "at": "str",
+     "ton": "str"
+    }
+   },
+   "uyari": "NoneType",
+   "whisper": {
+    "atlanan": "int",
+    "ben": "bool",
+    "ben_kod": "str",
+    "ben_neden": "str",
+    "durgun_max": "float",
+    "durum": "str",
+    "gecikme_max": "float",
+    "gecikme_sn": "NoneType",
+    "hata": "NoneType",
+    "karsi": "bool",
+    "kumeler": {},
+    "kuyruk": "int",
+    "satir": "int",
+    "ses_model": "str",
+    "son_sn": "NoneType",
+    "yanki": "int",
+    "yerel": "str",
+    "yerel_akiyor": "bool"
+   }
+  },
+  "/agenda": {
+   "title": "Deneme toplantısı — altyapı",
+   "items": [
+    "Yedekler: nerede tutuluyor, kim kontrol ediyor",
+    "AWS: IAM kullanıcıları ve MFA",
+    "GitHub: organizasyon üyeleri ve erişim"
+   ],
+   "baslangic": "<AN>",
+   "bitis": "<AN>",
+   "dil": "tr"
+  },
+  "/hazirlik.json": {
+   "adimlar": [
+    {
+     "ad": "str",
+     "ok": "bool"
+    }
+   ],
+   "baglanti": "NoneType",
+   "git": "bool",
+   "hazir": "bool",
+   "kalan_sn": "NoneType",
+   "konu": "NoneType"
+  }
+ },
+ "izle_turleri": {
+  "AÇIK SORU": 1,
+  "DOSYA": 1,
+  "DURUM": 2,
+  "DİNLE": 1,
+  "HAZIR": 2,
+  "HAZIR KARTLAR": 1,
+  "KART": 1,
+  "NOT": 2,
+  "SATIRLAR": 29,
+  "SORU": 1,
+  "SÜRE": 6,
+  "ÖZET İSTEĞİ": 1,
+  "İZLEME BAŞLADI": 1
+ },
+ "izle_satir_kapsami": "40/42",
+ "hatalar": []
+}
