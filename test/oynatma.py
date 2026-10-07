@@ -56,6 +56,14 @@ def yaz_baslangic(canli, t0):
               open(os.path.join(canli, "agenda.json"), "w"), ensure_ascii=False)
     json.dump({"toplanti": VERI["baslik"], "kartlar": VERI["hazir"]}, open(os.path.join(canli, "hazir.json"), "w"), ensure_ascii=False)
     json.dump({"terimler": VERI["sozluk"]}, open(os.path.join(canli, "sozluk.json"), "w"), ensure_ascii=False)
+    # önceki toplantıdan kalan açık sorular (7 Ekim olayı): e1 başka gündemin başlığıyla → izle başlarken arşive; e2 başlıksız (eski
+    # kayıt) ama başka toplantının dosyasında → arşive gitmez, tetiklenmez de. İkisinin tetiği de toplantıda geçer ("yedek").
+    eski = {"durum": "acik", "tetik": ["yedek"], "file": "2000-01-01-0900-Eski.md", "metin": "Eski toplantının sorusu"}
+    json.dump({"sorular": [dict(eski, id="e1", baslik="Eski toplantı"), dict(eski, id="e2")]},
+              open(os.path.join(canli, "acik.json"), "w"), ensure_ascii=False)
+    # Başlat formundan gelmiş bir bağlam kaynağı: izle başlarken bir kez "BAĞLAM b1" bildirir
+    json.dump({"son": 1, "kaynaklar": [{"id": "b1", "at": loc(0), "tur": "baglanti", "deger": "https://ornek.example/teklif", "ad": "https://ornek.example/teklif",
+               "kaynak": "baslat", "file": None}]}, open(os.path.join(canli, "baglam.json"), "w"), ensure_ascii=False)
 
 def istek(yol, govde=None, bas=None):
     r = urllib.request.Request(URL + yol, data=None if govde is None else json.dumps(govde).encode(), method="GET" if govde is None else "POST",
@@ -165,6 +173,18 @@ def kos():
     metinler = [o["satir"][1] for o in VERI["olaylar"] if "satir" in o] + [o["whisper"][2] for o in VERI["olaylar"] if "whisper" in o]
     gorulen = sum(1 for m in metinler if any(m[:40] in l for l in izle))
     hata_izle = [l for l in izle if "Traceback" in l or "Error" in l]
+    if not any("önceki toplantının 1 sorusu arşive taşındı (e1)" in l for l in izle): hata_izle.append("açık soru: e1 arşive taşınmadı")
+    if sum("BAĞLAM b1 (Başlat formu, bağlantı): https://ornek.example/teklif" in l for l in izle) != 1: hata_izle.append("bağlam: b1 bir kez bildirilmedi")
+    kat = [re.match(r"KATILIMCI: (.+?) \(ilk satır", l).group(1) for l in izle if l.startswith("KATILIMCI: ")]
+    ben = str(VERI.get("ben") or "").split()[0].lower()
+    if not kat: hata_izle.append("katılımcı: hiç KATILIMCI olayı yok")
+    if len(kat) != len(set(kat)): hata_izle.append(f"katılımcı: aynı kişi iki kez duyuruldu {kat}")
+    hata_izle += [f"katılımcı: duyurulmaması gereken ad {k!r}" for k in kat if k.lower().startswith(("karşı taraf", ben)) or k == "?"]
+    # kullanıcıya adıyla soru (her rolde yardım kartı): satır işaretli ve paket hemen "sana-soru" adayıyla gider; kendi satırı işaretlenmez
+    if not any("→Deniz Deniz, sizin tarafta" in l for l in izle): hata_izle.append("sana-soru: satır →<ad> ile işaretlenmedi")
+    if not any(l.startswith("SATIRLAR (") and "sana-soru" in l for l in izle): hata_izle.append("sana-soru: paket başlığında aday yok")
+    if any("Deniz Test] " in l and "→Deniz" in l for l in izle): hata_izle.append("sana-soru: kullanıcının kendi satırı işaretlendi")
+    hata_izle += [f"açık soru: başka toplantının sorusu tetiklendi — {l[:120]}" for l in izle if re.search(r"AÇIK SORU e[12] konusu", l)]
     hata_relay = [l for l in open(os.path.join(T, "relay.log"), encoding="utf-8") if "Traceback" in l]
     sonuc = {"surum_maskeli": True, "dosyalar": dict(sorted(dosyalar.items())), "http": http, "izle_turleri": dict(sorted(turler.items())),
              "izle_satir_kapsami": f"{gorulen}/{len(metinler)}", "hatalar": hatalar + hata_izle + [l.strip() for l in hata_relay]}

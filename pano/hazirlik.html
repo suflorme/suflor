@@ -14,7 +14,7 @@ button.p{background:var(--ac);border-color:var(--ac);color:#fff}.m{color:var(--t
 <script>
 const DIL="__DIL__", EN={"Suflor.me hazırlanıyor":"Suflor.me is getting ready","Hemen katıl":"Join now","Katılma":"Don't join","Toplantıya geçilmeyecek; bu sekmeyi kapatabilirsin.":"You won't be taken to the meeting; you can close this tab.",
  "Claude oturumu açıldı (Terminal)":"Claude session opened (Terminal)","Gündem hazırlandı":"Agenda ready","Konuşma tanıma hazır":"Speech recognition ready","Claude izliyor":"Claude is watching",
- "Takvimde toplantı bağlantısı yok — toplantıya kendin katıl.":"No meeting link in the calendar — join the meeting yourself.","Hazır — toplantıya geçiliyor…":"Ready — taking you to the meeting…","En geç {n} dk içinde toplantıya geçilecek":"You'll be taken to the meeting within {n} min at the latest"}
+ "Takvimde toplantı bağlantısı yok — toplantıya kendin katıl.":"No meeting link in the calendar — join the meeting yourself.","Bağlantı yok — Teams açılacak; toplantını oradan seç.":"No link — Teams will open; pick your meeting there.","Hazır — toplantıya geçiliyor…":"Ready — taking you to the meeting…","En geç {n} dk içinde toplantıya geçilecek":"You'll be taken to the meeting within {n} min at the latest"}
 const L=(s,v)=>{let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k+"}").join(v[k]);return t}
 for(const id of["bas","git","dur"]){const e=document.getElementById(id);e.textContent=L(e.textContent)};document.title=L("Suflor.me hazırlanıyor")
 let durdu=false
@@ -23,7 +23,7 @@ async function bak(){if(durdu)return;let h;try{h=await (await fetch('/hazirlik.j
  document.getElementById('konu').textContent=h.konu||''
  document.getElementById('ad').innerHTML=h.adimlar.map(a=>`<div class="s${a.ok?' ok':''}"><i>${a.ok?'✓':'…'}</i><div>${L(a.ad)}${a.not?`<small>${a.not}</small>`:''}</div></div>`).join('')
  const g=document.getElementById('git');g.onclick=()=>{if(h.baglanti)location.href=h.baglanti};g.hidden=!h.baglanti
- document.getElementById('m').textContent=!h.baglanti?L('Takvimde toplantı bağlantısı yok — toplantıya kendin katıl.'):h.hazir?L('Hazır — toplantıya geçiliyor…'):(h.kalan_sn!=null?L('En geç {n} dk içinde toplantıya geçilecek',{n:Math.ceil(h.kalan_sn/60)}):'')
+ document.getElementById('m').textContent=!h.baglanti?L('Takvimde toplantı bağlantısı yok — toplantıya kendin katıl.'):h.ana?L('Bağlantı yok — Teams açılacak; toplantını oradan seç.'):h.hazir?L('Hazır — toplantıya geçiliyor…'):(h.kalan_sn!=null?L('En geç {n} dk içinde toplantıya geçilecek',{n:Math.ceil(h.kalan_sn/60)}):'')
  if(h.git&&h.baglanti){location.href=h.baglanti;return}
  setTimeout(bak,2000)}
 bak()

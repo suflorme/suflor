@@ -31,6 +31,7 @@
   {"t": 395,  "satir": ["Ayla Örnek", "Root hesabı açık, onu ben yönetiyorum."]},
   {"t": 420,  "not": "Root hesabı tek kişide — yedek yönetici yok"},
   {"t": 425,  "satir": ["Deniz Test", "Eski çalışanların kullanıcıları ne zaman silinecek?"]},
+  {"t": 440,  "satir": ["Ayla Örnek", "Deniz, sizin tarafta da AWS yönetici erişimi var mı?"]},
   {"t": 455,  "satir": ["Ayla Örnek", "Bu ay içinde temizlemeyi planlıyoruz."]},
   {"t": 480,  "kart": ["sor", "Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne?", "--neden", "Sahip ve tarih belirsiz", "--gundem", "1"]},
   {"t": 482,  "kart": ["dur", "Root hesabını toplantıda paylaşma", "--gizli"]},

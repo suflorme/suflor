@@ -97,6 +97,20 @@ def kumele(iz, ks, a, np):
     if uzun and len(ks) < KUME_EN_COK:
         ks.append([e, 1]); return {"kume": f"k{len(ks)}", "benzerlik": round(max(sim), 2) if sim else None}
     return {"kume": None}
+# Whisper istemi en çok 223 belirteç (n_text_ctx // 2 - 1) ve aşınca BAŞINI atar — baştaki en önemli terimler düşüyordu. Önceki
+# metne son ONCEKI_EN_COK belirteç, kalan bütçeye terimler sırayla ve bütün olarak (aktarıcı önem sırasıyla dizer); payı 8.
+ISTEM_SINIR, ONCEKI_EN_COK = 223 - 8, 60
+_ISTEM_ON = {}
+def istem_kur(tok, terimler, onceki):
+    on = tok.encode(" " + onceki.strip())[-ONCEKI_EN_COK:] if onceki and onceki.strip() else []
+    butce = ISTEM_SINIR - len(on); k = (terimler, butce)
+    if k not in _ISTEM_ON:
+        ls = [t for t in (terimler or "").rstrip(".").split(", ") if t.strip()]; n = 0
+        while n < len(ls) and len(tok.encode(" " + ", ".join(ls[:n + 1]) + ".")) <= butce: n += 1
+        if len(_ISTEM_ON) > 50: _ISTEM_ON.clear()
+        _ISTEM_ON[k] = (", ".join(ls[:n]) + "." if n else "", len(ls) - n)
+    metin, dusen = _ISTEM_ON[k]
+    return (" ".join(x for x in (metin, tok.decode(on).strip() if on else "") if x) or None), dusen
 def out(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
 def main():
     t = time.time()
@@ -115,6 +129,10 @@ def main():
     if ey and os.path.exists(ey):
         try: import mlx.core as mx; iz = Ecapa(ey, np, mx); iz(np.zeros(16000, np.float32))  # ısınma
         except Exception as e: iz = None; sys.stderr.write(f"ECAPA yüklenemedi: {e}\n")
+    try:
+        from mlx_whisper.tokenizer import get_tokenizer
+        tok = get_tokenizer(multilingual=True, num_languages=100)  # düz metin belirteçleri dilden bağımsız
+    except Exception as e: tok = None; sys.stderr.write(f"belirteçleyici yok, istem kırpılmaz: {e}\n")
     out({"hazir": True, "model": MODEL, "sn": round(time.time() - t, 1), "ecapa": bool(iz)})
     kumeler = []; baslik = None  # karşı kanal kümeleri; yeni toplantıda sıfırlanır
     for satir in sys.stdin:
@@ -123,7 +141,9 @@ def main():
         except ValueError: continue
         try:
             a = np.frombuffer(base64.b64decode(p["pcm"]), np.int16).astype(np.float32) / 32768
-            t = time.time(); istem = " ".join(x for x in (p.get("istem") or "", p.get("onceki") or "") if x).strip() or None
+            t = time.time(); dusen = 0
+            if tok: istem, dusen = istem_kur(tok, p.get("istem") or "", p.get("onceki") or "")
+            else: istem = " ".join(x for x in (p.get("istem") or "", p.get("onceki") or "") if x).strip() or None
             r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil") or None, initial_prompt=istem,
                                        condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
             tut, atla = [], 0
@@ -143,7 +163,7 @@ def main():
             if iz and metin and p.get("kanal") == "karsi" and len(a) >= SR * 0.8:
                 try: km = kumele(iz, kumeler, a, np)
                 except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"ses": ses} if ses else {}), **km})
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"istem_dusen": dusen} if dusen else {}), **({"ses": ses} if ses else {}), **km})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0

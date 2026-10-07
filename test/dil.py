@@ -4,6 +4,7 @@
 #   1. aynı Türkçe metin her dosyada aynı İngilizceye çevrilmiş mi
 #   2. yasak terim ("dashboard", "board") geçiyor mu — Suflor.me'de pano = "panel", mini pano = "mini panel"
 #   3. kodda L("…") ile çevrilen sabit metnin o dosyanın sözlüğünde İngilizcesi var mı
+#   4. aynı dosyanın sözlüğünde aynı Türkçe metin iki kez yazılmış mı (JSON sonuncuyu alır, ilki sessizce kaybolur)
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/dil.py      (kaldı → çıkış 1)
 import json, os, re, sys
 
@@ -24,7 +25,16 @@ def sozluk(yol):
     s = open(os.path.join(KOD, yol), encoding="utf-8").read()
     m = re.search(r"\bEN\s*=\s*\{", s)
     if not m: raise ValueError(f"{yol}: EN sözlüğü bulunamadı")
-    return s, json.loads(blok(s, m.start()))
+    cift = []
+    def cifti_bul(ciftler):
+        g = {}
+        for k, v in ciftler:
+            if k in g: cift.append(k)
+            g[k] = v
+        return g
+    en = json.loads(blok(s, m.start()), object_pairs_hook=cifti_bul)
+    if cift: raise ValueError("aynı metin iki kez: " + ", ".join(repr(k) for k in cift[:5]))
+    return s, en
 
 
 hatalar, ceviri = [], {}  # ceviri: Türkçe → {dosya: İngilizce}
