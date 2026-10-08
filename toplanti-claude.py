@@ -366,7 +366,7 @@ def soz_cmd():
     ys = [x for x in soz_kisinin(d, A.kim) if A.hepsi or x.get("durum") == "acik"]
     print("\n".join(soz_satir(x) for x in ys) or "söz yok")
 # --- Eylem kuyruğu (Faz 4) ---------------------------------------------------------------------------------------
-EYLEM_AD = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "diger": "Diğer"}
+EYLEM_AD = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "mesaj": "Ekip mesajı", "diger": "Diğer"}
 def _post(yol, govde):
     req = urllib.request.Request(A.relay + yol, data=json.dumps(govde).encode(), method="POST", headers={"Content-Type": "application/json"})
     return json.load(urllib.request.urlopen(req, timeout=5))

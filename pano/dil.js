@@ -292,5 +292,10 @@ globalThis.SUFLOR_EN = {
   "{n} iş toplantı sonuna": "{n} tasks for the end of the meeting",
   "Yapılacaklar": "To do",
   "Hepsini onayla": "Approve all",
-  "Listedeki bekleyen işlerin hepsini onayla — Claude yalnız yazıldığı gibi uygular": "Approve every pending task — Claude applies each exactly as written"
+  "Listedeki bekleyen işlerin hepsini onayla — Claude yalnız yazıldığı gibi uygular": "Approve every pending task — Claude applies each exactly as written",
+  "Metni kopyala — ekip aracına sen yapıştırırsın": "Copy the text — you paste it into your team tool",
+  "Ekip mesajı": "Team message",
+  "kopyalandı": "copied",
+  "kopyalanamadı": "couldn't copy",
+  "Kopyala": "Copy"
 };

@@ -328,7 +328,7 @@ def ertele_kontrol():  # vakti gelen ertelenmiş kart geri gelir (görünümler 
 # (toplanti-claude.py eylem ekle). Toplantı sonunda Claude listeyi sunar (eylem sun): panoda Onayla/Reddet + "Hepsini onayla", ya da
 # kullanıcı sohbette onaylar (eylem onay). Karar yalnız anahtarlı istemciden; Claude yalnız onaylananı, ayrıntıda yazıldığı gibi
 # uygular ve sonucu yazar (eylem sonuc). E-posta yalnız taslak, takvim bildirim gönderilmeden — kural metni TOPLANTI-KURALLARI §8.
-EYLEM_TUR = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "diger": "Diğer"}
+EYLEM_TUR = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "mesaj": "Ekip mesajı", "diger": "Diğer"}
 EYLEMLER = []; EYLEM_SAAT = 12  # bu kadar saatten eski eylem panoda görünmez
 def _eylem_temiz(x, n): return " ".join(str(x or "").split())[:n]
 def eylem_yukle():

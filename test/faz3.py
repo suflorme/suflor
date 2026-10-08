@@ -126,21 +126,22 @@ try:
     # --- eylem kuyruğu ---
     e1 = tc("eylem", "ekle", "kayit", "Karar: yedek raporu haftalık", "--ayrinti", "kayit.py karar 'yedek raporu haftalık'").stdout
     kontrol("eylem ekle: kuyrukta (bekliyor)", "kuyruğa eklendi" in e1 and "[Kayıt · bekliyor]" in e1)
+    kontrol("eylem ekle: ekip mesajı türü", "[Ekip mesajı · bekliyor]" in tc("eylem", "ekle", "mesaj", "Proje — durum notu", "--ayrinti", "Bu hafta yedek raporu").stdout)
     kontrol("eylem ekle: bilinmeyen tür reddedildi", tc("eylem", "ekle", "sil", "x").returncode != 0)
     try: urllib.request.urlopen(urllib.request.Request(URL + "/eylem", data=b'{"tur":"kayit","baslik":"x"}', method="POST"), timeout=3); kod = 200
     except urllib.error.HTTPError as e: kod = e.code
     kontrol("anahtarsız /eylem 401", kod == 401)
     ev = istek("/cards").get("eylem") or {}
-    kontrol("toplantı sırasında 1 bekleyen, sunulmamış", ev.get("bekleyen") == 1 and not ev["liste"][0]["sunuldu"])
+    kontrol("toplantı sırasında 2 bekleyen, sunulmamış", ev.get("bekleyen") == 2 and not ev["liste"][0]["sunuldu"])
     kontrol("sunulmadan 'hepsi' onaylanmaz", istek("/eylem-karar", {"id": "hepsi", "durum": "onaylandi"}).get("n") == 0)
     tc("eylem", "ekle", "takip", "Ayla — takip e-postası", "--ayrinti", "Kime: Ayla (adres yok)\nKonu: Toplantı\n\nMerhaba Ayla,")
     su = tc("eylem", "sun").stdout
-    kontrol("eylem sun: 2 iş, numaralı liste, ayrıntı içinde", "2 iş panoda" in su and "\n1. " in su and "2. " in su and "Kime: Ayla (adres yok)" in su)
+    kontrol("eylem sun: 3 iş, numaralı liste, ayrıntı içinde", "3 iş panoda" in su and "\n1. " in su and "2. " in su and "Kime: Ayla (adres yok)" in su)
     ids = [x["id"] for x in istek("/cards")["eylem"]["liste"]]
     kontrol("sohbetten onay (sıra no 1)", "1 iş onaylandı" in tc("eylem", "onay", "1").stdout)
     b1 = tc("eylem", "bekle", "--sn", "3").stdout
-    kontrol("bekle: UYGULA + ayrıntı, bekleyen 1", "UYGULA: " + ids[0] in b1 and "kayit.py karar" in b1 and "bekleyen 1" in b1)
-    istek("/eylem-karar", {"id": ids[1], "durum": "reddedildi"})
+    kontrol("bekle: UYGULA + ayrıntı, bekleyen 2", "UYGULA: " + ids[0] in b1 and "kayit.py karar" in b1 and "bekleyen 2" in b1)
+    istek("/eylem-karar", {"id": ids[1], "durum": "reddedildi"}); istek("/eylem-karar", {"id": ids[2], "durum": "reddedildi"})
     b2 = tc("eylem", "bekle", "--sn", "3").stdout
     kontrol("bekle: reddedilen YAPMA, kuyruk kapandı, eskisi tekrar verilmez", "YAPMA: " + ids[1] in b2 and "kuyruk kapandı" in b2 and ids[0] not in b2)
     kontrol("sonuc: reddedilene yazılmaz", "kaydedilemedi" in tc("eylem", "sonuc", ids[1]).stdout)
@@ -166,7 +167,7 @@ finally:
             try: istek("/status"); break
             except Exception: time.sleep(0.1)
         kontrol("yeniden başlayınca sessizde bekleyen kart görünür", k3 in gorunen())
-        kontrol("yeniden başlayınca eylem kuyruğu ve kararlar duruyor", [x["durum"] for x in (istek("/cards").get("eylem") or {}).get("liste", [])] == ["yapildi", "reddedildi"])
+        kontrol("yeniden başlayınca eylem kuyruğu ve kararlar duruyor", [x["durum"] for x in (istek("/cards").get("eylem") or {}).get("liste", [])] == ["yapildi", "reddedildi", "reddedildi"])
     except NameError: pass
     finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print(f"faz3: {len(hatalar)} sorun" if hatalar else "faz3: ✓ hepsi geçti")
