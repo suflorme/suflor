@@ -25,14 +25,20 @@ arg = sys.argv[1:]; assert "--input-format" in arg and "stream-json" in arg and 
 pr = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\\n"), sys.stdout.flush())
 n = 0
 for l in sys.stdin:
-    q = json.loads(l)["message"]["content"]; n += 1
-    for parca in ["Sorduğun: ", q.rstrip(".?!") + ".", " İkinci", " cümle."]:
+    q = json.loads(l)["message"]["content"]; n += 1; soru = q.split("Soru: ", 1)[-1]
+    b = "[Bağlam" in q and "Şimdi:" in q and "Deneme planlama" in q and "GİZLİ NOT" not in q  # davet notu girmez
+    if n == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
+    for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Takvim", " geldi." if b else " gelmedi."]:
         time.sleep(0.15); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
+import datetime as _dt
+_y = (_dt.datetime.now().astimezone() + _dt.timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
+json.dump({"durum": "ok", "olaylar": [{"id": "e1", "baslik": "Deneme planlama", "baslangic": _y.isoformat(), "bitis": (_y + _dt.timedelta(minutes=30)).isoformat(),
+           "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Deniz T"], "kisi_sayisi": 2, "notlar": "GİZLİ NOT"}]}, open(os.path.join(T, "takvim.json"), "w"))
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 def pcm(metin):
     a, w = os.path.join(T, "q.aiff"), os.path.join(T, "q.wav")
@@ -62,11 +68,14 @@ try:
     k = sor("Toplantı en çok kaç dakika sürmeli?")
     ok("soru yazıya döküldü ve Claude'a gitti", k["durum"] == "hazir" and "dakika" in (k.get("soru") or "").lower() and "Sorduğun" in (k.get("cevap") or ""))
     ok("cümle cümle okundu (ilk cümle sonuçtan önce)", log().count("SES (deneme)") == 2 and k["olcum"]["ses_ms"] < k["olcum"]["sure_ms"])
+    ok("soruya tarih + yarının takvimi eklendi", "Takvim geldi" in (k.get("cevap") or ""))
     ok("açık süreç bir kez açıldı", log().count("KONUŞ: açık süreç açıldı") == 1)
     k2 = sor("Toplantının sonunda ne yazılır?")
+    ok("araç başlayınca 'Bakıyorum' söylendi (yalnız ikinci soruda)", log().count("Bakıyorum.") == 1 and log().count("SES (deneme)") == 5)
     ok("ikinci soru aynı süreçte, tur maliyeti farkla", k2["durum"] == "hazir" and log().count("KONUŞ: açık süreç açıldı") == 1 and abs(k2["olcum"]["maliyet"] - 0.01) < 1e-6)
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
-    ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) == 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c))
+    ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) == 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c)
+       and c[0]["arac"] == 0 and c[1]["arac"] == 1 and c[1]["araclar"] == ["Grep"] and c[1]["arac_ilk_ms"])
     ok("döküme yazılmadı", not any(f.endswith(".md") for f in os.listdir(canli)))
     ok("çok kısa kayıt reddedildi", post({"komut": "basla"}).get("ok") and not post({"pcm": base64.b64encode(b"\0" * 3200).decode()}).get("ok"))
     urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ping", data=json.dumps({"call": True, "panel": True}).encode(), headers={"X-Suflor-Anahtar": K}))
