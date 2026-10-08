@@ -153,6 +153,8 @@ ve konu, ekip mesajında araç, proje/konu başlığı ve yazılacak metin, belg
 iç iş için onay kartı (§7) kalır.
 - Toplantı sonunda `eylem sun`: panoda "Yapılacaklar" listesi (Onayla / Reddet / Hepsini onayla) ve sohbete numaralı liste. Kullanıcı
   sohbette onaylarsa ("hepsi evet", "1 ve 3 evet", "2 hayır") `eylem onay hepsi` / `eylem onay 1,3` / `eylem onay 2 --red`.
+  Aktarıcı özeti ve işleri Mac sesiyle de okur, her işte "yazayım mı?" diye sorar (cevap panodan; toplantı sürerken okumaz). Senin
+  yapacağın bir şey yok: kararları yine `eylem bekle` ile al. Sesli soru için `eylem sun`'u `ozet-hazir`'dan sonra çalıştır.
 - `eylem bekle` onaylananları ayrıntısıyla verir (`UYGULA:`). Yalnız onaylananı, ayrıntıda yazıldığı gibi uygula; iş değişecekse yeni
   eylem ekle ve yeniden sun. Sonra `eylem sonuc eN --durum yapildi|hata --not "<tek satır>"`. Bekleyen kaldıkça `eylem bekle`'yi
   yinele; kullanıcı vazgeçerse bırak.

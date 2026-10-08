@@ -357,6 +357,7 @@ def eylem_sun():
     with LOCK:
         xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and not x.get("sunuldu")]
         for x in xs: _eylem_yama(x, sunuldu=True)
+    soru_baslat([x["id"] for x in xs])  # sesli "yazayım mı?"
     return len(xs)
 def eylem_karar(p, kaynak):
     d = p.get("durum") if p.get("durum") in ("onaylandi", "reddedildi") else None
@@ -365,6 +366,8 @@ def eylem_karar(p, kaynak):
         xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and (p.get("id") == "hepsi" and x.get("sunuldu") or x["id"] == p.get("id"))]
         for x in xs: _eylem_yama(x, durum=d, karar_at=datetime.datetime.now().isoformat(timespec="seconds"), yetkili=True, kaynak=kaynak)
     if xs: print(f"EYLEM: {len(xs)} iş {'onaylandı' if d == 'onaylandi' else 'reddedildi'} ({kaynak})")
+    if xs and p.get("id") == "hepsi": ses_durdur(); soru_bitir("hepsi")
+    elif xs and SORU["aktif"] in {x["id"] for x in xs}: ses_durdur(); soru_sonraki()
     return len(xs)
 def eylem_sonuc(p):
     d = p.get("durum") if p.get("durum") in ("yapildi", "hata") else None
@@ -377,9 +380,9 @@ def eylem_gorunen():
     sinir = (datetime.datetime.now() - datetime.timedelta(hours=EYLEM_SAAT)).isoformat()
     return [x for x in EYLEMLER if x["at"] >= sinir]
 def eylem_view():
-    xs = eylem_gorunen()
+    xs = eylem_gorunen(); soru_zaman()
     return {"liste": [{k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc")} for x in xs],
-            "bekleyen": sum(1 for x in xs if x["durum"] == "bekliyor")} if xs else None
+            "bekleyen": sum(1 for x in xs if x["durum"] == "bekliyor"), "sesli": SORU["aktif"]} if xs else None
 def cards_view():
     ertele_kontrol()
     # (kullanıcı) pano yeniden açılınca önceki toplantının kartları görünmez — yalnız süren toplantının (aktif dosya)
@@ -1682,6 +1685,7 @@ def son_ekle(p):
     print(f"ÖZET: hazır" + (f" · not {r['puan']}/5" if r["puan"] else ""))
     bildirim("Suflor.me", _t("Toplantı özeti hazır", "Meeting summary ready"),
              (r["baslik"] or os.path.basename(ozet)) + (f" · {_t('not', 'score')} {r['puan']}/5" if r["puan"] else ""))
+    ozet_sesli(r)
     return {"ok": True, "id": r["id"]}
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
     sinir = (datetime.datetime.now() - datetime.timedelta(days=7)).isoformat()
@@ -1794,19 +1798,31 @@ def claude_json(ham, is_, t0, yalin):
 # --- Sesli brifing (karar #83: Başlat'a basınca; Faz 4) ----------------------------------------------------------------------------
 # Yerel macOS sesi (say, Türkçe Yelda): ses Mac'ten çıkmaz. Toplantı başladıysa okunmaz, okurken ilk döküm satırı gelince susar
 # (mikrofon brifingi dökmesin). Ayar konusma: false kapatır; ses: "<ad>" sesi seçer.
-SES = {"p": None}
+# Konuşmalar sıraya girer (özet okunurken gelen "yazayım mı?" onu kesmez); brifing ve ses_durdur sırayı boşaltır.
+SES = {"p": None, "q": [], "isci": False}; SES_K = threading.Condition()
 def ses_durdur():
-    p = SES.get("p")
+    with SES_K: SES["q"].clear(); p = SES.get("p")
     if p and p.poll() is None: p.terminate(); print("SES: durduruldu"); return True
     return False
-def seslendir(metin):
+def seslendir(metin, kuyruk=False):
     if not AYAR.get("konusma", True) or not metin: return False
-    ses_durdur(); v = AYAR.get("ses") or ("Yelda" if ARAYUZ_DILI == "tr" else None)
-    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): {len(metin)} karakter · {metin[:60]}"); return True
-    try:
-        SES["p"] = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        SES["p"].stdin.write(metin.encode("utf-8")); SES["p"].stdin.close(); return True
-    except OSError as e: print(f"SES: hata {e.__class__.__name__}"); return False
+    if not kuyruk: ses_durdur()
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): {len(metin)} karakter · {metin}"); return True
+    with SES_K:
+        SES["q"].append(metin); SES_K.notify()
+        if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
+    return True
+def _ses_isci():
+    v = AYAR.get("ses") or ("Yelda" if ARAYUZ_DILI == "tr" else None)
+    while True:
+        with SES_K:
+            while not SES["q"]: SES_K.wait()
+            metin = SES["q"].pop(0)
+            try: SES["p"] = p = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError as e: print(f"SES: hata {e.__class__.__name__}"); continue
+        try: p.stdin.write(metin.encode("utf-8")); p.stdin.close()
+        except OSError: pass
+        p.wait()
 def brifing_konusma(s):
     tem = lambda x: re.sub(r"\s*\([^()]*\)\s*\.?\s*$", "", " ".join(str(x).split())).strip()  # sondaki kaynak parantezi okunmaz
     d = [tem(x) for x in (s.get("dikkat") or [])[:3] if tem(x)]
@@ -1828,6 +1844,54 @@ def brifing_baslatta(oid):  # Başlat: hazırsa hemen oku; değilse hazırla, ha
     with LOCK:
         if BRIFING.get(oid, {}).get("durum") == "calisiyor": BRIFING[oid]["sesli"] = True
     if (BRIFING.get(oid) or {}).get("durum") == "hazir": brifing_sesli(oid, "baslat")  # tam o arada bittiyse
+# --- Sesli özet ve "yazayım mı?" (Faz 4; kullanıcı 8 Ekim: var olan akışa ses, ek Claude çağrısı yok) -------------------------------------
+# ozet-hazir gelince not, değerlendirme, öneri ve bekleyen iş sayısı okunur. eylem sun gelince sunulan işler tek tek okunup "yazayım
+# mı?" diye sorulur; cevap panodan (Onayla / Reddet / Sonra) ya da sohbetten. Karar gelince sıradaki iş; 2 dk cevap yoksa dizi durur
+# (işler panoda bekler). Toplantı sürerken hiçbiri okunmaz (karşı taraf duymasın, mikrofon dökmesin).
+SORU = {"liste": [], "aktif": None, "t": 0}; SORU_SN = 120
+EYLEM_SORU = {"kayit": ("Yazayım mı?", "Shall I record it?"), "belge": ("Yazayım mı?", "Shall I write it?"), "takvim": ("Takvime ekleyeyim mi?", "Shall I add it to the calendar?"),
+              "eposta": ("Taslak olarak yazayım mı?", "Shall I write it as a draft?"), "takip": ("Taslak olarak yazayım mı?", "Shall I write it as a draft?"),
+              "mesaj": ("Metni hazırlayayım mı?", "Shall I prepare the text?"), "diger": ("Yapayım mı?", "Shall I do it?")}
+def _ses_serbest(): return AYAR.get("konusma", True) and not toplanti_var()
+def _cumle(x):
+    x = " ".join(re.sub(r"[*`_#>]", "", str(x or "")).split()).strip()
+    return x if not x or x.endswith((".", "?", "!")) else x + "."
+def ozet_sesli(r):
+    if not _ses_serbest(): return False
+    bek = sum(1 for x in eylem_gorunen() if x["durum"] == "bekliyor")
+    p = [_t("Toplantı özeti hazır.", "The meeting summary is ready.")]
+    if r.get("puan"): p.append(_t(f"Not: beş üzerinden {r['puan']}.", f"Score: {r['puan']} out of five."))
+    p += [_cumle(r.get("degerlendirme"))] + ([_t("Öneri: ", "Suggestion: ") + _cumle(r["oneri"])] if r.get("oneri") else [])
+    if bek: p.append(_t(f"Onayını bekleyen {bek} iş var.", f"{bek} item{'s' if bek > 1 else ''} waiting for your approval."))
+    ok = seslendir(" ".join(x for x in p if x), kuyruk=True)
+    if ok: print("SES: özet okunuyor")
+    return ok
+def soru_baslat(ids):
+    if not ids or not _ses_serbest(): return
+    with LOCK:
+        SORU["liste"] += [i for i in ids if i not in SORU["liste"] and i != SORU["aktif"]]
+        bos = not SORU["aktif"]
+    if bos: soru_sonraki()
+def soru_sonraki():
+    with LOCK:
+        bek = {x["id"]: x for x in eylem_gorunen() if x["durum"] == "bekliyor"}
+        SORU["liste"] = [i for i in SORU["liste"] if i in bek]
+        x = bek[SORU["liste"].pop(0)] if SORU["liste"] else None
+        SORU.update(aktif=x["id"] if x else None, t=time.time())
+    if not x: return False
+    soru = EYLEM_SORU.get(x["tur"], EYLEM_SORU["diger"])
+    seslendir(f"{_t(EYLEM_TUR.get(x['tur'], ''), x['tur'])}: {_cumle(x['baslik'])}{(' ' + _t('Kişi: ', 'Person: ') + _cumle(x['kim'])) if x.get('kim') else ''} {_t(*soru)}", kuyruk=True)
+    print(f"SES: yazayım mı? ({x['id']})"); return True
+def soru_bitir(neden):
+    with LOCK: var = bool(SORU["aktif"] or SORU["liste"]); SORU.update(liste=[], aktif=None)
+    if var: print(f"SES: yazayım mı dizisi bitti ({neden})")
+def soru_komut(p):  # panodaki "Sonra" (bu işi şimdilik geç) ve "Sus" (diziyi bitir)
+    k = p.get("komut")
+    if k == "sonra": ses_durdur(); return {"ok": True, "devam": soru_sonraki()}
+    if k == "sus": ses_durdur(); soru_bitir("sus"); return {"ok": True}
+    return {"ok": False, "err": "komut"}
+def soru_zaman():  # pano yoklarken: 2 dk cevap yoksa dizi durur
+    if SORU["aktif"] and time.time() - SORU["t"] > SORU_SN: soru_bitir("cevap yok")
 def brifing_iste(p):
     oid = str(p.get("olay") or ""); olay = TAKVIM_TAM.get(oid)
     if not olay: return {"ok": False, "err": _t("Toplantı takvimde bulunamadı", "Meeting not found in the calendar")}
@@ -2133,6 +2197,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/eylem-karar":  # Onayla / Reddet / Hepsini onayla — anahtarlı pano ya da sohbetteki onay (eylem onay)
             n = eylem_karar(p, "pano" if pano else "sohbet"); return self._json({"ok": n > 0, "n": n})
         if self.path == "/eylem-sonuc": return self._json({"ok": eylem_sonuc(p)})
+        if self.path == "/eylem-sesli":  # sesli "yazayım mı?" dizisinde Sonra / Sus — yalnız pano (aynı köken + pano anahtarı)
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(soru_komut(p))
         if self.path == "/son-toplanti":  # toplantı sonu özeti hazır (toplanti-claude.py ozet-hazir) — kart gibi anahtarla
             return self._json(son_ekle(p))
         if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
