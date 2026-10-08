@@ -1802,7 +1802,7 @@ def claude_json(ham, is_, t0, yalin):
     with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     return str(j.get("result") or ""), o
 # --- Sesli brifing (karar #83: Başlat'a basınca; Faz 4) ----------------------------------------------------------------------------
-# Yerel macOS sesi (say, Türkçe Yelda): ses Mac'ten çıkmaz. Toplantı başladıysa okunmaz, okurken ilk döküm satırı gelince susar
+# Yerel macOS sesi (say; Türkçe: sistem sesi ya da Yelda, aşağıda ses_secimi): ses Mac'ten çıkmaz. Toplantı başladıysa okunmaz, okurken ilk döküm satırı gelince susar
 # (mikrofon brifingi dökmesin). Ayar konusma: false kapatır; ses: "<ad>" sesi seçer.
 # Konuşmalar sıraya girer (özet okunurken gelen "yazayım mı?" onu kesmez); brifing ve ses_durdur sırayı boşaltır.
 SES = {"p": None, "q": [], "isci": False}; SES_K = threading.Condition()
@@ -1810,8 +1810,47 @@ def ses_durdur():
     with SES_K: SES["q"].clear(); p = SES.get("p")
     if p and p.poll() is None: p.terminate(); print("SES: durduruldu"); return True
     return False
+# Ses seçimi (v0.20.2): ayar "ses" yoksa ve Türkçe sistem sesi seçiliyse (Erişilebilirlik → Oku ve Seslendir → Sistem sesi, ör. Siri → Ses 2
+# = nöral Elif) say'e ses adı verilmez, sistem sesi konuşur — Siri sesleri `say -v` listesinde yok. Seçim yoksa Yelda.
+# Telaffuz: nöral ses yabancı adları Türkçe okur (8 Ekim ölçümü: Basecamp → "base jump", Workspace → "works pace"); okunacak metinde adlar
+# Türkçe yazımla değişir (pano metni değişmez). Kullanıcı eki: canli/telaffuz.json {"Ad": "Okunuş"} (kişi adları depoya girmez).
+TELAFFUZ = {"Google": "Gugıl", "Gmail": "Ci meyl", "Workspace": "Vörkspeys", "Claude": "Klod", "Basecamp": "Beyskemp",
+            "Microsoft": "Maykrosoft", "iPhone": "Ayfon", "iCloud": "Ayklaud", "WhatsApp": "Vatsap", "PayPal": "Peypal", "Stripe": "Sitrayp",
+            "Slack": "Slek", "Notion": "Nouşın", "Zoom": "Zuum", "Dropbox": "Dropboks", "OneDrive": "Vandrayv", "GitHub": "Githab",
+            "Chrome": "Kroum", "Suflor.me": "Suflor mi"}
+_TEL = {"t": 0, "mt": None, "re": None, "esle": {}}
+def telaffuz(metin):
+    if ARAYUZ_DILI != "tr" or not metin: return metin
+    yol = os.path.join(BASE, "telaffuz.json")
+    if time.time() - _TEL["t"] > 30 or _TEL["re"] is None:
+        _TEL["t"] = time.time()
+        try: mt = os.path.getmtime(yol)
+        except OSError: mt = None
+        if mt != _TEL["mt"] or _TEL["re"] is None:
+            ek = {}
+            if mt:
+                try: ek = {str(k): str(v) for k, v in json.load(open(yol, encoding="utf-8")).items() if str(k).strip() and str(v).strip()}
+                except (OSError, ValueError, AttributeError): print("SES: telaffuz.json okunamadı")
+            esle = {k.lower(): v for k, v in {**TELAFFUZ, **ek}.items()}
+            _TEL.update(mt=mt, esle=esle, re=re.compile(r"(?<!\w)(" + "|".join(re.escape(k) for k in sorted(esle, key=len, reverse=True)) + r")(?!\w)", re.I))
+    return _TEL["re"].sub(lambda m: _TEL["esle"].get(m.group(1).lower(), m.group(1)), metin)
+_SES_SEC = {"t": 0, "v": None}
+def ses_secimi():  # say -v için ses adı; None = sistem sesi
+    if AYAR.get("ses"): return str(AYAR["ses"])
+    if ARAYUZ_DILI != "tr": return None
+    if time.time() - _SES_SEC["t"] > 60:
+        v = "Yelda"
+        try:
+            dil = subprocess.run(["defaults", "read", "-g", "AppleLanguages"], capture_output=True, text=True, timeout=5).stdout
+            sec = subprocess.run(["defaults", "read", "com.apple.Accessibility", "SpokenContentDefaultVoiceSelectionsByLanguage"], capture_output=True, text=True, timeout=5).stdout
+            if re.search(r'^\s*"?tr\b', dil.split("(", 1)[-1].strip()) and re.search(r"boundLanguage = tr;\s*\n?\s*voiceId = \"?com\.apple\.[^\";]*tr-TR", sec): v = None
+        except (OSError, subprocess.TimeoutExpired): pass
+        if v != _SES_SEC["v"] or not _SES_SEC["t"]: print(f"SES: {'sistem sesi (Türkçe seçim)' if v is None else v}")
+        _SES_SEC.update(t=time.time(), v=v)
+    return _SES_SEC["v"]
 def seslendir(metin, kuyruk=False):
     if not AYAR.get("konusma", True) or not metin: return False
+    metin = telaffuz(metin)
     if not kuyruk: ses_durdur()
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): {len(metin)} karakter · {metin}"); return True
     with SES_K:
@@ -1819,10 +1858,12 @@ def seslendir(metin, kuyruk=False):
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
     return True
 def _ses_isci():
-    v = AYAR.get("ses") or ("Yelda" if ARAYUZ_DILI == "tr" else None)
     while True:
         with SES_K:
             while not SES["q"]: SES_K.wait()
+        v = ses_secimi()  # defaults okuması kilidin dışında (60 sn önbellek)
+        with SES_K:
+            if not SES["q"]: continue
             metin = SES["q"].pop(0)
             try: SES["p"] = p = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError as e: print(f"SES: hata {e.__class__.__name__}"); continue

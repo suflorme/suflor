@@ -28,7 +28,7 @@ for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1; soru = q.split("Soru: ", 1)[-1]
     b = "[Bağlam" in q and "Şimdi:" in q and "Deneme planlama" in q and "GİZLİ NOT" not in q  # davet notu girmez
     if n == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
-    for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Takvim", " geldi." if b else " gelmedi."]:
+    for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."]:
         time.sleep(0.15); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
@@ -68,7 +68,8 @@ try:
     k = sor("Toplantı en çok kaç dakika sürmeli?")
     ok("soru yazıya döküldü ve Claude'a gitti", k["durum"] == "hazir" and "dakika" in (k.get("soru") or "").lower() and "Sorduğun" in (k.get("cevap") or ""))
     ok("cümle cümle okundu (ilk cümle sonuçtan önce)", log().count("SES (deneme)") == 2 and k["olcum"]["ses_ms"] < k["olcum"]["sure_ms"])
-    ok("soruya tarih + yarının takvimi eklendi", "Takvim geldi" in (k.get("cevap") or ""))
+    ok("soruya tarih + yarının takvimi eklendi", "takvimi geldi" in (k.get("cevap") or ""))
+    ok("okunurken yabancı ad Türkçe yazımla, pano metni aynen", "Beyskemp takvimi geldi" in log() and "Basecamp takvimi" in (k.get("cevap") or ""))
     ok("açık süreç bir kez açıldı", log().count("KONUŞ: açık süreç açıldı") == 1)
     k2 = sor("Toplantının sonunda ne yazılır?")
     ok("araç başlayınca 'Bakıyorum' söylendi (yalnız ikinci soruda)", log().count("Bakıyorum.") == 1 and log().count("SES (deneme)") == 5)
