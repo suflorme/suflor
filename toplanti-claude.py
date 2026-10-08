@@ -56,6 +56,7 @@ ka.add_argument("metin"); ka.add_argument("--neden", default=""); ka.add_argumen
 ka.add_argument("--gundem", type=int, default=None, help="ilgili gündem maddesinin sırası (0'dan)")
 ka.add_argument("--gizli", action="store_true", help="dur kartının metni şeritte görünmesin (Teams sekmesi paylaşılırsa)")
 ka.add_argument("--onay", action="store_true", help="onay kartı (#76): Onayla / Reddet düğmeleri; metin yapılacak iç işi tam yazar (TOPLANTI-MODU §7)")
+ka.add_argument("--durum", default="", help="kartın altında tek satır (Ne diyeyim?: şu an ne konuşuluyor, ≤ 120 karakter)")
 ka.add_argument("--sessiz-ozet", action="store_true", help="SESSİZ BİTTİ'den sonra tek özet kartı: sessizde bekleyen kartları kapatır")
 et = sub.add_parser("etiket", help="duygu etiketi (pano başlığı; kart değil): genel ton ya da --kim ile kişi başına")
 et.add_argument("ton", choices=["olumlu", "notr", "gergin", "olumsuz", "ilgili", "heyecanli", "tedirgin", "savunmada", "ilgisiz", "kararsiz"])
@@ -69,6 +70,12 @@ sz.add_argument("--ekle", nargs=2, metavar=("YANLIS", "DOGRU"), help="yanlış b
 sz.add_argument("--baglam", default="", help="virgüllü: yalnız aynı satırda bu kelimelerden biri varsa düzelt (gerçek kelime olabilen biçimler için)")
 sz.add_argument("--not", dest="aciklama", default="")
 sz.add_argument("--birlestir", action="store_true", help="v0.5.2: ayardaki sözlük kaynağından (tsv + xlsx Vendor sekmesi) yeniden kur; --ekle ile eklenenler korunur")
+so = sub.add_parser("soz", help="sözler defteri: toplantıda verilen sözler (toplantı sonunda) — liste [--kim] [--hepsi] | ekle \"ne\" --kim X [--tarih YYYY-MM-DD] | kapat sN")
+so.add_argument("islem", nargs="?", default="liste", choices=["liste", "ekle", "kapat"]); so.add_argument("deger", nargs="?")
+so.add_argument("--kim", default=""); so.add_argument("--tarih", default="", help="söz verilen tarih (YYYY-MM-DD); belirsizse boş")
+so.add_argument("--toplanti", default=None, help="toplantı .md adı (yoksa son toplantı)")
+so.add_argument("--durum", default="tutuldu", choices=["tutuldu", "iptal"], help="kapat: söz tutuldu mu, düştü mü")
+so.add_argument("--hepsi", action="store_true", help="liste: kapananlar da")
 ac = sub.add_parser("acik", help="v0.6.0: cevapsız sorular — liste | ekle \"soru\" --tetik a,b | kapat aN")
 ac.add_argument("islem", nargs="?", default="liste", choices=["liste", "ekle", "kapat", "sifirla"]); ac.add_argument("deger", nargs="?")
 ac.add_argument("--tetik", default="", help="virgüllü, küçük harf: konu yeniden açılınca geçecek ayırt edici kelimeler")
@@ -318,6 +325,40 @@ def acik_cmd():
     for q in qs:
         if A.islem == "liste" or q is qs[-1] or q.get("id") == A.deger:
             print(f"{q['id']} [{q.get('durum')}] {q.get('metin')}" + (f" — {q['kim']}" if q.get("kim") else "") + (f"   tetik: {', '.join(q['tetik'])}" if q.get("tetik") else ""))
+# --- Sözler defteri (Faz 3) -------------------------------------------------------------------------------------
+# Toplantı sonunda özetteki takip işleri ve verilen sözler (iki taraf da) sozler.json'a yazılır; aynı kişiyle bir sonraki toplantının
+# hazırlığında (hazirlik --kim) açık olanlar geri gelir, Claude onlardan hazır SÖYLE kartı kurar. Toplantı içinde kayıt yok (kullanıcı kararı, 8 Ekim).
+SOZ_FP = lambda: os.path.join(A.dir, "sozler.json")
+def soz_yukle():
+    try: return json.load(open(SOZ_FP(), encoding="utf-8"))
+    except (FileNotFoundError, ValueError): return {"sozler": []}
+def soz_satir(x):
+    gecti = x.get("durum") == "acik" and x.get("tarih") and x["tarih"] < datetime.date.today().isoformat()
+    return (f"{x['id']} [{x.get('durum')}] {x.get('kim') or '?'}: {x.get('metin')} · tarih {x.get('tarih') or 'yok'}{' — GEÇTİ' if gecti else ''}"
+            f" · {x.get('toplanti') or '?'} {str(x.get('at', ''))[:10]}")
+def soz_kisinin(d, kim):
+    k = kucuk(kim or "").split()
+    return [x for x in d.get("sozler", []) if not k or k[0] in kucuk(x.get("kim") or "")]
+def soz_cmd():
+    d = soz_yukle(); xs = d.setdefault("sozler", [])
+    if A.islem == "ekle":
+        if not A.deger or not A.kim: sys.exit("söz metni ve --kim gerekli")
+        if A.tarih and not re.match(r"^\d{4}-\d{2}-\d{2}$", A.tarih): sys.exit("--tarih YYYY-MM-DD")
+        md = toplanti_dosyasi(A.toplanti)
+        n = 1 + max([int(x["id"][1:]) for x in xs if str(x.get("id", "")).startswith("s") and x["id"][1:].isdigit()] or [0])
+        x = {"id": f"s{n}", "at": simdi(), "kim": " ".join(A.kim.split())[:60], "metin": " ".join(A.deger.split())[:200], "tarih": A.tarih or None,
+             "file": md, "toplanti": (toplanti_basligi(os.path.join(A.dir, md)) if md and os.path.exists(os.path.join(A.dir, md)) else None) or gundem_basligi() or None,
+             "durum": "acik"}
+        xs.append(x)
+    elif A.islem == "kapat":
+        x = next((x for x in xs if x.get("id") == A.deger), None)
+        if not x: sys.exit(f"sozler.json'da {A.deger} yok")
+        x["durum"] = A.durum; x["kapandi"] = simdi()
+    if A.islem != "liste":
+        tmp = SOZ_FP() + ".tmp"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, SOZ_FP())
+        print(soz_satir(xs[-1] if A.islem == "ekle" else x)); return
+    ys = [x for x in soz_kisinin(d, A.kim) if A.hepsi or x.get("durum") == "acik"]
+    print("\n".join(soz_satir(x) for x in ys) or "söz yok")
 def gundem_cmd():
     try: items = json.load(open(os.path.join(A.dir, "agenda.json"), encoding="utf-8")).get("items", [])
     except FileNotFoundError: items = []
@@ -334,7 +375,7 @@ def bana_soru(r):  # karşı taraftan, kullanıcıya adıyla yöneltilmiş soru 
     return re.search(r"(?<!\w)" + re.escape(kucuk(BEN)) + r"(?!\w{3})", kucuk(t)) is not None  # "Ali", "Ali'ye", "Ali Bey"; "Alicia" değil (ad + en çok 2 harf ek)
 def satir(r): return f"  [{r.get('time') or ''} {r.get('speaker') or '?'}] {'❓ ' if soru_mu(r.get('text','')) else ''}{'→' + BEN + ' ' if bana_soru(r) else ''}{'↻ ' if r.get('revised') else ''}{r.get('text','')}"
 def son_satirlar(jl, sn=75, en_az=4, en_cok=40):
-    # "Son 1 dk" özeti için: son sn saniyede aktarılan satırlar (aynı kimliğin son hâli); azsa son en_az satır
+    # "Ne diyeyim?" için: son sn saniyede aktarılan satırlar (aynı kimliğin son hâli); azsa son en_az satır
     try: rs = [json.loads(l) for l in open(jl, encoding="utf-8") if l.strip()]
     except FileNotFoundError: return []
     rs = [r for r in rs if "note" not in r and "kanit" not in r]; son = {}
@@ -355,6 +396,7 @@ def kart():
     if A.gundem is not None: body["agenda_i"] = A.gundem
     if A.gizli: body["gizli"] = True
     if A.sessiz_ozet: body["sessiz_ozet"] = True
+    if A.durum: body["durum"] = A.durum
     if A.onay:
         if A.tur in ("not", "bilgi", "dur", "dikkat", "deginme"): body["kind"] = "soyle"  # onay kartı şeritte de görünsün (NOT şeritte yok)
         body["onay"] = True
@@ -669,7 +711,7 @@ def izle():
             bg_bil.intersection_update({k.get("id") for k in liste})  # arşive giden kaynakların kimliği listeden düşer
             try: tmp = bg_bil_fp + ".tmp"; json.dump(sorted(bg_bil), open(tmp, "w", encoding="utf-8")); os.replace(tmp, bg_bil_fp)
             except OSError: pass
-    sessiz_on = False
+    sessiz_on = False; s = {}  # s: son /status (Ne diyeyim? gündem işaretlerini buradan okur)
     sure_ilk = True; sure_esik = set(); kayma_son = 0.0; pay_son = time.time() - 300  # PAY ilk 5 dk susar (yeniden kurulumda tekrar etmesin)
     # kendiliğinden bağlam + gündem tahmini
     try: sis = sistemler()
@@ -871,10 +913,17 @@ def izle():
                 except Exception: ts = []
                 return [f"  TASLAK ({len(ts)}, kesin değil — Teams'in ham metni, Whisper satırı gelince yerine geçer):", *[f"  [~ {t.get('speaker') or '?'}] {t.get('text')}" for t in ts]] if ts else []
             def soru_olay(q):
-                if q.get("tur") == "ozet":  # "Son 1 dk" düğmesi — bağlam araması yok, son dakikanın satırları
-                    ss = son_satirlar(jl_cur) if jl_cur else []
-                    return [f"ÖZET İSTEĞİ {q.get('id')}: son 1 dk'yı 1–2 cümleyle özetle → kart cevap \"…\" --cevap {q.get('id')}   ← ÖNCE BUNU (30 sn)",
-                            f"  SON 1 DK ({len(ss)} satır):" if ss else "  SON 1 DK: satır yok — 'son 1 dakikada döküm gelmedi' de", *[satir(r) for r in ss], *taslak_satir()]
+                if q.get("tur") == "ozet":  # "Ne diyeyim?" (Option + Shift + O) — proje araması yok (hız): son 2 dk, gündem, açık sorular
+                    ss = son_satirlar(jl_cur, sn=120, en_az=6) if jl_cur else []
+                    its = agj.get("items") or []; ticks_ = s.get("agenda_ticks") or {}
+                    gun = (f"şu an ▶ {its[aktif_i]}" if aktif_i is not None and aktif_i < len(its) else "konuşulan madde belli değil") + \
+                          (" · açık maddeler: " + " | ".join(it[:50] for i, it in enumerate(its) if not ticks_.get(str(i)))[:300] if its else "")
+                    aq = [x for x in acik if x.get("file") in (None, cur)][:3]
+                    return [f"NE DİYEYİM {q.get('id')}: {BEN} sıkıştı, ne diyeceğini soruyor → 15 sn içinde: kart cevap \"<söyleyeceği tek cümle, onun ağzından, ≤ 120 karakter>\" "
+                            f"--durum \"<şu an ne konuşuluyor, tek satır ≤ 120>\" --cevap {q.get('id')}   ← ÖNCE BUNU",
+                            f"  ROL {rol} · GÜNDEM: {gun}" if its else f"  ROL {rol} · gündem yok",
+                            *([f"  AÇIK SORULAR: " + " | ".join(f"{x.get('metin')}" + (f" ({x['kim']})" if x.get("kim") else "") for x in aq)] if aq else []),
+                            f"  SON 2 DK ({len(ss)} satır):" if ss else "  SON 2 DK: satır yok — replik yerine 'son dakikalarda döküm gelmedi' de", *[satir(r) for r in ss], *taslak_satir()]
                 return [f"SORU {q.get('id')}: {q.get('text')}   ← ÖNCE BUNU CEVAPLA (30 sn)", *soru_baglam(q.get('text') or ''), *taslak_satir()]
             emit(*[l for q in qs for l in soru_olay(q)], *acks, *sesler,
                  *([f"SATIRLAR ({len(buf)}, soruya kadar):", *buf] if buf else []), *paket_baglam())
@@ -1105,6 +1154,11 @@ def hazirlik_cmd():
             dur = [l.strip() for l in open(os.path.join(PROJE, db), encoding="utf-8") if k.split()[0] in kucuk(l)][:8]
             print(f"\n## {db}'de {A.kim} geçen satırlar"); print("\n".join("  " + l[:250] for l in dur) or "  yok")
         except FileNotFoundError: pass
+    sz = [x for x in soz_kisinin(soz_yukle(), A.kim) if x.get("durum") == "acik"]
+    print("\n## Önceki toplantılarda verilen, kapanmamış sözler" + (f" ({A.kim})" if A.kim else ""))
+    print("\n".join("  - " + soz_satir(x) for x in sz[-10:]) or "  yok")
+    if sz: print("  → her biri için hazir.json'a soyle kartı: \"<kim> <tarih>'e kadar <ne> demişti — durumunu sor\" (GEÇTİ olanlar önce); "
+                 "toplantıda tutulduğu anlaşılırsa sonunda: soz kapat sN")
     print("\nClaude: bundan hazir.json kartlarını ve kullanıcıya 3–6 satırlık 'geçmişte ne dendi / açık ne' özetini çıkar (kaynak dosya @konum).")
 
 # --- v0.7.2: Teams'in kendi dökümüyle karşılaştırma ------------------------------------------------------------
@@ -1581,7 +1635,7 @@ def _hms(sn):
     return f"{sn // 3600}:{sn % 3600 // 60:02d}:{sn % 60:02d}" if sn >= 3600 else f"{sn // 60}:{sn % 60:02d}"
 
 try:
-    {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "gundem": gundem_cmd,
+    {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

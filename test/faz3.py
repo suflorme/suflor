@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-# Faz 3 — sessiz mod ve kart erteleme. Yalıtılmış aktarıcı (SUFLOR_TEST_HIZLI: özet bekleme ve gündemsiz erteleme 2 sn) + izle.
+# Faz 3 — sessiz mod, kart erteleme, "Ne diyeyim?" ve sözler defteri. Yalıtılmış aktarıcı (SUFLOR_TEST_HIZLI: özet bekleme ve gündemsiz erteleme 2 sn) + izle.
 #   Sessiz: Option + Shift + M (/komut sessiz) açar/kapatır; sessizde SÖYLE/NOT bekler, DUR ve soruya CEVAP geçer; bitince izle
 #   SESSİZ BİTTİ der; --sessiz-ozet kartı bekleyenleri kapatır; özet gelmezse bekleyenler 2 sn sonra tek tek görünür.
 #   Ertele: /card-ack "ertele" kartı gizler; gündemde ▶ değişince (ya da gündemsizde süre dolunca) "geri" alanıyla döner.
-#   PYTHONDONTWRITEBYTECODE=1 python3 test/sessiz.py      (kaldı → çıkış 1)
+#   Ne diyeyim?: /komut ozet → izle NE DİYEYİM (son 2 dk, gündem); --cevap kartı "replik" + "durum" alanıyla, sessizde de geçer.
+#   Sözler: soz ekle / liste / kapat, tarih denetimi, hazirlik --kim açık sözleri getirir.
+#   PYTHONDONTWRITEBYTECODE=1 python3 test/faz3.py      (kaldı → çıkış 1)
 import json, os, shutil, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -98,6 +100,27 @@ try:
     kontrol("gündemsiz: süre dolunca geri geldi", e2 in gorunen())
     kontrol("izle: KART ⏸ olayı (süreyle)", bekle_olay("KART ⏸ sonraya bırakıldı (5 dk sonra"))
 
+    # --- Ne diyeyim? (sessizde de geçer) ---
+    istek("/komut", {"tur": "sessiz"})
+    y = istek("/komut", {"tur": "ozet"}); q = next((q for q in istek("/cards").get("questions", []) if q.get("tur") == "ozet"), {})
+    kontrol("Ne diyeyim? istendi (bekleyen soru, onay metni)", q.get("id") and "Ne diyeyim" in y.get("metin", ""))
+    kontrol("izle: NE DİYEYİM olayı + SON 2 DK", bekle_olay("NE DİYEYİM " + str(q.get("id"))) and bekle_olay("SON 2 DK"))
+    out = subprocess.run([sys.executable, "toplanti-claude.py", "--dir", canli, "--relay", URL, "kart", "cevap", "Takvimi şimdi netleştirelim mi?",
+                          "--durum", "Takvim konuşuluyor", "--cevap", q.get("id", "")], cwd=T, env=ENV, capture_output=True, text=True).stdout
+    c = next((c for c in istek("/cards")["cards"] if c.get("text") == "Takvimi şimdi netleştirelim mi?"), {})
+    kontrol("replik kartı sessizde görünüyor (replik + durum, soru satırı yok)", c.get("replik") and c.get("durum") == "Takvim konuşuluyor" and "q" not in c)
+    kontrol("cevaplanan istek bekleyenlerden düştü", not any(x.get("id") == q.get("id") for x in istek("/cards").get("questions", [])))
+    istek("/komut", {"tur": "sessiz"})
+    # --- sözler defteri ---
+    tc = lambda *a: subprocess.run([sys.executable, "toplanti-claude.py", "--dir", canli, "--relay", URL, *a], cwd=T, env=ENV, capture_output=True, text=True)
+    a1 = tc("soz", "ekle", "Yedek raporunu gönderecek", "--kim", "Ayla Örnek", "--tarih", "2026-01-05").stdout
+    a2 = tc("soz", "ekle", "Erişim listesini paylaşacak", "--kim", "Deniz T").stdout
+    kontrol("soz ekle: kimlik, kişi, geçen tarih işareti", a1.startswith("s1 [acik] Ayla Örnek") and "GEÇTİ" in a1 and a2.startswith("s2 [acik]"))
+    kontrol("soz ekle: --kim yoksa ve tarih bozuksa red", tc("soz", "ekle", "x").returncode != 0 and tc("soz", "ekle", "x", "--kim", "a", "--tarih", "5.1").returncode != 0)
+    tc("soz", "kapat", "s2")
+    kontrol("soz liste: yalnız açıklar; --hepsi kapananı da", "s2" not in tc("soz", "liste").stdout and "s2 [tutuldu]" in tc("soz", "liste", "--hepsi").stdout)
+    hz = tc("hazirlik", "--kim", "Ayla").stdout
+    kontrol("hazirlik --kim: açık söz ve hazır kart yönergesi", "kapanmamış sözler (Ayla)" in hz and "s1 [acik]" in hz and "durumunu sor" in hz and "s2" not in hz)
     md = open(os.path.join(canli, next(f for f in os.listdir(canli) if f.endswith(".md"))), encoding="utf-8").read()
     kontrol("dökümde SESSİZ, ⏸ ve ↩ satırları", "**SESSİZ** | açıldı" in md and "**SESSİZ** | bitti (kullanıcı kapattı)" in md and "**KART ⏸ sonra**" in md and "**KART ↩ geri geldi**" in md)
     istek("/komut", {"tur": "sessiz"}); k3 = kart("soyle", "Kayıt sonrası")
@@ -118,5 +141,5 @@ finally:
         kontrol("yeniden başlayınca sessizde bekleyen kart görünür", k3 in gorunen())
     except NameError: pass
     finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
-print(f"sessiz: {len(hatalar)} sorun" if hatalar else "sessiz: ✓ hepsi geçti")
+print(f"faz3: {len(hatalar)} sorun" if hatalar else "faz3: ✓ hepsi geçti")
 sys.exit(1 if hatalar else 0)

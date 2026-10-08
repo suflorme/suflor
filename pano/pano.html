@@ -38,7 +38,8 @@ section+section{margin-top:6px}main .sh,aside .sh{top:-6px}  /* kaydırınca sat
 .k{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:9px 11px;margin:0 0 8px;position:relative;overflow:hidden}
 .k::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc,var(--gr))}
 .k b{display:block;font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--kc,var(--gr));margin-bottom:2px}
-.kw{font-size:12px;color:var(--t2);margin-top:3px}
+.kw{font-size:12px;color:var(--t2);margin-top:3px}.k-replik .rp{font-weight:600}.kd{font-size:12px;color:var(--t2);margin-top:3px}
+.ipucu{position:fixed;z-index:1000;max-width:260px;padding:5px 8px;border-radius:6px;background:var(--tx);color:var(--bg);font:12px/1.35 var(--f-govde);white-space:pre-line;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}.ipucu[hidden]{display:none}
 .k-soyle{--kc:var(--br-tx)}.k-dur{--kc:var(--er);background:var(--er-bg)}.k-cevap,.k-not{--kc:var(--gr)}.k[data-id]{cursor:pointer;display:flex;gap:8px;align-items:flex-start}.k[data-id]:hover{border-color:var(--bd2)}.k .km{flex:1;min-width:0}.k.kapaniyor{opacity:.45}.ka{display:flex;gap:2px;flex:none}.ka button{padding:3px 5px;color:var(--t3)}.ka button:hover{color:var(--tx)}.ka button.on{padding:3px 8px;color:var(--t2)}.ka button.on.pri{color:#fff}.k[data-onay]{cursor:default}
 .kc{font-size:12px;color:var(--t3);padding:3px 0 3px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kq{font-size:12px;color:var(--t2);background:var(--ac-bg);border-radius:var(--r);padding:7px 10px;margin:0 0 8px;white-space:pre-wrap}
@@ -93,7 +94,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <section id=sk><div class=sh><span>Şimdi <span id=szd class=meta></span></span><span id=tone></span></div><div id=py class=py></div><div id=kc></div></section>
 </div>
 <div class=nb><textarea id=n rows=2 placeholder="Not ya da soru (başa ?)" title="Başta ? varsa Claude'a soru, yoksa not. ⌘Enter: her zaman soru."></textarea>
-<div class=bt><button id=b class=pri>Gönder</button><span class=sp1></span><button id=yz class=ib title="⭐ Önemli an: şu anı özette öne çıkar"></button><button id=sz class=ib title="Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)"></button><button id=oz class=ib title="Claude son 1 dakikayı özetlesin"></button><button id=kz class=ib title="Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur"></button></div></div></main>
+<div class=bt><button id=b class=pri>Gönder</button><span class=sp1></span><button id=yz class=ib title="⭐ Önemli an: şu anı özette öne çıkar"></button><button id=sz class=ib title="Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)"></button><button id=oz class=ib title="Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)"></button><button id=kz class=ib title="Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur"></button></div></div></main>
 <div id=rz title="Sürükleyerek genişlet/daralt · çift tıkla: varsayılan"></div>
 <aside><div class=sc id=yan>
 <section><div class=sh>Gündem <span id=agn class=meta></span></div><div id=ag></div></section>
@@ -121,9 +122,9 @@ cevir(document.body)
 // arayüz: üst çubuk (toplantı, rol, süre, tek durum cümlesi), solda kartlar (boşken "Sıradaki · Başlat") ve tek giriş,
 // sağda Gündem/Açık sorular/Kanıtlar ve katlanan döküm. /status 2 sn, /taslak 1 sn (yalnız döküm açıkken).
 const ICO={clock:'<circle cx=12 cy=12 r=9 /><path d="M12 7v5l3 2"/>',star:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"/>',cam:'<path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx=12 cy=13 r=3.5 />',hist:'<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M12 8v4l2.5 1.5"/>',
- win:'<rect x=3 y=5 width=18 height=14 rx=2 /><rect x=12 y=11 width=7 height=6 rx=1 />',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx=12 cy=12 r=2.8 />',x:'<path d="M6 6l12 12M18 6L6 18"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',pause:'<path d="M9 6v12M15 6v12"/>',mute:'<path d="M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M4 4l16 16"/>'}
+ win:'<rect x=3 y=5 width=18 height=14 rx=2 /><rect x=12 y=11 width=7 height=6 rx=1 />',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx=12 cy=12 r=2.8 />',x:'<path d="M6 6l12 12M18 6L6 18"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',replik:'<path d="M4 5h16v11H9l-5 4z"/><path d="M10 8.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4"/><path d="M12 13.6v.1"/>',pause:'<path d="M9 6v12M15 6v12"/>',mute:'<path d="M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M4 4l16 16"/>'}
 const ic=(n,t)=>`<svg class=i viewBox="0 0 24 24" aria-hidden=true>${ICO[n]}</svg>${t?'<span>'+t+'</span>':''}`
-document.getElementById('mini').innerHTML=ic('win'); document.getElementById('oz').innerHTML=ic('hist',L('Son 1 dk')); document.getElementById('yz').innerHTML=ic('star'); document.getElementById('sz').innerHTML=ic('mute'); document.getElementById('kz').innerHTML=ic('cam',L('Kanıt'))
+document.getElementById('mini').innerHTML=ic('win'); document.getElementById('oz').innerHTML=ic('replik',L('Ne diyeyim?')); document.getElementById('yz').innerHTML=ic('star'); document.getElementById('sz').innerHTML=ic('mute'); document.getElementById('kz').innerHTML=ic('cam',L('Kanıt'))
 // Sağ sütun sürüklenerek genişletilir; genişlik bu tarayıcıda hatırlanır (v0.3.3)
 const rz=document.getElementById('rz'), root=document.documentElement
 function setAw(px){px=Math.max(260,Math.min(innerWidth*0.7,px));root.style.setProperty('--aw',px+'px');return px}
@@ -183,8 +184,8 @@ const seenCards=new Set(); let firstCards=true, last=null, mini=null
 // kart metnindeki web bağlantısı tıklanabilir (test toplantısı 7 Ekim 21:09); önce kaçış, sonra yalnız http(s) — sondaki noktalama dışarıda
 function bag(h){return h.replace(/https?:\/\/[^\s<>"']+/g,u=>{const m=u.match(/^(.*?)([.,;:!?)]*)$/);return `<a href="${m[1]}" target=_blank rel="noopener noreferrer">${m[1]}</a>${m[2]}`})}
 function cardsHtml(v,mini){
-  const qs=(v.questions||[]).map(q=>`<div class=kq>${q.tur==="ozet"?L("Son 1 dk özeti hazırlanıyor…"):L("Claude'a soruldu: ")+esc(q.text)}</div>`).join("")
-  const oc=(v.cards||[]).map(c=>`<div class="k k-${esc(c.kind)}${(firstCards||seenCards.has(c.id+(c.geri||"")))?"":" yeni"}" data-id="${esc(c.id)}"${c.onay?` data-onay=1`:` title="${L('Dokun: kapat')}"`}><div class=km><b>${c.geri?`<span title="${L('Sonraya bırakmıştın; şimdi geri geldi')}">↩ </span>`:""}${c.onay?L("Onay bekliyor"):KL[c.kind]||KL.not}${c.gizli?" · "+L("gizli"):""}</b>${c.q?`<div class=kw>↳ ${esc(c.q)}</div>`:""}${bag(esc(c.text))}${c.why&&!mini?`<div class=kw>${bag(esc(c.why))}</div>`:""}</div><div class=ka>${ackBtns(c)}</div></div>`).join("")
+  const qs=(v.questions||[]).map(q=>`<div class=kq>${q.tur==="ozet"?L("Ne diyeyim? — replik hazırlanıyor…"):L("Claude'a soruldu: ")+esc(q.text)}</div>`).join("")
+  const oc=(v.cards||[]).map(c=>`<div class="k k-${esc(c.kind)}${c.replik?" k-replik":""}${(firstCards||seenCards.has(c.id+(c.geri||"")))?"":" yeni"}" data-id="${esc(c.id)}"${c.onay?` data-onay=1`:` title="${L('Dokun: kapat')}"`}><div class=km><b>${c.geri?`<span title="${L('Sonraya bırakmıştın; şimdi geri geldi')}">↩ </span>`:""}${c.onay?L("Onay bekliyor"):c.replik?L("Ne diyeyim"):KL[c.kind]||KL.not}${c.gizli?" · "+L("gizli"):""}</b>${c.q?`<div class=kw>↳ ${esc(c.q)}</div>`:""}${c.replik?`<span class=rp>${esc(c.text)}</span>`:bag(esc(c.text))}${c.durum?`<div class=kd>${esc(c.durum)}</div>`:""}${c.why&&!mini?`<div class=kw>${bag(esc(c.why))}</div>`:""}</div><div class=ka>${ackBtns(c)}</div></div>`).join("")
   const cc=(v.closed||[]).slice(-3).reverse().map(c=>`<div class=kc title="${esc(c.text)}">${ACK_ICON[c.status]||"✕"} ${esc(c.text)}</div>`).join("")
   return ((oc+qs)||`<div class=empty>${L("Şimdilik kart yok. Claude toplantıyı izlerken öneriler buraya düşer.")}</div>`)+cc
 }
@@ -208,7 +209,7 @@ async function sendOnemli(b){if(b)b.disabled=true;try{const r=await (await fetch
 async function sendSessiz(b){if(b)b.disabled=true;try{await fetch("/komut",{method:"POST",body:JSON.stringify({tur:"sessiz"})})}catch(e){}if(b)b.disabled=false;refresh()}
 function sessizCiz(b,s){if(!b)return;const ss=s.sessiz,on=!!(ss&&ss.acik);b.classList.toggle("on",on);setH(b,ic('mute',on?L("{n} dk",{n:Math.max(1,Math.ceil(ss.kalan_sn/60))}):""))}
 function sessizTxt(s){const ss=s.sessiz,n=(ss&&ss.tutulan||[]).length;return(ss&&ss.acik?"🔇 "+L("sessiz, bitiş {t}",{t:ss.bitis})+(n?L(" · {n} kart bekliyor",{n}):""):n?"🔔 "+L("Sessiz bitti — Claude özetliyor ({n} kart)",{n}):"")+(s.ertelenen?(ss&&(ss.acik||n)?" · ":"")+"⏸ "+L("{n} kart sonraya bırakıldı",{n:s.ertelenen}):"")}
-// "Son 1 dk" — Claude son dakikanın satırlarıyla kısa özet kartı (CEVAP) gönderir
+// "Ne diyeyim?" (eski "Son 1 dk") — Claude son 2 dk + gündemle tek cümlelik replik + tek satır durum kartı (CEVAP) gönderir
 async function sendOzet(b){if(b)b.disabled=true;await fetch("/ask",{method:"POST",body:JSON.stringify({tur:"ozet"})});refresh();if(b)setTimeout(()=>b.disabled=false,5000)}
 // kalan süre + gündem kayması, konuşma payı
 function sureTxt(s){const v=s.sure;if(!v)return["","",""];const k=v.kalan_dk;let t=k>0?L("{n} dk kaldı",{n:k}):(k===0?L("süre doldu"):L("{n} dk aşıldı",{n:-k}))
@@ -269,9 +270,9 @@ async function openMini(){
 }
 function buildMini(w){
   mini=w; const d=w.document; d.title="Suflor.me mini"; d.head.querySelectorAll("style").forEach(x=>x.remove()); const st=d.createElement("style"); st.textContent=miniCss(); d.head.appendChild(st)
-  d.body.innerHTML=`<div id=mh></div><div id=mc></div><div id=ml></div><textarea id=mn rows=2 placeholder="${L("Not ya da soru (başa ?)")}"></textarea><div class=bt><button id=mnb class=pri>${L("Gönder")}</button><span class=sp1></span><button id=myz class=ib title="${L("⭐ Önemli an: şu anı özette öne çıkar")}">${ic('star')}</button><button id=msz class=ib title="${L("Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)")}">${ic('mute')}</button><button id=moz class=ib title="${L("Claude son 1 dakikayı özetlesin")}">${ic('hist')}</button><button id=mkz class=ib title="${L("Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur")}">${ic('cam')}</button></div>`
+  d.body.innerHTML=`<div id=mh></div><div id=mc></div><div id=ml></div><textarea id=mn rows=2 placeholder="${L("Not ya da soru (başa ?)")}"></textarea><div class=bt><button id=mnb class=pri>${L("Gönder")}</button><span class=sp1></span><button id=myz class=ib title="${L("⭐ Önemli an: şu anı özette öne çıkar")}">${ic('star')}</button><button id=msz class=ib title="${L("Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)")}">${ic('mute')}</button><button id=moz class=ib title="${L("Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)")}">${ic('replik')}</button><button id=mkz class=ib title="${L("Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur")}">${ic('cam')}</button></div>`
   bindAck(d.getElementById("mc")); wireBox(d.getElementById("mn"),d.getElementById("mnb")); d.getElementById("moz").onclick=ev=>sendOzet(ev.currentTarget); d.getElementById("myz").onclick=ev=>sendOnemli(ev.currentTarget); d.getElementById("msz").onclick=ev=>sendSessiz(ev.currentTarget); d.getElementById("mkz").onclick=ev=>sendKanit(ev.currentTarget,d.getElementById("mn"))
-  w.addEventListener("pagehide",()=>{if(mini===w)mini=null}); birakmaKur(w); if(last)paintMini(last)
+  w.addEventListener("pagehide",()=>{if(mini===w)mini=null}); birakmaKur(w); ipucuKur(d); if(last)paintMini(last)
 }
 function paintMini(s){
   if(!mini||mini.closed)return; const d=mini.document, mc=d.getElementById("mc"); if(!mc)return
@@ -295,6 +296,20 @@ function birakmaKur(w){const b=w.document.body;let n=0
   w.addEventListener('dragover',ev=>{if([...(ev.dataTransfer&&ev.dataTransfer.types||[])].includes('Files'))ev.preventDefault()})
   w.addEventListener('drop',ev=>{if(!ev.dataTransfer||!ev.dataTransfer.files.length)return;ev.preventDefault();n=0;b.classList.remove('surukle');baglamBirak([...ev.dataTransfer.files])})}
 birakmaKur(window)
+// ipucu: simgenin üstüne gelince hemen çıkar (tarayıcının kendi ipucu ~1 sn gecikiyor, mini pano penceresinde hiç çıkmayabiliyor).
+// title okununca data-ipucu'ya taşınır (çift ipucu olmasın); yalnız simgeli düğmeye aria-label olarak da yazılır (ekran okuyucu).
+function ipucuKur(d){const w=d.defaultView;let b=null,hedef=null,t=0
+  const gizle=()=>{clearTimeout(t);hedef=null;if(b)b.hidden=true}
+  d.addEventListener("mouseover",ev=>{const e=ev.target.closest&&ev.target.closest("[title],[data-ipucu]");if(!e||e===hedef)return
+    if(e.hasAttribute("title")){e.dataset.ipucu=e.getAttribute("title");if(!e.hasAttribute("aria-label")&&!e.textContent.trim())e.setAttribute("aria-label",e.dataset.ipucu);e.removeAttribute("title")}
+    const m=e.dataset.ipucu;if(!m){gizle();return}hedef=e;clearTimeout(t)
+    t=setTimeout(()=>{if(hedef!==e||!e.isConnected)return;if(!b){b=d.createElement("div");b.className="ipucu";b.setAttribute("role","tooltip");d.body.appendChild(b)}
+      b.textContent=m;b.hidden=false;const r=e.getBoundingClientRect(),bw=b.offsetWidth,bh=b.offsetHeight
+      const y=r.bottom+6+bh>w.innerHeight-6?r.top-bh-6:r.bottom+6
+      b.style.left=Math.max(6,Math.min(r.left+r.width/2-bw/2,w.innerWidth-bw-6))+"px";b.style.top=Math.max(6,y)+"px"},250)})
+  d.addEventListener("mouseout",ev=>{if(hedef&&!(ev.relatedTarget&&hedef.contains(ev.relatedTarget)))gizle()})
+  d.addEventListener("mousedown",gizle,true);w.addEventListener("scroll",gizle,true);w.addEventListener("blur",gizle)}
+ipucuKur(document)
 let agTotal=0
 document.getElementById("mini").onclick=openMini
 // geri bildirim — kullanıcının metni + isteğe bağlı teknik paket (aktarıcı süzer; önizleme aynı paketi gösterir)

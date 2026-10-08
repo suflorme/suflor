@@ -7,14 +7,14 @@ globalThis.SUFLOR_EN = {
   "Türkçe": "Turkish",
   "İngilizce": "English",
   "Gönder": "Send",
-  "Son 1 dk": "Last 1 min",
+  "Ne diyeyim?": "What do I say?",
   "Kanıt": "Evidence",
   "Söyle": "Say",
   "Dur": "Stop",
   "Cevap": "Answer",
   "Not": "Note",
   "⭐ Önemli an: şu anı özette öne çıkar": "⭐ Key moment: highlight this moment in the summary",
-  "Son 1 dk özeti hazırlanıyor…": "Preparing the last-minute summary…",
+  "Ne diyeyim? — replik hazırlanıyor…": "What do I say? — preparing a line…",
   "Claude'a soruldu: ": "Asked Claude: ",
   "Yaptım": "Done",
   "{n} dk kaldı": "{n} min left",
@@ -23,7 +23,7 @@ globalThis.SUFLOR_EN = {
   "not": "note",
   "soru": "question",
   "gönderilemedi": "not sent",
-  "Claude son 1 dakikayı özetlesin": "Claude sums up the last minute",
+  "Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)": "What do I say? Claude suggests a one-sentence line from the last minutes (Option + Shift + O)",
   "Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur": "Save the meeting screen as evidence; text in the box becomes its note",
   "henüz satır yok": "no lines yet",
   "son satır {a} önce · {k}": "last line {a} ago · {k}",
@@ -237,7 +237,7 @@ globalThis.SUFLOR_EN = {
   "{n} açık kart": "{n} open cards",
   // --- eklenti arka planı (bildirimler)
   "⭐ işaretlenemedi: ": "⭐ couldn't be marked: ",
-  "Özet istenemedi: ": "Couldn't request a summary: ",
+  "Ne diyeyim? istenemedi: ": "Couldn't request a line: ",
   "aktarıcıya ulaşılamadı (127.0.0.1:8765)": "can't reach the relay (127.0.0.1:8765)",
   "Açık toplantı sekmesi yok (Teams).": "No open meeting tab (Teams).",
   "Çalışma alanı seçilmedi — Suflor.me simgesine tıklayıp seç.": "No workspace selected — click the Suflor.me icon and pick one.",
@@ -275,5 +275,6 @@ globalThis.SUFLOR_EN = {
   "Sessiz bitti — Claude özetliyor ({n} kart)": "Quiet ended — Claude is summarising ({n} cards)",
   "{n} kart sonraya bırakıldı": "{n} cards set aside for later",
   "Suflor.me — sessiz; kartlar bekliyor": "Suflor.me — quiet; cards are waiting",
-  "Sessiz açılamadı: ": "Could not turn on quiet: "
+  "Sessiz açılamadı: ": "Could not turn on quiet: ",
+  "Ne diyeyim": "What do I say"
 };

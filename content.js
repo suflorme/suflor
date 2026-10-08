@@ -477,8 +477,11 @@
         .alt{display:flex;gap:4px;justify-content:flex-end}.alt button{color:var(--t2);border-color:var(--bd)}
         .gir textarea{flex:1;min-width:0;resize:none;font:12px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--tx);background:var(--s1);
           border:1px solid var(--bd2);border-radius:8px;padding:6px 8px;box-sizing:border-box}.gir button{color:var(--tx);border-color:var(--bd2);padding:6px 9px}
+        .kd{font-size:12px;color:var(--t2);margin-top:2px}.rp{font-weight:600}
+        .ipucu{position:fixed;z-index:1000;max-width:240px;padding:5px 8px;border-radius:6px;background:#18201c;color:#fff;font:12px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;white-space:pre-line;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+        .ipucu[hidden]{display:none}@media (prefers-color-scheme:dark){.ipucu{background:#e8ebe6;color:#171d1a}}
         .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 rgba(176,131,46,.75)}100%{box-shadow:0 0 0 12px rgba(176,131,46,0)}}`;
-    // Kart penceresi = mini pano: kartlar (NOT dahil), son satır, Claude'a not/soru kutusu, ⭐ / Son 1 dk / Kanıt.
+    // Kart penceresi = mini pano: kartlar (NOT dahil), son satır, Claude'a not/soru kutusu, ⭐ / Ne diyeyim? / 🔇 / Kanıt.
     // Kutu pano ve mini panodakiyle aynı: aktarıcı /girdi soru mu not mu ayırır (başta ? → soru); Enter gönderir, ⌘Enter her zaman
     // soru, Shift+Enter yeni satır. Sayfa içi listede kutu yok (ayrı pencere açılamazsa yalnız kartlar).
     function altDugmeler(d, ta) {
@@ -486,10 +489,29 @@
       const dg = (metin, ipucu, is) => { const b = d.createElement("button"); b.textContent = metin; b.title = L(ipucu); b.onclick = async () => { b.disabled = true; try { await is(); } catch (e) {} setTimeout(() => { b.disabled = false; }, 2500); pollCards(); }; a.append(b); };
       const post = (yol, g) => rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) });
       dg("⭐", "⭐ Önemli an: şu anı özette öne çıkar", () => post("/komut", { tur: "onemli", meeting: meetingInfo() }));  // ad: not süren toplantının dosyasına
-      dg(L("Son 1 dk"), "Claude son 1 dakikayı özetlesin", () => post("/ask", { tur: "ozet" }));
+      dg(L("Ne diyeyim?"), "Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)", () => post("/ask", { tur: "ozet" }));
       dg("🔇", "Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)", () => post("/komut", { tur: "sessiz" }));
       dg(L("Kanıt"), "Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur", () => { const not = ta.value.trim(); ta.value = ""; chrome.runtime.sendMessage({ type: "kanit", kaynak: "serit", not }); });
       return a;
+    }
+    // ipucu (pano ile aynı): kart penceresinde tarayıcının kendi ipucu çıkmayabiliyor — üstüne gelince hemen, title → data-ipucu
+    function ipucuKur(d) {
+      const w = d.defaultView; let b = null, hedef = null, t = 0;
+      const gizle = () => { clearTimeout(t); hedef = null; if (b) b.hidden = true; };
+      d.addEventListener("mouseover", ev => {
+        const x = ev.target.closest && ev.target.closest("[title],[data-ipucu]"); if (!x || x === hedef) return;
+        if (x.hasAttribute("title")) { x.dataset.ipucu = x.getAttribute("title"); if (!x.hasAttribute("aria-label")) x.setAttribute("aria-label", x.dataset.ipucu); x.removeAttribute("title"); }
+        if (!x.dataset.ipucu) return gizle(); hedef = x; clearTimeout(t);
+        t = setTimeout(() => {
+          if (hedef !== x || !x.isConnected) return;
+          if (!b) { b = d.createElement("div"); b.className = "ipucu"; b.setAttribute("role", "tooltip"); d.body.appendChild(b); }
+          b.textContent = x.dataset.ipucu; b.hidden = false; const r = x.getBoundingClientRect(), bw = b.offsetWidth, bh = b.offsetHeight;
+          b.style.left = Math.max(6, Math.min(r.left + r.width / 2 - bw / 2, w.innerWidth - bw - 6)) + "px";
+          b.style.top = Math.max(6, r.bottom + 6 + bh > w.innerHeight - 6 ? r.top - bh - 6 : r.bottom + 6) + "px";
+        }, 250);
+      });
+      d.addEventListener("mouseout", ev => { if (hedef && !(ev.relatedTarget && hedef.contains(ev.relatedTarget))) gizle(); });
+      d.addEventListener("mousedown", gizle, true); w.addEventListener("blur", gizle);
     }
     function kutu(d) {
       const f = d.createElement("div"); f.className = "gir";
@@ -527,7 +549,7 @@
           const st = d.createElement("style"); st.textContent = CSS + `html,body{margin:0;height:100%}body{background:#f9faf7}@media (prefers-color-scheme:dark){body{background:#1b221e}}.w{padding:8px;box-sizing:border-box;min-height:100%}.w .list{display:block;width:auto;max-height:none;border:0;box-shadow:none;padding:0;margin:0;background:transparent}`;
           const w = d.createElement("div"); w.className = "w"; const g = kutu(d);
           w.append(Object.assign(d.createElement("div"), { className: "list" }), Object.assign(d.createElement("div"), { className: "son" }), g, altDugmeler(d, g.querySelector("textarea")));
-          d.head.appendChild(st); d.body.appendChild(w); d.addEventListener("click", tikla);
+          d.head.appendChild(st); d.body.appendChild(w); d.addEventListener("click", tikla); ipucuKur(d);
           pip.addEventListener("pagehide", () => { pip = null; });
           const yas = setInterval(() => { if (!pip || pip.closed) return clearInterval(yas); if (sonV) sonCiz(pip.document, sonV.son); }, 5000);
           acik = false; root.querySelector(".w").classList.remove("acik"); if (sonV) { sig = ""; paint(sonV); } return;
@@ -561,8 +583,9 @@
       cards.forEach(c => {
         const k = e("div", "k"); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
         if (c.onay) k.dataset.onay = "1"; else k.title = L("Dokun: kapat");
-        const m = e("div", "m"); m.append(e("b", null, (c.geri ? "↩ " : "") + L(c.onay ? "Onay bekliyor" : KL[c.kind] || "Not")));
-        if (!c.gizli || ayri) m.append(d.createTextNode(c.text));
+        const m = e("div", "m"); m.append(e("b", null, (c.geri ? "↩ " : "") + L(c.onay ? "Onay bekliyor" : c.replik ? "Ne diyeyim" : KL[c.kind] || "Not")));
+        if (!c.gizli || ayri) m.append(c.replik ? e("span", "rp", c.text) : d.createTextNode(c.text));
+        if (c.durum && (!c.gizli || ayri)) m.append(e("div", "kd", c.durum));  // Ne diyeyim?: şu an ne konuşuluyor
         const a = e("div", "a");
         // onay kartı (#76): Claude'un yapacağı iç işi yazılı onayla — yalnız anahtarlı eklentiden geçer
         (c.onay ? [["onaylandi", "✓ " + L("Onayla"), "Onayla"], ["reddedildi", "✕ " + L("Reddet"), "Reddet"]] :
@@ -570,7 +593,7 @@
           .forEach(([st, lbl, tip]) => { const x = e("button", null, lbl); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
         k.append(m, a); list.append(k);
       });
-      qs.forEach(q => list.append(e("div", "q", "⏳ " + (q.tur === "ozet" ? L("Son 1 dk özeti hazırlanıyor…") : L("Claude'a soruldu: ") + q.text))));
+      qs.forEach(q => list.append(e("div", "q", "⏳ " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L("Claude'a soruldu: ") + q.text))));
       if (!cards.length && !qs.length && !dil && !warn) list.append(e("div", "bos", L("Şimdilik kart yok")));
     }
     function sonCiz(d, son) {  // mini panodaki gibi tek satır canlılık: son döküm satırı ne zaman, kimden

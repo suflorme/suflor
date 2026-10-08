@@ -383,12 +383,14 @@ def add_card(p):
         c["reply_to"] = str(p["reply_to"])[:40]
         q = next((q for q in QUESTIONS if q["id"] == c["reply_to"]), None)
         if q: c["q"] = q["text"][:200]  # cevap kartında hangi soruya cevap olduğu görünsün
+        if q and q.get("tur") == "ozet": c["replik"] = True; c.pop("q", None)  # "Ne diyeyim?" kartı: başlık "Ne diyeyim", soru satırı yok
     if isinstance(p.get("agenda_i"), int): c["agenda_i"] = p["agenda_i"]
+    if p.get("durum"): c["durum"] = " ".join(str(p["durum"]).split())[:160]  # kartın altındaki tek satır (Ne diyeyim?: şu an ne konuşuluyor)
     if p.get("sessiz_ozet") and SESSIZ["id"]: c["sessiz_ozet"] = SESSIZ["id"]  # sessizin özeti: bekleyenleri kapatır, kendisi beklemez
     elif sessiz_acik() and kind != "dur" and not c.get("reply_to"): c["sessiz"] = SESSIZ["id"]
     with LOCK:
         c["file"] = aktif_dosya(); CARDS.append(c); _log("kartlar.jsonl", c)
-        _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')} |{' 🔇 bekliyor ' if c.get('sessiz') else ' '}|", c, "kartlar.jsonl")
+        _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {'NE DİYEYİM' if c.get('replik') else CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')}{(' — ' + c['durum'].replace('|', '¦')) if c.get('durum') else ''} |{' 🔇 bekliyor ' if c.get('sessiz') else ' '}|", c, "kartlar.jsonl")
         if c.get("sessiz_ozet"):
             for x in CARDS:
                 if x.get("sessiz") == c["sessiz_ozet"] and x.get("status") == "acik":
@@ -432,9 +434,10 @@ def girdi_ayir(ham):
     if re.match(r"^claude", t, re.I): return "soru", t
     return "not", t
 def ask(p):
-    # tur "ozet" = "Son 1 dk" düğmesi; izle son dakikanın satırlarını ekler, Claude kısa özet kartı döner
+    # tur "ozet" = "Ne diyeyim?" (Option + Shift + O, panodaki düğme; eski "Son 1 dk"): izle son 2 dk'nın satırlarını, gündemi ve açık
+    # soruları ekler, Claude tek cümlelik replik + tek satır durum kartı döner (kayıt adı "ozet" eski kayıtlarla uyumlu kalsın diye)
     ozet = p.get("tur") == "ozet"
-    text = str(p.get("text") or "").strip()[:1000] or ("Son 1 dakikanın kısa özeti" if ozet else "")
+    text = str(p.get("text") or "").strip()[:1000] or ("Ne diyeyim?" if ozet else "")
     if not text: return None
     now = datetime.datetime.now()
     with LOCK:
@@ -445,7 +448,7 @@ def ask(p):
         q = {"id": "q" + str(int(time.time() * 1000)) + secrets.token_hex(2), "at": now.isoformat(timespec="seconds"), "file": aktif_dosya(), "text": text}
         if ozet: q["tur"] = "ozet"
         QUESTIONS.append(q); _log("sorular.jsonl", q)
-        _md(f"| {now.strftime('%H:%M:%S')} | **{'SON 1 DK ÖZETİ İSTENDİ' if ozet else 'CLAUDE’A SORU'}** | {' / '.join(text.replace('|', '¦').splitlines())} | |", q, "sorular.jsonl")
+        _md(f"| {now.strftime('%H:%M:%S')} | **{'NE DİYEYİM? İSTENDİ' if ozet else 'CLAUDE’A SORU'}** | {' / '.join(text.replace('|', '¦').splitlines())} | |", q, "sorular.jsonl")
     return q
 # --- Kanıt ekran görüntüsü -------------------------------------------------------------------------------------
 # kullanıcı toplantıda ⌥⇧K (Chrome kısayolu), şeritteki ya da panodaki 📷 ile Teams sekmesinin görünen alanını kaydeder;
@@ -1124,14 +1127,14 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
                          **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,
                          **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60))} if ses else {})}]})  # ses sinyalleri + hız (kelime/dk)
 # --- Kısayol komutları ------------------------------------------------------------------------------------------
-# ⭐ önemli an ve son 1 dk özeti eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
+# ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
 # isteği de yok (Faz 2: üç yanlış alarm, karşı taraf da duyuyor); kanıt yalnız Option + Shift + K ve 📷 ile.
 def komut_uygula(tur, gov, title):  # tur: onemli | ozet | sessiz (/komut yalnız bunları kabul eder)
     title = title or STATE["meeting"] or "Toplantı"; at = datetime.datetime.now().isoformat(timespec="seconds")
     if tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
     elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
-    else: ask({"tur": "ozet"}); onay = "Son 1 dk özeti istendi"
+    else: ask({"tur": "ozet"}); onay = _t("💬 Ne diyeyim? — Claude replik hazırlıyor", "💬 What do I say? — Claude is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
     print(f"KOMUT: {tur} · \"{gov[:80]}\"")
 def ingest(p):

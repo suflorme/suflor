@@ -48,7 +48,7 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
 
 ## 3. Bağlam ve hazır kartlar
 - `tc hazirlik --kim <kişi>`: kişinin geçmişte söyledikleri, gündem maddesi başına ilk 3 sonuç, önceki toplantılarda ona sorulup
-  cevapsız kalan sorular ve esas belgelerde geçtiği satırlar. Yetmeyen madde için `tc ara "<sorgu>" [--kim] [--tur …] [--n 8]`
+  cevapsız kalan sorular, kapanmamış sözleri (sözler defteri) ve esas belgelerde geçtiği satırlar. Yetmeyen madde için `tc ara "<sorgu>" [--kim] [--tur …] [--n 8]`
   (tüm proje klasörü: belgeler, tablolar, görüşmeler, `_canli/` toplantıları). Kişiye ait hazırlık notu varsa oku.
 - Kullanıcıya 3–6 satır "geçmişte ne dendi / açık kalan ne" (kaynak `dosya @konum`). Esas belgeler ve tablolar güncel kayıttır;
   döküm ile çelişirse tablo geçer, çelişkiyi kullanıcıya söyle.
@@ -59,7 +59,7 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
     {"id": "h9", "gundem": 4, "tetik": [], "tur": "cevap", "soru": "kullanıcının sorabileceği soru", "metin": "cevap", "neden": "kaynak"}
   ]}
   ```
-  Madde başına 1–3 kart; çoğu `soyle`, gerekirse `dur`; NOT hazırlama. Cevapsız eski sorulardan `soyle` kartı yap. `dinleyici`da
+  Madde başına 1–3 kart; çoğu `soyle`, gerekirse `dur`; NOT hazırlama. Cevapsız eski sorulardan ve kapanmamış sözlerden (önce tarihi geçenler) `soyle` kartı yap. `dinleyici`da
   yalnız `cevap` ve `dur`; `katilimci`da `soyle` yalnız kullanıcının işini doğrudan ilgilendirince. `tetik`: 2–4 ayırt edici kelime, küçük harf;
   en az biri sistem adı (github, jira, iam) + dökümdeki olası yanlış yazımı. "hesap", "erişim",
   "şifre" gibi her yerde geçen kelime tetik olmaz; genel kelime ya da kişi adı tetiği yalnız o madde konuşulurken çalışır. `cevap`
@@ -77,6 +77,10 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    toplantıysa `--uzerine`). Teams'in dökümü gerekmez; kullanıcı indirdiyse (Downloads'ta yeni .docx/.vtt) `tc karsilastir <dosya>
    --kaydet` → özete "Döküm kapsamı %X, kaçan N satır" (önemli kaçan bölümü ekle). İndirmediyse hatırlatma.
 2. Özetten takip işlerini say (toplam T / sahibi ve tarihi belli S), `tc sonuc --takip T/S --karar K --kaydet`.
+   **Sözler defteri:** toplantıda verilen her söz ve takip işi (iki taraf, kullanıcınınkiler dahil; "yaparım", "Cuma'ya kadar
+   gönderirim") için `tc soz ekle "<ne>" --kim <kişi> [--tarih YYYY-MM-DD]` — sormadan (yerel kayıt, esas belge değil); tarih
+   söylenmediyse boş bırak, uydurma. Hazırlıkta gelen eski sözlerden toplantıda tutulduğu anlaşılanı `tc soz kapat sN`, düşeni
+   `--durum iptal`. Özette takip işleri satırlarının sonuna kimliği yaz (`s4`).
 3. `_canli/<bu toplantı>.md`'den özet taslağı, sırayla:
    - `## Değerlendirme — not X/5` + 1–2 cümle: karar çıktı mı, en zayıf boyut, bir dahaki toplantıya tek öneri. Not toplantıyı
      değerlendirir, kişiyi değil. Kullanıcı "neye göre" derse: "Not 1–5; gündemin ne kadarı konuşuldu, süre, açık soruların kapanması,

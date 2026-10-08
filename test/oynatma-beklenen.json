@@ -104,7 +104,7 @@
    "| <SAAT> | Ayla Örnek | Katılıyorum, sadece ilgili depolara verelim. |  |",
    "| <SAAT> | Deniz Test | Yedeklere bir daha dönelim: geri yükleme kaydı nerede tutuluyor? |  |",
    "| <SAAT> | Ayla Örnek | Kayıt ortak klasördeki tabloda, ben sana gönderirim. |  |",
-   "| <SAAT> | **SON 1 DK ÖZETİ İSTENDİ** | Son 1 dakikanın kısa özeti | |",
+   "| <SAAT> | **NE DİYEYİM? İSTENDİ** | Ne diyeyim? | |",
    "| <SAAT> | Deniz Test | Süper. Özetle: IAM temizliği senin, ayın yirmisi. |  |",
    "| <SAAT> | Ayla Örnek | Evet, GitHub üyelerini de aynı hafta gözden geçiririm. |  |",
    "| <SAAT> | Deniz Test | Başka eklemek istediğin bir şey var mı? |  |",
@@ -181,7 +181,7 @@
   "olcum.jsonl": "<var>",
   "sorular.jsonl": [
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}",
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Son 1 dakikanın kısa özeti\", \"tur\": \"ozet\"}"
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Ne diyeyim?\", \"tur\": \"ozet\"}"
   ],
   "sozluk.json": [
    "{\"terimler\": [{\"dogru\": \"GitHub\", \"yanlis\": [\"git hab\", \"gidhab\"]}, {\"dogru\": \"Bitwarden\", \"yanlis\": [\"bitvarden\"]}]}"
@@ -189,16 +189,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 83022,
-   "sha": "7f57ef2fb5899925"
+   "uzunluk": 85497,
+   "sha": "749224a7862509c7"
   },
   "/hazirlik": {
-   "uzunluk": 26507,
-   "sha": "4bac00f4a96ee07e"
+   "uzunluk": 26677,
+   "sha": "255776b389ce1504"
   },
   "/mini": {
-   "uzunluk": 83022,
-   "sha": "7f57ef2fb5899925"
+   "uzunluk": 85497,
+   "sha": "749224a7862509c7"
   },
   "/status": {
    "_ping_son": "float",
@@ -653,11 +653,11 @@
   "HAZIR KARTLAR": 1,
   "KART": 1,
   "KATILIMCI": 1,
+  "NE DİYEYİM": 1,
   "NOT": 2,
   "SATIRLAR": 30,
   "SORU": 1,
   "SÜRE": 6,
-  "ÖZET İSTEĞİ": 1,
   "İZLEME BAŞLADI": 1
  },
  "izle_satir_kapsami": "41/43",
