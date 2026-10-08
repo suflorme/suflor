@@ -38,7 +38,7 @@ section+section{margin-top:6px}main .sh,aside .sh{top:-6px}  /* kaydırınca sat
 .k{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:9px 11px;margin:0 0 8px;position:relative;overflow:hidden}
 .k::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc,var(--gr))}
 .k b{display:block;font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--kc,var(--gr));margin-bottom:2px}
-.kw{font-size:12px;color:var(--t2);margin-top:3px}.ey{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--bd)}.ey .t{flex:1;min-width:0}.ey .d{font-size:12px;color:var(--t2);margin-top:3px}.ey summary{font-size:12px;color:var(--t2);cursor:pointer;margin-top:3px}.ey pre{white-space:pre-wrap;font:12px/1.45 var(--f-teknik);background:var(--s2);border-radius:6px;padding:6px 8px;margin:4px 0 0}.ey .ea{display:flex;gap:4px;flex:none}.ey-ses{background:var(--s2);border-radius:8px;padding-left:8px;padding-right:8px}.ey-reddedildi .b{color:var(--t3);text-decoration:line-through}.ey-hata .d{color:var(--er)}.k-replik .rp{font-weight:600}.kd{font-size:12px;color:var(--t2);margin-top:3px}
+.kw{font-size:12px;color:var(--t2);margin-top:3px}.ey{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--bd)}.ey .t{flex:1;min-width:0}.ey .d{font-size:12px;color:var(--t2);margin-top:3px}.ey summary{font-size:12px;color:var(--t2);cursor:pointer;margin-top:3px}.ey pre{white-space:pre-wrap;font:12px/1.45 var(--f-teknik);background:var(--s2);border-radius:6px;padding:6px 8px;margin:4px 0 0}.ey .ea{display:flex;gap:4px;flex:none}.bk{display:flex;gap:12px;align-items:flex-start}.bk .t{flex:1;min-width:0}.bk .b{margin-top:3px}.bk .d{font-size:12px;color:var(--t2);margin-top:3px}#kb{flex:none;touch-action:none;user-select:none}#kb.on{background:var(--er);border-color:var(--er)}.ey-ses{background:var(--s2);border-radius:8px;padding-left:8px;padding-right:8px}.ey-reddedildi .b{color:var(--t3);text-decoration:line-through}.ey-hata .d{color:var(--er)}.k-replik .rp{font-weight:600}.kd{font-size:12px;color:var(--t2);margin-top:3px}
 .ipucu{position:fixed;z-index:1000;max-width:260px;padding:5px 8px;border-radius:6px;background:var(--tx);color:var(--bg);font:12px/1.35 var(--f-govde);white-space:pre-line;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}.ipucu[hidden]{display:none}
 .k-soyle{--kc:var(--br-tx)}.k-dur{--kc:var(--er);background:var(--er-bg)}.k-cevap,.k-not{--kc:var(--gr)}.k[data-id]{cursor:pointer;display:flex;gap:8px;align-items:flex-start}.k[data-id]:hover{border-color:var(--bd2)}.k .km{flex:1;min-width:0}.k.kapaniyor{opacity:.45}.ka{display:flex;gap:2px;flex:none}.ka button{padding:3px 5px;color:var(--t3)}.ka button:hover{color:var(--tx)}.ka button.on{padding:3px 8px;color:var(--t2)}.ka button.on.pri{color:#fff}.k[data-onay]{cursor:default}
 .kc{font-size:12px;color:var(--t3);padding:3px 0 3px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -89,6 +89,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <section id=tks hidden><div id=tk></div><div id=tkh class=hint></div><div id=tkalt class=tkalt><button id=tke class=gh title="Takvimde olmayan bir toplantı için">Elle başlat</button><button id=tky class="gh ib" title="Takvimi yenile">↻</button></div>
 <div id=tkf hidden><input id=tkk placeholder="Kişi — konu (ör. Ayşe — bütçe)"><input id=tkl type=url placeholder="Toplantı bağlantısı (isteğe bağlı; yoksa Teams açılır)"><textarea id=tkc rows=2 placeholder="Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin"></textarea><div class=r2><select id=tkr><option value=yurutucu>Yürütücü (ben yönetiyorum)</option><option value=katilimci>Katılımcı</option><option value=dinleyici>Dinleyici</option></select><select id=tkd><option value=tr>Türkçe</option><option value=en>İngilizce</option><option value=karisik>Karışık</option></select></div>
 <div class=bt><button id=tkb class=pri>Başlat</button><button id=tki class=gh>Vazgeç</button><span id=tkm></span><span class=sp1></span><a href="#" id=tky2 class=hint hidden>Suflor.me olmadan katıl</a></div></div></section>
+<section id=kns hidden><div class=sh><span>Konuş <span class=meta>Option + Shift + Boşluk'u basılı tut</span></span><span><button id=kz2 class=gh hidden>Sus</button></span></div><div class=bk><button id=kb class=pri title="Basılı tut, sor, bırak — Claude sesli cevaplar (ses Mac'ten çıkmaz)">🎙 Basılı tut, konuş</button><div id=knd class=t></div></div></section>
 <section id=brs hidden><div class=sh>Brifing <span id=brn class=meta></span></div><div id=br></div></section>
 <section id=sns hidden><div class=sh>Son toplantılar</div><div id=sn></div></section>
 <section id=eys hidden><div class=sh><span>Yapılacaklar <span id=eyn class=meta></span></span><button id=eyh class=pri title="Listedeki bekleyen işlerin hepsini onayla — Claude yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
@@ -363,6 +364,33 @@ document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=doc
   const o0=tkOlaylar.find(x=>x.id===tkSecili), bl=(o0&&o0.baglanti)?"":document.getElementById('tkl').value.trim(), hz=true, w=CHROME?window.open('/hazirlik','_blank'):null  // hazırlık sekmesi, hazır olunca toplantıya geçer
   try{const r=await j('/baslat',{method:'POST',body:JSON.stringify({olay:tkSecili,konu:k,baglanti:bl,baglam:document.getElementById('tkc').value,rol:document.getElementById('tkr').value,dil:document.getElementById('tkd').value})});if(r.err==='köken'||r.err==='anahtar')r.err=L('Pano eski — sayfayı yenileyip tekrar dene');if(w&&!r.ok)w.close();if(hz&&!CHROME&&r.ok)chromeAc({hazirlik:true});m.className=r.ok?'ok':'er';m.textContent=r.ok?L(hz?"Başladı — hazır olunca toplantıya geçilir":"Başladı — Claude gündemi kurup izlemeye başlar"):(r.err||L('başlatılamadı'))}
   catch(e){if(w)w.close();m.className='er';m.textContent=L("Suflor.me'ye ulaşılamadı")}finally{setTimeout(()=>b.disabled=false,3000)}}
+// bas-konuş (Faz 4): toplantı dışında basılı tut → pano mikrofonu 16 kHz → /bas-konus → yerel Whisper → Claude (açık süreç) → Mac sesi
+let kRec=null,kSure=null
+async function konusBasla(){if(kRec)return;kRec={hazir:false};konusCiz()
+  let r={};try{r=await j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'basla'})})}catch(e){}
+  if(!r.ok){kRec=null;konusCiz();geciciDurum(L('Bas-konuş başlamadı'),r.err||'');return}
+  try{const st=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}}),ac=new AudioContext({sampleRate:16000}),src=ac.createMediaStreamSource(st),pr=ac.createScriptProcessor(4096,1,1),parca=[]
+    pr.onaudioprocess=e=>parca.push(new Float32Array(e.inputBuffer.getChannelData(0)));src.connect(pr);pr.connect(ac.destination)
+    if(!kRec){st.getTracks().forEach(t=>t.stop());ac.close();return}  // izin beklerken bırakıldı
+    Object.assign(kRec,{st,ac,pr,parca,hazir:true});kSure=setTimeout(konusBitir,60000);if(kRec.birak)konusBitir()}
+  catch(e){kRec=null;konusCiz();geciciDurum(L('Mikrofon açılamadı'),String(e&&e.name||''))}}
+async function konusBitir(){const k=kRec;if(!k)return;if(!k.hazir){k.birak=true;return}kRec=null;clearTimeout(kSure);konusCiz()
+  k.pr.disconnect();k.st.getTracks().forEach(t=>t.stop());const sr=k.ac.sampleRate;await k.ac.close()
+  let n=k.parca.reduce((a,b)=>a+b.length,0),f=new Float32Array(n),o=0;for(const b of k.parca){f.set(b,o);o+=b.length}
+  if(sr!==16000){const m=Math.floor(n*16000/sr),g=new Float32Array(m);for(let i=0;i<m;i++)g[i]=f[Math.floor(i*sr/16000)];f=g;n=m}  // tarayıcı 16 kHz vermezse
+  const pcm=new Int16Array(n);for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,f[i]));pcm[i]=v<0?v*32768:v*32767}
+  const u=new Uint8Array(pcm.buffer);let bin='';for(let i=0;i<u.length;i+=32768)bin+=String.fromCharCode.apply(null,u.subarray(i,i+32768))
+  let r={};try{r=await j('/bas-konus',{method:'POST',body:JSON.stringify({pcm:btoa(bin)})})}catch(e){}
+  if(!r.ok)geciciDurum(L('Soru gönderilemedi'),r.err||'');refresh()}
+function konusCiz(){document.getElementById('kb').classList.toggle('on',!!kRec);if(last)renderKonus(last)}
+function renderKonus(s){const sec=document.getElementById('kns');sec.hidden=!!s.aktif;if(sec.hidden)return;const k=s.konus||{}
+  const d=kRec?L('Dinliyorum… bırakınca sorarım'):({yaziya:L('Yazıya döküyorum…'),dusunuyor:L('Claude düşünüyor…'),konusuyor:L('Claude cevaplıyor'),hata:k.hata||''}[k.durum]||(k.soru?'':L('Basılı tutup sor; Claude kısa ve sesli cevaplar. Yalnız okur, kayıt yapmaz.')))
+  document.getElementById('kz2').hidden=k.durum!=='konusuyor'&&k.durum!=='hazir'
+  setH(document.getElementById('knd'),`${d?`<div class=meta>${esc(d)}</div>`:''}${k.soru&&!kRec?`<div class=d><b>${L('Soru')}:</b> ${esc(k.soru)}</div>`:''}${k.cevap&&!kRec?`<div class=b>${esc(k.cevap)}</div>`:''}${k.olcum&&k.olcum.ses_ms&&!kRec?`<div class=meta>${L('Bırakıştan ilk sese {n} sn',{n:(k.olcum.ses_ms/1000).toFixed(1)})}</div>`:''}`)}
+{const kb=document.getElementById('kb');kb.addEventListener('pointerdown',e=>{e.preventDefault();kb.setPointerCapture(e.pointerId);konusBasla()});kb.addEventListener('pointerup',konusBitir);kb.addEventListener('pointercancel',konusBitir)
+  document.getElementById('kz2').onclick=()=>j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'sus'})}).catch(()=>{})
+  document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.altKey&&e.shiftKey&&!document.getElementById('kns').hidden){e.preventDefault();if(!e.repeat)konusBasla()}})
+  document.addEventListener('keyup',e=>{if(kRec&&(e.code==='Space'||e.key==='Alt'||e.key==='Shift')){e.preventDefault();konusBitir()}})}
 // toplantı öncesi brifing: boş panoda seçili takvim toplantısı için, dokununca (Claude yalnız okur; sonuç gün boyu saklanır)
 function renderBrifing(s){const sec=document.getElementById('brs'),izliyor=s.claude_age_s!=null&&s.claude_age_s<120,o=tkOlaylar.find(x=>x.id===tkGor)
   sec.hidden=!!s.aktif||izliyor||!o;if(sec.hidden)return
@@ -418,7 +446,7 @@ durumCiz()
 const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
-paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderSon(s)
+paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderKonus(s); renderSon(s)
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id+(c.geri||""))); firstCards=false

@@ -3,6 +3,8 @@
 // olabilir). Uygulama paketi `open` ile açılınca izin bu uygulamaya sorulur (bir kez) ve alt süreç Claude da onu kullanır.
 // Giriş: --istek <json>  {"claude": ".../claude", "args": [...], "cwd": "...", "cikti": "...", "sure": 240}
 // Yalnız adı "claude" olan ikiliyi çalıştırır; yazma/komut aracı açan argümanları reddeder (salt okunur brifing).
+// Açık süreç kipi (bas-konuş, v0.20.0): istekte "giris"/"cikis" (aktarıcının açtığı iki FIFO) varsa Claude'un girişi ve çıkışı onlara
+// bağlanır, süreç aktarıcı girişi kapatana (ya da "sure" dolana) kadar açık kalır; izin yine bu uygulamaya sorulur.
 import Foundation
 
 func bitir(_ kod: Int32) -> Never { exit(kod) }
@@ -16,6 +18,16 @@ let yasak = ["dangerously", "Bash", "Write", "Edit", "NotebookEdit", "WebFetch",
 if arg.contains(where: { x in yasak.contains(where: { x.contains($0) }) }) { bitir(3) }
 
 let p = Process()
+if let giris = j["giris"] as? String, let cikis = j["cikis"] as? String {
+    guard let gir = FileHandle(forReadingAtPath: giris), let cik = FileHandle(forWritingAtPath: cikis) else { bitir(7) }
+    p.executableURL = URL(fileURLWithPath: claude); p.arguments = arg; p.currentDirectoryURL = URL(fileURLWithPath: cwd)
+    var e = ProcessInfo.processInfo.environment; e["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:" + (e["PATH"] ?? ""); p.environment = e
+    p.standardInput = gir; p.standardOutput = cik; p.standardError = FileHandle.nullDevice
+    do { try p.run() } catch { bitir(4) }
+    let sure = (j["sure"] as? Double) ?? 7200
+    DispatchQueue.global().asyncAfter(deadline: .now() + sure) { if p.isRunning { p.terminate() } }
+    p.waitUntilExit(); bitir(p.terminationStatus)
+}
 p.executableURL = URL(fileURLWithPath: claude); p.arguments = arg; p.currentDirectoryURL = URL(fileURLWithPath: cwd)
 var env = ProcessInfo.processInfo.environment
 env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:" + (env["PATH"] ?? "")
