@@ -189,16 +189,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 85497,
-   "sha": "749224a7862509c7"
+   "uzunluk": 89000,
+   "sha": "290a95de3f40f95c"
   },
   "/hazirlik": {
-   "uzunluk": 26677,
-   "sha": "255776b389ce1504"
+   "uzunluk": 27331,
+   "sha": "adfd44b4a112f01f"
   },
   "/mini": {
-   "uzunluk": 85497,
-   "sha": "749224a7862509c7"
+   "uzunluk": 89000,
+   "sha": "290a95de3f40f95c"
   },
   "/status": {
    "_ping_son": "float",
@@ -308,6 +308,7 @@
     "ver": "str",
     "yonerge": "NoneType"
    },
+   "eylem": "NoneType",
    "file": "str",
    "file_last": {
     "<TARIH>-Deneme-toplantısı-altyapı.md": "float"
@@ -531,6 +532,7 @@
     "uyari": "NoneType"
    },
    "ertelenen": "int",
+   "eylem": "NoneType",
    "imza": "str",
    "kanit_iste": "NoneType",
    "kanit_n": "int",

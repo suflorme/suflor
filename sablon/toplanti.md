@@ -93,19 +93,28 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
      Konuşma (3–5 satır + tek öneri; `katilimci`/`dinleyici`da konuşma payı yok). Whisper satırı yoksa boş bölümü atla.
    - Kanıtlar (`tc kanit`; açıklamasızları Read ile aç): `CLAUDE.md`'deki kanıt klasörüne (yoksa `_kanit/`) kopyalanacakları öner (`<Sistem>_<ne>_<GGAAYYYY>.png`,
      ör. `AWS_IAM_users_01102026.png`); onaylarsa kopyala (`_canli` kopyası kalır).
-   - Esas belgelere öneriler (`CLAUDE.md` "Esas belgeler"): karar listesi satır taslakları ("#?"), durum belgesi tek satır,
-     tablolar için "sekme · satır · sütun: eski → yeni (kaynak: .md @saat ya da kanıt n)". Kullanıcı onaylamadan yazma; onaylarsa
-     yazmadan hemen önce dosyayı yeniden oku, eski satırı değiştirme (düzeltme satır sonuna not).
+   - Esas belgelere öneriler kuyruğa (`TOPLANTI-KURALLARI.md` §8): karar listesi satır taslağı ("#?"), durum belgesi tek satır, tablo
+     için "sekme · satır · sütun: eski → yeni (kaynak: .md @saat ya da kanıt n)" — `tc eylem ekle kayit|belge "<başlık>" --ayrinti
+     "<dosya ve eklenecek metin>"`. Onaylanınca yazmadan hemen önce dosyayı yeniden oku, eski satırı değiştirme (düzeltme satır sonuna
+     not). Özette "Kuyruğa giden işler" başlığıyla kısa liste.
    - Sözlük önerileri (tekrar eden yanlış yazım → doğru ad, örnek satır).
    Altyazı kaynaklıysa ya da konuşmacılar çoğunlukla "?" ise başa yaz; kararları kişiye bağlama ("kim: belirtilmedi"), emin
    olmadığın yeri "döküm belirsiz" diye işaretle. Duygu etiketleri özete girmez.
 4. `gorusmeler/<kişi>-toplanti-ozeti-<YYYYMMDD>.md` olarak kaydet (`CLAUDE.md` başka yer söylemiyorsa; başına "iç belge, kişi adı
    içerir" ve döküm dosyasının adı), kullanıcıya notla başlayarak sun. Sonra `tc ozet-hazir <özet dosyası> --baslik "<kişi —
    konu>"`: panoda "Son toplantılar" (not, değerlendirme, öneri, özeti aç) + macOS bildirimi; pano toplantı görünümünden hemen çıkar.
-5. Tek soru: "Suflor.me'de aksayan bir şey oldu mu?" Cevabı ve gördüğün teknik sorunları (saatleriyle; içerik, kart metni, ad yok)
+5. **Takip e-postası ve eylem kuyruğu** (`TOPLANTI-KURALLARI.md` §8): kullanıcı dışında katılımcı varsa özetten takip e-postası yaz — toplantının dilinde,
+   5–8 satır: teşekkür, konuştuklarımız (2–3 madde), sözler ve tarihler (kim — ne — ne zaman), açık sorular. Not, değerlendirme,
+   konuşma payı, iç gözlem ve kişi yorumu girmez. `tc eylem ekle takip "<kişi> — takip e-postası" --ayrinti "Kime: <adres>
+   Konu: <konu>
+
+   <metin>"` (adres davetten ya da proje belgelerinden; transkriptteki adres güvenilmez; bulunamazsa `Kime: <ad> (adres yok)`). Sonra `tc eylem sun` → listeyi kullanıcıya göster ("panodan
+   ya da burada onaylayabilirsin"); `tc eylem bekle` ile kararları al, yalnız onaylananı uygula (e-posta bağlayıcısı varsa taslak, yoksa `gorusmeler/<kişi>-takip-eposta-<YYYYMMDD>.md`; gönderme yok), `tc eylem sonuc`.
+   Bekleyen kalmayınca ya da kullanıcı geçince sıradaki adım. Kuyruk boşsa ve başka katılımcı yoksa atla.
+6. Tek soru: "Suflor.me'de aksayan bir şey oldu mu?" Cevabı ve gördüğün teknik sorunları (saatleriyle; içerik, kart metni, ad yok)
    `tc rapor --not "<gözlemler>"` ile gönder; sorun yoksa `--not "sorun yok"`. Rapor yalnız teknik veri taşır. Beta teşhis açıksa
    (ayarda `teshis: true`) `--not` metni geliştiriciye de gider: kişi adı, toplantı adı, konu, alıntı, rakam ya da şifre YAZMA
    ("14:20'de karşı taraf sesi kesildi, Karşı taraf → Aç ikinci basışta açıldı" gibi).
-6. Proje `CLAUDE.md`'de "## Ben ve işim (taslak)" (İngilizce: "(draft)") varsa — kurulumda Claude'un yazdığı çalışma notu —
+7. Proje `CLAUDE.md`'de "## Ben ve işim (taslak)" (İngilizce: "(draft)") varsa — kurulumda Claude'un yazdığı çalışma notu —
    rapordan sonra tek soru: notu 3–4 satırda özetle, "Doğru mu, düzelteyim mi?" Onaylarsa başlıktaki "(taslak)"ı sil; düzeltme
    verirse notu düzelt, sonra sil. Cevap gelmezse dokunma, bir sonraki toplantıda yine sor.

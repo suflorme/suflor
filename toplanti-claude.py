@@ -70,6 +70,12 @@ sz.add_argument("--ekle", nargs=2, metavar=("YANLIS", "DOGRU"), help="yanlış b
 sz.add_argument("--baglam", default="", help="virgüllü: yalnız aynı satırda bu kelimelerden biri varsa düzelt (gerçek kelime olabilen biçimler için)")
 sz.add_argument("--not", dest="aciklama", default="")
 sz.add_argument("--birlestir", action="store_true", help="v0.5.2: ayardaki sözlük kaynağından (tsv + xlsx Vendor sekmesi) yeniden kur; --ekle ile eklenenler korunur")
+ey = sub.add_parser("eylem", help="eylem kuyruğu: ekle <tur> \"başlık\" --ayrinti … | liste | sun | onay <eN,eM|hepsi> [--red] | bekle [--sn] | sonuc eN --durum yapildi|hata --not …")
+ey.add_argument("islem", choices=["ekle", "liste", "sun", "onay", "bekle", "sonuc"]); ey.add_argument("deger", nargs="*")
+ey.add_argument("--ayrinti", default="", help="ekle: uygulanacak işin tam hâli (komut; e-postada Kime/Konu/metin; davette kişiler/saat/konu)")
+ey.add_argument("--kim", default=""); ey.add_argument("--red", action="store_true", help="onay: reddet")
+ey.add_argument("--sn", type=int, default=540, help="bekle: en çok kaç sn (Bash aracının 10 dk sınırının altında)")
+ey.add_argument("--durum", default="yapildi", choices=["yapildi", "hata"]); ey.add_argument("--not", dest="aciklama", default="")
 so = sub.add_parser("soz", help="sözler defteri: toplantıda verilen sözler (toplantı sonunda) — liste [--kim] [--hepsi] | ekle \"ne\" --kim X [--tarih YYYY-MM-DD] | kapat sN")
 so.add_argument("islem", nargs="?", default="liste", choices=["liste", "ekle", "kapat"]); so.add_argument("deger", nargs="?")
 so.add_argument("--kim", default=""); so.add_argument("--tarih", default="", help="söz verilen tarih (YYYY-MM-DD); belirsizse boş")
@@ -359,6 +365,51 @@ def soz_cmd():
         print(soz_satir(xs[-1] if A.islem == "ekle" else x)); return
     ys = [x for x in soz_kisinin(d, A.kim) if A.hepsi or x.get("durum") == "acik"]
     print("\n".join(soz_satir(x) for x in ys) or "söz yok")
+# --- Eylem kuyruğu (Faz 4) ---------------------------------------------------------------------------------------
+EYLEM_AD = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "diger": "Diğer"}
+def _post(yol, govde):
+    req = urllib.request.Request(A.relay + yol, data=json.dumps(govde).encode(), method="POST", headers={"Content-Type": "application/json"})
+    return json.load(urllib.request.urlopen(req, timeout=5))
+def _eylemler(): return (get("/cards").get("eylem") or {}).get("liste") or []
+def eylem_satir(x, i=None, ayrinti=False):
+    d = {"bekliyor": "bekliyor", "onaylandi": "✓ ONAYLANDI", "reddedildi": "✕ reddedildi", "yapildi": "✓ yapıldı", "hata": "⚠ hata"}.get(x["durum"], x["durum"])
+    s = f"{(str(i) + '. ') if i else ''}{x['id']} [{EYLEM_AD.get(x['tur'], x['tur'])} · {d}] {x['baslik']}" + (f" — {x['kim']}" if x.get("kim") else "") + (f" · {x['sonuc']}" if x.get("sonuc") else "")
+    return s + ("\n" + "\n".join("     " + l for l in (x.get("ayrinti") or "(ayrıntı yok)").splitlines()) if ayrinti else "")
+def eylem_cmd():
+    if A.islem == "ekle":
+        if len(A.deger) < 2 or A.deger[0] not in EYLEM_AD: sys.exit("kullanım: eylem ekle <" + "|".join(EYLEM_AD) + "> \"başlık\" --ayrinti \"…\"")
+        r = _post("/eylem", {"tur": A.deger[0], "baslik": " ".join(A.deger[1:]), "ayrinti": A.ayrinti, "kim": A.kim})
+        if not r.get("ok"): sys.exit("eklenemedi")
+        print("kuyruğa eklendi: " + eylem_satir(r["eylem"])); return
+    if A.islem == "sun":
+        n = _post("/eylem-sun", {}).get("n", 0); xs = [x for x in _eylemler() if x["durum"] == "bekliyor"]
+        print(f"{n} iş panoda onaya sunuldu. Kullanıcıya bu listeyi göster; panodan ya da sohbette ('hepsi evet', '1 ve 3 evet') onaylar:")
+        for i, x in enumerate(xs, 1): print(eylem_satir(x, i, ayrinti=True))
+        print("Sonra: eylem bekle (onaylananları ayrıntısıyla verir) → yalnız onaylananı, ayrıntıdaki gibi uygula → eylem sonuc eN --durum yapildi|hata --not \"…\"")
+        return
+    if A.islem == "onay":  # kullanıcı sohbette onayladı; kimlikler ya da "hepsi"; sıra numarası da olur (sun'daki sıra)
+        bek = [x for x in _eylemler() if x["durum"] == "bekliyor" and x.get("sunuldu")]; n = 0
+        hedef = ["hepsi"] if A.deger == ["hepsi"] else [bek[int(v) - 1]["id"] if v.isdigit() and 0 < int(v) <= len(bek) else v for d in A.deger for v in d.split(",") if v]
+        for h in hedef: n += _post("/eylem-karar", {"id": h, "durum": "reddedildi" if A.red else "onaylandi"}).get("n", 0)
+        print(f"{n} iş {'reddedildi' if A.red else 'onaylandı'}"); return
+    if A.islem == "bekle":  # yeni kararları verir; karar yoksa --sn dolunca döner
+        fp = os.path.join(A.dir, "eylem-bildirilen.json")
+        try: bil = set(json.load(open(fp, encoding="utf-8")))
+        except (OSError, ValueError): bil = set()
+        son = time.time() + A.sn
+        while True:
+            xs = _eylemler(); yeni = [x for x in xs if x["durum"] in ("onaylandi", "reddedildi") and x["id"] not in bil]
+            bek = sum(1 for x in xs if x["durum"] == "bekliyor" and x.get("sunuldu"))
+            if yeni or not bek or time.time() >= son: break
+            time.sleep(2)
+        for x in yeni:
+            print(("UYGULA: " if x["durum"] == "onaylandi" else "YAPMA: ") + eylem_satir(x, ayrinti=x["durum"] == "onaylandi")); bil.add(x["id"])
+        json.dump(sorted(bil), open(fp, "w", encoding="utf-8"))
+        print(f"bekleyen {bek}" + (" → yeniden: eylem bekle" if bek else " — kuyruk kapandı") if yeni or not bek else f"{A.sn} sn'de karar gelmedi · bekleyen {bek}"); return
+    if A.islem == "sonuc":
+        if not A.deger: sys.exit("eylem kimliği gerekli")
+        print("kaydedildi" if _post("/eylem-sonuc", {"id": A.deger[0], "durum": A.durum, "sonuc": A.aciklama}).get("ok") else "kaydedilemedi (onaylanmamış iş?)"); return
+    xs = _eylemler(); print("\n".join(eylem_satir(x, ayrinti=True) for x in xs) or "kuyruk boş")
 def gundem_cmd():
     try: items = json.load(open(os.path.join(A.dir, "agenda.json"), encoding="utf-8")).get("items", [])
     except FileNotFoundError: items = []
@@ -1635,7 +1686,7 @@ def _hms(sn):
     return f"{sn // 3600}:{sn % 3600 // 60:02d}:{sn % 60:02d}" if sn >= 3600 else f"{sn // 60}:{sn % 60:02d}"
 
 try:
-    {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "gundem": gundem_cmd,
+    {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

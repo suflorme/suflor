@@ -276,5 +276,21 @@ globalThis.SUFLOR_EN = {
   "{n} kart sonraya bırakıldı": "{n} cards set aside for later",
   "Suflor.me — sessiz; kartlar bekliyor": "Suflor.me — quiet; cards are waiting",
   "Sessiz açılamadı: ": "Could not turn on quiet: ",
-  "Ne diyeyim": "What do I say"
+  "Ne diyeyim": "What do I say",
+  "Kayıt": "Record",
+  "Takvim": "Calendar",
+  "E-posta": "Email",
+  "Belge": "Document",
+  "Takip e-postası": "Follow-up email",
+  "Diğer": "Other",
+  "onaylandı — Claude uyguluyor": "approved — Claude is applying it",
+  "reddedildi": "rejected",
+  "yapıldı": "done",
+  "yapılamadı": "failed",
+  "{n} onay bekliyor": "{n} awaiting approval",
+  "Ayrıntı": "Details",
+  "{n} iş toplantı sonuna": "{n} tasks for the end of the meeting",
+  "Yapılacaklar": "To do",
+  "Hepsini onayla": "Approve all",
+  "Listedeki bekleyen işlerin hepsini onayla — Claude yalnız yazıldığı gibi uygular": "Approve every pending task — Claude applies each exactly as written"
 };

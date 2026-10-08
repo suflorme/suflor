@@ -323,6 +323,63 @@ def ertele_kontrol():  # vakti gelen ertelenmiş kart geri gelir (görünümler 
             c["geri"] = at.isoformat(timespec="seconds")
             _log("kartlar.jsonl", {"id": c["id"], "at": c["geri"], "geri": True})
             _md(f"| {at.strftime('%H:%M:%S')} | **KART ↩ geri geldi** | {c['text'].replace('|', '¦')} | |")
+# --- Eylem kuyruğu (Faz 4) --------------------------------------------------------------------------------------
+# Toplantıda konuşulan iş (kayıt, takvim/e-posta taslağı, belge değişikliği, takip e-postası) kart göstermeden kuyruğa girer
+# (toplanti-claude.py eylem ekle). Toplantı sonunda Claude listeyi sunar (eylem sun): panoda Onayla/Reddet + "Hepsini onayla", ya da
+# kullanıcı sohbette onaylar (eylem onay). Karar yalnız anahtarlı istemciden; Claude yalnız onaylananı, ayrıntıda yazıldığı gibi
+# uygular ve sonucu yazar (eylem sonuc). E-posta yalnız taslak, takvim bildirim gönderilmeden — kural metni TOPLANTI-KURALLARI §8.
+EYLEM_TUR = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "diger": "Diğer"}
+EYLEMLER = []; EYLEM_SAAT = 12  # bu kadar saatten eski eylem panoda görünmez
+def _eylem_temiz(x, n): return " ".join(str(x or "").split())[:n]
+def eylem_yukle():
+    sinir = (datetime.datetime.now() - datetime.timedelta(hours=EYLEM_SAAT)).isoformat(); by = {}
+    try:
+        for raw in open(os.path.join(BASE, "eylemler.jsonl"), encoding="utf-8"):
+            try: x = json.loads(raw)
+            except ValueError: continue
+            if "tur" in x:
+                if str(x.get("at", "")) >= sinir: EYLEMLER.append(x); by[x["id"]] = x
+            elif x.get("id") in by: by[x["id"]].update({k: v for k, v in x.items() if k not in ("id", "at")})
+    except FileNotFoundError: pass
+def eylem_ekle(p):
+    tur = p.get("tur") if p.get("tur") in EYLEM_TUR else None; baslik = _eylem_temiz(p.get("baslik"), 160)
+    if not tur or not baslik: return None
+    ayr = str(p.get("ayrinti") or "").strip()[:4000]; now = datetime.datetime.now()
+    x = {"id": "e" + str(int(time.time() * 1000)) + secrets.token_hex(2), "at": now.isoformat(timespec="seconds"), "file": aktif_dosya(),
+         "tur": tur, "baslik": baslik, "ayrinti": ayr, "kim": _eylem_temiz(p.get("kim"), 60) or None, "durum": "bekliyor", "sunuldu": False}
+    with LOCK:
+        EYLEMLER.append(x); _log("eylemler.jsonl", x)
+        if x["file"]: _md(f"| {now.strftime('%H:%M:%S')} | **EYLEM** | kuyruğa ({EYLEM_TUR[tur]}): {baslik.replace('|', '¦')} | |")  # toplantı bittiyse dökümde yer yok
+    return x
+def _eylem_yama(x, **k):  # LOCK içinde
+    x.update(k); _log("eylemler.jsonl", dict({"id": x["id"], "at": datetime.datetime.now().isoformat(timespec="seconds")}, **k))
+def eylem_sun():
+    with LOCK:
+        xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and not x.get("sunuldu")]
+        for x in xs: _eylem_yama(x, sunuldu=True)
+    return len(xs)
+def eylem_karar(p, kaynak):
+    d = p.get("durum") if p.get("durum") in ("onaylandi", "reddedildi") else None
+    if not d: return 0
+    with LOCK:
+        xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and (p.get("id") == "hepsi" and x.get("sunuldu") or x["id"] == p.get("id"))]
+        for x in xs: _eylem_yama(x, durum=d, karar_at=datetime.datetime.now().isoformat(timespec="seconds"), yetkili=True, kaynak=kaynak)
+    if xs: print(f"EYLEM: {len(xs)} iş {'onaylandı' if d == 'onaylandi' else 'reddedildi'} ({kaynak})")
+    return len(xs)
+def eylem_sonuc(p):
+    d = p.get("durum") if p.get("durum") in ("yapildi", "hata") else None
+    with LOCK:
+        x = next((x for x in EYLEMLER if x["id"] == p.get("id")), None)
+        if not x or not d or x["durum"] not in ("onaylandi", "yapildi", "hata"): return False
+        _eylem_yama(x, durum=d, sonuc=_eylem_temiz(p.get("sonuc"), 300))
+    return True
+def eylem_gorunen():
+    sinir = (datetime.datetime.now() - datetime.timedelta(hours=EYLEM_SAAT)).isoformat()
+    return [x for x in EYLEMLER if x["at"] >= sinir]
+def eylem_view():
+    xs = eylem_gorunen()
+    return {"liste": [{k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc")} for x in xs],
+            "bekleyen": sum(1 for x in xs if x["durum"] == "bekliyor")} if xs else None
 def cards_view():
     ertele_kontrol()
     # (kullanıcı) pano yeniden açılınca önceki toplantının kartları görünmez — yalnız süren toplantının (aktif dosya)
@@ -346,7 +403,7 @@ def cards_view():
     return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered][-5:],
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
-            "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "ertelenen": ertelenen,
+            "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
             "baglam": baglam_view(),
             "son": {k: v for k, v in (STATE.get("son_satir") or {}).items() if k != "file"} if (STATE.get("son_satir") or {}).get("file") == af and af else None}
 # şerit uzun yoklaması — GET /cards?bekle=25&imza=<son> şeridin gösterdiği durum değişene kadar (en çok 25 sn)
@@ -361,6 +418,7 @@ def serit_imza(v):
     ss = v.get("sessiz") or {}
     x = [[(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
          (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"),
+         [(x["id"], x["durum"], x.get("sunuldu")) for x in ((v.get("eylem") or {}).get("liste") or [])],
          (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
     return hashlib.sha1(json.dumps(x, default=str, sort_keys=True).encode()).hexdigest()[:16]
 def cards_bekle(imza, sn):
@@ -1997,6 +2055,12 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/card-ack":  # onay kartının Onayla/Reddet'i yalnız anahtarlı istemciden (#76)
             if p.get("status") in ("onaylandi", "reddedildi") and not yetkili: return self._anahtar_yok()
             return self._json({"ok": ack_card(p, yetkili)})
+        if self.path == "/eylem":  # kuyruğa iş — yalnız anahtarlı (toplanti-claude.py); geçiş listesinde yok
+            x = eylem_ekle(p); return self._json({"ok": bool(x), "eylem": x}, 200 if x else 400)
+        if self.path == "/eylem-sun": return self._json({"ok": True, "n": eylem_sun()})
+        if self.path == "/eylem-karar":  # Onayla / Reddet / Hepsini onayla — anahtarlı pano ya da sohbetteki onay (eylem onay)
+            n = eylem_karar(p, "pano" if pano else "sohbet"); return self._json({"ok": n > 0, "n": n})
+        if self.path == "/eylem-sonuc": return self._json({"ok": eylem_sonuc(p)})
         if self.path == "/son-toplanti":  # toplantı sonu özeti hazır (toplanti-claude.py ozet-hazir) — kart gibi anahtarla
             return self._json(son_ekle(p))
         if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
@@ -2080,7 +2144,7 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
 if __name__ == "__main__":
-    restore_state(); load_cards(); son_yukle(); brifing_yukle(); anahtar_yardimcisi_kur()
+    restore_state(); load_cards(); eylem_yukle(); son_yukle(); brifing_yukle(); anahtar_yardimcisi_kur()
     threading.Thread(target=_takvim_dongu, daemon=True).start()
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
