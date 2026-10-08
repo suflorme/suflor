@@ -65,9 +65,13 @@ def yaz_baslangic(canli, t0):
     json.dump({"son": 1, "kaynaklar": [{"id": "b1", "at": loc(0), "tur": "baglanti", "deger": "https://ornek.example/teklif", "ad": "https://ornek.example/teklif",
                "kaynak": "baslat", "file": None}]}, open(os.path.join(canli, "baglam.json"), "w"), ensure_ascii=False)
 
+ANAHTAR_DOSYA = None  # v0.14.0: eklenti gibi yerel anahtarla (kart-anahtari.txt; aktarıcı açılınca yazar)
+def anahtar():
+    try: return open(ANAHTAR_DOSYA, encoding="utf-8").read().strip()
+    except (OSError, TypeError): return ""
 def istek(yol, govde=None, bas=None):
     r = urllib.request.Request(URL + yol, data=None if govde is None else json.dumps(govde).encode(), method="GET" if govde is None else "POST",
-                               headers=dict(bas or {}, **({"Content-Type": "application/json"} if govde is not None else {})))
+                               headers=dict(bas or {}, **({"Content-Type": "application/json"} if govde is not None else {}), **{"X-Suflor-Anahtar": anahtar()}))
     return urllib.request.urlopen(r, timeout=5).read()
 
 def bekle_hazir():
@@ -94,7 +98,8 @@ def olay_turu(l):
     m = OLAY_RX.match(l); return m.group(1).strip() if m else None
 
 def kos():
-    T = tempfile.mkdtemp(prefix="suflor-oynatma-"); kod, canli = kur(T)
+    global ANAHTAR_DOSYA
+    T = tempfile.mkdtemp(prefix="suflor-oynatma-"); kod, canli = kur(T); ANAHTAR_DOSYA = os.path.join(canli, "kart-anahtari.txt")
     t0 = time.time(); yaz_baslangic(canli, t0)
     env = dict(os.environ, HIZ_T0=str(t0), HIZ_K=str(K), PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json"))
     py = sys.executable

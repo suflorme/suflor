@@ -11,8 +11,12 @@ shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"),
                      stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+def anahtar():  # v0.14.0 yerel anahtar (aktarıcı açılınca yazar)
+    try: return open(os.path.join(canli, "kart-anahtari.txt"), encoding="utf-8").read().strip()
+    except OSError: return ""
 def istek(yol, govde=None):
-    q = urllib.request.Request(URL + yol, data=json.dumps(govde).encode() if govde is not None else None, method="POST" if govde is not None else "GET")
+    q = urllib.request.Request(URL + yol, data=json.dumps(govde).encode() if govde is not None else None, method="POST" if govde is not None else "GET",
+                               headers={"X-Suflor-Anahtar": anahtar()})
     return json.load(urllib.request.urlopen(q, timeout=5))
 def satir(i, metin, baslik=None):
     istek("/ingest", dict({"source": "transcript", "entries": [{"id": f"s/{i}", "speaker": "Deniz", "time": "10:00", "text": metin}]},

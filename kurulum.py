@@ -10,7 +10,7 @@
 #   python3 kurulum.py modeller   yerel modeller ve Python ortamı (olanı yeniden kurmaz)                ← modeller-kur.command
 #   python3 kurulum.py guncelle   son sürümü alır (git klonu: git pull; değilse açık depodan), kurar     ← guncelle.command
 # Deneme: SUFLOR_EV=<geçici klasör> ev klasörünü değiştirir (ayar, uygulama, proje oraya yazılır; aktarıcı kurulmaz).
-import argparse, shlex, datetime, getpass, json, os, platform, re, secrets, shutil, subprocess, sys, tempfile, threading, time, urllib.request
+import argparse, shlex, datetime, getpass, json, os, platform, re, secrets, shutil, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.dont_write_bytecode = True
 
@@ -144,6 +144,20 @@ def modeller_baslat():
                                   stderr=subprocess.STDOUT, start_new_session=True)
 
 # ---------- aktarıcı (kurulduysa) ----------
+# v0.14.0 yerel anahtar: aktarıcının okuma uçları anahtar ister — bu hesabın aktarıcısına (ayardaki port) giden her isteğe başlık.
+# Başka porttaki aktarıcıya (aynı Mac'te diğer hesap) anahtar gitmez; yoklama orada yalnız "yanıt var mı"ya bakar (401 de yanıttır).
+def _anahtar():
+    try: return open(os.path.join(yollar()["uygulama"], "canli", "kart-anahtari.txt"), encoding="utf-8").read().strip()
+    except OSError: return ""
+class _AnahtarEkle(urllib.request.BaseHandler):
+    def http_request(self, r):
+        if r.full_url.startswith(f"http://127.0.0.1:{yollar()['port']}/") and not r.has_header("X-suflor-anahtar"): r.add_header("X-Suflor-Anahtar", _anahtar())
+        return r
+urllib.request.install_opener(urllib.request.build_opener(_AnahtarEkle()))
+def _yanit_var(url, sn):
+    try: urllib.request.urlopen(url, timeout=sn); return True
+    except urllib.error.HTTPError: return True  # 401/403: aktarıcı orada
+    except Exception: return False
 def aktarici(yol):
     port = ayar().get("port")
     if not port: return None
@@ -157,9 +171,7 @@ def eklenti():
     # bu Mac'te başka hesabın aktarıcısı da çalışıyorsa eklenti hangisine yazacağını sorar (Suflor.me simgesi → alan seç)
     coklu = sum(1 for p in range(8765, 8769) if p != ayar().get("port") and _acik(p)) > 0 if s else False
     return {"bagli": nabiz or arka, "surum": (x.get("ver") if nabiz else k.get("ver")) if (nabiz or arka) else None, "coklu": coklu, "alan": s.get("alan")}
-def _acik(p):
-    try: urllib.request.urlopen(f"http://127.0.0.1:{p}/status", timeout=0.6); return True
-    except Exception: return False
+def _acik(p): return _yanit_var(f"http://127.0.0.1:{p}/status", 0.6)
 def yerel_ses():  # karşı ses yardımcısı kuruldu mu (kur adımında gösterilir)
     s = aktarici("/status") or {}; y = s.get("yerel_ses") or {}
     return {"kurulu": bool(y.get("kurulu")), "durum": y.get("durum")} if s else None
@@ -173,43 +185,66 @@ def takvim():
     return {"durum": t.get("durum"), "takvimler": list(tk.values()),
             "olaylar": [{"saat": o["saat"], "bitis": o["bitis_saat"], "baslik": o["baslik"], "platform": o.get("platform")} for o in t.get("olaylar", [])]}
 
-# ---------- profil: Claude'un çalışma notu ----------
-PROFIL = {"durum": None, "metin": "", "terimler": []}
+# ---------- profil: Claude'un çalışma notu (taslak) ----------
+# Sihirbaz 17 → 10 ekran (8 Ekim): ayrı "Seni böyle tanıdım" ekranı yok. Kurulum bitince bağımsız süreç (`kurulum.py profil`,
+# sihirbaz kapansa da sürer) proje klasöründeki dökümlerden ve profil alanlarından notu yazar: CLAUDE.md'ye "(taslak)" başlıkla;
+# ilk toplantının sonunda /toplanti kullanıcıya gösterip onay ister. Terimler ayarın whisper_terimler'ine eklenir (aktarıcı
+# yeniden başlayınca, ör. güncellemede, ipucuna girer).
 PROFIL_ISTEM = {"tr": """Sen Suflor.me'nin kurulum yardımcısısın. Suflor.me, kullanıcının toplantılarını canlı izleyip ona kısa kartlarla ne
-sorması, neyi belirtmesi gerektiğini söyleyen bir asistan. Aşağıda kullanıcının kendini anlattığı cevaplar ve varsa LinkedIn
-profili ile geçmiş görüşme dökümleri var (dosya yolları verildiyse Read ile oku). Bunlardan kullanıcı için bir "çalışma notu" çıkar:
-kim olduğu, rolü, toplantı türleri, kartlarda neye öncelik vermesi ve neyle rahatsız edilmemesi gerektiği. 120–220 kelime,
-düz Türkçe, madde değil kısa paragraflar; uydurma bilgi yazma. Ayrıca konuşma tanımanın doğru yazması gereken özel adları ve
-terimleri (kişi adları, sistem ve ürün adları, kısaltmalar) en çok 30 tane çıkar.
+sorması, neyi belirtmesi gerektiğini söyleyen bir asistan. Aşağıda kullanıcının kurulumda verdiği bilgiler ve varsa geçmiş görüşme
+dökümlerinin yolları var (Read ile oku). Bunlardan kullanıcı için bir "çalışma notu" çıkar: kim olduğu, rolü, toplantı türleri,
+kartlarda neye öncelik verilmesi ve neyle rahatsız edilmemesi gerektiği. 120–220 kelime, düz Türkçe, madde değil kısa paragraflar;
+uydurma bilgi yazma, bilmediğini yazma. Ayrıca konuşma tanımanın doğru yazması gereken özel adları ve terimleri (kişi adları,
+sistem ve ürün adları, kısaltmalar) en çok 30 tane çıkar; genel kelimeleri (tedarikçi, stok, fatura gibi) ve Suflor.me'yi yazma.
 Yalnız şu JSON'u yaz, başka hiçbir şey yazma: {"not": "...", "terimler": ["...", "..."]}""",
                "en": """You are Suflor.me's setup assistant. Suflor.me follows the user's meetings live and tells them in short cards what to ask
-and what to point out. Below are the user's answers about themselves and, if provided, their LinkedIn profile and past meeting
-transcripts (read the files with Read if paths are given). Write a "working note" about the user: who they are, their role,
-their meetings, what cards should prioritise and what should not interrupt them. 120–220 words, plain English, short paragraphs,
-no invented facts. Also list up to 30 special names and terms speech recognition must spell correctly (people, systems, products, acronyms).
+and what to point out. Below is what the user gave during setup and, if any, paths to past meeting transcripts (read them with Read).
+Write a "working note" about the user: who they are, their role, their meetings, what cards should prioritise and what should not
+interrupt them. 120–220 words, plain English, short paragraphs, no invented facts, leave out what you don't know. Also list up to 30
+special names and terms speech recognition must spell correctly (people, systems, products, acronyms); leave out common words
+(supplier, stock, invoice) and Suflor.me.
 Output only this JSON and nothing else: {"not": "...", "terimler": ["...", "..."]}"""}
-def profil_olustur(cevap, dil):
-    p = claude_yolu()
-    if not p or cevap.get("kartsiz"): PROFIL.update(durum="yok"); return
-    PROFIL.update(durum="calisiyor")
-    def is_():
-        alanlar = {k: cevap.get(k) for k in ("ad", "rol", "sirket", "is_alani", "araclar", "araclar_ek", "kisiler", "s1", "s2", "s3", "s4", "linkedin_metin") if cevap.get(k)}
-        dosyalar = [os.path.join(YUKLEME, "linkedin", f) for f in os.listdir(os.path.join(YUKLEME, "linkedin"))] if os.path.isdir(os.path.join(YUKLEME, "linkedin")) else []
-        dosyalar += [os.path.join(YUKLEME, "gorusmeler", f) for f in sorted(os.listdir(os.path.join(YUKLEME, "gorusmeler")))[:5]] if os.path.isdir(os.path.join(YUKLEME, "gorusmeler")) else []
-        istem = PROFIL_ISTEM.get(dil, PROFIL_ISTEM["tr"]) + "\n\nCEVAPLAR:\n" + json.dumps(alanlar, ensure_ascii=False, indent=1) + \
-            ("\n\nDOSYALAR:\n" + "\n".join(dosyalar) if dosyalar else "")
-        try:
-            r = subprocess.run([p, "-p", istem, "--allowedTools", "Read", "--add-dir", YUKLEME], capture_output=True, text=True, timeout=240, cwd=YUKLEME if os.path.isdir(YUKLEME) else tempfile.gettempdir())
-            m = re.search(r"\{.*\}", r.stdout, re.S); j = json.loads(m.group(0)) if m else {}
-            PROFIL.update(durum="hazir" if j.get("not") else "hata", metin=str(j.get("not") or "").strip(), terimler=[str(x)[:60] for x in (j.get("terimler") or [])][:30])
-        except Exception as e: PROFIL.update(durum="hata", metin="", terimler=[])
-    threading.Thread(target=is_, daemon=True).start()
+PROFIL_BASLIK = {"tr": "## Ben ve işim", "en": "## About me and my work"}
+def profil_gerekli(c):  # yalnız adla not yazılmaz (uydurmaya iter); döküm ya da bir profil alanı gerekir
+    return not c.get("kartsiz") and (bool(c.get("gorusmeler")) or any(c.get(k) for k in ("rol", "is_alani", "araclar_ek", "kisiler")))
+def profil():  # komut satırı: kurulum.py profil — kurulum.json'daki cevaplar + proje/gorusmeler → CLAUDE.md taslak notu
+    a = ayar(); k = oku_json(KAYIT); c = k.get("cevap") or {}; dil = a.get("dil") or k.get("dil") or "tr"; cl = claude_yolu()
+    proje = gen(a.get("proje") or "~/Suflor"); cm = os.path.join(proje, "CLAUDE.md")
+    if not cl or not os.path.isfile(cm) or not profil_gerekli(c): say("profil: gerek yok ya da Claude/CLAUDE.md yok"); return
+    if PROFIL_BASLIK[dil] in open(cm, encoding="utf-8").read(): say("profil: not zaten var"); return
+    ornek = {os.path.basename(f) for f in glob_ornek(dil)}; gd = os.path.join(proje, "gorusmeler")
+    dosyalar = [os.path.join(gd, f) for f in sorted(os.listdir(gd)) if f in set(c.get("gorusmeler") or []) and f not in ornek][:5] if os.path.isdir(gd) else []
+    alanlar = {x: c.get(x) for x in ("ad", "rol", "sirket", "is_alani", "araclar_ek", "kisiler") if c.get(x)}
+    istem = PROFIL_ISTEM[dil] + "\n\nBİLGİLER:\n" + json.dumps(alanlar, ensure_ascii=False, indent=1) + ("\n\nDOSYALAR:\n" + "\n".join(dosyalar) if dosyalar else "")
+    try:
+        r = subprocess.run([cl, "-p", istem, "--allowedTools", "Read", "--add-dir", gd], capture_output=True, text=True, timeout=300, cwd=proje)
+        m = re.search(r"\{.*\}", r.stdout, re.S); j = json.loads(m.group(0)) if m else {}
+    except Exception as e: say(f"profil: Claude çağrısı başarısız ({e.__class__.__name__})"); return
+    metin = str(j.get("not") or "").strip()
+    terimler = [str(x)[:60] for x in (j.get("terimler") or []) if not str(x).lower().startswith("suflor")][:30]
+    if not metin: say("profil: Claude not döndürmedi"); return
+    s = open(cm, encoding="utf-8").read()
+    if PROFIL_BASLIK[dil] in s: return  # bu arada kullanıcı yazdıysa dokunma
+    bugun = datetime.date.today().isoformat()
+    s = s.rstrip() + f"\n\n{PROFIL_BASLIK[dil]} " + ("(taslak)\n" if dil == "tr" else "(draft)\n") + \
+        (f"_Kurulumda Claude hazırladı ({bugun}). İlk toplantının sonunda onaylanınca başlıktaki \"(taslak)\" silinir; istediğin zaman düzenleyebilirsin._\n\n" if dil == "tr" else
+         f"_Drafted by Claude during setup ({bugun}). Once you approve it after your first meeting, \"(draft)\" is removed from the heading; edit it any time._\n\n") + metin + "\n"
+    kisiler = [x.strip() for x in str(c.get("kisiler") or "").split(",") if x.strip()]
+    if kisiler: s += ("\nSık görüştüğüm kişiler: " if dil == "tr" else "\nPeople I meet often: ") + ", ".join(kisiler) + "\n"
+    open(cm, "w", encoding="utf-8").write(s)
+    if terimler: a = ayar(); a["whisper_terimler"] = list(dict.fromkeys((a.get("whisper_terimler") or []) + terimler))[:60]; yaz_json(AYAR_YOL, a)
+    say(f"profil: taslak not yazıldı ({len(metin.split())} kelime, {len(terimler)} terim)")
+def teshis_ayarla(acik):  # Kuruyorum ekranındaki anahtar kurulumdan sonra değişirse: ayara yaz, aktarıcı yeniden okusun
+    a = ayar()
+    if not a or a.get("teshis") is (acik is True): return {"ok": True}
+    a["teshis"] = acik is True; yaz_json(AYAR_YOL, a)
+    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
+    return {"ok": True}
 
 # ---------- son kurulum ----------
 def bos_port():
     for p in range(8765, 8770):
-        try: urllib.request.urlopen(f"http://127.0.0.1:{p}/status", timeout=1)
-        except Exception: return p
+        if not _yanit_var(f"http://127.0.0.1:{p}/status", 1): return p
     return 8770
 def tamamla(c, dil):
     sonuc = {"ayar": "bekle", "proje": "bekle", "not": "bekle", "aktarici": "bekle"}
@@ -247,16 +282,11 @@ def tamamla(c, dil):
             for f in glob_ornek(dil): shutil.copy2(f, os.path.join(proje, "gorusmeler", os.path.basename(f)))
         sonuc["proje"] = "iyi"
     except Exception as e: sonuc.update(proje="kotu", hata=f"Proje klasörü kurulamadı: {e}"); return sonuc
-    try:
-        cm = os.path.join(proje, "CLAUDE.md"); s = open(cm, encoding="utf-8").read(); baslik = "## Ben ve işim" if dil == "tr" else "## About me and my work"
-        metin = str(c.get("profil_metin") or "").strip()
-        if metin and baslik not in s:
-            s = s.rstrip() + f"\n\n{baslik}\n" + (f"_Kurulum sihirbazında hazırlandı ({datetime.date.today().isoformat()}); düzenleyebilirsin._\n\n" if dil == "tr" else
-                                                  f"_Drafted by the setup assistant ({datetime.date.today().isoformat()}); edit freely._\n\n") + metin + "\n"
-            if kisiler: s += ("\nSık görüştüğüm kişiler: " if dil == "tr" else "\nPeople I meet often: ") + ", ".join(kisiler) + "\n"
-            open(cm, "w", encoding="utf-8").write(s)
-        sonuc["not"] = "iyi"
-    except Exception as e: sonuc.update(**{"not": "uyari"})
+    # çalışma notu: bağımsız süreçte (sihirbaz kapansa da sürer); kurulum.json bu çağrıdan önce kaydedildi
+    sonuc["not"] = "bos"
+    if profil_gerekli(c) and claude_yolu() and (not DENEME or os.environ.get("SUFLOR_PROFIL_DENE")):
+        yaz_json(KAYIT, dict(oku_json(KAYIT), cevap=c, dil=dil))
+        subprocess.Popen([PY, os.path.abspath(__file__), "profil"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True); sonuc["not"] = "iyi"
     if DENEME: sonuc["aktarici"] = "iyi"; return sonuc
     r = subprocess.run([PY, os.path.abspath(__file__), "kur"], capture_output=True, text=True, timeout=300)
     sonuc["aktarici"] = "iyi" if r.returncode == 0 else "kotu"
@@ -300,7 +330,10 @@ def ac(hedef):
     elif hedef == "chrome-eklentiler": subprocess.Popen(["open", "-a", "Google Chrome", "chrome://extensions"])
     elif hedef == "eklenti-klasoru": subprocess.Popen(["open", "-R", os.path.join(KOD, "manifest.json")])
     elif hedef == "pano" and a.get("port"):
-        subprocess.Popen(["open"] + (["-a", "Google Chrome"] if os.path.isdir("/Applications/Google Chrome.app") else []) + [f"http://127.0.0.1:{a['port']}/"])  # pano Chrome'da; threading.Timer(3, lambda: os._exit(0)).start()
+        # pano yerel anahtarı kendi deposuna alır: aktarıcıdan tek kullanımlık adres (anahtar komut satırına yazılmaz)
+        try: url = json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{a['port']}/tek-kullanim", data=b"{}", method="POST"), timeout=3))["url"]
+        except Exception: url = f"http://127.0.0.1:{a['port']}/"
+        subprocess.Popen(["open"] + (["-a", "Google Chrome"] if os.path.isdir("/Applications/Google Chrome.app") else []) + [url])  # pano Chrome'da; threading.Timer(3, lambda: os._exit(0)).start()
 def klasor_sec():
     r = sh("osascript", "-e", 'POSIX path of (choose folder with prompt "Suflor.me proje klasörü")', zaman=300)
     return r.rstrip("/") if r else None
@@ -350,7 +383,6 @@ class H(BaseHTTPRequestHandler):
             return self._json({"mac": mac(), "claude": claude_durum(), "modeller": modeller_durum(), "eklenti": eklenti(), "takvim": takvim(), "yerel_ses": yerel_ses(),
                                "kod": KOD, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
         if yol == "/api/kayit": return self._json(oku_json(KAYIT))
-        if yol == "/api/profil": return self._json({k: PROFIL[k] for k in ("durum", "metin", "terimler")})
         if yol in ("/", "/index.html"): yol = "/sihirbaz/index.html"
         if yol.startswith(("/sihirbaz/", "/marka/")):
             f = os.path.realpath(os.path.join(KOD, yol.lstrip("/")))
@@ -372,7 +404,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/kaydet": yaz_json(KAYIT, dict(oku_json(KAYIT), dil=p.get("dil"), adim=p.get("adim"), cevap=p.get("cevap") or {}, t=time.time())); return self._json({"ok": True})
         if yol == "/api/modeller/baslat": modeller_baslat(); return self._json(modeller_durum())
         if yol == "/api/claude/denetle": claude_denetle(); return self._json(claude_durum())
-        if yol == "/api/profil/olustur": profil_olustur(p.get("cevap") or {}, p.get("dil") or "tr"); return self._json({"ok": True})
+        if yol == "/api/teshis": return self._json(teshis_ayarla(p.get("acik")))
         if yol == "/api/kur/tamamla": return self._json(tamamla(p.get("cevap") or {}, p.get("dil") or "tr"))
         if yol == "/api/klasor-sec": return self._json({"yol": klasor_sec()})
         if yol == "/api/ac": ac(str(p.get("hedef") or "")); return self._json({"ok": True})
@@ -403,6 +435,16 @@ SES_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleExecutable</key><string>SuflorSes</string><key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.13.0</string><key>LSUIElement</key><true/><key>LSMinimumSystemVersion</key><string>14.4</string>
   <key>NSAudioCaptureUsageDescription</key><string>Suflor.me toplantıdaki karşı tarafın sesini yazıya dökmek için toplantı uygulamasının sesini alır. Ses kaydedilmez, bu Mac dışına gönderilmez.</string>
+</dict></plist>
+"""
+BRIFING_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>local.suflor.brifing</string><key>CFBundleName</key><string>Suflor Brifing</string>
+  <key>CFBundleExecutable</key><string>SuflorBrifing</string><key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
+  <key>NSDesktopFolderUsageDescription</key><string>Suflor.me toplantı öncesi brifingi hazırlarken proje klasöründeki belgeleri ve geçmiş görüşmeleri okur. Hiçbir şey değiştirmez; metin yalnız Claude'a gider.</string>
+  <key>NSDocumentsFolderUsageDescription</key><string>Suflor.me toplantı öncesi brifingi hazırlarken proje klasöründeki belgeleri okur. Hiçbir şey değiştirmez; metin yalnız Claude'a gider.</string>
 </dict></plist>
 """
 def yollar():  # ayar.json'dan; yoksa varsayılanlar
@@ -488,7 +530,7 @@ def kur():
     import ast
     try: ast.parse(open(os.path.join(KOD, "relay.py"), encoding="utf-8").read())
     except Exception as e: sys.exit(f"HATA: relay.py sözdizimi hatalı ({e}) — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")
-    for f in ("pano.html", "hazirlik.html", "yazi.css"):
+    for f in ("pano.html", "hazirlik.html", "yazi.css", "dil.js", "anahtar.js"):
         if not os.path.isfile(os.path.join(KOD, "pano", f)): sys.exit(f"HATA: pano/{f} eksik — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")
     os.makedirs(app, exist_ok=True)
     # geri bildirim raporları için ortak klasör — iki macOS hesabı da yazar (herkes yazar, yapışkan bit: yalnız sahibi siler)
@@ -530,7 +572,11 @@ def kur():
             say(f"Ses yardımcısı derlendi: {ses}"); ses_yeni = True
             sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorSes")  # eski kopya kapanır, aktarıcı yenisini açar
         elif r: say(f"UYARI: ses yardımcısı derlenemedi ({r}) — karşı ses için Suflor.me simgesi → Karşı taraf → Aç ile devam")
-    imzala([tak, ses])
+    # brifing yardımcısı: toplantı öncesi brifingin claude -p çağrısı (aktarıcı Masaüstü'ndeki proje klasörünü okuyamaz; izin uygulamaya sorulur)
+    brf = os.path.join(app, "Suflor Brifing.app"); r = derle(brf, "brifing.swift", "SuflorBrifing", BRIFING_PLIST)
+    if r is True: say(f"Brifing yardımcısı derlendi: {brf}")
+    elif r: say(f"UYARI: brifing yardımcısı derlenemedi ({r}) — panodaki Brifing kapalı kalır")
+    imzala([tak, ses, brf])
     from xml.sax.saxutils import escape as x
     log = os.path.join(EV, "Library", "Logs", "suflor-aktarici.log")
     os.makedirs(os.path.dirname(plist_yolu()), exist_ok=True)
@@ -687,10 +733,10 @@ def guncelle(kaynak=None):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
-    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "modeller", "guncelle"], metavar="kur|kaldir|modeller|guncelle")
+    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "modeller", "guncelle", "profil"], metavar="kur|kaldir|modeller|guncelle|profil")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)"); A = ap.parse_args()
-    if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak)}[A.is_](); sys.exit(0)
+    if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak), "profil": profil}[A.is_](); sys.exit(0)
     os.makedirs(DESTEK, exist_ok=True)
     # port doluysa (ör. diğer macOS hesabının sihirbazı) sonrakini dene — önceden ikinci sihirbaz açılmıyor, kur.sh
     # tarayıcıda öbür hesabın sihirbazını açıyordu

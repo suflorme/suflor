@@ -39,17 +39,7 @@
   // okunur), chrome.storage.local "dil"de saklanır; yoksa "tr". Anahtar Türkçe metnin kendisi, terimler panoyla aynı.
   // Aktarıcıya giden metinler (/olay, /komut) ve Claude'un kart metinleri çevrilmez.
   let DIL = "tr";
-  const EN = {
-    "Suflor.me: canlı altyazı açıldı":"Suflor.me: live captions turned on",
-    "Suflor.me: altyazı konuşma dili {d} yapıldı (gündem dili)":"Suflor.me: caption spoken language set to {d} (agenda language)", "İngilizce":"English", "Türkçe":"Turkish",
-    "Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim":"Suflor.me: couldn't turn on captions — turn them on once by hand ({y}) and I'll learn the way",
-    "📷 Kanıt {n} kaydedildi":"📷 Evidence {n} saved",
-    "📷 Kanıt kaydedilemedi: ":"📷 Couldn't save evidence: ","bilinmiyor":"unknown"," · {n} madde geride":" · {n} items behind",
-    "{n} dk kaldı":"{n} min left","süre doldu":"time's up","+{n} dk":"+{n} min","Söyle":"Say","Dur":"Stop","Cevap":"Answer",
-    "Son 1 dk özeti hazırlanıyor…":"Preparing the last-minute summary…","Claude'a soruldu: ":"Asked Claude: ",
-    "Çalışma alanını seç: Suflor.me simgesi":"Pick a workspace: Suflor.me icon","Bu Chrome \"{a}\" alanına yazıyor":"This Chrome writes to \"{a}\"","Ad için altyazıyı aç: {y}":"Turn on captions for names: {y}","Altyazı kapalı: {y}":"Captions are off: {y}","Karşı tarafın sesi için: simge → Karşı taraf → Aç":"Other side's audio: icon → Other side → Open","Döküm dili yanlış — panoya bak":"Transcript language is wrong — see the panel","Dokun: kapat":"Tap to close","Yaptım":"Done","Gerek yok — Claude bir daha önermesin":"Not needed — Claude won't suggest it again","Şimdilik kart yok":"No cards yet","Not ya da soru (başa ?)":"Note or question (start with ?)","Not":"Note","⭐ Önemli an: şu anı özette öne çıkar":"⭐ Key moment: highlight this moment in the summary",
-    "Claude son 1 dakikayı özetlesin":"Claude sums up the last minute","Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur":"Save the meeting screen as evidence; text in the box becomes its note",
-    "Son 1 dk":"Last 1 min","Kanıt":"Evidence","henüz satır yok":"no lines yet","son satır {a} önce · {k}":"last line {a} ago · {k}","{n} sn":"{n} s","{n} dk":"{n} min","Gönder":"Send","soru":"question","not":"note","bağlam":"context","gönderilemedi":"not sent","Suflor.me — kartlar için tıkla":"Suflor.me — click for cards"};
+  const EN = globalThis.SUFLOR_EN || {};
   const L = (s, v) => { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; };
   function dilAyarla(d) { DIL = d === "en" ? "en" : "tr"; P.dil = DIL; }
   try { chrome.storage.local.get({ dil: "tr" }, v => dilAyarla(v.dil)); } catch (e) {}
@@ -61,17 +51,22 @@
   // aynı Mac'e ikinci hesap kurulunca ilk hesabın Chrome'u sessizce göndermeyi bırakıyordu (5 Ekim). Sonradan ikinci alan belirirse
   // gönderim sürer, bir kez "bu Chrome X alanına yazıyor; değiştirmek için simgeye tıkla" denir.
   let alanBekliyor = false, alanSecili = false, alanUyarildi = false, sonHata = "";
-  async function alanKesfet() {
+  async function alanKesfet() {  // 401 de aktarıcıdır (v0.14 anahtar ister) — background.js relayAdr ile aynı
     if (alanSecili) return;
-    const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
+    const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok || r.status === 401 ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
     alanBekliyor = bul.length > 1;
     if (bul.length === 1) { cfg.relay = bul[0]; alanSecili = true; chrome.storage.local.set({ relay: bul[0], relayOto: true }); }
     if (alanBekliyor && !alanUyarildi && window.top === window) { alanUyarildi = true; toast(L("Çalışma alanını seç: Suflor.me simgesi"), "#b26a00", 15000); }
   }
-  chrome.storage.sync.get(cfg, v => { cfg = Object.assign(cfg, v); chrome.storage.local.get({ relay: null, relayOto: false }, l => { if (l.relay) { cfg.relay = l.relay; alanSecili = true; if (l.relayOto) otoDenetle(); } else alanKesfet(); }); });
+  // v0.14.0: yerel anahtar yardımcısı varsa bu kullanıcının aktarıcısı odur — yoklama ve alan seçimi gerekmez. Adres belli olana
+  // kadar istekler bekler (en çok 3 sn): ilk satırlar varsayılan porttaki başka hesabın aktarıcısına gitmesin.
+  let hazirCoz; const hazir = new Promise(r => { hazirCoz = r; setTimeout(r, 3000); });
+  chrome.storage.sync.get(cfg, v => { cfg = Object.assign(cfg, v); globalThis.SuflorAnahtar.al().then(k => {
+    if (k) { cfg.relay = `http://127.0.0.1:${k.port}`; alanSecili = true; alanBekliyor = false; return hazirCoz(); }
+    chrome.storage.local.get({ relay: null, relayOto: false }, l => { if (l.relay) { cfg.relay = l.relay; alanSecili = true; hazirCoz(); if (l.relayOto) otoDenetle(); } else alanKesfet().finally(hazirCoz); }); }); });
   async function otoDenetle() {  // kendiliğinden seçilmiş alan + bu Mac'te başka alan var → bir kez bilgi (gönderim durmaz)
     if (window.top !== window) return;
-    const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok ? await r.json() : null; } catch (e) { return null; } }))).filter(Boolean);
+    const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok || r.status === 401 ? Object.assign({ port: p }, await r.json().catch(() => ({}))) : null; } catch (e) { return null; } }))).filter(Boolean);
     if (bul.length < 2) return;
     const { relayOtoUyari } = await chrome.storage.local.get({ relayOtoUyari: false }); if (relayOtoUyari) return;
     const su = bul.find(s => cfg.relay && cfg.relay.endsWith(":" + s.port)); chrome.storage.local.set({ relayOtoUyari: true });
@@ -85,7 +80,7 @@
   });
   // her istek en çok 8 sn bekler — 3 Ekim denemesinde nabız ~7 dk kesildi, mikrofon sesi akmaya devam etti; zaman aşımı
   // olmayan bir istek takılırsa onu bekleyen her şey (nabız → kuyruk boşaltma) de takılıyordu
-  const rf = (yol, o) => alanBekliyor ? Promise.reject(new Error("çalışma alanı seçilmedi")) : fetch((relayGecerli(cfg.relay) || RELAY_VARSAYILAN) + yol, Object.assign({ signal: AbortSignal.timeout(8000) }, o));
+  const rf = (yol, o) => hazir.then(() => alanBekliyor ? Promise.reject(new Error("çalışma alanı seçilmedi")) : fetch((relayGecerli(cfg.relay) || RELAY_VARSAYILAN) + yol, Object.assign({ signal: AbortSignal.timeout(8000) }, o)));
   // arayüz dilini aktarıcıdan oku (yalnız üst çerçeve, dakikada bir); değişince storage.local "dil" — diğer sekmeler ve
   // popup onChanged ile alır. Alan yoksa (eski aktarıcı) "tr".
   async function dilOku() {
@@ -542,7 +537,7 @@
     function tikla(ev) {
       if (ev.target.closest(".pill")) return hapTik();
       const b = ev.target.closest("button[data-ack]"), k = ev.target.closest(".k[data-id]");
-      if (!b && !k) return;
+      if (!b && (!k || k.dataset.onay)) return;  // onay kartına dokunmak onay değil (#76)
       const id = b ? b.dataset.id : k.dataset.id, st = b ? b.dataset.ack : "okundu";  // karta dokunmak = okundu
       if (k) k.style.opacity = ".45";
       rf("/card-ack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status: st }) }).then(pollCards).catch(() => {});
@@ -559,11 +554,14 @@
       if (dil) list.append(e("div", "top uy", "⚠ " + L("Döküm dili yanlış — panoya bak")));
       if (warn) list.append(e("div", "top uy", "⚠ " + warn));
       cards.forEach(c => {
-        const k = e("div", "k"); k.dataset.id = c.id; k.title = L("Dokun: kapat"); k.style.setProperty("--kc", COL[c.kind]);
-        const m = e("div", "m"); m.append(e("b", null, L(KL[c.kind] || "Not")));
+        const k = e("div", "k"); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
+        if (c.onay) k.dataset.onay = "1"; else k.title = L("Dokun: kapat");
+        const m = e("div", "m"); m.append(e("b", null, L(c.onay ? "Onay bekliyor" : KL[c.kind] || "Not")));
         if (!c.gizli || ayri) m.append(d.createTextNode(c.text));
         const a = e("div", "a");
-        [["yapildi", "✓", "Yaptım"], ["gecildi", "✕", "Gerek yok — Claude bir daha önermesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind))
+        // onay kartı (#76): Claude'un yapacağı iç işi yazılı onayla — yalnız anahtarlı eklentiden geçer
+        (c.onay ? [["onaylandi", "✓ " + L("Onayla"), "Onayla"], ["reddedildi", "✕ " + L("Reddet"), "Reddet"]] :
+        [["yapildi", "✓", "Yaptım"], ["gecildi", "✕", "Gerek yok — Claude bir daha önermesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
           .forEach(([st, lbl, tip]) => { const x = e("button", null, lbl); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
         k.append(m, a); list.append(k);
       });

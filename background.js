@@ -5,16 +5,9 @@ let state = { ok: null, at: 0, meeting: "", failCount: 0, queued: 0 };
 let DIL = "tr";
 chrome.storage.local.get({ dil: "tr" }, v => { DIL = v.dil === "en" ? "en" : "tr"; });
 chrome.storage.onChanged.addListener((ch, alan) => { if (alan === "local" && ch.dil) DIL = ch.dil.newValue === "en" ? "en" : "tr"; });
-const EN = {"⭐ işaretlenemedi: ":"⭐ couldn't be marked: ","Özet istenemedi: ":"Couldn't request a summary: ",
-  "aktarıcıya ulaşılamadı (127.0.0.1:8765)":"can't reach the relay (127.0.0.1:8765)","Açık toplantı sekmesi yok (Teams).":"No open meeting tab (Teams).",
-  "Çalışma alanı seçilmedi — Suflor.me simgesine tıklayıp seç.":"No workspace selected — click the Suflor.me icon and pick one.",
-  "🎙 Karşı tarafın sesi zaten yazılıyor":"🎙 The other side's audio is already being transcribed",
-  "Toplantı sekmesini öne getirdim — karşı tarafın sesi için Suflor.me simgesi → Karşı taraf → Aç'a bir kez daha bas":"I brought the meeting tab to the front — for the other side's audio, click Suflor.me icon → Other side → Open once more",
-  "🎙 Whisper: karşı tarafın sesi de yazılıyor":"🎙 Whisper: the other side's audio is now being transcribed too","Whisper karşı taraf açılamadı: ":"Couldn't start Whisper for the other side: ",
-  "Suflor.me — kanıt kaydedilemedi":"Suflor.me — couldn't save evidence","Toplantı penceresi simge durumunda — pencereyi açıp tekrar dene.":"The meeting window is minimised — restore it and try again.",
-  "Aktarıcıya ulaşılamadı (çalışma alanının aktarıcısı kapalı).":"Can't reach the relay (this workspace's relay is off).",
-  "{n} dk sonra başlıyor":"Starts in {n} min","Başlıyor":"Starting",". Suflor.me'yi başlatayım mı?":". Start Suflor.me?","Suflor.me'yi başlat":"Start Suflor.me","Panoyu aç":"Open panel",
-  "Suflor.me başlatılamadı":"Couldn't start Suflor.me","bilinmiyor":"unknown"};
+importScripts("pano/dil.js");  // arayüz metinlerinin İngilizcesi (tek kaynak)
+importScripts("yerel-anahtar.js");  // v0.14.0 yerel anahtar: aktarıcıya giden fetch'e başlık
+const EN = globalThis.SUFLOR_EN || {};
 function L(s, v) { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; }
 // toplantı sekmesi adresleri manifest'ten — platform dosyası (platform-*.js) yükleyen içerik betiği girdileri.
 // Yeni platform yalnız manifest'e eklenir. tabs.query kalıbında port olmaz (test sayfası 127.0.0.1:8797 → 127.0.0.1).
@@ -62,9 +55,16 @@ function bilgi(tab, text, renk, ms) { if (tab) chrome.tabs.sendMessage(tab.id, {
 // (güvenlik denetimi O3) aktarıcı adresi yalnız bu Mac (127.0.0.1/localhost, port 1024–65535) — döküm başka yere gitmesin
 const RELAY_VARSAYILAN = "http://127.0.0.1:8765";
 function relayGecerli(a) { const m = /^http:\/\/(127\.0\.0\.1|localhost):(\d{4,5})\/?$/.exec(String(a || "").trim()); return m && +m[2] >= 1024 && +m[2] <= 65535 ? `http://${m[1]}:${m[2]}` : null; }
+// anahtar alınamadıysa nedeni (Chrome'un hata metni + eklenti kimliği) aktarıcı günlüğüne 10 dk'da bir — kimlik yardımcı tanımındakiyle
+// tutmuyorsa ayara "eklenti_kimlik" eklenir. Kimlik gizli değil; anahtar gönderilmez.
+let anahtarOlay = 0;
+// yoklamada 401 de "aktarıcı burada" sayılır (v0.14: anahtarsız okuma 401) — yoksa yardımcısız eklenti kendi aktarıcısını görmez,
+// aynı Mac'teki diğer hesabın eski aktarıcısını tek aday sanıp ona yazar
 async function relayAdr() {
+  const k = await SuflorAnahtar.al(); if (k) return `http://127.0.0.1:${k.port}`;  // v0.14.0: yardımcı bu kullanıcının aktarıcısını söyler
+  if (Date.now() - anahtarOlay > 600000) { anahtarOlay = Date.now(); setTimeout(() => relayAdr().then(r => fetch(r + "/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur: "anahtar", metin: `yerel anahtar alınamadı: ${SuflorAnahtar.hata() || "?"} · eklenti ${chrome.runtime.id}` }) })).catch(() => {}), 0); }
   const l = relayGecerli((await chrome.storage.local.get({ relay: null })).relay); if (l) return l;
-  const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
+  const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok || r.status === 401 ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
   if (bul.length > 1) throw new Error("Çalışma alanı seçilmedi — Suflor.me simgesine tıklayıp seç.");
   if (bul.length === 1) chrome.storage.local.set({ relay: bul[0], relayOto: true });  // tek aktarıcı kendiliğinden kaydedilir (content.js ile aynı)
   return bul[0] || relayGecerli((await chrome.storage.sync.get({ relay: RELAY_VARSAYILAN })).relay) || RELAY_VARSAYILAN;
@@ -205,12 +205,14 @@ async function takvimBak() {
     }
   } catch (e) { /* aktarıcı kapalı ya da alan seçilmedi */ }
 }
-// pano zaten açıksa o sekmeye geç (her pano sekmesi aktarıcıyı saniyede bir yokluyor; ikincisi gereksiz)
+// pano zaten açıksa o sekmeye geç (her pano sekmesi aktarıcıyı saniyede bir yokluyor; ikincisi gereksiz). Yeni sekme anahtarla
+// açılır (?k=; pano kendi deposuna alıp adres çubuğundan siler) — açık sekme de odaklanınca anahtarı bir kez daha alır.
+const anahtarli = async (url) => { const k = await SuflorAnahtar.al(); return k && url.startsWith(`http://127.0.0.1:${k.port}/`) ? url + (url.includes("?") ? "&" : "?") + "k=" + k.anahtar : url; };
 async function panoAc(relay) {
   const kok = relay.replace(/\/$/, "") + "/";
   const [t] = (await chrome.tabs.query({ url: kok + "*" })).filter(t => t.url === kok || t.url.startsWith(kok + "?") || t.url.startsWith(kok + "#"));
-  if (t) { await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); }
-  else await chrome.tabs.create({ url: kok });
+  if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, (t.title || "").startsWith("🔑") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }  // 🔑: pano anahtarsız
+  else await chrome.tabs.create({ url: await anahtarli(kok) });
 }
 chrome.notifications.onButtonClicked.addListener(async (id, i) => {
   if (!id.startsWith("tk:")) return;
@@ -220,7 +222,7 @@ chrome.notifications.onButtonClicked.addListener(async (id, i) => {
     if (i === 1) return panoAc(relay);
     const r = await (await fetch(relay + "/baslat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ olay: id.slice(3) }) })).json();
     // hazırlık sekmesi — Claude izlemeye başlayınca (en geç 3 dk / toplantı saatinde) kendisi toplantıya geçer
-    if (r.ok) chrome.tabs.create({ url: relay + "/hazirlik" });
+    if (r.ok) chrome.tabs.create({ url: await anahtarli(relay + "/hazirlik") });
     if (!r.ok) chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me başlatılamadı"), message: r.err || L("bilinmiyor") });
   } catch (e) { chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me başlatılamadı"), message: L(String(e.message || e).slice(0, 160)) }); }
 });

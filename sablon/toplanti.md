@@ -12,7 +12,7 @@ burada tekrarlanmaz. Aşağıda `tc` = `python3 {{KOD}}/toplanti-claude.py` (yal
 
 ## 1. Kontrol (tek mesajda, eksikleri tek satırda)
 `tc saglik` — ⚠ satırlarını önerisiyle kullanıcıya tek satırda ilet ("eklenti sinyali yok" toplantıdan önce normaldir). Sonra
-`curl -s 127.0.0.1:{{PORT}}/status`:
+`tc durum` (aktarıcının durumu, yerel anahtarla):
 - Yanıt yok → "Aktarıcı çalışmıyor — `{{KOD}}/aktarici-kur.command`'a çift tıkla."
 - `extension` boş ya da `age_s` ≥ 30 → "Eklenti sinyali yok — toplantıya Chrome'da gir / toplantı sekmesini yenile."
 - `extension.panel` ve `captions` false → "Transkript ve altyazı kapalı — Teams: Diğer → Dil ve konuşma → Canlı altyazı (ya da
@@ -102,3 +102,6 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    `tc rapor --not "<gözlemler>"` ile gönder; sorun yoksa `--not "sorun yok"`. Rapor yalnız teknik veri taşır. Beta teşhis açıksa
    (ayarda `teshis: true`) `--not` metni geliştiriciye de gider: kişi adı, toplantı adı, konu, alıntı, rakam ya da şifre YAZMA
    ("14:20'de karşı taraf sesi kesildi, Karşı taraf → Aç ikinci basışta açıldı" gibi).
+6. Proje `CLAUDE.md`'de "## Ben ve işim (taslak)" (İngilizce: "(draft)") varsa — kurulumda Claude'un yazdığı çalışma notu —
+   rapordan sonra tek soru: notu 3–4 satırda özetle, "Doğru mu, düzelteyim mi?" Onaylarsa başlıktaki "(taslak)"ı sil; düzeltme
+   verirse notu düzelt, sonra sil. Cevap gelmezse dokunma, bir sonraki toplantıda yine sor.

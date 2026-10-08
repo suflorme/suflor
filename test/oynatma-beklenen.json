@@ -175,7 +175,7 @@
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"dur\", \"text\": \"Root hesabını toplantıda paylaşma\", \"why\": \"\", \"status\": \"acik\", \"gizli\": true}",
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"not\", \"text\": \"IAM kullanıcılarının listesi Ayla'da\", \"why\": \"\", \"status\": \"acik\"}",
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"duygu\", \"ton\": \"tedirgin\", \"text\": \"\", \"status\": \"etiket\", \"kim\": \"Ayla Örnek\"}",
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"status\": \"yapildi\"}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"status\": \"yapildi\", \"yetkili\": true}",
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"cevap\", \"text\": \"Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı.\", \"why\": \"\", \"status\": \"acik\", \"reply_to\": \"<ID>\", \"q\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}"
   ],
   "olcum.jsonl": "<var>",
@@ -189,16 +189,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 68390,
-   "sha": "6895c07dc7caaaa8"
+   "uzunluk": 79888,
+   "sha": "fa6867cb680d8f42"
   },
   "/hazirlik": {
-   "uzunluk": 8688,
-   "sha": "e965a387f8ea10fd"
+   "uzunluk": 25449,
+   "sha": "ad490bfe73c29f0b"
   },
   "/mini": {
-   "uzunluk": 68390,
-   "sha": "6895c07dc7caaaa8"
+   "uzunluk": 79888,
+   "sha": "fa6867cb680d8f42"
   },
   "/status": {
    "_ping_son": "float",
@@ -226,6 +226,7 @@
    },
    "aktif": "bool",
    "alan": "str",
+   "anahtarsiz": "NoneType",
    "arayuz_dili": "str",
    "baglam": [
     {
@@ -246,6 +247,7 @@
     ],
     "uyari": "str"
    },
+   "brifing": {},
    "cards": [
     {
      "at": "str",
@@ -448,14 +450,17 @@
     "ben": "bool",
     "ben_kod": "str",
     "ben_neden": "str",
+    "birlesen": {},
     "durgun_max": "float",
     "durum": "str",
+    "eski_atlanan": {},
     "gecikme_max": "float",
     "gecikme_sn": "NoneType",
     "hata": "NoneType",
     "karsi": "bool",
     "kumeler": {},
     "kuyruk": "int",
+    "parca": {},
     "satir": "int",
     "ses_model": "str",
     "son_sn": "NoneType",
@@ -589,14 +594,17 @@
     "ben": "bool",
     "ben_kod": "str",
     "ben_neden": "str",
+    "birlesen": {},
     "durgun_max": "float",
     "durum": "str",
+    "eski_atlanan": {},
     "gecikme_max": "float",
     "gecikme_sn": "NoneType",
     "hata": "NoneType",
     "karsi": "bool",
     "kumeler": {},
     "kuyruk": "int",
+    "parca": {},
     "satir": "int",
     "ses_model": "str",
     "son_sn": "NoneType",

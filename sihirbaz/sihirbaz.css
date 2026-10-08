@@ -142,6 +142,11 @@ input[type=text]:focus, textarea:focus, select:focus { outline: none; border-col
 
 .kart-not { background: var(--sahne-acik); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--murekkep) }
 .kart-not.uyari { background: color-mix(in srgb, var(--uyari) 12%, transparent) }
+/* Kuruyorum ekranının altındaki teşhis anahtarı (ayrı "Gelişmesine yardım et" ekranı yerine) */
+.anahtar { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--cizgi); border-radius: 12px; font-size: 13.5px; color: var(--murekkep); text-align: left; cursor: pointer }
+.anahtar input { margin: 3px 0 0; accent-color: var(--sahne); width: 16px; height: 16px; flex: none }
+.anahtar b { font-weight: 500 }
+.anahtar .ipucu { font-size: 12.5px; color: var(--soluk) }
 .adimlar { counter-reset: a; display: grid; gap: 10px; padding: 0; margin: 0; list-style: none }
 .adimlar li { counter-increment: a; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; background: var(--yuzey);
   border: 1px solid var(--cizgi); border-radius: 12px; padding: 12px 14px }

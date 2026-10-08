@@ -39,7 +39,7 @@ section+section{margin-top:6px}main .sh,aside .sh{top:-6px}  /* kaydırınca sat
 .k::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc,var(--gr))}
 .k b{display:block;font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--kc,var(--gr));margin-bottom:2px}
 .kw{font-size:12px;color:var(--t2);margin-top:3px}
-.k-soyle{--kc:var(--br-tx)}.k-dur{--kc:var(--er);background:var(--er-bg)}.k-cevap,.k-not{--kc:var(--gr)}.k[data-id]{cursor:pointer;display:flex;gap:8px;align-items:flex-start}.k[data-id]:hover{border-color:var(--bd2)}.k .km{flex:1;min-width:0}.k.kapaniyor{opacity:.45}.ka{display:flex;gap:2px;flex:none}.ka button{padding:3px 5px;color:var(--t3)}.ka button:hover{color:var(--tx)}
+.k-soyle{--kc:var(--br-tx)}.k-dur{--kc:var(--er);background:var(--er-bg)}.k-cevap,.k-not{--kc:var(--gr)}.k[data-id]{cursor:pointer;display:flex;gap:8px;align-items:flex-start}.k[data-id]:hover{border-color:var(--bd2)}.k .km{flex:1;min-width:0}.k.kapaniyor{opacity:.45}.ka{display:flex;gap:2px;flex:none}.ka button{padding:3px 5px;color:var(--t3)}.ka button:hover{color:var(--tx)}.ka button.on{padding:3px 8px;color:var(--t2)}.ka button.on.pri{color:#fff}.k[data-onay]{cursor:default}
 .kc{font-size:12px;color:var(--t3);padding:3px 0 3px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kq{font-size:12px;color:var(--t2);background:var(--ac-bg);border-radius:var(--r);padding:7px 10px;margin:0 0 8px;white-space:pre-wrap}
 .yeni{animation:nabiz 1s 3}@keyframes nabiz{0%{box-shadow:0 0 0 0 rgba(201,151,58,.6)}100%{box-shadow:0 0 0 9px rgba(201,151,58,0)}}
@@ -66,6 +66,7 @@ textarea{width:100%;font:inherit;color:var(--tx);background:var(--s2);border:1px
 .tkalt{display:flex;gap:4px;align-items:center;margin:2px 0 4px}#tkh:empty{display:none}#tkh{margin:4px 0}#tkf{background:var(--s1);border:1px solid var(--bd2);border-radius:var(--r);padding:10px;margin:6px 0 8px;display:flex;flex-direction:column;gap:7px}#tkf[hidden]{display:none}
 #tkf textarea{font:inherit;font-size:12px;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;width:100%;resize:vertical;box-sizing:border-box}
 body.surukle{outline:3px dashed var(--ac);outline-offset:-6px}.km a{color:var(--ac);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+#br .b{font-size:13px;color:var(--tx);margin:2px 0 8px;line-height:1.5}#br .bb{font-size:11.5px;color:var(--t3);margin:8px 0 2px;text-transform:uppercase;letter-spacing:.04em}#br ul{margin:0;padding-left:18px}#br li{font-size:12.5px;line-height:1.5;margin:2px 0;color:var(--t2)}#br .bt{margin-top:8px}
 .sn{padding:9px 0;border-bottom:1px solid var(--bd);display:flex;gap:10px;align-items:flex-start}.sn .t{flex:1;min-width:0}.sn .b{font-weight:500}.sn .b .z{font-family:var(--f-teknik);font-size:11px;color:var(--t3);font-weight:400;margin-right:6px}.sn .d{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5}.sn button{flex:none}
 .bg{padding:4px 0;border-bottom:1px solid var(--bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bg .sp{color:var(--t3);margin-left:4px}
 #tkf input,#tkf select{font:inherit;font-size:12px;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;width:100%}
@@ -87,6 +88,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <section id=tks hidden><div id=tk></div><div id=tkh class=hint></div><div id=tkalt class=tkalt><button id=tke class=gh title="Takvimde olmayan bir toplantı için">Elle başlat</button><button id=tky class="gh ib" title="Takvimi yenile">↻</button></div>
 <div id=tkf hidden><input id=tkk placeholder="Kişi — konu (ör. Ayşe — bütçe)"><input id=tkl type=url placeholder="Toplantı bağlantısı (isteğe bağlı; yoksa Teams açılır)"><textarea id=tkc rows=2 placeholder="Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin"></textarea><div class=r2><select id=tkr><option value=yurutucu>Yürütücü (ben yönetiyorum)</option><option value=katilimci>Katılımcı</option><option value=dinleyici>Dinleyici</option></select><select id=tkd><option value=tr>Türkçe</option><option value=en>İngilizce</option><option value=karisik>Karışık</option></select></div>
 <div class=bt><button id=tkb class=pri>Başlat</button><button id=tki class=gh>Vazgeç</button><span id=tkm></span><span class=sp1></span><a href="#" id=tky2 class=hint hidden>Suflor.me olmadan katıl</a></div></div></section>
+<section id=brs hidden><div class=sh>Brifing <span id=brn class=meta></span></div><div id=br></div></section>
 <section id=sns hidden><div class=sh>Son toplantılar</div><div id=sn></div></section>
 <section id=sk><div class=sh>Şimdi <span id=tone></span></div><div id=py class=py></div><div id=kc></div></section>
 </div>
@@ -104,47 +106,13 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <div id=dkg hidden><div id=lines></div><div id=tsl></div><button id=live>↓ Canlıya dön</button></div>
 </aside>
 </div>
+<script>/*__DIL_SOZLUK__*/</script>
+<script>/*__ANAHTAR__*/</script>
 <script>
 // arayüz dili (ayar "dil"; aktarıcı __DIL__ yerine yazar). Anahtar Türkçe metnin kendisi; İngilizcesi yoksa Türkçe kalır.
 // Sabit HTML yüklenince çevrilir (metin düğümleri + placeholder/title/aria-label), değişen metinler L() ile.
 const DIL="__DIL__"
-const EN={"toplantı bekleniyor":"waiting for a meeting","Mini pano: her zaman üstte duran küçük pencere":"Mini panel: a small window that stays on top",
-"Döküm":"Transcript","↓ Canlıya dön":"↓ Back to live","Sürükleyerek genişlet/daralt · çift tıkla: varsayılan":"Drag to resize · double-click: default",
-"Bugünkü toplantılar":"Today's meetings","Takvimde olmayan bir toplantı için":"For a meeting that isn't in your calendar","Takvimi yenile":"Refresh calendar",
-"Kişi — konu (ör. Ayşe — bütçe)":"Person — topic (e.g. Anna — budget)","Toplantı bağlantısı (isteğe bağlı; yoksa Teams açılır)":"Meeting link (optional; Teams opens if empty)","Yürütücü (ben yönetiyorum)":"Lead (I'm running it)","Katılımcı":"Participant","Dinleyici":"Listener",
-"Türkçe":"Turkish","İngilizce":"English","Karışık":"Mixed","Başlat":"Start","Vazgeç":"Cancel",
-"Şimdi":"Now","Gündem":"Agenda","Açık sorular":"Open questions","Kanıtlar":"Evidence","Hassas ifade":"Sensitive phrase",
-"değer dosyaya yazılmaz":"value is never written to file","Konuşmada şifre, parola, token, API anahtarı gibi bir kelime geçti. Değerin kendisi dosyaya yazılmaz; yalnız uyarı konur.":"A word like password, token or API key came up. The value itself is never written to file; only a marker is.",
-"Gönder":"Send",
-"Son 1 dk":"Last 1 min","Kanıt":"Evidence","aç":"open","Toplantı başlayınca konuşma burada akar.":"Once the meeting starts, the conversation flows here.",
-"Taslak ({d}); kesin metin gelince yerine geçer":"Draft ({d}); replaced when the final text arrives","Whisper bekleniyor":"waiting for Whisper","konuşuluyor":"in progress","taslak":"draft",
-"Söyle":"Say","Dur":"Stop","Cevap":"Answer","Not":"Note","gizli":"private","⭐ Önemli an: şu anı özette öne çıkar":"⭐ Key moment: highlight this moment in the summary",
-"olumlu":"positive","nötr":"neutral","gergin":"tense","olumsuz":"negative","ilgili":"engaged","heyecanlı":"excited","tedirgin":"uneasy","savunmada":"defensive","ilgisiz":"disengaged","kararsız":"undecided",
-"ton":"tone","Claude tahmini, {t}":"Claude's estimate, {t}","Claude tahmini (metin + ses), {t}":"Claude's estimate (text + voice), {t}","tahmin":"estimate",
-"Son 1 dk özeti hazırlanıyor…":"Preparing the last-minute summary…","Claude'a soruldu: ":"Asked Claude: ","Şimdilik kart yok. Claude toplantıyı izlerken öneriler buraya düşer.":"No cards yet. While Claude follows the meeting, suggestions land here.",
-"Yaptım":"Done","Önerileni yaptım":"I did what was suggested","Okudum":"Seen","Gördüm, kapat (reddetmiyorum)":"Seen, close it (not rejecting)","Gerek yok":"Not needed","Bu konu gereksiz; Claude bir daha önermesin":"Not relevant; Claude won't suggest it again",
-"{n} dk kaldı":"{n} min left","süre doldu":"time's up","{n} dk aşıldı":"{n} min over","bitiş {t}":"ends {t}"," · gündem {a}/{b}":" · agenda {a}/{b}"," (beklenen {n})":" (expected {n})"," · {n} madde geride":" · {n} items behind",
-"Konuşma payı ölçülemiyor (konuşmacı adı gelmiyor)":"Talk share can't be measured (no speaker names)","Konuşma payı":"Talk share"," (son 10 dk)":" (last 10 min)","toplam":"total",
-"not":"note","soru":"question","gönderilemedi":"not sent",
-"Claude son 1 dakikayı özetlesin":"Claude sums up the last minute","Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur":"Save the meeting screen as evidence; text in the box becomes its note",
-"henüz satır yok":"no lines yet","son satır {a} önce · {k}":"last line {a} ago · {k}","{n} sn":"{n} s","{n} dk":"{n} min","gündem {a}/{b}":"agenda {a}/{b}","pay %{n}":"share {n}%",
-"Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.":"No calendar access — System Settings → Privacy & Security → Calendars → Suflor Takvim.",
-"takvim okunuyor…":"reading calendar…","şimdi":"now","{n} dk sonra":"in {n} min","düzenleyen sen":"you're the organizer","takvim yenileniyor…":"refreshing calendar…",
-"Kişi ve konuyu yaz":"Enter the person and topic","başlatılıyor…":"starting…",
-"başlatılamadı":"couldn't start","Toplantı":"Meeting","yürütücü":"lead","katılımcı":"participant","dinleyici":"listener",
-"Claude tahmini: şu an bu madde konuşuluyor":"Claude's estimate: this item is being discussed now",
-"Toplantı başlayınca gündem burada görünür.":"The agenda appears here once the meeting starts.","Gündem yok":"No agenda",
-"Mini pano":"Mini panel",
-"Güncelleniyor…":"Updating…","Güncelleme başarısız — yeniden dene":"Update failed — try again",
-"Geri bildirim gönder":"Send feedback","Geri bildirim":"Feedback",
-"Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.":"Tell us what broke, what's missing or what you liked; it goes to the developer. Your text is sent as written: don't include names, passwords or meeting content.",
-"Ne oldu? Ne bekliyordun?":"What happened? What did you expect?","Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)":"Include technical info (versions, Mac, recent events — no meeting content)",
-"Önce ne olduğunu yaz":"Describe what happened first","gönderiliyor…":"sending…","Teşekkürler — gönderildi":"Thanks — sent","Gönderilemedi — sonra yeniden denenecek":"Couldn't send — will retry later","Mini panoyu aç":"Open mini panel",
-"Elle başlat":"Start manually","Suflor.me güncellendi":"Suflor.me was updated","açık bir toplantı sekmesi varsa yenile":"reload any open meeting tab","Döküm dili yanlış":"Transcript language is wrong","Diğer → Dil ve konuşma → Canlı altyazı":"More → Language and speech → Live captions","Satır gelmiyor":"No lines coming in","altyazıyı aç: ":"turn on captions: ","Karşı tarafın sesi için izin gerekiyor":"Permission needed for the other side's audio","Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses":"System Settings → Privacy & Security → Screen & System Audio Recording → Suflor Ses","Karşı tarafın sesi yazılmıyor":"The other side isn't being transcribed","Suflor.me simgesi → Karşı taraf → Aç":"Suflor.me icon → Other side → Open","Senin sesin yazılmıyor":"Your voice isn't being transcribed","mikrofon açılamadı — toplantı sekmesini yenile":"couldn't open the microphone — reload the meeting tab","mikrofon açık ama ses gelmiyor":"microphone is on but no audio is coming in","Claude izlemiyor — kart gelmez":"Claude isn't watching — no cards will come","Toplantı sekmesinden sinyal gelmiyor":"No signal from the meeting tab","sekmeyi yenile":"reload the tab","Dinliyorum":"Listening","Toplantıdasın":"In a meeting","Claude hazır — toplantı bekleniyor":"Claude is ready — waiting for a meeting","Hazır — toplantı bekleniyor":"Ready — waiting for a meeting","bağlanıyor…":"connecting…","Mini pano açılamadı":"Couldn't open the mini panel","açılır pencereye izin ver":"allow pop-ups","Takvim bağlı değil — toplantıyı elle başlatabilirsin.":"Calendar isn't connected — you can start a meeting manually.","Sıradaki":"Up next","Bugün":"Today","Takvimde toplantı yok":"No meetings in your calendar","Toplantı başlat":"Start a meeting","Pano eski — sayfayı yenileyip tekrar dene":"The panel is out of date — reload the page and try again","Başladı — hazır olunca toplantıya geçilir":"Started — moves to the meeting when ready","Başladı — Claude gündemi kurup izlemeye başlar":"Started — Claude sets the agenda and starts watching","Suflor.me'ye ulaşılamadı":"Couldn't reach Suflor.me","Suflor.me'ye ulaşılamıyor":"Can't reach Suflor.me","birkaç saniye içinde yeniden denenir":"retrying in a few seconds","Güncelle":"Update","Yeni sürüm hazır":"A new version is ready","Onayla — birkaç saniye kesilir":"Confirm — pauses for a few seconds","Güncellenemedi":"Couldn't update","önceki toplantınınki gizli":"previous meeting's is hidden","Not ya da soru (başa ?)":"Note or question (start with ?)","bağlam":"context","Bağlam":"Context","Claude okur":"Claude reads","kutu":"box","bırakıldı":"dropped","Dosya çok büyük":"File too large","en çok 25 MB":"25 MB at most",
-"Bağlam eklendi — Claude okuyacak":"Context added — Claude will read it","Bağlam eklenemedi":"Couldn't add context",
-"Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin":"Context (optional): link or file path, one per line — you can also drop a file on the panel",
-"Claude'un okuduğu bağlantı ve belgeler. Dosyayı panoya bırak ya da kutuya bağlantı/dosya yolu yaz.":"Links and documents Claude reads. Drop a file on the panel or type a link/file path in the box.","Başta ? varsa Claude'a soru, yoksa not. ⌘Enter: her zaman soru.":"Starting with ? asks Claude, otherwise it's a note. ⌘Enter: always a question.","Suflor.me olmadan katıl":"Join without Suflor.me","son satır {t}":"last line {t}","davet notu okunuyor…":"reading the invite…","davet notundan":"from the invite","Bu toplantı için gündem yok — Başlat'a basınca Claude hazırlar.":"No agenda for this meeting — Claude prepares one when you press Start.","Dokun: kapat":"Tap to close","Gerek yok — Claude bir daha önermesin":"Not needed — Claude won't suggest it again",
-"Son toplantılar":"Recent meetings","Özeti aç":"Open summary","Öneri":"Suggestion","Dün":"Yesterday","Özet açılamadı":"Couldn't open the summary"}
+const EN=globalThis.SUFLOR_EN || {}
 function L(s,v){let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k+"}").join(v[k]);return t}
 function cevir(kok){if(DIL!=="en")return;const w=document.createTreeWalker(kok,NodeFilter.SHOW_TEXT);const d=[];while(w.nextNode())d.push(w.currentNode)
   d.forEach(n=>{const k=n.nodeValue.trim();if(k&&EN[k])n.nodeValue=n.nodeValue.replace(k,EN[k])})
@@ -177,12 +145,14 @@ try{if(localStorage.getItem('dk'))setTimeout(()=>dokumAc(true))}catch(e){}
 function nearBottom(){return main.scrollHeight-main.scrollTop-main.clientHeight<40}
 main.addEventListener('scroll',()=>{atBottom=nearBottom();liveBtn.style.display=atBottom?'none':'block'})
 liveBtn.onclick=()=>{main.scrollTop=main.scrollHeight;atBottom=true;liveBtn.style.display='none'}
+// kanıt görseli/bağlantısı başlık gönderemez: anahtar adreste (yalnız /kanit/ için kabul edilir)
+const kq=()=>"?k="+encodeURIComponent(SUFLOR_ANAHTAR)
 // Metin HTML diye yorumlanmasın: "<", "&" içeren not/cümle aynen görünsün (v0.3.2)
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 function setH(el,h){if(el&&el.__h!==h){el.innerHTML=h;el.__h=h}}
 // Anahtar satırın konumuna değil kendisine bağlı: pencere kayınca not yerinden oynamaz (v0.3.2)
 function rowKey(e,i){return e.kanit?('kanit|'+e.kanit):e.note?('note|'+(e.at||'')+'|'+e.note):(e.id||('k|'+e.time+'|'+e.speaker+'|'+e.text))}
-function rowHtml(e){return e.kanit?`<div class="l kn">${ic('cam')} ${L('Kanıt')} ${esc(e.n)} · ${esc((e.at||'').slice(11,19))} · <a href="/${esc(e.kanit)}" target=_blank>${L('aç')}</a>${e.not?' — '+esc(e.not):''}</div>`:e.note?`<div class="l note">✎ ${esc(e.note)}</div>`:`<div class="l ${e.flags&&e.flags.length?'f':''}"><span class=sp><b>${esc(e.speaker)}</b>${e.time?' · <span class=z>'+esc(e.time)+'</span>':''}</span><br>${esc(e.text)}</div>`}
+function rowHtml(e){return e.kanit?`<div class="l kn">${ic('cam')} ${L('Kanıt')} ${esc(e.n)} · ${esc((e.at||'').slice(11,19))} · <a href="/${esc(e.kanit)}${kq()}" target=_blank>${L('aç')}</a>${e.not?' — '+esc(e.not):''}</div>`:e.note?`<div class="l note">✎ ${esc(e.note)}</div>`:`<div class="l ${e.flags&&e.flags.length?'f':''}"><span class=sp><b>${esc(e.speaker)}</b>${e.time?' · <span class=z>'+esc(e.time)+'</span>':''}</span><br>${esc(e.text)}</div>`}
 // Satır öğeleri Map'te tutulur: anahtar metin içerdiği için CSS seçiciyle aranmaz (v0.3.3)
 const rowEls=new Map()
 function renderLines(tail){
@@ -214,16 +184,18 @@ const seenCards=new Set(); let firstCards=true, last=null, mini=null
 function bag(h){return h.replace(/https?:\/\/[^\s<>"']+/g,u=>{const m=u.match(/^(.*?)([.,;:!?)]*)$/);return `<a href="${m[1]}" target=_blank rel="noopener noreferrer">${m[1]}</a>${m[2]}`})}
 function cardsHtml(v,mini){
   const qs=(v.questions||[]).map(q=>`<div class=kq>${q.tur==="ozet"?L("Son 1 dk özeti hazırlanıyor…"):L("Claude'a soruldu: ")+esc(q.text)}</div>`).join("")
-  const oc=(v.cards||[]).map(c=>`<div class="k k-${esc(c.kind)}${(firstCards||seenCards.has(c.id))?"":" yeni"}" data-id="${esc(c.id)}" title="${L('Dokun: kapat')}"><div class=km><b>${KL[c.kind]||KL.not}${c.gizli?" · "+L("gizli"):""}</b>${c.q?`<div class=kw>↳ ${esc(c.q)}</div>`:""}${bag(esc(c.text))}${c.why&&!mini?`<div class=kw>${bag(esc(c.why))}</div>`:""}</div><div class=ka>${ackBtns(c)}</div></div>`).join("")
+  const oc=(v.cards||[]).map(c=>`<div class="k k-${esc(c.kind)}${(firstCards||seenCards.has(c.id))?"":" yeni"}" data-id="${esc(c.id)}"${c.onay?` data-onay=1`:` title="${L('Dokun: kapat')}"`}><div class=km><b>${c.onay?L("Onay bekliyor"):KL[c.kind]||KL.not}${c.gizli?" · "+L("gizli"):""}</b>${c.q?`<div class=kw>↳ ${esc(c.q)}</div>`:""}${bag(esc(c.text))}${c.why&&!mini?`<div class=kw>${bag(esc(c.why))}</div>`:""}</div><div class=ka>${ackBtns(c)}</div></div>`).join("")
   const cc=(v.closed||[]).slice(-3).reverse().map(c=>`<div class=kc title="${esc(c.text)}">${ACK_ICON[c.status]||"✕"} ${esc(c.text)}</div>`).join("")
   return ((oc+qs)||`<div class=empty>${L("Şimdilik kart yok. Claude toplantıyı izlerken öneriler buraya düşer.")}</div>`)+cc
 }
 // karta dokunmak = okundu (kapat); ✓ yaptım, ✕ gerek yok ikincil. CEVAP ve NOT'ta "yaptım" anlamsız
-const ACK_ICON={yapildi:"✓",okundu:"👁",gecildi:"✕",yenilendi:"↻"}
+const ACK_ICON={yapildi:"✓",okundu:"👁",gecildi:"✕",yenilendi:"↻",onaylandi:"✓",reddedildi:"✕"}
 const NO_DO=["cevap","not"]
-function ackBtns(c){return [["yapildi","check",L("Yaptım")],["gecildi","x",L("Gerek yok — Claude bir daha önermesin")]].filter(([s])=>s!=="yapildi"||!NO_DO.includes(c.kind)).map(([s,i,t])=>`<button class=gh data-ack=${s} data-id="${esc(c.id)}" title="${t}" aria-label="${t}">${ic(i)}</button>`).join("")}
+// onay kartı (#76): Claude'un yapacağı iç işi (kayıt, kendi oturumlarına mesaj) yazılı onaylarsın; karta dokunmak onay değil
+function ackBtns(c){if(c.onay)return[["onaylandi","check",L("Onayla")],["reddedildi","x",L("Reddet")]].map(([s,i,t])=>`<button class="${s==="onaylandi"?"pri":"gh"} on" data-ack=${s} data-id="${esc(c.id)}" title="${t}">${ic(i,t)}</button>`).join("")
+  return [["yapildi","check",L("Yaptım")],["gecildi","x",L("Gerek yok — Claude bir daha önermesin")]].filter(([s])=>s!=="yapildi"||!NO_DO.includes(c.kind)).map(([s,i,t])=>`<button class=gh data-ack=${s} data-id="${esc(c.id)}" title="${t}" aria-label="${t}">${ic(i)}</button>`).join("")}
 function paintCards(el,v,mini){setH(el,cardsHtml(v,mini))}
-function bindAck(root){root.addEventListener("click",ev=>{if(ev.target.closest("a[href]"))return;const b=ev.target.closest("button[data-ack]"),k=ev.target.closest(".k[data-id]");if(!b&&!k)return
+function bindAck(root){root.addEventListener("click",ev=>{if(ev.target.closest("a[href]"))return;const b=ev.target.closest("button[data-ack]"),k=ev.target.closest(".k[data-id]");if(!b&&(!k||k.dataset.onay))return
   if(b)b.disabled=true;if(k)k.classList.add("kapaniyor");fetch("/card-ack",{method:"POST",body:JSON.stringify({id:b?b.dataset.id:k.dataset.id,status:b?b.dataset.ack:"okundu"})}).then(refresh)})}
 async function sendNote(t){await fetch("/note",{method:"POST",body:JSON.stringify({text:t,at:new Date().toISOString()})})}
 async function sendAsk(t){await fetch("/ask",{method:"POST",body:JSON.stringify({text:t})})}
@@ -259,6 +231,7 @@ function durum(s){
   const x=s.extension, w=s.whisper||{}, ek=x&&x.age_s<30, cagri=ek&&x.call, ca=s.claude_age_s, izl=ca!=null&&ca<120, so=[]
   try{const g=JSON.parse(sessionStorage.getItem("guncellendi")||"null");if(g&&Date.now()-g.t<90000)so.push(["wa",L("Suflor.me güncellendi"),L("açık bir toplantı sekmesi varsa yenile")])}catch(e){}
   if(s.uyari)so.push(["er",s.uyari,""])
+  if(s.anahtarsiz)so.push(["wa",L(s.anahtarsiz.tur==="yerel"?"Anahtarsız yerel istek geldi":"Eklenti eski sürümde"),L(s.anahtarsiz.tur==="yerel"?"toplantı yardımcısı eski olabilir — aktarici-kur ile yeniden kur":"chrome://extensions → Suflor.me → ↻ yenile")])
   if(s.dil&&s.dil.uyari)so.push(["er",L("Döküm dili yanlış"),s.dil.uyari])
   if(cagri){
     const yon=(x.yonerge&&x.yonerge.altyazi)||L("Diğer → Dil ve konuşma → Canlı altyazı")
@@ -310,7 +283,7 @@ function paintMini(s){
 // Claude okur (izle: BAĞLAM). En çok 25 MB; aktarıcı yalnız pano anahtarıyla kabul eder.
 async function baglamBirak(files){for(const f of files){if(f.size>25*1048576){geciciDurum(L("Dosya çok büyük"),L("en çok 25 MB")+" · "+f.name);continue}
   const veri=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]||'');fr.onerror=()=>r('');fr.readAsDataURL(f)})
-  let r={};try{r=await j('/baglam-dosya',{method:'POST',body:JSON.stringify({ad:f.name,veri,anahtar:BAS_ANAHTAR})})}catch(e){}
+  let r={};try{r=await j('/baglam-dosya',{method:'POST',body:JSON.stringify({ad:f.name,veri})})}catch(e){}
   geciciDurum(r.ok?L("Bağlam eklendi — Claude okuyacak"):L("Bağlam eklenemedi"),r.ok?r.ad:(r.err||f.name),4000)}refresh()}
 function birakmaKur(w){const b=w.document.body;let n=0
   w.addEventListener('dragenter',ev=>{if([...(ev.dataTransfer&&ev.dataTransfer.types||[])].includes('Files')){n++;b.classList.add('surukle')}})
@@ -328,7 +301,7 @@ document.getElementById("mini").onclick=openMini
   dd.textContent=L("gönderiliyor…");let r={};try{r=await j("/geri-bildirim",{method:"POST",body:JSON.stringify({metin:t,teknik:document.getElementById("gbt").checked})})}catch(e){}
   if(r.ok){m.value="";dd.textContent=L("Teşekkürler — gönderildi");setTimeout(()=>d.close(),1400)}else dd.textContent=L("Gönderilemedi — sonra yeniden denenecek")}}
 // takvimden sıradaki toplantılar + panodan başlatma (Claude izlemiyorken görünür). Anahtar sunucu tarafından gömülür.
-const BAS_ANAHTAR="__BASLAT_ANAHTAR__"; let tkSecili=null, tkOlaylar=[], tkGor=null  // tkGor: boş panoda gündemi gösterilen toplantı
+let tkSecili=null, tkOlaylar=[], tkGor=null  // tkGor: boş panoda gündemi gösterilen toplantı
 // boş panoda seçili toplantının gündemi: Claude'un hazırladığı gündem başlığı uyuşuyorsa onun maddeleri, yoksa davet notundaki
 // maddeler (ayırıcı çizgiden önceki kısım; bağlantı, parola, kimlik satırları atılır — Teams/Zoom katılım bilgisi gösterilmez)
 const tkNot={}; let agTam=null, agTamT=0
@@ -341,7 +314,7 @@ function seciliGundem(ag){const o=tkOlaylar.find(x=>x.id===tkGor);if(!o)return n
   if(!(o.id in tkNot)){tkNotAl(o.id);return{o,items:[],kaynak:L('davet notu okunuyor…')}}
   const m=davetMaddeleri(tkNot[o.id]);return{o,items:m,kaynak:m.length?L('davet notundan'):L('Bu toplantı için gündem yok — Başlat\'a basınca Claude hazırlar.')}}
 // pano Chrome'da değilse (Safari varsayılan) toplantı ve hazırlık sekmesini aktarıcı Chrome'da açar — eklenti yalnız Chrome'da
-const CHROME=/Chrome\//.test(navigator.userAgent)&&!/Edg\/|OPR\//.test(navigator.userAgent), chromeAc=b=>j('/ac',{method:'POST',body:JSON.stringify(Object.assign({anahtar:BAS_ANAHTAR},b))}).catch(()=>{})
+const CHROME=/Chrome\//.test(navigator.userAgent)&&!/Edg\/|OPR\//.test(navigator.userAgent), chromeAc=b=>j('/ac',{method:'POST',body:JSON.stringify(b)}).catch(()=>{})
 function tkForm(o,konu){tkSecili=o?o.id:null;const f=document.getElementById('tkf');document.getElementById('tks').hidden=false;f.hidden=false;document.getElementById('tky2').hidden=!(o&&o.baglanti);const tl=document.getElementById('tkl');tl.value='';tl.hidden=!!(o&&o.baglanti);document.getElementById('tkc').value='';document.getElementById('tkk').value=o?o.baslik:(konu||'');document.getElementById('tkr').value=o&&o.ben_duzenleyen?'yurutucu':(o?'katilimci':'yurutucu');document.getElementById('tkd').value='tr';document.getElementById('tkm').textContent='';document.getElementById('tkk').focus()}
 // Elle başlat aç/kapat: form zaten elle açıksa ikinci tıklama kapatır
 document.getElementById('tke').onclick=()=>{const f=document.getElementById('tkf');if(!f.hidden&&tkSecili===null){f.hidden=true;if(last)renderTakvim(last)}else tkForm(null)}
@@ -355,15 +328,25 @@ document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=doc
   // toplantı sekmesi tıklama anında açılır (yanıttan sonra açılırsa Chrome açılır pencere engelliyor), yanıt gelince bağlantıya gider
   // bağlantı: takvim olayınınki, yoksa formdaki, o da yoksa aktarıcı Teams'i açar — hazırlık sekmesi her başlatmada (test toplantısı 7 Ekim)
   const o0=tkOlaylar.find(x=>x.id===tkSecili), bl=(o0&&o0.baglanti)?"":document.getElementById('tkl').value.trim(), hz=true, w=CHROME?window.open('/hazirlik','_blank'):null  // hazırlık sekmesi, hazır olunca toplantıya geçer
-  try{const r=await j('/baslat',{method:'POST',body:JSON.stringify({olay:tkSecili,konu:k,baglanti:bl,baglam:document.getElementById('tkc').value,rol:document.getElementById('tkr').value,dil:document.getElementById('tkd').value,anahtar:BAS_ANAHTAR})});if(r.err==='köken')r.err=L('Pano eski — sayfayı yenileyip tekrar dene');if(w&&!r.ok)w.close();if(hz&&!CHROME&&r.ok)chromeAc({hazirlik:true});m.className=r.ok?'ok':'er';m.textContent=r.ok?L(hz?"Başladı — hazır olunca toplantıya geçilir":"Başladı — Claude gündemi kurup izlemeye başlar"):(r.err||L('başlatılamadı'))}
+  try{const r=await j('/baslat',{method:'POST',body:JSON.stringify({olay:tkSecili,konu:k,baglanti:bl,baglam:document.getElementById('tkc').value,rol:document.getElementById('tkr').value,dil:document.getElementById('tkd').value})});if(r.err==='köken'||r.err==='anahtar')r.err=L('Pano eski — sayfayı yenileyip tekrar dene');if(w&&!r.ok)w.close();if(hz&&!CHROME&&r.ok)chromeAc({hazirlik:true});m.className=r.ok?'ok':'er';m.textContent=r.ok?L(hz?"Başladı — hazır olunca toplantıya geçilir":"Başladı — Claude gündemi kurup izlemeye başlar"):(r.err||L('başlatılamadı'))}
   catch(e){if(w)w.close();m.className='er';m.textContent=L("Suflor.me'ye ulaşılamadı")}finally{setTimeout(()=>b.disabled=false,3000)}}
+// toplantı öncesi brifing: boş panoda seçili takvim toplantısı için, dokununca (Claude yalnız okur; sonuç gün boyu saklanır)
+function renderBrifing(s){const sec=document.getElementById('brs'),izliyor=s.claude_age_s!=null&&s.claude_age_s<120,o=tkOlaylar.find(x=>x.id===tkGor)
+  sec.hidden=!!s.aktif||izliyor||!o;if(sec.hidden)return
+  document.getElementById('brn').textContent=o.baslik;const b=(s.brifing||{})[o.id]||{},ls=(a,t)=>a&&a.length?`<div class=bb>${L(t)}</div><ul>${a.map(x=>`<li>${bag(esc(x))}</li>`).join('')}</ul>`:''
+  setH(document.getElementById('br'),b.durum==='hazir'?`${b.sonuc.ozet?`<div class=b>${esc(b.sonuc.ozet)}</div>`:''}${ls(b.sonuc.dikkat,'Dikkat')}${ls(b.sonuc.acik,'Açık kalanlar')}${ls(b.sonuc.gecmis,'Geçmişte')}<div class=bt><button class=gh data-brf="${esc(o.id)}" data-yeniden=1>${L('Yeniden hazırla')}</button></div>`
+    :b.durum==='calisiyor'?`<div class=empty>${L('Claude brifingi hazırlıyor… (1–2 dk)')}</div>`
+    :`${b.durum==='hata'?`<div class=empty>${esc(b.hata||'')}</div>`:`<div class=empty>${L('Claude geçmiş görüşmelere, açık sorulara ve belgelere bakıp kısa bir brifing hazırlar.')}</div>`}<div class=bt><button class=pri data-brf="${esc(o.id)}">${L(b.durum==='hata'?'Yeniden dene':'Brifing hazırla')}</button></div>`)}
+document.getElementById('br').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-brf]');if(!b)return;b.disabled=true
+  let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:b.dataset.brf,yeniden:!!b.dataset.yeniden})})}catch(e){}
+  if(!r.ok){b.disabled=false;geciciDurum(L('Brifing başlatılamadı'),r.err||'')}refresh()})
 // toplantı sonu: Claude özeti kaydedince (ozet-hazir) pano boşken son 7 günün en yeni 3 toplantısı — not, değerlendirme, öneri, özeti aç
 function gunTxt(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const g=Math.round((b-new Date(d).setHours(0,0,0,0))/864e5),s=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')
   return (g===0?L('Bugün'):g===1?L('Dün'):String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0'))+' '+s}
 function renderSon(s){const ls=s.son_toplantilar||[],sec=document.getElementById('sns');sec.hidden=!!s.aktif||!ls.length;if(sec.hidden)return
   setH(document.getElementById('sn'),ls.map(r=>`<div class=sn><div class=t><div class=b><span class=z>${esc(gunTxt(r.at))}</span>${esc(r.baslik||r.ad)}${r.puan?` <span class=chip>${esc(r.puan)}/5</span>`:''}</div>${r.degerlendirme?`<div class=d>${esc(r.degerlendirme)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}</div><button class=gh data-son="${esc(r.id)}" title="${esc(r.ad)}">${L('Özeti aç')}</button></div>`).join(''))}
 document.getElementById('sn').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-son]');if(!b)return
-  let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son,anahtar:BAS_ANAHTAR})})}catch(e){}
+  let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son})})}catch(e){}
   if(!r.ok)geciciDurum(L('Özet açılamadı'),r.err||'')})
 // boş pano = "Sıradaki · Başlat": ilk (süren ya da gelecek) toplantı büyük kart, kalanlar altında soluk satır. Claude izlerken gizli.
 function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks'),x=s.extension
@@ -388,9 +371,11 @@ function guncellemeCiz(s){const g=s.guncelleme||{},b=document.getElementById('gu
 // ilk tıklama onay ister (5 sn), ikincisi günceller — tarayıcının onay penceresi yerine
 document.getElementById('gun').onclick=async ev=>{const b=ev.currentTarget
   if(!b.dataset.onay){b.dataset.onay="1";b.textContent=L("Onayla — birkaç saniye kesilir");setTimeout(()=>{delete b.dataset.onay;if(last)guncellemeCiz(last)},5000);return}
-  delete b.dataset.onay;b.disabled=true;b.textContent=L("Güncelleniyor…");let r={};try{r=await j('/guncelle',{method:'POST',body:JSON.stringify({anahtar:BAS_ANAHTAR})})}catch(e){}
+  delete b.dataset.onay;b.disabled=true;b.textContent=L("Güncelleniyor…");let r={};try{r=await j('/guncelle',{method:'POST',body:"{}"})}catch(e){}
   if(!r.ok){b.disabled=false;b.textContent=L("Güncelleme başarısız — yeniden dene");geciciDurum(L("Güncellenemedi"),r.err||"")}}
-async function refresh(){let s;try{s=await j('/status')}catch(e){const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Suflor.me'ye ulaşılamıyor")));setH(document.getElementById('da'),esc(L('birkaç saniye içinde yeniden denenir')));return}last=s;guncellemeCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
+async function refresh(){let s;try{s=await j('/status')}catch(e){s=null}
+  if(s&&s.err==="anahtar"){document.title="🔑 Suflor.me";const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Pano anahtarsız açıldı")));setH(document.getElementById('da'),esc(L("Suflor.me simgesine tıkla → Panoyu aç")));return}
+  if(!s){const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Suflor.me'ye ulaşılamıyor")));setH(document.getElementById('da'),esc(L('birkaç saniye içinde yeniden denenir')));return}last=s;guncellemeCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
 setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||s.meeting||'Toplantı')):L('toplantı bekleniyor'))
 setH(document.getElementById('chips'),s.aktif&&ag.rol?`<span class=chip>${ROL[ag.rol]||esc(ag.rol)}</span>`:"")
 {const [t,c,ti]=sureTxt(s),e=document.getElementById('sure');setH(e,s.aktif&&t?ic('clock',esc(t)):"");e.className=c;e.title=ti}
@@ -399,14 +384,14 @@ durumCiz()
 const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
-paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderSon(s)
+paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderSon(s)
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id)); firstCards=false
 document.title=((s.cards||[]).length?`(${s.cards.length}) `:"")+"Suflor.me pano"
 {const fl=s.flags||[];document.getElementById('fls').hidden=!fl.length;setH(document.getElementById('fl'),fl.slice(-10).map(e=>`<div class="l f">${esc(e.time)} ${esc(e.speaker)}: ${esc(e.text)}</div>`).join(''))}
 {const e=document.getElementById('py'),h=payHtml(s);setH(e,h);e.className='py'+(payUy(s)?' uy':'');e.style.display=h?'':'none'}
-{const k=s.kanitlar||[];document.getElementById('kls').hidden=!k.length;setH(document.getElementById('kl'),k.slice().reverse().map(x=>`<div class=kl><a href="/${esc(x.kanit)}" target=_blank><img src="/${esc(x.kanit)}" alt=""></a><span>${esc(x.n)} · ${esc((x.at||'').slice(11,16))}${x.not?' — '+esc(x.not):''}</span></div>`).join(''))}
+{const k=s.kanitlar||[];document.getElementById('kls').hidden=!k.length;setH(document.getElementById('kl'),k.slice().reverse().map(x=>`<div class=kl><a href="/${esc(x.kanit)}${kq()}" target=_blank><img src="/${esc(x.kanit)}${kq()}" alt=""></a><span>${esc(x.n)} · ${esc((x.at||'').slice(11,16))}${x.not?' — '+esc(x.not):''}</span></div>`).join(''))}
 {const b=s.baglam||[],NK={baslat:L("Başlat"),kutu:L("kutu"),birak:L("bırakıldı")};document.getElementById('bgs').hidden=!b.length;setH(document.getElementById('bg'),b.map(x=>`<div class=bg title="${esc(x.ad)}">${x.tur==="dosya"?"📄":"🔗"} ${esc(x.ad)}<span class=sp>${esc(NK[x.kaynak]||x.kaynak)}</span></div>`).join(''))}
 {const a=s.acik||[];document.getElementById('aks').hidden=!a.length;setH(document.getElementById('ak'),a.map(q=>`<div class=ak>${esc(q.metin)}${q.kim?`<span class=sp>— ${esc(q.kim)}</span>`:''}</div>`).join(''))}
 // gündem her yenilemede karşılaştırılır — Claude `gundem i` ile işaretleyince ya da agenda.json değişince görünsün

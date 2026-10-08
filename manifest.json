@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suflor.me — canlı toplantı asistanı",
-  "version": "0.13.41",
+  "version": "0.14.2",
   "description": "Toplantıyı canlı yazıya döker (Teams; Meet ve Zoom web sırada), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
   "permissions": [
     "storage",
@@ -9,7 +9,8 @@
     "activeTab",
     "tabCapture",
     "offscreen",
-    "alarms"
+    "alarms",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "https://teams.microsoft.com/*",
@@ -47,6 +48,8 @@
       ],
       "all_frames": true,
       "js": [
+        "pano/dil.js",
+        "yerel-anahtar.js",
         "platform-teams.js",
         "content.js"
       ],

@@ -55,6 +55,7 @@ ka = sub.add_parser("kart"); ka.add_argument("tur", choices=["soyle", "dur", "ce
 ka.add_argument("metin"); ka.add_argument("--neden", default=""); ka.add_argument("--cevap", default=None, help="cevaplanan soru kimliği (q…)")
 ka.add_argument("--gundem", type=int, default=None, help="ilgili gündem maddesinin sırası (0'dan)")
 ka.add_argument("--gizli", action="store_true", help="dur kartının metni şeritte görünmesin (Teams sekmesi paylaşılırsa)")
+ka.add_argument("--onay", action="store_true", help="onay kartı (#76): Onayla / Reddet düğmeleri; metin yapılacak iç işi tam yazar (TOPLANTI-MODU §7)")
 et = sub.add_parser("etiket", help="duygu etiketi (pano başlığı; kart değil): genel ton ya da --kim ile kişi başına")
 et.add_argument("ton", choices=["olumlu", "notr", "gergin", "olumsuz", "ilgili", "heyecanli", "tedirgin", "savunmada", "ilgisiz", "kararsiz"])
 et.add_argument("--kim", default=None)
@@ -91,6 +92,7 @@ dk = sub.add_parser("dokum", help="v0.12.6: temiz döküm dosyası (.md + .vtt) 
 dk.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); dk.add_argument("--kim", default=None, help="dosya adındaki kişi/konu (yoksa toplantı başlığı)")
 dk.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)"); dk.add_argument("--uzerine", action="store_true", help="var olan dosyanın üzerine yaz")
 dk.add_argument("--goster", action="store_true", help="yazmadan .md'yi yazdır")
+sub.add_parser("durum", help="v0.14.0: aktarıcının /status yanıtı (JSON; yerel anahtarla — anahtarsız curl 401 alır)")
 sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü (aktarıcı, eklenti sürümü, Whisper, ses modeli, bellek, disk)")
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
 tk.add_argument("--id", default=None); tk.add_argument("--n", type=int, default=6)
@@ -102,11 +104,25 @@ gb.add_argument("--yeni", action="store_true"); gb.add_argument("--okundu", acti
 hz = sub.add_parser("hazir"); hz.add_argument("hid", help="hazir.json'daki kart kimliği (h1, h2…)")
 hz.add_argument("--cevap", default=None, help="SORU'ya cevap olarak gönder (q…); tür cevap olur")
 A = ap.parse_args()
+# v0.14.0 yerel anahtar: aktarıcının okuma uçları ve pano işlemleri anahtar ister — aktarıcıya giden her isteğe başlık (kart-anahtari.txt)
+def _anahtar():
+    try: return open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
+    except OSError: return ""
+class _AnahtarEkle(urllib.request.BaseHandler):
+    def http_request(self, r):
+        if r.full_url.startswith(A.relay.rstrip("/") + "/") and not r.has_header("X-suflor-anahtar"): r.add_header("X-Suflor-Anahtar", _anahtar())
+        return r
+urllib.request.install_opener(urllib.request.build_opener(_AnahtarEkle()))
 
 def get(path):
     # izle kendini bildirir → panoda "Claude izliyor" noktası (yalnız /status'ta kullanılır)
     # yalnız izle bildirir (takvim/saglik gibi tek seferlik komutlar "Claude izliyor" saymasın — panodan başlatmayı kilitler)
     return json.load(urllib.request.urlopen(urllib.request.Request(A.relay + path, headers={"X-Suflor-Istemci": "izle"} if A.cmd == "izle" else {}), timeout=3))
+
+def durum_cmd():
+    try: s = get("/status")
+    except Exception as e: sys.exit(f"aktarıcı yanıt vermiyor ({e.__class__.__name__})")
+    s.pop("tail", None); print(json.dumps(s, ensure_ascii=False, indent=1))  # döküm satırları (tail) kontrol için gereksiz
 
 def hazir_yukle():
     try: return json.load(open(os.path.join(A.dir, "hazir.json"), encoding="utf-8")).get("kartlar", [])
@@ -337,10 +353,13 @@ def kart():
     if A.cevap: body["reply_to"] = A.cevap
     if A.gundem is not None: body["agenda_i"] = A.gundem
     if A.gizli: body["gizli"] = True
+    if A.onay:
+        if A.tur in ("not", "bilgi", "dur", "dikkat", "deginme"): body["kind"] = "soyle"  # onay kartı şeritte de görünsün (NOT şeritte yok)
+        body["onay"] = True
     req = urllib.request.Request(A.relay + "/card", data=json.dumps(body).encode(), method="POST",
                                  headers={"X-Suflor-Anahtar": key, "Content-Type": "application/json"})
     r = json.load(urllib.request.urlopen(req, timeout=3)); c = r.get("card") or {}
-    print(f"kart gönderildi: {c.get('id')} [{c.get('kind')}] {c.get('text')}")
+    print(f"kart gönderildi: {c.get('id')} [{c.get('kind')}{' · ONAY BEKLİYOR' if c.get('onay') else ''}] {c.get('text')}")
     return c.get("id")
 def etiket_cmd():
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
@@ -849,6 +868,10 @@ def izle():
             buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
         for k in k_tail.new():
             if "text" in k: texts[k["id"]] = f"[{k.get('kind')}] {k.get('text')}"
+            elif k.get("status") in ("onaylandi", "reddedildi"):  # onay kartı (#76) — yalnız anahtarlı istemcinin düğmesi; beklemez
+                if not k.get("yetkili"): continue
+                emit(f"ONAY {k.get('id')}: " + (f"✓ ONAYLANDI ({BEN}, yazılı; anahtarlı istemci) → yalnız bu kartta yazılı iç işi şimdi yap, sonucu tek satır NOT kartıyla bildir"
+                     if k["status"] == "onaylandi" else f"✕ REDDEDİLDİ ({BEN}) → yapma; sohbete tek satır") + f": {texts.get(k.get('id'), k.get('id'))}")
             elif "status" in k: acks.append(f"KART {({'yapildi': '✓ yaptı', 'okundu': '👁 okudu (reddetmedi)', 'gecildi': '✕ gerek yok (bir daha önerme)', 'yenilendi': '↻ yenilendi'}).get(k['status'], k['status'])}: {texts.get(k.get('id'), k.get('id'))}")
         if acks and not buf_since: buf_since = time.time()  # kart dönüşü acil değil: sıradaki paketle gider
         # kart adayı (soru, sistem adı, rakamlı/kesin iddia) varsa paket hemen gider — iki paket arası en az
@@ -1544,5 +1567,5 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd}[A.cmd]()
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

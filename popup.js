@@ -6,7 +6,7 @@ const $ = id => document.getElementById(id);
 // arayüz dili (tr/en). Kaynak aktarıcının /status "arayuz_dili" alanı; chrome.storage.local "dil"de saklanır, yoksa "tr".
 // Anahtar Türkçe metnin kendisi (pano ile aynı yaklaşım ve terimler); İngilizcesi yoksa Türkçe kalır.
 let DIL = "tr";
-const EN = {"Bu Chrome'un yazdığı çalışma alanı": "The workspace this Chrome writes to", "Bu Chrome hangi çalışma alanına yazsın?": "Which workspace should this Chrome write to?", "Bu Mac'te birden fazla Suflor.me aktarıcısı çalışıyor. Bir kez seç; Ayarlar'dan değiştirebilirsin.": "More than one Suflor.me relay is running on this Mac. Pick one once; you can change it in Settings.", "bakılıyor…": "checking…", "Panoyu aç": "Open panel", "Ayarlar": "Settings", "Sesi Mac'te yazıya çevir": "Transcribe audio on this Mac", "Çalışma alanı": "Workspace", "Suflor.me kapalı": "Suflor.me is off", "kurulum klasöründe aktarici-kur'a çift tıkla": "double-click aktarici-kur in the install folder", "{n} satır bekliyor; Suflor.me açılınca gönderilir.": "{n} lines waiting; they'll be sent once Suflor.me is up.", "Döküm dili yanlış": "Transcript language is wrong", "altyazıyı aç": "turn on captions", "Satır gelmiyor": "No lines coming in", "Altyazıyı aç: ": "Turn on captions: ", "Karşı taraf: izin gerekiyor": "Other side: permission needed", "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses": "System Settings → Privacy & Security → Screen & System Audio Recording → Suflor Ses", "Karşı taraf: ses yazılmıyor": "Other side: not being transcribed", "Aç": "Open", "istendi…": "requested…", "Senin sesin yazılmıyor": "Your voice isn't being transcribed", "mikrofon açılamadı — toplantı sekmesini yenile": "couldn't open the microphone — reload the meeting tab", "mikrofon açık ama ses gelmiyor": "microphone is on but no audio is coming in", "Claude izlemiyor — kart gelmez": "Claude isn't watching — no cards will come", "Panodan başlat": "Start it from the panel", "Dinliyorum": "Listening", "1 açık kart": "1 open card", "{n} açık kart": "{n} open cards", "Claude hazır — toplantı bekleniyor": "Claude is ready — waiting for a meeting", "Hazır — toplantı bekleniyor": "Ready — waiting for a meeting"};
+const EN = globalThis.SUFLOR_EN || {};
 function L(s, v) { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; }
 function cevir(kok) {  // sabit HTML: metin düğümleri + placeholder/title/aria-label (yalnız tr → en)
   if (DIL !== "en") return; document.documentElement.lang = "en";
@@ -34,8 +34,10 @@ function relaySec(adr) { adr = relayGecerli(adr) || RELAY_VARSAYILAN; cfg.relay 
 // seçilmediyse seçtir — yanlış alana (ör. kişisel toplantı iş dökümüne) yazılmasın.
 let bulunan = [];
 async function kesfet() {
+  const k = await SuflorAnahtar.al();  // v0.14.0: yardımcı bu kullanıcının aktarıcısını söyler — seçim gerekmez
+  if (k) { bulunan = [{ adr: `http://127.0.0.1:${k.port}`, alan: k.alan || "Suflor", port: k.port }]; cfg.relay = bulunan[0].adr; cfg.secildi = true; $("alanl").hidden = true; return; }
   const ports = [8765, 8766, 8767, 8768];
-  bulunan = (await Promise.all(ports.map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const s = await (await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal })).json(); return { adr: `http://127.0.0.1:${p}`, alan: s.alan || "Suflor", ad: s.ad, port: p }; } catch { return null; } }))).filter(Boolean);
+  bulunan = (await Promise.all(ports.map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); if (!r.ok && r.status !== 401) return null; const s = await r.json().catch(() => ({})); return { adr: `http://127.0.0.1:${p}`, alan: s.alan || "Suflor", ad: s.ad, port: p }; } catch { return null; } }))).filter(Boolean);
   $("alansec").replaceChildren(...bulunan.map(b => { const o = document.createElement("option"); o.value = b.adr; o.textContent = `${b.alan} · port ${b.port}`; return o; }));
   if (bulunan.some(b => b.adr === cfg.relay)) $("alansec").value = cfg.relay;
   $("alansec").onchange = () => relaySec($("alansec").value);
@@ -81,11 +83,13 @@ async function durum() {
   if (cagri) return ciz("ok", L("Dinliyorum"), n ? L(n === 1 ? "1 açık kart" : "{n} açık kart", { n }) : "");
   ciz("nt", L(izl ? "Claude hazır — toplantı bekleniyor" : "Hazır — toplantı bekleniyor"));
 }
-// pano zaten açıksa o sekmeye geç (her pano sekmesi aktarıcıyı saniyede bir yokluyor; ikincisi gereksiz)
+// pano zaten açıksa o sekmeye geç (her pano sekmesi aktarıcıyı saniyede bir yokluyor; ikincisi gereksiz). Yeni sekme ya da
+// anahtarsız kalmış pano (başlığı 🔑 ile başlar) yerel anahtarla açılır: ?k= — pano kendi deposuna alıp adres çubuğundan siler.
+const anahtarli = async (url) => { const k = await SuflorAnahtar.al(); return k && url.startsWith(`http://127.0.0.1:${k.port}/`) ? url + "?k=" + k.anahtar : url; };
 async function panoAc(relay) {
   const kok = relay.replace(/\/$/, "") + "/";
   const [t] = (await chrome.tabs.query({ url: kok + "*" })).filter(t => t.url === kok || t.url.startsWith(kok + "?") || t.url.startsWith(kok + "#"));
-  if (t) { await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); }
-  else await chrome.tabs.create({ url: kok });
+  if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, (t.title || "").startsWith("🔑") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }
+  else await chrome.tabs.create({ url: await anahtarli(kok) });
 }
 $("pano").onclick = () => panoAc(cfg.relay).then(() => window.close());
