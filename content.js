@@ -487,6 +487,7 @@
       const post = (yol, g) => rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) });
       dg("⭐", "⭐ Önemli an: şu anı özette öne çıkar", () => post("/komut", { tur: "onemli", meeting: meetingInfo() }));  // ad: not süren toplantının dosyasına
       dg(L("Son 1 dk"), "Claude son 1 dakikayı özetlesin", () => post("/ask", { tur: "ozet" }));
+      dg("🔇", "Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)", () => post("/komut", { tur: "sessiz" }));
       dg(L("Kanıt"), "Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur", () => { const not = ta.value.trim(); ta.value = ""; chrome.runtime.sendMessage({ type: "kanit", kaynak: "serit", not }); });
       return a;
     }
@@ -551,17 +552,21 @@
       const sv = v.sure, kal = sv ? sv.kalan_dk : null;
       const top = e("div", "top", sv ? (kal > 0 ? L("{n} dk kaldı", { n: kal }) : kal === 0 ? L("süre doldu") : L("+{n} dk", { n: -kal })) + (sv.kayma >= 2 ? L(" · {n} madde geride", { n: sv.kayma }) : "") : "");
       list.replaceChildren(top);
+      const ss = v.sessiz, sn = (ss && ss.tutulan || []).length;
+      if (ss && ss.acik) list.append(e("div", "top", "🔇 " + L("Sessiz · {n} dk", { n: Math.max(1, Math.ceil(ss.kalan_sn / 60)) }) + (sn ? L(" · {n} kart bekliyor", { n: sn }) : "")));
+      else if (sn) list.append(e("div", "top", "🔔 " + L("Sessiz bitti — Claude özetliyor ({n} kart)", { n: sn })));
+      if (v.ertelenen) list.append(e("div", "top", "⏸ " + L("{n} kart sonraya bırakıldı", { n: v.ertelenen })));
       if (dil) list.append(e("div", "top uy", "⚠ " + L("Döküm dili yanlış — panoya bak")));
       if (warn) list.append(e("div", "top uy", "⚠ " + warn));
       cards.forEach(c => {
         const k = e("div", "k"); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
         if (c.onay) k.dataset.onay = "1"; else k.title = L("Dokun: kapat");
-        const m = e("div", "m"); m.append(e("b", null, L(c.onay ? "Onay bekliyor" : KL[c.kind] || "Not")));
+        const m = e("div", "m"); m.append(e("b", null, (c.geri ? "↩ " : "") + L(c.onay ? "Onay bekliyor" : KL[c.kind] || "Not")));
         if (!c.gizli || ayri) m.append(d.createTextNode(c.text));
         const a = e("div", "a");
         // onay kartı (#76): Claude'un yapacağı iç işi yazılı onayla — yalnız anahtarlı eklentiden geçer
         (c.onay ? [["onaylandi", "✓ " + L("Onayla"), "Onayla"], ["reddedildi", "✕ " + L("Reddet"), "Reddet"]] :
-        [["yapildi", "✓", "Yaptım"], ["gecildi", "✕", "Gerek yok — Claude bir daha önermesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
+        [["yapildi", "✓", "Yaptım"], ["ertele", "⏸", "Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster"], ["gecildi", "✕", "Gerek yok — Claude bir daha önermesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
           .forEach(([st, lbl, tip]) => { const x = e("button", null, lbl); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
         k.append(m, a); list.append(k);
       });
@@ -596,14 +601,17 @@
       ensure(); host.style.display = "block";
       if (pip && !pip.closed) sonCiz(pip.document, v.son);  // her yoklamada (yaş değişir)
       const tum = (v.cards || []).filter(c => KL[c.kind] || c.kind === "not");  // kart penceresi (mini pano) NOT'u da gösterir
-      const s = JSON.stringify([tum.map(c => c.id), qs.map(q => q.id), warn, dil, v.sure && [v.sure.kalan_dk, v.sure.kayma], live, DIL, !!pip]); if (s === sig) return; sig = s;
+      const ss = v.sessiz;  // sessiz: hapta 🔇; ertelenip geri gelen kart yeni sayılır (hap yeniden parlar)
+      const s = JSON.stringify([tum.map(c => c.id + (c.geri || "")), qs.map(q => q.id), warn, dil, v.sure && [v.sure.kalan_dk, v.sure.kayma], live, DIL, !!pip,
+        ss && [ss.acik, Math.ceil(ss.kalan_sn / 60), (ss.tutulan || []).length], v.ertelenen]); if (s === sig) return; sig = s;
       const top = PRI.find(k => cards.some(c => c.kind === k)) || "cevap";
       const pill = root.querySelector(".pill");
       // hap = nokta (en önemli kartın sınıf rengi; uyarıda kırmızı; kartsız toplantıda yeşil) + açık kart sayısı
       const pc = (warn || dil) ? COL.dur : cards.length ? COL[top] : (live ? "#1f7a4f" : "#8b938d");
       pill.style.setProperty("--pc", pc); pill.replaceChildren(el("i")); if (cards.length) pill.append(el("span", null, String(cards.length)));
-      pill.title = L("Suflor.me — kartlar için tıkla");
-      const fresh = cards.some(c => !seen.has(c.id)); cards.forEach(c => seen.add(c.id));
+      if (ss && ss.acik) pill.append(el("span", null, "🔇"));
+      pill.title = ss && ss.acik ? L("Suflor.me — sessiz; kartlar bekliyor") : L("Suflor.me — kartlar için tıkla");
+      const fresh = cards.some(c => !seen.has(c.id + (c.geri || ""))); cards.forEach(c => seen.add(c.id + (c.geri || "")));
       if (fresh && !first) { pill.classList.remove("yeni"); void pill.offsetWidth; pill.classList.add("yeni"); }
       first = false;
       listeCiz(root.querySelector(".list"), v, cards, qs, warn, dil, false);

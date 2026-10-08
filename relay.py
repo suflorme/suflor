@@ -269,7 +269,62 @@ def load_cards():
                     if "status" in r: byid[r["id"]].update(status=r["status"], acted_at=r.get("at"))
                     if "file" in r: byid[r["id"]]["file"] = r["file"]  # bekleyen kaydın sonradan işlenen dosyası
         except FileNotFoundError: pass
+# --- Sessiz mod ve kart erteleme (Faz 3) ------------------------------------------------------------------------
+# Sessiz (Option + Shift + M ya da 🔇; tekrar basınca kapanır): SESSIZ_DK boyunca DUR ve sorulara CEVAP dışındaki kartlar görünmez,
+# kayıtta "sessiz" işaretiyle bekler. Bitince Claude tek özet kartı yazar (kart … --sessiz-ozet) ve bekleyenler "ozetlendi" ile
+# kapanır; özet SESSIZ_OZET_SN içinde gelmezse bekleyenler tek tek görünür (kart kaybolmaz). Durum bellekte: aktarıcı yeniden
+# başlarsa bekleyen kartlar hemen görünür.
+# Ertele ("Sonra", /card-ack status "ertele"): kart gündemde sıradaki maddeye geçilince (izle'nin ▶ tahmini ya da ✓ işareti
+# değişince) geri gelir; gündem yoksa ERTELE_GUNDEMSIZ_SN, varsa en geç ERTELE_EN_COK_SN sonra. Geri gelen kartta "geri" alanı.
+SESSIZ_DK = 10; SESSIZ_OZET_SN = 90; ERTELE_GUNDEMSIZ_SN = 300; ERTELE_EN_COK_SN = 900
+if os.environ.get("SUFLOR_TEST_HIZLI"): SESSIZ_OZET_SN = ERTELE_GUNDEMSIZ_SN = 2  # test/sessiz.py: bekleme süreleri kısalır
+SESSIZ = {"id": None, "bas": 0.0, "bitis": 0.0, "bitti": None}
+def sessiz_acik(): return bool(SESSIZ["id"]) and SESSIZ["bitti"] is None and time.time() < SESSIZ["bitis"]
+def _sessiz_bitir(t, neden):  # LOCK içinde
+    SESSIZ["bitti"] = t; n = sum(1 for c in CARDS if c.get("sessiz") == SESSIZ["id"] and c.get("status") == "acik")
+    _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **SESSİZ** | bitti ({neden}) · bekleyen {n} kart | |")
+def sessiz_degistir():
+    with LOCK:
+        now = time.time()
+        if sessiz_acik(): _sessiz_bitir(now, "kullanıcı kapattı"); return False
+        SESSIZ.update(id="s" + secrets.token_hex(3), bas=now, bitis=now + SESSIZ_DK * 60, bitti=None)
+        _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **SESSİZ** | açıldı ({SESSIZ_DK} dk; DUR ve cevap dışındaki kartlar bekler) | |")
+    return True
+def tutulan(c):  # sessizde gelen kart: sessiz bitip özet gelene kadar (en çok SESSIZ_OZET_SN) görünmez
+    if not SESSIZ["id"] or c.get("sessiz") != SESSIZ["id"]: return False
+    return SESSIZ["bitti"] is None or time.time() - SESSIZ["bitti"] < SESSIZ_OZET_SN
+def sessiz_view():
+    if not SESSIZ["id"]: return None
+    tut = [{"id": c["id"], "kind": c.get("kind"), "text": c.get("text")} for c in CARDS if c.get("status") == "acik" and tutulan(c)]
+    if not sessiz_acik() and not tut: return None
+    return {"id": SESSIZ["id"], "acik": sessiz_acik(), "kalan_sn": max(0, round(SESSIZ["bitis"] - time.time())) if sessiz_acik() else 0,
+            "bitis": datetime.datetime.fromtimestamp(SESSIZ["bitis"]).strftime("%H:%M"), "tutulan": tut}
+def _gundem_imza(): return [STATE.get("agenda_aktif"), sorted(k for k, v in STATE["agenda_ticks"].items() if v)]
+def ertele_card(p):
+    with LOCK:
+        c = next((c for c in CARDS if c["id"] == p.get("id")), None)
+        if not c or c.get("status") != "acik" or c.get("ertele"): return False
+        gundemli = bool(gundem_gorunur() and agenda().get("items")); now = time.time()
+        c["ertele"] = {"imza": _gundem_imza() if gundemli else None, "son": now + (ERTELE_EN_COK_SN if gundemli else ERTELE_GUNDEMSIZ_SN)}
+        c.pop("geri", None); at = datetime.datetime.now()
+        _log("kartlar.jsonl", {"id": c["id"], "at": at.isoformat(timespec="seconds"), "ertele": "gundem" if gundemli else "sure"})
+        _md(f"| {at.strftime('%H:%M:%S')} | **KART ⏸ sonra** | {c['text'].replace('|', '¦')} | |")
+    return True
+def ertele_kontrol():  # vakti gelen ertelenmiş kart geri gelir (görünümler 1–2 sn'de bir çağırır); sessizin süresi de burada biter
+    now = time.time(); imza = _gundem_imza()
+    gelen = [c for c in CARDS if c.get("ertele") and c.get("status") == "acik" and (now >= c["ertele"]["son"] or c["ertele"]["imza"] not in (None, imza))]
+    bitti = SESSIZ["id"] and SESSIZ["bitti"] is None and now >= SESSIZ["bitis"]
+    if not gelen and not bitti: return
+    with LOCK:
+        if bitti and SESSIZ["bitti"] is None: _sessiz_bitir(SESSIZ["bitis"], "süre doldu")
+        at = datetime.datetime.now()
+        for c in gelen:
+            if not c.pop("ertele", None): continue
+            c["geri"] = at.isoformat(timespec="seconds")
+            _log("kartlar.jsonl", {"id": c["id"], "at": c["geri"], "geri": True})
+            _md(f"| {at.strftime('%H:%M:%S')} | **KART ↩ geri geldi** | {c['text'].replace('|', '¦')} | |")
 def cards_view():
+    ertele_kontrol()
     # (kullanıcı) pano yeniden açılınca önceki toplantının kartları görünmez — yalnız süren toplantının (aktif dosya)
     # ve henüz dosyası belli olmayan (PRE'de bekleyen) kartlar
     # dosyası belli olmayan kayıt (toplantı dışında sorulan soru, PRE kartı) yalnız 30 dk görünür — yoksa eski bir
@@ -280,8 +335,9 @@ def cards_view():
     answered = {c.get("reply_to") for c in CARDS if c.get("reply_to")}
     kartlar = [c if c.get("kind") in CARD_KINDS else dict(c, kind=kart_turu(c.get("kind")), **({"gizli": True} if c.get("kind") == "deginme" else {}))
                for c in cs if c.get("kind") != "duygu"]
-    open_ = [c for c in kartlar if c.get("status") == "acik"]
-    closed = sorted((c for c in kartlar if c.get("status") != "acik"), key=lambda c: c.get("acted_at") or "")[-5:]
+    open_ = sorted((c for c in kartlar if c.get("status") == "acik" and not c.get("ertele") and not tutulan(c)), key=lambda c: c.get("geri") or c.get("at") or "")
+    ertelenen = sum(1 for c in kartlar if c.get("status") == "acik" and c.get("ertele"))
+    closed = sorted((c for c in kartlar if c.get("status") not in ("acik", "ozetlendi")), key=lambda c: c.get("acted_at") or "")[-5:]
     tone = next(({"ton": c["ton"], "at": c["at"]} for c in reversed(cs) if c.get("kind") == "duygu" and not c.get("kim")), None)
     tone_kisi = {}  # kişi başına son duygu etiketi (kullanıcı, 2 Ekim)
     for c in cs:
@@ -290,7 +346,7 @@ def cards_view():
     return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered][-5:],
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
-            "whisper": whisper_view(), "komut": STATE.get("komut"),
+            "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "ertelenen": ertelenen,
             "baglam": baglam_view(),
             "son": {k: v for k, v in (STATE.get("son_satir") or {}).items() if k != "file"} if (STATE.get("son_satir") or {}).get("file") == af and af else None}
 # şerit uzun yoklaması — GET /cards?bekle=25&imza=<son> şeridin gösterdiği durum değişene kadar (en çok 25 sn)
@@ -302,7 +358,9 @@ def kart_bildir():
 def serit_imza(v):
     import hashlib
     sv = v.get("sure") or {}
-    x = [[(c.get("id"), c.get("status")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
+    ss = v.get("sessiz") or {}
+    x = [[(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
+         (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"),
          (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
     return hashlib.sha1(json.dumps(x, default=str, sort_keys=True).encode()).hexdigest()[:16]
 def cards_bekle(imza, sn):
@@ -326,9 +384,15 @@ def add_card(p):
         q = next((q for q in QUESTIONS if q["id"] == c["reply_to"]), None)
         if q: c["q"] = q["text"][:200]  # cevap kartında hangi soruya cevap olduğu görünsün
     if isinstance(p.get("agenda_i"), int): c["agenda_i"] = p["agenda_i"]
+    if p.get("sessiz_ozet") and SESSIZ["id"]: c["sessiz_ozet"] = SESSIZ["id"]  # sessizin özeti: bekleyenleri kapatır, kendisi beklemez
+    elif sessiz_acik() and kind != "dur" and not c.get("reply_to"): c["sessiz"] = SESSIZ["id"]
     with LOCK:
         c["file"] = aktif_dosya(); CARDS.append(c); _log("kartlar.jsonl", c)
-        _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')} | |", c, "kartlar.jsonl")
+        _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')} |{' 🔇 bekliyor ' if c.get('sessiz') else ' '}|", c, "kartlar.jsonl")
+        if c.get("sessiz_ozet"):
+            for x in CARDS:
+                if x.get("sessiz") == c["sessiz_ozet"] and x.get("status") == "acik":
+                    x["status"] = "ozetlendi"; x["acted_at"] = c["at"]; _log("kartlar.jsonl", {"id": x["id"], "at": c["at"], "status": "ozetlendi"})
     return c
 def etiket(p):  # duygu etiketi: genel (kim yok) ya da kişi başına; aynı kişinin önceki etiketinin yerine geçer
     ton = p.get("ton") if p.get("ton") in TONES else None
@@ -346,6 +410,7 @@ def ack_card(p, yetkili=False):
     # üç ayrı anlam — yapildi (✓ yaptım), okundu (👁 okudum: kapat, reddetme), gecildi (✕ gerek yok: bir daha önerme).
     # Onay kartı yalnız onaylandi / reddedildi ile kapanır (karta dokunmak onay değildir) ve yalnız anahtarlı istemciden (#76);
     # kayıtta "yetkili" işareti izle'nin ONAY olayına dayanaktır.
+    if p.get("status") == "ertele": return ertele_card(p)
     st = p.get("status") if p.get("status") in ACK_MD else None
     with LOCK:
         c = next((c for c in CARDS if c["id"] == p.get("id")), None)
@@ -1062,9 +1127,10 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
 # ⭐ önemli an ve son 1 dk özeti eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
 # isteği de yok (Faz 2: üç yanlış alarm, karşı taraf da duyuyor); kanıt yalnız Option + Shift + K ve 📷 ile.
-def komut_uygula(tur, gov, title):  # tur: onemli | ozet (/komut yalnız bunları kabul eder)
+def komut_uygula(tur, gov, title):  # tur: onemli | ozet | sessiz (/komut yalnız bunları kabul eder)
     title = title or STATE["meeting"] or "Toplantı"; at = datetime.datetime.now().isoformat(timespec="seconds")
     if tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
+    elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
     else: ask({"tur": "ozet"}); onay = "Son 1 dk özeti istendi"
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
     print(f"KOMUT: {tur} · \"{gov[:80]}\"")
@@ -1973,10 +2039,10 @@ class H(BaseHTTPRequestHandler):
             if not str(self.headers.get("Origin", "")).startswith("chrome-extension://"): return self._json({"ok": False, "err": "yalnız eklenti"}, 403)
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)
         if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
-        if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet)
-            if p.get("tur") not in ("onemli", "ozet"): return self._json({"ok": False, "err": "tur: onemli | ozet"}, 400)
+        if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
+            if p.get("tur") not in ("onemli", "ozet", "sessiz"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz"}, 400)
             komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"))
-            return self._json({"ok": True, "metin": STATE["komut"]["metin"]})
+            return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view()})
         if self.path == "/ses-yerel":  # yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar
             if self.headers.get("Origin") or not secrets.compare_digest(self.headers.get("X-Suflor-Anahtar", ""), SES_KEY): return self._json({"ok": False, "err": "anahtar"}, 403)
             return self._json(yerel_ses_al(p))

@@ -27,9 +27,10 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.type === "whisperKarsiDur") offDur();                       // toplantıdan çıkıldı
   if (msg.type === "offBitti") karsiTab = null;
 });
-// İki kısayol (manifest "commands"): Option + Shift + K kanıt — hangi pencere önde olursa olsun Teams sekmesini çeker, pano öndeyken
-// de çalışır; Option + Shift + O son 1 dk özeti. ⭐ önemli an panoda düğme; karşı tarafın sesi yerel ses yardımcısında (yedek: popup).
-chrome.commands.onCommand.addListener(cmd => { if (cmd === "kanit") kanit(null, "kisayol"); if (cmd === "ozet") komut(cmd); });
+// Üç kısayol (manifest "commands"): Option + Shift + K kanıt — hangi pencere önde olursa olsun Teams sekmesini çeker, pano öndeyken
+// de çalışır; Option + Shift + O son 1 dk özeti; Option + Shift + M sessiz (10 dk kart yok, tekrar basınca kapanır). ⭐ önemli an
+// panoda düğme; karşı tarafın sesi yerel ses yardımcısında (yedek: popup).
+chrome.commands.onCommand.addListener(cmd => { if (cmd === "kanit") kanit(null, "kisayol"); if (cmd === "ozet" || cmd === "sessiz") komut(cmd); });
 // son 1 dk özeti (kısayol) — "Suflor, …" sesli komutlarının yerine.
 // Onay şeritte aktarıcının "komut" alanından gelir (Teams'te yeşil toast); aktarıcıya ulaşılamazsa bildirim.
 async function komut(tur) {
@@ -37,7 +38,7 @@ async function komut(tur) {
     const r = await fetch((await relayAdr()) + "/komut", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur }) });
     if (!r.ok) throw new Error("aktarıcı HTTP " + r.status);
   } catch (e) {
-    chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me", message: L(tur === "onemli" ? "⭐ işaretlenemedi: " : "Özet istenemedi: ") + (/Failed to fetch/i.test(String(e)) ? L("aktarıcıya ulaşılamadı (127.0.0.1:8765)") : L(String(e.message || e))) });
+    chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me", message: L(tur === "onemli" ? "⭐ işaretlenemedi: " : tur === "sessiz" ? "Sessiz açılamadı: " : "Özet istenemedi: ") + (/Failed to fetch/i.test(String(e)) ? L("aktarıcıya ulaşılamadı (127.0.0.1:8765)") : L(String(e.message || e))) });
   }
 }
 

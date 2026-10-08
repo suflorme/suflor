@@ -189,16 +189,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 80155,
-   "sha": "07738c1bdf42d7a0"
+   "uzunluk": 83022,
+   "sha": "7f57ef2fb5899925"
   },
   "/hazirlik": {
-   "uzunluk": 25619,
-   "sha": "3eb1315b3019a034"
+   "uzunluk": 26507,
+   "sha": "4bac00f4a96ee07e"
   },
   "/mini": {
-   "uzunluk": 80155,
-   "sha": "07738c1bdf42d7a0"
+   "uzunluk": 83022,
+   "sha": "7f57ef2fb5899925"
   },
   "/status": {
    "_ping_son": "float",
@@ -291,6 +291,7 @@
     "since": "NoneType"
    },
    "eklenti_kurulu": "NoneType",
+   "ertelenen": "int",
    "extension": {
     "age_s": "int",
     "call": "bool",
@@ -392,6 +393,7 @@
     "parca": "int",
     "sn": "NoneType"
    },
+   "sessiz": "NoneType",
    "son": {
     "at": "str",
     "speaker": "str"
@@ -528,6 +530,7 @@
     "kaynak": "NoneType",
     "uyari": "NoneType"
    },
+   "ertelenen": "int",
    "imza": "str",
    "kanit_iste": "NoneType",
    "kanit_n": "int",
@@ -564,6 +567,7 @@
      "tur": "str"
     }
    ],
+   "sessiz": "NoneType",
    "son": {
     "at": "str",
     "speaker": "str"

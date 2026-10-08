@@ -265,5 +265,15 @@ globalThis.SUFLOR_EN = {
   "toplantı yardımcısı eski olabilir — aktarici-kur ile yeniden kur": "the meeting helper may be outdated — reinstall with aktarici-kur",
   "chrome://extensions → Suflor.me → ↻ yenile": "chrome://extensions → Suflor.me → ↻ reload",
   "Önemli güncelleme": "Important update",
-  "Güvenlik ya da kurulum düzeltmesi — toplantı yokken güncelle": "Security or setup fix — update when you're not in a meeting"
+  "Güvenlik ya da kurulum düzeltmesi — toplantı yokken güncelle": "Security or setup fix — update when you're not in a meeting",
+  "Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)": "Quiet: no cards for 10 min — STOP cards and answers still come (Option + Shift + M; press again to turn off)",
+  "Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster": "Later: show again at the next agenda item (in 5 min if there is no agenda)",
+  "Sonraya bırakmıştın; şimdi geri geldi": "You set this aside; it is back now",
+  "Sessiz · {n} dk": "Quiet · {n} min",
+  "sessiz, bitiş {t}": "quiet until {t}",
+  " · {n} kart bekliyor": " · {n} cards waiting",
+  "Sessiz bitti — Claude özetliyor ({n} kart)": "Quiet ended — Claude is summarising ({n} cards)",
+  "{n} kart sonraya bırakıldı": "{n} cards set aside for later",
+  "Suflor.me — sessiz; kartlar bekliyor": "Suflor.me — quiet; cards are waiting",
+  "Sessiz açılamadı: ": "Could not turn on quiet: "
 };

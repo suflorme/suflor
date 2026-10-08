@@ -56,6 +56,7 @@ ka.add_argument("metin"); ka.add_argument("--neden", default=""); ka.add_argumen
 ka.add_argument("--gundem", type=int, default=None, help="ilgili gündem maddesinin sırası (0'dan)")
 ka.add_argument("--gizli", action="store_true", help="dur kartının metni şeritte görünmesin (Teams sekmesi paylaşılırsa)")
 ka.add_argument("--onay", action="store_true", help="onay kartı (#76): Onayla / Reddet düğmeleri; metin yapılacak iç işi tam yazar (TOPLANTI-MODU §7)")
+ka.add_argument("--sessiz-ozet", action="store_true", help="SESSİZ BİTTİ'den sonra tek özet kartı: sessizde bekleyen kartları kapatır")
 et = sub.add_parser("etiket", help="duygu etiketi (pano başlığı; kart değil): genel ton ya da --kim ile kişi başına")
 et.add_argument("ton", choices=["olumlu", "notr", "gergin", "olumsuz", "ilgili", "heyecanli", "tedirgin", "savunmada", "ilgisiz", "kararsiz"])
 et.add_argument("--kim", default=None)
@@ -353,13 +354,14 @@ def kart():
     if A.cevap: body["reply_to"] = A.cevap
     if A.gundem is not None: body["agenda_i"] = A.gundem
     if A.gizli: body["gizli"] = True
+    if A.sessiz_ozet: body["sessiz_ozet"] = True
     if A.onay:
         if A.tur in ("not", "bilgi", "dur", "dikkat", "deginme"): body["kind"] = "soyle"  # onay kartı şeritte de görünsün (NOT şeritte yok)
         body["onay"] = True
     req = urllib.request.Request(A.relay + "/card", data=json.dumps(body).encode(), method="POST",
                                  headers={"X-Suflor-Anahtar": key, "Content-Type": "application/json"})
     r = json.load(urllib.request.urlopen(req, timeout=3)); c = r.get("card") or {}
-    print(f"kart gönderildi: {c.get('id')} [{c.get('kind')}{' · ONAY BEKLİYOR' if c.get('onay') else ''}] {c.get('text')}")
+    print(f"kart gönderildi: {c.get('id')} [{c.get('kind')}{' · ONAY BEKLİYOR' if c.get('onay') else ''}{' · SESSİZ: bekliyor (sessiz bitince özetle)' if c.get('sessiz') else ''}] {c.get('text')}")
     return c.get("id")
 def etiket_cmd():
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
@@ -667,6 +669,7 @@ def izle():
             bg_bil.intersection_update({k.get("id") for k in liste})  # arşive giden kaynakların kimliği listeden düşer
             try: tmp = bg_bil_fp + ".tmp"; json.dump(sorted(bg_bil), open(tmp, "w", encoding="utf-8")); os.replace(tmp, bg_bil_fp)
             except OSError: pass
+    sessiz_on = False
     sure_ilk = True; sure_esik = set(); kayma_son = 0.0; pay_son = time.time() - 300  # PAY ilk 5 dk susar (yeniden kurulumda tekrar etmesin)
     # kendiliğinden bağlam + gündem tahmini
     try: sis = sistemler()
@@ -778,6 +781,16 @@ def izle():
             if state != last_state:
                 if state != aday: aday, aday_t = state, time.time()
                 if last_state in (None, "yok") or "⚠" in state or time.time() - aday_t >= 10: emit(f"DURUM: {state}"); last_state = state
+            ss = s.get("sessiz") or {}  # sessiz mod (Option + Shift + M): açılış ve bitiş hemen, pakete beklemeden
+            if ss.get("acik") and not sessiz_on:
+                emit(f"SESSİZ: {BEN} sessiz istedi, bitiş {ss.get('bitis')} (tekrar basarsa erken biter) → bu sürede yalnız DUR kartı ve sorulara CEVAP; "
+                     "başka kart gönderme, söyleyeceklerini aklında biriktir (gönderirsen aktarıcı bekletir)")
+            elif sessiz_on and not ss.get("acik"):
+                tut = ss.get("tutulan") or []
+                emit(f"SESSİZ BİTTİ: {len(tut)} kart bekliyor" + (": " + " | ".join(f"[{t.get('kind')}] {t.get('text')}" for t in tut) if tut else "") +
+                     " → 60 sn içinde TEK özet kartı: kart soyle \"Sessizdeyken: …\" --sessiz-ozet (bekleyenler + biriktirdiklerin; yalnız hâlâ geçerli olanlar, en çok 3 madde)"
+                     + ("; söylenecek bir şey kalmadıysa kart gönderme" if not tut else "; geçerli bir şey kalmadıysa kısa NOT kartı --sessiz-ozet ile — yoksa 90 sn sonra bekleyenler tek tek görünür"))
+            sessiz_on = bool(ss.get("acik"))
             sv = s.get("sure")  # kalan süre eşikleri ve gündem kayması — yalnız eşik geçilince bir kez
             if sv:
                 kal, gun = sv["kalan_dk"], f"gündem {sv['bitti']}/{sv['toplam']} bitti" + (f", beklenen {sv['beklenen']}" if sv.get("beklenen") is not None else "")
@@ -872,6 +885,9 @@ def izle():
                 if not k.get("yetkili"): continue
                 emit(f"ONAY {k.get('id')}: " + (f"✓ ONAYLANDI ({BEN}, yazılı; anahtarlı istemci) → yalnız bu kartta yazılı iç işi şimdi yap, sonucu tek satır NOT kartıyla bildir"
                      if k["status"] == "onaylandi" else f"✕ REDDEDİLDİ ({BEN}) → yapma; sohbete tek satır") + f": {texts.get(k.get('id'), k.get('id'))}")
+            elif k.get("ertele"): acks.append(f"KART ⏸ sonraya bırakıldı ({'gündemde sıradaki maddede' if k['ertele'] == 'gundem' else '5 dk sonra'} kendiliğinden geri gelir; yeniden gönderme): {texts.get(k.get('id'), k.get('id'))}")
+            elif k.get("geri"): acks.append(f"KART ↩ geri geldi (ertelenmişti; artık geçersizse yeni kart yazma, kullanıcı kapatır): {texts.get(k.get('id'), k.get('id'))}")
+            elif k.get("status") == "ozetlendi": continue  # sessizin özet kartı kapattı — Claude'un kendi işi
             elif "status" in k: acks.append(f"KART {({'yapildi': '✓ yaptı', 'okundu': '👁 okudu (reddetmedi)', 'gecildi': '✕ gerek yok (bir daha önerme)', 'yenilendi': '↻ yenilendi'}).get(k['status'], k['status'])}: {texts.get(k.get('id'), k.get('id'))}")
         if acks and not buf_since: buf_since = time.time()  # kart dönüşü acil değil: sıradaki paketle gider
         # kart adayı (soru, sistem adı, rakamlı/kesin iddia) varsa paket hemen gider — iki paket arası en az
