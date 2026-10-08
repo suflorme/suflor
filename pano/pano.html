@@ -366,11 +366,12 @@ document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=doc
 function renderBrifing(s){const sec=document.getElementById('brs'),izliyor=s.claude_age_s!=null&&s.claude_age_s<120,o=tkOlaylar.find(x=>x.id===tkGor)
   sec.hidden=!!s.aktif||izliyor||!o;if(sec.hidden)return
   document.getElementById('brn').textContent=o.baslik;const b=(s.brifing||{})[o.id]||{},ls=(a,t)=>a&&a.length?`<div class=bb>${L(t)}</div><ul>${a.map(x=>`<li>${bag(esc(x))}</li>`).join('')}</ul>`:''
-  setH(document.getElementById('br'),b.durum==='hazir'?`${b.sonuc.ozet?`<div class=b>${esc(b.sonuc.ozet)}</div>`:''}${ls(b.sonuc.dikkat,'Dikkat')}${ls(b.sonuc.acik,'Açık kalanlar')}${ls(b.sonuc.gecmis,'Geçmişte')}<div class=bt><button class=gh data-brf="${esc(o.id)}" data-yeniden=1>${L('Yeniden hazırla')}</button></div>`
+  setH(document.getElementById('br'),b.durum==='hazir'?`${b.sonuc.ozet?`<div class=b>${esc(b.sonuc.ozet)}</div>`:''}${ls(b.sonuc.dikkat,'Dikkat')}${ls(b.sonuc.acik,'Açık kalanlar')}${ls(b.sonuc.gecmis,'Geçmişte')}<div class=bt><button class=gh data-brf="${esc(o.id)}" data-dinle=1 title="${L('Brifingi sesli okur (Mac sesi); tekrar basınca susar')}">🔊 ${L('Dinle')}</button><button class=gh data-brf="${esc(o.id)}" data-yeniden=1>${L('Yeniden hazırla')}</button></div>`
     :b.durum==='calisiyor'?`<div class=empty>${L('Claude brifingi hazırlıyor… (1–2 dk)')}</div>`
     :`${b.durum==='hata'?`<div class=empty>${esc(b.hata||'')}</div>`:`<div class=empty>${L('Claude geçmiş görüşmelere, açık sorulara ve belgelere bakıp kısa bir brifing hazırlar.')}</div>`}<div class=bt><button class=pri data-brf="${esc(o.id)}">${L(b.durum==='hata'?'Yeniden dene':'Brifing hazırla')}</button></div>`)}
 document.getElementById('br').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-brf]');if(!b)return;b.disabled=true
-  let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:b.dataset.brf,yeniden:!!b.dataset.yeniden})})}catch(e){}
+  let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:b.dataset.brf,yeniden:!!b.dataset.yeniden,dinle:!!b.dataset.dinle})})}catch(e){}
+  if(b.dataset.dinle){b.disabled=false;if(!r.ok)geciciDurum(L('Brifing okunamadı'),r.err||L('Ses kapalı (ayar konusma) ya da brifing hazır değil'));return}
   if(!r.ok){b.disabled=false;geciciDurum(L('Brifing başlatılamadı'),r.err||'')}refresh()})
 // toplantı sonu: Claude özeti kaydedince (ozet-hazir) pano boşken son 7 günün en yeni 3 toplantısı — not, değerlendirme, öneri, özeti aç
 function gunTxt(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const g=Math.round((b-new Date(d).setHours(0,0,0,0))/864e5),s=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')

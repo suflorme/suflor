@@ -1227,6 +1227,7 @@ def ingest(p):
                 if e.get(k) is not None: rec[k] = e[k]
             jl_out.append(json.dumps(rec, ensure_ascii=False) + "\n")
             STATE["son_satir"] = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "speaker": e.get("speaker"), "file": base_key}  # kart penceresi canlılık satırı
+            if SES.get("p"): ses_durdur()  # sesli brifing sürerken toplantı başladı
             # satır sayısı dosya bazında tutulur (STATE["lines"] tek bir global sayaç olursa, yeni bir
             # dosyaya geçilince eski oturumdan kalan sayıyla toplanıp yanlış gösterir — 29 Eylül gerçek
             # testinde yaşandı: pano "satır 259" derken dosyada 135 satır vardı).
@@ -1742,16 +1743,24 @@ def _brifing_is(oid, olay):
         if veri.get("notlar"): veri["notlar"] = str(veri["notlar"])[:3000]
         istem = BRIFING_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"].format(canli=BASE, olay=json.dumps(veri, ensure_ascii=False, indent=1))
         cikti = os.path.join(BASE, "brifing-cikti.json"); istek = os.path.join(BASE, "brifing-istek.json")
-        if os.path.exists(cikti): os.remove(cikti)
-        args = ["-p", istem, "--allowedTools", "Read,Grep,Glob", "--add-dir", BASE] + (["--model", str(AYAR["claude_model"])] if AYAR.get("claude_model") else [])
-        fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": cikti, "sure": 240}, f, ensure_ascii=False)
-        t0 = time.time()
-        subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=300)
-        try: os.remove(istek)
-        except OSError: pass
-        try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
-        except OSError: return bitir(durum="hata", hata=_t("Claude yanıt vermedi (izin penceresi ya da zaman aşımı) — yeniden dene", "Claude didn't answer (permission prompt or timeout) — try again"))
+        t0 = time.time(); ham = None
+        for yalin in ([True, False] if claude_yalin() else [False]):  # eski Claude Code yalın seçenekleri tanımazsa bir kez tam çağrı
+            if os.path.exists(cikti): os.remove(cikti)
+            args = ["-p", istem, "--allowedTools", "Read,Grep,Glob", "--add-dir", BASE, "--output-format", "json"] + (claude_yalin() if yalin else []) + \
+                   (["--model", str(AYAR["claude_model"])] if AYAR.get("claude_model") else [])
+            fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": cikti, "sure": 240}, f, ensure_ascii=False)
+            t1 = time.time()
+            subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=300)
+            try: os.remove(istek)
+            except OSError: pass
+            try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
+            except OSError: ham = None
+            if ham is None: break  # izin penceresi ya da zaman aşımı: ikinci deneme de bekler, yapma
+            ham, olc = claude_json(ham, "brifing", t1, yalin)
+            if olc or not yalin: break
+            print("BRİFİNG: yalın çağrı okunamadı — tam çağrıyla yeniden")
+        if ham is None: return bitir(durum="hata", hata=_t("Claude yanıt vermedi (izin penceresi ya da zaman aşımı) — yeniden dene", "Claude didn't answer (permission prompt or timeout) — try again"))
         m = re.search(r"\{.*\}", ham, re.S)
         try: j = json.loads(m.group(0)) if m else None
         except ValueError: j = None
@@ -1759,13 +1768,73 @@ def _brifing_is(oid, olay):
         temiz = lambda x, n: [" ".join(str(v).split())[:200] for v in (x or []) if str(v).strip()][:n]
         sonuc = {"ozet": " ".join(str(j.get("ozet") or "").split())[:240], "gecmis": temiz(j.get("gecmis"), 4), "acik": temiz(j.get("acik"), 4), "dikkat": temiz(j.get("dikkat"), 5)}
         print(f"BRİFİNG: hazır ({round(time.time() - t0)} sn)")
+        with LOCK: sesli = BRIFING.get(oid, {}).pop("sesli", None)
         bitir(durum="hazir", sonuc=sonuc, hata=None)
+        if sesli: brifing_sesli(oid, "baslat")
     except Exception as e:
         print(f"BRİFİNG: hata {e.__class__.__name__}"); bitir(durum="hata", hata=_t("Brifing hazırlanamadı", "Couldn't prepare the briefing"))
+# --- Yalın `claude -p` ve ölçümü (karar #83–84) -----------------------------------------------------------------------------------
+# Kişisel ayar, bağlayıcı (MCP), komut ve oturum kaydı yüklenmez; proje ayarı ve CLAUDE.md kalır (8 Ekim, aynı brifing istemi: tam 0,38 $ ·
+# 21 sn, yalın 0,23 $ · 24 sn, kalite aynı; tamamen yalın 0,27 $ ama dosyaları el yordamıyla aradı). Ayar claude_yalin: false → tam çağrı.
+def claude_yalin():
+    return ["--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence",
+            "--tools", "Read,Grep,Glob"] if AYAR.get("claude_yalin", True) else []
+def claude_json(ham, is_, t0, yalin):
+    # --output-format json → (sonuç metni, ölçüm). Ölçüm canli/claude-cagri.jsonl'e (olcum.py toplanti okur); yalnız sayılar, metin yok.
+    try: j = json.loads(ham)
+    except ValueError: return ham, None
+    if not isinstance(j, dict) or "result" not in j: return ham, None
+    u = j.get("usage") or {}; giris = sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+    o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "yalin": yalin, "sure_ms": j.get("duration_ms"),
+         "api_ms": j.get("duration_api_ms"), "duvar_ms": round((time.time() - t0) * 1000), "tur": j.get("num_turns"),
+         "maliyet": round(j.get("total_cost_usd") or 0, 4), "giris": giris, "cikti": u.get("output_tokens"),
+         "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / giris, 2) if giris else None, "hata": bool(j.get("is_error"))}
+    with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
+    return str(j.get("result") or ""), o
+# --- Sesli brifing (karar #83: Başlat'a basınca; Faz 4) ----------------------------------------------------------------------------
+# Yerel macOS sesi (say, Türkçe Yelda): ses Mac'ten çıkmaz. Toplantı başladıysa okunmaz, okurken ilk döküm satırı gelince susar
+# (mikrofon brifingi dökmesin). Ayar konusma: false kapatır; ses: "<ad>" sesi seçer.
+SES = {"p": None}
+def ses_durdur():
+    p = SES.get("p")
+    if p and p.poll() is None: p.terminate(); print("SES: durduruldu"); return True
+    return False
+def seslendir(metin):
+    if not AYAR.get("konusma", True) or not metin: return False
+    ses_durdur(); v = AYAR.get("ses") or ("Yelda" if ARAYUZ_DILI == "tr" else None)
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): {len(metin)} karakter · {metin[:60]}"); return True
+    try:
+        SES["p"] = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        SES["p"].stdin.write(metin.encode("utf-8")); SES["p"].stdin.close(); return True
+    except OSError as e: print(f"SES: hata {e.__class__.__name__}"); return False
+def brifing_konusma(s):
+    tem = lambda x: re.sub(r"\s*\([^()]*\)\s*\.?\s*$", "", " ".join(str(x).split())).strip()  # sondaki kaynak parantezi okunmaz
+    d = [tem(x) for x in (s.get("dikkat") or [])[:3] if tem(x)]
+    return " ".join([tem(s.get("ozet") or "")] + ([_t("Dikkat edilecekler.", "Things to watch.")] + [x if x.endswith((".", "?", "!")) else x + "." for x in d] if d else [])).strip()
+def brifing_sesli(oid, neden):
+    b = BRIFING.get(oid) or {}
+    if b.get("durum") != "hazir": return False
+    if neden == "baslat":
+        bs = STATE.get("baslatma") or {}
+        if bs.get("olay") != oid or time.time() - (bs.get("at") or 0) > 300 or toplanti_var(): print("SES: brifing okunmadı — toplantı başladı ya da süre geçti"); return False
+    ok = seslendir(brifing_konusma(b.get("sonuc") or {}))
+    if ok: print(f"SES: brifing okunuyor ({neden})")
+    return ok
+def brifing_baslatta(oid):  # Başlat: hazırsa hemen oku; değilse hazırla, hazır olunca oku
+    if not AYAR.get("konusma", True) or not oid or oid not in TAKVIM_TAM: return
+    b = BRIFING.get(oid) or {}
+    if b.get("durum") == "hazir": brifing_sesli(oid, "baslat"); return
+    if b.get("durum") != "calisiyor" and not brifing_iste({"olay": oid}).get("ok"): return
+    with LOCK:
+        if BRIFING.get(oid, {}).get("durum") == "calisiyor": BRIFING[oid]["sesli"] = True
+    if (BRIFING.get(oid) or {}).get("durum") == "hazir": brifing_sesli(oid, "baslat")  # tam o arada bittiyse
 def brifing_iste(p):
     oid = str(p.get("olay") or ""); olay = TAKVIM_TAM.get(oid)
     if not olay: return {"ok": False, "err": _t("Toplantı takvimde bulunamadı", "Meeting not found in the calendar")}
     b = BRIFING.get(oid) or {}
+    if p.get("dinle"):  # panodaki 🔊: okuyorsa susar, değilse okur
+        if ses_durdur(): return {"ok": True, "ses": False}
+        return {"ok": brifing_sesli(oid, "dinle"), "ses": True}
     if b.get("durum") == "calisiyor" or (b.get("durum") == "hazir" and not p.get("yeniden")): return {"ok": True, "durum": b["durum"]}
     if not BRIFING_KILIT.acquire(blocking=False): return {"ok": False, "err": _t("Başka bir brifing hazırlanıyor — biraz sonra dene", "Another briefing is being prepared — try again shortly")}
     BRIFING[oid] = {"durum": "calisiyor", "at": datetime.datetime.now().isoformat(timespec="seconds")}
@@ -1914,6 +1983,9 @@ def baslat(p):
     STATE["baslatma"] = {"at": time.time(), "konu": konu, "olay": (olay or {}).get("id"), "baglanti": baglanti, "ana": ana, "baslangic": (olay or {}).get("baslangic")}
     try: modelleri_isit()
     except Exception as e: print(f"BAŞLAT: model ısıtma hatası {e}")
+    if olay:
+        try: brifing_baslatta(olay.get("id"))
+        except Exception as e: print(f"BAŞLAT: sesli brifing hatası {e.__class__.__name__}")
     print(f"BAŞLAT: {konu} · rol {rol} · dil {dil}{' · takvimden' if olay else ''} → Terminal'de Claude"); return {"ok": True, "rol": rol, "dil": dil}
 
 def _durum_ad(d):  # hazırlık sayfasında ham durum ("kapali", "hazir") yerine okunur sözcük
