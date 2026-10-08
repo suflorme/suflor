@@ -21,7 +21,7 @@ subprocess.run(["codesign", "-s", "-", "--force", "--deep", app], capture_output
 os.makedirs(os.path.join(T, "bin")); sahte = os.path.join(T, "bin", "claude")  # Brifing.app yalnız adı "claude" olanı çalıştırır
 open(sahte, "w").write('''#!/usr/bin/env python3
 import json, sys, time
-arg = sys.argv[1:]; assert "--input-format" in arg and "stream-json" in arg and not any("Bash" in a or "Write" in a for a in arg)
+arg = sys.argv[1:]; assert "--input-format" in arg and "stream-json" in arg and not any("Bash" in a or "Write" in a for a in arg) and arg[arg.index("--model") + 1] == "sonnet"
 pr = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\\n"), sys.stdout.flush())
 n = 0
 for l in sys.stdin:
