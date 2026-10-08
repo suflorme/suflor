@@ -17,7 +17,7 @@ import CoreAudio
 import AudioToolbox
 import AVFoundation
 
-let SURUM = "0.13.0"
+let SURUM = "0.20.4"
 var arg: [String: String] = [:]
 var izinKipi = false
 do {
@@ -32,7 +32,8 @@ let anahtar: String = {
     guard let y = arg["anahtar"], let s = try? String(contentsOfFile: y, encoding: .utf8) else { return "" }
     return s.trimmingCharacters(in: .whitespacesAndNewlines)
 }()
-func gunluk(_ s: String) { FileHandle.standardError.write(("Suflor Ses: " + s + "\n").data(using: .utf8)!) }
+let saatBicim: DateFormatter = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm:ss"; return f }()
+func gunluk(_ s: String) { FileHandle.standardError.write((saatBicim.string(from: Date()) + " Suflor Ses: " + s + "\n").data(using: .utf8)!) }
 
 // --- Core Audio yardımcıları ---
 func ozellik<T>(_ nesne: AudioObjectID, _ secici: AudioObjectPropertySelector, _ bos: T) -> T? {
@@ -196,7 +197,7 @@ func tarayiciAilesi(_ ss: [Surec]) -> (onek: String, ad: String)? {
     let sirali = adaylar.filter { $0.ad == tarayiciIpucu } + adaylar.filter { $0.ad != tarayiciIpucu }
     return sirali.first { a in ss.contains { $0.bundle.hasPrefix(a.onek) && $0.cikis } } ?? sirali.first { a in ss.contains { $0.bundle.hasPrefix(a.onek) } }
 }
-var sonKurma = Date.distantPast, sonHata: String? = nil, tepe: Int16 = 0
+var sonKurma = Date.distantPast, sonHata: String? = nil, tepe: Int16 = 0, kurmaSay = 0, kurmaNeden = ""
 func adim() {
     let ss = surecler(), simdi = Date()
     var micAileler = Set<String>()
@@ -211,9 +212,15 @@ func adim() {
         }
         let hedef = ss.filter { $0.bundle.hasPrefix(ak.onek) }.map { $0.id }.sorted()
         let cikis = varsayilanCikis() ?? 0
-        if (Set(hedef) != Set(tapSurecler) && !hedef.isEmpty || cikis != tapCikis || ioProc == nil) && simdi.timeIntervalSince(sonKurma) >= 3 {
-            sonKurma = simdi; sonHata = tapKur(hedef)
-            if let h = sonHata { gunluk("yeniden kurulamadı: \(h)") }
+        // Yeniden kurma sesi kısa süre keser (9 Ekim denemesinde 2–3 "kopma" sesi duyuldu): yalnız gerekince — okuyucu yok, çıkış aygıtı
+        // değişti, ses çıkaran yeni bir süreç belirdi ya da dinlenen süreçlerin hepsi kapandı. Ses çıkarmayan yardımcı sürecin gelip gitmesi kurmaz.
+        let eski = Set(tapSurecler), yeni = Set(hedef)
+        let sesliYeni = ss.contains { yeni.contains($0.id) && !eski.contains($0.id) && $0.cikis }
+        let neden = ioProc == nil ? "okuyucu yok" : cikis != tapCikis ? "çıkış aygıtı değişti" : sesliYeni ? "ses çıkaran yeni süreç"
+            : (!yeni.isEmpty && eski.isDisjoint(with: yeni)) ? "dinlenen süreçler kapandı" : nil
+        if let n = neden, simdi.timeIntervalSince(sonKurma) >= 3 {
+            sonKurma = simdi; sonHata = tapKur(hedef); kurmaSay += 1; kurmaNeden = n
+            gunluk(sonHata.map { "yeniden kurulamadı (\(n)): \($0)" } ?? "yeniden kuruldu (\(n), \(hedef.count) süreç)")
         }
         return
     }
@@ -237,7 +244,8 @@ func paket() {   // 0,5 sn: halkadaki örnekleri 16 kHz'e indirip gönder
     gonder(["kanal": "karsi", "kaynak": "yerel", "uygulama": ak.ad, "t": Int64(t), "pcm": pcm.base64EncodedString()])
 }
 func nabiz() {   // 5 sn: durum + son 5 sn'nin tepe seviyesi (izin yoksa tap yalnız sıfır verir — aktarıcı uzun sürerse işaretler)
-    var g: [String: Any] = ["nabiz": true, "surum": SURUM, "durum": aktif == nil ? "bekliyor" : "dinliyor", "tepe": Int(tepe)]
+    var g: [String: Any] = ["nabiz": true, "surum": SURUM, "durum": aktif == nil ? "bekliyor" : "dinliyor", "tepe": Int(tepe),
+                            "kurma": kurmaSay, "kurma_neden": kurmaNeden]
     if let a = aktif { g["uygulama"] = a.ad }
     if let h = sonHata { g["hata"] = h }
     tepe = 0

@@ -826,9 +826,12 @@ def ses_al(p):
     kanal = "ben" if p.get("kanal") in BEN_ESKI else ("karsi" if p.get("kanal") == "karsi" else None)
     if not kanal: return {"ok": False, "err": "kanal"}
     # yerel ses yardımcısı karşı sesi veriyorsa eklentinin (popup, sekme sesi) karşı parçaları atılır — çift satır olmasın
-    if kanal == "karsi" and p.get("kaynak") != "yerel" and time.time() - (STATE["yerel_ses"].get("son") or 0) < 3: return {"ok": True, "yerel": True}
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
     except Exception: return {"ok": False, "err": "pcm"}
+    if kanal == "karsi" and p.get("kaynak") != "yerel":
+        if pcm and max(abs(min(memoryview(pcm[:len(pcm) // 2 * 2]).cast("h"), default=0)), max(memoryview(pcm[:len(pcm) // 2 * 2]).cast("h"), default=0)) > 500:
+            STATE["yerel_ses"]["eklenti_karsi_ses"] = time.time()  # "izin" kuralının kanıtı
+        if time.time() - (STATE["yerel_ses"].get("son") or 0) < 3: return {"ok": True, "yerel": True}
     if len(pcm) > WH_SR * 2 * 10: return {"ok": False, "err": "parça çok büyük"}
     baslik = (p.get("meeting") or {}).get("title") or STATE.get("meeting") or "Toplantı"
     with W_LOCK:
@@ -1515,7 +1518,14 @@ def _ses_anahtari():
     with os.fdopen(fd, "w") as f: f.write(k + "\n")
     return k
 SES_KEY = _ses_anahtari()
-STATE["yerel_ses"] = {"durum": None, "nabiz_t": 0, "son": 0, "acildi": 0, "uygulama": None, "hata": None, "surum": None, "sifir_bas": None}
+STATE["yerel_ses"] = {"durum": None, "nabiz_t": 0, "son": 0, "acildi": 0, "uygulama": None, "hata": None, "surum": None, "sifir_bas": None,
+                      "kurma": 0, "eklenti_karsi_ses": 0}
+SES_LOG = os.path.expanduser("~/Library/Logs/suflor-ses.log")  # yardımcının kendi günlüğü (yeniden kurma, hata)
+def karsi_konusuyor(sn=90):
+    # Karşı tarafın konuştuğuna yardımcıdan bağımsız kanıt: son sn saniyede Teams altyazısında başka birinin satırı ya da eklentinin
+    # sekme sesinde ses. Yoksa "1 dk sıfır" yalnız sessizliktir (9 Ekim tek kişilik deneme: 4 yanlış "izin" uyarısı).
+    now = time.time(); ben = ben_adi()
+    return now - (STATE["yerel_ses"].get("eklenti_karsi_ses") or 0) < sn or any(now - t < sn and k not in (ben, "?") for t, k in ALTYAZI_SON[-50:])
 def toplanti_var():  # eklenti son 60 sn'de toplantıda olduğunu bildirdi mi (iframe nabızları call=false gönderir, ayrı tutulur)
     return time.time() - (STATE.get("_cagri_son") or 0) < 60
 def yerel_ses_durum():
@@ -1524,7 +1534,7 @@ def yerel_ses_durum():
     if AYAR.get("yerel_ses") is False: return "kapali"
     if not os.path.isdir(SES_APP): return "yok"
     if now - y["nabiz_t"] > 20: return "kapali"
-    if y["durum"] == "dinliyor" and y["sifir_bas"] and now - y["sifir_bas"] > 60 and toplanti_var(): return "izin"  # 1 dk hep sıfır: izin yok olabilir
+    if y["durum"] == "dinliyor" and y["sifir_bas"] and now - y["sifir_bas"] > 60 and toplanti_var() and karsi_konusuyor(): return "izin"  # 1 dk hep sıfır, karşı taraf konuşuyor: izin yok olabilir
     return y["durum"] or "kapali"
 def yerel_ses_view():
     y = STATE["yerel_ses"]; now = time.time()
@@ -1538,6 +1548,9 @@ def yerel_ses_al(p):
                  surum=str(p.get("surum") or "")[:12] or None, hata=str(p.get("hata") or "")[:120] or None)
         if y["durum"] != "dinliyor" or int(p.get("tepe") or 0) > 0: y["sifir_bas"] = None
         elif not y["sifir_bas"]: y["sifir_bas"] = now
+        k_ = int(p.get("kurma") or 0)
+        if k_ > y["kurma"]: print(f"YEREL SES: ses yakalama yeniden kuruldu ({str(p.get('kurma_neden') or '?')[:40]}; toplam {k_})")
+        y["kurma"] = k_
         sonra = yerel_ses_durum()
         if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else ""))
         return {"ok": True, "toplanti": toplanti_var(), "tarayici": STATE.get("_tarayici") or "Chrome"}
@@ -1545,7 +1558,7 @@ def yerel_ses_al(p):
     y["son"] = now
     return ses_al(dict(p, kanal="karsi", kaynak="yerel"))
 def _yerel_ses_dongu():
-    if AYAR.get("yerel_ses") is False: return
+    if AYAR.get("yerel_ses") is False or os.environ.get("SUFLOR_TEST_BASLAT"): return  # deneme aktarıcısı gerçek yardımcıyı kapatıp açmasın
     while True:
         time.sleep(10)  # önce bekle: aktarıcı yeniden başladıysa çalışan yardımcının nabzı (5 sn) gelsin, boşuna kapatılmasın
         y = STATE["yerel_ses"]; now = time.time()
@@ -1555,7 +1568,7 @@ def _yerel_ses_dongu():
                 # yanıt vermeyen eski kopya açıksa (open -a çalışanı yeniden açmaz) yalnız bu hesabınkini kapat
                 # yalnız normal kopya (--port) — kurulumun izin penceresini bekleyen kopyası (--izin) kapanmasın
                 subprocess.run(["pkill", "-u", str(os.getuid()), "-f", "MacOS/SuflorSes --port"], capture_output=True, timeout=5)
-                subprocess.run(["open", "-g", "-a", SES_APP, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE], capture_output=True, timeout=20)
+                subprocess.run(["open", "-g", "-a", SES_APP, "--stderr", SES_LOG, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE], capture_output=True, timeout=20)
                 print("YEREL SES: yardımcı başlatıldı")
             except Exception as e: print(f"YEREL SES: hata başlatılamadı ({e})")
 
@@ -2211,6 +2224,21 @@ def claude_girisli(cl):
     if os.environ.get("SUFLOR_TEST_CLAUDE_GIRIS") == "0": return False
     try: return json.loads(subprocess.run([cl, "auth", "status"], capture_output=True, text=True, timeout=8).stdout).get("loggedIn") is not False
     except Exception: return True
+def gundem_saat_tazele(simdi):
+    # agenda.json bitişi geçmişte kalmışsa ya da dosya önceki günden kalmışsa (önceki toplantının gündemi) saatleri şimdiye çek; maddeler ve diğer alanlar kalır, toplantı
+    # oturumu kendi gündemini yazınca zaten değişir. Bitişi ilerideki (bu toplantı için hazırlanmış) gündeme dokunulmaz.
+    fp = os.path.join(BASE, "agenda.json")
+    try: a = json.load(open(fp, encoding="utf-8"))
+    except (OSError, ValueError): return
+    try: eski = _saat(a["bitis"]) if a.get("bitis") else None
+    except Exception: eski = None
+    try: dun = datetime.date.fromtimestamp(os.path.getmtime(fp)) != simdi.date()  # "22:18" dünün saatiyse bugünün 22:18'i sanılmasın
+    except OSError: dun = False
+    if not isinstance(a, dict) or (eski and eski > simdi.replace(tzinfo=None) and not dun): return
+    a.update(baslangic=simdi.strftime("%H:%M"), bitis=(simdi + datetime.timedelta(minutes=30)).strftime("%H:%M"))
+    tmp = fp + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, fp); print(f"BAŞLAT: gündem saati tazelendi ({a['baslangic']}–{a['bitis']}; eski bitiş geçmişte)")
 def baslat(p):
     if STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60: return {"ok": False, "err": "Claude zaten bu alanda izliyor"}
     olay = TAKVIM_TAM.get(str(p.get("olay") or "")) if p.get("olay") else None
@@ -2233,8 +2261,12 @@ def baslat(p):
         return {"ok": False, "err": _t("Bağlantı tanınmadı — yalnız Teams, Google Meet ya da Zoom https bağlantısı", "Link not recognised — only Teams, Google Meet or Zoom https links")}
     baglanti = (olay or {}).get("baglanti") or guvenli_baglanti(elle); ana = not baglanti
     if ana: baglanti = TEAMS_ANA
-    sec = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "konu": konu, "rol": rol, "dil": dil, "olay": olay,
+    simdi = datetime.datetime.now().astimezone()
+    sec = {"at": simdi.replace(tzinfo=None).isoformat(timespec="seconds"), "konu": konu, "rol": rol, "dil": dil, "olay": olay,
            **({"baglanti": baglanti} if not (olay or {}).get("baglanti") and not ana else {})}
+    if not olay:  # takvimsiz başlatma: toplantı şimdi başlıyor, 30 dk varsayılır (9 Ekim denemesi: gündemde eski toplantının saati kaldı)
+        sec.update(baslangic=simdi.isoformat(timespec="minutes"), bitis=(simdi + datetime.timedelta(minutes=30)).isoformat(timespec="minutes"))
+        gundem_saat_tazele(simdi)
     fp = os.path.join(BASE, "takvim-secilen.json"); tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(sec, f, ensure_ascii=False, indent=1)
     os.replace(tmp, fp)
