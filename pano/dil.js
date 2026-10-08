@@ -263,5 +263,7 @@ globalThis.SUFLOR_EN = {
   "Anahtarsız yerel istek geldi": "A local request arrived without the key",
   "Eklenti eski sürümde": "Extension is out of date",
   "toplantı yardımcısı eski olabilir — aktarici-kur ile yeniden kur": "the meeting helper may be outdated — reinstall with aktarici-kur",
-  "chrome://extensions → Suflor.me → ↻ yenile": "chrome://extensions → Suflor.me → ↻ reload"
+  "chrome://extensions → Suflor.me → ↻ yenile": "chrome://extensions → Suflor.me → ↻ reload",
+  "Önemli güncelleme": "Important update",
+  "Güvenlik ya da kurulum düzeltmesi — toplantı yokken güncelle": "Security or setup fix — update when you're not in a meeting"
 };

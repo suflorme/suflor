@@ -367,7 +367,7 @@ function guncellemeCiz(s){const g=s.guncelleme||{},b=document.getElementById('gu
   if(!ilkSurum)ilkSurum=s.surum;else if(s.surum&&s.surum!==ilkSurum){try{sessionStorage.setItem("guncellendi",JSON.stringify({v:s.surum,t:Date.now()}))}catch(e){};location.reload();return}
   const goster=g.durum==="calisiyor"||g.durum==="hata"||(g.durum==="var"&&!s.aktif);b.hidden=!goster;if(!goster)return
   b.className=g.durum==="var"?"pri":"";b.disabled=g.durum==="calisiyor";b.title=g.durum==="hata"?(g.hata||""):""
-  if(b.dataset.onay&&g.durum==="var")return;b.textContent=g.durum==="var"?L("Güncelle"):g.durum==="calisiyor"?L("Güncelleniyor…"):L("Güncelleme başarısız — yeniden dene");if(g.durum==="var")b.title=L("Yeni sürüm hazır")}
+  if(b.dataset.onay&&g.durum==="var")return;b.textContent=g.durum==="var"?L(g.acil?"Önemli güncelleme":"Güncelle"):g.durum==="calisiyor"?L("Güncelleniyor…"):L("Güncelleme başarısız — yeniden dene");if(g.durum==="var")b.title=L(g.acil?"Güvenlik ya da kurulum düzeltmesi — toplantı yokken güncelle":"Yeni sürüm hazır")}
 // ilk tıklama onay ister (5 sn), ikincisi günceller — tarayıcının onay penceresi yerine
 document.getElementById('gun').onclick=async ev=>{const b=ev.currentTarget
   if(!b.dataset.onay){b.dataset.onay="1";b.textContent=L("Onayla — birkaç saniye kesilir");setTimeout(()=>{delete b.dataset.onay;if(last)guncellemeCiz(last)},5000);return}

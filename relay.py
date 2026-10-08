@@ -1691,7 +1691,9 @@ def _takvim_dongu():
 # pano "Güncelle" düğmesini gösterir; tıklanınca guncelle.command ayrı oturumda (setsid) çalışır — aktarici-kur aktarıcıyı yeniden
 # başlatırken ölmesin. Git klonu (geliştirici kurulumu) panodan güncellenmez. Toplantı sürerken başlamaz.
 GUN_DEPO = "suflorme/suflor"; GUN_LOG = os.path.expanduser("~/Library/Logs/suflor-guncelle.log")
-GUN = {"son": None, "durum": None, "hata": None, "p": None}
+GUN = {"son": None, "durum": None, "hata": None, "p": None, "acil": False}
+# v0.14.3 (karar #80): açık depo her sürümde güncellenir ama beta panosu yalnız yayin.json'daki "bildirim" sürümünü görür — haftada bir
+# ya da acil yayında ilerler. yayin.json yoksa (eski depo) manifest.json.
 def _kod_dir(): return os.path.expanduser(os.environ.get("SUFLOR_TEST_KOD") or str(AYAR.get("kod") or ""))
 def _surum_t(v):
     try: return tuple(int(x) for x in str(v).split("."))
@@ -1708,13 +1710,18 @@ def guncelleme_view():
         hata = next((x for x in reversed(sat) if re.search(r"UYARI|HATA|İndirilemedi|eksik", x)), sat[-1] if sat else "")
         GUN.update(p=None, durum="hata", hata=hata[:200] or "bilinmeyen hata")
     if GUN["durum"] == "hata": return {"durum": "hata", "hata": GUN["hata"], "son": GUN["son"]}
-    return {"durum": "var" if _surum_t(GUN["son"]) > _surum_t(SURUM) else "guncel", "son": GUN["son"]}
+    var = _surum_t(GUN["son"]) > _surum_t(SURUM)
+    return {"durum": "var" if var else "guncel", "son": GUN["son"], "acil": var and bool(GUN.get("acil"))}
 def _guncelleme_dongu():
     import urllib.request
     while True:
         try:
-            r = urllib.request.urlopen(f"https://raw.githubusercontent.com/{GUN_DEPO}/main/manifest.json", timeout=15)
-            GUN["son"] = str(json.loads(r.read().decode()).get("version") or "")[:12] or None
+            try:
+                y = json.loads(urllib.request.urlopen(f"https://raw.githubusercontent.com/{GUN_DEPO}/main/yayin.json", timeout=15).read().decode())
+                GUN["son"] = str(y.get("bildirim") or "")[:12] or None; GUN["acil"] = bool(y.get("acil"))
+            except urllib.error.HTTPError:
+                r = urllib.request.urlopen(f"https://raw.githubusercontent.com/{GUN_DEPO}/main/manifest.json", timeout=15)
+                GUN["son"] = str(json.loads(r.read().decode()).get("version") or "")[:12] or None
         except Exception: pass  # çevrimdışı: sonra yeniden
         time.sleep(6 * 3600)
 def guncelle_baslat():
