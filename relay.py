@@ -940,10 +940,12 @@ def istem_metni():
     try: hz = json.load(open(os.path.join(BASE, "hazir.json"), encoding="utf-8")).get("kartlar", [])
     except Exception: hz = []
     ag = agenda(); bu = " ".join([str(ag.get("title") or "")] + [str(x) for x in ag.get("items") or []] + [str(k.get("metin") or "") for k in hz if isinstance(k, dict)]).lower()
+    # Tümü küçük harfli sözlük terimi ("product", "customer service") istemde yer yemesin: Whisper genel sözcüğü zaten yazar,
+    # istem özel adlar için (9 Ekim: 57 terim 182 belirteç, bütçe 155 → sondaki özel adlar düşüyordu). Sözlük düzeltmesi bundan bağımsız.
     adlar = []
     for t in sorted(ter, key=lambda t: (str(t.get("dogru") or "").strip().lower() not in bu, t.get("kaynak") not in BEN_ESKI)):
         d = str(t.get("dogru") or "").strip().replace(",", " ")
-        if d and d not in adlar: adlar.append(d)
+        if d and d != d.lower() and d not in adlar: adlar.append(d)
     for d in ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []):  # ayar: alanın sık sistem adları
         if d not in adlar: adlar.append(d)
     return (", ".join(adlar))[:3000] + "."
