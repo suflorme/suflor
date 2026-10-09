@@ -182,8 +182,33 @@ def takvim():
     tk = {}
     for e in tj.get("olaylar", []):
         if e.get("takvim"): tk[f'{e["takvim"]} · {e.get("hesap") or ""}'] = {"ad": e["takvim"], "hesap": e.get("hesap") or ""}
-    return {"durum": t.get("durum"), "takvimler": list(tk.values()),
-            "olaylar": [{"saat": o["saat"], "bitis": o["bitis_saat"], "baslik": o["baslik"], "platform": o.get("platform")} for o in t.get("olaylar", [])]}
+    return {"durum": t.get("durum"), "takvimler": list(tk.values()), "adaylar": takvim_adaylari(a) if t.get("durum") == "ok" else [],
+            "adresler": a.get("takvim_adreslerim"), "olaylar": [{"saat": o["saat"], "bitis": o["bitis_saat"], "baslik": o["baslik"], "platform": o.get("platform")} for o in t.get("olaylar", [])]}
+
+# Takvim adresleri: Takvim'e başkalarının paylaşılan takvimleri de eklenebiliyor ve macOS orada takvim sahibini "sen" sayıyor; aktarıcı
+# yalnız kullanıcının adreslerinin davetli/düzenleyen olduğu toplantıları gösterir (ayar takvim_adreslerim). Adaylar takvim
+# yardımcısından (--adaylar, son ve gelecek 30 gün) arka planda bir kez alınır; sihirbaz durum yoklaması beklemesin.
+_ADAY = {"liste": None, "is": None}
+def takvim_adaylari(a):
+    if _ADAY["liste"] is not None or DENEME: return _ADAY["liste"] or []
+    if _ADAY["is"] is None:
+        def al():
+            uyg = os.path.join(gen(a.get("uygulama") or "~/Library/Application Support/Suflor"), "Suflor Takvim.app")
+            cikti = os.path.join(tempfile.gettempdir(), f"suflor-takvim-aday-{os.getuid()}.json")
+            try:
+                subprocess.run(["open", "-g", "-W", "-a", uyg, "--args", "--cikti", cikti, "--once", "720", "--sonra", "720", "--adaylar"], timeout=90, capture_output=True)
+                j = oku_json(cikti); os.remove(cikti)
+            except Exception: j = {}
+            _ADAY["liste"] = [{k: x.get(k) for k in ("adres", "ad", "takvim", "hesap", "sayi")} for x in j.get("adaylar") or [] if "@" in str(x.get("adres"))]
+        _ADAY["is"] = threading.Thread(target=al, daemon=True); _ADAY["is"].start()
+    return None  # henüz alınmadı
+def takvim_ayarla(adresler, cikar):  # takvim ekranı kurulumdan sonra: ayara yaz, aktarıcı yeniden okusun (takvimi yeniden okur)
+    a = ayar()
+    if not a: return {"ok": False}
+    ad = [str(x).strip().lower() for x in adresler or [] if re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", str(x).strip())]
+    a["takvim_adreslerim"] = list(dict.fromkeys(ad)); a["takvim_haric"] = [str(x) for x in cikar or []]; yaz_json(AYAR_YOL, a)
+    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
+    return {"ok": True}
 
 # ---------- profil: Claude'un çalışma notu (taslak) ----------
 # Sihirbaz 17 → 10 ekran (8 Ekim): ayrı "Seni böyle tanıdım" ekranı yok. Kurulum bitince bağımsız süreç (`kurulum.py profil`,
@@ -260,7 +285,7 @@ def tamamla(c, dil):
               "rol": c.get("rol") or "", "sirket": c.get("sirket") or "", "is_alani": c.get("is_alani") or "", "kartsiz": bool(c.get("kartsiz")),
               "ek_sistem": list(dict.fromkeys((eski.get("ek_sistem") or []) + araclar)),
               "whisper_terimler": list(dict.fromkeys((eski.get("whisper_terimler") or []) + araclar + kisiler + terimler))[:60],
-              "takvim_haric": [x for x in (c.get("takvim_cikar") or [])],
+              "takvim_haric": [x for x in (c.get("takvim_cikar") or [])], "takvim_adreslerim": [x for x in (c.get("takvim_adres") or eski.get("takvim_adreslerim") or [])],
               "teshis": c.get("teshis") is True})  # beta teşhis izni (teshis.py; adres teshis_adres ya da varsayılan)
     a.setdefault("claude_model", "sonnet")
     if claude_yolu() and not a.get("claude"): a["claude"] = claude_yolu()  # aktarıcı panodan başlatırken aynı Claude
@@ -405,6 +430,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/modeller/baslat": modeller_baslat(); return self._json(modeller_durum())
         if yol == "/api/claude/denetle": claude_denetle(); return self._json(claude_durum())
         if yol == "/api/teshis": return self._json(teshis_ayarla(p.get("acik")))
+        if yol == "/api/takvim": return self._json(takvim_ayarla(p.get("adresler"), p.get("cikar")))
         if yol == "/api/kur/tamamla": return self._json(tamamla(p.get("cevap") or {}, p.get("dil") or "tr"))
         if yol == "/api/klasor-sec": return self._json({"yol": klasor_sec()})
         if yol == "/api/ac": ac(str(p.get("hedef") or "")); return self._json({"ok": True})

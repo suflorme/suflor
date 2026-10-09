@@ -56,7 +56,8 @@
       takvim_b: "Takvimini bağlayalım", takvim_a: "Toplantından birkaç dakika önce hatırlatır, gündemi ve katılımcıları davetten alır.",
       t_izin: "Erişim ver", t_izin_b: "Takvim izni", t_izin_a: "macOS bir izin penceresi açacak: \"Tam erişim\"i seç.",
       t_hesap_yok: "Mac'in Takvim uygulamasında hesap görünmüyor.", t_hesap_ekle: "Google, iCloud ya da Outlook hesabını ekle",
-      t_bugun: "Bugün gördüklerim", t_bos: "Bugün başka toplantın yok.", t_dogru: "Takvimlerin bunlar mı? İzlenmesini istemediklerinin işaretini kaldır.",
+      t_bugun: "Bugün gördüklerim", t_bos: "Bugün başka toplantın yok.", t_dogru: "Takvimlerin bunlar mı? İzlenmesini istemediklerinin işaretini kaldır.", t_adres: "Hangi adresler senin? Yalnız bu adreslerin davetli ya da düzenleyen olduğu toplantıları gösteririm; Takvim'e eklenmiş başkalarının takvimleri listeye girmez.",
+      t_adres_bekle: "Takvimdeki adresleri okuyorum…", t_adres_ek: "Listede olmayan bir adresin", t_adres_yok: "Adres seçmezsen macOS'un seni tanıdığı yere bakarım; Takvim'e başkalarının takvimi eklenmişse onların toplantıları da görünebilir.",
                                     ek_b: "Chrome eklentisini ekle", ek_a: "Eklenti Teams sayfasından sesi ve altyazıyı alır, kartları ekranın köşesinde gösterir.",
       e1: "Chrome'un eklenti sayfasını aç ve sağ üstte Geliştirici modu'nu aç.", e1d: "Eklenti sayfasını aç",
       e2: "\"Paketlenmemiş öğe yükle\"ye bas ve Suflor.me klasörünü seç.", e2d: "Klasörü Finder'da göster",
@@ -113,7 +114,8 @@
       takvim_b: "Connect your calendar", takvim_a: "It reminds you a few minutes before a meeting and takes the agenda and attendees from the invitation.",
       t_izin: "Allow access", t_izin_b: "Calendar permission", t_izin_a: "macOS will ask for permission: choose \"Full Access\".",
       t_hesap_yok: "No accounts in the Mac Calendar app.", t_hesap_ekle: "Add your Google, iCloud or Outlook account",
-      t_bugun: "What I see today", t_bos: "No more meetings today.", t_dogru: "Are these your calendars? Untick any you don't want followed.",
+      t_bugun: "What I see today", t_bos: "No more meetings today.", t_dogru: "Are these your calendars? Untick any you don't want followed.", t_adres: "Which addresses are yours? I only show meetings where one of them is invited or organizes; other people's calendars added to Calendar stay out.",
+      t_adres_bekle: "Reading the addresses in your calendar…", t_adres_ek: "Another address of yours", t_adres_yok: "With no address selected I go by who macOS thinks you are; if other people's calendars are added, their meetings may show too.",
                                     ek_b: "Add the Chrome extension", ek_a: "The extension takes sound and captions from the Teams page and shows the cards in a corner of the screen.",
       e1: "Open Chrome's extensions page and switch on Developer mode at the top right.", e1d: "Open extensions page",
       e2: "Click \"Load unpacked\" and choose the Suflor.me folder.", e2d: "Show the folder in Finder",
@@ -162,6 +164,7 @@
       modeller: { durum: "iniyor", yuzde: 38 }, eklenti: { bagli: false }, kod: "~/Suflor.me",
       proje: "~/Suflor", varsayilan_ad: "Ayşe Yılmaz",
       takvim: { durum: "ok", takvimler: [{ ad: "İş", hesap: "Exchange", sec: true }, { ad: "Kişisel", hesap: "iCloud", sec: true }, { ad: "Türkiye tatilleri", hesap: "iCloud", sec: false }],
+        adaylar: [["ayse", "Ayşe Yılmaz", 40], ["ekip", null, 12], ["ayse.yilmaz", null, 3]].map(([k, ad, sayi]) => ({ adres: k + "@" + "ornek.test", ad, sayi })), adresler: null,  // uydurma adresler
         olaylar: [{ saat: "14:00", bitis: "14:45", baslik: "Bütçe görüşmesi", platform: "teams" }, { saat: "16:30", bitis: "17:00", baslik: "Haftalık ekip", platform: "teams" }] },
       kur: { ayar: "iyi", proje: "iyi", not: "iyi", aktarici: "bekle", modeller: "bekle" },
     };
@@ -230,11 +233,15 @@
           ${k.aktarici === "iyi" && ys ? satir(ys.kurulu ? "iyi" : "uyari", t.k_ses, ys.kurulu ? t.k_ses_ok : t.k_ses_yok, ys.kurulu ? dug("ses-izni", t.k_ses_izin) : "") : ""}</div>
           ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div><p class="dipnot">${dug("kur-yeniden", t.k_m_yeniden)}</p>` : ""}${(k.uyarilar || []).map(u => `<div class="kart-not uyari">${esc(u)}</div>`).join("")}
           <label class="anahtar"><input type="checkbox" data-teshis ${C.teshis === true ? "checked" : ""}><span><b>${esc(t.p_anahtar)}</b><br><span class="ipucu">${esc(t.p_gider_a)} ${esc(t.p_gitmez_a)}</span></span></label>`; } },
-    { id: "takvim", simge: "takvim", b: "takvim_b", a: "takvim_a", gir: durumAl,
+    { id: "takvim", simge: "takvim", b: "takvim_b", a: "takvim_a", gir: takvimBekle,
       icerik: () => { const tk = (D.durum || {}).takvim || {};
         if (tk.durum !== "ok") return `<div class="liste">${satir(tk.durum === "izin_yok" ? "uyari" : "bos", t.t_izin_b, t.t_izin_a, dug("takvim-izin", t.t_izin))}</div>`;
-        const tl = tk.takvimler || [];
-        return `${tl.length ? `<div class="alan"><span class="etiket">${esc(t.t_dogru)}</span><div class="yongalar">${tl.map(x => yonga("takvim", x.ad + " · " + x.hesap, !(C.takvim_cikar || []).includes(x.ad + " · " + x.hesap) && x.sec !== false)).join("")}</div></div>`
+        const tl = tk.takvimler || [], sec = new Set(C.takvim_adres || []);
+        const ad = [...new Set([...(tk.adaylar || []).map(x => x.adres), ...(C.takvim_adres || [])])];
+        const adres = `<div class="alan"><span class="etiket">${esc(t.t_adres)}</span>${tk.adaylar == null ? `<div class="ipucu">${esc(t.t_adres_bekle)}</div>`
+          : `<div class="yongalar">${ad.map(x => yonga("adres", x, sec.has(x))).join("")}</div>`}
+          <input type="text" data-adres-ek placeholder="${esc(t.t_adres_ek)}" style="margin-top:8px">${tk.adaylar != null && !sec.size ? `<div class="ipucu">${esc(t.t_adres_yok)}</div>` : ""}</div>`;
+        return `${adres}${tl.length ? `<div class="alan"><span class="etiket">${esc(t.t_dogru)}</span><div class="yongalar">${tl.map(x => yonga("takvim", x.ad + " · " + x.hesap, !(C.takvim_cikar || []).includes(x.ad + " · " + x.hesap) && x.sec !== false)).join("")}</div></div>`
           : `<div class="kart-not">${esc(t.t_hesap_yok)} ${dug("internet-hesaplari", t.t_hesap_ekle)}</div>`}
           <div class="alan"><span class="etiket">${esc(t.t_bugun)}</span><div class="liste">${(tk.olaylar || []).length ? tk.olaylar.map(o => satir("iyi", o.baslik, `${o.saat}–${o.bitis}${o.platform ? " · " + o.platform : ""}`)).join("") : satir("iyi", t.t_bos)}</div></div>`; } },
     { id: "eklenti", simge: "eklenti", b: "ek_b", a: "ek_a", hazir: () => ((D.durum || {}).eklenti || {}).bagli, gir: () => eklentiBekle(),
@@ -283,6 +290,21 @@
     const a = gorunen()[D.adim], c = (D.durum || {}).claude || {};
     if (a && a.id === "claude" && c.kurulu && !c.giris && !D.claudeDen && Date.now() - (D.sonDen || 0) > 15000) claudeDenetle();
   });
+  // takvim ekranı: adaylar arka planda okunur (kurulum.py takvim_adaylari); gelince adı kullanıcının adına benzeyenler önceden seçilir
+  const sadele = x => String(x || "").toLocaleLowerCase("tr").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i");
+  const takvimKaydet = () => api("takvim", { adresler: C.takvim_adres || [], cikar: C.takvim_cikar || [] }).catch(() => {});
+  async function takvimBekle() {
+    for (let i = 0; i < 30 && gorunen()[D.adim] && gorunen()[D.adim].id === "takvim"; i++) {
+      await durumAl(); const tk = (D.durum || {}).takvim || {};
+      if (tk.durum !== "ok" || tk.adaylar == null) { ciz(); await new Promise(r => setTimeout(r, 3000)); continue; }
+      if (!C.takvim_adres) {
+        const ilk = sadele((C.ad || "").trim().split(/\s+/)[0]);
+        C.takvim_adres = (tk.adresler || []).length ? tk.adresler : ilk.length > 1 ? tk.adaylar.filter(x => sadele(x.ad).split(/[^a-z0-9]+/).includes(ilk) || sadele(x.adres).split("@")[0].split(/[^a-z0-9]+/).includes(ilk)).map(x => x.adres) : [];
+        kaydet(); await takvimKaydet();
+      }
+      ciz(); break;
+    }
+  }
   async function eklentiBekle() {
     while (gorunen()[D.adim] && gorunen()[D.adim].id === "eklenti") {
       await durumAl(); ciz(); if (((D.durum || {}).eklenti || {}).bagli) break; await new Promise(r => setTimeout(r, 3000));
@@ -297,8 +319,9 @@
     if (y) {
       const g = y.dataset.grup, v = y.dataset.deger, on = y.getAttribute("aria-pressed") !== "true";
       if (g === "alan") { C.is_alani = v; } else {
-        const anahtar = { takvim: "takvim_cikar" }[g]; const l = new Set(C[anahtar] || []);
-        if (!on) l.add(v); else l.delete(v); C[anahtar] = [...l];
+        const anahtar = { takvim: "takvim_cikar", adres: "takvim_adres" }[g]; const l = new Set(C[anahtar] || []);
+        if (g === "adres" ? on : !on) l.add(v); else l.delete(v); C[anahtar] = [...l];
+        takvimKaydet();  // takvim ekranı kurulumdan sonra: seçim ayara hemen yazılır
       }
       kaydet(); ciz(); return;
     }
@@ -323,6 +346,11 @@
   document.addEventListener("change", async e => {
     if (!e.target.matches || !e.target.matches("[data-teshis]")) return;
     C.teshis = e.target.checked; kaydet(); if ((D.kurDurum || {}).ayar === "iyi") await api("teshis", { acik: C.teshis }).catch(() => {});
+  });
+  document.addEventListener("change", e => {
+    if (!e.target.matches || !e.target.matches("[data-adres-ek]")) return;
+    const v = e.target.value.trim().toLowerCase(); if (!/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(v)) return;
+    C.takvim_adres = [...new Set([...(C.takvim_adres || []), v])]; kaydet(); takvimKaydet(); ciz();
   });
   document.addEventListener("input", e => { const k = e.target.dataset && e.target.dataset.cevap; if (k) { C[k] = e.target.value; const a = gorunen()[D.adim]; if (a.hazir) $("#devam").disabled = !a.hazir(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500); } });
   document.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && e.target.tagName !== "TEXTAREA" && !$("#devam").disabled && e.target.tagName !== "BUTTON") $("#devam").click(); });

@@ -8,6 +8,7 @@ import Foundation
 
 var cikti = (NSHomeDirectory() as NSString).appendingPathComponent("Library/Application Support/Suflor/takvim.json")
 var saatOnce = 3.0, saatSonra = 24.0
+var adaylar = false  // --adaylar: olay yerine kullanıcının olası takvim adresleri (kurulum sihirbazı seçtirir)
 var ayrinti = false  // --ayrinti: her olaya katılımcı adresleri ve "current user" işareti (teşhis; aktarıcı kullanmaz)
 var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
 var i = 1
@@ -17,6 +18,7 @@ while i < a.count {
   else if a[i] == "--once", i + 1 < a.count { saatOnce = Double(a[i + 1]) ?? 3; i += 1 }
   else if a[i] == "--sonra", i + 1 < a.count { saatSonra = Double(a[i + 1]) ?? 24; i += 1 }
   else if a[i] == "--ayrinti" { ayrinti = true }
+  else if a[i] == "--adaylar" { adaylar = true }
   else if a[i] == "--adres", i + 1 < a.count {
     adresler = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }); i += 1
   }
@@ -76,6 +78,24 @@ func oku(_ izin: Bool, _ hata: Error?) {
   let simdi = Date()
   let p = store.predicateForEvents(withStart: simdi.addingTimeInterval(-saatOnce * 3600), end: simdi.addingTimeInterval(saatSonra * 3600), calendars: nil)
   var olaylar: [[String: Any]] = []
+  if adaylar {
+    // Aday: olaylarda "current user" işaretli katılımcı/düzenleyen adresleri ve adı e-posta olan takvimler (Google'da kendi takvimin).
+    // Paylaşılan takvimde sahibi de "current user" göründüğü için hangisinin kullanıcı olduğu burada bilinmez — sihirbaz sorar.
+    var ad = [String: [String: Any]]()
+    func ekle(_ adr: String, _ isim: String?, _ e: EKCalendar) {
+      guard adr.contains("@"), !adr.contains(" ") else { return }
+      var x = ad[adr] ?? ["adres": adr, "sayi": 0, "takvim": e.title, "hesap": e.source.title]
+      x["sayi"] = (x["sayi"] as? Int ?? 0) + 1
+      if let isim = isim, !isim.isEmpty, x["ad"] == nil { x["ad"] = isim }
+      ad[adr] = x
+    }
+    for c in store.calendars(for: .event) where c.title.contains("@") { ekle(c.title.lowercased(), nil, c) }
+    for e in store.events(matching: p) {
+      for k in (e.attendees ?? []) + (e.organizer.map { [$0] } ?? []) where k.isCurrentUser { ekle(adres(k), k.name, e.calendar) }
+    }
+    yaz(["durum": "ok", "adaylar": ad.values.sorted { ($0["sayi"] as? Int ?? 0) > ($1["sayi"] as? Int ?? 0) }.prefix(20).map { $0 }])
+    return
+  }
   var gorulen = Set<String>()
   for e in store.events(matching: p).sorted(by: { $0.startDate != $1.startDate ? $0.startDate < $1.startDate : kendiTakvimi($0) && !kendiTakvimi($1) }) {
     if e.status == .canceled { continue }
