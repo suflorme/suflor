@@ -611,6 +611,14 @@ def sozluk_uygula(text, dosya):
         if parcalar: out = "".join(parcalar) + out[son:]
     return out, olay
 
+# Sesli "Claude:" talimatı (TOPLANTI-MODU §4) Whisper'da "Cloud," / "Klod:" diye yazılıyor (9 Ekim denemesi: "Cloud, card, English,
+# yes."). Yalnız kullanıcının kendi satırında, cümle başında ve ardından virgül/iki nokta gelirse düzeltilir: "cloud'a bağımlıyız"
+# gibi gerçek bulut anlamı ve karşı tarafın sözü değişmez. Ham metin .jsonl'de "raw"da kalır.
+HITAP_RX = re.compile(r"(^|[.!?…]\s+)(?:cloud|klod|klot|clod|claud|klaud|clode)\s*[,:]\s*", re.I)
+def hitap_duzelt(text):
+    out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", text)
+    return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])
+
 def slug(s): s = re.sub(r"[^\w\s-]", "", s, flags=re.U).strip(); s = re.sub(r"\s+", "-", s); return s[:60] or "toplanti"
 def paths(title):
     # Aynı toplantı için ilk çağrıda saat damgalı dosya adı üretilir, sonraki çağrılar aynı dosyaya yazar
@@ -1218,7 +1226,9 @@ def ingest(p):
             if e.get("id") and seen.get(e["id"]) == raw: continue  # eklentiden çift gelen satır (ham metne göre)
             onceki = seen.get(e["id"]) if e.get("id") else None
             if e.get("id"): seen[e["id"]] = raw
-            text, soz = sozluk_uygula(raw, base_key); low = text.lower()
+            text, soz = sozluk_uygula(raw, base_key)
+            if (e.get("speaker") or "") == ben_adi(): text, hd = hitap_duzelt(text); soz += hd
+            low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye
                 kim_ = e.get("speaker") or "?"; ALTYAZI_SON.append((time.time(), kim_)); del ALTYAZI_SON[:-400]; kume_oyla(kim_)
                 golgede = whisper_akiyor("ben" if kim_ == ben_adi() else "karsi"); taslak_sabit(dict(e, text=text), p.get("source"), golgede)
