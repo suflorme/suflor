@@ -1987,7 +1987,7 @@ def konus_baglam(simdi=None):  # her sorunun başına: tarih/saat + Mac Takvim b
         gun = (_t("bugün", "today") if b.date() == simdi.date() else _t("yarın", "tomorrow")) if b >= bas else _t("bugün", "today")
         kim = ", ".join((e.get("katilimcilar") or [])[:5]) + (f" +{e['kisi_sayisi'] - 6}" if (e.get("kisi_sayisi") or 0) > 6 else "")
         ol.append((b, f"- {gun} " + (_t("tüm gün", "all day") if e.get("tum_gun") else f"{b:%H:%M}–{s_:%H:%M}") + f" · {' '.join(str(e.get('baslik') or '').split())[:120]}"
-                     + (f" · {e['platform']}" if e.get("platform") else "") + (f" · {kim}" if kim else "")))
+                     + (f" · {e['platform']}" if e.get("platform") else "") + (f" · {kim}" if kim else "") + (_t(" · daveti reddettin", " · you declined") if e.get("reddettin") else "")))
     ol.sort(key=lambda x: x[0]); d = STATE["takvim"].get("durum")
     zaman = simdi.strftime("%A %-d %B %Y, %H:%M") if en else f"{simdi.day} {_AY_TR[simdi.month - 1]} {simdi.year} {_GUN_TR[simdi.weekday()]}, {simdi:%H:%M}"
     tk = "\n".join(x[1] for x in ol[:20]) if ol else (_t("- bugün ve yarın takvimde toplantı yok", "- no meetings today or tomorrow") if d == "ok" else
@@ -2145,7 +2145,7 @@ def takvim_view(tam=False):
         try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
         except (KeyError, ValueError): continue
         if s_ < simdi or b >= gece: continue  # (kullanıcı) bugün içindekiler — sürenler ve gün sonuna kadar başlayacaklar
-        v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "hesap", "yer")}
+        v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "hesap", "yer", "reddettin")}
         if v["ben_duzenleyen"] is None and not e.get("duzenleyen") and not e.get("kisi_sayisi"): v["ben_duzenleyen"] = True  # davetlisiz kendi etkinliğin
         v.update(saat=b.strftime("%H:%M"), bitis_saat=s_.strftime("%H:%M"), dk=round((b - simdi).total_seconds() / 60), suruyor=b <= simdi < s_,
                  katilimcilar=(e.get("katilimcilar") or [])[:30 if tam else 6], notlar_var=bool(e.get("notlar")))
@@ -2155,7 +2155,10 @@ def takvim_view(tam=False):
     return dict(STATE["takvim"], olaylar=ol[:12], uygulama=os.path.isdir(TAKVIM_APP))
 def takvim_yenile():
     if not os.path.isdir(TAKVIM_APP): STATE["takvim"].update(durum="yok", hata="takvim yardımcısı kurulu değil (aktarici-kur.command derler)"); return
-    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_JSON, "--sonra", "48"], timeout=150, capture_output=True)
+    # ayar takvim_adreslerim: kullanıcının takvim adresleri (Google, Exchange …) — yardımcı yalnız bu adreslerin davetli ya da
+    # düzenleyen olduğu toplantıları yazar (Takvim'e eklenmiş başkalarının paylaşılan takvimleri listeye girmesin)
+    adr = ",".join(str(x).strip() for x in (AYAR.get("takvim_adreslerim") or []) if "@" in str(x) and "," not in str(x))
+    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_JSON, "--sonra", "48"] + (["--adres", adr] if adr else []), timeout=150, capture_output=True)
     except subprocess.TimeoutExpired: STATE["takvim"].update(durum="zaman_asimi", hata="takvim yardımcısı yanıt vermedi (izin penceresi açık olabilir)")
     takvim_oku()
 def _takvim_dongu():

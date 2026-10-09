@@ -1547,7 +1547,7 @@ def takvim_cmd():  # aktarıcının takvimi (Suflor Takvim yardımcısı, Takvim
     for o in ol:
         ne = "şimdi" if o.get("suruyor") else (f"{o['dk']} dk sonra" if o.get("dk", 0) <= 120 else "")
         print(f"## {o['saat']}–{o['bitis_saat']} {o['baslik']}" + (f"  ({ne})" if ne else "") + f"  · id {o['id']}")
-        print(f"  platform: {o.get('platform') or '?'} · düzenleyen: {o.get('duzenleyen') or '?'}{' (sen)' if o.get('ben_duzenleyen') else ''} · kişi: {o.get('kisi_sayisi') or '?'} · takvim: {o.get('takvim')}")
+        print(f"  platform: {o.get('platform') or '?'} · düzenleyen: {o.get('duzenleyen') or '?'}{' (sen)' if o.get('ben_duzenleyen') else ''}{' · daveti reddettin' if o.get('reddettin') else ''} · kişi: {o.get('kisi_sayisi') or '?'} · takvim: {o.get('takvim')}")
         if o.get("katilimcilar"): print("  katılımcılar: " + ", ".join(o["katilimcilar"]))
         if o.get("notlar"):
             n = re.sub(r"_{6,}.*", "", o["notlar"], flags=re.S)  # Teams davetinin "Microsoft Teams toplantısı …" alt bloğu

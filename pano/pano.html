@@ -417,7 +417,7 @@ function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null
   sec.hidden=izliyor||(top&&!form);['tk','tkh','tkalt'].forEach(i=>document.getElementById(i).style.display=top?'none':'');if(izliyor||top)return
   tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh')
   h.textContent=!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.'):t.durum==='bekliyor'?L('takvim okunuyor…'):(t.durum&&t.durum!=='ok'?(t.hata||t.durum):'')
-  const [o,...ki]=tkOlaylar, ne=x=>esc([x.suruyor?L('şimdi'):x.dk<=60?L('{n} dk sonra',{n:x.dk}):'',(x.katilimcilar||[]).slice(0,3).join(', ')+(x.kisi_sayisi>4?' +'+(x.kisi_sayisi-4):''),x.ben_duzenleyen?L('düzenleyen sen'):''].filter(Boolean).join(' · '))
+  const [o,...ki]=tkOlaylar, ne=x=>esc([x.suruyor?L('şimdi'):x.dk<=60?L('{n} dk sonra',{n:x.dk}):'',(x.katilimcilar||[]).slice(0,3).join(', ')+(x.kisi_sayisi>4?' +'+(x.kisi_sayisi-4):''),x.ben_duzenleyen?L('düzenleyen sen'):'',x.reddettin?L('daveti reddettin'):''].filter(Boolean).join(' · '))
   if(!tkOlaylar.some(x=>x.id===tkGor))tkGor=o?o.id:null
   const buyuk=o?`<div class="sira${tkGor===o.id?' sec':''}" data-sec="${esc(o.id)}"><div class=t><div class=e>${L(o.suruyor?'Şimdi':'Sıradaki')}</div><div class=b><span class=z>${esc(o.saat)}</span>${esc(o.baslik)}</div><div class=sp>${ne(o)}</div></div><button class=pri data-bas="${esc(o.id)}">${L('Başlat')}</button></div>`
     :`<div class=sira><div class=t><div class=e>${L('Bugün')}</div><div class=b>${L('Takvimde toplantı yok')}</div></div><button class=pri data-bas="">${L('Toplantı başlat')}</button></div>`

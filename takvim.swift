@@ -8,12 +8,18 @@ import Foundation
 
 var cikti = (NSHomeDirectory() as NSString).appendingPathComponent("Library/Application Support/Suflor/takvim.json")
 var saatOnce = 3.0, saatSonra = 24.0
+var ayrinti = false  // --ayrinti: her olaya katılımcı adresleri ve "current user" işareti (teşhis; aktarıcı kullanmaz)
+var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
 var i = 1
 let a = CommandLine.arguments
 while i < a.count {
   if a[i] == "--cikti", i + 1 < a.count { cikti = a[i + 1]; i += 1 }
   else if a[i] == "--once", i + 1 < a.count { saatOnce = Double(a[i + 1]) ?? 3; i += 1 }
   else if a[i] == "--sonra", i + 1 < a.count { saatSonra = Double(a[i + 1]) ?? 24; i += 1 }
+  else if a[i] == "--ayrinti" { ayrinti = true }
+  else if a[i] == "--adres", i + 1 < a.count {
+    adresler = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }); i += 1
+  }
   i += 1
 }
 let iso = ISO8601DateFormatter()
@@ -50,6 +56,18 @@ func platform(_ u: String?) -> String? {
   return nil
 }
 
+// Yalnız kullanıcının toplantıları: Takvim'e eklenmiş başkalarının paylaşılan takvimlerindeki etkinlikler (kullanıcı ne davetli
+// ne düzenleyen) ve katılımcısız kişisel kayıtlar listeye girmez. Kullanıcı = EventKit'in "current user"ı ya da adresi
+// --adres listesinde olan kişi; adres verildiyse yalnız adres: EventKit paylaşılan takvimde takvim sahibini "current user"
+// sayıyor (9 Ekim ölçümü). Aynı toplantı birkaç takvimde varsa (kullanıcının ve katılımcının paylaşılan takvimi) bir kez yazılır,
+// kullanıcının kendi takvimindeki kopya seçilir. Reddedilen davet "reddettin" işaretiyle kalır.
+func adres(_ p: EKParticipant) -> String {
+  let u = p.url.absoluteString.lowercased()
+  return u.hasPrefix("mailto:") ? String(u.dropFirst(7)) : u
+}
+func ben(_ p: EKParticipant?) -> Bool { guard let p = p else { return false }; return adresler.isEmpty ? p.isCurrentUser : adresler.contains(adres(p)) }
+func kendiTakvimi(_ e: EKEvent) -> Bool { ((e.attendees ?? []) + (e.organizer.map { [$0] } ?? [])).contains { ben($0) && $0.isCurrentUser } }
+
 let store = EKEventStore()
 let bitti = DispatchSemaphore(value: 0)
 func oku(_ izin: Bool, _ hata: Error?) {
@@ -58,10 +76,20 @@ func oku(_ izin: Bool, _ hata: Error?) {
   let simdi = Date()
   let p = store.predicateForEvents(withStart: simdi.addingTimeInterval(-saatOnce * 3600), end: simdi.addingTimeInterval(saatSonra * 3600), calendars: nil)
   var olaylar: [[String: Any]] = []
-  for e in store.events(matching: p).sorted(by: { $0.startDate < $1.startDate }) {
+  var gorulen = Set<String>()
+  for e in store.events(matching: p).sorted(by: { $0.startDate != $1.startDate ? $0.startDate < $1.startDate : kendiTakvimi($0) && !kendiTakvimi($1) }) {
     if e.status == .canceled { continue }
-    let ben = e.attendees?.first(where: { $0.isCurrentUser })
-    if ben?.participantStatus == .declined { continue }
+    let katilan = e.attendees ?? []
+    let benKatilan = katilan.first(where: { ben($0) }), benDuzenleyen = ben(e.organizer)
+    let digerleri = katilan.filter { !ben($0) && !($0.url == e.organizer?.url && benDuzenleyen) }
+    if digerleri.isEmpty && !(e.organizer != nil && !benDuzenleyen) { continue }  // katılımcısız kayıt (yalnız kullanıcı)
+    if ayrinti {
+      olaylar.append(["baslik": e.title ?? "", "takvim": e.calendar.title, "duzenleyen": e.organizer.map { "\(adres($0)) cu=\($0.isCurrentUser)" } ?? "-",
+                      "katilan": katilan.map { "\(adres($0)) cu=\($0.isCurrentUser) \($0.participantStatus.rawValue)" }])
+      continue
+    }
+    if benKatilan == nil && !benDuzenleyen { continue }  // kullanıcının olmadığı etkinlik (paylaşılan takvim)
+    if !gorulen.insert("\(e.startDate.timeIntervalSince1970)|\(e.title ?? "")").inserted { continue }  // başka takvimdeki kopya
     var o: [String: Any] = [
       "id": e.calendarItemIdentifier, "baslik": e.title ?? "", "baslangic": iso.string(from: e.startDate), "bitis": iso.string(from: e.endDate),
       "tum_gun": e.isAllDay, "takvim": e.calendar.title, "hesap": e.calendar.source.title,
@@ -70,8 +98,9 @@ func oku(_ izin: Bool, _ hata: Error?) {
     if let n = e.notes, !n.isEmpty { o["notlar"] = String(n.prefix(4000)) }
     let b = baglanti([e.url?.absoluteString, e.location, e.notes])
     if let b = b { o["baglanti"] = b; o["platform"] = platform(b) }
-    if let org = e.organizer { o["duzenleyen"] = org.name ?? ""; o["ben_duzenleyen"] = org.isCurrentUser }
-    if let at = e.attendees { o["katilimcilar"] = at.filter { !$0.isCurrentUser }.compactMap { $0.name }.prefix(30).map { $0 } ; o["kisi_sayisi"] = at.count }
+    if let org = e.organizer { o["duzenleyen"] = org.name ?? ""; o["ben_duzenleyen"] = benDuzenleyen }
+    if benKatilan?.participantStatus == .declined && !benDuzenleyen { o["reddettin"] = true }
+    if !katilan.isEmpty { o["katilimcilar"] = katilan.filter { !ben($0) }.compactMap { $0.name }.prefix(30).map { $0 } ; o["kisi_sayisi"] = katilan.count }
     olaylar.append(o)
   }
   yaz(["durum": "ok", "olaylar": olaylar])

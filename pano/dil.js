@@ -104,6 +104,7 @@ globalThis.SUFLOR_EN = {
   "şimdi": "now",
   "{n} dk sonra": "in {n} min",
   "düzenleyen sen": "you're the organizer",
+  "daveti reddettin": "you declined",
   "takvim yenileniyor…": "refreshing calendar…",
   "Kişi ve konuyu yaz": "Enter the person and topic",
   "başlatılıyor…": "starting…",
