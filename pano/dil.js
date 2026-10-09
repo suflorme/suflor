@@ -175,6 +175,8 @@ globalThis.SUFLOR_EN = {
   "davet notundan": "from the invite",
   "Son toplantılar": "Recent meetings",
   "Brifing": "Briefing",
+  "Göster": "Show",
+  "Gizle": "Hide",
   "Dikkat": "Watch for",
   "Açık kalanlar": "Still open",
   "Geçmişte": "Previously",

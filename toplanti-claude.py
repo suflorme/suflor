@@ -1168,7 +1168,8 @@ def ozet_hazir_cmd():
     except Exception: agj = {}
     baslik = A.baslik or ((agj.get("title") if agj.get("items") else None) or st.get("meeting") or os.path.basename(yol))
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
-    body = {"ozet": yol, "baslik": baslik, "dosya": st.get("file"), "puan": puan, "degerlendirme": deg, "oneri": oneri}
+    # metin de gider: aktarıcı launchd'den çalıştığı için Masaüstü'ndeki özeti açamıyor; kendi klasörüne kopyasını yazar (panoda "Özeti aç")
+    body = {"ozet": yol, "baslik": baslik, "dosya": st.get("file"), "puan": puan, "degerlendirme": deg, "oneri": oneri, "metin": metin[:500000]}
     req = urllib.request.Request(A.relay + "/son-toplanti", data=json.dumps(body).encode(), method="POST",
                                  headers={"X-Suflor-Anahtar": key, "Content-Type": "application/json"})
     r = json.load(urllib.request.urlopen(req, timeout=3))

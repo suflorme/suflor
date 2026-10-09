@@ -1708,6 +1708,13 @@ def son_ekle(p):
     r = {"id": "s" + str(int(time.time() * 1000)), "at": datetime.datetime.now().isoformat(timespec="seconds"), "t": round(time.time(), 3), "ozet": ozet,
          "baslik": _son_temiz(p.get("baslik"), 120), "dosya": os.path.basename(str(p.get("dosya") or ""))[:160] or None,
          "puan": _son_temiz(p.get("puan"), 6) or None, "degerlendirme": _son_temiz(p.get("degerlendirme"), 400), "oneri": _son_temiz(p.get("oneri"), 300)}
+    if isinstance(p.get("metin"), str) and p["metin"].strip():  # kopya: aktarıcı Masaüstü'ndeki özeti açamaz (launchd), kendi klasöründekini açar
+        kp = os.path.join(BASE, "ozetler", os.path.basename(ozet))
+        try:
+            os.makedirs(os.path.dirname(kp), exist_ok=True)
+            with open(kp + ".tmp", "w", encoding="utf-8") as f: f.write(p["metin"][:500000])
+            os.replace(kp + ".tmp", kp); r["kopya"] = kp
+        except OSError as e: print(f"ÖZET: kopya yazılamadı ({e.__class__.__name__})")
     with LOCK:
         _log("son-toplantilar.jsonl", r); SON.append(r); del SON[:-20]
         if r["dosya"]: STATE["bitti"] = {"file": r["dosya"], "t": r["t"]}
@@ -1722,8 +1729,14 @@ def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
 def son_ac(p):
     r = next((x for x in SON if x.get("id") == str(p.get("id") or "")), None)
     if not r: return {"ok": False, "err": "kayıt yok"}
-    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): özet {os.path.basename(r['ozet'])}"); return {"ok": True}
-    subprocess.Popen(["open", r["ozet"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    yol = next((y for y in (r.get("kopya"), os.path.join(BASE, "ozetler", os.path.basename(r["ozet"]))) if y and os.path.isfile(y)), None)
+    if not yol: return {"ok": False, "err": _t("özetin kopyası yok; dosya: ", "no copy of the summary; file: ") + os.path.basename(r["ozet"])}
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): özet {os.path.basename(yol)}"); return {"ok": True}
+    # .md'nin varsayılan uygulamasıyla açılır (ayar ozet_uygulama başka uygulama seçer). Kopya aktarıcının klasöründe: Masaüstü'ndeki
+    # asıl dosyayı launchd'den açınca uygulama dosyaya erişemiyor, hiçbir şey açılmıyordu (9 Ekim). Hata panoya döner.
+    try: k = subprocess.run(["open"] + (["-a", str(AYAR["ozet_uygulama"])] if AYAR.get("ozet_uygulama") else []) + [yol], capture_output=True, text=True, timeout=15)
+    except subprocess.TimeoutExpired: return {"ok": False, "err": _t("özet uygulaması yanıt vermedi", "the summary app did not respond")}
+    if k.returncode: print(f"ÖZET: açılamadı ({(k.stderr or '').strip()[:160]})"); return {"ok": False, "err": (k.stderr or "").strip()[:160]}
     return {"ok": True}
 # --- Toplantı öncesi brifing (kullanıcı isteği 7 Ekim; kararlar 8 Ekim: panodan, dokununca) ---------------------------------------
 # Boş panoda seçili takvim toplantısı için "Brifing hazırla" → tek `claude -p` çağrısı, yalnız okuma araçlarıyla (Read, Grep, Glob):
