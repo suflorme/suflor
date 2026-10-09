@@ -546,7 +546,13 @@
         try {
           pip = await documentPictureInPicture.requestWindow({ width: 320, height: 420 });
           const d = pip.document; d.title = "Suflor.me mini";
-          const st = d.createElement("style"); st.textContent = CSS + `html,body{margin:0;height:100%}body{background:#f9faf7}@media (prefers-color-scheme:dark){body{background:#1b221e}}.w{padding:8px;box-sizing:border-box;min-height:100%}.w .list{display:block;width:auto;max-height:none;border:0;box-shadow:none;padding:0;margin:0;background:transparent}`;
+          // tema açıkça: PiP penceresi sistem açıkken de koyu açılıyordu (9 Ekim denemesi). Karar toplantı sekmesinin gördüğü
+          // açık/koyudan; PiP'in kendi değeri ve sekmeninki günlüğe (EKLENTİ: mini-tema) — farklılarsa neden orada görünür
+          const mq = "(prefers-color-scheme: dark)", temaKur = () => { d.documentElement.dataset.tema = matchMedia(mq).matches ? "koyu" : "acik"; };
+          temaKur(); matchMedia(mq).addEventListener("change", () => { if (pip && !pip.closed) temaKur(); });
+          olay("mini-tema", `pip ${pip.matchMedia(mq).matches ? "koyu" : "açık"} · sekme ${matchMedia(mq).matches ? "koyu" : "açık"}`);
+          const temali = c => c.replace(/@media \(prefers-color-scheme:dark\)\{([^{}]+)\{([^{}]*)\}\}/g, (_, sec, govde) => sec.split(",").map(x => "html[data-tema=koyu] " + x.trim()).join(",") + "{" + govde + "}");
+          const st = d.createElement("style"); st.textContent = "html{color-scheme:light}html[data-tema=koyu]{color-scheme:dark}" + temali(CSS + `html,body{margin:0;height:100%}body{background:#f9faf7}@media (prefers-color-scheme:dark){body{background:#1b221e}}.w{padding:8px;box-sizing:border-box;min-height:100%}.w .list{display:block;width:auto;max-height:none;border:0;box-shadow:none;padding:0;margin:0;background:transparent}`);
           const w = d.createElement("div"); w.className = "w"; const g = kutu(d);
           w.append(Object.assign(d.createElement("div"), { className: "list" }), Object.assign(d.createElement("div"), { className: "son" }), g, altDugmeler(d, g.querySelector("textarea")));
           d.head.appendChild(st); d.body.appendChild(w); d.addEventListener("click", tikla); ipucuKur(d);
