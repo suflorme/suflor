@@ -683,9 +683,12 @@ class Kesinlik:
 
 # --- Söz kesme + yankı (kullanıcı, 2 Ekim) ----------------------------------------------------------------------------------
 # Whisper satırlarının parça sınırları (t0/t1, iki ayrı kanal: kullanıcının mikrofonu / Teams sekmesinin sesi) üst üste binerse:
-# sonra başlayan, öbürü ≥ 0,5 sn konuşmuşken başladıysa ve öbürü ≥ 1 sn daha sürdüyse "söz kesti". İki metin büyük ölçüde
+# sonra başlayan, öbürü ≥ 0,5 sn konuşmuşken başladıysa, öbürü ≥ KESME_UST_SN daha sürdüyse ve kendisi ≥ KESME_ONAY_SN konuştuysa "söz kesti". İki metin büyük ölçüde
 # aynıysa bu söz kesme değil YANKI (karşı tarafın sesi hoparlörden kullanıcının mikrofonuna giriyor → çift satır): bir kez bildirilir.
-KESME_PENCERE_SN = 300; KESME_ESIK = 3; KESME_ARALIK_SN = 300; DINLE_ARALIK_SN = 300
+# 9 Ekim ilk gerçek toplantı: kural 22 olay saydı, çoğu söz kesme değildi — 10'u kısa onay ("Evet", "Tamam", "Hmm"; kesen parça < 2 sn),
+# 9'u doğal söz devri (öbürü cümlesini bitirirken 1–2 sn erken başlama; parça sonları sessizlik payı da taşır). Kesen parça ≥ 2 sn ve
+# üst üste konuşma ≥ 2,5 sn olunca sayılır: aynı veride 3 olay kaldı (ekran yönlendirmesinde gerçek üst üste konuşma).
+KESME_PENCERE_SN = 300; KESME_ESIK = 3; KESME_ARALIK_SN = 300; DINLE_ARALIK_SN = 300; KESME_ONAY_SN = 2.0; KESME_UST_SN = 2.5
 def _kel(t): return set(w for w in re.findall(r"\w+", kucuk(t or "")) if len(w) > 2)
 class Kesme:
     def __init__(s, ben): s.ben = ben; s.son = {"ben": [], "karsi": []}; s.olay = []; s.bildirim = {}; s.yanki = 0; s.yanki_bildirildi = False
@@ -705,7 +708,7 @@ class Kesme:
                                "görünebilir → kullanıcıya bir kez DUR kartı: \"Hoparlör sesi mikrofona giriyor — kulaklık tak ya da sesi kıs\"")
                 continue
             ilk, sonra = (o, r) if o["t0"] <= r["t0"] else (r, o)
-            if sonra["t0"] - ilk["t0"] >= 0.5 and ilk["t1"] - sonra["t0"] >= 1.0:
+            if sonra["t0"] - ilk["t0"] >= 0.5 and ilk["t1"] - sonra["t0"] >= KESME_UST_SN and sonra["t1"] - sonra["t0"] >= KESME_ONAY_SN:
                 s.olay.append((sonra["t0"], sonra.get("speaker") or "?", ilk.get("speaker") or "?", kanal_n(sonra.get("kanal"))))
         s.son[k] = (s.son[k] + [r])[-12:]
         now = r["t1"]; s.olay = [x for x in s.olay if now - x[0] <= KESME_PENCERE_SN]
