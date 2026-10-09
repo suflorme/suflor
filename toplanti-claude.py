@@ -736,6 +736,12 @@ def kart_adayi(r, sis):
         n = " ".join(baglam.kelimeler(t))
         if any(rx.search(n) for rx in sis.values()): o.add("sistem")
     return o
+def paket_kaydi(dosya, satir, aday, neden):
+    # #84/S5: her SATIRLAR paketi canli/izle-paketler.jsonl'e (içerik yok) — olcum.py toplanti paket → kart isabetini buradan sayar
+    try:
+        with open(os.path.join(A.dir, "izle-paketler.jsonl"), "a", encoding="utf-8") as f:
+            f.write(json.dumps({"at": datetime.datetime.now().isoformat(timespec="seconds"), "file": dosya, "satir": satir, "aday": sorted(aday), "neden": neden}, ensure_ascii=False) + "\n")
+    except OSError: pass
 def izle():
     import baglam  # hazır kart tetiği kök karşılaştırması
     q_tail = Tail(os.path.join(A.dir, "sorular.jsonl")); k_tail = Tail(os.path.join(A.dir, "kartlar.jsonl"))
@@ -983,6 +989,7 @@ def izle():
                 return [f"SORU {q.get('id')}: {q.get('text')}   ← ÖNCE BUNU CEVAPLA (30 sn)", *soru_baglam(q.get('text') or ''), *taslak_satir()]
             emit(*[l for q in qs for l in soru_olay(q)], *acks, *sesler,
                  *([f"SATIRLAR ({len(buf)}, soruya kadar):", *buf] if buf else []), *paket_baglam())
+            if buf: paket_kaydi(cur, len(buf), kart_aday, "soru")
             buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
         for k in k_tail.new():
             if "text" in k: texts[k["id"]] = f"[{k.get('kind')}] {k.get('text')}"
@@ -999,9 +1006,12 @@ def izle():
         # A.bosluk sn; yoksa A.aralik (45 sn) ya da A.paket satır. Geçmiş 21 toplantı benzetimi: aday satırı → Claude ortanca 14,1 → 2,0 sn
         # (%90 21,8 → 7,1); diğer satırlar ortanca aynı (~14 sn), %90 22 → 41 sn; paket/saat 106 → 129. Cevap dışı kartların %83'ünün
         # 40 sn öncesinde aday vardı (kalanı kaybolmaz, sakin paketle gelir).
-        acil = bool(kart_aday) and bool(buf) and time.time() - son_paket >= A.bosluk
+        # GEÇİCİ (S5, 9 Ekim): yalnız "iddia" adayı paketi hemen göndermez, sakin paketle gider — 9 Ekim'de 22 iddia paketinden 2'sinin
+        # ardından kart çıktı, her acil paket Claude'a ~180 bin simgelik bağlamı yeniden okutuyor. Kalıcı karar yeterli toplantı verisiyle (#84).
+        acil = bool(kart_aday - {"iddia"}) and bool(buf) and time.time() - son_paket >= A.bosluk
         if (buf or acks) and (acil or len(buf) >= A.paket or time.time() - buf_since >= A.aralik):
             emit(*acks, *sesler, *([f"SATIRLAR ({len(buf)}" + (f", kart adayı: {'/'.join(sorted(kart_aday))}" if kart_aday else "") + "):", *buf] if buf else []), *paket_baglam())
+            if buf: paket_kaydi(cur, len(buf), kart_aday, "acil" if acil else "dolu" if len(buf) >= A.paket else "sure")
             buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
         time.sleep(2)
 

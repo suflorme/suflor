@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suflor.me — canlı toplantı asistanı",
-  "version": "0.20.16",
+  "version": "0.20.17",
   "description": "Toplantıyı canlı yazıya döker (Teams; Meet ve Zoom web sırada), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
   "permissions": [
     "storage",

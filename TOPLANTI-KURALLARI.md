@@ -57,7 +57,7 @@ yanıta izin vermiyorsa yalnız `·` yaz.
 Bas-konuş (panodaki Konuş) toplantı sürerken kapalıdır; toplantıda soru sohbetten ya da sesli "Claude:" ile gelir. Kullanıcıya Konuş'u önerme.
 
 ## 4. Olaylar (`izle`)
-Satırlar paketle gelir: kart adayı (soru, sistem adı, rakamlı/kesin iddia) varsa hemen — başlıkta `SATIRLAR (n, kart adayı: …)`,
+Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız rakamlı/kesin iddia adayı sakin paketle gelir — başlıkta `SATIRLAR (n, kart adayı: …)`,
 önce o satıra bak; yoksa 45 sn'de ya da 30 satırda. Kart dönüşleri ve sinyal olayları pakete eklenir. `SORU`/`NE DİYEYİM` beklemez.
 - `SORU q…` ("← ÖNCE BUNU"): 30 sn içinde `cevap`. `hazir.json`'da uyan cevap kartı varsa `hazir hN --cevap q…`. Altındaki
   `BAĞLAM` satırlarına (proje araması, ilk 3) dayan, kaynağı `--neden`'e kısa adla yaz ("Ayşe görüşmesi 1:06:31",
