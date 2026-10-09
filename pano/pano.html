@@ -38,7 +38,7 @@ aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var
 .k{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:9px 11px;margin:0 0 8px;position:relative;overflow:hidden}
 .k::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc,var(--gr))}
 .k b{display:block;font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--kc,var(--gr));margin-bottom:2px}
-.kw{font-size:12px;color:var(--t2);margin-top:3px}.ey{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--bd)}.ey .t{flex:1;min-width:0}.ey .d{font-size:12px;color:var(--t2);margin-top:3px}.ey summary{font-size:12px;color:var(--t2);cursor:pointer;margin-top:3px}.ey pre{white-space:pre-wrap;font:12px/1.45 var(--f-teknik);background:var(--s2);border-radius:6px;padding:6px 8px;margin:4px 0 0}.ey .eyr{font-size:13px;line-height:1.5;margin-top:4px}.ey .eyr b{font-weight:600}.ey .eyk{margin-left:2px}.ey .ea{display:flex;gap:4px;flex:none}.bk{display:flex;gap:12px;align-items:flex-start}.bk .t{flex:1;min-width:0}.bk .b{margin-top:3px}.bk .d{font-size:12px;color:var(--t2);margin-top:3px}#kb{flex:none;touch-action:none;user-select:none}#kb.on{background:var(--er);border-color:var(--er)}.ey-ses{background:var(--s2);border-radius:8px;padding-left:8px;padding-right:8px}.ey-reddedildi .b{color:var(--t3);text-decoration:line-through}.ey-hata .d{color:var(--er)}.k-replik .rp{font-weight:600}.kd{font-size:12px;color:var(--t2);margin-top:3px}
+.kw{font-size:12px;color:var(--t2);margin-top:3px}.ey{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--bd)}.ey .t{flex:1;min-width:0}.ey .d{font-size:12px;color:var(--t2);margin-top:3px}.ey summary{font-size:12px;color:var(--t2);cursor:pointer;margin-top:3px}.ey pre{white-space:pre-wrap;font:12px/1.45 var(--f-teknik);background:var(--s2);border-radius:6px;padding:6px 8px;margin:4px 0 0}.ey .eyr{font-size:13px;line-height:1.5;margin-top:4px}.ey .eyr b{font-weight:600}.ey .eyr a,.ey pre a{color:var(--ac,inherit);text-decoration:underline;word-break:break-all}.ey .ea{display:flex;gap:4px;flex:none}.bk{display:flex;gap:12px;align-items:flex-start}.bk .t{flex:1;min-width:0}.bk .b{margin-top:3px}.bk .d{font-size:12px;color:var(--t2);margin-top:3px}#kb{flex:none;touch-action:none;user-select:none}#kb.on{background:var(--er);border-color:var(--er)}.ey-ses{background:var(--s2);border-radius:8px;padding-left:8px;padding-right:8px}.ey-reddedildi .b{color:var(--t3);text-decoration:line-through}.ey-hata .d{color:var(--er)}.k-replik .rp{font-weight:600}.kd{font-size:12px;color:var(--t2);margin-top:3px}
 .ipucu{position:fixed;z-index:1000;max-width:260px;padding:5px 8px;border-radius:6px;background:var(--tx);color:var(--bg);font:12px/1.35 var(--f-govde);white-space:pre-line;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}.ipucu[hidden]{display:none}
 .k-soyle{--kc:var(--br-tx)}.k-dur{--kc:var(--er);background:var(--er-bg)}.k-cevap,.k-not{--kc:var(--gr)}.k[data-id]{cursor:pointer;display:flex;gap:8px;align-items:flex-start}.k[data-id]:hover{border-color:var(--bd2)}.k .km{flex:1;min-width:0}.k.kapaniyor{opacity:.45}.ka{display:flex;gap:2px;flex:none}.ka button{padding:3px 5px;color:var(--t3)}.ka button:hover{color:var(--tx)}.ka button.on{padding:3px 8px;color:var(--t2)}.ka button.on.pri{color:#fff}.k[data-onay]{cursor:default}
 .kc{font-size:12px;color:var(--t3);padding:3px 0 3px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -213,25 +213,27 @@ function sessizCiz(b,s){if(!b)return;const ss=s.sessiz,on=!!(ss&&ss.acik);b.clas
 function sessizTxt(s){const ss=s.sessiz,n=(ss&&ss.tutulan||[]).length;return(ss&&ss.acik?"🔇 "+L("sessiz, bitiş {t}",{t:ss.bitis})+(n?L(" · {n} kart bekliyor",{n}):""):n?"🔔 "+L("Sessiz bitti — Claude özetliyor ({n} kart)",{n}):"")+(s.ertelenen?(ss&&(ss.acik||n)?" · ":"")+"⏸ "+L("{n} kart sonraya bırakıldı",{n:s.ertelenen}):"")}
 // eylem kuyruğu: toplantıda yalnız sayı ("📋 n iş toplantı sonuna"); Claude sununca (eylem sun) liste — her satırda Onayla/Reddet,
 // ayrıntı katlı (uygulanacak işin tam hâli). Karar anahtarlı panodan; Claude yalnız onaylananı uygular, sonucu satırda görünür.
-// eylem ayrıntısı komutsa (python3 … kayit.py … --sahip "X") okunur satırlara çevrilir: "Sahip: X"; ham komut altta kapalı "Komut"ta.
-// Onaylanan iş yine bu komuttur (ayrıntı = uygulanacak işin tam hâli); yalnız gösterim değişir. --yazan gibi iç bilgi gösterilmez.
+// eylem ayrıntısı komutsa (python3 … kayit.py … --sahip "X") okunur satırlara çevrilir: "Sahip: X". Ham komut panoda gösterilmez
+// (kullanıcı, 10 Ekim); onaylanan iş yine bu komuttur, tam hâli eylemler.jsonl'de. --yazan gibi iç bilgi gösterilmez.
+// lk: metindeki http(s) bağlantıları tıklanabilir (yeni sekme); başka şema (javascript: vb.) bağlantı olmaz.
+function lk(s){return String(s==null?'':s).split(/(https?:\/\/[^\s"<>]+)/).map((p,i)=>{if(!(i%2))return esc(p);const m=p.match(/^(.*?)([.,;:!?)\]]*)$/);return `<a href="${esc(m[1])}" target=_blank rel=noopener>${esc(m[1])}</a>${esc(m[2])}`}).join('')}
 function eyAyr(a){
   const t=String(a||'').replace(/^\s*```[^\n]*\n?/,'').replace(/\n?```\s*$/,'').trim()
   const sat=t.split('\n')
-  if(!sat.some(l=>/^\s*(python3?|\S+\.py)\s/.test(l)))return `<pre>${esc(a)}</pre>`
+  if(!sat.some(l=>/^\s*(python3?|\S+\.py)\s/.test(l)))return `<pre>${lk(a)}</pre>`
   const out=sat.map(l=>{
-    if(!/^\s*(python3?|\S+\.py)\s/.test(l))return l.trim()?`<div>${esc(l)}</div>`:''
+    if(!/^\s*(python3?|\S+\.py)\s/.test(l))return l.trim()?`<div>${lk(l)}</div>`:''
     const tok=[];l.replace(/"((?:\\.|[^"\\])*)"|'([^']*)'|(\S+)/g,(m,a1,a2,a3)=>{tok.push(a1!=null?a1.replace(/\\(.)/g,'$1'):a2!=null?a2:a3)})
     const r=[]
     for(let i=0;i<tok.length;i++){
       if(!/^--./.test(tok[i]))continue
       const k=tok[i].slice(2),v=i+1<tok.length&&!/^--./.test(tok[i+1])?tok[++i]:'✓'
       if(k==='yazan')continue
-      r.push(`<div><b>${esc(k.charAt(0).toLocaleUpperCase('tr')+k.slice(1).replace(/[-_]/g,' '))}:</b> ${esc(v)}</div>`)
+      r.push(`<div><b>${esc(k.charAt(0).toLocaleUpperCase('tr')+k.slice(1).replace(/[-_]/g,' '))}:</b> ${lk(v)}</div>`)
     }
     return r.join('')
   }).join('')
-  return `<div class=eyr>${out}</div><details class=eyk><summary>${L('Komut')}</summary><pre>${esc(t)}</pre></details>`
+  return `<div class=eyr>${out}</div>`
 }
 const EYT={kayit:L("Kayıt"),takvim:L("Takvim"),eposta:L("E-posta"),belge:L("Belge"),takip:L("Takip e-postası"),mesaj:L("Ekip mesajı"),diger:L("Diğer")}
 const EYD={onaylandi:L("onaylandı — Claude uyguluyor"),reddedildi:L("reddedildi"),yapildi:"✓ "+L("yapıldı"),hata:"⚠ "+L("yapılamadı")}

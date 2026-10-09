@@ -310,7 +310,6 @@ globalThis.SUFLOR_EN = {
   "yapılamadı": "failed",
   "{n} onay bekliyor": "{n} awaiting approval",
   "Ayrıntı": "Details",
-  "Komut": "Command",
   "{n} iş toplantı sonuna": "{n} tasks for the end of the meeting",
   "Yapılacaklar": "To do",
   "Hepsini onayla": "Approve all",
