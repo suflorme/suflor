@@ -284,7 +284,10 @@ async function openMini(){
   buildMini(mini)
 }
 function buildMini(w){
-  mini=w; const d=w.document; d.title="Suflor.me mini"; d.head.querySelectorAll("style").forEach(x=>x.remove()); const st=d.createElement("style"); st.textContent=miniCss(); d.head.appendChild(st)
+  mini=w; const d=w.document; d.title="Suflor.me mini"; d.head.querySelectorAll("style").forEach(x=>x.remove()); const st=d.createElement("style"); st.textContent=miniCss()+":root[data-theme=light]{color-scheme:light}"; d.head.appendChild(st)
+  // tema panodan: PiP penceresi sistem ve pano açıkken de "koyu" görüyordu (9 Ekim denemesi); iki değer günlüğe (EKLENTİ: mini-tema)
+  const mq="(prefers-color-scheme: dark)",tk=()=>{if(matchMedia(mq).matches)delete d.documentElement.dataset.theme;else d.documentElement.dataset.theme="light"};tk();matchMedia(mq).addEventListener("change",()=>{if(mini===w)tk()})
+  j('/olay',{method:'POST',body:JSON.stringify({tur:"mini-tema",metin:`pano mini · pip ${w.matchMedia(mq).matches?"koyu":"açık"} · pano ${matchMedia(mq).matches?"koyu":"açık"}`})}).catch(()=>{})
   d.body.innerHTML=`<div id=mh></div><div id=mc></div><div id=ml></div><textarea id=mn rows=2 placeholder="${L("Not ya da soru (başa ?)")}"></textarea><div class=bt><button id=mnb class=pri>${L("Gönder")}</button><span class=sp1></span><button id=myz class=ib title="${L("⭐ Önemli an: şu anı özette öne çıkar")}">${ic('star')}</button><button id=msz class=ib title="${L("Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)")}">${ic('mute')}</button><button id=moz class=ib title="${L("Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)")}">${ic('replik')}</button><button id=mkz class=ib title="${L("Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur")}">${ic('cam')}</button></div>`
   bindAck(d.getElementById("mc")); wireBox(d.getElementById("mn"),d.getElementById("mnb")); d.getElementById("moz").onclick=ev=>sendOzet(ev.currentTarget); d.getElementById("myz").onclick=ev=>sendOnemli(ev.currentTarget); d.getElementById("msz").onclick=ev=>sendSessiz(ev.currentTarget); d.getElementById("mkz").onclick=ev=>sendKanit(ev.currentTarget,d.getElementById("mn"))
   w.addEventListener("pagehide",()=>{if(mini===w)mini=null}); birakmaKur(w); ipucuKur(d); if(last)paintMini(last)
