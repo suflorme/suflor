@@ -147,6 +147,8 @@ def hazir():
     if not h: sys.exit(f"hazir.json'da {A.hid} yok")
     A.tur = "cevap" if A.cevap else h.get("tur", "bilgi"); A.metin = h["metin"]; A.neden = h.get("neden", "")
     A.gundem = h.get("gundem"); A.ton = None
+    # kart()'ın okuduğu, hazir alt komutunda olmayan seçenekler (9 Ekim: A.gizli yoktu, hazır kart hiç gitmedi — AttributeError)
+    A.gizli = False; A.onay = False; A.durum = ""; A.sessiz_ozet = False
     cid = kart()
     olcum_yaz({"t": "hazir-gonder", "hid": A.hid, "card_id": cid, "card_at": simdi()})
 
