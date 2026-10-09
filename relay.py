@@ -2012,6 +2012,9 @@ def brifing_sesli(oid, neden):
     b = BRIFING.get(oid) or {}
     if b.get("durum") != "hazir": return False
     if neden == "baslat":
+        # Başlat'ta kendiliğinden okuma kapalı (S21, 10 Ekim: içerik zayıf, adları yanlış okuyor; akıcı konuşan asistanla geri açılacak).
+        # Yazılı brifing hazırlanır, panodaki Dinle okur. Ayar brifing_sesli: true açar.
+        if not AYAR.get("brifing_sesli", False): print("SES: brifing kendiliğinden okunmadı (brifing_sesli kapalı; panoda Dinle)"); return False
         bs = STATE.get("baslatma") or {}
         if bs.get("olay") != oid or time.time() - (bs.get("at") or 0) > 300 or toplanti_var(): print("SES: brifing okunmadı — toplantı başladı ya da süre geçti"); return False
     ok = seslendir(brifing_konusma(b.get("sonuc") or {}))
