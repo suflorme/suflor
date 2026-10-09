@@ -998,6 +998,17 @@ def _birlestir(is_):
     pcm = bytearray(is_["pcm"])
     for x in ek: pcm += WH_BIRLES_ARA + x["pcm"]
     return dict(is_, pcm=bytes(pcm), t1=ek[-1]["t1"], birlesik=1 + len(ek))
+# İşçinin her işi (satır bırakmayanlar dahil: boş, uydurma, yankı, eski, hata) canli/whisper-isler.jsonl'e: kuyruk gecikmesinin
+# nereden geldiği satır kaydından görünmüyordu (9 Ekim). olcum.py toplanti özetler. Uzun beklemede günlüğe ayrıca bir satır.
+WH_UZUN_BEKLEME_SN = 8
+def is_kaydet(is_, sonuc, bit, q_n, isci_sn=None, acildi=False):
+    al = is_.get("t_al") or bit
+    r = {"t": round(bit, 2), "kanal": is_.get("kanal"), "sonuc": sonuc, "parca_sn": round(is_["t1"] - is_["t0"], 2), "q": q_n,
+         "bekleme": round(al - is_["kuyruga"], 2), "is_sn": round(bit - al, 2), **({"isci_sn": isci_sn} if isci_sn is not None else {}),
+         **({"birlesik": is_["birlesik"]} if is_.get("birlesik") else {}), **({"acildi": True} if acildi else {})}
+    _ISCI["son_is"] = {"kanal": r["kanal"], "sonuc": sonuc, "sure": r["is_sn"], "bit": bit}
+    try: _log("whisper-isler.jsonl", r)
+    except Exception: pass
 def _isci_dongu():
     w = STATE["whisper"]; hata_say = 0
     while True:
@@ -1012,10 +1023,18 @@ def _isci_dongu():
             continue
         # eşik 45 → 120 sn — altyazı gölgedeyken atlanan parça dökümden tamamen kayboluyordu (6 Ekim: en kötü 45,6 sn)
         if time.time() - is_["kuyruga"] > WH_ATLA_SN:
-            w["atlanan"] += 1; w["eski_atlanan"][is_["kanal"]] = w["eski_atlanan"].get(is_["kanal"], 0) + 1; continue
+            w["atlanan"] += 1; w["eski_atlanan"][is_["kanal"]] = w["eski_atlanan"].get(is_["kanal"], 0) + 1
+            if not is_.get("bas"): is_kaydet(is_, "eski", time.time(), WH_Q.qsize())
+            continue
         q_n = WH_Q.qsize(); is_ = _birlestir(is_)
         is_["t_al"] = time.time(); is_["q_n"] = q_n  # gecikme bileşenleri
+        bek = is_["t_al"] - is_["kuyruga"]; o = _ISCI.get("son_is")
+        if bek > WH_UZUN_BEKLEME_SN and not is_.get("bas"):  # 9 Ekim: önünde 0–1 iş varken 14–20 sn bekleme — işçi nerede kaldı
+            print(f"WHISPER: parça {bek:.1f} sn bekledi ({is_['kanal']}, sırada {q_n})" + (f" · önceki iş {o['kanal']} {o['sonuc']} {o['sure']:.1f} sn, "
+                  f"{is_['t_al'] - o['bit']:.1f} sn önce bitti" if o else " · önceki iş yok"))
+        acildi = False
         if not _ISCI["p"] or _ISCI["p"].poll() is not None:
+            acildi = True
             if not _isci_ac():
                 if w["durum"] == "yok": return
                 hata_say += 1; time.sleep(min(60, 5 * hata_say)); continue
@@ -1037,17 +1056,20 @@ def _isci_dongu():
             if j.get("hata"): _isci_kapat("hata")
             continue
         if j.get("hata"):
-            print(f"WHISPER: parça çevrilemedi ({j['hata']}) — işçi yeniden başlatılacak"); w["hata"] = j["hata"]; _isci_kapat("hata"); continue
+            print(f"WHISPER: parça çevrilemedi ({j['hata']}) — işçi yeniden başlatılacak"); w["hata"] = j["hata"]; _isci_kapat("hata")
+            is_kaydet(is_, "hata", time.time(), q_n, acildi=acildi); continue
         hata_say = 0; metin = " ".join(str(j.get("text") or "").split()); is_["t_wh"] = time.time(); is_["isci_sn"] = j.get("sn")
         gec = round(time.time() - is_["t1"], 1)
         w.update(son_sn=j.get("sn"), gecikme_sn=gec, gecikme_max=max(w.get("gecikme_max") or 0, gec)); w["atlanan"] += j.get("atlanan", 0)
         if j.get("istem_dusen") and j["istem_dusen"] != w.get("istem_dusen"): print(f"WHISPER: istem sınırı — {j['istem_dusen']} terim sığmadı (önem sırasında sondakiler)")
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
+        sonuc = "uydurma" if j.get("atlanan") else "bos"
         if metin:
             if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
-            is_["t_ses"] = time.time(); whisper_yaz(is_, metin, j.get("ses"), {"kume": j["kume"]} if j.get("kume") else None)
+            is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {"kume": j["kume"]} if j.get("kume") else None) or "satir"
+        is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
 # --- Konuşmacı ses izi (v0.8.4 ses işçisi → v0.13.12 Whisper işçisinin içinde) ------------------------------------------------
 # ECAPA (SpeechBrain VoxCeleb ağırlıkları, MLX) karşı kanal parçalarını kümeler: k1, k2… Kümenin adı altyazıdan oylanır: altyazı satırı
 # konuşmadan 3–6 sn sonra geldiği için o anda bekleyen parçalar geriye dönük oy alır. Ad yoksa tek kümede "Karşı taraf", çok kümede
@@ -1176,14 +1198,14 @@ def whisper_yaz(is_, metin, ses=None, model=None):
     karsi_akiyor = now - STATE["whisper"]["kanallar"].get("karsi", 0) < WH_AKIS_SN
     if kanal == "karsi":
         with YANKI_LOCK: YANKI_KARSI.append((is_["t0"], is_["t1"], _yk(metin))); del YANKI_KARSI[:-20]
-        _whisper_yaz(is_, metin, ses, model); _yanki_bosalt(); return
+        _whisper_yaz(is_, metin, ses, model); _yanki_bosalt(); return "satir"
     if kanal == "ben" and karsi_akiyor:
         m = (is_["t0"], is_["t1"], _yk(metin))
         with YANKI_LOCK:
-            if any(_yanki_mi(m, k) for k in YANKI_KARSI): _yanki_say(metin); return
+            if any(_yanki_mi(m, k) for k in YANKI_KARSI): _yanki_say(metin); return "yanki"
             if _karsi_bekleniyor(is_["t0"], is_["t1"]):
-                YANKI_BEKLEYEN.append((is_, metin, ses, model, now + 4.0)); threading.Timer(4.1, _yanki_bosalt).start(); return
-    _whisper_yaz(is_, metin, ses, model)
+                YANKI_BEKLEYEN.append((is_, metin, ses, model, now + 4.0)); threading.Timer(4.1, _yanki_bosalt).start(); return "bekletildi"
+    _whisper_yaz(is_, metin, ses, model); return "satir"
 def _whisper_yaz(is_, metin, ses=None, model=None):
     kanal = is_["kanal"]; k = KANALLAR.get(kanal)
     if k: k.onceki = (k.onceki + " " + metin)[-300:]
