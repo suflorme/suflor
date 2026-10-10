@@ -14,7 +14,7 @@
 import sys, os, json, time, base64, re
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # model diskte; ağa çıkma
 MODEL = os.environ.get("SUFLOR_WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
-UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|abone ol(mayı|un)|beğenmeyi unutma|bir sonraki videoda|"
+UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|субтитр|yoyo television|优优独播|abone ol(mayı|un)|beğenmeyi unutma|bir sonraki videoda|"
                      r"thanks? (you )?for watching|subtitles? by|please subscribe|amara\.org|transcribed by|"
                      r"^\W*(müzik|music|alkış|applause|\[.*\]|\(.*\))\W*$", re.I)
 # ses sinyalleri (kullanıcı, 2 Ekim: kişiye özel duygu): parçanın ses yüksekliği, perdesi (F0, otokorelasyon) ve perde
@@ -192,11 +192,40 @@ def dosya_parcala(a, np, en_uzun=25, en_kisa=1.5):
         if out_ and (b1 - b0 < en_kisa * 50 or out_[-1][1] - out_[-1][0] < en_kisa * 50) and b1 - out_[-1][0] <= en_uzun * 50 and b0 - out_[-1][1] < 50: out_[-1][1] = b1
         else: out_.append([b0, b1])
     return [(max(0, b0 * K - SR // 5), min(len(a), b1 * K + SR // 5)) for b0, b1 in out_]  # 200 ms pay
+DOSYA_DILLER = ("tr", "en"); DOSYA_YOGUNLUK = 0.35; DOSYA_YOGUN_SN = 6  # dosya kipi uydurma süzgeci (aşağıda dosya_tut)
+def dosya_tut(sure, segler):
+    # Dosya kipinde parça başına: canlıdaki süzgeç (gecerli) + yoğunluk. 10 Ekim gerçek kayıt ölçümü (gercek-ses/): müzikli 8–25 sn parçalar
+    # yalnız "Thank you." gibi 1–2 sözcük üretti (≤ 0,2 sözcük/sn); gerçek konuşmada 6 sn'yi aşan parçada en düşük 1,9 sözcük/sn. Güven
+    # (avg_logprob) ayırmıyor: gerçek "Thank you, counsel" −0,16…−0,73, uydurma −0,43…−1,0. 6 sn'den uzun parçada < 0,35 sözcük/sn → atılır.
+    tut = [(s, (s.get("text") or "").strip()) for s in segler]; tut = [(s, x) for s, x in tut if gecerli(s, x)]
+    if sure >= DOSYA_YOGUN_SN and sum(len(x.split()) for _, x in tut) / sure < DOSYA_YOGUNLUK: return [], len(segler)
+    return tut, len(segler) - len(tut)
+DOSYA_KUME_ESIK = 0.30  # toplu kümeleme birleşme eşiği (ortalama kosinüs); gercek-ses/kume-ayar.py ile seçildi
+def toplu_kumele(izler, np, esik=DOSYA_KUME_ESIK, en_kisa=1.0):
+    # Dosyada bütün ses baştan elde: parçaların ses izleri sonda birlikte kümelenir (ortalama bağlantılı, kosinüs ≥ esik birleşir; küme sınırı
+    # yok). Canlı kural (sırayla, en çok 6 küme, sınır dolunca öncekini devralma) 10 Ekim'de 12 konuşmacılı gerçek kayıtta aynı kişiyi üç
+    # kümeye böldü. izler: [(süre sn, iz ya da None)] → [küme no ya da None]; ≥ en_kisa sn parçalar kümelenir, kısa parça en yakın merkeze.
+    idx = [i for i, (sn, e) in enumerate(izler) if e is not None and sn >= en_kisa]
+    if not idx: return [None] * len(izler)
+    X = np.array([izler[i][1] for i in idx], np.float32); X /= np.linalg.norm(X, axis=1, keepdims=True) + 1e-9
+    M = X @ X.T; np.fill_diagonal(M, -9); boy = np.ones(len(idx)); uye = [[i] for i in range(len(idx))]
+    while len(idx) > 1:
+        a, b = np.unravel_index(int(np.argmax(M)), M.shape)
+        if M[a, b] < esik: break
+        y = (M[a] * boy[a] + M[b] * boy[b]) / (boy[a] + boy[b]); M[a] = y; M[:, a] = y; M[a, a] = -9; M[b] = -9; M[:, b] = -9
+        boy[a] += boy[b]; uye[a] += uye[b]; uye[b] = []
+    et = [None] * len(izler); merk = {}
+    for k, u in enumerate(uye):
+        if u: merk[k] = X[u].mean(0)
+        for j in u: et[idx[j]] = k
+    for i, (sn, e) in enumerate(izler):
+        if et[i] is None and e is not None: et[i] = max(merk, key=lambda k: float(np.dot(e, merk[k])))
+    return et
 def dosya_dok(yol, dil, terimler):
     # Dosyadan döküm (toplanti-claude.py dosyadan): afconvert'in ürettiği 16 kHz tek kanal 16 bit WAV, canlıdaki gibi konuşma parçalarıyla
     # (dosya_parcala) Whisper'a. 10 Ekim yapay iki kişilik denemesinde 5 dk'lık bloklar dili blok başında bir kez buldu (İngilizce paragraf
     # Türkçe uydurmaya döndü) ve iki konuşmacıyı tek bölümde birleştirdi; parça başına dil ve ses izi ikisini de çözer. Ses izi (ECAPA)
-    # varsa ≥ 0,8 sn parçalar k1, k2… kümelenir (canlıdaki karşı kanal kuralı). Çıkış satır başına JSON:
+    # varsa parçalar sonda toplu kümelenir (toplu_kumele), bölümler o yüzden iş bitince yazılır. Çıkış satır başına JSON:
     # {"hazir", "sure"} · {"blok", "toplam"} · {"bolum": {"t0", "t1", "metin", "kume"?}} · {"bitti", "sn", "atlanan"} · {"hata"}
     import struct
     t = time.time()
@@ -223,23 +252,30 @@ def dosya_dok(yol, dil, terimler):
             istem = istem_kur(get_tokenizer(multilingual=True, num_languages=100), terimler, "")[0]
         except Exception: istem = terimler
     out({"hazir": True, "model": MODEL, "sure": round(len(a) / SR, 1), "ecapa": bool(iz)})
-    parcalar = dosya_parcala(a, np); kumeler, atla, dil_son = [], 0, dil; adim = max(1, len(parcalar) // 20)
+    parcalar = dosya_parcala(a, np); atla, dil_son = 0, dil; adim = max(1, len(parcalar) // 20); izler, bolumler = [], []
     for k, (b0, b1) in enumerate(parcalar):
         if k % adim == 0: out({"blok": k + 1, "toplam": len(parcalar)})
         p = a[b0:b1]
         # dil: verilmediyse her parçada Whisper bulur (karışık dilli toplantı); 4 sn'den kısa parçada tahmin güvensiz → öncekinin dili
         r = mlx_whisper.transcribe(p, path_or_hf_repo=MODEL, language=dil or (dil_son if len(p) < 4 * SR else None), initial_prompt=istem,
                                    condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
-        if not dil and len(p) >= 4 * SR and r.get("language"): dil_son = r["language"]
-        km = {}
+        if not dil and r.get("language") not in DOSYA_DILLER:  # Rusça/Çince altyazı kalıbı ya da yanlış dil: beklenen dilde yeniden, sonra süzgeç
+            r = mlx_whisper.transcribe(p, path_or_hf_repo=MODEL, language=dil_son or DOSYA_DILLER[0], initial_prompt=istem,
+                                       condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
+        if not dil and len(p) >= 4 * SR and r.get("language") in DOSYA_DILLER: dil_son = r["language"]
+        e = None
         if iz and len(p) >= SR * 0.8:
-            try: km = kumele(iz, kumeler, p, np)
-            except Exception: km = {}
-        for s in r.get("segments") or []:
-            x = (s.get("text") or "").strip()
-            if not gecerli(s, x) or (istem and x.lower().strip(" .") in istem.lower()): atla += 1; continue
-            out({"bolum": {"t0": round(b0 / SR + float(s["start"]), 2), "t1": round(b0 / SR + float(s["end"]), 2), "metin": x, "dil": r.get("language"),
-                           **({"kume": km["kume"]} if km.get("kume") else {})}})
+            try: e = np.array(iz(p), np.float32)
+            except Exception: e = None
+        izler.append((len(p) / SR, e))
+        tut, at = dosya_tut(len(p) / SR, r.get("segments") or []); atla += at
+        for s, x in tut:
+            if istem and x.lower().strip(" .") in istem.lower(): atla += 1; continue
+            bolumler.append((k, {"t0": round(b0 / SR + float(s["start"]), 2), "t1": round(b0 / SR + float(s["end"]), 2), "metin": x, "dil": r.get("language")}))
+    et = toplu_kumele(izler, np) if iz else [None] * len(parcalar); ad = {}
+    for k, bo in bolumler:  # küme adları ilk konuşma sırasıyla k1, k2…
+        if et[k] is not None: bo["kume"] = ad.setdefault(et[k], f"k{len(ad) + 1}")
+        out({"bolum": bo})
     out({"bitti": True, "sn": round(time.time() - t, 1), "atlanan": atla}); return 0
 def ecapa_donustur(ckpt, hedef):
     # kurulumda bir kez (aktarici-kur / modeller-kur): SpeechBrain ağırlıkları (torch dosyası) → numpy .npz. torch yalnız burada gerekir
