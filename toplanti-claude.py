@@ -102,6 +102,8 @@ hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi")
 ks = sub.add_parser("karsilastir", help="v0.7.2: Teams dökümü (.vtt/.docx/.txt) ile Suflor.me dökümünü karşılaştır")
 ks.add_argument("teams", help="Teams'ten indirilen döküm dosyası"); ks.add_argument("dosya", nargs="?", help="Suflor.me .md/.jsonl (yoksa en yenisi)")
 ks.add_argument("--n", type=int, default=12, help="en çok kaç kaçan bölüm listelensin"); ks.add_argument("--kaydet", action="store_true")
+kc = sub.add_parser("konusmaci", help="toplantı sonu: karşı taraf konuşmacılarını ses izinden toplu kümele, altyazı adlarına bağla → <toplantı>.konusmaci.json (sonuc ve dokum kendiliğinden çağırır)")
+kc.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); kc.add_argument("--geri", action="store_true", help="eşlemeyi kaldır (canlı adlar)")
 dk = sub.add_parser("dokum", help="v0.12.6: temiz döküm dosyası (.md + .vtt) → <proje>/gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>")
 dk.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); dk.add_argument("--kim", default=None, help="dosya adındaki kişi/konu (yoksa toplantı başlığı)")
 dk.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)"); dk.add_argument("--uzerine", action="store_true", help="var olan dosyanın üzerine yaz")
@@ -1043,9 +1045,91 @@ def toplanti_dosyasi(ad=None):
     except Exception: pass
     jls = sorted((f for f in os.listdir(A.dir) if f.endswith(".jsonl") and f[:2] == "20"), key=lambda f: os.path.getmtime(os.path.join(A.dir, f)))
     return jls[-1].replace(".jsonl", ".md") if jls else None
-def kayitlar(md):
-    try: return [json.loads(l) for l in open(os.path.join(A.dir, md.replace(".md", ".jsonl")), encoding="utf-8") if l.strip()]
+def kayitlar(md, ham=False):
+    try: rs = [json.loads(l) for l in open(os.path.join(A.dir, md.replace(".md", ".jsonl")), encoding="utf-8") if l.strip()]
     except FileNotFoundError: return []
+    return rs if ham else ad_uygula(md, rs)
+# --- Toplantı sonu konuşmacı yeniden etiketleme (v0.24.0) --------------------------------------------------------------
+# Canlıda karşı kanal parçaları sırayla kümelenir (en çok 6 küme, ilk sesler merkezi belirler): gerçek kayıtta aynı kişiyi birkaç kümeye
+# böldü (ames: canlı %62, toplu %98–100). Aktarıcı her karşı satırın ses izini <toplantı>.sesizi.log'a yazar; toplantı sonunda hepsi
+# dosyadan dökümdeki toplu_kumele ile birlikte kümelenir (whisper-isci.py --toplu, model yüklemez), her küme altyazı adlarıyla
+# oylanıp ada bağlanır. Sonuç ayrı eşleme dosyasında (<toplantı>.konusmaci.json: satır kimliği → ad); .md/.jsonl değişmez, dosya silinince
+# canlı adlara dönülür. kayitlar/_jl_kayit eşlemeyi uygular: karne, döküm, koç, anlar, kesinlik düzeltilmiş adları görür.
+YER_AD_RX = re.compile(r"^(karşı taraf|konuşmacı|speaker|unknown|bilinmeyen|katılımcı)\b", re.I)
+def _ad_gercek(ad):  # yer tutucu ad, kullanıcının kendisi ya da boş → None
+    ad = " ".join(str(ad or "").split())
+    if not ad or ad == "?" or YER_AD_RX.match(ad): return None
+    if kucuk(ad).split()[0] == kucuk(BEN) or kucuk(ad) == kucuk(str(AYAR.get("ad") or "")): return None
+    return ad
+def _esleme_yol(md): return os.path.join(A.dir, md[:-3] + ".konusmaci.json")
+def ad_uygula(md, rs):
+    try: es = json.load(open(_esleme_yol(md), encoding="utf-8")).get("ad") or {}
+    except (OSError, ValueError): return rs
+    for r in rs:
+        if r.get("id") in es and "text" in r and r.get("speaker") != es[r["id"]]: r["speaker_canli"] = r.get("speaker"); r["speaker"] = es[r["id"]]
+    return rs
+KONUSMACI_OY_EN_AZ = 2  # kümenin ada bağlanması için en az oy (canlı kume_adi ile aynı)
+def konusmaci_esle(md, zorla=False, sessiz=False):
+    iz_yol = os.path.join(A.dir, md[:-3] + ".sesizi.log"); es_yol = _esleme_yol(md)
+    if not os.path.exists(iz_yol): return None
+    if not zorla and os.path.exists(es_yol) and os.path.getmtime(es_yol) >= os.path.getmtime(iz_yol): return json.load(open(es_yol, encoding="utf-8"))
+    py = next((y for y in (os.path.join(d, "whisper-venv", "bin", "python") for d in (AYAR["ortak"], AYAR["uygulama"])) if os.path.exists(y)), None)
+    if not py: print("(konuşmacı yeniden etiketleme yok: whisper-venv bulunamadı)"); return None
+    try:
+        c = subprocess.run([py, os.path.join(os.path.dirname(os.path.abspath(__file__)), "whisper-isci.py"), "--toplu", iz_yol], capture_output=True, text=True,
+                           timeout=120, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+        km = json.loads(c.stdout.strip().splitlines()[-1])["kume"]
+    except Exception as e: print(f"(konuşmacı yeniden etiketleme yapılamadı: {e.__class__.__name__})"); return None
+    son = {r.get("id"): r for r in kayitlar(md, ham=True) if "text" in r}
+    # altyazı işaretleri (an, ad): Whisper akarken gölgeye giden (.altyazi.log) + dökümdeki altyazı satırları
+    cap = []; golge = os.path.join(A.dir, md[:-3] + ".altyazi.log")
+    try: gs = [json.loads(l) for l in open(golge, encoding="utf-8") if l.strip()]
+    except (OSError, ValueError): gs = []
+    for r in list(son.values()) + gs:
+        if r.get("src") in ("captions", "transcript") and _ad_gercek(r.get("speaker")):
+            z = zaman(r.get("at") or r.get("seen"))
+            if z: cap.append((z.timestamp(), _ad_gercek(r["speaker"])))
+    # oy: satırın canlı adı (taslak oyunu da içerir) 1 + konuşma bittikten 1–9 sn sonra gelen sabit altyazı satırı 1 (canlı _oy_uyar kuralı)
+    oy, sure, satir = {}, {}, {}
+    for i, k in km.items():
+        r = son.get(i)
+        if not r or r.get("kanal") != "karsi": continue
+        o = oy.setdefault(k, {}); t1 = float(r.get("t1") or 0)
+        sure[k] = sure.get(k, 0) + max(0.0, t1 - float(r.get("t0") or t1)); satir[k] = satir.get(k, 0) + 1
+        a = _ad_gercek(r.get("speaker"))
+        if a: o[a] = o.get(a, 0) + 1
+        for c_, a in cap:
+            if t1 + 1.0 <= c_ <= t1 + 9.0: o[a] = o.get(a, 0) + 1
+    ad = {}
+    for k, o in oy.items():
+        if o and max(o.values()) >= KONUSMACI_OY_EN_AZ and max(o.values()) >= 0.5 * sum(o.values()): ad[k] = max(o, key=o.get)
+    adsiz = sorted((k for k in oy if k not in ad), key=lambda k: -sure[k])
+    for n, k in enumerate(adsiz, 1): ad[k] = "Karşı taraf" if len(oy) == 1 else f"Karşı taraf {n}"
+    es = {i: ad[k] for i, k in km.items() if k in ad and son.get(i, {}).get("kanal") == "karsi"}
+    degisen = sum(1 for i, a in es.items() if son[i].get("speaker") != a)
+    v = {"at": simdi(), "satir": len(es), "degisen": degisen, "kume": {str(k): {"ad": ad[k], "satir": satir[k], "sn": round(sure[k], 1), "oy": oy[k]} for k in sorted(oy)},
+         "ad": es}
+    try:
+        with open(es_yol + ".gecici", "w", encoding="utf-8") as f: json.dump(v, f, ensure_ascii=False, indent=1)
+        os.replace(es_yol + ".gecici", es_yol)
+    except OSError as e: print(f"(eşleme dosyası yazılamadı: {e})"); return None
+    if not sessiz:
+        kisi = ", ".join(x["ad"] + " " + str(x["satir"]) for x in v["kume"].values())
+        print(f"Konuşmacılar yeniden etiketlendi: {len(es)} karşı satır, {len(oy)} kişi ({kisi})"
+              f" · {degisen} satırın adı değişti · {os.path.basename(es_yol)}")
+    return v
+def konusmaci_cmd():
+    md = toplanti_dosyasi(A.dosya)
+    if not md: sys.exit("toplantı dosyası yok")
+    md = os.path.basename(md).replace(".jsonl", ".md")
+    if A.geri:
+        try: os.remove(_esleme_yol(md)); print("eşleme kaldırıldı — canlı adlara dönüldü")
+        except FileNotFoundError: print("eşleme yok")
+        return
+    if not os.path.exists(os.path.join(A.dir, md[:-3] + ".sesizi.log")): sys.exit(f"{md}: ses izi kaydı yok (v0.24.0 öncesi toplantı ya da karşı kanal Whisper'sız)")
+    v = konusmaci_esle(md, zorla=True)
+    if v:
+        for k, x in v["kume"].items(): print(f"  küme {k}: {x['ad']} · {x['satir']} satır, {x['sn']} sn · oy {x['oy'] or '-'}")
 def kanit_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
@@ -1161,6 +1245,7 @@ def sonuc_cmd():  # toplantı sonu tek komut: değerlendirme (not) + konuşma + 
         return
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
+    konusmaci_esle(os.path.basename(md).replace(".jsonl", ".md"))
     v = karne_hesap(md); sf = v["suflor"]
     print(f"## Değerlendirme — not {('%g' % v['puan']) if v['puan'] is not None else '-'}/5 ({v['etiket']})")
     print(f"*{v['dosya']} · rol {v['rol']} · {v['olcu'].get('sure_dk', '?')} dk · {v['satir']} satır" + (f" · {v['olcu']['karar']} karar" if "karar" in v["olcu"] else "") + "*\n")
@@ -1329,6 +1414,7 @@ def dokum_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
     md = os.path.basename(md).replace(".jsonl", ".md")
+    konusmaci_esle(md)
     sat = dokum_satirlari(md)
     if not any("metin" in x for x in sat): sys.exit(f"{md}: dökümde satır yok")
     dokum_yaz(sat, toplanti_basligi(md), "Kaynak: `_canli/" + md + "`")
@@ -1580,7 +1666,7 @@ def _yerel_saat(at):
 ACIK_UCLU_RX = re.compile(r"\b(nasıl|neden|niye|ne(yi|ler|den)?|hangi|anlat\w*|açıkla\w*|örnek\w*|how|why|what|which|tell me|walk me|describe|explain)\b", re.I)
 KARAR_RX = re.compile(r"\b(karar\w*|anlaştık|tamam o zaman|öyle yapalım|yapalım|kesinleşti|son tarih|cumaya|pazartesiye|haftaya|deadline|agreed|let's|we will|decided|by (monday|friday|next week))\b", re.I)
 def _jl_kayit(md):
-    try: return [json.loads(l) for l in open(os.path.join(A.dir, md.replace(".md", ".jsonl")), encoding="utf-8") if l.strip()]
+    try: return ad_uygula(md, [json.loads(l) for l in open(os.path.join(A.dir, md.replace(".md", ".jsonl")), encoding="utf-8") if l.strip()])
     except FileNotFoundError: sys.exit(f"{md}: .jsonl yok")
 def koc_yaz(md):
     rs = _jl_kayit(md); ag = {}
@@ -1827,5 +1913,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd}[A.cmd]()
+     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

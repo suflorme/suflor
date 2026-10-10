@@ -84,7 +84,8 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    gönderirim") için `tc soz ekle "<ne>" --kim <kişi> [--tarih YYYY-MM-DD]` — sormadan (yerel kayıt, esas belge değil); tarih
    söylenmediyse boş bırak, uydurma. Hazırlıkta gelen eski sözlerden toplantıda tutulduğu anlaşılanı `tc soz kapat sN`, düşeni
    `--durum iptal`. Özette takip işleri satırlarının sonuna kimliği yaz (`s4`).
-3. `_canli/<bu toplantı>.md`'den özet taslağı, sırayla:
+3. 1. adımdaki döküm dosyasından özet taslağı (`dokum` karşı taraf konuşmacılarını ses izinden yeniden adlandırır; `_canli/<bu toplantı>.md`
+   canlı adlarla kalır), sırayla:
    - `## Değerlendirme — not X/5` + 1–2 cümle: karar çıktı mı, en zayıf boyut, bir dahaki toplantıya tek öneri. Not toplantıyı
      değerlendirir, kişiyi değil. Kullanıcı "neye göre" derse: "Not 1–5; gündemin ne kadarı konuşuldu, süre, açık soruların kapanması,
      konuşma payın ve takip işlerinin sahibi." Yüzde/ağırlık yazma.

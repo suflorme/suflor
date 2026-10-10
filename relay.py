@@ -691,9 +691,9 @@ def yer_tutucu_birlestir(title):
     except ValueError: return None
     if STATE["file"] != emd or time.time() - bas > BIRLESTIR_DK * 60 or time.time() - STATE["file_last"].get(emd, 0) > RESUME_MAX_AGE_MIN * 60: return None
     yeni = os.path.join(BASE, os.path.basename(eski)[:16] + slug(title)); ymd = os.path.basename(yeni) + ".md"
-    if any(os.path.exists(yeni + u) for u in (".md", ".jsonl", ".altyazi.log")): return None
+    if any(os.path.exists(yeni + u) for u in (".md", ".jsonl", ".altyazi.log", ".sesizi.log")): return None
     try:
-        for u in (".md", ".jsonl", ".altyazi.log"):
+        for u in (".md", ".jsonl", ".altyazi.log", ".sesizi.log"):
             if os.path.exists(eski + u): os.rename(eski + u, yeni + u)
         if os.path.exists(yeni + ".md"):
             m = open(yeni + ".md", encoding="utf-8").read()
@@ -1115,7 +1115,7 @@ def _isci_dongu():
         if metin:
             if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
-            is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {"kume": j["kume"]} if j.get("kume") else None) or "satir"
+            is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz") if j.get(k)} or None) or "satir"
         is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
 # --- Konuşmacı ses izi (v0.8.4 ses işçisi → v0.13.12 Whisper işçisinin içinde) ------------------------------------------------
 # ECAPA (SpeechBrain VoxCeleb ağırlıkları, MLX) karşı kanal parçalarını kümeler: k1, k2… Kümenin adı altyazıdan oylanır: altyazı satırı
@@ -1270,7 +1270,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
             "entries": [{"id": is_["id"], "speaker": kim, "time": datetime.datetime.fromtimestamp(is_["t0"]).strftime("%H:%M:%S"), "text": metin,
                          "seen": datetime.datetime.utcfromtimestamp(is_["t1"]).isoformat(timespec="milliseconds") + "Z", "kanal": kanal,
                          "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2),
-                         **({"kume": kume} if kume else {}),  # # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
+                         **({"kume": kume} if kume else {}), **({"iz": model["iz"]} if kanal == "karsi" and (model or {}).get("iz") else {}),  # # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
                          **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,
                          **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60))} if ses else {})}]})  # ses sinyalleri + hız (kelime/dk)
 # --- Kısayol komutları ------------------------------------------------------------------------------------------
@@ -1289,7 +1289,7 @@ def ingest(p):
     m = p.get("meeting") or {}; title = m.get("title", "Toplantı"); entries = p.get("entries", [])
     with LOCK:
         md, jl = paths(title); hdr = ensure_header(md, title, m, p.get("source")); base_key = os.path.basename(md); show(md, title)
-        md_out, jl_out, golge_out = [], [], []  # önce bellekte kurulur, sonra tek grup olarak yazılır
+        md_out, jl_out, golge_out, iz_out = [], [], [], []  # önce bellekte kurulur, sonra tek grup olarak yazılır
         seen = SEEN.setdefault(base_key, {})
         for e in entries:
             raw = (e.get("text") or "").replace("|", "¦").strip()
@@ -1318,6 +1318,9 @@ def ingest(p):
             for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume", "gec"):  # ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
                 if e.get(k) is not None: rec[k] = e[k]
             jl_out.append(json.dumps(rec, ensure_ascii=False) + "\n")
+            # karşı satırın ses izi .jsonl'e girmez (Claude toplantıda okur, 192 sayı bağlamı şişirir): yan dosyaya; toplantı sonunda toplu
+            # kümelenip konuşmacılar yeniden etiketlenir (toplanti-claude.py konusmaci → <toplantı>.konusmaci.json)
+            if e.get("iz") and e.get("id"): iz_out.append(json.dumps({"id": e["id"], "t0": e.get("t0"), "t1": e.get("t1"), "iz": e["iz"]}) + "\n")
             STATE["son_satir"] = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "speaker": e.get("speaker"), "file": base_key}  # kart penceresi canlılık satırı
             if SES.get("p"): ses_durdur()  # sesli brifing sürerken toplantı başladı
             # satır sayısı dosya bazında tutulur (STATE["lines"] tek bir global sayaç olursa, yeni bir
@@ -1326,6 +1329,7 @@ def ingest(p):
             STATE["file_lines"][base_key] = STATE["file_lines"].get(base_key, 0) + 1
             if flags: STATE["flags"].append(rec)
         if golge_out: write([(md[:-3] + ".altyazi.log", "".join(golge_out))])
+        if iz_out: write([(md[:-3] + ".sesizi.log", "".join(iz_out))])
         if not md_out and not jl_out:
             # ilk paket tümüyle gölgeye (altyazı, Whisper akarken) gittiyse başlık yazılmadı — sonraki pakette yazılsın
             # (3 Ekim denemesinde .md başlıksız kaldı; toplantı adı ve devam ettirme başlıktan okunur)
