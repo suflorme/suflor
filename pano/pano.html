@@ -96,7 +96,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <section id=sk><div class=sh><span>Şimdi <span id=szd class=meta></span></span><span id=tone></span></div><div id=py class=py></div><div id=kc></div></section>
 </div>
 <div class=nb><textarea id=n rows=2 placeholder="Not ya da soru (başa ?)" title="Başta ? varsa Claude'a soru, yoksa not. ⌘Enter: her zaman soru."></textarea>
-<div class=bt><button id=b class=pri>Gönder</button><span class=sp1></span><button id=yz class=ib title="⭐ Önemli an: şu anı özette öne çıkar"></button><button id=sz class=ib title="Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)"></button><button id=oz class=ib title="Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)"></button><button id=kz class=ib title="Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur"></button></div></div></main>
+<div class=bt><button id=b class=pri>Gönder</button><span class=sp1></span><button id=yz class=ib title="⭐ Önemli an: şu anı özette öne çıkar"></button><button id=sz class=ib title="Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)"></button><button id=oz class=ib title="Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)"></button><button id=kz class=ib title="Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur"></button><button id=yk class=ib title="Yaparken kaydet: karşı taraf ekranında bir işi gösterirken, ekran değişince kanıt kendiliğinden alınır; toplantı sonunda adım belgesi çıkar (tekrar basınca kapanır)"></button></div></div></main>
 <div id=rz title="Sürükleyerek genişlet/daralt · çift tıkla: varsayılan"></div>
 <aside><div class=sc id=yan>
 <section><div class=sh>Gündem <span id=agn class=meta></span></div><div id=ag></div></section>
@@ -124,9 +124,9 @@ cevir(document.body)
 // arayüz: üst çubuk (toplantı, rol, süre, tek durum cümlesi), solda kartlar (boşken "Sıradaki · Başlat") ve tek giriş,
 // sağda Gündem/Açık sorular/Kanıtlar ve katlanan döküm. /status 2 sn, /taslak 1 sn (yalnız döküm açıkken).
 const ICO={clock:'<circle cx=12 cy=12 r=9 /><path d="M12 7v5l3 2"/>',star:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"/>',cam:'<path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx=12 cy=13 r=3.5 />',hist:'<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M12 8v4l2.5 1.5"/>',
- win:'<rect x=3 y=5 width=18 height=14 rx=2 /><rect x=12 y=11 width=7 height=6 rx=1 />',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx=12 cy=12 r=2.8 />',x:'<path d="M6 6l12 12M18 6L6 18"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',replik:'<path d="M4 5h16v11H9l-5 4z"/><path d="M10 8.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4"/><path d="M12 13.6v.1"/>',pause:'<path d="M9 6v12M15 6v12"/>',mute:'<path d="M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M4 4l16 16"/>'}
+ win:'<rect x=3 y=5 width=18 height=14 rx=2 /><rect x=12 y=11 width=7 height=6 rx=1 />',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx=12 cy=12 r=2.8 />',x:'<path d="M6 6l12 12M18 6L6 18"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',replik:'<path d="M4 5h16v11H9l-5 4z"/><path d="M10 8.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4"/><path d="M12 13.6v.1"/>',pause:'<path d="M9 6v12M15 6v12"/>',rec:'<rect x=3 y=5 width=18 height=13 rx=2 /><circle cx=12 cy=11.5 r=3 /><path d="M8 21h8"/>',mute:'<path d="M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M4 4l16 16"/>'}
 const ic=(n,t)=>`<svg class=i viewBox="0 0 24 24" aria-hidden=true>${ICO[n]}</svg>${t?'<span>'+t+'</span>':''}`
-document.getElementById('mini').innerHTML=ic('win'); document.getElementById('oz').innerHTML=ic('replik',L('Ne diyeyim?')); document.getElementById('yz').innerHTML=ic('star'); document.getElementById('sz').innerHTML=ic('mute'); document.getElementById('kz').innerHTML=ic('cam',L('Kanıt'))
+document.getElementById('mini').innerHTML=ic('win'); document.getElementById('oz').innerHTML=ic('replik',L('Ne diyeyim?')); document.getElementById('yz').innerHTML=ic('star'); document.getElementById('sz').innerHTML=ic('mute'); document.getElementById('kz').innerHTML=ic('cam',L('Kanıt')); document.getElementById('yk').innerHTML=ic('rec')
 // Sağ sütun sürüklenerek genişletilir; genişlik bu tarayıcıda hatırlanır (v0.3.3)
 const rz=document.getElementById('rz'), root=document.documentElement
 function setAw(px){px=Math.max(260,Math.min(innerWidth*0.7,px));root.style.setProperty('--aw',px+'px');return px}
@@ -210,6 +210,10 @@ async function sendOnemli(b){if(b)b.disabled=true;try{const r=await (await fetch
 // sessiz (Option + Shift + M ile aynı): 10 dk kart yok, tekrar basınca kapanır; durum düğmede ve "Şimdi" başlığında
 async function sendSessiz(b){if(b)b.disabled=true;try{await fetch("/komut",{method:"POST",body:JSON.stringify({tur:"sessiz"})})}catch(e){}if(b)b.disabled=false;refresh()}
 function sessizCiz(b,s){if(!b)return;const ss=s.sessiz,on=!!(ss&&ss.acik);b.classList.toggle("on",on);setH(b,ic('mute',on?L("{n} dk",{n:Math.max(1,Math.ceil(ss.kalan_sn/60))}):""))}
+// yaparken kaydet: düğme açık/kapalı; açıkken "Şimdi" başlığında kendiliğinden alınan görüntü sayısı
+async function sendYaparken(b){if(b)b.disabled=true;try{await fetch("/komut",{method:"POST",body:JSON.stringify({tur:"yaparken"})})}catch(e){}if(b)b.disabled=false;refresh()}
+function yaparkenCiz(b,s){if(!b)return;const y=s.yaparken;b.classList.toggle("on",!!y);setH(b,ic('rec',y?L("{n} görüntü",{n:y.oto}):""))}
+function yaparkenTxt(s){const y=s.yaparken;return y?"📷 "+L("yaparken kaydet · {n} görüntü",{n:y.oto})+(y.oto>=y.sinir?L(" (sınır doldu)"):""):""}
 function sessizTxt(s){const ss=s.sessiz,n=(ss&&ss.tutulan||[]).length;return(ss&&ss.acik?"🔇 "+L("sessiz, bitiş {t}",{t:ss.bitis})+(n?L(" · {n} kart bekliyor",{n}):""):n?"🔔 "+L("Sessiz bitti — Claude özetliyor ({n} kart)",{n}):"")+(s.ertelenen?(ss&&(ss.acik||n)?" · ":"")+"⏸ "+L("{n} kart sonraya bırakıldı",{n:s.ertelenen}):"")}
 // eylem kuyruğu: toplantıda yalnız sayı ("📋 n iş toplantı sonuna"); Claude sununca (eylem sun) liste — her satırda Onayla/Reddet,
 // ayrıntı katlı (uygulanacak işin tam hâli). Karar anahtarlı panodan; Claude yalnız onaylananı uygular, sonucu satırda görünür.
@@ -481,8 +485,8 @@ paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); rend
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id+(c.geri||""))); firstCards=false
-sessizCiz(document.getElementById("sz"),s); renderEylem(s)
-{const n=((s.eylem||{}).liste||[]).filter(x=>x.durum==="bekliyor"&&!x.sunuldu).length,t=sessizTxt(s);setH(document.getElementById("szd"),esc(t+(n?(t?" · ":"")+"📋 "+L("{n} iş toplantı sonuna",{n}):"")))}
+sessizCiz(document.getElementById("sz"),s); yaparkenCiz(document.getElementById("yk"),s); renderEylem(s)
+{const n=((s.eylem||{}).liste||[]).filter(x=>x.durum==="bekliyor"&&!x.sunuldu).length,t=[sessizTxt(s),yaparkenTxt(s)].filter(Boolean).join(" · ");setH(document.getElementById("szd"),esc(t+(n?(t?" · ":"")+"📋 "+L("{n} iş toplantı sonuna",{n}):"")))}
 document.title=((s.cards||[]).length?`(${s.cards.length}) `:"")+"Suflor.me pano"
 {const fl=s.flags||[];document.getElementById('fls').hidden=!fl.length;setH(document.getElementById('fl'),fl.slice(-10).map(e=>`<div class="l f">${esc(e.time)} ${esc(e.speaker)}: ${esc(e.text)}</div>`).join(''))}
 {const e=document.getElementById('py'),h=payHtml(s);setH(e,h);e.className='py'+(payUy(s)?' uy':'');e.style.display=h?'':'none'}
@@ -506,6 +510,7 @@ document.getElementById("oz").onclick=ev=>sendOzet(ev.currentTarget)
 document.getElementById("yz").onclick=ev=>sendOnemli(ev.currentTarget)
 document.getElementById("sz").onclick=ev=>sendSessiz(ev.currentTarget)
 document.getElementById("kz").onclick=ev=>sendKanit(ev.currentTarget,document.getElementById("n"))
+document.getElementById("yk").onclick=ev=>sendYaparken(ev.currentTarget)
 refresh();setInterval(refresh,2000)
 // kart/✓/soru/kanıt isteği değişince pano ve mini pano hemen yenilenir (aktarıcıda uzun yoklama, şeritle aynı imza);
 // 2 sn yenileme diğer alanlar için sürer. Eski aktarıcıda (imza yok) döngü kapanır.

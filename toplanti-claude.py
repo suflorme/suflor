@@ -106,6 +106,11 @@ dk = sub.add_parser("dokum", help="v0.12.6: temiz döküm dosyası (.md + .vtt) 
 dk.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); dk.add_argument("--kim", default=None, help="dosya adındaki kişi/konu (yoksa toplantı başlığı)")
 dk.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)"); dk.add_argument("--uzerine", action="store_true", help="var olan dosyanın üzerine yaz")
 dk.add_argument("--goster", action="store_true", help="yazmadan .md'yi yazdır")
+yp = sub.add_parser("yaparken", help="yaparken kaydet: ekran değişince kanıt kendiliğinden — ac | kapat (boş: durum)")
+yp.add_argument("durum", nargs="?", choices=["ac", "kapat"])
+ad = sub.add_parser("adimlar", help="yaparken kaydet sonrası: döküm + kanıtlar saat sırasıyla; görüntüler belgenin yanına kopyalanır → Claude adım belgesini yazar")
+ad.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); ad.add_argument("--kim", default=None, help="dosya adındaki konu (yoksa toplantı başlığı)")
+ad.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)")
 sub.add_parser("durum", help="v0.14.0: aktarıcının /status yanıtı (JSON; yerel anahtarla — anahtarsız curl 401 alır)")
 sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü (aktarıcı, eklenti sürümü, Whisper, ses modeli, bellek, disk)")
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
@@ -745,7 +750,7 @@ def paket_kaydi(dosya, satir, aday, neden):
 def izle():
     import baglam  # hazır kart tetiği kök karşılaştırması
     q_tail = Tail(os.path.join(A.dir, "sorular.jsonl")); k_tail = Tail(os.path.join(A.dir, "kartlar.jsonl"))
-    cur = None; t_tail = None; buf = []; acks = []; buf_since = None; last_state = None; texts = {}; aday = None; aday_t = 0.0
+    cur = None; t_tail = None; oto_bildirilen = None; buf = []; acks = []; buf_since = None; last_state = None; texts = {}; aday = None; aday_t = 0.0
     kart_aday = set(); son_paket = 0.0  # kapıcı: tampondaki kart adaylarının türü (soru/sistem/iddia), son paket anı
     hz_path = os.path.join(A.dir, "hazir.json"); hz_mtime = None; hz = []; hz_seen = set()
     ag_path = os.path.join(A.dir, "agenda.json"); ag_mtime = None; agj = {}
@@ -934,6 +939,10 @@ def izle():
             if t_tail:
                 for r in t_tail.new():
                     if "note" in r: emit(f"NOT ({BEN}): {r['note']}")
+                    elif "kanit" in r and r.get("kaynak") == "oto":  # yaparken kaydet: tek tek değil, ilkinde bir kez
+                        if oto_bildirilen != cur:
+                            oto_bildirilen = cur
+                            emit("YAPARKEN KAYDET: ekran değişince kanıt kendiliğinden alınıyor (kaynak oto) — tek tek bakma; toplantı sonunda `adimlar` → adım belgesi")
                     elif "kanit" in r:  # hemen — ekranda sır olabilir
                         emit(f"KANIT {r.get('n')}: {os.path.join(A.dir, r['kanit'])}" + (f" · not \"{r['not']}\"" if r.get("not") else "") +
                              f" · {r.get('kaynak') or '?'} → SORU yoksa Read ile bak: ekranda sır/şifre → DUR kartı; gündemle ilgili görünen → kanit {r.get('n')} --aciklama \"…\"; sohbete yazma")
@@ -1360,6 +1369,38 @@ def dokum_cmd():
         os.replace(tmp, y)
     print(f"Döküm yazıldı: {kok}.md · .vtt — {len(met)} satır, {round((t1 - t0) / 60)} dk, " + ", ".join(f"{k} {n}" for k, n in kisi.items()))
 
+# --- Yaparken kaydet: karşı taraf ekranında bir işi gösterirken eklenti kanıtı kendiliğinden alır (aktarıcı YAPARKEN) -----------------------
+def yaparken_cmd():
+    if A.durum: r = _post("/komut", {"tur": "yaparken", "durum": A.durum}); print(r.get("metin") or r); return
+    y = get("/cards").get("yaparken")
+    print(f"yaparken kaydet açık · {y['oto']} görüntü (sınır {y['sinir']})" if y else "yaparken kaydet kapalı")
+def adimlar_cmd():
+    import shutil
+    md = toplanti_dosyasi(A.dosya)
+    if not md: sys.exit("toplantı dosyası yok")
+    md = os.path.basename(md).replace(".jsonl", ".md")
+    ks = [r for r in kayitlar(md) if "kanit" in r and os.path.exists(os.path.join(A.dir, r["kanit"]))]
+    if not ks: sys.exit(f"{md}: kanıt görüntüsü yok")
+    met = [x for x in dokum_satirlari(md) if "metin" in x]
+    an = lambda r: (zaman(r.get("at")) or datetime.datetime.now()).timestamp()
+    bas = datetime.datetime.fromtimestamp(min([an(ks[0])] + [x["t"] for x in met[:1]])).astimezone()
+    kim = re.sub(r"[^\w-]+", "-", A.kim or toplanti_basligi(md), flags=re.UNICODE).strip("-")[:60] or "toplanti"
+    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(os.path.expanduser(AYAR["proje"]), "gorusmeler"), os.path.expanduser(AYAR["proje"])) if os.path.isdir(y))
+    kok = f"{AYAR.get('alan') or 'Suflor'}-{kim}-adimlar-{bas:%Y%m%d}"; gk = os.path.join(hedef, kok + "-gorseller"); os.makedirs(gk, exist_ok=True)
+    ac_fp = os.path.join(A.dir, "kanit", md[:-3], "aciklama.json")
+    try: acik = json.load(open(ac_fp, encoding="utf-8"))
+    except (FileNotFoundError, ValueError): acik = {}
+    ol = [(x["t"], f"{x['kim']}: {x['metin']}") for x in met]
+    for r in ks:
+        ad_ = os.path.basename(r["kanit"]); shutil.copy2(os.path.join(A.dir, r["kanit"]), os.path.join(gk, ad_))
+        ek = "; ".join(x for x in (r.get("not"), acik.get(str(r.get("n")))) if x)
+        ol.append((an(r), f"📷 KANIT {r.get('n')}{' (kendiliğinden)' if r.get('kaynak') == 'oto' else ''} → {kok}-gorseller/{ad_} · görüntü: {os.path.join(gk, ad_)}" + (f" · {ek}" if ek else "")))
+    ol.sort(key=lambda x: x[0])
+    print(f"Adım belgesi: {os.path.join(hedef, kok + '.md')} (sen yaz) · {len(ks)} görüntü {gk}/ klasörüne kopyalandı · {len(met)} döküm satırı")
+    print("Yaz: başlık, kısa amaç, ön koşullar, numaralı adımlar (her adımda ne yapılır + gerekirse görsel: ![](<göreli yol>)), dikkat edilecekler.")
+    print("Görüntüleri Read ile aç; aynı ekranı tekrarlayan ya da işle ilgisiz (yalnız video, boş ekran) görüntüyü kullanma. Belge iç belgedir.\n")
+    for t, m in ol: print(f"[{datetime.datetime.fromtimestamp(t).astimezone():%H:%M:%S}] {m}")
+
 def karsilastir_cmd():
     import baglam, difflib
     if not os.path.exists(A.teams): sys.exit(f"dosya yok: {A.teams}")
@@ -1704,5 +1745,6 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd}[A.cmd]()
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
+     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

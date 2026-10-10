@@ -23,6 +23,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     chrome.action.setBadgeBackgroundColor({ color: "#b3412e" });
   }
   if (msg.type === "kanit") kanit(sender.tab, msg.kaynak, msg.istek, msg.not);
+  if (msg.type === "otoKare") otoKare(sender.tab, msg.maske);
   if (msg.type === "whisperKarsi") karsiBaslat(null, "popup");       // popup düğmesi (eklenti çağrıldı: izin var)
   if (msg.type === "whisperKarsiDur") offDur();                       // toplantıdan çıkıldı
   if (msg.type === "offBitti") karsiTab = null;
@@ -154,11 +155,51 @@ async function kanit(hint, kaynak, istek, not) {
     const r = await fetch(relay + "/kanit", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ png, meeting: info.meeting || { title: (tab.title || "").split("|").slice(-2, -1)[0]?.trim() || "Toplantı" }, kaynak, istek, not, w: info.w, h: info.h }) });
     const j = await r.json().catch(() => ({}));
+    if (kaynak === "oto") {  // kendiliğinden kanıt: toast ve bildirim yok, yalnız günlük
+      if (j.sinir && !OTO.sinir) { OTO.sinir = true; kanitOlay("oto: toplantı sınırı doldu, kendiliğinden kanıt durdu"); }
+      else if (!j.ok) kanitOlay("oto: " + (j.err || "aktarıcı HTTP " + r.status));
+      return;
+    }
     if (!r.ok || !j.ok) return hata(tab, j.err || ("aktarıcı HTTP " + r.status));
     if (!j.dup) chrome.tabs.sendMessage(tab.id, { type: "kanitBitti", ok: true, n: j.n }, { frameId: 0 }).catch(() => {});
   } catch (e) {
+    if (kaynak === "oto") return kanitOlay("oto: " + String(e.message || e).slice(0, 160));
     hata(tab, /Failed to fetch/i.test(String(e)) ? "Aktarıcıya ulaşılamadı (çalışma alanının aktarıcısı kapalı)." : String(e.message || e).slice(0, 160));
   } finally { busy = false; }
+}
+// Yaparken kaydet (kip panodan ya da Claude'dan açılır): içerik betiği 3 sn'de bir çağırır. Sekme penceresinde öndeyse küçük JPEG çekilir,
+// 64×36 gri ızgarada önceki kareyle karşılaştırılır (şerit/uyarı maskeli). Belirgin değişimden (hücrelerin ≥ %6'sı) sonra ekran durulunca
+// (< %1,5) ve son kendiliğinden kanıttan ≥ 10 sn geçtiyse tam kanıt alınır (kaynak "oto"). Kip açılınca ilk ekran da alınır. Sekme arkadaysa
+// hiç çekilmez: kendiliğinden kanıt için sekme öne getirilmez. 15 sn kare gelmezse (kip kapandı, sekme arkada) karşılaştırma baştan başlar.
+const OTO = { kare: null, degisti: false, son: 0, t: 0, sinir: false };
+const OTO_W = 64, OTO_H = 36, OTO_FARK = 24, OTO_DEGISIM = 0.06, OTO_DURGUN = 0.015, OTO_ARA = 10000;
+async function otoKare(tab, maske) {
+  if (!tab || !tab.active || busy || OTO.sinir) return;
+  if (Date.now() - OTO.t > 15000) Object.assign(OTO, { kare: null, degisti: false, son: 0 });
+  OTO.t = Date.now();
+  let g;
+  try {
+    const jpg = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 40 });
+    const bmp = await createImageBitmap(await (await fetch(jpg)).blob());
+    const c = new OffscreenCanvas(OTO_W, OTO_H), x = c.getContext("2d", { willReadFrequently: true });
+    x.drawImage(bmp, 0, 0, OTO_W, OTO_H); bmp.close();
+    const d = x.getImageData(0, 0, OTO_W, OTO_H).data; g = new Uint8Array(OTO_W * OTO_H);
+    for (let i = 0; i < g.length; i++) g[i] = (d[i * 4] * 77 + d[i * 4 + 1] * 150 + d[i * 4 + 2] * 29) >> 8;
+    for (const m of maske || []) {
+      const x0 = Math.max(0, Math.floor(m.x * OTO_W)), x1 = Math.min(OTO_W, Math.ceil((m.x + m.w) * OTO_W));
+      const y0 = Math.max(0, Math.floor(m.y * OTO_H)), y1 = Math.min(OTO_H, Math.ceil((m.y + m.h) * OTO_H));
+      for (let y = y0; y < y1; y++) g.fill(0, y * OTO_W + x0, y * OTO_W + x1);
+    }
+  } catch (e) { return; }  // sekme o an çekilemiyor (pencere simge durumunda ya da sayfa değişiyor): sonraki karede
+  const once = OTO.kare; OTO.kare = g;
+  if (!once) { OTO.degisti = true; return otoAl(tab, 0); }  // kip yeni açıldı (ya da sekme geri geldi): ilk ekran
+  let n = 0; for (let i = 0; i < g.length; i++) if (Math.abs(g[i] - once[i]) > OTO_FARK) n++;
+  return otoAl(tab, n / g.length);
+}
+function otoAl(tab, oran) {
+  if (oran >= OTO_DEGISIM) OTO.degisti = true;
+  if (!OTO.degisti || oran >= OTO_DURGUN || Date.now() - OTO.son < OTO_ARA) return;
+  OTO.degisti = false; OTO.son = Date.now(); return kanit(tab, "oto");
 }
 
 // toplantı hatırlatması: dakikada bir aktarıcının takvimine bakar (Mac Takvim, Suflor Takvim yardımcısı). Bir toplantı

@@ -608,8 +608,20 @@
       const a = Math.max(0, Math.round((Date.now() - Date.parse(son.at)) / 1000));
       n.textContent = L("son satır {a} önce · {k}", { a: a < 60 ? L("{n} sn", { n: a }) : L("{n} dk", { n: Math.floor(a / 60) }), k: son.speaker || "?" }); n.className = a > 60 ? "son eski" : "son";
     }
+    // Yaparken kaydet: kip açıkken toplantı sekmesi 3 sn'de bir arka plana "kare" der; karşılaştırma ve kendiliğinden kanıt background.js'te.
+    // Şerit ve uyarı alanı maskelenir (kart gelince "ekran değişti" sayılmasın). Sekme görünür değilse istenmez.
+    let otoZaman = null;
+    function otoAyarla(acik) {
+      if (acik && !otoZaman && window.top === window) otoZaman = setInterval(() => {
+        if (document.visibilityState !== "visible" || !(inMeeting() || inCall())) return;
+        const maske = [...document.querySelectorAll("#suflor-serit, #suflor-toast")].map(e => e.getBoundingClientRect()).filter(r => r.width && r.height)
+          .map(r => ({ x: r.left / innerWidth, y: r.top / innerHeight, w: r.width / innerWidth, h: r.height / innerHeight }));
+        chrome.runtime.sendMessage({ type: "otoKare", maske }).catch(() => {});
+      }, 3000);
+      else if (!acik && otoZaman) { clearInterval(otoZaman); otoZaman = null; }
+    }
     function paint(v) {
-      sonV = v;
+      sonV = v; otoAyarla(!!v.yaparken);
       // panodan/mini panodan kanıt istendi — toplantıdaki sekme çeker (çift isteği aktarıcı ayıklar). Arkadaysa da ister;
       // arka plan sekmeyi bir an öne getirip çeker (2 Ekim: pano aynı penceredeyken kanıt düşüyordu)
       if (v.kanit_iste && v.kanit_iste.id !== kanitSon) { kanitSon = v.kanit_iste.id; if (window.top === window && (inMeeting() || inCall())) chrome.runtime.sendMessage({ type: "kanit", kaynak: v.kanit_iste.kaynak || "pano", istek: v.kanit_iste.id, not: v.kanit_iste.not }).catch(() => {}); }

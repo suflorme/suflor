@@ -215,16 +215,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 98258,
-   "sha": "f9600a5c37b5b5da"
+   "uzunluk": 101488,
+   "sha": "aaa74ccfa7134c1e"
   },
   "/hazirlik": {
-   "uzunluk": 29129,
-   "sha": "b7e3471953d507a3"
+   "uzunluk": 29635,
+   "sha": "1915e859544fcc8f"
   },
   "/mini": {
-   "uzunluk": 98258,
-   "sha": "f9600a5c37b5b5da"
+   "uzunluk": 101488,
+   "sha": "aaa74ccfa7134c1e"
   },
   "/status": {
    "_ping_son": "float",
@@ -506,6 +506,7 @@
     "yerel": "str",
     "yerel_akiyor": "bool"
    },
+   "yaparken": "NoneType",
    "yerel_ses": {
     "durum": "str",
     "hata": "NoneType",
@@ -652,7 +653,8 @@
     "yanki": "int",
     "yerel": "str",
     "yerel_akiyor": "bool"
-   }
+   },
+   "yaparken": "NoneType"
   },
   "/agenda": {
    "title": "Deneme toplantısı — altyapı",

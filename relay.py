@@ -407,7 +407,7 @@ def cards_view():
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
             "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
-            "baglam": baglam_view(),
+            "baglam": baglam_view(), "yaparken": yaparken_view(),
             "son": {k: v for k, v in (STATE.get("son_satir") or {}).items() if k != "file"} if (STATE.get("son_satir") or {}).get("file") == af and af else None}
 # şerit uzun yoklaması — GET /cards?bekle=25&imza=<son> şeridin gösterdiği durum değişene kadar (en çok 25 sn)
 # bekler, değişince hemen döner. Her POST (kart, ✓/✕, soru, kanıt isteği, komut, satır) bekleyenleri uyandırır; POST dışı değişiklik
@@ -422,7 +422,7 @@ def serit_imza(v):
     x = [[(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
          (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"),
          [(x["id"], x["durum"], x.get("sunuldu")) for x in ((v.get("eylem") or {}).get("liste") or [])],
-         (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
+         (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
     return hashlib.sha1(json.dumps(x, default=str, sort_keys=True).encode()).hexdigest()[:16]
 def cards_bekle(imza, sn):
     son = time.time() + max(0, min(sn, 25))
@@ -534,6 +534,10 @@ def kanit(p):
         ki = STATE["kanit_iste"]; rid = p.get("istek")
         if rid and ki and ki["id"] == rid: STATE["kanit_iste"] = None
         elif rid: return {"ok": True, "dup": True}  # aynı istek ikinci sekmeden: bir kez kaydedilir
+        if p.get("kaynak") == "oto":
+            if not yaparken_acik(): return {"ok": False, "err": "yaparken kaydet kapalı"}
+            if sum(1 for k in STATE["kanitlar"].get(os.path.basename(paths(title)[0]), []) if k.get("kaynak") == "oto") >= YAPARKEN_MAX:
+                return {"ok": False, "err": "sinir", "sinir": True}
         not_ = " ".join(str(p.get("not") or (ki.get("not") if ki and rid else "") or "").split())[:300]
         md, jl = paths(title); key = os.path.basename(md); hdr = ensure_header(md, title, m); show(md, title)
         lst = STATE["kanitlar"].setdefault(key, []); n = len(lst) + 1; now = datetime.datetime.now()
@@ -550,11 +554,35 @@ def kanit(p):
         rec = {"at": now.isoformat(timespec="seconds"), "kanit": rel, "n": n, "not": not_, "kaynak": str(p.get("kaynak") or "")[:20], "boyut": len(b),
                "w": p.get("w"), "h": p.get("h")}
         lst.append(rec)
-        write([(md, hdr), (md, pre_al(md)), (md, f"| {now.strftime('%H:%M:%S')} | **📷 KANIT {n}** | {rel}{(' — ' + not_.replace('|', '¦')) if not_ else ''} | |\n"),
+        write([(md, hdr), (md, pre_al(md)), (md, f"| {now.strftime('%H:%M:%S')} | **📷 KANIT {n}**{' (oto)' if rec['kaynak'] == 'oto' else ''} | {rel}{(' — ' + not_.replace('|', '¦')) if not_ else ''} | |\n"),
                (jl, json.dumps(rec, ensure_ascii=False) + "\n")])
         STATE["last"] = now.isoformat(timespec="seconds"); heartbeat()
     print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']})")
     return {"ok": True, "n": n, "path": rel}
+# Yaparken kaydet: ekran paylaşımında karşı taraf bir işi gösterirken eklenti, paylaşılan ekran belirgin biçimde değişip durulunca kanıtı
+# kendiliğinden alır (kaynak "oto"; karşılaştırma ve en sık 10 sn kuralı eklentide). Açılınca etkin toplantıya, toplantı yoksa ilk satıra
+# bağlanır; başka toplantı başlayınca kapanır. Toplantı sonunda `toplanti-claude.py adimlar` döküm + görüntülerden adım belgesine malzeme verir.
+YAPARKEN = {"acik": False, "file": None, "t": 0}; YAPARKEN_MAX = 200  # toplantı başına kendiliğinden kanıt sınırı
+def yaparken_acik():
+    if not YAPARKEN["acik"]: return False
+    af = aktif_dosya()
+    if YAPARKEN["file"] is None:  # toplantı başlamadan açıldı: ilk satırda bağlanır
+        if af: YAPARKEN["file"] = af
+        elif time.time() - YAPARKEN["t"] > 7200: YAPARKEN["acik"] = False; return False
+        return True
+    if af and af != YAPARKEN["file"]: YAPARKEN["acik"] = False; print("YAPARKEN: yeni toplantı — kapandı"); return False
+    return af == YAPARKEN["file"]  # toplantı bitince görünmez
+def yaparken_degistir(durum=None):  # durum: "ac" | "kapat" | None (tersine çevir)
+    with LOCK:
+        ac = (not yaparken_acik()) if durum is None else durum == "ac"
+        if ac == yaparken_acik(): return ac
+        YAPARKEN.update(acik=ac, file=aktif_dosya() if ac else YAPARKEN["file"], t=time.time())
+        _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **YAPARKEN KAYDET** | {'açıldı (ekran değişince kanıt kendiliğinden)' if ac else 'kapandı'} | |")
+    print(f"YAPARKEN: {'açıldı' if ac else 'kapandı'}"); return ac
+def yaparken_view():
+    if not yaparken_acik(): return None
+    f = YAPARKEN["file"]; ks = STATE["kanitlar"].get(f, []) if f else []
+    return {"acik": True, "oto": sum(1 for k in ks if k.get("kaynak") == "oto"), "sinir": YAPARKEN_MAX}
 
 KEYWORDS = ["şifre","parola","password","token","anahtar","api key","secret"]
 # --- Özel sözlük ------------------------------------------------------------------------------------------------
@@ -1232,9 +1260,10 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
 # ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
 # isteği de yok (Faz 2: üç yanlış alarm, karşı taraf da duyuyor); kanıt yalnız Option + Shift + K ve 📷 ile.
-def komut_uygula(tur, gov, title):  # tur: onemli | ozet | sessiz (/komut yalnız bunları kabul eder)
+def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | yaparken (/komut yalnız bunları kabul eder)
     title = title or STATE["meeting"] or "Toplantı"; at = datetime.datetime.now().isoformat(timespec="seconds")
-    if tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
+    if tur == "yaparken": onay = _t("📷 Yaparken kaydet açık — ekran değişince kanıt alınır", "📷 Record-as-you-go on — screenshots when the screen changes") if yaparken_degistir(durum) else _t("📷 Yaparken kaydet kapandı", "📷 Record-as-you-go off")
+    elif tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
     elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
     else: ask({"tur": "ozet"}); onay = _t("💬 Ne diyeyim? — Claude replik hazırlıyor", "💬 What do I say? — Claude is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
@@ -2616,9 +2645,9 @@ class H(BaseHTTPRequestHandler):
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)
         if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
         if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
-            if p.get("tur") not in ("onemli", "ozet", "sessiz"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz"}, 400)
-            komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"))
-            return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view()})
+            if p.get("tur") not in ("onemli", "ozet", "sessiz", "yaparken"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | yaparken"}, 400)
+            komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
+            return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view(), "yaparken": yaparken_view()})
         if self.path == "/ses-yerel":  # yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar
             if self.headers.get("Origin") or not secrets.compare_digest(self.headers.get("X-Suflor-Anahtar", ""), SES_KEY): return self._json({"ok": False, "err": "anahtar"}, 403)
             return self._json(yerel_ses_al(p))

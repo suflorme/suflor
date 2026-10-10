@@ -76,6 +76,9 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
 1. Monitor'ü durdur. `tc dokum --kim "<kişi>"` → `gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>.md` + `.vtt` ("zaten var" ve aynı
    toplantıysa `--uzerine`). Teams'in dökümü gerekmez; kullanıcı indirdiyse (Downloads'ta yeni .docx/.vtt) `tc karsilastir <dosya>
    --kaydet` → özete "Döküm kapsamı %X, kaçan N satır" (önemli kaçan bölümü ekle). İndirmediyse hatırlatma.
+   Yaparken kaydet açıldıysa (`YAPARKEN KAYDET` olayı geldi): `tc adimlar --kim "<konu>"` → çıktıdaki yola adım belgesini yaz
+   (`gorusmeler/<alan>-<konu>-adimlar-<YYYYMMDD>.md`, görüntüler yanındaki `-gorseller/` klasöründe). Görüntüleri Read ile aç; şifre,
+   anahtar ya da kişisel veri görünen görüntüyü belgeye koyma, kullanıcıya söyle. Özete belgenin yolunu ekle.
 2. Özetten takip işlerini say (toplam T / sahibi ve tarihi belli S), `tc sonuc --takip T/S --karar K --kaydet`.
    **Sözler defteri:** toplantıda verilen her söz ve takip işi (iki taraf, kullanıcınınkiler dahil; "yaparım", "Cuma'ya kadar
    gönderirim") için `tc soz ekle "<ne>" --kim <kişi> [--tarih YYYY-MM-DD]` — sormadan (yerel kayıt, esas belge değil); tarih
