@@ -441,7 +441,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "manifest.json", "whisper-isci.py", "teshis.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "manifest.json", "whisper-isci.py", "toplanti-claude.py", "teshis.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 ESKI_BETIK = ["kur.command", "relay-baslat.command"]  # tek kurulum komutuyla kalktı; açık depodan güncellemede kod klasöründen silinir
 TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>

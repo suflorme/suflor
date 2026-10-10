@@ -1791,6 +1791,114 @@ def son_ac(p):
     except subprocess.TimeoutExpired: return {"ok": False, "err": _t("özet uygulaması yanıt vermedi", "the summary app did not respond")}
     if k.returncode: print(f"ÖZET: açılamadı ({(k.stderr or '').strip()[:160]})"); return {"ok": False, "err": (k.stderr or "").strip()[:160]}
     return {"ok": True}
+# --- Panoya bırakılan ses/video → dosyadan döküm (10 Ekim) ------------------------------------------------------------------
+# Pano önce /dosyadan-karar {islem: sor} ile sorar (toplantı, meşgul, biçim, disk), sonra dosyayı ham gövdeyle (base64'süz, 40 MB sınırı
+# yok) POST /dosyadan'a akıtır → canli/dosyadan/<ad> (geçici; iş bitince silinir) → `toplanti-claude.py dosyadan` arka planda (Whisper
+# ayrı süreçte). Toplantı sürerken başlamaz; aynı anda tek iş. Çıktı: proje klasörü korunan klasörde değilse <proje>/gorusmeler, değilse
+# canli/dokum/ (launchd Masaüstü/Belgeler'e yazamaz; denemek izin penceresi açabilir). Aynı adlı döküm varsa panoda Üzerine yaz / Vazgeç
+# (dosya o arada bekler, yeniden yüklenmez).
+SES_UZANTI = (".m4a", ".mp4", ".mov", ".m4v", ".wav", ".mp3", ".aac", ".caf", ".aif", ".aiff", ".3gp")
+DOSYADAN_GB = 4
+DOSYADAN = {}; DOSYADAN_KILIT = threading.Lock()
+def dosyadan_view():
+    return {k: DOSYADAN.get(k) for k in ("durum", "ad", "adim", "blok", "toplam", "md", "yer", "var", "hata")} if DOSYADAN.get("durum") else None
+def _dosyadan_ad(ad):
+    return re.sub(r"[^\w.\- ]", "_", os.path.basename(str(ad or "")))[:120].strip(" .")
+def _dosyadan_cikti():
+    ev = os.path.expanduser("~")
+    korunan = [os.path.join(ev, x) for x in ("Desktop", "Documents", "Downloads", "Library/Mobile Documents")]
+    p = os.path.realpath(AYAR["proje"])
+    if not any(p == k or p.startswith(k + "/") for k in korunan):
+        for y in (os.path.join(p, "gorusmeler"), p):
+            if os.path.isdir(y) and os.access(y, os.W_OK): return y
+    y = os.path.join(BASE, "dokum"); os.makedirs(y, exist_ok=True); return y
+def dosyadan_sor(ad, boyut):  # yüklemeden önce: başlayabilir mi
+    if not _dosyadan_ad(ad).lower().endswith(SES_UZANTI): return _t("ses/video değil (m4a, mp4, mov, wav, mp3…)", "not audio/video (m4a, mp4, mov, wav, mp3…)")
+    if toplanti_var(): return _t("toplantı sürüyor — dosyadan döküm toplantı bitince (canlı döküm yavaşlamasın)", "a meeting is on — transcribe the file after it (so the live transcript is not slowed)")
+    if DOSYADAN.get("durum") in ("yukleniyor", "calisiyor", "var"): return _t("başka bir dosyanın dökümü sürüyor", "another file is being transcribed")
+    if not 0 < boyut <= DOSYADAN_GB << 30: return _t(f"dosya boş ya da {DOSYADAN_GB} GB'tan büyük", f"file empty or larger than {DOSYADAN_GB} GB")
+    if shutil.disk_usage(BASE).free < boyut + (2 << 30): return _t("diskte yer yok (dosya + 2 GB gerekir)", "not enough disk space (file + 2 GB needed)")
+    return None
+def dosyadan_al(h, n):  # h: istek işleyicisi; gövde ham dosya (n bayt)
+    import urllib.parse
+    ad = _dosyadan_ad(urllib.parse.unquote(str(h.headers.get("X-Suflor-Ad") or "")))
+    with DOSYADAN_KILIT:
+        err = dosyadan_sor(ad, n)
+        if err: return {"ok": False, "err": err}
+        DOSYADAN.clear(); DOSYADAN.update(durum="yukleniyor", ad=ad, at=time.time())
+    kl = os.path.join(BASE, "dosyadan"); os.makedirs(kl, exist_ok=True); yol = os.path.join(kl, ad); kalan = n
+    try:
+        with open(yol, "wb") as f:
+            while kalan > 0:
+                b = h.rfile.read(min(kalan, 1 << 20))
+                if not b: break
+                f.write(b); kalan -= len(b)
+        if kalan: raise OSError("eksik")
+        try: os.utime(yol, (time.time(), int(h.headers.get("X-Suflor-Tarih") or 0) / 1000 or time.time()))  # dökümün saati dosya tarihinden
+        except ValueError: pass
+    except OSError as e:
+        try: os.remove(yol)
+        except OSError: pass
+        DOSYADAN.clear(); print(f"DOSYADAN: yükleme yarıda ({e.__class__.__name__})"); return {"ok": False, "err": _t("dosya aktarılamadı", "file transfer failed")}
+    print(f"DOSYADAN: {ad} alındı ({round(n / 1048576, 1)} MB) · döküm başlıyor")
+    threading.Thread(target=_dosyadan_calis, args=(yol, False), daemon=True).start()
+    return {"ok": True, "ad": ad}
+def _dosyadan_calis(yol, uzerine):
+    tc = next((y for y in (os.path.join(os.path.dirname(os.path.abspath(__file__)), "toplanti-claude.py"),
+                           os.path.join(os.path.expanduser(str(AYAR.get("kod") or "")), "toplanti-claude.py")) if os.path.isfile(y)), None)
+    cikti = _dosyadan_cikti()
+    DOSYADAN.update(durum="calisiyor", adim=_t("ses hazırlanıyor", "preparing audio"), blok=None, toplam=None, var=None, hata=None)
+    if not tc: return _dosyadan_bitir(yol, hata=_t("toplanti-claude.py yok — aktarici-kur.command", "toplanti-claude.py missing — aktarici-kur.command"))
+    k = [sys.executable, "-u", tc, "--dir", BASE, "--relay", f"http://127.0.0.1:{A.port}", "dosyadan", yol, "--zorla", "--cikti", cikti] + (["--uzerine"] if uzerine else [])
+    try: p = subprocess.Popen(k, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", start_new_session=True,
+                              env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1"))
+    except OSError as e: return _dosyadan_bitir(yol, hata=str(e)[:160])
+    DOSYADAN["p"] = p; md, son = None, ""
+    for l in p.stdout:
+        l = l.strip()
+        if not l: continue
+        son = l
+        if m := re.search(r"blok (\d+)/(\d+)", l): DOSYADAN.update(blok=int(m[1]), toplam=int(m[2]), adim=None)
+        elif m := re.match(r"ses ([\d.]+) dk", l): DOSYADAN.update(adim=_t(f"{m[1]} dk ses · Whisper yüklendi", f"{m[1]} min audio · Whisper loaded"))
+        elif m := re.match(r"Döküm yazıldı: (.+?\.md) ", l): md = m[1]
+    p.wait(); DOSYADAN.pop("p", None)
+    if DOSYADAN.get("durum") != "calisiyor": return  # Vazgeç
+    if md:
+        DOSYADAN["yer"] = "canli/dokum" if os.path.dirname(md) == os.path.join(BASE, "dokum") else os.path.dirname(md).replace(os.path.expanduser("~"), "~", 1)
+        bildirim("Suflor.me", _t("Döküm hazır", "Transcript ready"), os.path.basename(md))
+        return _dosyadan_bitir(yol, md=md)
+    if "zaten var" in son:  # dosya bekler; panoda Üzerine yaz / Vazgeç
+        DOSYADAN.update(durum="var", var=os.path.basename(son.split(": ", 1)[-1].split(",")[0].strip())); print(f"DOSYADAN: aynı adlı döküm var ({DOSYADAN['var']})"); return
+    _dosyadan_bitir(yol, hata=(son or _t("döküm yarıda kaldı", "transcription stopped"))[:200])
+def _dosyadan_bitir(yol, md=None, hata=None):
+    try: os.remove(yol)
+    except OSError: pass
+    DOSYADAN.update(durum="bitti" if md else "hata", md=md, hata=hata, adim=None, yol=None)
+    print(f"DOSYADAN: " + (f"bitti · {os.path.basename(md)}" if md else f"hata · {hata}"))
+def dosyadan_karar(p):
+    i = p.get("islem")
+    if i == "sor":
+        try: err = dosyadan_sor(p.get("ad"), int(p.get("boyut") or 0))
+        except ValueError: err = "boyut"
+        return {"ok": not err, "err": err}
+    with DOSYADAN_KILIT:
+        d = DOSYADAN.get("durum"); yol = os.path.join(BASE, "dosyadan", DOSYADAN.get("ad") or "-")
+        if i == "uzerine" and d == "var":
+            threading.Thread(target=_dosyadan_calis, args=(yol, True), daemon=True).start(); DOSYADAN["durum"] = "calisiyor"; return {"ok": True}
+        if i == "vazgec" and d in ("var", "calisiyor"):
+            pr = DOSYADAN.get("p"); DOSYADAN["durum"] = "iptal"
+            if pr:
+                try: os.killpg(pr.pid, 15)  # Whisper işçisi de aynı süreç grubunda
+                except OSError: pass
+            try: os.remove(yol)
+            except OSError: pass
+            DOSYADAN.clear(); print("DOSYADAN: vazgeçildi"); return {"ok": True}
+        if i == "kapat" and d in ("bitti", "hata"): DOSYADAN.clear(); return {"ok": True}
+        if i == "ac" and d == "bitti" and os.path.isfile(DOSYADAN.get("md") or ""):
+            if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): döküm {os.path.basename(DOSYADAN['md'])}"); return {"ok": True}
+            k = subprocess.run(["open"] + (["-a", str(AYAR["ozet_uygulama"])] if AYAR.get("ozet_uygulama") else []) + [DOSYADAN["md"]], capture_output=True, text=True, timeout=15)
+            return {"ok": not k.returncode, "err": (k.stderr or "").strip()[:160]}
+    return {"ok": False, "err": _t("bu durumda yapılamaz", "not possible now")}
 # --- Toplantı öncesi brifing (kullanıcı isteği 7 Ekim; kararlar 8 Ekim: panodan, dokununca) ---------------------------------------
 # Boş panoda seçili takvim toplantısı için "Brifing hazırla" → tek `claude -p` çağrısı, yalnız okuma araçlarıyla (Read, Grep, Glob):
 # proje klasöründe geçmiş görüşmeler/belgeler, canlı klasörde geçmiş toplantılar ve cevapsız sorular. Aktarıcı launchd'den çalıştığı
@@ -2526,7 +2634,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
             s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli()); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
-            af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
+            af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
             if s.get("extension"):
@@ -2564,6 +2672,14 @@ class H(BaseHTTPRequestHandler):
         finally: kart_bildir()  # şeridin uzun yoklamasını uyandır
     def _post(self):
         if self._koken() is None: return self._red()
+        if self.path == "/dosyadan":  # panoya bırakılan ses/video — ham gövde, akıtarak yazılır (JSON değil, 40 MB sınırı yok); yalnız pano
+            o = str(self.headers.get("Origin", ""))
+            if o not in (f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}"): return self._json({"ok": False, "err": "köken"}, 403)
+            if not self._yetkili(): return self._anahtar_yok()
+            try: n = int(self.headers.get("Content-Length", 0))
+            except ValueError: n = -1
+            if n <= 0: return self._json({"ok": False, "err": "boyut"}, 413)
+            r = dosyadan_al(self, n); self.close_connection = True; return self._json(r)
         # gövde sınırı — ses parçası ve kanıt PNG'si büyük, diğerleri küçük; bozuk JSON 400 (hata paketi değil)
         try: n = int(self.headers.get("Content-Length", 0))
         except ValueError: n = -1
@@ -2617,6 +2733,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/baglam-dosya":  # panoya bırakılan dosya — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(baglam_dosya_al(p))
+        if self.path == "/dosyadan-karar":  # dosyadan döküm: sor / üzerine / vazgeç / kapat / aç — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(dosyadan_karar(p))
         if self.path == "/ac":  # takvim bağlantısı / hazırlık sekmesi Chrome'da — yalnız pano (anahtarla)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(chrome_ac(p))

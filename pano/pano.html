@@ -91,6 +91,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <div class=bt><button id=tkb class=pri>Başlat</button><button id=tki class=gh>Vazgeç</button><span id=tkm></span><span class=sp1></span><a href="#" id=tky2 class=hint hidden>Suflor.me olmadan katıl</a></div></div></section>
 <section id=kns hidden><div class=sh><span>Konuş <span class=meta>Option + Shift + Boşluk'u basılı tut</span></span><span><button id=kz2 class=gh hidden>Sus</button></span></div><div class=bk><button id=kb class=pri title="Basılı tut, sor, bırak — Claude sesli cevaplar (ses Mac'ten çıkmaz)">🎙 Basılı tut, konuş</button><div id=knd class=t></div></div></section>
 <section id=brs hidden><div class=sh><span class=brb>Brifing <span id=brn class=meta></span></span><button id=brk class=gh aria-expanded=true>Gizle</button></div><div id=br></div></section>
+<section id=dds hidden><div class=sh>Dosyadan döküm <span id=ddn class=meta></span></div><div id=dd></div></section>
 <section id=sns hidden><div class=sh>Son toplantılar</div><div id=sn></div></section>
 <section id=eys hidden><div class=sh><span>Yapılacaklar <span id=eyn class=meta></span></span><button id=eyh class=pri title="Listedeki bekleyen işlerin hepsini onayla — Claude yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
 <section id=sk><div class=sh><span>Şimdi <span id=szd class=meta></span></span><span id=tone></span></div><div id=py class=py></div><div id=kc></div></section>
@@ -330,7 +331,16 @@ function paintMini(s){
 }
 // dosya bırakma → bağlam: panoya ya da mini panoya bırakılan dosya bu Mac'te toplantının bağlam klasörüne yazılır,
 // Claude okur (izle: BAĞLAM). En çok 25 MB; aktarıcı yalnız pano anahtarıyla kabul eder.
-async function baglamBirak(files){for(const f of files){if(f.size>25*1048576){geciciDurum(L("Dosya çok büyük"),L("en çok 25 MB")+" · "+f.name);continue}
+// Ses/video dosyası (m4a, mp4, mov, wav, mp3…) bağlam olmaz: dosyadan döküm başlar (yerel Whisper; ses Mac'ten çıkmaz).
+const SES_UZ=/\.(m4a|mp4|mov|m4v|wav|mp3|aac|caf|aif|aiff|3gp)$/i
+async function dosyadanBirak(f){let r={};try{r=await j('/dosyadan-karar',{method:'POST',body:JSON.stringify({islem:'sor',ad:f.name,boyut:f.size})})}catch(e){}
+  if(!r.ok){geciciDurum(L("Döküm başlamadı"),r.err||f.name,8000);return}
+  geciciDurum(L("Dosya aktarılıyor"),f.name,4000)
+  try{r=await j('/dosyadan',{method:'POST',headers:{'X-Suflor-Ad':encodeURIComponent(f.name),'X-Suflor-Tarih':String(f.lastModified||0)},body:f})}catch(e){r={}}
+  if(!r.ok)geciciDurum(L("Döküm başlamadı"),r.err||L("dosya aktarılamadı"),8000);refresh()}
+async function baglamBirak(files){const ses=files.filter(f=>SES_UZ.test(f.name));files=files.filter(f=>!SES_UZ.test(f.name))
+  if(ses.length){if(ses.length>1)geciciDurum(L("Bir seferde tek ses dosyası"),L("ilki dökülüyor: {a}",{a:ses[0].name}),6000);await dosyadanBirak(ses[0])}
+  for(const f of files){if(f.size>25*1048576){geciciDurum(L("Dosya çok büyük"),L("en çok 25 MB")+" · "+f.name);continue}
   const veri=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).split(',')[1]||'');fr.onerror=()=>r('');fr.readAsDataURL(f)})
   let r={};try{r=await j('/baglam-dosya',{method:'POST',body:JSON.stringify({ad:f.name,veri})})}catch(e){}
   geciciDurum(r.ok?L("Bağlam eklendi — Claude okuyacak"):L("Bağlam eklenemedi"),r.ok?r.ad:(r.err||f.name),4000)}refresh()}
@@ -437,6 +447,19 @@ document.getElementById('br').addEventListener('click',async ev=>{const b=ev.tar
   let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:b.dataset.brf,yeniden:!!b.dataset.yeniden,dinle:!!b.dataset.dinle})})}catch(e){}
   if(b.dataset.dinle){b.disabled=false;if(!r.ok)geciciDurum(L('Brifing okunamadı'),r.err||L('Ses kapalı (ayar konusma) ya da brifing hazır değil'));return}
   if(!r.ok){b.disabled=false;geciciDurum(L('Brifing başlatılamadı'),r.err||'')}refresh()})
+// dosyadan döküm durumu: aktarılıyor → hazırlanıyor → parça n/N (konuşma parçası; Whisper ~20 kez bildirir) → hazır (Dökümü aç) · aynı adlı döküm varsa Üzerine yaz / Vazgeç
+function renderDosyadan(s){const d=s.dosyadan,sec=document.getElementById('dds');sec.hidden=!d;if(!d)return
+  const ad=`<div class=b>${esc(d.ad||'')}</div>`,dg=(m,bt)=>`<div class=sn><div class=t>${ad}<div class=d>${m}</div></div>${bt||''}</div>`
+  setH(document.getElementById('ddn'),esc(d.durum==='calisiyor'||d.durum==='yukleniyor'?L("yerel Whisper · ses Mac'ten çıkmaz"):''))
+  setH(document.getElementById('dd'),
+    d.durum==='yukleniyor'?dg(esc(L('dosya aktarılıyor…')))
+    :d.durum==='calisiyor'?dg(esc(d.toplam?L('parça {n}/{t} · %{y}',{n:d.blok,t:d.toplam,y:Math.round(100*(d.blok-1)/d.toplam)}):(d.adim||L('başlıyor…')))+(d.toplam?`<div><progress max="${d.toplam}" value="${Math.max(0,d.blok-1)}" style="width:100%"></progress></div>`:''),`<button class=gh data-dd=vazgec>${L('Vazgeç')}</button>`)
+    :d.durum==='var'?dg(esc(L('Bu adla döküm zaten var: {a}',{a:d.var||''})),`<button class=pri data-dd=uzerine>${L('Üzerine yaz')}</button><button class=gh data-dd=vazgec>${L('Vazgeç')}</button>`)
+    :d.durum==='bitti'?dg(esc(L('Döküm hazır: {a}',{a:(d.md||'').split('/').pop()}))+(d.yer?` · <span class=z>${esc(d.yer)}</span>`:''),`<button class=pri data-dd=ac>${L('Dökümü aç')}</button><button class="gh ib" data-dd=kapat title="${L('Kapat')}">✕</button>`)
+    :dg(esc(L('Döküm yapılamadı: {h}',{h:d.hata||''})),`<button class="gh ib" data-dd=kapat title="${L('Kapat')}">✕</button>`))}
+document.getElementById('dd').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-dd]');if(!b)return;b.disabled=true
+  let r={};try{r=await j('/dosyadan-karar',{method:'POST',body:JSON.stringify({islem:b.dataset.dd})})}catch(e){}
+  b.disabled=false;if(!r.ok)geciciDurum(L('Yapılamadı'),r.err||'');refresh()})
 // toplantı sonu: Claude özeti kaydedince (ozet-hazir) pano boşken son 7 günün en yeni 3 toplantısı — not, değerlendirme, öneri, özeti aç
 function gunTxt(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const g=Math.round((b-new Date(d).setHours(0,0,0,0))/864e5),s=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')
   return (g===0?L('Bugün'):g===1?L('Dün'):String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0'))+' '+s}
@@ -481,7 +504,7 @@ durumCiz()
 const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
-paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderKonus(s); renderSon(s)
+paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderKonus(s); renderDosyadan(s); renderSon(s)
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id+(c.geri||""))); firstCards=false
