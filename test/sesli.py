@@ -54,4 +54,20 @@ try:
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait()
+# S24 Aşama 1: sesli cevap ayırıcısı (aktarıcının kendi tanımları; Whisper'ın verdiği biçimler — noktalama, büyük harf, İ/I)
+import ast
+_k = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); _ad = {"SES_CEVAP", "SES_AMA", "SES_DOLGU", "sesli_ayir"}
+_ns = {"re": __import__("re")}
+exec(compile(ast.Module([n for n in ast.parse(_k).body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in _ad for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in _ad)], []), "relay", "exec"), _ns)
+TABLO = [("Evet.", "onay"), ("Evet, yaz.", "onay"), ("Tamam.", "onay"), ("Olur olur.", "onay"), ("Ekle lütfen.", "onay"), ("EVET", "onay"), ("Yes.", "onay"), ("Okay, do it.", "onay"),
+         ("Hayır.", "red"), ("Hayır, gerek yok.", "red"), ("Yazma.", "red"), ("No thanks.", "red"), ("İptal.", "red"),
+         ("Sonra.", "sonra"), ("Atla.", "sonra"), ("Daha sonra.", "sonra"), ("Later.", "sonra"),
+         ("Sus.", "sus"), ("Dur.", "sus"), ("Yeter.", "sus"), ("Stop.", "sus"),
+         ("Hepsini onayla.", "hepsi"), ("Hepsi evet.", "hepsi"), ("Approve all.", "hepsi"),
+         ("Ne dedin?", "tekrar"), ("Tekrar.", "tekrar"), ("Repeat.", "tekrar"),
+         ("Evet yazma.", "karisik"), ("Hayır evet.", "karisik"), ("Hepsini reddet.", "karisik"), ("Tamam dur.", "karisik"),
+         ("Evet ama saati on bir yap.", "uzun"), ("Evet ama.", "uzun"), ("Bunu yarın sabah ilk iş olarak yaz.", "uzun"),
+         ("Altyazı M.K.", "yok"), ("Teşekkürler.", "yok"), ("", "yok"), ("Hı.", "yok")]
+yanlis = [(m, b, _ns["sesli_ayir"](m)) for m, b in TABLO if _ns["sesli_ayir"](m) != b]
+ok(f"sesli cevap ayırıcısı {len(TABLO) - len(yanlis)}/{len(TABLO)}" + (f" — yanlış: {yanlis}" if yanlis else ""), not yanlis)
 print("yazayım:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

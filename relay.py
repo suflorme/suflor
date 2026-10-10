@@ -362,13 +362,24 @@ def eylem_sun():
 def eylem_karar(p, kaynak):
     d = p.get("durum") if p.get("durum") in ("onaylandi", "reddedildi") else None
     if not d: return 0
+    ek = {"karar_t": round(time.time(), 3), "ses_metin": _eylem_temiz(p.get("ses_metin"), 200)} if kaynak == "ses" else {}  # Geri al süresi + ne duyuldu
     with LOCK:
         xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and (p.get("id") == "hepsi" and x.get("sunuldu") or x["id"] == p.get("id"))]
-        for x in xs: _eylem_yama(x, durum=d, karar_at=datetime.datetime.now().isoformat(timespec="seconds"), yetkili=True, kaynak=kaynak)
-    if xs: print(f"EYLEM: {len(xs)} iş {'onaylandı' if d == 'onaylandi' else 'reddedildi'} ({kaynak})")
-    if xs and p.get("id") == "hepsi": ses_durdur(); soru_bitir("hepsi")
-    elif xs and SORU["aktif"] in {x["id"] for x in xs}: ses_durdur(); soru_sonraki()
+        for x in xs: _eylem_yama(x, durum=d, karar_at=datetime.datetime.now().isoformat(timespec="seconds"), yetkili=True, kaynak=kaynak, **ek)
+    if xs: print(f"EYLEM: {len(xs)} iş {'onaylandı' if d == 'onaylandi' else 'reddedildi'} ({kaynak})" + (f" · duyulan \"{ek['ses_metin']}\"" if ek else ""))
+    if kaynak != "ses" and xs: ses_durdur()  # sesli kararda geri okuma ("Takvim onaylandı.") kuyrukta, kesilmez
+    if xs and p.get("id") == "hepsi": soru_bitir("hepsi")
+    elif xs and SORU["aktif"] in {x["id"] for x in xs}: soru_sonraki()
     return len(xs)
+def eylem_geri_al(p):  # sesli kararın 10 sn'lik Geri al'ı: iş bekliyor'a döner, soru yeniden okunur
+    with LOCK:
+        x = next((x for x in eylem_gorunen() if x["id"] == p.get("id")), None)
+        if not x or x.get("kaynak") != "ses" or x["durum"] not in ("onaylandi", "reddedildi") or time.time() - (x.get("karar_t") or 0) > GERI_AL_SN + 2: return False
+        _eylem_yama(x, durum="bekliyor", geri_alindi=True, kaynak=None, karar_at=None, karar_t=None)
+        if SORU["aktif"] and SORU["aktif"] != x["id"]: SORU["liste"].insert(0, SORU["aktif"])
+        SORU["liste"] = [x["id"]] + [i for i in SORU["liste"] if i != x["id"]]; SORU["aktif"] = None
+    print(f"EYLEM: {x['id']} sesli karar geri alındı"); ses_durdur(); seslendir(_t("Geri aldım.", "Undone."), kuyruk=True); soru_sonraki()
+    return True
 def eylem_sonuc(p):
     d = p.get("durum") if p.get("durum") in ("yapildi", "hata") else None
     with LOCK:
@@ -379,9 +390,13 @@ def eylem_sonuc(p):
 def eylem_gorunen():
     sinir = (datetime.datetime.now() - datetime.timedelta(hours=EYLEM_SAAT)).isoformat()
     return [x for x in EYLEMLER if x["at"] >= sinir]
+GERI_AL_SN = 10  # sesli karar bu kadar sn geri alınabilir; toplantı oturumu (eylem bekle) kararı ancak sonra alır
+def _geri_al_sn(x):
+    if x.get("kaynak") != "ses" or x["durum"] not in ("onaylandi", "reddedildi"): return 0
+    return max(0, round(GERI_AL_SN - (time.time() - (x.get("karar_t") or 0)), 1))
 def eylem_view():
     xs = eylem_gorunen(); soru_zaman()
-    return {"liste": [{k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc")} for x in xs],
+    return {"liste": [dict({k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc", "kaynak", "ses_metin")}, geri_al_sn=_geri_al_sn(x)) for x in xs],
             "bekleyen": sum(1 for x in xs if x["durum"] == "bekliyor"), "sesli": SORU["aktif"]} if xs else None
 def cards_view():
     ertele_kontrol()
@@ -812,6 +827,8 @@ STATE["whisper"] = {"durum": "kapali", "model": None, "kuyruk": 0, "satir": 0, "
                     "hata": None, "kanallar": {}, "kanal_son_satir": {}, "kanal_son_parca": {}, "gecikme_max": 0.0, "durgun_max": 0.0,
                     "parca": {}, "eski_atlanan": {}, "birlesen": {}}  # kanal başına: kuyruğa giren · 120 sn'yi geçip atılan · birleştirilen
 W_LOCK = threading.Lock(); WH_Q = queue.Queue(); ALTYAZI_SON = []  # (epoch, konuşmacı) son 10 dk
+def wh_one_al(is_):  # bas-konuş işi kuyruğun başına (S24): toplantı sonundan kalan parçalar "evet"i bekletmesin
+    with WH_Q.not_empty: WH_Q.queue.appendleft(is_); WH_Q.unfinished_tasks += 1; WH_Q.not_empty.notify()
 def _rms(b):
     if audioop: return audioop.rms(b, 2)
     import array; a = array.array("h"); a.frombytes(b); return int((sum(x * x for x in a) / max(1, len(a))) ** 0.5)
@@ -2248,12 +2265,54 @@ def soru_komut(p):  # panodaki "Sonra" (bu işi şimdilik geç) ve "Sus" (diziyi
     return {"ok": False, "err": "komut"}
 def soru_zaman():  # pano yoklarken: 2 dk cevap yoksa dizi durur
     if SORU["aktif"] and time.time() - SORU["t"] > SORU_SN: soru_bitir("cevap yok")
+# Sesli cevap (S24, Aşama 1): "yazayım mı?" sorulurken bas-konuş kaydı Claude'a değil yerel ayırıcıya gider. Yalnız kısa cevap (≤ 4 sözcük)
+# karar verir; iki yönlü ("evet yazma") ya da "ama"lı cevapta karar yok, yeniden sorar. Karar sesli geri okunur, panoda 10 sn Geri al;
+# toplantı oturumu (eylem bekle) kararı 10 sn sonra alır. Kayıtta kaynak "ses" + Whisper metni.
+SES_CEVAP = {  # sözcük ve kalıplar (Türkçe + İngilizce; Whisper'ın verdiği biçim: küçük harfe çevrilir, noktalama atılır)
+    "hepsi": ["hepsini onayla", "hepsi evet", "hepsine evet", "hepsini yaz", "hepsi olur", "hepsi tamam", "hepsi", "hepsini", "hepsine", "approve all", "yes to all", "all of them", "all"],
+    "tekrar": ["ne dedin", "bir daha", "tekrar eder misin", "what did you say", "say again", "tekrar", "tekrarla", "efendim", "pardon", "repeat", "again"],
+    "sus": ["sessiz ol", "sus", "dur", "yeter", "kapat", "stop", "enough", "quiet"],
+    "sonra": ["daha sonra", "sonra bak", "sonra", "atla", "geç", "gec", "sonraki", "later", "skip", "next"],
+    "red": ["gerek yok", "no thanks", "hayır", "hayir", "yok", "yazma", "ekleme", "kaydetme", "reddet", "istemiyorum", "iptal", "no", "nope", "don't", "dont", "reject", "cancel"],
+    "onay": ["do it", "go ahead", "evet", "evt", "tamam", "tamamdır", "olur", "yaz", "yazabilirsin", "onayla", "onaylıyorum", "ekle", "ekleyebilirsin", "kaydet",
+             "peki", "aynen", "uygun", "uygundur", "yes", "yeah", "yep", "ok", "okay", "sure", "approve", "approved"]}
+SES_AMA = {"ama", "fakat", "ancak", "yalnız", "sadece", "but", "except", "only"}  # "evet ama…" → düzeltme (Aşama 1b), şimdilik kısa cevap iste
+SES_DOLGU = {"lütfen", "please", "ee", "eee", "ıı", "hı", "hmm", "şey", "claude", "suflor"}
+def sesli_ayir(metin):  # → hepsi | tekrar | sus | sonra | red | onay | karisik | uzun | yok
+    m = " " + " ".join(re.sub(r"[^\w\s']", " ", str(metin or "").replace("I", "ı").replace("İ", "i").lower()).split()) + " "
+    sozcuk = [w for w in m.split() if w not in SES_DOLGU]
+    if not sozcuk: return "yok"
+    if len(sozcuk) > 4 or SES_AMA & set(sozcuk): return "uzun"
+    m = " " + " ".join(sozcuk) + " "; bulunan = set()
+    for sinif, kaliplar in SES_CEVAP.items():
+        for k in kaliplar:
+            if f" {k} " in m: bulunan.add(sinif); m = m.replace(f" {k} ", " ")
+    if "hepsi" in bulunan: bulunan.discard("onay")  # "hepsini onayla" tek anlam
+    if len(bulunan) > 1: return "karisik"
+    return bulunan.pop() if bulunan else "yok"
+def sesli_cevap(metin, sid):  # bas-konuş metni soru aktifken; dönen: okunan cevap
+    sinif = sesli_ayir(metin)
+    with LOCK: x = next((x for x in eylem_gorunen() if x["id"] == sid and x["durum"] == "bekliyor"), None); SORU["t"] = time.time()
+    tur = _t(EYLEM_TUR.get(x["tur"], ""), x["tur"]) if x else ""
+    print(f"SES: sesli cevap \"{metin[:80]}\" → {sinif}")
+    if sinif in ("onay", "red") and x:
+        cevap = _t(f"{tur} onaylandı.", "Approved.") if sinif == "onay" else _t(f"{tur} reddedildi.", "Rejected.")
+        seslendir(cevap, kuyruk=True); eylem_karar({"id": sid, "durum": "onaylandi" if sinif == "onay" else "reddedildi", "ses_metin": metin}, "ses"); return cevap
+    if sinif == "hepsi":
+        cevap = _t("Hepsi onaylandı.", "All approved."); seslendir(cevap, kuyruk=True); eylem_karar({"id": "hepsi", "durum": "onaylandi", "ses_metin": metin}, "ses"); return cevap
+    if sinif == "sonra": cevap = _t("Sonraya bıraktım.", "Left for later."); seslendir(cevap, kuyruk=True); soru_sonraki(); return cevap
+    if sinif == "sus": cevap = _t("Tamam, susuyorum.", "Okay, stopping."); seslendir(cevap, kuyruk=True); soru_bitir("sus (sesle)"); return cevap
+    if sinif == "tekrar":
+        with LOCK: SORU["liste"].insert(0, sid); SORU["aktif"] = None
+        soru_sonraki(); return _t("Soruyu yeniden okudum.", "Read the question again.")
+    cevap = _t("Kısa cevap ver: evet, hayır, sonra ya da sus.", "Answer briefly: yes, no, later or stop.") if sinif == "uzun" else _t("Anlamadım: evet, hayır ya da sonra?", "Didn't catch that: yes, no or later?")
+    seslendir(cevap, kuyruk=True); return cevap
 # --- Bas-konuş (Faz 4, 5. gün; plan: testler/agent-sdk-deneme-plani-20261008.md) ------------------------------------------------------
 # Toplantı dışında panodan basılı tutarak soru: pano mikrofonu → /bas-konus (16 kHz PCM, yalnız 127.0.0.1) → yerel Whisper → açık
 # `claude -p --input-format stream-json` süreci → ilk cümle gelir gelmez yerel ses. Ses Mac'ten çıkmaz; metin yalnız Claude'a.
 # Süreci "Suflor Brifing.app" açar (Masaüstü izni ona ait; açık süreç kipi: iki FIFO). Salt okunur araçlar; yazma yok. Bas basılınca
 # süreç ve Whisper ısınır; 30 dk kullanılmazsa süreç kapanır. 8 Ekim ölçümü: açık süreçte ilk metin 1,2–2,8 sn (ayrı çağrı 5,6 sn).
-KONUS = {"durum": "kapali", "soru": None, "cevap": "", "hata": None, "at": None, "olcum": None}
+KONUS = {"durum": "kapali", "soru": None, "cevap": "", "hata": None, "at": None, "olcum": None, "sesli_cevap": False}
 _KS = {"w": None, "app": None, "son": 0, "kilit": threading.Lock(), "tur": None, "maliyet": 0}
 KONUS_BOSTA_SN = 1800; KONUS_EN_UZUN_SN = 60
 KONUS_ISTEM = {"tr": ("Sen Suflor.me'nin sesli asistanısın. Kullanıcı toplantı dışında sesle soruyor; cevabın Mac sesiyle okunacak. Kısa konuş: "
@@ -2376,8 +2435,9 @@ def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsı
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı", "Push-to-talk is off during a meeting")}
     if _KS["tur"]: return {"ok": False, "err": _t("Claude hâlâ cevaplıyor", "Claude is still answering")}
-    ses_durdur(); _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None)
-    if STATE["whisper"].get("durum") != "yok": WH_Q.put({"isinma": True, "kuyruga": time.time()}); _isci_baslat()
+    ses_durdur(); _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None, sesli_cevap=False)
+    if STATE["whisper"].get("durum") != "yok": wh_one_al({"isinma": True, "kuyruga": time.time()}); _isci_baslat()
+    if SORU["aktif"]: SORU["t"] = time.time(); return {"ok": True, "cevap": True}  # "yazayım mı?" cevabı: Claude gerekmez (yerel ayırıcı)
     threading.Thread(target=konus_ac, daemon=True).start()
     return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
@@ -2390,16 +2450,19 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if sn > KONUS_EN_UZUN_SN + 2: return {"ok": False, "err": _t("En çok 1 dakika", "One minute at most")}
     if STATE["whisper"].get("durum") == "yok": _konus_kur(durum="hata", hata=_t("Whisper kurulu değil", "Whisper isn't installed")); return {"ok": False, "err": KONUS["hata"]}
     tur = {"t_birak": time.time(), "kayit_sn": round(sn, 1), "metin": "", "tampon": ""}; _KS["tur"] = tur; _konus_kur(durum="yaziya")
+    sid = SORU["aktif"]
     def geri(metin, hata):
         tur["t_metin"] = time.time()
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
+        if sid and SORU["aktif"] == sid:  # "yazayım mı?" sorusuna sesli cevap — Claude'a gitmez
+            _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, sesli_cevap=True, cevap=sesli_cevap(metin, sid), olcum={"wh_ms": round((tur["t_metin"] - tur["t_birak"]) * 1000)}); return
         _konus_kur(durum="dusunuyor", soru=metin)
         if not konus_canli() and not konus_ac(): _KS["tur"] = None; return
         t = time.time()
         while time.time() - t < 15 and not _KS["w"]: time.sleep(0.05)
         try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": konus_baglam() + metin}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı")
-    WH_Q.put({"id": f"bas-{int(time.time() * 1000)}", "bas": True, "kanal": "bas", "baslik": None, "pcm": pcm, "t0": time.time() - sn, "t1": time.time(),
+    wh_one_al({"id": f"bas-{int(time.time() * 1000)}", "bas": True, "kanal": "bas", "baslik": None, "pcm": pcm, "t0": time.time() - sn, "t1": time.time(),
               "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri}); _isci_baslat()
     return {"ok": True}
 def konus_bekci():  # 30 dk kullanılmayan süreci kapat; toplantı başlayınca da (mikrofon ve ses toplantıya ait)
@@ -2747,6 +2810,9 @@ class H(BaseHTTPRequestHandler):
             if p.get("komut") == "basla": return self._json(konus_basla())
             if p.get("komut") == "sus": ses_durdur(); return self._json({"ok": True})
             return self._json(konus_ses(p))
+        if self.path == "/eylem-geri-al":  # sesli kararın Geri al'ı (10 sn) — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json({"ok": eylem_geri_al(p)})
         if self.path == "/eylem-sesli":  # sesli "yazayım mı?" dizisinde Sonra / Sus — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(soru_komut(p))

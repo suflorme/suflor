@@ -411,9 +411,10 @@ def eylem_cmd():
         try: bil = set(json.load(open(fp, encoding="utf-8")))
         except (OSError, ValueError): bil = set()
         son = time.time() + A.sn
-        while True:
-            xs = _eylemler(); yeni = [x for x in xs if x["durum"] in ("onaylandi", "reddedildi") and x["id"] not in bil]
-            bek = sum(1 for x in xs if x["durum"] == "bekliyor" and x.get("sunuldu"))
+        while True:  # sesli karar 10 sn Geri al süresi dolmadan verilmez (geri alınırsa iş bekliyor'a döner)
+            xs = _eylemler(); karar = [x for x in xs if x["durum"] in ("onaylandi", "reddedildi") and x["id"] not in bil]
+            yeni = [x for x in karar if not x.get("geri_al_sn")]
+            bek = sum(1 for x in xs if x["durum"] == "bekliyor" and x.get("sunuldu")) + len(karar) - len(yeni)
             if yeni or not bek or time.time() >= son: break
             time.sleep(2)
         for x in yeni:

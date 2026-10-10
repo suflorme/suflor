@@ -79,6 +79,42 @@ try:
        and c[0]["arac"] == 0 and c[1]["arac"] == 1 and c[1]["araclar"] == ["Grep"] and c[1]["arac_ilk_ms"])
     ok("döküme yazılmadı", not any(f.endswith(".md") for f in os.listdir(canli)))
     ok("çok kısa kayıt reddedildi", post({"komut": "basla"}).get("ok") and not post({"pcm": base64.b64encode(b"\0" * 3200).decode()}).get("ok"))
+    # S24 Aşama 1: "yazayım mı?" sorulurken bas-konuş = sesli cevap (Claude'a gitmez, yerel ayırıcı), 10 sn Geri al, eylem bekle 10 sn sonra alır
+    def uc(yol, v, pano=False):
+        h = {"X-Suflor-Anahtar": K, **({"Origin": f"http://127.0.0.1:{PORT}"} if pano else {})}
+        return json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}{yol}", data=json.dumps(v).encode(), headers=h), timeout=10).read())
+    ey = lambda: {x["id"]: x for x in ((json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read()).get("eylem") or {}).get("liste") or [])}
+    sesli = lambda: (json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read()).get("eylem") or {}).get("sesli")
+    ids = [uc("/eylem", {"tur": t, "baslik": b})["eylem"]["id"] for t, b in (("takvim", "Perşembe tekrar toplantı"), ("kayit", "Karar yaz"), ("takip", "Teşekkür e-postası"), ("belge", "Sözleşme notu"))]
+    uc("/eylem-sun", {}); time.sleep(0.5)
+    cagri0 = len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines())
+    t0 = time.time(); k = sor("Evet."); sn_ = time.time() - t0; t_karar = time.time()
+    e = ey()
+    ok(f"'Evet.' → takvim onaylandı (kaynak ses, duyulan metin kayıtta), Claude'a gitmedi ({sn_:.1f} sn)", e[ids[0]]["durum"] == "onaylandi" and e[ids[0]]["kaynak"] == "ses" and "evet" in (e[ids[0]]["ses_metin"] or "").lower()
+       and len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) == cagri0 and "Takvim onaylandı" in (k.get("cevap") or ""))
+    ok("geri okuma sonra sıradaki soru okundu", log().rfind("Takvim onaylandı.") < log().rfind("Kayıt: Karar yaz") and sesli() == ids[1])
+    ok("panoda Geri al süresi (≤ 10 sn)", 0 < e[ids[0]]["geri_al_sn"] <= 10)
+    bekle_p = subprocess.Popen([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", "eylem", "bekle", "--sn", "40"],
+                               stdout=subprocess.PIPE, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay))
+    k = sor("Hayır, gerek yok.")
+    erken = (bekle_p.poll() is None) if time.time() - t_karar < 9 else None  # (9 sn geçtiyse ölçülemez)
+    ok("'Hayır, gerek yok.' → kayıt reddedildi", ey()[ids[1]]["durum"] == "reddedildi" and sesli() == ids[2])
+    ok("Geri al → kayıt yeniden bekliyor, soru yeniden okundu", uc("/eylem-geri-al", {"id": ids[1]}, pano=True)["ok"] and ey()[ids[1]]["durum"] == "bekliyor" and sesli() == ids[1] and log().count("Kayıt: Karar yaz") == 2)
+    try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/eylem-geri-al", data=b'{"id": "x"}', headers={"X-Suflor-Anahtar": K}), timeout=5); kod = 200
+    except urllib.error.HTTPError as e_: kod = e_.code
+    ok("pano dışından Geri al yok (403)", kod == 403)
+    k = sor("Evet yazma.")
+    ok("'Evet yazma.' (iki yönlü) → karar yok, yeniden sorar", ey()[ids[1]]["durum"] == "bekliyor" and "Anlamadım" in (k.get("cevap") or "") and sesli() == ids[1])
+    k = sor("Sonra.")
+    ok("'Sonra.' → iş bekler, sıradaki soru", ey()[ids[1]]["durum"] == "bekliyor" and sesli() == ids[2])
+    k = sor("Evet ama saati on bir yap.")
+    ok("'Evet ama…' → kısa cevap iste, karar yok", ey()[ids[2]]["durum"] == "bekliyor" and "Kısa cevap" in (k.get("cevap") or ""))
+    t1 = time.time(); out = bekle_p.communicate(timeout=60)[0]
+    ok("eylem bekle sesli onayı 10 sn dolmadan vermedi, sonra verdi; geri alınan reddi vermedi", erken is not False and f"UYGULA: {ids[0]}" in out and ids[1] not in out)
+    k = sor("Hepsini onayla.")
+    e = ey()
+    ok("'Hepsini onayla.' → kalan sunulanlar onaylandı, dizi bitti", all(e[i]["durum"] == "onaylandi" for i in ids[1:]) and sesli() is None and "Hepsi onaylandı" in (k.get("cevap") or ""))
+    ok("sesli cevaplarda Claude süreci hiç çağrılmadı", len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) == cagri0)
     urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ping", data=json.dumps({"call": True, "panel": True}).encode(), headers={"X-Suflor-Anahtar": K}))
     ok("toplantı sürerken kapalı", not post({"komut": "basla"}).get("ok"))
     ok("aktarıcıda hata yok", "Traceback" not in log())
