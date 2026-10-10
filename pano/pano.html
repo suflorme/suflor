@@ -453,7 +453,7 @@ function renderDosyadan(s){const d=s.dosyadan,sec=document.getElementById('dds')
   setH(document.getElementById('ddn'),esc(d.durum==='calisiyor'||d.durum==='yukleniyor'?L("yerel Whisper · ses Mac'ten çıkmaz"):''))
   setH(document.getElementById('dd'),
     d.durum==='yukleniyor'?dg(esc(L('dosya aktarılıyor…')))
-    :d.durum==='calisiyor'?dg(esc(d.toplam?L('parça {n}/{t} · %{y}',{n:d.blok,t:d.toplam,y:Math.round(100*(d.blok-1)/d.toplam)}):(d.adim||L('başlıyor…')))+(d.toplam?`<div><progress max="${d.toplam}" value="${Math.max(0,d.blok-1)}" style="width:100%"></progress></div>`:''),`<button class=gh data-dd=vazgec>${L('Vazgeç')}</button>`)
+    :d.durum==='calisiyor'?dg((d.durakli?`<b>${esc(L('Duraklatıldı — toplantı bitince sürer'))}</b> · `:'')+esc(d.toplam?L('parça {n}/{t} · %{y}',{n:d.blok,t:d.toplam,y:Math.round(100*(d.blok-1)/d.toplam)}):(d.adim||L('başlıyor…')))+(d.toplam?`<div><progress max="${d.toplam}" value="${Math.max(0,d.blok-1)}" style="width:100%"></progress></div>`:''),`<button class=gh data-dd=vazgec>${L('Vazgeç')}</button>`)
     :d.durum==='var'?dg(esc(L('Bu adla döküm zaten var: {a}',{a:d.var||''})),`<button class=pri data-dd=uzerine>${L('Üzerine yaz')}</button><button class=gh data-dd=vazgec>${L('Vazgeç')}</button>`)
     :d.durum==='bitti'?dg(esc(L('Döküm hazır: {a}',{a:(d.md||'').split('/').pop()}))+(d.yer?` · <span class=z>${esc(d.yer)}</span>`:''),`<button class=pri data-dd=ac>${L('Dökümü aç')}</button><button class="gh ib" data-dd=kapat title="${L('Kapat')}">✕</button>`)
     :dg(esc(L('Döküm yapılamadı: {h}',{h:d.hata||''})),`<button class="gh ib" data-dd=kapat title="${L('Kapat')}">✕</button>`))}

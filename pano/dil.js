@@ -224,6 +224,7 @@ globalThis.SUFLOR_EN = {
   "Döküm hazır: {a}": "Transcript ready: {a}",
   "Dökümü aç": "Open transcript",
   "Kapat": "Close",
+  "Duraklatıldı — toplantı bitince sürer": "Paused — resumes after the meeting",
   "Döküm yapılamadı: {h}": "Transcription failed: {h}",
   "Yapılamadı": "Could not do it",
   "Öneri": "Suggestion",

@@ -2,7 +2,8 @@
 # Panoya bırakılan ses/video → dosyadan döküm (aktarıcı /dosyadan-karar + /dosyadan): yalıtılmış aktarıcı (kopya klasörde relay.py +
 # toplanti-claude.py + whisper-isci.py, kurulumdaki gibi), gerçek Whisper. Denetim: sor (biçim, toplantı, meşgul), anahtar ve köken,
 # ham gövdeyle yükleme, blok ilerlemesi, döküm proje/gorusmeler'e, saat dosya tarihinden, geçici kopya silinir, aynı ad → Üzerine yaz /
-# Vazgeç, bozuk dosya, korunan proje klasöründe (Masaüstü) canli/dokum. Whisper kurulu değilse atlar (~1 dk).
+# Vazgeç, bozuk dosya, korunan proje klasöründe (Masaüstü) canli/dokum; toplantı başlayınca duraklar (SIGSTOP), bitince sürer, duraklatılmışken
+# Vazgeç, aktarıcı yeniden başlayınca kalan duraklatılmış süreç kapanır. Whisper kurulu değilse atlar (~3 dk; toplantı bitişi 60 sn bekler).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/dosyadan-pano.py      (kaldı → çıkış 1)
 import datetime, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request, wave
 
@@ -31,10 +32,18 @@ subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", os.path.join(T, "k.wav")
 sure = os.path.getsize(os.path.join(T, "k.wav")) / 32000
 BITIS = datetime.datetime(2026, 10, 10, 14, 0, 0).timestamp() + sure  # dosya tarihi = kaydın sonu → döküm 14:00'te başlar
 open(os.path.join(T, "bozuk.m4a"), "w").write("metin")
+# uzun kayıt (~2,5 dk): duraklatma denemesi için Whisper'ın en az ~15 sn sürmesi gerekir
+pc = [wav(m, os.path.join(T, f"u{k}")) for k, m in enumerate(["Sevkiyat planı Salı günü kesinleşecek, araçlar sabah yedide yüklenir.", "Tedarikçi teklifini Çarşamba gönderecek, fiyat geçen yılın altında.", "Depo sayımında eksik çıkan paletleri ayrıca listeleyelim."])]
+o = wave.open(os.path.join(T, "u.wav"), "wb"); o.setnchannels(1); o.setsampwidth(2); o.setframerate(16000)
+for k in range(18): o.writeframes(pc[k % 3] + b"\0\0" * 12000)
+o.close(); UZUN = os.path.join(T, "Uzun deneme.m4a"); subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", os.path.join(T, "u.wav"), UZUN], check=True)
+def grup(pid):  # süreç grubundaki süreçlerin durumu (T = durdurulmuş)
+    r = [l.split() for l in subprocess.run(["ps", "-axo", "pgid=,stat="], capture_output=True, text=True).stdout.splitlines()]
+    return [x[1] for x in r if len(x) == 2 and x[0] == str(pid)]  # (ps -g boş grupta başka satır döndürüyor)
 
 class Aktarici:
     def __init__(self, port, proje):
-        self.url = f"http://127.0.0.1:{port}"; self.canli = os.path.join(T, f"canli{port}"); os.makedirs(self.canli)
+        self.url = f"http://127.0.0.1:{port}"; self.canli = os.path.join(T, f"canli{port}"); os.makedirs(self.canli, exist_ok=True)
         ay = os.path.join(T, f"ayar{port}.json")
         json.dump({"alan": "Deneme", "ad": "Deniz T", "port": port, "uygulama": T, "proje": proje, "ortak": ORTAK, "bildirim": False}, open(ay, "w"))
         self.p = subprocess.Popen([sys.executable, "relay.py", "--dir", self.canli, "--port", str(port)], cwd=T, stdout=open(os.path.join(T, f"relay{port}.log"), "w"),
@@ -95,6 +104,38 @@ try:
     A.karar("kapat"); A.istek("/ping", {"call": True, "meeting": {"title": "Deneme"}}, koken=None)
     kontrol("toplantı sürerken başlamaz (sor ve yükleme)", "toplantı sürüyor" in (A.karar("sor", ad="a.m4a", boyut=10).get("err") or "") and A.yukle(SES).get("ok") is False)
 finally: A.kapat()
+
+# toplantı başlayınca duraklar, bitince sürer · duraklatılmışken Vazgeç · aktarıcı yeniden başlayınca kalan duraklatılmış süreç kapanır
+C = Aktarici(8790, os.path.join(T, "proje"))
+def pgid(c):
+    try: return int(open(os.path.join(c.canli, "dosyadan", "surec.pid")).read())
+    except (OSError, ValueError): return 0
+def calisiyor(c, sn=60):
+    t = time.time()
+    while time.time() - t < sn:
+        d = c.durum() or {}
+        if d.get("toplam") and d.get("blok", 0) >= 2 and pgid(c): return d
+        time.sleep(0.3)
+    return {}
+try:
+    C.yukle(UZUN); d0 = calisiyor(C)
+    C.istek("/ping", {"call": True, "meeting": {"title": "Deneme"}}, koken=None); time.sleep(3)
+    d1 = C.durum() or {}; g = grup(pgid(C)); time.sleep(4); d2 = C.durum() or {}
+    kontrol(f"toplantı başlayınca duraklatıldı (süreçler {g}), ilerleme durdu, panoda 'durakli'", d0 and d1.get("durakli") is True and g and all(x.startswith("T") for x in g) and d1.get("blok") == d2.get("blok") and d2.get("durum") == "calisiyor")
+    t = time.time(); d, _ = C.bekle("bitti", "hata", sn=150)
+    kontrol(f"toplantı bitince sürdü ve bitti ({time.time() - t:.0f} sn sonra)", d.get("durum") == "bitti" and not d.get("durakli") and "toplantı bitti — sürüyor" in open(os.path.join(T, "relay8790.log")).read())
+    C.karar("kapat"); C.yukle(UZUN, ad="Uzun deneme 2.m4a"); calisiyor(C); p = pgid(C)
+    C.istek("/ping", {"call": True, "meeting": {"title": "Deneme"}}, koken=None); time.sleep(3)
+    durdu = (C.durum() or {}).get("durakli"); C.karar("vazgec"); time.sleep(4)
+    kontrol("duraklatılmışken Vazgeç → süreç grubu kapandı", durdu and not grup(p) and C.durum() is None)
+    kontrol("Vazgeç'te geçici WAV klasörü kalmadı", not [y for y in os.listdir(tempfile.gettempdir()) if y.startswith("suflor-dosya-") and time.time() - os.path.getmtime(os.path.join(tempfile.gettempdir(), y)) < 300])
+    time.sleep(60)  # toplantı penceresi kapansın
+    C.yukle(UZUN, ad="Uzun deneme 3.m4a"); calisiyor(C); p = pgid(C)
+    C.istek("/ping", {"call": True, "meeting": {"title": "Deneme"}}, koken=None); time.sleep(3)
+    durdu = (C.durum() or {}).get("durakli"); C.p.kill(); C.p.wait(5); time.sleep(1); kalan = grup(p)
+    C = Aktarici(8790, os.path.join(T, "proje")); time.sleep(4)
+    kontrol(f"aktarıcı yeniden başlayınca kalan duraklatılmış süreç kapandı (önce {kalan}, sonra {grup(p)})", durdu and kalan and not grup(p) and not os.path.exists(os.path.join(C.canli, "dosyadan")))
+finally: C.kapat()
 
 # proje Masaüstü'nde: launchd oraya yazamaz → canli/dokum (klasöre dokunulmaz; olmayan yol)
 B = Aktarici(8792, os.path.expanduser("~/Desktop/suflor-deneme-yok"))

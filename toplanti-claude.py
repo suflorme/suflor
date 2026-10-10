@@ -1438,6 +1438,10 @@ def dosyadan_cmd():
     adlar = []
     for d in [str(t.get("dogru") or "").strip().replace(",", " ") for t in ter] + ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []):
         if d and d != d.lower() and d not in adlar: adlar.append(d)
+    import signal  # panodan Vazgeç SIGTERM gönderir: finally çalışsın, geçici WAV kalmasın; yarıda kalmış eski işlerin artığı da silinir
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit("vazgeçildi"))
+    for y in glob.glob(os.path.join(tempfile.gettempdir(), "suflor-dosya-*")):
+        if time.time() - os.path.getmtime(y) > 6 * 3600: shutil.rmtree(y, ignore_errors=True)
     gecici = tempfile.mkdtemp(prefix="suflor-dosya-"); wav = os.path.join(gecici, "ses.wav")
     try:
         r = subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", g, wav], capture_output=True, text=True)

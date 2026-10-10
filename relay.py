@@ -1796,12 +1796,41 @@ def son_ac(p):
 # yok) POST /dosyadan'a akıtır → canli/dosyadan/<ad> (geçici; iş bitince silinir) → `toplanti-claude.py dosyadan` arka planda (Whisper
 # ayrı süreçte). Toplantı sürerken başlamaz; aynı anda tek iş. Çıktı: proje klasörü korunan klasörde değilse <proje>/gorusmeler, değilse
 # canli/dokum/ (launchd Masaüstü/Belgeler'e yazamaz; denemek izin penceresi açabilir). Aynı adlı döküm varsa panoda Üzerine yaz / Vazgeç
-# (dosya o arada bekler, yeniden yüklenmez).
+# (dosya o arada bekler, yeniden yüklenmez). İş sürerken toplantı başlarsa süreç grubu durdurulur (SIGSTOP; işlemci boşalır, bellek kalır),
+# toplantı bitince (eklenti 60 sn nabız göndermeyince) kaldığı yerden sürer (SIGCONT). Süreç grubu kimliği canli/dosyadan/surec.pid'de:
+# aktarıcı duraklatılmış işin ortasında yeniden başlarsa açılışta kalan grup kapatılır (durdurulmuş süreç yoksa sonsuza dek bellekte kalırdı).
 SES_UZANTI = (".m4a", ".mp4", ".mov", ".m4v", ".wav", ".mp3", ".aac", ".caf", ".aif", ".aiff", ".3gp")
 DOSYADAN_GB = 4
 DOSYADAN = {}; DOSYADAN_KILIT = threading.Lock()
 def dosyadan_view():
-    return {k: DOSYADAN.get(k) for k in ("durum", "ad", "adim", "blok", "toplam", "md", "yer", "var", "hata")} if DOSYADAN.get("durum") else None
+    return {k: DOSYADAN.get(k) for k in ("durum", "ad", "adim", "blok", "toplam", "md", "yer", "var", "hata", "durakli")} if DOSYADAN.get("durum") else None
+def _dosyadan_pid(): return os.path.join(BASE, "dosyadan", "surec.pid")
+def _dosyadan_sinyal(pr, *sig):
+    for g in sig:
+        try: os.killpg(pr.pid, g)
+        except OSError: pass
+def _dosyadan_bekci(pr):  # iş sürerken toplantı başlarsa duraklat, bitince sürdür
+    import signal
+    while pr.poll() is None and DOSYADAN.get("p") is pr and DOSYADAN.get("durum") == "calisiyor":  # Vazgeç'te çık: kapanan süreci yeniden durdurmasın
+        t = toplanti_var()
+        if t and not DOSYADAN.get("durakli"):
+            _dosyadan_sinyal(pr, signal.SIGSTOP); DOSYADAN["durakli"] = True; print("DOSYADAN: toplantı başladı — duraklatıldı")
+        elif not t and DOSYADAN.get("durakli"):
+            _dosyadan_sinyal(pr, signal.SIGCONT); DOSYADAN["durakli"] = False; print("DOSYADAN: toplantı bitti — sürüyor")
+        time.sleep(1)
+def dosyadan_artik_temizle():  # açılışta: önceki aktarıcıdan kalan (belki duraklatılmış) iş ve geçici dosyalar
+    import signal
+    try: pid = int(open(_dosyadan_pid()).read().strip())
+    except (OSError, ValueError): pid = 0
+    if pid:
+        k = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
+        if "toplanti-claude.py" in k and " dosyadan " in k:  # kimlik başka sürece geçmişse dokunma
+            for g in (signal.SIGCONT, signal.SIGTERM):
+                try: os.killpg(pid, g)
+                except OSError: pass
+            threading.Timer(3, lambda: [os.killpg(pid, signal.SIGKILL) for _ in [0] if subprocess.run(["ps", "-axo", "pgid="], capture_output=True, text=True).stdout.split().count(str(pid))]).start()
+            print("DOSYADAN: önceki aktarıcıdan kalan iş kapatıldı")
+    shutil.rmtree(os.path.join(BASE, "dosyadan"), ignore_errors=True)
 def _dosyadan_ad(ad):
     return re.sub(r"[^\w.\- ]", "_", os.path.basename(str(ad or "")))[:120].strip(" .")
 def _dosyadan_cikti():
@@ -1853,7 +1882,11 @@ def _dosyadan_calis(yol, uzerine):
     try: p = subprocess.Popen(k, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", start_new_session=True,
                               env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1"))
     except OSError as e: return _dosyadan_bitir(yol, hata=str(e)[:160])
-    DOSYADAN["p"] = p; md, son = None, ""
+    DOSYADAN.update(p=p, durakli=False); md, son = None, ""
+    try:
+        with open(_dosyadan_pid(), "w") as f: f.write(str(p.pid))
+    except OSError: pass
+    threading.Thread(target=_dosyadan_bekci, args=(p,), daemon=True).start()
     for l in p.stdout:
         l = l.strip()
         if not l: continue
@@ -1861,7 +1894,9 @@ def _dosyadan_calis(yol, uzerine):
         if m := re.search(r"blok (\d+)/(\d+)", l): DOSYADAN.update(blok=int(m[1]), toplam=int(m[2]), adim=None)
         elif m := re.match(r"ses ([\d.]+) dk", l): DOSYADAN.update(adim=_t(f"{m[1]} dk ses · Whisper yüklendi", f"{m[1]} min audio · Whisper loaded"))
         elif m := re.match(r"Döküm yazıldı: (.+?\.md) ", l): md = m[1]
-    p.wait(); DOSYADAN.pop("p", None)
+    p.wait(); DOSYADAN.pop("p", None); DOSYADAN["durakli"] = False
+    try: os.remove(_dosyadan_pid())
+    except OSError: pass
     if DOSYADAN.get("durum") != "calisiyor": return  # Vazgeç
     if md:
         DOSYADAN["yer"] = "canli/dokum" if os.path.dirname(md) == os.path.join(BASE, "dokum") else os.path.dirname(md).replace(os.path.expanduser("~"), "~", 1)
@@ -1887,9 +1922,9 @@ def dosyadan_karar(p):
             threading.Thread(target=_dosyadan_calis, args=(yol, True), daemon=True).start(); DOSYADAN["durum"] = "calisiyor"; return {"ok": True}
         if i == "vazgec" and d in ("var", "calisiyor"):
             pr = DOSYADAN.get("p"); DOSYADAN["durum"] = "iptal"
-            if pr:
-                try: os.killpg(pr.pid, 15)  # Whisper işçisi de aynı süreç grubunda
-                except OSError: pass
+            if pr:  # SIGCONT + SIGTERM (Whisper işçisi de aynı grupta); SIGTERM'ü yok sayan multiprocessing izleyicisi 3 sn sonra SIGKILL'le
+                import signal  # sinyal numarası değil adı: macOS'ta 18 SIGTSTP'dir (Linux'ta SIGCONT)
+                _dosyadan_sinyal(pr, signal.SIGCONT, signal.SIGTERM); threading.Timer(3, _dosyadan_sinyal, (pr, signal.SIGKILL)).start()
             try: os.remove(yol)
             except OSError: pass
             DOSYADAN.clear(); print("DOSYADAN: vazgeçildi"); return {"ok": True}
@@ -2801,7 +2836,7 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
 if __name__ == "__main__":
-    restore_state(); load_cards(); eylem_yukle(); son_yukle(); brifing_yukle(); anahtar_yardimcisi_kur()
+    restore_state(); load_cards(); eylem_yukle(); son_yukle(); brifing_yukle(); dosyadan_artik_temizle(); anahtar_yardimcisi_kur()
     threading.Thread(target=_takvim_dongu, daemon=True).start()
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
