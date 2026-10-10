@@ -111,6 +111,13 @@ yp.add_argument("durum", nargs="?", choices=["ac", "kapat"])
 ad = sub.add_parser("adimlar", help="yaparken kaydet sonrası: döküm + kanıtlar saat sırasıyla; görüntüler belgenin yanına kopyalanır → Claude adım belgesini yazar")
 ad.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); ad.add_argument("--kim", default=None, help="dosya adındaki konu (yoksa toplantı başlığı)")
 ad.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)")
+df = sub.add_parser("dosyadan", help="kayıtlı ses/video dosyası (m4a, mp4, mov, wav, mp3…) → yerel Whisper → döküm .md + .vtt (dokum ile aynı yer ve biçim)")
+df.add_argument("girdi", help="ses ya da video dosyası"); df.add_argument("--kim", default=None, help="dosya adındaki kişi/konu (yoksa dosyanın adı)")
+df.add_argument("--dil", default=None, choices=["tr", "en"], help="konuşma dili (yoksa Whisper her 5 dk'lık blokta kendisi bulur)")
+df.add_argument("--bas", default=None, help="kaydın başladığı an \"YYYY-AA-GG SS:DD\" (yoksa dosya tarihinden tahmin)")
+df.add_argument("--adlar", default=None, help="konuşmacı adları, ilk konuşma sırasıyla: \"Ayşe,John\" (yoksa Konuşmacı 1, 2…)")
+df.add_argument("--cikti", default=None); df.add_argument("--uzerine", action="store_true"); df.add_argument("--goster", action="store_true")
+df.add_argument("--zorla", action="store_true", help="toplantı sürerken de çalış (canlı döküm yavaşlayabilir)")
 sub.add_parser("durum", help="v0.14.0: aktarıcının /status yanıtı (JSON; yerel anahtarla — anahtarsız curl 401 alır)")
 sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü (aktarıcı, eklenti sürümü, Whisper, ses modeli, bellek, disk)")
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
@@ -1321,9 +1328,19 @@ def dokum_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
     md = os.path.basename(md).replace(".jsonl", ".md")
-    sat = dokum_satirlari(md); met = [x for x in sat if "metin" in x]
-    if not met: sys.exit(f"{md}: dökümde satır yok")
-    baslik = toplanti_basligi(md)
+    sat = dokum_satirlari(md)
+    if not any("metin" in x for x in sat): sys.exit(f"{md}: dökümde satır yok")
+    dokum_yaz(sat, toplanti_basligi(md), "Kaynak: `_canli/" + md + "`")
+def dokum_kok(kim, bas):  # <hedef>/<alan>-<kim>-transkript-<YYYYMMDD>; varsa ve --uzerine yoksa durur
+    kim = re.sub(r"[^\w-]+", "-", kim, flags=re.UNICODE).strip("-")[:60] or "toplanti"
+    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(os.path.expanduser(AYAR["proje"]), "gorusmeler"), os.path.expanduser(AYAR["proje"])) if os.path.isdir(y))
+    os.makedirs(hedef, exist_ok=True)
+    kok = os.path.join(hedef, f"{AYAR.get('alan') or 'Suflor'}-{kim}-transkript-{bas:%Y%m%d}")
+    var = [y for y in (kok + ".md", kok + ".vtt") if os.path.exists(y)]
+    if var and not A.uzerine and not A.goster: sys.exit("zaten var (üzerine yazmak için --uzerine): " + ", ".join(var))
+    return kok
+def dokum_yaz(sat, baslik, kaynak, saat_notu=""):  # dokum ve dosyadan: .md + .vtt → <proje>/gorusmeler (A.kim, A.cikti, A.uzerine, A.goster)
+    met = [x for x in sat if "metin" in x]
     t0, t1 = met[0]["t"], max(x["t1"] for x in met)
     bas = datetime.datetime.fromtimestamp(t0).astimezone(); bit = datetime.datetime.fromtimestamp(t1).astimezone()
     kisi = {}; kay = {}
@@ -1331,11 +1348,14 @@ def dokum_cmd():
     AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
     KAY = {"whisper": "yerel Whisper", "transcript": "Teams dökümü", "caption": "Teams altyazısı", "captions": "Teams altyazısı"}
     L = [f"# Döküm — {baslik}", "",
-         "İç belge, kişi adı içerir. " + ("Suflor.me'nin kendi dökümü: yerel Whisper, ses Mac dışına çıkmadı." if set(kay) == {"whisper"} else
+         "İç belge, kişi adı içerir. " + ("Ses dosyasından yerel Whisper dökümü; ses Mac dışına çıkmadı." if set(kay) == {"dosya"} else
+                                           "Suflor.me'nin kendi dökümü: yerel Whisper, ses Mac dışına çıkmadı." if set(kay) == {"whisper"} else
                                            f"Suflor.me dökümü — kaynak: {', '.join(f'{KAY.get(k, k)} {n}' for k, n in kay.items())} satır."),
          f"{bas.day} {AYLAR[bas.month - 1]} {bas.year}, {bas:%H:%M}–{bit:%H:%M} ({round((t1 - t0) / 60)} dk) · {len(met)} satır · "
          + ", ".join(f"{k} {n}" for k, n in sorted(kisi.items(), key=lambda kv: -kv[1])),
-         "Saatler yerel saat. \"Karşı taraf n\": ses izinden ayrılan, adı bulunamayan konuşmacı; \"Bilinmeyen konuşmacı\": altyazıda ad yoktu. Kaynak: `_canli/" + md + "`", ""]
+         "Saatler yerel saat" + saat_notu + ". "
+         + (("Konuşmacı adları elle verildi (ilk konuşma sırasıyla, ses izinden). " if getattr(A, "adlar", None) else "\"Konuşmacı n\": ses izinden ayrılan konuşmacı (adı bilinmiyor). ") if set(kay) == {"dosya"} else
+            "\"Karşı taraf n\": ses izinden ayrılan, adı bulunamayan konuşmacı; \"Bilinmeyen konuşmacı\": altyazıda ad yoktu. ") + kaynak, ""]
     paragraf = None
     def yaz():
         if paragraf: L.extend([f"**[{datetime.datetime.fromtimestamp(paragraf['t']).astimezone():%H:%M:%S}] {paragraf['kim']}:** " + " ".join(paragraf["m"]), ""])
@@ -1356,13 +1376,7 @@ def dokum_cmd():
     V = ["WEBVTT", f"NOTE {esc(baslik)} · {bas:%Y-%m-%d %H:%M} · Suflor.me (iç belge, kişi adı içerir)", ""]
     for k, x in enumerate(met, 1):
         V.extend([f"{k}", f"{vz(x['t'] - t0)} --> {vz(max(x['t1'], x['t'] + 0.5) - t0)}", f"<v {esc(x['kim'])}>{esc(x['metin'])}</v>", ""])
-    kim = A.kim or baslik
-    kim = re.sub(r"[^\w-]+", "-", kim, flags=re.UNICODE).strip("-")[:60] or "toplanti"
-    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(os.path.expanduser(AYAR["proje"]), "gorusmeler"), os.path.expanduser(AYAR["proje"])) if os.path.isdir(y))
-    os.makedirs(hedef, exist_ok=True)
-    kok = os.path.join(hedef, f"{AYAR.get('alan') or 'Suflor'}-{kim}-transkript-{bas:%Y%m%d}")
-    var = [y for y in (kok + ".md", kok + ".vtt") if os.path.exists(y)]
-    if var and not A.uzerine: sys.exit("zaten var (üzerine yazmak için --uzerine): " + ", ".join(var))
+    kok = dokum_kok(A.kim or baslik, bas)
     for y, m in ((kok + ".md", metin_md), (kok + ".vtt", "\n".join(V))):
         tmp = y + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f: f.write(m)
@@ -1400,6 +1414,68 @@ def adimlar_cmd():
     print("Yaz: başlık, kısa amaç, ön koşullar, numaralı adımlar (her adımda ne yapılır + gerekirse görsel: ![](<göreli yol>)), dikkat edilecekler.")
     print("Görüntüleri Read ile aç; aynı ekranı tekrarlayan ya da işle ilgisiz (yalnız video, boş ekran) görüntüyü kullanma. Belge iç belgedir.\n")
     for t, m in ol: print(f"[{datetime.datetime.fromtimestamp(t).astimezone():%H:%M:%S}] {m}")
+
+# --- Dosyadan döküm: kayıtlı ses/video → afconvert (macOS, 16 kHz tek kanal WAV, geçici) → whisper-isci.py --dosya → dokum_yaz ---------------
+# Ses Mac'ten çıkmaz; geçici WAV iş bitince silinir. Whisper ayrı süreçte (~2 GB bellek); toplantı sürerken --zorla olmadan çalışmaz.
+def dosyadan_cmd():
+    import tempfile, shutil, glob
+    g = os.path.abspath(os.path.expanduser(A.girdi))
+    if not os.path.isfile(g): sys.exit(f"dosya yok: {g}")
+    if not A.zorla:
+        try: x = get("/status").get("extension") or {}
+        except Exception: x = {}
+        if x.get("call") and (x.get("age_s") or 999) < 60: sys.exit("toplantı sürüyor — canlı döküm yavaşlamasın diye bekle (ya da --zorla)")
+    _ilk = lambda *ys: next((y for y in ys if os.path.exists(y)), None)
+    py = _ilk(*(os.path.join(d, "whisper-venv", "bin", "python") for d in (AYAR["ortak"], AYAR["uygulama"])))
+    mdl = _ilk(*(os.path.join(d, "whisper-modeller") for d in (AYAR["ortak"], AYAR["uygulama"])))
+    if not py or not mdl: sys.exit("Whisper kurulu değil (whisper-venv / whisper-modeller yok) — modeller-kur.command")
+    q8 = os.path.join(mdl, "hub", "models--suflor--whisper-large-v3-turbo-q8", "snapshots", "yerel")
+    tam = sorted(glob.glob(os.path.join(mdl, "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots", "*", "weights.safetensors")))
+    model = q8 if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(q8, "weights.safetensors")) else (os.path.dirname(tam[0]) if tam else None)
+    ecapa = _ilk(*(os.path.join(d, "ses-modeller", "spkrec-ecapa-voxceleb", "ecapa-mlx.npz") for d in (AYAR["ortak"], AYAR["uygulama"])))
+    try: ter = json.load(open(os.path.join(A.dir, "sozluk.json"), encoding="utf-8")).get("terimler", [])
+    except Exception: ter = []
+    adlar = []
+    for d in [str(t.get("dogru") or "").strip().replace(",", " ") for t in ter] + ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []):
+        if d and d != d.lower() and d not in adlar: adlar.append(d)
+    gecici = tempfile.mkdtemp(prefix="suflor-dosya-"); wav = os.path.join(gecici, "ses.wav")
+    try:
+        r = subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", g, wav], capture_output=True, text=True)
+        if r.returncode or not os.path.exists(wav): sys.exit(f"ses çıkarılamadı (afconvert): {(r.stderr or r.stdout).strip()[:200] or 'biçim desteklenmiyor'}")
+        sure = max(0, os.path.getsize(wav) - 44) / 32000  # 16 kHz × 2 bayt
+        if A.bas:
+            try: t_bas = datetime.datetime.strptime(A.bas, "%Y-%m-%d %H:%M").timestamp(); notu = ""
+            except ValueError: sys.exit("--bas biçimi: \"YYYY-AA-GG SS:DD\"")
+        else: t_bas = os.path.getmtime(g) - sure; notu = " (başlangıç dosya tarihinden tahmini; kesin saat için --bas)"
+        if not A.kim: A.kim = os.path.splitext(os.path.basename(g))[0]
+        dokum_kok(A.kim, datetime.datetime.fromtimestamp(t_bas).astimezone())  # dosya zaten varsa Whisper'dan önce dur
+        env = dict(os.environ, HF_HOME=mdl, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", SUFLOR_ISTEM=(", ".join(adlar))[:3000] + "." if adlar else "",
+                   **({"SUFLOR_WHISPER_MODEL": model} if model else {}), **({"SUFLOR_ECAPA": ecapa} if ecapa else {}))
+        isci = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whisper-isci.py")
+        p = subprocess.Popen([py, "-u", isci, "--dosya", wav, A.dil or "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
+        bol, son = [], None
+        for l in p.stdout:
+            try: j = json.loads(l)
+            except ValueError: continue
+            if j.get("hata"): sys.exit("Whisper: " + j["hata"])
+            if j.get("hazir"): print(f"ses {round(sure / 60, 1)} dk · Whisper yüklendi{' · ses izi var' if j.get('ecapa') else ''}", flush=True)
+            elif j.get("blok"): print(f"  blok {j['blok']}/{j['toplam']}…", flush=True)
+            elif j.get("bolum"): bol.append(j["bolum"])
+            elif j.get("bitti"): son = j
+        p.wait()
+    finally: shutil.rmtree(gecici, ignore_errors=True)
+    if not son: sys.exit("Whisper yarıda kaldı (bellek?) — yeniden dene")
+    if not bol: sys.exit("dosyada konuşma bulunamadı")
+    ad_ver = [x.strip() for x in (A.adlar or "").split(",") if x.strip()]; sira = {}
+    sat, onceki = [], "Bilinmeyen konuşmacı"
+    for b in bol:
+        k = b.get("kume")
+        if k:
+            if k not in sira: sira[k] = len(sira)
+            onceki = ad_ver[sira[k]] if sira[k] < len(ad_ver) else f"Konuşmacı {sira[k] + 1}"
+        sat.append({"t": t_bas + b["t0"], "t1": t_bas + b["t1"], "kim": onceki, "metin": b["metin"], "src": "dosya"})
+    print(f"Whisper {son['sn']} sn (ses {round(sure / 60, 1)} dk) · {len(bol)} bölüm · atlanan {son.get('atlanan', 0)} · konuşmacı {len(sira) or '?'}")
+    dokum_yaz(sat, os.path.splitext(os.path.basename(g))[0], "Kaynak: " + os.path.basename(g), notu)
 
 def karsilastir_cmd():
     import baglam, difflib
@@ -1746,5 +1822,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd}[A.cmd]()
+     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

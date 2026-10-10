@@ -167,6 +167,80 @@ def main():
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0
+def gecerli(s, x):  # canlı işçideki uydurma süzgeci (bölüm başına)
+    return bool(x) and not UYDURMA.search(x) and not (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
+        and s.get("compression_ratio", 0) <= 2.4 and s.get("avg_logprob", 0) >= -1.2 \
+        and not (len(x.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", x, re.I))
+def dosya_parcala(a, np, en_uzun=25, en_kisa=1.5):
+    # konuşma parçaları: ≥ 0,5 sn sessizlikten bölünür (söz devri çoğunlukla orada), en çok 25 sn (uzunsa son 5 sn'nin en sessiz karesinden),
+    # 1,5 sn'den kısa parça komşusuna eklenir. Sessizlik eşiği kaydın kendi gürültü tabanından (sessiz %10'luk dilim × 3).
+    K = SR // 50; n = len(a) // K
+    if n == 0: return [(0, len(a))]
+    rms = np.sqrt((a[:n * K].reshape(n, K) ** 2).mean(1)); esik = max(0.002, min(0.02, float(np.percentile(rms, 10)) * 3)); ses = rms > esik
+    bol, i = [], 0
+    while i < n:
+        while i < n and not ses[i]: i += 1
+        if i >= n: break
+        j, sus = i, 0
+        while j < n and sus < 25:
+            sus = sus + 1 if not ses[j] else 0; j += 1
+        bol.append([i, j - sus]); i = j
+    out_ = []
+    for b0, b1 in bol:
+        while b1 - b0 > en_uzun * 50:
+            c = b0 + (en_uzun - 5) * 50 + int(np.argmin(rms[b0 + (en_uzun - 5) * 50:b0 + en_uzun * 50])); out_.append([b0, c]); b0 = c
+        if out_ and (b1 - b0 < en_kisa * 50 or out_[-1][1] - out_[-1][0] < en_kisa * 50) and b1 - out_[-1][0] <= en_uzun * 50 and b0 - out_[-1][1] < 50: out_[-1][1] = b1
+        else: out_.append([b0, b1])
+    return [(max(0, b0 * K - SR // 5), min(len(a), b1 * K + SR // 5)) for b0, b1 in out_]  # 200 ms pay
+def dosya_dok(yol, dil, terimler):
+    # Dosyadan döküm (toplanti-claude.py dosyadan): afconvert'in ürettiği 16 kHz tek kanal 16 bit WAV, canlıdaki gibi konuşma parçalarıyla
+    # (dosya_parcala) Whisper'a. 10 Ekim yapay iki kişilik denemesinde 5 dk'lık bloklar dili blok başında bir kez buldu (İngilizce paragraf
+    # Türkçe uydurmaya döndü) ve iki konuşmacıyı tek bölümde birleştirdi; parça başına dil ve ses izi ikisini de çözer. Ses izi (ECAPA)
+    # varsa ≥ 0,8 sn parçalar k1, k2… kümelenir (canlıdaki karşı kanal kuralı). Çıkış satır başına JSON:
+    # {"hazir", "sure"} · {"blok", "toplam"} · {"bolum": {"t0", "t1", "metin", "kume"?}} · {"bitti", "sn", "atlanan"} · {"hata"}
+    import struct
+    t = time.time()
+    try:
+        import numpy as np, mlx_whisper
+        b = open(yol, "rb").read(); i, fmt, a = 12, None, None  # RIFF parçaları; afconvert WAVE_FORMAT_EXTENSIBLE yazar, wave modülü okumaz
+        while i + 8 <= len(b) and b[:4] == b"RIFF":
+            ad, n = b[i:i + 4], struct.unpack("<I", b[i + 4:i + 8])[0]
+            if ad == b"fmt ": fmt = struct.unpack("<HHI", b[i + 8:i + 16]) + struct.unpack("<H", b[i + 22:i + 24])  # biçim, kanal, örnekleme, bit
+            elif ad == b"data": a = np.frombuffer(b[i + 8:i + 8 + n], np.int16).astype(np.float32) / 32768; break
+            i += 8 + n + (n & 1)
+        if not fmt or a is None or fmt[1:] != (1, SR, 16): out({"hata": "WAV 16 kHz tek kanal 16 bit değil"}); return 1
+    except Exception as e: out({"hata": f"{e.__class__.__name__}: {str(e)[:200]}"}); return 1
+    try: import mlx.core as mx; mx.set_cache_limit(int(os.environ.get("SUFLOR_MLX_ONBELLEK_MB") or 0) * 2 ** 20)
+    except Exception: pass
+    iz = None; ey = os.environ.get("SUFLOR_ECAPA")
+    if ey and os.path.exists(ey):
+        try: import mlx.core as mx; iz = Ecapa(ey, np, mx)
+        except Exception as e: sys.stderr.write(f"ECAPA yüklenemedi: {e}\n")
+    istem = None
+    if terimler:
+        try:
+            from mlx_whisper.tokenizer import get_tokenizer
+            istem = istem_kur(get_tokenizer(multilingual=True, num_languages=100), terimler, "")[0]
+        except Exception: istem = terimler
+    out({"hazir": True, "model": MODEL, "sure": round(len(a) / SR, 1), "ecapa": bool(iz)})
+    parcalar = dosya_parcala(a, np); kumeler, atla, dil_son = [], 0, dil; adim = max(1, len(parcalar) // 20)
+    for k, (b0, b1) in enumerate(parcalar):
+        if k % adim == 0: out({"blok": k + 1, "toplam": len(parcalar)})
+        p = a[b0:b1]
+        # dil: verilmediyse her parçada Whisper bulur (karışık dilli toplantı); 4 sn'den kısa parçada tahmin güvensiz → öncekinin dili
+        r = mlx_whisper.transcribe(p, path_or_hf_repo=MODEL, language=dil or (dil_son if len(p) < 4 * SR else None), initial_prompt=istem,
+                                   condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
+        if not dil and len(p) >= 4 * SR and r.get("language"): dil_son = r["language"]
+        km = {}
+        if iz and len(p) >= SR * 0.8:
+            try: km = kumele(iz, kumeler, p, np)
+            except Exception: km = {}
+        for s in r.get("segments") or []:
+            x = (s.get("text") or "").strip()
+            if not gecerli(s, x) or (istem and x.lower().strip(" .") in istem.lower()): atla += 1; continue
+            out({"bolum": {"t0": round(b0 / SR + float(s["start"]), 2), "t1": round(b0 / SR + float(s["end"]), 2), "metin": x, "dil": r.get("language"),
+                           **({"kume": km["kume"]} if km.get("kume") else {})}})
+    out({"bitti": True, "sn": round(time.time() - t, 1), "atlanan": atla}); return 0
 def ecapa_donustur(ckpt, hedef):
     # kurulumda bir kez (aktarici-kur / modeller-kur): SpeechBrain ağırlıkları (torch dosyası) → numpy .npz. torch yalnız burada gerekir
     # (whisper-venv'de mlx-whisper'ın bağımlılığı olarak var); işçi çalışırken torch içe aktarılmaz.
@@ -193,4 +267,5 @@ def whisper_nicemle(kaynak, hedef, bit=8):
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--ecapa-donustur"]: ecapa_donustur(sys.argv[2], sys.argv[3]); sys.exit(0)
     if sys.argv[1:2] == ["--whisper-nicemle"]: whisper_nicemle(sys.argv[2], sys.argv[3]); sys.exit(0)
+    if sys.argv[1:2] == ["--dosya"]: sys.exit(dosya_dok(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] != "-" else None, os.environ.get("SUFLOR_ISTEM", "")))
     sys.exit(main())
