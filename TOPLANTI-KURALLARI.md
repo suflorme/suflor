@@ -104,9 +104,9 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
 - `KANIT n: <yol>.png …` (Option + Shift + K ya da 📷): SORU yoksa görüntüyü Read ile aç. Şifre/anahtar/kod değeri görünüyorsa hemen
   `dur` ("Kanıt 3'te şifre görünüyor — paylaşma; istersen sil"). Gündemle ilgiliyse `kanit n --aciklama "AWS IAM: 6 kullanıcı,
   2'sinde MFA yok"`. Konuşmayla çelişiyorsa `soyle`, `--neden "kanıt n"`. Sohbete yazma. Kanıt dosyaları iç belgedir.
-- Yaparken kaydet (panoda 📷 düğmesi ya da kullanıcı "ekranda göstereceği işi kaydet" der → `yaparken ac`, bitince `yaparken kapat`):
-  karşı tarafın ekranı değişince kanıt kendiliğinden alınır. Bunlar sana tek tek gelmez, yalnız ilkinde bir kez `YAPARKEN KAYDET: …`;
-  toplantı sırasında bakma. Görüntüler toplantı sonunda adım belgesine girer (`/toplanti` 5. bölüm).
+- `SUNULAN EKRAN: …` (karşı taraf ekran paylaşınca kendiliğinden; düğme yok): paylaşılan ekran değişince görüntü alınır. Bunlar sana
+  tek tek gelmez, yalnız ilkinde bir kez; toplantı sırasında bakma. Görüntüler toplantı sonunda özetin "Sunulan ekranlar" bölümüne
+  girer (`/toplanti` 5. bölüm). Elle kanıt (Option + Shift + K) bundan ayrıdır, `KANIT n` olarak gelir.
 - `DİNLE: …` (en çok 5 dk'da bir): kullanıcı son 10 dk'da konuşmanın ≥ %60'ını aldı (yalnız `yurutucu`) ya da söz kesme var.
   Kullanıcı çok konuşuyor ya da karşı tarafı kesiyorsa gizli `dur`: "Son 10 dk'da konuşmanın %70'i sende — kısa sor, Ayşe anlatsın" /
   "Ayşe bitirsin — sözünü kesme". Karşı taraf kullanıcıyı kesiyorsa gerekirse `soyle` "söz ver, ne eklemek istediğini sor".

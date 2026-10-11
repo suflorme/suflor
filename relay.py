@@ -386,7 +386,7 @@ def kanit(p):
         if rid and ki and ki["id"] == rid: STATE["kanit_iste"] = None
         elif rid: return {"ok": True, "dup": True}  # aynı istek ikinci sekmeden: bir kez kaydedilir
         if p.get("kaynak") == "oto":
-            if not yaparken_acik(): return {"ok": False, "err": "yaparken kaydet kapalı"}
+            if not yaparken_acik(): return {"ok": False, "err": "ekran kaydı kapalı"}
             if sum(1 for k in STATE["kanitlar"].get(os.path.basename(paths(title)[0]), []) if k.get("kaynak") == "oto") >= YAPARKEN_MAX:
                 return {"ok": False, "err": "sinir", "sinir": True}
         not_ = " ".join(str(p.get("not") or (ki.get("not") if ki and rid else "") or "").split())[:300]
@@ -414,9 +414,11 @@ def kanit(p):
         STATE["last"] = now.isoformat(timespec="seconds"); heartbeat()
     print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']}" + (f", paylaşılan ekran küçük %{kucuk}" if kucuk else "") + ")")
     return {"ok": True, "n": n, "path": rel, **({"kucuk": kucuk} if kucuk else {})}
-# Yaparken kaydet: ekran paylaşımında karşı taraf bir işi gösterirken eklenti, paylaşılan ekran belirgin biçimde değişip durulunca kanıtı
-# kendiliğinden alır (kaynak "oto"; karşılaştırma ve en sık 10 sn kuralı eklentide). Açılınca etkin toplantıya, toplantı yoksa ilk satıra
-# bağlanır; başka toplantı başlayınca kapanır. Toplantı sonunda `toplanti-claude.py adimlar` döküm + görüntülerden adım belgesine malzeme verir.
+# Ekran paylaşımı kaydı (eski adı "yaparken kaydet"): karşı taraf ekran paylaşırken eklenti, paylaşılan ekran belirgin biçimde değişip
+# durulunca kanıtı kendiliğinden alır (kaynak "oto"; karşılaştırma ve en sık 10 sn kuralı eklentide). v0.28.0 (S33): düğme yok — eklentinin
+# nabzındaki paylaşım sinyaliyle kendiliğinden açılır/kapanır (ayar `ekran_oto: false` kapatır); elle kanıt (Option + Shift + K) ayrı.
+# Etkin toplantıya bağlanır; başka toplantı başlayınca kapanır. Toplantı sonunda `toplanti-claude.py ekranlar` görüntüleri özetin
+# "Sunulan ekranlar" bölümüne (ve gerekirse adım belgesine) malzeme verir.
 YAPARKEN = {"acik": False, "file": None, "t": 0}; YAPARKEN_MAX = 200  # toplantı başına kendiliğinden kanıt sınırı
 def yaparken_acik():
     if not YAPARKEN["acik"]: return False
@@ -431,9 +433,14 @@ def yaparken_degistir(durum=None):  # durum: "ac" | "kapat" | None (tersine çev
     with LOCK:
         ac = (not yaparken_acik()) if durum is None else durum == "ac"
         if ac == yaparken_acik(): return ac
+        if ac and not aktif_dosya(): return False  # toplantı dosyası yokken açılmaz (paylaşım sinyali satırdan önce gelebilir; sonraki nabızda)
         YAPARKEN.update(acik=ac, file=aktif_dosya() if ac else YAPARKEN["file"], t=time.time())
-        _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **YAPARKEN KAYDET** | {'açıldı (ekran değişince kanıt kendiliğinden)' if ac else 'kapandı'} | |")
-    print(f"YAPARKEN: {'açıldı' if ac else 'kapandı'}"); return ac
+        n = sum(1 for k in STATE["kanitlar"].get(YAPARKEN["file"] or "", []) if k.get("kaynak") == "oto")
+        _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **SUNULAN EKRAN** | {'paylaşım başladı (ekran değişince görüntü kendiliğinden)' if ac else f'paylaşım bitti ({n} görüntü)'} | |")
+    print(f"EKRAN: paylaşım {'başladı — görüntü kaydı açık' if ac else f'bitti — {n} görüntü'}"); return ac
+def paylasim_bildir(var):  # eklentinin nabzı (kararlı değer): paylaşım başlayınca kayıt açılır, bitince kapanır
+    if var and AYAR.get("ekran_oto", True) is not False and not yaparken_acik(): yaparken_degistir("ac")
+    elif not var and yaparken_acik(): yaparken_degistir("kapat")
 def yaparken_view():
     if not yaparken_acik(): return None
     f = YAPARKEN["file"]; ks = STATE["kanitlar"].get(f, []) if f else []
@@ -446,10 +453,9 @@ bolum("whisper-hat")  # aktarici/whisper-hat.py — Whisper hattı: işçi, ses 
 # ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
 # isteği de yok (Faz 2: üç yanlış alarm, karşı taraf da duyuyor); kanıt yalnız Option + Shift + K ve 📷 ile.
-def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | yaparken (/komut yalnız bunları kabul eder)
+def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz (/komut yalnız bunları kabul eder)
     title = title or STATE["meeting"] or "Toplantı"; at = datetime.datetime.now().isoformat(timespec="seconds")
-    if tur == "yaparken": onay = _t("📷 Yaparken kaydet açık — ekran değişince kanıt alınır", "📷 Record-as-you-go on — screenshots when the screen changes") if yaparken_degistir(durum) else _t("📷 Yaparken kaydet kapandı", "📷 Record-as-you-go off")
-    elif tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
+    if tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
     elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
     else: ask({"tur": "ozet"}); onay = _t("💬 Ne diyeyim? — Claude replik hazırlıyor", "💬 What do I say? — Claude is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
@@ -1397,7 +1403,7 @@ class H(BaseHTTPRequestHandler):
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)
         if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
         if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
-            if p.get("tur") not in ("onemli", "ozet", "sessiz", "yaparken"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | yaparken"}, 400)
+            if p.get("tur") not in ("onemli", "ozet", "sessiz"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz"}, 400)
             komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
             return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view(), "yaparken": yaparken_view()})
         if self.path == "/ses-yerel":  # yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar
@@ -1423,6 +1429,7 @@ class H(BaseHTTPRequestHandler):
                     STATE["_tarayici"] = "Edge" if "Edg/" in ua else "Safari" if ("Safari/" in ua and "Chrome/" not in ua) else "Chrome"
                 if isinstance(p.get("mic"), dict): STATE["mic"] = {"on": bool(p["mic"].get("on")), "sessiz": bool(p["mic"].get("sessiz")), "hata": str(p["mic"].get("hata") or "")[:120], "t": simdi}
                 STATE["extension"] = {"ver": p.get("ver") or (STATE.get("extension") or {}).get("ver"), "seen": datetime.datetime.now().isoformat(timespec="seconds"), "panel": bool(p.get("panel")), "rows": p.get("rows", 0), "captions": bool(p.get("captions")), "call": bool(p.get("call")), "lang": p.get("lang") or p.get("capLang"), "langSrc": p.get("langSrc") or ("captions" if p.get("capLang") else None), "meeting": (p.get("meeting") or {}).get("title"), "sent": p.get("sent", 0), "capAuto": p.get("capAuto") or (STATE.get("extension") or {}).get("capAuto", ""), "platform": p.get("platform") or (STATE.get("extension") or {}).get("platform") or "teams", "yonerge": p.get("yonerge") or (STATE.get("extension") or {}).get("yonerge")}; heartbeat()  # altyazıyı kendisi açma sonucu; iframe pingleri (all_frames) boş gönderir, üzerine yazmasın
+            if isinstance(p.get("paylasim"), bool): paylasim_bildir(p["paylasim"])  # yalnız üst çerçeve gönderir
             return self._json({"ok": True})
         if self.path == "/agenda-tick":
             with LOCK:

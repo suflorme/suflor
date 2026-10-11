@@ -76,9 +76,9 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
 1. Monitor'ü durdur. `tc dokum --kim "<kişi>"` → `gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>.md` + `.vtt` ("zaten var" ve aynı
    toplantıysa `--uzerine`). Teams'in dökümü gerekmez; kullanıcı indirdiyse (Downloads'ta yeni .docx/.vtt) `tc karsilastir <dosya>
    --kaydet` → özete "Döküm kapsamı %X, kaçan N satır" (önemli kaçan bölümü ekle). İndirmediyse hatırlatma.
-   Yaparken kaydet açıldıysa (`YAPARKEN KAYDET` olayı geldi): `tc adimlar --kim "<konu>"` → çıktıdaki yola adım belgesini yaz
-   (`gorusmeler/<alan>-<konu>-adimlar-<YYYYMMDD>.md`, görüntüler yanındaki `-gorseller/` klasöründe). Görüntüleri Read ile aç; şifre,
-   anahtar ya da kişisel veri görünen görüntüyü belgeye koyma, kullanıcıya söyle. Özete belgenin yolunu ekle.
+   Ekran paylaşıldıysa (`SUNULAN EKRAN` olayı geldi): `tc ekranlar --kim "<konu>"` → görüntüler `gorusmeler/<alan>-<konu>-ekranlar-<YYYYMMDD>/`
+   klasörüne kopyalanır. Görüntüleri Read ile aç; şifre, anahtar ya da kişisel veri görüneni koyma, kullanıcıya söyle. Özete "Sunulan
+   ekranlar" (3. adım); karşı taraf bir işi adım adım gösterdiyse adım belgesini de yaz (çıktıdaki yol) ve özete yolunu ekle.
 2. Özetten takip işlerini say (toplam T / sahibi ve tarihi belli S), `tc sonuc --takip T/S --karar K --kaydet`.
    **Sözler defteri:** toplantıda verilen her söz ve takip işi (iki taraf, kullanıcınınkiler dahil; "yaparım", "Cuma'ya kadar
    gönderirim") için `tc soz ekle "<ne>" --kim <kişi> [--tarih YYYY-MM-DD]` — sormadan (yerel kayıt, esas belge değil); tarih
@@ -95,6 +95,8 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
      kartlar (✓ / 👁 / ✕) · cevapsız sorular (`tc acik`; kime soruldu) · hassas ifade uyarıları (yalnız işaret, değer yok).
    - `sonuc` çıktısından: Kesinleşmesi gerekenler (kim, ne, kime ne sorulacak) · Öne çıkan anlar (saat + bir cümle; ⭐ dahil) ·
      Konuşma (3–5 satır + tek öneri; `katilimci`/`dinleyici`da konuşma payı yok). Whisper satırı yoksa boş bölümü atla.
+   - Sunulan ekranlar (1. adımda `ekranlar` çalıştıysa): `## Sunulan ekranlar` — içerik değişen her ekran için saat + ne gösterildi
+     (tek cümle, dökümden) + görsel `![](<göreli yol>)`; tekrar eden, boş ya da yalnız kamera görüntüsünü atla.
    - Kanıtlar (`tc kanit`; açıklamasızları Read ile aç): `CLAUDE.md`'deki kanıt klasörüne (yoksa `_kanit/`) kopyalanacakları öner (`<Sistem>_<ne>_<GGAAYYYY>.png`,
      ör. `AWS_IAM_users_01102026.png`); onaylarsa kopyala (`_canli` kopyası kalır).
    - Esas belgelere öneriler kuyruğa (`TOPLANTI-KURALLARI.md` §8): karar listesi satır taslağı ("#?"), durum belgesi tek satır, tablo

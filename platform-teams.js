@@ -2,7 +2,7 @@
 // Çekirdek (content.js) platformdan bağımsızdır; sayfaya özgü her şeyi bu nesneden ister. Manifest bu dosyayı aynı
 // içerik betiği bağlamında content.js'ten ÖNCE yükler. Yeni platform = aynı arayüzü veren yeni dosya (platform-meet.js…):
 //   ad, etiket, yonerge{altyazi, dokum}, kur(yard)
-//   toplantiAdi() · cagrida() · micDugme() · sessizMi()
+//   toplantiAdi() · cagrida() · micDugme() · sessizMi() · paylasimVar() (isteğe bağlı: true/false, emin değilse null)
 //   dokumPaneli() · dokumOku(panel) → [{id, speaker, time, text}] | null (tanınmadı: çekirdek genel okuyucuyu dener)
 //   dokumSatirSayisi(panel) · altyaziKutusu() · altyaziVar() (sıkı: gerçek altyazı metni görünüyor) · altyaziOku(box)
 //   altyaziAdimlari: [[seçici, metin kalıbı]] — altyazıyı açan menü yolu (çekirdek güvenlik denetimiyle oynatır)
@@ -26,6 +26,14 @@
   // toplantıda mı (çağrı denetimleri görünüyor). Seçiciler gerçek Teams'te kısmen doğrulandı (ayrıl düğmesi).
   function cagrida() { return !!document.querySelector('[data-tid="hangup-main-btn"], [data-tid="call-hangup"], #hangup-button, button[aria-label^="Ayrıl"], button[aria-label^="Leave"], [data-tid="call-control-bar"]'); }
   function micDugme() { return document.querySelector('[data-tid="microphone-button"], #microphone-button, [data-tid="toggle-mute"], button[aria-label*="Sesi aç"], button[aria-label*="Sesi kapat"], button[aria-label*="Unmute"], button[aria-label*="Mute"]'); }
+  // karşı tarafın ekran paylaşımı (v0.28.0): Teams sahnesindeki paylaşım öğesi (data-tid tahmini; gerçek paylaşımda doğrulanmadı).
+  // Kendi paylaşımında "Paylaşmayı durdur" görünür → hayır. Öğe bulunmazsa null: çekirdek genel yolu dener (etiket, ekran boyutlu video).
+  function paylasimVar() {
+    const kendi = document.querySelector('[data-tid="call-share-stop"], [data-tid="stop-sharing-button"], [data-tid="sharing-stop-button"]');
+    if (kendi && kendi.getClientRects().length) return false;
+    const e = document.querySelector('[data-tid*="screen-share" i], [data-tid*="screenshare" i], [data-tid*="content-share" i], [data-tid*="desktop-share" i], [data-tid*="shared-content" i]');
+    return e && e.getClientRects().length && e.getBoundingClientRect().width * e.getBoundingClientRect().height >= innerWidth * innerHeight * 0.25 ? true : null;
+  }
   function sessizMi() {
     const b = micDugme(); if (!b) return false;
     const l = (b.getAttribute("aria-label") || b.title || "").toLowerCase();
@@ -123,7 +131,7 @@
       en: { altyazi: "More (…) → Language and speech → Turn on live captions", dokum: "More → Record and transcribe → Show transcript" } },
     get yonerge() { return this.YONERGE[this.dil] || this.YONERGE.tr; },
     kur(yard) { Y = yard; },
-    SKIP_RE, toplantiAdi, cagrida, micDugme, sessizMi, dokumPaneli, dokumSatirSayisi, dokumOku, altyaziKutusu, altyaziVar, altyaziOku,
+    SKIP_RE, toplantiAdi, cagrida, micDugme, sessizMi, paylasimVar, dokumPaneli, dokumSatirSayisi, dokumOku, altyaziKutusu, altyaziVar, altyaziOku,
     altyaziAdimlari: [  // metinle bulma: [seçici, metin/aria kalıbı]
       ['#callingButtons-showMoreBtn, [data-tid="more-button"], [data-tid="callingButtons-showMoreBtn"], button', /^(diğer|daha fazla|tümü|more)(\b|$)|^…$/i],  // 1 Ekim gerçek Teams (kanıt): çağrı çubuğunda "Tümü"
       ['[role="menuitem"], [role="menuitemcheckbox"], button', /^(dil ve konuşma|language and speech)/i],

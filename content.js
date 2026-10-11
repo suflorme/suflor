@@ -418,7 +418,7 @@
     if (queue.length) drainQueue(); // yeni satır gelmese de kuyruğu boşaltmayı dene
     const panel = findTranscriptPanel();
     const caps = !!findCaptions(); captureHint(panel, caps); if (queue.length) saveQueue(); else adoptQueues();
-    const body = { ver: chrome.runtime.getManifest().version, meeting: meetingInfo(), panel: !!panel, rows: panel ? P.dokumSatirSayisi(panel) : 0, platform: P.ad, yonerge: P.yonerge, captions: caps, call: window.top === window ? inCall() : false, lang: capLang, langSrc, capAuto, sent: sentById.size + sentKeys.size, at: new Date().toISOString(), kim, vis: document.visibilityState, mic: window.top === window ? { on: mic.on, sessiz: mic.on && teamsSessiz(), hata: mic.hata || "" } : null };
+    const body = { ver: chrome.runtime.getManifest().version, meeting: meetingInfo(), panel: !!panel, rows: panel ? P.dokumSatirSayisi(panel) : 0, platform: P.ad, yonerge: P.yonerge, captions: caps, call: window.top === window ? inCall() : false, lang: capLang, langSrc, capAuto, sent: sentById.size + sentKeys.size, at: new Date().toISOString(), kim, vis: document.visibilityState, ...(window.top === window ? { paylasim: paylasimDurum() } : {}), mic: window.top === window ? { on: mic.on, sessiz: mic.on && teamsSessiz(), hata: mic.hata || "" } : null };
     try { const r = await rf("/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); if (r.ok) { lastOk = Date.now(); failCount = 0; } }
     catch (e) { failCount++; }
     chrome.runtime.sendMessage({ type: "status", ok: failCount === 0, panel: !!panel, call: body.call, meeting: body.meeting.title, at: lastOk, failCount, queued: queue.length }).catch(() => {});
@@ -428,6 +428,34 @@
   // Kanıt anında paylaşılan ekranın ölçeği (9 Ekim: karşı tarafın ekranı küçük gösterilince kanıttaki yazı okunmadı). Görünür alanın ≥ %25'ini
 // kaplayan en büyük video ya da tuval (canvas; paylaşım tuvale çizilebilir) = sahnedeki paylaşım (galerideki küçük kamera karoları sayılmaz);
 // ölçek = ekrandaki cihaz pikseli / gerçek piksel (object-fit: contain). Ekran boyunda çizilen tuvalin ölçeği ~1: uyarı vermez. Teams seçicisi gerekmez.
+// Karşı tarafın ekran paylaşımı sürüyor mu (v0.28.0, S33): sürüyorsa aktarıcı ekran kaydını kendiliğinden açar, bitince kapatır.
+// Önce platform (Teams: data-tid ve kendi paylaşım düğmesi); emin değilse genel yol: kendi paylaşımı ("Paylaşmayı durdur" görünür → hayır;
+// Teams sekmesi kullanıcının kendi ekranını göstermez), paylaşımı anlatan erişilebilirlik etiketi, ya da görünür alanın ≥ %40'ını kaplayan,
+// ekran boyutlu (≥ 1280 genişlik) ve kamera oranında olmayan (16:9, 4:3) video/tuval. Seçiciler gerçek paylaşımda doğrulanmadı.
+const PAYLAS_KENDI = /paylaşmayı durdur|sunmayı durdur|paylaşımı durdur|stop sharing|stop presenting/i;
+const PAYLAS_ETIKET = /(ekran(ı|ını)?|içeri(k|ği)) paylaşıyor|ekranı paylaşılıyor|sunuyor\b|is (sharing|presenting)|shared (screen|content)|paylaşılan (ekran|içerik)/i;
+function paylasimHam() {
+  const p = P.paylasimVar ? P.paylasimVar() : null;
+  if (p === true || p === false) return p;
+  const gor = e => e.getClientRects().length > 0;
+  for (const b of document.querySelectorAll("button, [role=button]"))
+    if (PAYLAS_KENDI.test((b.getAttribute("aria-label") || "") + " " + (b.textContent || "").slice(0, 80)) && gor(b)) return false;
+  for (const e of document.querySelectorAll("[aria-label]")) if (PAYLAS_ETIKET.test(e.getAttribute("aria-label")) && gor(e)) return true;
+  for (const v of document.querySelectorAll("video, canvas")) {
+    const gw = v.tagName === "CANVAS" ? v.width : v.videoWidth, gh = v.tagName === "CANVAS" ? v.height : v.videoHeight;
+    if (!gw || !gh || gw < 1280) continue;
+    const r = v.getBoundingClientRect(), alan = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+    const oran = gw / gh;
+    if (alan >= innerWidth * innerHeight * 0.4 && Math.abs(oran - 16 / 9) > 0.04 && Math.abs(oran - 4 / 3) > 0.03) return true;
+  }
+  return false;
+}
+// iki ardışık nabızda (≥ 10 sn) aynı sonuç gelince değişir: kısa görünüp kaybolan öğe kaydı açıp kapatmasın
+const paylas = { deger: false, aday: false };
+function paylasimDurum() {
+  let h = false; try { h = (inMeeting() || inCall()) && paylasimHam(); } catch (e) {}
+  if (h === paylas.aday) paylas.deger = h; paylas.aday = h; return paylas.deger;
+}
 function paylasimOlcek() {
   let en = null;
   for (const v of document.querySelectorAll("video, canvas")) {
@@ -623,7 +651,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const a = Math.max(0, Math.round((Date.now() - Date.parse(son.at)) / 1000));
       n.textContent = L("son satır {a} önce · {k}", { a: a < 60 ? L("{n} sn", { n: a }) : L("{n} dk", { n: Math.floor(a / 60) }), k: son.speaker || "?" }); n.className = a > 60 ? "son eski" : "son";
     }
-    // Yaparken kaydet: kip açıkken toplantı sekmesi 3 sn'de bir arka plana "kare" der; karşılaştırma ve kendiliğinden kanıt background.js'te.
+    // Ekran paylaşımı kaydı (eski "yaparken kaydet"; aktarıcı paylaşım sürerken açar): toplantı sekmesi 3 sn'de bir arka plana "kare" der;
+    // karşılaştırma ve kendiliğinden kanıt background.js'te.
     // Şerit ve uyarı alanı maskelenir (kart gelince "ekran değişti" sayılmasın). Sekme görünür değilse istenmez.
     let otoZaman = null;
     function otoAyarla(acik) {
