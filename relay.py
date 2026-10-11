@@ -224,6 +224,35 @@ def card_key():
 CARD_KEY = card_key()
 def _log(name, rec):
     write([(os.path.join(BASE, name), json.dumps(rec, ensure_ascii=False) + "\n")])
+# --- Ölçüm kayıtlarının döndürülmesi (v0.24.2) -----------------------------------------------------------------------
+# İçeriksiz ölçüm kayıtları her toplantıda büyür (whisper-isler ~400, izle-paketler ~100 satır). Dosya KAYIT_SINIR'ı aşınca son KAYIT_KALAN
+# aktif dosyada kalır (yakın toplantıların ölçümü bozulmasın), eskisi canli/arsiv/<ad>.gz'ye eklenir (gzip ardışık üyeler; olcum.py ikisini
+# birlikte okur). Durum dosyaları (kartlar, sorular, eylemler) döndürülmez: sonradan gelen durum satırları eski kayda bağlanır, küçükler.
+# Toplantı sürerken yapılmaz (izle-paketler başka süreçten kilitsiz eklenir). Açılışta ve 6 saatte bir.
+KAYIT_DONEN = ("whisper-isler.jsonl", "izle-paketler.jsonl", "claude-cagri.jsonl")
+KAYIT_SINIR = int(os.environ.get("SUFLOR_KAYIT_SINIR_KB") or 2048) * 1024; KAYIT_KALAN = KAYIT_SINIR // 2
+def kayit_dondur():
+    import gzip
+    for ad in KAYIT_DONEN:
+        yol = os.path.join(BASE, ad)
+        try:
+            if os.path.getsize(yol) <= KAYIT_SINIR: continue
+            with LOCK:
+                b = open(yol, "rb").read(); k = b.find(b"\n", len(b) - KAYIT_KALAN) + 1
+                if k <= 0 or k >= len(b): continue
+                os.makedirs(os.path.join(BASE, "arsiv"), exist_ok=True)
+                with gzip.open(os.path.join(BASE, "arsiv", ad + ".gz"), "ab") as f: f.write(b[:k])
+                with open(yol + ".gecici", "wb") as f: f.write(b[k:])
+                os.replace(yol + ".gecici", yol)
+            n_ars, n_kal = b[:k].count(b"\n"), b[k:].count(b"\n")
+            print(f"KAYIT: {ad} döndürüldü — {n_ars} satır arşive, {n_kal} satır kaldı")
+        except FileNotFoundError: continue
+        except Exception as e: print(f"KAYIT: {ad} döndürülemedi ({e.__class__.__name__}: {e})")
+def _kayit_dongu():
+    time.sleep(5)
+    while True:
+        if not toplanti_var() and time.time() - max(STATE["file_last"].values(), default=0) > RESUME_MAX_AGE_MIN * 60: kayit_dondur()
+        time.sleep(6 * 3600)
 # --- Bekleyen kart/soru satırları ----------------------------------------------------------------------------
 # 30 Eylül: yeni toplantının ilk satırı gelmeden gönderilen kartlar önceki (29 Eylül) dosyaya yazıldı. Artık kart/soru
 # yalnız "etkin" toplantı dosyasına yazılır: son RESUME_MAX_AGE_MIN dakikada yazılmış ve eklentinin gördüğü toplantıyla
@@ -2911,6 +2940,7 @@ if __name__ == "__main__":
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi
+    threading.Thread(target=_kayit_dongu, daemon=True).start()  # ölçüm kayıtlarını döndür
     threading.Thread(target=_telaffuz_dongu, daemon=True).start()  # sözlükteki İngilizce adların Türkçe okunuşu (sesli özet, brifing)
     print(f"Suflor.me aktarıcı çalışıyor → http://127.0.0.1:{A.port}/  · dosyalar: {BASE}"); heartbeat()
     class Sunucu(ThreadingHTTPServer):
