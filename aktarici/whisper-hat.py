@@ -309,6 +309,7 @@ def _isci_dongu():
             _ISCI["baslik"] = is_["baslik"]
         istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem_metni(), "onceki": (k.onceki if k else "")[-150:],
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
+        if not dil: istek.update(diller=["tr", "en"], dil_yedek=getattr(k, "dil_son", None))  # karışık: yalnız tr/en
         # kullanıcı kanalında ses izi: oda açıksa ad için, değilse yalnız ses kilidi için ("Claude:" komutu kullanıcının sesi mi; ayar ses_kilidi)
         if is_["kanal"] == "ben" and not is_.get("bas") and (oda_acik() or AYAR.get("ses_kilidi", True) is not False): istek["oda"] = is_["oda"] = True
         try:
@@ -329,6 +330,7 @@ def _isci_dongu():
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         sonuc = "uydurma" if j.get("atlanan") else "bos"
+        if metin and j.get("dil") in ("tr", "en") and KANALLAR.get(is_["kanal"]): KANALLAR[is_["kanal"]].dil_son = j["dil"]
         if metin:
             if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
             if j.get("kume"): STATE["ses_model"]["parca"] += 1

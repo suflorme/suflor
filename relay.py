@@ -781,7 +781,8 @@ def karsi_konusuyor(sn=90):
     now = time.time(); ben = ben_adi()
     return now - (STATE["yerel_ses"].get("eklenti_karsi_ses") or 0) < sn or any(now - t < sn and k not in (ben, "?") for t, k in ALTYAZI_SON[-50:])
 def toplanti_var():  # eklenti son 60 sn'de toplantıda olduğunu bildirdi mi (iframe nabızları call=false gönderir, ayrı tutulur)
-    return time.time() - (STATE.get("_cagri_son") or 0) < 60
+    return time.time() - (STATE.get("_cagri_son") or 0) < TOPLANTI_VAR_SN
+TOPLANTI_VAR_SN = 6 if os.environ.get("SUFLOR_TEST_HIZLI") else 60
 def yerel_ses_durum():
     # yok (kurulu değil) · kapali (ayar ya da nabız yok) · bekliyor (toplantı uygulaması mikrofonu kullanmıyor) · dinliyor · izin
     y = STATE["yerel_ses"]; now = time.time()
@@ -857,6 +858,33 @@ def masaustu_baslik():  # eklenti toplantıda değilken masaüstü toplantısın
     if x.get("call") and _yas_sn(x) < 30: return None
     b = re.sub(r"\s*[|–-]\s*(Microsoft Teams|Zoom.*)$", "", m.get("baslik") or "").strip()
     return b if b and not re.fullmatch(r"(Microsoft Teams|Zoom( Meeting| Toplantısı)?|Toplantı|Meeting)", b, re.I) else f"{m.get('uygulama') or 'Masaüstü'} toplantısı"
+
+# Toplantı bitişi (v0.27.2): aktarıcı kendisi algılar, /status "toplanti_bitti" {file, t, neden}; izle "TOPLANTI BİTTİ" olayını bir kez verir.
+# 11 Ekim denemesi: eklenti sinyali 17:27'de koptu, kullanıcı 17:29'da ayrıldı, bitiş Claude'a ulaşmadı. Kural: toplantı sinyali (eklenti
+# çağrısı ya da masaüstü) 60 sn yok VE toplantı uygulaması mikrofonu bıraktı (ses yardımcısı "dinliyor" değil) → bitti; ses yardımcısı
+# kurulu/açık değilse yedek: son satır ≥ 5 dk önce. Sinyal kopsa da toplantı sürüyorsa tarayıcı mikrofonu tutar, yardımcı dinler → bitmez.
+BITIS = {"aktif": None, "t_aktif": 0.0}; BITIS_SATIRSIZ_SN = 8 if os.environ.get("SUFLOR_TEST_HIZLI") else 300
+def toplanti_bitis_bak():
+    af = STATE.get("file"); now = time.time()
+    if toplanti_var():
+        BITIS.update(aktif=af or BITIS["aktif"], t_aktif=now)
+        if (STATE.get("toplanti_bitti") or {}).get("file") == af: STATE["toplanti_bitti"] = None  # yeniden katıldı
+        return
+    f = BITIS["aktif"]
+    if not f or (STATE.get("toplanti_bitti") or {}).get("file") == f or STATE["file_lines"].get(f, 0) < 1: return
+    ys = yerel_ses_durum(); son_satir = STATE["file_last"].get(f, 0); m = STATE.get("masaustu") or {}
+    if ys in ("dinliyor", "izin") and now - son_satir < BITIS_SATIRSIZ_SN: return  # toplantı uygulaması mikrofonu hâlâ tutuyor
+    if ys not in ("bekliyor", "dinliyor", "izin") and now - son_satir < BITIS_SATIRSIZ_SN: return  # yardımcı yok: satırsız 5 dk beklenir
+    neden = ("masaüstü toplantı penceresi kapandı" if m.get("t", 0) > BITIS["t_aktif"] - 30 and not m.get("toplantida") else
+             f"{round((now - son_satir) / 60)} dk satır yok" if now - son_satir >= BITIS_SATIRSIZ_SN else
+             "toplantı sinyali yok, toplantı uygulaması mikrofonu bıraktı")
+    STATE["toplanti_bitti"] = {"file": f, "t": datetime.datetime.now().isoformat(timespec="seconds"), "neden": neden}
+    print(f"TOPLANTI: bitti ({neden}) · {f}")
+def _bitis_dongu():
+    while True:
+        time.sleep(1 if os.environ.get("SUFLOR_TEST_HIZLI") else 10)
+        try: toplanti_bitis_bak()
+        except Exception as e: print(f"TOPLANTI: bitiş denetimi hata ({e.__class__.__name__})")
 
 # --- v0.9.3: takvim + panodan /toplanti başlatma ------------------------------------------------------------------
 # Mac Takvim (Takvim uygulamasına eklenmiş tüm hesaplar) "Suflor Takvim.app" yardımcısıyla okunur: aktarıcı 5 dk'da bir
@@ -1411,6 +1439,7 @@ if __name__ == "__main__":
     threading.Thread(target=_takvim_dongu, daemon=True).start()
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=menu_baslat, daemon=True).start()  # ayar menu_cubugu
+    threading.Thread(target=_bitis_dongu, daemon=True).start()  # toplantı bitişi → /status toplanti_bitti
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi
     threading.Thread(target=_kayit_dongu, daemon=True).start()  # ölçüm kayıtlarını döndür

@@ -91,6 +91,9 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   veriyorsa tek NOT kartı (ad + bildiğin 1–2 bağlam); tanımıyorsan bir şey yapma. Sıklık sınırına sayılmaz.
   Satırda "karar grafında geçmişi: …" varsa (önceki toplantılardan iddia, karar, açık iş): bugün farklı rakam, tarih ya da
   karar söylerse `soyle` kartıyla çelişkiyi belirt ("Ayşe 11 Eki'de 95 bin demişti — hangisi?"); kişinin açık işi konuya gelince sor.
+- `TOPLANTI BİTTİ (<neden>)`: aktarıcı bitişi algıladı (toplantı sinyali yok ve uygulama mikrofonu bıraktı; yardımcı yoksa 5 dk satırsız;
+  masaüstü penceresi kapandı). kullanıcı "bitti" yazmasını bekleme: toplantı sonu adımlarına geç; sohbete tek satır. Yeniden katılırsa olay
+  sıfırlanır, satırlar sürer.
 - `SÜRE: …` (yarı, 15 dk, 5 dk, doldu; 10 dk'da bir en çok bir "gündem kayması"): yalnız `yurutucu`da ve işe yarayacaksa `soyle`
   ("Kalan 15 dk, 4 madde var — bütçe ve takvime geç"); `katilimci`da yalnız kullanıcının maddesi konuşulmadan kalacaksa;
   `dinleyici`da yok.

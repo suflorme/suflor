@@ -3,7 +3,8 @@
 # model bir kez yüklenir, sonra stdin'den gelen konuşma parçalarını metne çevirir. Tamamen yerel: ağ yok (model diskten).
 # Protokol (satır başına bir JSON):
 #   giriş : {"id": "...", "pcm": "<base64 int16, 16 kHz, tek kanal>", "dil": "tr"|"en"|null, "istem": "terimler…", "onceki": "son metin",
-#            "kanal": "ben"|"karsi", "baslik": "toplantı", "oda": true (yalnız ben: aynı mikrofonda ikinci kişi açık → ses izi de döner)}
+#            "kanal": "ben"|"karsi", "baslik": "toplantı", "oda": true (yalnız ben: ses izi de döner),
+#            "diller": ["tr", "en"] + "dil_yedek" (dil yokken: başka dil bulunursa yedek dilde yeniden)}
 #   çıkış : {"hazir": true, "model": "...", "sn": yükleme, "ecapa": bool} · {"id": "...", "text": "...", "sn": süre, "dil": "tr", "atlanan": n,
 #            "kume": "k1"|null, "benzerlik", "iz": karşı kanal ses izi (float16 base64), "bol": [{"s", "e", "n", "iz"}] bölüm başına} · {"id": "...", "hata": "..."}
 # konuşmacı ses izi (ECAPA-TDNN, SpeechBrain VoxCeleb ağırlıkları) bu süreçte MLX ile çalışır — ayrı ses işçisi,
@@ -146,6 +147,11 @@ def main():
             else: istem = " ".join(x for x in (p.get("istem") or "", p.get("onceki") or "") if x).strip() or None
             r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil") or None, initial_prompt=istem,
                                        condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
+            # karışık dil (gündem dil=karisik): yalnız izin verilen diller (tr/en); Whisper başkasını bulursa (11 Ekim: iki Türkçe satır İzlandaca)
+            # kanalın son dilinde (yoksa ilk izinli dilde) yeniden — dosyadan dökümdeki kural
+            if not p.get("dil") and p.get("diller") and r.get("language") not in p["diller"]:
+                r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil_yedek") if p.get("dil_yedek") in p["diller"] else p["diller"][0],
+                                           initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
             tut, atla = [], 0
             for s in r.get("segments") or []:
                 x = (s.get("text") or "").strip()
