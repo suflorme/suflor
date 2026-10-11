@@ -5,7 +5,7 @@
 #   giriş : {"id": "...", "pcm": "<base64 int16, 16 kHz, tek kanal>", "dil": "tr"|"en"|null, "istem": "terimler…", "onceki": "son metin",
 #            "kanal": "ben"|"karsi", "baslik": "toplantı"}
 #   çıkış : {"hazir": true, "model": "...", "sn": yükleme, "ecapa": bool} · {"id": "...", "text": "...", "sn": süre, "dil": "tr", "atlanan": n,
-#            "kume": "k1"|null, "benzerlik", "iz": karşı kanal ses izi (float16 base64)} · {"id": "...", "hata": "..."}
+#            "kume": "k1"|null, "benzerlik", "iz": karşı kanal ses izi (float16 base64), "bol": [{"s", "e", "n", "iz"}] bölüm başına} · {"id": "...", "hata": "..."}
 # konuşmacı ses izi (ECAPA-TDNN, SpeechBrain VoxCeleb ağırlıkları) bu süreçte MLX ile çalışır — ayrı ses işçisi,
 # PyTorch ve duygu modeli (emotion2vec+) kalktı. Ağırlıklar modeller-kur'un bir kez dönüştürdüğü ecapa-mlx.npz (SUFLOR_ECAPA); yoksa
 # kümeleme olmaz, Whisper aynen çalışır. SpeechBrain'le aynı sonuç (6 Ekim, 18 parça: kosinüs ≥ 0,99999), parça başına ~25 ms.
@@ -151,8 +151,8 @@ def main():
                 x = (s.get("text") or "").strip()
                 if not x or UYDURMA.search(x) or (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
                         or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; continue
-                tut.append(x)
-            metin = " ".join(tut).strip()
+                tut.append((s, x))
+            metin = " ".join(x for _, x in tut).strip()
             # kısa satırda web adresi: Whisper'ın video sonu uydurması ("www.feyyaz.tv" — 1 Ekim headless bip sesi denemesi)
             if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): metin = ""; atla += 1
             if istem and metin and metin.lower().strip(" .") in istem.lower(): metin = ""; atla += 1  # istemi geri okuma
@@ -163,8 +163,15 @@ def main():
             if iz and metin and p.get("kanal") == "karsi" and len(a) >= SR * 0.5:
                 # ses izi satırla geri döner (float16, base64): aktarıcı <toplantı>.sesizi.log'a yazar, toplantı sonunda toplu kümelenir (--toplu)
                 try:
-                    e = iz(a); km = {"iz": base64.b64encode(e.astype(np.float16).tobytes()).decode()}
+                    b64 = lambda v: base64.b64encode(v.astype(np.float16).tobytes()).decode()
+                    e = iz(a); km = {"iz": b64(e)}
                     if len(a) >= SR * 0.8: km.update(kumele(iz, kumeler, a, np, e))
+                    # birden çok bölümlü parçada bölüm (cümle) başına iz: hızlı söz devrinde canlı parça iki kişiyi içerir (11 Ekim, Easy Turkish:
+                    # canlı parçaların 6/15'i) ve parça izi ikisini tek kişide birleştirir (%62 → bölüm izleriyle %100). n = bölümün sözcük sayısı
+                    # (aktarıcının satır metnini bölmesi için); < 0,5 sn bölümün izi yok.
+                    if len(tut) > 1:
+                        km["bol"] = [dict({"s": round(sg["start"], 2), "e": round(sg["end"], 2), "n": len(x.split())},
+                                          **({"iz": b64(iz(a[int(sg["start"] * SR):int(sg["end"] * SR)]))} if (sg["end"] - sg["start"]) >= 0.5 else {})) for sg, x in tut]
                 except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}
             out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"istem_dusen": dusen} if dusen else {}), **({"ses": ses} if ses else {}), **km})
         except Exception as e:
@@ -230,17 +237,36 @@ def toplu_kumele(izler, np, esik=DOSYA_KUME_ESIK, en_kisa=1.0, kucuk_sn=8.0):
         if et[i] is None and e is not None: et[i] = max(merk, key=lambda k: float(np.dot(e, merk[k])))
     return et
 def toplu_dosya(yol):
-    # toplantı sonu (toplanti-claude.py konusmaci): canlı karşı satırların ses izleri (<toplantı>.sesizi.log: {"id", "t0", "t1", "iz"}) dosyadan
-    # dökümdeki gibi toplu kümelenir. Model yüklenmez (yalnız numpy). Çıkış: {"kume": {id: no}, "n": satır, "k": küme sayısı}
+    # toplantı sonu (toplanti-claude.py konusmaci): canlı karşı satırların ses izleri (<toplantı>.sesizi.log: {"id", "t0", "t1", "iz", "bol"?}) dosyadan
+    # dökümdeki gibi toplu kümelenir. Bölümlü satırda birim bölümdür (iki kişili canlı parça ayrılır); < 0,5 sn izsiz bölüm satırdaki en uzun
+    # izli bölümün kümesini alır. Model yüklenmez (yalnız numpy). Çıkış: {"kume": {id: no (süreye göre çoğunluk)}, "bol": {id: [no, …]} (yalnız
+    # bölümleri farklı kümede olan satır), "n": satır, "k": küme sayısı}
     import numpy as np
-    ids, izler = [], []
+    def iz_(b):
+        e = np.frombuffer(base64.b64decode(b), np.float16).astype(np.float32); return e / (np.linalg.norm(e) + 1e-9)
+    satir, birim = [], []  # satir: (id, [birim no]); birim: (süre, iz ya da None)
     for l in open(yol, encoding="utf-8"):
-        try: r = json.loads(l); e = np.frombuffer(base64.b64decode(r["iz"]), np.float16).astype(np.float32)
+        try: r = json.loads(l); e = iz_(r["iz"])
         except (ValueError, KeyError, TypeError): continue
-        ids.append(r["id"]); izler.append((max(0.0, float(r.get("t1") or 0) - float(r.get("t0") or 0)), e / (np.linalg.norm(e) + 1e-9)))
-    et = toplu_kumele(izler, np) if izler else []; ad = {}
-    km = {i: ad.setdefault(k, len(ad) + 1) for i, k in zip(ids, et) if k is not None}
-    out({"kume": km, "n": len(ids), "k": len(ad)}); return 0
+        bol = r.get("bol") or []
+        if len(bol) > 1 and any(b.get("iz") for b in bol):
+            ns = []
+            for b in bol:
+                try: ns.append(len(birim)); birim.append((max(0.0, float(b["e"]) - float(b["s"])), iz_(b["iz"]) if b.get("iz") else None))
+                except (ValueError, KeyError, TypeError): ns.append(len(birim)); birim.append((0.0, None))
+        else: ns = [len(birim)]; birim.append((max(0.0, float(r.get("t1") or 0) - float(r.get("t0") or 0)), e))
+        satir.append((r["id"], ns))
+    et = toplu_kumele(birim, np) if birim else []; ad = {}; km, bl = {}, {}
+    for i, ns in satir:
+        ks = [et[n] for n in ns]; sure = [birim[n][0] for n in ns]
+        if all(k is None for k in ks): continue
+        uz = max((m for m in range(len(ns)) if ks[m] is not None), key=lambda m: sure[m])
+        ks = [k if k is not None else ks[uz] for k in ks]
+        top = {}
+        for k, sn in zip(ks, sure): top[k] = top.get(k, 0) + sn
+        km[i] = ad.setdefault(max(top, key=top.get), len(ad) + 1)
+        if len(set(ks)) > 1: bl[i] = [ad.setdefault(k, len(ad) + 1) for k in ks]
+    out({"kume": km, "bol": bl, "n": len(satir), "k": len(ad)}); return 0
 def dosya_dok(yol, dil, terimler):
     # Dosyadan döküm (toplanti-claude.py dosyadan): afconvert'in ürettiği 16 kHz tek kanal 16 bit WAV, canlıdaki gibi konuşma parçalarıyla
     # (dosya_parcala) Whisper'a. 10 Ekim yapay iki kişilik denemesinde 5 dk'lık bloklar dili blok başında bir kez buldu (İngilizce paragraf

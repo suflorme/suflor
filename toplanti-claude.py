@@ -1063,11 +1063,25 @@ def _ad_gercek(ad):  # yer tutucu ad, kullanıcının kendisi ya da boş → Non
     return ad
 def _esleme_yol(md): return os.path.join(A.dir, md[:-3] + ".konusmaci.json")
 def ad_uygula(md, rs):
-    try: es = json.load(open(_esleme_yol(md), encoding="utf-8")).get("ad") or {}
+    # satırın adı = süreye göre çoğunluk kişi (karne, koç, pay); iki kişili satır (bölümleri farklı kişide) "_bol" taşır, döküm onu böler
+    try: v = json.load(open(_esleme_yol(md), encoding="utf-8")); es = v.get("ad") or {}; bol = v.get("bol") or {}
     except (OSError, ValueError): return rs
     for r in rs:
-        if r.get("id") in es and "text" in r and r.get("speaker") != es[r["id"]]: r["speaker_canli"] = r.get("speaker"); r["speaker"] = es[r["id"]]
+        if "text" not in r: continue
+        if r.get("id") in es and r.get("speaker") != es[r["id"]]: r["speaker_canli"] = r.get("speaker"); r["speaker"] = es[r["id"]]
+        if r.get("id") in bol: r["_bol"] = bol[r["id"]]
     return rs
+def bol_metin(r):
+    # iki kişili satırı bölümlerine ayır: metnin sözcükleri bölümlerin sözcük sayısıyla (n) orantılı paylaştırılır (sözlük düzeltmesi sayıyı
+    # biraz değiştirebilir); ardışık aynı kişi birleşir. → [(t0, t1, kim, metin)]
+    w = str(r.get("text") or "").split(); bs = r["_bol"]; N = sum(max(0, int(b.get("n") or 0)) for b in bs) or 1; t0 = float(r.get("t0") or 0)
+    out, top, onc = [], 0, 0
+    for b in bs:
+        top += max(0, int(b.get("n") or 0)); son = len(w) if b is bs[-1] else round(top / N * len(w)); parca = w[onc:son]; onc = son
+        if not parca: continue
+        if out and out[-1][2] == b["ad"]: out[-1] = (out[-1][0], t0 + float(b["e"]), b["ad"], out[-1][3] + " " + " ".join(parca))
+        else: out.append((t0 + float(b["s"]), t0 + float(b["e"]), b["ad"], " ".join(parca)))
+    return out
 KONUSMACI_OY_EN_AZ = 2  # kümenin ada bağlanması için en az oy (canlı kume_adi ile aynı)
 def konusmaci_esle(md, zorla=False, sessiz=False):
     iz_yol = os.path.join(A.dir, md[:-3] + ".sesizi.log"); es_yol = _esleme_yol(md)
@@ -1078,9 +1092,14 @@ def konusmaci_esle(md, zorla=False, sessiz=False):
     try:
         c = subprocess.run([py, os.path.join(os.path.dirname(os.path.abspath(__file__)), "whisper-isci.py"), "--toplu", iz_yol], capture_output=True, text=True,
                            timeout=120, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
-        km = json.loads(c.stdout.strip().splitlines()[-1])["kume"]
+        j = json.loads(c.stdout.strip().splitlines()[-1]); km, bl = j["kume"], j.get("bol") or {}
     except Exception as e: print(f"(konuşmacı yeniden etiketleme yapılamadı: {e.__class__.__name__})"); return None
     son = {r.get("id"): r for r in kayitlar(md, ham=True) if "text" in r}
+    bolum = {}  # id → [{"s", "e", "n"}] (yalnız iki kişili satırlar)
+    for l in open(iz_yol, encoding="utf-8"):
+        try: x = json.loads(l)
+        except ValueError: continue
+        if x.get("id") in bl and len(x.get("bol") or []) == len(bl[x["id"]]): bolum[x["id"]] = [{k: b.get(k) for k in ("s", "e", "n")} for b in x["bol"]]
     # altyazı işaretleri (an, ad): Whisper akarken gölgeye giden (.altyazi.log) + dökümdeki altyazı satırları
     cap = []; golge = os.path.join(A.dir, md[:-3] + ".altyazi.log")
     try: gs = [json.loads(l) for l in open(golge, encoding="utf-8") if l.strip()]
@@ -1089,26 +1108,31 @@ def konusmaci_esle(md, zorla=False, sessiz=False):
         if r.get("src") in ("captions", "transcript") and _ad_gercek(r.get("speaker")):
             z = zaman(r.get("at") or r.get("seen"))
             if z: cap.append((z.timestamp(), _ad_gercek(r["speaker"])))
-    # oy: satırın canlı adı (taslak oyunu da içerir) 1 + konuşma bittikten 1–9 sn sonra gelen sabit altyazı satırı 1 (canlı _oy_uyar kuralı)
+    # oy: satırın canlı adı (taslak oyunu da içerir) satırın çoğunluk kümesine 1 + konuşma (iki kişili satırda bölüm) bittikten 1–9 sn sonra
+    # gelen sabit altyazı satırı o birimin kümesine 1 (canlı _oy_uyar kuralı)
     oy, sure, satir = {}, {}, {}
     for i, k in km.items():
         r = son.get(i)
         if not r or r.get("kanal") != "karsi": continue
-        o = oy.setdefault(k, {}); t1 = float(r.get("t1") or 0)
-        sure[k] = sure.get(k, 0) + max(0.0, t1 - float(r.get("t0") or t1)); satir[k] = satir.get(k, 0) + 1
+        t0 = float(r.get("t0") or 0); t1 = float(r.get("t1") or t0)
+        birim = [(t0 + float(b["s"]), t0 + float(b["e"]), kb) for b, kb in zip(bolum[i], bl[i])] if i in bolum else [(t0, t1, k)]
+        satir[k] = satir.get(k, 0) + 1
         a = _ad_gercek(r.get("speaker"))
-        if a: o[a] = o.get(a, 0) + 1
-        for c_, a in cap:
-            if t1 + 1.0 <= c_ <= t1 + 9.0: o[a] = o.get(a, 0) + 1
+        if a: o = oy.setdefault(k, {}); o[a] = o.get(a, 0) + 1
+        for b0, b1, kb in birim:
+            o = oy.setdefault(kb, {}); sure[kb] = sure.get(kb, 0) + max(0.0, b1 - b0); satir.setdefault(kb, 0)
+            for c_, a in cap:
+                if b1 + 1.0 <= c_ <= b1 + 9.0: o[a] = o.get(a, 0) + 1
     ad = {}
     for k, o in oy.items():
         if o and max(o.values()) >= KONUSMACI_OY_EN_AZ and max(o.values()) >= 0.5 * sum(o.values()): ad[k] = max(o, key=o.get)
     adsiz = sorted((k for k in oy if k not in ad), key=lambda k: -sure[k])
     for n, k in enumerate(adsiz, 1): ad[k] = "Karşı taraf" if len(oy) == 1 else f"Karşı taraf {n}"
     es = {i: ad[k] for i, k in km.items() if k in ad and son.get(i, {}).get("kanal") == "karsi"}
+    bol = {i: [dict(b, ad=ad[kb]) for b, kb in zip(bolum[i], bl[i])] for i in bolum if i in es and len({ad[kb] for kb in bl[i]}) > 1}
     degisen = sum(1 for i, a in es.items() if son[i].get("speaker") != a)
-    v = {"at": simdi(), "satir": len(es), "degisen": degisen, "kume": {str(k): {"ad": ad[k], "satir": satir[k], "sn": round(sure[k], 1), "oy": oy[k]} for k in sorted(oy)},
-         "ad": es}
+    v = {"at": simdi(), "satir": len(es), "degisen": degisen, "bolunen": len(bol),
+         "kume": {str(k): {"ad": ad[k], "satir": satir.get(k, 0), "sn": round(sure.get(k, 0), 1), "oy": oy[k]} for k in sorted(oy)}, "ad": es, "bol": bol}
     try:
         with open(es_yol + ".gecici", "w", encoding="utf-8") as f: json.dump(v, f, ensure_ascii=False, indent=1)
         os.replace(es_yol + ".gecici", es_yol)
@@ -1116,7 +1140,7 @@ def konusmaci_esle(md, zorla=False, sessiz=False):
     if not sessiz:
         kisi = ", ".join(x["ad"] + " " + str(x["satir"]) for x in v["kume"].values())
         print(f"Konuşmacılar yeniden etiketlendi: {len(es)} karşı satır, {len(oy)} kişi ({kisi})"
-              f" · {degisen} satırın adı değişti · {os.path.basename(es_yol)}")
+              f" · {degisen} satırın adı değişti" + (f" · {len(bol)} satır iki kişiye bölündü" if bol else "") + f" · {os.path.basename(es_yol)}")
     return v
 def konusmaci_cmd():
     md = toplanti_dosyasi(A.dosya)
@@ -1398,6 +1422,9 @@ def dokum_satirlari(md):
         if not t or b is None: continue
         bt = float(r["t1"]) if r.get("t1") else None
         kim = (r.get("speaker") or "").strip()
+        if r.get("_bol") and r.get("t0"):  # iki kişili satır (konuşmacı yeniden etiketleme): bölümlerine
+            for b0, b1, k_, m_ in bol_metin(r): out.append({"t": b0, "t1": b1, "kim": k_, "metin": m_, "src": r.get("src") or r.get("source") or "?"})
+            continue
         out.append({"t": b, "t1": bt, "kim": kim if kim and kim != "?" else "Bilinmeyen konuşmacı", "metin": t, "src": r.get("src") or r.get("source") or "?"})
     for r in ek:
         b = an(r)

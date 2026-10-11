@@ -1115,7 +1115,7 @@ def _isci_dongu():
         if metin:
             if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
-            is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz") if j.get(k)} or None) or "satir"
+            is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz", "bol") if j.get(k)} or None) or "satir"
         is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
 # --- Konuşmacı ses izi (v0.8.4 ses işçisi → v0.13.12 Whisper işçisinin içinde) ------------------------------------------------
 # ECAPA (SpeechBrain VoxCeleb ağırlıkları, MLX) karşı kanal parçalarını kümeler: k1, k2… Kümenin adı altyazıdan oylanır: altyazı satırı
@@ -1270,7 +1270,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
             "entries": [{"id": is_["id"], "speaker": kim, "time": datetime.datetime.fromtimestamp(is_["t0"]).strftime("%H:%M:%S"), "text": metin,
                          "seen": datetime.datetime.utcfromtimestamp(is_["t1"]).isoformat(timespec="milliseconds") + "Z", "kanal": kanal,
                          "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2),
-                         **({"kume": kume} if kume else {}), **({"iz": model["iz"]} if kanal == "karsi" and (model or {}).get("iz") else {}),  # # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
+                         **({"kume": kume} if kume else {}), **({k: model[k] for k in ("iz", "bol") if model.get(k)} if kanal == "karsi" and model else {}),  # # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
                          **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,
                          **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60))} if ses else {})}]})  # ses sinyalleri + hız (kelime/dk)
 # --- Kısayol komutları ------------------------------------------------------------------------------------------
@@ -1320,7 +1320,7 @@ def ingest(p):
             jl_out.append(json.dumps(rec, ensure_ascii=False) + "\n")
             # karşı satırın ses izi .jsonl'e girmez (Claude toplantıda okur, 192 sayı bağlamı şişirir): yan dosyaya; toplantı sonunda toplu
             # kümelenip konuşmacılar yeniden etiketlenir (toplanti-claude.py konusmaci → <toplantı>.konusmaci.json)
-            if e.get("iz") and e.get("id"): iz_out.append(json.dumps({"id": e["id"], "t0": e.get("t0"), "t1": e.get("t1"), "iz": e["iz"]}) + "\n")
+            if e.get("iz") and e.get("id"): iz_out.append(json.dumps({"id": e["id"], "t0": e.get("t0"), "t1": e.get("t1"), "iz": e["iz"], **({"bol": e["bol"]} if e.get("bol") else {})}) + "\n")
             STATE["son_satir"] = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "speaker": e.get("speaker"), "file": base_key}  # kart penceresi canlılık satırı
             if SES.get("p"): ses_durdur()  # sesli brifing sürerken toplantı başladı
             # satır sayısı dosya bazında tutulur (STATE["lines"] tek bir global sayaç olursa, yeni bir

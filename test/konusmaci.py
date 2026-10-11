@@ -50,6 +50,11 @@ try:
         if k in ALTYAZI:
             istek("/ingest", {"meeting": {"title": BASLIK}, "source": "captions", "capturedAt": utc(t1 + 3),
                               "entries": [{"id": f"cap/{n}", "speaker": ALTYAZI[k], "time": "10:00", "text": "altyazı"}]})
+    # iki kişili canlı parça (hızlı söz devri): parça izi A'ya yakın, bölümler A (2 sn, 3 sözcük) + B (1,6 sn, 2 sözcük); canlı ad A
+    istek("/ingest", {"meeting": {"title": BASLIK}, "source": "whisper", "capturedAt": utc(t + 4), "entries": [
+        {"id": "wh/karsi/karisik", "speaker": "Ayşe Yılmaz", "time": "10:04", "text": "bir iki üç dört beş", "kanal": "karsi", "t0": t, "t1": t + 4,
+         "iz": iz("A"), "bol": [{"s": 0.0, "e": 2.0, "n": 3, "iz": iz("A")}, {"s": 2.4, "e": 4.0, "n": 2, "iz": iz("B")}]}]})
+    t += 15
     istek("/ingest", {"meeting": {"title": BASLIK}, "source": "whisper", "capturedAt": utc(t), "entries": [
         {"id": "wh/ben/1", "speaker": "Kullanıcı", "time": "10:05", "text": "ben kanalı", "kanal": "ben", "t0": t, "t1": t + 2}]})
     time.sleep(0.5)
@@ -59,7 +64,8 @@ try:
     if '"iz"' in jl_once: hatalar.append(".jsonl'e ses izi girdi")
     try: izs = [json.loads(l) for l in open(kok + ".sesizi.log", encoding="utf-8")]
     except OSError: izs = []
-    if len(izs) != len(SIRA): hatalar.append(f".sesizi.log {len(izs)} satır (beklenen {len(SIRA)})")
+    if len(izs) != len(SIRA) + 1: hatalar.append(f".sesizi.log {len(izs)} satır (beklenen {len(SIRA) + 1})")
+    if not any(x.get("bol") for x in izs): hatalar.append("bölüm izleri .sesizi.log'a yazılmadı")
     if any(x["id"] == "wh/ben/1" for x in izs): hatalar.append("ben kanalının izi yazıldı")
     o = tc("konusmaci", md)
     if o.returncode: hatalar.append(f"konusmaci çıkış {o.returncode}: {o.stderr[-300:]}")
@@ -71,12 +77,17 @@ try:
     if yanlis: hatalar.append(f"yanlış ad {len(yanlis)}: {yanlis[:4]}")
     if len(es.get("kume") or {}) != 3: hatalar.append(f"küme sayısı {len(es.get('kume') or {})} (beklenen 3)")
     if "wh/ben/1" in es["ad"]: hatalar.append("ben satırı eşlemeye girdi")
+    if es["ad"].get("wh/karsi/karisik") != "Ayşe Yılmaz": hatalar.append(f"iki kişili satırın ana adı {es['ad'].get('wh/karsi/karisik')!r} (beklenen süresi uzun olan Ayşe)")
+    if [b.get("ad") for b in (es.get("bol") or {}).get("wh/karsi/karisik", [])] != ["Ayşe Yılmaz", "Bora Kaya"]: hatalar.append(f"iki kişili satır bölünmedi: {es.get('bol')}")
     if open(kok + ".jsonl", encoding="utf-8").read() != jl_once: hatalar.append(".jsonl değişti")
     d = tc("dokum", md, "--goster")
     if d.returncode: hatalar.append(f"dokum çıkış {d.returncode}: {d.stderr[-300:]}")
     for ad in ("Ayşe Yılmaz", "Bora Kaya", "Karşı taraf 1"):
         if ad not in d.stdout: hatalar.append(f"dökümde yok: {ad}")
     if "Karşı taraf 2" in d.stdout or "Karşı taraf 3" in d.stdout: hatalar.append("dökümde eski canlı ad kaldı")
+    sat = [l for l in d.stdout.splitlines() if "bir iki üç" in l or "dört beş" in l]
+    if not (len(sat) == 2 and "Ayşe Yılmaz" in sat[0] and "bir iki üç" in sat[0] and "dört" not in sat[0] and "Bora Kaya" in sat[1] and "dört beş" in sat[1]):
+        hatalar.append(f"dökümde iki kişili satır bölünmedi: {sat}")
     tc("konusmaci", md, "--geri")
     if os.path.exists(kok + ".konusmaci.json"): hatalar.append("--geri eşlemeyi kaldırmadı")
 finally:
