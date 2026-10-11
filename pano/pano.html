@@ -9,7 +9,7 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1412;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#78807a;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06);
 --ac:#2a8a66;--ac-bg:#1a2c24;--ok:#47b07c;--ok-bg:#1a2c22;--wa:#d9a03c;--wa-bg:#2e2516;--er:#e0705c;--er-bg:#33201b;--vi:#b39ddb;--vi-bg:#2a2436;--te:#5fb7c0;--te-bg:#172c2e;--gr:#a5ada7;--gr-bg:#232a26;
 --br:#d8a849;--br-tx:#d8a849;--br-bg:#2e2716;--ro:#e08aa6;--ro-bg:#33202a}}
-:root{color-scheme:light dark}*{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%}
+:root{color-scheme:light dark}*{box-sizing:border-box}[hidden]{display:none!important}html,body{height:100%}html.panel,html.panel body{background:transparent!important;overflow:hidden}html.panel body>*:not(#panelf){display:none!important}#panelf{position:fixed;inset:0;width:100%;height:100%;border:0;background:transparent}
 body{font:var(--f);margin:0;background:var(--bg);color:var(--tx);display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh;overflow:hidden}
 button{font:inherit;font-size:12px;color:var(--tx);background:var(--s1);border:1px solid var(--bd2);border-radius:var(--r);padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 button:hover{background:var(--hov)}button:disabled{opacity:.6;cursor:default}button.pri{background:var(--ac);border-color:var(--ac);color:#fff}button.pri:hover{filter:brightness(1.05)}
@@ -30,7 +30,7 @@ aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var
 .sh{position:sticky;top:0;z-index:1;background:inherit;display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 12px/1.4 var(--f-govde);color:var(--t2);padding:8px 0 6px}
 .sh button{font:12px/1.4 var(--f-govde);letter-spacing:0;text-transform:none}main .sh{background:var(--bg)}aside .sh{background:var(--s2)}.meta{font:400 11px/1.4 var(--f-govde);letter-spacing:0;text-transform:none;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#brk{flex:none}section+section{margin-top:6px}main .sh,aside .sh{top:-6px}  /* kaydırınca satır başlığın üstündeki 6 px boşlukta görünmesin */
-.l{padding:7px 0;border-bottom:1px solid var(--bd);line-height:1.55;max-width:820px}.sp{color:var(--t3);font-size:11px}.sp .z{font-family:var(--f-teknik);font-size:10.5px}.sp b{color:var(--t2);font-weight:600}
+.l{padding:7px 0;border-bottom:1px solid var(--bd);line-height:1.55;max-width:820px}.l .cv{color:var(--t3);font-size:.92em;margin-top:2px}.sp{color:var(--t3);font-size:11px}.sp .z{font-family:var(--f-teknik);font-size:10.5px}.sp b{color:var(--t2);font-weight:600}
 .f{background:var(--er-bg);border-radius:4px;padding-left:6px;padding-right:6px}.note{background:var(--wa-bg);border-radius:4px;padding:6px 8px;white-space:pre-wrap;border:0;margin:4px 0}
 .kn{background:var(--ok-bg);border-radius:4px;padding:6px 8px;border:0;margin:4px 0}.kn a{color:var(--ok)}
 .ts{color:var(--t3);border-bottom:1px dashed var(--bd)}
@@ -156,7 +156,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','
 function setH(el,h){if(el&&el.__h!==h){el.innerHTML=h;el.__h=h}}
 // Anahtar satırın konumuna değil kendisine bağlı: pencere kayınca not yerinden oynamaz (v0.3.2)
 function rowKey(e,i){return e.kanit?('kanit|'+e.kanit):e.note?('note|'+(e.at||'')+'|'+e.note):(e.id||('k|'+e.time+'|'+e.speaker+'|'+e.text))}
-function rowHtml(e){return e.kanit?`<div class="l kn">${ic('cam')} ${L('Kanıt')} ${esc(e.n)} · ${esc((e.at||'').slice(11,19))} · <a href="/${esc(e.kanit)}${kq()}" target=_blank>${L('aç')}</a>${e.not?' — '+esc(e.not):''}</div>`:e.note?`<div class="l note">✎ ${esc(e.note)}</div>`:`<div class="l ${e.flags&&e.flags.length?'f':''}"><span class=sp><b>${esc(e.speaker)}</b>${e.time?' · <span class=z>'+esc(e.time)+'</span>':''}</span><br>${esc(e.text)}</div>`}
+function rowHtml(e){return e.kanit?`<div class="l kn">${ic('cam')} ${L('Kanıt')} ${esc(e.n)} · ${esc((e.at||'').slice(11,19))} · <a href="/${esc(e.kanit)}${kq()}" target=_blank>${L('aç')}</a>${e.not?' — '+esc(e.not):''}</div>`:e.note?`<div class="l note">✎ ${esc(e.note)}</div>`:`<div class="l ${e.flags&&e.flags.length?'f':''}"><span class=sp><b>${esc(e.speaker)}</b>${e.time?' · <span class=z>'+esc(e.time)+'</span>':''}</span><br>${esc(e.text)}${e.ceviri?'<div class=cv>'+esc(e.ceviri)+'</div>':''}</div>`}
 // Satır öğeleri Map'te tutulur: anahtar metin içerdiği için CSS seçiciyle aranmaz (v0.3.3)
 const rowEls=new Map()
 function renderLines(tail){
@@ -465,10 +465,10 @@ document.getElementById('dd').addEventListener('click',async ev=>{const b=ev.tar
 function gunTxt(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const g=Math.round((b-new Date(d).setHours(0,0,0,0))/864e5),s=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')
   return (g===0?L('Bugün'):g===1?L('Dün'):String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0'))+' '+s}
 function renderSon(s){const ls=s.son_toplantilar||[],sec=document.getElementById('sns');sec.hidden=!!s.aktif||!ls.length;if(sec.hidden)return
-  setH(document.getElementById('sn'),ls.map(r=>`<div class=sn><div class=t><div class=b><span class=z>${esc(gunTxt(r.at))}</span>${esc(r.baslik||r.ad)}${r.puan?` <span class=chip>${esc(r.puan)}/5</span>`:''}</div>${r.degerlendirme?`<div class=d>${esc(r.degerlendirme)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}</div><button class=gh data-son="${esc(r.id)}" title="${esc(r.ad)}">${L('Özeti aç')}</button></div>`).join(''))}
+  setH(document.getElementById('sn'),ls.map(r=>`<div class=sn><div class=t><div class=b><span class=z>${esc(gunTxt(r.at))}</span>${esc(r.baslik||r.ad)}${r.puan?` <span class=chip>${esc(r.puan)}/5</span>`:''}</div>${r.degerlendirme?`<div class=d>${esc(r.degerlendirme)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}</div>${r.harita?`<button class=gh data-son="${esc(r.id)}" data-tur=harita>${L('Zihin haritası')}</button>`:''}<button class=gh data-son="${esc(r.id)}" title="${esc(r.ad)}">${L('Özeti aç')}</button></div>`).join(''))}
 document.getElementById('sn').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-son]');if(!b)return
-  let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son})})}catch(e){}
-  if(!r.ok)geciciDurum(L('Özet açılamadı'),r.err||'')})
+  let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son,tur:b.dataset.tur||''})})}catch(e){}
+  if(!r.ok)geciciDurum(b.dataset.tur?L('Zihin haritası açılamadı'):L('Özet açılamadı'),r.err||'')})
 // boş pano = "Sıradaki · Başlat": ilk (süren ya da gelecek) toplantı büyük kart, kalanlar altında soluk satır. Claude izlerken gizli.
 function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks'),x=s.extension
   // toplantı sürerken büyük kart yok: durum cümlesindeki Başlat yalnız formu açar
@@ -536,6 +536,10 @@ document.getElementById("sz").onclick=ev=>sendSessiz(ev.currentTarget)
 document.getElementById("kz").onclick=ev=>sendKanit(ev.currentTarget,document.getElementById("n"))
 document.getElementById("yk").onclick=ev=>sendYaparken(ev.currentTarget)
 refresh();setInterval(refresh,2000)
+// menü çubuğu uygulamasının paneli (?gorunum=panel, v0.27.0): mini panonun kendisi, aynı kökenli bir iframe'de (PiP penceresi gibi ayrı belge);
+// pano gizli kalır ama yenilemeyi o yapar. Zemin saydam: panelin buzlu cam (vibrancy) zemini görünür.
+if(new URLSearchParams(location.search).get('gorunum')==='panel'){document.documentElement.classList.add('panel');const f=document.createElement('iframe');f.id='panelf';f.title='Suflor.me';document.body.appendChild(f)
+  buildMini(f.contentWindow);const st=f.contentDocument.createElement('style');st.textContent='html,body{background:transparent!important}';f.contentDocument.head.appendChild(st)}
 // kart/✓/soru/kanıt isteği değişince pano ve mini pano hemen yenilenir (aktarıcıda uzun yoklama, şeritle aynı imza);
 // 2 sn yenileme diğer alanlar için sürer. Eski aktarıcıda (imza yok) döngü kapanır.
 let kImza="";(async function kartBekle(){for(;;){try{const v=await (await fetch('/cards?bekle=25&imza='+encodeURIComponent(kImza),{signal:AbortSignal.timeout(35000)})).json()

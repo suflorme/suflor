@@ -487,6 +487,7 @@ def ingest(p):
             for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume", "gec"):  # ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
                 if e.get(k) is not None: rec[k] = e[k]
             jl_out.append(json.dumps(rec, ensure_ascii=False) + "\n")
+            if p.get("source") == "whisper" and e.get("kanal") == "karsi" and onceki is None: ceviri_ekle(e.get("id"), text, base_key)  # ayar ceviri
             # karşı satırın ses izi .jsonl'e girmez (Claude toplantıda okur, 192 sayı bağlamı şişirir): yan dosyaya; toplantı sonunda toplu
             # kümelenip konuşmacılar yeniden etiketlenir (toplanti-claude.py konusmaci → <toplantı>.konusmaci.json)
             if e.get("iz") and e.get("id"): iz_out.append(json.dumps({"id": e["id"], "t0": e.get("t0"), "t1": e.get("t1"), "iz": e["iz"], **({"bol": e["bol"]} if e.get("bol") else {})}) + "\n")
@@ -733,7 +734,7 @@ def tail(n=200):
     # (kullanıcı) pano yeniden açılınca son oturumdan kalan döküm görünmesin — yalnız süren toplantı
     if not STATE["file"] or not aktif_dosya(): return []
     jl = os.path.join(BASE, STATE["file"].replace(".md", ".jsonl"))
-    try: lines = open(jl, encoding="utf-8").read().splitlines()[-n:]; return [json.loads(x) for x in lines]
+    try: lines = open(jl, encoding="utf-8").read().splitlines()[-n:]; return ceviri_uygula([json.loads(x) for x in lines], STATE["file"])
     except Exception: return []
 
 # Pano sayfaları (pano/: pano.html — pano ve mini pano, hazirlik.html, yazi.css) ve marka yazı tipleri/işareti (marka/): aktarıcının
@@ -809,7 +810,8 @@ def yerel_ses_al(p):
         return {"ok": True, "toplanti": toplanti_var(), "tarayici": STATE.get("_tarayici") or "Chrome"}
     if not toplanti_var(): return {"ok": True, "bekle": True}
     y["son"] = now
-    return ses_al(dict(p, kanal="karsi", kaynak="yerel"))
+    mb = masaustu_baslik()
+    return ses_al(dict(p, kanal="karsi", kaynak="yerel", **({"meeting": {"title": mb}} if mb else {})))
 def _yerel_ses_dongu():
     if AYAR.get("yerel_ses") is False or os.environ.get("SUFLOR_TEST_BASLAT"): return  # deneme aktarıcısı gerçek yardımcıyı kapatıp açmasın
     while True:
@@ -824,6 +826,37 @@ def _yerel_ses_dongu():
                 subprocess.run(["open", "-g", "-a", SES_APP, "--stderr", SES_LOG, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE], capture_output=True, timeout=20)
                 print("YEREL SES: yardımcı başlatıldı")
             except Exception as e: print(f"YEREL SES: hata başlatılamadı ({e})")
+
+# --- Menü çubuğu uygulaması (v0.27.0, Faz 5; ayar menu_cubugu: true): aktarıcı açılırken bir kez açar (kapatılırsa aktarıcı yeniden
+# başlayana kadar kapalı kalır). Uygulama anahtarı kart-anahtari.txt'den okur; panel panonun ?gorunum=panel görünümü.
+MENU_APP = os.path.join(AYAR["uygulama"], "Suflor Menü.app")
+def menu_baslat():
+    if AYAR.get("menu_cubugu") is not True or os.environ.get("SUFLOR_TEST_BASLAT") or not os.path.isdir(MENU_APP): return
+    try:
+        if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
+        subprocess.run(["open", "-g", "-a", MENU_APP, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else []), capture_output=True, timeout=20)
+        print("MENÜ: menü çubuğu uygulaması başlatıldı")
+    except Exception as e: print(f"MENÜ: başlatılamadı ({e.__class__.__name__})")
+
+# Masaüstü toplantı uygulaması (v0.27.0): menü çubuğu uygulaması Erişilebilirlik ile Teams/Zoom masaüstünde "Ayrıl" ve "Sesi aç/kapat"
+# düğmelerini okur, POST /masaustu {uygulama, toplantida, sessiz, baslik} (anahtarla) — eklenti olmadan toplantı sinyali: karşı ses (ses
+# yardımcısının Teams/Zoom sesi) işlenir, döküm toplantı penceresinin başlığıyla açılır. Kullanıcının mikrofonu bu yoldan alınmaz (sonraki adım).
+def masaustu_al(p):
+    m = {"uygulama": str(p.get("uygulama") or "")[:20], "toplantida": bool(p.get("toplantida")), "sessiz": p.get("sessiz") if isinstance(p.get("sessiz"), bool) else None,
+         "baslik": " ".join(str(p.get("baslik") or "").split())[:120] or None, "t": time.time()}
+    o = STATE.get("masaustu") or {}; STATE["masaustu"] = m
+    if m["toplantida"]: STATE["_cagri_son"] = time.time(); STATE["_tarayici"] = m["uygulama"] or "Teams"
+    if m["toplantida"] != bool(o.get("toplantida")) or m["sessiz"] != o.get("sessiz"):
+        print(f"MASAÜSTÜ: {m['uygulama']} · " + ("toplantıda" if m["toplantida"] else "toplantı yok") + (" · sessizde" if m["sessiz"] else " · mikrofon açık" if m["sessiz"] is False else "")
+              + (f" · {m['baslik']}" if m["baslik"] and m["toplantida"] else ""))
+    return {"ok": True}
+def masaustu_baslik():  # eklenti toplantıda değilken masaüstü toplantısının döküm başlığı
+    m = STATE.get("masaustu") or {}
+    if not m.get("toplantida") or time.time() - m.get("t", 0) > 30: return None
+    x = STATE.get("extension") or {}
+    if x.get("call") and _yas_sn(x) < 30: return None
+    b = re.sub(r"\s*[|–-]\s*(Microsoft Teams|Zoom.*)$", "", m.get("baslik") or "").strip()
+    return b if b and not re.fullmatch(r"(Microsoft Teams|Zoom( Meeting| Toplantısı)?|Toplantı|Meeting)", b, re.I) else f"{m.get('uygulama') or 'Masaüstü'} toplantısı"
 
 # --- v0.9.3: takvim + panodan /toplanti başlatma ------------------------------------------------------------------
 # Mac Takvim (Takvim uygulamasına eklenmiş tüm hesaplar) "Suflor Takvim.app" yardımcısıyla okunur: aktarıcı 5 dk'da bir
@@ -958,6 +991,13 @@ def son_ekle(p):
             with open(kp + ".tmp", "w", encoding="utf-8") as f: f.write(p["metin"][:500000])
             os.replace(kp + ".tmp", kp); r["kopya"] = kp
         except OSError as e: print(f"ÖZET: kopya yazılamadı ({e.__class__.__name__})")
+    if isinstance(p.get("harita"), str) and p["harita"].lstrip().startswith("<!doctype html>"):  # zihin haritası (toplanti-claude.py yapi)
+        hp = os.path.join(BASE, "ozetler", os.path.basename(ozet)[:-3] + "-zihin-haritasi.html")
+        try:
+            os.makedirs(os.path.dirname(hp), exist_ok=True)
+            with open(hp + ".tmp", "w", encoding="utf-8") as f: f.write(p["harita"][:2000000])
+            os.replace(hp + ".tmp", hp); r["harita"] = hp
+        except OSError as e: print(f"ÖZET: harita yazılamadı ({e.__class__.__name__})")
     with LOCK:
         _log("son-toplantilar.jsonl", r); SON.append(r); del SON[:-20]
         if r["dosya"]: STATE["bitti"] = {"file": r["dosya"], "t": r["t"]}
@@ -972,6 +1012,12 @@ def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
 def son_ac(p):
     r = next((x for x in SON if x.get("id") == str(p.get("id") or "")), None)
     if not r: return {"ok": False, "err": "kayıt yok"}
+    if p.get("tur") == "harita":  # zihin haritası varsayılan tarayıcıda (tek dosya, çevrimdışı)
+        hp = r.get("harita")
+        if not hp or not os.path.isfile(hp): return {"ok": False, "err": _t("zihin haritası yok", "no mind map")}
+        if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): harita {os.path.basename(hp)}"); return {"ok": True}
+        k = subprocess.run(["open", hp], capture_output=True, text=True, timeout=15)
+        return {"ok": not k.returncode, **({"err": (k.stderr or "").strip()[:160]} if k.returncode else {})}
     yol = next((y for y in (r.get("kopya"), os.path.join(BASE, "ozetler", os.path.basename(r["ozet"]))) if y and os.path.isfile(y)), None)
     if not yol: return {"ok": False, "err": _t("özetin kopyası yok; dosya: ", "no copy of the summary; file: ") + os.path.basename(r["ozet"])}
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): özet {os.path.basename(yol)}"); return {"ok": True}
@@ -984,6 +1030,7 @@ def son_ac(p):
 bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
+bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 # --- v0.13.9: panodan güncelleme ---------------------------------------------------------------------------------
 # Aktarıcı 6 saatte bir açık deponun manifest.json'undaki sürüme bakar (yalnız okuma; Mac'ten bağlam bilgisi çıkmaz). Yeni sürüm varsa
 # pano "Güncelle" düğmesini gösterir; tıklanınca guncelle.command ayrı oturumda (setsid) çalışır — aktarici-kur aktarıcıyı yeniden
@@ -1188,7 +1235,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli()); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli()); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1334,6 +1381,7 @@ class H(BaseHTTPRequestHandler):
             p.pop("kaynak", None); return self._json(ses_al(p))
         if self.path == "/olay":  # eklentiden tanı satırı (kanıt hatası, Whisper kanalı açıldı/kapandı) → günlük
             print(f"EKLENTİ: {str(p.get('tur') or '?')[:40]} · {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})
+        if self.path == "/masaustu": return self._json(masaustu_al(p))  # menü çubuğu uygulaması (anahtarla)
         if self.path == "/agenda-aktif":  # izle konuşulan gündem maddesini tahmin eder; pano ▶ gösterir (yalnız görünüm)
             i = p.get("i"); STATE["agenda_aktif"] = int(i) if isinstance(i, int) else None; return self._json({"ok": True})
         if self.path == "/ping":
@@ -1362,6 +1410,7 @@ if __name__ == "__main__":
     restore_state(); load_cards(); eylem_yukle(); son_yukle(); brifing_yukle(); dosyadan_artik_temizle(); anahtar_yardimcisi_kur()
     threading.Thread(target=_takvim_dongu, daemon=True).start()
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
+    threading.Thread(target=menu_baslat, daemon=True).start()  # ayar menu_cubugu
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi
     threading.Thread(target=_kayit_dongu, daemon=True).start()  # ölçüm kayıtlarını döndür

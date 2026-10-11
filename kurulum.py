@@ -473,6 +473,15 @@ BRIFING_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>NSDocumentsFolderUsageDescription</key><string>Suflor.me toplantı öncesi brifingi hazırlarken proje klasöründeki belgeleri okur. Hiçbir şey değiştirmez; metin yalnız Claude'a gider.</string>
 </dict></plist>
 """
+MENU_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>local.suflor.menu</string><key>CFBundleName</key><string>Suflor Menü</string>
+  <key>CFBundleExecutable</key><string>SuflorMenu</string><key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Suflor.me bas-konuş: Option + Shift + Boşluk basılıyken sesin yalnız bu Mac'teki yerel konuşma tanımaya gider.</string>
+</dict></plist>
+"""
 def yollar():  # ayar.json'dan; yoksa varsayılanlar
     v = {"port": 8765, "uygulama": "~/Library/Application Support/Suflor", "proje": "~/Suflor", "ortak": ORTAK}; v.update(ayar())
     y = {k: os.path.expanduser(str(v[k])) for k in ("uygulama", "proje", "ortak")}; y["port"] = int(v["port"]); return y
@@ -602,7 +611,14 @@ def kur():
     brf = os.path.join(app, "Suflor Brifing.app"); r = derle(brf, "brifing.swift", "SuflorBrifing", BRIFING_PLIST)
     if r is True: say(f"Brifing yardımcısı derlendi: {brf}")
     elif r: say(f"UYARI: brifing yardımcısı derlenemedi ({r}) — panodaki Brifing kapalı kalır")
-    imzala([tak, ses, brf])
+    # menü çubuğu uygulaması (Faz 5): yalnız ayar menu_cubugu: true iken (beta kurulumunda kapalı); aktarıcı açar
+    mnu = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf]
+    if ayar().get("menu_cubugu") is True:
+        r = derle(mnu, "menu-cubugu.swift", "SuflorMenu", MENU_PLIST)
+        if r is True: say(f"Menü çubuğu uygulaması derlendi: {mnu}"); sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorMenu")
+        elif r: say(f"UYARI: menü çubuğu uygulaması derlenemedi ({r})")
+        imz.append(mnu)
+    imzala(imz)
     from xml.sax.saxutils import escape as x
     log = os.path.join(EV, "Library", "Logs", "suflor-aktarici.log")
     os.makedirs(os.path.dirname(plist_yolu()), exist_ok=True)

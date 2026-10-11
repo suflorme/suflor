@@ -3,7 +3,7 @@
 # model bir kez yüklenir, sonra stdin'den gelen konuşma parçalarını metne çevirir. Tamamen yerel: ağ yok (model diskten).
 # Protokol (satır başına bir JSON):
 #   giriş : {"id": "...", "pcm": "<base64 int16, 16 kHz, tek kanal>", "dil": "tr"|"en"|null, "istem": "terimler…", "onceki": "son metin",
-#            "kanal": "ben"|"karsi", "baslik": "toplantı"}
+#            "kanal": "ben"|"karsi", "baslik": "toplantı", "oda": true (yalnız ben: aynı mikrofonda ikinci kişi açık → ses izi de döner)}
 #   çıkış : {"hazir": true, "model": "...", "sn": yükleme, "ecapa": bool} · {"id": "...", "text": "...", "sn": süre, "dil": "tr", "atlanan": n,
 #            "kume": "k1"|null, "benzerlik", "iz": karşı kanal ses izi (float16 base64), "bol": [{"s", "e", "n", "iz"}] bölüm başına} · {"id": "...", "hata": "..."}
 # konuşmacı ses izi (ECAPA-TDNN, SpeechBrain VoxCeleb ağırlıkları) bu süreçte MLX ile çalışır — ayrı ses işçisi,
@@ -160,16 +160,17 @@ def main():
             except Exception: ses = None
             km = {}
             if p.get("baslik") != baslik: kumeler = []; baslik = p.get("baslik")
-            if iz and metin and p.get("kanal") == "karsi" and len(a) >= SR * 0.5:
+            oda = p.get("kanal") == "ben" and p.get("oda")  # aynı mikrofonda ikinci kişi açık: kullanıcı kanalında da iz (kümesiz; aktarıcı profille karşılaştırır)
+            if iz and metin and (p.get("kanal") == "karsi" or oda) and len(a) >= SR * 0.5:
                 # ses izi satırla geri döner (float16, base64): aktarıcı <toplantı>.sesizi.log'a yazar, toplantı sonunda toplu kümelenir (--toplu)
                 try:
                     b64 = lambda v: base64.b64encode(v.astype(np.float16).tobytes()).decode()
                     e = iz(a); km = {"iz": b64(e)}
-                    if len(a) >= SR * 0.8: km.update(kumele(iz, kumeler, a, np, e))
+                    if not oda and len(a) >= SR * 0.8: km.update(kumele(iz, kumeler, a, np, e))
                     # birden çok bölümlü parçada bölüm (cümle) başına iz: hızlı söz devrinde canlı parça iki kişiyi içerir (11 Ekim, Easy Turkish:
                     # canlı parçaların 6/15'i) ve parça izi ikisini tek kişide birleştirir (%62 → bölüm izleriyle %100). n = bölümün sözcük sayısı
                     # (aktarıcının satır metnini bölmesi için); < 0,5 sn bölümün izi yok.
-                    if len(tut) > 1:
+                    if len(tut) > 1 and not oda:
                         km["bol"] = [dict({"s": round(sg["start"], 2), "e": round(sg["end"], 2), "n": len(x.split())},
                                           **({"iz": b64(iz(a[int(sg["start"] * SR):int(sg["end"] * SR)]))} if (sg["end"] - sg["start"]) >= 0.5 else {})) for sg, x in tut]
                 except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}

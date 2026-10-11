@@ -215,16 +215,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 106765,
-   "sha": "2593bf322387d03b"
+   "uzunluk": 107999,
+   "sha": "88e28035a79be6f6"
   },
   "/hazirlik": {
-   "uzunluk": 31143,
-   "sha": "1f70a766b39c587d"
+   "uzunluk": 31235,
+   "sha": "0f05994269ec65d8"
   },
   "/mini": {
-   "uzunluk": 106765,
-   "sha": "2593bf322387d03b"
+   "uzunluk": 107999,
+   "sha": "88e28035a79be6f6"
   },
   "/status": {
    "_ping_son": "float",
@@ -286,6 +286,13 @@
      "why": "str"
     }
    ],
+   "ceviri": {
+    "acik": "bool",
+    "gecikme_ortanca": "NoneType",
+    "hata": "NoneType",
+    "n": "int",
+    "surec": "bool"
+   },
    "claude_age_s": "int",
    "closed": [
     {

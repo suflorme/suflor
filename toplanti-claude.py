@@ -56,6 +56,7 @@ ka.add_argument("metin"); ka.add_argument("--neden", default=""); ka.add_argumen
 ka.add_argument("--gundem", type=int, default=None, help="ilgili gündem maddesinin sırası (0'dan)")
 ka.add_argument("--gizli", action="store_true", help="dur kartının metni şeritte görünmesin (Teams sekmesi paylaşılırsa)")
 ka.add_argument("--onay", action="store_true", help="onay kartı (#76): Onayla / Reddet düğmeleri; metin yapılacak iç işi tam yazar (TOPLANTI-MODU §7)")
+ka.add_argument("--fisilti", default="", help="ayar fisilti açıksa kulaklıkta okunacak ≤ 4 sözcük (DUR kartı ve kullanıcıya adıyla sorulan sorunun kartı)")
 ka.add_argument("--durum", default="", help="kartın altında tek satır (Ne diyeyim?: şu an ne konuşuluyor, ≤ 120 karakter)")
 ka.add_argument("--sessiz-ozet", action="store_true", help="SESSİZ BİTTİ'den sonra tek özet kartı: sessizde bekleyen kartları kapatır")
 et = sub.add_parser("etiket", help="duygu etiketi (pano başlığı; kart değil): genel ton ya da --kim ile kişi başına")
@@ -96,6 +97,12 @@ sn.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)"); sn.
 sn.add_argument("--takip", default=None, help="takip işleri: toplam/sahipli (ör. 6/5) — Claude özetten sayar")
 sn.add_argument("--karar", type=int, default=None, help="çıkan karar sayısı"); sn.add_argument("--kaydet", action="store_true", help="karneler.jsonl'e ekle")
 sn.add_argument("--gecmis", action="store_true", help="son değerlendirmeler (karneler.jsonl)")
+yp = sub.add_parser("yapi", help="toplantı sonu: özetin yapı dosyası (<özet>.yapi.json) → karar grafı (canli/karar-grafi.sqlite) + zihin haritası (<özet>-zihin-haritasi.html)")
+yp.add_argument("json", nargs="?", help="yapı dosyası (yoksa --ornek)"); yp.add_argument("--ozet", default=None, help="özet .md (harita yanına yazılır; yoksa json'un yanına)")
+yp.add_argument("--dosya", default=None, help="canlı toplantı .md (grafta kaynak; yoksa en yenisi)"); yp.add_argument("--ornek", action="store_true", help="yapı dosyası biçimini yazdır")
+gf = sub.add_parser("graf", help="karar grafı: son kayıtlar ya da bir kişinin iddia/karar/açık işleri (yalnız bu Mac)")
+gf.add_argument("--kim", default=None); gf.add_argument("--n", type=int, default=20); gf.add_argument("--sil-toplanti", default=None, help="bu canlı toplantının kayıtlarını sil")
+gf.add_argument("--hepsini-sil", action="store_true")
 oh = sub.add_parser("ozet-hazir", help="özet kaydedildi: panoda Son toplantılar + macOS bildirimi (özetin '## Değerlendirme — not X/5' bölümünden)")
 oh.add_argument("yol", help="kaydedilen özet .md"); oh.add_argument("--baslik", default=None, help="panoda görünen ad (yoksa gündem başlığı ya da toplantı adı)")
 hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi"); hl.add_argument("--kim", default=None); hl.add_argument("--n", type=int, default=3)
@@ -441,7 +448,7 @@ SORU_RX = re.compile(r"\?\s*$|\bm[iıuü](s[iıuü]n(?:[iıuü]z)?|y[iıuü]z|y[
 def soru_mu(t): return bool(SORU_RX.search(kucuk(t.strip())))
 def bana_soru(r):  # karşı taraftan, kullanıcıya adıyla yöneltilmiş soru → her rolde yardım kartı (test toplantısı 7 Ekim 18:27)
     t = r.get("text", "")
-    if kanal_n(r.get("kanal")) == "ben" or kucuk((r.get("speaker") or "").split(" ")[0]) == kucuk(BEN) or not soru_mu(t): return False
+    if (kanal_n(r.get("kanal")) == "ben" and r.get("speaker") != "Odadaki kişi") or kucuk((r.get("speaker") or "").split(" ")[0]) == kucuk(BEN) or not soru_mu(t): return False
     return re.search(r"(?<!\w)" + re.escape(kucuk(BEN)) + r"(?!\w{3})", kucuk(t)) is not None  # "Ali", "Ali'ye", "Ali Bey"; "Alicia" değil (ad + en çok 2 harf ek)
 def satir(r): return f"  [{r.get('time') or ''} {r.get('speaker') or '?'}] {'❓ ' if soru_mu(r.get('text','')) else ''}{'→' + BEN + ' ' if bana_soru(r) else ''}{'↻ ' if r.get('revised') else ''}{r.get('text','')}"
 def son_satirlar(jl, sn=75, en_az=4, en_cok=40):
@@ -467,6 +474,7 @@ def kart():
     if A.gizli: body["gizli"] = True
     if A.sessiz_ozet: body["sessiz_ozet"] = True
     if A.durum: body["durum"] = A.durum
+    if A.fisilti: body["fisilti"] = A.fisilti
     if A.onay:
         if A.tur in ("not", "bilgi", "dur", "dikkat", "deginme"): body["kind"] = "soyle"  # onay kartı şeritte de görünsün (NOT şeritte yok)
         body["onay"] = True
@@ -810,7 +818,10 @@ def izle():
         ad = gercek_ad(r.get("speaker"))
         if not ad or kucuk(ad) in katilimci: return
         katilimci.add(kucuk(ad)); saat = str(r.get("time") or "")[:5] or datetime.datetime.now().strftime("%H:%M")
-        emit(f"KATILIMCI: {ad} (ilk satır {saat})")
+        try: gs = _yapi().graf_kisi(A.dir, ad, 3, haric=cur)
+        except Exception: gs = []
+        emit(f"KATILIMCI: {ad} (ilk satır {saat})" + (" · karar grafında geçmişi: " + " | ".join(_yapi().graf_satir(g) for g in gs) +  # gs boş değilse yapi yüklüdür
+             " → bugün farklı bir şey söylerse (rakam, tarih, karar) çelişkiyi SÖYLE kartıyla belirt" if gs else ""))
         olcum_yaz({"t": "katilimci-ilk", "file": cur, "ad": ad, "row_id": r.get("id"), "row_at": r.get("at"), "emit_at": simdi()})
     sis_kok = frozenset(w[:5] for n in sis for w in n.split() if len(w) >= 3)
     def paket_baglam():
@@ -1224,6 +1235,28 @@ def konusmaci_cmd():
         for k, x in v["kume"].items(): print(f"  küme {k}: {x['ad']} · {x['satir']} satır, {x['sn']} sn · oy {x['oy'] or '-'}"
                                              + (f" · hafızadan, benzerlik {str(x['hafiza']).replace('.', ',')}" if "hafiza" in x else ""))
         if v.get("hafiza_guncel"): print("  ses izi hafızası: " + ", ".join(f"{a} {d}" for a, d in v["hafiza_guncel"].items()))
+def _yapi():
+    sys.dont_write_bytecode = True; import yapi; return yapi
+def yapi_cmd():
+    Y = _yapi()
+    if A.ornek or not A.json: print(json.dumps(Y.YAPI_ORNEK, ensure_ascii=False, indent=1)); return
+    try: v = Y.oku(os.path.expanduser(A.json))
+    except (OSError, ValueError) as e: sys.exit(f"yapı dosyası okunamadı: {e}")
+    md = toplanti_dosyasi(A.dosya); kaynak = os.path.basename(md) if md else os.path.basename(A.json)
+    n = Y.graf_yaz(A.dir, v, kaynak)
+    taban = os.path.expanduser(A.ozet)[:-3] if A.ozet and A.ozet.endswith(".md") else re.sub(r"(\.yapi)?\.json$", "", os.path.expanduser(A.json))
+    hy = taban + "-zihin-haritasi.html"
+    with open(hy, "w", encoding="utf-8") as f: f.write(Y.harita_html(v))
+    say = {t: sum(1 for m in v["maddeler"] for o in m["ogeler"] if o["tur"] == t) for t in Y.TURLER}
+    print(f"karar grafı: {n} kayıt ({', '.join(f'{Y.kucuk(Y.TURLER[t])} {k}' for t, k in say.items() if k)}) · kaynak {kaynak}")
+    print(f"zihin haritası: {hy}")
+def graf_cmd():
+    Y = _yapi()
+    if A.hepsini_sil: Y.graf_sil(A.dir, hepsi=True); print("karar grafı silindi"); return
+    if A.sil_toplanti: print(f"silindi: {Y.graf_sil(A.dir, A.sil_toplanti)} kayıt"); return
+    rs = Y.graf_liste(A.dir, A.kim, A.n)
+    if not rs: print("karar grafı boş" + (f" ({A.kim} için kayıt yok)" if A.kim else " — toplantı sonunda `yapi` ile dolar")); return
+    for r in rs: print("  " + Y.graf_satir(r) + (f" · {r[2]}" if r[2] and not A.kim else ""))
 def hafiza_cmd():
     h = hafiza_oku()
     if A.hepsini_sil:
@@ -1396,11 +1429,13 @@ def ozet_hazir_cmd():
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     # metin de gider: aktarıcı launchd'den çalıştığı için Masaüstü'ndeki özeti açamıyor; kendi klasörüne kopyasını yazar (panoda "Özeti aç")
     body = {"ozet": yol, "baslik": baslik, "dosya": st.get("file"), "puan": puan, "degerlendirme": deg, "oneri": oneri, "metin": metin[:500000]}
+    hy = yol[:-3] + "-zihin-haritasi.html" if yol.endswith(".md") else ""
+    if hy and os.path.exists(hy): body["harita"] = open(hy, encoding="utf-8").read()[:2000000]  # panoda "Zihin haritası" (kopya aktarıcının klasöründe)
     req = urllib.request.Request(A.relay + "/son-toplanti", data=json.dumps(body).encode(), method="POST",
                                  headers={"X-Suflor-Anahtar": key, "Content-Type": "application/json"})
     r = json.load(urllib.request.urlopen(req, timeout=3))
     if not r.get("ok"): sys.exit(f"gönderilemedi: {r.get('err')}")
-    print(f"panoda Son toplantılar + bildirim: {baslik}" + (f" · not {puan}/5" if puan else " · not bulunamadı ('## Değerlendirme — not X/5' bölümü yok)") + (" · öneri var" if oneri else ""))
+    print(f"panoda Son toplantılar + bildirim: {baslik}" + (" · zihin haritası" if body.get("harita") else "") + (f" · not {puan}/5" if puan else " · not bulunamadı ('## Değerlendirme — not X/5' bölümü yok)") + (" · öneri var" if oneri else ""))
 
 # --- v0.7.0: toplantı öncesi bağlam paketi -----------------------------------------------------------------------
 def hazirlik_cmd():
@@ -1415,6 +1450,9 @@ def hazirlik_cmd():
     if A.kim:
         kart = vt_eslesen("kisiler", A.kim, 1)
         if kart: print(f"\n## {A.kim}: kişi kartı ({VT.get('yol')})\n  " + kart[0][:400])
+        try: gs = _yapi().graf_kisi(A.dir, A.kim, 8)
+        except Exception: gs = []  # yapi.py yanında değil (kopya) ya da veritabanı okunamadı: hazırlık sürer
+        if gs: print(f"\n## {A.kim}: karar grafı (iddia, karar, açık işler)\n" + "\n".join("  " + _yapi().graf_satir(g) for g in gs))
         print(f"\n## {A.kim}: geçmişte ne dedi"); print("\n".join(bas(A.kim, kim=A.kim)))
     for i, it in enumerate(agj.get("items") or []):
         q = " ".join([w for w in baglam.kelimeler(it) if len(w) >= 3 and w not in GUNDEM_DUR and w not in baglam.DUR][:6])
@@ -2035,5 +2073,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd}[A.cmd]()
+     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

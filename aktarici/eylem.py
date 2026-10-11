@@ -139,6 +139,7 @@ def add_card(p):
         if q and q.get("tur") == "ozet": c["replik"] = True; c.pop("q", None)  # "Ne diyeyim?" kartı: başlık "Ne diyeyim", soru satırı yok
     if isinstance(p.get("agenda_i"), int): c["agenda_i"] = p["agenda_i"]
     if p.get("durum"): c["durum"] = " ".join(str(p["durum"]).split())[:160]  # kartın altındaki tek satır (Ne diyeyim?: şu an ne konuşuluyor)
+    if p.get("fisilti"): c["fisilti"] = " ".join(str(p["fisilti"]).split()[:4])[:60]  # kulaklıkta okunacak ≤ 4 sözcük (ayar fisilti)
     if p.get("sessiz_ozet") and SESSIZ["id"]: c["sessiz_ozet"] = SESSIZ["id"]  # sessizin özeti: bekleyenleri kapatır, kendisi beklemez
     elif sessiz_acik() and kind != "dur" and not c.get("reply_to"): c["sessiz"] = SESSIZ["id"]
     with LOCK:
@@ -148,6 +149,7 @@ def add_card(p):
             for x in CARDS:
                 if x.get("sessiz") == c["sessiz_ozet"] and x.get("status") == "acik":
                     x["status"] = "ozetlendi"; x["acted_at"] = c["at"]; _log("kartlar.jsonl", {"id": x["id"], "at": c["at"], "status": "ozetlendi"})
+    fisilti_kart(c)
     return c
 def etiket(p):  # duygu etiketi: genel (kim yok) ya da kişi başına; aynı kişinin önceki etiketinin yerine geçer
     ton = p.get("ton") if p.get("ton") in TONES else None

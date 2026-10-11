@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Suflor.me — canlı toplantı asistanı",
-  "version": "0.26.0",
-  "description": "Toplantıyı canlı yazıya döker (Teams; Meet ve Zoom web sırada), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
+  "version": "0.27.0",
+  "description": "Toplantıyı canlı yazıya döker (Teams, Google Meet, Zoom web), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
   "permissions": [
     "storage",
     "notifications",
@@ -67,6 +67,52 @@
         "https://teams.microsoft.com/*",
         "https://teams.cloud.microsoft/*",
         "https://teams.live.com/*"
+      ],
+      "js": [
+        "mic-main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "all_frames": true,
+      "js": [
+        "pano/dil.js",
+        "yerel-anahtar.js",
+        "platform-meet.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://meet.google.com/*"
+      ],
+      "js": [
+        "mic-main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.zoom.us/wc/*"
+      ],
+      "all_frames": true,
+      "js": [
+        "pano/dil.js",
+        "yerel-anahtar.js",
+        "platform-zoom.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.zoom.us/wc/*"
       ],
       "js": [
         "mic-main.js"

@@ -236,6 +236,8 @@ globalThis.SUFLOR_EN = {
   "Öneri": "Suggestion",
   "Dün": "Yesterday",
   "Özet açılamadı": "Couldn't open the summary",
+  "Zihin haritası": "Mind map",
+  "Zihin haritası açılamadı": "Couldn't open the mind map",
   // --- hazırlık sayfası
   "Suflor.me hazırlanıyor": "Suflor.me is getting ready",
   "Hemen katıl": "Join now",

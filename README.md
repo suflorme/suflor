@@ -16,7 +16,12 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 - **Soru sor, not düş:** panoya yazdığın metin `?`, `soru`, `Claude` ya da iki boşlukla başlıyorsa Claude'a soru olur
   ve birkaç saniyede kartla cevaplanır; başka bir şeyle başlıyorsa toplantıya not olarak düşer.
 - **Kanıt:** Option + Shift + K ile toplantı ekranının görüntüsünü kaydeder (ekranda şifre görünürse uyarır).
-- **Toplantı sonu:** özet, kararlar, takip işleri, cevapsız kalan sorular ve toplantı için 1–5 arası bir not.
+- **Toplantı sonu:** özet, kararlar, takip işleri, cevapsız kalan sorular ve toplantı için 1–5 arası bir not; özetin yanında
+  gündem maddelerine göre **zihin haritası** (tarayıcıda açılır, resim olarak indirilir). Kararlar ve iddialar bu Mac'te bir
+  **karar grafında** birikir: sonraki toplantıda aynı kişi farklı bir rakam söylerse Claude fark eder.
+- **Konuşmacı adları:** altyazının ad verdiği kişilerin ses izi bu Mac'te saklanır (**ses izi hafızası**); altyazı yokken (Teams
+  masaüstü, panoya bırakılan kayıt) adı oradan bulur. Silmek için: `toplanti-claude.py hafiza --sil "<ad>"`.
+- **Platformlar:** Teams web; Google Meet ve Zoom web (altyazıdan; ilk sürüm). Teams ve Zoom masaüstü menü çubuğu uygulamasıyla.
 
 ## Gizlilik
 - Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
@@ -53,14 +58,21 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 4. Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? (Claude tek cümlelik replik önerir) · **Option + Shift + M** sessiz (10 dk kart yok; tekrar basınca kapanır). Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin. ⭐ önemli an panoda düğme.
 5. Toplantı bitince Claude özeti çıkarır ve sana sunar.
 
+**İsteğe bağlı (ayar.json, varsayılan kapalı):** `"menu_cubugu": true` — menü çubuğu uygulaması (buzlu cam panelde mini pano,
+Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş, Teams/Zoom masaüstü toplantılarını tanıma; Erişilebilirlik ve mikrofon
+izni sorar; sonra `guncelle.command`) · `"fisilti": true` — kulaklık takılıyken DUR kartı kısa sesle kulağına okunur ·
+`"ceviri": true` — karşı tarafın İngilizce satırları panoda Türkçesiyle (metin Claude'a gider) · `"oda": true` — aynı
+mikrofondaki ikinci kişinin sözleri "Odadaki kişi" diye ayrılır. Ses izi hafızasını kapatmak için `"ses_izi_hafiza": false`.
+
 ## Bileşenler
 | Parça | Ne iş yapar |
 |---|---|
-| Chrome eklentisi (`manifest.json`, `content.js`, `platform-teams.js`, …) | Teams sayfasından altyazı/döküm ve mikrofon sesini alır, şeridi gösterir |
+| Chrome eklentisi (`manifest.json`, `content.js`, `platform-teams.js`, `platform-meet.js`, `platform-zoom.js`, …) | Teams/Meet/Zoom sayfasından altyazı/döküm ve mikrofon sesini alır, şeridi gösterir |
 | Aktarıcı (`relay.py`) | Yerel sunucu: satırları dosyaya yazar, kartları tutar, panoyu sunar |
+| Menü çubuğu uygulaması (`menu-cubugu.swift` → Suflor Menü.app, isteğe bağlı) | Mini pano paneli, Mac geneli bas-konuş, masaüstü toplantı sinyali |
 | Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
 | Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
-| Claude köprüsü (`toplanti-claude.py`, `baglam.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
+| Claude köprüsü (`toplanti-claude.py`, `baglam.py`, `yapi.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
 | Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
 
 ## Lisans

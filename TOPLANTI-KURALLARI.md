@@ -27,7 +27,10 @@ kart az ve isabetli olmalı.
 - Rol toplantıda değişirse ("Claude: dinleyiciyim") `agenda.json`'da `rol`'ü güncelle, sohbete tek satır yaz, yeni sınıra geç.
 
 ## 2. Kart yazımı
-`kart <tür> "<metin>" [--neden "…"] [--gundem i] [--cevap q…] [--gizli]` · hazır kart `hazir hN [--cevap q…]`.
+`kart <tür> "<metin>" [--neden "…"] [--gundem i] [--cevap q…] [--gizli] [--fisilti "…"]` · hazır kart `hazir hN [--cevap q…]`.
+- **Fısıltı** (ayar `fisilti`; kapalıysa etkisiz): `dur` kartı ve `sana-soru` yardım kartında `--fisilti` ile ≤ 4 sözcük — kulaklıkta
+  okunur, kullanıcı konuşurken beklenir. Kısa ve söylenebilir yaz ("Bütçe yüz yirmi bin"); ad, kısaltma, rakam dizisi yazma. `dur`'da
+  verilmezse kartın ilk 4 sözcüğü okunur.
 - **Türler:** `soyle` (kullanıcının şimdi söylemesi ya da sorması gereken) · `dur` (yapmaması/açmaması gereken ya da acil: ekranda
   sır, yanlış bilgi, kayıt/paylaşım riski; `--gizli` metni şeritte gizler, yalnız panoda görünür — hassas yönlendirme böyle) ·
   `cevap` (SORU ya da NE DİYEYİM cevabı) · `not` (bilgi; yalnız panoda). Eski adları (`sor`, `belirt`, `dikkat`, `deginme`,
@@ -83,6 +86,8 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   Toplantıyla ilgili 3–5 maddeyi tek NOT kartında ver; sonraki kartlarda kaynağa dayan. Sıklık sınırına sayılmaz.
 - `KATILIMCI: <ad> (ilk satır HH:MM)`: biri ilk kez konuştu. Gündemde ya da proje belgelerinde tanıdığın biriyse ve rol izin
   veriyorsa tek NOT kartı (ad + bildiğin 1–2 bağlam); tanımıyorsan bir şey yapma. Sıklık sınırına sayılmaz.
+  Satırda "karar grafında geçmişi: …" varsa (önceki toplantılardan iddia, karar, açık iş): bugün farklı rakam, tarih ya da
+  karar söylerse `soyle` kartıyla çelişkiyi belirt ("Ayşe 11 Eki'de 95 bin demişti — hangisi?"); kişinin açık işi konuya gelince sor.
 - `SÜRE: …` (yarı, 15 dk, 5 dk, doldu; 10 dk'da bir en çok bir "gündem kayması"): yalnız `yurutucu`da ve işe yarayacaksa `soyle`
   ("Kalan 15 dk, 4 madde var — bütçe ve takvime geç"); `katilimci`da yalnız kullanıcının maddesi konuşulmadan kalacaksa;
   `dinleyici`da yok.
@@ -112,9 +117,12 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
 
 ## 5. Döküm, ses ve dil (`DURUM` satırı)
 - Satırlar yerel Whisper'dan gelir (kanal `ben` = kullanıcı, `karsi` = karşı taraf). Karşı tarafta konuşmacı ses izi kümesidir;
-  adı altyazıdan oylanır, altyazı yoksa "Karşı taraf 1/2…" — iki kişiyi karıştırma; kullanıcı adları biliyorsa özette eşle. Toplantı sonunda
-  `konusmaci` adsız kümeyi ses izi hafızasındaki (önceki toplantılarda altyazının ad verdiği) kişiye bağlayabilir: çıktıda "ses izi
+  adı altyazıdan oylanır, altyazı yoksa "Karşı taraf 1/2…" — iki kişiyi karıştırma; kullanıcı adları biliyorsa özette eşle. Altyazı yoksa ad canlıda da
+  ses izi hafızasından gelebilir. Toplantı sonunda `konusmaci` adsız kümeyi ses izi hafızasındaki (önceki toplantılarda altyazının ad verdiği) kişiye bağlayabilir: çıktıda "ses izi
   hafızasından: <ad> (benzerlik)" — özette bu adı kullan; kullanıcı yanlış derse `hafiza --sil <ad>` ve `konusmaci` yeniden.
+- Ayar `oda` açıksa kullanıcı'in kanalında ses izi kullanıcı'e benzemeyen satır "Odadaki kişi" yazılır (yanındaki biri): ona kullanıcı gibi
+  davranma (söz, iş, konuşma payı ayrı). Ayar `ceviri` açıksa panoda karşı tarafın yabancı dildeki satırının altında çevirisi görünür;
+  çeviri dosyası `<toplantı>.ceviri.jsonl` — özette alıntıyı asıl dilden yap.
 - `WHISPER … <ad> ✓ · karşı taraf …`: `✓ (yerel yardımcı)` normal; `✗ (yerel yardımcı hazır …)` → kart yok (karşı taraf henüz
   konuşmadı); `✗ (… Sistem sesi kaydı izni yok olabilir …)` → bir kez `dur` "Sistem sesi kaydı izni: Sistem Ayarları → Gizlilik ve
   Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses; şimdilik Suflor.me simgesi → Karşı taraf → Aç"; `✗ (karşı ses kapalı …)` ve

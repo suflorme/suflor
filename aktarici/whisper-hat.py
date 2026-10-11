@@ -12,7 +12,7 @@
 # Çift satır olmasın: bir kanal Whisper'a akarken o tarafın altyazı/döküm satırları .md/.jsonl'e değil
 # <toplantı>.altyazi.log'a gider (konuşmacı eşleme ve karşılaştırma için). Whisper o kanaldan 90 sn satır üretmezse
 # altyazı yeniden yazılır (sessiz kalma/bozulma güvencesi). Ses diske yazılmaz; yalnız metin.
-import base64, subprocess, queue
+import base64, subprocess, queue, struct, math
 try: import audioop  # Python ≤ 3.12 (sistem 3.9)
 except ImportError: audioop = None
 _UYG = os.path.dirname(os.path.abspath(__file__)); _APP = AYAR["uygulama"]; _ORT = AYAR["ortak"]
@@ -233,7 +233,7 @@ def _isci_ac():
     except ValueError: j = {}
     if not j.get("hazir"):
         pr.kill(); w.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"WHISPER: {w['hata']}"); return False
-    _ISCI.update(p=pr, satirlar=q, baslik=None); w.update(durum="hazir", model=j.get("model")); KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]
+    _ISCI.update(p=pr, satirlar=q, baslik=None); w.update(durum="hazir", model=j.get("model")); kume_sifirla()
     STATE["ses_model"].update(durum="hazir" if j.get("ecapa") else "yok", hata=None if j.get("ecapa") else f"ses izi ağırlıkları yok ({ECAPA})", sn=j.get("sn"))
     print(f"WHISPER: hazır ({j.get('model')}, {time.time() - t:.1f} sn{', ses izi (ECAPA, MLX)' if j.get('ecapa') else ', ses izi yok'})")
     return True
@@ -305,10 +305,11 @@ def _isci_dongu():
         k = KANALLAR.get(is_["kanal"])
         if is_.get("bas"): is_["baslik"] = _ISCI["baslik"]  # bas-konuş parçası küme/ad sıfırlamasın
         if _ISCI["baslik"] != is_["baslik"]:  # yeni toplantı: karşı kanal kümeleri ve adları sıfırlanır (işçi de başlık değişince sıfırlar)
-            if _ISCI["baslik"] is not None: KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]
+            if _ISCI["baslik"] is not None: kume_sifirla()
             _ISCI["baslik"] = is_["baslik"]
         istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem_metni(), "onceki": (k.onceki if k else "")[-150:],
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
+        if is_["kanal"] == "ben" and not is_.get("bas") and oda_acik(): istek["oda"] = is_["oda"] = True
         try:
             _ISCI["p"].stdin.write(json.dumps(istek) + "\n"); _ISCI["p"].stdin.flush()
             l = _ISCI["satirlar"].get(timeout=60); j = json.loads(l) if l else {"hata": "işçi kapandı"}
@@ -360,7 +361,96 @@ def kume_parca(t0, t1, k):
 def kume_adi(kume):
     oy = KUME_AD.get(kume)
     if oy and max(oy.values()) >= 2: return max(oy, key=oy.get)
-    return None
+    return KUME_HAFIZA[kume][0] if kume in KUME_HAFIZA else None
+# --- Ses izi hafızası canlıda (v0.27.0) ---------------------------------------------------------------------------------
+# Toplantı sonu (toplanti-claude.py hafiza_*) altyazının ad verdiği kişilerin ortalama izini canli/ses-izi-hafiza.json'a yazar. Canlıda
+# altyazı oyu olmayan küme, biriken izi (süre ağırlıklı ortalama) hafızadaki kişiye toplantı sonundaki eşikle benziyorsa onun adını alır;
+# altyazı oyu gelince oy önce gelir, toplantı sonu etiketleme son sözü söyler. Hafızaya canlıdan yazılmaz. Eşikler toplanti-claude.py ile aynı.
+HAFIZA_ESIK, HAFIZA_FARK, HAFIZA_EN_AZ_SN = 0.6, 0.1, 8.0
+KUME_IZ = {}; KUME_HAFIZA = {}; _HAF = {"mt": None, "kisi": {}}  # küme → [toplam vektör, sn]; küme → (ad, benzerlik)
+def _iz_coz(b):
+    r = base64.b64decode(b); v = struct.unpack(f"<{len(r) // 2}e", r); n = math.sqrt(sum(x * x for x in v)) or 1.0
+    return [x / n for x in v]
+def _hafiza_kisi():
+    if AYAR.get("ses_izi_hafiza", True) is False: return {}
+    yol = os.path.join(BASE, "ses-izi-hafiza.json")
+    try: mt = os.path.getmtime(yol)
+    except OSError: return {}
+    if mt != _HAF["mt"]:
+        try: h = json.load(open(yol, encoding="utf-8")); _HAF.update(mt=mt, kisi={a: _iz_coz(x["iz"]) for a, x in h.items() if isinstance(x, dict) and x.get("iz")})
+        except (OSError, ValueError, KeyError, TypeError, struct.error): _HAF.update(mt=mt, kisi={})
+    return _HAF["kisi"]
+def kume_iz_ekle(kume, iz, sn):
+    if not kume or not iz or sn <= 0: return
+    try: v = _iz_coz(iz)
+    except Exception: return
+    t = KUME_IZ.setdefault(kume, [[0.0] * len(v), 0.0])
+    if len(t[0]) != len(v): return
+    t[0] = [a + sn * b for a, b in zip(t[0], v)]; t[1] += sn
+    oy = KUME_AD.get(kume)
+    if (oy and max(oy.values()) >= 2) or t[1] < HAFIZA_EN_AZ_SN: KUME_HAFIZA.pop(kume, None); return
+    kisi = _hafiza_kisi()
+    if not kisi: return
+    n = math.sqrt(sum(x * x for x in t[0])) or 1.0; m = [x / n for x in t[0]]
+    kullanilan = {kume_adi(k) for k in set(KUME_AD) | set(KUME_HAFIZA) if k != kume}
+    s = sorted(((sum(a * b for a, b in zip(m, x)), ad) for ad, x in kisi.items()), reverse=True)
+    b, ad = s[0]; iki = s[1][0] if len(s) > 1 else 0.0
+    if ad not in kullanilan and b >= HAFIZA_ESIK and b - iki >= HAFIZA_FARK:
+        if KUME_HAFIZA.get(kume, (None,))[0] != ad: print(f"SES İZİ: {kume} → {ad} (hafızadan, benzerlik {b:.2f})")
+        KUME_HAFIZA[kume] = (ad, round(b, 2))
+    else: KUME_HAFIZA.pop(kume, None)
+# --- Aynı mikrofonda ikinci kişi (v0.27.0; ayar oda: true ya da agenda.json "oda": true, varsayılan kapalı) -----------------------------
+# Kullanıcı kanalındaki parçanın izi kullanıcının profiline (canli/ses-izi-ben.json, 0600, yalnız bu Mac) benzemiyorsa satır "Odadaki kişi".
+# Profil yoksa ilk ≥ 30 sn'lik (≥ 1,5 sn'lik parçalar) konuşmadan kurulur: ortalamaya ≥ 0,5 benzeyen parçalar ≥ 24 sn tutarsa (biri baştan
+# konuştuysa profil kurulmaz, sürer). Sonra ≥ 0,5 benzeyen parçalar profili yavaşça günceller (ağırlık en çok 600 sn). Ölçüm (11 Ekim,
+# gercek-ses/oda-olc.py, kullanıcının 3 dk kaydı): kendi parçaları profile 0,36–0,78, başka sesler ≤ 0,33 → eşik 0,35; belirsizlik
+# kullanıcıda kalır (kendi sözü başkasına yazılmasın). < 1,5 sn parça hep kullanıcı. Aynı mikrofondaki başka ses gerçekte daha yakın olabilir.
+ODA_AD = "Odadaki kişi"; ODA_ESIK, ODA_GUNCELLE, ODA_EN_KISA, ODA_PROFIL_SN, ODA_AGIRLIK_SN = 0.35, 0.5, 1.5, 30.0, 600.0
+ODA = {"profil": None, "sn": 0.0, "ogren": [], "yuklendi": False, "yazildi": 0.0, "say": 0}
+def oda_acik(): return AYAR.get("oda") is True or agenda().get("oda") is True
+def _oda_yol(): return os.path.join(BASE, "ses-izi-ben.json")
+def _oda_kaydet():
+    try:
+        n = math.sqrt(sum(x * x for x in ODA["profil"])) or 1.0
+        v = {"iz": base64.b64encode(struct.pack(f"<{len(ODA['profil'])}e", *(x / n for x in ODA["profil"]))).decode(), "sn": round(ODA["sn"], 1),
+             "son": datetime.datetime.now().strftime("%Y-%m-%d")}
+        fd = os.open(_oda_yol() + ".gecici", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(v, f)
+        os.replace(_oda_yol() + ".gecici", _oda_yol()); ODA["yazildi"] = time.time()
+    except OSError as e: print(f"ODA: profil yazılamadı ({e})")
+def oda_kim(iz, sn, metin=""):
+    # kullanıcı kanalının satırı: ben_adi() ya da ODA_AD. < 2 sözcüklü satır ("!", "Evet") karar vermez: sessizlik/gürültü parçasının izi
+    # profilden uzak düşüyor (test/oda.py: Whisper'ın "!" satırı)
+    ben = ben_adi()
+    if not iz or len(re.findall(r"\w{2,}", metin or "")) < 2: return ben
+    try: v = _iz_coz(iz)
+    except Exception: return ben
+    if not ODA["yuklendi"]:
+        ODA["yuklendi"] = True
+        try: x = json.load(open(_oda_yol(), encoding="utf-8")); ODA.update(profil=_iz_coz(x["iz"]), sn=float(x.get("sn") or 0))
+        except (OSError, ValueError, KeyError, TypeError, struct.error): pass
+    if ODA["profil"] is None:
+        if sn >= ODA_EN_KISA: ODA["ogren"].append((sn, v)); del ODA["ogren"][:-40]
+        top = sum(s_ for s_, _ in ODA["ogren"])
+        if top >= ODA_PROFIL_SN:
+            # baskın ses: diğerlerine benzerlik toplamı en yüksek parça (medoid) ve ona ≥ ODA_ESIK benzeyenler; konuşmanın ≥ %75'i olmalı
+            # (ölçüm: kullanıcı tek başına %87; araya başka ses karışınca %35–55 → kurulmaz, öğrenme sürer)
+            og = ODA["ogren"]; S = [[sum(a * b for a, b in zip(x, y)) for _, y in og] for _, x in og]
+            md = max(range(len(og)), key=lambda i: sum(S[i])); tut = [og[j] for j in range(len(og)) if S[md][j] >= ODA_ESIK]
+            if sum(s_ for s_, _ in tut) >= 0.75 * top:
+                ODA.update(profil=[sum(s_ * x[i] for s_, x in tut) for i in range(len(v))], sn=sum(s_ for s_, _ in tut)); ODA["ogren"] = []
+                print(f"ODA: kullanıcı ses profili kuruldu ({ODA['sn']:.0f} sn)"); _oda_kaydet()
+        return ben
+    n = math.sqrt(sum(x * x for x in ODA["profil"])) or 1.0; b = sum(a * x / n for a, x in zip(v, ODA["profil"]))
+    if sn >= ODA_EN_KISA and b < ODA_ESIK:
+        ODA["say"] += 1
+        if ODA["say"] == 1: print(f"ODA: {ODA_AD} (benzerlik {b:.2f})")
+        return ODA_AD
+    if sn >= ODA_EN_KISA and b >= ODA_GUNCELLE:
+        w0 = min(ODA["sn"], ODA_AGIRLIK_SN); ODA["profil"] = [w0 * x / n + sn * a for x, a in zip(ODA["profil"], v)]; ODA["sn"] += sn
+        if time.time() - ODA["yazildi"] > 60: _oda_kaydet()
+    return ben
+def kume_sifirla(): KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]; KUME_IZ.clear(); KUME_HAFIZA.clear()
 def konusmaci_karsi(t0, t1, kume=None):
     ben = ben_adi(); now = time.time()
     son = [(t, k) for t, k in ALTYAZI_SON if k and k != ben and k != "?" and now - t < 600]
@@ -479,8 +569,9 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
     if k: k.onceki = (k.onceki + " " + metin)[-300:]
     STATE["whisper"]["satir"] += 1; STATE["whisper"]["kanal_son_satir"][kanal] = time.time()
     kume = (model or {}).get("kume") if kanal == "karsi" else None
-    if kume: kume_parca(is_["t0"], is_["t1"], kume)
-    kim = ben_adi() if kanal == "ben" else (kume_adi(kume) if kume else None) or konusmaci_karsi(is_["t0"], is_["t1"], kume)
+    if kume: kume_parca(is_["t0"], is_["t1"], kume); kume_iz_ekle(kume, (model or {}).get("iz"), max(0.0, is_["t1"] - is_["t0"]))
+    kim = (oda_kim((model or {}).get("iz"), max(0.0, is_["t1"] - is_["t0"]), metin) if is_.get("oda") else ben_adi()) if kanal == "ben" else \
+        (kume_adi(kume) if kume else None) or konusmaci_karsi(is_["t0"], is_["t1"], kume)
     ta = taslak_tuket(kanal, is_["t1"])
     # satır başına gecikme bileşenleri (sn) — kuyruk bekleme, işçiye gidiş-dönüş, işçinin kendi süresi, ses işçisi
     # bekleme, yankı bekletmesi, toplam (parça sonu → yazım). olcum.py toplanti bunları ayrı ayrı özetler.

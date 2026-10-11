@@ -242,6 +242,56 @@ def _ses_isci():
         try: p.stdin.write(metin.encode("utf-8")); p.stdin.close()
         except OSError: pass
         p.wait()
+# --- Toplantı içi fısıltı (v0.27.0; ayar fisilti: true, varsayılan kapalı) ---------------------------------------------------------
+# Yalnız kulaklık takılıyken (çıkış aygıtı Bluetooth/USB ya da Mac'in kulaklık girişi; hoparlörden okunursa mikrofona girer, karşı taraf
+# da duyar) ve toplantı sürerken: DUR kartı ve fısıltı metni verilen kart (karşı taraf kullanıcıya adıyla sorunca yardım kartı) için kısa
+# tık + en çok 4 sözcük. Kullanıcı konuşuyorsa en çok 8 sn sessizlik beklenir, gelmezse okunmaz; iki fısıltı arası ≥ 20 sn. Sessizde
+# bekleyen kart okunmaz. Ses yerel macOS sesi (say); metin Mac'ten çıkmaz. Hız kuralı (konuşma → satır %90 < 5 sn) gerçek toplantıda
+# doğrulanınca açılması önerilir (S32).
+FISILTI = {"son": 0.0, "say": 0}; FISILTI_ARA_SN, FISILTI_BEKLE_SN = (2.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 20.0), 8.0
+def _ca_ozellik(nesne, secici, kapsam="glob"):
+    import ctypes
+    ca = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreAudio.framework/CoreAudio")
+    class Adres(ctypes.Structure): _fields_ = [("s", ctypes.c_uint32), ("k", ctypes.c_uint32), ("e", ctypes.c_uint32)]
+    d = lambda x: struct.unpack(">I", x.encode())[0]
+    a = Adres(d(secici), d(kapsam), 0); v = ctypes.c_uint32(0); n = ctypes.c_uint32(4)
+    if ca.AudioObjectGetPropertyData(ctypes.c_uint32(nesne), ctypes.byref(a), 0, None, ctypes.byref(n), ctypes.byref(v)): return None
+    return v.value
+def kulaklik():
+    # varsayılan çıkış aygıtı kulaklık mı: Bluetooth / BLE / USB → evet (çoğu kulaklık); yerleşik aygıtta veri kaynağı "hdpn" (kulaklık girişi);
+    # HDMI, AirPlay, yerleşik hoparlör → hayır. SUFLOR_TEST_KULAKLIK=1/0 deneme için.
+    if os.environ.get("SUFLOR_TEST_KULAKLIK"): return os.environ["SUFLOR_TEST_KULAKLIK"] == "1"
+    try:
+        cik = _ca_ozellik(1, "dOut")
+        if not cik: return False
+        tasima = struct.pack(">I", _ca_ozellik(cik, "tran") or 0).decode("latin-1")
+        if tasima in ("blue", "bleo", "usb "): return True
+        if tasima == "bltn": return struct.pack(">I", _ca_ozellik(cik, "ssrc", "outp") or 0).decode("latin-1") == "hdpn"
+    except Exception as e: print(f"FISILTI: çıkış aygıtı okunamadı ({e.__class__.__name__})")
+    return False
+def _kullanici_konusuyor():
+    k = KANALLAR.get("ben")
+    return bool(k and k.konusuyor and time.time() - k.son_bitis < 2)
+def fisilti_kart(c):
+    if AYAR.get("fisilti") is not True or c.get("sessiz") or not toplanti_var(): return
+    if c.get("kind") != "dur" and not c.get("fisilti"): return
+    metin = " ".join((c.get("fisilti") or c.get("text") or "").split()[:4]).rstrip(".,;:—-")
+    if not metin: return
+    def calis():
+        son = time.time() + FISILTI_BEKLE_SN
+        while _kullanici_konusuyor() and time.time() < son: time.sleep(0.3)
+        if _kullanici_konusuyor(): print("FISILTI: kullanıcı konuşuyor, okunmadı"); return
+        if time.time() - FISILTI["son"] < FISILTI_ARA_SN: print("FISILTI: 20 sn dolmadı, okunmadı"); return
+        if not kulaklik(): print("FISILTI: kulaklık yok, okunmadı"); return
+        FISILTI.update(son=time.time(), say=FISILTI["say"] + 1)
+        if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"FISILTI (deneme): {metin}"); return
+        try: subprocess.run(["/usr/bin/afplay", "-v", "0.4", "/System/Library/Sounds/Tink.aiff"], timeout=3)
+        except (OSError, subprocess.TimeoutExpired): pass
+        v = ses_secimi()
+        try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [telaffuz(metin)], timeout=10)
+        except (OSError, subprocess.TimeoutExpired): pass
+        print(f"FISILTI: {metin}")
+    threading.Thread(target=calis, daemon=True).start()
 def brifing_konusma(s):
     tem = lambda x: re.sub(r"\s*\([^()]*\)\s*\.?\s*$", "", " ".join(str(x).split())).strip()  # sondaki kaynak parantezi okunmaz
     d = [tem(x) for x in (s.get("dikkat") or [])[:3] if tem(x)]
