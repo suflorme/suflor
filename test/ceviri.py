@@ -10,13 +10,14 @@ hata = []
 def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: hata.append(ad)
-def calistir(ceviri=True, gercek=False):
+def calistir(ceviri=True, gercek=False, kulaklik=None):
     T = tempfile.mkdtemp(prefix="suflor-cv-"); canli = os.path.join(T, "canli"); os.makedirs(canli)
     for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
     shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
     ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Ali K", "port": PORT, "uygulama": T, "proje": T, "ortak": T, "ceviri": ceviri}, open(ay, "w"))
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1")
     if not gercek: env["SUFLOR_TEST_CEVIRI"] = "1"
+    if kulaklik is not None: env["SUFLOR_TEST_KULAKLIK"] = "1" if kulaklik else "0"
     r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT, env=env)
     for _ in range(50):
         if os.path.exists(os.path.join(canli, "kart-anahtari.txt")): break
@@ -48,6 +49,25 @@ r, T, canli, istek = calistir(ceviri=False)
 try:
     satirlar(istek); time.sleep(3.5)
     bak("ayar kapalıyken çevrilmez", not any("ceviri" in x for x in istek("/status")["tail"]))
+finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# sesli çeviri (v0.29.0): 🎧 kulaklıksız açılmaz; açılınca çeviri ayarı kapalı olsa da çevrilir, kısa öz okunur; tekrar basınca kapanır
+r, T, canli, istek = calistir(ceviri=False, kulaklik=False)
+try:
+    k = istek("/komut", {"tur": "sesli_ceviri"})
+    bak("kulaklık yokken sesli çeviri açılmaz (uyarı)", "Kulaklık" in k.get("metin", "") and not istek("/cards").get("sesli_ceviri"))
+finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+r, T, canli, istek = calistir(ceviri=False, kulaklik=True)
+try:
+    istek("/ingest", {"meeting": {"title": "Çeviri Deneme"}, "source": "whisper", "entries": [{"id": "wh/karsi/0", "speaker": "John", "time": "09:59:00", "text": "Hello everyone, thanks for joining today.", "kanal": "karsi", "t0": time.time(), "t1": time.time() + 2}]})
+    k = istek("/komut", {"tur": "sesli_ceviri"})
+    bak("kulaklıkla sesli çeviri açıldı", "açık" in k.get("metin", "") and (istek("/cards").get("sesli_ceviri") or {}).get("acik"))
+    satirlar(istek); time.sleep(3.5)
+    log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
+    bak("ayar kapalı ama sesli açık: satır çevrildi", any(x.get("id") == "wh/karsi/1" and "ceviri" in x for x in istek("/status")["tail"]))
+    bak("kısa öz okundu (Türkçe satır ve kendi satırı okunmadı)", log.count("SESLİ ÇEVİRİ (deneme): [kısa] We can ship") == 1 and log.count("SESLİ ÇEVİRİ (deneme)") == 1)
+    bak("panoda okunan sayısı 1", (istek("/cards").get("sesli_ceviri") or {}).get("okunan") == 1)
+    istek("/komut", {"tur": "sesli_ceviri"})
+    bak("tekrar basınca kapandı", not istek("/cards").get("sesli_ceviri"))
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 if os.environ.get("SUFLOR_CEVIRI_GERCEK"):
     r, T, canli, istek = calistir(gercek=True)

@@ -215,16 +215,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 106933,
-   "sha": "38de9aafcabd64e9"
+   "uzunluk": 108446,
+   "sha": "0a764037aec17e2f"
   },
   "/hazirlik": {
-   "uzunluk": 30831,
-   "sha": "61e49caa9f4f38a6"
+   "uzunluk": 31264,
+   "sha": "14bb477644eb0a60"
   },
   "/mini": {
-   "uzunluk": 106933,
-   "sha": "38de9aafcabd64e9"
+   "uzunluk": 108446,
+   "sha": "0a764037aec17e2f"
   },
   "/status": {
    "_ping_son": "float",
@@ -438,6 +438,7 @@
     "parca": "int",
     "sn": "NoneType"
    },
+   "sesli_ceviri": "NoneType",
    "sessiz": "NoneType",
    "son": {
     "at": "str",
@@ -614,6 +615,7 @@
      "tur": "str"
     }
    ],
+   "sesli_ceviri": "NoneType",
    "sessiz": "NoneType",
    "son": {
     "at": "str",

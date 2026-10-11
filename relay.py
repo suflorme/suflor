@@ -453,9 +453,14 @@ bolum("whisper-hat")  # aktarici/whisper-hat.py — Whisper hattı: işçi, ses 
 # ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
 # isteği de yok (Faz 2: üç yanlış alarm, karşı taraf da duyuyor); kanıt yalnız Option + Shift + K ve 📷 ile.
-def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz (/komut yalnız bunları kabul eder)
+def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | sesli_ceviri (/komut yalnız bunları kabul eder)
     title = title or STATE["meeting"] or "Toplantı"; at = datetime.datetime.now().isoformat(timespec="seconds")
     if tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
+    elif tur == "sesli_ceviri":
+        ac, uy = sesli_ceviri_degistir()
+        onay = _t("🎧 Sesli çeviri açık — kısa öz kulağına okunur", "🎧 Spoken translation on — the gist is read into your ear") if ac else \
+            _t("🎧 Kulaklık takılı değil — sesli çeviri açılmadı (hoparlörden karşı taraf da duyar)", "🎧 No headphones — spoken translation not turned on (the other side would hear it)") if uy else \
+            _t("🎧 Sesli çeviri kapandı", "🎧 Spoken translation off")
     elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
     else: ask({"tur": "ozet"}); onay = _t("💬 Ne diyeyim? — Claude replik hazırlıyor", "💬 What do I say? — Claude is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
@@ -1403,7 +1408,7 @@ class H(BaseHTTPRequestHandler):
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)
         if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
         if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
-            if p.get("tur") not in ("onemli", "ozet", "sessiz"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz"}, 400)
+            if p.get("tur") not in ("onemli", "ozet", "sessiz", "sesli_ceviri"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | sesli_ceviri"}, 400)
             komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
             return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view(), "yaparken": yaparken_view()})
         if self.path == "/ses-yerel":  # yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar

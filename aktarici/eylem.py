@@ -99,7 +99,7 @@ def cards_view():
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
             "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
-            "baglam": baglam_view(), "yaparken": yaparken_view(),
+            "baglam": baglam_view(), "yaparken": yaparken_view(), "sesli_ceviri": sesli_ceviri_view(),
             "son": {k: v for k, v in (STATE.get("son_satir") or {}).items() if k != "file"} if (STATE.get("son_satir") or {}).get("file") == af and af else None}
 # şerit uzun yoklaması — GET /cards?bekle=25&imza=<son> şeridin gösterdiği durum değişene kadar (en çok 25 sn)
 # bekler, değişince hemen döner. Her POST (kart, ✓/✕, soru, kanıt isteği, komut, satır) bekleyenleri uyandırır; POST dışı değişiklik
