@@ -426,15 +426,16 @@
   setInterval(() => ping(), 10000); setTimeout(() => ping(), 1500);
   // Popup'tan gelen "not" ve "durum" istekleri
   // Kanıt anında paylaşılan ekranın ölçeği (9 Ekim: karşı tarafın ekranı küçük gösterilince kanıttaki yazı okunmadı). Görünür alanın ≥ %25'ini
-// kaplayan en büyük oynayan video = sahnedeki paylaşım (galerideki küçük kamera karoları sayılmaz); ölçek = ekrandaki cihaz pikseli / videonun
-// gerçek pikseli (object-fit: contain). Teams seçicisi gerekmez: platformdan bağımsız.
+// kaplayan en büyük video ya da tuval (canvas; paylaşım tuvale çizilebilir) = sahnedeki paylaşım (galerideki küçük kamera karoları sayılmaz);
+// ölçek = ekrandaki cihaz pikseli / gerçek piksel (object-fit: contain). Ekran boyunda çizilen tuvalin ölçeği ~1: uyarı vermez. Teams seçicisi gerekmez.
 function paylasimOlcek() {
   let en = null;
-  for (const v of document.querySelectorAll("video")) {
-    if (!v.videoWidth || !v.videoHeight) continue;
+  for (const v of document.querySelectorAll("video, canvas")) {
+    const gw = v.tagName === "CANVAS" ? v.width : v.videoWidth, gh = v.tagName === "CANVAS" ? v.height : v.videoHeight;
+    if (!gw || !gh) continue;
     const r = v.getBoundingClientRect(), alan = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
     if (alan < innerWidth * innerHeight * 0.25 || (en && alan <= en.alan)) continue;
-    en = { alan, olcek: Math.round(Math.min(r.width / v.videoWidth, r.height / v.videoHeight) * devicePixelRatio * 100) / 100, vw: v.videoWidth, vh: v.videoHeight };
+    en = { alan, olcek: Math.round(Math.min(r.width / gw, r.height / gh) * devicePixelRatio * 100) / 100, vw: gw, vh: gh };
   }
   return en && { olcek: en.olcek, vw: en.vw, vh: en.vh };
 }
