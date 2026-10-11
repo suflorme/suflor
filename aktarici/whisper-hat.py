@@ -432,13 +432,19 @@ def taslak_view(baslik=None):
     return out[-6:]
 # --- Yankı ayıklama ------------------------------------------------------------------------------------------------
 # Hoparlörden çıkan karşı taraf sesi kullanıcının mikrofonuna da girerse aynı sözler iki kanalda (ben + karsi) yazılır, kullanıcının
-# adıyla ikinci kez. ben kanalının parçası, zamanı karşı kanalın bir parçasıyla ≥ 0,5 sn çakışıp kelimelerinin ≥ %50'si aynıysa
-# yazılmaz (sayılır: whisper.yanki). Karşı parça henüz çevrilmediyse (kuyrukta / sürüyor) kullanıcı satırı en çok 4 sn bekletilir.
+# adıyla ikinci kez. ben kanalının parçası, zamanı karşı kanalın bir parçasıyla ≥ 0,5 sn çakışıp sözcüklerinin ≥ %60'ı karşı metinde AYNI
+# SIRAYLA geçiyorsa (en az 2 sözcük; tek sözcüklük parçada 1) yazılmaz (sayılır: whisper.yanki). Karşı parça henüz çevrilmediyse (kuyrukta /
+# sürüyor) kullanıcı satırı en çok 4 sn bekletilir. Eski kural (kümelerin küçüğünün %50'si, sırasız) aynı konudaki kendi sözü atıyordu: 9 Ekim
+# kulaklıkla bir kişi adı ve "yetki" geçen kendi sorusu (karşı aynı anda aynı kişiden söz ediyordu; sırayla 2/4), 6 Ekim kendi sayımı + sorusu
+# (karşının saydığı üç ad içinde; 3/9). Gerçek yankı 7 Ekim "Merhabalar herkese" (2/2) yine tutulur. test/yanki.py (adlar değiştirildi).
 YANKI_LOCK = threading.Lock(); YANKI_KARSI = []; YANKI_BEKLEYEN = []; STATE["whisper"]["yanki"] = 0
-def _yk(t): return set(w for w in re.findall(r"\w+", sade(t or "")) if len(w) > 2)
-def _yanki_mi(a, b):  # a, b: (t0, t1, kelimeler)
+YANKI_KAPSAM = 0.6
+def _yk(t): return [w for w in re.findall(r"\w+", sade(t or "")) if len(w) > 2]
+def _yanki_mi(a, b):  # a: ben, b: karşı — (t0, t1, sözcükler sırayla)
     if min(a[1], b[1]) - max(a[0], b[0]) < 0.5 or not a[2] or not b[2]: return False
-    return len(a[2] & b[2]) / min(len(a[2]), len(b[2])) >= 0.5
+    import difflib
+    ortak = sum(m.size for m in difflib.SequenceMatcher(None, a[2], b[2], autojunk=False).get_matching_blocks())
+    return ortak >= min(2, len(a[2])) and ortak / len(a[2]) >= YANKI_KAPSAM
 def _karsi_bekleniyor(t0, t1):
     k = KANALLAR.get("karsi")
     if k and k.konusuyor and k.t0 < t1: return True
