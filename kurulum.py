@@ -441,7 +441,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "manifest.json", "whisper-isci.py", "toplanti-claude.py", "teshis.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "aktarici/", "manifest.json", "whisper-isci.py", "toplanti-claude.py", "teshis.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 ESKI_BETIK = ["kur.command", "relay-baslat.command"]  # tek kurulum komutuyla kalktı; açık depodan güncellemede kod klasöründen silinir
 TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
@@ -554,7 +554,7 @@ def kur():
     Y = yollar(); app, port = Y["uygulama"], Y["port"]; canli = os.path.join(app, "canli"); desk = os.path.join(Y["proje"], "_canli")
     # bozuk relay.py kurulursa KeepAlive çöken aktarıcıyı döngüde kaldırmaya çalışır: önce sözdizimi
     import ast
-    try: ast.parse(open(os.path.join(KOD, "relay.py"), encoding="utf-8").read())
+    try: [ast.parse(open(y, encoding="utf-8").read()) for y in [os.path.join(KOD, "relay.py")] + sorted(glob_(os.path.join(KOD, "aktarici", "*.py")))]
     except Exception as e: sys.exit(f"HATA: relay.py sözdizimi hatalı ({e}) — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")
     for f in ("pano.html", "hazirlik.html", "yazi.css", "dil.js", "anahtar.js"):
         if not os.path.isfile(os.path.join(KOD, "pano", f)): sys.exit(f"HATA: pano/{f} eksik — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")

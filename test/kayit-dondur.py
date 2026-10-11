@@ -9,6 +9,7 @@ import gzip, importlib.util, json, os, shutil, subprocess, sys, tempfile, time
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 T = tempfile.mkdtemp(prefix="suflor-kd-"); PORT = 8792
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
+shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
 def satirlar(n, bas=0): return [json.dumps({"t": 1790000000 + i, "id": f"w-karsi-{i}", "sonuc": "satir", "kuyruk": 0.1, "dolgu": "x" * 200}) + "\n" for i in range(bas, bas + n)]

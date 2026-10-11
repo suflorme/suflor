@@ -14,7 +14,7 @@ import json, os, re, sys, time, uuid, glob, threading, platform, subprocess, dat
 SURUM_SEMA = 1
 ADRES_VARSAYILAN = "https://suflor-geri-bildirim.wg9w7njmgz.workers.dev/"  # Worker (sunucu/); ayar `teshis_adres` geçersiz kılar
 BETA_ANAHTAR = "suflor-beta-1"  # gizli değil: yalnız rastgele isteği ayırmak için
-KOD_DOSYALARI = ("relay.py", "toplanti-claude.py", "whisper-isci.py", "ses-isci.py", "baglam.py", "kurulum.py", "teshis.py",
+KOD_DOSYALARI = ("relay.py", "eylem.py", "sozluk.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "bas-konus.py", "toplanti-claude.py", "whisper-isci.py", "ses-isci.py", "baglam.py", "kurulum.py", "teshis.py",
                  "content.js", "platform-teams.js", "background.js", "offscreen.js", "mic-main.js", "popup.js", "launcher.js")
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 SOZLUK_DOSYA = os.path.join(_BURASI, "teshis-sozluk.txt")
@@ -40,7 +40,8 @@ def _dizgeler(satir):
 def sozluk_uret(kod):
     s = set(TABAN)
     for ad in KOD_DOSYALARI:
-        try: satirlar = open(os.path.join(kod, ad), encoding="utf-8").read().splitlines()
+        yol = next((y for y in (os.path.join(kod, ad), os.path.join(kod, "aktarici", ad)) if os.path.exists(y)), None)  # relay.py bölümleri aktarici/'da
+        try: satirlar = open(yol, encoding="utf-8").read().splitlines() if yol else []
         except OSError: continue
         py = ad.endswith(".py")
         for l in satirlar:

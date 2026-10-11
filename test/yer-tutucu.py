@@ -7,6 +7,7 @@ import glob, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 T = tempfile.mkdtemp(prefix="suflor-yt-"); PORT = 8794; URL = f"http://127.0.0.1:{PORT}"
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
+shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"),

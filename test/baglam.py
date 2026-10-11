@@ -12,6 +12,7 @@ T = tempfile.mkdtemp(prefix="suflor-bg-"); PORT = 8793; URL = f"http://127.0.0.1
 EVD = os.path.expanduser("~/Library/Caches/Suflor-baglam-deneme"); os.makedirs(os.path.join(EVD, "iki kelime"), exist_ok=True)
 belge = os.path.join(EVD, "iki kelime", "teklif özeti.pdf"); open(belge, "wb").write(b"%PDF-1.4 deneme")
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
+shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli); os.makedirs(os.path.join(T, "proje"))
 stub = os.path.join(T, "claude-sahte"); open(stub, "w").write("#!/bin/sh\necho \"$@\"\n"); os.chmod(stub, 0o755)

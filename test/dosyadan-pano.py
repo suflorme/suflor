@@ -13,6 +13,7 @@ ORTAK = os.path.expanduser(GERCEK.get("ortak") or "/Users/Shared/Suflor")
 if not os.path.isdir(os.path.join(ORTAK, "whisper-venv")): print("Whisper kurulu değil — atlandı"); sys.exit(0)
 T = tempfile.mkdtemp(prefix="suflor-dp-")
 for f in ("relay.py", "manifest.json", "toplanti-claude.py", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
+shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 hatalar = []
 def kontrol(ad, kosul):

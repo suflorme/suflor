@@ -1,11 +1,12 @@
 # Faz 4 — sesli özet ve "yazayım mı?" dizisi (yalıtılmış aktarıcı; SUFLOR_TEST_BASLAT: ses çalınmaz, okunacak metin günlüğe yazılır).
 # Aktarıcıda seslendir / ozet_sesli / soru_* / eylem_sun / eylem_karar ya da panodaki Sonra/Sus değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/sesli.py
-import json, os, sys, subprocess, tempfile, time, urllib.request, urllib.error
+import shutil, json, os, sys, subprocess, tempfile, time, urllib.request, urllib.error
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8795
 T = tempfile.mkdtemp(prefix="yaz-"); canli = os.path.join(T, "canli"); os.makedirs(canli)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": os.path.join(T, "yok")}, open(ay, "w"))
 for f in ("relay.py", "manifest.json"): subprocess.run(["cp", os.path.join(KOD, f), T])
+shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 subprocess.run(["cp", "-R", os.path.join(KOD, "pano"), T]); open(os.path.join(T, "ozet.md"), "w").write("# özet\n")
 ENV = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1")
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, env=ENV, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
@@ -56,7 +57,7 @@ finally:
     r.terminate(); r.wait()
 # S24 Aşama 1: sesli cevap ayırıcısı (aktarıcının kendi tanımları; Whisper'ın verdiği biçimler — noktalama, büyük harf, İ/I)
 import ast
-_k = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); _ad = {"SES_CEVAP", "SES_AMA", "SES_DOLGU", "sesli_ayir"}
+_k = "".join(open(f, encoding="utf-8").read() for f in [os.path.join(KOD, "relay.py")] + sorted(__import__("glob").glob(os.path.join(KOD, "aktarici", "*.py")))); _ad = {"SES_CEVAP", "SES_AMA", "SES_DOLGU", "sesli_ayir"}
 _ns = {"re": __import__("re")}
 exec(compile(ast.Module([n for n in ast.parse(_k).body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in _ad for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in _ad)], []), "relay", "exec"), _ns)
 TABLO = [("Evet.", "onay"), ("Evet, yaz.", "onay"), ("Tamam.", "onay"), ("Olur olur.", "onay"), ("Ekle lütfen.", "onay"), ("EVET", "onay"), ("Yes.", "onay"), ("Okay, do it.", "onay"),

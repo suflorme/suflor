@@ -61,7 +61,7 @@ else:
         if YASAK.search(satir): hatalar.append(f"sihirbaz/sihirbaz.js: yasak terim — {satir.strip()[:120]}")
 
 # bilgi: hiçbir kaynakta metin olarak geçmeyen girdi (değişkenle L(x) çağrılan metinler de burada görünebilir; hata değil)
-tum = "".join(oku(y) for y in KULLANAN + ["relay.py", "platform-teams.js", "popup.html"])  # aktarıcının metni panoda L(x) ile çevrilir
+tum = "".join(oku(y) for y in KULLANAN + ["relay.py", "platform-teams.js", "popup.html"] + sorted(os.path.relpath(f, KOD) for f in __import__("glob").glob(os.path.join(KOD, "aktarici", "*.py"))))  # aktarıcının metni panoda L(x) ile çevrilir
 kimsesiz = [k for k in en if k not in kullanilan and json.dumps(k, ensure_ascii=False)[1:-1] not in tum and k not in tum]
 print(f"dil: pano/dil.js {len(en)} metin · {len(KULLANAN)} yüzey + sihirbaz · {len(hatalar)} sorun" + (f" · kaynakta görünmeyen {len(kimsesiz)}" if kimsesiz else ""))
 for h in hatalar: print("  KALDI:", h)
