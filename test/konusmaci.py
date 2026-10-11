@@ -8,7 +8,7 @@ import base64, datetime, json, os, random, shutil, subprocess, sys, tempfile, ti
 import struct
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-T = tempfile.mkdtemp(prefix="suflor-kn-"); PORT = 8793; URL = f"http://127.0.0.1:{PORT}"
+T = tempfile.mkdtemp(prefix="suflor-kn-"); PORT = 8786; URL = f"http://127.0.0.1:{PORT}"
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))

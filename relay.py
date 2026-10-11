@@ -313,7 +313,8 @@ def load_cards():
 # Ertele ("Sonra", /card-ack status "ertele"): kart gündemde sıradaki maddeye geçilince (izle'nin ▶ tahmini ya da ✓ işareti
 # değişince) geri gelir; gündem yoksa ERTELE_GUNDEMSIZ_SN, varsa en geç ERTELE_EN_COK_SN sonra. Geri gelen kartta "geri" alanı.
 SESSIZ_DK = 10; SESSIZ_OZET_SN = 90; ERTELE_GUNDEMSIZ_SN = 300; ERTELE_EN_COK_SN = 900
-if os.environ.get("SUFLOR_TEST_HIZLI"): SESSIZ_OZET_SN = ERTELE_GUNDEMSIZ_SN = 2  # test/sessiz.py: bekleme süreleri kısalır
+if os.environ.get("SUFLOR_TEST_HIZLI"): SESSIZ_OZET_SN, ERTELE_GUNDEMSIZ_SN = 6, 2  # test/faz3.py: bekleme süreleri kısalır (özet beklemesi izle'nin 2 sn'lik
+# yoklamasından uzun kalmalı: 2 sn'de izle bazen bekleyenleri serbest kaldıktan sonra görüp "SESSİZ BİTTİ: 0 kart" diyordu — 11 Ekim, ~1/3 aralıklı kalma)
 SESSIZ = {"id": None, "bas": 0.0, "bitis": 0.0, "bitti": None}
 def sessiz_acik(): return bool(SESSIZ["id"]) and SESSIZ["bitti"] is None and time.time() < SESSIZ["bitis"]
 def _sessiz_bitir(t, neden):  # LOCK içinde

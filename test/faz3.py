@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Faz 3–4 — sessiz mod, kart erteleme, "Ne diyeyim?", sözler defteri ve eylem kuyruğu. Yalıtılmış aktarıcı (SUFLOR_TEST_HIZLI: özet bekleme ve gündemsiz erteleme 2 sn) + izle.
 #   Sessiz: Option + Shift + M (/komut sessiz) açar/kapatır; sessizde SÖYLE/NOT bekler, DUR ve soruya CEVAP geçer; bitince izle
-#   SESSİZ BİTTİ der; --sessiz-ozet kartı bekleyenleri kapatır; özet gelmezse bekleyenler 2 sn sonra tek tek görünür.
+#   SESSİZ BİTTİ der; --sessiz-ozet kartı bekleyenleri kapatır; özet gelmezse bekleyenler 6 sn sonra (test kipi; gerçekte 90) tek tek görünür.
 #   Ertele: /card-ack "ertele" kartı gizler; gündemde ▶ değişince (ya da gündemsizde süre dolunca) "geri" alanıyla döner.
 #   Ne diyeyim?: /komut ozet → izle NE DİYEYİM (son 2 dk, gündem); --cevap kartı "replik" + "durum" alanıyla, sessizde de geçer.
 #   Sözler: soz ekle / liste / kapat, tarih denetimi, hazirlik --kim açık sözleri getirir.
@@ -72,11 +72,11 @@ try:
     kontrol("özet kartı görünüyor, bekleyenler kapandı", ozet in g and soyle not in g and not_ not in g)
     kontrol("özetlenenler 'son kapananlar'da yok", not any(c["id"] in (soyle, not_) for c in v.get("closed", [])))
     kontrol("izle: özetlenen kart için KART olayı yok", not any("Bütçeyi sor" in o and o.startswith("KART") for o in olaylar))
-    # özet gelmezse bekleyenler 2 sn sonra görünür
+    # özet gelmezse bekleyenler 6 sn sonra görünür
     istek("/komut", {"tur": "sessiz"}); k2 = kart("soyle", "Takvimi teyit et"); istek("/komut", {"tur": "sessiz"})
     kontrol("özetsiz: bitişte gizli", k2 not in gorunen())
-    time.sleep(2.5)
-    kontrol("özetsiz: 2 sn sonra tek tek göründü (kart kaybolmaz)", k2 in gorunen())
+    time.sleep(6.5)
+    kontrol("özetsiz: 6 sn sonra tek tek göründü (kart kaybolmaz)", k2 in gorunen())
 
     # --- ertele (gündemli) ---
     json.dump({"title": "Sessiz deneme", "items": ["Bütçe", "Takvim", "Riskler"]}, open(os.path.join(canli, "agenda.json"), "w"))
