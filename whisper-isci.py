@@ -240,7 +240,8 @@ def toplu_dosya(yol):
     # toplantı sonu (toplanti-claude.py konusmaci): canlı karşı satırların ses izleri (<toplantı>.sesizi.log: {"id", "t0", "t1", "iz", "bol"?}) dosyadan
     # dökümdeki gibi toplu kümelenir. Bölümlü satırda birim bölümdür (iki kişili canlı parça ayrılır); < 0,5 sn izsiz bölüm satırdaki en uzun
     # izli bölümün kümesini alır. Model yüklenmez (yalnız numpy). Çıkış: {"kume": {id: no (süreye göre çoğunluk)}, "bol": {id: [no, …]} (yalnız
-    # bölümleri farklı kümede olan satır), "n": satır, "k": küme sayısı}
+    # bölümleri farklı kümede olan satır), "n": satır, "k": küme sayısı, "merkez": {no: süre ağırlıklı ortalama iz (float16 base64, birim)},
+    # "sn": {no: izli konuşma sn}} — merkez ses izi hafızası içindir (toplanti-claude.py hafiza_*)
     import numpy as np
     def iz_(b):
         e = np.frombuffer(base64.b64decode(b), np.float16).astype(np.float32); return e / (np.linalg.norm(e) + 1e-9)
@@ -266,13 +267,19 @@ def toplu_dosya(yol):
         for k, sn in zip(ks, sure): top[k] = top.get(k, 0) + sn
         km[i] = ad.setdefault(max(top, key=top.get), len(ad) + 1)
         if len(set(ks)) > 1: bl[i] = [ad.setdefault(k, len(ad) + 1) for k in ks]
-    out({"kume": km, "bol": bl, "n": len(satir), "k": len(ad)}); return 0
+    top_iz, top_sn = {}, {}
+    for n, k in enumerate(et):
+        if k is None or k not in ad or birim[n][1] is None: continue
+        no = ad[k]; top_iz[no] = top_iz.get(no, 0) + birim[n][0] * birim[n][1]; top_sn[no] = top_sn.get(no, 0) + birim[n][0]
+    merkez = {no: base64.b64encode((v / (np.linalg.norm(v) + 1e-9)).astype(np.float16).tobytes()).decode() for no, v in top_iz.items() if top_sn[no] > 0}
+    out({"kume": km, "bol": bl, "n": len(satir), "k": len(ad), "merkez": merkez, "sn": {no: round(v, 1) for no, v in top_sn.items()}}); return 0
 def dosya_dok(yol, dil, terimler):
     # Dosyadan döküm (toplanti-claude.py dosyadan): afconvert'in ürettiği 16 kHz tek kanal 16 bit WAV, canlıdaki gibi konuşma parçalarıyla
     # (dosya_parcala) Whisper'a. 10 Ekim yapay iki kişilik denemesinde 5 dk'lık bloklar dili blok başında bir kez buldu (İngilizce paragraf
     # Türkçe uydurmaya döndü) ve iki konuşmacıyı tek bölümde birleştirdi; parça başına dil ve ses izi ikisini de çözer. Ses izi (ECAPA)
     # varsa bölümler sonda toplu kümelenir (toplu_kumele), o yüzden iş bitince yazılır. Çıkış satır başına JSON:
-    # {"hazir", "sure"} · {"blok", "toplam"} · {"bolum": {"t0", "t1", "metin", "kume"?}} · {"bitti", "sn", "atlanan"} · {"hata"}
+    # {"hazir", "sure"} · {"blok", "toplam"} · {"bolum": {"t0", "t1", "metin", "kume"?}} · {"merkez": {kume: iz}, "sn": {kume: sn}} (ses izi
+    # hafızası için, toplu_dosya'daki gibi) · {"bitti", "sn", "atlanan"} · {"hata"}
     import struct
     t = time.time()
     try:
@@ -324,6 +331,12 @@ def dosya_dok(yol, dil, terimler):
     for k, bo in bolumler:  # küme adları ilk konuşma sırasıyla k1, k2…
         if et[k] is not None: bo["kume"] = ad.setdefault(et[k], f"k{len(ad) + 1}")
         out({"bolum": bo})
+    top_iz, top_sn = {}, {}
+    for n, k in enumerate(et):
+        if k is None or izler[n][1] is None: continue
+        top_iz[ad[k]] = top_iz.get(ad[k], 0) + izler[n][0] * izler[n][1]; top_sn[ad[k]] = top_sn.get(ad[k], 0) + izler[n][0]
+    if top_iz: out({"merkez": {k: base64.b64encode((v / (np.linalg.norm(v) + 1e-9)).astype(np.float16).tobytes()).decode() for k, v in top_iz.items()},
+                    "sn": {k: round(v, 1) for k, v in top_sn.items()}})
     out({"bitti": True, "sn": round(time.time() - t, 1), "atlanan": atla}); return 0
 def ecapa_donustur(ckpt, hedef):
     # kurulumda bir kez (aktarici-kur / modeller-kur): SpeechBrain ağırlıkları (torch dosyası) → numpy .npz. torch yalnız burada gerekir

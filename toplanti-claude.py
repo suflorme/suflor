@@ -104,6 +104,8 @@ ks.add_argument("teams", help="Teams'ten indirilen döküm dosyası"); ks.add_ar
 ks.add_argument("--n", type=int, default=12, help="en çok kaç kaçan bölüm listelensin"); ks.add_argument("--kaydet", action="store_true")
 kc = sub.add_parser("konusmaci", help="toplantı sonu: karşı taraf konuşmacılarını ses izinden toplu kümele, altyazı adlarına bağla → <toplantı>.konusmaci.json (sonuc ve dokum kendiliğinden çağırır)")
 kc.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); kc.add_argument("--geri", action="store_true", help="eşlemeyi kaldır (canlı adlar)")
+hf = sub.add_parser("hafiza", help="ses izi hafızası: altyazıdan ad öğrenilen kişiler (canli/ses-izi-hafiza.json, yalnız bu Mac); altyazısız toplantıda adı buradan bulunur")
+hf.add_argument("--sil", default=None, help="bu adı hafızadan sil"); hf.add_argument("--hepsini-sil", action="store_true", help="hafıza dosyasını sil")
 dk = sub.add_parser("dokum", help="v0.12.6: temiz döküm dosyası (.md + .vtt) → <proje>/gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>")
 dk.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); dk.add_argument("--kim", default=None, help="dosya adındaki kişi/konu (yoksa toplantı başlığı)")
 dk.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)"); dk.add_argument("--uzerine", action="store_true", help="var olan dosyanın üzerine yaz")
@@ -1083,6 +1085,60 @@ def bol_metin(r):
         else: out.append((t0 + float(b["s"]), t0 + float(b["e"]), b["ad"], " ".join(parca)))
     return out
 KONUSMACI_OY_EN_AZ = 2  # kümenin ada bağlanması için en az oy (canlı kume_adi ile aynı)
+# --- Ses izi hafızası (v0.26.0, Faz 5) ---------------------------------------------------------------------------------
+# Altyazının ad verdiği kişilerin ses izi ortalaması toplantıdan toplantıya canli/ses-izi-hafiza.json'da (0600, yalnız bu Mac; teşhise ve
+# Claude'a gitmez) birikir; altyazısı olmayan küme (altyazı kapalı, Teams masaüstü, dosyadan döküm) hafızadaki kişiye benziyorsa onun adını
+# alır. Hafızaya yalnız altyazı oyuyla adlanan küme yazılır (hafızadan adlanan yazılmaz: yanlış eşleşme kendini büyütmesin). Eşik 11 Ekim
+# ölçümü (gercek-ses/hafiza-olc.py, ames iki yarı): aynı kişi 0,79–0,98, başka kişi ≤ 0,45 (başka kayıttaki kişiler ≤ 0,09); farklı gün ve
+# mikrofonda benzerlik düşeceği için ihtiyatlı: ≥ 0,6 ve ikinci adaydan ≥ 0,1 önde, küme ≥ 8 sn. Ayar ses_izi_hafiza: false kapatır.
+HAFIZA_ESIK, HAFIZA_FARK, HAFIZA_EN_AZ_SN = 0.6, 0.1, 8.0
+HAFIZA_UYUMSUZ = 0.35  # altyazı adı hafızadakine bundan az benziyorsa güncellenmez (yanlış oy ya da aynı adlı başka kişi), "uyuşmuyor" denir
+HAFIZA_AGIRLIK_SN = 1800  # eski ortalamanın ağırlığı en çok bu kadar sn: ses (mikrofon, kodek) değişince hafıza yavaşça uyar
+def hafiza_acik(): return AYAR.get("ses_izi_hafiza", True) is not False
+def _hafiza_yol(): return os.path.join(A.dir, "ses-izi-hafiza.json")
+def _iz_coz(b):
+    import base64, struct
+    r = base64.b64decode(b); v = struct.unpack(f"<{len(r) // 2}e", r); n = math.sqrt(sum(x * x for x in v)) or 1.0
+    return [x / n for x in v]
+def _iz_yaz(v):
+    import base64, struct
+    n = math.sqrt(sum(x * x for x in v)) or 1.0; return base64.b64encode(struct.pack(f"<{len(v)}e", *(x / n for x in v))).decode()
+def _benzer(a, b): return sum(x * y for x, y in zip(a, b))
+def hafiza_oku():
+    try: h = json.load(open(_hafiza_yol(), encoding="utf-8"))
+    except (OSError, ValueError): return {}
+    return h if isinstance(h, dict) else {}
+def hafiza_yaz(h):
+    yol = _hafiza_yol()
+    try:
+        fd = os.open(yol + ".gecici", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(h, f, ensure_ascii=False, indent=1)
+        os.replace(yol + ".gecici", yol); os.chmod(yol, 0o600)
+    except OSError as e: print(f"(ses izi hafızası yazılamadı: {e})")
+def hafiza_esle(merkez, sn, adli, h):
+    # adsız kümeler (süreye göre büyükten) → {küme: (ad, benzerlik)}; bu toplantıda kullanılmış ad ikinci kez verilmez
+    kisi = {a: _iz_coz(x["iz"]) for a, x in h.items() if x.get("iz")}; kullanilan = set(adli.values()); out = {}
+    for k in sorted(merkez, key=lambda k: -sn.get(k, 0)):
+        if k in adli or sn.get(k, 0) < HAFIZA_EN_AZ_SN or not kisi: continue
+        m = _iz_coz(merkez[k]); s = sorted(((_benzer(m, v), a) for a, v in kisi.items()), reverse=True)
+        b, a = s[0]; iki = s[1][0] if len(s) > 1 else 0.0
+        if a not in kullanilan and b >= HAFIZA_ESIK and b - iki >= HAFIZA_FARK: out[k] = (a, round(b, 2)); kullanilan.add(a)
+    return out
+def hafiza_guncelle(md, merkez, sn, adli, h):
+    # altyazıyla adlanan kümeler hafızaya; aynı toplantı ikinci kez sayılmaz (konusmaci yeniden çalışınca) → {ad: "yeni"|"güncel"|"uyuşmuyor"}
+    durum = {}
+    for k, a in adli.items():
+        if k not in merkez or sn.get(k, 0) < HAFIZA_EN_AZ_SN: continue
+        m = _iz_coz(merkez[k]); x = h.get(a)
+        if x and md in (x.get("toplantilar") or []): continue
+        if x and x.get("iz"):
+            eski = _iz_coz(x["iz"]); b = _benzer(m, eski)
+            if b < HAFIZA_UYUMSUZ: durum[a] = "uyuşmuyor"; continue
+            w0 = min(float(x.get("sn") or 0), HAFIZA_AGIRLIK_SN); w1 = float(sn[k])
+            x.update(iz=_iz_yaz([(w0 * p + w1 * q) for p, q in zip(eski, m)]), sn=round(float(x.get("sn") or 0) + w1, 1)); durum[a] = "güncel"
+        else: x = h[a] = {"iz": _iz_yaz(m), "sn": round(float(sn[k]), 1)}; durum[a] = "yeni"
+        x["son"] = simdi()[:10]; x["toplantilar"] = ((x.get("toplantilar") or []) + [md])[-20:]
+    return durum
 def konusmaci_esle(md, zorla=False, sessiz=False):
     iz_yol = os.path.join(A.dir, md[:-3] + ".sesizi.log"); es_yol = _esleme_yol(md)
     if not os.path.exists(iz_yol): return None
@@ -1093,6 +1149,7 @@ def konusmaci_esle(md, zorla=False, sessiz=False):
         c = subprocess.run([py, os.path.join(os.path.dirname(os.path.abspath(__file__)), "whisper-isci.py"), "--toplu", iz_yol], capture_output=True, text=True,
                            timeout=120, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
         j = json.loads(c.stdout.strip().splitlines()[-1]); km, bl = j["kume"], j.get("bol") or {}
+        merkez = {int(k): v for k, v in (j.get("merkez") or {}).items()}; msn = {int(k): float(v) for k, v in (j.get("sn") or {}).items()}
     except Exception as e: print(f"(konuşmacı yeniden etiketleme yapılamadı: {e.__class__.__name__})"); return None
     son = {r.get("id"): r for r in kayitlar(md, ham=True) if "text" in r}
     bolum = {}  # id → [{"s", "e", "n"}] (yalnız iki kişili satırlar)
@@ -1126,13 +1183,21 @@ def konusmaci_esle(md, zorla=False, sessiz=False):
     ad = {}
     for k, o in oy.items():
         if o and max(o.values()) >= KONUSMACI_OY_EN_AZ and max(o.values()) >= 0.5 * sum(o.values()): ad[k] = max(o, key=o.get)
+    hz, hd = {}, {}
+    if hafiza_acik() and merkez:
+        h = hafiza_oku(); adli = dict(ad)
+        hz = hafiza_esle(merkez, msn, adli, h); ad.update({k: a for k, (a, _) in hz.items()})
+        hd = hafiza_guncelle(md, merkez, msn, adli, h)
+        if hd: hafiza_yaz(h)
     adsiz = sorted((k for k in oy if k not in ad), key=lambda k: -sure[k])
-    for n, k in enumerate(adsiz, 1): ad[k] = "Karşı taraf" if len(oy) == 1 else f"Karşı taraf {n}"
+    for n, k in enumerate(adsiz, 1): ad[k] = "Karşı taraf" if len(oy) == 1 and not hz else f"Karşı taraf {n}"
     es = {i: ad[k] for i, k in km.items() if k in ad and son.get(i, {}).get("kanal") == "karsi"}
     bol = {i: [dict(b, ad=ad[kb]) for b, kb in zip(bolum[i], bl[i])] for i in bolum if i in es and len({ad[kb] for kb in bl[i]}) > 1}
     degisen = sum(1 for i, a in es.items() if son[i].get("speaker") != a)
     v = {"at": simdi(), "satir": len(es), "degisen": degisen, "bolunen": len(bol),
-         "kume": {str(k): {"ad": ad[k], "satir": satir.get(k, 0), "sn": round(sure.get(k, 0), 1), "oy": oy[k]} for k in sorted(oy)}, "ad": es, "bol": bol}
+         "kume": {str(k): dict({"ad": ad[k], "satir": satir.get(k, 0), "sn": round(sure.get(k, 0), 1), "oy": oy[k]},
+                               **({"hafiza": hz[k][1]} if k in hz else {})) for k in sorted(oy)}, "ad": es, "bol": bol}
+    if hd: v["hafiza_guncel"] = hd
     try:
         with open(es_yol + ".gecici", "w", encoding="utf-8") as f: json.dump(v, f, ensure_ascii=False, indent=1)
         os.replace(es_yol + ".gecici", es_yol)
@@ -1140,7 +1205,10 @@ def konusmaci_esle(md, zorla=False, sessiz=False):
     if not sessiz:
         kisi = ", ".join(x["ad"] + " " + str(x["satir"]) for x in v["kume"].values())
         print(f"Konuşmacılar yeniden etiketlendi: {len(es)} karşı satır, {len(oy)} kişi ({kisi})"
-              f" · {degisen} satırın adı değişti" + (f" · {len(bol)} satır iki kişiye bölündü" if bol else "") + f" · {os.path.basename(es_yol)}")
+              f" · {degisen} satırın adı değişti" + (f" · {len(bol)} satır iki kişiye bölündü" if bol else "")
+              + (" · ses izi hafızasından: " + ", ".join(f"{a} ({str(b).replace('.', ',')})" for a, b in hz.values()) if hz else "")
+              + (" · hafızayla uyuşmayan altyazı adı: " + ", ".join(a for a, d in hd.items() if d == "uyuşmuyor") if "uyuşmuyor" in hd.values() else "")
+              + f" · {os.path.basename(es_yol)}")
     return v
 def konusmaci_cmd():
     md = toplanti_dosyasi(A.dosya)
@@ -1153,7 +1221,24 @@ def konusmaci_cmd():
     if not os.path.exists(os.path.join(A.dir, md[:-3] + ".sesizi.log")): sys.exit(f"{md}: ses izi kaydı yok (v0.24.0 öncesi toplantı ya da karşı kanal Whisper'sız)")
     v = konusmaci_esle(md, zorla=True)
     if v:
-        for k, x in v["kume"].items(): print(f"  küme {k}: {x['ad']} · {x['satir']} satır, {x['sn']} sn · oy {x['oy'] or '-'}")
+        for k, x in v["kume"].items(): print(f"  küme {k}: {x['ad']} · {x['satir']} satır, {x['sn']} sn · oy {x['oy'] or '-'}"
+                                             + (f" · hafızadan, benzerlik {str(x['hafiza']).replace('.', ',')}" if "hafiza" in x else ""))
+        if v.get("hafiza_guncel"): print("  ses izi hafızası: " + ", ".join(f"{a} {d}" for a, d in v["hafiza_guncel"].items()))
+def hafiza_cmd():
+    h = hafiza_oku()
+    if A.hepsini_sil:
+        try: os.remove(_hafiza_yol()); print(f"ses izi hafızası silindi ({len(h)} kişi)")
+        except FileNotFoundError: print("hafıza yok")
+        return
+    if A.sil:
+        a = next((x for x in h if kucuk(x) == kucuk(A.sil)), None)
+        if not a: sys.exit(f"hafızada yok: {A.sil}")
+        del h[a]; hafiza_yaz(h); print(f"silindi: {a}"); return
+    if not hafiza_acik(): print("(ayar ses_izi_hafiza: false — hafıza kullanılmıyor)")
+    if not h: print("ses izi hafızası boş: altyazının ad verdiği kişiler toplantı sonunda (konusmaci) eklenir"); return
+    print(f"ses izi hafızası: {len(h)} kişi · {_hafiza_yol()}")
+    for a, x in sorted(h.items(), key=lambda t: -float(t[1].get("sn") or 0)):
+        print(f"  {a} · {round(float(x.get('sn') or 0) / 60, 1)} dk konuşma · {len(x.get('toplantilar') or [])} toplantı · son {x.get('son', '?')}")
 def kanit_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
@@ -1468,7 +1553,9 @@ def dokum_yaz(sat, baslik, kaynak, saat_notu=""):  # dokum ve dosyadan: .md + .v
          f"{bas.day} {AYLAR[bas.month - 1]} {bas.year}, {bas:%H:%M}–{bit:%H:%M} ({round((t1 - t0) / 60)} dk) · {len(met)} satır · "
          + ", ".join(f"{k} {n}" for k, n in sorted(kisi.items(), key=lambda kv: -kv[1])),
          "Saatler yerel saat" + saat_notu + ". "
-         + (("Konuşmacı adları elle verildi (ilk konuşma sırasıyla, ses izinden). " if getattr(A, "adlar", None) else "\"Konuşmacı n\": ses izinden ayrılan konuşmacı (adı bilinmiyor). ") if set(kay) == {"dosya"} else
+         + (("Konuşmacı adları elle verildi (ilk konuşma sırasıyla, ses izinden). " if getattr(A, "adlar", None) else "")
+            + (f"Ses izi hafızasından adlanan (önceki toplantılarda altyazının verdiği ad): {', '.join(A.hafiza_adlar)}. " if getattr(A, "hafiza_adlar", None) else "")
+            + ("" if getattr(A, "adlar", None) else "\"Konuşmacı n\": ses izinden ayrılan konuşmacı (adı bilinmiyor). ") if set(kay) == {"dosya"} else
             "\"Karşı taraf n\": ses izinden ayrılan, adı bulunamayan konuşmacı; \"Bilinmeyen konuşmacı\": altyazıda ad yoktu. ") + kaynak, ""]
     paragraf = None
     def yaz():
@@ -1571,7 +1658,7 @@ def dosyadan_cmd():
                    **({"SUFLOR_WHISPER_MODEL": model} if model else {}), **({"SUFLOR_ECAPA": ecapa} if ecapa else {}))
         isci = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whisper-isci.py")
         p = subprocess.Popen([py, "-u", isci, "--dosya", wav, A.dil or "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
-        bol, son = [], None
+        bol, son, merkez = [], None, {}
         for l in p.stdout:
             try: j = json.loads(l)
             except ValueError: continue
@@ -1579,20 +1666,28 @@ def dosyadan_cmd():
             if j.get("hazir"): print(f"ses {round(sure / 60, 1)} dk · Whisper yüklendi{' · ses izi var' if j.get('ecapa') else ''}", flush=True)
             elif j.get("blok"): print(f"  blok {j['blok']}/{j['toplam']}…", flush=True)
             elif j.get("bolum"): bol.append(j["bolum"])
+            elif j.get("merkez"): merkez = j
             elif j.get("bitti"): son = j
         p.wait()
     finally: shutil.rmtree(gecici, ignore_errors=True)
     if not son: sys.exit("Whisper yarıda kaldı (bellek?) — yeniden dene")
     if not bol: sys.exit("dosyada konuşma bulunamadı")
     ad_ver = [x.strip() for x in (A.adlar or "").split(",") if x.strip()]; sira = {}
-    sat, onceki = [], "Bilinmeyen konuşmacı"
+    for b in bol:
+        if b.get("kume") and b["kume"] not in sira: sira[b["kume"]] = len(sira)
+    # elle verilen adlar (ilk konuşma sırasıyla) önce; kalan kümeler ses izi hafızasında aranır (hafızaya buradan yazılmaz: altyazı oyu yok)
+    elle = {k: ad_ver[i] for k, i in sira.items() if i < len(ad_ver)}; hz = {}
+    if hafiza_acik() and merkez.get("merkez"):
+        hz = hafiza_esle(merkez["merkez"], {k: float(v) for k, v in (merkez.get("sn") or {}).items()}, elle, hafiza_oku())
+    sat, onceki, adsiz = [], "Bilinmeyen konuşmacı", {}
     for b in bol:
         k = b.get("kume")
         if k:
-            if k not in sira: sira[k] = len(sira)
-            onceki = ad_ver[sira[k]] if sira[k] < len(ad_ver) else f"Konuşmacı {sira[k] + 1}"
+            onceki = elle.get(k) or (hz[k][0] if k in hz else None) or f"Konuşmacı {adsiz.setdefault(k, len(adsiz) + 1)}"
         sat.append({"t": t_bas + b["t0"], "t1": t_bas + b["t1"], "kim": onceki, "metin": b["metin"], "src": "dosya"})
-    print(f"Whisper {son['sn']} sn (ses {round(sure / 60, 1)} dk) · {len(bol)} bölüm · atlanan {son.get('atlanan', 0)} · konuşmacı {len(sira) or '?'}")
+    print(f"Whisper {son['sn']} sn (ses {round(sure / 60, 1)} dk) · {len(bol)} bölüm · atlanan {son.get('atlanan', 0)} · konuşmacı {len(sira) or '?'}"
+          + (" · ses izi hafızasından: " + ", ".join(f"{a} ({str(b).replace('.', ',')})" for a, b in hz.values()) if hz else ""))
+    A.hafiza_adlar = [a for a, _ in hz.values()]
     dokum_yaz(sat, os.path.splitext(os.path.basename(g))[0], "Kaynak: " + os.path.basename(g), notu)
 
 def karsilastir_cmd():
@@ -1940,5 +2035,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd}[A.cmd]()
+     "yaparken": yaparken_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

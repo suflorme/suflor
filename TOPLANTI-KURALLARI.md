@@ -112,7 +112,9 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
 
 ## 5. Döküm, ses ve dil (`DURUM` satırı)
 - Satırlar yerel Whisper'dan gelir (kanal `ben` = kullanıcı, `karsi` = karşı taraf). Karşı tarafta konuşmacı ses izi kümesidir;
-  adı altyazıdan oylanır, altyazı yoksa "Karşı taraf 1/2…" — iki kişiyi karıştırma; kullanıcı adları biliyorsa özette eşle.
+  adı altyazıdan oylanır, altyazı yoksa "Karşı taraf 1/2…" — iki kişiyi karıştırma; kullanıcı adları biliyorsa özette eşle. Toplantı sonunda
+  `konusmaci` adsız kümeyi ses izi hafızasındaki (önceki toplantılarda altyazının ad verdiği) kişiye bağlayabilir: çıktıda "ses izi
+  hafızasından: <ad> (benzerlik)" — özette bu adı kullan; kullanıcı yanlış derse `hafiza --sil <ad>` ve `konusmaci` yeniden.
 - `WHISPER … <ad> ✓ · karşı taraf …`: `✓ (yerel yardımcı)` normal; `✗ (yerel yardımcı hazır …)` → kart yok (karşı taraf henüz
   konuşmadı); `✗ (… Sistem sesi kaydı izni yok olabilir …)` → bir kez `dur` "Sistem sesi kaydı izni: Sistem Ayarları → Gizlilik ve
   Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses; şimdilik Suflor.me simgesi → Karşı taraf → Aç"; `✗ (karşı ses kapalı …)` ve

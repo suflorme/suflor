@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # Dosyadan döküm (toplanti-claude.py dosyadan): yerel macOS sesleriyle (say) iki konuşmacılı, Türkçe/İngilizce karışık ~40 sn kayıt üretir,
 # m4a'ya çevirir, gerçek Whisper işçisiyle döker. Denetim: dil ve konuşmacı paragraf başına doğru, --adlar, --bas saati, .vtt, hedef varsa
-# Whisper'dan önce durma, sessiz ve bozuk dosya. Whisper kurulu değilse atlar. Çalıştır: PYTHONDONTWRITEBYTECODE=1 python3 test/dosyadan.py
+# Whisper'dan önce durma, sessiz ve bozuk dosya; ses izi hafızası (v0.26.0): Yelda'nın izi önceden hafızadaysa --adlar'sız dökümde Türkçe
+# paragraflar onun adını alır, İngilizce "Konuşmacı 1" kalır. Whisper kurulu değilse atlar. Çalıştır: PYTHONDONTWRITEBYTECODE=1 python3 test/dosyadan.py
 import os, re, subprocess, sys, tempfile, time, wave, json
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); TC = os.path.join(KOD, "toplanti-claude.py")
 ok = []
 def kontrol(ad, kosul): ok.append(bool(kosul)); print(("✓ " if kosul else "✗ ") + ad)
-def tc(*a): return subprocess.run([sys.executable, TC, "--relay", "http://127.0.0.1:9", *a], capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
-T = tempfile.mkdtemp(prefix="suflor-test-dosyadan-")
+T = tempfile.mkdtemp(prefix="suflor-test-dosyadan-"); CANLI = os.path.join(T, "canli"); os.makedirs(CANLI)  # gerçek canli/ (sözlük, hafıza) karışmasın
+def tc(*a): return subprocess.run([sys.executable, TC, "--relay", "http://127.0.0.1:9", "--dir", CANLI, *a], capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
 TR = ["Bugünkü toplantıda stok yönetimini konuşacağız. Toplam sipariş sayısı yüz kırk iki.", "Barkod okuyucular sık sık bağlantı kaybediyor, Cuma gününe kadar plan lazım."]
 EN = ["Thanks. The carrier confirmed the new pickup window starts on Monday.", "I can take the action plan for the scanners and send a quote by Thursday."]
 def wav(ses, metin, ad):
@@ -37,6 +38,24 @@ kontrol("sessiz dosya: 'konuşma bulunamadı'", "konuşma bulunamadı" in r3.std
 open(os.path.join(T, "bozuk.m4a"), "w").write("metin")
 r4 = tc("dosyadan", os.path.join(T, "bozuk.m4a"), "--cikti", cik)
 kontrol("bozuk dosya: 'ses çıkarılamadı'", "ses çıkarılamadı" in r4.stderr + r4.stdout)
+# ses izi hafızası: Yelda'nın ilk cümlesinden iz (işçinin Ecapa'sı) → hafıza; ikinci döküm adları kendisi bulmalı
+AY = json.load(open(os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json"), encoding="utf-8"))
+py = next((y for y in (os.path.join(d, "whisper-venv", "bin", "python") for d in (AY["ortak"], AY["uygulama"])) if os.path.exists(y)), None)
+ec = next((y for y in (os.path.join(d, "ses-modeller", "spkrec-ecapa-voxceleb", "ecapa-mlx.npz") for d in (AY["ortak"], AY["uygulama"])) if os.path.exists(y)), None)
+if py and ec:
+    kod = ("import sys, json, base64, numpy as np, mlx.core as mx, importlib.util; s = importlib.util.spec_from_file_location('w', sys.argv[1]); w = importlib.util.module_from_spec(s); s.loader.exec_module(w)\n"
+           "b = open(sys.argv[3], 'rb').read(); a = np.frombuffer(b[b.index(b'data') + 8:], np.int16).astype(np.float32) / 32768\n"
+           "e = np.array(w.Ecapa(sys.argv[2], np, mx)(a), np.float32); e /= np.linalg.norm(e)\n"
+           "print(json.dumps({'Yelda Hanım': {'iz': base64.b64encode(e.astype(np.float16).tobytes()).decode(), 'sn': 60, 'toplantilar': ['onceki.md']}}))")
+    h = subprocess.run([py, "-c", kod, os.path.join(KOD, "whisper-isci.py"), ec, os.path.join(T, "p0.wav")], capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    open(os.path.join(CANLI, "ses-izi-hafiza.json"), "w").write(h.stdout)
+    cik2 = os.path.join(T, "cikti2"); os.makedirs(cik2); r5 = tc("dosyadan", g, "--cikti", cik2, "--bas", "2026-10-10 14:00")
+    md2 = next((os.path.join(cik2, f) for f in os.listdir(cik2) if f.endswith(".md")), None)
+    L2 = [l for l in open(md2, encoding="utf-8") if l.startswith("**[")] if md2 else []
+    kontrol("hafıza: Türkçe → Yelda Hanım, İngilizce → Konuşmacı 1, başlıkta not",
+            len(L2) == 4 and all(("Yelda Hanım" if tr_mi(l.split(":**", 1)[1]) else "Konuşmacı 1") in l.split(":**")[0] for l in L2)
+            and "ses izi hafızasından" in r5.stdout and "Ses izi hafızasından adlanan" in open(md2, encoding="utf-8").read())
+else: print("(ses izi modeli yok — hafıza denetimi atlandı)")
 kontrol("geçici WAV kalmadı", not [f for f in os.listdir(tempfile.gettempdir()) if f.startswith("suflor-dosya-")])
 subprocess.run(["rm", "-rf", T])
 print(f"dosyadan: {'✓ hepsi geçti' if all(ok) else '✗ ' + str(ok.count(False)) + ' kaldı'} ({sum(ok)}/{len(ok)})"); sys.exit(0 if all(ok) else 1)
