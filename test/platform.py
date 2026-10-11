@@ -39,7 +39,7 @@ for ad, (govde, js, denet) in SAYFA.items():
                                          f"<script>let R;try{{{js}}}catch(e){{R={{hata:String(e)}}}}document.body.insertAdjacentHTML('beforeend','<pre id=sonuc>'+JSON.stringify(R).replace(/</g,'\\\\u003c')+'</pre>')</script>")
     # Chrome (154) --dump-dom çıktısını yazdıktan sonra kapanmıyor: çıktı dosyaya, sonuç görülünce süreç kapatılır
     cik = os.path.join(T, "o.html")
-    pr = subprocess.Popen([CHROME, "--headless=new", "--disable-gpu", "--allow-file-access-from-files", f"--user-data-dir={T}/p", "--no-first-run", "--no-default-browser-check",
+    pr = subprocess.Popen([CHROME, "--headless=new", "--disable-features=MacAppCodeSignClone", "--disable-gpu", "--allow-file-access-from-files", f"--user-data-dir={T}/p", "--no-first-run", "--no-default-browser-check",
                            "--dump-dom", "file://" + f], stdout=open(cik, "w"), stderr=subprocess.DEVNULL)
     m = None
     for _ in range(120):

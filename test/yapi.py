@@ -35,7 +35,7 @@ bak("zihin haritası: tek dosya, dış kaynak yok, veri gömülü", H.startswith
 # PNG: indirme bağlantısının href'i yakalanır
 dene = os.path.join(T, "dene.html"); open(dene, "w", encoding="utf-8").write(H.replace("ciz();\n</script>", "ciz();HTMLAnchorElement.prototype.click=function(){document.body.insertAdjacentHTML('beforeend','<pre id=png>'+this.download+'|'+this.href.slice(0,30)+'|'+this.href.length+'</pre>')};setTimeout(()=>document.getElementById('png').click(),300)\n</script>"))
 cik = os.path.join(T, "o.html")
-pr = subprocess.Popen([CHROME, "--headless=new", "--disable-gpu", f"--user-data-dir={T}/p", "--no-first-run", "--virtual-time-budget=4000", "--dump-dom", "file://" + dene], stdout=open(cik, "w"), stderr=subprocess.DEVNULL)
+pr = subprocess.Popen([CHROME, "--headless=new", "--disable-features=MacAppCodeSignClone", "--disable-gpu", f"--user-data-dir={T}/p", "--no-first-run", "--virtual-time-budget=4000", "--dump-dom", "file://" + dene], stdout=open(cik, "w"), stderr=subprocess.DEVNULL)
 m = None
 for _ in range(80):
     time.sleep(0.25); m = re.search(r'<pre id="png">(.*?)</pre>', open(cik, encoding="utf-8", errors="replace").read())
