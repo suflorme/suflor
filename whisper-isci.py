@@ -44,6 +44,12 @@ def ses_olc(a, np, sr=16000):
 # --- ECAPA (MLX). SpeechBrain'in Fbank'ı (25 ms Hamming, 10 ms adım, 80 mel, dB, üst 80 dB) + cümle ortalaması + ECAPA_TDNN
 # (1024 kanal, Res2Net ölçek 8, SE 128, dikkatli istatistik havuzu); Conv1d "same" + yansıtmalı dolgu, BatchNorm çıkarım istatistiği.
 SR, NFFT, HOP = 16000, 400, 160
+def cozme_ayari(sn):
+    # canlı parça: yeniden deneme 2 sıcaklıkla, belirteç sesin süresiyle sınırlı (sn başına 20, en az 48). Varsayılan 6 sıcaklık × 224 belirteç
+    # kısa parçada tekrar döngüsünü 6 kez baştan çözüyordu: 11 Ekim toplantılarında uydurma işleri ortalama 11,6 sn, işçi süresinin %59'u.
+    return {"temperature": (0.0, 0.2), "sample_len": min(224, max(48, int(sn * 20)))}
+def tr_harf(x, dil):  # Türkçe çözümde Azerice "ə" (11 Ekim: arka plandaki haber "muhabirənin … adreslər" yazıldı) → "e"
+    return x.replace("ə", "e").replace("Ə", "E") if dil == "tr" else x
 KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den aynen
 class Ecapa:
     def __init__(s, yol, np, mx):
@@ -143,22 +149,23 @@ def main():
         try:
             a = np.frombuffer(base64.b64decode(p["pcm"]), np.int16).astype(np.float32) / 32768
             t = time.time(); dusen = 0
+            cozme = cozme_ayari(len(a) / SR)
             if tok: istem, dusen = istem_kur(tok, p.get("istem") or "", p.get("onceki") or "")
             else: istem = " ".join(x for x in (p.get("istem") or "", p.get("onceki") or "") if x).strip() or None
             r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil") or None, initial_prompt=istem,
-                                       condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
+                                       condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             # karışık dil (gündem dil=karisik): yalnız izin verilen diller (tr/en); Whisper başkasını bulursa (11 Ekim: iki Türkçe satır İzlandaca)
             # kanalın son dilinde (yoksa ilk izinli dilde) yeniden — dosyadan dökümdeki kural
             if not p.get("dil") and p.get("diller") and r.get("language") not in p["diller"]:
                 r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil_yedek") if p.get("dil_yedek") in p["diller"] else p["diller"][0],
-                                           initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
+                                           initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             tut, atla = [], 0
             for s in r.get("segments") or []:
                 x = (s.get("text") or "").strip()
                 if not x or UYDURMA.search(x) or (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
                         or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; continue
                 tut.append((s, x))
-            metin = " ".join(x for _, x in tut).strip()
+            metin = tr_harf(" ".join(x for _, x in tut).strip(), r.get("language"))
             # kısa satırda web adresi: Whisper'ın video sonu uydurması ("www.feyyaz.tv" — 1 Ekim headless bip sesi denemesi)
             if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): metin = ""; atla += 1
             if istem and metin and metin.lower().strip(" .") in istem.lower(): metin = ""; atla += 1  # istemi geri okuma
@@ -333,7 +340,7 @@ def dosya_dok(yol, dil, terimler):
                 try: e = np.array(iz(a[s0:s1]), np.float32)
                 except Exception: e = None
             izler.append(((s1 - s0) / SR, e))
-            bolumler.append((len(izler) - 1, {"t0": round(b0 / SR + float(s["start"]), 2), "t1": round(b0 / SR + float(s["end"]), 2), "metin": x, "dil": r.get("language")}))
+            bolumler.append((len(izler) - 1, {"t0": round(b0 / SR + float(s["start"]), 2), "t1": round(b0 / SR + float(s["end"]), 2), "metin": tr_harf(x, r.get("language")), "dil": r.get("language")}))
     et = toplu_kumele(izler, np) if iz else [None] * len(izler); ad = {}
     for k, bo in bolumler:  # küme adları ilk konuşma sırasıyla k1, k2…
         if et[k] is not None: bo["kume"] = ad.setdefault(et[k], f"k{len(ad) + 1}")

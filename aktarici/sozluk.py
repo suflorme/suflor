@@ -55,9 +55,11 @@ def sozluk_uygula(text, dosya):
     return out, olay
 
 # Sesli "Claude:" talimatı (TOPLANTI-MODU §4) Whisper'da "Cloud," / "Klod:" diye yazılıyor (9 Ekim denemesi: "Cloud, card, English,
-# yes."). Yalnız kullanıcının kendi satırında, cümle başında ve ardından virgül/iki nokta gelirse düzeltilir: "cloud'a bağımlıyız"
-# gibi gerçek bulut anlamı ve karşı tarafın sözü değişmez. Ham metin .jsonl'de "raw"da kalır.
-HITAP_RX = re.compile(r"(^|[.!?…]\s+)(?:cloud|klod|klot|klo|clod|claud|klaud|clode)\s*[,:]\s*", re.I)
+# yes."). Yalnız kullanıcının kendi satırında ve cümle başında düzeltilir: "cloud'a bağımlıyız" gibi gerçek bulut anlamı ve karşı
+# tarafın sözü değişmez. Ham metin .jsonl'de "raw"da kalır. 11 Ekim: "...Cloud kaydı kapat." (üç noktadan sonra boşluksuz, virgülsüz) kaçtı →
+# üç nokta da cümle başı; virgül yoksa ardından bulut anlamlı sözcük gelmemeli ("Cloud hizmeti pahalı" değişmez).
+BULUT = r"hizmet|tabanl|sunucu|depola|bili[sş]im|ortam|altyap|platform|teknoloj|uygulama|sağlay|sistem|taraf|üzerin|maliyet|computing|service|storage|server|based|native|code\b"
+HITAP_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:cloud|klod|klot|klo|clod|claud|klaud|clode)(?:\s*[,:]\s*|\s+(?!(?:" + BULUT + r"))(?=\w))", re.I)
 def hitap_duzelt(text):
     out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", text)
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])
