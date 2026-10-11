@@ -1168,7 +1168,7 @@ def kanit_cmd():
     print(f"{md}: {len(ks)} kanıt")
     for r in ks:
         if A.n is None or r.get("n") == A.n:
-            print(f"  {r.get('n')} · {str(r.get('at', ''))[11:19]} · {os.path.join(A.dir, r['kanit'])}" + (f" · not: {r['not']}" if r.get("not") else "") + (f" · açıklama: {ac[str(r.get('n'))]}" if str(r.get("n")) in ac else ""))
+            print(f"  {r.get('n')} · {str(r.get('at', ''))[11:19]} · {os.path.join(A.dir, r['kanit'])}" + (f" · not: {r['not']}" if r.get("not") else "") + (f" · ⚠ paylaşılan ekran küçük (%{r['kucuk']}), yazı okunmayabilir" if r.get("kucuk") else "") + (f" · açıklama: {ac[str(r.get('n'))]}" if str(r.get("n")) in ac else ""))
 
 # --- v0.7.0: karne — toplantı sonu kısa başarı değerlendirmesi ---------------------------------------------------
 # Ölçülebilen kısım buradan, nitel kısım (takip işlerinin sahibi var mı) Claude'un özetinden --takip ile gelir.

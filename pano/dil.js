@@ -255,6 +255,7 @@ globalThis.SUFLOR_EN = {
   "Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim": "Suflor.me: couldn't turn on captions — turn them on once by hand ({y}) and I'll learn the way",
   "📷 Kanıt {n} kaydedildi": "📷 Evidence {n} saved",
   "📷 Kanıt kaydedilemedi: ": "📷 Couldn't save evidence: ",
+  "📷 Kanıt {n} kaydedildi — paylaşılan ekran küçük gösteriliyor (%{p}), yazı okunmayabilir: ekranı büyütüp yeniden al": "📷 Evidence {n} saved — the shared screen is shown small ({p}%), text may be unreadable: enlarge it and capture again",
   "+{n} dk": "+{n} min",
   "Çalışma alanını seç: Suflor.me simgesi": "Pick a workspace: Suflor.me icon",
   "Bu Chrome \"{a}\" alanına yazıyor": "This Chrome writes to \"{a}\"",

@@ -153,7 +153,7 @@ async function kanit(hint, kaynak, istek, not) {
     }
     const relay = await relayAdr();
     const r = await fetch(relay + "/kanit", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ png, meeting: info.meeting || { title: (tab.title || "").split("|").slice(-2, -1)[0]?.trim() || "Toplantı" }, kaynak, istek, not, w: info.w, h: info.h }) });
+      body: JSON.stringify({ png, meeting: info.meeting || { title: (tab.title || "").split("|").slice(-2, -1)[0]?.trim() || "Toplantı" }, kaynak, istek, not, w: info.w, h: info.h, paylasim: info.paylasim || null }) });
     const j = await r.json().catch(() => ({}));
     if (kaynak === "oto") {  // kendiliğinden kanıt: toast ve bildirim yok, yalnız günlük
       if (j.sinir && !OTO.sinir) { OTO.sinir = true; kanitOlay("oto: toplantı sınırı doldu, kendiliğinden kanıt durdu"); }
@@ -161,7 +161,7 @@ async function kanit(hint, kaynak, istek, not) {
       return;
     }
     if (!r.ok || !j.ok) return hata(tab, j.err || ("aktarıcı HTTP " + r.status));
-    if (!j.dup) chrome.tabs.sendMessage(tab.id, { type: "kanitBitti", ok: true, n: j.n }, { frameId: 0 }).catch(() => {});
+    if (!j.dup) chrome.tabs.sendMessage(tab.id, { type: "kanitBitti", ok: true, n: j.n, kucuk: j.kucuk || null }, { frameId: 0 }).catch(() => {});
   } catch (e) {
     if (kaynak === "oto") return kanitOlay("oto: " + String(e.message || e).slice(0, 160));
     hata(tab, /Failed to fetch/i.test(String(e)) ? "Aktarıcıya ulaşılamadı (çalışma alanının aktarıcısı kapalı)." : String(e.message || e).slice(0, 160));

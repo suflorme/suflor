@@ -425,20 +425,34 @@
   }
   setInterval(() => ping(), 10000); setTimeout(() => ping(), 1500);
   // Popup'tan gelen "not" ve "durum" istekleri
-  chrome.runtime.onMessage.addListener((msg, _s, reply) => {
+  // Kanıt anında paylaşılan ekranın ölçeği (9 Ekim: karşı tarafın ekranı küçük gösterilince kanıttaki yazı okunmadı). Görünür alanın ≥ %25'ini
+// kaplayan en büyük oynayan video = sahnedeki paylaşım (galerideki küçük kamera karoları sayılmaz); ölçek = ekrandaki cihaz pikseli / videonun
+// gerçek pikseli (object-fit: contain). Teams seçicisi gerekmez: platformdan bağımsız.
+function paylasimOlcek() {
+  let en = null;
+  for (const v of document.querySelectorAll("video")) {
+    if (!v.videoWidth || !v.videoHeight) continue;
+    const r = v.getBoundingClientRect(), alan = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+    if (alan < innerWidth * innerHeight * 0.25 || (en && alan <= en.alan)) continue;
+    en = { alan, olcek: Math.round(Math.min(r.width / v.videoWidth, r.height / v.videoHeight) * devicePixelRatio * 100) / 100, vw: v.videoWidth, vh: v.videoHeight };
+  }
+  return en && { olcek: en.olcek, vw: en.vw, vh: en.vh };
+}
+chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     if (msg.type === "nabiz") { ping("arka-plan"); reply({ ok: true, vis: document.visibilityState }); return; }
     if (msg.type === "note") { rf("/note", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ meeting: meetingInfo(), text: msg.text, at: new Date().toISOString() }) }).then(() => reply({ ok: true })).catch(e => reply({ ok: false, err: String(e) })); return true; }
     // kanıt: arka plan betiği çekmeden önce şeridi/uyarıyı gizletir (görüntüye girmesin), sonra geri açtırır
     if (msg.type === "kanitHazirla") {
       if (window.top !== window) return;
       document.querySelectorAll("#suflor-serit, #suflor-toast").forEach(e => { e.dataset.sfDisp = e.style.display; e.style.display = "none"; });
-      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => reply({ meeting: meetingInfo(), w: innerWidth, h: innerHeight }), 30))); return true;
+      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => reply({ meeting: meetingInfo(), w: innerWidth, h: innerHeight, paylasim: paylasimOlcek() }), 30))); return true;
     }
     if (msg.type === "bilgi") { if (window.top === window) toast(msg.text, msg.renk || "#1b6ef3", msg.ms || 5000); return; }
     if (msg.type === "kanitBitti") {
       if (window.top !== window) return;
       document.querySelectorAll("#suflor-serit, #suflor-toast").forEach(e => { e.style.display = e.dataset.sfDisp || ""; });
-      if (msg.ok) toast(L("📷 Kanıt {n} kaydedildi", { n: msg.n || "" }), "#1b8a3a", 2000); else if (msg.ok === false) toast(L("📷 Kanıt kaydedilemedi: ") + (msg.err || L("bilinmiyor"))); // null: yalnız şeridi geri aç
+      if (msg.ok && msg.kucuk) toast(L("📷 Kanıt {n} kaydedildi — paylaşılan ekran küçük gösteriliyor (%{p}), yazı okunmayabilir: ekranı büyütüp yeniden al", { n: msg.n || "", p: msg.kucuk }), "#b26a00", 7000);
+      else if (msg.ok) toast(L("📷 Kanıt {n} kaydedildi", { n: msg.n || "" }), "#1b8a3a", 2000); else if (msg.ok === false) toast(L("📷 Kanıt kaydedilemedi: ") + (msg.err || L("bilinmiyor"))); // null: yalnız şeridi geri aç
       return;
     }
     if (msg.type === "getStatus") { reply({ alan: { bekliyor: alanBekliyor, secili: alanSecili, relay: cfg.relay, sonHata }, meeting: meetingInfo().title, lastOk, failCount, sent: sentById.size + sentKeys.size, queued: queue.length, panel: !!findTranscriptPanel(), captions: !!findCaptions(), lang: capLang, langSrc, dilUyari,

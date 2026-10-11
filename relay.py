@@ -561,6 +561,7 @@ def ask(p):
 # kanit/<toplantı dosyası>/<SSDDss>-<n>.png + .md'ye "📷 KANIT n" satırı + .jsonl'e {"kanit": …} kaydı (satır sayılmaz).
 # Yalnız eklentiden (Origin chrome-extension://) kabul edilir: tarayıcıdaki başka bir site diske dosya yazdıramasın.
 KANIT_DIR = os.path.join(BASE, "kanit"); KANIT_MAX = 25 * 1024 * 1024
+KANIT_KUCUK = 0.6  # paylaşılan ekran gerçek boyunun bu oranından küçük gösteriliyorsa (eklentinin ölçtüğü) kanıttaki yazı okunmayabilir
 def kanit_iste(p):
     # pano / mini pano 📷: Teams sekmesindeki eklenti bir sonraki yoklamada (≤ 3 sn) çeker
     with LOCK:
@@ -595,14 +596,18 @@ def kanit(p):
             try: os.remove(tmp)
             except OSError: pass
             print(f"KANIT: yazılamadı ({e.__class__.__name__}: {e.strerror})"); return {"ok": False, "err": "diske yazılamadı"}
+        pay = p.get("paylasim") if isinstance(p.get("paylasim"), dict) else None
+        try: olcek = float(pay["olcek"]) if pay else None
+        except (TypeError, ValueError, KeyError): olcek = None
+        kucuk = round(olcek * 100) if olcek is not None and 0 < olcek < KANIT_KUCUK else None
         rec = {"at": now.isoformat(timespec="seconds"), "kanit": rel, "n": n, "not": not_, "kaynak": str(p.get("kaynak") or "")[:20], "boyut": len(b),
-               "w": p.get("w"), "h": p.get("h")}
+               "w": p.get("w"), "h": p.get("h"), **({"olcek": olcek} if olcek is not None else {}), **({"kucuk": kucuk} if kucuk else {})}
         lst.append(rec)
-        write([(md, hdr), (md, pre_al(md)), (md, f"| {now.strftime('%H:%M:%S')} | **📷 KANIT {n}**{' (oto)' if rec['kaynak'] == 'oto' else ''} | {rel}{(' — ' + not_.replace('|', '¦')) if not_ else ''} | |\n"),
+        write([(md, hdr), (md, pre_al(md)), (md, f"| {now.strftime('%H:%M:%S')} | **📷 KANIT {n}**{' (oto)' if rec['kaynak'] == 'oto' else ''} | {rel}{(' — ' + not_.replace('|', '¦')) if not_ else ''}{f' ⚠ paylaşılan ekran küçük (%{kucuk})' if kucuk else ''} | |\n"),
                (jl, json.dumps(rec, ensure_ascii=False) + "\n")])
         STATE["last"] = now.isoformat(timespec="seconds"); heartbeat()
-    print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']})")
-    return {"ok": True, "n": n, "path": rel}
+    print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']}" + (f", paylaşılan ekran küçük %{kucuk}" if kucuk else "") + ")")
+    return {"ok": True, "n": n, "path": rel, **({"kucuk": kucuk} if kucuk else {})}
 # Yaparken kaydet: ekran paylaşımında karşı taraf bir işi gösterirken eklenti, paylaşılan ekran belirgin biçimde değişip durulunca kanıtı
 # kendiliğinden alır (kaynak "oto"; karşılaştırma ve en sık 10 sn kuralı eklentide). Açılınca etkin toplantıya, toplantı yoksa ilk satıra
 # bağlanır; başka toplantı başlayınca kapanır. Toplantı sonunda `toplanti-claude.py adimlar` döküm + görüntülerden adım belgesine malzeme verir.
