@@ -536,7 +536,7 @@ document.getElementById("sz").onclick=ev=>sendSessiz(ev.currentTarget)
 document.getElementById("kz").onclick=ev=>sendKanit(ev.currentTarget,document.getElementById("n"))
 document.getElementById("yk").onclick=ev=>sendYaparken(ev.currentTarget)
 refresh();setInterval(refresh,2000)
-// menü çubuğu uygulamasının paneli (?gorunum=panel, v0.27.0): mini panonun kendisi, aynı kökenli bir iframe'de (PiP penceresi gibi ayrı belge);
+// menü çubuğu uygulamasının paneli (?gorunum=panel): mini panonun kendisi, aynı kökenli bir iframe'de (PiP penceresi gibi ayrı belge);
 // pano gizli kalır ama yenilemeyi o yapar. Zemin saydam: panelin buzlu cam (vibrancy) zemini görünür.
 if(new URLSearchParams(location.search).get('gorunum')==='panel'){document.documentElement.classList.add('panel');const f=document.createElement('iframe');f.id='panelf';f.title='Suflor.me';document.body.appendChild(f)
   buildMini(f.contentWindow);const st=f.contentDocument.createElement('style');st.textContent='html,body{background:transparent!important}';f.contentDocument.head.appendChild(st)}

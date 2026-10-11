@@ -57,7 +57,7 @@ def sozluk_uygula(text, dosya):
 # Sesli "Claude:" talimatı (TOPLANTI-MODU §4) Whisper'da "Cloud," / "Klod:" diye yazılıyor (9 Ekim denemesi: "Cloud, card, English,
 # yes."). Yalnız kullanıcının kendi satırında, cümle başında ve ardından virgül/iki nokta gelirse düzeltilir: "cloud'a bağımlıyız"
 # gibi gerçek bulut anlamı ve karşı tarafın sözü değişmez. Ham metin .jsonl'de "raw"da kalır.
-HITAP_RX = re.compile(r"(^|[.!?…]\s+)(?:cloud|klod|klot|clod|claud|klaud|clode)\s*[,:]\s*", re.I)
+HITAP_RX = re.compile(r"(^|[.!?…]\s+)(?:cloud|klod|klot|klo|clod|claud|klaud|clode)\s*[,:]\s*", re.I)
 def hitap_duzelt(text):
     out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", text)
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])

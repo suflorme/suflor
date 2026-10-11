@@ -450,7 +450,7 @@ def bana_soru(r):  # karşı taraftan, kullanıcıya adıyla yöneltilmiş soru 
     t = r.get("text", "")
     if (kanal_n(r.get("kanal")) == "ben" and r.get("speaker") != "Odadaki kişi") or kucuk((r.get("speaker") or "").split(" ")[0]) == kucuk(BEN) or not soru_mu(t): return False
     return re.search(r"(?<!\w)" + re.escape(kucuk(BEN)) + r"(?!\w{3})", kucuk(t)) is not None  # "Ali", "Ali'ye", "Ali Bey"; "Alicia" değil (ad + en çok 2 harf ek)
-def satir(r): return f"  [{r.get('time') or ''} {r.get('speaker') or '?'}] {'❓ ' if soru_mu(r.get('text','')) else ''}{'→' + BEN + ' ' if bana_soru(r) else ''}{'↻ ' if r.get('revised') else ''}{r.get('text','')}"
+def satir(r): return f"  [{r.get('time') or ''} {r.get('speaker') or '?'}] {'⚠ses-başkası (komut değil) ' if r.get('komut_ses') == 'uymuyor' else ''}{'❓ ' if soru_mu(r.get('text','')) else ''}{'→' + BEN + ' ' if bana_soru(r) else ''}{'↻ ' if r.get('revised') else ''}{r.get('text','')}"
 def son_satirlar(jl, sn=75, en_az=4, en_cok=40):
     # "Ne diyeyim?" için: son sn saniyede aktarılan satırlar (aynı kimliğin son hâli); azsa son en_az satır
     try: rs = [json.loads(l) for l in open(jl, encoding="utf-8") if l.strip()]

@@ -484,7 +484,7 @@ def ingest(p):
             rec = {"at": p.get("capturedAt"), "id": e.get("id"), "revised": bool(e.get("revised")), "time": e.get("time"), "speaker": e.get("speaker"), "text": text, "flags": flags, "src": p.get("source")}
             if e.get("kanal"): rec["kanal"] = e["kanal"]  # whisper ben/karsi
             if soz: rec["raw"] = raw; rec["sozluk"] = soz
-            for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume", "gec"):  # ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
+            for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume", "gec", "komut_ses"):  # ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
                 if e.get(k) is not None: rec[k] = e[k]
             jl_out.append(json.dumps(rec, ensure_ascii=False) + "\n")
             if p.get("source") == "whisper" and e.get("kanal") == "karsi" and onceki is None: ceviri_ekle(e.get("id"), text, base_key)  # ayar ceviri
