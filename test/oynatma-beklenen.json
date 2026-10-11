@@ -291,7 +291,7 @@
     "gecikme_ortanca": "NoneType",
     "hata": "NoneType",
     "n": "int",
-    "surec": "bool"
+    "surec": "int"
    },
    "claude_age_s": "int",
    "closed": [
