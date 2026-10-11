@@ -28,12 +28,12 @@ for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1; soru = q.split("Soru: ", 1)[-1]
     b = "[Bağlam" in q and "Şimdi:" in q and "Deneme planlama" in q and "GİZLİ NOT" not in q  # davet notu girmez
     if n == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
-    for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."]:
+    for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."] + ([" Önceki konuşma geldi."] if "[Önceki konuşma" in q and "Önceki soru: " in q else []):
         time.sleep(0.15); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 import datetime as _dt
 _y = (_dt.datetime.now().astimezone() + _dt.timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
@@ -75,9 +75,18 @@ try:
     ok("araç başlayınca 'Bakıyorum' söylendi (yalnız ikinci soruda)", log().count("Bakıyorum.") == 1 and log().count("SES (deneme)") == 5)
     ok("ikinci soru aynı süreçte, tur maliyeti farkla", k2["durum"] == "hazir" and log().count("KONUŞ: açık süreç açıldı") == 1 and abs(k2["olcum"]["maliyet"] - 0.01) < 1e-6)
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
-    ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) == 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c)
+    ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) >= 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c)
        and c[0]["arac"] == 0 and c[1]["arac"] == 1 and c[1]["araclar"] == ["Grep"] and c[1]["arac_ilk_ms"])
     ok("döküme yazılmadı", not any(f.endswith(".md") for f in os.listdir(canli)))
+    k3 = sor("Yarın ne var?")
+    t0 = time.time()
+    while time.time() - t0 < 10 and "tur sınırı" not in log(): time.sleep(0.2)
+    ok("tur sınırı (3 soru): üçüncü cevaptan sonra süreç kapandı, panoda cevap 'hazır' kaldı", k3["durum"] == "hazir" and st()["durum"] == "hazir" and "KONUŞ: süreç kapandı (tur sınırı: 3 soru" in log())
+    k4 = sor("Peki saat kaçta?")
+    ok("sonraki soru yeni süreçte, önceki soru-cevap bağlamıyla", k4["durum"] == "hazir" and log().count("KONUŞ: açık süreç açıldı") == 2
+       and "Önceki konuşma geldi" in (k4.get("cevap") or "") and "saat" in (k4.get("soru") or "").lower())
+    k5 = sor("Kim katılıyor?")
+    ok("yeni süreçte ikinci soruya önceki konuşma eklenmez", k5["durum"] == "hazir" and "Önceki konuşma geldi" not in (k5.get("cevap") or "") and log().count("KONUŞ: açık süreç açıldı") == 2)
     ok("çok kısa kayıt reddedildi", post({"komut": "basla"}).get("ok") and not post({"pcm": base64.b64encode(b"\0" * 3200).decode()}).get("ok"))
     # S24 Aşama 1: "yazayım mı?" sorulurken bas-konuş = sesli cevap (Claude'a gitmez, yerel ayırıcı), 10 sn Geri al, eylem bekle 10 sn sonra alır
     def uc(yol, v, pano=False):
