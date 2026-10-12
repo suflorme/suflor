@@ -838,7 +838,16 @@ def yerel_ses_al(p):
     if not toplanti_var(): return {"ok": True, "bekle": True}
     y["son"] = now
     mb = masaustu_baslik()
-    return ses_al(dict(p, kanal="karsi", kaynak="yerel", **({"meeting": {"title": mb}} if mb else {})))
+    r = ses_al(dict(p, kanal="karsi", kaynak="yerel", **({"meeting": {"title": mb}} if mb else {})))
+    km = masaustu_kis_ms()
+    return dict(r, kis_ms=km) if km else r
+# Masaüstü toplantıda sesli çeviri okunurken toplantı sesi kısılır (v0.31.8; ayar masaustu_ses_kis: true, varsayılan kapalı — kullanıcı onayı
+# 12 Ekim). Ses yardımcısı --kis ile açılınca masaüstü toplantı uygulamasının sesini kendi üzerinden çalar; bu yanıttaki kis_ms boyunca %30'a
+# indirir (yardımcı 0,5 sn'de bir sorar). Tarayıcıdaki toplantıda kısmayı eklenti yapar (sesli_ceviri_view "kis").
+def masaustu_kis_ms():
+    if AYAR.get("masaustu_ses_kis") is not True or AYAR.get("ceviri_kis", True) is False or not masaustu_baslik(): return 0
+    k = (globals().get("SESLI") or {}).get("kis")
+    return max(0, int((k["bitis"] - time.time()) * 1000)) if k else 0
 def deneme_aktarici():
     # deneme aktarıcısı: deneme ayarı (SUFLOR_AYAR), ayardakinden başka port ya da başka veri klasörü. Tek kopya yardımcıları (Suflor Ses,
     # Suflor Menü, anahtar yardımcısı) yalnız canlı aktarıcı yönetir — 12 Ekim: 8799'daki test aktarıcısı canlı ses yardımcısını kendine
@@ -857,7 +866,8 @@ def _yerel_ses_dongu():
                 # yanıt vermeyen eski kopya açıksa (open -a çalışanı yeniden açmaz) yalnız bu hesabınkini kapat
                 # yalnız normal kopya (--port) — kurulumun izin penceresini bekleyen kopyası (--izin) kapanmasın
                 subprocess.run(["pkill", "-u", str(os.getuid()), "-f", "MacOS/SuflorSes --port"], capture_output=True, timeout=5)
-                subprocess.run(["open", "-g", "-a", SES_APP, "--stderr", SES_LOG, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE], capture_output=True, timeout=20)
+                subprocess.run(["open", "-g", "-a", SES_APP, "--stderr", SES_LOG, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE]
+                               + (["--kis"] if AYAR.get("masaustu_ses_kis") is True else []), capture_output=True, timeout=20)
                 print("YEREL SES: yardımcı başlatıldı")
             except Exception as e: print(f"YEREL SES: hata başlatılamadı ({e})")
 

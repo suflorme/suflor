@@ -17,13 +17,14 @@ import CoreAudio
 import AudioToolbox
 import AVFoundation
 
-let SURUM = "0.20.5"
+let SURUM = "0.21.0"
 var arg: [String: String] = [:]
-var izinKipi = false
+var izinKipi = false, kisKipi = false
 do {
     let a = CommandLine.arguments; var i = 1
     while i < a.count {
         if a[i] == "--izin" { izinKipi = true; i += 1 }
+        else if a[i] == "--kis" { kisKipi = true; i += 1 }
         else if a[i].hasPrefix("--"), i + 1 < a.count { arg[String(a[i].dropFirst(2))] = a[i + 1]; i += 2 } else { i += 1 }
     }
 }
@@ -96,6 +97,16 @@ let halka = Halka(); let kilit = NSLock()
 var tapID = AudioObjectID(kAudioObjectUnknown), topluID = AudioObjectID(kAudioObjectUnknown)
 var ioProc: AudioDeviceIOProcID? = nil
 var tapHz = 48000.0, tapSurecler: [AudioObjectID] = [], tapCikis: AudioObjectID = 0
+// Kısma kipi (v0.21.0, ayar masaustu_ses_kis → --kis): masaüstü toplantı uygulamasının tap'i "mutedWhenTapped" kurulur ve sesi bu IOProc
+// toplu aygıtın çıkışına yeniden çalar; aktarıcı sesli çeviri okunurken kis_ms verir → kazanç %30'a iner, bitince yavaşça 1'e döner.
+// Yardımcı kapanınca tap silinir, uygulamanın sesi kendiliğinden normale döner. Tarayıcı ailesinde ve toplu aygıtta tap dışında giriş
+// (ör. kulaklık mikrofonu) varsa kısma kurulmaz (geri besleme riski), eski davranış sürer.
+var kisBitis = 0.0, kisKazanc: Float = 1, tapYenidenCal = false
+func girisAkimSayisi(_ aygit: AudioObjectID) -> Int {
+    var adr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams, mScope: kAudioObjectPropertyScopeInput, mElement: kAudioObjectPropertyElementMain)
+    var boyut: UInt32 = 0
+    return AudioObjectGetPropertyDataSize(aygit, &adr, 0, nil, &boyut) == noErr ? Int(boyut) / MemoryLayout<AudioStreamID>.size : -1
+}
 func tapDurdur() {
     if let p = ioProc { AudioDeviceStop(topluID, p); AudioDeviceDestroyIOProcID(topluID, p); ioProc = nil }
     if topluID != kAudioObjectUnknown { AudioHardwareDestroyAggregateDevice(topluID); topluID = AudioObjectID(kAudioObjectUnknown) }
@@ -103,10 +114,10 @@ func tapDurdur() {
     tapSurecler = []
     kilit.lock(); halka.ornek.removeAll(keepingCapacity: true); kilit.unlock()
 }
-func tapKur(_ hedef: [AudioObjectID]?) -> String? {  // hedef nil: tüm sistem (yalnız --izin)
+func tapKur(_ hedef: [AudioObjectID]?, kis: Bool = false) -> String? {  // hedef nil: tüm sistem (yalnız --izin)
     tapDurdur()
     let tanim = hedef.map { CATapDescription(stereoMixdownOfProcesses: $0) } ?? CATapDescription(stereoGlobalTapButExcludeProcesses: [])
-    tanim.uuid = UUID(); tanim.muteBehavior = .unmuted; tanim.isPrivate = true; tanim.name = "Suflor.me karşı ses"
+    tanim.uuid = UUID(); tanim.muteBehavior = kis ? .mutedWhenTapped : .unmuted; tanim.isPrivate = true; tanim.name = "Suflor.me karşı ses"
     var r = AudioHardwareCreateProcessTap(tanim, &tapID)
     if r != noErr { tapID = AudioObjectID(kAudioObjectUnknown); return "tap kurulamadı (\(r))" }
     guard let cikisID = varsayilanCikis(), let cikisUID = metin(cikisID, kAudioDevicePropertyDeviceUID) else { tapDurdur(); return "çıkış aygıtı yok" }
@@ -117,6 +128,11 @@ func tapKur(_ hedef: [AudioObjectID]?) -> String? {  // hedef nil: tüm sistem (
         kAudioAggregateDeviceTapListKey: [[kAudioSubTapDriftCompensationKey: true, kAudioSubTapUIDKey: tanim.uuid.uuidString]]]
     r = AudioHardwareCreateAggregateDevice(tanimT as CFDictionary, &topluID)
     if r != noErr { topluID = AudioObjectID(kAudioObjectUnknown); tapDurdur(); return "toplu aygıt kurulamadı (\(r))" }
+    if kis {  // yeniden çalma yalnız girişte tek akım (tap) varken; yoksa kısmasız kur (uygulamanın sesi susmasın)
+        let n = girisAkimSayisi(topluID)
+        if n != 1 { gunluk("kısma kurulmadı: toplu aygıtta \(n) giriş akımı (tap dışında giriş var)"); return tapKur(hedef, kis: false) }
+    }
+    tapYenidenCal = kis
     var asbd = AudioStreamBasicDescription()
     var adr = AudioObjectPropertyAddress(mSelector: kAudioTapPropertyFormat, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
     var boyut = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
@@ -124,7 +140,7 @@ func tapKur(_ hedef: [AudioObjectID]?) -> String? {  // hedef nil: tüm sistem (
     guard asbd.mFormatFlags & kAudioFormatFlagIsFloat != 0, asbd.mBitsPerChannel == 32 else { tapDurdur(); return "beklenmeyen ses biçimi" }
     tapHz = asbd.mSampleRate > 0 ? asbd.mSampleRate : 48000
     var mono = [Float](repeating: 0, count: 8192)
-    r = AudioDeviceCreateIOProcIDWithBlock(&ioProc, topluID, DispatchQueue(label: "suflor.tap", qos: .userInteractive)) { _, giris, girisZaman, _, _ in
+    r = AudioDeviceCreateIOProcIDWithBlock(&ioProc, topluID, DispatchQueue(label: "suflor.tap", qos: .userInteractive)) { _, giris, girisZaman, cikis, _ in
         let abl = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: giris))
         var kare = 0, kanalTop = 0
         for b in abl {
@@ -139,7 +155,17 @@ func tapKur(_ hedef: [AudioObjectID]?) -> String? {  // hedef nil: tüm sistem (
         kilit.lock()
         if halka.ornek.isEmpty { halka.ilkHost = girisZaman.pointee.mHostTime }
         if halka.ornek.count < Int(tapHz) * 10 { for i in 0..<kare { halka.ornek.append(mono[i] * bol) } }  // gönderim takılırsa en çok 10 sn
+        let kisiyor = Date().timeIntervalSince1970 < kisBitis
         kilit.unlock()
+        if tapYenidenCal {  // kısma kipi: uygulamanın sesi (tek kanala indirilmiş) çıkışa; okuma sırasında %30, tampon başına çeyrek adımla geçiş
+            let k0 = kisKazanc, k1: Float = abs((kisiyor ? 0.3 : 1) - k0) < 0.02 ? (kisiyor ? 0.3 : 1) : k0 + ((kisiyor ? 0.3 : 1) - k0) * 0.25
+            for b in UnsafeMutableAudioBufferListPointer(cikis) {
+                guard let p = b.mData?.assumingMemoryBound(to: Float.self) else { continue }
+                let kk = max(1, Int(b.mNumberChannels)), n = min(Int(b.mDataByteSize) / 4 / kk, kare)
+                for i in 0..<n { let v = mono[i] * bol * (k0 + (k1 - k0) * Float(i) / Float(n)); for c in 0..<kk { p[i * kk + c] = v } }
+            }
+            kisKazanc = k1
+        }
     }
     if r != noErr { tapDurdur(); return "ses okuyucu kurulamadı (\(r))" }
     r = AudioDeviceStart(topluID, ioProc)
@@ -229,7 +255,7 @@ func adim() {
         let neden = ioProc == nil ? "okuyucu yok" : cikis != tapCikis ? "çıkış aygıtı değişti" : sesliYeni ? "ses çıkaran yeni süreç"
             : (!yeni.isEmpty && eski.isDisjoint(with: yeni)) ? "dinlenen süreçler kapandı" : nil
         if let n = neden, simdi.timeIntervalSince(sonKurma) >= 3 {
-            sonKurma = simdi; sonHata = tapKur(hedef); kurmaSay += 1; kurmaNeden = n
+            sonKurma = simdi; sonHata = tapKur(hedef, kis: kisKipi && !tarayiciMi); kurmaSay += 1; kurmaNeden = n
             gunluk(sonHata.map { "yeniden kurulamadı (\(n)): \($0)" } ?? "yeniden kuruldu (\(n), \(hedef.count) süreç)")
         }
         return
@@ -243,7 +269,7 @@ func adim() {
     let hedef = ss.filter { $0.bundle.hasPrefix(a.onek) }.map { $0.id }.sorted()
     guard !hedef.isEmpty else { return }
     sonKurma = simdi
-    sonHata = tapKur(hedef)
+    sonHata = tapKur(hedef, kis: kisKipi && !TARAYICILAR.contains(a.ad))
     if let h = sonHata { gunluk("\(a.ad): \(h)") } else { aktif = a; gunluk("dinliyor: \(a.ad) (\(hedef.count) süreç, \(Int(tapHz)) Hz)") }
 }
 func paket() {   // 0,5 sn: halkadaki örnekleri 16 kHz'e indirip gönder
@@ -251,12 +277,16 @@ func paket() {   // 0,5 sn: halkadaki örnekleri 16 kHz'e indirip gönder
     guard let ak = aktif, !x.isEmpty, let pcm = donustur(x) else { return }
     let t = Date().timeIntervalSince1970 * 1000 - (hostSn(mach_absolute_time()) - hostSn(ilk)) * 1000
     pcm.withUnsafeBytes { b in for v in b.bindMemory(to: Int16.self) { let m = v == Int16.min ? Int16.max : abs(v); if m > tepe { tepe = m } } }
-    gonder(["kanal": "karsi", "kaynak": "yerel", "uygulama": ak.ad, "t": Int64(t), "pcm": pcm.base64EncodedString()])
+    gonder(["kanal": "karsi", "kaynak": "yerel", "uygulama": ak.ad, "t": Int64(t), "pcm": pcm.base64EncodedString()]) { j in
+        let ms = (j?["kis_ms"] as? Double) ?? Double((j?["kis_ms"] as? Int) ?? 0)  // sesli çeviri okunuyor: bu kadar ms kıs
+        if tapYenidenCal { kilit.lock(); kisBitis = ms > 0 ? Date().timeIntervalSince1970 + ms / 1000 : min(kisBitis, Date().timeIntervalSince1970); kilit.unlock() }
+    }
 }
 func nabiz() {   // 5 sn: durum + son 5 sn'nin tepe seviyesi (izin yoksa tap yalnız sıfır verir — aktarıcı uzun sürerse işaretler)
     var g: [String: Any] = ["nabiz": true, "surum": SURUM, "durum": aktif == nil ? "bekliyor" : "dinliyor", "tepe": Int(tepe),
                             "kurma": kurmaSay, "kurma_neden": kurmaNeden]
     if let a = aktif { g["uygulama"] = a.ad }
+    if tapYenidenCal { g["kis_kipi"] = true }
     if let h = sonHata { g["hata"] = h }
     tepe = 0
     gonder(g) { j in

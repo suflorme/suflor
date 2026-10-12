@@ -96,5 +96,13 @@ try:
     bak("aktarıcıda hata yok", "Traceback" not in log)
 finally:
     r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# masaüstü ses kısma (v0.31.8): yalnız ayar açık + masaüstü toplantı + sesli çeviri okunurken kis_ms > 0
+kod = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
+ns = {"time": time, "SESLI": {"kis": {"bitis": time.time() + 2}}}
+exec(kod[kod.index("def masaustu_kis_ms"):kod.index("def deneme_aktarici")], ns)
+for ayar, top, beklenen, ad in [({"masaustu_ses_kis": True}, "Deneme", True, "ayar açık, masaüstü toplantı, okunuyor → kıs"),
+                                 ({}, "Deneme", False, "ayar yok → kısma yok"), ({"masaustu_ses_kis": True}, None, False, "masaüstü toplantı yok → kısma yok"),
+                                 ({"masaustu_ses_kis": True, "ceviri_kis": False}, "Deneme", False, "ceviri_kis kapalı → kısma yok")]:
+    ns.update(AYAR=ayar, masaustu_baslik=lambda t=top: t); bak(ad, (ns["masaustu_kis_ms"]() > 0) == beklenen)
 print(f"masaüstü mikrofon: {len(hata)} sorun" if hata else "masaüstü mikrofon: ✓ GEÇTİ")
 sys.exit(1 if hata else 0)
