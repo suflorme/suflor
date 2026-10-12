@@ -409,7 +409,7 @@ final class Masaustu {
                 self.kisilerSon = Date()
                 if let k = self.katilimciOku() { self.katilimcilar = k; v["katilimcilar"] = k }
             }
-            let degisti = top != once || (v["sessiz"] as? Bool) != (self.son["sessiz"] as? Bool) || (v["paylasim"] as? Bool) != (self.son["paylasim"] as? Bool)
+            let degisti = self.son.isEmpty || top != once || (v["sessiz"] as? Bool) != (self.son["sessiz"] as? Bool) || (v["paylasim"] as? Bool) != (self.son["paylasim"] as? Bool)
                 || v["katilimcilar"] != nil || (v["konusan"] as? String) != nil
             if !v.isEmpty && (degisti || (top && Date().timeIntervalSince(self.sonGonder) > 10)) {
                 var g = v; if g["sessiz"] is NSNull || (g["sessiz"] as? Bool) == nil { g.removeValue(forKey: "sessiz") }
