@@ -233,7 +233,8 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
 // ağaç ancak ikincisiyle açıldı — her taramada yeniden verilir; `--ax-dokum` etiketleri döker). 3 sn'de bir, pencere başına en çok 6000 öğe;
 // durum değişince ya da toplantıda 10 sn'de bir POST /masaustu. Okunanlar (v0.31.0): "Ayrıl" (toplantıda), mikrofon düğmesi (sessiz),
 // ekran paylaşımı (karşı taraf paylaşıyor / kullanıcı kendisi paylaşıyor), konuşan kişi göstergesi ve Kişiler paneli (katılımcı adları;
-// panel kapalıysa 3 dk'da bir açılıp okunur ve kapatılır — kullanıcı onayı, 12 Ekim). Teams'te "Ayrıl" ve mikrofon adları gerçek uygulamada
+// yalnız ayar `masaustu_kisiler: true` iken 3 dk'da bir açılıp okunur ve kapatılır — 12 Ekim deneme 7: her açılış Teams'i öne getirip yeni
+// pencere açıyordu, kullanıcı istemedi; varsayılan kapalı). Teams'te "Ayrıl" ve mikrofon adları gerçek uygulamada
 // doğrulandı (12 Ekim); paylaşım, konuşan, Kişiler ve Zoom adları herkese açık bilgiyle — ilk gerçek kullanımda `--ax-dokum` ile genişlet.
 final class Masaustu {
     let UYG: [(bundle: String, ad: String)] = [("com.microsoft.teams2", "Teams"), ("com.microsoft.teams", "Teams"), ("us.zoom.xos", "Zoom")]
@@ -405,7 +406,7 @@ final class Masaustu {
             let top = v["toplantida"] as? Bool ?? false, once = self.son["toplantida"] as? Bool ?? false
             if top && !once { self.toplantiBas = Date(); self.kisilerSon = .distantPast }
             // Kişiler paneli: toplantı başından 15 sn sonra, sonra 3 dk'da bir
-            if top, !args.contains("--kisiler-kapali"), Date().timeIntervalSince(self.toplantiBas) > 15, Date().timeIntervalSince(self.kisilerSon) > 180 {
+            if top, args.contains("--kisiler-ac"), Date().timeIntervalSince(self.toplantiBas) > 15, Date().timeIntervalSince(self.kisilerSon) > 180 {
                 self.kisilerSon = Date()
                 if let k = self.katilimciOku() { self.katilimcilar = k; v["katilimcilar"] = k }
             }

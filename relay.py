@@ -856,7 +856,7 @@ def menu_baslat():
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
         subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
                        + (["--masaustu-mic-kapali"] if AYAR.get("masaustu_mic") is False else []) + (["--kisayol-kapali"] if AYAR.get("kisayollar") is False else [])
-                       + (["--kisiler-kapali"] if AYAR.get("masaustu_kisiler") is False else []), capture_output=True, timeout=20)
+                       + (["--kisiler-ac"] if AYAR.get("masaustu_kisiler") is True else []), capture_output=True, timeout=20)
         print("MENÜ: menü çubuğu uygulaması başlatıldı")
     except Exception as e: print(f"MENÜ: başlatılamadı ({e.__class__.__name__})")
 

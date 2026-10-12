@@ -60,9 +60,10 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 
 **İsteğe bağlı (ayar.json, varsayılan kapalı):** `"menu_cubugu": true` — menü çubuğu uygulaması (buzlu cam panelde mini pano,
 Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da
-çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, katılımcı adlarını Kişiler panelinden okur, kanıt ve
+çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, kanıt ve
 paylaşılan ekran görüntüsünü toplantı penceresinden alır; Erişilebilirlik, mikrofon ve Ekran Kaydı izni sorar; sonra `guncelle.command`.
-Kapatmak için `"masaustu_mic": false`, `"masaustu_kisiler": false`, `"kisayollar": false`) · `"fisilti": true` — kulaklık takılıyken DUR kartı kısa sesle kulağına okunur ·
+Kapatmak için `"masaustu_mic": false`, `"kisayollar": false`; Kişiler panelinden ad okuma `"masaustu_kisiler": true` ile açılır — panel
+3 dakikada bir açılıp kapanır, Teams penceresi öne gelir) · `"fisilti": true` — kulaklık takılıyken DUR kartı kısa sesle kulağına okunur ·
 `"ceviri": true` — karşı tarafın İngilizce satırları panoda Türkçesiyle (metin Claude'a gider) · `"oda": true` — aynı
 mikrofondaki ikinci kişinin sözleri "Odadaki kişi" diye ayrılır. Ses izi hafızasını kapatmak için `"ses_izi_hafiza": false`.
 

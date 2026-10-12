@@ -17,7 +17,7 @@ import CoreAudio
 import AudioToolbox
 import AVFoundation
 
-let SURUM = "0.20.4"
+let SURUM = "0.20.5"
 var arg: [String: String] = [:]
 var izinKipi = false
 do {
@@ -205,8 +205,18 @@ func adim() {
     for a in micAileler { micSon[a] = simdi; if micIlk[a] == nil { micIlk[a] = simdi } }
     for a in micIlk.keys where !micAileler.contains(a) { micIlk[a] = nil }
     let aktarıcıDiyor = simdi.timeIntervalSince(aktarıcıToplanti) < 8
+    // masaüstü toplantı uygulaması (Teams/Zoom…) mikrofonu ≥ 2 sn kullanıyor ya da aktarıcı toplantının masaüstünde olduğunu söylüyor (ipucu
+    // tarayıcı değil) → o aile. 12 Ekim deneme 7: pano Chrome'da açıkken yardımcı Chrome'a takılı kaldı, masaüstü Teams'in karşı sesi 15 dk yazılmadı.
+    let masaustuMic = micIlk.filter { k, v in simdi.timeIntervalSince(v) >= 2 && !(AILELER.first { $0.onek == k }.map { TARAYICILAR.contains($0.ad) } ?? true) }
+        .min { $0.value < $1.value }.flatMap { m in AILELER.first { $0.onek == m.key } }
+    let ipucuMasaustu = aktarıcıDiyor && !tarayiciIpucu.isEmpty && !TARAYICILAR.contains(tarayiciIpucu)
+        ? AILELER.first { a in a.ad == tarayiciIpucu && ss.contains { $0.bundle.hasPrefix(a.onek) } } : nil
+    let masaustuAile = masaustuMic ?? ipucuMasaustu
     if let ak = aktif {
         let tarayiciMi = TARAYICILAR.contains(ak.ad)
+        if tarayiciMi, let m = masaustuAile {   // tarayıcıyı bırak: sonraki adımda masaüstü uygulaması seçilir
+            tapDurdur(); aktif = nil; sonKurma = .distantPast; gunluk("bırakıldı (\(ak.ad)) — toplantı masaüstünde: \(m.ad)"); return
+        }
         if simdi.timeIntervalSince(micSon[ak.onek] ?? .distantPast) >= 8 && !(tarayiciMi && aktarıcıDiyor) {   // toplantı bitti
             tapDurdur(); aktif = nil; gunluk("durdu (\(ak.ad))"); return
         }
@@ -226,8 +236,8 @@ func adim() {
     }
     // mikrofonu ≥ 2 sn kullanan ilk toplantı uygulaması; yoksa aktarıcı "toplantı var" diyorsa tarayıcı ailesi
     guard simdi.timeIntervalSince(sonKurma) >= 3 else { return }
-    var secilen: (onek: String, ad: String)? = nil
-    if let (onek, bas) = micIlk.min(by: { $0.value < $1.value }), simdi.timeIntervalSince(bas) >= 2 { secilen = AILELER.first { $0.onek == onek } }
+    var secilen: (onek: String, ad: String)? = masaustuAile   // masaüstü toplantı uygulaması tarayıcıdan önce
+    if secilen == nil, let (onek, bas) = micIlk.min(by: { $0.value < $1.value }), simdi.timeIntervalSince(bas) >= 2 { secilen = AILELER.first { $0.onek == onek } }
     if secilen == nil, aktarıcıDiyor { secilen = tarayiciAilesi(ss) }
     guard let a = secilen else { return }
     let hedef = ss.filter { $0.bundle.hasPrefix(a.onek) }.map { $0.id }.sorted()
