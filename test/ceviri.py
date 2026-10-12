@@ -77,6 +77,14 @@ if os.environ.get("SUFLOR_CEVIRI_GERCEK"):
             time.sleep(1); tr = next((x.get("ceviri", "") for x in istek("/status")["tail"] if x.get("id") == "wh/karsi/1"), "")
         print(f"   gerçek Claude: {time.time() - t:.1f} sn · {tr}")
         bak("gerçek Claude çevirisi Türkçe", any(c in tr for c in "çğıöşü") or "Pazartesi" in tr)
+        # v0.32.1: özdeki yabancı adların okunuşu ("o") aynı cevapla telaffuz-oto.json'a yazılır
+        istek("/ingest", {"meeting": {"title": "Çeviri Deneme"}, "source": "whisper", "entries": [{"id": "wh/karsi/9", "speaker": "John", "time": "10:01:00",
+              "text": "Let's discuss the Salesforce dashboard and the HubSpot pipeline on Teams.", "kanal": "karsi", "t0": time.time(), "t1": time.time() + 3}]})
+        yol = os.path.join(canli, "telaffuz-oto.json"); t = time.time()
+        while time.time() - t < 40 and not os.path.exists(yol): time.sleep(1)
+        oto = json.load(open(yol, encoding="utf-8")) if os.path.exists(yol) else {}
+        print(f"   okunuş: {oto}")
+        bak("çeviri cevabındaki okunuşlar telaffuz-oto.json'da", any(k.lower() in ("salesforce", "hubspot") for k in oto))
     finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print("çeviri: ✓ hepsi geçti" if not hata else f"çeviri: ✗ {len(hata)} kaldı")
 sys.exit(1 if hata else 0)
