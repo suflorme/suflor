@@ -277,13 +277,23 @@ bindAck(document.getElementById("kc"))
 const PL={teams:"Teams",meet:"Google Meet",zoom:"Zoom"}, ROL={yurutucu:L("yürütücü"),katilimci:L("katılımcı"),dinleyici:L("dinleyici")}
 // tek durum cümlesi — beş bağlantı noktası ve uyarı şeridinin yerine. En önemli sorun gösterilir (kırmızı > turuncu); diğerleri
 // başlıkta (title). Sorun yoksa: toplantıda "Dinliyorum" (yeşil), değilse gri. Eylem yalnız panonun yapabildiği işte (Başlat).
+// masaüstü toplantı (v0.31.0): menü uygulaması Teams/Zoom masaüstünde toplantıda olduğunu son 30 sn'de bildirdi
+function masaustuTop(s){const m=s.masaustu;return!!(m&&m.toplantida&&Date.now()/1000-m.t<30)}
 function durum(s){
-  const x=s.extension, w=s.whisper||{}, ek=x&&x.age_s<30, cagri=ek&&x.call, ca=s.claude_age_s, izl=ca!=null&&ca<120, so=[]
+  const x=s.extension, w=s.whisper||{}, ek=x&&x.age_s<30, mt=masaustuTop(s)&&!(ek&&x.call), cagri=(ek&&x.call)||mt, ca=s.claude_age_s, izl=ca!=null&&ca<120, so=[]
   try{const g=JSON.parse(sessionStorage.getItem("guncellendi")||"null");if(g&&Date.now()-g.t<90000)so.push(["wa",L("Suflor.me güncellendi"),L("açık bir toplantı sekmesi varsa yenile")])}catch(e){}
   if(s.uyari)so.push(["er",s.uyari,""])
   if(s.anahtarsiz)so.push(["wa",L(s.anahtarsiz.tur==="yerel"?"Anahtarsız yerel istek geldi":"Eklenti eski sürümde"),L(s.anahtarsiz.tur==="yerel"?"toplantı yardımcısı eski olabilir — aktarici-kur ile yeniden kur":"chrome://extensions → Suflor.me → ↻ yenile")])
   if(s.dil&&s.dil.uyari)so.push(["er",L("Döküm dili yanlış"),s.dil.uyari])
-  if(cagri){
+  if(mt){  // masaüstü: altyazı yok, satırlar Whisper'dan (karşı: ses yardımcısı, sen: menü uygulamasının mikrofonu)
+    const mm=s.masaustu_mic||{}
+    if(!w.durum||w.durum==="yok")so.push(["wa",L("Satır gelmiyor"),L("masaüstü toplantıda döküm Whisper'la yazılır — Whisper kurulu değil")])
+    else{
+      if(w.yerel==="izin")so.push(["wa",L("Karşı tarafın sesi için izin gerekiyor"),L("Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses")])
+      else if(!w.karsi&&!["bekliyor","dinliyor"].includes(w.yerel))so.push(["wa",L("Karşı tarafın sesi yazılmıyor"),L("ses yardımcısı kapalı — aktarici-kur ile yeniden kur")])
+      if(!mm.akiyor&&s.masaustu.sessiz!==true)so.push(["wa",L("Senin sesin yazılmıyor"),L("Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü")])}
+    if(!izl)so.push(["wa",L("Claude izlemiyor — kart gelmez"),"",L("Başlat")])}
+  else if(cagri){
     const yon=(x.yonerge&&x.yonerge.altyazi)||L("Diğer → Dil ve konuşma → Canlı altyazı")
     if(!(x.panel||x.captions||w.ben||w.karsi))so.push(["wa",L("Satır gelmiyor"),L("altyazıyı aç: ")+yon])
     else if(w.durum&&w.durum!=="yok"){
@@ -476,7 +486,7 @@ document.getElementById('sn').addEventListener('click',async ev=>{const b=ev.tar
 // boş pano = "Sıradaki · Başlat": ilk (süren ya da gelecek) toplantı büyük kart, kalanlar altında soluk satır. Claude izlerken gizli.
 function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks'),x=s.extension
   // toplantı sürerken büyük kart yok: durum cümlesindeki Başlat yalnız formu açar
-  const top=s.aktif||!!(x&&x.age_s<30&&x.call),form=!document.getElementById('tkf').hidden
+  const top=s.aktif||!!(x&&x.age_s<30&&x.call)||masaustuTop(s),form=!document.getElementById('tkf').hidden
   sec.hidden=izliyor||(top&&!form);['tk','tkh','tkalt'].forEach(i=>document.getElementById(i).style.display=top?'none':'');if(izliyor||top)return
   tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh')
   h.textContent=!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.'):t.durum==='bekliyor'?L('takvim okunuyor…'):(t.durum&&t.durum!=='ok'?(t.hata||t.durum):'')
@@ -501,7 +511,7 @@ document.getElementById('gun').onclick=async ev=>{const b=ev.currentTarget
 async function refresh(){let s;try{s=await j('/status')}catch(e){s=null}
   if(s&&s.err==="anahtar"){document.title="🔑 Suflor.me";const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Pano anahtarsız açıldı")));setH(document.getElementById('da'),esc(L("Suflor.me simgesine tıkla → Panoyu aç")));return}
   if(!s){const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Suflor.me'ye ulaşılamıyor")));setH(document.getElementById('da'),esc(L('birkaç saniye içinde yeniden denenir')));return}last=s;guncellemeCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
-setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||s.meeting||'Toplantı')):L('toplantı bekleniyor'))
+setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||s.meeting||'Toplantı')):masaustuTop(s)?esc(s.masaustu.baslik||s.masaustu.uygulama||L('Toplantı')):L('toplantı bekleniyor'))
 setH(document.getElementById('chips'),s.aktif&&ag.rol?`<span class=chip>${ROL[ag.rol]||esc(ag.rol)}</span>`:"")
 {const [t,c,ti]=sureTxt(s),e=document.getElementById('sure');setH(e,s.aktif&&t?ic('clock',esc(t)):"");e.className=c;e.title=ti}
 durumCiz()
@@ -522,7 +532,7 @@ document.title=((s.cards||[]).length?`(${s.cards.length}) `:"")+"Suflor.me pano"
 {const b=s.baglam||[],NK={baslat:L("Başlat"),kutu:L("kutu"),birak:L("bırakıldı")};document.getElementById('bgs').hidden=!b.length;setH(document.getElementById('bg'),b.map(x=>`<div class=bg title="${esc(x.ad)}">${x.tur==="dosya"?"📄":"🔗"} ${esc(x.ad)}<span class=sp>${esc(NK[x.kaynak]||x.kaynak)}</span></div>`).join(''))}
 {const a=s.acik||[];document.getElementById('aks').hidden=!a.length;setH(document.getElementById('ak'),a.map(q=>`<div class=ak>${esc(q.metin)}${q.kim?`<span class=sp>— ${esc(q.kim)}</span>`:''}</div>`).join(''))}
 // gündem her yenilemede karşılaştırılır — Claude `gundem i` ile işaretleyince ya da agenda.json değişince görünsün
-const bos=!s.aktif&&!(s.claude_age_s!=null&&s.claude_age_s<120)&&!(x&&x.age_s<30&&x.call)
+const bos=!s.aktif&&!(s.claude_age_s!=null&&s.claude_age_s<120)&&!(x&&x.age_s<30&&x.call)&&!masaustuTop(s)
 if(bos&&Date.now()-agTamT>10000){agTamT=Date.now();j('/agenda').then(v=>{agTam=v}).catch(()=>{})}  // /status boşken gündemi gizler; eşleştirme için tamı
 if(bos&&tkGor){const g=seciliGundem(agTam)
   const sig='sec|'+JSON.stringify([tkGor,g&&g.items,g&&g.kaynak]);if(g&&sig!==agSig){agSig=sig;agTotal=0

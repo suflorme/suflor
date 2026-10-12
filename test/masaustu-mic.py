@@ -12,7 +12,7 @@ shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"),
-                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOKEN="http://sahte.test"))
+                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOKEN="http://sahte.test", SUFLOR_TEST_YENI_SN="2"))
 def anahtar():
     try: return open(os.path.join(canli, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     except OSError: return ""
@@ -51,7 +51,38 @@ try:
     istek("/ping", {"meeting": {"title": "Tarayıcı toplantısı"}, "call": True, "panel": False, "rows": 0}, koken="http://sahte.test")
     v = parca(); bak("tarayıcıda toplantı varken atılır", v.get("bekle") is True and mm().get("parca") == 3)
     istek("/ses-masaustu", {"olay": "kapandi"})
+    # --- v0.31.0: masaüstü kanıt, katılımcı adı, ekran paylaşımı, yeni toplantı dosyası ---
+    istek("/ping", {"meeting": {"title": "Tarayıcı toplantısı"}, "call": False, "panel": False, "rows": 0}, koken="http://sahte.test")
+    time.sleep(0.2); masaustu(True, False)
+    istek("/ingest", {"meeting": {"title": "Deneme"}, "source": "transcript", "entries": [{"id": "d/1", "speaker": "Deniz K", "time": "10:00", "text": "ilk satır"}]})
+    import struct, zlib
+    def png1():  # 1×1 PNG
+        c = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+        return b"\x89PNG\r\n\x1a\n" + c(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 0, 0, 0, 0)) + c(b"IDAT", zlib.compress(b"\0\0")) + c(b"IEND", b"")
+    PNG = base64.b64encode(png1()).decode()
+    bak("masaüstü kanıt: köken yanlışsa ret", istek("/kanit-masaustu", {"png": PNG}, koken="http://sahte.test").get("_kod") == 403)
+    v = istek("/kanit-masaustu", {"png": PNG, "kaynak": "kisayol", "w": 1, "h": 1}); bak("masaüstü kanıt kaydedilir (Deneme dosyasına)", v.get("ok") is True and "Deneme" in str(v.get("path")))
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams", "katilimcilar": ["Deniz K", "Ayşe Yılmaz"]})
+    s = istek("/status"); bak("katılımcılar /status'ta", (s.get("masaustu") or {}).get("katilimcilar") == ["Deniz K", "Ayşe Yılmaz"])
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams"})
+    s = istek("/status"); bak("katılımcılar sonraki gönderimde korunur", (s.get("masaustu") or {}).get("katilimcilar") == ["Deniz K", "Ayşe Yılmaz"])
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams", "paylasim": True})
+    s = istek("/status"); bak("karşı taraf paylaşınca ekran kaydı açılır", bool(s.get("yaparken") or (istek("/cards").get("yaparken"))))
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams", "paylasim": False})
+    bak("paylaşım bitince kapanır", not istek("/cards").get("yaparken"))
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Deneme | Microsoft Teams", "konusan": "Ayşe Yılmaz"})
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False})
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams"})
+    bak("kısa kopma (< 2 dk): aynı dosya", "yeni döküm dosyası" not in open(os.path.join(T, "relay.log"), encoding="utf-8").read())
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams"})
+    istek("/ingest", {"meeting": {"title": "Deneme"}, "source": "transcript", "entries": [{"id": "d/2", "speaker": "Deniz K", "time": "10:05", "text": "ikinci toplantı"}]})
+    import glob
+    md = glob.glob(os.path.join(canli, "*-Deneme*.md"))
+    bak("uzun aradan sonra yeni toplantı: yeni döküm dosyası", "yeni döküm dosyası" in open(os.path.join(T, "relay.log"), encoding="utf-8").read() and len(md) == 2)
     log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
+    log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
+    bak("konuşan kişi ve katılımcı günlükte", "katılımcılar 2 kişi" in log)
     bak("günlükte açıldı/kapandı satırları", "MASAÜSTÜ MİKROFON: açıldı · MacBook Pro Mikrofonu" in log and "MASAÜSTÜ MİKROFON: kapandı" in log)
     bak("aktarıcıda hata yok", "Traceback" not in log)
 finally:

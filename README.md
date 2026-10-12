@@ -59,8 +59,10 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 5. Toplantı bitince Claude özeti çıkarır ve sana sunar.
 
 **İsteğe bağlı (ayar.json, varsayılan kapalı):** `"menu_cubugu": true` — menü çubuğu uygulaması (buzlu cam panelde mini pano,
-Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş, Teams/Zoom masaüstü toplantılarını tanıma; Erişilebilirlik ve mikrofon
-izni sorar; sonra `guncelle.command`) · `"fisilti": true` — kulaklık takılıyken DUR kartı kısa sesle kulağına okunur ·
+Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da
+çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, katılımcı adlarını Kişiler panelinden okur, kanıt ve
+paylaşılan ekran görüntüsünü toplantı penceresinden alır; Erişilebilirlik, mikrofon ve Ekran Kaydı izni sorar; sonra `guncelle.command`.
+Kapatmak için `"masaustu_mic": false`, `"masaustu_kisiler": false`, `"kisayollar": false`) · `"fisilti": true` — kulaklık takılıyken DUR kartı kısa sesle kulağına okunur ·
 `"ceviri": true` — karşı tarafın İngilizce satırları panoda Türkçesiyle (metin Claude'a gider) · `"oda": true` — aynı
 mikrofondaki ikinci kişinin sözleri "Odadaki kişi" diye ayrılır. Ses izi hafızasını kapatmak için `"ses_izi_hafiza": false`.
 

@@ -491,6 +491,9 @@ def konusmaci_karsi(t0, t1, kume=None):
     farkli = {k for _, k in son}; n_kume = len({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))
     if kume and n_kume > 1: return f"Karşı taraf {kume[1:]}"  # ses izinden ayrılmış, adı henüz öğrenilmedi
     if len(farkli) == 1: return next(iter(farkli))
+    if not farkli and not (kume and n_kume > 1):  # masaüstü (v0.31.0): altyazı yok, Kişiler panelinde kullanıcıdan başka tek kişi
+        d = masaustu_diger_katilimci()
+        if d: return d
     return f"Karşı taraf {kume[1:]}" if kume else "Karşı taraf"  # küme varsa hep numaralı: kişi başına ses tabanı tutarlı kalsın
 # --- Taslak + kesin metin ----------------------------------------------------------------------------------------
 # Whisper satırı ancak konuşma parçası bitince gelir (sessizlikten ~1,5 sn sonra; uzun cümlede başlangıçtan ≤ ~14 sn).

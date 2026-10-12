@@ -76,7 +76,12 @@ def paths(title):
     if not base and title != YER_TUTUCU: base = yer_tutucu_birlestir(title)
     if not base:
         d = datetime.date.today().strftime("%Y-%m-%d"); t = datetime.datetime.now().strftime("%H%M")
-        base = os.path.join(BASE, f"{d}-{t}-{slug(title)}"); STATE["meeting_files"][title] = base
+        base = os.path.join(BASE, f"{d}-{t}-{slug(title)}")
+        if os.path.exists(base + ".md"):  # aynı dakikada aynı adlı ikinci toplantı (v0.31.0: masaüstünde yeniden girilen toplantı yeni dosya açar)
+            n = 2
+            while os.path.exists(f"{base}-{n}.md"): n += 1
+            base = f"{base}-{n}"
+        STATE["meeting_files"][title] = base
         STATE["file_start"][os.path.basename(base) + ".md"] = datetime.datetime.now().isoformat(timespec="seconds")
     STATE["file_last"][os.path.basename(base) + ".md"] = time.time()  # yalnız yazarken çağrılır (ingest/note/gündem)
     return base + ".md", base + ".jsonl"
