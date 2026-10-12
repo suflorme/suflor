@@ -4,6 +4,8 @@
 # Ses dosyası depoda değildir: kullanıcı yerelde indirir, kod yalnız ayar varsa kullanır (lisansı belirsiz ses açık depoya girmez).
 # Protokol (satır başına bir JSON):
 #   giriş : {"id": "...", "metin": "...", "hiz": 1.0, "ara": 0.4}   hiz > 1 daha hızlı (süre ≈ 1 / hiz; length_scale açılışta ölçülen eğriden);
+#           "uzun" (isteğe bağlı): {kök: IPA} — uzun ünlülü sözcük (cuma → dʒumˈaː) eki ile birlikte [[ ham ses yazımı ]] olur; ek Piper'ın kendi
+#           çözümlemesinden alınır (cumaya → dʒumˈaːja); ek tanınmazsa ("cumartesi") ya da çözümleme köke uymazsa sözcük olduğu gibi kalır
 #           "ton"/"ritim" (isteğe bağlı): noise_scale / noise_w_scale (yoksa modelin kendi değeri; dinlenerek seçilir)
 #           ara: cümleler arasına eklenen sessizlik (sn, hıza göre ölçekli; Piper cümle sonunu kırpıyor); noktalı virgül / iki nokta
 #           sonrası 0,7 katı, virgül sonrası 0,35 katı (Piper bunlarda ~0–0,06 sn duruyordu); "yan": true → her yan cümle ayrı parça
@@ -14,6 +16,27 @@
 import sys, os, re, json, time, wave, glob, tempfile
 
 def yaz(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
+
+_EK = r"(?:'?(?:y?[aeıiuü]|y?l[ae]|n?[dt][ae]n?|n[ıiuü]n|s[ıiuü]|l[ae]r(?:[ıi]n?|d[ae]n?|[ıi]nd[ae]n?)?|ki|y?d[ıiuü]|y?[ıiuü]n|n[ae]|ç[ıi]|c[ıi]|l[ıi]k|s[ıiuü]n[ae]|s[ıiuü]nd[ae]n?|y?[ıiuü]m|y?[ıiuü]z|d[ıiuü]r))?"
+_UZUN = {"anahtar": None, "rx": None}
+def desen(k):  # şapkasız harf şapkalıyla da eşleşir; şapkalı anahtar yalnız şapkalıyla
+    return "".join({"a": "[aâ]", "i": "[iî]", "u": "[uû]"}.get(c, re.escape(c)) for c in k)
+def uzun_uygula(ses, metin, uzun):
+    if not uzun: return metin
+    a = tuple(sorted(uzun.items()))
+    if _UZUN["anahtar"] != a:
+        _UZUN.update(anahtar=a, rx=re.compile(r"(?<![\w\[])(" + "|".join(desen(k) for k in sorted(uzun, key=len, reverse=True)) + ")(" + _EK + r")(?![\w'])", re.I))
+    def yalin(x): return "".join(sum(ses.phonemize(x), [])).replace("ˈ", "").replace("ˌ", "").replace(" ", "")
+    def deg(m):
+        kok, ek = m.group(1), m.group(2).replace("'", "")
+        hedef = next((v for k, v in uzun.items() if re.fullmatch(desen(k), kok, re.I)), None)
+        if not hedef: return m.group(0)
+        if not ek: return "[[ " + hedef + " ]]"
+        try:
+            ck = yalin(kok.lower()); ct = yalin((kok + ek).lower())
+        except Exception: return m.group(0)
+        return "[[ " + hedef + ct[len(ck):] + " ]]" if ct.startswith(ck) else m.group(0)
+    return _UZUN["rx"].sub(deg, metin)
 
 def main():
     model = sys.argv[1]; gecici = sys.argv[2] if len(sys.argv) > 2 else os.path.join(tempfile.gettempdir(), "suflor-piper")
@@ -60,6 +83,7 @@ def main():
             ara = min(1.5, max(0.0, float(g.get("ara") or 0))) / hiz
             t0 = time.time(); n = 0
             # cümleleri ve yan cümleleri kendimiz böleriz: Piper (espeak) küçük harfle başlayan cümleyi ayırmıyor, ; : , işaretlerinde durmuyordu
+            metin = uzun_uygula(ses, metin, g.get("uzun") if isinstance(g.get("uzun"), dict) else None)
             parcalar, once = [], 0.0
             for x in re.split(r"(?<=[.!?…;:,])\s+", metin):
                 if x.strip(): parcalar.append((x, once))

@@ -25,6 +25,19 @@ def piper_hiz(kisa=False):
 def piper_ara():
     try: return max(0.0, min(1.5, float(AYAR.get("piper_cumle_ara", 0.4))))
     except (TypeError, ValueError): return 0.4
+# Uzun ünlü (v0.32.3): Piper "cuma"yı dʒˈuma okur (kısa a, vurgu başta); Türkçede dʒumˈaː. aktarici/uzun-unlu.json (+ kullanıcı eki
+# canli/uzun-unlu.json) kök → IPA; metinde geçenler işçiye gider, işçi eki Piper'ın çözümlemesinden ekleyip [[ ham ses yazımı ]] yapar.
+_UZUN_V = {"t": 0, "v": {}}
+def piper_uzun(metin):
+    if time.time() - _UZUN_V["t"] > 30:
+        v = {}
+        for yol in (os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "uzun-unlu.json"), os.path.join(BASE, "uzun-unlu.json")):
+            try: v.update({str(k).lower(): str(x) for k, x in json.load(open(yol, encoding="utf-8")).items() if not str(k).startswith("_") and str(x).strip()})
+            except FileNotFoundError: pass
+            except (OSError, ValueError, AttributeError): print(f"PIPER: {os.path.basename(yol)} okunamadı")
+        _UZUN_V.update(t=time.time(), v=v)
+    k = metin.lower().replace("â", "a").replace("î", "i").replace("û", "u")
+    return {a: x for a, x in _UZUN_V["v"].items() if a.replace("â", "a").replace("î", "i").replace("û", "u") in k}
 def piper_ton():  # "piper_ton" (noise_scale, tonlama çeşitliliği) / "piper_ritim" (noise_w, hece süresi çeşitliliği); yoksa modelin kendi değeri
     o = {}
     for k, a in (("ton", "piper_ton"), ("ritim", "piper_ritim")):
@@ -152,7 +165,7 @@ def piper_oku(metin, hiz=1.0, iptal=None, kayit=None):
                 oyn = subprocess.Popen([PIPER_OYNAT, str(PIPER.get("sr") or 22050)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if kayit is not None: kayit["p"] = oyn
             except OSError: oyn = None
-        try: PIPER["p"].stdin.write(json.dumps(dict({"id": kim, "metin": metin, "hiz": hiz, "ara": piper_ara(), "yan": bool(oyn)}, **piper_ton()), ensure_ascii=False) + "\n"); PIPER["p"].stdin.flush()
+        try: PIPER["p"].stdin.write(json.dumps(dict({"id": kim, "metin": metin, "hiz": hiz, "ara": piper_ara(), "yan": bool(oyn)}, **piper_ton(), **({"uzun": u} if (u := piper_uzun(metin)) else {})), ensure_ascii=False) + "\n"); PIPER["p"].stdin.flush()
         except (OSError, AttributeError, ValueError): kapat(False); return False
         while True:
             try: o = q.get(timeout=15)

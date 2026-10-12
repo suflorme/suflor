@@ -18,7 +18,7 @@ def bak(ad, k):
 T = tempfile.mkdtemp(prefix="suflor-piper-")
 # bölümü relay.py'nin ad alanı yerine küçük bir taklitle çalıştır
 AYAR = {"ses_motoru": "piper", "piper_python": PY, "piper_model": MODEL, "uygulama": T}
-ns = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "A": types.SimpleNamespace(port=8790), "_UYG": KOD, "_APP": T, "deneme_aktarici": lambda: True,
+ns = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "A": types.SimpleNamespace(port=8790), "_UYG": KOD, "_APP": T, "__file__": os.path.join(KOD, "relay.py"), "BASE": T, "deneme_aktarici": lambda: True,
       "_ilk": lambda *y: next((x for x in y if os.path.exists(x)), y[-1]), "os": os, "re": re, "json": json, "time": time, "threading": threading, "subprocess": subprocess}
 exec(compile(open(os.path.join(KOD, "aktarici", "piper-ses.py"), encoding="utf-8").read(), "piper-ses.py", "exec"), ns)
 # v0.32.2 okunur metin: sayıya bitişik ek, saat, sıra sayısı, eksi, unvan ve kısaltma yazıya çevrilir (Piper yoluna özgü)
@@ -32,6 +32,23 @@ for g, b in [("Satışlar %12 arttı.", "Satışlar yüzde on iki arttı."), ("T
     v = ns["piper_okunur"](g)
     if v != b: bak(f"okunur {g!r} → {v!r} (beklenen {b!r})", False)
 bak("okunur metin: sayı, saat, sıra, eksi, unvan, kısaltma", not [h for h in HATA if h.startswith("okunur")])
+# v0.32.3 uzun ünlü: kök + ek → [[ IPA ]] (ek Piper'ın çözümlemesinden); benzer başlayan sözcük ve şapkasız "hala" dokunulmaz
+bak("piper_uzun: metinde geçen kökler (cuma, hâlâ yok)", set(ns["piper_uzun"]("Cuma'dan sonra saat üçte.")) == {"cuma", "saat"})
+UZ = r"""
+import json, re, sys
+from piper import PiperVoice
+src = open(sys.argv[1], encoding="utf-8").read(); exec(src[src.index("_EK = "):src.index("def main():")])
+v = PiperVoice.load(sys.argv[2], config_path=sys.argv[2] + ".json"); u = json.load(open(sys.argv[3], encoding="utf-8"))
+print(json.dumps([uzun_uygula(v, t, u) for t in json.loads(sys.argv[4])], ensure_ascii=False))
+"""
+G = ["Teslim cuma günü.", "Cuma'dan sonra", "cumaya kadar", "Cumartesi açık.", "Hala gelmedi.", "Hâlâ gelmedi.", "saat onda", "Mali tablolar"]
+o = subprocess.run([PY, "-I", "-c", UZ, os.path.join(KOD, "piper-isci.py"), MODEL, os.path.join(KOD, "aktarici", "uzun-unlu.json"), json.dumps(G, ensure_ascii=False)], capture_output=True, text=True)
+try: U = json.loads(o.stdout)
+except ValueError: U = []; print(o.stderr[-500:])
+B = ["Teslim [[ dʒumˈaː ]] günü.", "[[ dʒumˈaːdan ]] sonra", "[[ dʒumˈaːja ]] kadar", "Cumartesi açık.", "Hala gelmedi.", "[[ haːlˈaː ]] gelmedi.", "[[ sˈaːt ]] onda", "[[ maːlˈiː ]] tablolar"]
+for g, u, b in zip(G, U or [None] * len(G), B):
+    if u != b: bak(f"uzun ünlü {g!r} → {u!r} (beklenen {b!r})", False)
+bak("uzun ünlü: kök + ek, cumartesi/hala dokunulmaz", len(U) == len(G) and not [h for h in HATA if h.startswith("uzun ünlü")])
 r = None
 try:
     t = time.time(); ok = ns["piper_oku"]("Merhaba, toplantı başladı.")
@@ -66,10 +83,11 @@ try:
     os.environ.pop("SUFLOR_TEST_PIPER_SESSIZ")
     try:
         M2 = "Yarın Tims'te konuşalım; bütçe hazır. Raporu, tabloyu ve özeti cuma gönderirim."
+        AYAR.update(piper_ton=0, piper_ritim=0)  # süreler her üretimde rastgele oynuyor: karşılaştırma için kapalı
         ok = ns["piper_oku"](M2, 1.0); time.sleep(0.3)
         akis = os.path.getsize(cik) / 2 / ns["PIPER"]["sr"] if os.path.exists(cik) else 0
         q2 = ns["queue"].Queue(); ns["PIPER"]["bekleyen"]["t9"] = q2
-        p.stdin.write(json.dumps({"id": "t9", "metin": M2, "hiz": 1.0, "ara": 0}) + "\n"); p.stdin.flush(); ham = 0
+        p.stdin.write(json.dumps({"id": "t9", "metin": M2, "hiz": 1.0, "ara": 0, "ton": 0, "ritim": 0}) + "\n"); p.stdin.flush(); ham = 0
         while True:
             o = q2.get(timeout=20)
             if o.get("bitti"): break
@@ -79,7 +97,8 @@ try:
         bak("okuma bitince çalıcıda dosya kalmaz", not glob.glob(os.path.join(ns["PIPER_GECICI"], "*.wav")))
         AYAR["piper_cumle_ara"] = 0; ok = ns["piper_oku"](M2, 1.0); time.sleep(0.3); AYAR.pop("piper_cumle_ara")
         akis0 = os.path.getsize(cik) / 2 / ns["PIPER"]["sr"]
-        bak(f"piper_cumle_ara 0 → duraklama yok ({akis0:.2f} sn)", abs(akis0 - ham) < 0.4)
+        bak(f"piper_cumle_ara 0 → duraklama yok ({akis0:.2f} sn)", abs(akis0 - ham) < 0.2)
+        AYAR.pop("piper_ton"); AYAR.pop("piper_ritim")
     finally: os.environ["SUFLOR_TEST_PIPER_SESSIZ"] = "1"; ns["PIPER_OYNAT"] = os.path.join(T, "yok")
     # gerçek çalıcı derlenir ve sessizlik çalar (duyulmaz): stdin kapanınca kendisi çıkar
     if shutil.which("swiftc"):
