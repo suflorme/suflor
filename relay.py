@@ -820,7 +820,8 @@ def yerel_ses_durum():
 def yerel_ses_view():
     y = STATE["yerel_ses"]; now = time.time()
     return {"durum": yerel_ses_durum(), "uygulama": y["uygulama"], "surum": y["surum"], "hata": y["hata"], "toplanti": toplanti_var(),
-            "son_sn": round(now - y["son"], 1) if y["son"] else None, "kurulu": os.path.isdir(SES_APP)}
+            "son_sn": round(now - y["son"], 1) if y["son"] else None, "kurulu": os.path.isdir(SES_APP),
+            "kisma": {"ayar": AYAR.get("masaustu_ses_kis") is True, "etkin": bool(y.get("kis_kipi"))}}
 def yerel_ses_al(p):
     y = STATE["yerel_ses"]; now = time.time()
     if p.get("nabiz"):
@@ -832,6 +833,11 @@ def yerel_ses_al(p):
         k_ = int(p.get("kurma") or 0)
         if k_ > y["kurma"]: print(f"YEREL SES: ses yakalama yeniden kuruldu ({str(p.get('kurma_neden') or '?')[:40]}; toplam {k_})")
         y["kurma"] = k_
+        # kısma kipi (v0.31.8): yardımcı toplantı sesini kendi üzerinden çalıyorsa true — ayar açık ama kurulamadıysa (tarayıcı, tap dışında giriş) false
+        kk = bool(p.get("kis_kipi"))
+        if kk != bool(y.get("kis_kipi")) and (kk or AYAR.get("masaustu_ses_kis") is True):
+            print(f"YEREL SES: kısma kipi {'etkin — toplantı sesi yardımcıdan çalıyor' if kk else 'etkin değil'}" + (f" · {y['uygulama']}" if y["uygulama"] else ""))
+        y["kis_kipi"] = kk
         sonra = yerel_ses_durum()
         if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else ""))
         return {"ok": True, "toplanti": toplanti_var(), "tarayici": STATE.get("_tarayici") or "Chrome"}

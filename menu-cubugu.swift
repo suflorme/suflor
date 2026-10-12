@@ -439,7 +439,8 @@ final class Masaustu {
             }
             let degisti = self.son.isEmpty || top != once || (v["sessiz"] as? Bool) != (self.son["sessiz"] as? Bool) || (v["paylasim"] as? Bool) != (self.son["paylasim"] as? Bool)
                 || v["katilimcilar"] != nil || (v["konusan"] as? String) != nil
-            if !v.isEmpty && (degisti || (top && Date().timeIntervalSince(self.sonGonder) > 10)) {
+            // toplantı dışında da 60 sn'de bir: aktarıcı yeniden başlayınca durumu (menü uygulaması bağlı, toplantı yok) değişiklik beklemeden alır
+            if !v.isEmpty && (degisti || Date().timeIntervalSince(self.sonGonder) > (top ? 10 : 60)) {
                 var g = v; if g["sessiz"] is NSNull || (g["sessiz"] as? Bool) == nil { g.removeValue(forKey: "sessiz") }
                 istek("/masaustu", g) { _ in }; self.sonGonder = Date()
             }

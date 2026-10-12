@@ -528,6 +528,10 @@
    "yerel_ses": {
     "durum": "str",
     "hata": "NoneType",
+    "kisma": {
+     "ayar": "bool",
+     "etkin": "bool"
+    },
     "kurulu": "bool",
     "son_sn": "NoneType",
     "surum": "NoneType",

@@ -41,6 +41,10 @@ try:
     nabiz(kurma=1, kurma_neden="ses çıkaran yeni süreç")
     ok("yeniden kurma aktarıcı günlüğünde nedeniyle", "ses yakalama yeniden kuruldu (ses çıkaran yeni süreç; toplam 1)" in log())
     nabiz(kurma=1); ok("aynı sayı tekrar yazılmaz", log().count("ses yakalama yeniden kuruldu") == 1)
+    ks = lambda: json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read())["yerel_ses"].get("kisma") or {}
+    ok("kısma kipi /status'ta (ayar kapalı, etkin değil)", ks() == {"ayar": False, "etkin": False})
+    nabiz(kis_kipi=True); ok("kısma kipi etkin: /status ve günlük", ks().get("etkin") is True and "kısma kipi etkin" in log())
+    nabiz(); ok("kısma kipi bitti: /status", ks().get("etkin") is False)
     ok("deneme aktarıcısı gerçek yardımcıyı başlatmadı", "yardımcı başlatıldı" not in log())
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
