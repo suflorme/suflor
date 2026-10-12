@@ -105,7 +105,7 @@ def claude_json(ham, is_, t0, yalin):
 # Konuşmalar sıraya girer (özet okunurken gelen "yazayım mı?" onu kesmez); brifing ve ses_durdur sırayı boşaltır.
 SES = {"p": None, "q": [], "isci": False}; SES_K = threading.Condition()
 def ses_durdur():
-    with SES_K: SES["q"].clear(); p = SES.get("p")
+    with SES_K: SES["q"].clear(); SES["kes"] = SES.get("kes", 0) + 1; p = SES.get("p")  # kes: Piper'ın kalan cümleleri de çalınmaz
     if p and p.poll() is None: p.terminate(); print("SES: durduruldu"); return True
     return False
 # Ses seçimi (v0.20.2): ayar "ses" yoksa ve Türkçe sistem sesi seçiliyse (Erişilebilirlik → Oku ve Seslendir → Sistem sesi, ör. Siri → Ses 2
@@ -233,6 +233,12 @@ def _ses_isci():
     while True:
         with SES_K:
             while not SES["q"]: SES_K.wait()
+        if piper_acik():  # yerel Türkçe ses (ayar ses_motoru: piper); okunamazsa Mac sesi
+            with SES_K:
+                if not SES["q"]: continue
+                metin = SES["q"].pop(0); kes = SES.get("kes", 0)
+            if piper_oku(metin, piper_hiz(), iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
+            with SES_K: SES["q"].insert(0, metin)
         v = ses_secimi()  # defaults okuması kilidin dışında (60 sn önbellek)
         with SES_K:
             if not SES["q"]: continue
@@ -287,9 +293,11 @@ def fisilti_kart(c):
         if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"FISILTI (deneme): {metin}"); return
         try: subprocess.run(["/usr/bin/afplay", "-v", "0.4", "/System/Library/Sounds/Tink.aiff"], timeout=3)
         except (OSError, subprocess.TimeoutExpired): pass
-        v = ses_secimi(); t_oku = time.time()
-        try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [telaffuz(metin)], timeout=10)
-        except (OSError, subprocess.TimeoutExpired): pass
+        t_oku = time.time()
+        if not piper_oku(telaffuz(metin), piper_hiz(kisa=True)):
+            v = ses_secimi()
+            try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [telaffuz(metin)], timeout=10)
+            except (OSError, subprocess.TimeoutExpired): pass
         kendi_ses_kaydet(metin, t_oku, time.time())
         print(f"FISILTI: {metin}")
     threading.Thread(target=calis, daemon=True).start()

@@ -446,6 +446,11 @@
     "parca": "int",
     "sn": "NoneType"
    },
+   "seslendirme": {
+    "durum": "NoneType",
+    "hata": "NoneType",
+    "motor": "str"
+   },
    "sesli_ceviri": "NoneType",
    "sessiz": "NoneType",
    "son": {

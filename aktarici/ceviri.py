@@ -181,10 +181,11 @@ def _sesli_isci():
         if os.environ.get("SUFLOR_TEST_BASLAT"):
             t_oku = time.time(); print(f"SESLİ ÇEVİRİ (deneme): {kisa}"); time.sleep(float(os.environ.get("SUFLOR_TEST_KIS_SN") or 0))
             SESLI["kis"]["bitis"] = time.time(); kart_bildir(); kendi_ses_kaydet(kisa, t_oku, time.time()); continue
-        v = AYAR.get("ceviri_ses") or (ses_secimi() if ARAYUZ_DILI == "tr" else "Samantha")
         t_oku = time.time()
-        try: subprocess.run(["/usr/bin/say", "-r", "200"] + (["-v", str(v)] if v else []) + [telaffuz(kisa) if ARAYUZ_DILI == "tr" else kisa], timeout=15)
-        except (OSError, subprocess.TimeoutExpired): pass
+        if AYAR.get("ceviri_ses") or not piper_oku(telaffuz(kisa), piper_hiz(kisa=True)):  # ayar ceviri_ses verildiyse Mac sesi
+            v = AYAR.get("ceviri_ses") or (ses_secimi() if ARAYUZ_DILI == "tr" else "Samantha")
+            try: subprocess.run(["/usr/bin/say", "-r", "200"] + (["-v", str(v)] if v else []) + [telaffuz(kisa) if ARAYUZ_DILI == "tr" else kisa], timeout=15)
+            except (OSError, subprocess.TimeoutExpired): pass
         SESLI["kis"]["bitis"] = time.time(); kart_bildir(); kendi_ses_kaydet(kisa, t_oku, time.time())
 def sesli_ceviri_view():
     k = SESLI.get("kis"); kalan = int((k["bitis"] - time.time()) * 1000) if k else 0
