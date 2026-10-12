@@ -59,9 +59,15 @@ def sozluk_uygula(text, dosya):
 # tarafın sözü değişmez. Ham metin .jsonl'de "raw"da kalır. 11 Ekim: "...Cloud kaydı kapat." (üç noktadan sonra boşluksuz, virgülsüz) kaçtı →
 # üç nokta da cümle başı; virgül yoksa ardından bulut anlamlı sözcük gelmemeli ("Cloud hizmeti pahalı" değişmez).
 BULUT = r"hizmet|tabanl|sunucu|depola|bili[sş]im|ortam|altyap|platform|teknoloj|uygulama|sağlay|sistem|taraf|üzerin|maliyet|computing|service|storage|server|based|native|code\b"
-HITAP_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:cloud|klod|klot|klo|clod|claud|klaud|clode)(?:\s*[,:]\s*|\s+(?!(?:" + BULUT + r"))(?=\w))", re.I)
+# 12 Ekim (deneme 7): "Klot. Kaç kart açık?" — Whisper hitaptan sonra nokta koyup cümleyi bölüyor → noktadan sonra büyük harfle süren cümle de
+# hitap. "Suflor" da uyandırma sözü (kullanıcı isteği): aynı kural, "Claude:" olur (toplantı oturumu tek biçim arar). Cümle ortasında yalnız doğru yazılmış
+# "Claude"/"Suflor" ve satır soruyla bitiyorsa: "… yapayım Claude kaç kart açık?" ("Claude mu yazdı?" gibi ek/edat sonrası değişmez).
+HITAP_AD = r"(?:cloud|klod|klot|klo|clod|claud|klaud|clode|claude|suflor|suflör|süflör)"
+HITAP_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)" + HITAP_AD + r"(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])(?!(?:" + BULUT + r"))|\s+(?!(?:" + BULUT + r"))(?=\w))", re.I)
+HITAP_ORTA_RX = re.compile(r"(?<=\w)([,]?\s+)(?:Claude|Suflor)(?:\s*[,:]\s*|\s+(?!(?:mi|mı|mu|mü|ile|ve|için|gibi|de|da|ya|ki)\b)(?=\w))(?=[^.!?…]*\?\s*$)")
 def hitap_duzelt(text):
     out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", text)
+    if out == text: out = HITAP_ORTA_RX.sub(lambda m: ". Claude: ", text, count=1)
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])
 
 def slug(s): s = re.sub(r"[^\w\s-]", "", s, flags=re.U).strip(); s = re.sub(r"\s+", "-", s); return s[:60] or "toplanti"

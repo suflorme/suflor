@@ -418,7 +418,7 @@
     if (queue.length) drainQueue(); // yeni satır gelmese de kuyruğu boşaltmayı dene
     const panel = findTranscriptPanel();
     const caps = !!findCaptions(); captureHint(panel, caps); if (queue.length) saveQueue(); else adoptQueues();
-    const body = { ver: chrome.runtime.getManifest().version, meeting: meetingInfo(), panel: !!panel, rows: panel ? P.dokumSatirSayisi(panel) : 0, platform: P.ad, yonerge: P.yonerge, captions: caps, call: window.top === window ? inCall() : false, lang: capLang, langSrc, capAuto, sent: sentById.size + sentKeys.size, at: new Date().toISOString(), kim, vis: document.visibilityState, ...(window.top === window ? { paylasim: paylasimDurum() } : {}), mic: window.top === window ? { on: mic.on, sessiz: mic.on && teamsSessiz(), hata: mic.hata || "" } : null };
+    const body = { ver: chrome.runtime.getManifest().version, meeting: meetingInfo(), panel: !!panel, rows: panel ? P.dokumSatirSayisi(panel) : 0, platform: P.ad, yonerge: P.yonerge, captions: caps, call: window.top === window ? inCall() : false, lang: capLang, langSrc, capAuto, sent: sentById.size + sentKeys.size, at: new Date().toISOString(), kim, vis: document.visibilityState, ...(window.top === window ? { paylasim: paylasimDurum(), ...(paylas.deger && paylas.neden ? { paylasim_neden: paylas.neden } : {}) } : {}), mic: window.top === window ? { on: mic.on, sessiz: mic.on && teamsSessiz(), hata: mic.hata || "" } : null };
     try { const r = await rf("/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); if (r.ok) { lastOk = Date.now(); failCount = 0; } }
     catch (e) { failCount++; }
     chrome.runtime.sendMessage({ type: "status", ok: failCount === 0, panel: !!panel, call: body.call, meeting: body.meeting.title, at: lastOk, failCount, queued: queue.length }).catch(() => {});
@@ -440,19 +440,21 @@ function paylasimHam() {
   for (const b of document.querySelectorAll("button, [role=button], [role=status], [aria-live]"))
     if (PAYLAS_KENDI.test((b.getAttribute("aria-label") || "") + " " + (b.textContent || "").slice(0, 80)) && gor(b)) return false;
   const p = P.paylasimVar ? P.paylasimVar() : null;
-  if (p === true || p === false) return p;
-  for (const e of document.querySelectorAll("[aria-label]")) if (PAYLAS_ETIKET.test(e.getAttribute("aria-label")) && gor(e)) return true;
+  if (p === true || p === false) { paylas.neden = p ? "platform" : ""; return p; }
+  for (const e of document.querySelectorAll("[aria-label]")) if (PAYLAS_ETIKET.test(e.getAttribute("aria-label")) && gor(e)) { paylas.neden = "etiket " + (e.tagName || "").toLowerCase(); return true; }
   for (const v of document.querySelectorAll("video, canvas")) {
     const gw = v.tagName === "CANVAS" ? v.width : v.videoWidth, gh = v.tagName === "CANVAS" ? v.height : v.videoHeight;
     if (!gw || !gh || gw < 1280) continue;
     const r = v.getBoundingClientRect(), alan = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
     const oran = gw / gh;
-    if (alan >= innerWidth * innerHeight * 0.4 && Math.abs(oran - 16 / 9) > 0.04 && Math.abs(oran - 4 / 3) > 0.03) return true;
+    if (alan >= innerWidth * innerHeight * 0.4 && Math.abs(oran - 16 / 9) > 0.04 && Math.abs(oran - 4 / 3) > 0.03) { paylas.neden = `${v.tagName.toLowerCase()} ${gw}x${gh} %${Math.round(alan * 100 / (innerWidth * innerHeight))}`; return true; }
   }
   return false;
 }
-// iki ardışık nabızda (≥ 10 sn) aynı sonuç gelince değişir: kısa görünüp kaybolan öğe kaydı açıp kapatmasın
-const paylas = { deger: false, aday: false };
+// iki ardışık nabızda (≥ 10 sn) aynı sonuç gelince değişir: kısa görünüp kaybolan öğe kaydı açıp kapatmasın.
+// neden: hangi yol "var" dedi (platform | etiket <öğe> | video/canvas <boyut> %<alan>) — ad/metin yok; aktarıcı günlüğe yazar (deneme 7:
+// paylaşım yokken açıldı, yolu bilinmiyordu)
+const paylas = { deger: false, aday: false, neden: "" };
 function paylasimDurum() {
   let h = false; try { h = (inMeeting() || inCall()) && paylasimHam(); } catch (e) {}
   if (h === paylas.aday) paylas.deger = h; paylas.aday = h; return paylas.deger;

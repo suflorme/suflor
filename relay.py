@@ -429,7 +429,7 @@ def yaparken_acik():
         return True
     if af and af != YAPARKEN["file"]: YAPARKEN["acik"] = False; print("YAPARKEN: yeni toplantı — kapandı"); return False
     return af == YAPARKEN["file"]  # toplantı bitince görünmez
-def yaparken_degistir(durum=None):  # durum: "ac" | "kapat" | None (tersine çevir)
+def yaparken_degistir(durum=None, neden=None):  # durum: "ac" | "kapat" | None (tersine çevir)
     with LOCK:
         ac = (not yaparken_acik()) if durum is None else durum == "ac"
         if ac == yaparken_acik(): return ac
@@ -437,9 +437,11 @@ def yaparken_degistir(durum=None):  # durum: "ac" | "kapat" | None (tersine çev
         YAPARKEN.update(acik=ac, file=aktif_dosya() if ac else YAPARKEN["file"], t=time.time())
         n = sum(1 for k in STATE["kanitlar"].get(YAPARKEN["file"] or "", []) if k.get("kaynak") == "oto")
         _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **SUNULAN EKRAN** | {'paylaşım başladı (ekran değişince görüntü kendiliğinden)' if ac else f'paylaşım bitti ({n} görüntü)'} | |")
-    print(f"EKRAN: paylaşım {'başladı — görüntü kaydı açık' if ac else f'bitti — {n} görüntü'}"); return ac
-def paylasim_bildir(var):  # eklentinin nabzı (kararlı değer): paylaşım başlayınca kayıt açılır, bitince kapanır
-    if var and AYAR.get("ekran_oto", True) is not False and not yaparken_acik(): yaparken_degistir("ac")
+    print(f"EKRAN: paylaşım {'başladı — görüntü kaydı açık' if ac else f'bitti — {n} görüntü'}" + (f" · yol {neden}" if ac and neden else "")); return ac
+def paylasim_bildir(var, neden=None):  # eklentinin nabzı (kararlı değer): paylaşım başlayınca kayıt açılır, bitince kapanır
+    # neden: eklentinin hangi yoldan "var" dediği (yalnız harf/rakam/boşluk/x/%; ad içermez) — paylaşım yokken açılırsa günlükten bulunur
+    neden = re.sub(r"[^\w %x]", "", str(neden or ""))[:40] or None
+    if var and AYAR.get("ekran_oto", True) is not False and not yaparken_acik(): yaparken_degistir("ac", neden)
     elif not var and yaparken_acik(): yaparken_degistir("kapat")
 def yaparken_view():
     if not yaparken_acik(): return None
@@ -1516,7 +1518,7 @@ class H(BaseHTTPRequestHandler):
                     STATE["_tarayici"] = "Edge" if "Edg/" in ua else "Safari" if ("Safari/" in ua and "Chrome/" not in ua) else "Chrome"
                 if isinstance(p.get("mic"), dict): STATE["mic"] = {"on": bool(p["mic"].get("on")), "sessiz": bool(p["mic"].get("sessiz")), "hata": str(p["mic"].get("hata") or "")[:120], "t": simdi}
                 STATE["extension"] = {"ver": p.get("ver") or (STATE.get("extension") or {}).get("ver"), "seen": datetime.datetime.now().isoformat(timespec="seconds"), "panel": bool(p.get("panel")), "rows": p.get("rows", 0), "captions": bool(p.get("captions")), "call": bool(p.get("call")), "lang": p.get("lang") or p.get("capLang"), "langSrc": p.get("langSrc") or ("captions" if p.get("capLang") else None), "meeting": (p.get("meeting") or {}).get("title"), "sent": p.get("sent", 0), "capAuto": p.get("capAuto") or (STATE.get("extension") or {}).get("capAuto", ""), "platform": p.get("platform") or (STATE.get("extension") or {}).get("platform") or "teams", "yonerge": p.get("yonerge") or (STATE.get("extension") or {}).get("yonerge")}; heartbeat()  # altyazıyı kendisi açma sonucu; iframe pingleri (all_frames) boş gönderir, üzerine yazmasın
-            if isinstance(p.get("paylasim"), bool): paylasim_bildir(p["paylasim"])  # yalnız üst çerçeve gönderir
+            if isinstance(p.get("paylasim"), bool): paylasim_bildir(p["paylasim"], p.get("paylasim_neden"))  # yalnız üst çerçeve gönderir
             return self._json({"ok": True})
         if self.path == "/agenda-tick":
             with LOCK:

@@ -7,7 +7,7 @@ KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ns = {"re": re}
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
 sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name == "hitap_duzelt") or
-       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "BULUT"} for x in n.targets))]
+       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT"} for x in n.targets))]
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
     ("Cloud, card, English, yes.", "Claude: card, English, yes.", "9 Ekim: virgüllü"),
@@ -21,6 +21,17 @@ TABLO = [
     ("Bunu cloud kaydı olarak tutalım.", "Bunu cloud kaydı olarak tutalım.", "cümle ortası, virgülsüz"),
     ("Cloud'a taşıdık.", "Cloud'a taşıdık.", "cümle başı, kesmeli"),
     ("Cloud.", "Cloud.", "tek sözcük"),
+    ("Klot. Kaç kart açık?", "Claude: Kaç kart açık?", "12 Ekim: hitaptan sonra nokta"),
+    ("Tamam. Klot. Not al.", "Tamam. Claude: Not al.", "nokta + hitap + nokta"),
+    ("Cloud. Hizmeti pahalı.", "Cloud. Hizmeti pahalı.", "nokta sonrası bulut anlamı"),
+    ("Bunu yapayım. Claude kaç kart açık?", "Bunu yapayım. Claude: kaç kart açık?", "12 Ekim: doğru yazım, cümle başı"),
+    ("Bunu yapayım Claude kaç kart açık?", "Bunu yapayım. Claude: kaç kart açık?", "cümle ortası, soru"),
+    ("Bunu Claude mu yazdı?", "Bunu Claude mu yazdı?", "cümle ortası, soru eki"),
+    ("Bunu Claude ile yazdık.", "Bunu Claude ile yazdık.", "cümle ortası, soru değil"),
+    ("Suflor, kaç kart açık?", "Claude: kaç kart açık?", "Suflor uyandırma sözü"),
+    ("Süflör not al.", "Claude: not al.", "Suflor, Whisper yazımı"),
+    ("Suflor'u kapattım.", "Suflor'u kapattım.", "Suflor ekli, hitap değil"),
+    ("Dün Suflor çok iyiydi.", "Dün Suflor çok iyiydi.", "Suflor cümle ortası, soru değil"),
 ]
 hata = 0
 for girdi, bek, ac in TABLO:
