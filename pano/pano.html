@@ -293,6 +293,8 @@ function durum(s){
     if(!izl)so.push(["wa",L("Claude izlemiyor — kart gelmez"),"",L("Başlat")])}
   else if(s.aktif&&x&&x.age_s>=30&&x.age_s<300)so.push(["wa",L("Toplantı sekmesinden sinyal gelmiyor"),L("sekmeyi yenile")])
   if(s.bellek&&s.bellek.uyari)so.push(["wa",s.bellek.uyari,""])
+  // masaüstü toplantıda mikrofon hoparlörle kullanılıyor: karşı ses mikrofona girer (yankı ayırıcı süzer ama kaçan olur)
+  const mm=s.masaustu_mic;if(mm&&mm.akiyor&&mm.kulaklik===false)so.push(["wa",L("Kulaklık önerilir"),L("hoparlörden çıkan ses mikrofonuna giriyor; karşı tarafın sözü senin adınla yazılabilir")])
   const ilk=so.find(([c])=>c==="er")||so[0]
   if(ilk)return{c:ilk[0],m:ilk[1],a:ilk[2],e:ilk[3]||"",hep:so.map(([,m,a])=>m+(a?" — "+a:"")).join("\n")}
   return cagri?{c:"ok",m:izl?L("Dinliyorum"):L("Toplantıdasın")}:{c:"nt",m:izl?L("Claude hazır — toplantı bekleniyor"):L("Hazır — toplantı bekleniyor")}

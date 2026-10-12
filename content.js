@@ -665,8 +665,20 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       }, 3000);
       else if (!acik && otoZaman) { clearInterval(otoZaman); otoZaman = null; }
     }
+    // sesli çeviri okunurken toplantı sesi kısılır (v0.29.3): sayfadaki ses/video öğeleri %30'a, okuma bitince (ya da süre dolunca) eski düzeye.
+    // Teams sesi Web Audio ile çalıyorsa öğe sesi etkisizdir — gerçek toplantıda doğrulanmadı.
+    let kisSon = null, kisZaman = null;
+    function kisAyarla(k) {
+      if (window.top !== window) return;
+      const geri = () => { for (const e of document.querySelectorAll("audio, video")) if (e.dataset.sfSes) { e.volume = +e.dataset.sfSes; delete e.dataset.sfSes; } clearTimeout(kisZaman); kisZaman = null; kisSon = null; };
+      if (!k) { if (kisSon) geri(); return; }
+      if (k.id === kisSon) return;
+      kisSon = k.id;
+      for (const e of document.querySelectorAll("audio, video")) { if (!e.dataset.sfSes) e.dataset.sfSes = String(e.volume); e.volume = Math.min(e.volume, +e.dataset.sfSes * 0.3); }
+      clearTimeout(kisZaman); kisZaman = setTimeout(geri, Math.min(15000, k.kalan_ms + 300));
+    }
     function paint(v) {
-      sonV = v; otoAyarla(!!v.yaparken);
+      sonV = v; otoAyarla(!!v.yaparken); kisAyarla((v.sesli_ceviri || {}).kis);
       // panodan/mini panodan kanıt istendi — toplantıdaki sekme çeker (çift isteği aktarıcı ayıklar). Arkadaysa da ister;
       // arka plan sekmeyi bir an öne getirip çeker (2 Ekim: pano aynı penceredeyken kanıt düşüyordu)
       if (v.kanit_iste && v.kanit_iste.id !== kanitSon) { kanitSon = v.kanit_iste.id; if (window.top === window && (inMeeting() || inCall())) chrome.runtime.sendMessage({ type: "kanit", kaynak: v.kanit_iste.kaynak || "pano", istek: v.kanit_iste.id, not: v.kanit_iste.not }).catch(() => {}); }

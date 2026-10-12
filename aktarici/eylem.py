@@ -114,7 +114,7 @@ def serit_imza(v):
     x = [[(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
          (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"),
          [(x["id"], x["durum"], x.get("sunuldu")) for x in ((v.get("eylem") or {}).get("liste") or [])],
-         (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
+         (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), ((v.get("sesli_ceviri") or {}).get("kis") or {}).get("id"), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
     return hashlib.sha1(json.dumps(x, default=str, sort_keys=True).encode()).hexdigest()[:16]
 def cards_bekle(imza, sn):
     son = time.time() + max(0, min(sn, 25))

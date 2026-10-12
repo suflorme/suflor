@@ -847,7 +847,8 @@ def menu_baslat():
     if AYAR.get("menu_cubugu") is not True or os.environ.get("SUFLOR_TEST_BASLAT") or not os.path.isdir(MENU_APP): return
     try:
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
-        subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else []), capture_output=True, timeout=20)
+        subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
+                       + (["--masaustu-mic-kapali"] if AYAR.get("masaustu_mic") is False else []), capture_output=True, timeout=20)
         print("MENÜ: menü çubuğu uygulaması başlatıldı")
     except Exception as e: print(f"MENÜ: başlatılamadı ({e.__class__.__name__})")
 
@@ -878,6 +879,34 @@ def masaustu_baslik():  # eklenti toplantıda değilken masaüstü toplantısın
     if x.get("call") and _yas_sn(x) < 30: return None
     b = re.sub(r"\s*[|–-]\s*(Microsoft Teams|Zoom.*)$", "", m.get("baslik") or "").strip()
     return b if b and not re.fullmatch(r"(Microsoft Teams|Zoom( Meeting| Toplantısı)?|Toplantı|Meeting)", b, re.I) else f"{m.get('uygulama') or 'Masaüstü'} toplantısı"
+
+# Masaüstü toplantıda kullanıcının mikrofonu (v0.30.0, onaylı plan 12 Ekim): menü uygulaması toplantıda mikrofonu açar, 1 sn parçaları
+# 1 sn bekletip (arada sessize alınırsa atar) POST /ses-masaustu ile gönderir {t, pcm, aygit} ya da {olay: acildi|kapandi|izin, aygit}.
+# Yalnız masaüstü toplantı sürerken ve mikrofon sessizde değilken "ben" kanalına girer (web davranışı: sessizde hiçbir şey yazılmaz); tarayıcıda
+# toplantı varsa ya da eklenti son 3 sn'de "ben" parçası verdiyse atılır (çift satır olmasın). Hoparlörle kullanımda (kulaklık yok) panoda uyarı;
+# yankıyı metin ayırıcı (_yanki_mi) süzer — gerçek yankı giderme yalnız yankı sayısı yüksek çıkarsa (Aşama 2).
+STATE["masaustu_mic"] = {"acik": False, "aygit": None, "son": 0, "parca": 0, "atilan": 0, "kulaklik": None, "t_kulaklik": 0}
+def masaustu_mic_al(p):
+    mm = STATE["masaustu_mic"]; now = time.time(); ayg = " ".join(str(p.get("aygit") or "").split())[:60] or None
+    if p.get("olay") in ("acildi", "kapandi", "izin"):
+        if p["olay"] == "acildi": mm.update(acik=True, aygit=ayg); print(f"MASAÜSTÜ MİKROFON: açıldı · {ayg or '?'}")
+        elif p["olay"] == "kapandi": mm["acik"] = False; print(f"MASAÜSTÜ MİKROFON: kapandı · parça {mm['parca']}, atılan {mm['atilan']}")
+        else: print("MASAÜSTÜ MİKROFON: izin yok (Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü)")
+        return {"ok": True}
+    m = STATE.get("masaustu") or {}
+    if not masaustu_baslik() or m.get("sessiz") is True: mm["atilan"] += 1; return {"ok": True, "bekle": True}
+    if ayg and ayg != mm["aygit"]: mm["aygit"] = ayg; print(f"MASAÜSTÜ MİKROFON: aygıt {ayg}")
+    r = ses_al(dict(p, kanal="ben", kaynak="masaustu", meeting={"title": masaustu_baslik()}))
+    if r.get("eklenti"): mm["atilan"] += 1
+    elif r.get("ok"): mm["parca"] += 1; mm["son"] = now
+    return r
+def masaustu_mic_view():
+    mm = STATE["masaustu_mic"]; now = time.time(); akiyor = now - mm["son"] < 5
+    if akiyor and now - mm["t_kulaklik"] > 10:  # varsayılan çıkış aygıtı (fısıltıyla aynı yol); 10 sn'de bir
+        try: mm["kulaklik"] = kulaklik()
+        except Exception: mm["kulaklik"] = None
+        mm["t_kulaklik"] = now
+    return {"akiyor": akiyor, "aygit": mm["aygit"], "parca": mm["parca"], "atilan": mm["atilan"], "kulaklik": mm["kulaklik"] if akiyor else None}
 
 # Toplantı bitişi (v0.27.2): aktarıcı kendisi algılar, /status "toplanti_bitti" {file, t, neden}; izle "TOPLANTI BİTTİ" olayını bir kez verir.
 # 11 Ekim denemesi: eklenti sinyali 17:27'de koptu, kullanıcı 17:29'da ayrıldı, bitiş Claude'a ulaşmadı. Kural: toplantı sinyali (eklenti
@@ -1285,7 +1314,7 @@ class H(BaseHTTPRequestHandler):
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
             s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli()); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
-            s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
+            s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
             if s.get("extension"):
                 s["extension"] = dict(s["extension"])
@@ -1333,7 +1362,7 @@ class H(BaseHTTPRequestHandler):
         # gövde sınırı — ses parçası ve kanıt PNG'si büyük, diğerleri küçük; bozuk JSON 400 (hata paketi değil)
         try: n = int(self.headers.get("Content-Length", 0))
         except ValueError: n = -1
-        if not 0 <= n <= (40 << 20 if self.path in ("/ses", "/kanit", "/baglam-dosya", "/bas-konus") else 2 << 20): return self._json({"ok": False, "err": "boyut"}, 413)
+        if not 0 <= n <= (40 << 20 if self.path in ("/ses", "/ses-masaustu", "/kanit", "/baglam-dosya", "/bas-konus") else 2 << 20): return self._json({"ok": False, "err": "boyut"}, 413)
         try: p = json.loads(self.rfile.read(n) or b"{}")
         except ValueError: return self._json({"ok": False, "err": "json"}, 400)
         if not isinstance(p, dict): return self._json({"ok": False, "err": "json"}, 400)
@@ -1430,6 +1459,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/olay":  # eklentiden tanı satırı (kanıt hatası, Whisper kanalı açıldı/kapandı) → günlük
             print(f"EKLENTİ: {str(p.get('tur') or '?')[:40]} · {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})
         if self.path == "/masaustu": return self._json(masaustu_al(p))  # menü çubuğu uygulaması (anahtarla)
+        if self.path == "/ses-masaustu": return self._json(masaustu_mic_al(p))  # menü uygulamasının mikrofonu (anahtarla; geçiş listesinde yok)
         if self.path == "/agenda-aktif":  # izle konuşulan gündem maddesini tahmin eder; pano ▶ gösterir (yalnız görünüm)
             i = p.get("i"); STATE["agenda_aktif"] = int(i) if isinstance(i, int) else None; return self._json({"ok": True})
         if self.path == "/ping":

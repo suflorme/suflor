@@ -275,7 +275,7 @@ def zaman(t):  # "…Z" (eklenti, UTC) ya da saat dilimsiz yerel (aktarıcı) �
     return d if d.tzinfo else d.astimezone()
 
 def olcum():
-    jls = sorted((f for f in os.listdir(A.dir) if f.endswith(".jsonl") and f[:2] == "20"), key=lambda f: os.path.getmtime(os.path.join(A.dir, f)))
+    jls = sorted((f for f in os.listdir(A.dir) if f.endswith(".jsonl") and f[:2] == "20" and f.count(".") == 1), key=lambda f: os.path.getmtime(os.path.join(A.dir, f)))  # yan dosya (.ceviri.jsonl) değil
     f = (A.dosya.replace(".md", ".jsonl") if A.dosya else (jls[-1] if jls else None))
     if not f: sys.exit("toplantı dosyası yok")
     rows = [json.loads(l) for l in open(os.path.join(A.dir, f), encoding="utf-8") if l.strip()]
@@ -1057,7 +1057,7 @@ def toplanti_dosyasi(ad=None):
         # "toplantı" açtı; rapor onu seçip boş çıktı. Dökümü (.jsonl) olmayan dosya seçilmez, en son dökümlü toplantıya düşülür.
         if f and os.path.exists(os.path.join(A.dir, f.replace(".md", ".jsonl"))): return f
     except Exception: pass
-    jls = sorted((f for f in os.listdir(A.dir) if f.endswith(".jsonl") and f[:2] == "20"), key=lambda f: os.path.getmtime(os.path.join(A.dir, f)))
+    jls = sorted((f for f in os.listdir(A.dir) if f.endswith(".jsonl") and f[:2] == "20" and f.count(".") == 1), key=lambda f: os.path.getmtime(os.path.join(A.dir, f)))  # yan dosya (.ceviri.jsonl) değil
     return jls[-1].replace(".jsonl", ".md") if jls else None
 def kayitlar(md, ham=False):
     try: rs = [json.loads(l) for l in open(os.path.join(A.dir, md.replace(".md", ".jsonl")), encoding="utf-8") if l.strip()]

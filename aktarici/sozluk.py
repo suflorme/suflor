@@ -122,7 +122,9 @@ def restore_state():
     # aynı adlı yeni bir toplantı, eski (belki dünkü) dosyaya karışır (29 Eylül gerçek testinde yaşandı).
     try:
         today = datetime.date.today().strftime("%Y-%m-%d")
-        cands = sorted(glob.glob(os.path.join(BASE, f"{today}-*.jsonl")), key=os.path.getmtime)
+        # yalnız toplantı dökümü (tek noktalı ad): yan dosyalar (.ceviri.jsonl …) seçilirse süren toplantıya bağlanılamıyor, toplantı yeni dosyaya
+        # bölünüyordu (12 Ekim deneme 6: üç dosya)
+        cands = sorted((f for f in glob.glob(os.path.join(BASE, f"{today}-*.jsonl")) if os.path.basename(f).count(".") == 1), key=os.path.getmtime)
         if not cands: return
         jl = cands[-1]; base = jl[:-6]; md = base + ".md"
         age_min = (datetime.datetime.now().timestamp() - os.path.getmtime(jl)) / 60

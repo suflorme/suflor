@@ -132,7 +132,7 @@ def _ceviri_isci(y):
 # açıkken yazılı çeviri de çalışır. Okunan: Claude'un verdiği kısa öz (en çok 8 sözcük; tam çeviri panoda). Kural: kullanıcı konuşuyorsa en çok
 # 3 sn beklenir; konuşmanın 12 sn'den eski özü okunmaz; sırada en çok 2 öz (fazlası eskiden atılır) — okuma konuşmadan geride kalmasın.
 # Ses: Türkçede sistem sesi (Elif; ayar ceviri_ses), İngilizcede Samantha; yerel macOS sesi, ses Mac'ten çıkmaz. Yeni toplantıda kapanır.
-SESLI = {"acik": False, "file": None, "q": [], "okunan": 0, "atlanan": 0, "uyari": None}; SESLI_K = threading.Condition()
+SESLI = {"acik": False, "file": None, "q": [], "okunan": 0, "atlanan": 0, "uyari": None, "neden": {}}; SESLI_K = threading.Condition()
 SESLI_ESKI_SN, SESLI_SIRA, SESLI_BEKLE_SN = 12.0, 2, 3.0
 def sesli_ceviri_acik():
     if not SESLI["acik"]: return False
@@ -140,9 +140,11 @@ def sesli_ceviri_acik():
     if af and SESLI["file"] and af != SESLI["file"]: SESLI.update(acik=False, q=[]); print("SESLİ ÇEVİRİ: yeni toplantı — kapandı"); return False
     return True
 def sesli_ceviri_degistir():  # → (açık mı, uyarı)
-    if SESLI["acik"]: SESLI.update(acik=False, q=[]); print("SESLİ ÇEVİRİ: kapandı"); return False, None
+    if SESLI["acik"]:
+        print(f"SESLİ ÇEVİRİ: kapandı · okunan {SESLI['okunan']}, atlanan {SESLI['atlanan']} {SESLI['neden'] or ''}")
+        SESLI.update(acik=False, q=[]); return False, None
     if not kulaklik(): print("SESLİ ÇEVİRİ: kulaklık yok, açılmadı"); return False, "kulaklik"
-    SESLI.update(acik=True, file=aktif_dosya(), uyari=None); print("SESLİ ÇEVİRİ: açıldı")
+    SESLI.update(acik=True, file=aktif_dosya(), uyari=None, okunan=0, atlanan=0, neden={}); print("SESLİ ÇEVİRİ: açıldı")
     with SESLI_K:
         if not SESLI.get("isci"): SESLI["isci"] = True; threading.Thread(target=_sesli_isci, daemon=True).start()
     ceviri_isinsin(); return True, None
@@ -150,8 +152,15 @@ def sesli_ceviri_ekle(lid, kisa, t):
     if not sesli_ceviri_acik() or not kisa: return
     with SESLI_K:
         SESLI["q"].append((lid, " ".join(str(kisa).split()), t))
-        while len(SESLI["q"]) > SESLI_SIRA: SESLI["q"].pop(0); SESLI["atlanan"] += 1
+        while len(SESLI["q"]) > SESLI_SIRA: SESLI["q"].pop(0); _sesli_atla("sira")
         SESLI_K.notify()
+def _sesli_atla(neden):
+    SESLI["atlanan"] += 1; SESLI["neden"][neden] = SESLI["neden"].get(neden, 0) + 1
+def _sen_konusuyorsun():
+    # kullanıcı konuşuyor mu — karşı taraf da o an konuşuyorsa mikrofondaki ses büyük olasılıkla kulaklıktan/hoparlörden sızıntıdır (12 Ekim
+    # İngilizce YouTube denemesi: kablolu kulaklıkta 22 özün 22'si "kullanıcı konuşuyor" diye atlandı), okumayı engellemez
+    k = KANALLAR.get("karsi"); karsi = bool(k and k.konusuyor and time.time() - k.son_bitis < 2)
+    return _kullanici_konusuyor() and not karsi
 def _sesli_isci():
     while True:
         with SESLI_K:
@@ -159,18 +168,26 @@ def _sesli_isci():
             lid, kisa, t = SESLI["q"].pop(0)
         if not sesli_ceviri_acik(): continue
         son = time.time() + SESLI_BEKLE_SN
-        while _kullanici_konusuyor() and time.time() < son: time.sleep(0.2)
-        if _kullanici_konusuyor() or time.time() - t > SESLI_ESKI_SN: SESLI["atlanan"] += 1; continue
+        while _sen_konusuyorsun() and time.time() < son: time.sleep(0.2)
+        if _sen_konusuyorsun(): _sesli_atla("konusuyorsun"); continue
+        if time.time() - t > SESLI_ESKI_SN: _sesli_atla("eski"); continue
         if not kulaklik():
             if SESLI["uyari"] != "kulaklik": print("SESLİ ÇEVİRİ: kulaklık çıkarıldı, okunmuyor")
-            SESLI["uyari"] = "kulaklik"; SESLI["atlanan"] += 1; continue
+            SESLI["uyari"] = "kulaklik"; _sesli_atla("kulaklik"); continue
         SESLI["uyari"] = None; SESLI["okunan"] += 1
-        if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SESLİ ÇEVİRİ (deneme): {kisa}"); continue
+        # toplantı sesi kısılır (v0.29.3, kullanıcı isteği): okuma süresince eklenti Teams sekmesindeki ses/video öğelerini %30'a indirir, bitince geri açar
+        # (simultane çevirmen gibi: orijinal arka planda). Süre tahmini ~200 sözcük/dk; okuma bitince hemen geri.
+        SESLI["kis"] = {"id": secrets.token_hex(3), "bitis": time.time() + 1.0 + len(kisa.split()) * 0.35}; kart_bildir()
+        if os.environ.get("SUFLOR_TEST_BASLAT"):
+            print(f"SESLİ ÇEVİRİ (deneme): {kisa}"); time.sleep(float(os.environ.get("SUFLOR_TEST_KIS_SN") or 0)); SESLI["kis"]["bitis"] = time.time(); kart_bildir(); continue
         v = AYAR.get("ceviri_ses") or (ses_secimi() if ARAYUZ_DILI == "tr" else "Samantha")
         try: subprocess.run(["/usr/bin/say", "-r", "200"] + (["-v", str(v)] if v else []) + [telaffuz(kisa) if ARAYUZ_DILI == "tr" else kisa], timeout=15)
         except (OSError, subprocess.TimeoutExpired): pass
+        SESLI["kis"]["bitis"] = time.time(); kart_bildir()
 def sesli_ceviri_view():
-    return {"acik": True, "okunan": SESLI["okunan"], "atlanan": SESLI["atlanan"], "uyari": SESLI["uyari"]} if sesli_ceviri_acik() else None
+    k = SESLI.get("kis"); kalan = int((k["bitis"] - time.time()) * 1000) if k else 0
+    return {"acik": True, "okunan": SESLI["okunan"], "atlanan": SESLI["atlanan"], "neden": SESLI["neden"], "uyari": SESLI["uyari"],
+            **({"kis": {"id": k["id"], "kalan_ms": kalan}} if k and kalan > 0 and AYAR.get("ceviri_kis", True) is not False else {})} if sesli_ceviri_acik() else None
 def ceviri_view():
     g = sorted(_CV["gec"])
     return {"acik": ceviri_acik(), "n": _CV["n"], "surec": sum(1 for y in _CV["yuva"] if y["p"] and y["p"].poll() is None), "gecikme_ortanca": g[len(g) // 2] if g else None, "hata": _CV["hata"]}

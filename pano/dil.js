@@ -37,6 +37,8 @@ globalThis.SUFLOR_EN = {
   "{n} dk": "{n} min",
   "Döküm dili yanlış": "Transcript language is wrong",
   "Satır gelmiyor": "No lines coming in",
+  "Kulaklık önerilir": "Headphones recommended",
+  "hoparlörden çıkan ses mikrofonuna giriyor; karşı tarafın sözü senin adınla yazılabilir": "speaker sound reaches your microphone; the other side's words may be written under your name",
   "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses": "System Settings → Privacy & Security → Screen & System Audio Recording → Suflor Ses",
   "Senin sesin yazılmıyor": "Your voice isn't being transcribed",
   "mikrofon açılamadı — toplantı sekmesini yenile": "couldn't open the microphone — reload the meeting tab",

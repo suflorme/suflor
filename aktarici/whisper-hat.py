@@ -96,6 +96,9 @@ def ses_al(p):
     # yerel ses yardımcısı karşı sesi veriyorsa eklentinin (popup, sekme sesi) karşı parçaları atılır — çift satır olmasın
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
     except Exception: return {"ok": False, "err": "pcm"}
+    if kanal == "ben":  # masaüstü mikrofonu (v0.30.0): eklenti son 3 sn'de "ben" verdiyse menü uygulamasının parçası atılır — çift satır olmasın
+        if p.get("kaynak") != "masaustu": STATE["_ben_eklenti"] = time.time()
+        elif time.time() - (STATE.get("_ben_eklenti") or 0) < 3: return {"ok": True, "eklenti": True}
     if kanal == "karsi" and p.get("kaynak") != "yerel":
         if pcm and max(abs(min(memoryview(pcm[:len(pcm) // 2 * 2]).cast("h"), default=0)), max(memoryview(pcm[:len(pcm) // 2 * 2]).cast("h"), default=0)) > 500:
             STATE["yerel_ses"]["eklenti_karsi_ses"] = time.time()  # "izin" kuralının kanıtı

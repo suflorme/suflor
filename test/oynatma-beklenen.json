@@ -215,16 +215,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 108446,
-   "sha": "0a764037aec17e2f"
+   "uzunluk": 109000,
+   "sha": "742c3fac44707fc1"
   },
   "/hazirlik": {
-   "uzunluk": 31264,
-   "sha": "14bb477644eb0a60"
+   "uzunluk": 31501,
+   "sha": "f423557be133c930"
   },
   "/mini": {
-   "uzunluk": 108446,
-   "sha": "0a764037aec17e2f"
+   "uzunluk": 109000,
+   "sha": "742c3fac44707fc1"
   },
   "/status": {
    "_ping_son": "float",
@@ -399,6 +399,13 @@
    },
    "last": "str",
    "lines": "int",
+   "masaustu_mic": {
+    "akiyor": "bool",
+    "atilan": "int",
+    "aygit": "NoneType",
+    "kulaklik": "NoneType",
+    "parca": "int"
+   },
    "meeting": "str",
    "meeting_files": {
     "Deneme toplantısı — altyapı": "str"
