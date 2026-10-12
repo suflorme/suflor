@@ -142,7 +142,8 @@ def add_card(p):
     if p.get("durum"): c["durum"] = " ".join(str(p["durum"]).split())[:160]  # kartın altındaki tek satır (Ne diyeyim?: şu an ne konuşuluyor)
     if p.get("fisilti"): c["fisilti"] = " ".join(str(p["fisilti"]).split()[:4])[:60]  # kulaklıkta okunacak ≤ 4 sözcük (ayar fisilti)
     if p.get("sessiz_ozet") and SESSIZ["id"]: c["sessiz_ozet"] = SESSIZ["id"]  # sessizin özeti: bekleyenleri kapatır, kendisi beklemez
-    elif sessiz_acik() and kind != "dur" and not c.get("reply_to"): c["sessiz"] = SESSIZ["id"]
+    # sessizde DUR ve her CEVAP geçer: soruya bağlı (--cevap q…) olmayan cevap da (12 Ekim deneme 7: ❓ satırına verilen cevap bekletildi)
+    elif sessiz_acik() and kind not in ("dur", "cevap") and not c.get("reply_to"): c["sessiz"] = SESSIZ["id"]
     with LOCK:
         c["file"] = aktif_dosya(); CARDS.append(c); _log("kartlar.jsonl", c)
         _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {'NE DİYEYİM' if c.get('replik') else CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')}{(' — ' + c['durum'].replace('|', '¦')) if c.get('durum') else ''} |{' 🔇 bekliyor ' if c.get('sessiz') else ' '}|", c, "kartlar.jsonl")

@@ -306,7 +306,7 @@ def load_cards():
                     if "file" in r: byid[r["id"]]["file"] = r["file"]  # bekleyen kaydın sonradan işlenen dosyası
         except FileNotFoundError: pass
 # --- Sessiz mod ve kart erteleme (Faz 3) ------------------------------------------------------------------------
-# Sessiz (Option + Shift + M ya da 🔇; tekrar basınca kapanır): SESSIZ_DK boyunca DUR ve sorulara CEVAP dışındaki kartlar görünmez,
+# Sessiz (Option + Shift + M ya da 🔇; tekrar basınca kapanır): SESSIZ_DK boyunca DUR ve CEVAP dışındaki kartlar görünmez,
 # kayıtta "sessiz" işaretiyle bekler. Bitince Claude tek özet kartı yazar (kart … --sessiz-ozet) ve bekleyenler "ozetlendi" ile
 # kapanır; özet SESSIZ_OZET_SN içinde gelmezse bekleyenler tek tek görünür (kart kaybolmaz). Durum bellekte: aktarıcı yeniden
 # başlarsa bekleyen kartlar hemen görünür.

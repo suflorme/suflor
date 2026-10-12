@@ -114,7 +114,7 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
 - `YANKI: …`: karşı tarafın sesi kullanıcının mikrofonuna giriyor → tek `dur` "Hoparlör sesi mikrofona giriyor — kulaklık tak ya
   da sesi kıs".
 - `ROL`, `DOSYA`, `KART ✓/👁/✕/⏸/↩`: bilgi; dönüş anlamları §2. `KART ↩ geri geldi`: konu artık kapandıysa yeni kart yazma.
-- `SESSİZ: …` (Option + Shift + M ya da 🔇; 10 dk ya da kullanıcı yeniden basana kadar): yalnız `dur` ve SORU/NE DİYEYİM'e
+- `SESSİZ: …` (Option + Shift + M ya da 🔇; 10 dk ya da kullanıcı yeniden basana kadar): yalnız `dur` ve sorulara (SORU, NE DİYEYİM, ❓ satırı)
   `cevap`; başka kart gönderme, söyleyeceklerini biriktir (gönderirsen aktarıcı bekletir). Sohbete de yazma.
 - `SESSİZ BİTTİ: n kart bekliyor …`: 60 sn içinde TEK kart, `--sessiz-ozet` ile: "Sessizdeyken: …" (bekleyenler + biriktirdiklerin,
   yalnız hâlâ geçerli olanlar, en çok 3 madde; yapılacak varsa `soyle`, yoksa `not`). Bekleyen kartları bu kart kapatır; gelmezse

@@ -62,6 +62,8 @@ try:
     g = gorunen()
     kontrol("sessizde SÖYLE ve NOT görünmüyor", soyle not in g and not_ not in g)
     kontrol("sessizde DUR ve soruya CEVAP görünüyor", dur in g and cevap in g)
+    cevap2 = kart("cevap", "Evet, perşembe uygun")  # ❓ satırına cevap: soru kimliği yok, yine geçer
+    kontrol("sessizde soru kimliksiz CEVAP da görünüyor", cevap2 in gorunen())
     kontrol("bekleyen sayısı 2", len((istek("/cards").get("sessiz") or {}).get("tutulan") or []) == 2)
     y = istek("/komut", {"tur": "sessiz"})
     kontrol("ikinci basış sessizi kapattı", y.get("ok") and not (y.get("sessiz") or {}).get("acik") and "kapandı" in y.get("metin", ""))
