@@ -273,6 +273,7 @@
     ],
     "uyari": "str"
    },
+   "bildirim": "NoneType",
    "brifing": {},
    "cards": [
     {
@@ -552,6 +553,7 @@
      "tur": "str"
     }
    ],
+   "bildirim": "NoneType",
    "cards": [
     {
      "at": "str",

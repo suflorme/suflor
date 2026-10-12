@@ -1084,8 +1084,13 @@ def son_yukle():
     if SON and SON[-1].get("dosya"):  # yeniden başlatmada biten toplantı yeniden "süren" görünmesin
         try: STATE["bitti"] = {"file": SON[-1]["dosya"], "t": SON[-1].get("t") or datetime.datetime.fromisoformat(SON[-1]["at"]).timestamp() + 1}
         except (KeyError, ValueError): pass
-def bildirim(baslik, alt, metin):
+def bildirim(baslik, alt, metin, son=None):
+    # menü uygulaması açıksa bildirimi o gösterir (v0.31.3): tıklayınca özet açılır (son: SON kaydının kimliği) ya da pano. osascript'in
+    # bildirimine tıklayınca Betik Düzenleyici boş açılıyordu (12 Ekim). Menü uygulaması yoksa (beta) eski yol.
     if AYAR.get("bildirim") is False: return
+    if time.time() - (STATE.get("_menu_son") or 0) < 90:
+        STATE["bildirim"] = {"id": "b" + str(int(time.time() * 1000)), "t": time.time(), "baslik": baslik, "alt": alt, "metin": metin, **({"son": son} if son else {})}
+        kart_bildir(); print(f"BİLDİRİM (menü): {alt}"); return
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"BİLDİRİM (deneme): {alt}"); return
     subprocess.Popen(["osascript", "-e", "on run a", "-e", "display notification (item 3 of a) with title (item 1 of a) subtitle (item 2 of a)", "-e", "end run",
                       baslik, alt, metin], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -1114,7 +1119,7 @@ def son_ekle(p):
         if r["dosya"]: STATE["bitti"] = {"file": r["dosya"], "t": r["t"]}
     print(f"ÖZET: hazır" + (f" · not {r['puan']}/5" if r["puan"] else ""))
     bildirim("Suflor.me", _t("Toplantı özeti hazır", "Meeting summary ready"),
-             (r["baslik"] or os.path.basename(ozet)) + (f" · {_t('not', 'score')} {r['puan']}/5" if r["puan"] else ""))
+             (r["baslik"] or os.path.basename(ozet)) + (f" · {_t('not', 'score')} {r['puan']}/5" if r["puan"] else ""), son=r["id"])
     ozet_sesli(r)
     return {"ok": True, "id": r["id"]}
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
@@ -1366,6 +1371,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(dict(takvim_view("tam=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
+        if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
         if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); return self._json(v)
         if self.path.startswith("/cards?"):  # uzun yoklama
             from urllib.parse import urlsplit, parse_qs

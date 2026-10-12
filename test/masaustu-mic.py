@@ -81,6 +81,15 @@ try:
     md = glob.glob(os.path.join(canli, "*-Deneme*.md"))
     bak("uzun aradan sonra yeni toplantı: yeni döküm dosyası", "yeni döküm dosyası" in open(os.path.join(T, "relay.log"), encoding="utf-8").read() and len(md) == 2)
     log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
+    # --- v0.31.3: bildirim menü uygulamasından (tıklayınca özet açılır) ---
+    def menu_cards():
+        q = urllib.request.Request(URL + "/cards", headers={"X-Suflor-Anahtar": anahtar(), "X-Suflor-Istemci": "menu"})
+        return json.load(urllib.request.urlopen(q, timeout=5))
+    menu_cards()
+    oz = os.path.join(T, "ozet-deneme.md"); open(oz, "w", encoding="utf-8").write("# Özet\n")
+    v = istek("/son-toplanti", {"ozet": oz, "baslik": "Deneme", "puan": "4", "metin": "# Özet\n"})
+    b = menu_cards().get("bildirim") or {}
+    bak("menü uygulaması yokluyorsa bildirim ona gider (özet kimliğiyle)", b.get("son") == v.get("id") and "özeti hazır" in str(b.get("alt")))
     log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
     bak("konuşan kişi ve katılımcı günlükte", "katılımcılar 2 kişi" in log)
     bak("günlükte açıldı/kapandı satırları", "MASAÜSTÜ MİKROFON: açıldı · MacBook Pro Mikrofonu" in log and "MASAÜSTÜ MİKROFON: kapandı" in log)

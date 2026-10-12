@@ -95,9 +95,10 @@ def cards_view():
     for c in cs:
         if c.get("kind") == "duygu" and c.get("kim"): tone_kisi[c["kim"]] = {"ton": c["ton"], "at": c["at"]}
     ki = STATE["kanit_iste"]; ki = ki if ki and time.time() - ki["t"] < 20 else None
+    bi = STATE.get("bildirim"); bi = bi if bi and time.time() - bi["t"] < 120 else None  # menü uygulamasının göstereceği bildirim
     return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered][-5:],
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
-            "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
+            "bildirim": bi, "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
             "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
             "baglam": baglam_view(), "yaparken": yaparken_view(), "sesli_ceviri": sesli_ceviri_view(),
             "son": {k: v for k, v in (STATE.get("son_satir") or {}).items() if k != "file"} if (STATE.get("son_satir") or {}).get("file") == af and af else None}
@@ -114,7 +115,7 @@ def serit_imza(v):
     x = [[(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
          (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"),
          [(x["id"], x["durum"], x.get("sunuldu")) for x in ((v.get("eylem") or {}).get("liste") or [])],
-         (v.get("kanit_iste") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), ((v.get("sesli_ceviri") or {}).get("kis") or {}).get("id"), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
+         (v.get("kanit_iste") or {}).get("id"), (v.get("bildirim") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), ((v.get("sesli_ceviri") or {}).get("kis") or {}).get("id"), (v.get("komut") or {}).get("id"), str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
     return hashlib.sha1(json.dumps(x, default=str, sort_keys=True).encode()).hexdigest()[:16]
 def cards_bekle(imza, sn):
     son = time.time() + max(0, min(sn, 25))

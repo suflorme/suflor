@@ -13,6 +13,7 @@ import AVFoundation
 import Carbon.HIToolbox
 import ApplicationServices
 import ScreenCaptureKit
+import UserNotifications
 
 setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
 let args = CommandLine.arguments
@@ -24,7 +25,7 @@ func anahtar() -> String { (try? String(contentsOfFile: ANAHTAR_YOL, encoding: .
 func istek(_ yol: String, _ govde: [String: Any]? = nil, sure: TimeInterval = 10, _ bitti: @escaping ([String: Any]?) -> Void) {
     guard let u = URL(string: KOK + yol) else { bitti(nil); return }
     var q = URLRequest(url: u, timeoutInterval: sure)
-    q.setValue(anahtar(), forHTTPHeaderField: "X-Suflor-Anahtar")
+    q.setValue(anahtar(), forHTTPHeaderField: "X-Suflor-Anahtar"); q.setValue("menu", forHTTPHeaderField: "X-Suflor-Istemci")
     if let g = govde {
         q.httpMethod = "POST"; q.httpBody = try? JSONSerialization.data(withJSONObject: g)
         q.setValue(KOK, forHTTPHeaderField: "Origin")  // bas-konuş yalnız pano kökeniyle + anahtarla kabul edilir
@@ -70,16 +71,19 @@ func isaret(_ d: Durum) -> NSImage {
 final class Panel: NSPanel {
     override var canBecomeKey: Bool { true }  // not/soru kutusuna yazılabilsin
 }
-final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
+final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, UNUserNotificationCenterDelegate {
     var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!
     var durum: Durum = .bekliyor; var imza = ""; var gorulenKart = Set<String>(); var acikKart = Set<String>()
     var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?
-    var digerTuslar: [EventHotKeyRef?] = []
+    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""
     func applicationDidFinishLaunching(_ n: Notification) {
         oge = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
         oge.button?.target = self; oge.button?.action = #selector(tiklandi(_:)); oge.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         panelKur(); yoklamaDongusu(); sicakTusKur()
+        // bildirimler bu uygulamadan (v0.31.3): tıklayınca özet açılır — osascript bildirimi Betik Düzenleyici'yi açıyordu
+        let nc = UNUserNotificationCenter.current(); nc.delegate = self
+        nc.requestAuthorization(options: [.alert, .sound]) { izin, _ in if !izin { print("BİLDİRİM: izin yok (Sistem Ayarları → Bildirimler → Suflor Menü)") } }
         if !args.contains("--masaustu-kapali") {
             masaustu.dongu()
             if !args.contains("--masaustu-mic-kapali") { let m = MasaustuMic(masaustu) { [weak self] in self?.kayitci != nil }; masaustuMic = m; m.dongu() }
@@ -157,6 +161,10 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func isle(_ v: [String: Any]) {
         imza = v["imza"] as? String ?? ""
         masaustuKanit?.iste(v["kanit_iste"] as? [String: Any])  // masaüstü toplantıdayken kanıtı toplantı penceresinden al
+        if let b = v["bildirim"] as? [String: Any], let id = b["id"] as? String, id != sonBildirim {
+            let ilk = sonBildirim.isEmpty; sonBildirim = id
+            if !ilk || ((b["t"] as? Double).map { Date().timeIntervalSince1970 - $0 < 30 } ?? false) { bildir(b) }  // açılışta eski bildirim yinelenmesin
+        }
         let kartlar = (v["cards"] as? [[String: Any]] ?? []).filter { ($0["status"] as? String) == "acik" && ($0["sessiz"] == nil) }
         acikKart = Set(kartlar.compactMap { $0["id"] as? String })
         let eylem = ((v["eylem"] as? [String: Any])?["liste"] as? [[String: Any]] ?? []).contains { ($0["durum"] as? String) == "bekliyor" && ($0["sunuldu"] != nil) }
@@ -165,6 +173,21 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         durum = eylem ? .eylem : !acikKart.subtracting(gorulenKart).isEmpty && !panel.isVisible ? .kart : dinliyor ? .dinliyor : .bekliyor
         if panel.isVisible { gorulenKart = acikKart }
         simgeGuncelle()
+    }
+    func bildir(_ b: [String: Any]) {
+        let c = UNMutableNotificationContent()
+        c.title = b["baslik"] as? String ?? "Suflor.me"; c.subtitle = b["alt"] as? String ?? ""; c.body = b["metin"] as? String ?? ""; c.sound = .default
+        if let s = b["son"] as? String { c.userInfo = ["son": s] }
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: b["id"] as? String ?? UUID().uuidString, content: c, trigger: nil)) { h in
+            if let h = h { print("BİLDİRİM: gösterilemedi (\(h.localizedDescription))") }
+        }
+    }
+    func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification, withCompletionHandler t: @escaping (UNNotificationPresentationOptions) -> Void) { t([.banner, .list, .sound]) }
+    func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive y: UNNotificationResponse, withCompletionHandler t: @escaping () -> Void) {
+        if let s = y.notification.request.content.userInfo["son"] as? String {   // özet: aktarıcı varsayılan uygulamayla açar; açamazsa pano
+            istek("/son-ac", ["id": s]) { [weak self] v in if (v?["ok"] as? Bool) != true { DispatchQueue.main.async { self?.panoAc() } } }
+        } else { panoAc() }
+        t()
     }
     func simgeGuncelle() { oge.button?.image = isaret(kayitci != nil ? .kayit : durum) }
     // --- Mac geneli bas-konuş (Carbon sıcak tuş: basma + bırakma) ---
