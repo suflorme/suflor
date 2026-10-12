@@ -581,8 +581,21 @@ def _yanki_bosalt(zorla=False):
             if any(_yanki_mi(m, k) for k in YANKI_KARSI): YANKI_BEKLEYEN.remove(b); _yanki_say(b[1])
             elif zorla or now >= b[4] or not _karsi_bekleniyor(b[0]["t0"], b[0]["t1"]): YANKI_BEKLEYEN.remove(b); yaz.append(b)
     for b in yaz: _whisper_yaz(*b[:4])
+# Suflor'un kendi sesi (v0.30.2, deneme 6): hoparlörden okunan sesli çeviri özü / fısıltı mikrofona girip kullanıcının adıyla satır oluyordu
+# ("Eğlenceli değilse sadece bir serseri" ×3; konuşma payı, söz kesme ve DİNLE yanlış). Okuma aralığı ve sözcükleri kaydedilir; ben kanalında
+# o aralıkla çakışan ve sözcükleri sırayla eşleşen satır (yankı kuralı) yazılmaz. Kulaklıkta zaten girmez.
+KENDI_SES = []
+def kendi_ses_kaydet(metin, t0, t1):
+    with YANKI_LOCK: KENDI_SES.append((t0, t1 + 1.5, _yk(metin))); del KENDI_SES[:-10]
 def whisper_yaz(is_, metin, ses=None, model=None):
     kanal = is_["kanal"]; now = time.time()
+    if kanal == "ben":
+        m = (is_["t0"], is_["t1"], _yk(metin))
+        with YANKI_LOCK: kendi = any(_yanki_mi(m, k) for k in KENDI_SES)
+        if kendi:
+            STATE["whisper"]["kendi_ses"] = STATE["whisper"].get("kendi_ses", 0) + 1
+            if STATE["whisper"]["kendi_ses"] in (1, 10, 50): print(f"YANKI: Suflor'un okuduğu ses mikrofona girdi ({STATE['whisper']['kendi_ses']}. kez, yazılmadı) — \"{metin[:60]}\"")
+            return "yanki"
     karsi_akiyor = now - STATE["whisper"]["kanallar"].get("karsi", 0) < WH_AKIS_SN
     if kanal == "karsi":
         with YANKI_LOCK: YANKI_KARSI.append((is_["t0"], is_["t1"], _yk(metin))); del YANKI_KARSI[:-20]

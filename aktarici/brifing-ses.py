@@ -287,9 +287,10 @@ def fisilti_kart(c):
         if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"FISILTI (deneme): {metin}"); return
         try: subprocess.run(["/usr/bin/afplay", "-v", "0.4", "/System/Library/Sounds/Tink.aiff"], timeout=3)
         except (OSError, subprocess.TimeoutExpired): pass
-        v = ses_secimi()
+        v = ses_secimi(); t_oku = time.time()
         try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [telaffuz(metin)], timeout=10)
         except (OSError, subprocess.TimeoutExpired): pass
+        kendi_ses_kaydet(metin, t_oku, time.time())
         print(f"FISILTI: {metin}")
     threading.Thread(target=calis, daemon=True).start()
 def brifing_konusma(s):

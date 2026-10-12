@@ -824,8 +824,15 @@ def yerel_ses_al(p):
     y["son"] = now
     mb = masaustu_baslik()
     return ses_al(dict(p, kanal="karsi", kaynak="yerel", **({"meeting": {"title": mb}} if mb else {})))
+def deneme_aktarici():
+    # deneme aktarıcısı: deneme ayarı (SUFLOR_AYAR), ayardakinden başka port ya da başka veri klasörü. Tek kopya yardımcıları (Suflor Ses,
+    # Suflor Menü, anahtar yardımcısı) yalnız canlı aktarıcı yönetir — 12 Ekim: 8799'daki test aktarıcısı canlı ses yardımcısını kendine
+    # bağladı, süren toplantının karşı kanalı kesildi.
+    try: return bool(os.environ.get("SUFLOR_TEST_BASLAT") or os.environ.get("SUFLOR_AYAR") or A.port != int(AYAR["port"])
+                     or os.path.realpath(BASE) != os.path.realpath(os.path.join(AYAR["uygulama"], "canli")))
+    except Exception: return True
 def _yerel_ses_dongu():
-    if AYAR.get("yerel_ses") is False or os.environ.get("SUFLOR_TEST_BASLAT"): return  # deneme aktarıcısı gerçek yardımcıyı kapatıp açmasın
+    if AYAR.get("yerel_ses") is False or deneme_aktarici(): return  # deneme aktarıcısı gerçek yardımcıyı kapatıp açmasın
     while True:
         time.sleep(10)  # önce bekle: aktarıcı yeniden başladıysa çalışan yardımcının nabzı (5 sn) gelsin, boşuna kapatılmasın
         y = STATE["yerel_ses"]; now = time.time()
@@ -844,7 +851,7 @@ def _yerel_ses_dongu():
 MENU_APP = os.path.join(AYAR["uygulama"], "Suflor Menü.app")
 MENU_LOG = os.path.expanduser("~/Library/Logs/suflor-menu.log")
 def menu_baslat():
-    if AYAR.get("menu_cubugu") is not True or os.environ.get("SUFLOR_TEST_BASLAT") or not os.path.isdir(MENU_APP): return
+    if AYAR.get("menu_cubugu") is not True or deneme_aktarici() or not os.path.isdir(MENU_APP): return
     try:
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
         subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
@@ -993,7 +1000,7 @@ def tek_kullanim_al(yol):
 NM_AD = "me.suflor.anahtar"
 NM_TARAYICI = ["Google/Chrome", "Google/Chrome Beta", "Google/Chrome Canary", "Chromium", "Microsoft Edge", "BraveSoftware/Brave-Browser"]
 def anahtar_yardimcisi_kur():
-    if os.environ.get("SUFLOR_AYAR") or A.port != int(AYAR["port"]) or os.path.realpath(BASE) != os.path.realpath(os.path.join(AYAR["uygulama"], "canli")): return  # deneme ayarı / deneme aktarıcısı
+    if deneme_aktarici(): return  # deneme ayarı / deneme aktarıcısı
     yol = os.path.join(AYAR["uygulama"], "anahtar-yardimcisi.py")
     kod = (f"#!{sys.executable}\n# Suflor.me yerel anahtar yardımcısı — aktarıcı yazar (elle düzenleme, her açılışta yenilenir). Chrome yerel\n"
            "# mesajlaşmayla çağırır: tek ileti okur, bu kullanıcının aktarıcı portunu ve yerel anahtarını döner. Ağ yok.\n"
