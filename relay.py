@@ -842,21 +842,30 @@ def _yerel_ses_dongu():
 # --- Menü çubuğu uygulaması (v0.27.0, Faz 5; ayar menu_cubugu: true): aktarıcı açılırken bir kez açar (kapatılırsa aktarıcı yeniden
 # başlayana kadar kapalı kalır). Uygulama anahtarı kart-anahtari.txt'den okur; panel panonun ?gorunum=panel görünümü.
 MENU_APP = os.path.join(AYAR["uygulama"], "Suflor Menü.app")
+MENU_LOG = os.path.expanduser("~/Library/Logs/suflor-menu.log")
 def menu_baslat():
     if AYAR.get("menu_cubugu") is not True or os.environ.get("SUFLOR_TEST_BASLAT") or not os.path.isdir(MENU_APP): return
     try:
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
-        subprocess.run(["open", "-g", "-a", MENU_APP, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else []), capture_output=True, timeout=20)
+        subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else []), capture_output=True, timeout=20)
         print("MENÜ: menü çubuğu uygulaması başlatıldı")
     except Exception as e: print(f"MENÜ: başlatılamadı ({e.__class__.__name__})")
 
 # Masaüstü toplantı uygulaması (v0.27.0): menü çubuğu uygulaması Erişilebilirlik ile Teams/Zoom masaüstünde "Ayrıl" ve "Sesi aç/kapat"
 # düğmelerini okur, POST /masaustu {uygulama, toplantida, sessiz, baslik} (anahtarla) — eklenti olmadan toplantı sinyali: karşı ses (ses
 # yardımcısının Teams/Zoom sesi) işlenir, döküm toplantı penceresinin başlığıyla açılır. Kullanıcının mikrofonu bu yoldan alınmaz (sonraki adım).
+def masaustu_temiz(b):
+    # Teams pencere başlığı (12 Ekim gerçek): "[Görünüm |] <toplantı> | <kurum> | <hesap e-postası> | Microsoft Teams" — e-posta ve kurum günlüğe/dosya adına girmez
+    p = [x.strip() for x in re.split(r"\s+\|\s+", " ".join(str(b or "").split())) if x.strip()]
+    p = [x for x in p if not re.fullmatch(r"Microsoft Teams|Zoom.*", x)]
+    e = [x for x in p if "@" not in x]
+    if not e: return None
+    return (e[-2] if len(e) >= 2 and len(e) < len(p) else e[-1])[:120]
 def masaustu_al(p):
     m = {"uygulama": str(p.get("uygulama") or "")[:20], "toplantida": bool(p.get("toplantida")), "sessiz": p.get("sessiz") if isinstance(p.get("sessiz"), bool) else None,
-         "baslik": " ".join(str(p.get("baslik") or "").split())[:120] or None, "t": time.time()}
+         "baslik": masaustu_temiz(p.get("baslik")), "t": time.time()}
     o = STATE.get("masaustu") or {}; STATE["masaustu"] = m
+    if not o: print(f"MASAÜSTÜ: menü uygulaması bağlandı · {m['uygulama'] or '?'}" + ("" if m["toplantida"] else " · toplantı yok"))
     if m["toplantida"]: STATE["_cagri_son"] = time.time(); STATE["_tarayici"] = m["uygulama"] or "Teams"
     if m["toplantida"] != bool(o.get("toplantida")) or m["sessiz"] != o.get("sessiz"):
         print(f"MASAÜSTÜ: {m['uygulama']} · " + ("toplantıda" if m["toplantida"] else "toplantı yok") + (" · sessizde" if m["sessiz"] else " · mikrofon açık" if m["sessiz"] is False else "")

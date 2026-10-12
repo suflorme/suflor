@@ -48,6 +48,16 @@ def cozme_ayari(sn):
     # canlı parça: yeniden deneme 2 sıcaklıkla, belirteç sesin süresiyle sınırlı (sn başına 20, en az 48). Varsayılan 6 sıcaklık × 224 belirteç
     # kısa parçada tekrar döngüsünü 6 kez baştan çözüyordu: 11 Ekim toplantılarında uydurma işleri ortalama 11,6 sn, işçi süresinin %59'u.
     return {"temperature": (0.0, 0.2), "sample_len": min(224, max(48, int(sn * 20)))}
+def dil_olasilik(a):  # Whisper'ın dil tahmini (ilk 30 sn): {dil: olasılık}; yalnız kodlayıcı + tek belirteç, çözmeden ucuz
+    import mlx.core as mx
+    from mlx_whisper.transcribe import ModelHolder
+    from mlx_whisper.audio import log_mel_spectrogram, pad_or_trim, N_FRAMES, N_SAMPLES
+    m = ModelHolder.get_model(MODEL, mx.float16)
+    _, pr = m.detect_language(pad_or_trim(log_mel_spectrogram(a, n_mels=m.dims.n_mels, padding=N_SAMPLES), N_FRAMES, axis=-2).astype(mx.float16))
+    return pr[0] if isinstance(pr, list) else pr
+# başka dile geçişte kısa parçada Whisper'ın en sık uydurması (12 Ekim ölçümü: Türkçe kayıttaki gürültü İngilizce çözülünce "Thank you.")
+UYDURMA_EN = re.compile(r"^(thank you|thanks|amen|cheers|bye|okay|you|so)[.!]?$", re.I)
+DIL_GECIS = 0.9  # dayatılan dil boş çıkınca öbür dile geçiş için en düşük olasılık
 def tr_harf(x, dil):  # Türkçe çözümde Azerice "ə" (11 Ekim: arka plandaki haber "muhabirənin … adreslər" yazıldı) → "e"
     return x.replace("ə", "e").replace("Ə", "E") if dil == "tr" else x
 KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den aynen
@@ -159,6 +169,19 @@ def main():
             if not p.get("dil") and p.get("diller") and r.get("language") not in p["diller"]:
                 r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil_yedek") if p.get("dil_yedek") in p["diller"] else p["diller"][0],
                                            initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
+            # dil geçişi (v0.29.2, S36): toplantı dili dayatılmış (tr/en) ve sonuç boşsa Whisper'ın dil tahminine bakılır; öbür dil (en/tr)
+            # ≥ %80 ise o dilde yeniden çözülür (12 Ekim: Türkçe toplantıda İngilizce konuşan karşı tarafın 62 parçası boş kalmıştı).
+            # Dayatma kalkmaz: karışık kipte Türkçe kayıttaki gürültü "Thank you." diye yazılıyor ve süre iki katına çıkıyordu.
+            gec_dil = None
+            def _bos(rr): return not any(gecerli(s, (s.get("text") or "").strip()) for s in rr.get("segments") or [])
+            if p.get("dil") in ("tr", "en") and p.get("dil_algila") and _bos(r):
+                obur = "en" if p["dil"] == "tr" else "tr"
+                try: pr = dil_olasilik(a)
+                except Exception: pr = {}
+                if pr.get(obur, 0) >= DIL_GECIS:
+                    r2 = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=obur, initial_prompt=istem, condition_on_previous_text=False,
+                                                no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
+                    if not _bos(r2): r = r2; gec_dil = (obur, round(float(pr[obur]), 2))
             tut, atla = [], 0
             for s in r.get("segments") or []:
                 x = (s.get("text") or "").strip()
@@ -166,6 +189,8 @@ def main():
                         or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; continue
                 tut.append((s, x))
             metin = tr_harf(" ".join(x for _, x in tut).strip(), r.get("language"))
+            # toplantı dili dışındaki İngilizce (geçişle ya da kanal belleğiyle) kısa kalıp → uydurma
+            if p.get("ana_dil") and r.get("language") == "en" != p["ana_dil"] and UYDURMA_EN.match(metin): metin = ""; atla += 1
             # kısa satırda web adresi: Whisper'ın video sonu uydurması ("www.feyyaz.tv" — 1 Ekim headless bip sesi denemesi)
             if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): metin = ""; atla += 1
             if istem and metin and metin.lower().strip(" .") in istem.lower(): metin = ""; atla += 1  # istemi geri okuma
@@ -187,7 +212,7 @@ def main():
                         km["bol"] = [dict({"s": round(sg["start"], 2), "e": round(sg["end"], 2), "n": len(x.split())},
                                           **({"iz": b64(iz(a[int(sg["start"] * SR):int(sg["end"] * SR)]))} if (sg["end"] - sg["start"]) >= 0.5 else {})) for sg, x in tut]
                 except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"istem_dusen": dusen} if dusen else {}), **({"ses": ses} if ses else {}), **km})
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"ses": ses} if ses else {}), **km})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0

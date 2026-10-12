@@ -13,6 +13,7 @@ import AVFoundation
 import Carbon.HIToolbox
 import ApplicationServices
 
+setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
 let args = CommandLine.arguments
 func arg(_ ad: String) -> String? { if let i = args.firstIndex(of: ad), i + 1 < args.count { return args[i + 1] }; return nil }
 let PORT = Int(arg("--port") ?? "8765") ?? 8765
@@ -189,14 +190,15 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
 
 // --- Masaüstü toplantı uygulaması: Erişilebilirlik ile "Ayrıl" ve "Sesi aç/kapat" düğmeleri (Teams yeni sürüm, Zoom) -------------
 // İzin: Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik → Suflor Menü. Teams (WebView2/Chromium) erişilebilirlik ağacını yalnız
-// istenince kurar: uygulama öğesine AXManualAccessibility verilir. 3 sn'de bir, en çok 6000 öğe; durum değişince ya da toplantıda 10 sn'de
+// istenince kurar: uygulama öğesine AXManualAccessibility ve AXEnhancedUserInterface verilir (12 Ekim gerçek Teams: ikisi de hata kodu döndü ama
+// ağaç ancak ikincisiyle açıldı — her taramada yeniden verilir; `--ax-dokum` düğme adlarını döker). 3 sn'de bir, en çok 6000 öğe; durum değişince ya da toplantıda 10 sn'de
 // bir POST /masaustu. Düğme adları herkese açık bilgiyle; gerçek uygulamada doğrulanınca genişletilir.
 final class Masaustu {
     let UYG: [(bundle: String, ad: String)] = [("com.microsoft.teams2", "Teams"), ("com.microsoft.teams", "Teams"), ("us.zoom.xos", "Zoom")]
     let AYRIL = try! NSRegularExpression(pattern: "^(leave|ayrıl|end meeting|end|toplantıdan ayrıl|hang ?up)\\b", options: [.caseInsensitive])
-    let SESSIZ = try! NSRegularExpression(pattern: "^(unmute|sesi aç|sesini aç|mikrofonu aç|turn on mic)", options: [.caseInsensitive])
-    let ACIK = try! NSRegularExpression(pattern: "^(mute|sesi kapat|sesini kapat|mikrofonu kapat|turn off mic)", options: [.caseInsensitive])
-    var son: [String: Any] = [:]; var sonGonder = Date.distantPast; var acilmis = Set<pid_t>(); var izinSoruldu = false
+    let SESSIZ = try! NSRegularExpression(pattern: "^(unmute|sesi aç|sesini aç|mikrofonun sesini aç|mikrofonu aç|turn on mic)", options: [.caseInsensitive])
+    let ACIK = try! NSRegularExpression(pattern: "^(mute|sesi kapat|sesini kapat|mikrofonu sessize al|mikrofonu kapat|turn off mic)", options: [.caseInsensitive])
+    var son: [String: Any] = [:]; var sonGonder = Date.distantPast; var acilmis = Set<pid_t>(); var izinSoruldu = false, izinYazildi = false
     func uy(_ r: NSRegularExpression, _ t: String) -> Bool { r.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) != nil }
     func deger(_ e: AXUIElement, _ a: String) -> AnyObject? { var v: AnyObject?; return AXUIElementCopyAttributeValue(e, a as CFString, &v) == .success ? v : nil }
     func etiket(_ e: AXUIElement) -> String {
@@ -204,6 +206,7 @@ final class Masaustu {
     }
     func tara() -> [String: Any]? {
         guard AXIsProcessTrusted() else {
+            if !izinYazildi { izinYazildi = true; print("MASAÜSTÜ: Erişilebilirlik izni yok (Aygıt Denetimi ve Veri Erişimi → Suflor Menü)") }
             if !izinSoruldu, NSWorkspace.shared.runningApplications.contains(where: { a in UYG.contains { $0.bundle == a.bundleIdentifier } }) {
                 izinSoruldu = true; AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
             }
@@ -212,9 +215,8 @@ final class Masaustu {
         for app in NSWorkspace.shared.runningApplications {
             guard let u = UYG.first(where: { $0.bundle == app.bundleIdentifier }) else { continue }
             let kok = AXUIElementCreateApplication(app.processIdentifier)
-            if !acilmis.contains(app.processIdentifier) {
-                AXUIElementSetAttributeValue(kok, "AXManualAccessibility" as CFString, kCFBooleanTrue); acilmis.insert(app.processIdentifier)
-            }
+            AXUIElementSetAttributeValue(kok, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+            AXUIElementSetAttributeValue(kok, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
             for w in (deger(kok, kAXWindowsAttribute) as? [AXUIElement] ?? []) {
                 var ayril = false, sessiz: Bool? = nil, n = 0, yigin: [(AXUIElement, Int)] = [(w, 0)]
                 while let (e, d) = yigin.popLast(), n < 6000 {
@@ -230,6 +232,30 @@ final class Masaustu {
             return ["uygulama": u.ad, "toplantida": false]
         }
         return nil
+    }
+    // Teşhis: `--ax-dokum` → toplantı uygulamasının pencerelerindeki düğme/onay kutusu etiketleri stdout'a (gerçek ağaçla düğme adlarını doğrulamak için)
+    func dokum() {
+        print("izin:", AXIsProcessTrusted())
+        for app in NSWorkspace.shared.runningApplications {
+            guard UYG.contains(where: { $0.bundle == app.bundleIdentifier }) else { continue }
+            let kok = AXUIElementCreateApplication(app.processIdentifier)
+            let r1 = AXUIElementSetAttributeValue(kok, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+            let r2 = AXUIElementSetAttributeValue(kok, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue); Thread.sleep(forTimeInterval: 2.5)
+            print("açma: manual \(r1.rawValue) · enhanced \(r2.rawValue)")
+            for w in (deger(kok, kAXWindowsAttribute) as? [AXUIElement] ?? []) {
+                print("== \(app.bundleIdentifier ?? "") · \((deger(w, kAXTitleAttribute) as? String) ?? "")")
+                var n = 0, yigin: [(AXUIElement, Int)] = [(w, 0)]
+                while let (e, d) = yigin.popLast(), n < 8000 {
+                    n += 1; let r = (deger(e, kAXRoleAttribute) as? String) ?? ""
+                    if r == "AXButton" || r == "AXCheckBox" || r == "AXMenuButton" || r == "AXToggle" {
+                        let t = [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute].compactMap { deger(e, $0) as? String }.filter { !$0.isEmpty }
+                        if !t.isEmpty { print("  \(r) · \(t.joined(separator: " | ").prefix(120))") }
+                    }
+                    if d < 45, let c = deger(e, kAXChildrenAttribute) as? [AXUIElement] { yigin.append(contentsOf: c.map { ($0, d + 1) }) }
+                }
+                print("  öğe: \(n)")
+            }
+        }
     }
     func dongu() {
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3) { [weak self] in
@@ -267,6 +293,7 @@ final class Kayitci {
     func durdur() -> Data { motor.inputNode.removeTap(onBus: 0); motor.stop(); kilit.lock(); defer { kilit.unlock() }; return veri }
 }
 
+if args.contains("--ax-dokum") { Masaustu().dokum(); exit(0) }
 let uyg = NSApplication.shared
 let d = Uygulama()
 uyg.delegate = d

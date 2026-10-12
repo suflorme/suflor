@@ -429,17 +429,18 @@
 // kaplayan en büyük video ya da tuval (canvas; paylaşım tuvale çizilebilir) = sahnedeki paylaşım (galerideki küçük kamera karoları sayılmaz);
 // ölçek = ekrandaki cihaz pikseli / gerçek piksel (object-fit: contain). Ekran boyunda çizilen tuvalin ölçeği ~1: uyarı vermez. Teams seçicisi gerekmez.
 // Karşı tarafın ekran paylaşımı sürüyor mu (v0.28.0, S33): sürüyorsa aktarıcı ekran kaydını kendiliğinden açar, bitince kapatır.
-// Önce platform (Teams: data-tid ve kendi paylaşım düğmesi); emin değilse genel yol: kendi paylaşımı ("Paylaşmayı durdur" görünür → hayır;
-// Teams sekmesi kullanıcının kendi ekranını göstermez), paylaşımı anlatan erişilebilirlik etiketi, ya da görünür alanın ≥ %40'ını kaplayan,
+// Önce kendi paylaşımı ("Paylaşmayı durdur" / "Sunuyorsunuz" görünür → hayır; Teams sekmesi kullanıcının kendi ekranını göstermez), sonra
+// platform (Teams: data-tid); emin değilse genel yol: paylaşımı anlatan erişilebilirlik etiketi, ya da görünür alanın ≥ %40'ını kaplayan,
 // ekran boyutlu (≥ 1280 genişlik) ve kamera oranında olmayan (16:9, 4:3) video/tuval. Seçiciler gerçek paylaşımda doğrulanmadı.
-const PAYLAS_KENDI = /paylaşmayı durdur|sunmayı durdur|paylaşımı durdur|stop sharing|stop presenting/i;
+const PAYLAS_KENDI = /paylaşmayı durdur|sunmayı durdur|sunuyu durdur|paylaşımı durdur|sunuyorsunuz|ekranınızı paylaşıyorsunuz|stop sharing|stop presenting|you('| a)re (presenting|sharing)/i;
 const PAYLAS_ETIKET = /(ekran(ı|ını)?|içeri(k|ği)) paylaşıyor|ekranı paylaşılıyor|sunuyor\b|is (sharing|presenting)|shared (screen|content)|paylaşılan (ekran|içerik)/i;
 function paylasimHam() {
+  // önce kendi paylaşımı (platformdan da önce): 12 Ekim gerçek Teams — kullanıcının kendi paylaşımı Teams öğesiyle "karşı taraf" sayıldı
+  const gor = e => e.getClientRects().length > 0;
+  for (const b of document.querySelectorAll("button, [role=button], [role=status], [aria-live]"))
+    if (PAYLAS_KENDI.test((b.getAttribute("aria-label") || "") + " " + (b.textContent || "").slice(0, 80)) && gor(b)) return false;
   const p = P.paylasimVar ? P.paylasimVar() : null;
   if (p === true || p === false) return p;
-  const gor = e => e.getClientRects().length > 0;
-  for (const b of document.querySelectorAll("button, [role=button]"))
-    if (PAYLAS_KENDI.test((b.getAttribute("aria-label") || "") + " " + (b.textContent || "").slice(0, 80)) && gor(b)) return false;
   for (const e of document.querySelectorAll("[aria-label]")) if (PAYLAS_ETIKET.test(e.getAttribute("aria-label")) && gor(e)) return true;
   for (const v of document.querySelectorAll("video, canvas")) {
     const gw = v.tagName === "CANVAS" ? v.width : v.videoWidth, gh = v.tagName === "CANVAS" ? v.height : v.videoHeight;

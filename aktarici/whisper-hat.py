@@ -310,6 +310,11 @@ def _isci_dongu():
         istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem_metni(), "onceki": (k.onceki if k else "")[-150:],
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
         if not dil: istek.update(diller=["tr", "en"], dil_yedek=getattr(k, "dil_son", None))  # karışık: yalnız tr/en
+        elif dil in ("tr", "en"):
+            # dil geçişi (v0.29.2, S36): dayatılan dil boş çıkarsa işçi öbür dile bakar (olasılık ≥ %80); kanal son 60 sn'de öbür dilde satır
+            # verdiyse önce o dil denenir (karşı taraf İngilizce konuşurken her parça önce Türkçe çözülmesin), boş çıkarsa toplantı diline döner
+            istek["dil_algila"] = True; istek["ana_dil"] = dil
+            if k and getattr(k, "dil_son", None) in ("tr", "en") and k.dil_son != dil and time.time() - getattr(k, "dil_son_t", 0) < 60: istek["dil"] = k.dil_son
         # kullanıcı kanalında ses izi: oda açıksa ad için, değilse yalnız ses kilidi için ("Claude:" komutu kullanıcının sesi mi; ayar ses_kilidi)
         if is_["kanal"] == "ben" and not is_.get("bas") and (oda_acik() or AYAR.get("ses_kilidi", True) is not False): istek["oda"] = is_["oda"] = True
         try:
@@ -330,12 +335,29 @@ def _isci_dongu():
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         sonuc = "uydurma" if j.get("atlanan") else "bos"
-        if metin and j.get("dil") in ("tr", "en") and KANALLAR.get(is_["kanal"]): KANALLAR[is_["kanal"]].dil_son = j["dil"]
+        if metin and j.get("dil") in ("tr", "en") and KANALLAR.get(is_["kanal"]): KANALLAR[is_["kanal"]].dil_son = j["dil"]; KANALLAR[is_["kanal"]].dil_son_t = time.time()
+        if metin and j.get("dil_gecis"): print(f"WHISPER: {is_['kanal']} kanalı {j.get('dil')} ({j['dil_gecis']}) — toplantı dili dışında konuşma")
         if metin:
             if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
             is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz", "bol") if j.get(k)} or None) or "satir"
         is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
+        if AYAR.get("parca_kaydet"): parca_kaydet(is_, istek, j, sonuc)
+# Teşhis (v0.29.2, 12 Ekim: İngilizce YouTube denemesinde karşı kanalın 62 parçası "uydurma"; ses saklanmadığı için neden bilinemedi): ayar
+# parca_kaydet: true iken her kanalın son PARCA_KAYIT_EN_COK parçası 16 kHz WAV + sonucu (dil, metin, atlanan) canli/teshis-parcalar/'a yazılır.
+# Varsayılan kapalı; ses yalnız bu Mac'te kalır, eskiler silinir. Kapatınca klasörü elle sil.
+PARCA_KAYIT_EN_COK = 20
+def parca_kaydet(is_, istek, j, sonuc):
+    try:
+        import wave
+        kl = os.path.join(BASE, "teshis-parcalar"); os.makedirs(kl, exist_ok=True)
+        ad = f"{is_['kanal']}-{datetime.datetime.now().strftime('%H%M%S')}-{str(is_.get('id'))[-6:]}"
+        with wave.open(os.path.join(kl, ad + ".wav"), "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(is_["pcm"])
+        write([(os.path.join(kl, "sonuclar.jsonl"), json.dumps({"dosya": ad + ".wav", "sonuc": sonuc, "dil_istek": istek.get("dil"), "dil": j.get("dil"),
+                "atlanan": j.get("atlanan"), "metin": j.get("text"), "sn": round(len(is_["pcm"]) / 32000, 2)}, ensure_ascii=False) + "\n")])
+        es = sorted(f for f in os.listdir(kl) if f.startswith(is_["kanal"] + "-") and f.endswith(".wav"))
+        for f in es[:-PARCA_KAYIT_EN_COK]: os.remove(os.path.join(kl, f))
+    except Exception as e: print(f"TEŞHİS: parça yazılamadı ({e.__class__.__name__})")
 # --- Konuşmacı ses izi (v0.8.4 ses işçisi → v0.13.12 Whisper işçisinin içinde) ------------------------------------------------
 # ECAPA (SpeechBrain VoxCeleb ağırlıkları, MLX) karşı kanal parçalarını kümeler: k1, k2… Kümenin adı altyazıdan oylanır: altyazı satırı
 # konuşmadan 3–6 sn sonra geldiği için o anda bekleyen parçalar geriye dönük oy alır. Ad yoksa tek kümede "Karşı taraf", çok kümede
