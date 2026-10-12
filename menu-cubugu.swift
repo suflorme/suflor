@@ -21,11 +21,12 @@ func arg(_ ad: String) -> String? { if let i = args.firstIndex(of: ad), i + 1 < 
 let PORT = Int(arg("--port") ?? "8765") ?? 8765
 let ANAHTAR_YOL = arg("--anahtar") ?? ""
 let KOK = "http://127.0.0.1:\(PORT)"
+var bildirimIzni = false  // izin yoksa aktarıcı bildirimi eski yolla (osascript) gösterir
 func anahtar() -> String { (try? String(contentsOfFile: ANAHTAR_YOL, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
 func istek(_ yol: String, _ govde: [String: Any]? = nil, sure: TimeInterval = 10, _ bitti: @escaping ([String: Any]?) -> Void) {
     guard let u = URL(string: KOK + yol) else { bitti(nil); return }
     var q = URLRequest(url: u, timeoutInterval: sure)
-    q.setValue(anahtar(), forHTTPHeaderField: "X-Suflor-Anahtar"); q.setValue("menu", forHTTPHeaderField: "X-Suflor-Istemci")
+    q.setValue(anahtar(), forHTTPHeaderField: "X-Suflor-Anahtar"); q.setValue(bildirimIzni ? "menu" : "menu-izinsiz", forHTTPHeaderField: "X-Suflor-Istemci")
     if let g = govde {
         q.httpMethod = "POST"; q.httpBody = try? JSONSerialization.data(withJSONObject: g)
         q.setValue(KOK, forHTTPHeaderField: "Origin")  // bas-konuş yalnız pano kökeniyle + anahtarla kabul edilir
@@ -83,7 +84,10 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         panelKur(); yoklamaDongusu(); sicakTusKur()
         // bildirimler bu uygulamadan (v0.31.3): tıklayınca özet açılır — osascript bildirimi Betik Düzenleyici'yi açıyordu
         let nc = UNUserNotificationCenter.current(); nc.delegate = self
-        nc.requestAuthorization(options: [.alert, .sound]) { izin, _ in if !izin { print("BİLDİRİM: izin yok (Sistem Ayarları → Bildirimler → Suflor Menü)") } }
+        nc.requestAuthorization(options: [.alert, .sound]) { izin, _ in bildirimIzni = izin; if !izin { print("BİLDİRİM: izin yok (Sistem Ayarları → Bildirimler → Suflor Menü)") } }
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in  // izin sonradan Sistem Ayarları'ndan verilebilir
+            UNUserNotificationCenter.current().getNotificationSettings { a in bildirimIzni = a.authorizationStatus == .authorized || a.authorizationStatus == .provisional }
+        }
         if !args.contains("--masaustu-kapali") {
             masaustu.dongu()
             if !args.contains("--masaustu-mic-kapali") { let m = MasaustuMic(masaustu) { [weak self] in self?.kayitci != nil }; masaustuMic = m; m.dongu() }
