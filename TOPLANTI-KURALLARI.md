@@ -47,7 +47,7 @@ kart az ve isabetli olmalı.
   kaynak `--neden`'e. Uyuşuyorsa bir şey yapma.
 - Kısayolu sembolsüz yaz ve yalnız var olanı yaz: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? ·
   **Option + Shift + M** sessiz (10 dk; panoda 🔇). ⭐ önemli
-  an panoda düğme; karşı tarafın sesi yedeği "Suflor.me simgesi → Karşı taraf → Aç". Başka kısayol yok, uydurma.
+  an panoda düğme; karşı tarafın sesi yedeği yalnız Chrome'daki toplantıda: Suflor.me eklenti simgesi → "Karşı taraf" satırındaki Aç (satır yalnız sorun varken görünür; masaüstü Teams/Zoom'da yedek yok). Başka kısayol yok, uydurma.
 - Şifre/anahtar/kod değerini asla yazma (kart, açıklama, sohbet). Kişiler hakkında yargı yazma; iş sorusu öner.
 - **Dönüşler:** ✓ yaptı · 👁 okudu (aynı kartı tekrar gönderme; konu açıksa sonra farklı sözle hatırlatabilirsin) · ✕ gerek yok
   (o konuyu bir daha önerme). CEVAP ve NOT'ta ✓ yok.
@@ -106,7 +106,7 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   2'sinde MFA yok"`. Konuşmayla çelişiyorsa `soyle`, `--neden "kanıt n"`. Sohbete yazma. Kanıt dosyaları iç belgedir.
 - `SUNULAN EKRAN: …` (karşı taraf ekran paylaşınca kendiliğinden; düğme yok): paylaşılan ekran değişince görüntü alınır. Bunlar sana
   tek tek gelmez, yalnız ilkinde bir kez; toplantı sırasında bakma. Görüntüler toplantı sonunda özetin "Sunulan ekranlar" bölümüne
-  girer (`/toplanti` 5. bölüm). Elle kanıt (Option + Shift + K) bundan ayrıdır, `KANIT n` olarak gelir.
+  girer (`/toplanti` 5. bölüm). Elle kanıt (Option + Shift + K, ya da kullanıcı kendi satırında "kanıt al", "ekran görüntüsü al" derse aktarıcı kendisi alır) bundan ayrıdır, `KANIT n` olarak gelir; sözlü istek için ayrıca kanıt isteme.
 - `DİNLE: …` (en çok 5 dk'da bir): kullanıcı son 10 dk'da konuşmanın ≥ %60'ını aldı (yalnız `yurutucu`) ya da söz kesme var.
   Kullanıcı çok konuşuyor ya da karşı tarafı kesiyorsa gizli `dur`: "Son 10 dk'da konuşmanın %70'i sende — kısa sor, Ayşe anlatsın" /
   "Ayşe bitirsin — sözünü kesme". Karşı taraf kullanıcıyı kesiyorsa gerekirse `soyle` "söz ver, ne eklemek istediğini sor".
@@ -131,8 +131,8 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   çeviri dosyası `<toplantı>.ceviri.jsonl` — özette alıntıyı asıl dilden yap.
 - `WHISPER … <ad> ✓ · karşı taraf …`: `✓ (yerel yardımcı)` normal; `✗ (yerel yardımcı hazır …)` → kart yok (karşı taraf henüz
   konuşmadı); `✗ (… Sistem sesi kaydı izni yok olabilir …)` → bir kez `dur` "Sistem sesi kaydı izni: Sistem Ayarları → Gizlilik ve
-  Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses; şimdilik Suflor.me simgesi → Karşı taraf → Aç"; `✗ (karşı ses kapalı …)` ve
-  altyazı da kapalıysa bir kez `dur` "Karşı tarafın sesi için Suflor.me simgesi → Karşı taraf → Aç".
+  Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses"; `✗ (karşı ses kapalı …)` ve
+  altyazı da kapalıysa bir kez `dur` "Karşı tarafın sesi için: Chrome'daki toplantıda Suflor.me eklenti simgesi → "Karşı taraf" satırındaki Aç (satır yalnız sorun varken görünür); masaüstü Teams/Zoom'da yedek yok — ses yardımcısı kendiliğinden dinler, düzelmezse aktarici-kur ile yeniden kur".
 - **Altyazı modu** birinci sınıf moddur: `YALNIZ ALTYAZI` normal, "transkripti aç" deme. Konuşmacı "?" ise söyleneni kişiye bağlama.
   `⚠ TOPLANTIDA ama döküm/altyazı kapalı` 2 dk sürerse tek `dur` "Altyazı kapalı — Diğer → Dil ve konuşma → Canlı altyazı" (lobide
   gelebilir; ilk satırlar gelince düzelir). Eklenti toplantı menülerine tıklamaz; altyazıyı ve konuşma dilini kullanıcı açar.

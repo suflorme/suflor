@@ -373,6 +373,17 @@ def kanit_iste(p):
     with LOCK:
         STATE["kanit_iste"] = {"id": "r" + str(int(time.time() * 1000)), "t": time.time(), "not": " ".join(str(p.get("not") or "").split())[:300], "kaynak": p.get("kaynak") or "pano"}
         return STATE["kanit_iste"]["id"]
+# Sesli kanıt isteği (v0.31.6; kullanıcı isteği, 12 Ekim deneme 7): kullanıcının KENDİ satırında istek biçiminde "kanıt al", "ekran görüntüsü al/çek",
+# "ekran kaydı al", "take a screenshot" → kanıt isteği (tarayıcıda eklenti, masaüstünde menü uygulaması çeker). Faz 2'de kaldırılmıştı (üç yanlış
+# alarm: konunun içinde geçen sözcük) — bu yüzden yalnız fiille, olumsuzda değil ("alma", "gerek yok"), en sık 20 sn'de bir. Ayar `sesli_kanit: false` kapatır.
+SESLI_KANIT_RX = re.compile(r"\b(kanıt|ekran\s+(?:görüntü|resm|resim|kayd|kayıt)\w*|screenshot)\s+(?:bir\s+)?(al|alır|alabilir|alsana|alın|çek|kaydet|başlat)\w*|\btake\s+a\s+screenshot", re.I)
+SESLI_KANIT_YOK = re.compile(r"\b(alma|almay|çekme|çekmey|kaydetme|başlatma)\w*|gerek\s+yok|istemiyorum|don'?t", re.I)
+SESLI_KANIT = {"t": 0.0}
+def sesli_kanit_bak(metin):
+    if AYAR.get("sesli_kanit") is False or not SESLI_KANIT_RX.search(metin or "") or SESLI_KANIT_YOK.search(metin): return False
+    if time.time() - SESLI_KANIT["t"] < 20: return False
+    SESLI_KANIT["t"] = time.time(); kanit_iste({"kaynak": "sesli", "not": metin[:120]}); kart_bildir()
+    print(f"KANIT: sesli istek — \"{metin[:60]}\""); return True
 def kanit(p):
     import base64
     d = str(p.get("png") or "")
@@ -479,7 +490,9 @@ def ingest(p):
             onceki = seen.get(e["id"]) if e.get("id") else None
             if e.get("id"): seen[e["id"]] = raw
             text, soz = sozluk_uygula(raw, base_key)
-            if (e.get("speaker") or "") == ben_adi(): text, hd = hitap_duzelt(text); soz += hd
+            if (e.get("speaker") or "") == ben_adi():
+                text, hd = hitap_duzelt(text); soz += hd
+                if e.get("komut_ses") != "uymuyor": sesli_kanit_bak(text)  # yanındaki birinin sesi kanıt istemez
             low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye
                 kim_ = e.get("speaker") or "?"; ALTYAZI_SON.append((time.time(), kim_)); del ALTYAZI_SON[:-400]; kume_oyla(kim_)

@@ -18,7 +18,7 @@ burada tekrarlanmaz. Aşağıda `tc` = `python3 {{KOD}}/toplanti-claude.py` (yal
 - `extension.panel` ve `captions` false → "Transkript ve altyazı kapalı — Teams: Diğer → Dil ve konuşma → Canlı altyazı (ya da
   Kaydet ve transkript → Transkripti göster)". Yalnız altyazı açıksa sorun yok (döküm yetkisi yoksa tek yol).
 - `whisper.durum` "yok" → Whisper kurulu değil, altyazıyla devam. Toplantıda `whisper.ben` true olmalı. `whisper.karsi` false ve
-  `whisper.yerel` "bekliyor"/"dinliyor" değilse: "Karşı tarafın sesi için Suflor.me simgesi → Karşı taraf → Aç"; `whisper.yerel`
+  `whisper.yerel` "bekliyor"/"dinliyor" değilse: "Karşı tarafın sesi için: Chrome'daki toplantıda Suflor.me eklenti simgesi → "Karşı taraf" satırındaki Aç (satır yalnız sorun varken görünür); masaüstü Teams/Zoom'da yedek yok — ses yardımcısı kendiliğinden dinler, düzelmezse aktarici-kur ile yeniden kur"; `whisper.yerel`
   "izin" ise: "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses".
 - `dil.uyari` doluysa kullanıcıya aynen yaz (konuşma dili yanlış ayarlı).
 - `tc sozluk | tail -3` "UYARI: … daha yeni" derse `tc sozluk --birlestir` (ayardaki dış sözlük kaynağı güncellenmiş; kullanıcıya yazma).
@@ -124,7 +124,7 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
 6. Tek soru: "Suflor.me'de aksayan bir şey oldu mu?" Cevabı ve gördüğün teknik sorunları (saatleriyle; içerik, kart metni, ad yok)
    `tc rapor --not "<gözlemler>"` ile gönder; sorun yoksa `--not "sorun yok"`. Rapor yalnız teknik veri taşır. Beta teşhis açıksa
    (ayarda `teshis: true`) `--not` metni geliştiriciye de gider: kişi adı, toplantı adı, konu, alıntı, rakam ya da şifre YAZMA
-   ("14:20'de karşı taraf sesi kesildi, Karşı taraf → Aç ikinci basışta açıldı" gibi).
+   ("14:20'de karşı taraf sesi kesildi, karşı ses ikinci denemede açıldı" gibi).
 7. Proje `CLAUDE.md`'de "## Ben ve işim (taslak)" (İngilizce: "(draft)") varsa — kurulumda Claude'un yazdığı çalışma notu —
    rapordan sonra tek soru: notu 3–4 satırda özetle, "Doğru mu, düzelteyim mi?" Onaylarsa başlıktaki "(taslak)"ı sil; düzeltme
    verirse notu düzelt, sonra sil. Cevap gelmezse dokunma, bir sonraki toplantıda yine sor.

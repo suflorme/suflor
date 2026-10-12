@@ -900,8 +900,9 @@ def izle():
             state = ("eklenti bağlı" if (x.get("age_s") is not None and x["age_s"] < 30) else "EKLENTİ SİNYALİ YOK") + \
                     ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + (("✓ (yerel yardımcı)" if wv.get("yerel_akiyor") else "✓") if wv.get("karsi") else  # yerel ses yardımcısı
                      "✗ (yerel yardımcı hazır, karşı ses henüz gelmedi — kart gönderme)" if wv.get("yerel") in ("bekliyor", "dinliyor") else
-                     "✗ (yerel yardımcıda Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses; şimdilik Suflor.me simgesi → Karşı taraf → Aç)" if wv.get("yerel") == "izin" else
-                     "✗ (karşı ses kapalı — Suflor.me simgesi → Karşı taraf → Aç; karşı tarafın satırları " + ("altyazıdan" if (x.get("panel") or x.get("captions")) else "GELMİYOR") + ")")) if wak else
+                     "✗ (yerel yardımcıda Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses)" if wv.get("yerel") == "izin" else
+                     "✗ (karşı ses kapalı — " + ("masaüstü toplantı: ses yardımcısını aktarici-kur ile yeniden kur" if (s.get("masaustu") or {}).get("toplantida") else
+                     "Chrome'daki toplantıda Suflor.me eklenti simgesi → \"Karşı taraf\" satırındaki Aç") + "; karşı tarafın satırları " + ("altyazıdan" if (x.get("panel") or x.get("captions")) else "GELMİYOR") + ")")) if wak else
                      (" · panel açık" if x.get("panel") else (" · YALNIZ ALTYAZI (konuşmacı adı olmayabilir; özette kişiye bağlama)" if x.get("captions") else
                      (f" · ⚠ TOPLANTIDA ama döküm/altyazı kapalı — satır gelmiyor ({PLATFORM_AD.get(x.get('platform'), 'Teams')}'te kullanıcıya uyarı çıktı; 2 dk sürerse DUR kartı: \"{(x.get('yonerge') or {}).get('altyazi') or 'Diğer → Dil ve konuşma → Canlı altyazı'}\")" if x.get("call") else " · panel kapalı")))) + \
                     (f" · ⚠ WHISPER {wv['durum']}: {wv.get('hata')}" if wv.get("durum") == "hata" else "") + \

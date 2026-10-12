@@ -53,7 +53,7 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).
    Claude gündemi kurar, hazır olunca toplantıya katılırsın.
 2. Karşı tarafın sesi kendiliğinden yazıya dökülür (Suflor Ses yardımcısı, macOS 14.4+; ilk kurulumda macOS "Sistem Sesi Kaydı" izni
-   sorar — İzin Ver). Yardımcı yoksa ya da izin verilmediyse **Suflor.me simgesi → Karşı taraf → Aç**.
+   sorar — İzin Ver). Yardımcı yoksa ya da izin verilmediyse Chrome'daki toplantıda **Suflor.me simgesi → "Karşı taraf" satırındaki Aç** (satır yalnız sorun varken görünür; masaüstü Teams/Zoom'da yedek yok).
 3. Kartlar Teams'in sol altındaki küçük şeritte ve panoda görünür: **SÖYLE** (şunu de/sor), **DUR** (yapma/açma), **CEVAP**; **NOT** yalnız panoda. ✓ yaptım · Okudum · ✕ gerek yok.
 4. Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? (Claude tek cümlelik replik önerir) · **Option + Shift + M** sessiz (10 dk kart yok; tekrar basınca kapanır). Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin. ⭐ önemli an panoda düğme.
 5. Toplantı bitince Claude özeti çıkarır ve sana sunar.
