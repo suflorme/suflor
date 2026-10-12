@@ -112,26 +112,17 @@ def ses_durdur():
 # = nöral Elif) say'e ses adı verilmez, sistem sesi konuşur — Siri sesleri `say -v` listesinde yok. Seçim yoksa Yelda.
 # Telaffuz: nöral ses yabancı adları Türkçe okur (8 Ekim ölçümü: Basecamp → "base jump", Workspace → "works pace"); okunacak metinde adlar
 # Türkçe yazımla değişir (pano metni değişmez). Kullanıcı eki: canli/telaffuz.json {"Ad": "Okunuş"} (kişi adları depoya girmez).
-TELAFFUZ = {"Google": "Gugıl", "Gmail": "Cimeyl", "Workspace": "Vörkspeys", "Claude": "Klod", "Basecamp": "Beyskemp",
-            "Microsoft": "Maykrosoft", "iPhone": "Ayfon", "iCloud": "Ayklaud", "WhatsApp": "Vatsap", "PayPal": "Peypal", "Stripe": "Sitrayp",
-            "Slack": "Slek", "Notion": "Noşın", "Zoom": "Zum", "Dropbox": "Dropboks", "OneDrive": "Vandrayv", "GitHub": "Githab",
-            "Chrome": "Kroum", "Suflor.me": "Suflor mi",
-            # Piper (v0.32.1): Türkçe ses her harfi Türkçe okur ("Teams" → te-ams); uzun ünlü tek harfle (çift harf iki hece okunur)
-            "Teams": "Tims", "Outlook": "Autluk", "Excel": "Eksel", "PowerPoint": "Pavırpoynt", "Word": "Vörd", "SharePoint": "Şerpoynt",
-            "Meet": "Mit", "Webex": "Vebeks", "Jira": "Cira", "Confluence": "Konfluens", "Trello": "Trelo", "Canva": "Kanva",
-            "LinkedIn": "Linktin", "YouTube": "Yutub", "Facebook": "Feysbuk", "Apple": "Epıl", "MacBook": "Mekbuk",
-            "Mac": "Mek", "iPad": "Aypet", "Windows": "Vindovs", "Office": "Ofis", "Copilot": "Kopaylıt", "ChatGPT": "Çet ci pi ti",
-            "OpenAI": "Open ey ay", "Anthropic": "Entropik", "Sonnet": "Sonit", "Gemini": "Cemini", "Drive": "Drayv", "Sheets": "Şits",
-            "Docs": "Doks", "Firefox": "Fayırfoks", "Wi-Fi": "Vayfay", "iOS": "Ay o es", "macOS": "Mek o es",
-            "meeting": "miting", "deadline": "dedlayn", "feedback": "fidbek", "follow-up": "falov ap", "follow up": "falov ap",
-            "email": "imeyl", "e-mail": "imeyl", "mail": "meyl", "update": "apdeyt", "call": "kol", "check": "çek", "roadmap": "roudmep",
-            "dashboard": "deşbord", "launch": "lonç", "team": "tim", "manager": "menecır", "CEO": "si i o", "CFO": "si ef o",
-            "CTO": "si ti o", "KPI": "ki pi ay", "OK": "okey", "okay": "okey", "online": "onlayn", "offline": "oflayn", "slide": "slayt",
-            "deck": "dek", "review": "rivyu", "pipeline": "paypılayn", "workshop": "vörkşop", "brief": "brif", "briefing": "brifing",
-            "onboarding": "onbording", "customer": "kastımır", "budget": "bacıt", "invoice": "invoys", "forecast": "forkest",
-            "stakeholder": "steykholdır", "timeline": "taymlayn", "schedule": "skecul", "agenda": "acenda", "AI": "ey ay", "API": "ey pi ay",
-            "startup": "startap", "standup": "stendap", "sales": "seyls", "lead": "lid", "insight": "insayt", "feature": "fiçır",
-            "release": "rilis", "app": "ep", "website": "vebsayt", "download": "daunlod", "upload": "aplod"}
+# Sabit sözlük aktarici/telaffuz-sozluk.json (açık depoda: genel İngilizce iş/teknoloji sözcükleri, küresel ürün adları, kısaltmalar; 13 Ekim
+# gerçek dökümlerden genişletildi, Piper + Whisper ile doğrulandı). Piper her harfi Türkçe okur ("Teams" → te-ams): uzun ünlü tek harfle (Tims, Zum;
+# çift harf iki hece okunur), kısaltma söylendiği gibi (ki pi ay). Kuruma özgü adlar buraya değil canli/telaffuz.json'a.
+def _telaffuz_sozluk():
+    yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "telaffuz-sozluk.json")
+    try: return {str(k): str(v) for k, v in json.load(open(yol, encoding="utf-8")).items() if str(k).strip() and str(v).strip()}
+    except (OSError, ValueError, AttributeError): print("SES: telaffuz-sozluk.json okunamadı"); return {}
+TELAFFUZ = _telaffuz_sozluk()
+def _tel_harf(w, o):  # sözcük büyük harfle başlıyorsa okunuş da (Piper küçük harfle başlayanı yeni cümle saymaz); Türkçe: i → İ, ı → I
+    if not o or not w[:1].isupper(): return o
+    return {"i": "İ", "ı": "I"}.get(o[0], o[0].upper()) + o[1:]
 _TEL = {"t": 0, "mt": None, "re": None, "esle": {}}
 def telaffuz(metin):
     if ARAYUZ_DILI != "tr" or not metin: return metin
@@ -147,10 +138,17 @@ def telaffuz(metin):
             if os.path.exists(yol):
                 try: ek = {str(k): str(v) for k, v in json.load(open(yol, encoding="utf-8")).items() if str(k).strip() and str(v).strip()}
                 except (OSError, ValueError, AttributeError): print("SES: telaffuz.json okunamadı")
-            esle = {k.lower(): v for k, v in {**TELAFFUZ, **telaffuz_oto(), **ek}.items()}
-            _TEL.update(mt=mt, esle=esle, re=re.compile(r"(?<!\w)(" + "|".join(re.escape(k) for k in sorted(esle, key=len, reverse=True)) + r")(?!\w)", re.I))
+            hepsi = {**telaffuz_oto(), **TELAFFUZ, **ek}  # doğrulanmış sözlük Claude'un kendiliğinden yazdığının önünde (v0.32.2)
+            esle = {k.lower(): v for k, v in hepsi.items()}
+            # tamamı büyük harfli kısaltma yalnız metinde de büyük harfliyse değişir ("IP" ≠ Türkçe "ip", "OK" ≠ "ok")
+            buyuk = {k.lower() for k, v in hepsi.items() if len(k) <= 5 and k.isupper() and not any(x.lower() == k.lower() and not x.isupper() for x in hepsi)}
+            _TEL.update(mt=mt, esle=esle, buyuk=buyuk, re=re.compile(r"(?<!\w)(" + "|".join(re.escape(k) for k in sorted(esle, key=len, reverse=True)) + r")(?!\w)", re.I))
     _yabanci_topla(metin)
-    return _TEL["re"].sub(lambda m: _TEL["esle"].get(m.group(1).lower(), m.group(1)), metin)
+    def deg(m):
+        w = m.group(1)
+        if w.lower() in _TEL.get("buyuk", ()) and not w.isupper(): return w
+        return _tel_harf(w, _TEL["esle"].get(w.lower(), w))
+    return _TEL["re"].sub(deg, metin)
 # Okunan metinde görülen bilinmeyen yabancı sözcükler (v0.32.1; Piper her harfi Türkçe okur): Türkçe harfi olmayan ve yabancı yazım izi
 # taşıyan (q/w/x, th/sh/ch/ee/oo/ea/ou…, ünsüz+y sonu, ünsüzler arası y), büyük harfli kısaltma (2–5) ya da cümle ortasında büyük harfle başlayan sözcük
 # kuyruğa girer; _telaffuz_dongu bunları toplu Claude'a sorar → telaffuz-oto.json (ilk okumada eski hali, sonrakilerde doğru okunur).
@@ -181,7 +179,7 @@ def telaffuz_ekle(d):  # okunuşları telaffuz-oto.json'a katar (Claude toplu ce
     return len(d)
 # Okunuş tamamlama (v0.20.18; kullanıcı 9 Ekim: üç örnekten "Türkçe yazım" kabul edilebilir): sözlük terimi, kişi ve tedarikçi adlarından
 # yalnız Latin harfle (Türkçe harfsiz) yazılanların Türkçe okunuşunu Claude bir kez, toplu yazar → canli/telaffuz-oto.json. Öncelik:
-# TELAFFUZ < oto < telaffuz.json (elle düzeltme). Okunuşu zaten doğru olan kendisiyle eşlenir, yeniden sorulmaz. Metin yalnız Claude'a gider.
+# oto < TELAFFUZ (telaffuz-sozluk.json, doğrulanmış) < telaffuz.json (elle düzeltme). Okunuşu zaten doğru olan kendisiyle eşlenir, yeniden sorulmaz. Metin yalnız Claude'a gider.
 TEL_OTO_ISTEM = ("Aşağıdaki sözcükler, Türkçe metni okuyan Türkçe bir konuşma sesine verilecek; ses her harfi Türkçe kurallarla okur. "
                  "Her biri için doğru okunuşu (İngilizce ya da özgün dilindeki) Türkçe harflerle yaz; uzun ünlüyü tek harfle yaz (çift harf iki "
                  "hece okunur: Tims, Zum). Örnek: Microsoft Teams → Maykrosoft Tims, customer "

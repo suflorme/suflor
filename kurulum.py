@@ -463,6 +463,13 @@ SES_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>NSAudioCaptureUsageDescription</key><string>Suflor.me toplantıdaki karşı tarafın sesini yazıya dökmek için toplantı uygulamasının sesini alır. Ses kaydedilmez, bu Mac dışına gönderilmez.</string>
 </dict></plist>
 """
+OYNAT_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>local.suflor.oynat</string><key>CFBundleName</key><string>Suflor Oynat</string>
+  <key>CFBundleExecutable</key><string>SuflorOynat</string><key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
+</dict></plist>"""
 BRIFING_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -611,8 +618,12 @@ def kur():
     brf = os.path.join(app, "Suflor Brifing.app"); r = derle(brf, "brifing.swift", "SuflorBrifing", BRIFING_PLIST)
     if r is True: say(f"Brifing yardımcısı derlendi: {brf}")
     elif r: say(f"UYARI: brifing yardımcısı derlenemedi ({r}) — panodaki Brifing kapalı kalır")
+    # kesintisiz ses çalıcı (v0.32.2): Piper'ın cümleleri tek akışta, duraklamalar kodda; yoksa afplay
+    oyn = os.path.join(app, "Suflor Oynat.app"); r = derle(oyn, "oynat.swift", "SuflorOynat", OYNAT_PLIST)
+    if r is True: say(f"Ses çalıcı derlendi: {oyn}")
+    elif r: say(f"UYARI: ses çalıcı derlenemedi ({r}) — Piper sesi afplay ile çalınır")
     # menü çubuğu uygulaması (Faz 5): yalnız ayar menu_cubugu: true iken (beta kurulumunda kapalı); aktarıcı açar
-    mnu = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf]
+    mnu = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn]
     if ayar().get("menu_cubugu") is True:
         r = derle(mnu, "menu-cubugu.swift", "SuflorMenu", MENU_PLIST)
         if r is True: say(f"Menü çubuğu uygulaması derlendi: {mnu}"); sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorMenu")

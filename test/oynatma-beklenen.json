@@ -447,6 +447,7 @@
     "sn": "NoneType"
    },
    "seslendirme": {
+    "calici": "NoneType",
     "durum": "NoneType",
     "hata": "NoneType",
     "motor": "str"

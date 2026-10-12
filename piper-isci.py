@@ -3,11 +3,15 @@
 # olarak başlatır; ses modeli (ayar piper_model, .onnx + yanında .onnx.json ya da config.json) bir kez yüklenir. Tamamen yerel: ağ yok.
 # Ses dosyası depoda değildir: kullanıcı yerelde indirir, kod yalnız ayar varsa kullanır (lisansı belirsiz ses açık depoya girmez).
 # Protokol (satır başına bir JSON):
-#   giriş : {"id": "...", "metin": "...", "hiz": 1.0}          hiz > 1 daha hızlı (süre ≈ 1 / hiz; length_scale açılışta ölçülen eğriden)
+#   giriş : {"id": "...", "metin": "...", "hiz": 1.0, "ara": 0.4}   hiz > 1 daha hızlı (süre ≈ 1 / hiz; length_scale açılışta ölçülen eğriden);
+#           "ton"/"ritim" (isteğe bağlı): noise_scale / noise_w_scale (yoksa modelin kendi değeri; dinlenerek seçilir)
+#           ara: cümleler arasına eklenen sessizlik (sn, hıza göre ölçekli; Piper cümle sonunu kırpıyor); noktalı virgül / iki nokta
+#           sonrası 0,7 katı, virgül sonrası 0,35 katı (Piper bunlarda ~0–0,06 sn duruyordu); "yan": true → her yan cümle ayrı parça
+#           (kesintisiz çalıcıda ilk ses daha erken); yoksa parçalar cümle sonuna kadar birleşir (afplay her dosyada ~0,75 sn ekliyor)
 #   çıkış : {"hazir": true, "sn": yükleme, "sr": örnekleme} · cümle başına {"id", "parca": i, "wav": yol, "sure": sn, "ilk": sn (yalnız ilk parça)}
 #           · {"id", "bitti": true, "n": parça sayısı, "sn": toplam üretim} · {"id", "hata": "..."}
 # wav'lar geçici klasöre yazılır; aktarıcı çalınca siler (işçi açılışta eskilerini temizler).
-import sys, os, json, time, wave, glob, tempfile
+import sys, os, re, json, time, wave, glob, tempfile
 
 def yaz(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
 
@@ -51,14 +55,27 @@ def main():
         try:
             hiz = min(2.0, max(0.5, float(g.get("hiz") or 1.0)))
             # hız modelin kendi konuşma hızına göre (taban = modelin length_scale'i; dinlenen örnekler bununla)
-            sc = SynthesisConfig(length_scale=ls_bul(hiz)) if (SynthesisConfig and abs(hiz - 1.0) > 0.01) else None
+            ek = {k2: min(1.5, max(0.0, float(g[k1]))) for k1, k2 in (("ton", "noise_scale"), ("ritim", "noise_w_scale")) if g.get(k1) is not None}
+            sc = SynthesisConfig(length_scale=ls_bul(hiz), **ek) if (SynthesisConfig and (abs(hiz - 1.0) > 0.01 or ek)) else None
+            ara = min(1.5, max(0.0, float(g.get("ara") or 0))) / hiz
             t0 = time.time(); n = 0
-            for c in (ses.synthesize(metin, syn_config=sc) if sc else ses.synthesize(metin)):
-                b = c.audio_int16_bytes; r = getattr(c, "sample_rate", sr)
-                yol = os.path.join(gecici, f"{kim}-{n}.wav")
-                with wave.open(yol, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(r); w.writeframes(b)
-                yaz(dict({"id": kim, "parca": n, "wav": yol, "sure": round(len(b) / 2 / r, 2)}, **({"ilk": round(time.time() - t0, 3)} if n == 0 else {})))
-                n += 1
+            # cümleleri ve yan cümleleri kendimiz böleriz: Piper (espeak) küçük harfle başlayan cümleyi ayırmıyor, ; : , işaretlerinde durmuyordu
+            parcalar, once = [], 0.0
+            for x in re.split(r"(?<=[.!?…;:,])\s+", metin):
+                if x.strip(): parcalar.append((x, once))
+                once = ara * (1.0 if x.rstrip()[-1:] in ".!?…" else 0.7 if x.rstrip()[-1:] in ";:" else 0.35 if x.rstrip()[-1:] == "," else 0)
+            parcalar = parcalar or [(metin, 0.0)]
+            biriken, r = b"", sr
+            for k, (x, sessiz) in enumerate(parcalar):
+                for c in (ses.synthesize(x, syn_config=sc) if sc else ses.synthesize(x)):
+                    r = getattr(c, "sample_rate", sr)
+                    if sessiz and (biriken or n): biriken += bytes(int(sessiz * r) * 2)
+                    biriken += c.audio_int16_bytes; sessiz = 0
+                if biriken and (g.get("yan") or k == len(parcalar) - 1 or x.rstrip()[-1:] in ".!?…"):
+                    yol = os.path.join(gecici, f"{kim}-{n}.wav")
+                    with wave.open(yol, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(r); w.writeframes(biriken)
+                    yaz(dict({"id": kim, "parca": n, "wav": yol, "sure": round(len(biriken) / 2 / r, 2)}, **({"ilk": round(time.time() - t0, 3)} if n == 0 else {})))
+                    n += 1; biriken = b""
             yaz({"id": kim, "bitti": True, "n": n, "sn": round(time.time() - t0, 3)})
         except Exception as e:
             yaz({"id": kim, "hata": f"{e.__class__.__name__}: {e}"[:200]})
