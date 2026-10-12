@@ -798,7 +798,8 @@ def _ses_anahtari():
     with os.fdopen(fd, "w") as f: f.write(k + "\n")
     return k
 SES_KEY = _ses_anahtari()
-STATE["yerel_ses"] = {"durum": None, "nabiz_t": 0, "son": 0, "acildi": 0, "uygulama": None, "hata": None, "surum": None, "sifir_bas": None,
+SES_DUYULUR_TEPE = 300  # Int16 tepe: bunun üstü sessizlik değil (yaklaşık -40 dB)
+STATE["yerel_ses"] = {"durum": None, "nabiz_t": 0, "son": 0, "acildi": 0, "sesli_t": 0, "uygulama": None, "hata": None, "surum": None, "sifir_bas": None,
                       "kurma": 0, "eklenti_karsi_ses": 0}
 SES_LOG = os.path.expanduser("~/Library/Logs/suflor-ses.log")  # yardımcının kendi günlüğü (yeniden kurma, hata)
 def karsi_konusuyor(sn=90):
@@ -830,6 +831,12 @@ def yerel_ses_al(p):
                  surum=str(p.get("surum") or "")[:12] or None, hata=str(p.get("hata") or "")[:120] or None)
         if y["durum"] != "dinliyor" or int(p.get("tepe") or 0) > 0: y["sifir_bas"] = None
         elif not y["sifir_bas"]: y["sifir_bas"] = now
+        if y["durum"] == "dinliyor" and int(p.get("tepe") or 0) > SES_DUYULUR_TEPE: y["sesli_t"] = now  # toplantı uygulaması ses çıkarıyor (bitiş kararı)
+        # ses kısma ayarı yardımcıya açılışta verilir (--kis): ayar değiştiyse toplantı dışında kapat, döngü yeni ayarla açar
+        # (13 Ekim deneme 8: aktarici-kur yardımcıyı yeniden başlatmadı, kısma hiç devreye girmedi)
+        if bool(p.get("kis_ayar")) != (AYAR.get("masaustu_ses_kis") is True) and not toplanti_var() and now - y.get("kis_yeniden", 0) > 300:
+            y["kis_yeniden"] = now; print("YEREL SES: ses kısma ayarı değişti — yardımcı yeniden başlatılıyor")
+            threading.Thread(target=lambda: subprocess.run(["pkill", "-u", str(os.getuid()), "-f", "MacOS/SuflorSes --port"], capture_output=True, timeout=5), daemon=True).start()
         k_ = int(p.get("kurma") or 0)
         if k_ > y["kurma"]: print(f"YEREL SES: ses yakalama yeniden kuruldu ({str(p.get('kurma_neden') or '?')[:40]}; toplam {k_})")
         y["kurma"] = k_
@@ -978,6 +985,7 @@ def masaustu_mic_view():
 # çağrısı ya da masaüstü) 60 sn yok VE toplantı uygulaması mikrofonu bıraktı (ses yardımcısı "dinliyor" değil) → bitti; ses yardımcısı
 # kurulu/açık değilse yedek: son satır ≥ 5 dk önce. Sinyal kopsa da toplantı sürüyorsa tarayıcı mikrofonu tutar, yardımcı dinler → bitmez.
 BITIS = {"aktif": None, "t_aktif": 0.0}; BITIS_SATIRSIZ_SN = 8 if os.environ.get("SUFLOR_TEST_HIZLI") else 300
+BITIS_SESLI_SN = 6 if os.environ.get("SUFLOR_TEST_HIZLI") else 60
 def toplanti_bitis_bak():
     af = STATE.get("file"); now = time.time()
     if toplanti_var():
@@ -988,8 +996,10 @@ def toplanti_bitis_bak():
     if not f or (STATE.get("toplanti_bitti") or {}).get("file") == f or STATE["file_lines"].get(f, 0) < 1: return
     ys = yerel_ses_durum(); son_satir = STATE["file_last"].get(f, 0); m = STATE.get("masaustu") or {}
     if ys in ("dinliyor", "izin") and now - son_satir < BITIS_SATIRSIZ_SN: return  # toplantı uygulaması mikrofonu hâlâ tutuyor
+    # satır gelmese de toplantı uygulaması son 60 sn'de ses çıkardıysa sürüyor (13 Ekim deneme 8: eklenti sustu, Chrome'daki toplantı sürerken 5 dk sonra bitti sayıldı)
+    if ys == "dinliyor" and now - (STATE["yerel_ses"].get("sesli_t") or 0) < BITIS_SESLI_SN: return
     if ys not in ("bekliyor", "dinliyor", "izin") and now - son_satir < BITIS_SATIRSIZ_SN: return  # yardımcı yok: satırsız 5 dk beklenir
-    neden = ("masaüstü toplantı penceresi kapandı" if m.get("t", 0) > BITIS["t_aktif"] - 30 and not m.get("toplantida") else
+    neden = ("masaüstü toplantı penceresi kapandı" if not m.get("toplantida") and (m.get("bitti_t") or 0) > BITIS["t_aktif"] - 30 else
              f"{round((now - son_satir) / 60)} dk satır yok" if now - son_satir >= BITIS_SATIRSIZ_SN else
              "toplantı sinyali yok, toplantı uygulaması mikrofonu bıraktı")
     STATE["toplanti_bitti"] = {"file": f, "t": datetime.datetime.now().isoformat(timespec="seconds"), "neden": neden}

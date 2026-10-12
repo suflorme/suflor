@@ -280,6 +280,7 @@ final class Masaustu {
                       "ara", "kapat", "bekleme", "odası", "lobi", "kabul", "microsoft", "teams", "zoom"])
     var micDugme: AXUIElement?; let kilit = NSLock()  // toplantı penceresinin mikrofon düğmesi: 0,5 sn'de bir yalnız onun etiketi okunur
     var son: [String: Any] = [:]; var sonGonder = Date.distantPast; var izinSoruldu = false, izinYazildi = false
+    static let KAYIP_ESIK = 4; var kayip = 0
     var toplantiPid: pid_t = 0, toplantiBaslik = ""  // kanıt görüntüsü bu pencereden
     var paylasimAday: Bool? = nil, paylasimSay = 0, paylasim: Bool? = nil  // iki tarama aynıysa kararlı
     var kisilerSon = Date.distantPast, toplantiBas = Date.distantPast, katilimcilar: [String]? = nil, kisilerDugme: AXUIElement?
@@ -430,6 +431,11 @@ final class Masaustu {
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self = self else { return }
             var v = self.tara() ?? [:]
+            // toplantıdan çıkış ancak art arda KAYIP_ESIK taramada (~12 sn) "Ayrıl" bulunmayınca: 13 Ekim deneme 8'de tek tarama kaçınca
+            // toplantı bitti sayıldı, ses yardımcısı aç-kapa döngüsüne girdi. Uygulama kapandıysa (tara() nil/boş) beklenmez.
+            if !(v["toplantida"] as? Bool ?? false), self.son["toplantida"] as? Bool ?? false, !v.isEmpty, self.kayip + 1 < Masaustu.KAYIP_ESIK {
+                self.kayip += 1; v = self.son; v.removeValue(forKey: "katilimcilar"); v.removeValue(forKey: "konusan")
+            } else { self.kayip = 0 }
             let top = v["toplantida"] as? Bool ?? false, once = self.son["toplantida"] as? Bool ?? false
             if top && !once { self.toplantiBas = Date(); self.kisilerSon = .distantPast }
             // Kişiler paneli: toplantı başından 15 sn sonra, sonra 3 dk'da bir

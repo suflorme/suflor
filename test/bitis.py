@@ -27,7 +27,7 @@ def kur(yardimci):
         q = urllib.request.Request(f"http://127.0.0.1:{PORT}{yol}", data=json.dumps(v).encode(), headers={"X-Suflor-Anahtar": k or K})
         return json.loads(urllib.request.urlopen(q, timeout=10).read())
     st = lambda: json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read())
-    nabiz = lambda d: post("/ses-yerel", {"nabiz": True, "durum": d, "tepe": 0, "uygulama": "Chrome", "surum": "t", "kurma": 0}, SK)
+    nabiz = lambda d, tepe=0: post("/ses-yerel", {"nabiz": True, "durum": d, "tepe": tepe, "uygulama": "Chrome", "surum": "t", "kurma": 0}, SK)
     return T, canli, r, post, st, nabiz
 M = {"title": "Bitiş Deneme"}
 T, canli, r, post, st, nabiz = kur(True)
@@ -57,6 +57,29 @@ finally:
 olay = [l for l in out.splitlines() if "TOPLANTI BİTTİ" in l]
 bak(f"izle: TOPLANTI BİTTİ olayı ({len(olay)} kez; ilk bitiş + yeniden katılıştan sonraki)", len(olay) == 2 and "mikrofonu bıraktı" in olay[0])
 shutil.rmtree(T, ignore_errors=True)
+# 13 Ekim deneme 8: eklenti sustu, satır gelmiyor ama toplantı uygulaması ses çıkarıyor → bitmez; ses kesilince "satır yok" ile biter.
+# Masaüstü uygulaması toplantı dışı bildirse de (hiç toplantıda değildi) neden "masaüstü penceresi kapandı" yazılmaz.
+T, canli, r, post, st, nabiz = kur(True)
+try:
+    post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+    post("/ping", {"call": True, "panel": True, "meeting": M}); nabiz("dinliyor", 2000)
+    post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": "c/1", "speaker": "Ayşe", "time": "10:00", "text": "merhaba"}]})
+    for _ in range(14): time.sleep(1); nabiz("dinliyor", 2000); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+    bak("eklenti sustu, satır yok ama toplantı sesi akıyor: bitmedi", not st().get("toplanti_bitti"))
+    for _ in range(12): time.sleep(1); nabiz("dinliyor", 0); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+    tb = st().get("toplanti_bitti") or {}
+    bak(f"ses de kesildi: bitti, neden masaüstü penceresi değil ({tb.get('neden')})", tb.get("neden") and "masaüstü" not in tb["neden"])
+finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# masaüstü toplantı penceresi gerçekten kapanınca neden doğru yazılır
+T, canli, r, post, st, nabiz = kur(True)
+try:
+    post("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Bitiş Deneme | Microsoft Teams"}); nabiz("dinliyor")
+    post("/ingest", {"meeting": {"title": "Bitiş Deneme"}, "source": "transcript", "entries": [{"id": "d/1", "speaker": "Ayşe", "time": "10:00", "text": "merhaba"}]})
+    post("/masaustu", {"uygulama": "Teams", "toplantida": False}); nabiz("bekliyor")
+    for _ in range(10): time.sleep(1); nabiz("bekliyor"); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+    tb = st().get("toplanti_bitti") or {}
+    bak(f"masaüstü penceresi kapandı: neden doğru ({tb.get('neden')})", "masaüstü toplantı penceresi kapandı" == tb.get("neden"))
+finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 T, canli, r, post, st, nabiz = kur(False)
 try:
     post("/ping", {"call": True, "panel": True, "meeting": M})

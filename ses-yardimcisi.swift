@@ -17,7 +17,7 @@ import CoreAudio
 import AudioToolbox
 import AVFoundation
 
-let SURUM = "0.21.0"
+let SURUM = "0.22.0"
 var arg: [String: String] = [:]
 var izinKipi = false, kisKipi = false
 do {
@@ -243,7 +243,8 @@ func adim() {
         if tarayiciMi, let m = masaustuAile {   // tarayıcıyı bırak: sonraki adımda masaüstü uygulaması seçilir
             tapDurdur(); aktif = nil; sonKurma = .distantPast; gunluk("bırakıldı (\(ak.ad)) — toplantı masaüstünde: \(m.ad)"); return
         }
-        if simdi.timeIntervalSince(micSon[ak.onek] ?? .distantPast) >= 8 && !(tarayiciMi && aktarıcıDiyor) {   // toplantı bitti
+        // aktarıcı toplantının bu uygulamada sürdüğünü söylüyorsa bırakma (13 Ekim deneme 8: Teams mikrofonu bırakınca 3 sn'de bir aç-kapa)
+        if simdi.timeIntervalSince(micSon[ak.onek] ?? .distantPast) >= 8 && !((tarayiciMi || ak.ad == tarayiciIpucu) && aktarıcıDiyor) {   // toplantı bitti
             tapDurdur(); aktif = nil; gunluk("durdu (\(ak.ad))"); return
         }
         let hedef = ss.filter { $0.bundle.hasPrefix(ak.onek) }.map { $0.id }.sorted()
@@ -287,6 +288,7 @@ func nabiz() {   // 5 sn: durum + son 5 sn'nin tepe seviyesi (izin yoksa tap yal
                             "kurma": kurmaSay, "kurma_neden": kurmaNeden]
     if let a = aktif { g["uygulama"] = a.ad }
     if tapYenidenCal { g["kis_kipi"] = true }
+    g["kis_ayar"] = kisKipi   // aktarıcı ayar değişince (masaustu_ses_kis) toplantı dışında yeniden başlatır
     if let h = sonHata { g["hata"] = h }
     tepe = 0
     gonder(g) { j in
