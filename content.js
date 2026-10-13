@@ -687,7 +687,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       if (v.komut && v.komut.id !== komutSon) { if (komutSon !== undefined && window.top === window) toast(v.komut.metin, "#0a8f5a", 3500); komutSon = v.komut.id; }
       else if (!v.komut && komutSon === undefined) komutSon = null;
       // anlık uyarı (adın geçti / uzun konuşma) — yalnız toplantı sekmesinde kısa bildirim; ilk yoklamada eskisi gösterilmez
-      if (v.anlik && v.anlik.id !== anlikSon) { if (anlikSon !== undefined && window.top === window) toast(v.anlik.metin + (v.anlik.ayrinti ? " · " + v.anlik.ayrinti : ""), "#b4690e", 7000); anlikSon = v.anlik.id; }
+      if (v.anlik && v.anlik.id !== anlikSon) { if (anlikSon !== undefined && window.top === window) toast(v.anlik.metin + (v.anlik.ayrinti ? " · " + v.anlik.ayrinti : ""), v.anlik.tur === "uzun" ? "#c0392b" : "#b4690e", v.anlik.tur === "uzun" ? 15000 : 7000); anlikSon = v.anlik.id; }
       else if (!v.anlik && anlikSon === undefined) anlikSon = null;
       // Whisper durumu; karşı tarafın sesi henüz verilmediyse toplantı başına bir kez hatırlatma
       whisperView = v.whisper || null;

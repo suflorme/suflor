@@ -218,7 +218,7 @@ def ask(p):
             answered = {c.get("reply_to") for c in CARDS if c.get("reply_to")}
             q = next((q for q in reversed(QUESTIONS) if q.get("tur") == "ozet" and q["id"] not in answered and (now - datetime.datetime.fromisoformat(q["at"])).total_seconds() < 60), None)
             if q: return q
-        q = {"id": "q" + str(int(time.time() * 1000)) + secrets.token_hex(2), "at": now.isoformat(timespec="seconds"), "file": aktif_dosya(), "text": text}
+        q = {"id": "q" + str(int(time.time() * 1000)) + secrets.token_hex(2), "at": now.isoformat(timespec="seconds"), "file": aktif_dosya() or bitmis_dosya(), "text": text}
         if ozet: q["tur"] = "ozet"
         QUESTIONS.append(q); _log("sorular.jsonl", q)
         _md(f"| {now.strftime('%H:%M:%S')} | **{'NE DİYEYİM? İSTENDİ' if ozet else 'CLAUDE’A SORU'}** | {' / '.join(text.replace('|', '¦').splitlines())} | |", q, "sorular.jsonl")

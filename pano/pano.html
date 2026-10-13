@@ -283,7 +283,7 @@ function durum(s){
   const x=s.extension, w=s.whisper||{}, ek=x&&x.age_s<30, mt=masaustuTop(s)&&!(ek&&x.call), cagri=(ek&&x.call)||mt, ca=s.claude_age_s, izl=ca!=null&&ca<120, so=[]
   try{const g=JSON.parse(sessionStorage.getItem("guncellendi")||"null");if(g&&Date.now()-g.t<90000)so.push(["wa",L("Suflor.me güncellendi"),L("açık bir toplantı sekmesi varsa yenile")])}catch(e){}
   if(s.uyari)so.push(["er",s.uyari,""])
-  if(s.anlik)so.push(["wa",s.anlik.metin,s.anlik.ayrinti||""])  // adın geçti / uzun konuşma (20 sn; aktarici/anlik.py)
+  if(s.anlik)so.push([s.anlik.tur==="uzun"?"er":"wa",s.anlik.metin,s.anlik.ayrinti||""])  // adın geçti (20 sn) / uzun konuşma (kırmızı, 45 sn; aktarici/anlik.py)
   if(s.anahtarsiz)so.push(["wa",L(s.anahtarsiz.tur==="yerel"?"Anahtarsız yerel istek geldi":"Eklenti eski sürümde"),L(s.anahtarsiz.tur==="yerel"?"toplantı yardımcısı eski olabilir — aktarici-kur ile yeniden kur":"chrome://extensions → Suflor.me → ↻ yenile")])
   if(s.dil&&s.dil.uyari)so.push(["er",L("Döküm dili yanlış"),s.dil.uyari])
   if(mt){  // masaüstü: altyazı yok, satırlar Whisper'dan (karşı: ses yardımcısı, sen: menü uygulamasının mikrofonu)

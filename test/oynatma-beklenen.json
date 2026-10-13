@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 111059,
-   "sha": "223944b96fde5e57"
+   "uzunluk": 111102,
+   "sha": "e21e0a6324bf52fc"
   },
   "/hazirlik": {
    "uzunluk": 32000,
    "sha": "87fd797866f96ba2"
   },
   "/mini": {
-   "uzunluk": 111059,
-   "sha": "223944b96fde5e57"
+   "uzunluk": 111102,
+   "sha": "e21e0a6324bf52fc"
   },
   "/status": {
    "_ping_son": "float",

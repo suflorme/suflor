@@ -108,5 +108,32 @@ try:
     time.sleep(15); tb = st().get("toplanti_bitti") or {}
     bak(f"yardımcı yokken yedek kural: satırsız → bitti ({tb.get('neden')})", "satır yok" in (tb.get("neden") or ""))
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# v0.32.15 (deneme 9): bitişten sonra panodan not/soru toplantıyı yeniden açmaz, biten dosyaya yazılır; sesli çeviri bitişle kapanır;
+# bitişten sonra yeni Başlat varsa not eskisi gibi süren/yeni toplantıya gider.
+T, canli, r, post, st, nabiz = kur(True)
+os.environ["SUFLOR_TEST_KULAKLIK"] = "1"
+try:
+    post("/ping", {"call": True, "panel": True, "meeting": M}); nabiz("dinliyor")
+    post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": "e/1", "speaker": "Ayşe", "time": "10:00", "text": "merhaba"}]})
+    md = st()["file"]
+    sc = post("/komut", {"tur": "sesli_ceviri"})
+    nabiz("bekliyor")
+    for _ in range(12):
+        time.sleep(1); nabiz("bekliyor")
+        if st().get("toplanti_bitti"): break
+    time.sleep(1.5)
+    bak("sesli çeviri toplantı bitince kapandı", "SESLİ ÇEVİRİ: açıldı" in open(os.path.join(T, "relay.log")).read() and "toplantı bitti — kapandı" in open(os.path.join(T, "relay.log")).read())
+    oz = os.path.join(T, "ozet.md"); open(oz, "w").write("# Özet\n")
+    post("/son-toplanti", {"ozet": oz, "baslik": "Bitiş Deneme", "puan": "4", "metin": "# Özet\n", "dosya": md}); time.sleep(0.3)
+    post("/note", {"text": "bitişten sonra not", "at": "2026-10-13T20:50:00"})
+    q = post("/ask", {"text": "bitişten sonra soru"}); s = st()
+    metin = open(os.path.join(canli, md), encoding="utf-8").read()
+    bak("bitişten sonra not toplantıyı yeniden açmaz", s.get("file") == md and not s.get("aktif") and "bitişten sonra not" in metin and "toplantıdan sonra" in metin)
+    bak("bitişten sonra soru biten dosyaya", (q.get("question") or {}).get("file") == md and "bitişten sonra soru" in metin)
+    time.sleep(1.1); open(os.path.join(canli, "takvim-secilen.json"), "w").write('{"at": "2099-01-01T00:00:00", "konu": "Yeni"}')
+    post("/note", {"text": "yeni başlattan sonra not", "at": "2026-10-13T21:00:00"})
+    bak("yeni Başlat'tan sonra not eski dosyaya 'toplantıdan sonra' diye yazılmaz", "yeni başlattan sonra not | ✎ (toplantıdan sonra)" not in open(os.path.join(canli, md), encoding="utf-8").read())
+    bak("aktarıcıda hata yok", "Traceback" not in open(os.path.join(T, "relay.log")).read())
+finally: r.terminate(); r.wait(5); os.environ.pop("SUFLOR_TEST_KULAKLIK", None); shutil.rmtree(T, ignore_errors=True)
 print("bitiş: ✓ hepsi geçti" if not hata else f"bitiş: ✗ {len(hata)} kaldı")
 sys.exit(1 if hata else 0)

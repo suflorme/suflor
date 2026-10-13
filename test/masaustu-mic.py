@@ -80,6 +80,19 @@ try:
     import glob
     md = glob.glob(os.path.join(canli, "*-Deneme*.md"))
     bak("uzun aradan sonra yeni toplantı: yeni döküm dosyası", "yeni döküm dosyası" in open(os.path.join(T, "relay.log"), encoding="utf-8").read() and len(md) == 2)
+    # --- v0.32.15: toplantı adı toplantı başında sabit (deneme 9: pencere başlığı toplantı içinde değişti, döküm bölündü) ---
+    def kanit_yolu(): return str(istek("/kanit-masaustu", {"png": PNG, "kaynak": "kisayol", "w": 1, "h": 1}).get("path"))
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
+    with open(os.path.join(canli, "takvim-secilen.json"), "w", encoding="utf-8") as f:
+        json.dump({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "konu": "Haftalık Plan", "rol": "yurutucu", "dil": "tr"}, f)
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Eski Toplantı | Microsoft Teams"})
+    k1 = kanit_yolu()
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Kurum Adı | Microsoft Teams"}); k2 = kanit_yolu()
+    bak("ad Başlat konusundan, başlık değişince aynı toplantı", "Haftal" in k1 and "Haftal" in k2 and os.path.dirname(k1) == os.path.dirname(k2))
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Üçüncü | Microsoft Teams"}); k3 = kanit_yolu()
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Başka | Microsoft Teams"}); k4 = kanit_yolu()
+    bak("kullanılmış Başlat konusu yeni toplantıya geçmez; ilk başlık sabit", "nc" in k3 and "Haftal" not in k3 and os.path.dirname(k3) == os.path.dirname(k4))
     log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
     # --- v0.31.3: bildirim menü uygulamasından (tıklayınca özet açılır) ---
     def menu_cards():

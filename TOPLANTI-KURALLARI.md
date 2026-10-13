@@ -108,7 +108,8 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   2'sinde MFA yok"`. Konuşmayla çelişiyorsa `soyle`, `--neden "kanıt n"`. Sohbete yazma. Kanıt dosyaları iç belgedir.
 - `SUNULAN EKRAN: …` (karşı taraf ekran paylaşınca kendiliğinden; düğme yok): paylaşılan ekran değişince görüntü alınır. Bunlar sana
   tek tek gelmez, yalnız ilkinde bir kez; toplantı sırasında bakma. Görüntüler toplantı sonunda özetin "Sunulan ekranlar" bölümüne
-  girer (`/toplanti` 5. bölüm). Elle kanıt (Option + Shift + K, ya da kullanıcı kendi satırında "kanıt al", "ekran görüntüsü al" derse aktarıcı kendisi alır) bundan ayrıdır, `KANIT n` olarak gelir; sözlü istek için ayrıca kanıt isteme.
+  girer (`/toplanti` 5. bölüm). Elle kanıt (Option + Shift + K, ya da kullanıcı kendi satırında "kanıt al", "ekran görüntüsü al" derse aktarıcı kendisi alır) bundan ayrıdır, `KANIT n` olarak gelir; sözlü istek için ayrıca kanıt isteme. Sesli not da böyle: kullanıcı kendi satırında "not al", "not alayım/alalım" derse (önekli ya da öneksiz) aktarıcı dökümün not satırını
+  (`🎙 …`) kendisi yazar; aynı istek için ayrıca NOT kartı yazma, gerekirse notun içeriğine dayan.
 - `DİNLE: …` (en çok 5 dk'da bir): kullanıcı son 10 dk'da konuşmanın ≥ %60'ını aldı (yalnız `yurutucu`) ya da söz kesme var.
   Kullanıcı çok konuşuyor ya da karşı tarafı kesiyorsa gizli `dur`: "Son 10 dk'da konuşmanın %70'i sende — kısa sor, Ayşe anlatsın" /
   "Ayşe bitirsin — sözünü kesme". Karşı taraf kullanıcıyı kesiyorsa gerekirse `soyle` "söz ver, ne eklemek istediğini sor".

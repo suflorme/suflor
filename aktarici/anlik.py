@@ -6,9 +6,9 @@
 #    30 sn içinde ikincisi görünen uyarının metnini günceller (yeni bildirim yok). Ayar adin_gecti: false kapatır.
 # 2) Uzun konuşma: karşı taraf araya girmeden (≥ 4 sözcüklük karşı satır yok) kullanıcı uzun_konusma_sn'den (90) uzun konuşursa bir kez
 #    "1,5 dk'dır sen konuşuyorsun". Kısa onaylar ("evet", "hı hı") sözü kesmiş sayılmaz; kullanıcı 20 sn susarsa sayaç sıfırlanır. 0 kapatır.
-# Uyarı ANLIK_SN (20) görünür; /cards ve /status "anlik" alanında. Toplantıdan bağımsız sayaç dosya başına (yeni toplantı = yeni sayaç).
+# Uyarı ANLIK_SN (20; uzun konuşma ANLIK_UZUN_SN 45, panoda kırmızı, şeritte 15 sn — deneme 9: 20 sn kısa, renk dikkat çekmiyordu) görünür; /cards ve /status "anlik" alanında. Toplantıdan bağımsız sayaç dosya başına (yeni toplantı = yeni sayaç).
 ANLIK = {"son": None, "n": 0, "ad_id": set(), "ad_son": {}, "uzun": {}}
-ANLIK_SN = 20
+ANLIK_SN = 20; ANLIK_UZUN_SN = 45
 _AD_EK = r"(?:'?(?:nin|nun|in|un|ye|ya|yi|yu|e|a|i|u|den|dan|ten|tan|de|da|te|ta|le|la|cigim|cim|ciyim))?"
 def anlik_ver(tur, metin, ayrinti=""):
     ANLIK["n"] += 1
@@ -18,7 +18,7 @@ def anlik_ver(tur, metin, ayrinti=""):
     except NameError: pass
 def anlik_view():
     a = ANLIK["son"]
-    return {k: a[k] for k in ("id", "tur", "metin", "ayrinti")} if a and time.time() - a["t"] < ANLIK_SN else None
+    return {k: a[k] for k in ("id", "tur", "metin", "ayrinti")} if a and time.time() - a["t"] < (ANLIK_UZUN_SN if a["tur"] == "uzun" else ANLIK_SN) else None
 def _adlar():  # ilk ad + ayar "lakaplar" (sana başka adla hitap ediliyorsa; ör. ["Memo", "Başkan"]) — sade biçim, en az 3 harf
     xs = [sade(str(ben_adi() or "")).split(" ")[0]] + [" ".join(sade(str(x)).split()) for x in (AYAR.get("lakaplar") or []) if isinstance(x, str)]
     return [x for x in dict.fromkeys(xs) if len(x) >= 3]

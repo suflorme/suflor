@@ -102,7 +102,8 @@ func oku(_ izin: Bool, _ hata: Error?) {
     let katilan = e.attendees ?? []
     let benKatilan = katilan.first(where: { ben($0) }), benDuzenleyen = ben(e.organizer)
     let digerleri = katilan.filter { !ben($0) && !($0.url == e.organizer?.url && benDuzenleyen) }
-    if digerleri.isEmpty && !(e.organizer != nil && !benDuzenleyen) { continue }  // katılımcısız kayıt (yalnız kullanıcı)
+    // katılımcısız kayıt (yalnız kullanıcı) atlanır; kullanıcının düzenlediği bağlantılı toplantı kalır (deneme toplantısı tek kişilik açılır)
+    if digerleri.isEmpty && !(e.organizer != nil && !benDuzenleyen) && !(benDuzenleyen && baglanti([e.url?.absoluteString, e.location, e.notes]) != nil) { continue }
     if ayrinti {
       olaylar.append(["baslik": e.title ?? "", "takvim": e.calendar.title, "duzenleyen": e.organizer.map { "\(adres($0)) cu=\($0.isCurrentUser)" } ?? "-",
                       "katilan": katilan.map { "\(adres($0)) cu=\($0.isCurrentUser) \($0.participantStatus.rawValue)" }])
