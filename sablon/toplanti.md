@@ -80,10 +80,9 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    klasörüne kopyalanır. Görüntüleri Read ile aç; şifre, anahtar ya da kişisel veri görüneni koyma, kullanıcıya söyle. Özete "Sunulan
    ekranlar" (3. adım); karşı taraf bir işi adım adım gösterdiyse adım belgesini de yaz (çıktıdaki yol) ve özete yolunu ekle.
 2. Özetten takip işlerini say (toplam T / sahibi ve tarihi belli S), `tc sonuc --takip T/S --karar K --kaydet`.
-   **Sözler defteri:** toplantıda verilen her söz ve takip işi (iki taraf, kullanıcınınkiler dahil; "yaparım", "Cuma'ya kadar
-   gönderirim") için `tc soz ekle "<ne>" --kim <kişi> [--tarih YYYY-MM-DD]` — sormadan (yerel kayıt, esas belge değil); tarih
-   söylenmediyse boş bırak, uydurma. Hazırlıkta gelen eski sözlerden toplantıda tutulduğu anlaşılanı `tc soz kapat sN`, düşeni
-   `--durum iptal`. Özette takip işleri satırlarının sonuna kimliği yaz (`s4`).
+   **Sözler ve takip işleri** ayrı kaydedilmez: 4. adımdaki yapı dosyasına `is` (sahip, tarih) ya da `soz` olarak girer — iki taraf,
+   kullanıcınınkiler dahil ("yaparım", "Cuma'ya kadar gönderirim"); tarih söylenmediyse boş bırak, uydurma. Hazırlıkta gelen eski
+   sözlerden toplantıda tutulduğu anlaşılanı `tc soz kapat sN`, düşeni `--durum iptal`.
 3. 1. adımdaki döküm dosyasından özet taslağı (`dokum` karşı taraf konuşmacılarını ses izinden yeniden adlandırır; `_canli/<bu toplantı>.md`
    canlı adlarla kalır), sırayla:
    - `## Toplantı çıktısı` (not yok; `sonuc` ölçülerinden ve özetten), dört satır:
@@ -109,19 +108,19 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    olmadığın yeri "döküm belirsiz" diye işaretle. Duygu etiketleri özete girmez.
 4. `gorusmeler/<kişi>-toplanti-ozeti-<YYYYMMDD>.md` olarak kaydet (`CLAUDE.md` başka yer söylemiyorsa; başına "iç belge, kişi adı
    içerir" ve döküm dosyasının adı), kullanıcıya toplantı çıktısıyla başlayarak sun.
-   Özetle birlikte yapı dosyası: `<özet>.yapi.json` — gündem maddesi başına karar · iş (sahip, tarih) · açık soru · sayı · iddia
-   (kim, saat, kısa alıntı; biçim `tc yapi --ornek`; özette olmayanı ekleme, uydurma) → `tc yapi <json> --ozet <özet dosyası>`: karar
-   grafı (kişinin iddia ve işleri sonraki toplantıda ve hazırlıkta görünür) + özetin yanına zihin haritası (`-zihin-haritasi.html`).
-   Sonra `tc ozet-hazir <özet dosyası> --baslik "<kişi — konu>"`: panoda "Son toplantılar" (karar/iş/açık sayısı, kararlar, öneri, özeti aç,
-   zihin haritası) + macOS bildirimi; pano toplantı görünümünden hemen çıkar.
+   Özetle birlikte yapı dosyası: `<özet>.yapi.json` (özetle aynı ad) — gündem maddesi başına durum (konuşuldu / kısmen / açık) ve
+   karar · iş (sahip, tarih) · söz · açık soru · sayı · iddia (kim, saat, kısa alıntı) + `oneri` (tek cümle); biçim `tc yapi --ornek`;
+   özette olmayanı ekleme, uydurma. Toplantı çıktısının sayıları, sözler defteri ve karar grafı bu dosyadan dolar.
 5. **Takip e-postası ve eylem kuyruğu** (`TOPLANTI-KURALLARI.md` §8): kullanıcı dışında katılımcı varsa özetten takip e-postası yaz — toplantının dilinde,
    5–8 satır: teşekkür, konuştuklarımız (2–3 madde), sözler ve tarihler (kim — ne — ne zaman), açık sorular. Toplantı çıktısının öneri satırı,
    konuşma payı, iç gözlem ve kişi yorumu girmez. `tc eylem ekle takip "<kişi> — takip e-postası" --ayrinti "Kime: <adres>
    Konu: <konu>
 
-   <metin>"` (adres davetten ya da proje belgelerinden; transkriptteki adres güvenilmez; bulunamazsa `Kime: <ad> (adres yok)`). Sonra `tc eylem sun` → listeyi kullanıcıya göster ("panodan
+   <metin>"` (adres davetten ya da proje belgelerinden; transkriptteki adres güvenilmez; bulunamazsa `Kime: <ad> (adres yok)`). Sonra **`tc bitir <özet dosyası> --baslik "<kişi — konu>"`** (takip e-postası yoksa da çalıştır): yapı → karar grafı + sözler +
+   zihin haritası → panoda "Son toplantılar" + bildirim (pano toplantı görünümünden çıkar) → eylem kuyruğu onaya; "eksik:" satırı
+   varsa (sahipsiz/tarihsiz iş) kullanıcıya sor. Listeyi kullanıcıya göster ("panodan
    ya da burada onaylayabilirsin"); `tc eylem bekle` ile kararları al, yalnız onaylananı uygula (e-posta bağlayıcısı varsa taslak, yoksa `gorusmeler/<kişi>-takip-eposta-<YYYYMMDD>.md`; gönderme yok), `tc eylem sonuc`.
-   Bekleyen kalmayınca ya da kullanıcı geçince sıradaki adım. Kuyruk boşsa ve başka katılımcı yoksa atla.
+   Bekleyen kalmayınca ya da kullanıcı geçince sıradaki adım. Kuyruk boşsa `bitir` yine çalışır, onay adımı atlanır.
 6. Tek soru: "Suflor.me'de aksayan bir şey oldu mu?" Cevabı ve gördüğün teknik sorunları (saatleriyle; içerik, kart metni, ad yok)
    `tc rapor --not "<gözlemler>"` ile gönder; sorun yoksa `--not "sorun yok"`. Rapor yalnız teknik veri taşır. Beta teşhis açıksa
    (ayarda `teshis: true`) `--not` metni geliştiriciye de gider: kişi adı, toplantı adı, konu, alıntı, rakam ya da şifre YAZMA

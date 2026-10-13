@@ -38,7 +38,7 @@ runpy.run_path(sys.argv[0], run_name="__main__")
 
 def kur(T):
     kod = os.path.join(T, "kod"); os.makedirs(kod)
-    for f in ("relay.py", "toplanti-claude.py", "baglam.py", "teshis.py", "manifest.json"):
+    for f in ("relay.py", "toplanti-claude.py", "baglam.py", "yapi.py", "teshis.py", "manifest.json"):
         if os.path.exists(os.path.join(KOK, f)): shutil.copy(os.path.join(KOK, f), kod)
     for d in ("marka", "pano", "aktarici"):
         if os.path.isdir(os.path.join(KOK, d)): shutil.copytree(os.path.join(KOK, d), os.path.join(kod, d))

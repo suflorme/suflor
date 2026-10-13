@@ -16,15 +16,27 @@ def tc(*a): return subprocess.run([sys.executable, os.path.join(KOD, "toplanti-c
 Y = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": [
     {"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [{"tur": "karar", "metin": "Bütçe 120 bin", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım"},
                                                          {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz"}, {"tur": "yanlis", "metin": "atılmalı"}]},
-    {"baslik": "Teklif", "ogeler": [{"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17"}, {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"}]}]}
+    {"baslik": "Teklif", "ogeler": [{"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17"}, {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"},
+                                    {"tur": "soz", "metin": "Faturaları gönderecek", "sahip": "Ayşe Yılmaz"}]}], "oneri": "Gündemi bir gün önce gönder"}
 yj = os.path.join(T, "ozet.yapi.json"); json.dump(Y, open(yj, "w"), ensure_ascii=False)
 ozet = os.path.join(T, "ayse-toplanti-ozeti-20261011.md"); open(ozet, "w").write("# Özet\n\n## Toplantı çıktısı\n- **Kararlar (1):** Bütçe onaylandı\n- **Sahipli işler (2):** Ayşe — rapor — 15 Ekim; Ali — teklif — tarihsiz\n- **Açık kalanlar:** yok\n- **Öneri:** gündemi önceden gönder\n")
 o = tc("yapi", yj, "--ozet", ozet)
 db = os.path.join(canli, "karar-grafi.sqlite"); hy = ozet[:-3] + "-zihin-haritasi.html"
 n = lambda: sqlite3.connect(db).execute("SELECT COUNT(*) FROM kayit").fetchone()[0]
-bak(f"yapi: 4 kayıt, geçersiz tür atıldı ({o.stdout.strip().splitlines()[0] if o.stdout else o.stderr[-200:]})", os.path.exists(db) and n() == 4)
+# eski sözler defteri (sozler.json) bir kez grafa taşınır
+json.dump({"sozler": [{"id": "s1", "kim": "Bora Kaya", "metin": "Eski söz", "tarih": "2026-01-02", "durum": "acik", "toplanti": "Eski", "at": "2026-01-01T10:00:00"}]},
+          open(os.path.join(canli, "sozler.json"), "w"), ensure_ascii=False)
+bak(f"yapi: 5 kayıt, geçersiz tür atıldı ({o.stdout.strip().splitlines()[0] if o.stdout else o.stderr[-200:]})", os.path.exists(db) and n() == 5)
 bak("veritabanı 0600", os.path.exists(db) and not os.stat(db).st_mode & 0o077)
-tc("yapi", yj, "--ozet", ozet); bak("aynı toplantı ikinci kez: çoğalmadı", n() == 4)
+tc("yapi", yj, "--ozet", ozet); bak("aynı toplantı ikinci kez: çoğalmadı", n() == 5)
+sl = tc("soz", "liste").stdout
+bak("sözler defteri graftan: yapının işi ve sözü + taşınan eski söz", "Teklifi revize et" in sl and "Faturaları gönderecek" in sl and "Eski söz" in sl and "GEÇTİ" in sl
+    and os.path.exists(os.path.join(canli, "sozler-tasindi.json")) and not os.path.exists(os.path.join(canli, "sozler.json")))
+sid = re.search(r"(s\d+) \[acik\] Bora Kaya: Eski söz", sl)
+k = tc("soz", "kapat", sid.group(1) if sid else "s0").stdout
+bak("soz kapat: grafta kapanır, açık listede yok, --hepsi'de var", "[tutuldu]" in k and "Eski söz" not in tc("soz", "liste").stdout and "Eski söz" in tc("soz", "liste", "--hepsi").stdout)
+tc("soz", "ekle", "Elle eklenen söz", "--kim", "Bora Kaya"); tc("yapi", yj, "--ozet", ozet)
+bak("yapi yeniden yazılınca elle eklenen söz kalır", "Elle eklenen söz" in tc("soz", "liste", "--kim", "Bora").stdout)
 g = tc("graf", "--kim", "ayşe").stdout
 bak("graf --kim ilk adla: Ayşe'nin karar ve iddiası, Bora'nınki yok", "Bütçe 120 bin" in g and "95 bin" in g and "revize" not in g)
 bak("graf --kim sahip: Bora'nın açık işi", "Teklifi revize et" in tc("graf", "--kim", "Bora").stdout)
@@ -63,6 +75,21 @@ try:
     q = urllib.request.Request(f"http://127.0.0.1:{PORT}/son-ac", data=json.dumps({"id": son.get("id"), "tur": "harita"}).encode(),
                                headers={"X-Suflor-Anahtar": K, "Origin": f"http://127.0.0.1:{PORT}"})
     a = json.loads(urllib.request.urlopen(q, timeout=10).read()); time.sleep(0.3)
+    # bitir: yapı → graf + harita → ozet-hazir (sayılar yapıdan) → eylem kuyruğu
+    oz2 = os.path.join(T, "bora-toplanti-ozeti-20261012.md"); open(oz2, "w").write("# Özet\n\n## Toplantı çıktısı\n- **Kararlar (9):** metindeki sayı kullanılmamalı\n")
+    tc("eylem", "ekle", "takip", "Bora — takip e-postası", "--ayrinti", "Kime: Bora Kaya (adres yok)", "--kim", "Bora Kaya")
+    b = tc("bitir", oz2, "--yapi", yj, "--baslik", "Bora — teklif")
+    bo = b.stdout + b.stderr
+    bak("bitir: graf, harita, eksik uyarısı, sayılar yapıdan (1 karar, 2 iş, 1 açık), kuyruk onaya", "karar grafı:" in bo and "zihin haritası" in bo and "eksik:" in bo
+        and "tarih yok" in bo and "1 karar, 2 iş, 1 açık" in bo and "onaya sunuldu" in bo)
+    bak("bitir: öneri yapı dosyasından", "Gündemi bir gün önce gönder" in json.dumps(json.loads(urllib.request.urlopen(urllib.request.Request(
+        f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read()).get("son_toplantilar"), ensure_ascii=False))
+    bak("eylem kuyruğunun takip işi grafta açık iş (sahibi kullanıcı)", re.search(r"\[acik\] [^:]+: Bora — takip e-postası", tc("soz", "liste").stdout) is not None)
+    tc("eylem", "onay", "hepsi", "--red")
+    bak("kuyrukta reddedilince grafta iptal", "Bora — takip e-postası" not in tc("soz", "liste").stdout
+        and re.search(r"\[iptal\] [^:]+: Bora — takip e-postası", tc("soz", "liste", "--hepsi").stdout) is not None)
+    nb = tc("bitir", os.path.join(T, "yok.md"))
+    bak("bitir: özet yoksa açık hata", nb.returncode != 0 and "özet .md bulunamadı" in nb.stderr)
     bak("Zihin haritası düğmesi açar (deneme)", a.get("ok") and "AÇ (deneme): harita" in open(os.path.join(T, "relay.log"), encoding="utf-8").read())
 finally: r.terminate(); r.wait(5)
 if not hata: shutil.rmtree(T, ignore_errors=True)

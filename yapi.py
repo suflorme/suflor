@@ -5,6 +5,8 @@
 #    Hazırlıkta ve toplantıda (KATILIMCI olayı) kişinin geçmiş iddiaları ve açık işleri; Claude çelişkiyi aramadan graftan görür.
 #  - zihin haritası: <özet>-zihin-haritasi.html (tek dosya, çevrimdışı; NotebookLM benzeri: merkezde toplantı, dallar gündem maddeleri,
 #    altında karar · iş · açık soru · sayı · iddia; düğüm açılır/kapanır, yaprağa dokununca alıntı ve saat; "Resim olarak indir" PNG).
+#  - sözler defteri (v0.32.8, S44): ayrı dosya değil, grafın iş/söz kayıtları ("sN" = kayıt kimliği); eski sozler.json bir kez taşınır.
+#    Eylem kuyruğunun dış işleri (takvim, e-posta, takip, mesaj) grafa kullanıcının işi olarak bağlanır (bag "eylem:eN"), durumu kuyruktan izlenir.
 # Python 3.9, yalnız standart kütüphane. Metinler veridir; HTML'e kaçışlı (JSON) gömülür.
 import datetime, html, json, os, re, sqlite3
 TURLER = {"karar": "Karar", "is": "İş", "soru": "Açık soru", "sayi": "Sayı", "iddia": "İddia", "soz": "Söz"}
@@ -12,7 +14,9 @@ YAPI_ORNEK = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": 
     {"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [
         {"tur": "karar", "metin": "Bütçe 120 bin olarak kalıyor", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım"},
         {"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17", "saat": "10:15:02"},
-        {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"}, {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz", "saat": "10:11:00"}]}]}
+        {"tur": "soz", "metin": "Geçen yılın faturalarını gönderecek", "sahip": "Ayşe Yılmaz", "tarih": "2026-10-14"},
+        {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"}, {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz", "saat": "10:11:00"}]}],
+    "oneri": "Gündemi bir gün önce gönder"}
 def kucuk(t): return str(t).replace("İ", "i").replace("I", "ı").lower()
 def oku(yol):
     v = json.load(open(yol, encoding="utf-8"))
@@ -27,13 +31,14 @@ def _db(dizin):
     c.execute("""CREATE TABLE IF NOT EXISTS kayit (id INTEGER PRIMARY KEY, toplanti TEXT, baslik TEXT, tarih TEXT, madde TEXT, tur TEXT,
                  kim TEXT, sahip TEXT, metin TEXT, son_tarih TEXT, saat TEXT, alinti TEXT, durum TEXT DEFAULT 'acik', eklendi TEXT)""")
     c.execute("CREATE INDEX IF NOT EXISTS kayit_kim ON kayit (kim)"); c.execute("CREATE INDEX IF NOT EXISTS kayit_sahip ON kayit (sahip)")
+    if "bag" not in [x[1] for x in c.execute("PRAGMA table_info(kayit)")]: c.execute("ALTER TABLE kayit ADD COLUMN bag TEXT")  # söz/eylem bağı
     if yeni: os.chmod(yol, 0o600)
     return c
 def graf_yaz(dizin, v, toplanti):
     # aynı toplantı yeniden yazılırsa eski kayıtları yerine geçer
     c = _db(dizin); n = 0
     with c:
-        c.execute("DELETE FROM kayit WHERE toplanti = ?", (toplanti,))
+        c.execute("DELETE FROM kayit WHERE toplanti = ? AND bag IS NULL", (toplanti,))  # elle eklenen söz ve eylem bağları kalır
         for m in v["maddeler"]:
             for o in m["ogeler"]:
                 c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, saat, alinti, eklendi) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -65,6 +70,62 @@ def graf_sil(dizin, toplanti=None, hepsi=False):
     if hepsi: os.remove(yol); return -1
     c = _db(dizin)
     with c: n = c.execute("DELETE FROM kayit WHERE toplanti = ?", (toplanti,)).rowcount
+    c.close(); return n
+def cikti_say(v):
+    # toplantı çıktısı sayıları yapı dosyasından: karar · iş (iş + söz) · açık (açık soru + konuşulmayan/kısmen madde)
+    og = [o for m in v["maddeler"] for o in m["ogeler"]]
+    acik_madde = sum(1 for m in v["maddeler"] if kucuk(m.get("durum") or "") in ("açık", "acik", "kısmen", "kismen", "konuşulmadı", "konusulmadi"))
+    return {"karar": sum(o["tur"] == "karar" for o in og), "is": sum(o["tur"] in ("is", "soz") for o in og),
+            "acik": sum(o["tur"] == "soru" for o in og) + acik_madde}
+def eksik_isler(v):  # sahibi ya da tarihi olmayan iş/söz (bitir uyarısı)
+    return [o for m in v["maddeler"] for o in m["ogeler"] if o["tur"] in ("is", "soz") and (not (o.get("sahip") or o.get("kim")) or not o.get("tarih"))]
+# --- sözler defteri: grafın iş/söz kayıtları -------------------------------------------------------------------------
+def soz_dict(row):
+    i, tarih, tur, kim, sahip, metin, son, baslik, durum, eklendi = row
+    return {"id": f"s{i}", "kim": sahip or kim, "metin": metin, "tarih": son, "durum": durum, "toplanti": baslik, "at": eklendi or tarih, "tur": tur}
+def sozler(dizin, kim=None):
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return []
+    c = _db(dizin)
+    rs = c.execute("SELECT id, tarih, tur, kim, sahip, metin, son_tarih, baslik, durum, eklendi FROM kayit WHERE tur IN ('is', 'soz') ORDER BY id").fetchall(); c.close()
+    ilk = _ilk(kim) if kim else None
+    return [soz_dict(x) for x in rs if not ilk or _ilk(x[4] or x[3]) == ilk or (kim and kucuk(kim) in kucuk(x[4] or x[3] or ""))]
+def soz_ekle(dizin, kim, metin, tarih=None, toplanti=None, baslik=None):
+    c = _db(dizin)
+    with c:
+        i = c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, eklendi, bag) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                      (toplanti, baslik, datetime.date.today().isoformat(), None, "soz", None, kim, metin, tarih, datetime.datetime.now().isoformat(timespec="seconds"), "soz")).lastrowid
+    x = soz_dict(c.execute("SELECT id, tarih, tur, kim, sahip, metin, son_tarih, baslik, durum, eklendi FROM kayit WHERE id = ?", (i,)).fetchone()); c.close(); return x
+def soz_kapat(dizin, sid, durum):
+    if not re.fullmatch(r"s\d+", sid or "") or not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return None
+    c = _db(dizin)
+    with c: n = c.execute("UPDATE kayit SET durum = ? WHERE id = ? AND tur IN ('is', 'soz')", (durum, int(sid[1:]))).rowcount
+    x = c.execute("SELECT id, tarih, tur, kim, sahip, metin, son_tarih, baslik, durum, eklendi FROM kayit WHERE id = ?", (int(sid[1:]),)).fetchone(); c.close()
+    return soz_dict(x) if n and x else None
+def sozler_tasi(dizin):
+    # eski sozler.json (Faz 3) → graf, bir kez; dosya sozler-tasindi.json olur (silinmez)
+    yol = os.path.join(dizin, "sozler.json")
+    if not os.path.exists(yol): return 0
+    try: xs = json.load(open(yol, encoding="utf-8")).get("sozler") or []
+    except (OSError, ValueError): return 0
+    c = _db(dizin)
+    with c:
+        for x in xs:
+            c.execute("INSERT INTO kayit (toplanti, baslik, tarih, tur, sahip, metin, son_tarih, durum, eklendi, bag) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                      (x.get("file"), x.get("toplanti"), str(x.get("at") or "")[:10], "soz", x.get("kim"), x.get("metin"), x.get("tarih"),
+                       x.get("durum") or "acik", x.get("at"), "soz"))
+    c.close(); os.replace(yol, os.path.join(dizin, "sozler-tasindi.json")); return len(xs)
+def eylem_esle(dizin, eylemler, sahip, toplanti=None):
+    # kuyruğun dış işleri grafta kullanıcının işi; durum kuyruktan: yapildi → yapildi, reddedildi → iptal, diğerleri açık
+    c = _db(dizin); n = 0
+    with c:
+        for e in eylemler:
+            if e.get("tur") not in ("takvim", "eposta", "takip", "mesaj", "diger") or not e.get("id"): continue
+            bag = f"eylem:{e['id']}"; durum = {"yapildi": "yapildi", "reddedildi": "iptal"}.get(e.get("durum"), "acik")
+            var = c.execute("SELECT id FROM kayit WHERE bag = ?", (bag,)).fetchone()
+            if var: c.execute("UPDATE kayit SET durum = ? WHERE id = ?", (durum, var[0])); continue
+            c.execute("INSERT INTO kayit (toplanti, tarih, tur, sahip, metin, durum, eklendi, bag) VALUES (?,?,?,?,?,?,?,?)",
+                      (toplanti, datetime.date.today().isoformat(), "is", sahip, str(e.get("baslik") or "")[:600], durum,
+                       datetime.datetime.now().isoformat(timespec="seconds"), bag)); n += 1
     c.close(); return n
 # --- zihin haritası --------------------------------------------------------------------------------------------------
 def harita_veri(v):
