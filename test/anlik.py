@@ -32,7 +32,7 @@ def satir(istek, kim, metin, kanal, t0, t1, id_=None):
           "text": metin, "kanal": kanal, "t0": t0, "t1": t1}]})
 an = lambda istek: istek("/cards").get("anlik")
 
-r, T, istek = kur()
+r, T, istek = kur({"lakaplar": ["Başkan"]})
 try:
     t = time.time() - 100
     satir(istek, "Karşı taraf 1", "Bunu Kerem'in ekibi hazırlasın", "karsi", t, t + 2, "wh/karsi/ad1")
@@ -46,6 +46,9 @@ try:
     bak("adın içinde geçtiği başka sözcük uyarmaz", (an(istek) or {}).get("id") == i1)
     satir(istek, "Kerem S", "Kerem olarak ben söylüyorum", "ben", t + 6, t + 8)
     bak("kullanıcının kendi satırı uyarmaz", (an(istek) or {}).get("id") == i1)
+    satir(istek, "Karşı taraf 2", "Bunu Başkana soralım", "karsi", t + 8, t + 9)
+    a = an(istek) or {}
+    bak("ayardaki lakap (ekli) de uyarır", a.get("tur") == "ad" and a.get("id") != i1 and "Karşı taraf 2" in a.get("metin", "")); i1 = a.get("id")
     # uzun konuşma: 10–60 sn arası konuşma, kısa onay sayacı sıfırlamaz, sonra 4+ sözcük sıfırlar
     for k in range(6): satir(istek, "Kerem S", "bir iki üç dört beş altı", "ben", t + 10 + k * 10, t + 18 + k * 10)
     satir(istek, "Karşı taraf 1", "evet", "karsi", t + 60, t + 61)
@@ -58,7 +61,7 @@ try:
     satir(istek, "Karşı taraf 1", "Peki şunu sorayım o zaman", "karsi", t + 99, t + 100)
     for k in range(3): satir(istek, "Kerem S", "yeni konu", "ben", t + 100 + k * 5, t + 104 + k * 5)
     bak("4+ sözcüklük karşı satır sayacı sıfırladı", (an(istek) or {}).get("id") == iu)
-    bak("günlükte ANLIK satırları", open(os.path.join(T, "relay.log"), encoding="utf-8").read().count("ANLIK: ") == 2)
+    bak("günlükte ANLIK satırları", open(os.path.join(T, "relay.log"), encoding="utf-8").read().count("ANLIK: ") == 3)
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 
 r, T, istek = kur({"adin_gecti": False, "uzun_konusma_sn": 0})

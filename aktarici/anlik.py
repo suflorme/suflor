@@ -2,7 +2,7 @@
 # STATE, LOCK, AYAR, sade, ben_adi, _t … relay.py'nin. import etme. Python 3.9 uyumlu.
 # --- Anlık uyarı: Claude'u beklemeden, yalnız kullanıcıya (pano durum satırı, mini pano, şeritte kısa bildirim) ----------------
 # 1) Adın geçti: karşı tarafın satırında kullanıcının ilk adı geçerse (ekli biçimler de: "Kerem'in", "Kereme") tek satır — kim, ne dedi.
-#    Ek yalnız Türkçe hâl ekleri (kısa adda "Ali" → "alın" gibi sözcük yakalanmasın). Aynı satırın düzeltmeleri yeniden uyarmaz; aynı kişiden
+#    Ayar "lakaplar" (liste) başka hitapları da ekler. Ek yalnız Türkçe hâl ekleri (kısa adda "Ali" → "alın" gibi sözcük yakalanmasın). Aynı satırın düzeltmeleri yeniden uyarmaz; aynı kişiden
 #    30 sn içinde ikincisi görünen uyarının metnini günceller (yeni bildirim yok). Ayar adin_gecti: false kapatır.
 # 2) Uzun konuşma: karşı taraf araya girmeden (≥ 4 sözcüklük karşı satır yok) kullanıcı uzun_konusma_sn'den (90) uzun konuşursa bir kez
 #    "1,5 dk'dır sen konuşuyorsun". Kısa onaylar ("evet", "hı hı") sözü kesmiş sayılmaz; kullanıcı 20 sn susarsa sayaç sıfırlanır. 0 kapatır.
@@ -19,9 +19,9 @@ def anlik_ver(tur, metin, ayrinti=""):
 def anlik_view():
     a = ANLIK["son"]
     return {k: a[k] for k in ("id", "tur", "metin", "ayrinti")} if a and time.time() - a["t"] < ANLIK_SN else None
-def _ilk_ad():
-    a = sade(str(ben_adi() or "")).split(" ")[0]
-    return a if len(a) >= 3 else None
+def _adlar():  # ilk ad + ayar "lakaplar" (sana başka adla hitap ediliyorsa; ör. ["Memo", "Başkan"]) — sade biçim, en az 3 harf
+    xs = [sade(str(ben_adi() or "")).split(" ")[0]] + [" ".join(sade(str(x)).split()) for x in (AYAR.get("lakaplar") or []) if isinstance(x, str)]
+    return [x for x in dict.fromkeys(xs) if len(x) >= 3]
 def anlik_satir(key, e, text, onceki):
     # ingest'in her yazılan satırı için (LOCK içinde); hata satır yazımını durdurmaz
     try: _anlik_satir(key, e, text, onceki)
@@ -46,8 +46,8 @@ def _anlik_satir(key, e, text, onceki):
         elif sz >= 4: u.update(bas=None, uyardi=False)
     # 1) adın geçti
     if ben or AYAR.get("adin_gecti") is False or not e.get("id") or e["id"] in ANLIK["ad_id"]: return
-    ad = _ilk_ad()
-    if not ad or not re.search(r"(?<![a-z])" + re.escape(ad) + _AD_EK + r"(?![a-z])", sade(str(text)).replace("’", "'")): return
+    st = sade(str(text)).replace("’", "'")
+    if not any(re.search(r"(?<![a-z])" + re.escape(a) + _AD_EK + r"(?![a-z])", st) for a in _adlar()): return
     ANLIK["ad_id"].add(e["id"])
     if len(ANLIK["ad_id"]) > 500: ANLIK["ad_id"] = set(list(ANLIK["ad_id"])[-200:])
     ozet = f"“{' '.join(str(text).split())[:140]}”"; a = ANLIK["son"]
