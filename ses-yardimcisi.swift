@@ -165,6 +165,8 @@ func tapKur(_ hedef: [AudioObjectID]?, kis: Bool = false) -> String? {  // hedef
                 for i in 0..<n { let v = mono[i] * bol * (k0 + (k1 - k0) * Float(i) / Float(n)); for c in 0..<kk { p[i * kk + c] = v } }
             }
             kisKazanc = k1
+        } else {  // kısmasız: çıkışa açıkça sessizlik (tampon temizlenmemişse eski parça kulaklıkta tekrar çalmasın — 13 Ekim boğuk ses şüphesi)
+            for b in UnsafeMutableAudioBufferListPointer(cikis) { if let p = b.mData { memset(p, 0, Int(b.mDataByteSize)) } }
         }
     }
     if r != noErr { tapDurdur(); return "ses okuyucu kurulamadı (\(r))" }

@@ -85,8 +85,9 @@ try:
     bak("bitir: öneri yapı dosyasından", "Gündemi bir gün önce gönder" in json.dumps(json.loads(urllib.request.urlopen(urllib.request.Request(
         f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read()).get("son_toplantilar"), ensure_ascii=False))
     bak("eylem kuyruğunun takip işi grafta açık iş (sahibi kullanıcı)", re.search(r"\[acik\] [^:]+: Bora — takip e-postası", tc("soz", "liste").stdout) is not None)
-    tc("eylem", "onay", "hepsi", "--red")
-    bak("kuyrukta reddedilince grafta iptal", "Bora — takip e-postası" not in tc("soz", "liste").stdout
+    urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/eylem-karar", data=json.dumps({"id": "hepsi", "durum": "reddedildi"}).encode(),
+                           headers={"X-Suflor-Anahtar": K, "Origin": f"http://127.0.0.1:{PORT}"}), timeout=10)  # panodan Reddet: eylem komutu çalışmıyor
+    bak("panoda reddedilince (eylem komutu olmadan) grafta iptal", "Bora — takip e-postası" not in tc("soz", "liste").stdout
         and re.search(r"\[iptal\] [^:]+: Bora — takip e-postası", tc("soz", "liste", "--hepsi").stdout) is not None)
     nb = tc("bitir", os.path.join(T, "yok.md"))
     bak("bitir: özet yoksa açık hata", nb.returncode != 0 and "özet .md bulunamadı" in nb.stderr)

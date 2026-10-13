@@ -405,25 +405,40 @@ final class Masaustu {
         return tekil.isEmpty ? nil : Array(tekil.prefix(50))
     }
     // Teşhis: `--ax-dokum` → toplantı uygulamasının pencerelerindeki düğme etiketleri ve diğer metinler stdout'a (gerçek ağaçla adları doğrulamak için)
-    func dokum() {
-        print("izin:", AXIsProcessTrusted())
+    func dokum() { print(dokumMetin(bekle: true), terminator: "") }
+    func dokumMetin(bekle: Bool) -> String {
+        var o = "izin: \(AXIsProcessTrusted())\n"
         for app in NSWorkspace.shared.runningApplications {
             guard UYG.contains(where: { $0.bundle == app.bundleIdentifier }) else { continue }
-            let kok = AXUIElementCreateApplication(app.processIdentifier); ac(kok); Thread.sleep(forTimeInterval: 2.5)
+            let kok = AXUIElementCreateApplication(app.processIdentifier); ac(kok); if bekle { Thread.sleep(forTimeInterval: 2.5) }
             for w in (deger(kok, kAXWindowsAttribute) as? [AXUIElement] ?? []) {
-                print("== \(app.bundleIdentifier ?? "") · \((deger(w, kAXTitleAttribute) as? String) ?? "")")
+                o += "== \(app.bundleIdentifier ?? "") · \((deger(w, kAXTitleAttribute) as? String) ?? "")\n"
                 var n = 0, yigin: [(AXUIElement, Int)] = [(w, 0)], metin = Set<String>()
                 while let (e, d) = yigin.popLast(), n < 8000 {
                     n += 1; let r = (deger(e, kAXRoleAttribute) as? String) ?? ""
                     let t = [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute].compactMap { deger(e, $0) as? String }.filter { !$0.isEmpty }
-                    if r == "AXButton" || r == "AXCheckBox" || r == "AXMenuButton" || r == "AXToggle" { if !t.isEmpty { print("  \(r) · \(t.joined(separator: " | ").prefix(120))") } }
+                    if r == "AXButton" || r == "AXCheckBox" || r == "AXMenuButton" || r == "AXToggle" { if !t.isEmpty { o += "  \(r) · \(t.joined(separator: " | ").prefix(120))\n" } }
                     else { for x in t + [(r == kAXStaticTextRole as String ? deger(e, kAXValueAttribute) as? String : nil) ?? ""] where !x.isEmpty && x.count < 120 { metin.insert("\(r) · \(x)") } }
                     if d < 45, let c = deger(e, kAXChildrenAttribute) as? [AXUIElement] { yigin.append(contentsOf: c.map { ($0, d + 1) }) }
                 }
-                for m in metin.sorted().prefix(300) { print("  ~ \(m)") }
-                print("  öğe: \(n)")
+                for m in metin.sorted().prefix(300) { o += "  ~ \(m)\n" }
+                o += "  öğe: \(n)\n"
             }
         }
+        return o
+    }
+    // toplantı sürerken "Ayrıl" bir taramada bulunamayınca o anki ağaç kendiliğinden dosyaya (13 Ekim deneme 8: 78 sn kayıp, elle `--ax-dokum` gerekti).
+    // Toplantı başına en çok 3, aralarında ≥ 60 sn; ~/Library/Logs/suflor-ax/<zaman>.txt (adlar içerir: iç belge, makinede kalır).
+    var otoDokumSay = 0, otoDokumSon = Date.distantPast
+    func otoDokum() {
+        guard otoDokumSay < 3, Date().timeIntervalSince(otoDokumSon) > 60 else { return }
+        otoDokumSay += 1; otoDokumSon = Date()
+        let kl = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/suflor-ax")
+        try? FileManager.default.createDirectory(at: kl, withIntermediateDirectories: true)
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmmss"
+        let yol = kl.appendingPathComponent("\(f.string(from: Date())).txt")
+        do { try dokumMetin(bekle: false).write(to: yol, atomically: true, encoding: .utf8); print("MASAÜSTÜ: \"Ayrıl\" bulunamadı → ağaç döküldü: \(yol.path)") }
+        catch { print("MASAÜSTÜ: ağaç dökülemedi (\(error.localizedDescription))") }
     }
     // sessiz mi (hızlı yol): saklanan düğmenin etiketi; düğme yoksa ya da okunamazsa son taramanın sonucu
     func sessizHizli() -> Bool? {
@@ -442,9 +457,10 @@ final class Masaustu {
             // toplantı bitti sayıldı, ses yardımcısı aç-kapa döngüsüne girdi. Uygulama kapandıysa (tara() nil/boş) beklenmez.
             if !(v["toplantida"] as? Bool ?? false), self.son["toplantida"] as? Bool ?? false, !v.isEmpty, self.kayip + 1 < Masaustu.KAYIP_ESIK {
                 self.kayip += 1; v = self.son; v.removeValue(forKey: "katilimcilar"); v.removeValue(forKey: "konusan")
+                if self.kayip == 1 { self.otoDokum() }
             } else { self.kayip = 0 }
             let top = v["toplantida"] as? Bool ?? false, once = self.son["toplantida"] as? Bool ?? false
-            if top && !once { self.toplantiBas = Date(); self.kisilerSon = .distantPast }
+            if top && !once { self.toplantiBas = Date(); self.kisilerSon = .distantPast; self.otoDokumSay = 0 }
             if !top && once { self.cikis = Date() }
             // Kişiler paneli: toplantı başından 15 sn sonra, sonra 3 dk'da bir
             if top, args.contains("--kisiler-ac"), Date().timeIntervalSince(self.toplantiBas) > 15, Date().timeIntervalSince(self.kisilerSon) > 180 {

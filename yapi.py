@@ -114,8 +114,9 @@ def sozler_tasi(dizin):
                       (x.get("file"), x.get("toplanti"), str(x.get("at") or "")[:10], "soz", x.get("kim"), x.get("metin"), x.get("tarih"),
                        x.get("durum") or "acik", x.get("at"), "soz"))
     c.close(); os.replace(yol, os.path.join(dizin, "sozler-tasindi.json")); return len(xs)
-def eylem_esle(dizin, eylemler, sahip, toplanti=None):
+def eylem_esle(dizin, eylemler, sahip, toplanti=None, ekle=True):
     # kuyruğun dış işleri grafta kullanıcının işi; durum kuyruktan: yapildi → yapildi, reddedildi → iptal, diğerleri açık
+    # ekle=False: yalnız var olan bağların durumu (okumadan önce eşitleme — panodan onay/ret eylem komutu çalışmadan da yansır)
     c = _db(dizin); n = 0
     with c:
         for e in eylemler:
@@ -123,6 +124,7 @@ def eylem_esle(dizin, eylemler, sahip, toplanti=None):
             bag = f"eylem:{e['id']}"; durum = {"yapildi": "yapildi", "reddedildi": "iptal"}.get(e.get("durum"), "acik")
             var = c.execute("SELECT id FROM kayit WHERE bag = ?", (bag,)).fetchone()
             if var: c.execute("UPDATE kayit SET durum = ? WHERE id = ?", (durum, var[0])); continue
+            if not ekle: continue
             c.execute("INSERT INTO kayit (toplanti, tarih, tur, sahip, metin, durum, eklendi, bag) VALUES (?,?,?,?,?,?,?,?)",
                       (toplanti, datetime.date.today().isoformat(), "is", sahip, str(e.get("baslik") or "")[:600], durum,
                        datetime.datetime.now().isoformat(timespec="seconds"), bag)); n += 1

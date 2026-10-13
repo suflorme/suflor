@@ -365,9 +365,9 @@ def soz_satir(x):
     return (f"{x['id']} [{x.get('durum')}] {x.get('kim') or '?'}: {x.get('metin')} · tarih {x.get('tarih') or 'yok'}{' — GEÇTİ' if gecti else ''}"
             f" · {x.get('toplanti') or '?'} {str(x.get('at', ''))[:10]}")
 def sozler_graf(kim=None):
-    Y = _yapi(); Y.sozler_tasi(A.dir); return Y.sozler(A.dir, kim)
+    Y = _yapi(); Y.sozler_tasi(A.dir); eylem_durum_esitle(Y); return Y.sozler(A.dir, kim)
 def soz_cmd():
-    Y = _yapi(); Y.sozler_tasi(A.dir)
+    Y = _yapi(); Y.sozler_tasi(A.dir); eylem_durum_esitle(Y)
     if A.islem == "ekle":
         if not A.deger or not A.kim: sys.exit("söz metni ve --kim gerekli")
         if A.tarih and not re.match(r"^\d{4}-\d{2}-\d{2}$", A.tarih): sys.exit("--tarih YYYY-MM-DD")
@@ -393,6 +393,9 @@ def eylem_satir(x, i=None, ayrinti=False):
 def eylem_grafa():  # kuyruğun dış işleri karar grafında kullanıcının işi (durum kuyruktan) — hata eylemi durdurmaz
     try: _yapi().eylem_esle(A.dir, _eylemler(), AYAR.get("ad") or BEN, toplanti_dosyasi(None))
     except Exception as e: print(f"(karar grafına bağlanamadı: {e.__class__.__name__})", file=sys.stderr)
+def eylem_durum_esitle(Y=None):  # okumadan önce: panodan verilen onay/ret ve sonuç grafa (yeni kayıt eklemez; aktarıcı kapalıysa sessiz geçer)
+    try: (Y or _yapi()).eylem_esle(A.dir, _eylemler(), AYAR.get("ad") or BEN, ekle=False)
+    except Exception: pass
 def eylem_cmd():
     try: _eylem_cmd()
     finally:
@@ -1257,7 +1260,7 @@ def yapi_cmd():
     print(f"karar grafı: {n} kayıt ({', '.join(f'{Y.kucuk(Y.TURLER[t])} {k}' for t, k in say.items() if k)}) · kaynak {kaynak}")
     print(f"zihin haritası: {hy}")
 def graf_cmd():
-    Y = _yapi()
+    Y = _yapi(); eylem_durum_esitle(Y)
     if A.hepsini_sil: Y.graf_sil(A.dir, hepsi=True); print("karar grafı silindi"); return
     if A.sil_toplanti: print(f"silindi: {Y.graf_sil(A.dir, A.sil_toplanti)} kayıt"); return
     rs = Y.graf_liste(A.dir, A.kim, A.n)
