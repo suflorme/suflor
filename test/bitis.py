@@ -44,6 +44,11 @@ try:
     tb = st().get("toplanti_bitti") or {}
     bak(f"mikrofon bırakıldı: bitti ({tb.get('neden')})", tb.get("file") == md and "mikrofonu bıraktı" in (tb.get("neden") or ""))
     time.sleep(3)
+    # izle bitişten sonra yeniden başlarsa eski bitişi yeni olay gibi vermez (13 Ekim deneme 8)
+    iz2 = subprocess.Popen([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", "izle", "--aralik", "1"],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    time.sleep(4); iz2.terminate(); o2 = iz2.communicate(timeout=10)[0]
+    bak("yeniden başlayan izle eski bitişi olay olarak vermez", "TOPLANTI BİTTİ" not in o2 and "bitti saymıştı" in o2)
     post("/ping", {"call": True, "panel": True, "meeting": M}); nabiz("dinliyor"); time.sleep(1.5)
     bak("yeniden katıldı: sıfırlandı", not st().get("toplanti_bitti"))
     for _ in range(9): time.sleep(1); nabiz("bekliyor")
