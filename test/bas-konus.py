@@ -20,7 +20,7 @@ subprocess.run(["swiftc", "-O", "-o", os.path.join(app, "Contents/MacOS/SuflorBr
 subprocess.run(["codesign", "-s", "-", "--force", "--deep", app], capture_output=True)
 os.makedirs(os.path.join(T, "bin")); sahte = os.path.join(T, "bin", "claude")  # Brifing.app yalnız adı "claude" olanı çalıştırır
 open(sahte, "w").write('''#!/usr/bin/env python3
-import json, sys, time
+import json, re, sys, time
 arg = sys.argv[1:]; assert "--input-format" in arg and "stream-json" in arg and not any("Bash" in a or "Write" in a for a in arg) and arg[arg.index("--model") + 1] == "sonnet"
 pr = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\\n"), sys.stdout.flush())
 n = 0
@@ -28,7 +28,9 @@ for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1; soru = q.split("Soru: ", 1)[-1]
     b = "[Bağlam" in q and "Şimdi:" in q and "Deneme planlama" in q and "GİZLİ NOT" not in q  # davet notu girmez
     if n == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
-    for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."] + ([" Önceki konuşma geldi."] if "[Önceki konuşma" in q and "Önceki soru: " in q else []):
+    for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."] + ([" Önceki konuşma geldi."] if "[Önceki konuşma" in q and "Önceki soru: " in q else []) \
+            + ([f" Defter geldi: {d.group(1)}."] if (d := re.search(r"\\[Toplantı defteri — (.+?);", q)) and "[/Toplantı defteri]" in q else []) \
+            + ([" Ek geldi."] if "[Defter eki" in q else []) + (["\\n---\\n", "Ayrıntı satırı 10:01."] if "[Toplantı defteri" in q or "[Defter eki" in q else []):
         time.sleep(0.15); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
@@ -125,7 +127,39 @@ try:
     e = ey()
     ok("'Hepsini onayla.' → kalan sunulanlar onaylandı, dizi bitti", all(e[i]["durum"] == "onaylandi" for i in ids[1:]) and sesli() is None and "Hepsi onaylandı" in (k.get("cevap") or ""))
     ok("sesli cevaplarda Claude süreci hiç çağrılmadı", len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) == cagri0)
+    # S48: biten toplantının defteri — süreç başına bir kez tam defter, aynı süreçte yalnız ek, "---" sonrası okunmaz, toplantı değişince yeni süreç
+    ok("toplantı yokken panoda defter satırı yok", st().get("defter") is None)
+    def uc2(yol, v): return json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}{yol}", data=json.dumps(v).encode(), headers={"X-Suflor-Anahtar": K}), timeout=10).read())
+    satir = lambda b, i, kim, s, m: uc2("/ingest", {"meeting": {"title": b}, "source": "transcript", "entries": [{"id": f"{b[:3]}/{i}", "speaker": kim, "time": s, "text": m}]})
+    satir("Defter denemesi", 1, "Ayla K", "10:01", "Bütçe kırk bin olsun."); satir("Defter denemesi", 2, "Deniz T", "10:02", "Teslim cuma günü.")
+    md = next(f for f in os.listdir(canli) if f.endswith(".md")); oz = os.path.join(T, "defter-ozet.md"); open(oz, "w").write("# Özet\nKarar: bütçe kırk bin.\n")
+    uc2("/son-toplanti", {"ozet": oz, "baslik": "Defter denemesi", "dosya": md, "metin": open(oz).read()}); time.sleep(0.5)
+    ok("bitişten sonra panoda 'Son toplantı hazır' (ad)", (st().get("defter") or {}).get("ad") == "Defter denemesi")
+    ses0 = log().count("SES (deneme)")
+    k6 = sor("Toplantıda bütçe ne oldu?")
+    ok("ilk soruda tam defter gitti (döküm + özet), cevapta '---' ayrıntı", k6["durum"] == "hazir" and "Defter geldi: Defter denemesi" in (k6.get("cevap") or "") and "---" in k6["cevap"]
+       and "DEFTER: bas-konuşa gitti — 1 dosya" in log())
+    ok("'---' sonrası okunmadı", "Ayrıntı satırı" not in log() and log().count("SES (deneme)") > ses0)
+    c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
+    ok("ölçümde defter işareti", c[-1].get("defter") is True)
+    t0 = time.time()
+    while time.time() - t0 < 10 and log().count("tur sınırı") < 2: time.sleep(0.2)
+    k7 = sor("Teslim ne zaman?")
+    ok("süreç yenilenince defter yeniden gitti", "Defter geldi" in (k7.get("cevap") or "") and log().count("DEFTER: bas-konuşa gitti") == 2)
+    k8 = sor("Başka ne konuşuldu?")
+    ok("aynı süreçte ikinci soruda defter yok", k8["durum"] == "hazir" and "Defter geldi" not in (k8.get("cevap") or "") and "Ek geldi" not in (k8.get("cevap") or "")
+       and log().count("DEFTER: bas-konuşa gitti") == 2)
+    uc2("/note", {"text": "Toplantı sonrası not: fatura ayrı kesilecek."}); time.sleep(0.3)
+    k9 = sor("Not ne yazıldı?")
+    ok("yeni satır → yalnız [Defter eki]", "Ek geldi" in (k9.get("cevap") or "") and "Defter geldi" not in k9["cevap"] and "DEFTER: ek — " in log())
+    t0 = time.time()
+    while time.time() - t0 < 10 and log().count("tur sınırı") < 3: time.sleep(0.2)
+    k10 = sor("Kim katıldı?")
+    satir("Başka toplantı", 1, "Can B", "11:00", "Yeni konu."); time.sleep(0.3)
+    k11 = sor("Bu toplantıda ne konuşuldu?")
+    ok("toplantı değişince süreç yenilendi, yeni defter", "KONUŞ: süreç kapandı (yeni toplantı)" in log() and "Defter geldi: Başka toplantı" in (k11.get("cevap") or ""))
     urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ping", data=json.dumps({"call": True, "panel": True}).encode(), headers={"X-Suflor-Anahtar": K}))
+    ok("toplantı sürerken panoda defter satırı yok", st().get("defter") is None)
     ok("toplantı sürerken kapalı", not post({"komut": "basla"}).get("ok"))
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
