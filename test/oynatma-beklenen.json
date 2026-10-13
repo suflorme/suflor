@@ -205,25 +205,7 @@
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"cevap\", \"text\": \"Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı.\", \"why\": \"\", \"status\": \"acik\", \"reply_to\": \"<ID>\", \"q\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}"
   ],
   "olcum.jsonl": "<var>",
-  "sistem-izi.jsonl": [
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 58, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}",
-   "{\"t\": <EPOCH>, \"isi\": 0, \"dusuk_guc\": false, \"guc\": \"ac\", \"pil\": 100, \"bellek_bos\": 59, \"swap_gb\": 2.58}"
-  ],
+  "sistem-izi.jsonl": "<var>",
   "sorular.jsonl": [
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}",
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Ne diyeyim?\", \"tur\": \"ozet\"}"
@@ -234,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 110939,
-   "sha": "0a218d66ff2c09ec"
+   "uzunluk": 111059,
+   "sha": "223944b96fde5e57"
   },
   "/hazirlik": {
    "uzunluk": 32000,
    "sha": "87fd797866f96ba2"
   },
   "/mini": {
-   "uzunluk": 110939,
-   "sha": "0a218d66ff2c09ec"
+   "uzunluk": 111059,
+   "sha": "223944b96fde5e57"
   },
   "/status": {
    "_ping_son": "float",
@@ -272,6 +254,7 @@
    "aktif": "bool",
    "alan": "str",
    "anahtarsiz": "NoneType",
+   "anlik": "NoneType",
    "arayuz_dili": "str",
    "baglam": [
     {
@@ -573,6 +556,7 @@
      "metin": "str"
     }
    ],
+   "anlik": "NoneType",
    "baglam": [
     {
      "ad": "str",

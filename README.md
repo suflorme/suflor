@@ -70,6 +70,8 @@ kısılır, masaüstü Teams/Zoom'da kısmak için ayrıca `"masaustu_ses_kis": 
 mikrofondaki ikinci kişinin sözleri "Odadaki kişi" diye ayrılır. Ses izi hafızasını kapatmak için `"ses_izi_hafiza": false`.
 Claude'un soruya bağlı olmayan SÖYLE/NOT kartları araya dakikada en çok bir kez girer (aynı dakikada gelenler birlikte görünür); aralık
 `"kart_tavan_sn"` (varsayılan 60, 0 kapatır).
+Karşı taraf adını söyleyince panoda ve şeritte hemen "Adın geçti — kim" (Claude'u beklemeden, yalnız sana); karşı taraf araya girmeden
+90 sn'den uzun konuşursan "1,5 dk'dır sen konuşuyorsun". Kapatmak için `"adin_gecti": false`, `"uzun_konusma_sn": 0` (süre de bu ayarla).
 Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)
 — sesli çeviri, fısıltı, sesli özet ve cevaplar bu sesle okunur (Mac'te, yerel); ses dosyası Suflor.me ile gelmez. Hız: `"piper_hiz"`
 (varsayılan 1,0), kısa okumalar `"piper_hiz_kisa"` (1,15). Piper yoksa ya da hata verirse Mac sesi.

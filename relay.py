@@ -550,6 +550,7 @@ def ingest(p):
                 if e.get(k) is not None: rec[k] = e[k]
             jl_out.append(json.dumps(rec, ensure_ascii=False) + "\n")
             if p.get("source") == "whisper" and e.get("kanal") == "karsi" and onceki is None: ceviri_ekle(e.get("id"), text, base_key)  # ayar ceviri
+            anlik_satir(base_key, e, text, onceki)  # adın geçti / uzun konuşma (aktarici/anlik.py)
             # karşı satırın ses izi .jsonl'e girmez (Claude toplantıda okur, 192 sayı bağlamı şişirir): yan dosyaya; toplantı sonunda toplu
             # kümelenip konuşmacılar yeniden etiketlenir (toplanti-claude.py konusmaci → <toplantı>.konusmaci.json)
             if e.get("iz") and e.get("id"): iz_out.append(json.dumps({"id": e["id"], "t0": e.get("t0"), "t1": e.get("t1"), "iz": e["iz"], **({"bol": e["bol"]} if e.get("bol") else {})}) + "\n")
@@ -1240,6 +1241,7 @@ bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslend
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
+bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
 # --- v0.13.9: panodan güncelleme ---------------------------------------------------------------------------------
 # Aktarıcı 6 saatte bir açık deponun manifest.json'undaki sürüme bakar (yalnız okuma; Mac'ten bağlam bilgisi çıkmaz). Yeni sürüm varsa
 # pano "Güncelle" düğmesini gösterir; tıklanınca guncelle.command ayrı oturumda (setsid) çalışır — aktarici-kur aktarıcıyı yeniden

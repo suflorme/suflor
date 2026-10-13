@@ -14,7 +14,8 @@ T = tempfile.mkdtemp(prefix="suflor-yp-"); canli = os.path.join(T, "canli"); os.
 def tc(*a): return subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", *a],
                                   capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"), timeout=60)
 Y = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": [
-    {"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [{"tur": "karar", "metin": "Bütçe 120 bin", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım"},
+    {"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [{"tur": "karar", "metin": "Bütçe 120 bin", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım",
+                                                          "netlik": "örtük", "varsayim": "Kur yıl sonuna kadar aynı kalır"},
                                                          {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz"}, {"tur": "yanlis", "metin": "atılmalı"}]},
     {"baslik": "Teklif", "ogeler": [{"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17"}, {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"},
                                     {"tur": "soz", "metin": "Faturaları gönderecek", "sahip": "Ayşe Yılmaz"}]}], "oneri": "Gündemi bir gün önce gönder"}
@@ -82,6 +83,8 @@ try:
     bo = b.stdout + b.stderr
     bak("bitir: graf, harita, eksik uyarısı, sayılar yapıdan (1 karar, 2 iş, 1 açık), kuyruk onaya", "karar grafı:" in bo and "zihin haritası" in bo and "eksik:" in bo
         and "tarih yok" in bo and "1 karar, 2 iş, 1 açık" in bo and "onaya sunuldu" in bo)
+    bak("bitir: Gerçekten anlaştınız mı? — örtük ve varsayımlı karar sorulur", "ANLAŞMA: 1 karar teyit istiyor" in bo and "örtük kabul" in bo and "varsayım: Kur yıl sonuna" in bo)
+    bak("grafta karar 'teyit bekliyor' işaretiyle (hazırlıkta görünür)", "teyit bekliyor" in tc("graf", "--kim", "Ayşe").stdout)
     bak("bitir: öneri yapı dosyasından", "Gündemi bir gün önce gönder" in json.dumps(json.loads(urllib.request.urlopen(urllib.request.Request(
         f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read()).get("son_toplantilar"), ensure_ascii=False))
     bak("eylem kuyruğunun takip işi grafta açık iş (sahibi kullanıcı)", re.search(r"\[acik\] [^:]+: Bora — takip e-postası", tc("soz", "liste").stdout) is not None)

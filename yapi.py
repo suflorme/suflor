@@ -12,12 +12,23 @@ import datetime, html, json, os, re, sqlite3
 TURLER = {"karar": "Karar", "is": "İş", "soru": "Açık soru", "sayi": "Sayı", "iddia": "İddia", "soz": "Söz"}
 YAPI_ORNEK = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": [
     {"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [
-        {"tur": "karar", "metin": "Bütçe 120 bin olarak kalıyor", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım"},
+        {"tur": "karar", "metin": "Bütçe 120 bin olarak kalıyor", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım",
+         "netlik": "ortuk", "varsayim": "Kur yıl sonuna kadar aynı kalır"},
         {"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17", "saat": "10:15:02"},
         {"tur": "soz", "metin": "Geçen yılın faturalarını gönderecek", "sahip": "Ayşe Yılmaz", "tarih": "2026-10-14"},
         {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"}, {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz", "saat": "10:11:00"}]}],
     "oneri": "Gündemi bir gün önce gönder"}
 def kucuk(t): return str(t).replace("İ", "i").replace("I", "ı").lower()
+# "Gerçekten anlaştınız mı?" (Faz 6 #6): kararın netliği — acik (taraflar açıkça onayladı) · ortuk (itiraz yok ama kimse açıkça "tamam"
+# demedi) · tek (bir kişi söyledi, öteki cevap vermedi); varsayim = kararın dayandığı, toplantıda konuşulmamış koşul (yalnız dökümde
+# dayanağı varsa). Örtük/tek ya da varsayımlı karar toplantı sonunda kullanıcıya sorulur; grafta "teyit bekliyor" işaretiyle kalır.
+def teyit_kararlar(v):
+    return [o for m in v["maddeler"] for o in m["ogeler"] if o["tur"] == "karar"
+            and (kucuk(o.get("netlik") or "").replace("ö", "o").replace("ü", "u") in ("ortuk", "tek") or str(o.get("varsayim") or "").strip())]
+def teyit_neden(o):
+    n = kucuk(o.get("netlik") or "").replace("ö", "o").replace("ü", "u"); va = " ".join(str(o.get("varsayim") or "").split())[:200]
+    return "; ".join(x for x in ({"ortuk": "örtük kabul (kimse açıkça onaylamadı)", "tek": "tek taraflı (öteki taraf cevap vermedi)"}.get(n, ""),
+                                 f"varsayım: {va}" if va else "") if x)
 def oku(yol):
     v = json.load(open(yol, encoding="utf-8"))
     if not isinstance(v, dict) or not isinstance(v.get("maddeler"), list): raise ValueError("yapı dosyası: {\"baslik\", \"tarih\", \"maddeler\": [...]} bekleniyor")
@@ -39,11 +50,13 @@ def graf_yaz(dizin, v, toplanti):
     c = _db(dizin); n = 0
     with c:
         c.execute("DELETE FROM kayit WHERE toplanti = ? AND bag IS NULL", (toplanti,))  # elle eklenen söz ve eylem bağları kalır
+        teyitler = teyit_kararlar(v)
         for m in v["maddeler"]:
             for o in m["ogeler"]:
                 c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, saat, alinti, eklendi) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                           (toplanti, str(v.get("baslik") or "")[:200], str(v.get("tarih") or "")[:10], str(m.get("baslik") or "")[:200], o["tur"],
-                           str(o.get("kim") or "")[:80] or None, str(o.get("sahip") or "")[:80] or None, str(o["metin"])[:600], str(o.get("tarih") or "")[:20] or None,
+                           str(o.get("kim") or "")[:80] or None, str(o.get("sahip") or "")[:80] or None,
+                           (str(o["metin"])[:500] + (f" (teyit bekliyor — {teyit_neden(o)})" if o["tur"] == "karar" and o in teyitler else ""))[:600], str(o.get("tarih") or "")[:20] or None,
                            str(o.get("saat") or "")[:8] or None, str(o.get("alinti") or "")[:300] or None, datetime.datetime.now().isoformat(timespec="seconds")))
                 n += 1
     c.close(); return n

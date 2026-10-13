@@ -1489,6 +1489,10 @@ def bitir_cmd():
         except (OSError, ValueError) as e: sys.exit(f"yapı dosyası okunamadı: {e} — düzeltip yeniden çalıştır (biçim: tc yapi --ornek)")
         if not os.path.exists(yol[:-3] + ".yapi.json"): import shutil; shutil.copy(yj, yol[:-3] + ".yapi.json")  # ozet-hazir sayıları yanından okur
         A.json, A.ozet, A.ornek = yj, yol, False; yapi_cmd()
+        ty = Y.teyit_kararlar(v)  # "Gerçekten anlaştınız mı?" — örtük/tek taraflı ya da varsayımlı kararlar
+        if ty: print(f"ANLAŞMA: {len(ty)} karar teyit istiyor — kullanıcıya tek tek sor \"Gerçekten anlaştınız mı?\" (evet → kalır; hayır/emin değil → "
+                     "yapı dosyasında açık soruya çevir, bitir'i yeniden çalıştır; karşı tarafa sorulacaksa takip e-postasına \"Doğru anladık mı?\" satırı):\n"
+                     + "\n".join(f"  - {o['metin'][:120]} — {Y.teyit_neden(o)}" for o in ty))
         ek = Y.eksik_isler(v)
         if ek: print("eksik: " + " | ".join(f"{o['metin'][:50]} ({'sahip yok' if not (o.get('sahip') or o.get('kim')) else 'tarih yok'})" for o in ek[:8])
                      + " — özette \"sahipsiz\"/\"tarihsiz\" yazılı olsun; kullanıcıya sor")
