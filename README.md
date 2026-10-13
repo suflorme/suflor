@@ -16,7 +16,7 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 - **Soru sor, not düş:** panoya yazdığın metin `?`, `soru`, `Claude` ya da iki boşlukla başlıyorsa Claude'a soru olur
   ve birkaç saniyede kartla cevaplanır; başka bir şeyle başlıyorsa toplantıya not olarak düşer.
 - **Kanıt:** Option + Shift + K ile toplantı ekranının görüntüsünü kaydeder (ekranda şifre görünürse uyarır).
-- **Toplantı sonu:** özet, kararlar, takip işleri, cevapsız kalan sorular ve toplantı için 1–5 arası bir not; özetin yanında
+- **Toplantı sonu:** özet ve başında toplantı çıktısı (kararlar, sahibi ve tarihi belli işler, açık kalanlar, tek öneri); özetin yanında
   gündem maddelerine göre **zihin haritası** (tarayıcıda açılır, resim olarak indirilir). Kararlar ve iddialar bu Mac'te bir
   **karar grafında** birikir: sonraki toplantıda aynı kişi farklı bir rakam söylerse Claude fark eder.
 - **Konuşmacı adları:** altyazının ad verdiği kişilerin ses izi bu Mac'te saklanır (**ses izi hafızası**); altyazı yokken (Teams

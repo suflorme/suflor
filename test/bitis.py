@@ -27,7 +27,7 @@ def kur(yardimci):
         q = urllib.request.Request(f"http://127.0.0.1:{PORT}{yol}", data=json.dumps(v).encode(), headers={"X-Suflor-Anahtar": k or K})
         return json.loads(urllib.request.urlopen(q, timeout=10).read())
     st = lambda: json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read())
-    nabiz = lambda d, tepe=0: post("/ses-yerel", {"nabiz": True, "durum": d, "tepe": tepe, "uygulama": "Chrome", "surum": "t", "kurma": 0}, SK)
+    nabiz = lambda d, tepe=0, uyg="Chrome": post("/ses-yerel", {"nabiz": True, "durum": d, "tepe": tepe, "uygulama": uyg, "surum": "t", "kurma": 0}, SK)
     return T, canli, r, post, st, nabiz
 M = {"title": "Bitiş Deneme"}
 T, canli, r, post, st, nabiz = kur(True)
@@ -74,6 +74,20 @@ try:
     for _ in range(12): time.sleep(1); nabiz("dinliyor", 0); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
     tb = st().get("toplanti_bitti") or {}
     bak(f"ses de kesildi: bitti, neden masaüstü penceresi değil ({tb.get('neden')})", tb.get("neden") and "masaüstü" not in tb["neden"])
+finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# masaüstü: "Ayrıl" görünmüyor ama Teams sesi sürüyor → toplantıda sayılır; ses kesilince (4 sn) toplantı dışı (deneme 8: 78 sn boşluk)
+T, canli, r, post, st, nabiz = kur(True)
+try:
+    post("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Bitiş Deneme | Microsoft Teams"}); nabiz("dinliyor", 2000, "Teams")
+    post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(1)
+    for _ in range(4): nabiz("dinliyor", 2000, "Teams"); post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(1)
+    m = st().get("masaustu") or {}
+    bak("Ayrıl yok, Teams sesi sürüyor: toplantıda sayıldı", m.get("toplantida") is True and "toplantı sesi sürüyor" in open(os.path.join(T, "relay.log")).read())
+    for _ in range(6): nabiz("dinliyor", 0, "Teams"); post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(1)
+    bak("Teams sesi kesildi: toplantı dışı", (st().get("masaustu") or {}).get("toplantida") is False)
+    post("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Bitiş Deneme | Microsoft Teams"}); nabiz("bekliyor")
+    post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(0.5)
+    bak("ses yardımcısı dinlemiyorsa tutulmaz", (st().get("masaustu") or {}).get("toplantida") is False)
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 # masaüstü toplantı penceresi gerçekten kapanınca neden doğru yazılır
 T, canli, r, post, st, nabiz = kur(True)

@@ -913,10 +913,19 @@ def masaustu_al(p):
     m = {"uygulama": str(p.get("uygulama") or "")[:20], "toplantida": bool(p.get("toplantida")), "sessiz": p.get("sessiz") if isinstance(p.get("sessiz"), bool) else None,
          "baslik": masaustu_temiz(p.get("baslik")), "t": time.time()}
     o = STATE.get("masaustu") or {}
+    # menü uygulaması "Ayrıl"ı görmüyor ama toplantı uygulaması ses çıkarmayı sürdürüyorsa toplantı sürüyor sayılır (13 Ekim deneme 8: Teams
+    # toplantıdayken 78 sn "Ayrıl" bulunmadı, toplantı bitti sayıldı). En çok MASAUSTU_TUT_SN; ses MASAUSTU_SESSIZ_SN kesilince biter.
+    now = time.time(); y = STATE["yerel_ses"]
+    if not m["toplantida"] and o.get("toplantida") and m["uygulama"] == o.get("uygulama"):
+        bas = o.get("tut_bas") or now
+        if (yerel_ses_durum() == "dinliyor" and y.get("uygulama") == m["uygulama"] and now - (y.get("sesli_t") or 0) < MASAUSTU_SESSIZ_SN
+                and now - bas < MASAUSTU_TUT_SN):
+            if not o.get("tut_bas"): print(f"MASAÜSTÜ: {m['uygulama']} · \"Ayrıl\" görünmüyor ama toplantı sesi sürüyor — toplantıda sayıldı")
+            m.update(toplantida=True, sessiz=o.get("sessiz"), baslik=o.get("baslik"), tut_bas=bas)
     # v0.31.0: katılımcı listesi (Kişiler paneli, ara sıra gelir — gelmeyen gönderimde eskisi kalır), konuşan kişi (oy), ekran paylaşımı
     kat = p.get("katilimcilar")
     m["katilimcilar"] = [" ".join(str(k).split())[:60] for k in kat if str(k).strip()][:50] if isinstance(kat, list) else (o.get("katilimcilar") if m["toplantida"] else None)
-    m["paylasim"] = p.get("paylasim") if isinstance(p.get("paylasim"), bool) else None
+    m["paylasim"] = p.get("paylasim") if isinstance(p.get("paylasim"), bool) else (o.get("paylasim") if m.get("tut_bas") else None)
     m["bitti_t"] = o.get("bitti_t") if m["toplantida"] or not o.get("toplantida") else time.time()
     STATE["masaustu"] = m
     if not o: print(f"MASAÜSTÜ: menü uygulaması bağlandı · {m['uygulama'] or '?'}" + ("" if m["toplantida"] else " · toplantı yok"))
@@ -930,6 +939,7 @@ def masaustu_al(p):
     if ks and m["toplantida"] and ks != ben_adi(): kume_oyla(ks, taslak=True)  # konuşan kişi göstergesi: altyazı taslağı gibi oy
     if m["toplantida"] and masaustu_baslik() and m["paylasim"] is not None and m["paylasim"] != o.get("paylasim"): paylasim_bildir(m["paylasim"])
     return {"ok": True}
+MASAUSTU_TUT_SN, MASAUSTU_SESSIZ_SN = (20, 4) if os.environ.get("SUFLOR_TEST_HIZLI") else (600, 30)
 MASAUSTU_YENI_SN = float(os.environ.get("SUFLOR_TEST_YENI_SN") or 120)  # masaüstü toplantıdan bu süreden uzun çıkılıp yeniden girilince yeni döküm dosyası (kısa kopma aynı dosyada sürer)
 def masaustu_yeni_toplanti(o):
     # aynı adlı toplantı 20 dk içinde yeniden başlayınca eski dosyaya yazılıyordu (12 Ekim: tarayıcı denemesinin dosyasına masaüstü denemesi)

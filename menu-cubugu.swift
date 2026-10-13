@@ -287,7 +287,7 @@ final class Masaustu {
                       "ara", "kapat", "bekleme", "odası", "lobi", "kabul", "microsoft", "teams", "zoom"])
     var micDugme: AXUIElement?; let kilit = NSLock()  // toplantı penceresinin mikrofon düğmesi: 0,5 sn'de bir yalnız onun etiketi okunur
     var son: [String: Any] = [:]; var sonGonder = Date.distantPast; var izinSoruldu = false, izinYazildi = false
-    static let KAYIP_ESIK = 4; var kayip = 0
+    static let KAYIP_ESIK = 4; var kayip = 0, cikis = Date.distantPast
     var toplantiPid: pid_t = 0, toplantiBaslik = ""  // kanıt görüntüsü bu pencereden
     var paylasimAday: Bool? = nil, paylasimSay = 0, paylasim: Bool? = nil  // iki tarama aynıysa kararlı
     var kisilerSon = Date.distantPast, toplantiBas = Date.distantPast, katilimcilar: [String]? = nil, kisilerDugme: AXUIElement?
@@ -445,6 +445,7 @@ final class Masaustu {
             } else { self.kayip = 0 }
             let top = v["toplantida"] as? Bool ?? false, once = self.son["toplantida"] as? Bool ?? false
             if top && !once { self.toplantiBas = Date(); self.kisilerSon = .distantPast }
+            if !top && once { self.cikis = Date() }
             // Kişiler paneli: toplantı başından 15 sn sonra, sonra 3 dk'da bir
             if top, args.contains("--kisiler-ac"), Date().timeIntervalSince(self.toplantiBas) > 15, Date().timeIntervalSince(self.kisilerSon) > 180 {
                 self.kisilerSon = Date()
@@ -453,7 +454,9 @@ final class Masaustu {
             let degisti = self.son.isEmpty || top != once || (v["sessiz"] as? Bool) != (self.son["sessiz"] as? Bool) || (v["paylasim"] as? Bool) != (self.son["paylasim"] as? Bool)
                 || v["katilimcilar"] != nil || (v["konusan"] as? String) != nil
             // toplantı dışında da 60 sn'de bir: aktarıcı yeniden başlayınca durumu (menü uygulaması bağlı, toplantı yok) değişiklik beklemeden alır
-            if !v.isEmpty && (degisti || Date().timeIntervalSince(self.sonGonder) > (top ? 10 : 60)) {
+            // çıkıştan sonraki 10 dk da 10 sn'de bir: aktarıcı toplantı sesi sürüyorsa toplantıyı sürüyor sayar ve sık durum ister
+            let sik = top || Date().timeIntervalSince(self.cikis) < 600
+            if !v.isEmpty && (degisti || Date().timeIntervalSince(self.sonGonder) > (sik ? 10 : 60)) {
                 var g = v; if g["sessiz"] is NSNull || (g["sessiz"] as? Bool) == nil { g.removeValue(forKey: "sessiz") }
                 istek("/masaustu", g) { _ in }; self.sonGonder = Date()
             }

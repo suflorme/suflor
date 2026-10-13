@@ -149,7 +149,7 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
 ## 6. Duygu etiketi (kart değil)
 `etiket <ton> [--kim "<ad>"]` — ton: olumlu | notr | ilgili | heyecanli | kararsiz | tedirgin | savunmada | gergin | ilgisiz |
 olumsuz. Kullanıcının isteği; yalnız toplantı sırasında işe yarar. Kaynak metin; yalnız ton belirgin değişince, kişi başına en
-fazla 5 dk'da bir; genel ton `--kim`'siz. Pano başlığında durur; kart sayısına, özete, karneye, esas belgelere girmez. Tahmindir:
+fazla 5 dk'da bir; genel ton `--kim`'siz. Pano başlığında durur; kart sayısına, özete, toplantı çıktısına, esas belgelere girmez. Tahmindir:
 emin değilsen verme.
 
 ## 7. Güvenlik
