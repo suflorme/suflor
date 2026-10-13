@@ -294,6 +294,9 @@ globalThis.SUFLOR_EN = {
   "Panodan başlat": "Start it from the panel",
   "1 açık kart": "1 open card",
   "{n} açık kart": "{n} open cards",
+  "{n} karar": "{n} decisions",
+  "{n} iş": "{n} action items",
+  "{n} açık": "{n} open",
   // --- eklenti arka planı (bildirimler)
   "⭐ işaretlenemedi: ": "⭐ couldn't be marked: ",
   "Ne diyeyim? istenemedi: ": "Couldn't request a line: ",

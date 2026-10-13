@@ -1116,10 +1116,15 @@ TEAMS_ANA = "https://teams.microsoft.com/v2/"  # bağlantısız başlatmada aç�
 CHROME_APP = next((y for y in ("/Applications/Google Chrome.app", os.path.expanduser("~/Applications/Google Chrome.app")) if os.path.isdir(y)), None)
 # --- Son toplantılar (test toplantısı 7 Ekim) ------------------------------------------------------------------------
 # Toplantı sonu değerlendirmesi terminalde kalıyordu. Claude özeti kaydedince `toplanti-claude.py ozet-hazir <dosya>` → POST
-# /son-toplanti (kart anahtarıyla): kayıt son-toplantilar.jsonl'e, pano boşken "Son toplantılar"da not + değerlendirme + öneri +
+# /son-toplanti (kart anahtarıyla): kayıt son-toplantilar.jsonl'e, pano boşken "Son toplantılar"da karar/iş/açık sayısı + kararlar + öneri +
 # "Özeti aç"; macOS bildirimi yalnız yerel (osascript). Özet dosyası panodan yalnız kayıttaki yoldan açılır (rastgele yol değil).
 SON = []
 def _son_temiz(v, n): return " ".join(str(v or "").split())[:n]
+def _son_cikti(c):  # {karar, is, acik} → yalnız 0–99 tam sayılar (v0.32.6: tek not yerine toplantı çıktısı)
+    c = c if isinstance(c, dict) else {}
+    return {k: int(c[k]) for k in ("karar", "is", "acik") if isinstance(c.get(k), int) and not isinstance(c.get(k), bool) and 0 <= c[k] < 100}
+def cikti_metin(c):
+    return ", ".join(f"{c[k]} {_t(a, e)}" for k, a, e in (("karar", "karar", "decisions"), ("is", "iş", "action items"), ("acik", "açık", "open")) if k in c)
 def son_yukle():
     try: SON[:] = [json.loads(l) for l in open(os.path.join(BASE, "son-toplantilar.jsonl"), encoding="utf-8") if l.strip()][-20:]
     except (OSError, ValueError): return
@@ -1141,7 +1146,7 @@ def son_ekle(p):
     if not ozet.endswith(".md"): return {"ok": False, "err": "özet .md değil"}
     r = {"id": "s" + str(int(time.time() * 1000)), "at": datetime.datetime.now().isoformat(timespec="seconds"), "t": round(time.time(), 3), "ozet": ozet,
          "baslik": _son_temiz(p.get("baslik"), 120), "dosya": os.path.basename(str(p.get("dosya") or ""))[:160] or None,
-         "puan": _son_temiz(p.get("puan"), 6) or None, "degerlendirme": _son_temiz(p.get("degerlendirme"), 400), "oneri": _son_temiz(p.get("oneri"), 300)}
+         "cikti": _son_cikti(p.get("cikti")), "degerlendirme": _son_temiz(p.get("degerlendirme"), 400), "oneri": _son_temiz(p.get("oneri"), 300)}
     if isinstance(p.get("metin"), str) and p["metin"].strip():  # kopya: aktarıcı Masaüstü'ndeki özeti açamaz (launchd), kendi klasöründekini açar
         kp = os.path.join(BASE, "ozetler", os.path.basename(ozet))
         try:
@@ -1159,9 +1164,9 @@ def son_ekle(p):
     with LOCK:
         _log("son-toplantilar.jsonl", r); SON.append(r); del SON[:-20]
         if r["dosya"]: STATE["bitti"] = {"file": r["dosya"], "t": r["t"]}
-    print(f"ÖZET: hazır" + (f" · not {r['puan']}/5" if r["puan"] else ""))
+    print(f"ÖZET: hazır" + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""))
     bildirim("Suflor.me", _t("Toplantı özeti hazır", "Meeting summary ready"),
-             (r["baslik"] or os.path.basename(ozet)) + (f" · {_t('not', 'score')} {r['puan']}/5" if r["puan"] else ""), son=r["id"])
+             (r["baslik"] or os.path.basename(ozet)) + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""), son=r["id"])
     ozet_sesli(r)
     return {"ok": True, "id": r["id"]}
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)

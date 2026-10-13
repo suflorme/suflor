@@ -18,7 +18,7 @@ Y = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": [
                                                          {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz"}, {"tur": "yanlis", "metin": "atılmalı"}]},
     {"baslik": "Teklif", "ogeler": [{"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17"}, {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"}]}]}
 yj = os.path.join(T, "ozet.yapi.json"); json.dump(Y, open(yj, "w"), ensure_ascii=False)
-ozet = os.path.join(T, "ayse-toplanti-ozeti-20261011.md"); open(ozet, "w").write("# Özet\n\n## Değerlendirme — not 4/5\nKarar çıktı.\n")
+ozet = os.path.join(T, "ayse-toplanti-ozeti-20261011.md"); open(ozet, "w").write("# Özet\n\n## Toplantı çıktısı\n- **Kararlar (1):** Bütçe onaylandı\n- **Sahipli işler (2):** Ayşe — rapor — 15 Ekim; Ali — teklif — tarihsiz\n- **Açık kalanlar:** yok\n- **Öneri:** gündemi önceden gönder\n")
 o = tc("yapi", yj, "--ozet", ozet)
 db = os.path.join(canli, "karar-grafi.sqlite"); hy = ozet[:-3] + "-zihin-haritasi.html"
 n = lambda: sqlite3.connect(db).execute("SELECT COUNT(*) FROM kayit").fetchone()[0]
@@ -56,6 +56,7 @@ try:
     time.sleep(0.5); K = open(os.path.join(canli, "kart-anahtari.txt")).read().strip()
     o = tc("ozet-hazir", ozet, "--baslik", "Ayşe — bütçe")
     bak("ozet-hazir: zihin haritası gitti", "zihin haritası" in o.stdout)
+    bak("ozet-hazir: toplantı çıktısı okundu (1 karar, 2 iş, 0 açık)", "1 karar, 2 iş, 0 açık" in o.stdout and "öneri var" in o.stdout)
     st = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read())
     son = (st.get("son_toplantilar") or [{}])[0]
     bak("panoda kayıtta harita, kopya aktarıcının klasöründe", son.get("harita", "").startswith(os.path.join(canli, "ozetler")) and os.path.exists(son.get("harita", "")))

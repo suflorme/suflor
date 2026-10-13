@@ -9,9 +9,9 @@
 #   acik  : cevapsız kalan soruyu kaydeder/kapatır; izle, tetik yeniden geçince "AÇIK SORU aN" yazar
 #   gundem: gündem maddesini işaretler — kalan süre/kayma hesabı ve pano bunu kullanır
 #   kanit : toplantının kanıt ekran görüntülerini listeler / açıklama yazar; izle her yenisinde "KANIT n" yazar
-#   sonuc : toplantı sonu tek değerlendirme — not (1–5), konuşma, öne çıkan anlar, kesin olmayan iddialar; --kaydet ile karneler.jsonl'e
+#   sonuc : toplantı sonu — toplantı çıktısı (ölçülenler: gündem, açık sorular, takip işleri), konuşma, öne çıkan anlar, kesin olmayan iddialar; --kaydet ile karneler.jsonl'e
 #   hazirlik: toplantı öncesi bağlam paketi — kişi + gündem maddesi aramaları, önceki cevapsız sorular
-#   ozet-hazir: toplantı sonu özeti kaydedilince — panoda "Son toplantılar" (not, değerlendirme, öneri, özeti aç) + macOS bildirimi
+#   ozet-hazir: toplantı sonu özeti kaydedilince — panoda "Son toplantılar" (karar/iş/açık sayısı, kararlar, öneri, özeti aç) + macOS bildirimi
 #   karsilastir: Teams'in indirilen dökümü (.vtt/.docx/.txt) ile Suflor dökümü — kaçan satır, konuşmacı uyumu
 # Örnek:
 #   PYTHONDONTWRITEBYTECODE=1 python3 toplanti-claude.py izle
@@ -92,18 +92,18 @@ gu = sub.add_parser("gundem", help="v0.6.0: gündem maddesini işaretle (0'dan);
 gu.add_argument("--geri", action="store_true")
 kn = sub.add_parser("kanit", help="v0.7.0: kanıt listesi | kanit N --aciklama \"…\""); kn.add_argument("n", nargs="?", type=int)
 kn.add_argument("--aciklama", default=None); kn.add_argument("--dosya", default=None)
-sn = sub.add_parser("sonuc", help="toplantı sonu tek değerlendirme: not (1–5), konuşma koçluğu, öne çıkan anlar, kesinleşmesi gereken iddialar")
+sn = sub.add_parser("sonuc", help="toplantı sonu: toplantı çıktısı (ölçülenler), konuşma koçluğu, öne çıkan anlar, kesinleşmesi gereken iddialar")
 sn.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)"); sn.add_argument("--n", type=int, default=5, help="en çok kaç öne çıkan an")
 sn.add_argument("--takip", default=None, help="takip işleri: toplam/sahipli (ör. 6/5) — Claude özetten sayar")
 sn.add_argument("--karar", type=int, default=None, help="çıkan karar sayısı"); sn.add_argument("--kaydet", action="store_true", help="karneler.jsonl'e ekle")
-sn.add_argument("--gecmis", action="store_true", help="son değerlendirmeler (karneler.jsonl)")
+sn.add_argument("--gecmis", action="store_true", help="son toplantıların çıktısı (karneler.jsonl)")
 yp = sub.add_parser("yapi", help="toplantı sonu: özetin yapı dosyası (<özet>.yapi.json) → karar grafı (canli/karar-grafi.sqlite) + zihin haritası (<özet>-zihin-haritasi.html)")
 yp.add_argument("json", nargs="?", help="yapı dosyası (yoksa --ornek)"); yp.add_argument("--ozet", default=None, help="özet .md (harita yanına yazılır; yoksa json'un yanına)")
 yp.add_argument("--dosya", default=None, help="canlı toplantı .md (grafta kaynak; yoksa en yenisi)"); yp.add_argument("--ornek", action="store_true", help="yapı dosyası biçimini yazdır")
 gf = sub.add_parser("graf", help="karar grafı: son kayıtlar ya da bir kişinin iddia/karar/açık işleri (yalnız bu Mac)")
 gf.add_argument("--kim", default=None); gf.add_argument("--n", type=int, default=20); gf.add_argument("--sil-toplanti", default=None, help="bu canlı toplantının kayıtlarını sil")
 gf.add_argument("--hepsini-sil", action="store_true")
-oh = sub.add_parser("ozet-hazir", help="özet kaydedildi: panoda Son toplantılar + macOS bildirimi (özetin '## Değerlendirme — not X/5' bölümünden)")
+oh = sub.add_parser("ozet-hazir", help="özet kaydedildi: panoda Son toplantılar + macOS bildirimi (özetin '## Toplantı çıktısı' bölümünden)")
 oh.add_argument("yol", help="kaydedilen özet .md"); oh.add_argument("--baslik", default=None, help="panoda görünen ad (yoksa gündem başlığı ya da toplantı adı)")
 hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi"); hl.add_argument("--kim", default=None); hl.add_argument("--n", type=int, default=3)
 ks = sub.add_parser("karsilastir", help="v0.7.2: Teams dökümü (.vtt/.docx/.txt) ile Suflor.me dökümünü karşılaştır")
@@ -1295,11 +1295,10 @@ def kanit_cmd():
         if A.n is None or r.get("n") == A.n:
             print(f"  {r.get('n')} · {str(r.get('at', ''))[11:19]} · {os.path.join(A.dir, r['kanit'])}" + (f" · not: {r['not']}" if r.get("not") else "") + (f" · ⚠ paylaşılan ekran küçük (%{r['kucuk']}), yazı okunmayabilir" if r.get("kucuk") else "") + (f" · açıklama: {ac[str(r.get('n'))]}" if str(r.get("n")) in ac else ""))
 
-# --- v0.7.0: karne — toplantı sonu kısa başarı değerlendirmesi ---------------------------------------------------
-# Ölçülebilen kısım buradan, nitel kısım (takip işlerinin sahibi var mı) Claude'un özetinden --takip ile gelir.
-# Boyutlar (0–5) ve ağırlık: gündem kapsamı 30 · zaman 15 · açık soruların kapanması 20 · konuşma payı 15 (yalnız yürütücü,
-# Görüşmede kullanıcı dinlemeli: ≤ %40 tam puan) · takip işlerinin sahibi 20. Veri olmayan boyut hesaba katılmaz.
-NOT_AD = [(4.5, "çok iyi"), (3.5, "iyi"), (2.5, "orta"), (1.5, "zayıf"), (0, "verimsiz")]
+# --- v0.7.0: karne → v0.32.6 toplantı çıktısı ----------------------------------------------------------------------
+# Ölçülebilen kısım buradan (gündem kapsamı, zaman, açık sorular, konuşma payı), takip işleri Claude'un özetinden --takip ile gelir.
+# Tek not (1–5) kaldırıldı (kullanıcı kararı, 13 Ekim): 16 karnenin 15'inde "zaman" 5/5'ti, 7'si yalnız zamanla "çok iyi" aldı — not toplantıyı ayırt
+# etmiyordu. Boyutlar (0–5) karneler.jsonl'de ölçü olarak kalır; kullanıcıya karar · sahipli iş · açık kalanlar · tek öneri gösterilir.
 def karne_hesap(md):
     rs = kayitlar(md); son = {}
     for r in rs:
@@ -1360,9 +1359,9 @@ def karne_hesap(md):
         except ValueError: pass
     else: v["not_"].append("takip işleri sayılmadı (--takip toplam/sahipli)")
     if A.karar is not None: v["olcu"]["karar"] = A.karar
-    agirlik = sum(w for _, w, _ in v["boyut"].values())
-    v["puan"] = round(2 * sum(p * w for p, w, _ in v["boyut"].values()) / agirlik) / 2 if agirlik else None
-    v["etiket"] = next(e for e_, e in NOT_AD if v["puan"] is not None and v["puan"] >= e_) if v["puan"] is not None else "ölçülemedi"
+    if A.takip:
+        try: v["olcu"]["takip"] = A.takip if int(A.takip.split("/")[0]) else None
+        except ValueError: pass
     # Suflor'un kendi karnesi: kart isabeti, sıklık, yanıt süresi
     cards = [c for c in olcum_jl("kartlar.jsonl") if "text" in c and c.get("file") == md]
     qsj = {q["id"]: q for q in olcum_jl("sorular.jsonl") if q.get("file") == md}
@@ -1390,31 +1389,55 @@ def sonuc_cmd():  # toplantı sonu tek komut: değerlendirme (not) + konuşma + 
     if A.gecmis:
         try: ks = [json.loads(l) for l in open(fp, encoding="utf-8") if l.strip()][-10:]
         except FileNotFoundError: sys.exit("karne yok")
-        for k in ks: print(f"{k['dosya'][:16]} · {k.get('baslik') or '-'} · not {k.get('puan')} ({k.get('etiket')}) · " + " · ".join(f"{a} {b[0]:.1f}" for a, b in k["boyut"].items()) + f" · Suflor.me isabet {k['suflor'].get('isabet') or '-'}")
+        for k in ks:
+            o = k.get("olcu") or {}
+            print(f"{k['dosya'][:16]} · {k.get('baslik') or '-'} · " + " · ".join(x for x in [f"{o['karar']} karar" if o.get("karar") is not None else "",
+                  f"takip {o['takip']} sahipli" if o.get("takip") else "", f"gündem {o['gundem']}" if o.get("gundem") else "",
+                  f"{len(k.get('cevapsiz') or [])} cevapsız soru" if k.get("cevapsiz") else ""] if x) + f" · Suflor.me isabet {k['suflor'].get('isabet') or '-'}")
         return
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
     konusmaci_esle(os.path.basename(md).replace(".jsonl", ".md"))
-    v = karne_hesap(md); sf = v["suflor"]
-    print(f"## Değerlendirme — not {('%g' % v['puan']) if v['puan'] is not None else '-'}/5 ({v['etiket']})")
-    print(f"*{v['dosya']} · rol {v['rol']} · {v['olcu'].get('sure_dk', '?')} dk · {v['satir']} satır" + (f" · {v['olcu']['karar']} karar" if "karar" in v["olcu"] else "") + "*\n")
-    # (kullanıcı: "karışık") boyut başına tek sade satır, puan tam sayı
-    for a, (p, w, ac) in v["boyut"].items(): print(f"- {a.capitalize()}: {round(p)}/5 — {ac}")
+    v = karne_hesap(md); sf = v["suflor"]; o = v["olcu"]
+    print("## Toplantı çıktısı — ölçülenler")
+    print(f"*{v['dosya']} · rol {v['rol']} · {o.get('sure_dk', '?')} dk · {v['satir']} satır" + (f" · {o['karar']} karar" if "karar" in o else "") + "*\n")
+    if o.get("gundem"): print(f"- Gündem: {o['gundem']} madde konuşuldu" + (" — açık kalan: " + " | ".join(str(x)[:50] for x in v["acik_gundem"][:5]) if v.get("acik_gundem") else ""))
+    if v.get("cevapsiz"): print("- Cevapsız sorular: " + " | ".join(q.get("metin", "")[:60] + (f" ({q['kim']})" if q.get("kim") else "") for q in v["cevapsiz"][:5]))
+    if "takip sahipli" in v["boyut"]: print(f"- Takip işleri: {v['boyut']['takip sahipli'][2]}")
+    if "zaman" in v["boyut"]: print(f"- Süre: {v['boyut']['zaman'][2]}")
+    if o.get("pay"): print("- Konuşma payı: " + ", ".join(f"{k} %{n}" for k, n in o["pay"].items()))
     for n in v["not_"]: print(f"- ({n})")
-    if v.get("acik_gundem"): print("- açık kalan gündem: " + " | ".join(str(x)[:50] for x in v["acik_gundem"][:5]))
-    if v.get("cevapsiz"): print("- cevapsız sorular: " + " | ".join(q.get("metin", "")[:60] + (f" ({q['kim']})" if q.get("kim") else "") for q in v["cevapsiz"][:5]))
-    if v["olcu"].get("pay"): print("- konuşma payı: " + ", ".join(f"{k} %{n}" for k, n in v["olcu"]["pay"].items()))
     print(f"- Suflor.me: {sf['kart']} kart ({sf['saatte']}/saat; " + ", ".join(f"{k} {n}" for k, n in sf["tur"].items()) + ")" + (f" · isabet ✓/(✓+✕) {sf['isabet']}" if sf["isabet"] else "") +
           (f" · SORU→CEVAP ortanca {sf['cevap_ortanca_sn']} sn" if sf["cevap_ortanca_sn"] is not None else "") + (f" · 📷 {sf['kanit']} kanıt" if sf["kanit"] else ""))
     kes = kesinlik_hesap(md)
     print(); koc_yaz(md); print(); anlar_yaz(md, A.n, kes); print(); kesinlik_yaz(kes)
-    print("\nClaude: özete \"## Değerlendirme\" olarak not satırı + 1–2 cümle nitel değerlendirme (karar çıktı mı, en zayıf boyut, bir dahaki "
-          "toplantıya tek öneri); konuşma ve anlar bölümünden yalnız işe yarayanı, kesin olmayan iddiaları \"Kesinleşmesi gerekenler\" olarak ekle.")
+    print("\nClaude: özetin başına \"## Toplantı çıktısı\" (not yok): - **Kararlar (n):** …; - **Sahipli işler (n):** kim — ne — ne zaman "
+          "(sahibi ya da tarihi yoksa \"sahipsiz\"/\"tarihsiz\" yaz); - **Açık kalanlar (n):** konuşulmayan gündem + cevapsız soru + kararsız konu; "
+          "- **Öneri:** bir dahaki toplantıya tek cümle. Konuşma ve anlar bölümünden yalnız işe yarayanı, kesin olmayan iddiaları "
+          "\"Kesinleşmesi gerekenler\" olarak ekle.")
     if A.kaydet:
         with open(fp, "a", encoding="utf-8") as f: f.write(json.dumps(dict(v, at=simdi(), cevapsiz=[q.get("metin") for q in v.get("cevapsiz", [])]), ensure_ascii=False, default=str) + "\n")
         print("(karneler.jsonl'e eklendi)")
 
-def ozet_degerlendirme(metin):  # "## Değerlendirme — not 3/5" + altındaki paragraf → (puan, değerlendirme, öneri cümlesi)
+def ozet_cikti(metin):
+    # "## Toplantı çıktısı" bölümü → ({karar, is, acik} sayıları, kararlar satırı, öneri). Satırlar: "- **Kararlar (2):** …", "- **Sahipli işler (3):** …",
+    # "- **Açık kalanlar (1):** …", "- **Öneri:** …". Bölüm yoksa eski "## Değerlendirme — not X/5" biçiminden yalnız değerlendirme ve öneri (not atılır).
+    m = re.search(r"^##\s*(?:Toplantı çıktısı|Meeting outcome)[^\n]*\n(.*?)(?=\n#|\Z)", metin, re.M | re.S | re.I)
+    if not m:
+        _, deg, oneri = ozet_degerlendirme(metin); return {}, deg, oneri
+    say, kararlar, oneri = {}, "", ""
+    for l in m.group(1).splitlines():
+        g = re.match(r"\s*[-*]\s*\*\*([^*(:]+?)\s*(?:\((\d+)\))?\s*:?\s*\*\*\s*:?\s*(.*)", l)
+        if not g: continue
+        ad, n, govde = kucuk(g.group(1)), g.group(2), " ".join(g.group(3).split())
+        k = "karar" if ad.startswith(("karar", "decision")) else "is" if ("iş" in ad or "action" in ad or "task" in ad) else "acik" if ad.startswith(("açık", "open")) else "oneri" if ad.startswith(("öneri", "suggest", "recommend")) else None
+        if k == "oneri": oneri = govde
+        elif k:
+            say[k] = int(n) if n else (0 if re.fullmatch(r"(yok|none|-|—)\.?", govde, re.I) else len([x for x in re.split(r";\s*", govde) if x.strip()]))
+            if k == "karar": kararlar = govde
+    if oneri: oneri = ("İ" if oneri[0] == "i" else oneri[0].upper()) + oneri[1:]
+    return say, kararlar, oneri
+def ozet_degerlendirme(metin):  # (eski biçim) "## Değerlendirme — not 3/5" + altındaki paragraf → (puan, değerlendirme, öneri cümlesi)
     m = re.search(r"^##\s*(?:Değerlendirme|Assessment)\s*[—–-]+\s*(?:not|score)\s*([0-9]+(?:[.,][0-9])?)\s*/\s*5[^\n]*\n+(.*?)(?=\n\s*\n|\n#|\Z)", metin, re.M | re.S | re.I)
     if not m: return None, "", ""
     cumleler = [c for c in re.split(r"(?<=[.!?])\s+", " ".join(m.group(2).split())) if c]
@@ -1427,7 +1450,7 @@ def ozet_hazir_cmd():
     yol = os.path.abspath(os.path.expanduser(A.yol))
     try: metin = open(yol, encoding="utf-8").read()
     except OSError as e: sys.exit(f"özet okunamadı: {e}")
-    puan, deg, oneri = ozet_degerlendirme(metin)
+    say, deg, oneri = ozet_cikti(metin)
     try: st = get("/status")
     except Exception: sys.exit("aktarıcıya ulaşılamadı — özet kayıtlı, pano/bildirim yok")
     try: agj = json.load(open(os.path.join(A.dir, "agenda.json"), encoding="utf-8"))
@@ -1435,14 +1458,15 @@ def ozet_hazir_cmd():
     baslik = A.baslik or ((agj.get("title") if agj.get("items") else None) or st.get("meeting") or os.path.basename(yol))
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     # metin de gider: aktarıcı launchd'den çalıştığı için Masaüstü'ndeki özeti açamıyor; kendi klasörüne kopyasını yazar (panoda "Özeti aç")
-    body = {"ozet": yol, "baslik": baslik, "dosya": st.get("file"), "puan": puan, "degerlendirme": deg, "oneri": oneri, "metin": metin[:500000]}
+    body = {"ozet": yol, "baslik": baslik, "dosya": st.get("file"), "cikti": say, "degerlendirme": deg, "oneri": oneri, "metin": metin[:500000]}
     hy = yol[:-3] + "-zihin-haritasi.html" if yol.endswith(".md") else ""
     if hy and os.path.exists(hy): body["harita"] = open(hy, encoding="utf-8").read()[:2000000]  # panoda "Zihin haritası" (kopya aktarıcının klasöründe)
     req = urllib.request.Request(A.relay + "/son-toplanti", data=json.dumps(body).encode(), method="POST",
                                  headers={"X-Suflor-Anahtar": key, "Content-Type": "application/json"})
-    r = json.load(urllib.request.urlopen(req, timeout=3))
+    try: r = json.load(urllib.request.urlopen(req, timeout=10))
+    except OSError as e: sys.exit(f"aktarıcı cevap vermedi ({e.__class__.__name__}) — özet kayıtlı, pano/bildirim yok; aktarıcı günlüğüne bak")
     if not r.get("ok"): sys.exit(f"gönderilemedi: {r.get('err')}")
-    print(f"panoda Son toplantılar + bildirim: {baslik}" + (" · zihin haritası" if body.get("harita") else "") + (f" · not {puan}/5" if puan else " · not bulunamadı ('## Değerlendirme — not X/5' bölümü yok)") + (" · öneri var" if oneri else ""))
+    print(f"panoda Son toplantılar + bildirim: {baslik}" + (" · zihin haritası" if body.get("harita") else "") + (" · " + ", ".join(f"{n} {a}" for a, n in (("karar", say.get("karar")), ("iş", say.get("is")), ("açık", say.get("acik"))) if n is not None) if say else " · '## Toplantı çıktısı' bölümü bulunamadı") + (" · öneri var" if oneri else ""))
 
 # --- v0.7.0: toplantı öncesi bağlam paketi -----------------------------------------------------------------------
 def hazirlik_cmd():
@@ -2005,7 +2029,7 @@ def rapor_cmd():
            "## Toplantı (sayılar)",
            f"- Süre ~{round((t1 - t0).total_seconds() / 60) if t0 else '?'} dk · satır {len(satir)} (kaynak: " + ", ".join(f"{k} {n}" for k, n in kaynak.items()) + f") · not {sum(1 for r in rs if 'note' in r)} · kanıt {sum(1 for r in rs if 'kanit' in r)}",
            f"- Kartlar: {sf.get('kart', '?')} ({sf.get('saatte', '?')}/saat; " + ", ".join(f"{k} {n}" for k, n in (sf.get("tur") or {}).items()) + f") · isabet ✓/(✓+✕) {sf.get('isabet')} · SORU→CEVAP ortanca {sf.get('cevap_ortanca_sn')} sn",
-           f"- Karne: {v.get('puan', '-')}/5 · gündem {v['olcu'].get('gundem', '?')} · " + " · ".join(f"{a} {round(b[0])}" for a, b in (v.get("boyut") or {}).items()), "", "## Ölçüm (`olcum`)", "```", ort(_calistir(olcum, dosya=md)), "```", "",
+           f"- Toplantı çıktısı: gündem {v['olcu'].get('gundem', '?')} · " + " · ".join(f"{a} {round(b[0])}" for a, b in (v.get("boyut") or {}).items()), "", "## Ölçüm (`olcum`)", "```", ort(_calistir(olcum, dosya=md)), "```", "",
            "## Gözlemler (Claude ve kullanıcı)", A.notlar.strip() or "(yok)", "",
            f"## Aktarıcı günlüğü (teknik satırlar, toplantı ±15 dk; {len(g)} satır)", "```", *(g[-150:] or ["(yok)"]), "```"]
     metin = "\n".join(out) + "\n"
@@ -2015,7 +2039,7 @@ def rapor_cmd():
              "not": sum(1 for r in rs if "note" in r), "kanit": sum(1 for r in rs if "kanit" in r), "rol": v.get("rol") or ag.get("rol"), "dil": ag.get("dil"),
              "platform": x.get("platform"), "whisper": wv.get("durum"), "ses_modeli": wv.get("ses_model"), "yanki": wv.get("yanki", 0)},
              "kartlar": {k: sf.get(k) for k in ("kart", "saatte", "tur", "isabet", "cevap_ortanca_sn")},
-             "karne": {"puan": v.get("puan"), "boyut": {a: round(b[0]) for a, b in (v.get("boyut") or {}).items()}},
+             "karne": {"boyut": {a: round(b[0]) for a, b in (v.get("boyut") or {}).items()}},
              "olcum": [l for l in _calistir(olcum, dosya=md).splitlines() if not l.startswith("Dosya:")], "gozlem": (A.notlar or "").strip()[:3000]}
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import teshis

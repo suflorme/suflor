@@ -17,6 +17,13 @@ import UserNotifications
 
 setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
 let args = CommandLine.arguments
+// günlük satırları saatli (13 Ekim deneme 8: "bildirim izni yok" satırının ne zaman yazıldığı bilinemedi); teşhis kiplerinin çıktısı saatsiz
+let TANI = args.contains { ["--ax-dokum", "--kanit-dene", "--ekran-izni"].contains($0) }
+let saatBicim: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd HH:mm:ss"; return f }()
+func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+    let s = items.map { "\($0)" }.joined(separator: separator)
+    Swift.print(TANI ? s : "\(saatBicim.string(from: Date())) \(s)", terminator: terminator)
+}
 func arg(_ ad: String) -> String? { if let i = args.firstIndex(of: ad), i + 1 < args.count { return args[i + 1] }; return nil }
 let PORT = Int(arg("--port") ?? "8765") ?? 8765
 let ANAHTAR_YOL = arg("--anahtar") ?? ""
@@ -536,7 +543,7 @@ final class MasaustuMic {
     var tampon = Data(), t0 = 0.0, bekleyen: [(t0: Double, veri: Data, hazir: Double)] = [], sonSessiz = 0.0, izinYazildi = false
     let kilit = NSLock(); var gozlem: NSObjectProtocol?
     init(_ m: Masaustu, bas: @escaping () -> Bool) { masaustu = m; self.bas = bas }
-    var aygitAd = "?"
+    var aygitAd = "?", sonDegisim = 0.0
     func aygit() -> String { aygitAd }
     func dongu() {
         Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.tik() }
@@ -544,7 +551,8 @@ final class MasaustuMic {
     func tik() {
         let simdi = Date().timeIntervalSince1970
         guard masaustu.toplantida else { if kayitci != nil { durdur() }; return }
-        if kayitci == nil { baslat(); return }
+        // aygıt değişiminden sonra 2 sn bekle: gevşek kulaklık jakı aygıtı art arda değiştirince mikrofon her seferinde yeniden açılıyordu (deneme 8)
+        if kayitci == nil { if simdi - sonDegisim >= 2 { baslat() }; return }
         let sessiz = masaustu.sessizHizli() == true || bas()
         kilit.lock()
         if sessiz { sonSessiz = simdi; tampon = Data(); bekleyen.removeAll() }
@@ -576,7 +584,7 @@ final class MasaustuMic {
         guard k.basla() else { print("MASAÜSTÜ MİKROFON: açılamadı"); return }
         kayitci = k; print("MASAÜSTÜ MİKROFON: açıldı · \(aygit())"); istek("/ses-masaustu", ["olay": "acildi", "aygit": aygit()]) { _ in }
         gozlem = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: k.motor, queue: .main) { [weak self] _ in
-            print("MASAÜSTÜ MİKROFON: aygıt değişti, yeniden açılıyor"); self?.durdur(sessizce: true)  // sonraki tik yeniden açar
+            print("MASAÜSTÜ MİKROFON: aygıt değişti, yeniden açılıyor"); self?.sonDegisim = Date().timeIntervalSince1970; self?.durdur(sessizce: true)  // 2 sn sonra yeniden açılır
         }
     }
     func durdur(sessizce: Bool = false) {

@@ -374,7 +374,7 @@ def brifing_baslatta(oid):  # Başlat: hazırsa hemen oku; değilse hazırla, ha
         if BRIFING.get(oid, {}).get("durum") == "calisiyor": BRIFING[oid]["sesli"] = True
     if (BRIFING.get(oid) or {}).get("durum") == "hazir": brifing_sesli(oid, "baslat")  # tam o arada bittiyse
 # --- Sesli özet ve "yazayım mı?" (Faz 4; kullanıcı 8 Ekim: var olan akışa ses, ek Claude çağrısı yok) -------------------------------------
-# ozet-hazir gelince not, değerlendirme, öneri ve bekleyen iş sayısı okunur. eylem sun gelince sunulan işler tek tek okunup "yazayım
+# ozet-hazir gelince karar/iş/açık sayısı, kararlar, öneri ve bekleyen iş sayısı okunur. eylem sun gelince sunulan işler tek tek okunup "yazayım
 # mı?" diye sorulur; cevap panodan (Onayla / Reddet / Sonra) ya da sohbetten. Karar gelince sıradaki iş; 2 dk cevap yoksa dizi durur
 # (işler panoda bekler). Toplantı sürerken hiçbiri okunmaz (karşı taraf duymasın, mikrofon dökmesin).
 SORU = {"liste": [], "aktif": None, "t": 0}; SORU_SN = 120
@@ -389,7 +389,7 @@ def ozet_sesli(r):
     if not _ses_serbest(): return False
     bek = sum(1 for x in eylem_gorunen() if x["durum"] == "bekliyor")
     p = [_t("Toplantı özeti hazır.", "The meeting summary is ready.")]
-    if r.get("puan"): p.append(_t(f"Not: beş üzerinden {r['puan']}.", f"Score: {r['puan']} out of five."))
+    if r.get("cikti"): p.append(cikti_metin(r["cikti"]) + ".")
     p += [_cumle(r.get("degerlendirme"))] + ([_t("Öneri: ", "Suggestion: ") + _cumle(r["oneri"])] if r.get("oneri") else [])
     if bek: p.append(_t(f"Onayını bekleyen {bek} iş var.", f"{bek} item{'s' if bek > 1 else ''} waiting for your approval."))
     ok = seslendir(" ".join(x for x in p if x), kuyruk=True)

@@ -86,9 +86,10 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    `--durum iptal`. Özette takip işleri satırlarının sonuna kimliği yaz (`s4`).
 3. 1. adımdaki döküm dosyasından özet taslağı (`dokum` karşı taraf konuşmacılarını ses izinden yeniden adlandırır; `_canli/<bu toplantı>.md`
    canlı adlarla kalır), sırayla:
-   - `## Değerlendirme — not X/5` + 1–2 cümle: karar çıktı mı, en zayıf boyut, bir dahaki toplantıya tek öneri. Not toplantıyı
-     değerlendirir, kişiyi değil. Kullanıcı "neye göre" derse: "Not 1–5; gündemin ne kadarı konuşuldu, süre, açık soruların kapanması,
-     konuşma payın ve takip işlerinin sahibi." Yüzde/ağırlık yazma.
+   - `## Toplantı çıktısı` (not yok; `sonuc` ölçülerinden ve özetten), dört satır:
+     `- **Kararlar (n):** …; …` · `- **Sahipli işler (n):** kim — ne — ne zaman; …` (sahibi ya da tarihi yoksa "sahipsiz" /
+     "tarihsiz" yaz) · `- **Açık kalanlar (n):** …` (konuşulmayan gündem, cevapsız soru, karara bağlanmayan konu) ·
+     `- **Öneri:** …` (bir dahaki toplantıya tek cümle). Boşsa "yok" yaz. Pano, bildirim ve sesli özet bu satırları okur.
    - `dinleyici`/`katilimci`da önce "Kullanıcı için çıkanlar": ona verilen işler, onu etkileyen karar ve tarihler, sorması
      gereken açık noktalar.
    - Kararlar · gündem maddesi başına durum (konuşuldu / kısmen / açık; gündem yoksa atla) · takip işleri (kim — ne — ne zaman) ·
@@ -107,14 +108,14 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    Altyazı kaynaklıysa ya da konuşmacılar çoğunlukla "?" ise başa yaz; kararları kişiye bağlama ("kim: belirtilmedi"), emin
    olmadığın yeri "döküm belirsiz" diye işaretle. Duygu etiketleri özete girmez.
 4. `gorusmeler/<kişi>-toplanti-ozeti-<YYYYMMDD>.md` olarak kaydet (`CLAUDE.md` başka yer söylemiyorsa; başına "iç belge, kişi adı
-   içerir" ve döküm dosyasının adı), kullanıcıya notla başlayarak sun.
+   içerir" ve döküm dosyasının adı), kullanıcıya toplantı çıktısıyla başlayarak sun.
    Özetle birlikte yapı dosyası: `<özet>.yapi.json` — gündem maddesi başına karar · iş (sahip, tarih) · açık soru · sayı · iddia
    (kim, saat, kısa alıntı; biçim `tc yapi --ornek`; özette olmayanı ekleme, uydurma) → `tc yapi <json> --ozet <özet dosyası>`: karar
    grafı (kişinin iddia ve işleri sonraki toplantıda ve hazırlıkta görünür) + özetin yanına zihin haritası (`-zihin-haritasi.html`).
-   Sonra `tc ozet-hazir <özet dosyası> --baslik "<kişi — konu>"`: panoda "Son toplantılar" (not, değerlendirme, öneri, özeti aç,
+   Sonra `tc ozet-hazir <özet dosyası> --baslik "<kişi — konu>"`: panoda "Son toplantılar" (karar/iş/açık sayısı, kararlar, öneri, özeti aç,
    zihin haritası) + macOS bildirimi; pano toplantı görünümünden hemen çıkar.
 5. **Takip e-postası ve eylem kuyruğu** (`TOPLANTI-KURALLARI.md` §8): kullanıcı dışında katılımcı varsa özetten takip e-postası yaz — toplantının dilinde,
-   5–8 satır: teşekkür, konuştuklarımız (2–3 madde), sözler ve tarihler (kim — ne — ne zaman), açık sorular. Not, değerlendirme,
+   5–8 satır: teşekkür, konuştuklarımız (2–3 madde), sözler ve tarihler (kim — ne — ne zaman), açık sorular. Toplantı çıktısının öneri satırı,
    konuşma payı, iç gözlem ve kişi yorumu girmez. `tc eylem ekle takip "<kişi> — takip e-postası" --ayrinti "Kime: <adres>
    Konu: <konu>
 

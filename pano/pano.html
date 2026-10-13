@@ -475,11 +475,13 @@ function renderDosyadan(s){const d=s.dosyadan,sec=document.getElementById('dds')
 document.getElementById('dd').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-dd]');if(!b)return;b.disabled=true
   let r={};try{r=await j('/dosyadan-karar',{method:'POST',body:JSON.stringify({islem:b.dataset.dd})})}catch(e){}
   b.disabled=false;if(!r.ok)geciciDurum(L('Yapılamadı'),r.err||'');refresh()})
-// toplantı sonu: Claude özeti kaydedince (ozet-hazir) pano boşken son 7 günün en yeni 3 toplantısı — not, değerlendirme, öneri, özeti aç
+// toplantı sonu: Claude özeti kaydedince (ozet-hazir) pano boşken son 7 günün en yeni 3 toplantısı — karar/iş/açık sayısı, kararlar, öneri, özeti aç
 function gunTxt(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const g=Math.round((b-new Date(d).setHours(0,0,0,0))/864e5),s=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')
   return (g===0?L('Bugün'):g===1?L('Dün'):String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0'))+' '+s}
+function cikti(c){c=c||{};const p=[['karar','{n} karar'],['is','{n} iş'],['acik','{n} açık']].filter(([k])=>c[k]!=null).map(([k,m])=>L(m,{n:c[k]}))
+  return p.length?` <span class=chip>${esc(p.join(' · '))}</span>`:''}
 function renderSon(s){const ls=s.son_toplantilar||[],sec=document.getElementById('sns');sec.hidden=!!s.aktif||!ls.length;if(sec.hidden)return
-  setH(document.getElementById('sn'),ls.map(r=>`<div class=sn><div class=t><div class=b><span class=z>${esc(gunTxt(r.at))}</span>${esc(r.baslik||r.ad)}${r.puan?` <span class=chip>${esc(r.puan)}/5</span>`:''}</div>${r.degerlendirme?`<div class=d>${esc(r.degerlendirme)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}</div>${r.harita?`<button class=gh data-son="${esc(r.id)}" data-tur=harita>${L('Zihin haritası')}</button>`:''}<button class=gh data-son="${esc(r.id)}" title="${esc(r.ad)}">${L('Özeti aç')}</button></div>`).join(''))}
+  setH(document.getElementById('sn'),ls.map(r=>`<div class=sn><div class=t><div class=b><span class=z>${esc(gunTxt(r.at))}</span>${esc(r.baslik||r.ad)}${cikti(r.cikti)}</div>${r.degerlendirme?`<div class=d>${esc(r.degerlendirme)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}</div>${r.harita?`<button class=gh data-son="${esc(r.id)}" data-tur=harita>${L('Zihin haritası')}</button>`:''}<button class=gh data-son="${esc(r.id)}" title="${esc(r.ad)}">${L('Özeti aç')}</button></div>`).join(''))}
 document.getElementById('sn').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-son]');if(!b)return
   let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son,tur:b.dataset.tur||''})})}catch(e){}
   if(!r.ok)geciciDurum(b.dataset.tur?L('Zihin haritası açılamadı'):L('Özet açılamadı'),r.err||'')})

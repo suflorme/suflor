@@ -27,9 +27,9 @@ try:
     log = lambda: open(os.path.join(T, "relay.log")).read()
     ids = [post("/eylem", {"tur": t, "baslik": b, "kim": k})["eylem"]["id"] for t, b, k in
            [("kayit", "Karar: erişim listesi cuma güncellenir", None), ("takip", "Deniz — takip e-postası", "Deniz"), ("mesaj", "Ekibe toplantı notu", None)]]
-    post("/son-toplanti", {"ozet": os.path.join(T, "ozet.md"), "baslik": "Deneme", "puan": "4", "degerlendirme": "Karar çıktı; **süre** aşıldı", "oneri": "Gündemi kısalt"})
+    post("/son-toplanti", {"ozet": os.path.join(T, "ozet.md"), "baslik": "Deneme", "cikti": {"karar": 2, "is": 3, "acik": 1}, "degerlendirme": "Bütçe onaylandı; **süre** uzatıldı", "oneri": "Gündemi kısalt"})
     time.sleep(0.5); L = log()
-    ok("özet sesli okundu (not, değerlendirme, öneri, bekleyen sayısı)", "Toplantı özeti hazır. Not: beş üzerinden 4. Karar çıktı; süre aşıldı. Öneri: Gündemi kısalt." in L and "3 iş var" in L)
+    ok("özet sesli okundu (karar/iş/açık sayısı, kararlar, öneri, bekleyen sayısı)", "Toplantı özeti hazır. 2 karar, 3 iş, 1 açık. Bütçe onaylandı; süre uzatıldı. Öneri: Gündemi kısalt." in L and "3 iş var" in L)
     post("/eylem-sun", {}); time.sleep(0.5)
     ok("sun → ilk iş soruldu", "Kayıt: Karar: erişim listesi cuma güncellenir. Yazayım mı?" in log() and st()["eylem"]["sesli"] == ids[0])
     post("/eylem-karar", {"id": ids[0], "durum": "onaylandi"}, pano=True); time.sleep(0.5)
@@ -50,7 +50,7 @@ try:
     n0 = log().count("SES (deneme)")
     post("/ping", {"meeting": {"title": "Deneme"}, "call": True, "panel": True, "rows": 1})
     post("/eylem", {"tur": "kayit", "baslik": "Toplantıda eklenen"}); post("/eylem-sun", {})
-    post("/son-toplanti", {"ozet": os.path.join(T, "ozet.md"), "baslik": "Deneme", "puan": "3", "degerlendirme": "x"}); time.sleep(0.5)
+    post("/son-toplanti", {"ozet": os.path.join(T, "ozet.md"), "baslik": "Deneme", "cikti": {"karar": 1}, "degerlendirme": "x"}); time.sleep(0.5)
     ok("toplantı sürerken hiçbir şey okunmadı", log().count("SES (deneme)") == n0)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
