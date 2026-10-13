@@ -80,11 +80,13 @@ T, canli, r, post, st, nabiz = kur(True)
 try:
     post("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Bitiş Deneme | Microsoft Teams"}); nabiz("dinliyor", 2000, "Teams")
     post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(1)
-    for _ in range(4): nabiz("dinliyor", 2000, "Teams"); post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(1)
+    for _ in range(4): nabiz("dinliyor", 2000, "Teams"); y = post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(1)
+    bak("tutma sırasında yanıtta tut (menü uygulaması mikrofonu ve kanıtı sürdürür)", (y or {}).get("tut") is True)
     m = st().get("masaustu") or {}
     bak("Ayrıl yok, Teams sesi sürüyor: toplantıda sayıldı", m.get("toplantida") is True and "toplantı sesi sürüyor" in open(os.path.join(T, "relay.log")).read())
     for _ in range(6): nabiz("dinliyor", 0, "Teams"); post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(1)
-    bak("Teams sesi kesildi: toplantı dışı", (st().get("masaustu") or {}).get("toplantida") is False)
+    bak("Teams sesi kesildi: toplantı dışı, tut yok", (st().get("masaustu") or {}).get("toplantida") is False
+        and post("/masaustu", {"uygulama": "Teams", "toplantida": False}).get("tut") is False)
     post("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Bitiş Deneme | Microsoft Teams"}); nabiz("bekliyor")
     post("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(0.5)
     bak("ses yardımcısı dinlemiyorsa tutulmaz", (st().get("masaustu") or {}).get("toplantida") is False)

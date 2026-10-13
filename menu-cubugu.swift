@@ -354,7 +354,7 @@ final class Masaustu {
             }
             if bos == nil { bos = ["uygulama": u.ad, "toplantida": false] }
         }
-        kilit.lock(); micDugme = nil; toplantiPid = 0; kisilerDugme = nil; kilit.unlock()
+        kilit.lock(); micDugme = nil; if !tutuluyor { toplantiPid = 0 }; kisilerDugme = nil; kilit.unlock()
         paylasimAday = nil; paylasimSay = 0; paylasim = nil; katilimcilar = nil
         return bos
     }
@@ -442,11 +442,13 @@ final class Masaustu {
     }
     // sessiz mi (hızlı yol): saklanan düğmenin etiketi; düğme yoksa ya da okunamazsa son taramanın sonucu
     func sessizHizli() -> Bool? {
-        kilit.lock(); let d = micDugme, s = son["sessiz"] as? Bool; kilit.unlock()
+        kilit.lock(); let d = micDugme, s = son["sessiz"] as? Bool ?? (tutuluyor ? tutSessiz : nil); kilit.unlock()  // tutmada: çıkıştan önceki durum
         if let d = d { let t = etiket(d); if uy(SESSIZ, t) { return true }; if uy(ACIK, t) { return false } }
         return s
     }
-    var toplantida: Bool { kilit.lock(); defer { kilit.unlock() }; return (son["toplantida"] as? Bool) ?? false }
+    // aktarıcı "Ayrıl"sız toplantıyı tutuyorsa (toplantı sesi sürüyor, v0.32.7) mikrofon ve kanıt da sürer (v0.32.9)
+    var tutuluyor = false, tutSessiz: Bool? = nil
+    var toplantida: Bool { kilit.lock(); defer { kilit.unlock() }; return (son["toplantida"] as? Bool) ?? false || tutuluyor }
     var paylasimVar: Bool { kilit.lock(); defer { kilit.unlock() }; return (son["paylasim"] as? Bool) ?? false }
     var pencere: (pid_t, String) { kilit.lock(); defer { kilit.unlock() }; return (toplantiPid, toplantiBaslik) }
     func dongu() {
@@ -461,7 +463,7 @@ final class Masaustu {
             } else { self.kayip = 0 }
             let top = v["toplantida"] as? Bool ?? false, once = self.son["toplantida"] as? Bool ?? false
             if top && !once { self.toplantiBas = Date(); self.kisilerSon = .distantPast; self.otoDokumSay = 0 }
-            if !top && once { self.cikis = Date() }
+            if !top && once { self.cikis = Date(); self.kilit.lock(); self.tutSessiz = self.son["sessiz"] as? Bool; self.kilit.unlock() }
             // Kişiler paneli: toplantı başından 15 sn sonra, sonra 3 dk'da bir
             if top, args.contains("--kisiler-ac"), Date().timeIntervalSince(self.toplantiBas) > 15, Date().timeIntervalSince(self.kisilerSon) > 180 {
                 self.kisilerSon = Date()
@@ -474,7 +476,11 @@ final class Masaustu {
             let sik = top || Date().timeIntervalSince(self.cikis) < 600
             if !v.isEmpty && (degisti || Date().timeIntervalSince(self.sonGonder) > (sik ? 10 : 60)) {
                 var g = v; if g["sessiz"] is NSNull || (g["sessiz"] as? Bool) == nil { g.removeValue(forKey: "sessiz") }
-                istek("/masaustu", g) { _ in }; self.sonGonder = Date()
+                istek("/masaustu", g) { y in
+                    let t = (y?["tut"] as? Bool) ?? false
+                    self.kilit.lock(); let once = self.tutuluyor; self.tutuluyor = t && !top; self.kilit.unlock()
+                    if t && !top && !once { print("MASAÜSTÜ: aktarıcı toplantıyı tutuyor (\"Ayrıl\" yok, ses sürüyor) — mikrofon ve kanıt açık") }
+                }; self.sonGonder = Date()
             }
             self.kilit.lock(); self.son = v; self.kilit.unlock(); self.dongu()
         }

@@ -938,7 +938,7 @@ def masaustu_al(p):
     ks = " ".join(str(p.get("konusan") or "").split())[:60]
     if ks and m["toplantida"] and ks != ben_adi(): kume_oyla(ks, taslak=True)  # konuşan kişi göstergesi: altyazı taslağı gibi oy
     if m["toplantida"] and masaustu_baslik() and m["paylasim"] is not None and m["paylasim"] != o.get("paylasim"): paylasim_bildir(m["paylasim"])
-    return {"ok": True}
+    return {"ok": True, "tut": bool(m.get("tut_bas"))}  # menü uygulaması tutma sırasında mikrofonu ve kanıtı açık tutar
 MASAUSTU_TUT_SN, MASAUSTU_SESSIZ_SN = (20, 4) if os.environ.get("SUFLOR_TEST_HIZLI") else (600, 30)
 MASAUSTU_YENI_SN = float(os.environ.get("SUFLOR_TEST_YENI_SN") or 120)  # masaüstü toplantıdan bu süreden uzun çıkılıp yeniden girilince yeni döküm dosyası (kısa kopma aynı dosyada sürer)
 def masaustu_yeni_toplanti(o):
