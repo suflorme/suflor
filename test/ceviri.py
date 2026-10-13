@@ -81,10 +81,18 @@ if os.environ.get("SUFLOR_CEVIRI_GERCEK"):
         istek("/ingest", {"meeting": {"title": "Çeviri Deneme"}, "source": "whisper", "entries": [{"id": "wh/karsi/9", "speaker": "John", "time": "10:01:00",
               "text": "Let's discuss the Salesforce dashboard and the HubSpot pipeline on Teams.", "kanal": "karsi", "t0": time.time(), "t1": time.time() + 3}]})
         yol = os.path.join(canli, "telaffuz-oto.json"); t = time.time()
-        while time.time() - t < 40 and not os.path.exists(yol): time.sleep(1)
-        oto = json.load(open(yol, encoding="utf-8")) if os.path.exists(yol) else {}
+        def _oto():
+            try: return json.load(open(yol, encoding="utf-8"))
+            except (OSError, ValueError): return {}
+        while time.time() - t < 40 and not any(k.lower() in ("salesforce", "hubspot") for k in _oto()): time.sleep(1)  # dosya ilk çeviriden de olabilir
+        oto = _oto()
         print(f"   okunuş: {oto}")
         bak("çeviri cevabındaki okunuşlar telaffuz-oto.json'da", any(k.lower() in ("salesforce", "hubspot") for k in oto))
+        try: cg = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"), encoding="utf-8")]
+        except OSError: cg = []
+        cv = [x for x in cg if x.get("is") == "ceviri"]
+        print(f"   çağrı kaydı: {len(cv)} çeviri turu · {round(sum(x.get('maliyet') or 0 for x in cv), 4)} $")
+        bak("çeviri turları claude-cagri.jsonl'de (sayılar, metin yok)", cv and all("giris" in x and "metin" not in x for x in cv))
     finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print("çeviri: ✓ hepsi geçti" if not hata else f"çeviri: ✗ {len(hata)} kaldı")
 sys.exit(1 if hata else 0)
