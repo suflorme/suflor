@@ -481,7 +481,8 @@ def kart():
     req = urllib.request.Request(A.relay + "/card", data=json.dumps(body).encode(), method="POST",
                                  headers={"X-Suflor-Anahtar": key, "Content-Type": "application/json"})
     r = json.load(urllib.request.urlopen(req, timeout=3)); c = r.get("card") or {}
-    print(f"kart gönderildi: {c.get('id')} [{c.get('kind')}{' · ONAY BEKLİYOR' if c.get('onay') else ''}{' · SESSİZ: bekliyor (sessiz bitince özetle)' if c.get('sessiz') else ''}] {c.get('text')}")
+    print(f"kart gönderildi: {c.get('id')} [{c.get('kind')}{' · ONAY BEKLİYOR' if c.get('onay') else ''}{' · SESSİZ: bekliyor (sessiz bitince özetle)' if c.get('sessiz') else ''}"
+          f"{' · TAVAN: ' + str(max(0, round(c['tavan_t'] - time.time()))) + ' sn sonra görünür (araya dakikada bir)' if c.get('tavan_t') else ''}] {c.get('text')}")
     return c.get("id")
 def etiket_cmd():
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()

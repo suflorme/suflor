@@ -68,6 +68,8 @@ Kapatmak için `"masaustu_mic": false`, `"kisayollar": false`; Kişiler panelind
 kısılır, masaüstü Teams/Zoom'da kısmak için ayrıca `"masaustu_ses_kis": true` — ses yardımcısı toplantı uygulamasının sesini kendi üzerinden
 çalar; yardımcı takılırsa toplantı sesi kesilebilir) · `"oda": true` — aynı
 mikrofondaki ikinci kişinin sözleri "Odadaki kişi" diye ayrılır. Ses izi hafızasını kapatmak için `"ses_izi_hafiza": false`.
+Claude'un soruya bağlı olmayan SÖYLE/NOT kartları araya dakikada en çok bir kez girer (aynı dakikada gelenler birlikte görünür); aralık
+`"kart_tavan_sn"` (varsayılan 60, 0 kapatır).
 Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)
 — sesli çeviri, fısıltı, sesli özet ve cevaplar bu sesle okunur (Mac'te, yerel); ses dosyası Suflor.me ile gelmez. Hız: `"piper_hiz"`
 (varsayılan 1,0), kısa okumalar `"piper_hiz_kisa"` (1,15). Piper yoksa ya da hata verirse Mac sesi.

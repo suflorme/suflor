@@ -232,11 +232,11 @@ CARD_KEY = card_key()
 def _log(name, rec):
     write([(os.path.join(BASE, name), json.dumps(rec, ensure_ascii=False) + "\n")])
 # --- Ölçüm kayıtlarının döndürülmesi (v0.24.2) -----------------------------------------------------------------------
-# İçeriksiz ölçüm kayıtları her toplantıda büyür (whisper-isler ~400, izle-paketler ~100 satır). Dosya KAYIT_SINIR'ı aşınca son KAYIT_KALAN
+# İçeriksiz ölçüm kayıtları (uydurma-adaylari yalnız süzgecin attığı kısa metin) her toplantıda büyür (whisper-isler ~400, izle-paketler ~100 satır). Dosya KAYIT_SINIR'ı aşınca son KAYIT_KALAN
 # aktif dosyada kalır (yakın toplantıların ölçümü bozulmasın), eskisi canli/arsiv/<ad>.gz'ye eklenir (gzip ardışık üyeler; olcum.py ikisini
 # birlikte okur). Durum dosyaları (kartlar, sorular, eylemler) döndürülmez: sonradan gelen durum satırları eski kayda bağlanır, küçükler.
 # Toplantı sürerken yapılmaz (izle-paketler başka süreçten kilitsiz eklenir). Açılışta ve 6 saatte bir.
-KAYIT_DONEN = ("whisper-isler.jsonl", "izle-paketler.jsonl", "claude-cagri.jsonl")
+KAYIT_DONEN = ("whisper-isler.jsonl", "izle-paketler.jsonl", "claude-cagri.jsonl", "uydurma-adaylari.jsonl", "sistem-izi.jsonl")
 KAYIT_SINIR = int(os.environ.get("SUFLOR_KAYIT_SINIR_KB") or 2048) * 1024; KAYIT_KALAN = KAYIT_SINIR // 2
 def kayit_dondur():
     import gzip
@@ -260,6 +260,41 @@ def _kayit_dongu():
     while True:
         if not toplanti_var() and time.time() - max(STATE["file_last"].values(), default=0) > RESUME_MAX_AGE_MIN * 60: kayit_dondur()
         time.sleep(6 * 3600)
+# --- Isı, pil ve bellek izi (v0.32.12, Faz 5) -----------------------------------------------------------------------------
+# Fansız Air'da bir saatlik toplantı sürekli yük (Whisper, ses izi, Piper): yavaşlama ısıdan mı belleğinden mi — tahminle değil kayıtla.
+# Toplantı sürerken dakikada bir canli/sistem-izi.jsonl'e (içeriksiz, döndürülür): isi = macOS ısı durumu (NSProcessInfo.thermalState:
+# 0 normal, 1 hafif, 2 ciddi — işlemci kısılır, 3 kritik), guc ac|pil + pil yüzdesi, düşük güç kipi, boş bellek yüzdesi, swap. olcum.py toplanti özetler.
+SISTEM_IZI_SN = 2 if os.environ.get("SUFLOR_TEST_HIZLI") else 60
+def _isi_durumu():
+    try:
+        import ctypes, ctypes.util
+        objc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("objc"))
+        ctypes.cdll.LoadLibrary("/System/Library/Frameworks/Foundation.framework/Foundation")
+        objc.objc_getClass.restype = ctypes.c_void_p; objc.sel_registerName.restype = ctypes.c_void_p
+        ptr = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)(ctypes.cast(objc.objc_msgSend, ctypes.c_void_p).value)
+        sayi = ctypes.CFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p)(ctypes.cast(objc.objc_msgSend, ctypes.c_void_p).value)
+        pi = ptr(objc.objc_getClass(b"NSProcessInfo"), objc.sel_registerName(b"processInfo"))
+        return int(sayi(pi, objc.sel_registerName(b"thermalState"))), bool(sayi(pi, objc.sel_registerName(b"isLowPowerModeEnabled")))
+    except Exception: return None, None
+def sistem_izi():
+    import subprocess
+    isi, dusuk = _isi_durumu(); r = {"t": round(time.time(), 1), "isi": isi, "dusuk_guc": dusuk}
+    try:
+        b = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=3).stdout
+        r["guc"] = "ac" if "AC Power" in b else "pil" if "Battery Power" in b else None
+        m = re.search(r"(\d+)%", b); r["pil"] = int(m.group(1)) if m else None
+    except Exception: pass
+    try:
+        s = subprocess.run(["sysctl", "-n", "kern.memorystatus_level", "vm.swapusage"], capture_output=True, text=True, timeout=3).stdout.splitlines()
+        r["bellek_bos"] = int(s[0]); m = re.search(r"used = ([\d.]+)M", s[1]); r["swap_gb"] = round(float(m.group(1)) / 1024, 2) if m else None
+    except Exception: pass
+    return r
+def _sistem_izi_dongu():
+    while True:
+        time.sleep(SISTEM_IZI_SN)
+        if toplanti_var():
+            try: _log("sistem-izi.jsonl", sistem_izi())
+            except Exception as e: print(f"SİSTEM İZİ: yazılamadı ({e.__class__.__name__})")
 # --- Bekleyen kart/soru satırları ----------------------------------------------------------------------------
 # 30 Eylül: yeni toplantının ilk satırı gelmeden gönderilen kartlar önceki (29 Eylül) dosyaya yazıldı. Artık kart/soru
 # yalnız "etkin" toplantı dosyasına yazılır: son RESUME_MAX_AGE_MIN dakikada yazılmış ve eklentinin gördüğü toplantıyla
@@ -1595,6 +1630,7 @@ if __name__ == "__main__":
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi
     threading.Thread(target=_kayit_dongu, daemon=True).start()  # ölçüm kayıtlarını döndür
+    threading.Thread(target=_sistem_izi_dongu, daemon=True).start()  # toplantıda dakikada bir ısı/pil/bellek
     threading.Thread(target=_telaffuz_dongu, daemon=True).start()  # sözlükteki İngilizce adların Türkçe okunuşu (sesli özet, brifing)
     print(f"Suflor.me aktarıcı çalışıyor → http://127.0.0.1:{A.port}/  · dosyalar: {BASE}"); heartbeat()
     class Sunucu(ThreadingHTTPServer):

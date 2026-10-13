@@ -87,7 +87,7 @@ def cards_view():
     answered = {c.get("reply_to") for c in CARDS if c.get("reply_to")}
     kartlar = [c if c.get("kind") in CARD_KINDS else dict(c, kind=kart_turu(c.get("kind")), **({"gizli": True} if c.get("kind") == "deginme" else {}))
                for c in cs if c.get("kind") != "duygu"]
-    open_ = sorted((c for c in kartlar if c.get("status") == "acik" and not c.get("ertele") and not tutulan(c)), key=lambda c: c.get("geri") or c.get("at") or "")
+    open_ = sorted((c for c in kartlar if c.get("status") == "acik" and not c.get("ertele") and not tutulan(c) and not tavanda(c)), key=lambda c: c.get("geri") or c.get("at") or "")
     ertelenen = sum(1 for c in kartlar if c.get("status") == "acik" and c.get("ertele"))
     closed = sorted((c for c in kartlar if c.get("status") not in ("acik", "ozetlendi")), key=lambda c: c.get("acted_at") or "")[-5:]
     tone = next(({"ton": c["ton"], "at": c["at"]} for c in reversed(cs) if c.get("kind") == "duygu" and not c.get("kim")), None)
@@ -124,6 +124,21 @@ def cards_bekle(imza, sn):
         kalan = son - time.time()
         if v["imza"] != imza or kalan <= 0: return v
         with KART_KOSUL: KART_KOSUL.wait(min(1.0, kalan))
+# Kart tavanı (v0.32.12, Faz 5): soruya bağlı olmayan SÖYLE/NOT araya en çok kart_tavan_sn'de (60) bir girer — 13 Ekim: 4 türe
+# geçilen 7 Ekim'den beri bu kartların 103'ünden 33'ü öncekinden < 60 sn sonra geldi (bir toplantıda 18 NOT'un 9'u). Kart atılmaz:
+# pencere dolana kadar görünmez, aynı pencerede gelenler birlikte görünür. DUR, CEVAP, onay, fısıltılı ve sessizde bekleyen kart
+# dışarıda. TAVAN["son"]: son araya girme anı (gelecekteyse bekleyen bir toplu gösterim). Ayar kart_tavan_sn: 0 kapatır.
+TAVAN = {"son": 0.0}
+def tavan_uygula(c):  # LOCK içinde
+    w = AYAR.get("kart_tavan_sn", 60)
+    if os.environ.get("SUFLOR_KART_TAVAN_SN"): w = float(os.environ["SUFLOR_KART_TAVAN_SN"])  # tarayıcı testleri (gerçek ayarı okur) art arda kart gönderir
+    if not isinstance(w, (int, float)) or w <= 0 or c["kind"] not in ("soyle", "not"): return
+    if any(c.get(k) for k in ("reply_to", "onay", "fisilti", "sessiz", "sessiz_ozet", "replik")): return
+    now = time.time()
+    if TAVAN["son"] > now: c["tavan_t"] = TAVAN["son"]  # bekleyen toplu gösterime katıl
+    elif now - TAVAN["son"] < w: c["tavan_t"] = TAVAN["son"] = TAVAN["son"] + w
+    else: TAVAN["son"] = now
+def tavanda(c): return (c.get("tavan_t") or 0) > time.time()
 def add_card(p):
     ham = p.get("kind"); kind = kart_turu(ham)
     text = " ".join(str(p.get("text") or "").split())[:400]
@@ -145,8 +160,9 @@ def add_card(p):
     # sessizde DUR ve her CEVAP geçer: soruya bağlı (--cevap q…) olmayan cevap da (12 Ekim deneme 7: ❓ satırına verilen cevap bekletildi)
     elif sessiz_acik() and kind not in ("dur", "cevap") and not c.get("reply_to"): c["sessiz"] = SESSIZ["id"]
     with LOCK:
+        tavan_uygula(c)
         c["file"] = aktif_dosya(); CARDS.append(c); _log("kartlar.jsonl", c)
-        _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {'NE DİYEYİM' if c.get('replik') else CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')}{(' — ' + c['durum'].replace('|', '¦')) if c.get('durum') else ''} |{' 🔇 bekliyor ' if c.get('sessiz') else ' '}|", c, "kartlar.jsonl")
+        _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {'NE DİYEYİM' if c.get('replik') else CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')}{(' — ' + c['durum'].replace('|', '¦')) if c.get('durum') else ''} |{' 🔇 bekliyor ' if c.get('sessiz') else ' ⏳ tavan ' if c.get('tavan_t') else ' '}|", c, "kartlar.jsonl")
         if c.get("sessiz_ozet"):
             for x in CARDS:
                 if x.get("sessiz") == c["sessiz_ozet"] and x.get("status") == "acik":

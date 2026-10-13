@@ -58,6 +58,16 @@ def dil_olasilik(a):  # Whisper'ın dil tahmini (ilk 30 sn): {dil: olasılık}; 
 # başka dile geçişte kısa parçada Whisper'ın en sık uydurması (12 Ekim ölçümü: Türkçe kayıttaki gürültü İngilizce çözülünce "Thank you.")
 UYDURMA_EN = re.compile(r"^(thank you|thanks|amen|cheers|bye|okay|you|so)[.!]?$", re.I)
 DIL_GECIS = 0.9  # dayatılan dil boş çıkınca öbür dile geçiş için en düşük olasılık
+# Kısa kalıp konuşmasız parçadan (13 Ekim, gercek-ses/uydurma-topla.py): İngilizce kipte oda gürültüsü, nefes, klavye, uğultu ve sıfır ses
+# 36 parçanın 34'ünde "Thank you." / "You" yazıldı ve süzgeçten geçti (yukarıdaki kural yalnız toplantı dili Türkçeyken atıyordu). Gerçek kısa
+# konuşmada (Yüksek Mahkeme kaydı, ≤ 4 sözcüklü 32 parça) 20 ms karelerin ses düzeyi %90'lık/%10'luk oranı ≥ 6,5 ve %90'lık ≥ 0,067; düz gürültüde
+# oran ~1, nefes ve klavyede oran yüksek ama düzey < 0,02. Yalnız UYDURMA_EN kalıbına uyan tüm metinde, toplantı dili ne olursa olsun.
+def konusma_var(a, np, sr=16000):
+    k = sr // 50; m = len(a) // k
+    if m < 5: return False
+    r = np.sqrt((a[:m * k].reshape(m, k) ** 2).mean(1)) + 1e-6
+    p90 = float(np.percentile(r, 90))
+    return p90 >= 0.02 and p90 / float(np.percentile(r, 10)) >= 3
 def tr_harf(x, dil):  # Türkçe çözümde Azerice "ə" (11 Ekim: arka plandaki haber "muhabirənin … adreslər" yazıldı) → "e"
     return x.replace("ə", "e").replace("Ə", "E") if dil == "tr" else x
 KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den aynen
@@ -182,18 +192,19 @@ def main():
                     r2 = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=obur, initial_prompt=istem, condition_on_previous_text=False,
                                                 no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
                     if not _bos(r2): r = r2; gec_dil = (obur, round(float(pr[obur]), 2))
-            tut, atla = [], 0
+            tut, atla, atilan = [], 0, []  # atilan: aktarıcı canli/uydurma-adaylari.jsonl'e yazar (uydurma listesini kendi kayıtlarımızdan büyütmek için)
             for s in r.get("segments") or []:
                 x = (s.get("text") or "").strip()
                 if not x or UYDURMA.search(x) or (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
-                        or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; continue
+                        or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; atilan += [x] if x else []; continue
                 tut.append((s, x))
             metin = tr_harf(" ".join(x for _, x in tut).strip(), r.get("language"))
             # toplantı dili dışındaki İngilizce (geçişle ya da kanal belleğiyle) kısa kalıp → uydurma
-            if p.get("ana_dil") and r.get("language") == "en" != p["ana_dil"] and UYDURMA_EN.match(metin): metin = ""; atla += 1
+            if p.get("ana_dil") and r.get("language") == "en" != p["ana_dil"] and UYDURMA_EN.match(metin): atilan.append(metin); metin = ""; atla += 1
+            if metin and UYDURMA_EN.match(metin) and not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1
             # kısa satırda web adresi: Whisper'ın video sonu uydurması ("www.feyyaz.tv" — 1 Ekim headless bip sesi denemesi)
-            if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): metin = ""; atla += 1
-            if istem and metin and metin.lower().strip(" .") in istem.lower(): metin = ""; atla += 1  # istemi geri okuma
+            if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): atilan.append(metin); metin = ""; atla += 1
+            if istem and metin and metin.lower().strip(" .") in istem.lower(): atilan.append(metin); metin = ""; atla += 1  # istemi geri okuma
             try: ses = ses_olc(a, np) if metin else None
             except Exception: ses = None
             km = {}
@@ -212,7 +223,7 @@ def main():
                         km["bol"] = [dict({"s": round(sg["start"], 2), "e": round(sg["end"], 2), "n": len(x.split())},
                                           **({"iz": b64(iz(a[int(sg["start"] * SR):int(sg["end"] * SR)]))} if (sg["end"] - sg["start"]) >= 0.5 else {})) for sg, x in tut]
                 except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"ses": ses} if ses else {}), **km})
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"ses": ses} if ses else {}), **km})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0

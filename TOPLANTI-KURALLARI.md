@@ -35,6 +35,8 @@ kart az ve isabetli olmalı.
   sır, yanlış bilgi, kayıt/paylaşım riski; `--gizli` metni şeritte gizler, yalnız panoda görünür — hassas yönlendirme böyle) ·
   `cevap` (SORU ya da NE DİYEYİM cevabı) · `not` (bilgi; yalnız panoda). Eski adları (`sor`, `belirt`, `dikkat`, `deginme`,
   `bilgi`) kullanma.
+- **Tavan:** soruya bağlı olmayan `soyle`/`not` araya dakikada en çok bir kez girer; aynı dakikada gönderilen kart `TAVAN: n sn` der,
+  pencere dolunca öncekilerle birlikte görünür. O dakikada ikinci kart yerine en önemlisini seç. `dur`, `cevap` ve fısıltılı kart beklemez.
 - Metin ≤ 120 karakter, emir kipinde, tek iş ("Ayşe'ye yedeklerin nerede tutulduğunu sor"). Gerekçe ve kaynak `--neden`'e.
 - `--neden` panoda görünür (ekran paylaşılırken karşı taraf da görebilir): dosya yolu, klasör, kod satırı ya da iç belge adı
   yazma; kaynağı kısa adla ver ("Ayşe görüşmesi 1:06:31").

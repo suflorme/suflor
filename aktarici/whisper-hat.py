@@ -338,6 +338,9 @@ def _isci_dongu():
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         sonuc = "uydurma" if j.get("atlanan") else "bos"
+        if j.get("atilan"):  # süzgecin attığı metin (v0.32.12): uydurma listesini kendi kayıtlarımızdan büyütmek için; yalnız bu Mac'te, döndürülür
+            try: _log("uydurma-adaylari.jsonl", {"t": round(time.time(), 1), "kanal": is_.get("kanal"), "atilan": j["atilan"], "satir": bool(metin)})
+            except Exception: pass
         if metin and j.get("dil") in ("tr", "en") and KANALLAR.get(is_["kanal"]): KANALLAR[is_["kanal"]].dil_son = j["dil"]; KANALLAR[is_["kanal"]].dil_son_t = time.time()
         if metin and j.get("dil_gecis"): print(f"WHISPER: {is_['kanal']} kanalı {j.get('dil')} ({j['dil_gecis']}) — toplantı dili dışında konuşma")
         if metin:
