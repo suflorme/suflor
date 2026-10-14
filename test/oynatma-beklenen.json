@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 123331,
-   "sha": "62d8fb7312165485"
+   "uzunluk": 135361,
+   "sha": "4f2c32e6cb255361"
   },
   "/hazirlik": {
-   "uzunluk": 33706,
-   "sha": "3e43445c70738800"
+   "uzunluk": 38396,
+   "sha": "0bcdc1f0b214df42"
   },
   "/mini": {
-   "uzunluk": 123331,
-   "sha": "62d8fb7312165485"
+   "uzunluk": 135361,
+   "sha": "4f2c32e6cb255361"
   },
   "/status": {
    "_ping_son": "float",
@@ -256,6 +256,35 @@
    "anahtarsiz": "NoneType",
    "anlik": "NoneType",
    "arayuz_dili": "str",
+   "ayarlar": {
+    "deger": {
+     "adin_gecti": "bool",
+     "bildirim": "bool",
+     "brifing_sesli": "bool",
+     "ceviri": "bool",
+     "ceviri_kis": "bool",
+     "ekran_oto": "bool",
+     "eposta": "str",
+     "eposta_adres": "str",
+     "fisilti": "bool",
+     "kart_tavan_sn": "int",
+     "kisayollar": "bool",
+     "konusma": "bool",
+     "masaustu_kisiler": "bool",
+     "masaustu_mic": "bool",
+     "masaustu_ses_kis": "bool",
+     "menu_cubugu": "bool",
+     "oda": "bool",
+     "ses_izi_hafiza": "bool",
+     "ses_motoru": "str",
+     "sesli_kanit": "bool",
+     "sesli_not": "bool",
+     "teshis": "bool",
+     "uzun_konusma_sn": "int"
+    },
+    "menu": "bool",
+    "piper": "bool"
+   },
    "baglam": [
     {
      "ad": "str",
