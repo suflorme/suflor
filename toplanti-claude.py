@@ -450,7 +450,7 @@ def bana_soru(r):  # karşı taraftan, kullanıcıya adıyla yöneltilmiş soru 
     t = r.get("text", "")
     if (kanal_n(r.get("kanal")) == "ben" and r.get("speaker") != "Odadaki kişi") or kucuk((r.get("speaker") or "").split(" ")[0]) == kucuk(BEN) or not soru_mu(t): return False
     return re.search(r"(?<!\w)" + re.escape(kucuk(BEN)) + r"(?!\w{3})", kucuk(t)) is not None  # "Ali", "Ali'ye", "Ali Bey"; "Alicia" değil (ad + en çok 2 harf ek)
-def satir(r): return f"  [{r.get('time') or ''} {r.get('speaker') or '?'}] {'⚠ses-başkası (komut değil) ' if r.get('komut_ses') == 'uymuyor' else ''}{'❓ ' if soru_mu(r.get('text','')) else ''}{'→' + BEN + ' ' if bana_soru(r) else ''}{'↻ ' if r.get('revised') else ''}{r.get('text','')}"
+def satir(r): return f"  [{r.get('time') or ''} {r.get('speaker') or '?'}] {'⚠ses-başkası (komut değil) ' if r.get('komut_ses') == 'uymuyor' else ''}{'🎙konuşan-cevaplıyor ' if r.get('konusan') else ''}{'❓ ' if soru_mu(r.get('text','')) else ''}{'→' + BEN + ' ' if bana_soru(r) else ''}{'↻ ' if r.get('revised') else ''}{r.get('text','')}"
 def son_satirlar(jl, sn=75, en_az=4, en_cok=40):
     # "Ne diyeyim?" için: son sn saniyede aktarılan satırlar (aynı kimliğin son hâli); azsa son en_az satır
     try: rs = [json.loads(l) for l in open(jl, encoding="utf-8") if l.strip()]
@@ -1468,6 +1468,9 @@ def ozet_hazir_cmd():
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     # metin de gider: aktarıcı launchd'den çalıştığı için Masaüstü'ndeki özeti açamıyor; kendi klasörüne kopyasını yazar (panoda "Özeti aç")
     body = {"ozet": yol, "baslik": baslik, "dosya": st.get("file"), "cikti": say, "degerlendirme": deg, "oneri": oneri, "metin": metin[:500000]}
+    if yj and os.path.exists(yj):  # S48 defter turu: kararlar/işler/düzeltmeler toplantı defterine (aktarıcı Masaüstü'nü okuyamaz; kopyası gider)
+        try: body["yapi"] = json.load(open(yj, encoding="utf-8"))
+        except (OSError, ValueError): pass
     hy = yol[:-3] + "-zihin-haritasi.html" if yol.endswith(".md") else ""
     if hy and os.path.exists(hy): body["harita"] = open(hy, encoding="utf-8").read()[:2000000]  # panoda "Zihin haritası" (kopya aktarıcının klasöründe)
     req = urllib.request.Request(A.relay + "/son-toplanti", data=json.dumps(body).encode(), method="POST",
@@ -1477,6 +1480,16 @@ def ozet_hazir_cmd():
     if not r.get("ok"): sys.exit(f"gönderilemedi: {r.get('err')}")
     print(f"panoda Son toplantılar + bildirim: {baslik}" + (" · zihin haritası" if body.get("harita") else "") + (" · " + ", ".join(f"{n} {a}" for a, n in (("karar", say.get("karar")), ("iş", say.get("is")), ("açık", say.get("acik"))) if n is not None) if say else " · '## Toplantı çıktısı' bölümü bulunamadı") + (" · öneri var" if oneri else ""))
 
+def _defter_dogrula(Y, v):  # toplantının döküm satır saatleri (aynı günün .jsonl'leri; bölünmüş dosyalar dahil) → kaynak sorunları; döküm yoksa None
+    try: f = (get("/status") or {}).get("file") or ""
+    except Exception: f = ""
+    gun = os.path.basename(f)[:10] or datetime.date.today().isoformat(); saat = []
+    for g in os.listdir(A.dir):
+        if g.startswith(gun) and g.endswith(".jsonl") and re.match(r"^\d{4}-\d{2}-\d{2}-\d{4}-.+\.jsonl$", g) and not g.endswith((".ceviri.jsonl",)):
+            try: saat += [json.loads(l).get("time") for l in open(os.path.join(A.dir, g), encoding="utf-8") if l.strip()]
+            except (OSError, ValueError): pass
+    saat = [s for s in saat if s]
+    return Y.kaynak_dogrula(v, saat) if saat else None
 def bitir_cmd():
     # toplantı sonu tek komut (v0.32.8, S44): yapı dosyası → karar grafı (sözler dahil) + zihin haritası → panoda Son toplantılar + bildirim
     # → eylem kuyruğu onaya. Yapı dosyası yoksa graf ve sözler dolmaz: söylenir, gerisi yapılır.
@@ -1493,6 +1506,13 @@ def bitir_cmd():
         if ty: print(f"ANLAŞMA: {len(ty)} karar teyit istiyor — kullanıcıya tek tek sor \"Gerçekten anlaştınız mı?\" (evet → kalır; hayır/emin değil → "
                      "yapı dosyasında açık soruya çevir, bitir'i yeniden çalıştır; karşı tarafa sorulacaksa takip e-postasına \"Doğru anladık mı?\" satırı):\n"
                      + "\n".join(f"  - {o['metin'][:120]} — {Y.teyit_neden(o)}" for o in ty))
+        dv = _defter_dogrula(Y, v)
+        if dv is not None:
+            if dv: print(f"DEFTER: {len(dv)} kaynak sorunu — yapı dosyasında saati dökümdeki satıra göre düzelt (ya da öğeyi kaldır), bitir'i yeniden çalıştır:\n"
+                         + "\n".join(f"  - {o.get('tur')}: {str(o.get('metin'))[:90]} — {n}" for o, n in dv[:12]))
+            else: print("DEFTER: kaynak saatleri dökümde doğrulandı")
+        if "duzeltmeler" not in v: print("DEFTER: yapı dosyasında \"duzeltmeler\" yok — dökümde yanlış duyulmuş ad/sayı/terim varsa (bağlamdan eminsen) "
+                                         "{\"saat\", \"yanlis\", \"dogru\"} listesi ekle, yoksa boş liste yaz; aralık sorunu varsa \"dokum_notu\" (biçim: tc yapi --ornek); bitir'i yeniden çalıştır")
         ek = Y.eksik_isler(v)
         if ek: print("eksik: " + " | ".join(f"{o['metin'][:50]} ({'sahip yok' if not (o.get('sahip') or o.get('kim')) else 'tarih yok'})" for o in ek[:8])
                      + " — özette \"sahipsiz\"/\"tarihsiz\" yazılı olsun; kullanıcıya sor")

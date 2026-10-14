@@ -34,7 +34,8 @@ for l in sys.stdin:
     ns += 1; b = "[Bağlam" in q and "Şimdi:" in q and "Deneme planlama" in q and "GİZLİ NOT" not in q  # davet notu girmez
     if ns == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
     for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."] + ([" Önceki konuşma geldi."] if "[Önceki konuşma" in q and "Önceki soru: " in q else []) \
-            + ([f" Defter geldi: {defter}."] if defter else []) + ([" Ek geldi."] if ek else []) + (["\\n---\\n", "Ayrıntı satırı 10:01."] if defter or ek else []):
+            + ([f" Defter geldi: {defter}."] if defter else []) + ([" Ek geldi."] if ek else []) + ([" Geçmiş toplantı geldi."] if "[Sıradaki toplantı" in q and "Bütçe takibi" in q and "ortak: ayla" in q else []) \\
+            + ([" Toplantı bağlamı geldi."] if "Toplantı sürüyor:" in q and "yalnız panoda" in q else []) + (["\\n---\\n", "Ayrıntı satırı 10:01."] if defter or ek else []):
         time.sleep(0.15); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     defter = None; ek = False
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
@@ -46,13 +47,16 @@ shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # r
 import datetime as _dt
 _y = (_dt.datetime.now().astimezone() + _dt.timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
 json.dump({"durum": "ok", "olaylar": [{"id": "e1", "baslik": "Deneme planlama", "baslangic": _y.isoformat(), "bitis": (_y + _dt.timedelta(minutes=30)).isoformat(),
-           "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Deniz T"], "kisi_sayisi": 2, "notlar": "GİZLİ NOT"}]}, open(os.path.join(T, "takvim.json"), "w"))
+           "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Deniz T"], "kisi_sayisi": 2, "notlar": "GİZLİ NOT"},
+          {"id": "e2", "baslik": "Bütçe takibi", "baslangic": (_dt.datetime.now().astimezone() + _dt.timedelta(minutes=90)).isoformat(),  # S48: toplantı öncesi blok
+           "bitis": (_dt.datetime.now().astimezone() + _dt.timedelta(minutes=120)).isoformat(), "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Ayla K"], "kisi_sayisi": 2}]},
+          open(os.path.join(T, "takvim.json"), "w"))
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 def pcm(metin):
     a, w = os.path.join(T, "q.aiff"), os.path.join(T, "q.wav")
     subprocess.run(["say", "-v", "Yelda", "-o", a, metin]); subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", a, w])
     with wave.open(w) as f: return base64.b64encode(f.readframes(f.getnframes())).decode()
-r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1"),
+r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0"),
                      stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
 try:
     for _ in range(50):
@@ -151,6 +155,7 @@ try:
     while time.time() - t0 < 10 and log().count("tur sınırı") < 2: time.sleep(0.2)
     k7 = sor("Teslim ne zaman?")
     ok("süreç yenilenince defter yeniden gitti", "Defter geldi" in (k7.get("cevap") or "") and log().count("DEFTER: bas-konuşa gitti") == 2)
+    ok("toplantı öncesi: sıradaki toplantının bloğu, aynı kişiyle geçmiş toplantı (Ayla K) içinde", "Geçmiş toplantı geldi" in (k7.get("cevap") or "") and "KONUŞ: sıradaki toplantı bloğu gitti" in log())
     k8 = sor("Başka ne konuşuldu?")
     ok("aynı süreçte ikinci soruda defter yok", k8["durum"] == "hazir" and "Defter geldi" not in (k8.get("cevap") or "") and "Ek geldi" not in (k8.get("cevap") or "")
        and log().count("DEFTER: bas-konuşa gitti") == 2)
@@ -171,7 +176,23 @@ try:
     ok("ikinci denemede de cevap yoksa panoda hata", k13["durum"] == "hata" and "cevap vermedi" in (k13.get("hata") or "") and "ikinci denemede de 6 sn cevap yok" in log())
     urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ping", data=json.dumps({"call": True, "panel": True}).encode(), headers={"X-Suflor-Anahtar": K}))
     ok("toplantı sürerken panoda defter satırı yok", st().get("defter") is None)
-    ok("toplantı sürerken kapalı", not post({"komut": "basla"}).get("ok"))
+    # S48 (v0.35.0): toplantı sırasında aynı konuşan süreç — kulaklık yok (SUFLOR_TEST_KULAKLIK=0): cevap okunmaz, yalnız panoda
+    ses0 = log().count("SES (deneme)")
+    k14 = sor("Toplantıda ne konuşuldu?")
+    ok("toplantı sürerken Konuş: cevap geldi, bağlamda 'Toplantı sürüyor … yalnız panoda'", k14["durum"] == "hazir" and "Toplantı bağlamı geldi" in (k14.get("cevap") or ""))
+    ok("kulaklık yokken toplantıda cevap okunmadı", log().count("SES (deneme)") == ses0)
+    def ben(i, metin): uc2("/ingest", {"meeting": {"title": "Başka toplantı"}, "source": "whisper", "entries": [{"id": f"w/{i}", "speaker": "Deniz T", "time": f"11:0{i}:00", "text": metin, "kanal": "ben"}]})
+    ben(1, "Claude, bütçe ne kadardı?"); t0 = time.time()
+    while time.time() - t0 < 30 and not (st().get("kaynak") == "hitap" and st()["durum"] in ("hazir", "hata")): time.sleep(0.2)
+    k15 = st(); c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
+    jl = [json.loads(l) for f in os.listdir(canli) if f.endswith(".jsonl") and not f.startswith("claude") for l in open(os.path.join(canli, f)) if '"w/1"' in l]
+    ok("sesli 'Claude, …' sorusu konuşana gitti, cevap panoda", k15["durum"] == "hazir" and "bütçe ne kadardı" in (k15.get("soru") or "") and "Sorduğun" in (k15.get("cevap") or "")
+       and c[-1].get("kaynak") == "hitap" and c[-1].get("toplantida") is True and c[-1].get("sesli") is False)
+    ok("döküm satırında konusan işareti (izle: toplantı oturumu cevap kartı yazmaz)", bool(jl) and jl[-1].get("konusan") is True)
+    n0 = log().count("konuşana gitti")
+    ben(2, "Claude: kuyruğa al teklif e-postasını."); time.sleep(1)
+    jl2 = [json.loads(l) for f in os.listdir(canli) if f.endswith(".jsonl") and not f.startswith("claude") for l in open(os.path.join(canli, f)) if '"w/2"' in l]
+    ok("iş talimatı ('kuyruğa al') konuşana gitmedi, toplantı oturumunda kaldı", log().count("konuşana gitti") == n0 and bool(jl2) and not jl2[-1].get("konusan"))
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

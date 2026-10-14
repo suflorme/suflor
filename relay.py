@@ -580,6 +580,7 @@ def ingest(p):
                     if n_:  # note LOCK alır: bu paket yazıldıktan sonra ayrı iş parçacığında
                         threading.Thread(target=note, args=({"meeting": {"title": title}, "text": n_, "at": datetime.datetime.now().isoformat(timespec="seconds")},), daemon=True).start()
                         STATE["komut"] = {"id": secrets.token_hex(4), "at": datetime.datetime.now().isoformat(timespec="seconds"), "tur": "not", "metin": "🎙 " + _t("Not alındı", "Note taken")}; kart_bildir()
+                    elif p.get("source") == "whisper" and not onceki and "Claude:" in text and konus_hitap(text): e["_konusan"] = True  # S48: soru konuşana (bas-konus.py)
             if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text)); del SON_SATIRLAR[:-20]
             low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye
@@ -597,6 +598,7 @@ def ingest(p):
             md_out.append(f"| {e.get('time','')} | {e.get('speaker','?')} | {text} | {mark} |\n")
             rec = {"at": p.get("capturedAt"), "id": e.get("id"), "revised": bool(e.get("revised")), "time": e.get("time"), "speaker": e.get("speaker"), "text": text, "flags": flags, "src": p.get("source")}
             if e.get("kanal"): rec["kanal"] = e["kanal"]  # whisper ben/karsi
+            if e.get("_konusan"): rec["konusan"] = True  # izle: "Claude:" sorusunu konuşan cevaplıyor, toplantı oturumu cevap kartı yazmaz
             if soz: rec["raw"] = raw; rec["sozluk"] = soz
             for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume", "gec", "komut_ses"):  # ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
                 if e.get(k) is not None: rec[k] = e[k]
@@ -1284,6 +1286,13 @@ def son_ekle(p):
             with open(kp + ".tmp", "w", encoding="utf-8") as f: f.write(p["metin"][:500000])
             os.replace(kp + ".tmp", kp); r["kopya"] = kp
         except OSError as e: print(f"ÖZET: kopya yazılamadı ({e.__class__.__name__})")
+    if isinstance(p.get("yapi"), dict) and isinstance(p["yapi"].get("maddeler"), list):  # S48 defter turu: toplantı defterine "Toplantı sonu" bölümü (defter.py)
+        yp = os.path.join(BASE, "ozetler", os.path.basename(ozet)[:-3] + ".yapi.json")
+        try:
+            os.makedirs(os.path.dirname(yp), exist_ok=True)
+            with open(yp + ".tmp", "w", encoding="utf-8") as f: json.dump(p["yapi"], f, ensure_ascii=False)
+            os.replace(yp + ".tmp", yp); r["yapi"] = yp
+        except (OSError, TypeError, ValueError) as e: print(f"ÖZET: yapı yazılamadı ({e.__class__.__name__})")
     if isinstance(p.get("harita"), str) and p["harita"].lstrip().startswith("<!doctype html>"):  # zihin haritası (toplanti-claude.py yapi)
         hp = os.path.join(BASE, "ozetler", os.path.basename(ozet)[:-3] + "-zihin-haritasi.html")
         try:
@@ -1317,7 +1326,7 @@ def eposta_tur():
 # geçerli. Menü çubuğu uygulamasının ayarları açılışta verildiği için uygulama yeniden açılır (toplantı sürüyorsa bitince). Yeni ayar eklerken pano/pano.html AYG'ye de yaz.
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
-    "konusma": ("bool", True, None), "sesli_not": ("bool", True, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
+    "konusma": ("bool", True, None), "sesli_not": ("bool", True, None), "toplanti_konus": ("bool", True, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
     "brifing_sesli": ("bool", False, None), "ses_motoru": ("sec", "mac", ("mac", "piper")),
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
@@ -1598,7 +1607,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view()); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus()); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []

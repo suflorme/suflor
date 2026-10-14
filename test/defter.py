@@ -40,6 +40,24 @@ ok("sıra: başlık → gündem → döküm → konuşanlar → özet", m.index(
    and m.rstrip().endswith("Karar: bütçe kırk bin."))
 ok("konuşan sayımı", "Ayla K (1)" in m and "Deniz T (1)" in m and not kisa)
 ok("panoda görünüm (ad, saat)", defter_view() == {"ad": "Proje görüşmesi", "saat": datetime.datetime.fromtimestamp(d["son"]).strftime("%H:%M")})
+# S48 defter turu (v0.35.0): yapı dosyası (toplantı oturumu; kaynak saatleri bitir'de doğrulanır) → "Toplantı sonu" bölümü, özetten önce
+yp = os.path.join(BASE, "ozetler", "proje-ozet.yapi.json")
+json.dump({"baslik": "Proje", "maddeler": [{"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [
+    {"tur": "karar", "metin": "Bütçe kırk bin", "kim": "Ayla K", "saat": "10:00:01", "netlik": "ortuk"},
+    {"tur": "is", "metin": "Teklifi gönder", "sahip": "Deniz T", "tarih": "2026-10-20", "saat": "10:00:05"}, {"tur": "bilinmez", "metin": "atla"}]}],
+    "duzeltmeler": [{"saat": "10:02:00", "yanlis": "cuma", "dogru": "çarşamba"}, {"yanlis": "eksik"}], "dokum_notu": "10:01 ses kesik"}, open(yp, "w"))
+SON[-1]["yapi"] = yp; m2, _ = defter_metni(d)
+ok("yapı dosyası defterde: karar/iş saatli, düzeltme, döküm notu; bilinmeyen tür ve eksik düzeltme yok",
+   "- Karar [10:00:01] Ayla K — Bütçe kırk bin (netlik: ortuk)" in m2 and "- İş [10:00:05] Deniz T — Teklifi gönder (tarih 2026-10-20)" in m2
+   and '"cuma" → "çarşamba"' in m2 and "Döküm notu: 10:01 ses kesik" in m2 and "atla" not in m2 and "eksik" not in m2)
+ok("sıra: konuşanlar → toplantı sonu bölümü → özet", m2.index("## Konuşanlar") < m2.index("## Toplantı sonu: kararlar") < m2.index("## Toplantı sonu özeti"))
+SON[-1].pop("yapi")
+sys.path.insert(0, KOD); import yapi as Y
+v = Y.oku(yp)
+sr = Y.kaynak_dogrula(v, ["10:00:01", "10:02:00"])
+ok("kaynak doğrulama: ± 90 sn içinde satır varsa geçer, eksik düzeltme bildirilir", [n for _, n in sr] == ["düzeltmede yanlis/dogru eksik"])
+v["maddeler"][0]["ogeler"][0]["saat"] = "10:30:00"; v["maddeler"][0]["ogeler"][1].pop("saat")
+ok("kaynak doğrulama: dökümde olmayan saat ve saatsiz iş", [n for _, n in Y.kaynak_dogrula(v, ["10:00:01"])][:2] == ["10:30:00 dökümde yok (± 90 sn)", "kaynak saati yok"])
 # saat sınırı
 AYAR["konus_defter_saat"] = 0; yenile(); ok("ayar 0 → defter yok", defter_toplanti() is None)
 AYAR["konus_defter_saat"] = 0.02; yenile(); ok("son yazma sınırdan eski → defter yok (2 dk > 1,2 dk)", defter_toplanti() is None)

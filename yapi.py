@@ -17,7 +17,32 @@ YAPI_ORNEK = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": 
         {"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17", "saat": "10:15:02"},
         {"tur": "soz", "metin": "Geçen yılın faturalarını gönderecek", "sahip": "Ayşe Yılmaz", "tarih": "2026-10-14"},
         {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"}, {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz", "saat": "10:11:00"}]}],
-    "oneri": "Gündemi bir gün önce gönder"}
+    "oneri": "Gündemi bir gün önce gönder",
+    "duzeltmeler": [{"saat": "10:14:05", "yanlis": "Bora Kaplan", "dogru": "Bora Kaya"}, {"saat": "10:12:41", "yanlis": "on iki bin", "dogru": "yüz yirmi bin"}],
+    "dokum_notu": "10:20–10:22 karşı tarafın sesi kesikti; o aradaki satırlar eksik"}
+# Defter turu (S48, v0.35.0): toplantı sonunda oturum yapı dosyasına "duzeltmeler" (Whisper'ın yanlış duyduğu ad/sayı/terim: dökümdeki biçim → doğrusu,
+# satır saatiyle; yalnız bağlamdan emin olunanlar) ve "dokum_notu" (boşluk, kesinti, güvenilmez aralık) ekler. bitir kaynak saatlerini dökümde doğrular
+# (kaynak_dogrula); yapı dosyası aktarıcıya gider ve toplantı defterine "Toplantı sonu: kararlar, işler, düzeltmeler" bölümü olarak girer (Konuş okur).
+def _sn(s):
+    try: h, m, *x = [int(p) for p in str(s).strip().split(":")]; return h * 3600 + m * 60 + (x[0] if x else 0)
+    except ValueError: return None
+def kaynak_dogrula(v, saatler, pay=90):
+    # → [(öge, sorun)]: karar/iş/söz/iddia saati dökümde (± pay sn) yoksa; karar ve iş saatsizse. saatler: dökümdeki satır saatleri ("HH:MM:SS")
+    ss = sorted(x for x in (_sn(s) for s in saatler) if x is not None); sorun = []
+    import bisect
+    for m in v["maddeler"]:
+        for o in m["ogeler"]:
+            if o["tur"] not in ("karar", "is", "soz", "iddia"): continue
+            t = _sn(o.get("saat")) if o.get("saat") else None
+            if t is None:
+                if o["tur"] in ("karar", "is") and o.get("saat") is None: sorun.append((o, "kaynak saati yok"))
+                elif o.get("saat"): sorun.append((o, f"saat okunamadı ({o['saat']})"))
+                continue
+            i = bisect.bisect_left(ss, t - pay)
+            if not (i < len(ss) and ss[i] <= t + pay): sorun.append((o, f"{o['saat']} dökümde yok (± {pay} sn)"))
+    for d in v.get("duzeltmeler") or []:
+        if not isinstance(d, dict) or not d.get("yanlis") or not d.get("dogru"): sorun.append(({"tur": "duzeltme", "metin": str(d)[:60]}, "düzeltmede yanlis/dogru eksik"))
+    return sorun
 def kucuk(t): return str(t).replace("İ", "i").replace("I", "ı").lower()
 # "Gerçekten anlaştınız mı?" (Faz 6 #6): kararın netliği — acik (taraflar açıkça onayladı) · ortuk (itiraz yok ama kimse açıkça "tamam"
 # demedi) · tek (bir kişi söyledi, öteki cevap vermedi); varsayim = kararın dayandığı, toplantıda konuşulmamış koşul (yalnız dökümde

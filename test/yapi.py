@@ -83,6 +83,7 @@ try:
     bo = b.stdout + b.stderr
     bak("bitir: graf, harita, eksik uyarısı, sayılar yapıdan (1 karar, 2 iş, 1 açık), kuyruk onaya", "karar grafı:" in bo and "zihin haritası" in bo and "eksik:" in bo
         and "tarih yok" in bo and "1 karar, 2 iş, 1 açık" in bo and "onaya sunuldu" in bo)
+    bak("bitir: yapı dosyası aktarıcıya gitti (defter turu: ozetler/ kopyası)", os.path.exists(os.path.join(canli, "ozetler", os.path.basename(oz2)[:-3] + ".yapi.json")))
     bak("bitir: Gerçekten anlaştınız mı? — örtük ve varsayımlı karar sorulur", "ANLAŞMA: 1 karar teyit istiyor" in bo and "örtük kabul" in bo and "varsayım: Kur yıl sonuna" in bo)
     bak("grafta karar 'teyit bekliyor' işaretiyle (hazırlıkta görünür)", "teyit bekliyor" in tc("graf", "--kim", "Ayşe").stdout)
     bak("bitir: öneri yapı dosyasından", "Gündemi bir gün önce gönder" in json.dumps(json.loads(urllib.request.urlopen(urllib.request.Request(

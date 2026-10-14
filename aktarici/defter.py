@@ -64,6 +64,25 @@ def _df_adlar(f, satirlar):
             l = f"{p[0]} | {sira[(p[0][2:].strip(), p[1].strip())].pop(0)} | {p[2]}"
         ol.append(l)
     return ol
+_DF_TUR = {"karar": ("Karar", "Decision"), "is": ("İş", "Task"), "soz": ("Söz", "Promise"), "soru": ("Açık soru", "Open question"), "sayi": ("Sayı", "Number"), "iddia": ("İddia", "Claim")}
+def _df_yapi(v):  # S48 defter turu: toplantı oturumunun yapı dosyası (kaynak saatleri bitir'de doğrulandı) → defter bölümü
+    if not isinstance(v, dict) or not isinstance(v.get("maddeler"), list): return ""
+    t = lambda x, n=300: " ".join(str(x or "").split())[:n]
+    s = [f"## {_t('Toplantı sonu: kararlar, işler, düzeltmeler (toplantı oturumu; kaynak saatleri dökümde doğrulandı)', 'End of meeting: decisions, tasks, corrections (meeting session; source times checked against the transcript)')}"]
+    for m in v["maddeler"]:
+        og = [o for o in (m.get("ogeler") or []) if isinstance(o, dict) and o.get("tur") in _DF_TUR and str(o.get("metin") or "").strip()]
+        if not og and not m.get("baslik"): continue
+        s.append(f"### {t(m.get('baslik'), 120)}" + (f" ({t(m.get('durum'), 30)})" if m.get("durum") else ""))
+        for o in og[:40]:
+            ek = [x for x in ((_t("tarih ", "due ") + t(o["tarih"], 20)) if o.get("tarih") else "", (_t("netlik: ", "clarity: ") + t(o["netlik"], 20)) if o.get("netlik") else "",
+                              (_t("varsayım: ", "assumption: ") + t(o["varsayim"], 160)) if o.get("varsayim") else "", f"\"{t(o['alinti'], 160)}\"" if o.get("alinti") else "") if x]
+            s.append(f"- {_t(*_DF_TUR[o['tur']])}" + (f" [{t(o['saat'], 8)}]" if o.get("saat") else "") + (f" {t(o.get('kim') or o.get('sahip'), 60)}" if (o.get("kim") or o.get("sahip")) else "")
+                     + f" — {t(o['metin'])}" + (f" ({'; '.join(ek)})" if ek else ""))
+    dz = [d for d in (v.get("duzeltmeler") or []) if isinstance(d, dict) and d.get("yanlis") and d.get("dogru")]
+    if dz: s += [_t("Düzeltmeler (dökümde yanlış duyulmuş biçim → doğrusu):", "Corrections (misheard form in the transcript → correct):")] + \
+                [f"- " + (f"[{t(d.get('saat'), 8)}] " if d.get("saat") else "") + f"\"{t(d['yanlis'], 80)}\" → \"{t(d['dogru'], 80)}\"" for d in dz[:60]]
+    if v.get("dokum_notu"): s.append(_t("Döküm notu: ", "Transcript note: ") + t(v["dokum_notu"], 500))
+    return "\n".join(s) if len(s) > 1 else ""
 def defter_metni(d=None):
     # Tek metin; sabit kısım önde, büyüyen kısım (döküm, özet) sonda. → (metin, kısa_mı) ya da (None, False)
     d = d or defter_toplanti()
@@ -91,15 +110,19 @@ def defter_metni(d=None):
         if ts.get("konu") == d["ad"] and b.get("durum") == "hazir" and b.get("sonuc"):
             r = b["sonuc"]; p += ["", f"## {_t('Toplantı öncesi brifing', 'Pre-meeting briefing')}", r.get("ozet") or ""] + [f"- {x}" for k in ("dikkat", "acik", "gecmis") for x in (r.get(k) or [])]
     except (OSError, ValueError, AttributeError): pass
-    ozet = None
+    ozet = yapi = None
     for r in reversed(SON):
         if r.get("dosya") in d["dosyalar"]:
+            try: yapi = json.load(open(r["yapi"], encoding="utf-8")) if r.get("yapi") else None
+            except (OSError, ValueError): yapi = None
             for y in (r.get("kopya"), os.path.join(BASE, "ozetler", os.path.basename(r.get("ozet") or ""))):
                 try: ozet = open(y, encoding="utf-8").read()[:60000]; break
                 except (OSError, TypeError): pass
             break
     kisiler = f"## {_t('Konuşanlar (satır sayısı)', 'Speakers (lines)')}\n" + ", ".join(f"{k} ({n})" for k, n in kisi.most_common(30))
     oz = f"## {_t('Toplantı sonu özeti', 'End-of-meeting summary')}\n{ozet.strip()}" if ozet else ""
+    ys = _df_yapi(yapi)
+    if ys: oz = ys + ("\n\n" + oz if oz else "")
     tam = "\n".join(p) + "\n\n" + "\n\n".join(f"## {_t('Döküm', 'Transcript')}: {f}\n" + "\n".join(s) for f, s in dokum) + "\n\n" + kisiler + ("\n\n" + oz if oz else "")
     if len(tam) <= DEFTER_EN_COK: return tam, False
     # kısa defter: işaretli satırlar (kart, not, kanıt, gündem) + son 30 dk tam döküm; ayrıntı için tam dosyada Grep (aracı var, --add-dir BASE)

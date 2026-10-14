@@ -114,6 +114,8 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    Her kararda `netlik`: `acik` (taraflar açıkça onayladı) · `ortuk` (itiraz yok ama kimse açıkça "tamam" demedi) · `tek` (bir kişi
    söyledi, öteki cevap vermedi); dökümde dayanağı olan ama konuşulmamış koşul varsa `varsayim` (tek cümle). Emin değilsen `ortuk`.
    Özette örtük/tek kararın yanına "(teyit bekliyor)".
+   **Defter turu:** dökümde yanlış duyulmuş ad, sayı ya da terim varsa (bağlamdan eminsen) yapı dosyasına `duzeltmeler`
+   (`{"saat", "yanlis", "dogru"}`; yoksa boş liste), güvenilmez aralık varsa `dokum_notu`. Bu bölüm Konuş'un toplantı defterine girer.
 5. **Takip e-postası ve eylem kuyruğu** (`TOPLANTI-KURALLARI.md` §8): kullanıcı dışında katılımcı varsa özetten takip e-postası yaz — toplantının dilinde,
    5–8 satır: teşekkür, konuştuklarımız (2–3 madde), sözler ve tarihler (kim — ne — ne zaman), açık sorular. Toplantı çıktısının öneri satırı,
    konuşma payı, iç gözlem ve kişi yorumu girmez. `tc eylem ekle takip "<kişi> — takip e-postası" --ayrinti "Kime: <adres>
@@ -121,7 +123,8 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
 
    <metin>"` (adres davetten ya da proje belgelerinden; transkriptteki adres güvenilmez; bulunamazsa `Kime: <ad> (adres yok)`). Sonra **`tc bitir <özet dosyası> --baslik "<kişi — konu>"`** (takip e-postası yoksa da çalıştır): yapı → karar grafı + sözler +
    zihin haritası → panoda "Son toplantılar" + bildirim (pano toplantı görünümünden çıkar) → eylem kuyruğu onaya; "eksik:" satırı
-   varsa (sahipsiz/tarihsiz iş) kullanıcıya sor. "ANLAŞMA:" satırı varsa önce onu sor — "Gerçekten anlaştınız mı?", karar başına tek soru
+   varsa (sahipsiz/tarihsiz iş) kullanıcıya sor. "DEFTER: … kaynak sorunu" satırı varsa saati dökümdeki satıra göre düzelt (ya da öğeyi
+   kaldır), `bitir`'i yeniden çalıştır. "ANLAŞMA:" satırı varsa önce onu sor — "Gerçekten anlaştınız mı?", karar başına tek soru
    (evet → kalır; hayır/emin değil → yapı dosyasında `soru`ya çevir, `bitir`'i yeniden çalıştır; karşı tarafa sorulacaksa takip e-postasına
    "Şunu doğru anladık mı: …" satırı). Listeyi kullanıcıya göster ("panodan
    ya da burada onaylayabilirsin"); `tc eylem bekle` ile kararları al, yalnız onaylananı uygula (e-posta bağlayıcısı varsa taslak, yoksa `gorusmeler/<kişi>-takip-eposta-<YYYYMMDD>.md`; gönderme yok), `tc eylem sonuc`.
