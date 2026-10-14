@@ -289,7 +289,8 @@ def takvim_view(tam=False):
         v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "hesap", "yer", "reddettin")}
         if v["ben_duzenleyen"] is None and not e.get("duzenleyen") and not e.get("kisi_sayisi"): v["ben_duzenleyen"] = True  # davetlisiz kendi etkinliğin
         v.update(saat=b.strftime("%H:%M"), bitis_saat=s_.strftime("%H:%M"), dk=round((b - simdi).total_seconds() / 60), suruyor=b <= simdi < s_,
-                 katilimcilar=(e.get("katilimcilar") or [])[:30 if tam else 6], notlar_var=bool(e.get("notlar")))
+                 katilimcilar=(e.get("katilimcilar") or [])[:30 if tam else 6], notlar_var=bool(e.get("notlar")),
+                 katilimci_eposta=[str(x) for x in (e.get("katilimci_eposta") or [])[:30] if "@" in str(x)])  # panoda "E-posta: katılımcılara" (yalnız yerel)
         if tam: v["notlar"] = e.get("notlar")
         ol.append(v)
     ol.sort(key=lambda v: v["dk"])

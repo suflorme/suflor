@@ -122,6 +122,11 @@ func oku(_ izin: Bool, _ hata: Error?) {
     if let org = e.organizer { o["duzenleyen"] = org.name ?? ""; o["ben_duzenleyen"] = benDuzenleyen }
     if benKatilan?.participantStatus == .declined && !benDuzenleyen { o["reddettin"] = true }
     if !katilan.isEmpty { o["katilimcilar"] = katilan.filter { !ben($0) }.compactMap { $0.name }.prefix(30).map { $0 } ; o["kisi_sayisi"] = katilan.count }
+    // panodan "E-posta: katılımcılara" taslağı için adresler (kullanıcının kendisi hariç; düzenleyen katılımcılarda yoksa eklenir)
+    var ep = katilan.filter { !ben($0) }.map { adres($0) }
+    if let org = e.organizer, !benDuzenleyen, !ep.contains(adres(org)) { ep.append(adres(org)) }
+    ep = ep.filter { $0.contains("@") && !$0.contains("/") && !$0.contains(" ") }
+    if !ep.isEmpty { o["katilimci_eposta"] = Array(ep.prefix(30)) }
     olaylar.append(o)
   }
   yaz(["durum": "ok", "olaylar": olaylar])
