@@ -493,16 +493,40 @@ final class Masaustu {
 // görüntüden ≥ 10 sn geçtiyse tam görüntü (kaynak "oto"; eklentinin web kuralının karşılığı). Görüntü yalnız aktarıcıya (127.0.0.1) gider.
 final class MasaustuKanit {
     let masaustu: Masaustu; var sonIstek = "", oncekiKucuk: [UInt8]? = nil, degisti = false, sonOto = Date.distantPast, mesgul = false, izinYazildi = false
+    var secilen: (id: CGWindowID, t: Date)? = nil, bosYazildi = false
     init(_ m: Masaustu) { masaustu = m }
-    func pencereBul(_ pid: pid_t, _ baslik: String) async -> SCWindow? {
+    func adaylar(_ pid: pid_t, _ baslik: String) async -> [SCWindow] {
         guard let ic = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false) else {
             if !izinYazildi { izinYazildi = true; print("MASAÜSTÜ KANIT: ekran kaydı izni yok (Ekran ve Sistem Sesi Kaydı → Suflor Menü)") }
-            return nil
+            return []
         }
         // ekranda görünen, başlıklı pencereler önce (Teams'in gizli/başlıksız yardımcı pencereleri siyah görüntü verir — 12 Ekim denemesi)
         let hepsi = ic.windows.filter { $0.owningApplication?.processID == pid && $0.frame.width > 300 && $0.frame.height > 200 }
         let gorunen = hepsi.filter { $0.isOnScreen && !($0.title ?? "").isEmpty }, ws = gorunen.isEmpty ? hepsi : gorunen
-        return ws.first { !baslik.isEmpty && ($0.title ?? "") == baslik } ?? ws.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+        // sıra: toplantı başlıklı pencere (en büyüğün en az %40'ıysa), sonra büyükten küçüğe. Deneme 9 (13 Ekim): karşı taraf paylaşırken başlığı tutan
+        // pencere Teams'in 465×249'luk küçük toplantı penceresiydi, görüntü bomboş beyaz; paylaşım ana penceredeydi.
+        let alan = { (w: SCWindow) in w.frame.width * w.frame.height }, enBuyuk = ws.map(alan).max() ?? 0
+        return ws.sorted { a, b in
+            let ab = !baslik.isEmpty && (a.title ?? "") == baslik && alan(a) >= enBuyuk * 0.4, bb = !baslik.isEmpty && (b.title ?? "") == baslik && alan(b) >= enBuyuk * 0.4
+            return ab != bb ? ab : alan(a) > alan(b)
+        }
+    }
+    func bos(_ im: CGImage) -> Bool {  // tek renk (beyaz/siyah) görüntü: küçük kopyanın parlaklık sapması çok düşük
+        let k = kucuk(im), n = Double(k.count), o = k.reduce(0.0) { $0 + Double($1) } / n
+        return (k.reduce(0.0) { $0 + pow(Double($1) - o, 2) } / n).squareRoot() < 3
+    }
+    func pencereBul(_ pid: pid_t, _ baslik: String) async -> SCWindow? {  // boş görüntü vermeyen ilk aday; seçim 15 sn saklanır (3 sn'lik döngü her seferinde denemesin)
+        let ws = await adaylar(pid, baslik)
+        if let s = secilen, Date().timeIntervalSince(s.t) < 15, let w = ws.first(where: { $0.windowID == s.id }) { return w }
+        for w in ws {
+            guard let im = await goruntu(w, en: 256, boy: 160) else { continue }
+            if !bos(im) {
+                if secilen?.id != w.windowID { print("MASAÜSTÜ KANIT: pencere \(Int(w.frame.width))×\(Int(w.frame.height))" + (ws.count > 1 ? " (\(ws.count) aday)" : "")) }
+                secilen = (w.windowID, Date()); bosYazildi = false; return w
+            }
+        }
+        if !ws.isEmpty && !bosYazildi { bosYazildi = true; print("MASAÜSTÜ KANIT: \(ws.count) pencerenin görüntüsü boş (tek renk) — kanıt alınmadı") }
+        secilen = nil; return nil
     }
     func goruntu(_ w: SCWindow, en: Int, boy: Int) async -> CGImage? {
         let c = SCStreamConfiguration(); c.width = en; c.height = boy; c.showsCursor = false
@@ -650,10 +674,13 @@ if args.contains("--ax-dokum") { Masaustu().dokum(); exit(0) }
 // Ekran Kaydı izni (masaüstü kanıt görüntüsü, v0.31.0): `--ekran-izni` izni sorar ve sonucu yazar (kurulumda ya da elle bir kez)
 // Teşhis: `--kanit-dene <dosya.png>` → açık Teams/Zoom penceresinin görüntüsü dosyaya (ekran kaydı izni ve ScreenCaptureKit denemesi)
 if let yol = arg("--kanit-dene") {
-    _ = NSApplication.shared; let m = Masaustu(); let k = MasaustuKanit(m)
-    guard let app = NSWorkspace.shared.runningApplications.first(where: { a in m.UYG.contains { $0.bundle == a.bundleIdentifier } }) else { print("toplantı uygulaması açık değil"); exit(1) }
+    _ = NSApplication.shared; let m = Masaustu(); let k = MasaustuKanit(m); let uygArg = arg("--uyg")  // --uyg <bundle>: başka bir uygulamada pencere seçimini dene
+    guard let app = NSWorkspace.shared.runningApplications.first(where: { a in uygArg.map { $0 == a.bundleIdentifier } ?? m.UYG.contains { $0.bundle == a.bundleIdentifier } }) else { print("toplantı uygulaması açık değil"); exit(1) }
     Task {
-        if let w = await k.pencereBul(app.processIdentifier, ""), let im = await k.goruntu(w, en: Int(w.frame.width * 2), boy: Int(w.frame.height * 2)),
+        for w in await k.adaylar(app.processIdentifier, arg("--baslik") ?? "") {
+            if let im = await k.goruntu(w, en: 256, boy: 160) { print("aday: \(Int(w.frame.width))×\(Int(w.frame.height)) · \(w.title ?? "") · \(k.bos(im) ? "boş" : "dolu")") }
+        }
+        if let w = await k.pencereBul(app.processIdentifier, arg("--baslik") ?? ""), let im = await k.goruntu(w, en: Int(w.frame.width * 2), boy: Int(w.frame.height * 2)),
            let png = NSBitmapImageRep(cgImage: im).representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü: \(im.width)×\(im.height) · \(w.title ?? "") · \(png.count / 1024) KB")
             let kc = k.kucuk(im); print("küçük ortalama: \(kc.reduce(0) { $0 + Int($1) } / kc.count)")
