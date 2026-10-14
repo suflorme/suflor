@@ -18,7 +18,7 @@ import UserNotifications
 setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
 let args = CommandLine.arguments
 // günlük satırları saatli (13 Ekim deneme 8: "bildirim izni yok" satırının ne zaman yazıldığı bilinemedi); teşhis kiplerinin çıktısı saatsiz
-let TANI = args.contains { ["--ax-dokum", "--kanit-dene", "--ekran-izni"].contains($0) }
+let TANI = args.contains { ["--ax-dokum", "--ax-altyazi", "--kanit-dene", "--ekran-izni"].contains($0) }
 let saatBicim: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd HH:mm:ss"; return f }()
 func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
     let s = items.map { "\($0)" }.joined(separator: separator)
@@ -427,6 +427,46 @@ final class Masaustu {
         }
         return o
     }
+    // Teşhis (v0.35.0, deneme 9'un 7. maddesi): `--ax-altyazi <sn>` → toplantı sürerken (Teams'te canlı altyazı açık) sn saniye boyunca 1,5 sn'de bir
+    // ağaç taranır; değişen her metin, öğenin yolu (rol, DOM kimliği/sınıfı, sıra) ve saatiyle ~/Library/Logs/suflor-ax/altyazi-<zaman>.txt'ye; sonda en
+    // çok değişen öğeler (altyazı ve konuşan adı adayları). Karşı tarafın adı altyazıdan okunabiliyor mu, seçici ne — bununla ölçülür. Adlar içerir: iç belge.
+    func altyaziIzle(_ sn: Double, uyg: String? = nil) {  // uyg: başka bir uygulamanın paket kimliği (deneme)
+        let kl = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/suflor-ax")
+        try? FileManager.default.createDirectory(at: kl, withIntermediateDirectories: true)
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmmss"; let sf = DateFormatter(); sf.dateFormat = "HH:mm:ss"
+        let yol = kl.appendingPathComponent("altyazi-\(f.string(from: Date())).txt")
+        var o = "izin: \(AXIsProcessTrusted()) · süre \(Int(sn)) sn\n", son: [String: String] = [:], deg: [String: Int] = [:], ornek: [String: String] = [:], tur = 0
+        let bas = Date()
+        while Date().timeIntervalSince(bas) < sn {
+            tur += 1
+            for app in NSWorkspace.shared.runningApplications where uyg.map({ $0 == app.bundleIdentifier }) ?? UYG.contains(where: { $0.bundle == app.bundleIdentifier }) {
+                let kok = AXUIElementCreateApplication(app.processIdentifier); ac(kok)
+                for (wi, w) in (deger(kok, kAXWindowsAttribute) as? [AXUIElement] ?? []).enumerated() {
+                    var n = 0, yigin: [(AXUIElement, Int, String)] = [(w, 0, "w\(wi)")]
+                    while let (e, d, yl) = yigin.popLast(), n < 9000 {
+                        n += 1; let r = (deger(e, kAXRoleAttribute) as? String) ?? ""
+                        let t = ([kAXValueAttribute, kAXTitleAttribute, kAXDescriptionAttribute].compactMap { deger(e, $0) as? String }.filter { !$0.isEmpty }).joined(separator: " | ")
+                        if !t.isEmpty, t.count < 600, son[yl] != t {
+                            if son[yl] != nil { deg[yl, default: 0] += 1 }
+                            son[yl] = t; ornek[yl] = t
+                            if tur > 1 { o += "\(sf.string(from: Date())) \(yl.suffix(160)) :: \(t.prefix(300))\n" }
+                        }
+                        if d < 45, let c = deger(e, kAXChildrenAttribute) as? [AXUIElement] {
+                            for (i, x) in c.enumerated() {
+                                let rr = ((deger(x, kAXRoleAttribute) as? String) ?? "?").replacingOccurrences(of: "AX", with: "")
+                                let id = (deger(x, "AXDOMIdentifier") as? String).map { "#" + $0.prefix(40) } ?? ""
+                                let cl = (deger(x, "AXDOMClassList") as? [String]).map { "." + $0.prefix(3).joined(separator: ".").prefix(60) } ?? ""
+                                yigin.append((x, d + 1, yl + "/\(rr)\(id)\(cl)[\(i)]"))
+                            }
+                        }
+                    }
+                }
+            }
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+        o += "\n== en çok değişen öğeler (\(tur) tarama)\n" + deg.sorted { $0.value > $1.value }.prefix(30).map { "\($0.value)× \($0.key.suffix(220)) :: \(ornek[$0.key]?.prefix(160) ?? "")" }.joined(separator: "\n") + "\n"
+        do { try o.write(to: yol, atomically: true, encoding: .utf8); print("altyazı izi: \(yol.path) · \(tur) tarama · \(deg.count) değişen öğe") } catch { print("yazılamadı: \(error)") }
+    }
     // toplantı sürerken "Ayrıl" bir taramada bulunamayınca o anki ağaç kendiliğinden dosyaya (13 Ekim deneme 8: 78 sn kayıp, elle `--ax-dokum` gerekti).
     // Toplantı başına en çok 3, aralarında ≥ 60 sn; ~/Library/Logs/suflor-ax/<zaman>.txt (adlar içerir: iç belge, makinede kalır).
     var otoDokumSay = 0, otoDokumSon = Date.distantPast
@@ -671,6 +711,7 @@ final class Kayitci {
 }
 
 if args.contains("--ax-dokum") { Masaustu().dokum(); exit(0) }
+if let s = arg("--ax-altyazi") { Masaustu().altyaziIzle(Double(s) ?? 120, uyg: arg("--uyg")); exit(0) }
 // Ekran Kaydı izni (masaüstü kanıt görüntüsü, v0.31.0): `--ekran-izni` izni sorar ve sonucu yazar (kurulumda ya da elle bir kez)
 // Teşhis: `--kanit-dene <dosya.png>` → açık Teams/Zoom penceresinin görüntüsü dosyaya (ekran kaydı izni ve ScreenCaptureKit denemesi)
 if let yol = arg("--kanit-dene") {
