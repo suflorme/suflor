@@ -57,7 +57,7 @@ aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var
 #fls .l{font-size:12px}
 .nb{border-top:1px solid var(--bd);padding:10px 12px;background:var(--s1)}
 textarea{width:100%;font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--r);padding:7px 9px;resize:none;outline:none}textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-.bt{display:flex;gap:6px;margin-top:7px;align-items:center}.bt.akm{flex-wrap:wrap}.epf{margin-top:6px}.epf .meta{margin-top:6px}.epf input{font:inherit;font-size:12px;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;outline:none}.epf input:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}.bt .sp1{flex:1}
+.bt{display:flex;gap:6px;margin-top:7px;align-items:center}.bt.akm{flex-wrap:wrap}.bt .sp1{flex:1}
 #live{position:sticky;bottom:6px;float:right;display:none;background:var(--ac);border-color:var(--ac);color:#fff;border-radius:999px;padding:5px 12px}
 .hint{font-size:11px;color:var(--t3)}
 .tko{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bd)}.tko .t{min-width:0}.tko .t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -86,7 +86,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 </style>
 <header><div class=hl><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span><span id=sure></span></div>
 <div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
-<dialog id=ayd><form method=dialog id=ayf><b class=gbb>Ayarlar</b><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet</button><button value=kapat class=gh formnovalidate>Kapat</button><span class=sp1></span><span id=aym class=hint></span></div></form></dialog>
+<dialog id=ayd><form method=dialog id=ayf><b class=gbb>Ayarlar</b><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet</button><button value=kapat class=gh formnovalidate>Kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet'e basana kadar bir şey değişmez">Varsayılanlara dön</button><span class=sp1></span><span id=aym class=hint></span></div></form></dialog>
 <dialog id=gbd><form method=dialog id=gbf><b class=gbb>Geri bildirim</b><p class=hint>Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.</p>
 <textarea id=gbm rows=5 placeholder="Ne oldu? Ne bekliyordun?"></textarea>
 <label class=hint style="display:flex;gap:6px;align-items:center"><input type=checkbox id=gbt checked style="margin:0"> Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)</label>
@@ -473,16 +473,8 @@ document.getElementById('brk').onclick=()=>{const id=document.getElementById('br
 // 14 Ekim: mailto Chrome'a düşüp hiçbir şey açmadı — web postada yeni sekmede taslak), katılımcılara e-posta (takvimdeki adresler), kopyala, .md.
 // Gönderen hep kullanıcı. Metin yalnız kullanıcının seçtiği posta hizmetine (taslak adresinde) gider; aktarıcı dışarı bir şey göndermez.
 let akAcik=null,akOn={}
-async function epKaydet(b,ciz){const f=b.closest('.epf'),ad=(f.querySelector('[data-ep-adres]').value||'').trim()
-  let r={};try{r=await j('/eposta-ayar',{method:'POST',body:JSON.stringify({eposta:epSec!=null?epSec:((last&&last.eposta_ayar)||''),eposta_adres:ad})})}catch(e){}
-  if(!r.ok){geciciDurum(L('E-posta ayarı kaydedilemedi'),r.err||'');return}
-  geciciDurum(L('E-posta ayarı kaydedildi'),'');akAyar=null;epSec=null;await refresh();if(last)ciz(last)}
 function brAc(u,yeni){if(yeni)window.open(u,'_blank');else location.href=u}  // test bunu sarmalar
-let akAyar=null,epSec=null  // "⚙ E-posta ayarı" formu açık mı (kay) ve seçilen hizmet (kaydetmeden önce)
-function epForm(kay){const sec=epSec!=null?epSec:((last&&last.eposta_ayar)||''),su=(last&&last.eposta)||'mailto',ad={gmail:'Gmail',outlook:'Outlook (web)',mailto:L("Mac'in posta uygulaması")}
-  return `<div class=epf><div class=meta>${esc(L('E-posta taslağı nerede açılsın?'))}</div><div class="bt akm">${[['',L('Kendin seç')+(sec?'':` (${ad[su]||su})`)],['gmail','Gmail'],['outlook','Outlook (web)'],['mailto',L("Mac'in posta uygulaması")]].map(([v,t])=>`<button class="${sec===v?'pri':'gh'}" data-ep="${v}" aria-pressed="${sec===v}">${esc(t)}</button>`).join('')}</div>
-    <div class=meta>${esc(L('Gönderen adresin (“kendime” de buraya; Gmail’de taslak bu hesapla açılır)'))}</div><div class=bt><input data-ep-adres value="${esc((last&&last.eposta_hesap)||'')}" placeholder="${esc(L('boşsa takvim adresin'))}" style="flex:1;min-width:12em"><button class=pri data-ep-kaydet="${esc(kay)}">${L('Kaydet')}</button></div></div>`}
-function akMenu(kay,n){return `<div class="bt akm">${[['pdf','PDF'],['mail','E-posta'],...(n?[['mail-k',n>0?L('E-posta: katılımcılara ({n})',{n}):L('E-posta: katılımcılara')]]:[]),...(last&&last.eposta_ben?[['mail-b','E-posta: kendime']]:[]),['kopyala','Kopyala'],['md','Dosya (.md)']].map(([k,t])=>`<button class=gh data-ak=${k} data-kay="${esc(kay)}">${k==='mail-k'?esc(t):L(t)}</button>`).join('')}<button class=gh data-ep-ac="${esc(kay)}" aria-expanded="${akAyar===kay}" title="${L('Taslağın açılacağı yer ve gönderen adres')}">⚙ ${L('E-posta ayarı')}</button></div>${akAyar===kay?epForm(kay):''}`}
+function akMenu(kay,n){return `<div class="bt akm">${[['pdf','PDF'],['mail','E-posta'],...(n?[['mail-k',n>0?L('E-posta: katılımcılara ({n})',{n}):L('E-posta: katılımcılara')]]:[]),...(last&&last.eposta_ben?[['mail-b','E-posta: kendime']]:[]),['kopyala','Kopyala'],['md','Dosya (.md)']].map(([k,t])=>`<button class=gh data-ak=${k} data-kay="${esc(kay)}">${k==='mail-k'?esc(t):L(t)}</button>`).join('')}<button class=gh data-ayar-ac=eposta title="${L('Taslağın açılacağı yer ve gönderen adres — Ayarlar')}">⚙ ${L('E-posta ayarı')}</button></div>`}
 function akDug(kay){return `<button class=gh data-aktar="${esc(kay)}" aria-expanded="${akAcik===kay}" title="${L('PDF, e-posta, pano ya da dosya olarak dışarı al')}">${L('Dışarı aktar')} ${akAcik===kay?'▴':'▾'}</button>`}
 function yerelGun(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}  // toISOString UTC: gece yarısından sonra önceki gün
 function akDosya(t,d){return `${t} - ${yerelGun(d||new Date())}`.replace(/[\/\\:*?"<>|]+/g,' ').slice(0,120)}
@@ -524,9 +516,7 @@ async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.
   if(k==='kopyala'){try{await navigator.clipboard.writeText(mdDuz(c.md));btn.textContent='✓ '+L('kopyalandı')}catch(e){btn.textContent=L('kopyalanamadı')}setTimeout(()=>{btn.textContent=L('Kopyala')},1500);return}
   if(k==='md'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c.md.endsWith('\n')?c.md:c.md+'\n'],{type:'text/markdown;charset=utf-8'}));a.download=c.dosya+'.md';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}}
 function akTik(ev,ciz){const ak=ev.target.closest('button[data-ak]');if(ak){akYap(ak.dataset.ak,ak);return true}
-  const ea=ev.target.closest('button[data-ep-ac]');if(ea){akAyar=akAyar===ea.dataset.epAc?null:ea.dataset.epAc;epSec=null;if(last)ciz(last);return true}
-  const es=ev.target.closest('button[data-ep]');if(es){epSec=es.dataset.ep;if(last)ciz(last);return true}
-  const ek=ev.target.closest('button[data-ep-kaydet]');if(ek){epKaydet(ek,ciz);return true}
+  const ea=ev.target.closest('button[data-ayar-ac]');if(ea){ayarAc(ea.dataset.ayarAc);return true}
   const ac=ev.target.closest('button[data-aktar]');if(ac){akAcik=akAcik===ac.dataset.aktar?null:ac.dataset.aktar;if(last)ciz(last);return true}return false}
 // ⚙ Ayarlar (v0.34.0): şema aktarıcıdaki AYAR_PANO ile aynı sırada; değerler /status ayarlar'dan; Kaydet yalnız değişenleri /ayar'a yollar
 const AYG=[['E-posta',[['eposta','sec','Taslak nerede açılsın','Brifing ve özet e-postayla gönderilirken.',[['',"Kendin seç"],['gmail','Gmail'],['outlook','Outlook (web)'],['mailto',"Mac'in posta uygulaması"]]],
@@ -549,8 +539,14 @@ function ayCiz(){const a=(last&&last.ayarlar)||{deger:{}},d=a.deger,tah={gmail:'
       :tur==='sayi'?`<input type=number data-ay=${k} min=0 step=5 value="${esc(v)}">`:`<input data-ay=${k} data-tur=adres inputmode=email value="${esc(v||'')}" placeholder="${esc(L('takvim adresin'))}">`
     return `<div class="ayr${kap?' kapali':''}"><div><b>${esc(L(ad))}</b><div class=hint>${esc(L(ac))}${kap?' '+esc(L(k==='ses_motoru'?'(Piper kurulu değil)':'(menü çubuğu uygulaması kurulu değil)')):''}</div></div>${c}</div>`}).join('')).join('')
   document.getElementById('aym').textContent=''}
+function ayarAc(k){const d=document.getElementById('ayd');ayCiz();d.showModal();const e=k&&d.querySelector(`[data-ay=${k}]`);if(e){e.closest('.ayr').scrollIntoView({block:'center'});e.focus()}}
 {const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear')
-  document.getElementById('ay').onclick=()=>{ayCiz();d.showModal()}
+  document.getElementById('ay').onclick=()=>ayarAc()
+  // varsayılanlara dön (v0.34.1): yalnız formu doldurur; Kaydet'e basılmazsa hiçbir şey değişmez (e-posta gibi elle girilenler yanlışlıkla silinmesin)
+  document.getElementById('ayv').onclick=()=>{const v=(last&&last.ayarlar||{}).varsayilan||{};let n=0
+    d.querySelectorAll('[data-ay]').forEach(e=>{const k=e.dataset.ay;if(!(k in v)||e.disabled)return;const o=e.type==='checkbox'?e.checked:e.value
+      if(e.type==='checkbox')e.checked=!!v[k];else e.value=v[k]==null?'':String(v[k]);if((e.type==='checkbox'?e.checked:e.value)!==o)n++})
+    document.getElementById('aym').textContent=n?L('{n} ayar varsayılana çekildi — kaydetmek için Kaydet',{n}):L('Hepsi zaten varsayılan')}
   document.getElementById('ays').onclick=async()=>{const dg=(last&&last.ayarlar||{}).deger||{},ch={},m=document.getElementById('aym')
     d.querySelectorAll('[data-ay]').forEach(e=>{const k=e.dataset.ay,v=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value.trim();if(e.disabled)return;if(v!==dg[k]&&!(v===''&&dg[k]==null))ch[k]=v})
     if(!Object.keys(ch).length){m.textContent=L('Değişiklik yok');return}

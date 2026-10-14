@@ -1328,7 +1328,7 @@ MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar")
 def ayarlar_view():
     d = {k: AYAR.get(k, v[1]) for k, v in AYAR_PANO.items()}
     if d["ses_motoru"] != "piper": d["ses_motoru"] = "mac"
-    return {"deger": d, "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "menu": os.path.isdir(MENU_APP)}
+    return {"deger": d, "varsayilan": {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items()}, "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "menu": os.path.isdir(MENU_APP)}
 def ayar_yaz(deg):
     hata, yeni = {}, {}
     for k, v in (deg or {}).items():
@@ -1359,9 +1359,6 @@ def menu_yeniden():  # menü uygulamasını kapatıp (gerekirse) yeni ayarlarla 
     while toplanti_var(): time.sleep(30)
     subprocess.run(["pkill", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=10); time.sleep(1.5)
     print("MENÜ: ayar değişti — yeniden açılıyor" if AYAR.get("menu_cubugu") is True else "MENÜ: ayar kapandı — uygulama kapatıldı"); menu_baslat()
-def eposta_ayar_yaz(p):  # Dışarı aktar menüsündeki "⚙ E-posta ayarı" (v0.33.6) — aynı yol
-    r = ayar_yaz({"eposta": str(p.get("eposta") or "").strip().lower(), "eposta_adres": str(p.get("eposta_adres") or "").strip().lower()})
-    return dict(r, eposta=eposta_tur(), eposta_ben=eposta_ben()) if r.get("ok") else r
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
     sinir = (datetime.datetime.now() - datetime.timedelta(days=7)).isoformat()
     return [dict({k: v for k, v in r.items() if k != "ozet"}, ad=os.path.basename(r.get("ozet") or "")) for r in reversed(SON) if (r.get("at") or "") >= sinir][:3]
@@ -1695,9 +1692,6 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ayar":  # panodaki ⚙ Ayarlar — yalnız pano (aynı köken + anahtar)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(ayar_yaz(p.get("degisen")))
-        if self.path == "/eposta-ayar":  # panodaki "⚙ E-posta ayarı" — yalnız pano (aynı köken + anahtar)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(eposta_ayar_yaz(p))
         if self.path == "/son-ac":  # panodaki "Özeti aç" — yalnız pano (aynı köken + pano anahtarı), yalnız kayıttaki özet
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(son_ac(p))
