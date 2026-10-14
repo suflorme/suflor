@@ -1299,6 +1299,19 @@ def son_ekle(p):
              (r["baslik"] or os.path.basename(ozet)) + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""), son=r["id"])
     ozet_sesli(r)
     return {"ok": True, "id": r["id"]}
+# Dışarı aktarmada e-posta taslağı (v0.33.3–4): ayar eposta (outlook | gmail | mailto); yoksa tahmin — takvim adresin Gmail ise gmail, outlook.com/hotmail/live
+# ise outlook, değilse takvimdeki toplantıların çoğu Teams ise outlook, Meet ise gmail, hiçbiri değilse mailto (varsayılan posta uygulaması).
+def eposta_ben():
+    # ayar eposta_adres önce (ör. iş takvimi Microsoft'ta, posta Gmail'de — 14 Ekim), yoksa takvim adreslerinin ilki. eposta_adres Gmail'de gönderen hesabı da seçer.
+    return next((str(x).strip() for x in [AYAR.get("eposta_adres")] + list(AYAR.get("takvim_adreslerim") or []) if x and "@" in str(x) and "," not in str(x)), None)
+def eposta_tur():
+    t = str(AYAR.get("eposta") or "").lower()
+    if t in ("outlook", "gmail", "mailto"): return t
+    alan = [str(x).lower().rsplit("@", 1)[-1] for x in AYAR.get("takvim_adreslerim") or [] if "@" in str(x)]
+    if any(a in ("gmail.com", "googlemail.com") for a in alan): return "gmail"
+    if any(a in ("outlook.com", "hotmail.com", "live.com", "msn.com") or a.endswith(".onmicrosoft.com") for a in alan): return "outlook"
+    pl = collections.Counter(e.get("platform") for e in TAKVIM_TAM.values() if e.get("platform") in ("teams", "meet"))
+    return {"teams": "outlook", "meet": "gmail"}.get(pl.most_common(1)[0][0]) if pl else "mailto"
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
     sinir = (datetime.datetime.now() - datetime.timedelta(days=7)).isoformat()
     return [dict({k: v for k, v in r.items() if k != "ozet"}, ad=os.path.basename(r.get("ozet") or "")) for r in reversed(SON) if (r.get("at") or "") >= sinir][:3]
@@ -1538,7 +1551,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view()); s["eposta"] = str(AYAR.get("eposta") or "mailto"); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view()); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []

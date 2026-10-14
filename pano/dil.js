@@ -201,6 +201,7 @@ globalThis.SUFLOR_EN = {
   "PDF, e-posta, pano ya da dosya olarak dışarı al": "Export as PDF, email, clipboard or file",
   "E-posta: katılımcılara ({n})": "Email: to attendees ({n})",
   "E-posta: katılımcılara": "Email: to attendees",
+  "E-posta: kendime": "Email: to myself",
   "Takvimde bu toplantının katılımcı adresi yok": "No attendee addresses for this meeting in the calendar",
   "Alıcısız taslak için E-posta": "Use Email for a draft without recipients",
   "Özet okunamadı": "Couldn't read the summary",

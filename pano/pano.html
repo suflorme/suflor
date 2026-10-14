@@ -467,7 +467,7 @@ document.getElementById('brk').onclick=()=>{const id=document.getElementById('br
 // Gönderen hep kullanıcı. Metin yalnız kullanıcının seçtiği posta hizmetine (taslak adresinde) gider; aktarıcı dışarı bir şey göndermez.
 let akAcik=null,akOn={}
 function brAc(u,yeni){if(yeni)window.open(u,'_blank');else location.href=u}  // test bunu sarmalar
-function akMenu(kay,n){return `<div class=bt>${[['pdf','PDF'],['mail','E-posta'],...(n?[['mail-k',n>0?L('E-posta: katılımcılara ({n})',{n}):L('E-posta: katılımcılara')]]:[]),['kopyala','Kopyala'],['md','Dosya (.md)']].map(([k,t])=>`<button class=gh data-ak=${k} data-kay="${esc(kay)}">${k==='mail-k'?esc(t):L(t)}</button>`).join('')}</div>`}
+function akMenu(kay,n){return `<div class=bt>${[['pdf','PDF'],['mail','E-posta'],...(n?[['mail-k',n>0?L('E-posta: katılımcılara ({n})',{n}):L('E-posta: katılımcılara')]]:[]),...(last&&last.eposta_ben?[['mail-b','E-posta: kendime']]:[]),['kopyala','Kopyala'],['md','Dosya (.md)']].map(([k,t])=>`<button class=gh data-ak=${k} data-kay="${esc(kay)}">${k==='mail-k'?esc(t):L(t)}</button>`).join('')}</div>`}
 function akDug(kay){return `<button class=gh data-aktar="${esc(kay)}" aria-expanded="${akAcik===kay}" title="${L('PDF, e-posta, pano ya da dosya olarak dışarı al')}">${L('Dışarı aktar')} ${akAcik===kay?'▴':'▾'}</button>`}
 function yerelGun(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}  // toISOString UTC: gece yarısından sonra önceki gün
 function akDosya(t,d){return `${t} - ${yerelGun(d||new Date())}`.replace(/[\/\\:*?"<>|]+/g,' ').slice(0,120)}
@@ -490,12 +490,13 @@ function mdHtml(m){const sat=m.split('\n'),o=[];let liste=false,tablo=false
     if(x=l.match(/^\s*(?:[-*]|\d+\.)\s+(.*)/)){if(tablo){o.push('</table>');tablo=false}if(!liste){o.push('<ul>');liste=true}o.push(`<li>${ic(x[1])}</li>`);continue}
     kapat();if(l.trim())o.push(`<p>${ic(l)}</p>`)}
   kapat();return o.join('')}
-function postaUrl(c,alici){const tur=(last&&last.eposta)||'mailto',to=alici?c.alicilar.join(','):'',duz=mdDuz(c.md),sinir=tur==='mailto'?1800:6000
-  let body=duz,kisa=false;while(encodeURIComponent(body).length>sinir*3&&body.length>200){body=body.slice(0,Math.floor(body.length*0.8));kisa=true}
-  if(encodeURIComponent(body).length>sinir*3)body=body.slice(0,sinir/3)
-  if(kisa)body=body.trimEnd()+'\n\n'+L('(Kısaltıldı — tam metin panoda: Command + V ile yapıştır)')
+// gövde sınırı kodlanmış uzunlukla: Outlook'ta oturum kapalıysa taslak adresi giriş yönlendirmesine bir kez daha kodlanıp gömülüyor; 14 Ekim'de ~6000
+// karakterlik gövde "AADSTS90015: Requested query string is too long" verdi → outlook 1500. Kısaltılınca tam metin panoya kopyalanır.
+function postaUrl(c,alici){const tur=(last&&last.eposta)||'mailto',to=alici==='b'?(last&&last.eposta_ben)||'':alici?c.alicilar.join(','):'',duz=mdDuz(c.md),sinir={outlook:1500,gmail:6000}[tur]||1800
+  let body=duz,kisa=false;while(encodeURIComponent(body).length>sinir&&body.length>120){body=body.slice(0,Math.floor(body.length*0.85));kisa=true}
+  if(kisa)body=body.replace(/\s*\S*$/,'').trimEnd()+' …\n\n'+L('(Kısaltıldı — tam metin panoda: Command + V ile yapıştır)')
   const e=encodeURIComponent,u=tur==='outlook'?`https://outlook.office.com/mail/deeplink/compose?to=${e(to)}&subject=${e(c.baslik)}&body=${e(body)}`
-    :tur==='gmail'?`https://mail.google.com/mail/?view=cm&fs=1&to=${e(to)}&su=${e(c.baslik)}&body=${e(body)}`:`mailto:${e(to).replace(/%2C/g,',').replace(/%40/g,'@')}?subject=${e(c.baslik)}&body=${e(body)}`
+    :tur==='gmail'?`https://mail.google.com/mail/${last&&last.eposta_hesap?'u/'+e(last.eposta_hesap)+'/':''}?view=cm&fs=1&to=${e(to)}&su=${e(c.baslik)}&body=${e(body)}`:`mailto:${e(to).replace(/%2C/g,',').replace(/%40/g,'@')}?subject=${e(c.baslik)}&body=${e(body)}`
   return {u,yeni:tur!=='mailto',kisa,duz}}
 async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.indexOf(':')),kay.slice(kay.indexOf(':')+1)]
   // PDF penceresi tıklamayla hemen açılır (beklemeden sonra açılırsa tarayıcı engeller), içerik sonra yazılır
@@ -504,7 +505,7 @@ async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.
   if(k==='pdf'){w.document.write(`<!doctype html><html lang="${document.documentElement.lang||'tr'}"><head><meta charset=utf-8><title>${esc(c.dosya)}</title><style>body{font:14px/1.55 -apple-system,"Helvetica Neue",sans-serif;color:#18201c;max-width:720px;margin:40px auto;padding:0 24px}h1{font-size:22px;font-weight:500;margin:0 0 6px}h2{font-size:16px;font-weight:600;margin:22px 0 6px}h3{font-size:14px;font-weight:600;margin:16px 0 4px}p{margin:6px 0}ul{margin:4px 0;padding-left:20px}li{margin:3px 0}table{border-collapse:collapse;margin:8px 0;font-size:13px}td{border:1px solid #ccd;padding:4px 8px;vertical-align:top}code{font:12px ui-monospace,Menlo,monospace}.son{margin-top:28px;color:#8b938d;font-size:11px}@page{margin:18mm}</style></head><body>${mdHtml(c.md)}<div class=son>Suflor.me</div></body></html>`)
     w.document.close();w.focus();setTimeout(()=>w.print(),300);return}
   if(k==='mail-k'&&!c.alicilar.length){geciciDurum(L('Takvimde bu toplantının katılımcı adresi yok'),L('Alıcısız taslak için E-posta'));return}
-  if(k==='mail'||k==='mail-k'){const p=postaUrl(c,k==='mail-k');if(p.kisa)try{await navigator.clipboard.writeText(p.duz)}catch(e){}brAc(p.u,p.yeni);return}
+  if(k.startsWith('mail')){const p=postaUrl(c,{'mail-k':'k','mail-b':'b'}[k]||'');if(p.kisa)try{await navigator.clipboard.writeText(p.duz)}catch(e){}brAc(p.u,p.yeni);return}
   if(k==='kopyala'){try{await navigator.clipboard.writeText(mdDuz(c.md));btn.textContent='✓ '+L('kopyalandı')}catch(e){btn.textContent=L('kopyalanamadı')}setTimeout(()=>{btn.textContent=L('Kopyala')},1500);return}
   if(k==='md'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c.md.endsWith('\n')?c.md:c.md+'\n'],{type:'text/markdown;charset=utf-8'}));a.download=c.dosya+'.md';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}}
 function akTik(ev,ciz){const ak=ev.target.closest('button[data-ak]');if(ak){akYap(ak.dataset.ak,ak);return true}
