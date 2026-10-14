@@ -1312,6 +1312,21 @@ def eposta_tur():
     if any(a in ("outlook.com", "hotmail.com", "live.com", "msn.com") or a.endswith(".onmicrosoft.com") for a in alan): return "outlook"
     pl = collections.Counter(e.get("platform") for e in TAKVIM_TAM.values() if e.get("platform") in ("teams", "meet"))
     return {"teams": "outlook", "meet": "gmail"}.get(pl.most_common(1)[0][0]) if pl else "mailto"
+def eposta_ayar_yaz(p):  # panodaki "⚙ E-posta ayarı" (v0.33.6): ayar.json'a yazar (yalnız bu iki alan), bellekteki AYAR da güncellenir; yeniden başlatma gerekmez
+    tur = str(p.get("eposta") or "").strip().lower(); ad = str(p.get("eposta_adres") or "").strip().lower()
+    if tur and tur not in ("gmail", "outlook", "mailto"): return {"ok": False, "err": "eposta: gmail | outlook | mailto"}
+    if ad and not re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", ad): return {"ok": False, "err": _t("Adres geçersiz", "Invalid address")}
+    try: a = json.load(open(AYAR_YOL, encoding="utf-8"))
+    except (OSError, ValueError): a = {}
+    for k, v in (("eposta", tur), ("eposta_adres", ad)):
+        if v: a[k] = AYAR[k] = v
+        else: a.pop(k, None); AYAR.pop(k, None)
+    try:
+        with open(AYAR_YOL + ".tmp", "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
+        os.replace(AYAR_YOL + ".tmp", AYAR_YOL)
+    except OSError as e: return {"ok": False, "err": e.__class__.__name__}
+    print(f"AYAR: e-posta → {tur or 'kendiliğinden (' + eposta_tur() + ')'}" + (" · adres ayarlı" if ad else ""))
+    return {"ok": True, "eposta": eposta_tur(), "eposta_ben": eposta_ben()}
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
     sinir = (datetime.datetime.now() - datetime.timedelta(days=7)).isoformat()
     return [dict({k: v for k, v in r.items() if k != "ozet"}, ad=os.path.basename(r.get("ozet") or "")) for r in reversed(SON) if (r.get("at") or "") >= sinir][:3]
@@ -1551,7 +1566,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view()); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view()); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1642,6 +1657,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(brifing_iste(p))
+        if self.path == "/eposta-ayar":  # panodaki "⚙ E-posta ayarı" — yalnız pano (aynı köken + anahtar)
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(eposta_ayar_yaz(p))
         if self.path == "/son-ac":  # panodaki "Özeti aç" — yalnız pano (aynı köken + pano anahtarı), yalnız kayıttaki özet
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(son_ac(p))

@@ -57,7 +57,7 @@ aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var
 #fls .l{font-size:12px}
 .nb{border-top:1px solid var(--bd);padding:10px 12px;background:var(--s1)}
 textarea{width:100%;font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--r);padding:7px 9px;resize:none;outline:none}textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-.bt{display:flex;gap:6px;margin-top:7px;align-items:center}.bt .sp1{flex:1}
+.bt{display:flex;gap:6px;margin-top:7px;align-items:center}.bt.akm{flex-wrap:wrap}.epf{margin-top:6px}.epf .meta{margin-top:6px}.epf input{font:inherit;font-size:12px;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;outline:none}.epf input:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}.bt .sp1{flex:1}
 #live{position:sticky;bottom:6px;float:right;display:none;background:var(--ac);border-color:var(--ac);color:#fff;border-radius:999px;padding:5px 12px}
 .hint{font-size:11px;color:var(--t3)}
 .tko{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bd)}.tko .t{min-width:0}.tko .t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -466,8 +466,16 @@ document.getElementById('brk').onclick=()=>{const id=document.getElementById('br
 // 14 Ekim: mailto Chrome'a düşüp hiçbir şey açmadı — web postada yeni sekmede taslak), katılımcılara e-posta (takvimdeki adresler), kopyala, .md.
 // Gönderen hep kullanıcı. Metin yalnız kullanıcının seçtiği posta hizmetine (taslak adresinde) gider; aktarıcı dışarı bir şey göndermez.
 let akAcik=null,akOn={}
+async function epKaydet(b,ciz){const f=b.closest('.epf'),ad=(f.querySelector('[data-ep-adres]').value||'').trim()
+  let r={};try{r=await j('/eposta-ayar',{method:'POST',body:JSON.stringify({eposta:epSec!=null?epSec:((last&&last.eposta_ayar)||''),eposta_adres:ad})})}catch(e){}
+  if(!r.ok){geciciDurum(L('E-posta ayarı kaydedilemedi'),r.err||'');return}
+  geciciDurum(L('E-posta ayarı kaydedildi'),'');akAyar=null;epSec=null;await refresh();if(last)ciz(last)}
 function brAc(u,yeni){if(yeni)window.open(u,'_blank');else location.href=u}  // test bunu sarmalar
-function akMenu(kay,n){return `<div class=bt>${[['pdf','PDF'],['mail','E-posta'],...(n?[['mail-k',n>0?L('E-posta: katılımcılara ({n})',{n}):L('E-posta: katılımcılara')]]:[]),...(last&&last.eposta_ben?[['mail-b','E-posta: kendime']]:[]),['kopyala','Kopyala'],['md','Dosya (.md)']].map(([k,t])=>`<button class=gh data-ak=${k} data-kay="${esc(kay)}">${k==='mail-k'?esc(t):L(t)}</button>`).join('')}</div>`}
+let akAyar=null,epSec=null  // "⚙ E-posta ayarı" formu açık mı (kay) ve seçilen hizmet (kaydetmeden önce)
+function epForm(kay){const sec=epSec!=null?epSec:((last&&last.eposta_ayar)||''),su=(last&&last.eposta)||'mailto',ad={gmail:'Gmail',outlook:'Outlook (web)',mailto:L("Mac'in posta uygulaması")}
+  return `<div class=epf><div class=meta>${esc(L('E-posta taslağı nerede açılsın?'))}</div><div class="bt akm">${[['',L('Kendin seç')+(sec?'':` (${ad[su]||su})`)],['gmail','Gmail'],['outlook','Outlook (web)'],['mailto',L("Mac'in posta uygulaması")]].map(([v,t])=>`<button class="${sec===v?'pri':'gh'}" data-ep="${v}" aria-pressed="${sec===v}">${esc(t)}</button>`).join('')}</div>
+    <div class=meta>${esc(L('Gönderen adresin (“kendime” de buraya; Gmail’de taslak bu hesapla açılır)'))}</div><div class=bt><input data-ep-adres value="${esc((last&&last.eposta_hesap)||'')}" placeholder="${esc(L('boşsa takvim adresin'))}" style="flex:1;min-width:12em"><button class=pri data-ep-kaydet="${esc(kay)}">${L('Kaydet')}</button></div></div>`}
+function akMenu(kay,n){return `<div class="bt akm">${[['pdf','PDF'],['mail','E-posta'],...(n?[['mail-k',n>0?L('E-posta: katılımcılara ({n})',{n}):L('E-posta: katılımcılara')]]:[]),...(last&&last.eposta_ben?[['mail-b','E-posta: kendime']]:[]),['kopyala','Kopyala'],['md','Dosya (.md)']].map(([k,t])=>`<button class=gh data-ak=${k} data-kay="${esc(kay)}">${k==='mail-k'?esc(t):L(t)}</button>`).join('')}<button class=gh data-ep-ac="${esc(kay)}" aria-expanded="${akAyar===kay}" title="${L('Taslağın açılacağı yer ve gönderen adres')}">⚙ ${L('E-posta ayarı')}</button></div>${akAyar===kay?epForm(kay):''}`}
 function akDug(kay){return `<button class=gh data-aktar="${esc(kay)}" aria-expanded="${akAcik===kay}" title="${L('PDF, e-posta, pano ya da dosya olarak dışarı al')}">${L('Dışarı aktar')} ${akAcik===kay?'▴':'▾'}</button>`}
 function yerelGun(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}  // toISOString UTC: gece yarısından sonra önceki gün
 function akDosya(t,d){return `${t} - ${yerelGun(d||new Date())}`.replace(/[\/\\:*?"<>|]+/g,' ').slice(0,120)}
@@ -509,6 +517,9 @@ async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.
   if(k==='kopyala'){try{await navigator.clipboard.writeText(mdDuz(c.md));btn.textContent='✓ '+L('kopyalandı')}catch(e){btn.textContent=L('kopyalanamadı')}setTimeout(()=>{btn.textContent=L('Kopyala')},1500);return}
   if(k==='md'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c.md.endsWith('\n')?c.md:c.md+'\n'],{type:'text/markdown;charset=utf-8'}));a.download=c.dosya+'.md';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}}
 function akTik(ev,ciz){const ak=ev.target.closest('button[data-ak]');if(ak){akYap(ak.dataset.ak,ak);return true}
+  const ea=ev.target.closest('button[data-ep-ac]');if(ea){akAyar=akAyar===ea.dataset.epAc?null:ea.dataset.epAc;epSec=null;if(last)ciz(last);return true}
+  const es=ev.target.closest('button[data-ep]');if(es){epSec=es.dataset.ep;if(last)ciz(last);return true}
+  const ek=ev.target.closest('button[data-ep-kaydet]');if(ek){epKaydet(ek,ciz);return true}
   const ac=ev.target.closest('button[data-aktar]');if(ac){akAcik=akAcik===ac.dataset.aktar?null:ac.dataset.aktar;if(last)ciz(last);return true}return false}
 document.getElementById('br').addEventListener('click',async ev=>{if(akTik(ev,renderBrifing))return
   const b=ev.target.closest('button[data-brf]');if(!b)return;b.disabled=true
