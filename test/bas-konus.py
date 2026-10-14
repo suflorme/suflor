@@ -27,11 +27,8 @@ n = ns = 0; defter = None; ek = False; isaret = os.path.join(os.path.dirname(sys
 for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1; soru = q.split("Soru: ", 1)[-1]
     d = re.search(r"\\[Toplantı defteri — (.+?);", q)
-    if d and "[/Toplantı defteri]" in q: defter = d.group(1)  # ısınmada ya da soruyla gelen defter: sonraki cevap "Defter geldi" der
+    if d and "[/Toplantı defteri]" in q: defter = d.group(1)  # soruyla gelen defter: sonraki cevap "Defter geldi" der
     ek = ek or "[Defter eki" in q
-    if "[Isınma" in q:
-        pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Hazır."}}})
-        pr({"type": "result", "duration_api_ms": 300, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_creation_input_tokens": 900}}); continue
     if "donma" in soru.lower() or ("takılma" in soru.lower() and not os.path.exists(isaret)):  # takılan Claude: hiç cevap yok
         open(isaret, "w").close(); time.sleep(600); continue
     ns += 1; b = "[Bağlam" in q and "Şimdi:" in q and "Deneme planlama" in q and "GİZLİ NOT" not in q  # davet notu girmez
@@ -43,7 +40,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_isinma": True}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
@@ -145,15 +142,15 @@ try:
     ok("bitişten sonra panoda 'Son toplantı hazır' (ad)", (st().get("defter") or {}).get("ad") == "Defter denemesi")
     ses0 = log().count("SES (deneme)")
     k6 = sor("Toplantıda bütçe ne oldu?")
-    ok("basınca defter ısınma mesajıyla gitti (okunmadı), soru ondan sonra; cevapta '---' ayrıntı", k6["durum"] == "hazir" and "Defter geldi: Defter denemesi" in (k6.get("cevap") or "")
-       and "---" in k6["cevap"] and "DEFTER: bas-konuşa gitti — 1 dosya" in log() and "KONUŞ: ısınma bitti (defter)" in log() and "Hazır." not in log())
+    ok("defter soruyla birlikte gitti; cevapta '---' ayrıntı", k6["durum"] == "hazir" and "Defter geldi: Defter denemesi" in (k6.get("cevap") or "")
+       and "---" in k6["cevap"] and "DEFTER: bas-konuşa gitti — 1 dosya" in log() and "ısınma" not in log())
     ok("'---' sonrası okunmadı", "Ayrıntı satırı" not in log() and log().count("SES (deneme)") > ses0)
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
-    ok("ölçümde defter işareti ve ısınma kaydı", c[-1].get("defter") is True and c[-1]["is"] == "bas-konus" and c[-2]["is"] == "bas-konus-isinma")
+    ok("ölçümde defter işareti, ısınma kaydı yok", c[-1].get("defter") is True and c[-1]["is"] == "bas-konus" and not any(x["is"] == "bas-konus-isinma" for x in c))
     t0 = time.time()
     while time.time() - t0 < 10 and log().count("tur sınırı") < 2: time.sleep(0.2)
     k7 = sor("Teslim ne zaman?")
-    ok("süreç yenilenince defter yeniden gitti (ısınmayla)", "Defter geldi" in (k7.get("cevap") or "") and log().count("DEFTER: bas-konuşa gitti") == 2 and log().count("KONUŞ: ısınma bitti") == 2)
+    ok("süreç yenilenince defter yeniden gitti", "Defter geldi" in (k7.get("cevap") or "") and log().count("DEFTER: bas-konuşa gitti") == 2)
     k8 = sor("Başka ne konuşuldu?")
     ok("aynı süreçte ikinci soruda defter yok", k8["durum"] == "hazir" and "Defter geldi" not in (k8.get("cevap") or "") and "Ek geldi" not in (k8.get("cevap") or "")
        and log().count("DEFTER: bas-konuşa gitti") == 2)
