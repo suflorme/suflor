@@ -56,6 +56,8 @@
       takvim_b: "Takvimini bağlayalım", takvim_a: "Toplantından birkaç dakika önce hatırlatır, gündemi ve katılımcıları davetten alır.",
       t_izin: "Erişim ver", t_izin_b: "Takvim izni", t_izin_a: "macOS bir izin penceresi açacak: \"Tam erişim\"i seç.",
       t_hesap_yok: "Mac'in Takvim uygulamasında hesap görünmüyor.", t_hesap_ekle: "Google, iCloud ya da Outlook hesabını ekle",
+      t_eposta: "Brifingi ya da özeti e-postayla gönderirken taslak nerede açılsın?", t_e_oto: "Kendin seç", t_e_gmail: "Gmail", t_e_outlook: "Outlook (web)", t_e_mailto: "Mac'in posta uygulaması",
+      t_e_oto_a: "Takvim adresine ve toplantılarına bakıp ben seçerim (Gmail adresi → Gmail, Teams toplantıları → Outlook).", t_e_adres: "Gönderen adresin (\"kendime\" de buraya gider; Gmail'de taslak bu hesapla açılır)", t_e_adres_ph: "ör. Gmail adresin — boşsa takvim adresin",
       t_bugun: "Bugün gördüklerim", t_bos: "Bugün başka toplantın yok.", t_dogru: "Takvimlerin bunlar mı? İzlenmesini istemediklerinin işaretini kaldır.", t_adres: "Hangi adresler senin? Yalnız bu adreslerin davetli ya da düzenleyen olduğu toplantıları gösteririm; Takvim'e eklenmiş başkalarının takvimleri listeye girmez.",
       t_adres_bekle: "Takvimdeki adresleri okuyorum…", t_adres_ek: "Listede olmayan bir adresin", t_adres_yok: "Adres seçmezsen macOS'un seni tanıdığı yere bakarım; Takvim'e başkalarının takvimi eklenmişse onların toplantıları da görünebilir.",
                                     ek_b: "Chrome eklentisini ekle", ek_a: "Eklenti Teams sayfasından sesi ve altyazıyı alır, kartları ekranın köşesinde gösterir.",
@@ -114,6 +116,8 @@
       takvim_b: "Connect your calendar", takvim_a: "It reminds you a few minutes before a meeting and takes the agenda and attendees from the invitation.",
       t_izin: "Allow access", t_izin_b: "Calendar permission", t_izin_a: "macOS will ask for permission: choose \"Full Access\".",
       t_hesap_yok: "No accounts in the Mac Calendar app.", t_hesap_ekle: "Add your Google, iCloud or Outlook account",
+      t_eposta: "When you email a briefing or summary, where should the draft open?", t_e_oto: "You choose", t_e_gmail: "Gmail", t_e_outlook: "Outlook (web)", t_e_mailto: "Mac's mail app",
+      t_e_oto_a: "I'll pick from your calendar address and meetings (Gmail address → Gmail, Teams meetings → Outlook).", t_e_adres: "Your sending address (\"to myself\" goes here too; in Gmail the draft opens with this account)", t_e_adres_ph: "e.g. your Gmail address — empty means your calendar address",
       t_bugun: "What I see today", t_bos: "No more meetings today.", t_dogru: "Are these your calendars? Untick any you don't want followed.", t_adres: "Which addresses are yours? I only show meetings where one of them is invited or organizes; other people's calendars added to Calendar stay out.",
       t_adres_bekle: "Reading the addresses in your calendar…", t_adres_ek: "Another address of yours", t_adres_yok: "With no address selected I go by who macOS thinks you are; if other people's calendars are added, their meetings may show too.",
                                     ek_b: "Add the Chrome extension", ek_a: "The extension takes sound and captions from the Teams page and shows the cards in a corner of the screen.",
@@ -175,6 +179,13 @@
   // ---------- adımlar ----------
   const satir = (dur, ad, ac, eylem = "") => `<div class="satir"><span class="durum ${dur}">${dur === "bekle" ? "" : S[dur] || ""}</span><div><div class="ad">${esc(ad)}</div>${ac ? `<div class="ac">${esc(ac)}</div>` : ""}</div><div class="eylem">${eylem}</div></div>`;
   const dug = (id, yazi) => `<button class="ikincil-dug" type="button" data-eylem="${id}">${esc(yazi)}</button>`;
+  // e-posta bloğu (takvim ekranı; takvim izni olmasa da gösterilir): değer ↔ görünen ad ayrı
+  const epostaBlok = () => { const tk = (D.durum || {}).takvim || {}, sec = C.eposta != null ? C.eposta : (tk.eposta || "");
+    return `<div class="alan"><span class="etiket">${esc(t.t_eposta)}</span><div class="yongalar">${[["", t.t_e_oto], ["gmail", t.t_e_gmail], ["outlook", t.t_e_outlook], ["mailto", t.t_e_mailto]]
+      .map(([v, ad]) => `<button class="yonga" type="button" data-grup="eposta" data-deger="${esc(v)}" aria-pressed="${sec === v}">${esc(ad)}</button>`).join("")}</div>
+      ${sec ? "" : `<div class="ipucu">${esc(t.t_e_oto_a)}</div>`}
+      <span class="etiket" style="margin-top:10px">${esc(t.t_e_adres)}</span><input type="text" inputmode="email" autocomplete="email" data-eposta-adres value="${esc(C.eposta_adres != null ? C.eposta_adres : (tk.eposta_adres || ""))}" placeholder="${esc(t.t_e_adres_ph)}"></div>`; };
+  const epostaKaydet = () => api("eposta", { eposta: C.eposta || "", eposta_adres: C.eposta_adres || "" }).catch(() => {});
   const yonga = (grup, deger, secili) => `<button class="yonga" type="button" data-grup="${grup}" data-deger="${esc(deger)}" aria-pressed="${!!secili}">${esc(deger)}</button>`;
   const C = D.cevap;
   const alan = (id, etiket, ipucu = "", tur = "text") => `<div class="alan"><label for="${id}">${esc(etiket)}</label>${tur === "textarea"
@@ -235,7 +246,7 @@
           <label class="anahtar"><input type="checkbox" data-teshis ${C.teshis === true ? "checked" : ""}><span><b>${esc(t.p_anahtar)}</b><br><span class="ipucu">${esc(t.p_gider_a)} ${esc(t.p_gitmez_a)}</span></span></label>`; } },
     { id: "takvim", simge: "takvim", b: "takvim_b", a: "takvim_a", gir: takvimBekle,
       icerik: () => { const tk = (D.durum || {}).takvim || {};
-        if (tk.durum !== "ok") return `<div class="liste">${satir(tk.durum === "izin_yok" ? "uyari" : "bos", t.t_izin_b, t.t_izin_a, dug("takvim-izin", t.t_izin))}</div>`;
+        if (tk.durum !== "ok") return `<div class="liste">${satir(tk.durum === "izin_yok" ? "uyari" : "bos", t.t_izin_b, t.t_izin_a, dug("takvim-izin", t.t_izin))}</div>${epostaBlok()}`;
         const tl = tk.takvimler || [], sec = new Set(C.takvim_adres || []);
         const ad = [...new Set([...(tk.adaylar || []).map(x => x.adres), ...(C.takvim_adres || [])])];
         const adres = `<div class="alan"><span class="etiket">${esc(t.t_adres)}</span>${tk.adaylar == null ? `<div class="ipucu">${esc(t.t_adres_bekle)}</div>`
@@ -243,7 +254,8 @@
           <input type="text" data-adres-ek placeholder="${esc(t.t_adres_ek)}" style="margin-top:8px">${tk.adaylar != null && !sec.size ? `<div class="ipucu">${esc(t.t_adres_yok)}</div>` : ""}</div>`;
         return `${adres}${tl.length ? `<div class="alan"><span class="etiket">${esc(t.t_dogru)}</span><div class="yongalar">${tl.map(x => yonga("takvim", x.ad + " · " + x.hesap, !(C.takvim_cikar || []).includes(x.ad + " · " + x.hesap) && x.sec !== false)).join("")}</div></div>`
           : `<div class="kart-not">${esc(t.t_hesap_yok)} ${dug("internet-hesaplari", t.t_hesap_ekle)}</div>`}
-          <div class="alan"><span class="etiket">${esc(t.t_bugun)}</span><div class="liste">${(tk.olaylar || []).length ? tk.olaylar.map(o => satir("iyi", o.baslik, `${o.saat}–${o.bitis}${o.platform ? " · " + o.platform : ""}`)).join("") : satir("iyi", t.t_bos)}</div></div>`; } },
+          <div class="alan"><span class="etiket">${esc(t.t_bugun)}</span><div class="liste">${(tk.olaylar || []).length ? tk.olaylar.map(o => satir("iyi", o.baslik, `${o.saat}–${o.bitis}${o.platform ? " · " + o.platform : ""}`)).join("") : satir("iyi", t.t_bos)}</div></div>
+          ${epostaBlok()}`; } },
     { id: "eklenti", simge: "eklenti", b: "ek_b", a: "ek_a", hazir: () => ((D.durum || {}).eklenti || {}).bagli, gir: () => eklentiBekle(),
       icerik: () => { const e = (D.durum || {}).eklenti || {};
         return `<ol class="adimlar"><li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e1)}<div class="eylem">${dug("chrome-eklentiler", t.e1d)}</div></div></li>
@@ -318,7 +330,7 @@
     const y = e.target.closest(".yonga");
     if (y) {
       const g = y.dataset.grup, v = y.dataset.deger, on = y.getAttribute("aria-pressed") !== "true";
-      if (g === "alan") { C.is_alani = v; } else {
+      if (g === "alan") { C.is_alani = v; } else if (g === "eposta") { C.eposta = v; epostaKaydet(); } else {
         const anahtar = { takvim: "takvim_cikar", adres: "takvim_adres" }[g]; const l = new Set(C[anahtar] || []);
         if (g === "adres" ? on : !on) l.add(v); else l.delete(v); C[anahtar] = [...l];
         takvimKaydet();  // takvim ekranı kurulumdan sonra: seçim ayara hemen yazılır
@@ -346,6 +358,11 @@
   document.addEventListener("change", async e => {
     if (!e.target.matches || !e.target.matches("[data-teshis]")) return;
     C.teshis = e.target.checked; kaydet(); if ((D.kurDurum || {}).ayar === "iyi") await api("teshis", { acik: C.teshis }).catch(() => {});
+  });
+  document.addEventListener("change", e => {  // gönderen adresi: geçerliyse ya da boşsa yazılır
+    if (!e.target.matches || !e.target.matches("[data-eposta-adres]")) return;
+    const v = e.target.value.trim().toLowerCase(); if (v && !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(v)) return;
+    C.eposta_adres = v; kaydet(); epostaKaydet();
   });
   document.addEventListener("change", e => {
     if (!e.target.matches || !e.target.matches("[data-adres-ek]")) return;

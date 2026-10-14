@@ -57,6 +57,9 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 3. Kartlar Teams'in sol altındaki küçük şeritte ve panoda görünür: **SÖYLE** (şunu de/sor), **DUR** (yapma/açma), **CEVAP**; **NOT** yalnız panoda. ✓ yaptım · Okudum · ✕ gerek yok.
 4. Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? (Claude tek cümlelik replik önerir) · **Option + Shift + M** sessiz (10 dk kart yok; tekrar basınca kapanır). Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin. ⭐ önemli an panoda düğme.
 5. Toplantı bitince Claude özeti çıkarır ve sana sunar.
+6. Brifing ve özet panoda **Dışarı aktar** ile PDF, e-posta taslağı (alıcısız, katılımcılara ya da kendine), panoya kopya ya da .md dosyası olur.
+   Taslağın açılacağı yeri (Gmail, Outlook web ya da Mac'in posta uygulaması) ve gönderen adresini sihirbazın takvim ekranında seçersin;
+   sonradan ayar.json'da `"eposta"` ve `"eposta_adres"`. Seçmezsen takvimine bakılarak seçilir.
 
 **İsteğe bağlı (ayar.json, varsayılan kapalı):** `"menu_cubugu": true` — menü çubuğu uygulaması (buzlu cam panelde mini pano,
 Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da

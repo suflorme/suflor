@@ -183,7 +183,7 @@ def takvim():
     for e in tj.get("olaylar", []):
         if e.get("takvim"): tk[f'{e["takvim"]} · {e.get("hesap") or ""}'] = {"ad": e["takvim"], "hesap": e.get("hesap") or ""}
     return {"durum": t.get("durum"), "takvimler": list(tk.values()), "adaylar": takvim_adaylari(a) if t.get("durum") == "ok" else [],
-            "adresler": a.get("takvim_adreslerim"), "olaylar": [{"saat": o["saat"], "bitis": o["bitis_saat"], "baslik": o["baslik"], "platform": o.get("platform")} for o in t.get("olaylar", [])]}
+            "adresler": a.get("takvim_adreslerim"), "eposta": a.get("eposta"), "eposta_adres": a.get("eposta_adres"), "olaylar": [{"saat": o["saat"], "bitis": o["bitis_saat"], "baslik": o["baslik"], "platform": o.get("platform")} for o in t.get("olaylar", [])]}
 
 # Takvim adresleri: Takvim'e başkalarının paylaşılan takvimleri de eklenebiliyor ve macOS orada takvim sahibini "sen" sayıyor; aktarıcı
 # yalnız kullanıcının adreslerinin davetli/düzenleyen olduğu toplantıları gösterir (ayar takvim_adreslerim). Adaylar takvim
@@ -209,6 +209,23 @@ def takvim_ayarla(adresler, cikar):  # takvim ekranı kurulumdan sonra: ayara ya
     a["takvim_adreslerim"] = list(dict.fromkeys(ad)); a["takvim_haric"] = [str(x) for x in cikar or []]; yaz_json(AYAR_YOL, a)
     if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
     return {"ok": True}
+
+# E-posta (v0.33.5): panodaki "Dışarı aktar"da taslak hangi posta hizmetinde açılsın (ayar eposta: gmail | outlook | mailto; boş = aktarıcı takvimden
+# tahmin eder) ve gönderen/"kendime" adresi (ayar eposta_adres; Gmail'de taslak bu hesapla açılır). Takvim ekranında sorulur, hemen yazılır.
+EPOSTA_TUR = ("gmail", "outlook", "mailto")
+def eposta_temiz(tur, adres):
+    tur = str(tur or "").lower(); adres = str(adres or "").strip().lower()
+    return (tur if tur in EPOSTA_TUR else None), (adres if re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", adres) else None)
+def eposta_ayarla(tur, adres):
+    a = ayar()
+    if not a: return {"ok": False}
+    t, ad = eposta_temiz(tur, adres)
+    for k, v in (("eposta", t), ("eposta_adres", ad)):
+        if v: a[k] = v
+        else: a.pop(k, None)
+    yaz_json(AYAR_YOL, a)
+    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
+    return {"ok": True, "eposta": t, "eposta_adres": ad}
 
 # ---------- profil: Claude'un çalışma notu (taslak) ----------
 # Sihirbaz 17 → 10 ekran (8 Ekim): ayrı "Seni böyle tanıdım" ekranı yok. Kurulum bitince bağımsız süreç (`kurulum.py profil`,
@@ -287,6 +304,11 @@ def tamamla(c, dil):
               "whisper_terimler": list(dict.fromkeys((eski.get("whisper_terimler") or []) + araclar + kisiler + terimler))[:60],
               "takvim_haric": [x for x in (c.get("takvim_cikar") or [])], "takvim_adreslerim": [x for x in (c.get("takvim_adres") or eski.get("takvim_adreslerim") or [])],
               "teshis": c.get("teshis") is True})  # beta teşhis izni (teshis.py; adres teshis_adres ya da varsayılan)
+    if "eposta" in c or "eposta_adres" in c:  # takvim ekranındaki e-posta seçimi (boş = tahmin)
+        et, ea = eposta_temiz(c.get("eposta"), c.get("eposta_adres"))
+        for k, v in (("eposta", et), ("eposta_adres", ea)):
+            if v: a[k] = v
+            else: a.pop(k, None)
     a.setdefault("claude_model", "sonnet")
     if claude_yolu() and not a.get("claude"): a["claude"] = claude_yolu()  # aktarıcı panodan başlatırken aynı Claude
     try: yaz_json(AYAR_YOL, a); sonuc["ayar"] = "iyi"
@@ -431,6 +453,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/claude/denetle": claude_denetle(); return self._json(claude_durum())
         if yol == "/api/teshis": return self._json(teshis_ayarla(p.get("acik")))
         if yol == "/api/takvim": return self._json(takvim_ayarla(p.get("adresler"), p.get("cikar")))
+        if yol == "/api/eposta": return self._json(eposta_ayarla(p.get("eposta"), p.get("eposta_adres")))
         if yol == "/api/kur/tamamla": return self._json(tamamla(p.get("cevap") or {}, p.get("dil") or "tr"))
         if yol == "/api/klasor-sec": return self._json({"yol": klasor_sec()})
         if yol == "/api/ac": ac(str(p.get("hedef") or "")); return self._json({"ok": True})
