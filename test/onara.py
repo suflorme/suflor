@@ -15,7 +15,7 @@ os.environ["SUFLOR_AYAR"] = os.path.join(T, "ayar.json"); os.environ["SUFLOR_TES
 try:
     # bas-konus.py'nin ön arama bölümü, relay ad alanı yerine küçük taklitle (bölüm dosyası relay.py'nin ad alanında çalışır; __file__ relay.py yanında)
     src = open(os.path.join(K, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-    g = {"os": os, "sys": sys, "time": time, "threading": threading, "_t": lambda tr, en: tr, "__file__": os.path.join(K, "relay.py")}
+    g = {"os": os, "sys": sys, "time": time, "threading": threading, "_t": lambda tr, en: tr, "__file__": os.path.join(K, "relay.py"), "AYAR": {}, "ARAYUZ_DILI": "tr"}
     exec(src[src.index("# --- Hızlı bilgi (S47"):src.index("def konus_baglam(")], g)
     m = g["_onara_mod"](); bak("baglam.py yüklendi", m is not None)
     t = time.time(); m.guncelle(m.baglan()); print(f"   dizin kuruldu ({time.time() - t:.2f} sn)")
@@ -33,6 +33,11 @@ try:
     bak("arama dizini güncellemez (yeni dosya ön aramada yok)", "yeni.md" not in g["konus_onara"]("Karbon ayak izi raporu ne zaman teslim?"))
     m.guncelle(m.baglan())
     bak("güncellemeden sonra yeni dosya bulunur", "yeni.md" in g["konus_onara"]("Karbon ayak izi raporu ne zaman teslim?"))
+    # v0.42.0 bekleme cümlesi: art arda aynısı yok, türe göre içerikli cümle çıkabiliyor, bilinmeyen türde genel havuz
+    bc = g["bekleme_cumlesi"]; s = [bc() for _ in range(40)]
+    bak("bekleme cümlesi art arda aynı değil", all(a != b for a, b in zip(s, s[1:])))
+    bak("türe göre içerikli cümle çıkıyor (görüşme)", "Görüşme kayıtlarına bakıyorum." in {bc("gorusme") for _ in range(40)})
+    bak("bilinmeyen tür → genel havuz", all(c in g["BEKLE_GENEL"]["tr"] for c in (bc("bilinmeyen") for _ in range(20))))
 finally:
     if not hata: shutil.rmtree(T, ignore_errors=True)
     else: print(f"(deneme klasörü: {T})")
