@@ -79,7 +79,7 @@ try:
                "for n in (16000 * 3, 16000 * 11):\n a = (r.randn(n) * 0.1).astype(np.float32); b = np.pad(a[-128000:], (max(0, 128000 - n), 0))\n"
                " f = fe(b, sampling_rate=16000, return_tensors='np', padding='max_length', max_length=128000, truncation=True, do_normalize=True).input_features\n"
                " print(float(np.abs(f - t.ozellik(a)).max()))\n")
-        r = subprocess.run([tpy, "-I", "-c", kod, os.path.join(K, "tur-isci.py")], capture_output=True, text=True)
+        r = subprocess.run([tpy, "-I", "-B", "-c", kod, os.path.join(K, "tur-isci.py")], capture_output=True, text=True)
         if "No module named 'transformers'" in r.stderr: print("   (transformers yok — log-mel karşılaştırması atlandı)")
         else: bak(f"log-mel transformers'la aynı ({r.stdout.split()})", r.returncode == 0 and all(float(x) < 1e-4 for x in r.stdout.split()))
     else: print("   (smart-turn-venv ya da model yok — gerçek model denemesi atlandı)")
