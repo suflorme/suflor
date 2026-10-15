@@ -252,7 +252,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         }
         let k = Kayitci(); guard k.basla() else { uyar("Mikrofon açılamadı"); return }
         kayitci = k; simgeGuncelle(); NSSound(named: "Pop")?.play()
-        akisZaman = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in  // konuşurken saniyede bir parça (aktarıcı duraksamada döker)
+        akisZaman = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in  // konuşurken 0,5 sn'de bir parça (aktarıcı duraksamada döker, "hı hı" bakar)
             guard let d = self?.kayitci?.yeni(), !d.isEmpty else { return }
             istek("/bas-konus", ["komut": "parca", "pcm": d.base64EncodedString()]) { _ in }
         }

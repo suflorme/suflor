@@ -450,7 +450,7 @@ document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=doc
   catch(e){if(w)w.close();m.className='er';m.textContent=L("Suflor.me'ye ulaşılamadı")}finally{setTimeout(()=>b.disabled=false,3000)}}
 // bas-konuş (Faz 4): toplantı dışında basılı tut → pano mikrofonu 16 kHz → /bas-konus → yerel Whisper → Claude (açık süreç) → Mac sesi
 let kRec=null,kSure=null
-// v0.46.0 konuşurken yazıya dökme: kayıt sürerken saniyede bir yeni ses aktarıcıya (komut parca); bırakışta bütün kayıt yine gider (önek eşleşirse
+// v0.46.0 konuşurken yazıya dökme: kayıt sürerken 0,5 sn'de bir (v0.47.0; konuşurken "hı hı" duraksamayı geç görmesin) yeni ses aktarıcıya (komut parca); bırakışta bütün kayıt yine gider (önek eşleşirse
 // aktarıcı yalnız kalan kısmı döker). Tarayıcı 16 kHz vermezse akış yok (dönüşüm parça parça birebir olmaz).
 function f2b64(f){const pcm=new Int16Array(f.length);for(let i=0;i<f.length;i++){const v=Math.max(-1,Math.min(1,f[i]));pcm[i]=v<0?v*32768:v*32767}
   const u=new Uint8Array(pcm.buffer);let bin='';for(let i=0;i<u.length;i+=32768)bin+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(bin)}
@@ -463,7 +463,7 @@ async function konusBasla(){if(kRec)return;kRec={hazir:false};konusCiz()
   try{const st=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}}),ac=new AudioContext({sampleRate:16000}),src=ac.createMediaStreamSource(st),pr=ac.createScriptProcessor(4096,1,1),parca=[]
     pr.onaudioprocess=e=>parca.push(new Float32Array(e.inputBuffer.getChannelData(0)));src.connect(pr);pr.connect(ac.destination)
     if(!kRec){st.getTracks().forEach(t=>t.stop());ac.close();return}  // izin beklerken bırakıldı
-    Object.assign(kRec,{st,ac,pr,parca,hazir:true,gid:0});if(ac.sampleRate===16000){const k=kRec;k.akis=setInterval(()=>konusAkis(k),1000)}
+    Object.assign(kRec,{st,ac,pr,parca,hazir:true,gid:0});if(ac.sampleRate===16000){const k=kRec;k.akis=setInterval(()=>konusAkis(k),500)}
     kSure=setTimeout(konusBitir,60000);if(kRec.birak)konusBitir()}
   catch(e){kRec=null;konusCiz();geciciDurum(L('Mikrofon açılamadı'),String(e&&e.name||''))}}
 async function konusBitir(){const k=kRec;if(!k)return;if(!k.hazir){k.birak=true;return}kRec=null;clearTimeout(kSure);if(k.akis)clearInterval(k.akis);konusCiz()
@@ -554,7 +554,7 @@ function akTik(ev,ciz){const ak=ev.target.closest('button[data-ak]');if(ak){akYa
 // ⚙ Ayarlar (v0.34.0): şema aktarıcıdaki AYAR_PANO ile aynı sırada; değerler /status ayarlar'dan; Kaydet yalnız değişenleri /ayar'a yollar
 const AYG=[['E-posta',[['eposta','sec','Taslak nerede açılsın','Brifing ve özet e-postayla gönderilirken.',[['',"Kendin seç"],['gmail','Gmail'],['outlook','Outlook (web)'],['mailto',"Mac'in posta uygulaması"]]],
     ['eposta_adres','adres','Gönderen adresin','“Kendime” de buraya gider; Gmail’de taslak bu hesapla açılır. Boşsa takvim adresin.']]],
-  ['Ses ve konuşma',[['konusma','bool','Sesli özellikler','Bas-konuş, sesli özet ve okumalar. Kapalıyken Suflor hiç konuşmaz.'],['sesli_not','bool','Sesli not','“Not al: …” dediğinde not alınır.'],['toplanti_konus','bool','Toplantıda Konuş','Toplantı sırasında Konuş ve “Claude: …” sorusu kısa cevaplanır; kulaklık takılıysa sesli, değilse yalnız panoda.'],
+  ['Ses ve konuşma',[['konusma','bool','Sesli özellikler','Bas-konuş, sesli özet ve okumalar. Kapalıyken Suflor hiç konuşmaz.'],['sesli_not','bool','Sesli not','“Not al: …” dediğinde not alınır.'],['konus_hihi','bool','Konuşurken “hı hı”','Konuş’ta uzun anlatırken kısa duraksamalarda kısık bir onay sesi. Yalnız kulaklıkta, toplantıda değil.'],['toplanti_konus','bool','Toplantıda Konuş','Toplantı sırasında Konuş ve “Claude: …” sorusu kısa cevaplanır; kulaklık takılıysa sesli, değilse yalnız panoda.'],
     ['sesli_kanit','bool','Sesli kanıt','“Kanıt al” dediğinde toplantı ekranı kaydedilir.'],['fisilti','bool','Fısıltı','Kulaklık takılıyken DUR kartı kısa sesle kulağına okunur.'],
     ['brifing_sesli','bool',"Brifingi Başlat'ta oku","Başlat'a basınca brifing sesli okunur (panodaki Dinle her zaman var)."],['ses_motoru','sec','Ses','Okumalarda kullanılan ses.',[['mac','Mac sesi'],['piper','Piper (yerel Türkçe ses)']]]]],
   ['Toplantı uyarıları',[['adin_gecti','bool','Adın geçti','Karşı taraf adını söyleyince panoda uyarı.'],['uzun_konusma_sn','sayi','Uzun konuşma uyarısı (sn)','Bu kadar kesintisiz konuşunca uyarı; 0 kapatır.'],

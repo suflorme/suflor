@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 143545,
-   "sha": "683fcee3512599a2"
+   "uzunluk": 144017,
+   "sha": "8890c1781ce7ac2d"
   },
   "/hazirlik": {
-   "uzunluk": 40585,
-   "sha": "ae70a2c3df59cac4"
+   "uzunluk": 40854,
+   "sha": "e6749cb163991664"
   },
   "/mini": {
-   "uzunluk": 143545,
-   "sha": "683fcee3512599a2"
+   "uzunluk": 144017,
+   "sha": "8890c1781ce7ac2d"
   },
   "/status": {
    "_ping_son": "float",
@@ -270,6 +270,7 @@
      "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kisayollar": "bool",
+     "konus_hihi": "bool",
      "konusma": "bool",
      "masaustu_kisiler": "bool",
      "masaustu_mic": "bool",
@@ -300,6 +301,7 @@
      "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kisayollar": "bool",
+     "konus_hihi": "bool",
      "konusma": "bool",
      "masaustu_kisiler": "bool",
      "masaustu_mic": "bool",

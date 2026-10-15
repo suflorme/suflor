@@ -310,7 +310,7 @@ def _once_blogu(simdi):  # → (blok, anahtar) — toplantı sürerken yok
 AKIS_EN_AZ_SN, AKIS_SESSIZ_SN, AKIS_PENCERE = 1.5, 0.35, 800  # pencere: 50 ms (16 kHz × 2 bayt)
 AKIS = {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "kilit": threading.Lock(), "kosul": threading.Condition()}
 def _akis_sifirla():
-    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, bekleyen=0, sira=0)
+    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None)
 def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesim noktası (bayt) ya da None
     n = len(b) - bas
     if n < int(AKIS_EN_AZ_SN * WH_SR * 2): return None
@@ -337,7 +337,36 @@ def konus_parca(p):  # pano/menü: kayıt sürerken yeni ses (base64 16 kHz int1
         AKIS["pcm"] += pcm; kes = _akis_kesim(AKIS["pcm"], AKIS["kesik"]); bas = AKIS["kesik"]
         if kes: AKIS["kesik"] = kes; sira = AKIS["sira"]; AKIS["sira"] += 1
     if kes: _akis_gonder(bas, kes, sira); print(f"KONUŞ: akış parçası {sira + 1} Whisper'a ({(kes - bas) / 2 / WH_SR:.1f} sn, konuşurken)")
+    try: _hihi_bak()
+    except Exception as e: print(f"KONUŞ: hı hı hatası {e.__class__.__name__}")
     return {"ok": True, "n": len(AKIS["pcm"])}
+# Konuşurken "hı hı" (v0.47.0; aktif dinleme 4. adım, araştırma testler/arastirma-aktif-dinleme-20261015): ayar konus_hihi (varsayılan kapalı). Yalnız
+# kulaklıkta (hoparlörden mikrofona girer) ve toplantı dışında (toplantıya giden onay aldatıcı, dökümü kirletir). Bas-tut: tuş basılıyken tur sürüyor →
+# duraksama tur sonu değil, cevap bekleyen ana girilmez. Kural: kayıt ≥ HIHI_ILK_SN, son onaydan ≥ HIHI_ARA_SN, yeni başlamış duraksama
+# (HIHI_DURAK_SN aralığında) ve öncesinde ≥ 1,5 sn konuşma, olasılık HIHI_OLASILIK; tepki türü alindi ("Hı hı", "Hm", "Hıı"), kısık (HIHI_SES), sırasız.
+HIHI_ILK_SN, HIHI_ARA_SN, HIHI_DURAK_SN, HIHI_OLASILIK, HIHI_SES = 6.0, 12.0, (0.35, 0.9), 0.5, 0.6
+def _hihi_bak():
+    if AYAR.get("konus_hihi") is not True or _KS["tur"]: return
+    with AKIS["kilit"]:
+        b = AKIS["pcm"]; n = len(b) / 2 / WH_SR
+        if n < HIHI_ILK_SN or time.time() - AKIS.get("hihi_t", 0) < HIHI_ARA_SN: return
+        son = b[-int(4 * WH_SR * 2):]
+        pen = [_rms(bytes(son[i:i + AKIS_PENCERE])) for i in range(0, len(son) - AKIS_PENCERE + 1, AKIS_PENCERE)]
+        taban = sorted(_rms(bytes(b[i:i + AKIS_PENCERE])) for i in range(0, len(b) - AKIS_PENCERE + 1, AKIS_PENCERE * 4))
+        esik = max(250, (taban[len(taban) // 5] if taban else 0) * 2.5)
+        k = 0
+        while k < len(pen) and pen[-1 - k] < esik: k += 1
+        sessiz = k * AKIS_PENCERE / 2 / WH_SR; once = pen[:len(pen) - k][-int(1.5 * WH_SR * 2 / AKIS_PENCERE):]
+        durak_bas = len(b) - k * AKIS_PENCERE
+        if not (HIHI_DURAK_SN[0] <= sessiz <= HIHI_DURAK_SN[1]) or len(once) < 20 or sum(x >= esik for x in once) < len(once) * 0.6: return
+        if AKIS.get("hihi_durak") == durak_bas: return  # aynı duraksama bir kez değerlendirilir
+        AKIS["hihi_durak"] = durak_bas
+    import random
+    if random.random() >= (1.0 if os.environ.get("SUFLOR_TEST_HIHI_KESIN") else HIHI_OLASILIK): return
+    if toplanti_var() or not kulaklik(): return
+    if tepki_cal("alindi", hemen=True, ses=HIHI_SES):
+        with AKIS["kilit"]: AKIS["hihi_t"] = time.time()
+        print(f"KONUŞ: aktif dinleme — \"hı hı\" ({n:.0f}. sn, {sessiz:.2f} sn duraksama)")
 def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen parçalar → geri(metin, hata); tutmazsa False
     with AKIS["kilit"]: kesik, sira = AKIS["kesik"], AKIS["sira"]; tutar = kesik > 0 and len(pcm) >= kesik and bytes(AKIS["pcm"][:kesik]) == pcm[:kesik]
     if not tutar: return False

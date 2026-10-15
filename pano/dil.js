@@ -186,6 +186,8 @@ globalThis.SUFLOR_EN = {
   "Option + Shift + S son Konuş cevabını toplantıya okur. BlackHole kurulu olmalı ve Teams’te mikrofon olarak BlackHole 2ch seçilmeli.": "Option + Shift + S reads the last Talk answer into the meeting. BlackHole must be installed and BlackHole 2ch selected as the microphone in Teams.",
   "Toplantıya söyle": "Say in meeting",
   "Toplantıya söyle: Suflor bunu senin kanalından toplantıya okur (yeniden basınca susar)": "Say in meeting: Suflor reads this into the meeting through your channel (press again to stop)",
+  "Konuşurken “hı hı”": "“Mm-hm” while you talk",
+  "Konuş’ta uzun anlatırken kısa duraksamalarda kısık bir onay sesi. Yalnız kulaklıkta, toplantıda değil.": "A soft acknowledgement in short pauses while you speak at length in Talk. Headphones only, not in meetings.",
   "Suflor.me olmadan katıl": "Join without Suflor.me",
   "son satır {t}": "last line {t}",
   "davet notu okunuyor…": "reading the invite…",

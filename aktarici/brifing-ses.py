@@ -213,11 +213,15 @@ def tepki_sec(tur=None, tetik=None):
     son = list(TEPKI["son"]); taze = [r for r in aday if r["yol"] not in son]
     r = random.choice(taze) if taze else min(aday, key=lambda x: max(i for i, y in enumerate(son) if y == x["yol"]))  # hepsi yakında çaldıysa en eskisi
     TEPKI["son"].append(r["yol"]); return r["yol"]
-def tepki_cal(tur):  # türden bir klibi okuma kuyruğuna (bekleme gibi metinsiz anlar); klip yoksa False
+def tepki_cal(tur, hemen=False, ses=None):  # türden bir klibi okuma kuyruğuna (bekleme gibi metinsiz anlar); klip yoksa False
+    # hemen: sıraya girmeden, kuyruktaki okumayı kesmeden çalar (konuşurken "hı hı"); ses: afplay düzeyi (0–1, kısık onay sesi)
     if not AYAR.get("konusma", True) or piper_acik(): return False
     k = tepki_sec(tur)
     if not k: return False
-    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): tepki {os.path.basename(k)}"); return True
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): tepki {os.path.basename(k)}{' (hemen)' if hemen else ''}"); return True
+    if hemen:
+        try: subprocess.Popen(["/usr/bin/afplay"] + (["-v", str(ses)] if ses else []) + [k], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); return True
+        except OSError: return False
     with SES_K:
         SES["q"].append(("dosya", k)); SES_K.notify()
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
