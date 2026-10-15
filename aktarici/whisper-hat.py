@@ -641,4 +641,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
                          "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2), **({"komut_ses": komut_ses} if komut_ses else {}),
                          **({"kume": kume} if kume else {}), **({k: model[k] for k in ("iz", "bol") if model.get(k)} if kanal == "karsi" and model else {}),  # # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
                          **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,
-                         **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60))} if ses else {})}]})  # ses sinyalleri + hız (kelime/dk)
+                         **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60),
+                                                  **({"benzer": ODA["son_b"]} if kanal == "ben" and is_.get("oda") and ODA.get("son_b") is not None else {}))} if ses else {})}]})
+    # ses sinyalleri + hız (kelime/dk); benzer = kullanıcı kanalında parçanın kullanıcı profiline benzerliği (oda kapalıyken de; ODA_ESIK'i gerçek
+    # toplantıda ölçmek için — Deneme 9'da odadaki ses −35…−42 dB, perde 220–290 Hz; kullanıcı −12…−20 dB, 125–150 Hz; profil benzerliği kayıtta yoktu)

@@ -89,7 +89,7 @@ else:
             for x in rs:
                 if x.get("src") != "whisper" or "t0" not in x: continue
                 orta = (x["t0"] + x["t1"]) / 2; gk = next((k for k, a, b in aralik if a - 0.5 <= orta <= b + 0.5), "?")
-                out.append((gk, x.get("speaker"), round(x["t1"] - x["t0"], 1), x.get("text", "")[:40], x.get("komut_ses")))
+                out.append((gk, x.get("speaker"), round(x["t1"] - x["t0"], 1), x.get("text", "")[:40], x.get("komut_ses"), (x.get("ses") or {}).get("benzer")))
             return out
         finally: r.terminate(); r.wait(5)
     a = os.path.join(T, "komut"); subprocess.run(["say", "-v", "Yelda", "-o", a + ".aiff", "Tamam. Claude, bir kart gönder lütfen, toplantı notlarını da ekle."], check=True)
@@ -106,6 +106,9 @@ else:
     bak(f"oda kapalı: {len(s2)} satırın hepsi kullanıcı", s2 and all(x[1] == "Ali K" for x in s2))
     bak("ses kilidi: başka sesin 'Claude:' komutu işaretlendi (uymuyor)", any(x[0] == "K" and x[4] == "uymuyor" for x in s2))
     bak("ses kilidi: kullanıcının satırlarında işaret yok", not any(x[0] == "U" and x[4] == "uymuyor" for x in s2))
+    # benzer (v0.36.1): oda kapalıyken de satırda — gerçek toplantıda eşiği ölçmek için; başka ses kullanıcıdan düşük
+    bu = [x[5] for x in s2 if x[0] == "U" and x[2] >= 1.5 and x[5] is not None]; bo = [x[5] for x in s2 if x[0] in ("O", "K") and x[2] >= 1.5 and x[5] is not None]
+    bak(f"benzerlik satırda: kullanıcı {sorted(bu)[:1]}…, başka ses …{sorted(bo)[-1:]}", bu and bo and min(bu) > max(bo))
     if not hata: shutil.rmtree(T, ignore_errors=True)
     else: print(f"(deneme klasörü: {T})")
 print("oda: ✓ hepsi geçti" if not hata else f"oda: ✗ {len(hata)} kaldı")

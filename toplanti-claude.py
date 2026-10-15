@@ -714,10 +714,32 @@ class Kesinlik:
 # 9 Ekim ilk gerçek toplantı: kural 22 olay saydı, çoğu söz kesme değildi — 10'u kısa onay ("Evet", "Tamam", "Hmm"; kesen parça < 2 sn),
 # 9'u doğal söz devri (öbürü cümlesini bitirirken 1–2 sn erken başlama; parça sonları sessizlik payı da taşır). Kesen parça ≥ 2 sn ve
 # üst üste konuşma ≥ 2,5 sn olunca sayılır: aynı veride 3 olay kaldı (ekran yönlendirmesinde gerçek üst üste konuşma).
+# Deneme 9 (13 Ekim, podcast): kural 11 olay saydı, hiçbiri söz kesme değildi. (1) Kullanıcı kayda konuşurken karşı taraf hiç durmadı (kesmeden sonra
+# 28–87 sn sürdü; gerçek toplantıda kesilen 5–9 sn içinde sustu) → kesilenin kesintisiz akışı kesenin parçası bittikten KESME_DEVAM_SN sonra da
+# sürüyorsa yan konuşma sayılır; olay bu yüzden ~25 sn adayda bekler. (2) Uzun konuşmayı Whisper parçalara böler: karşı tarafın yeni
+# parçası, kullanıcı araya girdiyse "karşı taraf kesti" görünüyordu → kesen aynı kanalda kesilenden önce başlayıp kesintisiz (≤ KESME_AKIS_SN ara)
+# konuşuyorsa kesen değildir.
 KESME_PENCERE_SN = 300; KESME_ESIK = 3; KESME_ARALIK_SN = 300; DINLE_ARALIK_SN = 300; KESME_ONAY_SN = 2.0; KESME_UST_SN = 2.5
+KESME_AKIS_SN = 1.5; KESME_DEVAM_SN = 15.0; KESME_BEKLE_SN = 10.0  # parça satırı bitişinde gelir: geç gelen parçayı bekle
 def _kel(t): return set(w for w in re.findall(r"\w+", kucuk(t or "")) if len(w) > 2)
 class Kesme:
-    def __init__(s, ben): s.ben = ben; s.son = {"ben": [], "karsi": []}; s.olay = []; s.bildirim = {}; s.yanki = 0; s.yanki_bildirildi = False
+    def __init__(s, ben): s.ben = ben; s.son = {"ben": [], "karsi": []}; s.olay = []; s.aday = []; s.bildirim = {}; s.yanki = 0; s.yanki_bildirildi = False
+    def _akis(s, x, geri):  # x'in kanalında x'i içeren kesintisiz konuşmanın başı (geri) ya da sonu
+        t = x["t0"] if geri else x["t1"]; ys = [y for y in s.son[kanal_n(x.get("kanal"))] if y is not x]; degisti = True
+        while degisti:
+            degisti = False
+            for y in ys:
+                if geri and y["t0"] < t and y["t1"] >= t - KESME_AKIS_SN: t = y["t0"]; degisti = True
+                if not geri and y["t1"] > t and y["t0"] <= t + KESME_AKIS_SN: t = y["t1"]; degisti = True
+        return t
+    def _karar(s, now, son=False):
+        kalan = []
+        for sonra, ilk in s.aday:
+            if s._akis(ilk, False) >= sonra["t1"] + KESME_DEVAM_SN: continue
+            if son or now >= sonra["t1"] + KESME_DEVAM_SN + KESME_BEKLE_SN: s.olay.append((sonra["t0"], sonra.get("speaker") or "?", ilk.get("speaker") or "?", kanal_n(sonra.get("kanal"))))
+            else: kalan.append((sonra, ilk))
+        s.aday = kalan
+    def kapat(s): s._karar(0, son=True)  # toplantı sonu (karne): bekleyen adaylar
     def besle(s, r):
         k = kanal_n(r.get("kanal"))
         if r.get("src") != "whisper" or k not in s.son or r.get("t0") is None or r.get("t1") is None: return []
@@ -734,10 +756,13 @@ class Kesme:
                                "görünebilir → kullanıcıya bir kez DUR kartı: \"Hoparlör sesi mikrofona giriyor — kulaklık tak ya da sesi kıs\"")
                 continue
             ilk, sonra = (o, r) if o["t0"] <= r["t0"] else (r, o)
-            if sonra["t0"] - ilk["t0"] >= 0.5 and ilk["t1"] - sonra["t0"] >= KESME_UST_SN and sonra["t1"] - sonra["t0"] >= KESME_ONAY_SN:
-                s.olay.append((sonra["t0"], sonra.get("speaker") or "?", ilk.get("speaker") or "?", kanal_n(sonra.get("kanal"))))
+            if sonra["t0"] - ilk["t0"] >= 0.5 and ilk["t1"] - sonra["t0"] >= KESME_UST_SN and sonra["t1"] - sonra["t0"] >= KESME_ONAY_SN \
+                    and s._akis(sonra, True) > ilk["t0"] + 0.5:
+                s.aday.append((sonra, ilk))
         s.son[k] = (s.son[k] + [r])[-12:]
-        now = r["t1"]; s.olay = [x for x in s.olay if now - x[0] <= KESME_PENCERE_SN]
+        return out + s.tik(r["t1"])
+    def tik(s, now):  # adayları onayla + bildir; izle satır gelmese de saatle çağırır (aday ~25 sn bekler)
+        out = []; s._karar(now); s.olay = [x for x in s.olay if now - x[0] <= KESME_PENCERE_SN]
         for kanal in ("ben", "karsi"):
             xs = [x for x in s.olay if x[3] == kanal]
             if len(xs) >= KESME_ESIK and now - s.bildirim.get(kanal, 0) >= KESME_ARALIK_SN:
@@ -1043,6 +1068,10 @@ def izle():
             elif k.get("geri"): acks.append(f"KART ↩ geri geldi (ertelenmişti; artık geçersizse yeni kart yazma, kullanıcı kapatır): {texts.get(k.get('id'), k.get('id'))}")
             elif k.get("status") == "ozetlendi": continue  # sessizin özet kartı kapattı — Claude'un kendi işi
             elif "status" in k: acks.append(f"KART {({'yapildi': '✓ yaptı', 'okundu': '👁 okudu (reddetmedi)', 'gecildi': '✕ gerek yok (bir daha önerme)', 'yenilendi': '↻ yenilendi'}).get(k['status'], k['status'])}: {texts.get(k.get('id'), k.get('id'))}")
+        try:  # söz kesme adayı satır gelmese de saatle onaylanır (Whisper t0/t1 da duvar saati)
+            for x in kesme.tik(time.time()):
+                if time.time() - dinle_son >= DINLE_ARALIK_SN: sesler.append("DİNLE: " + x[7:]); dinle_son = time.time()
+        except Exception: pass
         if acks and not buf_since: buf_since = time.time()  # kart dönüşü acil değil: sıradaki paketle gider
         # kart adayı (soru, sistem adı, rakamlı/kesin iddia) varsa paket hemen gider — iki paket arası en az
         # A.bosluk sn; yoksa A.aralik (45 sn) ya da A.paket satır. Geçmiş 21 toplantı benzetimi: aday satırı → Claude ortanca 14,1 → 2,0 sn
@@ -1930,6 +1959,9 @@ def koc_yaz(md):
         once = list(kz.olay); kz.besle(r)
         for x in kz.olay:
             if x not in once: n_m += x[3] == "ben"; n_k += x[3] != "ben"
+    once = list(kz.olay); kz.kapat()
+    for x in kz.olay:
+        if x not in once: n_m += x[3] == "ben"; n_k += x[3] != "ben"
     print(f"### Konuşma ({ben})")
     print(f"  konuşma payı (kelime): %{round(kel / top * 100)}")
     if hiz: print(f"  konuşma hızı: ortanca {statistics.median(hiz):.0f} kelime/dk (Whisper parçaları, n={len(hiz)})")
