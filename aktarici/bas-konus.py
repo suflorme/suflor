@@ -87,7 +87,7 @@ def konus_onara(soru):
     if not m or len([w for w in m.kelimeler(soru or "") if len(w) > 3 and w not in m.DUR]) < 2: return ""
     try:
         t = time.time(); rows, ek = m.ara(soru, n=ONARA_N, guncel=False); sn = time.time() - t
-    except Exception as e: print(f"KONUŞ: ön arama hatası ({e.__class__.__name__})"); return ""
+    except Exception as e: print(f"KONUŞ: ön arama hatası ({e.__class__.__name__}: {str(e)[:100]})"); return ""
     if not rows: return ""
     sat = [f"[{i}] {tur} · {tarih} · {baslik} · {yol}{(' @' + konum) if konum else ''}{(' · ' + kim) if kim else ''}\n    {m.kesit(metin, soru, ek)}"
            for i, (pid, yol, konum, kim, metin, tur, tarih, baslik, s) in enumerate(rows, 1)]
@@ -307,7 +307,7 @@ def _once_blogu(simdi):  # → (blok, anahtar) — toplantı sürerken yok
 # sesi gönderir (komut parca, 16 kHz int16); biriken kesilmemiş ses ≥ AKIS_EN_AZ_SN ve son AKIS_SESSIZ_SN sessizse o ana kadarki kısım Whisper'a gider
 # (kullanıcı konuşurken). Bırakışta kayıt yine bütün gelir: önek akışla aynıysa yalnız kesilmemiş kuyruk dökülür, parçaların metni sırayla birleşir;
 # değilse (önek tutmaz, akış yok) bütün kayıt eskisi gibi. Aynı akış ileride konuşurken "hı hı"nın (4. adım) zamanlamasına da kaynak.
-AKIS_EN_AZ_SN, AKIS_SESSIZ_SN, AKIS_PENCERE = 1.5, 0.35, 800  # pencere: 50 ms (16 kHz × 2 bayt)
+AKIS_EN_AZ_SN, AKIS_SESSIZ_SN, AKIS_PENCERE = 3.0, 0.35, 800  # 15 Ekim gerçek deneme: 1,5 sn'de 9 küçük parça Whisper'ı geride bıraktı (çağrı başı ~1–2 sn)  # pencere: 50 ms (16 kHz × 2 bayt)
 AKIS = {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "kilit": threading.Lock(), "kosul": threading.Condition()}
 def _akis_sifirla():
     with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None)
@@ -323,10 +323,12 @@ def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesi
     return None
 def _akis_gonder(baslangic, bitis, sira):
     with AKIS["kilit"]: parca = bytes(AKIS["pcm"][baslangic:bitis]); AKIS["bekleyen"] += 1
+    t0 = time.time()
     def geri(metin, hata):
         with AKIS["kosul"]:
             AKIS["metin"][sira] = "" if hata else (metin or ""); AKIS["bekleyen"] -= 1; AKIS["kosul"].notify_all()
-    wh_one_al({"id": f"bas-akis-{int(time.time() * 1000)}-{sira}", "bas": True, "kanal": "bas", "baslik": None, "pcm": parca, "t0": time.time() - len(parca) / 2 / WH_SR,
+        print(f"KONUŞ: akış parçası {sira + 1} döküldü ({(time.time() - t0) * 1000:.0f} ms, {len(parca) / 2 / WH_SR:.1f} sn ses){' — HATA ' + str(hata) if hata else ''}")
+    wh_bas_sira({"id": f"bas-akis-{int(time.time() * 1000)}-{sira}", "bas": True, "kanal": "bas", "baslik": None, "pcm": parca, "t0": time.time() - len(parca) / 2 / WH_SR,
                "t1": time.time(), "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri}); _isci_baslat()
 def konus_parca(p):  # pano/menü: kayıt sürerken yeni ses (base64 16 kHz int16)
     if _KS["tur"] or AYAR.get("konus_akis") is False: return {"ok": True, "atlandi": True}
@@ -411,6 +413,7 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     # v0.45.0 (aktif dinleme araştırması 2. adım): bırakınca ~0,25 sn içinde kısa "Hı hı / Hm" (tepki türü alindi) — cevaba kadarki ~4 sn boşluk
     # sessiz kalmasın. "Yazayım mı?" cevabında ve toplantıda kulaklık yokken çalmaz; ayar konus_alindi: false kapatır. Çaldıysa bekleme cümlesi geç gelir.
     if not sid and AYAR.get("konus_alindi") is not False and (not toplanti_var() or kulaklik()): tur["alindi"] = tepki_cal("alindi")
+    if tur.get("alindi"): print("KONUŞ: bırakınca \"hı hı\" (alındı)")
     def geri(metin, hata):
         tur["t_metin"] = time.time()
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
@@ -492,8 +495,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("bakiyor") or not tur.get("sesli", True): return
         tur["bakiyor"] = True
         import random
-        if random.random() < 0.5 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi ({KONUS_BEKLE_SN:.1f} sn ses yok): düşünme tepki sesi"); return
-        c = bekleme_cumlesi(tur_ad); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi ({KONUS_BEKLE_SN:.1f} sn ses yok): {c}")
+        bek = KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0)
+        if random.random() < 0.5 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): düşünme tepki sesi"); return
+        c = bekleme_cumlesi(tur_ad); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): {c}")
     def bekci(sn):
         t = time.time()
         while time.time() - t < sn:

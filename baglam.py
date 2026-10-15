@@ -269,7 +269,7 @@ def _sozluk_oku():
         for t in json.load(open(SUFLOR_SOZLUK, encoding="utf-8")).get("terimler", []):
             d = str(t.get("dogru") or "").strip()
             if d: grup.setdefault(d, set()).update(norm(x).strip() for x in [d] + list(t.get("yanlis") or []) if norm(x).strip())
-    except (FileNotFoundError, ValueError): pass
+    except (OSError, ValueError): pass
     for d, b in grup.items(): out.append((d, sorted(b, key=len, reverse=True))); gor |= b
     try:
         for i, ln in enumerate(open(os.path.join(PROJE, SOZLUK), encoding="utf-8")):
@@ -279,7 +279,7 @@ def _sozluk_oku():
             bicim = {norm(b).strip() for b in p[0].split("|") if norm(b).strip()} | ({norm(dogru)} if norm(dogru).strip() else set())
             if bicim & gor: continue
             out.append((dogru, sorted(bicim, key=len, reverse=True)))
-    except FileNotFoundError: pass
+    except OSError: pass  # yok ya da izin yok (launchd'deki aktarıcı Masaüstü'ndeki projeyi okuyamaz — Konuş ön araması sözlüksüz sürer)
     return out
 # Türkçe soru, İngilizce döküm — kelime kökü eşleşirse İngilizce kökler de VEYA'lanır
 CEVIRI = {"kontr": "check", "erisi": "acces", "musteri": "custo", "fatur": "invoi", "odeme": "payme",

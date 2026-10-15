@@ -44,6 +44,11 @@ STATE["whisper"] = {"durum": "kapali", "model": None, "kuyruk": 0, "satir": 0, "
 W_LOCK = threading.Lock(); WH_Q = queue.Queue(); ALTYAZI_SON = []  # (epoch, konuşmacı) son 10 dk
 def wh_one_al(is_):  # bas-konuş işi kuyruğun başına (S24): toplantı sonundan kalan parçalar "evet"i bekletmesin
     with WH_Q.not_empty: WH_Q.queue.appendleft(is_); WH_Q.unfinished_tasks += 1; WH_Q.not_empty.notify()
+def wh_bas_sira(is_):  # bas-konuş akış parçası (v0.47.1): kuyruğun başındaki bas-konuş işlerinin ARKASINA — parçalar sırayla (önce gelen önce) dökülür
+    with WH_Q.not_empty:
+        q = WH_Q.queue; i = 0
+        while i < len(q) and q[i].get("bas"): i += 1
+        q.insert(i, is_); WH_Q.unfinished_tasks += 1; WH_Q.not_empty.notify()
 def _rms(b):
     if audioop: return audioop.rms(b, 2)
     import array; a = array.array("h"); a.frombytes(b); return int((sum(x * x for x in a) / max(1, len(a))) ** 0.5)
