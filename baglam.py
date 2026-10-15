@@ -321,14 +321,15 @@ def konusmacilar(c):
         if kelimeler(en) and kelimeler(en)[0] != kok[0]: TAKMA[kok[0]] = kelimeler(en)[0]; ad.add(kok[0])
     _ADLAR.update(ad); return ad
 TAKMA = {}
-def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2):
-    c = baglan(); guncelle(c)
+def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2, guncel=True):  # guncel=False: dizini güncellemeden (Konuş ön araması, ~0,1 sn)
+    c = baglan()
+    if guncel: guncelle(c)
     if not kim:
         # "Ayşe yedekler için ne demişti?" → önce Ayşe'nin konuştuğu parçalar, sonra genel sonuçlar
         adlar = konusmacilar(c); bulunan = [w for w in kelimeler(q) if w in adlar]
         if bulunan:
             kalan = " ".join(w for w in kelimeler(q) if w not in bulunan)
-            once, ek = ara(kalan, bulunan[0], turler, son, max(2, n // 2), dosya_basina) if kalan.strip() else ([], [])
+            once, ek = ara(kalan, bulunan[0], turler, son, max(2, n // 2), dosya_basina, guncel=False) if kalan.strip() else ([], [])
             genel, ek2 = ara_ic(c, q, None, turler, son, n, dosya_basina)
             gor = {r[0] for r in once}
             return (once + [r for r in genel if r[0] not in gor])[:n], ek or ek2

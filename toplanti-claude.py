@@ -996,7 +996,8 @@ def izle():
                 for r in old[-6:]: emit(satir(r))
             if t_tail:
                 for r in t_tail.new():
-                    if "note" in r: emit(f"NOT ({BEN}): {r['note']}")
+                    if "note" in r and r.get("kaynak") == "suflor": emit(f"SUFLOR SÖYLEDİ ({BEN}'in kısayoluyla toplantıya, onun kanalından okundu — not değil, iş değil): {r['note']}")
+                    elif "note" in r: emit(f"NOT ({BEN}): {r['note']}")
                     elif "kanit" in r and r.get("kaynak") == "oto":  # ekran paylaşımı kaydı: tek tek değil, ilkinde bir kez
                         if oto_bildirilen != cur:
                             oto_bildirilen = cur
@@ -1668,7 +1669,7 @@ def dokum_satirlari(md):
         b = an(r)
         if b is None: continue
         if "kanit" in r: out.append({"t": b, "isaret": f"📷 Kanıt {r.get('n', '?')}" + (f" — {r['not']}" if r.get("not") and not str(r["not"]).startswith("ses:") else "")})
-        else: out.append({"t": b, "isaret": "📝 " + str(r.get("note") or "").strip()[:300]})
+        else: out.append({"t": b, "isaret": ("🔊 Suflor söyledi: " if r.get("kaynak") == "suflor" else "📝 ") + str(r.get("note") or "").strip()[:300]})
     out.sort(key=lambda x: x["t"])
     for k, x in enumerate(out):  # bitiş: Whisper'ın t1'i, yoksa sonraki satır (en çok 8 sn) ya da kelime başına ~0,4 sn
         if "metin" in x and not x.get("t1"):

@@ -38,7 +38,12 @@ try:
     ayg = [l.split()[0] for l in subprocess.run(["/usr/bin/say", "-a", "?"], capture_output=True, text=True).stdout.splitlines() if l.strip() and not any(s in l for s in ("Hoparlör", "Speaker", "Kulaklık", "Headphone", "AirPods"))]
     if ayg:
         p = calistir({"toplantiya_ses": True}, {"SUFLOR_TEST_TS_AYGIT": ayg[0]})
+        k = open(os.path.join(T, "canli", "kart-anahtari.txt")).read().strip()
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ingest", data=json.dumps({"meeting": {"title": "Deneme TS"}, "source": "transcript", "entries": [{"id": "a/1", "speaker": "Ayla Ö", "time": "10:00", "text": "Bütçe ne durumda?"}]}).encode(), headers={"X-Suflor-Anahtar": k}), timeout=5)
         a = soyle("Bu uzun bir deneme cümlesidir, birkaç saniye sürsün diye biraz daha uzatıyorum ve devam ediyorum."); time.sleep(1); b = soyle("x")
+        md = [f for f in os.listdir(os.path.join(T, "canli")) if f.endswith(".md") and "Deneme-TS" in f]
+        mt = open(os.path.join(T, "canli", md[0])).read() if md else ""; jt = open(os.path.join(T, "canli", md[0][:-3] + ".jsonl")).read() if md else ""
+        bak("dökümde ayrı etiket (🔊 SUFLOR, kullanıcı notu değil), .jsonl'de kaynak: suflor", any("**🔊 SUFLOR** |" in l and "Bu uzun bir deneme" in l for l in mt.splitlines()) and "NOTU" not in mt and '"kaynak": "suflor"' in jt)
         bak(f"gerçek say (aygıt {ayg[0]}) başladı, ikinci basış susturdu: {b!r}", a.startswith("⌨ 🔊") and "sustu" in b)
         p.terminate(); p.wait(5)
     else: print("(gerçek say denemesi atlandı: hoparlör dışı çıkış aygıtı yok)")

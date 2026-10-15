@@ -4,7 +4,8 @@
 # Mac sesiyle BlackHole'a okur — Core Audio iki akışı aygıtta karıştırır, karşı taraf kullanıcının kanalından duyar. Aynı anda kulaklığa da
 # okunur (kullanıcı ne söylendiğini duysun); kulaklık yoksa yerelde okunmaz (hoparlör → mikrofon → toplantıya ikinci kez giderdi).
 # Toplantıdaki ilk okumada Suflor kendini tanıtır. Teams'te sessizdeyse karşı taraf duymaz (Teams BlackHole girişini de keser). Okurken yeniden
-# basmak susturur. Okunan metin dökümde not olarak kalır ("🔊 Suflor toplantıya söyledi: …").
+# basmak susturur. Okunan metin dökümde ayrı etiketle kalır (| saat | **🔊 SUFLOR** | metin | 🔊 |; .jsonl'de note + kaynak: suflor) — defter
+# ve toplantı oturumu bunu kullanıcının notu saymaz.
 TS = {"p": [], "tanitti": None, "son": None}; TS_KILIT = threading.Lock()
 TS_TANITIM = {"tr": "Merhaba, ben {ad} adına konuşan yapay zekâ asistanı Suflor.", "en": "Hello, I'm Suflor, an AI assistant speaking for {ad}."}
 def ts_aygit():  # say -a ? listesinde BlackHole çıkış aygıtının kimliği (yoksa None)
@@ -42,7 +43,7 @@ def toplantiya_soyle(metin=None):
     with TS_KILIT: TS["p"] = ps
     TS["son"] = m
     if STATE.get("meeting"):  # toplantı dosyası yoksa (deneme, toplantı dışı) not yazılmaz — yeni dosya açmasın
-        try: note({"meeting": {"title": STATE["meeting"]}, "text": "🔊 Suflor toplantıya söyledi: " + m, "at": datetime.datetime.now().isoformat(timespec="seconds")})
+        try: note({"meeting": {"title": STATE["meeting"]}, "text": m, "kaynak": "suflor", "at": datetime.datetime.now().isoformat(timespec="seconds")})
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")
     print(f"TOPLANTIYA SÖYLE: {len(m)} karakter · aygıt {aygit}{' · kulaklıkta da' if len(ps) > 1 else ' · kulaklık yok, yerelde okunmadı'}")
     return {"ok": True, "metin": "🔊 " + m[:120]}
