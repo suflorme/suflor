@@ -115,10 +115,14 @@ def ses_durdur():
 # Sabit sözlük aktarici/telaffuz-sozluk.json (açık depoda: genel İngilizce iş/teknoloji sözcükleri, küresel ürün adları, kısaltmalar; 13 Ekim
 # gerçek dökümlerden genişletildi, Piper + Whisper ile doğrulandı). Piper her harfi Türkçe okur ("Teams" → te-ams): uzun ünlü tek harfle (Tims, Zum;
 # çift harf iki hece okunur), kısaltma söylendiği gibi (ki pi ay). Kuruma özgü adlar buraya değil canli/telaffuz.json'a.
+# v0.48.1 aktarici/telaffuz-uzun.json: ünsüzü yumuşamış uzun ünlülü biçimler şapkayla (sahibini → sâhibini; TDK söyleniş + Elif ölçümü, ~1.650 biçim).
 def _telaffuz_sozluk():
-    yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "telaffuz-sozluk.json")
-    try: return {str(k): str(v) for k, v in json.load(open(yol, encoding="utf-8")).items() if str(k).strip() and str(v).strip()}
-    except (OSError, ValueError, AttributeError): print("SES: telaffuz-sozluk.json okunamadı"); return {}
+    d = {}
+    for ad in ("telaffuz-uzun.json", "telaffuz-sozluk.json"):  # sonraki öne geçer
+        yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", ad)
+        try: d.update({str(k): str(v) for k, v in json.load(open(yol, encoding="utf-8")).items() if str(k).strip() and str(v).strip() and not str(k).startswith("_")})
+        except (OSError, ValueError, AttributeError): print(f"SES: {ad} okunamadı")
+    return d
 TELAFFUZ = _telaffuz_sozluk()
 def _telaffuz_mac():  # Mac sesinin kendisi doğru okuduğu sözcükler (aktarici/telaffuz-mac.json; v0.39.2 dinleme testi)
     yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "telaffuz-mac.json")
