@@ -155,6 +155,25 @@ def telaffuz(metin, mac=False):  # mac: Mac sesiyle okunacak — TELAFFUZ_MAC'te
         if mac and w.lower() in TELAFFUZ_MAC and w.lower() not in _TEL.get("ek", ()): return w
         return _tel_harf(w, _TEL["esle"].get(w.lower(), w))
     return _TEL["re"].sub(deg, metin)
+# Doğal okuma düzeni (v0.41.0; araştırma testler/arastirma-dogal-ses-20261015, 15 Ekim kullanıcı dinlemesi). Mac sesinde (Elif nöral) yalnız perde
+# ([[pbas]]), sessizlik ([[slnc]]) ve yavaşlatma çalışıyor; vurgu ve duygu tonu yok. Dinlemede iyi: "Hm." + 0,3 sn sessizlik, "Şey," + 0,25 sn,
+# cümle başı ünlemde ("Vay!", "Aa!", "Harika!") yalnız o sözcükte perde +6, "mi?" ile soru. Kötü: "Ee/eee/ıı" her biçimde, "Hmm" (harf harf okunur),
+# "Hım" + perde. Metindeki [[…]] komutları silinir (Claude'un metni komut taşımasın; [[inpt PHON]] metni sesli okutuyordu); komutu yalnız bu
+# işlev koyar ve yalnız Mac sesinde (Piper komut bilmez).
+_SD_DOLGU = re.compile(r"(?<![\w])(?:[Ee]{2,}|[Iı]{2,}|[Iİi]{3,}|Mm+|mm+)(?![\w])[,.…!?]*\s*")
+_SD_HM = re.compile(r"(?<![\w])(?:[Hh](?:ı?m{2,}|ım+)|[Hh]m)(?![\w])[,.…]*\s*")
+_SD_SEY = re.compile(r"(?<![\w])(Şey|şey),\s*")
+_SD_UNLEM = re.compile(r"^(\s*)(Vay be|Vay|Aa+|Oo+|Harika|Süper|Muhteşem|Hay Allah)!\s*")
+def ses_duzen(metin, mac=True):
+    if not metin: return metin
+    m = re.sub(r"\[\[[^\]]*\]\]", " ", metin)
+    m = _SD_DOLGU.sub("", m)
+    m = _SD_HM.sub("Hm. [[slnc 300]] " if mac else "Hm, ", m)
+    if mac:
+        m = _SD_SEY.sub(lambda x: x.group(1) + ", [[slnc 250]] ", m)
+        m = _SD_UNLEM.sub(lambda x: f"{x.group(1)}[[pbas +6]] {x.group(2)}! [[pbas -6]] [[slnc 150]] ", m)
+    m = re.sub(r"\s{2,}", " ", m).strip()
+    return m[:1].upper() + m[1:] if m and metin.strip()[:1].isupper() else m
 # Okunan metinde görülen bilinmeyen yabancı sözcükler (v0.32.1; Piper her harfi Türkçe okur): Türkçe harfi olmayan ve yabancı yazım izi
 # taşıyan (q/w/x, th/sh/ch/ee/oo/ea/ou…, ünsüz+y sonu, ünsüzler arası y), büyük harfli kısaltma (2–5) ya da cümle ortasında büyük harfle başlayan sözcük
 # kuyruğa girer; _telaffuz_dongu bunları toplu Claude'a sorar → telaffuz-oto.json (ilk okumada eski hali, sonrakilerde doğru okunur).
@@ -276,7 +295,7 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
     return _SES_SEC["v"]
 def seslendir(metin, kuyruk=False):
     if not AYAR.get("konusma", True) or not metin: return False
-    metin = telaffuz(metin, mac=not piper_acik())
+    mac = not piper_acik(); metin = ses_duzen(telaffuz(metin, mac=mac), mac)
     if not kuyruk: ses_durdur()
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): {len(metin)} karakter · {metin}"); return True
     with SES_K:
@@ -350,7 +369,7 @@ def fisilti_kart(c):
         t_oku = time.time()
         if not piper_oku(telaffuz(metin), piper_hiz(kisa=True)):
             v = ses_secimi()
-            try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [telaffuz(metin, mac=True)], timeout=10)
+            try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [ses_duzen(telaffuz(metin, mac=True))], timeout=10)
             except (OSError, subprocess.TimeoutExpired): pass
         kendi_ses_kaydet(metin, t_oku, time.time())
         print(f"FISILTI: {metin}")

@@ -32,7 +32,7 @@ def toplantiya_soyle(metin=None):
     toplanti = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
     if TS["tanitti"] != toplanti:
         TS["tanitti"] = toplanti; m = TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı") + " " + m
-    v = ses_secimi(); okunan = telaffuz(m, mac=True); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
+    v = ses_secimi(); okunan = ses_duzen(telaffuz(m, mac=True)); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"TOPLANTIYA SÖYLE (deneme): aygıt {aygit} · {okunan}"); TS["son"] = m; return {"ok": True, "metin": "🔊 " + m}
     ses_durdur()  # kulaklıkta okunan bir şey varsa karışmasın
     ps = []
