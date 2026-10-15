@@ -346,9 +346,62 @@ def konus_parca(p):  # pano/menü: kayıt sürerken yeni ses (base64 16 kHz int1
 # kulaklıkta (hoparlörden mikrofona girer) ve toplantı dışında (toplantıya giden onay aldatıcı, dökümü kirletir). Bas-tut: tuş basılıyken tur sürüyor →
 # duraksama tur sonu değil, cevap bekleyen ana girilmez. Kural: kayıt ≥ HIHI_ILK_SN, son onaydan ≥ HIHI_ARA_SN, yeni başlamış duraksama
 # (HIHI_DURAK_SN aralığında) ve öncesinde ≥ 1,5 sn konuşma, olasılık HIHI_OLASILIK; tepki türü alindi ("Hı hı", "Hm", "Hıı"), kısık (HIHI_SES), sırasız.
-HIHI_ILK_SN, HIHI_ARA_SN, HIHI_DURAK_SN, HIHI_OLASILIK, HIHI_SES = 6.0, 12.0, (0.35, 0.9), 0.5, 0.6
+# v0.48.0 tur sonu kapısı: kural duraksamayı bulunca son ≤ 8 sn ses smart-turn v3 işçisine (tur-isci.py) gider; "cümle bitti" olasılığı
+# HIHI_TUR_ESIK'in altındaysa (cümle ortası, "şey…" duraksaması) çalmaz. Türkçe iki kayıtta doğru anda çalma %47–58 → %71–74, iyi anların ~%30'unda
+# susar (testler/smart-turn-20261016.md). Karar ~60 ms; sonra konuşma yeniden başladıysa çalmaz. İşçi/model yoksa yalnız kural (eski davranış).
+# Ayar hihi_tur_esik (0 kapatır). Ortam ortak klasörde: smart-turn-venv (onnxruntime + numpy), ses-modeller/smart-turn/*.onnx.
+HIHI_ILK_SN, HIHI_ARA_SN, HIHI_DURAK_SN, HIHI_OLASILIK, HIHI_SES, HIHI_TUR_ESIK = 6.0, 12.0, (0.35, 0.9), 0.5, 0.6, 0.95
+TUR_PY = os.environ.get("SUFLOR_TUR_PY") or os.path.join(_ORT, "smart-turn-venv", "bin", "python")
+TUR_MODEL = os.environ.get("SUFLOR_TUR_MODEL") or next(iter(sorted(glob.glob(os.path.join(_ORT, "ses-modeller", "smart-turn", "smart-turn-v3*.onnx")))), "")
+TUR_ISCI = _ilk(os.path.join(_UYG, "tur-isci.py"), os.path.join(_APP, "tur-isci.py"))
+TUR = {"p": None, "durum": None, "kilit": threading.Lock(), "bek": {}, "n": 0, "baslat_t": 0.0}
+def _tur_okuyucu(p):
+    for sat in p.stdout:
+        try: o = json.loads(sat)
+        except ValueError: continue
+        if o.get("hazir"): TUR["durum"] = "hazir"; print("KONUŞ: tur sonu modeli hazır"); continue
+        if "hata" in o and o.get("id") is None: TUR["durum"] = "hata"; print(f"KONUŞ: tur sonu modeli açılamadı ({o['hata'][:120]}) — yalnız kural"); continue
+        q = TUR["bek"].pop(o.get("id"), None)
+        if q: q.put(o)
+    if TUR["p"] is p: TUR.update(p=None, durum="hata" if TUR["durum"] != "yok" else "yok")
+def tur_baslat():
+    with TUR["kilit"]:
+        p = TUR["p"]
+        if p and p.poll() is None: return True
+        if TUR["durum"] == "yok" or (TUR["durum"] == "hata" and time.time() - TUR["baslat_t"] < 60): return False
+        eksik = next((y for y in (TUR_PY, TUR_MODEL, TUR_ISCI) if not y or not os.path.exists(y)), None)
+        if eksik is not None:
+            TUR["durum"] = "yok"; print(f"KONUŞ: tur sonu modeli yok ({os.path.basename(eksik) or 'model'}) — yalnız kural"); return False
+        TUR.update(baslat_t=time.time(), durum="yukleniyor")
+        try: p = subprocess.Popen([TUR_PY, "-I", "-B", TUR_ISCI, TUR_MODEL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
+        except OSError as e: TUR["durum"] = "hata"; print(f"KONUŞ: tur sonu modeli başlatılamadı ({e.__class__.__name__})"); return False
+        TUR["p"] = p; threading.Thread(target=_tur_okuyucu, args=(p,), daemon=True).start(); return True
+def tur_olasilik(pcm, zaman=0.4):  # son ≤ 8 sn int16 → "cümle bitti" olasılığı; işçi hazır değilse/geç kalırsa None
+    if TUR["durum"] != "hazir" or not TUR["p"]: return None
+    q = queue.Queue()
+    with TUR["kilit"]:
+        TUR["n"] += 1; i = TUR["n"]; TUR["bek"][i] = q
+        try: TUR["p"].stdin.write(json.dumps({"id": i, "pcm": base64.b64encode(bytes(pcm[-8 * WH_SR * 2:])).decode()}) + "\n"); TUR["p"].stdin.flush()
+        except (OSError, ValueError): TUR["bek"].pop(i, None); return None
+    try: o = q.get(timeout=zaman)
+    except queue.Empty: TUR["bek"].pop(i, None); print("KONUŞ: tur sonu modeli geç kaldı"); return None
+    return o.get("p")
+def _hihi_kapi(son8, uzunluk, n, sessiz, esik):  # uzunluk: karar anında kaydın boyu — sonrası "konuşmacı devam etti mi" denetimi
+    try:
+        e = float(AYAR.get("hihi_tur_esik", HIHI_TUR_ESIK))
+        p = tur_olasilik(son8) if e > 0 else None
+        if p is not None and p < e: print(f"KONUŞ: aktif dinleme — sustu, tur sonu modeli {p:.2f} < {e:.2f} ({n:.0f}. sn, cümle ortası)"); return
+        with AKIS["kilit"]: yeni = bytes(AKIS["pcm"][uzunluk:])
+        if any(_rms(yeni[i:i + AKIS_PENCERE]) >= esik for i in range(0, len(yeni) - AKIS_PENCERE + 1, AKIS_PENCERE)):
+            print(f"KONUŞ: aktif dinleme — sustu, konuşma yeniden başladı ({n:.0f}. sn)"); return  # geç kalan onay lafın üstüne binmez
+        if tepki_cal("alindi", hemen=True, ses=HIHI_SES):
+            with AKIS["kilit"]: AKIS["hihi_t"] = time.time()
+            print(f"KONUŞ: aktif dinleme — \"hı hı\" ({n:.0f}. sn, {sessiz:.2f} sn duraksama{'' if p is None else f', tur sonu {p:.2f}'})")
+    finally: AKIS["hihi_kapi"] = False
 def _hihi_bak():
     if AYAR.get("konus_hihi") is not True or _KS["tur"]: return
+    if TUR["p"] is None and TUR["durum"] in (None, "hata") and float(AYAR.get("hihi_tur_esik", HIHI_TUR_ESIK)) > 0: threading.Thread(target=tur_baslat, daemon=True).start()
+    if AKIS.get("hihi_kapi"): return
     with AKIS["kilit"]:
         b = AKIS["pcm"]; n = len(b) / 2 / WH_SR
         if n < HIHI_ILK_SN or time.time() - AKIS.get("hihi_t", 0) < HIHI_ARA_SN: return
@@ -362,13 +415,11 @@ def _hihi_bak():
         durak_bas = len(b) - k * AKIS_PENCERE
         if not (HIHI_DURAK_SN[0] <= sessiz <= HIHI_DURAK_SN[1]) or len(once) < 20 or sum(x >= esik for x in once) < len(once) * 0.6: return
         if AKIS.get("hihi_durak") == durak_bas: return  # aynı duraksama bir kez değerlendirilir
-        AKIS["hihi_durak"] = durak_bas
+        AKIS["hihi_durak"] = durak_bas; son8 = bytes(b[-8 * WH_SR * 2:]); uzunluk = len(b)
     import random
     if random.random() >= (1.0 if os.environ.get("SUFLOR_TEST_HIHI_KESIN") else HIHI_OLASILIK): return
     if toplanti_var() or not kulaklik(): return
-    if tepki_cal("alindi", hemen=True, ses=HIHI_SES):
-        with AKIS["kilit"]: AKIS["hihi_t"] = time.time()
-        print(f"KONUŞ: aktif dinleme — \"hı hı\" ({n:.0f}. sn, {sessiz:.2f} sn duraksama)")
+    AKIS["hihi_kapi"] = True; threading.Thread(target=_hihi_kapi, args=(son8, uzunluk, n, sessiz, esik), daemon=True).start()
 def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen parçalar → geri(metin, hata); tutmazsa False
     with AKIS["kilit"]: kesik, sira = AKIS["kesik"], AKIS["sira"]; tutar = kesik > 0 and len(pcm) >= kesik and bytes(AKIS["pcm"][:kesik]) == pcm[:kesik]
     if not tutar: return False

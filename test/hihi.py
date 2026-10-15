@@ -3,7 +3,9 @@
 # duraksamada (0,35–0,9 sn) kısık "alındı" klibi; ilk 6 sn'de ve son onaydan 12 sn içinde yok; ayar kapalıyken, kulaklık yokken ve toplantıda hiç yok.
 # Ses: say (Yelda) cümleleri + aralarına sessizlik; 0,5 sn'lik parçalar gerçek zamanlı gönderilir. Olasılık testte 1 (HIHI_OLASILIK yerine ayar yok:
 # SUFLOR_TEST_HIHI_KESIN=1). Gerçek Whisper gerekmez (akış parçaları kuyruğa düşer; işçi yoksa sonuç beklenmez).
-#   PYTHONDONTWRITEBYTECODE=1 python3 test/hihi.py     (~1 dk)
+# v0.48.0 tur sonu kapısı (tur-isci.py, smart-turn v3): işçi yokken eski kural; sahte işçi hep "cümle ortası" derse hiç çalmaz; gerçek model
+# (ortak klasörde smart-turn-venv + model varsa) "…geçtik ve" duraksamasında susar, cümle sonunda çalar; işçinin numpy log-mel'i transformers'la aynı.
+#   PYTHONDONTWRITEBYTECODE=1 python3 test/hihi.py     (~2 dk)
 import os, sys, json, time, wave, base64, shutil, tempfile, subprocess, urllib.request
 K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-hihi-"); PORT = 8795; hata = []
 def bak(ad, kosul): print(("✓ " if kosul else "✗ ") + ad); hata.extend([] if kosul else [ad])
@@ -42,6 +44,7 @@ try:
              ("Ayrıca yeni bir test ortamı kurulması da gündeme geldi.", 0.6), ("Bu konuda ne yapmamızı önerirsin?", 0.4)])
     print(f"   ses {len(b) / 32000:.1f} sn")
     p, k = calistir({"konus_hihi": True}, {"SUFLOR_TEST_KULAKLIK": "1"}); gonder(k, b); time.sleep(0.5); p.terminate(); p.wait(5)
+    bak("tur sonu işçisi yok → yalnız kural", "tur sonu modeli yok" in log())
     ls = [l for l in log().splitlines() if "aktif dinleme" in l]
     for l in ls: print("   " + l[20:])
     sn = [float(l.split("— \"hı hı\" (")[1].split(".")[0]) for l in ls]
@@ -53,6 +56,33 @@ try:
         p, k = calistir(ayar, env); gonder(k, b, top); time.sleep(0.3); p.terminate(); p.wait(5)
         bak(f"{ad} → 'hı hı' yok", "aktif dinleme" not in log())
     bak("günlükte hata yok", "Traceback" not in log())
+    # sahte tur sonu işçisi: her duraksamaya 0,10 → hiç çalmaz, her karar günlükte
+    open(os.path.join(T, "tur-isci.py"), "w").write('import sys, json\nprint(json.dumps({"hazir": True}), flush=True)\n'
+        'for s in sys.stdin: print(json.dumps({"id": json.loads(s)["id"], "p": 0.1, "ms": 1}), flush=True)\n')
+    p, k = calistir({"konus_hihi": True}, {"SUFLOR_TEST_KULAKLIK": "1", "SUFLOR_TUR_PY": sys.executable, "SUFLOR_TUR_MODEL": os.path.join(T, "relay.py")})
+    gonder(k, b); time.sleep(0.5); p.terminate(); p.wait(5)
+    bak("sahte işçi 'cümle ortası' → 'hı hı' yok, kararlar günlükte", "tur sonu modeli hazır" in log() and "\"hı hı\"" not in log() and log().count("tur sonu modeli 0.10 <") >= 2)
+    os.remove(os.path.join(T, "tur-isci.py"))
+    tpy = "/Users/Shared/Suflor/smart-turn-venv/bin/python"; tmod = sorted(__import__("glob").glob("/Users/Shared/Suflor/ses-modeller/smart-turn/smart-turn-v3*.onnx"))
+    if os.path.exists(tpy) and tmod:
+        shutil.copy(os.path.join(K, "tur-isci.py"), T)
+        b2 = ses([("Geçen hafta ekip toplantısında bütçe konusunu uzun uzun konuştuk.", 0.0), ("Sonra yedekleme konusuna geçtik ve", 0.6),
+                  ("herkes görüş bildirdi, özellikle gece yedeklerinin zamanlaması tartışıldı.", 0.6), ("En sonunda cuma gününe kadar plan hazırlamaya karar verdik.", 0.6)])
+        p, k = calistir({"konus_hihi": True}, {"SUFLOR_TEST_KULAKLIK": "1"}); gonder(k, b2); time.sleep(0.5); p.terminate(); p.wait(5)
+        ls = [l for l in log().splitlines() if "aktif dinleme" in l]
+        for l in ls: print("   " + l[20:])
+        bak("gerçek model hazır", "tur sonu modeli hazır" in log())
+        bak("'…geçtik ve' duraksamasında sustu", bool(ls) and "sustu, tur sonu modeli" in ls[0])
+        bak("cümle sonunda çaldı (tur sonu olasılığıyla)", any("\"hı hı\"" in l and "tur sonu 0." in l for l in ls))
+        kod = ("import sys, importlib.util, numpy as np\nsp = importlib.util.spec_from_file_location('t', sys.argv[1]); t = importlib.util.module_from_spec(sp); sp.loader.exec_module(t)\n"
+               "from transformers import WhisperFeatureExtractor\nfe = WhisperFeatureExtractor(chunk_length=8); r = np.random.RandomState(1)\n"
+               "for n in (16000 * 3, 16000 * 11):\n a = (r.randn(n) * 0.1).astype(np.float32); b = np.pad(a[-128000:], (max(0, 128000 - n), 0))\n"
+               " f = fe(b, sampling_rate=16000, return_tensors='np', padding='max_length', max_length=128000, truncation=True, do_normalize=True).input_features\n"
+               " print(float(np.abs(f - t.ozellik(a)).max()))\n")
+        r = subprocess.run([tpy, "-I", "-c", kod, os.path.join(K, "tur-isci.py")], capture_output=True, text=True)
+        if "No module named 'transformers'" in r.stderr: print("   (transformers yok — log-mel karşılaştırması atlandı)")
+        else: bak(f"log-mel transformers'la aynı ({r.stdout.split()})", r.returncode == 0 and all(float(x) < 1e-4 for x in r.stdout.split()))
+    else: print("   (smart-turn-venv ya da model yok — gerçek model denemesi atlandı)")
 finally:
     subprocess.run(["pkill", "-f", f"relay.py --dir {T}"])
     if not hata: shutil.rmtree(T, ignore_errors=True)
