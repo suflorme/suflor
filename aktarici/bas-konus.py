@@ -101,6 +101,7 @@ if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_onara_gunc
 KONUS_BEKLE_SN = float(AYAR.get("konus_bekle_sn", 1.5)); KONUS_BEKLE_ALINDI_EK_SN = 2.0  # bırakınca "Hı hı" çaldıysa bekleme cümlesi 3,5 sn'de
 BEKLE_GENEL = {"tr": ["Hm, bir bakayım.", "Bir saniye.", "Bakıyorum.", "Şey, hemen bakıyorum.", "Hm, kontrol ediyorum."],
                "en": ["Hm, let me see.", "One second.", "Let me check.", "Checking now."]}
+BEKLE_SEY = ["Şey...", "Şey, bir bakayım.", "Şey... şöyle söyleyeyim.", "Hm. Şey..."]  # v0.49.1: Türkçede vakit kazanma (16 Ekim dinleme: dördü de doğal)
 BEKLE_TUR = {"gorusme": "Görüşme kayıtlarına bakıyorum.", "toplanti": "Toplantı notlarına bakıyorum.", "defter": "Toplantı notlarına bakıyorum.",
              "belge": "Belgelere bakıyorum.", "tablo": "Tablolara bakıyorum.", "analiz": "Analizlere bakıyorum.", "sunum": "Sunumlara bakıyorum."}
 _BEKLE = {"son": None}
@@ -548,8 +549,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["bakiyor"] = True
         import random
         bek = KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0)
-        if random.random() < 0.5 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): düşünme tepki sesi"); return
-        c = bekleme_cumlesi(tur_ad); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): {c}")
+        z = random.random()
+        if z < 1 / 3 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): düşünme tepki sesi"); return
+        c = random.choice(BEKLE_SEY) if z < 2 / 3 and ARAYUZ_DILI == "tr" else bekleme_cumlesi(tur_ad); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): {c}")
     def bekci(sn):
         t = time.time()
         while time.time() - t < sn:

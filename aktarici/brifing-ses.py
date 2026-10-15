@@ -166,7 +166,7 @@ def telaffuz(metin, mac=False):  # mac: Mac sesiyle okunacak — TELAFFUZ_MAC'te
 # işlev koyar ve yalnız Mac sesinde (Piper komut bilmez).
 _SD_DOLGU = re.compile(r"(?<![\w])(?:[Ee]{2,}|[Iı]{2,}|[Iİi]{3,}|Mm+|mm+)(?![\w])[,.…!?]*\s*")
 _SD_HM = re.compile(r"(?<![\w])(?:[Hh](?:ı?m{2,}|ım+)|[Hh]m)(?![\w])[,.…]*\s*")
-_SD_SEY = re.compile(r"(?<![\w])(Şey|şey),\s*")
+_SD_SEY = re.compile(r"(?<![\w])(Şey|şey)(,|\.{2,}|…)\s*")  # v0.49.1: "Şey" yavaş (16 Ekim dinleme: e hafif uzun daha doğal; rate 120, sonra rset)
 _SD_UNLEM = re.compile(r"^(\s*)(Vay be|Vay|Aa+|Oo+|Harika|Süper|Muhteşem|Hay Allah)!\s*")
 def ses_duzen(metin, mac=True):
     if not metin: return metin
@@ -174,7 +174,7 @@ def ses_duzen(metin, mac=True):
     m = _SD_DOLGU.sub("", m)
     m = _SD_HM.sub("Hm. [[slnc 300]] " if mac else "Hm, ", m)
     if mac:
-        m = _SD_SEY.sub(lambda x: x.group(1) + ", [[slnc 250]] ", m)
+        m = _SD_SEY.sub(lambda x: f"[[rate 120]] {x.group(1)} [[rset 0]]" + (", [[slnc 250]] " if x.group(2) == "," else "... [[slnc 300]] "), m)
         m = _SD_UNLEM.sub(lambda x: f"{x.group(1)}[[pbas +6]] {x.group(2)}! [[pbas -6]] [[slnc 150]] ", m)
     m = re.sub(r"\s{2,}", " ", m).strip()
     return m[:1].upper() + m[1:] if m and metin.strip()[:1].isupper() else m
