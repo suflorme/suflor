@@ -83,12 +83,13 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!
     var durum: Durum = .bekliyor; var imza = ""; var gorulenKart = Set<String>(); var acikKart = Set<String>()
     var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?
-    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""
+    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var ortakMik: OrtakMik?
     func applicationDidFinishLaunching(_ n: Notification) {
         oge = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
         oge.button?.target = self; oge.button?.action = #selector(tiklandi(_:)); oge.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         panelKur(); yoklamaDongusu(); sicakTusKur()
+        if args.contains("--ortak-mik") { let o = OrtakMik(); ortakMik = o; o.dongu() }  // toplantıya sesli söyle (v0.38.0)
         // bildirimler bu uygulamadan (v0.31.3): tıklayınca özet açılır — osascript bildirimi Betik Düzenleyici'yi açıyordu
         let nc = UNUserNotificationCenter.current(); nc.delegate = self
         nc.requestAuthorization(options: [.alert, .sound]) { izin, _ in bildirimIzni = izin; if !izin { print("BİLDİRİM: izin yok (Sistem Ayarları → Bildirimler → Suflor Menü)") } }
@@ -147,7 +148,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         m.addItem(withTitle: "Paneli yenile", action: #selector(panelYenile), keyEquivalent: "").target = self
         if panel.isVisible { m.addItem(withTitle: "Paneli kapat (Esc)", action: #selector(panelKapat), keyEquivalent: "").target = self }
         m.addItem(.separator())
-        for t in ["Bas-konuş: Option + Shift + Boşluk basılı tut", "Kanıt: Option + Shift + K", "Ne diyeyim?: Option + Shift + O", "Sessiz (10 dk kart yok): Option + Shift + M"] {
+        for t in ["Bas-konuş: Option + Shift + Boşluk basılı tut", "Kanıt: Option + Shift + K", "Ne diyeyim?: Option + Shift + O", "Sessiz (10 dk kart yok): Option + Shift + M"] + (args.contains("--ortak-mik") ? ["Toplantıya söyle: Option + Shift + S"] : []) {
             let b = m.addItem(withTitle: t, action: nil, keyEquivalent: ""); b.isEnabled = false
         }
         m.addItem(.separator())
@@ -216,6 +217,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             case 2: if basildi { u.kisayol("kanit") }
             case 3: if basildi { u.kisayol("ozet") }
             case 4: if basildi { u.kisayol("sessiz") }
+            case 5: if basildi { u.kisayol("soyle") }
             default: break
             }
             return noErr
@@ -226,17 +228,20 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         // v0.31.0: eklentinin kısayolları Mac genelinde (masaüstü Teams/Zoom'da da). Chrome'daki aynı kısayolu bu uygulama yakalar; iş aynı kalır:
         // kanıt isteği aktarıcıya gider, tarayıcıdaki toplantıda eklenti, masaüstünde bu uygulama çeker. Ayar `kisayollar: false` kapatır.
         if !args.contains("--kisayol-kapali") {
-            for (i, tus) in [(UInt32(2), kVK_ANSI_K), (3, kVK_ANSI_O), (4, kVK_ANSI_M)] {
+            for (i, tus) in [(UInt32(2), kVK_ANSI_K), (UInt32(3), kVK_ANSI_O), (UInt32(4), kVK_ANSI_M)] + (args.contains("--ortak-mik") ? [(UInt32(5), kVK_ANSI_S)] : [] as [(UInt32, Int)]) {
                 var ref: EventHotKeyRef?
                 if RegisterEventHotKey(UInt32(tus), UInt32(optionKey | shiftKey), EventHotKeyID(signature: OSType(0x53464C52), id: i), GetApplicationEventTarget(), 0, &ref) == noErr { digerTuslar.append(ref) }
-                else { print("KISAYOL: Option + Shift + \(["", "", "K", "O", "M"][Int(i)]) başka uygulamada kullanılıyor") }
+                else { print("KISAYOL: Option + Shift + \(["", "", "K", "O", "M", "S"][Int(i)]) başka uygulamada kullanılıyor") }
             }
         }
     }
     func kisayol(_ tur: String) {
         NSSound(named: "Tink")?.play()
         let (yol, govde): (String, [String: Any]) = tur == "kanit" ? ("/kanit-iste", ["kaynak": "kisayol"]) : ("/komut", ["tur": tur])
-        istek(yol, govde) { [weak self] v in if v == nil { DispatchQueue.main.async { self?.uyar("Aktarıcıya ulaşılamadı") } } }
+        istek(yol, govde) { [weak self] v in DispatchQueue.main.async {
+            if v == nil { self?.uyar("Aktarıcıya ulaşılamadı") }
+            else if tur == "soyle", let m = v?["metin"] as? String, let r = m.range(of: "⚠ ") { self?.uyar(String(m[r.upperBound...])) }  // ör. BlackHole yok, cevap yok
+        } }
     }
     func basBasla() {
         guard kayitci == nil else { return }
@@ -708,6 +713,58 @@ final class Kayitci {
         return true
     }
     func durdur() -> Data { motor.inputNode.removeTap(onBus: 0); motor.stop(); kilit.lock(); defer { kilit.unlock() }; return veri }
+}
+
+// Toplantıya sesli söyle (v0.38.0; ayar toplantiya_ses → --ortak-mik): gerçek mikrofon → BlackHole çıkışı. Teams'te mikrofon "BlackHole 2ch"
+// seçiliyse karşı taraf kullanıcıyı bu geçişten duyar; aktarıcı Suflor'un sesini (say -a) aynı aygıta çalar, Core Audio ikisini karıştırır.
+// Geçiş yalnız gerekince açık: kapalıyken BlackHole'u biri kullanmaya başlayınca (Teams mikrofonu açtı) başlar, bu uygulamadan başka mikrofon okuyan
+// süreç 10 sn kalmayınca durur — toplantı dışında mikrofon açık kalmaz. BlackHole kullanıcının ayrı kurduğu sürücüdür (GPL), Suflor'a gömülmez.
+func caObje<T>(_ id: AudioObjectID, _ sec: AudioObjectPropertySelector, _ bos: T, kapsam: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> T? {
+    var a = AudioObjectPropertyAddress(mSelector: sec, mScope: kapsam, mElement: kAudioObjectPropertyElementMain); var v = bos; var n = UInt32(MemoryLayout<T>.size)
+    return AudioObjectGetPropertyData(id, &a, 0, nil, &n, &v) == noErr ? v : nil
+}
+func caDizi(_ id: AudioObjectID, _ sec: AudioObjectPropertySelector, kapsam: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> [AudioObjectID] {
+    var a = AudioObjectPropertyAddress(mSelector: sec, mScope: kapsam, mElement: kAudioObjectPropertyElementMain); var n: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(id, &a, 0, nil, &n) == noErr, n > 0 else { return [] }
+    var d = [AudioObjectID](repeating: 0, count: Int(n) / MemoryLayout<AudioObjectID>.size)
+    return AudioObjectGetPropertyData(id, &a, 0, nil, &n, &d) == noErr ? d : []
+}
+final class OrtakMik {
+    var motor: AVAudioEngine?; var bos = 0; var gozlem: NSObjectProtocol?
+    func blackhole() -> AudioObjectID? {
+        caDizi(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices).first { id in
+            let ad = (caObje(id, kAudioObjectPropertyName, "" as CFString) as String?) ?? ""
+            return ad.hasPrefix("BlackHole") && !caDizi(id, kAudioDevicePropertyStreams, kapsam: kAudioObjectPropertyScopeOutput).isEmpty
+        }
+    }
+    func baskaGiris() -> Bool {  // bu uygulamadan başka mikrofon okuyan süreç (toplantı uygulaması, tarayıcı, ses yardımcısı)
+        let ben = getpid()
+        return caDizi(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyProcessObjectList).contains { id in
+            (caObje(id, kAudioProcessPropertyPID, pid_t(0)) ?? 0) != ben && (caObje(id, kAudioProcessPropertyIsRunningInput, UInt32(0)) ?? 0) != 0
+        }
+    }
+    func dongu() { Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.bak() } }
+    func bak() {
+        guard let bh = blackhole() else { if motor != nil { durdur("BlackHole yok") }; return }
+        if motor == nil {
+            if (caObje(bh, kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) ?? 0) != 0 { basla(bh) }
+        } else if baskaGiris() { bos = 0 } else { bos += 1; if bos >= 10 { durdur("mikrofonu okuyan toplantı yok") } }
+    }
+    func basla(_ bh: AudioObjectID) {
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+        let m = AVAudioEngine(); var id = bh
+        guard let au = m.outputNode.audioUnit, AudioUnitSetProperty(au, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &id, UInt32(MemoryLayout<AudioObjectID>.size)) == noErr else { print("ORTAK MİK: çıkış aygıtı ayarlanamadı"); return }
+        let bic = m.inputNode.outputFormat(forBus: 0); guard bic.sampleRate > 0 else { return }
+        m.connect(m.inputNode, to: m.mainMixerNode, format: bic)
+        do { try m.start() } catch { print("ORTAK MİK: başlamadı (\(error.localizedDescription))"); return }
+        motor = m; bos = 0
+        gozlem = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: m, queue: .main) { [weak self] _ in self?.durdur("aygıt değişti") }  // döngü yeniden kurar
+        print("ORTAK MİK: mikrofon → BlackHole (\(Int(bic.sampleRate)) Hz, \(bic.channelCount) kanal)")
+    }
+    func durdur(_ neden: String) {
+        if let g = gozlem { NotificationCenter.default.removeObserver(g); gozlem = nil }
+        motor?.stop(); motor = nil; print("ORTAK MİK: durdu — \(neden)")
+    }
 }
 
 if args.contains("--ax-dokum") { Masaustu().dokum(); exit(0) }

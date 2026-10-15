@@ -182,6 +182,8 @@ globalThis.SUFLOR_EN = {
   "Başta ? varsa Claude'a soru, yoksa not. ⌘Enter: her zaman soru.": "Starting with ? asks Claude, otherwise it's a note. ⌘Enter: always a question.",
   "Gündem (isteğe bağlı): her satıra bir madde — Claude bu maddelerle başlar": "Agenda (optional): one item per line — Claude starts with these items",
   "Gündem — her satıra bir madde": "Agenda — one item per line",
+  "Toplantıya sesli söyle (deneme)": "Speak into the meeting (trial)",
+  "Option + Shift + S son Konuş cevabını toplantıya okur. BlackHole kurulu olmalı ve Teams’te mikrofon olarak BlackHole 2ch seçilmeli.": "Option + Shift + S reads the last Talk answer into the meeting. BlackHole must be installed and BlackHole 2ch selected as the microphone in Teams.",
   "Suflor.me olmadan katıl": "Join without Suflor.me",
   "son satır {t}": "last line {t}",
   "davet notu okunuyor…": "reading the invite…",

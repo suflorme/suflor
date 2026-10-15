@@ -567,7 +567,7 @@ bolum("whisper-hat")  # aktarici/whisper-hat.py — Whisper hattı: işçi, ses 
 # ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
 # isteği de yok (Faz 2: üç yanlış alarm, karşı taraf da duyuyor); kanıt yalnız Option + Shift + K ve 📷 ile.
-def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | sesli_ceviri (/komut yalnız bunları kabul eder)
+def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | sesli_ceviri | soyle (/komut yalnız bunları kabul eder)
     title = title or STATE["meeting"] or "Toplantı"; at = datetime.datetime.now().isoformat(timespec="seconds")
     if tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
     elif tur == "sesli_ceviri":
@@ -575,6 +575,7 @@ def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | 
         onay = _t("🎧 Sesli çeviri açık — kısa öz kulağına okunur", "🎧 Spoken translation on — the gist is read into your ear") if ac else \
             _t("🎧 Kulaklık takılı değil — sesli çeviri açılmadı (hoparlörden karşı taraf da duyar)", "🎧 No headphones — spoken translation not turned on (the other side would hear it)") if uy else \
             _t("🎧 Sesli çeviri kapandı", "🎧 Spoken translation off")
+    elif tur == "soyle": r = toplantiya_soyle(gov or None); onay = r.get("metin") or "⚠ " + str(r.get("err"))
     elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
     else: ask({"tur": "ozet"}); onay = _t("💬 Ne diyeyim? — Claude replik hazırlıyor", "💬 What do I say? — Claude is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
@@ -1050,7 +1051,7 @@ def menu_baslat():
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
         subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
                        + (["--masaustu-mic-kapali"] if AYAR.get("masaustu_mic") is False else []) + (["--kisayol-kapali"] if AYAR.get("kisayollar") is False else [])
-                       + (["--kisiler-ac"] if AYAR.get("masaustu_kisiler") is True else []), capture_output=True, timeout=20)
+                       + (["--kisiler-ac"] if AYAR.get("masaustu_kisiler") is True else []) + (["--ortak-mik"] if AYAR.get("toplantiya_ses") is True else []), capture_output=True, timeout=20)
         print("MENÜ: menü çubuğu uygulaması başlatıldı")
     except Exception as e: print(f"MENÜ: başlatılamadı ({e.__class__.__name__})")
 
@@ -1390,9 +1391,9 @@ AYAR_PANO = {
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None), "menu_cubugu": ("bool", False, None),
-    "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None),
+    "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None),
     "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None)}
-MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar")
+MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar", "toplantiya_ses")
 def ayarlar_view():
     d = {k: AYAR.get(k, v[1]) for k, v in AYAR_PANO.items()}
     if d["ses_motoru"] != "piper": d["ses_motoru"] = "mac"
@@ -1459,6 +1460,7 @@ bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslendirme (ayar ses_motoru: piper)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
+bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
 bolum("defter")  # aktarici/defter.py — Toplantı defteri: biten toplantıyı bas-konuşla sorma (S48)
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
@@ -1817,7 +1819,7 @@ class H(BaseHTTPRequestHandler):
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)
         if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
         if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
-            if p.get("tur") not in ("onemli", "ozet", "sessiz", "sesli_ceviri"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | sesli_ceviri"}, 400)
+            if p.get("tur") not in ("onemli", "ozet", "sessiz", "sesli_ceviri", "soyle"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | sesli_ceviri | soyle"}, 400)
             komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
             return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view(), "yaparken": yaparken_view()})
         if self.path == "/ses-yerel":  # yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar
