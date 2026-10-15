@@ -27,7 +27,8 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
 ## 2. Takvim, rol, dil, süre, gündem
 - **Takvim:** `_canli/takvim-secilen.json` son 30 dk içinde yazıldıysa (panodan/bildirimden başlatıldı) `konu`, `rol`, `dil`
   oradan — sorma; `olay` varsa `baslangic`/`bitis` (Mac yerel saati), katılımcılar ve davet notu (`notlar`; gündem maddeleri varsa
-  `items` taslağı) da oradan. Yoksa `tc takvim` (Mac Takvim, tüm hesaplar; `--id` tam not) ile $ARGUMENTS'a uyan toplantıyı bul;
+  `items` taslağı) da oradan. `gundem` varsa (Başlat formundaki Gündem alanı: kullanıcının yazdığı ya da onayladığı maddeler) `items` odur —
+  sırayı ve metni koru, yeniden onay sorma, eksik gördüğün maddeyi tek satırda öner; araştırma yalnız hazır kartlar için. Yoksa `tc takvim` (Mac Takvim, tüm hesaplar; `--id` tam not) ile $ARGUMENTS'a uyan toplantıyı bul;
   düzenleyen kullanıcıysa rol önerisi `yurutucu`. `takvim: izin_yok` → tek satır "Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler →
   Suflor Takvim". Mac Takvim'de yoksa takvim bağlantısında ara (Outlook ya da Google Takvim; saati Mac yerel saatine çevir).
 - **Bağlam kaynakları:** `_canli/baglam.json` varsa (Başlat formundaki "Bağlam" alanı, panoya bırakılan dosya) kaynakları gündemi
@@ -42,7 +43,7 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
 - **`_canli/agenda.json`:** `{"title", "rol": "yurutucu|katilimci|dinleyici", "dil": "tr|en|karisik", "baslangic": "HH:MM",
   "bitis": "HH:MM", "items": ["…"]}`; isteğe bağlı `"sureler": [dk, …]`, toplantıdaki adı ayardaki adla ({{AD}}) başlamıyorsa `"ben": "<ad>"`.
   Başlık $ARGUMENTS'la uyuşmuyorsa tek soru: mevcut gündem mi, yeni mi. Yeni gündem: önce bu klasörün `CLAUDE.md`'sindeki esas
-  belgeler, sonra kişi adıyla `tc ara`; 6–12 madde, kullanıcı onaylayınca yaz.
+  belgeler, sonra kişi adıyla `tc ara`; 6–12 madde, kullanıcı onaylayınca yaz (`gundem` geldiyse onu onaysız yaz).
   `dinleyici`/`katilimci`da gündem çoğu zaman kullanıcının değildir: takip etmek istediği 0–5 konuyu sor ya da davetten çıkar, yoksa
   `items` boş. Yeni gündemden sonra `tc acik sifirla` (eski açık sorular `acik-arsiv.jsonl`'e taşınır, silinmez).
 

@@ -1536,6 +1536,15 @@ def gundem_saat_tazele(simdi):
     tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
     os.replace(tmp, fp); print(f"BAŞLAT: gündem saati tazelendi ({a['baslangic']}–{a['bitis']}; eski bitiş geçmişte)")
+def gundem_maddeleri(v):
+    # Başlat formundaki Gündem alanı: her satır bir madde; madde işareti/numara atılır, boş ve yinelenen satır yok, en çok 15 × 200 karakter.
+    # Metin veridir: /toplanti onu takvim-secilen.json'dan taslak gündem olarak okur, komut satırına girmez.
+    out = []
+    for l in str(v or "").splitlines():
+        l = re.sub(r"^\s*(?:[-•*·▪◦]|\d+[.)])\s*", "", " ".join(l.split()))[:200].strip()
+        if l and l not in out: out.append(l)
+    return out[:15]
+
 def baslat(p):
     if STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60: return {"ok": False, "err": "Claude zaten bu alanda izliyor"}
     olay = TAKVIM_TAM.get(str(p.get("olay") or "")) if p.get("olay") else None
@@ -1559,8 +1568,9 @@ def baslat(p):
     baglanti = (olay or {}).get("baglanti") or guvenli_baglanti(elle); ana = not baglanti
     if ana: baglanti = TEAMS_ANA
     simdi = datetime.datetime.now().astimezone()
+    gundem = gundem_maddeleri(p.get("gundem"))
     sec = {"at": simdi.replace(tzinfo=None).isoformat(timespec="seconds"), "konu": konu, "rol": rol, "dil": dil, "olay": olay,
-           **({"baglanti": baglanti} if not (olay or {}).get("baglanti") and not ana else {})}
+           **({"baglanti": baglanti} if not (olay or {}).get("baglanti") and not ana else {}), **({"gundem": gundem} if gundem else {})}
     if not olay:  # takvimsiz başlatma: toplantı şimdi başlıyor, 30 dk varsayılır (9 Ekim denemesi: gündemde eski toplantının saati kaldı)
         sec.update(baslangic=simdi.isoformat(timespec="minutes"), bitis=(simdi + datetime.timedelta(minutes=30)).isoformat(timespec="minutes"))
         gundem_saat_tazele(simdi)
@@ -1585,7 +1595,7 @@ def baslat(p):
     if olay:
         try: brifing_baslatta(olay.get("id"))
         except Exception as e: print(f"BAŞLAT: sesli brifing hatası {e.__class__.__name__}")
-    print(f"BAŞLAT: {konu} · rol {rol} · dil {dil}{' · takvimden' if olay else ''} → Terminal'de Claude"); return {"ok": True, "rol": rol, "dil": dil}
+    print(f"BAŞLAT: {konu} · rol {rol} · dil {dil}{' · takvimden' if olay else ''}{f' · gündem {len(gundem)} madde' if gundem else ''} → Terminal'de Claude"); return {"ok": True, "rol": rol, "dil": dil}
 
 def _durum_ad(d):  # hazırlık sayfasında ham durum ("kapali", "hazir") yerine okunur sözcük
     return {"hazir": _t("hazır", "ready"), "yukleniyor": _t("yükleniyor", "loading"), "kapali": _t("kapalı", "off"), "yok": _t("kurulu değil", "not installed"),

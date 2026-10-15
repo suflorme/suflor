@@ -180,6 +180,8 @@ globalThis.SUFLOR_EN = {
   "Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin": "Context (optional): link or file path, one per line — you can also drop a file on the panel",
   "Claude'un okuduğu bağlantı ve belgeler. Dosyayı panoya bırak ya da kutuya bağlantı/dosya yolu yaz.": "Links and documents Claude reads. Drop a file on the panel or type a link/file path in the box.",
   "Başta ? varsa Claude'a soru, yoksa not. ⌘Enter: her zaman soru.": "Starting with ? asks Claude, otherwise it's a note. ⌘Enter: always a question.",
+  "Gündem (isteğe bağlı): her satıra bir madde — Claude bu maddelerle başlar": "Agenda (optional): one item per line — Claude starts with these items",
+  "Gündem — her satıra bir madde": "Agenda — one item per line",
   "Suflor.me olmadan katıl": "Join without Suflor.me",
   "son satır {t}": "last line {t}",
   "davet notu okunuyor…": "reading the invite…",
