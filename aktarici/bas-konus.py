@@ -98,7 +98,7 @@ if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_onara_gunc
 # --- Bekleme cümlesi (v0.42.0; doğal ses araştırması B): soru Claude'a gittikten KONUS_BEKLE_SN sonra hâlâ ses yoksa kısa, değişken, mümkünse içerikli
 # bir cümle (ön aramanın ilk sonucunun türüne göre). Araştırma: yalnız gecikme ~1 sn'yi aşınca, aynı cümle art arda değil; "Hm." ses_duzen'le sessizlik alır.
 # Araç kullanımındaki "Bakıyorum." bekleme cümlesi çaldıysa tekrarlanmaz (tur["bakiyor"]).
-KONUS_BEKLE_SN = float(AYAR.get("konus_bekle_sn", 1.5))
+KONUS_BEKLE_SN = float(AYAR.get("konus_bekle_sn", 1.5)); KONUS_BEKLE_ALINDI_EK_SN = 2.0  # bırakınca "Hı hı" çaldıysa bekleme cümlesi 3,5 sn'de
 BEKLE_GENEL = {"tr": ["Hm, bir bakayım.", "Bir saniye.", "Bakıyorum.", "Şey, hemen bakıyorum.", "Hm, kontrol ediyorum."],
                "en": ["Hm, let me see.", "One second.", "Let me check.", "Checking now."]}
 BEKLE_TUR = {"gorusme": "Görüşme kayıtlarına bakıyorum.", "toplanti": "Toplantı notlarına bakıyorum.", "defter": "Toplantı notlarına bakıyorum.",
@@ -325,6 +325,9 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if STATE["whisper"].get("durum") == "yok": _konus_kur(durum="hata", hata=_t("Whisper kurulu değil", "Whisper isn't installed")); return {"ok": False, "err": KONUS["hata"]}
     tur = {"t_birak": time.time(), "kayit_sn": round(sn, 1), "metin": "", "tampon": "", "kaynak": "bas"}; _KS["tur"] = tur; _konus_kur(durum="yaziya")
     sid = SORU["aktif"]
+    # v0.45.0 (aktif dinleme araştırması 2. adım): bırakınca ~0,25 sn içinde kısa "Hı hı / Hm" (tepki türü alindi) — cevaba kadarki ~4 sn boşluk
+    # sessiz kalmasın. "Yazayım mı?" cevabında ve toplantıda kulaklık yokken çalmaz; ayar konus_alindi: false kapatır. Çaldıysa bekleme cümlesi geç gelir.
+    if not sid and AYAR.get("konus_alindi") is not False and (not toplanti_var() or kulaklik()): tur["alindi"] = tepki_cal("alindi")
     def geri(metin, hata):
         tur["t_metin"] = time.time()
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
@@ -400,7 +403,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()
     def bekle_dolgu(tur_ad):
-        time.sleep(KONUS_BEKLE_SN)
+        time.sleep(KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0))
         if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("bakiyor") or not tur.get("sesli", True): return
         tur["bakiyor"] = True
         import random
