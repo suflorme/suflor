@@ -120,11 +120,16 @@ def _telaffuz_sozluk():
     try: return {str(k): str(v) for k, v in json.load(open(yol, encoding="utf-8")).items() if str(k).strip() and str(v).strip()}
     except (OSError, ValueError, AttributeError): print("SES: telaffuz-sozluk.json okunamadı"); return {}
 TELAFFUZ = _telaffuz_sozluk()
+def _telaffuz_mac():  # Mac sesinin kendisi doğru okuduğu sözcükler (aktarici/telaffuz-mac.json; v0.39.2 dinleme testi)
+    yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "telaffuz-mac.json")
+    try: return {str(w).lower() for w in json.load(open(yol, encoding="utf-8")).get("dogru_okur") or []}
+    except (OSError, ValueError, AttributeError): print("SES: telaffuz-mac.json okunamadı"); return set()
+TELAFFUZ_MAC = _telaffuz_mac()
 def _tel_harf(w, o):  # sözcük büyük harfle başlıyorsa okunuş da (Piper küçük harfle başlayanı yeni cümle saymaz); Türkçe: i → İ, ı → I
     if not o or not w[:1].isupper(): return o
     return {"i": "İ", "ı": "I"}.get(o[0], o[0].upper()) + o[1:]
 _TEL = {"t": 0, "mt": None, "re": None, "esle": {}}
-def telaffuz(metin):
+def telaffuz(metin, mac=False):  # mac: Mac sesiyle okunacak — TELAFFUZ_MAC'teki sözcüklere sabit sözlük uygulanmaz (canli/telaffuz.json yine uygulanır)
     if ARAYUZ_DILI != "tr" or not metin: return metin
     yol = os.path.join(BASE, "telaffuz.json")
     if time.time() - _TEL["t"] > 30 or _TEL["re"] is None:
@@ -142,11 +147,12 @@ def telaffuz(metin):
             esle = {k.lower(): v for k, v in hepsi.items()}
             # tamamı büyük harfli kısaltma yalnız metinde de büyük harfliyse değişir ("IP" ≠ Türkçe "ip", "OK" ≠ "ok")
             buyuk = {k.lower() for k, v in hepsi.items() if len(k) <= 5 and k.isupper() and not any(x.lower() == k.lower() and not x.isupper() for x in hepsi)}
-            _TEL.update(mt=mt, esle=esle, buyuk=buyuk, re=re.compile(r"(?<!\w)(" + "|".join(re.escape(k) for k in sorted(esle, key=len, reverse=True)) + r")(?!\w)", re.I))
+            _TEL.update(mt=mt, esle=esle, buyuk=buyuk, ek={k.lower() for k in ek}, re=re.compile(r"(?<!\w)(" + "|".join(re.escape(k) for k in sorted(esle, key=len, reverse=True)) + r")(?!\w)", re.I))
     _yabanci_topla(metin)
     def deg(m):
         w = m.group(1)
         if w.lower() in _TEL.get("buyuk", ()) and not w.isupper(): return w
+        if mac and w.lower() in TELAFFUZ_MAC and w.lower() not in _TEL.get("ek", ()): return w
         return _tel_harf(w, _TEL["esle"].get(w.lower(), w))
     return _TEL["re"].sub(deg, metin)
 # Okunan metinde görülen bilinmeyen yabancı sözcükler (v0.32.1; Piper her harfi Türkçe okur): Türkçe harfi olmayan ve yabancı yazım izi
@@ -270,7 +276,7 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
     return _SES_SEC["v"]
 def seslendir(metin, kuyruk=False):
     if not AYAR.get("konusma", True) or not metin: return False
-    metin = telaffuz(metin)
+    metin = telaffuz(metin, mac=not piper_acik())
     if not kuyruk: ses_durdur()
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): {len(metin)} karakter · {metin}"); return True
     with SES_K:
@@ -344,7 +350,7 @@ def fisilti_kart(c):
         t_oku = time.time()
         if not piper_oku(telaffuz(metin), piper_hiz(kisa=True)):
             v = ses_secimi()
-            try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [telaffuz(metin)], timeout=10)
+            try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [telaffuz(metin, mac=True)], timeout=10)
             except (OSError, subprocess.TimeoutExpired): pass
         kendi_ses_kaydet(metin, t_oku, time.time())
         print(f"FISILTI: {metin}")

@@ -20,6 +20,8 @@ bak("Zoom tek ünlü", telaffuz("Zoom'a geçelim"), "Zum'a geçelim")
 bak("meeting", telaffuz("Yarınki meeting saat 10'da, deadline cuma."), "Yarınki miting saat 10'da, dedlayn cuma.")
 bak("kısaltma yalnız büyük harfle", telaffuz("IP adresi verildi, ip atlamak yok, OK."), "Ay pi adresi verildi, ip atlamak yok, Okey.")
 bak("Türkçe dokunulmaz", telaffuz("Bütçe onayını bekliyoruz."), "Bütçe onayını bekliyoruz.")
+bak("Mac sesi: doğru okuduğu sözcüğe dokunulmaz, okuyamadığına sözlük (v0.39.2)", telaffuz("Teams'te meeting var, feedback ve KPI tablosu hazır.", mac=True), "Teams'te meeting var, fidbek ve Ki pi ay tablosu hazır.")
+bak("Piper: aynı cümlede hepsine sözlük", telaffuz("Teams'te meeting var, feedback ve KPI tablosu hazır."), "Tims'te miting var, fidbek ve Ki pi ay tablosu hazır.")
 bak("uzun ünlü şapkayla (v0.39.1, Mac sesi)", telaffuz("Cevabı şöyle: hesabını kontrol ettim, kağıt lazım."), "Cevâbı şöyle: hesâbını kontrol ettim, kâğıt lâzım.")
 # 1b) sözlük dosyası okundu, büyük harf korunur (Piper küçük harfle başlayanı yeni cümle saymaz); Türkçe i → İ
 bak("sözlük dosyası", len(TELAFFUZ) > 200 and TELAFFUZ.get("Teams") == "Tims", True)

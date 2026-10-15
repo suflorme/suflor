@@ -1,0 +1,4 @@
+{
+ "aciklama": "Mac sesinin (Türkçe sistem sesi) sözlüğe gerek duymadan doğru okuduğu İngilizce sözcükler: Mac sesiyle okunurken telaffuz-sozluk.json'daki Türkçe yazımları uygulanmaz (Piper'da uygulanır). 15 Ekim 2026 dinleme testi: 16 sözcükten 11'i; feedback, KPI, update, Basecamp, Workspace sözlükle okunur.",
+ "dogru_okur": ["Teams", "Zoom", "meeting", "deadline", "agenda", "account", "dashboard", "Google", "email", "Outlook", "Microsoft"]
+}
