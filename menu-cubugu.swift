@@ -730,13 +730,19 @@ func caDizi(_ id: AudioObjectID, _ sec: AudioObjectPropertySelector, kapsam: Aud
     return AudioObjectGetPropertyData(id, &a, 0, nil, &n, &d) == noErr ? d : []
 }
 final class OrtakMik {
-    var motor: AVAudioEngine?; var bos = 0; var gozlem: NSObjectProtocol?
+    // İki ayrı motor (v0.38.1): tek motorda çıkış aygıtını AudioUnitSetProperty ile değiştirmek gerçekte sesi kulaklığa verdi (15 Ekim denemesi: kullanıcı kendi
+    // sesini ve klavyeyi kulaklıkta duydu). Giriş motoru varsayılan mikrofonu dinler, örnekler kısa kuyruğa; çıkış motorunun aygıtı
+    // auAudioUnit.setDeviceID ile BlackHole, kaynak düğümü kuyruktan okur. Kuyruk en çok 0,25 sn (gecikme sınırlı); açılışta gerçek aygıtlar günlüğe.
+    var giris: AVAudioEngine?; var cikis: AVAudioEngine?; var bos = 0; var gozlem: [NSObjectProtocol] = []
+    var kuyruk: [Float] = []; let kilit = NSLock(); var tavan = 12000
+    var motor: AVAudioEngine? { cikis }
     func blackhole() -> AudioObjectID? {
         caDizi(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices).first { id in
             let ad = (caObje(id, kAudioObjectPropertyName, "" as CFString) as String?) ?? ""
             return ad.hasPrefix("BlackHole") && !caDizi(id, kAudioDevicePropertyStreams, kapsam: kAudioObjectPropertyScopeOutput).isEmpty
         }
     }
+    func ad(_ id: AudioObjectID) -> String { (caObje(id, kAudioObjectPropertyName, "" as CFString) as String?) ?? "?" }
     func baskaGiris() -> Bool {  // bu uygulamadan başka mikrofon okuyan süreç (toplantı uygulaması, tarayıcı, ses yardımcısı)
         let ben = getpid()
         return caDizi(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyProcessObjectList).contains { id in
@@ -745,25 +751,40 @@ final class OrtakMik {
     }
     func dongu() { Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.bak() } }
     func bak() {
-        guard let bh = blackhole() else { if motor != nil { durdur("BlackHole yok") }; return }
-        if motor == nil {
+        guard let bh = blackhole() else { if cikis != nil { durdur("BlackHole yok") }; return }
+        if cikis == nil {
             if (caObje(bh, kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) ?? 0) != 0 { basla(bh) }
         } else if baskaGiris() { bos = 0 } else { bos += 1; if bos >= 10 { durdur("mikrofonu okuyan toplantı yok") } }
     }
     func basla(_ bh: AudioObjectID) {
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
-        let m = AVAudioEngine(); var id = bh
-        guard let au = m.outputNode.audioUnit, AudioUnitSetProperty(au, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &id, UInt32(MemoryLayout<AudioObjectID>.size)) == noErr else { print("ORTAK MİK: çıkış aygıtı ayarlanamadı"); return }
-        let bic = m.inputNode.outputFormat(forBus: 0); guard bic.sampleRate > 0 else { return }
-        m.connect(m.inputNode, to: m.mainMixerNode, format: bic)
-        do { try m.start() } catch { print("ORTAK MİK: başlamadı (\(error.localizedDescription))"); return }
-        motor = m; bos = 0
-        gozlem = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: m, queue: .main) { [weak self] _ in self?.durdur("aygıt değişti") }  // döngü yeniden kurar
-        print("ORTAK MİK: mikrofon → BlackHole (\(Int(bic.sampleRate)) Hz, \(bic.channelCount) kanal)")
+        let g = AVAudioEngine(), c = AVAudioEngine()
+        do { try c.outputNode.auAudioUnit.setDeviceID(bh) } catch { print("ORTAK MİK: çıkış aygıtı ayarlanamadı (\(error.localizedDescription))"); return }
+        let bic = g.inputNode.outputFormat(forBus: 0); guard bic.sampleRate > 0, let mono = AVAudioFormat(standardFormatWithSampleRate: bic.sampleRate, channels: 1) else { return }
+        tavan = Int(bic.sampleRate / 4); kilit.lock(); kuyruk.removeAll(); kilit.unlock()
+        let kaynak = AVAudioSourceNode(format: mono) { [weak self] _, _, n, abl -> OSStatus in
+            guard let self = self, let p = UnsafeMutableAudioBufferListPointer(abl).first?.mData?.assumingMemoryBound(to: Float.self) else { return noErr }
+            self.kilit.lock(); let k = min(Int(n), self.kuyruk.count)
+            for i in 0..<k { p[i] = self.kuyruk[i] }; self.kuyruk.removeFirst(k); self.kilit.unlock()
+            for i in k..<Int(n) { p[i] = 0 }
+            return noErr
+        }
+        c.attach(kaynak); c.connect(kaynak, to: c.mainMixerNode, format: mono)
+        g.inputNode.installTap(onBus: 0, bufferSize: 512, format: bic) { [weak self] buf, _ in
+            guard let self = self, let d = buf.floatChannelData else { return }
+            self.kilit.lock(); self.kuyruk.append(contentsOf: UnsafeBufferPointer(start: d[0], count: Int(buf.frameLength)))
+            if self.kuyruk.count > self.tavan { self.kuyruk.removeFirst(self.kuyruk.count - self.tavan) }; self.kilit.unlock()
+        }
+        do { try c.start(); try g.start() } catch { g.inputNode.removeTap(onBus: 0); c.stop(); print("ORTAK MİK: başlamadı (\(error.localizedDescription))"); return }
+        giris = g; cikis = c; bos = 0
+        for m in [g, c] { gozlem.append(NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: m, queue: .main) { [weak self] _ in self?.durdur("aygıt değişti") }) }  // döngü yeniden kurar
+        let gAyg = caObje(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice, AudioObjectID(0)) ?? 0
+        print("ORTAK MİK: \(ad(gAyg)) → \(ad(c.outputNode.auAudioUnit.deviceID)) (\(Int(bic.sampleRate)) Hz)")
+        if c.outputNode.auAudioUnit.deviceID != bh { durdur("çıkış BlackHole değil — kulaklığa gitmesin") }
     }
     func durdur(_ neden: String) {
-        if let g = gozlem { NotificationCenter.default.removeObserver(g); gozlem = nil }
-        motor?.stop(); motor = nil; print("ORTAK MİK: durdu — \(neden)")
+        gozlem.forEach { NotificationCenter.default.removeObserver($0) }; gozlem = []
+        giris?.inputNode.removeTap(onBus: 0); giris?.stop(); cikis?.stop(); giris = nil; cikis = nil; print("ORTAK MİK: durdu — \(neden)")
     }
 }
 
