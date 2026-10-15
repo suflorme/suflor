@@ -172,6 +172,7 @@ try:
     k12 = sor("Takılma denemesi var mı?")
     ok("takılan soru: 3 sn sonra süreç yenilendi, soru yeniden gitti ve cevaplandı (defter yeni süreçte soruyla)", k12["durum"] == "hazir" and "Sorduğun" in (k12.get("cevap") or "")
        and "KONUŞ: zaman aşımı — 3 sn cevap yok" in log() and "KONUŞ: süreç kapandı (zaman aşımı)" in log() and "Defter geldi: Başka toplantı" in k12["cevap"])
+    ok("v0.42.0: takılan soruda 1,5 sn sonra bekleme cümlesi söylendi, yalnız bir kez (yeniden gönderimde tekrar yok)", log().count("KONUŞ: bekleme cümlesi") == 1)
     k13 = sor("Donma denemesi var mı?")
     ok("ikinci denemede de cevap yoksa panoda hata", k13["durum"] == "hata" and "cevap vermedi" in (k13.get("hata") or "") and "ikinci denemede de 6 sn cevap yok" in log())
     urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ping", data=json.dumps({"call": True, "panel": True}).encode(), headers={"X-Suflor-Anahtar": K}))
