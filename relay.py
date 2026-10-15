@@ -506,7 +506,26 @@ def kanit(p):
                (jl, json.dumps(rec, ensure_ascii=False) + "\n")])
         STATE["last"] = now.isoformat(timespec="seconds"); heartbeat()
     print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']}" + (f", paylaşılan ekran küçük %{kucuk}" if kucuk else "") + ")")
+    threading.Thread(target=kanit_metin, args=(md, rel, n, now.strftime('%H:%M:%S')), daemon=True).start()
     return {"ok": True, "n": n, "path": rel, **({"kucuk": kucuk} if kucuk else {})}
+# Kanıt görüntüsündeki yazı (v0.36.0, S48): paylaşılan ekranda görünen ama söylenmeyen bilgi (slayt, tablo, rakam) toplantı defterine girsin diye
+# görüntü yerel Apple Vision ile okunur (Suflor Metin.app; görüntü Mac'ten çıkmaz) ve .md'ye "📷 KANIT n metni" satırı yazılır (.jsonl'e girmez:
+# döküm satırı sayılmaz). Aynı ekranın tekrarında metin yerine "önceki kanıtla aynı yazı". Varsayılan KAPALI (ayar kanit_metin: true açar): ölçüm
+# (15 Ekim, gerçek ekran paylaşımlı toplantı, 24 kanıt, 16 soru): ekran soruları yazısız da 12/12 — sıçramayı Konuş'un görüntüyü Read ile açması
+# (istem + defterde tam yol) yaptı; yazı ek kazanç vermedi, metnin çoğu Teams arayüzü ve altyazı (paylaşılan alan pencerede küçük), defter %47 büyüdü,
+# ilk metin ~2,5 sn gecikti. Paylaşılan alana kırpılıp arayüz/altyazı atılırsa yeniden ölçülecek.
+METIN_APP = os.path.join(AYAR["uygulama"], "Suflor Metin.app", "Contents", "MacOS", "SuflorMetin"); KANIT_METIN_EN_COK = 1500; KANIT_METIN_SON = {}
+def kanit_metin(md, rel, n, saat):
+    if AYAR.get("kanit_metin") is not True or not os.access(METIN_APP, os.X_OK): return
+    try: o = json.loads(subprocess.run([METIN_APP, os.path.join(BASE, rel)], capture_output=True, text=True, timeout=90).stdout or "{}")
+    except (OSError, ValueError, subprocess.TimeoutExpired) as e: print(f"KANIT {n} METNİ: okunamadı ({e.__class__.__name__})"); return
+    s = [" ".join(str(x).split()) for x in (o.get("satirlar") or []) if str(x).strip()]
+    if not s: print(f"KANIT {n} METNİ: yazı yok" + (f" ({o['hata']})" if o.get("hata") else "")); return
+    m = " · ".join(s).replace("|", "¦")
+    if len(m) > KANIT_METIN_EN_COK: m = m[:KANIT_METIN_EN_COK].rsplit(" ", 1)[0] + " …"
+    k = os.path.basename(md); ayni = KANIT_METIN_SON.get(k) == m; KANIT_METIN_SON[k] = m
+    with LOCK: write([(md, f"| {saat} | **📷 KANIT {n} metni** | {_t('önceki kanıtla aynı yazı', 'same text as the previous evidence') if ayni else m} |  |\n")])
+    print(f"KANIT {n} METNİ: {len(s)} satır, {len(m)} karakter" + (" (öncekiyle aynı)" if ayni else ""))
 # Ekran paylaşımı kaydı (eski adı "yaparken kaydet"): karşı taraf ekran paylaşırken eklenti, paylaşılan ekran belirgin biçimde değişip
 # durulunca kanıtı kendiliğinden alır (kaynak "oto"; karşılaştırma ve en sık 10 sn kuralı eklentide). v0.28.0 (S33): düğme yok — eklentinin
 # nabzındaki paylaşım sinyaliyle kendiliğinden açılır/kapanır (ayar `ekran_oto: false` kapatır); elle kanıt (Option + Shift + K) ayrı.
@@ -1366,7 +1385,7 @@ def eposta_tur():
 # geçerli. Menü çubuğu uygulamasının ayarları açılışta verildiği için uygulama yeniden açılır (toplantı sürüyorsa bitince). Yeni ayar eklerken pano/pano.html AYG'ye de yaz.
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
-    "konusma": ("bool", True, None), "sesli_not": ("bool", True, None), "toplanti_konus": ("bool", True, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
+    "konusma": ("bool", True, None), "sesli_not": ("bool", True, None), "toplanti_konus": ("bool", True, None), "kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
     "brifing_sesli": ("bool", False, None), "ses_motoru": ("sec", "mac", ("mac", "piper")),
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),

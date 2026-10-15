@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 138955,
-   "sha": "45a0798a8a12c6dc"
+   "uzunluk": 139515,
+   "sha": "7d58217c88f05b32"
   },
   "/hazirlik": {
-   "uzunluk": 39414,
-   "sha": "64d912bd07b3fe3a"
+   "uzunluk": 39781,
+   "sha": "97f6e645c7a2d99b"
   },
   "/mini": {
-   "uzunluk": 138955,
-   "sha": "45a0798a8a12c6dc"
+   "uzunluk": 139515,
+   "sha": "7d58217c88f05b32"
   },
   "/status": {
    "_ping_son": "float",
@@ -267,6 +267,7 @@
      "eposta": "str",
      "eposta_adres": "str",
      "fisilti": "bool",
+     "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kisayollar": "bool",
      "konusma": "bool",
@@ -295,6 +296,7 @@
      "eposta": "str",
      "eposta_adres": "str",
      "fisilti": "bool",
+     "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kisayollar": "bool",
      "konusma": "bool",

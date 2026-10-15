@@ -6,6 +6,7 @@
 DEFTER_EN_COK = 250000  # karakter (~145k belirteç; ölçüm 15 Ekim: 1 karakter ≈ 0,57 belirteç + ~18k sabit); üstünde kısa defter + tam dökümde Grep.
 # Uzun toplantı ölçümü (15 Ekim, 2,7 ve 5,4 sa gerçek döküm): tam defter 16/16, 300k'da giriş 192k belirteç (pencere 200k); kısa defter 14–15/16 — ortadaki
 # işaretsiz satırı aramadan "yok" dedi. Bu yüzden sınır 250k ve kısa defterde "yok" demeden içerik araması zorunlu (KONUS_ISTEM + aşağıdaki yönerge).
+# Kural ölçümle ayarlandı (L4–L6): head_limit 20 doğru satırı kesti (13,5–14/16), 60 + "sınıra takılırsa daralt" 15–15,5/16, uydurma 0–1.
 DEFTER_ORTUSME_SN = 180  # aynı toplantının bölünmüş dosyaları (v0.32.15 öncesi masaüstü başlık değişimi) en az bu kadar üst üste yazılmıştır
 _DOSYA_RX = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})-.+\.md$")
 _DF_ON = {"t": 0, "v": None, "k": None}
@@ -94,6 +95,7 @@ def defter_metni(d=None):
         try: s = open(os.path.join(BASE, f), encoding="utf-8").read().splitlines()
         except OSError: continue
         s = _df_adlar(f, s)
+        s = [l.replace("| kanit/", "| " + os.path.join(BASE, "kanit") + "/", 1) if "**📷 KANIT" in l and "metni**" not in l else l for l in s]  # Konuş görüntüyü Read ile açabilsin
         for l in s:
             p = l.split(" | ", 2)
             if l.startswith("| ") and len(p) == 3 and "**" not in p[1] and p[1].strip() not in ("Konuşmacı", "---"): kisi[p[1].strip()] += 1
@@ -131,8 +133,8 @@ def defter_metni(d=None):
     sinir = (son - datetime.timedelta(minutes=30)).strftime("%H:%M:%S"); kisa = []
     for f, s in dokum:
         kisa.append(f"## {_t('Döküm (kısa: işaretli satırlar + son 30 dk)', 'Transcript (short: marked lines + last 30 min)')}: {f}\n"
-                    + _t(f"Tam döküm: {os.path.join(BASE, f)} — bu kısa defterde olmayan her şey orada: 'kayıtta yok' demeden önce Grep ile satır içeriğinde ara (output_mode content, -i, en az iki farklı sözcükle).",
-                            f"Full transcript: {os.path.join(BASE, f)} — everything missing from this short record is there: before saying 'not in the record', Grep the line contents (output_mode content, -i, at least two different words).") + "\n"
+                    + _t(f"Tam döküm: {os.path.join(BASE, f)} — bu kısa defterde olmayan her şey orada: 'kayıtta yok' demeden önce Grep ile satır içeriğinde ara (output_mode content, -i, head_limit 60, en az iki farklı sözcükle; sınıra takılırsa daralt); yalnız soruyu cevaplayan satırı kullan.",
+                            f"Full transcript: {os.path.join(BASE, f)} — everything missing from this short record is there: before saying 'not in the record', Grep the line contents (output_mode content, -i, head_limit 60, at least two different words; narrow it if it hits the limit); use only the line that answers.") + "\n"
                     + "\n".join(l for l in s if "**" in l or l.startswith("#") or (l.startswith("| ") and l[2:10] >= sinir)))
     k = "\n".join(p) + "\n\n" + (oz + "\n\n" if oz else "") + kisiler + "\n\n" + "\n\n".join(kisa)
     return k[-DEFTER_EN_COK:] if len(k) > DEFTER_EN_COK else k, True

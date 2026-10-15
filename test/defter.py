@@ -23,7 +23,7 @@ def dosya(bas_dk_once, son_dk_once, ad, satirlar, baslik=None):  # bas_dk_once: 
 def yenile(): _DF_ON.update(t=0)
 # bölünmüş toplantı: A 40 dk önce başladı, 2 dk önce bitti; B (başlık değişimi) 38 dk önce başladı, 20 dk önce bitti → üst üste 18 dk
 a = dosya(40, 2, "Proje-gorusmesi", [("10:00:01", "Karşı taraf 1", "Bütçe kırk bin."), ("10:00:05", "Deniz T", "Tamam.")], "Proje görüşmesi")
-b = dosya(38, 20, "Baska-baslik", [("10:02:00", "Karşı taraf 1", "Teslim cuma.")])
+b = dosya(38, 20, "Baska-baslik", [("10:02:00", "Karşı taraf 1", "Teslim cuma."), ("10:02:30", "**📷 KANIT 1**", "kanit/Baska/100230-1.png"), ("10:02:31", "**📷 KANIT 1 metni**", "Bütçe tablosu · 40.000")])
 # art arda toplantı: C, A başlamadan 1 dk önce bitti (60 dk önce başladı) → ayrı kalmalı
 c = dosya(60, 40.5, "Onceki-toplanti", [("09:20:00", "Can B", "Eski konu.")])
 open(os.path.join(BASE, a[:-3] + ".jsonl"), "w").write(json.dumps({"id": "w-1", "time": "10:00:01", "speaker": "Karşı taraf 1", "text": "Bütçe kırk bin."}) + "\n")
@@ -38,6 +38,7 @@ m, kisa = defter_metni(d)
 ok("konuşmacı düzeltmesi uygulandı (Karşı taraf 1 → Ayla K, yalnız eşlenen satır)", "| 10:00:01 | Ayla K | Bütçe kırk bin." in m and "| 10:02:00 | Karşı taraf 1 | Teslim cuma." in m)
 ok("sıra: başlık → gündem → döküm → konuşanlar → özet", m.index("# Toplantı defteri") < m.index("## Gündem") < m.index("## Döküm") < m.index("## Konuşanlar") < m.index("## Toplantı sonu özeti")
    and m.rstrip().endswith("Karar: bütçe kırk bin."))
+ok("kanıt yolu tam yol (Konuş görüntüyü açabilsin), kanıt metni satırı aynen", f"| {os.path.join(BASE, 'kanit')}/Baska/100230-1.png |" in m and "| **📷 KANIT 1 metni** | Bütçe tablosu · 40.000 |" in m)
 ok("konuşan sayımı", "Ayla K (1)" in m and "Deniz T (1)" in m and not kisa)
 ok("panoda görünüm (ad, saat)", defter_view() == {"ad": "Proje görüşmesi", "saat": datetime.datetime.fromtimestamp(d["son"]).strftime("%H:%M")})
 # S48 defter turu (v0.35.0): yapı dosyası (toplantı oturumu; kaynak saatleri bitir'de doğrulanır) → "Toplantı sonu" bölümü, özetten önce

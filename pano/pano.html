@@ -546,7 +546,7 @@ const AYG=[['E-posta',[['eposta','sec','Taslak nerede açılsın','Brifing ve ö
     ['masaustu_ses_kis','bool',"Masaüstü Teams/Zoom'da da kıs",'Ses yardımcısı toplantı sesini kendi üzerinden çalar; takılırsa ses kesilebilir.'],['menu_cubugu','bool','Menü çubuğu uygulaması','Mini pano, Mac geneli kısayollar ve masaüstü toplantılar.'],
     ['masaustu_mic','bool','Masaüstü toplantıda mikrofonun','Teams/Zoom masaüstünde senin sesin yazılır.'],['masaustu_kisiler','bool','Kişiler panelinden ad okuma','Panel 3 dakikada bir açılıp kapanır.'],
     ['kisayollar','bool','Mac geneli kısayollar','Option + Shift + Boşluk ve diğerleri her uygulamada.']]],
-  ['Gizlilik',[['teshis','bool','Teknik teşhis gönder','Yalnız sürüm, donanım, hata türü ve sayılar geliştiriciye gider; toplantı içeriği gitmez.'],
+  ['Gizlilik',[['kanit_metin','bool','Kanıttaki yazı','Kanıt görüntüsündeki yazı Mac’te okunur (görüntü Mac’ten çıkmaz) ve toplantı defterine eklenir. Kapalıyken de Claude gerekince kanıt görüntüsüne bakar.'],['teshis','bool','Teknik teşhis gönder','Yalnız sürüm, donanım, hata türü ve sayılar geliştiriciye gider; toplantı içeriği gitmez.'],
     ['ses_izi_hafiza','bool','Ses izi hafızası','Konuşanların ses izi bu Mac’te saklanır; sonraki toplantılarda adları bulunur.']]]]
 function ayCiz(){const a=(last&&last.ayarlar)||{deger:{}},d=a.deger,tah={gmail:'Gmail',outlook:'Outlook (web)',mailto:L("Mac'in posta uygulaması")}[(last&&last.eposta)||'mailto']
   document.getElementById('ayi').innerHTML=AYG.map(([g,al])=>`<div class=ayg>${esc(L(g))}</div>`+al.map(([k,tur,ad,ac,sec])=>{const v=d[k],kap=(k==='ses_motoru'&&!a.piper)||(['masaustu_mic','masaustu_kisiler','kisayollar','menu_cubugu'].includes(k)&&!a.menu)

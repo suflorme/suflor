@@ -221,6 +221,8 @@ globalThis.SUFLOR_EN = {
   "Sesli not": "Spoken note",
   "“Not al: …” dediğinde not alınır.": "Saying “take a note: …” records a note.",
   "Toplantıda Konuş": "Konuş in meetings",
+  "Kanıttaki yazı": "Text in evidence",
+  "Kanıt görüntüsündeki yazı Mac’te okunur (görüntü Mac’ten çıkmaz) ve toplantı defterine eklenir. Kapalıyken de Claude gerekince kanıt görüntüsüne bakar.": "Text in evidence images is read on the Mac (the image never leaves it) and added to the meeting record. Even when off, Claude looks at the evidence image when needed.",
   "Deneme hatırlatması": "Trial reminder",
   "Tamam": "OK",
   "Altyazı ölçümü başladı (3 dk) — Teams’te canlı altyazı açık olsun.": "Caption measurement started (3 min) — keep live captions on in Teams.",
