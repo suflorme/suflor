@@ -399,7 +399,7 @@ def _hihi_kapi(son8, uzunluk, n, sessiz, esik):  # uzunluk: karar anında kaydı
             print(f"KONUŞ: aktif dinleme — \"hı hı\" ({n:.0f}. sn, {sessiz:.2f} sn duraksama{'' if p is None else f', tur sonu {p:.2f}'})")
     finally: AKIS["hihi_kapi"] = False
 def _hihi_bak():
-    if AYAR.get("konus_hihi") is not True or _KS["tur"]: return
+    if AYAR.get("konus_hihi") is not True or _KS["tur"] or SOHBET["acik"]: return  # sohbet kipinde duraksama tur sonu sayılır (aktarici/sohbet.py)
     if TUR["p"] is None and TUR["durum"] in (None, "hata") and float(AYAR.get("hihi_tur_esik", HIHI_TUR_ESIK)) > 0: threading.Thread(target=tur_baslat, daemon=True).start()
     if AKIS.get("hihi_kapi"): return
     with AKIS["kilit"]:
@@ -470,6 +470,7 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
         if sid and SORU["aktif"] == sid:  # "yazayım mı?" sorusuna sesli cevap — Claude'a gitmez
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, sesli_cevap=True, cevap=sesli_cevap(metin, sid), olcum={"wh_ms": round((tur["t_metin"] - tur["t_birak"]) * 1000)}); return
+        if sohbet_metin(metin): _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=""); return  # "tamam teşekkürler" sohbeti kapatır
         _konus_sor(metin, tur)
     if _akis_birlestir(pcm, geri): tur["akis"] = True; return {"ok": True}
     _akis_sifirla()

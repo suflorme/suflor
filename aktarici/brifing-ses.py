@@ -105,7 +105,7 @@ def claude_json(ham, is_, t0, yalin):
 # Konuşmalar sıraya girer (özet okunurken gelen "yazayım mı?" onu kesmez); brifing ve ses_durdur sırayı boşaltır.
 SES = {"p": None, "q": [], "isci": False}; SES_K = threading.Condition()
 def ses_durdur():
-    with SES_K: SES["q"].clear(); SES["kes"] = SES.get("kes", 0) + 1; p = SES.get("p")  # kes: Piper'ın kalan cümleleri de çalınmaz
+    with SES_K: SES["q"].clear(); SES["kes"] = SES.get("kes", 0) + 1; p = SES.get("p"); SES["test_bit"] = 0  # kes: Piper'ın kalan cümleleri de çalınmaz
     if p and p.poll() is None: p.terminate(); print("SES: durduruldu"); return True
     return False
 # Ses seçimi (v0.20.2): ayar "ses" yoksa ve Türkçe sistem sesi seçiliyse (Erişilebilirlik → Oku ve Seslendir → Sistem sesi, ör. Siri → Ses 2
@@ -367,6 +367,7 @@ def seslendir(metin, kuyruk=False, tepkisiz=False):
     if os.environ.get("SUFLOR_TEST_BASLAT"):
         if klip: print(f"SES (deneme): tepki {os.path.basename(klip)}")
         if metin: print(f"SES (deneme): {len(metin)} karakter · {metin}")
+        SES["test_bit"] = max(SES.get("test_bit", 0), time.time()) + 0.06 * len(metin or "")  # sohbet testinde "okunuyor" süresi (ses çalınmaz)
         return True
     with SES_K:
         if klip: SES["q"].append(("dosya", klip))

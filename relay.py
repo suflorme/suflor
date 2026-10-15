@@ -1462,6 +1462,7 @@ bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslendirme (ayar ses_motoru: piper)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
+bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
 bolum("defter")  # aktarici/defter.py — Toplantı defteri: biten toplantıyı bas-konuşla sorma (S48)
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
@@ -1680,7 +1681,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1760,6 +1761,9 @@ class H(BaseHTTPRequestHandler):
             if p.get("komut") == "basla": return self._json(konus_basla())
             if p.get("komut") == "sus": ses_durdur(); return self._json({"ok": True})
             if p.get("komut") == "parca": return self._json(konus_parca(p))
+            if p.get("komut") == "sohbet_basla": return self._json(sohbet_basla())
+            if p.get("komut") == "sohbet_parca": return self._json(sohbet_parca(p))
+            if p.get("komut") == "sohbet_kapat": sohbet_kapat("pano"); return self._json({"ok": True})
             return self._json(konus_ses(p))
         if self.path == "/eylem-geri-al":  # sesli kararın Geri al'ı (10 sn) — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
