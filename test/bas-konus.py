@@ -194,6 +194,17 @@ try:
     ben(2, "Claude: kuyruğa al teklif e-postasını."); time.sleep(1)
     jl2 = [json.loads(l) for f in os.listdir(canli) if f.endswith(".jsonl") and not f.startswith("claude") for l in open(os.path.join(canli, f)) if '"w/2"' in l]
     ok("iş talimatı ('kuyruğa al') konuşana gitmedi, toplantı oturumunda kaldı", log().count("konuşana gitti") == n0 and bool(jl2) and not jl2[-1].get("konusan"))
+    # v0.44.0: karşı tarafın "Suflor, …" sorusu (Whisper yazımı "Süflör") konuşana, soranın adıyla; iş talebi ve tetiksiz satır gitmez
+    def karsi(i, metin): uc2("/ingest", {"meeting": {"title": "Başka toplantı"}, "source": "whisper", "entries": [{"id": f"k/{i}", "speaker": "Ayla Ö", "time": f"11:1{i}:00", "text": metin, "kanal": "karsi"}]})
+    karsi(1, "Süflör, bu projenin teslim tarihi ne?"); t0 = time.time()
+    while time.time() - t0 < 30 and not (st().get("kaynak") == "karsi" and st()["durum"] in ("hazir", "hata")): time.sleep(0.2)
+    k16 = st(); c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
+    jl3 = [json.loads(l) for f in os.listdir(canli) if f.endswith(".jsonl") and not f.startswith("claude") for l in open(os.path.join(canli, f)) if '"k/1"' in l]
+    ok("karşı tarafın 'Süflör, …' sorusu konuşana gitti (soranın adıyla), cevap panoda, satırda konusan", k16["durum"] == "hazir" and (k16.get("soru") or "").startswith("Ayla Ö")
+       and "Sorduğun" in (k16.get("cevap") or "") and c[-1].get("kaynak") == "karsi" and bool(jl3) and jl3[-1].get("konusan") is True)
+    n1 = log().count("konuşana gitti")
+    karsi(2, "Suflor, not al bunu lütfen."); karsi(3, "Teslim tarihi cuma olabilir mi?"); karsi(4, "Suflör'ün dediği doğru."); time.sleep(1)
+    ok("karşı tarafta iş talebi, hitapsız satır ve ek almış ad konuşana gitmedi", log().count("konuşana gitti") == n1)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

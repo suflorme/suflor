@@ -601,6 +601,7 @@ def ingest(p):
                         threading.Thread(target=note, args=({"meeting": {"title": title}, "text": n_, "at": datetime.datetime.now().isoformat(timespec="seconds")},), daemon=True).start()
                         STATE["komut"] = {"id": secrets.token_hex(4), "at": datetime.datetime.now().isoformat(timespec="seconds"), "tur": "not", "metin": "🎙 " + _t("Not alındı", "Note taken")}; kart_bildir()
                     elif p.get("source") == "whisper" and not onceki and "Claude:" in text and konus_hitap(text): e["_konusan"] = True  # S48: soru konuşana (bas-konus.py)
+            elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker")): e["_konusan"] = True  # v0.44.0
             if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text)); del SON_SATIRLAR[:-20]
             low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye

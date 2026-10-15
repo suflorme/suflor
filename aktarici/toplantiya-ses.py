@@ -41,7 +41,7 @@ def toplantiya_soyle(metin=None):
         if kulaklik(): ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     except OSError as e: print(f"TOPLANTIYA SÖYLE: hata {e.__class__.__name__}"); return {"ok": False, "err": "say"}
     with TS_KILIT: TS["p"] = ps
-    TS["son"] = m
+    TS["son"] = m; TS["son_t"] = time.time() + len(m) / 14  # tahmini okuma sonu (~14 karakter/sn): karşı taraf hitabı ardından 10 sn sayılmaz
     if STATE.get("meeting"):  # toplantı dosyası yoksa (deneme, toplantı dışı) not yazılmaz — yeni dosya açmasın
         try: note({"meeting": {"title": STATE["meeting"]}, "text": m, "kaynak": "suflor", "at": datetime.datetime.now().isoformat(timespec="seconds")})
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")
