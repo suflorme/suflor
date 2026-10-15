@@ -46,3 +46,24 @@ def toplantiya_soyle(metin=None):
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")
     print(f"TOPLANTIYA SÖYLE: {len(m)} karakter · aygıt {aygit}{' · kulaklıkta da' if len(ps) > 1 else ' · kulaklık yok, yerelde okunmadı'}")
     return {"ok": True, "metin": "🔊 " + m[:120]}
+
+# Menü uygulaması nöbeti (v0.39.0): Teams'in mikrofonu BlackHole'sa ve menü uygulaması kapanırsa karşı taraf kullanıcıyı da duymaz. Ayar açıkken
+# 5 sn'de bir bakılır; kapalıysa yeniden açılır ve bildirim gelir (en çok 5 dk'da bir). menu_yeniden'in kısa kapanışı da yeniden açmayla biter (zararsız).
+TS_NOBET = {"son_uyari": 0.0}
+def _ts_nobet():
+    while True:
+        time.sleep(5)
+        try:
+            if AYAR.get("toplantiya_ses") is not True or AYAR.get("menu_cubugu") is not True or deneme_aktarici() or not os.path.isdir(MENU_APP): continue
+            if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: continue
+            time.sleep(3)  # menu_yeniden kapatıp açıyor olabilir
+            if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: continue
+            print("TOPLANTIYA SÖYLE: menü uygulaması kapalı — yeniden açılıyor (Teams'in mikrofonu BlackHole'sa ses gitmiyordu)")
+            STATE["_menu_son"] = 0  # bildirim menüye değil macOS'a
+            if time.time() - TS_NOBET["son_uyari"] > 300:
+                TS_NOBET["son_uyari"] = time.time()
+                bildirim("Suflor.me", _t("Menü uygulaması kapandı — yeniden açılıyor", "Menu app quit — reopening"),
+                         _t("Teams'te mikrofon BlackHole ise birkaç saniye sesin gitmemiş olabilir.", "If Teams uses BlackHole as the microphone, your voice may have been cut for a few seconds."))
+            menu_baslat()
+        except Exception as e: print(f"TOPLANTIYA SÖYLE: nöbet hatası {e.__class__.__name__}")
+if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_ts_nobet, daemon=True).start()

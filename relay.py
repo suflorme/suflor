@@ -1820,7 +1820,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
         if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
             if p.get("tur") not in ("onemli", "ozet", "sessiz", "sesli_ceviri", "soyle"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | sesli_ceviri | soyle"}, 400)
-            komut_uygula(p["tur"], str(p.get("not") or "")[:200], (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
+            komut_uygula(p["tur"], (str(p.get("metin") or p.get("not") or "")[:1200] if p["tur"] == "soyle" else str(p.get("not") or "")[:200]), (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
             return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view(), "yaparken": yaparken_view()})
         if self.path == "/ses-yerel":  # yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar
             if self.headers.get("Origin") or not secrets.compare_digest(self.headers.get("X-Suflor-Anahtar", ""), SES_KEY): return self._json({"ok": False, "err": "anahtar"}, 403)

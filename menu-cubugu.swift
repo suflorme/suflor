@@ -734,7 +734,13 @@ final class OrtakMik {
     // sesini ve klavyeyi kulaklıkta duydu). Giriş motoru varsayılan mikrofonu dinler, örnekler kısa kuyruğa; çıkış motorunun aygıtı
     // auAudioUnit.setDeviceID ile BlackHole, kaynak düğümü kuyruktan okur. Kuyruk en çok 0,25 sn (gecikme sınırlı); açılışta gerçek aygıtlar günlüğe.
     var giris: AVAudioEngine?; var cikis: AVAudioEngine?; var bos = 0; var gozlem: [NSObjectProtocol] = []
-    var kuyruk: [Float] = []; let kilit = NSLock(); var tavan = 12000
+    var kuyruk: [Float] = []; let kilit = NSLock(); var tavan = 12000; var sonUyari = Date.distantPast
+    // Teams BlackHole'u okurken aktarım kurulamazsa karşı taraf kullanıcıyı duymaz → bildirim (en çok 5 dk'da bir)
+    func uyar(_ m: String) {
+        print("ORTAK MİK: UYARI — \(m)"); guard Date().timeIntervalSince(sonUyari) > 300 else { return }; sonUyari = Date()
+        let c = UNMutableNotificationContent(); c.title = "Suflor.me"; c.subtitle = m; c.body = "Teams'te mikrofonu geçici olarak Harici Mikrofon'a al."; c.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil)) { _ in }
+    }
     var motor: AVAudioEngine? { cikis }
     func blackhole() -> AudioObjectID? {
         caDizi(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDevices).first { id in
@@ -757,9 +763,9 @@ final class OrtakMik {
         } else if baskaGiris() { bos = 0 } else { bos += 1; if bos >= 10 { durdur("mikrofonu okuyan toplantı yok") } }
     }
     func basla(_ bh: AudioObjectID) {
-        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { uyar("Mikrofon izni yok — Teams'e sesin gitmiyor"); return }
         let g = AVAudioEngine(), c = AVAudioEngine()
-        do { try c.outputNode.auAudioUnit.setDeviceID(bh) } catch { print("ORTAK MİK: çıkış aygıtı ayarlanamadı (\(error.localizedDescription))"); return }
+        do { try c.outputNode.auAudioUnit.setDeviceID(bh) } catch { uyar("Ses BlackHole'a aktarılamadı — Teams'e sesin gitmiyor"); return }
         let bic = g.inputNode.outputFormat(forBus: 0); guard bic.sampleRate > 0, let mono = AVAudioFormat(standardFormatWithSampleRate: bic.sampleRate, channels: 1) else { return }
         tavan = Int(bic.sampleRate / 4); kilit.lock(); kuyruk.removeAll(); kilit.unlock()
         let kaynak = AVAudioSourceNode(format: mono) { [weak self] _, _, n, abl -> OSStatus in
@@ -775,12 +781,12 @@ final class OrtakMik {
             self.kilit.lock(); self.kuyruk.append(contentsOf: UnsafeBufferPointer(start: d[0], count: Int(buf.frameLength)))
             if self.kuyruk.count > self.tavan { self.kuyruk.removeFirst(self.kuyruk.count - self.tavan) }; self.kilit.unlock()
         }
-        do { try c.start(); try g.start() } catch { g.inputNode.removeTap(onBus: 0); c.stop(); print("ORTAK MİK: başlamadı (\(error.localizedDescription))"); return }
+        do { try c.start(); try g.start() } catch { g.inputNode.removeTap(onBus: 0); c.stop(); uyar("Mikrofon aktarımı başlamadı — Teams'e sesin gitmiyor (\(error.localizedDescription))"); return }
         giris = g; cikis = c; bos = 0
         for m in [g, c] { gozlem.append(NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: m, queue: .main) { [weak self] _ in self?.durdur("aygıt değişti") }) }  // döngü yeniden kurar
         let gAyg = caObje(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice, AudioObjectID(0)) ?? 0
         print("ORTAK MİK: \(ad(gAyg)) → \(ad(c.outputNode.auAudioUnit.deviceID)) (\(Int(bic.sampleRate)) Hz)")
-        if c.outputNode.auAudioUnit.deviceID != bh { durdur("çıkış BlackHole değil — kulaklığa gitmesin") }
+        if c.outputNode.auAudioUnit.deviceID != bh { durdur("çıkış BlackHole değil — kulaklığa gitmesin"); uyar("Ses BlackHole'a aktarılamadı — Teams'e sesin gitmiyor") }
     }
     func durdur(_ neden: String) {
         gozlem.forEach { NotificationCenter.default.removeObserver($0) }; gozlem = []
