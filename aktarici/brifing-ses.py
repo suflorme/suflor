@@ -179,6 +179,7 @@ def ses_duzen(metin, mac=True):
 # /Users/Shared/Suflor/tepki-sesleri/v2), tepki.json {"tepkiler": [{"id", "tur", "metin", "tetik": [...], "dosya"}]}. Yalnız Mac sesiyle ve sistem
 # sesi kütüphanenin örnek aldığı sesken (ayar tepki_ses_adi, varsayılan Elif; Kaan'da tını uymaz) kullanılır. Cevap bir tetikle başlarsa
 # ("Vay!", "Haha,") önce o türden bir klip çalar, kalan metni Mac sesi okur. Son TEPKI_SON klip yeniden seçilmez (aynı sesin tekrarı yapay).
+TEPKI_GENIS = {"saskinlik", "gulme", "sevinc", "rahatlama", "uzuntu_aksilik"}
 TEPKI = {"t": 0.0, "mt": None, "liste": [], "son": collections.deque(maxlen=8), "ses_t": 0.0, "ses_ok": False}
 def _tepki_yukle():
     if time.time() - TEPKI["t"] < 30: return TEPKI["liste"]
@@ -206,7 +207,8 @@ def tepki_sec(tur=None, tetik=None):
     if AYAR.get("tepki_sesi") is False or not _tepki_yukle() or not _tepki_ses_uygun(): return None
     import random
     aday = [r for r in TEPKI["liste"] if (tur is None or r["tur"] == tur) and (tetik is None or tetik in r["tetik"])]
-    if tetik and aday: aday = [r for r in TEPKI["liste"] if r["tur"] in {x["tur"] for x in aday}]  # aynı türün başka söyleyişleri de olur
+    # duygu türlerinde aynı türün başka söyleyişleri de olur ("Vay" ↔ "Hadi ya"); anlam taşıyanlarda (onay, merak, soru) yalnız aynı söyleyişin denemeleri
+    if tetik and aday: aday = [r for r in TEPKI["liste"] if r["tur"] in {x["tur"] for x in aday} & TEPKI_GENIS] or aday
     if not aday: return None
     son = list(TEPKI["son"]); taze = [r for r in aday if r["yol"] not in son]
     r = random.choice(taze) if taze else min(aday, key=lambda x: max(i for i, y in enumerate(son) if y == x["yol"]))  # hepsi yakında çaldıysa en eskisi

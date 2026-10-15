@@ -31,6 +31,12 @@ k, m = g["tepki_ayir"]("Vaybe sonra konuşuruz.")
 bak("tetiğe benzeyen ama noktalamasız başlangıç dokunulmaz", k is None)
 s = [ad(g["tepki_sec"]("saskinlik")) for _ in range(9)]
 bak(f"aynı klip art arda yok (3 söyleyiş, 9 seçim: {s[:4]}…)", all(a != b for a, b in zip(s, s[1:])))
+L2 = [("onay-tamam-1", "onay", "Tamam.", ["tamam"]), ("onay-anladim-1", "onay", "Anladım.", ["anladım"])]
+os.makedirs(os.path.join(lib, "onay"), exist_ok=True)
+for i, tur, m, tt in L2: open(os.path.join(lib, tur, i + ".wav"), "w").close()
+v = json.load(open(os.path.join(lib, "tepki.json"))); v["tepkiler"] += [{"id": i, "tur": tur, "metin": m, "tetik": tt, "dosya": f"{tur}/{i}.wav"} for i, tur, m, tt in L2]
+json.dump(v, open(os.path.join(lib, "tepki.json"), "w"), ensure_ascii=False); time.sleep(0.05); g["TEPKI"]["t"] = 0
+bak("anlam taşıyan türde (onay) yalnız aynı söyleyiş: 'Tamam.' → hep tamam", all(ad(g["tepki_ayir"]("Tamam. Yarın konuşuruz.")[0]) == "onay-tamam-1.wav" for _ in range(6)))
 bak("düşünme türü (bekleme) seçilir", "/dusunme/" in (g["tepki_sec"]("dusunme") or ""))
 g["AYAR"]["tepki_sesi"] = False
 bak("ayar tepki_sesi: false → klip yok", g["tepki_ayir"]("Vay! Tamam.")[0] is None)
