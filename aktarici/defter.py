@@ -3,7 +3,9 @@
 # Toplantı bitince bas-konuşla "ne konuştuk, ne karar aldık" diye sorulur; cevap bu defterden gelir. Defter = başlık + gündem + brifing + tam döküm
 # (satırlar, kartlar, notlar, kanıt ve gündem işaretleri .md'nin içinde) + konuşmacılar + özet. 13 Ekim ölçümü (deneme 9, 16 ayrıntı sorusu): tam defter
 # Sonnet'le 16/16 doğru, soru başı ~0,016 $; toplantı oturumunun kopyası da doğru ama ~9,3 $/soru. Kişi adı içerir: iç veri, yalnız Claude'a gider.
-DEFTER_EN_COK = 300000  # karakter (~100k belirteç); üstünde kısa defter + tam dökümde Grep (uzun toplantı ölçümü sonra)
+DEFTER_EN_COK = 250000  # karakter (~145k belirteç; ölçüm 15 Ekim: 1 karakter ≈ 0,57 belirteç + ~18k sabit); üstünde kısa defter + tam dökümde Grep.
+# Uzun toplantı ölçümü (15 Ekim, 2,7 ve 5,4 sa gerçek döküm): tam defter 16/16, 300k'da giriş 192k belirteç (pencere 200k); kısa defter 14–15/16 — ortadaki
+# işaretsiz satırı aramadan "yok" dedi. Bu yüzden sınır 250k ve kısa defterde "yok" demeden içerik araması zorunlu (KONUS_ISTEM + aşağıdaki yönerge).
 DEFTER_ORTUSME_SN = 180  # aynı toplantının bölünmüş dosyaları (v0.32.15 öncesi masaüstü başlık değişimi) en az bu kadar üst üste yazılmıştır
 _DOSYA_RX = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})-.+\.md$")
 _DF_ON = {"t": 0, "v": None, "k": None}
@@ -129,7 +131,8 @@ def defter_metni(d=None):
     sinir = (son - datetime.timedelta(minutes=30)).strftime("%H:%M:%S"); kisa = []
     for f, s in dokum:
         kisa.append(f"## {_t('Döküm (kısa: işaretli satırlar + son 30 dk)', 'Transcript (short: marked lines + last 30 min)')}: {f}\n"
-                    + _t(f"Tam döküm: {os.path.join(BASE, f)} — ayrıntı gerekirse Grep ile ara.", f"Full transcript: {os.path.join(BASE, f)} — Grep it for detail.") + "\n"
+                    + _t(f"Tam döküm: {os.path.join(BASE, f)} — bu kısa defterde olmayan her şey orada: 'kayıtta yok' demeden önce Grep ile satır içeriğinde ara (output_mode content, -i, en az iki farklı sözcükle).",
+                            f"Full transcript: {os.path.join(BASE, f)} — everything missing from this short record is there: before saying 'not in the record', Grep the line contents (output_mode content, -i, at least two different words).") + "\n"
                     + "\n".join(l for l in s if "**" in l or l.startswith("#") or (l.startswith("| ") and l[2:10] >= sinir)))
     k = "\n".join(p) + "\n\n" + (oz + "\n\n" if oz else "") + kisiler + "\n\n" + "\n\n".join(kisa)
     return k[-DEFTER_EN_COK:] if len(k) > DEFTER_EN_COK else k, True

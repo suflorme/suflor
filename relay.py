@@ -907,6 +907,46 @@ def karsi_konusuyor(sn=90):
 def toplanti_var():  # eklenti son 60 sn'de toplantıda olduğunu bildirdi mi (iframe nabızları call=false gönderir, ayrı tutulur)
     return time.time() - (STATE.get("_cagri_son") or 0) < TOPLANTI_VAR_SN
 TOPLANTI_VAR_SN = 6 if os.environ.get("SUFLOR_TEST_HIZLI") else 60
+# --- Deneme hatırlatması (v0.35.2): canli/hatirlatma.json (geliştirme oturumu yazar: {"id", "baslik", "maddeler": [...], "altyazi_olc": bool}) — sıradaki
+# gerçek toplantıda (toplantı sürerken kullanıcıdan başka birinin satırı gelince) panoda bir kez, "Tamam" kapatır. altyazi_olc: masaüstü toplantıda
+# ≥ 3 katılımcı görülünce menü uygulamasının `--ax-altyazi 180` teşhisi bir kez kendiliğinden (kullanıcı komutu hatırlamak zorunda kalmasın).
+HATIRLAT_YOL = os.path.join(BASE, "hatirlatma.json")
+def _hat_oku():
+    try: h = json.load(open(HATIRLAT_YOL, encoding="utf-8")); return h if isinstance(h, dict) and h.get("id") else None
+    except (OSError, ValueError): return None
+def _hat_yaz(h):
+    try:
+        with open(HATIRLAT_YOL + ".tmp", "w", encoding="utf-8") as f: json.dump(h, f, ensure_ascii=False, indent=1)
+        os.replace(HATIRLAT_YOL + ".tmp", HATIRLAT_YOL)
+    except OSError as e: print(f"HATIRLATMA: yazılamadı ({e.__class__.__name__})")
+def hatirlat_view():
+    h = _hat_oku()
+    if not h or h.get("kapandi"): return None
+    ben = ben_adi()
+    if toplanti_var():
+        if not any(k and k != ben and k != "?" for _, k, _ in SON_SATIRLAR): return None  # karşı taraf yok: tek kişilik deneme sayılmaz
+    elif not _hat_yakin(): return None
+
+    simdi = datetime.datetime.now().isoformat(timespec="seconds"); m = STATE.get("masaustu") or {}
+    if h.get("altyazi_olc") and not h.get("altyazi_basladi") and m.get("toplantida") and len(m.get("katilimcilar") or []) >= 3:
+        h["altyazi_basladi"] = simdi; _hat_yaz(h); print(f"HATIRLATMA: altyazı ölçümü başladı (180 sn, {len(m.get('katilimcilar') or [])} katılımcı)")
+        if os.environ.get("SUFLOR_TEST_BASLAT"): print("AÇ (deneme): menü --ax-altyazi 180")
+        elif os.path.isdir(MENU_APP): subprocess.Popen(["open", "-g", "-n", "-a", MENU_APP, "--args", "--ax-altyazi", "180"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if not h.get("gosterildi"): h["gosterildi"] = simdi; _hat_yaz(h); print(f"HATIRLATMA: panoda — {h.get('baslik')}")
+    return {"id": h["id"], "baslik": str(h.get("baslik") or "")[:120], "maddeler": [str(x)[:300] for x in (h.get("maddeler") or [])][:8],
+            "altyazi": "basladi" if h.get("altyazi_basladi") else ("bekliyor" if h.get("altyazi_olc") else None)}
+def _hat_yakin():  # toplantıdan önce: takvimde başka katılımcılı bir toplantı 15 dk içinde başlıyor (ya da sürüyor)
+    simdi = datetime.datetime.now().astimezone()
+    for e in TAKVIM_TAM.values():
+        if e.get("tum_gun") or e.get("reddettin") or (e.get("kisi_sayisi") or len(e.get("katilimcilar") or [])) < 2: continue
+        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
+        except (KeyError, ValueError): continue
+        if s_ > simdi and (b - simdi).total_seconds() <= 900: return True
+    return False
+def hatirlat_kapat(p):
+    h = _hat_oku()
+    if not h or p.get("id") != h.get("id"): return {"ok": False, "err": "yok"}
+    h["kapandi"] = datetime.datetime.now().isoformat(timespec="seconds"); _hat_yaz(h); print("HATIRLATMA: kapatıldı"); return {"ok": True}
 def yerel_ses_durum():
     # yok (kurulu değil) · kapali (ayar ya da nabız yok) · bekliyor (toplantı uygulaması mikrofonu kullanmıyor) · dinliyor · izin
     y = STATE["yerel_ses"]; now = time.time()
@@ -1607,7 +1647,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus()); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = piper_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1698,6 +1738,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(brifing_iste(p))
+        if self.path == "/hatirlat":  # panodaki deneme hatırlatmasının Tamam'ı — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(hatirlat_kapat(p))
         if self.path == "/ayar":  # panodaki ⚙ Ayarlar — yalnız pano (aynı köken + anahtar)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(ayar_yaz(p.get("degisen")))
