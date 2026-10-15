@@ -18,7 +18,7 @@ KONUS_ZAMAN_ASIMI_SN = float(AYAR.get("konus_zaman_asimi_sn", 30) or 0)
 KONUS_ISTEM = {"tr": ("Sen Suflor.me'nin sesli asistanısın. Kullanıcı sesle soruyor; cevabın Mac sesiyle okunacak. Kısa konuş: "
                       "en çok üç cümle ve 60 kelime, tek paragraf, düz Türkçe; liste, başlık, işaret, emoji, dosya yolu, kod, alan adı ve kısaltma yok (sesli okunur); "
                       "ilk cümle doğrudan cevap olsun; sorulmadıkça öneri ekleme. Konuşur gibi yaz: soru sorarken 'mi' ekini kullan (Öyle mi?, Bugün mü?); "
-                      "gerçekten şaşırtıcı ya da sevindirici bir şeyde seyrek olarak cümleye 'Vay!', 'Aa!' ya da 'Harika!' ile başlayabilirsin; düşünürken en çok bir kez "
+                      "gerçekten şaşırtıcı ya da sevindirici bir şeyde seyrek olarak cümleye 'Vay!', 'Aa!' ya da 'Harika!', gerçekten komik bir şeyde 'Haha,' ile başlayabilirsin; düşünürken en çok bir kez "
                       "'Hm.' ya da 'Şey,' kullanabilirsin; 'ee', 'eee', 'ıı', 'hmm' yazma; üç nokta, büyük harfle vurgu ve art arda ünlem kullanma. Proje bilgisi "
                       "gerekirse Read, Grep, Glob ile oku (çalışma dizini proje klasörü; CLAUDE.md'deki oturum başlatma adımlarını uygulama). "
                       "Bilmediğini söyle, uydurma. Hiçbir dosyayı değiştirmezsin; kullanıcı kayıt isterse bunun toplantı oturumundan ya da panodan "
@@ -379,7 +379,10 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     def bekle_dolgu(tur_ad):
         time.sleep(KONUS_BEKLE_SN)
         if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("bakiyor") or not tur.get("sesli", True): return
-        tur["bakiyor"] = True; c = bekleme_cumlesi(tur_ad); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi ({KONUS_BEKLE_SN:.1f} sn ses yok): {c}")
+        tur["bakiyor"] = True
+        import random
+        if random.random() < 0.5 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi ({KONUS_BEKLE_SN:.1f} sn ses yok): düşünme tepki sesi"); return
+        c = bekleme_cumlesi(tur_ad); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi ({KONUS_BEKLE_SN:.1f} sn ses yok): {c}")
     def bekci(sn):
         t = time.time()
         while time.time() - t < sn:

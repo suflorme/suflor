@@ -4,7 +4,7 @@
 # okunan metinde bilinmeyen yabancı görünümlü sözcükler kuyruğa girer (Türkçe sözcükler girmez), telaffuz_ekle sonrası yeni okunuş kullanılır.
 # Claude çağrısı yok. Kural ya da liste değişince koştur.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/telaffuz.py      (kaldı → çıkış 1)
-import os, re, sys, json, time, threading, tempfile
+import os, re, sys, json, time, threading, tempfile, collections, subprocess
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read()
 BASE = tempfile.mkdtemp(prefix="suflor-telaffuz-"); ARAYUZ_DILI = "tr"

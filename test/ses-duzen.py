@@ -6,7 +6,7 @@
 import os, re, sys, subprocess, tempfile
 K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); hata = 0
 src = open(os.path.join(K, "aktarici", "brifing-ses.py"), encoding="utf-8").read()
-g = {"re": re}; exec(src[src.index("_SD_DOLGU = "):src.index("# Okunan metinde görülen bilinmeyen yabancı sözcükler")], g); sd = g["ses_duzen"]
+g = {"re": re}; exec(src[src.index("_SD_DOLGU = "):src.index("# Tepki sesleri (v0.43.0")], g); sd = g["ses_duzen"]
 def bak(ad, v, b):
     global hata
     ok = v == b; hata += not ok; print(("✓ " if ok else "✗ ") + ad + ("" if ok else f": {v!r}, beklenen {b!r}"))

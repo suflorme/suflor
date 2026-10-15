@@ -174,6 +174,61 @@ def ses_duzen(metin, mac=True):
         m = _SD_UNLEM.sub(lambda x: f"{x.group(1)}[[pbas +6]] {x.group(2)}! [[pbas -6]] [[slnc 150]] ", m)
     m = re.sub(r"\s{2,}", " ", m).strip()
     return m[:1].upper() + m[1:] if m and metin.strip()[:1].isupper() else m
+# Tepki sesleri (v0.43.0; doğal ses araştırması D): Mac sesinin yapamadığı sözsüz/duygulu tepkiler (gülme, şaşkın "Vay!", "Hımm") Higgs Audio v3 ile
+# Elif örnek alınarak bir kez üretildi (kişisel kullanım, ticari olmayan lisans → açık depoya girmez): ayar tepki_sesleri (varsayılan
+# /Users/Shared/Suflor/tepki-sesleri/v2), tepki.json {"tepkiler": [{"id", "tur", "metin", "tetik": [...], "dosya"}]}. Yalnız Mac sesiyle ve sistem
+# sesi kütüphanenin örnek aldığı sesken (ayar tepki_ses_adi, varsayılan Elif; Kaan'da tını uymaz) kullanılır. Cevap bir tetikle başlarsa
+# ("Vay!", "Haha,") önce o türden bir klip çalar, kalan metni Mac sesi okur. Son TEPKI_SON klip yeniden seçilmez (aynı sesin tekrarı yapay).
+TEPKI = {"t": 0.0, "mt": None, "liste": [], "son": collections.deque(maxlen=8), "ses_t": 0.0, "ses_ok": False}
+def _tepki_yukle():
+    if time.time() - TEPKI["t"] < 30: return TEPKI["liste"]
+    TEPKI["t"] = time.time(); kok = os.path.expanduser(str(AYAR.get("tepki_sesleri") or "/Users/Shared/Suflor/tepki-sesleri/v2")); yol = os.path.join(kok, "tepki.json")
+    try: mt = os.path.getmtime(yol)
+    except OSError: TEPKI.update(liste=[], mt=None); return []
+    if mt != TEPKI["mt"]:
+        try:
+            v = json.load(open(yol, encoding="utf-8")); ls = []
+            for r in v.get("tepkiler") or []:
+                d = os.path.join(kok, str(r.get("dosya") or ""))
+                if r.get("tur") and os.path.isfile(d): ls.append(dict(r, yol=d, tetik=[" ".join(str(x).lower().split()) for x in r.get("tetik") or []]))
+            TEPKI.update(liste=ls, mt=mt); print(f"SES: tepki sesleri {len(ls)} klip")
+        except (OSError, ValueError, AttributeError) as e: print(f"SES: tepki.json okunamadı ({e.__class__.__name__})"); TEPKI.update(liste=[], mt=mt)
+    return TEPKI["liste"]
+def _tepki_ses_uygun():  # sistem sesi kütüphanenin örnek aldığı ses mi (60 sn önbellek)
+    if os.environ.get("SUFLOR_TEST_TEPKI"): return True
+    if time.time() - TEPKI["ses_t"] > 60:
+        TEPKI["ses_t"] = time.time(); ad = str(AYAR.get("tepki_ses_adi") or "Elif").lower()
+        try: sec = subprocess.run(["defaults", "read", "com.apple.Accessibility", "SpokenContentDefaultVoiceSelectionsByLanguage"], capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.TimeoutExpired): sec = ""
+        TEPKI["ses_ok"] = not AYAR.get("ses") and bool(re.search(r"voiceId = \"?[^\";]*_" + re.escape(ad) + r"_tr-TR", sec, re.I))
+    return TEPKI["ses_ok"]
+def tepki_sec(tur=None, tetik=None):
+    if AYAR.get("tepki_sesi") is False or not _tepki_yukle() or not _tepki_ses_uygun(): return None
+    import random
+    aday = [r for r in TEPKI["liste"] if (tur is None or r["tur"] == tur) and (tetik is None or tetik in r["tetik"])]
+    if tetik and aday: aday = [r for r in TEPKI["liste"] if r["tur"] in {x["tur"] for x in aday}]  # aynı türün başka söyleyişleri de olur
+    if not aday: return None
+    son = list(TEPKI["son"]); taze = [r for r in aday if r["yol"] not in son]
+    r = random.choice(taze) if taze else min(aday, key=lambda x: max(i for i, y in enumerate(son) if y == x["yol"]))  # hepsi yakında çaldıysa en eskisi
+    TEPKI["son"].append(r["yol"]); return r["yol"]
+def tepki_cal(tur):  # türden bir klibi okuma kuyruğuna (bekleme gibi metinsiz anlar); klip yoksa False
+    if not AYAR.get("konusma", True) or piper_acik(): return False
+    k = tepki_sec(tur)
+    if not k: return False
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): tepki {os.path.basename(k)}"); return True
+    with SES_K:
+        SES["q"].append(("dosya", k)); SES_K.notify()
+        if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
+    return True
+_TEPKI_BAS = re.compile(r"^\s*([^\W\d_][^\W\d_ ]*(?:\s+[^\W\d_]+){0,2}?)\s*([!.,…]+)\s*", re.U)
+def tepki_ayir(metin):  # (klip yolu, kalan metin) — cevap bir tetikle başlıyorsa
+    m = _TEPKI_BAS.match(metin or "")
+    if not m or not _tepki_yukle(): return None, metin
+    bas = " ".join(m.group(1).lower().split()); klip = None
+    for k in sorted({x for r in TEPKI["liste"] for x in r["tetik"]}, key=len, reverse=True):
+        if bas == k: klip = tepki_sec(tetik=k); break
+    if not klip: return None, metin
+    kalan = metin[m.end():].strip(); return klip, (kalan[:1].upper() + kalan[1:]) if kalan else ""
 # Okunan metinde görülen bilinmeyen yabancı sözcükler (v0.32.1; Piper her harfi Türkçe okur): Türkçe harfi olmayan ve yabancı yazım izi
 # taşıyan (q/w/x, th/sh/ch/ee/oo/ea/ou…, ünsüz+y sonu, ünsüzler arası y), büyük harfli kısaltma (2–5) ya da cümle ortasında büyük harfle başlayan sözcük
 # kuyruğa girer; _telaffuz_dongu bunları toplu Claude'a sorar → telaffuz-oto.json (ilk okumada eski hali, sonrakilerde doğru okunur).
@@ -293,19 +348,31 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
         if v != _SES_SEC["v"] or not _SES_SEC["t"]: print(f"SES: {'sistem sesi (Türkçe seçim)' if v is None else v}")
         _SES_SEC.update(t=time.time(), v=v)
     return _SES_SEC["v"]
-def seslendir(metin, kuyruk=False):
+def seslendir(metin, kuyruk=False, tepkisiz=False):
     if not AYAR.get("konusma", True) or not metin: return False
-    mac = not piper_acik(); metin = ses_duzen(telaffuz(metin, mac=mac), mac)
+    mac = not piper_acik(); klip = None
+    if mac and not tepkisiz: klip, metin = tepki_ayir(metin)
+    metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
     if not kuyruk: ses_durdur()
-    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): {len(metin)} karakter · {metin}"); return True
+    if os.environ.get("SUFLOR_TEST_BASLAT"):
+        if klip: print(f"SES (deneme): tepki {os.path.basename(klip)}")
+        if metin: print(f"SES (deneme): {len(metin)} karakter · {metin}")
+        return True
     with SES_K:
-        SES["q"].append(metin); SES_K.notify()
+        if klip: SES["q"].append(("dosya", klip))
+        if metin: SES["q"].append(metin)
+        SES_K.notify()
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
     return True
 def _ses_isci():
     while True:
         with SES_K:
             while not SES["q"]: SES_K.wait()
+            dosya = SES["q"].pop(0)[1] if isinstance(SES["q"][0], tuple) else None
+            if dosya:
+                try: SES["p"] = p = subprocess.Popen(["/usr/bin/afplay", dosya], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except OSError as e: print(f"SES: tepki çalınamadı {e.__class__.__name__}"); continue
+        if dosya: p.wait(); continue
         if piper_acik():  # yerel Türkçe ses (ayar ses_motoru: piper); okunamazsa Mac sesi
             with SES_K:
                 if not SES["q"]: continue
