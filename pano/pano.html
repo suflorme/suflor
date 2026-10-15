@@ -450,21 +450,27 @@ document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=doc
   catch(e){if(w)w.close();m.className='er';m.textContent=L("Suflor.me'ye ulaşılamadı")}finally{setTimeout(()=>b.disabled=false,3000)}}
 // bas-konuş (Faz 4): toplantı dışında basılı tut → pano mikrofonu 16 kHz → /bas-konus → yerel Whisper → Claude (açık süreç) → Mac sesi
 let kRec=null,kSure=null
+// v0.46.0 konuşurken yazıya dökme: kayıt sürerken saniyede bir yeni ses aktarıcıya (komut parca); bırakışta bütün kayıt yine gider (önek eşleşirse
+// aktarıcı yalnız kalan kısmı döker). Tarayıcı 16 kHz vermezse akış yok (dönüşüm parça parça birebir olmaz).
+function f2b64(f){const pcm=new Int16Array(f.length);for(let i=0;i<f.length;i++){const v=Math.max(-1,Math.min(1,f[i]));pcm[i]=v<0?v*32768:v*32767}
+  const u=new Uint8Array(pcm.buffer);let bin='';for(let i=0;i<u.length;i+=32768)bin+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(bin)}
+function konusAkis(k){if(!k||!k.hazir)return;const yeni=k.parca.slice(k.gid);if(!yeni.length)return;k.gid=k.parca.length
+  let n=yeni.reduce((a,b)=>a+b.length,0),f=new Float32Array(n),o=0;for(const b of yeni){f.set(b,o);o+=b.length}
+  j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'parca',pcm:f2b64(f)})}).catch(()=>{})}
 async function konusBasla(){if(kRec)return;kRec={hazir:false};konusCiz()
   let r={};try{r=await j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'basla'})})}catch(e){}
   if(!r.ok){kRec=null;konusCiz();geciciDurum(L('Bas-konuş başlamadı'),r.err||'');return}
   try{const st=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}}),ac=new AudioContext({sampleRate:16000}),src=ac.createMediaStreamSource(st),pr=ac.createScriptProcessor(4096,1,1),parca=[]
     pr.onaudioprocess=e=>parca.push(new Float32Array(e.inputBuffer.getChannelData(0)));src.connect(pr);pr.connect(ac.destination)
     if(!kRec){st.getTracks().forEach(t=>t.stop());ac.close();return}  // izin beklerken bırakıldı
-    Object.assign(kRec,{st,ac,pr,parca,hazir:true});kSure=setTimeout(konusBitir,60000);if(kRec.birak)konusBitir()}
+    Object.assign(kRec,{st,ac,pr,parca,hazir:true,gid:0});if(ac.sampleRate===16000){const k=kRec;k.akis=setInterval(()=>konusAkis(k),1000)}
+    kSure=setTimeout(konusBitir,60000);if(kRec.birak)konusBitir()}
   catch(e){kRec=null;konusCiz();geciciDurum(L('Mikrofon açılamadı'),String(e&&e.name||''))}}
-async function konusBitir(){const k=kRec;if(!k)return;if(!k.hazir){k.birak=true;return}kRec=null;clearTimeout(kSure);konusCiz()
+async function konusBitir(){const k=kRec;if(!k)return;if(!k.hazir){k.birak=true;return}kRec=null;clearTimeout(kSure);if(k.akis)clearInterval(k.akis);konusCiz()
   k.pr.disconnect();k.st.getTracks().forEach(t=>t.stop());const sr=k.ac.sampleRate;await k.ac.close()
   let n=k.parca.reduce((a,b)=>a+b.length,0),f=new Float32Array(n),o=0;for(const b of k.parca){f.set(b,o);o+=b.length}
   if(sr!==16000){const m=Math.floor(n*16000/sr),g=new Float32Array(m);for(let i=0;i<m;i++)g[i]=f[Math.floor(i*sr/16000)];f=g;n=m}  // tarayıcı 16 kHz vermezse
-  const pcm=new Int16Array(n);for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,f[i]));pcm[i]=v<0?v*32768:v*32767}
-  const u=new Uint8Array(pcm.buffer);let bin='';for(let i=0;i<u.length;i+=32768)bin+=String.fromCharCode.apply(null,u.subarray(i,i+32768))
-  let r={};try{r=await j('/bas-konus',{method:'POST',body:JSON.stringify({pcm:btoa(bin)})})}catch(e){}
+  let r={};try{r=await j('/bas-konus',{method:'POST',body:JSON.stringify({pcm:f2b64(f)})})}catch(e){}
   if(!r.ok)geciciDurum(L('Soru gönderilemedi'),r.err||'');refresh()}
 // deneme hatırlatması (v0.35.2): sıradaki gerçek toplantıda bir kez — panoda ve mini panoda; Tamam kapatır (aktarıcı dosyaya yazar)
 function renderHat(d,s){const el=d.getElementById(d===document?'hat':'mhat'),h=s.hatirlat;if(!el)return;el.hidden=!h;if(!h)return

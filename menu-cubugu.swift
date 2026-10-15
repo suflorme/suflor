@@ -83,7 +83,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!
     var durum: Durum = .bekliyor; var imza = ""; var gorulenKart = Set<String>(); var acikKart = Set<String>()
     var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?
-    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var ortakMik: OrtakMik?
+    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?
     func applicationDidFinishLaunching(_ n: Notification) {
         oge = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
@@ -252,12 +252,17 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         }
         let k = Kayitci(); guard k.basla() else { uyar("Mikrofon açılamadı"); return }
         kayitci = k; simgeGuncelle(); NSSound(named: "Pop")?.play()
+        akisZaman = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in  // konuşurken saniyede bir parça (aktarıcı duraksamada döker)
+            guard let d = self?.kayitci?.yeni(), !d.isEmpty else { return }
+            istek("/bas-konus", ["komut": "parca", "pcm": d.base64EncodedString()]) { _ in }
+        }
         istek("/bas-konus", ["komut": "basla"]) { [weak self] v in
             if let v = v, (v["ok"] as? Bool) == false { DispatchQueue.main.async { _ = self?.kayitci?.durdur(); self?.kayitci = nil; self?.simgeGuncelle(); self?.uyar(v["err"] as? String ?? "Bas-konuş başlamadı") } }
         }
     }
     func basBitir() {
         guard let k = kayitci else { return }
+        akisZaman?.invalidate(); akisZaman = nil
         let pcm = k.durdur(); kayitci = nil; simgeGuncelle()
         istek("/bas-konus", ["pcm": pcm.base64EncodedString()], sure: 20) { [weak self] v in
             if let v = v, (v["ok"] as? Bool) == false { DispatchQueue.main.async { self?.uyar(v["err"] as? String ?? "Gönderilemedi") } }
@@ -712,6 +717,8 @@ final class Kayitci {
         do { try motor.start() } catch { giris.removeTap(onBus: 0); return false }
         return true
     }
+    var gonderilen = 0  // v0.46.0: konuşurken yazıya dökme — yeni() son çağrıdan beri biriken sesi verir (veri silinmez; bırakışta bütün kayıt gider)
+    func yeni() -> Data { kilit.lock(); defer { kilit.unlock() }; let d = veri.count > gonderilen ? veri.subdata(in: gonderilen..<veri.count) : Data(); gonderilen = veri.count; return d }
     func durdur() -> Data { motor.inputNode.removeTap(onBus: 0); motor.stop(); kilit.lock(); defer { kilit.unlock() }; return veri }
 }
 

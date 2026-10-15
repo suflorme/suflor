@@ -1759,6 +1759,7 @@ class H(BaseHTTPRequestHandler):
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             if p.get("komut") == "basla": return self._json(konus_basla())
             if p.get("komut") == "sus": ses_durdur(); return self._json({"ok": True})
+            if p.get("komut") == "parca": return self._json(konus_parca(p))
             return self._json(konus_ses(p))
         if self.path == "/eylem-geri-al":  # sesli kararın Geri al'ı (10 sn) — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
