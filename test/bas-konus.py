@@ -238,9 +238,13 @@ try:
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
     ad_ = {"re": _re, "time": time, "print": lambda *a, **k: None}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False: okunan_.append(m) or True
     exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)
-    t_ = {"tampon": "Vay! Birinci cümle burada. İkinci cümle de var. Üçüncü cümle geliyor. Dördüncü okunmamalı. Beşinci de okunmamalı"}
+    t_ = {"tampon": "Vay! Birinci cümle burada. İkinci cümle de var. Üçüncü cümle geliyor. Dördüncü cümle de. Beşinci cümle son. Altıncı okunmamalı. Yedinci de okunmamalı"}
     ad_["_konus_cumle"](t_); ad_["_konus_cumle"](t_, son=True)
-    ok(f"okuma en çok üç cümle ('Vay!' sayılmaz; okunan {len(okunan_)})", okunan_[-1].startswith("Üçüncü") and len(okunan_) == 4 and t_.get("kesik"))
+    ok(f"okuma en çok beş cümle ('Vay!' sayılmaz; okunan {len(okunan_)})", okunan_[-1].startswith("Beşinci") and len(okunan_) == 6 and t_.get("kesik"))
+    # v0.54.0 anlamsız söz: Whisper'ın "!" gibi metni Claude'a gitmez
+    ad2 = {"re": _re}; exec(kod_[kod_.index("KONUS_SES_SOZ = "):kod_.index("# İş talimatı (toplantı")], ad2)
+    ok("anlamsız söz Claude'a gitmez ('!', 'Hı hı.', 'A.'), gerçek söz gider ('Evet.', soru)", all(ad2["konus_anlamsiz"](x) for x in ("!", "?", "Hı hı.", "A.", "Ee, ıı.")) and not any(ad2["konus_anlamsiz"](x) for x in ("Evet.", "Bugün ne var?", "Tamam")))
+    ok("bekleme cümlelerinde ve istemde 'şey' yok", "Şey" not in kod_[kod_.index("BEKLE_GENEL = "):kod_.index("BEKLE_TUR = ")] and "'Şey,'" not in kod_[kod_.index("KONUS_ISTEM = {"):kod_.index("# --- Hızlı bilgi")])
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])
