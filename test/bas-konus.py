@@ -253,6 +253,18 @@ try:
     ad2 = {"re": _re}; exec(kod_[kod_.index("KONUS_SES_SOZ = "):kod_.index("# İş talimatı (toplantı")], ad2)
     ok("anlamsız söz Claude'a gitmez ('!', 'Hı hı.', 'A.'), gerçek söz gider ('Evet.', soru)", all(ad2["konus_anlamsiz"](x) for x in ("!", "?", "Hı hı.", "A.", "Ee, ıı.")) and not any(ad2["konus_anlamsiz"](x) for x in ("Evet.", "Bugün ne var?", "Tamam")))
     ok("bekleme cümlelerinde ve istemde 'şey' yok", "Şey" not in kod_[kod_.index("BEKLE_GENEL = "):kod_.index("BEKLE_TUR = ")] and "'Şey,'" not in kod_[kod_.index("KONUS_ISTEM = {"):kod_.index("# --- Hızlı bilgi")])
+    # v0.57.5 veritabanı tazelik notu: son vt_sor'dan sonra dosya değişince bir kez; okunamazsa son sorgu VT_TAZE_SN'den eskiyse
+    vtd = os.path.join(proje, "vt.db"); open(vtd, "w").close()
+    ad3 = {"os": os, "time": time, "print": lambda *a: None, "_t": lambda tr, en: tr, "AYAR": {"proje": proje, "veritabani": {"yol": "vt.db"}}, "_KS": {}}
+    exec(kod_[kod_.index("VT_TAZE_SN = "):kod_.index("BRIFING_YASAK = ")], ad3)
+    ks = ad3["_KS"]; n0 = ad3["_vt_tazele_notu"]()
+    ks["vt_son"] = (time.time(), ad3["_vt_mt"]()); n1 = ad3["_vt_tazele_notu"]()
+    os.utime(vtd, (time.time() + 5, time.time() + 5)); n2 = ad3["_vt_tazele_notu"](); n3 = ad3["_vt_tazele_notu"]()
+    ad3["AYAR"]["veritabani"]["yol"] = "yok.db"; ks["vt_son"] = (time.time() - 700, None); n4 = ad3["_vt_tazele_notu"]()
+    ks["vt_son"] = (time.time() - 60, None); n5 = ad3["_vt_tazele_notu"]()
+    ok("veritabanı tazelik notu: sorgu yokken ve değişmeden yok, değişince bir kez, okunamazsa 10 dk sonra",
+       not n0 and not n1 and "değişti" in n2 and "vt_sor" in n2 and not n3 and "11 dk önce" in n4 and not n5)
+    ok("not soruyla gider, vt_sor turu tazelik kaydını yeniler", "_vt_tazele_notu() + metin" in kod_ and 'any("suflorvt__vt_so" in x for x in tur.get("araclar")' in kod_)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

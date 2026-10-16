@@ -91,6 +91,26 @@ def konus_vt_hazirla():  # → MCP yapılandırma dosyasının yolu ya da None
                                                            **({"SUFLOR_VT_SEMA_YOK": "1"} if _KS["vt_sema"] else {})}}}}, f)
         os.replace(yol + ".tmp", yol); return yol
     except OSError as e: print(f"KONUŞ: veritabanı araç yapılandırması yazılamadı ({e.__class__.__name__})"); return None
+# v0.57.5: açık süreçte aynı güncel durum sorusu geçmişten cevaplanır (3 sn); veri bu arada değiştiyse eski kalır. Son vt_sor'dan sonra veritabanı dosyası
+# değiştiyse (okunamazsa: son sorgu VT_TAZE_SN'den eskiyse) soruya tek seferlik not eklenir: güncel durum sorusuysa yeniden sorgula. Değişmediyse hızlı yol aynı.
+VT_TAZE_SN = 600
+def _vt_mt():  # kayıt veritabanının değişme saati (launchd'deki aktarıcı Masaüstü'nü okuyamazsa None)
+    v = AYAR.get("veritabani")
+    if not isinstance(v, dict) or not v.get("yol"): return None
+    try: return os.path.getmtime(os.path.join(os.path.expanduser(AYAR.get("proje") or ""), os.path.expanduser(v["yol"])))
+    except OSError: return None
+def _vt_tazele_notu():
+    s = _KS.get("vt_son")
+    if not s or _KS.get("vt_not") == s: return ""
+    t, mt = s; m = _vt_mt()
+    if m is not None and mt is not None:
+        if m <= mt: return ""
+        neden = _t("kayıt veritabanı son sorgundan sonra değişti", "the records database changed after your last query")
+    elif time.time() - t >= VT_TAZE_SN: neden = _t(f"son veritabanı sorgun {int((time.time() - t) // 60)} dk önceydi", f"your last database query was {int((time.time() - t) // 60)} min ago")
+    else: return ""
+    _KS["vt_not"] = s; print(f"KONUŞ: veritabanı tazelik notu ({'değişti' if m is not None and mt is not None else 'süre'})")
+    return _t(f"[Not: {neden}; bu bir güncel durum sorusuysa önceki cevabını tekrarlama, vt_sor ile yeniden sorgula.]\n",
+              f"[Note: {neden}; if this is a current-state question, don't repeat your earlier answer, query again with vt_sor.]\n")
 BRIFING_YASAK = ("dangerously", "Bash", "Write", "Edit", "NotebookEdit", "WebFetch", "bypassPermissions", "acceptEdits")  # brifing.swift: argümanda geçerse yardımcı açılmaz
 def konus_istem(vt=None):
     t = KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]; k = kisilik()
@@ -384,6 +404,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 yenile = _KS["sayac"] >= KONUS_TUR_EN_COK or cagri >= max(KONUS_GIRIS_SINIR, _KS["defter_taban"] + 40000 if _KS.get("defter_md") else 0)
                 with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
                 _konus_kur(durum="hazir", olcum={k: o[k] for k in ("wh_ms", "ilk_ms", "ses_ms", "sure_ms", "maliyet")})
+                if any("suflorvt__vt_so" in x for x in tur.get("araclar") or []): _KS["vt_son"] = (time.time(), _vt_mt())  # v0.57.5
                 if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"))  # v0.56.0 (S68)
                 print(f"KONUŞ: cevap · yazıya {o['wh_ms']} ms · ilk metin {o['ilk_ms']} ms · ilk ses {o['ses_ms']} ms · {o['maliyet']} $")
                 if yenile:  # pano durumu "hazır" kalır (cevap görünür); süreç arka planda kapanır, sonraki basış yenisini açar
@@ -754,7 +775,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         obl = ob if ok_ and _KS.get("once_k") != ok_ else ""
         if obl: _KS["once_k"] = ok_; print(f"KONUŞ: sıradaki toplantı bloğu gitti ({len(obl) // 100 / 10} bin karakter)")
         _ONARA["son_tur"] = None; oa = konus_onara(metin); tur_ad = "defter" if dfb else _ONARA.get("son_tur") if oa else None
-        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + konus_baglam(simdi, tb, metin) + oa + metin}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
+        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + konus_baglam(simdi, tb, metin) + oa + _vt_tazele_notu() + metin}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()
