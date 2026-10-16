@@ -221,6 +221,14 @@ try:
     n1 = log().count("konuşana gitti")
     karsi(2, "Suflor, not al bunu lütfen."); karsi(3, "Teslim tarihi cuma olabilir mi?"); karsi(4, "Suflör'ün dediği doğru."); time.sleep(1)
     ok("karşı tarafta iş talebi, hitapsız satır ve ek almış ad konuşana gitmedi", log().count("konuşana gitti") == n1)
+    # v0.51.1 okuma sınırı: _konus_cumle beş cümlelik cevabın yalnız üçünü okur (işlev doğrudan; uçtan uca akışta tur sayısını bozmasın)
+    import re as _re
+    kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
+    ad_ = {"re": _re, "time": time, "print": lambda *a, **k: None}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False: okunan_.append(m) or True
+    exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)
+    t_ = {"tampon": "Vay! Birinci cümle burada. İkinci cümle de var. Üçüncü cümle geliyor. Dördüncü okunmamalı. Beşinci de okunmamalı"}
+    ad_["_konus_cumle"](t_); ad_["_konus_cumle"](t_, son=True)
+    ok(f"okuma en çok üç cümle ('Vay!' sayılmaz; okunan {len(okunan_)})", okunan_[-1].startswith("Üçüncü") and len(okunan_) == 4 and t_.get("kesik"))
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

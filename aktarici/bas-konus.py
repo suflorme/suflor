@@ -169,11 +169,19 @@ def konus_kapat(neden, durum_koru=False):
         except subprocess.TimeoutExpired: pass
     if w: print(f"KONUŞ: süreç kapandı ({neden})")
     if KONUS["durum"] not in ("hata",) and not durum_koru: KONUS["durum"] = "kapali"
+# Okuma en çok KONUS_OKU_EN_COK cümle (v0.51.1, 16 Ekim): istem "en çok üç cümle / toplantı sorusunda iki kısa cümle" der ama uzun defterli cevapta
+# 3–5 cümle olabiliyor (ölçüm uzun-toplanti L6–L7: ≤ 2 cümle 9–16/16; istem değişikliği düzeltmedi). Sonrası okunmaz, panoda yazılı kalır. Tek sözcüklük
+# "Vay!" / "Hm." sayılmaz.
+KONUS_OKU_EN_COK = 3
 def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okuma kuyruğuna
     while True:
         m = re.search(r"^(.+?[.!?…])(\s+|$)", tur["tampon"], re.S) if not son else (re.match(r"^(.+)$", tur["tampon"].strip(), re.S) if tur["tampon"].strip() else None)
         if not m: break  # cümle sonu işareti görünür görünmez okunur (tek cümlelik cevapta sonucu bekleme: ölçüm 8 Ekim, +1,8 sn)
         c = m.group(1).strip(); tur["tampon"] = tur["tampon"][m.end():] if not son else ""
+        if c and tur.get("sesli", True) and tur.get("okunan", 0) >= KONUS_OKU_EN_COK:
+            if not tur.get("kesik"): tur["kesik"] = True; print(f"KONUŞ: okuma {KONUS_OKU_EN_COK} cümlede durdu — kalanı panoda")
+            c = ""
+        if c and len(c.split()) > 1: tur["okunan"] = tur.get("okunan", 0) + 1
         if c and tur.get("sesli", True) and seslendir(c, kuyruk=True) and not tur.get("t_ses"): tur["t_ses"] = time.time()
         if son: break
 def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenisinin turuna dokunmasın (S48: toplantı değişince süreç yenilenir)
