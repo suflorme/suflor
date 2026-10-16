@@ -6,7 +6,8 @@
 # değilse SOHBET_UZUN_SN beklenir; konuşma sürerse tur sürer; son parçanın metni "bekle / bir saniye" ile bitiyorsa SOHBET_BEKLE_SN. Süre dolunca
 # kayıt bas-tut'un bırakış yoluna (konus_ses) gider. Suflor düşünürken/konuşurken gelen ses atılır; ancak cevap SOHBET_KORU_SN'den uzun süredir
 # okunuyorken ≥ SOHBET_KESME_SN kesintisiz konuşma araya girme sayılır: okuma durur, kalan cümleler okunmaz, ses yeni turun başı olur ("hı hı" kısa
-# kalır, kesme sayılmaz). Kapanış: SOHBET_UYARI_SN sessizlikte "Buradayım." , SOHBET_KAPAN_SN'de kapanır; "tamam teşekkürler / kapat" kapatır;
+# kalır, kesme sayılmaz). v0.49.2: Claude düşünürken söylenen de atılmaz — ayrı tamponda birikir (önceki sorunun akışı o sırada sıfırlanır), Suflor boşa
+# çıkınca sonraki sorunun başı olur; söz sürerken okuma başlarsa koruma süresi beklenmeden okuma durur. Kapanış: SOHBET_UYARI_SN sessizlikte "Buradayım." , SOHBET_KAPAN_SN'de kapanır; "tamam teşekkürler / kapat" kapatır;
 # toplantı başlarsa ya da kulaklık çıkarsa kapanır. Yalnız kulaklıkla ve toplantı dışında (hoparlörde Suflor kendi sesini duyar; Apple ses işleme yok).
 SOHBET_SESSIZ_SN, SOHBET_KISA_SN, SOHBET_UZUN_SN, SOHBET_MODELSIZ_SN, SOHBET_BEKLE_SN = 0.6, 0.8, 2.5, 1.2, 6.0
 SOHBET_KESME_SN, SOHBET_KORU_SN, SOHBET_UYARI_SN, SOHBET_KAPAN_SN, SOHBET_ONCE_SN = 0.7, 2.0, 30.0, 60.0, 1.5
@@ -32,6 +33,7 @@ def sohbet_basla():
     r = konus_basla()
     if not r.get("ok"): return r
     simdi = time.time()
+    SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)
     with SOHBET["kilit"]: SOHBET.update(acik=True, t_ac=simdi, t_ses=simdi, t_mesgul=simdi, uyari=False, durak=None, bekle=None, kesme_sn=0.0, sira=SOHBET["sira"] + 1)
     _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None, kaynak="sohbet")
     if float(AYAR.get("hihi_tur_esik", HIHI_TUR_ESIK)) > 0: threading.Thread(target=tur_baslat, daemon=True).start()
@@ -40,7 +42,7 @@ def sohbet_basla():
 def sohbet_kapat(neden, soz=None):
     with SOHBET["kilit"]:
         if not SOHBET["acik"]: return
-        SOHBET.update(acik=False, bekle=None)
+        SOHBET.update(acik=False, bekle=None); SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)
     if not _KS["tur"]: _akis_sifirla(); _konus_kur(durum="hazir" if konus_canli() else "kapali")
     if soz: seslendir(soz, kuyruk=True)
     print(f"SOHBET: kapandı ({neden}, {time.time() - SOHBET['t_ac']:.0f} sn)")
@@ -72,27 +74,33 @@ def sohbet_parca(p):
     if konusma >= 0.15: SOHBET.update(t_ses=simdi, uyari=False)
     tur = _KS["tur"]
     if tur or ses_caliyor():  # Suflor düşünüyor ya da okuyor
-        onceki = SOHBET.setdefault("onceki", collections.deque(maxlen=4)); onceki.append(pcm)  # araya girmede sözün başı kaybolmasın (son ~2 sn)
+        onceki = SOHBET.setdefault("onceki", collections.deque(maxlen=4)); onceki.append(pcm)  # sözün başı kaybolmasın (son ~2 sn)
         okuma = _okuma_izle(simdi)
-        # araya girme: cevap ≥ SOHBET_KORU_SN'dir okunuyor ve parçanın çoğu konuşma; ardışık parçalarda birikir
-        SOHBET["kesme_sn"] = SOHBET["kesme_sn"] + konusma if konusma >= len(pen) * AKIS_PENCERE / 2 / WH_SR * 0.6 else 0.0
-        if okuma and simdi - SOHBET["t_okuma"] >= SOHBET_KORU_SN and SOHBET["kesme_sn"] >= SOHBET_KESME_SN:
-            if tur: tur["sesli"] = False
-            ses_durdur(); SOHBET.update(kesme_sn=0.0, t_okuma=0.0)
-            with AKIS["kilit"]: AKIS["pcm"] = bytearray(b"".join(onceki)); AKIS.update(kesik=0, sira=0, metin={}, bekleyen=0)
-            print("SOHBET: araya girildi — okuma durdu, kalan cümleler okunmayacak")
-            SOHBET["kesildi"] = True
-        elif SOHBET.get("kesildi"):  # araya girildi, Claude'un turu bitene kadar ses biriktirilir
-            with AKIS["kilit"]: AKIS["pcm"] += pcm
+        SOHBET["kesme_sn"] = SOHBET["kesme_sn"] + konusma if konusma >= len(pen) * AKIS_PENCERE / 2 / WH_SR * 0.6 else 0.0  # ardışık parçalarda birikir
+        bir = SOHBET.get("biriken")
+        if bir is not None:  # biriktiriliyor (araya girme ya da düşünürken konuşma); Suflor boşa çıkınca akışa geçer
+            bir += pcm
+            if okuma and SOHBET["kesme_sn"] >= SOHBET_KESME_SN: _sohbet_kes(tur, "konuşma sürerken okuma başladı")  # söz sürüyor: koruma süresi yok
+            return {"ok": True, "mesgul": True}
+        if okuma:  # araya girme: cevap ≥ SOHBET_KORU_SN'dir okunuyor ve ≥ SOHBET_KESME_SN kesintisiz konuşma ("hı hı" kısa kalır)
+            if simdi - SOHBET["t_okuma"] >= SOHBET_KORU_SN and SOHBET["kesme_sn"] >= SOHBET_KESME_SN:
+                SOHBET["biriken"] = bytearray(b"".join(onceki)); _sohbet_kes(tur, "araya girildi")
+        elif konusma >= 0.15:  # v0.49.2: Claude düşünürken (yazıya dökme, cevap bekleme) konuşma atılmaz, sonraki soru olur
+            SOHBET["biriken"] = bytearray(b"".join(onceki)); print("SOHBET: Claude düşünürken konuşma — biriktiriliyor, sonraki soru olacak")
         return {"ok": True, "mesgul": True}
     SOHBET["t_okuma"] = 0.0; SOHBET["kesme_sn"] = 0.0; SOHBET.pop("onceki", None)
-    if SOHBET.pop("kesildi", None): _sohbet_akis_kur()  # biriken araya girme sesi akışa
+    bir = SOHBET.pop("biriken", None)
+    if bir is not None:
+        with AKIS["kilit"]: AKIS.update(pcm=bytearray(bir), kesik=0, sira=0, metin={}, bekleyen=0)
+        print(f"SOHBET: biriken {len(bir) / 2 / WH_SR:.1f} sn ses sonraki soruya")
     r = konus_parca(p)
     if not r.get("ok"): return r
     _sohbet_kirp(); _sohbet_tur_sonu()
     return {"ok": True}
-def _sohbet_akis_kur():  # araya girmede biriken ses akış parçalarına bölünmeden durdu; konus_parca'nın kesimi sonraki parçada sürer
-    with AKIS["kilit"]: AKIS.update(kesik=0, sira=0, metin={}, bekleyen=0)
+def _sohbet_kes(tur, neden):  # okumayı durdur, kalan cümleler okunmasın
+    if tur: tur["sesli"] = False
+    ses_durdur(); SOHBET.update(kesme_sn=0.0, t_okuma=0.0)
+    print(f"SOHBET: {neden} — okuma durdu, kalan cümleler okunmayacak")
 def _sohbet_kirp():  # konuşma başlamadan biriken sessizlik büyümesin (60 sn tavanı): son SOHBET_ONCE_SN tutulur
     b, esik = _sohbet_esik()
     with AKIS["kilit"]:

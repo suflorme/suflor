@@ -187,6 +187,8 @@ globalThis.SUFLOR_EN = {
   "Toplantıya söyle": "Say in meeting",
   "Toplantıya söyle: Suflor bunu senin kanalından toplantıya okur (yeniden basınca susar)": "Say in meeting: Suflor reads this into the meeting through your channel (press again to stop)",
   "Konuşurken “hı hı”": "“Mm-hm” while you talk",
+  "Soru bitince “hı hı”": "“Mm-hm” when you finish",
+  "Konuş’ta ve Sohbet’te sözün bitince kısa bir onay sesi; cevap gelene kadar boşluk dolmuş olur.": "In Talk and Conversation, a short acknowledgement when you finish speaking, so the wait before the answer isn’t silent.",
   "Konuş’ta uzun anlatırken kısa duraksamalarda kısık bir onay sesi. Yalnız kulaklıkta, toplantıda değil.": "A soft acknowledgement in short pauses while you speak at length in Talk. Headphones only, not in meetings.",
   "Suflor.me olmadan katıl": "Join without Suflor.me",
   "son satır {t}": "last line {t}",

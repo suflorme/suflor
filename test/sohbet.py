@@ -2,7 +2,7 @@
 # Sohbet kipi (v0.49.0, aktarici/sohbet.py) uçtan uca, kota harcamadan: say → 16 kHz PCM → /bas-konus sohbet_parca (0,5 sn'lik parçalar) → tur sonu
 # (smart-turn bekleme seçicisi) → yerel Whisper → Brifing.app açık süreç → sahte "claude". Denenen: kulaklıksız açılmaz; cümle sonunda tur kapanır;
 # "…geçtik ve" duraksamasında tur sürer (tek soru); cevap okunurken uzun konuşma araya girer, okuma durur, yeni soru gider; "tamam teşekkürler"
-# kapatır (Claude'a gitmez); sessizlikte uyarı + kapanış (test süreleri 12/20 sn); toplantı başlayınca kapanır; sohbette "hı hı" yok.
+# kapatır (Claude'a gitmez); Claude düşünürken söylenen sonraki soru olur (v0.49.2); sessizlikte uyarı + kapanış (test süreleri 12/20 sn); toplantı başlayınca kapanır; sohbette "hı hı" yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/sohbet.py     (~3 dk; Brifing.app, swiftc, whisper-venv; smart-turn varsa bekleme seçicisi de)
 import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT, PORT2 = 8793, 8794
@@ -97,6 +97,12 @@ try:
     ok("cevap okunurken uzun konuşma araya girdi", "SOHBET: araya girildi" in log())
     k = bekle_hazir(k0)
     ok(f"araya girilen söz yeni soru oldu ({k.get('soru')!r})", "hava" in (k.get("soru") or "").lower())
+    okuma_bitsin()
+    # v0.49.2: soru biter bitmez (Claude düşünürken) söylenen atılmaz, sonraki soru olur
+    k1 = st().get("soru"); akit(ses("Kaç kişi katılacak?") + sus(1.0) + ses("Bir de yarın saat kaçta başlıyoruz?") + sus(1.2))
+    ok("Claude düşünürken konuşma biriktirildi", "Claude düşünürken konuşma — biriktiriliyor" in log())
+    k = bekle_hazir(k1); k = bekle_hazir(k.get("soru")) if "kişi" in (k.get("soru") or "") else k
+    ok(f"düşünürken söylenen sonraki soru oldu ({k.get('soru')!r})", "yarın" in (k.get("soru") or "").lower() and "kişi" not in (k.get("soru") or "").lower())
     okuma_bitsin()
     nc = log().count("Sorduğun")
     akit(ses("Tamam, teşekkürler.") + sus(1.2)); t = time.time()
