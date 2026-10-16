@@ -62,10 +62,10 @@ try:
     p2.terminate()
     r_, K = baslat(PORT, "1", ay); pler.append(r_); post, st = istemci(PORT, K)
     log = lambda: open(os.path.join(T, f"relay{PORT}.log")).read()
-    def akit(b, hiz=2.0):  # 0,5 sn'lik parçalar, gerçek zamanın hiz katı
+    def akit(b, hiz=2.0):  # ~0,5 sn'lik parçalar (pano gibi 2 × 4096 örnek: 50 ms pencerelere hizalı değil), gerçek zamanın hiz katı
         son = {}
-        for i in range(0, len(b), 16000):
-            son = post({"komut": "sohbet_parca", "pcm": base64.b64encode(b[i:i + 16000]).decode()}); time.sleep(0.5 / hiz)
+        for i in range(0, len(b), 16384):
+            son = post({"komut": "sohbet_parca", "pcm": base64.b64encode(b[i:i + 16384]).decode()}); time.sleep(0.512 / hiz)
             if son.get("kapali"): break
         return son
     def okuma_bitsin(sn=30):
@@ -84,11 +84,13 @@ try:
     k = bekle_hazir(None)
     ok(f"cümle sonunda tur kapandı, soru gitti ({k.get('soru')!r})", "dakika" in (k.get("soru") or "") and "Sorduğun" in (k.get("cevap") or ""))
     okuma_bitsin()
-    n0 = log().count("SOHBET: tur bitti")
+    n0 = log().count("SOHBET: tur bitti"); d0 = log().count("SOHBET: duraksama")
     akit(ses("Sonra yedekleme konusuna geçtik ve") + sus(1.0) + ses("herkes görüş bildirdi, sence ne yapmalıyız?") + sus(1.2))
     k = bekle_hazir(k.get("soru"))
     tur_sonu = "tur sonu yok" not in log()
     ok(f"'…ve' duraksamasında tur sürdü, tek soru ({k.get('soru')!r})", log().count("SOHBET: tur bitti") - n0 == 1 and "yedekleme" in (k.get("soru") or "").lower() and "görüş" in (k.get("soru") or "").lower())
+    d = log().count("SOHBET: duraksama") - d0
+    ok(f"tur sonu modeli duraksama başına bir kez soruldu ({d} satır, iki duraksama)", 1 <= d <= 2)
     okuma_bitsin()
     # araya girme: cevap okunurken (test: metin uzunluğu × 60 ms) 2 sn sonra uzun konuşma
     akit(ses("Bütçe kaç lira?") + sus(1.2)); t = time.time()

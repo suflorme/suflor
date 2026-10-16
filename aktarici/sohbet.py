@@ -9,7 +9,9 @@
 # kalır, kesme sayılmaz). v0.49.2: Claude düşünürken söylenen de atılmaz — ayrı tamponda birikir (önceki sorunun akışı o sırada sıfırlanır), Suflor boşa
 # çıkınca sonraki sorunun başı olur; söz sürerken okuma başlarsa koruma süresi beklenmeden okuma durur. Kapanış: SOHBET_UYARI_SN sessizlikte "Buradayım." , SOHBET_KAPAN_SN'de kapanır; "tamam teşekkürler / kapat" kapatır;
 # toplantı başlarsa ya da kulaklık çıkarsa kapanır. Yalnız kulaklıkla ve toplantı dışında (hoparlörde Suflor kendi sesini duyar; Apple ses işleme yok).
-SOHBET_SESSIZ_SN, SOHBET_KISA_SN, SOHBET_UZUN_SN, SOHBET_MODELSIZ_SN, SOHBET_BEKLE_SN = 0.6, 0.8, 2.5, 1.2, 6.0
+# v0.49.5 bekleme 0,8/2,5 → 1,0/2,0 ve biriktirme eşiği 0,15 → 0,3 sn: gerçek kayıtlarla benzetim (testler/sohbet-esik-20261016.md) — erken kesme
+# %4,3 → %1,7, tur sonunda ortanca bekleme +0,2 sn; kısa çıtırtı/"evet" Claude düşünürken biriktirmeyi başlatmaz.
+SOHBET_SESSIZ_SN, SOHBET_KISA_SN, SOHBET_UZUN_SN, SOHBET_MODELSIZ_SN, SOHBET_BEKLE_SN, SOHBET_BIRIK_SN = 0.6, 1.0, 2.0, 1.2, 6.0, 0.3
 SOHBET_KESME_SN, SOHBET_KORU_SN, SOHBET_UYARI_SN, SOHBET_KAPAN_SN, SOHBET_ONCE_SN = 0.7, 2.0, 30.0, 60.0, 1.5
 if os.environ.get("SUFLOR_TEST_SOHBET_KISA"): SOHBET_UYARI_SN, SOHBET_KAPAN_SN = 12.0, 20.0  # test/sohbet.py
 SOHBET = {"acik": False, "t_ac": 0.0, "t_ses": 0.0, "t_mesgul": 0.0, "uyari": False, "durak": None, "bekle": None, "kesme_sn": 0.0, "t_okuma": 0.0, "sira": 0, "kilit": threading.Lock()}
@@ -85,7 +87,7 @@ def sohbet_parca(p):
         if okuma:  # araya girme: cevap ≥ SOHBET_KORU_SN'dir okunuyor ve ≥ SOHBET_KESME_SN kesintisiz konuşma ("hı hı" kısa kalır)
             if simdi - SOHBET["t_okuma"] >= SOHBET_KORU_SN and SOHBET["kesme_sn"] >= SOHBET_KESME_SN:
                 SOHBET["biriken"] = bytearray(b"".join(onceki)); _sohbet_kes(tur, "araya girildi")
-        elif konusma >= 0.15:  # v0.49.2: Claude düşünürken (yazıya dökme, cevap bekleme) konuşma atılmaz, sonraki soru olur
+        elif konusma >= SOHBET_BIRIK_SN:  # v0.49.2: Claude düşünürken (yazıya dökme, cevap bekleme) konuşma atılmaz, sonraki soru olur
             SOHBET["biriken"] = bytearray(b"".join(onceki)); print("SOHBET: Claude düşünürken konuşma — biriktiriliyor, sonraki soru olacak")
         return {"ok": True, "mesgul": True}
     SOHBET["t_okuma"] = 0.0; SOHBET["kesme_sn"] = 0.0; SOHBET.pop("onceki", None)
@@ -116,8 +118,8 @@ def _sohbet_tur_sonu():
     if konusma < 0.4: SOHBET.update(durak=None, bekle=None); return
     if n >= KONUS_EN_UZUN_SN - 3: return _sohbet_gonder(b, n, sessiz)  # bir dakikalık kayıt tavanına yaklaşınca duraksamasız da tur kapanır
     if sessiz < SOHBET_SESSIZ_SN: SOHBET.update(durak=None, bekle=None); return
-    durak = len(b) - k * AKIS_PENCERE
-    if SOHBET["durak"] != durak:  # yeni duraksama: bekleme süresini seç
+    durak = (len(pen) - k) * AKIS_PENCERE  # son konuşma penceresinin sonu: pencereler kaydın başına hizalı, parça boyu ne olursa olsun duraksama boyunca sabit
+    if SOHBET["durak"] != durak:  # yeni duraksama: bekleme süresini seç (v0.49.5: duraksama başına bir kez — önce len(b)'ye göreydi, her parçada kayıyordu)
         e = float(AYAR.get("hihi_tur_esik", HIHI_TUR_ESIK)); p = tur_olasilik(b[:durak + int(0.3 * WH_SR * 2)]) if e > 0 else None
         bek = SOHBET_MODELSIZ_SN if p is None else SOHBET_KISA_SN if p >= e else SOHBET_UZUN_SN
         with AKIS["kilit"]: son = str(AKIS["metin"].get(AKIS["sira"] - 1) or "") if AKIS["sira"] else ""
