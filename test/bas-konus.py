@@ -221,6 +221,18 @@ try:
     n1 = log().count("konuşana gitti")
     karsi(2, "Suflor, not al bunu lütfen."); karsi(3, "Teslim tarihi cuma olabilir mi?"); karsi(4, "Suflör'ün dediği doğru."); time.sleep(1)
     ok("karşı tarafta iş talebi, hitapsız satır ve ek almış ad konuşana gitmedi", log().count("konuşana gitti") == n1)
+    # v0.52.0 hızlı sesli özet: tarayıcıda çağrı bitince (üst çerçeve nabzı call=false) Konuş sürecine üç cümlelik özet sorulur ve okunur; yazılı özet ikinci kez okunmaz
+    for i in range(5, 10): ben(i, f"Toplantıda {i}. madde konuşuldu, karar alındı.")
+    uc2("/ping", {"meeting": {"title": "Başka toplantı"}, "call": True, "panel": True, "mic": {"on": True}}); time.sleep(0.5)
+    ses1 = log().count("SES (deneme)")
+    uc2("/ping", {"meeting": {"title": "Başka toplantı"}, "call": False, "panel": False, "mic": {"on": False}})
+    t1 = time.time()
+    while time.time() - t1 < 25 and not ("ÖZET (hızlı)" in log() and st()["durum"] == "hazir" and "az önce bitti" in (st().get("soru") or "")): time.sleep(0.3)
+    ko = st(); dosya_ = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K})).read()).get("file")
+    ok(f"hızlı sesli özet: çağrı bitince Konuş'a soruldu ve okundu ({round(time.time() - t1, 1)} sn)", "ÖZET (hızlı): toplantıdan çıkış (tarayıcı)" in log() and "az önce bitti" in (ko.get("soru") or "") and log().count("SES (deneme)") > ses1)
+    oz_ = os.path.join(T, "ozet-deneme.md"); open(oz_, "w").write("# Özet\n")
+    uc2("/son-toplanti", {"ozet": oz_, "dosya": dosya_, "baslik": "Başka toplantı", "degerlendirme": "İyi geçti."}); time.sleep(1)
+    ok("yazılı özet gelince ikinci kez okunmadı", "hızlı özet okunmuştu, yeniden okunmadı" in log())
     # v0.51.1 okuma sınırı: _konus_cumle beş cümlelik cevabın yalnız üçünü okur (işlev doğrudan; uçtan uca akışta tur sayısını bozmasın)
     import re as _re
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()

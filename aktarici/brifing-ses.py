@@ -489,6 +489,9 @@ def _cumle(x):
     x = " ".join(re.sub(r"[*`_#>]", "", str(x or "")).split()).strip()
     return x if not x or x.endswith((".", "?", "!")) else x + "."
 def ozet_sesli(r):
+    h = globals().get("HIZLI") or {}
+    if h.get("okundu") and h.get("dosya") and h["dosya"] == r.get("dosya") and time.time() - h["t"] < 1800:  # v0.52.0: hızlı sesli özet okundu, yazılı özet yeniden okunmaz
+        print("SES: yazılı özet hazır — hızlı özet okunmuştu, yeniden okunmadı"); return False
     if not _ses_serbest(): return False
     bek = sum(1 for x in eylem_gorunen() if x["durum"] == "bekliyor")
     p = [_t("Toplantı özeti hazır.", "The meeting summary is ready.")]

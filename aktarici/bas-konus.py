@@ -584,6 +584,34 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         print(f"KONUŞ: zaman aşımı — {sn:.0f} sn cevap yok, süreç yenilenip soru yeniden gönderiliyor"); tur["yeniden"] = True
         konus_kapat("zaman aşımı", durum_koru=True); _KS["tur"] = tur; gonder()
     gonder()
+# Hızlı sesli özet (v0.52.0, 16 Ekim): toplantı sonu sesli özeti toplantı oturumunun (Opus) özeti yazmasını bekliyordu — deneme 9'da çıkıştan 52 sn (hedef ≤ 15).
+# Toplantıdan çıkınca (masaüstü "toplantı yok" ya da tarayıcıda çağrı bitti) OZET_HIZLI_ONAY_SN sonra hâlâ dışarıdaysa Konuş sürecine (Sonnet, canlı defterli) üç cümlelik
+# özet sorulur ve okunur; 60 sn'lik "toplantı sürüyor" penceresi beklenmez. Opus'un yazılı özeti gelince ikinci kez okunmaz (ozet_sesli). Ayar hizli_ozet: false kapatır.
+OZET_HIZLI_ONAY_SN, OZET_HIZLI_EN_AZ_SATIR = 3.0, 8
+HIZLI = {"dosya": None, "t": 0.0, "okundu": False}
+def hizli_ozet_tetik(kaynak):
+    f = STATE.get("file")
+    if not f or HIZLI["dosya"] == f or STATE["file_lines"].get(f, 0) < OZET_HIZLI_EN_AZ_SATIR: return
+    if AYAR.get("hizli_ozet", True) is False or not AYAR.get("konusma", True) or not claude_yolu() or not os.path.isdir(BRIFING_APP): return
+    HIZLI.update(dosya=f, t=time.time(), okundu=False)
+    threading.Thread(target=_hizli_ozet, args=(f, kaynak), daemon=True).start()
+def _tarayici_cagrida():
+    x = STATE.get("extension") or {}
+    try: return bool(x.get("call")) and (datetime.datetime.now() - datetime.datetime.fromisoformat(x["seen"])).total_seconds() < 15
+    except (KeyError, TypeError, ValueError): return False
+def _hizli_ozet(f, kaynak):
+    time.sleep(OZET_HIZLI_ONAY_SN)
+    if (STATE.get("masaustu") or {}).get("toplantida") or _tarayici_cagrida(): HIZLI["dosya"] = None; print("ÖZET (hızlı): toplantıya geri dönüldü — yapılmadı"); return
+    STATE["_cagri_son"] = 0  # toplantıdan çıkıldı: sesli okuma için 60 sn beklenmez (yeniden katılınca nabız günceller)
+    t0 = time.time()
+    while _KS["tur"] and time.time() - t0 < 20: time.sleep(0.3)
+    if _KS["tur"]: print("ÖZET (hızlı): Konuş meşgul — yapılmadı"); HIZLI["dosya"] = None; return
+    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "ozet"}; _KS["tur"] = tur; HIZLI["okundu"] = True
+    print(f"ÖZET (hızlı): toplantıdan çıkış ({kaynak}) — Konuş sürecine soruldu · {f}")
+    _konus_sor(_t("Toplantı az önce bitti. Sesli kısım 'Toplantı özeti:' diye başlasın, en çok üç kısa cümle: alınan kararlar, kim neyi üstlendi, açık kalanlar; konuşulmadıysa söyleme. "
+                  "Yazılı kısımda maddeleri saatleriyle yaz.",
+                  "The meeting just ended. Start the spoken part with 'Meeting summary:', at most three short sentences: decisions, who took on what, what is still open; skip what wasn't discussed. "
+                  "In the written part list the points with times."), tur)
 def konus_bekci():  # 30 dk kullanılmayan süreci kapat; toplantı sürerken (toplanti_konus) süreç açık tutulur: "Claude:" sorusu açılışı beklemesin
     while True:
         time.sleep(30)
