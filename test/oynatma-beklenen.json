@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 151061,
-   "sha": "c509962a91f76475"
+   "uzunluk": 154428,
+   "sha": "cf5b25dad07f0867"
   },
   "/hazirlik": {
-   "uzunluk": 43216,
-   "sha": "592d7302463a6815"
+   "uzunluk": 44251,
+   "sha": "a6662671cf526ce7"
   },
   "/mini": {
-   "uzunluk": 151061,
-   "sha": "c509962a91f76475"
+   "uzunluk": 154428,
+   "sha": "cf5b25dad07f0867"
   },
   "/status": {
    "_ping_son": "float",
@@ -278,6 +278,7 @@
      "masaustu_ses_kis": "bool",
      "menu_cubugu": "bool",
      "oda": "bool",
+     "otonom": "bool",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
      "sesli_kanit": "bool",
@@ -312,6 +313,7 @@
      "masaustu_ses_kis": "bool",
      "menu_cubugu": "bool",
      "oda": "bool",
+     "otonom": "bool",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
      "sesli_kanit": "bool",
@@ -475,6 +477,7 @@
     "hata": "NoneType",
     "kisilik": "NoneType",
     "olcum": "NoneType",
+    "otonom": "NoneType",
     "sesli_cevap": "bool",
     "sohbet": {
      "acik": "bool"
