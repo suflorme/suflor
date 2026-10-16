@@ -31,13 +31,20 @@ def sh(*c, zaman=20):
 def oku_json(yol, vars_=None):
     try: return json.load(open(yol, encoding="utf-8"))
     except Exception: return vars_ if vars_ is not None else {}
-_YAZ = threading.Lock()
+_YAZ = threading.RLock()
 def yaz_json(yol, d):
     with _YAZ:  # sihirbaz art arda kaydeder; aynı geçici dosyaya iki iş parçacığı yazmasın
         os.makedirs(os.path.dirname(yol), exist_ok=True); tmp = f"{yol}.{os.getpid()}.{threading.get_ident()}.tmp"
         with open(tmp, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=2)
         os.replace(tmp, yol)
 def ayar(): return oku_json(AYAR_YOL)
+def ayar_degistir(fn):  # ayar.json'u kilitli oku-değiştir-yaz: aktarıcı (relay.py ayar_yaz) da aynı kilidi alır, iki süreç birbirinin değişikliğini ezmez
+    import fcntl
+    os.makedirs(DESTEK, exist_ok=True)
+    with _YAZ, open(AYAR_YOL + ".kilit", "a") as k:
+        fcntl.flock(k, fcntl.LOCK_EX); a = ayar()
+        if fn(a) is False: return a
+        yaz_json(AYAR_YOL, a); return a
 def gen(p): return os.path.expanduser(p.replace("~", EV, 1)) if p.startswith("~") else p
 
 # ---------- Mac ----------
@@ -203,10 +210,11 @@ def takvim_adaylari(a):
         _ADAY["is"] = threading.Thread(target=al, daemon=True); _ADAY["is"].start()
     return None  # henüz alınmadı
 def takvim_ayarla(adresler, cikar):  # takvim ekranı kurulumdan sonra: ayara yaz, aktarıcı yeniden okusun (takvimi yeniden okur)
-    a = ayar()
-    if not a: return {"ok": False}
     ad = [str(x).strip().lower() for x in adresler or [] if re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", str(x).strip())]
-    a["takvim_adreslerim"] = list(dict.fromkeys(ad)); a["takvim_haric"] = [str(x) for x in cikar or []]; yaz_json(AYAR_YOL, a)
+    def fn(a):
+        if not a: return False
+        a["takvim_adreslerim"] = list(dict.fromkeys(ad)); a["takvim_haric"] = [str(x) for x in cikar or []]
+    if not ayar_degistir(fn): return {"ok": False}
     if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
     return {"ok": True}
 
@@ -217,13 +225,13 @@ def eposta_temiz(tur, adres):
     tur = str(tur or "").lower(); adres = str(adres or "").strip().lower()
     return (tur if tur in EPOSTA_TUR else None), (adres if re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", adres) else None)
 def eposta_ayarla(tur, adres):
-    a = ayar()
-    if not a: return {"ok": False}
     t, ad = eposta_temiz(tur, adres)
-    for k, v in (("eposta", t), ("eposta_adres", ad)):
-        if v: a[k] = v
-        else: a.pop(k, None)
-    yaz_json(AYAR_YOL, a)
+    def fn(a):
+        if not a: return False
+        for k, v in (("eposta", t), ("eposta_adres", ad)):
+            if v: a[k] = v
+            else: a.pop(k, None)
+    if not ayar_degistir(fn): return {"ok": False}
     if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
     return {"ok": True, "eposta": t, "eposta_adres": ad}
 
@@ -274,12 +282,11 @@ def profil():  # komut satırı: kurulum.py profil — kurulum.json'daki cevapla
     kisiler = [x.strip() for x in str(c.get("kisiler") or "").split(",") if x.strip()]
     if kisiler: s += ("\nSık görüştüğüm kişiler: " if dil == "tr" else "\nPeople I meet often: ") + ", ".join(kisiler) + "\n"
     open(cm, "w", encoding="utf-8").write(s)
-    if terimler: a = ayar(); a["whisper_terimler"] = list(dict.fromkeys((a.get("whisper_terimler") or []) + terimler))[:60]; yaz_json(AYAR_YOL, a)
+    if terimler: ayar_degistir(lambda a: a.update(whisper_terimler=list(dict.fromkeys((a.get("whisper_terimler") or []) + terimler))[:60]))
     say(f"profil: taslak not yazıldı ({len(metin.split())} kelime, {len(terimler)} terim)")
 def teshis_ayarla(acik):  # Kuruyorum ekranındaki anahtar kurulumdan sonra değişirse: ayara yaz, aktarıcı yeniden okusun
-    a = ayar()
-    if not a or a.get("teshis") is (acik is True): return {"ok": True}
-    a["teshis"] = acik is True; yaz_json(AYAR_YOL, a)
+    if ayar().get("teshis") is (acik is True): return {"ok": True}
+    if not ayar_degistir(lambda a: False if not a else a.update(teshis=acik is True)): return {"ok": True}
     if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
     return {"ok": True}
 
@@ -311,7 +318,10 @@ def tamamla(c, dil):
             else: a.pop(k, None)
     a.setdefault("claude_model", "sonnet")
     if claude_yolu() and not a.get("claude"): a["claude"] = claude_yolu()  # aktarıcı panodan başlatırken aynı Claude
-    try: yaz_json(AYAR_YOL, a); sonuc["ayar"] = "iyi"
+    def fn(g):  # okunduğundan beri yalnız bu adımın değiştirdiği alanlar: arada aktarıcının yazdığı (panodan Ayarlar) korunur
+        for k in set(eski) - set(a): g.pop(k, None)
+        g.update({k: v for k, v in a.items() if k not in eski or eski[k] != v})
+    try: ayar_degistir(fn); sonuc["ayar"] = "iyi"
     except Exception as e: sonuc.update(ayar="kotu", hata=f"Ayar yazılamadı: {e}"); return sonuc
     try:
         for k in ("belgeler", "gorusmeler", "_kanit", "_arsiv", ".claude/commands"): os.makedirs(os.path.join(proje, k), exist_ok=True)

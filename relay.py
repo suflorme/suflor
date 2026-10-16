@@ -1412,15 +1412,22 @@ def ayar_yaz(deg):
         else: hata[k] = _t("Adres geçersiz", "Invalid address") if tur == "adres" else _t(f"{sinir[0]}–{sinir[1]} arası", f"between {sinir[0]} and {sinir[1]}") if tur == "sayi" else _t("geçersiz", "invalid")
     if hata: return {"ok": False, "hata": hata, "err": next(iter(hata.values()))}
     if not yeni: return {"ok": True, "degisen": []}
-    try: a = json.load(open(AYAR_YOL, encoding="utf-8"))
-    except (OSError, ValueError): a = {}
-    for k, v in yeni.items():
-        if (k in ("eposta", "eposta_adres") and not v) or (k == "ses_motoru" and v == "mac"): a.pop(k, None); AYAR.pop(k, None)  # boş = varsayılan/tahmin
-        else: a[k] = AYAR[k] = v
+    import fcntl
     try:
-        with open(AYAR_YOL + ".tmp", "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
-        os.replace(AYAR_YOL + ".tmp", AYAR_YOL)
+        with open(AYAR_YOL + ".kilit", "a") as kilit:  # sihirbaz (kurulum.py ayar_degistir) da aynı kilitle oku-değiştir-yaz yapar: biri ötekini ezmez
+            fcntl.flock(kilit, fcntl.LOCK_EX)
+            try: a = json.load(open(AYAR_YOL, encoding="utf-8"))
+            except (OSError, ValueError): a = {}
+            for k, v in yeni.items():
+                if (k in ("eposta", "eposta_adres") and not v) or (k == "ses_motoru" and v == "mac"): a.pop(k, None)  # boş = varsayılan/tahmin
+                else: a[k] = v
+            gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
+            with open(gec, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
+            os.replace(gec, AYAR_YOL)
     except OSError as e: return {"ok": False, "err": e.__class__.__name__}
+    for k, v in yeni.items():
+        if k in a: AYAR[k] = v
+        else: AYAR.pop(k, None)
     print("AYAR: panodan değişti — " + ", ".join(sorted(yeni)))
     menu = None
     if any(k in yeni for k in MENU_AYAR) and os.path.isdir(MENU_APP) and not deneme_aktarici():
