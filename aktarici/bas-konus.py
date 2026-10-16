@@ -490,6 +490,7 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
         if sid and SORU["aktif"] == sid:  # "yazayım mı?" sorusuna sesli cevap — Claude'a gitmez
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, sesli_cevap=True, cevap=sesli_cevap(metin, sid), olcum={"wh_ms": round((tur["t_metin"] - tur["t_birak"]) * 1000)}); return
+        if sohbet_dusunme(metin, pcm): _KS["tur"] = None; _konus_kur(durum="dinliyor", hata=None); return  # sohbet: söz "nasıl desem…" ile bitti, dinleme sürer
         if sohbet_metin(metin): _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=""); return  # "tamam teşekkürler" sohbeti kapatır
         _konus_sor(metin, tur)
     if _akis_birlestir(pcm, geri): tur["akis"] = True; return {"ok": True}

@@ -115,6 +115,15 @@ try:
     k = bekle_hazir(k1); k = bekle_hazir(k.get("soru")) if "kişi" in (k.get("soru") or "") else k
     ok(f"düşünürken söylenen sonraki soru oldu ({k.get('soru')!r})", "yarın" in (k.get("soru") or "").lower() and "kişi" not in (k.get("soru") or "").lower())
     okuma_bitsin()
+    # v0.51.3 düşünme sözü: "…nasıl desem" + 2,6 sn duraksama + devamı → tek soru; "şey" + sessizlik → 4 sn sonra olduğu gibi gider
+    n1 = log().count("SOHBET: tur bitti")
+    akit(ses("Yarın toplantıda bütçeyi, nasıl desem") + sus(2.6) + ses("biraz daha ayrıntılı konuşalım mı?") + sus(1.5))
+    k = bekle_hazir(k.get("soru"))
+    ok(f"düşünme sözü: dinleme sürdü, iki parça tek soru ({k.get('soru')!r})", "düşünme sözüyle bitti" in log() and "bütçe" in (k.get("soru") or "").lower() and "ayrıntılı" in (k.get("soru") or "").lower())
+    okuma_bitsin()
+    akit(ses("Peki şey") + sus(1.5)); k2 = bekle_hazir(k.get("soru"))
+    ok(f"düşünme sözünden sonra sessizlik: söz 4 sn sonra olduğu gibi gitti ({k2.get('soru')!r})", "söz olduğu gibi gidiyor" in log() and "peki" in (k2.get("soru") or "").lower())
+    okuma_bitsin(); k = k2
     if profil:
         ok("ses izi: kullanıcının (Yelda) sorusu geçti", "SOHBET: ses izi" in log() and "— kullanıcı" in log())
         n1 = log().count("SOHBET: tur bitti"); soru_once = st().get("soru")

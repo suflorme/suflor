@@ -15,6 +15,13 @@ SOHBET_SESSIZ_SN, SOHBET_KISA_SN, SOHBET_UZUN_SN, SOHBET_MODELSIZ_SN, SOHBET_BEK
 SOHBET_KESME_SN, SOHBET_KORU_SN, SOHBET_UYARI_SN, SOHBET_KAPAN_SN, SOHBET_ONCE_SN = 0.7, 2.0, 30.0, 60.0, 1.5
 if os.environ.get("SUFLOR_TEST_SOHBET_KISA"): SOHBET_UYARI_SN, SOHBET_KAPAN_SN = 12.0, 20.0  # test/sohbet.py
 SOHBET = {"acik": False, "t_ac": 0.0, "t_ses": 0.0, "t_mesgul": 0.0, "uyari": False, "durak": None, "bekle": None, "kesme_sn": 0.0, "t_okuma": 0.0, "sira": 0, "kilit": threading.Lock()}
+# Düşünme sözü (v0.51.3, ikinci gerçek deneme 16 Ekim: "Günaydın… nasıl desem" duraksamasında tur sonu modeli 0,98 dedi, soru erken gitti; devam eden söz okumayı
+# durdurdu ve kullanıcı hiçbir şey duymadı). Tur bittiğinde dökülen söz düşünme ya da bağlaç sözüyle bitiyorsa Claude'a gitmez: kayıt akışa geri konur, dinleme sürer,
+# konuşma sürerse iki parça tek soru olur. SOHBET_DUSUNME_SN boyunca hiç konuşulmazsa söz olduğu gibi gider (takılıp kalmasın). Duraksama anında son parça henüz
+# dökülmemiş olduğundan SOHBET_BEKLE_RX bu durumu yakalayamıyordu.
+SOHBET_DUSUNME_SN = 4.0
+SOHBET_DUSUNME_RX = re.compile(r"(\b(nasıl (desem|diyeyim|söylesem|anlatsam)|yani|şey|hani|işte|şöyle( ki)?|mesela|aslında|bir saniye|dur bir|bekle|ve|ama|fakat|çünkü|ki|veya|ya da|ile|"
+                               r"how (do i|should i) (say|put)|i mean|like|so|and|but|because|um+|uh+)|\b(e+|ı+|hm+|em+))\W*$", re.I)
 SOHBET_KAPAT_RX = re.compile(r"^\W*(tamam,?\s*)?(teşekkür(ler| ederim)|sağ ?ol(un)?|kapat|sohbeti kapat|bu kadar|görüşürüz|thanks?( you)?|that'?s all|goodbye|bye)\W*$", re.I)
 SOHBET_BEKLE_RX = re.compile(r"\b(bekle|dur bir|bir saniye|bir dakika|şey|hold on|wait|one sec(ond)?)\W*$", re.I)
 def ses_caliyor():
@@ -56,6 +63,8 @@ def _sohbet_bekci(sira):
         if simdi - k_t > 5:
             k_t = simdi
             if not kulaklik(): sohbet_kapat("kulaklık çıktı", _t("Kulaklık çıktı, sohbeti kapattım.", "Headphones out, conversation closed.")); return
+        d = SOHBET.get("dusunme")
+        if d and not _KS["tur"] and SOHBET["t_ses"] - d["t"] < 0.3 and simdi - d["t"] >= SOHBET_DUSUNME_SN: SOHBET.pop("dusunme", None); _sohbet_dusunme_gonder(d["metin"])
         if _KS["tur"] or (ses_caliyor() and not SOHBET["uyari"]): SOHBET["t_mesgul"] = simdi; continue
         bos = simdi - max(SOHBET["t_ses"], SOHBET["t_mesgul"])
         if bos >= SOHBET_KAPAN_SN: sohbet_kapat("sessizlik", _t("Sohbeti kapattım.", "Conversation closed.")); return
@@ -110,6 +119,8 @@ def _sohbet_kirp():  # konuşma başlamadan biriken sessizlik büyümesin (60 sn
         if any(x >= esik for x in _pencereler(AKIS["pcm"])[:-int(SOHBET_ONCE_SN * WH_SR * 2 / AKIS_PENCERE)]): return
         del AKIS["pcm"][:len(AKIS["pcm"]) - int(SOHBET_ONCE_SN * WH_SR * 2) // 2 * 2]
 def _sohbet_tur_sonu():
+    d = SOHBET.get("dusunme")
+    if d and SOHBET["t_ses"] - d["t"] < 0.3: return  # düşünme sözünden sonra yeni konuşma yok: aynı söz yeniden gitmesin (bekçi SOHBET_DUSUNME_SN'de gönderir)
     b, esik = _sohbet_esik(); pen = _pencereler(b)
     if not pen: return
     k = 0
@@ -128,7 +139,7 @@ def _sohbet_tur_sonu():
         print(f"SOHBET: duraksama — tur sonu {'yok' if p is None else f'{p:.2f}'}, {bek:.1f} sn beklenecek")
     if sessiz >= SOHBET["bekle"]: _sohbet_gonder(b, n, sessiz)
 def _sohbet_gonder(b, n, sessiz):
-    SOHBET.update(durak=None, bekle=None)
+    SOHBET.update(durak=None, bekle=None); SOHBET.pop("dusunme", None)
     print(f"SOHBET: tur bitti ({n:.1f} sn kayıt, {sessiz:.1f} sn sessizlik)")
     r = konus_ses({"pcm": base64.b64encode(b).decode()})
     if not r.get("ok"): print(f"SOHBET: soru gönderilemedi ({r.get('err')})"); _akis_sifirla(); _konus_kur(durum="dinliyor", hata=None)
@@ -143,6 +154,17 @@ def sohbet_ses_izi_red(izler):  # izler: [(iz, sn)] → True: kullanıcının se
     top = sum(sn for _, sn in olc); red = sum(sn for b, sn in olc if b < ODA_ESIK) >= 0.6 * top
     print(f"SOHBET: ses izi {' '.join(f'{b:.2f}' for b, _ in olc)} — {'kullanıcıya benzemiyor, soru gönderilmedi' if red else 'kullanıcı'}")
     return red
+def sohbet_dusunme(metin, pcm):  # konus_ses'in dökülmüş metni düşünme sözüyle mi bitiyor → True: gönderilmez, kayıt akışa geri, dinleme sürer
+    if not SOHBET["acik"] or not SOHBET_DUSUNME_RX.search(metin or ""): return False
+    simdi = time.time(); bir = SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)  # dökülürken söylenen (biriktirilen) kaydın sonuna
+    with AKIS["kilit"]: AKIS.update(pcm=bytearray(pcm) + (bir or b""), kesik=0, sira=0, metin={}, iz={}, bekleyen=0)
+    SOHBET.update(dusunme={"t": simdi, "metin": metin}, durak=None, bekle=None, t_ses=simdi, uyari=False)
+    print(f"SOHBET: söz düşünme sözüyle bitti (\"…{' '.join(metin.split())[-30:]}\") — gönderilmedi, dinleme sürüyor")
+    return True
+def _sohbet_dusunme_gonder(metin):  # düşünme sözünden sonra SOHBET_DUSUNME_SN sessizlik: söz olduğu gibi Claude'a
+    _akis_sifirla(); tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "sohbet"}; _KS["tur"] = tur
+    print(f"SOHBET: düşünme sözünden sonra {SOHBET_DUSUNME_SN:.0f} sn sessizlik — söz olduğu gibi gidiyor")
+    threading.Thread(target=_konus_sor, args=(metin, tur), daemon=True).start()
 def sohbet_metin(metin):  # konus_ses'in yazıya dökülmüş metni: sohbeti kapatan söz mü (True: Claude'a gitmez)
     if not SOHBET["acik"] or not SOHBET_KAPAT_RX.match(metin or ""): return False
     sohbet_kapat("kullanıcı: " + " ".join(metin.split())[:40], _t("Görüşürüz.", "Talk soon.")); return True
