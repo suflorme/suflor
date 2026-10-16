@@ -4,7 +4,7 @@
 # kişilik metni (biçim kuralları önce, neşeli ünlem satırı çıkar); kişilik dosyası silinince nötr davranış, hata yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kisilik.py
 import json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8793
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8789  # 8793 sohbet testinin
 T = tempfile.mkdtemp(prefix="kis-"); canli = os.path.join(T, "canli"); os.makedirs(canli); hata = []
 def ok(ad, k): print(("✓ " if k else "✗ ") + ad); hata.append(not k)
 kd = os.path.join(T, "kisilik.md")

@@ -105,6 +105,7 @@ gf.add_argument("--kim", default=None); gf.add_argument("--n", type=int, default
 gf.add_argument("--hepsini-sil", action="store_true")
 # v0.54.0: Konuş (sesli asistan) güncel kayıt sorusunda kayıt veritabanına bakar — yalnız okunur, tek SELECT/WITH, en çok 60 satır, gizli sütunlar maskeli
 vs = sub.add_parser("vt-sema", help="kayıt veritabanının tabloları, sütunları ve satır sayıları (yalnız okunur)")
+vm = sub.add_parser("vt-mcp", help="kayıt veritabanı araçları (vt_sema, vt_sor) MCP sunucusu olarak (stdio) — Konuş süreci kullanır; komut çalıştırma izni gerekmez")
 vq = sub.add_parser("vt-sor", help="kayıt veritabanında tek SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; şifre/anahtar sütunları gizli)"); vq.add_argument("sorgu")
 bt = sub.add_parser("bitir", help="toplantı sonu tek komut: <özet>.yapi.json → karar grafı + sözler + zihin haritası → panoda Son toplantılar + bildirim → eylem kuyruğu onaya")
 bt.add_argument("yol", help="kaydedilen özet .md"); bt.add_argument("--yapi", default=None, help="yapı dosyası (yoksa <özet>.yapi.json)")
@@ -562,31 +563,62 @@ def vt_kayit(metin, n=2):
     sat = (si[:1] + ki[:1] + si[1:] + ki[1:])[:n]
     return [f"  KAYIT ({VT.get('yol')}, tablo esas):"] + ["    " + l[:330] for l in sat] if sat else []
 VT_GIZLI = re.compile(r"(?i)(sifre|şifre|parola|password|passwd|token|secret|gizli|anahtar|api_?key|\bkey\b|otp|2fa|totp|recovery|kurtarma)")
+class VtHata(Exception): pass
 def _vt_baglan():
-    if not VT.get("yol"): print("Kayıt veritabanı ayarlı değil (ayar veritabani.yol)."); sys.exit(1)
+    if not VT.get("yol"): raise VtHata("Kayıt veritabanı ayarlı değil (ayar veritabani.yol).")
     import sqlite3, pathlib
     try:
         con = sqlite3.connect(pathlib.Path(os.path.join(PROJE, VT["yol"])).resolve().as_uri() + "?mode=ro", uri=True, timeout=3)
         con.execute("PRAGMA query_only = ON"); return con
-    except Exception as e: print(f"Kayıt veritabanı açılamadı ({e.__class__.__name__})."); sys.exit(1)
-def vt_sema_cmd():
-    con = _vt_baglan()
+    except Exception as e: raise VtHata(f"Kayıt veritabanı açılamadı ({e.__class__.__name__}).")
+def vt_sema_metin():
+    con = _vt_baglan(); sat = []
     for ad, tur in con.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name").fetchall():
         kol = [r[1] for r in con.execute(f'PRAGMA table_info("{ad}")')]
         try: n = con.execute(f'SELECT count(*) FROM "{ad}"').fetchone()[0]
         except Exception: n = "?"
-        print(f"{ad} ({'görünüm' if tur == 'view' else 'tablo'}, {n} satır): " + ", ".join(k + (" [gizli]" if VT_GIZLI.search(k) else "") for k in kol))
-def vt_sor_cmd():
-    q = A.sorgu.strip().rstrip(";").strip()
+        sat.append(f"{ad} ({'görünüm' if tur == 'view' else 'tablo'}, {n} satır): " + ", ".join(k + (" [gizli]" if VT_GIZLI.search(k) else "") for k in kol))
+    return "\n".join(sat)
+def vt_sor_metin(q):
+    q = str(q or "").strip().rstrip(";").strip()
     if not re.match(r"(?is)^(select|with)\b", q) or ";" in q or re.search(r"(?i)\b(attach|detach|pragma|insert|update|delete|drop|create|alter|replace|vacuum|reindex|load_extension)\b", q):
-        print("Yalnız tek bir SELECT/WITH sorgusu çalışır."); sys.exit(1)
+        raise VtHata("Yalnız tek bir SELECT/WITH sorgusu çalışır.")
     con = _vt_baglan()
     try: cur = con.execute(q)
-    except Exception as e: print(f"Sorgu hatası: {str(e)[:200]}"); sys.exit(1)
+    except Exception as e: raise VtHata(f"Sorgu hatası: {str(e)[:200]}")
     kol = [d[0] for d in (cur.description or [])]; gz = [bool(VT_GIZLI.search(k)) for k in kol]; rows = cur.fetchmany(61)
-    print("\t".join(kol))
-    for r in rows[:60]: print("\t".join("***" if g and v is not None else ("" if v is None else " ".join(str(v).split())[:200]) for v, g in zip(r, gz)))
-    print(f"({min(len(rows), 60)} satır" + ("; 60'tan fazla — sorguyu daralt" if len(rows) > 60 else "") + ")")
+    sat = ["\t".join(kol)] + ["\t".join("***" if g and v is not None else ("" if v is None else " ".join(str(v).split())[:200]) for v, g in zip(r, gz)) for r in rows[:60]]
+    return "\n".join(sat + [f"({min(len(rows), 60)} satır" + ("; 60'tan fazla — sorguyu daralt" if len(rows) > 60 else "") + ")"])
+def vt_sema_cmd():
+    try: print(vt_sema_metin())
+    except VtHata as e: print(e); sys.exit(1)
+def vt_sor_cmd():
+    try: print(vt_sor_metin(A.sorgu))
+    except VtHata as e: print(e); sys.exit(1)
+# MCP (stdio, satır başına JSON-RPC): Brifing yardımcısı komut aracı (Bash) açan argümanı reddeder (salt okunur); Konuş bu iki aracı --mcp-config ile alır.
+VT_ARACLAR = [{"name": "vt_sema", "description": "Kayıt veritabanının tabloları, sütunları ve satır sayıları. [gizli] sütunlar maskelidir.",
+               "inputSchema": {"type": "object", "properties": {}}},
+              {"name": "vt_sor", "description": "Kayıt veritabanında tek bir SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; gizli sütunlar *** döner).",
+               "inputSchema": {"type": "object", "properties": {"sorgu": {"type": "string", "description": "SQLite SELECT sorgusu"}}, "required": ["sorgu"]}}]
+def vt_mcp_cmd():
+    yaz = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"), sys.stdout.flush())
+    for sat in sys.stdin:
+        try: m = json.loads(sat)
+        except ValueError: continue
+        yo, i = m.get("method"), m.get("id")
+        if i is None: continue  # bildirim (notifications/initialized)
+        if yo == "initialize":
+            yaz({"jsonrpc": "2.0", "id": i, "result": {"protocolVersion": (m.get("params") or {}).get("protocolVersion") or "2024-11-05",
+                 "capabilities": {"tools": {}}, "serverInfo": {"name": "suflor-vt", "version": "1"}}})
+        elif yo == "tools/list": yaz({"jsonrpc": "2.0", "id": i, "result": {"tools": VT_ARACLAR}})
+        elif yo == "tools/call":
+            p = m.get("params") or {}; ad = p.get("name"); ar = p.get("arguments") or {}
+            try: metin, hata = (vt_sema_metin() if ad == "vt_sema" else vt_sor_metin(ar.get("sorgu")) if ad == "vt_sor" else None), False
+            except VtHata as e: metin, hata = str(e), True
+            if metin is None: yaz({"jsonrpc": "2.0", "id": i, "error": {"code": -32602, "message": f"bilinmeyen araç {ad}"}}); continue
+            yaz({"jsonrpc": "2.0", "id": i, "result": {"content": [{"type": "text", "text": metin}], "isError": hata}})
+        elif yo == "ping": yaz({"jsonrpc": "2.0", "id": i, "result": {}})
+        else: yaz({"jsonrpc": "2.0", "id": i, "error": {"code": -32601, "message": f"yöntem yok: {yo}"}})
 def sistemler():
     import baglam
     adlar = set(EK_SISTEM)
@@ -2220,5 +2252,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd}[A.cmd]()
+     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

@@ -23,6 +23,16 @@ try:
     ok("en çok 60 satır + daralt uyarısı", o.count("\n") <= 63 and "daralt" in o)
     for q, ad in [("UPDATE kisiler SET rol = 'x'", "UPDATE"), ("SELECT 1; DROP TABLE kisiler", "çoklu sorgu"), ("WITH a AS (SELECT 1) DELETE FROM kisiler", "WITH içinde DELETE"), ("PRAGMA table_info(kisiler)", "PRAGMA")]:
         r = tc("vt-sor", q); ok(f"reddedildi: {ad}", r.returncode != 0 and "Yalnız tek" in r.stdout)
+    # MCP sunucusu (Konuş süreci bu yoldan kullanır; Brifing yardımcısı komut aracını reddeder)
+    girdi = "\n".join(json.dumps(m) for m in [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"}, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "vt_sor", "arguments": {"sorgu": "SELECT ad, sifre FROM kisiler ORDER BY admin_sayisi DESC LIMIT 1"}}},
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "vt_sor", "arguments": {"sorgu": "DELETE FROM kisiler"}}}]) + "\n"
+    m = subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "vt-mcp"], input=girdi, capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=ay, PYTHONDONTWRITEBYTECODE="1"))
+    c = {o["id"]: o for o in (json.loads(x) for x in m.stdout.splitlines() if x.strip())}
+    ok("MCP: initialize + tools/list (vt_sema, vt_sor)", c.get(1, {}).get("result", {}).get("protocolVersion") == "2025-06-18" and [x["name"] for x in c.get(2, {}).get("result", {}).get("tools", [])] == ["vt_sema", "vt_sor"])
+    t3 = c.get(3, {}).get("result", {}); t4 = c.get(4, {}).get("result", {})
+    ok("MCP: vt_sor sonucu doğru ve gizli sütun maskeli; DELETE hata olarak döner", "Ayla K\t***" in t3.get("content", [{}])[0].get("text", "") and t4.get("isError") is True)
     ok("veritabanı değişmedi", sqlite3.connect(db).execute("SELECT count(*) FROM kisiler").fetchone()[0] == 72)
     json.dump({"alan": "Deneme", "proje": proje, "uygulama": T}, open(ay, "w")); r = tc("vt-sema")
     ok("ayar yoksa açık mesaj, hata kodu", r.returncode != 0 and "ayarlı değil" in r.stdout)

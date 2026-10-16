@@ -59,31 +59,29 @@ KONUS_ISTEM = {"tr": ("Sen Suflor.me'nin sesli asistanısın. Kullanıcı sesle 
 _GUN_TR = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar")
 _AY_TR = ("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
 # Kişilik (v0.53.0, aktarici/kisilik.py): varsa istemin sonuna eklenir; biçim kuralları önce gelir. Neşeli ünlem satırı kişilik dosyasına bırakılır.
-# Kayıt veritabanı (v0.54.0; ayar veritabani.yol): güncel bilgi sorusunda ("şu anda en fazla admin yetkisi kimde?") Konuş tahmin etmez, yalnız okunur sorgu yapar.
-# Uygulama klasörünün yolunda boşluk var ("Application Support") → izin kalıbı için boşluksuz başlatıcı ~/.suflor/vt (sema | sor "<SELECT …>");
-# süreç yalnız onu çalıştırabilir (--allowedTools Bash(<yol>:*)). Sorgu kuralları ve gizli sütun maskesi toplanti-claude.py vt-sema / vt-sor'da.
-def konus_vt_hazirla():
+# Kayıt veritabanı (v0.54.1; ayar veritabani.yol): güncel bilgi sorusunda ("şu anda en fazla admin yetkisi kimde?") Konuş tahmin etmez, yalnız okunur sorgu yapar.
+# Araçlar MCP sunucusu olarak (toplanti-claude.py vt-mcp; --mcp-config canli/konus-mcp.json): Brifing yardımcısı komut aracı (Bash) açan argümanı reddeder
+# (v0.54.0 bu yüzden Konuş'u hiç açtırmadı). Sorgu kuralları ve gizli sütun maskesi toplanti-claude.py'de; araçlar yalnız vt_sema ve vt_sor.
+VT_MCP_ARACLAR = "mcp__suflorvt__vt_sema,mcp__suflorvt__vt_sor"
+def konus_vt_hazirla():  # → MCP yapılandırma dosyasının yolu ya da None
     v = AYAR.get("veritabani")
     tc = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toplanti-claude.py")
     if not isinstance(v, dict) or not v.get("yol") or not os.path.isfile(tc) or os.environ.get("SUFLOR_TEST_BASLAT") and not os.environ.get("SUFLOR_TEST_VT"): return None
-    d = os.path.join(os.path.expanduser("~"), ".suflor"); yol = os.path.join(d, "vt")
-    if " " in yol: return None
+    yol = os.path.join(BASE, "konus-mcp.json")
     try:
-        os.makedirs(d, mode=0o700, exist_ok=True)
-        icerik = ("#!/bin/sh\n# Suflor.me: Konuş'un kayıt veritabanı sorgusu (yalnız okunur) — aktarıcı yazar\nk=\"$1\"; shift\n"
-                  f"exec /usr/bin/python3 -B {shlex.quote(tc)} --dir {shlex.quote(BASE)} \"vt-$k\" \"$@\"\n")
-        if not os.path.isfile(yol) or open(yol, encoding="utf-8").read() != icerik:
-            with open(yol, "w", encoding="utf-8") as f: f.write(icerik)
-        os.chmod(yol, 0o700); return yol
-    except OSError as e: print(f"KONUŞ: veritabanı başlatıcısı yazılamadı ({e.__class__.__name__})"); return None
+        with open(yol + ".tmp", "w", encoding="utf-8") as f:
+            json.dump({"mcpServers": {"suflorvt": {"command": "/usr/bin/python3", "args": ["-B", tc, "--dir", BASE, "vt-mcp"],
+                                                   "env": {"PYTHONDONTWRITEBYTECODE": "1", **({"SUFLOR_AYAR": os.environ["SUFLOR_AYAR"]} if os.environ.get("SUFLOR_AYAR") else {})}}}}, f)
+        os.replace(yol + ".tmp", yol); return yol
+    except OSError as e: print(f"KONUŞ: veritabanı araç yapılandırması yazılamadı ({e.__class__.__name__})"); return None
 def konus_istem(vt=None):
     t = KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]; k = kisilik()
     _KS["kisilik_mt"] = _KIS.get("mt") if k else None
-    if vt: t += _t(f" Güncel durum sorusunda (kişiler, yetkiler, hesaplar, sistemler, sayılar; 'şu anda', 'en fazla', 'kimde') tahmin etme: önce '{vt} sema' ile tabloları gör, sonra '{vt} sor \"SELECT …\"' ile "
-                   "yalnız okuyan sorgu çalıştır; sesli kısımda yalnız sonucu doğal bir cümleyle söyle, kaynağı ve sorguyu yazılı kısma yaz; sonuç yoksa söyle. [gizli] sütunlar maskelidir, onları sesli söyleme. "
+    if vt: t += _t(" Güncel durum sorusunda (kişiler, yetkiler, hesaplar, sistemler, sayılar; 'şu anda', 'en fazla', 'kimde') tahmin etme: önce vt_sema aracıyla tabloları gör, sonra vt_sor aracıyla "
+                   "yalnız okuyan bir SELECT sorgusu çalıştır; sesli kısımda yalnız sonucu doğal bir cümleyle söyle, kaynağı ve sorguyu yazılı kısma yaz; sonuç yoksa söyle. [gizli] sütunlar maskelidir, onları sesli söyleme. "
                    "Toplantıda karşı tarafın sorusunu cevaplarken veritabanına bakma; yalnız kullanıcının kendi sorusunda.",
-                   f" For a current-state question (people, permissions, accounts, systems, counts) don't guess: first run '{vt} sema' to see the tables, then '{vt} sor \"SELECT …\"' "
-                   "(read-only); say only the result naturally in the spoken part, put the source and query in the written part; say so if nothing is found. [gizli] columns are masked; never read them aloud. "
+                   " For a current-state question (people, permissions, accounts, systems, counts) don't guess: first use the vt_sema tool to see the tables, then the vt_sor tool "
+                   "with a read-only SELECT; say only the result naturally in the spoken part, put the source and query in the written part; say so if nothing is found. [gizli] columns are masked; never read them aloud. "
                    "When answering the other side in a meeting, don't use the database; only for the user's own question.")
     # v0.54.0 (kullanıcı, 16 Ekim): sesli kısımda iç terim yok — "defterine göre", "veritabanına göre", "toplantı oturumu", "kart", "döküm", dosya adı; kaynak yazılı kısımda
     t += _t(" Sesli kısımda iç terimleri ve kaynak adlarını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, kart, döküm, toplantı oturumu, dosya adı); kaynak gerekiyorsa yalnız yazılı kısma (--- sonrası) yaz.",
@@ -179,7 +177,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
             os.mkfifo(f, 0o600)
         vt = konus_vt_hazirla()
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-                "--allowedTools", "Read,Grep,Glob" + (f",Bash({vt}:*)" if vt else ""), "--add-dir", BASE, "--append-system-prompt", konus_istem(vt)] + \
+                "--allowedTools", "Read,Grep,Glob" + ("," + VT_MCP_ARACLAR if vt else ""), "--add-dir", BASE, "--append-system-prompt", konus_istem(vt)] + (["--mcp-config", vt] if vt else []) + \
                (claude_yalin() or ["--no-session-persistence"]) + ["--model", str(AYAR.get("konus_model") or "sonnet")]  # v0.20.3: 6 soruluk kıyas (8 Ekim) Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "konus-bos"),
