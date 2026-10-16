@@ -606,6 +606,30 @@ VT_ARACLAR = [{"name": "vt_sema", "description": "Kayıt veritabanının tablola
               {"name": "vt_sor", "description": "Kayıt veritabanında tek bir SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; gizli sütunlar *** döner).",
                "inputSchema": {"type": "object", "properties": {"sorgu": {"type": "string", "description": "SQLite SELECT sorgusu"}}, "required": ["sorgu"]}}]
 VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Masaüstü'ndeki veritabanını okuyamaz; Konuş istemine tablo yapısı buradan girer
+# v0.57.8: sorgu sonucu önbelleği (canli/vt-sonuc.json, 0600) — aktarıcı veritabanını okuyamadığı için sonucu bu araç tutar. Her vt_sor sonucu sorgu metniyle yazılır;
+# açılışta ve veritabanı dosyası değişince (VT_DENETIM_SN'de bir bakılır) son sorgular yeniden çalıştırılır; "kontrol" alanı en son denetim anıdır.
+# Konuş benzer soruda taze sonucu soruyla verir: Claude araç turu olmadan cevaplar (~3 sn kazanç). Toplantı içeriği değil, yalnız sorgu ve maskeli sonuç.
+VT_SONUC_ONBELLEK = "vt-sonuc.json"; VT_SONUC_EN_COK = 40; VT_DENETIM_SN = 60
+def _vt_mt():
+    try: return os.path.getmtime(os.path.join(PROJE, VT["yol"]))
+    except (OSError, KeyError, TypeError): return None
+def _vt_onbellek(dosya, guncelle=None, yenile=False):
+    y = os.path.join(dosya, VT_SONUC_ONBELLEK)
+    try: ob = json.load(open(y, encoding="utf-8"))
+    except (OSError, ValueError): ob = {}
+    simdi, mt = round(time.time()), _vt_mt()
+    if guncelle: ob.pop(guncelle[0], None); ob[guncelle[0]] = {"t": simdi, "kontrol": simdi, "mt": mt, "sonuc": guncelle[1]}
+    if yenile:
+        for q, r in list(ob.items()):
+            if r.get("mt") != mt:
+                try: r.update(sonuc=vt_sor_metin(q), t=simdi, mt=mt)
+                except VtHata: ob.pop(q, None); continue
+            r["kontrol"] = simdi
+    ob = dict(list(ob.items())[-VT_SONUC_EN_COK:])
+    try:
+        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(ob, f, ensure_ascii=False)
+        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+    except OSError: pass
 # --- Toplantı oturumu maliyeti (v0.57.0) --------------------------------------------------------------------------------------------------
 # Kaynak: ~/.claude/projects/<proje klasörü>/*.jsonl — ilk kullanıcı iletisi /toplanti olan oturum. Her API cevabı içerik bloğu başına satır yazar (aynı message.id):
 # usage message.id'ye göre teke indirilir. Fiyat (MTok, 16 Ekim claude-api skill'i): giriş/çıkış ve önbellekten okuma; önbelleğe yazma 5 dk 1,25×, 1 sa 2×.
@@ -705,6 +729,13 @@ def vt_mcp_cmd():
         with open(y + ".tmp", "w", encoding="utf-8") as f: f.write(m)
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except (VtHata, OSError): pass
+    import threading
+    kilit = threading.Lock()
+    def denetle():  # açılışta bir kez, sonra dakikada bir: veritabanı değiştiyse önbellekteki sorgular yeniden çalışır
+        while True:
+            with kilit: _vt_onbellek(A.dir, yenile=True)
+            time.sleep(VT_DENETIM_SN)
+    threading.Thread(target=denetle, daemon=True).start()
     for sat in sys.stdin:
         try: m = json.loads(sat)
         except ValueError: continue
@@ -718,6 +749,8 @@ def vt_mcp_cmd():
             p = m.get("params") or {}; ad = p.get("name"); ar = p.get("arguments") or {}
             try: metin, hata = (vt_sema_metin() if ad == "vt_sema" else vt_sor_metin(ar.get("sorgu")) if ad == "vt_sor" else None), False
             except VtHata as e: metin, hata = str(e), True
+            if ad == "vt_sor" and not hata:
+                with kilit: _vt_onbellek(A.dir, guncelle=(str(ar.get("sorgu") or "").strip().rstrip(";").strip(), metin))
             if metin is None: yaz({"jsonrpc": "2.0", "id": i, "error": {"code": -32602, "message": f"bilinmeyen araç {ad}"}}); continue
             yaz({"jsonrpc": "2.0", "id": i, "result": {"content": [{"type": "text", "text": metin}], "isError": hata}})
         elif yo == "ping": yaz({"jsonrpc": "2.0", "id": i, "result": {}})

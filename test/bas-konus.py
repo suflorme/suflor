@@ -268,7 +268,7 @@ try:
     ks["vt_son"] = (time.time() - 60, None); n5 = ad3["_vt_tazele_notu"]()
     ok("veritabanı tazelik notu: sorgu yokken ve değişmeden yok, değişince bir kez, okunamazsa 10 dk sonra",
        not n0 and not n1 and "değişti" in n2 and "vt_sor" in n2 and not n3 and "11 dk önce" in n4 and not n5)
-    ok("not soruyla gider, vt_sor turu tazelik kaydını yeniler", "_vt_tazele_notu() + (_vt_benzer_notu(metin)" in kod_ and 'any("suflorvt__vt_so" in x for x in tur.get("araclar")' in kod_)
+    ok("not soruyla gider, vt_sor turu tazelik kaydını yeniler", "vt_sor çağırmadan\" in bz" in kod_ and 'any("suflorvt__vt_so" in x for x in tur.get("araclar")' in kod_)
     # v0.57.6 önceki benzer sorunun sorgusu: vt_sor sorgusu soruyla kaydedilir; yeni süreçte benzer soruya not, açık süreçteki ya da ilgisiz soruya yok
     import datetime as _dt
     ad3.update({"re": _re, "json": json, "datetime": _dt, "BASE": canli, "AYAR": {"proje": proje, "veritabani": {"yol": "vt.db"}}})
@@ -281,6 +281,15 @@ try:
     ok("benzer soru: yeni süreçte önceki sorgu notu, ilgisiz/açık süreç/veritabanısız soruda yok, kayıt 60 satırda kalır",
        "v_yetki" in b1 and "yeniden çalıştır" in b1 and not b2 and not b3 and not b4 and len(sat_) == 60)
     ok("vt_sor girdisi akıştan toplanır, karşı tarafın sorusunda not ve kayıt yok", '"input_json_delta"' in kod_ and "_vt_benzer_notu(metin) if tur.get(\"kaynak\") != \"karsi\" and not tur.get(\"karsi\")" in kod_)
+    # v0.57.8 taze sonuç: veritabanı aracının önbelleğinde 150 sn içinde denetlenmiş sonuç varsa not sonucu taşır ve "vt_sor çağırmadan" der (açık süreçte de)
+    q_ = "SELECT kisi, COUNT(*) FROM v_yetki WHERE rol='admin' GROUP BY kisi"
+    json.dump({q_: {"t": time.time(), "kontrol": time.time() - 20, "mt": None, "sonuc": "kisi\tn\nAyla\t5\n(1 satır)"}}, open(os.path.join(canli, "vt-sonuc.json"), "w"))
+    ks["acilis_t"] = 0; ad3["_vt_sorgu_kaydet"]("Şu anda en fazla admin yetkisi kimde?", [q_])
+    c1 = ad3["_vt_benzer_notu"]("Admin yetkisi en fazla kimde şu an?")
+    json.dump({q_: {"t": time.time() - 900, "kontrol": time.time() - 400, "mt": None, "sonuc": "eski"}}, open(os.path.join(canli, "vt-sonuc.json"), "w"))
+    c2 = ad3["_vt_benzer_notu"]("Admin yetkisi en fazla kimde şu an?")
+    ok("taze önbellek sonucu: açık süreçte de notta sonuç + 'vt_sor çağırmadan'; bayatsa (400 sn) açık süreçte not yok",
+       "Ayla\t5" in c1 and "vt_sor çağırmadan" in c1 and not c2)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])
