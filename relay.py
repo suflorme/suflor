@@ -260,6 +260,28 @@ def _kayit_dongu():
     while True:
         if not toplanti_var() and time.time() - max(STATE["file_last"].values(), default=0) > RESUME_MAX_AGE_MIN * 60: kayit_dondur()
         time.sleep(6 * 3600)
+# --- Toplantı oturumu maliyeti (v0.57.0) ------------------------------------------------------------------------------------
+# Biten /toplanti oturumlarının Claude harcaması (API fiyatıyla karşılığı) toplanti-claude.py maliyet'ten gelir, claude-cagri.jsonl'e is: toplanti satırı olarak
+# buradan (kilitli write ile; döndürmeyle yarışmasın) yazılır. Yalnız yerel dosyalar okunur (~/.claude/projects), ağa bir şey gitmez. Toplantı sürerken yapılmaz.
+MALIYET_ARA_SN = 1800
+def toplanti_maliyet_yaz():
+    tc = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toplanti-claude.py")
+    if not os.path.isfile(tc) or toplanti_var(): return 0
+    try: r = subprocess.run(["/usr/bin/python3", "-B", tc, "--dir", BASE, "maliyet", "--json"], capture_output=True, text=True, timeout=120, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    except (OSError, subprocess.TimeoutExpired) as e: print(f"MALİYET: hesaplanamadı ({e.__class__.__name__})"); return 0
+    sat = [l for l in r.stdout.splitlines() if l.startswith("{") and '"is": "toplanti"' in l]
+    if r.returncode or not sat: return 0
+    with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), "".join(l + "\n" for l in sat))])
+    for l in sat:
+        try: o = json.loads(l); print(f"MALİYET: toplantı oturumu {o.get('sure_dk')} dk · {o.get('maliyet')} $ · {o.get('etiket')} · {o.get('dosya') or 'dosya yok'}")
+        except ValueError: pass
+    return len(sat)
+def _maliyet_dongu():
+    time.sleep(60)
+    while True:
+        try: toplanti_maliyet_yaz()
+        except Exception as e: print(f"MALİYET: hata ({e.__class__.__name__})")
+        time.sleep(MALIYET_ARA_SN)
 # --- Isı, pil ve bellek izi (v0.32.12, Faz 5) -----------------------------------------------------------------------------
 # Fansız Air'da bir saatlik toplantı sürekli yük (Whisper, ses izi, Piper): yavaşlama ısıdan mı belleğinden mi — tahminle değil kayıtla.
 # Toplantı sürerken dakikada bir canli/sistem-izi.jsonl'e (içeriksiz, döndürülür): isi = macOS ısı durumu (NSProcessInfo.thermalState:
@@ -1903,6 +1925,7 @@ if __name__ == "__main__":
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi
     threading.Thread(target=_kayit_dongu, daemon=True).start()  # ölçüm kayıtlarını döndür
+    if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_maliyet_dongu, daemon=True).start()  # v0.57.0: toplantı oturumu maliyeti
     threading.Thread(target=_sistem_izi_dongu, daemon=True).start()  # toplantıda dakikada bir ısı/pil/bellek
     threading.Thread(target=_telaffuz_dongu, daemon=True).start()  # sözlükteki İngilizce adların Türkçe okunuşu (sesli özet, brifing)
     print(f"Suflor.me aktarıcı çalışıyor → http://127.0.0.1:{A.port}/  · dosyalar: {BASE}"); heartbeat()

@@ -107,6 +107,10 @@ gf.add_argument("--hepsini-sil", action="store_true")
 vs = sub.add_parser("vt-sema", help="kayıt veritabanının tabloları, sütunları ve satır sayıları (yalnız okunur)")
 vm = sub.add_parser("vt-mcp", help="kayıt veritabanı araçları (vt_sema, vt_sor) MCP sunucusu olarak (stdio) — Konuş süreci kullanır; komut çalıştırma izni gerekmez")
 vq = sub.add_parser("vt-sor", help="kayıt veritabanında tek SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; şifre/anahtar sütunları gizli)"); vq.add_argument("sorgu")
+# v0.57.0: toplantı oturumunun Claude harcaması (API fiyatıyla karşılığı) — Claude Code oturum dökümünden, yalnız yerel dosyalar; aktarıcı 30 dk'da bir çağırır
+mt = sub.add_parser("maliyet", help="biten /toplanti oturumlarının harcaması → canli/claude-cagri.jsonl (is: toplanti); --etiket ile gerçek/deneme düzeltmesi")
+mt.add_argument("--geri", action="store_true", help="geri doldurma: yeni yazılan satırlar 'deneme' etiketli"); mt.add_argument("--etiket", nargs=2, metavar=("OTURUM_YA_DA_DOSYA", "gercek|deneme"))
+mt.add_argument("--goster", action="store_true", help="yazmadan listele"); mt.add_argument("--json", action="store_true", help="yazmadan satırları JSON ver (aktarıcı kendi kilitli yazımıyla ekler)")
 bt = sub.add_parser("bitir", help="toplantı sonu tek komut: <özet>.yapi.json → karar grafı + sözler + zihin haritası → panoda Son toplantılar + bildirim → eylem kuyruğu onaya")
 bt.add_argument("yol", help="kaydedilen özet .md"); bt.add_argument("--yapi", default=None, help="yapı dosyası (yoksa <özet>.yapi.json)")
 bt.add_argument("--baslik", default=None, help="panoda görünen ad"); bt.add_argument("--dosya", default=None, help="canlı toplantı .md (grafta kaynak; yoksa en yenisi)")
@@ -602,6 +606,98 @@ VT_ARACLAR = [{"name": "vt_sema", "description": "Kayıt veritabanının tablola
               {"name": "vt_sor", "description": "Kayıt veritabanında tek bir SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; gizli sütunlar *** döner).",
                "inputSchema": {"type": "object", "properties": {"sorgu": {"type": "string", "description": "SQLite SELECT sorgusu"}}, "required": ["sorgu"]}}]
 VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Masaüstü'ndeki veritabanını okuyamaz; Konuş istemine tablo yapısı buradan girer
+# --- Toplantı oturumu maliyeti (v0.57.0) --------------------------------------------------------------------------------------------------
+# Kaynak: ~/.claude/projects/<proje klasörü>/*.jsonl — ilk kullanıcı iletisi /toplanti olan oturum. Her API cevabı içerik bloğu başına satır yazar (aynı message.id):
+# usage message.id'ye göre teke indirilir. Fiyat (MTok, 16 Ekim claude-api skill'i): giriş/çıkış ve önbellekten okuma; önbelleğe yazma 5 dk 1,25×, 1 sa 2×.
+# Oturum son etkinlikten MALIYET_BITTI_SN sonra "bitti" sayılır ve bir kez yazılır (yinelenmez: oturum kimliği). Etiket: karşı kanalda en az bir satır varsa ve
+# başlıkta deneme/test/echo yoksa "gercek", değilse "deneme"; elle düzeltme canli/toplanti-etiket.json (rapor okurken uygulanır, satır değişmez).
+FIYAT_MTOK = {"opus": (4.0, 20.0, 0.20), "sonnet": (2.0, 10.0, 0.20), "haiku": (0.10, 0.50, 0.01), "fable": (10.0, 50.0, 0.25)}
+MALIYET_BITTI_SN = 1800
+def _fiyat(model):
+    m = str(model or "").lower()
+    return next((v for k, v in FIYAT_MTOK.items() if k in m), FIYAT_MTOK["opus"])
+def _zt(s):
+    try: return datetime.datetime.fromisoformat(str(s).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError): return None
+def toplanti_oturumlari():  # → [{oturum, t0, t1, tur, model, giris, yaz5, yaz1s, oku, cikis, maliyet}]
+    import glob
+    kok = os.path.join(os.path.expanduser("~"), ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", os.path.expanduser(PROJE)))
+    out = []
+    for f in glob.glob(os.path.join(kok, "*.jsonl")):
+        top, ilk_k, gor, ts, mod = False, 0, {}, [], set()
+        try:
+            for l in open(f, encoding="utf-8", errors="replace"):
+                try: r = json.loads(l)
+                except ValueError: continue
+                t = _zt(r.get("timestamp"))
+                if t: ts.append(t)
+                if r.get("type") == "user" and ilk_k < 3 and not top and not r.get("isMeta"):  # komut ilk 3 iletiden birinde (önce oturum adı verilmiş olabilir)
+                    ilk_k += 1; ic = json.dumps((r.get("message") or {}).get("content", ""), ensure_ascii=False)[:3000]
+                    top = "<command-name>/toplanti" in ic or "<command-name>toplanti" in ic or ic.lstrip('"').startswith("/toplanti")
+                m = r.get("message") or {}
+                if r.get("type") == "assistant" and m.get("usage") and m.get("id"): gor[m["id"]] = (m["usage"], m.get("model"))
+        except OSError: continue
+        if not top or not gor or not ts: continue
+        s = {"oturum": os.path.basename(f)[:-6], "t0": min(ts), "t1": max(ts), "tur": len(gor), "giris": 0, "yaz5": 0, "yaz1s": 0, "oku": 0, "cikis": 0, "maliyet": 0.0}
+        for u, model in gor.values():
+            g, c, o = _fiyat(model); mod.add(model)
+            cc = u.get("cache_creation") or {}; yaz = u.get("cache_creation_input_tokens") or 0
+            y1 = cc.get("ephemeral_1h_input_tokens") or 0; y5 = max(0, yaz - y1)
+            s["giris"] += u.get("input_tokens") or 0; s["yaz5"] += y5; s["yaz1s"] += y1; s["oku"] += u.get("cache_read_input_tokens") or 0; s["cikis"] += u.get("output_tokens") or 0
+            s["maliyet"] += ((u.get("input_tokens") or 0) * g + y5 * g * 1.25 + y1 * g * 2 + (u.get("cache_read_input_tokens") or 0) * o + (u.get("output_tokens") or 0) * c) / 1e6
+        s["model"] = sorted(x for x in mod if x and not x.startswith("<")); s["maliyet"] = round(s["maliyet"], 4); out.append(s)
+    return sorted(out, key=lambda x: x["t0"])
+def _toplanti_dosyasi(t0, t1):  # oturumla en çok örtüşen canlı toplantı dosyası (ad YYYY-MM-DD-HHMM-…; bitiş = son değişiklik)
+    en, en_o = None, 0.0
+    for f in os.listdir(A.dir):
+        m = re.match(r"^(\d{4}-\d{2}-\d{2}-\d{4})-.+\.md$", f)
+        if not m: continue
+        try: b = datetime.datetime.strptime(m.group(1), "%Y-%m-%d-%H%M").timestamp(); e = os.path.getmtime(os.path.join(A.dir, f))
+        except (ValueError, OSError): continue
+        o = min(t1, e) - max(t0, b)
+        if o > en_o: en, en_o = f, o
+    return en
+DENEME_RX = re.compile(r"(?i)(deneme|test|echo|prova|trial)")
+def toplanti_etiketi(dosya):
+    if not dosya or DENEME_RX.search(dosya[16:]): return "deneme"
+    try:
+        for l in open(os.path.join(A.dir, dosya[:-3] + ".jsonl"), encoding="utf-8", errors="replace"):
+            if '"kanal": "karsi"' in l: return "gercek"
+    except OSError: pass
+    return "deneme"
+def maliyet_cmd():
+    yol = os.path.join(A.dir, "claude-cagri.jsonl")
+    if A.etiket:
+        k, e = A.etiket
+        if e not in ("gercek", "deneme"): sys.exit("etiket: gercek | deneme")
+        ey = os.path.join(A.dir, "toplanti-etiket.json")
+        try: d = json.load(open(ey, encoding="utf-8"))
+        except (OSError, ValueError): d = {}
+        d[k] = e; json.dump(d, open(ey, "w", encoding="utf-8"), ensure_ascii=False, indent=1); print(f"{k} → {e}"); return
+    import gzip
+    var = set()
+    for y, ac in ((os.path.join(A.dir, "arsiv", "claude-cagri.jsonl.gz"), lambda y: gzip.open(y, "rt", encoding="utf-8", errors="replace")), (yol, lambda y: open(y, encoding="utf-8", errors="replace"))):
+        try:  # aktarıcı claude-cagri.jsonl'i arşive döndürür: yazılmış oturumlar ikisinde de aranır
+            with ac(y) as f:
+                for l in f:
+                    if '"is": "toplanti"' in l:
+                        try: var.add(json.loads(l).get("oturum"))
+                        except ValueError: pass
+        except (OSError, EOFError): pass
+    yeni = []
+    for s in toplanti_oturumlari():
+        if s["oturum"] in var or time.time() - s["t1"] < MALIYET_BITTI_SN: continue
+        d = _toplanti_dosyasi(s["t0"], s["t1"]); sure = max(1, round((s["t1"] - s["t0"]) / 60))
+        r = {"at": datetime.datetime.fromtimestamp(s["t1"]).astimezone().isoformat(timespec="seconds"), "is": "toplanti", "oturum": s["oturum"], "dosya": d,
+             "sure_dk": sure, "tur": s["tur"], "model": ", ".join(s["model"]), "giris": s["giris"], "onbellek_yaz": s["yaz5"], "onbellek_yaz_1s": s["yaz1s"],
+             "onbellek_oku": s["oku"], "cikis": s["cikis"], "maliyet": s["maliyet"], "dk_maliyet": round(s["maliyet"] / sure, 4),
+             "etiket": "deneme" if A.geri else toplanti_etiketi(d), "etiket_kaynak": "geri doldurma" if A.geri else "kural"}
+        yeni.append(r)
+    if A.json: print("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in yeni), end=""); return
+    for r in yeni: print(f"{r['at'][:16]} · {r['sure_dk']} dk · {r['tur']} tur · {r['model']} · {r['maliyet']:.2f} $ · {r['etiket']} · {r['dosya'] or 'dosya yok'}")
+    if yeni and not A.goster:
+        with open(yol, "a", encoding="utf-8") as f: f.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in yeni))
+    print(f"{len(yeni)} yeni toplantı oturumu" + (" (yazılmadı)" if A.goster else ""))
 def vt_mcp_cmd():
     yaz = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"), sys.stdout.flush())
     try:  # v0.55.2: her açılışta tablo yapısını önbelleğe yaz (bu süreç Claude'un altında, veritabanını okuyabilir)
@@ -2265,5 +2361,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd}[A.cmd]()
+     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass
