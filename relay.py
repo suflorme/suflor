@@ -1235,7 +1235,7 @@ TAKVIM_SN = 300; TAKVIM_TAM = {}
 # Chrome yerel mesajlaşmasıyla (native messaging) bu kullanıcının anahtar yardımcısından; pano/hazırlık sayfası kendi deposundan
 # (localStorage — köken porta bağlı; çerez porta bağlı olmadığı için diğer hesabın aktarıcısına giderdi). Geçiş: eski eklentinin
 # yazma istekleri anahtarsız da kabul edilir, pano "eklentiyi yenile" der; ayar "anahtar_zorunlu": true bunu kapatır.
-VERI_GET = {"/status", "/geri-bildirim/onizle", "/taslak", "/hazirlik.json", "/takvim", "/agenda", "/cards"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/geri-bildirim/onizle", "/taslak", "/hazirlik.json", "/takvim", "/agenda", "/cards", "/soyle-ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1716,6 +1716,11 @@ class H(BaseHTTPRequestHandler):
             try: sn = float((q.get("bekle") or ["0"])[0])
             except ValueError: sn = 0
             return self._json(cards_bekle((q.get("imza") or [""])[0], sn))
+        if yol == "/soyle-ses":  # toplantıya söyle web sürümü: okunacak WAV (eklenti, anahtarla)
+            from urllib.parse import parse_qs, urlsplit
+            b = ts_web_ses((parse_qs(urlsplit(self.path).query).get("id") or [""])[0])
+            if not b: return self._json({"ok": False}, 404)
+            self.send_response(200); self._cors(); self.send_header("Content-Type", "audio/wav"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if self.path.startswith("/kanit/"):  # yalnız kanit/ altındaki PNG
             import urllib.parse
             fp = os.path.realpath(os.path.join(BASE, urllib.parse.unquote(self.path.split("?")[0].lstrip("/"))))
@@ -1844,6 +1849,7 @@ class H(BaseHTTPRequestHandler):
                     or (os.environ.get("SUFLOR_TEST_KOKEN") and o == os.environ["SUFLOR_TEST_KOKEN"])): return self._json({"ok": False, "err": "köken"}, 403)  # test: sahte sayfa
             p.pop("kaynak", None); return self._json(ses_al(p))
         if self.path == "/olay":  # eklentiden tanı satırı (kanıt hatası, Whisper kanalı açıldı/kapandı) → günlük
+            if p.get("tur") == "soyle-web": ts_web_durum(p.get("metin")); return self._json({"ok": True})
             print(f"EKLENTİ: {str(p.get('tur') or '?')[:40]} · {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})
         if self.path == "/masaustu": return self._json(masaustu_al(p))  # menü çubuğu uygulaması (anahtarla)
         if self.path == "/ses-masaustu": return self._json(masaustu_mic_al(p))

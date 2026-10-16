@@ -620,7 +620,19 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     // toplantıdayken (transkript paneli ya da altyazı açık) kart olmasa da hap görünür (nokta yeşil). Toplantı dışındaki
     // sayfalarda yalnız kart/uyarı varken.
     function inMeeting() { return !!(findTranscriptPanel() || capSiki()); }
-    let kanitSon = null, komutSon, anlikSon;  // sesli komut onayı ve anlık uyarı (ilk yoklamada eskisi gösterilmez)
+    let kanitSon = null, komutSon, anlikSon, soyleSon, soyleDur = null;  // sesli komut onayı, anlık uyarı, toplantıya söyle (ilk yoklamada eskisi alınmaz)
+    // toplantıya söyle, web sürümü (v0.50.0): aktarıcının WAV'ı alınır, sayfa bağlamındaki soyle-main.js toplantı bağlantısına okur; sonucu aktarıcıya
+    window.addEventListener("message", e => {
+      if (e.source === window && e.data && e.data.__suflor === "soyleDurum" && window.top === window) olay("soyle-web", e.data.durum);
+    });
+    async function soyleCal(w) {
+      if (teamsSessiz()) return olay("soyle-web", "sessiz");  // toplantıda mikrofon kapalı: karşı taraf duymasın
+      try {
+        const r = await rf("/soyle-ses?id=" + encodeURIComponent(w.id));
+        if (!r.ok) return olay("soyle-web", "hata:ses " + r.status);
+        window.postMessage({ __suflor: "soyle", komut: "cal", id: w.id, ses: await r.arrayBuffer() }, "*");
+      } catch (e) { olay("soyle-web", "hata:ses " + String(e && (e.message || e.name) || "?").slice(0, 60)); }
+    }
     function listeCiz(list, v, cards, qs, warn, dil, ayri) {
       const d = list.ownerDocument, e = (t, c, x) => { const n = d.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
       const sv = v.sure, kal = sv ? sv.kalan_dk : null;
@@ -684,6 +696,10 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       // panodan/mini panodan kanıt istendi — toplantıdaki sekme çeker (çift isteği aktarıcı ayıklar). Arkadaysa da ister;
       // arka plan sekmeyi bir an öne getirip çeker (2 Ekim: pano aynı penceredeyken kanıt düşüyordu)
       if (v.kanit_iste && v.kanit_iste.id !== kanitSon) { kanitSon = v.kanit_iste.id; if (window.top === window && (inMeeting() || inCall())) chrome.runtime.sendMessage({ type: "kanit", kaynak: v.kanit_iste.kaynak || "pano", istek: v.kanit_iste.id, not: v.kanit_iste.not }).catch(() => {}); }
+      const sw = v.soyle_web;
+      if (sw && sw.id !== soyleSon) { if (soyleSon !== undefined && !sw.dur && window.top === window && inCall()) soyleCal(sw); soyleSon = sw.id; }
+      else if (!sw && soyleSon === undefined) soyleSon = null;
+      if (sw && sw.dur && soyleDur !== sw.id && window.top === window) { soyleDur = sw.id; window.postMessage({ __suflor: "soyle", komut: "dur" }, "*"); }
       if (v.komut && v.komut.id !== komutSon) { if (komutSon !== undefined && window.top === window) toast(v.komut.metin, "#0a8f5a", 3500); komutSon = v.komut.id; }
       else if (!v.komut && komutSon === undefined) komutSon = null;
       // anlık uyarı (adın geçti / uzun konuşma) — yalnız toplantı sekmesinde kısa bildirim; ilk yoklamada eskisi gösterilmez
