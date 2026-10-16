@@ -483,8 +483,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     if (msg.type === "kanitBitti") {
       if (window.top !== window) return;
       document.querySelectorAll("#suflor-serit, #suflor-toast").forEach(e => { e.style.display = e.dataset.sfDisp || ""; });
-      if (msg.ok && msg.kucuk) toast(L("📷 Kanıt {n} kaydedildi — paylaşılan ekran küçük gösteriliyor (%{p}), yazı okunmayabilir: ekranı büyütüp yeniden al", { n: msg.n || "", p: msg.kucuk }), "#b26a00", 7000);
-      else if (msg.ok) toast(L("📷 Kanıt {n} kaydedildi", { n: msg.n || "" }), "#1b8a3a", 2000); else if (msg.ok === false) toast(L("📷 Kanıt kaydedilemedi: ") + (msg.err || L("bilinmiyor"))); // null: yalnız şeridi geri aç
+      if (msg.ok && msg.kucuk) toast(L("Kanıt {n} kaydedildi — paylaşılan ekran küçük gösteriliyor (%{p}), yazı okunmayabilir: ekranı büyütüp yeniden al", { n: msg.n || "", p: msg.kucuk }), "#b26a00", 7000);
+      else if (msg.ok) toast(L("Kanıt {n} kaydedildi", { n: msg.n || "" }), "#1b8a3a", 2000); else if (msg.ok === false) toast(L("Kanıt kaydedilemedi: ") + (msg.err || L("bilinmiyor"))); // null: yalnız şeridi geri aç
       return;
     }
     if (msg.type === "getStatus") { reply({ alan: { bekliyor: alanBekliyor, secili: alanSecili, relay: cfg.relay, sonHata }, meeting: meetingInfo().title, lastOk, failCount, sent: sentById.size + sentKeys.size, queued: queue.length, panel: !!findTranscriptPanel(), captions: !!findCaptions(), lang: capLang, langSrc, dilUyari,
@@ -501,6 +501,14 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     const PRI = ["dur", "soyle", "cevap"];
     let host = null, root = null, sig = "", first = true, acik = false, pip = null, sonV = null; const seen = new Set();
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+    // v0.57.9: panodaki ince çizgi simgeler (renkli emoji yerine); Teams sayfası innerHTML'e izin vermeyebilir — DOM ile çizilir
+    const IKON = { star: ["M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"], mute: ["M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8", "M10 20.5a2 2 0 0 0 4 0", "M4 4l16 16"],
+      check: ["M5 12.5l4.5 4.5L19 7.5"], x: ["M6 6l12 12M18 6L6 18"], pause: ["M9 6v12M15 6v12"], zil: ["M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z", "M10 20.5a2 2 0 0 0 4 0"], uyari: ["M12 4l9 15.5H3z", "M12 10v4M12 17v.01"] };
+    function ikon(d, ad) {
+      const NS = "http://www.w3.org/2000/svg", s = d.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "i"); s.setAttribute("aria-hidden", "true");
+      for (const yol of IKON[ad] || []) { const p = d.createElementNS(NS, "path"); p.setAttribute("d", yol); s.append(p); }
+      return s;
+    }
     const CSS = `
         .w{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;color:#18201c;
           --s1:#fff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#8b938d;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.05)}
@@ -517,7 +525,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .a{display:flex;gap:2px;flex:none}
         button{font:12px/1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--t3);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;cursor:pointer}
         button:hover{background:var(--hov);color:var(--tx)}button:disabled{opacity:.6}
-        .q{font-size:12px;color:var(--t2);padding:4px 2px}.top{font-size:12px;color:var(--t2);margin:0 2px 6px}.top:empty{display:none}.uy{color:#c0503b}
+        .q{font-size:12px;color:var(--t2);padding:4px 2px}.top{font-size:12px;color:var(--t2);margin:0 2px 6px;display:flex;align-items:center;gap:5px}svg.i{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}button svg.i{width:14px;height:14px}.top:empty{display:none}.uy{color:#c0503b}
         .bos{font-size:12px;color:var(--t3);padding:6px 2px}
         .gir{display:flex;gap:6px;align-items:flex-end;margin:0 0 6px}.son{font-size:11px;color:var(--t3);border-top:1px solid var(--bd);padding:4px 2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.son.eski{color:#b0832e}
         .alt{display:flex;gap:4px;justify-content:flex-end}.alt button{color:var(--t2);border-color:var(--bd)}
@@ -532,11 +540,11 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     // soru, Shift+Enter yeni satır. Sayfa içi listede kutu yok (ayrı pencere açılamazsa yalnız kartlar).
     function altDugmeler(d, ta) {
       const a = d.createElement("div"); a.className = "alt";
-      const dg = (metin, ipucu, is) => { const b = d.createElement("button"); b.textContent = metin; b.title = L(ipucu); b.onclick = async () => { b.disabled = true; try { await is(); } catch (e) {} setTimeout(() => { b.disabled = false; }, 2500); pollCards(); }; a.append(b); };
+      const dg = (metin, ipucu, is) => { const b = d.createElement("button"); if (typeof metin === "string") b.textContent = metin; else b.append(metin); b.title = L(ipucu); b.onclick = async () => { b.disabled = true; try { await is(); } catch (e) {} setTimeout(() => { b.disabled = false; }, 2500); pollCards(); }; a.append(b); };
       const post = (yol, g) => rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) });
-      dg("⭐", "⭐ Önemli an: şu anı özette öne çıkar", () => post("/komut", { tur: "onemli", meeting: meetingInfo() }));  // ad: not süren toplantının dosyasına
+      dg(ikon(d, "star"), "Önemli an: şu anı özette öne çıkar", () => post("/komut", { tur: "onemli", meeting: meetingInfo() }));  // ad: not süren toplantının dosyasına
       dg(L("Ne diyeyim?"), "Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)", () => post("/ask", { tur: "ozet" }));
-      dg("🔇", "Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)", () => post("/komut", { tur: "sessiz" }));
+      dg(ikon(d, "mute"), "Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)", () => post("/komut", { tur: "sessiz" }));
       dg(L("Kanıt"), "Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur", () => { const not = ta.value.trim(); ta.value = ""; chrome.runtime.sendMessage({ type: "kanit", kaynak: "serit", not }); });
       return a;
     }
@@ -566,7 +574,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const git = async soru => {
         const t = ta.value; if (!t.trim()) return; ta.value = ""; b.disabled = true; let r = {};
         try { r = await (await rf("/girdi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: t, soru, at: new Date().toISOString(), meeting: meetingInfo() }) })).json(); } catch (e) {}
-        b.textContent = r.tur ? "✓ " + L(r.tur) : L("gönderilemedi"); if (!r.tur) ta.value = t;
+        b.textContent = r.tur ? L(r.tur) + " ✓" : L("gönderilemedi"); if (!r.tur) ta.value = t;
         setTimeout(() => { b.textContent = L("Gönder"); b.disabled = false; }, 1500); pollCards();
       };
       b.onclick = () => git(false);
@@ -652,12 +660,12 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const sv = v.sure, kal = sv ? sv.kalan_dk : null;
       const top = e("div", "top", sv ? (kal > 0 ? L("{n} dk kaldı", { n: kal }) : kal === 0 ? L("süre doldu") : L("+{n} dk", { n: -kal })) + (sv.kayma >= 2 ? L(" · {n} madde geride", { n: sv.kayma }) : "") : "");
       list.replaceChildren(top);
-      const ss = v.sessiz, sn = (ss && ss.tutulan || []).length;
-      if (ss && ss.acik) list.append(e("div", "top", "🔇 " + L("Sessiz · {n} dk", { n: Math.max(1, Math.ceil(ss.kalan_sn / 60)) }) + (sn ? L(" · {n} kart bekliyor", { n: sn }) : "")));
-      else if (sn) list.append(e("div", "top", "🔔 " + L("Sessiz bitti — Claude özetliyor ({n} kart)", { n: sn })));
-      if (v.ertelenen) list.append(e("div", "top", "⏸ " + L("{n} kart sonraya bırakıldı", { n: v.ertelenen })));
-      if (dil) list.append(e("div", "top uy", "⚠ " + L("Döküm dili yanlış — panoya bak")));
-      if (warn) list.append(e("div", "top uy", "⚠ " + warn));
+      const ss = v.sessiz, sn = (ss && ss.tutulan || []).length, ust = (ad, x, c) => { const n = e("div", c || "top"); n.append(ikon(d, ad), e("span", null, x)); return n; };
+      if (ss && ss.acik) list.append(ust("mute", L("Sessiz · {n} dk", { n: Math.max(1, Math.ceil(ss.kalan_sn / 60)) }) + (sn ? L(" · {n} kart bekliyor", { n: sn }) : "")));
+      else if (sn) list.append(ust("zil", L("Sessiz bitti — Claude özetliyor ({n} kart)", { n: sn })));
+      if (v.ertelenen) list.append(ust("pause", L("{n} kart sonraya bırakıldı", { n: v.ertelenen })));
+      if (dil) list.append(ust("uyari", L("Döküm dili yanlış — panoya bak"), "top uy"));
+      if (warn) list.append(ust("uyari", warn, "top uy"));
       cards.forEach(c => {
         const k = e("div", "k"); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
         if (c.onay) k.dataset.onay = "1"; else k.title = L("Dokun: kapat");
@@ -666,9 +674,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         if (c.durum && (!c.gizli || ayri)) m.append(e("div", "kd", c.durum));  // Ne diyeyim?: şu an ne konuşuluyor
         const a = e("div", "a");
         // onay kartı (#76): Claude'un yapacağı iç işi yazılı onayla — yalnız anahtarlı eklentiden geçer
-        (c.onay ? [["onaylandi", "✓ " + L("Onayla"), "Onayla"], ["reddedildi", "✕ " + L("Reddet"), "Reddet"]] :
-        [["yapildi", "✓", "Yaptım"], ["ertele", "⏸", "Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster"], ["gecildi", "✕", "Gerek yok — Claude bir daha önermesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
-          .forEach(([st, lbl, tip]) => { const x = e("button", null, lbl); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
+        (c.onay ? [["onaylandi", ["check", L("Onayla")], "Onayla"], ["reddedildi", ["x", L("Reddet")], "Reddet"]] :
+        [["yapildi", ["check"], "Yaptım"], ["ertele", ["pause"], "Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster"], ["gecildi", ["x"], "Gerek yok — Claude bir daha önermesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
+          .forEach(([st, lbl, tip]) => { const x = e("button"); x.append(ikon(d, lbl[0])); if (lbl[1]) x.append(e("span", null, lbl[1])); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
         k.append(m, a); list.append(k);
       });
       qs.forEach(q => list.append(e("div", "q", "⏳ " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L("Claude'a soruldu: ") + q.text))));
@@ -729,7 +737,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const warn = v.uyari || ""; // disk dolu / az yer — kart olmasa da şerit görünür
       const dil = (v.dil && v.dil.uyari) || ""; // konuşma dili beklenenden farklı (ayrıntı panoda)
       dilHedef = (v.dil && v.dil.hedef) || null;
-      if (dil && dil !== dilUyari) toast("⚠ " + L("Döküm dili yanlış — panoya bak")); dilUyari = dil;
+      if (dil && dil !== dilUyari) toast(L("Döküm dili yanlış — panoya bak")); dilUyari = dil;
       if (!document.body || (!cards.length && !qs.length && !warn && !dil && !live)) { if (host) host.style.display = "none"; if (pip && !pip.closed) { pip.close(); pip = null; } return; }
       ensure(); host.style.display = "block";
       if (pip && !pip.closed) sonCiz(pip.document, v.son);  // her yoklamada (yaş değişir)
@@ -742,7 +750,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       // hap = nokta (en önemli kartın sınıf rengi; uyarıda kırmızı; kartsız toplantıda yeşil) + açık kart sayısı
       const pc = (warn || dil) ? COL.dur : cards.length ? COL[top] : (live ? "#1f7a4f" : "#8b938d");
       pill.style.setProperty("--pc", pc); pill.replaceChildren(el("i")); if (cards.length) pill.append(el("span", null, String(cards.length)));
-      if (ss && ss.acik) pill.append(el("span", null, "🔇"));
+      if (ss && ss.acik) pill.append(ikon(document, "mute"));
       pill.title = ss && ss.acik ? L("Suflor.me — sessiz; kartlar bekliyor") : L("Suflor.me — kartlar için tıkla");
       const fresh = cards.some(c => !seen.has(c.id + (c.geri || ""))); cards.forEach(c => seen.add(c.id + (c.geri || "")));
       if (fresh && !first) { pill.classList.remove("yeni"); void pill.offsetWidth; pill.classList.add("yeni"); }

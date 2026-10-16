@@ -39,7 +39,7 @@ async function komut(tur) {
     const r = await fetch((await relayAdr()) + "/komut", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur }) });
     if (!r.ok) throw new Error("aktarıcı HTTP " + r.status);
   } catch (e) {
-    chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me", message: L(tur === "onemli" ? "⭐ işaretlenemedi: " : tur === "sessiz" ? "Sessiz açılamadı: " : "Ne diyeyim? istenemedi: ") + (/Failed to fetch/i.test(String(e)) ? L("aktarıcıya ulaşılamadı (127.0.0.1:8765)") : L(String(e.message || e))) });
+    chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: "Suflor.me", message: L(tur === "onemli" ? "Önemli an işaretlenemedi: " : tur === "sessiz" ? "Sessiz açılamadı: " : "Ne diyeyim? istenemedi: ") + (/Failed to fetch/i.test(String(e)) ? L("aktarıcıya ulaşılamadı (127.0.0.1:8765)") : L(String(e.message || e))) });
   }
 }
 
@@ -77,13 +77,13 @@ async function karsiBaslat(hint, kaynak) {
   let relay; try { relay = await relayAdr(); } catch (e) { return bilgi(tab, L(e.message), "#b26a00", 10000); }  // alan seçilmedi
   const olay = metin => fetch(relay + "/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur: "whisper-karsi", metin }) }).catch(() => {});
   // (2 Ekim denemesi) ikinci basış "Cannot capture a tab with an active stream" kırmızısı veriyordu — zaten açık
-  if (karsiTab === tab.id) return bilgi(tab, L("🎙 Karşı tarafın sesi zaten yazılıyor"), "#1b8a3a", 3000);
+  if (karsiTab === tab.id) return bilgi(tab, L("Karşı tarafın sesi zaten yazılıyor"), "#1b8a3a", 3000);
   try {
     let id;
     try { id = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }); }
     catch (e) {
       // Chrome yalnız eklentinin çağrıldığı (öndeki) sekmeyi verir. Teams sekmesi arkadaysa öne getir, bir kez daha bastır.
-      if (/active stream/i.test(String(e))) { karsiTab = tab.id; return bilgi(tab, L("🎙 Karşı tarafın sesi zaten yazılıyor"), "#1b8a3a", 3000); }
+      if (/active stream/i.test(String(e))) { karsiTab = tab.id; return bilgi(tab, L("Karşı tarafın sesi zaten yazılıyor"), "#1b8a3a", 3000); }
       if (tab.active) throw e;
       await chrome.tabs.update(tab.id, { active: true }); await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
       bilgi(tab, L("Toplantı sekmesini öne getirdim — karşı tarafın sesi için Suflor.me simgesi → Karşı taraf → Aç'a bir kez daha bas"), "#1b6ef3", 10000);
@@ -92,7 +92,7 @@ async function karsiBaslat(hint, kaynak) {
     await offscreenAc();
     const title = (tab.title || "").replace(/^\(\d+\)\s*/, "").split("|").map(x => x.trim()).filter(Boolean).slice(-2, -1)[0] || "Toplantı";
     chrome.runtime.sendMessage({ type: "offBasla", id, relay, title }).catch(() => {});
-    karsiTab = tab.id; bilgi(tab, L("🎙 Whisper: karşı tarafın sesi de yazılıyor"), "#1b8a3a", 4000);
+    karsiTab = tab.id; bilgi(tab, L("Whisper: karşı tarafın sesi de yazılıyor"), "#1b8a3a", 4000);
   } catch (e) {
     const err = String(e.message || e).slice(0, 160);
     bilgi(tab, L("Whisper karşı taraf açılamadı: ") + err, "#b00020", 8000);
