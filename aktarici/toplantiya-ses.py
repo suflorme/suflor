@@ -19,7 +19,7 @@ def ts_aygit():  # say -a ? listesinde BlackHole çıkış aygıtının kimliği
     m = re.search(r"^\s*(\d+)\s+BlackHole\b", out, re.M)
     return m.group(1) if m else None
 def ts_sesli_kisim(metin):  # Konuş cevabının okunan kısmı: "---" öncesi, en çok 400 karakter
-    return re.split(r"(?:^|\n)\s*-{3,}", metin or "", maxsplit=1)[0].strip()[:400]
+    return sesli_terim_suz(re.split(r"(?:^|\n)\s*-{3,}", metin or "", maxsplit=1)[0].strip()[:400])  # v0.57.1: iç terim süzgeci (bas-konus.py)
 def ts_web():  # toplantı tarayıcıda mı: eklenti son 30 sn'de call=true dedi ve masaüstü uygulamada toplantı yok
     x = STATE.get("extension") or {}
     if not x.get("call") or (STATE.get("masaustu") or {}).get("toplantida"): return False
