@@ -611,7 +611,7 @@ def vt_mcp_cmd():
         if yo == "initialize":
             yaz({"jsonrpc": "2.0", "id": i, "result": {"protocolVersion": (m.get("params") or {}).get("protocolVersion") or "2024-11-05",
                  "capabilities": {"tools": {}}, "serverInfo": {"name": "suflor-vt", "version": "1"}}})
-        elif yo == "tools/list": yaz({"jsonrpc": "2.0", "id": i, "result": {"tools": VT_ARACLAR}})
+        elif yo == "tools/list": yaz({"jsonrpc": "2.0", "id": i, "result": {"tools": [a for a in VT_ARACLAR if not (os.environ.get("SUFLOR_VT_SEMA_YOK") and a["name"] == "vt_sema")]}})  # tablo yapısı istemde
         elif yo == "tools/call":
             p = m.get("params") or {}; ad = p.get("name"); ar = p.get("arguments") or {}
             try: metin, hata = (vt_sema_metin() if ad == "vt_sema" else vt_sor_metin(ar.get("sorgu")) if ad == "vt_sor" else None), False
