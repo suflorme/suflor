@@ -121,6 +121,7 @@ try:
         akit(ses("Hey, what's the weather going to be like in London tomorrow?", "Daniel") + sus(2.0)); time.sleep(4); akit(sus(1))
         ok(f"ses izi: başka sesin sorusu Claude'a gitmedi ({st().get('soru')!r})", log().count("SOHBET: tur bitti") > n1 and "kullanıcıya benzemiyor" in log() and st().get("soru") == soru_once)
         ok("ses izi: sohbet dinlemeye devam ediyor", st()["sohbet"]["acik"] and st()["durum"] == "dinliyor")
+        ok("ses izi: reddedince sesli söyledi ('Sesini tanıyamadım')", "Sesini tanıyamadım" in log())
     else: ok("(ses izi modeli yok — süzgeç denenmedi)", True)
     nc = log().count("Sorduğun")
     akit(ses("Tamam, teşekkürler.") + sus(1.2)); t = time.time()
@@ -133,7 +134,7 @@ try:
     post({"komut": "sohbet_basla"}); akit(sus(1))
     post({"meeting": {"title": "Deneme"}, "call": True, "panel": True}, yol="/ping"); time.sleep(1.5)
     ok("toplantı başlayınca kapandı", "kapandı (toplantı başladı" in log() and not st()["sohbet"]["acik"])
-    ok("sohbette 'hı hı' yok", "aktif dinleme" not in log())
+    ok("sohbette 'hı hı' yok (konuşurken de tur sonunda da)", "aktif dinleme" not in log() and "bırakınca \"hı hı\"" not in log())
     ok("smart-turn bekleme seçicisi çalıştı" if tur_sonu else "(smart-turn yok — modelsiz bekleme)", True)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:

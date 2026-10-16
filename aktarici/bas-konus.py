@@ -477,13 +477,16 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     sid = SORU["aktif"]
     # v0.45.0 (aktif dinleme araştırması 2. adım): bırakınca ~0,25 sn içinde kısa "Hı hı / Hm" (tepki türü alindi) — cevaba kadarki ~4 sn boşluk
     # sessiz kalmasın. "Yazayım mı?" cevabında ve toplantıda kulaklık yokken çalmaz; ayar konus_alindi: false kapatır. Çaldıysa bekleme cümlesi geç gelir.
-    if not sid and AYAR.get("konus_alindi") is not False and (not toplanti_var() or kulaklik()): tur["alindi"] = tepki_cal("alindi")
+    # v0.51.2: sohbette çalmaz — tur sonu erken gelince cevap "hı hı" ile başlıyor gibi duyuluyordu (kullanıcı, 16 Ekim)
+    if not sid and not SOHBET["acik"] and AYAR.get("konus_alindi") is not False and (not toplanti_var() or kulaklik()): tur["alindi"] = tepki_cal("alindi")
     if tur.get("alindi"): print("KONUŞ: bırakınca \"hı hı\" (alındı)")
     is_ = {"iz_iste": bool(SOHBET["acik"] and AYAR.get("sohbet_ses_izi") is True)}  # akışsız (kısa) sohbet sorusunda da ses izi süzgeci
     def geri(metin, hata):
         tur["t_metin"] = time.time()
         if metin and not hata and is_.get("iz") and sohbet_ses_izi_red([(is_["iz"], sn)]): hata = "ses_izi"
-        if hata == "ses_izi": _KS["tur"] = None; _konus_kur(durum="dinliyor", hata=None); return  # sohbet: başkasının sözü, Claude'a gitmez
+        if hata == "ses_izi":  # sohbet: ses izi kullanıcıya benzemedi, Claude'a gitmez; sessiz kalmasın (v0.51.2: kullanıcının kendi sözü de reddedilebiliyor)
+            _KS["tur"] = None; _konus_kur(durum="dinliyor", hata=None)
+            seslendir(_t("Sesini tanıyamadım; yeniden söyler misin?", "I didn't recognise your voice; could you say that again?"), kuyruk=True); return
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
         if sid and SORU["aktif"] == sid:  # "yazayım mı?" sorusuna sesli cevap — Claude'a gitmez
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, sesli_cevap=True, cevap=sesli_cevap(metin, sid), olcum={"wh_ms": round((tur["t_metin"] - tur["t_birak"]) * 1000)}); return
