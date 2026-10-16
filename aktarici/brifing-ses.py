@@ -134,6 +134,7 @@ def _tel_harf(w, o):  # sözcük büyük harfle başlıyorsa okunuş da (Piper k
     return {"i": "İ", "ı": "I"}.get(o[0], o[0].upper()) + o[1:]
 _TEL = {"t": 0, "mt": None, "re": None, "esle": {}}
 def telaffuz(metin, mac=False):  # mac: Mac sesiyle okunacak — TELAFFUZ_MAC'teki sözcüklere sabit sözlük uygulanmaz (canli/telaffuz.json yine uygulanır)
+    metin = kisilik_telaffuz(metin)  # v0.53.0: kişilik adı ve dosyadaki okunuşlar (büyük harfli ad harf harf okunmasın)
     if ARAYUZ_DILI != "tr" or not metin: return metin
     yol = os.path.join(BASE, "telaffuz.json")
     if time.time() - _TEL["t"] > 30 or _TEL["re"] is None:

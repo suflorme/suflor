@@ -210,7 +210,7 @@ def istem_metni():
     ag = agenda(); bu = " ".join([str(ag.get("title") or "")] + [str(x) for x in ag.get("items") or []] + [str(k.get("metin") or "") for k in hz if isinstance(k, dict)]).lower()
     # Tümü küçük harfli sözlük terimi ("product", "customer service") istemde yer yemesin: Whisper genel sözcüğü zaten yazar,
     # istem özel adlar için (9 Ekim: 57 terim 182 belirteç, bütçe 155 → sondaki özel adlar düşüyordu). Sözlük düzeltmesi bundan bağımsız.
-    adlar = []
+    k = kisilik(); adlar = [k["ad"]] if k else []  # v0.53.0: hitap adı istemin başında (ölçüm: istemsiz 9/14, istemle 13/14)
     for t in sorted(ter, key=lambda t: (str(t.get("dogru") or "").strip().lower() not in bu, t.get("kaynak") not in BEN_ESKI)):
         d = str(t.get("dogru") or "").strip().replace(",", " ")
         if d and d != d.lower() and d not in adlar: adlar.append(d)

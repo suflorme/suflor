@@ -55,7 +55,8 @@ def toplantiya_soyle(metin=None):
     if not m: return {"ok": False, "err": _t("Söylenecek cevap yok — önce Konuş'la sor", "Nothing to say — ask with Talk first")}
     toplanti = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
     if TS["tanitti"] != toplanti:
-        TS["tanitti"] = toplanti; m = TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı") + " " + m
+        k = kisilik(); tn = (k or {}).get("tanitim") or str(AYAR.get("tanitim") or "").strip()  # v0.53.0: kişilik/ayar tanıtımı; yoksa nötr varsayılan
+        TS["tanitti"] = toplanti; m = (tn or TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı")) + " " + m
     v = ses_secimi(); okunan = ses_duzen(telaffuz(m, mac=True)); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
     if web: return _ts_web_hazirla(m, sesli, okunan)
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"TOPLANTIYA SÖYLE (deneme): aygıt {aygit} · {okunan}"); TS["son"] = m; return {"ok": True, "metin": "🔊 " + m}

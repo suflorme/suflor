@@ -121,7 +121,7 @@ try:
     k = bekle_hazir(k.get("soru"))
     ok(f"düşünme sözü: dinleme sürdü, iki parça tek soru ({k.get('soru')!r})", "düşünme sözüyle bitti" in log() and "bütçe" in (k.get("soru") or "").lower() and "ayrıntılı" in (k.get("soru") or "").lower())
     okuma_bitsin()
-    akit(ses("Peki şey") + sus(1.5)); k2 = bekle_hazir(k.get("soru"))
+    akit(ses("Peki ama") + sus(1.5)); k2 = bekle_hazir(k.get("soru"))  # "Peki şey" bir koşuda "şeye" yazıldı
     ok(f"düşünme sözünden sonra sessizlik: söz 4 sn sonra olduğu gibi gitti ({k2.get('soru')!r})", "söz olduğu gibi gidiyor" in log() and "peki" in (k2.get("soru") or "").lower())
     okuma_bitsin(); k = k2
     if profil:

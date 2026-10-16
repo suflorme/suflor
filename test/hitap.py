@@ -4,10 +4,10 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/hitap.py      (kaldı → çıkış 1)
 import ast, os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ns = {"re": re}
+KIS = {"v": None}; ns = {"re": re, "kisilik": lambda: KIS["v"]}  # v0.53.0: kişilik hitabı (nötr örnek ad "Atlas")
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
-sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name == "hitap_duzelt") or
-       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT"} for x in n.targets))]
+sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx")) or
+       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR"} for x in n.targets))]
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
     ("Cloud, card, English, yes.", "Claude: card, English, yes.", "9 Ekim: virgüllü"),
@@ -37,5 +37,21 @@ hata = 0
 for girdi, bek, ac in TABLO:
     cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok
     print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
+# kişilik açıkken (16 Ekim ölçümünden çıkan kural: ad + noktalama ya da soru cümlesi); eski hitaplar geçiş döneminde sürer
+KIS["v"] = {"hitap": ["Atlas", "Atlaz", "Hatlas"]}
+for girdi, bek, ac in [
+    ("Atlas, bugün kaç toplantım var?", "Claude: bugün kaç toplantım var?", "kişilik: virgüllü"),
+    ("ATLAS: fiyat kaç olarak geçti?", "Claude: fiyat kaç olarak geçti?", "kişilik: iki noktalı, büyük harf"),
+    ("Atlaz bu karar çelişiyor mu?", "Claude: bu karar çelişiyor mu?", "kişilik: Whisper yazımı, virgülsüz soru"),
+    ("Hatlas. Açık iş var mı?", "Claude: Açık iş var mı?", "kişilik: noktadan sonra büyük harf"),
+    ("Atlas markasının yeni ürünü güzel olmuş.", "Atlas markasının yeni ürünü güzel olmuş.", "kişilik: hitap değil (soru değil, noktalama yok)"),
+    ("Dün Atlas çok iyiydi.", "Dün Atlas çok iyiydi.", "kişilik: cümle ortası"),
+    ("Claude, özet çıkar.", "Claude: özet çıkar.", "kişilik açıkken eski hitap da sürer"),
+    ("Suflor, kaç kart açık?", "Claude: kaç kart açık?", "kişilik açıkken Suflor da sürer (geçiş)")]:
+    cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok
+    print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
+KIS["v"] = None
+cik, _ = ns["hitap_duzelt"]("Atlas, bugün kaç toplantım var?"); ok = cik == "Atlas, bugün kaç toplantım var?"; hata += not ok
+print(f"{'✓' if ok else '✗'} kişilik dosyası yokken ad hitap değil: {cik!r}")
 print("GEÇTİ" if not hata else f"KALDI: {hata}")
 sys.exit(1 if hata else 0)

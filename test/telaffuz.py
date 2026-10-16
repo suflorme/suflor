@@ -8,6 +8,7 @@ import os, re, sys, json, time, threading, tempfile, collections, subprocess
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read()
 BASE = tempfile.mkdtemp(prefix="suflor-telaffuz-"); ARAYUZ_DILI = "tr"
+kisilik_telaffuz = lambda m: m  # v0.53.0: kişilik okunuşları (aktarici/kisilik.py) bu testin konusu değil; test/kisilik.py denetler
 _f = __file__; __file__ = os.path.join(KOD, "relay.py")  # bölüm relay.py'nin ad alanında çalışır: sözlük yolu relay.py'nin yanındaki aktarici/
 exec(src[src.index("def _telaffuz_sozluk"):src.index("def telaffuz_adaylari")]); __file__ = _f
 hata = 0

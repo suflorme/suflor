@@ -65,8 +65,19 @@ BULUT = r"hizmet|tabanl|sunucu|depola|bili[sş]im|ortam|altyap|platform|teknoloj
 HITAP_AD = r"(?:cloud|klod|klot|klo|clod|claud|klaud|clode|claude|suflor|suflör|süflör)"
 HITAP_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)" + HITAP_AD + r"(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])(?!(?:" + BULUT + r"))|\s+(?!(?:" + BULUT + r"))(?=\w))", re.I)
 HITAP_ORTA_RX = re.compile(r"(?<=\w)([,]?\s+)(?:Claude|Suflor)(?:\s*[,:]\s*|\s+(?!(?:mi|mı|mu|mü|ile|ve|için|gibi|de|da|ya|ki)\b)(?=\w))(?=[^.!?…]*\?\s*$)")
+# Kişilik hitabı (v0.53.0, ölçüm 16 Ekim: kişilik adıyla başlayan 14 cümlenin 13'ü istemle doğru yazıldı): adlar kişilik dosyasından/ayardan (kodda sabit ad yok).
+# Cümle başında ad + virgül/iki nokta/nokta ya da cümle soru ise hitap: "<Ad> markasının yeni ürünü…" tetiklemez. İçeride yine "Claude:" olur.
+_KHR = {"k": None, "rx": None}
+def _kisilik_hitap_rx():
+    k = kisilik(); adlar = tuple(k["hitap"]) if k else ()
+    if _KHR["k"] != adlar:
+        _KHR["k"] = adlar
+        _KHR["rx"] = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:" + "|".join(re.escape(a) for a in adlar) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?=[^.!?…]*\?))", re.I) if adlar else None
+    return _KHR["rx"]
 def hitap_duzelt(text):
-    out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", text)
+    krx = _kisilik_hitap_rx()
+    out = krx.sub(lambda m: m.group(1) + "Claude: ", text) if krx else text
+    out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", out)
     if out == text: out = HITAP_ORTA_RX.sub(lambda m: ". Claude: ", text, count=1)
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])
 

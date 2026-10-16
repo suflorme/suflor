@@ -58,6 +58,14 @@ KONUS_ISTEM = {"tr": ("Sen Suflor.me'nin sesli asistanısın. Kullanıcı sesle 
                       "meeting Read the file named in the block; same format: spoken part, ---, written detail.")}
 _GUN_TR = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar")
 _AY_TR = ("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
+# Kişilik (v0.53.0, aktarici/kisilik.py): varsa istemin sonuna eklenir; biçim kuralları önce gelir. Neşeli ünlem satırı kişilik dosyasına bırakılır.
+def konus_istem():
+    t = KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]; k = kisilik()
+    _KS["kisilik_mt"] = _KIS.get("mt") if k else None
+    if not k: return t
+    t = re.sub(r"gerçekten şaşırtıcı.*?kullanabilirsin; ", "", t)
+    return t + _t("\n\nAşağıdaki kişilik yalnız tonu ve kimliği belirler; yukarıdaki biçim kuralları (uzunluk, sesli kısım, ---, toplantı içinde tek kısa cümle) her zaman önce gelir.\n\n",
+                  "\n\nThe persona below sets only tone and identity; the format rules above (length, spoken part, ---, one short sentence during a meeting) always come first.\n\n") + k["metin"]
 # --- Hızlı bilgi (S47, v0.40.0): yerel ön arama --------------------------------------------------------------------------------------------
 # 15 Ekim ölçümü (claude-cagri.jsonl, 42 Konuş): araçsız soruda ilk ses ortanca 3,3 sn, Grep/Glob/Read'li soruda 9,6 sn (en kötü 25). Soru Claude'a
 # gitmeden baglam.py dizininde (SQLite FTS5) aranır, en iyi ONARA_N parça (tür · tarih · başlık · dosya @konum · kim + ~260 karakter kesit) bağlam
@@ -144,7 +152,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
             except OSError: pass
             os.mkfifo(f, 0o600)
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-                "--allowedTools", "Read,Grep,Glob", "--add-dir", BASE, "--append-system-prompt", KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]] + \
+                "--allowedTools", "Read,Grep,Glob", "--add-dir", BASE, "--append-system-prompt", konus_istem()] + \
                (claude_yalin() or ["--no-session-persistence"]) + ["--model", str(AYAR.get("konus_model") or "sonnet")]  # v0.20.3: 6 soruluk kıyas (8 Ekim) Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "konus-bos"),
@@ -486,7 +494,7 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
         if metin and not hata and is_.get("iz") and sohbet_ses_izi_red([(is_["iz"], sn)]): hata = "ses_izi"
         if hata == "ses_izi":  # sohbet: ses izi kullanıcıya benzemedi, Claude'a gitmez; sessiz kalmasın (v0.51.2: kullanıcının kendi sözü de reddedilebiliyor)
             _KS["tur"] = None; _konus_kur(durum="dinliyor", hata=None)
-            seslendir(_t("Sesini tanıyamadım; yeniden söyler misin?", "I didn't recognise your voice; could you say that again?"), kuyruk=True); return
+            seslendir(_t(kis_t("Sesini tanıyamadım; yeniden söyler misin?", "Sesinizi tanıyamadım; tekrar eder misiniz?"), "I didn't recognise your voice; could you say that again?"), kuyruk=True); return
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
         if sid and SORU["aktif"] == sid:  # "yazayım mı?" sorusuna sesli cevap — Claude'a gitmez
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, sesli_cevap=True, cevap=sesli_cevap(metin, sid), olcum={"wh_ms": round((tur["t_metin"] - tur["t_birak"]) * 1000)}); return
@@ -522,7 +530,7 @@ def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses ki
 KARSI_HITAP_RX = re.compile(r"(?:^|[.!?…]\s+)(?:hey\s+|merhaba\s+)?(?:suflor|suflör|süflör|sufle|süfle|suflo|soflor|sufler|souffle)(?:\.me)?\s*[,:!]?\s+(?=\w)", re.I)
 KARSI_HITAP_SUSKU_SN = 10
 def konus_hitap_karsi(text, kim):
-    if AYAR.get("karsi_hitap") is False or not toplanti_var() or not toplanti_konus() or not AYAR.get("konusma", True): return False
+    if AYAR.get("karsi_hitap") is False or kisilik() or not toplanti_var() or not toplanti_konus() or not AYAR.get("konusma", True): return False
     m = KARSI_HITAP_RX.search(text or "")
     if not m: return False
     soru = text[m.end():].strip()
@@ -541,6 +549,12 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     simdi = datetime.datetime.now().astimezone(); top = toplanti_var()
     tur["sesli"] = (not top) or kulaklik(); tur["toplantida"] = top
     df, dm, dk = _konus_defter()
+    k_ = kisilik()
+    if konus_canli() and _KS.get("kisilik_mt") != (_KIS.get("mt") if k_ else None):  # kişilik açıldı/değişti: istem sürecin açılışında verilir
+        konus_kapat("kişilik değişti", durum_koru=True); _KS["tur"] = tur
+    if tur["sesli"]:
+        sel = kisilik_selam()
+        if sel: seslendir(sel, kuyruk=True)
     if dk and _KS.get("defter_md") and _KS["defter_md"] != dk and konus_canli():  # başka toplantının defteri süreçte kalmasın
         konus_kapat("yeni toplantı", durum_koru=True); _KS["tur"] = tur
     ob, ok_ = _once_blogu(simdi)  # biten toplantının defteriyle birlikte de gidebilir (ardışık toplantılar)
