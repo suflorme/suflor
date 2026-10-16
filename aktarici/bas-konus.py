@@ -316,6 +316,9 @@ KONUS_OKU_EN_COK = 5  # v0.54.0: 3 → 5 (kullanıcı: "iki cümle bazı sorular
 def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okuma kuyruğuna
     while True:
         m = re.search(r"^(.+?[.!?…])(\s+|$)", tur["tampon"], re.S) if not son else (re.match(r"^(.+)$", tur["tampon"].strip(), re.S) if tur["tampon"].strip() else None)
+        if not m and not son and not tur.get("t_ses"):  # v0.57.3 (T10 ölçümü): ilk ses uzun ilk cümleyi beklemesin — "Şöyle diyebilirsiniz: "…"" gibi 200–340 karakterlik
+            # ilk cümlede ilk ses +1–1,9 sn gecikiyordu (kişilik açıkken daha sık). Yalnız ilk parça: ≥ 25 karakterden sonra iki nokta/noktalı virgül/uzun tire, 140'ı aşınca virgül.
+            m = re.search(r"^(.{25,}?[:;—])(\s+)", tur["tampon"], re.S) or (re.search(r"^(.{40,}?,)(\s+)", tur["tampon"], re.S) if len(tur["tampon"]) > 140 else None)
         if not m: break  # cümle sonu işareti görünür görünmez okunur (tek cümlelik cevapta sonucu bekleme: ölçüm 8 Ekim, +1,8 sn)
         c = m.group(1).strip(); tur["tampon"] = tur["tampon"][m.end():] if not son else ""
         if c and tur.get("sesli", True) and tur.get("okunan", 0) >= KONUS_OKU_EN_COK:
