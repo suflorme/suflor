@@ -311,7 +311,7 @@ def _once_blogu(simdi):  # → (blok, anahtar) — toplantı sürerken yok
 AKIS_EN_AZ_SN, AKIS_SESSIZ_SN, AKIS_PENCERE = 3.0, 0.35, 800  # 15 Ekim gerçek deneme: 1,5 sn'de 9 küçük parça Whisper'ı geride bıraktı (çağrı başı ~1–2 sn)  # pencere: 50 ms (16 kHz × 2 bayt)
 AKIS = {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "kilit": threading.Lock(), "kosul": threading.Condition()}
 def _akis_sifirla():
-    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None)
+    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, iz={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None)
 def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesim noktası (bayt) ya da None
     n = len(b) - bas
     if n < int(AKIS_EN_AZ_SN * WH_SR * 2): return None
@@ -324,13 +324,16 @@ def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesi
     return None
 def _akis_gonder(baslangic, bitis, sira):
     with AKIS["kilit"]: parca = bytes(AKIS["pcm"][baslangic:bitis]); AKIS["bekleyen"] += 1
-    t0 = time.time()
+    t0 = time.time(); is_ = {"iz_iste": bool(SOHBET["acik"] and AYAR.get("sohbet_ses_izi") is True)}  # sohbette ses izi süzgeci açıksa parça izi de gelir
     def geri(metin, hata):
         with AKIS["kosul"]:
-            AKIS["metin"][sira] = "" if hata else (metin or ""); AKIS["bekleyen"] -= 1; AKIS["kosul"].notify_all()
+            AKIS["metin"][sira] = "" if hata else (metin or ""); AKIS["bekleyen"] -= 1
+            if is_.get("iz"): AKIS.setdefault("iz", {})[sira] = (is_["iz"], len(parca) / 2 / WH_SR)
+            AKIS["kosul"].notify_all()
         print(f"KONUŞ: akış parçası {sira + 1} döküldü ({(time.time() - t0) * 1000:.0f} ms, {len(parca) / 2 / WH_SR:.1f} sn ses){' — HATA ' + str(hata) if hata else ''}")
-    wh_bas_sira({"id": f"bas-akis-{int(time.time() * 1000)}-{sira}", "bas": True, "kanal": "bas", "baslik": None, "pcm": parca, "t0": time.time() - len(parca) / 2 / WH_SR,
-               "t1": time.time(), "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri}); _isci_baslat()
+    is_.update({"id": f"bas-akis-{int(time.time() * 1000)}-{sira}", "bas": True, "kanal": "bas", "baslik": None, "pcm": parca, "t0": time.time() - len(parca) / 2 / WH_SR,
+                "t1": time.time(), "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri})
+    wh_bas_sira(is_); _isci_baslat()
 def konus_parca(p):  # pano/menü: kayıt sürerken yeni ses (base64 16 kHz int16)
     if _KS["tur"] or AYAR.get("konus_akis") is False: return {"ok": True, "atlandi": True}
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
@@ -435,8 +438,10 @@ def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen p
         with AKIS["kosul"]:
             t = time.time()
             while AKIS["bekleyen"] > 0 and time.time() - t < 30: AKIS["kosul"].wait(1)
-            metin = " ".join(" ".join(str(AKIS["metin"].get(i) or "").split()) for i in range(sira)).strip()
-        print(f"KONUŞ: akış — {sira} parça birleşti (kuyruk {kuyruk / 2 / WH_SR:.1f} sn)"); _akis_sifirla(); geri(metin, None if metin else "boş")
+            metin = " ".join(" ".join(str(AKIS["metin"].get(i) or "").split()) for i in range(sira)).strip(); izler = list((AKIS.get("iz") or {}).values())
+        print(f"KONUŞ: akış — {sira} parça birleşti (kuyruk {kuyruk / 2 / WH_SR:.1f} sn)"); _akis_sifirla()
+        if metin and izler and sohbet_ses_izi_red(izler): return geri(metin, "ses_izi")
+        geri(metin, None if metin else "boş")
     threading.Thread(target=bekle, daemon=True).start(); return True
 def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsın (kayıt sürerken)
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
@@ -466,8 +471,11 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     # sessiz kalmasın. "Yazayım mı?" cevabında ve toplantıda kulaklık yokken çalmaz; ayar konus_alindi: false kapatır. Çaldıysa bekleme cümlesi geç gelir.
     if not sid and AYAR.get("konus_alindi") is not False and (not toplanti_var() or kulaklik()): tur["alindi"] = tepki_cal("alindi")
     if tur.get("alindi"): print("KONUŞ: bırakınca \"hı hı\" (alındı)")
+    is_ = {"iz_iste": bool(SOHBET["acik"] and AYAR.get("sohbet_ses_izi") is True)}  # akışsız (kısa) sohbet sorusunda da ses izi süzgeci
     def geri(metin, hata):
         tur["t_metin"] = time.time()
+        if metin and not hata and is_.get("iz") and sohbet_ses_izi_red([(is_["iz"], sn)]): hata = "ses_izi"
+        if hata == "ses_izi": _KS["tur"] = None; _konus_kur(durum="dinliyor", hata=None); return  # sohbet: başkasının sözü, Claude'a gitmez
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
         if sid and SORU["aktif"] == sid:  # "yazayım mı?" sorusuna sesli cevap — Claude'a gitmez
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, sesli_cevap=True, cevap=sesli_cevap(metin, sid), olcum={"wh_ms": round((tur["t_metin"] - tur["t_birak"]) * 1000)}); return
@@ -475,8 +483,9 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
         _konus_sor(metin, tur)
     if _akis_birlestir(pcm, geri): tur["akis"] = True; return {"ok": True}
     _akis_sifirla()
-    wh_one_al({"id": f"bas-{int(time.time() * 1000)}", "bas": True, "kanal": "bas", "baslik": None, "pcm": pcm, "t0": time.time() - sn, "t1": time.time(),
-              "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri}); _isci_baslat()
+    is_.update({"id": f"bas-{int(time.time() * 1000)}", "bas": True, "kanal": "bas", "baslik": None, "pcm": pcm, "t0": time.time() - sn, "t1": time.time(),
+                "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri})
+    wh_one_al(is_); _isci_baslat()
     return {"ok": True}
 # İş talimatı (toplantı oturumunun işi) — konuşana gitmez. Yerel komutlar (not al, kanıt al, sessiz) aktarıcıda zaten yakalanır.
 HITAP_IS_RX = re.compile(r"\b(kuyruğa|kuyruga|not al|notal|kanıt al|ekran görüntüsü|kart(ı|a)? (yaz|aç|kapat)|e-?posta(yı)? (yaz|gönder|hazırla)|mail (yaz|at|gönder)|takvime|"

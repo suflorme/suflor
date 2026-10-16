@@ -50,7 +50,7 @@ def toplantiya_soyle(metin=None):
     if AYAR.get("toplantiya_ses") is not True: return {"ok": False, "err": _t("Toplantıya sesli söyleme kapalı (⚙ Ayarlar)", "Speaking into the meeting is off (⚙ Settings)")}
     if ts_durdur(): print("TOPLANTIYA SÖYLE: susturuldu"); return {"ok": True, "metin": _t("🔇 Suflor sustu", "🔇 Suflor stopped")}
     web = ts_web(); aygit = None if web else ts_aygit()
-    if not web and not aygit: return {"ok": False, "err": _t("BlackHole kurulu değil — toplantıya ses gidemez", "BlackHole isn't installed — no audio can reach the meeting")}
+    if not web and not aygit: return {"ok": False, "err": _t("BlackHole kurulu değil — masaüstü toplantıya ses gidemez (web toplantısında gerekmez)", "BlackHole isn't installed — no audio can reach a desktop meeting (not needed for web meetings)")}
     m = ts_sesli_kisim(metin if metin is not None else KONUS.get("cevap"))
     if not m: return {"ok": False, "err": _t("Söylenecek cevap yok — önce Konuş'la sor", "Nothing to say — ask with Talk first")}
     toplanti = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"

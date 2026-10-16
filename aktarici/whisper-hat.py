@@ -325,11 +325,13 @@ def _isci_dongu():
             if k and getattr(k, "dil_son", None) in ("tr", "en") and k.dil_son != dil and time.time() - getattr(k, "dil_son_t", 0) < 60: istek["dil"] = k.dil_son
         # kullanıcı kanalında ses izi: oda açıksa ad için, değilse yalnız ses kilidi için ("Claude:" komutu kullanıcının sesi mi; ayar ses_kilidi)
         if is_["kanal"] == "ben" and not is_.get("bas") and (oda_acik() or AYAR.get("ses_kilidi", True) is not False): istek["oda"] = is_["oda"] = True
+        if is_.get("iz_iste"): istek["iz_iste"] = True  # sohbet sorusu: ses izi süzgeci (aktarici/sohbet.py sohbet_ses_izi_red)
         try:
             _ISCI["p"].stdin.write(json.dumps(istek) + "\n"); _ISCI["p"].stdin.flush()
             l = _ISCI["satirlar"].get(timeout=60); j = json.loads(l) if l else {"hata": "işçi kapandı"}
         except Exception as e: j = {"hata": f"{e.__class__.__name__}"}
         if is_.get("bas"):  # bas-konuş: metin dökümüne değil, soruya (konus_metin)
+            if is_.get("iz_iste"): is_["iz"] = j.get("iz")
             threading.Thread(target=is_["geri"], args=(" ".join(str(j.get("text") or "").split()), j.get("hata")), daemon=True).start()
             if j.get("hata"): _isci_kapat("hata")
             continue
@@ -488,6 +490,16 @@ def oda_kim(iz, sn, metin="", ad_ver=True):
         w0 = min(ODA["sn"], ODA_AGIRLIK_SN); ODA["profil"] = [w0 * x / n + sn * a for x, a in zip(ODA["profil"], v)]; ODA["sn"] += sn
         if time.time() - ODA["yazildi"] > 60: _oda_kaydet()
     return ben
+def kullanici_benzer(iz):  # parçanın ses izi ile kullanıcı profilinin (ses-izi-ben.json, toplantılarda öğrenilir) benzerliği; profil/iz yoksa None
+    if not ODA["yuklendi"]:
+        ODA["yuklendi"] = True
+        try: x = json.load(open(_oda_yol(), encoding="utf-8")); ODA.update(profil=_iz_coz(x["iz"]), sn=float(x.get("sn") or 0))
+        except (OSError, ValueError, KeyError, TypeError, struct.error): pass
+    if not iz or ODA["profil"] is None: return None
+    try: v = _iz_coz(iz)
+    except Exception: return None
+    n = math.sqrt(sum(x * x for x in ODA["profil"])) or 1.0
+    return sum(a * x / n for a, x in zip(v, ODA["profil"]))
 def kume_sifirla(): KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]; KUME_IZ.clear(); KUME_HAFIZA.clear()
 def konusmaci_karsi(t0, t1, kume=None):
     ben = ben_adi(); now = time.time()

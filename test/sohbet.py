@@ -31,12 +31,12 @@ for l in sys.stdin:
 ''')
 os.chmod(sahte, 0o755)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
-    "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_hihi": True}, open(ay, "w"))
+    "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_hihi": True, "sohbet_ses_izi": True}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
-def ses(metin):
+def ses(metin, v="Yelda"):
     a, w = os.path.join(T, "q.aiff"), os.path.join(T, "q.wav")
-    subprocess.run(["say", "-v", "Yelda", "-o", a, metin], check=True); subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", a, w], check=True)
+    subprocess.run(["say", "-v", v, "-o", a, metin], check=True); subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", a, w], check=True)
     with wave.open(w) as f: return f.readframes(f.getnframes())
 sus = lambda sn: b"\x00\x00" * int(16000 * sn)
 def baslat(port, kulak, ayar_yol):
@@ -62,6 +62,15 @@ try:
     p2.terminate()
     r_, K = baslat(PORT, "1", ay); pler.append(r_); post, st = istemci(PORT, K)
     log = lambda: open(os.path.join(T, f"relay{PORT}.log")).read()
+    # ses izi süzgeci (v0.51.0): kullanıcı profili Yelda'nın sesinden (gerçekte toplantılarda öğrenilir); başka ses (Daniel) soru olmamalı
+    ECAPA = "/Users/Shared/Suflor/ses-modeller/spkrec-ecapa-voxceleb/ecapa-mlx.npz"; profil = os.path.exists(ECAPA)
+    if profil:
+        pw = os.path.join(T, "profil.wav")
+        with wave.open(pw, "wb") as f: f.setnchannels(1); f.setsampwidth(2); f.setframerate(16000); f.writeframes(ses("Merhaba, bugün toplantıda bütçeyi, takvimi ve yedekleme planını konuştuk. Sonra herkes görüşünü söyledi, kararları yarın netleştireceğiz."))
+        kod = ("import sys,json,base64,importlib.util,wave,numpy as np,mlx.core as mx\nsp=importlib.util.spec_from_file_location('w',sys.argv[1]);m=importlib.util.module_from_spec(sp);sp.loader.exec_module(m)\n"
+               "e=m.Ecapa(sys.argv[2],np,mx);f=wave.open(sys.argv[3]);a=np.frombuffer(f.readframes(f.getnframes()),np.int16).astype(np.float32)/32768\n"
+               "v=np.asarray(e(a),np.float32).reshape(-1);v=v/np.linalg.norm(v);json.dump({'iz':base64.b64encode(v.astype(np.float16).tobytes()).decode(),'sn':30},open(sys.argv[4],'w'))")
+        subprocess.run(["/Users/Shared/Suflor/whisper-venv/bin/python", "-I", "-B", "-c", kod, os.path.join(T, "whisper-isci.py"), ECAPA, pw, os.path.join(T, f"canli{PORT}", "ses-izi-ben.json")], check=True)
     def akit(b, hiz=2.0):  # ~0,5 sn'lik parçalar (pano gibi 2 × 4096 örnek: 50 ms pencerelere hizalı değil), gerçek zamanın hiz katı
         son = {}
         for i in range(0, len(b), 16384):
@@ -106,6 +115,13 @@ try:
     k = bekle_hazir(k1); k = bekle_hazir(k.get("soru")) if "kişi" in (k.get("soru") or "") else k
     ok(f"düşünürken söylenen sonraki soru oldu ({k.get('soru')!r})", "yarın" in (k.get("soru") or "").lower() and "kişi" not in (k.get("soru") or "").lower())
     okuma_bitsin()
+    if profil:
+        ok("ses izi: kullanıcının (Yelda) sorusu geçti", "SOHBET: ses izi" in log() and "— kullanıcı" in log())
+        n1 = log().count("SOHBET: tur bitti"); soru_once = st().get("soru")
+        akit(ses("Hey, what's the weather going to be like in London tomorrow?", "Daniel") + sus(2.0)); time.sleep(4); akit(sus(1))
+        ok(f"ses izi: başka sesin sorusu Claude'a gitmedi ({st().get('soru')!r})", log().count("SOHBET: tur bitti") > n1 and "kullanıcıya benzemiyor" in log() and st().get("soru") == soru_once)
+        ok("ses izi: sohbet dinlemeye devam ediyor", st()["sohbet"]["acik"] and st()["durum"] == "dinliyor")
+    else: ok("(ses izi modeli yok — süzgeç denenmedi)", True)
     nc = log().count("Sorduğun")
     akit(ses("Tamam, teşekkürler.") + sus(1.2)); t = time.time()
     while time.time() - t < 20 and st()["sohbet"]["acik"]: akit(sus(0.5))

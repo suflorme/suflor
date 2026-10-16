@@ -132,6 +132,17 @@ def _sohbet_gonder(b, n, sessiz):
     print(f"SOHBET: tur bitti ({n:.1f} sn kayıt, {sessiz:.1f} sn sessizlik)")
     r = konus_ses({"pcm": base64.b64encode(b).decode()})
     if not r.get("ok"): print(f"SOHBET: soru gönderilemedi ({r.get('err')})"); _akis_sifirla(); _konus_kur(durum="dinliyor", hata=None)
+# Ses izi süzgeci (v0.51.0, S59 3. adım; ayar sohbet_ses_izi, varsayılan kapalı): mikrofon açık kaldığı için odadaki başkasının ya da televizyonun sözü
+# soru olmasın. Turun akış parçalarının ses izi (ECAPA, Whisper işçisinde) toplantılarda öğrenilen kullanıcı profiliyle (ses-izi-ben.json) karşılaştırılır;
+# ≥ 1,5 sn'lik parçaların süresinin %60'ı ODA_ESIK'in (0,35; 11 Ekim ölçümü: kullanıcı 0,36–0,78, başka sesler ≤ 0,33) altındaysa soru gitmez, dinleme
+# sürer. Profil yoksa ya da parçalar kısaysa süzgeç karar vermez (soru gider). Araya girme yalnız ses düzeyine bakar (bu süzgeç onu kapsamaz).
+def sohbet_ses_izi_red(izler):  # izler: [(iz, sn)] → True: kullanıcının sesi değil
+    if not SOHBET["acik"] or AYAR.get("sohbet_ses_izi") is not True: return False
+    olc = [(b, sn) for b, sn in ((kullanici_benzer(iz), sn) for iz, sn in izler if sn >= ODA_EN_KISA) if b is not None]
+    if not olc: print("SOHBET: ses izi — karar yok (profil yok ya da parçalar kısa), soru gidiyor"); return False
+    top = sum(sn for _, sn in olc); red = sum(sn for b, sn in olc if b < ODA_ESIK) >= 0.6 * top
+    print(f"SOHBET: ses izi {' '.join(f'{b:.2f}' for b, _ in olc)} — {'kullanıcıya benzemiyor, soru gönderilmedi' if red else 'kullanıcı'}")
+    return red
 def sohbet_metin(metin):  # konus_ses'in yazıya dökülmüş metni: sohbeti kapatan söz mü (True: Claude'a gitmez)
     if not SOHBET["acik"] or not SOHBET_KAPAT_RX.match(metin or ""): return False
     sohbet_kapat("kullanıcı: " + " ".join(metin.split())[:40], _t("Görüşürüz.", "Talk soon.")); return True

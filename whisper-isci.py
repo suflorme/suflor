@@ -209,7 +209,7 @@ def main():
             except Exception: ses = None
             km = {}
             if p.get("baslik") != baslik: kumeler = []; baslik = p.get("baslik")
-            oda = p.get("kanal") == "ben" and p.get("oda")  # aynı mikrofonda ikinci kişi açık: kullanıcı kanalında da iz (kümesiz; aktarıcı profille karşılaştırır)
+            oda = (p.get("kanal") == "ben" and p.get("oda")) or (p.get("kanal") == "bas" and p.get("iz_iste"))  # kullanıcı kanalında (ikinci kişi/ses kilidi) ya da sohbet sorusunda iz: kümesiz, aktarıcı profille karşılaştırır
             if iz and metin and (p.get("kanal") == "karsi" or oda) and len(a) >= SR * 0.5:
                 # ses izi satırla geri döner (float16, base64): aktarıcı <toplantı>.sesizi.log'a yazar, toplantı sonunda toplu kümelenir (--toplu)
                 try:
