@@ -138,6 +138,7 @@ sub.add_parser("durum", help="v0.14.0: aktarıcının /status yanıtı (JSON; ye
 sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü (aktarıcı, eklenti sürümü, Whisper, ses modeli, bellek, disk)")
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
 tk.add_argument("--id", default=None); tk.add_argument("--n", type=int, default=6)
+tk.add_argument("--gun", type=int, default=1, help="v0.55.0: kaç gün (en çok 7); 1'den büyükse çalışma saatlerindeki boş zamanlar da (uygun zaman önerisi)")
 rp = sub.add_parser("rapor", help="v0.9.9: geliştiriciye geri bildirim — içeriksiz paket (sürüm, ölçüm, kart dönüşleri, günlük, gözlemler) → <ortak>/geri-bildirim")
 rp.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)"); rp.add_argument("--not", dest="notlar", default="", help="sorunlar, öneriler (Claude'un ve kullanıcının gözlemleri; toplantı içeriği yazma)")
 rp.add_argument("--github", action="store_true", help="ayrıca GitHub'da konu (issue) aç (gh oturumu gerekir)"); rp.add_argument("--goster", action="store_true", help="kaydetmeden yazdır")
@@ -2102,14 +2103,20 @@ def saglik_cmd():  # toplantıdan önce tek bakış; ⚠ satırları kullanıcı
     sat(os.path.exists(os.path.join(A.dir, "kart-anahtari.txt")), "kart anahtarı", "aktarıcıyı yeniden kur")
     print("SONUÇ: " + ("hazır" if not sorun else f"{sorun} eksik (⚠)"))
 def takvim_cmd():  # aktarıcının takvimi (Suflor Takvim yardımcısı, Takvim uygulamasındaki tüm hesaplar)
-    try: t = get("/takvim?tam=1")
+    gun = max(1, min(A.gun or 1, 7))
+    try: t = get("/takvim?tam=1" + (f"&gun={gun}" if gun > 1 else ""))
     except Exception as e: sys.exit(f"aktarıcıya ulaşılamadı: {e}")
     if t.get("durum") != "ok": print(f"takvim: {t.get('durum')} — {t.get('hata') or ''}".strip(" —"))
-    ol = [o for o in t.get("olaylar") or [] if not A.id or o.get("id") == A.id][:A.n]
-    if not ol: print("Bugün başka toplantı yok."); return
+    ol = [o for o in t.get("olaylar") or [] if not A.id or o.get("id") == A.id][:A.n if gun == 1 else 60]
+    if gun > 1:
+        print(f"# Boş zamanlar ({gun} gün, çalışma saatleri ayar calisma_saatleri; takvimdeki her etkinlik dolu)")
+        for b in t.get("bos") or []: print(f"- {b['tarih']}: " + ", ".join(b["araliklar"]))
+        if not t.get("bos"): print("- çalışma saatlerinde boş zaman yok")
+        print()
+    if not ol: print("Bugün başka toplantı yok." if gun == 1 else f"{gun} günde takvimde etkinlik yok."); return
     for o in ol:
         ne = "şimdi" if o.get("suruyor") else (f"{o['dk']} dk sonra" if o.get("dk", 0) <= 120 else "")
-        print(f"## {o['saat']}–{o['bitis_saat']} {o['baslik']}" + (f"  ({ne})" if ne else "") + f"  · id {o['id']}")
+        print(f"## {(o.get('tarih') or '') + ' ' if gun > 1 else ''}{o['saat']}–{o['bitis_saat']} {o['baslik']}" + (f"  ({ne})" if ne else "") + f"  · id {o['id']}")
         print(f"  platform: {o.get('platform') or '?'} · düzenleyen: {o.get('duzenleyen') or '?'}{' (sen)' if o.get('ben_duzenleyen') else ''}{' · daveti reddettin' if o.get('reddettin') else ''} · kişi: {o.get('kisi_sayisi') or '?'} · takvim: {o.get('takvim')}")
         if o.get("katilimcilar"): print("  katılımcılar: " + ", ".join(o["katilimcilar"]))
         if o.get("notlar"):

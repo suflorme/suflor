@@ -194,6 +194,14 @@ try:
     ben(2, "Claude: kuyruğa al teklif e-postasını."); time.sleep(1)
     jl2 = [json.loads(l) for f in os.listdir(canli) if f.endswith(".jsonl") and not f.startswith("claude") for l in open(os.path.join(canli, f)) if '"w/2"' in l]
     ok("iş talimatı ('kuyruğa al') konuşana gitmedi, toplantı oturumunda kaldı", log().count("konuşana gitti") == n0 and bool(jl2) and not jl2[-1].get("konusan"))
+    # v0.55.0: toplantıda Konuş'a basılı tutup söylenen iş talimatı Claude'a gitmez, dökümde kullanıcının notu olarak "Claude: …" (toplantı oturumu uygular)
+    cagri1 = len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines())
+    kis = sor("Ayla'ya bütçe için bir e-posta taslağı hazırla.")
+    md_ = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md"))
+    ok("Konuş'la iş talimatı: Claude'a gitmedi, dökümde 'Claude: … (Konuş düğmesiyle)' notu, panoda kısa onay", kis["durum"] == "hazir" and "hallediyorum" in (kis.get("cevap") or "")
+       and len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) == cagri1 and "(Konuş düğmesiyle)" in md_ and "taslağı hazırla" in md_.lower() and "iş talimatı toplantı oturumuna iletildi" in log())
+    n2 = log().count("konuşana gitti"); ben(3, "Claude, perşembe saat on dörde Ayla ile toplantı koy."); time.sleep(1)
+    ok("sesli 'Claude, … toplantı koy' konuşana gitmedi (iş talimatı)", log().count("konuşana gitti") == n2)
     # v0.46.0: konuşurken yazıya dökme — kayıt saniyede bir parça gelir, duraksamada ilk kısım Whisper'a gider; bırakışta yalnız kuyruk dökülür
     while st()["durum"] not in ("hazir", "hata", "kapali"): time.sleep(0.2)
     pb = base64.b64decode(pcm("Yarın saat onda toplantı var. [[slnc 900]] Bütçe konusunu da konuşacak mıyız acaba?")) + b"\x00\x00" * int(16000 * 0.7)  # konuşma bitince tuş ~0,7 sn sonra bırakılır
@@ -209,7 +217,7 @@ try:
     while time.time() - t0 < 60 and st()["durum"] not in ("hazir", "hata"): time.sleep(0.2)
     c2 = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
     print(f"   yazıya dökme: akışlı {c[-1].get('wh_ms')} ms · akışsız {c2[-1].get('wh_ms')} ms")
-    ok("akışlı yazıya dökme akışsızdan kısa", (c[-1].get("wh_ms") or 9e9) < (c2[-1].get("wh_ms") or 0))
+    ok("akışlı yazıya dökme akışsızdan kısa", (9e9 if c[-1].get("wh_ms") is None else c[-1]["wh_ms"]) < (c2[-1].get("wh_ms") or 0))  # 0 ms: parçalar bırakıştan önce bitti
     # v0.44.0: karşı tarafın "Suflor, …" sorusu (Whisper yazımı "Süflör") konuşana, soranın adıyla; iş talebi ve tetiksiz satır gitmez
     def karsi(i, metin): uc2("/ingest", {"meeting": {"title": "Başka toplantı"}, "source": "whisper", "entries": [{"id": f"k/{i}", "speaker": "Ayla Ö", "time": f"11:1{i}:00", "text": metin, "kanal": "karsi"}]})
     karsi(1, "Süflör, bu projenin teslim tarihi ne?"); t0 = time.time()

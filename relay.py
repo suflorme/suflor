@@ -1707,7 +1707,8 @@ class H(BaseHTTPRequestHandler):
             # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)
             m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
             if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
-            return self._json(dict(takvim_view("tam=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
+            g = re.search(r"[?&]gun=(\d{1,2})(?:&|$)", self.path)  # v0.55.0: ?gun=7 → 7 günün etkinlikleri + boş zamanlar
+            return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
