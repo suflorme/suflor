@@ -5,7 +5,8 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/maliyet.py
 import gzip, json, os, re, shutil, subprocess, sys, tempfile, time, datetime
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-T = tempfile.mkdtemp(prefix="maliyet-"); EV = os.path.join(T, "ev"); canli = os.path.join(T, "canli"); proje = os.path.join(T, "proje")
+_UYG = re.search(r'^UYG = os\.path\.join\(EV, "([^"]+)"\)', open(os.path.join(KOD, ".claude/skills/suflor-olcum/olcum.py"), encoding="utf-8").read(), re.M).group(1)  # olcum.py'nin canlı klasörü
+T = tempfile.mkdtemp(prefix="maliyet-"); EV = os.path.join(T, "ev"); canli = os.path.join(EV, _UYG, "canli"); proje = os.path.join(T, "proje")
 for d in (EV, canli, proje): os.makedirs(d)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": 8790, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor"}, open(ay, "w"))
 kok = os.path.join(EV, ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", proje)); os.makedirs(kok)
@@ -54,6 +55,17 @@ try:
     ok("döndürülüp arşive giden satırlar da sayıldı (yinelenmedi)", not [l for l in r3.stdout.splitlines() if l.startswith("{")])
     tc("--etiket", "b-sonnet", "gercek"); e = json.load(open(os.path.join(canli, "toplanti-etiket.json")))
     ok("--etiket elle düzeltme dosyaya", e.get("b-sonnet") == "gercek")
+    # olcum.py maliyet: dönemdeki her oturum tabloda, tablo toplamı özetle tutar (dosyası olmayan oturum da; v0.57.2 — önce son 15 satır)
+    for k in range(17): oturum(f"e{k}", gun - 86400 - k * 3600, 5, "<command-name>/toplanti</command-name>", [(f"e{k}m", "claude-opus-5-5", U)])
+    tc()
+    o = subprocess.run([sys.executable, "-B", os.path.join(KOD, ".claude/skills/suflor-olcum/olcum.py"), "maliyet", "--json"], capture_output=True, text=True, env=env)
+    try: m = json.loads(o.stdout)
+    except ValueError: m = {}
+    tb = sum(r["maliyet"] for r in m.get("toplantilar", [])); oz = (m.get("gercek") or {}).get("maliyet", 0) + (m.get("deneme") or {}).get("maliyet", 0)
+    n_oz = (m.get("gercek") or {}).get("toplanti", 0) + (m.get("deneme") or {}).get("toplanti", 0)
+    ok(f"olcum.py tablosu her oturumu gösterir ({len(m.get('toplantilar', []))} satır = {n_oz}) ve toplamı özetle tutar ({tb:.2f} = {oz:.2f})",
+       len(m.get("toplantilar", [])) == n_oz == 19 and abs(tb - oz) < 0.02)
+    ok("etiket düzeltmesi raporda (b-sonnet gerçek)", (m.get("gercek") or {}).get("toplanti") == 2)
     r = tc("--geri", "--json")
     ok("hata yok", "Traceback" not in r.stderr + r3.stderr)
 finally:
