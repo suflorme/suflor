@@ -101,9 +101,17 @@ try:
     d = log().count("SOHBET: duraksama") - d0
     ok(f"tur sonu modeli duraksama başına bir kez soruldu ({d} satır, iki duraksama)", 1 <= d <= 2)
     okuma_bitsin()
-    # araya girme: cevap okunurken (test: metin uzunluğu × 60 ms) 2 sn sonra uzun konuşma
+    # v0.54.3: araya girme varsayılan kapalı — okunurken konuşma (arka plan sesi) okumayı kesmez, soru olmaz
     akit(ses("Bütçe kaç lira?") + sus(1.2)); t = time.time()
-    while time.time() - t < 30 and "Sorduğun: Bütçe" not in log(): akit(sus(0.5))
+    while time.time() - t < 30 and log().count("Sorduğun: Bütçe") < 1: akit(sus(0.5))
+    k0 = st().get("soru"); time.sleep(2.3); akit(ses("Dur, onu boş ver, yarın hava nasıl olacak?") + sus(1.2))
+    ok("araya girme kapalı: okunurken konuşma yok sayıldı, okuma kesilmedi", "yok sayıldı (araya girme kapalı)" in log() and "SOHBET: araya girildi" not in log())
+    okuma_bitsin(); akit(sus(3))
+    ok(f"okuma sırasındaki söz soru olmadı ({st().get('soru')!r})", "hava" not in (st().get("soru") or "").lower())
+    ok("ayar açıldı (sohbet_araya_girme)", post({"degisen": {"sohbet_araya_girme": True}}, "/ayar").get("ok"))
+    # araya girme (ayar açık): cevap okunurken (test: metin uzunluğu × 60 ms) 2 sn sonra uzun konuşma
+    akit(ses("Bütçe kaç lira?") + sus(1.2)); t = time.time()
+    while time.time() - t < 30 and log().count("Sorduğun: Bütçe") < 2: akit(sus(0.5))
     k0 = st().get("soru"); time.sleep(2.3); akit(ses("Dur, onu boş ver, yarın hava nasıl olacak?") + sus(1.2))
     ok("cevap okunurken uzun konuşma araya girdi", "SOHBET: araya girildi" in log())
     k = bekle_hazir(k0)

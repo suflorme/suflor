@@ -33,7 +33,11 @@ def _okuma_izle(simdi):  # okumanın başladığı an (araya girme koruması SOH
     if okuma and not SOHBET["t_okuma"]: SOHBET["t_okuma"] = simdi
     if not okuma: SOHBET["t_okuma"] = 0.0
     return okuma
-def sohbet_view(): return {"acik": SOHBET["acik"], "bekle": SOHBET["bekle"], "okuyor": ses_caliyor()} if SOHBET["acik"] else {"acik": False}
+# v0.54.3 (kullanıcı, 16 Ekim: "sohbette miyim, kapalı mı anlamıyorum"): son kapanış nedeni 60 sn panoda görünür (aktarıcı kendisi kapatınca iz kalsın)
+def sohbet_view():
+    if SOHBET["acik"]: return {"acik": True, "bekle": SOHBET["bekle"], "okuyor": ses_caliyor()}
+    k = SOHBET.get("kapanis")
+    return {"acik": False, **({"kapandi": k["neden"], "kapandi_sn": round(time.time() - k["t"])} if k and time.time() - k["t"] < 60 else {})}
 def sohbet_basla():
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürerken sohbet kapalı — “Claude, …” de ya da basılı tut", "Conversation is off during a meeting — say “Claude, …” or hold to talk")}
@@ -51,7 +55,8 @@ def sohbet_basla():
 def sohbet_kapat(neden, soz=None):
     with SOHBET["kilit"]:
         if not SOHBET["acik"]: return
-        SOHBET.update(acik=False, bekle=None); SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)
+        SOHBET.update(acik=False, bekle=None, kapanis={"neden": "kullanici" if neden.startswith("kullanıcı") else {"toplantı başladı": "toplanti", "kulaklık çıktı": "kulaklik"}.get(neden, neden), "t": time.time()})
+        SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)
     if not _KS["tur"]: _akis_sifirla(); _konus_kur(durum="hazir" if konus_canli() else "kapali")
     if soz: seslendir(soz, kuyruk=True)
     print(f"SOHBET: kapandı ({neden}, {time.time() - SOHBET['t_ac']:.0f} sn)")
@@ -84,6 +89,13 @@ def sohbet_parca(p):
     konusma = sum(x >= esik for x in pen) * AKIS_PENCERE / 2 / WH_SR
     if konusma >= 0.15: SOHBET.update(t_ses=simdi, uyari=False)
     tur = _KS["tur"]
+    # v0.54.3 (S70, kullanıcı 16 Ekim: "arka plan seslerinden sürekli kesiliyor ve susuyor"): araya girme varsayılan kapalı (ayar sohbet_araya_girme) — cevap
+    # sonuna kadar okunur, okuma sırasında gelen ses atılır (arka plan sesi okumayı kesmez, sonraki soru da olmaz); Claude düşünürken söylenen yine biriktirilir.
+    if not AYAR.get("sohbet_araya_girme") and _okuma_izle(simdi):
+        SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET["kesme_sn"] = 0.0
+        if konusma >= SOHBET_BIRIK_SN and SOHBET.get("yok_t") != SOHBET["t_okuma"]:
+            SOHBET["yok_t"] = SOHBET["t_okuma"]; print("SOHBET: okuma sürerken ses — yok sayıldı (araya girme kapalı), okuma sürüyor")
+        return {"ok": True, "mesgul": True}
     if tur or ses_caliyor():  # Suflor düşünüyor ya da okuyor
         onceki = SOHBET.setdefault("onceki", collections.deque(maxlen=4)); onceki.append(pcm)  # sözün başı kaybolmasın (son ~2 sn)
         okuma = _okuma_izle(simdi)
