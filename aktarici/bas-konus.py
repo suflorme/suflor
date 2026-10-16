@@ -69,6 +69,11 @@ def _vt_sema_uret():  # tablo yapısı metni ("" = yok ya da yardımcının yasa
                            capture_output=True, text=True, timeout=10, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
         sema = r.stdout.strip()[:8000] if r.returncode == 0 else ""
     except (OSError, subprocess.TimeoutExpired): sema = ""
+    if not sema:  # v0.55.2: launchd'deki aktarıcı Masaüstü'ndeki veritabanını okuyamaz (canlıda tablo yapısı hiç isteme girmiyordu) → araç sunucusunun önbelleği
+        try:
+            y = os.path.join(BASE, "vt-sema.txt")
+            if time.time() - os.path.getmtime(y) < 7 * 86400: sema = open(y, encoding="utf-8").read().strip()[:8000]
+        except OSError: pass
     if any(y in sema for y in BRIFING_YASAK): print("KONUŞ: tablo yapısında yardımcının yasak sözcüğü var — isteme konmadı (araçla bakılır)"); sema = ""
     return sema
 # v0.55.1: istemde "vt_sema'yı çağırma" yazsa da Claude 13 soruda 13 kez çağırdı (+1 tur, ~3 sn) → tablo yapısı istemdeyse araç hiç listelenmez (SUFLOR_VT_SEMA_YOK)
@@ -78,6 +83,7 @@ def konus_vt_hazirla():  # → MCP yapılandırma dosyasının yolu ya da None
     tc = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toplanti-claude.py")
     if not isinstance(v, dict) or not v.get("yol") or not os.path.isfile(tc) or os.environ.get("SUFLOR_TEST_BASLAT") and not os.environ.get("SUFLOR_TEST_VT"): return None
     yol = os.path.join(BASE, "konus-mcp.json"); _KS["vt_sema"] = _vt_sema_uret()
+    print(f"KONUŞ: veritabanı araçları · tablo yapısı {'istemde (' + str(len(_KS['vt_sema'])) + ' karakter), vt_sema yok' if _KS['vt_sema'] else 'yok — vt_sema aracıyla'}")
     try:
         with open(yol + ".tmp", "w", encoding="utf-8") as f:
             json.dump({"mcpServers": {"suflorvt": {"command": "/usr/bin/python3", "args": ["-B", tc, "--dir", BASE, "vt-mcp"],

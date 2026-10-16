@@ -601,8 +601,14 @@ VT_ARACLAR = [{"name": "vt_sema", "description": "Kayıt veritabanının tablola
                "inputSchema": {"type": "object", "properties": {}}},
               {"name": "vt_sor", "description": "Kayıt veritabanında tek bir SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; gizli sütunlar *** döner).",
                "inputSchema": {"type": "object", "properties": {"sorgu": {"type": "string", "description": "SQLite SELECT sorgusu"}}, "required": ["sorgu"]}}]
+VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Masaüstü'ndeki veritabanını okuyamaz; Konuş istemine tablo yapısı buradan girer
 def vt_mcp_cmd():
     yaz = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"), sys.stdout.flush())
+    try:  # v0.55.2: her açılışta tablo yapısını önbelleğe yaz (bu süreç Claude'un altında, veritabanını okuyabilir)
+        m = vt_sema_metin(); y = os.path.join(A.dir, VT_SEMA_ONBELLEK)
+        with open(y + ".tmp", "w", encoding="utf-8") as f: f.write(m)
+        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+    except (VtHata, OSError): pass
     for sat in sys.stdin:
         try: m = json.loads(sat)
         except ValueError: continue
