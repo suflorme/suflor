@@ -271,6 +271,7 @@ def toplanti_maliyet_yaz():
     except (OSError, subprocess.TimeoutExpired) as e: print(f"MALİYET: hesaplanamadı ({e.__class__.__name__})"); return 0
     sat = [l for l in r.stdout.splitlines() if l.startswith("{") and '"is": "toplanti"' in l]
     if r.returncode or not sat: return 0
+    sat = [json.dumps(dict(json.loads(l), surum=SURUM), ensure_ascii=False) for l in sat]  # v0.57.4: Kulis'te verimlilik sürüme göre izlenir
     with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), "".join(l + "\n" for l in sat))])
     for l in sat:
         try: o = json.loads(l); print(f"MALİYET: toplantı oturumu {o.get('sure_dk')} dk · {o.get('maliyet')} $ · {o.get('etiket')} · {o.get('dosya') or 'dosya yok'}")
