@@ -559,6 +559,32 @@ def whisper_8bit(ort):  # Whisper turbo'nun 8 bit kopyası yerelde bir kez üret
                env=dict(os.environ, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1"))
     if r and r.returncode == 0: sessiz("chmod", "-R", "go+rX", os.path.join(hub, "models--suflor--whisper-large-v3-turbo-q8"))
     else: say("Not: 8 bit model hazırlanamadı — tam model kullanılır")
+TUR_SURUM = ("onnxruntime==1.19.2", "numpy==2.0.2")  # sistem Python'u 3.9: onnxruntime'ın 3.9'u destekleyen son sürümü
+TUR_URL = "https://huggingface.co/pipecat-ai/smart-turn-v3/resolve/main/smart-turn-v3.2-cpu.onnx"
+TUR_SHA = "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+def tur_kur(ort):  # tur sonu modeli (smart-turn v3, BSD-2, 8,7 MB) + küçük ortam (~125 MB); isteğe bağlı: olmazsa aktarıcı eski kuralla sürer
+    if DENEME: return
+    vpy, md = os.path.join(ort, "smart-turn-venv", "bin", "python"), os.path.join(ort, "ses-modeller", "smart-turn")
+    model = os.path.join(md, os.path.basename(TUR_URL))
+    venv_ok = bool((r := sessiz(vpy, "-c", "import onnxruntime, numpy")) and r.returncode == 0)
+    if venv_ok and os.path.isfile(model): return
+    if not os.access(ort, os.W_OK): say("Not: tur sonu modeli yok ve ortak klasör başka hesabın — konuşmada eski kural"); return
+    try:
+        if not venv_ok:
+            say("→ tur sonu ortamı kuruluyor (~125 MB)…")
+            shutil.rmtree(os.path.join(ort, "smart-turn-venv"), ignore_errors=True)
+            for c in ([PY, "-m", "venv", os.path.join(ort, "smart-turn-venv")], [vpy, "-m", "pip", "install", "-q", *TUR_SURUM]):
+                if subprocess.run(c, capture_output=True, timeout=600).returncode: raise RuntimeError(os.path.basename(c[0]) + " " + c[2])
+        if not os.path.isfile(model):
+            import hashlib
+            say("→ tur sonu modeli indiriliyor (8,7 MB)…")
+            veri = urllib.request.urlopen(TUR_URL, timeout=120).read()
+            if hashlib.sha256(veri).hexdigest() != TUR_SHA: raise RuntimeError("doğrulama tutmadı")
+            os.makedirs(md, exist_ok=True); gec = model + ".indir"
+            with open(gec, "wb") as f: f.write(veri)
+            os.replace(gec, model)
+        sessiz("chmod", "-R", "go+rX", os.path.join(ort, "smart-turn-venv"), md); say("✓ tur sonu modeli hazır")
+    except Exception as e: say(f"Not: tur sonu modeli kurulamadı ({str(e)[:120]}) — konuşmada eski kural, sonraki güncellemede yeniden denenir")
 def glob_(desen):
     import glob; return glob.glob(desen)
 
@@ -626,7 +652,7 @@ def kur():
             h = os.path.join(app, os.path.relpath(f, KOD)); os.makedirs(os.path.dirname(h), exist_ok=True); kopyala(f, h)
     for k in KALKAN:
         if os.path.isfile(os.path.join(app, k)): os.remove(os.path.join(app, k))
-    ecapa_donustur(Y["ortak"]); whisper_8bit(Y["ortak"])
+    ecapa_donustur(Y["ortak"]); whisper_8bit(Y["ortak"]); tur_kur(Y["ortak"])
     # beta teşhis sözlüğü (kodun kendi günlük metinlerinden üretilir)
     with open(os.path.join(app, "teshis-sozluk.txt"), "w") as g:
         subprocess.run([PY, os.path.join(KOD, "teshis.py"), "--sozluk", KOD], stdout=g, stderr=subprocess.DEVNULL, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
@@ -707,6 +733,7 @@ def modeller():
     # yalnız okur — eksik yoksa hiçbir şey indirmez. Sürümler 2 Ekim 2026'da çalışan kurulumdan sabitlendi.
     #   whisper-venv: mlx-whisper (Apple GPU) ~760 MB · whisper-modeller: whisper-large-v3-turbo ~1,6 GB (+ yerel 8 bit ~0,8 GB)
     #   ses-modeller: speechbrain/spkrec-ecapa-voxceleb ~85 MB → ecapa-mlx.npz (konuşmacı ayırma, Whisper işçisinde MLX ile)
+    #   smart-turn-venv (onnxruntime + numpy) ~125 MB + ses-modeller/smart-turn ~9 MB: tur sonu modeli (isteğe bağlı, tur_kur)
     ort = yollar()["ortak"]; vpy = os.path.join(ort, "whisper-venv", "bin", "python")
     try: os.makedirs(ort, exist_ok=True)
     except OSError: pass
@@ -748,7 +775,7 @@ def modeller():
                 "allow_patterns=['embedding_model.ckpt', 'hyperparams.yaml'])", ek)
     if os.path.isfile(os.path.join(ek, "ecapa-mlx.npz")): say("✓ ses izi ağırlıkları (MLX) var")
     else: ecapa_donustur(ort, onbellek=False)
-    whisper_8bit(ort)
+    whisper_8bit(ort); tur_kur(ort)
     say("→ Deneme: modeller çevrimdışı açılıyor mu…")
     zorunlu(vpy, "-c", "import numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), "
             "path_or_hf_repo='mlx-community/whisper-large-v3-turbo', language='tr'); print('✓ Whisper açılıyor')", env=dict(hf, HF_HUB_OFFLINE="1"))

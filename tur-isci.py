@@ -28,7 +28,8 @@ def ozellik(a):  # float32 ses → (1, 80, 800)
     n = 1 + (len(p) - N_FFT) // HOP
     kare = np.lib.stride_tricks.as_strided(p, (n, N_FFT), (p.strides[0] * HOP, p.strides[0])) * PENCERE
     guc = np.abs(np.fft.rfft(kare, axis=1)) ** 2
-    m = np.log10(np.maximum(MEL @ guc.T, 1e-10))[:, :-1]
+    with np.errstate(all="ignore"): m = MEL @ guc.T  # numpy 2.0 + Accelerate (sistem Python 3.9 ortamı) sonuç doğruyken yanlış uyarı verir
+    m = np.log10(np.maximum(m, 1e-10))[:, :-1]
     m = (np.maximum(m, m.max() - 8.0) + 4.0) / 4.0
     return m[None].astype(np.float32)
 def main():

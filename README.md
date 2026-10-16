@@ -89,6 +89,7 @@ Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_pytho
 | Menü çubuğu uygulaması (`menu-cubugu.swift` → Suflor Menü.app, isteğe bağlı) | Mini pano paneli, Mac geneli bas-konuş, masaüstü toplantı sinyali |
 | Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
 | Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
+| Tur sonu (`tur-isci.py`) | smart-turn v3 (8,7 MB, yerel): konuşurken sözün bitip bitmediğini tahmin eder; kurulamazsa sessizlik süresine bakılır |
 | Claude köprüsü (`toplanti-claude.py`, `baglam.py`, `yapi.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
 | Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
 
