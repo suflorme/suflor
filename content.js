@@ -622,15 +622,29 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     function inMeeting() { return !!(findTranscriptPanel() || capSiki()); }
     let kanitSon = null, komutSon, anlikSon, soyleSon, soyleDur = null;  // sesli komut onayı, anlık uyarı, toplantıya söyle (ilk yoklamada eskisi alınmaz)
     // toplantıya söyle, web sürümü (v0.50.0): aktarıcının WAV'ı alınır, sayfa bağlamındaki soyle-main.js toplantı bağlantısına okur; sonucu aktarıcıya
+    // v0.51.5: bağlantı iç çerçevede olabilir — komut bütün çerçevelere gider; cevaplar 1,5 sn toplanır, en anlamlısı bildirilir
+    // (bir çerçeve okuyorsa ötekilerin "baglanti-yok"u uyarı olmaz). "bitti/durdu" sonradan gelir, ayrıca bildirilir.
+    const cerceveler = (w, d = 0) => { const l = [w]; try { if (d < 4) for (let i = 0; i < w.frames.length; i++) l.push(...cerceveler(w.frames[i], d + 1)); } catch (e) {} return l; };
+    const soyleYolla = m => { for (const f of cerceveler(window)) { try { f.postMessage(m, "*"); } catch (e) {} } };
+    const SOYLE_SIRA = ["caliyor", "sessiz", "hata", "baglanti-yok"]; let soyleTop = null;
     window.addEventListener("message", e => {
-      if (e.source === window && e.data && e.data.__suflor === "soyleDurum" && window.top === window) olay("soyle-web", e.data.durum);
+      if (!e.data || e.data.__suflor !== "soyleDurum" || window.top !== window) return;
+      const d = String(e.data.durum || "");
+      if (soyleTop && soyleTop.id === e.data.id) { soyleTop.cevap.push(d); return; }
+      if (d === "bitti" || d === "durdu") olay("soyle-web", d);
     });
     async function soyleCal(w) {
       if (teamsSessiz()) return olay("soyle-web", "sessiz");  // toplantıda mikrofon kapalı: karşı taraf duymasın
       try {
         const r = await rf("/soyle-ses?id=" + encodeURIComponent(w.id));
         if (!r.ok) return olay("soyle-web", "hata:ses " + r.status);
-        window.postMessage({ __suflor: "soyle", komut: "cal", id: w.id, ses: await r.arrayBuffer() }, "*");
+        const ses = await r.arrayBuffer(); soyleTop = { id: w.id, cevap: [] };
+        soyleYolla({ __suflor: "soyle", komut: "cal", id: w.id, ses });
+        setTimeout(() => {
+          const c = soyleTop && soyleTop.id === w.id ? soyleTop.cevap : []; soyleTop = null;
+          const en = SOYLE_SIRA.map(k => c.find(x => x === k || x.startsWith(k + ":"))).find(Boolean) || "baglanti-yok";
+          olay("soyle-web", en); c.filter(x => x === "bitti" || x === "durdu").forEach(x => olay("soyle-web", x));
+        }, 1500);
       } catch (e) { olay("soyle-web", "hata:ses " + String(e && (e.message || e.name) || "?").slice(0, 60)); }
     }
     function listeCiz(list, v, cards, qs, warn, dil, ayri) {
@@ -699,7 +713,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const sw = v.soyle_web;
       if (sw && sw.id !== soyleSon) { if (soyleSon !== undefined && !sw.dur && window.top === window && inCall()) soyleCal(sw); soyleSon = sw.id; }
       else if (!sw && soyleSon === undefined) soyleSon = null;
-      if (sw && sw.dur && soyleDur !== sw.id && window.top === window) { soyleDur = sw.id; window.postMessage({ __suflor: "soyle", komut: "dur" }, "*"); }
+      if (sw && sw.dur && soyleDur !== sw.id && window.top === window) { soyleDur = sw.id; soyleYolla({ __suflor: "soyle", komut: "dur" }); }
       if (v.komut && v.komut.id !== komutSon) { if (komutSon !== undefined && window.top === window) toast(v.komut.metin, "#0a8f5a", 3500); komutSon = v.komut.id; }
       else if (!v.komut && komutSon === undefined) komutSon = null;
       // anlık uyarı (adın geçti / uzun konuşma) — yalnız toplantı sekmesinde kısa bildirim; ilk yoklamada eskisi gösterilmez

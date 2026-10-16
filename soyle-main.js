@@ -2,13 +2,15 @@
 // RTCPeerConnection'lar sayılır (sınıf alt sınıfla sarılır; davranış değişmez). İçerik betiği okunacak WAV'ı verince: canlı ses göndericisinin
 // izi yalnız okuma süresince "mikrofon + Suflor" karışımıyla değiştirilir (replaceTrack), ses bitince ya da "dur"da asıl mikrofon izi geri konur.
 // Özellik kullanılmadıkça toplantı sesine dokunulmaz. Mikrofon izi kapalıysa (enabled=false, sessiz) okunmaz. Sonuç içerik betiğine postMessage.
+// v0.51.5: her çerçevede çalışır (site bağlantıyı iç çerçevede kurabilir); komut üst sayfanın içerik betiğinden gelir, sonuç üst pencereye gider
+// ("baglanti-yok" yalnız bilgi: üst sayfa bütün çerçevelerin cevabını toplar).
 (() => {
   if (window.__suflorSoyle || !window.RTCPeerConnection) return; window.__suflorSoyle = true;
   const PCS = new Set(), Asil = window.RTCPeerConnection;
   class RTCPeerConnection extends Asil { constructor(...a) { super(...a); PCS.add(this); } }
   window.RTCPeerConnection = RTCPeerConnection;
   if (window.webkitRTCPeerConnection) window.webkitRTCPeerConnection = RTCPeerConnection;
-  const yaz = (id, durum) => window.postMessage({ __suflor: "soyleDurum", id, durum }, "*");
+  const yaz = (id, durum) => { try { window.top.postMessage({ __suflor: "soyleDurum", id, durum }, "*"); } catch (e) {} };
   let ak = null;  // {id, ctx, kaynak, degisen: [{s, asil, bizim}]}
   async function geriAl(neden) {
     const a = ak; if (!a) return; ak = null;
@@ -45,7 +47,7 @@
     }
   }
   window.addEventListener("message", e => {
-    if (e.source !== window || !e.data || e.data.__suflor !== "soyle") return;
+    if (!e.data || e.data.__suflor !== "soyle" || (e.source !== window && e.source !== window.top)) return;
     if (e.data.komut === "cal" && e.data.ses instanceof ArrayBuffer) cal(e.data.id, e.data.ses);
     if (e.data.komut === "dur") geriAl("durdu");
   });
