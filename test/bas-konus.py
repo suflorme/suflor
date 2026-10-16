@@ -94,6 +94,10 @@ try:
     t0 = time.time()
     while time.time() - t0 < 10 and "tur sınırı" not in log(): time.sleep(0.2)
     ok("tur sınırı (3 soru): üçüncü cevaptan sonra süreç kapandı, panoda cevap 'hazır' kaldı", k3["durum"] == "hazir" and st()["durum"] == "hazir" and "KONUŞ: süreç kapandı (tur sınırı: 3 soru" in log())
+    # v0.57.6: kapatılan süreç gerçekten çıkar — Brifing girişi anonim boruyla aktarır (gerçek claude adlı FIFO'da dosya sonunu görmüyordu, süreç açık kalıyordu)
+    t_ = time.time()
+    while time.time() - t_ < 10 and subprocess.run(["pgrep", "-f", "SuflorBrifing --istek " + T], capture_output=True).stdout.strip(): time.sleep(0.3)
+    ok(f"kapatılan süreç çıktı: Brifing yardımcısı açık kalmadı ({round(time.time() - t_, 1)} sn)", not subprocess.run(["pgrep", "-f", "SuflorBrifing --istek " + T], capture_output=True).stdout.strip())
     k4 = sor("Peki saat kaçta?")
     ok("sonraki soru yeni süreçte, önceki soru-cevap bağlamıyla", k4["durum"] == "hazir" and log().count("KONUŞ: açık süreç açıldı") == 2
        and "Önceki konuşma geldi" in (k4.get("cevap") or "") and "saat" in (k4.get("soru") or "").lower())
@@ -264,7 +268,19 @@ try:
     ks["vt_son"] = (time.time() - 60, None); n5 = ad3["_vt_tazele_notu"]()
     ok("veritabanı tazelik notu: sorgu yokken ve değişmeden yok, değişince bir kez, okunamazsa 10 dk sonra",
        not n0 and not n1 and "değişti" in n2 and "vt_sor" in n2 and not n3 and "11 dk önce" in n4 and not n5)
-    ok("not soruyla gider, vt_sor turu tazelik kaydını yeniler", "_vt_tazele_notu() + metin" in kod_ and 'any("suflorvt__vt_so" in x for x in tur.get("araclar")' in kod_)
+    ok("not soruyla gider, vt_sor turu tazelik kaydını yeniler", "_vt_tazele_notu() + (_vt_benzer_notu(metin)" in kod_ and 'any("suflorvt__vt_so" in x for x in tur.get("araclar")' in kod_)
+    # v0.57.6 önceki benzer sorunun sorgusu: vt_sor sorgusu soruyla kaydedilir; yeni süreçte benzer soruya not, açık süreçteki ya da ilgisiz soruya yok
+    import datetime as _dt
+    ad3.update({"re": _re, "json": json, "datetime": _dt, "BASE": canli, "AYAR": {"proje": proje, "veritabani": {"yol": "vt.db"}}})
+    ks["acilis_t"] = 0; ad3["_vt_sorgu_kaydet"]("Şu anda en fazla admin yetkisi kimde?", ["SELECT kisi, COUNT(*) FROM v_yetki WHERE rol='admin' GROUP BY kisi"]); ks["acilis_t"] = time.time() + 5  # sonra açılan süreç
+    b1 = ad3["_vt_benzer_notu"]("Admin yetkisi en fazla kimde şu an?"); b2 = ad3["_vt_benzer_notu"]("Yarın hava nasıl olacak?")
+    ks["acilis_t"] = 0; b3 = ad3["_vt_benzer_notu"]("Admin yetkisi en fazla kimde şu an?"); ks["acilis_t"] = time.time() + 5  # kayıttan önce açılmış süreç
+    ad3["AYAR"] = {"proje": proje}; b4 = ad3["_vt_benzer_notu"]("Admin yetkisi en fazla kimde şu an?"); ad3["AYAR"] = {"proje": proje, "veritabani": {"yol": "vt.db"}}
+    for i in range(70): ad3["_vt_sorgu_kaydet"](f"soru {i}", ["SELECT 1"])
+    sat_ = open(os.path.join(canli, "konus-sorgu.jsonl"), encoding="utf-8").read().splitlines()
+    ok("benzer soru: yeni süreçte önceki sorgu notu, ilgisiz/açık süreç/veritabanısız soruda yok, kayıt 60 satırda kalır",
+       "v_yetki" in b1 and "yeniden çalıştır" in b1 and not b2 and not b3 and not b4 and len(sat_) == 60)
+    ok("vt_sor girdisi akıştan toplanır, karşı tarafın sorusunda not ve kayıt yok", '"input_json_delta"' in kod_ and "_vt_benzer_notu(metin) if tur.get(\"kaynak\") != \"karsi\" and not tur.get(\"karsi\")" in kod_)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

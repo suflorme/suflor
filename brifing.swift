@@ -4,7 +4,7 @@
 // Giriş: --istek <json>  {"claude": ".../claude", "args": [...], "cwd": "...", "cikti": "...", "sure": 240}
 // Yalnız adı "claude" olan ikiliyi çalıştırır; yazma/komut aracı açan argümanları reddeder (salt okunur brifing).
 // Açık süreç kipi (bas-konuş, v0.20.0): istekte "giris"/"cikis" (aktarıcının açtığı iki FIFO) varsa Claude'un girişi ve çıkışı onlara
-// bağlanır, süreç aktarıcı girişi kapatana (ya da "sure" dolana) kadar açık kalır; izin yine bu uygulamaya sorulur.
+// bağlanır (giriş bu uygulamadan anonim boruyla geçer), süreç aktarıcı girişi kapatana (ya da "sure" dolana) kadar açık kalır; izin yine bu uygulamaya sorulur.
 import Foundation
 
 func bitir(_ kod: Int32) -> Never { exit(kod) }
@@ -22,8 +22,17 @@ if let giris = j["giris"] as? String, let cikis = j["cikis"] as? String {
     guard let gir = FileHandle(forReadingAtPath: giris), let cik = FileHandle(forWritingAtPath: cikis) else { bitir(7) }
     p.executableURL = URL(fileURLWithPath: claude); p.arguments = arg; p.currentDirectoryURL = URL(fileURLWithPath: cwd)
     var e = ProcessInfo.processInfo.environment; e["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:" + (e["PATH"] ?? ""); p.environment = e
-    p.standardInput = gir; p.standardOutput = cik; p.standardError = FileHandle.nullDevice
+    // v0.57.6: Claude Code adlı FIFO girişinde dosya sonunu görmüyor (17 Ekim denemesi: anonim boruda giriş kapanınca çıkıyor, FIFO'da hiç çıkmıyor) —
+    // aktarıcı süreci yenileyince eski claude + veritabanı yardımcısı açık kalıyordu (süreç başına ~250 MB). FIFO'yu burada okuyup anonim boruyla
+    // aktarırız; FIFO kapanınca boru kapanır, claude çıkar, uygulama biter.
+    signal(SIGPIPE, SIG_IGN)
+    let boru = Pipe()
+    p.standardInput = boru; p.standardOutput = cik; p.standardError = FileHandle.nullDevice
     do { try p.run() } catch { bitir(4) }
+    Thread.detachNewThread {
+        while true { let d = gir.availableData; if d.isEmpty { break }; do { try boru.fileHandleForWriting.write(contentsOf: d) } catch { break } }
+        try? boru.fileHandleForWriting.close()
+    }
     let sure = (j["sure"] as? Double) ?? 7200
     DispatchQueue.global().asyncAfter(deadline: .now() + sure) { if p.isRunning { p.terminate() } }
     p.waitUntilExit(); bitir(p.terminationStatus)
