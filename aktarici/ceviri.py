@@ -75,14 +75,15 @@ def _cv_ac(y):
     yd = y["yedek"]; y["yedek"] = None
     y["p"] = yd if yd and yd.poll() is None else _cv_baslat()
     if not y["p"]: return False
-    y.update(tur=0, bekleyen=0, atla=1 if y["p"] is yd else 0, maliyet=0); print(f"ÇEVİRİ: süreç {y['ad']} açıldı" + (" (yedekten)" if y["p"] is yd else "")); return True
+    y.update(tur=0, bekleyen=0, atla=1 if y["p"] is yd else 0, maliyet=0, api_ms=0); print(f"ÇEVİRİ: süreç {y['ad']} açıldı" + (" (yedekten)" if y["p"] is yd else "")); return True
 def _cv_kayit(y, j):  # her turun "result" satırı → canli/claude-cagri.jsonl (yalnız sayılar; olcum.py toplanti okur). Maliyet süreç başına birikir: fark yazılır
     try:
         u = j.get("usage") or {}; g = sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")); m = j.get("total_cost_usd") or 0
         o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": "ceviri", "model": str(AYAR.get("ceviri_model") or "haiku"),
-             "api_ms": j.get("duration_api_ms"), "maliyet": round(max(0, m - (y.get("maliyet") or 0)), 4), "giris": g,
+             "api_ms": j.get("duration_api_ms"), "api_tur_ms": max(0, (j.get("duration_api_ms") or 0) - (y.get("api_ms") or 0)),  # süre de maliyet gibi süreç boyunca birikir
+             "maliyet": round(max(0, m - (y.get("maliyet") or 0)), 4), "giris": g,
              "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, g), 2), "hata": bool(j.get("is_error"))}
-        y["maliyet"] = m
+        y["maliyet"] = m; y["api_ms"] = j.get("duration_api_ms") or 0
         with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     except Exception as e: print(f"ÇEVİRİ: ölçüm yazılamadı {e.__class__.__name__}")
 def _cv_sor(y, satirlar):
