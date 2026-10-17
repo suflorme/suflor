@@ -294,6 +294,14 @@ try:
     sat_ = open(os.path.join(canli, "konus-sorgu.jsonl"), encoding="utf-8").read().splitlines()
     ok("benzer soru: yeni süreçte önceki sorgu notu, ilgisiz/açık süreç/veritabanısız soruda yok, kayıt 60 satırda kalır",
        "v_yetki" in b1 and "yeniden çalıştır" in b1 and not b2 and not b3 and not b4 and len(sat_) == 60)
+    # v0.77.0 özel ad farkı: farklı kişinin aynı sorusu benzer sayılmaz; aynı kişinin kısa/tam adı ve adsız eş anlamlı soru sayılır
+    ks["acilis_t"] = 0; ad3["_vt_sorgu_kaydet"]("Ali'nin açık işleri neler?", ["SELECT * FROM v_is WHERE kisi='Ali'"]); ks["acilis_t"] = time.time() + 5
+    a1 = ad3["_vt_benzer_notu"]("Ayşe'nin açık işleri neler?"); a2 = ad3["_vt_benzer_notu"]("Açık işler neler, Ali'nin?"); a3 = ad3["_vt_benzer_notu"]("Açık işleri neler?")
+    ks["acilis_t"] = 0; ad3["_vt_sorgu_kaydet"]("Bugün Kemal Demir ile açık işleri konuştuk mu?", ["SELECT 2"]); ks["acilis_t"] = time.time() + 5
+    a4 = ad3["_vt_benzer_notu"]("Kemal'le bugün açık işleri konuştuk mu?")
+    ok("özel ad: Ali ↔ Ayşe eşleşmez, Ali ↔ Ali eşleşir, adsız soru adlı soruyla eşleşmez, Kemal ⊆ Kemal Demir eşleşir",
+       not a1 and "kisi='Ali'" in a2 and "kisi='Ali'" not in a3 and "SELECT 2" in a4)
+    if not (not a1 and "kisi='Ali'" in a2 and "kisi='Ali'" not in a3 and "SELECT 2" in a4): print("   ", repr(a1)[:80], repr(a2)[:80], repr(a3)[:80], repr(a4)[:80])
     ok("vt_sor girdisi akıştan toplanır, karşı tarafın sorusunda not ve kayıt yok", '"input_json_delta"' in kod_ and "_vt_benzer_notu(metin) if tur.get(\"kaynak\") != \"karsi\" and not tur.get(\"karsi\")" in kod_)
     # v0.57.8 taze sonuç: veritabanı aracının önbelleğinde 150 sn içinde denetlenmiş sonuç varsa not sonucu taşır ve "vt_sor çağırmadan" der (açık süreçte de)
     q_ = "SELECT kisi, COUNT(*) FROM v_yetki WHERE rol='admin' GROUP BY kisi"

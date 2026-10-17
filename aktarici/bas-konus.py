@@ -123,6 +123,16 @@ _VT_BOS = set("bir bu şu ne neler nedir mi mı mu mü kaç kim kimde hangi var 
 def _vt_sozler(m):
     m = str(m or "").replace("İ", "i").replace("I", "ı").lower()
     return {w[:5] for w in re.findall(r"[a-zçğıöşü0-9]{3,}", m) if w not in _VT_BOS}
+# v0.77.0 (18 Ekim): özel ad farkı. Sözcük örtüşmesi "Ali'nin açık işleri" ile "Ayşe'nin açık işleri"ni 0,75 ile benzer sayıyordu (yapay örnek; gerçek
+# geçmişte 27 soruda yanlış eşleşme 0). Özel ad: kesme işaretli sözcüğün kökü ya da cümle başında olmayan büyük harfli sözcük; adlar ayrışıyorsa (biri ötekini
+# kapsamıyor, ya da yalnız birinde ad var) benzer değil.
+def _vt_adlar(m):
+    m = str(m or ""); out = set()
+    for i, w in enumerate(re.finditer(r"[A-Za-zÇĞİÖŞÜçğıöşü0-9]+(?:['’][a-zçğıöşü]+)?", m)):
+        t = w.group(0); bas = i == 0 or bool(re.search(r"[.!?:]\s*$", m[:w.start()]))
+        if re.search(r"['’]", t) or (t[0].isupper() and not bas): out.add(_vt_sozler(re.split(r"['’]", t)[0]).pop() if _vt_sozler(re.split(r"['’]", t)[0]) else re.split(r"['’]", t)[0].lower())
+    return out
+def _vt_ad_uyar(x, y): return x == y or (bool(x) and bool(y) and (x <= y or y <= x))  # ikisinde de ad yok ya da biri ötekini kapsar ("Kemal" ⊆ "Kemal Demir")
 def _vt_sorgu_kaydet(soru, sorgular):
     yol = os.path.join(BASE, VT_SORGU_DOSYA)
     try: eski = [l for l in open(yol, encoding="utf-8") if l.strip()]
@@ -148,9 +158,9 @@ def _vt_benzer_notu(soru):
     if len(a) < 2: return ""
     try: rs = [json.loads(l) for l in open(os.path.join(BASE, VT_SORGU_DOSYA), encoding="utf-8") if l.strip()]
     except (OSError, ValueError): return ""
-    en, puan = None, 0
+    en, puan = None, 0; ad = _vt_adlar(soru)
     for r in rs:
-        if not r.get("sorgu"): continue
+        if not r.get("sorgu") or not _vt_ad_uyar(ad, _vt_adlar(r.get("soru"))): continue  # v0.77.0: farklı kişi/kurum adı → başka soru
         b = _vt_sozler(r.get("soru")); o = len(a & b)
         p = 2 * o / (len(a) + len(b)) if o >= 2 else 0
         if p >= puan and p >= 0.6: en, puan = r, p  # eşitlikte en yenisi
