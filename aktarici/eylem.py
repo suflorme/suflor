@@ -5,7 +5,7 @@
 # (toplanti-claude.py eylem ekle). Toplantı sonunda Claude listeyi sunar (eylem sun): panoda Onayla/Reddet + "Hepsini onayla", ya da
 # kullanıcı sohbette onaylar (eylem onay). Karar yalnız anahtarlı istemciden; Claude yalnız onaylananı, ayrıntıda yazıldığı gibi
 # uygular ve sonucu yazar (eylem sonuc). E-posta yalnız taslak, takvim bildirim gönderilmeden — kural metni TOPLANTI-KURALLARI §8.
-EYLEM_TUR = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "mesaj": "Ekip mesajı", "diger": "Diğer"}
+EYLEM_TUR = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "mesaj": "Ekip mesajı", "diger": "Diğer", "oturum": "Oturuma talimat", "yapilacak": "Yapılacak"}  # v0.75.0: son ikisi yerel (talimat.py uygular)
 EYLEMLER = []; EYLEM_SAAT = 12  # bu kadar saatten eski eylem panoda görünmez
 def _eylem_temiz(x, n): return " ".join(str(x or "").split())[:n]
 def eylem_yukle():
@@ -32,7 +32,7 @@ def _eylem_yama(x, **k):  # LOCK içinde
     x.update(k); _log("eylemler.jsonl", dict({"id": x["id"], "at": datetime.datetime.now().isoformat(timespec="seconds")}, **k))
 def eylem_sun():
     with LOCK:
-        xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and not x.get("sunuldu")]
+        xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and not x.get("sunuldu") and not x.get("yerel")]
         for x in xs: _eylem_yama(x, sunuldu=True)
     soru_baslat([x["id"] for x in xs])  # sesli "yazayım mı?"
     return len(xs)
@@ -43,6 +43,8 @@ def eylem_karar(p, kaynak):
     with LOCK:
         xs = [x for x in eylem_gorunen() if x["durum"] == "bekliyor" and (p.get("id") == "hepsi" and x.get("sunuldu") or x["id"] == p.get("id"))]
         for x in xs: _eylem_yama(x, durum=d, karar_at=datetime.datetime.now().isoformat(timespec="seconds"), yetkili=True, kaynak=kaynak, **ek)
+    for x in xs:
+        if x.get("yerel") and "talimat_karar" in globals(): talimat_karar(x, d)  # v0.75.0: aktarıcının kendi uyguladığı iş
     if xs: print(f"EYLEM: {len(xs)} iş {'onaylandı' if d == 'onaylandi' else 'reddedildi'} ({kaynak})" + (f" · duyulan \"{ek['ses_metin']}\"" if ek else ""))
     if kaynak != "ses" and xs: ses_durdur()  # sesli kararda geri okuma ("Takvim onaylandı.") kuyrukta, kesilmez
     if xs and p.get("id") == "hepsi": soru_bitir("hepsi")
@@ -73,7 +75,7 @@ def _geri_al_sn(x):
     return max(0, round(GERI_AL_SN - (time.time() - (x.get("karar_t") or 0)), 1))
 def eylem_view():
     xs = eylem_gorunen(); soru_zaman()
-    return {"liste": [dict({k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc", "kaynak", "ses_metin")}, geri_al_sn=_geri_al_sn(x)) for x in xs],
+    return {"liste": [dict({k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc", "kaynak", "ses_metin", "yerel")}, geri_al_sn=_geri_al_sn(x)) for x in xs],
             "bekleyen": sum(1 for x in xs if x["durum"] == "bekliyor"), "sesli": SORU["aktif"]} if xs else None
 def cards_view():
     ertele_kontrol()
@@ -194,6 +196,7 @@ def ack_card(p, yetkili=False):
         now = datetime.datetime.now(); c["status"] = st; c["acted_at"] = now.isoformat(timespec="seconds")
         _log("kartlar.jsonl", dict({"id": c["id"], "at": c["acted_at"], "status": st}, **({"yetkili": True} if yetkili else {})))
         _md(f"| {now.strftime('%H:%M:%S')} | **KART {ACK_MD[st]}** | {c['text'].replace('|', '¦')} | |")
+    if c.get("eylem") and st in ("onaylandi", "reddedildi"): eylem_karar({"id": c["eylem"], "durum": st}, "kart")  # v0.75.0: talimat onay kartı
     return True
 # (kullanıcı, 3 Ekim) not ve "Claude'a sor" tek kutu. Metin "?", "soru", "Claude" ya da iki boşlukla başlıyorsa soru,
 # değilse not. "?" ve ayrı sözcük "soru" (ardından boşluk, ":" "," "." "-" ya da metin sonu) baştan atılır; "sorun …" not kalır.

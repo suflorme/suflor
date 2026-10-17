@@ -492,7 +492,8 @@ def brifing_baslatta(oid):  # Başlat: hazırsa hemen oku; değilse hazırla, ha
 SORU = {"liste": [], "aktif": None, "t": 0}; SORU_SN = 120
 EYLEM_SORU = {"kayit": ("Yazayım mı?", "Shall I record it?"), "belge": ("Yazayım mı?", "Shall I write it?"), "takvim": ("Takvime ekleyeyim mi?", "Shall I add it to the calendar?"),
               "eposta": ("Taslak olarak yazayım mı?", "Shall I write it as a draft?"), "takip": ("Taslak olarak yazayım mı?", "Shall I write it as a draft?"),
-              "mesaj": ("Metni hazırlayayım mı?", "Shall I prepare the text?"), "diger": ("Yapayım mı?", "Shall I do it?")}
+              "mesaj": ("Metni hazırlayayım mı?", "Shall I prepare the text?"), "diger": ("Yapayım mı?", "Shall I do it?"),
+              "oturum": ("İleteyim mi?", "Shall I send it?"), "yapilacak": ("E-posta taslağını açayım mı?", "Shall I open the email draft?")}
 def _ses_serbest(): return AYAR.get("konusma", True) and not toplanti_var()
 def _cumle(x):
     x = " ".join(re.sub(r"[*`_#>]", "", str(x or "")).split()).strip()

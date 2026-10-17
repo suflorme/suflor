@@ -1503,6 +1503,7 @@ bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslend
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
+bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
 bolum("otonom")  # aktarici/otonom.py — Toplantıda otonom katılım: seslenince cevap, itiraz penceresi, söz sırası (S68)

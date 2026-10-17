@@ -920,6 +920,7 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
             return
         if sohbet_dusunme(metin, pcm): _KS["tur"] = None; _konus_kur(durum="dinliyor", hata=None); return  # sohbet: söz "nasıl desem…" ile bitti, dinleme sürer
         if sohbet_metin(metin): _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=""); return  # "tamam teşekkürler" sohbeti kapatır
+        if talimat_yakala(metin, "bas"): _KS["tur"] = None; return  # v0.75.0: sesle oturuma talimat / yapılacak (Claude'a gitmez)
         if konus_is_ilet(metin): _KS["tur"] = None; return
         _konus_sor(metin, tur)
     if _akis_birlestir(pcm, geri): tur["akis"] = True; return {"ok": True}
@@ -954,7 +955,10 @@ def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses ki
     m = list(re.finditer(r"Claude:\s*", text))
     if not m: return False
     soru = text[m[-1].end():].strip()
-    if len(soru.split()) < 2 or HITAP_IS_RX.search(soru): return False
+    if len(soru.split()) < 2: return False
+    if talimat_coz(soru):  # v0.75.0: toplantıda kendi sesli talimatın → onay kartı (ingest LOCK altında: iş ayrı iş parçacığında)
+        threading.Thread(target=talimat_yakala, args=(soru, "hitap"), daemon=True).start(); return True
+    if HITAP_IS_RX.search(soru): return False
     if _KS["tur"]:  # Konuş'a basıp "Claude, …" diye sorulduysa aynı soru toplantı kanalına da düşer: konuşan zaten cevaplıyor
         if _KS["tur"].get("kaynak") == "bas": return True
         print("KONUŞ: 'Claude:' sorusu geldi ama önceki cevap sürüyor — toplantı oturumuna kaldı"); return False
@@ -988,6 +992,7 @@ def konus_hitap_karsi(text, kim):
     threading.Thread(target=_konus_sor, args=(f"{kim} soruyor: {soru}", tur), daemon=True).start()
     print(f"KONUŞ: karşı tarafın Suflor sorusu konuşana gitti ({kim}) — \"{soru[:60]}\""); return True
 def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas-konuş ve toplantıdaki "Claude:" hitabı)
+    if tur.get("kaynak") not in ("hitap", "karsi") and not tur.get("karsi") and talimat_yakala(metin, tur.get("kaynak") or "bas"): _KS["tur"] = None; return  # v0.75.0 (sohbet yolu)
     _konus_kur(durum="dusunuyor", soru=metin)
     simdi = datetime.datetime.now().astimezone(); top = toplanti_var()
     if tur.get("kaynak") not in ("hitap", "karsi"):  # bas-konuş/sohbet: cümle başında kişilik adı → o kişilik (hitap yolu konus_hitap'ta seçti)

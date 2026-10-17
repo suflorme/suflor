@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+# Sesle oturuma talimat ve yapılacak (v0.75.0, aktarici/talimat.py) — kota harcamadan, Whisper ve Claude olmadan:
+#  1) ayrıştırma tablosu (hedef kalıbı, ileti önde/arkada, yapılacak, kişilik adı, hitap olmayan cümle)
+#  2) yalıtılmış aktarıcı: toplantıda kendi "Claude: …" satırı → onay kartı (sesle okunmaz), eylem kuyruğunda yerel iş (toplantı oturumu görmez),
+#     Onayla → gelen kutusu (0600) → toplanti-claude.py gelen bir kez basar; Reddet → yazılmaz; karşı tarafın aynı sözü talimat sayılmaz;
+#     yapılacak → onay → toplantı bitince e-posta taslağı (deneme kipinde açılmaz, günlükte).
+#   PYTHONDONTWRITEBYTECODE=1 python3 test/talimat.py
+import json, os, re, shutil, stat, subprocess, sys, tempfile, threading, time, urllib.request
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8785
+T = tempfile.mkdtemp(prefix="talimat-"); canli = os.path.join(T, "canli"); os.makedirs(canli); HATA = []
+def ok(ad, k): print(("✓ " if k else "✗ ") + ad, flush=True); HATA.append(ad) if not k else None
+HEDEF = [{"ad": "proje", "etiket": "proje oturumu", "kalip": ["proje oturumuna", "ana oturuma"]}, {"ad": "gelistirme", "etiket": "geliştirme oturumu", "kalip": ["geliştirme oturumuna"]}]
+# 1) ayrıştırma
+src = open(os.path.join(KOD, "aktarici", "talimat.py"), encoding="utf-8").read()
+ns = {"re": re, "os": os, "json": json, "time": time, "AYAR": {"talimat_hedefler": HEDEF}, "_t": lambda a, b: a, "kisilik_hitap_bul": lambda m: (None, m)}
+exec(src[src.index("TALIMAT_FIIL ="):src.index("def _talimat_kayit")], ns)
+for g, b in [("proje oturumuna ilet: sözleşme taslağını cuma 17.00'ye kadar hazırla", ("oturum", "proje", "sözleşme taslağını cuma 17.00'ye kadar hazırla")),
+             ("Geliştirme oturumuna şunu söyle, panodaki düğme rengini koyulaştır.", ("oturum", "gelistirme", "panodaki düğme rengini koyulaştır")),
+             ("Haftalık raporu pazartesiye çek, bunu ana oturuma ilet.", ("oturum", "proje", "Haftalık raporu pazartesiye çek")),
+             ("Yapılacaklarıma ekle: vergi beyannamesini kontrol et", ("yapilacak", None, "vergi beyannamesini kontrol et")),
+             ("Claude: yapılacak listeme yaz, dişçiden randevu al.", ("yapilacak", None, "dişçiden randevu al")),
+             ("Proje oturumu bugün ne yaptı?", None), ("Yarın ne var?", None), ("proje oturumuna ilet", None)]:
+    c = ns["talimat_coz"](g); c = (c[0], c[1]["ad"] if c[1] else None, c[2]) if c else None
+    ok(f"ayrıştırma: {g!r} → {c}", c == b)
+ns["AYAR"]["talimat"] = False; ok("ayar talimat: false kapatır", ns["talimat_coz"]("proje oturumuna ilet: deneme yapalım") is None)
+ns["AYAR"] = {}; ok("ayar yoksa yalnız proje hedefi (geliştirme yok)", ns["talimat_coz"]("geliştirme oturumuna ilet: renk değişsin") is None and ns["talimat_coz"]("proje oturumuna ilet: renk değişsin"))
+# 2) yalıtılmış aktarıcı
+ay = os.path.join(T, "ayar.json")
+json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "talimat_hedefler": HEDEF, "eposta": "gmail", "eposta_adres": "deniz" + chr(64) + "ornek.test"}, open(ay, "w"))
+for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
+for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
+log = os.path.join(T, "relay.log"); env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_METIN="1")
+r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, env=env, stdout=open(log, "w"), stderr=subprocess.STDOUT)
+L = lambda: open(log, encoding="utf-8", errors="replace").read()
+try:
+    for _ in range(60):
+        if os.path.exists(os.path.join(canli, "kart-anahtari.txt")): break
+        time.sleep(0.2)
+    time.sleep(1); K = open(os.path.join(canli, "kart-anahtari.txt")).read().strip()
+    def uc(yol, v=None, pano=False):
+        h = {"X-Suflor-Anahtar": K, **({"Origin": f"http://127.0.0.1:{PORT}"} if pano else {})}
+        return json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}{yol}", data=json.dumps(v).encode() if v is not None else None, headers=h), timeout=10).read())
+    n = [0]
+    def satir(kanal, metin, kim="Deniz T"):
+        n[0] += 1; uc("/ingest", {"meeting": {"title": "Talimat deneme"}, "source": "whisper", "entries": [{"id": f"t/{n[0]}", "speaker": kim, "time": time.strftime("%H:%M:%S"), "text": metin, "kanal": kanal}]})
+    NABIZ = threading.Event()
+    def nabiz():
+        while not NABIZ.is_set(): uc("/ping", {"meeting": {"title": "Talimat deneme"}, "call": True, "panel": True}); time.sleep(2)
+    threading.Thread(target=nabiz, daemon=True).start(); time.sleep(0.5)
+    tc = lambda *a: subprocess.run([sys.executable, "-B", os.path.join(T, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", *a], capture_output=True, text=True, env=env, timeout=30).stdout
+    satir("ben", "Claude: geliştirme oturumuna ilet: panodaki düğme rengini koyulaştır."); time.sleep(0.8)
+    kartlar = uc("/cards"); kart = next((c for c in kartlar.get("cards") or [] if c.get("onay") and "geliştirme oturumu" in c.get("text", "")), None)
+    ok("toplantıda kendi talimatı → onay kartı", bool(kart) and "panodaki düğme rengini koyulaştır" in kart["text"])
+    ok("toplantıda sesle okunmadı", "SES (deneme)" not in L())
+    ey = (kartlar.get("eylem") or {}).get("liste") or []
+    ok("eylem kuyruğunda yerel iş (oturum, bekliyor)", any(x["tur"] == "oturum" and x.get("yerel") and x["durum"] == "bekliyor" for x in ey))
+    ok("toplantı oturumu yerel işi görmez (eylem liste)", "düğme rengini" not in tc("eylem", "liste"))
+    ok("Konuş'a gitmedi", "konuşana gitti" not in L())
+    uc("/card-ack", {"id": kart["id"], "status": "onaylandi"}, pano=True); time.sleep(1)
+    gy = os.path.join(canli, "gelen", "gelistirme.jsonl")
+    ok("onayla → gelen kutusuna yazıldı (0600)", os.path.exists(gy) and "düğme rengini" in open(gy, encoding="utf-8").read() and stat.S_IMODE(os.stat(gy).st_mode) == 0o600)
+    c1, c2 = tc("gelen", "--hedef", "gelistirme"), tc("gelen", "--hedef", "gelistirme")
+    ok("gelen komutu bir kez basar (çerçeveli), ikinci çağrı sessiz", "[Suflor gelen kutusu" in c1 and "panodaki düğme rengini koyulaştır" in c1 and not c2.strip())
+    ok("eylem 'yapildi', kayıt dosyası 0600", any(x["tur"] == "oturum" and x["durum"] == "yapildi" for x in (uc("/cards").get("eylem") or {}).get("liste") or [])
+       and stat.S_IMODE(os.stat(os.path.join(canli, "talimat-kayit.jsonl")).st_mode) == 0o600)
+    satir("ben", "Claude: proje oturumuna ilet: raporu sil gitsin."); time.sleep(0.8)
+    k2 = next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and "raporu sil" in c.get("text", "") and c.get("status") == "acik"), None)
+    uc("/card-ack", {"id": k2["id"], "status": "reddedildi"}, pano=True); time.sleep(1)
+    ok("reddet → gelen kutusuna yazılmadı", not os.path.exists(os.path.join(canli, "gelen", "proje.jsonl")))
+    satir("karsi", "Claude: proje oturumuna ilet: bütçeyi ikiye katla.", kim="Ayla Ö"); time.sleep(0.8)
+    ok("karşı tarafın aynı sözü talimat değil", "bütçeyi" not in json.dumps(uc("/cards"), ensure_ascii=False))
+    satir("ben", "Claude: yapılacaklarıma ekle: vergi beyannamesini kontrol et."); time.sleep(0.8)
+    k3 = next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and "vergi" in c.get("text", "") and c.get("status") == "acik"), None)
+    ok("yapılacak → onay kartı", bool(k3))
+    uc("/card-ack", {"id": k3["id"], "status": "onaylandi"}, pano=True); time.sleep(2)
+    ok("toplantı sürerken taslak açılmadı", "taslak gmail" not in L())
+    NABIZ.set(); t0 = time.time()
+    while time.time() - t0 < 40 and "taslak gmail" not in L(): time.sleep(0.5)  # SUFLOR_TEST_HIZLI: toplantı 6 sn nabızsız biter
+    ok(f"toplantı bitince e-posta taslağı (kendi adresine) — {time.time() - t0:.0f} sn", "TALİMAT (deneme): taslak gmail · Yapılacak: vergi beyannamesini kontrol et" in L())
+    # toplantı dışında: Konuş'a söylenen talimat → sesli geri okuma + "İleteyim mi?", panodan Onayla → gelen kutusu
+    uc("/bas-konus", {"metin": "Proje oturumuna şunu söyle: haftalık raporu pazartesiye çek."}, pano=True); time.sleep(1)
+    ok("toplantı dışında: sesli geri okuma ve 'İleteyim mi?'", "Oturuma talimat: haftalık raporu pazartesiye çek. İleteyim mi?" in L())
+    x = next((x for x in (uc("/cards").get("eylem") or {}).get("liste") or [] if "haftalık raporu" in x["baslik"]), None)
+    ok("panoda onay bekliyor, Claude'a gitmedi", bool(x) and x["durum"] == "bekliyor" and "açık süreç açıldı" not in L())
+    uc("/eylem-karar", {"id": x["id"], "durum": "onaylandi"}, pano=True); time.sleep(1)
+    ok("panodan onay → proje gelen kutusu", "haftalık raporu pazartesiye çek" in tc("gelen", "--hedef", "proje"))
+    ok("aktarıcıda hata yok", "Traceback" not in L())
+finally:
+    r.terminate(); r.wait(5)
+    if HATA or sys.exc_info()[0]: print("günlük:", log)
+    else: shutil.rmtree(T, ignore_errors=True)
+print("talimat:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

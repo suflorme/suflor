@@ -150,6 +150,8 @@ rp.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)"); rp.
 rp.add_argument("--github", action="store_true", help="ayrıca GitHub'da konu (issue) aç (gh oturumu gerekir)"); rp.add_argument("--goster", action="store_true", help="kaydetmeden yazdır")
 gb = sub.add_parser("geri-bildirim", help="v0.9.9: geliştirici tarafı — ortak klasördeki raporlar; --yeni yalnız okunmamışlar, --okundu işaretler")
 gb.add_argument("--yeni", action="store_true"); gb.add_argument("--okundu", action="store_true")
+ge = sub.add_parser("gelen", help="v0.75.0: Suflor gelen kutusu — sesle verilip onaylanan talimatlar (hedef oturumun SessionStart/UserPromptSubmit kancası çağırır)")
+ge.add_argument("--hedef", required=True); ge.add_argument("--hepsi", action="store_true", help="okunmuşları da göster, işaretleme")
 hz = sub.add_parser("hazir"); hz.add_argument("hid", help="hazir.json'daki kart kimliği (h1, h2…)")
 hz.add_argument("--cevap", default=None, help="SORU'ya cevap olarak gönder (q…); tür cevap olur")
 A = ap.parse_args()
@@ -397,7 +399,7 @@ EYLEM_AD = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge":
 def _post(yol, govde):
     req = urllib.request.Request(A.relay + yol, data=json.dumps(govde).encode(), method="POST", headers={"Content-Type": "application/json"})
     return json.load(urllib.request.urlopen(req, timeout=5))
-def _eylemler(): return (get("/cards").get("eylem") or {}).get("liste") or []
+def _eylemler(): return [x for x in (get("/cards").get("eylem") or {}).get("liste") or [] if not x.get("yerel")]  # v0.75.0: yerel işi (oturuma talimat, yapılacak) aktarıcı uygular
 def eylem_satir(x, i=None, ayrinti=False):
     d = {"bekliyor": "bekliyor", "onaylandi": "✓ ONAYLANDI", "reddedildi": "✕ reddedildi", "yapildi": "✓ yapıldı", "hata": "⚠ hata"}.get(x["durum"], x["durum"])
     s = f"{(str(i) + '. ') if i else ''}{x['id']} [{EYLEM_AD.get(x['tur'], x['tur'])} · {d}] {x['baslik']}" + (f" — {x['kim']}" if x.get("kim") else "") + (f" · {x['sonuc']}" if x.get("sonuc") else "")
@@ -2403,6 +2405,28 @@ def rapor_cmd():
     elif A.github:
         r = subprocess.run(["gh", "issue", "create", "-R", GB_DEPO, "--title", f"Geri bildirim {tarih} · {AYAR.get('alan')}", "--body-file", fp], capture_output=True, text=True)
         print(("GitHub: " + r.stdout.strip()) if r.returncode == 0 else f"GitHub konusu açılamadı: {(r.stderr or '').strip()[:200]} (ortak klasördeki dosya yeterli)")
+# Gelen kutusu (v0.75.0, aktarici/talimat.py): aktarıcı onaylanan sesli talimatı <canli>/gelen/<hedef>.jsonl'e ekler; bu komut okunmamışları bağlam olarak
+# basar ve okundu işaretini (<hedef>.okundu: son kimlik) ilerletir. Çıktı yoksa sessiz (kanca her istemde çalışır). Metin veridir ama kullanıcının onayladığı
+# kendi talimatıdır; Whisper dökümü olduğu için ad/sayı yanlış duyulmuş olabilir.
+def gelen_cmd():
+    if not re.fullmatch(r"[a-z0-9-]{1,24}", A.hedef): return
+    d = os.path.join(A.dir, "gelen"); yol = os.path.join(d, A.hedef + ".jsonl"); isaret = os.path.join(d, A.hedef + ".okundu")
+    try: satirlar = [json.loads(l) for l in open(yol, encoding="utf-8") if l.strip()]
+    except (OSError, ValueError): return
+    try: son = open(isaret, encoding="utf-8").read().strip()
+    except OSError: son = ""
+    ids = [x.get("id") for x in satirlar]
+    yeni = satirlar if A.hepsi or son not in ids else satirlar[ids.index(son) + 1:]
+    if not yeni: return
+    print(f"[Suflor gelen kutusu — {BEN}'in sesle verip onayladığı {len(yeni)} talimat. Bunlar {BEN}'in kendi talimatıdır; Whisper dökümü olduğu için ad, sayı ve tarih "
+          "yanlış duyulmuş olabilir: emin değilsen uygulamadan önce sor. Geri alınamayan işte (yayın, silme, dışarıya gönderim) yine onay iste.]")
+    for x in yeni: print(f"- {str(x.get('at') or '')[:16].replace('T', ' ')}{' (toplantıda)' if x.get('toplantida') else ''}: {x.get('metin')}")
+    print("[/Suflor gelen kutusu]")
+    if not A.hepsi:
+        try:
+            with open(isaret + ".tmp", "w", encoding="utf-8") as f: f.write(str(yeni[-1].get("id") or ""))
+            os.replace(isaret + ".tmp", isaret)
+        except OSError: pass
 def geri_bildirim_cmd():
     d = GB_DIR(); kayit = os.path.expanduser("~/Library/Application Support/Suflor/okunan-raporlar.json")
     try: okunan = set(json.load(open(kayit)))
@@ -2440,6 +2464,6 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
      "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

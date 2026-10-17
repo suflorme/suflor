@@ -267,7 +267,7 @@ function eyAyr(a){
   }).join('')
   return `<div class=eyr>${out}</div>`
 }
-const EYT={kayit:L("Kayıt"),takvim:L("Takvim"),eposta:L("E-posta"),belge:L("Belge"),takip:L("Takip e-postası"),mesaj:L("Ekip mesajı"),diger:L("Diğer")}
+const EYT={kayit:L("Kayıt"),takvim:L("Takvim"),eposta:L("E-posta"),belge:L("Belge"),takip:L("Takip e-postası"),mesaj:L("Ekip mesajı"),diger:L("Diğer"),oturum:L("Oturuma talimat"),yapilacak:L("Yapılacak")}
 const EYD={onaylandi:L("onaylandı — Claude uyguluyor"),reddedildi:L("reddedildi"),yapildi:L("yapıldı"),hata:L("yapılamadı")}
 function renderEylem(s){const e=s.eylem||{},ls=(e.liste||[]).filter(x=>x.sunuldu),sec=document.getElementById('eys');sec.hidden=!ls.length;if(!ls.length)return
   const bek=ls.filter(x=>x.durum==="bekliyor").length;document.getElementById('eyn').textContent=bek?L("{n} onay bekliyor",{n:bek}):"";document.getElementById('eyh').hidden=bek<2

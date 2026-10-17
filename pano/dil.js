@@ -496,6 +496,8 @@ globalThis.SUFLOR_EN = {
   "E-posta": "Email",
   "Belge": "Document",
   "Takip e-postası": "Follow-up email",
+  "Oturuma talimat": "Instruction to a session",
+  "Yapılacak": "To-do",
   "Diğer": "Other",
   "onaylandı — Claude uyguluyor": "approved — Claude is applying it",
   "reddedildi": "rejected",
