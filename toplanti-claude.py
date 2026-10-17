@@ -64,7 +64,7 @@ et.add_argument("ton", choices=["olumlu", "notr", "gergin", "olumsuz", "ilgili",
 et.add_argument("--kim", default=None)
 ol = sub.add_parser("olcum"); ol.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl adı (yoksa en yenisi)")
 ar = sub.add_parser("ara", help="v0.5.0: proje + geçmiş toplantı araması (baglam.py)"); ar.add_argument("sorgu")
-ar.add_argument("--kim"); ar.add_argument("--tur", help="virgüllü: toplanti,gorusme,analiz,sunum,tablo,belge")
+ar.add_argument("--kim"); ar.add_argument("--tur", help="virgüllü: toplanti,gorusme,analiz,sunum,tablo,belge,karar,kural")
 ar.add_argument("--son", type=int, help="son N gün"); ar.add_argument("--n", type=int, default=8)
 sz = sub.add_parser("sozluk", help="v0.5.1: özel sözlük — listele ya da ekle (aktarıcı dosya değişince kendiliğinden yükler)")
 sz.add_argument("--ekle", nargs=2, metavar=("YANLIS", "DOGRU"), help="yanlış biçim ve doğru ad; kullanıcı onaylamadan ekleme")
@@ -271,12 +271,13 @@ def sozluk_cmd():
     except OSError: pass
 def ara_cmd():
     import baglam
-    r = baglam.ara(A.sorgu, A.kim, A.tur.split(",") if A.tur else None, A.son, A.n); baglam.yaz(r, A.sorgu, r[1])
+    # v0.64.0 (S78): toplantı oturumu yalnız ortak kaynaklarda arar — kişisel asistanın özel kaynakları (ürün kararları, Konuş geçmişi) toplantı kartına girmez
+    r = baglam.ara(A.sorgu, A.kim, A.tur.split(",") if A.tur else None, A.son, A.n, kapsam="ortak"); baglam.yaz(r, A.sorgu, r[1])
 def soru_baglam(text, n=3):
     # SORU gelince ilk sonuçlar olayla birlikte gider — Claude ayrı arama yapmadan cevaplayabilsin
     try:
         import baglam, io, contextlib
-        r = baglam.ara(text, n=n); buf = io.StringIO()
+        r = baglam.ara(text, n=n, kapsam="ortak"); buf = io.StringIO()
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()): baglam.yaz(r, text, r[1])
         return vt_kayit(text) + ["  BAĞLAM (proje araması, ilk %d; yetmezse: ara \"…\"):" % n] + ["    " + l for l in buf.getvalue().splitlines()]
     except Exception as e: return [f"  BAĞLAM: arama yapılamadı ({e.__class__.__name__})"]

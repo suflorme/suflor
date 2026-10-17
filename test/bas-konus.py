@@ -25,7 +25,7 @@ arg = sys.argv[1:]; assert "--input-format" in arg and "stream-json" in arg and 
 pr = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\\n"), sys.stdout.flush())
 n = ns = 0; defter = None; ek = False; isaret = os.path.join(os.path.dirname(sys.argv[0]), "takildi")
 for l in sys.stdin:
-    q = json.loads(l)["message"]["content"]; n += 1; soru = q.split("Soru: ", 1)[-1]
+    q = json.loads(l)["message"]["content"]; n += 1; soru = re.sub(r"(?s)\\[Ön arama.*?\\[/Ön arama\\]\\s*", "", q.split("Soru: ", 1)[-1])  # v0.64.0: ön aramada Konuş geçmişi de çıkabilir
     d = re.search(r"\\[Toplantı defteri — (.+?);", q)
     if d and "[/Toplantı defteri]" in q: defter = d.group(1)  # soruyla gelen defter: sonraki cevap "Defter geldi" der
     ek = ek or "[Defter eki" in q
@@ -41,7 +41,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_gecmis": True}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
@@ -245,6 +245,13 @@ try:
     oz_ = os.path.join(T, "ozet-deneme.md"); open(oz_, "w").write("# Özet\n")
     uc2("/son-toplanti", {"ozet": oz_, "dosya": dosya_, "baslik": "Başka toplantı", "degerlendirme": "İyi geçti."}); time.sleep(1)
     ok("yazılı özet gelince ikinci kez okunmadı", "hızlı özet okunmuştu, yeniden okunmadı" in log())
+    # v0.64.0 (S76): Konuş geçmişi — kullanıcının kendi soruları; karşı tarafın sorusu ve hızlı özet girmez; toplantıdaki soruda toplantı adı; 0600; dizinde konuşma türü
+    gp = os.path.join(canli, "konus-gecmis.jsonl"); gk = [json.loads(l) for l in open(gp, encoding="utf-8")] if os.path.exists(gp) else []
+    ok(f"Konuş geçmişi: {len(gk)} kayıt, karşı taraf ve hızlı özet yok, toplantıdaki soruda toplantı adı, 0600",
+       len(gk) >= 10 and not any(str(x["soru"]).startswith("Ayla Ö") or "az önce bitti" in x["soru"] for x in gk) and any(x.get("toplanti") for x in gk)
+       and any("bütçe ne kadardı" in x["soru"] and x.get("kaynak") == "hitap" for x in gk) and all(x["sesli"] for x in gk) and (os.stat(gp).st_mode & 0o777) == 0o600)
+    import sqlite3 as _sq; _db = _sq.connect(os.path.join(T, "dizin.sqlite"))
+    ok("Konuş geçmişi arama dizininde (konuşma türü, tek dosya güncellemesiyle)", (_db.execute("SELECT tur, parca FROM dosya WHERE yol = ?", (gp,)).fetchone() or ("", 0))[0] == "konusma")
     # v0.51.1 okuma sınırı: _konus_cumle beş cümlelik cevabın yalnız üçünü okur (işlev doğrudan; uçtan uca akışta tur sayısını bozmasın)
     import re as _re
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()

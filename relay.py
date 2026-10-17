@@ -255,6 +255,7 @@ def kayit_dondur():
             print(f"KAYIT: {ad} döndürüldü — {n_ars} satır arşive, {n_kal} satır kaldı")
         except FileNotFoundError: continue
         except Exception as e: print(f"KAYIT: {ad} döndürülemedi ({e.__class__.__name__}: {e})")
+    if "konus_gecmis_dondur" in globals(): konus_gecmis_dondur()  # aktarici/bellek.py: 90 günden eski Konuş geçmişi arşive
 def _kayit_dongu():
     time.sleep(5)
     while True:
@@ -1499,6 +1500,7 @@ def son_ac(p):
 bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslendirme (ayar ses_motoru: piper)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
+bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)

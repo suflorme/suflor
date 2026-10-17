@@ -47,6 +47,7 @@ try:
     ns = {"re": re, "os": os, "json": json, "time": time, "print": lambda *a, **k: None, "_t": lambda a, b: a, "ARAYUZ_DILI": "tr", "BASE": canli, "AYAR": {"kisilik": kd}, "_KS": {}, "TOP": [False]}
     ns["toplanti_var"] = lambda: ns["TOP"][0]
     exec(ks, ns); exec(src[src.index("KONUS_ISTEM = {"):src.index("# --- Hızlı bilgi")], ns)
+    exec(open(os.path.join(KOD, "aktarici", "bellek.py"), encoding="utf-8").read(), ns)  # v0.64.0: istemin sonundaki kullanıcı kartı (ayar yok → boş)
     ist = ns["konus_istem"]()
     ok("Konuş istemi: kişilik metni sonda, biçim kuralları önce, neşeli ünlem satırı çıktı",
        ist.endswith("KİŞİLİK-İŞARETİ") and "biçim kuralları" in ist.split("## Kişilik")[0][-400:] and "'Vay!'" not in ist and "en çok dört cümle" in ist and "Şey," not in ist)
