@@ -213,8 +213,10 @@ def dokum_kopyasi(yol):
     try: m = re.search(r"Kaynak: `_canli/([^`]+)\.md`", open(yol, encoding="utf-8", errors="replace").read(800))
     except OSError: return False
     return bool(m) and os.path.exists(os.path.join(PROJE, "_canli", m.group(1) + ".jsonl"))
-def dosyalar():
-    for kok, dirs, fs in os.walk(PROJE, followlinks=False):
+ERISILEMEYEN = []  # son guncelle'de okunamayan klasörler (proje köküne göre; "" = kök): launchd'nin Masaüstü engeli (TCC) os.walk'ta sessizce boş döner
+def dosyalar(erisilemeyen=None):
+    hata = (lambda e: erisilemeyen.append(os.path.relpath(e.filename, PROJE) if e.filename else "")) if erisilemeyen is not None else None
+    for kok, dirs, fs in os.walk(PROJE, onerror=hata, followlinks=False):
         rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else rel
         dirs[:] = [d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC)]
         for f in fs:
@@ -228,8 +230,11 @@ def dosyalar():
 def guncelle(c, yeniden=False, sessiz=True):
     t0 = time.time(); eski = {r[0]: (r[1], r[2]) for r in c.execute("SELECT yol, mtime, boy FROM dosya")}
     if yeniden: eski = {}; c.executescript("DELETE FROM dosya; DELETE FROM parca; INSERT INTO ara(ara) VALUES('delete-all');")
-    gorulen, n_yeni, n_parca, hata = set(), 0, 0, []
-    for yol, kisa in dosyalar():
+    gorulen, n_yeni, n_parca, hata, eris = set(), 0, 0, [], []
+    try:
+        if not os.listdir(PROJE): eris.append(".")  # TCC bazen hata yerine boş liste verir; proje kökü gerçekte boş olmaz
+    except OSError: eris.append(".")
+    for yol, kisa in dosyalar(eris):
         gorulen.add(kisa)
         try: st = os.stat(yol)
         except OSError: continue
@@ -243,8 +248,13 @@ def guncelle(c, yeniden=False, sessiz=True):
             c.execute("INSERT INTO ara(rowid, n, kimn) VALUES(?,?,?)", (cur.lastrowid, norm(metin), norm(kim)))
         c.execute("INSERT OR REPLACE INTO dosya VALUES(?,?,?,?,?,?,?)", (kisa, st.st_mtime, st.st_size, tur, tarih, baslik, len(ps)))
         n_yeni += 1; n_parca += len(ps)
-    for k in set(eski) - gorulen: sil(c, k); c.execute("DELETE FROM dosya WHERE yol=?", (k,))
+    # okunamayan klasörün dosyaları "silinmiş" sayılmaz (17 Ekim: aktarıcının 10 dk'lık turu dizini 101 bin parçadan 301'e indirdi)
+    eris = sorted({"" if e in (".", "") else e for e in eris}); ERISILEMEYEN[:] = eris
+    korunur = lambda k: any(e == "" or k == e or k.startswith(e + "/") for e in eris)  # kök okunamazsa hepsi (görülen _canli zaten güncel)
+    for k in set(eski) - gorulen:
+        if not korunur(k): sil(c, k); c.execute("DELETE FROM dosya WHERE yol=?", (k,))
     c.commit()
+    if eris and not sessiz: print(f"dizin: okunamayan klasör ({', '.join(e or 'proje kökü' for e in eris)}) — eski kayıtları korundu", file=sys.stderr)
     if not sessiz or n_yeni:
         print(f"dizin: {n_yeni} dosya güncellendi · {n_parca} parça · {time.time() - t0:.1f} sn" + (f" · okunamayan: {', '.join(hata)}" if hata else ""), file=sys.stderr)
     return n_yeni

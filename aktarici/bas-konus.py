@@ -207,9 +207,10 @@ def konus_istem(vt=None):
 # 15 Ekim ölçümü (claude-cagri.jsonl, 42 Konuş): araçsız soruda ilk ses ortanca 3,3 sn, Grep/Glob/Read'li soruda 9,6 sn (en kötü 25). Soru Claude'a
 # gitmeden baglam.py dizininde (SQLite FTS5) aranır, en iyi ONARA_N parça (tür · tarih · başlık · dosya @konum · kim + ~260 karakter kesit) bağlam
 # bloğuna eklenir; istem "yeterliyse araçsız, gerekirse önce o dosyayı Read" der. Arama dizini güncellemez (~0,1 sn); güncelleme arka planda
-# ONARA_GUNCELLE_SN'de bir (launchd'nin Masaüstü engeli varsa güncellenemez — toplantı oturumunun `tc ara`sı da günceller). < 2 içerik sözcüğü → arama yok.
+# ONARA_GUNCELLE_SN'de bir (launchd'nin Masaüstü engeli varsa proje belgeleri güncellenemez, eski kayıtlar korunur; yalnız _canli güncellenir —
+# toplantı oturumunun `tc ara`sı da günceller). < 2 içerik sözcüğü → arama yok.
 ONARA_N, ONARA_GUNCELLE_SN = 5, 600
-_ONARA = {"m": None, "hata": None, "guncel_t": 0.0, "kilit": threading.Lock(), "son_tur": None}
+_ONARA = {"m": None, "hata": None, "guncel_t": 0.0, "kilit": threading.Lock(), "son_tur": None, "eris": None}
 def _onara_mod():
     if _ONARA["m"] is None and not _ONARA["hata"]:
         try:
@@ -225,6 +226,10 @@ def _onara_guncelle():
         try:
             with _ONARA["kilit"]: t = time.time(); m.guncelle(m.baglan()); _ONARA["guncel_t"] = time.time()
             if time.time() - t > 2: print(f"KONUŞ: ön arama dizini güncellendi ({time.time() - t:.1f} sn)")
+            eris = list(getattr(m, "ERISILEMEYEN", []))
+            if eris != _ONARA["eris"]:  # durum değişince bir kez yaz (10 dk'da bir tekrar etmesin)
+                _ONARA["eris"] = eris
+                if eris: print(f"KONUŞ: ön arama dizini — okunamayan klasör ({', '.join(e or 'proje kökü' for e in eris[:5])}); eski kayıtlar korundu, yalnız okunabilenler güncellendi")
         except Exception as e: print(f"KONUŞ: ön arama dizini güncellenemedi ({e.__class__.__name__}: {str(e)[:80]})")
         time.sleep(ONARA_GUNCELLE_SN)
 def konus_onara(soru):

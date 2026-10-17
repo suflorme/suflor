@@ -3,7 +3,7 @@
 # kesitle bağlam bloğuna eklenir. Geçici proje klasörü + dizin: doğru dosya ilk sırada, kesitte aranan bilgi, < 3 sözcüklü/kısa soruda blok yok,
 # arama dizini güncellemez ve hızlı (< 300 ms), Türkçe büyük İ / sözlük biçimleri bozulmaz.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/onara.py
-import os, sys, json, shutil, tempfile, time, threading, importlib.util
+import os, re, sys, json, shutil, tempfile, time, threading, importlib.util
 K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-onara-"); hata = []
 def bak(ad, kosul): print(("✓ " if kosul else "✗ ") + ad); hata.extend([] if kosul else [ad])
 proje = os.path.join(T, "proje"); os.makedirs(os.path.join(proje, "notlar"))
@@ -15,7 +15,7 @@ os.environ["SUFLOR_AYAR"] = os.path.join(T, "ayar.json"); os.environ["SUFLOR_TES
 try:
     # bas-konus.py'nin ön arama bölümü, relay ad alanı yerine küçük taklitle (bölüm dosyası relay.py'nin ad alanında çalışır; __file__ relay.py yanında)
     src = open(os.path.join(K, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-    g = {"os": os, "sys": sys, "time": time, "threading": threading, "_t": lambda tr, en: tr, "__file__": os.path.join(K, "relay.py"), "AYAR": {}, "ARAYUZ_DILI": "tr"}
+    g = {"os": os, "re": re, "sys": sys, "time": time, "threading": threading, "_t": lambda tr, en: tr, "__file__": os.path.join(K, "relay.py"), "AYAR": {}, "ARAYUZ_DILI": "tr"}
     exec(src[src.index("# --- Hızlı bilgi (S47"):src.index("def konus_baglam(")], g)
     m = g["_onara_mod"](); bak("baglam.py yüklendi", m is not None)
     t = time.time(); m.guncelle(m.baglan()); print(f"   dizin kuruldu ({time.time() - t:.2f} sn)")
