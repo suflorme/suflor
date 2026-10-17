@@ -106,6 +106,8 @@ gf.add_argument("--hepsini-sil", action="store_true")
 # v0.54.0: Konuş (sesli asistan) güncel kayıt sorusunda kayıt veritabanına bakar — yalnız okunur, tek SELECT/WITH, en çok 60 satır, gizli sütunlar maskeli
 vs = sub.add_parser("vt-sema", help="kayıt veritabanının tabloları, sütunları ve satır sayıları (yalnız okunur)")
 vm = sub.add_parser("vt-mcp", help="kayıt veritabanı araçları (vt_sema, vt_sor) MCP sunucusu olarak (stdio) — Konuş süreci kullanır; komut çalıştırma izni gerekmez")
+vi = sub.add_parser("vt-izle", help="v0.62.0: kayıt veritabanı önbelleklerini (tablo yapısı, kişi adları, değişme saati, sorgu sonuçları) dakikada bir yazar — Brifing yardımcısı Masaüstü izniyle çalıştırır; tek kopya, 6 saatte kapanır")
+vi.add_argument("--sure", type=float, default=6 * 3600, help=argparse.SUPPRESS); vi.add_argument("--bir", action="store_true", help="bir kez yaz ve çık")
 vq = sub.add_parser("vt-sor", help="kayıt veritabanında tek SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; şifre/anahtar sütunları gizli)"); vq.add_argument("sorgu")
 # v0.57.0: toplantı oturumunun Claude harcaması (API fiyatıyla karşılığı) — Claude Code oturum dökümünden, yalnız yerel dosyalar; aktarıcı 30 dk'da bir çağırır
 mt = sub.add_parser("maliyet", help="biten /toplanti oturumlarının harcaması → canli/claude-cagri.jsonl (is: toplanti); --etiket ile gerçek/deneme düzeltmesi")
@@ -738,6 +740,32 @@ def maliyet_cmd():
     if yeni and not A.goster:
         with open(yol, "a", encoding="utf-8") as f: f.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in yeni))
     print(f"{len(yeni)} yeni toplantı oturumu" + (" (yazılmadı)" if A.goster else ""))
+# v0.62.0 (proje hazırlığı T0): aktarıcı launchd'den çalışır, Masaüstü'ndeki veritabanını okuyamaz; önbellekleri yalnız Konuş süreci açıkken
+# vt-mcp yazıyordu (Konuş kapalıyken tablo yapısı, adlar ve tazelik bilgisi eskiyordu). vt-izle aynı dosyaları Konuş'tan bağımsız yazar: aktarıcı
+# "Suflor Brifing.app --vt-izle <canli>" ile açar (izin yardımcıda), vt-mt.json eskiyince yeniden açar. Kilit dosyası tek kopyayı sağlar.
+VT_IZLE_KILIT = "vt-izle.kilit"
+def _vt_sema_yaz(dosya):
+    try:
+        m = vt_sema_metin(); y = os.path.join(dosya, VT_SEMA_ONBELLEK)
+        try: eski = open(y, encoding="utf-8").read()
+        except OSError: eski = None
+        if m == eski: return
+        with open(y + ".tmp", "w", encoding="utf-8") as f: f.write(m)
+        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+    except (VtHata, OSError): pass
+def vt_izle_cmd():
+    if not VT.get("yol"): print("kayıt veritabanı ayarlı değil (ayar veritabani.yol)"); return
+    import fcntl
+    kf = open(os.path.join(A.dir, VT_IZLE_KILIT), "a")
+    try: fcntl.flock(kf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError: print("vt-izle zaten çalışıyor"); return
+    son = time.time() + max(60, A.sure); mt0 = object()
+    while True:
+        mt = _vt_mt()
+        if mt != mt0: _vt_sema_yaz(A.dir); _vt_adlar_yaz(A.dir); mt0 = mt
+        _vt_onbellek(A.dir, yenile=True); _vt_mt_yaz(A.dir)
+        if A.bir or time.time() >= son: return
+        time.sleep(VT_DENETIM_SN)
 def vt_mcp_cmd():
     yaz = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"), sys.stdout.flush())
     try:  # v0.55.2: her açılışta tablo yapısını önbelleğe yaz (bu süreç Claude'un altında, veritabanını okuyabilir)
@@ -2412,5 +2440,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd, "maliyet": maliyet_cmd}[A.cmd]()
+     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

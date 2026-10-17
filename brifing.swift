@@ -21,6 +21,20 @@ if a.contains("--dizin") {
     DispatchQueue.global().asyncAfter(deadline: .now() + 600) { if p.isRunning { p.terminate() } }
     p.waitUntilExit(); bitir(p.terminationStatus)
 }
+// Veritabanı önbelleği kipi (v0.62.0, proje hazırlığı T0): --vt-izle <canli klasörü> → paketin yanındaki toplanti-claude.py'yi `vt-izle` ile çalıştırır
+// (kayıt veritabanı Masaüstü'nde; aktarıcı okuyamaz). Süreç dakikada bir önbellekleri yazar, 6 saatte kendisi kapanır; aktarıcı eskiyince yeniden açar.
+if let i = a.firstIndex(of: "--vt-izle") {
+    guard i + 1 < a.count else { bitir(2) }
+    var d: ObjCBool = false
+    let dir = a[i + 1], tc = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("toplanti-claude.py").path
+    guard FileManager.default.fileExists(atPath: dir, isDirectory: &d), d.boolValue, FileManager.default.isReadableFile(atPath: tc) else { bitir(2) }
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); p.arguments = ["-B", tc, "--dir", dir, "vt-izle"]
+    p.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
+    var e = ProcessInfo.processInfo.environment; e["PYTHONDONTWRITEBYTECODE"] = "1"; p.environment = e
+    p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice; p.standardInput = FileHandle.nullDevice
+    do { try p.run() } catch { bitir(4) }
+    p.waitUntilExit(); bitir(p.terminationStatus)
+}
 guard let i = a.firstIndex(of: "--istek"), i + 1 < a.count,
       let veri = FileManager.default.contents(atPath: a[i + 1]),
       let j = (try? JSONSerialization.jsonObject(with: veri)) as? [String: Any],
