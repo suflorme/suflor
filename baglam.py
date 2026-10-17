@@ -346,6 +346,7 @@ def baglan():
       CREATE TABLE IF NOT EXISTS dosya(yol TEXT PRIMARY KEY, mtime REAL, boy INTEGER, tur TEXT, tarih TEXT, baslik TEXT, parca INTEGER);
       CREATE TABLE IF NOT EXISTS parca(id INTEGER PRIMARY KEY, yol TEXT, konum TEXT, kim TEXT, metin TEXT);
       CREATE INDEX IF NOT EXISTS parca_yol ON parca(yol);
+      CREATE INDEX IF NOT EXISTS parca_kim ON parca(kim);
       CREATE VIRTUAL TABLE IF NOT EXISTS ara USING fts5(n, kimn, content='', prefix='3 4 5', tokenize='unicode61');""")
     for t, k in (("dosya", "kapsam"), ("parca", "tarih")):  # v0.64.0: bellek kaynakları (eski dizine sütun eklenir; boşsa kapsam ortak, tarih dosyanınki)
         if k not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]: c.execute(f"ALTER TABLE {t} ADD COLUMN {k} TEXT")
@@ -978,8 +979,12 @@ def sorgu_kur(q):
 DUR = {"ve", "ile", "bir", "bu", "ne", "mi", "mu", "da", "de", "icin", "gibi", "ki", "o", "neler", "nedir", "hakkinda",
        "dedi", "demisti", "soyledi", "soylemisti", "neydi", "nasil", "kim", "kimde", "nerede", "hangi", "var", "yok"}
 _ADLAR = set()
+_KONUSMACI = {}
 def konusmacilar(c):
-    # dizindeki konuşmacı adlarının kelimeleri (≥3 harf, K01/G gibi kodlar hariç) → sorguda kişi adı tanınsın
+    # dizindeki konuşmacı adlarının kelimeleri (≥3 harf, K01/G gibi kodlar hariç) → sorguda kişi adı tanınsın. Önbellekli (v0.70.2): her aramada
+    # baştan sayılıyordu, disk önbelleği soğukken ~0,9 sn (Konuş ön araması 17 Ekim akşamı 1,2–1,3 sn); yalnız dizine yeni parça ya da görüşme girince yenilenir.
+    anahtar = (c.execute("SELECT max(id) FROM parca").fetchone()[0], c.execute("SELECT count(*), max(mtime) FROM dosya WHERE tur = 'gorusme'").fetchone())
+    if _KONUSMACI.get("k") == anahtar: return _KONUSMACI["ad"]
     ad = set()
     for (k,) in c.execute("SELECT DISTINCT kim FROM parca WHERE kim != ''"):
         for w in kelimeler(k):
@@ -993,7 +998,7 @@ def konusmacilar(c):
                                   for k in kim.split(",") if k.strip() and not k.strip().startswith(BEN))
         en = say.most_common(1)[0][0] if say else ""
         if kelimeler(en) and kelimeler(en)[0] != kok[0]: TAKMA[kok[0]] = kelimeler(en)[0]; ad.add(kok[0])
-    _ADLAR.update(ad); return ad
+    _ADLAR.update(ad); _KONUSMACI.update(k=anahtar, ad=ad); return ad
 TAKMA = {}
 def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2, guncel=True, kapsam=None, aralik=None, eski=False, disa=None):  # guncel=False: dizini güncellemeden (Konuş ön araması, ~0,1 sn)
     # kapsam="ortak": yalnız ortak kaynaklar (özel kapsamlı bellek kaynakları ve Konuş geçmişi girmez); aralik=(baş, bitiş) ISO tarih: parçanın tarihi

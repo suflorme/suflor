@@ -64,8 +64,9 @@ try:
     open(os.path.join(P, "bt/yedek.md"), "a", encoding="utf-8").write("\nFelaket kurtarma tatbikatı İzmir veri merkezinde yapılacak.\n")
     m.guncelle(c); g2 = m.gomme(c)
     kontrol("değişen dosyanın yalnız yeni parçası gömüldü", g2["yapilan"] == c.execute("SELECT count(*) FROM parca WHERE yol='bt/yedek.md'").fetchone()[0], json.dumps(g2))
-    time.sleep(0.3)
-    kontrol("sunucu yeni gömmeyi yükledi", "bt/yedek.md" in yollar("afet senaryosu provası nerede"), str(yollar("afet senaryosu provası nerede")))
+    t = time.time()
+    while "bt/yedek.md" not in yollar("afet senaryosu provası nerede") and time.time() - t < 12: time.sleep(0.5)  # sunucu 5 sn'de bir arka planda yükler
+    kontrol("sunucu yeni gömmeyi arka planda yükledi (≤ 12 sn)", "bt/yedek.md" in yollar("afet senaryosu provası nerede"), str(yollar("afet senaryosu provası nerede")))
     json.dump({"meeting": {"title": "Deneme"}}, open(os.path.join(U, "canli", "heartbeat.json"), "w"))
     open(os.path.join(P, "ik/izin.md"), "a", encoding="utf-8").write("\nMazeret izni için belge gerekir.\n"); m.guncelle(c)
     g3 = m.gomme(c); os.remove(os.path.join(U, "canli", "heartbeat.json"))

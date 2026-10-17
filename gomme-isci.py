@@ -88,15 +88,22 @@ def sunucu(a):
         mt = os.stat(os.path.join(a.klasor, "durum.json")).st_mtime if os.path.exists(os.path.join(a.klasor, "durum.json")) else 0
         if D["mt"] == mt: return
         ids, crcs, dosya = mevcut(a.klasor)
-        if not ids: D.update(mt=mt, E=np.zeros((0, 768), np.float32), I=np.zeros(0, np.int64)); return
+        if not ids: D.update(mt=mt, v=(np.zeros((0, 768), np.float32), np.zeros(0, np.int64))); return
         I = np.concatenate(ids); C = np.concatenate(crcs); E = np.vstack([np.load(k + ".npy") for k in dosya]).astype(np.float32)
         c = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True)
         gecerli = {i: crc(t) for i, t in c.execute("SELECT id, metin FROM parca")}; c.close()
         tut = np.array([gecerli.get(int(i)) == int(cc) for i, cc in zip(I, C)], dtype=bool)
         _, ilk = np.unique(I[tut][::-1], return_index=True)  # aynı parça iki pakette: en yenisi
         sec = np.flatnonzero(tut)[::-1][ilk]
-        D.update(mt=mt, E=E[sec], I=I[sec]); gunluk(f"gömme yüklendi: {len(sec)} parça (eski/geçersiz {len(I) - len(sec)})")
+        D.update(mt=mt, v=(E[sec], I[sec])); gunluk(f"gömme yüklendi: {len(sec)} parça (eski/geçersiz {len(I) - len(sec)})")
     yukle()
+    import threading
+    def izle():  # gömme klasörü değişince arka planda yeniden yükle (v0.70.2: sorgu içinde yükleme ~1 sn sürüyor, Konuş 0,25 sn bekleyip boş dönüyordu)
+        while True:
+            time.sleep(5)
+            try: yukle()
+            except Exception as e: gunluk(f"yeniden yükleme hatası: {e.__class__.__name__}")
+    threading.Thread(target=izle, daemon=True).start()
     try: os.remove(a.soket)
     except OSError: pass
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.bind(a.soket); os.chmod(a.soket, 0o600); s.listen(8); s.settimeout(min(30, max(1, a.bos_dk * 60 / 2)))
@@ -110,12 +117,13 @@ def sunucu(a):
                 x = b.recv(65536)
                 if not x: break
                 veri += x
-            o = json.loads(veri or b"{}"); t = time.time(); yukle()
-            if o.get("q") and len(D["I"]):
+            o = json.loads(veri or b"{}"); t = time.time()
+            E_, I_ = D["v"]
+            if o.get("q") and len(I_):
                 q = m.encode(["query: " + o["q"][:1000]], normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False)[0].astype(np.float32)
-                sk = D["E"] @ q; k = min(int(o.get("k") or 100), len(sk)); en = np.argpartition(-sk, k - 1)[:k]; en = en[np.argsort(-sk[en])]
-                cevap = {"sonuc": [[int(D["I"][j]), round(float(sk[j]), 4)] for j in en], "ms": round((time.time() - t) * 1000, 1)}
-            else: cevap = {"sonuc": [], "parca": int(len(D["I"]))}
+                sk = E_ @ q; k = min(int(o.get("k") or 100), len(sk)); en = np.argpartition(-sk, k - 1)[:k]; en = en[np.argsort(-sk[en])]
+                cevap = {"sonuc": [[int(I_[j]), round(float(sk[j]), 4)] for j in en], "ms": round((time.time() - t) * 1000, 1)}
+            else: cevap = {"sonuc": [], "parca": int(len(I_))}
             b.sendall((json.dumps(cevap) + "\n").encode()); son = time.time()
         except Exception as e:
             try: b.sendall((json.dumps({"hata": f"{e.__class__.__name__}: {str(e)[:120]}"}) + "\n").encode())
