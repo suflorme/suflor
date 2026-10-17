@@ -33,7 +33,8 @@ SOZLUK_KOPYA = os.path.join(AYAR["uygulama"], "dis-sozluk.tsv")  # dış sözlü
 HARIC_GENEL = ["_yedek", "_arsiv", ".claude", ".git", "suflor", os.path.basename(str(AYAR.get("kod") or "").rstrip("/")) or "suflor"]
 HARIC = list(dict.fromkeys(HARIC_GENEL + list(AYAR.get("haric") or [])))  # ayar "haric": alanın kendi listesi (proje köküne göre)
 CANLI_HARIC = {"takvim-secilen.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "agenda.json", "hazir.json", "karneler.jsonl", "karsilastirmalar.jsonl"}  # karne · v0.7.2: karşılaştırma
-UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx"}
+UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx", ".eml"}
+CEVIR_UZ = {".pdf", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".tif", ".tiff", ".bmp"}  # T2: metne çevirme işçisiyle (önbellekten dizine)
 PARCA = 700  # bir parçanın hedef uzunluğu (karakter)
 
 # --- Türkçe sadeleştirme: harf harf 1:1 (özgün metinde konum bulunabilsin) ---------------------------------------
@@ -155,8 +156,20 @@ def xlsx_parcala(yol):
             if s: out.append((f"{ad}!{rn}", "", f"{ad} — {s}"[:PARCA * 2]))
     return out
 def docx_metin(yol):
+    # paragraflar satır satır; tablolar Markdown tablosu (metin_parcala her satırı başlığıyla tek parça yapar — v0.66.0, T2 ölçümünde tablo %0'dı)
     x = zipfile.ZipFile(yol).read("word/document.xml").decode("utf-8", "replace")
-    return "\n".join(html.unescape("".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", p, re.S))) for p in re.findall(r"<w:p[ >].*?</w:p>", x, re.S))
+    p_metin = lambda p: html.unescape("".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", p, re.S)))
+    out = []
+    for m in re.finditer(r"<w:tbl>.*?</w:tbl>|<w:p[ >].*?</w:p>", x, re.S):
+        if not m.group(0).startswith("<w:tbl>"): out.append(p_metin(m.group(0))); continue
+        satirlar = [[" ".join(p_metin(p) for p in re.findall(r"<w:p[ >].*?</w:p>", tc, re.S)).replace("|", "/").strip() for tc in re.findall(r"<w:tc[ >].*?</w:tc>", tr, re.S)]
+                    for tr in re.findall(r"<w:tr[ >].*?</w:tr>", m.group(0), re.S)]
+        satirlar = [s for s in satirlar if any(s)]
+        for i, s in enumerate(satirlar):
+            out.append("| " + " | ".join(s) + " |")
+            if i == 0: out.append("|" + "---|" * len(s))
+        out.append("")
+    return "\n".join(out)
 
 # --- Dosya türü, tarih, başlık ----------------------------------------------------------------------------------
 GORUSME = tuple(AYAR.get("gorusme_klasorleri") or ["gorusmeler/"])  # görüşme dökümü klasörleri (proje köküne göre)
@@ -182,14 +195,20 @@ def baslik_bul(kisa, t):
         if ln.startswith("# "): return ln[2:].strip()[:120]
     return os.path.basename(kisa)
 
-def parcala(yol, kisa):
+def parcala(yol, kisa, sha=None):
     ext = os.path.splitext(yol)[1].lower(); bt = BELLEK_TUR.get(kisa, ("",))[0]
     if bt == "konusma": return "Konuş geçmişi", "", gecmis_parcala(yol)
     if bt == "karar":
         t = open(yol, encoding="utf-8", errors="replace").read(); ps = karar_parcala(t)
         if ps: return baslik_bul(kisa, t), t[:1500], ps
     if ext == ".xlsx": return os.path.basename(kisa), "", xlsx_parcala(yol)
-    if ext == ".docx": t = docx_metin(yol)
+    if ext in CEVIR_UZ:  # T2: çevrilmiş metin önbellekten (çevrilmemişse dizine henüz girmez)
+        ps = cevrilmis(yol, sha)
+        if ps is None: raise Bekliyor()
+        t = "\n".join(m for _, m in ps)
+        return baslik_bul(kisa, t) if ext in (".pdf", ".pptx") else os.path.basename(kisa), t[:1500], [(k, "", m) for k0, m0 in ps for k, _, m in metin_parcala(m0, k0 + " · " if k0 else "")]
+    if ext == ".eml": t = eml_metin(yol)
+    elif ext == ".docx": t = docx_metin(yol)
     elif ext == ".jsonl":
         bas = open(yol.replace(".jsonl", ".md"), encoding="utf-8", errors="replace").read(600) if kisa.startswith("_canli/") and os.path.exists(yol.replace(".jsonl", ".md")) else ""
         return baslik_bul(kisa, bas), bas, jsonl_parcala(yol, kisa)
@@ -348,31 +367,35 @@ def dosyalar(erisilemeyen=None):
         dirs[:] = [d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC)]
         for f in fs:
             k = os.path.join(rel, f)
-            if os.path.splitext(f)[1].lower() in UZANTI and k not in HARIC and not f.startswith("~$") and not dokum_kopyasi(os.path.join(kok, f)): yield os.path.join(kok, f), k
+            if os.path.splitext(f)[1].lower() in UZANTI | CEVIR_UZ and k not in HARIC and not f.startswith("~$") and not dokum_kopyasi(os.path.join(kok, f)): yield os.path.join(kok, f), k
     canli = os.path.join(PROJE, "_canli")  # kısayol: os.walk takip etmez, ayrıca gez
     if os.path.isdir(canli):
         for f in sorted(os.listdir(canli)):
             if f in CANLI_HARIC or not f.endswith((".jsonl",)) or not f.startswith("20"): continue
             yield os.path.join(canli, f), "_canli/" + f
-def dizinle(c, yol, kisa, st, hata=None):  # bir dosyayı (yeniden) dizinle → parça sayısı
+def dizinle(c, yol, kisa, st, hata=None):  # bir dosyayı (yeniden) dizinle → parça sayısı (None: dizine girmez — çevrilmedi, adla hariç ya da birebir kopya)
     sil(c, kisa)
-    try: baslik, bas, ps = parcala(yol, kisa)
+    t = c.execute("SELECT gizli, kopya_of, sha256 FROM tarama WHERE yol=? AND mtime=? AND boy=?", (kisa, st.st_mtime, st.st_size)).fetchone()
+    if t and (t[0] or t[1]): c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); return None  # §2/§4: hariç tutulan ve kopya dizine girmez
+    try: baslik, bas, ps = parcala(yol, kisa, t[2] if t else None)
+    except Bekliyor: c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); return None
     except Exception as e:
         if hata is not None: hata.append(f"{kisa}: {e.__class__.__name__}")
         ps, baslik, bas = [], os.path.basename(kisa), ""
+    n0 = len(ps); ps = [p for p in ps if not gizli_bilgi(p[2])]  # G3: şifre/anahtar/kart/IBAN geçen parça dizine girmez
     tur = tur_bul(kisa); tarih = tarih_bul(kisa, bas, st.st_mtime); kapsam = BELLEK_TUR.get(kisa, (None, "ortak"))[1]
     for p in ps:
         konum, kim, metin = p[:3]
         cur = c.execute("INSERT INTO parca(yol, konum, kim, metin, tarih) VALUES(?,?,?,?,?)", (kisa, konum, kim, metin, p[3] if len(p) > 3 else None))
         c.execute("INSERT INTO ara(rowid, n, kimn) VALUES(?,?,?)", (cur.lastrowid, norm(metin), norm(kim)))
-    c.execute("INSERT OR REPLACE INTO dosya(yol, mtime, boy, tur, tarih, baslik, parca, kapsam) VALUES(?,?,?,?,?,?,?,?)", (kisa, st.st_mtime, st.st_size, tur, tarih, baslik, len(ps), kapsam))
+    c.execute("INSERT OR REPLACE INTO dosya(yol, mtime, boy, tur, tarih, baslik, parca, kapsam, gizli_parca) VALUES(?,?,?,?,?,?,?,?,?)", (kisa, st.st_mtime, st.st_size, tur, tarih, baslik, len(ps), kapsam, n0 - len(ps)))
     tara_dosyaya(c, kisa)  # tarama alanları (dosya değiştiyse boş kalır, sonraki tara doldurur)
     return len(ps)
 def gecmis_guncelle(c=None):  # Konuş geçmişine satır eklenince yalnız o dosya (10 dk'lık tam turu beklemeden; ~ms)
     c = c or baglan()
     try: st = os.stat(GECMIS)
     except OSError: return 0
-    BELLEK_TUR[GECMIS] = ("konusma", "ozel"); n = dizinle(c, GECMIS, GECMIS, st); c.commit(); return n
+    BELLEK_TUR[GECMIS] = ("konusma", "ozel"); n = dizinle(c, GECMIS, GECMIS, st); c.commit(); return n or 0
 def guncelle(c, yeniden=False, sessiz=True):
     t0 = time.time(); eski = {r[0]: (r[1], r[2], r[3], r[4] or "ortak") for r in c.execute("SELECT yol, mtime, boy, tur, kapsam FROM dosya")}
     if yeniden: eski = {}; c.executescript("DELETE FROM dosya; DELETE FROM parca; INSERT INTO ara(ara) VALUES('delete-all');")
@@ -385,7 +408,8 @@ def guncelle(c, yeniden=False, sessiz=True):
         try: st = os.stat(yol)
         except OSError: continue
         if eski.get(kisa) == (st.st_mtime, st.st_size, tur_bul(kisa), BELLEK_TUR.get(kisa, (None, "ortak"))[1]): continue  # tür/kapsam ayarı değişince de yeniden
-        n_parca += dizinle(c, yol, kisa, st, hata); n_yeni += 1
+        n = dizinle(c, yol, kisa, st, hata)
+        if n is not None: n_parca += n; n_yeni += 1
     # okunamayan klasörün dosyaları "silinmiş" sayılmaz (17 Ekim: aktarıcının 10 dk'lık turu dizini 101 bin parçadan 301'e indirdi)
     eris = sorted({"" if e in (".", "") else e for e in eris}); ERISILEMEYEN[:] = eris
     korunur = lambda k: any(e == "" or k == e or k.startswith(e + "/") for e in eris)  # kök okunamazsa hepsi (görülen _canli zaten güncel)
@@ -523,7 +547,8 @@ def tara_baglan(c):
     c.execute("""CREATE TABLE IF NOT EXISTS tarama(yol TEXT PRIMARY KEY, mtime REAL, boy INTEGER, tur TEXT, sha256 TEXT, minhash TEXT,
                  surum_grubu TEXT, gecerli INTEGER, kopya_of TEXT, kaynak_turu TEXT, kaynak_neden TEXT, gizli INTEGER, gizli_neden TEXT, hata TEXT, t REAL)""")
     var = [r[1] for r in c.execute("PRAGMA table_info(dosya)")]
-    for k, tip in (("sha256", "TEXT"), ("surum_grubu", "TEXT"), ("gecerli", "INTEGER"), ("kopya_of", "TEXT"), ("kaynak_turu", "TEXT"), ("gizli", "INTEGER"), ("hata", "TEXT")):
+    for k, tip in (("sha256", "TEXT"), ("surum_grubu", "TEXT"), ("gecerli", "INTEGER"), ("kopya_of", "TEXT"), ("kaynak_turu", "TEXT"), ("gizli", "INTEGER"), ("hata", "TEXT"),
+                   ("gizli_parca", "INTEGER"), ("cevirme", "TEXT")):
         if k not in var: c.execute(f"ALTER TABLE dosya ADD COLUMN {k} {tip}")
 TARA_DOSYA_ALAN = "sha256, surum_grubu, gecerli, kopya_of, kaynak_turu, gizli, hata"
 def tara_dosyaya(c, kisa=None):
@@ -645,6 +670,164 @@ def tara_ozet(r):
     if s["erisilemeyen"]: out.append("  okunamayan klasör: " + ", ".join(e or "proje kökü" for e in s["erisilemeyen"][:5]) + " (eski kayıtlar korundu)")
     out.append(f"  rapor: {TARA_RAPOR}")
     return "\n".join(out)
+
+# --- Çevirme (proje hazırlığı T2, planlar/proje-hazirligi.md §2 Adım 2) ---------------------------------------------
+# PDF, sunum ve görüntüler (CEVIR_UZ) Mac'te metne çevrilir: <ortak>/cevir-venv'deki cevir-isci.py (Docling + Apple Vision; ağ kapalı).
+# Sonuç <uygulama>/cevirme-onbellek/<sha256>.json (proje klasörüne yazılmaz; aynı içerik bir kez çevrilir). `cevir` önce `tara`yı çalıştırır;
+# adla hariç tutulan, birebir kopya, parolalı/bozuk/boş dosya çevrilmez. Her dosyaya zaman sınırı: aşılırsa işçi öldürülür, dosya
+# "zaman_asimi" diye önbelleğe yazılır, sonraki dosya yeni işçiyle; işçi CEVIR_YENILE dosyada bir yenilenir (bellek). Toplantı başlarsa
+# dosyalar arasında durur; yeniden çalıştırınca önbellekte olanlar atlanır (kaldığı yerden). Dizin (guncelle) çevrilmiş metni önbellekten okur.
+# G3 — içerikle gizli bilgi: dizine giren her parça gizli_bilgi()'den geçer (şifre/parola + değer, API anahtarı biçimleri, özel anahtar,
+# Luhn'u tutan kart numarası, IBAN); eşleşen parça dizine girmez, dosyanın gizli_parca sayısı artar (rapor ve sihirbaz için).
+class Bekliyor(Exception): pass  # çevrilmesi gereken dosyanın önbelleği yok: dizine henüz girmez
+ONBELLEK = os.path.join(AYAR["uygulama"], "cevirme-onbellek")
+CEVIR_PY = os.environ.get("SUFLOR_CEVIR_PY") or os.path.join(AYAR["ortak"], "cevir-venv", "bin", "python")
+CEVIR_ISCI = os.environ.get("SUFLOR_CEVIR_ISCI") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "cevir-isci.py")
+CEVIR_YENILE, CEVIR_HAZIR_SN = 25, 300
+def cevir_sure(ext): return int(AYAR.get("cevir_sure_sn") or 0) or (60 if ext not in (".pdf", ".pptx") else 180)
+
+def eml_metin(yol):
+    import email, email.policy
+    m = email.message_from_binary_file(open(yol, "rb"), policy=email.policy.default)
+    bas = "\n".join(f"{k}: {m[k]}" for k in ("Subject", "From", "To", "Cc", "Date") if m[k])
+    govde = m.get_body(preferencelist=("plain", "html"))
+    t = govde.get_content() if govde else ""
+    if govde and govde.get_content_type() == "text/html": t = html_metin(t)
+    return f"# {m['Subject'] or os.path.basename(yol)}\n\n{bas}\n\n{t}"
+
+def _onbellek_yol(sha): return os.path.join(ONBELLEK, sha[:2], sha + ".json")
+def cevrilmis(yol, sha=None):
+    # dosyanın çevrilmiş parçaları [(konum, metin)] ya da None (henüz çevrilmedi); çevirme hatası → [] (dizine boş girer, yeniden denenmez)
+    sha = sha or _sha256(yol)  # tarama satırı yoksa ya da eskiyse içerikten
+    try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
+    except (OSError, ValueError): return None
+    return [] if o.get("hata") else [(k, m) for k, m in o.get("parcalar") or []]
+
+_GIZLI_RX = [
+    ("anahtar", re.compile(r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----")),
+    ("anahtar", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    ("anahtar", re.compile(r"\b(?:sk|rk|pk)-(?:ant-|live_|test_|proj-)?[A-Za-z0-9_-]{20,}")),
+    ("anahtar", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|\bgithub_pat_[A-Za-z0-9_]{30,}")),
+    ("anahtar", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}")),
+    ("anahtar", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
+    ("anahtar", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
+]
+_SIFRE_RX = re.compile(r"(?i)(?:şifre|şifresi|sifre|parola|parolası|password|passwd|pwd|pass|pin)\b[^\n]{0,40}?[:=]?\s*[\"'`]?([^\s\"'`|,;]{8,64})")
+_KART_RX = re.compile(r"(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])")
+_IBAN_RX = re.compile(r"\b([A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?)\b")
+def _luhn(s):
+    t = 0
+    for i, ch in enumerate(reversed(s)):
+        d = int(ch)
+        if i % 2: d = d * 2 - 9 if d > 4 else d * 2
+        t += d
+    return t % 10 == 0
+def _iban_mi(s):
+    s = s.replace(" ", "")
+    if not 15 <= len(s) <= 34 or (s[:2] == "TR" and len(s) != 26): return False
+    r = s[4:] + s[:4]
+    return int("".join(str(int(ch, 36)) for ch in r)) % 97 == 1
+def gizli_bilgi(metin):
+    # → neden ya da None. Şifre: anahtar sözcükten sonra 40 karakter içinde harf + rakam (ya da işaret) içeren 8+ karakterlik değer.
+    if not metin: return None
+    for ad, rx in _GIZLI_RX:
+        if rx.search(metin): return ad
+    for m in _SIFRE_RX.finditer(metin):
+        v = m.group(1)
+        if re.search(r"[A-Za-zÇĞİÖŞÜçğıöşü]", v) and (re.search(r"\d", v) and re.search(r"[^\w]", v) or re.search(r"\d", v) and re.search(r"[A-ZÇĞİÖŞÜ]", v) and re.search(r"[a-zçğıöşü]", v)): return "şifre"
+    for m in _KART_RX.finditer(metin):
+        d = re.sub(r"\D", "", m.group(0))
+        if 13 <= len(d) <= 19 and d[0] in "3456" and _luhn(d) and len(set(d)) > 3: return "kart"
+    for m in _IBAN_RX.finditer(metin):
+        if _iban_mi(m.group(1)): return "iban"
+    return None
+
+def toplantida():  # süren toplantı: aktarıcının nabız dosyasında toplantı + son 10 dk'da yazılmış
+    try:
+        y = os.path.join(AYAR["uygulama"], "canli", "heartbeat.json"); h = json.load(open(y, encoding="utf-8"))
+        return bool((h.get("meeting") or (h.get("extension") or {}).get("call")) and time.time() - os.stat(y).st_mtime < 600)
+    except (OSError, ValueError, AttributeError): return False
+
+class _Isci:
+    def __init__(self):
+        import subprocess, threading, queue
+        self.q = queue.Queue(); self.n = 0
+        os.makedirs(AYAR["uygulama"], exist_ok=True)
+        self.p = subprocess.Popen([CEVIR_PY, "-B", CEVIR_ISCI], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8",
+                                  stderr=open(os.path.join(AYAR["uygulama"], "cevir-isci.log"), "a", encoding="utf-8"),
+                                  env=dict(os.environ, SUFLOR_ORTAK=AYAR["ortak"], PYTHONDONTWRITEBYTECODE="1"))
+        def oku():
+            for ln in self.p.stdout:
+                try: self.q.put(json.loads(ln))
+                except ValueError: pass
+            self.q.put({"bitti": True})  # süreç kendiliğinden kapandı (çöktü)
+        threading.Thread(target=oku, daemon=True).start()
+        self.hazir = self._al(CEVIR_HAZIR_SN) or {"hazir": False, "hata": "işçi açılmadı"}
+    def _al(self, sn):
+        import queue
+        try: return self.q.get(timeout=sn)
+        except queue.Empty: return None
+    def iste(self, yol, sn):
+        self.n += 1
+        try: self.p.stdin.write(json.dumps({"id": self.n, "yol": yol}, ensure_ascii=False) + "\n"); self.p.stdin.flush()
+        except OSError: return {"hata": "işçi kapandı"}
+        while True:
+            o = self._al(sn)
+            if o is None: self.kapat(); return {"hata": "zaman_asimi"}
+            if o.get("bitti"): self.kapat(); return {"hata": "işçi kapandı"}
+            if o.get("id") == self.n: return o
+    def kapat(self):
+        try: self.p.kill()
+        except OSError: pass
+        self.p.wait()
+
+def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR_YENILE, butce_sn=None):
+    c = c or baglan(); t0 = time.time(); tara(c)
+    adaylar = [r for r in c.execute("SELECT yol, sha256, mtime FROM tarama WHERE gizli=0 AND kopya_of IS NULL AND hata IS NULL ORDER BY mtime DESC")
+               if os.path.splitext(r[0])[1].lower() in CEVIR_UZ]
+    yap, onbellekte = [], 0
+    for yol, sha, _ in adaylar:
+        try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
+        except (OSError, ValueError): o = None
+        if o is None or (yeniden_dene and o.get("hata")): yap.append((yol, sha))
+        else: onbellekte += 1
+    if sinir: yap = yap[:sinir]
+    say = collections.Counter(); hatalar = []; isci = None; durdu = None
+    if yap and not os.path.exists(CEVIR_PY): durdu = f"çevirme ortamı yok ({CEVIR_PY}) — kurulum.py modeller"
+    try:
+        for i, (kisa, sha) in enumerate(yap):
+            if durdu: break
+            if toplantida(): durdu = "toplantı başladı — sonra kaldığı yerden"; break
+            if butce_sn and time.time() - t0 > butce_sn: durdu = "tur süresi doldu — sonraki turda sürer"; break
+            if isci is None or isci.n >= isci_yenile:
+                if isci: isci.kapat()
+                isci = _Isci()
+                if not isci.hazir.get("hazir"): durdu = "işçi açılmadı: " + str(isci.hazir.get("hata"))[:160]; isci = None; break
+            ext = os.path.splitext(kisa)[1].lower(); t1 = time.time()
+            o = isci.iste(os.path.join(PROJE, kisa), cevir_sure(ext))
+            if o.get("hata") in ("zaman_asimi", "işçi kapandı"): isci = None
+            kayit = {"yol": kisa, "arac": isci.hazir.get("arac") if isci else None, "t": int(time.time()), "sure": round(time.time() - t1, 2)}
+            if o.get("hata"): kayit["hata"] = o["hata"]; say["hata"] += 1; hatalar.append((kisa, o["hata"]))
+            else: kayit["parcalar"] = o.get("parcalar") or []; say["cevrildi"] += 1; say["karakter"] += sum(len(m) for _, m in kayit["parcalar"])
+            y = _onbellek_yol(sha); os.makedirs(os.path.dirname(y), exist_ok=True)
+            with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(kayit, f, ensure_ascii=False)
+            os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+            if o.get("hata") == "parolali": c.execute("UPDATE tarama SET hata='parolali' WHERE yol=?", (kisa,))
+            if not sessiz: print(f"  [{i + 1}/{len(yap)}] {kisa} — " + (f"hata: {o['hata']}" if o.get("hata") else f"{len(kayit['parcalar'])} parça, {kayit['sure']} sn"), file=sys.stderr)
+    finally:
+        if isci: isci.kapat()
+    c.commit()
+    n = guncelle(c)  # çevrilenler dizine
+    gp = c.execute("SELECT count(*), coalesce(sum(gizli_parca), 0) FROM dosya WHERE gizli_parca > 0").fetchone()
+    return {"aday": len(adaylar), "onbellekte": onbellekte, "cevrildi": say["cevrildi"], "hata": say["hata"], "hatalar": hatalar[:50], "karakter": say["karakter"],
+            "kalan": len(adaylar) - onbellekte - say["cevrildi"] - say["hata"], "durdu": durdu, "dizine": n, "gizli_dosya": gp[0], "gizli_parca": gp[1],
+            "sure_sn": round(time.time() - t0, 1)}
+def cevir_ozet(r):
+    s = [f"çevirme: {r['aday']} dosya adayı · önbellekte {r['onbellekte']} · bu tur çevrilen {r['cevrildi']} ({r['karakter']} karakter) · hata {r['hata']} · kalan {r['kalan']} · {r['sure_sn']} sn",
+         f"  dizine giren/güncellenen dosya: {r['dizine']} · gizli bilgi olabilir (parça dizine girmedi): {r['gizli_dosya']} dosya, {r['gizli_parca']} parça"]
+    if r["hatalar"]: s.append("  hatalar: " + ", ".join(f"{k} ({h})" for k, h in r["hatalar"][:8]))
+    if r["durdu"]: s.append("  durdu: " + r["durdu"])
+    return "\n".join(s)
 
 # --- Sözlük ve sorgu --------------------------------------------------------------------------------------------
 _SOZ = {}
@@ -803,12 +986,18 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("dizin"); d.add_argument("--yeniden", action="store_true")
     tr = sub.add_parser("tara"); tr.add_argument("--json", action="store_true", help="raporun tamamı")
+    cv = sub.add_parser("cevir"); cv.add_argument("--n", type=int, help="en çok N dosya"); cv.add_argument("--yeniden-dene", action="store_true", help="hata/zaman aşımı kayıtlarını da")
     a = sub.add_parser("ara"); a.add_argument("sorgu"); a.add_argument("--kim"); a.add_argument("--tur", help="virgüllü: toplanti,gorusme,analiz,sunum,tablo,belge,karar,kural,konusma")
     a.add_argument("--son", type=int, help="son N gün"); a.add_argument("--n", type=int, default=8); a.add_argument("--kapsam", choices=["ortak"], help="yalnız ortak kaynaklar")
     A = ap.parse_args()
     if A.cmd == "dizin":
         c = baglan(); guncelle(c, A.yeniden, sessiz=False)
+        if AYAR.get("cevir", True) is not False and os.path.exists(CEVIR_PY) and not toplantida():  # Brifing yardımcısının turu: çevrilmemiş PDF/görüntü (en çok ~4 dk)
+            r = cevir(c, butce_sn=int(AYAR.get("cevir_tur_sn") or 240))
+            if r["cevrildi"] or r["hata"] or r["durdu"]: print(cevir_ozet(r), file=sys.stderr)
         for tur, nd, np_ in c.execute("SELECT tur, count(*), sum(parca) FROM dosya GROUP BY tur ORDER BY 3 DESC"): print(f"  {tur}: {nd} dosya, {np_} parça")
+    elif A.cmd == "cevir":
+        r = cevir(sinir=A.n, yeniden_dene=A.yeniden_dene, sessiz=False); print(cevir_ozet(r))
     elif A.cmd == "tara":
         r = tara(); print(json.dumps(r, ensure_ascii=False, indent=1) if A.json else tara_ozet(r))
     else:

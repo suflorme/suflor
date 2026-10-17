@@ -474,7 +474,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "aktarici/", "manifest.json", "whisper-isci.py", "piper-isci.py", "tur-isci.py", "toplanti-claude.py", "yapi.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "aktarici/", "manifest.json", "whisper-isci.py", "piper-isci.py", "tur-isci.py", "cevir-isci.py", "toplanti-claude.py", "yapi.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 ESKI_BETIK = ["kur.command", "relay-baslat.command"]  # tek kurulum komutuyla kalktı; açık depodan güncellemede kod klasöründen silinir
 TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
@@ -595,6 +595,51 @@ def tur_kur(ort):  # tur sonu modeli (smart-turn v3, BSD-2, 8,7 MB) + küçük o
             os.replace(gec, model)
         sessiz("chmod", "-R", "go+rX", os.path.join(ort, "smart-turn-venv"), md); say("✓ tur sonu modeli hazır")
     except Exception as e: say(f"Not: tur sonu modeli kurulamadı ({str(e)[:120]}) — konuşmada eski kural, sonraki güncellemede yeniden denenir")
+# Belge → metin (proje hazırlığı T2): Docling + Apple Vision, ayrı Python 3.12 ortamında (Docling ≥ 3.10 ister; sistem Python'u 3.9).
+# Python: python-build-standalone (taşınabilir, yönetici izni gerekmez) SHA-256 doğrulanarak <ortak>/python312'ye; ortam <ortak>/cevir-venv
+# (cevir-gereksinim.txt'deki sabit sürümler, --no-deps; ~1,4 GB); modeller <ortak>/cevir-modeller (yerleşim + tablo, ~0,7 GB).
+# Kurulamazsa not düşer, aktarıcı ve dizin çalışmaya devam eder (PDF/görüntü dizine girmez).
+PBS_URL = "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.12.11%2B20250918-aarch64-apple-darwin-install_only_stripped.tar.gz"
+PBS_SHA = "559fb918c10f0cff226604257dcc390b391c87e6cbb2426824e99069c143e714"
+CEVIR_DOCLING = "2.140.0"
+def cevir_kur(ort):
+    if DENEME: return
+    py, vpy = os.path.join(ort, "python312", "bin", "python3.12"), os.path.join(ort, "cevir-venv", "bin", "python")
+    md = os.path.join(ort, "cevir-modeller")
+    venv_ok = bool((r := sessiz(vpy, "-c", f"from importlib.metadata import version as v; import ocrmac; assert v('docling') == '{CEVIR_DOCLING}'")) and r.returncode == 0)
+    model_ok = os.path.isdir(os.path.join(md, "docling-project--docling-layout-heron")) and os.path.isdir(os.path.join(md, "docling-project--docling-models"))
+    if venv_ok and model_ok: say("✓ belge çevirme ortamı var"); return
+    if not os.access(ort, os.W_OK): say("Not: belge çevirme ortamı yok ve ortak klasör başka hesabın — PDF ve görüntüler aranamaz"); return
+    if platform.machine() != "arm64": say("Not: belge çevirme yalnız Apple işlemcili Mac'te (M1 ve sonrası) — PDF ve görüntüler aranamaz"); return
+    if shutil.disk_usage(ort).free < 4 * 2 ** 30: say("Not: belge çevirme için en az 4 GB boş yer gerekli — atlandı"); return
+    try:
+        if not venv_ok:
+            if not ((r := sessiz(py, "-c", "import sys; assert sys.version_info >= (3, 12)")) and r.returncode == 0):
+                import hashlib, io, tarfile
+                say("→ Python 3.12 indiriliyor (~17 MB)…")
+                veri = urllib.request.urlopen(PBS_URL, timeout=300).read()
+                if hashlib.sha256(veri).hexdigest() != PBS_SHA: raise RuntimeError("Python doğrulaması tutmadı")
+                hedef = os.path.join(ort, "python312"); shutil.rmtree(hedef, ignore_errors=True); os.makedirs(hedef)
+                with tarfile.open(fileobj=io.BytesIO(veri), mode="r:gz") as t:
+                    for u in t.getmembers():
+                        u.name = u.name.split("/", 1)[1] if "/" in u.name else ""
+                        if u.name and not u.name.startswith("/") and ".." not in u.name.split("/"): t.extract(u, hedef)
+            say("→ belge çevirme ortamı kuruluyor (Docling, ~1,4 GB; birkaç dakika)…")
+            shutil.rmtree(os.path.join(ort, "cevir-venv"), ignore_errors=True)
+            for c in ([py, "-m", "venv", os.path.join(ort, "cevir-venv")], [vpy, "-m", "pip", "install", "-q", "--upgrade", "pip"],
+                      [vpy, "-m", "pip", "install", "-q", "--no-deps", "-r", os.path.join(KOD, "cevir-gereksinim.txt")]):
+                if subprocess.run(c, capture_output=True, timeout=1800).returncode: raise RuntimeError(os.path.basename(c[0]) + " " + " ".join(c[2:4]))
+        if not model_ok:
+            say("→ belge çevirme modelleri indiriliyor (~0,7 GB)…")
+            r = subprocess.run([vpy, "-c", "import sys; from pathlib import Path; from docling.utils.model_downloader import download_models as d; "
+                                "d(Path(sys.argv[1]), with_layout=True, with_tableformer=True, with_code_formula=False, with_picture_classifier=False, "
+                                "with_rapidocr=False, with_easyocr=False)", md], capture_output=True, timeout=1800)
+            if r.returncode: raise RuntimeError("modeller indirilemedi")
+        r = subprocess.run([vpy, "-B", os.path.join(KOD, "cevir-isci.py")], input="", capture_output=True, text=True, timeout=300,
+                           env=dict(os.environ, SUFLOR_ORTAK=ort))
+        if '"hazir": true' not in r.stdout: raise RuntimeError("deneme açılışı: " + (r.stdout + r.stderr)[-160:])
+        sessiz("chmod", "-R", "go+rX", os.path.join(ort, "python312"), os.path.join(ort, "cevir-venv"), md); say("✓ belge çevirme hazır (çevrimdışı açıldı)")
+    except Exception as e: say(f"Not: belge çevirme kurulamadı ({str(e)[:160]}) — PDF ve görüntüler aranamaz, sonraki güncellemede yeniden denenir")
 def glob_(desen):
     import glob; return glob.glob(desen)
 
@@ -761,6 +806,7 @@ def modeller():
     #   whisper-venv: mlx-whisper (Apple GPU) ~760 MB · whisper-modeller: whisper-large-v3-turbo ~1,6 GB (+ yerel 8 bit ~0,8 GB)
     #   ses-modeller: speechbrain/spkrec-ecapa-voxceleb ~85 MB → ecapa-mlx.npz (konuşmacı ayırma, Whisper işçisinde MLX ile)
     #   smart-turn-venv (onnxruntime + numpy) ~125 MB + ses-modeller/smart-turn ~9 MB: tur sonu modeli (isteğe bağlı, tur_kur)
+    #   python312 + cevir-venv (Docling + Vision) ~1,5 GB + cevir-modeller ~0,7 GB: PDF/sunum/görüntü → metin (proje hazırlığı, cevir_kur)
     ort = yollar()["ortak"]; vpy = os.path.join(ort, "whisper-venv", "bin", "python")
     try: os.makedirs(ort, exist_ok=True)
     except OSError: pass
@@ -802,7 +848,7 @@ def modeller():
                 "allow_patterns=['embedding_model.ckpt', 'hyperparams.yaml'])", ek)
     if os.path.isfile(os.path.join(ek, "ecapa-mlx.npz")): say("✓ ses izi ağırlıkları (MLX) var")
     else: ecapa_donustur(ort, onbellek=False)
-    whisper_8bit(ort); tur_kur(ort)
+    whisper_8bit(ort); tur_kur(ort); cevir_kur(ort)
     say("→ Deneme: modeller çevrimdışı açılıyor mu…")
     zorunlu(vpy, "-c", "import numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), "
             "path_or_hf_repo='mlx-community/whisper-large-v3-turbo', language='tr'); print('✓ Whisper açılıyor')", env=dict(hf, HF_HUB_OFFLINE="1"))
