@@ -31,6 +31,8 @@ try:
     finally: os.chmod(P, 0o755)
     kontrol("proje kökü okunamazken hiçbir kayıt silinmedi", dosyalar() == ilk and parca() == ilk_p)
     kontrol("okunamayan kök bildirildi", getattr(m, 'ERISILEMEYEN', None) == [""])
+    tur = json.load(open(m.DB + ".tur.json", encoding="utf-8"))
+    kontrol("son tur izi yazıldı (aktarıcı yardımcının sonucunu buradan okur)", tur.get("erisilemeyen") == [""] and tur.get("t", 0) > 0)
     os.chmod(os.path.join(P, "a"), 0); os.remove(os.path.join(P, "b", "uc.md")); canli_yaz("2026-10-17-yeni.jsonl")
     try: m.guncelle(c)
     finally: os.chmod(os.path.join(P, "a"), 0o755)

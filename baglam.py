@@ -254,6 +254,10 @@ def guncelle(c, yeniden=False, sessiz=True):
     for k in set(eski) - gorulen:
         if not korunur(k): sil(c, k); c.execute("DELETE FROM dosya WHERE yol=?", (k,))
     c.commit()
+    try:  # son turun izi: aktarıcı, Brifing yardımcısının (--dizin) tam erişimle bitirip bitirmediğini buradan anlar
+        with open(DB + ".tur.json.tmp", "w", encoding="utf-8") as f: json.dump({"t": time.time(), "erisilemeyen": eris, "pid": os.getpid()}, f)
+        os.replace(DB + ".tur.json.tmp", DB + ".tur.json")
+    except OSError: pass
     if eris and not sessiz: print(f"dizin: okunamayan klasör ({', '.join(e or 'proje kökü' for e in eris)}) — eski kayıtları korundu", file=sys.stderr)
     if not sessiz or n_yeni:
         print(f"dizin: {n_yeni} dosya güncellendi · {n_parca} parça · {time.time() - t0:.1f} sn" + (f" · okunamayan: {', '.join(hata)}" if hata else ""), file=sys.stderr)

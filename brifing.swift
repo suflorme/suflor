@@ -9,6 +9,18 @@ import Foundation
 
 func bitir(_ kod: Int32) -> Never { exit(kod) }
 let a = CommandLine.arguments
+// Arama dizini kipi (v0.58.0): --dizin → uygulama klasöründeki baglam.py'yi (bu paketin yanında) `dizin` komutuyla çalıştırır; başka argüman almaz.
+// Aktarıcı proje klasörünü okuyamayınca 10 dk'lık ön arama güncellemesini buna yaptırır (Masaüstü izni bu uygulamada).
+if a.contains("--dizin") {
+    let baglam = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("baglam.py").path
+    guard FileManager.default.isReadableFile(atPath: baglam) else { bitir(2) }
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); p.arguments = ["-B", baglam, "dizin"]
+    p.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
+    p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice; p.standardInput = FileHandle.nullDevice
+    do { try p.run() } catch { bitir(4) }
+    DispatchQueue.global().asyncAfter(deadline: .now() + 600) { if p.isRunning { p.terminate() } }
+    p.waitUntilExit(); bitir(p.terminationStatus)
+}
 guard let i = a.firstIndex(of: "--istek"), i + 1 < a.count,
       let veri = FileManager.default.contents(atPath: a[i + 1]),
       let j = (try? JSONSerialization.jsonObject(with: veri)) as? [String: Any],
