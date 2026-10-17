@@ -1320,7 +1320,13 @@ def takvim_oku():
     global TAKVIM_TAM
     try: j = json.load(open(TAKVIM_JSON, encoding="utf-8"))
     except (OSError, ValueError): return
-    TAKVIM_TAM = {e["id"]: dict(e, baglanti=guvenli_baglanti(e.get("baglanti"))) for e in j.get("olaylar") or [] if e.get("id")}
+    # v0.59.1: tekrarlanan toplantının her tekrarı aynı kimlikle gelir (30 günde haftalık toplantı dört kez); sözlükte yalnız sonuncusu kalıyordu.
+    # En yakın tekrar kimliği korur (pano, brifing, Başlat onunla bulur), sonrakiler "<kimlik>@<başlangıç>" olur.
+    tam = {}
+    for e in sorted((e for e in j.get("olaylar") or [] if e.get("id")), key=lambda e: str(e.get("baslangic") or "")):
+        k = e["id"] if e["id"] not in tam else f'{e["id"]}@{e.get("baslangic")}'
+        tam[k] = dict(e, id=k, baglanti=guvenli_baglanti(e.get("baglanti")))
+    TAKVIM_TAM = tam
     STATE["takvim"] = {"durum": j.get("durum"), "hata": j.get("hata"), "guncel": j.get("guncel")}
 def guvenli_baglanti(u):
     # (güvenlik denetimi D2) davetteki bağlantı yalnız https ve bilinen toplantı alan adıysa açılır (evilzoom.us gibi

@@ -56,7 +56,9 @@ for f in ("relay.py", "manifest.json", "baglam.py"): shutil.copy(os.path.join(KO
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 s0 = dt.datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
 json.dump({"durum": "ok", "olaylar": [{"id": "u1", "baslik": "Uzak toplantı", "baslangic": (s0 + dt.timedelta(days=4)).isoformat(), "bitis": (s0 + dt.timedelta(days=4, hours=1)).isoformat(),
-           "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Ayla K"], "kisi_sayisi": 2}]}, open(os.path.join(T, "takvim.json"), "w"))
+           "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Ayla K"], "kisi_sayisi": 2}]
+           + [{"id": "h1", "baslik": "Haftalık", "baslangic": (s0 + dt.timedelta(days=d, hours=1)).isoformat(), "bitis": (s0 + dt.timedelta(days=d, hours=2)).isoformat(),
+               "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": [], "kisi_sayisi": 0} for d in (16, 2, 9)]}, open(os.path.join(T, "takvim.json"), "w"))
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1"),
                      stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
 try:
@@ -69,6 +71,8 @@ try:
     ok("/takvim (eski): 4 gün sonraki toplantı yok, boş zaman alanı yok", not any(o["id"] == "u1" for o in t1["olaylar"]) and "bos" not in t1)
     ok("/takvim?gun=7: 4 gün sonraki toplantı tarihiyle, boş zaman listesi", any(o["id"] == "u1" and o.get("tarih") for o in t7["olaylar"]) and isinstance(t7.get("bos"), list) and t7.get("gun") == 7)
     ok("/takvim?gun=30: 30 güne kadar açılır (v0.59.0)", t30.get("gun") == 30)
+    tk = [o for o in t30["olaylar"] if o["baslik"] == "Haftalık"]
+    ok(f"tekrarlanan toplantının her tekrarı ayrı (aynı kimlik; v0.59.1): {len(tk)}/3, en yakını asıl kimlikle", len(tk) == 3 and tk[0]["id"] == "h1" and len({o["id"] for o in tk}) == 3)
     out = subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", "takvim", "--gun", "7"],
                          capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay)).stdout
     ok("toplanti-claude.py takvim --gun 7: boş zamanlar + uzak toplantı tarihli", "# Boş zamanlar (7 gün" in out and "Uzak toplantı" in out and (s0 + dt.timedelta(days=4)).strftime("%Y-%m-%d") in out)
