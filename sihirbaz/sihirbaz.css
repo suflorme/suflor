@@ -164,3 +164,7 @@ kbd, code { font: 400 13px var(--f-teknik); background: var(--yuzey-2); border: 
 .kilit .ad-yazi { font: 300 30px/1 var(--f-baslik); letter-spacing: 0 }
 .kilit .ad-yazi i { font-style: normal; color: var(--pirinc) } .kilit .ad-yazi span { color: var(--ikincil) }
 .gizli { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0) }
+/* proje hazırlığı (T6): kart satırları ve katlanan "çıktı sayılanlar" */
+.anahtar.kart-satir { margin-top: 6px; padding: 9px 12px }
+details.alan summary { cursor: pointer; list-style: revert }
+details.alan .liste { margin-top: 6px }

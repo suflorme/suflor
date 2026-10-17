@@ -45,6 +45,11 @@ curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı Chrome'da açılır (Chrome yoksa varsayılan tarayıcıda) ve her adımı kendisi denetler.
 Sihirbazı kapatırsan aynı komutu yeniden çalıştır; kaldığın adımdan sürer.
 
+**Proje hazırlığı:** sihirbaz proje klasörünü tarar (kopya, eski sürüm, adından gizli görünen dosyalar; dizine girmesini istemediğin klasörü
+çıkarırsın), PDF, sunum ve görüntüleri bu Mac'te metne çevirip dizinler ve istersen proje kartını (özet, kişiler, kararlar, açık işler, terimler)
+Claude'la hazırlar; kartı onaylamadan önce düzeltirsin. Arka planda sürer, sihirbazı kapatsan da biter. Sonradan: panoda ⚙ Ayarlar → Proje →
+**Projeyi yeniden hazırla**.
+
 **Güncelleme:** yeni sürüm çıkınca panonun sağ üstünde **Güncelle** düğmesi belirir (toplantı yokken); tıklaman yeter, Chrome
 eklentisi de kendini yeniler. Elle: `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
 belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensions` → Suflor.me → yenile.

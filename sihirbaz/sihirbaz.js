@@ -66,7 +66,31 @@
       e3: "Araç çubuğundaki yapboz simgesinden Suflor.me'yi sabitle.",
       e_bekle: "Eklentiyi bekliyorum…", e_bagli: "Eklenti bağlandı",
       e_coklu: "Bu Mac'te başka bir hesabın Suflor.me'si de çalışıyor. Chrome'da Suflor.me simgesine tıkla ve bu hesabın alanını seç: ", e_profil: "Eklentiyi Teams'e girdiğin Chrome profiline ekle; birden fazla Chrome profilin varsa doğru pencerede olduğuna bak.",
-      bitti_b: "Hazırsın",                             },
+      bitti_b: "Hazırsın",
+      // proje hazırlığı (T6, v0.76.0)
+      hz_tara_b: "Projeni tanıyorum", hz_tara_a: "Klasöründeki dosyalara bakıyorum. Dizine girmesini istemediklerini işaretle; dosyalarına dokunulmaz, hiçbir yere gönderilmez.",
+      hz_taraniyor: "Klasörü tarıyorum…", hz_bos: "Klasör şimdilik boş. Belge ekledikçe ve toplantı yaptıkça Suflor.me kendiliğinden dizinler.",
+      hz_dosya: "dosya", hz_kopya: "Birebir kopya", hz_kopya_a: "Her biri dizine bir kez girer", hz_surum: "Eski sürüm", hz_surum_a: "Aramada en yenisi öne çıkar",
+      hz_okunamaz: "Açılamayan", hz_okunamaz_a: "Parolalı, bozuk ya da boş", hz_ikincil: "Çıktı ya da dışa aktarım", hz_ikincil_a: "Aramada asıl belgenin arkasında kalır",
+      hz_klasorler: "Dizine girecek klasörler", hz_klasor_i: "Dokunarak çıkar ya da geri al. Yedek, arşiv ve kişisel klasörleri çıkarabilirsin.",
+      hz_gizli: "Adından gizli görünen dosyalar — dizine girmez", hz_dahil_et: "Dizine al", hz_dahil: "Senin isteğinle dizinde", hz_geri: "Geri al",
+      hz_asil_b: "Çıktı sayılanlar", hz_asil_i: "Asıl belgeyse işaretle; aramada öne çıkar.", hz_asil_say: "Asıl say", hz_asil: "Asıl sayılıyor", hz_daha: "daha",
+      hz_onay_b: "Ne kadar sürecek", hz_onay_a: "Belgelerin bu Mac'te metne çevrilir ve dizinlenir. Arka planda sürer; bu sırada kuruluma devam edebilirsin.",
+      hz_cevir: "Metne çevrilecek", hz_cevir_yok: "Metne çevrilecek dosya yok", hz_cevir_model: "Çevirme modelleri henüz inmedi; inince arka planda çevrilir",
+      hz_dizin: "Dizinlenecek", hz_parca: "parça", hz_sure: "Tahmini süre", hz_dk: "dk", hz_az: "1 dakikadan az",
+      hz_kart_cikar: "Proje kartını da hazırla (Claude)", hz_kart_ac: "{n} belge · yaklaşık {d} dk · yaklaşık {u} $ karşılığı Claude kullanımı. Belge metni yalnız Claude'a gider; şifre ve hesap numarası içeren parçalar gitmez.",
+      hz_kart_claude: "Claude'a giriş yapılmadığı için kart şimdi hazırlanamaz; sonra panodaki ⚙ Ayarlar → Proje'den.", hz_baslat: "Başlat",
+      hz_ilerleme_b: "Hazırlanıyor", hz_ilerleme_a: "Arka planda sürüyor; bu pencereyi kapatsan da biter.",
+      hz_e_tara: "Tarama", hz_e_cevir: "Metne çevirme", hz_e_dizin: "Dizinleme", hz_e_gomme: "Anlama göre arama dizini", hz_e_kart: "Proje kartı",
+      hz_durdu: "Durdu: ", hz_hata: "Hata: ", hz_bitti_s: "Bitti", hz_kurulu_degil: "Kurulu değil (sözcükle arama çalışır)", hz_toplanti_not: "Toplantı başlarsa durur, sonra kaldığı yerden sürer.",
+      hz_kart_b: "Proje kartı", hz_kart_a: "Belgelerinden çıkardıklarım. Yanlış satırın işaretini kaldır; seçtiğin terimleri konuşma tanıma doğru yazar. Onaylayınca toplantıda bunu kullanırım.",
+      hz_kart_bekle: "Proje kartı hazırlanıyor…", hz_kart_yok: "Proje kartı hazırlanmadı. Sonra panodaki ⚙ Ayarlar → Proje'den hazırlayabilirsin.",
+      hz_ozet: "Özet", hz_kisiler: "Kişiler", hz_kurumlar: "Kurumlar", hz_kararlar: "Kararlar", hz_tarihler: "Tarihler", hz_isler: "Açık işler", hz_sozluk: "Sözlüğe eklenecek terimler",
+      hz_sozluk_i: "En çok {n} terim; konuşma tanıma bunları doğru yazar.", hz_celiski: "farklı tarihler", hz_kaynak: "kaynak", hz_onayla: "Onayla", hz_onaylandi: "Onaylandı",
+      hz_vt: "Kişiler, kararlar ve işler kayıt veritabanından gelir; burada yalnız özet ve sözlük var.", hz_sonra: "Sonra onaylarım",
+      hz_bitti_hazir: "Proje hazır: {b} belge, {p} parça, {c} dosya metne çevrildi.", hz_bitti_hazir0: "Proje hazır: {b} belge, {p} parça.", hz_bitti_suruyor: "Proje hazırlığı arka planda sürüyor; bitince Suflor.me kendiliğinden kullanır.",
+      hz_bitti_b: "Proje hazırlığı tamam", hz_bitti_a: "Suflor.me toplantıda bu dizini ve proje kartını kullanır.", hz_bitir: "Panoya dön",
+                                     },
     en: {
       sen_a: "So the cards are written from your point of view. Only your name is required; the rest can come now or later. This stays on this Mac.",
       araclar_tek: "Tools you use often (optional)", araclar_ek_i: "Separate with commas: e.g. Jira, Salesforce",
@@ -126,7 +150,30 @@
       e3: "Pin Suflor.me from the puzzle icon in the toolbar.",
       e_bekle: "Waiting for the extension…", e_bagli: "Extension connected",
       e_coklu: "Another account's Suflor.me is also running on this Mac. Click the Suflor.me icon in Chrome and pick this account's workspace: ", e_profil: "Add the extension to the Chrome profile you use for Teams; if you have several profiles, make sure you're in the right window.",
-      bitti_b: "You're all set",                             },
+      bitti_b: "You're all set",
+      hz_tara_b: "Getting to know your project", hz_tara_a: "I'm looking at the files in your folder. Mark anything you don't want indexed; your files aren't changed or sent anywhere.",
+      hz_taraniyor: "Scanning the folder…", hz_bos: "The folder is empty for now. As you add documents and hold meetings, Suflor.me indexes them by itself.",
+      hz_dosya: "files", hz_kopya: "Exact copies", hz_kopya_a: "Each is indexed once", hz_surum: "Older versions", hz_surum_a: "Search puts the newest first",
+      hz_okunamaz: "Can't be opened", hz_okunamaz_a: "Password-protected, damaged or empty", hz_ikincil: "Outputs or exports", hz_ikincil_a: "Search ranks them behind the original",
+      hz_klasorler: "Folders to index", hz_klasor_i: "Tap to leave one out or bring it back. You can leave out backups, archives and personal folders.",
+      hz_gizli: "Files that look private by name — not indexed", hz_dahil_et: "Index it", hz_dahil: "Indexed at your request", hz_geri: "Undo",
+      hz_asil_b: "Counted as outputs", hz_asil_i: "Mark it if it's an original document; search will rank it first.", hz_asil_say: "It's an original", hz_asil: "Counted as original", hz_daha: "more",
+      hz_onay_b: "How long it will take", hz_onay_a: "Your documents are converted to text and indexed on this Mac. It runs in the background; you can keep setting up meanwhile.",
+      hz_cevir: "To convert to text", hz_cevir_yok: "Nothing needs converting", hz_cevir_model: "Conversion models haven't downloaded yet; files are converted in the background once they do",
+      hz_dizin: "To index", hz_parca: "passages", hz_sure: "Estimated time", hz_dk: "min", hz_az: "under a minute",
+      hz_kart_cikar: "Also prepare the project card (Claude)", hz_kart_ac: "{n} documents · about {d} min · about ${u} worth of Claude usage. Document text goes only to Claude; passages with passwords or account numbers don't.",
+      hz_kart_claude: "You're not signed in to Claude, so the card can't be prepared now; do it later from ⚙ Settings → Project on the panel.", hz_baslat: "Start",
+      hz_ilerleme_b: "Preparing", hz_ilerleme_a: "It runs in the background; it finishes even if you close this window.",
+      hz_e_tara: "Scan", hz_e_cevir: "Converting to text", hz_e_dizin: "Indexing", hz_e_gomme: "Search-by-meaning index", hz_e_kart: "Project card",
+      hz_durdu: "Paused: ", hz_hata: "Error: ", hz_bitti_s: "Done", hz_kurulu_degil: "Not installed (keyword search works)", hz_toplanti_not: "It pauses if a meeting starts and resumes later.",
+      hz_kart_b: "Project card", hz_kart_a: "What I found in your documents. Untick anything wrong; terms you select will be spelled right by speech recognition. Once you approve, I use this in meetings.",
+      hz_kart_bekle: "Preparing the project card…", hz_kart_yok: "The project card wasn't prepared. You can do it later from ⚙ Settings → Project on the panel.",
+      hz_ozet: "Summary", hz_kisiler: "People", hz_kurumlar: "Organisations", hz_kararlar: "Decisions", hz_tarihler: "Dates", hz_isler: "Open tasks", hz_sozluk: "Terms to add to the glossary",
+      hz_sozluk_i: "Up to {n} terms; speech recognition will spell them right.", hz_celiski: "conflicting dates", hz_kaynak: "source", hz_onayla: "Approve", hz_onaylandi: "Approved",
+      hz_vt: "People, decisions and tasks come from the records database; only the summary and glossary are here.", hz_sonra: "Approve later",
+      hz_bitti_hazir: "Project ready: {b} documents, {p} passages, {c} files converted to text.", hz_bitti_hazir0: "Project ready: {b} documents, {p} passages.", hz_bitti_suruyor: "Project preparation is still running in the background; Suflor.me uses it as soon as it's done.",
+      hz_bitti_b: "Project preparation done", hz_bitti_a: "Suflor.me uses this index and the project card in meetings.", hz_bitir: "Back to the panel",
+                                     },
   };
   // ---------- simgeler (çizgi, currentColor) ----------
   const S = {
@@ -157,7 +204,7 @@
     const r = await fetch("/api/" + yol, o); if (!r.ok) throw new Error((await r.text()) || r.status); return r.json();
   };
   let kayitSira = Promise.resolve();
-  const kaydet = () => { kayitSira = kayitSira.then(() => api("kaydet", { dil: D.dil, adim: D.adim, cevap: D.cevap })).catch(() => {}); return kayitSira; };
+  const kaydet = () => { kayitSira = kayitSira.then(() => api("kaydet", { dil: D.dil, adim: (D.durum || {}).mod === "hazirlik" ? D.kayitAdim : D.adim, adim_id: (D.durum || {}).mod === "hazirlik" ? D.kayitAdimId : ((gorunen()[D.adim] || {}).id), cevap: D.cevap })).catch(() => {}); return kayitSira; };  // hazırlık kipinde kurulumun kaldığı adım korunur
   async function durumAl() { try { D.durum = await api("durum"); } catch (e) { D.durum = D.durum || {}; } indirmeGoster(); return D.durum; }
 
   // örnek veriler (önizleme)
@@ -173,6 +220,10 @@
       kur: { ayar: "iyi", proje: "iyi", not: "iyi", aktarici: "bekle", modeller: "bekle" },
     };
     if (yol === "durum") return Promise.resolve(d);
+    if (yol === "hazirlik") return Promise.resolve({ bos: false, tara_suruyor: false, is: { evre: "cevir", calisiyor: true, kart_istendi: true, adim: { cevir: { n: 12, toplam: 43 } } },
+      tarama: { t: Date.now() / 1000, sayilar: { dosya: 412, boyut: 3.2e9, tur: { belge: 180, goruntu: 120, tablo: 60 }, kopya: 9, eski_surum: 14, okunamayan: 2, kaynak_turu: { asil: 380, turetilmis: 20, disa_aktarim: 12 } },
+        klasorler: [{ ad: "belgeler", dosya: 210, haric: false }, { ad: "gorusmeler", dosya: 80, haric: false }, { ad: "kisisel", dosya: 0, haric: true }], haric: [{ yol: "belgeler/sifreler.xlsx", neden: "ad: sifre" }], dahil: [], kaynak_turu: [], asil: [] },
+      tahmin: { cevir: { ".pdf": 30, ".png": 13 }, cevir_n: 43, parca_yeni: 1800, gomme_n: 1800, kart_belge: 120, kart_sn: 540, kart_usd: 6, sn: 300, cevirme_kurulu: true } });
     return Promise.resolve({ ok: true, ...d });
   }
 
@@ -191,6 +242,36 @@
   const alan = (id, etiket, ipucu = "", tur = "text") => `<div class="alan"><label for="${id}">${esc(etiket)}</label>${tur === "textarea"
     ? `<textarea id="${id}" data-cevap="${id}">${esc(D.cevap[id] || "")}</textarea>` : `<input type="text" id="${id}" data-cevap="${id}" value="${esc(D.cevap[id] || "")}">`}${ipucu ? `<div class="ipucu">${esc(ipucu)}</div>` : ""}</div>`;
 
+
+  // ---------- proje hazırlığı (T6, v0.76.0): B tarama · C süre/onay · D ilerleme · E proje kartı · F bitti içinde ----------
+  // kurulum.py /api/hazirlik* → hazirlik.py. Panodaki "Projeyi yeniden hazırla" sihirbazı mod=hazirlik ile açar: yalnız bu ekranlar.
+  const HZ_ADIM = ["hz_tara", "hz_onay", "hz_ilerleme", "hz_kart", "bitti"];
+  const hzMod = () => ((D.durum || {}).mod === "hazirlik");
+  const H = () => D.hz || {};
+  const mb = b => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b < 1e6 ? "< 1 MB" : Math.round(b / 1e6) + " MB";
+  const TUR_AD = { tr: { belge: "belge", sunum: "sunum", tablo: "tablo", veri: "veri", web: "web", goruntu: "görüntü", eposta: "e-posta", ses: "ses", video: "video", arsiv: "arşiv", kod: "kod", diger: "diğer" },
+    en: { belge: "documents", sunum: "presentations", tablo: "spreadsheets", veri: "data", web: "web", goruntu: "images", eposta: "email", ses: "audio", video: "video", arsiv: "archives", kod: "code", diger: "other" } };
+  const dk = sn => sn < 60 ? t.hz_az : "~" + Math.round(sn / 60) + " " + t.hz_dk;
+  const tf = (m, o) => m.replace(/\{(\w+)\}/g, (_, k) => o[k] ?? "");
+  async function hzAl() { try { D.hz = await api("hazirlik"); } catch (e) { D.hz = D.hz || {}; } return D.hz; }
+  async function hzBekle(id, kosul, ms = 2000) {  // ekran açıkken yokla; kosul() doğru olunca biter
+    while (gorunen()[D.adim] && gorunen()[D.adim].id === id) { await hzAl(); ciz(); if (kosul && kosul()) break; await new Promise(r => setTimeout(r, ms)); }
+  }
+  const hzBos = () => H().bos === true;
+  const hzKartIstendi = () => !!((H().is || {}).kart_istendi);
+  const hzIsDurum = () => (H().is || {});
+  const hzKartVarsayilan = () => { const c = (D.durum || {}).claude || {}; if (C.hz_kart == null) C.hz_kart = !!(c.kurulu && c.giris); };
+  const isaretle = async (tur, yol, deger) => { await api("hazirlik/isaret", { tur, yol, deger }).catch(() => {}); D.hz = { ...H(), tara_suruyor: true }; ciz(); hzBekle("hz_tara", () => H().tarama && !H().tara_suruyor, 1500); };
+  function kartSatir(bol, i, x, metin, ek) {
+    const sec = !((D.kartCikar || {})[bol] || new Set()).has(i);
+    const kay = (x.kaynaklar || []), ilk = kay.length ? String(kay[0][0]).split("/").pop() : "";
+    return `<label class="anahtar kart-satir"><input type="checkbox" data-kart="${bol}" data-i="${i}" ${sec ? "checked" : ""}><span><b>${esc(metin)}</b>${ek ? " · " + esc(ek) : ""}${x.celiski ? ` <span class="ipucu">(${esc(t.hz_celiski)})</span>` : ""}<br><span class="ipucu">${esc(t.hz_kaynak)}: ${esc(ilk)}${kay.length > 1 ? " +" + (kay.length - 1) : ""}</span></span></label>`;
+  }
+  function kartBolum(bol, baslik, satirFn) {
+    const l = ((D.kart || {})[bol] || []); if (!l.length) return "";
+    const g = l.slice(0, 60);
+    return `<div class="alan"><span class="etiket">${esc(baslik)} · ${l.length}</span>${g.map((x, i) => satirFn(x, i)).join("")}${l.length > g.length ? `<div class="ipucu">+${l.length - g.length} ${esc(t.hz_daha)}</div>` : ""}</div>`;
+  }
   const ADIMLAR = [
     { id: "karsilama", simge: null, cubuksuz: true,
       ciz: () => `<div class="adim karsilama"><div class="simge isaret">${S.isaret}</div>
@@ -244,6 +325,52 @@
           ${k.aktarici === "iyi" && ys ? satir(ys.kurulu ? "iyi" : "uyari", t.k_ses, ys.kurulu ? t.k_ses_ok : t.k_ses_yok, ys.kurulu ? dug("ses-izni", t.k_ses_izin) : "") : ""}</div>
           ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div><p class="dipnot">${dug("kur-yeniden", t.k_m_yeniden)}</p>` : ""}${(k.uyarilar || []).map(u => `<div class="kart-not uyari">${esc(u)}</div>`).join("")}
           <label class="anahtar"><input type="checkbox" data-teshis ${C.teshis === true ? "checked" : ""}><span><b>${esc(t.p_anahtar)}</b><br><span class="ipucu">${esc(t.p_gider_a)} ${esc(t.p_gitmez_a)}</span></span></label>`; } },
+    { id: "hz_tara", simge: "klasor", b: "hz_tara_b", a: "hz_tara_a", hazir: () => !!H().tarama && !H().tara_suruyor,
+      gir: async () => { await hzAl(); const tr = H().tarama; if (!H().tara_suruyor && (!tr || Date.now() / 1000 - tr.t > 600)) { await api("hazirlik/tara", {}).catch(() => {}); D.hz = { ...H(), tara_suruyor: true }; }
+        await hzBekle("hz_tara", () => H().tarama && !H().tara_suruyor, 1500); },
+      icerik: () => { const h = H(), tr = h.tarama;
+        if (!tr || h.tara_suruyor && !tr) return `<div class="liste">${satir("bekle", t.hz_taraniyor)}</div>`;
+        if (h.bos) return `<div class="kart-not">${esc(t.hz_bos)}</div>`;
+        const s = tr.sayilar, ik = (s.kaynak_turu.turetilmis || 0) + (s.kaynak_turu.disa_aktarim || 0);
+        const tur = Object.entries(s.tur).slice(0, 5).map(([k, n]) => `${(TUR_AD[D.dil] || TUR_AD.tr)[k] || k} ${n}`).join(", ");
+        const ozet = `<div class="liste">${satir(h.tara_suruyor ? "bekle" : "iyi", `${s.dosya} ${t.hz_dosya} · ${mb(s.boyut)}`, tur)}
+          ${s.kopya ? satir("iyi", `${t.hz_kopya}: ${s.kopya}`, t.hz_kopya_a) : ""}${s.eski_surum ? satir("iyi", `${t.hz_surum}: ${s.eski_surum}`, t.hz_surum_a) : ""}
+          ${ik ? satir("iyi", `${t.hz_ikincil}: ${ik}`, t.hz_ikincil_a) : ""}${s.okunamayan ? satir("uyari", `${t.hz_okunamaz}: ${s.okunamayan}`, t.hz_okunamaz_a) : ""}</div>`;
+        const kl = tr.klasorler || [];
+        const klasor = kl.length ? `<div class="alan"><span class="etiket">${esc(t.hz_klasorler)}</span><div class="yongalar">${kl.map(k =>
+          `<button class="yonga" type="button" data-hz-klasor="${esc(k.ad)}" aria-pressed="${!k.haric}">${esc(k.ad)}${k.haric ? "" : ` · ${k.dosya}`}</button>`).join("")}</div><div class="ipucu">${esc(t.hz_klasor_i)}</div></div>` : "";
+        const gz = (tr.haric || []), dh = (tr.dahil || []);
+        const gizli = gz.length || dh.length ? `<div class="alan"><span class="etiket">${esc(t.hz_gizli)}</span><div class="liste">${gz.slice(0, 20).map(x => satir("uyari", x.yol, x.neden, `<button class="ikincil-dug" type="button" data-hz-dahil="${esc(x.yol)}" data-deger="1">${esc(t.hz_dahil_et)}</button>`)).join("")}
+          ${dh.map(y => satir("iyi", y, t.hz_dahil, `<button class="ikincil-dug" type="button" data-hz-dahil="${esc(y)}" data-deger="">${esc(t.hz_geri)}</button>`)).join("")}</div>${gz.length > 20 ? `<div class="ipucu">+${gz.length - 20} ${esc(t.hz_daha)}</div>` : ""}</div>` : "";
+        const kt = (tr.kaynak_turu || []), as = (tr.asil || []);
+        const asil = kt.length || as.length ? `<details class="alan"><summary class="etiket">${esc(t.hz_asil_b)} · ${kt.length}</summary><div class="ipucu">${esc(t.hz_asil_i)}</div><div class="liste">${kt.slice(0, 30).map(x => satir("bos", x.yol, x.neden, `<button class="ikincil-dug" type="button" data-hz-asil="${esc(x.yol)}" data-deger="1">${esc(t.hz_asil_say)}</button>`)).join("")}
+          ${as.map(y => satir("iyi", y, t.hz_asil, `<button class="ikincil-dug" type="button" data-hz-asil="${esc(y)}" data-deger="">${esc(t.hz_geri)}</button>`)).join("")}</div></details>` : "";
+        return ozet + klasor + gizli + asil; } },
+    { id: "hz_onay", simge: "kur", b: "hz_onay_b", a: "hz_onay_a", kosul: () => !hzBos(), devamYazi: () => hzIsDurum().calisiyor ? null : t.hz_baslat,
+      gir: async () => { hzKartVarsayilan(); await hzAl(); ciz(); },
+      devamEt: async () => { const c = (D.durum || {}).claude || {}; hzKartVarsayilan(); await api("hazirlik/baslat", { kart: !!(C.hz_kart && c.giris) }).catch(() => {}); kaydet(); },
+      icerik: () => { const th = H().tahmin || {}, c = (D.durum || {}).claude || {};
+        const cv = th.cevir || {}, cvy = [[".pdf", "PDF"], [".pptx", "PowerPoint"]].map(([e, a]) => cv[e] ? `${a} ${cv[e]}` : "").filter(Boolean), gr = Object.entries(cv).filter(([e]) => ![".pdf", ".pptx"].includes(e)).reduce((a, [, n]) => a + n, 0);
+        const cvAc = [...cvy, gr ? `${(TUR_AD[D.dil] || TUR_AD.tr).goruntu} ${gr}` : ""].filter(Boolean).join(", ");
+        const kartSn = C.hz_kart && c.giris ? (th.kart_sn || 0) : 0;
+        return `<div class="liste">${!th.cevirme_kurulu && th.cevir_n ? satir("uyari", `${t.hz_cevir}: ${th.cevir_n}`, t.hz_cevir_model) : satir("iyi", th.cevir_n ? `${t.hz_cevir}: ${th.cevir_n}` : t.hz_cevir_yok, cvAc)}
+          ${satir("iyi", `${t.hz_dizin}: ~${(th.parca_yeni || 0) + (th.gomme_n || 0) ? (th.gomme_n || th.parca_yeni) : 0} ${t.hz_parca}`)}
+          ${satir("iyi", `${t.hz_sure}: ${dk((th.sn || 0) + kartSn)}`, t.hz_toplanti_not)}</div>
+          ${c.kurulu && c.giris ? `<label class="anahtar"><input type="checkbox" data-hz-kart ${C.hz_kart ? "checked" : ""}><span><b>${esc(t.hz_kart_cikar)}</b><br><span class="ipucu">${esc(tf(t.hz_kart_ac, { n: th.kart_belge || 0, d: Math.max(1, Math.round((th.kart_sn || 0) / 60)), u: (th.kart_usd || 0).toLocaleString(D.dil === "en" ? "en" : "tr") }))}</span></span></label>`
+            : `<div class="kart-not">${esc(t.hz_kart_claude)}</div>`}`; } },
+    { id: "hz_ilerleme", simge: "kur", b: "hz_ilerleme_b", a: "hz_ilerleme_a", kosul: () => !hzBos(),
+      gir: () => hzBekle("hz_ilerleme", () => { const e = hzIsDurum(); return !e.calisiyor && ["bitti", "durdu", "hata"].includes(e.evre); }),
+      icerik: () => { const e = hzIsDurum(), sira = ["tara", "cevir", "dizin", "gomme", "kart"], su = sira.indexOf(e.evre), son = ["bitti", "durdu", "hata"].includes(e.evre);
+        const ad = { tara: t.hz_e_tara, cevir: t.hz_e_cevir, dizin: t.hz_e_dizin, gomme: t.hz_e_gomme, kart: t.hz_e_kart };
+        const satirlar = sira.filter(x => x !== "kart" || e.kart_istendi).map((x, i) => {
+          const a = (e.adim || {})[x], bitti = son ? true : i < su, simdi = !son && i === su;
+          let ac = a && a.toplam ? `${a.n} / ${a.toplam}` : "";
+          if (x === "gomme" && e.gomme && e.gomme.durdu === "anlam araması kurulu değil") return satir("bos", ad[x], t.hz_kurulu_degil);
+          if (x === "cevir" && e.cevir && e.cevir.durdu && son) return satir("uyari", ad[x], /ortamı yok/.test(e.cevir.durdu) ? t.hz_cevir_model : t.hz_durdu + e.cevir.durdu);
+          return satir(bitti ? "iyi" : simdi ? "bekle" : "bos", ad[x], simdi ? (ac || "…") : bitti && a ? ac : "");
+        }).join("");
+        const alt = e.evre === "hata" ? `<div class="kart-not uyari">${esc(t.hz_hata + (e.hata || ""))}</div>` : e.evre === "durdu" && e.durdu ? `<div class="kart-not uyari">${esc(t.hz_durdu + e.durdu)}</div>` : "";
+        return `<div class="liste">${satirlar}</div>${alt}<p class="dipnot">${esc(t.hz_toplanti_not)}</p>`; } },
     { id: "takvim", simge: "takvim", b: "takvim_b", a: "takvim_a", gir: takvimBekle,
       icerik: () => { const tk = (D.durum || {}).takvim || {};
         if (tk.durum !== "ok") return `<div class="liste">${satir(tk.durum === "izin_yok" ? "uyari" : "bos", t.t_izin_b, t.t_izin_a, dug("takvim-izin", t.t_izin))}</div>${epostaBlok()}`;
@@ -264,9 +391,35 @@
           ${!e.bagli && e.coklu ? `<div class="kart-not uyari">${esc(t.e_coklu + (e.alan || ""))}</div>` : ""}
           ${e.bagli ? "" : `<p class="dipnot">${esc(t.e_profil)}</p><p class="dipnot">${dug("atla", t.atla)}</p>`}
           ${((D.durum || {}).mac || {}).teams_uygulama ? `<p class="dipnot">${esc(t.teams_not)}</p>` : ""}`; } },
-    { id: "bitti", simge: "isaret", b: "bitti_b", a: "bitti_a", son: true },
+    { id: "hz_kart", simge: "tanidim", b: "hz_kart_b", a: "hz_kart_a", kosul: () => !hzBos() && (hzKartIstendi() || !!(H().kart)),
+      devamYazi: () => D.kart && !D.kart.yok && !D.kartOnay ? t.hz_onayla : null,
+      gir: async () => { await hzBekle("hz_kart", () => { const e = hzIsDurum(); return !(e.calisiyor && e.evre === "kart") && !(e.calisiyor && e.kart_istendi); }, 3000);
+        if (gorunen()[D.adim] && gorunen()[D.adim].id === "hz_kart" && H().kart) { try { D.kart = await api("hazirlik/kart"); } catch (e) { D.kart = null; }
+          if (D.kart && !D.kart.yok && !D.kartTerim) D.kartTerim = new Set((D.kart.sozluk || []).filter(m => m.oneri).map(m => m.terim)); ciz(); } },
+      devamEt: async () => { if (!D.kart || D.kart.yok || D.kartOnay) return;
+        const cikar = {}; for (const [b, st] of Object.entries(D.kartCikar || {})) cikar[b] = [...st];
+        try { D.kartOnay = await api("hazirlik/kart-onayla", { cikar, terimler: [...(D.kartTerim || [])] }); } catch (e) { D.kartOnay = { hata: String(e.message || e) }; } },
+      icerik: () => { const e = hzIsDurum(), k = D.kart;
+        if (e.calisiyor && (e.evre === "kart" || e.kart_istendi)) { const a = (e.adim || {}).kart; return `<div class="liste">${satir("bekle", t.hz_kart_bekle, a && a.toplam ? `${a.n} / ${a.toplam}` : "")}</div>`; }
+        if (!k || k.yok) return `<div class="kart-not">${esc(t.hz_kart_yok)}</div>`;
+        const ozet = k.ozet ? `<div class="alan"><span class="etiket">${esc(t.hz_ozet)}</span><div class="kart-not">${esc(k.ozet)}</div></div>` : "";
+        const vt = k.veritabani_kipi ? `<div class="kart-not">${esc(t.hz_vt)}</div>` : "";
+        const ks = kartBolum("kisiler", t.hz_kisiler, (x, i) => kartSatir("kisiler", i, x, x.ad, [...(x.roller || []).slice(0, 2), ...(x.kurumlar || []).slice(0, 1)].join(", ")));
+        const ku = kartBolum("kurumlar", t.hz_kurumlar, (x, i) => kartSatir("kurumlar", i, x, x.ad));
+        const kr = kartBolum("kararlar", t.hz_kararlar, (x, i) => kartSatir("kararlar", i, x, x.ne, x.ne_zaman));
+        const ta = kartBolum("tarihler", t.hz_tarihler, (x, i) => kartSatir("tarihler", i, x, x.ne, x.tarih));
+        const is = kartBolum("acik_isler", t.hz_isler, (x, i) => kartSatir("acik_isler", i, x, x.is, [...(x.sahip || []), x.tarih].filter(Boolean).join(" · ")));
+        const sz = (k.sozluk || []).length ? `<div class="alan"><span class="etiket">${esc(t.hz_sozluk)} · ${(D.kartTerim || new Set()).size}/${k.sozluk_en_cok || 60}</span><div class="ipucu">${esc(tf(t.hz_sozluk_i, { n: k.sozluk_en_cok || 60 }))}</div>
+          <div class="yongalar">${k.sozluk.slice(0, 150).map(m => `<button class="yonga" type="button" data-hz-terim="${esc(m.terim)}" aria-pressed="${(D.kartTerim || new Set()).has(m.terim)}" title="${esc(m.aciklama || "")}">${esc(m.terim)}</button>`).join("")}</div></div>` : "";
+        const sonuc = D.kartOnay ? `<div class="kart-not ${D.kartOnay.hata ? "uyari" : ""}">${esc(D.kartOnay.hata ? t.hz_hata + D.kartOnay.hata : t.hz_onaylandi)}</div>` : "";
+        return ozet + vt + ks + ku + kr + ta + is + sz + sonuc + (D.kartOnay ? "" : `<p class="dipnot">${dug("atla", t.hz_sonra)}</p>`); } },
+    { id: "bitti", simge: "isaret", b: "bitti_b", a: "bitti_a", son: true, gir: async () => { if (D.hz) { await hzAl(); ciz(); } },
+      icerik: () => { const e = hzIsDurum(), s = e.sonuc;
+        if (!D.hz || hzBos()) return "";
+        if (e.calisiyor) return `<div class="liste">${satir("bekle", t.hz_bitti_suruyor)}</div>`;
+        return s && !s.bos ? `<div class="liste">${satir("iyi", tf(s.cevrilen ? t.hz_bitti_hazir : t.hz_bitti_hazir0, { b: s.belge, p: s.parca, c: s.cevrilen }))}</div>` : ""; } },
   ];
-  const gorunen = () => ADIMLAR.filter(a => !a.kosul || a.kosul());
+  const gorunen = () => ADIMLAR.filter(a => (!hzMod() || HZ_ADIM.includes(a.id)) && (!a.kosul || a.kosul()));
 
   // ---------- çizim ----------
   let yon = 1;
@@ -275,12 +428,12 @@
     const sahne = $("#sahne");
     sahne.innerHTML = a.ciz ? a.ciz() : `<section class="adim ${yon < 0 ? "geri" : ""}" aria-labelledby="baslik">
       <div class="simge ${a.simge === "isaret" ? "isaret" : ""}">${S[a.simge] || ""}</div>
-      <h1 id="baslik">${esc(t[a.b])}</h1><p class="alt">${esc(t[a.a])}</p>
+      <h1 id="baslik">${esc(t[a.id === "bitti" && hzMod() ? "hz_bitti_b" : a.b])}</h1><p class="alt">${esc(t[a.id === "bitti" && hzMod() ? "hz_bitti_a" : a.a])}</p>
       <div class="icerik">${a.icerik ? a.icerik() : ""}</div></section>`;
     const odak = sahne.querySelector("input, textarea"); if (odak && !odak.value && D.ilkCizim !== a.id) { odak.focus(); } D.ilkCizim = a.id;
     $("#alt-cubuk").style.visibility = a.cubuksuz ? "hidden" : "visible";
     $("#geri").textContent = t.geri; $("#geri").style.visibility = D.adim > 0 ? "visible" : "hidden";
-    const d = $("#devam"); d.textContent = a.son ? t.bitir : a.id === "hosgeldin" ? t.basla : t.devam; d.disabled = a.hazir ? !a.hazir() : false;
+    const d = $("#devam"); d.textContent = a.son ? (hzMod() ? t.hz_bitir : t.bitir) : (a.devamYazi && a.devamYazi()) || (a.id === "hosgeldin" ? t.basla : t.devam); d.disabled = a.hazir ? !a.hazir() : false;
     $("#noktalar").innerHTML = ads.map((_, i) => `<i class="${i === D.adim ? "su" : i < D.adim ? "bitti" : ""}"></i>`).join("");
     document.documentElement.lang = D.dil;
   }
@@ -327,6 +480,13 @@
   document.addEventListener("click", async e => {
     const dl = e.target.closest("[data-dil]");
     if (dl) { D.dil = dl.dataset.dil; t = M[D.dil]; git(1); return; }
+    // proje hazırlığı yongaları genel .yonga işleyicisinden önce
+    const hk = e.target.closest("[data-hz-klasor]"); if (hk) { isaretle("haric", hk.dataset.hzKlasor, hk.getAttribute("aria-pressed") === "true"); return; }
+    const hd = e.target.closest("[data-hz-dahil]"); if (hd) { isaretle("dahil", hd.dataset.hzDahil, !!hd.dataset.deger); return; }
+    const ha = e.target.closest("[data-hz-asil]"); if (ha) { isaretle("asil", ha.dataset.hzAsil, !!ha.dataset.deger); return; }
+    const ht = e.target.closest("[data-hz-terim]");
+    if (ht) { const s = D.kartTerim || (D.kartTerim = new Set()), v = ht.dataset.hzTerim, en = (D.kart || {}).sozluk_en_cok || 60;
+      if (s.has(v)) s.delete(v); else if (s.size < en) s.add(v); ciz(); return; }
     const y = e.target.closest(".yonga");
     if (y) {
       const g = y.dataset.grup, v = y.dataset.deger, on = y.getAttribute("aria-pressed") !== "true";
@@ -359,6 +519,12 @@
     if (!e.target.matches || !e.target.matches("[data-teshis]")) return;
     C.teshis = e.target.checked; kaydet(); if ((D.kurDurum || {}).ayar === "iyi") await api("teshis", { acik: C.teshis }).catch(() => {});
   });
+  document.addEventListener("change", e => {  // proje hazırlığı: kart çıkarılsın mı (C), kart satırı tutulsun mu (E)
+    if (!e.target.matches) return;
+    if (e.target.matches("[data-hz-kart]")) { C.hz_kart = e.target.checked; kaydet(); ciz(); return; }
+    if (e.target.matches("[data-kart]")) { const b = e.target.dataset.kart, i = +e.target.dataset.i, m = D.kartCikar || (D.kartCikar = {}), st = m[b] || (m[b] = new Set());
+      if (e.target.checked) st.delete(i); else st.add(i); }
+  });
   document.addEventListener("change", e => {  // gönderen adresi: geçerliyse ya da boşsa yazılır
     if (!e.target.matches || !e.target.matches("[data-eposta-adres]")) return;
     const v = e.target.value.trim().toLowerCase(); if (v && !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(v)) return;
@@ -371,7 +537,9 @@
   });
   document.addEventListener("input", e => { const k = e.target.dataset && e.target.dataset.cevap; if (k) { C[k] = e.target.value; const a = gorunen()[D.adim]; if (a.hazir) $("#devam").disabled = !a.hazir(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500); } });
   document.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && e.target.tagName !== "TEXTAREA" && !$("#devam").disabled && e.target.tagName !== "BUTTON") $("#devam").click(); });
-  $("#devam").addEventListener("click", () => { const a = gorunen()[D.adim]; if (a.son) { api("ac", { hedef: "pano" }).catch(() => {}); return; } git(D.adim + 1); });
+  $("#devam").addEventListener("click", async () => { const a = gorunen()[D.adim]; if (a.son) { api("ac", { hedef: "pano" }).catch(() => {}); return; }
+    if (a.devamEt) { const d = $("#devam"); d.disabled = true; try { await a.devamEt(); } finally { d.disabled = false; } }
+    const s = gorunen().indexOf(a); git((s < 0 ? D.adim : s) + 1); });
   $("#geri").addEventListener("click", () => git(D.adim - 1));
 
   // dosya bırakma / seçme
@@ -391,8 +559,12 @@
 
   // ---------- başlangıç ----------
   (async () => {
-    try { const k = await api("kayit"); if (k && k.dil) { D.dil = k.dil; D.adim = k.adim || 0; Object.assign(C, k.cevap || {}); } } catch (e) {}
-    t = M[D.dil] || M.tr; await durumAl(); ciz();
+    try { const k = await api("kayit"); if (k && k.dil) { D.dil = k.dil; D.adim = k.adim || 0; D.kayitAdimId = k.adim_id || ["karsilama", "hosgeldin", "mac", "claude", "sen", "proje", "kur", "takvim", "eklenti", "bitti"][k.adim || 0] /* v0.76.0 öncesi kayıt: eski sıra */; Object.assign(C, k.cevap || {}); } } catch (e) {}
+    D.kayitAdim = D.adim;
+    t = M[D.dil] || M.tr; await durumAl();
+    if (hzMod()) D.adim = 0; else if (D.adim > 0) await hzAl();  // kurulum yarıda kaldıysa kart ekranı görünsün diye
+    if (!hzMod() && D.kayitAdimId) { const i = gorunen().findIndex(a => a.id === D.kayitAdimId); if (i >= 0) D.adim = i; }  // v0.76.0: adım adıyla (yeni ekran araya girince sıra kayar)
+    ciz();
     const a = gorunen()[D.adim]; if (a && a.gir) { await a.gir(); ciz(); }
     setInterval(() => { if (!document.hidden) durumAl(); }, 5000);
   })();

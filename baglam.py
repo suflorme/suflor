@@ -504,7 +504,11 @@ def tara_okunamaz(yol, ext):
     except zipfile.BadZipFile: return "bozuk"
     except OSError: return "okunamadi"
     return None
+# v0.76.0 (T6): sihirbazın tarama ekranında kullanıcı kararı — ayar "dahil" (adla hariç tutulan dosya yine de dizine girer) ve "asil" (türetilmiş/dışa
+# aktarım sayılan dosya ya da klasör asıl belge sayılır). İkisi de proje köküne göre yol; klasör verilirse altındaki her şey.
+def _ayar_yolda(kisa, anahtar): return any(kisa == y or kisa.startswith(str(y).rstrip("/") + "/") for y in (AYAR.get(anahtar) or []) if y)
 def tara_gizli(kisa, ext, tur):
+    if _ayar_yolda(kisa, "dahil"): return None
     ad = norm(os.path.basename(kisa))
     if ext in TARA_GIZLI_UZ or ad in (".env", "id_rsa", "id_ed25519") or ad.startswith(".env."): return "ad: anahtar/ortam dosyası"
     if TARA_GIZLI_AD.search(ad): return "ad: " + TARA_GIZLI_AD.search(ad).group(0).strip(" ._-")
@@ -513,7 +517,8 @@ def tara_gizli(kisa, ext, tur):
         if m: return "ad: kimlik taraması (" + m.group(0) + ")"
     return None
 def tara_kaynak_turu(kisa, ext, ayni_klasor_kokler, disa):
-    # → (tür, neden). Sıra: ayardaki dışa aktarım yolu > dışa aktarım klasörü > tarih-saat damgalı veri dosyası > türetilmiş adı/klasörü > asıl.
+    # → (tür, neden). Sıra: kullanıcının "asil" işareti > ayardaki dışa aktarım yolu > dışa aktarım klasörü > tarih-saat damgalı veri dosyası > türetilmiş adı/klasörü > asıl.
+    if _ayar_yolda(kisa, "asil"): return "asil", "kullanıcı: asıl"
     if any(kisa == d or kisa.startswith(d.rstrip("/") + "/") for d in disa): return "disa_aktarim", "ayar: veritabani.disa_aktarim"
     parcalar = [norm(p) for p in kisa.split("/")[:-1]]
     for p in parcalar:
@@ -751,6 +756,13 @@ def gizli_bilgi(metin):
         if _iban_mi(m.group(1)): return "iban"
     return None
 
+def hazirlik_suruyor():  # v0.76.0: sihirbazın hazırlık işi (hazirlik.py calis) kilidi tutuyor mu — Brifing yardımcısının turu aynı dosyaları ikinci kez çevirmesin
+    import fcntl
+    try:
+        with open(os.path.join(AYAR["uygulama"], "hazirlik.kilit"), "a") as k:
+            try: fcntl.flock(k, fcntl.LOCK_EX | fcntl.LOCK_NB); return False
+            except OSError: return True
+    except OSError: return False
 def toplantida():  # süren toplantı: aktarıcının nabız dosyasında toplantı + son 10 dk'da yazılmış
     try:
         y = os.path.join(AYAR["uygulama"], "canli", "heartbeat.json"); h = json.load(open(y, encoding="utf-8"))
@@ -790,7 +802,7 @@ class _Isci:
         except OSError: pass
         self.p.wait()
 
-def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR_YENILE, butce_sn=None):
+def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR_YENILE, butce_sn=None, ilerleme=None):  # ilerleme(n, toplam): sihirbaz (hazirlik.py)
     c = c or baglan(); t0 = time.time(); tara(c)
     adaylar = [r for r in c.execute("SELECT yol, sha256, mtime FROM tarama WHERE gizli=0 AND kopya_of IS NULL AND hata IS NULL ORDER BY mtime DESC")
                if os.path.splitext(r[0])[1].lower() in CEVIR_UZ]
@@ -822,6 +834,7 @@ def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR
             with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(kayit, f, ensure_ascii=False)
             os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
             if o.get("hata") == "parolali": c.execute("UPDATE tarama SET hata='parolali' WHERE yol=?", (kisa,))
+            if ilerleme: ilerleme(i + 1, len(yap))
             if not sessiz: print(f"  [{i + 1}/{len(yap)}] {kisa} — " + (f"hata: {o['hata']}" if o.get("hata") else f"{len(kayit['parcalar'])} parça, {kayit['sure']} sn"), file=sys.stderr)
     finally:
         if isci: isci.kapat()
@@ -878,7 +891,7 @@ def anlam_ara(q, k=ANLAM_K):
     except (FileNotFoundError, ConnectionRefusedError): anlam_sunucu_ac(); return None
     except (OSError, ValueError, KeyError): return None
     finally: s.close()
-def gomme(c=None, butce_sn=None, sessiz=True):
+def gomme(c=None, butce_sn=None, sessiz=True, ilerleme=None):
     # eksik gömmeleri hesapla (işçi en çok 4 pakette bir yenilenir); toplantıda başlamaz → {"eksik", "yapilan", "durdu", "sure_sn"}
     import subprocess
     c = c or baglan(); t0 = time.time(); top = {"eksik": None, "yapilan": 0, "durdu": None}
@@ -896,6 +909,7 @@ def gomme(c=None, butce_sn=None, sessiz=True):
         except (subprocess.TimeoutExpired, ValueError, IndexError, OSError) as e: top["durdu"] = f"işçi hatası ({e.__class__.__name__})"; break
         if top["eksik"] is None: top["eksik"] = o["eksik"]
         top["yapilan"] += o["yapilan"]
+        if ilerleme and top["eksik"]: ilerleme(top["yapilan"], top["eksik"])
         if not sessiz and o["yapilan"]: print(f"  gömme: {top['yapilan']}/{top['eksik']} parça", file=sys.stderr)
         if o.get("durdu") != "paket sınırı": top["durdu"] = o.get("durdu"); break
     top["sure_sn"] = round(time.time() - t0, 1); return top
@@ -1093,6 +1107,7 @@ if __name__ == "__main__":
     A = ap.parse_args()
     if A.cmd == "dizin":
         c = baglan(); guncelle(c, A.yeniden, sessiz=False)
+        if hazirlik_suruyor(): print("dizin: sihirbazın proje hazırlığı sürüyor — çevirme ve gömme onda", file=sys.stderr); sys.exit(0)
         if AYAR.get("cevir", True) is not False and os.path.exists(CEVIR_PY) and not toplantida():  # Brifing yardımcısının turu: çevrilmemiş PDF/görüntü (en çok ~4 dk)
             r = cevir(c, butce_sn=int(AYAR.get("cevir_tur_sn") or 240))
             if r["cevrildi"] or r["hata"] or r["durdu"]: print(cevir_ozet(r), file=sys.stderr)

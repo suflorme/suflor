@@ -391,6 +391,43 @@ def ac(hedef):
         try: url = json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{a['port']}/tek-kullanim", data=b"{}", method="POST"), timeout=3))["url"]
         except Exception: url = f"http://127.0.0.1:{a['port']}/"
         subprocess.Popen(["open"] + (["-a", "Google Chrome"] if os.path.isdir("/Applications/Google Chrome.app") else []) + [url])  # pano Chrome'da; threading.Timer(3, lambda: os._exit(0)).start()
+# ---------- proje hazırlığı (T6, v0.76.0): sihirbazın B–F ekranları → hazirlik.py (alt süreç; ayar SUFLOR_AYAR'dan) ----------
+HZ = {"tara": None}; HZ_LOG = os.path.join(EV, "Library", "Logs", "suflor-hazirlik.log")
+def _hz_env(): return dict(os.environ, SUFLOR_AYAR=AYAR_YOL, PYTHONDONTWRITEBYTECODE="1")
+def _hz(komut, girdi=None, zaman=60):
+    if not os.path.isfile(AYAR_YOL): return {"ayar_yok": True}
+    try:
+        r = subprocess.run([PY, "-B", os.path.join(KOD, "hazirlik.py"), komut], input=girdi, capture_output=True, text=True, timeout=zaman, env=_hz_env(), cwd=KOD)
+        return json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"hata": (r.stderr.strip().splitlines() or ["?"])[-1][:200]}
+    except (subprocess.TimeoutExpired, ValueError, OSError) as e: return {"hata": e.__class__.__name__}
+def _hz_arka(*arg):
+    os.makedirs(os.path.dirname(HZ_LOG), exist_ok=True); log = open(HZ_LOG, "a", encoding="utf-8")
+    log.write(f"\n--- {datetime.datetime.now().isoformat(timespec='seconds')} hazirlik.py {' '.join(arg)}\n"); log.flush()
+    return subprocess.Popen([PY, "-B", os.path.join(KOD, "hazirlik.py")] + list(arg), stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                            env=_hz_env(), cwd=KOD, start_new_session=True)  # sihirbaz kapansa da sürer
+def hz_ozet():
+    p = HZ["tara"]; suruyor = bool(p and p.poll() is None)  # önce: tarama özet okunurken biterse eski rapor "bitti" diye görünmesin
+    o = _hz("ozet"); o["tara_suruyor"] = suruyor; return o
+def hz_tara():
+    p = HZ["tara"]
+    if not (p and p.poll() is None): HZ["tara"] = _hz_arka("tara")
+    return {"ok": True}
+def hz_isaret(p):
+    # B ekranı: dizine alma işareti. tur "haric": yol (dosya/klasör) ayar "haric"e girer/çıkar; adla hariç tutulan dosya için "dahil" listesi;
+    # tur "asil": türetilmiş/dışa aktarım sayılanı asıl say. Sonra tarama yeniden.
+    yol = str(p.get("yol") or "").strip().strip("/"); tur = p.get("tur"); ac = bool(p.get("deger"))
+    if not yol or ".." in yol.split("/") or tur not in ("haric", "dahil", "asil"): return {"ok": False, "hata": "yol"}
+    def fn(a):
+        l = [x for x in (a.get(tur) or []) if x != yol]
+        if ac: l.append(yol)
+        if l: a[tur] = l
+        else: a.pop(tur, None)
+    ayar_degistir(fn); hz_tara(); return {"ok": True}
+def hz_baslat(kart):
+    o = _hz("ozet")
+    if (o.get("is") or {}).get("calisiyor"): return {"ok": True, "zaten": True}
+    _hz_arka("calis", *(["--kart"] if kart else [])); return {"ok": True}
+
 def klasor_sec():
     r = sh("osascript", "-e", 'POSIX path of (choose folder with prompt "Suflor.me proje klasörü")', zaman=300)
     return r.rstrip("/") if r else None
@@ -438,8 +475,10 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/durum":
             a = ayar()
             return self._json({"mac": mac(), "claude": claude_durum(), "modeller": modeller_durum(), "eklenti": eklenti(), "takvim": takvim(), "yerel_ses": yerel_ses(),
-                               "kod": KOD, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
+                               "kod": KOD, "mod": A.adim if A else None, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
         if yol == "/api/kayit": return self._json(oku_json(KAYIT))
+        if yol == "/api/hazirlik": return self._json(hz_ozet())
+        if yol == "/api/hazirlik/kart": return self._json(_hz("kart"))
         if yol in ("/", "/index.html"): yol = "/sihirbaz/index.html"
         if yol.startswith(("/sihirbaz/", "/marka/")):
             f = os.path.realpath(os.path.join(KOD, yol.lstrip("/")))
@@ -458,7 +497,7 @@ class H(BaseHTTPRequestHandler):
             d = os.path.join(YUKLEME, "gorusmeler" if tur == "gorusme" else "linkedin"); os.makedirs(d, exist_ok=True)
             open(os.path.join(d, ad), "wb").write(govde); return self._json({"ok": True})
         p = json.loads(govde or b"{}")
-        if yol == "/api/kaydet": yaz_json(KAYIT, dict(oku_json(KAYIT), dil=p.get("dil"), adim=p.get("adim"), cevap=p.get("cevap") or {}, t=time.time())); return self._json({"ok": True})
+        if yol == "/api/kaydet": yaz_json(KAYIT, dict(oku_json(KAYIT), dil=p.get("dil"), adim=p.get("adim"), adim_id=p.get("adim_id"), cevap=p.get("cevap") or {}, t=time.time())); return self._json({"ok": True})
         if yol == "/api/modeller/baslat": modeller_baslat(); return self._json(modeller_durum())
         if yol == "/api/claude/denetle": claude_denetle(); return self._json(claude_durum())
         if yol == "/api/teshis": return self._json(teshis_ayarla(p.get("acik")))
@@ -467,6 +506,10 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/kur/tamamla": return self._json(tamamla(p.get("cevap") or {}, p.get("dil") or "tr"))
         if yol == "/api/klasor-sec": return self._json({"yol": klasor_sec()})
         if yol == "/api/ac": ac(str(p.get("hedef") or "")); return self._json({"ok": True})
+        if yol == "/api/hazirlik/tara": return self._json(hz_tara())
+        if yol == "/api/hazirlik/isaret": return self._json(hz_isaret(p))
+        if yol == "/api/hazirlik/baslat": return self._json(hz_baslat(bool(p.get("kart"))))
+        if yol == "/api/hazirlik/kart-onayla": return self._json(_hz("kart-onayla", json.dumps({"cikar": p.get("cikar") or {}, "terimler": p.get("terimler")}), zaman=120))
         self._json({"hata": "yok"}, 404)
 
 # ---------- kur / kaldir / modeller / guncelle (komut satırı) ----------
@@ -934,7 +977,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
     ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "modeller", "guncelle", "profil"], metavar="kur|kaldir|modeller|guncelle|profil")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
-    ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)"); A = ap.parse_args()
+    ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
+    ap.add_argument("--adim", choices=["hazirlik"], help="yalnız proje hazırlığı ekranları (panodaki 'Projeyi yeniden hazırla' → hazirla.command)"); A = ap.parse_args()
     if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak), "profil": profil}[A.is_](); sys.exit(0)
     os.makedirs(DESTEK, exist_ok=True)
     # port doluysa (ör. diğer macOS hesabının sihirbazı) sonrakini dene — önceden ikinci sihirbaz açılmıyor, kur.sh

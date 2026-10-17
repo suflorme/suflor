@@ -1557,6 +1557,15 @@ def guncelle_baslat():
     GUN.update(durum=None, hata=None, p=subprocess.Popen(["/bin/bash", os.path.join(k, "guncelle.command")], cwd=k, stdout=log, stderr=subprocess.STDOUT,
                                                          stdin=subprocess.DEVNULL, start_new_session=True))
     print(f"GÜNCELLEME: panodan başlatıldı (v{SURUM} → v{GUN['son'] or '?'})"); return {"ok": True}
+def hazirla_ac():  # v0.76.0 (T6): sihirbazı yalnız proje hazırlığı ekranlarıyla açar. open ile (LaunchServices → Terminal): launchd'deki aktarıcının
+    # alt süreci proje klasörünü (Masaüstü) okuyamaz; Terminal'in izniyle çalışan sihirbaz okur
+    k = _kod_dir(); c = os.path.join(k, "hazirla.command") if k else ""
+    if not c or not os.path.isfile(c): return {"ok": False, "err": _t("Kurulum klasörü bulunamadı (ayar kod)", "Install folder not found (setting kod)")}
+    if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürüyor — bitince", "A meeting is in progress — after it ends")}
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"HAZIRLIK: (deneme) açılacaktı {c}"); return {"ok": True}
+    try: subprocess.Popen(["/usr/bin/open", c], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e: return {"ok": False, "err": e.__class__.__name__}
+    print("HAZIRLIK: sihirbaz panodan açıldı"); return {"ok": True}
 def modelleri_isit():  # panodan başlatınca Whisper (v0.13.12: ses izi içinde) toplantıdan önce yüklenir (~5 sn)
     if STATE["whisper"].get("durum") != "yok": WH_Q.put({"isinma": True, "kuyruga": time.time()}); _isci_baslat()
 def claude_yolu():
@@ -1845,6 +1854,9 @@ class H(BaseHTTPRequestHandler):
             if not (o in EKLENTI_KOKEN or pano):  # başka eklenti Claude oturumu açtıramasın
                 print(f"KÖKEN: /baslat reddedildi · {o[:80] or '-'} (Suflor.me eklentisiyse kimliği ayara ekle: eklenti_kimlik)"); return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(baslat(p))
+        if self.path == "/hazirla":  # v0.76.0 (T6): panodan "Projeyi yeniden hazırla" — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(hazirla_ac())
         if self.path == "/guncelle":  # panodan güncelleme — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(guncelle_baslat())

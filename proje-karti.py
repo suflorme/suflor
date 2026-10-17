@@ -199,7 +199,7 @@ def vt_oku():
     c.close(); return out
 
 # --- Komutlar ---------------------------------------------------------------------------------------------------------
-def cikar(sinir=SINIR, model=None, paralel=4, tahmin=False, sessiz=True):
+def cikar(sinir=SINIR, model=None, paralel=4, tahmin=False, sessiz=True, ilerleme=None):  # ilerleme(n, toplam): sihirbaz (hazirlik.py)
     model = model or AYAR.get("kart_model") or "sonnet"; c = B.baglan(); t0 = time.time()
     adaylar = aday_belgeler(c, sinir); duzenli_var = any(d for *_, d in adaylar)
     metinler = [(y, d, belge_metni(c, y)) for y, _, _, d in adaylar]
@@ -217,6 +217,7 @@ def cikar(sinir=SINIR, model=None, paralel=4, tahmin=False, sessiz=True):
         with kilit:
             usd += u; onb += ob; sonuc[i] = (y, d, o)
             if o.get("hata"): hatalar.append((y, o["hata"]))
+            if ilerleme: ilerleme(sum(1 for s in sonuc if s), len(metinler))
             if not sessiz: print(f"  [{sum(1 for s in sonuc if s)}/{len(metinler)}] {y}" + (" (önbellek)" if ob else "") + (f" — hata: {o['hata']}" if o.get("hata") else ""), file=sys.stderr)
     with concurrent.futures.ThreadPoolExecutor(max(1, paralel)) as ex: list(ex.map(is_, range(len(metinler))))
     sonuclar = [s for s in sonuc if s]
@@ -251,14 +252,14 @@ def ozet_satiri(k):
     if k.get("durdu"): s += f"\n  durdu: {k['durdu']}"
     return s
 
-def onayla(taslak=None, kim="kullanici"):
+def onayla(taslak=None, kim="kullanici", terimler=None):  # terimler: sihirbazın E ekranında kullanıcının seçtiği sözlük terimleri (None: kurala göre)
     k = taslak or json.load(open(TASLAK, encoding="utf-8"))
     k = dict(k, onay={"t": int(time.time()), "kim": kim})
     with open(KART + ".tmp", "w", encoding="utf-8") as f: json.dump(k, f, ensure_ascii=False, indent=1)
     os.chmod(KART + ".tmp", 0o600); os.replace(KART + ".tmp", KART)
     with open(GECMIS, "a", encoding="utf-8") as f: f.write(json.dumps({"t": k["onay"]["t"], "kim": kim, "belge": k["belge"], "kisi": len(k["kisiler"]), "sozluk": len(k["sozluk"])}) + "\n")
     duz_yol = {y for y in {s[0] for m in k.get("sozluk") or [] for s in m.get("kaynaklar") or []} if y.count("/") <= 1 and DUZENLI_RX.match(os.path.basename(y))}
-    eklenen = sozluge_aktar(k.get("sozluk") or [], duz_yol)
+    eklenen = sozluge_aktar(k.get("sozluk") or [], duz_yol, terimler)
     notu = claude_notu(k) if k.get("kip") != "duzenli" else False  # düzenli klasörde belgeler değişmez
     return {"sozluk_eklenen": eklenen, "claude_notu": notu}
 
@@ -269,13 +270,14 @@ def sozluk_aktarilir(m, duz_yol):
     if SOZ_KONUSULMAZ.search(m["terim"]): return False
     kay = {k[0] for k in m.get("kaynaklar") or []}
     return len(kay) >= 2 or bool(kay & duz_yol)
-def sozluge_aktar(maddeler, duz_yol=frozenset()):
+def sozluge_aktar(maddeler, duz_yol=frozenset(), terimler=None):
     # kartın sözlüğü → sozluk.json (kaynak proje-karti; yanlış yazımı yok: düzeltme yapmaz, Whisper istemine özel ad olarak girer)
     try: s = json.load(open(SOZLUK, encoding="utf-8"))
     except (OSError, ValueError): s = {"surum": 1, "terimler": []}
     var = {n(t.get("dogru")) for t in s.get("terimler", [])} | {n(y) for t in s.get("terimler", []) for y in (t.get("yanlis") or [])}
     eklenen = 0
-    secilen = sorted((m for m in maddeler if sozluk_aktarilir(m, duz_yol)), key=lambda m: (not ({k[0] for k in m.get("kaynaklar") or []} & duz_yol), -len({k[0] for k in m.get("kaynaklar") or []})))
+    secim = {n(t) for t in terimler} if terimler is not None else None  # kullanıcı seçtiyse kural yerine seçim (en çok yine SOZ_AKTAR_EN_COK)
+    secilen = sorted((m for m in maddeler if (n(m["terim"]) in secim if secim is not None else sozluk_aktarilir(m, duz_yol))), key=lambda m: (not ({k[0] for k in m.get("kaynaklar") or []} & duz_yol), -len({k[0] for k in m.get("kaynaklar") or []})))
     for m in secilen[:SOZ_AKTAR_EN_COK]:
         if n(m["terim"]) and n(m["terim"]) not in var:
             s.setdefault("terimler", []).append({"dogru": m["terim"], "yanlis": [], "kip": "duzelt", "kaynak": "proje-karti", "not": m.get("aciklama", "")[:120]})

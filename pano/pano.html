@@ -605,10 +605,11 @@ const AYG=[['E-posta',[['eposta','sec','Taslak nerede açılsın','Brifing ve ö
   ['Gizlilik',[['kanit_metin','bool','Kanıttaki yazı','Kanıt görüntüsündeki yazı Mac’te okunur (görüntü Mac’ten çıkmaz) ve toplantı defterine eklenir. Kapalıyken de Claude gerekince kanıt görüntüsüne bakar.'],['teshis','bool','Teknik teşhis gönder','Yalnız sürüm, donanım, hata türü ve sayılar geliştiriciye gider; toplantı içeriği gitmez.'],
     ['ses_izi_hafiza','bool','Ses izi hafızası','Konuşanların ses izi bu Mac’te saklanır; sonraki toplantılarda adları bulunur.'],
     ['konus_gecmis','bool','Konuş geçmişi','Konuş’a sorduğun sorular ve cevapları bu Mac’te 90 gün saklanır; asistan önceki konuşmalarınızı hatırlar. Karşı tarafın soruları girmez.'],
-    ['gecmis_goster','dugme','Konuş geçmişini gör','Kayıtları tek tek silebilirsin.']]]]
+    ['gecmis_goster','dugme','Konuş geçmişini gör','Kayıtları tek tek silebilirsin.']]],
+  ['Proje',[['proje_hazirla','hazirla','Projeyi yeniden hazırla','Klasörü yeniden tarar; yeni belgeleri metne çevirip dizinler, istersen proje kartını günceller. Kurulum sihirbazı yalnız bu ekranlarla açılır.']]]]
 function ayCiz(){const a=(last&&last.ayarlar)||{deger:{}},d=a.deger,tah={gmail:'Gmail',outlook:'Outlook (web)',mailto:L("Mac'in posta uygulaması")}[(last&&last.eposta)||'mailto']
   document.getElementById('ayi').innerHTML=AYG.map(([g,al])=>`<div class=ayg>${esc(L(g))}</div>`+al.map(([k,tur,ad,ac,sec])=>{const v=d[k],kap=(k==='ses_motoru'&&!a.piper)||(['masaustu_mic','masaustu_kisiler','kisayollar','menu_cubugu'].includes(k)&&!a.menu)
-    const c=tur==='dugme'?`<button type=button class=gh data-gecmis>${esc(L('Göster'))}</button>`:tur==='bool'?`<input type=checkbox data-ay=${k} ${v?'checked':''} ${kap?'disabled':''}>`:tur==='sec'?`<select data-ay=${k} ${kap?'disabled':''}>${sec.map(([o,t])=>`<option value="${o}" ${String(v)===o?'selected':''}>${esc(L(t))}${k==='eposta'&&o===''&&!v?' ('+esc(tah)+')':''}</option>`).join('')}</select>`
+    const c=tur==='hazirla'?`<button type=button class=gh data-hazirla>${esc(L('Aç'))}</button>`:tur==='dugme'?`<button type=button class=gh data-gecmis>${esc(L('Göster'))}</button>`:tur==='bool'?`<input type=checkbox data-ay=${k} ${v?'checked':''} ${kap?'disabled':''}>`:tur==='sec'?`<select data-ay=${k} ${kap?'disabled':''}>${sec.map(([o,t])=>`<option value="${o}" ${String(v)===o?'selected':''}>${esc(L(t))}${k==='eposta'&&o===''&&!v?' ('+esc(tah)+')':''}</option>`).join('')}</select>`
       :tur==='sayi'?`<input type=number data-ay=${k} min=0 step=5 value="${esc(v)}">`:`<input data-ay=${k} data-tur=adres inputmode=email value="${esc(v||'')}" placeholder="${esc(L('takvim adresin'))}">`
     return `<div class="ayr${kap?' kapali':''}"><div><b>${esc(L(ad))}</b><div class=hint>${esc(L(ac))}${kap?' '+esc(L(k==='ses_motoru'?'(Piper kurulu değil)':'(menü çubuğu uygulaması kurulu değil)')):''}</div></div>${c}</div>`}).join('')).join('')
   document.getElementById('aym').textContent=''}
@@ -622,7 +623,9 @@ async function gecmisCiz(){let r={};try{r=await j('/konus-gecmis')}catch(e){}
 document.getElementById('kgi').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-sil]');if(!b)return;b.disabled=true
   let r={};try{r=await j('/konus-gecmis-sil',{method:'POST',body:JSON.stringify({id:b.dataset.sil})})}catch(e){}
   document.getElementById('kgm').textContent=r.ok?L('Silindi'):L('Silinemedi')+(r.err?' — '+r.err:'');await gecmisCiz()})
-document.getElementById('ayi').addEventListener('click',ev=>{if(ev.target.closest('button[data-gecmis]'))gecmisAc()})
+document.getElementById('ayi').addEventListener('click',async ev=>{if(ev.target.closest('button[data-gecmis]'))gecmisAc()
+  // v0.76.0 (T6): sihirbazın proje hazırlığı ekranları — aktarıcı hazirla.command'ı açar (Masaüstü izni Terminal'den; launchd'deki aktarıcı klasörü okuyamaz)
+  if(ev.target.closest('button[data-hazirla]')){const m=document.getElementById('aym');let r={};try{r=await j('/hazirla',{method:'POST',body:'{}'})}catch(e){}m.textContent=r.ok?L('Sihirbaz açılıyor — Terminal penceresi bir an görünür'):(r.err||L('açılamadı'))}})
 function ayarAc(k){const d=document.getElementById('ayd');ayCiz();d.showModal();const e=k&&d.querySelector(`[data-ay=${k}]`);if(e){e.closest('.ayr').scrollIntoView({block:'center'});e.focus()}}
 {const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear')
   document.getElementById('ay').onclick=()=>ayarAc()
