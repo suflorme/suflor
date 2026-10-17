@@ -99,6 +99,10 @@ try:
     sha = c.execute("SELECT sha256, kaynak_turu FROM dosya WHERE yol='tablolar/butce.md'").fetchone()
     kontrol("dizindeki dosya satırına alanlar yazıldı", sat == {"belgeler/teklif-v1.md": 0, "belgeler/teklif-v2.md": 0, "belgeler/Teklif_final.md": 1}
             and sha and len(sha[0] or "") == 64 and sha[1] == "turetilmis", f"{sat} {sha}")
+    kontrol("birebir kopya ve adla hariç dizinde değil, asıl dizinde", not c.execute("SELECT 1 FROM dosya WHERE yol IN ('belgeler/rapor (1).docx', 'eski/rapor.docx', 'belgeler/sifre-listesi.txt', 'ik/Maaş-tablosu.csv')").fetchone()
+            and c.execute("SELECT 1 FROM dosya WHERE yol='belgeler/rapor.docx'").fetchone())
+    os.remove(os.path.join(P, "belgeler/rapor.docx")); m.tara(c); m.guncelle(c)
+    kontrol("asıl silinince kopyası dizine girdi", c.execute("SELECT count(*) FROM dosya WHERE yol IN ('belgeler/rapor (1).docx', 'eski/rapor.docx')").fetchone()[0] == 1)
     yaz("belgeler/teklif-v1.md", TEKLIF + " değişti", gun=4); m.guncelle(c)
     kontrol("dosya değişip yeniden dizinlenince eski tarama alanı boş", c.execute("SELECT sha256 FROM dosya WHERE yol='belgeler/teklif-v1.md'").fetchone()[0] is None
             and c.execute("SELECT sha256 FROM dosya WHERE yol='belgeler/teklif-v2.md'").fetchone()[0] is not None)

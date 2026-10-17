@@ -642,7 +642,10 @@ def tara(c=None, sessiz=True):
     simdi = time.time()
     c.executemany("INSERT OR REPLACE INTO tarama VALUES(:yol,:mtime,:boy,:tur,:sha256,:minhash,:surum_grubu,:gecerli,:kopya_of,:kaynak_turu,:kaynak_neden,:gizli,:gizli_neden,:hata,:t)",
                   [dict(s, t=simdi) for s in satir.values()])
-    tara_dosyaya(c); c.commit()
+    tara_dosyaya(c)
+    for s in satir.values():  # kopya ve adla hariç dizinden çıkar (dizinle de almaz; kopya olmaktan çıkınca sonraki dizin turu geri alır)
+        if (s["kopya_of"] or s["gizli"]) and c.execute("SELECT 1 FROM dosya WHERE yol=?", (s["yol"],)).fetchone(): sil(c, s["yol"]); c.execute("DELETE FROM dosya WHERE yol=?", (s["yol"],))
+    c.commit()
     ss = list(satir.values())
     rapor = {"t": int(simdi), "proje": PROJE, "sure_sn": round(time.time() - t0, 1),
              "sayilar": {"dosya": len(ss), "boyut": sum(s["boy"] for s in ss), "tur": dict(collections.Counter(s["tur"] for s in ss).most_common()),
