@@ -474,7 +474,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "aktarici/", "manifest.json", "whisper-isci.py", "piper-isci.py", "tur-isci.py", "cevir-isci.py", "toplanti-claude.py", "yapi.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "aktarici/", "manifest.json", "whisper-isci.py", "piper-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "toplanti-claude.py", "yapi.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 ESKI_BETIK = ["kur.command", "relay-baslat.command"]  # tek kurulum komutuyla kalktı; açık depodan güncellemede kod klasöründen silinir
 TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
@@ -598,6 +598,7 @@ def tur_kur(ort):  # tur sonu modeli (smart-turn v3, BSD-2, 8,7 MB) + küçük o
 # Belge → metin (proje hazırlığı T2): Docling + Apple Vision, ayrı Python 3.12 ortamında (Docling ≥ 3.10 ister; sistem Python'u 3.9).
 # Python: python-build-standalone (taşınabilir, yönetici izni gerekmez) SHA-256 doğrulanarak <ortak>/python312'ye; ortam <ortak>/cevir-venv
 # (cevir-gereksinim.txt'deki sabit sürümler, --no-deps; ~1,4 GB); modeller <ortak>/cevir-modeller (yerleşim + tablo, ~0,7 GB).
+# Anlama göre arama (T4) aynı ortamda: sentence-transformers + intfloat/multilingual-e5-base (MIT) <ortak>/anlam-modeller (~1,1 GB).
 # Kurulamazsa not düşer, aktarıcı ve dizin çalışmaya devam eder (PDF/görüntü dizine girmez).
 PBS_URL = "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.12.11%2B20250918-aarch64-apple-darwin-install_only_stripped.tar.gz"
 PBS_SHA = "559fb918c10f0cff226604257dcc390b391c87e6cbb2426824e99069c143e714"
@@ -608,7 +609,9 @@ def cevir_kur(ort):
     md = os.path.join(ort, "cevir-modeller")
     venv_ok = bool((r := sessiz(vpy, "-c", f"from importlib.metadata import version as v; import ocrmac; assert v('docling') == '{CEVIR_DOCLING}'")) and r.returncode == 0)
     model_ok = os.path.isdir(os.path.join(md, "docling-project--docling-layout-heron")) and os.path.isdir(os.path.join(md, "docling-project--docling-models"))
-    if venv_ok and model_ok: say("✓ belge çevirme ortamı var"); return
+    am = os.path.join(ort, "anlam-modeller"); anlam_ok = bool(glob_(os.path.join(am, "hub", "models--intfloat--multilingual-e5-base", "snapshots", "*", "model.safetensors")))
+    venv_ok = venv_ok and bool((r := sessiz(vpy, "-c", "import sentence_transformers")) and r.returncode == 0)
+    if venv_ok and model_ok and anlam_ok: say("✓ belge çevirme ve anlam araması ortamı var"); return
     if not os.access(ort, os.W_OK): say("Not: belge çevirme ortamı yok ve ortak klasör başka hesabın — PDF ve görüntüler aranamaz"); return
     if platform.machine() != "arm64": say("Not: belge çevirme yalnız Apple işlemcili Mac'te (M1 ve sonrası) — PDF ve görüntüler aranamaz"); return
     if shutil.disk_usage(ort).free < 4 * 2 ** 30: say("Not: belge çevirme için en az 4 GB boş yer gerekli — atlandı"); return
@@ -635,10 +638,19 @@ def cevir_kur(ort):
                                 "d(Path(sys.argv[1]), with_layout=True, with_tableformer=True, with_code_formula=False, with_picture_classifier=False, "
                                 "with_rapidocr=False, with_easyocr=False)", md], capture_output=True, timeout=1800)
             if r.returncode: raise RuntimeError("modeller indirilemedi")
+        if not anlam_ok:
+            say("→ anlam araması modeli indiriliyor (~1,1 GB)…")
+            r = subprocess.run([vpy, "-c", "from huggingface_hub import snapshot_download as s; s('intfloat/multilingual-e5-base', allow_patterns=['*.json', '*.txt', "
+                                "'sentencepiece.bpe.model', 'model.safetensors', '1_Pooling/*'])"], capture_output=True, timeout=1800, env=dict(os.environ, HF_HOME=am))
+            if r.returncode: raise RuntimeError("anlam modeli indirilemedi")
         r = subprocess.run([vpy, "-B", os.path.join(KOD, "cevir-isci.py")], input="", capture_output=True, text=True, timeout=300,
                            env=dict(os.environ, SUFLOR_ORTAK=ort))
         if '"hazir": true' not in r.stdout: raise RuntimeError("deneme açılışı: " + (r.stdout + r.stderr)[-160:])
-        sessiz("chmod", "-R", "go+rX", os.path.join(ort, "python312"), os.path.join(ort, "cevir-venv"), md); say("✓ belge çevirme hazır (çevrimdışı açıldı)")
+        r = subprocess.run([vpy, "-B", "-c", "import sys; exec(open(sys.argv[1]).read().split('if __name__')[0]); m, _ = model_ac(); "
+                            "print('anlam-tamam', len(m.encode(['query: deneme'])[0]))", os.path.join(KOD, "gomme-isci.py")],
+                           capture_output=True, text=True, timeout=600, env=dict(os.environ, SUFLOR_ORTAK=ort))
+        if "anlam-tamam 768" not in r.stdout: raise RuntimeError("anlam modeli açılmadı: " + (r.stdout + r.stderr)[-160:])
+        sessiz("chmod", "-R", "go+rX", os.path.join(ort, "python312"), os.path.join(ort, "cevir-venv"), md, am); say("✓ belge çevirme ve anlam araması hazır (çevrimdışı açıldı)")
     except Exception as e: say(f"Not: belge çevirme kurulamadı ({str(e)[:160]}) — PDF ve görüntüler aranamaz, sonraki güncellemede yeniden denenir")
 def glob_(desen):
     import glob; return glob.glob(desen)

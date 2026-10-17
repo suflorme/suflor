@@ -32,7 +32,7 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 ## Gerekenler
 - Apple Silicon (M serisi) işlemcili Mac, macOS 14 ya da üstü
 - En az 16 GB bellek (konuşma tanıma ve ses modeli toplantı sırasında ~4 GB kullanır)
-- ~10 GB boş disk (modeller ~5 GB, belge çevirme ~2,2 GB)
+- ~12 GB boş disk (modeller ~5 GB, belge çevirme ve anlam araması ~3,3 GB)
 - Google Chrome
 - [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü). Claude Code kurulu değilse sihirbaz kurar;
   Terminal'de `claude` → `/login` ile giriş gerekir (Claude masaüstü uygulamasındaki giriş Terminal'e geçmez).
@@ -91,6 +91,7 @@ Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_pytho
 | Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
 | Toplantıya söyle (`aktarici/toplantiya-ses.py`, `soyle-main.js`; ayar `toplantiya_ses`, varsayılan kapalı) | Konuş cevabını Mac sesiyle toplantıya okur: web toplantısında yalnız okuma süresince mikrofon kanalına karıştırır (sessizdeysen okumaz); masaüstü Teams'te BlackHole ile |
 | Tur sonu (`tur-isci.py`) | smart-turn v3 (8,7 MB, yerel): konuşurken sözün bitip bitmediğini tahmin eder; kurulamazsa sessizlik süresine bakılır |
+| Anlama göre arama (`gomme-isci.py`; `baglam.py gomme`) | multilingual-e5-base (MIT, ~1,1 GB, yerel): sorudaki sözcükler belgede geçmese de anlamca yakın parçaları bulur; sözcük aramasıyla birleştirilir. Arka planda bir sunucu açık kalır (~1 GB bellek), 30 dk sorgu gelmezse kapanır |
 | Belge çevirme (`cevir-isci.py`; `baglam.py tara`, `baglam.py cevir`) | Proje klasörünü tarar (kopya, eski sürüm, dışa aktarım, gizli görünen dosya) ve PDF, sunum, görüntüleri Mac'te metne çevirir: Docling + Apple Vision, ayrı Python 3.12 ortamında, ağ kapalı. Şifre, anahtar, kart ya da IBAN geçen parça aramaya girmez |
 | Claude köprüsü (`toplanti-claude.py`, `baglam.py`, `yapi.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
 | Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |

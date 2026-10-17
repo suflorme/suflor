@@ -448,7 +448,7 @@ TARA_TUR = {"belge": "md txt rtf docx doc odt pages pdf", "sunum": "pptx ppt key
             "eposta": "eml msg mbox", "ses": "mp3 m4a wav aac flac ogg opus", "video": "mp4 mov m4v webm mkv avi",
             "arsiv": "zip rar 7z tar gz tgz", "kod": "py js ts gs sql sh swift rb go java c h css ipynb drawio vtt srt"}
 TARA_TUR = {u: t for t, us in TARA_TUR.items() for u in us.split()}
-TARA_METIN = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".csv", ".tsv", ".xml", ".yaml", ".yml", ".vtt", ".srt", ".docx"}  # MinHash için bugün okunabilenler
+TARA_METIN = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".csv", ".tsv", ".xml", ".yaml", ".yml", ".vtt", ".srt", ".docx", ".xlsx"}  # MinHash için okunabilenler (+ çevrilmiş PDF/görüntü önbellekten)
 TARA_GIZLI_UZ = {".env", ".key", ".pem", ".p12", ".pfx", ".kdbx", ".keychain", ".gpg", ".asc", ".ovpn", ".ppk"}
 TARA_GIZLI_AD = re.compile(r"parola|sifre(?!le)|password|passwd|credential|maas|salary|bordro|payroll|(^|[^a-z])(id_rsa|id_ed25519|\.?env)($|[^a-z])")
 TARA_KIMLIK_AD = re.compile(r"kimlik|pasaport|passport|ehliyet|nufus|surucu belgesi|id[ _-]?card|kimlik karti")  # yalnız görüntü/PDF: kimlik taraması
@@ -525,9 +525,11 @@ def tara_kaynak_turu(kisa, ext, ayni_klasor_kokler, disa):
     if ext not in TARA_ASIL_UZ and any(u in TARA_ASIL_UZ and u != ext for u in ayni_klasor_kokler.get(kok, ())):
         return "turetilmis", "aynı adlı özgün belgenin çıktısı"
     return "asil", ""
-def tara_metin(yol, ext, sinir=200_000):
+def tara_metin(yol, ext, sinir=200_000, sha=None):
     try:
         if ext == ".docx": return docx_metin(yol)[:sinir]
+        if ext == ".xlsx": return " ".join(m for _, _, m in xlsx_parcala(yol))[:sinir]
+        if ext in CEVIR_UZ: ps = cevrilmis(yol, sha); return " ".join(m for _, m in ps)[:sinir] if ps else None
         if ext in (".html", ".htm"): return html_metin(open(yol, encoding="utf-8", errors="replace").read(sinir * 2))[:sinir]
         return open(yol, encoding="utf-8", errors="replace").read(sinir)
     except Exception: return None
@@ -589,8 +591,8 @@ def tara(c=None, sessiz=True):
             try: sha = _sha256(y)
             except OSError: eris.append(k); continue
             hata = tara_okunamaz(y, ext) if st.st_size else "bos"; mh = None
-            if ext in TARA_METIN and not hata and st.st_size <= (50 << 20):
-                t = tara_metin(y, ext); s = minhash(t) if t else None; mh = json.dumps(s) if s else None
+        if mh is None and (ext in TARA_METIN or ext in CEVIR_UZ) and not hata and st.st_size <= (50 << 20):  # çevrilmiş metin sonradan gelir
+            t = tara_metin(y, ext, sha=sha); s = minhash(t) if t else None; mh = json.dumps(s) if s else None
         kt, kn = tara_kaynak_turu(k, ext, kokler[os.path.dirname(k)], disa)
         gn = tara_gizli(k, ext, tur)
         satir[k] = dict(yol=k, mtime=st.st_mtime, boy=st.st_size, tur=tur, sha256=sha, minhash=mh, surum_grubu=None, gecerli=1, kopya_of=None,
@@ -623,7 +625,7 @@ def tara(c=None, sessiz=True):
             for b in g[i + 1:]:
                 ma, mb = (json.loads(a["minhash"]) if a["minhash"] else None), (json.loads(b["minhash"]) if b["minhash"] else None)
                 if ma and mb: ayni = minhash_benzer(ma, mb) >= TARA_BENZER
-                elif ext in TARA_METIN: ayni = False  # metin okunabildi ama boş/okunamadı: içerik kanıtı yok
+                elif ext in TARA_METIN or (a["minhash"] or b["minhash"]): ayni = False  # metin okunabildi ama boş/okunamadı ya da yalnız biri çevrildi: içerik kanıtı yok
                 else: ayni = not (a["_tarih"] or b["_tarih"])  # içerik henüz yok (T2): adında tarih varsa gruplama
                 if ayni: ata[bul(id(a))] = bul(id(b))
         alt = collections.defaultdict(list)
@@ -832,6 +834,73 @@ def cevir_ozet(r):
     if r["durdu"]: s.append("  durdu: " + r["durdu"])
     return "\n".join(s)
 
+# --- Anlama göre arama (proje hazırlığı T4, planlar/proje-hazirligi.md §2 Adım 3) ------------------------------------
+# multilingual-e5-base gömmeleri <uygulama>/gomme/ altında (gomme-isci.py; <ortak>/cevir-venv). Yalnız sonuçta görünebilen parçalar gömülür
+# (geçerli sürüm; veritabanı kipinde dışa aktarım hariç). Sorgu, arka planda açık tutulan sunucuya Unix soketiyle gider (~10 ms); sunucu yoksa
+# bu arama yalnız sözcükle yapılır ve sunucu açılır (ilk kez ~12 sn) — Konuş ön araması hiç beklemez. Sözcük ve anlam sıraları RRF (k = 60)
+# ile birleşir (k ve sözcük kesimi ölçümle: RRF_K, RRF_FTS). Toplu dizinleme Brifing yardımcısının dizin turunda (en çok `gomme_tur_sn`), toplantıda başlamaz, paketler arasında durur.
+GOMME = os.path.join(AYAR["uygulama"], "gomme"); ANLAM_SOKET = os.path.join(AYAR["uygulama"], "anlam.sock")
+GOMME_ISCI = os.environ.get("SUFLOR_GOMME_ISCI") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "gomme-isci.py")
+ANLAM_KAPALI = AYAR.get("anlam_arama") is False
+ANLAM_SN, ANLAM_K = 0.25, 100
+RRF_K, RRF_FTS = 10, 20  # gerçek proje ölçümü (27 proje + 46 görüşme sorusu, ilk 5): k=10 ve sözcük sırasının ilk 20'si en iyi denge — 11/27 · 24/46 → 14/27 · 35/46
+_ANLAM = {"acilis": 0}
+def anlam_hazir(): return not ANLAM_KAPALI and os.path.exists(CEVIR_PY) and os.path.isdir(os.path.join(AYAR["ortak"], "anlam-modeller")) and os.path.exists(os.path.join(GOMME, "durum.json"))
+def gomme_kosul():
+    k = "COALESCE(d.gecerli, 1) = 1"
+    return k + (" AND COALESCE(d.kaynak_turu, 'asil') != 'disa_aktarim'" if VT_KIPI else "")
+def anlam_sunucu_ac():
+    if time.time() - _ANLAM["acilis"] < 60: return  # açılıyor
+    _ANLAM["acilis"] = time.time()
+    import subprocess
+    try:
+        subprocess.Popen([CEVIR_PY, "-B", GOMME_ISCI, "--sunucu", "--db", DB, "--klasor", GOMME, "--soket", ANLAM_SOKET,
+                          "--bos-dk", str(AYAR.get("anlam_bos_dk") or 30)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=open(os.path.join(AYAR["uygulama"], "anlam-sunucu.log"), "a"), start_new_session=True,
+                         env=dict(os.environ, SUFLOR_ORTAK=AYAR["ortak"], PYTHONDONTWRITEBYTECODE="1"))
+    except OSError: pass
+def anlam_ara(q, k=ANLAM_K):
+    # → [(parça no, benzerlik)] ya da None (kapalı, hazır değil, sunucu açılıyor ya da zaman aşımı); hiçbir durumda ANLAM_SN'den fazla beklemez
+    if not anlam_hazir(): return None
+    import socket
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(ANLAM_SN)
+    try:
+        s.connect(ANLAM_SOKET); s.sendall((json.dumps({"q": q, "k": k}, ensure_ascii=False) + "\n").encode()); veri = b""
+        while not veri.endswith(b"\n"):
+            x = s.recv(1 << 20)
+            if not x: break
+            veri += x
+        o = json.loads(veri); return [(int(i), sk) for i, sk in o["sonuc"]] if "sonuc" in o else None
+    except (FileNotFoundError, ConnectionRefusedError): anlam_sunucu_ac(); return None
+    except (OSError, ValueError, KeyError): return None
+    finally: s.close()
+def gomme(c=None, butce_sn=None, sessiz=True):
+    # eksik gömmeleri hesapla (işçi en çok 4 pakette bir yenilenir); toplantıda başlamaz → {"eksik", "yapilan", "durdu", "sure_sn"}
+    import subprocess
+    c = c or baglan(); t0 = time.time(); top = {"eksik": None, "yapilan": 0, "durdu": None}
+    if ANLAM_KAPALI or not os.path.exists(CEVIR_PY) or not os.path.isdir(os.path.join(AYAR["ortak"], "anlam-modeller")): top["durdu"] = "anlam araması kurulu değil"; return top
+    nabiz = os.path.join(AYAR["uygulama"], "canli", "heartbeat.json")
+    while True:
+        if toplantida(): top["durdu"] = "toplantı"; break
+        kalan = None if not butce_sn else butce_sn - (time.time() - t0)
+        if kalan is not None and kalan < 20: top["durdu"] = "tur süresi doldu — sonraki turda sürer"; break
+        try:
+            r = subprocess.run([CEVIR_PY, "-B", GOMME_ISCI, "--dizinle", "--db", DB, "--klasor", GOMME, "--kosul", gomme_kosul(), "--nabiz", nabiz,
+                                "--paket-sinir", "4"] + (["--sure", str(int(kalan))] if kalan else []), capture_output=True, text=True,
+                               timeout=(kalan + 120) if kalan else 7200, env=dict(os.environ, SUFLOR_ORTAK=AYAR["ortak"], PYTHONDONTWRITEBYTECODE="1"))
+            o = json.loads(r.stdout.strip().splitlines()[-1])
+        except (subprocess.TimeoutExpired, ValueError, IndexError, OSError) as e: top["durdu"] = f"işçi hatası ({e.__class__.__name__})"; break
+        if top["eksik"] is None: top["eksik"] = o["eksik"]
+        top["yapilan"] += o["yapilan"]
+        if not sessiz and o["yapilan"]: print(f"  gömme: {top['yapilan']}/{top['eksik']} parça", file=sys.stderr)
+        if o.get("durdu") != "paket sınırı": top["durdu"] = o.get("durdu"); break
+    top["sure_sn"] = round(time.time() - t0, 1); return top
+def rrf_birlestir(sira_listeleri, k=RRF_K):
+    p = {}
+    for liste in sira_listeleri:
+        for r, i in enumerate(liste): p[i] = p.get(i, 0.0) + 1.0 / (k + r + 1)
+    return p
+
 # --- Sözlük ve sorgu --------------------------------------------------------------------------------------------
 _SOZ = {}
 def _mt(y):
@@ -923,8 +992,10 @@ def konusmacilar(c):
         if kelimeler(en) and kelimeler(en)[0] != kok[0]: TAKMA[kok[0]] = kelimeler(en)[0]; ad.add(kok[0])
     _ADLAR.update(ad); return ad
 TAKMA = {}
-def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2, guncel=True, kapsam=None, aralik=None):  # guncel=False: dizini güncellemeden (Konuş ön araması, ~0,1 sn)
+def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2, guncel=True, kapsam=None, aralik=None, eski=False, disa=None):  # guncel=False: dizini güncellemeden (Konuş ön araması, ~0,1 sn)
     # kapsam="ortak": yalnız ortak kaynaklar (özel kapsamlı bellek kaynakları ve Konuş geçmişi girmez); aralik=(baş, bitiş) ISO tarih: parçanın tarihi
+    # T3 (proje hazırlığı §2 Adım 3): sürüm grubunun eski sürümleri sonuçtan çıkar (eski=True: dahil); veritabanı kipinde (ayar veritabani)
+    # dışa aktarımlar sonuçtan çıkar (§2b; disa=True: dahil); türetilmiş ve dışa aktarım aynı puandaki asıl kaynağın arkasına düşer.
     c = baglan()
     if guncel: guncelle(c)
     if not kim:
@@ -932,12 +1003,14 @@ def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2, guncel=True, ka
         adlar = konusmacilar(c); bulunan = [w for w in kelimeler(q) if w in adlar]
         if bulunan:
             kalan = " ".join(w for w in kelimeler(q) if w not in bulunan)
-            once, ek = ara(kalan, bulunan[0], turler, son, max(2, n // 2), dosya_basina, guncel=False, kapsam=kapsam, aralik=aralik) if kalan.strip() else ([], [])
-            genel, ek2 = ara_ic(c, q, None, turler, son, n, dosya_basina, kapsam, aralik)
+            once, ek = ara(kalan, bulunan[0], turler, son, max(2, n // 2), dosya_basina, guncel=False, kapsam=kapsam, aralik=aralik, eski=eski, disa=disa) if kalan.strip() else ([], [])
+            genel, ek2 = ara_ic(c, q, None, turler, son, n, dosya_basina, kapsam, aralik, eski, disa)
             gor = {r[0] for r in once}
             return (once + [r for r in genel if r[0] not in gor])[:n], ek or ek2
-    return ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam, aralik)
-def ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam=None, aralik=None):
+    return ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam, aralik, eski, disa)
+VT_KIPI = isinstance(AYAR.get("veritabani"), dict) and bool(AYAR["veritabani"].get("yol"))
+IKINCIL = 0.9  # türetilmiş/dışa aktarım parçasının BM25 puanı çarpanı (puan eksi; küçük çarpan = geride)
+def ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam=None, aralik=None, eski=False, disa=None):
     gruplar, eklenen = sorgu_kur(q)
     if not gruplar and not kim: return [], eklenen
     if kim and not TAKMA: konusmacilar(c)  # --kim <takma ad> doğrudan gelince takma adlar henüz kurulmamış olabilir
@@ -946,11 +1019,14 @@ def ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam=None, aralik=None):
     if son: kosul.append("d.tarih >= ?"); arg.append((datetime.date.today() - datetime.timedelta(days=son)).isoformat())
     if kapsam == "ortak": kosul.append("COALESCE(d.kapsam, 'ortak') = 'ortak'")
     if aralik: kosul.append("COALESCE(p.tarih, d.tarih) BETWEEN ? AND ?"); arg += list(aralik)
+    if not eski: kosul.append("COALESCE(d.gecerli, 1) = 1")
+    if not (disa if disa is not None else not VT_KIPI): kosul.append("COALESCE(d.kaynak_turu, 'asil') != 'disa_aktarim'")
     def calis(eslesme):
         kk = kelimeler(kim)[0] if kim and kelimeler(kim) else None  # parantez — "a OR b AND kimn:x" b'ye bağlanıyordu
         m = ((f"({eslesme}) AND " if eslesme else "") + f"kimn : {terim(TAKMA.get(kk, kk))}") if kk else eslesme
         m = m.strip() or "*"
-        sql = ("SELECT p.id, p.yol, p.konum, p.kim, p.metin, d.tur, COALESCE(p.tarih, d.tarih), d.baslik, bm25(ara, 1.0, 0.3) AS s FROM ara "
+        sql = ("SELECT p.id, p.yol, p.konum, p.kim, p.metin, d.tur, COALESCE(p.tarih, d.tarih), d.baslik, bm25(ara, 1.0, 0.3) * "
+               f"(CASE WHEN d.kaynak_turu IN ('turetilmis', 'disa_aktarim') THEN {IKINCIL} ELSE 1.0 END) AS s FROM ara "
                "JOIN parca p ON p.id = ara.rowid JOIN dosya d ON d.yol = p.yol WHERE ara MATCH ? "
                + ("AND " + " AND ".join(kosul) if kosul else "") + " ORDER BY s LIMIT 200")
         try: return c.execute(sql, [m] + arg).fetchall()
@@ -959,12 +1035,24 @@ def ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam=None, aralik=None):
     if len(rows) < 3 and len(gruplar) > 1: rows = rows + [r for r in calis(" OR ".join(gruplar)) if r[0] not in {x[0] for x in rows}]
     # yakın tarihe hafif öncelik; aynı dosyadan en çok dosya_basina sonuç
     bugun = datetime.date.today()
-    def puan(r):
+    def yakinlik(r):
         try: gun = (bugun - datetime.date.fromisoformat(r[6])).days
         except Exception: gun = 365
-        return r[8] * (1.0 + 0.3 / (1 + max(gun, 0) / 14))
+        return 1.0 + 0.3 / (1 + max(gun, 0) / 14)
+    sirali = sorted(rows, key=lambda r: r[8] * yakinlik(r))
+    vek = anlam_ara(q) if not kim and not ANLAM_KAPALI else None  # T4: anlam sırası (sunucu yoksa None → yalnız sözcük)
+    if vek:
+        satir = {r[0]: r for r in rows}; eksik = [i for i, _ in vek if i not in satir]
+        if eksik:
+            sql = ("SELECT p.id, p.yol, p.konum, p.kim, p.metin, d.tur, COALESCE(p.tarih, d.tarih), d.baslik, 0.0 FROM parca p JOIN dosya d ON d.yol = p.yol "
+                   f"WHERE p.id IN ({','.join('?' * len(eksik))})" + (" AND " + " AND ".join(kosul) if kosul else ""))
+            for r in c.execute(sql, eksik + arg): satir[r[0]] = r
+        puan = rrf_birlestir([[r[0] for r in sirali[:RRF_FTS]], [i for i, _ in vek if i in satir]])
+        ikincil = {i for i, kt in c.execute(f"SELECT p.id, d.kaynak_turu FROM parca p JOIN dosya d ON d.yol = p.yol WHERE p.id IN ({','.join('?' * len(puan))})", list(puan))
+                   if kt in ("turetilmis", "disa_aktarim")}
+        sirali = [satir[i] for i in sorted(puan, key=lambda i: -puan[i] * (IKINCIL if i in ikincil else 1.0) * yakinlik(satir[i]))]
     secilen, say = [], {}
-    for r in sorted(rows, key=puan):
+    for r in sirali:
         if say.get(r[1], 0) >= dosya_basina: continue
         say[r[1]] = say.get(r[1], 0) + 1; secilen.append(r)
         if len(secilen) >= n: break
@@ -989,19 +1077,26 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("dizin"); d.add_argument("--yeniden", action="store_true")
     tr = sub.add_parser("tara"); tr.add_argument("--json", action="store_true", help="raporun tamamı")
+    gm = sub.add_parser("gomme"); gm.add_argument("--sure", type=int, help="en çok N sn")
     cv = sub.add_parser("cevir"); cv.add_argument("--n", type=int, help="en çok N dosya"); cv.add_argument("--yeniden-dene", action="store_true", help="hata/zaman aşımı kayıtlarını da")
     a = sub.add_parser("ara"); a.add_argument("sorgu"); a.add_argument("--kim"); a.add_argument("--tur", help="virgüllü: toplanti,gorusme,analiz,sunum,tablo,belge,karar,kural,konusma")
     a.add_argument("--son", type=int, help="son N gün"); a.add_argument("--n", type=int, default=8); a.add_argument("--kapsam", choices=["ortak"], help="yalnız ortak kaynaklar")
+    a.add_argument("--eski", action="store_true", help="eski sürümler dahil"); a.add_argument("--disa", action="store_true", help="dışa aktarımlar dahil (veritabanı kipinde)")
     A = ap.parse_args()
     if A.cmd == "dizin":
         c = baglan(); guncelle(c, A.yeniden, sessiz=False)
         if AYAR.get("cevir", True) is not False and os.path.exists(CEVIR_PY) and not toplantida():  # Brifing yardımcısının turu: çevrilmemiş PDF/görüntü (en çok ~4 dk)
             r = cevir(c, butce_sn=int(AYAR.get("cevir_tur_sn") or 240))
             if r["cevrildi"] or r["hata"] or r["durdu"]: print(cevir_ozet(r), file=sys.stderr)
+        if not toplantida():  # T4: eksik gömmeler (en çok ~4 dk)
+            g = gomme(c, butce_sn=int(AYAR.get("gomme_tur_sn") or 240))
+            if g["yapilan"] or (g["durdu"] and g["durdu"] != "anlam araması kurulu değil"): print(f"gömme: {g}", file=sys.stderr)
         for tur, nd, np_ in c.execute("SELECT tur, count(*), sum(parca) FROM dosya GROUP BY tur ORDER BY 3 DESC"): print(f"  {tur}: {nd} dosya, {np_} parça")
+    elif A.cmd == "gomme":
+        print(json.dumps(gomme(sessiz=False, butce_sn=A.sure), ensure_ascii=False))
     elif A.cmd == "cevir":
         r = cevir(sinir=A.n, yeniden_dene=A.yeniden_dene, sessiz=False); print(cevir_ozet(r))
     elif A.cmd == "tara":
         r = tara(); print(json.dumps(r, ensure_ascii=False, indent=1) if A.json else tara_ozet(r))
     else:
-        r = ara(A.sorgu, A.kim, A.tur.split(",") if A.tur else None, A.son, A.n, kapsam=A.kapsam); yaz(r, A.sorgu, r[1])
+        r = ara(A.sorgu, A.kim, A.tur.split(",") if A.tur else None, A.son, A.n, kapsam=A.kapsam, eski=A.eski, disa=True if A.disa else None); yaz(r, A.sorgu, r[1])

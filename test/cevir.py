@@ -87,11 +87,28 @@ try:
     kontrol("toplantı sürerken çevirmedi, nedeni yazdı", r4["cevrildi"] == 0 and "toplantı" in (r4["durdu"] or ""), json.dumps(r4)[:200])
     os.remove(os.path.join(U, "canli", "heartbeat.json")); r5 = m.cevir(c)
     kontrol("toplantı bitince kaldığı yerden: yalnız yeni 3 dosya", r5["cevrildi"] == 3 and r5["kalan"] == 0, json.dumps(r5)[:200])
+    # çevrilmiş metin sürüm benzerliğine girer: tarihli adlı iki taranmış PDF, aynı metin → sürüm; farklı metin → değil
+    m.CEVIR_ISCI = os.path.join(KOD, "cevir-isci.py"); m.AYAR.pop("cevir_sure_sn", None)
+    URET2 = "import sys\nfrom PIL import Image, ImageDraw, ImageFont\nf = ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial.ttf', 30)\n" \
+            "for yol, metin in zip(sys.argv[1::2], sys.argv[2::2]):\n    im = Image.new('RGB', (1500, 700), 'white'); d = ImageDraw.Draw(im)\n" \
+            "    for i, s in enumerate(metin.split('|')): d.text((50, 50 + 60 * i), s, fill='black', font=f)\n    im.save(yol)\n"
+    ORT_M = "Haftalık depo raporu: Bursa deposunda sayım tamamlandı|eksik ürün yok, iade kutuları ayrıldı|sevkiyat planı perşembe günü güncellenecek|forklift bakımı ay sonunda yapılacak|personel vardiyası değişmedi"
+    os.makedirs(f"{P}/rapor", exist_ok=True)
+    subprocess.run([VPY, "-B", "-c", URET2, f"{P}/rapor/depo-20261016.pdf", ORT_M, f"{P}/rapor/depo-20261017.pdf", ORT_M + "|ek not: raf etiketleri yenilendi",
+                    f"{P}/rapor/fatura-20261016.pdf", "Fatura özeti: Konya bayisi|tutar ve vade bilgisi|ödeme koşulları otuz gün", f"{P}/rapor/fatura-20261017.pdf",
+                    "Toplantı tutanağı: Samsun ziyareti|katılımcılar ve kararlar|sonraki adımlar listesi"], check=True, capture_output=True)
+    for k, g in (("rapor/depo-20261016.pdf", -60), ("rapor/depo-20261017.pdf", -30), ("rapor/fatura-20261016.pdf", -60), ("rapor/fatura-20261017.pdf", -30)):
+        os.utime(os.path.join(P, k), (time.time() + g, time.time() + g))
+    m.cevir(c); rt = m.tara(c); dd = {x["yol"]: x for x in rt["dosyalar"]}
+    kontrol("çevrilmiş PDF: aynı metinli tarihli adlar sürüm, farklı metinliler değil",
+            dd["rapor/depo-20261016.pdf"]["gecerli"] == 0 and dd["rapor/depo-20261017.pdf"]["gecerli"] == 1
+            and dd["rapor/fatura-20261016.pdf"]["surum_grubu"] is None and dd["rapor/fatura-20261017.pdf"]["surum_grubu"] is None, json.dumps(rt["surum_gruplari"], ensure_ascii=False)[:300])
+    kontrol("eski sürüm PDF arama sonucunda yok", [x[1] for x in m.ara("forklift bakımı", n=5, guncel=False)[0]] == ["rapor/depo-20261017.pdf"])
     open(os.path.join(P, "ekran/butce.png"), "wb").write(open(os.path.join(P, "ekran/depo-sayimi.png"), "rb").read() + b"butce")
     rb = m.cevir(c, butce_sn=1e-6)
     kontrol("tur süresi dolunca durur, dosya sonraki tura kalır", rb["cevrildi"] == 0 and "süre" in (rb["durdu"] or "") and rb["kalan"] == 1, json.dumps(rb)[:200])
     os.remove(os.path.join(P, "ekran/butce.png"))
-    m.CEVIR_ISCI = os.path.join(T, "yok.py"); m.AYAR.pop("cevir_sure_sn")
+    m.CEVIR_ISCI = os.path.join(T, "yok.py")
     open(os.path.join(P, "ekran/son.png"), "wb").write(open(os.path.join(P, "ekran/depo-sayimi.png"), "rb").read() + b"3")
     r6 = m.cevir(c)
     kontrol("işçi açılamazsa durur, sebep yazılır, dosya önbelleğe yazılmaz", r6["cevrildi"] == 0 and "işçi açılmadı" in (r6["durdu"] or "") and r6["kalan"] == 1, json.dumps(r6)[:200])

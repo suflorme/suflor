@@ -538,7 +538,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         _KS["nesil"] = _KS.get("nesil", 0) + 1; threading.Thread(target=_konus_oku, args=(cik, _KS["nesil"]), daemon=True).start()
         print(f"KONUŞ: açık süreç açıldı ({time.time() - t0:.1f} sn)"); return True
 def konus_kapat(neden, durum_koru=False):
-    w, app = _KS["w"], _KS["app"]; _KS.update(w=None, app=None, tur=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None)  # yeni süreçte defter yeniden gider
+    w, app = _KS["w"], _KS["app"]; _KS.update(w=None, app=None, tur=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None, ozel_gitti=False)  # yeni süreçte defter (ve kartın özel bölümü) yeniden gider
     if w:
         try: w.close()  # giriş kapanınca claude çıkar, uygulama da biter
         except OSError: pass
@@ -995,7 +995,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["otonom"] = toplantiya_istendi(metin)
         print(f"KONUŞ: {kis['ad']} toplantıda — " + ("kullanıcı istedi, toplantıya okunacak" if tur["otonom"] else "yalnız kullanıcıya"))
     tur["sesli"] = ((not top) or kulaklik()) and not tur.get("otonom"); tur["toplantida"] = top  # otonom: cevap toplantıya okunur, kulakta da duyulur
-    tur["bellek_kapsam"] = bellek_kapsam(tur, kis); bsn = bellek_sira(metin, tur, kis)  # v0.64.0 (S76)
+    tur["bellek_kapsam"] = bellek_kapsam(tur, kis); bsn = bellek_sira(metin, tur, kis)  # v0.64.0 (S78)
+    if tur["bellek_kapsam"] == "ortak" and _KS.get("ozel_gitti") and konus_canli():  # v0.68.0: kartın özel bölümü süreç geçmişinde kalmasın (toplantı kişiliği görmesin)
+        konus_kapat("kartın özel bölümü süreçte — ortak cevap için yeni süreç", durum_koru=True); _KS["tur"] = tur
     df, dm, dk = _konus_defter(); tur["toplanti_ad"] = df["ad"] if top and df else None
     k_ = kisilik()
     if konus_canli() and (_KS.get("kisilik_mt") != (_KIS.get("mt") if k_ else None) or _KS.get("kart_mt") != kart_mt()):  # kişilik ya da kullanıcı kartı değişti: istem sürecin açılışında verilir
@@ -1029,7 +1031,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         ms, duz = konus_ad_duzelt(metin); adn = konus_ad_notu(duz)  # v0.60.0: sözlük + bilinen adlar (ön arama düzeltilmiş adla)
         tur["soru"] = ms; _ONARA["son_tur"] = None; oa = konus_onara(ms, tur.get("bellek_kapsam")); tur_ad = "defter" if dfb else _ONARA.get("son_tur") if oa else None
         if duz: _konus_kur(soru=ms)
-        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
+        ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
+        if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
+        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()

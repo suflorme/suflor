@@ -98,8 +98,10 @@ try:
     exec(open(os.path.join(KOD, "aktarici", "kisilik.py"), encoding="utf-8").read(), ns); exec(src[src.index("KONUS_ISTEM = {"):src.index("# --- Hızlı bilgi")], ns)
     exec(open(os.path.join(KOD, "aktarici", "bellek.py"), encoding="utf-8").read(), ns)
     ist = ns["konus_istem"]()
-    ok("istem: kişiliklerden sonra kart, kart kuralları, 'Yalnız Matlas' kuralı", ist.index("IKINCI-ISARET") < ist.index("[Kullanıcı kartı") and "Kuş gözlemi sever" in ist
-       and "Kartta 'Yalnız Matlas' bölümünü yalnız Matlas kullanır" in ist and "'Bunu bilmiyorum.'" in ist and "Kaynağı ve tarihini yalnız yazılı kısma" in ist and ns["_KS"]["kart_mt"])
+    ok("istem: kişiliklerden sonra kartın ortak kısmı ve kuralları; 'Yalnız Matlas' bölümü istemde değil", ist.index("IKINCI-ISARET") < ist.index("[Kullanıcı kartı") and "Sayı bölenle" in ist
+       and "Kuş gözlemi sever" not in ist and "Kartın 'Yalnız Matlas' bölümü istemde değildir" in ist and "'Bunu bilmiyorum.'" in ist and "Kaynağı ve tarihini yalnız yazılı kısma" in ist and ns["_KS"]["kart_mt"])
+    ob = ns["kart_ozel_blok"]("Matlas")
+    ok("özel bölüm yalnız o kişiliğe (mesajda): Matlas'ta var, Atlas'ta boş", "Kuş gözlemi sever" in ob and "Sayı bölenle" not in ob and ns["kart_ozel_blok"]("Atlas") == "")
     ns["AYAR"]["kisilik_bellek"] = ""; ok("kart ayarı yokken istemde kart yok", "[Kullanıcı kartı" not in ns["konus_istem"]())
     ns["AYAR"]["kisilik_bellek"] = os.path.join(T, "yok.md"); ok("kart dosyası yokken kartsız, günlükte 'okunamadı'", "[Kullanıcı kartı" not in ns["konus_istem"]() and any("kullanıcı kartı okunamadı" in l for l in LOG))
     ns["AYAR"]["kisilik_bellek"] = kart
@@ -133,6 +135,12 @@ try:
     ok("döndürme: 90 günden eski satır arşive (gz, 0600), yenileri kalır", n == 1 and gzip.open(ars, "rt", encoding="utf-8").read() == eski
        and len(open(gecmis, encoding="utf-8").readlines()) == 2 and stat.S_IMODE(os.stat(ars).st_mode) == 0o600 and stat.S_IMODE(os.stat(gecmis).st_mode) == 0o600)
     ok("döndürülecek satır yoksa dokunmaz", ns["konus_gecmis_dondur"](datetime.datetime(2026, 10, 17, 12, tzinfo=datetime.timezone.utc)) == 0)
+    # panodaki liste ve silme (v0.67.0)
+    lst = ns["konus_gecmis_liste"]()
+    ok("geçmiş listesi: en yeni önce, kimlikli, toplam ve gün", lst["ok"] and lst["toplam"] == 2 and lst["kayitlar"][0]["soru"] == "Matlas, bunu nasıl söylerim?" and all(x["id"] for x in lst["kayitlar"]) and lst["gun"] == 90)
+    r_ = ns["konus_gecmis_sil"](lst["kayitlar"][1]["id"]); kal = open(gecmis, encoding="utf-8").read()
+    ok("silme: yalnız o kayıt çıkar, dosya 0600, bilinmeyen kimlik hata", r_["ok"] and r_["kalan"] == 1 and "Yarın ne var?" not in kal and "nasıl söylerim" in kal
+       and stat.S_IMODE(os.stat(gecmis).st_mode) == 0o600 and not ns["konus_gecmis_sil"]("yok")["ok"])
     # sesle düzeltme sırası
     T_ = ns["bellek_sira_turu"]
     ok("sıra kalıpları: hatırla / yanlış / unut", T_("Matlas, bunu hatırla: cuma günleri koşuya gidiyorum.") == "hatirla" and T_("Bu yanlış, toplantı perşembe.") == "yanlis"

@@ -17,6 +17,14 @@ def docx(metin):
     with zipfile.ZipFile(b, "w") as z:
         z.writestr("[Content_Types].xml", "<Types/>"); z.writestr("word/document.xml", f"<w:document><w:body><w:p><w:r><w:t>{metin}</w:t></w:r></w:p></w:body></w:document>")
     return b.getvalue()
+def xlsx(satirlar):  # en küçük geçerli xlsx (satır içi metin hücreleri)
+    import io
+    b = io.BytesIO(); hucre = lambda v: f'<c t="inlineStr"><is><t>{v}</t></is></c>'
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("xl/workbook.xml", '<workbook><sheets><sheet name="Liste" sheetId="1" r:id="rId1"/></sheets></workbook>')
+        z.writestr("xl/_rels/workbook.xml.rels", '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')
+        z.writestr("xl/worksheets/sheet1.xml", "<worksheet><sheetData>" + "".join(f'<row r="{i}">' + "".join(hucre(v) for v in sat) + "</row>" for i, sat in enumerate(satirlar, 1)) + "</sheetData></worksheet>")
+    return b.getvalue()
 uzun = lambda tohum, n=120: " ".join(f"{tohum}{i % 17} sözcük{i} bütçe yedekleme planı madde{i}" for i in range(n))
 TEKLIF = uzun("teklif")
 # birebir kopya
@@ -33,6 +41,11 @@ yaz("notlar/toplanti-2026-10-16.md", uzun("pazartesi gündem"), gun=1); yaz("not
 # içeriği henüz okunamayan (PDF, T2'ye kadar): sürüm işaretli ad gruplanır, tarihli ad gruplanmaz
 yaz("sunum/sunum-v1.pdf", ikili=b"%PDF-1.4 bir", gun=1); yaz("sunum/sunum-v2.pdf", ikili=b"%PDF-1.4 iki", gun=2)
 yaz("sunum/brosur-2026-10-16.pdf", ikili=b"%PDF-1.4 uc", gun=1); yaz("sunum/brosur-2026-10-17.pdf", ikili=b"%PDF-1.4 dort", gun=2)
+# tarihli adlı Excel: içerik benzerse sürüm (geçerli en yenisi), farklıysa değil
+LISTE = [["Ad", "Birim", "Görev"]] + [[f"Kişi{i}", f"Birim{i % 5}", f"görev tanımı {i} rapor hazırlama"] for i in range(60)]
+yaz("liste/alici-listesi-20261009.xlsx", ikili=xlsx(LISTE), gun=1); yaz("liste/alici-listesi-20261010.xlsx", ikili=xlsx(LISTE + [["Yeni", "Birim9", "ek görev"]]), gun=2)
+yaz("liste/satis-20261009.xlsx", ikili=xlsx([["Ürün", "Adet"]] + [[f"Ürün{i}", str(i)] for i in range(40)]), gun=1)
+yaz("liste/satis-20261010.xlsx", ikili=xlsx([["Şehir", "Ciro"]] + [[f"Şehir{i}", str(i * 7)] for i in range(40)]), gun=2)
 # kilit dosyası, sistem dosyası, hariç klasör
 yaz("belgeler/~$rapor.docx", ikili=b"kilit"); yaz("belgeler/.DS_Store", ikili=b"\0"); yaz("_yedek/eski.md", "yedek")
 # adla hariç tutma
@@ -50,6 +63,11 @@ yaz("veri/disa/kisi.csv", "ad,rol\nDeniz,yonetici\n"); yaz("Export/sistemler.jso
 yaz("veri/gorunum.xlsx", ikili=docx("tablo")); yaz("tablolar/butce.xlsx", ikili=docx("bütçe")); yaz("tablolar/butce.md", "| bütçe |")
 yaz("belgeler/proje-ozeti.md", "Proje özeti"); yaz("analiz/bulgular.md", "bulgular")
 yaz("belgeler/sartname.docx", ikili=docx("Şartname metni")); yaz("belgeler/sartname.pdf", ikili=b"%PDF-1.4 sartname")
+# T3: arama önceliği ve harf katlaması
+KARS = "Lojistik karşılaştırma: Bursa ve Sakarya depolarında yükleme süresi ölçüldü, Sakarya daha hızlı çıktı."
+yaz("belgeler/karsilastirma.md", KARS + " Ayrıntı ekte.", gun=2); yaz("belgeler/karsilastirma-ozeti.md", KARS, gun=2)
+yaz("belgeler/sube.md", "IZMIR ŞUBESİ açılışı ve ILGAZ deposu (OCR çıktısı gibi büyük harf)", gun=2)
+yaz("veri/disa/stok-durumu.csv", "urun,adet\nPalet kaldırıcı,14\n")
 ay = os.path.join(T, "ayar.json")
 json.dump({"alan": "Deneme", "uygulama": os.path.join(T, "uyg"), "proje": P, "ortak": os.path.join(T, "yok"), "analiz_klasorleri": ["analiz/"],
            "veritabani": {"yol": "yok.db", "disa_aktarim": ["veri/gorunum.xlsx"]}}, open(ay, "w"))
@@ -79,7 +97,10 @@ try:
     kontrol("tarihli adlarda yanlış gruplama 0", all(d[k]["surum_grubu"] is None and d[k]["gecerli"] == 1 for k in tarihli),
             ", ".join(k for k in tarihli if d[k]["surum_grubu"]))
     kontrol("içeriği okunamayan sürüm işaretli PDF'ler gruplandı", d["sunum/sunum-v1.pdf"]["surum_grubu"] and d["sunum/sunum-v1.pdf"]["gecerli"] == 0 and d["sunum/sunum-v2.pdf"]["gecerli"] == 1)
-    kontrol("toplam: 2 sürüm grubu, 3 eski sürüm", s["surum_grubu"] == 2 and s["eski_surum"] == 3, f"{s['surum_grubu']}/{s['eski_surum']}")
+    kontrol("tarihli adlı Excel: benzer içerik sürüm grubu (geçerli en yenisi), farklı içerik grup değil",
+            d["liste/alici-listesi-20261009.xlsx"]["gecerli"] == 0 and d["liste/alici-listesi-20261010.xlsx"]["gecerli"] == 1
+            and d["liste/satis-20261009.xlsx"]["surum_grubu"] is None and d["liste/satis-20261010.xlsx"]["surum_grubu"] is None)
+    kontrol("toplam: 3 sürüm grubu, 4 eski sürüm", s["surum_grubu"] == 3 and s["eski_surum"] == 4, f"{s['surum_grubu']}/{s['eski_surum']}")
     gizli = {x["yol"] for x in r["haric"]}
     beklenen = {".env", "anahtarlar/sunucu.pem", "anahtarlar/imza.key", "belgeler/parolalar.xlsx", "ik/Maaş-tablosu.csv", "ik/salary-2026.xlsx",
                 "tarama/kimlik-on.jpg", "tarama/Pasaport.pdf", "belgeler/sifre-listesi.txt"}
@@ -103,6 +124,18 @@ try:
             and c.execute("SELECT 1 FROM dosya WHERE yol='belgeler/rapor.docx'").fetchone())
     os.remove(os.path.join(P, "belgeler/rapor.docx")); m.tara(c); m.guncelle(c)
     kontrol("asıl silinince kopyası dizine girdi", c.execute("SELECT count(*) FROM dosya WHERE yol IN ('belgeler/rapor (1).docx', 'eski/rapor.docx')").fetchone()[0] == 1)
+    yollar = lambda q, **k: [x[1] for x in m.ara(q, n=10, guncel=False, **k)[0]]
+    kontrol("T3: eski sürümler sonuçta yok, yalnız geçerli", yollar("teklif bütçe yedekleme") == ["belgeler/Teklif_final.md"] * len(yollar("teklif bütçe yedekleme")) and yollar("teklif bütçe yedekleme"),
+            str(yollar("teklif bütçe yedekleme")))
+    kontrol("T3: eski=True ile eski sürümler de", {"belgeler/teklif-v1.md", "belgeler/teklif-v2.md"} <= set(yollar("teklif bütçe yedekleme", eski=True)))
+    kontrol("T3: veritabanı kipinde dışa aktarım sonuçta yok, disa=True ile var", not yollar("palet kaldırıcı") and yollar("palet kaldırıcı", disa=True) == ["veri/disa/stok-durumu.csv"],
+            f"{yollar('palet kaldırıcı')} {yollar('palet kaldırıcı', disa=True)}")
+    kontrol("T3: aynı metinde asıl kaynak türetilmişin önünde", yollar("Sakarya yükleme süresi")[:2] == ["belgeler/karsilastirma.md", "belgeler/karsilastirma-ozeti.md"], str(yollar("Sakarya yükleme süresi")))
+    kontrol("T3: I/İ/ı katlaması (büyük harfli OCR metni)", all(yollar(q) == ["belgeler/sube.md"] for q in ("İzmir şubesi", "izmir", "Ilgaz", "ılgaz deposu")),
+            str([yollar(q) for q in ("İzmir şubesi", "izmir", "Ilgaz", "ılgaz deposu")]))
+    m.VT_KIPI = False
+    kontrol("T3: veritabanı kipi dışında dışa aktarım sonuçta (geride)", yollar("palet kaldırıcı") == ["veri/disa/stok-durumu.csv"])
+    m.VT_KIPI = True
     yaz("belgeler/teklif-v1.md", TEKLIF + " değişti", gun=4); m.guncelle(c)
     kontrol("dosya değişip yeniden dizinlenince eski tarama alanı boş", c.execute("SELECT sha256 FROM dosya WHERE yol='belgeler/teklif-v1.md'").fetchone()[0] is None
             and c.execute("SELECT sha256 FROM dosya WHERE yol='belgeler/teklif-v2.md'").fetchone()[0] is not None)

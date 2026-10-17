@@ -1261,7 +1261,7 @@ TAKVIM_SN = 300; TAKVIM_TAM = {}
 # Chrome yerel mesajlaşmasıyla (native messaging) bu kullanıcının anahtar yardımcısından; pano/hazırlık sayfası kendi deposundan
 # (localStorage — köken porta bağlı; çerez porta bağlı olmadığı için diğer hesabın aktarıcısına giderdi). Geçiş: eski eklentinin
 # yazma istekleri anahtarsız da kabul edilir, pano "eklentiyi yenile" der; ayar "anahtar_zorunlu": true bunu kapatır.
-VERI_GET = {"/status", "/geri-bildirim/onizle", "/taslak", "/hazirlik.json", "/takvim", "/agenda", "/cards", "/soyle-ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/geri-bildirim/onizle", "/taslak", "/hazirlik.json", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1426,11 +1426,12 @@ AYAR_PANO = {
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None), "menu_cubugu": ("bool", False, None),
     "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None),
-    "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None)}
+    "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
 MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar", "toplantiya_ses")
 def ayarlar_view():
     d = {k: AYAR.get(k, v[1]) for k, v in AYAR_PANO.items()}
     if d["ses_motoru"] != "piper": d["ses_motoru"] = "mac"
+    if "konus_gecmis" not in AYAR: d["konus_gecmis"] = konus_gecmis_acik()
     return {"deger": d, "varsayilan": {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items()}, "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "menu": os.path.isdir(MENU_APP)}
 def ayar_yaz(deg):
     hata, yeni = {}, {}
@@ -1743,6 +1744,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
+        if self.path == "/konus-gecmis": return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
         if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); return self._json(v)
         if self.path.startswith("/cards?"):  # uzun yoklama
@@ -1829,6 +1831,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/hatirlat":  # panodaki deneme hatırlatmasının Tamam'ı — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(hatirlat_kapat(p))
+        if self.path == "/konus-gecmis-sil":  # panoda Konuş geçmişinden tek kayıt silme — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(konus_gecmis_sil(p.get("id")))
         if self.path == "/ayar":  # panodaki ⚙ Ayarlar — yalnız pano (aynı köken + anahtar)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(ayar_yaz(p.get("degisen")))
