@@ -454,6 +454,7 @@ TARA_GIZLI_AD = re.compile(r"parola|sifre(?!lem|li)|password|passwd|credential|m
 TARA_KIMLIK_AD = re.compile(r"kimlik|pasaport|passport|ehliyet|nufus|surucu belgesi|id[ _-]?card|kimlik karti")  # yalnız görüntü/PDF: kimlik taraması
 TARA_DISA_KLASOR = re.compile(r"^(disa|disa[ _-]?aktarim|export|exports|dump|dokum[ _-]?ham|snapshot|snapshots|form[ _-]?cevaplar[a-z]*)$")
 TARA_DISA_UZ = {".csv", ".tsv", ".json", ".jsonl", ".xlsx", ".xls", ".xml", ".db", ".sqlite"}
+TARA_TURETILMIS_KLASOR = re.compile(r"^_?(son[ _-]?yayin|yayin|yayinlanan|publish|published|dist|build|_site|site[ _-]?cikti)$")  # yayımlanmış/derlenmiş kopyalar
 TARA_TURETILMIS_AD = re.compile(r"(^|[^a-z])(ozet|ozeti|summary|gorunum|view|pivot|anonim|anonymized|cikti|output)($|[^a-z])")
 TARA_ASIL_UZ = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".key", ".numbers", ".pages", ".odt", ".ods", ".odp"}  # yanındaki aynı adlı md/csv/pdf bunun dışa çıktısı
 TARA_TARIH = re.compile(r"(?<!\d)(20\d\d[-_.]?[01]\d[-_.]?[0-3]\d(?:[-_ t]?[0-2]\d[-_.:h]?[0-5]\d(?:[-_.:]?[0-5]\d)?)?|[0-3]?\d[-_.][01]?\d[-_.](?:20)?\d\d)(?!\d)")
@@ -519,6 +520,8 @@ def tara_kaynak_turu(kisa, ext, ayni_klasor_kokler, disa):
     ad = norm(os.path.basename(kisa))
     if ext in TARA_DISA_UZ and TARA_SAAT.search(ad): return "disa_aktarim", "ad: tarih-saat damgalı veri"
     if ANALIZ and kisa.startswith(ANALIZ): return "turetilmis", "ayar: analiz_klasorleri"
+    for p in parcalar:
+        if TARA_TURETILMIS_KLASOR.match(p): return "turetilmis", f"klasör: {p}"
     m = TARA_TURETILMIS_AD.search(os.path.splitext(ad)[0])
     if m: return "turetilmis", "ad: " + m.group(2)
     kok = os.path.splitext(ad)[0]

@@ -38,7 +38,7 @@ os.chmod(SAHTE, 0o755)
 BELGE = {
     "CLAUDE.md": "# Proje\n\nKISI: Ayşe Yılmaz | proje yöneticisi | AY\n\nKARAR: Depo Gebze'ye taşınacak | 2026-11-01 | Ayşe\n",
     "belgeler/toplanti-notu.md": "# Not\n\nKISI: Ayşe | yönetici\n\nKISI: AY | koordinatör\n\nKARAR: Depo Gebze'ye taşınacak | 2026-11-15 | Ayşe\n\nTERIM: Gebze Lojistik Merkezi | yeni depo\n\nKURUM: Atlas Taşımacılık\n",
-    "belgeler/plan.md": "# Plan\n\nIS: Tedarikçi listesini çıkar | Deniz | 2026-10-25\n\nTARIH: Açılış töreni | 2026-12-01\n\nKISI: Kemal Demir | satın alma\n\nTERIM: Gebze Lojistik Merkezi | depo\n",
+    "belgeler/plan.md": "# Plan\n\nIS: Tedarikçi listesini çıkar | Deniz | 2026-10-25\n\nTARIH: Açılış töreni | 2026-12-01\n\nKISI: Kemal Demir | satın alma\n\nTERIM: Gebze Lojistik Merkezi | depo\n\nTERIM: Tek Belgede Geçen | x\n\nTERIM: kayit.py | betik\n",
     "belgeler/eski-plan-v1.md": "# Plan\n\nIS: Eski iş | Biri | 2026-01-01\n" * 30,
     "belgeler/eski-plan-v2.md": "# Plan\n\nIS: Eski iş | Biri | 2026-01-01\n" * 30 + "ek\n",
     "veri/disa/kisiler.csv": "ad,rol\nKISI: Gizli Kisi | yok\n",
@@ -76,7 +76,7 @@ try:
     kontrol("çelişen tarih silinmedi, işaretlendi", len(kr) == 1 and kr[0].get("celiski") == {"ne_zaman": ["2026-11-01", "2026-11-15"]}, json.dumps(kr, ensure_ascii=False))
     kontrol("düzenli klasör: CLAUDE.md'den gelen satır fark değil, yalnız diğer belgeden gelen fark", kr[0]["fark"] is False and
             [x for x in k["kisiler"] if x["ad"] == "Kemal Demir"][0]["fark"] is True and k["kip"] == "duzenli")
-    kontrol("sözlük tekilleşti, kaynakları birikti", [m["terim"] for m in k["sozluk"]] == ["Gebze Lojistik Merkezi"] and len(k["sozluk"][0]["kaynaklar"]) == 2)
+    kontrol("sözlük tekilleşti, kaynakları birikti", [m["terim"] for m in k["sozluk"]][:1] == ["Gebze Lojistik Merkezi"] and len(k["sozluk"][0]["kaynaklar"]) == 2)
     kontrol("bozuk JSON'da bir kez daha soruldu, belge girdi", any(p["ad"] == "Selin Ak" for p in k["kisiler"]) and sum(1 for x in cagri() if x["yol"] == "belgeler/bozuk.md") == 2)
     kontrol("proje özeti tek çağrıyla, kaynak satırlarında konum var", k["ozet"].startswith("Deneme projesi") and all(len(s) == 2 and s[1] for p in k["kisiler"] for s in p["kaynaklar"]))
     n1 = len(cagri()); k2 = K.cikar()
@@ -89,7 +89,7 @@ try:
     kontrol("toplantıda: Claude'a sorulmadı, nedeni yazıldı", len(cagri()) == n3 and "toplantı" in (k4["durdu"] or ""), json.dumps(k4.get("durdu")))
     r = K.onayla(k3)
     s = json.load(open(K.SOZLUK, encoding="utf-8"))
-    kontrol("onay: kart dosyası 0600, sözlüğe 1 terim, düzenli klasörde CLAUDE.md'ye dokunulmadı", os.stat(K.KART).st_mode & 0o777 == 0o600 and r["sozluk_eklenen"] == 1
+    kontrol("onay: kart dosyası 0600, sözlüğe 1 terim (tek belgede geçen ve dosya adı aktarılmaz), düzenli klasörde CLAUDE.md'ye dokunulmadı", os.stat(K.KART).st_mode & 0o777 == 0o600 and r["sozluk_eklenen"] == 1
             and [t["dogru"] for t in s["terimler"]] == ["Gebze Lojistik Merkezi"] and r["claude_notu"] is False and "Proje kartı" not in open(os.path.join(P, "CLAUDE.md")).read())
     kontrol("ikinci onay sözlüğe tekrar eklemez", K.onayla(k3)["sozluk_eklenen"] == 0)
     # genel kip (kökte düzenli belge yok) → CLAUDE.md'ye taslak not

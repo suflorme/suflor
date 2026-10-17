@@ -61,7 +61,7 @@ yaz("belgeler/bos.md", ""); yaz("veri/bos.db", "")  # boş dosyalar birbirinin k
 # kaynak türü
 yaz("veri/disa/kisi.csv", "ad,rol\nDeniz,yonetici\n"); yaz("Export/sistemler.json", '{"a": 1}'); yaz("veri/durum-20261016-1200.csv", "a,b\n1,2\n")
 yaz("veri/gorunum.xlsx", ikili=docx("tablo")); yaz("tablolar/butce.xlsx", ikili=docx("bütçe")); yaz("tablolar/butce.md", "| bütçe |")
-yaz("belgeler/proje-ozeti.md", "Proje özeti"); yaz("analiz/bulgular.md", "bulgular")
+yaz("belgeler/proje-ozeti.md", "Proje özeti"); yaz("site/son-yayin/sayfa.html", "<p>yayımlanmış kopya</p>"); yaz("analiz/bulgular.md", "bulgular")
 yaz("belgeler/sartname.docx", ikili=docx("Şartname metni")); yaz("belgeler/sartname.pdf", ikili=b"%PDF-1.4 sartname")
 # T3: arama önceliği ve harf katlaması
 KARS = "Lojistik karşılaştırma: Bursa ve Sakarya depolarında yükleme süresi ölçüldü, Sakarya daha hızlı çıktı."
@@ -113,8 +113,8 @@ try:
     kt = {k: x["kaynak_turu"] for k, x in d.items()}
     kontrol("dışa aktarım: disa/ ve Export/ klasörü, tarih-saat damgalı csv, ayardaki yol",
             [kt[k] for k in ("veri/disa/kisi.csv", "Export/sistemler.json", "veri/durum-20261016-1200.csv", "veri/gorunum.xlsx")] == ["disa_aktarim"] * 4)
-    kontrol("türetilmiş: aynı adlı xlsx'in md'si, docx'in pdf'i, 'özeti' adı, analiz klasörü",
-            [kt[k] for k in ("tablolar/butce.md", "belgeler/sartname.pdf", "belgeler/proje-ozeti.md", "analiz/bulgular.md")] == ["turetilmis"] * 4)
+    kontrol("türetilmiş: aynı adlı xlsx'in md'si, docx'in pdf'i, 'özeti' adı, analiz klasörü, yayın kopyası klasörü",
+            [kt[k] for k in ("tablolar/butce.md", "belgeler/sartname.pdf", "belgeler/proje-ozeti.md", "analiz/bulgular.md", "site/son-yayin/sayfa.html")] == ["turetilmis"] * 5)
     kontrol("asıl: özgün belgeler ve tarihli döküm/not", [kt[k] for k in ("tablolar/butce.xlsx", "belgeler/sartname.docx", "belgeler/teklif-v1.md", "notlar/toplanti-2026-10-16.md")] == ["asil"] * 4)
     sat = dict(c.execute("SELECT yol, gecerli FROM dosya WHERE yol LIKE 'belgeler/teklif%' OR yol LIKE 'belgeler/Teklif%'").fetchall())
     sha = c.execute("SELECT sha256, kaynak_turu FROM dosya WHERE yol='tablolar/butce.md'").fetchone()

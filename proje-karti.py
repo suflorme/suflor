@@ -43,9 +43,10 @@ def aday_belgeler(c, sinir=SINIR):
     # → [(yol, tur, tarih, duzenli)] en yeniden; düzenli klasör belgeleri önde
     sat = c.execute("""SELECT d.yol, d.tur, COALESCE(d.tarih, ''), d.mtime FROM dosya d
                        WHERE COALESCE(d.gecerli, 1) = 1 AND COALESCE(d.kaynak_turu, 'asil') = 'asil' AND COALESCE(d.gizli, 0) = 0
-                         AND COALESCE(d.kapsam, 'ortak') = 'ortak' AND d.parca > 0 AND d.tur IN ('belge', 'sunum', 'gorusme', 'tablo')
+                         AND COALESCE(d.kapsam, 'ortak') = 'ortak' AND d.parca > 0 AND d.tur IN ('belge', 'sunum', 'gorusme', 'tablo', 'karar', 'kural')
                          AND d.yol NOT LIKE '/%' AND d.yol NOT LIKE '\\_canli/%' ESCAPE '\\'""").fetchall()
     duz = lambda y: y.count("/") <= 1 and bool(DUZENLI_RX.match(os.path.basename(y)))
+    sat = [r for r in sat if r[1] not in ("karar", "kural") or duz(r[0])]  # bellek kaynağı olarak eklenmiş karar/kural dosyası yalnız düzenli belgeyse
     sat = [r for r in sat if duz(r[0])] + sorted([r for r in sat if not duz(r[0])], key=lambda r: (r[2], r[3]), reverse=True)
     return [(y, t, tr, duz(y)) for y, t, tr, _ in sat[:sinir]]
 
@@ -203,8 +204,9 @@ def cikar(sinir=SINIR, model=None, paralel=4, tahmin=False, sessiz=True):
     adaylar = aday_belgeler(c, sinir); duzenli_var = any(d for *_, d in adaylar)
     metinler = [(y, d, belge_metni(c, y)) for y, _, _, d in adaylar]
     if tahmin:
-        kar = sum(len(m) for _, _, m in metinler); tk = kar / 3.5 + len(metinler) * 400
-        return {"belge": len(metinler), "karakter": kar, "tahmini_giris_belirtec": int(tk), "tahmini_usd_sonnet": round(tk / 1e6 * 3 + len(metinler) * 500 / 1e6 * 15, 2)}
+        # 17 Ekim gerçek proje denemesi (10 belge): giriş ≈ karakter / 3 + 1.200, çıktı ≈ 1.500 belirteç/belge (veritabanı kipinde de sözlük uzun) → 0,43 $
+        kar = sum(len(m) for _, _, m in metinler); tk = kar / 3 + len(metinler) * 1200; cik = (len(metinler) + 1) * 1500
+        return {"belge": len(metinler), "karakter": kar, "tahmini_giris_belirtec": int(tk), "tahmini_usd_sonnet": round(tk / 1e6 * 3 + cik / 1e6 * 15, 2)}
     sonuc, usd, onb, hatalar, durdu = [None] * len(metinler), 0.0, 0, [], None
     kilit = threading.Lock()
     def is_(i):
@@ -255,17 +257,25 @@ def onayla(taslak=None, kim="kullanici"):
     with open(KART + ".tmp", "w", encoding="utf-8") as f: json.dump(k, f, ensure_ascii=False, indent=1)
     os.chmod(KART + ".tmp", 0o600); os.replace(KART + ".tmp", KART)
     with open(GECMIS, "a", encoding="utf-8") as f: f.write(json.dumps({"t": k["onay"]["t"], "kim": kim, "belge": k["belge"], "kisi": len(k["kisiler"]), "sozluk": len(k["sozluk"])}) + "\n")
-    eklenen = sozluge_aktar(k.get("sozluk") or [])
+    duz_yol = {y for y in {s[0] for m in k.get("sozluk") or [] for s in m.get("kaynaklar") or []} if y.count("/") <= 1 and DUZENLI_RX.match(os.path.basename(y))}
+    eklenen = sozluge_aktar(k.get("sozluk") or [], duz_yol)
     notu = claude_notu(k) if k.get("kip") != "duzenli" else False  # düzenli klasörde belgeler değişmez
     return {"sozluk_eklenen": eklenen, "claude_notu": notu}
 
-def sozluge_aktar(maddeler):
+SOZ_KONUSULMAZ = re.compile(r"[/@\\]|\.(md|py|db|json|html?|csv|xlsx|txt)\b|^[a-z0-9_-]+$")  # dosya adı, komut, adres, tümü küçük harf: söylenmez
+def sozluk_aktarilir(m, duz_yol):
+    # Whisper istemi kısıtlı (belirteç bütçesi): yalnız en az iki belgede geçen ya da düzenli belgeden gelen, konuşmada söylenen terim
+    if SOZ_KONUSULMAZ.search(m["terim"]): return False
+    kay = {k[0] for k in m.get("kaynaklar") or []}
+    return len(kay) >= 2 or bool(kay & duz_yol)
+def sozluge_aktar(maddeler, duz_yol=frozenset()):
     # kartın sözlüğü → sozluk.json (kaynak proje-karti; yanlış yazımı yok: düzeltme yapmaz, Whisper istemine özel ad olarak girer)
     try: s = json.load(open(SOZLUK, encoding="utf-8"))
     except (OSError, ValueError): s = {"surum": 1, "terimler": []}
     var = {n(t.get("dogru")) for t in s.get("terimler", [])} | {n(y) for t in s.get("terimler", []) for y in (t.get("yanlis") or [])}
     eklenen = 0
     for m in maddeler:
+        if not sozluk_aktarilir(m, duz_yol): continue
         if n(m["terim"]) and n(m["terim"]) not in var:
             s.setdefault("terimler", []).append({"dogru": m["terim"], "yanlis": [], "kip": "duzelt", "kaynak": "proje-karti", "not": m.get("aciklama", "")[:120]})
             var.add(n(m["terim"])); eklenen += 1
