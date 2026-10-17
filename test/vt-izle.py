@@ -46,7 +46,7 @@ try:
         def Popen(k, **_): acilan.append(k)
     app = os.path.join(T, "Suflor Brifing.app"); os.makedirs(app)
     ad = {"os": os, "json": json, "time": time, "subprocess": SP, "print": lambda *a: None, "BASE": canli, "BRIFING_APP": app,
-          "AYAR": {"veritabani": {"yol": "kayit.db"}}, "threading": None}
+          "AYAR": {"veritabani": {"yol": "kayit.db"}, "uygulama": T}, "threading": None}
     bol = kod[kod.index("# --- Veritabanı önbelleği yardımcısı"):kod.index("def _vt_izle_dongu(")]
     exec(bol, ad); bak = ad["vt_izle_bak"]; os.remove(os.path.join(canli, "vt-mt.json"))
     t0 = 1_000_000.0
@@ -55,8 +55,18 @@ try:
     json.dump({"mt": 1, "kontrol": t0 + 300}, open(os.path.join(canli, "vt-mt.json"), "w"))
     ok("önbellek tazeyse açılmaz", not bak(t0 + 400) and len(acilan) == 1)
     ok("önbellek 150 sn'den eskiyse (ve 5 dk geçtiyse) yeniden açılır", bak(t0 + 300 + 151) and len(acilan) == 2)
+    ad["BASE"] = os.path.join(T, "baska"); bak2 = ad["vt_izle_bak"]; ad["_VTI"]["t"] = 0
+    ok("deneme aktarıcısı (canli/ uygulama klasöründe değil) yardımcıyı açmaz", not bak2(t0 + 5000) and len(acilan) == 2); ad["BASE"] = canli
     ad["AYAR"] = {}; ok("veritabanı ayarlı değilse açılmaz", not bak(t0 + 2000) and len(acilan) == 2)
     ad["AYAR"] = {"veritabani": {"yol": "kayit.db"}}; shutil.rmtree(app); ok("yardımcı kurulu değilse açılmaz", not bak(t0 + 3000) and len(acilan) == 2)
+    # --- panodaki izin uyarısı (proje_erisim_view) ------------------------------------------------------------------------------------------
+    ad.update(_t=lambda a, b: a, _ONARA={"eris": None}); exec(kod[kod.index("VT_IZIN_SN = "):kod.index("# --- Ad düzeltmesi")], ad); pv = ad["proje_erisim_view"]
+    ad["_VTI"].update(durum=True, t=t0); ok("her şey yolundaysa uyarı yok", pv(t0 + 1000) is None)
+    ad["_VTI"].update(durum=False, t=t0); ok("yardımcı yeni açıldıysa (3 dk dolmadan) uyarı yok", pv(t0 + 60) is None)
+    u = pv(t0 + 200); ok("açıldıktan 3 dk sonra önbellek hâlâ eskiyse: veritabanı uyarısı + izin yolu", u and "kayıt veritabanı" in u["uyari"] and "Dosyalar ve Klasörler" in u["yol"])
+    ad["_VTI"].update(durum=True); ad["_ONARA"]["eris"] = ([""], "hata"); u = pv(t0 + 200)
+    ok("yardımcı belgeleri dizinleyemediyse: proje belgeleri uyarısı", u and u["uyari"].endswith("proje belgeleri okuyamıyor"))
+    ad["_ONARA"]["eris"] = ([""], "tamam"); ok("yardımcı dizinlediyse uyarı yok", pv(t0 + 200) is None)
 finally:
     shutil.rmtree(T, ignore_errors=True)
 print("vt-izle:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

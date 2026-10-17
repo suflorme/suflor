@@ -598,17 +598,34 @@ def tur_kur(ort):  # tur sonu modeli (smart-turn v3, BSD-2, 8,7 MB) + küçük o
 def glob_(desen):
     import glob; return glob.glob(desen)
 
-def derle(uyg, kaynak, ikili_ad, plist):  # Swift yardımcısı: kaynak ikiliden yeniyse (ya da ikili yoksa) derlenir; True = yeni derlendi
+# v0.63.0: derleme kararı kaynağın içeriğine bağlı (uygulama klasöründe derleme.json: ikili adı → kaynağın SHA-256'sı). Önceden dosya saatine bakılıyordu:
+# başka bir kopyadan (git worktree) yapılan kurulum eski kaynağı yeni saatle derleyince sonraki kurulum güncel kaynağı "eski" sayıp atlıyordu
+# (17 Ekim: Brifing yardımcısı yeni kipi tanımadı). Kaydı olmayan eski kurulumda bir kez saat kuralı geçerli, kayıt yazılır.
+def _derleme_kaydi(uyg, ikili_ad, sha=None):
+    y = os.path.join(os.path.dirname(uyg), "derleme.json")
+    try: d = json.load(open(y, encoding="utf-8"))
+    except (OSError, ValueError): d = {}
+    if sha is None: return d.get(ikili_ad)
+    d[ikili_ad] = sha
+    try:
+        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(d, f, indent=1)
+        os.replace(y + ".tmp", y)
+    except OSError: pass
+def derle(uyg, kaynak, ikili_ad, plist):  # Swift yardımcısı: kaynak değiştiyse (ya da ikili yoksa) derlenir; True = yeni derlendi
     ikili = os.path.join(uyg, "Contents", "MacOS", ikili_ad); kay = os.path.join(KOD, kaynak)
     if not shutil.which("swiftc"): return False
-    if os.access(ikili, os.X_OK) and os.path.getmtime(kay) <= os.path.getmtime(ikili): return False
+    import hashlib
+    sha = hashlib.sha256(open(kay, "rb").read()).hexdigest(); kayit = _derleme_kaydi(uyg, ikili_ad)
+    if os.access(ikili, os.X_OK) and (kayit == sha or kayit is None and os.path.getmtime(kay) <= os.path.getmtime(ikili)):
+        if kayit is None: _derleme_kaydi(uyg, ikili_ad, sha)
+        return False
     os.makedirs(os.path.dirname(ikili), exist_ok=True)
     open(os.path.join(uyg, "Contents", "Info.plist"), "w", encoding="utf-8").write(plist)
     # (güvenlik denetimi D3) derleme günlüğü sabit /tmp yolunda değil, kullanıcının geçici klasöründe benzersiz dosyada
     fd, gunluk = tempfile.mkstemp(prefix=f"suflor-{ikili_ad.lower()}-derleme.")
     with os.fdopen(fd, "w") as g: r = subprocess.run(["swiftc", "-O", "-o", ikili, kay], stdout=subprocess.DEVNULL, stderr=g)
     if r.returncode: return gunluk
-    os.remove(gunluk); return True
+    os.remove(gunluk); _derleme_kaydi(uyg, ikili_ad, sha); return True
 def yerel_imza():  # yerel-imza.sh (kalıcı yerel imza); kurulamazsa "-" = geçici imza
     r = sessiz("/bin/bash", "-c", '. "$1"; yerel_imza', "_", os.path.join(KOD, "yerel-imza.sh"))
     return (r.stdout.strip() if r else "") or "-"

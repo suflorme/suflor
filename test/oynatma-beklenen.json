@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 159080,
-   "sha": "c181c99910a047d6"
+   "uzunluk": 159182,
+   "sha": "c95ba2f9b290bc2d"
   },
   "/hazirlik": {
    "uzunluk": 44276,
    "sha": "7d8e8ab990757069"
   },
   "/mini": {
-   "uzunluk": 159080,
-   "sha": "c181c99910a047d6"
+   "uzunluk": 159182,
+   "sha": "c95ba2f9b290bc2d"
   },
   "/status": {
    "_ping_son": "float",
@@ -518,6 +518,7 @@
     ]
    },
    "port": "int",
+   "proje_erisim": "NoneType",
    "questions": [
     {
      "at": "str",

@@ -277,6 +277,8 @@ _VTI = {"t": 0.0, "durum": None}
 def vt_izle_bak(simdi=None):  # → True: yardımcı açıldı
     v = AYAR.get("veritabani")
     if not isinstance(v, dict) or not v.get("yol") or not os.path.isdir(BRIFING_APP): return False
+    # yalnız asıl aktarıcı (deneme aktarıcıları gerçek ayarla çalışınca gerçek yardımcıyı kendi deneme klasörü için 6 saatliğine açıyordu)
+    if os.path.realpath(BASE) != os.path.realpath(os.path.join(os.path.expanduser(AYAR.get("uygulama") or ""), "canli")) and not os.environ.get("SUFLOR_VT_IZLE_DENEME"): return False
     simdi = simdi or time.time()
     try: k = float(json.load(open(os.path.join(BASE, "vt-mt.json"), encoding="utf-8")).get("kontrol") or 0)
     except (OSError, ValueError, TypeError, AttributeError): k = 0.0
@@ -296,6 +298,19 @@ def _vt_izle_dongu():
         except Exception as e: print(f"KONUŞ: veritabanı önbelleği denetimi hatası ({e.__class__.__name__})")
         time.sleep(60)
 if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_vt_izle_dongu, daemon=True).start()
+# v0.63.0 (T0): yardımcının Masaüstü izni yoksa panoda uyarı (önceden yalnız günlükte "Masaüstü izni?" satırı). İki belirti: proje belgelerini
+# dizinleyemedi (_onara_yardimci "hata") ya da açıldıktan VT_IZIN_SN sonra veritabanı önbelleği hâlâ eski.
+VT_IZIN_SN = 180
+def proje_erisim_view(simdi=None):
+    simdi = simdi or time.time(); eris = _ONARA.get("eris")
+    dizin = bool(eris and eris[0] and eris[1] == "hata")
+    vt = _VTI["durum"] is False and _VTI["t"] and simdi - _VTI["t"] >= VT_IZIN_SN
+    if not (dizin or vt): return None
+    ne = _t("proje belgeleri" if dizin and not vt else "kayıt veritabanı" if vt and not dizin else "proje belgeleri ve kayıt veritabanı",
+            "project documents" if dizin and not vt else "records database" if vt and not dizin else "project documents and records database")
+    return {"uyari": _t(f"Suflor.me {ne} okuyamıyor", f"Suflor.me can't read the {ne}"),
+            "yol": _t("Sistem Ayarları → Gizlilik ve Güvenlik → Dosyalar ve Klasörler → Suflor Brifing → Masaüstü klasörü",
+                      "System Settings → Privacy & Security → Files and Folders → Suflor Brifing → Desktop Folder")}
 # --- Ad düzeltmesi (v0.60.0; 17 Ekim gerçek uçtan uca deneme: Whisper görüşmecilerin adını V yerine B ile, ya da büyük harfle kısaltarak yazıyordu; Claude yanlış adla arayıp
 # dökümü bulamıyordu). Soru Claude'a ve ön aramaya gitmeden önce: 1) sözlük düzeltmesi (döküm satırlarıyla aynı), 2) bilinen adlarla ses benzerliği
 # (b/v, c/k, z/s, ie/i, çift harf; Türkçe harfler sadeleşir). Bilinen adlar: arama dizinindeki konuşmacılar ve görüşme dosyası adları, sözlükteki
