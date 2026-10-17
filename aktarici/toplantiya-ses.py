@@ -4,7 +4,7 @@
 # Mac sesiyle BlackHole'a okur — Core Audio iki akışı aygıtta karıştırır, karşı taraf kullanıcının kanalından duyar. Aynı anda kulaklığa da
 # okunur (kullanıcı ne söylendiğini duysun); kulaklık yoksa yerelde okunmaz (hoparlör → mikrofon → toplantıya ikinci kez giderdi).
 # Toplantıdaki ilk okumada Suflor kendini tanıtır. Teams'te sessizdeyse karşı taraf duymaz (Teams BlackHole girişini de keser). Okurken yeniden
-# basmak susturur. Okunan metin dökümde ayrı etiketle kalır (| saat | **🔊 SUFLOR** | metin | 🔊 |; .jsonl'de note + kaynak: suflor) — defter
+# basmak susturur. Okunan metin dökümde ayrı etiketle kalır (| saat | **SUFLOR (sesli)** | metin | sesli |; .jsonl'de note + kaynak: suflor) — defter
 # ve toplantı oturumu bunu kullanıcının notu saymaz.
 # Web sürümü (v0.50.0): toplantı tarayıcıdaysa (Teams/Meet/Zoom web; eklenti nabzı call=true, masaüstü toplantı yok) BlackHole gerekmez. Metin Mac
 # sesiyle WAV'a yazılır (say -o), eklenti /soyle-ses'ten alır, sayfa bağlamındaki soyle-main.js toplantı bağlantısının (RTCPeerConnection) ses

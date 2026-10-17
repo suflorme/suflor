@@ -439,6 +439,13 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
             if not tur or _KS.get("nesil") != nesil: continue
             e = j.get("event") or {}
             if j.get("type") == "system" and j.get("subtype") == "init": _KS["model"] = j.get("model")
+            # v0.58.1 ölçüm: araçlı turda süre nereye gidiyor (sorgu yazımı · araç · ikinci model turunun ilk sözü); düşünme bloğu açıldı mı.
+            # 17 Ekim, 5 yeni veritabanı sorusu: araç 0,02–0,3 sn, iki model turu 2–4'er sn; --effort low, alwaysThinkingEnabled: false ve Haiku kısaltmadı
+            # (düşünme blokları sürdü; low'da ve Haiku'da cevap tutarlılığı/iç terim kuralı bozuldu) → model ayarı değişmedi.
+            if j.get("type") == "user" and tur.get("t_arac") and not tur.get("t_sonuc"): tur["t_sonuc"] = time.time()
+            if j.get("type") == "stream_event" and e.get("type") == "message_start" and tur.get("t_sonuc") and not tur.get("t_tur2"): tur["t_tur2"] = time.time()
+            if j.get("type") == "stream_event" and e.get("type") == "content_block_start" and (e.get("content_block") or {}).get("type") in ("thinking", "redacted_thinking"):
+                tur["dusunme"] = tur.get("dusunme", 0) + 1
             if j.get("type") == "stream_event" and e.get("type") == "content_block_start" and (e.get("content_block") or {}).get("type") == "tool_use":
                 tur.setdefault("araclar", []).append(str(e["content_block"].get("name") or "?")[:20]); tur["_arac"] = [str(e["content_block"].get("name") or ""), ""]
                 if not tur.get("t_arac"): tur["t_arac"] = time.time()
@@ -448,6 +455,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 tur["_arac"][1] += e["delta"].get("partial_json") or ""
             if j.get("type") == "stream_event" and e.get("type") == "content_block_stop" and tur.get("_arac"):
                 ad, js = tur.pop("_arac")
+                if not tur.get("t_arac_son"): tur["t_arac_son"] = time.time()
                 if "vt_sor" in ad:
                     try: q = (json.loads(js or "{}") or {}).get("sorgu")
                     except ValueError: q = None
@@ -468,6 +476,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                      "wh_ms": ms("t_metin"), "ilk_ms": ms("t_ilk"), "ses_ms": ms("t_ses"), "sure_ms": ms("t_son"),
                      "api_ms": j.get("duration_api_ms"), "maliyet": round(m - _KS["maliyet"], 4), "tur": j.get("num_turns"), "model": _KS.get("model"),
                      "arac": len(tur.get("araclar") or []), "arac_ilk_ms": ms("t_arac"), "araclar": tur.get("araclar") or [],
+                     "arac_yazim_ms": ms("t_arac_son"), "arac_sonuc_ms": ms("t_sonuc"), "tur2_ms": ms("t_tur2"), "dusunme": tur.get("dusunme", 0),
                      "giris": sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
                      "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))), 2),
                      "hata": bool(j.get("is_error")), "kaynak": tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True))}

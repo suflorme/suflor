@@ -92,7 +92,7 @@ try:
     bekle(lambda v: v.get("durum") == "okundu", 15); ok("toplantıya bir kez okundu", son() == s0 + 1)
     time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md") and "Otonom" in f)
     sat = [l for l in md.splitlines() if "SUFLOR" in l]
-    ok(f"dökümde 🔊 SUFLOR satırı: tanıtım + sesli kısım, ayrıntı yok ({len(sat)} satır)", sat and "Merhaba, ben Atlas." in sat[-1] and "Teslim tarihi cuma" in sat[-1] and "Ayrıntı" not in sat[-1])
+    ok(f"dökümde SUFLOR (sesli) satırı: tanıtım + sesli kısım, ayrıntı yok ({len(sat)} satır)", sat and "Merhaba, ben Atlas." in sat[-1] and "Teslim tarihi cuma" in sat[-1] and "Ayrıntı" not in sat[-1])
     v, _ = bekle(lambda v: v.get("durum") == "okundu", 15); ok("durum: okundu", v.get("durum") == "okundu")
     SUSKU = lambda: time.sleep(13)  # KARSI_HITAP_SUSKU_SN: Suflor okuduktan sonra 10 sn karşı hitabı sayılmaz (kendi sesinin yankısı)
     # 2) ✕ iptal

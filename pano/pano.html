@@ -668,7 +668,7 @@ document.getElementById('gun').onclick=async ev=>{const b=ev.currentTarget
   delete b.dataset.onay;b.disabled=true;b.textContent=L("Güncelleniyor…");let r={};try{r=await j('/guncelle',{method:'POST',body:"{}"})}catch(e){}
   if(!r.ok){b.disabled=false;b.textContent=L("Güncelleme başarısız — yeniden dene");geciciDurum(L("Güncellenemedi"),r.err||"")}}
 async function refresh(){let s;try{s=await j('/status')}catch(e){s=null}
-  if(s&&s.err==="anahtar"){document.title="🔑 Suflor.me";const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Pano anahtarsız açıldı")));setH(document.getElementById('da'),esc(L("Suflor.me simgesine tıkla → Panoyu aç")));return}
+  if(s&&s.err==="anahtar"){document.title=L("Suflor.me — anahtar gerekli");const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Pano anahtarsız açıldı")));setH(document.getElementById('da'),esc(L("Suflor.me simgesine tıkla → Panoyu aç")));return}
   if(!s){const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Suflor.me'ye ulaşılamıyor")));setH(document.getElementById('da'),esc(L('birkaç saniye içinde yeniden denenir')));return}last=s;guncellemeCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
 setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||s.meeting||'Toplantı')):masaustuTop(s)?esc(s.masaustu.baslik||s.masaustu.uygulama||L('Toplantı')):L('toplantı bekleniyor'))
 setH(document.getElementById('chips'),s.aktif&&ag.rol?`<span class=chip>${ROL[ag.rol]||esc(ag.rol)}</span>`:"")

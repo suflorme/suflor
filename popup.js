@@ -84,12 +84,12 @@ async function durum() {
   ciz("nt", L(izl ? "Claude hazır — toplantı bekleniyor" : "Hazır — toplantı bekleniyor"));
 }
 // pano zaten açıksa o sekmeye geç (her pano sekmesi aktarıcıyı saniyede bir yokluyor; ikincisi gereksiz). Yeni sekme ya da
-// anahtarsız kalmış pano (başlığı 🔑 ile başlar) yerel anahtarla açılır: ?k= — pano kendi deposuna alıp adres çubuğundan siler.
+// anahtarsız kalmış pano (başlığı "anahtar gerekli"; v0.58.1 öncesi 🔑 ile başlar) yerel anahtarla açılır: ?k= — pano kendi deposuna alıp adres çubuğundan siler.
 const anahtarli = async (url) => { const k = await SuflorAnahtar.al(); return k && url.startsWith(`http://127.0.0.1:${k.port}/`) ? url + "?k=" + k.anahtar : url; };
 async function panoAc(relay) {
   const kok = relay.replace(/\/$/, "") + "/";
   const [t] = (await chrome.tabs.query({ url: kok + "*" })).filter(t => t.url === kok || t.url.startsWith(kok + "?") || t.url.startsWith(kok + "#"));
-  if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, (t.title || "").startsWith("🔑") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }
+  if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, /^🔑|anahtar gerekli|key required/.test(t.title || "") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }
   else await chrome.tabs.create({ url: await anahtarli(kok) });
 }
 $("pano").onclick = () => panoAc(cfg.relay).then(() => window.close());

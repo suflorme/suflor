@@ -253,7 +253,7 @@ const anahtarli = async (url) => { const k = await SuflorAnahtar.al(); return k 
 async function panoAc(relay) {
   const kok = relay.replace(/\/$/, "") + "/";
   const [t] = (await chrome.tabs.query({ url: kok + "*" })).filter(t => t.url === kok || t.url.startsWith(kok + "?") || t.url.startsWith(kok + "#"));
-  if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, (t.title || "").startsWith("🔑") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }  // 🔑: pano anahtarsız
+  if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, /^🔑|anahtar gerekli|key required/.test(t.title || "") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }  // başlık "anahtar gerekli" (eski pano: 🔑): pano anahtarsız
   else await chrome.tabs.create({ url: await anahtarli(kok) });
 }
 chrome.notifications.onButtonClicked.addListener(async (id, i) => {

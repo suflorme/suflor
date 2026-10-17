@@ -456,6 +456,7 @@ globalThis.SUFLOR_EN = {
   "Onayla": "Approve",
   "Reddet": "Decline",
   "Pano anahtarsız açıldı": "Panel opened without its key",
+  "Suflor.me — anahtar gerekli": "Suflor.me — key required",
   "Suflor.me simgesine tıkla → Panoyu aç": "Click the Suflor.me icon → Open panel",
   "Anahtar yok — panoyu Suflor.me simgesinden aç, sonra bu sayfayı yenile.": "No key — open the panel from the Suflor.me icon, then reload this page.",
   "Anahtarsız yerel istek geldi": "A local request arrived without the key",

@@ -675,14 +675,14 @@ def note(p):
     with LOCK:
         now = datetime.datetime.now().strftime("%H:%M:%S")
         cell = " / ".join((p.get("text") or "").replace("|", "¦").splitlines())  # çok satırlı not tabloyu bozmasın
-        etk = "🔊 SUFLOR" if p.get("kaynak") == "suflor" else NOT_ETIKET; ek = {"kaynak": "suflor"} if p.get("kaynak") == "suflor" else {}  # v0.40.0: Suflor'un toplantıya söylediği
+        etk = "SUFLOR (sesli)" if p.get("kaynak") == "suflor" else NOT_ETIKET; ek = {"kaynak": "suflor"} if p.get("kaynak") == "suflor" else {}  # v0.40.0: Suflor'un toplantıya söylediği
         b = None if m.get("title") else bitmis_dosya()
         if b:  # biten toplantının dosyasına, toplantıyı yeniden açmadan
             md = os.path.join(BASE, b)
             write([(md, f"| {now} | **{etk}** | {cell} | ✎ (toplantıdan sonra) |\n"), (md[:-3] + ".jsonl", json.dumps({"at": p.get("at"), "note": p.get("text"), "sonra": True, **ek}, ensure_ascii=False) + "\n")])
             STATE["notes"] += 1; heartbeat(); return
         md, jl = paths(title); hdr = ensure_header(md, title, m)
-        write([(md, hdr), (md, pre_al(md)), (md, f"| {now} | **{etk}** | {cell} | {'🔊' if ek else '✎'} |\n"), (jl, json.dumps({"at": p.get("at"), "note": p.get("text"), **ek}, ensure_ascii=False) + "\n")])
+        write([(md, hdr), (md, pre_al(md)), (md, f"| {now} | **{etk}** | {cell} | {'sesli' if ek else '✎'} |\n"), (jl, json.dumps({"at": p.get("at"), "note": p.get("text"), **ek}, ensure_ascii=False) + "\n")])
         show(md, title); STATE["notes"] += 1; STATE["last"] = now; heartbeat()
 def show(md, title):
     # Pano, notun/gündem işaretinin yazıldığı dosyayı göstersin (v0.3.4: aktarıcı yeniden başlayınca pano eski

@@ -43,7 +43,7 @@ try:
         a = soyle("Bu uzun bir deneme cümlesidir, birkaç saniye sürsün diye biraz daha uzatıyorum ve devam ediyorum."); time.sleep(1); b = soyle("x")
         md = [f for f in os.listdir(os.path.join(T, "canli")) if f.endswith(".md") and "Deneme-TS" in f]
         mt = open(os.path.join(T, "canli", md[0])).read() if md else ""; jt = open(os.path.join(T, "canli", md[0][:-3] + ".jsonl")).read() if md else ""
-        bak("dökümde ayrı etiket (🔊 SUFLOR, kullanıcı notu değil), .jsonl'de kaynak: suflor", any("**🔊 SUFLOR** |" in l and "Bu uzun bir deneme" in l for l in mt.splitlines()) and "NOTU" not in mt and '"kaynak": "suflor"' in jt)
+        bak("dökümde ayrı etiket (SUFLOR (sesli), kullanıcı notu değil), .jsonl'de kaynak: suflor", any("**SUFLOR (sesli)** |" in l and "Bu uzun bir deneme" in l for l in mt.splitlines()) and "NOTU" not in mt and '"kaynak": "suflor"' in jt)
         bak(f"gerçek say (aygıt {ayg[0]}) başladı, ikinci basış susturdu: {b!r}", a.startswith("⌨ 🔊") and "sustu" in b)
         p.terminate(); p.wait(5)
     else: print("(gerçek say denemesi atlandı: hoparlör dışı çıkış aygıtı yok)")
