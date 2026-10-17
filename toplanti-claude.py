@@ -620,6 +620,15 @@ def _vt_mt_yaz(dosya):
         with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"mt": _vt_mt(), "kontrol": round(time.time())}, f)
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except OSError: pass
+VT_ADLAR_DOSYA = "vt-adlar.json"  # v0.60.0: kişi ve takma adlar (ayar veritabani.kisiler sorgusunun ilk sütunu, virgüllü) — aktarıcının Konuş ad düzeltmesi için
+def _vt_adlar_yaz(dosya):
+    adlar = sorted({x.strip() for r in vt_sorgu("kisiler") for x in str((r or [""])[0] or "").split(",") if len(x.strip()) >= 3})
+    if not adlar: return
+    try:
+        y = os.path.join(dosya, VT_ADLAR_DOSYA)
+        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"adlar": adlar, "t": round(time.time())}, f, ensure_ascii=False)
+        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+    except OSError: pass
 def _vt_onbellek(dosya, guncelle=None, yenile=False):
     y = os.path.join(dosya, VT_SONUC_ONBELLEK)
     try: ob = json.load(open(y, encoding="utf-8"))
@@ -737,6 +746,7 @@ def vt_mcp_cmd():
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except (VtHata, OSError): pass
     _vt_mt_yaz(A.dir)  # açılışta hemen (denetim iş parçacığını beklemeden)
+    _vt_adlar_yaz(A.dir)
     import threading
     kilit = threading.Lock()
     def denetle():  # açılışta bir kez, sonra dakikada bir: veritabanı değiştiyse önbellekteki sorgular yeniden çalışır
