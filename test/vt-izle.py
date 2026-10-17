@@ -4,6 +4,8 @@
 # Geçici veritabanı ve ayarla; gerçek ayar ve _canli'ye dokunmaz (~3 sn). vt-izle ya da tetikleme değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/vt-izle.py
 import json, os, re, shutil, sqlite3, subprocess, sys, tempfile, time
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+PORT = bos_port(8795)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HATA = []
 def ok(ad, k):
@@ -14,7 +16,7 @@ os.makedirs(proje); os.makedirs(canli)
 DB = os.path.join(proje, "kayit.db"); con = sqlite3.connect(DB)
 con.executescript("CREATE TABLE kisi (id TEXT PRIMARY KEY, ad TEXT, lakap TEXT, sifre TEXT); INSERT INTO kisi VALUES ('a','Vedran Kaya','Vedo','gizli1');")
 con.commit(); con.close()
-json.dump({"alan": "Test", "ad": "Deneme", "port": 8795, "uygulama": os.path.join(T, "uyg"), "proje": proje, "ortak": os.path.join(T, "ortak"), "dil": "tr",
+json.dump({"alan": "Test", "ad": "Deneme", "port": PORT, "uygulama": os.path.join(T, "uyg"), "proje": proje, "ortak": os.path.join(T, "ortak"), "dil": "tr",
            "veritabani": {"yol": "kayit.db", "kisiler": "SELECT ad || coalesce(','||lakap,''), ad FROM kisi"}}, open(os.path.join(T, "ayar.json"), "w"))
 ENV = dict(os.environ, SUFLOR_AYAR=os.path.join(T, "ayar.json"), PYTHONDONTWRITEBYTECODE="1")
 tc = lambda *a, **k: subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, *a], env=ENV, capture_output=True, text=True, **k)

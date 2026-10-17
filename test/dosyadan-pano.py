@@ -6,6 +6,8 @@
 # Vazgeç, aktarıcı yeniden başlayınca kalan duraklatılmış süreç kapanır. Whisper kurulu değilse atlar (~3 dk; toplantı bitişi 60 sn bekler).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/dosyadan-pano.py      (kaldı → çıkış 1)
 import datetime, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request, wave
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+PA, PB, PC = bos_port(8791), bos_port(8792), bos_port(8790)
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GERCEK = json.load(open(os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json"), encoding="utf-8"))
@@ -76,7 +78,7 @@ class Aktarici:
         return self.durum() or {}, gorulen
     def kapat(self): self.p.terminate(); self.p.wait(5)
 
-A = Aktarici(8791, os.path.join(T, "proje")); os.makedirs(os.path.join(T, "proje", "gorusmeler"))
+A = Aktarici(PA, os.path.join(T, "proje")); os.makedirs(os.path.join(T, "proje", "gorusmeler"))
 try:
     kontrol("sor: ses/video olmayan dosya reddedilir", "ses/video değil" in (A.karar("sor", ad="rapor.pdf", boyut=10).get("err") or ""))
     kontrol("sor: m4a kabul", A.karar("sor", ad="Pano deneme.m4a", boyut=os.path.getsize(SES)).get("ok") is True)
@@ -107,7 +109,7 @@ try:
 finally: A.kapat()
 
 # toplantı başlayınca duraklar, bitince sürer · duraklatılmışken Vazgeç · aktarıcı yeniden başlayınca kalan duraklatılmış süreç kapanır
-C = Aktarici(8790, os.path.join(T, "proje"))
+C = Aktarici(PC, os.path.join(T, "proje"))
 def pgid(c):
     try: return int(open(os.path.join(c.canli, "dosyadan", "surec.pid")).read())
     except (OSError, ValueError): return 0
@@ -124,7 +126,7 @@ try:
     d1 = C.durum() or {}; g = grup(pgid(C)); time.sleep(4); d2 = C.durum() or {}
     kontrol(f"toplantı başlayınca duraklatıldı (süreçler {g}), ilerleme durdu, panoda 'durakli'", d0 and d1.get("durakli") is True and g and all(x.startswith("T") for x in g) and d1.get("blok") == d2.get("blok") and d2.get("durum") == "calisiyor")
     t = time.time(); d, _ = C.bekle("bitti", "hata", sn=150)
-    kontrol(f"toplantı bitince sürdü ve bitti ({time.time() - t:.0f} sn sonra)", d.get("durum") == "bitti" and not d.get("durakli") and "toplantı bitti — sürüyor" in open(os.path.join(T, "relay8790.log")).read())
+    kontrol(f"toplantı bitince sürdü ve bitti ({time.time() - t:.0f} sn sonra)", d.get("durum") == "bitti" and not d.get("durakli") and "toplantı bitti — sürüyor" in open(os.path.join(T, f"relay{PC}.log")).read())
     C.karar("kapat"); C.yukle(UZUN, ad="Uzun deneme 2.m4a"); calisiyor(C); p = pgid(C)
     C.istek("/ping", {"call": True, "meeting": {"title": "Deneme"}}, koken=None); time.sleep(3)
     durdu = (C.durum() or {}).get("durakli"); C.karar("vazgec"); time.sleep(4)
@@ -134,12 +136,12 @@ try:
     C.yukle(UZUN, ad="Uzun deneme 3.m4a"); calisiyor(C); p = pgid(C)
     C.istek("/ping", {"call": True, "meeting": {"title": "Deneme"}}, koken=None); time.sleep(3)
     durdu = (C.durum() or {}).get("durakli"); C.p.kill(); C.p.wait(5); time.sleep(1); kalan = grup(p)
-    C = Aktarici(8790, os.path.join(T, "proje")); time.sleep(4)
+    C = Aktarici(PC, os.path.join(T, "proje")); time.sleep(4)
     kontrol(f"aktarıcı yeniden başlayınca kalan duraklatılmış süreç kapandı (önce {kalan}, sonra {grup(p)})", durdu and kalan and not grup(p) and not os.path.exists(os.path.join(C.canli, "dosyadan")))
 finally: C.kapat()
 
 # proje Masaüstü'nde: launchd oraya yazamaz → canli/dokum (klasöre dokunulmaz; olmayan yol)
-B = Aktarici(8792, os.path.expanduser("~/Desktop/suflor-deneme-yok"))
+B = Aktarici(PB, os.path.expanduser("~/Desktop/suflor-deneme-yok"))
 try:
     B.yukle(SES); d, _ = B.bekle("bitti", "hata")
     kontrol("Masaüstündeki proje → canli/dokum, panoda 'canli/dokum'", d.get("durum") == "bitti" and os.path.realpath(os.path.dirname(d.get("md") or "-")) == os.path.realpath(os.path.join(B.canli, "dokum")) and d.get("yer") == "canli/dokum")

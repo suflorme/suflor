@@ -4,7 +4,8 @@
 # Kota yok, Whisper yok (~5 sn). Takvim/uygun zaman/iş talimatı kalıbı değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/takvim-hafta.py
 import datetime as dt, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8789
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8789)
 HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)

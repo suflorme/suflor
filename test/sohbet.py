@@ -5,7 +5,8 @@
 # kapatır (Claude'a gitmez); Claude düşünürken söylenen sonraki soru olur (v0.49.2); sessizlikte uyarı + kapanış (test süreleri 12/20 sn); toplantı başlayınca kapanır; sohbette "hı hı" yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/sohbet.py     (~3 dk; Brifing.app, swiftc, whisper-venv; smart-turn varsa bekleme seçicisi de)
 import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT, PORT2 = 8793, 8794
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT, PORT2 = bos_port(8793), bos_port(8794)
 T = tempfile.mkdtemp(prefix="sohbet-"); canli = os.path.join(T, "canli"); os.makedirs(canli); proje = os.path.join(T, "proje"); os.makedirs(proje)
 HATA = []
 def ok(ad, k):

@@ -605,8 +605,14 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
             # (düşünme blokları sürdü; low'da ve Haiku'da cevap tutarlılığı/iç terim kuralı bozuldu) → model ayarı değişmedi.
             if j.get("type") == "user" and tur.get("t_arac") and not tur.get("t_sonuc"): tur["t_sonuc"] = time.time()
             if j.get("type") == "stream_event" and e.get("type") == "message_start" and tur.get("t_sonuc") and not tur.get("t_tur2"): tur["t_tur2"] = time.time()
+            # v0.77.3 ölçüm (18 Ekim gece: "en az" sorusunda araca kadar 22 sn): sunucunun ilk yanıtı mı geç, düşünme mi uzun — gonder_ms, ilk_yanit_ms, dusunme_ms, dusunme_kar
+            if j.get("type") == "stream_event" and e.get("type") == "message_start" and not tur.get("t_ilk_yanit"): tur["t_ilk_yanit"] = time.time()
             if j.get("type") == "stream_event" and e.get("type") == "content_block_start" and (e.get("content_block") or {}).get("type") in ("thinking", "redacted_thinking"):
-                tur["dusunme"] = tur.get("dusunme", 0) + 1
+                tur["dusunme"] = tur.get("dusunme", 0) + 1; tur.setdefault("_dus", {})[e.get("index")] = time.time()
+            if j.get("type") == "stream_event" and e.get("type") == "content_block_delta" and (e.get("delta") or {}).get("type") == "thinking_delta":
+                tur["dusunme_kar"] = tur.get("dusunme_kar", 0) + len(e["delta"].get("thinking") or "")
+            if j.get("type") == "stream_event" and e.get("type") == "content_block_stop" and e.get("index") in (tur.get("_dus") or {}):
+                tur["dusunme_sn"] = tur.get("dusunme_sn", 0) + time.time() - tur["_dus"].pop(e.get("index"))
             if j.get("type") == "stream_event" and e.get("type") == "content_block_start" and (e.get("content_block") or {}).get("type") == "tool_use":
                 tur.setdefault("araclar", []).append(str(e["content_block"].get("name") or "?")[:20]); tur["_arac"] = [str(e["content_block"].get("name") or ""), ""]
                 if not tur.get("t_arac"): tur["t_arac"] = time.time()
@@ -638,6 +644,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                      "api_ms": j.get("duration_api_ms"), "maliyet": round(m - _KS["maliyet"], 4), "tur": j.get("num_turns"), "model": _KS.get("model"),
                      "arac": len(tur.get("araclar") or []), "arac_ilk_ms": ms("t_arac"), "araclar": tur.get("araclar") or [],
                      "arac_yazim_ms": ms("t_arac_son"), "arac_sonuc_ms": ms("t_sonuc"), "tur2_ms": ms("t_tur2"), "dusunme": tur.get("dusunme", 0),
+                     "gonder_ms": ms("t_gonder"), "ilk_yanit_ms": ms("t_ilk_yanit"), "dusunme_ms": round(tur.get("dusunme_sn", 0) * 1000), "dusunme_kar": tur.get("dusunme_kar", 0),
                      "giris": sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
                      "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))), 2),
                      "hata": bool(j.get("is_error")), "kaynak": tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True))}
@@ -1051,6 +1058,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if duz: _konus_kur(soru=ms)
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
         if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
+        tur["t_gonder"] = time.time(); tur.pop("t_ilk_yanit", None)  # v0.77.3 ölçüm: soru sürece yazıldı (yeniden gönderimde de)
         try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()

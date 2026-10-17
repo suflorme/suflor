@@ -5,7 +5,8 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/bas-konus.py
 # Gerekenler: swiftc, kurulu Brifing.app (ayar.json'daki uygulama klasöründe; paket iskeleti için), whisper-venv (/Users/Shared/Suflor).
 import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8791
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8791)
 T = tempfile.mkdtemp(prefix="bas-"); canli = os.path.join(T, "canli"); os.makedirs(canli); proje = os.path.join(T, "proje"); os.makedirs(proje)
 HATA = []
 def ok(ad, k):
@@ -32,6 +33,10 @@ for l in sys.stdin:
     if "donma" in soru.lower() or ("takılma" in soru.lower() and not os.path.exists(isaret)):  # takılan Claude: hiç cevap yok
         open(isaret, "w").close(); time.sleep(600); continue
     ns += 1; b = "[Bağlam" in q and "Şimdi:" in q and "Deneme planlama" in q and "GİZLİ NOT" not in q  # davet notu girmez
+    if ns == 2:  # v0.77.3: ilk yanıt + düşünme bloğu (ölçüm alanları)
+        pr({"type": "stream_event", "event": {"type": "message_start"}}); pr({"type": "stream_event", "event": {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking"}}})
+        pr({"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": "abcde"}}}); time.sleep(0.2)
+        pr({"type": "stream_event", "event": {"type": "content_block_stop", "index": 0}})
     if ns == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
     for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."] + ([" Önceki konuşma geldi."] if "[Önceki konuşma" in q and "Önceki soru: " in q else []) \
             + ([f" Defter geldi: {defter}."] if defter else []) + ([" Ek geldi."] if ek else []) + ([" Geçmiş toplantı geldi."] if "[Sıradaki toplantı" in q and "Bütçe takibi" in q and "ortak: ayla" in q else []) \\
@@ -89,6 +94,8 @@ try:
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
     ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) >= 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c)
        and c[0]["arac"] == 0 and c[1]["arac"] == 1 and c[1]["araclar"] == ["Grep"] and c[1]["arac_ilk_ms"])
+    ok("ölçüm: soru gönderimi, ilk yanıt, düşünme süresi/uzunluğu (v0.77.3)", c[1]["gonder_ms"] is not None and c[1]["ilk_yanit_ms"] and c[1]["dusunme"] == 1
+       and c[1]["dusunme_kar"] == 5 and 150 <= c[1]["dusunme_ms"] < 2000 and c[0]["dusunme_kar"] == 0 and c[0]["ilk_yanit_ms"] is None)
     ok("döküme yazılmadı", not any(f.endswith(".md") for f in os.listdir(canli)))
     k3 = sor("Yarın ne var?")
     t0 = time.time()

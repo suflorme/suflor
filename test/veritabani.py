@@ -3,6 +3,8 @@
 # hazirlik --kim). Geçici klasörde yapay bir SQLite veritabanı ve ayar kurar; gerçek ayar, _canli ve proje verisine dokunmaz.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/veritabani.py      (kaldı → çıkış 1)
 import contextlib, importlib.util, io, json, os, shutil, sqlite3, subprocess, sys, tempfile
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+PORT = bos_port(8796)
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 T = tempfile.mkdtemp(prefix="suflor-vt-")
@@ -19,7 +21,7 @@ INSERT INTO kisi VALUES ('ayse','Ayşe Deneme','Ayşe','Finans yöneticisi'), ('
 CREATE TABLE karar (no INTEGER PRIMARY KEY, ozet TEXT);
 """)
 con.commit(); con.close()
-AYAR = {"alan": "Test", "ad": "Deneme Kullanici", "port": 8796, "uygulama": os.path.join(T, "uyg"), "proje": proje,
+AYAR = {"alan": "Test", "ad": "Deneme Kullanici", "port": PORT, "uygulama": os.path.join(T, "uyg"), "proje": proje,
         "ortak": os.path.join(T, "ortak"), "yerel_ses": False, "teshis": False, "dil": "tr",
         "veritabani": {"yol": "kayit.db", "sistemler": "SELECT ad FROM sistem",
                        "sistemler_kart": "SELECT ad, ad || ' — sahip: ' || sahip || ' · erişen ' || erisen FROM sistem",

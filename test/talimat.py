@@ -6,7 +6,8 @@
 #     yapılacak → onay → toplantı bitince e-posta taslağı (deneme kipinde açılmaz, günlükte).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/talimat.py
 import json, os, re, shutil, stat, subprocess, sys, tempfile, threading, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8785
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8785)
 T = tempfile.mkdtemp(prefix="talimat-"); canli = os.path.join(T, "canli"); os.makedirs(canli); HATA = []
 def ok(ad, k): print(("✓ " if k else "✗ ") + ad, flush=True); HATA.append(ad) if not k else None
 HEDEF = [{"ad": "proje", "etiket": "proje oturumu", "kalip": ["proje oturumuna", "ana oturuma"]}, {"ad": "gelistirme", "etiket": "geliştirme oturumu", "kalip": ["geliştirme oturumuna"]}]

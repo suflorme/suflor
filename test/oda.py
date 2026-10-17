@@ -6,6 +6,7 @@
 # komut_ses "uymuyor" alır.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/oda.py      (kaldı → çıkış 1; gerçek kısım ~2 dk)
 import ast, base64, datetime, json, math, os, random, shutil, struct, subprocess, sys, tempfile, time, urllib.error, urllib.request
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GS = os.path.join(KOD, "..", "_yedek", "test-araclari", "gercek-ses")
 hata = []
@@ -48,7 +49,7 @@ def pcm(y, bas, son):
 if not (py and ec and os.path.exists(KUL) and os.path.exists(DIG)):
     print("(whisper-venv, ses izi modeli ya da gerçek kayıt yok — gerçek işçi bölümü atlandı)")
 else:
-    T = tempfile.mkdtemp(prefix="suflor-oda2-"); canli = os.path.join(T, "canli"); os.makedirs(canli); PORT = 8783
+    T = tempfile.mkdtemp(prefix="suflor-oda2-"); canli = os.path.join(T, "canli"); os.makedirs(canli); PORT = bos_port(8783)
     for f in ("relay.py", "manifest.json", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
     shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
     # profil: kullanıcının kaydının ilk 60 sn'si (gerçek kullanımda toplantının ilk 30 sn'sinden kendiliğinden kurulur)

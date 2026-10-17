@@ -4,9 +4,10 @@
 # parçası verdiyse atılır; hoparlörle (kulaklık yok) /status masaustu_mic.kulaklik false. Yalıtılmış aktarıcı, sessiz PCM (Whisper işi doğmaz).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/masaustu-mic.py      (kaldı → çıkış 1)
 import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-T = tempfile.mkdtemp(prefix="suflor-mm-"); PORT = 8793; URL = f"http://127.0.0.1:{PORT}"
+T = tempfile.mkdtemp(prefix="suflor-mm-"); PORT = bos_port(8793); URL = f"http://127.0.0.1:{PORT}"
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))

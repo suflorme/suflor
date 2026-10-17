@@ -5,7 +5,8 @@
 # kullanıcının kendi hitabı; kişilik adıyla karşı hitap; ayar kapalıyken eski davranış. otonom.py, konus_hitap*, toplantiya_soyle ya da Kanal değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/otonom.py
 import base64, json, math, os, shutil, struct, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8792; KOKEN = "http://otonom.deneme"
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8792); KOKEN = "http://otonom.deneme"
 T = tempfile.mkdtemp(prefix="otonom-"); canli = os.path.join(T, "canli"); os.makedirs(canli); proje = os.path.join(T, "proje"); os.makedirs(proje)
 HATA = []
 def ok(ad, k):

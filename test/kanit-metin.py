@@ -3,7 +3,8 @@
 # .md'ye "📷 KANIT n metni" satırı yazar (.jsonl'e girmez); aynı ekranın tekrarında "önceki kanıtla aynı yazı"; yazısız görüntüde satır yok.
 # kanit / kanit_metin / metin-tani.swift değişince koştur:   PYTHONDONTWRITEBYTECODE=1 python3 test/kanit-metin.py   (~30 sn; ilk tanıma model yükler)
 import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8793
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8793)
 T = tempfile.mkdtemp(prefix="kmetin-"); canli = os.path.join(T, "canli"); os.makedirs(canli); HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)

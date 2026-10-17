@@ -5,7 +5,8 @@
 # /status'ta da var · ayar adin_gecti: false ve uzun_konusma_sn: 0 kapatır.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/anlik.py      (kaldı → çıkış 1; ~15 sn)
 import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8768
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8768)
 hata = []
 def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)

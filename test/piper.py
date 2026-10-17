@@ -5,6 +5,8 @@
 # ya da SUFLOR_PIPER_PYTHON / SUFLOR_PIPER_MODEL; ikisi de yoksa test atlanır.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/piper.py      (kaldı → çıkış 1)
 import glob, json, os, re, shutil, subprocess, sys, tempfile, threading, time, types, urllib.request
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+PORT = bos_port(8790)
 os.environ["SUFLOR_TEST_PIPER_SESSIZ"] = "1"
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 try: AY = json.load(open(os.path.expanduser("~/Library/Application Support/Suflor/ayar.json"), encoding="utf-8"))
@@ -18,7 +20,7 @@ def bak(ad, k):
 T = tempfile.mkdtemp(prefix="suflor-piper-")
 # bölümü relay.py'nin ad alanı yerine küçük bir taklitle çalıştır
 AYAR = {"ses_motoru": "piper", "piper_python": PY, "piper_model": MODEL, "uygulama": T}
-ns = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "A": types.SimpleNamespace(port=8790), "_UYG": KOD, "_APP": T, "__file__": os.path.join(KOD, "relay.py"), "BASE": T, "deneme_aktarici": lambda: True,
+ns = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "A": types.SimpleNamespace(port=PORT), "_UYG": KOD, "_APP": T, "__file__": os.path.join(KOD, "relay.py"), "BASE": T, "deneme_aktarici": lambda: True,
       "_ilk": lambda *y: next((x for x in y if os.path.exists(x)), y[-1]), "os": os, "re": re, "json": json, "time": time, "threading": threading, "subprocess": subprocess}
 exec(compile(open(os.path.join(KOD, "aktarici", "piper-ses.py"), encoding="utf-8").read(), "piper-ses.py", "exec"), ns)
 # v0.32.2 okunur metin: sayıya bitişik ek, saat, sıra sayısı, eksi, unvan ve kısaltma yazıya çevrilir (Piper yoluna özgü)
@@ -115,14 +117,14 @@ try:
     for f in ("relay.py", "manifest.json", "piper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
     shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
     canli = os.path.join(T, "canli"); os.makedirs(canli); ay = os.path.join(T, "ayar.json")
-    json.dump({"port": 8790, "uygulama": T, "ortak": T, "ses_motoru": "piper", "piper_python": PY, "piper_model": MODEL}, open(ay, "w"))
-    r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", "8790"], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT,
+    json.dump({"port": PORT, "uygulama": T, "ortak": T, "ses_motoru": "piper", "piper_python": PY, "piper_model": MODEL}, open(ay, "w"))
+    r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT,
                          env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1"))
     st = {}
     for _ in range(60):
         try:
             k = open(os.path.join(canli, "kart-anahtari.txt")).read().strip()
-            st = json.load(urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8790/status", headers={"X-Suflor-Anahtar": k}), timeout=3)); break
+            st = json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": k}), timeout=3)); break
         except Exception: time.sleep(0.3)
     bak(f"aktarıcı /status seslendirme ({st.get('seslendirme')})", (st.get("seslendirme") or {}).get("motor") == "piper")
     bak("aktarıcıda hata yok", "Traceback" not in open(os.path.join(T, "relay.log")).read())

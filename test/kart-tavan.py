@@ -4,9 +4,10 @@
 # Aynı aktarıcıda sistem izi (v0.32.12): toplantı sürerken canli/sistem-izi.jsonl'e ısı/pil/bellek (test kipinde 2 sn'de bir).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kart-tavan.py      (kaldı → çıkış 1)
 import json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-T = tempfile.mkdtemp(prefix="suflor-tavan-"); PORT = 8793; URL = f"http://127.0.0.1:{PORT}"; W = 3
+T = tempfile.mkdtemp(prefix="suflor-tavan-"); PORT = bos_port(8793); URL = f"http://127.0.0.1:{PORT}"; W = 3
 for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))

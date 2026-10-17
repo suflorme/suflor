@@ -2,7 +2,8 @@
 # Aktarıcıda seslendir / ozet_sesli / soru_* / eylem_sun / eylem_karar ya da panodaki Sonra/Sus değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/sesli.py
 import shutil, json, os, sys, subprocess, tempfile, time, urllib.request, urllib.error
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8795
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8795)
 T = tempfile.mkdtemp(prefix="yaz-"); canli = os.path.join(T, "canli"); os.makedirs(canli)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": os.path.join(T, "yok")}, open(ay, "w"))
 for f in ("relay.py", "manifest.json"): subprocess.run(["cp", os.path.join(KOD, f), T])

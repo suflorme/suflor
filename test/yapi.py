@@ -4,7 +4,8 @@
 # üretir (headless Chrome) · ozet-hazir haritayı aktarıcıya verir, panodaki "Zihin haritası" açar (deneme kipi).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/yapi.py      (kaldı → çıkış 1; ~20 sn)
 import json, os, re, shutil, sqlite3, subprocess, sys, tempfile, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8777
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8777)
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 hata = []
 def bak(ad, k):

@@ -7,7 +7,8 @@
 # (ortak klasörde smart-turn-venv + model varsa) "…geçtik ve" duraksamasında susar, cümle sonunda çalar; işçinin numpy log-mel'i transformers'la aynı.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/hihi.py     (~2 dk)
 import os, sys, json, time, wave, base64, shutil, tempfile, subprocess, urllib.request
-K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-hihi-"); PORT = 8795; hata = []
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-hihi-"); PORT = bos_port(8795); hata = []
 def bak(ad, kosul): print(("✓ " if kosul else "✗ ") + ad); hata.extend([] if kosul else [ad])
 for f in ("relay.py", "manifest.json", "whisper-isci.py"): shutil.copy(os.path.join(K, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(K, d), os.path.join(T, d))

@@ -3,7 +3,8 @@
 # ikincisinde yok; toplantı yokken okunmaz (v0.77.2); cevap yoksa hata; Konuş cevabının yalnız --- öncesi okunur; okurken ikinci basış susturur (gerçek say -a, kulaklık yoksa yerelde okunmaz).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/toplantiya-ses.py     (~15 sn; BlackHole gerekmez: SUFLOR_TEST_TS_AYGIT)
 import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
-K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-ts-"); PORT = 8796; hata = []
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-ts-"); PORT = bos_port(8796); hata = []
 def bak(ad, kosul): print(("✓ " if kosul else "✗ ") + ad); hata.extend([] if kosul else [ad])
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(K, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(K, d), os.path.join(T, d))

@@ -4,7 +4,8 @@
 # kulaklık yokken okunmaz · toplantı yokken okunmaz · ayar kapalıyken okunmaz.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/fisilti.py      (kaldı → çıkış 1; ~25 sn)
 import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8781
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8781)
 hata = []
 def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)

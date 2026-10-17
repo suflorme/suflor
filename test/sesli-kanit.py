@@ -3,6 +3,7 @@
 # olumsuz istek tetiklemez (Faz 2'de üç yanlış alarm yüzünden kaldırılmıştı). Kural değişince koştur.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/sesli-kanit.py      (kaldı → çıkış 1)
 import os, re, sys
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
 exec(src[src.index("_KOMUT_FIIL ="):src.index("SESLI_KANIT = {")])
@@ -27,7 +28,7 @@ ORNEK += NOT
 # Gerçek aktarıcı: kullanıcının satırında "Kanıt al." → kanıt isteği açılır ve aktarıcı cevap vermeyi sürdürür (13 Ekim deneme 8: ingest LOCK'u tutarken
 # kanıt isteği LOCK'u yeniden aldı, aktarıcı kilitlendi — eklenti sustu, satırlar durdu). SUFLOR_TEST_RELAY ile başka relay.py denenebilir.
 import json, shutil, subprocess, tempfile, time, urllib.request
-T = tempfile.mkdtemp(prefix="suflor-sk-"); canli = os.path.join(T, "canli"); os.makedirs(canli); PORT = 8768
+T = tempfile.mkdtemp(prefix="suflor-sk-"); canli = os.path.join(T, "canli"); os.makedirs(canli); PORT = bos_port(8768)
 shutil.copy(os.environ.get("SUFLOR_TEST_RELAY") or os.path.join(KOD, "relay.py"), os.path.join(T, "relay.py")); shutil.copy(os.path.join(KOD, "manifest.json"), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Ali K", "port": PORT, "uygulama": T, "proje": T, "ortak": T}, open(ay, "w"))

@@ -5,7 +5,8 @@
 # SUFLOR_CEVIRI_GERCEK=1 (az kota: tek öbek).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/ceviri.py      (kaldı → çıkış 1; ~15 sn)
 import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8779
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8779)
 hata = []
 def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)

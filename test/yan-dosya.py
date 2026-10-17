@@ -4,7 +4,8 @@
 # toplanti-claude.py'nin dosya seçimi denenir.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/yan-dosya.py      (kaldı → çıkış 1; ~5 sn)
 import datetime, json, os, shutil, subprocess, sys, tempfile, time
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = 8778
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8778)
 hata = []
 def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)

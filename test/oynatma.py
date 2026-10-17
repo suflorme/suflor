@@ -2,15 +2,16 @@
 # Suflor.me — döküm oynatma regresyon testi (Faz 2 güvence ağı).
 # Yapay bir toplantıyı (oynatma-veri.json) yalıtılmış bir aktarıcıya (relay.py) ve izle'ye (toplanti-claude.py) hızlandırılmış
 # saatle oynatır; aktarıcının yazdığı dosyaları, HTTP yanıtlarını (pano HTML'i dahil) ve izle olaylarını normalleştirip
-# test/oynatma-beklenen.json ile karşılaştırır. Gerçek _canli, ayar, dizin ve canlı aktarıcıya dokunmaz (geçici klasör, port 8799).
+# test/oynatma-beklenen.json ile karşılaştırır. Gerçek _canli, ayar, dizin ve canlı aktarıcıya dokunmaz (geçici klasör, port 8799; doluysa boş bir port).
 #   python3 test/oynatma.py            karşılaştır (fark varsa çıkış kodu 1)
 #   python3 test/oynatma.py --kaydet   beklenen sonucu yeniden yaz (bilinçli davranış değişikliğinden sonra)
 #   --hiz 20 (sahte saat katsayısı) · --sakla (geçici klasörü silme) · --port 8799
 import argparse, collections, hashlib, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request
 BURA = os.path.dirname(os.path.abspath(__file__)); KOK = os.path.dirname(BURA)
+sys.dont_write_bytecode = True; sys.path.insert(0, BURA); from bosport import bos_port
 ap = argparse.ArgumentParser(); ap.add_argument("--kaydet", action="store_true"); ap.add_argument("--hiz", type=float, default=20)
-ap.add_argument("--sakla", action="store_true"); ap.add_argument("--port", type=int, default=8799)
-A = ap.parse_args(); K = A.hiz; PORT = A.port; URL = f"http://127.0.0.1:{PORT}"
+ap.add_argument("--sakla", action="store_true"); ap.add_argument("--port", type=int)
+A = ap.parse_args(); K = A.hiz; PORT = A.port or bos_port(8799); URL = f"http://127.0.0.1:{PORT}"
 VERI = json.load(open(os.path.join(BURA, "oynatma-veri.json"), encoding="utf-8"))
 BEKLENEN = os.path.join(BURA, "oynatma-beklenen.json")
 

@@ -5,9 +5,10 @@
 # kayit_satirlari ikisini birlikte okur.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kayit-dondur.py      (kaldı → çıkış 1)
 import gzip, importlib.util, json, os, shutil, subprocess, sys, tempfile, time
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-T = tempfile.mkdtemp(prefix="suflor-kd-"); PORT = 8785
+T = tempfile.mkdtemp(prefix="suflor-kd-"); PORT = bos_port(8785)
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
