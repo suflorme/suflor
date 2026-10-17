@@ -9,6 +9,8 @@
 # v0.61.0: iki kişilik. Ayar "kisilik_toplanti_disi": ikinci dosya — toplantı yokken o konuşur; toplantıda "kisilik" (ilk dosya). Kullanıcı cümleye birinin
 # adıyla başlarsa ("<Ad>, …") o soru ve ardından KISILIK_SURE_SN içindeki adsız sorular o kişilikle cevaplanır. Toplantıda varsayılan olmayan kişilik yalnız
 # kullanıcıya (kulaklık/pano) cevap verir; kullanıcı toplantıya söylemesini isterse (TOPLANTIYA_RX) toplantıya okunur. Ek ayar satırı: hitap_bicimi: sen (varsayılan siz).
+# v0.71.0: ses: piper | <Mac ses adı> ve hiz: 1,15 (çarpan) — kişiliğin cevapları bu sesle okunur (iki kişilik ayrı duyulsun). Mac'in sistem (Siri) sesi say -r'yi
+# yok sayar (ölçüm 17 Ekim: -r 180/220 aynı süre); hız yalnız Piper'da ve adı verilen Mac sesinde (ör. Yelda) işler. Toplantıya okuma (BlackHole) bundan etkilenmez.
 KISILIK_SURE_SN = 180
 _KIS = {"yol": None, "mt": None, "v": None, "uyari": None}  # geriye uyum: tek kişilikte eski alanlar (konus_istem kisilik_mt)
 _KIS_D = {}  # yol → {"mt", "v", "uyari"}
@@ -24,12 +26,16 @@ def _kisilik_oku(yol, rol):
     try:
         s = open(yol, encoding="utf-8").read()
         m = re.match(r"\s*---\s*\n(.*?)\n---\s*\n?(.*)\Z", s, re.S)
-        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "rol": rol, "metin": (m.group(2) if m else s).strip()}
+        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "hiz": None, "rol": rol, "metin": (m.group(2) if m else s).strip()}
         for sat in (m.group(1).splitlines() if m else []):
             k, _, d_ = sat.partition(":"); k = k.strip().lower(); d_ = d_.strip()
             if k in ("ad", "okunus", "tanitim", "selam"): v[k] = d_ or None
             elif k == "hitap": v["hitap"] = [x.strip() for x in d_.split(",") if x.strip()]
             elif k == "hitap_bicimi": v["bicim"] = "sen" if d_.lower() == "sen" else "siz"
+            elif k == "ses": v["ses"] = d_ or None  # v0.71.0: "piper" ya da Mac ses adı (say -v); yoksa ayardaki ses
+            elif k == "hiz":
+                try: v["hiz"] = max(0.7, min(1.6, float(d_.replace(",", "."))))
+                except ValueError: pass
             elif k == "telaffuz": v["telaffuz"] = {a.strip(): b.strip() for a, _, b in (x.partition("=") for x in d_.split(";")) if a.strip() and b.strip()}
         if not v["ad"] or not v["metin"]: print("KİŞİLİK: okunamadı (ad ya da metin yok) — nötr davranış"); v = None
     except OSError as e: print(f"KİŞİLİK: okunamadı ({e.__class__.__name__}) — nötr davranış"); v = None

@@ -346,6 +346,12 @@ def _telaffuz_dongu():
             if ad: _TEL_BEK.update(son=time.time(), n=_TEL_BEK["n"] + 1); telaffuz_tamamla(ad)
         time.sleep(15)
 _SES_SEC = {"t": 0, "v": None}
+SES_TABAN_HIZ = 180  # v0.71.0: Yelda'nın varsayılan hızı ~180 sözcük/dk (ölçüm 17 Ekim); kişilik hiz çarpanı bunun üstüne
+def kisilik_sesi(zorla=None):  # → (motor "piper"|"mac", Mac ses adı ya da None = sistem sesi, hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
+    k = kisilik(); kses = (k or {}).get("ses"); khiz = (k or {}).get("hiz") or 1.0
+    piper_var = ARAYUZ_DILI == "tr" and bool(AYAR.get("piper_python")) and bool(AYAR.get("piper_model"))
+    if zorla != "mac" and ((kses == "piper" and piper_var) or (not kses and piper_acik())): return "piper", None, khiz
+    return "mac", (kses if kses and kses != "piper" else ses_secimi()), khiz
 def ses_secimi():  # say -v için ses adı; None = sistem sesi
     if AYAR.get("ses"): return str(AYAR["ses"])
     if ARAYUZ_DILI != "tr": return None
@@ -385,17 +391,19 @@ def _ses_isci():
                 try: SES["p"] = p = subprocess.Popen(["/usr/bin/afplay", dosya], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except OSError as e: print(f"SES: tepki çalınamadı {e.__class__.__name__}"); continue
         if dosya: p.wait(); continue
-        if piper_acik():  # yerel Türkçe ses (ayar ses_motoru: piper); okunamazsa Mac sesi
+        motor, v, khiz = kisilik_sesi()
+        if motor == "piper":  # yerel Türkçe ses (ayar ses_motoru: piper ya da kişilikte ses: piper); okunamazsa Mac sesi
             with SES_K:
                 if not SES["q"]: continue
                 metin = SES["q"].pop(0); kes = SES.get("kes", 0)
-            if piper_oku(metin, piper_hiz(), iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
+            if piper_oku(metin, piper_hiz() * khiz, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             with SES_K: SES["q"].insert(0, metin)
-        v = ses_secimi()  # defaults okuması kilidin dışında (60 sn önbellek)
+        if motor == "piper": v, khiz = kisilik_sesi("mac")[1:]  # Piper okuyamadı: Mac sesi
+        hz = ["-r", str(round(SES_TABAN_HIZ * khiz))] if khiz != 1.0 and v else []  # sistem sesi (v None) -r'yi yok sayar
         with SES_K:
             if not SES["q"]: continue
             metin = SES["q"].pop(0)
-            try: SES["p"] = p = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try: SES["p"] = p = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + hz + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError as e: print(f"SES: hata {e.__class__.__name__}"); continue
         try: p.stdin.write(metin.encode("utf-8")); p.stdin.close()
         except OSError: pass
