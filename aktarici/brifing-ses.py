@@ -545,9 +545,10 @@ SES_CEVAP = {  # sözcük ve kalıplar (Türkçe + İngilizce; Whisper'ın verdi
     "tekrar": ["ne dedin", "bir daha", "tekrar eder misin", "what did you say", "say again", "tekrar", "tekrarla", "efendim", "pardon", "repeat", "again"],
     "sus": ["sessiz ol", "sus", "dur", "yeter", "kapat", "stop", "enough", "quiet"],
     "sonra": ["daha sonra", "sonra bak", "sonra", "atla", "geç", "gec", "sonraki", "later", "skip", "next"],
-    "red": ["gerek yok", "no thanks", "hayır", "hayir", "yok", "yazma", "ekleme", "kaydetme", "reddet", "istemiyorum", "iptal", "no", "nope", "don't", "dont", "reject", "cancel"],
+    "red": ["gerek yok", "no thanks", "hayır", "hayir", "yok", "yazma", "ekleme", "kaydetme", "reddet", "istemiyorum", "iptal", "no", "nope", "don't", "dont", "reject", "cancel", "gönderme", "iletme", "bildirme", "yollama"],
     "onay": ["do it", "go ahead", "evet", "evt", "tamam", "tamamdır", "olur", "yaz", "yazabilirsin", "onayla", "onaylıyorum", "ekle", "ekleyebilirsin", "kaydet",
-             "peki", "aynen", "uygun", "uygundur", "yes", "yeah", "yep", "ok", "okay", "sure", "approve", "approved"]}
+             "peki", "aynen", "uygun", "uygundur", "yes", "yeah", "yep", "ok", "okay", "sure", "approve", "approved",
+             "gönder", "gönderebilirsin", "gönderin", "gonder", "bildir", "bildirebilirsin", "ilet", "iletebilirsin", "yolla", "send", "send it"]}  # v0.77.1 (kullanıcı): talimat onayı
 SES_AMA = {"ama", "fakat", "ancak", "yalnız", "sadece", "but", "except", "only"}  # "evet ama…" → düzeltme (Aşama 1b), şimdilik kısa cevap iste
 SES_DOLGU = {"lütfen", "please", "ee", "eee", "ıı", "hı", "hmm", "şey", "claude", "suflor"}
 def sesli_ayir(metin):  # → hepsi | tekrar | sus | sonra | red | onay | karisik | uzun | yok

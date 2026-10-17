@@ -12,6 +12,7 @@
 # oturumu gibi kullanıcıya özel hedefler yalnız kullanıcının ayarında durur. Ayar "talimat": false kapatır.
 import urllib.parse
 TALIMAT_FIIL = r"(?:ilet|söyle|soyle|yaz|gönder|gonder|bildir|aktar|not\s+düş|not\s+dus|talimat\s+ver|haber\s+ver)\w*"
+TALIMAT_NESNE = r"(?:bildirim|mesaj|ileti|not|talimat|haber|hatırlatma)\w*\s+"  # v0.77.1
 YAPILACAK_RX = re.compile(r"(?:yapılacaklar(?:ıma|ımı|ım|a)?|yapılacak\s+listeme|yapılacak\s+listesine|yapılacaklar\s+listeme|yapılacaklar\s+listesine|to-?do(?:\s+listeme|\s+listesine)?)"
                           r"\s+(?:olarak\s+)?(?:ekle|yaz|koy|kaydet|at)\w*\s*[:,.;\-]?\s*(?P<m>.*)$", re.I | re.S)
 TALIMAT_EN_COK, TALIMAT_SAAT_SINIR = 1000, 20  # ileti uzunluğu; hedef başına saatte en çok
@@ -33,7 +34,9 @@ def talimat_coz(metin):  # → ("oturum", hedef, ileti) | ("yapilacak", None, i�
         return ("yapilacak", None, is_[:TALIMAT_EN_COK]) if len(is_.split()) >= 2 else None
     for h in talimat_hedefler():
         k = "|".join(re.escape(x) for x in sorted(h["kalip"], key=len, reverse=True))
-        r = re.search(r"(?:" + k + r")\s+(?:de\s+|da\s+)?(?:şunu\s+|sunu\s+|bunu\s+)?" + TALIMAT_FIIL + r"\s*[:,.;\-]?\s*(?P<m>.*)$", m, re.I | re.S)
+        # v0.77.1 (ilk gerçek deneme): "bildirim gönderir misin? <ileti>" — nesne sözcüğü (bildirim, mesaj …) ve soru eki fiil sayılmaz, ileti sonrasıdır
+        r = re.search(r"(?:" + k + r")\s+(?:de\s+|da\s+)?(?:şunu\s+|sunu\s+|bunu\s+)?(?:bir\s+)?(?:" + TALIMAT_NESNE + r")?" + TALIMAT_FIIL +
+                      r"(?:\s+m[iıuü](?:s[iıuü]n|y[iıuü]z|s[iıuü]n[iıuü]z)?)?\s*[:,.;?!\-]*\s*(?P<m>.*)$", m, re.I | re.S)
         if not r: continue
         ileti = _talimat_temiz(r.group("m")) or _talimat_temiz(re.sub(r"\b(bunu|şunu|sunu)\b", "", m[:r.start()], flags=re.I))
         if len(ileti.split()) < 2: return None

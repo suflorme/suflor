@@ -12,18 +12,26 @@ def ok(ad, k): print(("✓ " if k else "✗ ") + ad, flush=True); HATA.append(ad
 HEDEF = [{"ad": "proje", "etiket": "proje oturumu", "kalip": ["proje oturumuna", "ana oturuma"]}, {"ad": "gelistirme", "etiket": "geliştirme oturumu", "kalip": ["geliştirme oturumuna"]}]
 # 1) ayrıştırma
 src = open(os.path.join(KOD, "aktarici", "talimat.py"), encoding="utf-8").read()
-ns = {"re": re, "os": os, "json": json, "time": time, "AYAR": {"talimat_hedefler": HEDEF}, "_t": lambda a, b: a, "kisilik_hitap_bul": lambda m: (None, m)}
+ns = {"re": re, "os": os, "json": json, "time": time, "AYAR": {"talimat_hedefler": HEDEF}, "_t": lambda a, b: a, "kisilik_hitap_bul": lambda m: (None, re.sub(r"^Atlas,\s*", "", m))}
 exec(src[src.index("TALIMAT_FIIL ="):src.index("def _talimat_kayit")], ns)
 for g, b in [("proje oturumuna ilet: sözleşme taslağını cuma 17.00'ye kadar hazırla", ("oturum", "proje", "sözleşme taslağını cuma 17.00'ye kadar hazırla")),
              ("Geliştirme oturumuna şunu söyle, panodaki düğme rengini koyulaştır.", ("oturum", "gelistirme", "panodaki düğme rengini koyulaştır")),
              ("Haftalık raporu pazartesiye çek, bunu ana oturuma ilet.", ("oturum", "proje", "Haftalık raporu pazartesiye çek")),
              ("Yapılacaklarıma ekle: vergi beyannamesini kontrol et", ("yapilacak", None, "vergi beyannamesini kontrol et")),
              ("Claude: yapılacak listeme yaz, dişçiden randevu al.", ("yapilacak", None, "dişçiden randevu al")),
+             ("Atlas, Geliştirme Oturumuna bildirim gönderir misin? Test bildirimi.", ("oturum", "gelistirme", "Test bildirimi")),  # ilk gerçek deneme (18 Ekim)
+             ("Proje oturumuna bir mesaj ilet: toplantı perşembeye kaydı.", ("oturum", "proje", "toplantı perşembeye kaydı")),
+             ("Ana oturuma not düş, yarın izinliyim.", ("oturum", "proje", "yarın izinliyim")),
              ("Proje oturumu bugün ne yaptı?", None), ("Yarın ne var?", None), ("proje oturumuna ilet", None)]:
     c = ns["talimat_coz"](g); c = (c[0], c[1]["ad"] if c[1] else None, c[2]) if c else None
     ok(f"ayrıştırma: {g!r} → {c}", c == b)
 ns["AYAR"]["talimat"] = False; ok("ayar talimat: false kapatır", ns["talimat_coz"]("proje oturumuna ilet: deneme yapalım") is None)
 ns["AYAR"] = {}; ok("ayar yoksa yalnız proje hedefi (geliştirme yok)", ns["talimat_coz"]("geliştirme oturumuna ilet: renk değişsin") is None and ns["talimat_coz"]("proje oturumuna ilet: renk değişsin"))
+# 1b) onay sözcükleri (v0.77.1, kullanıcı: evet dışında gönder, bildir, onaylıyorum, yes, tamam da onay)
+bs = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); nb = {"re": re}; exec(bs[bs.index("SES_CEVAP = {"):bs.index("def sesli_cevap(")], nb)
+for g, b in [("Bildir.", "onay"), ("Gönder", "onay"), ("Evet, gönder.", "onay"), ("Onaylıyorum", "onay"), ("Yes", "onay"), ("Tamam", "onay"), ("İlet.", "onay"),
+             ("Gönderme", "red"), ("Hayır, iletme.", "red")]:
+    ok(f"onay sözcüğü: {g!r} → {nb['sesli_ayir'](g)}", nb["sesli_ayir"](g) == b)
 # 2) yalıtılmış aktarıcı
 ay = os.path.join(T, "ayar.json")
 json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "talimat_hedefler": HEDEF, "eposta": "gmail", "eposta_adres": "deniz" + chr(64) + "ornek.test"}, open(ay, "w"))
