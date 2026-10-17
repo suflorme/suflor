@@ -34,10 +34,17 @@ def _okuma_izle(simdi):  # okumanın başladığı an (araya girme koruması SOH
     if not okuma: SOHBET["t_okuma"] = 0.0
     return okuma
 # v0.54.3 (kullanıcı, 16 Ekim: "sohbette miyim, kapalı mı anlamıyorum"): son kapanış nedeni 60 sn panoda görünür (aktarıcı kendisi kapatınca iz kalsın)
+# v0.74.0 (kullanıcı, 18 Ekim: "ara yolu uygula"): toplantı dışında kulaklık takılıysa panonun mikrofon düğmesi Sohbet'i açar (bir dokunuş); kulaklık yoksa ya da
+# toplantıda basılı tut. Pano bunun için "kulaklik"ı okur (Core Audio, 3 sn önbellek; toplantıda sorulmaz).
+_SOH_KUL = {"t": 0.0, "v": False}
+def _sohbet_kulaklik():
+    if toplanti_var(): return False
+    if time.time() - _SOH_KUL["t"] > 3: _SOH_KUL.update(t=time.time(), v=bool(kulaklik()))
+    return _SOH_KUL["v"]
 def sohbet_view():
-    if SOHBET["acik"]: return {"acik": True, "bekle": SOHBET["bekle"], "okuyor": ses_caliyor()}
+    if SOHBET["acik"]: return {"acik": True, "bekle": SOHBET["bekle"], "okuyor": ses_caliyor(), "kulaklik": True}
     k = SOHBET.get("kapanis")
-    return {"acik": False, **({"kapandi": k["neden"], "kapandi_sn": round(time.time() - k["t"])} if k and time.time() - k["t"] < 60 else {})}
+    return {"acik": False, "kulaklik": _sohbet_kulaklik(), **({"kapandi": k["neden"], "kapandi_sn": round(time.time() - k["t"])} if k and time.time() - k["t"] < 60 else {})}
 def sohbet_basla():
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürerken sohbet kapalı — “Claude, …” de ya da basılı tut", "Conversation is off during a meeting — say “Claude, …” or hold to talk")}
