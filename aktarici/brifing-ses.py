@@ -367,7 +367,7 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
     return _SES_SEC["v"]
 def seslendir(metin, kuyruk=False, tepkisiz=False):
     if not AYAR.get("konusma", True) or not metin: return False
-    mac = not piper_acik(); klip = None
+    mac = kisilik_sesi()[0] != "piper"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
     if mac and not tepkisiz: klip, metin = tepki_ayir(metin)
     metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
     if not kuyruk: ses_durdur()

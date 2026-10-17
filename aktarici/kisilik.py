@@ -26,12 +26,13 @@ def _kisilik_oku(yol, rol):
     try:
         s = open(yol, encoding="utf-8").read()
         m = re.match(r"\s*---\s*\n(.*?)\n---\s*\n?(.*)\Z", s, re.S)
-        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "hiz": None, "rol": rol, "metin": (m.group(2) if m else s).strip()}
+        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "hiz": None, "kdili": False, "rol": rol, "metin": (m.group(2) if m else s).strip()}
         for sat in (m.group(1).splitlines() if m else []):
             k, _, d_ = sat.partition(":"); k = k.strip().lower(); d_ = d_.strip()
             if k in ("ad", "okunus", "tanitim", "selam"): v[k] = d_ or None
             elif k == "hitap": v["hitap"] = [x.strip() for x in d_.split(",") if x.strip()]
             elif k == "hitap_bicimi": v["bicim"] = "sen" if d_.lower() == "sen" else "siz"
+            elif k == "konusma_dili": v["kdili"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.73.0
             elif k == "ses": v["ses"] = d_ or None  # v0.71.0: "piper" ya da Mac ses adı (say -v); yoksa ayardaki ses
             elif k == "hiz":
                 try: v["hiz"] = max(0.7, min(1.6, float(d_.replace(",", "."))))
@@ -111,4 +112,23 @@ def kisilik_telaffuz(metin):  # okunacak metinde ad → okunuş ve dosyadaki tel
         es.setdefault(k["ad"], k.get("okunus") or k["ad"])
     for a, b in es.items():
         if a != b: metin = re.sub(r"(?<!\w)" + re.escape(a) + r"(?!\w)", b, metin)
+    return metin
+# v0.73.0 (kullanıcı, 17 Ekim): konuşma dili — kişilik dosyasında "konusma_dili: evet" ise o kişiliğin OKUNAN cümlesinde 1. ve 2. kişi kip ekleri
+# günlük söylenişe döner (okuyacağım → okuyacam, bakıyorum → bakıyom, geliyor musun → geliyon mu). Claude bu yazımı istemle de kullanmadı (gerçek deneme 3/3).
+# Yazılı kısım (pano) ve toplantıya okunan metin değişmez. Gelecek zaman ortacı ("okuyacağım kitap") bozulmasın diye -acağım yalnız noktalama/satır sonu ya da
+# bağlaçtan önce döner; -yorum fiilden başka sözcükte geçmez ("yorum" tek başına eşleşmez: önünde ünlü + y gerekir).
+_KD_SON = r"(?=\s*(?:[.,!?;:…]|$|\s(?:ama|ve|ki|de|da|sonra|şimdi|hemen|yani|zaten|bence|tamam)\b))"
+_KD_KURAL = [
+    (re.compile(r"\b(\w+?)(a|e)ca(?:ğ|g)ı(m|z)\b" + _KD_SON, re.I), lambda m: m.group(1) + m.group(2) + "ca" + m.group(3)),   # okuyacağım → okuyacam, yapacağız → yapacaz
+    (re.compile(r"\b(\w+?)(e)ce(?:ğ|g)i(m|z)\b" + _KD_SON, re.I), lambda m: m.group(1) + m.group(2) + "ce" + m.group(3)),     # gideceğim → gidecem
+    (re.compile(r"\b(\w+[ıiuü])yor\s+mu(sun|yum)\b", re.I), lambda m: m.group(1) + ("yon mu" if m.group(2).lower() == "sun" else "yom mu")),  # geliyor musun → geliyon mu
+    (re.compile(r"\b(\w+[ıiuü])yorum\b", re.I), lambda m: m.group(1) + "yom"),                                                   # bakıyorum → bakıyom
+    (re.compile(r"\b(\w+[ıiuü])yorsun\b", re.I), lambda m: m.group(1) + "yon"),                                                  # biliyorsun → biliyon
+    (re.compile(r"\b(\w+[ıiuü])yoruz\b", re.I), lambda m: m.group(1) + "yoz"),                                                   # gidiyoruz → gidiyoz
+]
+def konusma_dili(metin, k=None):  # okunacak cümle → kişilik konuşma dili istiyorsa günlük söyleniş
+    k = k or kisilik()
+    if not k or not k.get("kdili") or not metin or ARAYUZ_DILI != "tr": return metin
+    for rx, f in _KD_KURAL:
+        metin = rx.sub(f, metin)
     return metin

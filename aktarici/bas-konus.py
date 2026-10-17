@@ -564,7 +564,7 @@ def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okum
             if not tur.get("kesik"): tur["kesik"] = True; print(f"KONUŞ: okuma {KONUS_OKU_EN_COK} cümlede durdu — kalanı panoda")
             c = ""
         if c and len(c.split()) > 1: tur["okunan"] = tur.get("okunan", 0) + 1
-        if c and tur.get("sesli", True): c = sesli_terim_suz(c)
+        if c and tur.get("sesli", True): c = konusma_dili(sesli_terim_suz(c))  # v0.73.0: kişilik konuşma dili istiyorsa günlük söyleniş (yalnız okunan)
         if c and tur.get("sesli", True) and seslendir(c, kuyruk=True) and not tur.get("t_ses"): tur["t_ses"] = time.time()
         if son: break
 # Sesli kısımda iç terim süzgeci (v0.57.1, S70): istem "söyleme" dese de 22 gerçek cevabın birinde "karar kaydı bulamadım" okundu. Yalnız OKUNAN cümleye uygulanır

@@ -27,7 +27,7 @@ for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1
     ot = "toplantıya okunur, herkes duyar" in q; kim = next((a for a in ("MATLAS", "ATLAS") if f"[Bu soruyu {a} cevaplıyor]" in q), "?")
     yk = "yalnız kullanıcı duyar" in q
-    for parca in ["Teslim tarihi cuma.", " Otonom bağlam geldi." if ot else " Otonom bağlam yok.", "\\n---\\n", "Ayrıntı.", f" Kişi {kim}.", " Yalnız kullanıcı." if yk else ""]:
+    for parca in ["Teslim tarihi cuma.", " Bakıyorum." if kim == "MATLAS" else "", " Otonom bağlam geldi." if ot else " Otonom bağlam yok.", "\\n---\\n", "Ayrıntı.", f" Kişi {kim}.", " Yalnız kullanıcı." if yk else ""]:
         time.sleep(0.05); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     pr({"type": "result", "duration_api_ms": 300, "total_cost_usd": 0.01 * n, "num_turns": 1, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
@@ -36,7 +36,7 @@ kis = os.path.join(T, "kisilik.md")
 open(kis, "w", encoding="utf-8").write("---\nad: ATLAS\nhitap: Atlas\nokunus: atlas\ntanitim: Merhaba, ben Atlas.\nselam: Merhaba.\n---\n## Kişilik: ATLAS\nAdın ATLAS.\n")
 os.chmod(kis, 0o600)
 kis2 = os.path.join(T, "kisilik2.md")  # v0.61.0: toplantı dışı kişilik — toplantıda adıyla çağrılınca yalnız kullanıcıya, isterse toplantıya
-open(kis2, "w", encoding="utf-8").write("---\nad: MATLAS\nhitap: Matlas\nhitap_bicimi: sen\n---\n## Kişilik: MATLAS\nAdın MATLAS.\n")
+open(kis2, "w", encoding="utf-8").write("---\nad: MATLAS\nhitap: Matlas\nhitap_bicimi: sen\nkonusma_dili: evet\n---\n## Kişilik: MATLAS\nAdın MATLAS.\n")
 ay = os.path.join(T, "ayar.json")
 AY = {"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
       "claude": sahte, "otonom": True, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6}
@@ -140,10 +140,13 @@ try:
     c = (st().get("konus") or {}).get("cevap") or ""
     ok("ikinci kişilik toplantıda: cevapladı, yalnız kullanıcıya (otonom yok, toplantıya okunmadı)", "Kişi MATLAS." in c and "Yalnız kullanıcı." in c and "Otonom bağlam yok" in c
        and log().count("OTONOM: cevap hazır") == n0 and son() == s0 and "MATLAS toplantıda — yalnız kullanıcıya" in log())
+    ok("konuşma dili: kulakta 'Bakıyom', panoda 'Bakıyorum' (v0.73.0)", "Bakıyom." in log() and "Bakıyorum." in c)
     ok("panoda etiket ikinci kişiliğin adı", (st().get("konus") or {}).get("kisilik") == "MATLAS")
     satir("ben", "Matlas, bunu toplantıya söyle lütfen.")
     v, t9 = bekle(lambda v: v.get("durum") == "itiraz", 20); ok("ikinci kişilik: 'toplantıya söyle' deyince itiraz penceresi → toplantıya", t9 is not None and "Otonom bağlam geldi" in ((st().get("konus") or {}).get("cevap") or ""))
     bekle(lambda v: v.get("durum") == "okundu", 15); ok("ikinci kişilik toplantıya bir kez okudu", son() == s0 + 1)
+    time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md") and "Otonom" in f)
+    ok("toplantıya okunan metinde konuşma dili yok (Bakıyorum)", "Bakıyorum." in [l for l in md.splitlines() if "SUFLOR" in l][-1])
     SUSKU(); n1 = log().count("OTONOM: cevap hazır"); satir("karsi", "Matlas, bize de özet verir misin?"); time.sleep(5)
     ok("karşı taraf ikinci kişiliğe seslenemez", log().count("OTONOM: cevap hazır") == n1)
     # 8) ayar kapalı: eski davranış (otonom yok)

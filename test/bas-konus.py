@@ -255,7 +255,7 @@ try:
     # v0.51.1 okuma sınırı: _konus_cumle beş cümlelik cevabın yalnız üçünü okur (işlev doğrudan; uçtan uca akışta tur sayısını bozmasın)
     import re as _re
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-    ad_ = {"re": _re, "time": time, "print": lambda *a, **k: None}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False: okunan_.append(m) or True
+    ad_ = {"re": _re, "time": time, "print": lambda *a, **k: None, "konusma_dili": lambda m: m}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False: okunan_.append(m) or True
     exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)
     t_ = {"tampon": "Vay! Birinci cümle burada. İkinci cümle de var. Üçüncü cümle geliyor. Dördüncü cümle de. Beşinci cümle son. Altıncı okunmamalı. Yedinci de okunmamalı"}
     ad_["_konus_cumle"](t_); ad_["_konus_cumle"](t_, son=True)
