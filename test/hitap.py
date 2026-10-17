@@ -4,9 +4,9 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/hitap.py      (kaldı → çıkış 1)
 import ast, os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KIS = {"v": None}; ns = {"re": re, "kisilik": lambda: KIS["v"]}  # v0.53.0: kişilik hitabı (nötr örnek ad "Atlas")
+KIS = {"v": None, "v2": None}; ns = {"re": re, "time": __import__("time"), "kisilikler": lambda: [x for x in (KIS["v"], KIS["v2"]) if x]}  # v0.53.0: kişilik hitabı (nötr örnek ad "Atlas")
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
-sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx")) or
+sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad")) or
        (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR"} for x in n.targets))]
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
@@ -38,7 +38,7 @@ for girdi, bek, ac in TABLO:
     cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok
     print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
 # kişilik açıkken (16 Ekim ölçümünden çıkan kural: ad + noktalama ya da soru cümlesi); eski hitaplar geçiş döneminde sürer
-KIS["v"] = {"hitap": ["Atlas", "Atlaz", "Hatlas"]}
+KIS["v"] = {"ad": "Atlas", "rol": "toplanti", "hitap": ["Atlas", "Atlaz", "Hatlas"]}
 for girdi, bek, ac in [
     ("Atlas, bugün kaç toplantım var?", "Claude: bugün kaç toplantım var?", "kişilik: virgüllü"),
     ("ATLAS: fiyat kaç olarak geçti?", "Claude: fiyat kaç olarak geçti?", "kişilik: iki noktalı, büyük harf"),
@@ -50,7 +50,18 @@ for girdi, bek, ac in [
     ("Suflor, kaç kart açık?", "Claude: kaç kart açık?", "kişilik açıkken Suflor da sürer (geçiş)")]:
     cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok
     print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
-KIS["v"] = None
+# v0.61.0: iki kişilik — ikinci adın içinde birincinin yazımı geçse de (Matlas ⊃ atlas) doğru kişilik tanınır
+KIS["v2"] = {"ad": "Matlas", "rol": "disi", "hitap": ["Matlas", "Oh Matlas", "Oh, Matlas"]}
+for girdi, bek, kim, ac in [
+    ("Matlas, yarın ne var?", "Claude: yarın ne var?", "Matlas", "ikinci kişilik: virgüllü"),
+    ("Oh, Matlas, bugün nasıl geçti?", "Claude: bugün nasıl geçti?", "Matlas", "ikinci kişilik: 'Oh,' önekiyle"),
+    ("Atlas, kaç kart açık?", "Claude: kaç kart açık?", "Atlas", "iki kişilik açıkken birinci de tanınır"),
+    ("Dün Matlas'ı aradım.", "Dün Matlas'ı aradım.", None, "ikinci kişilik: cümle ortası hitap değil")]:
+    ns["_KHR"]["son"] = None; cik, _ = ns["hitap_duzelt"](girdi); sn = (ns["_KHR"]["son"] or (None,))[0]; ok = cik == bek and sn == kim; hata += not ok
+    print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r} · {sn}" + ("" if ok else f" (beklenen {bek!r} · {kim})"))
+rx = ns["_kisilik_hitap_rx"]("toplanti"); ok = bool(rx.search("Atlas, özet?")) and not rx.search("Matlas, özet?"); hata += not ok
+print(f"{'✓' if ok else '✗'} karşı taraf kalıbı yalnız toplantı kişiliğinin adı")
+KIS["v"] = KIS["v2"] = None
 cik, _ = ns["hitap_duzelt"]("Atlas, bugün kaç toplantım var?"); ok = cik == "Atlas, bugün kaç toplantım var?"; hata += not ok
 print(f"{'✓' if ok else '✗'} kişilik dosyası yokken ad hitap değil: {cik!r}")
 print("GEÇTİ" if not hata else f"KALDI: {hata}")

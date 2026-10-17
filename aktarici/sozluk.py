@@ -67,16 +67,24 @@ HITAP_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)" + HITAP_AD + r"(?:\s*[
 HITAP_ORTA_RX = re.compile(r"(?<=\w)([,]?\s+)(?:Claude|Suflor)(?:\s*[,:]\s*|\s+(?!(?:mi|mı|mu|mü|ile|ve|için|gibi|de|da|ya|ki)\b)(?=\w))(?=[^.!?…]*\?\s*$)")
 # Kişilik hitabı (v0.53.0, ölçüm 16 Ekim: kişilik adıyla başlayan 14 cümlenin 13'ü istemle doğru yazıldı): adlar kişilik dosyasından/ayardan (kodda sabit ad yok).
 # Cümle başında ad + virgül/iki nokta/nokta ya da cümle soru ise hitap: "<Ad> markasının yeni ürünü…" tetiklemez. İçeride yine "Claude:" olur.
-_KHR = {"k": None, "rx": None}
-def _kisilik_hitap_rx():
-    k = kisilik(); adlar = tuple(k["hitap"]) if k else ()
-    if _KHR["k"] != adlar:
-        _KHR["k"] = adlar
-        _KHR["rx"] = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:" + "|".join(re.escape(a) for a in adlar) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?=[^.!?…]*\?))", re.I) if adlar else None
-    return _KHR["rx"]
+_KHR = {"k": {}, "rx": {}, "son": None}  # v0.61.0: iki kişilik — kalıp tüm adlarla; "son" = (az önce tanınan kişiliğin adı, zaman), konus_hitap okur
+def _kisilik_hitap_rx(rol=None):  # rol "toplanti": yalnız toplantı kişiliğinin adları (karşı taraf için)
+    ks = [k for k in kisilikler() if not rol or k["rol"] == rol]; adlar = tuple(a for k in ks for a in k["hitap"])
+    if _KHR["k"].get(rol) != adlar:
+        _KHR["k"][rol] = adlar
+        _KHR["rx"][rol] = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)(" + "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True)) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?=[^.!?…]*\?))", re.I) if adlar else None
+    return _KHR["rx"][rol]
+def _kisilik_hitap_ad(soz):  # tanınan hitap sözü → kişiliğin adı
+    for k in kisilikler():
+        if any(a.lower() == soz.lower() for a in k["hitap"]): return k["ad"]
+    return None
 def hitap_duzelt(text):
     krx = _kisilik_hitap_rx()
-    out = krx.sub(lambda m: m.group(1) + "Claude: ", text) if krx else text
+    def kd(m):
+        ad = _kisilik_hitap_ad(m.group(2))
+        if ad: _KHR["son"] = (ad, time.time())
+        return m.group(1) + "Claude: "
+    out = krx.sub(kd, text) if krx else text
     out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", out)
     if out == text: out = HITAP_ORTA_RX.sub(lambda m: ". Claude: ", text, count=1)
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])

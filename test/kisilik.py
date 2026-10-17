@@ -44,11 +44,32 @@ try:
     ok("ikinci okumada tanıtım yok", len(s2) == 2 and "Merhaba" not in s2[-1])
     # Konuş istemi (aktarıcının kendi tanımları; süreç açılmaz)
     src = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read(); ks = open(os.path.join(KOD, "aktarici", "kisilik.py"), encoding="utf-8").read()
-    ns = {"re": re, "os": os, "json": json, "time": time, "print": lambda *a, **k: None, "_t": lambda a, b: a, "ARAYUZ_DILI": "tr", "BASE": canli, "AYAR": {"kisilik": kd}, "_KS": {}}
+    ns = {"re": re, "os": os, "json": json, "time": time, "print": lambda *a, **k: None, "_t": lambda a, b: a, "ARAYUZ_DILI": "tr", "BASE": canli, "AYAR": {"kisilik": kd}, "_KS": {}, "TOP": [False]}
+    ns["toplanti_var"] = lambda: ns["TOP"][0]
     exec(ks, ns); exec(src[src.index("KONUS_ISTEM = {"):src.index("# --- Hızlı bilgi")], ns)
     ist = ns["konus_istem"]()
     ok("Konuş istemi: kişilik metni sonda, biçim kuralları önce, neşeli ünlem satırı çıktı",
        ist.endswith("KİŞİLİK-İŞARETİ") and "biçim kuralları" in ist.split("## Kişilik")[0][-400:] and "'Vay!'" not in ist and "en çok dört cümle" in ist and "Şey," not in ist)
+    # v0.61.0: iki kişilik — toplantı dışı kişilik (ayar kisilik_toplanti_disi), adla seçim, toplantıda yalnız kulağa
+    kd2 = os.path.join(T, "kisilik2.md")
+    open(kd2, "w", encoding="utf-8").write("---\nad: Matlas\nhitap: Matlas, Oh Matlas\nhitap_bicimi: sen\nselam: Selam, ben Matlas.\ntelaffuz: Sir=sör\n---\n## Kişilik: Matlas\nAdın Matlas. Sen dersin. İKİNCİ-İŞARET\n")
+    ns["AYAR"]["kisilik_toplanti_disi"] = kd2
+    ist2 = ns["konus_istem"]()
+    ok("iki kişilik: istemde ikisi de, açıklama satırı, biçim kuralları önce", "KİŞİLİK-İŞARETİ" in ist2 and ist2.endswith("İKİNCİ-İŞARET") and "Aşağıda iki kişilik var: Atlas toplantıda, Matlas toplantı dışında" in ist2)
+    ok("toplantı yokken etkin kişilik ikincisi", ns["kisilik"]()["ad"] == "Matlas")
+    ns["TOP"][0] = True; ok("toplantıda etkin kişilik birincisi", ns["kisilik"]()["ad"] == "Atlas")
+    kb, kalan = ns["kisilik_hitap_bul"]("Matlas, bugün neler yaptım?"); ok("adla seslenme bulundu", kb and kb["ad"] == "Matlas" and kalan == "bugün neler yaptım?")
+    kb, _ = ns["kisilik_hitap_bul"]("Atlas, özet?"); ok("birincinin adı da bulunur", kb and kb["ad"] == "Atlas")
+    kb, _ = ns["kisilik_hitap_bul"]("Dün Matlas'la konuştum"); ok("cümle ortası ad seçmez", kb is None)
+    ns["kisilik_sec"]("Matlas"); ok("adla seçilen kişilik toplantıda da sürer (süre içinde)", ns["kisilik"]()["ad"] == "Matlas")
+    ok("'sen' diyen kişilikte kis_t nötr cümle", ns["kis_t"]("Söyler misin?", "Söyler misiniz?") == "Söyler misin?")
+    ns["_KSEC"]["t"] -= ns["KISILIK_SURE_SN"] + 1; ok("süre dolunca varsayılana döner", ns["kisilik"]()["ad"] == "Atlas")
+    ok("'siz' diyen kişilikte kis_t kişilikli cümle", ns["kis_t"]("Söyler misin?", "Söyler misiniz?") == "Söyler misiniz?")
+    ok("telaffuz iki kişilikten", ns["kisilik_telaffuz"]("Tamam Sir, Deneme şirketi.") == "Tamam sör, Denemee şirketi.")
+    ok("toplantıya söyleme isteği tanınır", all(ns["toplantiya_istendi"](x) for x in ("toplantıya söyle bunu", "herkese anlat lütfen", "bunu onlara söyle", "sesli söyle", "tell everyone")))
+    ok("sıradan soru toplantıya söyleme isteği değil", not any(ns["toplantiya_istendi"](x) for x in ("bugün ne söyledim?", "toplantı kaçta bitiyor?", "Ali ne anlattı?")))
+    ns["TOP"][0] = False; ns["AYAR"]["kisilik_toplanti_disi"] = ""
+    ok("ikinci kaldırılınca tek kişilik (eski istem)", ns["konus_istem"]().endswith("KİŞİLİK-İŞARETİ") and ns["kisilik"]()["ad"] == "Atlas")
     ns["AYAR"]["kisilik"] = ""; ok("kişilik yokken istem nötr (ünlem satırı yerinde)", "'Vay!'" in ns["konus_istem"]() and "KİŞİLİK-İŞARETİ" not in ns["konus_istem"]())
     # kişilik dosyası silinince nötr
     os.remove(kd); time.sleep(0.2)

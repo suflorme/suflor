@@ -25,8 +25,9 @@ pr = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\\n"), sys
 n = 0
 for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1
-    ot = "toplantıya okunur, herkes duyar" in q
-    for parca in ["Teslim tarihi cuma.", " Otonom bağlam geldi." if ot else " Otonom bağlam yok.", "\\n---\\n", "Ayrıntı."]:
+    ot = "toplantıya okunur, herkes duyar" in q; kim = next((a for a in ("MATLAS", "ATLAS") if f"[Bu soruyu {a} cevaplıyor]" in q), "?")
+    yk = "yalnız kullanıcı duyar" in q
+    for parca in ["Teslim tarihi cuma.", " Otonom bağlam geldi." if ot else " Otonom bağlam yok.", "\\n---\\n", "Ayrıntı.", f" Kişi {kim}.", " Yalnız kullanıcı." if yk else ""]:
         time.sleep(0.05); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     pr({"type": "result", "duration_api_ms": 300, "total_cost_usd": 0.01 * n, "num_turns": 1, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
@@ -34,9 +35,11 @@ os.chmod(sahte, 0o755)
 kis = os.path.join(T, "kisilik.md")
 open(kis, "w", encoding="utf-8").write("---\nad: ATLAS\nhitap: Atlas\nokunus: atlas\ntanitim: Merhaba, ben Atlas.\nselam: Merhaba.\n---\n## Kişilik: ATLAS\nAdın ATLAS.\n")
 os.chmod(kis, 0o600)
+kis2 = os.path.join(T, "kisilik2.md")  # v0.61.0: toplantı dışı kişilik — toplantıda adıyla çağrılınca yalnız kullanıcıya, isterse toplantıya
+open(kis2, "w", encoding="utf-8").write("---\nad: MATLAS\nhitap: Matlas\nhitap_bicimi: sen\n---\n## Kişilik: MATLAS\nAdın MATLAS.\n")
 ay = os.path.join(T, "ayar.json")
 AY = {"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
-      "claude": sahte, "otonom": True, "toplantiya_ses": True, "kisilik": kis, "otonom_bekle_sn": 6}
+      "claude": sahte, "otonom": True, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6}
 json.dump(AY, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
@@ -131,13 +134,25 @@ try:
     satir("karsi", "Atlas, bu hafta neler yapıldı?")
     v, t8 = bekle(lambda v: v.get("durum") == "itiraz" and v.get("kim") == "Ayla Ö", 20); ok("karşı taraf kişilik adıyla seslendi (Atlas,) → otonom", t8 is not None)
     bekle(lambda v: v.get("durum") == "okundu", 15)
+    ok("toplantıda varsayılan kişilik cevapladı (ATLAS)", "Kişi ATLAS." in ((st().get("konus") or {}).get("cevap") or ""))
+    # 7b) toplantı dışı kişilik toplantıda adıyla: yalnız kullanıcıya (itiraz penceresi yok); isterse toplantıya
+    SUSKU(); n0 = log().count("OTONOM: cevap hazır"); s0 = son(); satir("ben", "Matlas, bugün ne konuştuk?"); time.sleep(5)
+    c = (st().get("konus") or {}).get("cevap") or ""
+    ok("ikinci kişilik toplantıda: cevapladı, yalnız kullanıcıya (otonom yok, toplantıya okunmadı)", "Kişi MATLAS." in c and "Yalnız kullanıcı." in c and "Otonom bağlam yok" in c
+       and log().count("OTONOM: cevap hazır") == n0 and son() == s0 and "MATLAS toplantıda — yalnız kullanıcıya" in log())
+    ok("panoda etiket ikinci kişiliğin adı", (st().get("konus") or {}).get("kisilik") == "MATLAS")
+    satir("ben", "Matlas, bunu toplantıya söyle lütfen.")
+    v, t9 = bekle(lambda v: v.get("durum") == "itiraz", 20); ok("ikinci kişilik: 'toplantıya söyle' deyince itiraz penceresi → toplantıya", t9 is not None and "Otonom bağlam geldi" in ((st().get("konus") or {}).get("cevap") or ""))
+    bekle(lambda v: v.get("durum") == "okundu", 15); ok("ikinci kişilik toplantıya bir kez okudu", son() == s0 + 1)
+    SUSKU(); n1 = log().count("OTONOM: cevap hazır"); satir("karsi", "Matlas, bize de özet verir misin?"); time.sleep(5)
+    ok("karşı taraf ikinci kişiliğe seslenemez", log().count("OTONOM: cevap hazır") == n1)
     # 8) ayar kapalı: eski davranış (otonom yok)
     ok("ayar kapatıldı", uc("/ayar", {"degisen": {"otonom": False}}, pano=True).get("ok"))
     satir("ben", "Claude: kaç kart açık acaba?"); time.sleep(6)
-    ok("ayar kapalıyken otonom penceresi açılmadı", ot().get("durum") in (None, "okundu") and log().count("OTONOM: cevap hazır") == 8)
+    ok("ayar kapalıyken otonom penceresi açılmadı", ot().get("durum") in (None, "okundu") and log().count("OTONOM: cevap hazır") == 9)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     DUR.set(); r.terminate(); r.wait(5)
-    if HATA: print("günlük:", os.path.join(T, "relay.log"))
+    if HATA or sys.exc_info()[0]: print("günlük:", os.path.join(T, "relay.log"))
     else: shutil.rmtree(T, ignore_errors=True)
 print("otonom:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun")
