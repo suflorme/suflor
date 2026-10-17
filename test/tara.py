@@ -52,7 +52,7 @@ yaz("belgeler/~$rapor.docx", ikili=b"kilit"); yaz("belgeler/.DS_Store", ikili=b"
 for k in (".env", "anahtarlar/sunucu.pem", "anahtarlar/imza.key", "belgeler/parolalar.xlsx", "ik/Maaş-tablosu.csv", "ik/salary-2026.xlsx", "tarama/kimlik-on.jpg",
           "tarama/Pasaport.pdf", "belgeler/sifre-listesi.txt"):
     yaz(k, ikili=(b"%PDF-1.4 " if k.endswith(".pdf") else b"") + k.encode())
-yaz("belgeler/sifreleme-politikasi.md", "Şifreleme politikası belgesi"); yaz("belgeler/kimlik-dogrulama-sureci.md", "Kimlik doğrulama süreci")
+yaz("belgeler/sifreleme-politikasi.md", "Şifreleme politikası belgesi"); yaz("belgeler/Şifreler.md", "x"); yaz("belgeler/sifreli-arsiv-notu.md", "Şifreli arşiv notu"); yaz("belgeler/kimlik-dogrulama-sureci.md", "Kimlik doğrulama süreci")
 # parolalı ve bozuk
 yaz("belgeler/sozlesme.docx", ikili=b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 600)
 yaz("belgeler/korumali.pdf", ikili=b"%PDF-1.7\n1 0 obj <<>> endobj\ntrailer << /Root 1 0 R /Encrypt 5 0 R >>\n%%EOF")
@@ -103,9 +103,9 @@ try:
     kontrol("toplam: 3 sürüm grubu, 4 eski sürüm", s["surum_grubu"] == 3 and s["eski_surum"] == 4, f"{s['surum_grubu']}/{s['eski_surum']}")
     gizli = {x["yol"] for x in r["haric"]}
     beklenen = {".env", "anahtarlar/sunucu.pem", "anahtarlar/imza.key", "belgeler/parolalar.xlsx", "ik/Maaş-tablosu.csv", "ik/salary-2026.xlsx",
-                "tarama/kimlik-on.jpg", "tarama/Pasaport.pdf", "belgeler/sifre-listesi.txt"}
+                "tarama/kimlik-on.jpg", "tarama/Pasaport.pdf", "belgeler/sifre-listesi.txt", "belgeler/Şifreler.md"}
     kontrol("adla hariç tutma: anahtar, parola, maaş, kimlik taraması", gizli == beklenen, f"fazla {sorted(gizli - beklenen)} eksik {sorted(beklenen - gizli)}")
-    kontrol("'şifreleme' ve 'kimlik doğrulama' belgesi hariç değil", d["belgeler/sifreleme-politikasi.md"]["gizli"] == 0 and d["belgeler/kimlik-dogrulama-sureci.md"]["gizli"] == 0)
+    kontrol("'şifreleme', 'şifreli' ve 'kimlik doğrulama' belgesi hariç değil", d["belgeler/sifreleme-politikasi.md"]["gizli"] == 0 and d["belgeler/sifreli-arsiv-notu.md"]["gizli"] == 0 and d["belgeler/kimlik-dogrulama-sureci.md"]["gizli"] == 0)
     ok = {x["yol"]: x["hata"] for x in r["okunamayan"]}
     kontrol("parolalı docx/pdf, bozuk xlsx ve boş dosya işaretlendi; boşlar kopya değil", ok.get("belgeler/sozlesme.docx") == "parolali" and ok.get("belgeler/korumali.pdf") == "parolali"
             and ok.get("belgeler/bozuk.xlsx") == "bozuk" and "belgeler/rapor.docx" not in ok and ok.get("belgeler/bos.md") == "bos"
