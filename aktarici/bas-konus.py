@@ -306,7 +306,7 @@ def proje_erisim_view(simdi=None):
     dizin = bool(eris and eris[0] and eris[1] == "hata")
     vt = _VTI["durum"] is False and _VTI["t"] and simdi - _VTI["t"] >= VT_IZIN_SN
     if not (dizin or vt): return None
-    ne = _t("proje belgeleri" if dizin and not vt else "kayıt veritabanı" if vt and not dizin else "proje belgeleri ve kayıt veritabanı",
+    ne = _t("proje belgelerini" if dizin and not vt else "kayıt veritabanını" if vt and not dizin else "proje belgelerini ve kayıt veritabanını",
             "project documents" if dizin and not vt else "records database" if vt and not dizin else "project documents and records database")
     return {"uyari": _t(f"Suflor.me {ne} okuyamıyor", f"Suflor.me can't read the {ne}"),
             "yol": _t("Sistem Ayarları → Gizlilik ve Güvenlik → Dosyalar ve Klasörler → Suflor Brifing → Masaüstü klasörü",

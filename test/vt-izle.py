@@ -63,9 +63,9 @@ try:
     ad.update(_t=lambda a, b: a, _ONARA={"eris": None}); exec(kod[kod.index("VT_IZIN_SN = "):kod.index("# --- Ad düzeltmesi")], ad); pv = ad["proje_erisim_view"]
     ad["_VTI"].update(durum=True, t=t0); ok("her şey yolundaysa uyarı yok", pv(t0 + 1000) is None)
     ad["_VTI"].update(durum=False, t=t0); ok("yardımcı yeni açıldıysa (3 dk dolmadan) uyarı yok", pv(t0 + 60) is None)
-    u = pv(t0 + 200); ok("açıldıktan 3 dk sonra önbellek hâlâ eskiyse: veritabanı uyarısı + izin yolu", u and "kayıt veritabanı" in u["uyari"] and "Dosyalar ve Klasörler" in u["yol"])
+    u = pv(t0 + 200); ok("açıldıktan 3 dk sonra önbellek hâlâ eskiyse: veritabanı uyarısı + izin yolu", u and "kayıt veritabanını okuyamıyor" in u["uyari"] and "Dosyalar ve Klasörler" in u["yol"])
     ad["_VTI"].update(durum=True); ad["_ONARA"]["eris"] = ([""], "hata"); u = pv(t0 + 200)
-    ok("yardımcı belgeleri dizinleyemediyse: proje belgeleri uyarısı", u and u["uyari"].endswith("proje belgeleri okuyamıyor"))
+    ok("yardımcı belgeleri dizinleyemediyse: proje belgeleri uyarısı", u and u["uyari"].endswith("proje belgelerini okuyamıyor"))
     ad["_ONARA"]["eris"] = ([""], "tamam"); ok("yardımcı dizinlediyse uyarı yok", pv(t0 + 200) is None)
 finally:
     shutil.rmtree(T, ignore_errors=True)
