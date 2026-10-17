@@ -28,11 +28,14 @@ try:
         {"jsonrpc": "2.0", "method": "notifications/initialized"}, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
         {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "vt_sor", "arguments": {"sorgu": "SELECT ad, sifre FROM kisiler ORDER BY admin_sayisi DESC LIMIT 1"}}},
         {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "vt_sor", "arguments": {"sorgu": "DELETE FROM kisiler"}}}]) + "\n"
+    os.makedirs(os.path.join(T, "canli"), exist_ok=True)  # aktarıcının canli/ klasörü (vt-mt.json, vt-sonuc.json buraya)
     m = subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "vt-mcp"], input=girdi, capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=ay, PYTHONDONTWRITEBYTECODE="1"))
     c = {o["id"]: o for o in (json.loads(x) for x in m.stdout.splitlines() if x.strip())}
     ok("MCP: initialize + tools/list (vt_sema, vt_sor)", c.get(1, {}).get("result", {}).get("protocolVersion") == "2025-06-18" and [x["name"] for x in c.get(2, {}).get("result", {}).get("tools", [])] == ["vt_sema", "vt_sor"])
     t3 = c.get(3, {}).get("result", {}); t4 = c.get(4, {}).get("result", {})
     ok("MCP: vt_sor sonucu doğru ve gizli sütun maskeli; DELETE hata olarak döner", "Ayla K\t***" in t3.get("content", [{}])[0].get("text", "") and t4.get("isError") is True)
+    import glob; mtj = glob.glob(os.path.join(T, "**", "vt-mt.json"), recursive=True)
+    ok("MCP: veritabanının değişme saati vt-mt.json'a yazıldı (aktarıcının tazelik notu için)", len(mtj) == 1 and json.load(open(mtj[0]))["mt"] == os.path.getmtime(db))
     ok("veritabanı değişmedi", sqlite3.connect(db).execute("SELECT count(*) FROM kisiler").fetchone()[0] == 72)
     json.dump({"alan": "Deneme", "proje": proje, "uygulama": T}, open(ay, "w")); r = tc("vt-sema")
     ok("ayar yoksa açık mesaj, hata kodu", r.returncode != 0 and "ayarlı değil" in r.stdout)

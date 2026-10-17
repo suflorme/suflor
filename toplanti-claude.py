@@ -610,9 +610,16 @@ VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Mas
 # açılışta ve veritabanı dosyası değişince (VT_DENETIM_SN'de bir bakılır) son sorgular yeniden çalıştırılır; "kontrol" alanı en son denetim anıdır.
 # Konuş benzer soruda taze sonucu soruyla verir: Claude araç turu olmadan cevaplar (~3 sn kazanç). Toplantı içeriği değil, yalnız sorgu ve maskeli sonuç.
 VT_SONUC_ONBELLEK = "vt-sonuc.json"; VT_SONUC_EN_COK = 40; VT_DENETIM_SN = 60
+VT_MT_DOSYA = "vt-mt.json"  # v0.58.2: veritabanı dosyasının değişme saati, denetimde yazılır — aktarıcının tazelik notu için (kendisi okuyamaz)
 def _vt_mt():
     try: return os.path.getmtime(os.path.join(PROJE, VT["yol"]))
     except (OSError, KeyError, TypeError): return None
+def _vt_mt_yaz(dosya):
+    try:
+        y = os.path.join(dosya, VT_MT_DOSYA)
+        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"mt": _vt_mt(), "kontrol": round(time.time())}, f)
+        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+    except OSError: pass
 def _vt_onbellek(dosya, guncelle=None, yenile=False):
     y = os.path.join(dosya, VT_SONUC_ONBELLEK)
     try: ob = json.load(open(y, encoding="utf-8"))
@@ -729,12 +736,13 @@ def vt_mcp_cmd():
         with open(y + ".tmp", "w", encoding="utf-8") as f: f.write(m)
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except (VtHata, OSError): pass
+    _vt_mt_yaz(A.dir)  # açılışta hemen (denetim iş parçacığını beklemeden)
     import threading
     kilit = threading.Lock()
     def denetle():  # açılışta bir kez, sonra dakikada bir: veritabanı değiştiyse önbellekteki sorgular yeniden çalışır
         while True:
             with kilit: _vt_onbellek(A.dir, yenile=True)
-            time.sleep(VT_DENETIM_SN)
+            _vt_mt_yaz(A.dir); time.sleep(VT_DENETIM_SN)
     threading.Thread(target=denetle, daemon=True).start()
     for sat in sys.stdin:
         try: m = json.loads(sat)

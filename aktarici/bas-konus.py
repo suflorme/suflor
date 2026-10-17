@@ -94,11 +94,15 @@ def konus_vt_hazirla():  # → MCP yapılandırma dosyasının yolu ya da None
 # v0.57.5: açık süreçte aynı güncel durum sorusu geçmişten cevaplanır (3 sn); veri bu arada değiştiyse eski kalır. Son vt_sor'dan sonra veritabanı dosyası
 # değiştiyse (okunamazsa: son sorgu VT_TAZE_SN'den eskiyse) soruya tek seferlik not eklenir: güncel durum sorusuysa yeniden sorgula. Değişmediyse hızlı yol aynı.
 VT_TAZE_SN = 600
-def _vt_mt():  # kayıt veritabanının değişme saati (launchd'deki aktarıcı Masaüstü'nü okuyamazsa None)
+def _vt_mt():  # kayıt veritabanının değişme saati (launchd'deki aktarıcı Masaüstü'nü okuyamazsa araç sunucusunun dakikada bir yazdığı canli/vt-mt.json; o da eskiyse None)
     v = AYAR.get("veritabani")
     if not isinstance(v, dict) or not v.get("yol"): return None
     try: return os.path.getmtime(os.path.join(os.path.expanduser(AYAR.get("proje") or ""), os.path.expanduser(v["yol"])))
-    except OSError: return None
+    except OSError: pass
+    try:  # v0.58.2: araç sunucusu Konuş süreci açıkken çalışır; 150 sn'den eski kayıt sayılmaz (süreç kapanmış)
+        d = json.load(open(os.path.join(BASE, "vt-mt.json"), encoding="utf-8"))
+        return float(d["mt"]) if d.get("mt") and time.time() - float(d.get("kontrol") or 0) <= 150 else None
+    except (OSError, ValueError, TypeError, KeyError): return None
 def _vt_tazele_notu():
     s = _KS.get("vt_son")
     if not s or _KS.get("vt_not") == s: return ""
