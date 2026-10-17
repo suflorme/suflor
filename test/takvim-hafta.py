@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# v0.55.0 — takvim haftası ve uygun zaman: bos_zamanlar (çalışma saatleri, dolu etkinlikler, hafta sonu), Konuş bağlamında 7 gün yalnız haftaya/boş zamana
+# v0.55.0 (v0.59.0: her soruda 7 gün, ileri tarihte 30, boşluklar yalnız boş zaman sorusunda) — takvim haftası ve uygun zaman: bos_zamanlar (çalışma saatleri, dolu etkinlikler, hafta sonu), Konuş bağlamında 7 gün yalnız haftaya/boş zamana
 # değinen soruda, sözlü iş talimatı kalıbı (HITAP_IS_RX: e-posta taslağı, toplantı koy), /takvim?gun=7 ve toplanti-claude.py takvim --gun 7.
 # Kota yok, Whisper yok (~5 sn). Takvim/uygun zaman/iş talimatı kalıbı değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/takvim-hafta.py
@@ -32,11 +32,16 @@ bz2 = {str(d): [f"{b:%H:%M}–{e:%H:%M}" for b, e in ar] for d, ar in ad["bos_za
 ok("ayar calisma_saatleri (Cumartesi dahil, 10–16)", bz2.get("2026-10-17") == ["10:00–16:00"] and bz2.get("2026-10-20") == ["10:00–16:00"] and "2026-10-18" not in bz2)
 ad["AYAR"].pop("calisma_saatleri")
 b_dar = ad["konus_baglam"](simdi, "", "Bugün kaçta toplantım var?"); b_gen = ad["konus_baglam"](simdi, "", "Gelecek hafta perşembe boş saatim var mı?")
-ok("haftaya değinmeyen soruda bugün ve yarın, boş zaman yok", "(bugün ve yarın)" in b_dar and "Boş zamanlar" not in b_dar and "Toplantı 2" not in b_dar)
-ok("haftaya/boş zamana değinen soruda 7 gün + boş zamanlar (gün adıyla)", "(önümüzdeki 7 gün)" in b_gen and "Boş zamanlar" in b_gen and "Pazartesi 19 Ekim 13:00–18:00 · Toplantı 3" in b_gen
+ok("her soruda 7 gün (v0.59.0), boş zaman yalnız boş/uygun zaman sorusunda", "(önümüzdeki 7 gün)" in b_dar and "Boş zamanlar" not in b_dar and "Toplantı 2" in b_dar)
+ok("boş zamana değinen soruda 7 gün + boş zamanlar (gün adıyla)", "(önümüzdeki 7 gün)" in b_gen and "Boş zamanlar" in b_gen and "Pazartesi 19 Ekim 13:00–18:00 · Toplantı 3" in b_gen
    and "- Salı 20 Ekim: 09:00–18:00" in b_gen and "Toplantı 6" not in b_gen)
-ok("gün adı ve tarih tetikler, genel soru tetiklemez", all(ad["TAKVIM_GENIS_RX"].search(x) for x in ("Salı ne var?", "21 Ekim'de müsait miyim?", "Uygun bir zaman öner", "What's on next week?"))
-   and not any(ad["TAKVIM_GENIS_RX"].search(x) for x in ("Bütçe ne kadar?", "Sen kimsin?", "Yarın ne var?")))
+TAK["e7"] = olay(7, 20, 14, 15); TAK["e7"]["baslik"] = "Uzak gözden geçirme"
+b_7, b_30 = ad["konus_baglam"](simdi, "", "Ne var önümüzde?"), ad["konus_baglam"](simdi, "", "Kasım başında ne var?")
+ok("20 gün sonraki etkinlik 7 günlük bağlamda yok, ileri tarih sorusunda 30 günde var", "Uzak gözden geçirme" not in b_7 and "(önümüzdeki 30 gün)" in b_30 and "Uzak gözden geçirme" in b_30)
+ok("uzak tarih kalıbı: ay adı, gelecek ay, iki hafta sonra tutar; genel ve bu hafta sorusu tutmaz", all(ad["TAKVIM_UZAK_RX"].search(x) for x in ("21 Ekim'de ne var?", "Ay sonunda toplantı var mı?", "Gelecek ay ne var?", "İki hafta sonra ne var?", "Kasım'da müsait miyim?", "What's on next month?"))
+   and not any(ad["TAKVIM_UZAK_RX"].search(x) for x in ("Bütçe ne kadar?", "Sen kimsin?", "Yarın ne var?", "Gelecek hafta ne var?", "Bu hafta neler var?", "Ayla ne dedi?")))
+ok("boş zaman kalıbı: müsait, uygun zaman tutar; takvim sorusu tutmaz", all(ad["TAKVIM_BOS_RX"].search(x) for x in ("Salı müsait miyim?", "Uygun bir zaman öner", "When am I available?"))
+   and not any(ad["TAKVIM_BOS_RX"].search(x) for x in ("Salı ne var?", "Gelecek hafta ne var?")))
 ad3 = {"re": re}; exec(kod[kod.index("HITAP_IS_RX = "):kod.index("def konus_hitap(")].split("# v0.55.0 (S70): toplantıda Konuş")[0], ad3)
 ISR = ad3["HITAP_IS_RX"]
 evet = ["Ayla'ya bütçe için bir e-posta taslağı hazırla.", "Ali'ye kısa bir mail yaz.", "Bir taslak hazırla, teklifi özetlesin.", "Perşembe saat on dörde Ayla ile toplantı koy.",
@@ -60,9 +65,10 @@ try:
         time.sleep(0.2)
     time.sleep(1); K = open(os.path.join(canli, "kart-anahtari.txt")).read().strip()
     get = lambda y: json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}{y}", headers={"X-Suflor-Anahtar": K}), timeout=10).read())
-    t1, t7 = get("/takvim?tam=1"), get("/takvim?tam=1&gun=7")
+    t1, t7, t30 = get("/takvim?tam=1"), get("/takvim?tam=1&gun=7"), get("/takvim?tam=1&gun=30")
     ok("/takvim (eski): 4 gün sonraki toplantı yok, boş zaman alanı yok", not any(o["id"] == "u1" for o in t1["olaylar"]) and "bos" not in t1)
     ok("/takvim?gun=7: 4 gün sonraki toplantı tarihiyle, boş zaman listesi", any(o["id"] == "u1" and o.get("tarih") for o in t7["olaylar"]) and isinstance(t7.get("bos"), list) and t7.get("gun") == 7)
+    ok("/takvim?gun=30: 30 güne kadar açılır (v0.59.0)", t30.get("gun") == 30)
     out = subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", "takvim", "--gun", "7"],
                          capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay)).stdout
     ok("toplanti-claude.py takvim --gun 7: boş zamanlar + uzak toplantı tarihli", "# Boş zamanlar (7 gün" in out and "Uzak toplantı" in out and (s0 + dt.timedelta(days=4)).strftime("%Y-%m-%d") in out)

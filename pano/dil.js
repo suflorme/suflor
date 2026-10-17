@@ -346,7 +346,6 @@ globalThis.SUFLOR_EN = {
   "{ad} cevaplıyor": "{ad} is answering",
   "Basılı tutup sor; {ad} kısa ve sesli cevaplar. Yalnız okur, kayıt yapmaz.": "Hold and ask; {ad} answers briefly, aloud. Read-only — it doesn't record anything.",
   "Soru": "Question",
-  "Bırakıştan ilk sese {n} sn": "{n} s from release to first word",
   "Brifingi sesli okur (Mac sesi); tekrar basınca susar": "Reads the briefing aloud (Mac voice); press again to stop",
   "Brifing okunamadı": "Couldn't read the briefing aloud",
   "Ses kapalı (ayar konusma) ya da brifing hazır değil": "Voice is off (setting konusma) or the briefing isn't ready",

@@ -142,7 +142,7 @@ sub.add_parser("durum", help="v0.14.0: aktarıcının /status yanıtı (JSON; ye
 sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü (aktarıcı, eklenti sürümü, Whisper, ses modeli, bellek, disk)")
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
 tk.add_argument("--id", default=None); tk.add_argument("--n", type=int, default=6)
-tk.add_argument("--gun", type=int, default=1, help="v0.55.0: kaç gün (en çok 7); 1'den büyükse çalışma saatlerindeki boş zamanlar da (uygun zaman önerisi)")
+tk.add_argument("--gun", type=int, default=1, help="v0.55.0: kaç gün (v0.59.0: en çok 30); 1'den büyükse çalışma saatlerindeki boş zamanlar da (uygun zaman önerisi)")
 rp = sub.add_parser("rapor", help="v0.9.9: geliştiriciye geri bildirim — içeriksiz paket (sürüm, ölçüm, kart dönüşleri, günlük, gözlemler) → <ortak>/geri-bildirim")
 rp.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)"); rp.add_argument("--not", dest="notlar", default="", help="sorunlar, öneriler (Claude'un ve kullanıcının gözlemleri; toplantı içeriği yazma)")
 rp.add_argument("--github", action="store_true", help="ayrıca GitHub'da konu (issue) aç (gh oturumu gerekir)"); rp.add_argument("--goster", action="store_true", help="kaydetmeden yazdır")
@@ -2246,11 +2246,11 @@ def saglik_cmd():  # toplantıdan önce tek bakış; ⚠ satırları kullanıcı
     sat(os.path.exists(os.path.join(A.dir, "kart-anahtari.txt")), "kart anahtarı", "aktarıcıyı yeniden kur")
     print("SONUÇ: " + ("hazır" if not sorun else f"{sorun} eksik (⚠)"))
 def takvim_cmd():  # aktarıcının takvimi (Suflor Takvim yardımcısı, Takvim uygulamasındaki tüm hesaplar)
-    gun = max(1, min(A.gun or 1, 7))
+    gun = max(1, min(A.gun or 1, 30))
     try: t = get("/takvim?tam=1" + (f"&gun={gun}" if gun > 1 else ""))
     except Exception as e: sys.exit(f"aktarıcıya ulaşılamadı: {e}")
     if t.get("durum") != "ok": print(f"takvim: {t.get('durum')} — {t.get('hata') or ''}".strip(" —"))
-    ol = [o for o in t.get("olaylar") or [] if not A.id or o.get("id") == A.id][:A.n if gun == 1 else 60]
+    ol = [o for o in t.get("olaylar") or [] if not A.id or o.get("id") == A.id][:A.n if gun == 1 else 150]
     if gun > 1:
         print(f"# Boş zamanlar ({gun} gün, çalışma saatleri ayar calisma_saatleri; takvimdeki her etkinlik dolu)")
         for b in t.get("bos") or []: print(f"- {b['tarih']}: " + ", ".join(b["araliklar"]))
