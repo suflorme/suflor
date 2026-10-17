@@ -538,6 +538,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         _KS["nesil"] = _KS.get("nesil", 0) + 1; threading.Thread(target=_konus_oku, args=(cik, _KS["nesil"]), daemon=True).start()
         print(f"KONUŞ: açık süreç açıldı ({time.time() - t0:.1f} sn)"); return True
 def konus_kapat(neden, durum_koru=False):
+    if _KS["w"] or _KS["app"]: _KS["kapali_nesil"] = _KS.get("nesil")  # v0.70.1: bilerek kapatılan sürecin okuyucusu çıkınca "hata" demesin
     w, app = _KS["w"], _KS["app"]; _KS.update(w=None, app=None, tur=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None, ozel_gitti=False)  # yeni süreçte defter (ve kartın özel bölümü) yeniden gider
     if w:
         try: w.close()  # giriş kapanınca claude çıkar, uygulama da biter
@@ -647,7 +648,9 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if yenile:  # pano durumu "hazır" kalır (cevap görünür); süreç arka planda kapanır, sonraki basış yenisini açar
                     _KS["devir"] = (str(KONUS.get("soru") or "")[:300], " ".join(tur["metin"].split())[:600])
                     threading.Thread(target=konus_kapat, args=(f"tur sınırı: {_KS['sayac']} soru, giriş {o['giris']} belirteç — sonraki basışta yeni süreç", True), daemon=True).start()
-    if _KS.get("tur") and _KS.get("nesil") == nesil: _konus_kur(durum="hata", hata=_t("Claude süreci kapandı — yeniden bas", "The Claude process closed — press again")); _KS["tur"] = None
+    # v0.70.1: tur sınırında (ya da kişilik/toplantı değişince) süreç bilerek kapatılır; eski süreç ancak birkaç saniye sonra çıkar. O arada gelen yeni soru
+    # (_KS["tur"]) yeni süreç açılmadan önce bu satıra denk gelirse panoda bir an "Claude süreci kapandı" görünüyor, tur siliniyordu. Yalnız beklenmedik çıkış hata.
+    if _KS.get("tur") and _KS.get("nesil") == nesil and _KS.get("kapali_nesil") != nesil: _konus_kur(durum="hata", hata=_t("Claude süreci kapandı — yeniden bas", "The Claude process closed — press again")); _KS["tur"] = None
 def _konus_defter():  # → (df, dm, dk): son toplantının defteri ve kimliği (dosyalar), yoksa (None, (None, False), None)
     try: df = defter_toplanti(); dm = defter_metni(df) if df else (None, False)
     except Exception as e: print(f"DEFTER: kurulamadı ({e.__class__.__name__})"); return None, (None, False), None

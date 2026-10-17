@@ -262,7 +262,8 @@ def onayla(taslak=None, kim="kullanici"):
     notu = claude_notu(k) if k.get("kip") != "duzenli" else False  # düzenli klasörde belgeler değişmez
     return {"sozluk_eklenen": eklenen, "claude_notu": notu}
 
-SOZ_KONUSULMAZ = re.compile(r"[/@\\]|\.(md|py|db|json|html?|csv|xlsx|txt)\b|^[a-z0-9_-]+$")  # dosya adı, komut, adres, tümü küçük harf: söylenmez
+SOZ_KONUSULMAZ = re.compile(r"[/@\\#\[\]()]|\.\w|^[a-z0-9_-]+$")  # dosya/alan adı, komut, adres, işaretli ya da tümü küçük harf: söylenmez
+SOZ_AKTAR_EN_COK = 60  # Whisper istemi ~200 belirteç (whisper-hat istem_metni): 17 Ekim gerçek proje kartında (201 belge) 1.228 terim, süzgeçten sonra 303 kalıyordu
 def sozluk_aktarilir(m, duz_yol):
     # Whisper istemi kısıtlı (belirteç bütçesi): yalnız en az iki belgede geçen ya da düzenli belgeden gelen, konuşmada söylenen terim
     if SOZ_KONUSULMAZ.search(m["terim"]): return False
@@ -274,8 +275,8 @@ def sozluge_aktar(maddeler, duz_yol=frozenset()):
     except (OSError, ValueError): s = {"surum": 1, "terimler": []}
     var = {n(t.get("dogru")) for t in s.get("terimler", [])} | {n(y) for t in s.get("terimler", []) for y in (t.get("yanlis") or [])}
     eklenen = 0
-    for m in maddeler:
-        if not sozluk_aktarilir(m, duz_yol): continue
+    secilen = sorted((m for m in maddeler if sozluk_aktarilir(m, duz_yol)), key=lambda m: (not ({k[0] for k in m.get("kaynaklar") or []} & duz_yol), -len({k[0] for k in m.get("kaynaklar") or []})))
+    for m in secilen[:SOZ_AKTAR_EN_COK]:
         if n(m["terim"]) and n(m["terim"]) not in var:
             s.setdefault("terimler", []).append({"dogru": m["terim"], "yanlis": [], "kip": "duzelt", "kaynak": "proje-karti", "not": m.get("aciklama", "")[:120]})
             var.add(n(m["terim"])); eklenen += 1
