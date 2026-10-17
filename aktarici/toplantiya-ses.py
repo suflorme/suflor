@@ -10,7 +10,14 @@
 # sesiyle WAV'a yazılır (say -o), eklenti /soyle-ses'ten alır, sayfa bağlamındaki soyle-main.js toplantı bağlantısının (RTCPeerConnection) ses
 # göndericisini yalnız okuma süresince "mikrofon + Suflor" karışımıyla değiştirir (replaceTrack), bitince mikrofona döner — özellik kullanılmadıkça
 # toplantı sesine dokunulmaz. Mikrofon sayfada kapalıysa (sessiz) okumaz; sonucu eklenti /olay "soyle-web" ile bildirir.
-TS = {"p": [], "tanitti": None, "son": None, "web": None}; TS_KILIT = threading.Lock()
+# v0.77.2 (18 Ekim, sohbet açıkken toplantı dışında okunan tanıtım mikrofondan girip "yazayım mı?" cevabı sayıldı): toplantı yokken okunmaz; okuma
+# sürerken ts_caliyor() doğrudur — sohbet bunu da "Suflor okuyor" sayar (ses_caliyor), okunan metin kendi sesi süzgecine (kendi_ses_kaydet) yazılır.
+TS = {"p": [], "tanitti": None, "son": None, "web": None, "test_bit": 0.0}; TS_KILIT = threading.Lock()
+def ts_caliyor():
+    if os.environ.get("SUFLOR_TEST_BASLAT") and time.time() < TS["test_bit"]: return True
+    w = TS.get("web")
+    if w and not w["dur"] and not w.get("bitti") and time.time() - w["t"] < w["sure"] + 1: return True
+    with TS_KILIT: return any(p.poll() is None for p in TS["p"])
 TS_TANITIM = {"tr": "Merhaba, ben {ad} adına konuşan yapay zekâ asistanı Suflor.", "en": "Hello, I'm Suflor, an AI assistant speaking for {ad}."}
 def ts_aygit():  # say -a ? listesinde BlackHole çıkış aygıtının kimliği (yoksa None)
     if os.environ.get("SUFLOR_TEST_TS_AYGIT"): return os.environ["SUFLOR_TEST_TS_AYGIT"]  # test/toplantiya-ses.py: BlackHole'suz deneme
@@ -49,6 +56,8 @@ def ts_durdur():
 def toplantiya_soyle(metin=None):
     if AYAR.get("toplantiya_ses") is not True: return {"ok": False, "err": _t("Toplantıya sesli söyleme kapalı (⚙ Ayarlar)", "Speaking into the meeting is off (⚙ Settings)")}
     if ts_durdur(): print("TOPLANTIYA SÖYLE: susturuldu"); return {"ok": True, "metin": _t("🔇 Suflor sustu", "🔇 Suflor stopped")}
+    if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")):
+        print("TOPLANTIYA SÖYLE: toplantı yok — okunmadı"); return {"ok": False, "err": _t("Toplantı yok — toplantıya söylenecek bir yer yok", "No meeting — nowhere to say it")}
     web = ts_web(); aygit = None if web else ts_aygit()
     if not web and not aygit: return {"ok": False, "err": _t("BlackHole kurulu değil — masaüstü toplantıya ses gidemez (web toplantısında gerekmez)", "BlackHole isn't installed — no audio can reach a desktop meeting (not needed for web meetings)")}
     m = ts_sesli_kisim(metin if metin is not None else KONUS.get("cevap"))
@@ -59,7 +68,9 @@ def toplantiya_soyle(metin=None):
         TS["tanitti"] = toplanti; m = (tn or TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı")) + " " + m
     v = ses_secimi(); okunan = ses_duzen(telaffuz(m, mac=True)); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
     if web: return _ts_web_hazirla(m, sesli, okunan)
-    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"TOPLANTIYA SÖYLE (deneme): aygıt {aygit} · {okunan}"); TS["son"] = m; TS["son_t"] = time.time() + len(m) / 14; return {"ok": True, "metin": "🔊 " + m}
+    if os.environ.get("SUFLOR_TEST_BASLAT"):
+        print(f"TOPLANTIYA SÖYLE (deneme): aygıt {aygit} · {okunan}"); TS["son"] = m; TS["son_t"] = TS["test_bit"] = time.time() + len(m) / 14
+        kendi_ses_kaydet(m, time.time(), TS["son_t"]); return {"ok": True, "metin": "🔊 " + m}
     ses_durdur()  # kulaklıkta okunan bir şey varsa karışmasın
     ps = []
     try:
@@ -68,6 +79,7 @@ def toplantiya_soyle(metin=None):
     except OSError as e: print(f"TOPLANTIYA SÖYLE: hata {e.__class__.__name__}"); return {"ok": False, "err": "say"}
     with TS_KILIT: TS["p"] = ps
     TS["son"] = m; TS["son_t"] = time.time() + len(m) / 14  # tahmini okuma sonu (~14 karakter/sn): karşı taraf hitabı ardından 10 sn sayılmaz
+    kendi_ses_kaydet(m, time.time(), TS["son_t"])
     if STATE.get("meeting"):  # toplantı dosyası yoksa (deneme, toplantı dışı) not yazılmaz — yeni dosya açmasın
         try: note({"meeting": {"title": STATE["meeting"]}, "text": m, "kaynak": "suflor", "at": datetime.datetime.now().isoformat(timespec="seconds")})
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")
@@ -93,6 +105,7 @@ def _ts_web_hazirla(m, sesli, okunan):
         except OSError: pass
     with TS_KILIT: TS["p"] = ps
     TS["son"] = m; TS["son_t"] = time.time() + sure
+    kendi_ses_kaydet(m, time.time(), TS["son_t"])
     if STATE.get("meeting"):
         try: note({"meeting": {"title": STATE["meeting"]}, "text": m, "kaynak": "suflor", "at": datetime.datetime.now().isoformat(timespec="seconds")})
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Toplantıya sesli söyle (v0.38.0, aktarici/toplantiya-ses.py): /komut soyle — ayar kapalıyken ve BlackHole yokken hata; açıkken ilk okumada tanıtım,
-# ikincisinde yok; cevap yoksa hata; Konuş cevabının yalnız --- öncesi okunur; okurken ikinci basış susturur (gerçek say -a, kulaklık yoksa yerelde okunmaz).
+# ikincisinde yok; toplantı yokken okunmaz (v0.77.2); cevap yoksa hata; Konuş cevabının yalnız --- öncesi okunur; okurken ikinci basış susturur (gerçek say -a, kulaklık yoksa yerelde okunmaz).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/toplantiya-ses.py     (~15 sn; BlackHole gerekmez: SUFLOR_TEST_TS_AYGIT)
 import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 K = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="suflor-ts-"); PORT = 8796; hata = []
@@ -21,6 +21,9 @@ def soyle(metin=None):
     k = open(os.path.join(T, "canli", "kart-anahtari.txt")).read().strip()
     b = {"tur": "soyle", **({"not": metin} if metin else {})}
     return json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/komut", data=json.dumps(b).encode(), headers={"X-Suflor-Anahtar": k}), timeout=10))["metin"]
+def toplantida():  # masaüstü toplantı sinyali (menü uygulamasının yaptığı gibi)
+    k = open(os.path.join(T, "canli", "kart-anahtari.txt")).read().strip()
+    urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/masaustu", data=json.dumps({"uygulama": "Deneme", "toplantida": True, "baslik": "Deneme TS"}).encode(), headers={"X-Suflor-Anahtar": k}), timeout=5)
 try:
     p = calistir({}, {"SUFLOR_TEST_BASLAT": "1", "SUFLOR_TEST_TS_AYGIT": "1"})
     bak("ayar kapalı → kapalı uyarısı", "kapalı" in soyle("Deneme."))
@@ -29,6 +32,8 @@ try:
     if "BlackHole" not in subprocess.run(["/usr/bin/say", "-a", "?"], capture_output=True, text=True).stdout: bak("BlackHole yok → kurulu değil uyarısı", "kurulu değil" in soyle("Deneme."))
     p.terminate(); p.wait(5)
     p = calistir({"toplantiya_ses": True}, {"SUFLOR_TEST_BASLAT": "1", "SUFLOR_TEST_TS_AYGIT": "1"})
+    bak("toplantı yok → okunmaz (v0.77.2)", "Toplantı yok" in soyle("Deneme."))
+    toplantida()
     bak("cevap yok → uyarı", "cevap yok" in soyle())
     a = soyle("İlk cevap.\n---\nAyrıntı okunmaz."); b = soyle("İkinci cevap.")
     bak(f"ilk okumada tanıtım, --- sonrası yok: {a[:90]!r}", "yapay zekâ asistanı Suflor" in a and "Ali" in a and "Ayrıntı" not in a)
@@ -39,6 +44,7 @@ try:
     if ayg:
         p = calistir({"toplantiya_ses": True}, {"SUFLOR_TEST_TS_AYGIT": ayg[0]})
         k = open(os.path.join(T, "canli", "kart-anahtari.txt")).read().strip()
+        toplantida()
         urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ingest", data=json.dumps({"meeting": {"title": "Deneme TS"}, "source": "transcript", "entries": [{"id": "a/1", "speaker": "Ayla Ö", "time": "10:00", "text": "Bütçe ne durumda?"}]}).encode(), headers={"X-Suflor-Anahtar": k}), timeout=5)
         a = soyle("Bu uzun bir deneme cümlesidir, birkaç saniye sürsün diye biraz daha uzatıyorum ve devam ediyorum."); time.sleep(1); b = soyle("x")
         md = [f for f in os.listdir(os.path.join(T, "canli")) if f.endswith(".md") and "Deneme-TS" in f]

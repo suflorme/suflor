@@ -24,10 +24,10 @@ SOHBET_DUSUNME_RX = re.compile(r"(\b(nasıl (desem|diyeyim|söylesem|anlatsam)|y
                                r"how (do i|should i) (say|put)|i mean|like|so|and|but|because|um+|uh+)|\b(e+|ı+|hm+|em+))\W*$", re.I)
 SOHBET_KAPAT_RX = re.compile(r"^\W*(tamam,?\s*)?(teşekkür(ler| ederim)|sağ ?ol(un)?|kapat|sohbeti kapat|bu kadar|görüşürüz|thanks?( you)?|that'?s all|goodbye|bye)\W*$", re.I)
 SOHBET_BEKLE_RX = re.compile(r"\b(bekle|dur bir|bir saniye|bir dakika|şey|hold on|wait|one sec(ond)?)\W*$", re.I)
-def ses_caliyor():
-    if os.environ.get("SUFLOR_TEST_BASLAT"): return time.time() < SES.get("test_bit", 0)
+def ses_caliyor():  # v0.77.2: toplantıya söyle okuması da sayılır (ayrı süreçle çalar; sohbet onu mikrofondan cevap sanıyordu)
+    if os.environ.get("SUFLOR_TEST_BASLAT"): return time.time() < SES.get("test_bit", 0) or ts_caliyor()
     with SES_K: q = bool(SES["q"]); p = SES.get("p")
-    return q or bool(p and p.poll() is None)
+    return q or bool(p and p.poll() is None) or ts_caliyor()
 def _okuma_izle(simdi):  # okumanın başladığı an (araya girme koruması SOHBET_KORU_SN buna göre); bekçi ve parça ikisi de çağırır
     tur = _KS["tur"]; okuma = ses_caliyor() and (tur is None or bool(tur.get("t_ses")))  # tur bittiyse kuyruktaki son cümleler okunuyor
     if okuma and not SOHBET["t_okuma"]: SOHBET["t_okuma"] = simdi
