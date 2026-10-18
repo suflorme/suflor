@@ -19,6 +19,9 @@ class Sahte(http.server.BaseHTTPRequestHandler):
         if DAVRANIS["tur"] == "429hep" or (DAVRANIS["tur"] == "429bir" and not DAVRANIS.get("verildi")):  # v0.80.6: hız sınırı
             DAVRANIS["verildi"] = True; b = b'{"error":{"code":429,"message":"You exceeded your current quota","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"1s"}]}}'
             self.send_response(429); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
+        if DAVRANIS["tur"] == "gunluk" and "flash-lite" in self.path or DAVRANIS["tur"] == "gunluk2":  # v0.80.10: model başına günlük sınır
+            b = b'{"error":{"code":429,"message":"Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 100","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"6303s"}]}}'
+            self.send_response(429); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if DAVRANIS["tur"] == "400":
             b = b'{"error":{"code":400,"message":"API key not valid"}}'
             self.send_response(400); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
@@ -76,6 +79,17 @@ DAVRANIS.update(tur="429hep"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); t0 = 
 bak(f"beklerken okuma kesilirse beklemez, Mac sesine düşmez ({time.time() - t0:.1f} sn)", r429c is True and time.time() - t0 < 1.0 and len(GELEN) - n == 1)
 ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"
 bak("bekleme süresi: Retry-After başlığı, gövdedeki retryDelay, sınırlar", ad["_gemini_bekleme"]("", "2") == 2.0 and ad["_gemini_bekleme"]('"retryDelay": "9s"') == 4.0 and ad["_gemini_bekleme"]("yok") == 1.5 and ad["_gemini_bekleme"]('"retryDelay": "0.1s"') == 0.5)
+# v0.80.10: günlük sınır — beklemeden öteki model; ikisi de doluysa istek atılmadan False; kayıt dosyası yeniden yüklenince de geçerli
+DAVRANIS.update(tur="gunluk"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); t0 = time.time(); rg = ad["gemini_oku"]("Günlük sınır.")
+yollar = [g["yol"] for g in GELEN[n:]]
+bak(f"günlük sınır: beklemeden 3.8 Flash'a geçer ({time.time() - t0:.1f} sn, {yollar})", rg is True and len(yollar) == 2 and "flash-lite" in yollar[0] and "flash-lite" not in yollar[1] and time.time() - t0 < 1.5)
+n = len(GELEN); ad["gemini_oku"]("Sonraki cümle.")
+bak("sonraki cümle dolu modeli hiç denemez", len(GELEN) - n == 1 and "flash-lite" not in GELEN[-1]["yol"])
+DAVRANIS.update(tur="gunluk2"); n = len(GELEN); rg2 = ad["gemini_oku"]("İkisi de dolu."); n2 = len(GELEN); rg3 = ad["gemini_oku"]("Yine.")
+bak(f"iki model dolu: False, sonra istek atılmaz ({n2 - n} + {len(GELEN) - n2} istek)", rg2 is False and rg3 is False and n2 - n == 1 and len(GELEN) == n2)
+ad["GEMINI_KOTA"]["dolu"] = None; bak("kayıt dosyasından yüklenir (aktarıcı yeniden başlasa da)", ad["gemini_model"]() is None and "kota_dolu" in ad["gemini_view"]())
+os.remove(os.path.join(T, "gemini-kota.json")); ad["GEMINI_KOTA"]["dolu"] = None; ad["GEMINI"]["hata_t"] = 0; DAVRANIS.update(tur="normal")
+bak("kayıt yoksa ayardaki model", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
 

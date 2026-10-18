@@ -32,11 +32,34 @@ def gemini_acik(): return AYAR.get("ses_motoru") == "gemini" and gemini_var()
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
     return v if v in GEMINI_SESLER else "Charon"
-def gemini_model():
+# v0.80.10 (19 Ekim): Google'ın günlük sınırı model başına (Tier 1'de 100 istek/gün, "generate_requests_per_model_per_day"). Dolunca o model
+# sıfırlanana kadar (gövdedeki retryDelay) hiç denenmez, öteki modele geçilir; ikisi de doluysa istek atılmadan Mac sesi. Kayıt canli/gemini-kota.json.
+GEMINI_KOTA = {"dolu": None}
+def _kota_yol(): return os.path.join(BASE, "gemini-kota.json")
+def _kota():
+    if GEMINI_KOTA["dolu"] is None:
+        try: GEMINI_KOTA["dolu"] = {k: float(v) for k, v in json.load(open(_kota_yol(), encoding="utf-8")).items()}
+        except (OSError, ValueError, AttributeError): GEMINI_KOTA["dolu"] = {}
+    simdi = time.time()
+    return {k: v for k, v in GEMINI_KOTA["dolu"].items() if v > simdi}
+def _kota_doldu(model, govde):
+    m = re.search(r'"retryDelay"\s*:\s*"([\d.]+)s"', govde or "")
+    sn = float(m.group(1)) if m else 3600.0
+    GEMINI_KOTA["dolu"] = dict(_kota(), **{model: time.time() + sn})
+    try:
+        with open(_kota_yol(), "w", encoding="utf-8") as f: f.write(json.dumps(GEMINI_KOTA["dolu"]))
+    except OSError: pass
+    return sn
+def _gunluk_mu(govde): return "per_day" in (govde or "") or "PerDay" in (govde or "")
+def gemini_model():  # ayardaki model; günlük sınırı dolduysa öteki; ikisi de doluysa None
     m = str(AYAR.get("gemini_model") or GEMINI_MODELLER[0])
-    return m if m in GEMINI_MODELLER else GEMINI_MODELLER[0]
+    m = m if m in GEMINI_MODELLER else GEMINI_MODELLER[0]
+    dolu = _kota()
+    for x in (m,) + tuple(y for y in GEMINI_MODELLER if y != m):
+        if x not in dolu: return x
+    return None
 def gemini_view():
-    return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model()}
+    return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota())}
 def _gemini_baglanti():
     if GEMINI["c"] is None:
         GEMINI["c"] = (http.client.HTTPConnection if GEMINI_HOST.startswith("127.0.0.1") else http.client.HTTPSConnection)(GEMINI_HOST, timeout=GEMINI_ILK_SN)
@@ -55,7 +78,7 @@ def _gemini_parcalar(o):  # SSE olayındaki base64 ses parçaları (inlineData.d
     elif isinstance(o, list):
         for x in o: yield from _gemini_parcalar(x)
 def _gemini_kayit(metin, ses_sn, ilk):
-    try: write([(os.path.join(BASE, "gemini-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "model": gemini_model(),
+    try: write([(os.path.join(BASE, "gemini-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "model": gemini_model() or "",
                                                                      "karakter": len(metin), "ses_sn": round(ses_sn, 2), "ilk_ses": round(ilk, 2) if ilk else None}) + "\n")])
     except Exception as e: print(f"GEMINI: kayıt yazılamadı ({e.__class__.__name__})")
 def gemini_pcm(metin, ses=None, uslup=None):  # v0.79.0: çalmadan 24 kHz 16 bit ham ses (toplantıya söyle); olmazsa None
@@ -81,6 +104,8 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
     if not metin or not gemini_var(): return None if topla else False
     if aygit and not os.access(PIPER_OYNAT, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
     if time.time() - GEMINI["hata_t"] < GEMINI_BEKLE_SN: return None if topla else False
+    model = gemini_model()
+    if not model: return None if topla else False  # iki modelin de günlük sınırı dolu: istek atılmaz
     govde = json.dumps({"contents": [{"role": "user", "parts": [{"text": (f"## Style:\n{' '.join(str(uslup).split())}\n" if uslup else "") + "## Transcript:\n" + metin}]}],
                         "generationConfig": {"responseModalities": ["audio"], "temperature": 1,
                                              "speech_config": {"voice_config": {"prebuilt_voice_config": {"voice_name": gemini_ses(ses)}}}}}, ensure_ascii=False).encode()
@@ -109,7 +134,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
             for deneme in (0, 1):  # kalıcı bağlantı sunucu tarafında kapanmışsa bir kez yeniden kur
                 c = _gemini_baglanti()
                 try:
-                    c.request("POST", f"/v1beta/models/{gemini_model()}:streamGenerateContent?alt=sse", body=govde,
+                    c.request("POST", f"/v1beta/models/{model}:streamGenerateContent?alt=sse", body=govde,
                               headers={"Content-Type": "application/json", "x-goog-api-key": gemini_anahtar(), "Accept": "text/event-stream"})
                     r = c.getresponse(); break
                 except (http.client.HTTPException, BrokenPipeError, ConnectionResetError):  # sunucu kapatmış ya da bağlantı yarım kalmış
@@ -117,6 +142,11 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                     if deneme: raise
             if r.status != 200:
                 hata = r.read()[:3000].decode("utf-8", "replace"); _gemini_kapat()
+                if r.status == 429 and _gunluk_mu(hata):  # günlük sınır: beklemek işe yaramaz — model sıfırlanana kadar bırakılır, öteki hemen denenir
+                    sn = _kota_doldu(model, hata); oteki = gemini_model()
+                    print(f"GEMINI: {model} günlük sınırı doldu ({sn / 3600:.1f} saat sonra açılır)" + (f" — {oteki} ile devam" if oteki else " — iki model de dolu, Mac sesi"))
+                    if oteki: return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden)
+                    return None if topla else False
                 if r.status in (429, 503) and not _yeniden:  # v0.80.6: hız sınırı / geçici yoğunluk — önerilen süre (en çok GEMINI_429_EN_COK_SN) beklenip bir kez daha
                     bekle = _gemini_bekleme(hata, r.getheader("Retry-After")); t_b = time.time()
                     print(f"GEMINI: hız sınırı (HTTP {r.status}) — {bekle:.1f} sn bekleyip yeniden")
