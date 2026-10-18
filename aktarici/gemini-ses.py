@@ -7,16 +7,17 @@
 # Gizlilik: okunacak cevap metni Google'a gider (ses kaydı gitmez). Kullanıcı kararı S83: proje yedeği zaten Google'da; ücretli katman (ücretsizde metin
 # eğitimde kullanılır). v0.80.0 (S87): sesli çeviri, fısıltı, sesli özet (iki sesli), toplantıda duyuru da Gemini'yle; ton cümleye göre (aşağıda).
 # Akış: streamGenerateContent (SSE) → 24 kHz ham ses parçaları → Suflor Oynat (kesintisiz çalıcı) stdin'i; ilk parça gelince çalmaya başlar.
-# Ağ yoksa, anahtar geçersizse ya da 5 sn'de ses gelmezse False döner, çağıran Mac sesine düşer; hata sonrası 60 sn Gemini denenmez (her cümle
-# beklemesin). Kullanım canli/gemini-ses.jsonl'e (karakter, ses süresi, ilk ses) yazılır — maliyet: Flash-Lite ses 6 $/M token = 25 token/sn
+# Ağ yoksa, anahtar geçersizse ya da 3 sn'de ses gelmezse (yeni bağlantıyla bir kez daha denendikten sonra) False döner, çağıran Mac sesine düşer;
+# hata sonrası GEMINI_BEKLE_SN Gemini denenmez (her cümle beklemesin). Kullanım canli/gemini-ses.jsonl'e (karakter, ses süresi, ilk ses) yazılır — maliyet: Flash-Lite ses 6 $/M token = 25 token/sn
 # (2026 sonuna kadar ~0,009 $/dk; 1 Ocak 2027'den iki katı).
 import http.client, re
-GEMINI = {"durum": None, "hata": None, "anahtar": None, "anahtar_t": 0.0, "c": None, "kilit": threading.Lock(), "hata_t": 0.0}
+GEMINI = {"durum": None, "hata": None, "anahtar": None, "anahtar_t": 0.0, "c": None, "kilit": threading.RLock(), "hata_t": 0.0}  # RLock: zaman aşımında aynı iş parçacığı yeniden dener
 GEMINI_SESLER = ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")
 GEMINI_MODELLER = ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")
 GEMINI_SR = 24000
 GEMINI_HOST = os.environ.get("SUFLOR_TEST_GEMINI_HOST") or "generativelanguage.googleapis.com"  # deneme: 127.0.0.1:<port> (TLS'siz)
-GEMINI_ILK_SN = 5.0
+GEMINI_ILK_SN = 3.0  # v0.80.2: 5 → 3 sn (ilk ses p90 0,7 sn); ses gelmezse yeni bağlantıyla bir kez daha denenir
+GEMINI_BEKLE_SN = 15.0  # v0.80.2: iki deneme de olmazsa Gemini bu kadar denenmez (60 sn'de kullanıcı bir dakika Mac sesi duydu, 18 Ekim)
 GEMINI_ONAY = ("Hı hı.", "Hıhı.", "Hı hı, evet.", "Hım hım.")  # v0.79.0: aktif dinleme / alındı (tepki_cal), o anda üretilir; aynı klip tekrarlanmaz
 GEMINI_ONAY_USLUP = "Dinlerken araya giren kısa, kısık ve doğal bir onay sesi; tek nefeste, vurgusuz."
 def gemini_anahtar():
@@ -64,13 +65,13 @@ def _duzey(b, duzey):  # ham sesi kısar (hı hı); duzey 0–1
     a = array.array("h", b[:len(b) // 2 * 2]); f = max(0.0, min(1.0, float(duzey)))
     for i in range(len(a)): a[i] = int(a[i] * f)
     return a.tobytes()
-def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None):
+def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
     # duzey: 0–1 ses düzeyi (kısık "hı hı").
     if not metin or not gemini_var(): return None if topla else False
     if aygit and not os.access(PIPER_OYNAT, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
-    if time.time() - GEMINI["hata_t"] < 60: return None if topla else False
+    if time.time() - GEMINI["hata_t"] < GEMINI_BEKLE_SN: return None if topla else False
     govde = json.dumps({"contents": [{"role": "user", "parts": [{"text": (f"## Style:\n{' '.join(str(uslup).split())}\n" if uslup else "") + "## Transcript:\n" + metin}]}],
                         "generationConfig": {"responseModalities": ["audio"], "temperature": 1,
                                              "speech_config": {"voice_config": {"prebuilt_voice_config": {"voice_name": gemini_ses(ses)}}}}}, ensure_ascii=False).encode()
@@ -132,9 +133,12 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                     else: tampon.extend(b)
         except Exception as e:
             _gemini_kapat()
+            if not nbayt and not _yeniden and not isinstance(e, RuntimeError):  # zaman aşımı / bağlantı: yeni bağlantıyla bir kez daha (HTTP hatası kalıcı, denenmez)
+                print(f"GEMINI: ses gelmedi ({e.__class__.__name__}) — yeni bağlantıyla yeniden")
+                return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True)
             if not nbayt:
                 GEMINI.update(durum="hata", hata=str(e)[:200] or e.__class__.__name__, hata_t=time.time())
-                print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, 60 sn Gemini denenmez"); return None if topla else False
+                print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, {GEMINI_BEKLE_SN:.0f} sn Gemini denenmez"); return None if topla else False
             print(f"GEMINI: akış yarıda kesildi ({e.__class__.__name__})")
     GEMINI.update(durum="hazir", hata=None)
     bitir(True)

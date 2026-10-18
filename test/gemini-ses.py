@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Gemini ile seslendirme (v0.78.0, aktarici/gemini-ses.py): sahte Gemini sunucusuna (SSE, 24 kHz ham ses) karşı — akış okunur ve kayda girer, HTTP hatası
-# ve ses gelmemesi False döner (çağıran Mac sesine düşer) ve 60 sn Gemini denenmez, okuma yarıda kesilebilir, ses adı ve model ayardan;
+# ve ses gelmemesi False döner (çağıran Mac sesine düşer; zaman aşımında önce yeni bağlantıyla bir kez daha, v0.80.2) ve 15 sn Gemini denenmez, okuma yarıda kesilebilir, ses adı ve model ayardan;
 # kişilik sesi seçimi (gemini / gemini:Kore / anahtar yoksa Mac); ⚙ Ayarlar'da ses_motoru: gemini + gemini_ses kaydedilir. Ses çalınmaz, Google'a gidilmez.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/gemini-ses.py     (~15 sn)
 import base64, http.server, json, os, shutil, socket, subprocess, sys, tempfile, threading, time, types, urllib.request
@@ -49,9 +49,20 @@ ad["AYAR"]["gemini_model"] = "gemini-3.8-flash-tts"; ad["gemini_oku"]("Flash.");
 ad["AYAR"]["gemini_model"] = "uydurma"; bak("bilinmeyen model → Flash-Lite", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
 DAVRANIS["tur"] = "400"; n = len(GELEN); r4 = ad["gemini_oku"]("Hata.")
 bak(f"HTTP 400 → False (Mac sesine düşer), durum hata: {ad['GEMINI']['hata'][:60]!r}", r4 is False and ad["GEMINI"]["durum"] == "hata")
-r5 = ad["gemini_oku"]("Hemen yine."); bak("hatadan sonra 60 sn istek atılmaz (her cümle beklemesin)", r5 is False and len(GELEN) == n + 1)
-ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "yavas"; t0 = time.time(); r6 = ad["gemini_oku"]("Yavaş.")
-bak(f"5 sn'de ses gelmezse False ({time.time() - t0:.1f} sn)", r6 is False and time.time() - t0 < 6.5)
+r5 = ad["gemini_oku"]("Hemen yine."); bak("HTTP hatası yeniden denenmez; sonra 15 sn istek atılmaz (her cümle beklemesin)", r5 is False and len(GELEN) == n + 1)
+ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "yavas"; n = len(GELEN); t0 = time.time(); r6 = ad["gemini_oku"]("Yavaş.")
+bak(f"3 sn'de ses gelmezse yeni bağlantıyla bir kez daha, sonra False ({time.time() - t0:.1f} sn, {len(GELEN) - n} istek)", r6 is False and time.time() - t0 < 7.5 and len(GELEN) - n == 2)
+DAVRANIS["tur"] = "ok"; ad["GEMINI"]["hata_t"] = 0
+class _Bir:  # ilk istekte yavaş, ikincide hızlı: yeniden deneme sesi kurtarır
+    n = 0
+eski = Sahte.do_POST
+def _ilk_yavas(self):
+    _Bir.n += 1
+    if _Bir.n == 1: DAVRANIS["tur"] = "yavas"
+    else: DAVRANIS["tur"] = "ok"
+    eski(self)
+Sahte.do_POST = _ilk_yavas; ad["_gemini_kapat"](); t0 = time.time(); r6b = ad["gemini_oku"]("Bir yavaş bir hızlı."); Sahte.do_POST = eski; DAVRANIS["tur"] = "ok"
+bak(f"ilk deneme zaman aşımı, ikinci başarılı → True, Mac sesine düşmez ({time.time() - t0:.1f} sn)", r6b is True and ad["GEMINI"]["durum"] == "hazir")
 ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"; bak("sonra yeniden çalışır", ad["gemini_oku"]("Tekrar.") is True)
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
