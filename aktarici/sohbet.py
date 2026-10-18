@@ -20,6 +20,45 @@ SOHBET = {"acik": False, "t_ac": 0.0, "t_ses": 0.0, "t_mesgul": 0.0, "uyari": Fa
 # konuşma sürerse iki parça tek soru olur. SOHBET_DUSUNME_SN boyunca hiç konuşulmazsa söz olduğu gibi gider (takılıp kalmasın). Duraksama anında son parça henüz
 # dökülmemiş olduğundan SOHBET_BEKLE_RX bu durumu yakalayamıyordu.
 SOHBET_DUSUNME_SN = 4.0
+# Yakın ses kapısı — ÖLÇÜM KİPİ (v0.80.7, kullanıcı 18 Ekim: kalabalıkta arka plan konuşması soru oluyor; ses izi fısıltıda/yüksek seste tanımıyor). Düzeye
+# bakan kapı: arka plan düzeyi = son SOHBET_ARKA_SN'nin pencere düzeylerinin SOHBET_ARKA_YUZDE dilimi; pencere "yakın ses" = arka planın KAT katından yüksek.
+# Benzetim (scratchpad, 19 Ekim): kat 4'te kullanıcı arka plandan ≥ 6 dB yüksekse turunun %58–72'si, yalnız arka plan turunun %28'i geçer; eşit düzeyde
+# ayırmaz (MacBook mikrofonu masadayken olası). Gerçek ortamdaki farkı bilmediğimiz için şimdilik hiçbir şey engellenmez: her turda günlüğe + canli/sohbet-kapi.jsonl
+# (yalnız sayılar) — eşik bu veriyle seçilecek.
+SOHBET_ARKA_SN, SOHBET_ARKA_YUZDE, SOHBET_KAPI_KATLAR, SOHBET_KAPI_ORAN = 30.0, 0.3, (3.0, 4.0), 0.45
+def _kapi_olc(pen, esik0):  # sohbet_parca: ham pencere düzeyleri → arka plan geçmişi + tur sayaçları
+    arka = SOHBET.setdefault("arka", collections.deque(maxlen=int(SOHBET_ARKA_SN * WH_SR * 2 / AKIS_PENCERE)))
+    if len(arka) >= 40:
+        a = sorted(arka)[int(len(arka) * SOHBET_ARKA_YUZDE)]; o = SOHBET.setdefault("kapi", {"ham": 0, "yakin": [0] * len(SOHBET_KAPI_KATLAR), "arka": [], "kon": []})
+        o["arka"].append(a)
+        for x in pen:
+            if x < esik0: continue
+            o["ham"] += 1; o["kon"].append(x)
+            for i, k in enumerate(SOHBET_KAPI_KATLAR):
+                if x >= max(esik0, a * k): o["yakin"][i] += 1
+    arka.extend(pen)
+def _giris_turu():  # varsayılan girişin bağlantı türü: yerleşik (MacBook) / bluetooth (kulaklık) / usb / sanal / ? — kapı verisinde mikrofonları ayırmak için
+    if os.environ.get("SUFLOR_TEST_BASLAT"): return "deneme"
+    try:
+        g = _ca_ozellik(1, "dIn ")
+        t = struct.pack(">I", _ca_ozellik(g, "tran") or 0).decode("latin-1") if g else ""
+        return {"bltn": "yerleşik", "blue": "bluetooth", "blea": "bluetooth", "usb ": "usb", "virt": "sanal"}.get(t, t.strip() or "?")
+    except Exception: return "?"
+def _kapi_yaz(sonuc):  # tur bitti (sonuc: gonderildi | ...) → ölçüm satırı; sayaçlar sıfırlanır
+    o = SOHBET.pop("kapi", None)
+    if not o or o["ham"] < 8: return
+    arka = sorted(o["arka"])[len(o["arka"]) // 2] if o["arka"] else 0; kon = sorted(o["kon"])[len(o["kon"]) // 2]
+    fark = 20 * math.log10(kon / arka) if arka > 0 and kon > 0 else None
+    oran = [round(y / o["ham"], 2) for y in o["yakin"]]; i4 = SOHBET_KAPI_KATLAR.index(4.0) if 4.0 in SOHBET_KAPI_KATLAR else -1
+    karar = "geçerdi" if oran[i4] >= SOHBET_KAPI_ORAN else "keserdi"
+    print(f"SOHBET ÖLÇÜM: konuşma {o['ham'] * AKIS_PENCERE / 2 / WH_SR:.1f} sn · arka plan {arka:.0f} · konuşma {kon:.0f}" + (f" ({fark:+.1f} dB)" if fark is not None else "") +
+          " · yakın oran " + ", ".join(f"kat {k:g} %{v * 100:.0f}" for k, v in zip(SOHBET_KAPI_KATLAR, oran)) + f" → kapı (kat 4, %{SOHBET_KAPI_ORAN * 100:.0f}) {karar} · {sonuc}")
+    satir = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "sn": round(o["ham"] * AKIS_PENCERE / 2 / WH_SR, 1), "arka": round(arka), "kon": round(kon),
+             "fark_db": round(fark, 1) if fark is not None else None, "oran": dict(zip([f"{k:g}" for k in SOHBET_KAPI_KATLAR], oran)), "karar": karar, "sonuc": sonuc,
+             "mikrofon": _giris_turu()}
+    try:
+        with LOCK: write([(os.path.join(BASE, "sohbet-kapi.jsonl"), json.dumps(satir, ensure_ascii=False) + "\n")])
+    except Exception as e: print(f"SOHBET ÖLÇÜM: yazılamadı ({e.__class__.__name__})")
 SOHBET_DUSUNME_RX = re.compile(r"(\b(nasıl (desem|diyeyim|söylesem|anlatsam)|yani|şey|hani|işte|şöyle( ki)?|mesela|aslında|bir saniye|dur bir|bekle|ve|ama|fakat|çünkü|ki|veya|ya da|ile|"
                                r"how (do i|should i) (say|put)|i mean|like|so|and|but|because|um+|uh+)|\b(e+|ı+|hm+|em+))\W*$", re.I)
 SOHBET_KAPAT_RX = re.compile(r"^\W*(tamam,?\s*)?(teşekkür(ler| ederim)|sağ ?ol(un)?|kapat|sohbeti kapat|bu kadar|görüşürüz|thanks?( you)?|that'?s all|goodbye|bye)\W*$", re.I)
@@ -93,6 +132,8 @@ def sohbet_parca(p):
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
     except ValueError: return {"ok": False, "err": "pcm"}
     simdi = time.time(); pen = _pencereler(pcm); esik = AKIS.get("esik") or 400
+    try: _kapi_olc(pen, esik)  # v0.80.7: ölçüm kipi, davranışı değiştirmez
+    except Exception as e: print(f"SOHBET ÖLÇÜM: hata {e.__class__.__name__}")
     konusma = sum(x >= esik for x in pen) * AKIS_PENCERE / 2 / WH_SR
     if konusma >= 0.15: SOHBET.update(t_ses=simdi, uyari=False)
     tur = _KS["tur"]
@@ -145,7 +186,7 @@ def _sohbet_tur_sonu():
     k = 0
     while k < len(pen) and pen[-1 - k] < esik: k += 1
     sessiz = k * AKIS_PENCERE / 2 / WH_SR; konusma = sum(x >= esik for x in pen[:len(pen) - k]) * AKIS_PENCERE / 2 / WH_SR; n = len(b) / 2 / WH_SR
-    if konusma < 0.4: SOHBET.update(durak=None, bekle=None); return
+    if konusma < 0.4: SOHBET.update(durak=None, bekle=None); SOHBET.pop("kapi", None); return
     if n >= KONUS_EN_UZUN_SN - 3: return _sohbet_gonder(b, n, sessiz)  # bir dakikalık kayıt tavanına yaklaşınca duraksamasız da tur kapanır
     if sessiz < SOHBET_SESSIZ_SN: SOHBET.update(durak=None, bekle=None); return
     durak = (len(pen) - k) * AKIS_PENCERE  # son konuşma penceresinin sonu: pencereler kaydın başına hizalı, parça boyu ne olursa olsun duraksama boyunca sabit
@@ -166,7 +207,7 @@ def _sohbet_tur_sonu():
         except Exception as e: print(f"SOHBET: önceden ön arama başlatılamadı ({e.__class__.__name__})")
 def _sohbet_gonder(b, n, sessiz):
     SOHBET.update(durak=None, bekle=None); SOHBET.pop("dusunme", None)
-    print(f"SOHBET: tur bitti ({n:.1f} sn kayıt, {sessiz:.1f} sn sessizlik)")
+    print(f"SOHBET: tur bitti ({n:.1f} sn kayıt, {sessiz:.1f} sn sessizlik)"); _kapi_yaz("tur bitti")
     r = konus_ses({"pcm": base64.b64encode(b).decode()})
     if not r.get("ok"): print(f"SOHBET: soru gönderilemedi ({r.get('err')})"); _akis_sifirla(); _konus_kur(durum="dinliyor", hata=None)
 # Ses izi süzgeci (v0.51.0, S59 3. adım; ayar sohbet_ses_izi, varsayılan kapalı): mikrofon açık kaldığı için odadaki başkasının ya da televizyonun sözü
