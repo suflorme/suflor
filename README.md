@@ -25,7 +25,8 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 
 ## Gizlilik
 - Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
-- Aktarıcı yalnız `127.0.0.1` adresinde çalışır; hiçbir sunucuya veri göndermez.
+- Aktarıcı yalnız `127.0.0.1` adresinde çalışır; hiçbir sunucuya veri göndermez. Tek istisna isteğe bağlı Gemini sesi: açarsan (⚙ Ayarlar → Ses → Gemini)
+  yalnız okunacak cevap metni Google'a gider, ses kaydı gitmez; kapalıyken (varsayılan) sesler Mac'te üretilir.
 - Claude'a giden metin, senin Claude Code oturumunun gördükleridir (Anthropic'in kullanım koşulları geçerli).
 - Toplantı dosyaları senin proje klasöründe durur; kişi adı içerir, iç belge gibi davran.
 
