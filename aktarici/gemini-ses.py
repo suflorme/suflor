@@ -5,12 +5,12 @@
 # (hazır ses adı), model "gemini_model" (varsayılan 3.8 Flash-Lite: ilk ses ~0,7 sn, 3.8 Flash ~1,1 sn — ölçüm testler/arastirma-konusma-sesi-20261018).
 # Kişilik dosyasında "ses: gemini" ya da "ses: gemini:Kore" o kişiliğe Gemini sesi verir.
 # Gizlilik: okunacak cevap metni Google'a gider (ses kaydı gitmez). Kullanıcı kararı S83: proje yedeği zaten Google'da; ücretli katman (ücretsizde metin
-# eğitimde kullanılır). Toplantıya söyle ve fısıltı Mac sesinde kalır.
+# eğitimde kullanılır). v0.80.0 (S87): sesli çeviri, fısıltı, sesli özet (iki sesli), toplantıda duyuru da Gemini'yle; ton cümleye göre (aşağıda).
 # Akış: streamGenerateContent (SSE) → 24 kHz ham ses parçaları → Suflor Oynat (kesintisiz çalıcı) stdin'i; ilk parça gelince çalmaya başlar.
 # Ağ yoksa, anahtar geçersizse ya da 5 sn'de ses gelmezse False döner, çağıran Mac sesine düşer; hata sonrası 60 sn Gemini denenmez (her cümle
 # beklemesin). Kullanım canli/gemini-ses.jsonl'e (karakter, ses süresi, ilk ses) yazılır — maliyet: Flash-Lite ses 6 $/M token = 25 token/sn
 # (2026 sonuna kadar ~0,009 $/dk; 1 Ocak 2027'den iki katı).
-import http.client
+import http.client, re
 GEMINI = {"durum": None, "hata": None, "anahtar": None, "anahtar_t": 0.0, "c": None, "kilit": threading.Lock(), "hata_t": 0.0}
 GEMINI_SESLER = ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")
 GEMINI_MODELLER = ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")
@@ -142,3 +142,57 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
     print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")
     if topla: return bytes(tampon) if tampon else None
     return nbayt > 0
+# --- v0.80.0 (S87, kullanıcı 18 Ekim: "sesle ilgili her şey Gemini'ye") ------------------------------------------------------------------------
+# gemini_kullan: anahtar var ve ses motoru Gemini ya da bir kişiliğin sesi Gemini → kısa okumalar (fısıltı, sesli çeviri, duyuru) da Gemini'yle.
+# gemini_kisa: beklemeli kısa okuma (okuma kuyruğundan bağımsız; Gemini bağlantısı kilitle sırayla); olmazsa False, çağıran Piper/Mac sesine düşer.
+def gemini_kullan():
+    if not gemini_var(): return False
+    if AYAR.get("ses_motoru") == "gemini": return True
+    try: return any(str(k.get("ses") or "").startswith("gemini") for k in kisilikler())
+    except Exception: return False
+def gemini_kisilik_sesi(k=None):  # kişiliğin Gemini sesi (ses: gemini:Kore → Kore; ses: gemini → ayardaki); kişilik Gemini değilse ayardaki ses
+    s = str((k or {}).get("ses") or "")
+    return gemini_ses(s.split(":", 1)[1].strip() if s.startswith("gemini:") else None)
+def gemini_kisa(metin, ses=None, uslup=None, duzey=None):
+    if not metin or not gemini_kullan(): return False
+    if os.environ.get("SUFLOR_TEST_BASLAT") and not os.environ.get("SUFLOR_TEST_GEMINI_HOST"): print(f"GEMINI (deneme, kısa): {gemini_ses(ses)} · {metin}"); return True
+    return bool(gemini_oku(metin, ses=ses, uslup=uslup, duzey=duzey))
+# Duruma göre ton: Gemini'ye giden üslup = kişiliğin ses_uslup'u + durum. Durum iki yerden: Claude cevabın başına <ton:ad> yazdıysa o (o cevabın
+# kalanı için, TON_SURE_SN), yoksa cümlenin kendisinden kural (kötü haber, uyarı, acele). <ton:…> hiçbir seste okunmaz, panoda görünmez.
+TON_USLUP = {
+    "kotu_haber": ("Kötü bir haber veriyor: üzgün ama sakin, yumuşak ve anlayışlı; acele etmeden.", "Delivering bad news: sorry but calm, soft and understanding; unhurried."),
+    "uyari": ("Uyarıyor: net, ciddi ve dikkat çekici; telaşsız.", "Warning: clear, serious and attention-getting; not alarmed."),
+    "acele": ("Zaman dar: biraz hızlı, kısa ve net; telaşsız.", "Time is short: a bit faster, brief and clear; not frantic."),
+    "sakin": ("Ortam gergin: çok sakin, alçak ve yavaş; yatıştırıcı, şakasız.", "The room is tense: very calm, low and slow; soothing, no jokes."),
+    "yumusak": ("Ortam biraz gergin: yumuşak, sıcak ve uzlaştırıcı.", "The room is a little tense: soft, warm and conciliatory."),
+    "ciddi": ("Ciddi ve ölçülü; şakasız.", "Serious and measured; no jokes."),
+}
+TON_RX = re.compile(r"\s*<ton:\s*([a-z_]+)\s*>\s*", re.I)
+TON_KURAL = [  # (ton, kalıp) — ilk eşleşen; yalnız Gemini sesinde etkili
+    ("kotu_haber", re.compile(r"\b(maalesef|ne yazık ki|üzgünüm|başarısız oldu|kaybettik|iptal edildi|reddedildi|unfortunately|i'm sorry|sadly)\b", re.I)),
+    ("uyari", re.compile(r"\b(dikkat|uyarı|uyarıyorum|risk|tehlike|acil|ciddi bir sorun|önemli bir sorun|warning|careful|urgent|critical)\b", re.I)),
+    ("acele", re.compile(r"\b(şimdi başlıyor|birazdan başlıyor|\d+ dakika kaldı|acele|right now|starting now|in \d+ minutes?)\b", re.I)),
+]
+TON_SURE_SN = 45
+TON = {"ad": None, "t": 0.0}
+def ton_ayikla(metin):  # metindeki <ton:ad> → (temiz metin, ad ya da None); ad bilinmiyorsa yok sayılır ("normal" tonu sıfırlar)
+    m = TON_RX.search(metin or "")
+    if not m: return metin, None
+    ad = m.group(1).lower(); temiz = re.sub(r"\s{2,}", " ", TON_RX.sub(" ", metin)).strip()
+    return temiz, (ad if ad in TON_USLUP or ad == "normal" else None)
+def ton_kur(ad):
+    TON.update(ad=ad, t=time.time())
+    if ad: print(f"SES: ton {ad} (Claude)")
+def ton_sifirla(): TON.update(ad=None, t=0.0)
+def ton_bul(metin):  # → durum adı ya da None
+    if TON["ad"] and time.time() - TON["t"] < TON_SURE_SN: return None if TON["ad"] == "normal" else TON["ad"]
+    for ad, rx in TON_KURAL:
+        if rx.search(metin or ""): return ad
+    return None
+def ses_uslup_bul(metin, k=None, ek=None):  # kişiliğin üslubu + durum tonu + ek (fısıltı, çevirmen …); boşsa None
+    k = kisilik() if k is None else k
+    ton = ton_bul(metin); p = [str((k or {}).get("ses_uslup") or "").strip()]
+    if ton: p.append(_t(*TON_USLUP[ton]))
+    if ek: p.append(ek)
+    u = " ".join(x for x in p if x)
+    return u or None

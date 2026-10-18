@@ -45,6 +45,7 @@ def eylem_karar(p, kaynak):
         for x in xs: _eylem_yama(x, durum=d, karar_at=datetime.datetime.now().isoformat(timespec="seconds"), yetkili=True, kaynak=kaynak, **ek)
     for x in xs:
         if x.get("yerel") and "talimat_karar" in globals(): talimat_karar(x, d)  # v0.75.0: aktarıcının kendi uyguladığı iş
+    if xs and d == "onaylandi" and "duyuru_eylem" in globals(): duyuru_eylem(xs)  # v0.80.0: toplantıda duyuru (ayar toplanti_duyuru)
     if xs: print(f"EYLEM: {len(xs)} iş {'onaylandı' if d == 'onaylandi' else 'reddedildi'} ({kaynak})" + (f" · duyulan \"{ek['ses_metin']}\"" if ek else ""))
     if kaynak != "ses" and xs: ses_durdur()  # sesli kararda geri okuma ("Takvim onaylandı.") kuyrukta, kesilmez
     if xs and p.get("id") == "hepsi": soru_bitir("hepsi")

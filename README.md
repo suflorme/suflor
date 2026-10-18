@@ -26,7 +26,7 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 ## Gizlilik
 - Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
 - Aktarıcı yalnız `127.0.0.1` adresinde çalışır; hiçbir sunucuya veri göndermez. Tek istisna isteğe bağlı Gemini sesi: açarsan (⚙ Ayarlar → Ses → Gemini)
-  yalnız okunacak cevap metni Google'a gider, ses kaydı gitmez; kapalıyken (varsayılan) sesler Mac'te üretilir.
+  yalnız okunacak metin (cevap, özet, çeviri, fısıltı, duyuru) Google'a gider, ses kaydı gitmez; kapalıyken (varsayılan) sesler Mac'te üretilir.
 - Claude'a giden metin, senin Claude Code oturumunun gördükleridir (Anthropic'in kullanım koşulları geçerli).
 - Toplantı dosyaları senin proje klasöründe durur; kişi adı içerir, iç belge gibi davran.
 
@@ -92,7 +92,11 @@ En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API
 11 hazır ses (Gemini sesi) ve model (3.8 Flash-Lite, ilk ses ~0,7 sn; 3.8 Flash) oradan seçilir. Okunacak cevap metni Google'a gider (ses kaydı
 gitmez); canlı kullanım için ücretli katman gerekir (ücretsiz katman günde 10 istek; metni eğitimde kullanır). İnternet yoksa Mac sesi okur.
 Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi) ve `ses_etiket: evet` (<chuckle> gibi sözsüz sesler) kişiliğe özel ses verir;
-toplantıya söyle de toplantı kişiliğinin Gemini sesiyle okur. Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
+toplantıya söyle de toplantı kişiliğinin Gemini sesiyle okur. Gemini açıkken sesli çeviri (çevirmen sesi ayar `ceviri_gemini_ses`), fısıltı ve
+toplantı özeti de Gemini'yle okunur; iki kişiliğin sesi de Gemini ise özet iki sesle (⚙ Ayarlar → İki sesli özet). Ton cümleye göre değişir (kötü haber,
+uyarı, acele); kişilik dosyasında `gerginlik_tonu: evet` o kişiliğin tonunu toplantı gerginliğine göre ayarlatır (karar Claude'da).
+⚙ Ayarlar → Toplantıda duyuru (deneme): toplantıya söyle açıkken Suflor toplantı başında kendini tanıtır ve onaylanan işi "Not aldım" diye duyurur.
+Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
 
 ## Bileşenler
 | Parça | Ne iş yapar |

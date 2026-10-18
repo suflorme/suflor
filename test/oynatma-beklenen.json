@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 168708,
-   "sha": "e9821c3cb62596c9"
+   "uzunluk": 169798,
+   "sha": "99a0ccc5094f1a38"
   },
   "/hazirlik": {
-   "uzunluk": 47443,
-   "sha": "821b7e95d3872e70"
+   "uzunluk": 48132,
+   "sha": "9951cd6eb63b95bc"
   },
   "/mini": {
-   "uzunluk": 168708,
-   "sha": "e9821c3cb62596c9"
+   "uzunluk": 169798,
+   "sha": "99a0ccc5094f1a38"
   },
   "/status": {
    "_ping_son": "float",
@@ -282,6 +282,7 @@
      "menu_cubugu": "bool",
      "oda": "bool",
      "otonom": "bool",
+     "ozet_iki_ses": "bool",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
      "sesli_kanit": "bool",
@@ -289,6 +290,7 @@
      "sohbet_araya_girme": "bool",
      "sohbet_ses_izi": "bool",
      "teshis": "bool",
+     "toplanti_duyuru": "bool",
      "toplanti_konus": "bool",
      "toplantiya_ses": "bool",
      "uzun_konusma_sn": "int"
@@ -321,6 +323,7 @@
      "menu_cubugu": "bool",
      "oda": "bool",
      "otonom": "bool",
+     "ozet_iki_ses": "bool",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
      "sesli_kanit": "bool",
@@ -328,6 +331,7 @@
      "sohbet_araya_girme": "bool",
      "sohbet_ses_izi": "bool",
      "teshis": "bool",
+     "toplanti_duyuru": "bool",
      "toplanti_konus": "bool",
      "toplantiya_ses": "bool",
      "uzun_konusma_sn": "int"

@@ -148,7 +148,8 @@ def _ceviri_isci(y):
 # Panodaki 🎧 düğmesiyle açılır (/komut sesli_ceviri), yalnız kulaklık takılıyken (hoparlörden okunursa mikrofona girer, karşı taraf duyar);
 # açıkken yazılı çeviri de çalışır. Okunan: Claude'un verdiği kısa öz (en çok 8 sözcük; tam çeviri panoda). Kural: kullanıcı konuşuyorsa en çok
 # 3 sn beklenir; konuşmanın 12 sn'den eski özü okunmaz; sırada en çok 2 öz (fazlası eskiden atılır) — okuma konuşmadan geride kalmasın.
-# Ses: Türkçede sistem sesi (Elif; ayar ceviri_ses), İngilizcede Samantha; yerel macOS sesi, ses Mac'ten çıkmaz. Yeni toplantıda kapanır.
+# Ses: Gemini açıksa Gemini (v0.80.0; çevirmen sesi ayar ceviri_gemini_ses; okunacak çeviri metni Google'a gider, S83/S87), değilse Türkçede
+# sistem sesi (Elif; ayar ceviri_ses — verilirse Mac sesi zorlanır), İngilizcede Samantha. Yeni toplantıda kapanır.
 SESLI = {"acik": False, "file": None, "q": [], "okunan": 0, "atlanan": 0, "uyari": None, "neden": {}}; SESLI_K = threading.Condition()
 SESLI_ESKI_SN, SESLI_SIRA, SESLI_BEKLE_SN = 12.0, 2, 3.0
 def sesli_ceviri_acik():
@@ -199,7 +200,9 @@ def _sesli_isci():
             t_oku = time.time(); print(f"SESLİ ÇEVİRİ (deneme): {kisa}"); time.sleep(float(os.environ.get("SUFLOR_TEST_KIS_SN") or 0))
             SESLI["kis"]["bitis"] = time.time(); kart_bildir(); kendi_ses_kaydet(kisa, t_oku, time.time()); continue
         t_oku = time.time()
-        if AYAR.get("ceviri_ses") or not piper_oku(telaffuz(kisa), piper_hiz(kisa=True)):  # ayar ceviri_ses verildiyse Mac sesi
+        # v0.80.0 (S87): Gemini açıksa çeviri Gemini'yle — çevirmen sesi ayar ceviri_gemini_ses (yoksa ayardaki Gemini sesi), düz ve akıcı; olmazsa eskisi gibi
+        if not AYAR.get("ceviri_ses") and gemini_kisa(kisa, ses=AYAR.get("ceviri_gemini_ses"), uslup=_t("Simultane çevirmen: düz, akıcı ve nötr; biraz hızlı, vurgusuz.", "Simultaneous interpreter: plain, fluent and neutral; a little fast, no emphasis.")): pass
+        elif AYAR.get("ceviri_ses") or not piper_oku(telaffuz(kisa), piper_hiz(kisa=True)):  # ayar ceviri_ses verildiyse Mac sesi
             v = AYAR.get("ceviri_ses") or (ses_secimi() if ARAYUZ_DILI == "tr" else "Samantha")
             try: subprocess.run(["/usr/bin/say", "-r", "200"] + (["-v", str(v)] if v else []) + [telaffuz(kisa, mac=True) if ARAYUZ_DILI == "tr" else kisa], timeout=15)
             except (OSError, subprocess.TimeoutExpired): pass

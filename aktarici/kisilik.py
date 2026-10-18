@@ -26,7 +26,7 @@ def _kisilik_oku(yol, rol):
     try:
         s = open(yol, encoding="utf-8").read()
         m = re.match(r"\s*---\s*\n(.*?)\n---\s*\n?(.*)\Z", s, re.S)
-        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "hiz": None, "ses_uslup": None, "ses_etiket": False, "kdili": False, "rol": rol, "metin": (m.group(2) if m else s).strip()}
+        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "hiz": None, "ses_uslup": None, "ses_etiket": False, "gerginlik_tonu": False, "kdili": False, "rol": rol, "metin": (m.group(2) if m else s).strip()}
         for sat in (m.group(1).splitlines() if m else []):
             k, _, d_ = sat.partition(":"); k = k.strip().lower(); d_ = d_.strip()
             if k in ("ad", "okunus", "tanitim", "selam"): v[k] = d_ or None
@@ -35,6 +35,7 @@ def _kisilik_oku(yol, rol):
             elif k == "konusma_dili": v["kdili"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.73.0
             elif k == "ses_uslup": v["ses_uslup"] = d_[:400] or None  # v0.79.0: Gemini sesine ton yönergesi ("nüktedan, dostça…")
             elif k == "ses_etiket": v["ses_etiket"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.79.0: <chuckle> gibi sözsüz ses etiketleri (yalnız Gemini)
+            elif k == "gerginlik_tonu": v["gerginlik_tonu"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.80.0: toplantı gerginliğine göre ton (yalnız Gemini sesinde)
             elif k == "ses": v["ses"] = d_ or None  # v0.71.0: "piper" ya da Mac ses adı (say -v); yoksa ayardaki ses
             elif k == "hiz":
                 try: v["hiz"] = max(0.7, min(1.6, float(d_.replace(",", "."))))

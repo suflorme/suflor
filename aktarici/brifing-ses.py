@@ -377,27 +377,38 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
         _SES_SEC.update(t=time.time(), v=v)
     return _SES_SEC["v"]
 # v0.79.0: Gemini'nin sözsüz ses etiketleri (kişilikte ses_etiket: evet); Gemini dışındaki seslerde, panoda ve toplantıya söylerken silinir
-SES_ETIKET_RX = re.compile(r"\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm)>\s*", re.I)
+SES_ETIKET_RX = re.compile(r"\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm|ton:\s*[a-z_]+)>\s*", re.I)  # v0.80.0: <ton:…> de
 def etiket_sil(metin): return re.sub(r"\s{2,}", " ", SES_ETIKET_RX.sub(" ", metin or "")).strip() if metin else metin
-def seslendir(metin, kuyruk=False, tepkisiz=False):
+def seslendir(metin, kuyruk=False, tepkisiz=False, k=None):
+    # k: bu metni okuyacak kişilik (v0.80.0 iki sesli özet); verilmezse o anki kişilik. Gemini'de her parça kendi sesi ve üslubuyla kuyruğa girer.
     if not AYAR.get("konusma", True) or not metin: return False
-    motor = kisilik_sesi()[0]; mac = motor == "mac"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
+    metin, ton = ton_ayikla(metin)  # v0.80.0: Claude'un <ton:ad> etiketi (hiçbir seste okunmaz)
+    if ton: ton_kur(ton)
+    if not metin: return False
+    if k is not None and str(k.get("ses") or "").startswith("gemini") and gemini_var(): motor = "gemini"
+    else: motor = kisilik_sesi()[0]
+    mac = motor == "mac"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
     if mac and not tepkisiz: klip, metin = tepki_ayir(metin)  # tepki klipleri Elif tınısında: yalnız Mac sesinde
     if motor != "gemini": metin = etiket_sil(metin)
     if motor == "gemini": metin = ses_duzen(kisilik_telaffuz(metin), False) if metin else ""  # v0.78.0: Gemini Türkçeyi ve yabancı sözcükleri kendisi okur; yalnız kişilik okunuşları
     else: metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
+    oge = metin
+    if motor == "gemini" and metin:  # v0.80.0: ses ve üslup (kişilik + durum tonu) şimdi belirlenir; çalınırken kişilik değişse de bu parça bu sesle
+        kk = k if k is not None else kisilik()
+        oge = ("g", metin, gemini_kisilik_sesi(kk) if k is not None else None, ses_uslup_bul(metin, kk))
     if not kuyruk: ses_durdur()
     if os.environ.get("SUFLOR_TEST_BASLAT"):
         if klip: print(f"SES (deneme): tepki {os.path.basename(klip)}")
-        if metin: print(f"SES (deneme): {len(metin)} karakter · {metin}")
+        if metin: print(f"SES (deneme): {len(metin)} karakter · {metin}" + (f" · ses {oge[2] or '-'} · üslup {oge[3] or '-'}" if isinstance(oge, tuple) else ""))
         SES["test_bit"] = max(SES.get("test_bit", 0), time.time()) + 0.06 * len(metin or "")  # sohbet testinde "okunuyor" süresi (ses çalınmaz)
         return True
     with SES_K:
         if klip: SES["q"].append(("dosya", klip))
-        if metin: SES["q"].append(metin)
+        if metin: SES["q"].append(oge)
         SES_K.notify()
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
     return True
+def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] == "g" else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
 def _ses_isci():
     while True:
         with SES_K:
@@ -408,12 +419,17 @@ def _ses_isci():
                 except OSError as e: print(f"SES: tepki çalınamadı {e.__class__.__name__}"); continue
         if dosya: p.wait(); continue
         motor, v, khiz = kisilik_sesi()
+        with SES_K: bas = SES["q"][0] if SES["q"] else None
+        if isinstance(bas, tuple) and bas[0] == "g" and gemini_var(): motor = "gemini"  # v0.80.0: parça Gemini için hazırlandı (kendi sesi/üslubu)
         if motor == "gemini":  # v0.78.0: bulut ses; okunamazsa (ağ, anahtar) Mac sesi
             with SES_K:
                 if not SES["q"]: continue
-                metin = SES["q"].pop(0); kes = SES.get("kes", 0)
-            if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=v, uslup=(kisilik() or {}).get("ses_uslup")): continue
+                oge = SES["q"].pop(0); kes = SES.get("kes", 0)
+            metin = _ses_metin(oge); oses, ousl = (oge[2], oge[3]) if isinstance(oge, tuple) else (None, (kisilik() or {}).get("ses_uslup"))
+            if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=oses or v, uslup=ousl): continue
             with SES_K: SES["q"].insert(0, metin)
+        with SES_K:
+            if SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g": SES["q"][0] = etiket_sil(SES["q"][0][1])  # Gemini yok: düz metin
         if motor == "piper":  # yerel Türkçe ses (ayar ses_motoru: piper ya da kişilikte ses: piper); okunamazsa Mac sesi
             with SES_K:
                 if not SES["q"]: continue
@@ -437,7 +453,7 @@ def _ses_isci():
 # Yalnız kulaklık takılıyken (çıkış aygıtı Bluetooth/USB ya da Mac'in kulaklık girişi; hoparlörden okunursa mikrofona girer, karşı taraf
 # da duyar) ve toplantı sürerken: DUR kartı ve fısıltı metni verilen kart (karşı taraf kullanıcıya adıyla sorunca yardım kartı) için kısa
 # tık + en çok 4 sözcük. Kullanıcı konuşuyorsa en çok 8 sn sessizlik beklenir, gelmezse okunmaz; iki fısıltı arası ≥ 20 sn. Sessizde
-# bekleyen kart okunmaz. Ses yerel macOS sesi (say); metin Mac'ten çıkmaz. Hız kuralı (konuşma → satır %90 < 5 sn) gerçek toplantıda
+# bekleyen kart okunmaz. Ses: Gemini açıksa kişiliğin Gemini sesi (v0.80.0; metin Google'a gider, S83/S87), değilse Piper ya da macOS sesi. Hız kuralı (konuşma → satır %90 < 5 sn) gerçek toplantıda
 # doğrulanınca açılması önerilir (S32).
 FISILTI = {"son": 0.0, "say": 0}; FISILTI_ARA_SN, FISILTI_BEKLE_SN = (2.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 20.0), 8.0
 def _ca_ozellik(nesne, secici, kapsam="glob"):
@@ -478,8 +494,10 @@ def fisilti_kart(c):
         if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"FISILTI (deneme): {metin}"); return
         try: subprocess.run(["/usr/bin/afplay", "-v", "0.4", "/System/Library/Sounds/Tink.aiff"], timeout=3)
         except (OSError, subprocess.TimeoutExpired): pass
-        t_oku = time.time()
-        if not piper_oku(telaffuz(metin), piper_hiz(kisa=True)):
+        t_oku = time.time(); km, kv = kisilik_sesi()[:2]
+        # v0.80.0 (S87): Gemini açıksa fısıltı da o anki kişiliğin Gemini sesiyle, kısık; olmazsa Piper, sonra Mac sesi
+        if km == "gemini" and gemini_kisa(metin, ses=kv, uslup=_t("Kulağa fısıldar gibi: çok kısa, alçak ve sakin.", "Whispering in the ear: very short, low and calm."), duzey=0.7): pass
+        elif not piper_oku(telaffuz(metin), piper_hiz(kisa=True)):
             v = ses_secimi()
             try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [ses_duzen(telaffuz(metin, mac=True))], timeout=10)
             except (OSError, subprocess.TimeoutExpired): pass
@@ -529,13 +547,27 @@ def ozet_sesli(r):
         print("SES: yazılı özet hazır — hızlı özet okunmuştu, yeniden okunmadı"); return False
     if not _ses_serbest(): return False
     bek = sum(1 for x in eylem_gorunen() if x["durum"] == "bekliyor")
-    p = [_t("Toplantı özeti hazır.", "The meeting summary is ready.")]
-    if r.get("cikti"): p.append(cikti_metin(r["cikti"]) + ".")
-    p += [_cumle(r.get("degerlendirme"))] + ([_t("Öneri: ", "Suggestion: ") + _cumle(r["oneri"])] if r.get("oneri") else [])
-    if bek: p.append(_t(f"Onayını bekleyen {bek} iş var.", f"{bek} item{'s' if bek > 1 else ''} waiting for your approval."))
-    ok = seslendir(" ".join(x for x in p if x), kuyruk=True)
+    a = [_t("Toplantı özeti hazır.", "The meeting summary is ready.")] + ([cikti_metin(r["cikti"]) + "."] if r.get("cikti") else [])  # 1. ses: özet + sayılar
+    b = [_cumle(r.get("degerlendirme"))] + ([_t("Öneri: ", "Suggestion: ") + _cumle(r["oneri"])] if r.get("oneri") else [])  # 2. ses: değerlendirme + öneri
+    c = [_t(f"Onayını bekleyen {bek} iş var.", f"{bek} item{'s' if bek > 1 else ''} waiting for your approval.")] if bek else []
+    iki = ozet_iki_ses()
+    if iki and any(b):  # v0.80.0 (S87): iki kişilik de Gemini sesliyse özet iki sesle — toplantı kişiliği özeti, öteki değerlendirmeyi okur
+        k1, k2 = iki; ok = False
+        for kk, parca in ((k1, a), (k2, b), (k1, c)):
+            m = " ".join(x for x in parca if x)
+            if m: ok = seslendir(m, kuyruk=True, k=kk) or ok
+        if ok: print(f"SES: özet iki sesle okunuyor ({k1['ad']} + {k2['ad']})")
+        return ok
+    ok = seslendir(" ".join(x for x in a + b + c if x), kuyruk=True)
     if ok: print("SES: özet okunuyor")
     return ok
+def ozet_iki_ses():  # → (toplantı kişiliği, öteki) ikisi de Gemini sesliyse ve ayar ozet_iki_ses kapalı değilse; yoksa None
+    if AYAR.get("ozet_iki_ses", True) is False or not gemini_var(): return None
+    ks = [k for k in kisilikler() if str(k.get("ses") or "").startswith("gemini")]
+    if len(ks) < 2: return None
+    k1 = next((k for k in ks if k["rol"] == "toplanti"), ks[0])
+    k2 = next(k for k in ks if k is not k1)
+    return (k1, k2) if gemini_kisilik_sesi(k1) != gemini_kisilik_sesi(k2) else None
 def soru_baslat(ids):
     if not ids or not _ses_serbest(): return
     with LOCK:

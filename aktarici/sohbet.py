@@ -150,6 +150,7 @@ def _sohbet_tur_sonu():
     if sessiz < SOHBET_SESSIZ_SN: SOHBET.update(durak=None, bekle=None); return
     durak = (len(pen) - k) * AKIS_PENCERE  # son konuşma penceresinin sonu: pencereler kaydın başına hizalı, parça boyu ne olursa olsun duraksama boyunca sabit
     if SOHBET["durak"] != durak:  # yeni duraksama: bekleme süresini seç (v0.49.5: duraksama başına bir kez — önce len(b)'ye göreydi, her parçada kayıyordu)
+        onara_isit()  # v0.79.1: tur kapanmadan ön aramanın dizini bellekte olsun
         e = float(AYAR.get("hihi_tur_esik", HIHI_TUR_ESIK)); p = tur_olasilik(b[:durak + int(0.3 * WH_SR * 2)]) if e > 0 else None
         bek = SOHBET_MODELSIZ_SN if p is None else SOHBET_KISA_SN if p >= e else SOHBET_UZUN_SN
         with AKIS["kilit"]: son = str(AKIS["metin"].get(AKIS["sira"] - 1) or "") if AKIS["sira"] else ""

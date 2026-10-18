@@ -154,3 +154,50 @@ def _ts_nobet():
             menu_baslat()
         except Exception as e: print(f"TOPLANTIYA SÖYLE: nöbet hatası {e.__class__.__name__}")
 if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_ts_nobet, daemon=True).start()
+# --- Toplantıda duyuru (v0.80.0, S87 — kullanıcı 18 Ekim: "karşı tarafa bildirim sesi" = toplantıda duyuru; ayar toplanti_duyuru, varsayılan kapalı) -------
+# Toplantıya söyle açıksa (toplantiya_ses) Suflor toplantıdakilere kısa duyuru yapar: toplantı başında bir kez tanıtım + "dinleyip not alıyorum" (tanıtımı
+# toplantiya_soyle kendisi ekler) ve toplantıda onaylanan iş için "Not aldım: …" (en çok DUYURU_ARA_SN'de bir). Söz sırası boşalınca okunur
+# (kanal_sessizlik ≥ 1,5 sn, en çok DUYURU_SIRA_SN beklenir; kanal akmıyorsa ölçülemez, okunmaz). Ses toplantı kişiliğinin Gemini sesi (toplantiya_soyle).
+DUYURU = {"toplanti": None, "t_ilk": 0.0, "son": 0.0, "say": 0}
+DUYURU_ARA_SN, DUYURU_SIRA_SN, DUYURU_BASLA_SN = 60.0, 20.0, (3.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 30.0)
+DUYURU_METIN = {"baslangic": ("Toplantıyı dinleyip not alıyorum.", "I'm listening and taking notes."), "not": ("Not aldım: {b}", "Noted: {b}")}
+def duyuru_acik(): return AYAR.get("toplanti_duyuru") is True and AYAR.get("toplantiya_ses") is True
+def _duyuru_toplanti():
+    if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")): return None
+    return STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
+def toplanti_duyuru(neden, baslik=None):  # arka planda söz sırasını bekler; başlarsa True
+    if not duyuru_acik() or not _duyuru_toplanti(): return False
+    if neden != "baslangic" and time.time() - DUYURU["son"] < DUYURU_ARA_SN: print(f"DUYURU: {DUYURU_ARA_SN:.0f} sn dolmadı, okunmadı ({neden})"); return False
+    tr, en = DUYURU_METIN[neden]; b = _cumle(" ".join(str(baslik or "").split())[:120]).rstrip(".") if baslik else ""
+    metin = _t(tr, en).format(b=b).strip()
+    if metin.endswith(":"): return False
+    if not metin.endswith((".", "!", "?")): metin += "."
+    def calis():
+        son = time.time() + DUYURU_SIRA_SN
+        while time.time() < son:
+            if not _duyuru_toplanti(): return
+            s = kanal_sessizlik()
+            if s is not None and s >= 1.5 and not ses_caliyor(): break
+            time.sleep(0.3)
+        else: print(f"DUYURU: söz sırası boşalmadı, okunmadı ({neden})"); return
+        r = toplantiya_soyle(metin)
+        if r.get("ok"): DUYURU.update(son=time.time(), say=DUYURU["say"] + 1); print(f"DUYURU: {neden} · {metin}")
+        else: print(f"DUYURU: okunamadı ({neden}) — {r.get('err')}")
+    threading.Thread(target=calis, daemon=True).start(); return True
+def duyuru_eylem(xs):  # eylem_karar'dan: toplantıda onaylanan işler (birden çoksa ilki + sayı)
+    if not xs or not duyuru_acik() or not _duyuru_toplanti(): return
+    b = xs[0].get("baslik") or ""
+    if len(xs) > 1: b = _t(f"{b} ve {len(xs) - 1} iş daha", f"{b} and {len(xs) - 1} more")
+    toplanti_duyuru("not", b)
+def _duyuru_nobet():  # toplantı başında bir kez: toplantı DUYURU_BASLA_SN sürdükten sonra
+    while True:
+        time.sleep(1.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 5.0)
+        try:
+            t = _duyuru_toplanti()
+            if not t: DUYURU.update(toplanti=None, t_ilk=0.0); continue
+            if DUYURU["toplanti"] == t: continue
+            if not DUYURU["t_ilk"]: DUYURU["t_ilk"] = time.time()
+            if time.time() - DUYURU["t_ilk"] < DUYURU_BASLA_SN or not duyuru_acik(): continue
+            DUYURU["toplanti"] = t; toplanti_duyuru("baslangic")
+        except Exception as e: print(f"DUYURU: nöbet hatası {e.__class__.__name__}")
+threading.Thread(target=_duyuru_nobet, daemon=True).start()
