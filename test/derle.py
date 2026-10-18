@@ -5,7 +5,7 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/derle.py
 import importlib.util, json, os, shutil, subprocess, sys, tempfile, time
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path[:] = [x for x in sys.path if os.path.abspath(x or ".") != os.path.dirname(os.path.abspath(__file__))]  # test/platform.py standart platform modülünü gölgeliyor
+sys.path[:] = [x for x in sys.path if os.path.abspath(x or ".") != os.path.dirname(os.path.abspath(__file__))]  # test/ yola girmesin (test/platform.py adı standart modülü gölgeliyordu; 18 Ekim platformlar.py oldu)
 HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)

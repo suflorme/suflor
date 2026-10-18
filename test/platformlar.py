@@ -2,7 +2,7 @@
 # Meet ve Zoom web uyarlayıcıları (platform-meet.js, platform-zoom.js; v0.27.0): headless Chrome'da (eklentisiz) sahte toplantı sayfası +
 # platform dosyası + çekirdeğin yardımcıları (leaves, capId) — toplantı adı, çağrıda mı, mikrofon sessiz mi, altyazı (konuşmacı + metin), Zoom
 # tam döküm paneli. Sahte DOM herkese açık bilgiyle kuruldu: gerçek Meet/Zoom'un doğrulaması değildir, uyarlayıcının mantığını korur.
-#   PYTHONDONTWRITEBYTECODE=1 python3 test/platform.py      (kaldı → çıkış 1)
+#   PYTHONDONTWRITEBYTECODE=1 python3 test/platformlar.py      (kaldı → çıkış 1)
 import json, os, re, subprocess, sys, tempfile, time
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"

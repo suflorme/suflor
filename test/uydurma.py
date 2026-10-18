@@ -9,7 +9,7 @@ KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VENV = "/Users/Shared/Suflor/whisper-venv/bin/python"
 MODEL = "/Users/Shared/Suflor/whisper-modeller/hub/models--suflor--whisper-large-v3-turbo-q8/snapshots/yerel"
 if not (os.path.exists(VENV) and os.path.isdir(MODEL)): print("Whisper kurulu değil — atlandı"); sys.exit(0)
-# numpy whisper-venv'de; -I: test/ klasörü yola girmesin (test/platform.py, numpy'ın yüklediği platform modülünün önüne geçiyordu)
+# numpy whisper-venv'de; -I: test/ klasörü yola girmesin (eski test/platform.py — artık platformlar.py —, numpy'ın yüklediği platform modülünün önüne geçiyordu)
 if sys.executable != VENV: os.execv(VENV, [VENV, "-I", os.path.abspath(__file__)])
 import numpy as np
 SR = 16000; rng = np.random.default_rng(5); T = tempfile.mkdtemp(prefix="suflor-uyd-")

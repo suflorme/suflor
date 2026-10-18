@@ -4,7 +4,7 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/guncelle-mesgul.py
 import ast, os, sys
 sys.dont_write_bytecode = True
-sys.path = [p for p in sys.path if os.path.abspath(p or ".") != os.path.dirname(os.path.abspath(__file__))]  # test/platform.py kurulum.py'nin import platform'unu gölgelemesin
+sys.path = [p for p in sys.path if os.path.abspath(p or ".") != os.path.dirname(os.path.abspath(__file__))]  # test/ yola girmesin (eski test/platform.py standart modülü gölgeliyordu)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
