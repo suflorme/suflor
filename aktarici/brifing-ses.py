@@ -476,6 +476,14 @@ def kulaklik():
         if tasima == "bltn": return struct.pack(">I", _ca_ozellik(cik, "ssrc", "outp") or 0).decode("latin-1") == "hdpn"
     except Exception as e: print(f"FISILTI: çıkış aygıtı okunamadı ({e.__class__.__name__})")
     return False
+GIRIS_SANAL_UYARI = ("Mac'in mikrofonu sanal bir aygıtta (BlackHole) — Suflor seni duyamaz. Sistem Ayarları → Ses → Giriş'te kendi mikrofonunu seç.",
+                     "Your Mac's input is a virtual device (BlackHole) — Suflor can't hear you. Pick your microphone in System Settings → Sound → Input.")
+def giris_sanal():  # v0.80.3: varsayılan giriş sanal aygıt mı (BlackHole, Teams Audio: bağlantı türü "virt") — 18 Ekim: macOS girişi kendiliğinden BlackHole'a almıştı
+    if os.environ.get("SUFLOR_TEST_GIRIS_SANAL"): return os.environ["SUFLOR_TEST_GIRIS_SANAL"] == "1"
+    try:
+        g = _ca_ozellik(1, "dIn ")
+        return bool(g) and struct.pack(">I", _ca_ozellik(g, "tran") or 0).decode("latin-1") == "virt"
+    except Exception as e: print(f"SES: giriş aygıtı okunamadı ({e.__class__.__name__})"); return False
 def _kullanici_konusuyor():
     k = KANALLAR.get("ben")
     return bool(k and k.konusuyor and time.time() - k.son_bitis < 2)

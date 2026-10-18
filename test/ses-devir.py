@@ -95,5 +95,11 @@ m.DUYURU["son"] = 0; m.kanal_sessizlik = lambda: 0.2; m.DUYURU_SIRA_SN = 1.0
 r, o = cikti(m.toplanti_duyuru, "not", "Üçüncü iş", bekle=1.6)
 bak("biri konuşuyorsa beklenir, sıra boşalmazsa okunmaz", "söz sırası boşalmadı" in o and "Not aldım: Üçüncü" not in o)
 m.AYAR["toplanti_duyuru"] = False; bak("ayar kapalıyken duyuru yok", m.toplanti_duyuru("not", "X") is False)
+# 8) v0.80.3: Mac'in girişi sanal aygıttaysa (BlackHole) Konuş ve sohbet başlamaz, nedenini söyler
+m.STATE["_cagri_son"] = 0; os.environ.update(SUFLOR_TEST_GIRIS_SANAL="1", SUFLOR_TEST_KULAKLIK="1")
+r1, _ = cikti(m.konus_basla); r2, _ = cikti(m.sohbet_basla)
+bak("giriş BlackHole: Konuş başlamaz, uyarı Sistem Ayarları yolunu söyler", r1.get("ok") is False and "BlackHole" in r1.get("err", "") and "Giriş" in r1.get("err", ""))
+bak("giriş BlackHole: sohbet de açılmaz", r2.get("ok") is False and "BlackHole" in r2.get("err", ""))
+os.environ.pop("SUFLOR_TEST_GIRIS_SANAL"); g = m.giris_sanal(); bak(f"gerçek Core Audio okuması hatasız (şu an sanal: {g})", g in (True, False))
 shutil.rmtree(T, ignore_errors=True)
 print("ses devri: " + ("✓ hepsi geçti" if not hata else f"✗ {len(hata)} kaldı")); sys.exit(1 if hata else 0)

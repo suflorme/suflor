@@ -918,6 +918,7 @@ def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsı
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
     if _KS["tur"]: return {"ok": False, "err": _t("Claude hâlâ cevaplıyor", "Claude is still answering")}
+    if giris_sanal(): print("KONUŞ: varsayılan giriş sanal aygıt (BlackHole) — başlamadı"); return {"ok": False, "err": _t(*GIRIS_SANAL_UYARI)}  # v0.80.3
     _akis_sifirla(); onara_isit()
     if not toplanti_var(): ses_durdur()  # toplantıda yalnız okunan cevap durur (aşağıda konus_sus)
     _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None, sesli_cevap=False, kaynak="bas")

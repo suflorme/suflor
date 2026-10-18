@@ -741,11 +741,11 @@ final class OrtakMik {
     // sesini ve klavyeyi kulaklıkta duydu). Giriş motoru varsayılan mikrofonu dinler, örnekler kısa kuyruğa; çıkış motorunun aygıtı
     // auAudioUnit.setDeviceID ile BlackHole, kaynak düğümü kuyruktan okur. Kuyruk en çok 0,25 sn (gecikme sınırlı); açılışta gerçek aygıtlar günlüğe.
     var giris: AVAudioEngine?; var cikis: AVAudioEngine?; var bos = 0; var gozlem: [NSObjectProtocol] = []
-    var kuyruk: [Float] = []; let kilit = NSLock(); var tavan = 12000; var sonUyari = Date.distantPast
+    var kuyruk: [Float] = []; let kilit = NSLock(); var tavan = 12000; var sonUyari = Date.distantPast; var girisBH = false
     // Teams BlackHole'u okurken aktarım kurulamazsa karşı taraf kullanıcıyı duymaz → bildirim (en çok 5 dk'da bir)
-    func uyar(_ m: String) {
+    func uyar(_ m: String, govde: String = "Teams'te mikrofonu geçici olarak Harici Mikrofon'a al.") {
         print("ORTAK MİK: UYARI — \(m)"); guard Date().timeIntervalSince(sonUyari) > 300 else { return }; sonUyari = Date()
-        let c = UNMutableNotificationContent(); c.title = "Suflor.me"; c.subtitle = m; c.body = "Teams'te mikrofonu geçici olarak Harici Mikrofon'a al."; c.sound = .default
+        let c = UNMutableNotificationContent(); c.title = "Suflor.me"; c.subtitle = m; c.body = govde; c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil)) { _ in }
     }
     var motor: AVAudioEngine? { cikis }
@@ -766,7 +766,17 @@ final class OrtakMik {
     func bak() {
         guard let bh = blackhole() else { if cikis != nil { durdur("BlackHole yok") }; return }
         if cikis == nil {
-            if (caObje(bh, kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) ?? 0) != 0 { basla(bh) }
+            if (caObje(bh, kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) ?? 0) != 0 {
+                // v0.80.3 (18 Ekim): Mac'in varsayılan girişi BlackHole'a geçmişse geçiş BlackHole → BlackHole döngüsüne girer (kendi çıkışı BlackHole'u
+                // "çalışıyor" yapar, aygıt değişimiyle durur, yeniden başlar); karşı taraf kullanıcıyı duymaz. Başlamaz, bir kez günlük + bildirim.
+                let gAyg = caObje(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice, AudioObjectID(0)) ?? 0
+                if gAyg == bh || ad(gAyg).hasPrefix("BlackHole") {
+                    if !girisBH { girisBH = true; uyar("Mac'in mikrofonu BlackHole'a geçmiş — Teams'e sesin gitmiyor", govde: "Sistem Ayarları → Ses → Giriş'te kendi mikrofonunu seç.") }
+                    return
+                }
+                if girisBH { girisBH = false; print("ORTAK MİK: varsayılan giriş yeniden gerçek mikrofon (\(ad(gAyg)))") }
+                basla(bh)
+            }
         } else if baskaGiris() { bos = 0 } else { bos += 1; if bos >= 10 { durdur("mikrofonu okuyan toplantı yok") } }
     }
     func basla(_ bh: AudioObjectID) {
