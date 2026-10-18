@@ -65,6 +65,15 @@ def _duzey(b, duzey):  # ham sesi kısar (hı hı); duzey 0–1
     a = array.array("h", b[:len(b) // 2 * 2]); f = max(0.0, min(1.0, float(duzey)))
     for i in range(len(a)): a[i] = int(a[i] * f)
     return a.tobytes()
+GEMINI_429_EN_COK_SN = 4.0  # v0.80.6 (19 Ekim: art arda istekte "kota aşıldı" 429): cümle cümle okumada hız sınırına takılınca Mac sesine düşmeden önce
+def _gemini_bekleme(govde, retry_after=None):  # sunucunun önerdiği bekleme (Retry-After başlığı ya da gövdedeki "retryDelay": "2s"); 0,5–GEMINI_429_EN_COK_SN, yoksa 1,5
+    sn = None
+    try: sn = float(retry_after) if retry_after else None
+    except ValueError: sn = None
+    if sn is None:
+        m = re.search(r'"retryDelay"\s*:\s*"([\d.]+)s"', govde or "")
+        sn = float(m.group(1)) if m else 1.5
+    return max(0.5, min(GEMINI_429_EN_COK_SN, sn))
 def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
@@ -107,7 +116,14 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                     _gemini_kapat()
                     if deneme: raise
             if r.status != 200:
-                hata = r.read()[:300].decode("utf-8", "replace"); _gemini_kapat()
+                hata = r.read()[:3000].decode("utf-8", "replace"); _gemini_kapat()
+                if r.status in (429, 503) and not _yeniden:  # v0.80.6: hız sınırı / geçici yoğunluk — önerilen süre (en çok GEMINI_429_EN_COK_SN) beklenip bir kez daha
+                    bekle = _gemini_bekleme(hata, r.getheader("Retry-After")); t_b = time.time()
+                    print(f"GEMINI: hız sınırı (HTTP {r.status}) — {bekle:.1f} sn bekleyip yeniden")
+                    while time.time() - t_b < bekle:
+                        if iptal and iptal(): return None if topla else True  # okuma kesildi: Mac sesine düşülmez
+                        time.sleep(0.1)
+                    return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True)
                 raise RuntimeError(f"HTTP {r.status}: {' '.join(hata.split())[:160]}")
             while True:
                 satir = r.readline()

@@ -16,6 +16,9 @@ class Sahte(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         govde = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         GELEN.append({"yol": self.path, "anahtar": self.headers.get("x-goog-api-key"), "govde": govde})
+        if DAVRANIS["tur"] == "429hep" or (DAVRANIS["tur"] == "429bir" and not DAVRANIS.get("verildi")):  # v0.80.6: hız sınırı
+            DAVRANIS["verildi"] = True; b = b'{"error":{"code":429,"message":"You exceeded your current quota","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"1s"}]}}'
+            self.send_response(429); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if DAVRANIS["tur"] == "400":
             b = b'{"error":{"code":400,"message":"API key not valid"}}'
             self.send_response(400); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
@@ -64,6 +67,15 @@ def _ilk_yavas(self):
 Sahte.do_POST = _ilk_yavas; ad["_gemini_kapat"](); t0 = time.time(); r6b = ad["gemini_oku"]("Bir yavaş bir hızlı."); Sahte.do_POST = eski; DAVRANIS["tur"] = "ok"
 bak(f"ilk deneme zaman aşımı, ikinci başarılı → True, Mac sesine düşmez ({time.time() - t0:.1f} sn)", r6b is True and ad["GEMINI"]["durum"] == "hazir")
 ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"; bak("sonra yeniden çalışır", ad["gemini_oku"]("Tekrar.") is True)
+# v0.80.6: 429 (hız sınırı) — önerilen süre beklenip bir kez daha; ikinci de 429 ise Mac sesine düşer
+DAVRANIS.update(tur="429bir", verildi=False); n = len(GELEN); t0 = time.time(); r429 = ad["gemini_oku"]("Hız sınırı bir kez.")
+bak(f"429 bir kez: retryDelay (1 sn) beklenip yeniden, ses alınır ({time.time() - t0:.1f} sn, {len(GELEN) - n} istek)", r429 is True and len(GELEN) - n == 2 and 0.9 < time.time() - t0 < 3.5)
+DAVRANIS.update(tur="429hep"); n = len(GELEN); r429b = ad["gemini_oku"]("Hız sınırı sürüyor.")
+bak(f"429 sürüyor: yalnız bir kez yeniden, sonra False (Mac sesi) ({len(GELEN) - n} istek)", r429b is False and len(GELEN) - n == 2)
+DAVRANIS.update(tur="429hep"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); t0 = time.time(); r429c = ad["gemini_oku"]("Kesilecek.", iptal=lambda: time.time() - t0 > 0.3)
+bak(f"beklerken okuma kesilirse beklemez, Mac sesine düşmez ({time.time() - t0:.1f} sn)", r429c is True and time.time() - t0 < 1.0 and len(GELEN) - n == 1)
+ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"
+bak("bekleme süresi: Retry-After başlığı, gövdedeki retryDelay, sınırlar", ad["_gemini_bekleme"]("", "2") == 2.0 and ad["_gemini_bekleme"]('"retryDelay": "9s"') == 4.0 and ad["_gemini_bekleme"]("yok") == 1.5 and ad["_gemini_bekleme"]('"retryDelay": "0.1s"') == 0.5)
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
 
