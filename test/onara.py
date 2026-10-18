@@ -27,6 +27,14 @@ try:
     bak(f"hızlı ({sn * 1000:.0f} ms < 300)", sn < 0.3)
     bak("kısa soruda blok yok ('saat kaç')", g["konus_onara"]("Saat kaç?") == "")
     bak("tek içerik sözcüğünde blok yok ('bütçe ne?')", g["konus_onara"]("Bütçe ne?") == "")
+    # v0.80.5: toplantıda dönemsel dizin ısıtma (düğmesiz hitap ve karşı tarafın sorusu için)
+    g.update(STATE={}, toplanti_var=lambda: False, toplanti_konus=lambda: True); g["_ONARA"]["isit_t"] = 0
+    bak("toplantı yokken dönemsel ısıtma yok", g["onara_toplanti_isit_bak"]() is False and not g["_ONARA"]["isit_t"])
+    g["toplanti_var"] = lambda: True; r_ = g["onara_toplanti_isit_bak"](); time.sleep(0.5)
+    bak(f"toplantıda dizin ısıtılır ({g['_ONARA'].get('isit_ms')} ms)", r_ is True and g["_ONARA"]["isit_t"] > 0 and g["_ONARA"].get("isit_ms") is not None)
+    g["toplanti_konus"] = lambda: False; g["_ONARA"]["isit_t"] = 0
+    bak("toplantıda Konuş kapalıysa (toplanti_konus) ısıtma yok", g["onara_toplanti_isit_bak"]() is False)
+    g["_ONARA"].pop("isit_ms", None)
     b2 = g["konus_onara"]("Pazarlama bütçesi ne kadar artırıldı?")
     bak("ikinci soru doğru dosya", "butce.md" in b2.split("\n")[1] and "yüzde on" in b2)
     open(os.path.join(proje, "notlar", "yeni.md"), "w").write("# Yeni\n\nKarbon ayak izi raporu cuma günü teslim.\n")
