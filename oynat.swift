@@ -2,7 +2,9 @@
 // ~0,75 sn ek boşluk veriyordu (13 Ekim ölçümü), duraklama süresi kodun elinde değildi. Kullanım: suflor-oynat <örnekleme hızı>
 // stdin: ham 16 bit tek kanal PCM (parça parça gelir); stdin kapanınca kalan ses bitince çıkar. Sonlandırılınca (SIGTERM) ses hemen durur.
 // Yalnız çıkış aygıtına çalar; ağ yok, izin gerekmez.
+// v0.79.0: isteğe bağlı ikinci argüman Core Audio aygıt kimliği (say -a ? listesindeki sayı) — toplantıya söyle Gemini sesini BlackHole'a çalar.
 import AVFoundation
+import AudioToolbox
 import Foundation
 
 let sr = Double(CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "22050") ?? 22050
@@ -11,6 +13,10 @@ let oyuncu = AVAudioPlayerNode()
 guard let bicim = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sr, channels: 1, interleaved: false) else { exit(2) }
 motor.attach(oyuncu)
 motor.connect(oyuncu, to: motor.mainMixerNode, format: bicim)
+if CommandLine.arguments.count > 2, var aygit = AudioDeviceID(CommandLine.arguments[2]), let au = motor.outputNode.audioUnit {
+    let r = AudioUnitSetProperty(au, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &aygit, UInt32(MemoryLayout<AudioDeviceID>.size))
+    if r != noErr { FileHandle.standardError.write("aygıt seçilemedi (\(r))\n".data(using: .utf8)!); exit(5) }
+}
 do { try motor.start() } catch { FileHandle.standardError.write("motor açılamadı\n".data(using: .utf8)!); exit(3) }
 oyuncu.play()
 

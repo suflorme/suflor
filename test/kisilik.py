@@ -84,6 +84,12 @@ try:
     open(kd2, "w", encoding="utf-8").write(s2.replace("ses: piper", "ses: gemini:Kore")); os.utime(kd2, (time.time() + 10, time.time() + 10))
     ns["GEM"][0] = True; ok("kişilikte gemini:Kore → Gemini, Kore", ns["kisilik_sesi"]() == ("gemini", "Kore", 1.15))
     ns["GEM"][0] = False; ok("Gemini anahtarı yoksa Mac sistem sesi", ns["kisilik_sesi"]() == ("mac", None, 1.15))
+    # v0.79.0: ses üslubu ve sözsüz ses etiketleri (yalnız Gemini sesli, ses_etiket: evet kişilikte; istemde yalnız onun adı)
+    open(kd2, "w", encoding="utf-8").write(s2.replace("ses: piper", "ses: gemini:Kore\nses_uslup: nüktedan, dostça\nses_etiket: evet")); os.utime(kd2, (time.time() + 15, time.time() + 15))
+    ns["GEM"][0] = True; kk = ns["kisilik"]()
+    ok("kişilik alanları: ses_uslup, ses_etiket", kk["ses_uslup"] == "nüktedan, dostça" and kk["ses_etiket"] is True)
+    ist3 = ns["konus_istem"](); ok("istemde etiket kuralı yalnız etiketli kişiliğe", "[Ses etiketleri] Matlas sesli kısımda" in ist3 and "<chuckle>" in ist3 and "Öteki kişilik etiket kullanmaz" in ist3)
+    ns["GEM"][0] = False; ok("Gemini anahtarı yoksa etiket kuralı yok", "[Ses etiketleri]" not in ns["konus_istem"]())
     ns["TOP"][0] = False; ns["AYAR"]["kisilik_toplanti_disi"] = ""
     ok("ikinci kaldırılınca tek kişilik (eski istem)", ns["konus_istem"]().endswith("KİŞİLİK-İŞARETİ") and ns["kisilik"]()["ad"] == "Atlas")
     ns["AYAR"]["kisilik"] = ""; ok("kişilik yokken istem nötr (ünlem satırı yerinde)", "'Vay!'" in ns["konus_istem"]() and "KİŞİLİK-İŞARETİ" not in ns["konus_istem"]())

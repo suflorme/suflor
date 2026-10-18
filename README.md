@@ -86,6 +86,13 @@ Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_pytho
 — sesli çeviri, fısıltı, sesli özet ve cevaplar bu sesle okunur (Mac'te, yerel); ses dosyası Suflor.me ile gelmez. Hız: `"piper_hiz"`
 (varsayılan 1,0), kısa okumalar `"piper_hiz_kisa"` (1,15). Piper yoksa ya da hata verirse Mac sesi.
 
+En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API anahtarı alıp Anahtar Zinciri'ne koy
+(`security add-generic-password -a "$USER" -s suflor-gemini -w`; anahtar dosyaya yazılmaz), sonra panoda ⚙ Ayarlar → Ses → Gemini.
+11 hazır ses (Gemini sesi) ve model (3.8 Flash-Lite, ilk ses ~0,7 sn; 3.8 Flash) oradan seçilir. Okunacak cevap metni Google'a gider (ses kaydı
+gitmez); canlı kullanım için ücretli katman gerekir (ücretsiz katman günde 10 istek; metni eğitimde kullanır). İnternet yoksa Mac sesi okur.
+Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi) ve `ses_etiket: evet` (<chuckle> gibi sözsüz sesler) kişiliğe özel ses verir;
+toplantıya söyle de toplantı kişiliğinin Gemini sesiyle okur. Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
+
 ## Bileşenler
 | Parça | Ne iş yapar |
 |---|---|

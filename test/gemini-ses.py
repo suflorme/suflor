@@ -44,6 +44,7 @@ k = json.loads(YAZILAN[-1][1]) if YAZILAN else {}
 bak(f"kullanım kaydı (gemini-ses.jsonl): {k}", YAZILAN and YAZILAN[-1][0].endswith("gemini-ses.jsonl") and k.get("ses_sn") == 1.0 and k.get("karakter") > 10 and k.get("ilk_ses") is not None)
 r2 = ad["gemini_oku"]("İkinci.", ses="Puck"); bak("kalıcı bağlantıyla ikinci istek, ses parametresi (Puck)", r2 is True and '"voice_name": "Puck"' in json.dumps(GELEN[-1]["govde"]))
 r3 = ad["gemini_oku"]("Kesilecek.", iptal=lambda: True); bak("iptal: ilk parçada durur, True (Mac sesine düşmez)", r3 is True)
+ad["gemini_oku"]("Üsluplu.", uslup="nüktedan,\n dostça"); bak("üslup Style başlığıyla, Transcript'ten önce (v0.79.0)", GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"] == "## Style:\nnüktedan, dostça\n## Transcript:\nÜsluplu.")
 ad["AYAR"]["gemini_model"] = "gemini-3.8-flash-tts"; ad["gemini_oku"]("Flash."); bak("model ayardan (3.8 Flash)", "/gemini-3.8-flash-tts:" in GELEN[-1]["yol"])
 ad["AYAR"]["gemini_model"] = "uydurma"; bak("bilinmeyen model → Flash-Lite", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
 DAVRANIS["tur"] = "400"; n = len(GELEN); r4 = ad["gemini_oku"]("Hata.")
@@ -54,6 +55,35 @@ bak(f"5 sn'de ses gelmezse False ({time.time() - t0:.1f} sn)", r6 is False and t
 ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"; bak("sonra yeniden çalışır", ad["gemini_oku"]("Tekrar.") is True)
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
+
+# 1b) v0.79.0: çalmadan ses (toplantıya söyle), aygıt argümanı ve kısık düzey sahte çalıcıyla
+pcm = ad["gemini_pcm"]("Toplantıya."); bak(f"gemini_pcm: ham ses döner ({len(pcm or b'')} bayt)", pcm is not None and len(pcm) == 4 * 12000)
+SAHTE = os.path.join(T, "sahte-oynat.sh"); open(SAHTE, "w").write('#!/bin/sh\necho "$@" >> "$0.arg"\ncat >> "$0.pcm"\n'); os.chmod(SAHTE, 0o755)
+ad["PIPER_OYNAT"] = SAHTE; os.environ.pop("SUFLOR_TEST_GEMINI_SESSIZ")
+ad["gemini_oku"]("BlackHole'a.", aygit="59", duzey=0.5); time.sleep(0.3)
+arg = open(SAHTE + ".arg").read().split("\n")[-2]; ham = open(SAHTE + ".pcm", "rb").read()
+bak(f"aygıt çalıcıya argüman olarak gider ({arg!r})", arg == "24000 59")
+bak("duzey 0,5 sesi kısar (örnek değerleri yarıya)", len(ham) == 4 * 12000 and ham[2:4] == bytes([1, 0]) * 0 + ham[2:4] and int.from_bytes(ham[12000 * 1 + 0:12000 * 1 + 2], "little", signed=True) == 0 and int.from_bytes(ham[24000:24002], "little", signed=True) == 1)
+os.environ["SUFLOR_TEST_GEMINI_SESSIZ"] = "1"; ad["PIPER_OYNAT"] = "/yok"
+bak("aygıt istenip çalıcı yoksa False (afplay varsayılan çıkışa giderdi)", ad["gemini_oku"]("Yok.", aygit="59") is False)
+# 1c) toplantıya söyle: toplantı kişiliğinin sesi Gemini ise BlackHole + kulaklık aynı Gemini sesi (sahte çalıcı)
+tsn = dict(ad); open(SAHTE + ".arg", "w").close()
+tsn.update(PIPER_OYNAT=SAHTE, kisilik_sesi=lambda zorla=None: ("gemini", "Kore", 1.0), kisilik=lambda: {"ses_uslup": "ölçülü"}, kisilik_telaffuz=lambda m: m, ses_duzen=lambda m, mac=True: m,
+           AYAR={"toplantiya_ses": True}, STATE={"masaustu": {"toplantida": True}}, toplanti_var=lambda: True, ts_web=lambda: False, ts_aygit=lambda: "59", otonom_kisayol=lambda: None,
+           ses_secimi=lambda: None, telaffuz=lambda m, mac=False: m, ses_durdur=lambda: None, kulaklik=lambda: True, kendi_ses_kaydet=lambda *a: None, note=lambda *a: None, kart_bildir=lambda: None,
+           sesli_terim_suz=lambda m: m, etiket_sil=lambda m: m, _t=lambda a, b: a, ARAYUZ_DILI="tr", kisilik_ad=lambda: "Atlas", re=__import__("re"), secrets=__import__("secrets"))
+exec(compile(open(os.path.join(K, "aktarici", "toplantiya-ses.py"), encoding="utf-8").read(), "toplantiya-ses.py", "exec"), tsn)
+tsn["TS"]["tanitti"] = "?"  # tanıtım bu denemede okunmasın
+r = tsn["toplantiya_soyle"]("Bütçe onaylandı."); time.sleep(0.5)
+argl = [x for x in open(SAHTE + ".arg").read().split("\n") if x]
+bak(f"toplantıya söyle Gemini: BlackHole (59) + kulaklık, Kore ({argl}, {r})", r.get("ok") and argl == ["24000 59", "24000"] and '"voice_name": "Kore"' in json.dumps(GELEN[-1]["govde"]) and "## Style:\nölçülü" in GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"])
+# 1d) hı hı: Gemini sesiyle konuşan kişilikte klip değil o anda Gemini (tepki_cal)
+bs = open(os.path.join(K, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); i = bs.index("def tepki_cal("); tc = dict(ad)
+tc.update(AYAR={}, piper_acik=lambda: False, kisilik_sesi=lambda zorla=None: ("gemini", "Charon", 1.0), threading=threading); n0 = len(GELEN)
+exec(bs[i:bs.index("\n_TEPKI_BAS", i)], tc)
+r1 = tc["tepki_cal"]("alindi", hemen=True, ses=0.4); time.sleep(0.8)
+bak("hı hı: Gemini'den o anda (klip yok), kısık, Charon", r1 is True and len(GELEN) == n0 + 1 and '"voice_name": "Charon"' in json.dumps(GELEN[-1]["govde"]) and "Hı" in GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"] + "Hım")
+bak("bekleme (düşünme) klibi Gemini'de çalmaz → çağıran cümleyi okur", tc["tepki_cal"]("dusunme") is False)
 
 # 2) Gerçek aktarıcı: ⚙ Ayarlar'da Gemini seçenekleri ve kaydetme
 for f in ("relay.py", "manifest.json", "teshis.py"): shutil.copy(os.path.join(K, f), T)

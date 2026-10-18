@@ -17,6 +17,8 @@ GEMINI_MODELLER = ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")
 GEMINI_SR = 24000
 GEMINI_HOST = os.environ.get("SUFLOR_TEST_GEMINI_HOST") or "generativelanguage.googleapis.com"  # deneme: 127.0.0.1:<port> (TLS'siz)
 GEMINI_ILK_SN = 5.0
+GEMINI_ONAY = ("Hı hı.", "Hıhı.", "Hı hı, evet.", "Hım hım.")  # v0.79.0: aktif dinleme / alındı (tepki_cal), o anda üretilir; aynı klip tekrarlanmaz
+GEMINI_ONAY_USLUP = "Dinlerken araya giren kısa, kısık ve doğal bir onay sesi; tek nefeste, vurgusuz."
 def gemini_anahtar():
     if os.environ.get("SUFLOR_TEST_GEMINI_ANAHTAR") is not None: return os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"]
     if GEMINI["anahtar"] is not None and time.time() - GEMINI["anahtar_t"] < 300: return GEMINI["anahtar"]
@@ -55,15 +57,24 @@ def _gemini_kayit(metin, ses_sn, ilk):
     try: write([(os.path.join(BASE, "gemini-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "model": gemini_model(),
                                                                      "karakter": len(metin), "ses_sn": round(ses_sn, 2), "ilk_ses": round(ilk, 2) if ilk else None}) + "\n")])
     except Exception as e: print(f"GEMINI: kayıt yazılamadı ({e.__class__.__name__})")
-def gemini_oku(metin, iptal=None, kayit=None, ses=None):
+def gemini_pcm(metin, ses=None, uslup=None):  # v0.79.0: çalmadan 24 kHz 16 bit ham ses (toplantıya söyle); olmazsa None
+    return gemini_oku(metin, ses=ses, uslup=uslup, topla=True)
+def _duzey(b, duzey):  # ham sesi kısar (hı hı); duzey 0–1
+    import array
+    a = array.array("h", b[:len(b) // 2 * 2]); f = max(0.0, min(1.0, float(duzey)))
+    for i in range(len(a)): a[i] = int(a[i] * f)
+    return a.tobytes()
+def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
-    # kayit["p"]: çalan süreç (ses_durdur keser).
-    if not metin or not gemini_var(): return False
-    if time.time() - GEMINI["hata_t"] < 60: return False
-    govde = json.dumps({"contents": [{"role": "user", "parts": [{"text": "## Transcript:\n" + metin}]}],
+    # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
+    # duzey: 0–1 ses düzeyi (kısık "hı hı").
+    if not metin or not gemini_var(): return None if topla else False
+    if aygit and not os.access(PIPER_OYNAT, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
+    if time.time() - GEMINI["hata_t"] < 60: return None if topla else False
+    govde = json.dumps({"contents": [{"role": "user", "parts": [{"text": (f"## Style:\n{' '.join(str(uslup).split())}\n" if uslup else "") + "## Transcript:\n" + metin}]}],
                         "generationConfig": {"responseModalities": ["audio"], "temperature": 1,
                                              "speech_config": {"voice_config": {"prebuilt_voice_config": {"voice_name": gemini_ses(ses)}}}}}, ensure_ascii=False).encode()
-    t0 = time.time(); ilk = None; nbayt = 0; oyn = None; sessiz = bool(os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ")); tampon = bytearray()
+    t0 = time.time(); ilk = None; nbayt = 0; oyn = None; sessiz = bool(os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ")) or topla; tampon = bytearray()
     def bitir(bekle):
         if oyn:
             try: oyn.stdin.close()
@@ -110,10 +121,11 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None):
                         ilk = time.time() - t0
                         if not sessiz and os.access(PIPER_OYNAT, os.X_OK):
                             try:
-                                oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                                 if kayit is not None: kayit["p"] = oyn
                             except OSError: oyn = None
                     nbayt += len(b)
+                    if duzey is not None: b = _duzey(b, duzey)
                     if oyn:
                         try: oyn.stdin.write(b); oyn.stdin.flush()
                         except (BrokenPipeError, OSError, ValueError): _gemini_kapat(); return True  # çalıcı kesildi (ses_durdur)
@@ -122,10 +134,11 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None):
             _gemini_kapat()
             if not nbayt:
                 GEMINI.update(durum="hata", hata=str(e)[:200] or e.__class__.__name__, hata_t=time.time())
-                print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, 60 sn Gemini denenmez"); return False
+                print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, 60 sn Gemini denenmez"); return None if topla else False
             print(f"GEMINI: akış yarıda kesildi ({e.__class__.__name__})")
     GEMINI.update(durum="hazir", hata=None)
     bitir(True)
     _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk)
-    print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses")
+    print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")
+    if topla: return bytes(tampon) if tampon else None
     return nbayt > 0

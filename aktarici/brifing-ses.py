@@ -221,6 +221,14 @@ def tepki_sec(tur=None, tetik=None):
 def tepki_cal(tur, hemen=False, ses=None):  # türden bir klibi okuma kuyruğuna (bekleme gibi metinsiz anlar); klip yoksa False
     # hemen: sıraya girmeden, kuyruktaki okumayı kesmeden çalar (konuşurken "hı hı"); ses: afplay düzeyi (0–1, kısık onay sesi)
     if not AYAR.get("konusma", True) or piper_acik(): return False
+    km, kses, _ = kisilik_sesi()
+    if km == "gemini":  # v0.79.0 (kullanıcı: "kütüphane yapma, doğallık bozulmasın"): onay sesi o anda Gemini'yle, konuşan kişiliğin sesiyle; klip yok
+        if tur != "alindi": return False  # bekleme: çağıran içerikli cümleyi okur (Gemini)
+        import random
+        m = random.choice(GEMINI_ONAY)
+        if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): Gemini onay '{m}'{' (hemen)' if hemen else ''}"); return True
+        threading.Thread(target=gemini_oku, args=(m,), kwargs={"ses": kses, "uslup": GEMINI_ONAY_USLUP, "duzey": ses if ses else 0.7}, daemon=True).start(); return True
+    if km != "mac": return False  # klipler Elif tınısında; Piper sesiyle konuşurken araya başka ses girmesin
     k = tepki_sec(tur)
     if not k: return False
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): tepki {os.path.basename(k)}{' (hemen)' if hemen else ''}"); return True
@@ -368,10 +376,14 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
         if v != _SES_SEC["v"] or not _SES_SEC["t"]: print(f"SES: {'sistem sesi (Türkçe seçim)' if v is None else v}")
         _SES_SEC.update(t=time.time(), v=v)
     return _SES_SEC["v"]
+# v0.79.0: Gemini'nin sözsüz ses etiketleri (kişilikte ses_etiket: evet); Gemini dışındaki seslerde, panoda ve toplantıya söylerken silinir
+SES_ETIKET_RX = re.compile(r"\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm)>\s*", re.I)
+def etiket_sil(metin): return re.sub(r"\s{2,}", " ", SES_ETIKET_RX.sub(" ", metin or "")).strip() if metin else metin
 def seslendir(metin, kuyruk=False, tepkisiz=False):
     if not AYAR.get("konusma", True) or not metin: return False
     motor = kisilik_sesi()[0]; mac = motor == "mac"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
     if mac and not tepkisiz: klip, metin = tepki_ayir(metin)  # tepki klipleri Elif tınısında: yalnız Mac sesinde
+    if motor != "gemini": metin = etiket_sil(metin)
     if motor == "gemini": metin = ses_duzen(kisilik_telaffuz(metin), False) if metin else ""  # v0.78.0: Gemini Türkçeyi ve yabancı sözcükleri kendisi okur; yalnız kişilik okunuşları
     else: metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
     if not kuyruk: ses_durdur()
@@ -400,7 +412,7 @@ def _ses_isci():
             with SES_K:
                 if not SES["q"]: continue
                 metin = SES["q"].pop(0); kes = SES.get("kes", 0)
-            if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=v): continue
+            if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=v, uslup=(kisilik() or {}).get("ses_uslup")): continue
             with SES_K: SES["q"].insert(0, metin)
         if motor == "piper":  # yerel Türkçe ses (ayar ses_motoru: piper ya da kişilikte ses: piper); okunamazsa Mac sesi
             with SES_K:
@@ -408,7 +420,10 @@ def _ses_isci():
                 metin = SES["q"].pop(0); kes = SES.get("kes", 0)
             if piper_oku(metin, piper_hiz() * khiz, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             with SES_K: SES["q"].insert(0, metin)
-        if motor != "mac": v, khiz = kisilik_sesi("mac")[1:]  # Gemini/Piper okuyamadı: Mac sesi
+        if motor != "mac":  # Gemini/Piper okuyamadı: Mac sesi (etiketler okunmasın)
+            v, khiz = kisilik_sesi("mac")[1:]
+            with SES_K:
+                if SES["q"] and isinstance(SES["q"][0], str): SES["q"][0] = etiket_sil(SES["q"][0])
         hz = ["-r", str(round(SES_TABAN_HIZ * khiz))] if khiz != 1.0 and v else []  # sistem sesi (v None) -r'yi yok sayar
         with SES_K:
             if not SES["q"]: continue

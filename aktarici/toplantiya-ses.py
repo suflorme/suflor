@@ -26,7 +26,7 @@ def ts_aygit():  # say -a ? listesinde BlackHole çıkış aygıtının kimliği
     m = re.search(r"^\s*(\d+)\s+BlackHole\b", out, re.M)
     return m.group(1) if m else None
 def ts_sesli_kisim(metin):  # Konuş cevabının okunan kısmı: "---" öncesi, en çok 400 karakter
-    return sesli_terim_suz(re.split(r"(?:^|\n)\s*-{3,}", metin or "", maxsplit=1)[0].strip()[:400])  # v0.57.1: iç terim süzgeci (bas-konus.py)
+    return etiket_sil(sesli_terim_suz(re.split(r"(?:^|\n)\s*-{3,}", metin or "", maxsplit=1)[0].strip()[:400]))  # v0.79.0: ses etiketleri yok · v0.57.1: iç terim süzgeci (bas-konus.py)
 def ts_web():  # toplantı tarayıcıda mı: eklenti son 30 sn'de call=true dedi ve masaüstü uygulamada toplantı yok
     x = STATE.get("extension") or {}
     if not x.get("call") or (STATE.get("masaustu") or {}).get("toplantida"): return False
@@ -67,29 +67,46 @@ def toplantiya_soyle(metin=None):
         k = kisilik(); tn = (k or {}).get("tanitim") or str(AYAR.get("tanitim") or "").strip()  # v0.53.0: kişilik/ayar tanıtımı; yoksa nötr varsayılan
         TS["tanitti"] = toplanti; m = (tn or TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı")) + " " + m
     v = ses_secimi(); okunan = ses_duzen(telaffuz(m, mac=True)); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
-    if web: return _ts_web_hazirla(m, sesli, okunan)
+    # v0.79.0 (kullanıcı 18 Ekim: "toplantı kişiliğinin sesi"): kişiliğin sesi Gemini ise ses Gemini'den (ör. toplantı kişiliği Kore); alınamazsa Mac sesi
+    km, kses, _ = kisilik_sesi(); gpcm = None
+    if km == "gemini" and os.access(PIPER_OYNAT, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
+        gpcm = gemini_pcm(ses_duzen(kisilik_telaffuz(m), False), ses=kses, uslup=(kisilik() or {}).get("ses_uslup"))
+        if not gpcm: print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Mac sesi")
+    if web: return _ts_web_hazirla(m, sesli, okunan, gpcm)
     if os.environ.get("SUFLOR_TEST_BASLAT"):
         print(f"TOPLANTIYA SÖYLE (deneme): aygıt {aygit} · {okunan}"); TS["son"] = m; TS["son_t"] = TS["test_bit"] = time.time() + len(m) / 14
         kendi_ses_kaydet(m, time.time(), TS["son_t"]); return {"ok": True, "metin": "🔊 " + m}
     ses_durdur()  # kulaklıkta okunan bir şey varsa karışmasın
     ps = []
     try:
-        ps.append(subprocess.Popen(sesli + ["-a", aygit, okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-        if kulaklik(): ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        if gpcm:  # Gemini sesi kesintisiz çalıcıyla BlackHole'a (karşı taraf) ve kulaklığa
+            for a in [aygit] + ([None] if kulaklik() else []):
+                p = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(a)] if a else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); ps.append(p)
+                threading.Thread(target=_ts_besle, args=(p, gpcm), daemon=True).start()
+        else:
+            ps.append(subprocess.Popen(sesli + ["-a", aygit, okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+            if kulaklik(): ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     except OSError as e: print(f"TOPLANTIYA SÖYLE: hata {e.__class__.__name__}"); return {"ok": False, "err": "say"}
     with TS_KILIT: TS["p"] = ps
-    TS["son"] = m; TS["son_t"] = time.time() + len(m) / 14  # tahmini okuma sonu (~14 karakter/sn): karşı taraf hitabı ardından 10 sn sayılmaz
+    TS["son"] = m; TS["son_t"] = time.time() + (len(gpcm) / 2 / GEMINI_SR if gpcm else len(m) / 14)  # okuma sonu (Mac sesinde tahmin ~14 karakter/sn): karşı taraf hitabı ardından 10 sn sayılmaz
     kendi_ses_kaydet(m, time.time(), TS["son_t"])
     if STATE.get("meeting"):  # toplantı dosyası yoksa (deneme, toplantı dışı) not yazılmaz — yeni dosya açmasın
         try: note({"meeting": {"title": STATE["meeting"]}, "text": m, "kaynak": "suflor", "at": datetime.datetime.now().isoformat(timespec="seconds")})
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")
-    print(f"TOPLANTIYA SÖYLE: {len(m)} karakter · aygıt {aygit}{' · kulaklıkta da' if len(ps) > 1 else ' · kulaklık yok, yerelde okunmadı'}")
+    print(f"TOPLANTIYA SÖYLE: {len(m)} karakter · aygıt {aygit}{' · Gemini ' + (kses or gemini_ses()) if gpcm else ''}{' · kulaklıkta da' if len(ps) > 1 else ' · kulaklık yok, yerelde okunmadı'}")
     return {"ok": True, "metin": "🔊 " + m[:120]}
-def _ts_web_hazirla(m, sesli, okunan):
+def _ts_besle(p, pcm):  # kesintisiz çalıcıya ham sesi verir (ts_durdur süreci keserse yazma hatası yok sayılır)
+    try: p.stdin.write(pcm); p.stdin.close()
+    except (OSError, ValueError): pass
+def _ts_web_hazirla(m, sesli, okunan, gpcm=None):
     import tempfile
     fd, yol = tempfile.mkstemp(suffix=".wav", prefix="suflor-soyle-"); os.close(fd)
     try:
-        r = subprocess.run(sesli + ["-o", yol, "--file-format=WAVE", "--data-format=LEI16@24000", okunan], capture_output=True, timeout=60)
+        if gpcm:  # v0.79.0: Gemini sesi aynı biçimde (24 kHz 16 bit WAV)
+            import wave
+            with wave.open(yol, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(GEMINI_SR); w.writeframes(gpcm)
+            r = subprocess.CompletedProcess([], 0)
+        else: r = subprocess.run(sesli + ["-o", yol, "--file-format=WAVE", "--data-format=LEI16@24000", okunan], capture_output=True, timeout=60)
         b = open(yol, "rb").read()
     except (OSError, subprocess.TimeoutExpired) as e: r, b = None, b""; print(f"TOPLANTIYA SÖYLE (web): ses üretilemedi ({e.__class__.__name__})")
     finally:
@@ -101,7 +118,11 @@ def _ts_web_hazirla(m, sesli, okunan):
     TS["web"] = {"id": secrets.token_hex(6), "ses": b, "t": time.time(), "sure": sure, "dur": False}
     ps = []
     if kulaklik() and not os.environ.get("SUFLOR_TEST_BASLAT"):  # kullanıcı da duysun (kulaklık yoksa hoparlör → mikrofon → toplantıya ikinci kez giderdi)
-        try: ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        try:
+            if gpcm:
+                p = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); ps.append(p)
+                threading.Thread(target=_ts_besle, args=(p, gpcm), daemon=True).start()
+            else: ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         except OSError: pass
     with TS_KILIT: TS["p"] = ps
     TS["son"] = m; TS["son_t"] = time.time() + sure

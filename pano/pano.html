@@ -367,7 +367,7 @@ function buildMini(w){
 function miniKonus(d,s){const k=s.konus||{},on=!!(s.aktif&&k.toplanti),kb=d.getElementById("mkb"),mk=d.getElementById("mk");if(!kb||!mk)return
   kb.hidden=!on;kb.classList.toggle('on',!!kRec);const yas=k.at?(Date.now()-Date.parse(k.at))/1000:1e9,sur=['dinliyor','yaziya','dusunuyor','konusuyor'].includes(k.durum)
   if(!on||!(kRec||sur||(k.soru&&yas<300))){mk.hidden=true;return}
-  const cp=String(k.cevap||'').split(/\n\s*-{3,}\s*\n?/),ky=cp[0].trim(),ay=cp.slice(1).join('\n').trim()
+  const cp=String(k.cevap||'').replace(/\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm)>\s*/gi,' ').split(/\n\s*-{3,}\s*\n?/),ky=cp[0].trim(),ay=cp.slice(1).join('\n').trim()
   const d_=kRec?L('Dinliyorum… bırakınca sorarım'):({yaziya:L('Yazıya döküyorum…'),dusunuyor:L('{ad} düşünüyor…',{ad:k.kisilik||'Claude'}),hata:k.hata||''}[k.durum]||'')
   mk.hidden=false;setH(mk,`${otonomHtml(k)}${d_?`<div class=meta>${esc(d_)}</div>`:''}${k.soru&&!kRec?`<div class=d><b>${esc(k.soru)}</b></div>`:''}${ky&&!kRec?`<div class=b>${k.kisilik?`<b>${esc(k.kisilik)}:</b> `:''}${esc(ky)}</div>`:''}${ky&&!kRec&&!sur?soyleBtn(ky):''}${ay&&!kRec?`<details class=kay><summary>${L('Ayrıntı')}</summary><div class=d style="white-space:pre-wrap">${esc(ay)}</div></details>`:''}`)}
 function paintMini(s){
@@ -519,7 +519,7 @@ function renderKonus(s){const sec=document.getElementById('kns');sec.hidden=!!s.
   document.getElementById('kz2').hidden=k.durum!=='konusuyor'&&k.durum!=='hazir'
   // S48: biten toplantının defteri bağlıysa (son 3 saat) bir satır; cevapta "---" sonrası yazılı ayrıntı (okunmaz) katlanır
   const df=k.defter&&!kRec&&!k.soru?`<div class=meta>${esc(L('Son toplantı hazır: {a} ({s}) — ne konuşulduğunu sorabilirsin',{a:k.defter.ad||'',s:k.defter.saat||''}))}</div>`:''
-  const cp=String(k.cevap||'').split(/\n\s*-{3,}\s*\n?/),ky=cp[0].trim(),ay=cp.slice(1).join('\n').trim()
+  const cp=String(k.cevap||'').replace(/\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm)>\s*/gi,' ').split(/\n\s*-{3,}\s*\n?/),ky=cp[0].trim(),ay=cp.slice(1).join('\n').trim()
   setH(document.getElementById('knd'),`${otonomHtml(k)}${df}${d?`<div class=meta>${esc(d)}</div>`:''}${k.soru&&!kRec?`<div class=d><b>${L(k.sesli_cevap?'Duyulan':'Soru')}:</b> ${esc(k.soru)}</div>`:''}${ky&&!kRec?`<div class=b>${k.kisilik?`<b>${esc(k.kisilik)}:</b> `:''}${esc(ky)}</div>`:''}${ky&&!kRec&&!['dinliyor','yaziya','dusunuyor','konusuyor'].includes(k.durum)?soyleBtn(ky):''}${ay&&!kRec?`<details class=kay><summary>${L('Ayrıntı')}</summary><div class=d style="white-space:pre-wrap">${esc(ay)}</div></details>`:''}`)}
 {const kb=document.getElementById('kb');kb.addEventListener('pointerdown',e=>{e.preventDefault();if((kSohKip||kSoh)&&!kRec){sohbetAc();return}kb.setPointerCapture(e.pointerId);konusBasla()});kb.addEventListener('pointerup',konusBitir);kb.addEventListener('pointercancel',konusBitir)
   document.getElementById('kz2').onclick=()=>j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'sus'})}).catch(()=>{})
