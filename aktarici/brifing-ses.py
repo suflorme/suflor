@@ -413,7 +413,7 @@ def _ses_isci():
     while True:
         with SES_K:
             while not SES["q"]: SES_K.wait()
-            dosya = SES["q"].pop(0)[1] if isinstance(SES["q"][0], tuple) else None
+            dosya = SES["q"].pop(0)[1] if isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "dosya" else None  # v0.80.1: ("g", …) Gemini parçası da demet — dosya sanılıp afplay'e gidiyordu, cevap hiç okunmuyordu
             if dosya:
                 try: SES["p"] = p = subprocess.Popen(["/usr/bin/afplay", dosya], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except OSError as e: print(f"SES: tepki çalınamadı {e.__class__.__name__}"); continue
