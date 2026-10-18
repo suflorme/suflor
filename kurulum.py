@@ -170,6 +170,15 @@ def aktarici(yol):
     if not port: return None
     try: return json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}{yol}", timeout=2))
     except Exception: return None
+def mesgul():  # v0.77.4 (18 Ekim): aktarici-kur.command öncesi — kurulum aktarıcıyı yeniden başlatır; toplantı, sohbet ya da süren Konuş cevabı bölünür
+    s = aktarici("/status")
+    if not s: return ""
+    x = s.get("extension") or {}; k = s.get("konus") or {}; n = []
+    if x.get("call") and (x.get("age_s") is None or x["age_s"] < 60): n.append("web toplantısı sürüyor")
+    if (s.get("masaustu") or {}).get("toplantida"): n.append("masaüstü toplantısı sürüyor")
+    if (k.get("sohbet") or {}).get("acik"): n.append("sohbet açık")
+    if k.get("durum") in ("yaziya", "dusunuyor", "konusuyor"): n.append(f"Konuş cevabı sürüyor ({k['durum']})")
+    return ", ".join(n)
 def eklenti():
     # önceden yalnız Teams sekmesindeki eklentinin nabzı sayılıyordu — Teams açık değilse sihirbaz bu adımda bekleyip kalıyordu.
     # Eklentinin arka planı aktarıcıyı dakikada bir (ve yüklenince hemen) yoklar; aktarıcı bunu "eklenti_kurulu" olarak tutar.
@@ -588,8 +597,8 @@ def kopyala(kaynak, hedef):  # cp gibi: var olan dosyanın izinleri korunur, yen
     if not var: shutil.copymode(kaynak, hedef)
 def gui(): return f"gui/{os.getuid()}"
 def plist_yolu(): return os.path.join(EV, "Library", "LaunchAgents", LABEL + ".plist")
-def aktarici_durdur():  # yalnız bu hesabın aktarıcısı (diğer hesabınki çalışmaya devam eder)
-    sessiz("launchctl", "bootout", f"{gui()}/{LABEL}"); sessiz("pkill", "-u", str(os.getuid()), "-f", "relay.py --dir"); time.sleep(1)
+def aktarici_durdur(port):  # yalnız bu hesabın canlı aktarıcısı (diğer hesabınki ve başka porttaki deneme aktarıcıları çalışmaya devam eder)
+    sessiz("launchctl", "bootout", f"{gui()}/{LABEL}"); sessiz("pkill", "-u", str(os.getuid()), "-f", rf"relay\.py --dir .* --port {port}( |$)"); time.sleep(1)
 
 def ecapa_donustur(ort, onbellek=True):  # ses izi (ECAPA) ağırlıkları MLX için bir kez; ortak klasör yazılamıyorsa hesabın önbelleğine
     ek = os.path.join(ort, "ses-modeller", "spkrec-ecapa-voxceleb"); vpy = os.path.join(ort, "whisper-venv", "bin", "python")
@@ -764,7 +773,7 @@ def kur():
     except OSError: pass
     # veri klasörü: proje klasöründe gerçek _canli klasörü varsa bir kez taşı, yerine kısayol bırak
     if os.path.isdir(desk) and not os.path.islink(desk):
-        aktarici_durdur()
+        aktarici_durdur(port)
         if os.path.exists(canli): sys.exit(f"HATA: {canli} zaten var, taşıma yapılmadı.")
         shutil.move(desk, canli); os.symlink(canli, desk); say(f"Veri taşındı: {canli}  (kısayol: {desk})")
     os.makedirs(canli, exist_ok=True)
@@ -837,7 +846,7 @@ def kur():
 </dict></plist>
 """)
     # elle başlatılmış bir aktarıcı portu tutuyorsa kapat, ajanı yeniden yükle
-    aktarici_durdur()
+    aktarici_durdur(port)
     zorunlu("launchctl", "bootstrap", gui(), plist_yolu()); time.sleep(2)
     try: urllib.request.urlopen(f"http://127.0.0.1:{port}/status", timeout=3)
     except Exception:
@@ -975,10 +984,11 @@ def guncelle(kaynak=None):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
-    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "modeller", "guncelle", "profil"], metavar="kur|kaldir|modeller|guncelle|profil")
+    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "modeller", "guncelle", "profil", "mesgul"], metavar="kur|kaldir|modeller|guncelle|profil|mesgul")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
     ap.add_argument("--adim", choices=["hazirlik"], help="yalnız proje hazırlığı ekranları (panodaki 'Projeyi yeniden hazırla' → hazirla.command)"); A = ap.parse_args()
+    if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
     if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak), "profil": profil}[A.is_](); sys.exit(0)
     os.makedirs(DESTEK, exist_ok=True)
     # port doluysa (ör. diğer macOS hesabının sihirbazı) sonrakini dene — önceden ikinci sihirbaz açılmıyor, kur.sh
