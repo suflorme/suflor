@@ -347,11 +347,14 @@ def _telaffuz_dongu():
         time.sleep(15)
 _SES_SEC = {"t": 0, "v": None}
 SES_TABAN_HIZ = 180  # v0.71.0: Yelda'nın varsayılan hızı ~180 sözcük/dk (ölçüm 17 Ekim); kişilik hiz çarpanı bunun üstüne
-def kisilik_sesi(zorla=None):  # → (motor "piper"|"mac", Mac ses adı ya da None = sistem sesi, hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
+def kisilik_sesi(zorla=None):  # → (motor "gemini"|"piper"|"mac", ses adı (Gemini hazır sesi / Mac say -v; None = sistem sesi), hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
     k = kisilik(); kses = (k or {}).get("ses"); khiz = (k or {}).get("hiz") or 1.0
     piper_var = ARAYUZ_DILI == "tr" and bool(AYAR.get("piper_python")) and bool(AYAR.get("piper_model"))
-    if zorla != "mac" and ((kses == "piper" and piper_var) or (not kses and piper_acik())): return "piper", None, khiz
-    return "mac", (kses if kses and kses != "piper" else ses_secimi()), khiz
+    if zorla != "mac":
+        if (kses or "").startswith("gemini") and gemini_var(): return "gemini", (kses.split(":", 1)[1].strip() if ":" in kses else None), khiz  # v0.78.0: "gemini" ya da "gemini:Kore"
+        if not kses and gemini_acik(): return "gemini", None, khiz
+        if (kses == "piper" and piper_var) or (not kses and piper_acik()): return "piper", None, khiz
+    return "mac", (kses if kses and kses != "piper" and not kses.startswith("gemini") else ses_secimi()), khiz
 def ses_secimi():  # say -v için ses adı; None = sistem sesi
     if AYAR.get("ses"): return str(AYAR["ses"])
     if ARAYUZ_DILI != "tr": return None
@@ -367,9 +370,10 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
     return _SES_SEC["v"]
 def seslendir(metin, kuyruk=False, tepkisiz=False):
     if not AYAR.get("konusma", True) or not metin: return False
-    mac = kisilik_sesi()[0] != "piper"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
-    if mac and not tepkisiz: klip, metin = tepki_ayir(metin)
-    metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
+    motor = kisilik_sesi()[0]; mac = motor == "mac"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
+    if mac and not tepkisiz: klip, metin = tepki_ayir(metin)  # tepki klipleri Elif tınısında: yalnız Mac sesinde
+    if motor == "gemini": metin = ses_duzen(kisilik_telaffuz(metin), False) if metin else ""  # v0.78.0: Gemini Türkçeyi ve yabancı sözcükleri kendisi okur; yalnız kişilik okunuşları
+    else: metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
     if not kuyruk: ses_durdur()
     if os.environ.get("SUFLOR_TEST_BASLAT"):
         if klip: print(f"SES (deneme): tepki {os.path.basename(klip)}")
@@ -392,13 +396,19 @@ def _ses_isci():
                 except OSError as e: print(f"SES: tepki çalınamadı {e.__class__.__name__}"); continue
         if dosya: p.wait(); continue
         motor, v, khiz = kisilik_sesi()
+        if motor == "gemini":  # v0.78.0: bulut ses; okunamazsa (ağ, anahtar) Mac sesi
+            with SES_K:
+                if not SES["q"]: continue
+                metin = SES["q"].pop(0); kes = SES.get("kes", 0)
+            if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=v): continue
+            with SES_K: SES["q"].insert(0, metin)
         if motor == "piper":  # yerel Türkçe ses (ayar ses_motoru: piper ya da kişilikte ses: piper); okunamazsa Mac sesi
             with SES_K:
                 if not SES["q"]: continue
                 metin = SES["q"].pop(0); kes = SES.get("kes", 0)
             if piper_oku(metin, piper_hiz() * khiz, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             with SES_K: SES["q"].insert(0, metin)
-        if motor == "piper": v, khiz = kisilik_sesi("mac")[1:]  # Piper okuyamadı: Mac sesi
+        if motor != "mac": v, khiz = kisilik_sesi("mac")[1:]  # Gemini/Piper okuyamadı: Mac sesi
         hz = ["-r", str(round(SES_TABAN_HIZ * khiz))] if khiz != 1.0 and v else []  # sistem sesi (v None) -r'yi yok sayar
         with SES_K:
             if not SES["q"]: continue
