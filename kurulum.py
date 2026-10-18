@@ -922,7 +922,9 @@ def modeller():
 def surum(kok):
     try: return json.load(open(os.path.join(kok, "manifest.json"), encoding="utf-8"))["version"]
     except Exception: return "?"
-def guncelle(kaynak=None):
+def guncelle(kaynak=None, zorla=False):
+    m = "" if zorla else mesgul()  # v0.77.5: toplantı, sohbet ya da Konuş cevabı sürerken güncelleme aktarıcıyı yeniden başlatıp böler
+    if m: sys.exit(f"Güncellenmedi: {m}. Bitince yeniden çift tıkla (beklemeden güncellemek için: guncelle.command --zorla). Hiçbir dosya değişmedi.")
     # İki kurulum biçimi: git klonu (.git var → git pull) ya da tek satır kurulum (kur.sh; .git yok → açık depodan tar).
     # Kod güncellenince kurulum YENİ kodla yapılır (bu dosya da değişmiş olabilir). kaynak: deneme için tar.gz yolu ya da adresi.
     depo = "suflorme/suflor"
@@ -987,9 +989,10 @@ if __name__ == "__main__":
     ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "modeller", "guncelle", "profil", "mesgul"], metavar="kur|kaldir|modeller|guncelle|profil|mesgul")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
+    ap.add_argument("--zorla", action="store_true", help="guncelle: toplantı/sohbet sürse de güncelle")
     ap.add_argument("--adim", choices=["hazirlik"], help="yalnız proje hazırlığı ekranları (panodaki 'Projeyi yeniden hazırla' → hazirla.command)"); A = ap.parse_args()
     if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
-    if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak), "profil": profil}[A.is_](); sys.exit(0)
+    if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak, A.zorla), "profil": profil}[A.is_](); sys.exit(0)
     os.makedirs(DESTEK, exist_ok=True)
     # port doluysa (ör. diğer macOS hesabının sihirbazı) sonrakini dene — önceden ikinci sihirbaz açılmıyor, kur.sh
     # tarayıcıda öbür hesabın sihirbazını açıyordu

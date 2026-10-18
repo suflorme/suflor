@@ -1551,7 +1551,9 @@ def _guncelleme_dongu():
 def guncelle_baslat():
     v = guncelleme_view()
     if v["durum"] not in ("var", "guncel", "hata"): return {"ok": False, "err": v["durum"]}
-    if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürüyor — bitince güncelle", "A meeting is in progress — update when it ends")}
+    if toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida"): return {"ok": False, "err": _t("Toplantı sürüyor — bitince güncelle", "A meeting is in progress — update when it ends")}
+    if SOHBET.get("acik") or KONUS.get("durum") in ("yaziya", "dusunuyor", "konusuyor"):  # v0.77.5: güncelleme aktarıcıyı yeniden başlatır, konuşma bölünür
+        return {"ok": False, "err": _t("Sohbet ya da Konuş cevabı sürüyor — bitince güncelle", "A conversation is in progress — update when it ends")}
     k = _kod_dir(); log = open(GUN_LOG, "a", encoding="utf-8")
     log.write(f"\n--- {datetime.datetime.now().isoformat(timespec='seconds')} panodan güncelleme (v{SURUM} → v{GUN['son'] or '?'})\n"); log.flush()
     GUN.update(durum=None, hata=None, p=subprocess.Popen(["/bin/bash", os.path.join(k, "guncelle.command")], cwd=k, stdout=log, stderr=subprocess.STDOUT,
