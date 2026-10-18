@@ -408,6 +408,7 @@ def seslendir(metin, kuyruk=False, tepkisiz=False, k=None):
         SES_K.notify()
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
     return True
+GEMINI_BIRLESIK_EN_COK = 600  # v0.80.8: birleşik Gemini okumasının en uzun metni (karakter); Konuş cevabı en çok 5 cümle
 def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] == "g" else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
 def _ses_isci():
     while True:
@@ -425,6 +426,11 @@ def _ses_isci():
             with SES_K:
                 if not SES["q"]: continue
                 oge = SES["q"].pop(0); kes = SES.get("kes", 0)
+                if isinstance(oge, tuple) and oge[0] == "g":  # v0.80.8: arkada bekleyen aynı ses ve üsluptaki parçalar tek istekte (ilk cümle tek başına hemen çalar;
+                    parca = [oge[1]]                           # o okunurken gelen cümleler birleşir → istek sayısı ~üçte bir, hız sınırına (429) daha az takılır)
+                    while (SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g" and SES["q"][0][2:] == oge[2:]
+                           and sum(len(x) for x in parca) + len(SES["q"][0][1]) <= GEMINI_BIRLESIK_EN_COK): parca.append(SES["q"].pop(0)[1])
+                    if len(parca) > 1: oge = ("g", " ".join(parca), oge[2], oge[3])
             metin = _ses_metin(oge); oses, ousl = (oge[2], oge[3]) if isinstance(oge, tuple) else (None, (kisilik() or {}).get("ses_uslup"))
             if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=oses or v, uslup=ousl): continue
             with SES_K: SES["q"].insert(0, metin)
