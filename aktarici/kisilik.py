@@ -116,17 +116,17 @@ def kisilik_telaffuz(metin):  # okunacak metinde ad → okunuş ve dosyadaki tel
     for a, b in es.items():
         if a != b: metin = re.sub(r"(?<!\w)" + re.escape(a) + r"(?!\w)", b, metin)
     return metin
-# v0.73.0 (kullanıcı, 17 Ekim): konuşma dili — kişilik dosyasında "konusma_dili: evet" ise o kişiliğin OKUNAN cümlesinde 1. ve 2. kişi kip ekleri
-# günlük söylenişe döner (okuyacağım → okuyacam, bakıyorum → bakıyom, geliyor musun → geliyon mu). Claude bu yazımı istemle de kullanmadı (gerçek deneme 3/3).
+# v0.73.0 (kullanıcı, 17 Ekim): konuşma dili — kişilik dosyasında "konusma_dili: evet" ise o kişiliğin OKUNAN cümlesinde 1. kişi kip ekleri
+# günlük söylenişe döner (okuyacağım → okuyacam, bakıyorum → bakıyom). v0.80.9 (kullanıcı, 19 Ekim): 2. kişi "-yon" (bakıyon, gidiyon) kulağa kaba geldi, kaldırıldı;
+# "bakıyorsun", "geliyor musun" olduğu gibi okunur. Claude bu yazımı istemle de kullanmadı (gerçek deneme 3/3).
 # Yazılı kısım (pano) ve toplantıya okunan metin değişmez. Gelecek zaman ortacı ("okuyacağım kitap") bozulmasın diye -acağım yalnız noktalama/satır sonu ya da
 # bağlaçtan önce döner; -yorum fiilden başka sözcükte geçmez ("yorum" tek başına eşleşmez: önünde ünlü + y gerekir).
 _KD_SON = r"(?=\s*(?:[.,!?;:…]|$|\s(?:ama|ve|ki|de|da|sonra|şimdi|hemen|yani|zaten|bence|tamam)\b))"
 _KD_KURAL = [
     (re.compile(r"\b(\w+?)(a|e)ca(?:ğ|g)ı(m|z)\b" + _KD_SON, re.I), lambda m: m.group(1) + m.group(2) + "ca" + m.group(3)),   # okuyacağım → okuyacam, yapacağız → yapacaz
     (re.compile(r"\b(\w+?)(e)ce(?:ğ|g)i(m|z)\b" + _KD_SON, re.I), lambda m: m.group(1) + m.group(2) + "ce" + m.group(3)),     # gideceğim → gidecem
-    (re.compile(r"\b(\w+[ıiuü])yor\s+mu(sun|yum)\b", re.I), lambda m: m.group(1) + ("yon mu" if m.group(2).lower() == "sun" else "yom mu")),  # geliyor musun → geliyon mu
+    (re.compile(r"\b(\w+[ıiuü])yor\s+muyum\b", re.I), lambda m: m.group(1) + "yom mu"),                                       # anlıyor muyum → anlıyom mu
     (re.compile(r"\b(\w+[ıiuü])yorum\b", re.I), lambda m: m.group(1) + "yom"),                                                   # bakıyorum → bakıyom
-    (re.compile(r"\b(\w+[ıiuü])yorsun\b", re.I), lambda m: m.group(1) + "yon"),                                                  # biliyorsun → biliyon
     (re.compile(r"\b(\w+[ıiuü])yoruz\b", re.I), lambda m: m.group(1) + "yoz"),                                                   # gidiyoruz → gidiyoz
 ]
 def konusma_dili(metin, k=None):  # okunacak cümle → kişilik konuşma dili istiyorsa günlük söyleniş

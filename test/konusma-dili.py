@@ -6,8 +6,8 @@ import os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 K = {"v": {"kdili": True}}; ns = {"re": re, "ARAYUZ_DILI": "tr", "kisilik": lambda: K["v"]}
 s = open(os.path.join(KOD, "aktarici", "kisilik.py"), encoding="utf-8").read(); exec(s[s.index("_KD_SON ="):], ns)
-T=[("Okuyacağım, sonra söylerim.","Okuyacam, sonra söylerim."),("Bakıyorum.","Bakıyom."),("Geliyor musun?","Geliyon mu?"),
-("Biliyorsun, bu iş zor.","Biliyon, bu iş zor."),("Yarın gideceğim ama geç.","Yarın gidecem ama geç."),("Bunu yapacağız.","Bunu yapacaz."),
+T=[("Okuyacağım, sonra söylerim.","Okuyacam, sonra söylerim."),("Bakıyorum.","Bakıyom."),("Geliyor musun?","Geliyor musun?"),
+("Biliyorsun, bu iş zor.","Biliyorsun, bu iş zor."),("Bakıyorsun ama gidiyorsun.","Bakıyorsun ama gidiyorsun."),("Yarın gideceğim ama geç.","Yarın gidecem ama geç."),("Bunu yapacağız.","Bunu yapacaz."),
 ("Okuyacağım kitap bu.","Okuyacağım kitap bu."),("Bu yorum güzel.","Bu yorum güzel."),("Yorumum şu.","Yorumum şu."),
 ("Bilmiyorum.","Bilmiyom."),("Gidiyoruz.","Gidiyoz."),("Anlıyor muyum?","Anlıyom mu?"),("Söyleyeceğimi unuttum.","Söyleyeceğimi unuttum."),
 ("Takviminde üç toplantı var.","Takviminde üç toplantı var."),("Hallederim, merak etme.","Hallederim, merak etme."),("Görüyorum ki yorulmuşsun.","Görüyom ki yorulmuşsun."),
