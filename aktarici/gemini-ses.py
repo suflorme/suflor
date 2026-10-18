@@ -13,7 +13,9 @@
 import http.client, re
 GEMINI = {"durum": None, "hata": None, "anahtar": None, "anahtar_t": 0.0, "c": None, "kilit": threading.RLock(), "hata_t": 0.0}  # RLock: zaman aşımında aynı iş parçacığı yeniden dener
 GEMINI_SESLER = ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")
-GEMINI_MODELLER = ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")
+GEMINI_MODELLER = ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts")  # v0.80.11: günlük sınır yedek sırası
+# (her modelin günlük sınırı ayrı; 19 Ekim ölçümü, Charon, ilk ses: 3.1 Flash 1,2 sn akışlı; 2.5 Flash 3,9 sn akışsız ve duygusuz — hızı için son yedek; 2.5 Pro 6,8 sn, alınmadı)
+GEMINI_SECILIR = GEMINI_MODELLER[:2]  # ayarda seçilebilen (ana) modeller
 GEMINI_SR = 24000
 GEMINI_HOST = os.environ.get("SUFLOR_TEST_GEMINI_HOST") or "generativelanguage.googleapis.com"  # deneme: 127.0.0.1:<port> (TLS'siz)
 GEMINI_ILK_SN = 3.0  # v0.80.2: 5 → 3 sn (ilk ses p90 0,7 sn); ses gelmezse yeni bağlantıyla bir kez daha denenir
@@ -53,7 +55,7 @@ def _kota_doldu(model, govde):
 def _gunluk_mu(govde): return "per_day" in (govde or "") or "PerDay" in (govde or "")
 def gemini_model():  # ayardaki model; günlük sınırı dolduysa öteki; ikisi de doluysa None
     m = str(AYAR.get("gemini_model") or GEMINI_MODELLER[0])
-    m = m if m in GEMINI_MODELLER else GEMINI_MODELLER[0]
+    m = m if m in GEMINI_SECILIR else GEMINI_MODELLER[0]
     dolu = _kota()
     for x in (m,) + tuple(y for y in GEMINI_MODELLER if y != m):
         if x not in dolu: return x
@@ -97,19 +99,91 @@ def _gemini_bekleme(govde, retry_after=None):  # sunucunun önerdiği bekleme (R
         m = re.search(r'"retryDelay"\s*:\s*"([\d.]+)s"', govde or "")
         sn = float(m.group(1)) if m else 1.5
     return max(0.5, min(GEMINI_429_EN_COK_SN, sn))
+# v0.80.11 (kullanıcı, 19 Ekim): sabit kısa cümleler (bekleme cümleleri, "hı hı") önbellekten — her ses + üslup + cümle için GEMINI_SABIT_N farklı okuyuş
+# bir kez Gemini'den alınıp canli/gemini-onbellek/'e yazılır, sonra Google'a gitmeden rastgele biri çalar (art arda aynısı değil). İsteklerin ~%20'si bekleme
+# cümlesiydi (18–19 Ekim, 14/71); günlük sınır geç dolar, bekleme cümlesi beklemesiz başlar.
+GEMINI_SABIT_N = 3
+_SABIT_SON = {}
+def _sabit_mi(metin):
+    m = (metin or "").strip()
+    if m in GEMINI_ONAY: return True
+    g = globals()
+    for ad in ("BEKLE_GENEL", "BEKLE_SEY", "BEKLE_TUR"):
+        v = g.get(ad)
+        vs = [x for l in v.values() for x in (l if isinstance(l, list) else [l])] if isinstance(v, dict) else (v or [])
+        if m in vs: return True
+    return False
+def _sabit_klasor(metin, ses, uslup):
+    import hashlib
+    h = hashlib.sha1(f"{gemini_ses(ses)}\n{' '.join(str(uslup or '').split())}\n{metin.strip()}".encode()).hexdigest()[:16]
+    return os.path.join(BASE, "gemini-onbellek", h)
+def _sabit_al(metin, ses, uslup):  # dolu önbellekten rastgele bir okuyuş (ham ses) ya da None (henüz GEMINI_SABIT_N okuyuş yok)
+    import random
+    k = _sabit_klasor(metin, ses, uslup)
+    try: ds = sorted(f for f in os.listdir(k) if f.endswith(".pcm"))
+    except OSError: return None
+    if len(ds) < GEMINI_SABIT_N: return None
+    secenek = [d for d in ds if d != _SABIT_SON.get(k)] or ds
+    d = random.choice(secenek); _SABIT_SON[k] = d
+    try: return open(os.path.join(k, d), "rb").read() or None
+    except OSError: return None
+def _sabit_yaz(metin, ses, uslup, pcm):
+    k = _sabit_klasor(metin, ses, uslup)
+    try:
+        os.makedirs(k, exist_ok=True)
+        n = len([f for f in os.listdir(k) if f.endswith(".pcm")])
+        if n >= GEMINI_SABIT_N: return
+        with open(os.path.join(k, f"{n}.pcm"), "wb") as f: f.write(pcm)
+        with open(os.path.join(k, "metin.txt"), "w", encoding="utf-8") as f: f.write(f"{gemini_ses(ses)} · {metin.strip()}\n")
+    except OSError: pass
+def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekteki ham sesi kesintisiz çalıcıyla (yoksa WAV + afplay) çalar
+    if duzey is not None: pcm = _duzey(pcm, duzey)
+    if os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ"): return True
+    if os.access(PIPER_OYNAT, os.X_OK):
+        try: oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError: return False
+        if kayit is not None: kayit["p"] = oyn
+        try:
+            for i in range(0, len(pcm), 9600):
+                if iptal and iptal(): break
+                oyn.stdin.write(pcm[i:i + 9600]); oyn.stdin.flush()
+            oyn.stdin.close()
+            oyn.wait(timeout=len(pcm) / 2 / GEMINI_SR + 5)
+        except (BrokenPipeError, OSError, ValueError, subprocess.TimeoutExpired): pass
+        if oyn.poll() is None: oyn.terminate()
+        return True
+    if aygit: return False
+    import tempfile, wave
+    fd, yol = tempfile.mkstemp(suffix=".wav", prefix="suflor-gemini-"); os.close(fd)
+    try:
+        with wave.open(yol, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(GEMINI_SR); w.writeframes(pcm)
+        pr = subprocess.Popen(["/usr/bin/afplay", yol], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if kayit is not None: kayit["p"] = pr
+        pr.wait()
+    finally:
+        try: os.remove(yol)
+        except OSError: pass
+    return True
 def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
     # duzey: 0–1 ses düzeyi (kısık "hı hı").
     if not metin or not gemini_var(): return None if topla else False
     if aygit and not os.access(PIPER_OYNAT, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
+    sabit = _sabit_mi(metin)
+    if sabit:
+        pcm = _sabit_al(metin, ses, uslup)
+        if pcm:
+            print(f"GEMINI: önbellekten · {metin.strip()[:40]}")
+            if topla: return _duzey(pcm, duzey) if duzey is not None else pcm
+            return _pcm_cal(pcm, iptal=iptal, kayit=kayit, aygit=aygit, duzey=duzey)
     if time.time() - GEMINI["hata_t"] < GEMINI_BEKLE_SN: return None if topla else False
     model = gemini_model()
     if not model: return None if topla else False  # iki modelin de günlük sınırı dolu: istek atılmaz
     govde = json.dumps({"contents": [{"role": "user", "parts": [{"text": (f"## Style:\n{' '.join(str(uslup).split())}\n" if uslup else "") + "## Transcript:\n" + metin}]}],
                         "generationConfig": {"responseModalities": ["audio"], "temperature": 1,
                                              "speech_config": {"voice_config": {"prebuilt_voice_config": {"voice_name": gemini_ses(ses)}}}}}, ensure_ascii=False).encode()
-    t0 = time.time(); ilk = None; nbayt = 0; oyn = None; sessiz = bool(os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ")) or topla; tampon = bytearray()
+    t0 = time.time(); ilk = None; nbayt = 0; oyn = None; sessiz = bool(os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ")) or topla; tampon = bytearray(); ham = bytearray()
     def bitir(bekle):
         if oyn:
             try: oyn.stdin.close()
@@ -172,6 +246,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                                 if kayit is not None: kayit["p"] = oyn
                             except OSError: oyn = None
                     nbayt += len(b)
+                    if sabit: ham.extend(b)
                     if duzey is not None: b = _duzey(b, duzey)
                     if oyn:
                         try: oyn.stdin.write(b); oyn.stdin.flush()
@@ -185,8 +260,9 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
             if not nbayt:
                 GEMINI.update(durum="hata", hata=str(e)[:200] or e.__class__.__name__, hata_t=time.time())
                 print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, {GEMINI_BEKLE_SN:.0f} sn Gemini denenmez"); return None if topla else False
-            print(f"GEMINI: akış yarıda kesildi ({e.__class__.__name__})")
+            print(f"GEMINI: akış yarıda kesildi ({e.__class__.__name__})"); ham.clear()  # yarım okuyuş önbelleğe girmez
     GEMINI.update(durum="hazir", hata=None)
+    if sabit and ham and not (iptal and iptal()): _sabit_yaz(metin, ses, uslup, bytes(ham))
     bitir(True)
     _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk)
     print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")

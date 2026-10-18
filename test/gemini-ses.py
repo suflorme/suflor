@@ -86,10 +86,27 @@ bak(f"günlük sınır: beklemeden 3.8 Flash'a geçer ({time.time() - t0:.1f} sn
 n = len(GELEN); ad["gemini_oku"]("Sonraki cümle.")
 bak("sonraki cümle dolu modeli hiç denemez", len(GELEN) - n == 1 and "flash-lite" not in GELEN[-1]["yol"])
 DAVRANIS.update(tur="gunluk2"); n = len(GELEN); rg2 = ad["gemini_oku"]("İkisi de dolu."); n2 = len(GELEN); rg3 = ad["gemini_oku"]("Yine.")
-bak(f"iki model dolu: False, sonra istek atılmaz ({n2 - n} + {len(GELEN) - n2} istek)", rg2 is False and rg3 is False and n2 - n == 1 and len(GELEN) == n2)
+yl = [g["yol"].split("/")[3].split(":")[0] for g in GELEN[n:n2]]
+bak(f"yedek sırası 3.8 Flash → 3.1 Flash → 2.5 Flash, hepsi dolu: False, sonra istek atılmaz ({yl} + {len(GELEN) - n2})",
+    rg2 is False and rg3 is False and yl == ["gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts"] and len(GELEN) == n2)
 ad["GEMINI_KOTA"]["dolu"] = None; bak("kayıt dosyasından yüklenir (aktarıcı yeniden başlasa da)", ad["gemini_model"]() is None and "kota_dolu" in ad["gemini_view"]())
 os.remove(os.path.join(T, "gemini-kota.json")); ad["GEMINI_KOTA"]["dolu"] = None; ad["GEMINI"]["hata_t"] = 0; DAVRANIS.update(tur="normal")
 bak("kayıt yoksa ayardaki model", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
+bak("ayarda yedek model seçilemez (3.1 → Flash-Lite)", (ad["AYAR"].__setitem__("gemini_model", "gemini-3.1-flash-tts-preview"), ad["gemini_model"]())[1] == "gemini-3.8-flash-lite-tts"); ad["AYAR"].pop("gemini_model")
+# v0.80.11: sabit cümle önbelleği — ilk GEMINI_SABIT_N okuyuş Gemini'den (kaydedilir), sonra istek yok; art arda aynı okuyuş değil; sabit olmayan cümle önbelleğe girmez
+ad["BEKLE_SEY"] = ["Hemen bakıyorum.", "Kontrol ediyorum."]; ad["GEMINI"]["hata_t"] = 0
+n = len(GELEN); [ad["gemini_oku"]("Hemen bakıyorum.", ses="Charon") for _ in range(3)]; n3 = len(GELEN)
+kl = ad["_sabit_klasor"]("Hemen bakıyorum.", "Charon", None); dosyalar = sorted(f for f in os.listdir(kl) if f.endswith(".pcm"))
+bak(f"ilk 3 okuyuş Gemini'den, önbelleğe yazılır ({n3 - n} istek, {dosyalar})", n3 - n == 3 and dosyalar == ["0.pcm", "1.pcm", "2.pcm"])
+secilen = []; ad["_SABIT_SON"].clear()
+for _ in range(6): r_ = ad["gemini_oku"]("Hemen bakıyorum.", ses="Charon"); secilen.append(ad["_SABIT_SON"][kl])
+bak(f"sonra istek atılmaz, art arda aynı okuyuş yok ({len(GELEN) - n3} istek, {secilen})", len(GELEN) == n3 and r_ is True and all(a != b for a, b in zip(secilen, secilen[1:])))
+pc = ad["gemini_oku"]("Hemen bakıyorum.", ses="Charon", topla=True)
+bak("toplantıya söyle (topla) önbellekten ham ses alır", isinstance(pc, bytes) and len(pc) == 48000 and len(GELEN) == n3)
+n = len(GELEN); ad["gemini_oku"]("Hemen bakıyorum.", ses="Kore"); bak("başka ses ayrı önbellek (Kore için yine istek)", len(GELEN) - n == 1)
+n = len(GELEN); ad["gemini_oku"]("Bu sabit değil."); ad["gemini_oku"]("Bu sabit değil.")
+bak("sabit olmayan cümle her seferinde Gemini'ye gider", len(GELEN) - n == 2)
+n = len(GELEN); [ad["gemini_oku"]("Hı hı.", ses="Charon", duzey=0.5) for _ in range(4)]; bak(f"hı hı da önbellekte (4 okumada {len(GELEN) - n} istek)", len(GELEN) - n == 3)
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
 
