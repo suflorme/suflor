@@ -157,7 +157,13 @@ def _sohbet_tur_sonu():
         if son and SOHBET_BEKLE_RX.search(son): bek = max(bek, SOHBET_BEKLE_SN)
         SOHBET.update(durak=durak, bekle=bek)
         print(f"SOHBET: duraksama — tur sonu {'yok' if p is None else f'{p:.2f}'}, {bek:.1f} sn beklenecek")
-    if sessiz >= SOHBET["bekle"]: _sohbet_gonder(b, n, sessiz)
+    if sessiz >= SOHBET["bekle"]: return _sohbet_gonder(b, n, sessiz)
+    with AKIS["kilit"]:  # v0.80.4: duraksamaya kadarki ses dökülmüşse ön arama tur sonunu beklemeden başlar (soru aynı kalırsa sonuç hazır olur)
+        hazir = AKIS["sira"] and AKIS["bekleyen"] == 0 and AKIS["kesik"] >= durak
+        metin = " ".join(" ".join(str(AKIS["metin"].get(i) or "").split()) for i in range(AKIS["sira"])).strip() if hazir else ""
+    if metin and len(metin.split()) >= 3 and not SOHBET_KAPAT_RX.search(metin) and not SOHBET_DUSUNME_RX.search(metin):
+        try: onara_onceden(metin)
+        except Exception as e: print(f"SOHBET: önceden ön arama başlatılamadı ({e.__class__.__name__})")
 def _sohbet_gonder(b, n, sessiz):
     SOHBET.update(durak=None, bekle=None); SOHBET.pop("dusunme", None)
     print(f"SOHBET: tur bitti ({n:.1f} sn kayıt, {sessiz:.1f} sn sessizlik)")
