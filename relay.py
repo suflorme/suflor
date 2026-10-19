@@ -1421,7 +1421,7 @@ def eposta_tur():
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
     "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "otonom": ("bool", False, None), "sesli_not": ("bool", True, None), "toplanti_konus": ("bool", True, None), "kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
-    "brifing_sesli": ("bool", False, None), "ses_motoru": ("sec", "mac", ("mac", "piper", "gemini")),
+    "brifing_sesli": ("bool", False, None), "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")),
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
     "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
@@ -1432,9 +1432,9 @@ AYAR_PANO = {
 MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar", "toplantiya_ses")
 def ayarlar_view():
     d = {k: AYAR.get(k, v[1]) for k, v in AYAR_PANO.items()}
-    if d["ses_motoru"] not in ("piper", "gemini"): d["ses_motoru"] = "mac"
+    if d["ses_motoru"] not in ("piper", "pocket", "gemini"): d["ses_motoru"] = "mac"
     if "konus_gecmis" not in AYAR: d["konus_gecmis"] = konus_gecmis_acik()
-    return {"deger": d, "varsayilan": {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items()}, "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP)}
+    return {"deger": d, "varsayilan": {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items()}, "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP)}
 def ayar_yaz(deg):
     hata, yeni = {}, {}
     for k, v in (deg or {}).items():
@@ -1502,6 +1502,7 @@ def son_ac(p):
     return {"ok": True}
 bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslendirme (ayar ses_motoru: piper)
+bolum("pocket-ses")  # aktarici/pocket-ses.py — Pocket TTS ile yerel Türkçe ses (kişilikte yerel_ses: pocket:…; S93)
 bolum("gemini-ses")  # aktarici/gemini-ses.py — Gemini TTS ile seslendirme (ayar ses_motoru: gemini; v0.78.0)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)

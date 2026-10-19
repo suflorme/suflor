@@ -18,12 +18,14 @@ class P:  # sahte afplay/say süreci
     def close(self): CALAN.append(("mac", self.yazi.decode()))
     def wait(self):
         if self.k[0] == "/usr/bin/afplay": CALAN.append(("afplay", self.k[1]))
-def deneme(gemini_acik, motor="mac", q=None, bekle=3):
+def deneme(gemini_acik, motor="mac", q=None, bekle=3, pocket=None, piper=None):  # pocket/piper: None = yok, True/False = okuyabildi mi (S93)
     del CALAN[:]
     n = {"SES": {"q": q or [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Mac cümlesi."], "isci": True, "kes": 0}, "GEMINI_BIRLESIK_EN_COK": 600, "SES_K": threading.Condition(),
          "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "PIPE": None}), "kisilik_sesi": lambda m=None, toplantiya=False: (m or motor, None, 1.0), "gemini_var": lambda: gemini_acik, "gemini_izinli": lambda toplantiya=False: gemini_acik,
          "gemini_oku": lambda metin, **a: (CALAN.append(("gemini", metin, a.get("ses"), a.get("uslup"))), True)[1], "etiket_sil": lambda m: m, "kisilik": lambda: {},
-         "piper_oku": lambda *a, **k: False, "piper_hiz": lambda: 1.0, "SES_TABAN_HIZ": 180, "print": lambda *a, **k: None, "time": time, "os": os}
+         "pocket_oku": lambda metin, **a: (CALAN.append(("pocket", metin)), True)[1] if pocket else False, "ARAYUZ_DILI": "tr",
+         "AYAR": {"piper_python": "/x", "piper_model": "/y"} if piper is not None else {},
+         "piper_oku": lambda metin, *a, **k: (CALAN.append(("piper", metin)), True)[1] if piper else False, "piper_hiz": lambda: 1.0, "SES_TABAN_HIZ": 180, "print": lambda *a, **k: None, "time": time, "os": os}
     exec(compile(ast.Module(fn, []), "brifing-ses.py", "exec"), n)
     threading.Thread(target=n["_ses_isci"], daemon=True).start()
     for _ in range(100):
@@ -42,4 +44,12 @@ ok(f"birleştirme: aynı ses+üslup tek istek, değişince ayrı: {c}", c == [("
 uzun = "x" * 350 + "."
 c = deneme(True, q=[("g", uzun, "Charon", "u"), ("g", uzun, "Charon", "u"), ("g", "Son.", "Charon", "u")], bekle=2)
 ok(f"birleştirme sınırı (600 karakter): {[len(x[1]) for x in c]}", [len(x[1]) for x in c] == [351, 356])
+# S93: yerel ses Pocket — okuyabilirse Pocket, okuyamazsa Piper (kuruluysa), o da olmazsa Mac sesi; Gemini parçası Gemini yoksa düz metin olur
+q3 = lambda: [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Yerel cümle."]
+c = deneme(False, motor="pocket", q=q3(), pocket=True)
+ok(f"Pocket: tepki → afplay, metinler → Pocket: {c}", c == [("afplay", "/tepki.caf"), ("pocket", "Gemini cümlesi."), ("pocket", "Yerel cümle.")])
+c = deneme(False, motor="pocket", q=q3(), pocket=False, piper=True)
+ok(f"Pocket okuyamadı → Piper: {c}", c == [("afplay", "/tepki.caf"), ("piper", "Gemini cümlesi."), ("piper", "Yerel cümle.")])
+c = deneme(False, motor="pocket", q=q3(), pocket=False)
+ok(f"Pocket okuyamadı, Piper yok → Mac sesi: {c}", c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
 print("ses-kuyruk: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

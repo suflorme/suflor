@@ -220,14 +220,21 @@ def tepki_sec(tur=None, tetik=None):
     TEPKI["son"].append(r["yol"]); return r["yol"]
 def tepki_cal(tur, hemen=False, ses=None):  # türden bir klibi okuma kuyruğuna (bekleme gibi metinsiz anlar); klip yoksa False
     # hemen: sıraya girmeden, kuyruktaki okumayı kesmeden çalar (konuşurken "hı hı"); ses: afplay düzeyi (0–1, kısık onay sesi)
-    if not AYAR.get("konusma", True) or piper_acik(): return False
+    if not AYAR.get("konusma", True): return False
     km, kses, _ = kisilik_sesi()
+    if piper_acik() and km != "pocket": return False  # S93: Piper ayarında da kişiliğin yerel sesi Pocket ise onay o sesle
     if km == "gemini":  # v0.79.0 (kullanıcı: "kütüphane yapma, doğallık bozulmasın"): onay sesi o anda Gemini'yle, konuşan kişiliğin sesiyle; klip yok
         if tur != "alindi": return False  # bekleme: çağıran içerikli cümleyi okur (Gemini)
         import random
         m = random.choice(GEMINI_ONAY)
         if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): Gemini onay '{m}'{' (hemen)' if hemen else ''}"); return True
         threading.Thread(target=gemini_oku, args=(m,), kwargs={"ses": kses, "uslup": GEMINI_ONAY_USLUP, "duzey": ses if ses else 0.7}, daemon=True).start(); return True
+    if km == "pocket":  # S93: onay sesi o anda kişiliğin Pocket sesiyle (ilk ses ~0,03 sn); klip yok
+        if tur != "alindi": return False
+        import random
+        m = random.choice(GEMINI_ONAY)
+        if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): Pocket onay '{m}'{' (hemen)' if hemen else ''}"); return True
+        threading.Thread(target=pocket_oku, args=(m,), kwargs={"ses": kses}, daemon=True).start(); return True
     if km != "mac": return False  # klipler Elif tınısında; Piper sesiyle konuşurken araya başka ses girmesin
     k = tepki_sec(tur)
     if not k: return False
@@ -355,16 +362,20 @@ def _telaffuz_dongu():
         time.sleep(15)
 _SES_SEC = {"t": 0, "v": None}
 SES_TABAN_HIZ = 180  # v0.71.0: Yelda'nın varsayılan hızı ~180 sözcük/dk (ölçüm 17 Ekim); kişilik hiz çarpanı bunun üstüne
-def kisilik_sesi(zorla=None, toplantiya=False):  # toplantiya: ses katılımcılara gidiyor (v0.81.0, S92: Gemini yalnız orada)  # → (motor "gemini"|"piper"|"mac", ses adı (Gemini hazır sesi / Mac say -v; None = sistem sesi), hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
+def kisilik_sesi(zorla=None, toplantiya=False):  # toplantiya: ses katılımcılara gidiyor (v0.81.0, S92: Gemini yalnız orada)  # → (motor "gemini"|"pocket"|"piper"|"mac", ses adı (Gemini hazır sesi / Pocket "model:ses" / Mac say -v; None = sistem sesi), hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
     k = kisilik(); kses = (k or {}).get("ses"); khiz = (k or {}).get("hiz") or 1.0
     piper_var = ARAYUZ_DILI == "tr" and bool(AYAR.get("piper_python")) and bool(AYAR.get("piper_model"))
     if zorla != "mac":
         if (kses or "").startswith("gemini") and gemini_izinli(toplantiya): return "gemini", (kses.split(":", 1)[1].strip() if ":" in kses else None), khiz  # v0.78.0: "gemini" ya da "gemini:Kore"
         if not kses and gemini_acik() and gemini_izinli(toplantiya): return "gemini", None, khiz
-        if ((kses or "").startswith("gemini") or (not kses and gemini_acik())) and piper_var and AYAR.get("ses_motoru") in ("piper", "gemini"):
+        # S93: yerel ses Pocket — kişilikte yerel_ses (ya da ses) pocket:…, yoksa ayar ses_motoru: pocket; ⚙ Ayarlar'da Ses "Mac sesi" ise Elif (aşağıda)
+        yses = (k or {}).get("yerel_ses") or (kses if (kses or "").startswith("pocket") else None)
+        if pocket_var() and AYAR.get("ses_motoru") in ("piper", "pocket", "gemini") and (str(yses or "").startswith("pocket") or (not yses and AYAR.get("ses_motoru") == "pocket")):
+            return "pocket", (pocket_ses_adi(yses) if str(yses or "").startswith("pocket") else None) or pocket_varsayilan(), 1.0
+        if ((kses or "").startswith("gemini") or (not kses and gemini_acik())) and piper_var and AYAR.get("ses_motoru") in ("piper", "pocket", "gemini"):
             return "piper", None, khiz  # v0.81.0: Gemini toplantıya ayrıldı → yerel ses; ⚙ Ayarlar'da Ses "Mac sesi" ise Elif (aşağıda)
-        if (kses == "piper" and piper_var) or (not kses and piper_acik()): return "piper", None, khiz
-    return "mac", (kses if kses and kses != "piper" and not kses.startswith("gemini") else ses_secimi()), khiz
+        if (kses == "piper" and piper_var) or (not kses and (piper_acik() or (AYAR.get("ses_motoru") == "pocket" and piper_var))): return "piper", None, khiz
+    return "mac", (kses if kses and kses != "piper" and not kses.startswith(("gemini", "pocket")) else ses_secimi()), khiz
 def ses_secimi():  # say -v için ses adı; None = sistem sesi
     if AYAR.get("ses"): return str(AYAR["ses"])
     if ARAYUZ_DILI != "tr": return None
@@ -438,13 +449,20 @@ def _ses_isci():
             with SES_K: SES["q"].insert(0, metin)
         with SES_K:
             if SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g": SES["q"][0] = etiket_sil(SES["q"][0][1])  # Gemini yok: düz metin
+        if motor == "pocket":  # S93: yerel Türkçe ses (Pocket); okunamazsa Piper (kuruluysa), sonra Mac sesi
+            with SES_K:
+                if not SES["q"]: continue
+                metin = SES["q"].pop(0); kes = SES.get("kes", 0)
+            if pocket_oku(metin, ses=v, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
+            with SES_K: SES["q"].insert(0, metin)
+            motor = "piper" if (ARAYUZ_DILI == "tr" and AYAR.get("piper_python") and AYAR.get("piper_model")) else "mac"
         if motor == "piper":  # yerel Türkçe ses (ayar ses_motoru: piper ya da kişilikte ses: piper); okunamazsa Mac sesi
             with SES_K:
                 if not SES["q"]: continue
                 metin = SES["q"].pop(0); kes = SES.get("kes", 0)
             if piper_oku(metin, piper_hiz() * khiz, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             with SES_K: SES["q"].insert(0, metin)
-        if motor != "mac":  # Gemini/Piper okuyamadı: Mac sesi (etiketler okunmasın)
+        if motor != "mac":  # Gemini/Pocket/Piper okuyamadı: Mac sesi (etiketler okunmasın)
             v, khiz = kisilik_sesi("mac")[1:]
             with SES_K:
                 if SES["q"] and isinstance(SES["q"][0], str): SES["q"][0] = etiket_sil(SES["q"][0])
@@ -511,9 +529,9 @@ def fisilti_kart(c):
         try: subprocess.run(["/usr/bin/afplay", "-v", "0.4", "/System/Library/Sounds/Tink.aiff"], timeout=3)
         except (OSError, subprocess.TimeoutExpired): pass
         t_oku = time.time(); km, kv = kisilik_sesi()[:2]
-        # v0.80.0 (S87): Gemini açıksa fısıltı da o anki kişiliğin Gemini sesiyle, kısık; olmazsa Piper, sonra Mac sesi
+        # v0.80.0 (S87): Gemini açıksa fısıltı da o anki kişiliğin Gemini sesiyle, kısık; olmazsa yerel ses (Pocket → Piper, S93), sonra Mac sesi
         if km == "gemini" and gemini_kisa(metin, ses=kv, uslup=_t("Kulağa fısıldar gibi: çok kısa, alçak ve sakin.", "Whispering in the ear: very short, low and calm."), duzey=0.7): pass
-        elif not piper_oku(telaffuz(metin), piper_hiz(kisa=True)):
+        elif not yerel_oku(telaffuz(metin), kisa=True):
             v = ses_secimi()
             try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [ses_duzen(telaffuz(metin, mac=True))], timeout=10)
             except (OSError, subprocess.TimeoutExpired): pass

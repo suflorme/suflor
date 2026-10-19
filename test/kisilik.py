@@ -74,7 +74,7 @@ try:
     open(kd2, "a", encoding="utf-8").write("")
     s2 = open(kd2, encoding="utf-8").read().replace("hitap_bicimi: sen\n", "hitap_bicimi: sen\nses: piper\nhiz: 1,15\n"); open(kd2, "w", encoding="utf-8").write(s2)
     bs = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); i = bs.index("def kisilik_sesi("); exec(bs[i:bs.index("\ndef ses_secimi", i)], ns)
-    ns["ses_secimi"] = lambda: None; ns["piper_acik"] = lambda: False; ns["GEM"] = [False]; ns["gemini_var"] = lambda: ns["GEM"][0]; ns["gemini_acik"] = lambda: False; ns["gemini_izinli"] = lambda toplantiya=False: ns["GEM"][0] and (toplantiya or ns["AYAR"].get("gemini_kapsam") == "hepsi"); ns["AYAR"].update(piper_python="/x/python", piper_model="/x/m.onnx"); ns["_KSEC"].update(ad=None, t=0)
+    ns["ses_secimi"] = lambda: None; ns["piper_acik"] = lambda: False; ns["GEM"] = [False]; ns["gemini_var"] = lambda: ns["GEM"][0]; ns["pocket_var"] = lambda: False; ns["pocket_ses_adi"] = lambda x: None; ns["pocket_varsayilan"] = lambda: "wite:female_2"; ns["gemini_acik"] = lambda: False; ns["gemini_izinli"] = lambda toplantiya=False: ns["GEM"][0] and (toplantiya or ns["AYAR"].get("gemini_kapsam") == "hepsi"); ns["AYAR"].update(piper_python="/x/python", piper_model="/x/m.onnx"); ns["_KSEC"].update(ad=None, t=0)
     ns["TOP"][0] = False; ok("toplantı dışı kişilik: Piper, hız 1,15", ns["kisilik_sesi"]() == ("piper", None, 1.15))
     ns["TOP"][0] = True; ok("toplantı kişiliği: sistem sesi, hız 1", ns["kisilik_sesi"]() == ("mac", None, 1.0))
     ns["AYAR"]["piper_model"] = ""; ns["TOP"][0] = False; ok("Piper kurulu değilse Mac sesi (hız korunur)", ns["kisilik_sesi"]() == ("mac", None, 1.15))

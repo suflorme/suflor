@@ -202,7 +202,7 @@ def _sesli_isci():
         t_oku = time.time()
         # v0.80.0 (S87): Gemini açıksa çeviri Gemini'yle — çevirmen sesi ayar ceviri_gemini_ses (yoksa ayardaki Gemini sesi), düz ve akıcı; olmazsa eskisi gibi
         if not AYAR.get("ceviri_ses") and gemini_kisa(kisa, ses=AYAR.get("ceviri_gemini_ses"), uslup=_t("Simultane çevirmen: düz, akıcı ve nötr; biraz hızlı, vurgusuz.", "Simultaneous interpreter: plain, fluent and neutral; a little fast, no emphasis.")): pass
-        elif AYAR.get("ceviri_ses") or not piper_oku(telaffuz(kisa), piper_hiz(kisa=True)):  # ayar ceviri_ses verildiyse Mac sesi
+        elif AYAR.get("ceviri_ses") or not yerel_oku(telaffuz(kisa), kisa=True):  # ayar ceviri_ses verildiyse Mac sesi
             v = AYAR.get("ceviri_ses") or (ses_secimi() if ARAYUZ_DILI == "tr" else "Samantha")
             try: subprocess.run(["/usr/bin/say", "-r", "200"] + (["-v", str(v)] if v else []) + [telaffuz(kisa, mac=True) if ARAYUZ_DILI == "tr" else kisa], timeout=15)
             except (OSError, subprocess.TimeoutExpired): pass
