@@ -85,7 +85,9 @@ try:
     ns["GEM"][0] = True; ns["AYAR"]["gemini_kapsam"] = "hepsi"; ok("kişilikte gemini:Kore → Gemini, Kore (kapsam hepsi)", ns["kisilik_sesi"]() == ("gemini", "Kore", 1.15))
     ns["AYAR"].pop("gemini_kapsam"); ok("S92: kapsam toplantı → kullanıcıya okunan Mac/Piper (Piper yok: Mac sistem sesi)", ns["kisilik_sesi"]() == ("mac", None, 1.15))
     ok("S92: toplantıya söylenen Gemini, Kore", ns["kisilik_sesi"](toplantiya=True) == ("gemini", "Kore", 1.15))
-    ns["AYAR"]["piper_model"] = "/x/model.onnx"; ok("S92: Piper kuruluysa kullanıcıya okunan Piper (hız korunur)", ns["kisilik_sesi"]() == ("piper", None, 1.15)); ns["AYAR"]["piper_model"] = ""
+    ns["AYAR"]["piper_model"] = "/x/model.onnx"; ns["AYAR"]["ses_motoru"] = "piper"; ok("S92: Piper kuruluysa kullanıcıya okunan Piper (hız korunur)", ns["kisilik_sesi"]() == ("piper", None, 1.15))
+    ns["AYAR"]["ses_motoru"] = "mac"; ok("S92: Ayarlar'da Mac sesi seçiliyse Elif (sistem sesi), Piper kurulu olsa da", ns["kisilik_sesi"]() == ("mac", None, 1.15))
+    ns["AYAR"]["ses_motoru"] = "gemini"; ok("S92: Ayarlar'da Gemini seçiliyken toplantı dışı Piper", ns["kisilik_sesi"]() == ("piper", None, 1.15)); ns["AYAR"].pop("ses_motoru"); ns["AYAR"]["piper_model"] = ""
     ns["GEM"][0] = False; ok("Gemini anahtarı yoksa Mac sistem sesi", ns["kisilik_sesi"]() == ("mac", None, 1.15))
     # v0.79.0: ses üslubu ve sözsüz ses etiketleri (yalnız Gemini sesli, ses_etiket: evet kişilikte; istemde yalnız onun adı)
     open(kd2, "w", encoding="utf-8").write(s2.replace("ses: piper", "ses: gemini:Kore\nses_uslup: nüktedan, dostça\nses_etiket: evet")); os.utime(kd2, (time.time() + 15, time.time() + 15))

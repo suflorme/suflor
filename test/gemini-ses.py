@@ -128,6 +128,7 @@ tsn.update(PIPER_OYNAT=SAHTE, kisilik_sesi=lambda zorla=None, toplantiya=False: 
            ses_secimi=lambda: None, telaffuz=lambda m, mac=False: m, ses_durdur=lambda: None, kulaklik=lambda: True, kendi_ses_kaydet=lambda *a: None, note=lambda *a: None, kart_bildir=lambda: None,
            sesli_terim_suz=lambda m: m, etiket_sil=lambda m: m, _t=lambda a, b: a, ARAYUZ_DILI="tr", kisilik_ad=lambda: "Atlas", re=__import__("re"), secrets=__import__("secrets"))
 exec(compile(open(os.path.join(K, "aktarici", "toplantiya-ses.py"), encoding="utf-8").read(), "toplantiya-ses.py", "exec"), tsn)
+tsn["ts_aygit"] = lambda: "59"  # bölüm dosyası kendi ts_aygit'ini tanımlar (gerçek BlackHole kimliği yeniden başlatınca değişir: 59 → 85, 19 Ekim)
 tsn["TS"]["tanitti"] = "?"  # tanıtım bu denemede okunmasın
 r = tsn["toplantiya_soyle"]("Bütçe onaylandı."); time.sleep(0.5)
 argl = [x for x in open(SAHTE + ".arg").read().split("\n") if x]

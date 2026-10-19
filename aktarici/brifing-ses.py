@@ -361,7 +361,8 @@ def kisilik_sesi(zorla=None, toplantiya=False):  # toplantiya: ses katılımcıl
     if zorla != "mac":
         if (kses or "").startswith("gemini") and gemini_izinli(toplantiya): return "gemini", (kses.split(":", 1)[1].strip() if ":" in kses else None), khiz  # v0.78.0: "gemini" ya da "gemini:Kore"
         if not kses and gemini_acik() and gemini_izinli(toplantiya): return "gemini", None, khiz
-        if ((kses or "").startswith("gemini") or (not kses and gemini_acik())) and piper_var: return "piper", None, khiz  # v0.81.0: Gemini toplantıya ayrıldı → yerel ses
+        if ((kses or "").startswith("gemini") or (not kses and gemini_acik())) and piper_var and AYAR.get("ses_motoru") in ("piper", "gemini"):
+            return "piper", None, khiz  # v0.81.0: Gemini toplantıya ayrıldı → yerel ses; ⚙ Ayarlar'da Ses "Mac sesi" ise Elif (aşağıda)
         if (kses == "piper" and piper_var) or (not kses and piper_acik()): return "piper", None, khiz
     return "mac", (kses if kses and kses != "piper" and not kses.startswith("gemini") else ses_secimi()), khiz
 def ses_secimi():  # say -v için ses adı; None = sistem sesi
