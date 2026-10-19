@@ -19,7 +19,7 @@ def olay(i, gun, b, s, **k):
                  "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Ayla K"], "kisi_sayisi": 2}, **k)
 TAK = {e["id"]: e for e in [olay(1, 0, 11, 12), olay(2, 3, 9, 10.5), olay(3, 3, 13, 18), olay(4, 4, 0, 24, tum_gun=True), olay(5, 5, 9, 18, reddettin=True),
                             olay(6, 6, 10, 11, takvim="Paylaşılan", hesap="Başkası")]}
-ad = {"re": re, "datetime": dt, "AYAR": {"takvim_haric": ["Paylaşılan · Başkası"]}, "TAKVIM_TAM": TAK, "ARAYUZ_DILI": "tr", "STATE": {"takvim": {"durum": "ok"}},
+ad = {"re": re, "datetime": dt, "os": os, "json": json, "time": time, "subprocess": subprocess, "BASE": "/yok/canli", "TAKVIM_APP": "/yok", "AYAR": {"takvim_haric": ["Paylaşılan · Başkası"]}, "TAKVIM_TAM": TAK, "ARAYUZ_DILI": "tr", "STATE": {"takvim": {"durum": "ok"}},
       "_t": lambda a, b: a, "_zaman": lambda t: dt.datetime.fromisoformat(t).astimezone()}
 exec(kod[kod.index("_GUN_TR = "):kod.index("# Kişilik (v0.53.0")], ad)
 exec(kod[kod.index("# --- Takvim haftası ve uygun zaman"):kod.index("def _konus_kur(")], ad)
@@ -43,6 +43,30 @@ ok("uzak tarih kalıbı: ay adı, gelecek ay, iki hafta sonra tutar; genel ve bu
    and not any(ad["TAKVIM_UZAK_RX"].search(x) for x in ("Bütçe ne kadar?", "Sen kimsin?", "Yarın ne var?", "Gelecek hafta ne var?", "Bu hafta neler var?", "Ayla ne dedi?")))
 ok("boş zaman kalıbı: müsait, uygun zaman tutar; takvim sorusu tutmaz", all(ad["TAKVIM_BOS_RX"].search(x) for x in ("Salı müsait miyim?", "Uygun bir zaman öner", "When am I available?"))
    and not any(ad["TAKVIM_BOS_RX"].search(x) for x in ("Salı ne var?", "Gelecek hafta ne var?")))
+# v0.84.0: geçmiş günler (yalnız geçmişi soran soruda) ve davet notu (yalnız gündem/davet sorusunda; katılım metni ve parola silinir)
+ad["_baslik_soz"] = lambda b: {w for w in re.findall(r"\w{4,}", str(b or "").replace("İ", "i").replace("I", "ı").lower()) if not w.isdigit()}
+ad["TAKVIM_GEC"]["olaylar"] = [olay(8, -1, 14, 15, baslik="Tedarikçi görüşmesi", katilimcilar=["Kerem A"]), olay(9, -10, 9, 10, baslik="Eski toplantı"),
+                               olay(10, -2, 9, 10, baslik="Gizli", takvim="Paylaşılan", hesap="Başkası")]
+bg = ad["konus_baglam"](simdi, "", "Dün kiminle görüştüm?"); bn = ad["konus_baglam"](simdi, "", "Bugün kaçta toplantım var?")
+ok("geçmiş: 'dün kiminle görüştüm' → geçen 7 gün, dün 14:00 Tedarikçi görüşmesi + kişi", "Mac Takvim (geçen 7 gün)" in bg and "- dün 14:00–15:00 · Tedarikçi görüşmesi · Kerem A" in bg)
+ok("geçmiş: 7 günden eski ve izlenmeyen takvim yok", "Eski toplantı" not in bg and "Gizli" not in bg)
+ok("geçmişi sormayan soruda geçmiş blok yok", "geçen 7 gün" not in bn and "Tedarikçi" not in bn)
+GR = ad["GECMIS_GUN_RX"]
+ok("geçmiş kalıbı: dün, geçen hafta, Salıki toplantı, kiminle görüştüm tutar; yarın/gelecek tutmaz",
+   all(GR.search(x) for x in ("Dünkü toplantı nasıldı?", "Geçen hafta kimlerle toplandım?", "Salıki toplantıda kim vardı?", "Bu hafta kimlerle görüştüm?", "Who did I meet yesterday?"))
+   and not any(GR.search(x) for x in ("Yarın ne var?", "Gelecek hafta ne var?", "Bütçe ne kadar?", "Salı müsait miyim?")))
+NOT = ("________________\r\nMicrosoft Teams Need help?<https://aka.ms/JoinTeamsMeeting>\r\nJoin the meeting now<https://teams.microsoft.com/l/meetup-join/x>\r\n"
+       "Meeting ID: 385 107 963 300 68\r\nPasscode: ky7hL3DZ\r\n________________\r\nGündem: bütçe ve takvim.\r\nLütfen rakamları getirin.\r\nFor organizers: Meeting options<https://teams.microsoft.com/meetingOptions/?a=1>")
+temiz = ad["davet_notu_temiz"](NOT)
+ok(f"davet notu süzgeci: parola, toplantı kimliği, bağlantı ve Teams metni silinir ({temiz!r})", temiz == "Gündem: bütçe ve takvim. Lütfen rakamları getirin.")
+ok("yalnız katılım metni olan not boş kalır", ad["davet_notu_temiz"](NOT.split("Gündem")[0]) == "")
+ok("Teams'in 'Please do not edit' ayırıcısı ve tek 'Join:' satırı da silinir", ad["davet_notu_temiz"]("Join:\r\n::~:~::~:~:~:~:~:~:: Join Microsoft Teams Meeting Please do not edit this section. ::~:~::~:~::\r\nKonu: teklif") == "Konu: teklif")
+TAK["e2"]["baslik"] = "Bütçe gözden geçirme"; TAK["e2"]["notlar"] = NOT
+bd = ad["konus_baglam"](simdi, "", "Bütçe gözden geçirme toplantısının gündemi ne?")
+ok("davet sorusu: o toplantının temiz notu bağlamda, parola yok", "Davet notu — Bütçe gözden geçirme (Pazartesi 19 Ekim 09:00): Gündem: bütçe ve takvim. Lütfen rakamları getirin." in bd and "ky7h" not in bd and "Passcode" not in bd)
+ok("davet sormayan soruda not yok (parola hiçbir soruda yok)", "Davet notu" not in ad["konus_baglam"](simdi, "", "Bütçe gözden geçirme kaçta?") and "ky7h" not in ad["konus_baglam"](simdi, "", "Bütçe gözden geçirme kaçta?"))
+bs_ = ad["konus_baglam"](simdi, "", "Sıradaki toplantının gündemi ne?")
+ok("başlık eşleşmezse sıradaki toplantı; notu yoksa 'katılım bilgisinden başka not yok'", "Davet notu — Toplantı 1" in bs_ and "başka not yok" in bs_)
 ad3 = {"re": re}; exec(kod[kod.index("HITAP_IS_RX = "):kod.index("def konus_hitap(")].split("# v0.55.0 (S70): toplantıda Konuş")[0], ad3)
 ISR = ad3["HITAP_IS_RX"]
 evet = ["Ayla'ya bütçe için bir e-posta taslağı hazırla.", "Ali'ye kısa bir mail yaz.", "Bir taslak hazırla, teklifi özetlesin.", "Perşembe saat on dörde Ayla ile toplantı koy.",
