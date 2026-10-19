@@ -889,6 +889,10 @@ AKIS_EN_AZ_SN, AKIS_SESSIZ_SN, AKIS_PENCERE = 3.0, 0.35, 800  # 15 Ekim gerçek 
 # kısa olduğu için kuyruk ancak tur bitince Whisper'a gidiyordu. Belirgin duraksamada (≥ AKIS_DURAK_SN) ≥ AKIS_DURAK_EN_AZ_SN'lik kuyruk da hemen gider —
 # sohbetin tur sonu beklemesi (1–2 sn) sürerken dökülür. Cümle içi kısa duraksamalar (0,35 sn) eskisi gibi 3 sn'yi bekler (küçük parça seli olmasın).
 AKIS_DURAK_SN, AKIS_DURAK_EN_AZ_SN, AKIS_DURAK_KONUSMA_SN = 0.6, 1.0, 0.4
+# v0.91.0 (reçete 6, 19 Ekim sohbeti): arka plan sesinde (TV) duraksama eşiğin altına inmeyince parça 9,5–12,7 sn'ye uzadı; tur bitince son parça 5,7–5,8 sn
+# döküldü (yazıya 7,1–8,5 sn). Sessizlik bulunmasa da AKIS_ZORLA_SN'de kesilir — son AKIS_ZORLA_ARA_SN içindeki en sessiz 50 ms'nin ortasından (sözcük ortası
+# değil, en olası nefes/hece arası). Tek başına ölçüm: 5 sn ses 1,13 sn, 13 sn ses 1,29 sn (olcum.py isci, 20 Ekim).
+AKIS_ZORLA_SN, AKIS_ZORLA_ARA_SN = 8.0, 2.0
 AKIS = {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "kilit": threading.Lock(), "kosul": threading.Condition()}
 def _akis_sifirla():
     with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, iz={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None)
@@ -904,6 +908,9 @@ def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesi
     k = int((AKIS_DURAK_SN if kisa else AKIS_SESSIZ_SN) * WH_SR * 2 / AKIS_PENCERE)
     if kisa and sum(x >= esik for x in pen[:-k]) * AKIS_PENCERE / 2 / WH_SR < AKIS_DURAK_KONUSMA_SN: return None
     if all(x < esik for x in pen[-k:]) and any(x >= esik for x in pen[:-k]): return len(b) - (k // 2) * AKIS_PENCERE  # sessizliğin ortasından kes
+    if n >= int(AKIS_ZORLA_SN * WH_SR * 2):  # sessizlik yok ama parça uzadı: son AKIS_ZORLA_ARA_SN'nin en sessiz penceresinden zorla
+        m = max(1, int(AKIS_ZORLA_ARA_SN * WH_SR * 2 / AKIS_PENCERE)); i0 = len(pen) - m
+        j = min(range(i0, len(pen)), key=lambda x: pen[x]); return bas + j * AKIS_PENCERE + AKIS_PENCERE // 2
     return None
 def _akis_gonder(baslangic, bitis, sira):
     with AKIS["kilit"]: parca = bytes(AKIS["pcm"][baslangic:bitis]); AKIS["bekleyen"] += 1
@@ -913,7 +920,8 @@ def _akis_gonder(baslangic, bitis, sira):
             AKIS["metin"][sira] = "" if hata else (metin or ""); AKIS["bekleyen"] -= 1
             if is_.get("iz"): AKIS.setdefault("iz", {})[sira] = (is_["iz"], len(parca) / 2 / WH_SR)
             AKIS["kosul"].notify_all()
-        print(f"KONUŞ: akış parçası {sira + 1} döküldü ({(time.time() - t0) * 1000:.0f} ms, {len(parca) / 2 / WH_SR:.1f} sn ses){' — HATA ' + str(hata) if hata else ''}")
+        al_ = is_.get("t_al"); bk = f" · sırada {(al_ - t0) * 1000:.0f} ms, işçi {(time.time() - al_) * 1000:.0f} ms" if al_ else ""  # v0.91.0 teşhis: yavaşlık bekleme mi işleme mi
+        print(f"KONUŞ: akış parçası {sira + 1} döküldü ({(time.time() - t0) * 1000:.0f} ms, {len(parca) / 2 / WH_SR:.1f} sn ses{bk}){' — HATA ' + str(hata) if hata else ''}")
     is_.update({"id": f"bas-akis-{int(time.time() * 1000)}-{sira}", "bas": True, "kanal": "bas", "baslik": None, "pcm": parca, "t0": time.time() - len(parca) / 2 / WH_SR,
                 "t1": time.time(), "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri})
     wh_bas_sira(is_); _isci_baslat()

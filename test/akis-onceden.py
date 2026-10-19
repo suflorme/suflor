@@ -35,6 +35,12 @@ b = bytearray(ses(3.2, 3000) + ses(0.4, 30))
 ok("3,2 sn konuşma + 0,4 sn duraksama → kesilir (eski kural)", k(b, 0) is not None)
 b = bytearray(ses(2.0, 3000) + ses(0.7, 30)); kes = k(b, 0)
 ok(f"kesim duraksamanın içinde (konuşma kesilmez): {kes} bayt", kes is not None and 2.0 * SR * 2 <= kes <= len(b))
+# v0.91.0: sessizliksiz uzun konuşma (arka planda TV) 8 sn'de zorla kesilir, son 2 sn'nin en sessiz yerinden
+b = bytearray(ses(7.0, 3000)); ok("7 sn kesintisiz konuşma → henüz kesilmez", k(b, 0) is None)
+b = bytearray(ses(6.5, 3000) + ses(0.1, 400) + ses(1.8, 3000)); kes = k(b, 0)
+ok(f"8,4 sn kesintisiz konuşma → zorla kesilir, son 2 sn'nin en sessiz yerinden (6,5–6,6 sn): {kes and kes / 2 / SR:.2f} sn", kes is not None and 6.5 <= kes / 2 / SR <= 6.6 and kes % 2 == 0)
+b = bytearray(ses(4.0, 3000) + ses(8.5, 3000)); kes = k(b, int(4.0 * SR * 2))
+ok(f"önceki kesimden sonra (bas > 0) da konum doğru: {kes and kes / 2 / SR:.2f} sn", kes is not None and 4.0 * SR * 2 < kes <= len(b) and kes / 2 / SR >= 4.0 + 8.0 - 2.1)
 
 # (2) önceden ön arama
 ARA = []
