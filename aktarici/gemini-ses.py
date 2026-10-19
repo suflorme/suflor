@@ -31,6 +31,11 @@ def gemini_anahtar():
     GEMINI.update(anahtar=k, anahtar_t=time.time()); return k
 def gemini_var(): return bool(gemini_anahtar())
 def gemini_acik(): return AYAR.get("ses_motoru") == "gemini" and gemini_var()
+# v0.81.0 (S92, kullanıcı 19 Ekim: "öncelik toplantı esnasında katılımcıları etkilemesi"): günlük sınır yüzünden Gemini yalnız katılımcıların duyduğu seste —
+# toplantıya söyle, otonom cevap, toplantıda tanıtım/duyuru (toplantiya_soyle). Kulağa cevap, fısıltı, sesli çeviri ve toplantı dışı her okuma yerel ses (Piper;
+# yoksa Mac). Ayar gemini_kapsam: toplanti (varsayılan) | hepsi (eski davranış).
+def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" else "toplanti"
+def gemini_izinli(toplantiya=False): return gemini_var() and (toplantiya or gemini_kapsam() == "hepsi")
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
     return v if v in GEMINI_SESLER else "Charon"
@@ -60,8 +65,20 @@ def gemini_model():  # ayardaki model; günlük sınırı dolduysa öteki; ikisi
     for x in (m,) + tuple(y for y in GEMINI_MODELLER if y != m):
         if x not in dolu: return x
     return None
+def gemini_gun_basi():  # Google'ın günlük sayacının başı: 19 Ekim'de 429'un önerdiği bekleme UTC gece yarısını (TR 03.00) gösterdi — gerçek sıfırlanma _kota_doldu'da kayıtlı
+    return datetime.datetime.now(datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+def gemini_bugun():  # model başına bugün (Google günü) yapılan başarılı istek sayısı (canli/gemini-ses.jsonl; önbellekten çalınanlar sayılmaz)
+    bas = gemini_gun_basi(); say = {}
+    try:
+        for l in open(os.path.join(BASE, "gemini-ses.jsonl"), encoding="utf-8"):
+            try: d = json.loads(l); t = datetime.datetime.fromisoformat(d["t"]).timestamp()
+            except (ValueError, KeyError): continue
+            if t >= bas: say[d.get("model") or "?"] = say.get(d.get("model") or "?", 0) + 1
+    except OSError: pass
+    return say
 def gemini_view():
-    return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota())}
+    return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
+            "kapsam": gemini_kapsam(), "bugun": gemini_bugun()}
 def _gemini_baglanti():
     if GEMINI["c"] is None:
         GEMINI["c"] = (http.client.HTTPConnection if GEMINI_HOST.startswith("127.0.0.1") else http.client.HTTPSConnection)(GEMINI_HOST, timeout=GEMINI_ILK_SN)
@@ -79,12 +96,12 @@ def _gemini_parcalar(o):  # SSE olayındaki base64 ses parçaları (inlineData.d
             else: yield from _gemini_parcalar(v)
     elif isinstance(o, list):
         for x in o: yield from _gemini_parcalar(x)
-def _gemini_kayit(metin, ses_sn, ilk):
-    try: write([(os.path.join(BASE, "gemini-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "model": gemini_model() or "",
+def _gemini_kayit(metin, ses_sn, ilk, model=None):
+    try: write([(os.path.join(BASE, "gemini-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "model": model or gemini_model() or "",
                                                                      "karakter": len(metin), "ses_sn": round(ses_sn, 2), "ilk_ses": round(ilk, 2) if ilk else None}) + "\n")])
     except Exception as e: print(f"GEMINI: kayıt yazılamadı ({e.__class__.__name__})")
-def gemini_pcm(metin, ses=None, uslup=None):  # v0.79.0: çalmadan 24 kHz 16 bit ham ses (toplantıya söyle); olmazsa None
-    return gemini_oku(metin, ses=ses, uslup=uslup, topla=True)
+def gemini_pcm(metin, ses=None, uslup=None, sabit=None):  # v0.79.0: çalmadan 24 kHz 16 bit ham ses (toplantıya söyle); olmazsa None
+    return gemini_oku(metin, ses=ses, uslup=uslup, topla=True, sabit=sabit)
 def _duzey(b, duzey):  # ham sesi kısar (hı hı); duzey 0–1
     import array
     a = array.array("h", b[:len(b) // 2 * 2]); f = max(0.0, min(1.0, float(duzey)))
@@ -165,13 +182,13 @@ def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekt
         try: os.remove(yol)
         except OSError: pass
     return True
-def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False):
+def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
     # duzey: 0–1 ses düzeyi (kısık "hı hı").
     if not metin or not gemini_var(): return None if topla else False
     if aygit and not os.access(PIPER_OYNAT, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
-    sabit = _sabit_mi(metin)
+    sabit = _sabit_mi(metin) if sabit is None else sabit  # v0.81.0: çağıran söyleyebilir (kişilik tanıtımı, toplantı başı duyurusu)
     if sabit:
         pcm = _sabit_al(metin, ses, uslup)
         if pcm:
@@ -220,7 +237,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                 if r.status == 429 and _gunluk_mu(hata):  # günlük sınır: beklemek işe yaramaz — model sıfırlanana kadar bırakılır, öteki hemen denenir
                     sn = _kota_doldu(model, hata); oteki = gemini_model()
                     print(f"GEMINI: {model} günlük sınırı doldu ({sn / 3600:.1f} saat sonra açılır)" + (f" — {oteki} ile devam" if oteki else " — iki model de dolu, Mac sesi"))
-                    if oteki: return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden)
+                    if oteki: return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden, sabit=sabit)
                     return None if topla else False
                 if r.status in (429, 503) and not _yeniden:  # v0.80.6: hız sınırı / geçici yoğunluk — önerilen süre (en çok GEMINI_429_EN_COK_SN) beklenip bir kez daha
                     bekle = _gemini_bekleme(hata, r.getheader("Retry-After")); t_b = time.time()
@@ -228,7 +245,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                     while time.time() - t_b < bekle:
                         if iptal and iptal(): return None if topla else True  # okuma kesildi: Mac sesine düşülmez
                         time.sleep(0.1)
-                    return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True)
+                    return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
                 raise RuntimeError(f"HTTP {r.status}: {' '.join(hata.split())[:160]}")
             while True:
                 satir = r.readline()
@@ -257,7 +274,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
             _gemini_kapat()
             if not nbayt and not _yeniden and not isinstance(e, RuntimeError):  # zaman aşımı / bağlantı: yeni bağlantıyla bir kez daha (HTTP hatası kalıcı, denenmez)
                 print(f"GEMINI: ses gelmedi ({e.__class__.__name__}) — yeni bağlantıyla yeniden")
-                return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True)
+                return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
             if not nbayt:
                 GEMINI.update(durum="hata", hata=str(e)[:200] or e.__class__.__name__, hata_t=time.time())
                 print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, {GEMINI_BEKLE_SN:.0f} sn Gemini denenmez"); return None if topla else False
@@ -265,7 +282,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
     GEMINI.update(durum="hazir", hata=None)
     if sabit and ham and not (iptal and iptal()): _sabit_yaz(metin, ses, uslup, bytes(ham))
     bitir(True)
-    _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk)
+    _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk, model)
     print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")
     if topla: return bytes(tampon) if tampon else None
     return nbayt > 0
@@ -273,7 +290,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
 # gemini_kullan: anahtar var ve ses motoru Gemini ya da bir kişiliğin sesi Gemini → kısa okumalar (fısıltı, sesli çeviri, duyuru) da Gemini'yle.
 # gemini_kisa: beklemeli kısa okuma (okuma kuyruğundan bağımsız; Gemini bağlantısı kilitle sırayla); olmazsa False, çağıran Piper/Mac sesine düşer.
 def gemini_kullan():
-    if not gemini_var(): return False
+    if not gemini_izinli(): return False  # v0.81.0: kısa okumalar (fısıltı, sesli çeviri) yalnız kullanıcıya — kapsam "toplanti"da yerel ses
     if AYAR.get("ses_motoru") == "gemini": return True
     try: return any(str(k.get("ses") or "").startswith("gemini") for k in kisilikler())
     except Exception: return False

@@ -123,7 +123,7 @@ os.environ["SUFLOR_TEST_GEMINI_SESSIZ"] = "1"; ad["PIPER_OYNAT"] = "/yok"
 bak("aygıt istenip çalıcı yoksa False (afplay varsayılan çıkışa giderdi)", ad["gemini_oku"]("Yok.", aygit="59") is False)
 # 1c) toplantıya söyle: toplantı kişiliğinin sesi Gemini ise BlackHole + kulaklık aynı Gemini sesi (sahte çalıcı)
 tsn = dict(ad); open(SAHTE + ".arg", "w").close()
-tsn.update(PIPER_OYNAT=SAHTE, kisilik_sesi=lambda zorla=None: ("gemini", "Kore", 1.0), kisilik=lambda: {"ses_uslup": "ölçülü"}, kisilik_telaffuz=lambda m: m, ses_duzen=lambda m, mac=True: m,
+tsn.update(PIPER_OYNAT=SAHTE, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Kore", 1.0), kisilik=lambda: {"ses_uslup": "ölçülü"}, kisilik_telaffuz=lambda m: m, ses_duzen=lambda m, mac=True: m,
            AYAR={"toplantiya_ses": True}, STATE={"masaustu": {"toplantida": True}}, toplanti_var=lambda: True, ts_web=lambda: False, ts_aygit=lambda: "59", otonom_kisayol=lambda: None,
            ses_secimi=lambda: None, telaffuz=lambda m, mac=False: m, ses_durdur=lambda: None, kulaklik=lambda: True, kendi_ses_kaydet=lambda *a: None, note=lambda *a: None, kart_bildir=lambda: None,
            sesli_terim_suz=lambda m: m, etiket_sil=lambda m: m, _t=lambda a, b: a, ARAYUZ_DILI="tr", kisilik_ad=lambda: "Atlas", re=__import__("re"), secrets=__import__("secrets"))
@@ -132,9 +132,18 @@ tsn["TS"]["tanitti"] = "?"  # tanıtım bu denemede okunmasın
 r = tsn["toplantiya_soyle"]("Bütçe onaylandı."); time.sleep(0.5)
 argl = [x for x in open(SAHTE + ".arg").read().split("\n") if x]
 bak(f"toplantıya söyle Gemini: BlackHole (59) + kulaklık, Kore ({argl}, {r})", r.get("ok") and argl == ["24000 59", "24000"] and '"voice_name": "Kore"' in json.dumps(GELEN[-1]["govde"]) and "## Style:\nölçülü" in GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"])
+# v0.81.0 (S92): tanıtım ayrı okunup cevabın önüne eklenir ve önbelleğe girer; ikinci toplantıda tanıtım için istek yok
+def _tan(toplanti):
+    ts_ = tsn; eski_ = (ts_["kisilik"], ts_["STATE"]); ts_["kisilik"] = lambda: {"ses_uslup": "ölçülü", "tanitim": "Merhaba, ben Atlas."}; ts_["TS"]["tanitti"] = None; ts_["STATE"] = {"masaustu": {"toplantida": True, "baslik": toplanti}}
+    ts_["TS"]["p"] = []; n = len(GELEN); r_ = ts_["toplantiya_soyle"]("Bütçe onaylandı."); time.sleep(0.3); ts_["kisilik"], ts_["STATE"] = eski_
+    return r_, [g["govde"]["contents"][0]["parts"][0]["text"].split("## Transcript:\n")[-1] for g in GELEN[n:]]
+for i_ in range(3): r1_, m1_ = _tan(f"T{i_}")
+r2_, m2_ = _tan("T9")
+bak(f"tanıtım ayrı istek, ilk 3 toplantıda önbelleğe yazılır ({m1_})", r1_.get("ok") and m1_ == ["Bütçe onaylandı.", "Merhaba, ben Atlas."] and "Merhaba, ben Atlas." in r1_.get("metin", ""))
+bak(f"sonra tanıtım önbellekten, yalnız cevap Gemini'ye ({m2_})", r2_.get("ok") and m2_ == ["Bütçe onaylandı."])
 # 1d) hı hı: Gemini sesiyle konuşan kişilikte klip değil o anda Gemini (tepki_cal)
 bs = open(os.path.join(K, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); i = bs.index("def tepki_cal("); tc = dict(ad)
-tc.update(AYAR={}, piper_acik=lambda: False, kisilik_sesi=lambda zorla=None: ("gemini", "Charon", 1.0), threading=threading); n0 = len(GELEN)
+tc.update(AYAR={}, piper_acik=lambda: False, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Charon", 1.0), threading=threading); n0 = len(GELEN)
 exec(bs[i:bs.index("\n_TEPKI_BAS", i)], tc)
 r1 = tc["tepki_cal"]("alindi", hemen=True, ses=0.4); time.sleep(0.8)
 bak("hı hı: Gemini'den o anda (klip yok), kısık, Charon", r1 is True and len(GELEN) == n0 + 1 and '"voice_name": "Charon"' in json.dumps(GELEN[-1]["govde"]) and "Hı" in GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"] + "Hım")

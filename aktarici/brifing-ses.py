@@ -355,12 +355,13 @@ def _telaffuz_dongu():
         time.sleep(15)
 _SES_SEC = {"t": 0, "v": None}
 SES_TABAN_HIZ = 180  # v0.71.0: Yelda'nın varsayılan hızı ~180 sözcük/dk (ölçüm 17 Ekim); kişilik hiz çarpanı bunun üstüne
-def kisilik_sesi(zorla=None):  # → (motor "gemini"|"piper"|"mac", ses adı (Gemini hazır sesi / Mac say -v; None = sistem sesi), hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
+def kisilik_sesi(zorla=None, toplantiya=False):  # toplantiya: ses katılımcılara gidiyor (v0.81.0, S92: Gemini yalnız orada)  # → (motor "gemini"|"piper"|"mac", ses adı (Gemini hazır sesi / Mac say -v; None = sistem sesi), hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
     k = kisilik(); kses = (k or {}).get("ses"); khiz = (k or {}).get("hiz") or 1.0
     piper_var = ARAYUZ_DILI == "tr" and bool(AYAR.get("piper_python")) and bool(AYAR.get("piper_model"))
     if zorla != "mac":
-        if (kses or "").startswith("gemini") and gemini_var(): return "gemini", (kses.split(":", 1)[1].strip() if ":" in kses else None), khiz  # v0.78.0: "gemini" ya da "gemini:Kore"
-        if not kses and gemini_acik(): return "gemini", None, khiz
+        if (kses or "").startswith("gemini") and gemini_izinli(toplantiya): return "gemini", (kses.split(":", 1)[1].strip() if ":" in kses else None), khiz  # v0.78.0: "gemini" ya da "gemini:Kore"
+        if not kses and gemini_acik() and gemini_izinli(toplantiya): return "gemini", None, khiz
+        if ((kses or "").startswith("gemini") or (not kses and gemini_acik())) and piper_var: return "piper", None, khiz  # v0.81.0: Gemini toplantıya ayrıldı → yerel ses
         if (kses == "piper" and piper_var) or (not kses and piper_acik()): return "piper", None, khiz
     return "mac", (kses if kses and kses != "piper" and not kses.startswith("gemini") else ses_secimi()), khiz
 def ses_secimi():  # say -v için ses adı; None = sistem sesi
@@ -385,7 +386,7 @@ def seslendir(metin, kuyruk=False, tepkisiz=False, k=None):
     metin, ton = ton_ayikla(metin)  # v0.80.0: Claude'un <ton:ad> etiketi (hiçbir seste okunmaz)
     if ton: ton_kur(ton)
     if not metin: return False
-    if k is not None and str(k.get("ses") or "").startswith("gemini") and gemini_var(): motor = "gemini"
+    if k is not None and str(k.get("ses") or "").startswith("gemini") and gemini_izinli(): motor = "gemini"
     else: motor = kisilik_sesi()[0]
     mac = motor == "mac"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
     if mac and not tepkisiz: klip, metin = tepki_ayir(metin)  # tepki klipleri Elif tınısında: yalnız Mac sesinde
@@ -421,7 +422,7 @@ def _ses_isci():
         if dosya: p.wait(); continue
         motor, v, khiz = kisilik_sesi()
         with SES_K: bas = SES["q"][0] if SES["q"] else None
-        if isinstance(bas, tuple) and bas[0] == "g" and gemini_var(): motor = "gemini"  # v0.80.0: parça Gemini için hazırlandı (kendi sesi/üslubu)
+        if isinstance(bas, tuple) and bas[0] == "g" and gemini_izinli(): motor = "gemini"  # v0.81.0: kapsam bu arada daraldıysa yerel sese düşer  # v0.80.0: parça Gemini için hazırlandı (kendi sesi/üslubu)
         if motor == "gemini":  # v0.78.0: bulut ses; okunamazsa (ağ, anahtar) Mac sesi
             with SES_K:
                 if not SES["q"]: continue
@@ -576,7 +577,7 @@ def ozet_sesli(r):
     if ok: print("SES: özet okunuyor")
     return ok
 def ozet_iki_ses():  # → (toplantı kişiliği, öteki) ikisi de Gemini sesliyse ve ayar ozet_iki_ses kapalı değilse; yoksa None
-    if AYAR.get("ozet_iki_ses", True) is False or not gemini_var(): return None
+    if AYAR.get("ozet_iki_ses", True) is False or not gemini_izinli(): return None  # v0.81.0: özet kullanıcıya okunur — kapsam "toplanti"da tek yerel ses
     ks = [k for k in kisilikler() if str(k.get("ses") or "").startswith("gemini")]
     if len(ks) < 2: return None
     k1 = next((k for k in ks if k["rol"] == "toplanti"), ks[0])

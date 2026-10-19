@@ -30,6 +30,7 @@ os.environ.update(SUFLOR_AYAR=os.path.join(T, "ayar.json"), SUFLOR_TEST_BASLAT="
 sys.argv = ["relay.py", "--dir", os.path.join(T, "canli"), "--port", str(PORT)]; os.chdir(T)
 sp = u.spec_from_file_location("relay_t", os.path.join(T, "relay.py")); m = u.module_from_spec(sp)
 with contextlib.redirect_stdout(io.StringIO()): sp.loader.exec_module(m)
+m.AYAR["gemini_kapsam"] = "hepsi"  # 1–8: v0.80.0 davranışı (her okuma Gemini); S92 (kapsam "toplanti") en sonda
 def cikti(fn, *a, bekle=0.0, **k):
     o = io.StringIO()
     with contextlib.redirect_stdout(o):
@@ -101,5 +102,18 @@ r1, _ = cikti(m.konus_basla); r2, _ = cikti(m.sohbet_basla)
 bak("giriş BlackHole: Konuş başlamaz, uyarı Sistem Ayarları yolunu söyler", r1.get("ok") is False and "BlackHole" in r1.get("err", "") and "Giriş" in r1.get("err", ""))
 bak("giriş BlackHole: sohbet de açılmaz", r2.get("ok") is False and "BlackHole" in r2.get("err", ""))
 os.environ.pop("SUFLOR_TEST_GIRIS_SANAL"); g = m.giris_sanal(); bak(f"gerçek Core Audio okuması hatasız (şu an sanal: {g})", g in (True, False))
+# 9) v0.81.0 (S92): kapsam "toplanti" — Gemini yalnız katılımcıların duyduğu seste; kullanıcıya okunan her şey yerel ses
+m.AYAR.pop("gemini_kapsam"); m.AYAR["ses_motoru"] = "mac"
+bak("varsayılan kapsam toplantı", m.gemini_kapsam() == "toplanti" and m.gemini_view()["kapsam"] == "toplanti" and isinstance(m.gemini_view()["bugun"], dict))
+bak("toplantıya söylenen Gemini (kişilik sesiyle)", m.kisilik_sesi(toplantiya=True)[0] == "gemini")
+bak("kullanıcıya okunan Gemini değil (Piper ya da Mac)", m.kisilik_sesi()[0] in ("piper", "mac"))
+_, o = cikti(m.seslendir, "Tamam, bakıyorum.", kuyruk=True)
+bak("seslendir (sohbet, Konuş, kulağa cevap) Gemini parçası üretmez", "SES (deneme)" in o and "· ses " not in o)
+bak("fısıltı ve sesli çeviri (gemini_kisa) yerel sese düşer", m.gemini_kullan() is False and m.gemini_kisa("Kısa.") is False)
+bak("iki sesli özet yok (tek yerel ses)", m.ozet_iki_ses() is None)
+ts = open(os.path.join(KOD, "aktarici", "toplantiya-ses.py"), encoding="utf-8").read()
+bak("toplantıya söyle (otonom, duyuru, tanıtım da buradan) toplantiya=True ister", "kisilik_sesi(toplantiya=True)" in ts and ts.count("toplantiya_soyle(") >= 2)
+bak("tanıtım ve toplantı başı duyurusu önbellekten (sabit)", "sabit=True" in ts and m.DUYURU_SABIT() == {"Toplantıyı dinleyip not alıyorum."})
+m.AYAR["gemini_kapsam"] = "hepsi"; bak("kapsam hepsi: eski davranış geri gelir", m.kisilik_sesi()[0] == "gemini" and m.gemini_kullan() is True); m.AYAR.pop("gemini_kapsam")
 shutil.rmtree(T, ignore_errors=True)
 print("ses devri: " + ("✓ hepsi geçti" if not hata else f"✗ {len(hata)} kaldı")); sys.exit(1 if hata else 0)

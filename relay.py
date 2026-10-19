@@ -1423,7 +1423,7 @@ AYAR_PANO = {
     "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "otonom": ("bool", False, None), "sesli_not": ("bool", True, None), "toplanti_konus": ("bool", True, None), "kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
     "brifing_sesli": ("bool", False, None), "ses_motoru": ("sec", "mac", ("mac", "piper", "gemini")),
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
-    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
+    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None), "menu_cubugu": ("bool", False, None),

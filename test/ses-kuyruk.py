@@ -21,7 +21,7 @@ class P:  # sahte afplay/say süreci
 def deneme(gemini_acik, motor="mac", q=None, bekle=3):
     del CALAN[:]
     n = {"SES": {"q": q or [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Mac cümlesi."], "isci": True, "kes": 0}, "GEMINI_BIRLESIK_EN_COK": 600, "SES_K": threading.Condition(),
-         "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "PIPE": None}), "kisilik_sesi": lambda m=None: (m or motor, None, 1.0), "gemini_var": lambda: gemini_acik,
+         "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "PIPE": None}), "kisilik_sesi": lambda m=None, toplantiya=False: (m or motor, None, 1.0), "gemini_var": lambda: gemini_acik, "gemini_izinli": lambda toplantiya=False: gemini_acik,
          "gemini_oku": lambda metin, **a: (CALAN.append(("gemini", metin, a.get("ses"), a.get("uslup"))), True)[1], "etiket_sil": lambda m: m, "kisilik": lambda: {},
          "piper_oku": lambda *a, **k: False, "piper_hiz": lambda: 1.0, "SES_TABAN_HIZ": 180, "print": lambda *a, **k: None, "time": time, "os": os}
     exec(compile(ast.Module(fn, []), "brifing-ses.py", "exec"), n)

@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 169798,
-   "sha": "99a0ccc5094f1a38"
+   "uzunluk": 170472,
+   "sha": "b1a6d2c0ae94d2f4"
   },
   "/hazirlik": {
-   "uzunluk": 48132,
-   "sha": "9951cd6eb63b95bc"
+   "uzunluk": 48563,
+   "sha": "17bbd04bc76b8927"
   },
   "/mini": {
-   "uzunluk": 169798,
-   "sha": "99a0ccc5094f1a38"
+   "uzunluk": 170472,
+   "sha": "b1a6d2c0ae94d2f4"
   },
   "/status": {
    "_ping_son": "float",
@@ -267,6 +267,7 @@
      "eposta": "str",
      "eposta_adres": "str",
      "fisilti": "bool",
+     "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
      "kanit_metin": "bool",
@@ -308,6 +309,7 @@
      "eposta": "str",
      "eposta_adres": "str",
      "fisilti": "bool",
+     "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
      "kanit_metin": "bool",

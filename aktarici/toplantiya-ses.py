@@ -63,14 +63,21 @@ def toplantiya_soyle(metin=None):
     m = ts_sesli_kisim(metin if metin is not None else KONUS.get("cevap"))
     if not m: return {"ok": False, "err": _t("Söylenecek cevap yok — önce Konuş'la sor", "Nothing to say — ask with Talk first")}
     toplanti = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
+    tanitim = None
     if TS["tanitti"] != toplanti:
         k = kisilik(); tn = (k or {}).get("tanitim") or str(AYAR.get("tanitim") or "").strip()  # v0.53.0: kişilik/ayar tanıtımı; yoksa nötr varsayılan
-        TS["tanitti"] = toplanti; m = (tn or TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı")) + " " + m
+        tanitim = tn or TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı")
+        TS["tanitti"] = toplanti; m = tanitim + " " + m
     v = ses_secimi(); okunan = ses_duzen(telaffuz(m, mac=True)); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
     # v0.79.0 (kullanıcı 18 Ekim: "toplantı kişiliğinin sesi"): kişiliğin sesi Gemini ise ses Gemini'den (ör. toplantı kişiliği Kore); alınamazsa Mac sesi
-    km, kses, _ = kisilik_sesi(); gpcm = None
+    km, kses, _ = kisilik_sesi(toplantiya=True); gpcm = None  # v0.81.0 (S92): katılımcıların duyduğu ses — Gemini her zaman burada
     if km == "gemini" and os.access(PIPER_OYNAT, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
-        gpcm = gemini_pcm(ses_duzen(kisilik_telaffuz(m), False), ses=kses, uslup=(kisilik() or {}).get("ses_uslup"))
+        usl = (kisilik() or {}).get("ses_uslup"); govde = m[len(tanitim) + 1:] if tanitim else m
+        # tanıtım ve toplantı başı duyurusu sabit: bir kez okunup önbellekte (günlük sınırdan yemez); tanıtım ayrı okunup cevabın önüne eklenir
+        gpcm = gemini_pcm(ses_duzen(kisilik_telaffuz(govde), False), ses=kses, uslup=usl, sabit=True if govde.strip() in DUYURU_SABIT() else None)
+        if gpcm and tanitim:
+            tp = gemini_pcm(ses_duzen(kisilik_telaffuz(tanitim), False), ses=kses, uslup=usl, sabit=True)
+            gpcm = (tp + b"\0\0" * int(GEMINI_SR * 0.35) + gpcm) if tp else None
         if not gpcm: print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Mac sesi")
     if web: return _ts_web_hazirla(m, sesli, okunan, gpcm)
     if os.environ.get("SUFLOR_TEST_BASLAT"):
@@ -161,6 +168,7 @@ if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_ts_nobet, 
 DUYURU = {"toplanti": None, "t_ilk": 0.0, "son": 0.0, "say": 0}
 DUYURU_ARA_SN, DUYURU_SIRA_SN, DUYURU_BASLA_SN = 60.0, 20.0, (3.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 30.0)
 DUYURU_METIN = {"baslangic": ("Toplantıyı dinleyip not alıyorum.", "I'm listening and taking notes."), "not": ("Not aldım: {b}", "Noted: {b}")}
+def DUYURU_SABIT(): return {_t(*DUYURU_METIN["baslangic"])}  # v0.81.0: değişmeyen duyurular (önbellekten)
 def duyuru_acik(): return AYAR.get("toplanti_duyuru") is True and AYAR.get("toplantiya_ses") is True
 def _duyuru_toplanti():
     if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")): return None
