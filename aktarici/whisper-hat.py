@@ -289,6 +289,7 @@ def _isci_dongu():
             if _ISCI["p"]: _isci_kapat(f"{WH_BOSTA_KAPAT_SN // 60} dk ses yok, bellek boşaltıldı")
             return
         w["kuyruk"] = WH_Q.qsize()
+        if "gizli_acik" in globals() and gizli_acik(): continue  # v0.89.1: gizli toplantı — parça işlenmeden atılır, işçi açılmaz
         if is_.get("isinma"):  # toplantıdan önce modeli belleğe al (ilk cümle beklemesin)
             if not _ISCI["p"] or _ISCI["p"].poll() is not None: _isci_ac()
             continue
@@ -652,6 +653,7 @@ def whisper_yaz(is_, metin, ses=None, model=None):
                 YANKI_BEKLEYEN.append((is_, metin, ses, model, now + 4.0)); threading.Timer(4.1, _yanki_bosalt).start(); return "bekletildi"
     _whisper_yaz(is_, metin, ses, model); return "satir"
 def _whisper_yaz(is_, metin, ses=None, model=None):
+    if "gizli_acik" in globals() and gizli_acik(): return  # v0.89.1: gizli toplantıda satır yazılmaz (kuyrukta kalmış parça dahil)
     kanal = is_["kanal"]; k = KANALLAR.get(kanal)
     if k: k.onceki = (k.onceki + " " + metin)[-300:]
     STATE["whisper"]["satir"] += 1; STATE["whisper"]["kanal_son_satir"][kanal] = time.time()

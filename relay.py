@@ -427,31 +427,33 @@ def sessiz_view():
     if not sessiz_acik() and not tut: return None
     return {"id": SESSIZ["id"], "acik": sessiz_acik(), "kalan_sn": max(0, round(SESSIZ["bitis"] - time.time())) if sessiz_acik() else 0,
             "bitis": datetime.datetime.fromtimestamp(SESSIZ["bitis"]).strftime("%H:%M"), "tutulan": tut}
-# Gizli toplantı (S91, v0.89.0): kritik toplantı için tek dokunuş — Gemini'ye metin gitmez (her okuma yerel sesle: Pocket → Mac), asistanlar
-# toplantıda konuşmaz (otonom, adıyla çağrılınca herkese okuma, moderatör, duyuru kapalı; adıyla soru yalnız kulağa). Toplantı bitip
-# GIZLI_BOS_SN boyunca yeni toplantı olmayınca kendiliğinden kapanır (unutulan anahtar ertesi günü etkilemesin).
-GIZLI = {"acik": False, "bas": 0.0, "bos_t": 0.0}
-GIZLI_BOS_SN = 3 if os.environ.get("SUFLOR_TEST_HIZLI") else 900
+# Gizli toplantı (S91, v0.89.0; v0.89.1 kullanıcı 19 Ekim: "tamamen kör ve sağır, tekrar tıklayana kadar") — açıkken hiçbir yapay zekâ ve hiçbir
+# kayıt yok: eklentinin ve masaüstü uygulamasının satırı, sesi, taslağı, kanıtı alınıp atılır (eklenti yeniden göndermesin diye "ok"); Whisper
+# işçisi kapanır ve kuyruktaki parçalar işlenmeden atılır; Konuş, sohbet, Ne diyeyim?, not, soru, Başlat, brifing, moderatör, otonom, kart,
+# duyuru, toplantıya söyle reddedilir; izle toplantı oturumuna tek "GİZLİ TOPLANTI" satırı yazar, sonra olay göndermez; Gemini kapalı. Dökümde
+# yalnız açılış/kapanış saati kalır. Kendiliğinden kapanmaz (ayrı bir toplantıya geçilse de); pano ve mini panoda 🔒 açıkça görünür.
+GIZLI = {"acik": False, "bas": 0.0}
+GIZLI_YUT = {"/ingest", "/taslak", "/ses", "/ses-yerel", "/ses-masaustu", "/kanit", "/kanit-masaustu", "/masaustu"}  # sessizce atılır
+GIZLI_RED = {"/note", "/ask", "/girdi", "/kanit-iste", "/bas-konus", "/baslat", "/brifing", "/baglam-dosya", "/dosyadan", "/dosyadan-karar", "/card",
+             "/etiket", "/eylem", "/eylem-sun", "/eylem-sesli", "/eylem-karar", "/eylem-sonuc", "/eylem-geri-al", "/moderator", "/otonom", "/agenda-tick",
+             "/geri-bildirim", "/komut"}  # /komut yalnız tur=gizli geçer
 def gizli_acik(): return GIZLI["acik"]
+def gizli_red(): return {"ok": False, "gizli": True, "err": _t("Gizli toplantı açık — Suflor hiçbir şey dinlemiyor ve işlemiyor (🔒 ile kapat)", "Private meeting is on — Suflor isn't listening or processing anything (turn off with 🔒)")}
 def gizli_degistir(neden="kullanıcı"):
     with LOCK:
-        ac = not GIZLI["acik"]; GIZLI.update(acik=ac, bas=time.time() if ac else 0.0, bos_t=0.0)
-        if STATE.get("file"): _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **GİZLİ** | {'açıldı (Gemini ve asistanların toplantıda konuşması kapalı)' if ac else f'kapandı ({neden})'} | |")
-    if ac:
-        try: ts_durdur(); otonom_kisayol()  # süren toplantıya okuma ve bekleyen otonom cevap hemen kesilir
-        except Exception as e: print(f"GİZLİ: okuma durdurulamadı ({e.__class__.__name__})")
+        ac = not GIZLI["acik"]; GIZLI.update(acik=ac, bas=time.time() if ac else 0.0)
+        if STATE.get("file"): _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **GİZLİ** | {'açıldı — kapanana kadar hiçbir şey kaydedilmez' if ac else f'kapandı ({neden})'} | |")
+    if ac:  # süren her şey hemen kesilir
+        for ad, fn in (("toplantıya okuma", lambda: ts_durdur()), ("otonom", lambda: otonom_kisayol()), ("Konuş", lambda: konus_kapat("gizli toplantı")),
+                       ("sohbet", lambda: SOHBET["acik"] and sohbet_kapat("gizli toplantı")), ("Whisper", lambda: _isci_kapat("gizli toplantı")),
+                       ("çeviri", lambda: [_cv_kapat(y, "gizli toplantı") for y in _CV.get("yuva") or []])):
+            try: fn()
+            except Exception as e: print(f"GİZLİ: {ad} durdurulamadı ({e.__class__.__name__})")
+        try:
+            with WH_Q.mutex: WH_Q.queue.clear()
+        except Exception: pass
     print(f"GİZLİ: {'açıldı' if ac else 'kapandı'} ({neden})"); kart_bildir(); return ac
 def gizli_view(): return {"acik": True, "bas": datetime.datetime.fromtimestamp(GIZLI["bas"]).strftime("%H:%M")} if GIZLI["acik"] else None
-def _gizli_nobet():
-    while True:
-        time.sleep(1.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 10.0)
-        try:
-            if not GIZLI["acik"]: continue
-            if toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida"): GIZLI["bos_t"] = 0.0; continue
-            if not GIZLI["bos_t"]: GIZLI["bos_t"] = time.time()
-            elif time.time() - GIZLI["bos_t"] >= GIZLI_BOS_SN: gizli_degistir("toplantı bitti")
-        except Exception as e: print(f"GİZLİ: nöbet hatası {e.__class__.__name__}")
-threading.Thread(target=_gizli_nobet, daemon=True).start()
 def _gundem_imza(): return [STATE.get("agenda_aktif"), sorted(k for k, v in STATE["agenda_ticks"].items() if v)]
 def ertele_card(p):
     with LOCK:
@@ -532,6 +534,7 @@ def sesli_not_bak(metin):
     print(f"NOT: sesli istek — \"{metin[:60]}\""); return "🎙 " + (icerik[:300] or _t("sesli not işareti", "voice note mark"))
 def kanit(p):
     import base64
+    if gizli_acik(): return {"ok": False, "err": _t("Gizli toplantı açık — kanıt alınmaz", "Private meeting is on — no evidence is captured")}
     d = str(p.get("png") or "")
     if d.startswith("data:"): d = d.split(",", 1)[-1]
     try: b = base64.b64decode(d, validate=True)
@@ -616,6 +619,7 @@ def yaparken_degistir(durum=None, neden=None):  # durum: "ac" | "kapat" | None (
     print(f"EKRAN: paylaşım {'başladı — görüntü kaydı açık' if ac else f'bitti — {n} görüntü'}" + (f" · yol {neden}" if ac and neden else "")); return ac
 def paylasim_bildir(var, neden=None):  # eklentinin nabzı (kararlı değer): paylaşım başlayınca kayıt açılır, bitince kapanır
     # neden: eklentinin hangi yoldan "var" dediği (yalnız harf/rakam/boşluk/x/%; ad içermez) — paylaşım yokken açılırsa günlükten bulunur
+    if gizli_acik(): return  # v0.89.1: gizli toplantıda kendiliğinden kanıt yok
     neden = re.sub(r"[^\w %x]", "", str(neden or ""))[:70] or None  # v0.88.1: etiket yolunda eşleşen ifade de gelir
     if var and AYAR.get("ekran_oto", True) is not False and not yaparken_acik(): yaparken_degistir("ac", neden)
     elif not var and yaparken_acik(): yaparken_degistir("kapat")
@@ -641,12 +645,13 @@ def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | 
             _t("🎧 Kulaklık takılı değil — sesli çeviri açılmadı (hoparlörden karşı taraf da duyar)", "🎧 No headphones — spoken translation not turned on (the other side would hear it)") if uy else \
             _t("🎧 Sesli çeviri kapandı", "🎧 Spoken translation off")
     elif tur == "soyle": r = toplantiya_soyle(gov) if gov else asistan_dur(); onay = r.get("metin") or "⚠ " + str(r.get("err"))  # S94: metinsiz (Option + Shift + S) = asistan sussun; metinli yalnız API/test (panodaki 🔊 kalktı)
-    elif tur == "gizli": onay = _t("🔒 Gizli toplantı: Gemini ve asistanların toplantıda konuşması kapalı, ses yerel", "🔒 Private meeting: Gemini and assistants speaking in the meeting off, local voice") if gizli_degistir() else _t("🔓 Gizli toplantı kapandı", "🔓 Private meeting off")
+    elif tur == "gizli": onay = _t("🔒 Gizli toplantı: Suflor hiçbir şey dinlemiyor, yazmıyor, hiçbir yapay zekâya göndermiyor — kapatmak için yine 🔒", "🔒 Private meeting: Suflor isn't listening, writing or sending anything to any AI — press 🔒 again to turn off") if gizli_degistir() else _t("🔓 Gizli toplantı kapandı", "🔓 Private meeting off")
     elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
     else: ask({"tur": "ozet"}); onay = _t("💬 Ne diyeyim? — Claude replik hazırlıyor", "💬 What do I say? — Claude is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
     print(f"KOMUT: {tur} · \"{gov[:80]}\"")
 def ingest(p):
+    if gizli_acik(): return  # v0.89.1: gizli toplantıda satır yazılmaz
     m = p.get("meeting") or {}; title = m.get("title", "Toplantı"); entries = p.get("entries", [])
     with LOCK:
         md, jl = paths(title); hdr = ensure_header(md, title, m, p.get("source")); base_key = os.path.basename(md); show(md, title)
@@ -1871,6 +1876,7 @@ class H(BaseHTTPRequestHandler):
             o = str(self.headers.get("Origin", ""))
             if o not in (f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}"): return self._json({"ok": False, "err": "köken"}, 403)
             if not self._yetkili(): return self._anahtar_yok()
+            if gizli_acik(): self.close_connection = True; return self._json(gizli_red())
             try: n = int(self.headers.get("Content-Length", 0))
             except ValueError: n = -1
             if n <= 0: return self._json({"ok": False, "err": "boyut"}, 413)
@@ -1886,6 +1892,8 @@ class H(BaseHTTPRequestHandler):
         if not yetkili and self.path != "/ses-yerel":  # ses yardımcısı kendi anahtarıyla
             if self.path in GECIS_YAZMA and not AYAR.get("anahtar_zorunlu"): anahtarsiz_kaydet(self.path, o)
             else: return self._anahtar_yok()
+        if gizli_acik() and self.path in GIZLI_YUT: return self._json({"ok": True, "gizli": True})  # v0.89.1
+        if gizli_acik() and self.path in GIZLI_RED and not (self.path == "/komut" and p.get("tur") == "gizli"): return self._json(gizli_red())
         if self.path == "/ingest": ingest(p); return self._json({"ok": True, "lines": STATE["lines"], "held": STATE["disk"]["held"]})
         if self.path == "/taslak": return self._json(taslak_al(p))
         if self.path == "/note": note(p); return self._json({"ok": True})

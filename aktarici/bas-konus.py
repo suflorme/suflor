@@ -1247,6 +1247,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
 OZET_HIZLI_ONAY_SN, OZET_HIZLI_EN_AZ_SATIR = 3.0, 8
 HIZLI = {"dosya": None, "t": 0.0, "okundu": False}
 def hizli_ozet_tetik(kaynak):
+    if "gizli_acik" in globals() and gizli_acik(): return
     f = STATE.get("file")
     if not f or HIZLI["dosya"] == f or STATE["file_lines"].get(f, 0) < OZET_HIZLI_EN_AZ_SATIR: return
     if AYAR.get("hizli_ozet", True) is False or not AYAR.get("konusma", True) or not claude_yolu() or not os.path.isdir(BRIFING_APP): return

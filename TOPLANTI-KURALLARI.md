@@ -102,6 +102,8 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   veriyorsa tek NOT kartı (ad + bildiğin 1–2 bağlam); tanımıyorsan bir şey yapma. Sıklık sınırına sayılmaz.
   Satırda "karar grafında geçmişi: …" varsa (önceki toplantılardan iddia, karar, açık iş): bugün farklı rakam, tarih ya da
   karar söylerse `soyle` kartıyla çelişkiyi belirt ("Ayşe 11 Eki'de 95 bin demişti — hangisi?"); kişinin açık işi konuya gelince sor.
+- `GİZLİ TOPLANTI`: kullanıcı 🔒 ile tamamen kapattı — kapanana kadar hiçbir olay gelmez; kart yazma, arama yapma, sohbete tek satır.
+  `GİZLİ TOPLANTI BİTTİ`: aradaki bölüm kayıtta yok; özette yalnız "gizli bölüm (HH:MM–HH:MM)" diye an, içerik tahmin etme.
 - `TOPLANTI BİTTİ (<neden>)`: aktarıcı bitişi algıladı (toplantı sinyali yok ve uygulama mikrofonu bıraktı; yardımcı yoksa 5 dk satırsız;
   masaüstü penceresi kapandı). kullanıcı "bitti" yazmasını bekleme: toplantı sonu adımlarına geç; sohbete tek satır. Yeniden katılırsa olay
   sıfırlanır, satırlar sürer.

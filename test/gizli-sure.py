@@ -28,36 +28,49 @@ def cikti(fn, *a, bekle=0.0, **k):
     return r, o.getvalue()
 def toplanti(): m.STATE["_cagri_son"] = time.time()
 
-# 1) gizli toplantı
+# 1) gizli toplantı — v0.89.1: tamamen steril, tekrar basana kadar
+import threading, urllib.request
+srv = m.ThreadingHTTPServer(("127.0.0.1", PORT), m.H); threading.Thread(target=srv.serve_forever, daemon=True).start()
+def post(yol, govde):
+    r = urllib.request.Request(f"http://127.0.0.1:{PORT}{yol}", data=json.dumps(govde).encode(), method="POST",
+                               headers={"X-Suflor-Anahtar": m.CARD_KEY, "Content-Type": "application/json"})
+    try: return json.loads(urllib.request.urlopen(r, timeout=10).read())
+    except urllib.error.HTTPError as e: return json.loads(e.read() or b"{}")
 m.STATE["meeting"] = "Deneme Toplantı"; toplanti(); m.kanal_sessizlik = lambda: 2.0; m.SES["test_bit"] = 0
-bak("başta: Gemini toplantıya izinli, asistanlar konuşur, duyuru açık", m.gemini_izinli(True) and m.asistan_toplanti() and m.duyuru_acik() and m.otonom_acik())
-_, o = cikti(m.komut_uygula, "gizli", "", None)
-bak("/komut gizli açar, günlükte GİZLİ", m.gizli_acik() and "GİZLİ: açıldı" in o and "🔒" in m.STATE["komut"]["metin"])
-bak("gizlide Gemini hiç yok (toplantıya da)", not m.gemini_izinli(True) and not m.gemini_izinli() and m.kisilik_sesi(toplantiya=True)[0] != "gemini")
-bak("gizlide asistanlar toplantıda konuşmaz, otonom kapalı", not m.asistan_toplanti() and not m.otonom_acik())
-bak("gizlide duyuru yok", not m.duyuru_acik() and m.toplanti_duyuru("not", "X") is False)
-r, _ = cikti(m.toplantiya_soyle, "Merhaba")
-bak("gizlide toplantıya söyle reddedilir", r.get("ok") is False and "Gizli" in r.get("err", ""))
-r, _ = cikti(m.moderator_basla, "toplantıyı sen yönet")
-bak("gizlide moderatör başlamaz", r.get("ok") is False and "Gizli" in r.get("err", ""))
-v = m.cards_view() if hasattr(m, "cards_view") else None
-bak("pano verisinde gizli görünür", (v or {}).get("gizli", {}).get("acik") is True if v else "gizli" in open(os.path.join(KOD, "aktarici", "eylem.py")).read())
-_, o = cikti(m.komut_uygula, "gizli", "", None)
-bak("ikinci basış kapatır", not m.gizli_acik() and "kapandı (kullanıcı)" in o and m.gemini_izinli(True))
-_, o = cikti(m.komut_uygula, "gizli", "", None); m.STATE["_cagri_son"] = 0; m.STATE.pop("masaustu", None)
-o = io.StringIO()
-with contextlib.redirect_stdout(o):
-    son = time.time() + 6
-    while m.gizli_acik() and time.time() < son: time.sleep(0.2)
-bak(f"toplantı yokken {m.GIZLI_BOS_SN} sn sonra kendiliğinden kapanır", not m.gizli_acik() and "toplantı bitti" in o.getvalue())
+post("/ingest", {"meeting": {"title": "Deneme Toplantı"}, "source": "transcript", "entries": [{"id": "a/1", "speaker": "Veli", "time": "00:01", "text": "gizli öncesi satır"}]})
+md = os.path.join(m.BASE, m.STATE["file"]); once = open(md, encoding="utf-8").read()
+bak("başta: Gemini izinli, asistanlar konuşur, satır yazılır", m.gemini_izinli(True) and m.asistan_toplanti() and "gizli öncesi satır" in once)
+r = post("/komut", {"tur": "gizli"})
+bak("/komut gizli açar (HTTP), günlük/dökümde yalnız işaret", r.get("ok") and m.gizli_acik() and r.get("gizli", {}).get("acik") and "**GİZLİ** | açıldı" in open(md, encoding="utf-8").read())
+r = post("/ingest", {"meeting": {"title": "Deneme Toplantı"}, "source": "transcript", "entries": [{"id": "a/2", "speaker": "Veli", "time": "00:02", "text": "GİZLİ İÇERİK"}]})
+r2 = post("/taslak", {"meeting": {"title": "Deneme Toplantı"}, "entries": [{"speaker": "Veli", "text": "GİZLİ TASLAK"}]})
+r3 = post("/ses", {"pcm": "AAAA", "kanal": "karsi"}); r4 = post("/kanit", {"png": "iVBOR"})
+bak("eklentinin satırı, taslağı, sesi, kanıtı 'ok' ile alınıp atılır (yeniden gönderilmesin)", all(x.get("ok") and x.get("gizli") for x in (r, r2, r3, r4)))
+bak("döküme ve jsonl'e gizli içerik girmez", "GİZLİ İÇERİK" not in open(md, encoding="utf-8").read() and "GİZLİ TASLAK" not in json.dumps(m.taslak_view(), ensure_ascii=False))
+red = [y for y in ("/bas-konus", "/ask", "/note", "/baslat", "/brifing", "/card", "/moderator", "/kanit-iste", "/eylem", "/girdi") if not (post(y, {"tur": "x", "text": "x", "kind": "not"}).get("err", "").startswith("Gizli"))]
+bak(f"Konuş, soru, not, Başlat, brifing, kart, moderatör… reddedilir {red or ''}", not red)
+r = post("/komut", {"tur": "ozet"}); bak("Ne diyeyim? (komut) reddedilir", r.get("gizli") and not r.get("ok"))
+bak("Gemini yok, asistanlar konuşmaz, duyuru yok", not m.gemini_izinli(True) and not m.asistan_toplanti() and not m.duyuru_acik() and m.toplanti_duyuru("not", "X") is False)
+r, _ = cikti(m.toplantiya_soyle, "Merhaba"); bak("toplantıya söyle reddedilir", r.get("ok") is False and "Gizli" in r.get("err", ""))
+_, o = cikti(m._whisper_yaz, {"kanal": "karsi"}, "GİZLİ WHISPER"); bak("Whisper satırı yazılmaz (kuyrukta kalmış parça)", "GİZLİ WHISPER" not in open(md, encoding="utf-8").read())
+m.FISILTI.update(son=0, ipucu=0); _, o = cikti(m.paylasim_bildir, True, "deneme"); bak("kendiliğinden kanıt (ekran paylaşımı) açılmaz", "KANIT" not in o and not m.STATE.get("paylasim", {}).get("acik") if isinstance(m.STATE.get("paylasim"), dict) else "KANIT" not in o)
+m.STATE["_cagri_son"] = 0; m.STATE.pop("masaustu", None); time.sleep(4)
+bak("toplantı bitse de kendiliğinden kapanmaz", m.gizli_acik())
+v = m.cards_view(); bak("pano verisinde gizli görünür", (v.get("gizli") or {}).get("acik") is True)
+toplanti(); r = post("/komut", {"tur": "gizli"})
+bak("ikinci basış kapatır, satırlar yeniden yazılır", r.get("ok") and not m.gizli_acik() and m.gemini_izinli(True))
+post("/ingest", {"meeting": {"title": "Deneme Toplantı"}, "source": "transcript", "entries": [{"id": "a/3", "speaker": "Veli", "time": "00:03", "text": "gizli sonrası satır"}]})
+bak("kapandıktan sonra satır yazılır, aradaki içerik yok", "gizli sonrası satır" in open(os.path.join(m.BASE, m.STATE["file"]), encoding="utf-8").read())
 pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read()
-bak("panoda ve mini panoda 🔒 düğmesi", "id=gz " in pano and "id=mgz " in pano and pano.count("gizliCiz(") == 3 and "tur:\"gizli\"" in pano)
+bak("panoda ve mini panoda 🔒 düğmesi ve uyarı şeridi", "id=gz " in pano and "id=mgz " in pano and pano.count("gizliCiz(") == 3 and "tur:\"gizli\"" in pano and "gzb" in pano)
+izle = open(os.path.join(KOD, "toplanti-claude.py"), encoding="utf-8").read()
+bak("izle: gizlide tek GİZLİ TOPLANTI satırı, sonra olay yok", 'emit("GİZLİ TOPLANTI: kullanıcı açtı' in izle and "time.sleep(2); continue" in izle)
 
 # 2) sesli süre uyarısı
 def gundem(kalan_dk, rol="yurutucu", n=4, bitti=0, bas_dk=60):
     now = datetime.datetime.now()
-    json.dump({"title": "Deneme", "rol": rol, "baslangic": (now - datetime.timedelta(minutes=bas_dk)).strftime("%H:%M"),
-               "bitis": (now + datetime.timedelta(minutes=kalan_dk)).strftime("%H:%M"), "items": [f"M{i}" for i in range(n)]}, open(os.path.join(m.BASE, "agenda.json"), "w"))
+    json.dump({"title": "Deneme", "rol": rol, "baslangic": (now - datetime.timedelta(minutes=bas_dk)).isoformat(timespec="seconds"),
+               "bitis": (now + datetime.timedelta(minutes=kalan_dk)).isoformat(timespec="seconds"), "items": [f"M{i}" for i in range(n)]}, open(os.path.join(m.BASE, "agenda.json"), "w"))
     m.STATE["agenda_ticks"] = {str(i): True for i in range(bitti)}; m.AG["mtime"] = None
 sdb = m.sure_duyuru_bak; m.sure_duyuru_bak = lambda: None  # arka plandaki nöbet eşikleri tüketmesin; deneme doğrudan çağırır
 toplanti(); m.AYAR["sure_duyuru"] = True; m.SURE_DUY.update(toplanti=None, esik=set())
@@ -70,7 +83,7 @@ bak("aynı eşik ikinci kez söylenmez", sdb() is None)
 gundem(4, bitti=4); r = sdb(); bak(f"5 dk eşiği: {r}", r and r[0] == "5" and r[1] == "Son beş dakika.")
 gundem(-1, bitti=4); r = sdb(); bak(f"süre doldu: {r}", r and r[0] == "bitti")
 m.SURE_DUY.update(toplanti=None, esik=set()); gundem(40, n=6, bitti=0, bas_dk=50); sdb()
-m.SURE_DUY["kayma_son"] = time.time() - 10; r = sdb()
+toplanti(); m.SURE_DUY["kayma_son"] = time.time() - 10; r = sdb()
 bak(f"gündem kayması (≥ 2 madde geride): {r}", r and r[0] == "kayma" and "gerisindeyiz" in r[1])
 bak("kayma aralık dolmadan tekrar yok", sdb() is None)
 m.SURE_DUY.update(toplanti=None, esik=set()); gundem(20, rol="katilimci"); sdb(); gundem(14, rol="katilimci")

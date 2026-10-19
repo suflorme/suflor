@@ -38,7 +38,7 @@ def dil_tahmin(metin):  # "tr" | "en" | None (kısa ya da belirsiz)
     return None
 def ceviri_ekle(lid, metin, md):
     # karşı satır yazıldı: arayüz dilinden başka dildeyse kuyruğa
-    if not ceviri_acik() or not lid or not metin: return
+    if not ceviri_acik() or not lid or not metin or ("gizli_acik" in globals() and gizli_acik()): return
     hedef = "en" if ARAYUZ_DILI == "en" else "tr"; d = dil_tahmin(metin)
     if not d or d == hedef: return
     with CEVIRI_K: CEVIRI_Q.append((lid, metin, md, time.time())); CEVIRI_K.notify()

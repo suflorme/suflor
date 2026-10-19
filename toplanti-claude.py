@@ -1083,7 +1083,7 @@ def izle():
             bg_bil.intersection_update({k.get("id") for k in liste})  # arşive giden kaynakların kimliği listeden düşer
             try: tmp = bg_bil_fp + ".tmp"; json.dump(sorted(bg_bil), open(tmp, "w", encoding="utf-8")); os.replace(tmp, bg_bil_fp)
             except OSError: pass
-    sessiz_on = False; s = {}  # s: son /status (Ne diyeyim? gündem işaretlerini buradan okur)
+    sessiz_on = gizli_on = False; s = {}  # s: son /status (Ne diyeyim? gündem işaretlerini buradan okur)
     sure_ilk = True; sure_esik = set(); kayma_son = 0.0; pay_son = time.time() - 300  # PAY ilk 5 dk susar (yeniden kurulumda tekrar etmesin)
     # kendiliğinden bağlam + gündem tahmini
     try: sis = sistemler()
@@ -1158,6 +1158,13 @@ def izle():
          (" · ARAYÜZ DİLİ en: kartları ve özeti İngilizce yaz" if AYAR.get("dil") == "en" else ""))
     acik_gundem_disi(True)
     while True:
+        # v0.89.1 (S91, kullanıcı 19 Ekim: "tamamen kör ve sağır"): gizli toplantıda aktarıcı hiçbir şey almaz; izle de olay göndermez
+        try: gz = bool((get("/status") or {}).get("gizli"))
+        except Exception: gz = False
+        if gz:
+            if not gizli_on: emit("GİZLİ TOPLANTI: kullanıcı açtı — kapatana kadar hiçbir satır, ses, kanıt ya da olay gelmez. Kart yazma, arama yapma, hiçbir şey yapma; sohbete tek satır yaz ve bekle."); gizli_on = True
+            time.sleep(2); continue
+        if gizli_on: emit("GİZLİ TOPLANTI BİTTİ: kullanıcı kapattı — aradaki bölüm kayıtta yok; özette yalnız 'gizli bölüm (HH:MM–HH:MM)' diye an, içerik tahmin etme."); gizli_on = False
         baglam_bak()
         if ag_yukle():
             if cur: gundem_kopya(cur, agj)
