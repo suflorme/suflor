@@ -103,10 +103,11 @@ def _gemini_bekleme(govde, retry_after=None):  # sunucunun önerdiği bekleme (R
 # bir kez Gemini'den alınıp canli/gemini-onbellek/'e yazılır, sonra Google'a gitmeden rastgele biri çalar (art arda aynısı değil). İsteklerin ~%20'si bekleme
 # cümlesiydi (18–19 Ekim, 14/71); günlük sınır geç dolar, bekleme cümlesi beklemesiz başlar.
 GEMINI_SABIT_N = 3
+GEMINI_SABIT_EK = ("Buradayım.", "I'm here.", "Bakıyorum.", "Let me check.")  # sohbette 30 sn sessizlik uyarısı (aktarici/sohbet.py), cevap gecikince "Bakıyorum."
 _SABIT_SON = {}
 def _sabit_mi(metin):
     m = (metin or "").strip()
-    if m in GEMINI_ONAY: return True
+    if m in GEMINI_ONAY or m in GEMINI_SABIT_EK: return True
     g = globals()
     for ad in ("BEKLE_GENEL", "BEKLE_SEY", "BEKLE_TUR"):
         v = g.get(ad)

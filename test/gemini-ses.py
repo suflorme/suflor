@@ -107,6 +107,7 @@ n = len(GELEN); ad["gemini_oku"]("Hemen bakıyorum.", ses="Kore"); bak("başka s
 n = len(GELEN); ad["gemini_oku"]("Bu sabit değil."); ad["gemini_oku"]("Bu sabit değil.")
 bak("sabit olmayan cümle her seferinde Gemini'ye gider", len(GELEN) - n == 2)
 n = len(GELEN); [ad["gemini_oku"]("Hı hı.", ses="Charon", duzey=0.5) for _ in range(4)]; bak(f"hı hı da önbellekte (4 okumada {len(GELEN) - n} istek)", len(GELEN) - n == 3)
+bak("sohbetin 30 sn uyarısı ('Buradayım.') sabit cümle", ad["_sabit_mi"]("Buradayım.") and ad["_sabit_mi"]("I'm here.") and not ad["_sabit_mi"]("Buradayım, söyle."))
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
 
