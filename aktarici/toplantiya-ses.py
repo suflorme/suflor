@@ -95,6 +95,7 @@ def toplantiya_soyle(metin=None):
             if kulaklik(): ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     except OSError as e: print(f"TOPLANTIYA SÖYLE: hata {e.__class__.__name__}"); return {"ok": False, "err": "say"}
     with TS_KILIT: TS["p"] = ps
+    TS["zarf"] = (time.time(), ses_zarfi(gpcm, GEMINI_SR)) if gpcm else None  # 19 Ekim: otonom okurken kanaldaki ses kendi yankımız mı (otonom.py)
     TS["son"] = m; TS["son_t"] = time.time() + (len(gpcm) / 2 / GEMINI_SR if gpcm else len(m) / 14)  # okuma sonu (Mac sesinde tahmin ~14 karakter/sn): karşı taraf hitabı ardından 10 sn sayılmaz
     kendi_ses_kaydet(m, time.time(), TS["son_t"])
     if STATE.get("meeting"):  # toplantı dosyası yoksa (deneme, toplantı dışı) not yazılmaz — yeni dosya açmasın
@@ -102,6 +103,13 @@ def toplantiya_soyle(metin=None):
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")
     print(f"TOPLANTIYA SÖYLE: {len(m)} karakter · aygıt {aygit}{' · Gemini ' + (kses or gemini_ses()) if gpcm else ''}{' · kulaklıkta da' if len(ps) > 1 else ' · kulaklık yok, yerelde okunmadı'}")
     return {"ok": True, "metin": "🔊 " + m[:120]}
+def ses_zarfi(pcm, sr, kare_sn=0.02):  # 16 bit ham ses → 20 ms karelerin sesli/sessiz listesi (eşik: en yüksek karelerin %12'si)
+    import array
+    a = array.array("h"); a.frombytes(pcm[: len(pcm) // 2 * 2]); n = max(1, int(sr * kare_sn))
+    r = [math.sqrt(sum(x * x for x in a[i:i + n][::4]) / max(1, len(a[i:i + n][::4]))) for i in range(0, len(a) - n + 1, n)]
+    if not r: return []
+    tepe = sorted(r)[int(len(r) * 0.95)]
+    return [x > max(150.0, tepe * 0.12) for x in r]
 def _ts_besle(p, pcm):  # kesintisiz çalıcıya ham sesi verir (ts_durdur süreci keserse yazma hatası yok sayılır)
     try: p.stdin.write(pcm); p.stdin.close()
     except (OSError, ValueError): pass
@@ -132,6 +140,7 @@ def _ts_web_hazirla(m, sesli, okunan, gpcm=None):
             else: ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         except OSError: pass
     with TS_KILIT: TS["p"] = ps
+    TS["zarf"] = (time.time(), ses_zarfi(b[44:], 24000))  # 19 Ekim: otonomun yankı ayrımı (eklenti birazdan çalar; gecikme aramada)
     TS["son"] = m; TS["son_t"] = time.time() + sure
     kendi_ses_kaydet(m, time.time(), TS["son_t"])
     if STATE.get("meeting"):

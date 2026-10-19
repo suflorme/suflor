@@ -8,6 +8,8 @@ KIS = {"v": None, "v2": None}; ns = {"re": re, "time": __import__("time"), "kisi
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
 sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad")) or
        (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR"} for x in n.targets))]
+ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").read())  # 19 Ekim: söz etme kalıbı kisilik.py'de (iki yer aynı tanımı kullanır)
+sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) == "KISILIK_SOZ_ETME" for x in n.targets)] + sec
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
     ("Cloud, card, English, yes.", "Claude: card, English, yes.", "9 Ekim: virgüllü"),
@@ -46,6 +48,11 @@ for girdi, bek, ac in [
     ("Hatlas. Açık iş var mı?", "Claude: Açık iş var mı?", "kişilik: noktadan sonra büyük harf"),
     ("Atlas markasının yeni ürünü güzel olmuş.", "Atlas markasının yeni ürünü güzel olmuş.", "kişilik: hitap değil (soru değil, noktalama yok)"),
     ("Dün Atlas çok iyiydi.", "Dün Atlas çok iyiydi.", "kişilik: cümle ortası"),
+    ("Atlas ile ilgili problem neydi?", "Atlas ile ilgili problem neydi?", "19 Ekim: kişilikten söz (ile ilgili), seslenme değil"),
+    ("Tamam. Atlas hakkında ne düşünüyorsun?", "Tamam. Atlas hakkında ne düşünüyorsun?", "kişilikten söz (hakkında)"),
+    ("Atlas mı cevap verdi?", "Atlas mı cevap verdi?", "kişilikten söz (soru eki)"),
+    ("Atlas'ın sesi neden kesildi?", "Atlas'ın sesi neden kesildi?", "kişilikten söz (kesmeli ek)"),
+    ("Atlas neden kesik konuşuyordu?", "Claude: neden kesik konuşuyordu?", "soru cümlesi, ad + soru: seslenme (kural aynı)"),
     ("Claude, özet çıkar.", "Claude: özet çıkar.", "kişilik açıkken eski hitap da sürer"),
     ("Suflor, kaç kart açık?", "Claude: kaç kart açık?", "kişilik açıkken Suflor da sürer (geçiş)")]:
     cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok

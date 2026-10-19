@@ -53,7 +53,7 @@ def _rms(b):
     if audioop: return audioop.rms(b, 2)
     import array; a = array.array("h"); a.frombytes(b); return int((sum(x * x for x in a) / max(1, len(a))) ** 0.5)
 class Kanal:
-    def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0  # t_ses/n_ses: otonom söz sırası (v0.56.0)
+    def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0; self.ses_t = collections.deque(maxlen=600)  # t_ses/n_ses: otonom söz sırası (v0.56.0); ses_t: sesli karelerin zamanı (son ~12 sn; otonomun yankı ayrımı, 19 Ekim)
     def reset(self): self.parca = bytearray(); self.on = bytearray(); self.konusuyor = False; self.sessiz = 0; self.sesli = 0; self.ust = 0; self.t0 = 0.0; self.rmsler = []
     def besle(self, pcm, t_bas, baslik):
         if t_bas - self.son_bitis > 0.5 and self.konusuyor: self.kes(baslik)  # boşluk (mikrofon kapalıydı / parça kayıp)
@@ -62,7 +62,7 @@ class Kanal:
         for i in range(0, len(pcm) - WH_KARE * 2 + 1, WH_KARE * 2):
             kare = bytes(pcm[i:i + WH_KARE * 2]); t = t_bas + i / 2 / WH_SR; r = _rms(kare)
             esik = max(220.0, self.gurultu * 2.8)
-            if r > esik: self.t_ses = t + WH_KARE / WH_SR; self.n_ses += 1
+            if r > esik: self.t_ses = t + WH_KARE / WH_SR; self.n_ses += 1; self.ses_t.append(t)
             if not self.konusuyor:
                 self.gurultu = self.gurultu * 0.98 + r * 0.02 if r < self.gurultu * 2.5 else self.gurultu * 0.999 + r * 0.001
                 self.on += kare; self.on = self.on[-int(WH_SR * WH_ON_MS / 1000) * 2:]

@@ -63,6 +63,8 @@ try:
     kb, kalan = ns["kisilik_hitap_bul"]("Matlas, bugün neler yaptım?"); ok("adla seslenme bulundu", kb and kb["ad"] == "Matlas" and kalan == "bugün neler yaptım?")
     kb, _ = ns["kisilik_hitap_bul"]("Atlas, özet?"); ok("birincinin adı da bulunur", kb and kb["ad"] == "Atlas")
     kb, _ = ns["kisilik_hitap_bul"]("Dün Matlas'la konuştum"); ok("cümle ortası ad seçmez", kb is None)
+    kb, _ = ns["kisilik_hitap_bul"]("Atlas ile ilgili problem neydi?"); kb2, _ = ns["kisilik_hitap_bul"]("Atlas'ın sesi neden kesildi?")
+    ok("19 Ekim: kişilikten söz etmek (ile ilgili, kesmeli ek) o kişiliği seçmez", kb is None and kb2 is None)
     ns["kisilik_sec"]("Matlas"); ok("adla seçilen kişilik toplantıda da sürer (süre içinde)", ns["kisilik"]()["ad"] == "Matlas")
     ok("'sen' diyen kişilikte kis_t nötr cümle", ns["kis_t"]("Söyler misin?", "Söyler misiniz?") == "Söyler misin?")
     ns["_KSEC"]["t"] -= ns["KISILIK_SURE_SN"] + 1; ok("süre dolunca varsayılana döner", ns["kisilik"]()["ad"] == "Atlas")

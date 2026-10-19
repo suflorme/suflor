@@ -78,11 +78,14 @@ def kisilik_sec(ad):  # bu soru (ve KISILIK_SURE_SN içindeki adsız sorular) bu
     onceki = _KSEC["ad"] if time.time() - _KSEC["t"] < KISILIK_SURE_SN else None
     _KSEC.update(ad=ad, t=time.time() if ad else 0.0)
     if ad and ad != onceki: print(f"KİŞİLİK: bu soru {ad} ile (adıyla seslenildi)")
+# 19 Ekim test toplantısı: "<toplantı kişiliği> ile ilgili problem neydi?" (öteki kişiliğe soru, ondan söz) seslenme sayıldı → ad + söz etme sözcüğü ya da
+# soru eki ("ile", "hakkında", "için", "gibi", "ve", "de", "mi" …) seslenme değil; kesmeli ek ("<Ad>'in") de değil. sozluk.py'deki kalıp da bunu kullanır.
+KISILIK_SOZ_ETME = r"(?:ile|hakkında\w*|için|gibi|ve|veya|ya|de|da|ki|mi|mı|mu|mü|kadar|konusunda|tarafından|yüzünden|sayesinde)\b"
 def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kişilik, adsız metin) ya da (None, metin)
     ks = kisilikler()
     if len(ks) < 2 or not metin: return None, metin
     for k in sorted(ks, key=lambda k: -max(len(a) for a in k["hitap"])):
-        m = re.match(r"\W*(?:" + "|".join(re.escape(a) for a in sorted(k["hitap"], key=len, reverse=True)) + r")(?:'\w+)?(?:\s*[,:.!]\s*|\s+(?=\w))", metin, re.I)
+        m = re.match(r"\W*(?:" + "|".join(re.escape(a) for a in sorted(k["hitap"], key=len, reverse=True)) + r")(?:(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w))", metin, re.I)  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil
         if m and metin[m.end():].strip(): return k, metin[m.end():].strip()
     return None, metin
 TOPLANTIYA_RX = re.compile(r"(toplantıya|toplantıda|herkese|onlara|karşı tarafa|ekibe|sesli|yüksek sesle|açıktan)\b.{0,25}\b(söyle|anlat|oku|açıkla|cevap ver|konuş|yanıtla|bildir)|"
