@@ -1176,7 +1176,9 @@ def izle():
                     emit(f"DURUM: aktarıcı bu toplantıyı {tb['t'][11:16]}'de bitti saymıştı ({tb.get('neden')}) — izle sonradan başladı; toplantı sürüyorsa yok say")
                 else: emit(f"TOPLANTI BİTTİ ({tb.get('neden')}) → kullanıcı ayrıldı: toplantı sonu adımlarını başlat (bitti yazmasını bekleme)")
             wv = s.get("whisper") or {}; wak = wv.get("durum") in ("hazir", "yukleniyor") and (wv.get("ben") or wv.get("karsi"))
-            state = ("eklenti bağlı" if (x.get("age_s") is not None and x["age_s"] < 30) else "EKLENTİ SİNYALİ YOK") + \
+            ms = s.get("masaustu") or {}  # 19 Ekim test toplantısı: masaüstü Teams'te eklenti olmadığı için "EKLENTİ SİNYALİ YOK" → gereksiz NOT kartı ("eklenti 102 sn'dir sessiz")
+            state = ("eklenti bağlı" if (x.get("age_s") is not None and x["age_s"] < 30) else
+                     f"masaüstü {ms.get('uygulama') or 'toplantı'} (menü uygulaması) — eklenti gerekmez, uyarma" if ms.get("toplantida") else "EKLENTİ SİNYALİ YOK") + \
                     ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + (("✓ (yerel yardımcı)" if wv.get("yerel_akiyor") else "✓") if wv.get("karsi") else  # yerel ses yardımcısı
                      "✗ (yerel yardımcı hazır, karşı ses henüz gelmedi — kart gönderme)" if wv.get("yerel") in ("bekliyor", "dinliyor") else
                      "✗ (yerel yardımcıda Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses)" if wv.get("yerel") == "izin" else

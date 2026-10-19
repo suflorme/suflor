@@ -1604,6 +1604,20 @@ def gundem_saat_tazele(simdi):
     tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
     os.replace(tmp, fp); print(f"BAŞLAT: gündem saati tazelendi ({a['baslangic']}–{a['bitis']}; eski bitiş geçmişte)")
+def gundem_yeni_konu(konu, rol, dil, simdi, maddeler, bas=None, bit=None):
+    # 19 Ekim test toplantısı: "test" konusuyla Başlat'a basılınca agenda.json önceki toplantının gündemiyle (15 madde) kaldı — toplantı oturumu gündem başlığı uyuşmazsa
+    # kullanıcıya "mevcut mu, yeni mi" diye soruyor, o arada panoda eski gündem görünüyordu. Başlatılan konu gündem başlığından farklıysa eski gündem
+    # canli/agenda-arsiv.jsonl'e eklenir, yerine bu konunun gündemi (formdaki maddeler ya da boş) yazılır; oturum maddeleri sonra doldurur. → True: yenilendi
+    fp = os.path.join(BASE, "agenda.json")
+    try: a = json.load(open(fp, encoding="utf-8"))
+    except (OSError, ValueError): a = None
+    if isinstance(a, dict) and " ".join(str(a.get("title") or "").split()).casefold() == konu.casefold(): return False
+    if isinstance(a, dict):
+        with open(os.path.join(BASE, "agenda-arsiv.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(dict(a, arsiv_at=simdi.isoformat(timespec="seconds")), ensure_ascii=False) + "\n")
+    yeni = {"title": konu, "rol": rol, "dil": dil, "baslangic": bas or simdi.strftime("%H:%M"), "bitis": bit or (simdi + datetime.timedelta(minutes=30)).strftime("%H:%M"), "items": list(maddeler or [])}
+    tmp = fp + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f: json.dump(yeni, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, fp); print(f"BAŞLAT: yeni konu — gündem yenilendi ({len(yeni['items'])} madde){'; eskisi agenda-arsiv.jsonl' if isinstance(a, dict) else ''}"); return True
 def gundem_maddeleri(v):
     # Başlat formundaki Gündem alanı: her satır bir madde; madde işareti/numara atılır, boş ve yinelenen satır yok, en çok 15 × 200 karakter.
     # Metin veridir: /toplanti onu takvim-secilen.json'dan taslak gündem olarak okur, komut satırına girmez.
@@ -1641,7 +1655,11 @@ def baslat(p):
            **({"baglanti": baglanti} if not (olay or {}).get("baglanti") and not ana else {}), **({"gundem": gundem} if gundem else {})}
     if not olay:  # takvimsiz başlatma: toplantı şimdi başlıyor, 30 dk varsayılır (9 Ekim denemesi: gündemde eski toplantının saati kaldı)
         sec.update(baslangic=simdi.isoformat(timespec="minutes"), bitis=(simdi + datetime.timedelta(minutes=30)).isoformat(timespec="minutes"))
-        gundem_saat_tazele(simdi)
+        if not gundem_yeni_konu(konu, rol, dil, simdi, gundem): gundem_saat_tazele(simdi)  # aynı konu: yalnız saat tazelenir, maddeler kalır
+    else:
+        try: ob, obt = _zaman(olay["baslangic"]).strftime("%H:%M"), _zaman(olay["bitis"]).strftime("%H:%M")
+        except Exception: ob = obt = None
+        gundem_yeni_konu(konu, rol, dil, simdi, gundem, ob, obt)
     fp = os.path.join(BASE, "takvim-secilen.json"); tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(sec, f, ensure_ascii=False, indent=1)
     os.replace(tmp, fp)

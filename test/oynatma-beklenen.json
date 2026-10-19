@@ -51,7 +51,7 @@
   "<TARIH>-Deneme-toplantısı-altyapı.md": [
    "# Canlı transkript — Deneme toplantısı — altyapı",
    "",
-   "**Başlangıç: ? · Kaynak: Teams transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir) · Aktarıcı: Suflor.me**",
+   "**Başlangıç: <AN> (ilk kayıt; satırlar geliş sırasıyla) · Kaynak: Teams transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir) · Aktarıcı: Suflor.me**",
    "**Gizlilik: iç belge, kişi adı içerir.**",
    "",
    "| Saat | Konuşmacı | Metin | İşaret |",
@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 171402,
-   "sha": "eeee65398b90a3c0"
+   "uzunluk": 172874,
+   "sha": "0625492f985f562a"
   },
   "/hazirlik": {
-   "uzunluk": 48758,
-   "sha": "1e05fc7ad6a707a0"
+   "uzunluk": 49076,
+   "sha": "a3fe84881748d248"
   },
   "/mini": {
-   "uzunluk": 171402,
-   "sha": "eeee65398b90a3c0"
+   "uzunluk": 172874,
+   "sha": "0625492f985f562a"
   },
   "/status": {
    "_ping_son": "float",
@@ -501,6 +501,7 @@
     "durum": "str",
     "hata": "NoneType",
     "kisilik": "NoneType",
+    "moderator": "NoneType",
     "olcum": "NoneType",
     "otonom": "NoneType",
     "sesli_cevap": "bool",

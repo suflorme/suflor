@@ -62,12 +62,17 @@ try:
     os.utime(ag, (time.time() - 86400, time.time() - 86400))  # dünden kalan gündem
     y = istek("/baslat", {"konu": "Yeni — dış", "baglam": f"https://yeni.example/sunum\n{belge}"}, PANO)
     a_ = json.load(open(ag)); sec = json.load(open(os.path.join(canli, "takvim-secilen.json")))
-    kontrol("Başlat (takvimsiz): dünkü gündemin saati şimdiye çekildi, maddeler kaldı; seçimde başlangıç/bitiş var",
-            a_["baslangic"] == time.strftime("%H:%M") and a_["items"] == ["madde"] and sec.get("baslangic") and sec.get("bitis"))
+    arsiv = [json.loads(x) for x in open(os.path.join(canli, "agenda-arsiv.jsonl"), encoding="utf-8")]
+    kontrol("Başlat (takvimsiz, yeni konu): eski gündem arşive, yeni konunun boş gündemi yazıldı (19 Ekim); seçimde başlangıç/bitiş var",
+            a_["title"] == "Yeni — dış" and a_["items"] == [] and a_["baslangic"] == time.strftime("%H:%M") and arsiv[-1]["title"] == "Eski" and arsiv[-1]["items"] == ["madde"]
+            and sec.get("baslangic") and sec.get("bitis"))
     k = bg()["kaynaklar"]
     kontrol("Başlat: eski toplantının kaynakları arşive, yeniler eklendi", y.get("ok") and [x["kaynak"] for x in k] == ["baslat", "baslat"]
             and len(open(os.path.join(canli, "baglam-arsiv.jsonl"), encoding="utf-8").read().splitlines()) == 3)
     kontrol("kimlik sayacı arşivden sonra sürüyor (b4, b5)", [x["id"] for x in k] == ["b4", "b5"])
+    json.dump({"title": "Yeni — dış", "baslangic": "21:48", "bitis": "22:18", "items": ["madde"]}, open(ag, "w")); os.utime(ag, (time.time() - 86400, time.time() - 86400))
+    istek("/baslat", {"konu": "Yeni — dış"}, PANO); a_ = json.load(open(ag))
+    kontrol("Başlat (aynı konu): dünkü gündemin saati şimdiye çekildi, maddeler kaldı", a_["baslangic"] == time.strftime("%H:%M") and a_["items"] == ["madde"])
     # --- v0.14.0 yerel anahtar ---
     k_ = anahtar(); TEAMS = "https://teams.microsoft.com"
     kontrol("anahtarsız okuma 401 (/status, /cards, /taslak, /hazirlik.json)", all(istek(y_, anh=False).get("kod") == 401 for y_ in ("/status", "/cards", "/taslak", "/hazirlik.json")))

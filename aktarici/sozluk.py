@@ -231,4 +231,7 @@ def ensure_header(md, title, m, source=None):
     pl = PLATFORM_AD.get((m or {}).get("platform") or (STATE.get("extension") or {}).get("platform") or "teams", "Teams")
     src = f"Whisper (yerel konuşma tanıma, large-v3-turbo; konuşmacı: kullanıcı mikrofonu / karşı taraf {pl} sesi)" if source == "whisper" else \
           f"{pl} canlı altyazı (döküm yetkisi yok; konuşmacı adı eksik, dil yanlış seçilmişse metin anlamsız olabilir)" if source == "captions" else f"{pl} transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir)"
-    return (f"# Canlı transkript — {title}\n\n**Başlangıç: {m.get('startedAt','?')} · Kaynak: {src} · Aktarıcı: Suflor.me**\n**Gizlilik: iç belge, kişi adı içerir.**\n\n| Saat | Konuşmacı | Metin | İşaret |\n|---|---|---|---|\n")
+    # 19 Ekim test toplantısı: masaüstü Teams'te eklenti yok → "Başlangıç: ?"; başlangıç bilinmiyorsa dosyanın ilk kaydının saati (canlı dosya geliş sırasıyla yazılır:
+    # Whisper satırı ~5 sn geç gelir, Suflor'un sesli satırı okunduğu an — toplantı sonundaki döküm (toplanti-claude.py dokum) zamana göre sıralar)
+    bas = (m or {}).get("startedAt") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M") + " (ilk kayıt; satırlar geliş sırasıyla)"
+    return (f"# Canlı transkript — {title}\n\n**Başlangıç: {bas} · Kaynak: {src} · Aktarıcı: Suflor.me**\n**Gizlilik: iç belge, kişi adı içerir.**\n\n| Saat | Konuşmacı | Metin | İşaret |\n|---|---|---|---|\n")
