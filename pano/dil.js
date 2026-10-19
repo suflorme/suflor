@@ -277,6 +277,8 @@ globalThis.SUFLOR_EN = {
   "Yalnız toplantıya söylenenler": "Only what is said into the meeting",
   "Her okuma": "Every reading",
   "Bugün {n} istek": "Today {n} requests",
+  "E-postayı oku (Mac Mail)": "Read email (Mac Mail)",
+  "Konuş ve sohbette e-posta sorusunda Mac Mail’deki son iletilerin gönderen, konu ve kısa özeti Claude’a gider (gövde açılmaz). İzin: Sistem Ayarları → Gizlilik ve Güvenlik → Tam Disk Erişimi → Suflor Posta.": "In Talk and chat, for email questions the sender, subject and short snippet of recent Mac Mail messages go to Claude (bodies are not opened). Permission: System Settings → Privacy & Security → Full Disk Access → Suflor Posta.",
   "Madde {i}/{n}: {m}": "Item {i}/{n}: {m}",
   "{d} dk kaldı": "{d} min left",
   "Gündem bekleniyor": "Waiting for the agenda",

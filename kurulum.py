@@ -539,6 +539,14 @@ TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>NSCalendarsUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak için takvimini okur. Hiçbir şey değiştirmez.</string>
 </dict></plist>
 """
+POSTA_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>local.suflor.posta</string><key>CFBundleName</key><string>Suflor Posta</string>
+  <key>CFBundleExecutable</key><string>SuflorPosta</string><key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
+</dict></plist>
+"""
 SES_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -818,8 +826,12 @@ def kur():
     mtn = os.path.join(app, "Suflor Metin.app"); r = derle(mtn, "metin-tani.swift", "SuflorMetin", METIN_PLIST)
     if r is True: say(f"Metin tanıma yardımcısı derlendi: {mtn}")
     elif r: say(f"UYARI: metin tanıma yardımcısı derlenemedi ({r}) — kanıttaki yazı deftere girmez")
+    # posta yardımcısı (v0.85.0): Mac Mail'in yerel ileti dizinini yalnız okur; izin (Tam Disk Erişimi) elle verilir, ayar eposta_oku: true iken kullanılır
+    pst = os.path.join(app, "Suflor Posta.app"); r = derle(pst, "posta.swift", "SuflorPosta", POSTA_PLIST)
+    if r is True: say(f"Posta yardımcısı derlendi: {pst}")
+    elif r: say(f"UYARI: posta yardımcısı derlenemedi ({r}) — e-posta okuma kapalı kalır")
     # menü çubuğu uygulaması (Faz 5): yalnız ayar menu_cubugu: true iken (beta kurulumunda kapalı); aktarıcı açar
-    mnu = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn, mtn]
+    mnu = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn, mtn, pst]
     if ayar().get("menu_cubugu") is True:
         r = derle(mnu, "menu-cubugu.swift", "SuflorMenu", MENU_PLIST)
         if r is True: say(f"Menü çubuğu uygulaması derlendi: {mnu}"); sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorMenu")

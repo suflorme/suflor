@@ -410,7 +410,7 @@
   // nabız kuyruğu beklemez (boşaltma takılırsa nabız da susuyordu); arka plan servis çalışanı da 30 sn'de bir
   // "nabiz" mesajıyla ping() çağırır — Chrome arka plandaki sekmenin zamanlayıcılarını kısarsa mesaj yine işlenir.
   // Gövdede kim (zamanlayici|arka-plan) ve sekme görünürlüğü: aktarıcı 30 sn'yi aşan boşlukları bununla günlüğe yazar.
-  let pingSon = 0;
+  let pingSon = 0, kisiEtiketSon = "";
   async function ping(kim = "zamanlayici") {
     if (!cfg.enabled) return;
     if (kim !== "zamanlayici" && Date.now() - pingSon < 8000) return;  // zamanlayıcı yeni attıysa tekrar etme
@@ -419,6 +419,9 @@
     const panel = findTranscriptPanel();
     const caps = !!findCaptions(); captureHint(panel, caps); if (queue.length) saveQueue(); else adoptQueues();
     const body = { ver: chrome.runtime.getManifest().version, meeting: meetingInfo(), panel: !!panel, rows: panel ? P.dokumSatirSayisi(panel) : 0, platform: P.ad, yonerge: P.yonerge, captions: caps, call: window.top === window ? inCall() : false, lang: capLang, langSrc, capAuto, sent: sentById.size + sentKeys.size, at: new Date().toISOString(), kim, vis: document.visibilityState, ...(window.top === window ? { paylasim: paylasimDurum(), ...(paylas.deger && paylas.neden ? { paylasim_neden: paylas.neden } : {}) } : {}), mic: window.top === window ? { on: mic.on, sessiz: mic.on && teamsSessiz(), hata: mic.hata || "" } : null };
+    if (window.top === window && P.kisiSayisi && body.call) {  // v0.84.1: katılımcı sayısı (Kişiler düğmesi); etiket yalnız değişince (teşhis)
+      try { const k = P.kisiSayisi(); if (k.n) body.kisi_sayisi = k.n; if (k.etiket !== kisiEtiketSon) { kisiEtiketSon = k.etiket; body.kisiler_etiket = k.etiket; } } catch (e) {}
+    }
     try { const r = await rf("/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); if (r.ok) { lastOk = Date.now(); failCount = 0; } }
     catch (e) { failCount++; }
     chrome.runtime.sendMessage({ type: "status", ok: failCount === 0, panel: !!panel, call: body.call, meeting: body.meeting.title, at: lastOk, failCount, queued: queue.length }).catch(() => {});

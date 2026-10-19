@@ -622,6 +622,7 @@ def konus_baglam(simdi=None, toplanti="", soru=""):  # her sorunun başına: tar
         gc.sort(key=lambda x: x[0])
         tk_g = "\n".join(x[1] for x in gc[-60:]) if gc else _t(f"- geçen {TAKVIM_GECMIS_GUN} günde takvimde etkinlik yok", f"- no events in the past {TAKVIM_GECMIS_GUN} days")
         gt = _t(f"Mac Takvim (geçen {TAKVIM_GECMIS_GUN} gün):\n", f"Mac Calendar (past {TAKVIM_GECMIS_GUN} days):\n") + tk_g + "\n" + gt
+    if soru and "posta_baglam" in globals(): gt += posta_baglam(soru, simdi)  # v0.85.0: e-posta sorusunda Mac Mail'den son iletiler
     if soru and DAVET_RX.search(soru):  # v0.84.0: davet notu — sorulan toplantı (başlıkta ortak sözcük) ya da sıradaki
         hepsi = gc + ol; sz = _baslik_soz(soru)
         sec = [x for x in hepsi if sz & _baslik_soz(x[2].get("baslik"))] or [x for x in ol if x[3] > simdi][:1]

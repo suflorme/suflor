@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 178126,
-   "sha": "4172a90b77b1f962"
+   "uzunluk": 178883,
+   "sha": "eeadcd856f57735b"
   },
   "/hazirlik": {
-   "uzunluk": 49820,
-   "sha": "2f4218e4406e1644"
+   "uzunluk": 50315,
+   "sha": "4781087796767de3"
   },
   "/mini": {
-   "uzunluk": 178126,
-   "sha": "4172a90b77b1f962"
+   "uzunluk": 178883,
+   "sha": "eeadcd856f57735b"
   },
   "/status": {
    "_ping_son": "float",
@@ -266,6 +266,7 @@
      "ekran_oto": "bool",
      "eposta": "str",
      "eposta_adres": "str",
+     "eposta_oku": "bool",
      "fisilti": "bool",
      "gemini_kapsam": "str",
      "gemini_model": "str",
@@ -309,6 +310,7 @@
      "ekran_oto": "bool",
      "eposta": "str",
      "eposta_adres": "str",
+     "eposta_oku": "bool",
      "fisilti": "bool",
      "gemini_kapsam": "str",
      "gemini_model": "str",
@@ -417,6 +419,7 @@
    "eposta_ben": "NoneType",
    "eposta_hesap": "NoneType",
    "ertelenen": "int",
+   "ext_kisi": "NoneType",
    "extension": {
     "age_s": "int",
     "call": "bool",
@@ -545,6 +548,7 @@
     ]
    },
    "port": "int",
+   "posta": "NoneType",
    "proje_erisim": "NoneType",
    "questions": [
     {

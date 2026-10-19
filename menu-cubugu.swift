@@ -319,6 +319,9 @@ final class Masaustu {
     // Katılımcı sayısı paneli açmadan (19 Ekim, kullanıcı: "c yolunu dene"): Kişiler düğmesinin etiketi ya da içindeki rozet ("Kişiler (3)", "3 katılımcı", rozet "3").
     // Klavye kısayolundaki rakam sayılmaz (⌘ ⌥ ⇧ ⌃ Ctrl Shift Alt Cmd). Teams/Zoom biçimi doğrulanmadı: düğmenin bütün etiketleri toplantı başına bir kez günlüğe (MASAÜSTÜ: Kişiler düğmesi …).
     static let SAYI = rx("(?:^|[\\s(])(\\d{1,3})(?:\\)|\\s*(?:kişi|katılımcı|participant|people|person)|$)")
+    // 19 Ekim gerçek toplantı: masaüstü Teams'te Kişiler düğmesinde sayı yok ("Kişiler | Kişiler"); toplantı sohbeti başlığında "Kişi ve aracı ekle, 1 katılımcı" var
+    // (sohbetteki hesap sayısı — aynı hesaptan iki giriş tek sayılır). Pencerenin herhangi bir öğesinde "N katılımcı / N participants" aranır.
+    static let KATILIMCI_N = rx("(?:^|[,(\\s])(\\d{1,3})\\s+(?:katılımcı|participants?)\\b")
     static let KISAYOL = rx("[⌘⌥⇧⌃]|\\b(ctrl|shift|alt|cmd|option|command)\\b")
     func kisiSayisi(_ d: AXUIElement) -> (Int?, String) {
         var et: [String] = [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute, kAXValueAttribute].compactMap { deger(d, $0) as? String }.filter { !$0.isEmpty }
@@ -340,11 +343,13 @@ final class Masaustu {
             if rol == kAXButtonRole as String || rol == "AXCheckBox" || rol == "AXMenuButton" {
                 let t = etiket(e)
                 if uy(AYRIL, t) { s.ayril = true } else if uy(SESSIZ, t) { s.sessiz = true; s.md = s.md ?? e } else if uy(ACIK, t) { s.sessiz = false; s.md = s.md ?? e }
-                else if uy(KISILER, t) { if s.kisiler == nil { s.kisiler = e; (s.kisiSayi, s.kisiEtiket) = kisiSayisi(e) } }
+                else if uy(KISILER, t) { if s.kisiler == nil { s.kisiler = e; let (n, et) = kisiSayisi(e); s.kisiSayi = s.kisiSayi ?? n; s.kisiEtiket = et + (s.kisiEtiket.isEmpty ? "" : " | " + s.kisiEtiket) } }
                 if uy(KENDI_PAYLAS, t) { s.kendi = true }
             }
-            for t in [deger(e, kAXDescriptionAttribute) as? String, rol == kAXStaticTextRole as String ? deger(e, kAXValueAttribute) as? String : nil].compactMap({ $0 }) where t.count < 160 {
+            for t in [deger(e, kAXDescriptionAttribute) as? String, deger(e, kAXTitleAttribute) as? String, rol == kAXStaticTextRole as String ? deger(e, kAXValueAttribute) as? String : nil].compactMap({ $0 }) where t.count < 160 {
                 let tt = t.trimmingCharacters(in: .whitespaces)
+                if s.kisiSayi == nil, let m = Masaustu.KATILIMCI_N.firstMatch(in: tt, range: NSRange(tt.startIndex..., in: tt)), let r = Range(m.range(at: 1), in: tt), let n = Int(tt[r]), n > 0 {
+                    s.kisiSayi = n; s.kisiEtiket += (s.kisiEtiket.isEmpty ? "" : " | ") + "[\(rol)] " + tt }
                 if uy(KENDI_PAYLAS, tt) { s.kendi = true } else if uy(PAYLAS, tt) { s.karsi = true }
                 if s.konusan == nil, let ad = yakala(KONUSAN, tt) { s.konusan = ad }
             }
@@ -377,7 +382,7 @@ final class Masaustu {
                 if let pp = paylasim { v["paylasim"] = pp }
                 if let k = s.konusan { v["konusan"] = k }
                 if let n = s.kisiSayi { v["kisi_sayisi"] = n }
-                if s.kisiler != nil, kisiEtiketYazildi != baslik { kisiEtiketYazildi = baslik; print("MASAÜSTÜ: Kişiler düğmesi · \(s.kisiEtiket.prefix(200)) · sayı \(s.kisiSayi.map(String.init) ?? "yok")") }
+                if s.kisiler != nil || s.kisiSayi != nil, kisiEtiketYazildi != baslik { kisiEtiketYazildi = baslik; print("MASAÜSTÜ: Kişiler düğmesi · \(s.kisiEtiket.prefix(200)) · sayı \(s.kisiSayi.map(String.init) ?? "yok")") }
                 return v
             }
             if bos == nil { bos = ["uygulama": u.ad, "toplantida": false] }

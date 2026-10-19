@@ -34,6 +34,26 @@
     const e = document.querySelector('[data-tid*="screen-share" i], [data-tid*="screenshare" i], [data-tid*="content-share" i], [data-tid*="desktop-share" i], [data-tid*="shared-content" i]');
     return e && e.getClientRects().length && e.getBoundingClientRect().width * e.getBoundingClientRect().height >= innerWidth * innerHeight * 0.25 ? true : null;
   }
+  // katılımcı sayısı (v0.84.1, 19 Ekim): Kişiler düğmesinin etiketi/rozeti, yoksa sayfadaki "N katılımcı / N participants" (masaüstü Teams'te sohbet başlığında
+  // "Kişi ve aracı ekle, 1 katılımcı" görüldü). Klavye kısayolundaki rakam sayılmaz. Biçim web'de doğrulanmadı: etiket aktarıcıya gider, değişince günlüğe yazılır.
+  const KISI_DUGME = '[data-tid="roster-button"], #roster-button, [data-tid="call-roster-button"], button[aria-label^="Kişiler"], button[aria-label^="People"], button[aria-label^="Katılımcılar"], button[aria-label^="Participants"]';
+  const KISI_SAYI = /(?:^|[\s(,])(\d{1,3})(?:\)|\s*(?:kişi|katılımcı|participant|people|person)|$)/i, KISAYOL = /[⌘⌥⇧⌃]|\b(ctrl|shift|alt|cmd|option|command)\b/i;
+  function kisiSayisi() {
+    const et = [], b = document.querySelector(KISI_DUGME);
+    if (b) {
+      for (const t of [b.getAttribute("aria-label"), b.title]) if (t && t.length < 120) et.push(t);
+      for (const c of b.querySelectorAll("*")) if (!c.children.length) { const t = (c.textContent || "").trim(); if (t && t.length < 40) et.push(t); }  // rozet ayrı öğede ("5")
+    }
+    for (const e of document.querySelectorAll('[aria-label*="katılımcı" i], [aria-label*="participant" i]')) { const t = e.getAttribute("aria-label"); if (t && t.length < 120 && /\d/.test(t)) et.push(t); if (et.length > 8) break; }
+    let n = null;
+    for (const t of et) { if (KISAYOL.test(t)) continue; const m = t.match(KISI_SAYI); if (m && +m[1] > 0) { n = +m[1]; break; } }
+    // 19 Ekim gerçek web toplantısı: düğme yalnız "Kişiler" (sayı/rozet yok). Teşhis: sahnedeki katılımcı kutucuklarını sayabilmek için data-tid adları ve sayıları
+    // (yalnız öğe adı ve adet; metin/kişi adı yok) — ilk web toplantısında hangi adın katılımcı sayısına denk geldiği görülür.
+    let tid = "";
+    if (!n) { const say = {}; for (const e of document.querySelectorAll("[data-tid]")) { const a = e.getAttribute("data-tid"); if (/participant|tile|roster|avatar|stream|video|stage|gallery/i.test(a) && a.length < 50) say[a] = (say[a] || 0) + 1; }
+      tid = Object.entries(say).sort((x, y) => x[0].localeCompare(y[0])).map(([a, k]) => a + "×" + k).join(", "); }
+    return { n, etiket: ([...new Set(et)].join(" | ").slice(0, 200) + (tid ? " · tid: " + tid : "")).slice(0, 600) };
+  }
   function sessizMi() {
     const b = micDugme(); if (!b) return false;
     const l = (b.getAttribute("aria-label") || b.title || "").toLowerCase();
@@ -131,7 +151,7 @@
       en: { altyazi: "More (…) → Language and speech → Turn on live captions", dokum: "More → Record and transcribe → Show transcript" } },
     get yonerge() { return this.YONERGE[this.dil] || this.YONERGE.tr; },
     kur(yard) { Y = yard; },
-    SKIP_RE, toplantiAdi, cagrida, micDugme, sessizMi, paylasimVar, dokumPaneli, dokumSatirSayisi, dokumOku, altyaziKutusu, altyaziVar, altyaziOku,
+    SKIP_RE, toplantiAdi, cagrida, micDugme, sessizMi, paylasimVar, kisiSayisi, dokumPaneli, dokumSatirSayisi, dokumOku, altyaziKutusu, altyaziVar, altyaziOku,
     altyaziAdimlari: [  // metinle bulma: [seçici, metin/aria kalıbı]
       ['#callingButtons-showMoreBtn, [data-tid="more-button"], [data-tid="callingButtons-showMoreBtn"], button', /^(diğer|daha fazla|tümü|more)(\b|$)|^…$/i],  // 1 Ekim gerçek Teams (kanıt): çağrı çubuğunda "Tümü"
       ['[role="menuitem"], [role="menuitemcheckbox"], button', /^(dil ve konuşma|language and speech)/i],
