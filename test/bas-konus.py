@@ -94,6 +94,7 @@ try:
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
     ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) >= 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c)
        and c[0]["arac"] == 0 and c[1]["arac"] == 1 and c[1]["araclar"] == ["Grep"] and c[1]["arac_ilk_ms"])
+    ok("ölçümde o anki sistem durumu: yük, boş bellek %, takas (v0.91.1)", all(isinstance((x.get("sistem") or {}).get("yuk"), float) and 0 <= (x["sistem"].get("bos_yuzde") or -1) <= 100 for x in c))
     ok("ölçüm: soru gönderimi, ilk yanıt, düşünme süresi/uzunluğu (v0.77.3)", c[1]["gonder_ms"] is not None and c[1]["ilk_yanit_ms"] and c[1]["dusunme"] == 1
        and c[1]["dusunme_kar"] == 5 and 150 <= c[1]["dusunme_ms"] < 2000 and c[0]["dusunme_kar"] == 0 and c[0]["ilk_yanit_ms"] is None)
     ok("döküme yazılmadı", not any(f.endswith(".md") for f in os.listdir(canli)))

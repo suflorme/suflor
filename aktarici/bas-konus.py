@@ -777,7 +777,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 # süreç kapanıyordu, sonraki soru soğuk başlıyordu). Geçmiş büyüdükçe çağrı başına giriş büyür; tek turluk soruda eskisiyle aynı.
                 cagri = o["giris"] / max(1, int(o.get("tur") or 1))
                 if tur.get("defter_gitti"): _KS["defter_taban"] = cagri  # defterin girdiği tur: sınır defter + 40k
-                o["defter"] = bool(_KS.get("defter_md"))
+                o["defter"] = bool(_KS.get("defter_md")); o["sistem"] = sistem_anlik()
                 yenile = _KS["sayac"] >= KONUS_TUR_EN_COK or cagri >= max(KONUS_GIRIS_SINIR, _KS["defter_taban"] + 40000 if _KS.get("defter_md") else 0)
                 with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
                 _konus_kur(durum="hazir", olcum={k: o[k] for k in ("wh_ms", "ilk_ms", "ses_ms", "sure_ms", "maliyet")})
@@ -792,6 +792,16 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
     # v0.70.1: tur sınırında (ya da kişilik/toplantı değişince) süreç bilerek kapatılır; eski süreç ancak birkaç saniye sonra çıkar. O arada gelen yeni soru
     # (_KS["tur"]) yeni süreç açılmadan önce bu satıra denk gelirse panoda bir an "Claude süreci kapandı" görünüyor, tur siliniyordu. Yalnız beklenmedik çıkış hata.
     if _KS.get("tur") and _KS.get("nesil") == nesil and _KS.get("kapali_nesil") != nesil: _konus_kur(durum="hata", hata=_t("Claude süreci kapandı — yeniden bas", "The Claude process closed — press again")); _KS["tur"] = None
+# v0.91.1 (reçete 4, 20 Ekim): ön arama yalıtılmış aktarıcıda 30–116 ms (işlemci ≈ süre), canlıda bazen 1,4–1,9 sn (işlemci 5 kat); Whisper da aynı akşam
+# 2–4 kat yavaştı → sistem yükü şüphesi. Her cevabın ölçümüne o anki bellek boşluğu (%), takas (MB) ve 1 dk işlemci yükü (cevap bittikten sonra; gecikmeye girmez).
+def sistem_anlik():
+    import subprocess
+    o = {"yuk": round(os.getloadavg()[0], 2)}
+    try:
+        r = subprocess.run(["/usr/sbin/sysctl", "-n", "kern.memorystatus_level", "vm.swapusage"], capture_output=True, text=True, timeout=1).stdout.split("\n")
+        o["bos_yuzde"] = int(r[0]); m = re.search(r"used = ([\d.]+)M", r[1] if len(r) > 1 else ""); o["takas_mb"] = round(float(m.group(1))) if m else None
+    except (OSError, ValueError, subprocess.SubprocessError): pass
+    return o
 def _konus_defter():  # → (df, dm, dk): son toplantının defteri ve kimliği (dosyalar), yoksa (None, (None, False), None)
     try: df = defter_toplanti(); dm = defter_metni(df) if df else (None, False)
     except Exception as e: print(f"DEFTER: kurulamadı ({e.__class__.__name__})"); return None, (None, False), None
