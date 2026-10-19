@@ -1038,6 +1038,8 @@ def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsı
     if SORU["aktif"]: SORU["t"] = time.time(); return {"ok": True, "cevap": True}  # "yazayım mı?" cevabı: Claude gerekmez (yerel ayırıcı)
     # süreç kayıt sürerken açılır; defter sorunun ilk mesajıyla gider. Ayrı "ısınma" mesajı (v0.33.1) kaldırıldı: ölçümde kazanç yoktu
     # (14 Ekim: ısınmasız defterli ilk metin 0,9–3,3 sn) ve 14 Ekim gece gerçek denemede (deftersiz) bırakıştan ilk sese 2,8 sn.
+    # 20 Ekim (v0.90.0 sonrası, istem başı sabitken) yeniden denendi, yine kazanç yok: ısınma turu 5,4–7 sn sürdü (4 sn konuşmadan uzun), soru onu bekledi;
+    # 7 ilk soruda bırakıştan ilk metne ortanca 2,1 → 5,3 sn, maliyet +%21. Sürecin açılış masrafı zaten konuşma sırasında gizleniyor.
     threading.Thread(target=konus_ac, daemon=True).start()
     return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
