@@ -19,7 +19,7 @@ def otonom_kesilsin(ts, zarf, t_bas, esik):  # → (kesilsin mi, son 3 sn'de aç
     return (d is not None and n >= OTONOM_ARA_KARE and son >= esik), n, d  # üstümüze konuşma: son 3 sn'de ≥ esik ses ve bir kısmı aralarımızda
 OT = {"id": None}; OT_K = threading.Lock()
 OT_SON = ("iptal", "okundu", "kesildi", "soylenmedi", "okunamadi")
-def otonom_acik(): return AYAR.get("otonom") is True and toplanti_var() and AYAR.get("konusma", True) is not False
+def otonom_acik(): return (AYAR.get("otonom") is True or moderator_acik()) and toplanti_var() and AYAR.get("konusma", True) is not False  # v0.83.0: moderatör açıkken otonom
 def _ot_ayar(ad, v):
     try: return max(0.0, float(AYAR.get(ad, v)))
     except (TypeError, ValueError): return v

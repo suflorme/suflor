@@ -609,13 +609,33 @@ def _yanki_bosalt(zorla=False):
 # ("Eğlenceli değilse sadece bir serseri" ×3; konuşma payı, söz kesme ve DİNLE yanlış). Okuma aralığı ve sözcükleri kaydedilir; ben kanalında
 # o aralıkla çakışan ve sözcükleri sırayla eşleşen satır (yankı kuralı) yazılmaz. Kulaklıkta zaten girmez.
 KENDI_SES = []
+# 19 Ekim test toplantısı: okunan "Ses kesikliğinin kaynağını şu an bilmiyorum" mikrofondan "<kişilik adı> sesin kesikliğinin kaynağını şu an bilin" yazıldı —
+# Whisper yankıyı bozuk yazıyor (ek değişiyor, sözcük kısalıyor) ve istemdeki kişilik adını başa ekliyor; birebir eşleşme 2/5 kaldı. Yalnız kendi sesimiz için
+# sözcükler kök benzerliğiyle karşılaştırılır (ortak önek ≥ 3 ve kısa olanın en çok 2 harf eksiği) ve kişilik adları sayılmaz; karşı tarafın yankı kuralı aynı.
+def _kok_ayni(x, y):
+    n = 0
+    for a, b in zip(x, y):
+        if a != b: break
+        n += 1
+    return n >= 3 and n >= min(len(x), len(y)) - 2
+def _kendi_mi(a, b):  # a: ben satırı, b: Suflor'un okuduğu — (t0, t1, sözcükler)
+    if min(a[1], b[1]) - max(a[0], b[0]) < 0.5: return False
+    try: adlar = {sade(x) for k in kisilikler() for x in k.get("hitap") or []}
+    except Exception: adlar = set()
+    s = [w for w in a[2] if w not in adlar]; o = b[2]
+    if not s or not o: return False
+    d = [[0] * (len(o) + 1) for _ in range(len(s) + 1)]  # sıralı eşleşme (en uzun ortak alt dizi, kök benzerliğiyle)
+    for i in range(len(s)):
+        for j in range(len(o)): d[i + 1][j + 1] = d[i][j] + 1 if _kok_ayni(s[i], o[j]) else max(d[i][j + 1], d[i + 1][j])
+    ortak = d[len(s)][len(o)]
+    return ortak >= min(2, len(s)) and ortak / len(s) >= YANKI_KAPSAM
 def kendi_ses_kaydet(metin, t0, t1):
     with YANKI_LOCK: KENDI_SES.append((t0, t1 + 1.5, _yk(metin))); del KENDI_SES[:-10]
 def whisper_yaz(is_, metin, ses=None, model=None):
     kanal = is_["kanal"]; now = time.time()
     if kanal == "ben":
         m = (is_["t0"], is_["t1"], _yk(metin))
-        with YANKI_LOCK: kendi = any(_yanki_mi(m, k) for k in KENDI_SES)
+        with YANKI_LOCK: kendi = any(_kendi_mi(m, k) for k in KENDI_SES)
         if kendi:
             STATE["whisper"]["kendi_ses"] = STATE["whisper"].get("kendi_ses", 0) + 1
             if STATE["whisper"]["kendi_ses"] in (1, 10, 50): print(f"YANKI: Suflor'un okuduğu ses mikrofona girdi ({STATE['whisper']['kendi_ses']}. kez, yazılmadı) — \"{metin[:60]}\"")

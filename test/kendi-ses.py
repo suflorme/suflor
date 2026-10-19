@@ -18,8 +18,13 @@ t = time.time(); m.kendi_ses_kaydet("Eğlenceli değilse sadece bir serseri", t,
 sonuc = [m.whisper_yaz({"kanal": "ben", "t0": t + 0.3, "t1": t + 3.0}, "Eğlenceli değilse sadece bir serseri."),
          m.whisper_yaz({"kanal": "ben", "t0": t + 1.0, "t1": t + 3.5}, "Bence bu sunum çok iyi gidiyor."),
          m.whisper_yaz({"kanal": "ben", "t0": t + 20, "t1": t + 23}, "Eğlenceli değilse sadece bir serseri.")]
+# 19 Ekim test toplantısı: bozuk yazılmış yankı + istemden gelen kişilik adı (nötr örnek "Atlas"); aynı anda kullanıcının başka sözü yazılır
+m.AYAR["kisilik"] = None; m.kisilikler = lambda: [{"ad": "Atlas", "hitap": ["Atlas", "Atlaz"]}]
+t2 = time.time() + 100; m.kendi_ses_kaydet("Ses kesikliğinin kaynağını şu an bilmiyorum. Yazıya dökülen satırlarda bir kayıp görünmüyor.", t2, t2 + 15.4)
+sonuc += [m.whisper_yaz({"kanal": "ben", "t0": t2 + 0.5, "t1": t2 + 2.8}, "Atlas sesin kesikliğinin kaynağını şu an bilin."),
+          m.whisper_yaz({"kanal": "ben", "t0": t2 + 4, "t1": t2 + 6}, "Dur bir dakika, telefonu kapatıyorum.")]
 shutil.rmtree(T, ignore_errors=True)
-ok = sonuc == ["yanki", "satir", "satir"]
-print(("✓" if ok else "✗") + f" okunan öz atıldı, kullanıcının sözü ve zaman dışı aynı söz yazıldı · {sonuc}")
+ok = sonuc == ["yanki", "satir", "satir", "yanki", "satir"]
+print(("✓" if ok else "✗") + f" okunan öz atıldı (bozuk yazılmış yankı + kişilik adı da), kullanıcının sözü ve zaman dışı aynı söz yazıldı · {sonuc}")
 print("kendi ses: ✓ hepsi geçti" if ok else "kendi ses: ✗ kaldı")
 sys.exit(0 if ok else 1)

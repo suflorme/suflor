@@ -78,6 +78,19 @@ def _kisilik_hitap_ad(soz):  # tanınan hitap sözü → kişiliğin adı
     for k in kisilikler():
         if any(a.lower() == soz.lower() for a in k["hitap"]): return k["ad"]
     return None
+# Bölünen hitap (19 Ekim test toplantısı): Whisper "<kişilik adı> şu an" ve "toplantıda kaç tane şey var? … kontrol eder misin?" diye iki satıra böldü; ilk satırda soru
+# işareti olmadığı için hitap sayılmadı, Konuş cevap vermedi. Kullanıcı satırı ad (ya da Claude/Suflor) ile başlayıp noktalamasız biterse (en çok 6 sözcük) askıda
+# tutulur; HITAP_ASKI_SN içinde başlayan sonraki kullanıcı satırıyla birleşik metinde hitap aranır (döküm satırları ayrı kalır).
+HITAP_ASKI = {"metin": None, "t1": 0.0}; HITAP_ASKI_SN = 2.0
+def hitap_aski(metin, t0=None, t1=None):  # → askıdaki yarım hitap + bu satır (birleşik) ya da None; bu satır yarım hitapsa askıya alınır
+    a = HITAP_ASKI; t0 = time.time() if t0 is None else t0; t1 = time.time() if t1 is None else t1
+    if a["metin"] and 0 <= t0 - a["t1"] <= HITAP_ASKI_SN:
+        m = a["metin"] + " " + metin; a.update(metin=None); return m
+    a.update(metin=None)
+    adlar = [x for k in kisilikler() for x in k["hitap"]]
+    rx = r"\W*(?:" + "|".join([re.escape(x) for x in sorted(adlar, key=len, reverse=True)] + [HITAP_AD]) + r")\b"
+    if re.match(rx, metin or "", re.I) and not re.search(r"[.!?…:,]\s*$", metin) and len(metin.split()) <= 6: a.update(metin=metin, t1=t1)
+    return None
 def hitap_duzelt(text):
     krx = _kisilik_hitap_rx()
     def kd(m):

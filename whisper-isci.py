@@ -44,6 +44,18 @@ def ses_olc(a, np, sr=16000):
 # --- ECAPA (MLX). SpeechBrain'in Fbank'ı (25 ms Hamming, 10 ms adım, 80 mel, dB, üst 80 dB) + cümle ortalaması + ECAPA_TDNN
 # (1024 kanal, Res2Net ölçek 8, SE 128, dikkatli istatistik havuzu); Conv1d "same" + yansıtmalı dolgu, BatchNorm çıkarım istatistiği.
 SR, NFFT, HOP = 16000, 400, 160
+# Tekrar döngüsü (19 Ekim test toplantısı): karşı kanaldan geri gelen kendi sesimiz "OBSERV, PARA, OLI, AKMU" + 9 kez "AKMU" yazıldı; kısa satırda sıkıştırma
+# oranı süzgeci (2,4) yakalamıyor. Aynı sözcük ya da 2–3 sözcüklük öbek art arda ≥ 4 kez ve satırın en az yarısıysa uydurma (gerçek "evet evet evet" 3 kez kalır).
+def tekrar_dongu(metin):
+    w = re.findall(r"\w+", (metin or "").lower())
+    for n in (1, 2, 3):
+        i = 0
+        while i + n <= len(w):
+            k = 1
+            while w[i + k * n:i + (k + 1) * n] == w[i:i + n]: k += 1
+            if k >= 4 and k * n >= len(w) / 2: return True
+            i += 1
+    return False
 def cozme_ayari(sn):
     # canlı parça: yeniden deneme 2 sıcaklıkla, belirteç sesin süresiyle sınırlı (sn başına 20, en az 48). Varsayılan 6 sıcaklık × 224 belirteç
     # kısa parçada tekrar döngüsünü 6 kez baştan çözüyordu: 11 Ekim toplantılarında uydurma işleri ortalama 11,6 sn, işçi süresinin %59'u.
@@ -205,6 +217,7 @@ def main():
             # kısa satırda web adresi: Whisper'ın video sonu uydurması ("www.feyyaz.tv" — 1 Ekim headless bip sesi denemesi)
             if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): atilan.append(metin); metin = ""; atla += 1
             if istem and metin and metin.lower().strip(" .") in istem.lower(): atilan.append(metin); metin = ""; atla += 1  # istemi geri okuma
+            if metin and tekrar_dongu(metin): atilan.append(metin); metin = ""; atla += 1  # tekrar döngüsü uydurması
             try: ses = ses_olc(a, np) if metin else None
             except Exception: ses = None
             km = {}

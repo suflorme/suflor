@@ -618,6 +618,7 @@ def ingest(p):
             if e.get("id"): seen[e["id"]] = raw
             text, soz = sozluk_uygula(raw, base_key)
             if (e.get("speaker") or "") == ben_adi():
+                birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if p.get("source") == "whisper" and not onceki else None  # 19 Ekim: bölünen hitap
                 text, hd = hitap_duzelt(text); soz += hd
                 if e.get("komut_ses") != "uymuyor":  # yanındaki birinin sesi kanıt/not istemez
                     sesli_kanit_bak(text)
@@ -626,6 +627,8 @@ def ingest(p):
                         threading.Thread(target=note, args=({"meeting": {"title": title}, "text": n_, "at": datetime.datetime.now().isoformat(timespec="seconds")},), daemon=True).start()
                         STATE["komut"] = {"id": secrets.token_hex(4), "at": datetime.datetime.now().isoformat(timespec="seconds"), "tur": "not", "metin": "🎙 " + _t("Not alındı", "Note taken")}; kart_bildir()
                     elif p.get("source") == "whisper" and not onceki and "Claude:" in text and konus_hitap(text): e["_konusan"] = True  # S48: soru konuşana (bas-konus.py)
+                    elif birlesik and "Claude:" not in text and "Claude:" in (bt := hitap_duzelt(birlesik)[0]) and konus_hitap(bt):  # yarım hitap + bu satır
+                        e["_konusan"] = True; print(f"KONUŞ: bölünen hitap birleştirildi — \"{birlesik[:60]}\"")
             elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker")): e["_konusan"] = True  # v0.44.0
             if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text)); del SON_SATIRLAR[:-20]
             low = text.lower()
@@ -1510,6 +1513,7 @@ bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
+bolum("moderator")  # aktarici/moderator.py — Toplantı moderatörü: gündem, söz, özet ve karar (v0.83.0, S93)
 bolum("otonom")  # aktarici/otonom.py — Toplantıda otonom katılım: seslenince cevap, itiraz penceresi, söz sırası (S68)
 bolum("defter")  # aktarici/defter.py — Toplantı defteri: biten toplantıyı bas-konuşla sorma (S48)
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
@@ -1740,7 +1744,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = gemini_view() if gemini_acik() else piper_view(); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = gemini_view() if gemini_acik() else piper_view(); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1825,6 +1829,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/otonom":  # otonom cevap: iptal | simdi — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(otonom_karar(str(p.get("id") or "") or None, "simdi" if p.get("karar") == "simdi" else "iptal"))
+        if self.path == "/moderator":  # v0.83.0 moderatör düğmeleri: sonraki | ozet | bekle | devam | birak — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(moderator_pano(str(p.get("komut") or "")))
         if self.path == "/bas-konus":  # bas-konuş — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             if p.get("komut") == "basla": return self._json(konus_basla())

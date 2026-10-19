@@ -6,8 +6,8 @@ import ast, os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KIS = {"v": None, "v2": None}; ns = {"re": re, "time": __import__("time"), "kisilikler": lambda: [x for x in (KIS["v"], KIS["v2"]) if x]}  # v0.53.0: kişilik hitabı (nötr örnek ad "Atlas")
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
-sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad")) or
-       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR"} for x in n.targets))]
+sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "hitap_aski")) or
+       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR", "HITAP_ASKI", "HITAP_ASKI_SN"} for x in n.targets))]
 ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").read())  # 19 Ekim: söz etme kalıbı kisilik.py'de (iki yer aynı tanımı kullanır)
 sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) == "KISILIK_SOZ_ETME" for x in n.targets)] + sec
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
@@ -71,5 +71,21 @@ print(f"{'✓' if ok else '✗'} karşı taraf kalıbı yalnız toplantı kişil
 KIS["v"] = KIS["v2"] = None
 cik, _ = ns["hitap_duzelt"]("Atlas, bugün kaç toplantım var?"); ok = cik == "Atlas, bugün kaç toplantım var?"; hata += not ok
 print(f"{'✓' if ok else '✗'} kişilik dosyası yokken ad hitap değil: {cik!r}")
+# 19 Ekim test toplantısı: hitap iki satıra bölündü ("<ad> şu an" + "toplantıda kaç tane şey var? … kontrol eder misin?") → birleşik metinde hitap
+KIS["v"] = {"ad": "Atlas", "rol": "toplanti", "hitap": ["Atlas", "Atlaz"]}; KIS["v2"] = None
+ha = ns["hitap_aski"]; T = 1000.0
+r1 = ha("Atlas şu an", T, T + 1.5); r2 = ha("toplantıda kaç tane şey var? Kontrol eder misin?", T + 2.0, T + 7.5)
+b = ns["hitap_duzelt"](r2 or "")[0]
+ok = r1 is None and r2 == "Atlas şu an toplantıda kaç tane şey var? Kontrol eder misin?" and b.startswith("Claude: şu an toplantıda"); hata += not ok
+print(("✓ " if ok else "✗ ") + f"bölünen hitap birleşir: {b!r}")
+ha("Atlas şu an", T + 20, T + 21); r3 = ha("toplantıda kaç kişi var?", T + 24, T + 26)
+ok = r3 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "2 sn'den geç gelen satır birleşmez")
+ha("Atlas, kaç kart açık?", T + 40, T + 41); r4 = ha("Bir de özet çıkar.", T + 41.5, T + 43)
+ok = r4 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "noktalamayla biten tam hitap askıya alınmaz")
+ha("Bugün şu an", T + 60, T + 61); r5 = ha("toplantıda kaç kişi var?", T + 61.2, T + 63)
+ok = r5 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "adla başlamayan satır askıya alınmaz")
+ha("Klod şu an", T + 80, T + 81); r6 = ha("kaç kart açık?", T + 81.3, T + 83)
+ok = r6 == "Klod şu an kaç kart açık?" and ns["hitap_duzelt"](r6)[0].startswith("Claude:"); hata += not ok; print(("✓ " if ok else "✗ ") + "Claude yazımlarıyla da (Klod)")
+
 print("GEÇTİ" if not hata else f"KALDI: {hata}")
 sys.exit(1 if hata else 0)
