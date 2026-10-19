@@ -4,6 +4,7 @@
 # Whisper'dan önce durma, sessiz ve bozuk dosya; ses izi hafızası (v0.26.0): Yelda'nın izi önceden hafızadaysa --adlar'sız dökümde Türkçe
 # paragraflar onun adını alır, İngilizce "Konuşmacı 1" kalır. Whisper kurulu değilse atlar. Çalıştır: PYTHONDONTWRITEBYTECODE=1 python3 test/dosyadan.py
 import os, re, subprocess, sys, tempfile, time, wave, json
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import bosport  # noqa: canlı kullanım koruması (gerçek model)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); TC = os.path.join(KOD, "toplanti-claude.py")
 ok = []
 def kontrol(ad, kosul): ok.append(bool(kosul)); print(("✓ " if kosul else "✗ ") + ad)

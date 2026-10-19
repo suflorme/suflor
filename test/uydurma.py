@@ -4,6 +4,7 @@
 # gürültü boş döner ve atılan metin "atilan"da gelir; gerçek "Thank you." ve Türkçe kısa cevap korunur. Whisper kurulu değilse atlar (~20 sn).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/uydurma.py      (kaldı → çıkış 1)
 import base64, json, os, subprocess, sys, tempfile
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import bosport  # noqa: canlı kullanım koruması (gerçek model)
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VENV = "/Users/Shared/Suflor/whisper-venv/bin/python"

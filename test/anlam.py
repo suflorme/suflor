@@ -5,6 +5,7 @@
 # göre en çok +50 ms (§7/6). Gerçek model ister (<ortak>/cevir-venv + anlam-modeller; yoksa atlanır). ~1 dk.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/anlam.py      (kaldı → çıkış 1)
 import importlib.util, json, os, shutil, subprocess, sys, tempfile, time
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import bosport  # noqa: canlı kullanım koruması (gerçek model)
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORTAK = "/Users/Shared/Suflor"

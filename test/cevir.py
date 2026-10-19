@@ -5,6 +5,7 @@
 # Gerçek Docling + Vision ister (<ortak>/cevir-venv; yoksa atlanır). ~1 dk.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/cevir.py      (kaldı → çıkış 1)
 import importlib.util, json, os, shutil, subprocess, sys, tempfile, time
+sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import bosport  # noqa: canlı kullanım koruması (gerçek model)
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORTAK = "/Users/Shared/Suflor"; VPY = os.path.join(ORTAK, "cevir-venv", "bin", "python")
