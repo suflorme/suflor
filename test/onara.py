@@ -15,7 +15,7 @@ os.environ["SUFLOR_AYAR"] = os.path.join(T, "ayar.json"); os.environ["SUFLOR_TES
 try:
     # bas-konus.py'nin ön arama bölümü, relay ad alanı yerine küçük taklitle (bölüm dosyası relay.py'nin ad alanında çalışır; __file__ relay.py yanında)
     src = open(os.path.join(K, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-    g = {"os": os, "re": re, "sys": sys, "time": time, "threading": threading, "_t": lambda tr, en: tr, "__file__": os.path.join(K, "relay.py"), "AYAR": {}, "ARAYUZ_DILI": "tr"}
+    g = {"os": os, "re": re, "sys": sys, "time": time, "threading": threading, "_t": lambda tr, en: tr, "__file__": os.path.join(K, "relay.py"), "AYAR": {}, "ARAYUZ_DILI": "tr", "BASE": os.path.join(T, "canli")}  # v0.84.0: takvim geçmişi dosya yolu BASE ister
     exec(src[src.index("# --- Hızlı bilgi (S47"):src.index("def konus_baglam(")], g)
     m = g["_onara_mod"](); bak("baglam.py yüklendi", m is not None)
     t = time.time(); m.guncelle(m.baglan()); print(f"   dizin kuruldu ({time.time() - t:.2f} sn)")

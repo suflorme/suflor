@@ -38,7 +38,7 @@ PORT = bos_port(); sunucu = http.server.ThreadingHTTPServer(("127.0.0.1", PORT),
 # 1) Bölüm dosyası yalıtılmış ad alanında (relay.py'nin verdiği adlar taklit)
 os.environ.update(SUFLOR_TEST_GEMINI_HOST=f"127.0.0.1:{PORT}", SUFLOR_TEST_GEMINI_ANAHTAR="deneme-anahtar", SUFLOR_TEST_GEMINI_SESSIZ="1")
 YAZILAN = []
-ad = {"__name__": "gemini_ses", "os": os, "time": time, "json": json, "base64": base64, "subprocess": subprocess, "threading": threading,
+ad = {"__name__": "gemini_ses", "math": __import__("math"), "os": os, "time": time, "json": json, "base64": base64, "subprocess": subprocess, "threading": threading,
       "datetime": __import__("datetime"), "AYAR": {"gemini_ses": "Kore"}, "BASE": T, "PIPER_OYNAT": "/yok", "write": lambda ps: YAZILAN.extend(ps)}
 exec(compile(open(os.path.join(K, "aktarici", "gemini-ses.py"), encoding="utf-8").read(), "gemini-ses.py", "exec"), ad)
 t0 = time.time(); r = ad["gemini_oku"]("Gerçekten mi? Geçen hafta tam tersini söylemişlerdi.")
