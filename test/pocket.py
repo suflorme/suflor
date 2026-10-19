@@ -55,8 +55,8 @@ AYAR["ses_motoru"] = "mac"; a4 = sec(); AYAR["ses_motoru"] = "piper"
 K["k"] = None; AYAR.update(ses_motoru="pocket", pocket_ses="wite:male_1"); a5 = sec(); AYAR.update(ses_motoru="piper"); AYAR.pop("pocket_ses")
 K["k"] = {"ses": "gemini:Charon"}; a6 = sec()
 AYAR.pop("piper_python"); AYAR.pop("piper_model")
-bak("kişilik sesi: toplantı dışı → Pocket, toplantıya → Gemini, Pocket yoksa → Piper, Ses 'Mac' → Mac, ayar pocket → pocket_ses, yerel_ses yok → Piper",
-    (a1, a2, a3, a4, a5, a6) == (("pocket", "alperiox:female_2"), ("gemini", "Kore"), ("piper", None), ("mac", None), ("pocket", "wite:male_1"), ("piper", None)))
+bak("kişilik sesi: toplantı dışı → Pocket, toplantıya → Gemini, Pocket yoksa → Mac (Piper değil), Ses 'Mac' → Mac, ayar pocket → pocket_ses, yerel_ses yok → Piper",
+    (a1, a2, a3, a4, a5, a6) == (("pocket", "alperiox:female_2"), ("gemini", "Kore"), ("mac", None), ("mac", None), ("pocket", "wite:male_1"), ("piper", None)))
 # "hı hı" (tepki_cal): Piper ayarında da kişiliğin yerel sesi Pocket ise onay Pocket'la; Gemini/Mac dalları eskisi gibi
 import ast; tc = ast.get_source_segment(src, next(f for f in ast.parse(src).body if isinstance(f, ast.FunctionDef) and f.name == "tepki_cal"))
 OKU = []

@@ -44,12 +44,12 @@ ok(f"birleştirme: aynı ses+üslup tek istek, değişince ayrı: {c}", c == [("
 uzun = "x" * 350 + "."
 c = deneme(True, q=[("g", uzun, "Charon", "u"), ("g", uzun, "Charon", "u"), ("g", "Son.", "Charon", "u")], bekle=2)
 ok(f"birleştirme sınırı (600 karakter): {[len(x[1]) for x in c]}", [len(x[1]) for x in c] == [351, 356])
-# S93: yerel ses Pocket — okuyabilirse Pocket, okuyamazsa Piper (kuruluysa), o da olmazsa Mac sesi; Gemini parçası Gemini yoksa düz metin olur
+# S93: yerel ses Pocket — okuyabilirse Pocket, okuyamazsa Mac sesi (Piper denenmez; sıra Pocket → Mac → Piper); Gemini parçası Gemini yoksa düz metin olur
 q3 = lambda: [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Yerel cümle."]
 c = deneme(False, motor="pocket", q=q3(), pocket=True)
 ok(f"Pocket: tepki → afplay, metinler → Pocket: {c}", c == [("afplay", "/tepki.caf"), ("pocket", "Gemini cümlesi."), ("pocket", "Yerel cümle.")])
 c = deneme(False, motor="pocket", q=q3(), pocket=False, piper=True)
-ok(f"Pocket okuyamadı → Piper: {c}", c == [("afplay", "/tepki.caf"), ("piper", "Gemini cümlesi."), ("piper", "Yerel cümle.")])
+ok(f"Pocket okuyamadı → Mac sesi, Piper kurulu olsa da (sıra Pocket → Mac → Piper): {c}", c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
 c = deneme(False, motor="pocket", q=q3(), pocket=False)
 ok(f"Pocket okuyamadı, Piper yok → Mac sesi: {c}", c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
 print("ses-kuyruk: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

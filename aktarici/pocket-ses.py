@@ -3,7 +3,7 @@
 # 19 Ekim kör puanlamasında (testler/yerel-ses-arastirma-20261019, 11 ses × 4 soru) ilk 3'ün üçü Pocket; Piper sonuncu. Gemini toplantıya ayrıldığı için
 # (S92) kullanıcının duyduğu ses ve toplantı dışı her okuma yerel: kişilikte "yerel_ses: pocket:<model>:<ses>" (ör. pocket:alperiox:female_2,
 # pocket:wite:male_1) ya da ayar ses_motoru: pocket + pocket_ses. Ayar pocket_python (torch + pocket_tts ortamı) ve pocket_hf (modellerin
-# HF_HOME'u) yoksa, dosya yoksa ya da işçi hata verirse Piper'a, o da yoksa Mac sesine düşülür. Model dosyaları depoda değil (kullanıcı indirir;
+# HF_HOME'u) yoksa, dosya yoksa ya da işçi hata verirse Mac sesine düşülür (sıra Pocket → Mac → Piper; 19 Ekim). Model dosyaları depoda değil (kullanıcı indirir;
 # wite-tech CC-BY-4.0 atıfla, alperiox MIT). İşçi (pocket-isci.py) aktarıcı açılırken bir kez yüklenir (iki model ~4,6 sn) ve açık kalır.
 # Hız ayarı yok (Pocket'ın tek konuşma hızı; doğal hızı Elif'le aynı, 5,2 hece/sn). Duygu etiketi yalnız wite modelinde: Claude'un <ton:…>'u ya da
 # cümlenin kendisinden (ünlem → mutlu, hayret kalıbı → şaşkın). Ses ve metin Mac'ten çıkmaz.
@@ -58,7 +58,7 @@ def pocket_baslat():
         py, hf = os.path.expanduser(str(AYAR["pocket_python"])), os.path.expanduser(str(AYAR["pocket_hf"]))
         eksik = next((y for y in (py, hf, POCKET_ISCI) if not os.path.exists(y)), None)
         if eksik:
-            if POCKET["hata"] != "yok": print(f"POCKET: dosya yok ({os.path.basename(eksik)}) — Piper/Mac sesi")
+            if POCKET["hata"] != "yok": print(f"POCKET: dosya yok ({os.path.basename(eksik)}) — Mac sesi")
             POCKET.update(durum="yok", hata="yok"); return False
         if time.time() - POCKET["baslat_t"] < 30 and POCKET["durum"] == "hata": return False  # art arda çöken işçiyi zorlamaz
         POCKET["baslat_t"] = time.time(); POCKET["durum"] = "yukleniyor"
@@ -66,7 +66,7 @@ def pocket_baslat():
             p = subprocess.Popen([py, "-I", "-B", POCKET_ISCI, POCKET_GECICI, ",".join(pocket_kisilik_sesleri())], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                  stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=dict(os.environ, HF_HOME=hf, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1"))
         except OSError as e:
-            POCKET.update(durum="hata", hata=e.__class__.__name__); print(f"POCKET: başlatılamadı ({e.__class__.__name__}) — Piper/Mac sesi"); return False
+            POCKET.update(durum="hata", hata=e.__class__.__name__); print(f"POCKET: başlatılamadı ({e.__class__.__name__}) — Mac sesi"); return False
         POCKET["p"] = p; threading.Thread(target=_pocket_okuyucu, args=(p,), daemon=True).start()
     son = time.time() + 30
     while POCKET["durum"] == "yukleniyor" and time.time() < son: time.sleep(0.05)
@@ -86,7 +86,7 @@ def pocket_metin(metin, ses):
     m = piper_okunur(metin)
     return _rakam_yazi(m) if ses.startswith("alperiox") else m
 def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None):
-    # metni Pocket'la okur; bitince True. Hiçbir parça çalınamadıysa False (çağıran Piper/Mac sesine düşer). ses: "wite:male_1" / "alperiox:female_2"
+    # metni Pocket'la okur; bitince True. Hiçbir parça çalınamadıysa False (çağıran Mac sesine düşer). ses: "wite:male_1" / "alperiox:female_2"
     # (yoksa ayardaki); iptal(): True dönerse kalan parçalar çalınmaz; kayit["p"]: çalan süreç (ses_durdur keser).
     ses = pocket_ses_adi(ses) or pocket_varsayilan()
     if not metin or not pocket_var() or not pocket_baslat(): return False
@@ -140,8 +140,8 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None):
                 try: os.remove(o["wav"])
                 except OSError: pass
     finally: POCKET["bekleyen"].pop(kim, None)
-def yerel_oku(metin, kisa=False):  # fısıltı, sesli çeviri: o anki kişiliğin yerel sesi (Pocket → Piper); okunamazsa False (çağıran Mac sesine düşer)
+def yerel_oku(metin, kisa=False):  # fısıltı, sesli çeviri: o anki kişiliğin yerel sesi; okunamazsa False (çağıran Mac sesine düşer). Pocket kişiliğinde Piper denenmez
     km, kv = kisilik_sesi()[:2]
-    if km == "pocket" and pocket_oku(metin, ses=kv): return True
+    if km == "pocket": return pocket_oku(metin, ses=kv)  # sıra Pocket → Mac → Piper (19 Ekim)
     return piper_oku(metin, piper_hiz(kisa=kisa))
 if pocket_var() and not deneme_aktarici(): threading.Thread(target=pocket_baslat, daemon=True).start()  # ilk okuma beklemesin

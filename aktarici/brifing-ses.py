@@ -370,11 +370,13 @@ def kisilik_sesi(zorla=None, toplantiya=False):  # toplantiya: ses katılımcıl
         if not kses and gemini_acik() and gemini_izinli(toplantiya): return "gemini", None, khiz
         # S93: yerel ses Pocket — kişilikte yerel_ses (ya da ses) pocket:…, yoksa ayar ses_motoru: pocket; ⚙ Ayarlar'da Ses "Mac sesi" ise Elif (aşağıda)
         yses = (k or {}).get("yerel_ses") or (kses if (kses or "").startswith("pocket") else None)
-        if pocket_var() and AYAR.get("ses_motoru") in ("piper", "pocket", "gemini") and (str(yses or "").startswith("pocket") or (not yses and AYAR.get("ses_motoru") == "pocket")):
-            return "pocket", (pocket_ses_adi(yses) if str(yses or "").startswith("pocket") else None) or pocket_varsayilan(), 1.0
+        pocket_ist = AYAR.get("ses_motoru") in ("piper", "pocket", "gemini") and (str(yses or "").startswith("pocket") or (not yses and AYAR.get("ses_motoru") == "pocket"))
+        if pocket_ist and pocket_var(): return "pocket", (pocket_ses_adi(yses) if str(yses or "").startswith("pocket") else None) or pocket_varsayilan(), 1.0
+        if pocket_ist: zorla = "mac"  # Pocket istendi ama kurulu değil: Mac sesi (Piper değil; sıra Pocket → Mac → Piper)
+    if zorla != "mac":
         if ((kses or "").startswith("gemini") or (not kses and gemini_acik())) and piper_var and AYAR.get("ses_motoru") in ("piper", "pocket", "gemini"):
             return "piper", None, khiz  # v0.81.0: Gemini toplantıya ayrıldı → yerel ses; ⚙ Ayarlar'da Ses "Mac sesi" ise Elif (aşağıda)
-        if (kses == "piper" and piper_var) or (not kses and (piper_acik() or (AYAR.get("ses_motoru") == "pocket" and piper_var))): return "piper", None, khiz
+        if (kses == "piper" and piper_var) or (not kses and piper_acik()): return "piper", None, khiz
     return "mac", (kses if kses and kses != "piper" and not kses.startswith(("gemini", "pocket")) else ses_secimi()), khiz
 def ses_secimi():  # say -v için ses adı; None = sistem sesi
     if AYAR.get("ses"): return str(AYAR["ses"])
@@ -449,13 +451,13 @@ def _ses_isci():
             with SES_K: SES["q"].insert(0, metin)
         with SES_K:
             if SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g": SES["q"][0] = etiket_sil(SES["q"][0][1])  # Gemini yok: düz metin
-        if motor == "pocket":  # S93: yerel Türkçe ses (Pocket); okunamazsa Piper (kuruluysa), sonra Mac sesi
+        if motor == "pocket":  # S93: yerel Türkçe ses (Pocket); okunamazsa Mac sesi (19 Ekim kararı: sıra Pocket → Mac → Piper)
             with SES_K:
                 if not SES["q"]: continue
                 metin = SES["q"].pop(0); kes = SES.get("kes", 0)
             if pocket_oku(metin, ses=v, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             with SES_K: SES["q"].insert(0, metin)
-            motor = "piper" if (ARAYUZ_DILI == "tr" and AYAR.get("piper_python") and AYAR.get("piper_model")) else "mac"
+            motor = "mac"
         if motor == "piper":  # yerel Türkçe ses (ayar ses_motoru: piper ya da kişilikte ses: piper); okunamazsa Mac sesi
             with SES_K:
                 if not SES["q"]: continue

@@ -91,7 +91,7 @@ Kendi Python ortamına (Python 3.11: `pip install pocket-tts pocket-tts-turkish`
 (3 kadın + 3 erkek hazır ses, duygu etiketi; CC-BY-4.0) ve istersen `alperiox/pocket-tts-turkish` (MIT; hazır sesi yok, wite-tech'in seslerini örnek alır).
 Ayar: `"pocket_python"` (o ortamın python'u), `"pocket_hf"` (modellerin indirildiği HF_HOME), `"ses_motoru": "pocket"` ve `"pocket_ses": "wite:female_2"`;
 kişilik dosyasında `yerel_ses: pocket:alperiox:female_2` o kişiliğe ayrı ses verir (Gemini toplantıya ayrıldığında da yerel okumalar bu sesle).
-Pocket okuyamazsa Piper, o da yoksa Mac sesi. Ses ve metin Mac'ten çıkmaz; model dosyaları Suflor.me ile gelmez.
+Pocket okuyamazsa ya da kurulu değilse Mac sesi (Piper ondan sonra). Ses ve metin Mac'ten çıkmaz; model dosyaları Suflor.me ile gelmez.
 
 En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API anahtarı alıp Anahtar Zinciri'ne koy
 (`security add-generic-password -a "$USER" -s suflor-gemini -w`; anahtar dosyaya yazılmaz), sonra panoda ⚙ Ayarlar → Ses → Gemini.
