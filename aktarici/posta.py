@@ -60,6 +60,24 @@ def posta_kisiler(soru, basta=False):  # soruda geçen kişi adları / adresleri
         if ilk and "@" not in w and not basta and not re.search(r"['’]", m.group(0)): continue  # kesmeli sözcük (Ayla'dan) Türkçede özel addır
         out.append(k)
     return list(dict.fromkeys(out))
+# v0.88.0 (kullanıcı 19 Ekim: "db'de kişi listesinden check etmesi gerekir"): kayıt veritabanı aracının yazdığı canli/vt-kisi-adres.json (ayar veritabani.kisi_adres
+# sorgusu; aktarıcı veritabanını okuyamaz) — sorudaki ad bir kişinin adı/lakabı/takma adıyla eşleşirse o kişinin bütün adları ve e-posta adresleri aranır.
+_VTKA = {"mt": None, "v": []}
+def posta_vt_kisiler():
+    y = os.path.join(BASE, "vt-kisi-adres.json")
+    try: mt = os.path.getmtime(y)
+    except OSError: return []
+    if mt != _VTKA["mt"]:
+        try: _VTKA.update(mt=mt, v=[k for k in (json.load(open(y, encoding="utf-8")).get("kisiler") or []) if isinstance(k, dict)])
+        except (OSError, ValueError): _VTKA.update(mt=mt, v=[])
+    return _VTKA["v"]
+def posta_vt_genislet(kisiler):  # ["ayla"] → kişinin öteki adları + adresleri (küçük harf)
+    out = []
+    for k in posta_vt_kisiler():
+        adlar = [_posta_k(a) for a in k.get("adlar") or []]
+        if any(w == a or (len(w) >= 4 and a.split(" ")[0] == w) or w in a.split(" ") for w in kisiler for a in adlar):
+            out += [a for a in adlar if len(a) >= 3] + [str(x).lower() for x in k.get("adresler") or [] if "@" in str(x)]
+    return out
 def posta_sec(soru, iletiler=None):  # → (seçilen iletiler, açıklama)
     xs = list(POSTA["iletiler"] if iletiler is None else iletiler)
     gon = bool(POSTA_GONDER_RX.search(soru)); xs = [x for x in xs if bool(x.get("gonderilen")) == gon]
@@ -68,6 +86,7 @@ def posta_sec(soru, iletiler=None):  # → (seçilen iletiler, açıklama)
     # v0.86.1 (kullanıcı: kişi Mail'de lakabıyla görünüyordu): ayar posta_takma_ad {"Ayla": "Ayla Kaya" | [..]} — ad, Mail'deki gönderen adına çevrilir
     ta = {_posta_k(k): ([v] if isinstance(v, str) else list(v or [])) for k, v in (AYAR.get("posta_takma_ad") or {}).items()} if isinstance(AYAR.get("posta_takma_ad"), dict) else {}
     kisiler = list(dict.fromkeys(kisiler + [_posta_k(t) for w in kisiler for t in ta.get(w, []) if str(t).strip()]))
+    kisiler = list(dict.fromkeys(kisiler + posta_vt_genislet(kisiler)))  # v0.88.0: kayıt veritabanındaki kişi → lakap, takma adlar ve e-posta adresleri
     if kisiler:
         def eslesir(x):
             hedef = _posta_k(f"{x.get('ad', '')} {x.get('adres', '')}")

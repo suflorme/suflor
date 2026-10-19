@@ -634,6 +634,19 @@ def _vt_adlar_yaz(dosya):
         with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"adlar": adlar, "t": round(time.time())}, f, ensure_ascii=False)
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except OSError: pass
+VT_KISI_ADRES_DOSYA = "vt-kisi-adres.json"  # v0.88.0: kişi başına adlar (ad, lakap, takma) + e-posta adresleri (ayar veritabani.kisi_adres: 1. sütun adlar, 2. sütun adresler, virgüllü)
+def _vt_kisi_adres_yaz(dosya):  # aktarıcının e-posta seçimi için: "Ayla'dan mail" → kişinin adresleri ve lakapları (Mail'de lakabıyla görünse de bulunur)
+    kayit = []
+    for r in vt_sorgu("kisi_adres"):
+        adlar = [x.strip() for x in str((r or [""])[0] or "").split(",") if len(x.strip()) >= 2]
+        adresler = [x.strip().lower() for x in str((r[1] if len(r) > 1 else "") or "").split(",") if "@" in x]
+        if adlar and adresler: kayit.append({"adlar": adlar, "adresler": adresler})
+    if not kayit: return
+    try:
+        y = os.path.join(dosya, VT_KISI_ADRES_DOSYA)
+        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"kisiler": kayit, "t": round(time.time())}, f, ensure_ascii=False)
+        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+    except OSError: pass
 def _vt_onbellek(dosya, guncelle=None, yenile=False):
     y = os.path.join(dosya, VT_SONUC_ONBELLEK)
     try: ob = json.load(open(y, encoding="utf-8"))
@@ -765,7 +778,7 @@ def vt_izle_cmd():
     son = time.time() + max(60, A.sure); mt0 = object()
     while True:
         mt = _vt_mt()
-        if mt != mt0: _vt_sema_yaz(A.dir); _vt_adlar_yaz(A.dir); mt0 = mt
+        if mt != mt0: _vt_sema_yaz(A.dir); _vt_adlar_yaz(A.dir); _vt_kisi_adres_yaz(A.dir); mt0 = mt
         _vt_onbellek(A.dir, yenile=True); _vt_mt_yaz(A.dir)
         if A.bir or time.time() >= son: return
         time.sleep(VT_DENETIM_SN)
@@ -777,7 +790,7 @@ def vt_mcp_cmd():
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except (VtHata, OSError): pass
     _vt_mt_yaz(A.dir)  # açılışta hemen (denetim iş parçacığını beklemeden)
-    _vt_adlar_yaz(A.dir)
+    _vt_adlar_yaz(A.dir); _vt_kisi_adres_yaz(A.dir)
     import threading
     kilit = threading.Lock()
     def denetle():  # açılışta bir kez, sonra dakikada bir: veritabanı değiştiyse önbellekteki sorgular yeniden çalışır

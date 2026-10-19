@@ -86,6 +86,9 @@ bak("izin yokken asistana nedeni (Tam Disk Erişimi) söylenir", "Tam Disk Eriş
 ns["AYAR"]["posta_takma_ad"] = {"Kerem": "Ayla Kaya"}; s, ne = ns["posta_sec"]("Kerem'den mail geldi mi?")
 bak(f"takma ad (ayar posta_takma_ad): Kerem → Ayla Kaya'nın iletileri de ({ne})", "Bütçe taslağı" in [x["konu"] for x in s]); ns["AYAR"].pop("posta_takma_ad")
 s, ne = ns["posta_sec"]("Tamam. Şimdi mailimi kontrol eder misin? Son gelen mailler neler?"); bak(f"'kontrol', 'eder', cümle başı 'Tamam' kişi sayılmaz → son gelenler ({ne})", ne == "son gelenler" and len(s) == 2)
+json.dump({"kisiler": [{"adlar": ["Kerem Arslan", "Koko"], "adresler": [A("ayla")]}]}, open(os.path.join(T, "vt-kisi-adres.json"), "w"))
+s, ne = ns["posta_sec"]("Koko'dan mail geldi mi?"); bak(f"kayıt veritabanından lakap → adres: Koko → Kerem Arslan'ın adresi ({ne})", "Bütçe taslağı" in [x["konu"] for x in s] and ne == "soruda geçen kişi")
+os.remove(os.path.join(T, "vt-kisi-adres.json")); ns["_VTKA"].update(mt=None, v=[])
 s, ne = ns["posta_sec"]("Zeynep'ten mail geldi mi?"); bak(f"adla eşleşen gönderen yoksa son gelenler + not ({ne})", len(s) == 2 and "eşleşen gönderen yok" in ne)
 import base64
 metin = ns["posta_govde_coz"](base64.b64decode(g["1"]["ham"]))
