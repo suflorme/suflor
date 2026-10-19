@@ -102,7 +102,7 @@ def cards_view():
     return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered][-5:],
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "bildirim": bi, "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
-            "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
+            "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "gizli": gizli_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
             "baglam": baglam_view(), "yaparken": yaparken_view(), "sesli_ceviri": sesli_ceviri_view(), "anlik": anlik_view(), "soyle_web": ts_web_view(),
             "son": {k: v for k, v in (STATE.get("son_satir") or {}).items() if k != "file"} if (STATE.get("son_satir") or {}).get("file") == af and af else None}
 # şerit uzun yoklaması — GET /cards?bekle=25&imza=<son> şeridin gösterdiği durum değişene kadar (en çok 25 sn)
@@ -116,7 +116,7 @@ def serit_imza(v):
     sv = v.get("sure") or {}
     ss = v.get("sessiz") or {}
     x = [[(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
-         (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"),
+         (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"), bool(v.get("gizli")),
          [(x["id"], x["durum"], x.get("sunuldu")) for x in ((v.get("eylem") or {}).get("liste") or [])],
          (v.get("kanit_iste") or {}).get("id"), (v.get("bildirim") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), ((v.get("sesli_ceviri") or {}).get("kis") or {}).get("id"), (v.get("komut") or {}).get("id"), (v.get("anlik") or {}).get("id"), [(v.get("soyle_web") or {}).get(k) for k in ("id", "dur")], str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
     return hashlib.sha1(json.dumps(x, default=str, sort_keys=True).encode()).hexdigest()[:16]

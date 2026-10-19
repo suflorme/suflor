@@ -143,6 +143,8 @@ def _mod_gorev(ad, **k):  # görevi Konuş sürecine verir; cevap otonom yoldan 
 
 def moderator_basla(metin, kis_ad=None):
     if not toplanti_var(): return {"ok": False, "err": _t("Toplantı yok", "No meeting")}
+    if gizli_acik():  # v0.89.0
+        print("MODERATÖR: gizli toplantı — başlamadı"); return {"ok": False, "err": _t("Gizli toplantı açık — asistanlar toplantıda konuşmuyor", "Private meeting is on — assistants don't speak in the meeting")}
     if not asistan_toplanti():  # S94: tek anahtar
         print("MODERATÖR: 'Asistanlar toplantıda konuşsun' kapalı — başlamadı")
         seslendir(_t("Toplantıyı yönetebilmem için Ayarlar'da 'Asistanlar toplantıda konuşsun'u açman gerek.", "To chair the meeting, turn on 'Assistants speak in meetings' in Settings."), kuyruk=True)

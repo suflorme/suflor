@@ -483,7 +483,10 @@ def _ses_isci():
 # tık + en çok 4 sözcük. Kullanıcı konuşuyorsa en çok 8 sn sessizlik beklenir, gelmezse okunmaz; iki fısıltı arası ≥ 20 sn. Sessizde
 # bekleyen kart okunmaz. Ses: Gemini açıksa kişiliğin Gemini sesi (v0.80.0; metin Google'a gider, S83/S87), değilse Piper ya da macOS sesi. Hız kuralı (konuşma → satır %90 < 5 sn) gerçek toplantıda
 # doğrulanınca açılması önerilir (S32).
-FISILTI = {"son": 0.0, "say": 0}; FISILTI_ARA_SN, FISILTI_BEKLE_SN = (2.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 20.0), 8.0
+# v0.89.0 (S91, strateji ipucu): soruya bağlı olmayan SÖYLE kartı da fısıltılı gelebilir ("Ne diyeyim?"in kısa hâli, istenmeden) — bunlar
+# arasında en az FISILTI_IPUCU_SN; DUR ve soru cevabının fısıltısı bu sınıra girmez.
+FISILTI = {"son": 0.0, "say": 0, "ipucu": 0.0}; FISILTI_ARA_SN, FISILTI_BEKLE_SN = (2.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 20.0), 8.0
+FISILTI_IPUCU_SN = 5.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 120.0
 def _ca_ozellik(nesne, secici, kapsam="glob"):
     import ctypes
     ca = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreAudio.framework/CoreAudio")
@@ -520,13 +523,15 @@ def fisilti_kart(c):
     if c.get("kind") != "dur" and not c.get("fisilti"): return
     metin = " ".join((c.get("fisilti") or c.get("text") or "").split()[:4]).rstrip(".,;:—-")
     if not metin: return
+    ipucu = c.get("kind") == "soyle" and not c.get("reply_to")
+    if ipucu and time.time() - FISILTI["ipucu"] < FISILTI_IPUCU_SN: print(f"FISILTI: ipucu {FISILTI_IPUCU_SN:.0f} sn dolmadı, okunmadı"); return
     def calis():
         son = time.time() + FISILTI_BEKLE_SN
         while _kullanici_konusuyor() and time.time() < son: time.sleep(0.3)
         if _kullanici_konusuyor(): print("FISILTI: kullanıcı konuşuyor, okunmadı"); return
         if time.time() - FISILTI["son"] < FISILTI_ARA_SN: print("FISILTI: 20 sn dolmadı, okunmadı"); return
         if not kulaklik(): print("FISILTI: kulaklık yok, okunmadı"); return
-        FISILTI.update(son=time.time(), say=FISILTI["say"] + 1)
+        FISILTI.update(son=time.time(), say=FISILTI["say"] + 1, **({"ipucu": time.time()} if ipucu else {}))
         if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"FISILTI (deneme): {metin}"); return
         try: subprocess.run(["/usr/bin/afplay", "-v", "0.4", "/System/Library/Sounds/Tink.aiff"], timeout=3)
         except (OSError, subprocess.TimeoutExpired): pass

@@ -427,6 +427,31 @@ def sessiz_view():
     if not sessiz_acik() and not tut: return None
     return {"id": SESSIZ["id"], "acik": sessiz_acik(), "kalan_sn": max(0, round(SESSIZ["bitis"] - time.time())) if sessiz_acik() else 0,
             "bitis": datetime.datetime.fromtimestamp(SESSIZ["bitis"]).strftime("%H:%M"), "tutulan": tut}
+# Gizli toplantı (S91, v0.89.0): kritik toplantı için tek dokunuş — Gemini'ye metin gitmez (her okuma yerel sesle: Pocket → Mac), asistanlar
+# toplantıda konuşmaz (otonom, adıyla çağrılınca herkese okuma, moderatör, duyuru kapalı; adıyla soru yalnız kulağa). Toplantı bitip
+# GIZLI_BOS_SN boyunca yeni toplantı olmayınca kendiliğinden kapanır (unutulan anahtar ertesi günü etkilemesin).
+GIZLI = {"acik": False, "bas": 0.0, "bos_t": 0.0}
+GIZLI_BOS_SN = 3 if os.environ.get("SUFLOR_TEST_HIZLI") else 900
+def gizli_acik(): return GIZLI["acik"]
+def gizli_degistir(neden="kullanıcı"):
+    with LOCK:
+        ac = not GIZLI["acik"]; GIZLI.update(acik=ac, bas=time.time() if ac else 0.0, bos_t=0.0)
+        if STATE.get("file"): _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **GİZLİ** | {'açıldı (Gemini ve asistanların toplantıda konuşması kapalı)' if ac else f'kapandı ({neden})'} | |")
+    if ac:
+        try: ts_durdur(); otonom_kisayol()  # süren toplantıya okuma ve bekleyen otonom cevap hemen kesilir
+        except Exception as e: print(f"GİZLİ: okuma durdurulamadı ({e.__class__.__name__})")
+    print(f"GİZLİ: {'açıldı' if ac else 'kapandı'} ({neden})"); kart_bildir(); return ac
+def gizli_view(): return {"acik": True, "bas": datetime.datetime.fromtimestamp(GIZLI["bas"]).strftime("%H:%M")} if GIZLI["acik"] else None
+def _gizli_nobet():
+    while True:
+        time.sleep(1.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 10.0)
+        try:
+            if not GIZLI["acik"]: continue
+            if toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida"): GIZLI["bos_t"] = 0.0; continue
+            if not GIZLI["bos_t"]: GIZLI["bos_t"] = time.time()
+            elif time.time() - GIZLI["bos_t"] >= GIZLI_BOS_SN: gizli_degistir("toplantı bitti")
+        except Exception as e: print(f"GİZLİ: nöbet hatası {e.__class__.__name__}")
+threading.Thread(target=_gizli_nobet, daemon=True).start()
 def _gundem_imza(): return [STATE.get("agenda_aktif"), sorted(k for k, v in STATE["agenda_ticks"].items() if v)]
 def ertele_card(p):
     with LOCK:
@@ -607,7 +632,7 @@ bolum("whisper-hat")  # aktarici/whisper-hat.py — Whisper hattı: işçi, ses 
 # ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
 # isteği de yok (Faz 2: üç yanlış alarm, karşı taraf da duyuyor); kanıt yalnız Option + Shift + K ve 📷 ile.
-def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | sesli_ceviri | soyle (/komut yalnız bunları kabul eder)
+def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | sesli_ceviri | soyle | gizli (/komut yalnız bunları kabul eder)
     title = title or STATE["meeting"] or "Toplantı"; at = datetime.datetime.now().isoformat(timespec="seconds")
     if tur == "onemli": note({"meeting": {"title": title}, "text": "⭐ ÖNEMLİ AN" + (f" — {gov}" if gov else ""), "at": at}); onay = "⭐ Önemli an işaretlendi"
     elif tur == "sesli_ceviri":
@@ -616,6 +641,7 @@ def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | 
             _t("🎧 Kulaklık takılı değil — sesli çeviri açılmadı (hoparlörden karşı taraf da duyar)", "🎧 No headphones — spoken translation not turned on (the other side would hear it)") if uy else \
             _t("🎧 Sesli çeviri kapandı", "🎧 Spoken translation off")
     elif tur == "soyle": r = toplantiya_soyle(gov) if gov else asistan_dur(); onay = r.get("metin") or "⚠ " + str(r.get("err"))  # S94: metinsiz (Option + Shift + S) = asistan sussun; metinli yalnız API/test (panodaki 🔊 kalktı)
+    elif tur == "gizli": onay = _t("🔒 Gizli toplantı: Gemini ve asistanların toplantıda konuşması kapalı, ses yerel", "🔒 Private meeting: Gemini and assistants speaking in the meeting off, local voice") if gizli_degistir() else _t("🔓 Gizli toplantı kapandı", "🔓 Private meeting off")
     elif tur == "sessiz": onay = _t(f"🔇 Sessiz: {SESSIZ_DK} dk — kartlar bekler", f"🔇 Quiet: {SESSIZ_DK} min — cards wait") if sessiz_degistir() else _t("🔔 Sessiz kapandı", "🔔 Quiet off")
     else: ask({"tur": "ozet"}); onay = _t("💬 Ne diyeyim? — Claude replik hazırlıyor", "💬 What do I say? — Claude is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
@@ -1461,7 +1487,7 @@ AYAR_PANO = {
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None), "menu_cubugu": ("bool", False, None),
-    "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "toplanti_duyuru": ("bool", False, None),
+    "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "toplanti_duyuru": ("bool", False, None), "sure_duyuru": ("bool", False, None),
     "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
 MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar", "toplantiya_ses")
 def ayarlar_view():
@@ -1958,9 +1984,9 @@ class H(BaseHTTPRequestHandler):
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)
         if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
         if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
-            if p.get("tur") not in ("onemli", "ozet", "sessiz", "sesli_ceviri", "soyle"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | sesli_ceviri | soyle"}, 400)
+            if p.get("tur") not in ("onemli", "ozet", "sessiz", "sesli_ceviri", "soyle", "gizli"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | sesli_ceviri | soyle | gizli"}, 400)
             komut_uygula(p["tur"], (str(p.get("metin") or p.get("not") or "")[:1200] if p["tur"] == "soyle" else str(p.get("not") or "")[:200]), (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
-            return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view(), "yaparken": yaparken_view()})
+            return self._json({"ok": True, "metin": STATE["komut"]["metin"], "sessiz": sessiz_view(), "gizli": gizli_view(), "yaparken": yaparken_view()})
         if self.path == "/ses-yerel":  # yalnız yerel ses yardımcısı — tarayıcı değil (Origin yok) + anahtar
             if self.headers.get("Origin") or not secrets.compare_digest(self.headers.get("X-Suflor-Anahtar", ""), SES_KEY): return self._json({"ok": False, "err": "anahtar"}, 403)
             return self._json(yerel_ses_al(p))

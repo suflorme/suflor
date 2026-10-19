@@ -35,7 +35,7 @@ def gemini_acik(): return AYAR.get("ses_motoru") == "gemini" and gemini_var()
 # toplantıya söyle, otonom cevap, toplantıda tanıtım/duyuru (toplantiya_soyle). Kulağa cevap, fısıltı, sesli çeviri ve toplantı dışı her okuma yerel ses (Piper;
 # yoksa Mac). Ayar gemini_kapsam: toplanti (varsayılan) | hepsi (eski davranış).
 def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" else "toplanti"
-def gemini_izinli(toplantiya=False): return gemini_var() and (toplantiya or gemini_kapsam() == "hepsi")
+def gemini_izinli(toplantiya=False): return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi")  # v0.89.0: gizli toplantıda hiç
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
     return v if v in GEMINI_SESLER else "Charon"

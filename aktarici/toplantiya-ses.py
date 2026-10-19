@@ -56,6 +56,7 @@ def ts_durdur():
 def toplantiya_soyle(metin=None):
     if AYAR.get("toplantiya_ses") is not True: return {"ok": False, "err": _t("Toplantıya sesli söyleme kapalı (⚙ Ayarlar)", "Speaking into the meeting is off (⚙ Settings)")}
     if ts_durdur(): print("TOPLANTIYA SÖYLE: susturuldu"); return {"ok": True, "metin": _t("🔇 Suflor sustu", "🔇 Suflor stopped")}
+    if "gizli_acik" in globals() and gizli_acik(): print("TOPLANTIYA SÖYLE: gizli toplantı — okunmadı"); return {"ok": False, "err": _t("Gizli toplantı açık — toplantıya ses gitmez", "Private meeting is on — nothing is said into the meeting")}
     if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")):
         print("TOPLANTIYA SÖYLE: toplantı yok — okunmadı"); return {"ok": False, "err": _t("Toplantı yok — toplantıya söylenecek bir yer yok", "No meeting — nowhere to say it")}
     web = ts_web(); aygit = None if web else ts_aygit()
@@ -178,15 +179,16 @@ DUYURU = {"toplanti": None, "t_ilk": 0.0, "son": 0.0, "say": 0}
 DUYURU_ARA_SN, DUYURU_SIRA_SN, DUYURU_BASLA_SN = 60.0, 20.0, (3.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 30.0)
 DUYURU_METIN = {"baslangic": ("Toplantıyı dinleyip not alıyorum.", "I'm listening and taking notes."), "not": ("Not aldım: {b}", "Noted: {b}")}
 def DUYURU_SABIT(): return {_t(*DUYURU_METIN["baslangic"])}  # v0.81.0: değişmeyen duyurular (önbellekten)
-def duyuru_acik(): return AYAR.get("toplanti_duyuru") is True and AYAR.get("toplantiya_ses") is True
+def duyuru_acik(): return AYAR.get("toplanti_duyuru") is True and AYAR.get("toplantiya_ses") is True and not ("gizli_acik" in globals() and gizli_acik())
 def _duyuru_toplanti():
     if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")): return None
     return STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
-def toplanti_duyuru(neden, baslik=None):  # arka planda söz sırasını bekler; başlarsa True
-    if not duyuru_acik() or not _duyuru_toplanti(): return False
-    if neden != "baslangic" and time.time() - DUYURU["son"] < DUYURU_ARA_SN: print(f"DUYURU: {DUYURU_ARA_SN:.0f} sn dolmadı, okunmadı ({neden})"); return False
-    tr, en = DUYURU_METIN[neden]; b = _cumle(" ".join(str(baslik or "").split())[:120]).rstrip(".") if baslik else ""
-    metin = _t(tr, en).format(b=b).strip()
+def toplanti_duyuru(neden, baslik=None, metin=None):  # arka planda söz sırasını bekler; başlarsa True. neden "sure": metin hazır (sesli süre uyarısı)
+    if not (sure_duyuru_acik() if neden == "sure" else duyuru_acik()) or not _duyuru_toplanti(): return False
+    if neden not in ("baslangic", "sure") and time.time() - DUYURU["son"] < DUYURU_ARA_SN: print(f"DUYURU: {DUYURU_ARA_SN:.0f} sn dolmadı, okunmadı ({neden})"); return False
+    if metin is None:
+        tr, en = DUYURU_METIN[neden]; b = _cumle(" ".join(str(baslik or "").split())[:120]).rstrip(".") if baslik else ""
+        metin = _t(tr, en).format(b=b).strip()
     if metin.endswith(":"): return False
     if not metin.endswith((".", "!", "?")): metin += "."
     def calis():
@@ -218,3 +220,37 @@ def _duyuru_nobet():  # toplantı başında bir kez: toplantı DUYURU_BASLA_SN s
             DUYURU["toplanti"] = t; toplanti_duyuru("baslangic")
         except Exception as e: print(f"DUYURU: nöbet hatası {e.__class__.__name__}")
 threading.Thread(target=_duyuru_nobet, daemon=True).start()
+# --- Sesli süre uyarısı (S91, v0.89.0; ayar sure_duyuru, varsayılan kapalı; toplantiya_ses de açık olmalı) ------------------------------------
+# Yürütücü rolünde (agenda.json rol) kalan 15 dk, son 5 dk, süre doldu ve gündem kayması (≥ 2 madde geride, en çok SURE_KAYMA_SN'de bir)
+# toplantıya söylenir; önceden yalnız toplantı oturumuna SÜRE olayı ve kart. Toplantıya geç katılınca geçilmiş eşikler söylenmez. Söz sırası duyuruyla aynı.
+SURE_DUY = {"toplanti": None, "esik": set(), "kayma_son": 0.0}
+SURE_KAYMA_SN = 5.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 600.0
+def sure_duyuru_acik(): return AYAR.get("sure_duyuru") is True and AYAR.get("toplantiya_ses") is True and not ("gizli_acik" in globals() and gizli_acik())
+def _sure_esikler(sv): k = sv["kalan_dk"]; return {e for e, ok in (("15", k <= 15), ("5", k <= 5), ("bitti", k <= 0)) if ok}
+def sure_duyuru_metin(e, sv):
+    kal, acik = sv["kalan_dk"], len(sv.get("acik") or [])
+    if e == "15": return _t(f"Kalan süre {kal} dakika" + (f", gündemde {acik} madde açık." if acik else "."), f"{kal} minutes left" + (f", {acik} agenda items open." if acik else "."))
+    if e == "5": return _t("Son beş dakika" + (f"; {acik} madde açık." if acik else "."), "Last five minutes" + (f"; {acik} items still open." if acik else "."))
+    if e == "bitti": return _t("Toplantı süresi doldu.", "We're at time.")
+    return _t(f"Gündemin {sv['kayma']} madde gerisindeyiz; kalan süre {kal} dakika.", f"We're {sv['kayma']} agenda items behind; {kal} minutes left.")
+def sure_duyuru_bak():  # nöbetten; söylenecekse (neden, metin), yoksa None
+    t = _duyuru_toplanti()
+    if not t: SURE_DUY.update(toplanti=None, esik=set()); return None
+    sv = sure_view() if (agenda().get("rol") or "") == "yurutucu" else None
+    if not sv: return None
+    es = _sure_esikler(sv)
+    if SURE_DUY["toplanti"] != t: SURE_DUY.update(toplanti=t, esik=set(es), kayma_son=time.time()); return None  # geçilmiş eşikler söylenmez
+    yeni = es - SURE_DUY["esik"]; SURE_DUY["esik"] |= es
+    if not sure_duyuru_acik(): return None
+    if yeni: e = next(x for x in ("bitti", "5", "15") if x in yeni); SURE_DUY["kayma_son"] = time.time(); return e, sure_duyuru_metin(e, sv)
+    if sv.get("kayma", 0) >= 2 and sv["kalan_dk"] > 5 and time.time() - SURE_DUY["kayma_son"] >= SURE_KAYMA_SN:
+        SURE_DUY["kayma_son"] = time.time(); return "kayma", sure_duyuru_metin("kayma", sv)
+    return None
+def _sure_nobet():
+    while True:
+        time.sleep(1.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 5.0)
+        try:
+            r = sure_duyuru_bak()
+            if r: print(f"SÜRE DUYURU: {r[0]} · {r[1]}"); toplanti_duyuru("sure", metin=r[1])
+        except Exception as e: print(f"SÜRE DUYURU: nöbet hatası {e.__class__.__name__}")
+threading.Thread(target=_sure_nobet, daemon=True).start()

@@ -95,7 +95,7 @@ def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kiş
     return None, metin
 # --- S94: toplantıda asistanlar — katılma durumu (toplantı başına) ---------------------------------------------------------------------
 _KATIL = {"toplanti": None, "adlar": []}
-def asistan_toplanti(): return AYAR.get("toplantiya_ses") is True and AYAR.get("konusma", True) is not False  # tek anahtar: "Asistanlar toplantıda konuşsun"
+def asistan_toplanti(): return AYAR.get("toplantiya_ses") is True and AYAR.get("konusma", True) is not False and not ("gizli_acik" in globals() and gizli_acik())  # tek anahtar: "Asistanlar toplantıda konuşsun"; v0.89.0: gizli toplantıda kapalı
 def asistan_adlari(): ks = kisilikler(); return [k["ad"] for k in ks] if ks else ["Suflor"]  # kişilik yoksa (nötr kurulum) asistanın adı Suflor
 def asistan_katilan():
     if not toplanti_var(): return []
