@@ -86,23 +86,36 @@ var st: OpaquePointer?
 guard sqlite3_prepare_v2(db, sql, -1, &st, nil) == SQLITE_OK else {
   yaz(["durum": "sema", "hata": "sorgu hazırlanamadı: " + String(cString: sqlite3_errmsg(db)), "iletiler": []]); exit(0)
 }
-sqlite3_bind_double(st, 1, sinir); sqlite3_bind_int(st, 2, Int32(enCok * 2))
+sqlite3_bind_double(st, 1, sinir); sqlite3_bind_int(st, 2, Int32(enCok * 4))
 func metin(_ k: Int32) -> String? { if let c = sqlite3_column_text(st, k) { return String(cString: c) }; return nil }
 // kutu adı: URL'nin son bölümü (yüzde kodlu) — INBOX, Sent Messages, [Gmail]/Gönderilmiş Postalar …
 let atla = try! NSRegularExpression(pattern: "(trash|junk|spam|deleted|drafts|çöp|gereksiz|taslak|silin|istenmeyen|bin)", options: [.caseInsensitive])
 let gonder = try! NSRegularExpression(pattern: "(sent|gönderil|giden)", options: [.caseInsensitive])
-var iletiler: [[String: Any]] = []
-while sqlite3_step(st) == SQLITE_ROW && iletiler.count < enCok {
-  let t = sqlite3_column_double(st, 0)
+// v0.85.2 (gerçek veri, 19 Ekim): Gmail aynı iletiyi Gelen Kutusu ve "[Gmail]/All Mail"da tutar → (gönderen, konu, saniye) bir kez; gönderdiklerin de All Mail'de →
+// gönderilen kutularındaki gönderen adresleri "benim" sayılır; kutu adı Mac'te ayrık harfle (o + ¨) gelir → eşleşmeden önce birleşik biçime çevrilir.
+struct Satir { let t: Double; let ad: String?; let adres: String; let konu: String; let kutu: String; let okundu: Int32?; let ozet: String? }
+var satirlar: [Satir] = []
+while sqlite3_step(st) == SQLITE_ROW {
   let url = metin(5) ?? ""
-  let kutu = (URL(string: url)?.pathComponents.filter { $0 != "/" }.joined(separator: "/")).flatMap { $0.removingPercentEncoding ?? $0 } ?? url
-  let r = NSRange(kutu.startIndex..., in: kutu)
-  if atla.firstMatch(in: kutu, range: r) != nil { continue }
-  var o: [String: Any] = ["t": iso.string(from: Date(timeIntervalSince1970: t)), "adres": metin(2) ?? "", "konu": ((metin(3) ?? "") + (metin(4) ?? "")).trimmingCharacters(in: .whitespaces),
-                          "kutu": String(kutu.suffix(60)), "gonderilen": gonder.firstMatch(in: kutu, range: r) != nil]
-  if let y = metin(1), !y.isEmpty { o["ad"] = y }
-  if okundu != "NULL", sqlite3_column_type(st, 6) != SQLITE_NULL { o["okundu"] = sqlite3_column_int(st, 6) != 0 }
-  if let z = metin(7), !z.isEmpty { o["ozet"] = String(z.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ").prefix(300)) }
+  let kutu = ((URL(string: url)?.pathComponents.filter { $0 != "/" }.joined(separator: "/")).flatMap { $0.removingPercentEncoding ?? $0 } ?? url).precomposedStringWithCanonicalMapping
+  satirlar.append(Satir(t: sqlite3_column_double(st, 0), ad: metin(1), adres: (metin(2) ?? "").lowercased(), konu: ((metin(3) ?? "") + (metin(4) ?? "")).trimmingCharacters(in: .whitespaces),
+                        kutu: kutu, okundu: (okundu != "NULL" && sqlite3_column_type(st, 6) != SQLITE_NULL) ? sqlite3_column_int(st, 6) : nil, ozet: metin(7)))
+}
+func eslesir(_ re: NSRegularExpression, _ k: String) -> Bool { re.firstMatch(in: k, range: NSRange(k.startIndex..., in: k)) != nil }
+let benim = Set(satirlar.filter { eslesir(gonder, $0.kutu) && !$0.adres.isEmpty }.map { $0.adres })
+var goruldu = Set<String>()
+var iletiler: [[String: Any]] = []
+for x in satirlar where iletiler.count < enCok {
+  if eslesir(atla, x.kutu) { continue }
+  let anahtar = "\(x.adres)|\(x.konu)|\(Int(x.t))"
+  if goruldu.contains(anahtar) { continue }
+  goruldu.insert(anahtar)
+  let t = x.t, kutu = x.kutu
+  var o: [String: Any] = ["t": iso.string(from: Date(timeIntervalSince1970: t)), "adres": x.adres, "konu": x.konu,
+                          "kutu": String(kutu.suffix(60)), "gonderilen": eslesir(gonder, kutu) || benim.contains(x.adres)]
+  if let y = x.ad, !y.isEmpty { o["ad"] = y }
+  if let r = x.okundu { o["okundu"] = r != 0 }
+  if let z = x.ozet, !z.isEmpty { o["ozet"] = String(z.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ").prefix(300)) }
   iletiler.append(o)
 }
 sqlite3_finalize(st); sqlite3_close(db)
