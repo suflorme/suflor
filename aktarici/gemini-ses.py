@@ -67,7 +67,10 @@ def gemini_model():  # ayardaki model; günlük sınırı dolduysa öteki; ikisi
     return None
 def gemini_gun_basi():  # Google'ın günlük sayacının başı: 19 Ekim'de 429'un önerdiği bekleme UTC gece yarısını (TR 03.00) gösterdi — gerçek sıfırlanma _kota_doldu'da kayıtlı
     return datetime.datetime.now(datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-def gemini_bugun():  # model başına bugün (Google günü) yapılan başarılı istek sayısı (canli/gemini-ses.jsonl; önbellekten çalınanlar sayılmaz)
+_BUGUN = {"t": 0.0, "v": {}}
+GEMINI_GUN_SINIR = 100  # Tier 1, model başına günlük istek (19 Ekim 429 yanıtı)
+def gemini_bugun():  # model başına bugün (Google günü) yapılan başarılı istek sayısı (canli/gemini-ses.jsonl; önbellekten çalınanlar sayılmaz); 10 sn önbellek (pano sık yoklar)
+    if time.time() - _BUGUN["t"] < 10: return dict(_BUGUN["v"])
     bas = gemini_gun_basi(); say = {}
     try:
         for l in open(os.path.join(BASE, "gemini-ses.jsonl"), encoding="utf-8"):
@@ -75,7 +78,12 @@ def gemini_bugun():  # model başına bugün (Google günü) yapılan başarıl�
             except (ValueError, KeyError): continue
             if t >= bas: say[d.get("model") or "?"] = say.get(d.get("model") or "?", 0) + 1
     except OSError: pass
-    return say
+    _BUGUN.update(t=time.time(), v=say)
+    return dict(say)
+def gemini_gunluk_view():  # panoya (⚙ Ayarlar → Gemini nerede): model sırasıyla bugünkü istek, sınır, dolu mu
+    if not gemini_var(): return None
+    b = gemini_bugun(); dolu = _kota()
+    return {"modeller": [{"ad": m, "n": b.get(m, 0), "dolu": m in dolu} for m in GEMINI_MODELLER], "sinir": GEMINI_GUN_SINIR, "toplam": sum(b.values())}
 def gemini_view():
     return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
             "kapsam": gemini_kapsam(), "bugun": gemini_bugun()}
@@ -281,6 +289,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
             print(f"GEMINI: akış yarıda kesildi ({e.__class__.__name__})"); ham.clear()  # yarım okuyuş önbelleğe girmez
     GEMINI.update(durum="hazir", hata=None)
     if sabit and ham and not (iptal and iptal()): _sabit_yaz(metin, ses, uslup, bytes(ham))
+    _BUGUN["t"] = 0.0  # sayaç yeniden okunsun
     bitir(True)
     _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk, model)
     print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")

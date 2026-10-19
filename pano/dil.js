@@ -276,6 +276,8 @@ globalThis.SUFLOR_EN = {
   "Google’ın günlük istek sınırı yüzünden Gemini sesi toplantıda katılımcıların duyduğu sese ayrılır; sana okunanlar yerel sesle.": "Because of Google's daily request limit, the Gemini voice is reserved for what meeting participants hear; what is read to you uses the local voice.",
   "Yalnız toplantıya söylenenler": "Only what is said into the meeting",
   "Her okuma": "Every reading",
+  "Bugün {n} istek": "Today {n} requests",
+  "dolu": "full",
   "3.8 Flash-Lite": "3.8 Flash-Lite",
   "3.8 Flash": "3.8 Flash",
   "(Gemini anahtarı yok)": "(no Gemini key)",

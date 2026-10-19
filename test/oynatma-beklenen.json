@@ -216,16 +216,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 170472,
-   "sha": "b1a6d2c0ae94d2f4"
+   "uzunluk": 171127,
+   "sha": "cf9bc760119a1b3d"
   },
   "/hazirlik": {
-   "uzunluk": 48563,
-   "sha": "17bbd04bc76b8927"
+   "uzunluk": 48624,
+   "sha": "1ee0e4be3aa59d25"
   },
   "/mini": {
-   "uzunluk": 170472,
-   "sha": "b1a6d2c0ae94d2f4"
+   "uzunluk": 171127,
+   "sha": "cf9bc760119a1b3d"
   },
   "/status": {
    "_ping_son": "float",
@@ -465,6 +465,17 @@
      "time": "str"
     }
    ],
+   "gemini_gunluk": {
+    "modeller": [
+     {
+      "ad": "str",
+      "dolu": "bool",
+      "n": "int"
+     }
+    ],
+    "sinir": "int",
+    "toplam": "int"
+   },
    "guncelleme": {
     "durum": "str"
    },
