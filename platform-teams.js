@@ -34,8 +34,8 @@
     const e = document.querySelector('[data-tid*="screen-share" i], [data-tid*="screenshare" i], [data-tid*="content-share" i], [data-tid*="desktop-share" i], [data-tid*="shared-content" i]');
     return e && e.getClientRects().length && e.getBoundingClientRect().width * e.getBoundingClientRect().height >= innerWidth * innerHeight * 0.25 ? true : null;
   }
-  // katılımcı sayısı (v0.84.1, 19 Ekim): Kişiler düğmesinin etiketi/rozeti, yoksa sayfadaki "N katılımcı / N participants" (masaüstü Teams'te sohbet başlığında
-  // "Kişi ve aracı ekle, 1 katılımcı" görüldü). Klavye kısayolundaki rakam sayılmaz. Biçim web'de doğrulanmadı: etiket aktarıcıya gider, değişince günlüğe yazılır.
+  // katılımcı sayısı (v0.84.1; v0.85.1 web'de doğrulandı): Kişiler düğmesinin rozeti, yoksa sayfadaki "N katılımcı / N participants" (masaüstü Teams'te sohbet
+  // başlığında "Kişi ve aracı ekle, 1 katılımcı" görüldü). Klavye kısayolundaki rakam sayılmaz. Etiket aktarıcıya yalnız değişince gider (günlükte teşhis).
   const KISI_DUGME = '[data-tid="roster-button"], #roster-button, [data-tid="call-roster-button"], button[aria-label^="Kişiler"], button[aria-label^="People"], button[aria-label^="Katılımcılar"], button[aria-label^="Participants"]';
   const KISI_SAYI = /(?:^|[\s(,])(\d{1,3})(?:\)|\s*(?:kişi|katılımcı|participant|people|person)|$)/i, KISAYOL = /[⌘⌥⇧⌃]|\b(ctrl|shift|alt|cmd|option|command)\b/i;
   function kisiSayisi() {
@@ -47,12 +47,10 @@
     for (const e of document.querySelectorAll('[aria-label*="katılımcı" i], [aria-label*="participant" i]')) { const t = e.getAttribute("aria-label"); if (t && t.length < 120 && /\d/.test(t)) et.push(t); if (et.length > 8) break; }
     let n = null;
     for (const t of et) { if (KISAYOL.test(t)) continue; const m = t.match(KISI_SAYI); if (m && +m[1] > 0) { n = +m[1]; break; } }
-    // 19 Ekim gerçek web toplantısı: düğme yalnız "Kişiler" (sayı/rozet yok). Teşhis: sahnedeki katılımcı kutucuklarını sayabilmek için data-tid adları ve sayıları
-    // (yalnız öğe adı ve adet; metin/kişi adı yok) — ilk web toplantısında hangi adın katılımcı sayısına denk geldiği görülür.
-    let tid = "";
-    if (!n) { const say = {}; for (const e of document.querySelectorAll("[data-tid]")) { const a = e.getAttribute("data-tid"); if (/participant|tile|roster|avatar|stream|video|stage|gallery/i.test(a) && a.length < 50) say[a] = (say[a] || 0) + 1; }
-      tid = Object.entries(say).sort((x, y) => x[0].localeCompare(y[0])).map(([a, k]) => a + "×" + k).join(", "); }
-    return { n, etiket: ([...new Set(et)].join(" | ").slice(0, 200) + (tid ? " · tid: " + tid : "")).slice(0, 600) };
+    // 19 Ekim gerçek web toplantısı: Kişiler düğmesi yalnız "Kişiler"; ikinci kişi (telefon) katılınca rozet "2" geldi → Teams rozeti 2+ kişide gösterir.
+    // Düğme var, rozet yok → 1 (yalnız kullanıcı). Sayı girişi sayar (aynı hesaptan iki giriş 2), hesabı değil.
+    if (!n && b) n = 1;
+    return { n, etiket: [...new Set(et)].join(" | ").slice(0, 200) };
   }
   function sessizMi() {
     const b = micDugme(); if (!b) return false;
