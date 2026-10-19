@@ -35,7 +35,7 @@ try:
     p = calistir({"toplantiya_ses": True}, {"SUFLOR_TEST_BASLAT": "1", "SUFLOR_TEST_TS_AYGIT": "1"})
     bak("toplantı yok → okunmaz (v0.77.2)", "Toplantı yok" in soyle("Deneme."))
     toplantida()
-    bak("cevap yok → uyarı", "cevap yok" in soyle())
+    bak("S94: metinsiz basış (Option + Shift + S) = dur; okunan yoksa söyler", "Okunan bir şey yok" in soyle())
     a = soyle("İlk cevap.\n---\nAyrıntı okunmaz."); b = soyle("İkinci cevap.")
     bak(f"ilk okumada tanıtım, --- sonrası yok: {a[:90]!r}", "yapay zekâ asistanı Suflor" in a and "Ali" in a and "Ayrıntı" not in a)
     bak(f"ikinci okumada tanıtım yok: {b!r}", "Suflor" not in b and "İkinci cevap" in b)

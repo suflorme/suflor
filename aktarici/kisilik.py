@@ -7,8 +7,9 @@
 #   selam: kişilik açıldıktan sonraki ilk konuşmada bir kez  telaffuz: SÖZCÜK=okunuş; SÖZCÜK2=okunuş2
 # Kişiliğe özgü adlar ve metinler yalnız bu dosyada ve kullanıcının ayarında durur; kodda sabit ad yok (açık depoda örnek: sablon/kisilik-ornek.md).
 # v0.61.0: iki kişilik. Ayar "kisilik_toplanti_disi": ikinci dosya — toplantı yokken o konuşur; toplantıda "kisilik" (ilk dosya). Kullanıcı cümleye birinin
-# adıyla başlarsa ("<Ad>, …") o soru ve ardından KISILIK_SURE_SN içindeki adsız sorular o kişilikle cevaplanır. Toplantıda varsayılan olmayan kişilik yalnız
-# kullanıcıya (kulaklık/pano) cevap verir; kullanıcı toplantıya söylemesini isterse (TOPLANTIYA_RX) toplantıya okunur. Ek ayar satırı: hitap_bicimi: sen (varsayılan siz).
+# adıyla başlarsa ("<Ad>, …") o soru ve ardından KISILIK_SURE_SN içindeki adsız sorular o kişilikle cevaplanır. Ek ayar satırı: hitap_bicimi: sen (varsayılan siz).
+# S94 (kullanıcı, 19 Ekim): toplantıda tek kural — "<Ad>, …" diye seslenilen kişilik toplantıya herkesin duyacağı şekilde cevap verir (hangisi olursa olsun);
+# yalnız kullanıcıya cevap tek yoldan: Konuş düğmesi. Kişilik, kullanıcı onu toplantıda ilk kez çağırınca "katılır"; sonra karşı taraf da ona adıyla sorabilir.
 # v0.71.0: ses: piper | <Mac ses adı> ve hiz: 1,15 (çarpan) — kişiliğin cevapları bu sesle okunur (iki kişilik ayrı duyulsun). Mac'in sistem (Siri) sesi say -r'yi
 # yok sayar (ölçüm 17 Ekim: -r 180/220 aynı süre); hız yalnız Piper'da ve adı verilen Mac sesinde (ör. Yelda) işler. Toplantıya okuma (BlackHole) bundan etkilenmez.
 # S93: yerel_ses: pocket:<model>:<ses> — kişiliğin Gemini dışındaki sesi (S92'den beri toplantı dışı ve kulağa okumalar yerel); Pocket'ta hız ayarı yok.
@@ -81,6 +82,10 @@ def kisilik_sec(ad):  # bu soru (ve KISILIK_SURE_SN içindeki adsız sorular) bu
 # 19 Ekim test toplantısı: "<toplantı kişiliği> ile ilgili problem neydi?" (öteki kişiliğe soru, ondan söz) seslenme sayıldı → ad + söz etme sözcüğü ya da
 # soru eki ("ile", "hakkında", "için", "gibi", "ve", "de", "mi" …) seslenme değil; kesmeli ek ("<Ad>'in") de değil. sozluk.py'deki kalıp da bunu kullanır.
 KISILIK_SOZ_ETME = r"(?:ile|hakkında\w*|için|gibi|ve|veya|ya|de|da|ki|mi|mı|mu|mü|kadar|konusunda|tarafından|yüzünden|sayesinde)\b"
+# S94 (19 Ekim: "<Ad> gelsin" virgülsüz ve sorusuz kaçtı): noktalamasız ve sorusuz cümle yalnız istek içeriyorsa seslenme — 3. kişi emir (-sın/-sin),
+# "…ır mısın / …ebilir misin" ya da istek fiili. "<Ad> markasının yeni ürünü güzel" gibi addan söz eden cümle seslenme değil.
+KISILIK_ISTEK = (r"(?:\b(?:lütfen|söyle|anlat|özetle|açıkla|bak|kontrol et|devam et|başla|yönet|katıl|gel|dur|sus|cevap ver|yardım et|hatırlat|bul|ara|not al|kaydet|oku|"
+                 r"tell|say|explain|summari[sz]e|check|join|stop|help)\b|\w+(?:s[ıiuü]n|s[ıiuü]nl[ae]r)\b|\w+[ıiuüae]r\s+m[ıiuü]s[ıiuü]n|\w+[ae]bilir\s+m[ıi]s[ıi]n)")
 def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kişilik, adsız metin) ya da (None, metin)
     ks = kisilikler()
     if len(ks) < 2 or not metin: return None, metin
@@ -88,10 +93,20 @@ def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kiş
         m = re.match(r"\W*(?:" + "|".join(re.escape(a) for a in sorted(k["hitap"], key=len, reverse=True)) + r")(?:(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w))", metin, re.I)  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil
         if m and metin[m.end():].strip(): return k, metin[m.end():].strip()
     return None, metin
-TOPLANTIYA_RX = re.compile(r"(toplantıya|toplantıda|herkese|onlara|karşı tarafa|ekibe|sesli|yüksek sesle|açıktan)\b.{0,25}\b(söyle|anlat|oku|açıkla|cevap ver|konuş|yanıtla|bildir)|"
-                           r"\b(söyle|anlat|oku|açıkla)\w*\b.{0,15}\b(toplantıya|herkese|onlara|karşı tarafa)|"
-                           r"\b(tell|say (it )?to|explain to|answer) (everyone|them|the (meeting|room|team))|\bout loud\b|\baloud\b", re.I)
-def toplantiya_istendi(metin): return bool(TOPLANTIYA_RX.search(metin or ""))
+# --- S94: toplantıda asistanlar — katılma durumu (toplantı başına) ---------------------------------------------------------------------
+_KATIL = {"toplanti": None, "adlar": []}
+def asistan_toplanti(): return AYAR.get("toplantiya_ses") is True and AYAR.get("konusma", True) is not False  # tek anahtar: "Asistanlar toplantıda konuşsun"
+def asistan_adlari(): ks = kisilikler(); return [k["ad"] for k in ks] if ks else ["Suflor"]  # kişilik yoksa (nötr kurulum) asistanın adı Suflor
+def asistan_katilan():
+    if not toplanti_var(): return []
+    a = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
+    if _KATIL["toplanti"] != a: _KATIL.update(toplanti=a, adlar=[])
+    return list(_KATIL["adlar"])
+def asistan_katil(ad):
+    if ad and ad not in asistan_katilan(): _KATIL["adlar"].append(ad); print(f"ASİSTAN: {ad} toplantıya katıldı (kullanıcı adıyla çağırdı)")
+def asistan_view():  # /status konus.asistan — pano: "<adlar> dinliyor" / "<ad> toplantıda"
+    if not toplanti_var(): return None
+    return {"acik": asistan_toplanti(), "adlar": asistan_adlari(), "katilan": asistan_katilan()}
 def kisilik_ad(): k = kisilik(); return k["ad"] if k else None
 def kis_t(notr, kisilikli):  # sabit sesli cümle: kişilik açıkken "siz"li sürümü (Türkçe arayüzde; kişilik "sen" diyorsa nötr); İngilizce ayrı _t ile
     k = kisilik(); return kisilikli if k and k.get("bicim") != "sen" and ARAYUZ_DILI == "tr" else notr

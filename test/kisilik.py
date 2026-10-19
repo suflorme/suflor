@@ -70,8 +70,13 @@ try:
     ns["_KSEC"]["t"] -= ns["KISILIK_SURE_SN"] + 1; ok("süre dolunca varsayılana döner", ns["kisilik"]()["ad"] == "Atlas")
     ok("'siz' diyen kişilikte kis_t kişilikli cümle", ns["kis_t"]("Söyler misin?", "Söyler misiniz?") == "Söyler misiniz?")
     ok("telaffuz iki kişilikten", ns["kisilik_telaffuz"]("Tamam Sir, Deneme şirketi.") == "Tamam sör, Denemee şirketi.")
-    ok("toplantıya söyleme isteği tanınır", all(ns["toplantiya_istendi"](x) for x in ("toplantıya söyle bunu", "herkese anlat lütfen", "bunu onlara söyle", "sesli söyle", "tell everyone")))
-    ok("sıradan soru toplantıya söyleme isteği değil", not any(ns["toplantiya_istendi"](x) for x in ("bugün ne söyledim?", "toplantı kaçta bitiyor?", "Ali ne anlattı?")))
+    # S94: toplantıda asistanlar — kullanıcı adıyla ilk kez çağırınca katılır, toplantı değişince sıfırlanır
+    ns["STATE"] = {"meeting": "T1"}
+    ok("S94: asistan adları iki kişilik", ns["asistan_adlari"]() == ["Atlas", "Matlas"])
+    ok("S94: toplantı başında katılan yok", ns["asistan_katilan"]() == [])
+    ns["asistan_katil"]("Matlas"); ns["asistan_katil"]("Matlas"); ok("S94: çağrılan asistan katılır (bir kez)", ns["asistan_katilan"]() == ["Matlas"])
+    ns["STATE"]["meeting"] = "T2"; ok("S94: yeni toplantıda katılım sıfırlanır", ns["asistan_katilan"]() == [])
+    ns["TOP"][0] = False; ok("S94: toplantı yokken durum yok", ns["asistan_view"]() is None and ns["asistan_katilan"]() == []); ns["TOP"][0] = True
     # v0.71.0: kişilik başına ses ve hız (brifing-ses.py kisilik_sesi)
     open(kd2, "a", encoding="utf-8").write("")
     s2 = open(kd2, encoding="utf-8").read().replace("hitap_bicimi: sen\n", "hitap_bicimi: sen\nses: piper\nhiz: 1,15\n"); open(kd2, "w", encoding="utf-8").write(s2)

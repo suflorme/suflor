@@ -67,12 +67,14 @@ HITAP_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)" + HITAP_AD + r"(?:\s*[
 HITAP_ORTA_RX = re.compile(r"(?<=\w)([,]?\s+)(?:Claude|Suflor)(?:\s*[,:]\s*|\s+(?!(?:mi|mı|mu|mü|ile|ve|için|gibi|de|da|ya|ki)\b)(?=\w))(?=[^.!?…]*\?\s*$)")
 # Kişilik hitabı (v0.53.0, ölçüm 16 Ekim: kişilik adıyla başlayan 14 cümlenin 13'ü istemle doğru yazıldı): adlar kişilik dosyasından/ayardan (kodda sabit ad yok).
 # Cümle başında ad + virgül/iki nokta/nokta ya da cümle soru ise hitap: "<Ad> markasının yeni ürünü…" tetiklemez. İçeride yine "Claude:" olur.
-_KHR = {"k": {}, "rx": {}, "son": None}  # v0.61.0: iki kişilik — kalıp tüm adlarla; "son" = (az önce tanınan kişiliğin adı, zaman), konus_hitap okur
+# S94 (19 Ekim test toplantısı: "<Ad> gelsin" virgülsüz ve sorusuz kaçtı): noktalamasız/sorusuz cümlede istek varsa da hitap (KISILIK_ISTEK, kisilik.py).
+# Kişilik varken "Claude"/"Suflor" artık seslenme değil (toplantıda tek kural: asistanın adı); kişiliksiz (nötr) kurulumda eskisi gibi.
+_KHR = {"k": {}, "rx": {}, "son": None, "satir": None}  # v0.61.0: iki kişilik — kalıp tüm adlarla; "son" = (az önce tanınan kişiliğin adı, zaman), konus_hitap okur; "satir" = son hitap_duzelt satırındaki ad
 def _kisilik_hitap_rx(rol=None):  # rol "toplanti": yalnız toplantı kişiliğinin adları (karşı taraf için)
     ks = [k for k in kisilikler() if not rol or k["rol"] == rol]; adlar = tuple(a for k in ks for a in k["hitap"])
     if _KHR["k"].get(rol) != adlar:
         _KHR["k"][rol] = adlar
-        _KHR["rx"][rol] = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)(" + "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True)) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*\?))", re.I) if adlar else None
+        _KHR["rx"][rol] = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)(" + "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True)) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*(?:\?|" + KISILIK_ISTEK + r")))", re.I) if adlar else None
     return _KHR["rx"][rol]
 def _kisilik_hitap_ad(soz):  # tanınan hitap sözü → kişiliğin adı
     for k in kisilikler():
@@ -88,18 +90,23 @@ def hitap_aski(metin, t0=None, t1=None):  # → askıdaki yarım hitap + bu sat�
         m = a["metin"] + " " + metin; a.update(metin=None); return m
     a.update(metin=None)
     adlar = [x for k in kisilikler() for x in k["hitap"]]
-    rx = r"\W*(?:" + "|".join([re.escape(x) for x in sorted(adlar, key=len, reverse=True)] + [HITAP_AD]) + r")\b"
+    rx = r"\W*(?:" + "|".join([re.escape(x) for x in sorted(adlar, key=len, reverse=True)] + ([] if adlar else [HITAP_AD])) + r")\b"
     if re.match(rx, metin or "", re.I) and not re.search(r"[.!?…:,]\s*$", metin) and len(metin.split()) <= 6: a.update(metin=metin, t1=t1)
     return None
+def hitap_askida(metin): return bool(metin) and HITAP_ASKI["metin"] == metin  # S94: bu satır az önce askıya alındı (tek başına gönderilmez; süre dolarsa hitap_aski_bitti)
+def hitap_aski_bitti(metin):  # S94: askıdaki satıra HITAP_ASKI_SN içinde devam gelmedi → tek başına hitap ("<Ad> gelsin" kaybolmasın) — metni döndürür, yoksa None
+    if HITAP_ASKI["metin"] != metin: return None
+    HITAP_ASKI.update(metin=None); return metin
 def hitap_duzelt(text):
-    krx = _kisilik_hitap_rx()
+    krx = _kisilik_hitap_rx(); _KHR["satir"] = None
     def kd(m):
         ad = _kisilik_hitap_ad(m.group(2))
-        if ad: _KHR["son"] = (ad, time.time())
+        if ad: _KHR["son"] = (ad, time.time()); _KHR["satir"] = ad
         return m.group(1) + "Claude: "
     out = krx.sub(kd, text) if krx else text
-    out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", out)
-    if out == text: out = HITAP_ORTA_RX.sub(lambda m: ". Claude: ", text, count=1)
+    if not kisilikler():  # S94: kişilik varken Claude/Suflor seslenme değil
+        out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", out)
+        if out == text: out = HITAP_ORTA_RX.sub(lambda m: ". Claude: ", text, count=1)
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])
 
 def slug(s): s = re.sub(r"[^\w\s-]", "", s, flags=re.U).strip(); s = re.sub(r"\s+", "-", s); return s[:60] or "toplanti"

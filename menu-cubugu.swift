@@ -148,7 +148,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         m.addItem(withTitle: "Paneli yenile", action: #selector(panelYenile), keyEquivalent: "").target = self
         if panel.isVisible { m.addItem(withTitle: "Paneli kapat (Esc)", action: #selector(panelKapat), keyEquivalent: "").target = self }
         m.addItem(.separator())
-        for t in ["Bas-konuş: Option + Shift + Boşluk basılı tut", "Kanıt: Option + Shift + K", "Ne diyeyim?: Option + Shift + O", "Sessiz (10 dk kart yok): Option + Shift + M"] + (args.contains("--ortak-mik") ? ["Toplantıya söyle: Option + Shift + S"] : []) {
+        for t in ["Bas-konuş: Option + Shift + Boşluk basılı tut", "Kanıt: Option + Shift + K", "Ne diyeyim?: Option + Shift + O", "Sessiz (10 dk kart yok): Option + Shift + M"] + (args.contains("--ortak-mik") ? ["Asistan sussun: Option + Shift + S"] : []) {
             let b = m.addItem(withTitle: t, action: nil, keyEquivalent: ""); b.isEnabled = false
         }
         m.addItem(.separator())

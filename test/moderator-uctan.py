@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Moderatör uçtan uca (v0.83.0, S93; aktarici/moderator.py), kota harcamadan: test/otonom.py düzeni (yalıtılmış aktarıcı + Brifing.app açık süreç + sahte "claude",
 # iki kanala yapay ses). Senaryo: kullanıcı toplantıda toplantı dışı kişiliğe "toplantıyı sen yönet, gündem: …" der → moderatör başlar (Claude'a soru gitmez) →
-# başla görevi o kişilikle Konuş sürecine gider → otonom yoldan toplantıya okunur → karşı taraf o kişiliğe seslenince (otonom ayarı kapalıyken de) cevap toplantıya →
+# başla görevi o kişilikle Konuş sürecine gider → otonom yoldan toplantıya okunur → karşı taraf o kişiliğe seslenince (kullanıcı çağırdığı için katılmış) cevap toplantıya →
 # "sonraki madde" → ikinci madde açılır → "yönetimi geri alıyorum" → kapanır. moderator.py, konus_hitap*, otonom_acik ya da _konus_sor değişince koştur (~1,5 dk):
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/moderator-uctan.py
 import base64, json, math, os, shutil, struct, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
@@ -41,7 +41,7 @@ kis2 = os.path.join(T, "kisilik2.md")  # v0.61.0: toplantı dışı kişilik —
 open(kis2, "w", encoding="utf-8").write("---\nad: MATLAS\nhitap: Matlas\nhitap_bicimi: sen\nkonusma_dili: evet\n---\n## Kişilik: MATLAS\nAdın MATLAS.\n")
 ay = os.path.join(T, "ayar.json")
 AY = {"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
-      "claude": sahte, "otonom": False, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6}
+      "claude": sahte, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6}
 json.dump(AY, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
@@ -99,15 +99,15 @@ try:
     s0 = son(); satir("ben", "Matlas, toplantıyı sen yönet, gündem: bütçe ve takvim, her madde 5 dakika.")
     ok("moderatör başladı: MATLAS, 2 madde, 5 dk", bekle_log("MODERATÖR: başladı · MATLAS · 2 madde · madde başına 5.0 dk", 10))
     ok("komut Claude'a soru olarak gitmedi (başla görevi gitti)", bekle_log("MODERATÖR: basla · Bütçe", 10))
-    v, t1 = bekle(lambda v: v.get("durum") == "itiraz", 25)
-    ok("başla görevi otonom yoldan: itiraz penceresi", t1 is not None and "OTONOM: cevap hazır (moderator)" in log())
+    v, t1 = bekle(lambda v: v.get("durum") in ("itiraz", "sira", "okunuyor", "okundu"), 25)
+    ok("başla görevi otonom yoldan (S94: itirazsız söz sırası)", t1 is not None and "OTONOM: cevap hazır (moderator" in log() and "ASİSTAN: MATLAS toplantıya katıldı" in log())
     ok("görevi MATLAS cevapladı, istemde 'doğrudan toplantıya okunur'", "Kişi MATLAS moderatör-basla" in cevap() and "Otonom bağlam geldi" in cevap())
     bekle(lambda v: v.get("durum") == "okundu", 20); ok("açılış toplantıya okundu", son() == s0 + 1)
     m = mod(); ok(f"durum: madde 1/2 Bütçe, kalan süre var ({m.get('kalan_sn')} sn)", m.get("acik") and m.get("sira") == 1 and m.get("madde") == "Bütçe" and (m.get("kalan_sn") or 0) > 200)
-    # 2) karşı taraf moderatör kişiliğine seslenir (otonom ayarı kapalı)
+    # 2) karşı taraf moderatör kişiliğine seslenir (S94: kullanıcı onu çağırdığı için katılmış)
     time.sleep(13); s0 = son(); satir("karsi", "Matlas, bütçe ne kadar?")
-    v, t2 = bekle(lambda v: v.get("durum") == "itiraz" and v.get("kim") == "Ayla Ö", 25)
-    ok("karşı taraf moderatöre seslendi → otonom (ayar kapalıyken de)", t2 is not None)
+    v, t2 = bekle(lambda v: v.get("durum") in ("itiraz", "sira", "okunuyor", "okundu") and v.get("kim") == "Ayla Ö", 25)
+    ok("karşı taraf katılan moderatöre seslendi → herkese", t2 is not None)
     bekle(lambda v: v.get("durum") == "okundu", 20); ok("cevabı MATLAS verdi ve toplantıya okundu", "Kişi MATLAS" in cevap() and son() == s0 + 1)
     # 3) sonraki madde
     time.sleep(2); n0 = log().count("MODERATÖR: ac"); satir("ben", "Matlas, sonraki maddeye geçelim.")

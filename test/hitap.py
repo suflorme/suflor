@@ -6,10 +6,10 @@ import ast, os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KIS = {"v": None, "v2": None}; ns = {"re": re, "time": __import__("time"), "kisilikler": lambda: [x for x in (KIS["v"], KIS["v2"]) if x]}  # v0.53.0: kişilik hitabı (nötr örnek ad "Atlas")
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
-sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "hitap_aski")) or
+sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "hitap_aski", "hitap_askida", "hitap_aski_bitti")) or
        (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR", "HITAP_ASKI", "HITAP_ASKI_SN"} for x in n.targets))]
 ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").read())  # 19 Ekim: söz etme kalıbı kisilik.py'de (iki yer aynı tanımı kullanır)
-sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) == "KISILIK_SOZ_ETME" for x in n.targets)] + sec
+sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK") for x in n.targets)] + sec
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
     ("Cloud, card, English, yes.", "Claude: card, English, yes.", "9 Ekim: virgüllü"),
@@ -53,8 +53,12 @@ for girdi, bek, ac in [
     ("Atlas mı cevap verdi?", "Atlas mı cevap verdi?", "kişilikten söz (soru eki)"),
     ("Atlas'ın sesi neden kesildi?", "Atlas'ın sesi neden kesildi?", "kişilikten söz (kesmeli ek)"),
     ("Atlas neden kesik konuşuyordu?", "Claude: neden kesik konuşuyordu?", "soru cümlesi, ad + soru: seslenme (kural aynı)"),
-    ("Claude, özet çıkar.", "Claude: özet çıkar.", "kişilik açıkken eski hitap da sürer"),
-    ("Suflor, kaç kart açık?", "Claude: kaç kart açık?", "kişilik açıkken Suflor da sürer (geçiş)")]:
+    ("Atlas gelsin", "Claude: gelsin", "S94: virgülsüz istek (-sın/-sin) seslenme"),
+    ("Atlas özetle son on dakikayı", "Claude: özetle son on dakikayı", "S94: virgülsüz istek fiili seslenme"),
+    ("Atlas bunu kontrol eder misin", "Claude: bunu kontrol eder misin", "S94: '…er misin' sorusuz da seslenme"),
+    ("Atlas dün güzel cevap verdi.", "Atlas dün güzel cevap verdi.", "S94: istek yok, addan söz — seslenme değil"),
+    ("Claude, özet çıkar.", "Claude, özet çıkar.", "S94: kişilik açıkken Claude seslenme değil (tek kural: asistanın adı)"),
+    ("Suflor, kaç kart açık?", "Suflor, kaç kart açık?", "S94: kişilik açıkken Suflor seslenme değil")]:
     cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok
     print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
 # v0.61.0: iki kişilik — ikinci adın içinde birincinin yazımı geçse de (Matlas ⊃ atlas) doğru kişilik tanınır
@@ -85,7 +89,12 @@ ok = r4 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "noktalamayl
 ha("Bugün şu an", T + 60, T + 61); r5 = ha("toplantıda kaç kişi var?", T + 61.2, T + 63)
 ok = r5 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "adla başlamayan satır askıya alınmaz")
 ha("Klod şu an", T + 80, T + 81); r6 = ha("kaç kart açık?", T + 81.3, T + 83)
-ok = r6 == "Klod şu an kaç kart açık?" and ns["hitap_duzelt"](r6)[0].startswith("Claude:"); hata += not ok; print(("✓ " if ok else "✗ ") + "Claude yazımlarıyla da (Klod)")
+ok = r6 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "S94: kişilik açıkken Claude yazımı (Klod) askıya alınmaz")
+ha("Atlas gelsin", T + 100, T + 101); ok = ns["hitap_askida"]("Atlas gelsin") and ns["hitap_aski_bitti"]("Atlas gelsin") == "Atlas gelsin" and not ns["hitap_askida"]("Atlas gelsin")
+hata += not ok; print(("✓ " if ok else "✗ ") + "S94: devamı gelmeyen askıdaki hitap tek başına bırakılır (hitap_aski_bitti)")
+KIS["v"] = None
+ha("Klod şu an", T + 120, T + 121); r7 = ha("kaç kart açık?", T + 121.3, T + 123)
+ok = r7 == "Klod şu an kaç kart açık?" and ns["hitap_duzelt"](r7)[0].startswith("Claude:"); hata += not ok; print(("✓ " if ok else "✗ ") + "kişiliksiz kurulumda Claude yazımlarıyla da (Klod)")
 
 print("GEÇTİ" if not hata else f"KALDI: {hata}")
 sys.exit(1 if hata else 0)

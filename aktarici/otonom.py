@@ -7,7 +7,9 @@
 # ("söylenmedi"). Okurken biri OTONOM_KESME_SN konuşursa susar ve yeniden başlamaz. Cevap kulağa ayrıca okunmaz (iki kez okunur, soran bekler);
 # toplantıya okunan ses kulaklıkta da duyulur. Ayar otonom (varsayılan kapalı); okumak için toplantiya_ses de açık olmalı (değilse panoda kalır).
 # Araştırma önerisi (ölçüm değil): sessizlik 0,7–1,0 sn, fırsat yoksa 6–8 sn — başlangıç S68'in değerleri, ayarla kısaltılır (otonom_sessiz_sn, otonom_bekle_sn).
-OTONOM_ITIRAZ_SN, OTONOM_SESSIZ_SN, OTONOM_BEKLE_SN, OTONOM_KESME_SN, OTONOM_GORUNUR_SN = 3.0, 1.5, 20.0, 1.0, 60.0
+# S94 (kullanıcı, 19 Ekim): tek kural — adıyla seslenilen asistan herkese cevap verir; itiraz penceresi yok (0), ayar otonom kalktı: tek anahtar
+# toplantiya_ses ("Asistanlar toplantıda konuşsun", asistan_toplanti). Durdurmak: "<Ad>, dur" / "sus" ya da Option + Shift + S (asistan_dur).
+OTONOM_ITIRAZ_SN, OTONOM_SESSIZ_SN, OTONOM_BEKLE_SN, OTONOM_KESME_SN, OTONOM_GORUNUR_SN = 0.0, 1.5, 20.0, 1.0, 60.0
 # 19 Ekim test toplantısı: okumaların hepsi 2–3 sn'de "biri konuştu" diye kesildi — kesen, karşı taraftan (aynı odadaki ikinci cihaz) geri gelen kendi sesimizdi.
 # Kesme eşiği 0,3 → 1,0 sn ve kanaldaki ses, okunan sesin (TS["zarf"], 20 ms kareler) 0–OTONOM_YANKI_GECIKME_SN gecikmeli kopyasıyla açıklanıyorsa
 # yankı sayılır; yalnız açıklanamayan ses (biz susarken konuşan) eşiği doldurursa okuma kesilir. Zarf yoksa (Mac sesi) eski sayım.
@@ -19,7 +21,7 @@ def otonom_kesilsin(ts, zarf, t_bas, esik):  # → (kesilsin mi, son 3 sn'de aç
     return (d is not None and n >= OTONOM_ARA_KARE and son >= esik), n, d  # üstümüze konuşma: son 3 sn'de ≥ esik ses ve bir kısmı aralarımızda
 OT = {"id": None}; OT_K = threading.Lock()
 OT_SON = ("iptal", "okundu", "kesildi", "soylenmedi", "okunamadi")
-def otonom_acik(): return (AYAR.get("otonom") is True or moderator_acik()) and toplanti_var() and AYAR.get("konusma", True) is not False  # v0.83.0: moderatör açıkken otonom
+def otonom_acik(): return asistan_toplanti() and toplanti_var()  # S94: tek anahtar (moderatör de toplantiya_ses ister)
 def _ot_ayar(ad, v):
     try: return max(0.0, float(AYAR.get(ad, v)))
     except (TypeError, ValueError): return v
@@ -50,7 +52,7 @@ def yanki_disi(ts, zarf, t_bas, kare=0.02, en_cok_gecikme=None, son_sn=3.0):
 def otonom_view():
     with OT_K: o = dict(OT)
     if not o.get("id") or (o.get("durum") in OT_SON and time.time() - o.get("t_durum", 0) > OTONOM_GORUNUR_SN): return None
-    return {"id": o["id"], "durum": o["durum"], "metin": o.get("metin", "")[:400], "kim": o.get("kim"), "neden": o.get("neden"),
+    return {"id": o["id"], "durum": o["durum"], "metin": o.get("metin", "")[:400], "kim": o.get("kim"), "neden": o.get("neden"), "ad": o.get("ad"),
             "kalan": round(max(0.0, o.get("son", 0) - time.time()), 1) if o["durum"] == "itiraz" else None}
 def _ot_gec(i, durum, **ek):  # id hâlâ bu ve bitmemişse durumu ilerletir
     with OT_K:
@@ -60,12 +62,13 @@ def _ot_uyari():  # kullanıcıya: cevap hazır, 3 sn sonra toplantıya okunacak
     if os.environ.get("SUFLOR_TEST_BASLAT") or not kulaklik(): return
     try: subprocess.Popen(["/usr/bin/afplay", "-v", "0.35", "/System/Library/Sounds/Tink.aiff"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError: pass
-def otonom_sun(cevap, kaynak, kim=None):  # konuşanın cevabı hazır → itiraz penceresi başlar
+def otonom_sun(cevap, kaynak, kim=None, ad=None):  # konuşanın cevabı hazır → (itiraz penceresi, S94'ten 0) → söz sırası → toplantıya; ad: konuşan asistan
     m = ts_sesli_kisim(cevap)
     if not m: return False
-    i = secrets.token_hex(4)
-    with OT_K: OT.clear(); OT.update(id=i, metin=m, kaynak=kaynak, kim=kim, durum="itiraz", t=time.time(), t_durum=time.time(), son=time.time() + _ot_ayar("otonom_itiraz_sn", OTONOM_ITIRAZ_SN))
-    _ot_uyari(); print(f"OTONOM: cevap hazır ({kaynak}{' · ' + kim if kim else ''}) — {_ot_ayar('otonom_itiraz_sn', OTONOM_ITIRAZ_SN):.0f} sn itiraz penceresi")
+    i = secrets.token_hex(4); itz = _ot_ayar("otonom_itiraz_sn", OTONOM_ITIRAZ_SN)
+    with OT_K: OT.clear(); OT.update(id=i, metin=m, kaynak=kaynak, kim=kim, ad=ad, durum="itiraz", t=time.time(), t_durum=time.time(), son=time.time() + itz)
+    if itz > 0: _ot_uyari()
+    print(f"OTONOM: cevap hazır ({kaynak}{' · ' + kim if kim else ''}{' · ' + ad if ad else ''})" + (f" — {itz:.0f} sn itiraz penceresi" if itz > 0 else " — söz sırası bekleniyor"))
     threading.Thread(target=_ot_dongu, args=(i,), daemon=True).start(); return True
 def otonom_karar(i, karar):  # panodan: iptal | simdi
     with OT_K:
@@ -78,6 +81,10 @@ def otonom_kisayol():  # Option + Shift + S: otonom cevap bekliyor ya da okunuyo
     with OT_K: d = OT.get("durum") if OT.get("id") else None
     if d not in ("itiraz", "sira", "okunuyor"): return None
     otonom_karar(None, "iptal"); return {"ok": True, "metin": _t("🔇 Toplantıya söylenmeyecek", "🔇 Won't be said in the meeting")}
+def asistan_dur():  # S94: "<Ad>, dur" / "sus" ve Option + Shift + S — bekleyen ya da okunan cevap ve toplantıya okuma susar (moderatör sürer)
+    r = otonom_kisayol()
+    if ts_durdur(): print("ASİSTAN: sustu (okuma durdu)"); return {"ok": True, "metin": _t("🔇 Asistan sustu", "🔇 Assistant stopped")}
+    return r or {"ok": True, "metin": _t("🔇 Okunan bir şey yok", "🔇 Nothing is being read")}
 def _ot_dongu(i):
     while time.time() < OT.get("son", 0) and not OT.get("simdi"):  # itiraz penceresi
         if OT.get("id") != i or OT.get("durum") != "itiraz": return

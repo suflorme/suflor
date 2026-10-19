@@ -83,6 +83,10 @@ bak("e-posta sormayan soruda blok yok", ns["posta_baglam"]("Yarın ne var?", sim
 ns["AYAR"]["eposta_oku"] = False; bak("ayar kapalıyken blok yok", ns["posta_baglam"]("Son maillerim neler?", simdi) == "" and ns["posta_view"]() is None); ns["AYAR"]["eposta_oku"] = True
 P.update(durum="izin"); b2 = ns["posta_baglam"]("Son maillerim neler?", simdi)
 bak("izin yokken asistana nedeni (Tam Disk Erişimi) söylenir", "Tam Disk Erişimi" in b2 and "Mac Mail" in b2)
+ns["AYAR"]["posta_takma_ad"] = {"Kerem": "Ayla Kaya"}; s, ne = ns["posta_sec"]("Kerem'den mail geldi mi?")
+bak(f"takma ad (ayar posta_takma_ad): Kerem → Ayla Kaya'nın iletileri de ({ne})", "Bütçe taslağı" in [x["konu"] for x in s]); ns["AYAR"].pop("posta_takma_ad")
+s, ne = ns["posta_sec"]("Tamam. Şimdi mailimi kontrol eder misin? Son gelen mailler neler?"); bak(f"'kontrol', 'eder', cümle başı 'Tamam' kişi sayılmaz → son gelenler ({ne})", ne == "son gelenler" and len(s) == 2)
+s, ne = ns["posta_sec"]("Zeynep'ten mail geldi mi?"); bak(f"adla eşleşen gönderen yoksa son gelenler + not ({ne})", len(s) == 2 and "eşleşen gönderen yok" in ne)
 import base64
 metin = ns["posta_govde_coz"](base64.b64decode(g["1"]["ham"]))
 bak(f"çözüm: düz metin, Türkçe (QP), alıntı ve '>' satırları kesildi ({metin!r})", metin.startswith("Merhaba Deniz,\nBütçe 1,2 milyon.") and "eski yazışma" not in metin and "Kerem wrote" not in metin)

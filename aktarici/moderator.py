@@ -143,10 +143,10 @@ def _mod_gorev(ad, **k):  # görevi Konuş sürecine verir; cevap otonom yoldan 
 
 def moderator_basla(metin, kis_ad=None):
     if not toplanti_var(): return {"ok": False, "err": _t("Toplantı yok", "No meeting")}
-    if AYAR.get("toplantiya_ses") is not True:
-        print("MODERATÖR: toplantıya söyle kapalı — başlamadı")
-        seslendir(_t("Toplantıyı yönetebilmem için Ayarlar'da 'Toplantıya sesli söyle'yi açman gerek.", "To chair the meeting, turn on 'Speak into the meeting' in Settings."), kuyruk=True)
-        return {"ok": False, "err": _t("Toplantıya sesli söyle kapalı (⚙ Ayarlar)", "Speaking into the meeting is off (⚙ Settings)")}
+    if not asistan_toplanti():  # S94: tek anahtar
+        print("MODERATÖR: 'Asistanlar toplantıda konuşsun' kapalı — başlamadı")
+        seslendir(_t("Toplantıyı yönetebilmem için Ayarlar'da 'Asistanlar toplantıda konuşsun'u açman gerek.", "To chair the meeting, turn on 'Assistants speak in meetings' in Settings."), kuyruk=True)
+        return {"ok": False, "err": _t("Asistanlar toplantıda konuşmuyor (⚙ Ayarlar)", "Assistants don't speak in meetings (⚙ Settings)")}
     g = _mod_gundem_coz(metin) or _mod_gundem_dosya()
     with MOD_K:
         MOD.update(acik=True, maddeler=g, i=0, faz="basla", t_bas=time.time(), t_madde=time.time(), sure_sn=_mod_sure(max(1, len(g)), metin), kisilik=kis_ad or kisilik_ad(),

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-# Otonom katılım (v0.56.0, S68; aktarici/otonom.py) uçtan uca, kota harcamadan: yalıtılmış aktarıcı + Brifing.app açık süreç + sahte "claude".
-# İki kanala (ben, karşı) 0,25 sn'de bir yapay ses beslenir (konuşma = ton, sessizlik = hafif gürültü). Senaryolar: karşı tarafın hitabı → 3 sn itiraz →
-# söz sırası → toplantıya okuma; ✕ iptal; konuşma sürerken bekleme; okurken biri konuşursa susma; fırsat çıkmazsa söylenmez; Option + Shift + S iptal;
-# kullanıcının kendi hitabı; kişilik adıyla karşı hitap; ayar kapalıyken eski davranış. otonom.py, konus_hitap*, toplantiya_soyle ya da Kanal değişince koştur:
+# Toplantıda asistanlar (S94 tek kural; aktarici/otonom.py, konus_hitap*) uçtan uca, kota harcamadan: yalıtılmış aktarıcı + Brifing.app açık süreç + sahte "claude".
+# İki kanala (ben, karşı) 0,25 sn'de bir yapay ses beslenir (konuşma = ton, sessizlik = hafif gürültü). Senaryolar: kullanıcı çağırmadan karşı taraf seslenemez;
+# kullanıcı "<Ad>, …" → asistan katılır, itirazsız söz sırası → toplantıya okuma; katıldıktan sonra karşı taraf sorar; Dur (pano) ve Option + Shift + S;
+# konuşma sürerken bekleme; okurken biri konuşursa susma; fırsat çıkmazsa söylenmez; ikinci kişilik de herkese; Konuş düğmesi yalnız kullanıcıya;
+# kişilik varken "Claude:" asistan değil; ayar (toplantiya_ses) kapalıyken toplantıya okunmaz. otonom.py, konus_hitap*, toplantiya_soyle ya da Kanal değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/otonom.py
 import base64, json, math, os, shutil, struct, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -40,12 +41,12 @@ kis2 = os.path.join(T, "kisilik2.md")  # v0.61.0: toplantı dışı kişilik —
 open(kis2, "w", encoding="utf-8").write("---\nad: MATLAS\nhitap: Matlas\nhitap_bicimi: sen\nkonusma_dili: evet\n---\n## Kişilik: MATLAS\nAdın MATLAS.\n")
 ay = os.path.join(T, "ayar.json")
 AY = {"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
-      "claude": sahte, "otonom": True, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6}
+      "claude": sahte, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6}
 json.dump(AY, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T,
-                     env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="1", SUFLOR_TEST_KOKEN=KOKEN, SUFLOR_TEST_TS_AYGIT="7"),
+                     env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="1", SUFLOR_TEST_KOKEN=KOKEN, SUFLOR_TEST_TS_AYGIT="7", SUFLOR_TEST_METIN="1"),
                      stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
 log = lambda: open(os.path.join(T, "relay.log"), encoding="utf-8", errors="replace").read()
 MOD = {"ben": "sessiz", "karsi": "sessiz"}; DUR = threading.Event()
@@ -85,75 +86,75 @@ try:
             time.sleep(0.1)
         return ot(), None
     son = lambda: log().count("TOPLANTIYA SÖYLE (")  # web yolu (ping call=true) ya da BlackHole (deneme)
-    # 1) karşı tarafın hitabı → itiraz → söz sırası → okundu
-    s0 = son(); satir("karsi", "Suflor, teslim tarihi ne zaman?")
-    v, t1 = bekle(lambda v: v.get("durum") == "itiraz", 20)
-    ok(f"karşı hitabı: cevap hazır, itiraz penceresi ({v.get('kalan')} sn kaldı)", t1 is not None and 0 < (v.get("kalan") or 0) <= 3)
-    ok("istemde otonom bağlamı (toplantıya okunur, herkes duyar)", "Otonom bağlam geldi" in ((st().get("konus") or {}).get("cevap") or ""))
+    hazir = lambda: log().count("OTONOM: cevap hazır")
+    SUSKU = lambda: time.sleep(13)  # KARSI_HITAP_SUSKU_SN: asistan okuduktan sonra 10 sn karşı hitabı sayılmaz (kendi sesinin yankısı)
+    # 0) kullanıcı çağırmadan karşı taraf seslenemez
+    n0 = hazir(); satir("karsi", "Atlas, teslim tarihi ne zaman?"); time.sleep(4)
+    ok("asistan katılmadan karşı tarafın seslenmesi sayılmadı", hazir() == n0 and "adıyla soruldu" not in log())
+    # 1) kullanıcı "Atlas, …" → katılır → itirazsız söz sırası → okundu
+    s0 = son(); satir("ben", "Atlas, teslim tarihi ne zaman?")
+    v, t1 = bekle(lambda v: v.get("durum") in ("itiraz", "sira", "okunuyor", "okundu"), 20)
+    ok("kullanıcı adıyla çağırdı: asistan katıldı", t1 is not None and "ASİSTAN: ATLAS toplantıya katıldı" in log())
+    ok("istemde 'herkes duyar' bağlamı", "Otonom bağlam geldi" in ((st().get("konus") or {}).get("cevap") or ""))
+    ok("itiraz penceresi yok (söz sırası bekleniyor)", "itiraz penceresi" not in log() and "söz sırası bekleniyor" in log())
+    v, t2 = bekle(lambda v: v.get("durum") == "okundu", 15); ok("toplantıya bir kez okundu", t2 is not None and son() == s0 + 1)
     ok("cevap kulağa ayrıca okunmadı", "SES (deneme): " + "Teslim tarihi cuma" not in log())
-    ta = time.time(); v, t2 = bekle(lambda v: v.get("durum") in ("okunuyor", "okundu"), 10)
-    ok(f"3 sn sonra, herkes sessizken toplantıya okumaya başladı ({time.time() - ta:.1f} sn)", t2 is not None and 2.5 <= time.time() - ta <= 7)
-    bekle(lambda v: v.get("durum") == "okundu", 15); ok("toplantıya bir kez okundu", son() == s0 + 1)
     time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md") and "Otonom" in f)
     sat = [l for l in md.splitlines() if "SUFLOR" in l]
     ok(f"dökümde SUFLOR (sesli) satırı: tanıtım + sesli kısım, ayrıntı yok ({len(sat)} satır)", sat and "Merhaba, ben Atlas." in sat[-1] and "Teslim tarihi cuma" in sat[-1] and "Ayrıntı" not in sat[-1])
-    v, _ = bekle(lambda v: v.get("durum") == "okundu", 15); ok("durum: okundu", v.get("durum") == "okundu")
-    SUSKU = lambda: time.sleep(13)  # KARSI_HITAP_SUSKU_SN: Suflor okuduktan sonra 10 sn karşı hitabı sayılmaz (kendi sesinin yankısı)
-    # 2) ✕ iptal
-    SUSKU(); s0 = son(); satir("karsi", "Suflor, bütçe ne kadar?")
-    v, _ = bekle(lambda v: v.get("durum") == "itiraz", 20)
-    uc("/otonom", {"id": v.get("id"), "karar": "iptal"}, pano=True); time.sleep(5)
-    ok("✕ ile iptal: toplantıya okunmadı", ot().get("durum") == "iptal" and son() == s0)
-    ok("/otonom yalnız pano kökeninden", uc("/otonom", {"karar": "iptal"}, koken="http://kotu.ornek").get("kod") == 403)
-    # 3) konuşma sürerken bekler, susunca okur
-    s0 = son(); satir("karsi", "Suflor, kaç kişi katılacak?")
-    v, _ = bekle(lambda v: v.get("durum") == "itiraz", 20); MOD["karsi"] = "konus"
-    v, _ = bekle(lambda v: v.get("durum") == "sira", 6); time.sleep(2.5)
-    ok("konuşma sürerken söz sırası bekleniyor", ot().get("durum") == "sira" and son() == s0)
+    ok("/status: ATLAS toplantıda", ((st().get("konus") or {}).get("asistan") or {}).get("katilan") == ["ATLAS"])
+    # 2) katıldıktan sonra karşı taraf sorar; konuşma sürerken bekler, susunca okur
+    SUSKU(); s0 = son(); MOD["karsi"] = "konus"; satir("karsi", "Atlas, kaç kişi katılacak?")
+    v, _ = bekle(lambda v: v.get("durum") == "sira" and v.get("kim") == "Ayla Ö", 20); time.sleep(2.5)
+    ok("katılan asistana karşı taraf sordu; konuşma sürerken söz sırası bekleniyor", ot().get("durum") == "sira" and son() == s0)
     MOD["karsi"] = "sessiz"; tk = time.time(); v, t3 = bekle(lambda v: v.get("durum") in ("okunuyor", "okundu"), 8)
     ok(f"susunca ≥ 1,5 sn sonra okumaya başladı ({time.time() - tk:.1f} sn)", t3 is not None and 1.4 <= time.time() - tk <= 4)
     bekle(lambda v: v.get("durum") == "okundu", 15); ok("bekledikten sonra bir kez okundu", son() == s0 + 1)
-    # 4) okurken biri konuşursa susar
-    SUSKU(); satir("karsi", "Suflor, toplantı kaç dakika sürecek, uzunca anlatır mısın?")
+    # 3) Dur (pano) söz sırası beklerken
+    SUSKU(); s0 = son(); MOD["karsi"] = "konus"; satir("ben", "Atlas, bütçe ne kadar?")
+    v, _ = bekle(lambda v: v.get("durum") == "sira", 20)
+    uc("/otonom", {"id": v.get("id"), "karar": "iptal"}, pano=True); MOD["karsi"] = "sessiz"; time.sleep(4)
+    ok("Dur ile iptal: toplantıya okunmadı", ot().get("durum") == "iptal" and son() == s0)
+    ok("/otonom yalnız pano kökeninden", uc("/otonom", {"karar": "iptal"}, koken="http://kotu.ornek").get("kod") == 403)
+    # 4) Option + Shift + S (metinsiz /komut soyle) söz sırası beklerken durdurur
+    s0 = son(); MOD["karsi"] = "konus"; satir("ben", "Atlas, sonraki adım ne?")
+    v, _ = bekle(lambda v: v.get("durum") == "sira", 20)
+    r6 = uc("/komut", {"tur": "soyle"}, pano=True); MOD["karsi"] = "sessiz"; time.sleep(4)
+    ok("Option + Shift + S durdurdu", ot().get("durum") == "iptal" and son() == s0 and "söylenmeyecek" in (r6.get("metin") or ""))
+    # 5) okurken biri konuşursa susar
+    satir("ben", "Atlas, toplantı kaç dakika sürecek, uzunca anlatır mısın?")
     v, _ = bekle(lambda v: v.get("durum") == "okunuyor", 20); time.sleep(0.6); MOD["karsi"] = "konus"
     v, t4 = bekle(lambda v: v.get("durum") == "kesildi", 5); MOD["karsi"] = "sessiz"
     ok("okurken karşı taraf konuştu → okuma durdu (kesildi)", t4 is not None and "OTONOM: biri konuştu" in log())
-    # 5) fırsat çıkmazsa söylenmez (otonom_bekle_sn 6)
-    SUSKU(); s0 = son(); satir("karsi", "Suflor, sunumu kim yapacak?")
-    v, _ = bekle(lambda v: v.get("durum") == "itiraz", 20); MOD["ben"] = "konus"
-    v, t5 = bekle(lambda v: v.get("durum") == "soylenmedi", 14); MOD["ben"] = "sessiz"
+    # 6) fırsat çıkmazsa söylenmez (otonom_bekle_sn 6)
+    SUSKU(); s0 = son(); MOD["ben"] = "konus"; satir("karsi", "Atlas, sunumu kim yapacak?")
+    v, t5 = bekle(lambda v: v.get("durum") == "soylenmedi", 20); MOD["ben"] = "sessiz"
     ok(f"sürekli konuşmada fırsat çıkmadı → söylenmedi ({v.get('neden')})", t5 is not None and son() == s0)
-    # 6) Option + Shift + S (komut soyle) itiraz penceresinde durdurur
-    s0 = son(); satir("karsi", "Suflor, sonraki adım ne?")
-    v, _ = bekle(lambda v: v.get("durum") == "itiraz", 20)
-    r6 = uc("/komut", {"tur": "soyle"}, pano=True); time.sleep(5)
-    ok("Option + Shift + S itiraz penceresinde durdurdu", ot().get("durum") == "iptal" and son() == s0 and "söylenmeyecek" in (r6.get("metin") or ""))
-    # 7) kullanıcının kendi hitabı (Claude:) ve kişilik adıyla karşı hitap
-    satir("ben", "Claude: yarınki toplantı saat kaçta?")
-    v, t7 = bekle(lambda v: v.get("durum") == "itiraz", 20); ok("kullanıcının kendi hitabı da otonom", t7 is not None)
-    bekle(lambda v: v.get("durum") == "okundu", 15); SUSKU()
-    satir("karsi", "Atlas, bu hafta neler yapıldı?")
-    v, t8 = bekle(lambda v: v.get("durum") == "itiraz" and v.get("kim") == "Ayla Ö", 20); ok("karşı taraf kişilik adıyla seslendi (Atlas,) → otonom", t8 is not None)
-    bekle(lambda v: v.get("durum") == "okundu", 15)
-    ok("toplantıda varsayılan kişilik cevapladı (ATLAS)", "Kişi ATLAS." in ((st().get("konus") or {}).get("cevap") or ""))
-    # 7b) toplantı dışı kişilik toplantıda adıyla: yalnız kullanıcıya (itiraz penceresi yok); isterse toplantıya
-    SUSKU(); n0 = log().count("OTONOM: cevap hazır"); s0 = son(); satir("ben", "Matlas, bugün ne konuştuk?"); time.sleep(5)
+    # 7) "Atlas, dur" — okunan bir şey yokken de sorun çıkarmaz, kesme komutu Claude'a gitmez
+    n7 = hazir(); satir("ben", "Atlas, dur."); time.sleep(2)
+    ok("'Atlas, dur' asistana soru olarak gitmedi", hazir() == n7 and "ASİSTAN: 'ATLAS, dur'" in log())
+    # 8) ikinci kişilik (toplantı dışı) de adıyla çağrılınca herkese; katıldıktan sonra karşı taraf ona da sorar
+    SUSKU(); s0 = son(); satir("ben", "Matlas, bugün ne konuştuk?")
+    v, t9 = bekle(lambda v: v.get("durum") == "okundu" and son() == s0 + 1, 25)
     c = (st().get("konus") or {}).get("cevap") or ""
-    ok("ikinci kişilik toplantıda: cevapladı, yalnız kullanıcıya (otonom yok, toplantıya okunmadı)", "Kişi MATLAS." in c and "Yalnız kullanıcı." in c and "Otonom bağlam yok" in c
-       and log().count("OTONOM: cevap hazır") == n0 and son() == s0 and "MATLAS toplantıda — yalnız kullanıcıya" in log())
-    ok("konuşma dili: kulakta 'Bakıyom', panoda 'Bakıyorum' (v0.73.0)", "Bakıyom." in log() and "Bakıyorum." in c)
+    ok("ikinci kişilik de herkese: toplantıya okundu", t9 is not None and "Kişi MATLAS." in c and "Otonom bağlam geldi" in c and "ASİSTAN: MATLAS toplantıya katıldı" in log())
     ok("panoda etiket ikinci kişiliğin adı", (st().get("konus") or {}).get("kisilik") == "MATLAS")
-    satir("ben", "Matlas, bunu toplantıya söyle lütfen.")
-    v, t9 = bekle(lambda v: v.get("durum") == "itiraz", 20); ok("ikinci kişilik: 'toplantıya söyle' deyince itiraz penceresi → toplantıya", t9 is not None and "Otonom bağlam geldi" in ((st().get("konus") or {}).get("cevap") or ""))
-    bekle(lambda v: v.get("durum") == "okundu", 15); ok("ikinci kişilik toplantıya bir kez okudu", son() == s0 + 1)
     time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md") and "Otonom" in f)
     ok("toplantıya okunan metinde konuşma dili yok (Bakıyorum)", "Bakıyorum." in [l for l in md.splitlines() if "SUFLOR" in l][-1])
-    SUSKU(); n1 = log().count("OTONOM: cevap hazır"); satir("karsi", "Matlas, bize de özet verir misin?"); time.sleep(5)
-    ok("karşı taraf ikinci kişiliğe seslenemez", log().count("OTONOM: cevap hazır") == n1)
-    # 8) ayar kapalı: eski davranış (otonom yok)
-    ok("ayar kapatıldı", uc("/ayar", {"degisen": {"otonom": False}}, pano=True).get("ok"))
-    satir("ben", "Claude: kaç kart açık acaba?"); time.sleep(6)
-    ok("ayar kapalıyken otonom penceresi açılmadı", ot().get("durum") in (None, "okundu") and log().count("OTONOM: cevap hazır") == 9)
+    SUSKU(); s0 = son(); satir("karsi", "Matlas, bize de özet verir misin?")
+    v, t10 = bekle(lambda v: v.get("durum") == "okundu" and son() == s0 + 1, 25)
+    ok("katılan ikinci kişiliğe karşı taraf sordu → MATLAS herkese", t10 is not None and "Kişi MATLAS." in ((st().get("konus") or {}).get("cevap") or ""))
+    # 9) Konuş düğmesi (bas) toplantıda yalnız kullanıcıya
+    SUSKU(); n9 = hazir(); s0 = son(); uc("/bas-konus", {"metin": "Atlas, bütçe kalemleri neler?"}, pano=True); time.sleep(4)
+    c = (st().get("konus") or {}).get("cevap") or ""
+    ok("Konuş düğmesi: yalnız kullanıcıya (toplantıya okunmadı)", "Yalnız kullanıcı." in c and "Otonom bağlam yok" in c and hazir() == n9 and son() == s0)
+    # 10) kişilik varken "Claude:" asistan değil
+    n10 = hazir(); satir("ben", "Claude, kaç kart açık acaba?"); time.sleep(4)
+    ok("kişilik varken 'Claude,' asistana gitmedi", hazir() == n10)
+    # 11) ayar kapalı (Asistanlar toplantıda konuşsun): cevap var ama toplantıya okunmaz
+    ok("ayar kapatıldı", uc("/ayar", {"degisen": {"toplantiya_ses": False}}, pano=True).get("ok"))
+    n11 = hazir(); satir("ben", "Atlas, kaç kart açık acaba?"); time.sleep(6)
+    ok("ayar kapalıyken toplantıya okunmadı (yalnız kullanıcıya)", hazir() == n11 and "Yalnız kullanıcı." in ((st().get("konus") or {}).get("cevap") or ""))
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     DUR.set(); r.terminate(); r.wait(5)

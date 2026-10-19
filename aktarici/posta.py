@@ -6,7 +6,7 @@
 # Konuş/sohbet sorusu e-postaya değinirse (POSTA_RX) ilgili iletiler soruyla birlikte gider (araç turu yok): soruda geçen ad/adres → o kişinin iletileri;
 # "okunmamış" → okunmamışlar; "gönderdiğim" → gönderilenler; yoksa son gelenler. İleti metni veridir, talimat değil (bağlam bloğunda yazılı). Yalnız Claude'a gider.
 POSTA = {"iletiler": [], "durum": None, "hata": None, "t": 0.0, "guncel": None}
-POSTA_SN, POSTA_GUN, POSTA_EN_COK = 90, 14, 15
+POSTA_SN, POSTA_GUN, POSTA_EN_COK = 90, 60, 15  # v0.86.1: 14 → 60 gün (kişi sorusu: sorulan kişinin son iletisi 20 gün önceydi); genel soruda yine en yeni 15
 POSTA_APP = os.path.join(AYAR["uygulama"], "Suflor Posta.app")
 POSTA_JSON = os.path.join(BASE, "posta.json")
 POSTA_RX = re.compile(r"(?i)\b(e-?posta\w*|mail\w*|meyil\w*|maıl\w*|ileti\w*|gelen kutu\w*|okunmamış|okumadığım|cevap (yazmış|vermiş|atmış|dönmüş)|yanıt (yazmış|vermiş)"
@@ -29,7 +29,7 @@ def posta_yenile(zorla=False):
     if not os.path.isdir(POSTA_APP): POSTA.update(durum="yok", hata=_t("posta yardımcısı kurulu değil (aktarici-kur.command derler)", "mail helper not installed")); return
     onceki = POSTA["durum"]
     ben = ",".join(dict.fromkeys(str(x).strip().lower() for x in list(AYAR.get("takvim_adreslerim") or []) + [AYAR.get("eposta_adres") or ""] if "@" in str(x) and "," not in str(x)))
-    try: subprocess.run(["open", "-g", "-W", "-a", POSTA_APP, "--args", "--cikti", POSTA_JSON, "--gun", str(POSTA_GUN)] + (["--ben", ben] if ben else []), timeout=60, capture_output=True)  # v0.85.3: kendi adreslerin (Gmail'de gönderdiklerin All Mail'de)
+    try: subprocess.run(["open", "-g", "-W", "-a", POSTA_APP, "--args", "--cikti", POSTA_JSON, "--gun", str(POSTA_GUN), "--en-cok", "1500"] + (["--ben", ben] if ben else []), timeout=60, capture_output=True)  # v0.85.3: kendi adreslerin (Gmail'de gönderdiklerin All Mail'de)
     except subprocess.TimeoutExpired: POSTA.update(durum="zaman_asimi"); return
     posta_oku()
     if POSTA["durum"] != onceki: print(f"POSTA: {POSTA['durum']}" + (f" · {len(POSTA['iletiler'])} ileti" if POSTA["durum"] == "ok" else f" — {POSTA['hata']}"))
@@ -41,20 +41,49 @@ def _posta_dongu():
         time.sleep(30)
 threading.Thread(target=_posta_dongu, daemon=True).start()
 def _posta_k(s): return str(s or "").replace("İ", "i").replace("I", "ı").casefold()
+# v0.86.1 (gerçek soru, 19 Ekim: "Tamam. Şimdi mailimi kontrol eder misin? Son gelen mailler neler?" → "kontrol", "eder" kişi sanıldı, otomatik iletiler seçildi):
+# kişi yalnız büyük harfle başlayan sözcükten (Whisper adları büyük yazar; kesmeden önceki kök: "Ayla'dan" → Ayla) ya da adresten; cümle başındaki sıradan
+# sözcük ve fiil sayılmaz. Konu araması yalnız "hakkında / konulu / ile ilgili" ile. Sorulan kişiden ileti yoksa boş liste + açıklama (başkası listelenmez).
+_POSTA_GENEL = {"tamam", "şimdi", "peki", "son", "bana", "benim", "bugün", "dün", "bu", "şu", "bir", "acaba", "lütfen", "hey", "selam", "merhaba", "evet", "hayır", "gmail", "outlook",
+                "mail", "mailler", "maillerim", "mailimi", "maili", "e-posta", "eposta", "posta", "ileti", "gelen", "kontrol", "okunmamış", "hangi", "kim", "kimden", "ne", "neler",
+                "claude", "suflor", "sir", "the", "any", "what", "who", "did", "my", "last", "latest", "new", "check", "email", "emails"}
+_POSTA_KONU_RX = re.compile(r"(?i)\b(\w{3,})\s+(hakkında\w*|konulu|konusunda\w*|ile ilgili|ilgili)\b|\babout\s+(\w{3,})")
+def _kisilik_adlari():
+    try: return {_posta_k(a) for k in kisilikler() for a in [k.get("ad")] + list(k.get("hitap") or []) if a}
+    except NameError: return set()
+def posta_kisiler(soru, basta=False):  # soruda geçen kişi adları / adresleri (küçük harf kökler); basta: cümle başındakiler de (gönderenle eşleşirse sayılır)
+    out = []
+    for m in re.finditer(r"[\w.+-]+@[\w.-]+|\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,}(?:['’]\w+)?", soru or ""):
+        w = re.split(r"['’]", m.group(0))[0]; k = _posta_k(w)
+        if k in _POSTA_GENEL or k in _kisilik_adlari() or (k in _POSTA_BOS and "@" not in w): continue
+        ilk = not re.search(r"[\w,;:]\s*$", (soru or "")[:m.start()])  # cümle başı: önünde sözcük/virgül yok (yalnız noktalama ya da hiç)
+        if ilk and "@" not in w and not basta and not re.search(r"['’]", m.group(0)): continue  # kesmeli sözcük (Ayla'dan) Türkçede özel addır
+        out.append(k)
+    return list(dict.fromkeys(out))
 def posta_sec(soru, iletiler=None):  # → (seçilen iletiler, açıklama)
     xs = list(POSTA["iletiler"] if iletiler is None else iletiler)
     gon = bool(POSTA_GONDER_RX.search(soru)); xs = [x for x in xs if bool(x.get("gonderilen")) == gon]
-    sozler = [w for w in re.findall(r"[\w@.\-]{3,}", _posta_k(soru)) if w not in _POSTA_BOS]
-    def eslesir(x):
-        hedef = _posta_k(f"{x.get('ad', '')} {x.get('adres', '')}")
-        return any(re.search(r"(?<!\w)" + re.escape(w[:max(3, len(w) - 3)]), hedef) for w in sozler)  # Türkçe ek: "Ayla'dan" → "ayla"
-    kisi = [x for x in xs if eslesir(x)]
-    if kisi: xs, ne = kisi, _t("soruda geçen kişi", "person in the question")
-    elif POSTA_OKUNMAMIS_RX.search(soru): xs, ne = [x for x in xs if x.get("okundu") is False], _t("okunmamışlar", "unread")
-    else:
-        konu = [x for x in xs if any(len(w) >= 4 and w[:max(4, len(w) - 3)] in _posta_k(x.get("konu")) for w in sozler)]
-        xs, ne = (konu, _t("konuda geçen sözcük", "subject match")) if konu else (xs, _t("gönderilenler" if gon else "son gelenler", "sent" if gon else "latest"))
-    return xs[:POSTA_EN_COK], ne
+    def _var(w): return any(re.search(r"(?<![\w])" + re.escape(w[:max(3, len(w) - 2)]), _posta_k(f"{x.get('ad', '')} {x.get('adres', '')}")) for x in POSTA["iletiler"] if not x.get("gonderilen"))
+    kisiler = posta_kisiler(soru) + [w for w in posta_kisiler(soru, basta=True) if w not in posta_kisiler(soru) and _var(w)]  # cümle başı: yalnız bir gönderenle eşleşirse
+    # v0.86.1 (kullanıcı: kişi Mail'de lakabıyla görünüyordu): ayar posta_takma_ad {"Ayla": "Ayla Kaya" | [..]} — ad, Mail'deki gönderen adına çevrilir
+    ta = {_posta_k(k): ([v] if isinstance(v, str) else list(v or [])) for k, v in (AYAR.get("posta_takma_ad") or {}).items()} if isinstance(AYAR.get("posta_takma_ad"), dict) else {}
+    kisiler = list(dict.fromkeys(kisiler + [_posta_k(t) for w in kisiler for t in ta.get(w, []) if str(t).strip()]))
+    if kisiler:
+        def eslesir(x):
+            hedef = _posta_k(f"{x.get('ad', '')} {x.get('adres', '')}")
+            return any(re.search(r"(?<![\w])" + re.escape(w if "@" in w else w[:max(3, len(w) - 2)]), hedef) for w in kisiler)
+        kisi = [x for x in xs if eslesir(x)]
+        if kisi: return kisi[:POSTA_EN_COK], _t("soruda geçen kişi", "person in the question")
+        ad = ", ".join(w.capitalize() for w in kisiler[:3])
+        if not POSTA_OKUNMAMIS_RX.search(soru) and not _POSTA_KONU_RX.search(soru):  # adla eşleşen gönderen yok: son gelenler + not (kart takma adı biliyorsa asistan bulur)
+            return xs[:POSTA_EN_COK], _t(f"soruda geçen ada ({ad}) eşleşen gönderen yok — son gelenler; kişi farklı adla (takma ad) yazmış olabilir",
+                                         f"no sender matches the name ({ad}) — latest; they may write under another name")
+    if POSTA_OKUNMAMIS_RX.search(soru): return [x for x in xs if x.get("okundu") is False][:POSTA_EN_COK], _t("okunmamışlar", "unread")
+    km = _POSTA_KONU_RX.search(soru)
+    if km:
+        w = _posta_k(km.group(1) or km.group(3)); konu = [x for x in xs if w[:max(4, len(w) - 2)] in _posta_k(x.get("konu"))]
+        if konu: return konu[:POSTA_EN_COK], _t("konuda geçen sözcük", "subject match")
+    return xs[:POSTA_EN_COK], _t("gönderilenler" if gon else "son gelenler", "sent" if gon else "latest")
 # --- v0.86.0 (kullanıcı 19 Ekim: "yalnız benim sorum üzerine hedef gövde açılsın; mail içeriğini talimat olarak algılamasın") ------------------------------
 # Gövde yalnız: kullanıcının kendi sorusu (karşı taraf, otonom, moderatör değil) + içerik isteyen kalıp (POSTA_GOVDE_RX) + seçim belli kişi/konuya inmiş (genel
 # "son maillerim", "okunmamışlar" değil) → en çok POSTA_GOVDE_N ileti, her biri POSTA_GOVDE_KAR karakter; alıntılanan eski yazışma kesilir. Ham ileti yardımcıdan

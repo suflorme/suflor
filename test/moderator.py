@@ -11,7 +11,7 @@ def bak(ad, kosul): print(("✓ " if kosul else "✗ ") + ad); hata.extend([] if
 DOKUM, GOREV, SESLI, SECILEN = [], [], [], []
 D = {"top": True, "sessiz": 5.0, "agenda": {"items": []}}
 ns = {"__name__": "moderator", "os": os, "re": re, "time": time, "json": json, "datetime": datetime, "threading": threading,
-      "AYAR": {"ad": "Deniz T", "toplantiya_ses": True}, "STATE": {}, "_KS": {"tur": None}, "OT": {}, "OT_SON": ("iptal", "okundu", "kesildi", "soylenmedi", "okunamadi"),
+      "AYAR": {"ad": "Deniz T", "toplantiya_ses": True}, "asistan_toplanti": lambda: ns["AYAR"].get("toplantiya_ses") is True, "STATE": {}, "_KS": {"tur": None}, "OT": {}, "OT_SON": ("iptal", "okundu", "kesildi", "soylenmedi", "okunamadi"),
       "TS": {"p": []}, "_t": lambda a, b: a, "tail": lambda n=200: list(DOKUM), "agenda": lambda: D["agenda"], "toplanti_var": lambda: D["top"],
       "kanal_sessizlik": lambda: D["sessiz"], "kisilik_sec": lambda ad: SECILEN.append(ad), "kisilik_ad": lambda: "ATLAS", "seslendir": lambda m, kuyruk=False: SESLI.append(m),
       "_konus_kur": lambda **k: None, "_konus_sor": lambda metin, tur: GOREV.append((metin, tur)),
@@ -37,7 +37,7 @@ bak("süre: 'toplam 30 dakika' 3 maddeye 10'ar dk, 'her madde 5 dakika' 5 dk", n
 
 # 2) toplantıya söyle kapalıyken başlamaz; açıkken MATLAS'le başlar
 ns["AYAR"]["toplantiya_ses"] = False
-bak("toplantıya söyle kapalı: başlamaz, kulağa söyler", ns["moderator_komut"]("toplantıyı sen yönet", "MATLAS") is True and not M["acik"] and SESLI and "Toplantıya sesli söyle" in SESLI[-1])
+bak("asistanlar toplantıda konuşmuyorken başlamaz, kulağa söyler (S94 ayar adı)", ns["moderator_komut"]("toplantıyı sen yönet", "MATLAS") is True and not M["acik"] and SESLI and "Asistanlar toplantıda konuşsun" in SESLI[-1])
 ns["AYAR"]["toplantiya_ses"] = True
 ns["moderator_komut"]("toplantıyı sen yönet, gündem: bütçe ve takvim, her madde 1 dakika", "MATLAS")
 bak("başladı: MATLAS, 2 madde, madde başına 60 sn", M["acik"] and M["kisilik"] == "MATLAS" and M["maddeler"] == ["Bütçe", "Takvim"] and M["sure_sn"] == 60)

@@ -98,10 +98,10 @@ En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API
 11 hazır ses (Gemini sesi) ve model (3.8 Flash-Lite, ilk ses ~0,7 sn; 3.8 Flash) oradan seçilir. Okunacak cevap metni Google'a gider (ses kaydı
 gitmez); canlı kullanım için ücretli katman gerekir (ücretsiz katman günde 10 istek; metni eğitimde kullanır). İnternet yoksa Mac sesi okur.
 Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi) ve `ses_etiket: evet` (<chuckle> gibi sözsüz sesler) kişiliğe özel ses verir;
-toplantıya söyle de toplantı kişiliğinin Gemini sesiyle okur. Gemini açıkken sesli çeviri (çevirmen sesi ayar `ceviri_gemini_ses`), fısıltı ve
+toplantıda asistanın cevabı da o kişiliğin Gemini sesiyle okunur. Gemini açıkken sesli çeviri (çevirmen sesi ayar `ceviri_gemini_ses`), fısıltı ve
 toplantı özeti de Gemini'yle okunur; iki kişiliğin sesi de Gemini ise özet iki sesle (⚙ Ayarlar → İki sesli özet). Ton cümleye göre değişir (kötü haber,
 uyarı, acele); kişilik dosyasında `gerginlik_tonu: evet` o kişiliğin tonunu toplantı gerginliğine göre ayarlatır (karar Claude'da).
-⚙ Ayarlar → Toplantıda duyuru (deneme): toplantıya söyle açıkken Suflor toplantı başında kendini tanıtır ve onaylanan işi "Not aldım" diye duyurur.
+⚙ Ayarlar → Toplantıda duyuru (deneme): asistanlar toplantıda konuşurken Suflor toplantı başında kendini tanıtır ve onaylanan işi "Not aldım" diye duyurur.
 Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
 
 ## Bileşenler
@@ -112,7 +112,7 @@ Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
 | Menü çubuğu uygulaması (`menu-cubugu.swift` → Suflor Menü.app, isteğe bağlı) | Mini pano paneli, Mac geneli bas-konuş, masaüstü toplantı sinyali |
 | Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
 | Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
-| Toplantıya söyle (`aktarici/toplantiya-ses.py`, `soyle-main.js`; ayar `toplantiya_ses`, varsayılan kapalı) | Konuş cevabını Mac sesiyle toplantıya okur: web toplantısında yalnız okuma süresince mikrofon kanalına karıştırır (sessizdeysen okumaz); masaüstü Teams'te BlackHole ile |
+| Toplantıda asistan (`aktarici/toplantiya-ses.py`, `aktarici/otonom.py`, `soyle-main.js`; ⚙ Ayarlar → Asistanlar toplantıda konuşsun, ayar `toplantiya_ses`, varsayılan kapalı) | Toplantıda “<ad>, …” diye seslendiğin asistanın cevabını herkesin duyacağı şekilde okur (söz sırası gelince; “<ad>, dur” ya da Option + Shift + S susturur; sen bir kez çağırdıktan sonra diğer katılımcılar da ona adıyla sorabilir; yalnız sana cevap için Konuş düğmesi): web toplantısında yalnız okuma süresince mikrofon kanalına karıştırır (sessizdeysen okumaz); masaüstü Teams'te BlackHole ile |
 | Tur sonu (`tur-isci.py`) | smart-turn v3 (8,7 MB, yerel): konuşurken sözün bitip bitmediğini tahmin eder; kurulamazsa sessizlik süresine bakılır |
 | Anlama göre arama (`gomme-isci.py`; `baglam.py gomme`) | multilingual-e5-base (MIT, ~1,1 GB, yerel): sorudaki sözcükler belgede geçmese de anlamca yakın parçaları bulur; sözcük aramasıyla birleştirilir. Arka planda bir sunucu açık kalır (~1 GB bellek), 30 dk sorgu gelmezse kapanır |
 | Belge çevirme (`cevir-isci.py`; `baglam.py tara`, `baglam.py cevir`) | Proje klasörünü tarar (kopya, eski sürüm, dışa aktarım, gizli görünen dosya) ve PDF, sunum, görüntüleri Mac'te metne çevirir: Docling + Apple Vision, ayrı Python 3.12 ortamında, ağ kapalı. Şifre, anahtar, kart ya da IBAN geçen parça aramaya girmez |

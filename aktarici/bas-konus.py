@@ -774,7 +774,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 _konus_kur(durum="hazir", olcum={k: o[k] for k in ("wh_ms", "ilk_ms", "ses_ms", "sure_ms", "maliyet")})
                 if any("suflorvt__vt_so" in x for x in tur.get("araclar") or []): _KS["vt_son"] = (time.time(), _vt_mt())  # v0.57.5
                 if tur.get("sorgular") and not o["hata"] and tur.get("kaynak") != "karsi" and not tur.get("karsi"): _vt_sorgu_kaydet(tur.get("soru") or KONUS.get("soru"), tur["sorgular"])  # v0.57.6
-                if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"))  # v0.56.0 (S68)
+                if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"))  # v0.56.0 (S68); S94: konuşan asistanın adı
                 if not o["hata"]: konus_gecmis_yaz(tur, tur.get("metin") or "", tur.get("toplanti_ad"))  # v0.64.0 (S76)
                 print(f"KONUŞ: cevap · yazıya {o['wh_ms']} ms · ilk metin {o['ilk_ms']} ms · ilk ses {o['ses_ms']} ms · {o['maliyet']} $")
                 if yenile:  # pano durumu "hazır" kalır (cevap görünür); süreç arka planda kapanır, sonraki basış yenisini açar
@@ -802,7 +802,13 @@ def _defter_blogu(df, dm, dk):  # süreç başına bir kez tam defter (açık s�
 # her soruda yalnız yeni satırlar eklenir. Cevap kulaklık takılıysa okunur (hoparlörden okunsa mikrofona girer, karşı taraf duyar), değilse yalnız
 # panoda. İş talimatı ("kuyruğa al", "not al", rol …) toplantı oturumunda kalır. Toplantıdan önce (3 saat içinde başlayacak toplantı) sürecin
 # ilk sorusuna "Sıradaki toplantı" bloğu: brifing (hazırsa) ve aynı kişilerle ya da aynı adla geçmiş toplantılar (dosya yolu + özet başı).
-def toplanti_konus(): return AYAR.get("toplanti_konus", True) is not False
+def toplanti_konus(): return True  # S94: ayar toplanti_konus kalktı — toplantıda Konuş düğmesi her zaman (yalnız kullanıcıya), adıyla seslenme asistan_toplanti'ya bağlı
+def hitap_aski_zaman(metin):  # S94: askıdaki yarım hitaba HITAP_ASKI_SN içinde devam gelmedi → tek başına asistana ("<Ad> gelsin" kaybolmasın)
+    time.sleep(HITAP_ASKI_SN + 0.3)
+    m = hitap_aski_bitti(metin)
+    if not m: return
+    t2 = hitap_duzelt(m)[0]
+    if "Claude:" in t2 and konus_hitap(t2): print(f"KONUŞ: askıdaki hitap tek başına gitti — \"{m[:60]}\"")
 KONUS_ONCE_SN = 3 * 3600
 _GECMIS_ON = {}  # dosya → (mtime, konuşan adlarının ilk sözcükleri)
 _BOS_SOZ = {"toplantı", "toplantısı", "görüşme", "görüşmesi", "meeting", "call", "sync", "with", "ile", "haftalık", "weekly", "teams", "zoom"}
@@ -1090,49 +1096,73 @@ def konus_is_ilet(metin):
     _konus_kur(durum="hazir", soru=metin, cevap=c, hata=None, olcum=None)
     if kulaklik(): seslendir(c, kuyruk=True)
     print(f"KONUŞ: iş talimatı toplantı oturumuna iletildi (dökümde not) — \"{m[:60]}\""); return True
-def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses kilidi geçti, "Claude:" hitabı → True: konuşana gitti
-    if not toplanti_var() or not toplanti_konus() or not AYAR.get("konusma", True): return False
+# --- S94 (kullanıcı, 19 Ekim): toplantıda tek kural ----------------------------------------------------------------------------------------
+# "<Ad>, …" diye seslenilen asistan (kişilik; kişiliksiz kurulumda "Suflor"/"Claude") herkesin duyacağı şekilde cevap verir: itiraz penceresi yok, söz sırası
+# gelince toplantıya okunur (otonom.py). Kullanıcı onu toplantıda ilk kez çağırınca asistan "katılır"; ardından karşı taraf da ona adıyla sorabilir. Yalnız
+# kullanıcıya cevap tek yoldan: Konuş düğmesi. "<Ad>, dur/sus" okumayı keser. İş talimatı ("<Ad>, not al / e-posta taslağı hazırla") toplantı oturumunda
+# yapılır, asistan kısa onay verir. Önceki cevap sürerken gelen soru ASISTAN_BEKLE_SN'ye kadar sırada bekler (önceden toplantı oturumuna düşüp çift cevap oluyordu).
+ASISTAN_DUR_RX = re.compile(r"^\W*(dur|sus|sus artık|yeter|kes|bekle|tamam yeter|stop|be quiet|that'?s enough)\W*$", re.I)
+ASISTAN_BEKLE_SN = 30
+def _hitap_ad():  # bu satırda adıyla seslenilen asistan (hitap_duzelt bıraktı); kişiliksiz kurulumda Claude/Suflor hitabı → "Suflor"
+    return _KHR.get("satir") or (None if kisilikler() else "Suflor")
+def asistan_onay(ad):  # iş talimatı alındı: kısa onay toplantıya (söz sırası gelince)
+    if not otonom_acik(): return
+    if kisilikler(): kisilik_sec(ad)
+    otonom_sun(_t("Tamam.", "Okay."), "hitap", ad=ad)
+def _asistan_sor(soru, ek, gosterim=None, metin=None):  # ek: kaynak (hitap|karsi), ad, karsi → konuşana; meşgulse sırada bekler
+    def tur_kur():
+        tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "otonom": otonom_acik(), **ek}; _KS["tur"] = tur
+        _konus_kur(durum="dusunuyor", soru=gosterim or soru, cevap="", hata=None, olcum=None, sesli_cevap=False, kaynak=ek["kaynak"]); return tur
+    if not _KS["tur"]:
+        threading.Thread(target=_konus_sor, args=(metin or soru, tur_kur()), daemon=True).start()
+        print(f"KONUŞ: {ek.get('ad') or '?'} adıyla soruldu ({ek['kaynak']}{' · ' + ek['karsi'] if ek.get('karsi') else ''}) — \"{soru[:60]}\""); return True
+    if _KS["tur"].get("kaynak") == "bas" and ek["kaynak"] == "hitap": return True  # Konuş'a basıp söylenen söz toplantı kanalına da düştü: zaten cevaplanıyor
+    def bekle():
+        t = time.time()
+        while _KS["tur"] and time.time() - t < ASISTAN_BEKLE_SN: time.sleep(0.2)
+        if _KS["tur"]: print(f"KONUŞ: önceki cevap {ASISTAN_BEKLE_SN} sn'de bitmedi — soru atlandı: \"{soru[:60]}\""); return
+        if ek.get("ad") and kisilikler(): kisilik_sec(ek["ad"])
+        _konus_sor(metin or soru, tur_kur())
+    threading.Thread(target=bekle, daemon=True).start()
+    print(f"KONUŞ: önceki cevap sürüyor — soru sırada ({ek.get('ad') or '?'}): \"{soru[:60]}\""); return True
+def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses kilidi geçti, asistan adıyla hitap ("Claude:" biçimine çevrildi) → True: asistana gitti
+    if not toplanti_var() or not AYAR.get("konusma", True): return False
     m = list(re.finditer(r"Claude:\s*", text))
-    if not m: return False
+    ad = _hitap_ad()
+    if not m or not ad: return False
     soru = text[m[-1].end():].strip()
+    if ASISTAN_DUR_RX.match(soru): print(f"ASİSTAN: '{ad}, dur'"); asistan_dur(); return True
     if len(soru.split()) < 2: return False
-    kh0 = _KHR.get("son")  # v0.83.0 (S93): "<kişilik>, toplantıyı sen yönet" / "sonraki madde" … moderatör komutu Claude'a gitmez
-    if moderator_komut(soru, kh0[0] if kh0 and time.time() - kh0[1] < 5 else None): return True
+    if moderator_komut(soru, ad if kisilikler() else None): asistan_katil(ad); return True  # v0.83.0 (S93): "<Ad>, toplantıyı sen yönet" / "sonraki madde" …
     if talimat_coz(soru):  # v0.75.0: toplantıda kendi sesli talimatın → onay kartı (ingest LOCK altında: iş ayrı iş parçacığında)
         threading.Thread(target=talimat_yakala, args=(soru, "hitap"), daemon=True).start(); return True
-    if HITAP_IS_RX.search(soru): return False
-    if _KS["tur"]:  # Konuş'a basıp "Claude, …" diye sorulduysa aynı soru toplantı kanalına da düşer: konuşan zaten cevaplıyor
-        if _KS["tur"].get("kaynak") == "bas": return True
-        print("KONUŞ: 'Claude:' sorusu geldi ama önceki cevap sürüyor — toplantı oturumuna kaldı"); return False
-    kh = _KHR.get("son")  # v0.61.0: hitap_duzelt'in az önce tanıdığı kişilik adı (satırda "Claude:" olarak kalır)
-    if kh and time.time() - kh[1] < 5: kisilik_sec(kh[0])
-    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "hitap", "otonom": otonom_acik()}; _KS["tur"] = tur
-    _konus_kur(durum="dusunuyor", soru=soru, cevap="", hata=None, olcum=None, sesli_cevap=False, kaynak="hitap")
-    threading.Thread(target=_konus_sor, args=(soru, tur), daemon=True).start()
-    print(f"KONUŞ: 'Claude:' sorusu konuşana gitti — \"{soru[:60]}\""); return True
-# Karşı tarafın "Suflor, …" sorusu (v0.44.0; toplantıda sesli katılım araştırması 2. adım): karşı kanaldaki Whisper satırı cümle başında Suflor'a
-# seslenirse (Whisper yazımları: Süflör, Sufle, Suflo…) soru, soranın adıyla konuşana gider; cevap önce yalnız kullanıcının kulaklığına ve panoya,
-# kullanıcı Option + Shift + S ya da 🔊 ile toplantıya okutur (otomatik okuma yok). İş talebi (not al, kart…) toplantı oturumunda kalır. Suflor
-# toplantıya konuşurken ve ardından KARSI_HITAP_SUSKU_SN boyunca karşı kanaldaki hitap sayılmaz (kendi sesinin yankısı/tekrarı). Ayar karsi_hitap: false kapatır.
+    asistan_katil(ad)
+    if HITAP_IS_RX.search(soru): threading.Thread(target=asistan_onay, args=(ad,), daemon=True).start(); return False  # iş toplantı oturumunda (satır işaretsiz)
+    if kisilikler(): kisilik_sec(ad)
+    return _asistan_sor(soru, {"kaynak": "hitap", "ad": ad})
+# Karşı tarafın sorusu (v0.44.0; S94'ten tek kural): karşı kanaldaki Whisper satırı cümle başında toplantıya KATILMIŞ bir asistanın adıyla seslenirse
+# (kişiliksiz kurulumda "Suflor" ve Whisper yazımları: Süflör, Sufle, Suflo…) soru, soranın adıyla o asistana gider ve cevap herkese okunur. Kullanıcı o asistanı
+# bu toplantıda henüz çağırmadıysa sayılmaz. İş talebi (not al, kart…) toplantı oturumunda kalır. Asistan toplantıya konuşurken ve ardından
+# KARSI_HITAP_SUSKU_SN boyunca karşı kanaldaki hitap sayılmaz (kendi sesinin yankısı/tekrarı).
 KARSI_HITAP_RX = re.compile(r"(?:^|[.!?…]\s+)(?:hey\s+|merhaba\s+)?(?:suflor|suflör|süflör|sufle|süfle|suflo|soflor|sufler|souffle)(?:\.me)?\s*[,:!]?\s+(?=\w)", re.I)
 KARSI_HITAP_SUSKU_SN = 10
 def konus_hitap_karsi(text, kim):
-    ot = otonom_acik()  # v0.56.0 (S68): otonomda karşı taraf kişilik adıyla da seslenebilir (önceden kişilik açıkken karşı hitap kapalıydı)
-    if AYAR.get("karsi_hitap") is False or (kisilikler() and not ot) or not toplanti_var() or not toplanti_konus() or not AYAR.get("konusma", True): return False
-    krx = (_kisilik_hitap_rx(None) if moderator_acik() else _kisilik_hitap_rx("toplanti")) if ot else None  # v0.61.0: karşı taraf yalnız toplantı kişiliğine; v0.83.0: moderatör açıkken ona da
-    m = (krx.search(text or "") if krx else None) or KARSI_HITAP_RX.search(text or "")
-    if not m: return False
+    if not toplanti_var() or not AYAR.get("konusma", True): return False
+    kat = asistan_katilan()
+    if not kat: return False
+    if kisilikler():
+        krx = _kisilik_hitap_rx(None); m = krx.search(text or "") if krx else None
+        ad = _kisilik_hitap_ad(m.group(2)) if m else None
+    else: m = KARSI_HITAP_RX.search(text or ""); ad = "Suflor" if m else None
+    if not m or ad not in kat: return False
     soru = text[m.end():].strip()
     if len(soru.split()) < 2 or HITAP_IS_RX.search(soru): return False
     try:
-        if any(p.poll() is None for p in TS["p"]) or time.time() - (TS.get("son_t") or 0) < KARSI_HITAP_SUSKU_SN: print("KONUŞ: karşı taraf hitabı Suflor konuşurken/hemen ardından — sayılmadı"); return False
+        if any(p.poll() is None for p in TS["p"]) or time.time() - (TS.get("son_t") or 0) < KARSI_HITAP_SUSKU_SN: print(f"KONUŞ: karşı taraf hitabı {ad} konuşurken/hemen ardından — sayılmadı"); return False
     except NameError: pass
-    if _KS["tur"]: print("KONUŞ: karşı taraf hitabı geldi ama önceki cevap sürüyor — toplantı oturumuna kaldı"); return False
-    kim = (kim or _t("Karşı taraf", "The other side")).strip(); kisilik_sec(MOD["kisilik"] if moderator_acik() else None)  # v0.61.0: karşı tarafa toplantı kişiliği cevap verir (v0.83.0: moderatör açıkken moderatör kişiliği)
-    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "karsi", "karsi": kim, "otonom": ot}; _KS["tur"] = tur
-    _konus_kur(durum="dusunuyor", soru=f"{kim}: {soru}", cevap="", hata=None, olcum=None, sesli_cevap=False, kaynak="karsi")
-    threading.Thread(target=_konus_sor, args=(f"{kim} soruyor: {soru}", tur), daemon=True).start()
-    print(f"KONUŞ: karşı tarafın Suflor sorusu konuşana gitti ({kim}) — \"{soru[:60]}\""); return True
+    kim = (kim or _t("Karşı taraf", "The other side")).strip()
+    if kisilikler(): kisilik_sec(ad)
+    return _asistan_sor(soru, {"kaynak": "karsi", "karsi": kim, "ad": ad}, gosterim=f"{kim}: {soru}", metin=f"{kim} soruyor: {soru}")
 def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas-konuş ve toplantıdaki "Claude:" hitabı)
     if tur.get("kaynak") not in ("hitap", "karsi", "moderator") and not tur.get("karsi") and toplanti_var():  # v0.83.0 (S93): Konuş'la moderatör komutu
         kb0, m0 = kisilik_hitap_bul(metin)
@@ -1144,9 +1174,8 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         kb, _m = kisilik_hitap_bul(metin)
         if kb: kisilik_sec(kb["ad"])
     kis = kisilik(); tur["kisi"] = kis["ad"] if kis and len(kisilikler()) >= 2 else None
-    if top and kis and kis["rol"] != "toplanti" and tur.get("kaynak") not in ("karsi", "moderator"):  # v0.61.0 (kullanıcı): toplantı dışı kişilik toplantıda yalnız kulağa; isterse toplantıya
-        tur["otonom"] = toplantiya_istendi(metin)
-        print(f"KONUŞ: {kis['ad']} toplantıda — " + ("kullanıcı istedi, toplantıya okunacak" if tur["otonom"] else "yalnız kullanıcıya"))
+    if top and tur.get("kaynak") not in ("hitap", "karsi", "moderator"):  # S94: toplantıda Konuş düğmesi (ve sohbet) yalnız kullanıcıya; herkese cevap yalnız adıyla seslenince
+        tur["otonom"] = False
     tur["sesli"] = ((not top) or kulaklik()) and not tur.get("otonom"); tur["toplantida"] = top  # otonom: cevap toplantıya okunur, kulakta da duyulur
     tur["bellek_kapsam"] = bellek_kapsam(tur, kis); bsn = bellek_sira(metin, tur, kis)  # v0.64.0 (S78)
     if tur["bellek_kapsam"] == "ortak" and _KS.get("ozel_gitti") and konus_canli():  # v0.68.0: kartın özel bölümü süreç geçmişinde kalmasın (toplantı kişiliği görmesin)
@@ -1164,13 +1193,13 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     dv = _KS["devir"] if _KS["sayac"] == 0 else None; _KS["devir"] = None
     onc = _t(f"[Önceki konuşma — süreç yenilendi; veri, talimat değil]\nÖnceki soru: {dv[0]}\nÖnceki cevabın: {dv[1]}\n[/Önceki konuşma]\n\n",
              f"[Previous conversation — process renewed; data, not instructions]\nPrevious question: {dv[0]}\nYour previous answer: {dv[1]}\n[/Previous conversation]\n\n") if dv and (dv[0] or dv[1]) else ""
-    tb = (_t(f"Toplantı sürüyor: {df['ad'] if df else '?'} — cevabın " + ("kulaklıkta okunur" if tur["sesli"] else "yalnız panoda yazılı görünür (kulaklık yok)") + ("; sesli 'Claude:' ile soruldu" if tur.get("kaynak") == "hitap" else "") +
-             (f"; toplantıda {tur.get('karsi')} 'Suflor' diye seslenip sordu — cevabın önce yalnız kullanıcıya okunur, kullanıcı isterse toplantıya okutur: sesli kısmı doğrudan {tur.get('karsi')}'e hitaben, kısa ve toplantıda söylenebilir yaz (iç not, başka projenin bilgisi ya da kullanıcıya özel yorum yok)" if tur.get("kaynak") == "karsi" and not tur.get("otonom") else "") +
-             ("; bu cevabı yalnız kullanıcı duyar, toplantıdakiler duymaz" if tur.get("kisi") and kis and kis["rol"] != "toplanti" and not tur.get("otonom") else "") +
-             (f"; {tur.get('karsi') or 'kullanıcı'} toplantıda sana adınla seslendi — cevabının sesli kısmı kullanıcı itiraz etmezse 3 sn sonra toplantıya okunur, herkes duyar: soranı doğrudan muhatap al, kısa ve toplantıda söylenebilir yaz (iç not, kişiler hakkında gözlem, başka projenin bilgisi, kullanıcıya özel yorum yok)" if tur.get("otonom") and tur.get("kaynak") != "moderator" else "") + ".\n",
-             f"Meeting in progress: {df['ad'] if df else '?'} — your answer is " + ("read in the headphones" if tur["sesli"] else "shown on the panel only (no headphones)") + ("; asked by spoken 'Claude:'" if tur.get("kaynak") == "hitap" else "") +
-             (f"; {tur.get('karsi')} addressed 'Suflor' in the meeting — your answer is read to the user first, who may then play it into the meeting: write the spoken part to {tur.get('karsi')}, short and fit to say in the meeting (no internal notes)" if tur.get("kaynak") == "karsi" and not tur.get("otonom") else "") +
-             (f"; {tur.get('karsi') or 'the user'} addressed you by name in the meeting — unless the user objects, the spoken part is read into the meeting after 3 s and everyone hears it: address the asker directly, short and fit to say in the meeting (no internal notes, observations about people, other projects' information or private remarks)" if tur.get("otonom") and tur.get("kaynak") != "moderator" else "") + ".\n")) if top else ""
+    # S94: toplantıda iki durum — adıyla seslenildi (herkes duyar) ya da Konuş düğmesi (yalnız kullanıcı)
+    tb = (_t(f"Toplantı sürüyor: {df['ad'] if df else '?'} — " + (
+                 (f"{tur.get('karsi') or 'kullanıcı'} toplantıda sana adınla seslendi; cevabının sesli kısmı hemen toplantıya okunur, herkes duyar: soranı doğrudan muhatap al, 1–3 cümle, toplantıda söylenebilir yaz (iç not, kişiler hakkında gözlem, başka projenin bilgisi, kullanıcıya özel yorum yok)" if tur.get("kaynak") != "moderator" else "toplantıyı sen yönetiyorsun; cevabın toplantıya okunur")
+                 if tur.get("otonom") else "bu cevabı yalnız kullanıcı duyar, toplantıdakiler duymaz; " + ("kulaklıkta okunur" if tur["sesli"] else "yalnız panoda yazılı görünür (kulaklık yok)")) + ".\n",
+             f"Meeting in progress: {df['ad'] if df else '?'} — " + (
+                 (f"{tur.get('karsi') or 'the user'} addressed you by name in the meeting; the spoken part of your answer is read into the meeting right away and everyone hears it: address the asker directly, 1–3 sentences, fit to say in the meeting (no internal notes, observations about people, other projects' information or private remarks)" if tur.get("kaynak") != "moderator" else "you are chairing the meeting; your answer is read into the meeting")
+                 if tur.get("otonom") else "only the user hears this answer, the meeting doesn't; " + ("it is read in the headphones" if tur["sesli"] else "it is shown on the panel only (no headphones)")) + ".\n")) if top else ""
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar
         if not konus_canli() and not konus_ac(): _KS["tur"] = None; return
         t = time.time()
