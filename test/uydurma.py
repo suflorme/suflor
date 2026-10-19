@@ -39,6 +39,11 @@ try:
         r = json.loads(p.stdout.readline()); m = r.get("text") or ""
         if konusma: kontrol(f"{ad} korunur → {m!r}", bool(m.strip()))
         else: kontrol(f"{ad} boş döner" + (f" (atılan: {r['atilan']})" if r.get("atilan") else ""), not m.strip())
+    # v0.88.2 (19 Ekim 18.20 deneme): kullanıcı toplantıda daha önce söylediği sözü yeniden söyleyince istemdeki önceki satırla eşleşip atılıyordu
+    a = soyle("Yelda", "Test toplantısı başladı.")
+    for ad, govde, bek in [("önceki satırla aynı gerçek söz korunur", {"onceki": "Test toplantısı başladım. Bir iki üç."}, True)]:
+        p.stdin.write(json.dumps(dict({"id": "o", "pcm": pcm(a), "dil": "tr", "ana_dil": "tr", "kanal": "ben", "baslik": "d"}, **govde)) + "\n"); p.stdin.flush()
+        r = json.loads(p.stdout.readline()); kontrol(f"{ad} → {r.get('text')!r}" + (f" (atılan: {r['atilan']})" if r.get("atilan") else ""), bool((r.get("text") or "").strip()) == bek)
 finally:
     p.stdin.close(); p.wait(10)
 print("GEÇTİ" if not hatalar else f"KALDI: {len(hatalar)} — " + "; ".join(hatalar))

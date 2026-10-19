@@ -56,6 +56,21 @@ def tekrar_dongu(metin):
             if k >= 4 and k * n >= len(w) / 2: return True
             i += 1
     return False
+# v0.88.2 (19 Ekim 18.23 deneme): gerçek cümlenin ardına öbek döngüsü eklenince ("Eklentiyi yeniledim. Web toplantısına girdim." + öbek ×N) tüm satır
+# atılıyordu. Döngü 2–3 sözcüklük öbekse ve önünde en az 2 sözcük varsa öndeki söz + öbeğin bir kopyası kalır; tek sözcük döngüsü ("AKMU" ×9) yine atılır.
+def tekrar_kirp(metin):
+    m = list(re.finditer(r"\w+", metin or "")); w = [x.group().lower() for x in m]
+    for n in (2, 3):
+        i = 0
+        while i + n <= len(w):
+            k = 1
+            while w[i + k * n:i + (k + 1) * n] == w[i:i + n]: k += 1
+            if k >= 4 and k * n >= len(w) / 2:
+                if i < 2 or len(set(w[i:i + n])) == 1: return None  # öbek tek sözcüğün tekrarıysa ("AKMU AKMU") tek sözcük döngüsü
+                son = metin[:m[i + n - 1].end()]; j = m[i + n - 1].end()
+                return (son + (metin[j] if j < len(metin) and metin[j] in ".!?" else "")).strip()
+            i += 1
+    return None
 def cozme_ayari(sn):
     # canlı parça: yeniden deneme 2 sıcaklıkla, belirteç sesin süresiyle sınırlı (sn başına 20, en az 48). Varsayılan 6 sıcaklık × 224 belirteç
     # kısa parçada tekrar döngüsünü 6 kez baştan çözüyordu: 11 Ekim toplantılarında uydurma işleri ortalama 11,6 sn, işçi süresinin %59'u.
@@ -216,8 +231,13 @@ def main():
             if metin and UYDURMA_EN.match(metin) and not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1
             # kısa satırda web adresi: Whisper'ın video sonu uydurması ("www.feyyaz.tv" — 1 Ekim headless bip sesi denemesi)
             if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): atilan.append(metin); metin = ""; atla += 1
-            if istem and metin and metin.lower().strip(" .") in istem.lower(): atilan.append(metin); metin = ""; atla += 1  # istemi geri okuma
-            if metin and tekrar_dongu(metin): atilan.append(metin); metin = ""; atla += 1  # tekrar döngüsü uydurması
+            # istemi geri okuma. v0.88.2 (19 Ekim 18.20 deneme): istemde toplantının önceki satırları da var; kullanıcı aynı sözü yeniden söyleyince
+            # ("Test toplantısı başladı") gerçek satır atılıyordu. Yalnız önceki satırlarla eşleşen metin, parçada konuşma sesi varsa kalır.
+            if istem and metin and metin.lower().strip(" .") in istem.lower():
+                terim = metin.lower().strip(" .") in (p.get("istem") or "").lower()
+                if terim or not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1
+            if metin and tekrar_dongu(metin):  # tekrar döngüsü uydurması (öndeki gerçek söz kalır)
+                kirp = tekrar_kirp(metin); atilan.append(metin); atla += 1; metin = kirp or ""
             try: ses = ses_olc(a, np) if metin else None
             except Exception: ses = None
             km = {}
