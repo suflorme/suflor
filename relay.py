@@ -1111,6 +1111,10 @@ def masaustu_al(p):
     # v0.31.0: katılımcı listesi (Kişiler paneli, ara sıra gelir — gelmeyen gönderimde eskisi kalır), konuşan kişi (oy), ekran paylaşımı
     kat = p.get("katilimcilar")
     m["katilimcilar"] = [" ".join(str(k).split())[:60] for k in kat if str(k).strip()][:50] if isinstance(kat, list) else (o.get("katilimcilar") if m["toplantida"] else None)
+    # v0.83.3: katılımcı sayısı paneli açmadan (Kişiler düğmesinin etiketi/rozeti; menü uygulaması her taramada) — gelmezse eskisi (toplantı sürüyorsa)
+    try: ksay = int(p["kisi_sayisi"]) if p.get("kisi_sayisi") is not None and 0 < int(p["kisi_sayisi"]) < 1000 else None
+    except (TypeError, ValueError): ksay = None
+    m["kisi_sayisi"] = ksay if ksay else (o.get("kisi_sayisi") if m["toplantida"] else None)
     m["paylasim"] = p.get("paylasim") if isinstance(p.get("paylasim"), bool) else (o.get("paylasim") if m.get("tut_bas") else None)
     m["bitti_t"] = o.get("bitti_t") if m["toplantida"] or not o.get("toplantida") else time.time()
     STATE["masaustu"] = m
@@ -1124,6 +1128,7 @@ def masaustu_al(p):
         print(f"MASAÜSTÜ: {m['uygulama']} · " + ("toplantıda" if m["toplantida"] else "toplantı yok") + (" · sessizde" if m["sessiz"] else " · mikrofon açık" if m["sessiz"] is False else "")
               + (f" · {m['baslik']}" if m["baslik"] and m["toplantida"] else ""))
     if isinstance(kat, list) and m["katilimcilar"] != o.get("katilimcilar"): print(f"MASAÜSTÜ: katılımcılar {len(m['katilimcilar'])} kişi")
+    if ksay and ksay != o.get("kisi_sayisi"): print(f"MASAÜSTÜ: katılımcı sayısı {ksay} (Kişiler düğmesinden)")
     ks = " ".join(str(p.get("konusan") or "").split())[:60]
     if ks and m["toplantida"] and ks != ben_adi(): kume_oyla(ks, taslak=True)  # konuşan kişi göstergesi: altyazı taslağı gibi oy
     if m["toplantida"] and masaustu_baslik() and m["paylasim"] is not None and m["paylasim"] != o.get("paylasim"): paylasim_bildir(m["paylasim"])
@@ -1873,9 +1878,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/hatirlat":  # panodaki deneme hatırlatmasının Tamam'ı — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(hatirlat_kapat(p))
-        if self.path == "/konus-gecmis-sil":  # panoda Konuş geçmişinden tek kayıt silme — yalnız pano
+        if self.path == "/konus-gecmis-sil":  # panoda Konuş geçmişinden silme (tek kayıt id, seçilenler ids, hepsi) — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(konus_gecmis_sil(p.get("id")))
+            return self._json(konus_gecmis_sil(p.get("id"), p.get("ids") if isinstance(p.get("ids"), list) else None, p.get("hepsi") is True))
         if self.path == "/ayar":  # panodaki ⚙ Ayarlar — yalnız pano (aynı köken + anahtar)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(ayar_yaz(p.get("degisen")))

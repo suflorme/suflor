@@ -1179,6 +1179,7 @@ def izle():
             ms = s.get("masaustu") or {}  # 19 Ekim test toplantısı: masaüstü Teams'te eklenti olmadığı için "EKLENTİ SİNYALİ YOK" → gereksiz NOT kartı ("eklenti 102 sn'dir sessiz")
             state = ("eklenti bağlı" if (x.get("age_s") is not None and x["age_s"] < 30) else
                      f"masaüstü {ms.get('uygulama') or 'toplantı'} (menü uygulaması) — eklenti gerekmez, uyarma" if ms.get("toplantida") else "EKLENTİ SİNYALİ YOK") + \
+                    (f" · katılımcı sayısı {ms['kisi_sayisi']} (uygulamadaki Kişiler düğmesinden; kendin dahil)" if ms.get("toplantida") and ms.get("kisi_sayisi") else "") + \
                     ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + (("✓ (yerel yardımcı)" if wv.get("yerel_akiyor") else "✓") if wv.get("karsi") else  # yerel ses yardımcısı
                      "✗ (yerel yardımcı hazır, karşı ses henüz gelmedi — kart gönderme)" if wv.get("yerel") in ("bekliyor", "dinliyor") else
                      "✗ (yerel yardımcıda Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses)" if wv.get("yerel") == "izin" else

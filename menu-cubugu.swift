@@ -300,7 +300,7 @@ final class Masaustu {
     static let KAYIP_ESIK = 4; var kayip = 0, cikis = Date.distantPast
     var toplantiPid: pid_t = 0, toplantiBaslik = ""  // kanıt görüntüsü bu pencereden
     var paylasimAday: Bool? = nil, paylasimSay = 0, paylasim: Bool? = nil  // iki tarama aynıysa kararlı
-    var kisilerSon = Date.distantPast, toplantiBas = Date.distantPast, katilimcilar: [String]? = nil, kisilerDugme: AXUIElement?
+    var kisilerSon = Date.distantPast, toplantiBas = Date.distantPast, katilimcilar: [String]? = nil, kisilerDugme: AXUIElement?, kisiEtiketYazildi = ""
     func uy(_ r: NSRegularExpression, _ t: String) -> Bool { r.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) != nil }
     func yakala(_ r: NSRegularExpression, _ t: String) -> String? {
         guard let m = r.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)), m.numberOfRanges > 1, let g = Range(m.range(at: 1), in: t) else { return nil }
@@ -315,7 +315,23 @@ final class Masaustu {
         AXUIElementSetAttributeValue(kok, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
     }
     // bir pencerenin taraması: düğmeler (ayrıl, mikrofon, kişiler, kendi paylaşımı) + tüm etiket/metinler (paylaşım, konuşan)
-    struct Tarama { var ayril = false, sessiz: Bool? = nil, md: AXUIElement? = nil, kisiler: AXUIElement? = nil, kendi = false, karsi = false, konusan: String? = nil }
+    struct Tarama { var ayril = false, sessiz: Bool? = nil, md: AXUIElement? = nil, kisiler: AXUIElement? = nil, kendi = false, karsi = false, konusan: String? = nil, kisiSayi: Int? = nil, kisiEtiket: String = "" }
+    // Katılımcı sayısı paneli açmadan (19 Ekim, kullanıcı: "c yolunu dene"): Kişiler düğmesinin etiketi ya da içindeki rozet ("Kişiler (3)", "3 katılımcı", rozet "3").
+    // Klavye kısayolundaki rakam sayılmaz (⌘ ⌥ ⇧ ⌃ Ctrl Shift Alt Cmd). Teams/Zoom biçimi doğrulanmadı: düğmenin bütün etiketleri toplantı başına bir kez günlüğe (MASAÜSTÜ: Kişiler düğmesi …).
+    static let SAYI = rx("(?:^|[\\s(])(\\d{1,3})(?:\\)|\\s*(?:kişi|katılımcı|participant|people|person)|$)")
+    static let KISAYOL = rx("[⌘⌥⇧⌃]|\\b(ctrl|shift|alt|cmd|option|command)\\b")
+    func kisiSayisi(_ d: AXUIElement) -> (Int?, String) {
+        var et: [String] = [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute, kAXValueAttribute].compactMap { deger(d, $0) as? String }.filter { !$0.isEmpty }
+        var yigin: [(AXUIElement, Int)] = (deger(d, kAXChildrenAttribute) as? [AXUIElement] ?? []).map { ($0, 1) }
+        while let (e, k) = yigin.popLast(), et.count < 12 {  // rozet: düğmenin alt öğelerindeki kısa metin
+            for a in [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute] { if let t = deger(e, a) as? String, !t.isEmpty, t.count < 40 { et.append(t) } }
+            if k < 3, let c = deger(e, kAXChildrenAttribute) as? [AXUIElement] { yigin.append(contentsOf: c.map { ($0, k + 1) }) }
+        }
+        for t in et where !uy(Masaustu.KISAYOL, t) {
+            if let m = Masaustu.SAYI.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)), let r = Range(m.range(at: 1), in: t), let n = Int(t[r]), n > 0 { return (n, et.joined(separator: " | ")) }
+        }
+        return (nil, et.joined(separator: " | "))
+    }
     func pencereTara(_ w: AXUIElement) -> Tarama {
         var s = Tarama(), n = 0, yigin: [(AXUIElement, Int)] = [(w, 0)]
         while let (e, d) = yigin.popLast(), n < 6000 {
@@ -324,7 +340,7 @@ final class Masaustu {
             if rol == kAXButtonRole as String || rol == "AXCheckBox" || rol == "AXMenuButton" {
                 let t = etiket(e)
                 if uy(AYRIL, t) { s.ayril = true } else if uy(SESSIZ, t) { s.sessiz = true; s.md = s.md ?? e } else if uy(ACIK, t) { s.sessiz = false; s.md = s.md ?? e }
-                else if uy(KISILER, t) { s.kisiler = s.kisiler ?? e }
+                else if uy(KISILER, t) { if s.kisiler == nil { s.kisiler = e; (s.kisiSayi, s.kisiEtiket) = kisiSayisi(e) } }
                 if uy(KENDI_PAYLAS, t) { s.kendi = true }
             }
             for t in [deger(e, kAXDescriptionAttribute) as? String, rol == kAXStaticTextRole as String ? deger(e, kAXValueAttribute) as? String : nil].compactMap({ $0 }) where t.count < 160 {
@@ -360,6 +376,8 @@ final class Masaustu {
                 var v: [String: Any] = ["uygulama": u.ad, "toplantida": true, "sessiz": s.sessiz as Any, "baslik": baslik]
                 if let pp = paylasim { v["paylasim"] = pp }
                 if let k = s.konusan { v["konusan"] = k }
+                if let n = s.kisiSayi { v["kisi_sayisi"] = n }
+                if s.kisiler != nil, kisiEtiketYazildi != baslik { kisiEtiketYazildi = baslik; print("MASAÜSTÜ: Kişiler düğmesi · \(s.kisiEtiket.prefix(200)) · sayı \(s.kisiSayi.map(String.init) ?? "yok")") }
                 return v
             }
             if bos == nil { bos = ["uygulama": u.ad, "toplantida": false] }

@@ -77,7 +77,10 @@ dialog#ayd::backdrop,dialog#kgd::backdrop{background:rgba(12,18,15,.4)}
 dialog#kgd{border:1px solid var(--bd2);border-radius:14px;background:var(--s1);color:var(--tx);padding:18px;width:min(620px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}
 #kgf{display:flex;flex-direction:column;gap:10px;margin:0}#kgi{overflow:auto;max-height:calc(100vh - 210px);padding-right:12px}
 .kgr{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bd)}.kgr .t{min-width:0}.kgr .s{font-weight:500}
-.kgr .c{color:var(--t2);margin-top:2px;overflow-wrap:anywhere}.kgr .z{color:var(--t3);font-size:12px;margin-bottom:2px}.kgr button{flex:none}#ayf{display:flex;flex-direction:column;gap:10px;margin:0}#ayi{overflow:auto;max-height:calc(100vh - 190px);padding-right:12px;outline:none}
+.kgr .c{color:var(--t2);margin-top:2px;overflow-wrap:anywhere}.kgr .z{color:var(--t3);font-size:12px;margin-bottom:2px}.kgr button{flex:none}#ayf{display:flex;flex-direction:column;gap:10px;margin:0}#ayi{overflow:auto;max-height:calc(100vh - 250px);padding-right:12px;outline:none}
+.ayb{display:flex;align-items:center;gap:8px}.ayb .gbb{flex:1}#ayara{width:150px;font:inherit;font-size:12px;padding:3px 8px;border:1px solid var(--bd);border-radius:6px;background:transparent;color:inherit}
+.ayt{display:flex;flex-wrap:wrap;gap:6px}.ayt button{font-size:12px;padding:3px 10px;border-radius:99px;color:var(--t2)}.ayt button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+#ayi .ays-yok{padding:14px 0}#ayi [hidden],#kgu[hidden]{display:none!important}.kgu{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.kgu label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2)}.kgr input[type=checkbox]{margin-top:4px;flex:none}
 .ayg{margin-top:14px;font:500 11px/1 var(--f-metin,inherit);letter-spacing:.06em;text-transform:uppercase;color:var(--t3)}.ayg:first-child{margin-top:4px}
 .ayr{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)}.ayr .hint{margin-top:2px}.ayr.kapali{opacity:.5}
 .ayr select,.ayr input:not([type=checkbox]){font:inherit;font-size:12px;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;outline:none}
@@ -91,8 +94,8 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 </style>
 <header><div class=hl><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span><span id=sure></span></div>
 <div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
-<dialog id=ayd><form method=dialog id=ayf><b class=gbb>Ayarlar</b><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet</button><button value=kapat class=gh formnovalidate>Kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet'e basana kadar bir şey değişmez">Varsayılanlara dön</button><span class=sp1></span><span id=aym class=hint></span></div></form></dialog>
-<dialog id=kgd><form method=dialog id=kgf><b class=gbb>Konuş geçmişi</b><p class=hint id=kgh></p><div id=kgi></div><div class=bt><button value=kapat class=gh formnovalidate>Kapat</button><span class=sp1></span><span id=kgm class=hint></span></div></form></dialog>
+<dialog id=ayd><form method=dialog id=ayf><div class=ayb><b class=gbb>Ayarlar</b><input id=ayara type=search placeholder="Ara" aria-label="Ayarlarda ara" autocomplete=off><button id=ayx class="ib gh" type=button title="Kaydetmeden kapat"></button></div><div id=ayt class=ayt role=tablist aria-label="Ayar grupları"></div><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet ve kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet ve kapat'a basana kadar bir şey değişmez">Varsayılanlara dön</button><span class=sp1></span><span id=aym class=hint></span></div></form></dialog>
+<dialog id=kgd><form method=dialog id=kgf><b class=gbb>Konuş geçmişi</b><p class=hint id=kgh></p><div class=kgu id=kgu><label><input type=checkbox id=kgt>Tümünü seç</label><button id=kgs class=gh type=button disabled>Seçilenleri sil</button><button id=kga class=gh type=button>Hepsini sil</button></div><div id=kgi></div><div class=bt><button value=kapat class=gh formnovalidate>Kapat</button><span class=sp1></span><span id=kgm class=hint></span></div></form></dialog>
 <dialog id=gbd><form method=dialog id=gbf><b class=gbb>Geri bildirim</b><p class=hint>Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.</p>
 <textarea id=gbm rows=5 placeholder="Ne oldu? Ne bekliyordun?"></textarea>
 <label class=hint style="display:flex;gap:6px;align-items:center"><input type=checkbox id=gbt checked style="margin:0"> Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)</label>
@@ -615,46 +618,67 @@ const AYG=[['E-posta',[['eposta','sec','Taslak nerede açılsın','Brifing ve ö
   ['Gizlilik',[['kanit_metin','bool','Kanıttaki yazı','Kanıt görüntüsündeki yazı Mac’te okunur (görüntü Mac’ten çıkmaz) ve toplantı defterine eklenir. Kapalıyken de Claude gerekince kanıt görüntüsüne bakar.'],['teshis','bool','Teknik teşhis gönder','Yalnız sürüm, donanım, hata türü ve sayılar geliştiriciye gider; toplantı içeriği gitmez.'],
     ['ses_izi_hafiza','bool','Ses izi hafızası','Konuşanların ses izi bu Mac’te saklanır; sonraki toplantılarda adları bulunur.'],
     ['konus_gecmis','bool','Konuş geçmişi','Konuş’a sorduğun sorular ve cevapları bu Mac’te 90 gün saklanır; asistan önceki konuşmalarınızı hatırlar. Karşı tarafın soruları girmez.'],
-    ['gecmis_goster','dugme','Konuş geçmişini gör','Kayıtları tek tek silebilirsin.']]],
+    ['gecmis_goster','dugme','Konuş geçmişini gör','Kayıtları tek tek, seçerek ya da hepsini birden silebilirsin.']]],
   ['Proje',[['proje_hazirla','hazirla','Projeyi yeniden hazırla','Klasörü yeniden tarar; yeni belgeleri metne çevirip dizinler, istersen proje kartını günceller. Kurulum sihirbazı yalnız bu ekranlarla açılır.']]]]
 // v0.81.2: ⚙ Ayarlar → Gemini nerede satırında bugünkü Gemini istekleri (model başına / günlük sınır; dolu olan işaretli)
 const GKISA={'gemini-3.8-flash-lite-tts':'Lite','gemini-3.8-flash-tts':'3.8 Flash','gemini-3.1-flash-tts-preview':'3.1 Flash','gemini-2.5-flash-preview-tts':'2.5 Flash'}
 function gGunluk(){const g=last&&last.gemini_gunluk;if(!g)return''
   return L('Bugün {n} istek',{n:g.toplam})+': '+g.modeller.map(m=>`${GKISA[m.ad]||m.ad} ${m.n}/${g.sinir}${m.dolu?' ('+L('dolu')+')':''}`).join(' · ')}
 function ayCiz(){const a=(last&&last.ayarlar)||{deger:{}},d=a.deger,tah={gmail:'Gmail',outlook:'Outlook (web)',mailto:L("Mac'in posta uygulaması")}[(last&&last.eposta)||'mailto']
-  document.getElementById('ayi').innerHTML=AYG.map(([g,al])=>`<div class=ayg>${esc(L(g))}</div>`+al.map(([k,tur,ad,ac,sec])=>{const v=d[k],kap=(['gemini_ses','gemini_model'].includes(k)&&!a.gemini)||(['masaustu_mic','masaustu_kisiler','kisayollar','menu_cubugu'].includes(k)&&!a.menu),sk=o=>k==='ses_motoru'&&((o==='piper'&&!a.piper)||(o==='pocket'&&!a.pocket)||(o==='gemini'&&!a.gemini))
+  document.getElementById('ayt').innerHTML=`<button type=button class=gh role=tab data-g=hepsi>${esc(L('Hepsi'))}</button>`+AYG.map(([g],gi)=>`<button type=button class=gh role=tab data-g=${gi}>${esc(L(g))}</button>`).join('')
+  document.getElementById('ayi').innerHTML=AYG.map(([g,al],gi)=>`<div class=ayg data-g=${gi}>${esc(L(g))}</div>`+al.map(([k,tur,ad,ac,sec])=>{const v=d[k],kap=(['gemini_ses','gemini_model'].includes(k)&&!a.gemini)||(['masaustu_mic','masaustu_kisiler','kisayollar','menu_cubugu'].includes(k)&&!a.menu),sk=o=>k==='ses_motoru'&&((o==='piper'&&!a.piper)||(o==='pocket'&&!a.pocket)||(o==='gemini'&&!a.gemini))
     const c=tur==='hazirla'?`<button type=button class=gh data-hazirla>${esc(L('Aç'))}</button>`:tur==='dugme'?`<button type=button class=gh data-gecmis>${esc(L('Göster'))}</button>`:tur==='bool'?`<input type=checkbox data-ay=${k} ${v?'checked':''} ${kap?'disabled':''}>`:tur==='sec'?`<select data-ay=${k} ${kap?'disabled':''}>${sec.map(([o,t])=>`<option value="${o}" ${String(v)===o?'selected':''} ${sk(o)?'disabled':''}>${esc(L(t))}${k==='eposta'&&o===''&&!v?' ('+esc(tah)+')':''}</option>`).join('')}</select>`
       :tur==='sayi'?`<input type=number data-ay=${k} min=0 step=5 value="${esc(v)}">`:`<input data-ay=${k} data-tur=adres inputmode=email value="${esc(v||'')}" placeholder="${esc(L('takvim adresin'))}">`
-    return `<div class="ayr${kap?' kapali':''}"><div><b>${esc(L(ad))}</b><div class=hint>${esc(L(ac))}${k==='gemini_kapsam'&&gGunluk()?`<br><span data-gg>${esc(gGunluk())}</span>`:''}${kap?' '+esc(L(k.startsWith('gemini')?'(Gemini anahtarı yok)':'(menü çubuğu uygulaması kurulu değil)')):''}${k==='ses_motoru'&&(!a.piper||!a.gemini)?' '+esc(L(!a.piper&&!a.gemini?'(Piper kurulu değil, Gemini anahtarı yok)':!a.piper?'(Piper kurulu değil)':'(Gemini anahtarı yok)')):''}${k==='ses_motoru'&&!a.pocket?' '+esc(L('(Pocket kurulu değil)')):''}</div></div>${c}</div>`}).join('')).join('')
-  document.getElementById('aym').textContent=''}
+    return `<div class="ayr${kap?' kapali':''}" data-g=${gi}><div><b>${esc(L(ad))}</b><div class=hint>${esc(L(ac))}${k==='gemini_kapsam'&&gGunluk()?`<br><span data-gg>${esc(gGunluk())}</span>`:''}${kap?' '+esc(L(k.startsWith('gemini')?'(Gemini anahtarı yok)':'(menü çubuğu uygulaması kurulu değil)')):''}${k==='ses_motoru'&&(!a.piper||!a.gemini)?' '+esc(L(!a.piper&&!a.gemini?'(Piper kurulu değil, Gemini anahtarı yok)':!a.piper?'(Piper kurulu değil)':'(Gemini anahtarı yok)')):''}${k==='ses_motoru'&&!a.pocket?' '+esc(L('(Pocket kurulu değil)')):''}</div></div>${c}</div>`}).join('')).join('')+`<p class="hint ays-yok" id=ayyok hidden>${esc(L('Eşleşen ayar yok'))}</p>`
+  document.getElementById('aym').textContent='';ayFiltre()}
+// 19 Ekim (kullanıcı): grup başlıkları seçilebilir sekme (Hepsi + gruplar), küçük arama kutusu (satırın adı, açıklaması, seçenekleri; yazınca bütün gruplarda arar)
+let AYSEC='hepsi'
+function ayFiltre(){const kc=s=>(s||'').toLocaleLowerCase(DIL==='en'?'en':'tr'),q=kc(document.getElementById('ayara').value.trim());let n=0
+  document.querySelectorAll('#ayt button').forEach(b=>{const on=q?b.dataset.g==='hepsi':b.dataset.g===AYSEC;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)})
+  document.querySelectorAll('#ayi .ayg').forEach(h=>{const g=h.dataset.g;let gor=0
+    document.querySelectorAll(`#ayi .ayr[data-g="${g}"]`).forEach(r=>{const ok=q?kc(r.textContent).includes(q):(AYSEC==='hepsi'||AYSEC===g);r.hidden=!ok;if(ok)gor++})
+    h.hidden=!gor||(!q&&AYSEC!=='hepsi');n+=gor})
+  document.getElementById('ayyok').hidden=n>0}
+document.getElementById('ayt').addEventListener('click',ev=>{const b=ev.target.closest('button[data-g]');if(!b)return;AYSEC=b.dataset.g;document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0})
+document.getElementById('ayara').addEventListener('input',ayFiltre)
 // Konuş geçmişi (v0.67.0): ⚙ Ayarlar → Gizlilik → Göster; en yeni önce, tek tek Sil (dosyadan çıkar, aramadan da düşer)
 async function gecmisAc(){const d=document.getElementById('kgd');document.getElementById('kgm').textContent='';d.showModal();await gecmisCiz()}
 async function gecmisCiz(){let r={};try{r=await j('/konus-gecmis')}catch(e){}
   const k=r.kayitlar||[],h=document.getElementById('kgh')
   h.textContent=(r.acik?L('Kayıt açık — {g} gün saklanır, sonra arşive gider.',{g:r.gun||90}):L('Kayıt kapalı — yeni soru kaydedilmez.'))+' '+L('{n} kayıt',{n:r.toplam||0})
   const tr=a=>{try{const x=new Date(a);return x.toLocaleDateString(DIL==='en'?'en-GB':'tr-TR',{day:'numeric',month:'long'})+' '+x.toLocaleTimeString(DIL==='en'?'en-GB':'tr-TR',{hour:'2-digit',minute:'2-digit'})}catch(e){return a||''}}
-  document.getElementById('kgi').innerHTML=k.length?k.map(x=>`<div class=kgr><div class=t><div class=z>${esc(tr(x.at))}${x.kisilik?' · '+esc(x.kisilik):''}${x.toplanti?' · '+esc(x.toplanti):''}</div><div class=s>${esc(x.soru||'')}</div><div class=c>${esc(x.sesli||'')}</div></div><button type=button class=gh data-sil="${esc(x.id)}">${esc(L('Sil'))}</button></div>`).join(''):`<p class=hint>${esc(L('Henüz kayıt yok.'))}</p>`}
+  document.getElementById('kgi').innerHTML=k.length?k.map(x=>`<div class=kgr><input type=checkbox data-kg="${esc(x.id)}" aria-label="${esc(L('Seç'))}"><div class=t style="flex:1"><div class=z>${esc(tr(x.at))}${x.kisilik?' · '+esc(x.kisilik):''}${x.toplanti?' · '+esc(x.toplanti):''}</div><div class=s>${esc(x.soru||'')}</div><div class=c>${esc(x.sesli||'')}</div></div><button type=button class=gh data-sil="${esc(x.id)}">${esc(L('Sil'))}</button></div>`).join(''):`<p class=hint>${esc(L('Henüz kayıt yok.'))}</p>`
+  document.getElementById('kgu').hidden=!k.length;document.getElementById('kgt').checked=false;kgSec()}
+// 19 Ekim (kullanıcı): seçerek ve hepsini birden silme (tek tek Sil de duruyor)
+function kgSec(){const n=document.querySelectorAll('#kgi [data-kg]:checked').length,b=document.getElementById('kgs');b.disabled=!n;b.textContent=n?L('Seçilenleri sil ({n})',{n}):L('Seçilenleri sil')}
+document.getElementById('kgi').addEventListener('change',ev=>{if(ev.target.matches('[data-kg]')){const t=[...document.querySelectorAll('#kgi [data-kg]')];document.getElementById('kgt').checked=t.length>0&&t.every(x=>x.checked);kgSec()}})
+document.getElementById('kgt').addEventListener('change',ev=>{document.querySelectorAll('#kgi [data-kg]').forEach(x=>x.checked=ev.target.checked);kgSec()})
+async function kgSil(govde,soru){if(!confirm(soru))return;const m=document.getElementById('kgm');let r={};try{r=await j('/konus-gecmis-sil',{method:'POST',body:JSON.stringify(govde)})}catch(e){}
+  m.textContent=r.ok?L('{n} kayıt silindi',{n:r.silinen||0}):L('Silinemedi')+(r.err?' — '+r.err:'');await gecmisCiz()}
+document.getElementById('kgs').onclick=()=>{const ids=[...document.querySelectorAll('#kgi [data-kg]:checked')].map(x=>x.dataset.kg);if(ids.length)kgSil({ids},L('Seçilen {n} kayıt silinsin mi? Geri alınamaz.',{n:ids.length}))}
+document.getElementById('kga').onclick=()=>{const n=document.querySelectorAll('#kgi [data-kg]').length;if(n)kgSil({hepsi:true},L('Konuş geçmişindeki {n} kaydın hepsi silinsin mi? Geri alınamaz.',{n}))}
 document.getElementById('kgi').addEventListener('click',async ev=>{const b=ev.target.closest('button[data-sil]');if(!b)return;b.disabled=true
   let r={};try{r=await j('/konus-gecmis-sil',{method:'POST',body:JSON.stringify({id:b.dataset.sil})})}catch(e){}
   document.getElementById('kgm').textContent=r.ok?L('Silindi'):L('Silinemedi')+(r.err?' — '+r.err:'');await gecmisCiz()})
 document.getElementById('ayi').addEventListener('click',async ev=>{if(ev.target.closest('button[data-gecmis]'))gecmisAc()
   // v0.76.0 (T6): sihirbazın proje hazırlığı ekranları — aktarıcı hazirla.command'ı açar (Masaüstü izni Terminal'den; launchd'deki aktarıcı klasörü okuyamaz)
   if(ev.target.closest('button[data-hazirla]')){const m=document.getElementById('aym');let r={};try{r=await j('/hazirla',{method:'POST',body:'{}'})}catch(e){}m.textContent=r.ok?L('Sihirbaz açılıyor — Terminal penceresi bir an görünür'):(r.err||L('açılamadı'))}})
-function ayarAc(k){const d=document.getElementById('ayd');ayCiz();d.showModal();const e=k&&d.querySelector(`[data-ay=${k}]`);if(e){e.closest('.ayr').scrollIntoView({block:'center'});e.focus()}}
-{const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear')
+function ayarAc(k){const d=document.getElementById('ayd');document.getElementById('ayara').value='';if(k){const gi=AYG.findIndex(([,al])=>al.some(x=>x[0]===k));AYSEC=gi>=0?String(gi):'hepsi'}
+  ayCiz();d.showModal();const e=k&&d.querySelector(`[data-ay=${k}]`);if(e){e.closest('.ayr').scrollIntoView({block:'center'});e.focus()}}
+{const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear');document.getElementById('ayx').innerHTML=ic('x');document.getElementById('ayx').onclick=()=>d.close()
   document.getElementById('ay').onclick=()=>ayarAc()
   // varsayılanlara dön (v0.34.1): yalnız formu doldurur; Kaydet'e basılmazsa hiçbir şey değişmez (e-posta gibi elle girilenler yanlışlıkla silinmesin)
   document.getElementById('ayv').onclick=()=>{const v=(last&&last.ayarlar||{}).varsayilan||{};let n=0
     d.querySelectorAll('[data-ay]').forEach(e=>{const k=e.dataset.ay;if(!(k in v)||e.disabled)return;const o=e.type==='checkbox'?e.checked:e.value
       if(e.type==='checkbox')e.checked=!!v[k];else e.value=v[k]==null?'':String(v[k]);if((e.type==='checkbox'?e.checked:e.value)!==o)n++})
-    document.getElementById('aym').textContent=n?L('{n} ayar varsayılana çekildi — kaydetmek için Kaydet',{n}):L('Hepsi zaten varsayılan')}
+    document.getElementById('aym').textContent=n?L('{n} ayar varsayılana çekildi — kaydetmek için Kaydet ve kapat',{n}):L('Hepsi zaten varsayılan')}
   document.getElementById('ays').onclick=async()=>{const dg=(last&&last.ayarlar||{}).deger||{},ch={},m=document.getElementById('aym')
     d.querySelectorAll('[data-ay]').forEach(e=>{const k=e.dataset.ay,v=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value.trim();if(e.disabled)return;if(v!==dg[k]&&!(v===''&&dg[k]==null))ch[k]=v})
-    if(!Object.keys(ch).length){m.textContent=L('Değişiklik yok');return}
+    if(!Object.keys(ch).length){d.close();return}  // 19 Ekim: Kaydet ve kapat — değişiklik yoksa yalnız kapatır
     let r={};try{r=await j('/ayar',{method:'POST',body:JSON.stringify({degisen:ch})})}catch(e){}
     d.querySelectorAll('.ayr .hata').forEach(x=>x.remove())
     if(!r.ok){m.textContent=L('Kaydedilemedi');for(const[k,h]of Object.entries(r.hata||{})){const e=d.querySelector(`[data-ay=${k}]`);if(e)e.closest('.ayr').querySelector('.hint').insertAdjacentHTML('beforeend',` <span class=hata>${esc(h)}</span>`)}if(!r.hata)m.textContent+=' — '+(r.err||'');return}
-    await refresh();ayCiz();m.textContent=L('Kaydedildi')+(r.menu==='simdi'?' · '+L('menü uygulaması yeniden açılıyor'):r.menu==='sonra'?' · '+L('menü uygulaması toplantı bitince yeniden açılır'):'')}}
+    await refresh();m.textContent=L('Kaydedildi')+(r.menu==='simdi'?' · '+L('menü uygulaması yeniden açılıyor'):r.menu==='sonra'?' · '+L('menü uygulaması toplantı bitince yeniden açılır'):'');d.close()}}
 document.getElementById('br').addEventListener('click',async ev=>{if(akTik(ev,renderBrifing))return
   const b=ev.target.closest('button[data-brf]');if(!b)return;b.disabled=true
   let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:b.dataset.brf,yeniden:!!b.dataset.yeniden,dinle:!!b.dataset.dinle})})}catch(e){}

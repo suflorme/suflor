@@ -68,22 +68,25 @@ def konus_gecmis_liste(n=300):  # panodaki Konuş geçmişi (v0.67.0): en yeni �
         out.append({"id": _gecmis_kimlik(l), "at": o.get("at"), "kisilik": o.get("kisilik"), "soru": o.get("soru"), "sesli": o.get("sesli"), "toplanti": o.get("toplanti")})
         if len(out) >= n: break
     return {"ok": True, "acik": konus_gecmis_acik(), "gun": KONUS_GECMIS_GUN, "toplam": len(sat), "kayitlar": out}
-def konus_gecmis_sil(kimlik):  # kullanıcının panodan sildiği kayıt: dosyadan çıkar (arşive gitmez), dizin hemen güncellenir
+def konus_gecmis_sil(kimlik=None, kimlikler=None, hepsi=False):  # kullanıcının panodan sildiği kayıt(lar): dosyadan çıkar (arşive gitmez), dizin hemen güncellenir
+    # 19 Ekim (kullanıcı): tek tek silmenin yanında seçerek (kimlikler) ve hepsini birden (hepsi=True) silme
     yol = os.path.join(BASE, KONUS_GECMIS_DOSYA)
-    if not kimlik: return {"ok": False, "err": "id"}
+    ks = {str(x) for x in (kimlikler or []) if str(x).strip()} | ({kimlik} if kimlik else set())
+    if not ks and hepsi is not True: return {"ok": False, "err": "id"}
     try:
         with LOCK:
-            sat = open(yol, encoding="utf-8").readlines(); kalan = [l for l in sat if _gecmis_kimlik(l) != kimlik]
-            silinen = next((l for l in sat if _gecmis_kimlik(l) == kimlik), "")
-            if len(kalan) == len(sat): return {"ok": False, "err": _t("kayıt bulunamadı", "record not found")}
+            sat = open(yol, encoding="utf-8").readlines()
+            kalan = [] if hepsi is True else [l for l in sat if _gecmis_kimlik(l) not in ks]
+            sil = [l for l in sat if l not in kalan]
+            if not sil: return {"ok": False, "err": _t("kayıt bulunamadı", "record not found")}
             fd = os.open(yol + ".gecici", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as f: f.write("".join(kalan))
             os.replace(yol + ".gecici", yol)
     except OSError as e: return {"ok": False, "err": e.__class__.__name__}
     try:
-        if _BLM["son"] and json.loads(silinen).get("soru") == _BLM["son"][0]: _BLM["son"] = None  # silinen kayıt düzeltme sırasına "önceki soru" olarak girmesin
+        if _BLM["son"] and any(json.loads(l).get("soru") == _BLM["son"][0] for l in sil): _BLM["son"] = None  # silinen kayıt düzeltme sırasına "önceki soru" olarak girmesin
     except ValueError: pass
-    print(f"BELLEK: Konuş geçmişinden bir kayıt silindi (panodan) — {len(kalan)} kayıt kaldı")
+    print(f"BELLEK: Konuş geçmişinden {'bir kayıt' if len(sil) == 1 else f'{len(sil)} kayıt'} silindi (panodan) — {len(kalan)} kayıt kaldı")
     def dizinle():
         mo = _onara_mod()
         if mo and hasattr(mo, "gecmis_guncelle"):
@@ -91,7 +94,7 @@ def konus_gecmis_sil(kimlik):  # kullanıcının panodan sildiği kayıt: dosyad
                 with _ONARA["kilit"]: mo.gecmis_guncelle()
             except Exception as e: print(f"BELLEK: geçmiş dizinlenemedi ({e.__class__.__name__})")
     threading.Thread(target=dizinle, daemon=True).start()
-    return {"ok": True, "kalan": len(kalan)}
+    return {"ok": True, "kalan": len(kalan), "silinen": len(sil)}
 # --- Kullanıcı kartı ---------------------------------------------------------------------------------------------------------------------
 def kart_mt():
     yol = os.path.expanduser(str(AYAR.get("kisilik_bellek") or "").strip())
