@@ -576,7 +576,7 @@ def yaparken_degistir(durum=None, neden=None):  # durum: "ac" | "kapat" | None (
     print(f"EKRAN: paylaşım {'başladı — görüntü kaydı açık' if ac else f'bitti — {n} görüntü'}" + (f" · yol {neden}" if ac and neden else "")); return ac
 def paylasim_bildir(var, neden=None):  # eklentinin nabzı (kararlı değer): paylaşım başlayınca kayıt açılır, bitince kapanır
     # neden: eklentinin hangi yoldan "var" dediği (yalnız harf/rakam/boşluk/x/%; ad içermez) — paylaşım yokken açılırsa günlükten bulunur
-    neden = re.sub(r"[^\w %x]", "", str(neden or ""))[:40] or None
+    neden = re.sub(r"[^\w %x]", "", str(neden or ""))[:70] or None  # v0.88.1: etiket yolunda eşleşen ifade de gelir
     if var and AYAR.get("ekran_oto", True) is not False and not yaparken_acik(): yaparken_degistir("ac", neden)
     elif not var and yaparken_acik(): yaparken_degistir("kapat")
 def yaparken_view():
@@ -1146,6 +1146,12 @@ def masaustu_ad_sabitle(o):
     s = STATE.get("masaustu_ad") or {}; b = o.get("bitti_t")
     if s and b is not None and time.time() - b < MASAUSTU_YENI_SN: return
     ad, kaynak, at = None, "başlık", None
+    # v0.88.1 (19 Ekim 17.45 deneme): kullanıcı web'deki toplantıdan çıkıp 2 sn sonra masaüstü uygulamasıyla aynı toplantıya girdi; masaüstü yolu
+    # Başlat'ın adıyla yeni dosya açtı, döküm ikiye bölündü. Tarayıcıda son MASAUSTU_YENI_SN içinde süren toplantının dosyası varsa o sürer.
+    w = STATE.get("_web_toplanti") or {}
+    if w.get("ad") and time.time() - w.get("t", 0) < MASAUSTU_YENI_SN and w["ad"] in STATE["meeting_files"]:
+        STATE["masaustu_ad"] = {"ad": w["ad"], "devir": True}
+        print(f"MASAÜSTÜ: toplantı adı sabit — {w['ad']} (tarayıcıdaki toplantı sürüyor)"); return
     try:
         with open(os.path.join(BASE, "takvim-secilen.json"), encoding="utf-8") as f: ts = json.load(f)
         at = str(ts.get("at") or ""); now = datetime.datetime.now().astimezone()
@@ -1164,6 +1170,7 @@ def masaustu_yeni_toplanti(o):
     # aynı adlı toplantı 20 dk içinde yeniden başlayınca eski dosyaya yazılıyordu (12 Ekim: tarayıcı denemesinin dosyasına masaüstü denemesi)
     b = o.get("bitti_t")
     if b is not None and time.time() - b < MASAUSTU_YENI_SN: return
+    if (STATE.get("masaustu_ad") or {}).get("devir"): return  # tarayıcıdan geçiş: aynı dosya sürer
     with LOCK:
         t = masaustu_baslik()
         if t and STATE["meeting_files"].pop(t, None): print(f"MASAÜSTÜ: yeni toplantı — yeni döküm dosyası ({t})")
@@ -1772,7 +1779,7 @@ class H(BaseHTTPRequestHandler):
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = gemini_view() if gemini_acik() else piper_view(); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = gemini_view() if gemini_acik() else piper_view(); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -1968,6 +1975,8 @@ class H(BaseHTTPRequestHandler):
                 if isinstance(p.get("mic"), dict):  # yalnız üst çerçeve mic gönderir: çağrı bitti geçişi → hızlı sesli özet (v0.52.0)
                     if STATE.get("_ext_cagri") and not p.get("call"): hizli_ozet_tetik("tarayıcı")
                     STATE["_ext_cagri"] = bool(p.get("call"))
+                    # v0.88.1: tarayıcıdaki toplantının adı — kullanıcı aynı toplantıya masaüstü uygulamasıyla geçerse o dosya sürer (masaustu_ad_sabitle)
+                    if p.get("call") and (p.get("meeting") or {}).get("title"): STATE["_web_toplanti"] = {"t": simdi, "ad": str(p["meeting"]["title"])[:200]}
                 if isinstance(p.get("mic"), dict): STATE["mic"] = {"on": bool(p["mic"].get("on")), "sessiz": bool(p["mic"].get("sessiz")), "hata": str(p["mic"].get("hata") or "")[:120], "t": simdi}
                 STATE["extension"] = {"ver": p.get("ver") or (STATE.get("extension") or {}).get("ver"), "seen": datetime.datetime.now().isoformat(timespec="seconds"), "panel": bool(p.get("panel")), "rows": p.get("rows", 0), "captions": bool(p.get("captions")), "call": bool(p.get("call")), "lang": p.get("lang") or p.get("capLang"), "langSrc": p.get("langSrc") or ("captions" if p.get("capLang") else None), "meeting": (p.get("meeting") or {}).get("title"), "sent": p.get("sent", 0), "capAuto": p.get("capAuto") or (STATE.get("extension") or {}).get("capAuto", ""), "platform": p.get("platform") or (STATE.get("extension") or {}).get("platform") or "teams", "yonerge": p.get("yonerge") or (STATE.get("extension") or {}).get("yonerge")}; heartbeat()  # altyazıyı kendisi açma sonucu; iframe pingleri (all_frames) boş gönderir, üzerine yazmasın
             if isinstance(p.get("paylasim"), bool): paylasim_bildir(p["paylasim"], p.get("paylasim_neden"))  # yalnız üst çerçeve gönderir

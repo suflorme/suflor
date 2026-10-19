@@ -669,7 +669,7 @@ def _vt_onbellek(dosya, guncelle=None, yenile=False):
 # usage message.id'ye göre teke indirilir. Fiyat (MTok, 16 Ekim claude-api skill'i): giriş/çıkış ve önbellekten okuma; önbelleğe yazma 5 dk 1,25×, 1 sa 2×.
 # Oturum son etkinlikten MALIYET_BITTI_SN sonra "bitti" sayılır ve bir kez yazılır (yinelenmez: oturum kimliği). Etiket: karşı kanalda en az bir satır varsa ve
 # başlıkta deneme/test/echo yoksa "gercek", değilse "deneme"; elle düzeltme canli/toplanti-etiket.json (rapor okurken uygulanır, satır değişmez).
-FIYAT_MTOK = {"opus": (4.0, 20.0, 0.20), "sonnet": (2.0, 10.0, 0.20), "haiku": (0.10, 0.50, 0.01), "fable": (10.0, 50.0, 0.25)}
+FIYAT_MTOK = {"opus": (4.0, 20.0, 0.20), "sonnet": (2.0, 10.0, 0.10), "haiku": (0.10, 0.50, 0.01), "fable": (10.0, 50.0, 0.25)}
 MALIYET_BITTI_SN = 1800
 def _fiyat(model):
     m = str(model or "").lower()

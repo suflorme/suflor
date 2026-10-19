@@ -442,9 +442,12 @@ function paylasimHam() {
   const gor = e => e.getClientRects().length > 0;
   for (const b of document.querySelectorAll("button, [role=button], [role=status], [aria-live]"))
     if (PAYLAS_KENDI.test((b.getAttribute("aria-label") || "") + " " + (b.textContent || "").slice(0, 80)) && gor(b)) return false;
+  // v0.88.1 (19 Ekim 17.34 ve 18.13 denemeleri): kullanıcı toplantıda tek başınayken "etiket div" yolu paylaşım dedi — tek kişide karşı taraf paylaşamaz
+  try { if (P.kisiSayisi && P.kisiSayisi().n === 1) return false; } catch (e) {}
   const p = P.paylasimVar ? P.paylasimVar() : null;
   if (p === true || p === false) { paylas.neden = p ? "platform" : ""; return p; }
-  for (const e of document.querySelectorAll("[aria-label]")) if (PAYLAS_ETIKET.test(e.getAttribute("aria-label")) && gor(e)) { paylas.neden = "etiket " + (e.tagName || "").toLowerCase(); return true; }
+  // nedende eşleşen ifade de (yalnız kalıbın eşleşen kısmı, ad yok): yanlış alarmda hangi Teams öğesi olduğu günlükten görülsün
+  for (const e of document.querySelectorAll("[aria-label]")) { const m = gor(e) && (e.getAttribute("aria-label") || "").match(PAYLAS_ETIKET); if (m) { paylas.neden = "etiket " + (e.tagName || "").toLowerCase() + " «" + m[0].slice(0, 40) + "»"; return true; } }
   for (const v of document.querySelectorAll("video, canvas")) {
     const gw = v.tagName === "CANVAS" ? v.width : v.videoWidth, gh = v.tagName === "CANVAS" ? v.height : v.videoHeight;
     if (!gw || !gh || gw < 1280) continue;

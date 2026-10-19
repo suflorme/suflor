@@ -100,6 +100,16 @@ try:
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Üçüncü | Microsoft Teams"}); k3 = kanit_yolu()
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Başka | Microsoft Teams"}); k4 = kanit_yolu()
     bak("kullanılmış Başlat konusu yeni toplantıya geçmez; ilk başlık sabit", "nc" in k3 and "Haftal" not in k3 and os.path.dirname(k3) == os.path.dirname(k4))
+    # --- v0.88.1: web'deki toplantıdan masaüstü uygulamasına geçiş aynı dosyada sürer (19 Ekim 17.45: Başlat adıyla yeni dosya açılmıştı) ---
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
+    with open(os.path.join(canli, "takvim-secilen.json"), "w", encoding="utf-8") as f:
+        json.dump({"at": time.strftime("%Y-%m-%dT%H:%M:%S") + "x", "konu": "Baslat Adi", "rol": "yurutucu", "dil": "tr"}, f)
+    istek("/ping", {"meeting": {"title": "Web Gecis"}, "call": True, "panel": True, "rows": 1, "mic": {"on": True}}, koken="http://sahte.test")
+    istek("/ingest", {"meeting": {"title": "Web Gecis"}, "source": "transcript", "entries": [{"id": "w/1", "speaker": "Deniz K", "time": "11:00", "text": "web satırı"}]})
+    istek("/ping", {"meeting": {"title": "Web Gecis"}, "call": False, "panel": False, "rows": 0, "mic": {"on": False}}, koken="http://sahte.test")
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Web Gecis | Microsoft Teams"}); k5 = kanit_yolu()
+    bak(f"web → masaüstü geçişi: tarayıcıdaki toplantının dosyası sürer ({os.path.basename(os.path.dirname(k5))})", "Web-Gecis" in k5 and "Baslat" not in k5
+        and "tarayıcıdaki toplantı sürüyor" in open(os.path.join(T, "relay.log"), encoding="utf-8").read())
     log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
     # --- v0.31.3: bildirim menü uygulamasından (tıklayınca özet açılır) ---
     def menu_cards():

@@ -43,7 +43,7 @@ try:
     ok(f"--json: 2 biten /toplanti oturumu, dosyaya yazmadı ({len(sat)})", len(sat) == 2 and not os.path.exists(os.path.join(canli, "claude-cagri.jsonl")))
     a = next((x for x in sat if x["oturum"] == "a-gercek"), {}); b = next((x for x in sat if x["oturum"] == "b-sonnet"), {})
     ok(f"fiyat: aynı message.id teke indi, 1 sa yazma 2× ({a.get('maliyet')} $ = 2 × {BEK:.4f})", abs((a.get("maliyet") or 0) - 2 * BEK) < 1e-3 and a.get("tur") == 2)
-    ok(f"Sonnet fiyatı ayrı ({b.get('maliyet')} $)", abs((b.get("maliyet") or 0) - (1000 * 2 + 200000 * 2 * 1.25 + 100000 * 2 * 2 + 2000000 * 0.20 + 10000 * 10) / 1e6) < 1e-3)
+    ok(f"Sonnet fiyatı ayrı (önbellek okuma 0,10) ({b.get('maliyet')} $)", abs((b.get("maliyet") or 0) - (1000 * 2 + 200000 * 2 * 1.25 + 100000 * 2 * 2 + 2000000 * 0.10 + 10000 * 10) / 1e6) < 1e-3)
     ok(f"toplantı dosyası eşleşti, karşı kanal + başlık temiz → gercek ({a.get('dosya')}, {a.get('etiket')})", a.get("dosya") == d_a and a.get("etiket") == "gercek")
     ok(f"başlıkta 'deneme' → deneme ({b.get('dosya')}, {b.get('etiket')})", b.get("dosya") == d_b and b.get("etiket") == "deneme")
     ok("/toplanti olmayan ve 30 dk içinde biten oturum sayılmadı", not any(x["oturum"] in ("c-baska", "d-suruyor") for x in sat))
