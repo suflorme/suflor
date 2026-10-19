@@ -433,6 +433,9 @@ def sessiz_view():
 # duyuru, toplantıya söyle reddedilir; izle toplantı oturumuna tek "GİZLİ TOPLANTI" satırı yazar, sonra olay göndermez; Gemini kapalı. Dökümde
 # yalnız açılış/kapanış saati kalır. Kendiliğinden kapanmaz (ayrı bir toplantıya geçilse de); pano ve mini panoda 🔒 açıkça görünür.
 GIZLI = {"acik": False, "bas": 0.0}
+GIZLI_FP = os.path.join(BASE, "gizli.json")  # aktarıcı yeniden başlasa da (çökme, kurulum) kip sürer
+try: GIZLI.update(acik=True, bas=float(json.load(open(GIZLI_FP)).get("bas") or time.time())); print("GİZLİ: açık (önceki çalışmadan sürüyor)")
+except (OSError, ValueError, AttributeError): pass
 GIZLI_YUT = {"/ingest", "/taslak", "/ses", "/ses-yerel", "/ses-masaustu", "/kanit", "/kanit-masaustu", "/masaustu"}  # sessizce atılır
 GIZLI_RED = {"/note", "/ask", "/girdi", "/kanit-iste", "/bas-konus", "/baslat", "/brifing", "/baglam-dosya", "/dosyadan", "/dosyadan-karar", "/card",
              "/etiket", "/eylem", "/eylem-sun", "/eylem-sesli", "/eylem-karar", "/eylem-sonuc", "/eylem-geri-al", "/moderator", "/otonom", "/agenda-tick",
@@ -442,6 +445,10 @@ def gizli_red(): return {"ok": False, "gizli": True, "err": _t("Gizli toplantı 
 def gizli_degistir(neden="kullanıcı"):
     with LOCK:
         ac = not GIZLI["acik"]; GIZLI.update(acik=ac, bas=time.time() if ac else 0.0)
+        try:
+            if ac: json.dump({"bas": GIZLI["bas"]}, open(GIZLI_FP, "w"))
+            else: os.remove(GIZLI_FP)
+        except OSError as e: print(f"GİZLİ: durum dosyası yazılamadı ({e.__class__.__name__})")
         if STATE.get("file"): _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **GİZLİ** | {'açıldı — kapanana kadar hiçbir şey kaydedilmez' if ac else f'kapandı ({neden})'} | |")
     if ac:  # süren her şey hemen kesilir
         for ad, fn in (("toplantıya okuma", lambda: ts_durdur()), ("otonom", lambda: otonom_kisayol()), ("Konuş", lambda: konus_kapat("gizli toplantı")),
