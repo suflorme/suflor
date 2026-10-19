@@ -41,6 +41,8 @@ bak(f"durum ok, {len(il)} ileti (spam, çöp — ayrık harfli 'Çöp Kutusu' da
 bak("en yeni önce; gönderen adı, adres, konu, okunmadı", il[0]["konu"] == "Haftalık bülten" and K["Bütçe taslağı"]["ad"] == "Ayla Kaya" and K["Bütçe taslağı"]["okundu"] is False)
 bak("gönderilmiş kutusu ayrıldı, 'Re: ' öneki konuda", K["Re: Teklif"]["gonderilen"] is True and K["Bütçe taslağı"]["gonderilen"] is False)
 bak("ayrık harfli 'Gönderilmiş Öğeler' gönderilen; All Mail'deki kendi iletim de gönderilen (adresinden)", K["Teklif"]["gonderilen"] is True and [x for x in il if x["kutu"].endswith("All Mail")][0]["gonderilen"] is True)
+subprocess.run([ikili, "--db", dbp, "--cikti", cik, "--ben", A("AYLA")], timeout=20); j2 = {x["konu"]: x for x in json.load(open(cik))["iletiler"]}
+bak("--ben ile verilen kendi adresinden gelen ileti gönderilen sayılır (büyük/küçük harf duyarsız)", j2["Bütçe taslağı"]["gonderilen"] is True and j2["Haftalık bülten"]["gonderilen"] is False)
 bak("özet tek satır, 300 karakterle sınırlı", "\n" not in K["Bütçe taslağı"]["ozet"] and K["Bütçe taslağı"]["ozet"].startswith("Merhaba, ekte bütçe var."))
 bak("çıktı dosyası yalnız kullanıcıya (0600)", oct(os.stat(cik).st_mode & 0o777) == "0o600")
 db = sqlite3.connect(dbp); db.execute("ALTER TABLE messages RENAME COLUMN sender TO gonderen"); db.commit(); db.close()

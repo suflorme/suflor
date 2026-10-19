@@ -28,7 +28,8 @@ def posta_yenile(zorla=False):
     POSTA["t"] = time.time()
     if not os.path.isdir(POSTA_APP): POSTA.update(durum="yok", hata=_t("posta yardımcısı kurulu değil (aktarici-kur.command derler)", "mail helper not installed")); return
     onceki = POSTA["durum"]
-    try: subprocess.run(["open", "-g", "-W", "-a", POSTA_APP, "--args", "--cikti", POSTA_JSON, "--gun", str(POSTA_GUN)], timeout=60, capture_output=True)
+    ben = ",".join(dict.fromkeys(str(x).strip().lower() for x in list(AYAR.get("takvim_adreslerim") or []) + [AYAR.get("eposta_adres") or ""] if "@" in str(x) and "," not in str(x)))
+    try: subprocess.run(["open", "-g", "-W", "-a", POSTA_APP, "--args", "--cikti", POSTA_JSON, "--gun", str(POSTA_GUN)] + (["--ben", ben] if ben else []), timeout=60, capture_output=True)  # v0.85.3: kendi adreslerin (Gmail'de gönderdiklerin All Mail'de)
     except subprocess.TimeoutExpired: POSTA.update(durum="zaman_asimi"); return
     posta_oku()
     if POSTA["durum"] != onceki: print(f"POSTA: {POSTA['durum']}" + (f" · {len(POSTA['iletiler'])} ileti" if POSTA["durum"] == "ok" else f" — {POSTA['hata']}"))

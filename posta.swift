@@ -10,6 +10,7 @@ import SQLite3
 var cikti = (NSHomeDirectory() as NSString).appendingPathComponent("Library/Application Support/Suflor/posta.json")
 var gun = 14.0, enCok = 400
 var dbYol: String? = nil
+var benAdres = Set<String>()  // --ben a@x,b@y: kullanıcının kendi adresleri (aktarıcı ayardan verir) — bunlardan gelen ileti gönderilen sayılır
 var i = 1
 let a = CommandLine.arguments
 while i < a.count {
@@ -17,6 +18,7 @@ while i < a.count {
   else if a[i] == "--gun", i + 1 < a.count { gun = Double(a[i + 1]) ?? 14; i += 1 }
   else if a[i] == "--en-cok", i + 1 < a.count { enCok = Int(a[i + 1]) ?? 400; i += 1 }
   else if a[i] == "--db", i + 1 < a.count { dbYol = a[i + 1]; i += 1 }
+  else if a[i] == "--ben", i + 1 < a.count { benAdres = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { $0.contains("@") }); i += 1 }
   i += 1
 }
 let iso = ISO8601DateFormatter()
@@ -102,7 +104,7 @@ while sqlite3_step(st) == SQLITE_ROW {
                         kutu: kutu, okundu: (okundu != "NULL" && sqlite3_column_type(st, 6) != SQLITE_NULL) ? sqlite3_column_int(st, 6) : nil, ozet: metin(7)))
 }
 func eslesir(_ re: NSRegularExpression, _ k: String) -> Bool { re.firstMatch(in: k, range: NSRange(k.startIndex..., in: k)) != nil }
-let benim = Set(satirlar.filter { eslesir(gonder, $0.kutu) && !$0.adres.isEmpty }.map { $0.adres })
+let benim = Set(satirlar.filter { eslesir(gonder, $0.kutu) && !$0.adres.isEmpty }.map { $0.adres }).union(benAdres)
 var goruldu = Set<String>()
 var iletiler: [[String: Any]] = []
 for x in satirlar where iletiler.count < enCok {
