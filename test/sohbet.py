@@ -136,10 +136,14 @@ try:
     if profil:
         ok("ses izi: kullanıcının (Yelda) sorusu geçti", "SOHBET: ses izi" in log() and "— kullanıcı" in log())
         n1 = log().count("SOHBET: tur bitti"); soru_once = st().get("soru")
-        akit(ses("Hey, what's the weather going to be like in London tomorrow?", "Daniel") + sus(2.0)); time.sleep(4); akit(sus(1))
+        akit(ses("Hey, what's the weather going to be like in London tomorrow?", "Daniel") + sus(2.0)); t = time.time()
+        while time.time() - t < 20 and "kullanıcıya benzemiyor" not in log(): akit(sus(0.5))  # 20 Ekim: yük altında ret 4 sn'yi aşıyordu (sabit bekleme kararsızdı)
+        t = time.time()
+        while time.time() - t < 10 and "Sesini tanıyamadım" not in log(): akit(sus(0.5))
         ok(f"ses izi: başka sesin sorusu Claude'a gitmedi ({st().get('soru')!r})", log().count("SOHBET: tur bitti") > n1 and "kullanıcıya benzemiyor" in log() and st().get("soru") == soru_once)
         ok("ses izi: sohbet dinlemeye devam ediyor", st()["sohbet"]["acik"] and st()["durum"] == "dinliyor")
         ok("ses izi: reddedince sesli söyledi ('Sesini tanıyamadım')", "Sesini tanıyamadım" in log())
+        okuma_bitsin()  # "Sesini tanıyamadım" okunurken söylenen kısa söz araya girme sayılmaz; sonraki adım okuma bitince
     else: ok("(ses izi modeli yok — süzgeç denenmedi)", True)
     nc = log().count("Sorduğun")
     akit(ses("Tamam, teşekkürler.") + sus(1.2)); t = time.time()

@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+# Renkler tek kaynakta (v0.99.2, pano/renk.css): pano ve hazırlık gömer, eklenti penceresi ve sihirbaz bağlar; Teams şeridi (content.js, gölge DOM) aynı
+# değerleri taşır. Okunurluk (WCAG AA ≥ 4,5:1): soluk yazı (--t3) tüm zeminlerde, uyarı (--wa) yüzeyde ve kendi zemininde, ana düğme yazısı dolgusunda.
+#   PYTHONDONTWRITEBYTECODE=1 python3 test/renk.py      — renk değiştirince ya da yeni yüzey eklenince
+import os, re, sys
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); ok = []
+def kontrol(ad, k): ok.append(bool(k)); print(("✓ " if k else "✗ ") + ad)
+oku = lambda p: open(os.path.join(KOD, p), encoding="utf-8").read()
+R = oku("pano/renk.css")
+def jetonlar(blok): return dict(re.findall(r"--([a-z0-9-]+):([^;}]+)", blok))
+acik = jetonlar(R[R.index(":root{"):R.index("@media")]); koyu = jetonlar(R[R.index(":root:not([data-theme=light])"):R.index(":root[data-theme=dark]")])
+koyu2 = jetonlar(R[R.index(":root[data-theme=dark]"):])
+kontrol("koyu tema iki yolda aynı (sistem tercihi ve data-theme=dark)", koyu == koyu2)
+def L(h):
+    h = h.strip().lstrip("#"); h = "".join(c * 2 for c in h) if len(h) == 3 else h; c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]; return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+def oran(a, b): x, y = sorted([L(a), L(b)], reverse=True); return (x + 0.05) / (y + 0.05)
+for ad, j in (("açık", acik), ("koyu", koyu)):
+    en = min(oran(j["t3"], j[z]) for z in ("bg", "s1", "s2", "gr-bg"))
+    kontrol(f"{ad}: soluk yazı tüm zeminlerde ≥ 4,5 ({en:.2f})", en >= 4.5)
+    kontrol(f"{ad}: ana düğme yazısı dolguda ≥ 4,5 ({oran('#ffffff', j['ac-dolgu']):.2f})", oran("#ffffff", j["ac-dolgu"]) >= 4.5)
+kontrol(f"açık: uyarı yüzeyde ve kendi zemininde ≥ 4,5 ({min(oran(acik['wa'], acik['s1']), oran(acik['wa'], acik['wa-bg'])):.2f})", min(oran(acik["wa"], acik["s1"]), oran(acik["wa"], acik["wa-bg"])) >= 4.5)
+C = oku("content.js"); i = C.index(".w{font:"); wa, wk = jetonlar(C[i:C.index("@media", i)]), jetonlar(C[C.index("@media (prefers-color-scheme:dark){.w{", i):C.index(".pill{", i)])
+kontrol("Teams şeridi açık renkleri renk.css'le aynı", all(acik[k] == v for k, v in wa.items() if k in acik) and len(wa) >= 7)
+kontrol("Teams şeridi koyu renkleri renk.css'le aynı", all(koyu[k] == v for k, v in wk.items() if k in koyu) and len(wk) >= 7)
+kontrol("pano ve hazırlık renk.css'i gömer", "/*__RENK__*/" in oku("pano/pano.html") and "/*__RENK__*/" in oku("pano/hazirlik.html") and 'replace("/*__RENK__*/", pano_dosyasi("renk.css"))' in oku("relay.py"))
+kontrol("eklenti penceresi ve sihirbaz bağlar", 'href="pano/renk.css"' in oku("popup.html") and 'href="/pano/renk.css"' in oku("sihirbaz/index.html") and '"/pano/renk.css"' in oku("kurulum.py"))
+kopya = [p for p in ("pano/pano.html", "pano/hazirlik.html", "popup.html", "sihirbaz/sihirbaz.css") if re.search(r"--(t3|soluk|tx|murekkep)\s*:\s*#", oku(p))]
+kontrol(f"başka dosyada renk tanımı kopyası yok ({kopya or '—'})", not kopya)
+print(f"{sum(ok)}/{len(ok)}"); sys.exit(0 if all(ok) else 1)

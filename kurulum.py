@@ -489,7 +489,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/hazirlik": return self._json(hz_ozet())
         if yol == "/api/hazirlik/kart": return self._json(_hz("kart"))
         if yol in ("/", "/index.html"): yol = "/sihirbaz/index.html"
-        if yol.startswith(("/sihirbaz/", "/marka/")):
+        if yol.startswith(("/sihirbaz/", "/marka/")) or yol == "/pano/renk.css":  # v0.99.2: renkler panoyla tek dosyada
             f = os.path.realpath(os.path.join(KOD, yol.lstrip("/")))
             if f.startswith(KOD + os.sep) and os.path.isfile(f) and os.path.splitext(f)[1] in STATIK:
                 b = open(f, "rb").read(); self.send_response(200); self.send_header("Content-Type", STATIK[os.path.splitext(f)[1]])
@@ -936,6 +936,35 @@ def modeller():
 def surum(kok):
     try: return json.load(open(os.path.join(kok, "manifest.json"), encoding="utf-8"))["version"]
     except Exception: return "?"
+# v0.99.0 (güvenlik denetimi O5): açık depo yayını imzalı (yayinla.py: IMZA/dosyalar.sha256 + .sig, ssh-keygen -Y). Güven kaynağı Mac'te KURULU olan bu
+# dosyadaki açık anahtar — indirilen paket değil. İmza, özet ya da dosya listesi tutmazsa, ya da sürüm kuruludan eskiyse güncelleme yapılmaz.
+YAYIN_ACIK = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA9+UdolCdC6kdhqzRf4379aWJpm4YmP1mOexl9AWgVI suflor-yayin"
+def _surum_t(v):
+    try: return tuple(int(x) for x in str(v).split("."))
+    except ValueError: return ()
+def imza_dogrula(klasor, acik=None):  # → (hata metni ya da None, imzalı sürüm)
+    acik = acik or os.environ.get("SUFLOR_TEST_IMZA_ACIK") or YAYIN_ACIK  # deneme anahtarı yalnız testte (ortam değişkeni)
+    m = os.path.join(klasor, "IMZA", "dosyalar.sha256")
+    if not (os.path.isfile(m) and os.path.isfile(m + ".sig")): return "pakette imza yok", None
+    with tempfile.TemporaryDirectory() as t:
+        izin = os.path.join(t, "izinli"); open(izin, "w").write(f'suflor-yayin namespaces="suflor-yayin" {acik}\n')
+        with open(m, "rb") as g:
+            r = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", izin, "-I", "suflor-yayin", "-n", "suflor-yayin", "-s", m + ".sig"], stdin=g, capture_output=True)
+    if r.returncode: return "imza tutmadı", None
+    import hashlib
+    sat = open(m, encoding="utf-8").read().splitlines()
+    if not sat or not sat[0].startswith("# suflor "): return "imzalı liste bozuk", None
+    liste = {}
+    for l in sat[1:]:
+        h, _, y = l.partition("  ")
+        if not re.fullmatch(r"[0-9a-f]{64}", h) or not y or y.startswith("/") or ".." in y.split("/"): return "imzalı liste bozuk", None
+        liste[y] = h
+    var = {os.path.relpath(os.path.join(k, f), klasor) for k, _, fs in os.walk(klasor) for f in fs}
+    var = {y for y in var if not y.startswith("IMZA/")}
+    if var != set(liste): return f"paketteki dosyalar imzalı listeyle aynı değil ({len(var ^ set(liste))} fark)", None
+    for y, h in liste.items():
+        if hashlib.sha256(open(os.path.join(klasor, y), "rb").read()).hexdigest() != h: return f"dosya değişmiş: {y}", None
+    return None, sat[0][len("# suflor "):].strip()
 def guncelle(kaynak=None, zorla=False):
     m = "" if zorla else mesgul()  # v0.77.5: toplantı, sohbet ya da Konuş cevabı sürerken güncelleme aktarıcıyı yeniden başlatıp böler
     if m: sys.exit(f"Güncellenmedi: {m}. Bitince yeniden çift tıkla (beklemeden güncellemek için: guncelle.command --zorla). Hiçbir dosya değişmedi.")
@@ -966,7 +995,11 @@ def guncelle(kaynak=None, zorla=False):
             except Exception as e: sys.exit(f"İndirilemedi ({e}) — internet bağlantısını denetle, sonra yeniden çift tıkla. Hiçbir dosya değişmedi.")
             if not (os.path.isfile(os.path.join(gecici, "manifest.json")) and os.path.isfile(os.path.join(gecici, "relay.py"))):
                 sys.exit("İndirilen paket eksik — güncelleme yapılmadı.")
+            hata, imzali = imza_dogrula(gecici)
+            if hata: sys.exit(f"Güncelleme yapılmadı: {hata}. İndirilen kod doğrulanamadı; hiçbir dosya değişmedi. Geliştiriciye haber ver.")
             sonra = surum(gecici)
+            if imzali != sonra: sys.exit("Güncelleme yapılmadı: imzalı sürüm paketteki sürümle aynı değil. Hiçbir dosya değişmedi.")
+            if _surum_t(sonra) < _surum_t(once): sys.exit(f"Güncelleme yapılmadı: indirilen v{sonra}, kurulu v{once}'dan eski. Hiçbir dosya değişmedi.")
             if once == sonra: say(f"✓ zaten güncel (v{sonra}) — yine de aktarıcı ve komut yenileniyor")
             # kod dosyaları güncellenir; kullanıcının bu klasöre koyduğu başka bir şey silinmez (yalnız kalkan eski betikler)
             for k, _, fs in os.walk(gecici):

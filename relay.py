@@ -229,6 +229,12 @@ def card_key():
     with os.fdopen(fd, "w") as f: f.write(k + "\n")
     return k
 CARD_KEY = card_key()
+# v0.99.0 (güvenlik denetimi O1): eklenti anahtarı ve veriyi göndermeden önce bu hesabın aktarıcısıyla konuştuğunu doğrular — /kimlik?n=<nonce>
+# cevabı HMAC-SHA256(anahtar, "suflor-kimlik|<nonce>|<port>"); anahtar cevapta yok. İki hesapta öbür hesap portu tutarsa doğru imzayı üretemez.
+ACILIS = secrets.token_hex(8)
+def kimlik_imza(n):
+    import hmac, hashlib
+    return hmac.new(CARD_KEY.encode(), f"suflor-kimlik|{n}|{A.port}".encode(), hashlib.sha256).hexdigest()
 def _log(name, rec):
     write([(os.path.join(BASE, name), json.dumps(rec, ensure_ascii=False) + "\n")])
 # --- Ölçüm kayıtlarının döndürülmesi (v0.24.2) -----------------------------------------------------------------------
@@ -1825,7 +1831,7 @@ def sayfa(ad, yol=""):  # yazı tipleri + arayüz dili (ayar "dil": tr|en; denem
     # arayüz metinlerinin İngilizcesi tek kaynakta (pano/dil.js; eklenti de aynı dosyayı yükler) — sayfaya gömülür
     # yerel anahtar (pano/anahtar.js): tek kullanımlık ?t= ile açılan sayfaya anahtar gömülür, yoksa sayfa kendi deposundan alır
     anh = pano_dosyasi("anahtar.js").replace("__SAYFA_ANAHTAR__", CARD_KEY if tek_kullanim_al(yol) else "")
-    return pano_dosyasi(ad).replace("/*__YAZI__*/", pano_dosyasi("yazi.css")).replace("/*__DIL_SOZLUK__*/", pano_dosyasi("dil.js")) \
+    return pano_dosyasi(ad).replace("/*__YAZI__*/", pano_dosyasi("yazi.css")).replace("/*__RENK__*/", pano_dosyasi("renk.css")).replace("/*__DIL_SOZLUK__*/", pano_dosyasi("dil.js")) \
         .replace("/*__ANAHTAR__*/", anh).replace("__DIL__", dil).replace("<html lang=tr>", f"<html lang={dil}>")
 
 class H(BaseHTTPRequestHandler):
@@ -1869,6 +1875,9 @@ class H(BaseHTTPRequestHandler):
             if not fp: return self._json({"ok": False}, 404)
             b = open(fp, "rb").read(); self.send_response(200); self.send_header("Content-Type", "font/woff2" if fp.endswith(".woff2") else "image/svg+xml")
             self.send_header("Cache-Control", "max-age=86400"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
+        if yol == "/kimlik":  # anahtarsız: yalnız imza döner (O1)
+            m = re.search(r"[?&]n=([0-9a-f]{32})(?:&|$)", self.path)
+            return self._json({"ok": True, "h": kimlik_imza(m.group(1)), "acilis": ACILIS}) if m else self._json({"ok": False}, 400)
         if yol == "/hazirlik":  # sayfa kabuğu anahtarsız (veri /hazirlik.json'dan anahtarla gelir)
             b = sayfa("hazirlik.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if yol == "/takvim" and not self._yetkili():

@@ -1,18 +1,17 @@
 <!doctype html><html lang="tr"><meta charset="utf-8"><title>Suflor.me</title>
+<link rel="stylesheet" href="pano/renk.css">
 <style>
-:root{color-scheme:light dark;--s1:#fff;--s2:#f4f5f1;--tx:#18201c;--t2:#5c655f;--t3:#8b938d;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.05);--ac:#175e46;--ok:#1f7a4f;--wa:#a86b12;--er:#b3412e;--er-bg:#f8e7e3}
-@media (prefers-color-scheme:dark){:root{--s1:#171d1a;--s2:#0f1412;--tx:#e8ebe6;--t2:#a5ada7;--t3:#78807a;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06);--ac:#2a8a66;--ok:#47b07c;--wa:#d9a03c;--er:#e0705c;--er-bg:#33201b}}
 *{box-sizing:border-box}
-body{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;width:330px;margin:0;padding:12px;background:var(--s2);color:var(--tx)}
+body{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;width:330px;margin:0;padding:12px;background:var(--bg);color:var(--tx)}
 .hd{display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px}.brand{font-weight:300;font-size:16px;letter-spacing:-.02em;display:flex;align-items:center;gap:7px}.brand svg{width:20px;height:20px;flex:none}.brand .n{color:#c9973a}.brand .m{color:var(--t2)}
-.chip{font-size:11px;padding:1px 8px;border-radius:999px;background:var(--hov);color:var(--t2)}.chip.alan{background:var(--ac);color:#fff;font-weight:500}.chip.alan:empty{display:none}
+.chip{font-size:11px;padding:1px 8px;border-radius:999px;background:var(--hov);color:var(--t2)}.chip.alan{background:var(--ac-dolgu);color:#fff;font-weight:500}.chip.alan:empty{display:none}
 #sec{background:var(--s1);border:1px solid var(--ac);border-radius:10px;padding:10px 12px;margin-bottom:10px}.sec-t{font-weight:600;margin-bottom:8px}.sec-b{display:flex;gap:6px;flex-wrap:wrap}.sec-n{font-size:11px;color:var(--t3);margin-top:8px}
 .card{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:4px 12px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);min-height:36px}.row:last-child{border-bottom:0}
 .row .n{display:flex;align-items:center;gap:8px;white-space:nowrap}.row .v{color:var(--t2);font-size:12px;text-align:right}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--t3);flex:none}.dot.ok{background:var(--ok)}.dot.wa{background:var(--wa)}.dot.er{background:var(--er)}
 button{font:inherit;font-size:12px;color:var(--tx);background:var(--s1);border:1px solid var(--bd2);border-radius:8px;padding:5px 11px;cursor:pointer;white-space:nowrap}button:hover{background:var(--hov)}
-button.pri{background:var(--ac);border-color:var(--ac);color:#fff}button.sm{padding:2px 9px;font-size:11px}
+button.pri{background:var(--ac-dolgu);border-color:var(--ac-dolgu);color:#fff}button.sm{padding:2px 9px;font-size:11px}
 .bt{display:flex;gap:6px;margin-top:10px}.bt .grow{flex:1}
 #uy:empty{display:none}#uy{background:var(--er-bg);color:var(--er);border-radius:8px;padding:7px 10px;font-size:12px;margin-bottom:8px}
 textarea,input,select{width:100%;font:inherit;color:var(--tx);background:var(--s1);border:1px solid var(--bd2);border-radius:8px;padding:6px 8px;outline:none}textarea{resize:none}

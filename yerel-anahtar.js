@@ -23,18 +23,47 @@
     if (!bekleyen) bekleyen = iste().then(k => { bel = k; zaman = Date.now(); bekleyen = null; return k; });
     return bekleyen;
   }
+  // v0.99.0 (güvenlik denetimi O1): anahtar ve veri gitmeden önce karşıdaki aktarıcı bu hesabınki mi — /kimlik?n=<nonce> → HMAC(anahtar, "suflor-kimlik|n|port").
+  // Doğrulama DOGRU_SURE geçerli; ağ hatasından sonra (aktarıcı yeniden başlıyor: port el değiştirebilir) yeniden sorulur. Doğrulanamazsa istek gönderilmez.
+  const DOGRU_SURE = 30 * 1000, TE = new TextEncoder();
+  let dog = { port: 0, anahtar: "", t: 0, p: null };
+  const hex = b => Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, "0")).join("");
+  async function imza(anahtar, metin) {
+    const k = await crypto.subtle.importKey("raw", TE.encode(anahtar), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    return hex(await crypto.subtle.sign("HMAC", k, TE.encode(metin)));
+  }
+  function dogrula(p, anahtar) {
+    if (dog.port === p && dog.anahtar === anahtar) { if (Date.now() - dog.t < DOGRU_SURE) return Promise.resolve(true); if (dog.p) return dog.p; }
+    const d = dog = { port: p, anahtar, t: 0, p: null };
+    d.p = (async () => {
+      const n = hex(crypto.getRandomValues(new Uint8Array(16)));
+      try {
+        const j = await (await f0(`http://127.0.0.1:${p}/kimlik?n=${n}`, { cache: "no-store" })).json();
+        const ok = !!j && typeof j.h === "string" && j.h === await imza(anahtar, `suflor-kimlik|${n}|${p}`);
+        if (ok) d.t = Date.now(); else hata = "aktarıcı doğrulanamadı (port başka bir süreçte olabilir)";
+        return ok;
+      } catch (e) { return false; } finally { d.p = null; }
+    })();
+    return d.p;
+  }
   const portu = u => { const m = /^http:\/\/(?:127\.0\.0\.1|localhost):(\d{4,5})\//.exec(String(u)); return m ? +m[1] : 0; };
   const f0 = globalThis.fetch.bind(globalThis);
   globalThis.fetch = async (u, o) => {
     const p = typeof u === "string" ? portu(u) : 0;
     if (!p) return f0(u, o);
-    const k = await al();
+    let k = await al();
     if (!k || k.port !== p) return f0(u, o);
+    if (!(await dogrula(p, k.anahtar))) {  // anahtar değişmiş olabilir (aktarıcı yeniden kuruldu): bir kez taze anahtarla
+      const k2 = await al(true);
+      if (!k2 || k2.port !== p || !(await dogrula(p, k2.anahtar))) throw new TypeError("Suflor: aktarıcı doğrulanamadı");
+      k = k2;
+    }
     const ekle = a => { const x = Object.assign({}, o), h = new Headers((o && o.headers) || {}); h.set("X-Suflor-Anahtar", a); x.headers = h; return x; };
-    const r = await f0(u, ekle(k.anahtar));
+    let r;
+    try { r = await f0(u, ekle(k.anahtar)); } catch (e) { dog.t = 0; throw e; }
     if (r.status !== 401) return r;
     const k2 = await al(true);  // anahtar değişmiş (aktarıcı yeniden kuruldu): bir kez yeniden dene
-    return k2 && k2.port === p && k2.anahtar !== k.anahtar ? f0(u, ekle(k2.anahtar)) : r;
+    return k2 && k2.port === p && k2.anahtar !== k.anahtar && await dogrula(p, k2.anahtar) ? f0(u, ekle(k2.anahtar)) : r;
   };
   if (yerli && chrome.runtime.onMessage) chrome.runtime.onMessage.addListener((m, _s, cevap) => {
     if (!m || m.type !== "anahtar") return;

@@ -14,35 +14,18 @@
 @font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: swap; src: url(/marka/yazi/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
 :root {
-  --zemin: #f4f5f1;
-  --yuzey: #ffffff;
-  --yuzey-2: #f9faf7;
-  --murekkep: #18201c;
-  --ikincil: #5c655f;
-  --soluk: #8b938d;
-  --cizgi: rgba(24, 32, 28, .11);
-  --cizgi-2: rgba(24, 32, 28, .2);
-  --sahne: #175e46;
-  --sahne-acik: rgba(23, 94, 70, .09);
-  --krem: #f1e6cf;
-  --pirinc: #c9973a;
-  --iyi: #1f7a4f;
-  --uyari: #a86b12;
-  --kotu: #b3412e;
+  /* v0.99.2: renk değerleri pano/renk.css'te (tek kaynak, açık/koyu); burada yalnız sihirbazın adları */
+  --zemin: var(--bg); --yuzey: var(--s1); --yuzey-2: var(--s2); --murekkep: var(--tx); --ikincil: var(--t2); --soluk: var(--t3);
+  --cizgi: var(--bd); --cizgi-2: var(--bd2); --sahne: var(--ac); --sahne-acik: rgba(23, 94, 70, .09);
+  --pirinc: var(--br); --iyi: var(--ok); --uyari: var(--wa); --kotu: var(--er);
   --f-baslik: "Bricolage Grotesque", "Avenir Next", "Helvetica Neue", system-ui, sans-serif;
   --f-govde: "IBM Plex Sans", -apple-system, "Helvetica Neue", system-ui, sans-serif;
   --f-teknik: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --gecis: 420ms cubic-bezier(.2, .7, .2, 1);
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --zemin: #0f1412; --yuzey: #171d1a; --yuzey-2: #1b221e; --murekkep: #e8ebe6; --ikincil: #a5ada7; --soluk: #78807a;
-  --cizgi: rgba(232, 235, 230, .1); --cizgi-2: rgba(232, 235, 230, .2); --sahne: #2a8a66; --sahne-acik: rgba(42, 138, 102, .16);
-  --pirinc: #d8a849; --iyi: #47b07c; --uyari: #d9a03c; --kotu: #e0705c; color-scheme: dark } }
-:root[data-theme="dark"] {
-  --zemin: #0f1412; --yuzey: #171d1a; --yuzey-2: #1b221e; --murekkep: #e8ebe6; --ikincil: #a5ada7; --soluk: #78807a;
-  --cizgi: rgba(232, 235, 230, .1); --cizgi-2: rgba(232, 235, 230, .2); --sahne: #2a8a66; --sahne-acik: rgba(42, 138, 102, .16);
-  --pirinc: #d8a849; --iyi: #47b07c; --uyari: #d9a03c; --kotu: #e0705c; color-scheme: dark }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sahne-acik: rgba(42, 138, 102, .16); color-scheme: dark } }
+:root[data-theme="dark"] { --sahne-acik: rgba(42, 138, 102, .16); color-scheme: dark }
 
 * { box-sizing: border-box }
 html, body { height: 100% }

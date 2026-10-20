@@ -1,0 +1,12 @@
+/* Suflor.me renkleri — tek kaynak (v0.99.2). Pano ve hazırlık sayfasına aktarıcı gömer (yer tutucu __RENK__), eklenti penceresi ve sihirbaz bağlantıyla yükler.
+   Teams şeridi (content.js) kendi gölge DOM'unda aynı değerleri kullanır; test/renk.py eşitliği denetler. Okunurluk (WCAG AA ≥ 4,5:1): --t3 en koyu açık zeminde 4,63
+   (açık) / 4,59 (koyu, en koyu yüzeyde); --wa uyarı zemininde 4,63; ana düğme dolgusu --ac-dolgu beyaz yazıyla koyu temada 5,24. */
+:root{color-scheme:light dark;--bg:#f4f5f1;--s1:#ffffff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#646c66;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.045);
+--ac:#175e46;--ac-dolgu:#175e46;--ac-bg:#e5efe9;--ok:#1f7a4f;--ok-bg:#e6f1ea;--wa:#94600f;--wa-bg:#f7eedd;--er:#b3412e;--er-bg:#f8e7e3;--vi:#6b4f9e;--vi-bg:#efebf6;--te:#1f6f78;--te-bg:#e2eff0;--gr:#6b736d;--gr-bg:#eceee9;
+--br:#c9973a;--br-tx:#8a6420;--br-bg:#f6eedb;--ro:#a24d6a;--ro-bg:#f6e8ed;--krem:#f1e6cf}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1412;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#8a928c;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06);
+--ac:#2a8a66;--ac-dolgu:#237a5b;--ac-bg:#1a2c24;--ok:#47b07c;--ok-bg:#1a2c22;--wa:#d9a03c;--wa-bg:#2e2516;--er:#e0705c;--er-bg:#33201b;--vi:#b39ddb;--vi-bg:#2a2436;--te:#5fb7c0;--te-bg:#172c2e;--gr:#a5ada7;--gr-bg:#232a26;
+--br:#d8a849;--br-tx:#d8a849;--br-bg:#2e2716;--ro:#e08aa6;--ro-bg:#33202a}}
+:root[data-theme=dark]{color-scheme:dark;--bg:#0f1412;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#8a928c;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06);
+--ac:#2a8a66;--ac-dolgu:#237a5b;--ac-bg:#1a2c24;--ok:#47b07c;--ok-bg:#1a2c22;--wa:#d9a03c;--wa-bg:#2e2516;--er:#e0705c;--er-bg:#33201b;--vi:#b39ddb;--vi-bg:#2a2436;--te:#5fb7c0;--te-bg:#172c2e;--gr:#a5ada7;--gr-bg:#232a26;
+--br:#d8a849;--br-tx:#d8a849;--br-bg:#2e2716;--ro:#e08aa6;--ro-bg:#33202a}

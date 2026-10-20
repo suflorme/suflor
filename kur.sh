@@ -19,6 +19,16 @@ fi
 echo "→ Suflor.me indiriliyor: $KOD"
 GECICI="$(mktemp -d)"
 curl -fsSL "https://codeload.github.com/$DEPO/tar.gz/refs/heads/main" | tar -xz -C "$GECICI" --strip-components 1
+# imzalı sürüm: dosyaların SHA-256 listesi geliştiricinin anahtarıyla imzalı; imza, özet ya da dosya listesi tutmazsa kurulmaz
+ACIK="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA9+UdolCdC6kdhqzRf4379aWJpm4YmP1mOexl9AWgVI suflor-yayin"
+M="$GECICI/IMZA/dosyalar.sha256"; IZIN="$(mktemp)"
+printf 'suflor-yayin namespaces="suflor-yayin" %s\n' "$ACIK" > "$IZIN"
+dur() { rm -rf "$GECICI" "$IZIN"; echo "Kurulum durdu: $1. Hiçbir şey kurulmadı; geliştiriciye haber ver."; exit 1; }
+[ -f "$M" ] && [ -f "$M.sig" ] || dur "indirilen kod imzasız"
+ssh-keygen -Y verify -f "$IZIN" -I suflor-yayin -n suflor-yayin -s "$M.sig" < "$M" >/dev/null 2>&1 || dur "imza tutmadı"
+(cd "$GECICI" && tail -n +2 IMZA/dosyalar.sha256 | shasum -a 256 -c --quiet - >/dev/null 2>&1) || dur "dosya özetleri tutmadı"
+[ "$(cd "$GECICI" && find . -type f ! -path './IMZA/*' | sed 's|^\./||' | LC_ALL=C sort)" = "$(tail -n +2 "$M" | cut -c67- | LC_ALL=C sort)" ] || dur "pakette imzalı listede olmayan dosya var"
+rm -f "$IZIN"
 mkdir -p "$KOD"
 # kod dosyaları güncellenir; kullanıcının bu klasöre koyduğu başka bir şey silinmez
 (cd "$GECICI" && tar -cf - .) | (cd "$KOD" && tar -xf -)

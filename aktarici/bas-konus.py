@@ -1004,9 +1004,11 @@ AKIS_DURAK_SN, AKIS_DURAK_EN_AZ_SN, AKIS_DURAK_KONUSMA_SN = 0.6, 1.0, 0.4
 # döküldü (yazıya 7,1–8,5 sn). Sessizlik bulunmasa da AKIS_ZORLA_SN'de kesilir — son AKIS_ZORLA_ARA_SN içindeki en sessiz 50 ms'nin ortasından (sözcük ortası
 # değil, en olası nefes/hece arası). Tek başına ölçüm: 5 sn ses 1,13 sn, 13 sn ses 1,29 sn (olcum.py isci, 20 Ekim).
 AKIS_ZORLA_SN, AKIS_ZORLA_ARA_SN = 8.0, 2.0
-AKIS = {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "kilit": threading.Lock(), "kosul": threading.Condition()}
+AKIS = {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "kilit": threading.Lock(), "kosul": threading.Condition(), "nesil": 0}
+# v0.98.1 (20 Ekim, test/sohbet.py kararsızlığının kökü): sıfırlamada yoldaki parça geri dönünce bekleyen sayacını eksiltip (−1) sonraki turu metin gelmeden
+# "boş" bitiriyor, metnini de yeni turun aynı sırasına yazabiliyordu. Her sıfırlama nesli artırır; eski nesilden dönen parça hiçbir şeye dokunmaz.
 def _akis_sifirla():
-    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, iz={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None)
+    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, iz={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None, nesil=AKIS.get("nesil", 0) + 1)
 def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesim noktası (bayt) ya da None; kısa kuyrukta ≥ AKIS_DURAK_SN duraksama (v0.80.4)
     n = len(b) - bas
     if n < int(AKIS_DURAK_EN_AZ_SN * WH_SR * 2): return None
@@ -1024,12 +1026,14 @@ def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesi
         j = min(range(i0, len(pen)), key=lambda x: pen[x]); return bas + j * AKIS_PENCERE + AKIS_PENCERE // 2
     return None
 def _akis_gonder(baslangic, bitis, sira):
-    with AKIS["kilit"]: parca = bytes(AKIS["pcm"][baslangic:bitis]); AKIS["bekleyen"] += 1
+    with AKIS["kilit"]: parca = bytes(AKIS["pcm"][baslangic:bitis]); AKIS["bekleyen"] += 1; nesil = AKIS.get("nesil", 0)
     t0 = time.time(); is_ = {"iz_iste": bool(SOHBET["acik"] and AYAR.get("sohbet_ses_izi") is True)}  # sohbette ses izi süzgeci açıksa parça izi de gelir
     def geri(metin, hata):
         with AKIS["kosul"]:
-            AKIS["metin"][sira] = "" if hata else (metin or ""); AKIS["bekleyen"] -= 1
-            if is_.get("iz"): AKIS.setdefault("iz", {})[sira] = (is_["iz"], len(parca) / 2 / WH_SR)
+            if AKIS.get("nesil", 0) == nesil:  # akış bu arada sıfırlandıysa eski parça yeni tura karışmaz
+                AKIS["metin"][sira] = "" if hata else (metin or ""); AKIS["bekleyen"] = max(0, AKIS["bekleyen"] - 1)
+                if is_.get("iz"): AKIS.setdefault("iz", {})[sira] = (is_["iz"], len(parca) / 2 / WH_SR)
+            else: print(f"KONUŞ: akış parçası {sira + 1} eski akıştan döndü — atıldı")
             AKIS["kosul"].notify_all()
         al_ = is_.get("t_al"); bk = f" · sırada {(al_ - t0) * 1000:.0f} ms, işçi {(time.time() - al_) * 1000:.0f} ms" if al_ else ""  # v0.91.0 teşhis: yavaşlık bekleme mi işleme mi
         print(f"KONUŞ: akış parçası {sira + 1} döküldü ({(time.time() - t0) * 1000:.0f} ms, {len(parca) / 2 / WH_SR:.1f} sn ses{bk}){' — HATA ' + str(hata) if hata else ''}")

@@ -179,10 +179,21 @@
     await drainQueue();
     chrome.runtime.sendMessage({ type: "status", ok: failCount === 0, n: entries.length, meeting: m.title, at: lastOk, failCount, queued: queue.length }).catch(() => {});
   }
-  function toast(msg, renk, ms) {  // renk/süre (kanıt onayı yeşil, kısa)
+  // v0.99.2 (sistem analizi §3.6): bildirim sağ altta, sayfa yüzeyi renginde, solda ince renk şeridi; bilgi en çok 4 sn, işlem isteyen uyarı 8 sn
+  // (önceden üst ortada doygun renkli hap, 15 sn'ye kadar — toplantıda göz kaydırıyordu). Tıklayınca kapanır; ekran okuyucu okur (role=status).
+  const TOAST_UYARI = /^#(b26a00|b4690e|b00020|c0503b|b3412e)$/i;
+  function toast(msg, renk, ms) {
     let t = document.getElementById("suflor-toast");
-    if (!t) { t = document.createElement("div"); t.id = "suflor-toast"; Object.assign(t.style, { position: "fixed", top: "10px", left: "50%", transform: "translateX(-50%)", zIndex: 999999, color: "#fff", padding: "8px 16px", borderRadius: "999px", font: "13px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif", boxShadow: "0 4px 14px rgba(0,0,0,.25)", maxWidth: "70vw" }); document.body.appendChild(t); }
-    t.style.background = renk || "#b00020"; t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", ms || 8000);
+    if (!t) {
+      t = document.createElement("div"); t.id = "suflor-toast"; t.setAttribute("role", "status"); t.setAttribute("aria-live", "polite");
+      Object.assign(t.style, { position: "fixed", right: "16px", bottom: "16px", zIndex: 999999, padding: "8px 12px 8px 12px", borderRadius: "8px", cursor: "pointer",
+        font: "13px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,.16)", maxWidth: "min(360px,70vw)", boxSizing: "border-box" });
+      t.onclick = () => { t.style.display = "none"; }; document.body.appendChild(t);
+    }
+    const koyu = matchMedia("(prefers-color-scheme: dark)").matches, r = renk || "#b3412e";
+    Object.assign(t.style, { background: koyu ? "#171d1a" : "#fff", color: koyu ? "#e8ebe6" : "#18201c", border: `1px solid ${koyu ? "rgba(232,235,230,.14)" : "rgba(24,32,28,.14)"}`, borderLeft: `3px solid ${r}` });
+    t.textContent = msg; t.style.display = "block"; clearTimeout(t._h);
+    t._h = setTimeout(() => t.style.display = "none", Math.min(ms || 8000, TOAST_UYARI.test(r) || !renk ? 8000 : 4000));
   }
   // toplantıda mı (çağrı denetimleri görünüyor) — döküm/altyazı kapalıyken satır kaçırmamak için uyarı.
   // Seçiciler gerçek Teams'te doğrulanmadı (ayrıl düğmesi); bulunamazsa uyarı hiç çıkmaz, başka bir şey bozulmaz.
@@ -503,7 +514,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
   // DUR ve CEVAP; NOT yalnız panoda. Gizli DUR'un metni sekmedeki listede yok, yalnız ayrı pencerede ve panoda.
   if (window.top === window) {
     const KL = { soyle: "Söyle", dur: "Dur", cevap: "Cevap" };  // gösterirken L(); NOT kartı yalnız kart penceresinde (mini pano)
-    const COL = { dur: "#c0503b", soyle: "#b0832e", cevap: "#8b938d", not: "#8b938d" }; // iki sınıf: Yap (Söyle pirinç, Dur kırmızı) · Bil (Cevap gri)
+    const COL = { dur: "#c0503b", soyle: "#b0832e", cevap: "#646c66", not: "#646c66" }; // iki sınıf: Yap (Söyle pirinç, Dur kırmızı) · Bil (Cevap gri)
     const PRI = ["dur", "soyle", "cevap"];
     let host = null, root = null, sig = "", first = true, acik = false, pip = null, sonV = null; const seen = new Set();
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -517,8 +528,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     }
     const CSS = `
         .w{font:13px/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;color:#18201c;
-          --s1:#fff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#8b938d;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.05)}
-        @media (prefers-color-scheme:dark){.w{color:#ecebe7;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#78807a;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.07)}}
+          --s1:#ffffff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#646c66;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.045)}  /* renkler pano/renk.css'ten (test/renk.py denetler) */
+        @media (prefers-color-scheme:dark){.w{color:#ecebe7;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#8a928c;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06)}}
         .pill{display:inline-flex;align-items:center;gap:6px;background:var(--s1);color:var(--tx);border:1px solid var(--bd2);border-radius:999px;padding:5px 10px;min-height:28px;box-sizing:border-box;
           box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;user-select:none;font-size:12px;font-weight:600;white-space:nowrap}
         .pill i{width:8px;height:8px;border-radius:50%;background:var(--pc,#8c8b85);flex:none}.pill:empty{display:none}
@@ -754,7 +765,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const top = PRI.find(k => cards.some(c => c.kind === k)) || "cevap";
       const pill = root.querySelector(".pill");
       // hap = nokta (en önemli kartın sınıf rengi; uyarıda kırmızı; kartsız toplantıda yeşil) + açık kart sayısı
-      const pc = (warn || dil) ? COL.dur : cards.length ? COL[top] : (live ? "#1f7a4f" : "#8b938d");
+      const pc = (warn || dil) ? COL.dur : cards.length ? COL[top] : (live ? "#1f7a4f" : "#646c66");
       pill.style.setProperty("--pc", pc); pill.replaceChildren(el("i")); if (cards.length) pill.append(el("span", null, String(cards.length)));
       if (ss && ss.acik) pill.append(ikon(document, "mute"));
       pill.title = ss && ss.acik ? L("Suflor.me — sessiz; kartlar bekliyor") : L("Suflor.me — kartlar için tıkla");

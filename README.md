@@ -45,6 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 ```
 Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı Chrome'da açılır (Chrome yoksa varsayılan tarayıcıda) ve her adımı kendisi denetler.
 Sihirbazı kapatırsan aynı komutu yeniden çalıştır; kaldığın adımdan sürer.
+Her yayın geliştiricinin anahtarıyla imzalıdır: kurulum ve güncelleme indirilen kodun imzasını ve dosya özetlerini doğrular, tutmazsa hiçbir şey kurmaz.
 
 **Proje hazırlığı:** sihirbaz proje klasörünü tarar (kopya, eski sürüm, adından gizli görünen dosyalar; dizine girmesini istemediğin klasörü
 çıkarırsın), PDF, sunum ve görüntüleri bu Mac'te metne çevirip dizinler ve istersen proje kartını (özet, kişiler, kararlar, açık işler, terimler)

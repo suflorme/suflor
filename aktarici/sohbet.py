@@ -162,7 +162,7 @@ def sohbet_parca(p):
     SOHBET["t_okuma"] = 0.0; SOHBET["kesme_sn"] = 0.0; SOHBET.pop("onceki", None)
     bir = SOHBET.pop("biriken", None)
     if bir is not None:
-        with AKIS["kilit"]: AKIS.update(pcm=bytearray(bir), kesik=0, sira=0, metin={}, bekleyen=0)
+        with AKIS["kilit"]: AKIS.update(pcm=bytearray(bir), kesik=0, sira=0, metin={}, bekleyen=0, nesil=AKIS.get("nesil", 0) + 1)  # v0.98.1: yoldaki parça karışmasın
         print(f"SOHBET: biriken {len(bir) / 2 / WH_SR:.1f} sn ses sonraki soruya")
     r = konus_parca(p)
     if not r.get("ok"): return r
@@ -224,7 +224,7 @@ def sohbet_ses_izi_red(izler):  # izler: [(iz, sn)] → True: kullanıcının se
 def sohbet_dusunme(metin, pcm):  # konus_ses'in dökülmüş metni düşünme sözüyle mi bitiyor → True: gönderilmez, kayıt akışa geri, dinleme sürer
     if not SOHBET["acik"] or not SOHBET_DUSUNME_RX.search(metin or ""): return False
     simdi = time.time(); bir = SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)  # dökülürken söylenen (biriktirilen) kaydın sonuna
-    with AKIS["kilit"]: AKIS.update(pcm=bytearray(pcm) + (bir or b""), kesik=0, sira=0, metin={}, iz={}, bekleyen=0)
+    with AKIS["kilit"]: AKIS.update(pcm=bytearray(pcm) + (bir or b""), kesik=0, sira=0, metin={}, iz={}, bekleyen=0, nesil=AKIS.get("nesil", 0) + 1)
     # v0.92.1: söz dökülürken devamı söylendiyse (biriken seste konuşma) yeni konuşma var sayılır — yoksa tur sonu bekçisi yalnız ilk yarıyı 4 sn sonra
     # gönderiyordu, devamı kayboluyordu (test/sohbet.py "nasıl desem"; yeni konuşma ölçütü yalnız sonradan gelen parçaydı)
     devam = bool(bir) and sum(x >= (AKIS.get("esik") or 400) for x in _pencereler(bytes(bir))) * AKIS_PENCERE / 2 / WH_SR >= 0.15
