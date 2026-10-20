@@ -20,7 +20,7 @@ def bos_port(tercih=0):
 # bekler, sonra çıkış 3 ile durur. Bilerek koşturmak için SUFLOR_TEST_ZORLA=1. Liste: AGIR_TESTLER (yeni gerçek modelli test buraya).
 import json, os, sys, time, urllib.request
 AGIR_TESTLER = {"anlam.py", "bas-konus.py", "cevir.py", "dosyadan-pano.py", "dosyadan.py", "hihi.py", "konusmaci.py", "moderator-uctan.py", "otonom.py", "oda.py",
-                "kisilik.py", "pocket.py", "piper.py", "sohbet.py", "talimat.py", "uydurma.py", "yerel-ses.py"}
+                "kisilik.py", "pocket.py", "piper.py", "sohbet.py", "talimat.py", "uydurma.py", "whisper-cpp.py", "yerel-ses.py"}
 CANLI_BEKLE_SN = 900
 def canli_mesgul():  # kurulum.py mesgul ile aynı ölçüt; canlı aktarıcıya ulaşılamazsa boş (meşgul değil)
     try:

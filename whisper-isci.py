@@ -75,7 +75,54 @@ def cozme_ayari(sn):
     # canlı parça: yeniden deneme 2 sıcaklıkla, belirteç sesin süresiyle sınırlı (sn başına 20, en az 48). Varsayılan 6 sıcaklık × 224 belirteç
     # kısa parçada tekrar döngüsünü 6 kez baştan çözüyordu: 11 Ekim toplantılarında uydurma işleri ortalama 11,6 sn, işçi süresinin %59'u.
     return {"temperature": (0.0, 0.2), "sample_len": min(224, max(48, int(sn * 20)))}
+# whisper.cpp + Core ML motoru (ayar whisper_motor: cpp → aktarıcı SUFLOR_WHISPER_CPP=<ortak>/whisper-cpp verir). Aynı turbo q8 modeli,
+# kodlayıcı Neural Engine'de. 20 Ekim kıyası (testler/asr-kiyas-20261020.md, 1.093 öğe): 4–6 sn parça 1,40 → 0,60 sn, kısa parça p90
+# 2,57 → 0,55 sn, canlı parça Türkçe hata %12,5 → %12,7, uydurma bu dosyanın süzgeciyle aynı (%23). Yalnız canlı döngü; dosyadan ve
+# toplu döküm MLX'te kalır. Sunucu yalnız 127.0.0.1'de; işçi öldürülse de bekçi kabuk sunucuyu kapatır.
+class CppMotor:
+    def __init__(s, dizin):
+        import socket, subprocess, urllib.request
+        so = socket.socket(); so.bind(("127.0.0.1", 0)); s.port = so.getsockname()[1]; so.close()
+        s.ad = "whisper.cpp:ggml-large-v3-turbo-q8_0+coreml"; s.url = f"http://127.0.0.1:{s.port}/inference"
+        # -nlp: yoksa her istekte dil olasılığı için kodlayıcı ikinci kez çalışıyor; -ml 100000: yoksa bölüm 60 karakterde sözcük ortasından kesiliyor
+        s.p = subprocess.Popen([os.path.join(dizin, "whisper-server"), "-m", os.path.join(dizin, "ggml-large-v3-turbo-q8_0.bin"), "--host", "127.0.0.1",
+                                "--port", str(s.port), "-t", "4", "-l", "tr", "-bs", "-1", "-et", "2.4", "-lpt", "-1.0", "-nth", "0.6", "-nlp",
+                                "-ml", "100000", "--public", "/nonexistent"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # bekçi: işçi çıkınca (öldürülüp zombi kalsa da) sunucuyu kapatır; normal çıkışta atexit hemen kapatır
+        subprocess.Popen(["/bin/sh", "-c", f"while d=$(ps -o stat= -p {os.getpid()} 2>/dev/null) && [ \"${{d#Z}}\" = \"$d\" ] && kill -0 {s.p.pid} 2>/dev/null; "
+                          f"do sleep 1; done; kill {s.p.pid} 2>/dev/null"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        import atexit; atexit.register(lambda: s.p.poll() is None and s.p.terminate())
+        t0 = time.time()  # ilk açılışta Neural Engine derlemesi 30–60 sn (macOS sonra önbellekten verir)
+        while True:
+            if s.p.poll() is not None: raise RuntimeError(f"whisper-server kapandı ({s.p.returncode})")
+            try: urllib.request.urlopen(f"http://127.0.0.1:{s.port}/", timeout=2); break
+            except urllib.error.HTTPError: break
+            except Exception: pass
+            if time.time() - t0 > 170: s.p.kill(); raise RuntimeError("whisper-server açılmadı")
+            time.sleep(0.2)
+        try: from mlx_whisper.tokenizer import LANGUAGES; s.kod = {v: k for k, v in LANGUAGES.items()}
+        except Exception: s.kod = {"turkish": "tr", "english": "en"}
+    def istek(s, a, language=None, initial_prompt=None):
+        import io, wave, uuid, urllib.request, numpy as np
+        b = io.BytesIO()
+        with wave.open(b, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR); w.writeframes((np.clip(a, -1, 1) * 32767).astype("<i2").tobytes())
+        alan = {"language": language or "auto", "prompt": initial_prompt or "", "temperature": "0.0", "temperature_inc": "0.2",
+                "response_format": "verbose_json", "no_timestamps": "false", "no_language_probabilities": "true", "max_len": "100000"}
+        sn = uuid.uuid4().hex; g = []
+        for k, v in alan.items(): g += [f"--{sn}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n".encode(), str(v).encode("utf-8"), b"\r\n"]
+        g += [f"--{sn}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"p.wav\"\r\nContent-Type: audio/wav\r\n\r\n".encode(), b.getvalue(), b"\r\n", f"--{sn}--\r\n".encode()]
+        q = urllib.request.Request(s.url, data=b"".join(g), headers={"Content-Type": f"multipart/form-data; boundary={sn}"})
+        with urllib.request.urlopen(q, timeout=120) as y: return json.loads(y.read().decode("utf-8"))
+    def __call__(s, a, language=None, initial_prompt=None, **_):  # mlx_whisper.transcribe biçiminde sonuç
+        r = s.istek(a, language, initial_prompt)
+        seg = [{"text": x.get("text") or "", "start": float(x.get("start") or 0), "end": float(x.get("end") or 0),
+                "no_speech_prob": x.get("no_speech_prob", 0), "avg_logprob": x.get("avg_logprob", 0)} for x in r.get("segments") or []]
+        d = str(r.get("language") or "").lower()
+        return {"text": "".join(x["text"] for x in seg), "segments": seg, "language": s.kod.get(d, d) or language}
+CPP = None
 def dil_olasilik(a):  # Whisper'ın dil tahmini (ilk 30 sn): {dil: olasılık}; yalnız kodlayıcı + tek belirteç, çözmeden ucuz
+    if CPP:  # whisper.cpp: olasılık istenmiyor (-nlp); algılanan dil tek aday olarak döner, metin boşsa geçiş zaten yapılmaz
+        r = CPP(a); return {r["language"]: 1.0} if r.get("language") else {}
     import mlx.core as mx
     from mlx_whisper.transcribe import ModelHolder
     from mlx_whisper.audio import log_mel_spectrogram, pad_or_trim, N_FRAMES, N_SAMPLES
@@ -167,10 +214,16 @@ def istem_kur(tok, terimler, onceki):
     return (" ".join(x for x in (metin, tok.decode(on).strip() if on else "") if x) or None), dusen
 def out(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
 def main():
-    t = time.time()
+    global CPP
+    t = time.time(); model_ad = MODEL
     try:
-        import numpy as np, mlx_whisper
-        mlx_whisper.transcribe(np.zeros(16000, np.float32), path_or_hf_repo=MODEL, language="tr")  # ısınma: model belleğe
+        import numpy as np
+        if os.environ.get("SUFLOR_WHISPER_CPP"):
+            CPP = CppMotor(os.environ["SUFLOR_WHISPER_CPP"]); model_ad = CPP.ad; coz = CPP
+        else:
+            import mlx_whisper
+            def coz(a, **k): return mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, **k)
+        coz(np.zeros(16000, np.float32), language="tr")  # ısınma: model belleğe
     except Exception as e:
         out({"hata": f"model yüklenemedi: {e.__class__.__name__}: {str(e)[:200]}"}); return 1
     # MLX ara bellek önbelleği kapalı. Sınırsızken parça boyları değiştikçe önbellek büyüyor: 47 parçalık oturumda
@@ -187,7 +240,7 @@ def main():
         from mlx_whisper.tokenizer import get_tokenizer
         tok = get_tokenizer(multilingual=True, num_languages=100)  # düz metin belirteçleri dilden bağımsız
     except Exception as e: tok = None; sys.stderr.write(f"belirteçleyici yok, istem kırpılmaz: {e}\n")
-    out({"hazir": True, "model": MODEL, "sn": round(time.time() - t, 1), "ecapa": bool(iz)})
+    out({"hazir": True, "model": model_ad, "motor": "cpp" if CPP else "mlx", "sn": round(time.time() - t, 1), "ecapa": bool(iz)})
     kumeler = []; baslik = None  # karşı kanal kümeleri; yeni toplantıda sıfırlanır
     for satir in sys.stdin:
         if not satir.strip(): continue
@@ -199,12 +252,12 @@ def main():
             cozme = cozme_ayari(len(a) / SR)
             if tok: istem, dusen = istem_kur(tok, p.get("istem") or "", p.get("onceki") or "")
             else: istem = " ".join(x for x in (p.get("istem") or "", p.get("onceki") or "") if x).strip() or None
-            r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil") or None, initial_prompt=istem,
+            r = coz(a, language=p.get("dil") or None, initial_prompt=istem,
                                        condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             # karışık dil (gündem dil=karisik): yalnız izin verilen diller (tr/en); Whisper başkasını bulursa (11 Ekim: iki Türkçe satır İzlandaca)
             # kanalın son dilinde (yoksa ilk izinli dilde) yeniden — dosyadan dökümdeki kural
             if not p.get("dil") and p.get("diller") and r.get("language") not in p["diller"]:
-                r = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=p.get("dil_yedek") if p.get("dil_yedek") in p["diller"] else p["diller"][0],
+                r = coz(a, language=p.get("dil_yedek") if p.get("dil_yedek") in p["diller"] else p["diller"][0],
                                            initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             # dil geçişi (v0.29.2, S36): toplantı dili dayatılmış (tr/en) ve sonuç boşsa Whisper'ın dil tahminine bakılır; öbür dil (en/tr)
             # ≥ %80 ise o dilde yeniden çözülür (12 Ekim: Türkçe toplantıda İngilizce konuşan karşı tarafın 62 parçası boş kalmıştı).
@@ -216,7 +269,7 @@ def main():
                 try: pr = dil_olasilik(a)
                 except Exception: pr = {}
                 if pr.get(obur, 0) >= DIL_GECIS:
-                    r2 = mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, language=obur, initial_prompt=istem, condition_on_previous_text=False,
+                    r2 = coz(a, language=obur, initial_prompt=istem, condition_on_previous_text=False,
                                                 no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
                     if not _bos(r2): r = r2; gec_dil = (obur, round(float(pr[obur]), 2))
             tut, atla, atilan = [], 0, []  # atilan: aktarıcı canli/uydurma-adaylari.jsonl'e yazar (uydurma listesini kendi kayıtlarımızdan büyütmek için)

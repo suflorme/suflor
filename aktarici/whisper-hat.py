@@ -29,6 +29,11 @@ WH_MODEL = os.path.dirname(WH_MODEL) if WH_MODEL else None
 # aynı doğruluk, parça +0,06 sn. Ayar "whisper_model": "turbo" tam modele döndürür.
 _WH_Q8 = os.path.join(WH_MODELLER, "hub", "models--suflor--whisper-large-v3-turbo-q8", "snapshots", "yerel")
 if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(_WH_Q8, "weights.safetensors")): WH_MODEL = _WH_Q8
+# ayar "whisper_motor": "cpp" → canlı döngüde whisper.cpp + Core ML (aynı turbo q8, kodlayıcı Neural Engine'de; ~2,3 kat hızlı, doğruluk ve
+# uydurma süzgeci aynı — 20 Ekim kıyası). Dosyalar <ortak>/whisper-cpp/ (whisper-server, ggml-large-v3-turbo-q8_0.bin + Core ML kodlayıcı);
+# yoksa MLX'e düşülür. Dosyadan ve toplu döküm her durumda MLX.
+WH_CPP = os.path.join(_ORT, "whisper-cpp")
+def wh_cpp(): return AYAR.get("whisper_motor") == "cpp" and os.path.exists(os.path.join(WH_CPP, "whisper-server")) and os.path.exists(os.path.join(WH_CPP, "ggml-large-v3-turbo-q8_0.bin"))
 WH_SR = 16000; WH_KARE = 320  # 20 ms
 # parça üst sınırı 12 → 6 sn. Ölçüm (6 Ekim, 115 sn kesintisiz Türkçe, gerçek zamanlı): kelime → satır ortanca 7,7 → 4,6 sn,
 # %90 12,2 → 6,7 sn; WER 12 sn %16,0 · 8 sn %11,9 · 6 sn %15,6–18,1 (aynı ayarda tur farkı kadar — kesim noktasına bağlı gürültü)
@@ -165,7 +170,7 @@ def bellek_view():
     if bos is None: return {"bos_gb": None, "uyari": ""}
     w = STATE["whisper"]; yuklu = w["durum"] in ("hazir", "yok")
     # gerek sayıları suflor-olcum ölçümünden (4 Ekim): Whisper ~2,4 GB; v0.13.12: ses izi Whisper işçisinde (~0,1 GB)
-    gerek = 0 if yuklu else (2.0 if WH_MODEL == _WH_Q8 else 2.5)  # q8 ~1,8 GB, tam turbo ~2,4 GB
+    gerek = 0 if yuklu else (1.5 if wh_cpp() else 2.0 if WH_MODEL == _WH_Q8 else 2.5)  # q8 ~1,8 GB, tam turbo ~2,4 GB, whisper.cpp ~1,3 GB
     az = bos < 1.5 or (gerek and bos < gerek + 0.5)
     sy = (lambda x: str(x)) if ARAYUZ_DILI == "en" else (lambda x: str(x).replace(".", ","))  # ondalık: en 3.1, tr 3,1
     ec = [(bellek_ad(a), v) for a, v in _BELLEK.get("en_cok") or []]
@@ -229,7 +234,7 @@ def _isci_ac():
         w.update(durum="yok", hata=f"whisper-venv ya da whisper-isci.py yok ({WH_PY})"); print(f"WHISPER: kullanılamıyor — {w['hata']}"); return False
     w.update(durum="yukleniyor", hata=None); t = time.time()
     env = dict(os.environ, HF_HOME=WH_MODELLER, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", **({"SUFLOR_WHISPER_MODEL": WH_MODEL} if WH_MODEL else {}),
-               **({"SUFLOR_ECAPA": ECAPA} if os.path.exists(ECAPA) else {}))
+               **({"SUFLOR_ECAPA": ECAPA} if os.path.exists(ECAPA) else {}), **({"SUFLOR_WHISPER_CPP": WH_CPP} if wh_cpp() else {}))
     pr = subprocess.Popen([WH_PY, "-u", WH_ISCI], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
     q = queue.Queue()
     def oku():
@@ -242,7 +247,7 @@ def _isci_ac():
     except ValueError: j = {}
     if not j.get("hazir"):
         pr.kill(); w.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"WHISPER: {w['hata']}"); return False
-    _ISCI.update(p=pr, satirlar=q, baslik=None); w.update(durum="hazir", model=j.get("model")); kume_sifirla()
+    _ISCI.update(p=pr, satirlar=q, baslik=None); w.update(durum="hazir", model=j.get("model"), motor=j.get("motor") or "mlx"); kume_sifirla()
     STATE["ses_model"].update(durum="hazir" if j.get("ecapa") else "yok", hata=None if j.get("ecapa") else f"ses izi ağırlıkları yok ({ECAPA})", sn=j.get("sn"))
     print(f"WHISPER: hazır ({j.get('model')}, {time.time() - t:.1f} sn{', ses izi (ECAPA, MLX)' if j.get('ecapa') else ', ses izi yok'})")
     return True
