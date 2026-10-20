@@ -58,6 +58,8 @@ try:
     ns["AYAR"]["kisilik_toplanti_disi"] = kd2
     ist2 = ns["konus_istem"]()
     ok("iki kişilik: istemde ikisi de, açıklama satırı, biçim kuralları önce", "KİŞİLİK-İŞARETİ" in ist2 and ist2.endswith("İKİNCİ-İŞARET") and "Aşağıda iki kişilik var: Atlas toplantıda, Matlas toplantı dışında" in ist2)
+    ok("adın söylenişleri kuralı: hitap listesi, düzeltme yok, kişilik metninden önce (v0.97.5)", "Adının söylenişleri" in ist2 and "Matlas: Oh Matlas" in ist2
+       and "Adını düzeltme" in ist2 and ist2.index("Adının söylenişleri") < ist2.index("## Kişilik"))
     ok("toplantı yokken etkin kişilik ikincisi", ns["kisilik"]()["ad"] == "Matlas")
     ns["TOP"][0] = True; ok("toplantıda etkin kişilik birincisi", ns["kisilik"]()["ad"] == "Atlas")
     kb, kalan = ns["kisilik_hitap_bul"]("Matlas, bugün neler yaptım?"); ok("adla seslenme bulundu", kb and kb["ad"] == "Matlas" and kalan == "bugün neler yaptım?")

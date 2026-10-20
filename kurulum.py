@@ -702,7 +702,7 @@ def cevir_kur(ort):
             if r.returncode: raise RuntimeError("modeller indirilemedi")
         if not anlam_ok:
             say("→ anlam araması modeli indiriliyor (~1,1 GB)…")
-            r = subprocess.run([vpy, "-c", "from huggingface_hub import snapshot_download as s; s('intfloat/multilingual-e5-base', allow_patterns=['*.json', '*.txt', "
+            r = subprocess.run([vpy, "-c", "from huggingface_hub import snapshot_download as s; s('intfloat/multilingual-e5-base', revision='d128750597153bb5987e10b1c3493a34e5a4502a', allow_patterns=['*.json', '*.txt', "
                                 "'sentencepiece.bpe.model', 'model.safetensors', '1_Pooling/*'])"], capture_output=True, timeout=1800, env=dict(os.environ, HF_HOME=am))
             if r.returncode: raise RuntimeError("anlam modeli indirilemedi")
         r = subprocess.run([vpy, "-B", os.path.join(KOD, "cevir-isci.py")], input="", capture_output=True, text=True, timeout=300,
@@ -917,12 +917,12 @@ def modeller():
     if os.path.isdir(os.path.join(ort, "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo")): say("✓ Whisper modeli var")
     elif not rel_indir("suflor-whisper-large-v3-turbo.tar"):
         say("→ Whisper modeli Hugging Face'ten indiriliyor (~1,6 GB)…")
-        zorunlu(vpy, "-c", "from huggingface_hub import snapshot_download as s; s('mlx-community/whisper-large-v3-turbo')", env=hf)
+        zorunlu(vpy, "-c", "from huggingface_hub import snapshot_download as s; s('mlx-community/whisper-large-v3-turbo', revision='a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb')", env=hf)
     ek = os.path.join(ort, "ses-modeller", "spkrec-ecapa-voxceleb"); os.makedirs(os.path.dirname(ek), exist_ok=True)
     if os.path.isfile(os.path.join(ek, "embedding_model.ckpt")): say("✓ ses izi modeli var")
     else:
         say("→ ses izi modeli Hugging Face'ten indiriliyor (~85 MB)…")
-        zorunlu(vpy, "-c", "import sys; from huggingface_hub import snapshot_download as s; s('speechbrain/spkrec-ecapa-voxceleb', local_dir=sys.argv[1], "
+        zorunlu(vpy, "-c", "import sys; from huggingface_hub import snapshot_download as s; s('speechbrain/spkrec-ecapa-voxceleb', revision='0f99f2d0ebe89ac095bcc5903c4dd8f72b367286', local_dir=sys.argv[1], "
                 "allow_patterns=['embedding_model.ckpt', 'hyperparams.yaml'])", ek)
     if os.path.isfile(os.path.join(ek, "ecapa-mlx.npz")): say("✓ ses izi ağırlıkları (MLX) var")
     else: ecapa_donustur(ort, onbellek=False)

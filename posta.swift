@@ -3,11 +3,22 @@
 // ileti gövdesi (.emlx) açılmaz, hiçbir şey değiştirilmez. Mail klasörü macOS korumasında: izin (Gizlilik ve Güvenlik → Tam Disk Erişimi) yalnız bu
 // uygulamaya verilir. İzin yoksa {"durum": "izin"} yazar. Aktarıcı `open -g -W -a "Suflor Posta.app" --args --cikti <yol> --gun 14` ile çalıştırır.
 // Şema sürümden sürüme değişebildiği için sütunlar PRAGMA ile denetlenir; zorunlu olanlar yoksa {"durum": "sema"}.
-// Deneme: --db <yol> (sahte dizin), --cikti <yol>.
+// Deneme: --db <yol> (sahte dizin), --cikti <yol>; --db yalnız deneme derlemesinde (swiftc -D SUFLOR_DENEME).
+// v0.97.4 (güvenlik denetimi O3): Tam Disk Erişimi bu uygulamada — aynı hesaptaki başka bir program onu argümanla çalıştırıp izni ödünç alamasın:
+// çıktı yalnız uygulama klasörünün (<uygulama>, bu paketin bulunduğu klasör) altına ve yalnız posta.json / posta-govde.json adıyla; geçici dosya
+// sembolik bağı izlemeden açılır; --db (başka SQLite dosyasını okutma) kurulu sürümde yok.
 import Foundation
 import SQLite3
 
-var cikti = (NSHomeDirectory() as NSString).appendingPathComponent("Library/Application Support/Suflor/posta.json")
+func gercek(_ y: String) -> String {  // sembolik bağları çözülmüş mutlak yol (C realpath; dosya yoksa klasörü çözülür — Foundation /private önekini tutarsız atıyor)
+    let s = URL(fileURLWithPath: y).standardizedFileURL.path
+    if let r = realpath(s, nil) { defer { free(r) }; return String(cString: r) }
+    let ust = (s as NSString).deletingLastPathComponent
+    if let r = realpath(ust, nil) { defer { free(r) }; return (String(cString: r) as NSString).appendingPathComponent((s as NSString).lastPathComponent) }
+    return s
+}
+let uygulamaKlasor = gercek(Bundle.main.bundleURL.deletingLastPathComponent().path)
+var cikti = (uygulamaKlasor as NSString).appendingPathComponent("posta.json")
 var gun = 14.0, enCok = 400
 var dbYol: String? = nil
 var govdeIds: [Int64] = []  // --govde 12,34: yalnız bu iletilerin ham metni (v0.86.0; kullanıcının belli bir iletiyi hedefleyen sorusunda)
@@ -18,11 +29,26 @@ while i < a.count {
   if a[i] == "--cikti", i + 1 < a.count { cikti = a[i + 1]; i += 1 }
   else if a[i] == "--gun", i + 1 < a.count { gun = Double(a[i + 1]) ?? 14; i += 1 }
   else if a[i] == "--en-cok", i + 1 < a.count { enCok = Int(a[i + 1]) ?? 400; i += 1 }
-  else if a[i] == "--db", i + 1 < a.count { dbYol = a[i + 1]; i += 1 }
+  else if a[i] == "--db", i + 1 < a.count {
+    #if SUFLOR_DENEME
+    dbYol = a[i + 1]
+    #else
+    exit(3)
+    #endif
+    i += 1
+  }
   else if a[i] == "--govde", i + 1 < a.count { govdeIds = a[i + 1].split(separator: ",").compactMap { Int64($0.trimmingCharacters(in: .whitespaces)) }.prefix(3).map { $0 }; i += 1 }
   else if a[i] == "--ben", i + 1 < a.count { benAdres = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { $0.contains("@") }); i += 1 }
   i += 1
 }
+#if !SUFLOR_DENEME
+do {  // çıktı yolu: adı sabit, klasörü uygulama klasörünün altında (sembolik bağlar çözülerek)
+  let ad = (cikti as NSString).lastPathComponent
+  let ust = gercek((cikti as NSString).deletingLastPathComponent)
+  guard ad == "posta.json" || ad == "posta-govde.json", ust == uygulamaKlasor || ust.hasPrefix(uygulamaKlasor + "/") else { exit(3) }
+  cikti = (ust as NSString).appendingPathComponent(ad)
+}
+#endif
 let iso = ISO8601DateFormatter()
 iso.formatOptions = [.withInternetDateTime]
 
@@ -32,7 +58,10 @@ func yaz(_ o: [String: Any]) {
   guard let d = try? JSONSerialization.data(withJSONObject: o, options: []) else { return }
   try? FileManager.default.createDirectory(atPath: (cikti as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
   let gecici = cikti + ".tmp"
-  FileManager.default.createFile(atPath: gecici, contents: d, attributes: [.posixPermissions: 0o600])  // ileti başlıkları kişi adı içerir
+  unlink(gecici)  // hazır duran sembolik bağı izleme (O3); ileti başlıkları kişi adı içerir → 0600
+  let fd = open(gecici, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+  guard fd >= 0 else { return }
+  _ = d.withUnsafeBytes { write(fd, $0.baseAddress, d.count) }; close(fd)
   _ = try? FileManager.default.replaceItemAt(URL(fileURLWithPath: cikti), withItemAt: URL(fileURLWithPath: gecici))
   if !FileManager.default.fileExists(atPath: cikti) { try? FileManager.default.moveItem(atPath: gecici, toPath: cikti) }
 }

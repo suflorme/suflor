@@ -31,10 +31,13 @@ def main():
         import numpy as np, torch
         torch.set_num_threads(1)
         hub = os.path.join(os.environ.get("HF_HOME") or os.path.expanduser("~/.cache/huggingface"), "hub")
+        SABIT = {"wite-tech/pocket-tts-turkish": "fcbd37c74dc127be846face0ff36062e9a939f7b", "alperiox/pocket-tts-turkish": "13d9b4ad051ce9d5ef5bfb8af9724be01ad2fd31"}  # O5: denenmiş sürüm
         def anlik(repo):
-            d = sorted(glob.glob(os.path.join(hub, "models--" + repo.replace("/", "--"), "snapshots", "*")))
+            k = os.path.join(hub, "models--" + repo.replace("/", "--"), "snapshots")
+            if SABIT.get(repo) and os.path.isdir(os.path.join(k, SABIT[repo])): return os.path.join(k, SABIT[repo])
+            d = sorted(glob.glob(os.path.join(k, "*")))
             if not d: raise FileNotFoundError(f"{repo} indirilmemiş")
-            return d[-1]
+            print(f"pocket: {repo} denenmiş sürümü yok, {os.path.basename(d[-1])[:10]} kullanılıyor", file=sys.stderr); return d[-1]
         M = {}
         def wite():
             if "wite" not in M:

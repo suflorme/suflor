@@ -11,8 +11,21 @@ A = lambda k, d="ornek.com": k + AT + d
 def bak(ad, k): print(("✓ " if k else "✗ ") + ad); hata.extend([] if k else [ad])
 T = tempfile.mkdtemp(prefix="posta-"); ikili = os.path.join(T, "SuflorPosta")
 if not shutil.which("swiftc"): sys.exit("atlandı: swiftc yok")
-r = subprocess.run(["swiftc", "-O", "-o", ikili, os.path.join(KOD, "posta.swift")], capture_output=True, text=True)
-bak("posta.swift derlendi", r.returncode == 0)
+r = subprocess.run(["swiftc", "-O", "-D", "SUFLOR_DENEME", "-o", ikili, os.path.join(KOD, "posta.swift")], capture_output=True, text=True)
+bak("posta.swift derlendi (deneme: --db açık)", r.returncode == 0)
+# O3 (v0.97.4): kurulu sürüm — --db yok, çıktı yalnız uygulama klasörünün altında posta.json / posta-govde.json, geçici dosyada sembolik bağ izlenmez
+os.makedirs(os.path.join(T, "uyg", "canli")); os.makedirs(os.path.join(T, "uyg", "paket")); ikili_k = os.path.join(T, "uyg", "paket", "SuflorPosta")  # paketsiz ikilide "paket" = bulunduğu klasör → uygulama klasörü uyg
+r2 = subprocess.run(["swiftc", "-O", "-o", ikili_k, os.path.join(KOD, "posta.swift")], capture_output=True, text=True); bak("posta.swift derlendi (kurulu sürüm)", r2.returncode == 0)
+kurban = os.path.join(T, "kurban.txt"); open(kurban, "w").write("dokunulmamalı")
+r = subprocess.run([ikili_k, "--db", os.path.join(T, "x.db"), "--cikti", os.path.join(T, "uyg", "canli", "posta.json")], capture_output=True, timeout=20)
+bak("kurulu sürümde --db reddedilir (çıkış 3, dosya yok)", r.returncode == 3 and not os.path.exists(os.path.join(T, "uyg", "canli", "posta.json")))
+for ad, y in (("uygulama klasörü dışı", os.path.join(T, "disari.json")), ("başka ad", os.path.join(T, "uyg", "canli", "zshrc")),
+              ("../ ile dışarı", os.path.join(T, "uyg", "canli", "..", "..", "posta.json"))):
+    r = subprocess.run([ikili_k, "--cikti", y, "--gun", "1", "--en-cok", "1"], capture_output=True, timeout=20)
+    bak(f"çıktı yolu reddedilir ({ad})", r.returncode == 3 and not os.path.exists(y))
+os.symlink(kurban, os.path.join(T, "uyg", "canli", "posta.json.tmp"))
+subprocess.run([ikili_k, "--cikti", os.path.join(T, "uyg", "canli", "posta.json"), "--gun", "1", "--en-cok", "1"], capture_output=True, timeout=30)
+bak("geçici dosyadaki sembolik bağ izlenmez (hedef değişmedi)", open(kurban).read() == "dokunulmamalı")
 dbk = os.path.join(T, "Mail V", "MailData"); os.makedirs(dbk); dbp = os.path.join(dbk, "Envelope Index")
 db = sqlite3.connect(dbp)
 db.executescript(f"""
