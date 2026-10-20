@@ -253,8 +253,14 @@ def main():
             cozme = cozme_ayari(len(a) / SR)
             if tok: istem, dusen = istem_kur(tok, p.get("istem") or "", p.get("onceki") or "")
             else: istem = " ".join(x for x in (p.get("istem") or "", p.get("onceki") or "") if x).strip() or None
-            r = coz(a, language=p.get("dil") or None, initial_prompt=istem,
+            # karma dil (whisper.cpp): dil sabitken whisper.cpp İngilizce konuşmayı Türkçeye "çevirip" anlamsız metin yazıyor (20 Ekim terimli kayıt:
+            # "Let me switch to English…" → "İngilizce bir zaman, çünkü…"; MLX yazmıyordu). Karşı kanalda dil kendiliğinden bulunur (yalnız tr/en;
+            # başkası çıkarsa sabit dilde yeniden): parça ~0,6 → ~1,1 sn. Kullanıcının kanalı ve Konuş sabit dilde kalır (hız orada önemli).
+            oto = bool(CPP) and p.get("kanal") == "karsi" and p.get("dil") in ("tr", "en")
+            r = coz(a, language=None if oto else (p.get("dil") or None), initial_prompt=istem,
                                        condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
+            if oto and r.get("language") not in ("tr", "en"):
+                r = coz(a, language=p["dil"], initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             # karışık dil (gündem dil=karisik): yalnız izin verilen diller (tr/en); Whisper başkasını bulursa (11 Ekim: iki Türkçe satır İzlandaca)
             # kanalın son dilinde (yoksa ilk izinli dilde) yeniden — dosyadan dökümdeki kural
             if not p.get("dil") and p.get("diller") and r.get("language") not in p["diller"]:
@@ -265,7 +271,8 @@ def main():
             # Dayatma kalkmaz: karışık kipte Türkçe kayıttaki gürültü "Thank you." diye yazılıyor ve süre iki katına çıkıyordu.
             gec_dil = None
             def _bos(rr): return not any(gecerli(s, (s.get("text") or "").strip()) for s in rr.get("segments") or [])
-            if p.get("dil") in ("tr", "en") and p.get("dil_algila") and _bos(r):
+            if oto and r.get("language") != p["dil"] and not _bos(r): gec_dil = (r.get("language"), None)
+            if p.get("dil") in ("tr", "en") and p.get("dil_algila") and not oto and _bos(r):
                 obur = "en" if p["dil"] == "tr" else "tr"
                 try: pr = dil_olasilik(a)
                 except Exception: pr = {}
@@ -290,6 +297,12 @@ def main():
             if istem and metin and metin.lower().strip(" .") in istem.lower():
                 terim = metin.lower().strip(" .") in (p.get("istem") or "").lower()
                 if terim or not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1
+            # yarım yarım geri okuma (20 Ekim, whisper.cpp + sessiz parça: "Grafan, Jira, Promethu."): her sözcüğün en az %60'ı (≥ 3 harf) bir
+            # terim sözcüğüyle aynı başlıyorsa ve parçada konuşma sesi yoksa uydurma. Gerçek kısa söz ("Jira'ya baktım") en az bir terim dışı sözcük taşır.
+            if metin and p.get("istem") and not konusma_var(a, np):
+                tw = re.findall(r"\w{3,}", (p.get("istem") or "").lower()); mw = re.findall(r"\w+", metin.lower())
+                ortak = lambda w, t: len(os.path.commonprefix([w, t])) >= max(3, int(0.6 * len(w) + 0.5))  # bozuk yazılan terim de ("promethu")
+                if mw and all(len(w) >= 3 and any(ortak(w, t) for t in tw) for w in mw): atilan.append(metin); metin = ""; atla += 1
             if metin and tekrar_dongu(metin):  # tekrar döngüsü uydurması (öndeki gerçek söz kalır)
                 kirp = tekrar_kirp(metin); atilan.append(metin); atla += 1; metin = kirp or ""
             try: ses = ses_olc(a, np) if metin else None
