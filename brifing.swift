@@ -23,12 +23,14 @@ func gercek(_ y: String) -> String {  // sembolik bağları çözülmüş mutlak
 }
 func altinda(_ y: String, _ k: String) -> Bool { y == k || y.hasPrefix(k + "/") }
 let uygulamaKlasor = gercek(Bundle.main.bundleURL.deletingLastPathComponent().path)
+// O3 kalan sınırı (v0.99.4): Python betikleri hep -I (yalıtılmış) ile — PYTHON* ortam değişkenleri, kullanıcı site-packages ve çalışma klasörü okunmaz;
+// araya kod sokmanın kolay yolu kapanır. Betiklerin kendisi paket dışında: aynı hesaptaki program onları değiştirebilir (kabul edilen risk, S108).
 // Arama dizini kipi (v0.58.0): --dizin → uygulama klasöründeki baglam.py'yi (bu paketin yanında) `dizin` komutuyla çalıştırır; başka argüman almaz.
 // Aktarıcı proje klasörünü okuyamayınca 10 dk'lık ön arama güncellemesini buna yaptırır (Masaüstü izni bu uygulamada).
 if a.contains("--dizin") {
     let baglam = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("baglam.py").path
     guard FileManager.default.isReadableFile(atPath: baglam) else { bitir(2) }
-    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); p.arguments = ["-B", baglam, "dizin"]
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); p.arguments = ["-I", "-B", baglam, "dizin"]
     p.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
     p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice; p.standardInput = FileHandle.nullDevice
     do { try p.run() } catch { bitir(4) }
@@ -43,7 +45,7 @@ if let i = a.firstIndex(of: "--vt-izle") {
     let dir = a[i + 1], tc = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("toplanti-claude.py").path
     guard FileManager.default.fileExists(atPath: dir, isDirectory: &d), d.boolValue, FileManager.default.isReadableFile(atPath: tc) else { bitir(2) }
     guard altinda(gercek(dir), uygulamaKlasor) else { bitir(3) }  // O3: önbellekler yalnız uygulama klasörünün altına
-    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); p.arguments = ["-B", tc, "--dir", dir, "vt-izle"]
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); p.arguments = ["-I", "-B", tc, "--dir", dir, "vt-izle"]
     p.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
     var e = ProcessInfo.processInfo.environment; e["PYTHONDONTWRITEBYTECODE"] = "1"; p.environment = e
     p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice; p.standardInput = FileHandle.nullDevice
@@ -80,15 +82,15 @@ func ayarUygun(_ v: String) -> Bool {  // --settings: yalnız {"env": {CLAUDE_CO
           let e = o["env"] as? [String: Any] else { return false }
     return Set(e.keys).isSubset(of: ["CLAUDE_CODE_DISABLE_CLAUDE_MDS", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"]) && e.values.allSatisfy { $0 is String }
 }
-// --mcp-config: yalnız istek klasöründeki konus-mcp.json ve içeriği tek sunucu "suflorvt" = /usr/bin/python3 -B <uygulama>/toplanti-claude.py --dir <istek klasörü> vt-mcp.
+// --mcp-config: yalnız istek klasöründeki konus-mcp.json ve içeriği tek sunucu "suflorvt" = /usr/bin/python3 -I -B <uygulama>/toplanti-claude.py --dir <istek klasörü> vt-mcp.
 // Denetlenen içerik Claude'a dosya yolu olarak değil metin olarak verilir (denetimden sonra dosya değişse de fark etmez).
 func mcpDenetle(_ y: String) -> String? {
     guard gercek(y) == (istekKlasor as NSString).appendingPathComponent("konus-mcp.json"), let d = FileManager.default.contents(atPath: y),
           let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], Set(o.keys) == ["mcpServers"],
           let m = o["mcpServers"] as? [String: Any], Set(m.keys) == ["suflorvt"], let v = m["suflorvt"] as? [String: Any],
           Set(v.keys).isSubset(of: ["command", "args", "env", "type"]), v["command"] as? String == "/usr/bin/python3",
-          let ar = v["args"] as? [String], ar.count == 5, ar[0] == "-B", gercek(ar[1]) == (uygulamaKlasor as NSString).appendingPathComponent("toplanti-claude.py"),
-          ar[2] == "--dir", gercek(ar[3]) == istekKlasor, ar[4] == "vt-mcp" else { return nil }
+          let ar = v["args"] as? [String], ar.count == 6, ar[0] == "-I", ar[1] == "-B", gercek(ar[2]) == (uygulamaKlasor as NSString).appendingPathComponent("toplanti-claude.py"),
+          ar[3] == "--dir", gercek(ar[4]) == istekKlasor, ar[5] == "vt-mcp" else { return nil }
     if let t = v["type"] { guard t as? String == "stdio" else { return nil } }
     var izinliEnv: Set<String> = ["PYTHONDONTWRITEBYTECODE", "SUFLOR_VT_SEMA_YOK"]
     #if SUFLOR_DENEME

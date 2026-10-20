@@ -88,7 +88,7 @@ def konus_vt_hazirla():  # → MCP yapılandırma dosyasının yolu ya da None
     print(f"KONUŞ: veritabanı araçları · tablo yapısı {'istemde (' + str(len(_KS['vt_sema'])) + ' karakter), vt_sema yok' if _KS['vt_sema'] else 'yok — vt_sema aracıyla'}")
     try:
         with open(yol + ".tmp", "w", encoding="utf-8") as f:
-            json.dump({"mcpServers": {"suflorvt": {"command": "/usr/bin/python3", "args": ["-B", tc, "--dir", BASE, "vt-mcp"],
+            json.dump({"mcpServers": {"suflorvt": {"command": "/usr/bin/python3", "args": ["-I", "-B", tc, "--dir", BASE, "vt-mcp"],
                                                    "env": {"PYTHONDONTWRITEBYTECODE": "1", **({"SUFLOR_AYAR": os.environ["SUFLOR_AYAR"]} if os.environ.get("SUFLOR_AYAR") else {}),
                                                            **({"SUFLOR_VT_SEMA_YOK": "1"} if _KS["vt_sema"] else {})}}}}, f)
         os.replace(yol + ".tmp", yol); return yol

@@ -27,8 +27,8 @@ def calistir(ik, args, claude=None, klasor=C, ek=None, sure=30):
     return subprocess.run([ik, "--istek", y], capture_output=True, timeout=sure).returncode
 def sahte_calisti(): return os.path.exists(os.path.join(T, "bin", "iz"))
 MCP = os.path.join(C, "konus-mcp.json")
-def mcp_yaz(komut="/usr/bin/python3", tc=os.path.join(U, "toplanti-claude.py"), env=None):
-    json.dump({"mcpServers": {"suflorvt": {"command": komut, "args": ["-B", tc, "--dir", C, "vt-mcp"], "env": env or {"PYTHONDONTWRITEBYTECODE": "1"}}}}, open(MCP, "w"))
+def mcp_yaz(komut="/usr/bin/python3", tc=os.path.join(U, "toplanti-claude.py"), env=None, args=None):
+    json.dump({"mcpServers": {"suflorvt": {"command": komut, "args": args or ["-I", "-B", tc, "--dir", C, "vt-mcp"], "env": env or {"PYTHONDONTWRITEBYTECODE": "1"}}}}, open(MCP, "w"))
 mcp_yaz()
 KONUS = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
          "--allowedTools", "Read,Grep,Glob,mcp__suflorvt__vt_sema,mcp__suflorvt__vt_sor", "--add-dir", C, "--append-system-prompt", "istem", "--mcp-config", MCP,
@@ -48,11 +48,19 @@ try:
                      ("başka klasör --add-dir", ["-p", "x", "--add-dir", "/"]), ("ikinci konumsal argüman", ["-p", "x", "fazla"]),
                      ("bilinmeyen bayrak", ["-p", "x", "--agents", "{}"]), ("--model'de boşluk", ["-p", "x", "--model", "a b"])]:
         kontrol(f"reddedildi: {ad}", calistir(den, args) == 3 and not sahte_calisti())
-    for ad, kw in [("başka komut", {"komut": sahte}), ("başka betik", {"tc": os.path.join(T, "kotu.py")}), ("ortam değişkeni", {"env": {"PYTHONPATH": T}})]:
+    for ad, kw in [("başka komut", {"komut": sahte}), ("başka betik", {"tc": os.path.join(T, "kotu.py")}), ("ortam değişkeni", {"env": {"PYTHONPATH": T}}),
+                   ("-I olmadan (eski biçim)", {"args": ["-B", os.path.join(U, "toplanti-claude.py"), "--dir", C, "vt-mcp"]})]:
         mcp_yaz(**kw); kontrol(f"MCP reddedildi: {ad}", calistir(den, KONUS) == 3 and not sahte_calisti())
     mcp_yaz()
     os.makedirs(os.path.join(T, "disari")); kontrol("istek uygulama klasörü dışında → red", calistir(den, BRIFING, klasor=os.path.join(T, "disari")) == 3)
     kontrol("çıktı başka klasörde → red", calistir(den, BRIFING, ek={"cikti": os.path.join(T, "x.json")}) == 3 and not sahte_calisti())
+    # v0.99.4 (O3 kalan sınırı): --dizin betiği yalıtılmış Python'la çalışır — PYTHONPATH'teki sitecustomize çalışmaz
+    kotu = os.path.join(T, "kotu"); os.makedirs(kotu); iz = os.path.join(T, "site-iz")
+    open(os.path.join(kotu, "sitecustomize.py"), "w").write(f"open({iz!r}, 'w').write('x')\n")
+    open(os.path.join(U, "baglam.py"), "w").write(f"import sys\nopen({os.path.join(T, 'bayrak')!r}, 'w').write(str(sys.flags.isolated))\n")
+    r = subprocess.run([kur, "--dizin"], env=dict(os.environ, PYTHONPATH=kotu), capture_output=True, timeout=30).returncode
+    bayrak = open(os.path.join(T, "bayrak")).read() if os.path.exists(os.path.join(T, "bayrak")) else "yok"
+    kontrol(f"--dizin: python -I ile (isolated={bayrak}), PYTHONPATH'teki kod çalışmadı", r == 0 and bayrak == "1" and not os.path.exists(iz))
     # kurulu sürüm: imza denetimi
     kontrol("kurulu sürüm: imzasız 'claude' reddedildi", calistir(kur, BRIFING) == 3 and not sahte_calisti())
     if gercek:
