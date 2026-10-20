@@ -695,7 +695,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         if w is None:
             _konus_kur(durum="hata", hata=_t("Claude açılamadı (izin penceresi?) — yeniden dene", "Couldn't open Claude (permission prompt?) — try again")); konus_kapat("açılmadı"); return False
         os.set_blocking(w, True); _KS["w"] = os.fdopen(w, "w", encoding="utf-8", buffering=1); _KS["son"] = time.time(); _KS["maliyet"] = 0; _KS["sayac"] = 0; _KS["acilis_t"] = time.time()
-        _KS["nesil"] = _KS.get("nesil", 0) + 1; threading.Thread(target=_konus_oku, args=(cik, _KS["nesil"]), daemon=True).start()
+        _KS["nesil"] = _KS["nesil_en"] = _KS.get("nesil_en", 0) + 1; threading.Thread(target=_konus_oku, args=(cik, _KS["nesil"]), daemon=True).start()
         print(f"KONUŞ: açık süreç açıldı ({time.time() - t0:.1f} sn)"); return True
 def konus_kapat(neden, durum_koru=False):
     if _KS["w"] or _KS["app"]: _KS["kapali_nesil"] = _KS.get("nesil")  # v0.70.1: bilerek kapatılan sürecin okuyucusu çıkınca "hata" demesin
@@ -708,6 +708,41 @@ def konus_kapat(neden, durum_koru=False):
         except subprocess.TimeoutExpired: pass
     if w: print(f"KONUŞ: süreç kapandı ({neden})")
     if KONUS["durum"] not in ("hata",) and not durum_koru: KONUS["durum"] = "kapali"
+# v0.96.0 (ısıtma ölçümü, 20 Ekim: 122 sorunun 31'i yeni sürecin ilk sorusu — ortanca +0,9 sn, +0,07 $; 7 yeni süreç kartın özel bölümü yüzünden):
+# özel ve ortak cevap için iki süreç. Etkin süreç _KS'te; öteki _KS_YEDEK'te açık bekler, kapsam değişince yer değiştirir (özel bilgi ortak sürece yine
+# girmez). Ayar konus_iki_surec: false eski davranış (ortak soruda özel süreç kapanır). Bekleyen süreç KONUS_BOSTA_SN boşta kalınca kapanır.
+KONUS_P = ("w", "app", "son", "maliyet", "sayac", "acilis_t", "nesil", "defter_md", "defter_satir", "defter_taban", "once_k", "ozel_gitti", "kisilik_mt", "kart_mt", "model", "vt_son")
+_KS_YEDEK = {}
+def _yedek_canli(): return bool(_KS_YEDEK.get("w")) and _KS_YEDEK.get("app") is not None and _KS_YEDEK["app"].poll() is None
+def konus_yedek_kapat(neden):
+    y = dict(_KS_YEDEK); _KS_YEDEK.clear()
+    if y.get("w"):
+        try: y["w"].close()
+        except OSError: pass
+    if y.get("app") and y["app"].poll() is None:
+        try: y["app"].wait(timeout=5)
+        except subprocess.TimeoutExpired: pass
+    if y.get("w"): print(f"KONUŞ: bekleyen süreç kapandı ({neden})")
+def konus_yuva_degis(neden):  # etkin süreci bekleyen yuvaya alır; bekleyen canlıysa etkin olur, değilse etkin yuva boşalır (soru yenisini açar)
+    with _KS["kilit"]:
+        y = dict(_KS_YEDEK) if _yedek_canli() else None
+        if not y: konus_yedek_kapat("öldü")
+        _KS_YEDEK.clear()
+        if konus_canli(): _KS_YEDEK.update({k: _KS.get(k) for k in KONUS_P})
+        if y: _KS.update({k: y.get(k) for k in KONUS_P})
+        else: _KS.update(w=None, app=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None, ozel_gitti=False, model=None, vt_son=None)
+    print(f"KONUŞ: süreç yuvası değişti ({neden}) · etkin {'özel' if _KS.get('ozel_gitti') else 'ortak'}" + (" (bekleyen süreç)" if y else " (yeni süreç açılacak)"))
+# Önceden açma (v0.96.0): mesaj gönderilmez (token yok), süreç boşta yalnız bellek tutar (~150–250 MB). Pano açıkken ya da toplantıda bekçi açar; tur sınırında
+# kapanınca hemen yenisi. Boşta (KONUS_BOSTA_SN) kapandıktan sonra pano yeniden açılana kadar açılmaz. Ölçüm: ilk soruda sürecin hazır olmasını bekleme ortanca 0,67 sn
+# (sonraki sorularda 0,21). Ayar konus_on_ac: false kapatır (toplantıdaki önceden açma da).
+KONUS_PANO_SN = 90
+def konus_on_ac(neden):
+    if AYAR.get("konus_on_ac") is False or not AYAR.get("konusma", True) or konus_canli() or _KS["tur"] or not claude_yolu() or not os.path.isdir(BRIFING_APP): return False
+    _KS["on_ac"] = time.time(); k = {x: KONUS.get(x) for x in ("durum", "hata", "at")}
+    if not konus_ac():  # önceden açma sessiz: başarısızsa panoda hata görünmez, soru gelince yeniden denenir (bu arada soru geldiyse onun durumu kalır)
+        if KONUS.get("durum") == "hata" and not _KS["tur"]: KONUS.update(k)
+        return False
+    print(f"KONUŞ: süreç önceden açıldı ({neden})"); return True
 # Okuma en çok KONUS_OKU_EN_COK cümle (v0.51.1, 16 Ekim): istem "en çok üç cümle / toplantı sorusunda iki kısa cümle" der ama uzun defterli cevapta
 # 3–5 cümle olabiliyor (ölçüm uzun-toplanti L6–L7: ≤ 2 cümle 9–16/16; istem değişikliği düzeltmedi). Sonrası okunmaz, panoda yazılı kalır. Tek sözcüklük
 # "Vay!" / "Hm." sayılmaz.
@@ -827,7 +862,8 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 print(f"KONUŞ: cevap · yazıya {o['wh_ms']} ms · ilk metin {o['ilk_ms']} ms · ilk ses {o['ses_ms']} ms · {o['maliyet']} $")
                 if yenile:  # pano durumu "hazır" kalır (cevap görünür); süreç arka planda kapanır, sonraki basış yenisini açar
                     _KS["devir"] = (str(KONUS.get("soru") or "")[:300], " ".join(tur["metin"].split())[:600])
-                    threading.Thread(target=konus_kapat, args=(f"tur sınırı: {_KS['sayac']} soru, giriş {o['giris']} belirteç — sonraki basışta yeni süreç", True), daemon=True).start()
+                    ns_ = f"tur sınırı: {_KS['sayac']} soru, giriş {o['giris']} belirteç — yeni süreç önceden açılır"
+                    threading.Thread(target=lambda: (konus_kapat(ns_, True), konus_on_ac("tur sınırı")), daemon=True).start()
     # v0.70.1: tur sınırında (ya da kişilik/toplantı değişince) süreç bilerek kapatılır; eski süreç ancak birkaç saniye sonra çıkar. O arada gelen yeni soru
     # (_KS["tur"]) yeni süreç açılmadan önce bu satıra denk gelirse panoda bir an "Claude süreci kapandı" görünüyor, tur siliniyordu. Yalnız beklenmedik çıkış hata.
     if _KS.get("tur") and _KS.get("nesil") == nesil and _KS.get("kapali_nesil") != nesil: _konus_kur(durum="hata", hata=_t("Claude süreci kapandı — yeniden bas", "The Claude process closed — press again")); _KS["tur"] = None
@@ -1258,8 +1294,12 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["otonom"] = False
     tur["sesli"] = ((not top) or kulaklik()) and not tur.get("otonom"); tur["toplantida"] = top  # otonom: cevap toplantıya okunur, kulakta da duyulur
     tur["bellek_kapsam"] = bellek_kapsam(tur, kis); bsn = bellek_sira(metin, tur, kis)  # v0.64.0 (S78)
+    iki = AYAR.get("konus_iki_surec", True) is not False
     if tur["bellek_kapsam"] == "ortak" and _KS.get("ozel_gitti") and konus_canli():  # v0.68.0: kartın özel bölümü süreç geçmişinde kalmasın (toplantı kişiliği görmesin)
-        konus_kapat("kartın özel bölümü süreçte — ortak cevap için yeni süreç", durum_koru=True); _KS["tur"] = tur
+        if iki: konus_yuva_degis("ortak cevap — özel süreç bekliyor")
+        else: konus_kapat("kartın özel bölümü süreçte — ortak cevap için yeni süreç", durum_koru=True); _KS["tur"] = tur
+    elif iki and tur["bellek_kapsam"] != "ortak" and not _KS.get("ozel_gitti") and _KS_YEDEK.get("ozel_gitti") and _yedek_canli():
+        konus_yuva_degis("özel cevap — ortak süreç bekliyor")
     df, dm, dk = _konus_defter(); tur["toplanti_ad"] = df["ad"] if top and df else None
     k_ = kisilik()
     if konus_canli() and (_KS.get("kisilik_mt") != (_KIS.get("mt") if k_ else None) or _KS.get("kart_mt") != kart_mt()):  # kişilik ya da kullanıcı kartı değişti: istem sürecin açılışında verilir
@@ -1281,6 +1321,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
                  (f"{tur.get('karsi') or 'the user'} addressed you by name in the meeting; the spoken part of your answer is read into the meeting right away and everyone hears it: address the asker directly, 1–3 sentences, fit to say in the meeting (no internal notes, observations about people, other projects' information or private remarks)" if tur.get("kaynak") != "moderator" else "you are chairing the meeting; your answer is read into the meeting")
                  if tur.get("otonom") else "only the user hears this answer, the meeting doesn't; " + ("it is read in the headphones" if tur["sesli"] else "it is shown on the panel only (no headphones)")) + ".\n")) if top else ""
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar
+        _KS["bosta"] = False
         if not konus_canli() and not konus_ac(): _KS["tur"] = None; return
         t = time.time()
         while time.time() - t < 15 and not _KS["w"]: time.sleep(0.05)
@@ -1352,13 +1393,15 @@ def _hizli_ozet(f, kaynak):
 def konus_bekci():  # KONUS_BOSTA_SN (55 dk) kullanılmayan süreci kapat; toplantı sürerken (toplanti_konus) süreç açık tutulur: "Claude:" sorusu açılışı beklemesin
     while True:
         time.sleep(30)
-        top = toplanti_var()
+        top = toplanti_var(); simdi = time.time()
+        if _KS_YEDEK and not _KS["tur"] and (not _yedek_canli() or simdi - (_KS_YEDEK.get("son") or 0) > KONUS_BOSTA_SN): konus_yedek_kapat("boşta")
         if top and toplanti_konus() and AYAR.get("konusma", True):
-            if not konus_canli() and not _KS["tur"] and time.time() - _KS.get("on_ac", 0) > 300 and claude_yolu() and os.path.isdir(BRIFING_APP):
-                _KS["on_ac"] = time.time(); k = {x: KONUS.get(x) for x in ("durum", "hata", "at")}
-                if not konus_ac(): KONUS.update(k)  # önceden açma sessiz: başarısızsa panoda hata görünmez, soru gelince yeniden denenir
+            if not konus_canli() and simdi - _KS.get("on_ac", 0) > 300: konus_on_ac("toplantı")
             continue
-        if _KS["w"] and not _KS["tur"] and (time.time() - _KS["son"] > KONUS_BOSTA_SN or top): konus_kapat("boşta" if not top else "toplantı başladı")
+        if _KS["w"] and not _KS["tur"] and (simdi - _KS["son"] > KONUS_BOSTA_SN or top): konus_kapat("boşta" if not top else "toplantı başladı"); _KS.update(bosta=True, bosta_t=simdi); continue
+        pt = STATE.get("_pano_t") or 0; pi = STATE.get("_pano_ilk") or 0  # pano son KONUS_PANO_SN içinde yokladı; _pano_ilk = uzun aradan sonra ilk yoklama
+        if simdi - pt < KONUS_PANO_SN and not konus_canli() and simdi - _KS.get("on_ac", 0) > 300 and (not _KS.get("bosta") or pi > _KS.get("bosta_t", 0)):
+            if konus_on_ac("pano açık"): _KS["bosta"] = False
 threading.Thread(target=konus_bekci, daemon=True).start()
 def brifing_iste(p):
     oid = str(p.get("olay") or ""); olay = TAKVIM_TAM.get(oid)
