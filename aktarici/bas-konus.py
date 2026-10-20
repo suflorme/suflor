@@ -4,10 +4,12 @@
 # Toplantı dışında panodan basılı tutarak soru: pano mikrofonu → /bas-konus (16 kHz PCM, yalnız 127.0.0.1) → yerel Whisper → açık
 # `claude -p --input-format stream-json` süreci → ilk cümle gelir gelmez yerel ses. Ses Mac'ten çıkmaz; metin yalnız Claude'a.
 # Süreci "Suflor Brifing.app" açar (Masaüstü izni ona ait; açık süreç kipi: iki FIFO). Salt okunur araçlar; yazma yok. Bas basılınca
-# süreç ve Whisper ısınır; 30 dk kullanılmazsa süreç kapanır. 8 Ekim ölçümü: açık süreçte ilk metin 1,2–2,8 sn (ayrı çağrı 5,6 sn).
+# süreç ve Whisper ısınır; 55 dk kullanılmazsa süreç kapanır (v0.92.0; önce 30). 8 Ekim ölçümü: açık süreçte ilk metin 1,2–2,8 sn (ayrı çağrı 5,6 sn).
 KONUS = {"durum": "kapali", "soru": None, "cevap": "", "hata": None, "at": None, "olcum": None, "sesli_cevap": False}
 _KS = {"w": None, "app": None, "son": 0, "kilit": threading.Lock(), "tur": None, "maliyet": 0, "sayac": 0, "devir": None, "defter_md": None, "defter_satir": None, "defter_taban": 0}
-KONUS_BOSTA_SN = 1800; KONUS_EN_UZUN_SN = 60
+# v0.92.0 (S101 reçetesi, araştırma A/B): boşta kapanma 30 → 55 dk. Sistem kısmı 1 saat önbellekte; 30. dk'da kapanan süreçten sonra gelen soru yeni süreç +
+# ilk mesaj yazımı (~0,027 $, +1–2 sn) ödüyordu, 1 saati aşınca tamamen soğuk (0,12–0,14 $). Açık süreç boşta ücretsiz (~150–250 MB bellek). Ayar konus_bosta_dk.
+KONUS_BOSTA_SN = float(AYAR.get("konus_bosta_dk") or 55) * 60; KONUS_EN_UZUN_SN = 60
 # Açık süreç konuşma geçmişini biriktirir: her tur bütün geçmişle gider, ilk ses gecikir ve maliyet artar (8 Ekim ölçümü: tur başına giriş 14–32 bin
 # belirteç, araç turlarıyla). Süreç KONUS_TUR_EN_COK soruda ya da tek turun girişi KONUS_GIRIS_SINIR'ı aşınca o turdan sonra kapanır; sonraki basış
 # yenisini açar (açılış kayıt sürerken başlar). Son soru-cevap yeni sürecin ilk sorusuna "önceki konuşma" olarak eklenir: devam sorusu kopmasın.
@@ -158,13 +160,16 @@ def _vt_benzer_notu(soru):
     if len(a) < 2: return ""
     try: rs = [json.loads(l) for l in open(os.path.join(BASE, VT_SORGU_DOSYA), encoding="utf-8") if l.strip()]
     except (OSError, ValueError): return ""
-    en, puan = None, 0; ad = _vt_adlar(soru)
+    en, puan = None, 0; ad = _vt_adlar(soru); yakin = (0, None)
     for r in rs:
         if not r.get("sorgu") or not _vt_ad_uyar(ad, _vt_adlar(r.get("soru"))): continue  # v0.77.0: farklı kişi/kurum adı → başka soru
         b = _vt_sozler(r.get("soru")); o = len(a & b)
         p = 2 * o / (len(a) + len(b)) if o >= 2 else 0
         if p >= puan and p >= 0.6: en, puan = r, p  # eşitlikte en yenisi
-    if not en: return ""
+        elif p > yakin[0]: yakin = (p, r)
+    if not en:  # v0.92.0 ölçüm (vt-sorulari-20261020 Ö2): eşiğin altında kalan en yakın aday — eşik gevşetilirse kaç soru kazanılır
+        if yakin[1] and yakin[0] >= 0.4: print(f"KONUŞ: benzer soru eşik altında ({yakin[0]:.2f} < 0.60) · «{str(yakin[1].get('soru'))[:80]}»")
+        return ""
     sn = _vt_sonuc(en["sorgu"])
     if not sn and en.get("t", 0) >= _KS.get("acilis_t", 0): return ""  # bu süreçteki soru geçmişte zaten var; taze sonuç yoksa ek not gereksiz
     g = datetime.datetime.fromtimestamp(en["t"]).strftime("%d.%m %H:%M"); q = " ;; ".join(" ".join(x.split()) for x in en["sorgu"])
@@ -728,6 +733,10 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
             # 17 Ekim, 5 yeni veritabanı sorusu: araç 0,02–0,3 sn, iki model turu 2–4'er sn; --effort low, alwaysThinkingEnabled: false ve Haiku kısaltmadı
             # (düşünme blokları sürdü; low'da ve Haiku'da cevap tutarlılığı/iç terim kuralı bozuldu) → model ayarı değişmedi.
             if j.get("type") == "user" and tur.get("t_arac") and not tur.get("t_sonuc"): tur["t_sonuc"] = time.time()
+            if j.get("type") == "user":  # v0.92.0 ölçüm (vt-sorulari-20261020 Ö1): ikinci tur sonuç büyüdükçe uzuyor mu — araç sonucunun karakteri
+                for b in ((j.get("message") or {}).get("content") or []):
+                    if isinstance(b, dict) and b.get("type") == "tool_result":
+                        c = b.get("content"); tur["sonuc_kar"] = tur.get("sonuc_kar", 0) + (len(c) if isinstance(c, str) else sum(len(str(x.get("text") or "")) for x in c or [] if isinstance(x, dict)))
             if j.get("type") == "stream_event" and e.get("type") == "message_start" and tur.get("t_sonuc") and not tur.get("t_tur2"): tur["t_tur2"] = time.time()
             # v0.77.3 ölçüm (18 Ekim gece: "en az" sorusunda araca kadar 22 sn): sunucunun ilk yanıtı mı geç, düşünme mi uzun — gonder_ms, ilk_yanit_ms, dusunme_ms, dusunme_kar
             if j.get("type") == "stream_event" and e.get("type") == "message_start" and not tur.get("t_ilk_yanit"): tur["t_ilk_yanit"] = time.time()
@@ -736,7 +745,8 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
             if j.get("type") == "stream_event" and e.get("type") == "content_block_delta" and (e.get("delta") or {}).get("type") == "thinking_delta":
                 tur["dusunme_kar"] = tur.get("dusunme_kar", 0) + len(e["delta"].get("thinking") or "")
             if j.get("type") == "stream_event" and e.get("type") == "content_block_stop" and e.get("index") in (tur.get("_dus") or {}):
-                tur["dusunme_sn"] = tur.get("dusunme_sn", 0) + time.time() - tur["_dus"].pop(e.get("index"))
+                ds = time.time() - tur["_dus"].pop(e.get("index")); tur["dusunme_sn"] = tur.get("dusunme_sn", 0) + ds
+                if tur.get("t_sonuc"): tur["dusunme2_sn"] = tur.get("dusunme2_sn", 0) + ds  # v0.92.0: araç sonucundan sonraki turun düşünmesi
             if j.get("type") == "stream_event" and e.get("type") == "content_block_start" and (e.get("content_block") or {}).get("type") == "tool_use":
                 tur.setdefault("araclar", []).append(str(e["content_block"].get("name") or "?")[:20]); tur["_arac"] = [str(e["content_block"].get("name") or ""), ""]
                 if not tur.get("t_arac"): tur["t_arac"] = time.time()
@@ -769,7 +779,9 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                      "arac": len(tur.get("araclar") or []), "arac_ilk_ms": ms("t_arac"), "araclar": tur.get("araclar") or [],
                      "arac_yazim_ms": ms("t_arac_son"), "arac_sonuc_ms": ms("t_sonuc"), "tur2_ms": ms("t_tur2"), "dusunme": tur.get("dusunme", 0),
                      "gonder_ms": ms("t_gonder"), "ilk_yanit_ms": ms("t_ilk_yanit"), "dusunme_ms": round(tur.get("dusunme_sn", 0) * 1000), "dusunme_kar": tur.get("dusunme_kar", 0),
+                     "dusunme2_ms": round(tur.get("dusunme2_sn", 0) * 1000), "sonuc_kar": tur.get("sonuc_kar", 0), "sorgu_kar": sum(len(x) for x in tur.get("sorgular") or []),
                      "giris": sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
+                     "yazim": u.get("cache_creation_input_tokens") or 0, "yazim_1h": (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0,  # v0.92.0: önbellek yazımı ve 1 saatlik payı (kota dışında 5 dk'ya düşerse görünsün)
                      "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))), 2),
                      "hata": bool(j.get("is_error")), "kaynak": tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True))}
                 _KS["maliyet"] = m; _KS["tur"] = None; _KS["son"] = time.time(); _KS["sayac"] += 1
@@ -1299,7 +1311,7 @@ def _hizli_ozet(f, kaynak):
                   "Yazılı kısımda maddeleri saatleriyle yaz.",
                   "The meeting just ended. Start the spoken part with 'Meeting summary:', at most three short sentences: decisions, who took on what, what is still open; skip what wasn't discussed. "
                   "In the written part list the points with times."), tur)
-def konus_bekci():  # 30 dk kullanılmayan süreci kapat; toplantı sürerken (toplanti_konus) süreç açık tutulur: "Claude:" sorusu açılışı beklemesin
+def konus_bekci():  # KONUS_BOSTA_SN (55 dk) kullanılmayan süreci kapat; toplantı sürerken (toplanti_konus) süreç açık tutulur: "Claude:" sorusu açılışı beklemesin
     while True:
         time.sleep(30)
         top = toplanti_var()

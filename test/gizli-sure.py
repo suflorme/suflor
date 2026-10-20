@@ -95,6 +95,21 @@ toplanti(); m.SES["test_bit"] = 0; m.AYAR["sure_duyuru"] = True; m.AYAR["toplant
 r, o = cikti(m.toplanti_duyuru, "sure", metin="Son beş dakika.", bekle=1.5)
 bak("süre duyurusu toplanti_duyuru kapalıyken de ve 60 sn aralığına takılmadan okunur", r is True and "DUYURU: sure · Son beş dakika." in o)
 m.GIZLI["acik"] = True; bak("gizlide süre duyurusu yok", m.sure_duyuru_acik() is False); m.GIZLI["acik"] = False
+# v0.92.0: gece yarısını geçen toplantı — yalın "HH:MM" saat şimdiye en yakın güne düşer
+class _Saat(datetime.datetime):
+    SIMDI = None
+    @classmethod
+    def now(cls, tz=None): return cls.SIMDI
+def saat_dene(simdi, bas, bit):
+    _Saat.SIMDI = simdi; eski = m.datetime.datetime; m.datetime.datetime = _Saat
+    try:
+        json.dump({"title": "Gece", "rol": "yurutucu", "baslangic": bas, "bitis": bit, "items": ["A", "B"]}, open(os.path.join(m.BASE, "agenda.json"), "w"))
+        m.STATE["agenda_ticks"] = {}; m.AG["mtime"] = None; return m.sure_view()
+    finally: m.datetime.datetime = eski
+g = datetime.datetime.combine(datetime.date.today(), datetime.time(23, 40))
+v = saat_dene(g, "23:30", "00:30"); bak(f"23.40'ta 23:30–00:30 toplantı: kalan 50 dk ({v and v.get('kalan_dk')})", v and v["kalan_dk"] == 50 and v.get("toplam_dk") == 60)
+v = saat_dene(g + datetime.timedelta(minutes=30), "23:30", "00:30"); bak(f"00.10'da aynı toplantı: kalan 20 dk, geçen 40 ({v and (v.get('kalan_dk'), v.get('gecen_dk'))})", v and v["kalan_dk"] == 20 and v.get("gecen_dk") == 40)
+v = saat_dene(g.replace(hour=14, minute=10), "14:00", "15:00"); bak(f"gündüz toplantısı değişmedi ({v and v.get('kalan_dk')})", v and v["kalan_dk"] == 50 and v.get("gecen_dk") == 10)
 ayar_k = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
 bak("ayar sure_duyuru aktarıcıda ve ⚙ Ayarlar'da", '"sure_duyuru": ("bool", False, None)' in ayar_k and "['sure_duyuru','bool'" in pano)
 

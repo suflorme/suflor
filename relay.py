@@ -779,10 +779,13 @@ def _epoch(t):
         return d.timestamp() if d.tzinfo else time.mktime(d.timetuple())
     except Exception: return time.time()
 def _saat(s):
-    # "15:30" (bugün) ya da ISO tarih-saat → yerel datetime (saat dilimsiz)
+    # "15:30" ya da ISO tarih-saat → yerel datetime (saat dilimsiz). v0.92.0: yalın saat şimdiye en yakın gün (±12 sa) — gece yarısını geçen toplantıda
+    # "23:30" başlangıç 00.10'da dünün, "00:30" bitiş 23.40'ta yarının saati (eskiden ikisi de bugün sayılıyordu: kalan süre −23 sa, kayma yanlış).
     s = str(s).strip()
     if re.fullmatch(r"\d{1,2}[:.]\d{2}", s):
-        h, m = map(int, re.split(r"[:.]", s)); return datetime.datetime.combine(datetime.date.today(), datetime.time(h, m))
+        h, m = map(int, re.split(r"[:.]", s)); now = datetime.datetime.now()
+        d = datetime.datetime.combine(now.date(), datetime.time(h, m)); fark = (d - now).total_seconds()
+        return d - datetime.timedelta(days=1) if fark >= 43200 else d + datetime.timedelta(days=1) if fark < -43200 else d
     d = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
     return d.astimezone().replace(tzinfo=None) if d.tzinfo else d
 # --- Kalan süre + gündem kayması ------------------------------------------------------------------------------
@@ -800,6 +803,8 @@ def sure_view():
          "bitti": bitti, "toplam": n, "beklenen": None, "kayma": 0, "acik": [i for i in range(n) if not STATE["agenda_ticks"].get(str(i))]}
     try: bas = _saat(a["baslangic"]) if a.get("baslangic") else (datetime.datetime.fromisoformat(STATE["file_start"][STATE["file"]]) if STATE["file"] in STATE["file_start"] else None)
     except Exception: bas = None
+    if bas and b <= bas and re.fullmatch(r"\d{1,2}[:.]\d{2}", str(a["bitis"]).strip()) and (b + datetime.timedelta(days=1) - bas).total_seconds() < 43200:
+        b += datetime.timedelta(days=1); v.update(bitis=b.strftime("%H:%M"), kalan_dk=int((b - now).total_seconds() // 60) + (1 if (b - now).total_seconds() % 60 else 0))
     if bas and b > bas and n:
         top = (b - bas).total_seconds(); gec = max(0.0, min(top, (now - bas).total_seconds()))
         sr = a.get("sureler")
