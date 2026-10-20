@@ -87,7 +87,8 @@ class CppMotor:
         # -nlp: yoksa her istekte dil olasılığı için kodlayıcı ikinci kez çalışıyor; -ml 100000: yoksa bölüm 60 karakterde sözcük ortasından kesiliyor
         s.p = subprocess.Popen([os.path.join(dizin, "whisper-server"), "-m", os.path.join(dizin, "ggml-large-v3-turbo-q8_0.bin"), "--host", "127.0.0.1",
                                 "--port", str(s.port), "-t", "4", "-l", "tr", "-bs", "-1", "-et", "2.4", "-lpt", "-1.0", "-nth", "0.6", "-nlp",
-                                "-ml", "100000", "--public", "/nonexistent"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                "-ml", "100000", "--public", "/nonexistent"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               env=dict(os.environ, WHISPER_TEMP_MAX="0.2"))  # yeniden deneme 0 → 0,2'de durur (MLX'teki cozme_ayari gibi; yamalı sunucu)
         # bekçi: işçi çıkınca (öldürülüp zombi kalsa da) sunucuyu kapatır; normal çıkışta atexit hemen kapatır
         subprocess.Popen(["/bin/sh", "-c", f"while d=$(ps -o stat= -p {os.getpid()} 2>/dev/null) && [ \"${{d#Z}}\" = \"$d\" ] && kill -0 {s.p.pid} 2>/dev/null; "
                           f"do sleep 1; done; kill {s.p.pid} 2>/dev/null"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

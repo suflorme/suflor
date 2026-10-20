@@ -486,22 +486,38 @@ def konus_ad_notu(duz):
     print(f"KONUŞ: ad düzeltmesi {s}")
     return _t(f"[Ad düzeltmesi — Suflor: soru yerel konuşma tanımayla yazıldı; duyulan → kayıtlardaki ad: {s}. Soruda düzeltilmiş ad var; bağlama uymuyorsa duyulanı da düşün.]\n",
               f"[Name correction — Suflor: the question was transcribed locally; heard → name in the records: {s}. The question uses the corrected name; if it doesn't fit, consider what was heard.]\n")
-# --- Bekleme cümlesi (v0.42.0; doğal ses araştırması B): soru Claude'a gittikten KONUS_BEKLE_SN sonra hâlâ ses yoksa kısa, değişken, mümkünse içerikli
-# bir cümle (ön aramanın ilk sonucunun türüne göre). Araştırma: yalnız gecikme ~1 sn'yi aşınca, aynı cümle art arda değil; "Hm." ses_duzen'le sessizlik alır.
-# Araç kullanımındaki "Bakıyorum." bekleme cümlesi çaldıysa tekrarlanmaz (tur["bakiyor"]).
-KONUS_BEKLE_SN = float(AYAR.get("konus_bekle_sn", 1.5)); KONUS_BEKLE_ALINDI_EK_SN = 2.0  # bırakınca "Hı hı" çaldıysa bekleme cümlesi 3,5 sn'de
-BEKLE_GENEL = {"tr": ["Hm, bir bakayım.", "Bir saniye.", "Bakıyorum.", "Hemen bakıyorum.", "Kontrol ediyorum.", "Cevabınız için kısa bir araştırma yapıyorum."],
-               "en": ["Hm, let me see.", "One second.", "Let me check.", "Checking now."]}
-BEKLE_SEY = ["Hemen bakıyorum.", "Kontrol ediyorum.", "Cevabınız için kısa bir araştırma yapıyorum.", "Bir saniye, bakıyorum."]  # v0.54.0: "şey" tamamen kalktı (kullanıcı, 16 Ekim); süre kazanma cümleleri
-BEKLE_TUR = {"gorusme": "Görüşme kayıtlarına bakıyorum.", "toplanti": "Toplantı notlarına bakıyorum.", "defter": "Toplantı notlarına bakıyorum.",
-             "belge": "Belgelere bakıyorum.", "tablo": "Tablolara bakıyorum.", "analiz": "Analizlere bakıyorum.", "sunum": "Sunumlara bakıyorum."}
-_BEKLE = {"son": None}
+# --- Bekleme cümlesi (v0.42.0; doğal ses araştırması B; v0.94.0 S102, kullanıcı 20 Ekim): cevap hazırsa ara cümle yok. Araç başlayınca (veritabanı,
+# dosya araması) konuya özgü kısa cümle hemen; araçsız cevap KONUS_BEKLE_SN'yi aşarsa kısa cümle. Ölçüm (17–20 Ekim, 111 araçsız soru): ilk metin
+# gönderimden ortanca 1,8 sn, p90 3,8 sn sonra — eski 1,5 sn eşiği hazır cevapların ~%70'ine "Kontrol ediyorum" sokuyordu; araçlı sorularda ilk metin
+# ortanca 10,5 sn. "Hemen bakıyorum", "Kontrol ediyorum", "kısa bir araştırma yapıyorum" havuzdan çıktı. Son BEKLE_ARA cümle tekrar seçilmez.
+# Araç ya da gecikme cümlesi çaldıysa ikincisi söylenmez (tur["bakiyor"]).
+KONUS_BEKLE_SN = float(AYAR.get("konus_bekle_sn", 4.0)); KONUS_BEKLE_ALINDI_EK_SN = 1.0  # bırakınca "Hı hı" çaldıysa 1 sn daha
+BEKLE_GENEL = {"tr": ["Bir saniye.", "Bakayım.", "Hm, bakayım.", "Bir bakayım."],
+               "en": ["One second.", "Let me see.", "Hm, let me see.", "Let me check."]}
+BEKLE_TUR = {"takvim": ["Takvimine bakıyorum.", "Takvime bakayım."], "sayi": ["Sayıları çekiyorum.", "Rakamlara bakayım."],
+             "not": ["Notlara göz atıyorum.", "Notlara bakayım."], "gorusme": ["Görüşme kayıtlarına bakıyorum.", "Görüşmelere bakayım."],
+             "belge": ["Belgelere göz atıyorum.", "Belgelere bakayım."], "tablo": ["Tablolara bakıyorum."], "sunum": ["Sunumlara bakayım."], "analiz": ["Analizlere bakayım."]}
+BEKLE_TUR_EN = {"takvim": ["Checking your calendar."], "sayi": ["Pulling the numbers."], "not": ["Looking at the notes."]}
+BEKLE_TUR_ESLE = {"toplanti": "not", "defter": "not"}  # ön aramanın sonuç türü → cümle türü
+BEKLE_SAYI_RX = re.compile(r"(?i)(\bkaç\b|kaç (tane|kişi|adet)|\bsayı\w*|\brakam\w*|\btoplam\w*|\boran\w*|yüzde|\badet\w*|\bciro\w*|\bistatistik|en (çok|fazla|az)\b|"
+                           r"how many|how much|\bnumbers?\b|\btotal\b|\bcount\b|percent)")
+BEKLE_TAKVIM_RX = re.compile(r"(?i)(takvim|toplantı\w* (var|ne zaman|saat)|bugün\w* ne var|yarın\w* ne var|saat kaçta|ajanda|calendar|schedule)")
+BEKLE_ARA = 2
+_BEKLE = {"son": []}
+def bekleme_turu(soru="", arac=None, tur_ad=None):  # → BEKLE_TUR anahtarı ya da None (genel kısa cümle)
+    a = str(arac or "")
+    if "vt_s" in a: return "sayi"
+    if tur_ad: return BEKLE_TUR_ESLE.get(tur_ad, tur_ad if tur_ad in BEKLE_TUR else "not" if a else None)
+    if TAKVIM_UZAK_RX.search(soru or "") or TAKVIM_BOS_RX.search(soru or "") or BEKLE_TAKVIM_RX.search(soru or ""): return "takvim"
+    if BEKLE_SAYI_RX.search(soru or ""): return "sayi"
+    return "not" if a in ("Grep", "Glob", "Read") else None
 def bekleme_cumlesi(tur_ad=None):
     import random
-    dil = "tr" if ARAYUZ_DILI == "tr" else "en"
-    aday = ([BEKLE_TUR[tur_ad]] if dil == "tr" and tur_ad in BEKLE_TUR and random.random() < 0.6 else []) or BEKLE_GENEL[dil]
-    aday = [c for c in aday if c != _BEKLE["son"]] or aday
-    c = random.choice(aday); _BEKLE["son"] = c; return c
+    tr = ARAYUZ_DILI == "tr"
+    aday = list((BEKLE_TUR if tr else BEKLE_TUR_EN).get(tur_ad) or []) or BEKLE_GENEL["tr" if tr else "en"]
+    if len(aday) == 1: aday = aday + BEKLE_GENEL["tr" if tr else "en"][:2]  # tek cümlelik türde de art arda aynısı olmasın
+    aday = [c for c in aday if c not in _BEKLE["son"]] or [c for c in aday if c != (_BEKLE["son"] or [None])[-1]] or aday
+    c = random.choice(aday); _BEKLE["son"] = (_BEKLE["son"] + [c])[-BEKLE_ARA:]; return c
 # --- Takvim haftası ve uygun zaman (v0.55.0, S70; kullanıcı 16 Ekim: Mac Takvim, hafta içi 09:00–18:00) -------------------------------
 # v0.59.0 (kullanıcı, 17 Ekim): yardımcı 30 gün ileriyi okur; Konuş bağlamında her soruda 7 gün (bugün-yarınla sınırlı kalınca kalıba uymayan soruda
 # "yalnız bugün ve yarına erişimim var" deniyordu). 7 günden ötesi (ay adı, gelecek ay, iki hafta sonra) TAKVIM_UZAK_RX'te 30 gün; çalışma saatlerindeki
@@ -750,7 +766,9 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
             if j.get("type") == "stream_event" and e.get("type") == "content_block_start" and (e.get("content_block") or {}).get("type") == "tool_use":
                 tur.setdefault("araclar", []).append(str(e["content_block"].get("name") or "?")[:20]); tur["_arac"] = [str(e["content_block"].get("name") or ""), ""]
                 if not tur.get("t_arac"): tur["t_arac"] = time.time()
-                if not tur.get("t_ses") and not tur.get("bakiyor") and tur.get("sesli", True): tur["bakiyor"] = True; seslendir(_t("Bakıyorum.", "Let me check."), kuyruk=True)  # dosya araması sessiz geçmesin
+                if not tur.get("t_ses") and not tur.get("bakiyor") and tur.get("sesli", True):  # dosya/veritabanı araması sessiz geçmesin; v0.94.0: konuya özgü
+                    tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur"))); seslendir(c, kuyruk=True)
+                    print(f"KONUŞ: araç cümlesi ({tur['_arac'][0][:20]}): {c}")
                 tur["tampon"] = ""  # araçtan önce yarım kalan anlatım okunmasın
             if j.get("type") == "stream_event" and e.get("type") == "content_block_delta" and (e.get("delta") or {}).get("type") == "input_json_delta" and tur.get("_arac"):
                 tur["_arac"][1] += e["delta"].get("partial_json") or ""
@@ -1253,6 +1271,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         vtn = (bz if "vt_sor çağırmadan" in bz or "without calling vt_sor" in bz else _vt_tazele_notu() + bz)  # v0.57.8: taze sonuç gidiyorsa "yeniden sorgula" notu çelişir
         ms, duz = konus_ad_duzelt(metin); adn = konus_ad_notu(duz)  # v0.60.0: sözlük + bilinen adlar (ön arama düzeltilmiş adla)
         tur["soru"] = ms; oa, son_tur = onara_al(ms, tur.get("bellek_kapsam")); tur_ad = "defter" if dfb else son_tur if oa else None
+        tur["bekle_tur"] = tur_ad
         if duz: _konus_kur(soru=ms)
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
         if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
@@ -1262,15 +1281,13 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()
-    def bekle_dolgu(tur_ad):
-        time.sleep(KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0))
-        if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("bakiyor") or not tur.get("sesli", True): return
+    def bekle_dolgu(tur_ad):  # v0.94.0: yalnız cevap gecikince; metin geldiyse (okunmayı bekliyor) ara cümle yok
+        bek = KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0); time.sleep(bek)
+        if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("t_ilk") or tur.get("bakiyor") or not tur.get("sesli", True): return
         tur["bakiyor"] = True
         import random
-        bek = KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0)
-        z = random.random()
-        if z < 1 / 3 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): düşünme tepki sesi"); return
-        c = random.choice(BEKLE_SEY) if z < 2 / 3 and ARAYUZ_DILI == "tr" else bekleme_cumlesi(tur_ad); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi (Whisper'dan sonra {bek:.1f} sn ses yok): {c}")
+        if random.random() < 1 / 3 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): düşünme tepki sesi"); return
+        c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur_ad=tur_ad)); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): {c}")
     def bekci(sn):
         t = time.time()
         while time.time() - t < sn:

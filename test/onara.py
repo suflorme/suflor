@@ -41,11 +41,19 @@ try:
     bak("arama dizini güncellemez (yeni dosya ön aramada yok)", "yeni.md" not in g["konus_onara"]("Karbon ayak izi raporu ne zaman teslim?"))
     m.guncelle(m.baglan())
     bak("güncellemeden sonra yeni dosya bulunur", "yeni.md" in g["konus_onara"]("Karbon ayak izi raporu ne zaman teslim?"))
-    # v0.42.0 bekleme cümlesi: art arda aynısı yok, türe göre içerikli cümle çıkabiliyor, bilinmeyen türde genel havuz
-    bc = g["bekleme_cumlesi"]; s = [bc() for _ in range(40)]
-    bak("bekleme cümlesi art arda aynı değil", all(a != b for a, b in zip(s, s[1:])))
+    # v0.42.0 / v0.94.0 bekleme cümlesi: son iki cümle tekrar yok, türe göre içerikli cümle, bilinmeyen türde kısa genel havuz, eski kalıplar yok
+    bc, bt = g["bekleme_cumlesi"], g["bekleme_turu"]; s = [bc() for _ in range(40)]
+    bak("bekleme cümlesi son ikisiyle aynı değil", all(c not in s[i - 2:i] for i, c in enumerate(s) if i >= 2) and all(a != b for a, b in zip(s, s[1:])))
     bak("türe göre içerikli cümle çıkıyor (görüşme)", "Görüşme kayıtlarına bakıyorum." in {bc("gorusme") for _ in range(40)})
-    bak("bilinmeyen tür → genel havuz", all(c in g["BEKLE_GENEL"]["tr"] for c in (bc("bilinmeyen") for _ in range(20))))
+    bak("tek cümlelik türde de art arda aynısı yok (tablo)", all(a != b for a, b in zip(*(lambda x: (x, x[1:]))([bc("tablo") for _ in range(30)]))))
+    bak("bilinmeyen tür → kısa genel havuz", all(c in g["BEKLE_GENEL"]["tr"] for c in (bc("bilinmeyen") for _ in range(20))))
+    havuz = str(g["BEKLE_GENEL"]) + str(g["BEKLE_TUR"])
+    bak("eski kalıplar havuzda yok", not any(k in havuz for k in ("Hemen bakıyorum", "Kontrol ediyorum", "araştırma yapıyorum")))
+    bak("tür seçimi: veritabanı → sayı, takvim sorusu → takvim, sayı sorusu → sayı, dosya araması → not, sıradan soru → genel",
+        bt("ne var", "mcp__suflorvt__vt_sor") == "sayi" and bt("Yarın takvimimde ne var?") == "takvim" and bt("Perşembe müsait miyim?") == "takvim"
+        and bt("Kaç tane açık sipariş var?") == "sayi" and bt("Ne konuştuk?", "Grep") == "not" and bt("Bu fikir hakkında ne düşünüyorsun?") is None
+        and bt("x", tur_ad="defter") == "not" and bt("x", tur_ad="belge") == "belge")
+    print("   örnek:", bc("takvim"), "|", bc("sayi"), "|", bc("not"), "|", bc())
 finally:
     if not hata: shutil.rmtree(T, ignore_errors=True)
     else: print(f"(deneme klasörü: {T})")

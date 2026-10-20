@@ -94,16 +94,16 @@ os.remove(os.path.join(T, "gemini-kota.json")); ad["GEMINI_KOTA"]["dolu"] = None
 bak("kayıt yoksa ayardaki model", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
 bak("ayarda yedek model seçilemez (3.1 → Flash-Lite)", (ad["AYAR"].__setitem__("gemini_model", "gemini-3.1-flash-tts-preview"), ad["gemini_model"]())[1] == "gemini-3.8-flash-lite-tts"); ad["AYAR"].pop("gemini_model")
 # v0.80.11: sabit cümle önbelleği — ilk GEMINI_SABIT_N okuyuş Gemini'den (kaydedilir), sonra istek yok; art arda aynı okuyuş değil; sabit olmayan cümle önbelleğe girmez
-ad["BEKLE_SEY"] = ["Hemen bakıyorum.", "Kontrol ediyorum."]; ad["GEMINI"]["hata_t"] = 0
-n = len(GELEN); [ad["gemini_oku"]("Hemen bakıyorum.", ses="Charon") for _ in range(3)]; n3 = len(GELEN)
-kl = ad["_sabit_klasor"]("Hemen bakıyorum.", "Charon", None); dosyalar = sorted(f for f in os.listdir(kl) if f.endswith(".pcm"))
+ad["BEKLE_GENEL"] = {"tr": ["Bir saniye.", "Bakayım."]}; ad["GEMINI"]["hata_t"] = 0
+n = len(GELEN); [ad["gemini_oku"]("Bir saniye.", ses="Charon") for _ in range(3)]; n3 = len(GELEN)
+kl = ad["_sabit_klasor"]("Bir saniye.", "Charon", None); dosyalar = sorted(f for f in os.listdir(kl) if f.endswith(".pcm"))
 bak(f"ilk 3 okuyuş Gemini'den, önbelleğe yazılır ({n3 - n} istek, {dosyalar})", n3 - n == 3 and dosyalar == ["0.pcm", "1.pcm", "2.pcm"])
 secilen = []; ad["_SABIT_SON"].clear()
-for _ in range(6): r_ = ad["gemini_oku"]("Hemen bakıyorum.", ses="Charon"); secilen.append(ad["_SABIT_SON"][kl])
+for _ in range(6): r_ = ad["gemini_oku"]("Bir saniye.", ses="Charon"); secilen.append(ad["_SABIT_SON"][kl])
 bak(f"sonra istek atılmaz, art arda aynı okuyuş yok ({len(GELEN) - n3} istek, {secilen})", len(GELEN) == n3 and r_ is True and all(a != b for a, b in zip(secilen, secilen[1:])))
-pc = ad["gemini_oku"]("Hemen bakıyorum.", ses="Charon", topla=True)
+pc = ad["gemini_oku"]("Bir saniye.", ses="Charon", topla=True)
 bak("toplantıya söyle (topla) önbellekten ham ses alır", isinstance(pc, bytes) and len(pc) == 48000 and len(GELEN) == n3)
-n = len(GELEN); ad["gemini_oku"]("Hemen bakıyorum.", ses="Kore"); bak("başka ses ayrı önbellek (Kore için yine istek)", len(GELEN) - n == 1)
+n = len(GELEN); ad["gemini_oku"]("Bir saniye.", ses="Kore"); bak("başka ses ayrı önbellek (Kore için yine istek)", len(GELEN) - n == 1)
 n = len(GELEN); ad["gemini_oku"]("Bu sabit değil."); ad["gemini_oku"]("Bu sabit değil.")
 bak("sabit olmayan cümle her seferinde Gemini'ye gider", len(GELEN) - n == 2)
 n = len(GELEN); [ad["gemini_oku"]("Hı hı.", ses="Charon", duzey=0.5) for _ in range(4)]; bak(f"hı hı da önbellekte (4 okumada {len(GELEN) - n} istek)", len(GELEN) - n == 3)

@@ -46,7 +46,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_gecmis": True}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_gecmis": True}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
@@ -89,7 +89,7 @@ try:
     ok("okunurken yabancı ad Türkçe yazımla, pano metni aynen", "Beyskemp takvimi geldi" in log() and "Basecamp takvimi" in (k.get("cevap") or ""))
     ok("açık süreç bir kez açıldı", log().count("KONUŞ: açık süreç açıldı") == 1)
     k2 = sor("Toplantının sonunda ne yazılır?")
-    ok("araç başlayınca 'Bakıyorum' söylendi (yalnız ikinci soruda)", log().count("Bakıyorum.") == 1 and log().count("SES (deneme)") == 5)
+    ok("araç başlayınca konuya özgü cümle söylendi (yalnız ikinci soruda)", log().count("KONUŞ: araç cümlesi") == 1 and log().count("SES (deneme)") == 5)
     ok("ikinci soru aynı süreçte, tur maliyeti farkla", k2["durum"] == "hazir" and log().count("KONUŞ: açık süreç açıldı") == 1 and abs(k2["olcum"]["maliyet"] - 0.01) < 1e-6)
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
     ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) >= 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c)
@@ -184,7 +184,7 @@ try:
     k12 = sor("Takılma denemesi var mı?")
     ok("takılan soru: 3 sn sonra süreç yenilendi, soru yeniden gitti ve cevaplandı (defter yeni süreçte soruyla)", k12["durum"] == "hazir" and "Sorduğun" in (k12.get("cevap") or "")
        and "KONUŞ: zaman aşımı — 3 sn cevap yok" in log() and "KONUŞ: süreç kapandı (zaman aşımı)" in log() and "Defter geldi: Başka toplantı" in k12["cevap"])
-    ok("v0.42.0: takılan soruda 1,5 sn sonra bekleme cümlesi söylendi, yalnız bir kez (yeniden gönderimde tekrar yok)", log().count("KONUŞ: bekleme cümlesi") == 1)
+    ok("v0.42.0: takılan soruda (test ayarı) 1,5 sn sonra bekleme cümlesi söylendi, yalnız bir kez (yeniden gönderimde tekrar yok)", log().count("KONUŞ: bekleme cümlesi") == 1)
     k13 = sor("Donma denemesi var mı?")
     ok("ikinci denemede de cevap yoksa panoda hata", k13["durum"] == "hata" and "cevap vermedi" in (k13.get("hata") or "") and "ikinci denemede de 6 sn cevap yok" in log())
     urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ping", data=json.dumps({"call": True, "panel": True}).encode(), headers={"X-Suflor-Anahtar": K}))
