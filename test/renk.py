@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Renkler tek kaynakta (v0.99.2, pano/renk.css): pano ve hazırlık gömer, eklenti penceresi ve sihirbaz bağlar; Teams şeridi (content.js, gölge DOM) aynı
+# Renkler, yazı boyları ve köşeler tek kaynakta (v0.99.2; boy/köşe v0.99.3, pano/renk.css): pano ve hazırlık gömer, eklenti penceresi ve sihirbaz bağlar; Teams şeridi (content.js, gölge DOM) aynı
 # değerleri taşır. Okunurluk (WCAG AA ≥ 4,5:1): soluk yazı (--t3) tüm zeminlerde, uyarı (--wa) yüzeyde ve kendi zemininde, ana düğme yazısı dolgusunda.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/renk.py      — renk değiştirince ya da yeni yüzey eklenince
 import os, re, sys
@@ -27,4 +27,18 @@ kontrol("pano ve hazırlık renk.css'i gömer", "/*__RENK__*/" in oku("pano/pano
 kontrol("eklenti penceresi ve sihirbaz bağlar", 'href="pano/renk.css"' in oku("popup.html") and 'href="/pano/renk.css"' in oku("sihirbaz/index.html") and '"/pano/renk.css"' in oku("kurulum.py"))
 kopya = [p for p in ("pano/pano.html", "pano/hazirlik.html", "popup.html", "sihirbaz/sihirbaz.css") if re.search(r"--(t3|soluk|tx|murekkep)\s*:\s*#", oku(p))]
 kontrol(f"başka dosyada renk tanımı kopyası yok ({kopya or '—'})", not kopya)
+# v0.99.3: yazı boyu ve köşe yarıçapı da renk.css'te (az basamak); pano, hazırlık ve eklenti penceresinde sabit px kalmasın. Başlık yazısı (font:300 …,
+# marka yazı tipi) ve yazdırılan PDF sayfası (pano.html'de window.open'la yazılan ayrı belge) sayılmaz. Hareket azaltma tüm yüzeylerde.
+olcu = jetonlar(R[:R.index("@media")])
+kontrol("renk.css'te beş yazı boyu ve üç köşe + tam yuvarlak", all(f"yz-{i}" in olcu for i in range(1, 6)) and all(k in olcu for k in ("kose-s", "kose", "kose-l", "kose-tam")))
+def sabit(p):
+    x = []
+    for i, l in enumerate(oku(p).split("\n")):
+        if p == "pano/pano.html" and "w.document.write(" in l: continue  # yazdırılan PDF sayfası
+        x += [f"{p}:{i + 1} {m}" for m in re.findall(r"font-size:\s*[0-9.]+px|font:\s*[0-9.]+px|border-radius:\s*(?:[1-9][0-9.]*px|var\(--r\))", l)]
+    return x
+sx = [y for p in ("pano/pano.html", "pano/hazirlik.html", "popup.html") for y in sabit(p)]
+kontrol(f"pano, hazırlık ve eklenti penceresinde sabit yazı boyu/köşe yok ({sx[:3] or '—'})", not sx)
+kontrol("hareket azaltma: renk.css tüm animasyon ve geçişleri kısaltır, Teams kart penceresi de", re.search(r"prefers-reduced-motion:reduce\)\{\*,\*::before,\*::after\{animation-duration", R) is not None
+        and "@media (prefers-reduced-motion:reduce){*{animation:none!important" in C)
 print(f"{sum(ok)}/{len(ok)}"); sys.exit(0 if all(ok) else 1)

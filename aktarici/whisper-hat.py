@@ -322,7 +322,10 @@ def _isci_dongu():
         if _ISCI["baslik"] != is_["baslik"]:  # yeni toplantı: karşı kanal kümeleri ve adları sıfırlanır (işçi de başlık değişince sıfırlar)
             if _ISCI["baslik"] is not None: kume_sifirla()
             _ISCI["baslik"] = is_["baslik"]
-        istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem_metni(), "onceki": (k.onceki if k else "")[-150:],
+        # "yazayım mı?" sorusuna bas-konuş cevabı istemsiz: whisper.cpp ad/terim listeli istemle kısa "Evet."i "Evit." yazıyordu, ayırıcı tanımıyordu
+        # (20 Ekim, test34; istemsiz doğru). Cevap sözcüklerini isteme koymak olmaz: işçi istemde geçen tek sözü "istemi geri okuma" diye atar.
+        istem = "" if is_.get("bas") and SORU.get("aktif") else istem_metni()
+        istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem, "onceki": (k.onceki if k else "")[-150:],
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
         if not dil: istek.update(diller=["tr", "en"], dil_yedek=getattr(k, "dil_son", None))  # karışık: yalnız tr/en
         elif dil in ("tr", "en"):

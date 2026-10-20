@@ -520,7 +520,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     // v0.57.9: panodaki ince çizgi simgeler (renkli emoji yerine); Teams sayfası innerHTML'e izin vermeyebilir — DOM ile çizilir
     const IKON = { star: ["M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"], mute: ["M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8", "M10 20.5a2 2 0 0 0 4 0", "M4 4l16 16"],
-      check: ["M5 12.5l4.5 4.5L19 7.5"], x: ["M6 6l12 12M18 6L6 18"], pause: ["M9 6v12M15 6v12"], zil: ["M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z", "M10 20.5a2 2 0 0 0 4 0"], uyari: ["M12 4l9 15.5H3z", "M12 10v4M12 17v.01"] };
+      check: ["M5 12.5l4.5 4.5L19 7.5"], x: ["M6 6l12 12M18 6L6 18"], pause: ["M9 6v12M15 6v12"], zil: ["M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z", "M10 20.5a2 2 0 0 0 4 0"], uyari: ["M12 4l9 15.5H3z", "M12 10v4M12 17v.01"],
+      saat: ["M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z", "M12 7v5l3 2"] };
     function ikon(d, ad) {
       const NS = "http://www.w3.org/2000/svg", s = d.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "i"); s.setAttribute("aria-hidden", "true");
       for (const yol of IKON[ad] || []) { const p = d.createElementNS(NS, "path"); p.setAttribute("d", yol); s.append(p); }
@@ -551,7 +552,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .kd{font-size:12px;color:var(--t2);margin-top:2px}.rp{font-weight:600}
         .ipucu{position:fixed;z-index:1000;max-width:240px;padding:5px 8px;border-radius:6px;background:#18201c;color:#fff;font:12px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;white-space:pre-line;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}
         .ipucu[hidden]{display:none}@media (prefers-color-scheme:dark){.ipucu{background:#e8ebe6;color:#171d1a}}
-        .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 rgba(176,131,46,.75)}100%{box-shadow:0 0 0 12px rgba(176,131,46,0)}}`;
+        .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 rgba(176,131,46,.75)}100%{box-shadow:0 0 0 12px rgba(176,131,46,0)}}
+        @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
     // Kart penceresi = mini pano: kartlar (NOT dahil), son satır, Claude'a not/soru kutusu, ⭐ / Ne diyeyim? / 🔇 / Kanıt.
     // Kutu pano ve mini panodakiyle aynı: aktarıcı /girdi soru mu not mu ayırır (başta ? → soru); Enter gönderir, ⌘Enter her zaman
     // soru, Shift+Enter yeni satır. Sayfa içi listede kutu yok (ayrı pencere açılamazsa yalnız kartlar).
@@ -696,7 +698,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
           .forEach(([st, lbl, tip]) => { const x = e("button"); x.append(ikon(d, lbl[0])); if (lbl[1]) x.append(e("span", null, lbl[1])); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
         k.append(m, a); list.append(k);
       });
-      qs.forEach(q => list.append(e("div", "q", "⏳ " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L("Claude'a soruldu: ") + q.text))));
+      qs.forEach(q => { const x = e("div", "q", " " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L("Claude'a soruldu: ") + q.text)); x.prepend(ikon(d, "saat")); list.append(x); });
       if (!cards.length && !qs.length && !dil && !warn) list.append(e("div", "bos", L("Şimdilik kart yok")));
     }
     function sonCiz(d, son) {  // mini panodaki gibi tek satır canlılık: son döküm satırı ne zaman, kimden

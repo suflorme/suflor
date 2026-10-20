@@ -533,7 +533,7 @@ globalThis.SUFLOR_EN = {
   "Güvenlik ya da kurulum düzeltmesi — toplantı yokken güncelle": "Security or setup fix — update when you're not in a meeting",
   "Gizli toplantı: tekrar basana kadar Suflor tamamen kapalı — ses, Whisper, döküm, kanıt yok; Claude ve Gemini'ye hiçbir şey gitmez": "Private meeting: until you press again Suflor is fully off — no audio, Whisper, transcript or evidence; nothing goes to Claude or Gemini",
   "Gizli": "Private",
-  "🔒 Gizli toplantı — Suflor dinlemiyor, yazmıyor, hiçbir yapay zekâya göndermiyor": "🔒 Private meeting — Suflor isn't listening, writing or sending anything to any AI",
+  "Gizli toplantı — Suflor dinlemiyor, yazmıyor, hiçbir yapay zekâya göndermiyor": "Private meeting — Suflor isn't listening, writing or sending anything to any AI",
   "Gizli toplantı açık — Suflor hiçbir şey dinlemiyor ve işlemiyor (🔒 ile kapat)": "Private meeting is on — Suflor isn't listening or processing anything (turn off with 🔒)",
   "Gizli toplantı açık — kanıt alınmaz": "Private meeting is on — no evidence is captured",
   "🔒 Gizli toplantı: Suflor hiçbir şey dinlemiyor, yazmıyor, hiçbir yapay zekâya göndermiyor — kapatmak için yine 🔒": "🔒 Private meeting: Suflor isn't listening, writing or sending anything to any AI — press 🔒 again to turn off",
