@@ -1225,6 +1225,7 @@ def konus_is_ilet(metin):
 # gelince toplantıya okunur (otonom.py). Kullanıcı onu toplantıda ilk kez çağırınca asistan "katılır"; ardından karşı taraf da ona adıyla sorabilir. Yalnız
 # kullanıcıya cevap tek yoldan: Konuş düğmesi. "<Ad>, dur/sus" okumayı keser. İş talimatı ("<Ad>, not al / e-posta taslağı hazırla") toplantı oturumunda
 # yapılır, asistan kısa onay verir. Önceki cevap sürerken gelen soru ASISTAN_BEKLE_SN'ye kadar sırada bekler (önceden toplantı oturumuna düşüp çift cevap oluyordu).
+ASISTAN_OKU_RX = re.compile(r"^\W*(oku|okuyabilirsin|söyle|soyle|evet|evet oku|tamam|tamam oku|cevapla|cevap ver|onaylıyorum|go ahead|read it|yes)\W*$", re.I)  # v0.97.0 (Y2): bekleyen karşı taraf cevabını onayla
 ASISTAN_DUR_RX = re.compile(r"^\W*(dur|sus|sus artık|yeter|kes|bekle|tamam yeter|stop|be quiet|that'?s enough)\W*$", re.I)
 ASISTAN_BEKLE_SN = 30
 def _hitap_ad():  # bu satırda adıyla seslenilen asistan (hitap_duzelt bıraktı); kişiliksiz kurulumda Claude/Suflor hitabı → "Suflor"
@@ -1256,6 +1257,7 @@ def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses ki
     if not m or not ad: return False
     soru = text[m[-1].end():].strip()
     if ASISTAN_DUR_RX.match(soru): print(f"ASİSTAN: '{ad}, dur'"); asistan_dur(); return True
+    if ASISTAN_OKU_RX.match(soru) and "otonom_onay_ver" in globals() and otonom_onay_ver(): print(f"ASİSTAN: '{ad}, oku' — karşı tarafa cevap onaylandı"); return True  # v0.97.0 (Y2)
     if len(soru.split()) < 2: return False
     if moderator_komut(soru, ad if kisilikler() else None): asistan_katil(ad); return True  # v0.83.0 (S93): "<Ad>, toplantıyı sen yönet" / "sonraki madde" …
     if talimat_coz(soru):  # v0.75.0: toplantıda kendi sesli talimatın → onay kartı (ingest LOCK altında: iş ayrı iş parçacığında)

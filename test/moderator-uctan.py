@@ -108,6 +108,12 @@ try:
     time.sleep(13); s0 = son(); satir("karsi", "Matlas, bütçe ne kadar?")
     v, t2 = bekle(lambda v: v.get("durum") in ("itiraz", "sira", "okunuyor", "okundu") and v.get("kim") == "Ayla Ö", 25)
     ok("karşı taraf katılan moderatöre seslendi → herkese", t2 is not None)
+    # v0.97.0 (Y2): karşı tarafa cevap kullanıcı onayıyla okunur — kartı onayla
+    for _ in range(50):
+        kc = next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and c.get("status") == "acik" and "okuyayım mı" in c.get("text", "")), None)
+        if kc: uc("/card-ack", {"id": kc["id"], "status": "onaylandi"}, pano=True); break
+        time.sleep(0.2)
+    ok("karşı tarafa cevap için onay kartı çıktı (v0.97.0)", kc is not None)
     bekle(lambda v: v.get("durum") == "okundu", 20); ok("cevabı MATLAS verdi ve toplantıya okundu", "Kişi MATLAS" in cevap() and son() == s0 + 1)
     # 3) sonraki madde
     time.sleep(2); n0 = log().count("MODERATÖR: ac"); satir("ben", "Matlas, sonraki maddeye geçelim.")

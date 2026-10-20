@@ -41,7 +41,7 @@ kis2 = os.path.join(T, "kisilik2.md")  # v0.61.0: toplantı dışı kişilik —
 open(kis2, "w", encoding="utf-8").write("---\nad: MATLAS\nhitap: Matlas\nhitap_bicimi: sen\nkonusma_dili: evet\n---\n## Kişilik: MATLAS\nAdın MATLAS.\n")
 ay = os.path.join(T, "ayar.json")
 AY = {"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
-      "claude": sahte, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6}
+      "claude": sahte, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6, "karsi_onay_sn": 10}
 json.dump(AY, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
@@ -87,6 +87,13 @@ try:
         return ot(), None
     son = lambda: log().count("TOPLANTIYA SÖYLE (")  # web yolu (ping call=true) ya da BlackHole (deneme)
     hazir = lambda: log().count("OTONOM: cevap hazır")
+    def izin_kart(): return next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and c.get("status") == "acik" and "okuyayım mı" in c.get("text", "")), None)
+    def izin_ver(durum="onaylandi", sn=20):  # v0.97.0 (Y2): karşı tarafa cevap onay kartı
+        t = time.time()
+        while time.time() - t < sn:
+            c = izin_kart()
+            if c: uc("/card-ack", {"id": c["id"], "status": durum}, pano=True); return c
+            time.sleep(0.2)
     SUSKU = lambda: time.sleep(13)  # KARSI_HITAP_SUSKU_SN: asistan okuduktan sonra 10 sn karşı hitabı sayılmaz (kendi sesinin yankısı)
     # 0) kullanıcı çağırmadan karşı taraf seslenemez
     n0 = hazir(); satir("karsi", "Atlas, teslim tarihi ne zaman?"); time.sleep(4)
@@ -105,7 +112,12 @@ try:
     ok("/status: ATLAS toplantıda", ((st().get("konus") or {}).get("asistan") or {}).get("katilan") == ["ATLAS"])
     # 2) katıldıktan sonra karşı taraf sorar; konuşma sürerken bekler, susunca okur
     SUSKU(); s0 = son(); MOD["karsi"] = "konus"; satir("karsi", "Atlas, kaç kişi katılacak?")
-    v, _ = bekle(lambda v: v.get("durum") == "sira" and v.get("kim") == "Ayla Ö", 20); time.sleep(2.5)
+    v, _ = bekle(lambda v: v.get("durum") == "itiraz" and v.get("kim") == "Ayla Ö", 20); time.sleep(1.5)
+    kc = izin_kart()
+    ok("karşı tarafa cevap: onay kartı, onaysız okunmadı (v0.97.0)", kc is not None and "Ayla Ö" in kc["text"] and ot().get("durum") == "itiraz" and son() == s0)
+    satir("ben", "Atlas, oku."); time.sleep(1)
+    ok("'Atlas, oku' sesle onayladı, kart kapandı", "ASİSTAN: 'ATLAS, oku'" in log() and izin_kart() is None)
+    v, _ = bekle(lambda v: v.get("durum") == "sira", 10); time.sleep(2.5)
     ok("katılan asistana karşı taraf sordu; konuşma sürerken söz sırası bekleniyor", ot().get("durum") == "sira" and son() == s0)
     MOD["karsi"] = "sessiz"; tk = time.time(); v, t3 = bekle(lambda v: v.get("durum") in ("okunuyor", "okundu"), 8)
     ok(f"susunca ≥ 1,5 sn sonra okumaya başladı ({time.time() - tk:.1f} sn)", t3 is not None and 1.4 <= time.time() - tk <= 4)
@@ -127,7 +139,7 @@ try:
     v, t4 = bekle(lambda v: v.get("durum") == "kesildi", 5); MOD["karsi"] = "sessiz"
     ok("okurken karşı taraf konuştu → okuma durdu (kesildi)", t4 is not None and "OTONOM: biri konuştu" in log())
     # 6) fırsat çıkmazsa söylenmez (otonom_bekle_sn 6)
-    SUSKU(); s0 = son(); MOD["ben"] = "konus"; satir("karsi", "Atlas, sunumu kim yapacak?")
+    SUSKU(); s0 = son(); MOD["ben"] = "konus"; satir("karsi", "Atlas, sunumu kim yapacak?"); izin_ver()
     v, t5 = bekle(lambda v: v.get("durum") == "soylenmedi", 20); MOD["ben"] = "sessiz"
     ok(f"sürekli konuşmada fırsat çıkmadı → söylenmedi ({v.get('neden')})", t5 is not None and son() == s0)
     # 7) "Atlas, dur" — okunan bir şey yokken de sorun çıkarmaz, kesme komutu Claude'a gitmez
@@ -141,9 +153,16 @@ try:
     ok("panoda etiket ikinci kişiliğin adı", (st().get("konus") or {}).get("kisilik") == "MATLAS")
     time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md") and "Otonom" in f)
     ok("toplantıya okunan metinde konuşma dili yok (Bakıyorum)", "Bakıyorum." in [l for l in md.splitlines() if "SUFLOR" in l][-1])
-    SUSKU(); s0 = son(); satir("karsi", "Matlas, bize de özet verir misin?")
+    SUSKU(); s0 = son(); satir("karsi", "Matlas, bize de özet verir misin?"); izin_ver()
     v, t10 = bekle(lambda v: v.get("durum") == "okundu" and son() == s0 + 1, 25)
     ok("katılan ikinci kişiliğe karşı taraf sordu → MATLAS herkese", t10 is not None and "Kişi MATLAS." in ((st().get("konus") or {}).get("cevap") or ""))
+    # 8b) v0.97.0 (Y2): karşı tarafa cevap — Reddet → okunmaz; onay gelmezse (karsi_onay_sn 10) okunmaz, kart kapanır
+    SUSKU(); s0 = son(); satir("karsi", "Atlas, maliyet ne kadar?"); izin_ver("reddedildi")
+    v, tr_ = bekle(lambda v: v.get("durum") == "iptal", 10)
+    ok(f"karşı tarafa cevap reddedildi → okunmadı ({v.get('neden')})", tr_ is not None and son() == s0 and "reddedildi" in log())
+    SUSKU(); s0 = son(); satir("karsi", "Atlas, toplantı nerede?")
+    v, tz = bekle(lambda v: v.get("durum") == "soylenmedi", 25)
+    ok(f"onay gelmedi → okunmadı, kart kapandı ({v.get('neden')})", tz is not None and son() == s0 and "onay gelmedi" in (v.get("neden") or "") and izin_kart() is None)
     # 9) Konuş düğmesi (bas) toplantıda yalnız kullanıcıya
     SUSKU(); n9 = hazir(); s0 = son(); uc("/bas-konus", {"metin": "Atlas, bütçe kalemleri neler?"}, pano=True); time.sleep(4)
     c = (st().get("konus") or {}).get("cevap") or ""
