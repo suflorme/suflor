@@ -2354,6 +2354,7 @@ GB_DIR = lambda: os.path.join(AYAR["ortak"], "geri-bildirim")
 GB_DEPO = AYAR.get("geri_bildirim_depo")  # --github hedefi (yoksa yalnız ortak klasör)
 GUNLUK = os.path.expanduser(AYAR.get("gunluk") or "~/Library/Logs/suflor-aktarici.log")
 GUNLUK_RX = re.compile(r"EKLENTİ|WHISPER|nabız|hata|HATA|UYARI|Traceback|Error|BAŞLAT|DİSK|TAKVİM|KANIT|aktarıcı çalışıyor")
+GUNLUK_HARIC = re.compile(r"Kişiler düğmesi")  # v0.97.3 (O2): düğme etiketi katılımcı adlarını taşıyabilir — ortak rapora girmez
 def _calistir(fn, **kw):
     import io, contextlib
     old = {k: getattr(A, k, None) for k in kw}
@@ -2366,6 +2367,16 @@ def _calistir(fn, **kw):
     finally:
         for k, v in old.items(): setattr(A, k, v)
     return b.getvalue().strip()
+def gb_yaz(fp, metin):  # v0.97.3 (O2): ortak klasör herkese yazılabilir — hazır duran sembolik bağı izleme, var olan dosyayı ezme (aynı dakikada -2, -3 …)
+    kok, uz = os.path.splitext(fp)
+    for i in range(1, 50):
+        yol = fp if i == 1 else f"{kok}-{i}{uz}"
+        try: fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        except FileExistsError: continue
+        try: os.fchmod(fd, 0o644); os.write(fd, metin.encode("utf-8"))
+        finally: os.close(fd)
+        return yol
+    raise OSError("geri bildirim dosyası için boş ad bulunamadı")
 def rapor_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
@@ -2388,7 +2399,7 @@ def rapor_cmd():
     try:
         for l in open(GUNLUK, encoding="utf-8", errors="replace"):
             m = re.match(r"(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) ", l)
-            if not m or not GUNLUK_RX.search(l): continue
+            if not m or not GUNLUK_RX.search(l) or GUNLUK_HARIC.search(l): continue
             if t0:
                 an = datetime.datetime.fromisoformat(m.group(1)).astimezone()
                 if not (t0 - datetime.timedelta(minutes=15) <= an <= t1 + datetime.timedelta(minutes=10)): continue
@@ -2435,8 +2446,7 @@ def rapor_cmd():
     try:
         os.makedirs(d, exist_ok=True)
         fp = os.path.join(d, f"{(t0 or datetime.datetime.now()).strftime('%Y%m%d-%H%M')}-{re.sub(r'[^A-Za-z0-9]+', '', str(AYAR.get('alan')))}-{getpass.getuser()}.md")
-        with open(fp, "w", encoding="utf-8") as f: f.write(metin)
-        os.chmod(fp, 0o644); print(f"geri bildirim yazıldı: {fp}")
+        fp = gb_yaz(fp, metin); print(f"geri bildirim yazıldı: {fp}")
     except OSError as e:
         fp = os.path.join(A.dir, "geri-bildirim-" + datetime.datetime.now().strftime("%Y%m%d-%H%M") + ".md"); open(fp, "w", encoding="utf-8").write(metin)
         print(f"ortak klasöre yazılamadı ({e}) — {fp} (geliştiriciye elle ilet; kurulum: aktarici-kur.command klasörü açar)")
