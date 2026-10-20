@@ -580,8 +580,19 @@ def _vt_baglan():
     import sqlite3, pathlib
     try:
         con = sqlite3.connect(pathlib.Path(os.path.join(PROJE, VT["yol"])).resolve().as_uri() + "?mode=ro", uri=True, timeout=3)
-        con.execute("PRAGMA query_only = ON"); return con
+        con.execute("PRAGMA query_only = ON"); gor = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'view'")}
+        con.set_authorizer(lambda e, a1, a2, vt, kaynak: _vt_yetki(e, a1, a2, kaynak, gor)); return con
     except Exception as e: raise VtHata(f"Kayıt veritabanı açılamadı ({e.__class__.__name__}).")
+# v0.97.2 (güvenlik denetimi O4): maske yalnız sonuç sütununun adına bakıyordu — "SELECT sifre AS x", ifade içi ya da alt sorgu açık değer veriyordu.
+# Yetkilendirici gizli sütunun sorgudaki her okumasını NULL'a çevirir (WHERE'de de: değer tahmin edilemez). Görünümün kendi içindeki okuma serbest
+# (görünüm tanımı veritabanı sahibinin; dışarıya çıkan görünüm sütunu yine ada göre NULL). WITH (CTE) da "kaynak" adı taşır: yalnız veritabanında
+# tanımlı görünümün adı serbest. ATTACH ve table_info dışı PRAGMA reddedilir.
+def _vt_yetki(eylem, a1, a2, kaynak, gorunumler):
+    import sqlite3
+    if eylem == sqlite3.SQLITE_READ: return sqlite3.SQLITE_IGNORE if kaynak not in gorunumler and a2 and VT_GIZLI.search(a2) else sqlite3.SQLITE_OK
+    if eylem == sqlite3.SQLITE_ATTACH: return sqlite3.SQLITE_DENY
+    if eylem == sqlite3.SQLITE_PRAGMA: return sqlite3.SQLITE_OK if str(a1 or "").lower() in ("table_info", "query_only") else sqlite3.SQLITE_DENY
+    return sqlite3.SQLITE_OK
 def vt_sema_metin():
     con = _vt_baglan(); sat = []
     for ad, tur in con.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name").fetchall():
@@ -595,10 +606,13 @@ def vt_sor_metin(q):
     if not re.match(r"(?is)^(select|with)\b", q) or ";" in q or re.search(r"(?i)\b(attach|detach|pragma|insert|update|delete|drop|create|alter|replace|vacuum|reindex|load_extension)\b", q):
         raise VtHata("Yalnız tek bir SELECT/WITH sorgusu çalışır.")
     con = _vt_baglan()
+    for v, in con.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():  # O4: görünüm adlı CTE yetkilendiriciyi şaşırtır
+        if re.search(r'(?i)["`\[]?\b' + re.escape(v) + r'\b["`\]]?\s*(\([^()]*\))?\s*AS\s+(NOT\s+)?(MATERIALIZED\s+)?\(', q):
+            raise VtHata(f"WITH adı bir görünümün adıyla aynı olamaz ({v}).")
     try: cur = con.execute(q)
     except Exception as e: raise VtHata(f"Sorgu hatası: {str(e)[:200]}")
     kol = [d[0] for d in (cur.description or [])]; gz = [bool(VT_GIZLI.search(k)) for k in kol]; rows = cur.fetchmany(61)
-    sat = ["\t".join(kol)] + ["\t".join("***" if g and v is not None else ("" if v is None else " ".join(str(v).split())[:200]) for v, g in zip(r, gz)) for r in rows[:60]]
+    sat = ["\t".join(kol)] + ["\t".join("***" if g else ("" if v is None else " ".join(str(v).split())[:200]) for v, g in zip(r, gz)) for r in rows[:60]]
     return "\n".join(sat + [f"({min(len(rows), 60)} satır" + ("; 60'tan fazla — sorguyu daralt" if len(rows) > 60 else "") + ")"])
 def vt_sema_cmd():
     try: print(vt_sema_metin())

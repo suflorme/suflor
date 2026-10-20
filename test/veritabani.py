@@ -19,6 +19,9 @@ INSERT INTO sistem VALUES ('fatura','Fatura Paneli / Tahsilat','Finans',4), ('de
 CREATE TABLE kisi (id TEXT PRIMARY KEY, ad TEXT, lakap TEXT, gorev TEXT);
 INSERT INTO kisi VALUES ('ayse','Ayşe Deneme','Ayşe','Finans yöneticisi'), ('can','Can Örnek',NULL,'Depo sorumlusu');
 CREATE TABLE karar (no INTEGER PRIMARY KEY, ozet TEXT);
+CREATE TABLE hesap (id TEXT PRIMARY KEY, ad TEXT, sifre TEXT);
+INSERT INTO hesap VALUES ('h1','Fatura yönetici','GIZLI-DEGER-1'), ('h2','Depo','GIZLI-DEGER-2');
+CREATE VIEW v_hesap AS SELECT id, ad, sifre, (sifre IS NOT NULL) AS dolu FROM hesap;
 """)
 con.commit(); con.close()
 AYAR = {"alan": "Test", "ad": "Deneme Kullanici", "port": PORT, "uygulama": os.path.join(T, "uyg"), "proje": proje,
@@ -52,6 +55,24 @@ try:
     c = sqlite3.connect(DB)
     kontrol("veritabanı değişmedi", os.path.getmtime(DB) == mt0 and c.execute("SELECT count(*) FROM sistem").fetchone()[0] == 3
             and c.execute("SELECT count(*) FROM karar").fetchone()[0] == 0); c.close()
+    # O4 (v0.97.2): gizli sütun takma adla, ifade içinde, alt sorguda, WHERE'de, CTE ve görünümden okunamaz; görünümün iç işleyişi sürer
+    for sor, q in [("AS takma adı", "SELECT sifre AS x FROM hesap"), ("ifade içinde", "SELECT upper(sifre) || '' FROM hesap"),
+                   ("alt sorgu", "SELECT (SELECT sifre FROM hesap LIMIT 1) AS y"), ("CTE", "WITH c AS (SELECT sifre AS z FROM hesap) SELECT z FROM c"),
+                   ("CTE görünüm adıyla", "WITH v_hesap AS (SELECT sifre AS ad FROM hesap) SELECT ad FROM v_hesap"),
+                   ("özyinelemeli CTE", "WITH RECURSIVE r(n, s) AS (SELECT 1, (SELECT sifre FROM hesap LIMIT 1) UNION ALL SELECT n+1, s FROM r WHERE n < 2) SELECT s FROM r"),
+                   ("görünümden takma adla", "SELECT sifre AS w FROM v_hesap"), ("substr/hex", "SELECT hex(substr(sifre,1,3)) h FROM hesap"),
+                   ("json", "SELECT json_object('a', sifre) j FROM hesap")]:
+        try: r = m.vt_sor_metin(q)
+        except m.VtHata as e: r = str(e)
+        kontrol(f"gizli sütun açık dönmez ({sor})", "GIZLI" not in r and "47495A" not in r)
+    r = m.vt_sor_metin("SELECT count(*) n FROM hesap WHERE sifre LIKE 'GIZLI%'")
+    kontrol("WHERE ile değer tahmini yapılamaz (0 satır sayılır)", r.split("\n")[1] == "0")
+    r = m.vt_sor_metin("SELECT ad, dolu FROM v_hesap ORDER BY id")
+    kontrol("görünüm kendi içinde gizli sütunu kullanabilir, öbür sütunlar açık", "Fatura yönetici\t1" in r)
+    kontrol("sema'da [gizli] işareti sürer", "sifre [gizli]" in m.vt_sema_metin())
+    for sor, q in [("ATTACH", "SELECT * FROM pragma_database_list"), ]:
+        try: r = m.vt_sor_metin(q); kontrol(f"tablo değerli pragma reddedildi ({sor})", False)
+        except m.VtHata: kontrol(f"tablo değerli pragma reddedildi ({sor})", True)
     m.VT["yol"] = "yok.db"; m._VT_ON.clear()
     kontrol("veritabanı yoksa sessizce boş (eski davranış)", m.vt_sorgu("sistemler") == [] and m.vt_kayit("Tahsilat?") == [])
     h = subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "hazirlik", "--kim", "Ayşe"],
