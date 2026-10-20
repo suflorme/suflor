@@ -104,8 +104,22 @@ def claude_json(ham, is_, t0, yalin):
 # (mikrofon brifingi dökmesin). Ayar konusma: false kapatır; ses: "<ad>" sesi seçer.
 # Konuşmalar sıraya girer (özet okunurken gelen "yazayım mı?" onu kesmez); brifing ve ses_durdur sırayı boşaltır.
 SES = {"p": None, "q": [], "isci": False}; SES_K = threading.Condition()
+# v0.95.0 ölçüm (S102 devri, 20 Ekim): duyulan ilk ses. seslendir(…, cal=f): kuyruktaki bu metin çalmaya başlayınca f(zaman) bir kez çağrılır.
+# Motorlar ilk ses parçasını çalıcıya verdikleri anda ses_basladi(kayit) der; çalan öğe SES["simdi"] (birleşik Gemini okumasında birkaç cümle).
+# Eşleşme metnin başıyla (etiketsiz ilk 40 karakter); okuma kesilince (ses_durdur) bekleyenler düşer.
+def _cal_anahtar(m): return " ".join(etiket_sil(_ses_metin(m) or "").split())[:40]
+def ses_basladi(kayit=None):
+    if kayit is not SES: return
+    t = time.time()
+    with SES_K:
+        simdi = " ".join(etiket_sil(SES.get("simdi") or "").split()); bek = SES.get("bek") or []
+        if not bek or not simdi: return
+        olan = [x for x in bek if x[0] and x[0] in simdi]; SES["bek"] = [x for x in bek if x not in olan and t - x[2] < 120]
+    for x in olan:
+        try: x[1](t)
+        except Exception: pass
 def ses_durdur():
-    with SES_K: SES["q"].clear(); SES["kes"] = SES.get("kes", 0) + 1; p = SES.get("p"); SES["test_bit"] = 0  # kes: Piper'ın kalan cümleleri de çalınmaz
+    with SES_K: SES["q"].clear(); SES["kes"] = SES.get("kes", 0) + 1; p = SES.get("p"); SES["test_bit"] = 0; SES["bek"] = []  # kes: Piper'ın kalan cümleleri de çalınmaz
     if p and p.poll() is None: p.terminate(); print("SES: durduruldu"); return True
     return False
 # Ses seçimi (v0.20.2): ayar "ses" yoksa ve Türkçe sistem sesi seçiliyse (Erişilebilirlik → Oku ve Seslendir → Sistem sesi, ör. Siri → Ses 2
@@ -394,7 +408,7 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
 # v0.79.0: Gemini'nin sözsüz ses etiketleri (kişilikte ses_etiket: evet); Gemini dışındaki seslerde, panoda ve toplantıya söylerken silinir
 SES_ETIKET_RX = re.compile(r"\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm|ton:\s*[a-z_]+)>\s*", re.I)  # v0.80.0: <ton:…> de
 def etiket_sil(metin): return re.sub(r"\s{2,}", " ", SES_ETIKET_RX.sub(" ", metin or "")).strip() if metin else metin
-def seslendir(metin, kuyruk=False, tepkisiz=False, k=None):
+def seslendir(metin, kuyruk=False, tepkisiz=False, k=None, cal=None):
     # k: bu metni okuyacak kişilik (v0.80.0 iki sesli özet); verilmezse o anki kişilik. Gemini'de her parça kendi sesi ve üslubuyla kuyruğa girer.
     if not AYAR.get("konusma", True) or not metin: return False
     metin, ton = ton_ayikla(metin)  # v0.80.0: Claude'un <ton:ad> etiketi (hiçbir seste okunmaz)
@@ -416,10 +430,12 @@ def seslendir(metin, kuyruk=False, tepkisiz=False, k=None):
         if klip: print(f"SES (deneme): tepki {os.path.basename(klip)}")
         if metin: print(f"SES (deneme): {len(metin)} karakter · {metin}" + (f" · ses {oge[2] or '-'} · üslup {oge[3] or '-'}" if isinstance(oge, tuple) else ""))
         SES["test_bit"] = max(SES.get("test_bit", 0), time.time()) + 0.06 * len(metin or "")  # sohbet testinde "okunuyor" süresi (ses çalınmaz)
+        if cal and metin: cal(time.time())
         return True
     with SES_K:
         if klip: SES["q"].append(("dosya", klip))
         if metin: SES["q"].append(oge)
+        if metin and cal: SES.setdefault("bek", []).append((_cal_anahtar(oge), cal, time.time()))
         SES_K.notify()
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
     return True
@@ -446,7 +462,7 @@ def _ses_isci():
                     while (SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g" and SES["q"][0][2:] == oge[2:]
                            and sum(len(x) for x in parca) + len(SES["q"][0][1]) <= GEMINI_BIRLESIK_EN_COK): parca.append(SES["q"].pop(0)[1])
                     if len(parca) > 1: oge = ("g", " ".join(parca), oge[2], oge[3])
-            metin = _ses_metin(oge); oses, ousl = (oge[2], oge[3]) if isinstance(oge, tuple) else (None, (kisilik() or {}).get("ses_uslup"))
+            metin = _ses_metin(oge); oses, ousl = (oge[2], oge[3]) if isinstance(oge, tuple) else (None, (kisilik() or {}).get("ses_uslup")); SES["simdi"] = metin
             if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=oses or v, uslup=ousl): continue
             with SES_K: SES["q"].insert(0, metin)
         with SES_K:
@@ -454,14 +470,14 @@ def _ses_isci():
         if motor == "pocket":  # S93: yerel Türkçe ses (Pocket); okunamazsa Mac sesi (19 Ekim kararı: sıra Pocket → Mac → Piper)
             with SES_K:
                 if not SES["q"]: continue
-                metin = SES["q"].pop(0); kes = SES.get("kes", 0)
+                metin = SES["q"].pop(0); kes = SES.get("kes", 0); SES["simdi"] = metin
             if pocket_oku(metin, ses=v, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             with SES_K: SES["q"].insert(0, metin)
             motor = "mac"
         if motor == "piper":  # yerel Türkçe ses (ayar ses_motoru: piper ya da kişilikte ses: piper); okunamazsa Mac sesi
             with SES_K:
                 if not SES["q"]: continue
-                metin = SES["q"].pop(0); kes = SES.get("kes", 0)
+                metin = SES["q"].pop(0); kes = SES.get("kes", 0); SES["simdi"] = metin
             if piper_oku(metin, piper_hiz() * khiz, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             with SES_K: SES["q"].insert(0, metin)
         if motor != "mac":  # Gemini/Pocket/Piper okuyamadı: Mac sesi (etiketler okunmasın)
@@ -471,11 +487,12 @@ def _ses_isci():
         hz = ["-r", str(round(SES_TABAN_HIZ * khiz))] if khiz != 1.0 and v else []  # sistem sesi (v None) -r'yi yok sayar
         with SES_K:
             if not SES["q"]: continue
-            metin = SES["q"].pop(0)
+            metin = SES["q"].pop(0); SES["simdi"] = metin
             try: SES["p"] = p = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + hz + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError as e: print(f"SES: hata {e.__class__.__name__}"); continue
         try: p.stdin.write(metin.encode("utf-8")); p.stdin.close()
         except OSError: pass
+        ses_basladi(SES)  # Mac sesi: say başladı (kendi ilk ses gecikmesi ölçülmez, ~0,1–0,3 sn)
         p.wait()
 # --- Toplantı içi fısıltı (v0.27.0; ayar fisilti: true, varsayılan kapalı) ---------------------------------------------------------
 # Yalnız kulaklık takılıyken (çıkış aygıtı Bluetooth/USB ya da Mac'in kulaklık girişi; hoparlörden okunursa mikrofona girer, karşı taraf

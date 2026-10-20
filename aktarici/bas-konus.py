@@ -197,6 +197,11 @@ def _etiket_istem(ks):  # v0.79.0: ses_etiket: evet olan ve Gemini sesiyle konu�
 # kapatılır (ortam değişkenleri --settings env ile; yardımcı yalnız claude'u çalıştırır). Deneme: Haiku, aynı soru, giriş 14 568 → 6 295 belirteç.
 # CLAUDE_CODE_PROMPT_CACHE_TTL=1h KONMAZ: sistem kısmı zaten 1 saat; ayar mesajları da 1 saate yazdırınca sıcak soruda sunucu ~0,3–0,5 sn gecikti (kişilik sınavı, 20 Ekim).
 # Ayar konus_onek_sabit: false eski davranış.
+# v0.95.0: düşünme düzeyi denemesi (ayar konus_effort: low|medium|high; yoksa Claude Code'un varsayılanı). Süreç başına: o süreçteki bütün sorulara uygulanır.
+# 17 Ekim'de veritabanı sorularında low ~0,6 sn kazandırdı ama bir soruda tutarsız sayı verdi; araçsız/sohbet soruları için kör deneme _yedek/test-araclari/konus-effort/.
+def konus_effort():
+    e = str(AYAR.get("konus_effort") or "").strip().lower()
+    return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
 def konus_onek_ayar():
     if AYAR.get("konus_onek_sabit", True) is False: return []
     return ["--settings", json.dumps({"env": {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"}})]
@@ -678,7 +683,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         vt = konus_vt_hazirla()
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
                 "--allowedTools", "Read,Grep,Glob" + ("," + VT_MCP_ARACLAR if vt else ""), "--add-dir", BASE, "--append-system-prompt", konus_istem(vt)] + (["--mcp-config", vt] if vt else []) + \
-               (claude_yalin() or ["--no-session-persistence"]) + ["--model", str(AYAR.get("konus_model") or "sonnet")] + konus_onek_ayar()  # v0.20.3: 6 soruluk kıyas (8 Ekim) Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın
+               (claude_yalin() or ["--no-session-persistence"]) + ["--model", str(AYAR.get("konus_model") or "sonnet")] + konus_onek_ayar() + konus_effort()  # v0.20.3: 6 soruluk kıyas (8 Ekim) Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "konus-bos"),
                                                                    "giris": gir, "cikis": cik, "sure": 7200}, f, ensure_ascii=False)
@@ -720,7 +725,7 @@ def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okum
             c = ""
         if c and len(c.split()) > 1: tur["okunan"] = tur.get("okunan", 0) + 1
         if c and tur.get("sesli", True): c = konusma_dili(sesli_terim_suz(c))  # v0.73.0: kişilik konuşma dili istiyorsa günlük söyleniş (yalnız okunan)
-        if c and tur.get("sesli", True) and seslendir(c, kuyruk=True) and not tur.get("t_ses"): tur["t_ses"] = time.time()
+        if c and tur.get("sesli", True) and seslendir(c, kuyruk=True, cal=None if tur.get("t_ses") else lambda t: tur.setdefault("t_ses_cal", t)) and not tur.get("t_ses"): tur["t_ses"] = time.time()
         if son: break
 # Sesli kısımda iç terim süzgeci (v0.57.1, S70): istem "söyleme" dese de 22 gerçek cevabın birinde "karar kaydı bulamadım" okundu. Yalnız OKUNAN cümleye uygulanır
 # (pano metni değişmez): kaynak atfı ("kayıtlara göre", "karar defterine göre") düşer, "karar kaydı" → "karar". Toplantıya okunan cevaba da (ts_sesli_kisim).
@@ -767,7 +772,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 tur.setdefault("araclar", []).append(str(e["content_block"].get("name") or "?")[:20]); tur["_arac"] = [str(e["content_block"].get("name") or ""), ""]
                 if not tur.get("t_arac"): tur["t_arac"] = time.time()
                 if not tur.get("t_ses") and not tur.get("bakiyor") and tur.get("sesli", True):  # dosya/veritabanı araması sessiz geçmesin; v0.94.0: konuya özgü
-                    tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur"))); seslendir(c, kuyruk=True)
+                    tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur"))); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t))
                     print(f"KONUŞ: araç cümlesi ({tur['_arac'][0][:20]}): {c}")
                 tur["tampon"] = ""  # araçtan önce yarım kalan anlatım okunmasın
             if j.get("type") == "stream_event" and e.get("type") == "content_block_delta" and (e.get("delta") or {}).get("type") == "input_json_delta" and tur.get("_arac"):
@@ -809,7 +814,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if tur.get("defter_gitti"): _KS["defter_taban"] = cagri  # defterin girdiği tur: sınır defter + 40k
                 o["defter"] = bool(_KS.get("defter_md")); o["sistem"] = sistem_anlik()
                 yenile = _KS["sayac"] >= KONUS_TUR_EN_COK or cagri >= max(KONUS_GIRIS_SINIR, _KS["defter_taban"] + 40000 if _KS.get("defter_md") else 0)
-                with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
+                _konus_kayit_yaz(o, tur)
                 _konus_kur(durum="hazir", olcum={k: o[k] for k in ("wh_ms", "ilk_ms", "ses_ms", "sure_ms", "maliyet")})
                 if any("suflorvt__vt_so" in x for x in tur.get("araclar") or []): _KS["vt_son"] = (time.time(), _vt_mt())  # v0.57.5
                 if tur.get("sorgular") and not o["hata"] and tur.get("kaynak") != "karsi" and not tur.get("karsi"): _vt_sorgu_kaydet(tur.get("soru") or KONUS.get("soru"), tur["sorgular"])  # v0.57.6
@@ -822,6 +827,18 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
     # v0.70.1: tur sınırında (ya da kişilik/toplantı değişince) süreç bilerek kapatılır; eski süreç ancak birkaç saniye sonra çıkar. O arada gelen yeni soru
     # (_KS["tur"]) yeni süreç açılmadan önce bu satıra denk gelirse panoda bir an "Claude süreci kapandı" görünüyor, tur siliniyordu. Yalnız beklenmedik çıkış hata.
     if _KS.get("tur") and _KS.get("nesil") == nesil and _KS.get("kapali_nesil") != nesil: _konus_kur(durum="hata", hata=_t("Claude süreci kapandı — yeniden bas", "The Claude process closed — press again")); _KS["tur"] = None
+# v0.95.0 ölçüm: ses_cal_ms = bırakıştan cevabın ilk sesinin çalıcıya girdiği ana (ses_ms kuyruğa girdiği an; Gemini'de ~0,6 sn fark), dolgu_cal_ms = ara
+# cümlenin ya da araç cümlesinin çaldığı an. Kısa cevapta ilk ses sonuçtan sonra çalabildiği için satır, ilk ses çalana kadar (en çok KONUS_CAL_BEKLE_SN) bekler.
+KONUS_CAL_BEKLE_SN = 20
+def _konus_kayit_yaz(o, tur):
+    def yaz():
+        t = time.time()
+        while tur.get("t_ses") and not tur.get("t_ses_cal") and time.time() - t < KONUS_CAL_BEKLE_SN: time.sleep(0.1)
+        for a, k in (("t_ses_cal", "ses_cal_ms"), ("t_dolgu_cal", "dolgu_cal_ms")): o[k] = round((tur[a] - tur["t_birak"]) * 1000) if tur.get(a) and tur.get("t_birak") else None
+        with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
+        if o["ses_cal_ms"] is not None: print(f"KONUŞ: duyulan ilk ses {o['ses_cal_ms']} ms (kuyruğa giriş {o.get('ses_ms')} ms)" + (f" · ara cümle {o['dolgu_cal_ms']} ms" if o["dolgu_cal_ms"] is not None else ""))
+    if tur.get("t_ses") and not tur.get("t_ses_cal"): threading.Thread(target=yaz, daemon=True).start()
+    else: yaz()
 # v0.91.1 (reçete 4, 20 Ekim): ön arama yalıtılmış aktarıcıda 30–116 ms (işlemci ≈ süre), canlıda bazen 1,4–1,9 sn (işlemci 5 kat); Whisper da aynı akşam
 # 2–4 kat yavaştı → sistem yükü şüphesi. Her cevabın ölçümüne o anki bellek boşluğu (%), takas (MB) ve 1 dk işlemci yükü (cevap bittikten sonra; gecikmeye girmez).
 def sistem_anlik():
@@ -1287,7 +1304,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["bakiyor"] = True
         import random
         if random.random() < 1 / 3 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): düşünme tepki sesi"); return
-        c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur_ad=tur_ad)); seslendir(c, kuyruk=True); print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): {c}")
+        c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur_ad=tur_ad)); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t)); print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): {c}")
     def bekci(sn):
         t = time.time()
         while time.time() - t < sn:

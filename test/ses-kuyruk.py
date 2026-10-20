@@ -10,7 +10,7 @@ def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
 agac = ast.parse(open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read())
-fn = [f for f in agac.body if isinstance(f, ast.FunctionDef) and f.name in ("_ses_metin", "_ses_isci")]
+fn = [f for f in agac.body if isinstance(f, ast.FunctionDef) and f.name in ("_ses_metin", "_ses_isci", "_cal_anahtar", "ses_basladi")]
 CALAN = []
 class P:  # sahte afplay/say süreci
     def __init__(self, k, **a): self.k = k; self.stdin = self; self.yazi = b""
@@ -18,11 +18,11 @@ class P:  # sahte afplay/say süreci
     def close(self): CALAN.append(("mac", self.yazi.decode()))
     def wait(self):
         if self.k[0] == "/usr/bin/afplay": CALAN.append(("afplay", self.k[1]))
-def deneme(gemini_acik, motor="mac", q=None, bekle=3, pocket=None, piper=None):  # pocket/piper: None = yok, True/False = okuyabildi mi (S93)
+def deneme(gemini_acik, motor="mac", q=None, bekle=3, pocket=None, piper=None, bek=None):  # pocket/piper: None = yok, True/False = okuyabildi mi (S93)
     del CALAN[:]
-    n = {"SES": {"q": q or [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Mac cümlesi."], "isci": True, "kes": 0}, "GEMINI_BIRLESIK_EN_COK": 600, "SES_K": threading.Condition(),
+    n = {"SES": {"q": q or [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Mac cümlesi."], "isci": True, "kes": 0, "bek": bek or []}, "GEMINI_BIRLESIK_EN_COK": 600, "SES_K": threading.Condition(),
          "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "PIPE": None}), "kisilik_sesi": lambda m=None, toplantiya=False: (m or motor, None, 1.0), "gemini_var": lambda: gemini_acik, "gemini_izinli": lambda toplantiya=False: gemini_acik,
-         "gemini_oku": lambda metin, **a: (CALAN.append(("gemini", metin, a.get("ses"), a.get("uslup"))), True)[1], "etiket_sil": lambda m: m, "kisilik": lambda: {},
+         "gemini_oku": lambda metin, **a: (n["ses_basladi"](a.get("kayit")), CALAN.append(("gemini", metin, a.get("ses"), a.get("uslup"))), True)[2], "etiket_sil": lambda m: m, "kisilik": lambda: {},
          "pocket_oku": lambda metin, **a: (CALAN.append(("pocket", metin)), True)[1] if pocket else False, "ARAYUZ_DILI": "tr",
          "AYAR": {"piper_python": "/x", "piper_model": "/y"} if piper is not None else {},
          "piper_oku": lambda metin, *a, **k: (CALAN.append(("piper", metin)), True)[1] if piper else False, "piper_hiz": lambda: 1.0, "SES_TABAN_HIZ": 180, "print": lambda *a, **k: None, "time": time, "os": os}
@@ -52,4 +52,10 @@ c = deneme(False, motor="pocket", q=q3(), pocket=False, piper=True)
 ok(f"Pocket okuyamadı → Mac sesi, Piper kurulu olsa da (sıra Pocket → Mac → Piper): {c}", c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
 c = deneme(False, motor="pocket", q=q3(), pocket=False)
 ok(f"Pocket okuyamadı, Piper yok → Mac sesi: {c}", c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
+# v0.95.0: duyulan ilk ses — bekleyen metin çalmaya başlayınca (Gemini birleşik okumada ikinci cümle de) çağrı bir kez; çalmayan metnin çağrısı gelmez
+CAL = {}
+bk = lambda ad: (ad[:40], lambda t: CAL.setdefault(ad, t), time.time())
+c = deneme(True, q=[("g", "Bir.", "Charon", "u"), ("g", "İki.", "Charon", "u"), "Mac cümlesi."], bekle=2, bek=[bk("Bir."), bk("İki."), bk("Mac cümlesi."), bk("Hiç çalmayan.")])
+time.sleep(0.05)
+ok(f"çalma anı: Gemini (birleşik) ve Mac sesinde bekleyen metinler çağrıldı, çalmayan çağrılmadı: {sorted(CAL)}", sorted(CAL) == ["Bir.", "Mac cümlesi.", "İki."])
 print("ses-kuyruk: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

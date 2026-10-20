@@ -13,6 +13,8 @@
 # boşluk veriyordu (13 Ekim ölçümü), duraklama kodun elinde değildi. Çalıcı yoksa afplay (parçalar cümle sonuna kadar birleşik).
 # Ses ve metin Mac'ten çıkmaz.
 import queue, tempfile, wave
+if "ses_basladi" not in globals():  # v0.95.0: çalma anı ölçümü brifing-ses.py'de; bu bölüm tek başına yüklenince (testler) etkisiz
+    def ses_basladi(kayit=None): pass
 PIPER = {"p": None, "durum": "kapali", "hata": None, "bekleyen": {}, "iptal": set(), "n": 0, "kilit": threading.Lock(), "baslat_t": 0.0}
 PIPER_ISCI = _ilk(os.path.join(_UYG, "piper-isci.py"), os.path.join(_APP, "piper-isci.py"))
 PIPER_OYNAT = os.path.join(AYAR["uygulama"], "Suflor Oynat.app", "Contents", "MacOS", "SuflorOynat")
@@ -178,15 +180,17 @@ def piper_oku(metin, hiz=1.0, iptal=None, kayit=None):
                 except OSError: pass
                 return True
             try:
-                if os.environ.get("SUFLOR_TEST_PIPER_SESSIZ"): calinan += 1
+                if os.environ.get("SUFLOR_TEST_PIPER_SESSIZ"): calinan or ses_basladi(kayit); calinan += 1
                 elif oyn:
                     with wave.open(o["wav"]) as w: b = w.readframes(w.getnframes())
                     try: oyn.stdin.write(b); oyn.stdin.flush()
                     except (BrokenPipeError, OSError, ValueError): PIPER["iptal"].add(kim); return True  # çalıcı kesildi (ses_durdur)
+                    if not calinan: ses_basladi(kayit)  # v0.95.0: ilk ses parçası çalıcıda
                     calinan += 1; sure += len(b) / 2 / (PIPER.get("sr") or 22050)
                 else:
                     pr = subprocess.Popen(["/usr/bin/afplay", o["wav"]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     if kayit is not None: kayit["p"] = pr
+                    if not calinan: ses_basladi(kayit)
                     pr.wait(); calinan += 1
             except (OSError, wave.Error): kapat(False); return calinan > 0
             finally:

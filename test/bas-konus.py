@@ -92,7 +92,7 @@ try:
     ok("araç başlayınca konuya özgü cümle söylendi (yalnız ikinci soruda)", log().count("KONUŞ: araç cümlesi") == 1 and log().count("SES (deneme)") == 5)
     ok("ikinci soru aynı süreçte, tur maliyeti farkla", k2["durum"] == "hazir" and log().count("KONUŞ: açık süreç açıldı") == 1 and abs(k2["olcum"]["maliyet"] - 0.01) < 1e-6)
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
-    ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) >= 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] for x in c)
+    ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) >= 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] and x.get("ses_cal_ms") is not None for x in c)
        and c[0]["arac"] == 0 and c[1]["arac"] == 1 and c[1]["araclar"] == ["Grep"] and c[1]["arac_ilk_ms"])
     ok("ölçümde o anki sistem durumu: yük, boş bellek %, takas (v0.91.1)", all(isinstance((x.get("sistem") or {}).get("yuk"), float) and 0 <= (x["sistem"].get("bos_yuzde") or -1) <= 100 for x in c))
     ok("ölçüm: soru gönderimi, ilk yanıt, düşünme süresi/uzunluğu (v0.77.3)", c[1]["gonder_ms"] is not None and c[1]["ilk_yanit_ms"] and c[1]["dusunme"] == 1
@@ -263,7 +263,7 @@ try:
     # v0.51.1 okuma sınırı: _konus_cumle beş cümlelik cevabın yalnız üçünü okur (işlev doğrudan; uçtan uca akışta tur sayısını bozmasın)
     import re as _re
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-    ad_ = {"re": _re, "time": time, "print": lambda *a, **k: None, "konusma_dili": lambda m: m}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False: okunan_.append(m) or True
+    ad_ = {"re": _re, "time": time, "print": lambda *a, **k: None, "konusma_dili": lambda m: m}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False, cal=None: okunan_.append(m) or True
     exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)
     t_ = {"tampon": "Vay! Birinci cümle burada. İkinci cümle de var. Üçüncü cümle geliyor. Dördüncü cümle de. Beşinci cümle son. Altıncı okunmamalı. Yedinci de okunmamalı"}
     ad_["_konus_cumle"](t_); ad_["_konus_cumle"](t_, son=True)

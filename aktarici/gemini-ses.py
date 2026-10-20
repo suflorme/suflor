@@ -11,6 +11,8 @@
 # hata sonrası GEMINI_BEKLE_SN Gemini denenmez (her cümle beklemesin). Kullanım canli/gemini-ses.jsonl'e (karakter, ses süresi, ilk ses) yazılır — maliyet: Flash-Lite ses 6 $/M token = 25 token/sn
 # (2026 sonuna kadar ~0,009 $/dk; 1 Ocak 2027'den iki katı).
 import http.client, re
+if "ses_basladi" not in globals():  # v0.95.0: çalma anı ölçümü brifing-ses.py'de; bu bölüm tek başına yüklenince (testler) etkisiz
+    def ses_basladi(kayit=None): pass
 GEMINI = {"durum": None, "hata": None, "anahtar": None, "anahtar_t": 0.0, "c": None, "kilit": threading.RLock(), "hata_t": 0.0}  # RLock: zaman aşımında aynı iş parçacığı yeniden dener
 GEMINI_SESLER = ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")
 GEMINI_MODELLER = ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts")  # v0.80.11: günlük sınır yedek sırası
@@ -164,11 +166,11 @@ def _sabit_yaz(metin, ses, uslup, pcm):
     except OSError: pass
 def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekteki ham sesi kesintisiz çalıcıyla (yoksa WAV + afplay) çalar
     if duzey is not None: pcm = _duzey(pcm, duzey)
-    if os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ"): return True
+    if os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ"): ses_basladi(kayit); return True
     if os.access(PIPER_OYNAT, os.X_OK):
         try: oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError: return False
-        if kayit is not None: kayit["p"] = oyn
+        if kayit is not None: kayit["p"] = oyn; ses_basladi(kayit)
         try:
             for i in range(0, len(pcm), 9600):
                 if iptal and iptal(): break
@@ -184,7 +186,7 @@ def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekt
     try:
         with wave.open(yol, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(GEMINI_SR); w.writeframes(pcm)
         pr = subprocess.Popen(["/usr/bin/afplay", yol], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if kayit is not None: kayit["p"] = pr
+        if kayit is not None: kayit["p"] = pr; ses_basladi(kayit)
         pr.wait()
     finally:
         try: os.remove(yol)
@@ -224,7 +226,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
             try:
                 with wave.open(yol, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(GEMINI_SR); w.writeframes(bytes(tampon))
                 pr = subprocess.Popen(["/usr/bin/afplay", yol], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if kayit is not None: kayit["p"] = pr
+                if kayit is not None: kayit["p"] = pr; ses_basladi(kayit)
                 pr.wait()
             finally:
                 try: os.remove(yol)
@@ -266,6 +268,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                     if iptal and iptal(): _gemini_kapat(); bitir(False); return True
                     if ilk is None:
                         ilk = time.time() - t0
+                        if sessiz and not topla: ses_basladi(kayit)  # deneme kipi: ses çalınmaz, ilk parça geldi
                         if not sessiz and os.access(PIPER_OYNAT, os.X_OK):
                             try:
                                 oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -277,6 +280,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                     if oyn:
                         try: oyn.stdin.write(b); oyn.stdin.flush()
                         except (BrokenPipeError, OSError, ValueError): _gemini_kapat(); return True  # çalıcı kesildi (ses_durdur)
+                        if nbayt == len(b): ses_basladi(kayit)  # v0.95.0: ilk ses parçası çalıcıda
                     else: tampon.extend(b)
         except Exception as e:
             _gemini_kapat()
