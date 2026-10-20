@@ -225,7 +225,10 @@ def sohbet_dusunme(metin, pcm):  # konus_ses'in dökülmüş metni düşünme s�
     if not SOHBET["acik"] or not SOHBET_DUSUNME_RX.search(metin or ""): return False
     simdi = time.time(); bir = SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)  # dökülürken söylenen (biriktirilen) kaydın sonuna
     with AKIS["kilit"]: AKIS.update(pcm=bytearray(pcm) + (bir or b""), kesik=0, sira=0, metin={}, iz={}, bekleyen=0)
-    SOHBET.update(dusunme={"t": simdi, "metin": metin}, durak=None, bekle=None, t_ses=simdi, uyari=False)
+    # v0.92.1: söz dökülürken devamı söylendiyse (biriken seste konuşma) yeni konuşma var sayılır — yoksa tur sonu bekçisi yalnız ilk yarıyı 4 sn sonra
+    # gönderiyordu, devamı kayboluyordu (test/sohbet.py "nasıl desem"; yeni konuşma ölçütü yalnız sonradan gelen parçaydı)
+    devam = bool(bir) and sum(x >= (AKIS.get("esik") or 400) for x in _pencereler(bytes(bir))) * AKIS_PENCERE / 2 / WH_SR >= 0.15
+    SOHBET.update(dusunme={"t": simdi - (1.0 if devam else 0.0), "metin": metin}, durak=None, bekle=None, t_ses=simdi, uyari=False)
     print(f"SOHBET: söz düşünme sözüyle bitti (\"…{' '.join(metin.split())[-30:]}\") — gönderilmedi, dinleme sürüyor")
     return True
 def _sohbet_dusunme_gonder(metin):  # düşünme sözünden sonra SOHBET_DUSUNME_SN sessizlik: söz olduğu gibi Claude'a

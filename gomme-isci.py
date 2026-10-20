@@ -83,6 +83,18 @@ def sunucu(a):
     try: fcntl.flock(kilit, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError: gunluk("başka sunucu çalışıyor"); return 0
     m, aygit = model_ac(); m.encode(["query: ısınma"], normalize_embeddings=True); gunluk(f"model açıldı ({aygit})")  # ilk sorgu ~0,7 sn: açılışta
+    # v0.92.1: tek kısa sorgu 20 Ekim'de MPS'te 72–75 ms, işlemcide 21–25 ms (yarım duyarlık GPU'ya tek tek gönderim pahalı). Sunucu yalnız sorgu gömer:
+    # açılışta ikisi de ölçülür, hızlı olan kalır (toplu dizinleme MPS'te sürer). Gömmeler normalize; aygıt farkı benzerlikte yalnız sayısal gürültü.
+    if aygit == "mps":
+        def olc():
+            ms = []
+            for q in ("fatura ödeme listesi", "sunucu yedekleri kimde", "yarınki toplantının gündemi ne", "izin onayı", "kampanya bütçesi"):
+                t = time.time(); m.encode(["query: " + q], normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False); ms.append((time.time() - t) * 1000)
+            return sorted(ms)[2]
+        g = olc(); m = m.to("cpu").float(); m.encode(["query: ısınma"], normalize_embeddings=True); c_ = olc()
+        if g < c_: m = m.to("mps").half()
+        else: aygit = "cpu"
+        gunluk(f"sorgu aygıtı: {aygit} (mps {g:.0f} ms, işlemci {c_:.0f} ms)")
     D = {"mt": None}
     def yukle():
         mt = os.stat(os.path.join(a.klasor, "durum.json")).st_mtime if os.path.exists(os.path.join(a.klasor, "durum.json")) else 0

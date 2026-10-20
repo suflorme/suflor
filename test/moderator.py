@@ -15,7 +15,7 @@ ns = {"__name__": "moderator", "os": os, "re": re, "time": time, "json": json, "
       "TS": {"p": []}, "_t": lambda a, b: a, "tail": lambda n=200: list(DOKUM), "agenda": lambda: D["agenda"], "toplanti_var": lambda: D["top"],
       "kanal_sessizlik": lambda: D["sessiz"], "kisilik_sec": lambda ad: SECILEN.append(ad), "kisilik_ad": lambda: "ATLAS", "seslendir": lambda m, kuyruk=False: SESLI.append(m),
       "_konus_kur": lambda **k: None, "_konus_sor": lambda metin, tur: GOREV.append((metin, tur)),
-      "_epoch": lambda t: datetime.datetime.fromisoformat(str(t)).timestamp(), "_saat": lambda s: datetime.datetime.now() + datetime.timedelta(minutes=30)}
+      "_epoch": lambda t: datetime.datetime.fromisoformat(str(t)).timestamp(), "_saat": lambda s: datetime.datetime.now() + datetime.timedelta(minutes=30), "gizli_acik": lambda: False}  # v0.89.0: gizli toplantıda başlamaz
 exec(compile(open(os.path.join(KOD, "aktarici", "moderator.py"), encoding="utf-8").read(), "moderator.py", "exec"), ns)
 M = ns["MOD"]; M["isci"] = True  # döngü iş parçacığı yerine adımlar elle
 def satir(kim, metin, once_sn=0.0, kanal="karsi"):

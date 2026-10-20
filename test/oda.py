@@ -71,6 +71,12 @@ else:
                 q = urllib.request.Request(f"http://127.0.0.1:{PORT}{yol}", data=json.dumps(v).encode(), headers={"X-Suflor-Anahtar": K, "Origin": "chrome-extension://" + "a" * 32})
                 return json.loads(urllib.request.urlopen(q, timeout=30).read())
             post("/ping", {"call": True, "panel": True, "meeting": {"title": baslik}})
+            # 20 Ekim: model yüklenmeden (7 sn) gönderilen sesler sırada birikip birleşiyordu → iki ses tek satırda; önce sessiz parça, Whisper hazır olunca başla
+            post("/ses", {"kanal": "ben", "t": int(time.time() * 1000) - 5000, "pcm": base64.b64encode(b"\0\0" * 8000).decode(), "meeting": {"title": baslik}})
+            for _ in range(90):
+                st = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read())
+                if (st.get("whisper") or {}).get("durum") == "hazir": break
+                time.sleep(1)
             sira = [("U", pcm(KUL, 62, 80)), ("-", b"\0\0" * 16000 * 2), ("O", pcm(DIG, 40, 58)), ("-", b"\0\0" * 16000 * 2), ("U", pcm(KUL, 95, 113)), ("-", b"\0\0" * 16000 * 3)]
             if not oda: sira += [("K", KOMUT), ("-", b"\0\0" * 16000 * 3)]  # ses kilidi: başka sesin "Claude:" komutu
             t = time.time(); aralik = []

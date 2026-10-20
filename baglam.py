@@ -887,7 +887,8 @@ def anlam_ara(q, k=ANLAM_K):
             x = s.recv(1 << 20)
             if not x: break
             veri += x
-        o = json.loads(veri); return [(int(i), sk) for i, sk in o["sonuc"]] if "sonuc" in o else None
+        o = json.loads(veri); _ANLAM["acilis"] = 0  # v0.92.1: sunucu ayaktaydı → sonra kapanırsa (boşta) bir sonraki arama 60 sn beklemeden yeniden açar
+        return [(int(i), sk) for i, sk in o["sonuc"]] if "sonuc" in o else None
     except (FileNotFoundError, ConnectionRefusedError): anlam_sunucu_ac(); return None
     except (OSError, ValueError, KeyError): return None
     finally: s.close()
