@@ -101,6 +101,12 @@ try:
     ns["GEM"][0] = True; kk = ns["kisilik"]()
     ok("kişilik alanları: ses_uslup, ses_etiket", kk["ses_uslup"] == "nüktedan, dostça" and kk["ses_etiket"] is True)
     ist3 = ns["konus_istem"](); ok("istemde etiket kuralı yalnız etiketli kişiliğe", "[Ses etiketleri] Matlas sesli kısımda" in ist3 and "<chuckle>" in ist3 and "Öteki kişilik etiket kullanmaz" in ist3)
+    # v0.96.2: toplantı dışında Gemini kapalıyken (kapsam toplanti) yerel ses okur → o cevapta etiket yok; toplantıya okunan (otonom) cevapta etiket serbest
+    etn = ns["_etiket_tur_notu"]; ns["AYAR"].pop("gemini_kapsam", None)
+    ok("v0.96.2: toplantı dışı, Gemini yalnız toplantıda → 'etiket kullanma' notu", "ses etiketi" in etn({"sesli": True}))
+    ok("v0.96.2: toplantıya okunan cevap (Gemini) → not yok", etn({"otonom": True, "sesli": False}) == "")
+    ns["AYAR"]["gemini_kapsam"] = "hepsi"; ok("v0.96.2: Gemini her yerde açık → not yok", etn({"sesli": True}) == "")
+    ok("v0.96.2: kulaklık yok (yalnız pano) → not var", "ses etiketi" in etn({"sesli": False})); ns["AYAR"].pop("gemini_kapsam")
     ns["GEM"][0] = False; ok("Gemini anahtarı yoksa etiket kuralı yok", "[Ses etiketleri]" not in ns["konus_istem"]())
     ns["TOP"][0] = False; ns["AYAR"]["kisilik_toplanti_disi"] = ""
     ok("ikinci kaldırılınca tek kişilik (eski istem)", ns["konus_istem"]().endswith("KİŞİLİK-İŞARETİ") and ns["kisilik"]()["ad"] == "Atlas")

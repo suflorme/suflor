@@ -192,6 +192,14 @@ def _etiket_istem(ks):  # v0.79.0: ses_etiket: evet olan ve Gemini sesiyle konu�
               "Yazılı kısımda (--- sonrası) etiket kullanma." + (" Öteki kişilik etiket kullanmaz." if len(ks) >= 2 and len(ad) < len(ks) else ""),
               f"\n\n[Voice tags] {', '.join(ad)} may use at most one non-verbal voice tag in the spoken part when a joke or emotion truly fits: <chuckle>, <laugh>, <sigh>, "
               "<short pause>. Write the tag exactly so; not in every answer — most answers have none. No tags in the written part (after ---)." + (" The other persona never uses tags." if len(ks) >= 2 and len(ad) < len(ks) else ""))
+# v0.96.2 (kullanıcı, 20 Ekim 17.46: kişiliğin gülmesi hiç duyulmadı): istemdeki izin sürecin açılışında verilir, o cevabın hangi sesle okunacağına bakmaz —
+# toplantı dışında Gemini kapalıyken (gemini_kapsam: toplanti) Pocket okur, etiket silinir, ses çıkmaz. Her soruya: bu cevap Gemini'yle okunmayacaksa etiket yok.
+def _etiket_tur_notu(tur):
+    k = kisilik()
+    if not k or not k.get("ses_etiket") or not str(k.get("ses") or "").startswith("gemini") or not gemini_var(): return ""
+    if (tur.get("otonom") or tur.get("sesli", True)) and kisilik_sesi(toplantiya=bool(tur.get("otonom")))[0] == "gemini": return ""
+    return _t("[Bu cevap Gemini sesiyle okunmuyor: sesli kısımda ses etiketi (<laugh>, <chuckle>, <sigh>, <short pause>) kullanma.]\n",
+              "[This answer is not read with the Gemini voice: no voice tags (<laugh>, <chuckle>, <sigh>, <short pause>) in the spoken part.]\n")
 # v0.90.0 (reçete 1, 19 Ekim ölçümü): Claude Code proje CLAUDE.md'sini (~8 bin belirteç) ve git bilgisini sistem istemine değil İLK KULLANICI
 # MESAJINA koyar; ilk mesaj her süreçte farklı olduğundan bu kısım hiç önbellekten okunmaz → yeni süreçte ilk soru ~0,055 $ ve ~2 sn yavaş. Konuş sürecinde
 # kapatılır (ortam değişkenleri --settings env ile; yardımcı yalnız claude'u çalıştırır). Deneme: Haiku, aynı soru, giriş 14 568 → 6 295 belirteç.
@@ -1337,7 +1345,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if duz: _konus_kur(soru=ms)
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
         if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
-        ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi"))  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
+        ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi")) + _etiket_tur_notu(tur)  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
         tur["t_gonder"] = time.time(); tur.pop("t_ilk_yanit", None)  # v0.77.3 ölçüm: soru sürece yazıldı (yeniden gönderimde de)
         try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + gnb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı"); return
