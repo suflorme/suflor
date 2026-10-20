@@ -868,6 +868,7 @@ def gomme_kosul():
     return k + (" AND COALESCE(d.kaynak_turu, 'asil') != 'disa_aktarim'" if VT_KIPI else "")
 def anlam_sunucu_ac():
     if time.time() - _ANLAM["acilis"] < 60: return  # açılıyor
+    if not os.path.exists(GOMME_ISCI): return  # v0.97.0: geçici klasöre kopyalanan baglam.py (ölçüm betikleri) gerçek anlam-sunucu.log'a "can't open file" yazıyordu
     _ANLAM["acilis"] = time.time()
     import subprocess
     try:

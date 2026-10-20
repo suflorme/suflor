@@ -637,6 +637,8 @@ def tur_kur(ort):  # tur sonu modeli (smart-turn v3, BSD-2, 8,7 MB) + küçük o
     vpy, md = os.path.join(ort, "smart-turn-venv", "bin", "python"), os.path.join(ort, "ses-modeller", "smart-turn")
     model = os.path.join(md, os.path.basename(TUR_URL))
     venv_ok = bool((r := sessiz(vpy, "-c", "import onnxruntime, numpy")) and r.returncode == 0)
+    # v0.97.0: ortamın Python'u bir kullanıcının ev klasöründeyse (elle uv ile kurulmuş: /Users/<ad>/.local/…) öbür hesap açamaz → paylaşılan değil, yeniden kur
+    if venv_ok and re.match(r"/Users/(?!Shared/)", os.path.realpath(vpy)): venv_ok = False; say("→ tur sonu ortamı bir hesabın Python'una bağlı — ortak Python'la yeniden kuruluyor")
     if venv_ok and os.path.isfile(model): return
     if not os.access(ort, os.W_OK): say("Not: tur sonu modeli yok ve ortak klasör başka hesabın — konuşmada eski kural"); return
     try:

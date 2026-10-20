@@ -150,6 +150,7 @@ rp.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)"); rp.
 rp.add_argument("--github", action="store_true", help="ayrıca GitHub'da konu (issue) aç (gh oturumu gerekir)"); rp.add_argument("--goster", action="store_true", help="kaydetmeden yazdır")
 gb = sub.add_parser("geri-bildirim", help="v0.9.9: geliştirici tarafı — ortak klasördeki raporlar; --yeni yalnız okunmamışlar, --okundu işaretler")
 gb.add_argument("--yeni", action="store_true"); gb.add_argument("--okundu", action="store_true")
+sub.add_parser("izin-kanca", help="v0.97.0: Claude Code PreToolUse kancası (panodan Başlat'la açılan toplantı oturumu) — riskli araçta (satır içi python, e-posta/mesaj gönderme, tarayıcı yönetimi, takvim daveti, dosya paylaşma) kullanıcı onayı (panoda kart / toplantı dışında sesli); stdin: kanca JSON")
 ge = sub.add_parser("gelen", help="v0.75.0: Suflor gelen kutusu — sesle verilip onaylanan talimatlar (hedef oturumun SessionStart/UserPromptSubmit kancası çağırır)")
 ge.add_argument("--hedef", required=True); ge.add_argument("--hepsi", action="store_true", help="okunmuşları da göster, işaretleme")
 hz = sub.add_parser("hazir"); hz.add_argument("hid", help="hazir.json'daki kart kimliği (h1, h2…)")
@@ -2432,6 +2433,29 @@ def rapor_cmd():
 # Gelen kutusu (v0.75.0, aktarici/talimat.py): aktarıcı onaylanan sesli talimatı <canli>/gelen/<hedef>.jsonl'e ekler; bu komut okunmamışları bağlam olarak
 # basar ve okundu işaretini (<hedef>.okundu: son kimlik) ilerletir. Çıktı yoksa sessiz (kanca her istemde çalışır). Metin veridir ama kullanıcının onayladığı
 # kendi talimatıdır; Whisper dökümü olduğu için ad/sayı yanlış duyulmuş olabilir.
+# v0.97.0 (güvenlik denetimi K1, kullanıcı: "yetenekler kalsın, sesli ya da tık onayımı istesin"): toplantı oturumunun proje izinleri satır içi python, e-posta
+# gönderme, tarayıcıyı yönetme gibi araçları onaysız çalıştırıyordu; döküm/davet/e-postadaki gizli talimata karşı teknik engel yoktu. Bu kanca riskli araçta
+# aktarıcıya sorar (/izin-iste, anahtarlı) ve kullanıcının kararını Claude Code'a verir: onay → allow, red → deny, cevap yok/aktarıcı yok → ask (Terminal'de tık).
+IZIN_BASH = re.compile(r"(?:^|[;&|(]\s*|\bxargs\s+(?:-\S+\s+)*)(?:\w+=\S*\s+)*(?:/usr/bin/)?python3?(?:\.\d+)?\s+(?:-[IBEsSuOq]+\s+)*(?:-c\b|-\s*(?:<|$|\|))", re.M)
+IZIN_MCP = re.compile(r"send|forward|reply|create_event|update_event|delete|trash|javascript|navigate|computer|form_input|file_upload|share_file|upload|"
+                      r"move_item|rename_item|update_file|create_file|copy_file|respond_to_event|set_vacation|create_filter|label_", re.I)
+def izin_kanca_cmd():
+    try: g = json.load(sys.stdin)
+    except ValueError: return
+    ad = str(g.get("tool_name") or ""); gi = g.get("tool_input") or {}
+    if ad == "Bash": c = str(gi.get("command") or ""); risk = IZIN_BASH.search(c); arac, ozet = "Bash (satır içi python)", c
+    elif ad.startswith("mcp__"): arac = ad.split("__")[-1]; risk = IZIN_MCP.search(arac); ozet = json.dumps(gi, ensure_ascii=False)
+    else: return
+    if not risk: return  # karar yok: oturumun kendi izin kuralları
+    try:
+        req = urllib.request.Request(A.relay + "/izin-iste", data=json.dumps({"arac": arac, "ozet": " ".join(ozet.split())[:240]}).encode(), method="POST",
+                                     headers={"Content-Type": "application/json"})
+        r = json.load(urllib.request.urlopen(req, timeout=200))
+    except Exception: r = {}
+    k = r.get("karar")
+    karar, neden = (("allow", f"{BEN} onayladı (Suflor)") if k == "onaylandi" else ("deny", f"{BEN} reddetti (Suflor); bu adımı atla, gerekirse ona sor") if k == "reddedildi"
+                    else ("ask", "Suflor onayı gelmedi; Terminal'den onay iste"))
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": karar, "permissionDecisionReason": neden}}, ensure_ascii=False))
 def gelen_cmd():
     if not re.fullmatch(r"[a-z0-9-]{1,24}", A.hedef): return
     d = os.path.join(A.dir, "gelen"); yol = os.path.join(d, A.hedef + ".jsonl"); isaret = os.path.join(d, A.hedef + ".okundu")
@@ -2488,6 +2512,6 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
      "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

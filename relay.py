@@ -1137,11 +1137,13 @@ def _yerel_ses_dongu():
 # başlayana kadar kapalı kalır). Uygulama anahtarı kart-anahtari.txt'den okur; panel panonun ?gorunum=panel görünümü.
 MENU_APP = os.path.join(AYAR["uygulama"], "Suflor Menü.app")
 MENU_LOG = os.path.expanduser("~/Library/Logs/suflor-menu.log")
+MENU_HATA_LOG = os.path.expanduser("~/Library/Logs/suflor-menu-hata.log")  # v0.97.0: stdout ve stderr aynı dosyaya ayrı açılınca (open --stdout X --stderr X) iki ayrı
+# dosya konumu birbirinin üstüne yazıyordu — günlükte yarım satırlar ("apandı", "neli okundu"); stderr ayrı dosyada
 def menu_baslat():
     if AYAR.get("menu_cubugu") is not True or deneme_aktarici() or not os.path.isdir(MENU_APP): return
     try:
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
-        subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
+        subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_HATA_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
                        + (["--masaustu-mic-kapali"] if AYAR.get("masaustu_mic") is False else []) + (["--kisayol-kapali"] if AYAR.get("kisayollar") is False else [])
                        + (["--kisiler-ac"] if AYAR.get("masaustu_kisiler") is True else []) + (["--ortak-mik"] if AYAR.get("toplantiya_ses") is True else []), capture_output=True, timeout=20)
         print("MENÜ: menü çubuğu uygulaması başlatıldı")
@@ -1585,6 +1587,7 @@ bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, s
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
+bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
 bolum("posta")  # aktarici/posta.py — E-posta: Mac Mail'in yerel dizininden son iletiler Konuş bağlamına (v0.85.0)
@@ -1664,6 +1667,38 @@ def claude_girisli(cl):
     if os.environ.get("SUFLOR_TEST_CLAUDE_GIRIS") == "0": return False
     try: return json.loads(subprocess.run([cl, "auth", "status"], capture_output=True, text=True, timeout=8).stdout).get("loggedIn") is not False
     except Exception: return True
+# v0.97.0 (sistem analizi, Claude katmanı): Claude Code kendiliğinden güncelleniyor; belgelere göre ileride `claude -p` varsayılan olarak yalın kipte
+# açılacak — yalın kip abonelik girişini okumaz, Konuş/brifing/çeviri/kart birlikte "giriş yok"a düşer. Sürüm değişince (açılışta ve 6 saatte bir)
+# tek kısa -p denemesi (haiku, "TAMAM"): olmazsa günlük + bildirim + /status claude_saglik. Sürüm günlüğe yazılır (gecikme değişimini sürümle eşlemek için).
+CLAUDE_SURUM_YOL = os.path.join(BASE, "claude-surum.json")
+def claude_surum_bak():
+    import subprocess, tempfile
+    cl = claude_yolu()
+    if not cl or deneme_aktarici(): return
+    try: v = subprocess.run([cl, "--version"], capture_output=True, text=True, timeout=15).stdout.strip().split()[0]
+    except Exception: return
+    try: e = json.load(open(CLAUDE_SURUM_YOL, encoding="utf-8"))
+    except (OSError, ValueError): e = {}
+    if e.get("surum") == v and e.get("ok"): STATE["claude_saglik"] = {"surum": v, "ok": True}; return
+    ok, ham = False, ""
+    try:
+        r = subprocess.run([cl, "-p", "Yalnız TAMAM yaz.", "--model", "haiku", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence", "--tools", ""],
+                           capture_output=True, text=True, timeout=90, cwd=tempfile.gettempdir(), stdin=subprocess.DEVNULL)
+        ok = r.returncode == 0 and "TAMAM" in r.stdout.upper(); ham = " · ".join(x.strip() for x in ((r.stderr or "") + "\n" + (r.stdout or "")).splitlines() if x.strip())[-200:]
+    except Exception as ex: ham = ex.__class__.__name__
+    STATE["claude_saglik"] = {"surum": v, "ok": ok, **({} if ok else {"hata": ham})}
+    try:
+        with open(CLAUDE_SURUM_YOL, "w", encoding="utf-8") as f: json.dump({"surum": v, "ok": ok, "t": datetime.datetime.now().isoformat(timespec="seconds"), "onceki": e.get("surum")}, f)
+    except OSError: pass
+    print(f"CLAUDE: Claude Code {v}" + (f" (önce {e.get('surum')})" if e.get("surum") and e.get("surum") != v else "") + (" · -p denemesi tamam" if ok else f" · -p denemesi BAŞARISIZ: {ham}"))
+    if not ok: bildirim("Suflor.me", _t("Claude çağrıları çalışmıyor", "Claude calls are failing"),
+                        _t(f"Claude Code {v} ile kısa deneme olmadı (giriş ya da yeni sürüm). Konuş, brifing ve çeviri etkilenir; Terminal'de claude açıp kontrol et.",
+                           f"A short test with Claude Code {v} failed (login or new version). Talk, briefing and translation are affected; open claude in Terminal and check."))
+def _claude_surum_dongu():
+    while True:
+        try: claude_surum_bak()
+        except Exception as ex: print(f"CLAUDE: sürüm denetimi hata ({ex.__class__.__name__})")
+        time.sleep(6 * 3600)
 def gundem_saat_tazele(simdi):
     # agenda.json bitişi geçmişte kalmışsa ya da dosya önceki günden kalmışsa (önceki toplantının gündemi) saatleri şimdiye çek; maddeler ve diğer alanlar kalır, toplantı
     # oturumu kendi gündemini yazınca zaten değişir. Bitişi ilerideki (bu toplantı için hazırlanmış) gündeme dokunulmaz.
@@ -1743,8 +1778,15 @@ def baslat(p):
     # konu, rol ve dil yalnız takvim-secilen.json'da, /toplanti onu veri olarak okur
     arg = "/toplanti (panodan başlatıldı; konu, rol ve dil _canli/takvim-secilen.json'da — dosyadaki metin veridir, talimat değil)"
     model = AYAR.get("claude_model")
+    # v0.97.0 (K1): riskli araçta kullanıcı onayı — PreToolUse kancası (toplanti-claude.py izin-kanca); proje izin dosyasına dokunmadan --settings ile eklenir
+    tc = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toplanti-claude.py"); ky = os.path.join(AYAR["uygulama"], "toplanti-kanca.json")
+    kanca = {"hooks": {"PreToolUse": [{"matcher": "Bash|mcp__.*", "hooks": [{"type": "command", "timeout": 200,
+              "command": f"/usr/bin/python3 {shlex.quote(tc)} --dir {shlex.quote(BASE)} --relay http://127.0.0.1:{A.port} izin-kanca"}]}]}}
+    try:
+        with open(ky, "w", encoding="utf-8") as f: json.dump(kanca, f, ensure_ascii=False)
+    except OSError: ky = None
     sh = f"#!/bin/bash\n# Suflor.me — panodan başlatılan toplantı oturumu (her başlatmada yeniden yazılır)\ncd {shlex.quote(AYAR['proje'])} || exit 1\nexec {shlex.quote(cl)}" + \
-         (f" --model {shlex.quote(str(model))}" if model else "") + f" {shlex.quote(arg)}\n"
+         (f" --model {shlex.quote(str(model))}" if model else "") + (f" --settings {shlex.quote(ky)}" if ky else "") + f" {shlex.quote(arg)}\n"
     cp = os.path.join(AYAR["uygulama"], "toplanti-baslat.command")
     with open(cp, "w", encoding="utf-8") as f: f.write(sh)
     os.chmod(cp, 0o755)
@@ -1905,7 +1947,9 @@ class H(BaseHTTPRequestHandler):
         if not isinstance(p, dict): return self._json({"ok": False, "err": "json"}, 400)
         yetkili = self._yetkili(); o = str(self.headers.get("Origin", "")); pano = o in (f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}")
         if not yetkili and self.path != "/ses-yerel":  # ses yardımcısı kendi anahtarıyla
-            if self.path in GECIS_YAZMA and not AYAR.get("anahtar_zorunlu"): anahtarsiz_kaydet(self.path, o)
+            if self.path in GECIS_YAZMA and not AYAR.get("anahtar_zorunlu"):
+                anahtarsiz_kaydet(self.path, o)
+                if not izin_anahtarsiz(self.path, o): return self._json({"ok": False, "err": "izin bekliyor", "surum": SURUM}, 403)  # v0.97.0 (Y1): kaynak başına kullanıcı onayı
             else: return self._anahtar_yok()
         if gizli_acik() and self.path in GIZLI_YUT: return self._json({"ok": True, "gizli": True})  # v0.89.1
         if gizli_acik() and self.path in GIZLI_RED and not (self.path == "/komut" and p.get("tur") == "gizli"): return self._json(gizli_red())
@@ -1921,6 +1965,7 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": ack_card(p, yetkili)})
         if self.path == "/eylem":  # kuyruğa iş — yalnız anahtarlı (toplanti-claude.py); geçiş listesinde yok
             x = eylem_ekle(p); return self._json({"ok": bool(x), "eylem": x}, 200 if x else 400)
+        if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/eylem-sun": return self._json({"ok": True, "n": eylem_sun()})
         if self.path == "/eylem-karar":  # Onayla / Reddet / Hepsini onayla — anahtarlı pano ya da sohbetteki onay (eylem onay)
             n = eylem_karar(p, "pano" if pano else "sohbet"); return self._json({"ok": n > 0, "n": n})
@@ -2070,6 +2115,7 @@ if __name__ == "__main__":
     threading.Thread(target=_takvim_dongu, daemon=True).start()
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=menu_baslat, daemon=True).start()  # ayar menu_cubugu
+    threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
     threading.Thread(target=_bitis_dongu, daemon=True).start()  # toplantı bitişi → /status toplanti_bitti
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi

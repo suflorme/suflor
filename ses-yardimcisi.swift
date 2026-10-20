@@ -201,7 +201,9 @@ func donustur(_ x: [Float]) -> Data? {
 
 // --- aktarıcıya gönderim ---
 let oturum: URLSession = { let c = URLSessionConfiguration.ephemeral; c.timeoutIntervalForRequest = 5; c.connectionProxyDictionary = [:]; return URLSession(configuration: c) }()
-var sonUlasma = Date(), ulasilamadi = 0
+// v0.97.0: "5 dk ulaşılamadı" sayacı uyanık süreyle (systemUptime, uykuda ilerlemez). Duvar saati (Date) uykuda geçen süreyi de sayıyordu: Mac uyanınca
+// ilk nabızda "ulaşılamadı — kapanıyor" (6–20 Ekim: 10 günde 337 gereksiz kapanış, aktarıcı 542 kez yeniden açtı). Ayrıca art arda en az 10 başarısız gönderim şart.
+var sonUlasma = ProcessInfo.processInfo.systemUptime, ulasilamadi = 0
 func gonder(_ govde: [String: Any], _ tamam: (([String: Any]?) -> Void)? = nil) {
     var r = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ses-yerel")!)
     r.httpMethod = "POST"; r.setValue("application/json", forHTTPHeaderField: "Content-Type"); r.setValue(anahtar, forHTTPHeaderField: "X-Suflor-Anahtar")
@@ -209,7 +211,7 @@ func gonder(_ govde: [String: Any], _ tamam: (([String: Any]?) -> Void)? = nil) 
     oturum.dataTask(with: r) { veri, yanit, _ in
         let ok = (yanit as? HTTPURLResponse)?.statusCode == 200
         let j = ok ? veri.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } : nil
-        DispatchQueue.main.async { if ok { sonUlasma = Date() } else { ulasilamadi += 1 }; tamam?(j) }
+        DispatchQueue.main.async { if ok { sonUlasma = ProcessInfo.processInfo.systemUptime; ulasilamadi = 0 } else { ulasilamadi += 1 }; tamam?(j) }
     }.resume()
 }
 
@@ -297,7 +299,7 @@ func nabiz() {   // 5 sn: durum + son 5 sn'nin tepe seviyesi (izin yoksa tap yal
         if (j?["toplanti"] as? Bool) == true { aktarıcıToplanti = Date() }
         if let t = j?["tarayici"] as? String { tarayiciIpucu = t }
     }
-    if Date().timeIntervalSince(sonUlasma) > 300 { gunluk("aktarıcıya 5 dk ulaşılamadı — kapanıyor"); tapDurdur(); exit(0) }
+    if ProcessInfo.processInfo.systemUptime - sonUlasma > 300 && ulasilamadi >= 10 { gunluk("aktarıcıya 5 dk ulaşılamadı — kapanıyor"); tapDurdur(); exit(0) }
 }
 
 if izinKipi {
