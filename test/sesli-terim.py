@@ -19,6 +19,11 @@ TABLO = [
     ("Karar kayıtlarında bu yok.", "Kararlarda bu yok.", "çoğul + bulunma"),
     ("Ali kullanıcı ve rol dökümlerini gönderdi.", "Ali kullanıcı ve rol dökümlerini gönderdi.", "dışa aktarılan liste: değişmez"),
     ("Teslim tarihi cuma.", "Teslim tarihi cuma.", "terimsiz cümle değişmez"),
+    ("Rakamlar dökümde kısmen bozuk çıkmış, bu yüzden yaklaşık.", "Rakamlar net duyulmamış, bu yüzden yaklaşık.", "v0.95.1: belirsizlik iç terimsiz"),
+    ("Dökümde bozuk yazılmış yerler var.", "Net duyulmamış yerler var.", "v0.95.1: cümle başı büyük harf"),
+    ("Dökümde Filipinli çalışanlar için net bir liste yok.", "Görüşmede Filipinli çalışanlar için net bir liste yok.", "v0.95.1: dökümde → görüşmede"),
+    ("Sözlerini dökümden kontrol ettim.", "Sözlerini görüşmeden kontrol ettim.", "v0.95.1: dökümden → görüşmeden"),
+    ("Ali rol dökümünü gönderdi.", "Ali rol dökümünü gönderdi.", "v0.95.1: dışa aktarılan liste değişmez"),
 ]
 hata = 0
 for g, b, ad in TABLO:

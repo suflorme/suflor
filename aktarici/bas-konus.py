@@ -235,8 +235,8 @@ def konus_istem(vt=None):
             " Past meetings and their decisions are not current-state questions: if the context has 'Suflor's recent meetings', the 'last meeting' is its newest entry; read the decisions from that entry's summary file (don't query the database). "
             "If the newest is a test, say so and also mention the latest real meeting in the list.")
     # v0.54.0 (kullanıcı, 16 Ekim): sesli kısımda iç terim yok — "defterine göre", "veritabanına göre", "toplantı oturumu", "kart", "döküm", dosya adı; kaynak yazılı kısımda
-    t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası).",
-            " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Source and method only in the written part (after ---).")
+    t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Belirsizliği de iç terimsiz söyle: 'dökümde bozuk duyulmuş' değil 'bu kısım net duyulmamış'; 'dökümde' değil 'görüşmede' ya da 'toplantıda'. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası).",
+            " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Say uncertainty without internal terms too: not 'garbled in the transcript' but 'that part wasn't clear'; not 'in the transcript' but 'in the conversation' or 'in the meeting'. Source and method only in the written part (after ---).")
     if not k: return t + kart_istem()
     t = re.sub(r"gerçekten şaşırtıcı.*?kullanabilirsin; ", "", t)
     t = t.replace("Sen Suflor.me'nin sesli asistanısın.", "Sen kullanıcının sesli asistanısın.")  # v0.54.3: kimlik kişilikten (kullanıcı: tanıtımda ürün adı yok)
@@ -732,7 +732,11 @@ def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okum
 SESLI_KAYNAK_RX = re.compile(r"(?i)\b(?:karar defterine|karar kayd[ıi]na|kayıtlara|kayıtlarıma|veritabanına|toplantı defterine|deftere|dökümüne|transkripte|toplantı oturumuna) göre,?\s*")
 SESLI_TERIM = ((re.compile(r"(?i)\bkarar kayıtlar(ı|ında|ına|ını)?\b"), lambda m: "kararlar" + {"ı": "", "ında": "da", "ına": "a", "ını": "ı"}.get(m.group(1) or "", "")),
                (re.compile(r"(?i)\bkarar kayd(ı|ını|ında|ına|ından)\b"), lambda m: "karar" + {"ı": "", "ını": "ı", "ında": "da", "ına": "a", "ından": "dan"}[m.group(1)]),
-               (re.compile(r"(?i)\bkarar defter(i|inde|ine|ini)\b"), lambda m: "kararlar" + {"i": "", "inde": "da", "ine": "a", "ini": "ı"}[m.group(1)]))
+               (re.compile(r"(?i)\bkarar defter(i|inde|ine|ini)\b"), lambda m: "kararlar" + {"i": "", "inde": "da", "ine": "a", "ini": "ı"}[m.group(1)]),
+               # v0.95.1 (S102 kör denemesi, 20 Ekim: 144 cevabın 7'sinde "Dökümde rakamlar bozuk duyulmuş" gibi): belirsizlik iç terimsiz; yalnız -de/-den
+               # (dışa aktarılan liste anlamındaki "rol dökümlerini", "dökümünü" değişmez)
+               (re.compile(r"(?i)\bdökümde (?:kısmen |bazı yerler(?:i)? )?bozuk (?:duyulmuş|yazılmış|çıkmış|geçiyor)"), lambda m: "net duyulmamış"),
+               (re.compile(r"\b([Dd])ökümd([ea])(n?)\b"), lambda m: ("G" if m.group(1) == "D" else "g") + "örüşmed" + m.group(2) + m.group(3)))
 def sesli_terim_suz(c):
     o = SESLI_KAYNAK_RX.sub("", c)
     for rx, f in SESLI_TERIM: o = rx.sub(f, o)
