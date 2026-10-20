@@ -42,6 +42,36 @@ def toplantida(nabiz):
         return bool((h.get("meeting") or (h.get("extension") or {}).get("call")) and time.time() - os.stat(nabiz).st_mtime < 600)
     except (OSError, ValueError, AttributeError): return False
 
+SIKISTIR_EN_AZ, SIKISTIR_ORAN = 2000, 0.3
+def sikistir(a, ids, crcs, dosya):
+    # v0.97.6 (sistem analizi §3.5): değişen/silinen parçanın eski gömmesi pakette kalıyordu (20 Ekim: 47.647 satırın 28.675'i, %60) — sunucu her açılışta
+    # hepsini okuyup ayıklıyordu. Eski satır ≥ SIKISTIR_EN_AZ ve ≥ %30 ise geçerli satırlar (parça no + metin CRC'si tutan, her parçanın en yenisi) yeni
+    # paketlere yazılır, eski paketler silinir. Sunucu durum.json değişince bir kez yeniden yükler (yazım bitmeden yüklemez).
+    import numpy as np
+    if not ids: return ids, crcs, dosya
+    I, C = np.concatenate(ids), np.concatenate(crcs)
+    c = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True); gecerli = {i: crc(t) for i, t in c.execute("SELECT id, metin FROM parca") if t}; c.close()
+    tut = np.array([gecerli.get(int(i)) == int(cc) for i, cc in zip(I, C)], dtype=bool)
+    _, ilk = np.unique(I[tut][::-1], return_index=True); sec = np.sort(np.flatnonzero(tut)[::-1][ilk])
+    eski = len(I) - len(sec)
+    if eski < SIKISTIR_EN_AZ or eski < SIKISTIR_ORAN * len(I): return ids, crcs, dosya
+    E = np.vstack([np.load(k + ".npy") for k in dosya])
+    if len(E) != len(I): gunluk("sıkıştırma atlandı: paket boyları tutmuyor"); return ids, crcs, dosya
+    no = max(int(os.path.basename(k)[1:6]) for k in dosya) + 1
+    for b in range(0, len(sec), PAKET):
+        j = sec[b:b + PAKET]; k = os.path.join(a.klasor, f"p{no:05d}")
+        for son, veri in ((".npy", E[j]), (".crc.npy", C[j]), (".id.npy", I[j])):
+            with open(k + son + ".tmp", "wb") as f: np.save(f, veri)
+            os.replace(k + son + ".tmp", k + son)
+        no += 1
+    for k in dosya:  # önce .id.npy: yarım silinen paket görünmez
+        for son in (".id.npy", ".crc.npy", ".npy"):
+            try: os.remove(k + son)
+            except OSError: pass
+    json.dump({"t": time.time(), "model": MODEL, "surum": SURUM}, open(os.path.join(a.klasor, "durum.json"), "w"))
+    gunluk(f"sıkıştırıldı: {len(I)} → {len(sec)} satır ({eski} eski), {len(dosya)} → {no - int(os.path.basename(dosya[-1])[1:6]) - 1} paket")
+    ids, crcs, dosya = mevcut(a.klasor); return ids, crcs, dosya
+
 def dizinle(a):
     import numpy as np
     os.makedirs(a.klasor, exist_ok=True)
@@ -49,7 +79,7 @@ def dizinle(a):
     except (OSError, ValueError): eski = None
     if eski != SURUM:
         for f in glob.glob(os.path.join(a.klasor, "p*.npy")): os.remove(f)
-    ids, crcs, _ = mevcut(a.klasor)
+    ids, crcs, dosya = sikistir(a, *mevcut(a.klasor))
     var = set(zip(np.concatenate(ids).tolist(), np.concatenate(crcs).tolist())) if ids else set()
     c = sqlite3.connect(f"file:{a.db}?mode=ro", uri=True)
     aday = [(i, t, b) for i, t, b in c.execute(f"SELECT p.id, p.metin, COALESCE(d.baslik, '') FROM parca p JOIN dosya d ON d.yol = p.yol WHERE {a.kosul} ORDER BY p.id")
@@ -108,7 +138,9 @@ def sunucu(a):
         _, ilk = np.unique(I[tut][::-1], return_index=True)  # aynı parça iki pakette: en yenisi
         sec = np.flatnonzero(tut)[::-1][ilk]
         D.update(mt=mt, v=(E[sec], I[sec])); gunluk(f"gömme yüklendi: {len(sec)} parça (eski/geçersiz {len(I) - len(sec)})")
-    yukle()
+    try: yukle()
+    except Exception as e: gunluk(f"ilk yükleme hatası: {e.__class__.__name__} — 5 sn sonra yeniden")  # sıkıştırma o an paket siliyorsa
+    D.setdefault("v", (np.zeros((0, 768), np.float32), np.zeros(0, np.int64)))
     import threading
     def izle():  # gömme klasörü değişince arka planda yeniden yükle (v0.70.2: sorgu içinde yükleme ~1 sn sürüyor, Konuş 0,25 sn bekleyip boş dönüyordu)
         while True:

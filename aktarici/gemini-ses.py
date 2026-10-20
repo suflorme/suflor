@@ -36,7 +36,31 @@ def gemini_acik(): return AYAR.get("ses_motoru") == "gemini" and gemini_var()
 # v0.81.0 (S92, kullanıcı 19 Ekim: "öncelik toplantı esnasında katılımcıları etkilemesi"): günlük sınır yüzünden Gemini yalnız katılımcıların duyduğu seste —
 # toplantıya söyle, otonom cevap, toplantıda tanıtım/duyuru (toplantiya_soyle). Kulağa cevap, fısıltı, sesli çeviri ve toplantı dışı her okuma yerel ses (Piper;
 # yoksa Mac). Ayar gemini_kapsam: toplanti (varsayılan) | hepsi (eski davranış).
-def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" else "toplanti"
+# v0.98.0 (S104, kullanıcı 20 Ekim): sesli "Gemini sesiyle konuş" → toplantı dışında da Gemini, GEMINI_GECIS_SN (15 dk; ayar gemini_gecis_dk) sonra ya da
+# "yerel sese dön" deyince hemen yerel ses (Pocket). Geçiş kalıcı değil: günlük sınır (model başına 100 istek) çabuk dolmasın; iki model de dolunca kendiliğinden biter.
+GEMINI_GECIS = {"bitis": 0.0}
+GEMINI_GECIS_SN = float(AYAR.get("gemini_gecis_dk") or 15) * 60
+def gemini_gecis_acik():
+    b = GEMINI_GECIS["bitis"]
+    if not b: return False
+    if time.time() >= b: GEMINI_GECIS["bitis"] = 0.0; print("GEMINI: geçiş süresi doldu — yerel ses"); return False
+    if gemini_model() is None: GEMINI_GECIS["bitis"] = 0.0; print("GEMINI: günlük sınır doldu — geçiş bitti, yerel ses"); return False
+    return True
+GECIS_AC_RX = re.compile(r"(?i)^\W*gemini\W*\w*\s+(?:sesi\w*\s+)?(?:konuş|geç|dön|başla)\w*(?:\s+m[ıiuü]s[ıiuü]n)?\W*$|^\W*(?:use|switch to) (?:the )?gemini(?: voice)?\W*$")
+GECIS_KAPAT_RX = re.compile(r"(?i)^\W*(?:yerel|kendi|normal|eski|pocket)\s+ses\w*\s+(?:dön|geç)\w*(?:\s+m[ıiuü]s[ıiuü]n)?\W*$|^\W*gemini'?\w*\s+(?:kapat|bırak)\w*\W*$"
+                            r"|^\W*(?:back to|switch to|use) (?:the )?local voice\W*$")
+def gemini_gecis_komut(metin):  # → okunacak kısa onay ya da None (komut değil). Yalnız tüm cümle komutsa (cümle içindeki "Gemini" sayılmaz)
+    m = " ".join(str(metin or "").split())
+    if GECIS_KAPAT_RX.search(m):
+        acikti = gemini_gecis_acik(); GEMINI_GECIS["bitis"] = 0.0; print("GEMINI: geçiş kapatıldı (kullanıcı)" if acikti else "GEMINI: geçiş zaten kapalı")
+        return _t("Tamam, yerel sese döndüm." if acikti else "Zaten yerel sesle konuşuyorum.", "OK, back to the local voice." if acikti else "I'm already using the local voice.")
+    if not GECIS_AC_RX.search(m): return None
+    if not gemini_var() or ("gizli_acik" in globals() and gizli_acik()): return _t("Gemini sesi şu an kullanılamıyor.", "The Gemini voice isn't available right now.")
+    if gemini_model() is None: return _t("Gemini'nin bugünkü sınırı doldu, yerel sesle devam ediyorum.", "Gemini's daily limit is used up; staying with the local voice.")
+    GEMINI_GECIS["bitis"] = time.time() + GEMINI_GECIS_SN; dk = round(GEMINI_GECIS_SN / 60)
+    print(f"GEMINI: geçiş açıldı ({dk} dk, kullanıcı)")
+    return _t(f"Tamam, {dk} dakika Gemini sesiyle konuşuyorum.", f"OK, I'll use the Gemini voice for {dk} minutes.")
+def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" or gemini_gecis_acik() else "toplanti"
 def gemini_izinli(toplantiya=False): return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi")  # v0.89.0: gizli toplantıda hiç
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
