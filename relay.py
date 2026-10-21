@@ -1424,7 +1424,11 @@ def guvenli_baglanti(u):
     h = (x.hostname or "").lower()
     ok = x.scheme == "https" and (h in ("teams.microsoft.com", "teams.live.com", "teams.cloud.microsoft", "meet.google.com") or h == "zoom.us" or h.endswith(".zoom.us"))
     return str(u) if ok else None
-TEAMS_ANA = "https://teams.microsoft.com/v2/"  # bağlantısız başlatmada açılan sayfa (toplantı oradan seçilir)
+TEAMS_ANA = "https://teams.microsoft.com/v2/"
+# Bağlantısız başlatmada açılan ana sayfa (toplantı oradan seçilir). Varsayılan yok (kullanıcı, 21 Ekim): Başlat formunda uygulama seçilmediyse
+# hazırlık sekmesi üçünü düğme olarak sunar.
+PLATFORM_ANA = {"teams": TEAMS_ANA, "meet": "https://meet.google.com/", "zoom": "https://app.zoom.us/wc/home"}
+PLATFORM_AD = {"teams": "Teams", "meet": "Google Meet", "zoom": "Zoom"}
 CHROME_APP = next((y for y in ("/Applications/Google Chrome.app", os.path.expanduser("~/Applications/Google Chrome.app")) if os.path.isdir(y)), None)
 # --- Son toplantılar (test toplantısı 7 Ekim) ------------------------------------------------------------------------
 # Toplantı sonu değerlendirmesi terminalde kalıyordu. Claude özeti kaydedince `toplanti-claude.py ozet-hazir <dosya>` → POST
@@ -1758,14 +1762,15 @@ def baslat(p):
         return {"ok": False, "err": _t("Claude Code'da oturum açık değil — Terminal'de claude yazıp /login ile gir, sonra yeniden Başlat",
                                        "Claude Code isn't signed in — type claude in Terminal and sign in with /login, then press Start again")}
     # toplantı sayfası (test toplantısı 7 Ekim: Teams elle açılmıştı): takvim olayının bağlantısı, yoksa formdaki bağlantı (yalnız
-    # bilinen toplantı alan adı, güvenli_baglanti), o da yoksa Teams ana sayfası — hazırlık sekmesi hazır olunca oraya geçer
+    # bilinen toplantı alan adı, güvenli_baglanti), o da yoksa formda seçilen uygulamanın ana sayfası (seçilmediyse hazırlık sekmesi sorar)
     bag_ogeler, bag_kotu = baglam_ayir(p.get("baglam"))
     if bag_kotu: return {"ok": False, "err": _t("Bağlam satırı tanınmadı (bağlantı ya da var olan dosya yolu olmalı): ", "Context line not recognised (must be a link or an existing file path): ") + bag_kotu[0]}
     elle = str(p.get("baglanti") or "").strip()
     if elle and not guvenli_baglanti(elle):
         return {"ok": False, "err": _t("Bağlantı tanınmadı — yalnız Teams, Google Meet ya da Zoom https bağlantısı", "Link not recognised — only Teams, Google Meet or Zoom https links")}
     baglanti = (olay or {}).get("baglanti") or guvenli_baglanti(elle); ana = not baglanti
-    if ana: baglanti = TEAMS_ANA
+    plat = p.get("platform") if p.get("platform") in PLATFORM_ANA else None
+    if ana: baglanti = PLATFORM_ANA.get(plat)  # seçilmediyse None: hazırlık sekmesi sorar
     simdi = datetime.datetime.now().astimezone()
     gundem = gundem_maddeleri(p.get("gundem"))
     sec = {"at": simdi.replace(tzinfo=None).isoformat(timespec="seconds"), "konu": konu, "rol": rol, "dil": dil, "olay": olay,
@@ -1799,7 +1804,7 @@ def baslat(p):
     os.chmod(cp, 0o755)
     if not os.environ.get("SUFLOR_TEST_BASLAT"):  # deneme: Terminal açılmaz, yalnız dosyalar yazılır
         subprocess.Popen(["open", "-a", "Terminal", cp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    STATE["baslatma"] = {"at": time.time(), "konu": konu, "olay": (olay or {}).get("id"), "baglanti": baglanti, "ana": ana, "baslangic": (olay or {}).get("baslangic")}
+    STATE["baslatma"] = {"at": time.time(), "konu": konu, "olay": (olay or {}).get("id"), "baglanti": baglanti, "ana": ana, "platform": plat if ana else None, "baslangic": (olay or {}).get("baslangic")}
     try: modelleri_isit()
     except Exception as e: print(f"BAŞLAT: model ısıtma hatası {e}")
     if olay:
@@ -1824,7 +1829,8 @@ def hazirlik_view():  # "Suflor hazırlanıyor" sekmesi bunu yoklar; adımlar bi
             {"ad": "Konuşma tanıma hazır", "ok": w in ("hazir", "yok") and sm in ("hazir", "yok", "hata"), "not": f"Whisper {_durum_ad(w)} · {_t('ses modeli', 'voice model')} {_durum_ad(sm)}"},
             {"ad": "Claude izliyor", "ok": ca is not None and ca < 30 and at > 0 and STATE["izle_seen"] > at}]
     hazir = adim[3]["ok"]
-    return {"konu": b.get("konu"), "baglanti": b.get("baglanti"), "ana": bool(b.get("ana")), "adimlar": adim, "hazir": hazir, "kalan_sn": max(0, round(son - simdi)) if at else None,
+    sec = [{"ad": PLATFORM_AD[k], "url": u} for k, u in PLATFORM_ANA.items()] if b.get("ana") and not b.get("baglanti") else []
+    return {"konu": b.get("konu"), "baglanti": b.get("baglanti"), "ana": bool(b.get("ana")), "platform": PLATFORM_AD.get(b.get("platform") or ""), "sec": sec, "adimlar": adim, "hazir": hazir, "kalan_sn": max(0, round(son - simdi)) if at else None,
             "git": bool(at) and (hazir or simdi >= son)}
 
 def sayfa(ad, yol=""):  # yazı tipleri + arayüz dili (ayar "dil": tr|en; deneme için ?dil=en)

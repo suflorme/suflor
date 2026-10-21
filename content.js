@@ -365,8 +365,9 @@
     if (Date.now() - callSince > 45000 && callWarned !== m) { callWarned = m;
       toast(whAkiyor ? L("Ad için altyazıyı aç: {y}", { y: P.yonerge.altyazi }) : L("Altyazı kapalı: {y}", { y: P.yonerge.altyazi }), "#b26a00", 12000); }
   }
+  const sayfaUygun = () => !P.toplantiSayfasi || P.toplantiSayfasi();  // platform "toplantı değil" diyorsa (Meet ana/bağlantı sayfası) susar
   function tick() {
-    if (!cfg.enabled) return;
+    if (!cfg.enabled || !sayfaUygun()) return;
     let entries = [], source = "";
     const panel = findTranscriptPanel();
     if (panel) { entries = parsePanel(panel); source = "transcript"; }
@@ -423,7 +424,7 @@
   // Gövdede kim (zamanlayici|arka-plan) ve sekme görünürlüğü: aktarıcı 30 sn'yi aşan boşlukları bununla günlüğe yazar.
   let pingSon = 0, kisiEtiketSon = "";
   async function ping(kim = "zamanlayici") {
-    if (!cfg.enabled) return;
+    if (!cfg.enabled || !sayfaUygun()) return;
     if (kim !== "zamanlayici" && Date.now() - pingSon < 8000) return;  // zamanlayıcı yeni attıysa tekrar etme
     pingSon = Date.now();
     if (queue.length) drainQueue(); // yeni satır gelmese de kuyruğu boşaltmayı dene

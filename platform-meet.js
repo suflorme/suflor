@@ -9,6 +9,11 @@
   // listesini satır diye gönderiyordu. Asıl kutu role=region aria-label="Captions"; içinde her konuşma bloğu .nMcdL (ad .NWpY1d, metin .ygicle).
   const CC = ['div[role="region"][aria-label*="altyazı" i]', 'div[role="region"][aria-label*="caption" i]', '[jsname="dsyhDe"]'];
   let Y = null;
+  // Toplantı adresi meet.google.com/abc-defg-hij (bekleme odası dahil). Ana sayfa ve "Share your new meeting" (/getalink) toplantı değil:
+  // 21 Ekim denemesinde bağlantı sayfasının nabzı toplantınınkini eziyordu (ad yanlış, "çağrıda değil"). Meet tek sayfa uygulaması —
+  // ana sayfadan toplantıya adres değişerek geçer, bu yüzden her çağrıda bakılır.
+  const KOD_RE = /^\/[a-z]{3,4}-[a-z]{4}-[a-z]{3,4}(?:\/|$)/i;
+  function toplantiSayfasi() { return KOD_RE.test(location.pathname); }
   function toplantiAdi() {
     const m = document.querySelector("[data-meeting-title]");
     if (m && m.getAttribute("data-meeting-title")) return m.getAttribute("data-meeting-title").trim();
@@ -59,7 +64,7 @@
                en: { altyazi: "CC button at the bottom (Turn on captions)", dokum: "Meet has no live transcript panel — turn on captions" } },
     get yonerge() { return this.YONERGE[this.dil] || this.YONERGE.tr; },
     kur(yard) { Y = yard; },
-    SKIP_RE, toplantiAdi, cagrida, micDugme, sessizMi, dokumPaneli, dokumSatirSayisi, dokumOku, altyaziKutusu, altyaziVar, altyaziOku,
+    SKIP_RE, toplantiSayfasi, toplantiAdi, cagrida, micDugme, sessizMi, dokumPaneli, dokumSatirSayisi, dokumOku, altyaziKutusu, altyaziVar, altyaziOku,
     altyaziAdimlari: [['button[aria-label], [role="button"][aria-label]', /^(altyazıları aç|turn on captions)/i]],
     dilYollari() { return []; },  // Meet'te altyazı dili altyazı ayarından; otomasyon kapalı (Faz 0)
   };

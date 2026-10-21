@@ -219,16 +219,16 @@
  },
  "http": {
   "/": {
-   "uzunluk": 187498,
-   "sha": "7e19c77f17dfd263"
+   "uzunluk": 188025,
+   "sha": "66acb34ec0488160"
   },
   "/hazirlik": {
-   "uzunluk": 53677,
-   "sha": "15fbf804a6304a36"
+   "uzunluk": 54358,
+   "sha": "0e4558a1b946eece"
   },
   "/mini": {
-   "uzunluk": 187498,
-   "sha": "7e19c77f17dfd263"
+   "uzunluk": 188025,
+   "sha": "66acb34ec0488160"
   },
   "/status": {
    "_ping_son": "float",
@@ -836,7 +836,9 @@
    "git": "bool",
    "hazir": "bool",
    "kalan_sn": "NoneType",
-   "konu": "NoneType"
+   "konu": "NoneType",
+   "platform": "NoneType",
+   "sec": []
   }
  },
  "izle_turleri": {

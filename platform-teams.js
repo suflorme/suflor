@@ -8,6 +8,7 @@
 //   altyaziAdimlari: [[seçici, metin kalıbı]] — altyazıyı açan menü yolu (çekirdek güvenlik denetimiyle oynatır)
 //   dilYollari(hedef "tr"|"en") → [[{sec, re, zaten?, kap?, icinde?, istege?}]] — altyazı konuşma dilini ayarlayan yollar (v0.13.10)
 //   SKIP_RE: dökümde satır sayılmayacak sistem metinleri
+//   toplantiSayfasi() (isteğe bağlı): false → bu sayfa toplantı değil (ana sayfa, bağlantı sayfası); çekirdek nabız ve satır göndermez
 // Seçiciler Eylül–Ekim 2026 Teams DOM'u (teams.cloud.microsoft, Türkçe arayüz); ayrıntı BRIEF-devir.md §3.
 (() => {
   if (globalThis.SuflorPlatform) return;
