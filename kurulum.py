@@ -767,6 +767,21 @@ def kaldir():
     if os.path.exists(plist_yolu()): os.remove(plist_yolu())
     say(f"Otomatik başlatma kaldırıldı. Veri {os.path.join(yollar()['uygulama'], 'canli')} içinde duruyor (proje klasöründeki _canli kısayolu çalışmaya devam eder).")
 
+# Yerel Türkçe sesler (21 Ekim): ortak klasörde Pocket/Piper kuruluysa (ilk hesap elle kurdu) bu hesabın ayarına yolları yaz — ikinci hesapta
+# anahtarlar yoktu, kişilikteki yerel ses (pocket:…) sessizce Mac sesine düşüyordu. Yalnız eksik anahtar yazılır (elle verilen yol korunur);
+# ses_motoru seçimine dokunulmaz. Ortak klasörde yoksa (beta kullanıcısı) hiçbir şey yazmaz.
+def yerel_ses_bul(a, ort):
+    t = os.path.join(ort, "tts-deneme")
+    adaylar = {"pocket_python": (os.path.join(t, "yeni-venv", "bin", "python"), "x"), "pocket_hf": (os.path.join(t, "hf"), "d"),
+               "piper_python": (os.path.join(t, "piper-venv", "bin", "python"), "x"), "piper_model": (os.path.join(ort, "piper-ses", "tr-turkce.onnx"), "f")}
+    var = lambda y, tur: os.path.isdir(y) if tur == "d" else os.path.isfile(y) and (tur != "x" or os.access(y, os.X_OK))
+    yazilan = []
+    for cift in (("pocket_python", "pocket_hf"), ("piper_python", "piper_model")):  # ikisi birden olmadan motor çalışmaz: ikisi de varsa yaz
+        if all(var(*adaylar[k]) for k in cift):
+            for k in cift:
+                if not a.get(k): a[k] = adaylar[k][0]; yazilan.append(k)
+    return yazilan
+
 def kur():
     if DENEME: sys.exit("Deneme kipinde (SUFLOR_EV) aktarıcı kurulmaz.")
     Y = yollar(); app, port = Y["uygulama"], Y["port"]; canli = os.path.join(app, "canli"); desk = os.path.join(Y["proje"], "_canli")
@@ -777,6 +792,10 @@ def kur():
     for f in ("pano.html", "hazirlik.html", "yazi.css", "dil.js", "anahtar.js"):
         if not os.path.isfile(os.path.join(KOD, "pano", f)): sys.exit(f"HATA: pano/{f} eksik — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")
     os.makedirs(app, exist_ok=True)
+    ys = []
+    def _ys(a): ys.extend(yerel_ses_bul(a, Y["ortak"])); return None if ys else False  # False: değişiklik yok, ayar yeniden yazılmaz
+    ayar_degistir(_ys)
+    if ys: say(f"Yerel Türkçe ses ortak klasörde bulundu, ayara yazıldı: {', '.join(ys)}")
     # geri bildirim raporları için ortak klasör — iki macOS hesabı da yazar (herkes yazar, yapışkan bit: yalnız sahibi siler)
     gb = os.path.join(Y["ortak"], "geri-bildirim")
     try: os.makedirs(gb, exist_ok=True); os.chmod(gb, 0o1777)
