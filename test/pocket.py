@@ -22,13 +22,15 @@ AYAR = {"ses_motoru": "piper", "pocket_python": PY or "/yok/python", "pocket_hf"
 TON = {"ad": None}
 ns = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "A": types.SimpleNamespace(port=PORT), "_UYG": KOD, "_APP": T, "__file__": os.path.join(KOD, "relay.py"), "BASE": T, "deneme_aktarici": lambda: True,
       "_ilk": lambda *y: next((x for x in y if os.path.exists(x)), y[-1]), "os": os, "re": re, "json": json, "time": time, "threading": threading, "subprocess": subprocess,
-      "kisilikler": lambda: [{"yerel_ses": "pocket:alperiox:female_2", "ses": "gemini:Kore"}, {"yerel_ses": "pocket:wite:male_1", "ses": "gemini:Charon"}],
+      "kisilikler": lambda: [{"yerel_ses": "pocket:alperiox:female_2", "ses": "gemini:Kore", "yerel_ses_en": "pocket:en:mary"}, {"yerel_ses": "pocket:wite:male_1", "ses": "gemini:Charon", "yerel_ses_en": "pocket:en:michael"}],
       "ton_bul": lambda m: TON["ad"]}
 for b in ("piper-ses.py", "pocket-ses.py"): exec(compile(open(os.path.join(KOD, "aktarici", b), encoding="utf-8").read(), b, "exec"), ns)
 ad = ns["pocket_ses_adi"]
 bak("ses adı: pocket:alperiox:female_2 / wite / boş ses / bilinmeyen model",
     (ad("pocket:alperiox:female_2"), ad("wite:male_1"), ad("pocket:wite"), ad("pocket:yok:x"), ad("")) == ("alperiox:female_2", "wite:male_1", "wite:female_2", None, None))
-bak("önceden yüklenecek sesler: iki kişiliğin yerel sesi", ns["pocket_kisilik_sesleri"]() == ["alperiox:female_2", "wite:male_1"])
+bak("önceden yüklenecek sesler: iki kişiliğin yerel sesi + İngilizce sesi (v0.101.3)", ns["pocket_kisilik_sesleri"]() == ["alperiox:female_2", "en:mary", "wite:male_1", "en:michael"])
+bak("ses adı: İngilizce model (pocket:en:michael, boş ses → mary)", (ad("pocket:en:michael"), ad("en")) == ("en:michael", "en:mary"))
+bak("İngilizce metne Türkçe okunuş uygulanmaz (saat, sayı, yüzde olduğu gibi)", ns["pocket_metin"]("At 14:30, 3 tasks are 80% done.", "en:michael") == "At 14:30, 3 tasks are 80% done.")
 pm = ns["pocket_metin"]
 for g, s, b in [("Bütçe 1.250.000 liraya çıktı.", "alperiox:female_2", "Bütçe bir milyon iki yüz elli bin liraya çıktı."),
                 ("Teslim 24 Ekim'de, saat 14:30'da.", "alperiox:female_2", "Teslim yirmi dört Ekim'de, saat on dört otuzda."),
@@ -74,8 +76,10 @@ else:
         bak(f"ilk okuma işçiyi açar (iki model önceden) ve biter ({time.time() - t:.1f} sn)", ok is True and ns["POCKET"]["durum"] == "hazir")
         t = time.time(); ok = ns["pocket_oku"]("Harika haber, müşteri teklifi kabul etti!", ses="wite:male_1")
         bak(f"ikinci okuma (wite, mutlu) ilk ses {ns['POCKET'].get('ilk', 9):.3f} sn ≤ 0,15 sn", ok is True and ns["POCKET"].get("ilk", 9) <= 0.15)
+        t = time.time(); ok = ns["pocket_oku"]("Happy to help, Sir. You have three meetings on Friday, the first one at 10:30.", ses="en:michael")
+        bak(f"v0.101.3: İngilizce model (en:michael) okur, ilk ses {ns['POCKET'].get('ilk', 9):.3f} sn ≤ 0,15 sn ({time.time() - t:.1f} sn)", ok is True and ns["POCKET"].get("ilk", 9) <= 0.15)
         rss = int(subprocess.run(["ps", "-o", "rss=", "-p", str(ns["POCKET"]["p"].pid)], capture_output=True, text=True).stdout.strip() or 0) / 1024
-        bak(f"işçi belleği {rss:.0f} MB ≤ 2.000 MB (iki model)", 0 < rss <= 2000)
+        bak(f"işçi belleği {rss:.0f} MB ≤ 2.500 MB (üç model)", 0 < rss <= 2500)
         n = {"i": 0}
         def iptal(): n["i"] += 1; return n["i"] > 2
         uzun = " ".join(["Bu uzun bir cümle, okuma yarıda kesilince kalan parçalar çalınmamalı."] * 6)

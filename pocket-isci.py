@@ -6,7 +6,9 @@
 #   wite     = wite-tech/pocket-tts-turkish — hazır sesler female_1..3 / male_1..3, duygu etiketi (mutlu, üzgün, kızgın, şaşkın, sakin), sayıları kendisi okur
 #   alperiox = alperiox/pocket-tts-turkish (6 katman) — duygu etiketi yok, ses örneği ister (wite'ın hazır seslerinden ya da bir .wav), rakam okuyamaz
 #              (aktarıcı rakamı yazıya çevirip gönderir), Türkçe küçük harfle eğitilmiş
-# Ses adı "model:ses": "wite:male_1", "alperiox:female_2", "alperiox:/yol/ornek.wav".
+#   en       = kyutai/pocket-tts İngilizce (v0.101.3, kullanıcı 21 Ekim: İngilizce cevap Türkçe aksanla okunuyordu) — ses kopyalamasız sürüm
+#              (pocket-tts-without-voice-cloning, koşulsuz), hazır sesler (michael, mary …; kör dinlemede seçildi), duygu etiketi yok, ilk ses ~0,05 sn
+# Ses adı "model:ses": "wite:male_1", "alperiox:female_2", "alperiox:/yol/ornek.wav", "en:michael".
 # Protokol (satır başına bir JSON):
 #   giriş : {"id": "...", "metin": "...", "ses": "wite:male_1", "duygu": null|"mutlu"|…}
 #   çıkış : {"hazir": true, "sn": yükleme, "sr": 24000, "modeller": [...]} · parça {"id", "parca": i, "wav": yol, "sure": sn, "ilk": sn (yalnız ilk)}
@@ -56,6 +58,12 @@ def main():
                 cfg.write(open(os.path.join(d, "turkish_6l.yaml"), encoding="utf-8").read().replace("hf://alperiox/pocket-tts-turkish/", d + "/")); cfg.close()
                 M["alperiox"] = TTSModel.load_model(config=cfg.name); os.remove(cfg.name)
             return M["alperiox"]
+        def ingilizce():
+            if "en" not in M:
+                from pocket_tts.models.tts_model import TTSModel
+                M["en"] = TTSModel.load_model(language="english_2026-09")  # ağırlık ve ses sürümleri yapılandırmada sabit (@revizyon); çevrimdışı önbellekten
+            return M["en"]
+        DURUM_EN = {}
         DURUM = {}  # alperiox ses örneği durumları (ses başına bir kez)
         def alperiox_durum(ses):
             if ses not in DURUM:
@@ -71,9 +79,12 @@ def main():
             elif model == "alperiox":
                 st = alperiox_durum(ad or "female_2")
                 for p in alperiox().generate_audio_stream(st, cumle.replace("…", ",").translate(_KUCUK).lower()): yield p.detach().cpu().numpy().reshape(-1).astype(np.float32)
+            elif model == "en":
+                if (ad or "michael") not in DURUM_EN: DURUM_EN[ad or "michael"] = ingilizce().get_state_for_audio_prompt(ad or "michael")
+                for p in ingilizce().generate_audio_stream(DURUM_EN[ad or "michael"], cumle.replace("…", ",")): yield p.detach().cpu().numpy().reshape(-1).astype(np.float32)
             else: raise ValueError(f"bilinmeyen model: {model}")
         for m in onyukle:  # aktarıcı açılırken kişiliklerin sesleri; ilk okuma beklemesin (ısınma dahil)
-            for _ in akis(m, "Merhaba.", None): pass
+            for _ in akis(m, "Hello." if m.startswith("en:") else "Merhaba.", None): pass
     except Exception as e:
         yaz({"hazir": False, "hata": f"{e.__class__.__name__}: {e}"[:200]}); return
     SR = 24000

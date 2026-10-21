@@ -28,7 +28,7 @@ def _kisilik_oku(yol, rol):
     try:
         s = open(yol, encoding="utf-8").read()
         m = re.match(r"\s*---\s*\n(.*?)\n---\s*\n?(.*)\Z", s, re.S)
-        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "hiz": None, "ses_uslup": None, "ses_etiket": False, "gerginlik_tonu": False, "kdili": False, "rol": rol, "metin": (m.group(2) if m else s).strip()}
+        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "yerel_ses_en": None, "hiz": None, "ses_uslup": None, "ses_etiket": False, "gerginlik_tonu": False, "kdili": False, "rol": rol, "metin": (m.group(2) if m else s).strip()}
         for sat in (m.group(1).splitlines() if m else []):
             k, _, d_ = sat.partition(":"); k = k.strip().lower(); d_ = d_.strip()
             if k in ("ad", "okunus", "tanitim", "selam"): v[k] = d_ or None
@@ -39,6 +39,7 @@ def _kisilik_oku(yol, rol):
             elif k == "ses_etiket": v["ses_etiket"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.79.0: <chuckle> gibi sözsüz ses etiketleri (yalnız Gemini)
             elif k == "gerginlik_tonu": v["gerginlik_tonu"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.80.0: toplantı gerginliğine göre ton (yalnız Gemini sesinde)
             elif k == "ses": v["ses"] = d_ or None  # v0.71.0: "piper" ya da Mac ses adı (say -v); yoksa ayardaki ses
+            elif k == "yerel_ses_en": v["yerel_ses_en"] = d_ or None  # v0.101.3: İngilizce cümlelerin yerel sesi, ör. pocket:en:michael
             elif k == "yerel_ses": v["yerel_ses"] = d_ or None  # S93: Gemini dışındaki (yerel) ses, ör. pocket:alperiox:female_2; Gemini toplantıya ayrıldığı için (S92) ayrı
             elif k == "hiz":
                 try: v["hiz"] = max(0.7, min(1.6, float(d_.replace(",", "."))))

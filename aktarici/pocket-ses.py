@@ -12,21 +12,21 @@ if "ses_basladi" not in globals():  # v0.95.0: çalma anı ölçümü brifing-se
 POCKET = {"p": None, "durum": "kapali", "hata": None, "bekleyen": {}, "iptal": set(), "n": 0, "kilit": threading.Lock(), "baslat_t": 0.0, "sr": 24000}
 POCKET_ISCI = _ilk(os.path.join(_UYG, "pocket-isci.py"), os.path.join(_APP, "pocket-isci.py"))
 POCKET_GECICI = os.path.join(tempfile.gettempdir(), f"suflor-pocket-{A.port}")
-POCKET_MODELLER = ("wite", "alperiox")
+POCKET_MODELLER = ("wite", "alperiox", "en")  # v0.101.3: en = İngilizce temel model (İngilizce cümleler, kişilikte yerel_ses_en)
 def pocket_var(): return ARAYUZ_DILI == "tr" and bool(AYAR.get("pocket_python")) and bool(AYAR.get("pocket_hf"))
 def pocket_acik(): return AYAR.get("ses_motoru") == "pocket" and pocket_var()
 def pocket_ses_adi(s):  # "pocket:alperiox:female_2" / "alperiox:female_2" → "alperiox:female_2"; geçersizse None
     s = str(s or "").strip()
     if s.startswith("pocket"): s = s[6:].lstrip(":")
     m, _, ad = s.partition(":")
-    return f"{m}:{ad.strip() or 'female_2'}" if m in POCKET_MODELLER else None
+    return f"{m}:{ad.strip() or ('mary' if m == 'en' else 'female_2')}" if m in POCKET_MODELLER else None
 def pocket_varsayilan(): return pocket_ses_adi(AYAR.get("pocket_ses")) or "wite:female_2"
 def pocket_kisilik_sesleri():  # işçi açılırken önceden yüklenecek sesler (kişiliklerin yerel sesleri + ayardaki)
     s = []
     try: kk = kisilikler()
     except Exception: kk = []
     for k in kk:
-        for a in (k.get("yerel_ses"), k.get("ses")):
+        for a in (k.get("yerel_ses"), k.get("ses"), k.get("yerel_ses_en")):
             v = pocket_ses_adi(a) if str(a or "").startswith("pocket") else None
             if v and v not in s: s.append(v)
     if AYAR.get("ses_motoru") == "pocket" and pocket_varsayilan() not in s: s.append(pocket_varsayilan())
@@ -85,6 +85,7 @@ def pocket_duygu(metin):
 def _rakam_yazi(m):  # alperiox rakam okuyamaz (19 Ekim: "1.250.000"da cümleyi kesti) → yazıya; piper_okunur'dan sonra kalan rakamlar
     return re.sub(r"(?<![\d,])(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?(?![\d.]\d)", lambda x: tr_sayi(x.group(1).replace(".", "")) + (" virgül " + tr_sayi(x.group(2)) if x.group(2) else ""), m)
 def pocket_metin(metin, ses):
+    if ses.startswith("en:"): return metin  # İngilizce model sayı, saat ve yüzdeyi kendisi okur; Türkçe okunuş kuralları uygulanmaz
     m = piper_okunur(metin)
     return _rakam_yazi(m) if ses.startswith("alperiox") else m
 def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None):
@@ -93,6 +94,7 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None):
     ses = pocket_ses_adi(ses) or pocket_varsayilan()
     if not metin or not pocket_var() or not pocket_baslat(): return False
     if duygu is None and ses.startswith("wite"): duygu = pocket_duygu(metin)
+    if ses.startswith("en:"): duygu = None
     metin = pocket_metin(metin, ses)
     POCKET["n"] += 1; kim = f"k{POCKET['n']}"; q = queue.Queue(); POCKET["bekleyen"][kim] = q; calinan = 0; oyn = None; sure = 0.0; t0 = time.time(); sr = POCKET.get("sr") or 24000
     def kapat(bekle):

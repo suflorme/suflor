@@ -408,6 +408,30 @@ def ses_secimi():  # say -v için ses adı; None = sistem sesi
 # v0.79.0: Gemini'nin sözsüz ses etiketleri (kişilikte ses_etiket: evet); Gemini dışındaki seslerde, panoda ve toplantıya söylerken silinir
 SES_ETIKET_RX = re.compile(r"\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm|ton:\s*[a-z_]+)>\s*", re.I)  # v0.80.0: <ton:…> de
 def etiket_sil(metin): return re.sub(r"\s{2,}", " ", SES_ETIKET_RX.sub(" ", metin or "")).strip() if metin else metin
+# İngilizce cümle (v0.101.3, kullanıcı 21 Ekim: "İngilizce konuşması Türkçe konuşur gibi kalıyor; aynı sohbette iki dilde akıcı"): okunacak her parçanın dili
+# ayrılır; İngilizceyse ve kişilikte yerel_ses_en varsa (Pocket İngilizce modeli, ör. pocket:en:michael) o sesle okunur ve Türkçe okunuş adımları (yabancı
+# sözcük sözlüğü, Türkçe yazıma çevirme sırası, kişilik okunuşları "Sir=sör", Türkçe sayı/saat) uygulanmaz; Gemini sesinde de kişilik okunuşu atlanır.
+# Türkçe harf varsa Türkçe; yoksa ceviri.py dil_tahmin, belirsiz kısa parçada İngilizce sözcük işareti; hâlâ belirsizse son 20 sn'deki parçanın dili (cevap
+# cümle cümle gelir), yoksa Türkçe. Türkçe cümle içindeki İngilizce terim Türkçe seste kalır (bugünkü gibi).
+_DIL_EN = set("i i'm i'll i've i'd you you're you've it's that's there's we're they're my me your sir yes no ok okay sure please thanks thank sorry hello hi "
+              "the and is are to of we that it for in on with this be have will can was were what so but not they our just do does did here let".split())
+_DIL_TR = set("ve bir bu da de ne için ama çok var yok mi mı mu mü ben sen biz o şey gibi daha olarak şimdi evet hayır tamam yani peki hadi tabii merhaba selam".split())
+_DIL = {"son": None, "t": 0.0}
+def okuma_dili(metin):  # → "tr" | "en"
+    m = metin or ""
+    if re.search(r"[çğıöşüÇĞİÖŞÜ]", m): d = "tr"
+    else:
+        d = dil_tahmin(m) if "dil_tahmin" in globals() else None
+        if d is None:
+            w = re.findall(r"[a-z']+", m.lower())
+            en, tr = sum(x in _DIL_EN for x in w), sum(x in _DIL_TR for x in w)
+            d = "en" if en >= 1 and en > tr else "tr" if tr >= 1 else None
+    if d: _DIL.update(son=d, t=time.time()); return d
+    return _DIL["son"] if _DIL["son"] and time.time() - _DIL["t"] < 20 else "tr"
+def kisilik_en_sesi(k=None):  # kişiliğin İngilizce yerel sesi ("en:michael") ya da None (Pocket kurulu değilse de None)
+    kk = k if k is not None else kisilik()
+    v = str((kk or {}).get("yerel_ses_en") or "")
+    return pocket_ses_adi(v) if v.startswith("pocket") and "pocket_var" in globals() and pocket_var() and (pocket_ses_adi(v) or "").startswith("en:") else None
 def seslendir(metin, kuyruk=False, tepkisiz=False, k=None, cal=None):
     # k: bu metni okuyacak kişilik (v0.80.0 iki sesli özet); verilmezse o anki kişilik. Gemini'de her parça kendi sesi ve üslubuyla kuyruğa girer.
     if not AYAR.get("konusma", True) or not metin: return False
@@ -419,16 +443,18 @@ def seslendir(metin, kuyruk=False, tepkisiz=False, k=None, cal=None):
     mac = motor == "mac"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
     if mac and not tepkisiz: klip, metin = tepki_ayir(metin)  # tepki klipleri Elif tınısında: yalnız Mac sesinde
     if motor != "gemini": metin = etiket_sil(metin)
-    if motor == "gemini": metin = ses_duzen(kisilik_telaffuz(metin), False) if metin else ""  # v0.78.0: Gemini Türkçeyi ve yabancı sözcükleri kendisi okur; yalnız kişilik okunuşları
+    en = ARAYUZ_DILI == "tr" and okuma_dili(metin) == "en"; en_ses = kisilik_en_sesi(k) if en and motor == "pocket" else None  # ⚙ Ayarlar'da Mac sesi seçiliyse dokunulmaz
+    if motor == "gemini": metin = ses_duzen(metin if en else kisilik_telaffuz(metin), False) if metin else ""  # v0.78.0: Gemini Türkçeyi ve yabancı sözcükleri kendisi okur; yalnız kişilik okunuşları
+    elif en_ses: metin = ses_duzen(metin, False) if metin else ""  # v0.101.3: İngilizce cümle İngilizce sesle, Türkçe okunuş yok
     else: metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
-    oge = metin
+    oge = ("en", metin, en_ses) if en_ses and metin else metin
     if motor == "gemini" and metin:  # v0.80.0: ses ve üslup (kişilik + durum tonu) şimdi belirlenir; çalınırken kişilik değişse de bu parça bu sesle
         kk = k if k is not None else kisilik()
         oge = ("g", metin, gemini_kisilik_sesi(kk) if k is not None else None, ses_uslup_bul(metin, kk))
     if not kuyruk: ses_durdur()
     if os.environ.get("SUFLOR_TEST_BASLAT"):
         if klip: print(f"SES (deneme): tepki {os.path.basename(klip)}")
-        if metin: print(f"SES (deneme): {len(metin)} karakter · {metin}" + (f" · ses {oge[2] or '-'} · üslup {oge[3] or '-'}" if isinstance(oge, tuple) else ""))
+        if metin: print(f"SES (deneme): {len(metin)} karakter · {metin}" + (f" · İngilizce {oge[2]}" if isinstance(oge, tuple) and oge[0] == "en" else f" · ses {oge[2] or '-'} · üslup {oge[3] or '-'}" if isinstance(oge, tuple) else ""))
         SES["test_bit"] = max(SES.get("test_bit", 0), time.time()) + 0.06 * len(metin or "")  # sohbet testinde "okunuyor" süresi (ses çalınmaz)
         if cal and metin: cal(time.time())
         return True
@@ -440,7 +466,7 @@ def seslendir(metin, kuyruk=False, tepkisiz=False, k=None, cal=None):
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
     return True
 GEMINI_BIRLESIK_EN_COK = 600  # v0.80.8: birleşik Gemini okumasının en uzun metni (karakter); Konuş cevabı en çok 5 cümle
-def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] == "g" else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
+def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] in ("g", "en") else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
 def _ses_isci():
     while True:
         with SES_K:
@@ -450,6 +476,14 @@ def _ses_isci():
                 try: SES["p"] = p = subprocess.Popen(["/usr/bin/afplay", dosya], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except OSError as e: print(f"SES: tepki çalınamadı {e.__class__.__name__}"); continue
         if dosya: p.wait(); continue
+        with SES_K: bas = SES["q"][0] if SES["q"] else None
+        if isinstance(bas, tuple) and bas[0] == "en":  # v0.101.3: İngilizce cümle kişiliğin İngilizce Pocket sesiyle; okunamazsa düz metin olarak yerel sese düşer
+            with SES_K:
+                if not SES["q"] or SES["q"][0] is not bas: continue
+                SES["q"].pop(0); kes = SES.get("kes", 0); SES["simdi"] = bas[1]
+            if pocket_oku(bas[1], ses=bas[2], iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
+            print("SES: İngilizce ses okuyamadı — yerel sese düştü")
+            with SES_K: SES["q"].insert(0, bas[1])
         motor, v, khiz = kisilik_sesi()
         with SES_K: bas = SES["q"][0] if SES["q"] else None
         if isinstance(bas, tuple) and bas[0] == "g" and gemini_izinli(): motor = "gemini"  # v0.81.0: kapsam bu arada daraldıysa yerel sese düşer  # v0.80.0: parça Gemini için hazırlandı (kendi sesi/üslubu)
