@@ -82,6 +82,8 @@ so.add_argument("islem", nargs="?", default="liste", choices=["liste", "ekle", "
 so.add_argument("--kim", default=""); so.add_argument("--tarih", default="", help="söz verilen tarih (YYYY-MM-DD); belirsizse boş")
 so.add_argument("--toplanti", default=None, help="toplantı .md adı (yoksa son toplantı)")
 so.add_argument("--durum", default="tutuldu", choices=["tutuldu", "iptal"], help="kapat: söz tutuldu mu, düştü mü")
+ta = sub.add_parser("taahhut", help="taahhüt ve tutarlılık: toplantıda bulunan net olmayan sözler, değişen rakamlar, geçmişle farklar (toplantı sonu özeti için)")
+ta.add_argument("--toplanti", default=None, help="toplantı .md adı (yoksa son toplantı)")
 so.add_argument("--hepsi", action="store_true", help="liste: kapananlar da")
 ac = sub.add_parser("acik", help="v0.6.0: cevapsız sorular — liste | ekle \"soru\" --tetik a,b | kapat aN")
 ac.add_argument("islem", nargs="?", default="liste", choices=["liste", "ekle", "kapat", "sifirla"]); ac.add_argument("deger", nargs="?")
@@ -395,6 +397,27 @@ def soz_cmd():
         print(soz_satir(x)); return
     ys = [x for x in Y.sozler(A.dir, A.kim or None) if A.hepsi or x.get("durum") == "acik"]
     print("\n".join(soz_satir(x) for x in ys) or "söz yok")
+def taahhut_cmd():
+    # izle'nin <toplantı>.taahhut.log'u (her bulgu bir JSON satırı) → türe göre, tekrarsız; özetin "Netleşmesi gerekenler" bölümü buradan
+    import taahhut
+    md = toplanti_dosyasi(A.toplanti)
+    if not md: sys.exit("toplantı dosyası yok")
+    yol = os.path.join(A.dir, md[:-3] + ".taahhut.log"); kayit = []
+    try: kayit = [json.loads(l) for l in open(yol, encoding="utf-8") if l.strip()]
+    except FileNotFoundError: pass
+    except (OSError, ValueError) as e: sys.exit(f"{yol}: okunamadı ({e})")
+    o = taahhut.ozet_satirlari(kayit)
+    if not any(o.values()): print(f"{md}: taahhüt/tutarlılık bulgusu yok"); return
+    print(f"{md} — taahhüt ve tutarlılık adayları (kural tabanlı; her birini dökümle doğrula, yanlış eşleşmeyi özete alma):")
+    if o["net_degil"]:
+        print(f"NET OLMAYAN SÖZ ({len(o['net_degil'])}) — sahibi ya da tarihi yok; özette 'Netleşmesi gerekenler'e, söz defterine tarihsiz:")
+        for x in o["net_degil"]: print(f"  [{x['saat']} {x['kim']}] {x['metin']}  (\"{x['isaret']}\")")
+    if o["rakam"]:
+        print(f"DEĞİŞEN RAKAM ({len(o['rakam'])}) — çoğu farklı şeylerin sayısıdır; yalnız aynı şeyden söz edilenleri al:")
+        for x in o["rakam"]: print(f"  {x['onceki']['deger']} → {x['deger']} · [{x['onceki']['saat']} {x['onceki']['kim']}] {x['onceki']['metin'][:120]} || [{x['saat']} {x['kim']}] {x['metin'][:120]}")
+    if o["gecmis"]:
+        print(f"GEÇMİŞLE FARK ({len(o['gecmis'])}) — karar grafındaki önceki beyanla:")
+        for x in o["gecmis"]: print(f"  [{x['saat']} {x['kim']}] {x['metin'][:120]} · {x['onceki']['tarih']}: {x['onceki']['metin'][:120]}")
 # --- Eylem kuyruğu (Faz 4) ---------------------------------------------------------------------------------------
 EYLEM_AD = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "mesaj": "Ekip mesajı", "diger": "Diğer"}
 def _post(yol, govde):
@@ -1106,6 +1129,13 @@ def izle():
     son_ara = {}; buf_recs = []; kokler = []; guclu = []; kok_pen = []; aktif_i = None; aktif_t = 0.0; kok_sig = None
     sesler = []  # pakete eklenen sinyal olayları (YANKI, DİNLE)
     kesme = Kesme(BEN); dinle_son = 0.0  # DİNLE (söz kesme + konuşma payı) en çok DINLE_ARALIK_SN'de bir
+    try:  # taahhüt ve tutarlılık (S91): net olmayan söz, aynı toplantıda değişen rakam, karar grafıyla fark — olay 10 dk'da en çok bir
+        import taahhut
+        def _th_graf(kim):
+            gs = _yapi().graf_kisi(A.dir, kim, 40, haric=cur)
+            return [(g[0], g[4]) for g in gs if g[1] in ("iddia", "karar", "sayi")]
+        th = taahhut.Taahhut(BEN, _th_graf); th_dosya = None
+    except Exception: th = None
     import collections; konusan = collections.Counter()  # karşıdaki kişi = kullanıcı dışında en çok konuşan
     katilimci = set(); izle_bas = time.time(); bitti_son = None  # bu toplantı dosyasında görülen konuşmacılar (KATILIMCI yalnız ilk görünüşte)
     def gercek_ad(ad):  # yer tutucu ad, kullanıcının kendisi ya da boş → None
@@ -1297,6 +1327,15 @@ def izle():
                                 if not x.startswith("KESME: "): sesler.append(x)  # YANKI
                                 elif time.time() - dinle_son >= DINLE_ARALIK_SN: sesler.append("DİNLE: " + x[7:]); dinle_son = time.time()
                         except Exception: pass
+                        if th:
+                            try:
+                                if th_dosya != cur: th = taahhut.Taahhut(BEN, _th_graf); th_dosya = cur  # yeni toplantı: sayı defteri sıfırdan
+                                n0 = len(th.kayit); ol = th.besle(r, time.time())
+                                if len(th.kayit) > n0 and cur:
+                                    with open(os.path.join(A.dir, cur[:-3] + ".taahhut.log"), "a", encoding="utf-8") as f:
+                                        for x in th.kayit[n0:]: f.write(json.dumps(x, ensure_ascii=False) + "\n")
+                                if ol: sesler.extend(ol); kart_aday.add("taahhut")
+                            except Exception: pass
                         buf_since = buf_since or time.time()
                         kart_aday |= kart_adayi(r, sis)
                         low = kucuk(r.get("text", "") + " " + r.get("raw", ""))  # sözlük düzeltmesi öncesi hâl de
@@ -2534,7 +2573,7 @@ def _hms(sn):
     return f"{sn // 3600}:{sn % 3600 // 60:02d}:{sn % 60:02d}" if sn >= 3600 else f"{sn // 60}:{sn % 60:02d}"
 
 try:
-    {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
+    {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "taahhut": taahhut_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
      "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()

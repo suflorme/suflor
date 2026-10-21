@@ -111,6 +111,9 @@
    "| <SAAT> | Ayla Örnek | Yok, teşekkürler. |  |",
    "| <SAAT> | Deniz Test | Teşekkürler, görüşmek üzere. |  |"
   ],
+  "<TARIH>-Deneme-toplantısı-altyapı.taahhut.log": [
+   "{\"tur\": \"net_degil\", \"kim\": \"Ayla Örnek\", \"saat\": \"<SAAT>\", \"metin\": \"Kayıt ortak klasördeki tabloda, ben sana gönderirim.\", \"isaret\": \"tarih yok\"}"
+  ],
   "acik-arsiv.jsonl": [
    "{\"durum\": \"acik\", \"tetik\": [\"yedek\"], \"file\": \"<TARIH>-Eski.md\", \"metin\": \"Eski toplantının sorusu\", \"id\": \"e1\", \"baslik\": \"Eski toplantı\", \"arsiv_at\": \"<AN>\", \"toplanti\": \"Eski toplantı\"}"
   ],

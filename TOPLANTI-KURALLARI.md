@@ -102,6 +102,13 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   veriyorsa tek NOT kartı (ad + bildiğin 1–2 bağlam); tanımıyorsan bir şey yapma. Sıklık sınırına sayılmaz.
   Satırda "karar grafında geçmişi: …" varsa (önceki toplantılardan iddia, karar, açık iş): bugün farklı rakam, tarih ya da
   karar söylerse `soyle` kartıyla çelişkiyi belirt ("Ayşe 11 Eki'de 95 bin demişti — hangisi?"); kişinin açık işi konuya gelince sor.
+- `TAAHHÜT` · `GEÇMİŞLE FARK` (yalnız metinden, kural tabanlı; en çok 10 dk'da bir gelir): biri iş üstlendi ama kaçamak konuştu ("bakarız",
+  "en kısa sürede", "I'll try"; sahibi ya da zamanı yok) · kişinin karar grafındaki önceki beyanından farklı sayı. Önce satıra bak: aynı şeyden
+  söz edilmiyorsa ya da önemsizse geç. Gerçekse `soyle` kartı, kaynağıyla ve soru biçiminde ("Ne zamana kadar? — tarih iste", "11 Eki'de
+  95 bin demişti — değişti mi?"); "yalan", "tutarsız" deme. Sıklık sınırına sayılır. Toplantı sonunda özetten önce `taahhut`: tarihsiz sözler,
+  kaçamak sözler ve aynı toplantıda değişen rakam adayları (adayların çoğu yanlış eşleşmedir; dökümü okurken aynı şey için değişen sayı ve
+  tarihleri kendin de ara). Gerçek olanları özetin "Açık kalanlar" satırına "netleşmesi gereken: …" diye ekle; tarihsiz sözü yapı dosyasına
+  tarihsiz `soz` olarak yaz.
 - `GİZLİ TOPLANTI`: kullanıcı 🔒 ile tamamen kapattı — kapanana kadar hiçbir olay gelmez; kart yazma, arama yapma, sohbete tek satır.
   `GİZLİ TOPLANTI BİTTİ`: aradaki bölüm kayıtta yok; özette yalnız "gizli bölüm (HH:MM–HH:MM)" diye an, içerik tahmin etme.
 - `TOPLANTI BİTTİ (<neden>)`: aktarıcı bitişi algıladı (toplantı sinyali yok ve uygulama mikrofonu bıraktı; yardımcı yoksa 5 dk satırsız;
