@@ -4,6 +4,7 @@
 //   turuncu nokta (onay bekleyen iş). Durum aktarıcının şerit uzun yoklamasından (GET /cards?bekle=25).
 // - Tıkla: buzlu cam (NSVisualEffectView) panelde mini pano — panonun ?gorunum=panel görünümü (WKWebView, saydam). Panel ekran
 //   paylaşımında görünmez (sharingType none), odak çalmaz (nonactivating). Sağ tık: Panoyu aç · kısayol · Çık.
+// - Pano penceresi (deneme): sağ tık → "Panoyu pencerede aç" tam panoyu Chrome sekmesi yerine bu uygulamanın penceresinde açar (PanoPencere).
 // - Mac geneli bas-konuş: Option + Shift + Boşluk basılı tut → mikrofon (16 kHz) → bırakınca POST /bas-konus (anahtar + pano kökeni).
 //   Carbon sıcak tuşu basma/bırakmayı ayrı verir; Erişilebilirlik izni gerekmez, mikrofon izni bu uygulamaya sorulur.
 // Ağ: yalnız 127.0.0.1. Ses yalnız aktarıcıya gider (Mac'ten çıkmaz).
@@ -80,7 +81,7 @@ final class Panel: NSPanel {
     override var canBecomeKey: Bool { true }  // not/soru kutusuna yazılabilsin
 }
 final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, UNUserNotificationCenterDelegate {
-    var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!
+    var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!; var pano: PanoPencere?
     var durum: Durum = .bekliyor; var imza = ""; var gorulenKart = Set<String>(); var acikKart = Set<String>()
     var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?
     var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?
@@ -131,6 +132,10 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func webView(_ w: WKWebView, createWebViewWith c: WKWebViewConfiguration, for a: WKNavigationAction, windowFeatures f: WKWindowFeatures) -> WKWebView? {
         if let u = a.request.url { NSWorkspace.shared.open(u) }; return nil
     }
+    @available(macOS 12.0, *)
+    func webView(_ w: WKWebView, requestMediaCapturePermissionFor o: WKSecurityOrigin, initiatedByFrame f: WKFrameInfo, type t: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        decisionHandler(yerelKoken(o) && t == .microphone ? .grant : .deny)
+    }
     @objc func tiklandi(_ s: NSStatusBarButton) {
         if NSApp.currentEvent?.type == .rightMouseUp { menuGoster(); return }
         if panel.isVisible { panel.orderOut(nil); return }
@@ -145,6 +150,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func menuGoster() {
         let m = NSMenu()
         m.addItem(withTitle: "Panoyu aç", action: #selector(panoAc), keyEquivalent: "").target = self
+        m.addItem(withTitle: "Panoyu pencerede aç (deneme)", action: #selector(panoPencere), keyEquivalent: "").target = self
         m.addItem(withTitle: "Paneli yenile", action: #selector(panelYenile), keyEquivalent: "").target = self
         if panel.isVisible { m.addItem(withTitle: "Paneli kapat (Esc)", action: #selector(panelKapat), keyEquivalent: "").target = self }
         m.addItem(.separator())
@@ -156,6 +162,8 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         oge.menu = m; oge.button?.performClick(nil); oge.menu = nil
     }
     @objc func panoAc() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
+    @objc func panoPencere() { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.goster() }
+    func panelGoster() { if !panel.isVisible { tiklandi(oge.button!) } }  // panodaki "mini pano" düğmesi: menüdeki panel
     @objc func panelYenile() { panelYukle() }
     @objc func panelKapat() { panel.orderOut(nil) }
     @objc func cik() { NSApp.terminate(nil) }
@@ -834,6 +842,112 @@ final class OrtakMik {
     }
 }
 
+// --- Pano penceresi: tam pano Chrome sekmesi yerine bu uygulamada (deneme). Mac'in web görünümü (WKWebView, Safari motoru).
+// Pencere açıkken uygulama Dock'ta görünür (normal pencere gibi Command + Tab), kapanınca yine yalnız menü çubuğunda.
+// Mikrofon (Sohbet, Konuş) yalnız aktarıcının kökenine; bağlantılar varsayılan tarayıcıda; .md indirme İndirilenler'e.
+func yerelKoken(_ o: WKSecurityOrigin) -> Bool { o.host == "127.0.0.1" && o.port == PORT }
+final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
+    let pencere: NSWindow; let web: WKWebView; let mini: () -> Void; var yuklendi: (() -> Void)?
+    init(mini: @escaping () -> Void) {
+        self.mini = mini
+        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        pencere.title = "Suflor.me"; pencere.minSize = NSSize(width: 420, height: 360); pencere.isReleasedWhenClosed = false
+        pencere.sharingType = .none  // mini panel gibi: ekran paylaşımında görünmez (kartlar karşı tarafa gitmesin)
+        pencere.tabbingMode = .disallowed
+        let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
+        web = WKWebView(frame: pencere.contentView!.bounds, configuration: c); web.autoresizingMask = [.width, .height]
+        super.init()
+        web.navigationDelegate = self; web.uiDelegate = self; pencere.delegate = self; pencere.contentView = web
+        pencere.center(); pencere.setFrameAutosaveName("SuflorPano")  // yer ve boy hatırlanır
+        anaMenu()
+    }
+    func goster() {
+        if web.url == nil { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { web.load(URLRequest(url: u)) } }
+        NSApp.setActivationPolicy(.regular); pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    func windowWillClose(_ n: Notification) { DispatchQueue.main.async { NSApp.setActivationPolicy(.accessory) } }
+    // Command + C/V/X/A/Z metin kutularında ancak Düzen menüsü varsa çalışır; Command + W pencereyi kapatır, Command + R yeniler
+    func anaMenu() {
+        let ana = NSMenu()
+        func alt(_ ad: String, _ ogeler: [(String, Selector?, String, NSEvent.ModifierFlags)]) {
+            let m = NSMenu(title: ad); for (t, s, k, f) in ogeler { let o = m.addItem(withTitle: t, action: s, keyEquivalent: k); o.keyEquivalentModifierMask = f }
+            let o = NSMenuItem(title: ad, action: nil, keyEquivalent: ""); o.submenu = m; ana.addItem(o)
+        }
+        alt("Suflor.me", [("Suflor.me penceresini gizle", #selector(NSApplication.hide(_:)), "h", .command)])
+        alt("Düzen", [("Geri al", Selector(("undo:")), "z", .command), ("Yinele", Selector(("redo:")), "z", [.command, .shift]),
+                      ("Kes", #selector(NSText.cut(_:)), "x", .command), ("Kopyala", #selector(NSText.copy(_:)), "c", .command),
+                      ("Yapıştır", #selector(NSText.paste(_:)), "v", .command), ("Tümünü seç", #selector(NSText.selectAll(_:)), "a", .command)])
+        alt("Pencere", [("Kapat", #selector(NSWindow.performClose(_:)), "w", .command), ("Küçült", #selector(NSWindow.performMiniaturize(_:)), "m", .command),
+                        ("Yenile", #selector(yenile), "r", .command)])
+        ana.items.last?.submenu?.items.last?.target = self
+        NSApp.mainMenu = ana
+    }
+    @objc func yenile() { web.reload() }
+    func webView(_ w: WKWebView, didFinish n: WKNavigation!) { yuklendi?(); yuklendi = nil }
+    func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if a.shouldPerformDownload || a.request.url?.scheme == "blob" && a.navigationType == .linkActivated { decisionHandler(.download); return }
+        if let u = a.request.url, a.navigationType == .linkActivated, !(u.host == "127.0.0.1" && u.port == PORT) { NSWorkspace.shared.open(u); decisionHandler(.cancel); return }
+        decisionHandler(.allow)
+    }
+    func webView(_ w: WKWebView, decidePolicyFor r: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        decisionHandler(r.canShowMIMEType ? .allow : .download)
+    }
+    func webView(_ w: WKWebView, navigationAction a: WKNavigationAction, didBecome d: WKDownload) { d.delegate = self }
+    func webView(_ w: WKWebView, navigationResponse r: WKNavigationResponse, didBecome d: WKDownload) { d.delegate = self }
+    func download(_ d: WKDownload, decideDestinationUsing r: URLResponse, suggestedFilename ad: String, completionHandler: @escaping (URL?) -> Void) {
+        let klasor = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        var hedef = klasor.appendingPathComponent(ad); var i = 2
+        while FileManager.default.fileExists(atPath: hedef.path) {
+            let u = (ad as NSString).pathExtension, k = (ad as NSString).deletingPathExtension
+            hedef = klasor.appendingPathComponent(u.isEmpty ? "\(k) \(i)" : "\(k) \(i).\(u)"); i += 1
+        }
+        completionHandler(hedef)
+    }
+    func downloadDidFinish(_ d: WKDownload) { if let u = d.progress.fileURL { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
+    // window.open: boş pencere = panodaki mini pano düğmesi → menü panelini aç; adres = varsayılan tarayıcı
+    func webView(_ w: WKWebView, createWebViewWith c: WKWebViewConfiguration, for a: WKNavigationAction, windowFeatures f: WKWindowFeatures) -> WKWebView? {
+        if let u = a.request.url, u.scheme == "http" || u.scheme == "https" { NSWorkspace.shared.open(u) } else { mini() }
+        return nil
+    }
+    @available(macOS 12.0, *)
+    func webView(_ w: WKWebView, requestMediaCapturePermissionFor o: WKSecurityOrigin, initiatedByFrame f: WKFrameInfo, type t: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        decisionHandler(yerelKoken(o) && t == .microphone ? .grant : .deny)
+    }
+    func webView(_ w: WKWebView, runJavaScriptConfirmPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        let a = NSAlert(); a.messageText = m; a.addButton(withTitle: "Tamam"); a.addButton(withTitle: "Vazgeç")
+        a.beginSheetModal(for: pencere) { completionHandler($0 == .alertFirstButtonReturn) }
+    }
+    func webView(_ w: WKWebView, runJavaScriptAlertPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        let a = NSAlert(); a.messageText = m; a.beginSheetModal(for: pencere) { _ in completionHandler() }
+    }
+    func webView(_ w: WKWebView, runOpenPanelWith p: WKOpenPanelParameters, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        let o = NSOpenPanel(); o.allowsMultipleSelection = p.allowsMultipleSelection; o.canChooseDirectories = p.allowsDirectories
+        o.beginSheetModal(for: pencere) { completionHandler($0 == .OK ? o.urls : nil) }
+    }
+}
+
+// Teşhis: `--pencere-dene [sn]` → yalnız pano penceresi (menü simgesi, kısayol, masaüstü yok); yüklenince mikrofonu dener ve sonucu yazar
+if args.contains("--pencere-dene") {
+    final class Dene: NSObject, NSApplicationDelegate {
+        var p: PanoPencere?
+        func applicationDidFinishLaunching(_ n: Notification) {
+            let p = PanoPencere { print("mini pano istendi") }; self.p = p
+            p.web.configuration.userContentController.addUserScript(WKUserScript(source: "window.__h=[];addEventListener('error',e=>__h.push(e.message+' @'+e.lineno));addEventListener('unhandledrejection',e=>__h.push('söz: '+e.reason))", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            p.yuklendi = { [weak p] in
+                print("yüklendi:", p?.web.url?.path ?? "?")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {  // pano ilk yoklamasını yapsın
+                    p?.web.evaluateJavaScript("[document.title,document.body.innerText.length,document.querySelectorAll('button').length,JSON.stringify(__h)].join(' · ')") { v, _ in print("sayfa:", v ?? "?") }
+                }
+                p?.web.callAsyncJavaScript("try{const s=await navigator.mediaDevices.getUserMedia({audio:true});const t=s.getAudioTracks();const r='mikrofon: açıldı ('+t.length+' iz, '+(t[0]&&t[0].label)+')';t.forEach(x=>x.stop());return r}catch(e){return 'mikrofon: '+e.name+' '+e.message}", arguments: [:], in: nil, in: .page) { r in
+                    switch r { case .success(let v): print(v); case .failure(let e): print("js hata:", e.localizedDescription) }
+                }
+            }
+            p.goster()
+            if let i = args.firstIndex(of: "--pencere-dene"), i + 1 < args.count, let sn = Double(args[i + 1]) { DispatchQueue.main.asyncAfter(deadline: .now() + sn) { exit(0) } }
+        }
+    }
+    let d = Dene(); NSApplication.shared.delegate = d; NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
+}
 if args.contains("--ax-dokum") { Masaustu().dokum(); exit(0) }
 if let s = arg("--ax-altyazi") { Masaustu().altyaziIzle(Double(s) ?? 120, uyg: arg("--uyg")); exit(0) }
 // Ekran Kaydı izni (masaüstü kanıt görüntüsü, v0.31.0): `--ekran-izni` izni sorar ve sonucu yazar (kurulumda ya da elle bir kez)
