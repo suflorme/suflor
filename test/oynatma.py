@@ -14,6 +14,7 @@ ap.add_argument("--sakla", action="store_true"); ap.add_argument("--port", type=
 A = ap.parse_args(); K = A.hiz; PORT = A.port or bos_port(8799); URL = f"http://127.0.0.1:{PORT}"
 VERI = json.load(open(os.path.join(BURA, "oynatma-veri.json"), encoding="utf-8"))
 BEKLENEN = os.path.join(BURA, "oynatma-beklenen.json")
+ACILIS_SN = 6  # aktarıcı + izle açılış payı (gerçek saniye)
 
 # Hızlandırılmış saat: aktarıcı ve izle aynı sahte saati kullanır (sahte = T0 + (gerçek - T0) * K)
 SAAT = r'''import os, sys, time, datetime, runpy, threading
@@ -101,7 +102,9 @@ def olay_turu(l):
 def kos():
     global ANAHTAR_DOSYA
     T = tempfile.mkdtemp(prefix="suflor-oynatma-"); kod, canli = kur(T); ANAHTAR_DOSYA = os.path.join(canli, "kart-anahtari.txt")
-    t0 = time.time(); yaz_baslangic(canli, t0)
+    # t0 ileride: aktarıcı ve izle önce açılır, oynatma izle "İZLEME BAŞLADI" dedikten sonra t0'da başlar (21 Ekim: soğuk başlangıçta izle açılırken
+    # ilk satırlar geçip gidiyordu — KATILIMCI olayı çıkmadı, SATIRLAR 20/24). Sahte saat t0'a göre; t0'dan önce de tek yönlü ilerler.
+    t0 = time.time() + ACILIS_SN; yaz_baslangic(canli, t0)
     env = dict(os.environ, HIZ_T0=str(t0), HIZ_K=str(K), PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json"))
     py = sys.executable
     rl = subprocess.Popen([py, "saat.py", "relay.py", "--dir", canli, "--port", str(PORT)], cwd=kod, env=env,
@@ -111,6 +114,10 @@ def kos():
         bekle_hazir()
         iz = subprocess.Popen([py, "-u", "saat.py", "toplanti-claude.py", "--dir", canli, "--relay", URL, "izle"], cwd=kod, env=env,
                               stdout=open(os.path.join(T, "izle.log"), "w"), stderr=subprocess.STDOUT)
+        izle_log = os.path.join(T, "izle.log"); son = time.time() + ACILIS_SN + 20
+        while time.time() < son and "İZLEME BAŞLADI" not in open(izle_log, encoding="utf-8").read(): time.sleep(0.1)
+        if time.time() > t0: print(f"uyarı: izle {time.time() - t0 + ACILIS_SN:.1f} sn'de açıldı (bekleme {ACILIS_SN} sn) — oynatma geç başladı")
+        while time.time() < t0: time.sleep(0.05)
         tc = lambda *a: subprocess.run([py, "saat.py", "toplanti-claude.py", "--dir", canli, "--relay", URL, *a], cwd=kod, env=env,
                                         capture_output=True, text=True, timeout=20)
         M = {"title": VERI["baslik"]}; n = 0; son_ping = 0; sorular = []; son_kart = None; hatalar = []

@@ -416,10 +416,14 @@ def _hz_arka(*arg):
                             env=_hz_env(), cwd=KOD, start_new_session=True)  # sihirbaz kapansa da sürer
 def hz_ozet():
     p = HZ["tara"]; suruyor = bool(p and p.poll() is None)  # önce: tarama özet okunurken biterse eski rapor "bitti" diye görünmesin
+    if not suruyor and HZ.get("tara_bekleyen"): hz_tara(); suruyor = True  # süren taramada gelen işaret: o bitti, yeni ayarla bir kez daha
     o = _hz("ozet"); o["tara_suruyor"] = suruyor; return o
 def hz_tara():
+    # tarama sürerken gelen istek yok sayılmaz (21 Ekim: klasör yongasına ilk tarama bitmeden basılınca ayar yazılıyor, süren tarama eski
+    # ayarla bitiyor, ekran "5 dosya"da kalıyordu): bekleyen işaretlenir, sihirbazın sonraki özet yoklamasında yeni tarama başlar
     p = HZ["tara"]
-    if not (p and p.poll() is None): HZ["tara"] = _hz_arka("tara")
+    if p and p.poll() is None: HZ["tara_bekleyen"] = True
+    else: HZ["tara"] = _hz_arka("tara"); HZ["tara_bekleyen"] = False
     return {"ok": True}
 def hz_isaret(p):
     # B ekranı: dizine alma işareti. tur "haric": yol (dosya/klasör) ayar "haric"e girer/çıkar; adla hariç tutulan dosya için "dahil" listesi;

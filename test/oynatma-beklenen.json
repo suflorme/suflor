@@ -629,6 +629,7 @@
      "ton": "str"
     }
    },
+   "toplanti_bitti": "NoneType",
    "uyari": "NoneType",
    "whisper": {
     "atlanan": "int",
@@ -842,7 +843,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 2,
+  "DURUM": 3,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,
