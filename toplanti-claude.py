@@ -654,9 +654,11 @@ VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Mas
 # Konuş benzer soruda taze sonucu soruyla verir: Claude araç turu olmadan cevaplar (~3 sn kazanç). Toplantı içeriği değil, yalnız sorgu ve maskeli sonuç.
 VT_SONUC_ONBELLEK = "vt-sonuc.json"; VT_SONUC_EN_COK = 40; VT_DENETIM_SN = 60
 VT_MT_DOSYA = "vt-mt.json"  # v0.58.2: veritabanı dosyasının değişme saati, denetimde yazılır — aktarıcının tazelik notu için (kendisi okuyamaz)
-def _vt_mt():
-    try: return os.path.getmtime(os.path.join(PROJE, VT["yol"]))
-    except (OSError, KeyError, TypeError): return None
+def _vt_mt():  # WAL kipinde yazma önce -wal'a gider; .db'nin saati ancak checkpoint'te değişir — ikisinin en yenisi
+    try: y = os.path.join(PROJE, VT["yol"])
+    except (KeyError, TypeError): return None
+    mt = [os.path.getmtime(f) for f in (y, y + "-wal") if os.path.exists(f)]
+    return max(mt) if mt else None
 def _vt_mt_yaz(dosya):
     try:
         y = os.path.join(dosya, VT_MT_DOSYA)
