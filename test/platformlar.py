@@ -5,7 +5,8 @@
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/platformlar.py      (kaldı → çıkış 1)
 import json, os, re, subprocess, sys, tempfile, time
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from gizlichrome import chrome_yolu, CHROME_EK  # Dock'ta görünmeyen kopya
+CHROME = chrome_yolu()
 YARD = """<script>
 function leaves(root){const out=[];const w=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT);let n=root;while(n){if(n.childElementCount===0){const t=(n.innerText||n.textContent||'').trim();if(t)out.push({el:n,t})}n=w.nextNode()}return out}
 let capN=0;const ids=new WeakMap();function capId(el,t){if(!ids.has(el))ids.set(el,'cap/'+(++capN));return ids.get(el)}
@@ -39,7 +40,7 @@ for ad, (govde, js, denet) in SAYFA.items():
                                          f"<script>let R;try{{{js}}}catch(e){{R={{hata:String(e)}}}}document.body.insertAdjacentHTML('beforeend','<pre id=sonuc>'+JSON.stringify(R).replace(/</g,'\\\\u003c')+'</pre>')</script>")
     # Chrome (154) --dump-dom çıktısını yazdıktan sonra kapanmıyor: çıktı dosyaya, sonuç görülünce süreç kapatılır
     cik = os.path.join(T, "o.html")
-    pr = subprocess.Popen([CHROME, "--headless=new", "--disable-features=MacAppCodeSignClone", "--disable-gpu", "--allow-file-access-from-files", f"--user-data-dir={T}/p", "--no-first-run", "--no-default-browser-check",
+    pr = subprocess.Popen([CHROME, "--headless=new", *CHROME_EK, "--disable-features=MacAppCodeSignClone", "--disable-gpu", "--allow-file-access-from-files", f"--user-data-dir={T}/p", "--no-first-run", "--no-default-browser-check",
                            "--dump-dom", "file://" + f], stdout=open(cik, "w"), stderr=subprocess.DEVNULL)
     m = None
     for _ in range(120):
