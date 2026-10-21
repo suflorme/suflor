@@ -557,7 +557,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 rgba(176,131,46,.75)}100%{box-shadow:0 0 0 12px rgba(176,131,46,0)}}
         @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
     // Kart penceresi = mini pano: kartlar (NOT dahil), son satır, Claude'a not/soru kutusu, ⭐ / Ne diyeyim? / 🔇 / Kanıt.
-    // Kutu pano ve mini panodakiyle aynı: aktarıcı /girdi soru mu not mu ayırır (başta ? → soru); Enter gönderir, ⌘Enter her zaman
+    // Kutu pano ve mini panodakiyle aynı: aktarıcı /girdi toplantıdaki Claude'a iletir, soru mu not mu Claude karar verir; Enter gönderir, ⌘Enter her zaman
     // soru, Shift+Enter yeni satır. Sayfa içi listede kutu yok (ayrı pencere açılamazsa yalnız kartlar).
     function altDugmeler(d, ta) {
       const a = d.createElement("div"); a.className = "alt";
@@ -590,7 +590,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     }
     function kutu(d) {
       const f = d.createElement("div"); f.className = "gir";
-      const ta = d.createElement("textarea"); ta.rows = 2; ta.placeholder = L("Not ya da soru (başa ?)");
+      const ta = d.createElement("textarea"); ta.rows = 2; ta.placeholder = L("Not ya da soru");
       const b = d.createElement("button"); b.textContent = L("Gönder");
       const git = async soru => {
         const t = ta.value; if (!t.trim()) return; ta.value = ""; b.disabled = true; let r = {};
@@ -700,7 +700,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
           .forEach(([st, lbl, tip]) => { const x = e("button"); x.append(ikon(d, lbl[0])); if (lbl[1]) x.append(e("span", null, lbl[1])); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
         k.append(m, a); list.append(k);
       });
-      qs.forEach(q => { const x = e("div", "q", " " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L("Claude'a soruldu: ") + q.text)); x.prepend(ikon(d, "saat")); list.append(x); });
+      qs.forEach(q => { const x = e("div", "q", " " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L(q.tur === "girdi" ? "Claude'a iletildi: " : "Claude'a soruldu: ") + q.text)); x.prepend(ikon(d, "saat")); list.append(x); });
       if (!cards.length && !qs.length && !dil && !warn) list.append(e("div", "bos", L("Şimdilik kart yok")));
     }
     function sonCiz(d, son) {  // mini panodaki gibi tek satır canlılık: son döküm satırı ne zaman, kimden

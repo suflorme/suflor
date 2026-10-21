@@ -2032,12 +2032,16 @@ class H(BaseHTTPRequestHandler):
             r_ = teshis_gonder("geri_bildirim", ek, anahtar=("gb", time.time()), zorla=True)
             print(f"GERİ BİLDİRİM: gönderildi ({r_.get('durum')})"); return self._json(r_)
         if self.path == "/ask": q = ask(p); return self._json({"ok": bool(q), "question": q})
-        if self.path == "/girdi":  # tek kutu (pano, mini pano, eklenti penceresi) — soru mu not mu aktarıcı ayırır
+        if self.path == "/girdi":  # tek kutu (pano, mini pano, eklenti penceresi)
+            # kullanıcı (21 Ekim): not mu soru mu Claude karar verir — toplantı oturumu izliyorsa yazı not olarak dökümde kalır ve
+            # GİRDİ olayıyla hemen Claude'a gider (soruysa cevaplar). Claude izlemiyorsa eski kural (başta ? → soru). ⌘Enter her zaman soru.
             tur, metin = girdi_ayir(p.get("text"))
             if not metin: return self._json({"ok": False, "err": "boş"}, 400)
             if tur == "soru" or p.get("soru"): q = ask({"text": metin}); return self._json({"ok": bool(q), "tur": "soru", "question": q})
+            claude = bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
             note({"text": metin, "at": p.get("at") or datetime.datetime.now().isoformat(timespec="seconds"), "meeting": p.get("meeting") or {}})
             yeni = baglam_ekle(baglam_ayir(metin)[0], "kutu")  # nottaki bağlantı/dosya yolu bağlam kaynağı da olur (izle: BAĞLAM)
+            if claude and not yeni: q = ask({"text": metin, "tur": "girdi"}); return self._json({"ok": bool(q), "tur": "iletildi", "question": q})
             return self._json({"ok": True, "tur": "bağlam" if yeni else "not"})
         if self.path == "/kanit":
             if not str(self.headers.get("Origin", "")).startswith("chrome-extension://"): return self._json({"ok": False, "err": "yalnız eklenti"}, 403)

@@ -100,7 +100,7 @@ def cards_view():
         if c.get("kind") == "duygu" and c.get("kim"): tone_kisi[c["kim"]] = {"ton": c["ton"], "at": c["at"]}
     ki = STATE["kanit_iste"]; ki = ki if ki and time.time() - ki["t"] < 20 else None
     bi = STATE.get("bildirim"); bi = bi if bi and time.time() - bi["t"] < 120 else None  # menü uygulamasının göstereceği bildirim
-    return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered][-5:],
+    return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered and not (q.get("tur") == "girdi" and (datetime.datetime.now() - datetime.datetime.fromisoformat(q["at"])).total_seconds() > 45)][-5:],
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "bildirim": bi, "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano")} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
             "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "gizli": gizli_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
@@ -225,6 +225,7 @@ def ask(p):
             if q: return q
         q = {"id": "q" + str(int(time.time() * 1000)) + secrets.token_hex(2), "at": now.isoformat(timespec="seconds"), "file": aktif_dosya() or bitmis_dosya(), "text": text}
         if ozet: q["tur"] = "ozet"
+        if p.get("tur") == "girdi": q["tur"] = "girdi"; QUESTIONS.append(q); _log("sorular.jsonl", q); return q  # dökümde not satırı zaten var
         QUESTIONS.append(q); _log("sorular.jsonl", q)
         _md(f"| {now.strftime('%H:%M:%S')} | **{'NE DİYEYİM? İSTENDİ' if ozet else 'CLAUDE’A SORU'}** | {' / '.join(text.replace('|', '¦').splitlines())} | |", q, "sorular.jsonl")
     return q

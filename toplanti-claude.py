@@ -1380,6 +1380,9 @@ def izle():
                             f"  ROL {rol} · GÜNDEM: {gun}" if its else f"  ROL {rol} · gündem yok",
                             *([f"  AÇIK SORULAR: " + " | ".join(f"{x.get('metin')}" + (f" ({x['kim']})" if x.get("kim") else "") for x in aq)] if aq else []),
                             f"  SON 2 DK ({len(ss)} satır):" if ss else "  SON 2 DK: satır yok — replik yerine 'son dakikalarda döküm gelmedi' de", *[satir(r) for r in ss], *taslak_satir()]
+                if q.get("tur") == "girdi":  # kutuya yazılan; not mu soru mu sen karar ver (kullanıcı, 21 Ekim)
+                    return [f"GİRDİ {q.get('id')} ({BEN} kutuya yazdı): {q.get('text')}   ← soru ya da istekse 30 sn içinde cevap --cevap {q.get('id')}; bilgi notuysa kart yazma, sonraki kartlarda kullan",
+                            *soru_baglam(q.get('text') or ''), *taslak_satir()]
                 return [f"SORU {q.get('id')}: {q.get('text')}   ← ÖNCE BUNU CEVAPLA (30 sn)", *soru_baglam(q.get('text') or ''), *taslak_satir()]
             emit(*[l for q in qs for l in soru_olay(q)], *acks, *sesler,
                  *([f"SATIRLAR ({len(buf)}, soruya kadar):", *buf] if buf else []), *paket_baglam())
