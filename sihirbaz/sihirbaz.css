@@ -29,18 +29,18 @@
 
 * { box-sizing: border-box }
 html, body { height: 100% }
-body { margin: 0; background: var(--zemin); color: var(--murekkep); font: 16px/1.55 var(--f-govde); -webkit-font-smoothing: antialiased }
+body { margin: 0; background: var(--zemin); color: var(--murekkep); font: var(--yz-5)/1.55 var(--f-govde); -webkit-font-smoothing: antialiased }
 button, input, textarea, select { font: inherit; color: inherit }
-:focus-visible { outline: 2px solid var(--sahne); outline-offset: 3px; border-radius: 8px }
+:focus-visible { outline: 2px solid var(--sahne); outline-offset: 3px; border-radius: var(--kose) }
 
 .pencere { min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; padding-inline: 20px }
 
 /* üst: yalnız arka plandaki indirme ve dil */
 .ust { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-block: 18px 0; min-height: 52px }
-.indirme { display: inline-flex; align-items: center; gap: 10px; font: 400 12px/1 var(--f-teknik); color: var(--ikincil);
-  background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: 999px; padding: 7px 12px }
+.indirme { display: inline-flex; align-items: center; gap: 10px; font: 400 var(--yz-2)/1 var(--f-teknik); color: var(--ikincil);
+  background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: var(--kose-tam); padding: 7px 12px }
 .indirme[hidden] { display: none }
-.indirme .cubuk { width: 72px; height: 3px; border-radius: 2px; background: var(--cizgi); overflow: hidden }
+.indirme .cubuk { width: 72px; height: 3px; border-radius: var(--kose-tam); background: var(--cizgi); overflow: hidden }
 .indirme .cubuk i { display: block; height: 100%; width: 0; background: var(--pirinc); transition: width .6s ease }
 
 /* sahne: ortalanmış tek sütun */
@@ -58,7 +58,7 @@ button, input, textarea, select { font: inherit; color: inherit }
 h1 { font: 300 clamp(30px, 4.2vw, 40px)/1.12 var(--f-baslik); letter-spacing: -.02em; margin: 0; text-wrap: balance }
 .alt { margin: 0; color: var(--ikincil); max-width: 46ch; text-wrap: pretty }
 .icerik { width: 100%; display: grid; gap: 14px; margin-top: 18px; text-align: left }
-.dipnot { font-size: 13px; color: var(--soluk); text-align: center; margin: 4px 0 0 }
+.dipnot { font-size: var(--yz-3); color: var(--soluk); text-align: center; margin: 4px 0 0 }
 
 /* karşılama */
 .karsilama { gap: 28px }
@@ -67,81 +67,81 @@ h1 { font: 300 clamp(30px, 4.2vw, 40px)/1.12 var(--f-baslik); letter-spacing: -.
 .selam span:nth-child(2) { animation-delay: 3.6s }
 @keyframes selam { 0% { opacity: 0; transform: translateY(8px) } 8%, 42% { opacity: 1; transform: none } 50%, 100% { opacity: 0; transform: translateY(-6px) } }
 .diller { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center }
-.dil { min-width: 150px; border: 1px solid var(--cizgi-2); background: var(--yuzey); border-radius: 999px; padding: 12px 22px; cursor: pointer;
+.dil { min-width: 150px; border: 1px solid var(--cizgi-2); background: var(--yuzey); border-radius: var(--kose-tam); padding: 12px 22px; cursor: pointer;
   font-weight: 500; transition: border-color .2s, background .2s }
 .dil:hover { border-color: var(--sahne) } .dil[aria-pressed="true"] { border-color: var(--sahne); background: var(--sahne-acik) }
 
 /* alt çubuk */
 .alt-cubuk { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding-block: 18px 26px;
   max-width: 760px; width: 100%; margin-inline: auto }
-.geri-dug { justify-self: start; background: none; border: 0; color: var(--ikincil); cursor: pointer; padding: 10px 6px; border-radius: 8px }
+.geri-dug { justify-self: start; background: none; border: 0; color: var(--ikincil); cursor: pointer; padding: 10px 6px; border-radius: var(--kose) }
 .geri-dug:hover { color: var(--murekkep) }
-.devam { justify-self: end; background: var(--sahne); color: #fff; border: 0; border-radius: 999px; padding: 11px 26px; font-weight: 500;
+.devam { justify-self: end; background: var(--sahne); color: #fff; border: 0; border-radius: var(--kose-tam); padding: 11px 26px; font-weight: 500;
   cursor: pointer; transition: opacity .2s, transform .15s }
 .devam:hover { transform: translateY(-1px) } .devam:disabled { opacity: .35; cursor: default; transform: none }
 .ikincil-dug { background: none; border: 0; color: var(--sahne); font-weight: 500; cursor: pointer; padding: 6px 2px }
 .noktalar { display: flex; gap: 6px }
 .noktalar i { width: 6px; height: 6px; border-radius: 50%; background: var(--cizgi-2); transition: background .3s, width .3s }
-.noktalar i.su { background: var(--sahne); width: 18px; border-radius: 3px }
+.noktalar i.su { background: var(--sahne); width: 18px; border-radius: var(--kose-tam) }
 .noktalar i.bitti { background: var(--sahne); opacity: .45 }
 
 /* kutular */
-.liste { background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: 14px; overflow: hidden }
+.liste { background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: var(--kose-l); overflow: hidden }
 .satir { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 16px }
 .satir + .satir { border-top: 1px solid var(--cizgi) }
-.satir .ad { font-weight: 500 } .satir .ac { font-size: 13.5px; color: var(--ikincil) }
+.satir .ad { font-weight: 500 } .satir .ac { font-size: var(--yz-4); color: var(--ikincil) }
 .durum { width: 22px; height: 22px; display: grid; place-items: center }
 .durum.bekle::after { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--cizgi-2); border-top-color: var(--sahne); animation: don 0.9s linear infinite }
 @keyframes don { to { transform: rotate(360deg) } }
 .durum.bos::after { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--cizgi-2) }
 .durum.iyi { color: var(--iyi) } .durum.uyari { color: var(--uyari) } .durum.kotu { color: var(--kotu) }
-.satir .eylem { font-size: 13.5px }
+.satir .eylem { font-size: var(--yz-4) }
 
 .alan { display: grid; gap: 6px }
-.alan label, .etiket { font-size: 13px; font-weight: 500; color: var(--ikincil) }
-.alan .ipucu { font-size: 12.5px; color: var(--soluk) }
-input[type=text], textarea, select { width: 100%; background: var(--yuzey); border: 1px solid var(--cizgi-2); border-radius: 12px; padding: 12px 14px;
-  font-size: 16px; transition: border-color .2s, box-shadow .2s }
+.alan label, .etiket { font-size: var(--yz-3); font-weight: 500; color: var(--ikincil) }
+.alan .ipucu { font-size: var(--yz-3); color: var(--soluk) }
+input[type=text], textarea, select { width: 100%; background: var(--yuzey); border: 1px solid var(--cizgi-2); border-radius: var(--kose-l); padding: 12px 14px;
+  font-size: var(--yz-5); transition: border-color .2s, box-shadow .2s }
 textarea { min-height: 92px; resize: vertical; line-height: 1.5 }
 input[type=text]:focus, textarea:focus, select:focus { outline: none; border-color: var(--sahne); box-shadow: 0 0 0 4px var(--sahne-acik) }
 .iki { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px }
 @media (max-width: 560px) { .iki { grid-template-columns: minmax(0, 1fr) } }
 
 .yongalar { display: flex; flex-wrap: wrap; gap: 8px }
-.yonga { border: 1px solid var(--cizgi-2); background: var(--yuzey); border-radius: 999px; padding: 7px 14px; cursor: pointer; font-size: 14px;
+.yonga { border: 1px solid var(--cizgi-2); background: var(--yuzey); border-radius: var(--kose-tam); padding: 7px 14px; cursor: pointer; font-size: var(--yz-4);
   transition: border-color .2s, background .2s, color .2s }
 .yonga:hover { border-color: var(--sahne) }
 .yonga[aria-pressed="true"] { background: var(--sahne); border-color: var(--sahne); color: #fff }
 
-.birak { border: 1.5px dashed var(--cizgi-2); border-radius: 14px; padding: 22px; text-align: center; color: var(--ikincil); background: var(--yuzey-2);
+.birak { border: 1.5px dashed var(--cizgi-2); border-radius: var(--kose-l); padding: 22px; text-align: center; color: var(--ikincil); background: var(--yuzey-2);
   transition: border-color .2s, background .2s; cursor: pointer }
 .birak.ustunde { border-color: var(--sahne); background: var(--sahne-acik) }
 .birak b { color: var(--murekkep); font-weight: 500 }
-.dosyalar { display: grid; gap: 6px; font-size: 13.5px }
-.dosyalar div { display: flex; justify-content: space-between; gap: 8px; background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: 10px; padding: 8px 12px }
+.dosyalar { display: grid; gap: 6px; font-size: var(--yz-4) }
+.dosyalar div { display: flex; justify-content: space-between; gap: 8px; background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: var(--kose); padding: 8px 12px }
 
 .sorular { display: grid; gap: 16px }
-.soru-no { font: 400 12px/1 var(--f-teknik); color: var(--pirinc) }
+.soru-no { font: 400 var(--yz-2)/1 var(--f-teknik); color: var(--pirinc) }
 
-.kart-not { background: var(--sahne-acik); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--murekkep) }
+.kart-not { background: var(--sahne-acik); border-radius: var(--kose-l); padding: 12px 14px; font-size: var(--yz-4); color: var(--murekkep) }
 .kart-not.uyari { background: color-mix(in srgb, var(--uyari) 12%, transparent) }
 /* Kuruyorum ekranının altındaki teşhis anahtarı (ayrı "Gelişmesine yardım et" ekranı yerine) */
-.anahtar { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--cizgi); border-radius: 12px; font-size: 13.5px; color: var(--murekkep); text-align: left; cursor: pointer }
+.anahtar { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--cizgi); border-radius: var(--kose-l); font-size: var(--yz-4); color: var(--murekkep); text-align: left; cursor: pointer }
 .anahtar input { margin: 3px 0 0; accent-color: var(--sahne); width: 16px; height: 16px; flex: none }
 .anahtar b { font-weight: 500 }
-.anahtar .ipucu { font-size: 12.5px; color: var(--soluk) }
+.anahtar .ipucu { font-size: var(--yz-3); color: var(--soluk) }
 .adimlar { counter-reset: a; display: grid; gap: 10px; padding: 0; margin: 0; list-style: none }
 .adimlar li { counter-increment: a; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; background: var(--yuzey);
-  border: 1px solid var(--cizgi); border-radius: 12px; padding: 12px 14px }
+  border: 1px solid var(--cizgi); border-radius: var(--kose-l); padding: 12px 14px }
 .adimlar li::before { content: counter(a); width: 24px; height: 24px; border-radius: 50%; background: var(--sahne-acik); color: var(--sahne);
-  font: 500 12px/24px var(--f-teknik); text-align: center }
+  font: 500 var(--yz-2)/24px var(--f-teknik); text-align: center }
 .adimlar li.tamam::before { content: "✓"; background: var(--sahne); color: #fff }
 .adimlar .eylem { margin-top: 6px }
-kbd, code { font: 400 13px var(--f-teknik); background: var(--yuzey-2); border: 1px solid var(--cizgi); border-radius: 6px; padding: 1px 6px }
+kbd, code { font: 400 var(--yz-3) var(--f-teknik); background: var(--yuzey-2); border: 1px solid var(--cizgi); border-radius: var(--kose-s); padding: 1px 6px }
 
-.ozet { background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: 14px; padding: 16px 18px; display: grid; gap: 8px; text-align: left }
-.ozet h3 { margin: 0; font: 500 15px/1.3 var(--f-govde) }
-.ozet textarea { min-height: 180px; font-size: 14.5px }
+.ozet { background: var(--yuzey); border: 1px solid var(--cizgi); border-radius: var(--kose-l); padding: 16px 18px; display: grid; gap: 8px; text-align: left }
+.ozet h3 { margin: 0; font: 500 var(--yz-5)/1.3 var(--f-govde) }
+.ozet textarea { min-height: 180px; font-size: var(--yz-4) }
 
 .kilit { display: inline-flex; align-items: center; gap: 12px }
 .kilit .ad-yazi { font: 300 30px/1 var(--f-baslik); letter-spacing: 0 }

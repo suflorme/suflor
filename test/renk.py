@@ -39,6 +39,11 @@ def sabit(p):
     return x
 sx = [y for p in ("pano/pano.html", "pano/hazirlik.html", "popup.html") for y in sabit(p)]
 kontrol(f"pano, hazırlık ve eklenti penceresinde sabit yazı boyu/köşe yok ({sx[:3] or '—'})", not sx)
+# 21 Ekim: Teams şeridi (content.js gölge DOM + kart penceresi) ve kurulum sihirbazı da aynı ölçekte; şerit renk.css'i yükleyemez, değerleri kendisi taşır
+sx = [y for p in ("content.js", "sihirbaz/sihirbaz.css") for y in sabit(p)]
+kontrol(f"Teams şeridi ve sihirbazda sabit yazı boyu/köşe yok ({sx[:3] or '—'})", not sx)
+ct = jetonlar(C[C.index(":host,:root{"):C.index("}", C.index(":host,:root{"))])
+kontrol("Teams şeridinin yazı boyu ve köşe ölçeği renk.css'le aynı", ct and all(olcu.get(k) == v for k, v in ct.items()) and set(ct) == {k for k in olcu if k.startswith(("yz-", "kose"))})
 kontrol("hareket azaltma: renk.css tüm animasyon ve geçişleri kısaltır, Teams kart penceresi de", re.search(r"prefers-reduced-motion:reduce\)\{\*,\*::before,\*::after\{animation-duration", R) is not None
         and "@media (prefers-reduced-motion:reduce){*{animation:none!important" in C)
 print(f"{sum(ok)}/{len(ok)}"); sys.exit(0 if all(ok) else 1)
