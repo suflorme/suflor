@@ -40,7 +40,7 @@ for l in sys.stdin:
     if ns == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
     for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."] + ([" Önceki konuşma geldi."] if "[Önceki konuşma" in q and "Önceki soru: " in q else []) \
             + ([f" Defter geldi: {defter}."] if defter else []) + ([" Ek geldi."] if ek else []) + ([" Geçmiş toplantı geldi."] if "[Sıradaki toplantı" in q and "Bütçe takibi" in q and "ortak: ayla" in q else []) \\
-            + ([" Toplantı bağlamı geldi."] if "Toplantı sürüyor:" in q and "yalnız panoda" in q else []) + (["\\n---\\n", "Ayrıntı satırı 10:01."] if defter or ek else []):
+            + ([" Toplantı bağlamı geldi."] if "Toplantı sürüyor:" in q and "yalnız panoda" in q else []) + ([" Selam notu geldi."] if "[Suflor cevaptan önce kullanıcıyı sesli selamladı" in q else []) + (["\\n---\\n", "Ayrıntı satırı 10:01."] if defter or ek else []):
         time.sleep(0.15); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     defter = None; ek = False
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
@@ -84,12 +84,14 @@ try:
     ok("yalnız panodan (pano kökeni yoksa 403)", post({"komut": "basla"}, pano=False).get("kod") == 403)
     k = sor("Toplantı en çok kaç dakika sürmeli?")
     ok("soru yazıya döküldü ve Claude'a gitti", k["durum"] == "hazir" and "dakika" in (k.get("soru") or "").lower() and "Sorduğun" in (k.get("cevap") or ""))
-    ok("cümle cümle okundu (ilk cümle sonuçtan önce)", log().count("SES (deneme)") == 2 and k["olcum"]["ses_ms"] < k["olcum"]["sure_ms"])
+    ok("cümle cümle okundu (ilk cümle sonuçtan önce; önünde günün selamı)", log().count("SES (deneme)") == 4 and k["olcum"]["ses_ms"] < k["olcum"]["sure_ms"])
+    ok("v0.101.0: günün ilk sorusunda selam okundu, Claude'a 'selam verildi' notu gitti", "KONUŞ: selam (ilk): " in log() and "Deniz." in log() and "Selam notu geldi" in (k.get("cevap") or ""))
     ok("soruya tarih + yarının takvimi eklendi", "takvimi geldi" in (k.get("cevap") or ""))
     ok("okunurken yabancı ad Türkçe yazımla, pano metni aynen", "Beyskemp takvimi geldi" in log() and "Basecamp takvimi" in (k.get("cevap") or ""))
     ok("açık süreç bir kez açıldı", log().count("KONUŞ: açık süreç açıldı") == 1)
     k2 = sor("Toplantının sonunda ne yazılır?")
-    ok("araç başlayınca konuya özgü cümle söylendi (yalnız ikinci soruda)", log().count("KONUŞ: araç cümlesi") == 1 and log().count("SES (deneme)") == 5)
+    ok("araç başlayınca konuya özgü cümle söylendi (yalnız ikinci soruda)", log().count("KONUŞ: araç cümlesi") == 1 and log().count("SES (deneme)") == 7)
+    ok("v0.101.0: konuşma sürerken ikinci soruda selam yok", log().count("KONUŞ: selam") == 1 and "Selam notu geldi" not in (k2.get("cevap") or ""))
     ok("ikinci soru aynı süreçte, tur maliyeti farkla", k2["durum"] == "hazir" and log().count("KONUŞ: açık süreç açıldı") == 1 and abs(k2["olcum"]["maliyet"] - 0.01) < 1e-6)
     c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
     ok("ölçüm claude-cagri.jsonl'de (bas-konus, wh/ilk/ses)", len(c) >= 2 and all(x["is"] == "bas-konus" and x["wh_ms"] and x["ilk_ms"] and x["ses_ms"] and x.get("ses_cal_ms") is not None for x in c)

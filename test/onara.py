@@ -49,11 +49,33 @@ try:
     bak("bilinmeyen tür → kısa genel havuz", all(c in g["BEKLE_GENEL"]["tr"] for c in (bc("bilinmeyen") for _ in range(20))))
     havuz = str(g["BEKLE_GENEL"]) + str(g["BEKLE_TUR"])
     bak("eski kalıplar havuzda yok", not any(k in havuz for k in ("Hemen bakıyorum", "Kontrol ediyorum", "araştırma yapıyorum")))
-    bak("tür seçimi: veritabanı → sayı, takvim sorusu → takvim, sayı sorusu → sayı, dosya araması → not, sıradan soru → genel",
-        bt("ne var", "mcp__suflorvt__vt_sor") == "sayi" and bt("Yarın takvimimde ne var?") == "takvim" and bt("Perşembe müsait miyim?") == "takvim"
+    vt = "mcp__suflorvt__vt_sor"
+    bak("v0.101.0 veritabanı aracında konuya göre: plan → plan, sayı → sayı, takvim → takvim, görüşme → görüşme, diğer → kayıtlar",
+        bt("Günaydın Asistan. Bugün planımızda neler var?", vt) == "plan" and bt("Kaç tane açık iş var?", vt) == "sayi" and bt("Yarın takvimimde ne var?", vt) == "takvim"
+        and bt("Ayla'yla en son ne zaman görüştük?", vt) == "gorusme" and bt("ne var", vt) == "kayit" and bc("plan") in g["BEKLE_TUR"]["plan"])
+    bak("tür seçimi: takvim sorusu → takvim, sayı sorusu → sayı, dosya araması → not, sıradan soru → genel",
+        True and bt("Yarın takvimimde ne var?") == "takvim" and bt("Perşembe müsait miyim?") == "takvim"
         and bt("Kaç tane açık sipariş var?") == "sayi" and bt("Ne konuştuk?", "Grep") == "not" and bt("Bu fikir hakkında ne düşünüyorsun?") is None
         and bt("x", tur_ad="defter") == "not" and bt("x", tur_ad="belge") == "belge")
     print("   örnek:", bc("takvim"), "|", bc("sayi"), "|", bc("not"), "|", bc())
+    # v0.101.0 Konuş selamı: günün ilk sorusunda saate göre, 2 saat aradan sonra "Tekrar merhaba", konuşma sürerken yok; kullanıcının selamına aynısıyla
+    okunan = []; os.makedirs(g["BASE"], exist_ok=True)
+    g.update(json=json, seslendir=lambda m, kuyruk=False, cal=None: okunan.append(m) or True, toplanti_var=lambda: False, print=lambda *a, **k: None); g["AYAR"]["ad"] = "Deniz T"
+    sm, ks, sa = g["selam_metni"], g["konus_selam"], g["selam_asamasi"]
+    bak("saate göre ilk selam (sabah Günaydın, akşam İyi akşamlar, gün içi Merhaba/Selam)", sm("Bugün ne var?", "ilk", 9) == "Günaydın Deniz." and sm("x", "ilk", 20) == "İyi akşamlar Deniz."
+        and sm("x", "ilk", 14) in ("Merhaba Deniz.", "Selam Deniz."))
+    bak("kullanıcının selamına aynısıyla (hitaptan sonra da), uzun aradan sonra 'Tekrar merhaba'", sm("Günaydın Asistan. Planımızda ne var?", "ilk", 20) == "Günaydın Deniz."
+        and sm("Asistan, selam. Nasılsın?", None) == "Selam Deniz." and sm("Merhaba, bugün ne var?", "tekrar") == "Tekrar merhaba Deniz." and sm("x", "tekrar") == "Tekrar merhaba Deniz.")
+    bak("selamsız soruda konuşma sürerken selam yok; 'selamı ilet' selam sayılmaz", sm("Bir de yarına bak.", None) is None and sm("Ayla'ya selamı ilet.", None) is None)
+    tur_ = {"sesli": True, "toplantida": False, "kaynak": "bas"}
+    s1 = ks("Bugün ne var?", tur_); s2 = ks("Peki yarın?", tur_)
+    bak("ilk soruda okundu, hemen ardından ikinci soruda yok; aşama artık yok", s1 and okunan == [s1] and s2 is None and sa() is None)
+    g["_SELAM"]["son"] -= 3 * 3600; s3 = ks("Şimdi ne var?", dict(tur_))
+    bak("3 saat sonra aynı gün 'Tekrar merhaba'", s3 == "Tekrar merhaba Deniz.")
+    bak("toplantıda, karşı tarafın sorusunda, sessiz turda selam yok", [ks("Merhaba", dict(tur_, toplantida=True)), ks("Merhaba", dict(tur_, karsi="Ayla")), ks("Merhaba", dict(tur_, sesli=False))] == [None] * 3)
+    g["_SELAM"].update(yuklendi=False, son=0, gun=None); bak("durum dosyadan geri yüklenir (aktarıcı yeniden başlasa da)", sa() is None and g["_SELAM"]["gun"])
+    g["AYAR"]["konus_selam"] = False; g["_SELAM"]["son"] -= 3 * 3600; bak("ayar konus_selam: false kapatır", ks("Merhaba", dict(tur_)) is None and not g["selam_bekleniyor"]())
+    bak("not metni: yeniden selamlama deme", "yeniden selamlama" in g["selam_notu"]("Günaydın Deniz.") and g["selam_notu"](None) == "")
 finally:
     if not hata: shutil.rmtree(T, ignore_errors=True)
     else: print(f"(deneme klasörü: {T})")
