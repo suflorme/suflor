@@ -1,11 +1,13 @@
-// Suflor.me v0.27.0 — platform katmanı: Google Meet (web) adaptörü. Arayüz platform-teams.js başında.
+// Suflor.me v0.27.0 (seçiciler 21 Ekim'de gerçek Meet'te düzeltildi) — platform katmanı: Google Meet (web) adaptörü. Arayüz platform-teams.js başında.
 // Meet'te canlı döküm paneli yok (döküm toplantı sonunda Drive'a gider): kaynak altyazı (CC) ve yerel Whisper. Seçiciler herkese açık
-// bilgiyle yazıldı, GERÇEK MEET'TE DOĞRULANMADI (11 Ekim): sınıf adları sık değişir, bu yüzden önce aria etiketleri ve yapı; tanınmazsa
+// bilgiyle yazıldı; altyazı kutusu ve blokları 21 Ekim'de gerçek Meet'te (İngilizce arayüz) doğrulandı: sınıf adları sık değişir, bu yüzden önce aria etiketleri ve yapı; tanınmazsa
 // çekirdeğin genel okuyucusu (yaprak düğümler). İlk gerçek kullanımda capAuto/günlükteki "altyazı yok" ve satır adlarına bak.
 (() => {
   if (globalThis.SuflorPlatform) return;
   const SKIP_RE = /^(Altyazılar?|Captions?|Altyazıları (aç|kapat)|Turn (on|off) captions|Dil|Language|Türkçe|English.*|Ayarlar|Settings|Kapat|Close|Siz|You)$/i;
-  const CC = 'div[role="region"][aria-label*="altyazı" i], div[role="region"][aria-label*="caption" i], [jsname="dsyhDe"], .a4cQT';
+  // Öncelik sırasıyla (21 Ekim, gerçek Meet): .a4cQT altyazı ayarlarını (dil listesi, yazı boyutu) da içerir — tek seçici listesi belge sırasında onu bulup dil
+  // listesini satır diye gönderiyordu. Asıl kutu role=region aria-label="Captions"; içinde her konuşma bloğu .nMcdL (ad .NWpY1d, metin .ygicle).
+  const CC = ['div[role="region"][aria-label*="altyazı" i]', 'div[role="region"][aria-label*="caption" i]', '[jsname="dsyhDe"]'];
   let Y = null;
   function toplantiAdi() {
     const m = document.querySelector("[data-meeting-title]");
@@ -27,11 +29,12 @@
   function dokumPaneli() { return null; }  // Meet'te canlı döküm paneli yok
   function dokumSatirSayisi() { return 0; }
   function dokumOku() { return null; }
-  function altyaziKutusu() { return document.querySelector(CC); }
+  function altyaziKutusu() { for (const s of CC) { const b = document.querySelector(s); if (b) return b; } return null; }
   function altyaziVar() { const b = altyaziKutusu(); return !!(b && (b.innerText || "").trim().length > 1); }
   // Altyazı bloğu: konuşmacı adı (kısa düğüm, çoğu zaman resmin yanında) + metin (bir ya da birkaç span). Blok = kutunun doğrudan
   // çocuğu ya da onun tek çocuğu; adı sınıf adıyla (bilinen: .NWpY1d, .KcIKyf) ya da "ilk kısa yaprak" kuralıyla bulur.
   function bloklar(box) {
+    const nm = box.querySelectorAll(".nMcdL"); if (nm.length) return [...nm].filter(b => (b.innerText || "").trim());
     let k = box; for (let i = 0; i < 3 && k.children.length === 1; i++) k = k.children[0];
     return [...k.children].filter(b => (b.innerText || "").trim());
   }

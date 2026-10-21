@@ -676,6 +676,7 @@ def ingest(p):
             onceki = seen.get(e["id"]) if e.get("id") else None
             if e.get("id"): seen[e["id"]] = raw
             text, soz = sozluk_uygula(raw, base_key)
+            if p.get("source") == "captions" and (e.get("speaker") or "").strip().lower() in ("you", "siz", "sen"): e["speaker"] = AYAR.get("ad") or e["speaker"]  # Meet kendi satırına "You" yazar
             if (e.get("speaker") or "") == ben_adi():
                 birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if p.get("source") == "whisper" and not onceki else None  # 19 Ekim: bölünen hitap
                 askida = text if hitap_askida(text) else None  # S94: yarım hitap tek başına gitmez; devamı gelmezse HITAP_ASKI_SN sonra tek başına
