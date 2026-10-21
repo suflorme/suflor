@@ -4,7 +4,7 @@
 # Aktarıcıda konus_* / Whisper döngüsünün bas dalı / brifing.swift açık süreç kipi / panodaki Konuş değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/bas-konus.py
 # Gerekenler: swiftc, kurulu Brifing.app (ayar.json'daki uygulama klasöründe; paket iskeleti için), whisper-venv (/Users/Shared/Suflor).
-import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
+import base64, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8791)
 T = tempfile.mkdtemp(prefix="bas-"); canli = os.path.join(T, "canli"); os.makedirs(canli); proje = os.path.join(T, "proje"); os.makedirs(proje)
@@ -38,6 +38,10 @@ for l in sys.stdin:
         pr({"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": "abcde"}}}); time.sleep(0.2)
         pr({"type": "stream_event", "event": {"type": "content_block_stop", "index": 0}})
     if ns == 2: pr({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "tool_use", "name": "Grep"}}}); time.sleep(0.3)
+    if "listeden" in soru.lower():  # v0.101.1: Claude oturuma iletiyi hazırlar — etiket sesli kısımda, "---" yok (okunmamalı)
+        for parca in ["Tamam, ana oturuma iletiyi hazırladım.", " [İLET proje: R12 Ali raporu işini listeden çıkar; ", "günlük plandaki 8. satır da düşsün.]"]:
+            time.sleep(0.15); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
+        pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}}); continue
     for parca in ["Sorduğun: ", soru.rstrip(".?!") + ".", " Basecamp takvimi", " geldi." if b else " gelmedi."] + ([" Önceki konuşma geldi."] if "[Önceki konuşma" in q and "Önceki soru: " in q else []) \
             + ([f" Defter geldi: {defter}."] if defter else []) + ([" Ek geldi."] if ek else []) + ([" Geçmiş toplantı geldi."] if "[Sıradaki toplantı" in q and "Bütçe takibi" in q and "ortak: ayla" in q else []) \\
             + ([" Toplantı bağlamı geldi."] if "Toplantı sürüyor:" in q and "yalnız panoda" in q else []) + ([" Selam notu geldi."] if "[Suflor cevaptan önce kullanıcıyı sesli selamladı" in q else []) + (["\\n---\\n", "Ayrıntı satırı 10:01."] if defter or ek else []):
@@ -326,6 +330,19 @@ try:
     c2 = ad3["_vt_benzer_notu"]("Admin yetkisi en fazla kimde şu an?")
     ok("taze önbellek sonucu: açık süreçte de notta sonuç + 'vt_sor çağırmadan'; bayatsa (400 sn) açık süreçte not yok",
        "Ayla\t5" in c1 and "vt_sor çağırmadan" in c1 and not c2)
+    # v0.101.1: Claude'un hazırladığı oturum iletisi (kalıp tutmadığında) — istemde yol var, etiket okunmaz/panoda görünmez, aynı onay yoluna girer
+    while st()["durum"] not in ("hazir", "hata", "kapali"): time.sleep(0.2)
+    ses0 = len(re.findall(r"SES \(deneme\).*", log()))
+    kt = sor("R12 işini listeden çıkaralım lütfen.")
+    t0 = time.time()
+    while time.time() - t0 < 5 and "Claude hazırladı" not in log(): time.sleep(0.2)
+    okunan = "\n".join(re.findall(r"SES \(deneme\).*", log())[ses0:])
+    ist = json.load(open(os.path.join(canli, "konus-istek.json")))["args"]
+    ok("istemde oturuma ileti yolu ve hedef (iki kişilikte de ortak kısımda)", any("[İLET <hedef>: <ileti>]" in a and "proje = " in a for a in ist))
+    ok("Claude'un [İLET …] etiketi okunmadı, panoda görünmedi; ileti onaya sunuldu (aynı yol)", kt["durum"] == "hazir" and "iletiyi hazırladım" in (kt.get("cevap") or "")
+       and "[İLET" not in (kt.get("cevap") or "") and "İLET" not in okunan and "R12" not in okunan.split("Oturuma talimat")[0]
+       and "TALİMAT: Claude hazırladı · oturum → proje onay bekliyor" in log())
+    if "TALİMAT: Claude hazırladı" not in log(): print("   okunan:", okunan[:300], "| cevap:", (kt.get("cevap") or "")[:200])
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

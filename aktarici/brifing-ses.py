@@ -663,19 +663,24 @@ SES_CEVAP = {  # sözcük ve kalıplar (Türkçe + İngilizce; Whisper'ın verdi
     "red": ["gerek yok", "no thanks", "hayır", "hayir", "yok", "yazma", "ekleme", "kaydetme", "reddet", "istemiyorum", "iptal", "no", "nope", "don't", "dont", "reject", "cancel", "gönderme", "iletme", "bildirme", "yollama"],
     "onay": ["do it", "go ahead", "evet", "evt", "tamam", "tamamdır", "olur", "yaz", "yazabilirsin", "onayla", "onaylıyorum", "ekle", "ekleyebilirsin", "kaydet",
              "peki", "aynen", "uygun", "uygundur", "yes", "yeah", "yep", "ok", "okay", "sure", "approve", "approved",
-             "gönder", "gönderebilirsin", "gönderin", "gonder", "bildir", "bildirebilirsin", "ilet", "iletebilirsin", "yolla", "send", "send it"]}  # v0.77.1 (kullanıcı): talimat onayı
+             "gönder", "gönderebilirsin", "gönderin", "gonder", "bildir", "bildirebilirsin", "ilet", "iletebilirsin", "yolla", "send", "send it",
+             "kabul ediyorum", "kabul", "ileti", "iletin", "gönderebilirsiniz"]}  # v0.77.1 (kullanıcı): talimat onayı; v0.101.1: "İlet" Whisper'da "İleti"
+# v0.101.1 (kullanıcı, 21 Ekim: "Evet, evet, gönder. Kabul ediyorum, ilet." uzun sayılıp reddedilmişti): 4 sözcükten uzun cevap yalnız tek yönlüyse (yalnız onay ya da
+# yalnız red sözcükleri) ve kalan sözcükler pekiştirme ise karar verir; başka bir şey söylendiyse ("evet, Ali'yi de ekle") yine uzun.
+SES_PEKISTIRME = {"tabii", "tabi", "elbette", "kesinlikle", "hemen", "şimdi", "simdi", "de", "da", "bunu", "onu", "iletiyi", "mesajı", "bildirimi", "sure", "absolutely", "now", "it"}
 SES_AMA = {"ama", "fakat", "ancak", "yalnız", "sadece", "but", "except", "only"}  # "evet ama…" → düzeltme (Aşama 1b), şimdilik kısa cevap iste
 SES_DOLGU = {"lütfen", "please", "ee", "eee", "ıı", "hı", "hmm", "şey", "claude", "suflor"}
 def sesli_ayir(metin):  # → hepsi | tekrar | sus | sonra | red | onay | karisik | uzun | yok
     m = " " + " ".join(re.sub(r"[^\w\s']", " ", str(metin or "").replace("I", "ı").replace("İ", "i").lower()).split()) + " "
     sozcuk = [w for w in m.split() if w not in SES_DOLGU]
     if not sozcuk: return "yok"
-    if len(sozcuk) > 4 or SES_AMA & set(sozcuk): return "uzun"
+    if SES_AMA & set(sozcuk): return "uzun"
     m = " " + " ".join(sozcuk) + " "; bulunan = set()
     for sinif, kaliplar in SES_CEVAP.items():
         for k in kaliplar:
-            if f" {k} " in m: bulunan.add(sinif); m = m.replace(f" {k} ", " ")
+            while f" {k} " in m: bulunan.add(sinif); m = m.replace(f" {k} ", " ")  # v0.101.1: "evet evet" (bitişik tekrar tek geçişte kalıyordu)
     if "hepsi" in bulunan: bulunan.discard("onay")  # "hepsini onayla" tek anlam
+    if len(sozcuk) > 4 and not (bulunan in ({"onay"}, {"red"}) and set(m.split()) <= SES_PEKISTIRME): return "uzun"
     if len(bulunan) > 1: return "karisik"
     return bulunan.pop() if bulunan else "yok"
 def sesli_cevap(metin, sid):  # bas-konuş metni soru aktifken; dönen: okunan cevap

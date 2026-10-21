@@ -58,7 +58,7 @@ finally:
     r.terminate(); r.wait()
 # S24 Aşama 1: sesli cevap ayırıcısı (aktarıcının kendi tanımları; Whisper'ın verdiği biçimler — noktalama, büyük harf, İ/I)
 import ast
-_k = "".join(open(f, encoding="utf-8").read() for f in [os.path.join(KOD, "relay.py")] + sorted(__import__("glob").glob(os.path.join(KOD, "aktarici", "*.py")))); _ad = {"SES_CEVAP", "SES_AMA", "SES_DOLGU", "sesli_ayir"}
+_k = "".join(open(f, encoding="utf-8").read() for f in [os.path.join(KOD, "relay.py")] + sorted(__import__("glob").glob(os.path.join(KOD, "aktarici", "*.py")))); _ad = {"SES_CEVAP", "SES_AMA", "SES_DOLGU", "SES_PEKISTIRME", "sesli_ayir"}
 _ns = {"re": __import__("re")}
 exec(compile(ast.Module([n for n in ast.parse(_k).body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in _ad for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in _ad)], []), "relay", "exec"), _ns)
 TABLO = [("Evet.", "onay"), ("Evet, yaz.", "onay"), ("Tamam.", "onay"), ("Olur olur.", "onay"), ("Ekle lütfen.", "onay"), ("EVET", "onay"), ("Yes.", "onay"), ("Okay, do it.", "onay"),

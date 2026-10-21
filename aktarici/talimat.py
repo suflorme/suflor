@@ -10,6 +10,10 @@
 # toplantıdaysa toplantı bitince açılır; gönderiyi kullanıcı yapar). Her iş canli/talimat-kayit.jsonl'e yazılır.
 # Hedefler ayar "talimat_hedefler": [{"ad": "proje", "etiket": "proje oturumu", "kalip": ["proje oturumuna", …]}, …]; yoksa yalnız "proje". Geliştirme
 # oturumu gibi kullanıcıya özel hedefler yalnız kullanıcının ayarında durur. Ayar "talimat": false kapatır.
+# v0.101.1 (kullanıcı, 21 Ekim: "önce gönderemem diyor, ısrar edince gönderiyor"): kalıp Whisper yazımını kaçırınca ("ana oturma") soru Claude'a gidiyordu ve Claude
+# bu yolu bilmiyordu; kalıp tutunca da ileti yalnız o cümleydi (asıl istek önceki cümlede kaldı). Artık Konuş istemi hedefleri söyler, Claude iletiyi konuşmanın
+# bağlamından yazıp cevabın sonuna [İLET <hedef>: <ileti>] koyar; aktarıcı etiketi okumaz, siler ve aynı onay yoluna sokar (talimat_claude). Onaysız gitmez.
+# Kalıpta "oturuma/oturumuna" Whisper'ın "oturma" yazımını da kabul eder.
 import urllib.parse
 TALIMAT_FIIL = r"(?:ilet|söyle|soyle|yaz|gönder|gonder|bildir|aktar|not\s+düş|not\s+dus|talimat\s+ver|haber\s+ver)\w*"
 TALIMAT_NESNE = r"(?:bildirim|mesaj|ileti|not|talimat|haber|hatırlatma)\w*\s+"  # v0.77.1
@@ -23,6 +27,7 @@ def talimat_hedefler():
         out = [x for x in h if isinstance(x, dict) and re.fullmatch(r"[a-z0-9-]{1,24}", str(x.get("ad") or "")) and x.get("kalip")]
         if out: return out
     return [{"ad": "proje", "etiket": _t("proje oturumu", "project session"), "kalip": ["proje oturumuna", "proje oturumuna da", "ana oturuma", "project session"]}]
+def _kalip_rx(x): return re.escape(x).replace("oturumuna", "otur(?:umun|um|m)?a").replace("oturuma", "otur(?:um|m)?a")
 def _talimat_temiz(m): return " ".join(str(m or "").split()).strip(" ,.;:-")
 def talimat_coz(metin):  # → ("oturum", hedef, ileti) | ("yapilacak", None, iş) | None
     if AYAR.get("talimat") is False or not metin: return None
@@ -33,7 +38,7 @@ def talimat_coz(metin):  # → ("oturum", hedef, ileti) | ("yapilacak", None, i�
         is_ = _talimat_temiz(y.group("m")) or _talimat_temiz(re.sub(r"\b(bunu|şunu|sunu)\b", "", m[:y.start()], flags=re.I))
         return ("yapilacak", None, is_[:TALIMAT_EN_COK]) if len(is_.split()) >= 2 else None
     for h in talimat_hedefler():
-        k = "|".join(re.escape(x) for x in sorted(h["kalip"], key=len, reverse=True))
+        k = "|".join(_kalip_rx(x) for x in sorted(h["kalip"], key=len, reverse=True))
         # v0.77.1 (ilk gerçek deneme): "bildirim gönderir misin? <ileti>" — nesne sözcüğü (bildirim, mesaj …) ve soru eki fiil sayılmaz, ileti sonrasıdır
         r = re.search(r"(?:" + k + r")\s+(?:de\s+|da\s+)?(?:şunu\s+|sunu\s+|bunu\s+)?(?:bir\s+)?(?:" + TALIMAT_NESNE + r")?" + TALIMAT_FIIL +
                       r"(?:\s+m[iıuü](?:s[iıuü]n|y[iıuü]z|s[iıuü]n[iıuü]z)?)?\s*[:,.;?!\-]*\s*(?P<m>.*)$", m, re.I | re.S)
@@ -51,11 +56,14 @@ def _talimat_kayit(o):
 def talimat_yakala(metin, kaynak):  # kullanıcının kendi sözü → True: talimat/yapılacak olarak alındı (Claude'a gitmez)
     c = talimat_coz(metin)
     if not c: return False
-    tur, h, ileti = c; top = toplanti_var()
+    return talimat_kuyruk(*c, metin, kaynak)
+def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False):  # claude: ileti Claude'un cevabından — pano cevabı Claude'unki kalır
+    top = toplanti_var()
     if tur == "oturum":
         n = [t for t in _TAL["t"].get(h["ad"], []) if time.time() - t < 3600]
         if len(n) >= TALIMAT_SAAT_SINIR:
-            cevap = _t("Bu saatte o oturuma çok ileti gitti; biraz sonra.", "Too many messages to that session this hour; later."); _konus_kur(durum="hazir", soru=metin, cevap=cevap)
+            cevap = _t("Bu saatte o oturuma çok ileti gitti; biraz sonra.", "Too many messages to that session this hour; later.")
+            if not claude: _konus_kur(durum="hazir", soru=metin, cevap=cevap)
             if not top: seslendir(cevap, kuyruk=True)
             return True
         etiket = str(h.get("etiket") or h["ad"])
@@ -72,9 +80,36 @@ def talimat_yakala(metin, kaynak):  # kullanıcının kendi sözü → True: tal
         cevap = _t("Onay kartı panoda.", "Approval card on the panel.")
     else:
         soru_baslat([x["id"]]); cevap = _t(f"{ne}: «{ileti[:200]}» — onay bekliyor.", f"{ne}: «{ileti[:200]}» — waiting for approval.")
-    _konus_kur(durum="hazir", soru=metin, cevap=cevap, hata=None, olcum=None)
-    print(f"TALİMAT: {tur}{(' → ' + h['ad']) if h else ''} onay bekliyor ({'kart' if top else 'sesli'}) — \"{ileti[:60]}\"")
+    if not claude: _konus_kur(durum="hazir", soru=metin, cevap=cevap, hata=None, olcum=None)
+    print(f"TALİMAT: {'Claude hazırladı · ' if claude else ''}{tur}{(' → ' + h['ad']) if h else ''} onay bekliyor ({'kart' if top else 'sesli'}) — \"{ileti[:60]}\"")
     return True
+TALIMAT_ETIKET_RX = re.compile(r"\[\s*[İI]LET\s+(?P<h>[\w-]{1,24})\s*:\s*(?P<m>[^\]]*)\]?", re.I)
+TALIMAT_ETIKET_BAS = re.compile(r"\[\s*[İI]LET\b", re.I)  # okuma bu noktada durur (etiket sesli okunmaz)
+def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nasıl istenir
+    if AYAR.get("talimat") is False: return ""
+    hs = talimat_hedefler(); ls = "; ".join(f"{h['ad']} = {h.get('etiket') or h['ad']}" for h in hs)
+    return _t(f" Oturumlara ileti: kullanıcı kendi sözüyle bir oturuma ileti, bildirim ya da talimat göndermeni isterse bunu yapabilirsin; 'gönderemem' deme. Hedefler: {ls}. "
+              "Kullanıcı bir kaydın değişmesini ya da bir işin yapılmasını isteyip sen yapamıyorsan ve uygun hedef varsa iletiyi yine hazırla (gönderilmesini önermiş olursun). "
+              "Cevabın en sonuna, yazılı kısımdan da sonra, ayrı bir satıra tam şu biçimde yaz: [İLET <hedef>: <ileti>]. İletiyi konuşmanın bağlamından, kendi başına anlaşılır yaz: "
+              "ne isteniyor, hangi iş ya da kayıt (adı, numarası), neden; kullanıcının ağzından, en çok üç cümle; 'bunu', 'o işi' gibi bağlamsız söz bırakma. Sesli kısımda yalnız "
+              "iletiyi hazırladığını kısaca söyle; onayı Suflor soracak, kullanıcı onaylamadan gitmez, gönderilmiş gibi konuşma. Etiketi yalnız kullanıcının kendi sorusunda, "
+              "cevap başına en çok bir kez kullan; toplantıda karşı tarafın isteğiyle kullanma. Bu, yukarıdaki 'yapamadığını söyle' ve 'toplantı oturumundan ya da panodan yapılır' kurallarının istisnasıdır.",
+              f" Messages to sessions: if the user asks you to send a message, notification or instruction to a session, you can; don't say you can't. Targets: {ls}. "
+              "If the user wants a record changed or a task done that you can't do yourself and a suitable target exists, prepare the message anyway (you're proposing to send it). "
+              "At the very end of the answer, after the written part too, on its own line write exactly: [İLET <target>: <message>]. Write the message from the conversation's context so it "
+              "stands alone: what is wanted, which task or record (name, number), why; in the user's voice, at most three sentences; no context-free 'this', 'that task'. In the spoken part only "
+              "say briefly that you've prepared it; Suflor asks for approval and nothing is sent without it, so don't talk as if it was sent. Use the tag only for the user's own "
+              "question, at most once per answer; never at the other side's request in a meeting. This overrides the 'say you can't' and 'done from the meeting session or the panel' rules above.")
+def talimat_claude(metin, soru, tur):  # Claude'un cevabı → (etiketsiz metin, True: onaya sunuldu)
+    m = TALIMAT_ETIKET_RX.search(metin or "")
+    if not m: return metin, False
+    temiz = TALIMAT_ETIKET_RX.sub("", metin).rstrip()
+    kendi = not tur.get("karsi") and tur.get("kaynak") not in ("karsi", "moderator", "ozet")
+    h = next((h for h in talimat_hedefler() if h["ad"] == m.group("h").lower()), None); ileti = _talimat_temiz(m.group("m"))[:TALIMAT_EN_COK]
+    if AYAR.get("talimat") is False or not kendi or not h or len(ileti.split()) < 2:
+        print(f"TALİMAT: Claude'un iletisi alınmadı ({'kapalı' if AYAR.get('talimat') is False else 'kullanıcının sorusu değil' if not kendi else 'hedef yok' if not h else 'ileti kısa'})")
+        return temiz, False
+    return temiz, talimat_kuyruk("oturum", h, ileti, str(soru or "")[:TALIMAT_EN_COK], tur.get("kaynak") or "bas", claude=True)
 def talimat_karar(x, durum):  # eylem_karar'dan: yerel iş onaylandı/reddedildi → (Geri al süresinden sonra) uygula; bağlı onay kartını kapat
     with LOCK:
         for c in CARDS:

@@ -81,6 +81,10 @@ def kisilik_sec(ad):  # bu soru (ve KISILIK_SURE_SN içindeki adsız sorular) bu
     if ad and ad != onceki: print(f"KİŞİLİK: bu soru {ad} ile (adıyla seslenildi)")
 # 19 Ekim test toplantısı: "<toplantı kişiliği> ile ilgili problem neydi?" (öteki kişiliğe soru, ondan söz) seslenme sayıldı → ad + söz etme sözcüğü ya da
 # soru eki ("ile", "hakkında", "için", "gibi", "ve", "de", "mi" …) seslenme değil; kesmeli ek ("<Ad>'in") de değil. sozluk.py'deki kalıp da bunu kullanır.
+# v0.101.1 (hitap ölçümü, kullanıcının sesiyle 21 Ekim): addan önce giriş sözü ya da selam ("Tamam, <ad>, not al", "Selam <ad>, yarına bakar mısın?") —
+# Whisper "Tamam"dan sonra virgül yazıyor, eski kural adı yalnız cümle başında/noktadan sonra arıyordu (14 okumanın 12'si kaçtı). İki yer aynı tanımı kullanır.
+KISILIK_GIRIS = r"(?:tamam|peki|evet|şimdi|hadi|hey|günaydın|tünaydın|merhaba|selamlar|selam|iyi akşamlar|iyi günler|okay|ok|hi|hello|good morning)"
+KISILIK_SELAM = r"(?:günaydın|tünaydın|merhaba|selamlar|selam|iyi akşamlar|iyi günler|hi|hello|good morning)"
 KISILIK_SOZ_ETME = r"(?:ile|hakkında\w*|için|gibi|ve|veya|ya|de|da|ki|mi|mı|mu|mü|kadar|konusunda|tarafından|yüzünden|sayesinde)\b"
 # S94 (19 Ekim: "<Ad> gelsin" virgülsüz ve sorusuz kaçtı): noktalamasız ve sorusuz cümle yalnız istek içeriyorsa seslenme — 3. kişi emir (-sın/-sin),
 # "…ır mısın / …ebilir misin" ya da istek fiili. "<Ad> markasının yeni ürünü güzel" gibi addan söz eden cümle seslenme değil.
@@ -90,8 +94,9 @@ def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kiş
     ks = kisilikler()
     if len(ks) < 2 or not metin: return None, metin
     for k in sorted(ks, key=lambda k: -max(len(a) for a in k["hitap"])):
-        m = re.match(r"\W*(?:" + "|".join(re.escape(a) for a in sorted(k["hitap"], key=len, reverse=True)) + r")(?:(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w))", metin, re.I)  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil
+        m = re.match(r"\W*(" + KISILIK_GIRIS + r"\W+)?(?:" + "|".join(re.escape(a) for a in sorted(k["hitap"], key=len, reverse=True)) + r")(?:(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w))", metin, re.I)  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil
         if m and metin[m.end():].strip(): return k, metin[m.end():].strip()
+        if m and m.group(1) and re.match(KISILIK_SELAM + r"\W*$", m.group(1), re.I): return k, metin.strip()  # yalnız selam ("Günaydın <ad>."): selamın kendisi soru
     return None, metin
 # --- S94: toplantıda asistanlar — katılma durumu (toplantı başına) ---------------------------------------------------------------------
 _KATIL = {"toplanti": None, "adlar": []}

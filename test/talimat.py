@@ -23,15 +23,37 @@ for g, b in [("proje oturumuna ilet: sözleşme taslağını cuma 17.00'ye kadar
              ("Atlas, Geliştirme Oturumuna bildirim gönderir misin? Test bildirimi.", ("oturum", "gelistirme", "Test bildirimi")),  # ilk gerçek deneme (18 Ekim)
              ("Proje oturumuna bir mesaj ilet: toplantı perşembeye kaydı.", ("oturum", "proje", "toplantı perşembeye kaydı")),
              ("Ana oturuma not düş, yarın izinliyim.", ("oturum", "proje", "yarın izinliyim")),
+             ("Anladım. Ana oturma bildirim gönderir misin? R12 işi listeden çıksın.", ("oturum", "proje", "R12 işi listeden çıksın")),  # v0.101.1: Whisper "oturma"
+             ("Oturma odasına bildirim gönder: ışıklar açık.", None),
              ("Proje oturumu bugün ne yaptı?", None), ("Yarın ne var?", None), ("proje oturumuna ilet", None)]:
     c = ns["talimat_coz"](g); c = (c[0], c[1]["ad"] if c[1] else None, c[2]) if c else None
     ok(f"ayrıştırma: {g!r} → {c}", c == b)
 ns["AYAR"]["talimat"] = False; ok("ayar talimat: false kapatır", ns["talimat_coz"]("proje oturumuna ilet: deneme yapalım") is None)
 ns["AYAR"] = {}; ok("ayar yoksa yalnız proje hedefi (geliştirme yok)", ns["talimat_coz"]("geliştirme oturumuna ilet: renk değişsin") is None and ns["talimat_coz"]("proje oturumuna ilet: renk değişsin"))
+# 1a) v0.101.1: Claude'un hazırladığı ileti — [İLET <hedef>: <ileti>] etiketi silinir, yalnız kullanıcının kendi sorusunda onaya gider
+nc = dict(ns, AYAR={"talimat_hedefler": HEDEF}, TALIMAT_EN_COK=1000); giden = []
+nc["talimat_kuyruk"] = lambda tur, h, ileti, metin, kaynak, claude=False: giden.append((tur, h["ad"], ileti, kaynak, claude)) or True
+exec(src[src.index("TALIMAT_FIIL ="):src.index("def _talimat_kayit")] + src[src.index("TALIMAT_ETIKET_RX ="):src.index("def talimat_karar")], nc); exec("def print(*a, **k): pass", nc)
+c_ = "Tamam, hazırladım.\n---\nAyrıntı.\n[İLET proje: R12 Ali raporu işini listeden çıkar.]"
+t_, g_ = nc["talimat_claude"](c_, "o işi listeden çıkaralım", {"kaynak": "bas"})
+ok("Claude etiketi: silindi, proje hedefine onaya gitti (claude=True)", g_ and "[İLET" not in t_ and t_.endswith("Ayrıntı.") and giden[-1] == ("oturum", "proje", "R12 Ali raporu işini listeden çıkar", "bas", True))
+n_ = len(giden)
+for tur_, ad_ in (({"kaynak": "karsi", "karsi": True}, "karşı taraf"), ({"kaynak": "hitap"}, None)):
+    t_, g_ = nc["talimat_claude"](c_, "soru", tur_)
+    ok(f"Claude etiketi ({tur_['kaynak']}): {'gitmedi' if ad_ else 'gitti (kullanıcının hitabı)'}, etiket silindi", "[İLET" not in t_ and (not g_ if ad_ else g_))
+ok("karşı tarafın sorusunda kuyruğa bir şey girmedi", len(giden) == n_ + 1)
+t_, g_ = nc["talimat_claude"]("Olur. [ILET bilinmeyen: bir şey yap lütfen]", "s", {"kaynak": "bas"}); ok("bilinmeyen hedef: gitmez, etiket silinir", not g_ and t_ == "Olur.")
+t_, g_ = nc["talimat_claude"]("Cevap.", "s", {"kaynak": "bas"}); ok("etiketsiz cevap değişmez", t_ == "Cevap." and not g_)
+nc["AYAR"] = {"talimat": False}; ok("ayar talimat: false → istemde yol yok", nc["talimat_istem"]() == "")
+nc["AYAR"] = {"talimat_hedefler": HEDEF}; i_ = nc["talimat_istem"]()
+ok("istemde hedef listesi ve etiket biçimi", "proje = proje oturumu" in i_ and "gelistirme = geliştirme oturumu" in i_ and "[İLET <hedef>: <ileti>]" in i_)
+ok("okuma sınırı: etiketin başı yakalanır (kapanış gelmeden)", nc["TALIMAT_ETIKET_BAS"].search("Hazırladım. [İLET pro") is not None)
 # 1b) onay sözcükleri (v0.77.1, kullanıcı: evet dışında gönder, bildir, onaylıyorum, yes, tamam da onay)
 bs = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); nb = {"re": re}; exec(bs[bs.index("SES_CEVAP = {"):bs.index("def sesli_cevap(")], nb)
 for g, b in [("Bildir.", "onay"), ("Gönder", "onay"), ("Evet, gönder.", "onay"), ("Onaylıyorum", "onay"), ("Yes", "onay"), ("Tamam", "onay"), ("İlet.", "onay"),
-             ("Gönderme", "red"), ("Hayır, iletme.", "red")]:
+             ("Gönderme", "red"), ("Hayır, iletme.", "red"),
+             ("İleti.", "onay"), ("Evet, evet, gönder. Kabul ediyorum, ilet.", "onay"), ("Kabul ediyorum.", "onay"),  # v0.101.1 (21 Ekim gerçek deneme)
+             ("Hayır hayır, gönderme bunu.", "red"), ("Evet, Ali'nin raporunu da ekle lütfen.", "uzun"), ("Evet evet gönder ama önce bana oku", "uzun")]:
     ok(f"onay sözcüğü: {g!r} → {nb['sesli_ayir'](g)}", nb["sesli_ayir"](g) == b)
 # 2) yalıtılmış aktarıcı
 ay = os.path.join(T, "ayar.json")

@@ -9,7 +9,7 @@ agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8")
 sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "hitap_aski", "hitap_askida", "hitap_aski_bitti")) or
        (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR", "HITAP_ASKI", "HITAP_ASKI_SN"} for x in n.targets))]
 ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").read())  # 19 Ekim: söz etme kalıbı kisilik.py'de (iki yer aynı tanımı kullanır)
-sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK") for x in n.targets)] + sec
+sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS") for x in n.targets)] + sec
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
     ("Cloud, card, English, yes.", "Claude: card, English, yes.", "9 Ekim: virgüllü"),
@@ -58,7 +58,14 @@ for girdi, bek, ac in [
     ("Atlas bunu kontrol eder misin", "Claude: bunu kontrol eder misin", "S94: '…er misin' sorusuz da seslenme"),
     ("Atlas dün güzel cevap verdi.", "Atlas dün güzel cevap verdi.", "S94: istek yok, addan söz — seslenme değil"),
     ("Claude, özet çıkar.", "Claude, özet çıkar.", "S94: kişilik açıkken Claude seslenme değil (tek kural: asistanın adı)"),
-    ("Suflor, kaç kart açık?", "Suflor, kaç kart açık?", "S94: kişilik açıkken Suflor seslenme değil")]:
+    ("Suflor, kaç kart açık?", "Suflor, kaç kart açık?", "S94: kişilik açıkken Suflor seslenme değil"),
+    ("Tamam, Atlas, bunu not al.", "Tamam, Claude: bunu not al.", "v0.101.1: giriş sözü + virgül + ad (ölçümde 12/14 kaçıyordu)"),
+    ("Tamam Atlas bunu not al.", "Tamam Claude: bunu not al.", "v0.101.1: giriş sözü, virgülsüz istek"),
+    ("Selam Atlas, yarına bakar mısın?", "Selam Claude: yarına bakar mısın?", "v0.101.1: selam + ad + rica"),
+    ("Tamam. Merhaba Atlaz, kaç kart açık?", "Tamam. Merhaba Claude: kaç kart açık?", "v0.101.1: noktadan sonra selam + ad"),
+    ("Tamam, Atlas dün iyi cevap verdi.", "Tamam, Atlas dün iyi cevap verdi.", "v0.101.1: giriş sözünden sonra da addan söz seslenme değil"),
+    ("Merhaba Atlas'a selam söyle.", "Merhaba Atlas'a selam söyle.", "v0.101.1: selam + ekli ad seslenme değil"),
+    ("Bak Atlas ne güzel olmuş.", "Bak Atlas ne güzel olmuş.", "v0.101.1: listede olmayan söz (bak) giriş sayılmaz")]:
     cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok
     print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
 # v0.61.0: iki kişilik — ikinci adın içinde birincinin yazımı geçse de (Matlas ⊃ atlas) doğru kişilik tanınır

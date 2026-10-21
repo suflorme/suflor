@@ -251,6 +251,7 @@ def konus_istem(vt=None):
     # v0.54.0 (kullanıcı, 16 Ekim): sesli kısımda iç terim yok — "defterine göre", "veritabanına göre", "toplantı oturumu", "kart", "döküm", dosya adı; kaynak yazılı kısımda
     t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Belirsizliği de iç terimsiz söyle: 'dökümde bozuk duyulmuş' değil 'bu kısım net duyulmamış'; 'dökümde' değil 'görüşmede' ya da 'toplantıda'. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası).",
             " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Say uncertainty without internal terms too: not 'garbled in the transcript' but 'that part wasn't clear'; not 'in the transcript' but 'in the conversation' or 'in the meeting'. Source and method only in the written part (after ---).")
+    if "talimat_istem" in globals(): t += talimat_istem()  # v0.101.1: oturumlara ileti (iki kişilikte de)
     if not k: return t + kart_istem()
     t = re.sub(r"gerçekten şaşırtıcı.*?kullanabilirsin; ", "", t)
     t = t.replace("Sen Suflor.me'nin sesli asistanısın.", "Sen kullanıcının sesli asistanısın.")  # v0.54.3: kimlik kişilikten (kullanıcı: tanıtımda ürün adı yok)
@@ -897,11 +898,13 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if not tur.get("t_ilk"): tur["t_ilk"] = time.time(); _konus_kur(durum="konusuyor")
                 tur["metin"] += d; KONUS["cevap"] = tur["metin"]
                 if not tur.get("ayrinti"):  # S48: "---" sonrası yazılı ayrıntı — okunmaz, panoda görünür
-                    tur["tampon"] += d; m = re.search(r"(?:^|\n)\s*-{3,}", tur["tampon"])
+                    tur["tampon"] += d; m = re.search(r"(?:^|\n)\s*-{3,}", tur["tampon"]) or TALIMAT_ETIKET_BAS.search(tur["tampon"])  # v0.101.1: [İLET …] okunmaz
                     if m: tur["tampon"] = tur["tampon"][:m.start()]; _konus_cumle(tur, son=True); tur["ayrinti"] = True
                     else: _konus_cumle(tur)
             elif j.get("type") == "result":
                 if not tur.get("ayrinti"): _konus_cumle(tur, son=True)
+                if TALIMAT_ETIKET_BAS.search(tur["metin"]):  # v0.101.1: Claude'un hazırladığı oturum iletisi → onaya (etiket panoda ve geçmişte görünmez)
+                    tur["metin"], _ = talimat_claude(tur["metin"], tur.get("soru") or KONUS.get("soru"), tur); KONUS["cevap"] = tur["metin"]
                 tur["t_son"] = time.time(); m = j.get("total_cost_usd") or 0; u = j.get("usage") or {}
                 ms = lambda a: round((tur[a] - tur["t_birak"]) * 1000) if tur.get(a) else None
                 o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": "bas-konus", "yalin": bool(claude_yalin()), "kayit_sn": tur.get("kayit_sn"),
