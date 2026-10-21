@@ -979,12 +979,12 @@ def tail(n=200):
     try: lines = open(jl, encoding="utf-8").read().splitlines()[-n:]; return ceviri_uygula([json.loads(x) for x in lines], STATE["file"])
     except Exception: return []
 
-# Pano sayfaları (pano/: pano.html — pano ve mini pano, hazirlik.html, yazi.css) ve marka yazı tipleri/işareti (marka/): aktarıcının
+# Pano sayfaları (pano/: pano.html — pano ve mini pano, yazi.css) ve marka yazı tipleri/işareti (marka/): aktarıcının
 # yanındaki kopyadan (aktarici-kur.command kopyalar: launchd Masaüstü'ndeki kod klasörünü okuyamaz), yoksa ayardaki kod klasöründen.
 # Yazı tipi yoksa sistem yazı tipine düşer.
 PANO_DIZIN = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "pano"), os.path.join(os.path.expanduser(str(AYAR.get("kod") or "")), "pano")]
 _PANO = {}
-def pano_dosyasi(ad):  # pano/ altındaki sayfa (pano.html, hazirlik.html, yazi.css); dosya değişince yeniden okunur
+def pano_dosyasi(ad):  # pano/ altındaki sayfa (pano.html, yazi.css); dosya değişince yeniden okunur
     fp = next((os.path.join(d, ad) for d in PANO_DIZIN if os.path.isfile(os.path.join(d, ad))), None)
     if not fp: raise FileNotFoundError(f"pano/{ad} yok — aktarici-kur.command ile yeniden kur")
     m = os.path.getmtime(fp)
@@ -1347,7 +1347,7 @@ TAKVIM_SN = 300; TAKVIM_TAM = {}
 # Chrome yerel mesajlaşmasıyla (native messaging) bu kullanıcının anahtar yardımcısından; pano/hazırlık sayfası kendi deposundan
 # (localStorage — köken porta bağlı; çerez porta bağlı olmadığı için diğer hesabın aktarıcısına giderdi). Geçiş: eski eklentinin
 # yazma istekleri anahtarsız da kabul edilir, pano "eklentiyi yenile" der; ayar "anahtar_zorunlu": true bunu kapatır.
-VERI_GET = {"/status", "/geri-bildirim/onizle", "/taslak", "/hazirlik.json", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1810,28 +1810,7 @@ def baslat(p):
     if olay:
         try: brifing_baslatta(olay.get("id"))
         except Exception as e: print(f"BAŞLAT: sesli brifing hatası {e.__class__.__name__}")
-    print(f"BAŞLAT: {konu} · rol {rol} · dil {dil}{' · takvimden' if olay else ''}{f' · gündem {len(gundem)} madde' if gundem else ''} → Terminal'de Claude"); return {"ok": True, "rol": rol, "dil": dil}
-
-def _durum_ad(d):  # hazırlık sayfasında ham durum ("kapali", "hazir") yerine okunur sözcük
-    return {"hazir": _t("hazır", "ready"), "yukleniyor": _t("yükleniyor", "loading"), "kapali": _t("kapalı", "off"), "yok": _t("kurulu değil", "not installed"),
-            "hata": _t("hata", "error"), "bekliyor": _t("bekliyor", "waiting")}.get(d, d or "—")
-def hazirlik_view():  # "Suflor hazırlanıyor" sekmesi bunu yoklar; adımlar bitince (ya da süre dolunca) toplantıya geçer
-    b = STATE.get("baslatma") or {}; simdi = time.time(); at = b.get("at") or 0
-    ca = (simdi - STATE["izle_seen"]) if STATE.get("izle_seen") else None
-    try: ag_t = os.path.getmtime(os.path.join(BASE, "agenda.json"))
-    except OSError: ag_t = 0
-    try: bas = _zaman(b["baslangic"]).timestamp() if b.get("baslangic") else None
-    except ValueError: bas = None
-    son = min(at + 180, bas + 60) if bas else at + 180  # en geç: başlatmadan 3 dk sonra ya da toplantı başlangıcı + 1 dk
-    w, sm = STATE["whisper"].get("durum"), STATE["ses_model"].get("durum")
-    adim = [{"ad": "Claude oturumu açıldı (Terminal)", "ok": bool(at)},
-            {"ad": "Gündem hazırlandı", "ok": ag_t > at > 0},
-            {"ad": "Konuşma tanıma hazır", "ok": w in ("hazir", "yok") and sm in ("hazir", "yok", "hata"), "not": f"Whisper {_durum_ad(w)} · {_t('ses modeli', 'voice model')} {_durum_ad(sm)}"},
-            {"ad": "Claude izliyor", "ok": ca is not None and ca < 30 and at > 0 and STATE["izle_seen"] > at}]
-    hazir = adim[3]["ok"]
-    sec = [{"ad": PLATFORM_AD[k], "url": u} for k, u in PLATFORM_ANA.items()] if b.get("ana") and not b.get("baglanti") else []
-    return {"konu": b.get("konu"), "baglanti": b.get("baglanti"), "ana": bool(b.get("ana")), "platform": PLATFORM_AD.get(b.get("platform") or ""), "sec": sec, "adimlar": adim, "hazir": hazir, "kalan_sn": max(0, round(son - simdi)) if at else None,
-            "git": bool(at) and (hazir or simdi >= son)}
+    print(f"BAŞLAT: {konu} · rol {rol} · dil {dil}{' · takvimden' if olay else ''}{f' · gündem {len(gundem)} madde' if gundem else ''} → Terminal'de Claude"); return {"ok": True, "rol": rol, "dil": dil, "baglanti": baglanti}
 
 def sayfa(ad, yol=""):  # yazı tipleri + arayüz dili (ayar "dil": tr|en; deneme için ?dil=en)
     m = re.search(r"[?&]dil=(tr|en)\b", yol); dil = m.group(1) if m else ("en" if AYAR.get("dil") == "en" else "tr")
@@ -1885,8 +1864,6 @@ class H(BaseHTTPRequestHandler):
         if yol == "/kimlik":  # anahtarsız: yalnız imza döner (O1)
             m = re.search(r"[?&]n=([0-9a-f]{32})(?:&|$)", self.path)
             return self._json({"ok": True, "h": kimlik_imza(m.group(1)), "acilis": ACILIS}) if m else self._json({"ok": False}, 400)
-        if yol == "/hazirlik":  # sayfa kabuğu anahtarsız (veri /hazirlik.json'dan anahtarla gelir)
-            b = sayfa("hazirlik.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if yol == "/takvim" and not self._yetkili():
             # eski eklenti (anahtarsız) yalnız sürümü görür — aktarıcı yeni sürümdeyse kendini yenilesin, geçiş kendiliğinden bitsin
             m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
@@ -1909,7 +1886,6 @@ class H(BaseHTTPRequestHandler):
             return self._json(s)
         if self.path == "/geri-bildirim/onizle": return self._json(teshis_gonder("geri_bildirim", {"kullanici_metni": "(yazdığın metin)"}, onizle=True))
         if self.path == "/taslak": return self._json({"taslak": taslak_view(STATE.get("meeting"))})  # izle (SORU/ÖZET bağlamı)
-        if self.path == "/hazirlik.json": return self._json(hazirlik_view())
         if self.path.split("?")[0] == "/takvim":  # ?tam=1 davet notları ve tüm katılımcılarla (toplanti-claude.py takvim)
             # eklentinin arka planı (Teams açık olmasa da) ?v=<sürüm> ile yoklar. Chrome bu istekte Origin göndermeyebilir;
             # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)
@@ -2040,11 +2016,11 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/dosyadan-karar":  # dosyadan döküm: sor / üzerine / vazgeç / kapat / aç — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(dosyadan_karar(p))
-        if self.path == "/ac":  # takvim bağlantısı / hazırlık sekmesi Chrome'da — yalnız pano (anahtarla)
+        if self.path == "/ac":  # takvim bağlantısı / başlatılan toplantı Chrome'da — yalnız pano (anahtarla)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(chrome_ac(p))
         if self.path == "/tek-kullanim":  # anahtarlı yerel istemci (kurulum) panoyu/hazırlığı tarayıcıda açacak: 2 dk'lık tek kullanımlık adres
-            return self._json({"ok": True, "url": tek_kullanim_url("/hazirlik" if p.get("yol") == "/hazirlik" else "/")})
+            return self._json({"ok": True, "url": tek_kullanim_url("/")})
         if self.path == "/takvim-yenile":  # panodaki ↻ — arka planda
             threading.Thread(target=takvim_yenile, daemon=True).start(); return self._json({"ok": True})
         if self.path == "/geri-bildirim":  # panodan elle geri bildirim — kullanıcının metni + (isterse) teknik paket

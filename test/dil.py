@@ -9,7 +9,7 @@
 import json, os, re, sys
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KULLANAN = ["popup.js", "background.js", "content.js", "pano/pano.html", "pano/hazirlik.html"]
+KULLANAN = ["popup.js", "background.js", "content.js", "pano/pano.html"]
 YASAK = re.compile(r"\b(dashboard|board)\b", re.I)
 oku = lambda y: open(os.path.join(KOD, y), encoding="utf-8").read()
 hatalar = []
@@ -41,7 +41,7 @@ for cs in man.get("content_scripts", []):
 if 'importScripts("pano/dil.js")' not in oku("background.js"): hatalar.append("background.js: importScripts(\"pano/dil.js\") yok")
 p = oku("popup.html")
 if 'src="pano/dil.js"' not in p or p.index('src="pano/dil.js"') > p.index('src="popup.js"'): hatalar.append("popup.html: pano/dil.js popup.js'ten önce yüklenmiyor")
-for y in ("pano/pano.html", "pano/hazirlik.html"):
+for y in ("pano/pano.html",):
     if "/*__DIL_SOZLUK__*/" not in oku(y): hatalar.append(f"{y}: aktarıcının gömdüğü /*__DIL_SOZLUK__*/ yer tutucusu yok")
 if '"/*__DIL_SOZLUK__*/", pano_dosyasi("dil.js")' not in oku("relay.py"): hatalar.append("relay.py: sayfa() dil.js'i gömmüyor")
 

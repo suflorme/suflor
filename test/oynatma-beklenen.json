@@ -219,16 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 188025,
-   "sha": "66acb34ec0488160"
-  },
-  "/hazirlik": {
-   "uzunluk": 54358,
-   "sha": "0e4558a1b946eece"
+   "uzunluk": 187330,
+   "sha": "8b68aa86914ce13d"
   },
   "/mini": {
-   "uzunluk": 188025,
-   "sha": "66acb34ec0488160"
+   "uzunluk": 187330,
+   "sha": "8b68aa86914ce13d"
   },
   "/status": {
    "_ping_son": "float",
@@ -823,22 +819,6 @@
    "baslangic": "<AN>",
    "bitis": "<AN>",
    "dil": "tr"
-  },
-  "/hazirlik.json": {
-   "adimlar": [
-    {
-     "ad": "str",
-     "ok": "bool"
-    }
-   ],
-   "ana": "bool",
-   "baglanti": "NoneType",
-   "git": "bool",
-   "hazir": "bool",
-   "kalan_sn": "NoneType",
-   "konu": "NoneType",
-   "platform": "NoneType",
-   "sec": []
   }
  },
  "izle_turleri": {

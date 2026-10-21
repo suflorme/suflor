@@ -1533,9 +1533,9 @@ def brifing_iste(p):
     print("BRİFİNG: istendi"); return {"ok": True, "durum": "calisiyor"}
 def chrome_ac(p):
     # (kullanıcı, 3 Ekim denemesi) pano Safari'de açıkken takvimden toplantıya tıklayınca Teams Safari'de açıldı, eklenti
-    # sinyal vermedi. Varsayılan tarayıcı Safari kalır; toplantı bağlantısı ve hazırlık sekmesi Chrome'da açılır. Rastgele adres
-    # açılmaz: yalnız takvimdeki olayın (guvenli_baglanti'dan geçmiş) bağlantısı ya da kendi hazırlık sayfamız.
-    if p.get("hazirlik"): url = tek_kullanim_url("/hazirlik")  # Chrome'da anahtar olmayabilir (pano Safari'de)
+    # sinyal vermedi. Varsayılan tarayıcı Safari kalır; toplantı bağlantısı Chrome'da açılır. Rastgele adres açılmaz: yalnız takvimdeki
+    # olayın ya da son Başlat'ın (ikisi de guvenli_baglanti / PLATFORM_ANA'dan geçmiş) bağlantısı.
+    if p.get("baslatma"): url = (STATE.get("baslatma") or {}).get("baglanti") if time.time() - ((STATE.get("baslatma") or {}).get("at") or 0) < 120 else None
     else: url = (TAKVIM_TAM.get(str(p.get("olay") or "")) or {}).get("baglanti")
     if not url: return {"ok": False, "err": "bağlantı yok"}
     k = ["open", "-a", CHROME_APP, url] if CHROME_APP else ["open", url]

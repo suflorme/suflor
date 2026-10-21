@@ -158,14 +158,13 @@ def kos():
             while time.time() < son: istek("/ping", {"meeting": M, "panel": panel, "rows": n, "call": panel, "ver": "test"}); time.sleep(0.25)
         surum = json.loads(istek("/status"))["surum"]
         http = {}
-        for yol in ("/", "/hazirlik", "/mini"):
+        for yol in ("/", "/mini"):
             try: b = istek(yol).decode()
             except Exception as e: http[yol] = f"HATA {e}"; continue
             http[yol] = {"uzunluk": len(maskele(b, surum)), "sha": hashlib.sha256(maskele(b, surum).encode()).hexdigest()[:16]}
         http["/status"] = sekil(json.loads(istek("/status"))); http["/cards"] = sekil(json.loads(istek("/cards")))
         http["/agenda"] = json.loads(istek("/agenda"))
         for k in ("baslangic", "bitis"): http["/agenda"][k] = "<AN>"
-        http["/hazirlik.json"] = sekil(json.loads(istek("/hazirlik.json")))
     finally:
         for p in (iz, rl):
             if p: p.terminate()

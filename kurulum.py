@@ -793,7 +793,7 @@ def kur():
     import ast
     try: [ast.parse(open(y, encoding="utf-8").read()) for y in [os.path.join(KOD, "relay.py")] + sorted(glob_(os.path.join(KOD, "aktarici", "*.py")))]
     except Exception as e: sys.exit(f"HATA: relay.py sözdizimi hatalı ({e}) — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")
-    for f in ("pano.html", "hazirlik.html", "yazi.css", "dil.js", "anahtar.js"):
+    for f in ("pano.html", "yazi.css", "dil.js", "anahtar.js"):
         if not os.path.isfile(os.path.join(KOD, "pano", f)): sys.exit(f"HATA: pano/{f} eksik — kurulum yapılmadı, çalışan aktarıcı olduğu gibi bırakıldı.")
     os.makedirs(app, exist_ok=True)
     ys = []

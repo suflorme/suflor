@@ -263,8 +263,8 @@ chrome.notifications.onButtonClicked.addListener(async (id, i) => {
     const relay = await relayAdr();
     if (i === 1) return panoAc(relay);
     const r = await (await fetch(relay + "/baslat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ olay: id.slice(3) }) })).json();
-    // hazırlık sekmesi — Claude izlemeye başlayınca (en geç 3 dk / toplantı saatinde) kendisi toplantıya geçer
-    if (r.ok) chrome.tabs.create({ url: await anahtarli(relay + "/hazirlik") });
+    // toplantı hemen açılır (21 Ekim: hazırlık sekmesi kalktı; Claude dökümü baştan okur). Bağlantıyı aktarıcı süzer (bilinen toplantı adresi)
+    if (r.ok && r.baglanti) chrome.tabs.create({ url: r.baglanti });
     if (!r.ok) chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me başlatılamadı"), message: r.err || L("bilinmiyor") });
   } catch (e) { chrome.notifications.create({ type: "basic", iconUrl: "icons/128.png", title: L("Suflor.me başlatılamadı"), message: L(String(e.message || e).slice(0, 160)) }); }
 });

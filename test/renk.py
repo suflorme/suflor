@@ -23,9 +23,9 @@ kontrol(f"açık: uyarı yüzeyde ve kendi zemininde ≥ 4,5 ({min(oran(acik['wa
 C = oku("content.js"); i = C.index(".w{font:"); wa, wk = jetonlar(C[i:C.index("@media", i)]), jetonlar(C[C.index("@media (prefers-color-scheme:dark){.w{", i):C.index(".pill{", i)])
 kontrol("Teams şeridi açık renkleri renk.css'le aynı", all(acik[k] == v for k, v in wa.items() if k in acik) and len(wa) >= 7)
 kontrol("Teams şeridi koyu renkleri renk.css'le aynı", all(koyu[k] == v for k, v in wk.items() if k in koyu) and len(wk) >= 7)
-kontrol("pano ve hazırlık renk.css'i gömer", "/*__RENK__*/" in oku("pano/pano.html") and "/*__RENK__*/" in oku("pano/hazirlik.html") and 'replace("/*__RENK__*/", pano_dosyasi("renk.css"))' in oku("relay.py"))
+kontrol("pano renk.css'i gömer", "/*__RENK__*/" in oku("pano/pano.html") and 'replace("/*__RENK__*/", pano_dosyasi("renk.css"))' in oku("relay.py"))
 kontrol("eklenti penceresi ve sihirbaz bağlar", 'href="pano/renk.css"' in oku("popup.html") and 'href="/pano/renk.css"' in oku("sihirbaz/index.html") and '"/pano/renk.css"' in oku("kurulum.py"))
-kopya = [p for p in ("pano/pano.html", "pano/hazirlik.html", "popup.html", "sihirbaz/sihirbaz.css") if re.search(r"--(t3|soluk|tx|murekkep)\s*:\s*#", oku(p))]
+kopya = [p for p in ("pano/pano.html", "popup.html", "sihirbaz/sihirbaz.css") if re.search(r"--(t3|soluk|tx|murekkep)\s*:\s*#", oku(p))]
 kontrol(f"başka dosyada renk tanımı kopyası yok ({kopya or '—'})", not kopya)
 # v0.99.3: yazı boyu ve köşe yarıçapı da renk.css'te (az basamak); pano, hazırlık ve eklenti penceresinde sabit px kalmasın. Başlık yazısı (font:300 …,
 # marka yazı tipi) ve yazdırılan PDF sayfası (pano.html'de window.open'la yazılan ayrı belge) sayılmaz. Hareket azaltma tüm yüzeylerde.
@@ -37,7 +37,7 @@ def sabit(p):
         if p == "pano/pano.html" and "w.document.write(" in l: continue  # yazdırılan PDF sayfası
         x += [f"{p}:{i + 1} {m}" for m in re.findall(r"font-size:\s*[0-9.]+px|font:\s*[0-9.]+px|border-radius:\s*(?:[1-9][0-9.]*px|var\(--r\))", l)]
     return x
-sx = [y for p in ("pano/pano.html", "pano/hazirlik.html", "popup.html") for y in sabit(p)]
+sx = [y for p in ("pano/pano.html", "popup.html") for y in sabit(p)]
 kontrol(f"pano, hazırlık ve eklenti penceresinde sabit yazı boyu/köşe yok ({sx[:3] or '—'})", not sx)
 # 21 Ekim: Teams şeridi (content.js gölge DOM + kart penceresi) ve kurulum sihirbazı da aynı ölçekte; şerit renk.css'i yükleyemez, değerleri kendisi taşır
 sx = [y for p in ("content.js", "sihirbaz/sihirbaz.css") for y in sabit(p)]

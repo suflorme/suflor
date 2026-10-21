@@ -75,14 +75,14 @@ try:
     kontrol("Başlat (aynı konu): dünkü gündemin saati şimdiye çekildi, maddeler kaldı", a_["baslangic"] == time.strftime("%H:%M") and a_["items"] == ["madde"])
     # --- v0.14.0 yerel anahtar ---
     k_ = anahtar(); TEAMS = "https://teams.microsoft.com"
-    kontrol("anahtarsız okuma 401 (/status, /cards, /taslak, /hazirlik.json)", all(istek(y_, anh=False).get("kod") == 401 for y_ in ("/status", "/cards", "/taslak", "/hazirlik.json")))
+    kontrol("anahtarsız okuma 401 (/status, /cards, /taslak)", all(istek(y_, anh=False).get("kod") == 401 for y_ in ("/status", "/cards", "/taslak")))
     kontrol("pano kökeni taklit edilse de anahtarsız okuma 401", istek("/status", anh=False, koken=PANO).get("kod") == 401)
     sayfa = istek("/", anh=False, ham=True)
     kontrol("pano kabuğu anahtarsız açılır, anahtar içermez", isinstance(sayfa, str) and "SUFLOR_ANAHTAR" in sayfa and k_ not in sayfa and "__SAYFA_ANAHTAR__" not in sayfa)
-    u = istek("/tek-kullanim", {"yol": "/hazirlik"}).get("url") or ""
+    u = istek("/tek-kullanim", {"yol": "/"}).get("url") or ""
     kontrol("tek kullanımlık adres anahtarsız alınamaz", istek("/tek-kullanim", {}, anh=False).get("kod") == 401)
     s1 = istek(u.replace(URL, ""), anh=False, ham=True); s2 = istek(u.replace(URL, ""), anh=False, ham=True)
-    kontrol("tek kullanımlık adres anahtarı bir kez gömer", "/hazirlik?t=" in u and k_ in s1 and k_ not in s2)
+    kontrol("tek kullanımlık adres anahtarı bir kez gömer", "/?t=" in u and k_ in s1 and k_ not in s2)
     kontrol("kanıt görseli: yanlış ?k= 401", istek("/kanit/x/y.png?k=" + "0" * 48, anh=False).get("kod") == 401)
     # v0.97.0 (Y1): anahtarsız yazma ilk istekte kullanıcı onayı bekler (403 izin bekliyor + onay kartı); onaydan sonra kabul (ayrıntı test/izin.py)
     y0 = istek("/ping", {"panel": True}, TEAMS, anh=False)
