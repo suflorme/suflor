@@ -75,6 +75,15 @@ try:
     bak("toplantıda, karşı tarafın sorusunda, sessiz turda selam yok", [ks("Merhaba", dict(tur_, toplantida=True)), ks("Merhaba", dict(tur_, karsi="Ayla")), ks("Merhaba", dict(tur_, sesli=False))] == [None] * 3)
     g["_SELAM"].update(yuklendi=False, son=0, gun=None); bak("durum dosyadan geri yüklenir (aktarıcı yeniden başlasa da)", sa() is None and g["_SELAM"]["gun"])
     g["AYAR"]["konus_selam"] = False; g["_SELAM"]["son"] -= 3 * 3600; bak("ayar konus_selam: false kapatır", ks("Merhaba", dict(tur_)) is None and not g["selam_bekleniyor"]())
+    # v0.101.4: Türkçe arayüzde İngilizce soruda bekleme cümlesi ve selam İngilizce (kullanıcı: İngilizce konuşmada "Belgelere bakıyorum" dendi)
+    bsrc = open(os.path.join(K, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); csrc = open(os.path.join(K, "aktarici", "ceviri.py"), encoding="utf-8").read()
+    exec(csrc[csrc.index("_EN_SOZ ="):csrc.index("def ceviri_ekle")], g); exec(bsrc[bsrc.index("_DIL_EN = set("):bsrc.index("def okuma_dili(")], g)
+    g["AYAR"].pop("konus_selam", None)
+    en_b = [bc("belge", g["konus_soru_dili"]("Can you check the documents for the budget?")) for _ in range(10)]
+    bak(f"İngilizce soruda bekleme cümlesi İngilizce ({en_b[0]}), Türkçe soruda Türkçe", all(c in g["BEKLE_TUR_EN"]["belge"] + g["BEKLE_GENEL"]["en"] for c in en_b)
+        and bc("belge", g["konus_soru_dili"]("Bütçe belgelerine bakar mısın?")) in g["BEKLE_TUR"]["belge"])
+    bak("İngilizce soruya İngilizce selam (karşılık, sabah, tekrar)", sm("Good morning, what's on my calendar today?", "ilk", 20) == "Good morning Deniz."
+        and sm("What do I have today?", "ilk", 9) == "Good morning Deniz." and sm("What about tomorrow then?", "tekrar") == "Hello again Deniz." and sm("Bugün ne var?", "ilk", 9) == "Günaydın Deniz.")
     bak("not metni: yeniden selamlama deme", "yeniden selamlama" in g["selam_notu"]("Günaydın Deniz.") and g["selam_notu"](None) == "")
 finally:
     if not hata: shutil.rmtree(T, ignore_errors=True)

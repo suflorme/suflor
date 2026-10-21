@@ -256,7 +256,8 @@ def main():
             # karma dil (whisper.cpp): dil sabitken whisper.cpp İngilizce konuşmayı Türkçeye "çevirip" anlamsız metin yazıyor (20 Ekim terimli kayıt:
             # "Let me switch to English…" → "İngilizce bir zaman, çünkü…"; MLX yazmıyordu). Karşı kanalda dil kendiliğinden bulunur (yalnız tr/en;
             # başkası çıkarsa sabit dilde yeniden): parça ~0,6 → ~1,1 sn. Kullanıcının kanalı ve Konuş sabit dilde kalır (hız orada önemli).
-            oto = bool(CPP) and p.get("kanal") == "karsi" and p.get("dil") in ("tr", "en")
+            # v0.101.4: Konuş da (oto_dil) — yalnız sorunun ilk parçasında; aktarıcı sonraki parçaları bulunan dille gönderir (+0,5 sn parça başına yalnız bir kez)
+            oto = bool(CPP) and (p.get("kanal") == "karsi" or p.get("oto_dil") is True) and p.get("dil") in ("tr", "en")
             r = coz(a, language=None if oto else (p.get("dil") or None), initial_prompt=istem,
                                        condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             if oto and r.get("language") not in ("tr", "en"):

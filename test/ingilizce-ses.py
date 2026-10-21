@@ -11,7 +11,7 @@ def ok(ad, k):
     if not k: HATA.append(ad)
 src = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read()
 cv = open(os.path.join(KOD, "aktarici", "ceviri.py"), encoding="utf-8").read()
-ag = ast.parse(src); ad_ = {"okuma_dili", "kisilik_en_sesi", "seslendir"}
+ag = ast.parse(src); ad_ = {"metin_dili", "okuma_dili", "kisilik_en_sesi", "seslendir"}
 govde = [n for n in ag.body if (isinstance(n, ast.FunctionDef) and n.name in ad_) or (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("_DIL_EN", "_DIL_TR", "_DIL") for t in n.targets))]
 TEL = []; K = {"k": {"yerel_ses": "pocket:wite:male_1", "yerel_ses_en": "pocket:en:michael"}, "motor": "pocket", "pocket": True}
 ns = {"re": re, "time": time, "os": os, "AYAR": {"konusma": True}, "ARAYUZ_DILI": "tr", "SES": {"q": [], "isci": True}, "SES_K": threading.Condition(),
@@ -45,4 +45,17 @@ K["motor"] = "mac"; q = sor("Happy to help, Sir."); K["motor"] = "pocket"
 ok(f"⚙ Ayarlar'da Mac sesi → dokunulmaz: {q}", q == ["Happy to help, sör."])
 ns["ARAYUZ_DILI"] = "en"; q = sor("Happy to help, Sir."); ns["ARAYUZ_DILI"] = "tr"
 ok(f"İngilizce arayüzde (beta) değişiklik yok: {q}", q == ["Happy to help, sör."])
+# v0.101.4: Konuş'ta Whisper'ın dili (bas-konus.py konus_dil_istek / konus_dil_kaydet): yalnız sorunun ilk parçası (≥ 2 sn) otomatik, sonrakiler bulunan dille,
+# kısa söz ve "yazayım mı?" cevabı son 10 dk'nın dilinde (yoksa Türkçe); ayar konus_oto_dil: false ve İngilizce arayüz eski davranış
+bk = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
+kd = {"time": time, "threading": threading, "AYAR": {}, "ARAYUZ_DILI": "tr", "SORU": {"aktif": None}, "AKIS": {"kilit": threading.Lock(), "dil": None, "nesil": 1}, "print": lambda *a, **k: None}
+exec(bk[bk.index("KONUS_DIL_SN, KONUS_DIL_EN_AZ_SN ="):bk.index("def _akis_kesim(")], kd); di, dk = kd["konus_dil_istek"], kd["konus_dil_kaydet"]
+r = [di(0, 3.5), di(0, 1.2)]; dk("en", 1); r += [di(1, 2.0), di(0, 1.2)]; kd["AKIS"]["dil"] = None; r += [di(0, 3.0)]
+kd["SORU"]["aktif"] = "e1"; r += [di(0, 3.0)]; kd["SORU"]["aktif"] = None
+kd["_KDIL"]["t"] -= 700; r += [di(0, 1.2)]
+ok(f"Whisper dili: ilk parça otomatik, kısa söz Türkçe; İngilizce bulununca sonraki parça ve kısa söz İngilizce; yeni soru yine otomatik; 'yazayım mı?' cevabı son dilde, otomatik değil; 10 dk sonra Türkçe: {r}",
+   r == [("tr", True), ("tr", False), ("en", False), ("en", False), ("en", True), ("en", False), ("tr", False)])
+dk("tr", 0); ok("eski akıştan (nesil farklı) gelen dil bu sorunun parçalarına yazılmaz", kd["AKIS"]["dil"] is None and kd["_KDIL"]["son"] == "tr")
+kd["AYAR"]["konus_oto_dil"] = False; a1 = di(0, 3.0); kd["AYAR"].pop("konus_oto_dil"); kd["ARAYUZ_DILI"] = "en"; a2 = di(0, 3.0)
+ok(f"ayar konus_oto_dil: false → Türkçe sabit; İngilizce arayüz → İngilizce sabit: {a1} {a2}", a1 == ("tr", False) and a2 == ("en", False))
 print("ingilizce-ses: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

@@ -518,7 +518,11 @@ BEKLE_TUR = {"takvim": ["Takvimine bakıyorum.", "Takvime bakayım."], "sayi": [
              "not": ["Notlara göz atıyorum.", "Notlara bakayım."], "gorusme": ["Görüşme kayıtlarına bakıyorum.", "Görüşmelere bakayım."],
              "belge": ["Belgelere göz atıyorum.", "Belgelere bakayım."], "tablo": ["Tablolara bakıyorum."], "sunum": ["Sunumlara bakayım."], "analiz": ["Analizlere bakayım."]}
 BEKLE_TUR["plan"] = ["Plana bakıyorum.", "İş listesine bakayım."]; BEKLE_TUR["kayit"] = ["Kayıtlara bakıyorum.", "Kayıtlara bakayım."]
-BEKLE_TUR_EN = {"takvim": ["Checking your calendar."], "sayi": ["Pulling the numbers."], "not": ["Looking at the notes."], "plan": ["Checking the plan."], "kayit": ["Checking the records."]}
+BEKLE_TUR_EN = {"takvim": ["Checking your calendar.", "Let me look at your calendar."], "sayi": ["Pulling the numbers.", "Let me get the numbers."],
+                "not": ["Looking at the notes.", "Let me check the notes."], "plan": ["Checking the plan.", "Let me look at the task list."],
+                "kayit": ["Checking the records.", "Let me check the records."], "gorusme": ["Looking at the conversation notes.", "Let me check the conversations."],
+                "belge": ["Looking through the documents.", "Let me check the documents."], "tablo": ["Checking the spreadsheets."], "sunum": ["Let me check the slides."],
+                "analiz": ["Let me look at the analysis."]}  # v0.101.4: Türkçe arayüzde İngilizce soruda da (kullanıcı: İngilizce konuşmada "Belgelere bakıyorum" dendi)
 BEKLE_TUR_ESLE = {"toplanti": "not", "defter": "not"}  # ön aramanın sonuç türü → cümle türü
 BEKLE_SAYI_RX = re.compile(r"(?i)(\bkaç\b|kaç (tane|kişi|adet)|\bsayı\w*|\brakam\w*|\btoplam\w*|\boran\w*|yüzde|\badet\w*|\bciro\w*|\bistatistik|en (çok|fazla|az)\b|"
                            r"how many|how much|\bnumbers?\b|\btotal\b|\bcount\b|percent)")
@@ -540,9 +544,10 @@ def bekleme_turu(soru="", arac=None, tur_ad=None):  # → BEKLE_TUR anahtarı ya
     if TAKVIM_UZAK_RX.search(soru or "") or TAKVIM_BOS_RX.search(soru or "") or BEKLE_TAKVIM_RX.search(soru or ""): return "takvim"
     if BEKLE_SAYI_RX.search(soru or ""): return "sayi"
     return "not" if a in ("Grep", "Glob", "Read") else None
-def bekleme_cumlesi(tur_ad=None):
+def konus_soru_dili(soru): return "en" if ARAYUZ_DILI == "en" or ("metin_dili" in globals() and metin_dili(soru) == "en") else "tr"  # v0.101.4: sorunun dili — bekleme cümlesi ve selam (brifing-ses.py metin_dili)
+def bekleme_cumlesi(tur_ad=None, dil=None):  # dil: sorunun dili (v0.101.4); yoksa arayüz dili
     import random
-    tr = ARAYUZ_DILI == "tr"
+    tr = (dil or ("tr" if ARAYUZ_DILI == "tr" else "en")) == "tr"
     aday = list((BEKLE_TUR if tr else BEKLE_TUR_EN).get(tur_ad) or []) or BEKLE_GENEL["tr" if tr else "en"]
     if len(aday) == 1: aday = aday + BEKLE_GENEL["tr" if tr else "en"][:2]  # tek cümlelik türde de art arda aynısı olmasın
     aday = [c for c in aday if c not in _BEKLE["son"]] or [c for c in aday if c != (_BEKLE["son"] or [None])[-1]] or aday
@@ -570,11 +575,12 @@ def selam_bekleniyor(): return AYAR.get("konus_selam") is not False and not topl
 def selam_metni(soru, asama, saat=None):  # → selam cümlesi ya da None
     import random
     m = SELAM_RX.search(soru or ""); ad = (str(AYAR.get("ad") or "").split() or [""])[0]
-    if m: s = SELAM_KARSILIK[m.group(1).lower()]; s = ("Tekrar merhaba" if s in ("Merhaba", "Selam") else s) if asama == "tekrar" and ARAYUZ_DILI == "tr" else s
-    elif asama == "tekrar": s = _t("Tekrar merhaba", "Hello again")
+    en = konus_soru_dili(soru) == "en"; T = lambda a, b: b if en else a  # v0.101.4: İngilizce soruya İngilizce selam
+    if m: s = SELAM_KARSILIK[m.group(1).lower()]; s = ("Tekrar merhaba" if s in ("Merhaba", "Selam") else s) if asama == "tekrar" and not en else s
+    elif asama == "tekrar": s = T("Tekrar merhaba", "Hello again")
     elif asama == "ilk":
         h = time.localtime().tm_hour if saat is None else saat
-        s = (_t("Günaydın", "Good morning") if 5 <= h < 11 else _t("İyi akşamlar", "Good evening") if h >= 18 else random.choice(_t(["Merhaba", "Selam"], ["Hello", "Hi"])))
+        s = (T("Günaydın", "Good morning") if 5 <= h < 11 else T("İyi akşamlar", "Good evening") if h >= 18 else random.choice(T(["Merhaba", "Selam"], ["Hello", "Hi"])))
     else: return None
     return f"{s} {ad}." if ad else f"{s}."
 def konus_selam(soru, tur):  # her soruda çağrılır: selam gerekiyorsa okur ve döner; son soru zamanını yazar
@@ -881,7 +887,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 tur.setdefault("araclar", []).append(str(e["content_block"].get("name") or "?")[:20]); tur["_arac"] = [str(e["content_block"].get("name") or ""), ""]
                 if not tur.get("t_arac"): tur["t_arac"] = time.time()
                 if not tur.get("t_ses") and not tur.get("bakiyor") and tur.get("sesli", True):  # dosya/veritabanı araması sessiz geçmesin; v0.94.0: konuya özgü
-                    tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur"))); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t))
+                    tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur")), konus_soru_dili(tur.get("soru"))); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t))
                     print(f"KONUŞ: araç cümlesi ({tur['_arac'][0][:20]}): {c}")
                 tur["tampon"] = ""  # araçtan önce yarım kalan anlatım okunmasın
             if j.get("type") == "stream_event" and e.get("type") == "content_block_delta" and (e.get("delta") or {}).get("type") == "input_json_delta" and tur.get("_arac"):
@@ -1066,7 +1072,28 @@ AKIS = {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "
 # v0.98.1 (20 Ekim, test/sohbet.py kararsızlığının kökü): sıfırlamada yoldaki parça geri dönünce bekleyen sayacını eksiltip (−1) sonraki turu metin gelmeden
 # "boş" bitiriyor, metnini de yeni turun aynı sırasına yazabiliyordu. Her sıfırlama nesli artırır; eski nesilden dönen parça hiçbir şeye dokunmaz.
 def _akis_sifirla():
-    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, iz={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None, nesil=AKIS.get("nesil", 0) + 1)
+    with AKIS["kilit"]: AKIS.update(pcm=bytearray(), kesik=0, metin={}, iz={}, bekleyen=0, sira=0, hihi_t=0, hihi_durak=None, dil=None, nesil=AKIS.get("nesil", 0) + 1)
+# --- Konuş'ta Whisper'ın dili (v0.101.4, kullanıcı 21 Ekim: "Whisper'ı da otomatik dile çevir"): dil sabitken (tr) İngilizce soru Türkçeye "çevrilip" bozuk
+# yazılıyordu ("TÜRKİŞ", "Mayburu"). Ölçüm (_yedek/test-araclari/konus-dil, whisper.cpp): İngilizce hata %70 → %0, Türk aksanlı İngilizce %59 → %36, Türkçe
+# sohbet değişmedi (%0), ama otomatik dil parça başına 0,54 → 1,03 sn ve kısa Türkçe sözde bir kez yanlış dil ("Peki." → "Pick you."). Bu yüzden yalnız
+# sorunun ilk parçası (≥ KONUS_DIL_EN_AZ_SN; çoğu zaman konuşurken çözülür) otomatik; sonraki parçalar bulunan dille sabit; kısa söz ve "yazayım mı?" cevabı
+# son KONUS_DIL_SN içindeki dilde (yoksa Türkçe). Ayar konus_oto_dil: false eski davranış. İngilizce arayüzde (beta) dokunulmaz.
+KONUS_DIL_SN, KONUS_DIL_EN_AZ_SN = 600, 2.0
+_KDIL = {"son": None, "t": 0.0}
+def konus_dil_son(): return _KDIL["son"] if _KDIL["son"] and time.time() - _KDIL["t"] < KONUS_DIL_SN else "tr"
+def konus_dil_istek(sira, sn):  # → (Whisper'a gidecek dil, otomatik mi)
+    if ARAYUZ_DILI == "en": return "en", False
+    if AYAR.get("konus_oto_dil") is False: return "tr", False
+    if SORU.get("aktif"): return konus_dil_son(), False
+    with AKIS["kilit"]: d = AKIS.get("dil")
+    if sira > 0 and d: return d, False
+    return konus_dil_son(), sira == 0 and sn >= KONUS_DIL_EN_AZ_SN
+def konus_dil_kaydet(d, nesil=None):  # Whisper'ın bulduğu dil (whisper-hat'tan): sorunun sonraki parçaları ve kısa sözler bu dilde
+    if d not in ("tr", "en"): return
+    if d != _KDIL["son"]: print(f"KONUŞ: soru dili {d}")
+    _KDIL.update(son=d, t=time.time())
+    with AKIS["kilit"]:
+        if nesil is None or AKIS.get("nesil", 0) == nesil: AKIS["dil"] = d
 def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesim noktası (bayt) ya da None; kısa kuyrukta ≥ AKIS_DURAK_SN duraksama (v0.80.4)
     n = len(b) - bas
     if n < int(AKIS_DURAK_EN_AZ_SN * WH_SR * 2): return None
@@ -1095,8 +1122,9 @@ def _akis_gonder(baslangic, bitis, sira):
             AKIS["kosul"].notify_all()
         al_ = is_.get("t_al"); bk = f" · sırada {(al_ - t0) * 1000:.0f} ms, işçi {(time.time() - al_) * 1000:.0f} ms" if al_ else ""  # v0.91.0 teşhis: yavaşlık bekleme mi işleme mi
         print(f"KONUŞ: akış parçası {sira + 1} döküldü ({(time.time() - t0) * 1000:.0f} ms, {len(parca) / 2 / WH_SR:.1f} sn ses{bk}){' — HATA ' + str(hata) if hata else ''}")
+    dil, oto = konus_dil_istek(sira, len(parca) / 2 / WH_SR)
     is_.update({"id": f"bas-akis-{int(time.time() * 1000)}-{sira}", "bas": True, "kanal": "bas", "baslik": None, "pcm": parca, "t0": time.time() - len(parca) / 2 / WH_SR,
-                "t1": time.time(), "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri})
+                "t1": time.time(), "kuyruga": time.time(), "dil": dil, "oto_dil": oto, "akis_nesil": nesil, "geri": geri})
     wh_bas_sira(is_); _isci_baslat()
 def konus_parca(p):  # pano/menü: kayıt sürerken yeni ses (base64 16 kHz int16)
     if _KS["tur"] or AYAR.get("konus_akis") is False: return {"ok": True, "atlandi": True}
@@ -1263,8 +1291,9 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
         _konus_sor(metin, tur)
     if _akis_birlestir(pcm, geri): tur["akis"] = True; return {"ok": True}
     _akis_sifirla()
+    dil, oto = konus_dil_istek(0, len(pcm) / 2 / WH_SR)
     is_.update({"id": f"bas-{int(time.time() * 1000)}", "bas": True, "kanal": "bas", "baslik": None, "pcm": pcm, "t0": time.time() - sn, "t1": time.time(),
-                "kuyruga": time.time(), "dil": "en" if ARAYUZ_DILI == "en" else "tr", "geri": geri})
+                "kuyruga": time.time(), "dil": dil, "oto_dil": oto, "geri": geri})
     wh_one_al(is_); _isci_baslat()
     return {"ok": True}
 KONUS_SES_SOZ = {"hı", "hıhı", "hı hı", "hm", "hmm", "hım", "ıı", "ıh", "ee", "eee", "em", "mm", "mhm", "uh", "um", "ah", "oh", "a", "e"}
@@ -1433,7 +1462,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["bakiyor"] = True
         import random
         if random.random() < 1 / 3 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): düşünme tepki sesi"); return
-        c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur_ad=tur_ad)); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t)); print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): {c}")
+        c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur_ad=tur_ad), konus_soru_dili(tur.get("soru"))); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t)); print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): {c}")
     def bekci(sn):
         t = time.time()
         while time.time() - t < sn:

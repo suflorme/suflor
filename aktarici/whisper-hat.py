@@ -335,6 +335,7 @@ def _isci_dongu():
             if k and getattr(k, "dil_son", None) in ("tr", "en") and k.dil_son != dil and time.time() - getattr(k, "dil_son_t", 0) < 60: istek["dil"] = k.dil_son
         # kullanıcı kanalında ses izi: oda açıksa ad için, değilse yalnız ses kilidi için ("Claude:" komutu kullanıcının sesi mi; ayar ses_kilidi)
         if is_["kanal"] == "ben" and not is_.get("bas") and (oda_acik() or AYAR.get("ses_kilidi", True) is not False): istek["oda"] = is_["oda"] = True
+        if is_.get("bas") and is_.get("oto_dil"): istek["oto_dil"] = True  # v0.101.4: Konuş sorusunun ilk parçası — dil Whisper'dan (yalnız tr/en)
         if is_.get("iz_iste"): istek["iz_iste"] = True  # sohbet sorusu: ses izi süzgeci (aktarici/sohbet.py sohbet_ses_izi_red)
         try:
             _ISCI["p"].stdin.write(json.dumps(istek) + "\n"); _ISCI["p"].stdin.flush()
@@ -342,6 +343,7 @@ def _isci_dongu():
         except Exception as e: j = {"hata": f"{e.__class__.__name__}"}
         if is_.get("bas"):  # bas-konuş: metin dökümüne değil, soruya (konus_metin)
             if is_.get("iz_iste"): is_["iz"] = j.get("iz")
+            if is_.get("oto_dil") and j.get("dil") in ("tr", "en") and "konus_dil_kaydet" in globals(): konus_dil_kaydet(j["dil"], is_.get("akis_nesil"))
             threading.Thread(target=is_["geri"], args=(" ".join(str(j.get("text") or "").split()), j.get("hata")), daemon=True).start()
             if j.get("hata"): _isci_kapat("hata")
             continue

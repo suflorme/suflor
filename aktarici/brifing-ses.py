@@ -417,15 +417,17 @@ _DIL_EN = set("i i'm i'll i've i'd you you're you've it's that's there's we're t
               "the and is are to of we that it for in on with this be have will can was were what so but not they our just do does did here let".split())
 _DIL_TR = set("ve bir bu da de ne için ama çok var yok mi mı mu mü ben sen biz o şey gibi daha olarak şimdi evet hayır tamam yani peki hadi tabii merhaba selam".split())
 _DIL = {"son": None, "t": 0.0}
-def okuma_dili(metin):  # → "tr" | "en"
+def metin_dili(metin):  # → "tr" | "en" | None (belirsiz); durum tutmaz (Konuş'ta sorunun dili: bekleme cümlesi, selam)
     m = metin or ""
-    if re.search(r"[çğıöşüÇĞİÖŞÜ]", m): d = "tr"
-    else:
-        d = dil_tahmin(m) if "dil_tahmin" in globals() else None
-        if d is None:
-            w = re.findall(r"[a-z']+", m.lower())
-            en, tr = sum(x in _DIL_EN for x in w), sum(x in _DIL_TR for x in w)
-            d = "en" if en >= 1 and en > tr else "tr" if tr >= 1 else None
+    if re.search(r"[çğıöşüÇĞİÖŞÜ]", m): return "tr"
+    d = dil_tahmin(m) if "dil_tahmin" in globals() else None
+    if d is None:
+        w = re.findall(r"[a-z']+", m.lower())
+        en, tr = sum(x in _DIL_EN for x in w), sum(x in _DIL_TR for x in w)
+        d = "en" if en >= 1 and en > tr else "tr" if tr >= 1 else None
+    return d
+def okuma_dili(metin):  # → "tr" | "en"
+    d = metin_dili(metin)
     if d: _DIL.update(son=d, t=time.time()); return d
     return _DIL["son"] if _DIL["son"] and time.time() - _DIL["t"] < 20 else "tr"
 def kisilik_en_sesi(k=None):  # kişiliğin İngilizce yerel sesi ("en:michael") ya da None (Pocket kurulu değilse de None)
