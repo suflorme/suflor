@@ -47,7 +47,7 @@ Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı Chrome'da açılır (Chro
 Sihirbazı kapatırsan aynı komutu yeniden çalıştır; kaldığın adımdan sürer.
 
 **Asistan:** sihirbazda asistanına ad koyarsın; ona adıyla seslenirsin ("Defne, yarın neler var?"). Hitap (siz/sen), tarz (ölçülü ya da rahat
-ve esprili) ve ses (Mac'in Türkçe sesi; Pocket kuruluysa kadın ya da erkek sesi) seçilir; istersen toplantı dışında konuşan ikinci bir asistan
+ve esprili) ve ses (Mac'in Türkçe sesi ya da doğal Türkçe kadın/erkek sesi: Pocket, seçince indirilir) seçilir; istersen toplantı dışında konuşan ikinci bir asistan
 eklersin. Sihirbaz kişilik dosyasını `~/Library/Application Support/Suflor/kisilik/<ad>.md` olarak yazar (aynı adlı dosya varsa üzerine yazmaz)
 ve ayara bağlar (`kisilik`, ikinci asistan `kisilik_toplanti_disi`). Atlarsan asistanın adı Suflor olur. Dosyayı elle de düzenleyebilirsin
 (biçim: `sablon/kisilik-ornek.md`); asistanları sonradan ⚙ Ayarlar → Konuş'ta değiştirirsin.
@@ -93,8 +93,13 @@ Karşı taraf adını söyleyince panoda ve şeritte hemen "Adın geçti — kim
 Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)
 — sesli çeviri, fısıltı, sesli özet ve cevaplar bu sesle okunur (Mac'te, yerel); ses dosyası Suflor.me ile gelmez. Hız: `"piper_hiz"`
 (varsayılan 1,0), kısa okumalar `"piper_hiz_kisa"` (1,15). Piper yoksa ya da hata verirse Mac sesi.
-En doğal yerel Türkçe ses: Pocket TTS (kör dinlemede Piper'dan ve Mac sesinden belirgin iyi; işlemcide çalışır, ilk ses ~0,03 sn, ~1,6 GB bellek).
-Kendi Python ortamına (Python 3.11: `pip install pocket-tts pocket-tts-turkish`) kurup modelleri bir kez indir: `wite-tech/pocket-tts-turkish`
+En doğal yerel Türkçe ses: Pocket TTS (kör dinlemede Piper'dan ve Mac sesinden belirgin iyi; işlemcide çalışır, ilk ses ~0,03 sn, ~1,3 GB bellek).
+**Sihirbazdan:** asistan adımında "Kadın sesi" ya da "Erkek sesi" seçilince arka planda kurulur (seçmek indirme onayıdır; varsayılan Mac sesi):
+Python paketleri PyPI'dan (`pocket-gereksinim.txt`, sabit sürümler, ~0,9 GB) ve ses modeli Hugging Face'ten (`wite-tech/pocket-tts-turkish`, sabit sürüm,
+~0,4 GB); toplam ~1,3 GB, hızlı bağlantıda ~2 dk. Yer: ortak klasörde `pocket-venv` + `pocket-modeller` (Python 3.12, belge çevirmeyle ortak).
+Deneme açılışı geçince ayara `pocket_python`, `pocket_hf` ve `ses_motoru: pocket` yazılır; olmazsa asistan Mac sesiyle konuşur, sihirbazda "Yeniden dene"
+ya da sonraki güncelleme yeniden dener (günlük: `~/Library/Application Support/Suflor/pocket-kur.log`; elle: `python3 kurulum.py pocket`).
+**Elle (başka model ya da ses):** kendi Python ortamına (≥ 3.10: `pip install pocket-tts pocket-tts-turkish`) kurup modelleri bir kez indir: `wite-tech/pocket-tts-turkish`
 (3 kadın + 3 erkek hazır ses, duygu etiketi; CC-BY-4.0) ve istersen `alperiox/pocket-tts-turkish` (MIT; hazır sesi yok, wite-tech'in seslerini örnek alır).
 Ayar: `"pocket_python"` (o ortamın python'u), `"pocket_hf"` (modellerin indirildiği HF_HOME), `"ses_motoru": "pocket"` ve `"pocket_ses": "wite:female_2"`;
 kişilik dosyasında `yerel_ses: pocket:alperiox:female_2` o kişiliğe ayrı ses verir (Gemini toplantıya ayrıldığında da yerel okumalar bu sesle).
@@ -128,3 +133,7 @@ Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
 
 ## Lisans
 MIT — ayrıntı [LICENSE](LICENSE).
+
+İsteğe bağlı indirilen bileşenler Suflor.me ile gelmez, kendi lisanslarıyla kullanılır: doğal Türkçe ses modeli
+[wite-tech/pocket-tts-turkish](https://huggingface.co/wite-tech/pocket-tts-turkish) (CC-BY-4.0, wite-tech), Pocket TTS (Kyutai, MIT),
+pocket-tts-turkish paketi (Apache-2.0); elle kurulursa [alperiox/pocket-tts-turkish](https://huggingface.co/alperiox/pocket-tts-turkish) (MIT).

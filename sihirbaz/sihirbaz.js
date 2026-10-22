@@ -48,6 +48,10 @@
       as_ad: "Adı", as_ad_ph: "örneğin Defne", as_ad_i: "Kısa, kolay söylenen bir ad seç; iki-üç heceli ad, konuşma tanımanın en kolay yakaladığıdır.",
       as_bicim: "Sana nasıl hitap etsin?", as_siz: "siz", as_sen: "sen", as_tarz: "Tarzı", as_olculu: "Ölçülü", as_rahat: "Rahat ve esprili",
       as_ses: "Sesi", as_mac: "Mac'in Türkçe sesi", as_kadin: "Kadın sesi", as_erkek: "Erkek sesi", as_dinle: "Dinle", as_okuyor: "Okuyor…",
+      as_pk_indir: "Kadın ve erkek ses bu Mac'e indirilir (~1,3 GB, birkaç dakika); seçince başlar. İstemezsen Mac'in sesi kalır.",
+      as_pk_iniyor: "Doğal Türkçe ses indiriliyor", as_pk_bekle: "Bitene kadar asistan ve Dinle Mac sesiyle okur; kurulumun devam edebilir.",
+      as_pk_hata: "Doğal ses kurulamadı; asistan şimdilik Mac sesiyle konuşur.", as_pk_yeniden: "Yeniden dene",
+      as_pk_atif: "Ses modeli: wite-tech/pocket-tts-turkish (CC-BY-4.0) · Pocket TTS, Kyutai (MIT). Hugging Face ve PyPI'dan indirilir; ses ve metin Mac'ten çıkmaz.",
       as_iki: "Toplantı dışında ayrı bir asistan ister misin?", as_iki_a: "Örneğin toplantıda ölçülü bir asistan, kendi başınayken daha rahat konuşan ikinci bir asistan. Toplantıda öbürüne adıyla seslenirsen o cevaplar.",
       as_toplanti: "Toplantıda", as_disi: "Toplantı dışında", as_atla_a: "Atlarsan asistanın adı Suflor olur; sonra kurulumu yeniden açarak ad koyabilirsin.",
       as_ayni: "İki asistanın adı farklı olmalı.", as_suflor: "Suflor adı uygulamanın kendisine ayrıldı; başka bir ad seç.", as_gecersiz: "Ad 2–24 harf olmalı; rakam ve işaret kullanma.",
@@ -139,6 +143,10 @@
       as_ad: "Name", as_ad_ph: "e.g. Robin", as_ad_i: "Pick a short name that's easy to say; two or three syllables are easiest for speech recognition to catch.",
       as_bicim: "How should it address you?", as_siz: "formal", as_sen: "informal", as_tarz: "Style", as_olculu: "Measured", as_rahat: "Relaxed and witty",
       as_ses: "Voice", as_mac: "Mac voice", as_kadin: "Female voice", as_erkek: "Male voice", as_dinle: "Listen", as_okuyor: "Speaking…",
+      as_pk_indir: "The female and male voices are downloaded to this Mac (~1.3 GB, a few minutes) when you pick one. Otherwise the Mac voice stays.",
+      as_pk_iniyor: "Downloading the natural Turkish voice", as_pk_bekle: "Until it finishes, the assistant and Listen use the Mac voice; you can continue setup.",
+      as_pk_hata: "The natural voice could not be installed; the assistant uses the Mac voice for now.", as_pk_yeniden: "Try again",
+      as_pk_atif: "Voice model: wite-tech/pocket-tts-turkish (CC-BY-4.0) · Pocket TTS, Kyutai (MIT). Downloaded from Hugging Face and PyPI; voice and text stay on this Mac.",
       as_iki: "Do you want a separate assistant outside meetings?", as_iki_a: "For example, a measured assistant in meetings and a more relaxed one when you're on your own. In a meeting, call the other one by name and it answers.",
       as_toplanti: "In meetings", as_disi: "Outside meetings", as_atla_a: "If you skip, the assistant is called Suflor; you can name it later by opening setup again.",
       as_ayni: "The two assistants need different names.", as_suflor: "Suflor is the app's own name; pick another.", as_gecersiz: "Use 2–24 letters; no digits or symbols.",
@@ -222,7 +230,7 @@
   };
   let kayitSira = Promise.resolve();
   const kaydet = () => { kayitSira = kayitSira.then(() => api("kaydet", { dil: D.dil, adim: (D.durum || {}).mod === "hazirlik" ? D.kayitAdim : D.adim, adim_id: (D.durum || {}).mod === "hazirlik" ? D.kayitAdimId : ((gorunen()[D.adim] || {}).id), cevap: D.cevap })).catch(() => {}); return kayitSira; };  // hazırlık kipinde kurulumun kaldığı adım korunur
-  async function durumAl() { try { D.durum = await api("durum"); } catch (e) { D.durum = D.durum || {}; } indirmeGoster(); return D.durum; }
+  async function durumAl() { try { D.durum = await api("durum"); } catch (e) { D.durum = D.durum || {}; } indirmeGoster(); if (C.asistan) pkGoster(); return D.durum; }
 
   // örnek veriler (önizleme)
   function ornek(yol) {
@@ -291,7 +299,15 @@
   }
   // ---------- asistan ----------
   const AS_BOS = tarz => ({ ad: "", bicim: "siz", tarz, ses: "mac" });
-  const asPocket = () => !!(((D.durum || {}).asistan || {}).pocket) && D.dil !== "en";
+  const asPocket = () => !!(((D.durum || {}).asistan || {}).pocket) && D.dil !== "en";  // kurulu
+  const asTr = () => D.dil !== "en";  // Pocket Türkçe: kadın/erkek yalnız Türkçe kurulumda; kurulu değilse seçince indirilir (S135)
+  function pkDurum() {  // ses satırlarının altında: indirme bilgisi, durum, atıf (CC-BY)
+    const k = ((D.durum || {}).asistan || {}).pocket_kur || {}, sec = C.asistan.liste.slice(0, C.asistan.iki ? 2 : 1).some(x => x.ses && x.ses !== "mac");
+    const ust = asPocket() ? "" : k.durum === "iniyor" ? `<b>${esc(t.as_pk_iniyor)} · %${k.yuzde || 0}</b><br>${esc(t.as_pk_bekle)}<br>`
+      : k.durum === "hata" && sec ? `${esc(t.as_pk_hata)}${k.mesaj ? " (" + esc(k.mesaj) + ")" : ""} ${dug("pk-yeniden", t.as_pk_yeniden)}<br>` : `${esc(t.as_pk_indir)}<br>`;
+    return ust + `<span class="ipucu">${esc(t.as_pk_atif)}</span>`;
+  }
+  const pkGoster = () => { const e = $("[data-pk-durum]"); if (e) e.innerHTML = pkDurum(); };
   function asistanHazirla() {
     if (C.asistan && Array.isArray(C.asistan.liste)) return;
     const m = (D.durum || {}).asistan || {}, tp = m.toplanti, ds = m.disi;
@@ -308,7 +324,7 @@
   }
   const asYonga = (i, alan, deger, yazi, secili) => `<button class="yonga" type="button" data-as="${alan}" data-i="${i}" data-deger="${deger}" aria-pressed="${!!secili}">${esc(yazi)}</button>`;
   function asistanBlok(i, iki) {
-    const x = C.asistan.liste[i], pk = asPocket(), ses = pk ? x.ses : "mac", h = x.ad.trim() ? asistanHata(i) : null;
+    const x = C.asistan.liste[i], pk = asTr(), ses = pk ? x.ses : "mac", h = x.ad.trim() ? asistanHata(i) : null;
     const var_ = Object.values((D.durum || {}).asistan || {}).some(m => m && m.ad && m.ad.toLocaleLowerCase("tr") === x.ad.trim().toLocaleLowerCase("tr"));
     return `${iki ? `<h2 class="etiket" style="margin-top:${i ? 18 : 0}px">${esc(i ? t.as_disi : t.as_toplanti)}</h2>` : ""}
       <div class="alan"><label for="as_ad_${i}">${esc(t.as_ad)}</label><input type="text" id="as_ad_${i}" data-as-ad="${i}" value="${esc(x.ad)}" placeholder="${esc(t.as_ad_ph)}" autocomplete="off" maxlength="24">
@@ -365,6 +381,7 @@
       devamEt: () => { asistanHazirla(); C.asistan.atla = false; kaydet(); },
       icerik: () => { asistanHazirla(); const s = C.asistan, iki = !!s.iki;
         return `${(iki ? [0, 1] : [0]).map(i => asistanBlok(i, iki)).join("")}
+          ${asTr() ? `<p class="dipnot" data-pk-durum>${pkDurum()}</p>` : ""}
           <label class="anahtar"><input type="checkbox" data-as-iki ${iki ? "checked" : ""}><span><b>${esc(t.as_iki)}</b><br><span class="ipucu">${esc(t.as_iki_a)}</span></span></label>
           <p class="dipnot">${dug("as-atla", t.atla)}<br>${esc(t.as_atla_a)}</p>`; } },
     { id: "proje", simge: "klasor", b: "proje_b", a: "proje_a", gir: () => { if (!C.proje && D.durum) C.proje = D.durum.proje; },
@@ -541,7 +558,9 @@
     if (ht) { const s = D.kartTerim || (D.kartTerim = new Set()), v = ht.dataset.hzTerim, en = (D.kart || {}).sozluk_en_cok || 60;
       if (s.has(v)) s.delete(v); else if (s.size < en) s.add(v); ciz(); return; }
     const ay = e.target.closest("[data-as]");
-    if (ay) { asistanHazirla(); C.asistan.liste[+ay.dataset.i][ay.dataset.as] = ay.dataset.deger; kaydet(); ciz(); return; }
+    if (ay) { asistanHazirla(); C.asistan.liste[+ay.dataset.i][ay.dataset.as] = ay.dataset.deger; kaydet(); ciz();
+      if (ay.dataset.as === "ses" && ay.dataset.deger !== "mac" && !asPocket()) api("pocket/baslat", {}).then(durumAl).then(pkGoster).catch(() => {});  // seçim = indirme onayı
+      return; }
     const y = e.target.closest(".yonga");
     if (y) {
       const g = y.dataset.grup, v = y.dataset.deger, on = y.getAttribute("aria-pressed") !== "true";
@@ -558,8 +577,9 @@
       if (n === "kartsiz") { C.kartsiz = true; kaydet(); ciz(); return; }
       if (n === "atla") { git(D.adim + 1); return; }
       if (n === "as-atla") { asistanHazirla(); C.asistan.atla = true; kaydet(); git(D.adim + 1); return; }
+      if (n === "pk-yeniden") { await api("pocket/baslat", {}).catch(() => {}); await durumAl(); pkGoster(); return; }
       if (n === "as-dinle") { const i = +ey.dataset.i, x = C.asistan.liste[i]; D.asDinle = i; ciz();
-        try { await api("asistan/dinle", { ...x, ses: asPocket() ? x.ses : "mac", dil: D.dil }); } catch (e) {} D.asDinle = null; ciz(); return; }
+        try { await api("asistan/dinle", { ...x, ses: asTr() ? x.ses : "mac", dil: D.dil }); } catch (e) {} D.asDinle = null; ciz(); return; }
       if (n === "ornek") { C.ornek = !C.ornek; kaydet(); ciz(); return; }
       if (n === "claude-denetle") { await claudeDenetle(); return; }
       if (n === "kur-yeniden") { const a = gorunen()[D.adim]; if (a && a.gir) await a.gir(); return; }  // kurulum adımı başarısızsa
