@@ -45,12 +45,14 @@ class _Saatli:
     def flush(self):
         try: self.st.flush()
         except Exception: pass
-# beta teşhis (teshis.py): bağlam Mac dışına çıkmaz; ayarda `teshis: true` ise sorun satırları ve yakalanmayan
-# hatalar süzülmüş teknik paket olarak geliştiriciye gider (saatte bir/tür). Son 40 günlük satırı pakete bağlam olarak eklenir
-# (gönderimden önce sözlük süzgecinden geçer).
+# beta teşhis (teshis.py): bağlam Mac dışına çıkmaz; S141'den beta şartı (ayarla kapanmaz): sorun satırları ve yakalanmayan
+# hatalar süzülmüş teknik paket olarak geliştiriciye gider (saatte bir/tür). Son 40 günlük satırı yalnız hata/sorun paketine bağlam
+# olarak eklenir (gönderimden önce sözlük süzgecinden geçer). Toplantı sonu, haftalık ve kurulum paketleri yalnız sayı ve seçenek.
 import collections, traceback
 try: import teshis
 except Exception: teshis = None
+# deneme aktarıcısı (başka klasör ya da port: test/, Hızlı test) gerçek adrese göndermez — teshis.acik() yalnız yerel alıcıya izin verir
+if teshis and (os.path.realpath(BASE) != os.path.realpath(os.path.join(AYAR["uygulama"], "canli")) or A.port != int(AYAR["port"])): teshis.DENEME = True
 _SON_SATIR = collections.deque(maxlen=40); _SORUN_SON = {}
 SORUN_RX = [("whisper", re.compile(r"^WHISPER: (?!hazır|işçi kapatıldı)")),
             ("disk", re.compile(r"^DİSK: (yazılamadı|az yer)")), ("eklenti", re.compile(r"^EKLENTİ: .*(açılamadı|hata|yanıt vermiyor)")),
@@ -59,11 +61,14 @@ SORUN_RX = [("whisper", re.compile(r"^WHISPER: (?!hazır|işçi kapatıldı)")),
 def teshis_satir(l):
     _SON_SATIR.append((time.time(), l))
     for tur, rx in SORUN_RX:
-        if rx.search(l): teshis_gonder("sorun", {"kategori": tur, "satir": l}); break
+        if rx.search(l):
+            if "beta_olay" in globals(): beta_olay("sorun")
+            teshis_gonder("sorun", {"kategori": tur, "satir": l}); break
+    if "beta_satir" in globals(): beta_satir(l)
 def teshis_gonder(tur, ek, anahtar=None, zorla=False, onizle=False):
     """Teknik paket: ortam + anlık durum + son günlük satırları (+ ek). Aynı anahtar saatte bir."""
     if not teshis: return {"ok": False, "durum": "kapali"}
-    if not onizle and not (zorla or AYAR.get("teshis") is True): return {"ok": False, "durum": "kapali"}
+    if not onizle and not (zorla or teshis.acik(AYAR)): return {"ok": False, "durum": "kapali"}
     k = anahtar or (tur, (ek or {}).get("kategori") or (ek or {}).get("hata", {}).get("parmak"))
     if not (zorla or onizle) and time.time() - _SORUN_SON.get(k, 0) < 3600: return {"ok": False, "durum": "yakin_zamanda"}
     if not onizle: _SORUN_SON[k] = time.time()
@@ -80,7 +85,7 @@ def teshis_gonder(tur, ek, anahtar=None, zorla=False, onizle=False):
                        "bellek_bos_gb": (bellek_view() or {}).get("bos_gb") if "bellek_view" in globals() else None,
                        "claude_yas_sn": round(simdi - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                        "calisma_dk": round((simdi - _BASLANGIC) / 60)},
-             "son_olaylar": [f"{round(simdi - t)} sn: {l}" for t, l in list(_SON_SATIR)[-25:]]}
+             "son_olaylar": [f"{round(simdi - t)} sn: {l}" for t, l in list(_SON_SATIR)[-25:]] if tur in ("hata", "sorun", "geri_bildirim") else []}
         p.update(ek or {})
         if onizle: return teshis.temizle(p)
         return teshis.gonder(p, AYAR, AYAR["uygulama"], zorla=zorla)
@@ -113,7 +118,9 @@ def _toplanti_paketi(f):
     bas, son = STATE["file_start"].get(f), STATE["file_last"].get(f)
     try: bas = datetime.datetime.fromisoformat(bas).timestamp() if isinstance(bas, str) else bas
     except Exception: bas = None
-    return {"toplanti_kimlik": toplanti_kimlik(f), "kaynak": "aktarici",
+    try: kalite = beta_kalite(f, bas, son, metin, gec) if "beta_kalite" in globals() else {}  # S141 (aktarici/beta-veri.py)
+    except Exception as e: kalite = {}; sys.__stderr__.write(f"toplantı kalitesi: {e.__class__.__name__}\n")
+    return {"kalite": kalite, "toplanti_kimlik": toplanti_kimlik(f), "kaynak": "aktarici",
             "toplanti": {"sure_dk": round((son - bas) / 60) if bas and son else None, "satir": len(metin), "kaynak": dict(kaynak), "kanal": dict(kanal),
                          "not": sum(1 for x in satir if "note" in x), "kanit": len(STATE["kanitlar"].get(f, [])),
                          "platform": (STATE.get("extension") or {}).get("platform"),
@@ -122,15 +129,16 @@ def _toplanti_paketi(f):
                         "donus": dict(collections.Counter(c.get("status") or "acik" for c in cs)), "soru": len(qs_),
                         "cevap_ortanca_sn": gec[len(gec) // 2] if gec else None, "cevap_en_kotu_sn": gec[-1] if gec else None},
             "whisper": {"durum": w.get("durum"), "satir_toplam": w.get("satir"), "gecikme_sn": w.get("gecikme_sn"), "yanki": w.get("yanki")}}
+TOPLANTI_BITTI_SN, TOPLANTI_IZLE_SN = (4, 2) if os.environ.get("SUFLOR_TEST_BETA") else (600, 60)  # test/beta-veri.py kısaltır
 def _toplanti_izle():
-    fp = os.path.join(AYAR["uygulama"], "teshis", "raporlanan.json")
+    fp = os.path.join(BASE if teshis and teshis.DENEME else AYAR["uygulama"], "teshis-raporlanan.json" if teshis and teshis.DENEME else os.path.join("teshis", "raporlanan.json"))
     while True:
-        time.sleep(60)
-        if not teshis or AYAR.get("teshis") is not True: continue
+        time.sleep(TOPLANTI_IZLE_SN)
+        if not teshis or not teshis.acik(AYAR): continue
         try: gitti = set(json.load(open(fp)))
         except Exception: gitti = set()
         for f, son in list(STATE["file_last"].items()):
-            if f in gitti or time.time() - son < 600 or son < _BASLANGIC - 600 or STATE["file_lines"].get(f, 0) < 10: continue  # aktarıcı başlamadan biten eski toplantılar gönderilmez
+            if f in gitti or time.time() - son < TOPLANTI_BITTI_SN or son < _BASLANGIC - 600 or STATE["file_lines"].get(f, 0) < 10: continue  # aktarıcı başlamadan biten eski toplantılar gönderilmez
             try: teshis_gonder("toplanti_sonu", _toplanti_paketi(f), anahtar=("toplanti", f))
             except Exception as e: sys.__stderr__.write(f"toplantı paketi: {e.__class__.__name__}\n")
             gitti.add(f)
@@ -138,6 +146,7 @@ def _toplanti_izle():
             except OSError: pass
 def _yakalanmayan(tur, deger, tb):
     if teshis and tur not in (KeyboardInterrupt, SystemExit):
+        if "beta_olay" in globals(): beta_olay("hata")
         teshis_gonder("hata", {"hata": teshis.hata_ozeti(tur, deger, tb)})
 _BASLANGIC = time.time()
 _eski_hook = sys.excepthook
@@ -1556,7 +1565,7 @@ AYAR_PANO = {
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None),
     "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "sure_duyuru": ("bool", False, None),
-    "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
+    "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, gemini_kapsam (sesli "Gemini sesiyle
 # konuş" geçişi aynı işi görür), toplanti_duyuru panodan kalktı; ayar dosyasında elle yazılırsa kod eskisi gibi okur.
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
@@ -1669,6 +1678,7 @@ bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, t
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
 bolum("gerginlik")  # aktarici/gerginlik.py — Toplantı gerginliği → kişiliğin ses tonu (v0.80.0, S87)
+bolum("beta-veri")  # aktarici/beta-veri.py — Beta geliştirme verisi: olay sayacı, haftalık paket, toplantı sonu kalitesi (S141; en sonda: öbür bölümlerin işlevlerini sarar)
 # --- v0.13.9: panodan güncelleme ---------------------------------------------------------------------------------
 # Aktarıcı 6 saatte bir açık deponun manifest.json'undaki sürüme bakar (yalnız okuma; Mac'ten bağlam bilgisi çıkmaz). Yeni sürüm varsa
 # pano "Güncelle" düğmesini gösterir; tıklanınca guncelle.command ayrı oturumda (setsid) çalışır — aktarici-kur aktarıcıyı yeniden

@@ -25,8 +25,13 @@ Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplant
 
 ## Gizlilik
 - Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
-- Aktarıcı yalnız `127.0.0.1` adresinde çalışır; hiçbir sunucuya veri göndermez. Tek istisna isteğe bağlı Gemini sesi: açarsan (⚙ Ayarlar → Ses → Gemini)
+- Aktarıcı yalnız `127.0.0.1` adresinde çalışır; toplantı içeriğini hiçbir sunucuya göndermez. İstisna isteğe bağlı Gemini sesi: açarsan (⚙ Ayarlar → Ses → Gemini)
   yalnız okunacak metin (cevap, özet, çeviri, fısıltı, duyuru) Google'a gider, ses kaydı gitmez; kapalıyken (varsayılan) sesler Mac'te üretilir.
+- **Beta geliştirme verisi:** beta sürümü gönüllü geliştirme katılımıdır. Suflor.me'yi geliştirmek için yalnız sayılar gönderilir (kullanım, hız, hata):
+  kurulum adımlarının süresi ve izinler, haftalık kullanım sayıları, toplantı sonu gecikme ve hata sayıları, çağrı ve simge sayısı, seçili ayarlar
+  (ses motoru, dil, tema gibi). Konuşmaların, metinlerin ve adların hiçbiri Mac'inden çıkmaz: döküm, kart, soru ve cevap, kişi/toplantı/proje/dosya
+  ve asistan adı, e-posta, takvim, ses, ses izi ve ekran görüntüsü gitmez. Kimlik yalnız rastgele bir kurulum numarasıdır. Beta sürümünde kapatılmaz;
+  giden her paketin kopyası `~/Library/Application Support/Suflor/teshis/gonderilen/` altında durur.
 - Claude'a giden metin, senin Claude Code oturumunun gördükleridir (Anthropic'in kullanım koşulları geçerli).
 - Toplantı dosyaları senin proje klasöründe durur; kişi adı içerir, iç belge gibi davran.
 

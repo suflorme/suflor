@@ -15,8 +15,7 @@
       gor_birak: "Teams dökümlerini buraya bırak (isteğe bağlı)",
       sen_not: "Dökümler Claude'un seni tanımasının en hızlı yolu: kurulumda senin için bir çalışma notu taslağı hazırlar, ilk toplantının sonunda onaylarsın. Dosyalar proje klasörüne kopyalanır, hiçbir yere gönderilmez.",
       sonra: "Sonra",
-      p_anahtar: "Bir şey aksarsa teknik bilgi geliştiriciye gitsin (beta)",
-      p_gider_a: "Gider: sürümler, Mac modeli, hata türü ve yeri, gecikmeler ve sayılar.", p_gitmez_a: "Asla gitmez: döküm, kişi ve toplantı adları, kartlar, notlar, takvim, belgeler.",
+      p_veri: "Suflor.me'yi geliştirmek için yalnız sayılar gönderilir (kullanım, hız, hata); konuşmaların, metinlerin ve adların hiçbiri Mac'inden çıkmaz.",
       teams_not: "Teams uygulaması kurulu: toplantıya davetteki bağlantıdan katıl ve \"Bu tarayıcıda devam et\"i seç; Suflor.me Teams'i Chrome'da izler. Panodaki Başlat toplantıyı her zaman tarayıcıda açar.",
       bitti_a: "Toplantından önce panodaki Başlat'a bas. Kartlar panoda ve toplantı penceresinin köşesinde görünür.",
       geri: "Geri", devam: "Devam", basla: "Başla", bitir: "Suflor.me'yi aç", atla: "Şimdilik geç",
@@ -111,8 +110,7 @@
       gor_birak: "Drop Teams transcripts here (optional)",
       sen_not: "Transcripts are the fastest way for Claude to get to know you: during setup it drafts a working note for you, and you approve it after your first meeting. Files are copied into your project folder and never sent anywhere.",
       sonra: "Later",
-      p_anahtar: "If something breaks, send technical details to the developer (beta)",
-      p_gider_a: "Sent: versions, Mac model, error type and location, delays and counts.", p_gitmez_a: "Never sent: transcripts, names of people and meetings, cards, notes, calendar, documents.",
+      p_veri: "To improve Suflor.me, only numbers are sent (usage, speed, errors); none of your conversations, texts or names leave your Mac.",
       teams_not: "The Teams app is installed: join from the invitation link and choose \"Continue on this browser\"; Suflor.me follows Teams in Chrome. Start on the panel always opens the meeting in the browser.",
       bitti_a: "Before your meeting, press Start on the panel. Cards appear on the panel and in the corner of the meeting window.",
       geri: "Back", devam: "Continue", basla: "Get started", bitir: "Open Suflor.me", atla: "Skip for now",
@@ -397,7 +395,7 @@
           ${satir(m.durum === "hazir" ? "iyi" : m.durum === "hata" ? "kotu" : "bekle", t.k_modeller, m.durum === "hazir" ? "" : m.durum === "hata" ? (m.tur === "baska_hesap" ? t.k_m_baska : t.k_m_hata + (m.mesaj ? " (" + m.mesaj + ")" : "")) : `%${m.yuzde || 0}`, m.durum === "hata" ? dug("modeller-yeniden", t.k_m_yeniden) : "")}
           ${k.aktarici === "iyi" && ys ? satir(ys.kurulu ? "iyi" : "uyari", t.k_ses, ys.kurulu ? t.k_ses_ok : t.k_ses_yok, ys.kurulu ? dug("ses-izni", t.k_ses_izin) : "") : ""}</div>
           ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div><p class="dipnot">${dug("kur-yeniden", t.k_m_yeniden)}</p>` : ""}${k.asistan_hata ? `<div class="kart-not uyari">${esc(k.asistan_hata)}</div>` : ""}${(k.uyarilar || []).map(u => `<div class="kart-not uyari">${esc(u)}</div>`).join("")}
-          <label class="anahtar"><input type="checkbox" data-teshis ${C.teshis === true ? "checked" : ""}><span><b>${esc(t.p_anahtar)}</b><br><span class="ipucu">${esc(t.p_gider_a)} ${esc(t.p_gitmez_a)}</span></span></label>`; } },
+          <p class="dipnot" data-beta-veri>${esc(t.p_veri)}</p>`; } },  // S141: beta şartı — onay kutusu yok, tek cümle
     { id: "hz_tara", simge: "klasor", b: "hz_tara_b", a: "hz_tara_a", hazir: () => !!H().tarama && !H().tara_suruyor,
       gir: async () => { await hzAl(); const tr = H().tarama; if (!H().tara_suruyor && (!tr || Date.now() / 1000 - tr.t > 600)) { await api("hazirlik/tara", {}).catch(() => {}); D.hz = { ...H(), tara_suruyor: true }; }
         await hzBekle("hz_tara", () => H().tarama && !H().tara_suruyor, 1500); },
@@ -594,11 +592,6 @@
       return;
     }
     const bk = e.target.closest(".birak"); if (bk) dosyaSec(bk.dataset.yukle);
-  });
-  // teşhis anahtarı (Kuruyorum ekranı): kurulum bittiyse ayara yazılır, aktarıcı yeniden başlar (kurulum.py /api/teshis)
-  document.addEventListener("change", async e => {
-    if (!e.target.matches || !e.target.matches("[data-teshis]")) return;
-    C.teshis = e.target.checked; kaydet(); if ((D.kurDurum || {}).ayar === "iyi") await api("teshis", { acik: C.teshis }).catch(() => {});
   });
   document.addEventListener("change", e => {  // proje hazırlığı: kart çıkarılsın mı (C), kart satırı tutulsun mu (E)
     if (!e.target.matches) return;

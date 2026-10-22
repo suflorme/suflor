@@ -2479,7 +2479,7 @@ def rapor_cmd():
            "## Gözlemler (Claude ve kullanıcı)", A.notlar.strip() or "(yok)", "",
            f"## Aktarıcı günlüğü (teknik satırlar, toplantı ±15 dk; {len(g)} satır)", "```", *(g[-150:] or ["(yok)"]), "```"]
     metin = "\n".join(out) + "\n"
-    # beta teşhis: ayarda teshis açıksa toplantı sonu teknik paketi geliştiriciye (yalnız sayılar; ad, metin, not yok)
+    # beta teşhis (S141: beta şartı, teshis.acik): toplantı sonu teknik paketi geliştiriciye (yalnız sayılar; ad, metin, not, gözlem yok)
     import hashlib  # toplantı kimliği aktarıcınınkiyle aynı (dosya adının özeti): Worker iki paketi aynı konuda birleştirir
     paket = {"tur": "toplanti_sonu", "toplanti_kimlik": hashlib.sha1(os.path.basename(md).encode()).hexdigest()[:12], "kaynak": "claude", "toplanti": {"sure_dk": round((t1 - t0).total_seconds() / 60) if t0 else None, "satir": len(satir), "kaynak": kaynak,
              "not": sum(1 for r in rs if "note" in r), "kanit": sum(1 for r in rs if "kanit" in r), "rol": v.get("rol") or ag.get("rol"), "dil": ag.get("dil"),
@@ -2495,7 +2495,6 @@ def rapor_cmd():
             g = teshis.gonder(paket, AYAR, AYAR["uygulama"], arka=False)
             if g.get("durum") != "kapali":
                 print(f"teknik paket: {g.get('durum')} (kopyası: {g.get('dosya')})")
-                if paket.get("gozlem"): print(f"giden gözlem (v0.12.3, süzülmüş): {teshis.temizle(paket)['gozlem']}")  # bilinmeyen kelime "…"
     except Exception as e: print(f"teknik paket kurulamadı: {e.__class__.__name__}")
     if A.goster: print(metin); return
     d = GB_DIR()

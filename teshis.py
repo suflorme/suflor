@@ -5,16 +5,25 @@
 # Güvence iki katmanlı: (1) paketler yalnız izinli alanlarla kurulur; (2) gönderimden hemen önce `temizle()` her metin
 # değerini sözlük süzgecinden geçirir — Suflor'un kendi günlük/olay metinlerinde geçmeyen her kelime "…" olur, yol ve dosya
 # adı "<yol>", tırnak içi "…". Tek istisna kullanıcının panodaki geri bildirim kutusuna kendisi yazdığı metin (gönderilmeden
-# önce gösterilir). Gönderim yalnız ayarda `teshis: true` ise (kurulumda sorulur); panodan elle geri bildirim her zaman.
+# önce gösterilir). S141 (23 Ekim): beta kullanıcısı gönüllü geliştirme katılımcısıdır — sayılar beta şartıdır, ayarla kapanmaz
+# (eski `teshis` ayarı okunmaz; kurulumda tek cümleyle söylenir). Paketler: hata, sorun, toplantı sonu, kurulum, haftalık, geri bildirim.
+# Deneme aktarıcısı ve deneme sihirbazı (DENEME) yalnız yerel alıcıya gönderir. Geliştiricinin kurulumu (kod klasörü git klonu) da
+# gönderir; pakette `gelistirici: true` işaretlidir, beta özetine karışmaz.
 # Gönderilen her paketin kopyası <uygulama>/teshis/gonderilen/ altında durur: kullanıcı neyin gittiğini görebilir.
 #   python3 teshis.py --sozluk <kod klasörü>   sözlüğü üret (aktarici-kur.command çağırır)
 #   python3 teshis.py --dene "<satır>"         süzgeç denemesi
-import json, os, re, sys, time, uuid, glob, threading, platform, subprocess, datetime, urllib.request
+import json, os, re, sys, time, uuid, glob, threading, platform, subprocess, datetime, urllib.request, urllib.error
 
 SURUM_SEMA = 1
 ADRES_VARSAYILAN = "https://suflor-geri-bildirim.wg9w7njmgz.workers.dev/"  # Worker (sunucu/); ayar `teshis_adres` geçersiz kılar
 BETA_ANAHTAR = "suflor-beta-1"  # gizli değil: yalnız rastgele isteği ayırmak için
-KOD_DOSYALARI = ("relay.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "bellek.py", "sozluk.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "bas-konus.py", "sohbet.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
+# Deneme: SUFLOR_AYAR/SUFLOR_EV ortamı ya da aktarıcının kendi kanonik klasörü/portu dışında çalışması (relay.py DENEME'yi kendisi de
+# işaretler) — gerçek adrese gitmez, yalnız `teshis_adres` yerel (http://127.0.0.1:…) ise.
+DENEME = bool(os.environ.get("SUFLOR_AYAR") or os.environ.get("SUFLOR_EV"))
+def acik(ayar):
+    if DENEME: return str(ayar.get("teshis_adres") or "").startswith("http://127.0.0.1:")
+    return True
+KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "bellek.py", "sozluk.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "bas-konus.py", "sohbet.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
                  "content.js", "platform-teams.js", "background.js", "offscreen.js", "mic-main.js", "popup.js", "launcher.js")
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 SOZLUK_DOSYA = os.path.join(_BURASI, "teshis-sozluk.txt")
@@ -106,16 +115,23 @@ KALIP = {"kurulum": r"[0-9a-f]{12}", "surum": r"v?\d{1,3}(\.\d{1,4}){0,3}|\?", "
          "python": r"\d{1,2}\.\d{1,2}\.\d{1,3}[a-z0-9]{0,4}", "zaman": r"[\d:T+.-]{10,32}",
          "claude_model": r"(claude-)?(opus|sonnet|haiku|fable)[a-z0-9.-]{0,30}|varsayilan|default|\?",
          "islev": r"[\w<>.-]{1,40}", "parmak": r"[0-9a-f]{12}", "toplanti_kimlik": r"[0-9a-f]{12}", "isim": r"[A-Za-z_]\w{0,40}",
-         "isabet": r"\d{1,4}/\d{1,4}"}  # kart isabeti "yapıldı/(yapıldı+geçildi)" — eskiden "/1" yol sanılıyordu
+         "isabet": r"\d{1,4}/\d{1,4}", "hafta": r"\d{4}-H\d\d"}  # kart isabeti "yapıldı/(yapıldı+geçildi)" — eskiden "/1" yol sanılıyordu
 # kalıba uyan serbest küçük harfli değer ("gizli_proje_kartal") geçmesin — bu alanlar yalnız kodda gerçekten
 # üretilen değerleri alır (relay.py, toplanti-claude.py, content.js taranarak toplandı); bilinmeyen değer "?". Yeni değer
 # üreten kod yazınca buraya ekle.
-_DURUMLAR = {"kapali", "yukleniyor", "hazir", "yok", "hata", "zaman_asimi", "bekliyor", "ok", "izin_yok"}
-SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim"},
+_DURUMLAR = {"kapali", "yukleniyor", "hazir", "yok", "hata", "zaman_asimi", "bekliyor", "ok", "izin_yok", "izin", "kurulmadi"}
+ADIMLAR = {"karsilama", "hosgeldin", "mac", "claude", "sen", "asistan", "proje", "kur", "hz_tara", "hz_onay", "hz_ilerleme", "takvim", "eklenti", "hz_kart", "bitti"}  # sihirbaz.js ADIMLAR
+IZIN = {"var", "yok", "sorulmadi"}
+SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "haftalik"},
          "kategori": {"whisper", "ses_modeli", "disk", "eklenti", "nabiz", "takvim", "baslat", "sozluk"},  # relay.py SORUN_RX
-         "kaynak": {"aktarici", "claude"}, "platform": {"teams", "meet", "zoom"}, "rol": {"yurutucu", "katilimci", "dinleyici"},
+         "kaynak": {"aktarici", "claude"}, "platform": {"teams", "meet", "zoom", "masaustu"}, "rol": {"yurutucu", "katilimci", "dinleyici"},
          "dil": {"tr", "en", "karisik"}, "arayuz": {"tr", "en"}, "durum": _DURUMLAR, "whisper": _DURUMLAR, "ses_modeli": _DURUMLAR, "yerel_ses": {"yok", "kapali", "bekliyor", "dinliyor", "izin"},
          "sebep": set(),  # bugün üreten kod yok
+         # S141 kurulum ve haftalık paket (kurulum.py kurulum_paketi, aktarici/beta-veri.py)
+         "adim": ADIMLAR, "birakilan": ADIMLAR, "sonuc": {"bitti", "yarida", "hazir", "hata", "yok", "iniyor", "secilmedi", "onceden"},
+         "neden": {"abonelik", "giris", "hata", "zaman", "yok", "kurulamadi", "baska_hesap"}, "mikrofon": IZIN, "erisilebilirlik": IZIN, "ekran": IZIN, "takvim": _DURUMLAR,
+         "ses_motoru": {"mac", "piper", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
+         "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"}}
 # sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için
 # (kaynak, kanal, kart türü, dönüş, karne boyutu) yalnız bilinen değerler. Uymayan anahtar "?<sıra>" olur (değer yine süzülür).
@@ -124,7 +140,13 @@ ANAHTAR_CEVIR = {"?": "bilinmeyen", "gündem": "gundem", "açık sorular": "acik
 SAYIM = {"kaynak": {"transcript", "captions", "whisper", "bilinmeyen"}, "kanal": {"ben", "karsi"},
          "tur": {"soyle", "dur", "cevap", "not", "sor", "belirt", "deginme", "dikkat", "bilgi"},  # relay.py CARD_KINDS (+ eski adlar)
          "donus": {"acik", "yenilendi", "yapildi", "okundu", "gecildi"},
-         "boyut": {"gundem", "zaman", "acik_sorular", "konusma_payi", "takip_sahipli"}}
+         "boyut": {"gundem", "zaman", "acik_sorular", "konusma_payi", "takip_sahipli"},
+         # S141: sayım sözlükleri — anahtarı veriden gelenler yalnız bilinen değerler
+         "kart_turu": {"soyle", "dur", "cevap", "not", "sor", "belirt", "deginme", "dikkat", "bilgi"},
+         "platformlar": {"teams", "meet", "zoom", "masaustu", "bilinmeyen"},
+         "toplanti_disi": {"sesli", "yazili", "sohbet", "herkese", "karsi", "ozet", "diger", "kulaga", "toplam"},
+         "toplanti_ici": {"sesli", "yazili", "sohbet", "herkese", "karsi", "ozet", "diger", "kulaga", "toplam"},
+         "claude_is": {"bas_konus", "toplanti", "proje_karti", "telaffuz", "ceviri", "brifing", "diger"}}
 SERBEST = {"kullanici_metni"}  # kullanıcının panoda yazdığı metin (gönderilmeden önce gösterilir); v0.12.3: gozlem artık sade()'den geçer
 def _anahtar(k, ust, i):
     k = ANAHTAR_CEVIR.get(str(k), str(k))
@@ -136,7 +158,7 @@ def temizle(x, anahtar=None):
     if isinstance(x, bool) or x is None or isinstance(x, (int, float)): return x
     s = str(x)
     if anahtar in SERBEST: return s[:4000]
-    if anahtar == "gozlem": return sade(s, 3000)  # Claude'un toplantı sonu gözlemi — ad/içerik kaçmasın
+    if anahtar == "gozlem": return None  # S141: Claude'un toplantı sonu gözlemi serbest metin — beta şartında gitmez (yalnız sayı ve seçenek)
     if anahtar in SABIT: return s if s in SABIT[anahtar] or s == "?" else "?"
     if anahtar in KALIP: return s if re.fullmatch(KALIP[anahtar], s) else sade(s, 60)
     return sade(s)
@@ -159,7 +181,8 @@ def ortam(ayar, uyg, eklenti=None, aktarici=None):
     return {"kurulum": kurulum_id(uyg), "kod": kod or "?", "surum": aktarici or "?", "eklenti": eklenti or "?",
             "model": _sh("sysctl", "-n", "hw.model") or "?", "macos": platform.mac_ver()[0] or "?",
             "bellek_gb": round(int(_sh("sysctl", "-n", "hw.memsize") or 0) / 2**30), "arayuz": "en" if ayar.get("dil") == "en" else "tr",
-            "claude_model": str(ayar.get("claude_model") or "varsayilan"), "python": platform.python_version()}
+            "claude_model": str(ayar.get("claude_model") or "varsayilan"), "python": platform.python_version(),
+            "gelistirici": os.path.isdir(os.path.join(os.path.expanduser(str(ayar.get("kod") or _BURASI)), ".git"))}  # geliştiricinin git klonu: beta özetine karışmaz
 
 # ---------- hata özeti ----------
 def hata_ozeti(tur, deger, tb):
@@ -180,10 +203,10 @@ _KILIT = threading.Lock()
 def _klasor(uyg, alt):
     d = os.path.join(uyg, "teshis", alt); os.makedirs(d, exist_ok=True); return d
 def gonder(paket, ayar, uyg, zorla=False, arka=True):
-    """Paketi temizleyip ayardaki adrese gönderir (yalnız `teshis: true` ya da zorla=True — elle geri bildirim).
+    """Paketi temizleyip adrese gönderir (S141: beta şartı, her zaman; deneme yalnız yerel alıcıya — acik()). zorla: elle geri bildirim.
     Kopyası teshis/gonderilen/'e yazılır; adres yoksa ya da ağ yoksa teshis/bekleyen/'e, sonraki gönderimde yeniden denenir.
     Döner: {"ok": bool, "durum": "gonderildi|bekliyor|kapali", "dosya": yol}"""
-    if not (zorla or ayar.get("teshis") is True): return {"ok": False, "durum": "kapali"}
+    if not acik(ayar): return {"ok": False, "durum": "kapali"}
     p = temizle(dict(paket, sema=SURUM_SEMA, zaman=datetime.datetime.now().astimezone().isoformat(timespec="seconds")))
     ad = f"{time.strftime('%Y%m%d-%H%M%S')}-{p.get('tur', 'paket')}.json"
     try: fp = os.path.join(_klasor(uyg, "bekleyen"), ad); json.dump(p, open(fp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -195,14 +218,18 @@ def gonder(paket, ayar, uyg, zorla=False, arka=True):
 def _bekleyenleri_gonder(ayar, uyg):
     adres = str(ayar.get("teshis_adres") or ADRES_VARSAYILAN)
     if not (adres.startswith("https://") or adres.startswith("http://127.0.0.1:")): return  # yerel: yalnız deneme
+    if DENEME and not adres.startswith("http://127.0.0.1:"): return
     bek, gon = _klasor(uyg, "bekleyen"), _klasor(uyg, "gonderilen")
-    for fp in sorted(glob.glob(os.path.join(bek, "*.json")))[:20]:
+    for fp in sorted(glob.glob(os.path.join(bek, "*.json")))[:50]:
         try:
             veri = open(fp, "rb").read()
             r = urllib.request.Request(adres, data=veri, method="POST", headers={"Content-Type": "application/json", "X-Suflor-Beta": BETA_ANAHTAR})
             with urllib.request.urlopen(r, timeout=10) as y:
                 if y.status >= 300: break
             os.replace(fp, os.path.join(gon, os.path.basename(fp)))
+        except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500: continue  # bu paketi alıcı tanımıyor (ör. Worker yeni türden eski): bekler, ötekileri tıkamaz
+            break
         except Exception: break  # ağ yok / sunucu yok: sonra yeniden
     for eski in sorted(glob.glob(os.path.join(gon, "*.json")))[:-200]:
         try: os.remove(eski)

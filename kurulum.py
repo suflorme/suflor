@@ -520,11 +520,64 @@ def profil():  # komut satırı: kurulum.py profil — kurulum.json'daki cevapla
     open(cm, "w", encoding="utf-8").write(s)
     if terimler: ayar_degistir(lambda a: a.update(whisper_terimler=list(dict.fromkeys((a.get("whisper_terimler") or []) + terimler))[:60]))
     say(f"profil: taslak not yazıldı ({len(metin.split())} kelime, {len(terimler)} terim)")
-def teshis_ayarla(acik):  # Kuruyorum ekranındaki anahtar kurulumdan sonra değişirse: ayara yaz, aktarıcı yeniden okusun
-    if ayar().get("teshis") is (acik is True): return {"ok": True}
-    if not ayar_degistir(lambda a: False if not a else a.update(teshis=acik is True)): return {"ok": True}
-    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
-    return {"ok": True}
+# ---------- kurulum paketi (S141, beta geliştirme verisi) ----------
+# Beta şartı: sihirbaz bitince ya da yarıda kalınca yalnız sayı ve seçenek geliştiriciye gider (teshis.py süzgeci; kopyası
+# <uygulama>/teshis/gonderilen/): adım süreleri ve bırakılan adım, Claude bağlantısı, izinler, model ve Pocket indirme süresi/sonucu,
+# Mac modeli, bellek, macOS. Ad, şirket, proje yolu, asistan adı, takvim adresi gitmez. İz DESTEK/kurulum-izi.json'da (sekme kapansa da).
+# Yarıda: sihirbaz 30 dk istek almazsa, Terminal kapanırsa (SIGHUP/SIGTERM) ya da sonraki açılışta önceki iz bitmemişse.
+IZI_YOL = os.path.join(DESTEK, "kurulum-izi.json"); IZI = {"son_istek": time.time(), "acik": False}
+YARIDA_SN = 4 if os.environ.get("SUFLOR_TEST_BETA") else 1800
+def _izi_degistir(fn):
+    with _YAZ: z = oku_json(IZI_YOL); fn(z); yaz_json(IZI_YOL, z); return z
+def izi_baslat():  # sihirbaz sunucusu açılınca (yalnız kurulum kipi): önceki iz bitmemişse yarıda paketi, sonra yeni iz
+    z = oku_json(IZI_YOL)
+    if z.get("bas") and not z.get("gitti"): kurulum_paketi("yarida", arka=False)
+    yaz_json(IZI_YOL, {"bas": time.time(), "ilk": not ayar().get("kod"), "adimlar": [], "model": {}, "pocket": {}}); IZI["acik"] = True
+def izi_adim(adim_id):
+    if not IZI["acik"] or not isinstance(adim_id, str): return
+    def fn(z):
+        a = z.setdefault("adimlar", [])
+        if not a or a[-1][0] != adim_id: a.append([adim_id[:20], round(time.time(), 1)])
+    z = _izi_degistir(fn)
+    if adim_id == "bitti" and not z.get("gitti"): threading.Thread(target=kurulum_paketi, args=("bitti",), daemon=True).start()
+def izi_indirme(ad, durum):  # ad: model | pocket; durum: modeller_durum()/pocket_durum() sonucu — ilk görülen başlangıç ve sonuç
+    if not IZI["acik"]: return
+    d = durum.get("durum")
+    z = oku_json(IZI_YOL).get(ad) or {}
+    if d == "iniyor" and not z.get("bas"): _izi_degistir(lambda z_: z_.setdefault(ad, {}).update(bas=round(time.time(), 1)))
+    elif d in ("hazir", "hata") and not z.get("sonuc"):
+        _izi_degistir(lambda z_: z_.setdefault(ad, {}).update(sonuc=d if z.get("bas") else ("onceden" if d == "hazir" else d), son=round(time.time(), 1), tur=durum.get("tur")))
+def _izinler():
+    o = {}
+    mnu = menu_yolu()
+    if os.path.isdir(mnu) and not DENEME:
+        for k, v in menu_izin_durum(mnu).items(): o[k] = "sorulmadi" if v.startswith("sorul") else v  # mikrofon, erisilebilirlik, ekran
+    o["takvim"] = (takvim() or {}).get("durum")
+    y = yerel_ses() or {}; o["yerel_ses"] = y.get("durum")  # karşı ses yardımcısı (Ekran ve Sistem Sesi Kaydı); "izin" = izin yok
+    return o
+def kurulum_paketi(sonuc, arka=True):
+    z = oku_json(IZI_YOL)
+    if not z.get("bas") or z.get("gitti") == "bitti" or (sonuc == "yarida" and z.get("gitti") == "yarida"): return
+    try:
+        sys.path.insert(0, KOD); import teshis
+        ad, son = z.get("adimlar") or [], time.time()
+        sure = lambda x: round(x["son"] - x["bas"]) if x.get("bas") and x.get("son") else None
+        c = claude_durum(); m = mac(); md, pk = z.get("model") or {}, z.get("pocket") or {}
+        p = {"tur": "kurulum", "sonuc": sonuc, "ilk_kurulum": bool(z.get("ilk")), "toplam_dk": round((son - z["bas"]) / 60, 1),
+             "adimlar": [{"adim": a, "sn": round((ad[i + 1][1] if i + 1 < len(ad) else son) - t)} for i, (a, t) in enumerate(ad[:40])],
+             "birakilan": ad[-1][0] if sonuc == "yarida" and ad else None,
+             "claude": {"kurulu": c.get("kurulu"), "giris": c.get("giris"), "neden": (c.get("neden") or {}).get("tur")},
+             "izin": _izinler(), "model": {"sonuc": md.get("sonuc") or ("iniyor" if md.get("bas") else "yok"), "sn": sure(md), "neden": md.get("tur")},
+             "pocket": {"sonuc": pk.get("sonuc") or ("iniyor" if pk.get("bas") else "secilmedi"), "sn": sure(pk)},
+             "mac": {"arm": m.get("arm"), "disk_bos_gb": m.get("disk_gb"), "chrome": m.get("chrome"), "teams_uygulama": m.get("teams_uygulama")}}
+        a = ayar(); uyg = yollar()["uygulama"]; p["ortam"] = teshis.ortam(dict(a, kod=KOD), uyg)
+        g = teshis.gonder(p, a, uyg, arka=arka)
+        if g.get("durum") != "kapali": _izi_degistir(lambda z_: z_.update(gitti=sonuc))
+    except Exception as e: print(f"kurulum paketi kurulamadı: {e.__class__.__name__}", flush=True)
+def _izi_bekci():  # 30 dk sihirbazdan istek yoksa yarıda (sekme kapandı, Terminal açık kaldı)
+    while True:
+        time.sleep(2 if os.environ.get("SUFLOR_TEST_BETA") else 60)
+        if IZI["acik"] and time.time() - IZI["son_istek"] > YARIDA_SN: kurulum_paketi("yarida")
 
 # ---------- son kurulum ----------
 def bos_port():
@@ -545,8 +598,8 @@ def tamamla(c, dil):
               "rol": c.get("rol") or "", "sirket": c.get("sirket") or "", "is_alani": c.get("is_alani") or "", "kartsiz": bool(c.get("kartsiz")),
               "ek_sistem": list(dict.fromkeys((eski.get("ek_sistem") or []) + araclar)),
               "whisper_terimler": list(dict.fromkeys((eski.get("whisper_terimler") or []) + araclar + kisiler + terimler))[:60],
-              "takvim_haric": [x for x in (c.get("takvim_cikar") or [])], "takvim_adreslerim": [x for x in (c.get("takvim_adres") or eski.get("takvim_adreslerim") or [])],
-              "teshis": c.get("teshis") is True})  # beta teşhis izni (teshis.py; adres teshis_adres ya da varsayılan)
+              "takvim_haric": [x for x in (c.get("takvim_cikar") or [])], "takvim_adreslerim": [x for x in (c.get("takvim_adres") or eski.get("takvim_adreslerim") or [])]})
+    a.pop("teshis", None)  # S141: geliştirme verisi beta şartı; eski izin anahtarı okunmaz
     if "eposta" in c or "eposta_adres" in c:  # takvim ekranındaki e-posta seçimi (boş = tahmin)
         et, ea = eposta_temiz(c.get("eposta"), c.get("eposta_adres"))
         for k, v in (("eposta", et), ("eposta_adres", ea)):
@@ -713,6 +766,7 @@ class H(BaseHTTPRequestHandler):
         return (self.headers.get("Host") or "").lower() in (f"127.0.0.1:{A.port}", f"localhost:{A.port}")
     def do_GET(self):
         if not self._host(): return self._json({"hata": "host"}, 403)
+        IZI["son_istek"] = time.time()
         yol, _, sorgu = self.path.partition("?")
         if yol in ("/", "/index.html", "/sihirbaz/index.html"):
             k = dict(x.split("=", 1) for x in sorgu.split("&") if "=" in x).get("k")
@@ -722,8 +776,9 @@ class H(BaseHTTPRequestHandler):
             if not self._cerezli(): return self._kapali()
         elif yol.startswith("/api/") and not self._cerezli(): return self._json({"hata": "anahtar"}, 403)
         if yol == "/api/durum":
-            a = ayar()
-            return self._json({"mac": mac(), "claude": claude_durum(), "modeller": modeller_durum(), "eklenti": eklenti(), "takvim": takvim(), "yerel_ses": yerel_ses(), "asistan": asistan_durum(),
+            a = ayar(); mdl = modeller_durum(); izi_indirme("model", mdl)
+            asd = asistan_durum(); izi_indirme("pocket", asd.get("pocket_kur") or {})
+            return self._json({"mac": mac(), "claude": claude_durum(), "modeller": mdl, "eklenti": eklenti(), "takvim": takvim(), "yerel_ses": yerel_ses(), "asistan": asd,
                                "kod": KOD, "mod": A.adim if A else None, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
         if yol == "/api/kayit": return self._json(oku_json(KAYIT))
         if yol == "/api/hazirlik": return self._json(hz_ozet())
@@ -737,6 +792,7 @@ class H(BaseHTTPRequestHandler):
         self._json({"hata": "yok"}, 404)
     def do_POST(self):
         if not self._host(): return self._json({"hata": "host"}, 403)
+        IZI["son_istek"] = time.time()
         if not self._kaynak(): return self._json({"hata": "köken"}, 403)  # yalnız sihirbaz sayfası
         if not self._cerezli(): return self._json({"hata": "anahtar"}, 403)
         yol, _, sorgu = self.path.partition("?"); n = int(self.headers.get("Content-Length") or 0); govde = self.rfile.read(n) if n else b""
@@ -746,10 +802,9 @@ class H(BaseHTTPRequestHandler):
             d = os.path.join(YUKLEME, "gorusmeler" if tur == "gorusme" else "linkedin"); os.makedirs(d, exist_ok=True)
             open(os.path.join(d, ad), "wb").write(govde); return self._json({"ok": True})
         p = json.loads(govde or b"{}")
-        if yol == "/api/kaydet": yaz_json(KAYIT, dict(oku_json(KAYIT), dil=p.get("dil"), adim=p.get("adim"), adim_id=p.get("adim_id"), cevap=p.get("cevap") or {}, t=time.time())); return self._json({"ok": True})
+        if yol == "/api/kaydet": izi_adim(p.get("adim_id")); yaz_json(KAYIT, dict(oku_json(KAYIT), dil=p.get("dil"), adim=p.get("adim"), adim_id=p.get("adim_id"), cevap=p.get("cevap") or {}, t=time.time())); return self._json({"ok": True})
         if yol == "/api/modeller/baslat": modeller_baslat(); return self._json(modeller_durum())
         if yol == "/api/claude/denetle": claude_denetle(); return self._json(claude_durum())
-        if yol == "/api/teshis": return self._json(teshis_ayarla(p.get("acik")))
         if yol == "/api/takvim": return self._json(takvim_ayarla(p.get("adresler"), p.get("cikar")))
         if yol == "/api/eposta": return self._json(eposta_ayarla(p.get("eposta"), p.get("eposta_adres")))
         if yol == "/api/pocket/baslat": return self._json(pocket_baslat())
@@ -768,7 +823,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "aktarici/", "manifest.json", "whisper-isci.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "taahhut.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "taahhut.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 ESKI_BETIK = ["kur.command", "relay-baslat.command"]  # tek kurulum komutuyla kalktı; açık depodan güncellemede kod klasöründen silinir
 TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
@@ -1361,4 +1416,9 @@ if __name__ == "__main__":
         cr = next((y for y in ("/Applications/Google Chrome.app", os.path.join(EV, "Applications/Google Chrome.app")) if os.path.isdir(y)), None)
         subprocess.Popen(["open"] + (["-a", cr] if cr else []) + [f"http://127.0.0.1:{A.port}/?k={ANAHTAR}"])
     elif DENEME: print(f"  açılış: http://127.0.0.1:{A.port}/?k={ANAHTAR}", flush=True)
+    if not A.adim:  # S141: kurulum paketi (hazırlık kipinde değil)
+        import signal
+        izi_baslat(); threading.Thread(target=_izi_bekci, daemon=True).start()
+        def _kapan(*_): kurulum_paketi("yarida", arka=False); os._exit(0)
+        for sg in (signal.SIGHUP, signal.SIGTERM): signal.signal(sg, _kapan)
     s.serve_forever()
