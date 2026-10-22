@@ -1,155 +1,150 @@
-# Suflor.me
+<p align="center">
+  <img src="gorsel/hero.png" alt="Suflor.me: toplantı ekranının köşesinde asistanın kartları; büyütülmüş Söyle kartı: Ödeme adımı cumaya yetişmezse yedek plan ne? Bunu sor." width="100%">
+</p>
 
-Toplantıda ve toplantı dışında yanında olan, adını senin koyduğun sesli asistan. Suflor.me toplantını Mac'inde canlı olarak yazıya döker;
-asistanın konuşmayı izler, sana küçük kartlarla ne sorman, neyi belirtmen ya da neye dikkat etmen gerektiğini söyler, adıyla seslenince
-cevap verir. Kartlara ve cevaplara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplantılarını da katar.
+<p align="center">
+  <b>Toplantıların için sesli asistan.</b> Mac'inde çalışır, projeni bilir, doğru anda kulağına fısıldar.
+</p>
 
-> Durum: beta. Yalnız Mac (Apple Silicon). Toplantı: Teams, Google Meet ve Zoom web (Chrome); Teams ve Zoom masaüstü menü çubuğu uygulamasıyla.
+<p align="center">
+  <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-175E46?style=flat-square">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-M%20serisi-175E46?style=flat-square">
+  <img alt="Durum: beta" src="https://img.shields.io/badge/durum-beta-C9973A?style=flat-square">
+  <img alt="Lisans: MIT" src="https://img.shields.io/badge/lisans-MIT-6B6F68?style=flat-square">
+</p>
 
-## Ne yapar
-- **Tek muhatap: asistanın.** Kurulumda ona ad koyarsın; panoda, kartlarda ve seste yalnız onun adı geçer. Ona adıyla seslenirsin
-  ("Defne, bütçe ne kadardı?") ya da yazarsın; işi kim yaparsa yapsın cevap onun adıyla ve sesiyle gelir.
-- **Tek kutu:** her görünümün altında aynı kutu: solda `+` (belge ekle), ortada yazı, sağda mikrofon. Mikrofona basılı tut = sesle sor,
-  iki kez dokun = eller serbest sohbet. Yazdığın soru asistana gider; toplantıda not deftere düşer.
-- **Canlı döküm:** senin sesin ve karşı tarafın sesi Mac'te, yerel konuşma tanımayla (Whisper) yazıya dökülür. Toplantı uygulamasının
-  altyazısı açıksa konuşmacı adları oradan alınır.
-- **Kartlar:** asistan toplantıyı izler ve toplantı ekranının köşesindeki küçük şeride ve panoya kart gönderir: **SÖYLE** (şunu de ya da sor),
-  **DUR** (yapma, açma), **CEVAP**, **NOT**. Toplantıdaki rolüne (yöneten, katılımcı, dinleyici) göre az ya da çok konuşur.
-- **Toplantıda asistan:** istersen asistanın toplantıda herkesin duyacağı şekilde konuşur; "<ad>, dur" ya da Option + Shift + S susturur.
-- **Proje bağlamı:** konuşmada geçen bir iddia, rakam ya da sorumluluk daha önceki bir belgede ya da toplantıda farklı geçiyorsa fark eder
-  ve kaynağıyla söyler.
-- **Kanıt:** "kanıt al" ya da Option + Shift + K toplantı ekranını, "ekran görüntüsü al" o an baktığın pencereyi kaydeder (ekranda şifre görünürse uyarır).
-- **Başka oturuma iş:** "<ad>, şunu proje oturumuna ilet" dediğinde ileti onay kartıyla sunulur; onaylarsan iletilir.
-- **Toplantı sonu:** özet ve başında toplantı çıktısı (kararlar, sahibi ve tarihi belli işler, açık kalanlar, tek öneri); gündem maddelerine göre
-  **zihin haritası**. Kararlar ve iddialar bu Mac'te bir **karar grafında** birikir: sonraki toplantıda aynı kişi farklı bir rakam söylerse fark edilir.
-- **Toplantılar penceresi:** bütün toplantı dökümleri tek yerde; dökümlerde ve özetlerde arama.
-- **Konuşmacı adları:** altyazının ad verdiği kişilerin ses izi bu Mac'te saklanır (**ses izi hafızası**); altyazı yokken (masaüstü toplantı,
-  panoya bırakılan kayıt) adı oradan bulur. Silmek için: `toplanti-claude.py hafiza --sil "<ad>"`.
-- **Mac uygulaması:** pano kendi Mac penceresinde (araç çubuğu, kenar çubuğunda Şimdi · Bugün · Arşiv, ayrı Ayarlar ve Yardım, açık/koyu tema);
-  Chrome'daki pano da çalışır.
+<p align="center">
+  <a href="#kurulum">Kurulum</a> ·
+  <a href="#toplantıda-ne-olur">Toplantıda ne olur</a> ·
+  <a href="#gizlilik">Gizlilik</a> ·
+  <a href="KILAVUZ.md">Kılavuz</a>
+</p>
+
+---
+
+Tiyatroda suflör, oyuncu repliğini unuttuğunda kulisten fısıldayan kişidir. Suflor.me toplantıda aynı işi yapar. Sen konuşmaya
+odaklanırsın. O dinler, projenin geçmişini hatırlar ve gerektiğinde tek bir cümle söyler.
+
+<table>
+<tr>
+<td valign="top" width="33%"><b>Dinler</b><br>Senin sesini ve karşı tarafın sesini Mac'inde, canlı olarak yazıya döker. Ses diske yazılmaz, Mac'ten çıkmaz.</td>
+<td valign="top" width="33%"><b>Hatırlar</b><br>Projenin belgelerini ve geçmiş toplantıları bilir. Bugün söylenen bir rakam geçen haftakiyle çelişirse fark eder.</td>
+<td valign="top" width="33%"><b>Fısıldar</b><br>Ne sorman, neyi açmaman, neyi not etmen gerektiğini küçük kartlarla söyler. Adıyla seslenirsen cevap verir.</td>
+</tr>
+</table>
+
+## Toplantıda ne olur
+
+Asistan toplantıyı izler ve dört tür kart gönderir. Kartlar toplantı ekranının köşesindeki küçük şeritte ve panoda belirir.
+Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
+
+<p align="center"><img src="gorsel/kartlar.png" alt="Dört kart türü: Söyle, Dur, Cevap, Not" width="100%"></p>
+
+Asistan araya girmeyi ölçülü yapar. Toplantıdaki rolüne (yöneten, katılımcı, dinleyici) göre az ya da çok konuşur. Kendiliğinden gelen
+Söyle ve Not kartları dakikada en çok bir kez araya girer. **Sessiz** düğmesi 10 dakika boyunca hiç kart göndermez.
+
+### Bir toplantının üç anı
+
+| Önce | Sırasında | Sonra |
+|---|---|---|
+| Takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, **Ne diyeyim?** (tek cümlelik replik önerisi), **Kanıt** (toplantı ekranının görüntüsü), sesli çeviri. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
+
+## Asistanına adıyla seslen
+
+Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad geçer. Ona yazarsın ya da sesle sorarsın:
+*"Defne, geçen hafta beta için hangi tarihi konuşmuştuk?"* Cevap birkaç saniye içinde panoda ve sesli olarak gelir.
+
+<p align="center"><img src="gorsel/pano.png" alt="Suflor.me panosu: solda kartlar ve Defne'nin cevabı, sağda gündem ve canlı döküm" width="100%"></p>
+
+- **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
+  Mikrofona iki kez dokunursan eller serbest sohbet başlar.
+- **Toplantıda konuşabilir (isteğe bağlı):** açarsan asistan cevabını herkesin duyacağı şekilde okur. Sözü kesmez, sırasını bekler.
+  *"Defne, dur"* ya da Option + Shift + S onu susturur.
+- **İki asistan:** istersen toplantı dışında daha rahat konuşan ikinci bir asistan eklersin.
+- **Ses:** Mac'in Türkçe sesi, Mac'te çalışan doğal Türkçe kadın ve erkek sesi (Pocket) ya da isteğe bağlı Gemini sesi.
+
+## Projeni ve geçmişini hatırlar
+
+Kurulumda proje klasörünü gösterirsin. Suflor.me klasördeki belgeleri, sunumları ve PDF'leri bu Mac'te metne çevirir ve dizinler.
+Arama sözcükle sınırlı değildir. Soruda geçen sözcük belgede hiç geçmese de anlamca yakın parçayı bulur.
+
+<p align="center"><img src="gorsel/toplantilar.png" alt="Toplantılar penceresi: 'beta' araması, dört toplantıda sekiz sonuç" width="100%"></p>
+
+- **Çelişkiyi yakalar:** konuşmada geçen bir iddia, rakam ya da sorumluluk daha önceki bir belgede ya da toplantıda farklı geçiyorsa
+  kaynağıyla söyler.
+- **Karar grafı:** kararlar ve iddialar bu Mac'te birikir. Aynı kişi bir sonraki toplantıda farklı bir rakam söylerse fark edilir.
+- **Toplantılar penceresi:** bütün dökümler tek yerde; dökümlerde ve özetlerde arama yapılır.
+- **Konuşmacı adları:** toplantı uygulamasının altyazısındaki adlar, kişinin ses iziyle bu Mac'te eşleştirilir. Altyazı olmadığında da
+  (masaüstü toplantı, sonradan yüklenen kayıt) konuşanın adı bulunur.
 
 ## Gizlilik
-- Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
-- Aktarıcı yalnız `127.0.0.1` adresinde çalışır; toplantı içeriğini hiçbir sunucuya göndermez. İstisna isteğe bağlı Gemini sesi: açarsan (⚙ Ayarlar → Ses → Gemini)
-  yalnız okunacak metin (cevap, özet, çeviri, fısıltı, duyuru) Google'a gider, ses kaydı gitmez; kapalıyken (varsayılan) sesler Mac'te üretilir.
-- **Beta geliştirme verisi:** beta sürümü gönüllü geliştirme katılımıdır. Suflor.me'yi geliştirmek için yalnız sayılar gönderilir (kullanım, hız, hata):
-  kurulum adımlarının süresi ve izinler, haftalık kullanım sayıları, toplantı sonu gecikme ve hata sayıları, çağrı ve simge sayısı, seçili ayarlar
-  (ses motoru, dil, tema gibi). Konuşmaların, metinlerin ve adların hiçbiri Mac'inden çıkmaz: döküm, kart, soru ve cevap, kişi/toplantı/proje/dosya
-  ve asistan adı, e-posta, takvim, ses, ses izi ve ekran görüntüsü gitmez. Kimlik yalnız rastgele bir kurulum numarasıdır. Beta sürümünde kapatılmaz;
-  giden her paketin kopyası `~/Library/Application Support/Suflor/teshis/gonderilen/` altında durur.
-- Claude'a giden metin, senin Claude Code oturumunun gördükleridir (Anthropic'in kullanım koşulları geçerli).
-- Toplantı dosyaları senin proje klasöründe durur; kişi adı içerir, iç belge gibi davran.
 
-## Gerekenler
-- Apple Silicon (M serisi) işlemcili Mac, macOS 14 ya da üstü
-- En az 16 GB bellek (konuşma tanıma ve ses modeli toplantı sırasında ~4 GB kullanır)
-- ~12 GB boş disk (modeller ~5 GB, belge çevirme ve anlam araması ~3,3 GB)
-- Google Chrome
-- [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü). Claude Code kurulu değilse sihirbaz kurar;
-  Terminal'de `claude` → `/login` ile giriş gerekir (Claude masaüstü uygulamasındaki giriş Terminal'e geçmez).
+Suflor.me baştan bu kuralla yazıldı: **ses Mac'inden çıkmaz.** Konuşma tanıma, ses izi, belge çevirme ve arama bu Mac'te çalışır.
+
+<p align="center"><img src="gorsel/gizlilik.png" alt="Mac'inde kalanlar, Claude'a gidenler, yalnız açarsan Google'a gidenler" width="100%"></p>
+
+- Suflor.me'nin yerel sunucusu yalnız bu Mac'ten gelen bağlantıyı kabul eder (`127.0.0.1`). Toplantı içeriği hiçbir sunucuya gönderilmez.
+- Claude'a giden metni senin Claude Code oturumun görür; Anthropic'in kullanım koşulları geçerlidir.
+- Beta sürümü gönüllü geliştirme katılımıdır ve kapatılmaz. Giden her paketin kopyası
+  `~/Library/Application Support/Suflor/teshis/gonderilen/` altında durur; neyin gittiğini kendin okuyabilirsin.
+- Toplantı dosyaları senin proje klasöründe durur. Kişi adı içerirler; iç belge gibi davran.
+
+Ayrıntı: [Kılavuz → Gizlilik ayrıntıları](KILAVUZ.md#gizlilik-ayrıntıları).
+
+## Nerede çalışır
+
+| Toplantı | Nasıl |
+|---|---|
+| Microsoft Teams, Google Meet (web) | Chrome eklentisiyle |
+| Zoom (web) | Chrome eklentisiyle (deneme aşamasında) |
+| Teams ve Zoom masaüstü uygulaması | Suflor.me Mac uygulamasıyla (menü çubuğu) |
+
+Pano iki yerde açılır: Suflor.me Mac uygulamasının penceresinde ya da Chrome'da. Mac penceresinde kenar çubuğu (Şimdi · Bugün · Arşiv),
+ayrı Ayarlar ve Yardım pencereleri ve açık/koyu tema var.
 
 ## Kurulum
-Terminal'e yapıştır:
+
+**1.** Terminal'e yapıştır:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 ```
-Kod `~/Suflor.me` klasörüne iner, kurulum sihirbazı Chrome'da açılır (Chrome yoksa varsayılan tarayıcıda) ve her adımı kendisi denetler.
-Sihirbazı kapatırsan aynı komutu yeniden çalıştır; kaldığın adımdan sürer.
 
-**Asistan:** sihirbazda asistanına ad koyarsın; ona adıyla seslenirsin ("Defne, yarın neler var?"). Hitap (siz/sen), tarz (ölçülü ya da rahat
-ve esprili) ve ses (Mac'in Türkçe sesi ya da doğal Türkçe kadın/erkek sesi: Pocket, seçince indirilir) seçilir; istersen toplantı dışında konuşan ikinci bir asistan
-eklersin. Sihirbaz kişilik dosyasını `~/Library/Application Support/Suflor/kisilik/<ad>.md` olarak yazar (aynı adlı dosya varsa üzerine yazmaz)
-ve ayara bağlar (`kisilik`, ikinci asistan `kisilik_toplanti_disi`). Atlarsan asistanın adı Suflor olur. Dosyayı elle de düzenleyebilirsin
-(biçim: `sablon/kisilik-ornek.md`); asistanları sonradan ⚙ Ayarlar → Konuş'ta değiştirirsin.
-Her yayın geliştiricinin anahtarıyla imzalıdır: kurulum ve güncelleme indirilen kodun imzasını ve dosya özetlerini doğrular, tutmazsa hiçbir şey kurmaz.
+**2.** Kurulum sihirbazı tarayıcıda açılır. Her ekranda tek iş var: Mac denetimi, Claude bağlantısı, senin adın,
+asistanın adı ve sesi, proje klasörü, modellerin indirilmesi, takvim ve Chrome eklentisi. Sihirbaz her adımı kendisi denetler. Kapatırsan aynı komut kaldığın yerden sürdürür.
 
-**Proje hazırlığı:** sihirbaz proje klasörünü tarar (kopya, eski sürüm, adından gizli görünen dosyalar; dizine girmesini istemediğin klasörü
-çıkarırsın), PDF, sunum ve görüntüleri bu Mac'te metne çevirip dizinler ve istersen proje kartını (özet, kişiler, kararlar, açık işler, terimler)
-Claude'la hazırlar; kartı onaylamadan önce düzeltirsin. Arka planda sürer, sihirbazı kapatsan da biter. Sonradan: panoda ⚙ Ayarlar → Proje →
-**Projeyi yeniden hazırla**.
-Proje klasörün buluttaysa (iCloud Drive, Google Drive, OneDrive, Dropbox): yalnız bulutta duran dosyalar indirilmez, adı ve yeriyle tanınır;
-içinde arama için dosyayı Mac'e indirmen gerekir (sonraki turda kendiliğinden okunur). Google Dokümanlar/E-Tablolar/Slaytlar Mac'te yalnız kısayol
-olduğu için bugün okunmaz.
+**3.** Bir toplantıya katıl. Panodaki takvimden **Başlat**'a bas; gerisini asistan yürütür.
 
-**Güncelleme:** yeni sürüm çıkınca panonun sağ üstünde **Güncelle** düğmesi belirir (toplantı yokken); tıklaman yeter, Chrome
-eklentisi de kendini yeniler. Elle: `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
-belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensions` → Suflor.me → yenile.
+<p align="center"><img src="gorsel/sihirbaz.png" alt="Kurulum sihirbazı: Asistanına bir ad koy" width="72%"></p>
 
-## Kullanım (kısaca)
-1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).
-   Gündem kurulur, hazır olunca toplantıya katılırsın.
-2. Karşı tarafın sesi kendiliğinden yazıya dökülür (Suflor Ses yardımcısı, macOS 14.4+; ilk kurulumda macOS "Sistem Sesi Kaydı" izni
-   sorar — İzin Ver). Yardımcı yoksa ya da izin verilmediyse Chrome'daki toplantıda **Suflor.me simgesi → "Karşı taraf" satırındaki Aç** (satır yalnız sorun varken görünür; masaüstü Teams/Zoom'da yedek yok).
-3. Kartlar toplantı ekranının sol altındaki küçük şeritte ve panoda görünür. ✓ yaptım · 👁 okudum · ✕ gerek yok. Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin.
-4. Toplantıda kutunun üstünde sağda: **Ne diyeyim?** (tek cümlelik replik önerisi), **Kanıt**, **Sessiz** (10 dk kart yok); "⋯" içinde önemli an, gizli toplantı, sesli çeviri.
-   Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? · **Option + Shift + M** sessiz · **Option + Shift + S** asistan sussun.
-5. Toplantı bitince özet hazırlanır ve sana sunulur.
-6. Brifing ve özet panoda **Dışarı aktar** ile PDF, e-posta taslağı (alıcısız, katılımcılara ya da kendine), panoya kopya ya da .md dosyası olur.
-   Taslağın açılacağı yeri (Gmail, Outlook web ya da Mac'in posta uygulaması) ve gönderen adresini sihirbazın takvim ekranında seçersin;
-   sonradan ayar.json'da `"eposta"` ve `"eposta_adres"`. Seçmezsen takvimine bakılarak seçilir.
+Her yayın geliştiricinin anahtarıyla imzalıdır. Kurulum ve güncelleme indirilen kodun imzasını doğrular; tutmazsa hiçbir şey kurmaz.
+Yeni sürüm çıkınca panoda **Güncelle** düğmesi belirir.
 
-**Ayarlar:** panonun üst çubuğundaki ⚙ — e-posta, ses ve konuşma, toplantı uyarıları, çeviri ve masaüstü, gizlilik; kaydedince hemen geçerli.
+### Gerekenler
 
-**İsteğe bağlı (ayar.json, varsayılan kapalı):** `"menu_cubugu": true` — menü çubuğu uygulaması (buzlu cam panelde mini pano,
-Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da
-çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, kanıt ve
-paylaşılan ekran görüntüsünü toplantı penceresinden alır; Erişilebilirlik, mikrofon ve Ekran Kaydı izni sorar; sonra `guncelle.command`.
-Uygulama `~/Applications/Suflor.me.app`'e kurulur (hesaba özel): Launchpad'de, Spotlight'ta ve Finder'daki Uygulamalar'da Suflor.me adıyla
-bulunur; açıkken simgesine tıklamak pano penceresini öne getirir.
-Kapatmak için `"masaustu_mic": false`, `"kisayollar": false`; Kişiler panelinden ad okuma `"masaustu_kisiler": true` ile açılır — panel
-3 dakikada bir açılıp kapanır, Teams penceresi öne gelir) · `"fisilti": true` — kulaklık takılıyken DUR kartı kısa sesle kulağına okunur ·
-`"ceviri": true` — karşı tarafın İngilizce satırları panoda Türkçesiyle (metin Claude'a gider; 🎧 sesli çeviride toplantı sesi tarayıcıda
-kısılır, masaüstü Teams/Zoom'da kısmak için ayrıca `"masaustu_ses_kis": true` — ses yardımcısı toplantı uygulamasının sesini kendi üzerinden
-çalar; yardımcı takılırsa toplantı sesi kesilebilir) · `"oda": true` — aynı
-mikrofondaki ikinci kişinin sözleri "Odadaki kişi" diye ayrılır. Ses izi hafızasını kapatmak için `"ses_izi_hafiza": false`.
-Claude'un soruya bağlı olmayan SÖYLE/NOT kartları araya dakikada en çok bir kez girer (aynı dakikada gelenler birlikte görünür); aralık
-`"kart_tavan_sn"` (varsayılan 60, 0 kapatır).
-Karşı taraf adını söyleyince panoda ve şeritte hemen "Adın geçti — kim" (Claude'u beklemeden, yalnız sana); karşı taraf araya girmeden
-90 sn'den uzun konuşursan "1,5 dk'dır sen konuşuyorsun". Sana başka adla da hitap ediliyorsa `"lakaplar": ["…"]`. Kapatmak için `"adin_gecti": false`, `"uzun_konusma_sn": 0` (süre de bu ayarla).
-Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)
-— sesli çeviri, fısıltı, sesli özet ve cevaplar bu sesle okunur (Mac'te, yerel); ses dosyası Suflor.me ile gelmez. Hız: `"piper_hiz"`
-(varsayılan 1,0), kısa okumalar `"piper_hiz_kisa"` (1,15). Piper yoksa ya da hata verirse Mac sesi.
-En doğal yerel Türkçe ses: Pocket TTS (kör dinlemede Piper'dan ve Mac sesinden belirgin iyi; işlemcide çalışır, ilk ses ~0,03 sn, ~1,3 GB bellek).
-**Sihirbazdan:** asistan adımında "Kadın sesi" ya da "Erkek sesi" seçilince arka planda kurulur (seçmek indirme onayıdır; varsayılan Mac sesi):
-Python paketleri PyPI'dan (`pocket-gereksinim.txt`, sabit sürümler, ~0,9 GB) ve ses modeli Hugging Face'ten (`wite-tech/pocket-tts-turkish`, sabit sürüm,
-~0,4 GB); toplam ~1,3 GB, hızlı bağlantıda ~2 dk. Yer: ortak klasörde `pocket-venv` + `pocket-modeller` (Python 3.12, belge çevirmeyle ortak).
-Deneme açılışı geçince ayara `pocket_python`, `pocket_hf` ve `ses_motoru: pocket` yazılır; olmazsa asistan Mac sesiyle konuşur, sihirbazda "Yeniden dene"
-ya da sonraki güncelleme yeniden dener (günlük: `~/Library/Application Support/Suflor/pocket-kur.log`; elle: `python3 kurulum.py pocket`).
-**Elle (başka model ya da ses):** kendi Python ortamına (≥ 3.10: `pip install pocket-tts pocket-tts-turkish`) kurup modelleri bir kez indir: `wite-tech/pocket-tts-turkish`
-(3 kadın + 3 erkek hazır ses, duygu etiketi; CC-BY-4.0) ve istersen `alperiox/pocket-tts-turkish` (MIT; hazır sesi yok, wite-tech'in seslerini örnek alır).
-Ayar: `"pocket_python"` (o ortamın python'u), `"pocket_hf"` (modellerin indirildiği HF_HOME), `"ses_motoru": "pocket"` ve `"pocket_ses": "wite:female_2"`;
-kişilik dosyasında `yerel_ses: pocket:alperiox:female_2` o kişiliğe ayrı ses verir (Gemini toplantıya ayrıldığında da yerel okumalar bu sesle).
-Pocket okuyamazsa ya da kurulu değilse Mac sesi (Piper ondan sonra). Ses ve metin Mac'ten çıkmaz; model dosyaları Suflor.me ile gelmez.
-
-En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API anahtarı alıp Anahtar Zinciri'ne koy
-(`security add-generic-password -a "$USER" -s suflor-gemini -w`; anahtar dosyaya yazılmaz), sonra panoda ⚙ Ayarlar → Ses → Gemini.
-11 hazır ses (Gemini sesi) ve model (3.8 Flash-Lite, ilk ses ~0,7 sn; 3.8 Flash) oradan seçilir. Okunacak cevap metni Google'a gider (ses kaydı
-gitmez); canlı kullanım için ücretli katman gerekir (ücretsiz katman günde 10 istek; metni eğitimde kullanır). İnternet yoksa Mac sesi okur.
-Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi) ve `ses_etiket: evet` (<chuckle> gibi sözsüz sesler) kişiliğe özel ses verir;
-toplantıda asistanın cevabı da o kişiliğin Gemini sesiyle okunur. Gemini açıkken sesli çeviri (çevirmen sesi ayar `ceviri_gemini_ses`), fısıltı ve
-toplantı özeti de Gemini'yle okunur; iki kişiliğin sesi de Gemini ise özet iki sesle (⚙ Ayarlar → İki sesli özet). Ton cümleye göre değişir (kötü haber,
-uyarı, acele); kişilik dosyasında `gerginlik_tonu: evet` o kişiliğin tonunu toplantı gerginliğine göre ayarlatır (karar Claude'da).
-⚙ Ayarlar → Toplantıda duyuru (deneme): asistanlar toplantıda konuşurken Suflor toplantı başında kendini tanıtır ve onaylanan işi "Not aldım" diye duyurur.
-Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
-
-## Bileşenler
-| Parça | Ne iş yapar |
+| Ne | Gereken |
 |---|---|
-| Chrome eklentisi (`manifest.json`, `content.js`, `platform-teams.js`, `platform-meet.js`, `platform-zoom.js`, …) | Teams/Meet/Zoom sayfasından altyazı/döküm ve mikrofon sesini alır, şeridi gösterir |
-| Aktarıcı (`relay.py`) | Yerel sunucu: satırları dosyaya yazar, kartları tutar, panoyu sunar |
-| Menü çubuğu uygulaması (`menu-cubugu.swift` → `~/Applications/Suflor.me.app`, isteğe bağlı) | Mini pano paneli, Mac geneli bas-konuş, masaüstü toplantı sinyali |
-| Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
-| Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
-| Toplantıda asistan (`aktarici/toplantiya-ses.py`, `aktarici/otonom.py`, `soyle-main.js`; ⚙ Ayarlar → Asistanlar toplantıda konuşsun, ayar `toplantiya_ses`, varsayılan kapalı) | Toplantıda “<ad>, …” diye seslendiğin asistanın cevabını herkesin duyacağı şekilde okur (söz sırası gelince; “<ad>, dur” ya da Option + Shift + S susturur; sen bir kez çağırdıktan sonra diğer katılımcılar da ona adıyla sorabilir; yalnız sana cevap için Konuş düğmesi): web toplantısında yalnız okuma süresince mikrofon kanalına karıştırır (sessizdeysen okumaz); masaüstü Teams'te BlackHole ile |
-| Tur sonu (`tur-isci.py`) | smart-turn v3 (8,7 MB, yerel): konuşurken sözün bitip bitmediğini tahmin eder; kurulamazsa sessizlik süresine bakılır |
-| Anlama göre arama (`gomme-isci.py`; `baglam.py gomme`) | multilingual-e5-base (MIT, ~1,1 GB, yerel): sorudaki sözcükler belgede geçmese de anlamca yakın parçaları bulur; sözcük aramasıyla birleştirilir. Arka planda bir sunucu açık kalır (~1 GB bellek), 30 dk sorgu gelmezse kapanır |
-| Belge çevirme (`cevir-isci.py`; `baglam.py tara`, `baglam.py cevir`) | Proje klasörünü tarar (kopya, eski sürüm, dışa aktarım, gizli görünen dosya) ve PDF, sunum, görüntüleri Mac'te metne çevirir: Docling + Apple Vision, ayrı Python 3.12 ortamında, ağ kapalı. Şifre, anahtar, kart ya da IBAN geçen parça aramaya girmez |
-| Claude köprüsü (`toplanti-claude.py`, `baglam.py`, `yapi.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
-| Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
+| Mac | Apple Silicon (M serisi), macOS 14 ya da üstü |
+| Bellek | en az 16 GB (toplantı sırasında ~4 GB kullanılır) |
+| Disk | ~12 GB boş alan (modeller ~5 GB; belge çevirme ve arama ~3,3 GB) |
+| Tarayıcı | Google Chrome |
+| Claude | [Claude Code](https://claude.com/claude-code) ve Claude aboneliği (Pro ya da üstü). Claude Code yoksa sihirbaz kurar; Terminal'de `claude` → `/login` ile giriş gerekir. |
+
+## Kısayollar
+
+| Kısayol | Ne yapar |
+|---|---|
+| Option + Shift + K | Kanıt: toplantı ekranının görüntüsünü kaydeder (ekranda şifre görünürse uyarır) |
+| Option + Shift + O | Ne diyeyim? Tek cümlelik replik önerisi |
+| Option + Shift + M | Sessiz: 10 dakika kart yok |
+| Option + Shift + S | Asistan sussun |
+| Option + Shift + Boşluk (basılı tut) | Mac'in her yerinde asistana sesle sor (Mac uygulamasıyla) |
+
+## Daha fazlası
+
+[KILAVUZ.md](KILAVUZ.md) içinde: kurulumdan sonraki adımlar, proje hazırlığı, ayarlar, sesler (Pocket, Piper, Gemini), gizlilik ayrıntıları
+ve bileşenlerin listesi.
 
 ## Lisans
-MIT — ayrıntı [LICENSE](LICENSE).
 
-İsteğe bağlı indirilen bileşenler Suflor.me ile gelmez, kendi lisanslarıyla kullanılır: doğal Türkçe ses modeli
-[wite-tech/pocket-tts-turkish](https://huggingface.co/wite-tech/pocket-tts-turkish) (CC-BY-4.0, wite-tech), Pocket TTS (Kyutai, MIT),
-pocket-tts-turkish paketi (Apache-2.0); elle kurulursa [alperiox/pocket-tts-turkish](https://huggingface.co/alperiox/pocket-tts-turkish) (MIT).
+MIT, ayrıntı [LICENSE](LICENSE). İsteğe bağlı indirilen ses modelleri kendi lisanslarıyla gelir ([Kılavuz → Lisanslar](KILAVUZ.md#lisanslar)).
