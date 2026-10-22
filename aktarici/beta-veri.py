@@ -132,7 +132,8 @@ def _beta_maliyet(bas, son, toplanti_dk):
         for k, ks in (("giris", ("giris",)), ("cikti", ("cikti", "cikis")), ("onbellek_yaz", ("yazim", "onbellek_yaz")), ("onbellek_oku", ("onbellek_oku",))):
             x[k] += sum(int(r.get(a) or 0) for a in ks if isinstance(r.get(a), (int, float)))
     for x in isler.values(): x["dolar"] = round(x["dolar"], 3)
-    tp = isler.get("toplanti") or {}; n_top = len([r for r in cg if r.get("is") == "toplanti"])
+    tp = isler.get("toplanti") or {}; trs = [r for r in cg if r.get("is") == "toplanti"]; n_top = len(trs)
+    toplanti_dk = sum(float(r.get("sure_dk") or 0) for r in trs) or toplanti_dk  # oturumun kendi süresi (maliyet kaydı); yoksa olay kaydından
     gm = [r for r in _jsonl("gemini-ses.jsonl") if bas <= (_ts(r, "t") or 0) < son]
     return {"claude": isler, "toplanti_basi_dolar": round(tp["dolar"] / n_top, 3) if n_top else None,
             "dakika_basi_dolar": round(tp["dolar"] / toplanti_dk, 4) if tp and toplanti_dk else None,
@@ -158,7 +159,8 @@ def beta_haftalik_paket(ad):
                         "canli_ceviri_toplanti": sum(1 for v in tps if v.get("ceviri")), "gizli": o["gizli"], "moderator": o["moderator"], "dur": o["dur"]},
             "kalite": {"konus": _beta_konus(kon), "hitap_yinelenen": o["hitap_yinelenen"], "zaman_asimi": o["zaman_asimi"], "acilis": beta_say("acilis", bas, son),
                        "hata": o["hata"], "sorun": o["sorun"], "sistem": _beta_sistem(bas, son)},
-            "maliyet": _beta_maliyet(bas, son, sum(sure)), "profil": _beta_profil()}
+            "maliyet": _beta_maliyet(bas, son, sum(sure)), "profil": _beta_profil(),
+            "proje": teshis.proje_olcu(AYAR.get("proje"), AYAR["uygulama"])}  # klasör türü + son taramanın sayıları (klasör değişebilir)
 def _beta_haftalik():
     simdi = datetime.datetime.now()
     ad = _KUL.hafta_adi(simdi) if BETA_TEST else _KUL.hafta_adi(simdi - datetime.timedelta(days=7))  # biten hafta

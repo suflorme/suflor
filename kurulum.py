@@ -571,6 +571,7 @@ def kurulum_paketi(sonuc, arka=True):
              "pocket": {"sonuc": pk.get("sonuc") or ("iniyor" if pk.get("bas") else "secilmedi"), "sn": sure(pk)},
              "mac": {"arm": m.get("arm"), "disk_bos_gb": m.get("disk_gb"), "chrome": m.get("chrome"), "teams_uygulama": m.get("teams_uygulama")}}
         a = ayar(); uyg = yollar()["uygulama"]; p["ortam"] = teshis.ortam(dict(a, kod=KOD), uyg)
+        p["proje"] = teshis.proje_olcu(gen(a.get("proje") or (z.get("cevap") or {}).get("proje") or ""), uyg)  # klasör türü + son taramanın bulut sayıları
         g = teshis.gonder(p, a, uyg, arka=arka)
         if g.get("durum") != "kapali": _izi_degistir(lambda z_: z_.update(gitti=sonuc))
     except Exception as e: print(f"kurulum paketi kurulamadı: {e.__class__.__name__}", flush=True)

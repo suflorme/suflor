@@ -567,12 +567,14 @@ def tara_dosyaya(c, kisa=None):
     w = "" if kisa is None else " WHERE yol = ?"
     c.execute(f"""UPDATE dosya SET ({TARA_DOSYA_ALAN}) = (SELECT {TARA_DOSYA_ALAN} FROM tarama t WHERE t.yol = dosya.yol AND t.mtime = dosya.mtime AND t.boy = dosya.boy){w}""",
               () if kisa is None else (kisa,))
+SF_DATALESS = 0x40000000  # macOS: içeriği yalnız bulutta duran dosya (iCloud Drive, Google Drive / OneDrive / Dropbox dosya sağlayıcısı)
+BULUT_KISAYOL = {".gdoc", ".gsheet", ".gslides", ".gdraw", ".gform", ".gmap"}  # Google Drive belge kısayolu: içeriği yok, yalnız bağlantı
 def tara(c=None, sessiz=True):
     c = c or baglan(); t0 = time.time()
     vt = AYAR.get("veritabani") if isinstance(AYAR.get("veritabani"), dict) else {}
     disa = [str(d).strip("/") for d in (vt.get("disa_aktarim") or []) if str(d).strip("/")]
     eski = {r[0]: r[1:] for r in c.execute("SELECT yol, mtime, boy, sha256, minhash, hata FROM tarama")}
-    eris, atlanan, kayit = [], collections.Counter(), []
+    eris, atlanan, kayit, bulut = [], collections.Counter(), [], collections.Counter()
     hata_kayit = (lambda e: eris.append(os.path.relpath(e.filename, PROJE) if e.filename else ""))
     try:
         if not os.listdir(PROJE): eris.append("")
@@ -588,6 +590,8 @@ def tara(c=None, sessiz=True):
             if os.path.islink(y): atlanan["kısayol"] += 1; continue
             try: st = os.stat(y)
             except OSError: eris.append(k); continue
+            if getattr(st, "st_flags", 0) & SF_DATALESS: bulut["bulutta"] += 1  # S141 ölçümü: yalnız bulutta (iCloud/Drive yer tutucusu); bayrak stat'tan, okunmadan
+            if os.path.splitext(f)[1].lower() in BULUT_KISAYOL: bulut["bulut_kisayol"] += 1
             kayit.append((k, y, st))
     # özgün belge + çıktısı eşleşmesi için: klasör → ad kökü (uzantısız, sadeleşmiş) → uzantılar
     kokler = collections.defaultdict(lambda: collections.defaultdict(set))
@@ -663,7 +667,8 @@ def tara(c=None, sessiz=True):
                          "kopya": sum(len(k["kopyalar"]) for k in kopyalar), "kopya_kumesi": len(kopyalar),
                          "surum_grubu": len(gruplar), "eski_surum": sum(len(g["eski"]) for g in gruplar),
                          "kaynak_turu": dict(collections.Counter(s["kaynak_turu"] for s in ss)), "haric": sum(s["gizli"] for s in ss),
-                         "okunamayan": sum(1 for s in ss if s["hata"]), "atlanan": dict(atlanan), "erisilemeyen": eris},
+                         "okunamayan": sum(1 for s in ss if s["hata"]), "atlanan": dict(atlanan), "erisilemeyen": eris,
+                         "bulutta": bulut["bulutta"], "bulut_kisayol": bulut["bulut_kisayol"]},
              "surum_gruplari": gruplar, "kopyalar": kopyalar,
              "haric": [{"yol": s["yol"], "neden": s["gizli_neden"]} for s in ss if s["gizli"]],
              "okunamayan": [{"yol": s["yol"], "hata": s["hata"]} for s in ss if s["hata"]],

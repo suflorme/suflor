@@ -132,6 +132,7 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          "neden": {"abonelik", "giris", "hata", "zaman", "yok", "kurulamadi", "baska_hesap"}, "mikrofon": IZIN, "erisilebilirlik": IZIN, "ekran": IZIN, "takvim": _DURUMLAR,
          "ses_motoru": {"mac", "piper", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
          "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"},
+         "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"}}
 # sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için
 # (kaynak, kanal, kart türü, dönüş, karne boyutu) yalnız bilinen değerler. Uymayan anahtar "?<sıra>" olur (değer yine süzülür).
@@ -183,6 +184,33 @@ def ortam(ayar, uyg, eklenti=None, aktarici=None):
             "bellek_gb": round(int(_sh("sysctl", "-n", "hw.memsize") or 0) / 2**30), "arayuz": "en" if ayar.get("dil") == "en" else "tr",
             "claude_model": str(ayar.get("claude_model") or "varsayilan"), "python": platform.python_version(),
             "gelistirici": os.path.isdir(os.path.join(os.path.expanduser(str(ayar.get("kod") or _BURASI)), ".git"))}  # geliştiricinin git klonu: beta özetine karışmaz
+
+# ---------- proje klasörü (S141: "proje klasörü buluttaysa?") ----------
+# Klasör türü yalnız yoldan (sağlayıcı adı; ~/Library/CloudStorage/<Sağlayıcı>-<hesap> içindeki hesap/e-posta kısmı alınmaz). Sayılar son proje
+# taramasından (baglam.py tara → <uygulama>/tarama.json): ayrıca tarama yok, dosya okunmaz, yalnız bulutta duran dosya indirilmez.
+def klasor_turu(yol, ev=None):
+    if not yol: return "yok"
+    ev = os.path.realpath(ev or os.path.expanduser("~")); y = os.path.realpath(os.path.expanduser(str(yol)))
+    if not os.path.isdir(y): return "yok"
+    md = os.path.join(ev, "Library", "Mobile Documents")
+    if y.startswith(md + os.sep) or y == md: return "icloud"
+    for k in ("Desktop", "Documents"):  # iCloud "Masaüstü ve Belgeler" eşitlemesi: yol yerel görünür, içerik iCloud'da
+        if (y == os.path.join(ev, k) or y.startswith(os.path.join(ev, k) + os.sep)) and os.path.isdir(os.path.join(md, "com~apple~CloudDocs", k)): return "icloud"
+    cs = os.path.join(ev, "Library", "CloudStorage")
+    if y.startswith(cs + os.sep):
+        ad = y[len(cs) + 1:].split(os.sep)[0].split("-")[0].lower()
+        return {"googledrive": "googledrive", "onedrive": "onedrive", "dropbox": "dropbox"}.get(ad, "diger_bulut")
+    for ad, tur in (("Dropbox", "dropbox"), ("Google Drive", "googledrive"), ("OneDrive", "onedrive")):  # eski istemcilerin ev klasöründeki yeri
+        if y == os.path.join(ev, ad) or y.startswith(os.path.join(ev, ad) + os.sep): return tur
+    return "yerel"
+def proje_olcu(proje, uyg):
+    o = {"klasor_turu": klasor_turu(proje)}
+    try: r = json.load(open(os.path.join(uyg, "tarama.json"), encoding="utf-8"))
+    except (OSError, ValueError): return dict(o, tarandi=False)
+    if not proje or os.path.realpath(os.path.expanduser(str(r.get("proje") or ""))) != os.path.realpath(os.path.expanduser(str(proje))): return dict(o, tarandi=False)
+    s = r.get("sayilar") or {}
+    return dict(o, tarandi=True, tarama_gun_once=round((time.time() - (r.get("t") or time.time())) / 86400, 1), dosya=s.get("dosya"),
+                bulutta=s.get("bulutta"), bulut_kisayol=s.get("bulut_kisayol"), okunamayan=(s.get("okunamayan") or 0) + len(s.get("erisilemeyen") or []))
 
 # ---------- hata özeti ----------
 def hata_ozeti(tur, deger, tb):

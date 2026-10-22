@@ -37,6 +37,21 @@ kontrol("süzgeç: izinli seçenekler kaldı (hafta, platform, adım, ses motoru
 kontrol("süzgeç: bilinmeyen seçenek '?' (sonuç, tema, adım)", t["sonuc"] == "?" and t["profil"]["tema"] == "?" and t["adimlar"][1]["adim"] == "?")
 kontrol("süzgeç: Claude gözlemi (serbest metin) gitmez", t.get("gozlem") is None)
 kontrol("süzgeç: 10 haneli sayı değer olarak kalır (sayı içerik değil), metin içinde maskeli", t["kalite"]["sayi"] == 5321234567 and "5321234567" not in t["kalite"]["not"])
+# klasör türü (S141): sahte ev klasöründe sağlayıcı yolları; hesap/e-posta kısmı pakete girmez
+_ev = tempfile.mkdtemp(prefix="suflor-ev-")
+for d in ("Library/CloudStorage/GoogleDrive-" + EPOSTA + "/My Drive/P", "Library/CloudStorage/OneDrive-Kisisel/P", "Library/CloudStorage/Box-Box/P",
+          "Library/Mobile Documents/com~apple~CloudDocs/P", "Library/Mobile Documents/com~apple~CloudDocs/Documents", "Documents/P", "Desktop/P", "Dropbox/P"):
+    os.makedirs(os.path.join(_ev, d))
+_kt = {d: teshis.klasor_turu(os.path.join(_ev, d), ev=_ev) for d in ("Library/CloudStorage/GoogleDrive-" + EPOSTA + "/My Drive/P", "Library/CloudStorage/OneDrive-Kisisel/P",
+       "Library/CloudStorage/Box-Box/P", "Library/Mobile Documents/com~apple~CloudDocs/P", "Documents/P", "Desktop/P", "Dropbox/P", "yok/P")}
+kontrol("klasör türü: googledrive, onedrive, diger_bulut, icloud (Belgeler eşitlemesi dahil), yerel, dropbox, yok",
+        list(_kt.values()) == ["googledrive", "onedrive", "diger_bulut", "icloud", "icloud", "yerel", "dropbox", "yok"], _kt)
+json.dump({"proje": os.path.join(_ev, "Desktop/P"), "t": time.time(), "sayilar": {"dosya": 40, "bulutta": 7, "bulut_kisayol": 2, "okunamayan": 1, "erisilemeyen": ["Zeynep"]}},
+          open(os.path.join(_ev, "tarama.json"), "w"))
+_po = teshis.temizle({"proje": teshis.proje_olcu(os.path.join(_ev, "Desktop/P"), _ev)})["proje"]
+kontrol("proje ölçüsü son taramadan: 40 dosya, 7 yalnız bulutta, 2 kısayol, 2 okunamayan; ad yok",
+        _po.get("dosya") == 40 and _po.get("bulutta") == 7 and _po.get("bulut_kisayol") == 2 and _po.get("okunamayan") == 2 and not sizinti(_po), _po)
+shutil.rmtree(_ev, ignore_errors=True)
 kontrol("deneme: gerçek Worker adresine gönderim kapalı", teshis.acik({}) is False and teshis.acik({"teshis_adres": "http://127.0.0.1:9/"}) is True)
 
 # ---------- yerel alıcı ----------
