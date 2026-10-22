@@ -19,7 +19,7 @@ import UserNotifications
 setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
 let args = CommandLine.arguments
 // günlük satırları saatli (13 Ekim deneme 8: "bildirim izni yok" satırının ne zaman yazıldığı bilinemedi); teşhis kiplerinin çıktısı saatsiz
-let TANI = args.contains { ["--ax-dokum", "--ax-altyazi", "--kanit-dene", "--ekran-dene", "--ekran-izni"].contains($0) }
+let TANI = args.contains { ["--ax-dokum", "--ax-altyazi", "--kanit-dene", "--ekran-dene", "--ekran-izni", "--simge-yaz"].contains($0) }
 let saatBicim: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd HH:mm:ss"; return f }()
 func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
     let s = items.map { "\($0)" }.joined(separator: separator)
@@ -61,7 +61,8 @@ func isaret(_ d: Durum) -> NSImage {
                     controlPoint2: NSPoint(x: (25.17 + dx) * s, y: (40.79 - 3.3) * s))
             return p
         }
-        NSColor.black.set()
+        // renkli noktalı durumlarda görüntü şablon değil: tırnaklar menü çubuğunun yazı rengiyle (koyu çubukta siyah görünmüyordu, yalnız turuncu nokta kalıyordu)
+        (d == .eylem || d == .kayit ? NSColor.labelColor : NSColor.black).set()
         for dx: CGFloat in [0, 19] {
             let p = tirnak(dx)
             if d == .dinliyor || d == .kayit { p.fill() } else { p.lineWidth = 1.2; p.stroke() }
@@ -1322,6 +1323,17 @@ if args.contains("--pencere-dene") {
         }
     }
     let d = Dene(); NSApplication.shared.delegate = d; NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
+}
+// Kurulum: `--simge-yaz <dosya.png>` → Dock simgesi 1024 px; kurulum.py bundan paket simgesi (AppIcon.icns) yapar — simge yalnız çalışırken verilince
+// pencere kapanıp uygulama Dock'tan çekilince sabitlenmiş kısayol boş kalıyordu
+if let yol = arg("--simge-yaz") {
+    guard let s = suflorSimge, let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                                         isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
+    rep.size = NSSize(width: 512, height: 512)
+    NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    s.draw(in: NSRect(x: 0, y: 0, width: 512, height: 512)); NSGraphicsContext.restoreGraphicsState()
+    guard let d = rep.representation(using: .png, properties: [:]) else { exit(1) }
+    do { try d.write(to: URL(fileURLWithPath: yol)); exit(0) } catch { exit(1) }
 }
 if args.contains("--ax-dokum") { Masaustu().dokum(); exit(0) }
 if let s = arg("--ax-altyazi") { Masaustu().altyaziIzle(Double(s) ?? 120, uyg: arg("--uyg")); exit(0) }

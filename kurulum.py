@@ -826,7 +826,7 @@ MENU_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>CFBundleIdentifier</key><string>local.suflor.menu</string><key>CFBundleName</key><string>Suflor Menü</string>
-  <key>CFBundleExecutable</key><string>SuflorMenu</string><key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleExecutable</key><string>SuflorMenu</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Suflor.me bas-konuş: Option + Shift + Boşluk basılıyken sesin yalnız bu Mac'teki yerel konuşma tanımaya gider.</string>
 </dict></plist>
@@ -991,6 +991,15 @@ def derle(uyg, kaynak, ikili_ad, plist):  # Swift yardımcısı: kaynak değişt
     with os.fdopen(fd, "w") as g: r = subprocess.run(["swiftc", "-O", "-o", ikili, kay], stdout=subprocess.DEVNULL, stderr=g)
     if r.returncode: return gunluk
     os.remove(gunluk); _derleme_kaydi(uyg, ikili_ad, sha); return True
+def menu_simge(mnu):  # paket simgesi (imzadan önce): ikilinin çizdiği 1024 px PNG → sips → Contents/Resources/AppIcon.icns
+    res = os.path.join(mnu, "Contents", "Resources"); os.makedirs(res, exist_ok=True); gec = tempfile.mkdtemp(prefix="suflor-simge-")
+    try:
+        png = os.path.join(gec, "simge.png"); r = sessiz(os.path.join(mnu, "Contents", "MacOS", "SuflorMenu"), "--simge-yaz", png, timeout=30)
+        if not (r and r.returncode == 0 and os.path.exists(png)): return False
+        r = sessiz("sips", "-s", "format", "icns", png, "--out", os.path.join(res, "AppIcon.icns"))
+        if not (r and r.returncode == 0): return False
+        sessiz("touch", mnu); return True  # Finder/Dock simge önbelleği paketi yeniden okusun
+    finally: shutil.rmtree(gec, ignore_errors=True)
 def yerel_imza():  # yerel-imza.sh (kalıcı yerel imza); kurulamazsa "-" = geçici imza
     r = sessiz("/bin/bash", "-c", '. "$1"; yerel_imza', "_", os.path.join(KOD, "yerel-imza.sh"))
     return (r.stdout.strip() if r else "") or "-"
@@ -1105,6 +1114,8 @@ def kur():
         r = derle(mnu, "menu-cubugu.swift", "SuflorMenu", MENU_PLIST)
         if r is True: say(f"Menü çubuğu uygulaması derlendi: {mnu}"); sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorMenu")
         elif r: say(f"UYARI: menü çubuğu uygulaması derlenemedi ({r})")
+        if r is True or not os.path.exists(os.path.join(mnu, "Contents", "Resources", "AppIcon.icns")):
+            say("Menü uygulamasına Dock simgesi eklendi" if menu_simge(mnu) else "UYARI: Dock simgesi yazılamadı — pencere kapanınca Dock'ta genel simge görünür")
         imz.append(mnu)
     imzala(imz)
     from xml.sax.saxutils import escape as x
