@@ -88,6 +88,8 @@ async function durum() {
 const anahtarli = async (url) => { const k = await SuflorAnahtar.al(); return k && url.startsWith(`http://127.0.0.1:${k.port}/`) ? url + "?k=" + k.anahtar : url; };
 async function panoAc(relay) {
   const kok = relay.replace(/\/$/, "") + "/";
+  // v0.105.0: menü uygulaması çalışıyorsa pano onun Mac penceresinde açılır; yoksa (pencere: false ya da eski aktarıcı) Chrome sekmesi
+  try { const r = await fetch(kok + "pano-ac", { method: "POST", body: "{}" }); if (r.ok && (await r.json()).pencere) return; } catch (e) {}
   const [t] = (await chrome.tabs.query({ url: kok + "*" })).filter(t => t.url === kok || t.url.startsWith(kok + "?") || t.url.startsWith(kok + "#"));
   if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, /^🔑|anahtar gerekli|key required/.test(t.title || "") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }
   else await chrome.tabs.create({ url: await anahtarli(kok) });

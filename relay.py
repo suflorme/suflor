@@ -1897,6 +1897,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/agenda": return self._json(agenda())
         if self.path == "/konus-gecmis": return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
+        if (self.headers.get("X-Suflor-Istemci") or "").startswith("menu"): STATE["_menu_yokluyor"] = time.time()  # pano penceresi açılabilir (bildirim izni olmasa da)
         if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); return self._json(v)
         if self.path.startswith("/cards?"):  # uzun yoklama
             from urllib.parse import urlsplit, parse_qs
@@ -1997,6 +1998,10 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ayar":  # panodaki ⚙ Ayarlar — yalnız pano (aynı köken + anahtar)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(ayar_yaz(p.get("degisen")))
+        if self.path == "/pano-ac":  # v0.105.0: panoyu menü uygulamasının Mac penceresinde aç (kurulum, eklentinin "Panoyu aç"ı) — anahtarla;
+            # menü uygulaması son 60 sn'de yoklamadıysa pencere: false → istemci eskisi gibi tarayıcıda açar
+            if time.time() - STATE.get("_menu_yokluyor", 0) > 60: return self._json({"ok": True, "pencere": False})
+            STATE["pano_ac"] = {"id": "p" + str(int(time.time() * 1000)), "t": time.time()}; kart_bildir(); return self._json({"ok": True, "pencere": True})
         if self.path == "/son-ac":  # panodaki "Özeti aç" — yalnız pano (aynı köken + pano anahtarı), yalnız kayıttaki özet
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(son_ac(p))

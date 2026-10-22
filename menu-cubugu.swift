@@ -4,7 +4,7 @@
 //   turuncu nokta (onay bekleyen iş). Durum aktarıcının şerit uzun yoklamasından (GET /cards?bekle=25).
 // - Tıkla: buzlu cam (NSVisualEffectView) panelde mini pano — panonun ?gorunum=panel görünümü (WKWebView, saydam). Panel ekran
 //   paylaşımında görünmez (sharingType none), odak çalmaz (nonactivating). Sağ tık: Panoyu aç · kısayol · Çık.
-// - Pano penceresi (v0.104.0): "Panoyu aç" ve bildirim tam panoyu bu uygulamanın Mac penceresinde açar (PanoPencere); "Panoyu Chrome'da aç" eski yol.
+// - Pano penceresi (v0.104.0): "Panoyu aç" ve bildirim tam panoyu bu uygulamanın Mac penceresinde açar (PanoPencere); "Panoyu tarayıcıda aç" eski yol.
 // - Mac geneli bas-konuş: Option + Shift + Boşluk basılı tut → mikrofon (16 kHz) → bırakınca POST /bas-konus (anahtar + pano kökeni).
 //   Carbon sıcak tuşu basma/bırakmayı ayrı verir; Erişilebilirlik izni gerekmez, mikrofon izni bu uygulamaya sorulur.
 // Ağ: yalnız 127.0.0.1. Ses yalnız aktarıcıya gider (Mac'ten çıkmaz).
@@ -84,7 +84,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!; var pano: PanoPencere?
     var durum: Durum = .bekliyor; var imza = ""; var gorulenKart = Set<String>(); var acikKart = Set<String>()
     var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?
-    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?
+    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var sonPanoAc = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?
     func applicationDidFinishLaunching(_ n: Notification) {
         oge = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
@@ -119,6 +119,11 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         web = WKWebView(frame: ve.bounds, configuration: c); web.autoresizingMask = [.width, .height]; web.navigationDelegate = self; web.uiDelegate = self
         web.setValue(false, forKey: "drawsBackground")  // saydam: buzlu cam görünsün
         ve.addSubview(web); panel.contentView = ve
+        // sağ üst köşede büyüt: tam pano Mac penceresinde (panel kapanır)
+        let b = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: "Panoyu aç")!, target: self, action: #selector(panelBuyut))
+        b.isBordered = false; b.bezelStyle = .regularSquare; b.contentTintColor = .secondaryLabelColor; b.toolTip = "Panoyu aç (tam pencere)"
+        b.frame = NSRect(x: ve.bounds.width - 26, y: ve.bounds.height - 24, width: 18, height: 18); b.autoresizingMask = [.minXMargin, .minYMargin]
+        ve.addSubview(b)
     }
     func panelYukle() {
         let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
@@ -150,7 +155,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func menuGoster() {
         let m = NSMenu()
         m.addItem(withTitle: "Panoyu aç", action: #selector(panoAc), keyEquivalent: "").target = self
-        m.addItem(withTitle: "Panoyu Chrome'da aç", action: #selector(panoTarayici), keyEquivalent: "").target = self
+        m.addItem(withTitle: "Panoyu tarayıcıda aç", action: #selector(panoTarayici), keyEquivalent: "").target = self
         m.addItem(withTitle: "Paneli yenile", action: #selector(panelYenile), keyEquivalent: "").target = self
         if panel.isVisible { m.addItem(withTitle: "Paneli kapat (Esc)", action: #selector(panelKapat), keyEquivalent: "").target = self }
         m.addItem(.separator())
@@ -162,6 +167,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         oge.menu = m; oge.button?.performClick(nil); oge.menu = nil
     }
     @objc func panoAc() { panoPencere() }
+    @objc func panelBuyut() { panel.orderOut(nil); panoPencere() }
     @objc func panoTarayici() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
     @objc func panoPencere() { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.goster() }
     func panelGoster() { if !panel.isVisible { tiklandi(oge.button!) } }  // panodaki "mini pano" düğmesi: menüdeki panel
@@ -182,6 +188,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func isle(_ v: [String: Any]) {
         imza = v["imza"] as? String ?? ""
         masaustuKanit?.iste(v["kanit_iste"] as? [String: Any])  // masaüstü toplantıdayken kanıtı toplantı penceresinden al
+        if let id = (v["pano_ac"] as? [String: Any])?["id"] as? String, id != sonPanoAc { sonPanoAc = id; panoPencere() }  // /pano-ac (kurulum, eklenti)
         if let b = v["bildirim"] as? [String: Any], let id = b["id"] as? String, id != sonBildirim {
             let ilk = sonBildirim.isEmpty; sonBildirim = id
             if !ilk || ((b["t"] as? Double).map { Date().timeIntervalSince1970 - $0 < 30 } ?? false) { bildir(b) }  // açılışta eski bildirim yinelenmesin
@@ -915,6 +922,13 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     @objc func aracTik(_ o: NSToolbarItem) { if let a = PanoPencere.ARACLAR.first(where: { $0.0 == o.itemIdentifier }) { tikla(a.3) } }
     func tikla(_ dugme: String) { web.evaluateJavaScript("(()=>{const b=document.getElementById('\(dugme)');if(b){b.click();return true}return false})()") { v, _ in if (v as? Bool) != true { print("PENCERE: sayfada \(dugme) düğmesi yok") } } }
     @objc func ayarlar() { tikla("ay") }
+    // Toplantı menüsü panodaki alt çubuk düğmelerine tıklar (durum ve onay panoda kalır); Option + Shift kısayolları Mac genelinde zaten var
+    static let MENU_DUGME = ["Önemli an": "yz", "Kanıt al": "kz", "Ne diyeyim?": "oz", "Sessiz (10 dk kart yok)": "sz", "Sesli çeviri": "sc", "Gizli toplantı": "gz"]
+    @objc func menuDugme(_ o: NSMenuItem) { if let d = PanoPencere.MENU_DUGME[o.title] { tikla(d) } }
+    @objc func baslat() {  // boş panodaki büyük kartın Başlat'ı (form açılır); toplantı sürerken yok
+        web.evaluateJavaScript("(()=>{const b=document.querySelector('button[data-bas]');if(b){b.click();return true}return false})()") { v, _ in if (v as? Bool) != true { print("PENCERE: Başlat düğmesi yok (toplantı sürüyor olabilir)") } }
+    }
+    @objc func chromeda() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
     @objc func geriBildirim() { tikla("gb") }
     @objc func miniPano() { mini() }
     @objc func hakkinda() {
@@ -937,10 +951,19 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         alt("Düzen", [("Geri al", Selector(("undo:")), "z", .command, nil), ("Yinele", Selector(("redo:")), "z", [.command, .shift], nil), ("-", nil, "", [], nil),
                       ("Kes", #selector(NSText.cut(_:)), "x", .command, nil), ("Kopyala", #selector(NSText.copy(_:)), "c", .command, nil),
                       ("Yapıştır", #selector(NSText.paste(_:)), "v", .command, nil), ("Tümünü seç", #selector(NSText.selectAll(_:)), "a", .command, nil)])
-        alt("Görünüm", [("Mini pano", #selector(miniPano), "", [], self), ("Yenile", #selector(yenile), "r", .command, self), ("-", nil, "", [], nil),
-                        ("Tam ekran", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control], nil)])
+        alt("Toplantı", [("Toplantı başlat…", #selector(baslat), "", [], self), ("-", nil, "", [], nil),
+                         ("Önemli an", #selector(menuDugme(_:)), "", [], self), ("Kanıt al", #selector(menuDugme(_:)), "k", [.option, .shift], self),
+                         ("Ne diyeyim?", #selector(menuDugme(_:)), "o", [.option, .shift], self), ("-", nil, "", [], nil),
+                         ("Sessiz (10 dk kart yok)", #selector(menuDugme(_:)), "m", [.option, .shift], self), ("Sesli çeviri", #selector(menuDugme(_:)), "", [], self),
+                         ("Gizli toplantı", #selector(menuDugme(_:)), "", [], self)])
+        alt("Görünüm", [("Mini pano", #selector(miniPano), "", [], self), ("Panoyu tarayıcıda aç", #selector(chromeda), "", [], self), ("-", nil, "", [], nil),
+                        ("Yenile", #selector(yenile), "r", .command, self), ("Tam ekran", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control], nil)])
         alt("Pencere", [("Küçült", #selector(NSWindow.performMiniaturize(_:)), "m", .command, nil), ("Büyüt", #selector(NSWindow.performZoom(_:)), "", [], nil),
                         ("Kapat", #selector(NSWindow.performClose(_:)), "w", .command, nil)])
+        alt("Yardım", [("Geri bildirim gönder…", #selector(geriBildirim), "", [], self), ("-", nil, "", [], nil),
+                       ("Konuş: Option + Shift + Boşluk basılı tut", nil, "", [], nil), ("Kanıt: Option + Shift + K", nil, "", [], nil),
+                       ("Ne diyeyim?: Option + Shift + O", nil, "", [], nil), ("Sessiz: Option + Shift + M", nil, "", [], nil),
+                       ("Asistan sussun: Option + Shift + S", nil, "", [], nil)])
         NSApp.mainMenu = ana
     }
     @objc func yenile() { web.reload() }
@@ -1013,6 +1036,35 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     }
 }
 
+// Teşhis: `--panel-dene <png>` → yalnız menü paneli (mini pano + büyüt düğmesi); yüklenince görüntüsü dosyaya
+if arg("--panel-dene") != nil {
+    final class PDene: NSObject, NSApplicationDelegate {
+        let u = Uygulama()
+        func applicationDidFinishLaunching(_ n: Notification) {
+            u.panelKur(); u.panel.sharingType = .readOnly; u.panelYukle(); u.panel.center(); u.panel.makeKeyAndOrderFront(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [u] in
+                let ve = u.panel.contentView!
+                u.web.takeSnapshot(with: nil) { sayfa, _ in
+                    let im = NSImage(size: ve.bounds.size); im.lockFocus(); NSColor.windowBackgroundColor.setFill(); ve.bounds.fill(); sayfa?.draw(in: u.web.frame)
+                    for d in ve.subviews where d is NSButton { if let r = d.bitmapImageRepForCachingDisplay(in: d.bounds) { d.cacheDisplay(in: d.bounds, to: r); r.draw(in: d.frame) } }
+                    im.unlockFocus()
+                    if let t = im.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) { let yol = arg("--panel-dene")!; try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü:", yol) }
+                    exit(0)
+                }
+            }
+        }
+    }
+    let d = PDene(); NSApplication.shared.delegate = d; NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
+}
+func goruntuAl(_ p: PanoPencere, _ yol: String) {  // çerçeve (araç çubuğu) + sayfa tek PNG (pencere paylaşımda görünmediği için ekran görüntüsü yerine)
+    guard let cerceve = p.pencere.contentView?.superview else { return }
+    p.web.takeSnapshot(with: nil) { sayfa, _ in
+        guard let rep = cerceve.bitmapImageRepForCachingDisplay(in: cerceve.bounds) else { return }
+        cerceve.cacheDisplay(in: cerceve.bounds, to: rep)
+        let im = NSImage(size: cerceve.bounds.size); im.addRepresentation(rep); im.lockFocus(); sayfa?.draw(in: p.web.convert(p.web.bounds, to: cerceve)); im.unlockFocus()
+        if let t = im.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü:", yol) }
+    }
+}
 // Teşhis: `--pencere-dene [sn]` → yalnız pano penceresi (menü simgesi, kısayol, masaüstü yok); yüklenince mikrofonu dener ve sonucu yazar
 if args.contains("--pencere-dene") {
     final class Dene: NSObject, NSApplicationDelegate {
@@ -1022,6 +1074,14 @@ if args.contains("--pencere-dene") {
             p.web.configuration.userContentController.addUserScript(WKUserScript(source: "window.__h=[];addEventListener('error',e=>__h.push(e.message+' @'+e.lineno));addEventListener('unhandledrejection',e=>__h.push('söz: '+e.reason))", injectionTime: .atDocumentStart, forMainFrameOnly: true))
             p.yuklendi = { [weak p] in
                 print("yüklendi:", p?.web.url?.path ?? "?")
+                // --goruntu <png> [--js <kod>] [--bekle <sn>]: yalnız görüntü (mikrofon ve düğme denemesi yok); --js görüntüden önce sayfada çalışır
+                if let yol = arg("--goruntu") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg("--bekle") ?? "") ?? 4)) {
+                        p?.web.evaluateJavaScript(arg("--js") ?? "0") { v, e in if let e = e { print("js hata:", e.localizedDescription) } else if let v = v { print("js:", v) } }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { if let p = p { goruntuAl(p, yol) } }
+                    }
+                    return
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 4) {  // pano ilk yoklamasını yapsın
                     p?.web.evaluateJavaScript("[document.title,document.body.innerText.length,document.querySelectorAll('button').length,JSON.stringify(__h)].join(' · ')") { v, _ in print("sayfa:", v ?? "?") }
                     p?.ayarlar(); DispatchQueue.main.asyncAfter(deadline: .now() + 1) {  // araç çubuğu/menü → sayfadaki düğme: Ayarlar, sonra Geri bildirim açılıyor mu
@@ -1032,20 +1092,13 @@ if args.contains("--pencere-dene") {
                             if args.contains("--pdf-dene") { p?.web.evaluateJavaScript("(()=>{const w=window.open('','_blank');if(!w)return 'pencere yok';w.document.write('<!doctype html><title>Suflor deneme PDF</title><h1>Deneme</h1><p>'+'Satır. '.repeat(3000)+'</p>');w.document.close();setTimeout(()=>w.print(),300);return 'yazıldı'})()") { v, e in print("pdf:", v ?? e?.localizedDescription ?? "?") } }
                         }
                     }
-                    if let yol = arg("--goruntu"), let p = p, let cerceve = p.pencere.contentView?.superview {  // çerçeve (araç çubuğu) + sayfa görüntüsü tek PNG
-                        p.web.takeSnapshot(with: nil) { sayfa, _ in
-                            guard let rep = cerceve.bitmapImageRepForCachingDisplay(in: cerceve.bounds) else { return }
-                            cerceve.cacheDisplay(in: cerceve.bounds, to: rep)
-                            let im = NSImage(size: cerceve.bounds.size); im.addRepresentation(rep); im.lockFocus()
-                            sayfa?.draw(in: p.web.convert(p.web.bounds, to: cerceve)); im.unlockFocus()
-                            if let t = im.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü:", yol) }
-                        }
-                    }
                 }
                 p?.web.callAsyncJavaScript("try{const s=await navigator.mediaDevices.getUserMedia({audio:true});const t=s.getAudioTracks();const r='mikrofon: açıldı ('+t.length+' iz, '+(t[0]&&t[0].label)+')';t.forEach(x=>x.stop());return r}catch(e){return 'mikrofon: '+e.name+' '+e.message}", arguments: [:], in: nil, in: .page) { r in
                     switch r { case .success(let v): print(v); case .failure(let e): print("js hata:", e.localizedDescription) }
                 }
             }
+            if args.contains("--koyu") { NSApp.appearance = NSAppearance(named: .darkAqua) }  // denemede koyu görünüm
+            if let b = arg("--boy")?.split(separator: "x").compactMap({ Double($0) }), b.count == 2 { p.pencere.setContentSize(NSSize(width: b[0], height: b[1])) }
             p.goster(); p.pencere.sharingType = .readOnly; print("pencere no:", p.pencere.windowNumber)  // denemede ekran görüntüsü alınabilsin (screencapture -l)
             if let i = args.firstIndex(of: "--pencere-dene"), i + 1 < args.count, let sn = Double(args[i + 1]) { DispatchQueue.main.asyncAfter(deadline: .now() + sn) { exit(0) } }
         }

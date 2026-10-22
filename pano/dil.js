@@ -222,6 +222,7 @@ globalThis.SUFLOR_EN = {
   "E-posta: katılımcılara ({n})": "Email: to attendees ({n})",
   "E-posta: katılımcılara": "Email: to attendees",
   "E-posta: kendime": "Email: to myself",
+  "E-posta taslağı": "Email draft",
   "takvim adresin": "your calendar address",
   "Kaydedilemedi": "Couldn't save",
   "Kaydedildi": "Saved",

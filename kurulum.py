@@ -396,6 +396,12 @@ def ac(hedef):
     elif hedef == "chrome-eklentiler": subprocess.Popen(["open", "-a", "Google Chrome", "chrome://extensions"])
     elif hedef == "eklenti-klasoru": subprocess.Popen(["open", "-R", os.path.join(KOD, "manifest.json")])
     elif hedef == "pano" and a.get("port"):
+        # v0.105.0: menü uygulaması varsa pano onun Mac penceresinde (aktarıcı yeni kalktıysa menünün ilk yoklamasını 5 sn'ye kadar bekle)
+        for _ in range(5 if a.get("menu_cubugu") is True else 0):
+            try:
+                if json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{a['port']}/pano-ac", data=b"{}", method="POST"), timeout=3)).get("pencere"): return
+            except Exception: pass
+            time.sleep(1)
         # pano yerel anahtarı kendi deposuna alır: aktarıcıdan tek kullanımlık adres (anahtar komut satırına yazılmaz)
         try: url = json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{a['port']}/tek-kullanim", data=b"{}", method="POST"), timeout=3))["url"]
         except Exception: url = f"http://127.0.0.1:{a['port']}/"
