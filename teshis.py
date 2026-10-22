@@ -243,6 +243,9 @@ def gonder(paket, ayar, uyg, zorla=False, arka=True):
         with _KILIT: _bekleyenleri_gonder(ayar, uyg)
     if arka: threading.Thread(target=isle, daemon=True).start(); return {"ok": True, "durum": "kuyrukta", "dosya": fp}
     isle(); return {"ok": not os.path.exists(fp), "durum": "gonderildi" if not os.path.exists(fp) else "bekliyor", "dosya": fp}
+def _surum():
+    try: return json.load(open(os.path.join(_BURASI, "manifest.json"))).get("version") or "?"
+    except (OSError, ValueError): return "?"
 def _bekleyenleri_gonder(ayar, uyg):
     adres = str(ayar.get("teshis_adres") or ADRES_VARSAYILAN)
     if not (adres.startswith("https://") or adres.startswith("http://127.0.0.1:")): return  # yerel: yalnız deneme
@@ -251,7 +254,8 @@ def _bekleyenleri_gonder(ayar, uyg):
     for fp in sorted(glob.glob(os.path.join(bek, "*.json")))[:50]:
         try:
             veri = open(fp, "rb").read()
-            r = urllib.request.Request(adres, data=veri, method="POST", headers={"Content-Type": "application/json", "X-Suflor-Beta": BETA_ANAHTAR})
+            # User-Agent şart (23 Ekim): Cloudflare, Python'un varsayılan "Python-urllib" kimliğini "error code: 1010" (403) ile engelliyor — v0.12'den beri paketler bu yüzden gitmiyordu
+            r = urllib.request.Request(adres, data=veri, method="POST", headers={"Content-Type": "application/json", "X-Suflor-Beta": BETA_ANAHTAR, "User-Agent": f"Suflor.me/{_surum()}"})
             with urllib.request.urlopen(r, timeout=10) as y:
                 if y.status >= 300: break
             os.replace(fp, os.path.join(gon, os.path.basename(fp)))

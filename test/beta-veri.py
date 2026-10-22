@@ -55,10 +55,11 @@ shutil.rmtree(_ev, ignore_errors=True)
 kontrol("deneme: gerçek Worker adresine gönderim kapalı", teshis.acik({}) is False and teshis.acik({"teshis_adres": "http://127.0.0.1:9/"}) is True)
 
 # ---------- yerel alıcı ----------
-GELEN = []
+GELEN = []; UA = []
 class Al(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_POST(self):
+        UA.append(self.headers.get("User-Agent") or "")
         b = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         try: GELEN.append(json.loads(b))
         except ValueError: GELEN.append({"ham": b.decode("utf-8", "replace")})
@@ -127,6 +128,7 @@ try:
                 json.dumps([h.get("ozellik"), h.get("profil")])[:300])
         kontrol("haftalık: maliyet (bas_konus 3 çağrı) ve kimlik yalnız kurulum numarası", ((h.get("maliyet") or {}).get("claude") or {}).get("bas_konus", {}).get("cagri") == 3
                 and re.fullmatch(r"[0-9a-f]{12}", h["ortam"]["kurulum"]), json.dumps(h.get("maliyet"))[:300])
+    kontrol("istek kendi kimliğiyle (Cloudflare Python-urllib'i 1010 ile engelliyor)", UA and all(u.startswith("Suflor.me/") for u in UA), UA[:2])
     gk = os.listdir(os.path.join(uyg, "teshis", "gonderilen")) if os.path.isdir(os.path.join(uyg, "teshis", "gonderilen")) else []
     kontrol("gönderilen paketlerin kopyası teshis/gonderilen/'de", any("haftalik" in f for f in gk) and any("toplanti_sonu" in f for f in gk), gk)
     olay = json.load(open(os.path.join(canli, "beta-olay.json"))) if os.path.exists(os.path.join(canli, "beta-olay.json")) else {}
