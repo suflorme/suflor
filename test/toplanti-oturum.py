@@ -100,7 +100,7 @@ try:
             if any(m["kim"] == "claude" and metin in m["metin"] for m in mesaj()): return True
             time.sleep(0.2)
         return False
-    def izin_kartlari(): return [c for c in uc("/cards")[1].get("cards") or [] if c.get("onay") and "Toplantı oturumu" in c.get("text", "") and c.get("status") == "acik"]
+    def izin_kartlari(): return [c for c in uc("/cards")[1].get("cards") or [] if c.get("onay") and "Claude şunu yapmak istiyor" in c.get("text", "") and c.get("status") == "acik"]
 
     ok("Başlat'tan önce panoda oturum bölümü yok", to() == {})
     kod, y = uc("/baslat", {"konu": "Deneme oturum", "rol": "yurutucu", "dil": "tr"})
@@ -124,7 +124,8 @@ try:
     t0 = time.time()
     while time.time() - t0 < 10 and not izin_kartlari(): time.sleep(0.2)
     k = izin_kartlari(); v = to()
-    ok(f"araç izni panoda onay kartı ({len(k)}) ve oturum özeti izin={v.get('izin')}", len(k) == 1 and "Bash" in k[0]["text"] and v.get("izin") == 1)
+    ok(f"araç izni panoda onay kartı ({len(k)}) ve oturum özeti izin={v.get('izin')}", len(k) == 1 and v.get("izin") == 1)
+    ok(f"kartta açıklama cümlesi, komut yok ({k[0]['text'][:80] if k else ''})", bool(k) and "Deneme komutu" in k[0]["text"] and "print(1)" not in k[0]["text"])
     uc("/card-ack", {"id": k[0]["id"], "status": "onaylandi"})
     ok("Onayla → Claude Code'a allow", claude_der("İzin: allow"))
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "izin iste yine"})

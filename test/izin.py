@@ -67,7 +67,23 @@ try:
     ok(f"Reddet → reddedildi ({y.get('karar')})", y.get("karar") == "reddedildi")
     t = time.time(); kod, y = uc("/izin-iste", {"arac": "navigate", "ozet": "https://ornek.test", "bekle": 1.5}, zaman=30)
     ok(f"cevap yok → zaman_asimi ({y.get('karar')}, {time.time() - t:.1f} sn)", y.get("karar") == "zaman_asimi" and time.time() - t < 5)
+    ok("süresi dolan kart panoda kapanır (v0.112.2: onaylanırsa bekleyen yoktu, ikinci kart açılıyordu)", not izin_kartlari())
     for c in izin_kartlari(): uc("/card-ack", {"id": c["id"], "status": "reddedildi"}, koken=PANO)
+    # v0.112.2: kartta komut/JSON yok, düz cümle (kullanıcı: "kodu göstermenin anlamı yok")
+    def kart_metni(govde):
+        karar_ver("reddedildi", 0.8); t_ = {}
+        def yakala():
+            for _ in range(20):
+                c = izin_kartlari()
+                if c: t_["m"] = c[-1]["text"]; return
+                time.sleep(0.1)
+        th = threading.Thread(target=yakala); th.start(); uc("/izin-iste", govde, zaman=30); th.join(); return t_.get("m", "")
+    m = kart_metni({"arac": "Bash (satır içi python)", "ad": "Bash", "ozet": "python3 -c 'import json;print(1)'", "aciklama": "Kulis'in veri dosyasını okuyup test listesini çıkarmak"})
+    ok(f"Bash: kartta açıklama cümlesi, komut yok ({m[:90]})", "Kulis'in veri dosyasını okuyup test listesini çıkarmak" in m and "Onaylıyor musun" in m and "python3" not in m and "import" not in m)
+    m = kart_metni({"arac": "Bash (satır içi python)", "ad": "Bash", "ozet": "python3 -c 'print(2)'"})
+    ok(f"Bash açıklamasız: genel cümle, komut yok ({m[:80]})", "komut çalıştırmak" in m and "print" not in m)
+    m = kart_metni({"arac": "create_draft", "ad": "mcp__gmail__create_draft", "ozet": '{"to":"Deniz T","subject":"Toplantı notu","body":"{x}"}', "girdi": {"to": "Deniz T", "subject": "Toplantı notu"}})
+    ok(f"MCP: düz cümle + alıcı/konu, JSON yok ({m[:90]})", "e-posta taslağı hazırlamak" in m and "Deniz T" in m and "Toplantı notu" in m and "{" not in m)
     # 3) izin-kanca
     def kanca(girdi, relay=f"http://127.0.0.1:{PORT}"):
         return subprocess.run([sys.executable, "-B", os.path.join(T, "toplanti-claude.py"), "--dir", canli, "--relay", relay, "izin-kanca"],

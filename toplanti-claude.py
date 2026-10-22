@@ -2516,12 +2516,16 @@ def izin_kanca_cmd():
     else: return
     if not risk: return  # karar yok: oturumun kendi izin kuralları
     try:
-        req = urllib.request.Request(A.relay + "/izin-iste", data=json.dumps({"arac": arac, "ozet": " ".join(ozet.split())[:240]}).encode(), method="POST",
+        # v0.112.2: kart düz cümleyle (ad, girdi, açıklama); komut yalnız ozet'te (kayıt)
+        req = urllib.request.Request(A.relay + "/izin-iste", data=json.dumps({"arac": arac, "ozet": " ".join(ozet.split())[:240], "ad": ad, "aciklama": gi.get("description"),
+                                                                            "girdi": {k: v for k, v in gi.items() if k in ("to", "recipient", "recipients", "subject", "summary", "title", "url")}}).encode(), method="POST",
                                      headers={"Content-Type": "application/json"})
         r = json.load(urllib.request.urlopen(req, timeout=200))
     except Exception: r = {}
     k = r.get("karar")
     karar, neden = (("allow", f"{BEN} onayladı (Suflor)") if k == "onaylandi" else ("deny", f"{BEN} reddetti (Suflor); bu adımı atla, gerekirse ona sor") if k == "reddedildi"
+                    # v0.112.2: arka plandaki oturumda Terminal yok — süre dolunca reddet (ask yeniden denemeye ve ikinci karta yol açıyordu)
+                    else ("deny", f"{BEN} 3 dk içinde onaylamadı (Suflor); bu adımı şimdilik atla, gerekiyorsa ne yapmak istediğini düz bir cümleyle ona sor") if r.get("arka")
                     else ("ask", "Suflor onayı gelmedi; Terminal'den onay iste"))
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": karar, "permissionDecisionReason": neden}}, ensure_ascii=False))
 def gelen_cmd():

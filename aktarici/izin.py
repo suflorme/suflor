@@ -18,7 +18,7 @@ def _izin_kayit(o):
         except OSError: pass
     with LOCK: write([(yol, json.dumps(dict(o, at=datetime.datetime.now().isoformat(timespec="seconds")), ensure_ascii=False) + "\n")])
 def izin_iste(tur, ne, ayrinti=None, sesli=True):
-    ne = " ".join(str(ne or "").split())[:300]
+    ne = " ".join(str(ne or "").split())[:400]
     x = eylem_ekle({"tur": "izin", "baslik": ne[:160], "ayrinti": json.dumps(dict(ayrinti or {}, izin=tur, ne=ne), ensure_ascii=False)})
     if not x: return None
     with LOCK: x["yerel"] = True; _eylem_yama(x, yerel=True)
@@ -44,7 +44,47 @@ def izin_bekle(iid, sn=IZIN_BEKLE_SN):
     i = IZIN.get(iid)
     if not i: return "zaman_asimi"
     i["olay"].wait(sn)
+    if not i["karar"]: izin_sure_doldu(iid)
     return i["karar"] or "zaman_asimi"
+def izin_sure_doldu(iid):  # v0.112.2 (22 Ekim: süresi dolan kart açık kaldı, kullanıcı onu onayladı — bekleyen yoktu, oturum ikinci kart açtı): kart ve iş kapanır
+    with LOCK:
+        for c in CARDS:
+            if c.get("eylem") == iid and c.get("status") == "acik": c["status"] = "zaman_asimi"; c["acted_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+        for x in EYLEMLER:
+            if x["id"] == iid and x["durum"] == "bekliyor": _eylem_yama(x, durum="zaman_asimi")
+    if SORU.get("aktif") == iid: soru_sonraki()
+    _izin_kayit({"id": iid, "durum": "zaman_asimi"}); print(f"İZİN: {iid} süre doldu — kart kapandı")
+# v0.112.2 (kullanıcı, 22 Ekim: "Kodu göstermenin bir anlamı yok, kafam karışıyor. Bana düz metin şeklinde şunu yapmak istiyorum onaylıyor musun gibi sor"):
+# araç izninde kartta komut/JSON yok — Claude'un yazdığı açıklama (Bash/Monitor description; toplantı oturumuna Türkçe düz cümle yazması söylenir) ya da
+# araç türünden kurulan cümle. Komutun kendisi yalnız izin-kayit.jsonl ve eylem ayrıntısında.
+IZIN_MCP_CUMLE = [  # (araç adı kalıbı, Türkçe, İngilizce) — ilk eşleşen
+    (r"create_draft|draft", "e-posta taslağı hazırlamak", "prepare an email draft"), (r"reply", "e-postaya cevap göndermek", "send an email reply"),
+    (r"forward", "bir e-postayı iletmek", "forward an email"), (r"send", "ileti ya da e-posta göndermek", "send a message or email"),
+    (r"create_event", "takvime etkinlik eklemek", "add a calendar event"), (r"update_event", "takvimdeki bir etkinliği değiştirmek", "change a calendar event"),
+    (r"delete_event", "takvimden bir etkinliği silmek", "delete a calendar event"), (r"respond_to_event", "bir davete cevap vermek", "respond to an invitation"),
+    (r"set_vacation", "e-posta otomatik yanıtını ayarlamak", "set the email auto-reply"), (r"create_filter", "e-posta kuralı eklemek", "add an email rule"),
+    (r"label_", "e-postaları etiketlemek", "label emails"), (r"trash|delete", "bir şeyi silmek", "delete something"), (r"share_file", "bir dosyayı paylaşmak", "share a file"),
+    (r"upload|create_file|update_file|copy_file|move_item|rename_item", "bulut dosyalarında değişiklik yapmak", "change cloud files"),
+    (r"navigate", "tarayıcıda bir sayfa açmak", "open a page in the browser"), (r"javascript|computer|form_input|file_upload", "tarayıcıda işlem yapmak", "act in the browser")]
+def izin_metni(arac, gi=None, aciklama=None):
+    gi = gi if isinstance(gi, dict) else {}; a = str(arac or ""); kisa = a.split("__")[-1]
+    acik = " ".join(str(aciklama or gi.get("description") or "").split()).rstrip(" .")[:200]
+    if a in ("Bash", "Monitor") or a.startswith("Bash"):
+        ne = acik or _t("bilgisayarda bir komut çalıştırmak", "run a command on this Mac")
+    elif a.startswith("mcp__"):
+        m = next(((tr, en) for k, tr, en in IZIN_MCP_CUMLE if re.search(k, kisa, re.I)), None)
+        ne = _t(m[0], m[1]) if m else _t(f"“{kisa}” aracını kullanmak", f"use the “{kisa}” tool")
+        alici = gi.get("to") or gi.get("recipient") or gi.get("recipients"); konu = gi.get("subject") or gi.get("summary") or gi.get("title")
+        if isinstance(alici, list): alici = ", ".join(str(x) for x in alici[:3])
+        ek = ", ".join(x for x in [(_t("alıcı: ", "to: ") + " ".join(str(alici).split())[:80]) if alici else "", (_t("konu: ", "subject: ") + " ".join(str(konu).split())[:80]) if konu else ""] if x)
+        if ek: ne += f" ({ek})"
+    elif a in ("Write", "Edit", "NotebookEdit"): ne = _t(f"“{os.path.basename(str(gi.get('file_path') or gi.get('notebook_path') or ''))}” dosyasını değiştirmek", f"change the file “{os.path.basename(str(gi.get('file_path') or gi.get('notebook_path') or ''))}”")
+    elif a == "Read": ne = _t(f"“{os.path.basename(str(gi.get('file_path') or ''))}” dosyasını okumak", f"read the file “{os.path.basename(str(gi.get('file_path') or ''))}”")
+    elif a in ("WebFetch", "WebSearch"):
+        alan = re.sub(r"^https?://([^/]+).*", r"\1", str(gi.get("url") or ""))
+        ne = _t("internetten bilgi almak", "look something up on the internet") + (f" ({alan})" if alan else "")
+    else: ne = acik or _t(f"“{kisa}” aracını kullanmak", f"use the “{kisa}” tool")
+    return _t(f"Claude şunu yapmak istiyor: {ne}. Onaylıyor musun?", f"Claude wants to: {ne}. Do you approve?")
 # --- Y1: anahtarsız yazma isteği (geçiş listesi GECIS_YAZMA). Eski eklenti ya da başka bir yerel süreç (öbür macOS hesabı, başka eklenti, Teams
 # sayfasındaki betik) anahtarsız yazabiliyordu: sahte satır, asistanı konuşturma, sahte onay kartı. Yetenek kalır; kaynak (köken) başına ilk istekte
 # kullanıcıya sorulur, onaylanırsa 12 saat geçer, reddedilirse 30 dk sorulmaz. Onay gelene kadar istek işlenmez (403 "izin bekliyor").
@@ -65,6 +105,7 @@ def izin_kaynak_view():
 def izin_arac(p):
     arac = " ".join(str(p.get("arac") or "").split())[:80]; ozet = " ".join(str(p.get("ozet") or "").split())[:240]
     if not arac: return {"ok": False, "err": "arac"}
-    iid = izin_iste("arac", _t(f"Toplantı oturumu: {arac} — {ozet}", f"Meeting session: {arac} — {ozet}"), {"arac": arac, "ozet": ozet})
+    iid = izin_iste("arac", izin_metni(p.get("ad") or arac, p.get("girdi"), p.get("aciklama")), {"arac": arac, "ozet": ozet})  # komut yalnız ayrıntıda/kayıtta
     if not iid: return {"ok": False, "err": "eylem"}
-    return {"ok": True, "id": iid, "karar": izin_bekle(iid, min(IZIN_BEKLE_SN, float(p.get("bekle") or IZIN_BEKLE_SN)))}
+    k = izin_bekle(iid, min(IZIN_BEKLE_SN, float(p.get("bekle") or IZIN_BEKLE_SN)))
+    return {"ok": True, "id": iid, "karar": k, "arka": "topo_canli" in globals() and topo_canli()}
