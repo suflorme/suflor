@@ -54,7 +54,7 @@ Söyle ve Not kartları dakikada en çok bir kez araya girer. **Sessiz** düğme
 Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad geçer. Ona yazarsın ya da sesle sorarsın:
 *"Defne, geçen hafta beta için hangi tarihi konuşmuştuk?"* Cevap birkaç saniye içinde panoda ve sesli olarak gelir.
 
-<p align="center"><img src="gorsel/pano.png" alt="Suflor.me panosu: solda kartlar ve Defne'nin cevabı, sağda gündem ve canlı döküm" width="100%"></p>
+<p align="center"><img src="gorsel/mac.png" alt="Suflor.me Mac penceresi: kenar çubuğu, ortada kartlar ve Defne'nin cevabı, sağda gündem ve canlı döküm" width="100%"></p>
 
 - **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
   Mikrofona iki kez dokunursan eller serbest sohbet başlar.
