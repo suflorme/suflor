@@ -123,6 +123,9 @@ if j["kip"] as? String == "toplanti" {
     Thread.detachNewThread {
         while true { let d = gir.availableData; if d.isEmpty { break }; do { try boru.fileHandleForWriting.write(contentsOf: d) } catch { break } }
         try? boru.fileHandleForWriting.close()
+        // v0.112.0: giriş kapanınca (Bitir, yeni Başlat, Terminal'e alma) Monitor çalışan claude çıkmıyordu (arka plan işini bekliyor) — 5 sn sonra kapatılır
+        Thread.sleep(forTimeInterval: 5); if p.isRunning { p.terminate() }
+        Thread.sleep(forTimeInterval: 3); if p.isRunning { kill(p.processIdentifier, SIGKILL) }
     }
     let sure = (j["sure"] as? Double) ?? 21600
     DispatchQueue.global().asyncAfter(deadline: .now() + sure) { if p.isRunning { p.terminate() } }

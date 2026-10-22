@@ -40,14 +40,19 @@ def izin(ad, gi, rid):
     pr({"type": "control_request", "request_id": rid, "request": {"subtype": "can_use_tool", "tool_name": ad, "input": gi}})
     return bekle_cevap(rid)
 pr({"type": "system", "subtype": "init", "session_id": SID})
+open(os.path.join(D, "pid"), "w").write(str(os.getpid())); asili = False
 while True:
     l = sys.stdin.readline()
-    if not l: break
+    if not l:
+        if asili: time.sleep(120)  # Monitor çalışan gerçek claude gibi: giriş kapansa da çıkmaz
+        break
     o = json.loads(l)
     if o.get("type") == "control_request": continue  # boşta gelen durdurma
     q = o["message"]["content"]
     if q.startswith("/toplanti"): yaz("Gündem hazır. **Rolün** yürütücü mü?"); bitti()
     elif "izin" in q: c = izin("Bash", {"command": "python3 -c 'print(1)'", "description": "Deneme komutu"}, "r-" + str(time.time())); yaz("İzin: " + c["behavior"]); bitti()
+    elif "asili" in q: asili = True; yaz("Arka plan işi sürüyor"); bitti()
+    elif "secim" in q: yaz("Bu kararda anlaştınız mı?\\n\\n[[seç: Anlaştık | Anlaşmadık | Emin değilim]]"); bitti()
     elif "monitor-izle" in q: c = izin("Monitor", {"command": "PYTHONDONTWRITEBYTECODE=1 python3 -u " + D + "/../toplanti-claude.py izle", "description": "izle"}, "m-1"); yaz("Monitor izle: " + c["behavior"]); bitti()
     elif "monitor-baska" in q: c = izin("Monitor", {"command": "python3 -u /tmp/toplanti-claude.py izle", "description": "x"}, "m-2"); yaz("Monitor başka: " + c["behavior"]); bitti()
     elif "soru-araci" in q: c = izin("AskUserQuestion", {"questions": []}, "s-1"); yaz("AskUserQuestion: " + c["behavior"] + " · " + c.get("message", "")[:40]); bitti()
@@ -153,9 +158,32 @@ try:
     urllib.request.urlopen(urllib.request.Request(PANO + "/status", headers={"X-Suflor-Anahtar": K, "X-Suflor-Istemci": "izle"}), timeout=5).read()
     v = to(); ok(f"izle (Monitor) çalışırken tur bitmiş oturum 'izliyor' ({v.get('durum')})", v.get("durum") == "izliyor")
     kod, y = uc("/girdi", {"text": "toplantıda not"}); ok(f"izle çalışırken kutu eski yolda: not + GİRDİ ({y.get('tur')})", y.get("tur") == "iletildi")
+    # v0.112.0: seçenekli soru ([[seç: …]])
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "secim"}); claude_der("anlaştınız mı")
+    v = bekle(lambda v: (v.get("soru") or {}).get("secenek"))
+    sm = [x for x in mesaj() if x["kim"] == "claude" and "anlaştınız mı" in x["metin"]][-1]
+    ok("seçenek satırı iletiden ayıklandı, seçenekler ayrı", "[[" not in sm["metin"] and sm.get("secenek") == ["Anlaştık", "Anlaşmadık", "Emin değilim"])
+    ok(f"izle sürerken de soru açık ({v.get('durum')}): /status soru.secenek", v.get("durum") == "izliyor" and v["soru"]["i"] == sm["i"] and v["soru"]["secenek"][0] == "Anlaştık")
+    kod, y = uc("/girdi", {"text": "Anlaşmadık, bütçe eksik"}); ok(f"seçenekli soru açıkken (izle sürse de) kutu cevabı oturuma ({y.get('tur')})", y.get("tur") == "oturum")
+    ok("serbest cevap Claude'a ulaştı, soru kapandı", claude_der("Aldım: Anlaşmadık, bütçe eksik") and not (to().get("soru") or {}).get("secenek"))
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "secim 2"}); time.sleep(0.3); v = bekle(lambda v: (v.get("soru") or {}).get("secenek")); i2 = v["soru"]["i"]
+    kod, y = uc("/toplanti-oturum", {"islem": "sec", "i": sm["i"], "secim": "Anlaştık"}); ok("eski sorunun düğmesi reddedilir", not y.get("ok"))
+    kod, y = uc("/toplanti-oturum", {"islem": "sec", "i": i2, "secim": "Belki"}); ok("listede olmayan seçim reddedilir", not y.get("ok"))
+    kod, y = uc("/toplanti-oturum", {"islem": "sec", "i": i2, "secim": "Anlaştık"})
+    ok("düğme → seçim oturuma gider, panoda 'ben' olarak", y.get("ok") and claude_der("Aldım: Anlaştık") and any(x["kim"] == "ben" and x["metin"] == "Anlaştık" and x.get("kaynak") == "düğme" for x in mesaj()))
+    ok("cevaptan sonra soru kapandı", not (to().get("soru") or {}).get("secenek"))
     kod, _ = uc("/toplanti-oturum?n=0", anahtar=False); ok(f"iletiler anahtarsız okunmaz ({kod})", kod == 401)
     kod, _ = uc("/toplanti-oturum", {"islem": "durdur"}, anahtar=False); ok(f"işlem anahtarsız yapılmaz ({kod})", kod in (401, 403))
 
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "asili"}); claude_der("Arka plan işi sürüyor")
+    pid = int(open(os.path.join(T, "bin", "pid")).read()); t0 = time.time()
+    kod, y = uc("/toplanti-oturum", {"islem": "kapat"}, zaman=30)
+    def yasiyor(p):
+        try: os.kill(p, 0); return True
+        except OSError: return False
+    while time.time() - t0 < 15 and yasiyor(pid): time.sleep(0.3)
+    ok(f"Kapat: giriş kapanınca çıkmayan claude Brifing.app'te kapatılır ({time.time() - t0:.1f} sn)", y.get("ok") and not yasiyor(pid) and to().get("durum") == "kapali")
+    ok("kapandıktan sonra kendiliğinden yeniden açılmaz", (time.sleep(2), to().get("durum"))[1] == "kapali" and any(x["kim"] == "sistem" and "kapatıldı" in x["metin"] for x in mesaj()))
     kod, y = uc("/toplanti-oturum", {"islem": "terminal"})
     cm = open(os.path.join(T, "toplanti-terminal.command")).read() if os.path.exists(os.path.join(T, "toplanti-terminal.command")) else ""
     v = to()

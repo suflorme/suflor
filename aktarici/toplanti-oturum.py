@@ -8,23 +8,39 @@
 # Panoda Durdur (interrupt) ve "Terminal'de göster" (süreç kapanır, aynı oturum `claude --resume` ile Terminal'de açılır). Süreç beklenmedik çıkarsa
 # aynı oturum en çok TOPO_YENIDEN kez kaldığı yerden açılır. Ayar toplanti_terminal: true eski davranış (Terminal penceresi).
 TOPO = {"app": None, "w": None, "durum": "kapali", "sid": None, "mesaj": [], "n": 0, "konu": None, "t0": 0.0, "t_durum": 0.0, "maliyet": 0.0, "nesil": 0,
-        "kapali_nesil": None, "yeniden": 0, "izin": 0, "hata": None, "acilis": None, "kilit": threading.RLock()}
+        "kapali_nesil": None, "yeniden": 0, "izin": 0, "hata": None, "acilis": None, "secenek_i": None, "kilit": threading.RLock()}
 TOPO_YENIDEN, TOPO_MESAJ_EN_COK, TOPO_METIN_EN_COK, TOPO_SURE_SN = 2, 400, 6000, 8 * 3600
 TOPO_TERMINAL_ILETI = "(Suflor) Oturum arka plandan Terminal'e alındı; arka plandaki Monitor durdu. Toplantı sürüyorsa izle'yi yeniden başlat, sürmüyorsa kaldığın yerden devam et."
 TOPO_BOSTA_SN = 2 * 3600  # tur bitmiş ve izle yokken bu kadar boşta kalırsa süreç kapanır (~250 MB); "Terminal'de göster" yine aynı oturumu açar
 TOPO_ISTEM = ("Bu toplantı oturumu Suflor.me panosundan arka planda açıldı; Terminal penceresi yok. Kullanıcıya yazdığın her metin panoda 'Claude' bölümünde "
               "görünür; kullanıcı panodaki kutudan yazar. Kullanıcıya soru sorman gerekiyorsa soruyu kısa ve açık yaz, sonra turu bitir (cevap yeni ileti "
               "olarak gelir); AskUserQuestion aracını kullanma. Toplantı sürerken izle döngüsünü bırakma. Kancanın 'Terminal'den onay iste' demesi bu "
-              "oturumda panodan onay demektir.")
+              "oturumda panodan onay demektir. Kullanıcıdan seçim isterken (onay, evet/hayır, birkaç seçenek) mesajının son satırına seçenekleri "
+              "şu biçimde yaz: [[seç: Seçenek 1 | Seçenek 2 | Seçenek 3]] — en çok 5 seçenek, her biri kısa; panoda düğme olur, basılan seçenek cevap "
+              "olarak gelir. Kullanıcı düğme yerine serbest metin de yazabilir.")
+# v0.112.0 (S122 2. adım): Claude'un seçim sorusu — mesajdaki [[seç: A | B]] satırı ayıklanır, panoda ve mini panoda düğme olur; basınca seçim oturuma gider.
+TOPO_SECENEK_RX = re.compile(r"^[ \t]*\[\[\s*(?:seç|sec|seçenek|secenek|options?|choices?)\s*:\s*(.+?)\s*\]\][ \t]*$", re.M | re.I)
+def _topo_secenek_ayir(metin):
+    bul = TOPO_SECENEK_RX.findall(str(metin or ""))
+    if not bul: return metin, None
+    liste = []
+    for x in bul[-1].split("|"):
+        x = " ".join(x.split())[:60]
+        if x and x not in liste: liste.append(x)
+    return TOPO_SECENEK_RX.sub("", metin).strip(), (liste[:5] if len(liste) >= 1 else None)
 def topo_canli(): return bool(TOPO["w"]) and TOPO["app"] is not None and TOPO["app"].poll() is None
 def _topo_durum(d, hata=None):
     TOPO["durum"] = d; TOPO["t_durum"] = time.time()
     if hata is not None: TOPO["hata"] = hata
 def _topo_mesaj(kim, metin, **ek):
     metin = str(metin or "").strip()
-    if not metin: return
+    if kim == "claude":
+        metin, sec = _topo_secenek_ayir(metin)
+        if sec: ek["secenek"] = sec
+    if not metin and not ek.get("secenek"): return
     with LOCK:
         TOPO["n"] += 1
+        if ek.get("secenek"): TOPO["secenek_i"] = TOPO["n"]
         TOPO["mesaj"].append(dict(i=TOPO["n"], t=datetime.datetime.now().strftime("%H:%M"), kim=kim, metin=metin[:TOPO_METIN_EN_COK], **ek))
         del TOPO["mesaj"][:-TOPO_MESAJ_EN_COK]
 def _topo_arac_ozet(ad, gi):
@@ -54,7 +70,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "toplanti-bos"),
                        "giris": gir, "cikis": cik, "sure": TOPO_SURE_SN}, f, ensure_ascii=False)
-        if not sid: TOPO.update(mesaj=[], n=TOPO["n"], sid=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None)
+        if not sid: TOPO.update(mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None)
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
         _topo_durum("aciliyor", hata=None)
         TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -86,7 +102,7 @@ def toplanti_oturum_yaz(metin, kaynak="kutu"):
     if not metin: return {"ok": False, "err": "boş"}
     if not topo_canli(): return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
     if not _topo_gonder({"type": "user", "message": {"role": "user", "content": metin}}): return {"ok": False, "err": _t("Oturuma yazılamadı", "Couldn't write to the session")}
-    _topo_mesaj("ben", metin, kaynak=kaynak); _topo_durum("calisiyor")
+    _topo_mesaj("ben", metin, kaynak=kaynak); _topo_durum("calisiyor"); TOPO["secenek_i"] = None
     print(f"TOPLANTI OTURUMU: kullanıcı yazdı ({kaynak}, {len(metin)} karakter)"); return {"ok": True}
 def toplanti_oturum_durdur():
     if not topo_canli() or TOPO["durum"] != "calisiyor": return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
@@ -185,8 +201,12 @@ def toplanti_oturum_view():
     son = next((m for m in reversed(TOPO["mesaj"]) if m["kim"] == "claude"), None)
     d = TOPO["durum"]
     if d == "bekliyor" and topo_canli() and topo_izliyor(): d = "izliyor"  # tur bitti ama Monitor'daki izle sürüyor: kullanıcıyı beklemiyor, toplantıyı izliyor
+    soru = None  # açık soru: seçenekli son ileti (cevaplanana kadar) ya da izlemeden kullanıcıyı bekleyen turun son iletisi
+    sm = next((m for m in TOPO["mesaj"] if m["i"] == TOPO["secenek_i"]), None) if TOPO["secenek_i"] and topo_canli() else None
+    if sm: soru = {"i": sm["i"], "metin": sm["metin"][-400:], "secenek": sm["secenek"]}
+    elif d == "bekliyor" and son: soru = {"i": son["i"], "metin": son["metin"][-400:]}
     return {"durum": d, "n": TOPO["n"], "t0": TOPO["t0"], "izin": TOPO["izin"], "konu": TOPO["konu"], "hata": TOPO["hata"] if TOPO["durum"] == "hata" else None,
-            "terminal": bool(TOPO["sid"] and TOPO["acilis"]), "son": (son or {}).get("metin", "")[:300], "son_i": (son or {}).get("i")}
+            "terminal": bool(TOPO["sid"] and TOPO["acilis"]), "son": (son or {}).get("metin", "")[:300], "son_i": (son or {}).get("i"), "soru": soru}
 def toplanti_oturum_mesajlar(n=0):
     with LOCK: m = [x for x in TOPO["mesaj"] if x["i"] > n]
     return dict(toplanti_oturum_view() or {"durum": "kapali", "n": 0}, mesaj=m)
@@ -195,7 +215,15 @@ def toplanti_oturum_islem(p):
     if i == "yaz":
         if gizli_acik(): return gizli_red()
         return toplanti_oturum_yaz(p.get("metin"), "pano")
+    if i == "sec":  # seçenek düğmesi: yalnız açık sorunun kendi seçeneklerinden biri (eski düğmeye basılırsa reddedilir)
+        if gizli_acik(): return gizli_red()
+        sm = next((m for m in TOPO["mesaj"] if m["i"] == TOPO["secenek_i"]), None) if TOPO["secenek_i"] else None
+        if not sm or p.get("i") != sm["i"] or p.get("secim") not in sm["secenek"]: return {"ok": False, "err": _t("Bu soru artık açık değil", "This question is no longer open")}
+        return toplanti_oturum_yaz(p["secim"], "düğme")
     if i == "durdur": return toplanti_oturum_durdur()
     if i == "terminal": return toplanti_oturum_terminal()
-    if i == "kapat": toplanti_oturum_kapat("kullanıcı kapattı"); return {"ok": True}
-    return {"ok": False, "err": "islem: yaz | durdur | terminal | kapat"}
+    if i == "kapat":  # v0.112.0: panodaki Kapat (toplantı sonu işleri yapılmaz; sürdürmek için Terminal'de göster)
+        if not topo_canli(): return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
+        _topo_mesaj("sistem", _t("Oturum kapatıldı. Sürdürmek için Terminal'de göster.", "Session closed. Use Show in Terminal to continue."))
+        toplanti_oturum_kapat("kullanıcı kapattı"); return {"ok": True}
+    return {"ok": False, "err": "islem: yaz | sec | durdur | terminal | kapat"}

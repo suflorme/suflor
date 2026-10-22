@@ -1987,7 +1987,7 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": ack_card(p, yetkili)})
         if self.path == "/eylem":  # kuyruğa iş — yalnız anahtarlı (toplanti-claude.py); geçiş listesinde yok
             x = eylem_ekle(p); return self._json({"ok": bool(x), "eylem": x}, 200 if x else 400)
-        if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
+        if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
         if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/eylem-sun": return self._json({"ok": True, "n": eylem_sun()})
         if self.path == "/eylem-karar":  # Onayla / Reddet / Hepsini onayla — anahtarlı pano ya da sohbetteki onay (eylem onay)
@@ -2076,7 +2076,8 @@ class H(BaseHTTPRequestHandler):
             claude = bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
             # v0.111.0: arka plandaki toplantı oturumu kullanıcıyı bekliyor (soru sordu) ya da çalışıyor ama izle'de değil (hazırlık) — yazı doğrudan ona gider
             # (izle çalışıyorsa — Monitor'da — eski yol: not + GİRDİ olayı; oturum turu bitirmiş görünse de izliyordur)
-            if topo_canli() and not claude and TOPO["durum"] in ("bekliyor", "calisiyor"):
+            # v0.112.0: seçenekli soru açıksa (izle sürse de) yazı onun cevabıdır
+            if topo_canli() and (TOPO["secenek_i"] or (not claude and TOPO["durum"] in ("bekliyor", "calisiyor"))):
                 if toplanti_oturum_yaz(metin, "kutu").get("ok"): return self._json({"ok": True, "tur": "oturum"})
             note({"text": metin, "at": p.get("at") or datetime.datetime.now().isoformat(timespec="seconds"), "meeting": p.get("meeting") or {}})
             yeni = baglam_ekle(baglam_ayir(metin)[0], "kutu")  # nottaki bağlantı/dosya yolu bağlam kaynağı da olur (izle: BAĞLAM)
