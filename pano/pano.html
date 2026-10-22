@@ -141,7 +141,9 @@ body.surukle{outline:3px dashed var(--ac);outline-offset:-6px}.km a{color:var(--
 dialog#ayd{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:18px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}
 dialog#ayd::backdrop,dialog#kgd::backdrop{background:rgba(12,18,15,.4)}
 dialog#kgd{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:18px;width:min(620px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}
-#kgf{display:flex;flex-direction:column;gap:10px;margin:0}#kgi{overflow:auto;max-height:calc(100vh - 210px);padding-right:12px}
+#kgf{display:flex;flex-direction:column;gap:10px;margin:0;min-height:0;flex:1}#kgi{overflow:auto;flex:1;min-height:60px;padding-right:12px}
+dialog#kgd[open]{display:flex;flex-direction:column}  /* v0.109.1: uzun listede Kapat pencerenin altında kesiliyordu — liste kalan alana sığar */
+.kgb{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .kgr{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bd)}.kgr .t{min-width:0}.kgr .s{font-weight:500}
 .kgr .c{color:var(--t2);margin-top:2px;overflow-wrap:anywhere}.kgr .z{color:var(--t3);font-size:var(--yz-2);margin-bottom:2px}.kgr button{flex:none}#ayf{display:flex;flex-direction:column;gap:10px;margin:0}#ayi{overflow:auto;max-height:calc(100vh - 250px);padding-right:12px;outline:none}
 .ayb{display:flex;align-items:center;gap:8px}.ayb .gbb{flex:1}#ayara{width:150px;font:inherit;font-size:var(--yz-2);padding:3px 8px;border:1px solid var(--bd);border-radius:var(--kose-s);background:transparent;color:inherit}
@@ -221,7 +223,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <details><summary>I want to report a problem.</summary><p>Suflor.me → Send feedback… Your text goes to the developer; do not include names, passwords or meeting content.</p></details>
 </div>
 </div><form method=dialog class=bt><span class=sp1></span><button value=kapat class=pri autofocus>Tamam</button></form></dialog>
-<dialog id=kgd><form method=dialog id=kgf><b class=gbb>Konuş geçmişi</b><p class=hint id=kgh></p><div class=kgu id=kgu><label><input type=checkbox id=kgt>Tümünü seç</label><button id=kgs class=gh type=button disabled>Seçilenleri sil</button><button id=kga class=gh type=button>Hepsini sil</button></div><div id=kgi></div><div class=bt><button value=kapat class=gh formnovalidate>Kapat</button><span class=sp1></span><span id=kgm class=hint></span></div></form></dialog>
+<dialog id=kgd><form method=dialog id=kgf><div class=kgb><b class=gbb>Konuş geçmişi</b><button value=kapat class="ib gh kgx" formnovalidate title="Kapat" aria-label="Kapat"></button></div><p class=hint id=kgh></p><div class=kgu id=kgu><label><input type=checkbox id=kgt>Tümünü seç</label><button id=kgs class=gh type=button disabled>Seçilenleri sil</button><button id=kga class=gh type=button>Hepsini sil</button></div><div id=kgi></div><div class=bt><button value=kapat class=gh formnovalidate>Kapat</button><span class=sp1></span><span id=kgm class=hint></span></div></form></dialog>
 <dialog id=gbd><form method=dialog id=gbf><b class=gbb>Geri bildirim</b><p class=hint>Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.</p>
 <textarea id=gbm rows=5 placeholder="Ne oldu? Ne bekliyordun?"></textarea>
 <label class=hint style="display:flex;gap:6px;align-items:center"><input type=checkbox id=gbt checked style="margin:0"> Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)</label>
@@ -823,6 +825,8 @@ function ayFiltre(){const kc=s=>(s||'').toLocaleLowerCase(DIL==='en'?'en':'tr'),
 document.getElementById('ayt').addEventListener('click',ev=>{const b=ev.target.closest('button[data-g]');if(!b)return;AYSEC=b.dataset.g;document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0})
 document.getElementById('ayara').addEventListener('input',ayFiltre)
 // Konuş geçmişi (v0.67.0): ⚙ Ayarlar → Gizlilik → Göster; en yeni önce, tek tek Sil (dosyadan çıkar, aramadan da düşer)
+// dışarı (karartılmış alana) tıklayınca kapanır; ✕ simgesi
+{const d=document.getElementById('kgd');d.addEventListener('click',ev=>{if(ev.target===d)d.close()});d.querySelector('.kgx').innerHTML=ic('x')}
 async function gecmisAc(){const d=document.getElementById('kgd');document.getElementById('kgm').textContent='';d.showModal();await gecmisCiz()}
 async function gecmisCiz(){let r={};try{r=await j('/konus-gecmis')}catch(e){}
   const k=r.kayitlar||[],h=document.getElementById('kgh')
