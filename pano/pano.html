@@ -88,6 +88,15 @@ html.mac.kc-kapali #kenar{display:none}html.mac.kc-kapali .grid{grid-template-co
 html.mac #sn .sn:nth-child(n+2){display:none}  /* Mac penceresinde ana alanda yalnız en son toplantı; hepsi kenar çubuğunda */
 #kenar .kalt{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px;font-size:12px;color:var(--t2);border-top:.5px solid var(--bd);position:sticky;bottom:0}#kenar .kalt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:720px){html.mac #kenar{display:none}html.mac .grid{grid-template-columns:minmax(0,1fr)!important}}
+/* v0.109.0: yardım */
+#yrd [lang=en],html.dil-en #yrd [lang=tr]{display:none}html.dil-en #yrd [lang=en]{display:block}
+dialog#yrd{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:0;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}dialog#yrd[open]{display:flex;flex-direction:column}
+dialog#yrd::backdrop{background:rgba(12,18,15,.4)}#yrd .yrdi{overflow:auto;padding:18px 24px 8px;line-height:1.55}#yrd .bt{padding:10px 24px 14px;margin:0;border-top:1px solid var(--bd)}
+#yrd h2{font:600 18px/1.3 var(--f-baslik);margin:0 0 6px}#yrd h3{font-size:13px;font-weight:600;margin:18px 0 6px;color:var(--t2)}#yrd ul{padding-left:18px;margin:4px 0}#yrd li{margin:4px 0}
+#yrd table{border-collapse:collapse;width:100%;font-size:var(--yz-2)}#yrd td{padding:5px 8px;border-bottom:1px solid var(--bd)}#yrd td:first-child{white-space:nowrap;color:var(--t2);width:40%}
+#yrd details{border-bottom:1px solid var(--bd);padding:8px 0}#yrd summary{cursor:pointer;font-weight:500}#yrd details p{margin:6px 0 2px;color:var(--t2)}
+html.yardim body{display:block;background:var(--s1)}html.yardim body>*:not(#yrd){display:none!important}
+html.yardim dialog#yrd{width:100vw;height:100vh;max-width:none;max-height:none;margin:0;inset:0;border:0;border-radius:0;box-shadow:none}html.yardim dialog#yrd::backdrop{background:transparent}html.mac #yrd h2{font-family:-apple-system,var(--f-govde)}
 /* Ayarlar penceresi (?gorunum=ayarlar): yalnız Ayarlar, pencereyi doldurur */
 html.ayarlar body{display:block;background:var(--s1)}html.ayarlar body>*:not(#ayd):not(#kgd){display:none!important}
 html.ayarlar dialog#ayd{width:100vw;height:100vh;max-width:none;max-height:none;margin:0;inset:0;border:0;border-radius:0;box-shadow:none;padding:14px 22px;background:var(--bg)}html.ayarlar dialog#ayd::backdrop{background:transparent}
@@ -150,8 +159,68 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 .grid{grid-template-columns:minmax(0,1fr)}#rz{display:none}main>.sc{padding:8px 16px 12px}aside{border-top:1px solid var(--bd)}#dkg{max-height:60vh}.sira{flex-wrap:wrap}}  /* dar pencere — tek sütun */#tkm{font-size:var(--yz-2)}#tkm.er{color:var(--er)}#tkm.ok{color:var(--ok)}
 </style>
 <header><div class=hl><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span><span id=sure></span></div>
-<div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
+<div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=yb class="ib gh" title="Yardım ve sık sorulanlar" aria-label="Yardım">?</button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
 <dialog id=ayd><form method=dialog id=ayf><div class=ayb><b class=gbb>Ayarlar</b><input id=ayara type=search placeholder="Ara" aria-label="Ayarlarda ara" autocomplete=off><button id=ayx class="ib gh" type=button title="Kaydetmeden kapat"></button></div><div id=ayt class=ayt role=tablist aria-label="Ayar grupları"></div><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet ve kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet ve kapat'a basana kadar bir şey değişmez">Varsayılanlara dön</button><span class=sp1></span><span id=aym class=hint></span></div></form></dialog>
+<dialog id=yrd><div class=yrdi>
+<div lang=tr>
+<h2>Suflor.me yardımı</h2>
+<p>Suflor.me toplantını dinler, yazıya döker ve Claude'un önerilerini kart olarak gösterir. Toplantı dışında da asistanla sesli konuşabilirsin. Ses Mac'ten çıkmaz; yazı yalnız Claude'a gider.</p>
+<h3>Başlarken</h3>
+<ul><li><b>Pano:</b> menü çubuğundaki Suflor işaretine sağ tıkla → Panoyu aç. Sol tık küçük mini panoyu açar.</li>
+<li><b>Toplantı başlatmak:</b> Bugün'deki Başlat'a bas (ya da Toplantı → Toplantı başlat…, Command + N). Bağlantı varsa toplantı Chrome'da açılır, Claude izlemeye başlar.</li>
+<li><b>Teams'te döküm:</b> toplantıda Diğer → Kaydet ve transkript → Transkripti göster, ya da Diğer (…) → Dil ve konuşma → Canlı altyazıyı aç. Meet'te alttaki CC düğmesiyle altyazıyı aç.</li></ul>
+<h3>Toplantı sırasında</h3>
+<ul><li><b>Kartlar:</b> DUR — yanlış ya da riskli bir şey söylendi; SÖYLE — söyleyebileceğin bir cümle; CEVAP — sorduğun sorunun cevabı; NOT — bilgi.</li>
+<li><b>Not kutusu:</b> yaz, Return'e bas. Soru mu not mu Claude anlar; Command + Return her zaman soru.</li>
+<li><b>Konuş:</b> mikrofon düğmesini ya da Option + Shift + Boşluk'u basılı tut, sor, bırak; cevap sesli gelir.</li>
+<li><b>Araç çubuğu:</b> Önemli an · Gizli toplantı (her şey durur) · Sesli çeviri · Sessiz (10 dk kart yok) · Kanıt (ekran kaydı).</li></ul>
+<h3>Kısayollar</h3>
+<table><tr><td>Option + Shift + Boşluk</td><td>Basılı tut, konuş (her uygulamada)</td></tr>
+<tr><td>Option + Shift + K</td><td>Kanıt al</td></tr><tr><td>Option + Shift + O</td><td>Ne diyeyim?</td></tr>
+<tr><td>Option + Shift + M</td><td>Sessiz (10 dk)</td></tr><tr><td>Option + Shift + S</td><td>Asistan sussun</td></tr>
+<tr><td>Command + N</td><td>Toplantı başlat</td></tr><tr><td>Command + Virgül</td><td>Ayarlar</td></tr>
+<tr><td>Command + Option + S</td><td>Kenar çubuğunu gizle/göster</td></tr><tr><td>Esc</td><td>Açık menüyü ya da formu kapat</td></tr></table>
+<h3>Sık sorulanlar</h3>
+<details><summary>"Claude izlemiyor — kart gelmez" ne demek?</summary><p>Döküm yazılıyor ama toplantıyı izleyen Claude oturumu açık değil. Başlığın altındaki Başlat'a bas; Terminal'de toplantı oturumu açılır.</p></details>
+<details><summary>Döküm gelmiyor.</summary><p>Toplantı Chrome'da açık mı, Suflor.me eklentisi yüklü mü bak. Teams'te döküm panelini ya da canlı altyazıyı aç; Meet ve Zoom'da altyazıyı aç. Pano durumu başlıkta söyler.</p></details>
+<details><summary>Mikrofon çalışmıyor.</summary><p>Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü açık olmalı. Karşı tarafın sesi için Ekran ve Sistem Sesi Kaydı → Yalnızca Sistem Sesi Kaydı'nda Suflor Ses'e izin ver.</p></details>
+<details><summary>Konuş ile Sohbet farkı ne?</summary><p>Konuş: basılı tut, tek soru sor. Sohbet: kulaklık takılıyken bir kez dokun, sustuğunda asistan cevaplar, sen yine konuşursun; bir daha dokununca biter.</p></details>
+<details><summary>Asistanın sesini nasıl değiştiririm?</summary><p>Ayarlar → Ses ve konuşma → Ses. Mac sesi, yerel Türkçe sesler (Piper, Pocket) ya da Gemini. Gemini'de yalnız okunacak cevap metni Google'a gider, ses kaydı gitmez.</p></details>
+<details><summary>Toplantı özetine nereden ulaşırım?</summary><p>Kenar çubuğunda Son toplantılar'a tıkla. Satırdaki ⋯ ya da sağ tık: zihin haritası, PDF, kopyala, .md dosyası, e-posta taslağı.</p></details>
+<details><summary>Gizli toplantı ne yapar?</summary><p>Tekrar basana kadar Suflor tamamen durur: ses, döküm, kanıt yok; Claude'a ve Gemini'ye hiçbir şey gitmez.</p></details>
+<details><summary>Verilerim nerede duruyor?</summary><p>Döküm, kart, özet ve ses izleri bu Mac'te, Suflor'un uygulama klasöründe durur. Döküm metni ve bağlam yalnız Claude'a gider. Teknik teşhis (Ayarlar → Gizlilik) açıksa yalnız sürüm, donanım ve hata sayıları gider.</p></details>
+<details><summary>Bir sorun bildirmek istiyorum.</summary><p>Suflor.me → Geri bildirim gönder… Yazdığın metin geliştiriciye gider; kişi adı, şifre ya da toplantı içeriği yazma.</p></details>
+</div>
+<div lang=en>
+<h2>Suflor.me help</h2>
+<p>Suflor.me listens to your meeting, transcribes it and shows Claude's suggestions as cards. Outside meetings you can talk to the assistant. Audio never leaves your Mac; text goes only to Claude.</p>
+<h3>Getting started</h3>
+<ul><li><b>Panel:</b> right-click the Suflor mark in the menu bar → Open panel. Left-click opens the mini panel.</li>
+<li><b>Start a meeting:</b> press Start under Today (or Meeting → Start a meeting…, Command + N). With a link the meeting opens in Chrome and Claude starts watching.</li>
+<li><b>Transcript in Teams:</b> More → Record and transcribe → Show transcript, or turn on live captions. In Meet and Zoom turn on captions.</li></ul>
+<h3>During a meeting</h3>
+<ul><li><b>Cards:</b> STOP — something wrong or risky was said; SAY — a line you can use; ANSWER — the answer to your question; NOTE — information.</li>
+<li><b>Note box:</b> type and press Return. Claude decides whether it is a question or a note; Command + Return is always a question.</li>
+<li><b>Talk:</b> hold the microphone button or Option + Shift + Space, ask, release; the answer is spoken.</li>
+<li><b>Toolbar:</b> Key moment · Private meeting (everything stops) · Spoken translation · Quiet (no cards for 10 min) · Evidence (screen capture).</li></ul>
+<h3>Shortcuts</h3>
+<table><tr><td>Option + Shift + Space</td><td>Hold to talk (in any app)</td></tr>
+<tr><td>Option + Shift + K</td><td>Capture evidence</td></tr><tr><td>Option + Shift + O</td><td>What should I say?</td></tr>
+<tr><td>Option + Shift + M</td><td>Quiet (10 min)</td></tr><tr><td>Option + Shift + S</td><td>Assistant, stop</td></tr>
+<tr><td>Command + N</td><td>Start a meeting</td></tr><tr><td>Command + Comma</td><td>Settings</td></tr>
+<tr><td>Command + Option + S</td><td>Show/hide sidebar</td></tr><tr><td>Esc</td><td>Close the open menu or form</td></tr></table>
+<h3>Frequently asked</h3>
+<details><summary>What does "Claude is not watching — no cards" mean?</summary><p>The transcript is being written but no Claude session is watching the meeting. Press Start under the title; a meeting session opens in Terminal.</p></details>
+<details><summary>No transcript is coming in.</summary><p>Check that the meeting is open in Chrome and the Suflor.me extension is installed. In Teams open the transcript panel or live captions; in Meet and Zoom turn on captions. The panel shows the state in its title.</p></details>
+<details><summary>The microphone does not work.</summary><p>System Settings → Privacy &amp; Security → Microphone → Suflor Menü must be on. For the other side's audio allow Suflor Ses under Screen &amp; System Audio Recording → System Audio Recording Only.</p></details>
+<details><summary>What is the difference between Talk and Chat?</summary><p>Talk: hold and ask one question. Chat: with headphones on tap once, the assistant answers when you pause and you can keep talking; tap again to end.</p></details>
+<details><summary>How do I change the assistant's voice?</summary><p>Settings → Voice and speech → Voice: Mac voice, local Turkish voices (Piper, Pocket) or Gemini. With Gemini only the answer text to be read goes to Google, never a recording.</p></details>
+<details><summary>Where are my meeting summaries?</summary><p>Click a meeting under Recent meetings in the sidebar. The ⋯ button or a right-click offers mind map, PDF, copy, .md file and email draft.</p></details>
+<details><summary>What does Private meeting do?</summary><p>Until you press it again Suflor stops completely: no audio, transcript or evidence; nothing goes to Claude or Gemini.</p></details>
+<details><summary>Where is my data stored?</summary><p>Transcripts, cards, summaries and voice prints stay on this Mac in Suflor's application folder. Transcript text and context go only to Claude. If technical diagnostics (Settings → Privacy) is on, only version, hardware and error counts are sent.</p></details>
+<details><summary>I want to report a problem.</summary><p>Suflor.me → Send feedback… Your text goes to the developer; do not include names, passwords or meeting content.</p></details>
+</div>
+</div><form method=dialog class=bt><span class=sp1></span><button value=kapat class=pri autofocus>Tamam</button></form></dialog>
 <dialog id=kgd><form method=dialog id=kgf><b class=gbb>Konuş geçmişi</b><p class=hint id=kgh></p><div class=kgu id=kgu><label><input type=checkbox id=kgt>Tümünü seç</label><button id=kgs class=gh type=button disabled>Seçilenleri sil</button><button id=kga class=gh type=button>Hepsini sil</button></div><div id=kgi></div><div class=bt><button value=kapat class=gh formnovalidate>Kapat</button><span class=sp1></span><span id=kgm class=hint></span></div></form></dialog>
 <dialog id=gbd><form method=dialog id=gbf><b class=gbb>Geri bildirim</b><p class=hint>Aksayan, eksik ya da beğendiğin bir şey varsa yaz; geliştiriciye gider. Yazdığın metin olduğu gibi gider: kişi adı, şifre ya da toplantı içeriği yazma.</p>
 <textarea id=gbm rows=5 placeholder="Ne oldu? Ne bekliyordun?"></textarea>
@@ -780,6 +849,12 @@ const MAC=document.documentElement.classList.contains('mac'),AYAR_PEN=new URLSea
 function ayarAc(k){if(MAC&&!AYAR_PEN&&window.webkit){webkit.messageHandlers.suflor.postMessage({ayarlar:k||''});return}
   const d=document.getElementById('ayd');document.getElementById('ayara').value='';if(k){const gi=AYG.findIndex(([,al])=>al.some(x=>x[0]===k));AYSEC=gi>=0?String(gi):'hepsi'}
   ayCiz();d.showModal();const e=k&&d.querySelector(`[data-ay=${k}]`);if(e){e.closest('.ayr').scrollIntoView({block:'center'});e.focus()}}
+// v0.109.0: Yardım ve sık sorulanlar — Chrome'da diyalog (başlıktaki ?), Mac'te Yardım menüsünden ayrı pencere (?gorunum=yardim); metin iki dilde, arayüz diline göre biri
+document.documentElement.classList.add('dil-'+DIL)
+function yardimAc(){if(MAC&&!YARDIM_PEN&&window.webkit){webkit.messageHandlers.suflor.postMessage({yardim:1});return}document.getElementById('yrd').showModal()}
+const YARDIM_PEN=new URLSearchParams(location.search).get('gorunum')==='yardim'
+document.getElementById('yb').onclick=yardimAc
+if(YARDIM_PEN){document.documentElement.classList.add('yardim');yardimAc();document.getElementById('yrd').addEventListener('close',()=>{try{webkit.messageHandlers.suflor.postMessage({kapat:1})}catch(e){}})}
 // Ayarlar penceresinde gruplar pencerenin araç çubuğunda (Mac Ayarlar gibi): ayGrup(i) o grubu gösterir; "Hepsi" yok, arama bütün gruplarda arar
 function ayGrup(i){AYSEC=String(i);document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0}
 if(AYAR_PEN){document.documentElement.classList.add('ayarlar');const d=document.getElementById('ayd'),a=new URLSearchParams(location.search).get('ayar')||undefined

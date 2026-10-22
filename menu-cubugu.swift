@@ -864,7 +864,7 @@ let suflorSimge: NSImage? = {  // Dock ve Hakkında için: Mac simgeleri gibi ke
 }()
 // sayfaya: işaret, ⚙, geri bildirim ve mini pano düğmeleri gizli (pencerede araç çubuğu ve menüde); başlık satırı araç çubuğunun altında sıkı
 // durum cümlesi (ve toplantıda ad · süre) pencere başlığının altında (subtitle); sayfa başlık satırı yalnız etiket, eylem düğmesi ya da Güncelle varken
-let MAC_STIL = "header .brand,#gb,#ay,#mini,#t,#sure,#dm,#da,#durum .dot{display:none!important}html.bas-bos header{display:none!important}"
+let MAC_STIL = "header .brand,#yb,#gb,#ay,#mini,#t,#sure,#dm,#da,#durum .dot{display:none!important}html.bas-bos header{display:none!important}"
 let BASLIK_IZLE = """
 (()=>{const h=document.querySelector('header');if(!h||!window.webkit)return;let son=null;const $=i=>document.getElementById(i),m=e=>e?e.textContent.trim():''
 const gor=e=>e&&!e.hidden&&getComputedStyle(e).display!=='none'&&e.textContent.trim()
@@ -923,6 +923,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         guard let d = m.body as? [String: Any] else { return }
         if let alt = d["alt"] as? String { pencere.subtitle = alt }
         if let k = d["ayarlar"] as? String { ayarPenceresi(k) }
+        if d["yardim"] != nil { yardim() }
         if d["toplanti"] != nil { durumIsle(d) }
     }
     func goster() {
@@ -931,7 +932,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         anaMenu(); web.frame = pencere.contentLayoutRect; pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         istek("/status") { [weak self] v in if let s = v?["surum"] as? String { DispatchQueue.main.async { self?.surum = s } } }
     }
-    func windowWillClose(_ n: Notification) { DispatchQueue.main.async { NSApp.dockTile.badgeLabel = nil; if self.ayarPen?.pencere.isVisible != true { NSApp.setActivationPolicy(.accessory) } } }
+    func windowWillClose(_ n: Notification) { DispatchQueue.main.async { NSApp.dockTile.badgeLabel = nil; if self.ayarPen?.pencere.isVisible != true && self.yardimPen?.pencere.isVisible != true { NSApp.setActivationPolicy(.accessory) } } }
     // --- araç çubuğu ---
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] {
         [NSToolbarItem.Identifier("kenar"), .flexibleSpace] + ["yz", "gz", "sc", "sz", "kz", "yan"].map { NSToolbarItem.Identifier($0) } + [.space] + ["mini", "gb", "ay"].map { NSToolbarItem.Identifier($0) }
@@ -964,6 +965,8 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     // v0.107.0: Ayarlar ayrı Mac penceresi (?gorunum=ayarlar; sayfa yalnız Ayarlar'ı gösterir, Kaydet ve kapat pencereyi kapatır)
     var ayarPen: AyarPencere?
     func ayarPenceresi(_ bolum: String) { if ayarPen == nil { ayarPen = AyarPencere() }; ayarPen?.goster(bolum) }
+    var yardimPen: AyarPencere?
+    @objc func yardim() { if yardimPen == nil { yardimPen = AyarPencere(yardim: true) }; yardimPen?.goster("") }  // v0.109.0: Yardım ve sık sorulanlar (?gorunum=yardim)
     // Toplantı menüsü panodaki alt çubuk düğmelerine tıklar (durum ve onay panoda kalır); Option + Shift kısayolları Mac genelinde zaten var
     static let MENU_DUGME = ["Önemli an": "yz", "Kanıt al": "kz", "Ne diyeyim?": "oz", "Sessiz (10 dk kart yok)": "sz", "Sesli çeviri": "sc", "Gizli toplantı": "gz"]
     @objc func menuDugme(_ o: NSMenuItem) { if let d = PanoPencere.MENU_DUGME[o.title] { tikla(d) } }
@@ -1003,7 +1006,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
                         ("Yenile", #selector(yenile), "r", .command, self), ("Tam ekran", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control], nil)])
         alt("Pencere", [("Küçült", #selector(NSWindow.performMiniaturize(_:)), "m", .command, nil), ("Büyüt", #selector(NSWindow.performZoom(_:)), "", [], nil),
                         ("Kapat", #selector(NSWindow.performClose(_:)), "w", .command, nil)])
-        alt("Yardım", [("Geri bildirim gönder…", #selector(geriBildirim), "", [], self), ("-", nil, "", [], nil),
+        alt("Yardım", [("Suflor.me Yardımı", #selector(yardim), "?", .command, self), ("Geri bildirim gönder…", #selector(geriBildirim), "", [], self), ("-", nil, "", [], nil),
                        ("Konuş: Option + Shift + Boşluk basılı tut", nil, "", [], nil), ("Kanıt: Option + Shift + K", nil, "", [], nil),
                        ("Ne diyeyim?: Option + Shift + O", nil, "", [], nil), ("Sessiz: Option + Shift + M", nil, "", [], nil),
                        ("Asistan sussun: Option + Shift + S", nil, "", [], nil)])
@@ -1100,7 +1103,7 @@ if arg("--panel-dene") != nil {
     let d = PDene(); NSApplication.shared.delegate = d; NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
 }
 final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate, NSToolbarDelegate {
-    let pencere: NSWindow; let web: WKWebView
+    let pencere: NSWindow; let web: WKWebView; let yardimKipi: Bool
     // v0.109.0: Mac Ayarlar penceresi gibi üstte simgeli sekmeler (sıra panodaki AYG gruplarıyla aynı); seçilen grup sayfada gösterilir, başlık grubun adı
     static let GRUPLAR = [("E-posta", "envelope"), ("Ses ve konuşma", "waveform"), ("Toplantı uyarıları", "bell.badge"), ("Çeviri ve masaüstü", "globe"), ("Gizlilik", "hand.raised"), ("Proje", "folder")]
     func kimlik(_ i: Int) -> NSToolbarItem.Identifier { .init("g\(i)") }
@@ -1118,21 +1121,24 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
         pencere.toolbar?.selectedItemIdentifier = kimlik(i); pencere.title = AyarPencere.GRUPLAR[i].0
         if sayfaya { web.evaluateJavaScript("typeof ayGrup==='function'&&ayGrup(\(i))") }
     }
-    override init() {
-        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 600), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        pencere.title = "Ayarlar"; pencere.minSize = NSSize(width: 460, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
+    init(yardim: Bool = false) {  // yardim: aynı pencere Yardım için (sekmesiz, ?gorunum=yardim)
+        yardimKipi = yardim
+        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: yardim ? 720 : 600), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        pencere.title = yardim ? "Suflor.me Yardımı" : "Ayarlar"; pencere.minSize = NSSize(width: 460, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
         let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
         c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: pencere.contentView!.bounds, configuration: c); web.autoresizingMask = [.width, .height]
         super.init()
         c.userContentController.add(self, name: "suflor"); web.navigationDelegate = self; pencere.delegate = self; pencere.contentView = web
-        let t = NSToolbar(identifier: "SuflorAyar"); t.delegate = self; t.displayMode = .iconAndLabel; t.allowsUserCustomization = false
-        pencere.toolbar = t; pencere.toolbarStyle = .preference; grupSec(0, sayfaya: false)
-        pencere.center(); pencere.setFrameAutosaveName("SuflorAyar")
+        if !yardim {
+            let t = NSToolbar(identifier: "SuflorAyar"); t.delegate = self; t.displayMode = .iconAndLabel; t.allowsUserCustomization = false
+            pencere.toolbar = t; pencere.toolbarStyle = .preference; grupSec(0, sayfaya: false)
+        }
+        pencere.center(); pencere.setFrameAutosaveName(yardim ? "SuflorYardim" : "SuflorAyar")
     }
     func goster(_ bolum: String) {
         let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "", b = bolum.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
-        if !pencere.isVisible || !bolum.isEmpty, let u = URL(string: "\(KOK)/?gorunum=ayarlar&k=\(k)" + (b.isEmpty ? "" : "&ayar=\(b)")) { web.load(URLRequest(url: u)) }
+        if !pencere.isVisible || !bolum.isEmpty, let u = URL(string: "\(KOK)/?gorunum=\(yardimKipi ? "yardim" : "ayarlar")&k=\(k)" + (b.isEmpty ? "" : "&ayar=\(b)")) { web.load(URLRequest(url: u)) }
         NSApp.setActivationPolicy(.regular); pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
     func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
@@ -1172,7 +1178,11 @@ if args.contains("--pencere-dene") {
                         p?.web.evaluateJavaScript(arg("--js") ?? "0") { v, e in if let e = e { print("js hata:", e.localizedDescription) } else if let v = v { print("js:", v) } }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                             guard let p = p else { return }
-                            if args.contains("--ayar-pen") {  // Ayarlar penceresi: aç, yüklenince sayfa görüntüsü
+                            if args.contains("--yardim-pen") {  // Yardım penceresi görüntüsü
+                                p.yardim(); DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                    p.yardimPen?.web.takeSnapshot(with: nil) { im, _ in if let t = im?.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü:", yol) } }
+                                }
+                            } else if args.contains("--ayar-pen") {  // Ayarlar penceresi: aç, yüklenince sayfa görüntüsü
                                 p.ayarPenceresi(""); DispatchQueue.main.asyncAfter(deadline: .now() + 2) { if let g = arg("--ayar-grup").flatMap({ Int($0) }) { p.ayarPen?.grupSec(g, sayfaya: true) } }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                                     if let ap = p.ayarPen, let cerceve = ap.pencere.contentView?.superview { ap.web.takeSnapshot(with: nil) { sayfa, _ in
