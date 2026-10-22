@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 192831,
-   "sha": "b556179a8608f621"
+   "uzunluk": 196879,
+   "sha": "0a4e62ecd11c23d7"
   },
   "/mini": {
-   "uzunluk": 192831,
-   "sha": "b556179a8608f621"
+   "uzunluk": 196879,
+   "sha": "0a4e62ecd11c23d7"
   },
   "/status": {
    "_ping_son": "float",

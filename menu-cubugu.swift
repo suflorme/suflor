@@ -918,6 +918,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
         guard let d = m.body as? [String: Any] else { return }
         if let alt = d["alt"] as? String { pencere.subtitle = alt }
+        if let k = d["ayarlar"] as? String { ayarPenceresi(k) }
         if d["toplanti"] != nil { durumIsle(d) }
     }
     func goster() {
@@ -926,7 +927,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         anaMenu(); web.frame = pencere.contentLayoutRect; pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         istek("/status") { [weak self] v in if let s = v?["surum"] as? String { DispatchQueue.main.async { self?.surum = s } } }
     }
-    func windowWillClose(_ n: Notification) { DispatchQueue.main.async { NSApp.dockTile.badgeLabel = nil; NSApp.setActivationPolicy(.accessory) } }
+    func windowWillClose(_ n: Notification) { DispatchQueue.main.async { NSApp.dockTile.badgeLabel = nil; if self.ayarPen?.pencere.isVisible != true { NSApp.setActivationPolicy(.accessory) } } }
     // --- araç çubuğu ---
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.flexibleSpace] + ["yz", "gz", "sc", "sz", "kz", "yan"].map { NSToolbarItem.Identifier($0) } + [.space] + ["mini", "gb", "ay"].map { NSToolbarItem.Identifier($0) }
@@ -954,12 +955,15 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         }
     }
     func tikla(_ dugme: String) { web.evaluateJavaScript("(()=>{const b=document.getElementById('\(dugme)');if(b){b.click();return true}return false})()") { v, _ in if (v as? Bool) != true { print("PENCERE: sayfada \(dugme) düğmesi yok") } } }
-    @objc func ayarlar() { tikla("ay") }
+    @objc func ayarlar() { ayarPenceresi("") }
+    // v0.107.0: Ayarlar ayrı Mac penceresi (?gorunum=ayarlar; sayfa yalnız Ayarlar'ı gösterir, Kaydet ve kapat pencereyi kapatır)
+    var ayarPen: AyarPencere?
+    func ayarPenceresi(_ bolum: String) { if ayarPen == nil { ayarPen = AyarPencere() }; ayarPen?.goster(bolum) }
     // Toplantı menüsü panodaki alt çubuk düğmelerine tıklar (durum ve onay panoda kalır); Option + Shift kısayolları Mac genelinde zaten var
     static let MENU_DUGME = ["Önemli an": "yz", "Kanıt al": "kz", "Ne diyeyim?": "oz", "Sessiz (10 dk kart yok)": "sz", "Sesli çeviri": "sc", "Gizli toplantı": "gz"]
     @objc func menuDugme(_ o: NSMenuItem) { if let d = PanoPencere.MENU_DUGME[o.title] { tikla(d) } }
-    @objc func baslat() {  // boş panodaki büyük kartın Başlat'ı (form açılır); toplantı sürerken yok
-        web.evaluateJavaScript("(()=>{const b=document.querySelector('button[data-bas]');if(b){b.click();return true}return false})()") { v, _ in if (v as? Bool) != true { print("PENCERE: Başlat düğmesi yok (toplantı sürüyor olabilir)") } }
+    @objc func baslat() {  // boş panodaki büyük kartın Başlat'ı (sıradaki takvim toplantısıyla); yoksa (toplantı sürerken) boş form
+        goster(); web.evaluateJavaScript("(()=>{const b=document.querySelector('button[data-bas]');if(b){b.click();return true}if(typeof tkForm==='function'){tkForm(null);return true}return false})()") { v, _ in if (v as? Bool) != true { print("PENCERE: Başlat formu açılamadı") } }
     }
     @objc func chromeda() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
     @objc func geriBildirim() { tikla("gb") }
@@ -984,7 +988,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         alt("Düzen", [("Geri al", Selector(("undo:")), "z", .command, nil), ("Yinele", Selector(("redo:")), "z", [.command, .shift], nil), ("-", nil, "", [], nil),
                       ("Kes", #selector(NSText.cut(_:)), "x", .command, nil), ("Kopyala", #selector(NSText.copy(_:)), "c", .command, nil),
                       ("Yapıştır", #selector(NSText.paste(_:)), "v", .command, nil), ("Tümünü seç", #selector(NSText.selectAll(_:)), "a", .command, nil)])
-        alt("Toplantı", [("Toplantı başlat…", #selector(baslat), "", [], self), ("-", nil, "", [], nil),
+        alt("Toplantı", [("Toplantı başlat…", #selector(baslat), "n", .command, self), ("-", nil, "", [], nil),
                          ("Önemli an", #selector(menuDugme(_:)), "", [], self), ("Kanıt al", #selector(menuDugme(_:)), "k", [.option, .shift], self),
                          ("Ne diyeyim?", #selector(menuDugme(_:)), "o", [.option, .shift], self), ("-", nil, "", [], nil),
                          ("Sessiz (10 dk kart yok)", #selector(menuDugme(_:)), "m", [.option, .shift], self), ("Sesli çeviri", #selector(menuDugme(_:)), "", [], self),
@@ -1089,6 +1093,32 @@ if arg("--panel-dene") != nil {
     }
     let d = PDene(); NSApplication.shared.delegate = d; NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
 }
+final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate {
+    let pencere: NSWindow; let web: WKWebView
+    override init() {
+        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 640), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        pencere.title = "Ayarlar"; pencere.minSize = NSSize(width: 460, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
+        let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
+        c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        web = WKWebView(frame: pencere.contentView!.bounds, configuration: c); web.autoresizingMask = [.width, .height]
+        super.init()
+        c.userContentController.add(self, name: "suflor"); web.navigationDelegate = self; pencere.delegate = self; pencere.contentView = web
+        pencere.center(); pencere.setFrameAutosaveName("SuflorAyar")
+    }
+    func goster(_ bolum: String) {
+        let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "", b = bolum.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        if !pencere.isVisible || !bolum.isEmpty, let u = URL(string: "\(KOK)/?gorunum=ayarlar&k=\(k)" + (b.isEmpty ? "" : "&ayar=\(b)")) { web.load(URLRequest(url: u)) }
+        NSApp.setActivationPolicy(.regular); pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) { if (m.body as? [String: Any])?["kapat"] != nil { pencere.performClose(nil) } }
+    func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if let u = a.request.url, a.navigationType == .linkActivated, !(u.host == "127.0.0.1" && u.port == PORT) { NSWorkspace.shared.open(u); decisionHandler(.cancel); return }
+        decisionHandler(.allow)
+    }
+    func windowWillClose(_ n: Notification) {  // pano penceresi de kapalıysa yine yalnız menü çubuğunda
+        DispatchQueue.main.async { if !NSApp.windows.contains(where: { $0.isVisible && $0.styleMask.contains(.titled) && $0 !== self.pencere }) { NSApp.setActivationPolicy(.accessory) } }
+    }
+}
 func goruntuAl(_ p: PanoPencere, _ yol: String) {  // çerçeve (araç çubuğu) + sayfa tek PNG (pencere paylaşımda görünmediği için ekran görüntüsü yerine)
     guard let cerceve = p.pencere.contentView?.superview else { return }
     p.web.takeSnapshot(with: nil) { sayfa, _ in
@@ -1111,7 +1141,14 @@ if args.contains("--pencere-dene") {
                 if let yol = arg("--goruntu") {
                     DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg("--bekle") ?? "") ?? 4)) {
                         p?.web.evaluateJavaScript(arg("--js") ?? "0") { v, e in if let e = e { print("js hata:", e.localizedDescription) } else if let v = v { print("js:", v) } }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { if let p = p { goruntuAl(p, yol) } }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            guard let p = p else { return }
+                            if args.contains("--ayar-pen") {  // Ayarlar penceresi: aç, yüklenince sayfa görüntüsü
+                                p.ayarPenceresi(""); DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                    p.ayarPen?.web.takeSnapshot(with: nil) { im, _ in if let t = im?.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü:", yol) } }
+                                }
+                            } else { goruntuAl(p, yol) }
+                        }
                     }
                     return
                 }
