@@ -353,7 +353,10 @@ def _isci_dongu():
         hata_say = 0; metin = " ".join(str(j.get("text") or "").split()); is_["t_wh"] = time.time(); is_["isci_sn"] = j.get("sn")
         gec = round(time.time() - is_["t1"], 1)
         w.update(son_sn=j.get("sn"), gecikme_sn=gec, gecikme_max=max(w.get("gecikme_max") or 0, gec)); w["atlanan"] += j.get("atlanan", 0)
-        if j.get("istem_dusen") and j["istem_dusen"] != w.get("istem_dusen"): print(f"WHISPER: istem sınırı — {j['istem_dusen']} terim sığmadı (önem sırasında sondakiler)")
+        # sığmayan terim sayısı önceki metnin uzunluğuyla her parçada oynuyor: günlüğe yarım saatte bir ya da 10'dan fazla artınca (22 Ekim: toplantıda 50 satır)
+        il = w.get("istem_log") or (0, 0)
+        if j.get("istem_dusen") and (j["istem_dusen"] > il[1] + 10 or time.time() - il[0] > 1800):
+            print(f"WHISPER: istem sınırı — {j['istem_dusen']} terim sığmadı (önem sırasında sondakiler)"); w["istem_log"] = (time.time(), j["istem_dusen"])
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         sonuc = "uydurma" if j.get("atlanan") else "bos"

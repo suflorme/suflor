@@ -212,9 +212,10 @@ def elle_oncelik(oto, elle):
     # kullanıcının eklediği biçim otomatik terimlerden çıkarılır (dış sözlük başka ada bağlasa da kullanıcının kararı geçer)
     mb = {_sb(y) for t in elle for y in t.get("yanlis", [])}
     out = []
+    # yanlış yazımı hiç olmayan terim (proje kartı: yalnız Whisper istemine girer) korunur — 22 Ekim'de bir --ekle 46 terimi silmişti
     for t in oto:
-        t = dict(t, yanlis=[y for y in t["yanlis"] if _sb(y) not in mb])
-        if t["yanlis"]: out.append(t)
+        ys = [y for y in t.get("yanlis") or [] if _sb(y) not in mb]
+        if ys or not t.get("yanlis"): out.append(dict(t, yanlis=ys))
     return out
 def sozluk_birlestir(d):
     import csv, re as _re
@@ -234,6 +235,7 @@ def sozluk_birlestir(d):
         if b not in t["yanlis"]: t["yanlis"].append(b)
     elle = [t for t in d.get("terimler", []) if elle_mi(t)]
     grup = elle_oncelik(list(grup.values()), elle)
+    kart = [t for t in d.get("terimler", []) if t.get("kaynak") == "proje-karti"]  # dış sözlükten değil: yeniden kurmada korunur
     vendor = []
     try:
         for k, _, m in baglam.xlsx_parcala(SOZ_XLSX):
@@ -243,7 +245,7 @@ def sozluk_birlestir(d):
     return {"surum": 2, "guncelleme": datetime.date.today().isoformat(),
             "aciklama": "Suflor.me özel sözlüğü. duzelt: her geçiş düzeltilir · baglam: yalnız aynı satırda bağlam kelimesi varsa · isaret: düzeltilmez, '?' işareti. Kaynak: ayardaki sozluk_kaynagi (sozluk --birlestir ile yeniden kurulur) + elle eklenenler (kaynak=kullanici).",
             "kaynak_mtime": max(os.path.getmtime(SOZ_TSV), os.path.getmtime(SOZ_XLSX)),
-            "terimler": grup + elle, "vendor": sorted(dict.fromkeys(vendor)), "kisiler": KISILER}
+            "terimler": grup + kart + elle, "vendor": sorted(dict.fromkeys(vendor)), "kisiler": KISILER}
 def sozluk_cmd():
     fp = os.path.join(A.dir, "sozluk.json")
     try: d = json.load(open(fp, encoding="utf-8"))
