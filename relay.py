@@ -1761,6 +1761,17 @@ def gundem_yeni_konu(konu, rol, dil, simdi, maddeler, bas=None, bit=None):
     tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(yeni, f, ensure_ascii=False, indent=1)
     os.replace(tmp, fp); print(f"BAŞLAT: yeni konu — gündem yenilendi ({len(yeni['items'])} madde){'; eskisi agenda-arsiv.jsonl' if isinstance(a, dict) else ''}"); return True
+# v0.112.1 (kullanıcı, 22 Ekim: uygulama seçmeden Başlat'a basınca toplantı sayfası açılmadı, Claude gelmeyecek toplantıyı bekledi): Başlat formunda
+# bağlantı yoksa açılacak uygulama son seçilenle (canli/son-platform.json; Chrome'daki pano ile Mac penceresi aynı) açılır, hiç seçilmediyse Teams.
+SON_PLATFORM_YOL = os.path.join(BASE, "son-platform.json")
+def son_platform():
+    try: v = json.load(open(SON_PLATFORM_YOL, encoding="utf-8")).get("platform")
+    except (OSError, ValueError, AttributeError): v = None
+    return v if v in PLATFORM_ANA else "teams"
+def son_platform_yaz(plat):
+    try:
+        with open(SON_PLATFORM_YOL, "w", encoding="utf-8") as f: json.dump({"platform": plat}, f)
+    except OSError: pass
 def gundem_maddeleri(v):
     # Başlat formundaki Gündem alanı: her satır bir madde; madde işareti/numara atılır, boş ve yinelenen satır yok, en çok 15 × 200 karakter.
     # Metin veridir: /toplanti onu takvim-secilen.json'dan taslak gündem olarak okur, komut satırına girmez.
@@ -1792,6 +1803,7 @@ def baslat(p):
         return {"ok": False, "err": _t("Bağlantı tanınmadı — yalnız Teams, Google Meet ya da Zoom https bağlantısı", "Link not recognised — only Teams, Google Meet or Zoom https links")}
     baglanti = (olay or {}).get("baglanti") or guvenli_baglanti(elle); ana = not baglanti
     plat = p.get("platform") if p.get("platform") in PLATFORM_ANA else None
+    if plat: son_platform_yaz(plat)  # v0.112.1: Başlat formu sonra bunu seçili açar
     if ana: baglanti = PLATFORM_ANA.get(plat)  # seçilmediyse None: hazırlık sekmesi sorar
     simdi = datetime.datetime.now().astimezone()
     gundem = gundem_maddeleri(p.get("gundem"))
@@ -1904,7 +1916,7 @@ class H(BaseHTTPRequestHandler):
                 STATE["_pano_t"] = time.time()
             s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = gemini_view() if gemini_acik() else piper_view(); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
-            s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
+            s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
             if s.get("extension"):
                 s["extension"] = dict(s["extension"])

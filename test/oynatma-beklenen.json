@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 227689,
-   "sha": "5b41f821fb014909"
+   "uzunluk": 227721,
+   "sha": "f3abe550e10b29af"
   },
   "/mini": {
-   "uzunluk": 227689,
-   "sha": "5b41f821fb014909"
+   "uzunluk": 227721,
+   "sha": "f3abe550e10b29af"
   },
   "/status": {
    "_ping_son": "float",
@@ -577,6 +577,7 @@
     "at": "str",
     "speaker": "str"
    },
+   "son_platform": "str",
    "son_satir": {
     "at": "str",
     "file": "str",
