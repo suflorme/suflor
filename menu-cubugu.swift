@@ -90,6 +90,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
         oge.button?.target = self; oge.button?.action = #selector(tiklandi(_:)); oge.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         panelKur(); yoklamaDongusu(); sicakTusKur()
+        istek("/status") { v in let d = ((v?["ayarlar"] as? [String: Any])?["deger"] as? [String: Any])?["dil"] as? String; DispatchQueue.main.async { dilAyarla(d) } }
         if args.contains("--ortak-mik") { let o = OrtakMik(); ortakMik = o; o.dongu() }  // toplantıya sesli söyle (v0.38.0)
         // bildirimler bu uygulamadan (v0.31.3): tıklayınca özet açılır — osascript bildirimi Betik Düzenleyici'yi açıyordu
         let nc = UNUserNotificationCenter.current(); nc.delegate = self
@@ -121,7 +122,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         ve.addSubview(web); panel.contentView = ve
         // sağ üst köşede büyüt: tam pano Mac penceresinde (panel kapanır)
         let b = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: "Panoyu aç")!, target: self, action: #selector(panelBuyut))
-        b.isBordered = false; b.bezelStyle = .regularSquare; b.contentTintColor = .secondaryLabelColor; b.toolTip = "Panoyu aç (tam pencere)"
+        b.isBordered = false; b.bezelStyle = .regularSquare; b.contentTintColor = .secondaryLabelColor; b.toolTip = T("Panoyu aç (tam pencere)")
         b.frame = NSRect(x: ve.bounds.width - 26, y: ve.bounds.height - 24, width: 18, height: 18); b.autoresizingMask = [.minXMargin, .minYMargin]
         ve.addSubview(b)
     }
@@ -154,16 +155,16 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     }
     func menuGoster() {
         let m = NSMenu()
-        m.addItem(withTitle: "Panoyu aç", action: #selector(panoAc), keyEquivalent: "").target = self
-        m.addItem(withTitle: "Panoyu tarayıcıda aç", action: #selector(panoTarayici), keyEquivalent: "").target = self
-        m.addItem(withTitle: "Paneli yenile", action: #selector(panelYenile), keyEquivalent: "").target = self
-        if panel.isVisible { m.addItem(withTitle: "Paneli kapat (Esc)", action: #selector(panelKapat), keyEquivalent: "").target = self }
+        m.addItem(withTitle: T("Panoyu aç"), action: #selector(panoAc), keyEquivalent: "").target = self
+        m.addItem(withTitle: T("Panoyu tarayıcıda aç"), action: #selector(panoTarayici), keyEquivalent: "").target = self
+        m.addItem(withTitle: T("Paneli yenile"), action: #selector(panelYenile), keyEquivalent: "").target = self
+        if panel.isVisible { m.addItem(withTitle: T("Paneli kapat (Esc)"), action: #selector(panelKapat), keyEquivalent: "").target = self }
         m.addItem(.separator())
         for t in ["Bas-konuş: Option + Shift + Boşluk basılı tut", "Kanıt: Option + Shift + K", "Ne diyeyim?: Option + Shift + O", "Sessiz (10 dk kart yok): Option + Shift + M"] + (args.contains("--ortak-mik") ? ["Asistan sussun: Option + Shift + S"] : []) {
-            let b = m.addItem(withTitle: t, action: nil, keyEquivalent: ""); b.isEnabled = false
+            let b = m.addItem(withTitle: T(t), action: nil, keyEquivalent: ""); b.isEnabled = false
         }
         m.addItem(.separator())
-        m.addItem(withTitle: "Suflor.me menüsünden çık", action: #selector(cik), keyEquivalent: "").target = self
+        m.addItem(withTitle: T("Suflor.me menüsünden çık"), action: #selector(cik), keyEquivalent: "").target = self
         oge.menu = m; oge.button?.performClick(nil); oge.menu = nil
     }
     @objc func panoAc() { panoPencere() }
@@ -856,6 +857,29 @@ final class OrtakMik {
 // stil; pano.html değişmez, Chrome'daki pano aynı kalır). Araç çubuğu ve menü sayfadaki gizli düğmeye tıklar: iş panoda kalır.
 // Pencere açıkken uygulama Dock'ta görünür (Command + Tab), kapanınca yine yalnız menü çubuğunda.
 // Mikrofon (Sohbet, Konuş) yalnız aktarıcının kökenine; bağlantılar varsayılan tarayıcıda; .md indirme İndirilenler'e.
+// v0.110.1 (kullanıcı, 22 Ekim: İngilizcede Ayarlar sekmeleri Türkçe kalıyordu): uygulamanın kendi metinleri (menüler, sekmeler, pencere başlıkları,
+// onay düğmeleri) arayüz diline göre. Dil açılışta /status'tan, sonra her sayfa yüklenişinde sayfadan (<html lang>) gelir; değişince "SuflorDil" bildirimi.
+var ARAYUZ_EN = false
+let EN_METIN: [String: String] = [
+    "Panoyu aç": "Open panel", "Panoyu tarayıcıda aç": "Open panel in browser", "Paneli yenile": "Reload mini panel", "Paneli kapat (Esc)": "Close mini panel (Esc)",
+    "Bas-konuş: Option + Shift + Boşluk basılı tut": "Talk: hold Option + Shift + Space", "Kanıt: Option + Shift + K": "Evidence: Option + Shift + K",
+    "Ne diyeyim?: Option + Shift + O": "What should I say?: Option + Shift + O", "Sessiz (10 dk kart yok): Option + Shift + M": "Quiet (no cards for 10 min): Option + Shift + M",
+    "Asistan sussun: Option + Shift + S": "Assistant, stop: Option + Shift + S", "Suflor.me menüsünden çık": "Quit Suflor.me menu", "Panoyu aç (tam pencere)": "Open panel (full window)",
+    "Mini pano": "Mini panel", "Geri bildirim": "Feedback", "Ayarlar": "Settings", "Önemli an": "Key moment", "Gizli toplantı": "Private meeting", "Sesli çeviri": "Spoken translation",
+    "Sessiz (10 dk)": "Quiet (10 min)", "Kanıt al": "Capture evidence", "Yan panel": "Side panel", "Kenar çubuğu": "Sidebar",
+    "Suflor.me hakkında": "About Suflor.me", "Ayarlar…": "Settings…", "Geri bildirim gönder…": "Send feedback…", "Suflor.me penceresini gizle": "Hide Suflor.me", "Diğerlerini gizle": "Hide others",
+    "Düzen": "Edit", "Geri al": "Undo", "Yinele": "Redo", "Kes": "Cut", "Kopyala": "Copy", "Yapıştır": "Paste", "Tümünü seç": "Select all",
+    "Toplantı": "Meeting", "Toplantı başlat…": "Start a meeting…", "Ne diyeyim?": "What should I say?", "Sessiz (10 dk kart yok)": "Quiet (no cards for 10 min)",
+    "Görünüm": "View", "Kenar çubuğunu gizle/göster": "Show/hide sidebar", "Yenile": "Reload", "Tam ekran": "Full screen",
+    "Pencere": "Window", "Küçült": "Minimize", "Büyüt": "Zoom", "Kapat": "Close", "Yardım": "Help", "Suflor.me Yardımı": "Suflor.me Help",
+    "Konuş: Option + Shift + Boşluk basılı tut": "Talk: hold Option + Shift + Space",
+    "Sessiz: Option + Shift + M": "Quiet: Option + Shift + M", "Tamam": "OK", "Vazgeç": "Cancel", "Evet": "Yes",
+    "Genel": "General", "Ses": "Voice", "Konuş": "Talk", "Kanıt": "Evidence", "Çeviri": "Translation", "E-posta": "Email", "Gizlilik": "Privacy", "Proje": "Project"]
+func T(_ s: String) -> String { ARAYUZ_EN ? (EN_METIN[s] ?? s) : s }
+func dilAyarla(_ dil: String?) {  // sayfa ya da /status bildirdi; değiştiyse açık pencereler ve menüler yeni dille
+    guard let d = dil, ["tr", "en"].contains(d), (d == "en") != ARAYUZ_EN else { return }
+    ARAYUZ_EN = d == "en"; NotificationCenter.default.post(name: .init("SuflorDil"), object: nil)
+}
 func yerelKoken(_ o: WKSecurityOrigin) -> Bool { o.host == "127.0.0.1" && o.port == PORT }
 let ISARET_SVG = ##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg>"##
 let suflorSimge: NSImage? = {  // Dock ve Hakkında için: Mac simgeleri gibi kenarda boşluk (marka/suflor-isaret.svg ile aynı çizim)
@@ -866,7 +890,8 @@ let suflorSimge: NSImage? = {  // Dock ve Hakkında için: Mac simgeleri gibi ke
 // durum cümlesi (ve toplantıda ad · süre) pencere başlığının altında (subtitle); sayfa başlık satırı yalnız etiket, eylem düğmesi ya da Güncelle varken
 let MAC_STIL = "header .brand,#yb,#gb,#ay,#mini,#t,#sure,#dm,#da,#durum .dot{display:none!important}html.bas-bos header{display:none!important}"
 let BASLIK_IZLE = """
-(()=>{const h=document.querySelector('header');if(!h||!window.webkit)return;let son=null;const $=i=>document.getElementById(i),m=e=>e?e.textContent.trim():''
+(()=>{try{webkit.messageHandlers.suflor.postMessage({dil:document.documentElement.lang})}catch(e){}
+const h=document.querySelector('header');if(!h||!window.webkit)return;let son=null;const $=i=>document.getElementById(i),m=e=>e?e.textContent.trim():''
 const gor=e=>e&&!e.hidden&&getComputedStyle(e).display!=='none'&&e.textContent.trim()
 const yaz=()=>{const du=$('durum'),uy=!!du&&/\\b(wa|er)\\b/.test(du.className)
   const alt=(uy?'⚠︎ ':'')+[[m($('t')),m($('sure'))].filter(Boolean).join(' · '),[m($('dm')),m($('da'))].filter(Boolean).join(' — ')].filter(Boolean).join(' · ')
@@ -912,6 +937,10 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         web.frame = pencere.contentLayoutRect; kap.addSubview(web); pencere.contentView = kap
         pencere.center(); pencere.setFrameAutosaveName("SuflorPano")  // yer ve boy hatırlanır
         anaMenu()
+        NotificationCenter.default.addObserver(forName: .init("SuflorDil"), object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }; self.anaMenu()
+            for o in self.pencere.toolbar?.items ?? [] { if let a = PanoPencere.ARACLAR.first(where: { $0.0 == o.itemIdentifier }) { o.label = T(a.2); o.toolTip = T(a.2) } }
+        }
         // Dock rozeti: açık kart sayısı (pano başlığı "(n) Suflor.me pano")
         baslikIzle = web.observe(\.title, options: [.new]) { w, _ in
             let n = (w.title ?? "").range(of: #"^\((\d+)\)"#, options: .regularExpression).map { String((w.title ?? "")[$0].dropFirst().dropLast()) }
@@ -923,6 +952,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         guard let d = m.body as? [String: Any] else { return }
         if let alt = d["alt"] as? String { pencere.subtitle = alt }
         if let k = d["ayarlar"] as? String { ayarPenceresi(k) }
+        if let dl = d["dil"] as? String { dilAyarla(dl) }
         if d["yardim"] != nil { yardim() }
         if d["toplanti"] != nil { durumIsle(d) }
     }
@@ -940,7 +970,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     func toolbarAllowedItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
     func toolbar(_ t: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar f: Bool) -> NSToolbarItem? {
         guard let a = PanoPencere.ARACLAR.first(where: { $0.0 == id }) else { return nil }
-        let o = NSToolbarItem(itemIdentifier: id); o.label = a.2; o.toolTip = a.2; o.isBordered = true
+        let o = NSToolbarItem(itemIdentifier: id); o.label = T(a.2); o.toolTip = T(a.2); o.isBordered = true
         o.image = NSImage(systemSymbolName: a.1, accessibilityDescription: a.2); o.target = self; o.action = #selector(aracTik(_:))
         if #available(macOS 15.0, *), PanoPencere.TOPLANTI.contains(id.rawValue) { o.isHidden = true }  // toplantı başlayınca görünür
         return o
@@ -969,7 +999,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     @objc func yardim() { if yardimPen == nil { yardimPen = AyarPencere(yardim: true) }; yardimPen?.goster("") }  // v0.109.0: Yardım ve sık sorulanlar (?gorunum=yardim)
     // Toplantı menüsü panodaki alt çubuk düğmelerine tıklar (durum ve onay panoda kalır); Option + Shift kısayolları Mac genelinde zaten var
     static let MENU_DUGME = ["Önemli an": "yz", "Kanıt al": "kz", "Ne diyeyim?": "oz", "Sessiz (10 dk kart yok)": "sz", "Sesli çeviri": "sc", "Gizli toplantı": "gz"]
-    @objc func menuDugme(_ o: NSMenuItem) { if let d = PanoPencere.MENU_DUGME[o.title] { tikla(d) } }
+    @objc func menuDugme(_ o: NSMenuItem) { if let d = PanoPencere.MENU_DUGME[(o.representedObject as? String) ?? o.title] { tikla(d) } }  // Türkçe ad representedObject'te (menü İngilizce de olsa)
     @objc func baslat() {  // boş panodaki büyük kartın Başlat'ı (sıradaki takvim toplantısıyla); yoksa (toplantı sürerken) boş form
         goster(); web.evaluateJavaScript("(()=>{const b=document.querySelector('button[data-bas]');if(b){b.click();return true}if(typeof tkForm==='function'){tkForm(null);return true}return false})()") { v, _ in if (v as? Bool) != true { print("PENCERE: Başlat formu açılamadı") } }
     }
@@ -987,8 +1017,8 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         let ana = NSMenu()
         func alt(_ ad: String, _ ogeler: [(String, Selector?, String, NSEvent.ModifierFlags, AnyObject?)]) {
             let m = NSMenu(title: ad)
-            for (t, s, k, f, h) in ogeler { if t == "-" { m.addItem(.separator()); continue }; let o = m.addItem(withTitle: t, action: s, keyEquivalent: k); o.keyEquivalentModifierMask = f; o.target = h }
-            let o = NSMenuItem(title: ad, action: nil, keyEquivalent: ""); o.submenu = m; ana.addItem(o)
+            for (t, s, k, f, h) in ogeler { if t == "-" { m.addItem(.separator()); continue }; let o = m.addItem(withTitle: T(t), action: s, keyEquivalent: k); o.keyEquivalentModifierMask = f; o.target = h; o.representedObject = t }
+            let o = NSMenuItem(title: T(ad), action: nil, keyEquivalent: ""); m.title = T(ad); o.submenu = m; ana.addItem(o)
         }
         alt("Suflor.me", [("Suflor.me hakkında", #selector(hakkinda), "", [], self), ("-", nil, "", [], nil),
                           ("Ayarlar…", #selector(ayarlar), ",", .command, self), ("Geri bildirim gönder…", #selector(geriBildirim), "", [], self), ("-", nil, "", [], nil),
@@ -1070,7 +1100,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         decisionHandler(yerelKoken(o) && t == .microphone ? .grant : .deny)
     }
     func webView(_ w: WKWebView, runJavaScriptConfirmPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
-        let a = NSAlert(); a.messageText = m; a.addButton(withTitle: "Tamam"); a.addButton(withTitle: "Vazgeç")
+        let a = NSAlert(); a.messageText = m; a.addButton(withTitle: T("Tamam")); a.addButton(withTitle: T("Vazgeç"))
         a.beginSheetModal(for: pencere) { completionHandler($0 == .alertFirstButtonReturn) }
     }
     func webView(_ w: WKWebView, runJavaScriptAlertPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping () -> Void) {
@@ -1108,26 +1138,28 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
     static let GRUPLAR = [("Genel", "gearshape"), ("Ses", "speaker.wave.2"), ("Konuş", "mic"), ("Toplantı", "person.2"), ("Kanıt", "camera"),  // v0.110.0: 9 grup
                           ("Çeviri", "globe"), ("E-posta", "envelope"), ("Gizlilik", "hand.raised"), ("Proje", "folder")]
     func kimlik(_ i: Int) -> NSToolbarItem.Identifier { .init("g\(i)") }
+    var seciliGrup = 0
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { AyarPencere.GRUPLAR.indices.map(kimlik) }
     func toolbarAllowedItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
     func toolbarSelectableItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
     func toolbar(_ t: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar f: Bool) -> NSToolbarItem? {
         guard let i = Int(id.rawValue.dropFirst()), i < AyarPencere.GRUPLAR.count else { return nil }
         let (ad, simge) = AyarPencere.GRUPLAR[i], o = NSToolbarItem(itemIdentifier: id)
-        o.label = ad; o.image = NSImage(systemSymbolName: simge, accessibilityDescription: ad); o.target = self; o.action = #selector(sekme(_:)); return o
+        o.label = T(ad); o.image = NSImage(systemSymbolName: simge, accessibilityDescription: T(ad)); o.target = self; o.action = #selector(sekme(_:)); return o
     }
     @objc func sekme(_ o: NSToolbarItem) { if let i = Int(o.itemIdentifier.rawValue.dropFirst()) { grupSec(i, sayfaya: true) } }
     func grupSec(_ i: Int, sayfaya: Bool) {
         guard i >= 0, i < AyarPencere.GRUPLAR.count else { return }
-        pencere.toolbar?.selectedItemIdentifier = kimlik(i); pencere.title = AyarPencere.GRUPLAR[i].0
+        pencere.toolbar?.selectedItemIdentifier = kimlik(i); pencere.title = T(AyarPencere.GRUPLAR[i].0); seciliGrup = i
         if sayfaya { web.evaluateJavaScript("typeof ayGrup==='function'&&ayGrup(\(i))") }
     }
     init(yardim: Bool = false) {  // yardim: aynı pencere Yardım için (sekmesiz, ?gorunum=yardim)
         yardimKipi = yardim
         pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: yardim ? 720 : 600), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        pencere.title = yardim ? "Suflor.me Yardımı" : "Ayarlar"; pencere.minSize = NSSize(width: 460, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
+        pencere.title = T(yardim ? "Suflor.me Yardımı" : "Ayarlar"); pencere.minSize = NSSize(width: 460, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
         let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
         c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        c.userContentController.addUserScript(WKUserScript(source: "try{webkit.messageHandlers.suflor.postMessage({dil:document.documentElement.lang})}catch(e){}", injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         web = WKWebView(frame: pencere.contentView!.bounds, configuration: c); web.autoresizingMask = [.width, .height]
         super.init()
         c.userContentController.add(self, name: "suflor"); web.navigationDelegate = self; web.uiDelegate = self; pencere.delegate = self; pencere.contentView = web
@@ -1136,6 +1168,12 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
             pencere.toolbar = t; pencere.toolbarStyle = .preference; grupSec(0, sayfaya: false)
         }
         pencere.center(); pencere.setFrameAutosaveName(yardim ? "SuflorYardim" : "SuflorAyar")
+        NotificationCenter.default.addObserver(forName: .init("SuflorDil"), object: nil, queue: .main) { [weak self] _ in  // sekmeler ve başlık yeni dille
+            guard let self = self else { return }
+            if self.yardimKipi { self.pencere.title = T("Suflor.me Yardımı"); return }
+            for o in self.pencere.toolbar?.items ?? [] { if let i = Int(o.itemIdentifier.rawValue.dropFirst()), i < AyarPencere.GRUPLAR.count { o.label = T(AyarPencere.GRUPLAR[i].0) } }
+            self.pencere.title = T(AyarPencere.GRUPLAR[self.seciliGrup].0)
+        }
     }
     func goster(_ bolum: String) {
         let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "", b = bolum.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
@@ -1144,13 +1182,14 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
     }
     // "Varsayılanlara dön" onayı (v0.110.0): yanıtlayıcı olmadan WebKit confirm()'u sessizce "hayır" sayar
     func webView(_ w: WKWebView, runJavaScriptConfirmPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
-        let a = NSAlert(); a.messageText = m; a.addButton(withTitle: "Evet"); a.addButton(withTitle: "Vazgeç")
+        let a = NSAlert(); a.messageText = m; a.addButton(withTitle: T("Evet")); a.addButton(withTitle: T("Vazgeç"))
         a.beginSheetModal(for: pencere) { completionHandler($0 == .alertFirstButtonReturn) }
     }
     func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
         guard let d = m.body as? [String: Any] else { return }
         if d["kapat"] != nil { pencere.performClose(nil) }
-        if let g = d["grup"] as? Int { grupSec(g, sayfaya: false) }  // sayfa bir ayara doğrudan açıldı (ör. Gemini satırı): sekme ona göre
+        if let g = d["grup"] as? Int { grupSec(g, sayfaya: false) }
+        if let dl = d["dil"] as? String { dilAyarla(dl) }  // sayfa bir ayara doğrudan açıldı (ör. Gemini satırı): sekme ona göre
     }
     func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if let u = a.request.url, a.navigationType == .linkActivated, !(u.host == "127.0.0.1" && u.port == PORT) { NSWorkspace.shared.open(u); decisionHandler(.cancel); return }
