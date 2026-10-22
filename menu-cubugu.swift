@@ -884,7 +884,8 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         (.init("mini"), "pip", "Mini pano", "mini"), (.init("gb"), "bubble.left", "Geri bildirim", "gb"), (.init("ay"), "gearshape", "Ayarlar", "ay"),
         // v0.106.0: toplantı sürerken görünenler (panodaki alt çubuktan taşındı; açık olan dolu simgeyle)
         (.init("yz"), "star", "Önemli an", "yz"), (.init("gz"), "lock", "Gizli toplantı", "gz"), (.init("sc"), "headphones", "Sesli çeviri", "sc"),
-        (.init("sz"), "bell.slash", "Sessiz (10 dk)", "sz"), (.init("kz"), "camera", "Kanıt al", "kz"), (.init("yan"), "sidebar.right", "Yan panel", "")]
+        (.init("sz"), "bell.slash", "Sessiz (10 dk)", "sz"), (.init("kz"), "camera", "Kanıt al", "kz"), (.init("yan"), "sidebar.right", "Yan panel", ""),
+        (.init("kenar"), "sidebar.left", "Kenar çubuğu", "")]
     static let TOPLANTI: Set<String> = ["yz", "gz", "sc", "sz", "kz", "yan"]
     static let DOLU = ["yz": "star.fill", "gz": "lock.fill", "sc": "headphones.circle.fill", "sz": "bell.slash.fill"]
     var baslikIzle: NSKeyValueObservation?
@@ -905,6 +906,9 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         let t = NSToolbar(identifier: "SuflorPano"); t.delegate = self; t.displayMode = .iconOnly; t.allowsUserCustomization = false
         pencere.toolbar = t; pencere.toolbarStyle = .unified; pencere.titlebarSeparatorStyle = .automatic
         let kap = NSView(frame: pencere.contentView!.bounds); kap.autoresizingMask = [.width, .height]
+        // v0.108.0: sayfanın zemini saydam; kenar çubuğunun arkasında Mac'in kenar çubuğu malzemesi (buzlu cam), içerik alanı kendi zeminini çizer
+        let cam = NSVisualEffectView(frame: kap.bounds); cam.autoresizingMask = [.width, .height]; cam.material = .sidebar; cam.blendingMode = .behindWindow; cam.state = .followsWindowActiveState
+        kap.addSubview(cam); web.setValue(false, forKey: "drawsBackground")
         web.frame = pencere.contentLayoutRect; kap.addSubview(web); pencere.contentView = kap
         pencere.center(); pencere.setFrameAutosaveName("SuflorPano")  // yer ve boy hatırlanır
         anaMenu()
@@ -930,7 +934,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     func windowWillClose(_ n: Notification) { DispatchQueue.main.async { NSApp.dockTile.badgeLabel = nil; if self.ayarPen?.pencere.isVisible != true { NSApp.setActivationPolicy(.accessory) } } }
     // --- araç çubuğu ---
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace] + ["yz", "gz", "sc", "sz", "kz", "yan"].map { NSToolbarItem.Identifier($0) } + [.space] + ["mini", "gb", "ay"].map { NSToolbarItem.Identifier($0) }
+        [NSToolbarItem.Identifier("kenar"), .flexibleSpace] + ["yz", "gz", "sc", "sz", "kz", "yan"].map { NSToolbarItem.Identifier($0) } + [.space] + ["mini", "gb", "ay"].map { NSToolbarItem.Identifier($0) }
     }
     func toolbarAllowedItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
     func toolbar(_ t: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar f: Bool) -> NSToolbarItem? {
@@ -942,6 +946,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     }
     @objc func aracTik(_ o: NSToolbarItem) {
         if o.itemIdentifier.rawValue == "yan" { web.evaluateJavaScript("yanAcKapa()"); return }
+        if o.itemIdentifier.rawValue == "kenar" { kenarAcKapa(); return }
         if let a = PanoPencere.ARACLAR.first(where: { $0.0 == o.itemIdentifier }) { tikla(a.3) }
     }
     // sayfadan: toplantıda mı, hangi düğme açık, yan panel açık mı → araç çubuğu
@@ -968,6 +973,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     @objc func chromeda() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
     @objc func geriBildirim() { tikla("gb") }
     @objc func miniPano() { mini() }
+    @objc func kenarAcKapa() { web.evaluateJavaScript("kenarAcKapa()") }
     @objc func hakkinda() {
         var o: [NSApplication.AboutPanelOptionKey: Any] = [.applicationName: "Suflor.me", .applicationVersion: surum.isEmpty ? "—" : surum, .version: ""]
         if let s = suflorSimge { o[.applicationIcon] = s }
@@ -993,7 +999,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
                          ("Ne diyeyim?", #selector(menuDugme(_:)), "o", [.option, .shift], self), ("-", nil, "", [], nil),
                          ("Sessiz (10 dk kart yok)", #selector(menuDugme(_:)), "m", [.option, .shift], self), ("Sesli çeviri", #selector(menuDugme(_:)), "", [], self),
                          ("Gizli toplantı", #selector(menuDugme(_:)), "", [], self)])
-        alt("Görünüm", [("Mini pano", #selector(miniPano), "", [], self), ("Panoyu tarayıcıda aç", #selector(chromeda), "", [], self), ("-", nil, "", [], nil),
+        alt("Görünüm", [("Kenar çubuğunu gizle/göster", #selector(kenarAcKapa), "s", [.command, .option], self), ("Mini pano", #selector(miniPano), "", [], self), ("Panoyu tarayıcıda aç", #selector(chromeda), "", [], self), ("-", nil, "", [], nil),
                         ("Yenile", #selector(yenile), "r", .command, self), ("Tam ekran", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control], nil)])
         alt("Pencere", [("Küçült", #selector(NSWindow.performMiniaturize(_:)), "m", .command, nil), ("Büyüt", #selector(NSWindow.performZoom(_:)), "", [], nil),
                         ("Kapat", #selector(NSWindow.performClose(_:)), "w", .command, nil)])
@@ -1093,16 +1099,35 @@ if arg("--panel-dene") != nil {
     }
     let d = PDene(); NSApplication.shared.delegate = d; NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
 }
-final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate {
+final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate, NSToolbarDelegate {
     let pencere: NSWindow; let web: WKWebView
+    // v0.109.0: Mac Ayarlar penceresi gibi üstte simgeli sekmeler (sıra panodaki AYG gruplarıyla aynı); seçilen grup sayfada gösterilir, başlık grubun adı
+    static let GRUPLAR = [("E-posta", "envelope"), ("Ses ve konuşma", "waveform"), ("Toplantı uyarıları", "bell.badge"), ("Çeviri ve masaüstü", "globe"), ("Gizlilik", "hand.raised"), ("Proje", "folder")]
+    func kimlik(_ i: Int) -> NSToolbarItem.Identifier { .init("g\(i)") }
+    func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { AyarPencere.GRUPLAR.indices.map(kimlik) }
+    func toolbarAllowedItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
+    func toolbarSelectableItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
+    func toolbar(_ t: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar f: Bool) -> NSToolbarItem? {
+        guard let i = Int(id.rawValue.dropFirst()), i < AyarPencere.GRUPLAR.count else { return nil }
+        let (ad, simge) = AyarPencere.GRUPLAR[i], o = NSToolbarItem(itemIdentifier: id)
+        o.label = ad; o.image = NSImage(systemSymbolName: simge, accessibilityDescription: ad); o.target = self; o.action = #selector(sekme(_:)); return o
+    }
+    @objc func sekme(_ o: NSToolbarItem) { if let i = Int(o.itemIdentifier.rawValue.dropFirst()) { grupSec(i, sayfaya: true) } }
+    func grupSec(_ i: Int, sayfaya: Bool) {
+        guard i >= 0, i < AyarPencere.GRUPLAR.count else { return }
+        pencere.toolbar?.selectedItemIdentifier = kimlik(i); pencere.title = AyarPencere.GRUPLAR[i].0
+        if sayfaya { web.evaluateJavaScript("typeof ayGrup==='function'&&ayGrup(\(i))") }
+    }
     override init() {
-        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 640), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 600), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         pencere.title = "Ayarlar"; pencere.minSize = NSSize(width: 460, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
         let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
         c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: pencere.contentView!.bounds, configuration: c); web.autoresizingMask = [.width, .height]
         super.init()
         c.userContentController.add(self, name: "suflor"); web.navigationDelegate = self; pencere.delegate = self; pencere.contentView = web
+        let t = NSToolbar(identifier: "SuflorAyar"); t.delegate = self; t.displayMode = .iconAndLabel; t.allowsUserCustomization = false
+        pencere.toolbar = t; pencere.toolbarStyle = .preference; grupSec(0, sayfaya: false)
         pencere.center(); pencere.setFrameAutosaveName("SuflorAyar")
     }
     func goster(_ bolum: String) {
@@ -1110,7 +1135,11 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
         if !pencere.isVisible || !bolum.isEmpty, let u = URL(string: "\(KOK)/?gorunum=ayarlar&k=\(k)" + (b.isEmpty ? "" : "&ayar=\(b)")) { web.load(URLRequest(url: u)) }
         NSApp.setActivationPolicy(.regular); pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
-    func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) { if (m.body as? [String: Any])?["kapat"] != nil { pencere.performClose(nil) } }
+    func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
+        guard let d = m.body as? [String: Any] else { return }
+        if d["kapat"] != nil { pencere.performClose(nil) }
+        if let g = d["grup"] as? Int { grupSec(g, sayfaya: false) }  // sayfa bir ayara doğrudan açıldı (ör. Gemini satırı): sekme ona göre
+    }
     func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if let u = a.request.url, a.navigationType == .linkActivated, !(u.host == "127.0.0.1" && u.port == PORT) { NSWorkspace.shared.open(u); decisionHandler(.cancel); return }
         decisionHandler(.allow)
@@ -1144,8 +1173,12 @@ if args.contains("--pencere-dene") {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                             guard let p = p else { return }
                             if args.contains("--ayar-pen") {  // Ayarlar penceresi: aç, yüklenince sayfa görüntüsü
-                                p.ayarPenceresi(""); DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                    p.ayarPen?.web.takeSnapshot(with: nil) { im, _ in if let t = im?.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü:", yol) } }
+                                p.ayarPenceresi(""); DispatchQueue.main.asyncAfter(deadline: .now() + 2) { if let g = arg("--ayar-grup").flatMap({ Int($0) }) { p.ayarPen?.grupSec(g, sayfaya: true) } }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                    if let ap = p.ayarPen, let cerceve = ap.pencere.contentView?.superview { ap.web.takeSnapshot(with: nil) { sayfa, _ in
+                                        guard let rep = cerceve.bitmapImageRepForCachingDisplay(in: cerceve.bounds) else { return }
+                                        cerceve.cacheDisplay(in: cerceve.bounds, to: rep); let im = NSImage(size: cerceve.bounds.size); im.addRepresentation(rep); im.lockFocus(); sayfa?.draw(in: ap.web.convert(ap.web.bounds, to: cerceve)); im.unlockFocus()
+                                        if let t = im.tiffRepresentation, let png = NSBitmapImageRep(data: t)?.representation(using: .png, properties: [:]) { try? png.write(to: URL(fileURLWithPath: yol)); print("görüntü:", yol) } } }
                                 }
                             } else { goruntuAl(p, yol) }
                         }

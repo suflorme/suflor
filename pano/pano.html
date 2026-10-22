@@ -75,11 +75,33 @@ html.mac #tkf input,html.mac #tkf textarea{background:var(--s1);border-radius:6p
 html.mac #tkf .ayt{display:inline-flex;flex-wrap:nowrap;gap:0;background:var(--hov);border-radius:7px;padding:2px;align-self:flex-start}
 html.mac #tkf .ayt button{border:0;border-radius:5px;padding:3px 13px;background:transparent;color:var(--tx);font-weight:400}html.mac #tkf .ayt button.on{background:var(--s1);color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.08);font-weight:500}
 html.mac #tkf .sgs{gap:8px 12px}html.mac #tkf .bt{margin-top:4px}
+/* v0.108.0: kenar çubuğu (yalnız Mac penceresi; zemin saydam — arkasında Mac'in buzlu cam kenar çubuğu malzemesi) */
+#kenar{display:none}html.mac #kenar{display:flex;flex-direction:column;gap:1px;min-height:0;overflow:auto;padding:8px 10px 0;border-right:.5px solid var(--bd)}
+html.mac body{background:transparent}html.mac main,html.mac header{background:var(--bg)}
+html.mac .grid{grid-template-columns:220px minmax(0,1fr) 5px var(--aw,min(380px,36vw))}html.mac.yan-bos .grid,html.mac.yan-kapali .grid{grid-template-columns:220px minmax(0,1fr)}
+html.mac.kc-kapali #kenar{display:none}html.mac.kc-kapali .grid{grid-template-columns:minmax(0,1fr) 5px var(--aw,min(380px,36vw))}html.mac.kc-kapali.yan-bos .grid,html.mac.kc-kapali.yan-kapali .grid{grid-template-columns:minmax(0,1fr)}
+#kenar .kb{font-size:11px;font-weight:600;color:var(--t3);padding:12px 10px 5px}
+#kenar .ko{display:flex;align-items:center;gap:8px;width:100%;padding:5px 10px;border:0;border-radius:6px;background:transparent;color:var(--tx);font-size:13px;text-align:left;white-space:nowrap}
+#kenar .ko svg.i{width:16px;height:16px;color:var(--ac);stroke-width:1.8}#kenar .ko .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}#kenar .ko .r{font-size:11px;color:var(--t3);font-variant-numeric:tabular-nums}
+#kenar .ko:hover{background:var(--hov)}#kenar .ko.sec{background:var(--ac-bg)}#kenar .ko[data-canli]{font-weight:600}
+#kenar .nok{width:8px;height:8px;border-radius:50%;background:#d6453b;flex:none;margin:0 4px;box-shadow:0 0 0 3px rgba(214,69,59,.18)}
+html.mac #sn .sn:nth-child(n+2){display:none}  /* Mac penceresinde ana alanda yalnız en son toplantı; hepsi kenar çubuğunda */
+#kenar .kalt{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px;font-size:12px;color:var(--t2);border-top:.5px solid var(--bd);position:sticky;bottom:0}#kenar .kalt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:720px){html.mac #kenar{display:none}html.mac .grid{grid-template-columns:minmax(0,1fr)!important}}
 /* Ayarlar penceresi (?gorunum=ayarlar): yalnız Ayarlar, pencereyi doldurur */
-html.ayarlar body{display:block;background:var(--s1)}html.ayarlar body>*:not(#ayd){display:none!important}
-html.ayarlar dialog#ayd{width:100vw;height:100vh;max-width:none;max-height:none;margin:0;inset:0;border:0;border-radius:0;box-shadow:none;padding:14px 20px}html.ayarlar dialog#ayd::backdrop{background:transparent}
+html.ayarlar body{display:block;background:var(--s1)}html.ayarlar body>*:not(#ayd):not(#kgd){display:none!important}
+html.ayarlar dialog#ayd{width:100vw;height:100vh;max-width:none;max-height:none;margin:0;inset:0;border:0;border-radius:0;box-shadow:none;padding:14px 22px;background:var(--bg)}html.ayarlar dialog#ayd::backdrop{background:transparent}
+/* v0.109.0: Mac Ayarlar görünümü — gruplar araç çubuğunda, satırlar tek beyaz kutuda (Sistem Ayarları gibi), değişiklik hemen kaydedilir */
+html.ayarlar #ayf{height:100%}html.ayarlar .ayb .gbb,html.ayarlar #ayx,html.ayarlar #ayt,html.ayarlar #ays,html.ayarlar .ayg{display:none}
+html.ayarlar .ayb{justify-content:flex-end}html.ayarlar #ayara{width:200px;border-radius:7px;background:var(--s1);border-color:var(--bd2);padding:4px 9px}
+html.ayarlar #ayi{flex:0 1 auto;max-height:none;background:var(--s1);border-radius:10px;box-shadow:0 0 0 .5px var(--bd2);padding:0 16px}
+html.ayarlar #ayi .ayr{padding:11px 0;border-bottom:.5px solid var(--bd)}html.ayarlar #ayi .ayr:last-of-type{border-bottom:0}html.ayarlar #ayi .ayr b{font-weight:500}
+html.ayarlar #ayi select{border-radius:6px}html.ayarlar #ayi input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:none;width:34px;height:20px;border-radius:10px;background:var(--bd2);position:relative;cursor:pointer;transition:background .15s;margin:0}
+html.ayarlar #ayi input[type=checkbox]::before{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+html.ayarlar #ayi input[type=checkbox]:checked{background:var(--ac)}html.ayarlar #ayi input[type=checkbox]:checked::before{transform:translateX(14px)}html.ayarlar #ayi input[type=checkbox]:disabled{opacity:.4;cursor:default}
+html.ayarlar .bt{min-height:28px}
 html.mac body{font-family:-apple-system,"SF Pro Text",var(--f-govde)}html.mac .sira .b,html.mac .kna{font-family:-apple-system,"SF Pro Display",var(--f-govde);font-weight:600}
-html.mac.yan-bos .grid,html.mac.yan-kapali .grid{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}html.mac #durum{background:none!important;padding:0}html.mac.yan-bos #rz,html.mac.yan-bos aside,html.mac.yan-kapali #rz,html.mac.yan-kapali aside{display:none}
+html.mac.yan-bos .grid,html.mac.yan-kapali .grid{grid-template-rows:minmax(0,1fr)}  /* sütunlar kenar çubuğu bloğunda (v0.108.0) */html.mac #durum{background:none!important;padding:0}html.mac.yan-bos #rz,html.mac.yan-bos aside,html.mac.yan-kapali #rz,html.mac.yan-kapali aside{display:none}
 html.mac main>.sc{padding:10px 24px 14px}html.mac main>.sc>section{max-width:680px;margin-inline:auto}
 html.mac .sira{padding:12px 16px;border-radius:12px;margin:6px 0 8px;gap:12px}html.mac .sira .b{font-size:17px}html.mac .kn{padding:10px 14px;border-radius:12px}html.mac .knb{width:40px;height:40px}
 html.mac .nb{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;align-items:end;padding:8px 12px 10px}html.mac .nb .bt{display:contents}html.mac .nb .bt>*{grid-row:1}
@@ -136,6 +158,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <label class=hint style="display:flex;gap:6px;align-items:center"><input type=checkbox id=gbt checked style="margin:0"> Teknik bilgiyi ekle (sürümler, Mac, son olaylar — toplantı içeriği yok)</label>
 <div class=bt><button id=gbs class=pri value=gonder>Gönder</button><button value=vazgec class=gh formnovalidate>Vazgeç</button><span class=sp1></span><span id=gbd2 class=hint></span></div></form></dialog>
 <div class=grid>
+<nav id=kenar aria-label="Gezinme"></nav>
 <main><div class=sc>
 <section id=tks hidden><div id=tk></div><div id=tkh class=hint></div><div id=tkalt class=tkalt><button id=tke class=gh title="Takvimde olmayan bir toplantı için">Elle başlat</button><button id=tky class="gh ib" title="Takvimi yenile" aria-label="Takvimi yenile"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button></div>
 <div id=tkf hidden><div class=tkfb>Toplantı başlat</div><input id=tkk placeholder="Kişi — konu (ör. Ayşe — bütçe)"><input id=tkl type=url placeholder="Toplantı bağlantısı (isteğe bağlı)"><div class="ayt sg" id=tkp data-bos=1 title="Bağlantı yoksa açılacak uygulama"><button type=button data-v=teams>Teams</button><button type=button data-v=meet>Meet</button><button type=button data-v=zoom>Zoom</button></div><textarea id=tkc rows=2 placeholder="Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin"></textarea><textarea id=tkg rows=3 placeholder="Gündem (isteğe bağlı): her satıra bir madde — Claude bu maddelerle başlar"></textarea><div class=sgs><div class="ayt sg" id=tkr><button type=button data-v=yurutucu title="Toplantıyı ben yönetiyorum">Yürütücü</button><button type=button data-v=katilimci>Katılımcı</button><button type=button data-v=dinleyici>Dinleyici</button></div><div class="ayt sg" id=tkd><button type=button data-v=tr>Türkçe</button><button type=button data-v=en>İngilizce</button><button type=button data-v=karisik>Karışık</button></div></div>
@@ -180,7 +203,7 @@ const ICO={hoparlor:'<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a
  win:'<rect x=3 y=5 width=18 height=14 rx=2 /><rect x=12 y=11 width=7 height=6 rx=1 />',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx=12 cy=12 r=2.8 />',x:'<path d="M6 6l12 12M18 6L6 18"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',replik:'<path d="M4 5h16v11H9l-5 4z"/><path d="M10 8.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4"/><path d="M12 13.6v.1"/>',pause:'<path d="M9 6v12M15 6v12"/>',rec:'<rect x=3 y=5 width=18 height=13 rx=2 /><circle cx=12 cy=11.5 r=3 /><path d="M8 21h8"/>',kulak:'<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x=3.5 y=14 width=4 height=6 rx=1.5 /><rect x=16.5 y=14 width=4 height=6 rx=1.5 />',kilit:'<rect x=5 y=10.5 width=14 height=10 rx=2 /><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>',mute:'<path d="M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M4 4l16 16"/>',
  dahasi:'<circle cx=5.5 cy=12 r=.9 /><circle cx=12 cy=12 r=.9 /><circle cx=18.5 cy=12 r=.9 />',belge:'<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4M9 13h6M9 16.5h4"/>',
  kopya:'<rect x=8.5 y=8.5 width=11 height=12 rx=2 /><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"/>',indir:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
- posta:'<rect x=3.5 y=5.5 width=17 height=13 rx=2 /><path d="M4 7l8 6 8-6"/>',harita:'<circle cx=12 cy=12 r=2.5 /><circle cx=5 cy=6 r=1.8 /><circle cx=19 cy=6 r=1.8 /><circle cx=19 cy=18 r=1.8 /><path d="M7 7l3.2 3.4M17 7l-3.2 3.4M17.3 16.7l-3.3-3"/>',bos:''}
+ posta:'<rect x=3.5 y=5.5 width=17 height=13 rx=2 /><path d="M4 7l8 6 8-6"/>',harita:'<circle cx=12 cy=12 r=2.5 /><circle cx=5 cy=6 r=1.8 /><circle cx=19 cy=6 r=1.8 /><circle cx=19 cy=18 r=1.8 /><path d="M7 7l3.2 3.4M17 7l-3.2 3.4M17.3 16.7l-3.3-3"/>',bos:'',takvim:'<rect x=4 y=5 width=16 height=15 rx=2 /><path d="M4 10h16M9 3v4M15 3v4"/>',mik:'<rect x=9 y=3 width=6 height=11 rx=3 /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'}
 const ic=(n,t)=>`<svg class=i viewBox="0 0 24 24" aria-hidden=true>${ICO[n]}</svg>${t?'<span>'+t+'</span>':''}`
 document.getElementById('mini').innerHTML=ic('win'); document.getElementById('oz').innerHTML=ic('replik',L('Ne diyeyim?')); document.getElementById('yz').innerHTML=ic('star'); document.getElementById('sz').innerHTML=ic('mute'); document.getElementById('gz').innerHTML=ic('kilit'); document.getElementById('kz').innerHTML=ic('cam'); document.getElementById('sc').innerHTML=ic('kulak')
 // Sağ sütun sürüklenerek genişletilir; genişlik bu tarayıcıda hatırlanır (v0.3.3)
@@ -650,6 +673,28 @@ async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.
   if(k.startsWith('mail')){const p=postaUrl(c,{'mail-k':'k','mail-b':'b'}[k]||'');if(p.kisa)try{await navigator.clipboard.writeText(p.duz)}catch(e){}brAc(p.u,p.yeni);return}
   if(k==='kopyala'){try{await navigator.clipboard.writeText(mdDuz(c.md));btn.textContent='✓ '+L('kopyalandı')}catch(e){btn.textContent=L('kopyalanamadı')}setTimeout(()=>{btn.textContent=L('Kopyala')},1500);return}
   if(k==='md'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c.md.endsWith('\n')?c.md:c.md+'\n'],{type:'text/markdown;charset=utf-8'}));a.download=c.dosya+'.md';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}}
+// v0.108.0 (madde 11): Mac penceresinde solda kenar çubuğu — Şimdi (süren toplantı), Bugün, Sohbet, Son toplantılar (tıklayınca özet), Arşiv (Konuş geçmişi);
+// altta durum. Yalnız html.mac'te görünür; araç çubuğundaki düğme ya da Command + Option + S gizler. Seçim yalnız kaydırma ve vurgu.
+let kcSec='tks',kcImza=''
+function kisaGun(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const g=Math.round((b-new Date(d).setHours(0,0,0,0))/864e5)  // kenar çubuğunda kısa: Bugün · Dün · Pzt · 19 Eki
+  return g===0?L('Bugün'):g===1?L('Dün'):g>1&&g<7?d.toLocaleDateString(L('tr-TR'),{weekday:'short'}):d.toLocaleDateString(L('tr-TR'),{day:'numeric',month:'short'})}
+function kenarCiz(s,top){if(!document.documentElement.classList.contains('mac'))return;const ls=s.son_toplantilar||[],t=(document.getElementById('t').textContent||L('Toplantı')).trim(),su=(document.getElementById('sure').textContent||'').trim()
+  const du=document.getElementById('durum'),dm=(document.getElementById('dm').textContent||'').trim(),dc=/\b(ok|wa|er)\b/.exec(du.className)
+  const sec=top&&kcSec==='tks'?'kc':!top&&kcSec==='kc'?'tks':kcSec  // toplantıda varsayılan seçim Şimdi
+  const o=(id,ikon,ad,r,ek)=>`<button class="ko${sec===id?' sec':''}" data-git="${esc(id)}"${ek||''}>${ikon}<span class=tx>${esc(ad)}</span>${r?`<span class=r>${esc(r)}</span>`:''}</button>`
+  const h=(top?`<div class=kb>${L('Şimdi')}</div>`+o('kc','<span class=nok></span>',t,su,' data-canli=1'):'')
+    +o('tks',ic('takvim'),L('Bugün'))+o('kns',ic('mik'),L('Sohbet'),'⌥⇧␣')
+    +(ls.length?`<div class=kb>${L('Son toplantılar')}</div>`+ls.map(r=>o('son:'+r.id,ic('chat'),r.baslik||r.ad,kisaGun(r.at),` title="${L('Özeti aç')} — ${esc(r.ad||'')}"`)).join(''):'')
+    +`<div class=kb>${L('Arşiv')}</div>`+o('gecmis',ic('hist'),L('Konuş geçmişi'))
+    +`<div class=kalt><i class="dot ${dc?dc[1]:''}"></i><span>${esc(dm)}</span></div>`
+  if(h!==kcImza){kcImza=h;document.getElementById('kenar').innerHTML=h}}
+document.getElementById('kenar').addEventListener('click',async ev=>{const b=ev.target.closest('[data-git]');if(!b)return;const g=b.dataset.git
+  if(g.startsWith('son:')){let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:g.slice(4),tur:''})})}catch(e){}if(!r.ok)geciciDurum(L('Özet açılamadı'),r.err||'');return}
+  if(g==='gecmis'){gecmisAc();return}
+  kcSec=g;const e=document.getElementById(g);if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))
+  const hedef=g==='kc'?document.querySelector('main .sc'):e;if(hedef)(g==='kc'?hedef.scrollTo({top:0,behavior:'smooth'}):hedef.scrollIntoView({behavior:'smooth',block:'start'}))})
+function kenarAcKapa(){const k=document.documentElement.classList.toggle('kc-kapali');try{localStorage.setItem('kcKapali',k?'1':'')}catch(e){}}
+try{if(localStorage.getItem('kcKapali'))document.documentElement.classList.add('kc-kapali')}catch(e){}
 // Mac penceresinde yan sütun araç çubuğundaki düğmeyle açılıp kapanır (tercih bu tarayıcıda saklanır)
 function yanAcKapa(){const k=document.documentElement.classList.toggle('yan-kapali');try{localStorage.setItem('yanKapali',k?'1':'')}catch(e){}}
 try{if(localStorage.getItem('yanKapali'))document.documentElement.classList.add('yan-kapali')}catch(e){}
@@ -735,8 +780,10 @@ const MAC=document.documentElement.classList.contains('mac'),AYAR_PEN=new URLSea
 function ayarAc(k){if(MAC&&!AYAR_PEN&&window.webkit){webkit.messageHandlers.suflor.postMessage({ayarlar:k||''});return}
   const d=document.getElementById('ayd');document.getElementById('ayara').value='';if(k){const gi=AYG.findIndex(([,al])=>al.some(x=>x[0]===k));AYSEC=gi>=0?String(gi):'hepsi'}
   ayCiz();d.showModal();const e=k&&d.querySelector(`[data-ay=${k}]`);if(e){e.closest('.ayr').scrollIntoView({block:'center'});e.focus()}}
+// Ayarlar penceresinde gruplar pencerenin araç çubuğunda (Mac Ayarlar gibi): ayGrup(i) o grubu gösterir; "Hepsi" yok, arama bütün gruplarda arar
+function ayGrup(i){AYSEC=String(i);document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0}
 if(AYAR_PEN){document.documentElement.classList.add('ayarlar');const d=document.getElementById('ayd'),a=new URLSearchParams(location.search).get('ayar')||undefined
-  const ac=()=>{if(last&&last.ayarlar)ayarAc(a);else setTimeout(ac,150)};ac()
+  const ac=()=>{if(last&&last.ayarlar){if(!a)AYSEC='0';ayarAc(a);try{webkit.messageHandlers.suflor.postMessage({grup:Number(AYSEC)||0})}catch(e){}}else setTimeout(ac,150)};ac()
   d.addEventListener('close',()=>{try{webkit.messageHandlers.suflor.postMessage({kapat:1})}catch(e){}})}  // Kaydet ve kapat / ✕ pencereyi de kapatır
 {const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear');document.getElementById('ayx').innerHTML=ic('x');document.getElementById('ayx').onclick=()=>d.close()
   document.getElementById('ay').onclick=()=>ayarAc()
@@ -745,13 +792,16 @@ if(AYAR_PEN){document.documentElement.classList.add('ayarlar');const d=document.
     d.querySelectorAll('[data-ay]').forEach(e=>{const k=e.dataset.ay;if(!(k in v)||e.disabled)return;const o=e.type==='checkbox'?e.checked:e.value
       if(e.type==='checkbox')e.checked=!!v[k];else e.value=v[k]==null?'':String(v[k]);if((e.type==='checkbox'?e.checked:e.value)!==o)n++})
     document.getElementById('aym').textContent=n?L('{n} ayar varsayılana çekildi — kaydetmek için Kaydet ve kapat',{n}):L('Hepsi zaten varsayılan')}
-  document.getElementById('ays').onclick=async()=>{const dg=(last&&last.ayarlar||{}).deger||{},ch={},m=document.getElementById('aym')
+  document.getElementById('ays').onclick=()=>ayKaydet(true)
+  // v0.109.0: Ayarlar penceresinde (Mac) değişiklik hemen kaydedilir — Mac ayarları gibi; Kaydet düğmesi yok. Varsayılanlara dön de hemen kaydeder.
+  if(AYAR_PEN){document.getElementById('ayi').addEventListener('change',()=>ayKaydet(false));document.getElementById('ayv').addEventListener('click',()=>setTimeout(()=>ayKaydet(false)))}
+  async function ayKaydet(kapat){const dg=(last&&last.ayarlar||{}).deger||{},ch={},m=document.getElementById('aym')
     d.querySelectorAll('[data-ay]').forEach(e=>{const k=e.dataset.ay,v=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value.trim();if(e.disabled)return;if(v!==dg[k]&&!(v===''&&dg[k]==null))ch[k]=v})
-    if(!Object.keys(ch).length){d.close();return}  // 19 Ekim: Kaydet ve kapat — değişiklik yoksa yalnız kapatır
+    if(!Object.keys(ch).length){if(kapat)d.close();return}  // 19 Ekim: Kaydet ve kapat — değişiklik yoksa yalnız kapatır
     let r={};try{r=await j('/ayar',{method:'POST',body:JSON.stringify({degisen:ch})})}catch(e){}
     d.querySelectorAll('.ayr .hata').forEach(x=>x.remove())
     if(!r.ok){m.textContent=L('Kaydedilemedi');for(const[k,h]of Object.entries(r.hata||{})){const e=d.querySelector(`[data-ay=${k}]`);if(e)e.closest('.ayr').querySelector('.hint').insertAdjacentHTML('beforeend',` <span class=hata>${esc(h)}</span>`)}if(!r.hata)m.textContent+=' — '+(r.err||'');return}
-    await refresh();m.textContent=L('Kaydedildi')+(r.menu==='simdi'?' · '+L('menü uygulaması yeniden açılıyor'):r.menu==='sonra'?' · '+L('menü uygulaması toplantı bitince yeniden açılır'):'');d.close()}}
+    await refresh();m.textContent=L('Kaydedildi')+(r.menu==='simdi'?' · '+L('menü uygulaması yeniden açılıyor'):r.menu==='sonra'?' · '+L('menü uygulaması toplantı bitince yeniden açılır'):'');if(kapat)d.close()}}
 document.getElementById('br').addEventListener('click',async ev=>{if(akTik(ev,renderBrifing))return
   const b=ev.target.closest('button[data-brf]');if(!b)return;b.disabled=true
   let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:b.dataset.brf,yeniden:!!b.dataset.yeniden,dinle:!!b.dataset.dinle})})}catch(e){}
@@ -820,7 +870,7 @@ if(wasBottom)main.scrollTop=main.scrollHeight
 paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSon(s)
 // Mac penceresi (html.mac, v0.106.0): toplantıda mı (araç çubuğundaki toplantı düğmeleri), toplantı dışında yan sütun boş mu (gizlenir)
 {const x=s.extension,top=!!(s.aktif||(x&&x.age_s<30&&x.call)||masaustuTop(s)),h=document.documentElement;h.classList.toggle('toplantida',top)
-  h.classList.toggle('yan-bos',!top&&![...document.querySelectorAll('#yan>section[id]')].some(e=>!e.hidden))}
+  h.classList.toggle('yan-bos',!top&&![...document.querySelectorAll('#yan>section[id]')].some(e=>!e.hidden));kenarCiz(s,top)}
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id+(c.geri||""))); firstCards=false
