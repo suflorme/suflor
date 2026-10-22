@@ -1392,8 +1392,10 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         kb0, m0 = kisilik_hitap_bul(metin)
         if moderator_komut(m0 if kb0 else metin, kb0["ad"] if kb0 else None): _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=_t("Moderatör: tamam.", "Moderator: OK.")); return
     if tur.get("kaynak") not in ("hitap", "karsi", "moderator") and not tur.get("karsi") and talimat_yakala(metin, tur.get("kaynak") or "bas"): _KS["tur"] = None; return  # v0.75.0 (sohbet yolu)
-    if tur.get("kaynak") not in ("karsi", "moderator") and not tur.get("karsi") and not tur.get("otonom"):  # v0.98.0 (S104): "Gemini sesiyle konuş" / "yerel sese dön" — yalnız kullanıcı
-        kbg, mg = kisilik_hitap_bul(metin); gc = gemini_gecis_komut(mg if kbg else metin)
+    # v0.98.0 (S104): "Gemini sesiyle konuş" / "yerel sese dön" — yalnız kullanıcı. v0.113.0: toplantıda kullanıcının kendi hitabı da ("<asistan>, Pocket sesine dön";
+    # otonom tur) — önceden atlanıyordu, asistan "panodan seç" diyordu; karşı tarafın sözü (karsi) yine komut olmaz
+    if tur.get("kaynak") not in ("karsi", "moderator") and not tur.get("karsi") and (not tur.get("otonom") or tur.get("kaynak") == "hitap"):
+        kbg, mg = kisilik_hitap_bul(metin); gc = ses_komut(mg if kbg else metin)
         if gc:
             if kbg: kisilik_sec(kbg["ad"])
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=gc); seslendir(gc, kuyruk=True); return

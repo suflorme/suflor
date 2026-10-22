@@ -53,6 +53,41 @@ def ts_durdur():
     for p in ps:
         if p.poll() is None: p.terminate(); n += 1
     return n > 0
+# v0.113.0 (kullanıcı, 22 Ekim test toplantısı: "Gemini kotamı doldurmamak için toplantıda Pocket sesine dön diyebilmem lazım"): katılımcıların duyduğu
+# ses ayarla (⚙ Ayarlar → Konuş → Toplantıda asistanın sesi, toplanti_ses) ya da toplantıda sesle (ses_komut). kisilik = eskisi gibi kişiliğin sesi (S92: Gemini).
+# Gemini seçilip kullanılamıyorsa Pocket, o da yoksa Mac sesi. → (motor "gemini"|"pocket"|"piper"|"mac", ses adı)
+def toplanti_ses_motoru():
+    ts = AYAR.get("toplanti_ses") or "kisilik"; k = kisilik() or {}
+    pocket = lambda: ("pocket", (pocket_ses_adi(k.get("yerel_ses")) if str(k.get("yerel_ses") or "").startswith("pocket") else None) or pocket_varsayilan()) if pocket_var() else ("mac", None)
+    if ts == "mac": return "mac", None
+    if ts == "pocket": return pocket()
+    if ts == "gemini":
+        kses = str(k.get("ses") or "")
+        return ("gemini", kses.split(":", 1)[1].strip() if kses.startswith("gemini:") else None) if gemini_izinli(True) else pocket()
+    km, kses, _ = kisilik_sesi(toplantiya=True)
+    return km, kses
+# Sesle ses değiştirme (v0.113.0): yalnız tüm cümle komutsa ("tamam, Pocket sesine dön", "Pocket'a geç", "Gemini sesine geç", "Mac sesine geç"; Whisper
+# "Pocket"ı paket/pakıt yazabiliyor). Toplantıda toplanti_ses ayarını kalıcı değiştirir (⚙ Ayarlar'da da görünür); toplantı dışında v0.98.0 Gemini geçişi.
+SES_KOMUT_RX = re.compile(r"(?i)^\W*(?:(?:tamam|peki|lütfen|hadi|şimdi|o\s+zaman)\W+)*(?P<m>pocket|poket|pakıt|paket|yerel|kendi|normal|gemini|cemini|mac)"
+                          r"(?:'?(?:[ıiuü]n|y?[ae]))?\s*(?:ses\w*\s+)?(?:dön|geç|konuş|kullan|başla)\w*(?:\s+m[ıiuü]s[ıiuü]n)?(?:\W+lütfen)?\W*$")
+def ses_komut(metin):  # → okunacak kısa onay ya da None (komut değil)
+    m = SES_KOMUT_RX.search(" ".join(str(metin or "").split()))
+    if not m: return gemini_gecis_komut(metin)
+    h = m.group("m").lower(); hedef = "gemini" if h in ("gemini", "cemini") else "mac" if h == "mac" else "pocket"
+    if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")):
+        if hedef == "mac": return _t("Toplantı dışındaki sesi ⚙ Ayarlar → Ses'ten değiştirebilirsin.", "Change the voice outside meetings in ⚙ Settings → Voice.")
+        return gemini_gecis_komut("gemini sesiyle konuş" if hedef == "gemini" else "yerel sese dön")
+    ad = {"pocket": "Pocket", "gemini": "Gemini", "mac": _t("Mac", "Mac")}[hedef]
+    if hedef == "pocket" and not pocket_var(): return _t("Pocket bu Mac'te kurulu değil; ses değişmedi.", "Pocket isn't installed on this Mac; the voice didn't change.")
+    if hedef == "gemini" and not gemini_izinli(True): return _t("Gemini sesi şu an kullanılamıyor; ses değişmedi.", "The Gemini voice isn't available right now; the voice didn't change.")
+    if hedef == "gemini" and gemini_model() is None: return _t("Gemini'nin bugünkü sınırı doldu; ses değişmedi.", "Gemini's daily limit is used up; the voice didn't change.")
+    eski = toplanti_ses_motoru()[0]
+    r = ayar_yaz({"toplanti_ses": hedef})
+    if not r.get("ok"): return _t("Ayar yazılamadı; ses değişmedi.", "Couldn't save the setting; the voice didn't change.")
+    if hedef != "gemini": GEMINI_GECIS["bitis"] = 0.0
+    print(f"TOPLANTIYA SÖYLE: ses sesle değişti — {eski} → {hedef}")
+    return _t(f"Tamam, toplantıda {ad} sesiyle konuşuyorum." if eski != hedef else f"Zaten {ad} sesiyle konuşuyorum.",
+              f"OK, I'll use the {ad} voice in the meeting." if eski != hedef else f"I'm already using the {ad} voice.")
 def toplantiya_soyle(metin=None):
     if AYAR.get("toplantiya_ses") is not True: return {"ok": False, "err": _t("Toplantıya sesli söyleme kapalı (⚙ Ayarlar)", "Speaking into the meeting is off (⚙ Settings)")}
     if ts_durdur(): print("TOPLANTIYA SÖYLE: susturuldu"); return {"ok": True, "metin": _t("🔇 Suflor sustu", "🔇 Suflor stopped")}
@@ -71,7 +106,7 @@ def toplantiya_soyle(metin=None):
         TS["tanitti"] = toplanti; m = tanitim + " " + m
     v = ses_secimi(); okunan = ses_duzen(telaffuz(m, mac=True)); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
     # v0.79.0 (kullanıcı 18 Ekim: "toplantı kişiliğinin sesi"): kişiliğin sesi Gemini ise ses Gemini'den (ör. toplantı kişiliği Kore); alınamazsa Mac sesi
-    km, kses, _ = kisilik_sesi(toplantiya=True); gpcm = None  # v0.81.0 (S92): katılımcıların duyduğu ses — Gemini her zaman burada
+    km, kses = toplanti_ses_motoru(); gpcm = None  # v0.81.0 (S92): katılımcıların duyduğu ses — Gemini burada; v0.113.0: ayar toplanti_ses / sesle Pocket
     if km == "gemini" and os.access(PIPER_OYNAT, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
         usl = (kisilik() or {}).get("ses_uslup"); govde = m[len(tanitim) + 1:] if tanitim else m
         # tanıtım ve toplantı başı duyurusu sabit: bir kez okunup önbellekte (günlük sınırdan yemez); tanıtım ayrı okunup cevabın önüne eklenir
@@ -80,6 +115,11 @@ def toplantiya_soyle(metin=None):
             tp = gemini_pcm(ses_duzen(kisilik_telaffuz(tanitim), False), ses=kses, uslup=usl, sabit=True)
             gpcm = (tp + b"\0\0" * int(GEMINI_SR * 0.35) + gpcm) if tp else None
         if not gpcm: print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Mac sesi")
+    elif km == "pocket" and os.access(PIPER_OYNAT, os.X_OK) and (not os.environ.get("SUFLOR_TEST_BASLAT") or os.environ.get("SUFLOR_TEST_TS_POCKET")):
+        # v0.113.0: Pocket da 24 kHz 16 bit — Gemini'nin yolu (BlackHole / web toplantısında eklenti) aynen; okunacak metin toplanır, sonra çalınır
+        gpcm = pocket_pcm(kisilik_telaffuz(etiket_sil(m)), ses=kses)
+        if gpcm: print(f"TOPLANTIYA SÖYLE: Pocket sesi ({kses}, {len(gpcm) / 2 / GEMINI_SR:.1f} sn)")
+        else: print("TOPLANTIYA SÖYLE: Pocket sesi alınamadı — Mac sesi")
     if web: return _ts_web_hazirla(m, sesli, okunan, gpcm)
     if os.environ.get("SUFLOR_TEST_BASLAT"):
         print(f"TOPLANTIYA SÖYLE (deneme): aygıt {aygit} · {okunan}"); TS["son"] = m; TS["son_t"] = TS["test_bit"] = time.time() + len(m) / 14

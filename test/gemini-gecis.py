@@ -33,5 +33,6 @@ D["var"] = False; ok("anahtar yoksa açılmaz", "kullanılamıyor" in k("Gemini 
 D["gizli"] = True; ok("gizli toplantıda açılmaz", "kullanılamıyor" in k("Gemini sesine geç") and not acik()); D["gizli"] = False
 ns["AYAR"]["gemini_kapsam"] = "hepsi"; ok("ayarda 'hepsi' seçiliyse geçişten bağımsız izinli", izin()); ns["AYAR"].pop("gemini_kapsam")
 b = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-ok("Konuş yolunda komut Claude'a gitmeden yakalanıyor, karşı taraf geçiremez", "gemini_gecis_komut(" in b and 'tur.get("kaynak") not in ("karsi", "moderator") and not tur.get("karsi")' in b)
+ok("Konuş yolunda komut Claude'a gitmeden yakalanıyor (v0.113.0: ses_komut → gemini_gecis_komut), karşı taraf geçiremez", "ses_komut(" in b and 'tur.get("kaynak") not in ("karsi", "moderator") and not tur.get("karsi")' in b
+   and "return gemini_gecis_komut(metin)" in open(os.path.join(KOD, "aktarici", "toplantiya-ses.py"), encoding="utf-8").read())
 print("gemini geçiş: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

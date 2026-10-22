@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 227721,
-   "sha": "f3abe550e10b29af"
+   "uzunluk": 228603,
+   "sha": "3ee9f3a13d071004"
   },
   "/mini": {
-   "uzunluk": 227721,
-   "sha": "f3abe550e10b29af"
+   "uzunluk": 228603,
+   "sha": "3ee9f3a13d071004"
   },
   "/status": {
    "_ping_son": "float",
@@ -292,6 +292,7 @@
      "sohbet_ses_izi": "bool",
      "sure_duyuru": "bool",
      "teshis": "bool",
+     "toplanti_ses": "str",
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
      "uzun_konusma_sn": "int"
@@ -334,6 +335,7 @@
      "sohbet_ses_izi": "bool",
      "sure_duyuru": "bool",
      "teshis": "bool",
+     "toplanti_ses": "str",
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
      "uzun_konusma_sn": "int"
@@ -569,7 +571,8 @@
     "calici": "NoneType",
     "durum": "NoneType",
     "hata": "NoneType",
-    "motor": "str"
+    "motor": "str",
+    "toplanti": "str"
    },
    "sesli_ceviri": "NoneType",
    "sessiz": "NoneType",
@@ -627,7 +630,6 @@
      "ton": "str"
     }
    },
-   "toplanti_bitti": "NoneType",
    "toplanti_oturum": "NoneType",
    "uyari": "NoneType",
    "whisper": {

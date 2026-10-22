@@ -527,11 +527,17 @@ def kart_okunuyor(metin):  # kullanıcı ekrandaki kartı yüksek sesle okuyor m
     return any(len(s & _sozcukler(c.get("text"))) / len(s) >= 0.6 for c in CARDS[-12:] if str(c.get("at") or "") >= sinir)
 def suflor_konusuyor():
     p = SES.get("p"); return bool(p and p.poll() is None)
-def sesli_kanit_bak(metin):  # yalnız ingest'in LOCK bloğundan çağrılır
-    if AYAR.get("sesli_kanit") is False or not SESLI_KANIT_RX.search(metin or "") or SESLI_KANIT_YOK.search(metin): return False
-    if time.time() - SESLI_KANIT["t"] < 20 or kart_okunuyor(metin) or suflor_konusuyor(): return False
-    SESLI_KANIT["t"] = time.time(); _kanit_iste({"kaynak": "sesli", "not": metin[:120]}); kart_bildir()
-    print(f"KANIT: sesli istek — \"{metin[:60]}\""); return True
+def sesli_kanit_bak(metin, onceki=None):  # yalnız ingest'in LOCK bloğundan çağrılır
+    # v0.113.0 (22 Ekim test toplantısı): Meet altyazısı büyüyen tek blok — blok uzadıkça aynı "ekran görüntüsü al" yeniden sayılıp 44 sn sonra ikinci
+    # kanıt alındı; not da bloğun başıydı. Artık güncellenen satırda yalnız yeni eklenen komut sayılır; not komutun geçtiği cümle.
+    if AYAR.get("sesli_kanit") is False: return False
+    bul = list(SESLI_KANIT_RX.finditer(metin or ""))
+    if not bul or len(bul) <= len(SESLI_KANIT_RX.findall(onceki or "")): return False
+    cumle = next((c for c in re.split(r"(?<=[.!?…])\s+", metin) if SESLI_KANIT_RX.search(c)), metin)
+    if SESLI_KANIT_YOK.search(cumle): return False
+    if time.time() - SESLI_KANIT["t"] < 20 or kart_okunuyor(cumle) or suflor_konusuyor(): return False
+    SESLI_KANIT["t"] = time.time(); _kanit_iste({"kaynak": "sesli", "not": cumle[:120]}); kart_bildir()
+    print(f"KANIT: sesli istek — \"{cumle[:60]}\""); return True
 def sesli_not_bak(metin):
     # → not metni ya da None. Komuttan sonra söylenen ("not al: müşteri cuma dönecek") not olur; komut tek başınaysa son 60 sn'deki
     # önceki satır (çoğu kez karşı tarafın söylediği) not olur. Ayar `sesli_not: false` kapatır. LOCK dışında çağrılır (note LOCK alır).
@@ -684,7 +690,7 @@ def ingest(p):
                 if askida and "Claude:" in text and e.get("komut_ses") != "uymuyor":
                     e["_konusan"] = True; threading.Thread(target=hitap_aski_zaman, args=(askida,), daemon=True).start()
                 if e.get("komut_ses") != "uymuyor":  # yanındaki birinin sesi kanıt/not istemez
-                    sesli_kanit_bak(text)
+                    sesli_kanit_bak(text, onceki)
                     n_ = None if onceki else sesli_not_bak(text)
                     if n_:  # note LOCK alır: bu paket yazıldıktan sonra ayrı iş parçacığında
                         threading.Thread(target=note, args=({"meeting": {"title": title}, "text": n_, "at": datetime.datetime.now().isoformat(timespec="seconds")},), daemon=True).start()
@@ -1519,7 +1525,7 @@ AYAR_PANO = {
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None),
     "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "sure_duyuru": ("bool", False, None),
-    "toplanti_terminal": ("bool", False, None), "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
+    "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, gemini_kapsam (sesli "Gemini sesiyle
 # konuş" geçişi aynı işi görür), toplanti_duyuru panodan kalktı; ayar dosyasında elle yazılırsa kod eskisi gibi okur.
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
@@ -1914,7 +1920,8 @@ class H(BaseHTTPRequestHandler):
             elif (self.headers.get("Referer") or "").startswith((f"http://127.0.0.1:{A.port}/", f"http://localhost:{A.port}/")) and "hazirlik" not in (self.headers.get("Referer") or ""):  # v0.96.0: pano açık (Konuş süreci önceden açılır)
                 if time.time() - (STATE.get("_pano_t") or 0) > 300: STATE["_pano_ilk"] = time.time()
                 STATE["_pano_t"] = time.time()
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = gemini_view() if gemini_acik() else piper_view(); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []

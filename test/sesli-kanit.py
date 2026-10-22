@@ -58,6 +58,17 @@ try:
     for ad, k in [("komuttan sonrası not", "🎙 müşteri cuma dönecek" in md), ("tek başına komut önceki satırı not eder", "🎙 Deniz: Teklifi salıya" in md),
                   ("kartı okurken not tetiklenmez", md.count("🎙") == 2)]:
         print(("✓ " if k else "✗ ") + "gerçek aktarıcı: " + ad); hata += 0 if k else 1; ORNEK.append(ad)
+    # v0.113.0 (22 Ekim): Meet altyazısı büyüyen tek blok — aynı komut blok uzayınca yeniden sayılmasın; not komutun geçtiği cümle
+    durum = lambda: json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=4).read()).get("kanit_iste") or {}
+    def blok(t): post("/ingest", {"meeting": M, "source": "captions", "entries": [{"id": "c/blok", "speaker": "Ali K", "time": "10:02", "text": t}]})
+    time.sleep(21); blok("O zaman başlayalım. Kartları gönder gelsin."); time.sleep(0.3); k0 = durum().get("id")
+    blok("O zaman başlayalım. Kartları gönder gelsin. Şimdi ayarlarda ekran görüntüsü al."); time.sleep(0.3); k1 = durum()
+    for ad, k in [("büyüyen altyazı bloğunda yeni komut kanıt ister", k1.get("id") != k0 and k1.get("kaynak") == "sesli"),
+                  ("kanıt notu komutun geçtiği cümle (bloğun başı değil)", k1.get("not") == "Şimdi ayarlarda ekran görüntüsü al.")]:
+        print(("✓ " if k else "✗ ") + "gerçek aktarıcı: " + ad); hata += 0 if k else 1; ORNEK.append(ad)
+    time.sleep(21); blok("O zaman başlayalım. Kartları gönder gelsin. Şimdi ayarlarda ekran görüntüsü al. Evet aldın, güzel."); time.sleep(0.3)
+    k = durum().get("id") == k1.get("id")
+    print(("✓ " if k else "✗ ") + "gerçek aktarıcı: blok uzayınca aynı komut ikinci kanıt istemez (22 Ekim: 44 sn sonra ikinci kanıt)"); hata += 0 if k else 1; ORNEK.append("blok")
 finally: r.kill(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print(f"sesli kanıt: {len(ORNEK) + 1 - hata}/{len(ORNEK) + 1}" + (" ✓ hepsi geçti" if not hata else ""))
 sys.exit(1 if hata else 0)

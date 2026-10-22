@@ -45,7 +45,7 @@ bak("duygu: Claude tonu → üzgün, ünlem → mutlu, hayret → şaşkın, dü
     (d1, du("Harika haber, kabul ettiler!"), du("Gerçekten mi? Bütçe iki katı mı?"), du("Toplantı yarın.")) == ("üzgün", "mutlu", "şaşkın", None))
 # kişilik başına ses seçimi: brifing-ses.py'deki kisilik_sesi taklit ortamda
 src = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read()
-ks = re.search(r"^def kisilik_sesi\(.*?(?=^def )", src, re.S | re.M).group(0)
+ks = re.search(r"^def kisilik_sesi\(.*?(?=^def ses_secimi)", src, re.S | re.M).group(0)  # v0.110.0: kisilik_sesi + _kisilik_sesi
 K = {"k": None, "izin": False, "pocket": True, "piper": True}
 kn = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "kisilik": lambda: K["k"], "gemini_izinli": lambda t=False: K["izin"] or t, "gemini_acik": lambda: False,
       "piper_acik": lambda: AYAR.get("ses_motoru") == "piper", "pocket_var": lambda: K["pocket"], "pocket_ses_adi": ad, "pocket_varsayilan": ns["pocket_varsayilan"], "ses_secimi": lambda: None}
@@ -78,6 +78,9 @@ else:
         bak(f"ikinci okuma (wite, mutlu) ilk ses {ns['POCKET'].get('ilk', 9):.3f} sn ≤ 0,15 sn", ok is True and ns["POCKET"].get("ilk", 9) <= 0.15)
         t = time.time(); ok = ns["pocket_oku"]("Happy to help, Sir. You have three meetings on Friday, the first one at 10:30.", ses="en:michael")
         bak(f"v0.101.3: İngilizce model (en:michael) okur, ilk ses {ns['POCKET'].get('ilk', 9):.3f} sn ≤ 0,15 sn ({time.time() - t:.1f} sn)", ok is True and ns["POCKET"].get("ilk", 9) <= 0.15)
+        t = time.time(); pcm = ns["pocket_pcm"]("Tamam, toplantıda Pocket sesiyle konuşuyorum.", ses="wite:male_1")
+        bak(f"v0.113.0: toplantıya okunacak ses toplanır, çalınmaz (24 kHz 16 bit, {len(pcm or b'') / 48000:.1f} sn ses, {time.time() - t:.1f} sn sürdü)",
+            bool(pcm) and len(pcm) % 2 == 0 and 1.0 < len(pcm) / 48000 < 15 and time.time() - t < 10)
         rss = int(subprocess.run(["ps", "-o", "rss=", "-p", str(ns["POCKET"]["p"].pid)], capture_output=True, text=True).stdout.strip() or 0) / 1024
         bak(f"işçi belleği {rss:.0f} MB ≤ 2.500 MB (üç model)", 0 < rss <= 2500)
         n = {"i": 0}

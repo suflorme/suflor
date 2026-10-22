@@ -88,7 +88,10 @@ def pocket_metin(metin, ses):
     if ses.startswith("en:"): return metin  # İngilizce model sayı, saat ve yüzdeyi kendisi okur; Türkçe okunuş kuralları uygulanmaz
     m = piper_okunur(metin)
     return _rakam_yazi(m) if ses.startswith("alperiox") else m
-def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None):
+def pocket_pcm(metin, ses=None):  # v0.113.0: toplantıya okunacak ses (24 kHz 16 bit PCM, toplanmış) — çalınmaz; olmazsa None
+    parcalar = []
+    return b"".join(parcalar) if pocket_oku(metin, ses=ses, topla=parcalar) and parcalar else None
+def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None, topla=None):
     # metni Pocket'la okur; bitince True. Hiçbir parça çalınamadıysa False (çağıran Mac sesine düşer). ses: "wite:male_1" / "alperiox:female_2"
     # (yoksa ayardaki); iptal(): True dönerse kalan parçalar çalınmaz; kayit["p"]: çalan süreç (ses_durdur keser).
     ses = pocket_ses_adi(ses) or pocket_varsayilan()
@@ -106,8 +109,8 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None):
             except subprocess.TimeoutExpired: pass
         if oyn.poll() is None: oyn.terminate()
     try:
-        sessiz = bool(os.environ.get("SUFLOR_TEST_PIPER_SESSIZ"))
-        if not sessiz and os.access(PIPER_OYNAT, os.X_OK):
+        sessiz = bool(os.environ.get("SUFLOR_TEST_PIPER_SESSIZ")) and topla is None
+        if not sessiz and topla is None and os.access(PIPER_OYNAT, os.X_OK):
             try:
                 oyn = subprocess.Popen([PIPER_OYNAT, str(sr)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if kayit is not None: kayit["p"] = oyn
@@ -129,7 +132,10 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None):
                 except OSError: pass
                 return True
             try:
-                if sessiz: calinan or ses_basladi(kayit); calinan += 1
+                if topla is not None:
+                    with wave.open(o["wav"]) as w: topla.append(w.readframes(w.getnframes()))
+                    calinan += 1
+                elif sessiz: calinan or ses_basladi(kayit); calinan += 1
                 elif oyn:
                     with wave.open(o["wav"]) as w: b = w.readframes(w.getnframes())
                     try: oyn.stdin.write(b); oyn.stdin.flush()
