@@ -57,6 +57,22 @@ def talimat_yakala(metin, kaynak):  # kullanıcının kendi sözü → True: tal
     c = talimat_coz(metin)
     if not c: return False
     return talimat_kuyruk(*c, metin, kaynak)
+# v0.115.2 (kullanıcı, 22 Ekim test toplantısı: "asistan ve oturum aynı onayı iki kez sordu"): adsız "bunu geliştirme oturumuna bildirebilir misin?" isteğini
+# toplantı oturumu kendi "ileteyim mi?" kartıyla sordu (onayı hiçbir şey göndermedi), az sonra asistan aynı isteği defterden görüp bu yoldan ikinci onay kartını
+# açtı. Artık toplantı oturumu da bu yolu kullanır (toplanti-claude.py ilet → /ilet → talimat_ilet) ve aynı oturuma 5 dk içinde benzer ileti (sözcüklerin
+# yarısı ortak) bekliyor/onaylandı/iletildi ise yenisi açılmaz.
+TALIMAT_YINELEME_SN = 300
+def _talimat_yinelenen(h, ileti):
+    s = _sozcukler(ileti); sinir = (datetime.datetime.now() - datetime.timedelta(seconds=TALIMAT_YINELEME_SN)).isoformat(timespec="seconds")
+    if not s: return None
+    with LOCK:
+        for x in reversed(EYLEMLER):
+            if x.get("tur") != "oturum" or x.get("durum") not in ("bekliyor", "onaylandi", "yapildi") or str(x.get("at") or "") < sinir: continue
+            try: a = json.loads(x.get("ayrinti") or "{}")
+            except ValueError: continue
+            o = _sozcukler(a.get("metin"))
+            if a.get("hedef") == h["ad"] and o and len(s & o) / min(len(s), len(o)) >= 0.5: return x
+    return None
 def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False):  # claude: ileti Claude'un cevabından — pano cevabı Claude'unki kalır
     top = toplanti_var()
     if tur == "oturum":
@@ -65,6 +81,13 @@ def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False):  # claude: ileti
             cevap = _t("Bu saatte o oturuma çok ileti gitti; biraz sonra.", "Too many messages to that session this hour; later.")
             if not claude: _konus_kur(durum="hazir", soru=metin, cevap=cevap)
             if not top: seslendir(cevap, kuyruk=True)
+            return True
+        y = _talimat_yinelenen(h, ileti)
+        if y:
+            cevap = (_t("Bu ileti zaten onay bekliyor.", "That message is already waiting for approval.") if y["durum"] == "bekliyor"
+                     else _t("Bu ileti zaten iletildi.", "That message was already sent."))
+            if not claude: _konus_kur(durum="hazir", soru=metin, cevap=cevap)
+            print(f"TALİMAT: yinelenmedi — {h['ad']} oturumuna 5 dk içinde benzer ileti var ({y['id']}, {y['durum']})")
             return True
         etiket = str(h.get("etiket") or h["ad"])
     x = eylem_ekle({"tur": tur, "baslik": ileti[:160], "ayrinti": json.dumps({"hedef": h["ad"] if h else None, "etiket": etiket if h else None, "metin": ileti,
@@ -83,6 +106,18 @@ def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False):  # claude: ileti
     if not claude: _konus_kur(durum="hazir", soru=metin, cevap=cevap, hata=None, olcum=None)
     print(f"TALİMAT: {'Claude hazırladı · ' if claude else ''}{tur}{(' → ' + h['ad']) if h else ''} onay bekliyor ({'kart' if top else 'sesli'}) — \"{ileti[:60]}\"")
     return True
+def talimat_ilet(p):  # v0.115.2: toplantı oturumu (toplanti-claude.py ilet, anahtarlı /ilet) — kullanıcının istediği ileti aynı onay yolundan; kendi kartını açmaz
+    hedefler = [x["ad"] for x in talimat_hedefler()]
+    h = next((x for x in talimat_hedefler() if x["ad"] == str(p.get("hedef") or "").strip().lower()), None); ileti = _talimat_temiz(p.get("metin"))[:TALIMAT_EN_COK]
+    if AYAR.get("talimat") is False: return {"ok": False, "err": "kapalı", "hedefler": hedefler}
+    if not h: return {"ok": False, "err": "hedef yok", "hedefler": hedefler}
+    if len(ileti.split()) < 2: return {"ok": False, "err": "ileti kısa", "hedefler": hedefler}
+    with LOCK: n = len(EYLEMLER)
+    talimat_kuyruk("oturum", h, ileti, str(p.get("duyulan") or ileti)[:TALIMAT_EN_COK], "toplanti", claude=True)
+    with LOCK: x = EYLEMLER[-1] if len(EYLEMLER) > n else None
+    if x: return {"ok": True, "durum": "onay", "id": x["id"], "toplantida": toplanti_var()}
+    y = _talimat_yinelenen(h, ileti)
+    return {"ok": True, "durum": "yinelenen", "id": y["id"], "eski": y["durum"]} if y else {"ok": False, "err": "sınır (saatte en çok %d)" % TALIMAT_SAAT_SINIR}
 TALIMAT_ETIKET_RX = re.compile(r"\[\s*[İI]LET\s+(?P<h>[\w-]{1,24})\s*:\s*(?P<m>[^\]]*)\]?", re.I)
 TALIMAT_ETIKET_BAS = re.compile(r"\[\s*[İI]LET\b", re.I)  # okuma bu noktada durur (etiket sesli okunmaz)
 def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nasıl istenir

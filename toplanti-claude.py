@@ -155,6 +155,9 @@ gb.add_argument("--yeni", action="store_true"); gb.add_argument("--okundu", acti
 sub.add_parser("izin-kanca", help="v0.97.0: Claude Code PreToolUse kancası (panodan Başlat'la açılan toplantı oturumu) — riskli araçta (satır içi python, e-posta/mesaj gönderme, tarayıcı yönetimi, takvim daveti, dosya paylaşma) kullanıcı onayı (panoda kart / toplantı dışında sesli); stdin: kanca JSON")
 ge = sub.add_parser("gelen", help="v0.75.0: Suflor gelen kutusu — sesle verilip onaylanan talimatlar (hedef oturumun SessionStart/UserPromptSubmit kancası çağırır)")
 ge.add_argument("--hedef", required=True); ge.add_argument("--hepsi", action="store_true", help="okunmuşları da göster, işaretleme")
+il = sub.add_parser("ilet", help="v0.115.2: kullanıcının istediği iletiyi başka oturuma (ayar talimat_hedefler) onay kartıyla sun — kendi kartınla \"ileteyim mi?\" sorma")
+il.add_argument("hedef", help="hedef oturumun adı (ör. proje, gelistirme); yanlışsa geçerli adlar yazılır"); il.add_argument("metin", nargs="+", help="iletinin tam hâli (bağlamıyla)")
+il.add_argument("--duyulan", default="", help="kullanıcının isteği (döküm satırı)")
 hz = sub.add_parser("hazir"); hz.add_argument("hid", help="hazir.json'daki kart kimliği (h1, h2…)")
 hz.add_argument("--cevap", default=None, help="SORU'ya cevap olarak gönder (q…); tür cevap olur")
 A = ap.parse_args()
@@ -425,6 +428,12 @@ EYLEM_AD = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge":
 def _post(yol, govde):
     req = urllib.request.Request(A.relay + yol, data=json.dumps(govde).encode(), method="POST", headers={"Content-Type": "application/json"})
     return json.load(urllib.request.urlopen(req, timeout=5))
+def ilet_cmd():  # v0.115.2: aktarıcı onay kartı açar, onaylanınca kendisi yazar (gelen kutusu); 5 dk içinde benzer ileti varsa yenisini açmaz
+    try: r = _post("/ilet", {"hedef": A.hedef, "metin": " ".join(A.metin), "duyulan": A.duyulan})
+    except Exception as e: sys.exit(f"aktarıcı yanıt vermiyor ({e.__class__.__name__})")
+    if r.get("durum") == "onay": print(f"onay kartı panoda ({r['id']}): kullanıcı onaylayınca aktarıcı iletir. İletildi deme; 'Onay kartı panoda' de."); return
+    if r.get("durum") == "yinelenen": print(f"yinelenmedi: bu oturuma benzer ileti 5 dk içinde zaten var ({r['id']}, {r.get('eski')}); yeni kart açılmadı."); return
+    sys.exit(f"iletilmedi: {r.get('err') or '?'}" + (f" — geçerli hedefler: {', '.join(r['hedefler'])}" if r.get("hedefler") else ""))
 def _eylemler(): return [x for x in (get("/cards").get("eylem") or {}).get("liste") or [] if not x.get("yerel")]  # v0.75.0: yerel işi (oturuma talimat, yapılacak) aktarıcı uygular
 def eylem_satir(x, i=None, ayrinti=False):
     d = {"bekliyor": "bekliyor", "onaylandi": "✓ ONAYLANDI", "reddedildi": "✕ reddedildi", "yapildi": "✓ yapıldı", "hata": "⚠ hata"}.get(x["durum"], x["durum"])
@@ -2587,6 +2596,6 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "taahhut": taahhut_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
      "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

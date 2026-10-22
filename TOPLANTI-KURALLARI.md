@@ -67,6 +67,9 @@ Asistanlar (kullanıcının sesli asistanı; adları kişilik dosyasında, kişi
 okunur (dökümde `SUFLOR SÖYLEDİ`). Panodaki Konuş düğmesiyle sorulan yalnız kullanıcıya cevaplanır. Satırda `🎙asistan-cevaplıyor` varsa cevap kartı
 yazma, sohbete yazma; `SUFLOR SÖYLEDİ` olayına da kart yazma. "Toplantıya söyle" kartı ya da "asistanı aç/otonomu aç" önerisi yazma: kullanıcı asistanı adıyla çağırır.
 İş talimatı ("kuyruğa al", "not al", rol, kart, e-posta, takvim) asistana gitmez, işaretsiz gelir: her zamanki gibi sen yaparsın (asistan kısa "Tamam" der).
+Başka bir oturuma ileti ("geliştirme oturumuna bildir", "proje oturumuna ilet") istenirse `ilet <hedef> "<iletinin tam hâli>" --duyulan "<istek satırı>"`:
+aktarıcı onay kartı açar, onaylanınca kendisi iletir. Kendi kartınla "ileteyim mi?" sorma, kart onaylanmadan "iletildi" deme; komut "yinelenmedi" derse
+aynı ileti zaten onayda ya da gitmiştir (asistan da yakalamış olabilir), yeni kart açma. Hedef adı yanlışsa komut geçerli adları yazar.
 Konuş'a basılı tutup söylenen iş talimatı dökümde `NOT (<kullanıcı>): Claude: … (Konuş düğmesiyle)` olarak gelir: aynı "Claude:" talimatıdır. Aynı iş
 30 sn içinde hem bu notla hem "Claude:" satırıyla gelirse bir kez yap.
 

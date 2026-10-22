@@ -445,7 +445,7 @@ except (OSError, ValueError, AttributeError): pass
 GIZLI_YUT = {"/ingest", "/taslak", "/ses", "/ses-yerel", "/ses-masaustu", "/kanit", "/kanit-masaustu", "/masaustu"}  # sessizce atılır
 GIZLI_RED = {"/note", "/ask", "/girdi", "/kanit-iste", "/bas-konus", "/baslat", "/brifing", "/baglam-dosya", "/dosyadan", "/dosyadan-karar", "/card",
              "/etiket", "/eylem", "/eylem-sun", "/eylem-sesli", "/eylem-karar", "/eylem-sonuc", "/eylem-geri-al", "/moderator", "/otonom", "/agenda-tick",
-             "/geri-bildirim", "/komut"}  # /komut yalnız tur=gizli geçer
+             "/geri-bildirim", "/komut", "/ilet"}  # /komut yalnız tur=gizli geçer
 def gizli_acik(): return GIZLI["acik"]
 def gizli_red(): return {"ok": False, "gizli": True, "err": _t("Gizli toplantı açık — Suflor hiçbir şey dinlemiyor ve işlemiyor (🔒 ile kapat)", "Private meeting is on — Suflor isn't listening or processing anything (turn off with 🔒)")}
 def gizli_degistir(neden="kullanıcı"):
@@ -2014,6 +2014,7 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": ack_card(p, yetkili)})
         if self.path == "/eylem":  # kuyruğa iş — yalnız anahtarlı (toplanti-claude.py); geçiş listesinde yok
             x = eylem_ekle(p); return self._json({"ok": bool(x), "eylem": x}, 200 if x else 400)
+        if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
         if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/eylem-sun": return self._json({"ok": True, "n": eylem_sun()})
