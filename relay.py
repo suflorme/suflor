@@ -503,7 +503,10 @@ def kanit_iste(p):
     # pano / mini pano 📷: Teams sekmesindeki eklenti bir sonraki yoklamada (≤ 3 sn) çeker
     with LOCK: return _kanit_iste(p)
 def _kanit_iste(p):  # LOCK tutulurken (ingest içinden sesli istek: LOCK yeniden alınırsa aktarıcı kilitlenir — 13 Ekim deneme 8)
-    STATE["kanit_iste"] = {"id": "r" + str(int(time.time() * 1000)), "t": time.time(), "not": " ".join(str(p.get("not") or "").split())[:300], "kaynak": p.get("kaynak") or "pano"}
+    hedef = "ekran" if p.get("hedef") == "ekran" else None
+    if hedef and time.time() - (STATE.get("_menu_yokluyor") or 0) > 90: hedef = None; print("KANIT: menü uygulaması yok — ekran görüntüsü yerine toplantı ekranı")
+    STATE["kanit_iste"] = {"id": "r" + str(int(time.time() * 1000)), "t": time.time(), "not": " ".join(str(p.get("not") or "").split())[:300], "kaynak": p.get("kaynak") or "pano",
+                           **({"hedef": hedef} if hedef else {})}
     return STATE["kanit_iste"]["id"]
 # Sesli kanıt isteği (v0.31.6; kullanıcı isteği, 12 Ekim deneme 7): kullanıcının KENDİ satırında istek biçiminde "kanıt al", "ekran görüntüsü al/çek",
 # "ekran kaydı al", "take a screenshot" → kanıt isteği (tarayıcıda eklenti, masaüstünde menü uygulaması çeker). Faz 2'de kaldırılmıştı (üç yanlış
@@ -512,6 +515,9 @@ def _kanit_iste(p):  # LOCK tutulurken (ingest içinden sesli istek: LOCK yenide
 # kabul ediliyordu) ve özelliği anlatırken ("kanıt al denince", "kanıt alayım gibi"). Artık fiil yalnız komut biçimleriyle (al, alalım, alayım,
 # alır mısın …) ve tümcenin sonunda (noktalama, satır sonu ya da "lütfen/hemen/şimdi") sayılır; satır son 3 dk'daki bir kartın metnine benziyorsa
 # (kart okunuyor) ve Suflor o an konuşuyorsa tetiklenmez. Aynı kural öneksiz "not al" için (kullanıcı isteği): not satırı aktarıcı yazar.
+# v0.115.0 (kullanıcı, 22 Ekim test toplantısı: Ayarlar'a bakarken "ekran görüntüsü al" dedi, kanıta Meet sekmesi düştü): "kanıt al" toplantı ekranı
+# (eklenti sekmeyi, masaüstünde menü uygulaması toplantı penceresini çeker); "ekran görüntüsü/resmi/kaydı al", "take a screenshot" o an bakılan
+# pencere (hedef "ekran": menü uygulaması ön plandaki pencereyi çeker; menü uygulaması yoksa toplantı ekranı).
 _KOMUT_FIIL = r"(?:al|alın|alalım|alayım|alsana|alır\s+mısın|alabilir\s+misin|alır\s+mıyız|alabilir\s+miyiz)"
 _KOMUT_SON = r"(?=\s*(?:$|[.,:;!?…]|\s(?:lütfen|hemen|şimdi|bakalım|şunu|bunu|şuna|buna|şunun|bunun)\b))"
 SESLI_KANIT_RX = re.compile(r"\b(?:kanıt|ekran\s+(?:görüntü|resm|resim|kayd|kayıt)\w*)\s+(?:bir\s+)?(?:" + _KOMUT_FIIL[3:-1] + r"|çek|çekelim|çekeyim|kaydet|başlat)" + _KOMUT_SON
@@ -536,8 +542,9 @@ def sesli_kanit_bak(metin, onceki=None):  # yalnız ingest'in LOCK bloğundan ç
     cumle = next((c for c in re.split(r"(?<=[.!?…])\s+", metin) if SESLI_KANIT_RX.search(c)), metin)
     if SESLI_KANIT_YOK.search(cumle): return False
     if time.time() - SESLI_KANIT["t"] < 20 or kart_okunuyor(cumle) or suflor_konusuyor(): return False
-    SESLI_KANIT["t"] = time.time(); _kanit_iste({"kaynak": "sesli", "not": cumle[:120]}); kart_bildir()
-    print(f"KANIT: sesli istek — \"{cumle[:60]}\""); return True
+    hedef = "toplanti" if SESLI_KANIT_RX.search(cumle).group(0).lower().startswith("kanıt") else "ekran"
+    SESLI_KANIT["t"] = time.time(); _kanit_iste({"kaynak": "sesli", "not": cumle[:120], "hedef": hedef}); kart_bildir()
+    print(f"KANIT: sesli istek ({(STATE['kanit_iste'] or {}).get('hedef') or 'toplantı'}) — \"{cumle[:60]}\""); return True
 def sesli_not_bak(metin):
     # → not metni ya da None. Komuttan sonra söylenen ("not al: müşteri cuma dönecek") not olur; komut tek başınaysa son 60 sn'deki
     # önceki satır (çoğu kez karşı tarafın söylediği) not olur. Ayar `sesli_not: false` kapatır. LOCK dışında çağrılır (note LOCK alır).
@@ -585,13 +592,14 @@ def kanit(p):
         try: olcek = float(pay["olcek"]) if pay else None
         except (TypeError, ValueError, KeyError): olcek = None
         kucuk = round(olcek * 100) if olcek is not None and 0 < olcek < KANIT_KUCUK else None
-        rec = {"at": now.isoformat(timespec="seconds"), "kanit": rel, "n": n, "not": not_, "kaynak": str(p.get("kaynak") or "")[:20], "boyut": len(b),
+        ekran = " ".join(str(p.get("uyg") or _t("ekran", "screen")).split())[:60] if p.get("hedef") == "ekran" else None  # o an bakılan pencere (toplantı ekranı değil)
+        rec = {"at": now.isoformat(timespec="seconds"), "kanit": rel, "n": n, "not": not_, "kaynak": str(p.get("kaynak") or "")[:20], "boyut": len(b), **({"ekran": ekran} if ekran else {}),
                "w": p.get("w"), "h": p.get("h"), **({"olcek": olcek} if olcek is not None else {}), **({"kucuk": kucuk} if kucuk else {})}
         lst.append(rec)
-        write([(md, hdr), (md, pre_al(md)), (md, f"| {now.strftime('%H:%M:%S')} | **📷 KANIT {n}**{' (oto)' if rec['kaynak'] == 'oto' else ''} | {rel}{(' — ' + not_.replace('|', '¦')) if not_ else ''}{f' ⚠ paylaşılan ekran küçük (%{kucuk})' if kucuk else ''} | |\n"),
+        write([(md, hdr), (md, pre_al(md)), (md, f"| {now.strftime('%H:%M:%S')} | **📷 KANIT {n}**{' (oto)' if rec['kaynak'] == 'oto' else ''}{f' (ekran: {ekran.replace(chr(124), chr(166))})' if ekran else ''} | {rel}{(' — ' + not_.replace('|', '¦')) if not_ else ''}{f' ⚠ paylaşılan ekran küçük (%{kucuk})' if kucuk else ''} | |\n"),
                (jl, json.dumps(rec, ensure_ascii=False) + "\n")])
         STATE["last"] = now.isoformat(timespec="seconds"); heartbeat()
-    print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']}" + (f", paylaşılan ekran küçük %{kucuk}" if kucuk else "") + ")")
+    print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']}" + (f", ekran: {ekran}" if ekran else "") + (f", paylaşılan ekran küçük %{kucuk}" if kucuk else "") + ")")
     threading.Thread(target=kanit_metin, args=(md, rel, n, now.strftime('%H:%M:%S')), daemon=True).start()
     return {"ok": True, "n": n, "path": rel, **({"kucuk": kucuk} if kucuk else {})}
 # Kanıt görüntüsündeki yazı (v0.36.0, S48): paylaşılan ekranda görünen ama söylenmeyen bilgi (slayt, tablo, rakam) toplantı defterine girsin diye

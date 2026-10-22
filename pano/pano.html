@@ -92,7 +92,7 @@ html.mac #sn .sn:nth-child(n+2){display:none}  /* Mac penceresinde ana alanda ya
 #tos .tom{max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:2px 0}
 #tos .tm{font-size:var(--yz-3);line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}#tos .tm .tt{color:var(--t3);font-size:var(--yz-1);margin-right:6px}
 #tos .tm.ben{color:var(--t2);border-left:2px solid var(--bd2);padding-left:8px}#tos .tm.sistem,#tos .tm.arac{font-size:var(--yz-2);color:var(--t3)}#tos .tm.izin{font-size:var(--yz-2);color:var(--wa)}
-#tos.bek .tom{border-left:3px solid var(--ac);padding-left:8px}.tsc{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.tsc button{white-space:normal;text-align:left}#mto .d{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px}#tos .tob{font-size:var(--yz-2);font-weight:600;color:var(--ac);margin-top:6px}#tos .tob.er{color:var(--er)}#tos .tod{display:flex;gap:6px;flex:none}
+#tos.bek .tom{border-left:3px solid var(--ac);padding-left:8px}.tsc{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.tsc button{white-space:normal;text-align:left}#mto .d{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px}#tos .tob{font-size:var(--yz-2);font-weight:600;color:var(--ac);margin-top:6px}#tos .tob.er{color:var(--er)}#tos .tod{display:flex;gap:6px;flex:none}.tol{font-size:var(--yz-2);color:var(--t2);margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tol.iz{color:var(--wa);font-weight:600}.tiz{border-left:3px solid var(--wa);padding:4px 8px;margin-top:6px;background:var(--s1);border-radius:var(--kose-s)}.tiz .d{white-space:pre-wrap;overflow-wrap:anywhere}
 /* v0.109.0: yardım */
 #yrd [lang=en],html.dil-en #yrd [lang=tr]{display:none}html.dil-en #yrd [lang=en]{display:block}
 dialog#yrd{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:0;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}dialog#yrd[open]{display:flex;flex-direction:column}
@@ -245,7 +245,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <section id=dds hidden><div class=sh>Dosyadan döküm <span id=ddn class=meta></span></div><div id=dd></div></section>
 <section id=sns hidden><div class=sh>Son toplantılar</div><div id=sn></div></section>
 <section id=eys hidden><div class=sh><span>Yapılacaklar <span id=eyn class=meta></span></span><button id=eyh class=pri title="Listedeki bekleyen işlerin hepsini onayla — Claude yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
-<section id=tos hidden><div class=sh><span class=brb>Claude <span id=tosd class=meta></span></span><span class=tod><button id=tosa class=gh title="Araç adımlarını da göster (komutlar, dosyalar)">Ayrıntı</button><button id=tosx class=gh title="Claude'un şu anki işini durdurur; yazarsan kaldığı yerden sürer">Durdur</button><button id=tost class=gh title="Aynı oturumu Terminal'de açar; arka plandaki kapanır">Terminal'de göster</button><button id=tosk class=gh title="Claude oturumunu kapatır; toplantı sonu işleri (özet) yapılmaz. Sürdürmek için sonra Terminal'de göster.">Kapat</button></span></div><div id=tom class=tom></div><div id=tob class=tob></div></section>
+<section id=tos hidden><div class=sh><span class=brb>Claude <span id=tosd class=meta></span></span><span class=tod><button id=tosa class=gh title="Araç adımlarını da göster (komutlar, dosyalar)">Ayrıntı</button><button id=tosx class=gh title="Claude'un şu anki işini durdurur; yazarsan kaldığı yerden sürer">Durdur</button><button id=tost class=gh title="Aynı oturumu Terminal'de açar; arka plandaki kapanır. Terminal'e alınınca arka plandaki toplantı izlemesi durur (Terminal'de yeniden başlatman gerekir) ve kutuya yazdığın notlar oturuma gitmez — Terminal'den yaz.">Terminal'de göster</button><button id=tosk class=gh title="Claude oturumunu kapatır; toplantı sonu işleri (özet) yapılmaz. Sürdürmek için sonra Terminal'de göster.">Kapat</button></span></div><div id=tol class=tol hidden></div><div id=tom class=tom></div><div id=tiz></div><div id=tob class=tob></div></section>
 <section id=sk><div class=sh><span>Şimdi <span id=szd class=meta></span></span><span id=tone></span></div><div id=py class=py></div><div id=kc></div></section>
 </div>
 <div class=nb><textarea id=n rows=2 placeholder="Not ya da soru" title="Claude yazına bakar: soruysa cevaplar, değilse not olarak alır. ⌘Enter: her zaman soru."></textarea>
@@ -951,6 +951,13 @@ document.getElementById('gun').onclick=async ev=>{const b=ev.currentTarget
 // v0.111.0: arka plandaki toplantı oturumu — /status'ta özet (n: ileti sayısı), yeni iletiler /toplanti-oturum?n= ile; kutudaki yazı oturum soru sorunca ona gider
 let tosM=[],tosN=0,tosT0=null,tosAyr=false,tosYuk=false
 const TOS_D={aciliyor:"açılıyor…",calisiyor:"çalışıyor",izliyor:"toplantıyı izliyor",bekliyor:"cevabını bekliyor",kapali:"kapandı",hata:"durdu",terminalde:"Terminal'de"}
+// v0.115.0 (kullanıcı, 22 Ekim: Claude'un ne yaptığı görünmüyordu): tek satır canlı durum — panoda, mini panoda ve Mac panelinde aynı
+function tosSatir(o){if(!o)return"";if((o.izinler||[]).length)return L("Claude iznini bekliyor")
+  if(o.durum==="aciliyor")return L("Claude açılıyor…");if(o.durum==="izliyor")return L("Claude şu an: toplantıyı izliyor")
+  if(o.durum!=="calisiyor")return"";const e=o.etkinlik,sn=e?e.sn:o.sn
+  return (e?L("Claude şu an: {m}…",{m:e.metin}):L("Claude şu an: düşünüyor…"))+(sn>=15?" · "+L("{n} sn",{n:sn}):"")}
+// v0.115.0: arka plandaki oturumun araç izni ayrı kart değil — Claude bölümünde ve mini panoda Onayla / Reddet (/eylem-karar, anahtarlı)
+function tosIzinHtml(o){return (o.izinler||[]).map(x=>`<div class=tiz><div class=d>${esc(x.metin)}</div><div class=tsc><button class=pri data-tiz="${esc(x.id)}" data-d=onaylandi>${esc(L("Onayla"))}</button><button class=gh data-tiz="${esc(x.id)}" data-d=reddedildi>${esc(L("Reddet"))}</button></div></div>`).join('')}
 function tosMd(t){return esc(t).replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/`([^`\n]+)`/g,'<code>$1</code>')}
 async function renderOturum(s){const o=s.toplanti_oturum,sec=document.getElementById('tos'),ta=document.getElementById('n');sec.hidden=!o
   if(!o){if(ta)ta.placeholder=L("Not ya da soru");return}
@@ -962,8 +969,10 @@ async function renderOturum(s){const o=s.toplanti_oturum,sec=document.getElement
   const box=document.getElementById('tom'),alt=box.scrollHeight-box.scrollTop-box.clientHeight<30,gor=tosM.filter(m=>tosAyr||m.kim!=="arac")
   const sig=gor.length+"|"+(gor.length?gor[gor.length-1].i:0)+"|"+tosAyr+"|"+(sor?sor.i:0)
   if(box.dataset.sig!==sig){box.dataset.sig=sig;setH(box,gor.map(m=>`<div class="tm ${esc(m.kim)}"><span class=tt>${esc(m.t)}</span>${m.kim==="izin"?esc(L("İzin istedi: "))+esc(m.metin):m.kim==="ben"?esc(L("Sen: "))+tosMd(m.metin):tosMd(m.metin)}${sor&&m.i===sor.i?tosSecHtml(sor):''}</div>`).join('')||`<div class=hint>${esc(L("Claude hazırlanıyor…"))}</div>`);if(alt)box.scrollTop=box.scrollHeight}
+  {const t=tosSatir(o),l=document.getElementById('tol');l.hidden=!t;l.textContent=t;l.title=t;l.classList.toggle('iz',!!(o.izinler||[]).length)
+   const z=document.getElementById('tiz'),zs=(o.izinler||[]).map(x=>x.id).join();if(z.dataset.sig!==zs){z.dataset.sig=zs;setH(z,tosIzinHtml(o))}}
   const b=document.getElementById('tob');b.className='tob'+(o.durum==="hata"?' er':'')
-  b.textContent=o.durum==="hata"?(o.hata||L("Oturum kapandı")):sor?L("Claude cevabını bekliyor — bir düğmeye bas ya da kutuya yaz."):bek?L("Claude cevabını bekliyor — aşağıdaki kutuya yaz, Return'e bas."):o.izin?L("Claude bir araç için iznini bekliyor — kartlarda Onayla ya da Reddet."):""
+  b.textContent=o.durum==="hata"?(o.hata||L("Oturum kapandı")):(o.izinler||[]).length?"":sor?L("Claude cevabını bekliyor — bir düğmeye bas ya da kutuya yaz."):bek?L("Claude cevabını bekliyor — aşağıdaki kutuya yaz, Return'e bas."):""
   if(ta)ta.placeholder=bek?L("Claude'a cevap yaz"):L("Not ya da soru")}
 document.getElementById('tosx').onclick=async ev=>{ev.currentTarget.disabled=true;try{await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"durdur"})})}catch(e){}ev.currentTarget.disabled=false;refresh()}
 document.getElementById('tost').onclick=async ev=>{ev.currentTarget.disabled=true;try{const r=await (await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"terminal"})})).json();if(!r.ok)geciciDurum(r.err||L("Açılamadı"),"",6000)}catch(e){}ev.currentTarget.disabled=false;refresh()}
@@ -974,14 +983,18 @@ document.getElementById('tosk').onclick=async ev=>{const b=ev.currentTarget
   b.dataset.emin="";b.disabled=true;b.textContent=L("Kapat");try{await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"kapat"})})}catch(e){}b.disabled=false;refresh()}
 // v0.112.0: Claude'un seçim sorusu ([[seç: …]]) — düğmeler panoda ve mini panoda; basınca seçim oturuma gider
 function tosSecHtml(q){return `<div class=tsc>${q.secenek.map(x=>`<button class=gh data-tsec="${esc(x)}" data-ti="${q.i}">${esc(x)}</button>`).join('')}</div>`}
-function tosSecBagla(d){d.addEventListener('click',async ev=>{const b=ev.target.closest('button[data-tsec]');if(!b)return;b.closest('.tsc').querySelectorAll('button').forEach(x=>x.disabled=true)
+function tosSecBagla(d){d.addEventListener('click',async ev=>{const z=ev.target.closest('button[data-tiz]');if(z){z.closest('.tsc').querySelectorAll('button').forEach(x=>x.disabled=true);eylemKarar(z.dataset.tiz,z.dataset.d);return}
+  const b=ev.target.closest('button[data-tsec]');if(!b)return;b.closest('.tsc').querySelectorAll('button').forEach(x=>x.disabled=true)
   let r={};try{r=await (await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"sec",i:+b.dataset.ti,secim:b.dataset.tsec})})).json()}catch(e){}
   if(!r.ok){geciciDurum(r.err||L("gönderilemedi"),"",5000);b.closest('.tsc').querySelectorAll('button').forEach(x=>x.disabled=false)}refresh()})}
 tosSecBagla(document)
 // mini pano (ve Mac paneli): açık soru — son ileti, varsa seçenek düğmeleri; cevap mini kutudan da yazılır
 function miniOturum(d,s){const e=d.getElementById("mto"),o=s.toplanti_oturum,q=o&&o.soru,mn=d.getElementById("mn");if(!e)return
   if(mn)mn.placeholder=q?L("Claude'a cevap yaz"):L("Not ya da soru")
-  if(!q){e.hidden=true;e.dataset.sig="";return}
+  const iz=(o&&o.izinler)||[]
+  if(iz.length){const sig="iz|"+iz.map(x=>x.id).join();e.hidden=false;if(e.dataset.sig===sig)return;e.dataset.sig=sig
+    setH(e,`<div class=meta><b>${esc(L("Claude iznini bekliyor"))}</b></div>${tosIzinHtml(o)}`);return}
+  if(!q){const t=tosSatir(o);e.hidden=!t;if(!t){e.dataset.sig="";return}const sig="t|"+t;if(e.dataset.sig===sig)return;e.dataset.sig=sig;setH(e,`<div class=meta>${esc(t)}</div>`);return}
   const sig=q.i+"|"+(q.secenek?1:0);e.hidden=false;if(e.dataset.sig===sig)return;e.dataset.sig=sig
   setH(e,`<div class=meta><b>${esc(L("Claude soruyor"))}</b></div><div class=d>${tosMd(q.metin.length>=400?"…"+q.metin:q.metin)}</div>${q.secenek?tosSecHtml(q):`<div class=meta>${esc(L("Cevabı aşağıdaki kutuya yaz."))}</div>`}`)}
 async function refresh(){let s;try{s=await j('/status')}catch(e){s=null}

@@ -737,8 +737,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     function paint(v) {
       sonV = v; otoAyarla(!!v.yaparken); kisAyarla((v.sesli_ceviri || {}).kis);
       // panodan/mini panodan kanıt istendi — toplantıdaki sekme çeker (çift isteği aktarıcı ayıklar). Arkadaysa da ister;
-      // arka plan sekmeyi bir an öne getirip çeker (2 Ekim: pano aynı penceredeyken kanıt düşüyordu)
-      if (v.kanit_iste && v.kanit_iste.id !== kanitSon) { kanitSon = v.kanit_iste.id; if (window.top === window && (inMeeting() || inCall())) chrome.runtime.sendMessage({ type: "kanit", kaynak: v.kanit_iste.kaynak || "pano", istek: v.kanit_iste.id, not: v.kanit_iste.not }).catch(() => {}); }
+      // arka plan sekmeyi bir an öne getirip çeker (2 Ekim: pano aynı penceredeyken kanıt düşüyordu). Sesli "ekran görüntüsü al" (hedef ekran)
+      // o an bakılan pencereyi ister — onu menü uygulaması çeker, sekme değil
+      if (v.kanit_iste && v.kanit_iste.id !== kanitSon) { kanitSon = v.kanit_iste.id; if (window.top === window && v.kanit_iste.hedef !== "ekran" && (inMeeting() || inCall())) chrome.runtime.sendMessage({ type: "kanit", kaynak: v.kanit_iste.kaynak || "pano", istek: v.kanit_iste.id, not: v.kanit_iste.not }).catch(() => {}); }
       const sw = v.soyle_web;
       if (sw && sw.id !== soyleSon) { if (soyleSon !== undefined && !sw.dur && window.top === window && inCall()) soyleCal(sw); soyleSon = sw.id; }
       else if (!sw && soyleSon === undefined) soyleSon = null;

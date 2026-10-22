@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Sesli kanıt isteği (v0.31.6): relay.py'deki SESLI_KANIT_RX / SESLI_KANIT_YOK kalıpları — istek biçimi tetikler, konu içinde geçen sözcük ve
-# olumsuz istek tetiklemez (Faz 2'de üç yanlış alarm yüzünden kaldırılmıştı). Kural değişince koştur.
+# olumsuz istek tetiklemez (Faz 2'de üç yanlış alarm yüzünden kaldırılmıştı). v0.115.0: "kanıt al" toplantı ekranı, "ekran görüntüsü al" o an bakılan
+# pencere (hedef ekran). Kural değişince koştur.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/sesli-kanit.py      (kaldı → çıkış 1)
 import os, re, sys
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -44,7 +45,7 @@ try:
     try:
         post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": "w/1", "speaker": "Ali K", "time": "10:00", "text": "Kanıt al."}]})
         st = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=4).read())
-        ok = bool(st.get("kanit_iste")) and (st["kanit_iste"].get("kaynak") == "sesli")
+        ok = bool(st.get("kanit_iste")) and (st["kanit_iste"].get("kaynak") == "sesli") and not st["kanit_iste"].get("hedef")  # "kanıt al" toplantı ekranı
     except Exception as e: ok = False; print(f"✗ aktarıcı cevap vermedi ({e.__class__.__name__})")
     if not ok: hata += 1
     print(("✓" if ok else "✗") + " gerçek aktarıcı: \"Kanıt al.\" → sesli kanıt isteği, aktarıcı kilitlenmedi")
@@ -66,9 +67,26 @@ try:
     for ad, k in [("büyüyen altyazı bloğunda yeni komut kanıt ister", k1.get("id") != k0 and k1.get("kaynak") == "sesli"),
                   ("kanıt notu komutun geçtiği cümle (bloğun başı değil)", k1.get("not") == "Şimdi ayarlarda ekran görüntüsü al.")]:
         print(("✓ " if k else "✗ ") + "gerçek aktarıcı: " + ad); hata += 0 if k else 1; ORNEK.append(ad)
-    time.sleep(21); blok("O zaman başlayalım. Kartları gönder gelsin. Şimdi ayarlarda ekran görüntüsü al. Evet aldın, güzel."); time.sleep(0.3)
-    k = durum().get("id") == k1.get("id")
+    istek_say = lambda: open(os.path.join(T, "relay.log"), encoding="utf-8").read().count("KANIT: sesli istek")  # görünüm 20 sn'de düşer: günlükten say
+    n0 = istek_say(); time.sleep(21); blok("O zaman başlayalım. Kartları gönder gelsin. Şimdi ayarlarda ekran görüntüsü al. Evet aldın, güzel."); time.sleep(0.3)
+    k = istek_say() == n0 and not durum().get("id")
     print(("✓ " if k else "✗ ") + "gerçek aktarıcı: blok uzayınca aynı komut ikinci kanıt istemez (22 Ekim: 44 sn sonra ikinci kanıt)"); hata += 0 if k else 1; ORNEK.append("blok")
+    # v0.115.0 (22 Ekim: Ayarlar'a bakarken "ekran görüntüsü al" → Meet sekmesi düştü): "ekran görüntüsü al" o an bakılan pencere (hedef ekran, menü
+    # uygulaması çeker); menü uygulaması yoksa toplantı ekranı. Yukarıdaki blok menüsüzdü: hedef yok olmalı
+    k = not k1.get("hedef") and "menü uygulaması yok" in open(os.path.join(T, "relay.log"), encoding="utf-8").read()
+    print(("✓ " if k else "✗ ") + "gerçek aktarıcı: menü uygulaması yokken \"ekran görüntüsü al\" toplantı ekranına düşer"); hata += 0 if k else 1; ORNEK.append("menüsüz")
+    urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/cards", headers={"X-Suflor-Anahtar": K, "X-Suflor-Istemci": "menu"}), timeout=4).read()
+    time.sleep(21); post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": "w/9", "speaker": "Ali K", "time": "10:03", "text": "Şu ayarın ekran görüntüsünü alır mısın?"}]})
+    k2 = durum(); kc = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/cards", headers={"X-Suflor-Anahtar": K}), timeout=4).read()).get("kanit_iste") or {}
+    for ad, k in [("menü uygulaması varken \"ekran görüntüsü al\" → hedef ekran (o an bakılan pencere)", k2.get("hedef") == "ekran" and k2.get("id") != k1.get("id")),
+                  ("eklentinin gördüğü istekte de hedef ekran (sekme çekmez)", kc.get("hedef") == "ekran")]:
+        print(("✓ " if k else "✗ ") + "gerçek aktarıcı: " + ad); hata += 0 if k else 1; ORNEK.append(ad)
+    import base64
+    y = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/kanit-masaustu", data=json.dumps({"png": base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 64).decode(), "kaynak": "sesli",
+        "istek": k2.get("id"), "hedef": "ekran", "uyg": "Suflor.me — Ayarlar", "w": 640, "h": 600}).encode(), headers={"X-Suflor-Anahtar": K}), timeout=4).read())
+    md = open(next(os.path.join(canli, f) for f in os.listdir(canli) if f.endswith("Kanıt-Deneme.md")), encoding="utf-8").read()
+    k = y.get("ok") and "(ekran: Suflor.me — Ayarlar)" in md and not durum().get("id")
+    print(("✓ " if k else "✗ ") + "gerçek aktarıcı: menü uygulamasının ekran görüntüsü dökümde \"(ekran: …)\" ile, istek kapandı"); hata += 0 if k else 1; ORNEK.append("ekran kaydı")
 finally: r.kill(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print(f"sesli kanıt: {len(ORNEK) + 1 - hata}/{len(ORNEK) + 1}" + (" ✓ hepsi geçti" if not hata else ""))
 sys.exit(1 if hata else 0)

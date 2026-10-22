@@ -4,11 +4,12 @@
 # Panodan Başlat'la açılan toplantı oturumu (/toplanti) Terminal yerine Suflor Brifing.app'in toplantı kipinde çalışır: `claude -p` stream-json giriş/çıkış,
 # iki FIFO (bas-konuş açık süreç kipiyle aynı yol; Masaüstü izni o uygulamada). Oturumun kullanıcıya yazdıkları panoda "Claude" bölümünde görünür;
 # tur bitince (sonuç iletisi) oturum kullanıcıyı bekler ve kutuya yazılan metin ona gider. Tur sürerken kutu eski yolla (izle GİRDİ) gider.
-# Proje izinlerinde olmayan araç: Claude Code soruyu stdio'dan sorar (can_use_tool) → izin_iste (panoda onay kartı; toplantı dışında sesli) → karar.
+# Proje izinlerinde olmayan araç: Claude Code soruyu stdio'dan sorar (can_use_tool) → izin_iste (v0.115.0: kart değil, Claude bölümünde ve mini panoda
+# Onayla / Reddet; toplantı dışında sesli) → karar.
 # Panoda Durdur (interrupt) ve "Terminal'de göster" (süreç kapanır, aynı oturum `claude --resume` ile Terminal'de açılır). Süreç beklenmedik çıkarsa
 # aynı oturum en çok TOPO_YENIDEN kez kaldığı yerden açılır. Ayar toplanti_terminal: true eski davranış (Terminal penceresi).
 TOPO = {"app": None, "w": None, "durum": "kapali", "sid": None, "mesaj": [], "n": 0, "konu": None, "t0": 0.0, "t_durum": 0.0, "maliyet": 0.0, "nesil": 0,
-        "kapali_nesil": None, "yeniden": 0, "izin": 0, "hata": None, "acilis": None, "secenek_i": None, "kilit": threading.RLock()}
+        "kapali_nesil": None, "yeniden": 0, "izin": 0, "hata": None, "acilis": None, "secenek_i": None, "etkinlik": None, "kilit": threading.RLock()}
 TOPO_YENIDEN, TOPO_MESAJ_EN_COK, TOPO_METIN_EN_COK, TOPO_SURE_SN = 2, 400, 6000, 8 * 3600
 TOPO_TERMINAL_ILETI = "(Suflor) Oturum arka plandan Terminal'e alındı; arka plandaki Monitor durdu. Toplantı sürüyorsa izle'yi yeniden başlat, sürmüyorsa kaldığın yerden devam et."
 TOPO_BOSTA_SN = 2 * 3600  # tur bitmiş ve izle yokken bu kadar boşta kalırsa süreç kapanır (~250 MB); "Terminal'de göster" yine aynı oturumu açar
@@ -51,6 +52,13 @@ def _topo_arac_ozet(ad, gi):
     elif ad in ("Grep", "Glob"): s = gi.get("pattern")
     else: s = json.dumps(gi, ensure_ascii=False)
     return " ".join(str(s or "").split())[:200]
+# v0.115.0 (kullanıcı, 22 Ekim test toplantısı: "neden bekliyorsun" — Claude'un ne yaptığı görünmüyordu, Terminal'e geçti): panoda ve mini panoda tek satır
+# canlı durum "Claude şu an: <araç cümlesi>…". Cümle aracın açıklamasından (TOPO_ISTEM Türkçe düz cümle yazdırır) ya da araç türünden (arac_cumlesi);
+# araç sonucu, metin ya da tur sonu gelince silinir (satır "düşünüyor" der). Komut ve dosya yolu yalnız Ayrıntı'da.
+def _topo_etkinlik(ad, gi):
+    gi = gi if isinstance(gi, dict) else {}
+    metin = _t("toplantıyı izlemek", "watching the meeting") if _topo_izle_mi(ad, gi) else arac_cumlesi(ad, gi)
+    TOPO["etkinlik"] = {"metin": metin[:200], "t": time.time()}
 def _topo_gonder(o):
     w = TOPO["w"]
     if not w: return False
@@ -71,7 +79,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "toplanti-bos"),
                        "giris": gir, "cikis": cik, "sure": TOPO_SURE_SN}, f, ensure_ascii=False)
-        if not sid: TOPO.update(mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None)
+        if not sid: TOPO.update(mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None)
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
         _topo_durum("aciliyor", hata=None)
         TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -125,7 +133,8 @@ def toplanti_oturum_terminal():
     with open(cp, "w", encoding="utf-8") as f: f.write(sh)
     os.chmod(cp, 0o755)
     if not os.environ.get("SUFLOR_TEST_BASLAT"): subprocess.Popen(["open", "-a", "Terminal", cp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    _topo_durum("terminalde"); _topo_mesaj("sistem", _t("Oturum Terminal'e alındı; oradan sürer.", "The session moved to Terminal and continues there."))
+    _topo_durum("terminalde"); _topo_mesaj("sistem", _t("Oturum Terminal'e alındı; oradan sürer. Arka plandaki toplantı izlemesi durdu ve kutuya yazdıkların artık oturuma gitmez — Terminal'de yaz.",
+                                                    "The session moved to Terminal and continues there. Background meeting watching stopped and what you type in the box no longer reaches the session — type in Terminal."))
     print(f"TOPLANTI OTURUMU: Terminal'e alındı ({sid[:8]})"); return {"ok": True}
 # /toplanti izle'yi Monitor'la kurar (30 dk'da bir yeniden); proje izinlerinde Monitor yok — Terminal'de her seferinde elle onaylanıyordu. Yalnız Suflor'un
 # kendi toplanti-claude.py'si (aktarıcının yanındaki, ayar kod ya da uygulama klasöründeki) ve yalnız `izle` alt komutu kartsız geçer; başka komut kart açar.
@@ -144,9 +153,10 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
                                                    "AskUserQuestion isn't available in this session: write the question as plain text and end the turn; the user answers from the panel.")}
     else:
         ozet = _topo_arac_ozet(ad, gi); TOPO["izin"] += 1
-        _topo_mesaj("izin", f"{ad} — {ozet}" if ozet else ad)
-        iid = izin_iste("arac", izin_metni(ad, gi), {"arac": ad, "ozet": ozet})  # v0.112.2: kartta düz cümle, komut yalnız ayrıntıda
+        _topo_mesaj("izin", arac_cumlesi(ad, gi))  # v0.112.2: düz cümle, komut yalnız eylem ayrıntısında ve izin-kayit.jsonl'de
+        iid = izin_iste("arac", izin_metni(ad, gi), {"arac": ad, "ozet": ozet}, oturum=True)  # v0.115.0: kart değil, Claude bölümünde Onayla / Reddet
         k = izin_bekle(iid) if iid else "zaman_asimi"; TOPO["izin"] = max(0, TOPO["izin"] - 1)
+        _topo_mesaj("sistem", {"onaylandi": _t("İzin verdin.", "You allowed it."), "reddedildi": _t("İzni reddettin.", "You declined.")}.get(k, _t("İzin süresi doldu; Claude bu adımı atladı.", "The permission timed out; Claude skipped this step.")))
         cevap = ({"behavior": "allow", "updatedInput": gi} if k == "onaylandi" else
                  {"behavior": "deny", "message": _t(f"{AYAR.get('ad') or 'Kullanıcı'} reddetti (Suflor); bu adımı atla, gerekirse ona sor." if k == "reddedildi" else
                                                      "Kullanıcı onay vermedi (süre doldu); bu adımı atla, gerekirse ona sor.",
@@ -170,12 +180,17 @@ def _topo_oku(cik, nesil):
                 if TOPO["durum"] == "bekliyor": _topo_durum("calisiyor")  # kullanıcı yazmadan yeni tur (arka plan işi bitti bildirimi vb.)
                 for b in ((j.get("message") or {}).get("content") or []):
                     if not isinstance(b, dict): continue
-                    if b.get("type") == "text": _topo_mesaj("claude", b.get("text"))
-                    elif b.get("type") == "tool_use": _topo_mesaj("arac", (str(b.get("name") or "?") + " — " + _topo_arac_ozet(b.get("name"), b.get("input"))).strip(" —"))
+                    if b.get("type") == "text": _topo_mesaj("claude", b.get("text")); TOPO["etkinlik"] = None
+                    elif b.get("type") == "tool_use":
+                        _topo_mesaj("arac", (str(b.get("name") or "?") + " — " + _topo_arac_ozet(b.get("name"), b.get("input"))).strip(" —")); _topo_etkinlik(b.get("name"), b.get("input"))
+            elif t == "user":
+                c = (j.get("message") or {}).get("content")
+                if isinstance(c, list) and any(isinstance(x, dict) and x.get("type") == "tool_result" for x in c): TOPO["etkinlik"] = None  # araç bitti: sıradaki adıma kadar "düşünüyor"
             elif t == "result":
                 try: TOPO["maliyet"] = round(TOPO["maliyet"] + float(j.get("total_cost_usd") or 0), 4)
                 except (TypeError, ValueError): pass
                 if TOPO["durum"] == "calisiyor": _topo_durum("bekliyor")
+                TOPO["etkinlik"] = None
                 print(f"TOPLANTI OTURUMU: tur bitti ({j.get('subtype')}) — kullanıcıyı bekliyor")
             elif t == "control_request" and (j.get("request") or {}).get("subtype") == "can_use_tool":
                 threading.Thread(target=_topo_izin, args=(j,), daemon=True).start()
@@ -206,8 +221,11 @@ def toplanti_oturum_view():
     sm = next((m for m in TOPO["mesaj"] if m["i"] == TOPO["secenek_i"]), None) if TOPO["secenek_i"] and topo_canli() else None
     if sm: soru = {"i": sm["i"], "metin": sm["metin"][-400:], "secenek": sm["secenek"]}
     elif d == "bekliyor" and son: soru = {"i": son["i"], "metin": son["metin"][-400:]}
+    e = TOPO["etkinlik"] if d == "calisiyor" else None
     return {"durum": d, "n": TOPO["n"], "t0": TOPO["t0"], "izin": TOPO["izin"], "konu": TOPO["konu"], "hata": TOPO["hata"] if TOPO["durum"] == "hata" else None,
-            "terminal": bool(TOPO["sid"] and TOPO["acilis"]), "son": (son or {}).get("metin", "")[:300], "son_i": (son or {}).get("i"), "soru": soru}
+            "terminal": bool(TOPO["sid"] and TOPO["acilis"]), "son": (son or {}).get("metin", "")[:300], "son_i": (son or {}).get("i"), "soru": soru,
+            "etkinlik": {"metin": e["metin"], "sn": round(time.time() - e["t"])} if e else None, "sn": round(time.time() - TOPO["t_durum"]),
+            "izinler": izin_bekleyen_oturum() if topo_canli() else []}
 def toplanti_oturum_mesajlar(n=0):
     with LOCK: m = [x for x in TOPO["mesaj"] if x["i"] > n]
     return dict(toplanti_oturum_view() or {"durum": "kapali", "n": 0}, mesaj=m)

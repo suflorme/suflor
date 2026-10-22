@@ -1321,6 +1321,7 @@ def izle():
                             emit("SUNULAN EKRAN: karşı taraf ekran paylaşıyor, görüntüler kendiliğinden alınıyor (kaynak oto) — tek tek bakma; toplantı sonunda `ekranlar` → özette 'Sunulan ekranlar'")
                     elif "kanit" in r:  # hemen — ekranda sır olabilir
                         emit(f"KANIT {r.get('n')}: {os.path.join(A.dir, r['kanit'])}" + (f" · not \"{r['not']}\"" if r.get("not") else "") +
+                             (f" · toplantı ekranı değil, kullanıcının o an baktığı pencere ({r['ekran']})" if r.get("ekran") else "") +
                              f" · {r.get('kaynak') or '?'} → SORU yoksa Read ile bak: ekranda sır/şifre → DUR kartı; gündemle ilgili görünen → kanit {r.get('n')} --aciklama \"…\"; sohbete yazma")
                     else:
                         buf.append(satir(r)); buf_recs.append(r); gundem_tahmin(r, ticks); konusan[r.get("speaker") or "?"] += 1; katilimci_bak(r)

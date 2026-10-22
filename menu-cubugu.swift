@@ -19,7 +19,7 @@ import UserNotifications
 setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
 let args = CommandLine.arguments
 // günlük satırları saatli (13 Ekim deneme 8: "bildirim izni yok" satırının ne zaman yazıldığı bilinemedi); teşhis kiplerinin çıktısı saatsiz
-let TANI = args.contains { ["--ax-dokum", "--ax-altyazi", "--kanit-dene", "--ekran-izni"].contains($0) }
+let TANI = args.contains { ["--ax-dokum", "--ax-altyazi", "--kanit-dene", "--ekran-dene", "--ekran-izni"].contains($0) }
 let saatBicim: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd HH:mm:ss"; return f }()
 func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
     let s = items.map { "\($0)" }.joined(separator: separator)
@@ -638,8 +638,61 @@ final class MasaustuKanit {
         }
     }
     func iste(_ ki: [String: Any]?) {  // şeridin uzun yoklamasındaki kanit_iste
-        guard let ki = ki, let id = ki["id"] as? String, id != sonIstek, masaustu.toplantida else { return }
+        guard let ki = ki, let id = ki["id"] as? String, id != sonIstek else { return }
+        if (ki["hedef"] as? String) == "ekran" { sonIstek = id; ekran(ki["kaynak"] as? String ?? "sesli", istek: id); return }  // web toplantısında da
+        guard masaustu.toplantida else { return }
         sonIstek = id; tam(ki["kaynak"] as? String ?? "pano", istek: id)
+    }
+    // v0.115.0: sesli "ekran görüntüsü al" (hedef ekran; "kanıt al" toplantı ekranı kalır) — o an bakılan pencere: ön plandaki uygulamanın en üstteki
+    // penceresi (yoksa en üstteki normal pencere). Tüm ekran değil: toplantı kenarda dururken konu olan pencere okunaklı kalsın, bildirim ve öbür
+    // pencereler girmesin. Suflor'un kendi pencereleri (pano, Ayarlar) ekran paylaşımında gizli (sharingType none) — ekran kaydı onları boş verir;
+    // bu yüzden sayfanın kendi görüntüsü alınır.
+    var ekranMesgul = false
+    func onPencere() -> (id: CGWindowID, pid: pid_t, ad: String, boy: CGRect)? {
+        let on = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        guard let liste = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        let cerceve = { (w: [String: Any]) -> CGRect in (w[kCGWindowBounds as String] as! CFDictionary?).flatMap { CGRect(dictionaryRepresentation: $0) } ?? .zero }
+        let normal = liste.filter { w in (w[kCGWindowLayer as String] as? Int) == 0 && ((w[kCGWindowAlpha as String] as? Double) ?? 1) > 0.1 && cerceve(w).width > 200 && cerceve(w).height > 150 }
+        guard let w = normal.first(where: { ($0[kCGWindowOwnerPID as String] as? pid_t) == on }) ?? normal.first,
+              let id = w[kCGWindowNumber as String] as? CGWindowID, let pid = w[kCGWindowOwnerPID as String] as? pid_t else { return nil }
+        var ad = w[kCGWindowOwnerName as String] as? String ?? ""
+        if pid == getpid() { ad = "Suflor.me" + (NSApp.windows.first { CGWindowID($0.windowNumber) == id }.map { $0.title.isEmpty ? "" : " — " + $0.title } ?? "") }
+        return (id, pid, ad, cerceve(w))
+    }
+    func kendiGoruntu(_ id: CGWindowID, _ bitti: @escaping (Data?) -> Void) {  // ana iş parçacığında: Suflor penceresinin sayfası
+        guard let p = NSApp.windows.first(where: { CGWindowID($0.windowNumber) == id }), let v = p.contentView else { bitti(nil); return }
+        func bul(_ x: NSView) -> WKWebView? { if let w = x as? WKWebView { return w }; for a in x.subviews { if let w = bul(a) { return w } }; return nil }
+        if let web = bul(v) {
+            web.takeSnapshot(with: nil) { im, _ in bitti(im?.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0) }?.representation(using: .png, properties: [:])) }
+        } else if let r = v.bitmapImageRepForCachingDisplay(in: v.bounds) { v.cacheDisplay(in: v.bounds, to: r); bitti(r.representation(using: .png, properties: [:])) }
+        else { bitti(nil) }
+    }
+    func ekranPng(_ bitti: @escaping (Data?, (id: CGWindowID, pid: pid_t, ad: String, boy: CGRect)?) -> Void) {
+        guard let on = onPencere() else { bitti(nil, nil); return }
+        if on.pid == getpid() { kendiGoruntu(on.id) { bitti($0, on) }; return }
+        Task {
+            let ic = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+            guard let w = ic?.windows.first(where: { $0.windowID == on.id }) else {
+                if ic == nil && !self.izinYazildi { self.izinYazildi = true; print("MASAÜSTÜ KANIT: ekran kaydı izni yok (Ekran ve Sistem Sesi Kaydı → Suflor Menü)") }
+                DispatchQueue.main.async { bitti(nil, on) }; return
+            }
+            let olcek = NSScreen.main?.backingScaleFactor ?? 2
+            let im = await self.goruntu(w, en: Int(w.frame.width * olcek), boy: Int(w.frame.height * olcek))
+            let png = im.flatMap { NSBitmapImageRep(cgImage: $0).representation(using: .png, properties: [:]) }
+            DispatchQueue.main.async { bitti(png, on) }
+        }
+    }
+    func ekran(_ kaynak: String, istek idx: String) {
+        guard !ekranMesgul else { return }
+        ekranMesgul = true
+        ekranPng { [weak self] png, on in
+            self?.ekranMesgul = false
+            guard let png = png, let on = on else { print("MASAÜSTÜ KANIT: ekran görüntüsü alınamadı (\(on?.ad ?? "pencere yok"))"); return }
+            print("MASAÜSTÜ KANIT: ekran görüntüsü · \(on.ad) · \(Int(on.boy.width))×\(Int(on.boy.height))")
+            istek("/kanit-masaustu", ["png": png.base64EncodedString(), "kaynak": kaynak, "istek": idx, "hedef": "ekran", "uyg": on.ad, "w": Int(on.boy.width), "h": Int(on.boy.height)], sure: 30) { v in
+                if (v?["ok"] as? Bool) != true { print("MASAÜSTÜ KANIT: kaydedilmedi (\(v?["err"] as? String ?? "yanıt yok"))") }
+            }
+        }
     }
     func kucuk(_ im: CGImage) -> [UInt8] {
         var b = [UInt8](repeating: 0, count: 64 * 40)
@@ -1289,6 +1342,27 @@ if let yol = arg("--kanit-dene") {
         exit(0)
     }
     NSApplication.shared.run()
+}
+// Teşhis: `--ekran-dene <dosya.png>` → 3 sn sonra o an bakılan pencerenin görüntüsü (sesli "ekran görüntüsü al"ın yolu) + kıyas için tüm ekran (<dosya>-tam.png)
+if let yol = arg("--ekran-dene") {
+    _ = NSApplication.shared; let k = MasaustuKanit(Masaustu())
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        k.ekranPng { png, on in
+            if let png = png, let on = on { try? png.write(to: URL(fileURLWithPath: yol)); print("pencere: \(on.ad) · \(Int(on.boy.width))×\(Int(on.boy.height)) · \(png.count / 1024) KB") }
+            else { print("pencere görüntüsü alınamadı (\(on?.ad ?? "pencere yok"))") }
+            Task {
+                if let ic = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true), let ek = ic.displays.first {
+                    let c = SCStreamConfiguration(); c.width = ek.width * 2; c.height = ek.height * 2; c.showsCursor = false
+                    if let im = try? await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(display: ek, excludingWindows: []), configuration: c),
+                       let p2 = NSBitmapImageRep(cgImage: im).representation(using: .png, properties: [:]) {
+                        try? p2.write(to: URL(fileURLWithPath: yol.replacingOccurrences(of: ".png", with: "-tam.png"))); print("tüm ekran: \(im.width)×\(im.height) · \(p2.count / 1024) KB")
+                    }
+                }
+                exit(0)
+            }
+        }
+    }
+    NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
 }
 if args.contains("--ekran-izni") { print("ekran izni:", CGPreflightScreenCaptureAccess() ? "var" : (CGRequestScreenCaptureAccess() ? "verildi" : "soruldu")); exit(0) }
 let uyg = NSApplication.shared

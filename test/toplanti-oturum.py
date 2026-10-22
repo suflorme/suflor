@@ -57,7 +57,9 @@ while True:
     elif "monitor-baska" in q: c = izin("Monitor", {"command": "python3 -u /tmp/toplanti-claude.py izle", "description": "x"}, "m-2"); yaz("Monitor başka: " + c["behavior"]); bitti()
     elif "soru-araci" in q: c = izin("AskUserQuestion", {"questions": []}, "s-1"); yaz("AskUserQuestion: " + c["behavior"] + " · " + c.get("message", "")[:40]); bitti()
     elif "uzun" in q:
+        pr({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "sleep 99", "description": "Proje belgelerini taramak"}}]}})
         yaz("Uzun iş başladı")
+        pr({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "/x/y/rapor-veri.json"}}]}})
         while True:
             l = sys.stdin.readline()
             if not l: sys.exit(0)
@@ -101,6 +103,11 @@ try:
             time.sleep(0.2)
         return False
     def izin_kartlari(): return [c for c in uc("/cards")[1].get("cards") or [] if c.get("onay") and "Claude şunu yapmak istiyor" in c.get("text", "") and c.get("status") == "acik"]
+    def izinler(): return to().get("izinler") or []  # v0.115.0: arka plandaki oturumun izni kart değil, Claude bölümünde (Onayla / Reddet → /eylem-karar)
+    def izin_bekle_(sn=10):
+        t0 = time.time()
+        while time.time() - t0 < sn and not izinler(): time.sleep(0.2)
+        return izinler()
 
     ok("Başlat'tan önce panoda oturum bölümü yok", to() == {})
     kod, y = uc("/baslat", {"konu": "Deneme oturum", "rol": "yurutucu", "dil": "tr"})
@@ -121,34 +128,40 @@ try:
     ok("kullanıcının cevabı panoda 'ben' olarak", any(x["kim"] == "ben" and x["metin"] == "Evet yürütücüyüm" for x in mesaj()))
 
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "izin iste"})
-    t0 = time.time()
-    while time.time() - t0 < 10 and not izin_kartlari(): time.sleep(0.2)
-    k = izin_kartlari(); v = to()
-    ok(f"araç izni panoda onay kartı ({len(k)}) ve oturum özeti izin={v.get('izin')}", len(k) == 1 and v.get("izin") == 1)
-    ok(f"kartta açıklama cümlesi, komut yok ({k[0]['text'][:80] if k else ''})", bool(k) and "Deneme komutu" in k[0]["text"] and "print(1)" not in k[0]["text"])
-    uc("/card-ack", {"id": k[0]["id"], "status": "onaylandi"})
-    ok("Onayla → Claude Code'a allow", claude_der("İzin: allow"))
+    k = izin_bekle_(); v = to()
+    ok(f"araç izni Claude bölümünde ({len(k)}), ayrı kart yok ({len(izin_kartlari())}), oturum özeti izin={v.get('izin')}", len(k) == 1 and not izin_kartlari() and v.get("izin") == 1)
+    ok(f"izinde açıklama cümlesi, komut yok ({k[0]['metin'][:80] if k else ''})", bool(k) and "Claude şunu yapmak istiyor: Deneme komutu" in k[0]["metin"] and "print(1)" not in k[0]["metin"])
+    ok("panodaki izin iletisi düz cümle (komut yok)", any(x["kim"] == "izin" and x["metin"] == "Deneme komutu" for x in mesaj()))
+    kod, y = uc("/eylem-karar", {"id": k[0]["id"], "durum": "onaylandi"}) if k else (0, {})
+    ok("Onayla → Claude Code'a allow, izin listeden düştü", y.get("ok") and claude_der("İzin: allow") and not izinler())
+    ok("kararın izi panoda ('İzin verdin.')", any(x["kim"] == "sistem" and x["metin"] == "İzin verdin." for x in mesaj()))
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "izin iste yine"})
-    t0 = time.time()
-    while time.time() - t0 < 10 and not izin_kartlari(): time.sleep(0.2)
-    k = izin_kartlari(); uc("/card-ack", {"id": k[0]["id"], "status": "reddedildi"}) if k else None
-    ok("Reddet → deny", claude_der("İzin: deny"))
+    k = izin_bekle_(); uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"}) if k else None
+    ok("Reddet → deny", claude_der("İzin: deny") and any(x["kim"] == "sistem" and x["metin"] == "İzni reddettin." for x in mesaj()))
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "izin iste anahtarsiz"}); k = izin_bekle_()
+    kod, y = uc("/eylem-karar", {"id": k[0]["id"], "durum": "onaylandi"}, anahtar=False) if k else (0, {})
+    ok(f"izin anahtarsız onaylanamaz ({kod})", kod in (401, 403) and len(izinler()) == 1)
+    if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"}); claude_der("İzin: deny")
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "monitor-izle"})
-    ok("Suflor'un izle'si (Monitor) kartsız onaylanır", claude_der("Monitor izle: allow") and not izin_kartlari())
+    ok("Suflor'un izle'si (Monitor) kartsız onaylanır", claude_der("Monitor izle: allow") and not izin_kartlari() and not izinler())
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "monitor-baska"})
     t0 = time.time()
     while time.time() - t0 < 10 and not izin_kartlari(): time.sleep(0.2)
-    k = izin_kartlari(); ok("başka yerdeki toplanti-claude.py ile Monitor kart açar", len(k) == 1)
-    if k: uc("/card-ack", {"id": k[0]["id"], "status": "reddedildi"})
+    k = izin_bekle_(); ok("başka yerdeki toplanti-claude.py ile Monitor izin ister", len(k) == 1)
+    if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"})
     claude_der("Monitor başka: deny")
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "soru-araci"})
-    ok("AskUserQuestion kartsız reddedilir (soru düz metin olsun)", claude_der("AskUserQuestion: deny") and not izin_kartlari())
+    ok("AskUserQuestion kartsız reddedilir (soru düz metin olsun)", claude_der("AskUserQuestion: deny") and not izin_kartlari() and not izinler())
 
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "uzun iş"}); ok("uzun iş sürüyor", claude_der("Uzun iş başladı") and to().get("durum") == "calisiyor")
+    v = bekle(lambda v: (v.get("etkinlik") or {}).get("metin", "").startswith("“rapor"), 5)
+    ok(f"canlı durum: son aracın düz cümlesi ({(v.get('etkinlik') or {}).get('metin')})", (v.get("etkinlik") or {}).get("metin") == "“rapor-veri.json” dosyasını okumak" and (v.get("etkinlik") or {}).get("sn", 99) < 5)
+    ok("Bash açıklaması da canlı duruma düştü (Ayrıntı'da komut)", any(x["kim"] == "arac" and "Proje belgelerini taramak" in x["metin"] for x in mesaj()))
     kod, y = uc("/girdi", {"text": "hazırlık sırasında not"}); ok(f"oturum çalışırken (izle yok) kutudaki yazı ona gider ({y.get('tur')})", y.get("tur") == "oturum")
     kod, y = uc("/toplanti-oturum", {"islem": "durdur"})
     v = bekle(lambda v: v.get("durum") == "bekliyor")
     ok(f"Durdur → tur kesildi, oturum bekliyor ({v.get('durum')})", y.get("ok") and v.get("durum") == "bekliyor" and any(x["kim"] == "sistem" and "Durduruldu" in x["metin"] for x in mesaj()))
+    ok("tur bitince canlı durum silinir", v.get("etkinlik") is None)
 
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "cok"})
     ok("süreç çökünce aynı oturum kaldığı yerden açılır (--resume)", claude_der("Kaldığım yerden sürüyorum", 25))
@@ -191,6 +204,7 @@ try:
     ok("Terminal'de göster → aynı oturum --resume ile .command'a (izle'yi yeniden başlat iletisiyle), arka plandaki kapandı",
        y.get("ok") and "--resume 0f1e2d3c-4b5a-4968-8776-655443322110" in cm and "yeniden başlat" in cm and v.get("durum") == "terminalde")
     kod, y = uc("/girdi", {"text": "sonraki not"}); ok(f"Terminal'e alındıktan sonra kutu eski yolda ({y.get('tur')})", y.get("tur") in ("not", "iletildi"))
+    ok("Terminal'e alınınca panoda: izleme durdu, kutudaki yazı oturuma gitmez", any(x["kim"] == "sistem" and "izlemesi durdu" in x["metin"] and "oturuma gitmez" in x["metin"] for x in mesaj()))
 
     # Brifing.app toplantı kipi: izin listesi dışındaki argümanı ve değiştirilmiş kancayı reddeder (çıkış 3)
     def calistir(args, kanca=None):

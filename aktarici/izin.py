@@ -17,20 +17,26 @@ def _izin_kayit(o):
         try: os.close(os.open(yol, os.O_WRONLY | os.O_CREAT, 0o600))
         except OSError: pass
     with LOCK: write([(yol, json.dumps(dict(o, at=datetime.datetime.now().isoformat(timespec="seconds")), ensure_ascii=False) + "\n")])
-def izin_iste(tur, ne, ayrinti=None, sesli=True):
+def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False):
+    # oturum=True (v0.115.0; kullanıcı 22 Ekim: arka plandaki toplantı oturumunun araç izni ayrı kart olmasın): kart açılmaz — panonun Claude bölümünde
+    # ve mini panoda Onayla / Reddet (toplanti_oturum_view "izinler"); karar yine eylem_karar → izin_karar. Toplantı dışında sesli soru aynı.
     ne = " ".join(str(ne or "").split())[:400]
     x = eylem_ekle({"tur": "izin", "baslik": ne[:160], "ayrinti": json.dumps(dict(ayrinti or {}, izin=tur, ne=ne), ensure_ascii=False)})
     if not x: return None
-    with LOCK: x["yerel"] = True; _eylem_yama(x, yerel=True)
+    with LOCK: x["yerel"] = True; _eylem_yama(x, yerel=True, **({"oturum": True} if oturum else {}))
     IZIN[x["id"]] = {"olay": threading.Event(), "karar": None, "tur": tur}
-    c = add_card({"kind": "not", "text": _t(f"İzin: {ne}", f"Permission: {ne}"), "why": _t("Onayla ya da Reddet (yalnız sen).", "Approve or reject (you only)."), "onay": True})
-    if c:
-        with LOCK: c["eylem"] = x["id"]
+    if not oturum:
+        c = add_card({"kind": "not", "text": _t(f"İzin: {ne}", f"Permission: {ne}"), "why": _t("Onayla ya da Reddet (yalnız sen).", "Approve or reject (you only)."), "onay": True})
+        if c:
+            with LOCK: c["eylem"] = x["id"]
+    else: kart_bildir()
     top = toplanti_var()
     if sesli and not top: soru_baslat([x["id"]])
     _izin_kayit({"id": x["id"], "tur": tur, "ne": ne, "durum": "bekliyor", "toplantida": top})
-    print(f"İZİN: {tur} onay bekliyor ({'kart' if top or not sesli else 'kart + sesli'}) — \"{ne[:80]}\"")
+    print(f"İZİN: {tur} onay bekliyor ({'Claude bölümü' if oturum else 'kart'}{' + sesli' if sesli and not top else ''}) — \"{ne[:80]}\"")
     return x["id"]
+def izin_bekleyen_oturum():  # panonun Claude bölümü ve mini pano: arka plandaki toplantı oturumunun onay bekleyen araç izinleri
+    return [{"id": x["id"], "metin": x["baslik"]} for x in eylem_gorunen() if x["tur"] == "izin" and x.get("oturum") and x["durum"] == "bekliyor"]
 def izin_karar(x, durum):  # eylem_karar'dan (yerel iş, tur izin): bağlı kartı kapat, bekleyeni uyandır
     with LOCK:
         for c in CARDS:
@@ -67,6 +73,8 @@ IZIN_MCP_CUMLE = [  # (araç adı kalıbı, Türkçe, İngilizce) — ilk eşle�
     (r"upload|create_file|update_file|copy_file|move_item|rename_item", "bulut dosyalarında değişiklik yapmak", "change cloud files"),
     (r"navigate", "tarayıcıda bir sayfa açmak", "open a page in the browser"), (r"javascript|computer|form_input|file_upload", "tarayıcıda işlem yapmak", "act in the browser")]
 def izin_metni(arac, gi=None, aciklama=None):
+    return _t(f"Claude şunu yapmak istiyor: {arac_cumlesi(arac, gi, aciklama)}. Onaylıyor musun?", f"Claude wants to: {arac_cumlesi(arac, gi, aciklama)}. Do you approve?")
+def arac_cumlesi(arac, gi=None, aciklama=None):  # aracın düz cümlesi ("… dosyasını okumak"): izin metni ve toplantı oturumunun canlı durum satırı
     gi = gi if isinstance(gi, dict) else {}; a = str(arac or ""); kisa = a.split("__")[-1]
     acik = " ".join(str(aciklama or gi.get("description") or "").split()).rstrip(" .")[:200]
     if a in ("Bash", "Monitor") or a.startswith("Bash"):
@@ -83,8 +91,10 @@ def izin_metni(arac, gi=None, aciklama=None):
     elif a in ("WebFetch", "WebSearch"):
         alan = re.sub(r"^https?://([^/]+).*", r"\1", str(gi.get("url") or ""))
         ne = _t("internetten bilgi almak", "look something up on the internet") + (f" ({alan})" if alan else "")
+    elif a in ("Grep", "Glob"): ne = acik or _t("dosyalarda aramak", "search the files")
+    elif a == "TodoWrite": ne = _t("yapılacaklar listesini güncellemek", "update the to-do list")
     else: ne = acik or _t(f"“{kisa}” aracını kullanmak", f"use the “{kisa}” tool")
-    return _t(f"Claude şunu yapmak istiyor: {ne}. Onaylıyor musun?", f"Claude wants to: {ne}. Do you approve?")
+    return ne
 # --- Y1: anahtarsız yazma isteği (geçiş listesi GECIS_YAZMA). Eski eklenti ya da başka bir yerel süreç (öbür macOS hesabı, başka eklenti, Teams
 # sayfasındaki betik) anahtarsız yazabiliyordu: sahte satır, asistanı konuşturma, sahte onay kartı. Yetenek kalır; kaynak (köken) başına ilk istekte
 # kullanıcıya sorulur, onaylanırsa 12 saat geçer, reddedilirse 30 dk sorulmaz. Onay gelene kadar istek işlenmez (403 "izin bekliyor").
@@ -105,7 +115,8 @@ def izin_kaynak_view():
 def izin_arac(p):
     arac = " ".join(str(p.get("arac") or "").split())[:80]; ozet = " ".join(str(p.get("ozet") or "").split())[:240]
     if not arac: return {"ok": False, "err": "arac"}
-    iid = izin_iste("arac", izin_metni(p.get("ad") or arac, p.get("girdi"), p.get("aciklama")), {"arac": arac, "ozet": ozet})  # komut yalnız ayrıntıda/kayıtta
+    arka = "topo_canli" in globals() and topo_canli()  # arka plandaki oturumun kancası: izin Claude bölümünde (kart değil)
+    iid = izin_iste("arac", izin_metni(p.get("ad") or arac, p.get("girdi"), p.get("aciklama")), {"arac": arac, "ozet": ozet}, oturum=arka)  # komut yalnız ayrıntıda/kayıtta
     if not iid: return {"ok": False, "err": "eylem"}
     k = izin_bekle(iid, min(IZIN_BEKLE_SN, float(p.get("bekle") or IZIN_BEKLE_SN)))
-    return {"ok": True, "id": iid, "karar": k, "arka": "topo_canli" in globals() and topo_canli()}
+    return {"ok": True, "id": iid, "karar": k, "arka": arka}
