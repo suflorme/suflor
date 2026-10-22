@@ -4,7 +4,7 @@
 //   turuncu nokta (onay bekleyen iş). Durum aktarıcının şerit uzun yoklamasından (GET /cards?bekle=25).
 // - Tıkla: buzlu cam (NSVisualEffectView) panelde mini pano — panonun ?gorunum=panel görünümü (WKWebView, saydam). Panel ekran
 //   paylaşımında görünmez (sharingType none), odak çalmaz (nonactivating). Sağ tık: Panoyu aç · kısayol · Çık.
-// - Pano penceresi (deneme): sağ tık → "Panoyu pencerede aç" tam panoyu Chrome sekmesi yerine bu uygulamanın Mac penceresinde açar (PanoPencere).
+// - Pano penceresi (v0.104.0): "Panoyu aç" ve bildirim tam panoyu bu uygulamanın Mac penceresinde açar (PanoPencere); "Panoyu Chrome'da aç" eski yol.
 // - Mac geneli bas-konuş: Option + Shift + Boşluk basılı tut → mikrofon (16 kHz) → bırakınca POST /bas-konus (anahtar + pano kökeni).
 //   Carbon sıcak tuşu basma/bırakmayı ayrı verir; Erişilebilirlik izni gerekmez, mikrofon izni bu uygulamaya sorulur.
 // Ağ: yalnız 127.0.0.1. Ses yalnız aktarıcıya gider (Mac'ten çıkmaz).
@@ -150,7 +150,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func menuGoster() {
         let m = NSMenu()
         m.addItem(withTitle: "Panoyu aç", action: #selector(panoAc), keyEquivalent: "").target = self
-        m.addItem(withTitle: "Panoyu pencerede aç (deneme)", action: #selector(panoPencere), keyEquivalent: "").target = self
+        m.addItem(withTitle: "Panoyu Chrome'da aç", action: #selector(panoTarayici), keyEquivalent: "").target = self
         m.addItem(withTitle: "Paneli yenile", action: #selector(panelYenile), keyEquivalent: "").target = self
         if panel.isVisible { m.addItem(withTitle: "Paneli kapat (Esc)", action: #selector(panelKapat), keyEquivalent: "").target = self }
         m.addItem(.separator())
@@ -161,7 +161,8 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         m.addItem(withTitle: "Suflor.me menüsünden çık", action: #selector(cik), keyEquivalent: "").target = self
         oge.menu = m; oge.button?.performClick(nil); oge.menu = nil
     }
-    @objc func panoAc() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
+    @objc func panoAc() { panoPencere() }
+    @objc func panoTarayici() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
     @objc func panoPencere() { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.goster() }
     func panelGoster() { if !panel.isVisible { tiklandi(oge.button!) } }  // panodaki "mini pano" düğmesi: menüdeki panel
     @objc func panelYenile() { panelYukle() }
@@ -855,9 +856,20 @@ let suflorSimge: NSImage? = {  // Dock ve Hakkında için: Mac simgeleri gibi ke
     let r = NSImage(size: NSSize(width: 512, height: 512)); r.lockFocus(); svg.draw(in: NSRect(x: 50, y: 50, width: 412, height: 412)); r.unlockFocus(); return r
 }()
 // sayfaya: işaret, ⚙, geri bildirim ve mini pano düğmeleri gizli (pencerede araç çubuğu ve menüde); başlık satırı araç çubuğunun altında sıkı
-let MAC_STIL = "header .brand,#gb,#ay,#mini{display:none!important}"
-final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, NSToolbarDelegate {
+// durum cümlesi (ve toplantıda ad · süre) pencere başlığının altında (subtitle); sayfa başlık satırı yalnız etiket, eylem düğmesi ya da Güncelle varken
+let MAC_STIL = "header .brand,#gb,#ay,#mini,#t,#sure,#dm,#da,#durum .dot{display:none!important}html.bas-bos header{display:none!important}"
+let BASLIK_IZLE = """
+(()=>{const h=document.querySelector('header');if(!h||!window.webkit)return;let son=null;const $=i=>document.getElementById(i),m=e=>e?e.textContent.trim():''
+const gor=e=>e&&!e.hidden&&getComputedStyle(e).display!=='none'&&e.textContent.trim()
+const yaz=()=>{const du=$('durum'),uy=!!du&&/\\b(wa|er)\\b/.test(du.className)
+  const alt=(uy?'⚠︎ ':'')+[[m($('t')),m($('sure'))].filter(Boolean).join(' · '),[m($('dm')),m($('da'))].filter(Boolean).join(' — ')].filter(Boolean).join(' · ')
+  if(alt!==son){son=alt;webkit.messageHandlers.suflor.postMessage({alt})}
+  document.documentElement.classList.toggle('bas-bos',!(gor($('chips'))||gor($('de'))||gor($('gun'))))}
+new MutationObserver(yaz).observe(h,{subtree:true,childList:true,characterData:true,attributes:true});yaz()})()
+"""
+final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, NSToolbarDelegate, WKScriptMessageHandler {
     let pencere: NSWindow; let web: WKWebView; let mini: () -> Void; var yuklendi: (() -> Void)?; var surum = ""
+    var pdfler: [(WKWebView, NSWindow)] = []  // PDF'e aktar: panonun açtığı görünmez pencereler (yazdırılınca kapanır)
     static let ARACLAR: [(NSToolbarItem.Identifier, String, String, String)] = [  // kimlik, SF simgesi, ad, sayfadaki düğme
         (.init("mini"), "pip", "Mini pano", "mini"), (.init("gb"), "bubble.left", "Geri bildirim", "gb"), (.init("ay"), "gearshape", "Ayarlar", "ay")]
     init(mini: @escaping () -> Void) {
@@ -869,7 +881,9 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
         c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac');const s=document.createElement('style');s.textContent='\(MAC_STIL)';document.documentElement.appendChild(s)", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: pencere.contentView!.bounds, configuration: c); web.autoresizingMask = [.width, .height]
+        c.userContentController.addUserScript(WKUserScript(source: BASLIK_IZLE, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         super.init()
+        c.userContentController.add(self, name: "suflor")
         web.navigationDelegate = self; web.uiDelegate = self; pencere.delegate = self
         // araç çubuğu pencerenin başlığıyla tek satır (Mac'in birleşik araç çubuğu); sayfa altından başlar
         let t = NSToolbar(identifier: "SuflorPano"); t.delegate = self; t.displayMode = .iconOnly; t.allowsUserCustomization = false
@@ -880,6 +894,9 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         anaMenu()
     }
     func windowDidResize(_ n: Notification) { web.frame = pencere.contentLayoutRect }
+    func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
+        if let d = m.body as? [String: Any], let alt = d["alt"] as? String { pencere.subtitle = alt }
+    }
     func goster() {
         if web.url == nil { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { web.load(URLRequest(url: u)) } }
         NSApp.setActivationPolicy(.regular); if let s = suflorSimge { NSApp.applicationIconImage = s }
@@ -949,11 +966,35 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     }
     func downloadDidFinish(_ d: WKDownload) { if let u = d.progress.fileURL { NSWorkspace.shared.activateFileViewerSelecting([u]) } }
     // window.open: adres = varsayılan tarayıcı; boş 360 genişlikli pencere = panodaki mini pano (openMini) → menü paneli; başka boş pencere
-    // (PDF'e aktar) açılmaz, pano "yeni pencere açılamadı" der
+    // = PDF'e aktar: görünmez pencerede açılır, pano içeriği yazıp print() deyince PDF İndirilenler'e kaydedilir ve Önizleme'de açılır
     func webView(_ w: WKWebView, createWebViewWith c: WKWebViewConfiguration, for a: WKNavigationAction, windowFeatures f: WKWindowFeatures) -> WKWebView? {
-        if let u = a.request.url, u.scheme == "http" || u.scheme == "https" { NSWorkspace.shared.open(u) }
-        else if f.width?.intValue == 360 { mini() } else { print("PENCERE: boş pencere istendi (\(f.width?.intValue ?? 0)×\(f.height?.intValue ?? 0)) — açılmadı") }
-        return nil
+        if let u = a.request.url, u.scheme == "http" || u.scheme == "https" { NSWorkspace.shared.open(u); return nil }
+        if f.width?.intValue == 360 { mini(); return nil }
+        let pp = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 1000), styleMask: [.titled], backing: .buffered, defer: false); pp.isReleasedWhenClosed = false
+        let pw = WKWebView(frame: pp.contentView!.bounds, configuration: c); pw.uiDelegate = self; pp.contentView = pw
+        pdfler.append((pw, pp)); return pw
+    }
+    func webViewDidClose(_ w: WKWebView) { pdfBirak(w) }
+    func pdfBirak(_ w: WKWebView) { pdfler.removeAll { $0.0 === w } }
+    // window.print(): WebKit'in macOS yazdırma çağrısı (genel API'de karşılığı yok; Safari ve diğer WKWebView uygulamaları da bunu kullanır)
+    @objc(_webView:printFrame:) func yazdirCagri(_ w: WKWebView, _ f: WKFrameInfo) { pdfYaz(w) }
+    @objc(_webView:printFrame:pdfFirstPageSize:completionHandler:) func yazdirCagri2(_ w: WKWebView, _ f: WKFrameInfo, _ b: CGSize, _ bitti: @escaping () -> Void) { pdfYaz(w); bitti() }
+    func pdfYaz(_ w: WKWebView) {
+        guard let pp = pdfler.first(where: { $0.0 === w })?.1 else { print("PENCERE: yazdırma pano penceresinde istendi — yok sayıldı"); return }
+        let ad = (w.title ?? "").replacingOccurrences(of: "/", with: "-").trimmingCharacters(in: .whitespaces)
+        let klasor = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        var hedef = klasor.appendingPathComponent((ad.isEmpty ? "Suflor" : ad) + ".pdf"); var i = 2
+        while FileManager.default.fileExists(atPath: hedef.path) { hedef = klasor.appendingPathComponent("\(ad.isEmpty ? "Suflor" : ad) \(i).pdf"); i += 1 }
+        let pi = NSPrintInfo(dictionary: [.jobSavingURL: hedef]); pi.jobDisposition = .save
+        pi.topMargin = 36; pi.bottomMargin = 36; pi.leftMargin = 36; pi.rightMargin = 36; pi.horizontalPagination = .fit; pi.verticalPagination = .automatic
+        let op = w.printOperation(with: pi); op.showsPrintPanel = false; op.showsProgressPanel = false; op.view?.frame = w.bounds
+        op.runModal(for: pp, delegate: self, didRun: #selector(pdfBitti(_:basarili:bilgi:)), contextInfo: Unmanaged.passRetained(hedef as NSURL).toOpaque())
+    }
+    @objc func pdfBitti(_ op: NSPrintOperation, basarili: Bool, bilgi: UnsafeMutableRawPointer?) {
+        guard let b = bilgi else { return }; let hedef = Unmanaged<NSURL>.fromOpaque(b).takeRetainedValue() as URL
+        if basarili && FileManager.default.fileExists(atPath: hedef.path) { print("PENCERE: PDF → \(hedef.lastPathComponent)"); NSWorkspace.shared.open(hedef) }
+        else { print("PENCERE: PDF yazılamadı") }
+        if let w = op.view as? WKWebView ?? pdfler.last?.0 { pdfBirak(w) }
     }
     @available(macOS 12.0, *)
     func webView(_ w: WKWebView, requestMediaCapturePermissionFor o: WKSecurityOrigin, initiatedByFrame f: WKFrameInfo, type t: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
@@ -987,6 +1028,8 @@ if args.contains("--pencere-dene") {
                         p?.web.evaluateJavaScript("const a=document.getElementById('ayd').open;document.getElementById('ayd').close();a") { v, _ in print("ayarlar açıldı:", v ?? "?") }
                         p?.geriBildirim(); DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                             p?.web.evaluateJavaScript("const g=document.getElementById('gbd').open;document.getElementById('gbd').close();g") { v, _ in print("geri bildirim açıldı:", v ?? "?") }
+                            // PDF'e aktar yolu: boş pencere + document.write + print() (panonun akYap'ı gibi) → İndirilenler/Suflor deneme PDF.pdf
+                            if args.contains("--pdf-dene") { p?.web.evaluateJavaScript("(()=>{const w=window.open('','_blank');if(!w)return 'pencere yok';w.document.write('<!doctype html><title>Suflor deneme PDF</title><h1>Deneme</h1><p>'+'Satır. '.repeat(3000)+'</p>');w.document.close();setTimeout(()=>w.print(),300);return 'yazıldı'})()") { v, e in print("pdf:", v ?? e?.localizedDescription ?? "?") } }
                         }
                     }
                     if let yol = arg("--goruntu"), let p = p, let cerceve = p.pencere.contentView?.superview {  // çerçeve (araç çubuğu) + sayfa görüntüsü tek PNG
