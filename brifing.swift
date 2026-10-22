@@ -73,6 +73,61 @@ guard anthropicImzali(claudeGercek) else { bitir(3) }
 #else
 let claudeGercek = claude
 #endif
+// Toplantı oturumu kipi (v0.111.0; kullanıcı 22 Ekim: "Claude Code terminalini görmesine gerek yok"): istekte "kip": "toplanti" → panodan Başlat'la açılan
+// toplantı oturumu Terminal yerine burada, girişi/çıkışı aktarıcının FIFO'larında. Araçlar kısıtlanmaz (Terminal'deki oturumla aynı proje izinleri);
+// izin modu verilemez — proje izinlerinde olmayan her araç sorusu stream-json'la aktarıcıya gelir (--permission-prompt-tool stdio), kullanıcı panoda onaylar.
+// Argümanlar ayrı izin listesinden: istem metni yok (ilk mesaj girişten), --settings yalnız uygulama klasöründeki toplanti-kanca.json ve içeriği tek
+// PreToolUse kancası (izin-kanca; komut burada yeniden kurulup karşılaştırılır), --resume yalnız oturum kimliği. Risk Terminal'le aynı: aynı hesaptaki
+// bir program .command dosyasıyla Terminal'de de oturum açtırabiliyordu.
+func kabukTirnak(_ s: String) -> String {  // Python shlex.quote ile aynı
+    if !s.isEmpty, s.range(of: "^[A-Za-z0-9@%+=:,./_-]+$", options: .regularExpression) != nil { return s }
+    return "'" + s.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+}
+func kancaDenetle(_ y: String) -> String? {
+    guard gercek(y) == (uygulamaKlasor as NSString).appendingPathComponent("toplanti-kanca.json"), let d = FileManager.default.contents(atPath: y),
+          let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], Set(o.keys) == ["hooks"],
+          let h = o["hooks"] as? [String: Any], Set(h.keys) == ["PreToolUse"], let pt = h["PreToolUse"] as? [[String: Any]], pt.count == 1,
+          Set(pt[0].keys) == ["matcher", "hooks"], pt[0]["matcher"] as? String == "Bash|mcp__.*", let hk = pt[0]["hooks"] as? [[String: Any]], hk.count == 1,
+          Set(hk[0].keys) == ["type", "timeout", "command"], hk[0]["type"] as? String == "command", let c = hk[0]["command"] as? String,
+          let r = c.range(of: " --relay http://127\\.0\\.0\\.1:[0-9]{2,5} izin-kanca$", options: .regularExpression) else { return nil }
+    let tc = (uygulamaKlasor as NSString).appendingPathComponent("toplanti-claude.py")
+    guard String(c[..<r.lowerBound]) == "/usr/bin/python3 -I -B \(kabukTirnak(tc)) --dir \(kabukTirnak(istekKlasor))" else { return nil }
+    return String(data: d, encoding: .utf8)
+}
+if j["kip"] as? String == "toplanti" {
+    guard let giris = j["giris"] as? String, let cikis = j["cikis"] as? String else { bitir(2) }
+    let tek: Set<String> = ["-p", "--print", "--verbose"]
+    let deg: [String: (String) -> Bool] = [
+        "--input-format": { $0 == "stream-json" }, "--output-format": { $0 == "stream-json" }, "--permission-prompt-tool": { $0 == "stdio" },
+        "--append-system-prompt": { _ in true }, "--settings": { kancaDenetle($0) != nil },
+        "--model": { $0.range(of: "^[A-Za-z0-9._\\[\\]-]{1,64}$", options: .regularExpression) != nil },
+        "--effort": { ["low", "medium", "high", "xhigh", "max"].contains($0) },
+        "--resume": { $0.range(of: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", options: .regularExpression) != nil }]
+    var k = 0
+    while k < arg.count {
+        let x = arg[k]
+        if tek.contains(x) { k += 1; continue }
+        guard let uygun = deg[x], k + 1 < arg.count, uygun(arg[k + 1]) else { bitir(3) }
+        if x == "--settings", let metin = kancaDenetle(arg[k + 1]) { arg[k + 1] = metin }
+        k += 2
+    }
+    guard arg.contains("--permission-prompt-tool"), arg.contains("--input-format") else { bitir(3) }
+    guard let gir = FileHandle(forReadingAtPath: giris), let cik = FileHandle(forWritingAtPath: cikis) else { bitir(7) }
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: claudeGercek); p.arguments = arg; p.currentDirectoryURL = URL(fileURLWithPath: cwd)
+    var e = ProcessInfo.processInfo.environment; e["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:" + (e["PATH"] ?? ""); p.environment = e
+    signal(SIGPIPE, SIG_IGN)
+    let boru = Pipe()
+    p.standardInput = boru; p.standardOutput = cik; p.standardError = FileHandle.nullDevice
+    do { try p.run() } catch { bitir(4) }
+    Thread.detachNewThread {
+        while true { let d = gir.availableData; if d.isEmpty { break }; do { try boru.fileHandleForWriting.write(contentsOf: d) } catch { break } }
+        try? boru.fileHandleForWriting.close()
+    }
+    let sure = (j["sure"] as? Double) ?? 21600
+    DispatchQueue.global().asyncAfter(deadline: .now() + sure) { if p.isRunning { p.terminate() } }
+    p.waitUntilExit(); bitir(p.terminationStatus)
+}
 // izin listesi: değersiz bayraklar, değerli bayraklar (değer denetimiyle); -p'den hemen sonraki tek metin istemdir, başka konumsal argüman yok
 let tekBayrak: Set<String> = ["-p", "--print", "--verbose", "--include-partial-messages", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"]
 let araclar: Set<String> = ["Read", "Grep", "Glob"]
