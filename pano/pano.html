@@ -76,7 +76,9 @@ html.mac #tkf .ayt{display:inline-flex;flex-wrap:nowrap;gap:0;background:var(--h
 html.mac #tkf .ayt button{border:0;border-radius:5px;padding:3px 13px;background:transparent;color:var(--tx);font-weight:400}html.mac #tkf .ayt button.on{background:var(--s1);color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.08);font-weight:500}
 html.mac #tkf .sgs{gap:8px 12px}html.mac #tkf .bt{margin-top:4px}
 /* v0.108.0: kenar çubuğu (yalnız Mac penceresi; zemin saydam — arkasında Mac'in buzlu cam kenar çubuğu malzemesi) */
-#kenar{display:none}html.mac #kenar{display:flex;flex-direction:column;gap:1px;min-height:0;overflow:auto;padding:8px 10px 0;border-right:.5px solid var(--bd)}
+#kenar{display:none}/* Yan paneldeki seçim ayrı görünüm (kullanıcı, 22 Ekim: "Bugün ve Sohbet aynı ekranı veriyor"): Bugün = takvim ve günün işleri, Asistan = asistanla konuşma ve asistanın bölümü; Şimdi (toplantıda) hepsi */
+@media (min-width:721px){html.mac:not(.kc-kapali)[data-gr=tks] main .sc>section:is(#kns,#tos,#sk){display:none!important}html.mac:not(.kc-kapali)[data-gr=kns] main .sc>section:not(#kns,#tos){display:none!important}html.mac:not(.kc-kapali)[data-gr=kns] #grbos{display:block}}#grbos{display:none}
+html.mac #kenar{display:flex;flex-direction:column;gap:1px;min-height:0;overflow:auto;padding:8px 10px 0;border-right:.5px solid var(--bd)}
 html.mac body{background:transparent}html.mac main,html.mac header{background:var(--bg)}
 html.mac .grid{grid-template-columns:220px minmax(0,1fr) 5px var(--aw,min(380px,36vw))}html.mac.yan-bos .grid,html.mac.yan-kapali .grid{grid-template-columns:220px minmax(0,1fr)}
 html.mac.kc-kapali #kenar{display:none}html.mac.kc-kapali .grid{grid-template-columns:minmax(0,1fr) 5px var(--aw,min(380px,36vw))}html.mac.kc-kapali.yan-bos .grid,html.mac.kc-kapali.yan-kapali .grid{grid-template-columns:minmax(0,1fr)}
@@ -250,7 +252,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <div id=tkf hidden><div class=tkfb>Toplantı başlat</div><input id=tkk placeholder="Kişi — konu (ör. Ayşe — bütçe)"><input id=tkl type=url placeholder="Toplantı bağlantısı (isteğe bağlı)"><div class="ayt sg" id=tkp data-bos=1 title="Bağlantı yoksa açılacak uygulama"><button type=button data-v=teams>Teams</button><button type=button data-v=meet>Meet</button><button type=button data-v=zoom>Zoom</button></div><textarea id=tkc rows=2 placeholder="Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin"></textarea><textarea id=tkg rows=3 placeholder="Gündem (isteğe bağlı): her satıra bir madde — {asistan} bu maddelerle başlar"></textarea><div class=sgs><div class="ayt sg" id=tkr><button type=button data-v=yurutucu title="Toplantıyı ben yönetiyorum">Yürütücü</button><button type=button data-v=katilimci>Katılımcı</button><button type=button data-v=dinleyici>Dinleyici</button></div><div class="ayt sg" id=tkd><button type=button data-v=tr>Türkçe</button><button type=button data-v=en>İngilizce</button><button type=button data-v=karisik>Karışık</button></div></div>
 <div class=bt><span id=tkm></span><span class=sp1></span><a href="#" id=tky2 class=hint hidden>Suflor.me olmadan katıl</a><button id=tki class=gh>Vazgeç</button><button id=tkb class=pri>Başlat</button></div></div></section>
 <section id=hat class=hat hidden></section>
-<section id=kns hidden><div class=kn><button id=kb class=knb aria-label="Basılı tut, konuş" title="Basılı tut, sor, bırak — {asistan} sesli cevaplar (ses Mac'ten çıkmaz)"><svg class=i viewBox="0 0 24 24" aria-hidden=true><rect x=9 y=2.5 width=6 height=11.5 rx=3 /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><div class=knt><div class=knh><span id=kna class=kna>Asistanla konuş</span><span id=ksd class=sohd hidden>Sohbet açık</span><span class=sp1></span><button id=kz2 class=gh hidden>Sus</button><button id=ksb class=knsb hidden title="Sohbeti bitir"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.2A8.5 8.5 0 1 1 20.5 12z"/><path d="M9 10.5v3M12 9v6M15 10.5v3"/></svg><span>Sohbet</span></button></div><div id=knk class=knk>Basılı tut ya da <kbd>Option</kbd> + <kbd>Shift</kbd> + <kbd>Boşluk</kbd></div><div id=knd class=t></div></div></div></section>
+<div id=grbos class=hint></div><section id=kns hidden><div class=kn><button id=kb class=knb aria-label="Basılı tut, konuş" title="Basılı tut, sor, bırak — {asistan} sesli cevaplar (ses Mac'ten çıkmaz)"><svg class=i viewBox="0 0 24 24" aria-hidden=true><rect x=9 y=2.5 width=6 height=11.5 rx=3 /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><div class=knt><div class=knh><span id=kna class=kna>Asistanla konuş</span><span id=ksd class=sohd hidden>Sohbet açık</span><span class=sp1></span><button id=kz2 class=gh hidden>Sus</button><button id=ksb class=knsb hidden title="Sohbeti bitir"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.2A8.5 8.5 0 1 1 20.5 12z"/><path d="M9 10.5v3M12 9v6M15 10.5v3"/></svg><span>Sohbet</span></button></div><div id=knk class=knk>Basılı tut ya da <kbd>Option</kbd> + <kbd>Shift</kbd> + <kbd>Boşluk</kbd></div><div id=knd class=t></div></div></div></section>
 <section id=brs hidden><div class=sh><span class=brb>Brifing <span id=brn class=meta></span></span><button id=brk class=gh aria-expanded=true>Gizle</button></div><div id=br></div></section>
 <section id=dds hidden><div class=sh>Dosyadan döküm <span id=ddn class=meta></span></div><div id=dd></div></section>
 <section id=nts hidden><div class=sh><span>Notlar <span id=ntn class=meta></span></span></div><div id=nt></div></section>
@@ -782,17 +784,19 @@ function kenarCiz(s,top){if(!document.documentElement.classList.contains('mac'))
   const sec=top&&kcSec==='tks'?'kc':!top&&kcSec==='kc'?'tks':kcSec  // toplantıda varsayılan seçim Şimdi
   const o=(id,ikon,ad,r,ek)=>`<button class="ko${sec===id?' sec':''}" data-git="${esc(id)}"${ek||''}>${ikon}<span class=tx>${esc(ad)}</span>${r?`<span class=r>${esc(r)}</span>`:''}</button>`
   const h=(top?`<div class=kb>${L('Şimdi')}</div>`+o('kc','<span class=nok></span>',t,su,' data-canli=1'):'')
-    +o('tks',ic('takvim'),L('Bugün'))+o('kns',ic('mik'),L('Sohbet'),'⌥⇧␣')
+    +o('tks',ic('takvim'),L('Bugün'))+o('kns',ic('mik'),L('Asistan'),'⌥⇧␣')
     +(ls.length?`<div class=kb>${L('Son toplantılar')}</div>`+ls.map(r=>o('son:'+r.id,ic('chat'),r.baslik||r.ad,kisaGun(r.at),` title="${L('Özeti aç')} — ${esc(r.ad||'')}"`)).join(''):'')
     +`<div class=kb>${L('Arşiv')}</div>`+o('ar-ara',ic('liste'),L('Toplantılarda ara'))+o('ar-dok',ic('dosya'),L('Dökümler'))+o('gecmis',ic('hist'),L('Konuş geçmişi'))
     +`<div class=kalt><i class="dot ${dc?dc[1]:''}"></i><span>${esc(dm)}</span></div>`
+  document.documentElement.dataset.gr=sec  // görünüm: CSS seçilmeyen bölümleri gizler (Şimdi ve son toplantı hepsini gösterir)
+  const bos=document.getElementById('grbos');if(bos){const k=document.getElementById('kns'),t=document.getElementById('tos');bos.textContent=sec==='kns'&&k.hidden&&t.hidden?L('Asistan toplantıda; Şimdi bölümünden izle.'):''}
   if(h!==kcImza){kcImza=h;document.getElementById('kenar').innerHTML=h}}
 document.getElementById('kenar').addEventListener('click',async ev=>{const b=ev.target.closest('[data-git]');if(!b)return;const g=b.dataset.git
   if(g.startsWith('son:')){let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:g.slice(4),tur:''})})}catch(e){}if(!r.ok)geciciDurum(L('Özet açılamadı'),r.err||'');return}
   if(g==='gecmis'){gecmisAc();return}
   if(g==='ar-ara'||g==='ar-dok'){arsivAc(g==='ar-ara');return}
-  kcSec=g;const e=document.getElementById(g);if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))
-  const hedef=g==='kc'?document.querySelector('main .sc'):e;if(hedef)(g==='kc'?hedef.scrollTo({top:0,behavior:'smooth'}):hedef.scrollIntoView({behavior:'smooth',block:'start'}))})
+  kcSec=g;if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))
+  const sc=document.querySelector('main .sc');if(sc)sc.scrollTo({top:0,behavior:'smooth'})})  // her seçim kendi görünümünü baştan açar
 function kenarAcKapa(){const k=document.documentElement.classList.toggle('kc-kapali');try{localStorage.setItem('kcKapali',k?'1':'')}catch(e){}}
 try{if(localStorage.getItem('kcKapali'))document.documentElement.classList.add('kc-kapali')}catch(e){}
 // Mac penceresinde yan sütun araç çubuğundaki düğmeyle açılıp kapanır (tercih bu tarayıcıda saklanır)

@@ -434,6 +434,8 @@ globalThis.SUFLOR_EN = {
   "Toplantıya söylenmedi — {n}": "Not said in the meeting — {n}",
   "Toplantıya okunamadı — {n}": "Couldn't speak in the meeting — {n}",
   "Sohbet": "Conversation",
+  "Asistan": "Assistant",
+  "Asistan toplantıda; Şimdi bölümünden izle.": "The assistant is in the meeting; follow it under Now.",
   "Bitir": "End",
   "Sohbet açık": "Conversation on",
   "Sohbet kapandı — {n}. Yeniden konuşmak için mikrofona dokun.": "Conversation ended — {n}. To talk again, tap the microphone.",
