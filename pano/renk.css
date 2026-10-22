@@ -1,9 +1,9 @@
 /* Suflor.me renkleri, yazı boyları ve köşeleri — tek kaynak (v0.99.2; boy, köşe ve hareket azaltma v0.99.3). Pano ve hazırlık sayfasına aktarıcı gömer (yer tutucu __RENK__), eklenti penceresi ve sihirbaz bağlantıyla yükler.
    Teams şeridi (content.js) kendi gölge DOM'unda aynı değerleri kullanır; test/renk.py eşitliği denetler. Okunurluk (WCAG AA ≥ 4,5:1): --t3 en koyu açık zeminde 4,63
    (açık) / 4,59 (koyu, en koyu yüzeyde); --wa uyarı zemininde 4,63; ana düğme dolgusu --ac-dolgu beyaz yazıyla koyu temada 5,24. */
-/* Yazı boyları (beş basamak) ve köşe yarıçapları (üç basamak + tam yuvarlak). Yeni boy ya da köşe eklemeden önce bunlardan birini seç;
+/* Yazı boyları (beş basamak) ve köşe yarıçapları (v0.118.0, tek kutu tasarımı: yalnız iki ölçü — büyük 12, küçük 6; --kose küçükle aynı — + tam yuvarlak). Yeni boy ya da köşe eklemeden önce bunlardan birini seç;
    test/renk.py pano, hazırlık ve eklenti penceresinde sabit px boyu ve köşeyi yakalar (yazdırılan PDF sayfası ayrı belge, sayılmaz). */
-:root{--yz-1:11px;--yz-2:12px;--yz-3:13px;--yz-4:14px;--yz-5:16px;--kose-s:6px;--kose:8px;--kose-l:14px;--kose-tam:999px}
+:root{--yz-1:11px;--yz-2:12px;--yz-3:13px;--yz-4:14px;--yz-5:16px;--kose-s:6px;--kose:6px;--kose-l:12px;--kose-tam:999px}
 :root{color-scheme:light dark;--bg:#f4f5f1;--s1:#ffffff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#646c66;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.045);
 --ac:#175e46;--ac-dolgu:#175e46;--ac-bg:#e5efe9;--ok:#1f7a4f;--ok-bg:#e6f1ea;--wa:#94600f;--wa-bg:#f7eedd;--er:#b3412e;--er-bg:#f8e7e3;--vi:#6b4f9e;--vi-bg:#efebf6;--te:#1f6f78;--te-bg:#e2eff0;--gr:#6b736d;--gr-bg:#eceee9;
 --br:#c9973a;--br-tx:#8a6420;--br-bg:#f6eedb;--ro:#a24d6a;--ro-bg:#f6e8ed;--krem:#f1e6cf}

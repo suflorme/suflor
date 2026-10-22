@@ -523,14 +523,19 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     // v0.57.9: panodaki ince çizgi simgeler (renkli emoji yerine); Teams sayfası innerHTML'e izin vermeyebilir — DOM ile çizilir
     const IKON = { star: ["M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"], mute: ["M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8", "M10 20.5a2 2 0 0 0 4 0", "M4 4l16 16"],
       check: ["M5 12.5l4.5 4.5L19 7.5"], x: ["M6 6l12 12M18 6L6 18"], pause: ["M9 6v12M15 6v12"], zil: ["M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z", "M10 20.5a2 2 0 0 0 4 0"], uyari: ["M12 4l9 15.5H3z", "M12 10v4M12 17v.01"],
-      saat: ["M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z", "M12 7v5l3 2"] };
+      saat: ["M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z", "M12 7v5l3 2"],
+      // v0.118.0 tek kutu (panodaki simgelerle aynı çizim)
+      replik: ["M4 5h16v11H9l-5 4z", "M10 8.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4", "M12 13.6v.1"], cam: ["M4 8h3l2-2.5h6L17 8h3v11H4z", "M8.5 13a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0"],
+      mic: ["M9 5.5a3 3 0 0 1 6 0v5.5a3 3 0 0 1-6 0z", "M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"], arti: ["M12 5.5v13M5.5 12h13"], dahasi: ["M5.5 12h.01M12 12h.01M18.5 12h.01"],
+      kulak: ["M4 15v-3a8 8 0 0 1 16 0v3", "M5 14h1a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 6 20H5a1.5 1.5 0 0 1-1.5-1.5v-3A1.5 1.5 0 0 1 5 14z", "M18 14h1a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 19 20h-1a1.5 1.5 0 0 1-1.5-1.5v-3A1.5 1.5 0 0 1 18 14z"],
+      kilit: ["M7 10.5h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z", "M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"] };
     function ikon(d, ad) {
       const NS = "http://www.w3.org/2000/svg", s = d.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "i"); s.setAttribute("aria-hidden", "true");
       for (const yol of IKON[ad] || []) { const p = d.createElementNS(NS, "path"); p.setAttribute("d", yol); s.append(p); }
       return s;
     }
     const CSS = `
-        :host,:root{--yz-1:11px;--yz-2:12px;--yz-3:13px;--yz-4:14px;--yz-5:16px;--kose-s:6px;--kose:8px;--kose-l:14px;--kose-tam:999px}  /* yazı boyu ve köşe ölçeği pano/renk.css'ten (gölge DOM ve kart penceresi; test/renk.py denetler) */
+        :host,:root{--yz-1:11px;--yz-2:12px;--yz-3:13px;--yz-4:14px;--yz-5:16px;--kose-s:6px;--kose:6px;--kose-l:12px;--kose-tam:999px}  /* yazı boyu ve köşe ölçeği pano/renk.css'ten (gölge DOM ve kart penceresi; test/renk.py denetler) */
         .w{font:var(--yz-3)/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;color:#18201c;
           --s1:#ffffff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#646c66;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.045)}  /* renkler pano/renk.css'ten (test/renk.py denetler) */
         @media (prefers-color-scheme:dark){.w{color:#ecebe7;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#8a928c;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06)}}
@@ -539,9 +544,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .pill i{width:8px;height:8px;border-radius:50%;background:var(--pc,#8c8b85);flex:none}.pill:empty{display:none}
         .list{display:none;width:320px;max-height:58vh;overflow:auto;background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose);box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px;margin-bottom:8px}
         .w.acik .list{display:block}
-        .k{position:relative;background:var(--s1);border:1px solid var(--bd);border-radius:var(--kose);padding:8px 8px 8px 12px;margin:0 0 6px;overflow:hidden;color:var(--tx);cursor:pointer;display:flex;gap:6px;align-items:flex-start}
-        .k:hover{border-color:var(--bd2)}.k .m{flex:1;min-width:0}
-        .k::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kc,#8c8b85)}
+        .k{position:relative;background:transparent;border:0;border-radius:var(--kose-s);padding:6px 6px 6px 12px;margin:0 0 6px;overflow:hidden;color:var(--tx);cursor:pointer;display:flex;gap:6px;align-items:flex-start}
+        .k:hover{background:var(--hov)}.k .m{flex:1;min-width:0}
+        .k::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:var(--kose-tam);background:var(--kc,#8c8b85)}.k.bil::before{display:none}
         .k b{display:block;font-size:var(--yz-1);font-weight:600;letter-spacing:.03em;color:var(--kc,#8c8b85);margin-bottom:1px}
         .a{display:flex;gap:2px;flex:none}
         button{font:var(--yz-2)/1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--t3);background:transparent;border:1px solid transparent;border-radius:var(--kose-s);padding:4px 6px;cursor:pointer}
@@ -549,25 +554,38 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .q{font-size:var(--yz-2);color:var(--t2);padding:4px 2px}.top{font-size:var(--yz-2);color:var(--t2);margin:0 2px 6px;display:flex;align-items:center;gap:5px}svg.i{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}button svg.i{width:14px;height:14px}.top:empty{display:none}.uy{color:#c0503b}
         .bos{font-size:var(--yz-2);color:var(--t3);padding:6px 2px}
         .gir{display:flex;gap:6px;align-items:flex-end;margin:0 0 6px}.son{font-size:var(--yz-1);color:var(--t3);border-top:1px solid var(--bd);padding:4px 2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.son.eski{color:#b0832e}
-        .alt{display:flex;gap:4px;justify-content:flex-end}.alt button{color:var(--t2);border-color:var(--bd)}
-        .gir textarea{flex:1;min-width:0;resize:none;font:var(--yz-2)/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--tx);background:var(--s1);
-          border:1px solid var(--bd2);border-radius:var(--kose);padding:6px 8px;box-sizing:border-box}.gir button{color:var(--tx);border-color:var(--bd2);padding:6px 9px}
+        .alt{display:flex;gap:0;justify-content:flex-end;align-items:center;margin:4px 0 2px}.alt button{color:var(--t2)}.alt details{position:relative}.alt summary{list-style:none;cursor:pointer;color:var(--t2);padding:4px 6px;border-radius:var(--kose-s)}.alt summary::-webkit-details-marker{display:none}.alt summary:hover{background:var(--hov);color:var(--tx)}
+        .alt .dmk{position:absolute;right:0;bottom:calc(100% + 4px);display:flex;flex-direction:column;min-width:150px;padding:4px;background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose);box-shadow:0 6px 18px rgba(0,0,0,.14);z-index:5}.alt .dmk button{display:flex;align-items:center;gap:6px;justify-content:flex-start;color:var(--tx);padding:5px 7px}
+        /* v0.118.0 tek kutu: + (belge), yazı, mikrofon — tek çerçeve; Gönder yok (Enter) */
+        .gir{display:flex;align-items:flex-end;gap:2px;margin:0;background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose-l);padding:3px}
+        .gir textarea{flex:1;min-width:0;resize:none;font:var(--yz-3)/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--tx);background:transparent;border:0;outline:none;padding:6px 4px;min-height:30px;max-height:120px;box-sizing:border-box}
+        .gir button{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--t2);flex:none}.gir button svg.i{width:16px;height:16px}
+        .gir .ktm{position:relative;touch-action:none;user-select:none}.gir .ktm.on{color:#175e46}.gir .ktm::after{content:"";position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:var(--t3);opacity:0}.gir .ktm.dinl::after{opacity:.55}
+        .kdz{display:none;align-items:center;gap:2px;height:30px;padding:0 3px}.kdz.on{display:inline-flex}.kdz i{width:2px;height:3px;border-radius:var(--kose-tam);background:#175e46}
+        @media (prefers-color-scheme:dark){.gir .ktm.on{color:#2a8a66}.kdz i{background:#2a8a66}}
+        .kal{font-size:var(--yz-1);color:var(--t3);padding:3px 6px 0}.kal:empty{display:none}
+        .cvp{padding:2px 4px 4px}.cvp:empty{display:none}.cvp .ca{font-size:var(--yz-1);font-weight:500;color:var(--t3)}.cvp .b{font-size:var(--yz-3);line-height:1.5;color:var(--tx);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}.cvp.acik .b{display:block}.cvp .meta{font-size:var(--yz-1);color:var(--t3)}
         .kd{font-size:var(--yz-2);color:var(--t2);margin-top:2px}.rp{font-weight:600}
         .ipucu{position:fixed;z-index:1000;max-width:240px;padding:5px 8px;border-radius:var(--kose-s);background:#18201c;color:#fff;font:var(--yz-2)/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;white-space:pre-line;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.2)}
         .ipucu[hidden]{display:none}@media (prefers-color-scheme:dark){.ipucu{background:#e8ebe6;color:#171d1a}}
         .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 rgba(176,131,46,.75)}100%{box-shadow:0 0 0 12px rgba(176,131,46,0)}}
         @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
-    // Kart penceresi = mini pano: kartlar (NOT dahil), son satır, Claude'a not/soru kutusu, ⭐ / Ne diyeyim? / 🔇 / Kanıt.
-    // Kutu pano ve mini panodakiyle aynı: aktarıcı /girdi toplantıdaki Claude'a iletir, soru mu not mu Claude karar verir; Enter gönderir, ⌘Enter her zaman
+    // Kart penceresi = mini pano: kartlar (NOT dahil), son satır, cevap, toplantı simgeleri ve tek kutu (v0.118.0, 5. taslak): + (belge), yazı, mikrofon.
+    // Kutu pano ve mini panodakiyle aynı: aktarıcı /girdi toplantıdaki asistana iletir, soru mu not mu o karar verir; Enter gönderir, ⌘Enter her zaman
     // soru, Shift+Enter yeni satır. Sayfa içi listede kutu yok (ayrı pencere açılamazsa yalnız kartlar).
+    const post = (yol, g, ms) => rf(yol, Object.assign({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) }, ms ? { signal: AbortSignal.timeout(ms) } : {}));
     function altDugmeler(d, ta) {
       const a = d.createElement("div"); a.className = "alt";
-      const dg = (metin, ipucu, is) => { const b = d.createElement("button"); if (typeof metin === "string") b.textContent = metin; else b.append(metin); b.title = L(ipucu); b.onclick = async () => { b.disabled = true; try { await is(); } catch (e) {} setTimeout(() => { b.disabled = false; }, 2500); pollCards(); }; a.append(b); };
-      const post = (yol, g) => rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) });
-      dg(ikon(d, "star"), "Önemli an: şu anı özette öne çıkar", () => post("/komut", { tur: "onemli", meeting: meetingInfo() }));  // ad: not süren toplantının dosyasına
-      dg(L("Ne diyeyim?"), "Ne diyeyim? {asistan} son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)", () => post("/ask", { tur: "ozet" }));
-      dg(ikon(d, "mute"), "Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)", () => post("/komut", { tur: "sessiz" }));
-      dg(L("Kanıt"), "Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur", () => { const not = ta.value.trim(); ta.value = ""; chrome.runtime.sendMessage({ type: "kanit", kaynak: "serit", not }); });
+      const dg = (ad, ipucu, is, kok) => { const b = d.createElement("button"); b.append(ikon(d, ad)); b.title = L(ipucu); b.onclick = async () => { b.disabled = true; try { await is(); } catch (e) {} setTimeout(() => { b.disabled = false; }, 2500); pollCards(); }; (kok || a).append(b); return b; };
+      dg("replik", "Ne diyeyim? · Option + Shift + O", () => post("/ask", { tur: "ozet" }));
+      dg("cam", "Kanıt · Option + Shift + K", () => { const not = ta.value.trim(); ta.value = ""; chrome.runtime.sendMessage({ type: "kanit", kaynak: "serit", not }); });
+      dg("mute", "Sessiz · Option + Shift + M", () => post("/komut", { tur: "sessiz" }));
+      const dm = d.createElement("details"), sm = d.createElement("summary"), mk = d.createElement("div"); sm.append(ikon(d, "dahasi")); sm.title = L("Diğer"); mk.className = "dmk";
+      const ek = (ad, metin, is) => { const b = dg(ad, metin, is, mk); b.append(d.createTextNode(" " + L(metin.split(":")[0]))); b.addEventListener("click", () => dm.removeAttribute("open")); };
+      ek("star", "Önemli an: şu anı özette öne çıkar", () => post("/komut", { tur: "onemli", meeting: meetingInfo() }));  // ad: not süren toplantının dosyasına
+      ek("kilit", "Gizli toplantı: tekrar basana kadar Suflor tamamen kapalı — ses, Whisper, döküm, kanıt yok; yapay zekâ servislerine hiçbir şey gitmez", () => post("/komut", { tur: "gizli" }));
+      ek("kulak", "Sesli çeviri: karşı tarafın yabancı dildeki sözünün kısa özü kulaklığına okunur (yalnız kulaklık takılıyken; tekrar basınca kapanır)", () => post("/komut", { tur: "sesli_ceviri" }));
+      dm.append(sm, mk); a.append(dm);
       return a;
     }
     // ipucu (pano ile aynı): kart penceresinde tarayıcının kendi ipucu çıkmayabiliyor — üstüne gelince hemen, title → data-ipucu
@@ -589,21 +607,94 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       d.addEventListener("mouseout", ev => { if (hedef && !(ev.relatedTarget && hedef.contains(ev.relatedTarget))) gizle(); });
       d.addEventListener("mousedown", gizle, true); w.addEventListener("blur", gizle);
     }
+    // asistanın adına yönelme eki (pano ile aynı): Suflor'a, Elif'e, Ada'ya
+    const yonelme = ad => { const k = String(ad || "").replace(/İ/g, "i").toLowerCase(), u = (k.match(/[aıoueiöü]/g) || ["e"]).pop(); return ad + "'" + (/[aıoueiöü]$/.test(k) ? "y" : "") + ("aıou".includes(u) ? "a" : "e"); };
+    const SES_UZ = /\.(m4a|mp4|mov|m4v|wav|mp3|aac|caf|aif|aiff|3gp)$/i;
+    let kIpT = 0, sk = null, skSon = { t: 0 }, skMk = null;
+    function kutuIp(d, m) { const n = d.querySelector(".kal"); if (!n) return; n.textContent = m || ""; clearTimeout(kIpT); if (m && !sk) kIpT = setTimeout(() => { if (!sk) n.textContent = ""; }, 2500); }
+    function kutuCiz(d) { const b = d.querySelector(".ktm"); if (!b) return; b.classList.toggle("on", !!sk); b.classList.toggle("dinl", mic.on && !teamsSessiz()); d.querySelector(".kdz").classList.toggle("on", !!(sk && sk.hazir)); if (sk) d.querySelector(".kal").textContent = L("Dinliyorum · bırakınca gönderir"); }
+    // kayıt sesi: toplantıda yalnız kulaklık takılıyken (aktarıcının /status konus.kulaklik'ı; son cevap yoklamasından), ayar kayit_sesi kapatır
+    function skSes(yukari) {
+      if (!skSon.kulaklik || skSon.kapali) return;
+      try { skMk = skMk || new AudioContext(); const c = skMk, o = c.createOscillator(), g = c.createGain(), t = c.currentTime; o.frequency.setValueAtTime(yukari ? 520 : 700, t); o.frequency.exponentialRampToValueAtTime(yukari ? 780 : 440, t + .12);
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.045, t + .015); g.gain.exponentialRampToValueAtTime(.0001, t + .12); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + .13); } catch (e) {}
+    }
+    function f2b64(f) { const pcm = new Int16Array(f.length); for (let i = 0; i < f.length; i++) { const v = Math.max(-1, Math.min(1, f[i])); pcm[i] = v < 0 ? v * 32768 : v * 32767; }
+      const u = new Uint8Array(pcm.buffer); let bin = ""; for (let i = 0; i < u.length; i += 32768) bin += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return btoa(bin); }
+    function skDuzey(d) { const k = sk; if (!k || !k.an) return; const a = new Uint8Array(k.an.frequencyBinCount); k.an.getByteFrequencyData(a);
+      [...d.querySelectorAll(".kdz i")].forEach((c, i) => { let t = 0; for (let j = 1 + i * 3; j < 4 + i * 3; j++) t += a[j] || 0; c.style.height = (3 + Math.round(t / 765 * 19)) + "px"; });
+      d.defaultView.requestAnimationFrame(() => skDuzey(d)); }
+    async function skBasla(d) {
+      if (sk) return; sk = { hazir: false }; kutuCiz(d); let r = {};
+      try { r = await (await post("/bas-konus", { komut: "basla" })).json(); } catch (e) {}
+      if (!r.ok) { sk = null; kutuCiz(d); kutuIp(d, r.err || L("Bas-konuş başlamadı")); return; }
+      try {
+        const st = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }), ac = new AudioContext({ sampleRate: 16000 }), src = ac.createMediaStreamSource(st), pr = ac.createScriptProcessor(4096, 1, 1), an = ac.createAnalyser(), parca = [];
+        an.fftSize = 64; src.connect(an); pr.onaudioprocess = e => parca.push(new Float32Array(e.inputBuffer.getChannelData(0))); src.connect(pr); pr.connect(ac.destination);
+        if (!sk) { st.getTracks().forEach(t => t.stop()); ac.close(); return; }
+        Object.assign(sk, { st, ac, pr, an, parca, hazir: true }); kutuCiz(d); skSes(true); skDuzey(d); sk.sure = setTimeout(() => skBitir(d), 60000); if (sk.birak) skBitir(d);
+      } catch (e) { sk = null; kutuCiz(d); kutuIp(d, L("Mikrofon açılamadı")); }
+    }
+    async function skBitir(d) {
+      const k = sk; if (!k) return; if (!k.hazir) { k.birak = true; return; } sk = null; clearTimeout(k.sure); skSes(false); kutuCiz(d); kutuIp(d, "");
+      k.pr.disconnect(); k.st.getTracks().forEach(t => t.stop()); const sr = k.ac.sampleRate; await k.ac.close();
+      let n = k.parca.reduce((a, b) => a + b.length, 0), f = new Float32Array(n), o = 0; for (const b of k.parca) { f.set(b, o); o += b.length; }
+      if (sr !== 16000) { const m = Math.floor(n * 16000 / sr), g = new Float32Array(m); for (let i = 0; i < m; i++) g[i] = f[Math.floor(i * sr / 16000)]; f = g; }
+      let r = {}; try { r = await (await post("/bas-konus", { pcm: f2b64(f) }, 30000)).json(); } catch (e) {}
+      if (!r.ok) kutuIp(d, r.err || L("Soru gönderilemedi")); cevapYokla(d, 90);
+    }
+    // cevap kutunun üstünde: asistanın adı küçük etiket, en çok iki satır; dokununca yerinde açılır. Soru sorulunca 90 sn /status'a bakılır (sürekli yoklama yok).
+    let cvZ = null;
+    function cevapYokla(d, sn) {
+      const bit = Date.now() + sn * 1000; clearInterval(cvZ);
+      const bak = async () => {
+        if (!pip || pip.closed || Date.now() > bit) return clearInterval(cvZ);
+        let j = null; try { j = await (await rf("/status")).json(); } catch (e) { return; }
+        const k = j.konus || {}, a = (j.ayarlar || {}).deger || {}; skSon = { t: Date.now(), kulaklik: !!k.kulaklik, kapali: a.kayit_sesi === false };
+        const yas = k.at ? (Date.now() - Date.parse(k.at)) / 1000 : 1e9, sur = ["yaziya", "dusunuyor", "konusuyor"].includes(k.durum), cv = d.querySelector(".cvp"); if (!cv) return;
+        const ky = k.toplanti && yas < 300 ? String(k.cevap || "").replace(/\s*<[^>]{1,30}>\s*/g, " ").split(/\n\s*-{3,}\s*\n?/)[0].trim() : "";
+        const dt = { yaziya: L("Yazıya döküyorum…"), dusunuyor: L("{ad} düşünüyor…", { ad: k.kisilik || AS }), konusuyor: L("{ad} cevaplıyor", { ad: k.kisilik || AS }) }[k.durum] || "";
+        const imza = dt + "|" + ky; if (cv.dataset.imza === imza) return; cv.dataset.imza = imza; cv.replaceChildren();
+        const e = (c, x) => Object.assign(d.createElement("div"), { className: c, textContent: x });
+        if (dt && sur) cv.append(e("meta", dt));
+        if (ky) { cv.append(e("ca", k.kisilik || AS)); const b = e("b", ky); b.title = L("Tamamını göster"); b.onclick = () => cv.classList.toggle("acik"); cv.append(b); }
+      };
+      bak(); cvZ = setInterval(bak, 2000);
+    }
     function kutu(d) {
       const f = d.createElement("div"); f.className = "gir";
-      const ta = d.createElement("textarea"); ta.rows = 2; ta.placeholder = L("Not ya da soru");
-      const b = d.createElement("button"); b.textContent = L("Gönder");
+      const ek = d.createElement("button"); ek.append(ikon(d, "arti")); ek.title = L("Belge ekle");
+      const ed = d.createElement("input"); ed.type = "file"; ed.multiple = true; ed.hidden = true;
+      const ta = d.createElement("textarea"); ta.rows = 1; ta.placeholder = L("{ad} yaz", { ad: yonelme(AS) });
+      const dz = d.createElement("span"); dz.className = "kdz"; for (let i = 0; i < 5; i++) dz.append(d.createElement("i"));
+      const mk = d.createElement("button"); mk.className = "ktm"; mk.append(ikon(d, "mic")); mk.title = L("Basılı tut: sesle sor (Option + Shift + Boşluk)");
       const git = async soru => {
-        const t = ta.value; if (!t.trim()) return; ta.value = ""; b.disabled = true; let r = {};
+        const t = ta.value; if (!t.trim()) return; ta.value = ""; let r = {};
         try { r = await (await rf("/girdi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: t, soru, at: new Date().toISOString(), meeting: meetingInfo() }) })).json(); } catch (e) {}
-        b.textContent = r.tur ? L(r.tur) + " ✓" : L("gönderilemedi"); if (!r.tur) ta.value = t;
-        setTimeout(() => { b.textContent = L("Gönder"); b.disabled = false; }, 1500); pollCards();
+        if (!r.tur) ta.value = t; kutuIp(d, r.tur ? "✓ " + L(r.tur) : L("gönderilemedi")); pollCards(); if (r.tur) cevapYokla(d, 60);
       };
-      b.onclick = () => git(false);
+      // + : belge bağlam klasörüne (pano ile aynı uç); ses/video dosyası panodan dökülür
+      ek.onclick = () => ed.click();
+      ed.onchange = async () => {
+        for (const x of [...ed.files]) {
+          if (SES_UZ.test(x.name)) { kutuIp(d, L("Ses dosyasını panoya bırak: dökümü orada başlar")); continue; }
+          if (x.size > 25 * 1048576) { kutuIp(d, L("Dosya çok büyük") + " · " + x.name); continue; }
+          const veri = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1] || ""); fr.onerror = () => r(""); fr.readAsDataURL(x); });
+          let r = {}; try { r = await (await post("/baglam-dosya", { ad: x.name, veri }, 30000)).json(); } catch (e) {}
+          kutuIp(d, r.ok ? L("Bağlam eklendi — {asistan} okuyacak") : L("Bağlam eklenemedi"));
+        }
+        ed.value = "";
+      };
+      // mikrofon: 200 ms'den uzun basış kayıt; kısa dokunuş ipucu (toplantıda Sohbet yok)
+      let tm = null;
+      mk.addEventListener("pointerdown", ev => { if (ev.button) return; ev.preventDefault(); try { mk.setPointerCapture(ev.pointerId); } catch (e) {} if (!skSon.t || Date.now() - skSon.t > 30000) cevapYokla(d, 3); tm = setTimeout(() => { tm = null; skBasla(d); }, 200); });
+      const birak = () => { if (tm) { clearTimeout(tm); tm = null; kutuIp(d, L("Basılı tut ve konuş")); return; } skBitir(d); };
+      mk.addEventListener("pointerup", birak); mk.addEventListener("pointercancel", birak);
       // sayfa içindeyken tuşlar Teams'in kısayollarına gitmesin
       ta.addEventListener("keydown", ev => { ev.stopPropagation(); if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); git(ev.metaKey || ev.ctrlKey); } });
+      ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px"; });
       ["keyup", "keypress"].forEach(t => ta.addEventListener(t, ev => ev.stopPropagation()));
-      f.append(ta, b); return f;
+      f.append(ek, ed, ta, dz, mk); return f;
     }
     function ensure() {
       if (host && host.isConnected) return;
@@ -630,10 +721,11 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
           const temali = c => c.replace(/@media \(prefers-color-scheme:dark\)\{([^{}]+)\{([^{}]*)\}\}/g, (_, sec, govde) => sec.split(",").map(x => "html[data-tema=koyu] " + x.trim()).join(",") + "{" + govde + "}");
           const st = d.createElement("style"); st.textContent = "html{color-scheme:light}html[data-tema=koyu]{color-scheme:dark}" + temali(CSS + `html,body{margin:0;height:100%}body{background:#f9faf7}@media (prefers-color-scheme:dark){body{background:#1b221e}}.w{padding:8px;box-sizing:border-box;min-height:100%}.w .list{display:block;width:auto;max-height:none;border:0;box-shadow:none;padding:0;margin:0;background:transparent}`);
           const w = d.createElement("div"); w.className = "w"; const g = kutu(d);
-          w.append(Object.assign(d.createElement("div"), { className: "list" }), Object.assign(d.createElement("div"), { className: "son" }), g, altDugmeler(d, g.querySelector("textarea")));
+          w.append(Object.assign(d.createElement("div"), { className: "list" }), Object.assign(d.createElement("div"), { className: "son" }), Object.assign(d.createElement("div"), { className: "cvp" }), altDugmeler(d, g.querySelector("textarea")), g, Object.assign(d.createElement("div"), { className: "kal" }));
           d.head.appendChild(st); d.body.appendChild(w); d.addEventListener("click", tikla); ipucuKur(d);
           pip.addEventListener("pagehide", () => { pip = null; });
-          const yas = setInterval(() => { if (!pip || pip.closed) return clearInterval(yas); if (sonV) sonCiz(pip.document, sonV.son); }, 5000);
+          const yas = setInterval(() => { if (!pip || pip.closed) return clearInterval(yas); if (sonV) sonCiz(pip.document, sonV.son); kutuCiz(pip.document); }, 5000);
+          kutuCiz(d); cevapYokla(d, 3);
           acik = false; root.querySelector(".w").classList.remove("acik"); if (sonV) { sig = ""; paint(sonV); } return;
         } catch (e) { pip = null; }
       }
@@ -689,7 +781,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       if (dil) list.append(ust("uyari", L("Döküm dili yanlış — panoya bak"), "top uy"));
       if (warn) list.append(ust("uyari", warn, "top uy"));
       cards.forEach(c => {
-        const k = e("div", "k"); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
+        const k = e("div", c.kind === "cevap" || c.kind === "not" ? "k bil" : "k"); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
         if (c.onay) k.dataset.onay = "1"; else k.title = L("Dokun: kapat");
         const m = e("div", "m"); m.append(e("b", null, (c.geri ? "↩ " : "") + L(c.onay ? "Onay bekliyor" : c.replik ? "Ne diyeyim" : KL[c.kind] || "Not")));
         if (!c.gizli || ayri) m.append(c.replik ? e("span", "rp", c.text) : d.createTextNode(c.text));

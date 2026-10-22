@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 245359,
-   "sha": "9e4c073a48d70ae5"
+   "uzunluk": 246590,
+   "sha": "24319c909d7cf821"
   },
   "/mini": {
-   "uzunluk": 245359,
-   "sha": "9e4c073a48d70ae5"
+   "uzunluk": 246590,
+   "sha": "24319c909d7cf821"
   },
   "/status": {
    "_ping_son": "float",
@@ -272,6 +272,7 @@
      "gemini_ses": "str",
      "kanit_metin": "bool",
      "kart_tavan_sn": "int",
+     "kayit_sesi": "bool",
      "kisayollar": "bool",
      "kisilik": "str",
      "kisilik_toplanti_disi": "str",
@@ -318,6 +319,7 @@
      "gemini_ses": "str",
      "kanit_metin": "bool",
      "kart_tavan_sn": "int",
+     "kayit_sesi": "bool",
      "kisayollar": "bool",
      "konus_alindi": "bool",
      "konus_gecmis": "bool",
@@ -508,6 +510,7 @@
     "durum": "str",
     "hata": "NoneType",
     "kisilik": "NoneType",
+    "kulaklik": "bool",
     "moderator": "NoneType",
     "olcum": "NoneType",
     "otonom": "NoneType",

@@ -1528,9 +1528,18 @@ def eposta_tur():
 # Panodaki Ayarlar (v0.34.0, 14 Ekim): üst çubuktaki ⚙ — kullanıcının değiştirebileceği ayarlar tek yerde. Şema: anahtar → (tür, varsayılan, sınır/seçenek).
 # Kaydet yalnız değişenleri ayar.json'a yazar (dosyadaki diğer alanlara dokunmaz) ve bellekteki AYAR'ı günceller: bu ayarlar kullanıldığı anda okunur, hemen
 # geçerli. Menü çubuğu uygulamasının ayarları açılışta verildiği için uygulama yeniden açılır (toplantı sürüyorsa bitince). Yeni ayar eklerken pano/pano.html AYG'ye de yaz.
+# v0.118.0 tek kutu: mikrofonun kayıt sesi toplantıda yalnız kulaklık takılıyken çalar — pano kulaklığı toplantıda da bilmeli
+# (sohbet_view toplantıda hep False der; Core Audio okuması 3 sn önbellekli)
+_KUTU_KUL = {"t": 0.0, "v": False}
+def kutu_kulaklik():
+    if time.time() - _KUTU_KUL["t"] > 3:
+        try: v = bool(kulaklik())
+        except Exception: v = False
+        _KUTU_KUL.update(t=time.time(), v=v)
+    return _KUTU_KUL["v"]
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
-    "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "sesli_not": ("bool", True, None),"kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
+    "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "kayit_sesi": ("bool", True, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "sesli_not": ("bool", True, None),"kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
     "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac ve Piper sesinde çarpan
     "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
@@ -1937,7 +1946,7 @@ class H(BaseHTTPRequestHandler):
                 if time.time() - (STATE.get("_pano_t") or 0) > 300: STATE["_pano_ilk"] = time.time()
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -2004,6 +2013,8 @@ class H(BaseHTTPRequestHandler):
         except ValueError: return self._json({"ok": False, "err": "json"}, 400)
         if not isinstance(p, dict): return self._json({"ok": False, "err": "json"}, 400)
         yetkili = self._yetkili(); o = str(self.headers.get("Origin", "")); pano = o in (f"http://127.0.0.1:{A.port}", f"http://localhost:{A.port}")
+        # v0.118.0 tek kutu: Teams şeridinin kart penceresi de basılı tut ve belge ekle yapar — anahtarlı eklenti isteği (içerik betiği toplantı sitesinin kökeniyle gelir)
+        serit = yetkili and (o.startswith("chrome-extension://") or any(re.match(k, o) for k in PLATFORM_KOKEN) or bool(os.environ.get("SUFLOR_TEST_KOKEN") and o == os.environ["SUFLOR_TEST_KOKEN"]))
         if not yetkili and self.path != "/ses-yerel":  # ses yardımcısı kendi anahtarıyla
             if self.path in GECIS_YAZMA and not AYAR.get("anahtar_zorunlu"):
                 anahtarsiz_kaydet(self.path, o)
@@ -2036,8 +2047,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/moderator":  # v0.83.0 moderatör düğmeleri: sonraki | ozet | bekle | devam | birak — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(moderator_pano(str(p.get("komut") or "")))
-        if self.path == "/bas-konus":  # bas-konuş — yalnız pano (aynı köken + pano anahtarı)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+        if self.path == "/bas-konus":  # bas-konuş — pano (aynı köken + pano anahtarı); şerit penceresi yalnız basılı tut (basla + ses)
+            if not (pano or (serit and str(p.get("komut") or "") in ("basla", "") and (p.get("komut") or p.get("pcm")))): return self._json({"ok": False, "err": "köken"}, 403)
             if p.get("komut") == "basla": return self._json(konus_basla())
             if p.get("komut") == "sus": ses_durdur(); return self._json({"ok": True})
             if p.get("komut") == "parca": return self._json(konus_parca(p))
@@ -2085,8 +2096,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/guncelle":  # panodan güncelleme — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(guncelle_baslat())
-        if self.path == "/baglam-dosya":  # panoya bırakılan dosya — yalnız pano (aynı köken + pano anahtarı)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+        if self.path == "/baglam-dosya":  # panoya bırakılan ya da + ile seçilen dosya — pano ya da şerit penceresi (anahtarlı)
+            if not (pano or serit): return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(baglam_dosya_al(p))
         if self.path == "/dosyadan-karar":  # dosyadan döküm: sor / üzerine / vazgeç / kapat / aç — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
