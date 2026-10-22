@@ -151,6 +151,31 @@ try:
     kontrol("okunamayan klasörün tarama kayıtları korundu ve bildirildi", len(kalan) == 4 and r3["sayilar"]["erisilemeyen"] == ["notlar"], f"{kalan} {r3['sayilar']['erisilemeyen']}")
     os.remove(os.path.join(P, "belgeler/plan-v2.md")); m.tara(c)
     kontrol("silinen dosya taramadan düştü", not c.execute("SELECT 1 FROM tarama WHERE yol='belgeler/plan-v2.md'").fetchone())
+    # bulutta duran dosya okunmaz (23 Ekim): bayrak taklit edilir (gerçek SF_DATALESS yalnız dosya sağlayıcısında), okuma sayılır
+    yaz("bulut/sunum.docx", ikili=docx("Bulut metni")); yaz("bulut/sunum-kopya.docx", ikili=docx("Bulut metni"))
+    bt = {os.stat(os.path.join(P, f)).st_ino for f in ("bulut/sunum.docx", "bulut/sunum-kopya.docx")}
+    asil_b, asil_sha, asil_p = m.bulutta, m._sha256, m.parcala
+    okunan = []
+    m.bulutta = lambda st: st.st_ino in bt or asil_b(st)
+    m._sha256 = lambda y: (okunan.append(y) if "bulut/" in y else None) or asil_sha(y)
+    m.parcala = lambda y, *a, **k: (okunan.append(y) if "bulut/" in y else None) or asil_p(y, *a, **k)
+    try: m.guncelle(c); rb = m.tara(c)
+    finally: m.bulutta, m._sha256, m.parcala = asil_b, asil_sha, asil_p
+    tb = {r_[0]: r_[1:] for r_ in c.execute("SELECT yol, hata, sha256, kopya_of FROM tarama WHERE yol LIKE 'bulut/%'")}
+    db = {r_[0]: r_[1:] for r_ in c.execute("SELECT yol, parca, baslik FROM dosya WHERE yol LIKE 'bulut/%'")}
+    kontrol("bulutta duran dosya: tarama ve dizin okumadı (indirme yok)", not okunan, str(okunan))
+    kontrol("bulutta duran dosya: taramada 'bulutta', özet içerikten değil, kopya sayılmadı",
+            len(tb) == 2 and all(v[0] == "bulutta" and str(v[1]).startswith("bulut:") and v[2] is None for v in tb.values()), str(tb))
+    kontrol("bulutta duran dosya: dizinde yalnız adıyla (parça yok)", db.get("bulut/sunum.docx") == (0, "sunum.docx"), str(db))
+    kontrol("bulutta duran dosya: ölçümde sayıldı", rb["sayilar"].get("bulut", {}).get("bulutta") == 2 if isinstance(rb["sayilar"].get("bulut"), dict) else True, str(rb["sayilar"].get("bulut")))
+    m.guncelle(c)  # indirilince (bayrak kalkınca) normal okunur
+    say2 = [0]; m.parcala = lambda y, *a, **k: (say2.__setitem__(0, say2[0] + 1) if "bulut/" in y else None) or asil_p(y, *a, **k)
+    try: m.guncelle(c)
+    finally: m.parcala = asil_p
+    kontrol("indirilen dosya bir kez okunur, sonraki dizin turunda yeniden okunmaz", say2[0] == 0, f"{say2[0]} okuma")
+    m.tara(c)
+    kontrol("indirilince sonraki turda içerikten okunur", c.execute("SELECT parca > 0 FROM dosya WHERE yol='bulut/sunum.docx'").fetchone() == (1,)
+            and c.execute("SELECT hata IS NULL, sha256 NOT LIKE 'bulut:%' FROM tarama WHERE yol='bulut/sunum.docx'").fetchone() == (1, 1))
     print(m.tara_ozet(r))
 finally:
     try: os.chmod(os.path.join(P, "notlar"), 0o755)

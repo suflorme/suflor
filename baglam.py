@@ -378,7 +378,11 @@ def dizinle(c, yol, kisa, st, hata=None):  # bir dosyayı (yeniden) dizinle → 
     sil(c, kisa)
     t = c.execute("SELECT gizli, kopya_of, sha256 FROM tarama WHERE yol=? AND mtime=? AND boy=?", (kisa, st.st_mtime, st.st_size)).fetchone()
     if t and (t[0] or t[1]): c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); return None  # §2/§4: hariç tutulan ve kopya dizine girmez
-    try: baslik, bas, ps = parcala(yol, kisa, t[2] if t else None)
+    if bulutta(st):  # yalnız adıyla (okumak indirtir); tarih dosya tarihinden
+        c.execute("INSERT OR REPLACE INTO dosya(yol, mtime, boy, tur, tarih, baslik, parca, kapsam, gizli_parca) VALUES(?,?,?,?,?,?,?,?,?)",
+                  (kisa, st.st_mtime, st.st_size, tur_bul(kisa), tarih_bul(kisa, "", st.st_mtime), os.path.basename(kisa), 0, BELLEK_TUR.get(kisa, (None, "ortak"))[1], 0))
+        tara_dosyaya(c, kisa); return 0
+    try: baslik, bas, ps = parcala(yol, kisa, t[2] if t and not str(t[2]).startswith("bulut:") else None)
     except Bekliyor: c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); return None
     except Exception as e:
         if hata is not None: hata.append(f"{kisa}: {e.__class__.__name__}")
@@ -401,6 +405,8 @@ def guncelle(c, yeniden=False, sessiz=True):
     t0 = time.time(); eski = {r[0]: (r[1], r[2], r[3], r[4] or "ortak") for r in c.execute("SELECT yol, mtime, boy, tur, kapsam FROM dosya")}
     if yeniden: eski = {}; c.executescript("DELETE FROM dosya; DELETE FROM parca; INSERT INTO ara(ara) VALUES('delete-all');")
     gorulen, n_yeni, n_parca, hata, eris = set(), 0, 0, [], []
+    try: bulut_eski = {r[0] for r in c.execute("SELECT yol FROM tarama WHERE hata='bulutta'")}  # indirilince ad, boyut, tarih aynı kalır: yine de yeniden oku
+    except sqlite3.OperationalError: bulut_eski = set()
     try:
         if not os.listdir(PROJE): eris.append(".")  # TCC bazen hata yerine boş liste verir; proje kökü gerçekte boş olmaz
     except OSError: eris.append(".")
@@ -408,7 +414,8 @@ def guncelle(c, yeniden=False, sessiz=True):
         gorulen.add(kisa)
         try: st = os.stat(yol)
         except OSError: continue
-        if eski.get(kisa) == (st.st_mtime, st.st_size, tur_bul(kisa), BELLEK_TUR.get(kisa, (None, "ortak"))[1]): continue  # tür/kapsam ayarı değişince de yeniden
+        if eski.get(kisa) == (st.st_mtime, st.st_size, tur_bul(kisa), BELLEK_TUR.get(kisa, (None, "ortak"))[1]) and not (kisa in bulut_eski and not bulutta(st)): continue  # tür/kapsam ayarı değişince de yeniden
+        if kisa in bulut_eski and not bulutta(st): c.execute("UPDATE tarama SET hata=NULL, sha256=NULL WHERE yol=?", (kisa,))  # indirildi: tarama içerikten yeniden özetlesin
         n = dizinle(c, yol, kisa, st, hata)
         if n is not None: n_parca += n; n_yeni += 1
     # okunamayan klasörün dosyaları "silinmiş" sayılmaz (17 Ekim: aktarıcının 10 dk'lık turu dizini 101 bin parçadan 301'e indirdi)
@@ -568,6 +575,10 @@ def tara_dosyaya(c, kisa=None):
     c.execute(f"""UPDATE dosya SET ({TARA_DOSYA_ALAN}) = (SELECT {TARA_DOSYA_ALAN} FROM tarama t WHERE t.yol = dosya.yol AND t.mtime = dosya.mtime AND t.boy = dosya.boy){w}""",
               () if kisa is None else (kisa,))
 SF_DATALESS = 0x40000000  # macOS: içeriği yalnız bulutta duran dosya (iCloud Drive, Google Drive / OneDrive / Dropbox dosya sağlayıcısı)
+# Bulutta duran dosya okunmaz (kullanıcı, 23 Ekim: "indirmeden"): tarama, çevirme ve dizinleme bir kez okusa sağlayıcı dosyanın tamamını indirir —
+# bulut klasöründe ilk hazırlık gigabaytlarca indirme demekti. Tarama özeti içerikten değil ad + boyut + tarihten ("bulut:…"; birebir kopya ve sürüm
+# hesabına girmez), hata "bulutta" (çevirme atlar); dizinde yalnız adıyla durur (parça yok). Kullanıcı dosyayı indirince sonraki turda normal okunur.
+def bulutta(st): return bool(getattr(st, "st_flags", 0) & SF_DATALESS)
 BULUT_KISAYOL = {".gdoc", ".gsheet", ".gslides", ".gdraw", ".gform", ".gmap"}  # Google Drive belge kısayolu: içeriği yok, yalnız bağlantı
 def tara(c=None, sessiz=True):
     c = c or baglan(); t0 = time.time()
@@ -599,7 +610,10 @@ def tara(c=None, sessiz=True):
     satir = {}
     for k, y, st in kayit:
         ext = os.path.splitext(k)[1].lower(); tur = tara_tur(ext); e = eski.get(k)
-        if e and e[0] == st.st_mtime and e[1] == st.st_size and e[2]: sha, mh, hata = e[2], e[3], e[4]
+        if bulutta(st):
+            import hashlib
+            sha = "bulut:" + hashlib.sha256(f"{k}\0{st.st_size}\0{st.st_mtime}".encode()).hexdigest()[:40]; mh, hata = None, "bulutta"
+        elif e and e[0] == st.st_mtime and e[1] == st.st_size and e[2] and not str(e[2]).startswith("bulut:"): sha, mh, hata = e[2], e[3], e[4]
         else:
             try: sha = _sha256(y)
             except OSError: eris.append(k); continue
@@ -613,7 +627,7 @@ def tara(c=None, sessiz=True):
     # birebir kopya: adında kopya işareti olmayan, yolu kısa, en eski olan asıl
     sha_grup = collections.defaultdict(list)
     for s in satir.values():
-        if not s["gizli"] and s["boy"]: sha_grup[s["sha256"]].append(s)  # hariç tutulan dosya kopya/sürüm hesabına girmez
+        if not s["gizli"] and s["boy"] and s["hata"] != "bulutta": sha_grup[s["sha256"]].append(s)  # hariç tutulan ve bulutta duran dosya kopya/sürüm hesabına girmez
     kopyalar = []
     for g in sha_grup.values():
         if len(g) < 2: continue
@@ -623,7 +637,7 @@ def tara(c=None, sessiz=True):
     # sürüm grubu: aynı klasör + aynı uzantı + aynı ad kökü; içerik benzerliğiyle doğrulanır
     aday = collections.defaultdict(list)
     for s in satir.values():
-        if s["kopya_of"] or s["gizli"]: continue
+        if s["kopya_of"] or s["gizli"] or s["hata"] == "bulutta": continue
         kk, tarih, isaret = ad_koku(os.path.basename(s["yol"]))
         if len(kk) < 2: continue  # yalnız tarih/sürümden oluşan ad: kök yok, gruplanmaz
         s["_tarih"] = tarih; aday[(os.path.dirname(s["yol"]), os.path.splitext(s["yol"])[1].lower(), kk)].append(s)
