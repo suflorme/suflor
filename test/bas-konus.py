@@ -50,7 +50,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_gecmis": True}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
@@ -197,6 +197,7 @@ try:
     ok("v0.42.0: takılan soruda (test ayarı) 1,5 sn sonra bekleme cümlesi söylendi, yalnız bir kez (yeniden gönderimde tekrar yok)", log().count("KONUŞ: bekleme cümlesi") == 1)
     k13 = sor("Donma denemesi var mı?")
     ok("ikinci denemede de cevap yoksa panoda hata", k13["durum"] == "hata" and "cevap vermedi" in (k13.get("hata") or "") and "ikinci denemede de 6 sn cevap yok" in log())
+    ok(f"v0.113.1: cevap gecikince (test ayarı 2 sn) ara bilgi — iki takılan soruda birer kez ({log().count('KONUŞ: ara bilgi')})", log().count("KONUŞ: ara bilgi (2 sn cevap yok)") == 2)
     urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ping", data=json.dumps({"call": True, "panel": True}).encode(), headers={"X-Suflor-Anahtar": K}))
     ok("toplantı sürerken panoda defter satırı yok", st().get("defter") is None)
     # S48 (v0.35.0): toplantı sırasında aynı konuşan süreç — kulaklık yok (SUFLOR_TEST_KULAKLIK=0): cevap okunmaz, yalnız panoda

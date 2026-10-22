@@ -90,7 +90,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
         oge.button?.target = self; oge.button?.action = #selector(tiklandi(_:)); oge.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         panelKur(); yoklamaDongusu(); sicakTusKur()
-        istek("/status") { v in let d = ((v?["ayarlar"] as? [String: Any])?["deger"] as? [String: Any])?["dil"] as? String; DispatchQueue.main.async { dilAyarla(d) } }
+        istek("/status") { v in let dg = (v?["ayarlar"] as? [String: Any])?["deger"] as? [String: Any]; DispatchQueue.main.async { dilAyarla(dg?["dil"] as? String); if !args.contains("--koyu") { temaAyarla(dg?["tema"] as? String) } } }
         if args.contains("--ortak-mik") { let o = OrtakMik(); ortakMik = o; o.dongu() }  // toplantıya sesli söyle (v0.38.0)
         // bildirimler bu uygulamadan (v0.31.3): tıklayınca özet açılır — osascript bildirimi Betik Düzenleyici'yi açıyordu
         let nc = UNUserNotificationCenter.current(); nc.delegate = self
@@ -880,6 +880,11 @@ func dilAyarla(_ dil: String?) {  // sayfa ya da /status bildirdi; değiştiyse 
     guard let d = dil, ["tr", "en"].contains(d), (d == "en") != ARAYUZ_EN else { return }
     ARAYUZ_EN = d == "en"; NotificationCenter.default.post(name: .init("SuflorDil"), object: nil)
 }
+// v0.114.0: tema ayarı (sistem | acik | koyu) — /status'tan açılışta, sayfadan değişince; tüm pencereler, menü paneli ve WKWebView'lerin prefers-color-scheme'i
+func temaAyarla(_ t: String?) {
+    guard let t = t, ["sistem", "acik", "koyu"].contains(t) else { return }
+    NSApp.appearance = t == "koyu" ? NSAppearance(named: .darkAqua) : t == "acik" ? NSAppearance(named: .aqua) : nil
+}
 func yerelKoken(_ o: WKSecurityOrigin) -> Bool { o.host == "127.0.0.1" && o.port == PORT }
 let ISARET_SVG = ##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg>"##
 let suflorSimge: NSImage? = {  // Dock ve Hakkında için: Mac simgeleri gibi kenarda boşluk (marka/suflor-isaret.svg ile aynı çizim)
@@ -953,6 +958,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         if let alt = d["alt"] as? String { pencere.subtitle = alt }
         if let k = d["ayarlar"] as? String { ayarPenceresi(k) }
         if let dl = d["dil"] as? String { dilAyarla(dl) }
+        if let tm = d["tema"] as? String { temaAyarla(tm) }
         if d["yardim"] != nil { yardim() }
         if d["toplanti"] != nil { durumIsle(d) }
     }
@@ -1189,6 +1195,7 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
         guard let d = m.body as? [String: Any] else { return }
         if d["kapat"] != nil { pencere.performClose(nil) }
         if let g = d["grup"] as? Int { grupSec(g, sayfaya: false) }
+        if let tm = d["tema"] as? String { temaAyarla(tm) }  // Ayarlar penceresinde tema değişti
         if let dl = d["dil"] as? String { dilAyarla(dl) }  // sayfa bir ayara doğrudan açıldı (ör. Gemini satırı): sekme ona göre
     }
     func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {

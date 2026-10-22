@@ -74,7 +74,10 @@ def _kisilik_hitap_rx(rol=None):  # rol "toplanti": yalnız toplantı kişiliği
     ks = [k for k in kisilikler() if not rol or k["rol"] == rol]; adlar = tuple(a for k in ks for a in k["hitap"])
     if _KHR["k"].get(rol) != adlar:
         _KHR["k"][rol] = adlar
-        _KHR["rx"][rol] = re.compile(r"((?:^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?)(" + "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True)) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*(?:\?|" + KISILIK_ISTEK + r")))", re.I) if adlar else None
+        _KHR["rx"][rol] = re.compile(r"((?:^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?)(" + "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True)) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*(?:\?|" + KISILIK_ISTEK + r"))"
+                                     # v0.113.1 (22 Ekim test toplantısı: "Tamam... Orney... eee... Bugün projede... açık kalan iş kaldı mı?" ~1 dk cevapsız): addan sonra
+                                     # duraksama (üç nokta) ve satırın kalanında soru ya da istek varsa da seslenme
+                                     r"|(?:\.{2,}(?!\.)|…)(?!\s*" + KISILIK_SOZ_ETME + r")\s*(?=[^\n]*(?:\?|" + KISILIK_ISTEK + r")))", re.I) if adlar else None
     return _KHR["rx"][rol]
 def _kisilik_hitap_ad(soz):  # tanınan hitap sözü → kişiliğin adı
     for k in kisilikler():

@@ -65,7 +65,12 @@ for girdi, bek, ac in [
     ("Tamam. Merhaba Atlaz, kaç kart açık?", "Tamam. Merhaba Claude: kaç kart açık?", "v0.101.1: noktadan sonra selam + ad"),
     ("Tamam, Atlas dün iyi cevap verdi.", "Tamam, Atlas dün iyi cevap verdi.", "v0.101.1: giriş sözünden sonra da addan söz seslenme değil"),
     ("Merhaba Atlas'a selam söyle.", "Merhaba Atlas'a selam söyle.", "v0.101.1: selam + ekli ad seslenme değil"),
-    ("Bak Atlas ne güzel olmuş.", "Bak Atlas ne güzel olmuş.", "v0.101.1: listede olmayan söz (bak) giriş sayılmaz")]:
+    ("Bak Atlas ne güzel olmuş.", "Bak Atlas ne güzel olmuş.", "v0.101.1: listede olmayan söz (bak) giriş sayılmaz"),
+    # v0.113.1 (22 Ekim test toplantısı: "Tamam... Orney... eee... Bugün projede... açık kalan iş kaldı mı?" ~1 dk cevapsız): addan sonra üç noktalı duraksama
+    ("Tamam... Atlaz... eee... Bugün projede... açık kalan iş kaldı mı? Bir kontrol eder misin?", "Tamam... Claude: eee... Bugün projede... açık kalan iş kaldı mı? Bir kontrol eder misin?", "v0.113.1: ad + üç nokta + soru"),
+    ("Atlas… şunu özetle.", "Claude: şunu özetle.", "v0.113.1: ad + üç nokta + istek"),
+    ("Atlas... ile ilgili bir şey sorayım mı?", "Atlas... ile ilgili bir şey sorayım mı?", "v0.113.1: üç noktadan sonra da addan söz seslenme değil"),
+    ("Atlas... evet güzeldi.", "Atlas... evet güzeldi.", "v0.113.1: üç nokta, soru/istek yok — seslenme değil")]:
     cik, _ = ns["hitap_duzelt"](girdi); ok = cik == bek; hata += not ok
     print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
 # v0.61.0: iki kişilik — ikinci adın içinde birincinin yazımı geçse de (Matlas ⊃ atlas) doğru kişilik tanınır

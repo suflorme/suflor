@@ -512,6 +512,11 @@ def konus_ad_notu(duz):
 # ortanca 10,5 sn. "Hemen bakıyorum", "Kontrol ediyorum", "kısa bir araştırma yapıyorum" havuzdan çıktı. Son BEKLE_ARA cümle tekrar seçilmez.
 # Araç ya da gecikme cümlesi çaldıysa ikincisi söylenmez (tur["bakiyor"]).
 KONUS_BEKLE_SN = float(AYAR.get("konus_bekle_sn", 4.0)); KONUS_BEKLE_ALINDI_EK_SN = 1.0  # bırakınca "Hı hı" çaldıysa 1 sn daha
+# v0.113.1 (kullanıcı, 22 Ekim test toplantısı: "10 saniye geçti, bekletiyorsun; 'incelemeye devam ediyorum' gibi bir dönüt vermen gerekiyor"): Claude KONUS_ARA_SN içinde
+# cevaplamazsa bir kez ara bilgi — toplantıda herkese sorulan soruda (otonom) toplantıya, kendi Konuş'unda kulaklığa/hoparlöre. Ayar konus_ara_sn (0 kapatır).
+KONUS_ARA_SN = float(AYAR.get("konus_ara_sn", 10.0))
+BEKLE_UZUN = {"tr": ["Hâlâ bakıyorum, birazdan dönüyorum.", "İncelemeye devam ediyorum, az kaldı.", "Biraz uzun sürüyor, birazdan dönüyorum."],
+              "en": ["Still looking, I'll be right back.", "Still checking, almost there.", "This is taking a moment, back shortly."]}
 BEKLE_GENEL = {"tr": ["Bir saniye.", "Bakayım.", "Hm, bakayım.", "Bir bakayım."],
                "en": ["One second.", "Let me see.", "Hm, let me see.", "Let me check."]}
 BEKLE_TUR = {"takvim": ["Takvimine bakıyorum.", "Takvime bakayım."], "sayi": ["Sayıları çekiyorum.", "Rakamlara bakayım."],
@@ -1348,6 +1353,7 @@ def _asistan_sor(soru, ek, gosterim=None, metin=None):  # ek: kaynak (hitap|kars
         _konus_sor(metin or soru, tur_kur())
     threading.Thread(target=bekle, daemon=True).start()
     print(f"KONUŞ: önceki cevap sürüyor — soru sırada ({ek.get('ad') or '?'}): \"{soru[:60]}\""); return True
+_HITAP_SON = {"soru": None, "t": 0.0}; HITAP_YINE_SN = 20.0
 def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses kilidi geçti, asistan adıyla hitap ("Claude:" biçimine çevrildi) → True: asistana gitti
     if not toplanti_var() or not AYAR.get("konusma", True): return False
     m = list(re.finditer(r"Claude:\s*", text))
@@ -1363,6 +1369,10 @@ def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses ki
     asistan_katil(ad)
     if HITAP_IS_RX.search(soru): threading.Thread(target=asistan_onay, args=(ad,), daemon=True).start(); return False  # iş toplantı oturumunda (satır işaretsiz)
     if kisilikler(): kisilik_sec(ad)
+    # v0.113.1 (22 Ekim test toplantısı: Whisper "burada mısın?" sorusunu art arda iki satırda yazdı, asistan iki kez cevap verdi): aynı soru HITAP_YINE_SN içinde yinelenirse sayılmaz
+    a_ = " ".join(re.findall(r"\w+", soru.lower()))
+    if a_ == _HITAP_SON["soru"] and time.time() - _HITAP_SON["t"] < HITAP_YINE_SN: print(f"KONUŞ: aynı hitap sorusu {HITAP_YINE_SN:.0f} sn içinde yinelendi — sayılmadı"); return True
+    _HITAP_SON.update(soru=a_, t=time.time())
     return _asistan_sor(soru, {"kaynak": "hitap", "ad": ad})
 # Karşı tarafın sorusu (v0.44.0; S94'ten tek kural): karşı kanaldaki Whisper satırı cümle başında toplantıya KATILMIŞ bir asistanın adıyla seslenirse
 # (kişiliksiz kurulumda "Suflor" ve Whisper yazımları: Süflör, Sufle, Suflo…) soru, soranın adıyla o asistana gider ve cevap herkese okunur. Kullanıcı o asistanı
@@ -1460,6 +1470,17 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()
+        if KONUS_ARA_SN > 0 and not tur.get("yeniden"): threading.Thread(target=ara_bilgi, daemon=True).start()
+    def ara_bilgi():  # v0.113.1: cevap KONUS_ARA_SN'yi geçince bir kez
+        time.sleep(KONUS_ARA_SN)
+        if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("ara_bilgi"): return  # cevap bitti ya da okunmaya başladı
+        tur["ara_bilgi"] = True
+        import random
+        c = random.choice(BEKLE_UZUN[konus_soru_dili(tur.get("soru"))])
+        if tur.get("otonom") and "toplantiya_soyle" in globals():  # soru herkesin önünde soruldu: herkes bekliyor
+            r = toplantiya_soyle(c); print(f"KONUŞ: ara bilgi ({KONUS_ARA_SN:.0f} sn cevap yok) toplantıya — {c}" + ("" if r.get("ok") else f" (okunamadı: {r.get('err')})"))
+        elif tur.get("sesli", True):  # toplantıda kulaklık yoksa okunmaz (hoparlörden toplantıya gitmesin)
+            seslendir(c, kuyruk=True); print(f"KONUŞ: ara bilgi ({KONUS_ARA_SN:.0f} sn cevap yok) — {c}")
     def bekle_dolgu(tur_ad):  # v0.94.0: yalnız cevap gecikince; metin geldiyse (okunmayı bekliyor) ara cümle yok
         bek = KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0); time.sleep(bek)
         if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("t_ilk") or tur.get("bakiyor") or not tur.get("sesli", True): return

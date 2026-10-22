@@ -71,6 +71,18 @@ def tekrar_kirp(metin):
                 return (son + (metin[j] if j < len(metin) and metin[j] in ".!?" else "")).strip()
             i += 1
     return None
+# v0.113.1 (22 Ekim test toplantısı): iki uydurma biçimi süzgeçten geçti — (1) harf döngüsü tek sözcükte ("bildiririririr…" yüzlerce harf; sözcük düzeyindeki
+# tekrar_dongu görmez), (2) cümlenin art arda aynen tekrarı ("Marvin burada mısın? Marvin burada mısın? Marvin burada mısın?": asistan iki kez cevap verdi).
+# Harf döngüsü: 1–4 harflik birim art arda ≥ 7 kez → bir kez (rakam sayılmaz: "10000000" kalır). Cümle: ≥ 3 sözcüklük cümle art arda aynen gelirse bir kez.
+HARF_DONGU_RX = re.compile(r"((?:[^\W\d_]){1,4}?)\1{6,}")
+def tekrar_sadelestir(metin):
+    m = HARF_DONGU_RX.sub(r"\1", metin or "")
+    parca = re.split(r"(?<=[.!?…])\s+", m.strip()); out = []
+    anah = lambda c: " ".join(re.findall(r"\w+", c.lower()))
+    for c in parca:
+        if out and len(anah(c).split()) >= 3 and anah(c) == anah(out[-1]): continue
+        out.append(c)
+    return " ".join(out) if m.strip() else m
 def cozme_ayari(sn):
     # canlı parça: yeniden deneme 2 sıcaklıkla, belirteç sesin süresiyle sınırlı (sn başına 20, en az 48). Varsayılan 6 sıcaklık × 224 belirteç
     # kısa parçada tekrar döngüsünü 6 kez baştan çözüyordu: 11 Ekim toplantılarında uydurma işleri ortalama 11,6 sn, işçi süresinin %59'u.
@@ -306,6 +318,7 @@ def main():
                 if mw and all(len(w) >= 3 and any(ortak(w, t) for t in tw) for w in mw): atilan.append(metin); metin = ""; atla += 1
             if metin and tekrar_dongu(metin):  # tekrar döngüsü uydurması (öndeki gerçek söz kalır)
                 kirp = tekrar_kirp(metin); atilan.append(metin); atla += 1; metin = kirp or ""
+            if metin and (s_ := tekrar_sadelestir(metin)) != metin: atilan.append(metin); metin = s_  # v0.113.1: harf döngüsü, art arda aynı cümle
             try: ses = ses_olc(a, np) if metin else None
             except Exception: ses = None
             km = {}
