@@ -941,13 +941,13 @@ document.getElementById('gun').onclick=async ev=>{const b=ev.currentTarget
   if(!r.ok){b.disabled=false;b.textContent=L("Güncelleme başarısız — yeniden dene");geciciDurum(L("Güncellenemedi"),r.err||"")}}
 // v0.111.0: arka plandaki toplantı oturumu — /status'ta özet (n: ileti sayısı), yeni iletiler /toplanti-oturum?n= ile; kutudaki yazı oturum soru sorunca ona gider
 let tosM=[],tosN=0,tosT0=null,tosAyr=false,tosYuk=false
-const TOS_D={aciliyor:"açılıyor…",calisiyor:"çalışıyor",bekliyor:"cevabını bekliyor",kapali:"kapandı",hata:"durdu",terminalde:"Terminal'de"}
+const TOS_D={aciliyor:"açılıyor…",calisiyor:"çalışıyor",izliyor:"toplantıyı izliyor",bekliyor:"cevabını bekliyor",kapali:"kapandı",hata:"durdu",terminalde:"Terminal'de"}
 function tosMd(t){return esc(t).replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/`([^`\n]+)`/g,'<code>$1</code>')}
 async function renderOturum(s){const o=s.toplanti_oturum,sec=document.getElementById('tos'),ta=document.getElementById('n');sec.hidden=!o
   if(!o){if(ta)ta.placeholder=L("Not ya da soru");return}
   if(o.t0!==tosT0){tosT0=o.t0;tosM=[];tosN=0}
   if(o.n>tosN&&!tosYuk){tosYuk=true;try{const v=await j('/toplanti-oturum?n='+tosN);(v.mesaj||[]).forEach(m=>{if(m.i>tosN){tosM.push(m);tosN=m.i}});tosM=tosM.slice(-400)}catch(e){}tosYuk=false}
-  const bek=o.durum==="bekliyor",canli=["aciliyor","calisiyor","bekliyor"].includes(o.durum);sec.classList.toggle('bek',bek)
+  const bek=o.durum==="bekliyor",canli=["aciliyor","calisiyor","bekliyor","izliyor"].includes(o.durum);sec.classList.toggle('bek',bek)
   document.getElementById('tosd').textContent=L(TOS_D[o.durum]||o.durum)+(o.konu?" · "+o.konu:"")
   document.getElementById('tosx').hidden=o.durum!=="calisiyor";document.getElementById('tost').hidden=!(o.terminal&&o.durum!=="terminalde");document.getElementById('tosa').textContent=L(tosAyr?"Kısa":"Ayrıntı")
   const box=document.getElementById('tom'),alt=box.scrollHeight-box.scrollTop-box.clientHeight<30,gor=tosM.filter(m=>tosAyr||m.kim!=="arac")
@@ -1013,7 +1013,7 @@ cubukAdlari(document)
 // onu bu sayfa çizer); görünür olunca hemen. Önceden koşulsuz 2 sn (sohbette Chrome işlemcisi). Kartlar ayrıca uzun yoklamayla anında gelir.
 let sonEtkin=Date.now()  // etkinlik bittikten sonra 15 sn daha hızlı (kapanış, Geri al gibi kısa süreli durumlar kaçmasın)
 function yenileAralik(){const s=last||{},k=s.konus||{},mOn=mini&&!mini.closed
-  if(s.aktif||masaustuTop(s)||["aciliyor","calisiyor","bekliyor"].includes((s.toplanti_oturum||{}).durum)||(k.durum&&!["kapali","hazir","hata"].includes(k.durum))||(k.sohbet||{}).acik)sonEtkin=Date.now()
+  if(s.aktif||masaustuTop(s)||["aciliyor","calisiyor","bekliyor","izliyor"].includes((s.toplanti_oturum||{}).durum)||(k.durum&&!["kapali","hazir","hata"].includes(k.durum))||(k.sohbet||{}).acik)sonEtkin=Date.now()
   if(document.hidden&&!mOn)return 15000
   return Date.now()-sonEtkin<15000?2000:5000}
 let yT=0;async function yDongu(){clearTimeout(yT);try{await refresh()}catch(e){}clearTimeout(yT);yT=setTimeout(yDongu,yenileAralik())}

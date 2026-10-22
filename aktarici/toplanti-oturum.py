@@ -10,6 +10,7 @@
 TOPO = {"app": None, "w": None, "durum": "kapali", "sid": None, "mesaj": [], "n": 0, "konu": None, "t0": 0.0, "t_durum": 0.0, "maliyet": 0.0, "nesil": 0,
         "kapali_nesil": None, "yeniden": 0, "izin": 0, "hata": None, "acilis": None, "kilit": threading.RLock()}
 TOPO_YENIDEN, TOPO_MESAJ_EN_COK, TOPO_METIN_EN_COK, TOPO_SURE_SN = 2, 400, 6000, 8 * 3600
+TOPO_TERMINAL_ILETI = "(Suflor) Oturum arka plandan Terminal'e alındı; arka plandaki Monitor durdu. Toplantı sürüyorsa izle'yi yeniden başlat, sürmüyorsa kaldığın yerden devam et."
 TOPO_BOSTA_SN = 2 * 3600  # tur bitmiş ve izle yokken bu kadar boşta kalırsa süreç kapanır (~250 MB); "Terminal'de göster" yine aynı oturumu açar
 TOPO_ISTEM = ("Bu toplantı oturumu Suflor.me panosundan arka planda açıldı; Terminal penceresi yok. Kullanıcıya yazdığın her metin panoda 'Claude' bölümünde "
               "görünür; kullanıcı panodaki kutudan yazar. Kullanıcıya soru sorman gerekiyorsa soruyu kısa ve açık yaz, sonra turu bitir (cevap yeni ileti "
@@ -102,16 +103,26 @@ def toplanti_oturum_terminal():
     cl = ac.get("cl") or claude_yolu()
     sh = (f"#!/bin/bash\n# Suflor.me — arka plandaki toplantı oturumu Terminal'de (her seferinde yeniden yazılır)\ncd {shlex.quote(os.path.expanduser(AYAR['proje']))} || exit 1\n"
           f"exec {shlex.quote(cl)} --resume {shlex.quote(sid)}" + (f" --model {shlex.quote(str(ac['model']))}" if ac.get("model") else "")
-          + (f" --settings {shlex.quote(ac['ky'])}" if ac.get("ky") else "") + "\n")
+          + (f" --settings {shlex.quote(ac['ky'])}" if ac.get("ky") else "") + " " + shlex.quote(TOPO_TERMINAL_ILETI) + "\n")
     cp = os.path.join(AYAR["uygulama"], "toplanti-terminal.command")
     with open(cp, "w", encoding="utf-8") as f: f.write(sh)
     os.chmod(cp, 0o755)
     if not os.environ.get("SUFLOR_TEST_BASLAT"): subprocess.Popen(["open", "-a", "Terminal", cp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     _topo_durum("terminalde"); _topo_mesaj("sistem", _t("Oturum Terminal'e alındı; oradan sürer.", "The session moved to Terminal and continues there."))
     print(f"TOPLANTI OTURUMU: Terminal'e alındı ({sid[:8]})"); return {"ok": True}
+# /toplanti izle'yi Monitor'la kurar (30 dk'da bir yeniden); proje izinlerinde Monitor yok — Terminal'de her seferinde elle onaylanıyordu. Yalnız Suflor'un
+# kendi toplanti-claude.py'si (aktarıcının yanındaki, ayar kod ya da uygulama klasöründeki) ve yalnız `izle` alt komutu kartsız geçer; başka komut kart açar.
+TOPO_IZLE_RX = re.compile(r"^(?:PYTHONDONTWRITEBYTECODE=1\s+)?(?:/usr/bin/)?python3\s+(?:-[uBI]+\s+)*(\S+/toplanti-claude\.py)(?:\s+--dir\s+\S+)?(?:\s+--relay\s+http://127\.0\.0\.1:\d+)?\s+izle\s*$")
+def _topo_izle_mi(ad, gi):
+    m = TOPO_IZLE_RX.match(str(gi.get("command") or "").strip()) if ad == "Monitor" else None
+    if not m: return False
+    yer = {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
+    return os.path.realpath(os.path.expanduser(m.group(1))) in yer
 def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay → control_response
     r = o.get("request") or {}; ad = str(r.get("tool_name") or "?"); gi = r.get("input") if isinstance(r.get("input"), dict) else {}
-    if ad == "AskUserQuestion":  # soru düz metin olarak panoya gelsin
+    if _topo_izle_mi(ad, gi):
+        cevap = {"behavior": "allow", "updatedInput": gi}; print("TOPLANTI OTURUMU: izin Monitor (izle) → kendiliğinden")
+    elif ad == "AskUserQuestion":  # soru düz metin olarak panoya gelsin
         cevap = {"behavior": "deny", "message": _t("Bu oturumda AskUserQuestion yok: soruyu düz metin olarak yaz ve turu bitir; kullanıcı panodan cevaplar.",
                                                    "AskUserQuestion isn't available in this session: write the question as plain text and end the turn; the user answers from the panel.")}
     else:
@@ -135,7 +146,9 @@ def _topo_oku(cik, nesil):
             try: j = json.loads(l)
             except ValueError: continue
             t = j.get("type")
-            if t == "system" and j.get("subtype") == "init" and j.get("session_id"): TOPO["sid"] = str(j["session_id"])
+            if t == "system" and j.get("subtype") == "init":  # her turun başında gelir (Monitor olayı da yeni tur açar)
+                if j.get("session_id"): TOPO["sid"] = str(j["session_id"])
+                if TOPO["durum"] == "bekliyor": _topo_durum("calisiyor")
             elif t == "assistant":
                 if TOPO["durum"] == "bekliyor": _topo_durum("calisiyor")  # kullanıcı yazmadan yeni tur (arka plan işi bitti bildirimi vb.)
                 for b in ((j.get("message") or {}).get("content") or []):
@@ -166,10 +179,13 @@ def _topo_bekci(nesil):
         if TOPO["nesil"] == nesil and TOPO["durum"] == "bekliyor" and not izliyor and time.time() - TOPO["t_durum"] > TOPO_BOSTA_SN:
             _topo_mesaj("sistem", _t("Uzun süredir boşta olduğu için kapandı. Sürdürmek için Terminal'de göster.", "Closed after a long idle period. Use Show in Terminal to continue."))
             toplanti_oturum_kapat("boşta"); return
+def topo_izliyor(): return bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
 def toplanti_oturum_view():
     if TOPO["durum"] == "kapali" and not TOPO["n"]: return None
     son = next((m for m in reversed(TOPO["mesaj"]) if m["kim"] == "claude"), None)
-    return {"durum": TOPO["durum"], "n": TOPO["n"], "t0": TOPO["t0"], "izin": TOPO["izin"], "konu": TOPO["konu"], "hata": TOPO["hata"] if TOPO["durum"] == "hata" else None,
+    d = TOPO["durum"]
+    if d == "bekliyor" and topo_canli() and topo_izliyor(): d = "izliyor"  # tur bitti ama Monitor'daki izle sürüyor: kullanıcıyı beklemiyor, toplantıyı izliyor
+    return {"durum": d, "n": TOPO["n"], "t0": TOPO["t0"], "izin": TOPO["izin"], "konu": TOPO["konu"], "hata": TOPO["hata"] if TOPO["durum"] == "hata" else None,
             "terminal": bool(TOPO["sid"] and TOPO["acilis"]), "son": (son or {}).get("metin", "")[:300], "son_i": (son or {}).get("i")}
 def toplanti_oturum_mesajlar(n=0):
     with LOCK: m = [x for x in TOPO["mesaj"] if x["i"] > n]

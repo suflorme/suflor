@@ -2075,7 +2075,8 @@ class H(BaseHTTPRequestHandler):
             if tur == "soru" or p.get("soru"): q = ask({"text": metin}); return self._json({"ok": bool(q), "tur": "soru", "question": q})
             claude = bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
             # v0.111.0: arka plandaki toplantı oturumu kullanıcıyı bekliyor (soru sordu) ya da çalışıyor ama izle'de değil (hazırlık) — yazı doğrudan ona gider
-            if topo_canli() and (TOPO["durum"] == "bekliyor" or (TOPO["durum"] == "calisiyor" and not claude)):
+            # (izle çalışıyorsa — Monitor'da — eski yol: not + GİRDİ olayı; oturum turu bitirmiş görünse de izliyordur)
+            if topo_canli() and not claude and TOPO["durum"] in ("bekliyor", "calisiyor"):
                 if toplanti_oturum_yaz(metin, "kutu").get("ok"): return self._json({"ok": True, "tur": "oturum"})
             note({"text": metin, "at": p.get("at") or datetime.datetime.now().isoformat(timespec="seconds"), "meeting": p.get("meeting") or {}})
             yeni = baglam_ekle(baglam_ayir(metin)[0], "kutu")  # nottaki bağlantı/dosya yolu bağlam kaynağı da olur (izle: BAĞLAM)

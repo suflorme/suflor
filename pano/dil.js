@@ -598,6 +598,7 @@ globalThis.SUFLOR_EN = {
   "kapandı": "closed",
   "durdu": "stopped",
   "Terminal'de": "in Terminal",
+  "toplantıyı izliyor": "watching the meeting",
   "İzin istedi: ": "Asked permission: ",
   "Sen: ": "You: ",
   "Claude hazırlanıyor…": "Claude is getting ready…",

@@ -48,6 +48,8 @@ while True:
     q = o["message"]["content"]
     if q.startswith("/toplanti"): yaz("Gündem hazır. **Rolün** yürütücü mü?"); bitti()
     elif "izin" in q: c = izin("Bash", {"command": "python3 -c 'print(1)'", "description": "Deneme komutu"}, "r-" + str(time.time())); yaz("İzin: " + c["behavior"]); bitti()
+    elif "monitor-izle" in q: c = izin("Monitor", {"command": "PYTHONDONTWRITEBYTECODE=1 python3 -u " + D + "/../toplanti-claude.py izle", "description": "izle"}, "m-1"); yaz("Monitor izle: " + c["behavior"]); bitti()
+    elif "monitor-baska" in q: c = izin("Monitor", {"command": "python3 -u /tmp/toplanti-claude.py izle", "description": "x"}, "m-2"); yaz("Monitor başka: " + c["behavior"]); bitti()
     elif "soru-araci" in q: c = izin("AskUserQuestion", {"questions": []}, "s-1"); yaz("AskUserQuestion: " + c["behavior"] + " · " + c.get("message", "")[:40]); bitti()
     elif "uzun" in q:
         yaz("Uzun iş başladı")
@@ -125,6 +127,14 @@ try:
     while time.time() - t0 < 10 and not izin_kartlari(): time.sleep(0.2)
     k = izin_kartlari(); uc("/card-ack", {"id": k[0]["id"], "status": "reddedildi"}) if k else None
     ok("Reddet → deny", claude_der("İzin: deny"))
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "monitor-izle"})
+    ok("Suflor'un izle'si (Monitor) kartsız onaylanır", claude_der("Monitor izle: allow") and not izin_kartlari())
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "monitor-baska"})
+    t0 = time.time()
+    while time.time() - t0 < 10 and not izin_kartlari(): time.sleep(0.2)
+    k = izin_kartlari(); ok("başka yerdeki toplanti-claude.py ile Monitor kart açar", len(k) == 1)
+    if k: uc("/card-ack", {"id": k[0]["id"], "status": "reddedildi"})
+    claude_der("Monitor başka: deny")
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "soru-araci"})
     ok("AskUserQuestion kartsız reddedilir (soru düz metin olsun)", claude_der("AskUserQuestion: deny") and not izin_kartlari())
 
@@ -140,15 +150,18 @@ try:
     ok("yeniden açılışta --resume <oturum kimliği>", len(a) == 2 and a[1][a[1].index("--resume") + 1] == "0f1e2d3c-4b5a-4968-8776-655443322110")
 
     kod, y = uc("/toplanti-oturum", {"islem": "durdur"}); ok("oturum beklerken Durdur bir şey yapmaz", not y.get("ok"))
+    urllib.request.urlopen(urllib.request.Request(PANO + "/status", headers={"X-Suflor-Anahtar": K, "X-Suflor-Istemci": "izle"}), timeout=5).read()
+    v = to(); ok(f"izle (Monitor) çalışırken tur bitmiş oturum 'izliyor' ({v.get('durum')})", v.get("durum") == "izliyor")
+    kod, y = uc("/girdi", {"text": "toplantıda not"}); ok(f"izle çalışırken kutu eski yolda: not + GİRDİ ({y.get('tur')})", y.get("tur") == "iletildi")
     kod, _ = uc("/toplanti-oturum?n=0", anahtar=False); ok(f"iletiler anahtarsız okunmaz ({kod})", kod == 401)
     kod, _ = uc("/toplanti-oturum", {"islem": "durdur"}, anahtar=False); ok(f"işlem anahtarsız yapılmaz ({kod})", kod in (401, 403))
 
     kod, y = uc("/toplanti-oturum", {"islem": "terminal"})
     cm = open(os.path.join(T, "toplanti-terminal.command")).read() if os.path.exists(os.path.join(T, "toplanti-terminal.command")) else ""
     v = to()
-    ok("Terminal'de göster → aynı oturum --resume ile .command'a, arka plandaki kapandı",
-       y.get("ok") and "--resume 0f1e2d3c-4b5a-4968-8776-655443322110" in cm and v.get("durum") == "terminalde")
-    kod, y = uc("/girdi", {"text": "sonraki not"}); ok(f"Terminal'e alındıktan sonra kutu eski yolda ({y.get('tur')})", y.get("tur") == "not")
+    ok("Terminal'de göster → aynı oturum --resume ile .command'a (izle'yi yeniden başlat iletisiyle), arka plandaki kapandı",
+       y.get("ok") and "--resume 0f1e2d3c-4b5a-4968-8776-655443322110" in cm and "yeniden başlat" in cm and v.get("durum") == "terminalde")
+    kod, y = uc("/girdi", {"text": "sonraki not"}); ok(f"Terminal'e alındıktan sonra kutu eski yolda ({y.get('tur')})", y.get("tur") in ("not", "iletildi"))
 
     # Brifing.app toplantı kipi: izin listesi dışındaki argümanı ve değiştirilmiş kancayı reddeder (çıkış 3)
     def calistir(args, kanca=None):
