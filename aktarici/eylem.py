@@ -168,7 +168,7 @@ def add_card(p):
     with LOCK:
         tavan_uygula(c)
         c["file"] = aktif_dosya(); CARDS.append(c); _log("kartlar.jsonl", c)
-        _md(f"| {now.strftime('%H:%M:%S')} | **CLAUDE · {'NE DİYEYİM' if c.get('replik') else CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')}{(' — ' + c['durum'].replace('|', '¦')) if c.get('durum') else ''} |{' 🔇 bekliyor ' if c.get('sessiz') else ' ⏳ tavan ' if c.get('tavan_t') else ' '}|", c, "kartlar.jsonl")
+        _md(f"| {now.strftime('%H:%M:%S')} | **{asistan_buyuk()} · {'NE DİYEYİM' if c.get('replik') else CARD_KINDS[kind]}** | {c['text'].replace('|', '¦')}{(' — ' + c['durum'].replace('|', '¦')) if c.get('durum') else ''} |{' 🔇 bekliyor ' if c.get('sessiz') else ' ⏳ tavan ' if c.get('tavan_t') else ' '}|", c, "kartlar.jsonl")
         if c.get("sessiz_ozet"):
             for x in CARDS:
                 if x.get("sessiz") == c["sessiz_ozet"] and x.get("status") == "acik":
@@ -202,16 +202,17 @@ def ack_card(p, yetkili=False):
         _md(f"| {now.strftime('%H:%M:%S')} | **KART {ACK_MD[st]}** | {c['text'].replace('|', '¦')} | |")
     if c.get("eylem") and st in ("onaylandi", "reddedildi"): eylem_karar({"id": c["eylem"], "durum": st}, "kart")  # v0.75.0: talimat onay kartı
     return True
-# (kullanıcı, 3 Ekim) not ve "Claude'a sor" tek kutu. Metin "?", "soru", "Claude" ya da iki boşlukla başlıyorsa soru,
+# (kullanıcı, 3 Ekim) not ve soru tek kutu. Metin "?", "soru", asistanın adı ya da iki boşlukla başlıyorsa soru,
 # değilse not. "?" ve ayrı sözcük "soru" (ardından boşluk, ":" "," "." "-" ya da metin sonu) baştan atılır; "sorun …" not kalır.
-# "Claude" ile başlayan olduğu gibi soru olur ("Claude: dinleyiciyim" talimatı Claude'a tanınır gelsin). Ayrım ham metinle (istemci kırpmaz).
+# Asistanın adıyla başlayan olduğu gibi soru olur ("<ad>: dinleyiciyim" talimat olarak tanınır gelsin; S133: "Claude" artık ad değil). Ayrım ham metinle (istemci kırpmaz).
 GIRDI_SORU = re.compile(r"^(?:\?+|soru(?=[\s:,.\-]|$)[:,.\-]?)\s*", re.I)
 def girdi_ayir(ham):
     ham = str(ham or "").replace("\r", "")
     if ham.startswith("  "): return "soru", ham.strip()
     t = ham.strip(); m = GIRDI_SORU.match(t)
     if m: return "soru", t[m.end():].strip() or t
-    if re.match(r"^claude", t, re.I): return "soru", t
+    adlar = set(asistan_adlari()) | {a for k in kisilikler() for a in k["hitap"]}
+    if any(re.match(re.escape(a) + r"\b", t, re.I) for a in adlar if a): return "soru", t
     return "not", t
 def ask(p):
     # tur "ozet" = "Ne diyeyim?" (Option + Shift + O, panodaki düğme; eski "Son 1 dk"): izle son 2 dk'nın satırlarını, gündemi ve açık
@@ -229,5 +230,5 @@ def ask(p):
         if ozet: q["tur"] = "ozet"
         if p.get("tur") == "girdi": q["tur"] = "girdi"; QUESTIONS.append(q); _log("sorular.jsonl", q); return q  # dökümde not satırı zaten var
         QUESTIONS.append(q); _log("sorular.jsonl", q)
-        _md(f"| {now.strftime('%H:%M:%S')} | **{'NE DİYEYİM? İSTENDİ' if ozet else 'CLAUDE’A SORU'}** | {' / '.join(text.replace('|', '¦').splitlines())} | |", q, "sorular.jsonl")
+        _md(f"| {now.strftime('%H:%M:%S')} | **{'NE DİYEYİM? İSTENDİ' if ozet else 'SORU → ' + asistan_buyuk()}** | {' / '.join(text.replace('|', '¦').splitlines())} | |", q, "sorular.jsonl")
     return q

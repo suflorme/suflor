@@ -86,7 +86,7 @@ def sohbet_view():
     return {"acik": False, "kulaklik": _sohbet_kulaklik(), **({"kapandi": k["neden"], "kapandi_sn": round(time.time() - k["t"])} if k and time.time() - k["t"] < 60 else {})}
 def sohbet_basla():
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
-    if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürerken sohbet kapalı — “Claude, …” de ya da basılı tut", "Conversation is off during a meeting — say “Claude, …” or hold to talk")}
+    if toplanti_var(): return {"ok": False, "err": _t(f"Toplantı sürerken sohbet kapalı — “{asistan_ad()}, …” de ya da basılı tut", "Conversation is off during a meeting — say “Claude, …” or hold to talk")}
     if not kulaklik(): return {"ok": False, "err": _t("Sohbet yalnız kulaklıkla (hoparlörde Suflor kendi sesini duyar) — basılı tutarak sor", "Conversation needs headphones (on speakers Suflor hears itself) — hold to talk instead")}
     if SOHBET["acik"]: return {"ok": True}
     r = konus_basla()

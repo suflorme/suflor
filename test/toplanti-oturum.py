@@ -130,7 +130,7 @@ try:
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "izin iste"})
     k = izin_bekle_(); v = to()
     ok(f"araç izni Claude bölümünde ({len(k)}), ayrı kart yok ({len(izin_kartlari())}), oturum özeti izin={v.get('izin')}", len(k) == 1 and not izin_kartlari() and v.get("izin") == 1)
-    ok(f"izinde açıklama cümlesi, komut yok ({k[0]['metin'][:80] if k else ''})", bool(k) and "Claude şunu yapmak istiyor: Deneme komutu" in k[0]["metin"] and "print(1)" not in k[0]["metin"])
+    ok(f"izinde açıklama cümlesi, komut yok ({k[0]['metin'][:80] if k else ''})", bool(k) and "Şunu yapmak istiyorum: Deneme komutu" in k[0]["metin"] and "Claude" not in k[0]["metin"] and "print(1)" not in k[0]["metin"])
     ok("panodaki izin iletisi düz cümle (komut yok)", any(x["kim"] == "izin" and x["metin"] == "Deneme komutu" for x in mesaj()))
     kod, y = uc("/eylem-karar", {"id": k[0]["id"], "durum": "onaylandi"}) if k else (0, {})
     ok("Onayla → Claude Code'a allow, izin listeden düştü", y.get("ok") and claude_der("İzin: allow") and not izinler())

@@ -7,7 +7,8 @@ const $ = id => document.getElementById(id);
 // Anahtar Türkçe metnin kendisi (pano ile aynı yaklaşım ve terimler); İngilizcesi yoksa Türkçe kalır.
 let DIL = "tr";
 const EN = globalThis.SUFLOR_EN || {};
-function L(s, v) { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; }
+let AS = "Suflor";  // S133: asistanın adı (/status asistan)
+function L(s, v) { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t.split("{asistan}").join(AS); }
 function cevir(kok) {  // sabit HTML: metin düğümleri + placeholder/title/aria-label (yalnız tr → en)
   if (DIL !== "en") return; document.documentElement.lang = "en";
   const w = document.createTreeWalker(kok, NodeFilter.SHOW_TEXT), d = []; while (w.nextNode()) d.push(w.currentNode);
@@ -59,6 +60,7 @@ function ciz(c, m, a, e) {
 const karsiAc = () => { chrome.runtime.sendMessage({ type: "whisperKarsi" }); $("da").textContent = L("istendi…"); };
 async function durum() {
   let s = null; try { const r = await fetch(cfg.relay + "/status"); s = await r.json(); } catch {}
+  if (s && s.asistan) AS = s.asistan;
   const t = await sekmeDurumu(), bek = t && t.queued ? L("{n} satır bekliyor; Suflor.me açılınca gönderilir.", { n: t.queued }) : "";
   if (!s) return ciz("er", L("Suflor.me kapalı"), bek || L("kurulum klasöründe aktarici-kur'a çift tıkla"));
   dilGuncelle(s.arayuz_dili);  // alan yoksa "tr"
@@ -74,14 +76,14 @@ async function durum() {
       else if (!w.karsi && !x.captions && !x.panel && !["bekliyor", "dinliyor"].includes(w.yerel)) so.push(["wa", L("Karşı taraf: ses yazılmıyor"), "", [L("Aç"), karsiAc]]);
       if (!w.ben && ["hata", "sorun"].includes(w.ben_kod)) so.push(["wa", L("Senin sesin yazılmıyor"), L(w.ben_kod === "hata" ? "mikrofon açılamadı — toplantı sekmesini yenile" : "mikrofon açık ama ses gelmiyor")]);
     }
-    if (!izl) so.push(["wa", L("Claude izlemiyor — kart gelmez"), L("Panodan başlat")]);
+    if (!izl) so.push(["wa", L("{asistan} izlemiyor — kart gelmez"), L("Panodan başlat")]);
   }
   if (bek) so.push(["wa", bek]);
   const o = so.find(([c]) => c === "er") || so[0];
   if (o) return ciz(o[0], o[1], o[2], o[3]);
   const n = (s.cards || []).length;
   if (cagri) return ciz("ok", L("Dinliyorum"), n ? L(n === 1 ? "1 açık kart" : "{n} açık kart", { n }) : "");
-  ciz("nt", L(izl ? "Claude hazır — toplantı bekleniyor" : "Hazır — toplantı bekleniyor"));
+  ciz("nt", L(izl ? "{asistan} hazır — toplantı bekleniyor" : "Hazır — toplantı bekleniyor"));
 }
 // pano zaten açıksa o sekmeye geç (her pano sekmesi aktarıcıyı saniyede bir yokluyor; ikincisi gereksiz). Yeni sekme ya da
 // anahtarsız kalmış pano (başlığı "anahtar gerekli"; v0.58.1 öncesi 🔑 ile başlar) yerel anahtarla açılır: ?k= — pano kendi deposuna alıp adres çubuğundan siler.

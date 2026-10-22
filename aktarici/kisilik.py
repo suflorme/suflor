@@ -103,6 +103,9 @@ def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kiş
 _KATIL = {"toplanti": None, "adlar": []}
 def asistan_toplanti(): return AYAR.get("toplantiya_ses") is True and AYAR.get("konusma", True) is not False and not ("gizli_acik" in globals() and gizli_acik())  # tek anahtar: "Asistanlar toplantıda konuşsun"; v0.89.0: gizli toplantıda kapalı
 def asistan_adlari(): ks = kisilikler(); return [k["ad"] for k in ks] if ks else ["Suflor"]  # kişilik yoksa (nötr kurulum) asistanın adı Suflor
+def asistan_buyuk(): return asistan_ad().replace("i", "İ").replace("ı", "I").upper()  # dökümdeki kart etiketi (Türkçe büyük harf)
+def asistan_ad():  # S133: kullanıcıya görünen tek muhatap — toplantı kişiliğinin adı (yoksa ilk kişilik, kişiliksiz kurulumda Suflor)
+    ks = kisilikler(); return next((k["ad"] for k in ks if k["rol"] == "toplanti"), ks[0]["ad"] if ks else "Suflor")
 def asistan_katilan():
     if not toplanti_var(): return []
     a = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"

@@ -62,9 +62,10 @@ BULUT = r"hizmet|tabanl|sunucu|depola|bili[sş]im|ortam|altyap|platform|teknoloj
 # 12 Ekim (deneme 7): "Klot. Kaç kart açık?" — Whisper hitaptan sonra nokta koyup cümleyi bölüyor → noktadan sonra büyük harfle süren cümle de
 # hitap. "Suflor" da uyandırma sözü (kullanıcı isteği): aynı kural, "Claude:" olur (toplantı oturumu tek biçim arar). Cümle ortasında yalnız doğru yazılmış
 # "Claude"/"Suflor" ve satır soruyla bitiyorsa: "… yapayım Claude kaç kart açık?" ("Claude mu yazdı?" gibi ek/edat sonrası değişmez).
-HITAP_AD = r"(?:cloud|klod|klot|klo|clod|claud|klaud|clode|claude|suflor|suflör|süflör)"
+# S133 (22 Ekim): tek muhatap asistan — kişiliksiz kurulumda seslenme yalnız "Suflor"; "Claude" (ve Whisper'ın "Cloud/Klod" yazımları) artık komut değil.
+HITAP_AD = r"(?:suflor|suflör|süflör)"
 HITAP_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)" + HITAP_AD + r"(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])(?!(?:" + BULUT + r"))|\s+(?!(?:" + BULUT + r"))(?=\w))", re.I)
-HITAP_ORTA_RX = re.compile(r"(?<=\w)([,]?\s+)(?:Claude|Suflor)(?:\s*[,:]\s*|\s+(?!(?:mi|mı|mu|mü|ile|ve|için|gibi|de|da|ya|ki)\b)(?=\w))(?=[^.!?…]*\?\s*$)")
+HITAP_ORTA_RX = re.compile(r"(?<=\w)([,]?\s+)(?:Suflor)(?:\s*[,:]\s*|\s+(?!(?:mi|mı|mu|mü|ile|ve|için|gibi|de|da|ya|ki)\b)(?=\w))(?=[^.!?…]*\?\s*$)")
 # Kişilik hitabı (v0.53.0, ölçüm 16 Ekim: kişilik adıyla başlayan 14 cümlenin 13'ü istemle doğru yazıldı): adlar kişilik dosyasından/ayardan (kodda sabit ad yok).
 # Cümle başında ad + virgül/iki nokta/nokta ya da cümle soru ise hitap: "<Ad> markasının yeni ürünü…" tetiklemez. İçeride yine "Claude:" olur.
 # S94 (19 Ekim test toplantısı: "<Ad> gelsin" virgülsüz ve sorusuz kaçtı): noktalamasız/sorusuz cümlede istek varsa da hitap (KISILIK_ISTEK, kisilik.py).

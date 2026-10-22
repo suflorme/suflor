@@ -73,7 +73,7 @@ IZIN_MCP_CUMLE = [  # (araç adı kalıbı, Türkçe, İngilizce) — ilk eşle�
     (r"upload|create_file|update_file|copy_file|move_item|rename_item", "bulut dosyalarında değişiklik yapmak", "change cloud files"),
     (r"navigate", "tarayıcıda bir sayfa açmak", "open a page in the browser"), (r"javascript|computer|form_input|file_upload", "tarayıcıda işlem yapmak", "act in the browser")]
 def izin_metni(arac, gi=None, aciklama=None):
-    return _t(f"Claude şunu yapmak istiyor: {arac_cumlesi(arac, gi, aciklama)}. Onaylıyor musun?", f"Claude wants to: {arac_cumlesi(arac, gi, aciklama)}. Do you approve?")
+    return _t(f"Şunu yapmak istiyorum: {arac_cumlesi(arac, gi, aciklama)}. Onaylıyor musun?", f"I'd like to {arac_cumlesi(arac, gi, aciklama)}. Do you approve?")  # S133: asistan kendi ağzından
 def arac_cumlesi(arac, gi=None, aciklama=None):  # aracın düz cümlesi ("… dosyasını okumak"): izin metni ve toplantı oturumunun canlı durum satırı
     gi = gi if isinstance(gi, dict) else {}; a = str(arac or ""); kisa = a.split("__")[-1]
     acik = " ".join(str(aciklama or gi.get("description") or "").split()).rstrip(" .")[:200]

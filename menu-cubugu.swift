@@ -925,7 +925,7 @@ let EN_METIN: [String: String] = [
     "Toplantı": "Meeting", "Toplantı başlat…": "Start a meeting…", "Ne diyeyim?": "What should I say?", "Sessiz (10 dk kart yok)": "Quiet (no cards for 10 min)",
     "Görünüm": "View", "Kenar çubuğunu gizle/göster": "Show/hide sidebar", "Yenile": "Reload", "Tam ekran": "Full screen",
     "Pencere": "Window", "Küçült": "Minimize", "Büyüt": "Zoom", "Kapat": "Close", "Yardım": "Help", "Suflor.me Yardımı": "Suflor.me Help",
-    "Konuş: Option + Shift + Boşluk basılı tut": "Talk: hold Option + Shift + Space",
+    "Asistanla konuş: Option + Shift + Boşluk basılı tut": "Talk to the assistant: hold Option + Shift + Space",
     "Sessiz: Option + Shift + M": "Quiet: Option + Shift + M", "Tamam": "OK", "Vazgeç": "Cancel", "Evet": "Yes",
     "Genel": "General", "Ses": "Voice", "Konuş": "Talk", "Kanıt": "Evidence", "Çeviri": "Translation", "E-posta": "Email", "Gizlilik": "Privacy", "Proje": "Project"]
 func T(_ s: String) -> String { ARAYUZ_EN ? (EN_METIN[s] ?? s) : s }
@@ -1096,7 +1096,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         alt("Pencere", [("Küçült", #selector(NSWindow.performMiniaturize(_:)), "m", .command, nil), ("Büyüt", #selector(NSWindow.performZoom(_:)), "", [], nil),
                         ("Kapat", #selector(NSWindow.performClose(_:)), "w", .command, nil)])
         alt("Yardım", [("Suflor.me Yardımı", #selector(yardim), "?", .command, self), ("Geri bildirim gönder…", #selector(geriBildirim), "", [], self), ("-", nil, "", [], nil),
-                       ("Konuş: Option + Shift + Boşluk basılı tut", nil, "", [], nil), ("Kanıt: Option + Shift + K", nil, "", [], nil),
+                       ("Asistanla konuş: Option + Shift + Boşluk basılı tut", nil, "", [], nil), ("Kanıt: Option + Shift + K", nil, "", [], nil),
                        ("Ne diyeyim?: Option + Shift + O", nil, "", [], nil), ("Sessiz: Option + Shift + M", nil, "", [], nil),
                        ("Asistan sussun: Option + Shift + S", nil, "", [], nil)])
         NSApp.mainMenu = ana

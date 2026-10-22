@@ -236,21 +236,23 @@ def konus_istem(vt=None):
                    + ("tablolar yukarıda, vt_sema'yı çağırma; doğrudan vt_sor aracıyla " if sema else "önce vt_sema aracıyla tabloları gör, sonra vt_sor aracıyla ") +
                    "yalnız okuyan tek bir SELECT sorgusu çalıştır (gerekirse ikincisi; sonucu tek sorguda toplamaya çalış). Aynı soruya her seferinde aynı sonucu ver: "
                    "güncel durumu veren görünüm (v_ ile başlayan) varsa ham tablo yerine onu kullan, erişimi/geçerliliği olmayan satırları (ör. erişim yok, iptal, tekrar) sayma, "
-                   "eşitlikte hepsini söyle. Sesli kısımda yalnız sonucu doğal bir cümleyle söyle; kullandığın ölçütü ve sorguyu yazılı kısma yaz; sonuç yoksa söyle. [gizli] sütunlar maskelidir, onları sesli söyleme. "
+                   "eşitlikte hepsini söyle. Sesli kısımda yalnız sonucu doğal bir cümleyle söyle; kullandığın ölçütü yazılı kısma tek satırla yaz (sorguyu yazma); sonuç yoksa söyle. [gizli] sütunlar maskelidir, onları sesli söyleme. "
                    "Toplantıda karşı tarafın sorusunu cevaplarken veritabanına bakma; yalnız kullanıcının kendi sorusunda.",
                    " For a current-state question (people, permissions, accounts, systems, counts) don't guess: "
                    + ("the tables are above, don't call vt_sema; use the vt_sor tool directly " if sema else "first use the vt_sema tool to see the tables, then the vt_sor tool ") +
                    "with a single read-only SELECT (a second only if needed; try to get the result in one query). Give the same answer to the same question every time: "
                    "prefer a current-state view (starting with v_) over the raw table, don't count rows without access/validity (no access, cancelled, duplicate), name all on a tie. "
-                   "Say only the result naturally in the spoken part; put the criterion and query in the written part; say so if nothing is found. [gizli] columns are masked; never read them aloud. "
+                   "Say only the result naturally in the spoken part; put the criterion in the written part in one line (not the query); say so if nothing is found. [gizli] columns are masked; never read them aloud. "
                    "When answering the other side in a meeting, don't use the database; only for the user's own question.")
     t += _t(" Geçmiş toplantı ve kararları güncel durum sorusu değildir: bağlamda 'Suflor'un son toplantıları' listesi varsa 'son toplantı' onun en yenisidir; kararları o satırdaki özet dosyasından oku (veritabanına bakma). "
             "En yenisi denemeyse bunu söyle ve listedeki son gerçek toplantıyı da an.",
             " Past meetings and their decisions are not current-state questions: if the context has 'Suflor's recent meetings', the 'last meeting' is its newest entry; read the decisions from that entry's summary file (don't query the database). "
             "If the newest is a test, say so and also mention the latest real meeting in the list.")
+    # v0.115.3 (22 Ekim ölçümü, testler/konus-arac-gecikme-20261022.md): araç sonrasındaki cevap akmıyor, tamamı yazılınca bir kerede geliyor —
+    # yazılı ayrıntı (okunmasa da) sesli cevabı bekletiyordu (~80 kar 1,5 sn, ~670 kar 4,6 sn); araçlı cevapta yazılı kısım en çok iki satır
     # v0.54.0 (kullanıcı, 16 Ekim): sesli kısımda iç terim yok — "defterine göre", "veritabanına göre", "toplantı oturumu", "kart", "döküm", dosya adı; kaynak yazılı kısımda
-    t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Belirsizliği de iç terimsiz söyle: 'dökümde bozuk duyulmuş' değil 'bu kısım net duyulmamış'; 'dökümde' değil 'görüşmede' ya da 'toplantıda'. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası).",
-            " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Say uncertainty without internal terms too: not 'garbled in the transcript' but 'that part wasn't clear'; not 'in the transcript' but 'in the conversation' or 'in the meeting'. Source and method only in the written part (after ---).")
+    t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Belirsizliği de iç terimsiz söyle: 'dökümde bozuk duyulmuş' değil 'bu kısım net duyulmamış'; 'dökümde' değil 'görüşmede' ya da 'toplantıda'. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası). Araç kullandığın cevapta (dosya okuma, arama, veritabanı) yazılı kısım en çok iki kısa satır olsun: ölçüt ya da kaynak; tablo, liste ve uzun açıklama yazma.",
+            " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Say uncertainty without internal terms too: not 'garbled in the transcript' but 'that part wasn't clear'; not 'in the transcript' but 'in the conversation' or 'in the meeting'. Source and method only in the written part (after ---). When you used a tool (file read, search, database), keep the written part to at most two short lines: criterion or source; no tables, lists or long explanations.")
     if "talimat_istem" in globals(): t += talimat_istem()  # v0.101.1: oturumlara ileti (iki kişilikte de)
     if not k: return t + kart_istem()
     t = re.sub(r"gerçekten şaşırtıcı.*?kullanabilirsin; ", "", t)
@@ -775,7 +777,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
             try: w = os.open(gir, os.O_WRONLY | os.O_NONBLOCK); break
             except OSError: time.sleep(0.05)
         if w is None:
-            _konus_kur(durum="hata", hata=_t("Claude açılamadı (izin penceresi?) — yeniden dene", "Couldn't open Claude (permission prompt?) — try again")); konus_kapat("açılmadı"); return False
+            _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} açılamadı (izin penceresi?) — yeniden dene", f"Couldn't start {asistan_ad()} (permission prompt?) — try again")); konus_kapat("açılmadı"); return False
         os.set_blocking(w, True); _KS["w"] = os.fdopen(w, "w", encoding="utf-8", buffering=1); _KS["son"] = time.time(); _KS["maliyet"] = 0; _KS["sayac"] = 0; _KS["acilis_t"] = time.time()
         _KS["nesil"] = _KS["nesil_en"] = _KS.get("nesil_en", 0) + 1; threading.Thread(target=_konus_oku, args=(cik, _KS["nesil"]), daemon=True).start()
         print(f"KONUŞ: açık süreç açıldı ({time.time() - t0:.1f} sn)"); return True
@@ -950,7 +952,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                     threading.Thread(target=lambda: (konus_kapat(ns_, True), konus_on_ac("tur sınırı")), daemon=True).start()
     # v0.70.1: tur sınırında (ya da kişilik/toplantı değişince) süreç bilerek kapatılır; eski süreç ancak birkaç saniye sonra çıkar. O arada gelen yeni soru
     # (_KS["tur"]) yeni süreç açılmadan önce bu satıra denk gelirse panoda bir an "Claude süreci kapandı" görünüyor, tur siliniyordu. Yalnız beklenmedik çıkış hata.
-    if _KS.get("tur") and _KS.get("nesil") == nesil and _KS.get("kapali_nesil") != nesil: _konus_kur(durum="hata", hata=_t("Claude süreci kapandı — yeniden bas", "The Claude process closed — press again")); _KS["tur"] = None
+    if _KS.get("tur") and _KS.get("nesil") == nesil and _KS.get("kapali_nesil") != nesil: _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} kapandı — yeniden bas", f"{asistan_ad()} closed — press again")); _KS["tur"] = None
 # v0.95.0 ölçüm: ses_cal_ms = bırakıştan cevabın ilk sesinin çalıcıya girdiği ana (ses_ms kuyruğa girdiği an; Gemini'de ~0,6 sn fark), dolgu_cal_ms = ara
 # cümlenin ya da araç cümlesinin çaldığı an. Kısa cevapta ilk ses sonuçtan sonra çalabildiği için satır, ilk ses çalana kadar (en çok KONUS_CAL_BEKLE_SN) bekler.
 KONUS_CAL_BEKLE_SN = 20
@@ -1244,7 +1246,7 @@ def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen p
 def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsın (kayıt sürerken)
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
-    if _KS["tur"]: return {"ok": False, "err": _t("Claude hâlâ cevaplıyor", "Claude is still answering")}
+    if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
     if giris_sanal(): print("KONUŞ: varsayılan giriş sanal aygıt (BlackHole) — başlamadı"); return {"ok": False, "err": _t(*GIRIS_SANAL_UYARI)}  # v0.80.3
     _akis_sifirla(); onara_isit()
     if not toplanti_var(): ses_durdur()  # toplantıda yalnız okunan cevap durur (aşağıda konus_sus)
@@ -1259,7 +1261,7 @@ def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsı
     return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
-    if _KS["tur"]: return {"ok": False, "err": _t("Claude hâlâ cevaplıyor", "Claude is still answering")}
+    if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
     if os.environ.get("SUFLOR_TEST_METIN") and isinstance(p.get("metin"), str) and p["metin"].strip():  # yalnız deneme aktarıcısı: ses yerine yazılı soru (sınav, kör kıyas)
         tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "bas"}; _KS["tur"] = tur; _konus_sor(p["metin"].strip(), tur); return {"ok": True}
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
@@ -1467,7 +1469,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi")) + _etiket_tur_notu(tur)  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
         tur["t_gonder"] = time.time(); tur.pop("t_ilk_yanit", None)  # v0.77.3 ölçüm: soru sürece yazıldı (yeniden gönderimde de)
         try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + selam_notu(tur.get("selam")) + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + gnb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
-        except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Claude'a ulaşılamadı — yeniden bas", "Couldn't reach Claude — press again")); konus_kapat("yazılamadı"); return
+        except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} cevap veremedi — yeniden bas", f"{asistan_ad()} couldn't answer — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()
         if KONUS_ARA_SN > 0 and not tur.get("yeniden"): threading.Thread(target=ara_bilgi, daemon=True).start()
@@ -1495,7 +1497,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
             if _KS["tur"] is not tur or tur.get("t_ilk") or tur.get("t_arac"): return  # cevap ya da araç geldi
         if tur.get("yeniden"):
             print(f"KONUŞ: zaman aşımı — ikinci denemede de {sn:.0f} sn cevap yok"); _KS["tur"] = None
-            _konus_kur(durum="hata", hata=_t("Claude cevap vermedi — yeniden bas", "Claude didn't answer — press again")); konus_kapat("zaman aşımı"); return
+            _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} cevap vermedi — yeniden bas", f"{asistan_ad()} didn't answer — press again")); konus_kapat("zaman aşımı"); return
         print(f"KONUŞ: zaman aşımı — {sn:.0f} sn cevap yok, süreç yenilenip soru yeniden gönderiliyor"); tur["yeniden"] = True
         konus_kapat("zaman aşımı", durum_koru=True); _KS["tur"] = tur; gonder()
     gonder()

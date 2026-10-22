@@ -68,7 +68,7 @@
    "| <SAAT> | Deniz Test | Tamam, yedek konusunu not alıyorum. |  |",
    "| <SAAT> | Ayla Örnek | Şifreler de Bitwarden'da duruyor, oradan paylaşıyoruz. | ⚠ şifre ✎ Bitvarden'da=Bitwarden |",
    "| <SAAT> | Deniz Test | Güzel. AWS tarafına geçelim, IAM kullanıcıları kaç tane? |  |",
-   "| <SAAT> | **CLAUDE’A SORU** | Yedeklerin bulut kopyasını kim kontrol ediyor? | |",
+   "| <SAAT> | **SORU → SUFLOR** | Yedeklerin bulut kopyasını kim kontrol ediyor? | |",
    "| <SAAT> | Ayla Örnek | Yaklaşık on iki IAM kullanıcısı var, bazıları eski çalışanlardan kalma. |  |",
    "| <SAAT> | Ayla Örnek | MFA hepsinde açık değil, iki üç kişide kapalı olabilir. |  |",
    "| <SAAT> | Deniz Test | Root hesabında MFA açık mı? |  |",
@@ -77,14 +77,14 @@
    "| <SAAT> | Deniz Test | Eski çalışanların kullanıcıları ne zaman silinecek? |  |",
    "| <SAAT> | Ayla Örnek | Deniz, sizin tarafta da AWS yönetici erişimi var mı? |  |",
    "| <SAAT> | Ayla Örnek | Bu ay içinde temizlemeyi planlıyoruz. |  |",
-   "| <SAAT> | **CLAUDE · SÖYLE** | Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne? | |",
-   "| <SAAT> | **CLAUDE · DUR** | Root hesabını toplantıda paylaşma | |",
-   "| <SAAT> | **CLAUDE · NOT** | IAM kullanıcılarının listesi Ayla'da | ⏳ tavan |",
+   "| <SAAT> | **SUFLOR · SÖYLE** | Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne? | |",
+   "| <SAAT> | **SUFLOR · DUR** | Root hesabını toplantıda paylaşma | |",
+   "| <SAAT> | **SUFLOR · NOT** | IAM kullanıcılarının listesi Ayla'da | ⏳ tavan |",
    "| <SAAT> | Deniz Test | Bunun sahibi kim olacak, tarih verebilir miyiz? |  |",
    "| <SAAT> | **DUYGU** | Ayla Örnek: tedirgin (tahmin) | |",
    "| <SAAT> | Ayla Örnek | Ben sahiplenirim, ayın yirmisine kadar. |  |",
    "| <SAAT> | **KART ✓ yaptım** | Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne? | |",
-   "| <SAAT> | **CLAUDE · CEVAP** | Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı. | |",
+   "| <SAAT> | **SUFLOR · CEVAP** | Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı. | |",
    "| <SAAT> | **GÜNDEM** | ✓ Yedekler: nerede tutuluyor, kim kontrol ediyor (Claude) | |",
    "| <SAAT> | **DENİZ NOTU** | ⭐ ÖNEMLİ AN | ✎ |",
    "| <SAAT> | Deniz Test | GitHub organizasyonuna geçelim, üyeler kimler? |  |",
@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 232854,
-   "sha": "fa8848a600370e40"
+   "uzunluk": 242702,
+   "sha": "89ce9db1ab0a270d"
   },
   "/mini": {
-   "uzunluk": 232854,
-   "sha": "fa8848a600370e40"
+   "uzunluk": 242702,
+   "sha": "89ce9db1ab0a270d"
   },
   "/status": {
    "_ping_son": "float",
@@ -255,6 +255,7 @@
    "anahtarsiz": "NoneType",
    "anlik": "NoneType",
    "arayuz_dili": "str",
+   "asistan": "str",
    "ayarlar": {
     "deger": {
      "adin_gecti": "bool",

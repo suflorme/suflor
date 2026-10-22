@@ -40,9 +40,10 @@
   // Aktarıcıya giden metinler (/olay, /komut) ve Claude'un kart metinleri çevrilmez.
   let DIL = "tr";
   const EN = globalThis.SUFLOR_EN || {};
-  const L = (s, v) => { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t; };
+  let AS = "Suflor";  // S133: tek muhatap — asistanın adı (/status asistan; kişiliksiz "Suflor"), metinlerde {asistan}
+  const L = (s, v) => { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v) t = t.split("{" + k + "}").join(v[k]); return t.split("{asistan}").join(AS); };
   function dilAyarla(d) { DIL = d === "en" ? "en" : "tr"; P.dil = DIL; }
-  try { chrome.storage.local.get({ dil: "tr" }, v => dilAyarla(v.dil)); } catch (e) {}
+  try { chrome.storage.local.get({ dil: "tr", asistan: "Suflor" }, v => { dilAyarla(v.dil); AS = v.asistan || "Suflor"; }); } catch (e) {}
 
   // aktarıcı adresi yalnız bu tarayıcıda (storage.local) — iki macOS hesabının Chrome'u aynı Google hesabıyla eşitlenirse
   // adres karşı hesaba geçmesin (iki aktarıcı aynı anda açık, ikisine de 127.0.0.1'den ulaşılır). Eski sync değeri yalnız yedek.
@@ -85,7 +86,7 @@
   // popup onChanged ile alır. Alan yoksa (eski aktarıcı) "tr".
   async function dilOku() {
     if (window.top !== window) return;
-    try { const j = await (await rf("/status")).json(); const d = j.arayuz_dili === "en" ? "en" : "tr"; if (d !== DIL) { dilAyarla(d); chrome.storage.local.set({ dil: d }); } } catch (e) {}
+    try { const j = await (await rf("/status")).json(); if (j.asistan) { AS = j.asistan; chrome.storage.local.set({ asistan: AS }); } const d = j.arayuz_dili === "en" ? "en" : "tr"; if (d !== DIL) { dilAyarla(d); chrome.storage.local.set({ dil: d }); } } catch (e) {}
   }
   setTimeout(dilOku, 2000); setInterval(dilOku, 60000);
 
@@ -564,7 +565,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const dg = (metin, ipucu, is) => { const b = d.createElement("button"); if (typeof metin === "string") b.textContent = metin; else b.append(metin); b.title = L(ipucu); b.onclick = async () => { b.disabled = true; try { await is(); } catch (e) {} setTimeout(() => { b.disabled = false; }, 2500); pollCards(); }; a.append(b); };
       const post = (yol, g) => rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(g) });
       dg(ikon(d, "star"), "Önemli an: şu anı özette öne çıkar", () => post("/komut", { tur: "onemli", meeting: meetingInfo() }));  // ad: not süren toplantının dosyasına
-      dg(L("Ne diyeyim?"), "Ne diyeyim? Claude son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)", () => post("/ask", { tur: "ozet" }));
+      dg(L("Ne diyeyim?"), "Ne diyeyim? {asistan} son dakikalara bakıp tek cümlelik replik önersin (Option + Shift + O)", () => post("/ask", { tur: "ozet" }));
       dg(ikon(d, "mute"), "Sessiz: 10 dk kart gösterme — DUR ve cevaplar yine gelir (Option + Shift + M; tekrar basınca kapanır)", () => post("/komut", { tur: "sessiz" }));
       dg(L("Kanıt"), "Toplantı ekranını kanıt olarak kaydet; kutudaki yazı not olur", () => { const not = ta.value.trim(); ta.value = ""; chrome.runtime.sendMessage({ type: "kanit", kaynak: "serit", not }); });
       return a;
@@ -683,7 +684,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       list.replaceChildren(top);
       const ss = v.sessiz, sn = (ss && ss.tutulan || []).length, ust = (ad, x, c) => { const n = e("div", c || "top"); n.append(ikon(d, ad), e("span", null, x)); return n; };
       if (ss && ss.acik) list.append(ust("mute", L("Sessiz · {n} dk", { n: Math.max(1, Math.ceil(ss.kalan_sn / 60)) }) + (sn ? L(" · {n} kart bekliyor", { n: sn }) : "")));
-      else if (sn) list.append(ust("zil", L("Sessiz bitti — Claude özetliyor ({n} kart)", { n: sn })));
+      else if (sn) list.append(ust("zil", L("Sessiz bitti — {asistan} özetliyor ({n} kart)", { n: sn })));
       if (v.ertelenen) list.append(ust("pause", L("{n} kart sonraya bırakıldı", { n: v.ertelenen })));
       if (dil) list.append(ust("uyari", L("Döküm dili yanlış — panoya bak"), "top uy"));
       if (warn) list.append(ust("uyari", warn, "top uy"));
@@ -696,11 +697,11 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         const a = e("div", "a");
         // onay kartı (#76): Claude'un yapacağı iç işi yazılı onayla — yalnız anahtarlı eklentiden geçer
         (c.onay ? [["onaylandi", ["check", L("Onayla")], "Onayla"], ["reddedildi", ["x", L("Reddet")], "Reddet"]] :
-        [["yapildi", ["check"], "Yaptım"], ["ertele", ["pause"], "Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster"], ["gecildi", ["x"], "Gerek yok — Claude bir daha önermesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
+        [["yapildi", ["check"], "Yaptım"], ["ertele", ["pause"], "Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster"], ["gecildi", ["x"], "Gerek yok — bir daha önerilmesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
           .forEach(([st, lbl, tip]) => { const x = e("button"); x.append(ikon(d, lbl[0])); if (lbl[1]) x.append(e("span", null, lbl[1])); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
         k.append(m, a); list.append(k);
       });
-      qs.forEach(q => { const x = e("div", "q", " " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L(q.tur === "girdi" ? "Claude'a iletildi: " : "Claude'a soruldu: ") + q.text)); x.prepend(ikon(d, "saat")); list.append(x); });
+      qs.forEach(q => { const x = e("div", "q", " " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L(q.tur === "girdi" ? "İletildi: " : "Soruldu: ") + q.text)); x.prepend(ikon(d, "saat")); list.append(x); });
       if (!cards.length && !qs.length && !dil && !warn) list.append(e("div", "bos", L("Şimdilik kart yok")));
     }
     function sonCiz(d, son) {  // mini panodaki gibi tek satır canlılık: son döküm satırı ne zaman, kimden

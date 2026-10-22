@@ -44,6 +44,14 @@
       c_ga3: "Claude aboneliğinin olduğu hesapla gir, girişi görünce /exit yaz.", c_ga4: "Buraya dön: sihirbaz kendisi yeniden denetler.",
       c_masaustu: "Claude masaüstü uygulamasındaki giriş sayılmaz; Terminal'deki Claude ayrıca giriş ister.",
       c_kartsiz_a: "Kartsız kipte döküm, pano ve notlar çalışır; kart ve özet olmaz. Sonradan Claude bağlayabilirsin.",
+      as_b: "Asistanına bir ad koy", as_a: "Toplantıda ve toplantı dışında seninle konuşan, sorularını cevaplayan asistan. Ona adıyla seslenirsin: “Defne, yarın neler var?” Adı ve ayarları yalnız bu Mac'te kalır.",
+      as_ad: "Adı", as_ad_ph: "örneğin Defne", as_ad_i: "Kısa, kolay söylenen bir ad seç; iki-üç heceli ad, konuşma tanımanın en kolay yakaladığıdır.",
+      as_bicim: "Sana nasıl hitap etsin?", as_siz: "siz", as_sen: "sen", as_tarz: "Tarzı", as_olculu: "Ölçülü", as_rahat: "Rahat ve esprili",
+      as_ses: "Sesi", as_mac: "Mac'in Türkçe sesi", as_kadin: "Kadın sesi", as_erkek: "Erkek sesi", as_dinle: "Dinle", as_okuyor: "Okuyor…",
+      as_iki: "Toplantı dışında ayrı bir asistan ister misin?", as_iki_a: "Örneğin toplantıda ölçülü bir asistan, kendi başınayken daha rahat konuşan ikinci bir asistan. Toplantıda öbürüne adıyla seslenirsen o cevaplar.",
+      as_toplanti: "Toplantıda", as_disi: "Toplantı dışında", as_atla_a: "Atlarsan asistanın adı Suflor olur; sonra kurulumu yeniden açarak ad koyabilirsin.",
+      as_ayni: "İki asistanın adı farklı olmalı.", as_suflor: "Suflor adı uygulamanın kendisine ayrıldı; başka bir ad seç.", as_gecersiz: "Ad 2–24 harf olmalı; rakam ve işaret kullanma.",
+      as_var: "Bu asistan bu Mac'te zaten var; ayarları değişmeden kullanılır.",
       sen_b: "Seni tanıyalım",       ad: "Adın", ad_i: "Toplantılarda göründüğü gibi", rol: "Rolün ya da unvanın", sirket: "Şirketin (isteğe bağlı)", is_alani: "İş alanın",
       alanlar: ["E-ticaret", "Yazılım", "Danışmanlık", "Finans", "Sağlık", "Eğitim", "Üretim", "Kamu", "Diğer"],
                                                                               gor_tur: ".docx · .vtt · .txt · .md",
@@ -127,6 +135,14 @@
       c_ga3: "Sign in with the account that has your Claude subscription, then type /exit.", c_ga4: "Come back here: the wizard checks again by itself.",
       c_masaustu: "Being signed in to the Claude desktop app doesn't count; Claude in Terminal needs its own sign-in.",
       c_kartsiz_a: "Without cards you still get the transcript, the panel and notes; no cards or summaries. You can connect Claude later.",
+      as_b: "Name your assistant", as_a: "The assistant that talks with you in and outside meetings and answers your questions. You call it by name: “Robin, what's on tomorrow?” Its name and settings stay on this Mac.",
+      as_ad: "Name", as_ad_ph: "e.g. Robin", as_ad_i: "Pick a short name that's easy to say; two or three syllables are easiest for speech recognition to catch.",
+      as_bicim: "How should it address you?", as_siz: "formal", as_sen: "informal", as_tarz: "Style", as_olculu: "Measured", as_rahat: "Relaxed and witty",
+      as_ses: "Voice", as_mac: "Mac voice", as_kadin: "Female voice", as_erkek: "Male voice", as_dinle: "Listen", as_okuyor: "Speaking…",
+      as_iki: "Do you want a separate assistant outside meetings?", as_iki_a: "For example, a measured assistant in meetings and a more relaxed one when you're on your own. In a meeting, call the other one by name and it answers.",
+      as_toplanti: "In meetings", as_disi: "Outside meetings", as_atla_a: "If you skip, the assistant is called Suflor; you can name it later by opening setup again.",
+      as_ayni: "The two assistants need different names.", as_suflor: "Suflor is the app's own name; pick another.", as_gecersiz: "Use 2–24 letters; no digits or symbols.",
+      as_var: "This assistant already exists on this Mac; its settings are kept as they are.",
       sen_b: "Tell us about you",       ad: "Your name", ad_i: "As it appears in meetings", rol: "Your role or title", sirket: "Company (optional)", is_alani: "Your field",
       alanlar: ["E-commerce", "Software", "Consulting", "Finance", "Healthcare", "Education", "Manufacturing", "Public sector", "Other"],
                                                                               gor_tur: ".docx · .vtt · .txt · .md",
@@ -180,6 +196,7 @@
     isaret: `<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="var(--sahne)"/><g transform="translate(0 -3.3)"><path fill="var(--krem)" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="var(--pirinc)" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg>`,
     mac: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="12" y="14" width="40" height="27" rx="3"/><path d="M6 46h52l-3 4H9z"/><path d="M27 46h10" stroke-linecap="round"/></svg>`,
     claude: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M32 12v40M12 32h40M18 18l28 28M46 18 18 46"/><circle cx="32" cy="32" r="6" fill="var(--zemin)"/></svg>`,
+    asistan: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="26" cy="26" r="9"/><path d="M10 51c2.3-8.5 8.4-13 16-13s13.7 4.5 16 13"/><path d="M44 20c2.5 2.2 2.5 9.8 0 12M50 15c5 4.5 5 17.5 0 22"/></svg>`,
     sen: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="32" cy="24" r="9"/><path d="M15 51c2.5-9 9-14 17-14s14.5 5 17 14" stroke-linecap="round"/></svg>`,
     arac: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="13" y="13" width="15" height="15" rx="4"/><rect x="36" y="13" width="15" height="15" rx="4"/><rect x="13" y="36" width="15" height="15" rx="4"/><circle cx="43.5" cy="43.5" r="7.5"/></svg>`,
     anlat: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 16h40a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H30l-10 8v-8h-8a4 4 0 0 1-4-4V20a4 4 0 0 1 4-4z"/><path d="M19 27h26M19 34h16" stroke-linecap="round"/></svg>`,
@@ -213,7 +230,7 @@
       mac: { islemci: "Apple M3", arm: true, macos: "15.1", macos_ok: true, bellek_gb: 16, disk_gb: 84, python: "3.9.6", chrome: true, teams_uygulama: true },
       claude: { kurulu: true, surum: "2.1.4", giris: true },
       modeller: { durum: "iniyor", yuzde: 38 }, eklenti: { bagli: false }, kod: "~/Suflor.me",
-      proje: "~/Suflor", varsayilan_ad: "Ayşe Yılmaz",
+      proje: "~/Suflor", varsayilan_ad: "Ayşe Yılmaz", asistan: { pocket: true },
       takvim: { durum: "ok", takvimler: [{ ad: "İş", hesap: "Exchange", sec: true }, { ad: "Kişisel", hesap: "iCloud", sec: true }, { ad: "Türkiye tatilleri", hesap: "iCloud", sec: false }],
         adaylar: [["ayse", "Ayşe Yılmaz", 40], ["ekip", null, 12], ["ayse.yilmaz", null, 3]].map(([k, ad, sayi]) => ({ adres: k + "@" + "ornek.test", ad, sayi })), adresler: null,  // uydurma adresler
         olaylar: [{ saat: "14:00", bitis: "14:45", baslik: "Bütçe görüşmesi", platform: "teams" }, { saat: "16:30", bitis: "17:00", baslik: "Haftalık ekip", platform: "teams" }] },
@@ -272,6 +289,35 @@
     const g = l.slice(0, 60);
     return `<div class="alan"><span class="etiket">${esc(baslik)} · ${l.length}</span>${g.map((x, i) => satirFn(x, i)).join("")}${l.length > g.length ? `<div class="ipucu">+${l.length - g.length} ${esc(t.hz_daha)}</div>` : ""}</div>`;
   }
+  // ---------- asistan ----------
+  const AS_BOS = tarz => ({ ad: "", bicim: "siz", tarz, ses: "mac" });
+  const asPocket = () => !!(((D.durum || {}).asistan || {}).pocket) && D.dil !== "en";
+  function asistanHazirla() {
+    if (C.asistan && Array.isArray(C.asistan.liste)) return;
+    const m = (D.durum || {}).asistan || {}, tp = m.toplanti, ds = m.disi;
+    C.asistan = { iki: !!(ds && (!tp || ds.ad !== tp.ad)), atla: false, liste: [tp ? { ...tp } : AS_BOS("olculu"), ds && (!tp || ds.ad !== tp.ad) ? { ...ds } : AS_BOS("rahat")] };
+  }
+  const asAdHata = ad => { ad = String(ad || "").trim().replace(/\s+/g, " ");
+    if (!/^[A-Za-zÇĞİIÖŞÜçğıiöşüÂâÎîÛû][A-Za-zÇĞİIÖŞÜçğıiöşüÂâÎîÛû' -]{1,23}$/.test(ad)) return "gecersiz";
+    return ad.toLocaleLowerCase("tr") === "suflor" ? "suflor" : null; };
+  function asistanHata(i) {  // i verilirse yalnız o asistan; yoksa ekranın tamamı (Devam)
+    asistanHazirla(); const l = C.asistan.liste, n = C.asistan.iki ? 2 : 1;
+    for (const j of (i == null ? [...Array(n).keys()] : [i])) { const h = asAdHata(l[j].ad); if (h) return h;
+      if (j === 1 && l[0].ad.trim().toLocaleLowerCase("tr") === l[1].ad.trim().toLocaleLowerCase("tr")) return "ayni"; }
+    return null;
+  }
+  const asYonga = (i, alan, deger, yazi, secili) => `<button class="yonga" type="button" data-as="${alan}" data-i="${i}" data-deger="${deger}" aria-pressed="${!!secili}">${esc(yazi)}</button>`;
+  function asistanBlok(i, iki) {
+    const x = C.asistan.liste[i], pk = asPocket(), ses = pk ? x.ses : "mac", h = x.ad.trim() ? asistanHata(i) : null;
+    const var_ = Object.values((D.durum || {}).asistan || {}).some(m => m && m.ad && m.ad.toLocaleLowerCase("tr") === x.ad.trim().toLocaleLowerCase("tr"));
+    return `${iki ? `<h2 class="etiket" style="margin-top:${i ? 18 : 0}px">${esc(i ? t.as_disi : t.as_toplanti)}</h2>` : ""}
+      <div class="alan"><label for="as_ad_${i}">${esc(t.as_ad)}</label><input type="text" id="as_ad_${i}" data-as-ad="${i}" value="${esc(x.ad)}" placeholder="${esc(t.as_ad_ph)}" autocomplete="off" maxlength="24">
+        <div class="ipucu" data-as-ipucu="${i}">${esc(h ? t["as_" + h] : var_ ? t.as_var : i ? "" : t.as_ad_i)}</div></div>
+      <div class="iki"><div class="alan"><span class="etiket">${esc(t.as_bicim)}</span><div class="yongalar">${asYonga(i, "bicim", "siz", t.as_siz, x.bicim !== "sen")}${asYonga(i, "bicim", "sen", t.as_sen, x.bicim === "sen")}</div></div>
+        <div class="alan"><span class="etiket">${esc(t.as_tarz)}</span><div class="yongalar">${asYonga(i, "tarz", "olculu", t.as_olculu, x.tarz !== "rahat")}${asYonga(i, "tarz", "rahat", t.as_rahat, x.tarz === "rahat")}</div></div></div>
+      <div class="alan"><span class="etiket">${esc(t.as_ses)}</span><div class="yongalar">${asYonga(i, "ses", "mac", t.as_mac, ses === "mac")}${pk ? asYonga(i, "ses", "kadin", t.as_kadin, ses === "kadin") + asYonga(i, "ses", "erkek", t.as_erkek, ses === "erkek") : ""}
+        <button class="ikincil-dug" type="button" data-eylem="as-dinle" data-i="${i}" ${D.asDinle != null ? "disabled" : ""}>${esc(D.asDinle === i ? t.as_okuyor : t.as_dinle)}</button></div></div>`;
+  }
   const ADIMLAR = [
     { id: "karsilama", simge: null, cubuksuz: true,
       ciz: () => `<div class="adim karsilama"><div class="simge isaret">${S.isaret}</div>
@@ -314,6 +360,13 @@
         <div class="birak" data-yukle="gorusme" tabindex="0"><b>${esc(t.gor_birak)}</b> <span class="ipucu">· ${esc(t.gor_tur)}</span></div>
         ${(C.gorusmeler || []).length ? `<div class="dosyalar">${C.gorusmeler.map(d => `<div><span>${esc(d)}</span><span>✓</span></div>`).join("")}</div>` : ""}
         <p class="dipnot">${esc(t.sen_not)}</p><p class="dipnot">${dug("ornek", (C.ornek ? "✓ " : "") + t.gor_ornek)} ${dug("atla", t.sonra)}</p>` },
+    // asistan (S133): kullanıcı yalnız asistanla muhatap; ad, hitap, tarz, ses, isteğe bağlı toplantı dışı ikinci asistan → kurulum.py asistan_uygula
+    { id: "asistan", simge: "asistan", b: "as_b", a: "as_a", gir: () => { asistanHazirla(); ciz(); }, hazir: () => !asistanHata(),
+      devamEt: () => { asistanHazirla(); C.asistan.atla = false; kaydet(); },
+      icerik: () => { asistanHazirla(); const s = C.asistan, iki = !!s.iki;
+        return `${(iki ? [0, 1] : [0]).map(i => asistanBlok(i, iki)).join("")}
+          <label class="anahtar"><input type="checkbox" data-as-iki ${iki ? "checked" : ""}><span><b>${esc(t.as_iki)}</b><br><span class="ipucu">${esc(t.as_iki_a)}</span></span></label>
+          <p class="dipnot">${dug("as-atla", t.atla)}<br>${esc(t.as_atla_a)}</p>`; } },
     { id: "proje", simge: "klasor", b: "proje_b", a: "proje_a", gir: () => { if (!C.proje && D.durum) C.proje = D.durum.proje; },
       icerik: () => `<div class="liste">${satir("iyi", C.proje || "~/Suflor", t.proje_icerik, dug("klasor-sec", t.proje_sec))}</div>` },
     { id: "kur", simge: "kur", b: "kur_b", a: "kur_a", hazir: () => { const k = D.kurDurum || {}; return k.ayar === "iyi" && k.aktarici === "iyi"; },
@@ -323,7 +376,7 @@
         return `<div class="liste">${satir(k.ayar || "bekle", t.k_ayar)}${satir(k.proje || "bekle", t.k_proje, C.proje || "")}${k.not === "bos" ? "" : satir(k.not || "bekle", t.k_not, k.not === "iyi" ? t.k_not_a : "")}${satir(k.aktarici || "bekle", t.k_aktarici)}
           ${satir(m.durum === "hazir" ? "iyi" : m.durum === "hata" ? "kotu" : "bekle", t.k_modeller, m.durum === "hazir" ? "" : m.durum === "hata" ? (m.tur === "baska_hesap" ? t.k_m_baska : t.k_m_hata + (m.mesaj ? " (" + m.mesaj + ")" : "")) : `%${m.yuzde || 0}`, m.durum === "hata" ? dug("modeller-yeniden", t.k_m_yeniden) : "")}
           ${k.aktarici === "iyi" && ys ? satir(ys.kurulu ? "iyi" : "uyari", t.k_ses, ys.kurulu ? t.k_ses_ok : t.k_ses_yok, ys.kurulu ? dug("ses-izni", t.k_ses_izin) : "") : ""}</div>
-          ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div><p class="dipnot">${dug("kur-yeniden", t.k_m_yeniden)}</p>` : ""}${(k.uyarilar || []).map(u => `<div class="kart-not uyari">${esc(u)}</div>`).join("")}
+          ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div><p class="dipnot">${dug("kur-yeniden", t.k_m_yeniden)}</p>` : ""}${k.asistan_hata ? `<div class="kart-not uyari">${esc(k.asistan_hata)}</div>` : ""}${(k.uyarilar || []).map(u => `<div class="kart-not uyari">${esc(u)}</div>`).join("")}
           <label class="anahtar"><input type="checkbox" data-teshis ${C.teshis === true ? "checked" : ""}><span><b>${esc(t.p_anahtar)}</b><br><span class="ipucu">${esc(t.p_gider_a)} ${esc(t.p_gitmez_a)}</span></span></label>`; } },
     { id: "hz_tara", simge: "klasor", b: "hz_tara_b", a: "hz_tara_a", hazir: () => !!H().tarama && !H().tara_suruyor,
       gir: async () => { await hzAl(); const tr = H().tarama; if (!H().tara_suruyor && (!tr || Date.now() / 1000 - tr.t > 600)) { await api("hazirlik/tara", {}).catch(() => {}); D.hz = { ...H(), tara_suruyor: true }; }
@@ -487,6 +540,8 @@
     const ht = e.target.closest("[data-hz-terim]");
     if (ht) { const s = D.kartTerim || (D.kartTerim = new Set()), v = ht.dataset.hzTerim, en = (D.kart || {}).sozluk_en_cok || 60;
       if (s.has(v)) s.delete(v); else if (s.size < en) s.add(v); ciz(); return; }
+    const ay = e.target.closest("[data-as]");
+    if (ay) { asistanHazirla(); C.asistan.liste[+ay.dataset.i][ay.dataset.as] = ay.dataset.deger; kaydet(); ciz(); return; }
     const y = e.target.closest(".yonga");
     if (y) {
       const g = y.dataset.grup, v = y.dataset.deger, on = y.getAttribute("aria-pressed") !== "true";
@@ -502,6 +557,9 @@
       const n = ey.dataset.eylem;
       if (n === "kartsiz") { C.kartsiz = true; kaydet(); ciz(); return; }
       if (n === "atla") { git(D.adim + 1); return; }
+      if (n === "as-atla") { asistanHazirla(); C.asistan.atla = true; kaydet(); git(D.adim + 1); return; }
+      if (n === "as-dinle") { const i = +ey.dataset.i, x = C.asistan.liste[i]; D.asDinle = i; ciz();
+        try { await api("asistan/dinle", { ...x, ses: asPocket() ? x.ses : "mac", dil: D.dil }); } catch (e) {} D.asDinle = null; ciz(); return; }
       if (n === "ornek") { C.ornek = !C.ornek; kaydet(); ciz(); return; }
       if (n === "claude-denetle") { await claudeDenetle(); return; }
       if (n === "kur-yeniden") { const a = gorunen()[D.adim]; if (a && a.gir) await a.gir(); return; }  // kurulum adımı başarısızsa
@@ -535,6 +593,13 @@
     const v = e.target.value.trim().toLowerCase(); if (!/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(v)) return;
     C.takvim_adres = [...new Set([...(C.takvim_adres || []), v])]; kaydet(); takvimKaydet(); ciz();
   });
+  document.addEventListener("input", e => {  // asistan adı: yeniden çizmeden (odak kaybolmasın) ipucu ve Devam güncellenir
+    const i = e.target.dataset && e.target.dataset.asAd; if (i == null) return;
+    asistanHazirla(); C.asistan.liste[+i].ad = e.target.value; const h = e.target.value.trim() ? asistanHata(+i) : null, ip = $(`[data-as-ipucu="${i}"]`);
+    if (ip && (h || ip.dataset.h)) { ip.textContent = h ? t["as_" + h] : (+i ? "" : t.as_ad_i); ip.dataset.h = h || ""; }
+    $("#devam").disabled = !!asistanHata(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500);
+  });
+  document.addEventListener("change", e => { if (e.target.matches && e.target.matches("[data-as-iki]")) { asistanHazirla(); C.asistan.iki = e.target.checked; kaydet(); ciz(); } });
   document.addEventListener("input", e => { const k = e.target.dataset && e.target.dataset.cevap; if (k) { C[k] = e.target.value; const a = gorunen()[D.adim]; if (a.hazir) $("#devam").disabled = !a.hazir(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500); } });
   document.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && e.target.tagName !== "TEXTAREA" && !$("#devam").disabled && e.target.tagName !== "BUTTON") $("#devam").click(); });
   $("#devam").addEventListener("click", async () => { const a = gorunen()[D.adim]; if (a.son) { api("ac", { hedef: "pano" }).catch(() => {}); return; }

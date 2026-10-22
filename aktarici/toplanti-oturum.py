@@ -13,8 +13,8 @@ TOPO = {"app": None, "w": None, "durum": "kapali", "sid": None, "mesaj": [], "n"
 TOPO_YENIDEN, TOPO_MESAJ_EN_COK, TOPO_METIN_EN_COK, TOPO_SURE_SN = 2, 400, 6000, 8 * 3600
 TOPO_TERMINAL_ILETI = "(Suflor) Oturum arka plandan Terminal'e alındı; arka plandaki Monitor durdu. Toplantı sürüyorsa izle'yi yeniden başlat, sürmüyorsa kaldığın yerden devam et."
 TOPO_BOSTA_SN = 2 * 3600  # tur bitmiş ve izle yokken bu kadar boşta kalırsa süreç kapanır (~250 MB); "Terminal'de göster" yine aynı oturumu açar
-TOPO_ISTEM = ("Bu toplantı oturumu Suflor.me panosundan arka planda açıldı; Terminal penceresi yok. Kullanıcıya yazdığın her metin panoda 'Claude' bölümünde "
-              "görünür; kullanıcı panodaki kutudan yazar. Kullanıcıya soru sorman gerekiyorsa soruyu kısa ve açık yaz, sonra turu bitir (cevap yeni ileti "
+TOPO_ISTEM = ("Bu toplantı oturumu Suflor.me panosundan arka planda açıldı; Terminal penceresi yok. Kullanıcıya yazdığın her metin panoda asistanın bölümünde "
+              "görünür; kullanıcı yalnız asistanı tanır: kendinden asistanın adıyla söz et, 'Claude' deme; kullanıcı panodaki kutudan yazar. Kullanıcıya soru sorman gerekiyorsa soruyu kısa ve açık yaz, sonra turu bitir (cevap yeni ileti "
               "olarak gelir); AskUserQuestion aracını kullanma. Toplantı sürerken izle döngüsünü bırakma. Kancanın 'Terminal'den onay iste' demesi bu "
               "oturumda panodan onay demektir. Araç çağrılarında açıklama (description) alanını Türkçe, kullanıcıya düz bir cümleyle yaz — ne yapacağını ve "
               "gerekiyorsa neden (ör. \"Kulis'in veri dosyasını okuyup test listesini çıkarmak\"); komut, kod ya da dosya yolu yazma: onay kartında bu cümle görünür. Kullanıcıdan seçim isterken (onay, evet/hayır, birkaç seçenek) mesajının son satırına seçenekleri "
@@ -156,7 +156,7 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         _topo_mesaj("izin", arac_cumlesi(ad, gi))  # v0.112.2: düz cümle, komut yalnız eylem ayrıntısında ve izin-kayit.jsonl'de
         iid = izin_iste("arac", izin_metni(ad, gi), {"arac": ad, "ozet": ozet}, oturum=True)  # v0.115.0: kart değil, Claude bölümünde Onayla / Reddet
         k = izin_bekle(iid) if iid else "zaman_asimi"; TOPO["izin"] = max(0, TOPO["izin"] - 1)
-        _topo_mesaj("sistem", {"onaylandi": _t("İzin verdin.", "You allowed it."), "reddedildi": _t("İzni reddettin.", "You declined.")}.get(k, _t("İzin süresi doldu; Claude bu adımı atladı.", "The permission timed out; Claude skipped this step.")))
+        _topo_mesaj("sistem", {"onaylandi": _t("İzin verdin.", "You allowed it."), "reddedildi": _t("İzni reddettin.", "You declined.")}.get(k, _t("İzin süresi doldu; bu adım atlandı.", "The permission timed out; Claude skipped this step.")))
         cevap = ({"behavior": "allow", "updatedInput": gi} if k == "onaylandi" else
                  {"behavior": "deny", "message": _t(f"{AYAR.get('ad') or 'Kullanıcı'} reddetti (Suflor); bu adımı atla, gerekirse ona sor." if k == "reddedildi" else
                                                      "Kullanıcı onay vermedi (süre doldu); bu adımı atla, gerekirse ona sor.",

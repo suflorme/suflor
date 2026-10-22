@@ -12,25 +12,27 @@ ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").
 sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS") for x in n.targets)] + sec
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
-    ("Cloud, card, English, yes.", "Claude: card, English, yes.", "9 Ekim: virgüllü"),
-    ("...Cloud kaydı kapat.", "...Claude: kaydı kapat.", "11 Ekim: üç noktadan sonra, virgülsüz"),
-    ("Hikayesi duyulmadan... ...Cloud kaydı kapat.", "Hikayesi duyulmadan... ...Claude: kaydı kapat.", "11 Ekim gerçek satır yapısı"),
-    ("Tamam. Klod not al bunu.", "Tamam. Claude: not al bunu.", "nokta + virgülsüz"),
-    ("Klo, özet çıkar.", "Claude: özet çıkar.", "Klo hitabı"),
+    ("Cloud, card, English, yes.", "Cloud, card, English, yes.", "S133: Claude adı seslenme değil — 9 Ekim: virgüllü"),
+    ("...Cloud kaydı kapat.", "...Cloud kaydı kapat.", "S133: Claude adı seslenme değil — 11 Ekim: üç noktadan sonra, virgülsüz"),
+    ("Hikayesi duyulmadan... ...Cloud kaydı kapat.", "Hikayesi duyulmadan... ...Cloud kaydı kapat.", "S133: Claude adı seslenme değil — 11 Ekim gerçek satır yapısı"),
+    ("Tamam. Klod not al bunu.", "Tamam. Klod not al bunu.", "S133: Claude adı seslenme değil — nokta + virgülsüz"),
+    ("Klo, özet çıkar.", "Klo, özet çıkar.", "S133: Claude adı seslenme değil — Klo hitabı"),
     ("Cloud hizmeti pahalı geldi.", "Cloud hizmeti pahalı geldi.", "bulut anlamı, cümle başı"),
     ("Cloud tabanlı bir sistem kuracağız.", "Cloud tabanlı bir sistem kuracağız.", "bulut anlamı"),
     ("Biz cloud'a bağımlıyız.", "Biz cloud'a bağımlıyız.", "cümle ortası, kesmeli"),
     ("Bunu cloud kaydı olarak tutalım.", "Bunu cloud kaydı olarak tutalım.", "cümle ortası, virgülsüz"),
     ("Cloud'a taşıdık.", "Cloud'a taşıdık.", "cümle başı, kesmeli"),
     ("Cloud.", "Cloud.", "tek sözcük"),
-    ("Klot. Kaç kart açık?", "Claude: Kaç kart açık?", "12 Ekim: hitaptan sonra nokta"),
-    ("Tamam. Klot. Not al.", "Tamam. Claude: Not al.", "nokta + hitap + nokta"),
+    ("Klot. Kaç kart açık?", "Klot. Kaç kart açık?", "S133: Claude adı seslenme değil — 12 Ekim: hitaptan sonra nokta"),
+    ("Tamam. Klot. Not al.", "Tamam. Klot. Not al.", "S133: Claude adı seslenme değil — nokta + hitap + nokta"),
     ("Cloud. Hizmeti pahalı.", "Cloud. Hizmeti pahalı.", "nokta sonrası bulut anlamı"),
-    ("Bunu yapayım. Claude kaç kart açık?", "Bunu yapayım. Claude: kaç kart açık?", "12 Ekim: doğru yazım, cümle başı"),
-    ("Bunu yapayım Claude kaç kart açık?", "Bunu yapayım. Claude: kaç kart açık?", "cümle ortası, soru"),
+    ("Bunu yapayım. Claude kaç kart açık?", "Bunu yapayım. Claude kaç kart açık?", "S133: Claude adı seslenme değil — 12 Ekim: doğru yazım, cümle başı"),
+    ("Bunu yapayım Claude kaç kart açık?", "Bunu yapayım Claude kaç kart açık?", "S133: Claude adı seslenme değil — cümle ortası, soru"),
     ("Bunu Claude mu yazdı?", "Bunu Claude mu yazdı?", "cümle ortası, soru eki"),
     ("Bunu Claude ile yazdık.", "Bunu Claude ile yazdık.", "cümle ortası, soru değil"),
     ("Suflor, kaç kart açık?", "Claude: kaç kart açık?", "Suflor uyandırma sözü"),
+    ("Tamam. Suflor. Not al.", "Tamam. Claude: Not al.", "S133: nokta + Suflor + nokta"),
+    ("Bunu yapayım Suflor kaç kart açık?", "Bunu yapayım. Claude: kaç kart açık?", "S133: Suflor cümle ortası, soru"),
     ("Süflör not al.", "Claude: not al.", "Suflor, Whisper yazımı"),
     ("Suflor'u kapattım.", "Suflor'u kapattım.", "Suflor ekli, hitap değil"),
     ("Dün Suflor çok iyiydi.", "Dün Suflor çok iyiydi.", "Suflor cümle ortası, soru değil"),
@@ -105,8 +107,10 @@ ok = r6 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "S94: kişil
 ha("Atlas gelsin", T + 100, T + 101); ok = ns["hitap_askida"]("Atlas gelsin") and ns["hitap_aski_bitti"]("Atlas gelsin") == "Atlas gelsin" and not ns["hitap_askida"]("Atlas gelsin")
 hata += not ok; print(("✓ " if ok else "✗ ") + "S94: devamı gelmeyen askıdaki hitap tek başına bırakılır (hitap_aski_bitti)")
 KIS["v"] = None
-ha("Klod şu an", T + 120, T + 121); r7 = ha("kaç kart açık?", T + 121.3, T + 123)
-ok = r7 == "Klod şu an kaç kart açık?" and ns["hitap_duzelt"](r7)[0].startswith("Claude:"); hata += not ok; print(("✓ " if ok else "✗ ") + "kişiliksiz kurulumda Claude yazımlarıyla da (Klod)")
+ha("Süflör şu an", T + 120, T + 121); r7 = ha("kaç kart açık?", T + 121.3, T + 123)
+ok = r7 == "Süflör şu an kaç kart açık?" and ns["hitap_duzelt"](r7)[0].startswith("Claude:"); hata += not ok; print(("✓ " if ok else "✗ ") + "kişiliksiz kurulumda Suflor yazımlarıyla da (Süflör)")
+ha("Klod şu an", T + 140, T + 141); r8 = ha("kaç kart açık?", T + 141.3, T + 143)
+ok = r8 is None; hata += not ok; print(("✓ " if ok else "✗ ") + "S133: kişiliksiz kurulumda Claude yazımı (Klod) askıya alınmaz")
 
 print("GEÇTİ" if not hata else f"KALDI: {hata}")
 sys.exit(1 if hata else 0)

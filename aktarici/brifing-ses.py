@@ -68,7 +68,7 @@ def _brifing_is(oid, olay):
             ham, olc = claude_json(ham, "brifing", t1, yalin)
             if olc or not yalin: break
             print("BRİFİNG: yalın çağrı okunamadı — tam çağrıyla yeniden")
-        if ham is None: return bitir(durum="hata", hata=_t("Claude yanıt vermedi (izin penceresi ya da zaman aşımı) — yeniden dene", "Claude didn't answer (permission prompt or timeout) — try again"))
+        if ham is None: return bitir(durum="hata", hata=_t(f"{asistan_ad()} yanıt vermedi (izin penceresi ya da zaman aşımı) — yeniden dene", "Claude didn't answer (permission prompt or timeout) — try again"))
         m = re.search(r"\{.*\}", ham, re.S)
         try: j = json.loads(m.group(0)) if m else None
         except ValueError: j = None
