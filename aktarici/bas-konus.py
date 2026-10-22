@@ -576,7 +576,8 @@ def selam_metni(soru, asama, saat=None):  # → selam cümlesi ya da None
     import random
     m = SELAM_RX.search(soru or ""); ad = (str(AYAR.get("ad") or "").split() or [""])[0]
     en = konus_soru_dili(soru) == "en"; T = lambda a, b: b if en else a  # v0.101.4: İngilizce soruya İngilizce selam
-    if m: s = SELAM_KARSILIK[m.group(1).lower()]; s = ("Tekrar merhaba" if s in ("Merhaba", "Selam") else s) if asama == "tekrar" and not en else s
+    k = m.group(1).lower() if m else ""  # (?i) noktasız ı'yı i sayar: "Hı hı" → "hı" selam değil (22 Ekim: KeyError, Sohbet cevapsız kaldı)
+    if k in SELAM_KARSILIK: s = SELAM_KARSILIK[k]; s = ("Tekrar merhaba" if s in ("Merhaba", "Selam") else s) if asama == "tekrar" and not en else s
     elif asama == "tekrar": s = T("Tekrar merhaba", "Hello again")
     elif asama == "ilk":
         h = time.localtime().tm_hour if saat is None else saat
@@ -1419,7 +1420,8 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     if tur["sesli"]:
         sel = kisilik_selam()
         if sel: seslendir(sel, kuyruk=True); tur["tanitim"] = True
-    tur["selam"] = konus_selam(metin, tur)
+    try: tur["selam"] = konus_selam(metin, tur)
+    except Exception as e: tur["selam"] = None; print(f"KONUŞ: selam atlandı ({type(e).__name__}: {e})")  # selam hatası soruyu düşürmesin (22 Ekim: durum 'dusunuyor'da takılı kaldı)
     if dk and _KS.get("defter_md") and _KS["defter_md"] != dk and konus_canli():  # başka toplantının defteri süreçte kalmasın
         konus_kapat("yeni toplantı", durum_koru=True); _KS["tur"] = tur
     ob, ok_ = _once_blogu(simdi)  # biten toplantının defteriyle birlikte de gidebilir (ardışık toplantılar)

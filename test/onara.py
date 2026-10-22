@@ -67,6 +67,7 @@ try:
     bak("kullanıcının selamına aynısıyla (hitaptan sonra da), uzun aradan sonra 'Tekrar merhaba'", sm("Günaydın Asistan. Planımızda ne var?", "ilk", 20) == "Günaydın Deniz."
         and sm("Asistan, selam. Nasılsın?", None) == "Selam Deniz." and sm("Merhaba, bugün ne var?", "tekrar") == "Tekrar merhaba Deniz." and sm("x", "tekrar") == "Tekrar merhaba Deniz.")
     bak("selamsız soruda konuşma sürerken selam yok; 'selamı ilet' selam sayılmaz", sm("Bir de yarına bak.", None) is None and sm("Ayla'ya selamı ilet.", None) is None)
+    bak("'Hı hı' selam değil, çökmez ((?i) ı'yı i sayar; 22 Ekim KeyError)", sm("Hı hı, bugün ne var?", None) is None and sm("Hı.", "ilk", 20) == "İyi akşamlar Deniz.")
     tur_ = {"sesli": True, "toplantida": False, "kaynak": "bas"}
     s1 = ks("Bugün ne var?", tur_); s2 = ks("Peki yarın?", tur_)
     bak("ilk soruda okundu, hemen ardından ikinci soruda yok; aşama artık yok", s1 and okunan == [s1] and s2 is None and sa() is None)
