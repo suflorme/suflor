@@ -4,7 +4,7 @@
 # Aktarıcıda konus_* / Whisper döngüsünün bas dalı / brifing.swift açık süreç kipi / panodaki Konuş değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/bas-konus.py
 # Gerekenler: swiftc, kurulu Brifing.app (ayar.json'daki uygulama klasöründe; paket iskeleti için), whisper-venv (/Users/Shared/Suflor).
-import base64, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
+import glob, base64, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8791)
 T = tempfile.mkdtemp(prefix="bas-"); canli = os.path.join(T, "canli"); os.makedirs(canli); proje = os.path.join(T, "proje"); os.makedirs(proje)
@@ -344,6 +344,24 @@ try:
        and "[İLET" not in (kt.get("cevap") or "") and "İLET" not in okunan and "R12" not in okunan.split("Oturuma talimat")[0]
        and "TALİMAT: Claude hazırladı · oturum → proje onay bekliyor" in log())
     if "TALİMAT: Claude hazırladı" not in log(): print("   okunan:", okunan[:300], "| cevap:", (kt.get("cevap") or "")[:200])
+    # v0.117.0 (S136): toplantı yokken pano kutusundaki soru asistana yazılı gider — cevap panoda, sesli okunmaz. Ayrı deneme aktarıcısıyla
+    # (bu aktarıcıda toplantılar geçti, toplantısız durum yok; yukarıdaki süreç sayaçları ve ölçüm sırası da bozulmasın)
+    canli2 = os.path.join(T, "canli2"); os.makedirs(canli2); P2 = bos_port(PORT + 7)
+    r2 = subprocess.Popen([sys.executable, "relay.py", "--dir", canli2, "--port", str(P2)], cwd=T, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0"),
+                          stdout=open(os.path.join(T, "relay2.log"), "w"), stderr=subprocess.STDOUT)
+    try:
+        for _ in range(50):
+            if os.path.exists(os.path.join(canli2, "kart-anahtari.txt")): break
+            time.sleep(0.2)
+        time.sleep(1); H2 = {"X-Suflor-Anahtar": open(os.path.join(canli2, "kart-anahtari.txt")).read().strip(), "Origin": f"http://127.0.0.1:{P2}"}
+        g = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{P2}/girdi", data=json.dumps({"text": "?Yazılı kutu sorusu"}).encode(), headers=H2), timeout=20).read())
+        st2 = lambda: json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{P2}/status", headers=H2), timeout=10).read())["konus"]
+        t0 = time.time()
+        while time.time() - t0 < 40 and not ("Yazılı kutu" in (st2().get("soru") or "") and st2()["durum"] in ("hazir", "hata")): time.sleep(0.3)
+        k = st2(); l2 = open(os.path.join(T, "relay2.log"), encoding="utf-8").read()
+        ok("v0.117.0: toplantı yokken kutudaki soru asistana yazılı, cevap panoda, okunmadı, döküm açılmadı", g.get("tur") == "asistan" and k["durum"] == "hazir"
+           and "Sorduğun" in (k.get("cevap") or "") and "SES (deneme)" not in l2 and not [f for f in os.listdir(canli2) if f.endswith(".md")] and "Traceback" not in l2)
+    finally: r2.terminate(); r2.wait()
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

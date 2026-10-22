@@ -54,6 +54,7 @@ try:
           "telaffuz: Kahve=Kahfe\nses: gemini:Kore\nyerel_ses: pocket:alperiox:female_2\nhiz: 1,0\n---\n## Kişilik: NOVA\nHitap: \"siz\" dersin. Özel kural.\nTon: elle yazılmış ton.\n")
     open(oz, "w", encoding="utf-8").write(OZ); bak = lambda y: glob.glob(y + ".bak-*")
     K.pocket_kurulu = lambda a=None: False
+    kontrol("elle yazılmış ton tanınır (sihirbaz tarz seçeneği yerine not gösterir)", K._kis_oku(oz)["tarz_elle"] is True)
     d0 = K._kis_oku(oz); x0 = {"ad": "NOVA", "bicim": "siz", "tarz": d0["tarz"], "ses": K._kis_ses(d0)}
     K.asistan_uygula({"ad": "Ayşe"}, {"asistan": {"liste": [x0]}}, "tr")
     kontrol("var olan asistan, değişiklik yok: dosya bayt bayt aynı, yedek yok", open(oz, encoding="utf-8").read() == OZ and not bak(oz))
@@ -80,7 +81,7 @@ try:
     # sihirbazı doldurmak için durum
     os.makedirs(os.path.dirname(K.AYAR_YOL), exist_ok=True); json.dump(a3, open(K.AYAR_YOL, "w"))
     d = K.asistan_durum()
-    kontrol("asistan_durum: bağlı iki asistan sihirbaza döner", d["toplanti"]["ad"] == "Çınar" and d["disi"] == {"ad": "Işık", "bicim": "sen", "tarz": "rahat", "ses": "mac"} and "pocket" in d)
+    kontrol("asistan_durum: bağlı iki asistan sihirbaza döner", d["toplanti"]["ad"] == "Çınar" and d["disi"] == {"ad": "Işık", "bicim": "sen", "tarz": "rahat", "ses": "mac", "tarz_elle": False} and "pocket" in d)
     # tamamla: ayar + Whisper terimi
     json.dump({"ad": "Ayşe Yılmaz", "whisper_terimler": ["Jira"]}, open(K.AYAR_YOL, "w"))
     s = K.tamamla({"ad": "Ayşe Yılmaz", "proje": EV + "/Suflor", "asistan": {"liste": [{"ad": "Defne"}]}}, "tr")

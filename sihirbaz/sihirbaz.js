@@ -55,7 +55,8 @@
       as_iki: "Toplantı dışında ayrı bir asistan ister misin?", as_iki_a: "Örneğin toplantıda ölçülü bir asistan, kendi başınayken daha rahat konuşan ikinci bir asistan. Toplantıda öbürüne adıyla seslenirsen o cevaplar.",
       as_toplanti: "Toplantıda", as_disi: "Toplantı dışında", as_atla_a: "Atlarsan asistanın adı Suflor olur; sonra kurulumu yeniden açarak ad koyabilirsin.",
       as_ayni: "İki asistanın adı farklı olmalı.", as_suflor: "Suflor adı uygulamanın kendisine ayrıldı; başka bir ad seç.", as_gecersiz: "Ad 2–24 harf olmalı; rakam ve işaret kullanma.",
-      as_var: "Bu asistan bu Mac'te zaten var; ayarları değişmeden kullanılır.",
+      as_var: "Bu asistan bu Mac'te zaten var; yalnız burada değiştirdiğin hitap, tarz ve ses dosyasına yazılır (önce yedeği alınır).",
+      as_tarz_elle: "Bu asistanın tonu kişilik dosyasında elle yazılmış; burada değiştirilmez. Değiştirmek için dosyayı düzenle.",
       sen_b: "Seni tanıyalım",       ad: "Adın", ad_i: "Toplantılarda göründüğü gibi", rol: "Rolün ya da unvanın", sirket: "Şirketin (isteğe bağlı)", is_alani: "İş alanın",
       alanlar: ["E-ticaret", "Yazılım", "Danışmanlık", "Finans", "Sağlık", "Eğitim", "Üretim", "Kamu", "Diğer"],
                                                                               gor_tur: ".docx · .vtt · .txt · .md",
@@ -150,7 +151,8 @@
       as_iki: "Do you want a separate assistant outside meetings?", as_iki_a: "For example, a measured assistant in meetings and a more relaxed one when you're on your own. In a meeting, call the other one by name and it answers.",
       as_toplanti: "In meetings", as_disi: "Outside meetings", as_atla_a: "If you skip, the assistant is called Suflor; you can name it later by opening setup again.",
       as_ayni: "The two assistants need different names.", as_suflor: "Suflor is the app's own name; pick another.", as_gecersiz: "Use 2–24 letters; no digits or symbols.",
-      as_var: "This assistant already exists on this Mac; its settings are kept as they are.",
+      as_var: "This assistant already exists on this Mac; only the form of address, style and voice you change here are written to its file (after a backup).",
+      as_tarz_elle: "This assistant's tone is hand-written in its persona file, so it can't be changed here. Edit the file to change it.",
       sen_b: "Tell us about you",       ad: "Your name", ad_i: "As it appears in meetings", rol: "Your role or title", sirket: "Company (optional)", is_alani: "Your field",
       alanlar: ["E-commerce", "Software", "Consulting", "Finance", "Healthcare", "Education", "Manufacturing", "Public sector", "Other"],
                                                                               gor_tur: ".docx · .vtt · .txt · .md",
@@ -325,12 +327,13 @@
   const asYonga = (i, alan, deger, yazi, secili) => `<button class="yonga" type="button" data-as="${alan}" data-i="${i}" data-deger="${deger}" aria-pressed="${!!secili}">${esc(yazi)}</button>`;
   function asistanBlok(i, iki) {
     const x = C.asistan.liste[i], pk = asTr(), ses = pk ? x.ses : "mac", h = x.ad.trim() ? asistanHata(i) : null;
-    const var_ = Object.values((D.durum || {}).asistan || {}).some(m => m && m.ad && m.ad.toLocaleLowerCase("tr") === x.ad.trim().toLocaleLowerCase("tr"));
+    const mev = Object.values((D.durum || {}).asistan || {}).find(m => m && m.ad && m.ad.toLocaleLowerCase("tr") === x.ad.trim().toLocaleLowerCase("tr")), var_ = !!mev;
+    const elle = !!(mev && mev.tarz_elle);  // ton dosyada elle yazılmış: tarz seçimi uygulanmaz (kurulum.py asistan_guncelle), seçenek yerine not
     return `${iki ? `<h2 class="etiket" style="margin-top:${i ? 18 : 0}px">${esc(i ? t.as_disi : t.as_toplanti)}</h2>` : ""}
       <div class="alan"><label for="as_ad_${i}">${esc(t.as_ad)}</label><input type="text" id="as_ad_${i}" data-as-ad="${i}" value="${esc(x.ad)}" placeholder="${esc(t.as_ad_ph)}" autocomplete="off" maxlength="24">
         <div class="ipucu" data-as-ipucu="${i}">${esc(h ? t["as_" + h] : var_ ? t.as_var : i ? "" : t.as_ad_i)}</div></div>
       <div class="iki"><div class="alan"><span class="etiket">${esc(t.as_bicim)}</span><div class="yongalar">${asYonga(i, "bicim", "siz", t.as_siz, x.bicim !== "sen")}${asYonga(i, "bicim", "sen", t.as_sen, x.bicim === "sen")}</div></div>
-        <div class="alan"><span class="etiket">${esc(t.as_tarz)}</span><div class="yongalar">${asYonga(i, "tarz", "olculu", t.as_olculu, x.tarz !== "rahat")}${asYonga(i, "tarz", "rahat", t.as_rahat, x.tarz === "rahat")}</div></div></div>
+        <div class="alan"><span class="etiket">${esc(t.as_tarz)}</span>${elle ? `<div class="ipucu" data-as-tarz-elle="${i}">${esc(t.as_tarz_elle)}</div>` : `<div class="yongalar">${asYonga(i, "tarz", "olculu", t.as_olculu, x.tarz !== "rahat")}${asYonga(i, "tarz", "rahat", t.as_rahat, x.tarz === "rahat")}</div>`}</div></div>
       <div class="alan"><span class="etiket">${esc(t.as_ses)}</span><div class="yongalar">${asYonga(i, "ses", "mac", t.as_mac, ses === "mac")}${pk ? asYonga(i, "ses", "kadin", t.as_kadin, ses === "kadin") + asYonga(i, "ses", "erkek", t.as_erkek, ses === "erkek") : ""}
         <button class="ikincil-dug" type="button" data-eylem="as-dinle" data-i="${i}" ${D.asDinle != null ? "disabled" : ""}>${esc(D.asDinle === i ? t.as_okuyor : t.as_dinle)}</button></div></div>`;
   }
@@ -620,6 +623,7 @@
     $("#devam").disabled = !!asistanHata(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500);
   });
   document.addEventListener("change", e => { if (e.target.matches && e.target.matches("[data-as-iki]")) { asistanHazirla(); C.asistan.iki = e.target.checked; kaydet(); ciz(); } });
+  document.addEventListener("change", e => { if (e.target.dataset && e.target.dataset.asAd != null) ciz(); });  // ad alanından çıkınca: var olan asistan notu ve tarz seçeneği yeni ada göre
   document.addEventListener("input", e => { const k = e.target.dataset && e.target.dataset.cevap; if (k) { C[k] = e.target.value; const a = gorunen()[D.adim]; if (a.hazir) $("#devam").disabled = !a.hazir(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500); } });
   document.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && e.target.tagName !== "TEXTAREA" && !$("#devam").disabled && e.target.tagName !== "BUTTON") $("#devam").click(); });
   $("#devam").addEventListener("click", async () => { const a = gorunen()[D.adim]; if (a.son) { api("ac", { hedef: "pano" }).catch(() => {}); return; }

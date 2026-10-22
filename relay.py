@@ -695,6 +695,7 @@ def ingest(p):
                 birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if p.get("source") == "whisper" and not onceki else None  # 19 Ekim: bölünen hitap
                 askida = text if hitap_askida(text) else None  # S94: yarım hitap tek başına gitmez; devamı gelmezse HITAP_ASKI_SN sonra tek başına
                 text, hd = hitap_duzelt(text); soz += hd
+                if _KHR["satir"] and "Claude:" in text: e["_hitap_ad"] = _KHR["satir"]  # S133: kullanıcıya görünen dökümde bu ad yazılır (asistan_goster)
                 if askida and "Claude:" in text and e.get("komut_ses") != "uymuyor":
                     e["_konusan"] = True; threading.Thread(target=hitap_aski_zaman, args=(askida,), daemon=True).start()
                 if e.get("komut_ses") != "uymuyor":  # yanındaki birinin sesi kanıt/not istemez
@@ -722,9 +723,10 @@ def ingest(p):
             if e.get("revised"): mark = ("↻ düzeltme " + mark).strip()
             if soz:  # ✎ düzeltildi · ? şüpheli (bağlam yok, düzeltilmedi)
                 mark = (mark + " " + " ".join(("✎ " if z["durum"] == "duzeltildi" else "? ") + f"{z['bicim']}={z['dogru']}" for z in soz)).strip()
-            md_out.append(f"| {e.get('time','')} | {e.get('speaker','?')} | {text} | {mark} |\n")
+            md_out.append(f"| {e.get('time','')} | {e.get('speaker','?')} | {asistan_goster(text, e.get('_hitap_ad'))} | {asistan_goster(mark, e.get('_hitap_ad'))} |\n")
             rec = {"at": p.get("capturedAt"), "id": e.get("id"), "revised": bool(e.get("revised")), "time": e.get("time"), "speaker": e.get("speaker"), "text": text, "flags": flags, "src": p.get("source")}
             if e.get("kanal"): rec["kanal"] = e["kanal"]  # whisper ben/karsi
+            if e.get("_hitap_ad"): rec["hitap"] = e["_hitap_ad"]
             if e.get("_konusan"): rec["konusan"] = True  # izle: "Claude:" sorusunu konuşan cevaplıyor, toplantı oturumu cevap kartı yazmaz
             if soz: rec["raw"] = raw; rec["sozluk"] = soz
             for k in ("seen", "chg", "stableMs", "taslak", "ses", "t0", "t1", "duygu", "kume", "gec", "komut_ses"):  # ses = Whisper parçasının ses sinyalleri  # v0.8.1: taslak = Whisper satırının taslağının ilk görüldüğü an  # v0.4.6: gecikme ölçümü (ilk görülme, son değişme, sabitleme)
@@ -756,7 +758,7 @@ def note(p):
     m = p.get("meeting") or {}; title = m.get("title", STATE["meeting"] or "Toplantı")
     with LOCK:
         now = datetime.datetime.now().strftime("%H:%M:%S")
-        cell = " / ".join((p.get("text") or "").replace("|", "¦").splitlines())  # çok satırlı not tabloyu bozmasın
+        cell = asistan_goster(" / ".join((p.get("text") or "").replace("|", "¦").splitlines()))  # çok satırlı not tabloyu bozmasın; S133: "Claude: …" notu asistanın adıyla (jsonl'de değişmez)
         etk = "SUFLOR (sesli)" if p.get("kaynak") == "suflor" else NOT_ETIKET; ek = {"kaynak": "suflor"} if p.get("kaynak") == "suflor" else {}  # v0.40.0: Suflor'un toplantıya söylediği
         b = None if m.get("title") else bitmis_dosya()
         if b:  # biten toplantının dosyasına, toplantıyı yeniden açmadan
@@ -990,8 +992,12 @@ def tail(n=200):
     # (kullanıcı) pano yeniden açılınca son oturumdan kalan döküm görünmesin — yalnız süren toplantı
     if not STATE["file"] or not aktif_dosya(): return []
     jl = os.path.join(BASE, STATE["file"].replace(".md", ".jsonl"))
-    try: lines = open(jl, encoding="utf-8").read().splitlines()[-n:]; return ceviri_uygula([json.loads(x) for x in lines], STATE["file"])
+    try: lines = open(jl, encoding="utf-8").read().splitlines()[-n:]; rs = ceviri_uygula([json.loads(x) for x in lines], STATE["file"])
     except Exception: return []
+    for r in rs:  # S133: panodaki canlı döküm — içerideki "Claude:" hitabı asistanın adıyla (dosya değişmez)
+        for k in ("text", "note"):
+            if "Claude:" in str(r.get(k) or ""): r[k] = asistan_goster(r[k], r.get("hitap"))
+    return rs
 
 # Pano sayfaları (pano/: pano.html — pano ve mini pano, yazi.css) ve marka yazı tipleri/işareti (marka/): aktarıcının
 # yanındaki kopyadan (aktarici-kur.command kopyalar: launchd Masaüstü'ndeki kod klasörünü okuyamaz), yoksa ayardaki kod klasöründen.
@@ -1641,6 +1647,7 @@ bolum("posta")  # aktarici/posta.py — E-posta: Mac Mail'in yerel dizininden so
 bolum("moderator")  # aktarici/moderator.py — Toplantı moderatörü: gündem, söz, özet ve karar (v0.83.0, S93)
 bolum("otonom")  # aktarici/otonom.py — Toplantıda otonom katılım: seslenince cevap, itiraz penceresi, söz sırası (S68)
 bolum("defter")  # aktarici/defter.py — Toplantı defteri: biten toplantıyı bas-konuşla sorma (S48)
+bolum("notlar")  # aktarici/notlar.py — Notlar defteri: toplantı yokken kutu, soru asistana yazılı (v0.117.0, S136)
 bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, toplantılarda arama, dökümü panoda okuma (v0.116.0)
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
@@ -1931,7 +1938,7 @@ class H(BaseHTTPRequestHandler):
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
             s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
-            af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
+            af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
             if s.get("extension"):
@@ -2062,6 +2069,9 @@ class H(BaseHTTPRequestHandler):
             # menü uygulaması son 60 sn'de yoklamadıysa pencere: false → istemci eskisi gibi tarayıcıda açar
             if time.time() - STATE.get("_menu_yokluyor", 0) > 60: return self._json({"ok": True, "pencere": False})
             STATE["pano_ac"] = {"id": "p" + str(int(time.time() * 1000)), "t": time.time()}; kart_bildir(); return self._json({"ok": True, "pencere": True})
+        if self.path == "/notlar":  # v0.117.0: panoda notu sil — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(notlar_islem(p))
         if self.path == "/son-ac":  # panodaki "Özeti aç" — yalnız pano (aynı köken + pano anahtarı), yalnız kayıttaki özet
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(son_ac(p))
@@ -2102,6 +2112,9 @@ class H(BaseHTTPRequestHandler):
             # GİRDİ olayıyla hemen Claude'a gider (soruysa cevaplar). Claude izlemiyorsa eski kural (başta ? → soru). ⌘Enter her zaman soru.
             tur, metin = girdi_ayir(p.get("text"))
             if not metin: return self._json({"ok": False, "err": "boş"}, 400)
+            if toplantisiz():  # v0.117.0 (S136): toplantı yokken soru toplantı dışı asistana yazılı, not Notlar defterine (sahte "Toplantı" dökümü açılmaz)
+                if tur == "soru" or p.get("soru"): return self._json(dict(konus_yazili(metin), tur="asistan"))
+                baglam_ekle(baglam_ayir(metin)[0], "kutu"); return self._json(dict(not_defter_yaz(metin, p.get("at")), tur="defter"))
             if tur == "soru" or p.get("soru"): q = ask({"text": metin}); return self._json({"ok": bool(q), "tur": "soru", "question": q})
             claude = bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
             # v0.111.0: arka plandaki toplantı oturumu kullanıcıyı bekliyor (soru sordu) ya da çalışıyor ama izle'de değil (hazırlık) — yazı doğrudan ona gider

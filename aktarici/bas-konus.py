@@ -1259,6 +1259,11 @@ def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsı
     # 7 ilk soruda bırakıştan ilk metne ortanca 2,1 → 5,3 sn, maliyet +%21. Sürecin açılış masrafı zaten konuşma sırasında gizleniyor.
     threading.Thread(target=konus_ac, daemon=True).start()
     return {"ok": True}
+def konus_yazili(metin):  # v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py)
+    if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
+    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True}; _KS["tur"] = tur
+    threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
+    print("KONUŞ: yazılı soru (pano kutusu, toplantı yok)"); return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
     if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
@@ -1419,7 +1424,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     kis = kisilik(); tur["kisi"] = kis["ad"] if kis and len(kisilikler()) >= 2 else None
     if top and tur.get("kaynak") not in ("hitap", "karsi", "moderator"):  # S94: toplantıda Konuş düğmesi (ve sohbet) yalnız kullanıcıya; herkese cevap yalnız adıyla seslenince
         tur["otonom"] = False
-    tur["sesli"] = ((not top) or kulaklik()) and not tur.get("otonom"); tur["toplantida"] = top  # otonom: cevap toplantıya okunur, kulakta da duyulur
+    tur["sesli"] = ((not top) or kulaklik()) and not tur.get("otonom") and not tur.get("yazili"); tur["toplantida"] = top  # otonom: cevap toplantıya okunur, kulakta da duyulur
     tur["bellek_kapsam"] = bellek_kapsam(tur, kis); bsn = bellek_sira(metin, tur, kis)  # v0.64.0 (S78)
     iki = AYAR.get("konus_iki_surec", True) is not False
     if tur["bellek_kapsam"] == "ortak" and _KS.get("ozel_gitti") and konus_canli():  # v0.68.0: kartın özel bölümü süreç geçmişinde kalmasın (toplantı kişiliği görmesin)
@@ -1449,6 +1454,8 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
              f"Meeting in progress: {df['ad'] if df else '?'} — " + (
                  (f"{tur.get('karsi') or 'the user'} addressed you by name in the meeting; the spoken part of your answer is read into the meeting right away and everyone hears it: address the asker directly, 1–3 sentences, fit to say in the meeting (no internal notes, observations about people, other projects' information or private remarks)" if tur.get("kaynak") != "moderator" else "you are chairing the meeting; your answer is read into the meeting")
                  if tur.get("otonom") else "only the user hears this answer, the meeting doesn't; " + ("it is read in the headphones" if tur["sesli"] else "it is shown on the panel only (no headphones)")) + ".\n")) if top else ""
+    if tur.get("yazili"): tb += _t("Kullanıcı bu soruyu panoya yazdı; cevabın sesli okunmaz, yalnız panoda yazılı görünür.\n",
+                                   "The user typed this question on the panel; your answer is not read aloud, it is shown on the panel only.\n")
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar
         _KS["bosta"] = False
         if not konus_canli() and not konus_ac(): _KS["tur"] = None; return

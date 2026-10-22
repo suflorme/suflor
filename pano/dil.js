@@ -344,6 +344,12 @@ globalThis.SUFLOR_EN = {
   "Ses izi hafızası": "Voiceprint memory",
   "Konuşanların ses izi bu Mac’te saklanır; sonraki toplantılarda adları bulunur.": "Speakers' voiceprints are kept on this Mac so their names are found in later meetings.",
   "Konuş geçmişi": "Konuş history",
+  // --- v0.117.0 toplantı yokken kutu: Notlar defteri
+  "Notlar": "Notes",
+  "Notu sil": "Delete note",
+  "Not silinemedi": "Couldn't delete the note",
+  "{asistan} cevaplıyor": "{asistan} is answering",
+  "Notlara yazıldı": "Added to Notes",
   // --- v0.116.0 Toplantılar penceresi (arşiv)
   "Toplantılar": "Meetings",
   "Toplantılarda ara": "Search meetings",

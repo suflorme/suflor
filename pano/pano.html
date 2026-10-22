@@ -154,6 +154,8 @@ dialog#ard[open]{display:flex;flex-direction:column;gap:8px}dialog#ard::backdrop
 #ard mark{background:var(--wa-bg);color:inherit;border-radius:2px;padding:0 1px}.ars{display:grid;grid-template-columns:64px minmax(70px,140px) 1fr;gap:2px 10px;padding:4px 6px;border-bottom:1px solid var(--bd);overflow-wrap:anywhere}
 .ars .arz{color:var(--t3);font-variant-numeric:tabular-nums}.ars .arkim{color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ars.sis{color:var(--t3)}.ars.sec{background:var(--hov);box-shadow:inset 3px 0 0 var(--ac);border-radius:var(--kose-s)}
 @media (max-width:520px){.ars{grid-template-columns:52px 1fr}.ars .arkim{grid-column:2}.ars>span:last-child{grid-column:1/-1}}
+/* v0.117.0 (S136): toplantı yokken kutudan yazılan notlar (canli/notlar.jsonl) */
+.nt{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bd)}.nt .z{color:var(--t3);font-variant-numeric:tabular-nums;flex:none}.nt .m{flex:1;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}.nt button{flex:none}
 dialog#kgd[open]{display:flex;flex-direction:column}  /* v0.109.1: uzun listede Kapat pencerenin altında kesiliyordu — liste kalan alana sığar */
 .kgb{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .kgr{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bd)}.kgr .t{min-width:0}.kgr .s{font-weight:500}
@@ -251,6 +253,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <section id=kns hidden><div class=kn><button id=kb class=knb aria-label="Basılı tut, konuş" title="Basılı tut, sor, bırak — {asistan} sesli cevaplar (ses Mac'ten çıkmaz)"><svg class=i viewBox="0 0 24 24" aria-hidden=true><rect x=9 y=2.5 width=6 height=11.5 rx=3 /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button><div class=knt><div class=knh><span id=kna class=kna>Asistanla konuş</span><span id=ksd class=sohd hidden>Sohbet açık</span><span class=sp1></span><button id=kz2 class=gh hidden>Sus</button><button id=ksb class=knsb hidden title="Sohbeti bitir"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.2A8.5 8.5 0 1 1 20.5 12z"/><path d="M9 10.5v3M12 9v6M15 10.5v3"/></svg><span>Sohbet</span></button></div><div id=knk class=knk>Basılı tut ya da <kbd>Option</kbd> + <kbd>Shift</kbd> + <kbd>Boşluk</kbd></div><div id=knd class=t></div></div></div></section>
 <section id=brs hidden><div class=sh><span class=brb>Brifing <span id=brn class=meta></span></span><button id=brk class=gh aria-expanded=true>Gizle</button></div><div id=br></div></section>
 <section id=dds hidden><div class=sh>Dosyadan döküm <span id=ddn class=meta></span></div><div id=dd></div></section>
+<section id=nts hidden><div class=sh><span>Notlar <span id=ntn class=meta></span></span></div><div id=nt></div></section>
 <section id=sns hidden><div class=sh><span>Son toplantılar</span><button id=snt class=gh type=button>Tüm toplantılar</button></div><div id=sn></div></section>
 <section id=eys hidden><div class=sh><span>Yapılacaklar <span id=eyn class=meta></span></span><button id=eyh class=pri title="Listedeki bekleyen işlerin hepsini onayla — {asistan} yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
 <section id=tos hidden><div class=sh><span class=brb><span id=tosad>Suflor</span> <span id=tosd class=meta></span></span><span class=tod><button id=tosa class=gh title="Araç adımlarını da göster (komutlar, dosyalar)">Ayrıntı</button><button id=tosx class=gh title="Şu anki işi durdurur; yazarsan kaldığı yerden sürer">Durdur</button><button id=tost class=gh title="Aynı oturumu Terminal'de açar; arka plandaki kapanır. Terminal'e alınınca arka plandaki toplantı izlemesi durur (Terminal'de yeniden başlatman gerekir) ve kutuya yazdığın notlar oturuma gitmez — Terminal'den yaz.">Terminal'de göster</button><button id=tosk class=gh title="Toplantı oturumunu kapatır; toplantı sonu işleri (özet) yapılmaz. Sürdürmek için sonra Terminal'de göster.">Kapat</button></span></div><div id=tol class=tol hidden></div><div id=tom class=tom></div><div id=tiz></div><div id=tob class=tob></div></section>
@@ -456,7 +459,7 @@ function payUy(s){const p=s.pay;return!!(p&&p.ben_son!=null&&p.ben_son>=60&&p.ke
 // tek kutu, tek düğme — "?", "soru", "Claude" ya da iki boşlukla başlayan soru, gerisi not (ayrım aktarıcıda; ⌘Enter hep soru).
 // Gönderince düğmede kısa onay: "✓ not" / "✓ soru".
 function wireBox(ta,btn){
-  const go=async soru=>{const t=ta.value;if(!t.trim())return;ta.value="";const r=await sendGirdi(t,soru);if(r.tur==="oturum")r.tur="{asistan} aldı";if(document.documentElement.classList.contains('mac'))geciciDurum(r.tur?"✓ "+L(r.tur):L("gönderilemedi"),"",2500)  // Mac penceresinde düğme yalnız ok simgesi: onay başlıkta
+  const go=async soru=>{const t=ta.value;if(!t.trim())return;ta.value="";const r=await sendGirdi(t,soru);if(r.tur==="oturum")r.tur="{asistan} aldı";if(r.tur==="asistan")r.tur=r.ok?"{asistan} cevaplıyor":"";if(r.tur==="defter")r.tur="Notlara yazıldı";if(document.documentElement.classList.contains('mac'))geciciDurum(r.tur?"✓ "+L(r.tur):L("gönderilemedi"),"",2500)  // Mac penceresinde düğme yalnız ok simgesi: onay başlıkta
     const e=btn.innerHTML;btn.textContent=r.tur?"✓ "+L(r.tur):L("gönderilemedi");setTimeout(()=>btn.innerHTML=e,1500);refresh()}
   btn.onclick=()=>go(false)
   ta.onkeydown=ev=>{if(ev.key==="Enter"&&!ev.shiftKey&&!ev.isComposing){ev.preventDefault();go(ev.metaKey||ev.ctrlKey)}}
@@ -965,6 +968,12 @@ function gunTxt(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const 
   return (g===0?L('Bugün'):g===1?L('Dün'):g>1&&g<7?d.toLocaleDateString(L('tr-TR'),{weekday:'long'}):d.toLocaleDateString(L('tr-TR'),{day:'numeric',month:'long'}))+' '+s}
 function cikti(c){c=c||{};const p=[['karar','{n} karar'],['is','{n} iş'],['acik','{n} açık']].filter(([k])=>c[k]>0).map(([k,m])=>L(m,{n:c[k]}))
   return p.length?` <span class=chip>${esc(p.join(' · '))}</span>`:''}
+// v0.117.0 (S136): toplantı yokken kutudan yazılan notlar — son 24 saat (aktarici/notlar.py); toplantıda gizli. ✕ notu siler.
+function renderNotlar(s){const ls=s.notlar||[],sec=document.getElementById('nts');sec.hidden=!!s.aktif||!ls.length;if(sec.hidden)return
+  document.getElementById('ntn').textContent=ls.length
+  setH(document.getElementById('nt'),ls.map(x=>`<div class=nt><span class=z>${esc(gunTxt(x.at))}</span><span class=m>${esc(x.metin)}</span><button class="ib gh" data-not-sil="${esc(x.id)}" title="${L('Notu sil')}" aria-label="${L('Notu sil')}">${ic('x')}</button></div>`).join(''))}
+document.getElementById('nt').addEventListener('click',async ev=>{const b=ev.target.closest('[data-not-sil]');if(!b)return;let r={};try{r=await j('/notlar',{method:'POST',body:JSON.stringify({sil:b.dataset.notSil})})}catch(e){}
+  if(!r.ok)geciciDurum(L('Not silinemedi'),r.err||'');refresh()})
 function renderSon(s){const ls=s.son_toplantilar||[],sec=document.getElementById('sns');sec.hidden=!!s.aktif||!ls.length;if(sec.hidden)return
   setH(document.getElementById('sn'),ls.map(r=>`<div class=sn><div class=t data-son="${esc(r.id)}" title="${L('Özeti aç')} — ${esc(r.ad)}"><div class=b><span class=z>${esc(gunTxt(r.at))}</span>${esc(r.baslik||r.ad)}${cikti(r.cikti)}</div>${r.degerlendirme&&!/^(yok|-|—)\.?$/i.test(String(r.degerlendirme).trim())?`<div class=d>${esc(r.degerlendirme)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}</div><span class=akw><button class="ib akd" data-aktar="sn:${esc(r.id)}" aria-haspopup=menu aria-expanded="${akAcik==='sn:'+r.id}" title="${L('Zihin haritası, dışarı aktar')}" aria-label="${L('Zihin haritası, dışarı aktar')}">${ic('dahasi')}</button>${akAcik==='sn:'+r.id?akMenu('sn:'+r.id,-1,r.harita?`<button class=aki data-son="${esc(r.id)}" data-tur=harita role=menuitem>${ic('harita',L('Zihin haritası'))}</button><hr>`:''):''}</span></div>`).join(''))}
 document.getElementById('sn').addEventListener('click',async ev=>{if(akTik(ev,renderSon))return;const b=ev.target.closest('[data-son]');if(!b)return
@@ -1057,7 +1066,7 @@ durumCiz()
 const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
-paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSon(s); renderOturum(s)
+paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderNotlar(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSon(s); renderOturum(s)
 if(s.ayarlar&&s.ayarlar.deger)temaUygula(s.ayarlar.deger.tema||'sistem')  // tema başka pencereden (Ayarlar) değiştiyse de
 // arayüz dili başka pencereden (Ayarlar) değiştiyse bu sayfa da yeni dille yeniden yüklenir
 if(s.ayarlar&&s.ayarlar.deger&&s.ayarlar.deger.dil&&s.ayarlar.deger.dil!==DIL&&!new URLSearchParams(location.search).get('dil')&&!window._dilYeni){window._dilYeni=1;location.reload()}

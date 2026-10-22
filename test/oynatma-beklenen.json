@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 242702,
-   "sha": "89ce9db1ab0a270d"
+   "uzunluk": 244421,
+   "sha": "858cca275939d8e8"
   },
   "/mini": {
-   "uzunluk": 242702,
-   "sha": "89ce9db1ab0a270d"
+   "uzunluk": 244421,
+   "sha": "858cca275939d8e8"
   },
   "/status": {
    "_ping_son": "float",
@@ -533,6 +533,7 @@
     "Deneme toplantısı — altyapı": "str"
    },
    "notes": "int",
+   "notlar": [],
    "pano_ac": "NoneType",
    "pay": {
     "adsiz": "int",

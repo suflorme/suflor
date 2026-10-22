@@ -101,6 +101,13 @@ def hitap_askida(metin): return bool(metin) and HITAP_ASKI["metin"] == metin  # 
 def hitap_aski_bitti(metin):  # S94: askıdaki satıra HITAP_ASKI_SN içinde devam gelmedi → tek başına hitap ("<Ad> gelsin" kaybolmasın) — metni döndürür, yoksa None
     if HITAP_ASKI["metin"] != metin: return None
     HITAP_ASKI.update(metin=None); return metin
+# S133 (kullanıcı, 22 Ekim): dışarı aktarılan dökümde kullanıcının satırı "<kullanıcı>: Claude: …" görünüyordu. İçeride (jsonl, izle, Konuş) hitap biçimi
+# "Claude:" kalır; kullanıcıya görünen dökümde (.md, panodaki canlı döküm, Dökümler penceresi) seslenilen asistanın adı yazılır ("<ad>, …").
+_ASG_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)Claude:\s*")
+def asistan_goster(metin, ad=None):  # ad: satırda seslenilen asistan (jsonl "hitap"); yoksa toplantı asistanı
+    if not metin or "Claude:" not in metin: return metin
+    ad = ad or (asistan_ad() if "asistan_ad" in globals() else None) or "Suflor"
+    return _ASG_RX.sub(lambda m: m.group(1) + ad + ", ", metin).replace("Cloud=Claude:", "→ " + ad)
 def hitap_duzelt(text):
     krx = _kisilik_hitap_rx(); _KHR["satir"] = None
     def kd(m):

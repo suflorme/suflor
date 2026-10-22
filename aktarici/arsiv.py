@@ -122,7 +122,7 @@ def arsiv_dokum(i):  # GET /toplantilar/dokum?id=<dosya adı .md'siz>
     if not d: return {"ok": False, "err": _t("döküm yok", "no transcript")}
     s = d["satirlar"]
     return {"ok": True, **_ar_ozet(f, d, _ar_ozetler()), "kesildi": len(s) > ARSIV_DOKUM_EN_COK,
-            "satirlar": [{"saat": x[0], "kim": x[1], "metin": x[2], "isaret": x[3], "sistem": x[4]} for x in s[:ARSIV_DOKUM_EN_COK]]}
+            "satirlar": [{"saat": x[0], "kim": x[1], "metin": asistan_goster(x[2]), "isaret": asistan_goster(x[3]), "sistem": x[4]} for x in s[:ARSIV_DOKUM_EN_COK]]}  # S133: eski dökümlerde "Claude:" hitabı
 
 def arsiv_ozet_kaydi(i):  # son_ac'ın yedeği: SON bellekte yalnız son 20 kaydı tutar; arşivdeki eski toplantının "Özeti aç"ı için
     return next((r for r in _ar_ozetler().values() if r.get("id") == str(i or "")), None)

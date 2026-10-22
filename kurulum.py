@@ -260,6 +260,7 @@ def _kis_oku(yol):  # kişilik dosyasının ayar satırları → dict (yoksa Non
     for sat in m.group(1).splitlines():
         k, _, v = sat.partition(":"); d[k.strip().lower()] = v.strip()
     d["tarz"] = "rahat" if "Ton (rahat)" in s or "Tone (relaxed)" in s else "olculu"
+    d["tarz_elle"] = not re.search(r"(?m)^(Ton \((ölçülü|rahat)\)|Tone \((measured|relaxed)\)):", s)  # ton sihirbaz biçiminde değil: tarz seçimi uygulanmaz, sihirbaz söyler
     return d if d.get("ad") else None
 def pocket_kurulu(a=None):
     a = a if a is not None else ayar()
@@ -269,7 +270,7 @@ def asistan_durum():  # /api/durum → sihirbaz: Pocket var mı, ayarda bağlı 
     for k, rol in (("kisilik", "toplanti"), ("kisilik_toplanti_disi", "disi")):
         d = _kis_oku(a.get(k)) if a.get(k) else None
         if d:
-            out[rol] = {"ad": d["ad"], "bicim": "sen" if d.get("hitap_bicimi", "").lower() == "sen" else "siz", "tarz": d["tarz"], "ses": _kis_ses(d)}
+            out[rol] = {"ad": d["ad"], "bicim": "sen" if d.get("hitap_bicimi", "").lower() == "sen" else "siz", "tarz": d["tarz"], "ses": _kis_ses(d), "tarz_elle": d["tarz_elle"]}
     return out
 ASISTAN_AD_RX = re.compile(r"[A-Za-zÇĞİIÖŞÜçğıiöşüÂâÎîÛû][A-Za-zÇĞİIÖŞÜçğıiöşüÂâÎîÛû' -]{1,23}")
 def asistan_ad_temiz(ad):
