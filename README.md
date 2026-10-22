@@ -1,27 +1,32 @@
 # Suflor.me
 
-Toplantıda kulağına fısıldayan asistan. Suflor.me, Microsoft Teams toplantını Mac'inde canlı olarak yazıya döker.
-Claude konuşmayı izler ve sana küçük kartlarla ne sorman, neyi belirtmen ya da neye dikkat etmen gerektiğini söyler.
-Kartlara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplantılarını da katar.
+Toplantıda ve toplantı dışında yanında olan, adını senin koyduğun sesli asistan. Suflor.me toplantını Mac'inde canlı olarak yazıya döker;
+asistanın konuşmayı izler, sana küçük kartlarla ne sorman, neyi belirtmen ya da neye dikkat etmen gerektiğini söyler, adıyla seslenince
+cevap verir. Kartlara ve cevaplara yalnız o toplantıyı değil, projenin belgelerini ve geçmiş toplantılarını da katar.
 
-> Durum: erken sürüm. Yalnız Mac (Apple Silicon) ve Teams web (Chrome) destekleniyor; Google Meet ve Zoom web sırada.
+> Durum: beta. Yalnız Mac (Apple Silicon). Toplantı: Teams, Google Meet ve Zoom web (Chrome); Teams ve Zoom masaüstü menü çubuğu uygulamasıyla.
 
 ## Ne yapar
-- **Canlı döküm:** senin sesin ve karşı tarafın sesi Mac'te, yerel Whisper modeliyle yazıya döker. Teams'in altyazısı
-  ya da dökümü açıksa konuşmacı adlarını oradan alır.
-- **Kartlar:** Claude toplantıyı izler ve Teams ekranının köşesindeki küçük şeride ve panoya kart gönderir:
-  *Sor*, *Belirt*, *Değinme*, *Dikkat*, *Bilgi*. Toplantıdaki rolüne (yöneten, katılımcı, dinleyici) göre az ya da çok konuşur.
-- **Proje bağlamı:** konuşmada geçen bir iddia, rakam ya da sorumluluk daha önceki bir belgede ya da toplantıda farklı
-  geçiyorsa bunu fark eder ve kaynağıyla birlikte söyler.
-- **Soru sor, not düş:** panoya yazdığın metin `?`, `soru`, `Claude` ya da iki boşlukla başlıyorsa Claude'a soru olur
-  ve birkaç saniyede kartla cevaplanır; başka bir şeyle başlıyorsa toplantıya not olarak düşer.
-- **Kanıt:** Option + Shift + K ile toplantı ekranının görüntüsünü kaydeder (ekranda şifre görünürse uyarır).
-- **Toplantı sonu:** özet ve başında toplantı çıktısı (kararlar, sahibi ve tarihi belli işler, açık kalanlar, tek öneri); özetin yanında
-  gündem maddelerine göre **zihin haritası** (tarayıcıda açılır, resim olarak indirilir). Kararlar ve iddialar bu Mac'te bir
-  **karar grafında** birikir: sonraki toplantıda aynı kişi farklı bir rakam söylerse Claude fark eder.
-- **Konuşmacı adları:** altyazının ad verdiği kişilerin ses izi bu Mac'te saklanır (**ses izi hafızası**); altyazı yokken (Teams
-  masaüstü, panoya bırakılan kayıt) adı oradan bulur. Silmek için: `toplanti-claude.py hafiza --sil "<ad>"`.
-- **Platformlar:** Teams web; Google Meet ve Zoom web (altyazıdan; ilk sürüm). Teams ve Zoom masaüstü menü çubuğu uygulamasıyla.
+- **Tek muhatap: asistanın.** Kurulumda ona ad koyarsın; panoda, kartlarda ve seste yalnız onun adı geçer. Ona adıyla seslenirsin
+  ("Defne, bütçe ne kadardı?") ya da yazarsın; işi kim yaparsa yapsın cevap onun adıyla ve sesiyle gelir.
+- **Tek kutu:** her görünümün altında aynı kutu: solda `+` (belge ekle), ortada yazı, sağda mikrofon. Mikrofona basılı tut = sesle sor,
+  iki kez dokun = eller serbest sohbet. Yazdığın soru asistana gider; toplantıda not deftere düşer.
+- **Canlı döküm:** senin sesin ve karşı tarafın sesi Mac'te, yerel konuşma tanımayla (Whisper) yazıya dökülür. Toplantı uygulamasının
+  altyazısı açıksa konuşmacı adları oradan alınır.
+- **Kartlar:** asistan toplantıyı izler ve toplantı ekranının köşesindeki küçük şeride ve panoya kart gönderir: **SÖYLE** (şunu de ya da sor),
+  **DUR** (yapma, açma), **CEVAP**, **NOT**. Toplantıdaki rolüne (yöneten, katılımcı, dinleyici) göre az ya da çok konuşur.
+- **Toplantıda asistan:** istersen asistanın toplantıda herkesin duyacağı şekilde konuşur; "<ad>, dur" ya da Option + Shift + S susturur.
+- **Proje bağlamı:** konuşmada geçen bir iddia, rakam ya da sorumluluk daha önceki bir belgede ya da toplantıda farklı geçiyorsa fark eder
+  ve kaynağıyla söyler.
+- **Kanıt:** "kanıt al" ya da Option + Shift + K toplantı ekranını, "ekran görüntüsü al" o an baktığın pencereyi kaydeder (ekranda şifre görünürse uyarır).
+- **Başka oturuma iş:** "<ad>, şunu proje oturumuna ilet" dediğinde ileti onay kartıyla sunulur; onaylarsan iletilir.
+- **Toplantı sonu:** özet ve başında toplantı çıktısı (kararlar, sahibi ve tarihi belli işler, açık kalanlar, tek öneri); gündem maddelerine göre
+  **zihin haritası**. Kararlar ve iddialar bu Mac'te bir **karar grafında** birikir: sonraki toplantıda aynı kişi farklı bir rakam söylerse fark edilir.
+- **Toplantılar penceresi:** bütün toplantı dökümleri tek yerde; dökümlerde ve özetlerde arama.
+- **Konuşmacı adları:** altyazının ad verdiği kişilerin ses izi bu Mac'te saklanır (**ses izi hafızası**); altyazı yokken (masaüstü toplantı,
+  panoya bırakılan kayıt) adı oradan bulur. Silmek için: `toplanti-claude.py hafiza --sil "<ad>"`.
+- **Mac uygulaması:** pano kendi Mac penceresinde (araç çubuğu, kenar çubuğunda Şimdi · Bugün · Arşiv, ayrı Ayarlar ve Yardım, açık/koyu tema);
+  Chrome'daki pano da çalışır.
 
 ## Gizlilik
 - Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
@@ -62,6 +67,9 @@ Her yayın geliştiricinin anahtarıyla imzalıdır: kurulum ve güncelleme indi
 çıkarırsın), PDF, sunum ve görüntüleri bu Mac'te metne çevirip dizinler ve istersen proje kartını (özet, kişiler, kararlar, açık işler, terimler)
 Claude'la hazırlar; kartı onaylamadan önce düzeltirsin. Arka planda sürer, sihirbazı kapatsan da biter. Sonradan: panoda ⚙ Ayarlar → Proje →
 **Projeyi yeniden hazırla**.
+Proje klasörün buluttaysa (iCloud Drive, Google Drive, OneDrive, Dropbox): yalnız bulutta duran dosyalar indirilmez, adı ve yeriyle tanınır;
+içinde arama için dosyayı Mac'e indirmen gerekir (sonraki turda kendiliğinden okunur). Google Dokümanlar/E-Tablolar/Slaytlar Mac'te yalnız kısayol
+olduğu için bugün okunmaz.
 
 **Güncelleme:** yeni sürüm çıkınca panonun sağ üstünde **Güncelle** düğmesi belirir (toplantı yokken); tıklaman yeter, Chrome
 eklentisi de kendini yeniler. Elle: `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
@@ -69,12 +77,13 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 
 ## Kullanım (kısaca)
 1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).
-   Claude gündemi kurar, hazır olunca toplantıya katılırsın.
+   Gündem kurulur, hazır olunca toplantıya katılırsın.
 2. Karşı tarafın sesi kendiliğinden yazıya dökülür (Suflor Ses yardımcısı, macOS 14.4+; ilk kurulumda macOS "Sistem Sesi Kaydı" izni
    sorar — İzin Ver). Yardımcı yoksa ya da izin verilmediyse Chrome'daki toplantıda **Suflor.me simgesi → "Karşı taraf" satırındaki Aç** (satır yalnız sorun varken görünür; masaüstü Teams/Zoom'da yedek yok).
-3. Kartlar Teams'in sol altındaki küçük şeritte ve panoda görünür: **SÖYLE** (şunu de/sor), **DUR** (yapma/açma), **CEVAP**; **NOT** yalnız panoda. ✓ yaptım · Okudum · ✕ gerek yok.
-4. Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? (Claude tek cümlelik replik önerir) · **Option + Shift + M** sessiz (10 dk kart yok; tekrar basınca kapanır). Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin. ⭐ önemli an panoda düğme.
-5. Toplantı bitince Claude özeti çıkarır ve sana sunar.
+3. Kartlar toplantı ekranının sol altındaki küçük şeritte ve panoda görünür. ✓ yaptım · 👁 okudum · ✕ gerek yok. Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin.
+4. Toplantıda kutunun üstünde sağda: **Ne diyeyim?** (tek cümlelik replik önerisi), **Kanıt**, **Sessiz** (10 dk kart yok); "⋯" içinde önemli an, gizli toplantı, sesli çeviri.
+   Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? · **Option + Shift + M** sessiz · **Option + Shift + S** asistan sussun.
+5. Toplantı bitince özet hazırlanır ve sana sunulur.
 6. Brifing ve özet panoda **Dışarı aktar** ile PDF, e-posta taslağı (alıcısız, katılımcılara ya da kendine), panoya kopya ya da .md dosyası olur.
    Taslağın açılacağı yeri (Gmail, Outlook web ya da Mac'in posta uygulaması) ve gönderen adresini sihirbazın takvim ekranında seçersin;
    sonradan ayar.json'da `"eposta"` ve `"eposta_adres"`. Seçmezsen takvimine bakılarak seçilir.
