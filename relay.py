@@ -1589,7 +1589,7 @@ def ayarlar_view():
     d["dil"] = ARAYUZ_DILI; d["ses_hizi"] = str(AYAR.get("ses_hizi") or "1.0")
     vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] != "kisilik" and k != "dil"}  # kişilik ve dil "varsayılana dön"le değişmez
     vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
-    return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP)}
+    return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici()}
 def ayar_yaz(deg):
     hata, yeni = {}, {}
     for k, v in (deg or {}).items():

@@ -177,8 +177,10 @@ def _sh(*c):
     try: return (subprocess.run(list(c), capture_output=True, text=True, timeout=5).stdout or "").strip()
     except Exception: return ""
 def ortam(ayar, uyg, eklenti=None, aktarici=None):
-    try: kod = json.load(open(os.path.join(os.path.expanduser(str(ayar.get("kod") or _BURASI)), "manifest.json"))).get("version")
-    except Exception: kod = None
+    kod = None
+    for d in (os.path.expanduser(str(ayar.get("kod") or "")), _BURASI):  # launchd'deki aktarıcı Masaüstü'ndeki kod klasörünü okuyamaz ("v?"): yanındaki kopyaya düş
+        try: kod = json.load(open(os.path.join(d, "manifest.json"))).get("version"); break
+        except Exception: pass
     return {"kurulum": kurulum_id(uyg), "kod": kod or "?", "surum": aktarici or "?", "eklenti": eklenti or "?",
             "model": _sh("sysctl", "-n", "hw.model") or "?", "macos": platform.mac_ver()[0] or "?",
             "bellek_gb": round(int(_sh("sysctl", "-n", "hw.memsize") or 0) / 2**30), "arayuz": "en" if ayar.get("dil") == "en" else "tr",
