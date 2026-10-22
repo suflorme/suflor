@@ -206,11 +206,11 @@ try:
     ok("toplantı sürerken Konuş: cevap geldi, bağlamda 'Toplantı sürüyor … yalnız panoda'", k14["durum"] == "hazir" and "Toplantı bağlamı geldi" in (k14.get("cevap") or ""))
     ok("kulaklık yokken toplantıda cevap okunmadı", log().count("SES (deneme)") == ses0)
     def ben(i, metin): uc2("/ingest", {"meeting": {"title": "Başka toplantı"}, "source": "whisper", "entries": [{"id": f"w/{i}", "speaker": "Deniz T", "time": f"11:0{i}:00", "text": metin, "kanal": "ben"}]})
-    ben(1, "Claude, bütçe ne kadardı?"); t0 = time.time()
+    ben(1, "Suflor, bütçe ne kadardı?"); t0 = time.time()
     while time.time() - t0 < 30 and not (st().get("kaynak") == "hitap" and st()["durum"] in ("hazir", "hata")): time.sleep(0.2)
     k15 = st(); c = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"))]
     jl = [json.loads(l) for f in os.listdir(canli) if f.endswith(".jsonl") and not f.startswith("claude") for l in open(os.path.join(canli, f)) if '"w/1"' in l]
-    ok("sesli 'Claude, …' sorusu konuşana gitti, cevap panoda", k15["durum"] == "hazir" and "bütçe ne kadardı" in (k15.get("soru") or "") and "Sorduğun" in (k15.get("cevap") or "")
+    ok("sesli 'Suflor, …' sorusu konuşana gitti, cevap panoda", k15["durum"] == "hazir" and "bütçe ne kadardı" in (k15.get("soru") or "") and "Sorduğun" in (k15.get("cevap") or "")
        and c[-1].get("kaynak") == "hitap" and c[-1].get("toplantida") is True and c[-1].get("sesli") is False)
     ok("döküm satırında konusan işareti (izle: toplantı oturumu cevap kartı yazmaz)", bool(jl) and jl[-1].get("konusan") is True)
     n0 = log().count("konuşana gitti")

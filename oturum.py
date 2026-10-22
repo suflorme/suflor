@@ -11,7 +11,7 @@
 #   python3 -B oturum.py kilit <ad> <iş>             yayın kilidi (başkasındaysa durur, çıkış 2); coz <ad> bırakır
 #   python3 -B oturum.py durum                       kayıtlar, kilit, kaydedilmemiş dosyalar ve sahipleri
 #   (--kanca: commit kancası · --kurulum: aktarici-kur.command öncesi · --yayin: yayinla.py öncesi denetim)
-import json, os, subprocess, sys, time
+import ast, fnmatch, json, os, re, subprocess, sys, time
 KOK = os.path.dirname(os.path.abspath(__file__))
 def git(*a): return subprocess.run(["git", "-C", KOK] + list(a), capture_output=True, text=True).stdout
 GIT = git("rev-parse", "--absolute-git-dir").strip() or None
@@ -78,9 +78,19 @@ def kanca():  # commit kancası: başka oturumun dosyası commit'e girmez
     kl = kilit_al()
     if kl and kl["ad"] != b: print(f"✗ OTURUM: commit durdu — yayın kilidi {kl['ad']}'de ({kl.get('is')}); sürüm numarası çakışmasın. Bitince yeniden dene."); return 1
     return 0
+def _kopya():  # kurulum.py'nin canlıya kopyaladığı yollar (KOPYA: dosya, "klasör/", desen); metinden okunur (içe aktarmak kurulumu çalıştırırdı)
+    try:
+        m = re.search(r"^KOPYA = (\[[^\n]*\])", open(os.path.join(KOK, "kurulum.py"), encoding="utf-8").read(), re.M)
+        return ast.literal_eval(m.group(1)) if m else None
+    except (OSError, ValueError, SyntaxError): return None
+def canliya_gider(y, kopya):  # izlenmeyen dosya kurulumda kopyalanır mı (liste okunamazsa evet: eskisi gibi durdur)
+    return kopya is None or any(y.startswith(k) if k.endswith("/") else fnmatch.fnmatch(y, k) for k in kopya)
 def kurulum():  # aktarici-kur.command öncesi: kaydedilmemiş kod ya da başkasının kilidi varken kurmaz
     if not os.path.exists(ISARET): return 0
-    kr = [(s, y) for s, y in kirli() if not y.startswith(DIS)]; k = kayitlar(); kl = kilit_al(); b = ben()
+    # izlenmeyen dosya yalnız kurulumun kopyaladığı yerdeyse sayılır (22 Ekim: başka oturumun kökteki pocket-gereksinim.txt'si kurulumu durdurdu;
+    # aktarici/ ve pano/ bütün kopyalandığı için oradaki izlenmeyen dosya canlıya gider — o yine durdurur)
+    kp = _kopya()
+    kr = [(s, y) for s, y in kirli() if not y.startswith(DIS) and (s != "??" or canliya_gider(y, kp))]; k = kayitlar(); kl = kilit_al(); b = ben()
     if kr:
         print("Kurulmadı — kaydedilmemiş değişiklik var (canlıya yarım kod gitmesin; önce commit):")
         for s, y in kr: print(f"  {s} {y}  ← " + (k[y]["ad"] if y in k else "sahipsiz"))
