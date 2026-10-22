@@ -1139,7 +1139,7 @@ def masaustu_kis_ms():
     return max(0, int((k["bitis"] - time.time()) * 1000)) if k else 0
 def deneme_aktarici():
     # deneme aktarıcısı: deneme ayarı (SUFLOR_AYAR), ayardakinden başka port ya da başka veri klasörü. Tek kopya yardımcıları (Suflor Ses,
-    # Suflor Menü, anahtar yardımcısı) yalnız canlı aktarıcı yönetir — 12 Ekim: 8799'daki test aktarıcısı canlı ses yardımcısını kendine
+    # Suflor.me menü uygulaması, anahtar yardımcısı) yalnız canlı aktarıcı yönetir — 12 Ekim: 8799'daki test aktarıcısı canlı ses yardımcısını kendine
     # bağladı, süren toplantının karşı kanalı kesildi.
     try: return bool(os.environ.get("SUFLOR_TEST_BASLAT") or os.environ.get("SUFLOR_AYAR") or A.port != int(AYAR["port"])
                      or os.path.realpath(BASE) != os.path.realpath(os.path.join(AYAR["uygulama"], "canli")))
@@ -1162,7 +1162,10 @@ def _yerel_ses_dongu():
 
 # --- Menü çubuğu uygulaması (v0.27.0, Faz 5; ayar menu_cubugu: true): aktarıcı açılırken bir kez açar (kapatılırsa aktarıcı yeniden
 # başlayana kadar kapalı kalır). Uygulama anahtarı kart-anahtari.txt'den okur; panel panonun ?gorunum=panel görünümü.
-MENU_APP = os.path.join(AYAR["uygulama"], "Suflor Menü.app")
+# v0.119.0: ~/Applications/Suflor.me.app (kurulum.py menu_yolu); argümanlar menu-argumanlar.json'a da yazılır — kullanıcı uygulamayı
+# Launchpad'den ya da Spotlight'tan açınca (argümansız) aynı port, anahtar ve seçeneklerle açılsın.
+MENU_APP = os.path.expanduser("~/Applications/Suflor.me.app")
+MENU_ARG = os.path.join(os.path.dirname(AYAR_YOL), "menu-argumanlar.json")
 MENU_LOG = os.path.expanduser("~/Library/Logs/suflor-menu.log")
 MENU_HATA_LOG = os.path.expanduser("~/Library/Logs/suflor-menu-hata.log")  # v0.97.0: stdout ve stderr aynı dosyaya ayrı açılınca (open --stdout X --stderr X) iki ayrı
 # dosya konumu birbirinin üstüne yazıyordu — günlükte yarım satırlar ("apandı", "neli okundu"); stderr ayrı dosyada
@@ -1170,9 +1173,14 @@ def menu_baslat():
     if AYAR.get("menu_cubugu") is not True or deneme_aktarici() or not os.path.isdir(MENU_APP): return
     try:
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
-        subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_HATA_LOG, "--args", "--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
-                       + (["--masaustu-mic-kapali"] if AYAR.get("masaustu_mic") is False else []) + (["--kisayol-kapali"] if AYAR.get("kisayollar") is False else [])
-                       + (["--kisiler-ac"] if AYAR.get("masaustu_kisiler") is True else []) + (["--ortak-mik"] if AYAR.get("toplantiya_ses") is True else []), capture_output=True, timeout=20)
+        ma = (["--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
+              + (["--masaustu-mic-kapali"] if AYAR.get("masaustu_mic") is False else []) + (["--kisayol-kapali"] if AYAR.get("kisayollar") is False else [])
+              + (["--kisiler-ac"] if AYAR.get("masaustu_kisiler") is True else []) + (["--ortak-mik"] if AYAR.get("toplantiya_ses") is True else []))
+        try:
+            with open(MENU_ARG + ".tmp", "w", encoding="utf-8") as f: json.dump(ma, f)
+            os.replace(MENU_ARG + ".tmp", MENU_ARG)
+        except OSError: pass
+        subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_HATA_LOG, "--args"] + ma, capture_output=True, timeout=20)
         print("MENÜ: menü çubuğu uygulaması başlatıldı")
     except Exception as e: print(f"MENÜ: başlatılamadı ({e.__class__.__name__})")
 
@@ -1288,7 +1296,7 @@ def masaustu_mic_al(p):
     if p.get("olay") in ("acildi", "kapandi", "izin"):
         if p["olay"] == "acildi": mm.update(acik=True, aygit=ayg); print(f"MASAÜSTÜ MİKROFON: açıldı · {ayg or '?'}")
         elif p["olay"] == "kapandi": mm["acik"] = False; print(f"MASAÜSTÜ MİKROFON: kapandı · parça {mm['parca']}, atılan {mm['atilan']}")
-        else: print("MASAÜSTÜ MİKROFON: izin yok (Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü)")
+        else: print("MASAÜSTÜ MİKROFON: izin yok (Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me)")
         return {"ok": True}
     m = STATE.get("masaustu") or {}
     if not masaustu_baslik() or m.get("sessiz") is True: mm["atilan"] += 1; return {"ok": True, "bekle": True}

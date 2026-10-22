@@ -1,5 +1,7 @@
-// Suflor.me menü çubuğu uygulaması (v0.27.0, Faz 5 çekirdek sürüm) — "Suflor Menü.app". Aktarıcı açar (ayar menu_cubugu: true):
-//   --port <aktarıcı portu> --anahtar <canli/kart-anahtari.txt>
+// Suflor.me menü çubuğu uygulaması (v0.27.0, Faz 5 çekirdek sürüm) — "~/Applications/Suflor.me.app" (v0.119.0'a kadar "Suflor Menü.app",
+// uygulama klasöründe). Aktarıcı açar (ayar menu_cubugu: true): --port <aktarıcı portu> --anahtar <canli/kart-anahtari.txt>
+// Kullanıcı Uygulamalar'dan, Launchpad'den ya da Spotlight'tan açınca argüman gelmez: aktarıcının son açışta yazdığı argümanlar
+// (Application Support/Suflor/menu-argumanlar.json) kullanılır ve pano penceresi açılır; açıkken simgeye tıklamak pencereyi öne getirir.
 // - Menü çubuğunda Replik işareti; biçim durumu söyler: boş (bekliyor), dolu (dinliyor: Whisper kanalı akıyor), nokta (açık kart),
 //   turuncu nokta (onay bekleyen iş). Durum aktarıcının şerit uzun yoklamasından (GET /cards?bekle=25).
 // - Tıkla: buzlu cam (NSVisualEffectView) panelde mini pano — panonun ?gorunum=panel görünümü (WKWebView, saydam). Panel ekran
@@ -17,9 +19,18 @@ import ScreenCaptureKit
 import UserNotifications
 
 setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
-let args = CommandLine.arguments
+let hamArg = CommandLine.arguments
+let ELLE = !hamArg.dropFirst().contains { $0.hasPrefix("--") }  // kullanıcı açtı (aktarıcı her zaman --port verir)
+let args: [String] = ELLE ? [hamArg[0]] + {
+    let dz = NSHomeDirectory() + "/Library/Application Support/Suflor/"
+    if let d = FileManager.default.contents(atPath: dz + "menu-argumanlar.json"), let a = try? JSONSerialization.jsonObject(with: d) as? [String], a.contains("--port") { return a }
+    // aktarıcı henüz yazmadıysa ayar dosyasından port ve anahtar (kurulumdaki varsayılanlarla)
+    let ay = FileManager.default.contents(atPath: dz + "ayar.json").flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+    let uy = ((ay["uygulama"] as? String) ?? "~/Library/Application Support/Suflor") as NSString
+    return ["--port", "\((ay["port"] as? Int) ?? 8765)", "--anahtar", uy.expandingTildeInPath + "/canli/kart-anahtari.txt"]
+}() : hamArg
 // günlük satırları saatli (13 Ekim deneme 8: "bildirim izni yok" satırının ne zaman yazıldığı bilinemedi); teşhis kiplerinin çıktısı saatsiz
-let TANI = args.contains { ["--ax-dokum", "--ax-altyazi", "--kanit-dene", "--ekran-dene", "--ekran-izni", "--simge-yaz"].contains($0) }
+let TANI = args.contains { ["--ax-dokum", "--ax-altyazi", "--kanit-dene", "--ekran-dene", "--ekran-izni", "--simge-yaz", "--izin-durum"].contains($0) }
 let saatBicim: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd HH:mm:ss"; return f }()
 func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
     let s = items.map { "\($0)" }.joined(separator: separator)
@@ -95,7 +106,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         if args.contains("--ortak-mik") { let o = OrtakMik(); ortakMik = o; o.dongu() }  // toplantıya sesli söyle (v0.38.0)
         // bildirimler bu uygulamadan (v0.31.3): tıklayınca özet açılır — osascript bildirimi Betik Düzenleyici'yi açıyordu
         let nc = UNUserNotificationCenter.current(); nc.delegate = self
-        nc.requestAuthorization(options: [.alert, .sound]) { izin, _ in bildirimIzni = izin; if !izin { print("BİLDİRİM: izin yok (Sistem Ayarları → Bildirimler → Suflor Menü)") } }
+        nc.requestAuthorization(options: [.alert, .sound]) { izin, _ in bildirimIzni = izin; if !izin { print("BİLDİRİM: izin yok (Sistem Ayarları → Bildirimler → Suflor.me)") } }
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in  // izin sonradan Sistem Ayarları'ndan verilebilir
             UNUserNotificationCenter.current().getNotificationSettings { a in bildirimIzni = a.authorizationStatus == .authorized || a.authorizationStatus == .provisional }
         }
@@ -109,7 +120,10 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             if e.keyCode == 53, let p = self?.panel, p.isVisible { p.orderOut(nil); return nil }
             return e
         }
+        if ELLE { panoPencere() }  // Uygulamalar'dan açıldı: kullanıcı pencere bekliyor
     }
+    // açıkken Dock, Launchpad, Spotlight ya da Finder'dan yeniden açılınca pano penceresi öne gelir
+    func applicationShouldHandleReopen(_ s: NSApplication, hasVisibleWindows v: Bool) -> Bool { panoPencere(); return false }
     func panelKur() {
         panel = Panel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 500), styleMask: [.nonactivatingPanel, .borderless, .resizable], backing: .buffered, defer: true)
         panel.isFloatingPanel = true; panel.level = .statusBar; panel.hidesOnDeactivate = false; panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -265,7 +279,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         guard kayitci == nil else { return }
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .notDetermined: AVCaptureDevice.requestAccess(for: .audio) { _ in }; uyar("Mikrofon izni soruldu — izin verip yeniden bas"); return
-        case .denied, .restricted: uyar("Mikrofon izni yok: Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü"); return
+        case .denied, .restricted: uyar("Mikrofon izni yok: Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me"); return
         default: break
         }
         let k = Kayitci(); guard k.basla() else { uyar("Mikrofon açılamadı"); return }
@@ -290,7 +304,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
 }
 
 // --- Masaüstü toplantı uygulaması: Erişilebilirlik ile toplantı durumu (Teams yeni sürüm, Zoom) ---------------------------------
-// İzin: Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik → Suflor Menü. Teams (WebView2/Chromium) erişilebilirlik ağacını yalnız
+// İzin: Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik → Suflor.me. Teams (WebView2/Chromium) erişilebilirlik ağacını yalnız
 // istenince kurar: uygulama öğesine AXManualAccessibility ve AXEnhancedUserInterface verilir (12 Ekim gerçek Teams: ikisi de hata kodu döndü ama
 // ağaç ancak ikincisiyle açıldı — her taramada yeniden verilir; `--ax-dokum` etiketleri döker). 3 sn'de bir, pencere başına en çok 6000 öğe;
 // durum değişince ya da toplantıda 10 sn'de bir POST /masaustu. Okunanlar (v0.31.0): "Ayrıl" (toplantıda), mikrofon düğmesi (sessiz),
@@ -377,7 +391,7 @@ final class Masaustu {
     }
     func tara() -> [String: Any]? {
         guard AXIsProcessTrusted() else {
-            if !izinYazildi { izinYazildi = true; print("MASAÜSTÜ: Erişilebilirlik izni yok (Aygıt Denetimi ve Veri Erişimi → Suflor Menü)") }
+            if !izinYazildi { izinYazildi = true; print("MASAÜSTÜ: Erişilebilirlik izni yok (Aygıt Denetimi ve Veri Erişimi → Suflor.me)") }
             if !izinSoruldu, NSWorkspace.shared.runningApplications.contains(where: { a in UYG.contains { $0.bundle == a.bundleIdentifier } }) {
                 izinSoruldu = true; AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
             }
@@ -578,7 +592,7 @@ final class Masaustu {
     }
 }
 
-// --- Masaüstü toplantı penceresinin görüntüsü (v0.31.0; ScreenCaptureKit, izin: Ekran ve Sistem Sesi Kaydı → Suflor Menü) --------
+// --- Masaüstü toplantı penceresinin görüntüsü (v0.31.0; ScreenCaptureKit, izin: Ekran ve Sistem Sesi Kaydı → Suflor.me) --------
 // Kanıt isteği (pano 📷, Option + Shift + K, Claude) masaüstü toplantıdayken toplantı penceresinden alınır → POST /kanit-masaustu.
 // Karşı taraf ekran paylaşırken 3 sn'de bir küçük (64×40 gri) görüntü karşılaştırılır: belirgin değişip duruluyunca ve son kendiliğinden
 // görüntüden ≥ 10 sn geçtiyse tam görüntü (kaynak "oto"; eklentinin web kuralının karşılığı). Görüntü yalnız aktarıcıya (127.0.0.1) gider.
@@ -588,7 +602,7 @@ final class MasaustuKanit {
     init(_ m: Masaustu) { masaustu = m }
     func adaylar(_ pid: pid_t, _ baslik: String) async -> [SCWindow] {
         guard let ic = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false) else {
-            if !izinYazildi { izinYazildi = true; print("MASAÜSTÜ KANIT: ekran kaydı izni yok (Ekran ve Sistem Sesi Kaydı → Suflor Menü)") }
+            if !izinYazildi { izinYazildi = true; print("MASAÜSTÜ KANIT: ekran kaydı izni yok (Ekran ve Sistem Sesi Kaydı → Suflor.me)") }
             return []
         }
         // ekranda görünen, başlıklı pencereler önce (Teams'in gizli/başlıksız yardımcı pencereleri siyah görüntü verir — 12 Ekim denemesi)
@@ -674,7 +688,7 @@ final class MasaustuKanit {
         Task {
             let ic = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
             guard let w = ic?.windows.first(where: { $0.windowID == on.id }) else {
-                if ic == nil && !self.izinYazildi { self.izinYazildi = true; print("MASAÜSTÜ KANIT: ekran kaydı izni yok (Ekran ve Sistem Sesi Kaydı → Suflor Menü)") }
+                if ic == nil && !self.izinYazildi { self.izinYazildi = true; print("MASAÜSTÜ KANIT: ekran kaydı izni yok (Ekran ve Sistem Sesi Kaydı → Suflor.me)") }
                 DispatchQueue.main.async { bitti(nil, on) }; return
             }
             let olcek = NSScreen.main?.backingScaleFactor ?? 2
@@ -1375,6 +1389,12 @@ if let yol = arg("--ekran-dene") {
         }
     }
     NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
+}
+// İzin durumu (v0.119.0, sormaz): kurulum taşınmadan sonra izinlerin kalıp kalmadığını bununla ölçer (open -W -n -a … --args --izin-durum)
+if args.contains("--izin-durum") {
+    let m: String
+    switch AVCaptureDevice.authorizationStatus(for: .audio) { case .authorized: m = "var"; case .notDetermined: m = "sorulmadı"; default: m = "yok" }
+    print("mikrofon=\(m) erisilebilirlik=\(AXIsProcessTrusted() ? "var" : "yok") ekran=\(CGPreflightScreenCaptureAccess() ? "var" : "yok")"); exit(0)
 }
 if args.contains("--ekran-izni") { print("ekran izni:", CGPreflightScreenCaptureAccess() ? "var" : (CGRequestScreenCaptureAccess() ? "verildi" : "soruldu")); exit(0) }
 let uyg = NSApplication.shared

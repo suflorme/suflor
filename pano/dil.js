@@ -41,7 +41,7 @@ globalThis.SUFLOR_EN = {
   "Kulaklık önerilir": "Headphones recommended",
   "masaüstü toplantıda döküm Whisper'la yazılır — Whisper kurulu değil": "in a desktop meeting the transcript comes from Whisper — Whisper is not installed",
   "ses yardımcısı kapalı — aktarici-kur ile yeniden kur": "the audio helper is off — reinstall with aktarici-kur",
-  "Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü": "System Settings → Privacy & Security → Microphone → Suflor Menu",
+  "Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me": "System Settings → Privacy & Security → Microphone → Suflor.me",
   "hoparlörden çıkan ses mikrofonuna giriyor; karşı tarafın sözü senin adınla yazılabilir": "speaker sound reaches your microphone; the other side's words may be written under your name",
   "Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses": "System Settings → Privacy & Security → Screen & System Audio Recording → Suflor Ses",
   "Senin sesin yazılmıyor": "Your voice isn't being transcribed",

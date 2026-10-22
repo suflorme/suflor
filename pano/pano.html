@@ -206,7 +206,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <h3>Sık sorulanlar</h3>
 <details><summary>"… izlemiyor — kart gelmez" ne demek?</summary><p>Döküm yazılıyor ama asistan toplantıyı izlemiyor. Başlığın altındaki Başlat'a bas; toplantı oturumu arka planda açılır, yazdıkları panoda asistanın bölümünde görünür. Soru sorarsa cevabını not kutusuna yaz.</p></details>
 <details><summary>Döküm gelmiyor.</summary><p>Toplantı Chrome'da açık mı, Suflor.me eklentisi yüklü mü bak. Teams'te döküm panelini ya da canlı altyazıyı aç; Meet ve Zoom'da altyazıyı aç. Pano durumu başlıkta söyler.</p></details>
-<details><summary>Mikrofon çalışmıyor.</summary><p>Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü açık olmalı. Karşı tarafın sesi için Ekran ve Sistem Sesi Kaydı → Yalnızca Sistem Sesi Kaydı'nda Suflor Ses'e izin ver.</p></details>
+<details><summary>Mikrofon çalışmıyor.</summary><p>Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me açık olmalı. Karşı tarafın sesi için Ekran ve Sistem Sesi Kaydı → Yalnızca Sistem Sesi Kaydı'nda Suflor Ses'e izin ver.</p></details>
 <details><summary>Basılı tutmak ile iki kez dokunmak farkı ne?</summary><p>Mikrofonu basılı tut: tek soru sor, bırakınca gider. İki kez dokun: Sohbet açılır (kulaklık takılıyken, toplantı dışında); sustuğunda asistan cevaplar, sen yine konuşursun; bir dokunuş kapatır.</p></details>
 <details><summary>Asistanın sesini nasıl değiştiririm?</summary><p>Ayarlar → Ses ve konuşma → Ses. Mac sesi, yerel Türkçe sesler (Piper, Pocket) ya da Gemini. Gemini'de yalnız okunacak cevap metni Google'a gider, ses kaydı gitmez.</p></details>
 <details><summary>Toplantı özetine nereden ulaşırım?</summary><p>Kenar çubuğunda Son toplantılar'a tıkla. Satırdaki ⋯ ya da sağ tık: zihin haritası, PDF, kopyala, .md dosyası, e-posta taslağı.</p></details>
@@ -235,7 +235,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <h3>Frequently asked</h3>
 <details><summary>What does "… isn't watching — no cards will come" mean?</summary><p>The transcript is being written but the assistant is not watching the meeting. Press Start under the title; the meeting session starts in the background and what it writes appears in the assistant's section of the panel. If it asks a question, type your answer in the note box.</p></details>
 <details><summary>No transcript is coming in.</summary><p>Check that the meeting is open in Chrome and the Suflor.me extension is installed. In Teams open the transcript panel or live captions; in Meet and Zoom turn on captions. The panel shows the state in its title.</p></details>
-<details><summary>The microphone does not work.</summary><p>System Settings → Privacy &amp; Security → Microphone → Suflor Menü must be on. For the other side's audio allow Suflor Ses under Screen &amp; System Audio Recording → System Audio Recording Only.</p></details>
+<details><summary>The microphone does not work.</summary><p>System Settings → Privacy &amp; Security → Microphone → Suflor.me must be on. For the other side's audio allow Suflor Ses under Screen &amp; System Audio Recording → System Audio Recording Only.</p></details>
 <details><summary>What is the difference between holding and double-tapping?</summary><p>Hold the microphone: ask one question, it is sent when you release. Double-tap: Chat opens (with headphones, outside meetings); the assistant answers when you pause and you can keep talking; one tap ends it.</p></details>
 <details><summary>How do I change the assistant's voice?</summary><p>Settings → Voice and speech → Voice: Mac voice, local Turkish voices (Piper, Pocket) or Gemini. With Gemini only the answer text to be read goes to Google, never a recording.</p></details>
 <details><summary>Where are my meeting summaries?</summary><p>Click a meeting under Recent meetings in the sidebar. The ⋯ button or a right-click offers mind map, PDF, copy, .md file and email draft.</p></details>
@@ -492,7 +492,7 @@ function durum(s){
     else{
       if(w.yerel==="izin")so.push(["wa",L("Karşı tarafın sesi için izin gerekiyor"),L("Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses")])
       else if(!w.karsi&&!["bekliyor","dinliyor"].includes(w.yerel))so.push(["wa",L("Karşı tarafın sesi yazılmıyor"),L("ses yardımcısı kapalı — aktarici-kur ile yeniden kur")])
-      if(!mm.akiyor&&s.masaustu.sessiz!==true)so.push(["wa",L("Senin sesin yazılmıyor"),L("Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor Menü")])}
+      if(!mm.akiyor&&s.masaustu.sessiz!==true)so.push(["wa",L("Senin sesin yazılmıyor"),L("Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me")])}
     if(!izl)so.push(["wa",L("{asistan} izlemiyor — kart gelmez"),"",L("Başlat")])}
   else if(cagri){
     const yon=(x.yonerge&&x.yonerge.altyazi)||L("Diğer → Dil ve konuşma → Canlı altyazı")

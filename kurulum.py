@@ -825,7 +825,7 @@ BRIFING_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 MENU_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleIdentifier</key><string>local.suflor.menu</string><key>CFBundleName</key><string>Suflor Menü</string>
+  <key>CFBundleIdentifier</key><string>local.suflor.menu</string><key>CFBundleName</key><string>Suflor.me</string><key>CFBundleDisplayName</key><string>Suflor.me</string>
   <key>CFBundleExecutable</key><string>SuflorMenu</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Suflor.me bas-konuş: Option + Shift + Boşluk basılıyken sesin yalnız bu Mac'teki yerel konuşma tanımaya gider.</string>
@@ -966,8 +966,8 @@ def glob_(desen):
 # v0.63.0: derleme kararı kaynağın içeriğine bağlı (uygulama klasöründe derleme.json: ikili adı → kaynağın SHA-256'sı). Önceden dosya saatine bakılıyordu:
 # başka bir kopyadan (git worktree) yapılan kurulum eski kaynağı yeni saatle derleyince sonraki kurulum güncel kaynağı "eski" sayıp atlıyordu
 # (17 Ekim: Brifing yardımcısı yeni kipi tanımadı). Kaydı olmayan eski kurulumda bir kez saat kuralı geçerli, kayıt yazılır.
-def _derleme_kaydi(uyg, ikili_ad, sha=None):
-    y = os.path.join(os.path.dirname(uyg), "derleme.json")
+def _derleme_kaydi(dizin, ikili_ad, sha=None):  # dizin: kaydın klasörü (uygulama klasörü; ~/Applications'a kayıt yazılmaz)
+    y = os.path.join(dizin, "derleme.json")
     try: d = json.load(open(y, encoding="utf-8"))
     except (OSError, ValueError): d = {}
     if sha is None: return d.get(ikili_ad)
@@ -976,13 +976,13 @@ def _derleme_kaydi(uyg, ikili_ad, sha=None):
         with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(d, f, indent=1)
         os.replace(y + ".tmp", y)
     except OSError: pass
-def derle(uyg, kaynak, ikili_ad, plist):  # Swift yardımcısı: kaynak değiştiyse (ya da ikili yoksa) derlenir; True = yeni derlendi
-    ikili = os.path.join(uyg, "Contents", "MacOS", ikili_ad); kay = os.path.join(KOD, kaynak)
+def derle(uyg, kaynak, ikili_ad, plist, kayit_dizin=None):  # Swift yardımcısı: kaynak değiştiyse (ya da ikili yoksa) derlenir; True = yeni derlendi
+    ikili = os.path.join(uyg, "Contents", "MacOS", ikili_ad); kay = os.path.join(KOD, kaynak); kd = kayit_dizin or os.path.dirname(uyg)
     if not shutil.which("swiftc"): return False
     import hashlib
-    sha = hashlib.sha256(open(kay, "rb").read()).hexdigest(); kayit = _derleme_kaydi(uyg, ikili_ad)
+    sha = hashlib.sha256(open(kay, "rb").read()).hexdigest(); kayit = _derleme_kaydi(kd, ikili_ad)
     if os.access(ikili, os.X_OK) and (kayit == sha or kayit is None and os.path.getmtime(kay) <= os.path.getmtime(ikili)):
-        if kayit is None: _derleme_kaydi(uyg, ikili_ad, sha)
+        if kayit is None: _derleme_kaydi(kd, ikili_ad, sha)
         return False
     os.makedirs(os.path.dirname(ikili), exist_ok=True)
     open(os.path.join(uyg, "Contents", "Info.plist"), "w", encoding="utf-8").write(plist)
@@ -990,7 +990,7 @@ def derle(uyg, kaynak, ikili_ad, plist):  # Swift yardımcısı: kaynak değişt
     fd, gunluk = tempfile.mkstemp(prefix=f"suflor-{ikili_ad.lower()}-derleme.")
     with os.fdopen(fd, "w") as g: r = subprocess.run(["swiftc", "-O", "-o", ikili, kay], stdout=subprocess.DEVNULL, stderr=g)
     if r.returncode: return gunluk
-    os.remove(gunluk); _derleme_kaydi(uyg, ikili_ad, sha); return True
+    os.remove(gunluk); _derleme_kaydi(kd, ikili_ad, sha); return True
 def menu_simge(mnu):  # paket simgesi (imzadan önce): ikilinin çizdiği 1024 px PNG → sips → Contents/Resources/AppIcon.icns
     res = os.path.join(mnu, "Contents", "Resources"); os.makedirs(res, exist_ok=True); gec = tempfile.mkdtemp(prefix="suflor-simge-")
     try:
@@ -1000,6 +1000,32 @@ def menu_simge(mnu):  # paket simgesi (imzadan önce): ikilinin çizdiği 1024 p
         if not (r and r.returncode == 0): return False
         sessiz("touch", mnu); return True  # Finder/Dock simge önbelleği paketi yeniden okusun
     finally: shutil.rmtree(gec, ignore_errors=True)
+# v0.119.0: menü uygulaması sıradan bir Mac uygulaması gibi ~/Applications/Suflor.me.app'te (Launchpad, Spotlight, Finder'daki Uygulamalar);
+# ~/Applications hesaba özel, ikinci macOS hesabı kendi kopyasını kurar. Önceden uygulama klasöründe "Suflor Menü.app" idi. Paket kimliği
+# (local.suflor.menu) ve kalıcı yerel imza aynı: macOS izinleri kimliğe ve imzaya bağlı, yola değil.
+LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+def menu_yolu(): return os.path.join(EV, "Applications", "Suflor.me.app")
+IZIN_AD = {"mikrofon": "Mikrofon", "erisilebilirlik": "Erişilebilirlik", "ekran": "Ekran ve Sistem Sesi Kaydı"}
+def menu_izin_durum(mnu):  # {"mikrofon": "var|yok|sorulmadı", …}; uygulama kendi kimliğiyle açılır (open), yoksa izin Terminal'inki ölçülürdü
+    fd, cik = tempfile.mkstemp(prefix="suflor-izin-"); os.close(fd)
+    try:
+        sessiz("open", "-W", "-n", "-g", "-a", mnu, "--stdout", cik, "--args", "--izin-durum", timeout=30)
+        return dict(x.split("=", 1) for x in open(cik, encoding="utf-8").read().split() if "=" in x)
+    except OSError: return {}
+    finally: os.remove(cik)
+def menu_yerlestir(mnu, eski, tasindi):  # imzadan sonra: eski kopyayı kaldırır, Launchpad/Spotlight'a tanıtır, taşındıysa izinleri ölçer
+    if os.path.isdir(eski) and os.access(os.path.join(mnu, "Contents", "MacOS", "SuflorMenu"), os.X_OK):
+        sessiz("pkill", "-u", str(os.getuid()), "-f", "Suflor Menü.app/Contents/MacOS/SuflorMenu"); sessiz(LSREGISTER, "-u", eski)
+        shutil.rmtree(eski, ignore_errors=True); say(f"Menü uygulaması Uygulamalar klasörüne taşındı: {mnu} (Launchpad ve Spotlight'ta \"Suflor.me\")")
+    sessiz(LSREGISTER, "-f", mnu)
+    if tasindi:
+        d = menu_izin_durum(mnu); eksik = [IZIN_AD[k] for k in IZIN_AD if d.get(k) and d[k] != "var"]
+        if not d: say("Not: izin durumu okunamadı — macOS Suflor.me için mikrofon, erişilebilirlik ya da ekran kaydı iznini yeniden sorarsa İzin Ver de.")
+        elif eksik: say(f"Not: macOS Suflor.me için şu izni yeniden sorabilir: {', '.join(eksik)} — sorunca İzin Ver de (Sistem Ayarları → Gizlilik ve Güvenlik).")
+        else: say("İzinler yerinde: mikrofon, erişilebilirlik, ekran kaydı taşınmadan etkilenmedi.")
+    r = sessiz("defaults", "read", "com.apple.dock", "persistent-apps")
+    if r and "Suflor%20Men" in (r.stdout or ""):
+        say("Not: Dock'a sabitlediğin eski \"Suflor Menü\" artık açılmaz — onu Dock'tan sürükleyip çıkar, Uygulamalar'daki Suflor.me'yi sabitle.")
 def yerel_imza():  # yerel-imza.sh (kalıcı yerel imza); kurulamazsa "-" = geçici imza
     r = sessiz("/bin/bash", "-c", '. "$1"; yerel_imza', "_", os.path.join(KOD, "yerel-imza.sh"))
     return (r.stdout.strip() if r else "") or "-"
@@ -1108,16 +1134,19 @@ def kur():
     pst = os.path.join(app, "Suflor Posta.app"); r = derle(pst, "posta.swift", "SuflorPosta", POSTA_PLIST)
     if r is True: say(f"Posta yardımcısı derlendi: {pst}")
     elif r: say(f"UYARI: posta yardımcısı derlenemedi ({r}) — e-posta okuma kapalı kalır")
-    # menü çubuğu uygulaması (Faz 5): yalnız ayar menu_cubugu: true iken (beta kurulumunda kapalı); aktarıcı açar
-    mnu = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn, mtn, pst]
-    if ayar().get("menu_cubugu") is True:
-        r = derle(mnu, "menu-cubugu.swift", "SuflorMenu", MENU_PLIST)
+    # menü çubuğu uygulaması (Faz 5): yalnız ayar menu_cubugu: true iken (beta kurulumunda kapalı); aktarıcı açar. v0.119.0: ~/Applications/Suflor.me.app
+    mnu = menu_yolu(); eski = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn, mtn, pst]; menu_acik = ayar().get("menu_cubugu") is True
+    tasindi = menu_acik and os.path.isdir(eski) and not os.path.isdir(mnu)
+    if menu_acik:
+        os.makedirs(os.path.dirname(mnu), exist_ok=True)
+        r = derle(mnu, "menu-cubugu.swift", "SuflorMenu", MENU_PLIST, kayit_dizin=app)
         if r is True: say(f"Menü çubuğu uygulaması derlendi: {mnu}"); sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorMenu")
         elif r: say(f"UYARI: menü çubuğu uygulaması derlenemedi ({r})")
         if r is True or not os.path.exists(os.path.join(mnu, "Contents", "Resources", "AppIcon.icns")):
             say("Menü uygulamasına Dock simgesi eklendi" if menu_simge(mnu) else "UYARI: Dock simgesi yazılamadı — pencere kapanınca Dock'ta genel simge görünür")
         imz.append(mnu)
     imzala(imz)
+    if menu_acik and os.path.isdir(mnu): menu_yerlestir(mnu, eski, tasindi)
     from xml.sax.saxutils import escape as x
     log = os.path.join(EV, "Library", "Logs", "suflor-aktarici.log")
     os.makedirs(os.path.dirname(plist_yolu()), exist_ok=True)

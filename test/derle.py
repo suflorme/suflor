@@ -26,6 +26,14 @@ try:
     ok("kaynak değişti ama saati eski (başka kopyadan kurulum): yine derlenir", K.derle(uyg, "deneme.swift", "Deneme", "<plist/>") is True and cikti() == "iki")
     os.remove(os.path.join(T, "app", "derleme.json")); os.utime(kay, (time.time() - 3600, time.time() - 3600))
     ok("kaydı olmayan eski kurulum: saat kuralı, kayıt yazılır, derlenmez", K.derle(uyg, "deneme.swift", "Deneme", "<plist/>") is False and kayit().get("Deneme"))
+    # v0.119.0: menü uygulaması ~/Applications'ta — kayıt uygulamanın yanına değil, verilen klasöre (uygulama klasörü)
+    dis = os.path.join(T, "Applications", "Suflor.me.app"); os.makedirs(os.path.dirname(dis))
+    ok("kayit_dizin: kayıt verilen klasörde, uygulamanın yanında derleme.json yok",
+       K.derle(dis, "deneme.swift", "Deneme", "<plist/>", kayit_dizin=os.path.join(T, "app")) is True and not os.path.exists(os.path.join(T, "Applications", "derleme.json"))
+       and K.derle(dis, "deneme.swift", "Deneme", "<plist/>", kayit_dizin=os.path.join(T, "app")) is False)
+    ok("menü uygulamasının yeri ~/Applications/Suflor.me.app", K.menu_yolu() == os.path.join(K.EV, "Applications", "Suflor.me.app"))
+    ok("menü uygulamasının adı Suflor.me, kimliği aynı", "<key>CFBundleName</key><string>Suflor.me</string>" in K.MENU_PLIST
+       and "<key>CFBundleDisplayName</key><string>Suflor.me</string>" in K.MENU_PLIST and "local.suflor.menu" in K.MENU_PLIST)
 finally:
     shutil.rmtree(T, ignore_errors=True)
 print("derle:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)
