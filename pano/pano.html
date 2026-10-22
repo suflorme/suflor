@@ -62,6 +62,16 @@ aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var
 textarea{width:100%;font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose);padding:7px 9px;resize:none;outline:none}textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .bt{display:flex;gap:6px;margin-top:7px;align-items:center}#tkf .sgs{display:flex;flex-wrap:wrap;gap:8px 18px}#tkb{padding-left:22px;padding-right:22px}.sn .t[data-son]{cursor:pointer}
 .akw{position:relative;display:inline-flex;flex:none}
+/* Mac penceresi (menü uygulaması sayfaya html.mac ekler; Chrome'daki pano değişmez) — v0.106.0 */
+html.mac.yan-bos .grid,html.mac.yan-kapali .grid{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}html.mac #durum{background:none!important;padding:0}html.mac.yan-bos #rz,html.mac.yan-bos aside,html.mac.yan-kapali #rz,html.mac.yan-kapali aside{display:none}
+html.mac main>.sc{padding:10px 24px 14px}html.mac main>.sc>section{max-width:680px;margin-inline:auto}
+html.mac .sira{padding:12px 16px;border-radius:12px;margin:6px 0 8px;gap:12px}html.mac .sira .b{font-size:17px}html.mac .kn{padding:10px 14px;border-radius:12px}html.mac .knb{width:40px;height:40px}
+html.mac .nb{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:8px;align-items:end;padding:8px 12px 10px}html.mac .nb .bt{display:contents}html.mac .nb .bt>*{grid-row:1}
+html.mac .nb>textarea{grid-column:1;grid-row:1;border-radius:18px;padding:8px 46px 8px 14px;min-height:38px;background:var(--s1)}
+html.mac #yz,html.mac #gz,html.mac #sc,html.mac #sz,html.mac #kz,html.mac .nb .sp1{display:none}
+html.mac #b{grid-column:1;justify-self:end;margin:0 5px 5px 0;width:28px;height:28px;border-radius:50%;padding:0;font-size:0;display:flex;align-items:center;justify-content:center;z-index:1}
+html.mac #b::before{content:"";width:14px;height:14px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M5.5 11.5 12 5l6.5 6.5'/%3E%3C/svg%3E") center/contain no-repeat}
+html.mac #oz{grid-column:2;height:38px;border-radius:19px;padding:0 14px}
 .akp{position:absolute;right:0;top:calc(100% + 4px);z-index:30;display:flex;flex-direction:column;min-width:220px;padding:5px;background:var(--s1);border:1px solid var(--bd2);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.16),0 1px 3px rgba(0,0,0,.08)}
 .akp hr{border:0;border-top:1px solid var(--bd);margin:4px 6px}
 .akp .aki{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;border:0;border-radius:6px;padding:6px 9px;font-size:var(--yz-2);color:var(--tx);white-space:nowrap}
@@ -318,7 +328,8 @@ function payUy(s){const p=s.pay;return!!(p&&p.ben_son!=null&&p.ben_son>=60&&p.ke
 // tek kutu, tek düğme — "?", "soru", "Claude" ya da iki boşlukla başlayan soru, gerisi not (ayrım aktarıcıda; ⌘Enter hep soru).
 // Gönderince düğmede kısa onay: "✓ not" / "✓ soru".
 function wireBox(ta,btn){
-  const go=async soru=>{const t=ta.value;if(!t.trim())return;ta.value="";const r=await sendGirdi(t,soru);const e=btn.innerHTML;btn.textContent=r.tur?"✓ "+L(r.tur):L("gönderilemedi");setTimeout(()=>btn.innerHTML=e,1500);refresh()}
+  const go=async soru=>{const t=ta.value;if(!t.trim())return;ta.value="";const r=await sendGirdi(t,soru);if(document.documentElement.classList.contains('mac'))geciciDurum(r.tur?"✓ "+L(r.tur):L("gönderilemedi"),"",2500)  // Mac penceresinde düğme yalnız ok simgesi: onay başlıkta
+    const e=btn.innerHTML;btn.textContent=r.tur?"✓ "+L(r.tur):L("gönderilemedi");setTimeout(()=>btn.innerHTML=e,1500);refresh()}
   btn.onclick=()=>go(false)
   ta.onkeydown=ev=>{if(ev.key==="Enter"&&!ev.shiftKey&&!ev.isComposing){ev.preventDefault();go(ev.metaKey||ev.ctrlKey)}}
 }
@@ -622,6 +633,12 @@ async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.
   if(k.startsWith('mail')){const p=postaUrl(c,{'mail-k':'k','mail-b':'b'}[k]||'');if(p.kisa)try{await navigator.clipboard.writeText(p.duz)}catch(e){}brAc(p.u,p.yeni);return}
   if(k==='kopyala'){try{await navigator.clipboard.writeText(mdDuz(c.md));btn.textContent='✓ '+L('kopyalandı')}catch(e){btn.textContent=L('kopyalanamadı')}setTimeout(()=>{btn.textContent=L('Kopyala')},1500);return}
   if(k==='md'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c.md.endsWith('\n')?c.md:c.md+'\n'],{type:'text/markdown;charset=utf-8'}));a.download=c.dosya+'.md';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}}
+// Mac penceresinde yan sütun araç çubuğundaki düğmeyle açılıp kapanır (tercih bu tarayıcıda saklanır)
+function yanAcKapa(){const k=document.documentElement.classList.toggle('yan-kapali');try{localStorage.setItem('yanKapali',k?'1':'')}catch(e){}}
+try{if(localStorage.getItem('yanKapali'))document.documentElement.classList.add('yan-kapali')}catch(e){}
+// son toplantı satırına sağ tık: aynı menü, farenin olduğu yerde (Mac bağlam menüsü gibi)
+document.getElementById('sn').addEventListener('contextmenu',ev=>{const r=ev.target.closest('.sn'),b=r&&r.querySelector('button[data-aktar]');if(!b||!last)return
+  ev.preventDefault();akAcik=b.dataset.aktar;renderSon(last);const m=document.querySelector('#sn .akp');if(m)Object.assign(m.style,{position:'fixed',left:Math.min(ev.clientX,innerWidth-240)+'px',top:Math.min(ev.clientY,innerHeight-m.offsetHeight-8)+'px',right:'auto'})})
 function akKapat(){if(!akAcik)return;akAcik=null;if(last){renderSon(last);renderBrifing(last)}}
 document.addEventListener('click',ev=>{if(akAcik&&!ev.composedPath().some(e=>e.classList&&e.classList.contains('akw')))akKapat()});document.addEventListener('keydown',ev=>{if(ev.key==='Escape')akKapat()})  // composedPath: tıklanan düğme yeniden çizimle sayfadan çıkmış olabilir
 function akTik(ev,ciz){const ak=ev.target.closest('button[data-ak]');if(ak){akYap(ak.dataset.ak,ak);if(ak.dataset.ak!=='kopyala')akKapat();return true}
@@ -777,6 +794,9 @@ const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
 paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSon(s)
+// Mac penceresi (html.mac, v0.106.0): toplantıda mı (araç çubuğundaki toplantı düğmeleri), toplantı dışında yan sütun boş mu (gizlenir)
+{const x=s.extension,top=!!(s.aktif||(x&&x.age_s<30&&x.call)||masaustuTop(s)),h=document.documentElement;h.classList.toggle('toplantida',top)
+  h.classList.toggle('yan-bos',!top&&![...document.querySelectorAll('#yan>section[id]')].some(e=>!e.hidden))}
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id+(c.geri||""))); firstCards=false
