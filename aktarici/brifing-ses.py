@@ -376,7 +376,12 @@ def _telaffuz_dongu():
         time.sleep(15)
 _SES_SEC = {"t": 0, "v": None}
 SES_TABAN_HIZ = 180  # v0.71.0: Yelda'nın varsayılan hızı ~180 sözcük/dk (ölçüm 17 Ekim); kişilik hiz çarpanı bunun üstüne
-def kisilik_sesi(zorla=None, toplantiya=False):  # toplantiya: ses katılımcılara gidiyor (v0.81.0, S92: Gemini yalnız orada)  # → (motor "gemini"|"pocket"|"piper"|"mac", ses adı (Gemini hazır sesi / Pocket "model:ses" / Mac say -v; None = sistem sesi), hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
+def kisilik_sesi(zorla=None, toplantiya=False):  # v0.110.0: ⚙ Ayarlar → Ses → Okuma hızı (ses_hizi) Mac ve Piper sesinde kişiliğin hızıyla çarpılır (Pocket ve Gemini hız almıyor)
+    m, v, h = _kisilik_sesi(zorla, toplantiya)
+    try: c = max(0.7, min(1.5, float(AYAR.get("ses_hizi") or 1.0)))
+    except (TypeError, ValueError): c = 1.0
+    return m, v, (h * c if m in ("mac", "piper") else h)
+def _kisilik_sesi(zorla=None, toplantiya=False):  # toplantiya: ses katılımcılara gidiyor (v0.81.0, S92: Gemini yalnız orada)  # → (motor "gemini"|"pocket"|"piper"|"mac", ses adı (Gemini hazır sesi / Pocket "model:ses" / Mac say -v; None = sistem sesi), hız çarpanı); v0.71.0: o an cevaplayan kişiliğin sesi
     k = kisilik(); kses = (k or {}).get("ses"); khiz = (k or {}).get("hiz") or 1.0
     piper_var = ARAYUZ_DILI == "tr" and bool(AYAR.get("piper_python")) and bool(AYAR.get("piper_model"))
     if zorla != "mac":

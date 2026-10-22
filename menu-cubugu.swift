@@ -1102,10 +1102,11 @@ if arg("--panel-dene") != nil {
     }
     let d = PDene(); NSApplication.shared.delegate = d; NSApplication.shared.setActivationPolicy(.accessory); NSApplication.shared.run()
 }
-final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate, NSToolbarDelegate {
+final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate, NSToolbarDelegate, WKUIDelegate {
     let pencere: NSWindow; let web: WKWebView; let yardimKipi: Bool
     // v0.109.0: Mac Ayarlar penceresi gibi üstte simgeli sekmeler (sıra panodaki AYG gruplarıyla aynı); seçilen grup sayfada gösterilir, başlık grubun adı
-    static let GRUPLAR = [("E-posta", "envelope"), ("Ses ve konuşma", "waveform"), ("Toplantı uyarıları", "bell.badge"), ("Çeviri ve masaüstü", "globe"), ("Gizlilik", "hand.raised"), ("Proje", "folder")]
+    static let GRUPLAR = [("Genel", "gearshape"), ("Ses", "speaker.wave.2"), ("Konuş", "mic"), ("Toplantı", "person.2"), ("Kanıt", "camera"),  // v0.110.0: 9 grup
+                          ("Çeviri", "globe"), ("E-posta", "envelope"), ("Gizlilik", "hand.raised"), ("Proje", "folder")]
     func kimlik(_ i: Int) -> NSToolbarItem.Identifier { .init("g\(i)") }
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { AyarPencere.GRUPLAR.indices.map(kimlik) }
     func toolbarAllowedItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
@@ -1129,7 +1130,7 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
         c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: pencere.contentView!.bounds, configuration: c); web.autoresizingMask = [.width, .height]
         super.init()
-        c.userContentController.add(self, name: "suflor"); web.navigationDelegate = self; pencere.delegate = self; pencere.contentView = web
+        c.userContentController.add(self, name: "suflor"); web.navigationDelegate = self; web.uiDelegate = self; pencere.delegate = self; pencere.contentView = web
         if !yardim {
             let t = NSToolbar(identifier: "SuflorAyar"); t.delegate = self; t.displayMode = .iconAndLabel; t.allowsUserCustomization = false
             pencere.toolbar = t; pencere.toolbarStyle = .preference; grupSec(0, sayfaya: false)
@@ -1140,6 +1141,11 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
         let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "", b = bolum.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
         if !pencere.isVisible || !bolum.isEmpty, let u = URL(string: "\(KOK)/?gorunum=\(yardimKipi ? "yardim" : "ayarlar")&k=\(k)" + (b.isEmpty ? "" : "&ayar=\(b)")) { web.load(URLRequest(url: u)) }
         NSApp.setActivationPolicy(.regular); pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    // "Varsayılanlara dön" onayı (v0.110.0): yanıtlayıcı olmadan WebKit confirm()'u sessizce "hayır" sayar
+    func webView(_ w: WKWebView, runJavaScriptConfirmPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        let a = NSAlert(); a.messageText = m; a.addButton(withTitle: "Evet"); a.addButton(withTitle: "Vazgeç")
+        a.beginSheetModal(for: pencere) { completionHandler($0 == .alertFirstButtonReturn) }
     }
     func userContentController(_ u: WKUserContentController, didReceive m: WKScriptMessage) {
         guard let d = m.body as? [String: Any] else { return }

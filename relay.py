@@ -1511,20 +1511,39 @@ def eposta_tur():
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
     "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "sesli_not": ("bool", True, None),"kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
-    "brifing_sesli": ("bool", False, None), "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")),
+    "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac ve Piper sesinde çarpan
+    "dil": ("sec", "tr", ("tr", "en")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
-    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "eposta_oku": ("bool", False, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
+    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "eposta_oku": ("bool", False, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
-    "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None), "menu_cubugu": ("bool", False, None),
-    "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "toplanti_duyuru": ("bool", False, None), "sure_duyuru": ("bool", False, None),
+    "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None),
+    "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "sure_duyuru": ("bool", False, None),
     "teshis": ("bool", False, None), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
+# v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, gemini_kapsam (sesli "Gemini sesiyle
+# konuş" geçişi aynı işi görür), toplanti_duyuru panodan kalktı; ayar dosyasında elle yazılırsa kod eskisi gibi okur.
+def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
+    ev = os.path.expanduser("~"); bel = os.path.expanduser(str(AYAR.get("kisilik_bellek") or "")); out = []
+    yer = next((os.path.dirname(os.path.expanduser(str(AYAR.get(a)))) for a in ("kisilik", "kisilik_toplanti_disi", "kisilik_bellek") if AYAR.get(a)), os.path.join(os.path.dirname(AYAR_YOL), "kisilik"))
+    try: adlar = sorted(f for f in os.listdir(yer) if f.endswith(".md"))
+    except OSError: return []
+    for f in adlar:
+        y = os.path.join(yer, f)
+        if y == bel or f.startswith("oneri"): continue
+        try: ad = (_kisilik_oku(y, "toplanti") or {}).get("ad")
+        except Exception: ad = None
+        if not ad: continue  # adı olmayan dosya kişilik değil (taslak, not)
+        out.append({"yol": "~/" + os.path.relpath(y, ev) if y.startswith(ev + os.sep) else y, "ad": ad})
+    return out
 MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar", "toplantiya_ses")
 def ayarlar_view():
     d = {k: AYAR.get(k, v[1]) for k, v in AYAR_PANO.items()}
     if d["ses_motoru"] not in ("piper", "pocket", "gemini"): d["ses_motoru"] = "mac"
     if "konus_gecmis" not in AYAR: d["konus_gecmis"] = konus_gecmis_acik()
-    return {"deger": d, "varsayilan": {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items()}, "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP)}
+    d["dil"] = ARAYUZ_DILI; d["ses_hizi"] = str(AYAR.get("ses_hizi") or "1.0")
+    vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] != "kisilik" and k != "dil"}  # kişilik ve dil "varsayılana dön"le değişmez
+    vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
+    return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP)}
 def ayar_yaz(deg):
     hata, yeni = {}, {}
     for k, v in (deg or {}).items():
@@ -1533,6 +1552,7 @@ def ayar_yaz(deg):
         if tur == "bool" and isinstance(v, bool): yeni[k] = v
         elif tur == "sec" and str(v) in sinir: yeni[k] = str(v)
         elif tur == "adres" and (not str(v).strip() or re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", str(v).strip())): yeni[k] = str(v).strip().lower()
+        elif tur == "kisilik" and (str(v) == "" or str(v) in {x["yol"] for x in kisilik_listesi()}): yeni[k] = str(v)
         elif tur == "sayi" and isinstance(v, (int, float)) and not isinstance(v, bool) and sinir[0] <= v <= sinir[1]: yeni[k] = int(v)
         else: hata[k] = _t("Adres geçersiz", "Invalid address") if tur == "adres" else _t(f"{sinir[0]}–{sinir[1]} arası", f"between {sinir[0]} and {sinir[1]}") if tur == "sayi" else _t("geçersiz", "invalid")
     if hata: return {"ok": False, "hata": hata, "err": next(iter(hata.values()))}
@@ -1544,7 +1564,7 @@ def ayar_yaz(deg):
             try: a = json.load(open(AYAR_YOL, encoding="utf-8"))
             except (OSError, ValueError): a = {}
             for k, v in yeni.items():
-                if (k in ("eposta", "eposta_adres") and not v) or (k == "ses_motoru" and v == "mac"): a.pop(k, None)  # boş = varsayılan/tahmin
+                if (k in ("eposta", "eposta_adres", "kisilik", "kisilik_toplanti_disi") and not v) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
             gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
             with open(gec, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
@@ -1553,6 +1573,7 @@ def ayar_yaz(deg):
     for k, v in yeni.items():
         if k in a: AYAR[k] = v
         else: AYAR.pop(k, None)
+    if "dil" in yeni: global ARAYUZ_DILI; ARAYUZ_DILI = "en" if AYAR.get("dil") == "en" else "tr"  # aktarıcının kendi metinleri de yeni dille
     print("AYAR: panodan değişti — " + ", ".join(sorted(yeni)))
     menu = None
     if any(k in yeni for k in MENU_AYAR) and os.path.isdir(MENU_APP) and not deneme_aktarici():

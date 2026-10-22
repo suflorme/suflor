@@ -98,6 +98,8 @@ try:
     ns["AYAR"].pop("gemini_kapsam"); ok("S92: kapsam toplantı → kullanıcıya okunan Mac/Piper (Piper yok: Mac sistem sesi)", ns["kisilik_sesi"]() == ("mac", None, 1.15))
     ok("S92: toplantıya söylenen Gemini, Kore", ns["kisilik_sesi"](toplantiya=True) == ("gemini", "Kore", 1.15))
     ns["AYAR"]["piper_model"] = "/x/model.onnx"; ns["AYAR"]["ses_motoru"] = "piper"; ok("S92: Piper kuruluysa kullanıcıya okunan Piper (hız korunur)", ns["kisilik_sesi"]() == ("piper", None, 1.15))
+    ns["AYAR"]["ses_hizi"] = "1.2"; ok("v0.110.0: Okuma hızı Piper'da kişilik hızıyla çarpılır, Gemini'de değil", abs(ns["kisilik_sesi"]()[2] - 1.38) < 1e-9 and ns["kisilik_sesi"](toplantiya=True)[2] == 1.15)
+    ns["AYAR"].pop("ses_hizi")
     ns["AYAR"]["ses_motoru"] = "mac"; ok("S92: Ayarlar'da Mac sesi seçiliyse Elif (sistem sesi), Piper kurulu olsa da", ns["kisilik_sesi"]() == ("mac", None, 1.15))
     ns["AYAR"]["ses_motoru"] = "gemini"; ok("S92: Ayarlar'da Gemini seçiliyken toplantı dışı Piper", ns["kisilik_sesi"]() == ("piper", None, 1.15)); ns["AYAR"].pop("ses_motoru"); ns["AYAR"]["piper_model"] = ""
     ns["GEM"][0] = False; ok("Gemini anahtarı yoksa Mac sistem sesi", ns["kisilik_sesi"]() == ("mac", None, 1.15))

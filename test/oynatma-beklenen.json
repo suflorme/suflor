@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 215424,
-   "sha": "930cadd05f7f17d3"
+   "uzunluk": 217483,
+   "sha": "bc83fc41fa9625a8"
   },
   "/mini": {
-   "uzunluk": 215424,
-   "sha": "930cadd05f7f17d3"
+   "uzunluk": 217483,
+   "sha": "bc83fc41fa9625a8"
   },
   "/status": {
    "_ping_son": "float",
@@ -259,20 +259,21 @@
     "deger": {
      "adin_gecti": "bool",
      "bildirim": "bool",
-     "brifing_sesli": "bool",
      "ceviri": "bool",
      "ceviri_kis": "bool",
+     "dil": "str",
      "ekran_oto": "bool",
      "eposta": "str",
      "eposta_adres": "str",
      "eposta_oku": "bool",
      "fisilti": "bool",
-     "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
      "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kisayollar": "bool",
+     "kisilik": "str",
+     "kisilik_toplanti_disi": "str",
      "konus_alindi": "bool",
      "konus_gecmis": "bool",
      "konus_hihi": "bool",
@@ -280,9 +281,9 @@
      "masaustu_kisiler": "bool",
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
-     "menu_cubugu": "bool",
      "oda": "bool",
      "ozet_iki_ses": "bool",
+     "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
      "sesli_kanit": "bool",
@@ -291,18 +292,17 @@
      "sohbet_ses_izi": "bool",
      "sure_duyuru": "bool",
      "teshis": "bool",
-     "toplanti_duyuru": "bool",
      "toplantiya_ses": "bool",
      "uzun_konusma_sn": "int"
     },
     "gemini": "bool",
+    "kisiler": [],
     "menu": "bool",
     "piper": "bool",
     "pocket": "bool",
     "varsayilan": {
      "adin_gecti": "bool",
      "bildirim": "bool",
-     "brifing_sesli": "bool",
      "ceviri": "bool",
      "ceviri_kis": "bool",
      "ekran_oto": "bool",
@@ -310,7 +310,6 @@
      "eposta_adres": "str",
      "eposta_oku": "bool",
      "fisilti": "bool",
-     "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
      "kanit_metin": "bool",
@@ -323,9 +322,9 @@
      "masaustu_kisiler": "bool",
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
-     "menu_cubugu": "bool",
      "oda": "bool",
      "ozet_iki_ses": "bool",
+     "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
      "sesli_kanit": "bool",
@@ -334,7 +333,6 @@
      "sohbet_ses_izi": "bool",
      "sure_duyuru": "bool",
      "teshis": "bool",
-     "toplanti_duyuru": "bool",
      "toplantiya_ses": "bool",
      "uzun_konusma_sn": "int"
     }
