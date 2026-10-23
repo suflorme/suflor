@@ -1,4 +1,8 @@
 <p align="center">
+  <b>Türkçe</b> · <a href="README.en.md">English</a>
+</p>
+
+<p align="center">
   <img src="gorsel/hero.png" alt="Suflor.me: toplantı ekranının köşesinde asistanın kartları; büyütülmüş Söyle kartı: Ödeme adımı cumaya yetişmezse yedek plan ne? Bunu sor." width="100%">
 </p>
 
@@ -51,7 +55,7 @@ Bir kez çağırdıktan sonra öbür katılımcılar da ona soru sorabilir. İst
   yaklaşık bir saniyede gelir.
 - **Sesli çeviri:** kulaklık takılıyken çevirinin kısa özü (en çok sekiz sözcük) kulağına okunur; tam çeviri panoda kalır.
   Tarayıcıdaki toplantıda karşı tarafın sesi bu sırada kısılır.
-- **Sorunun dilinde cevap:** asistana İngilizce sorarsan İngilizce cevap verir ve İngilizce bir sesle okur.
+- **Sorunun dilinde cevap:** asistana İngilizce sorarsan İngilizce cevap verir.
 
 ## Kulağına fısıldar
 
