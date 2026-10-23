@@ -80,6 +80,11 @@ bak(f"beklerken okuma kesilirse beklemez, Mac sesine düşmez ({time.time() - t0
 ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"
 bak("bekleme süresi: Retry-After başlığı, gövdedeki retryDelay, sınırlar", ad["_gemini_bekleme"]("", "2") == 2.0 and ad["_gemini_bekleme"]('"retryDelay": "9s"') == 4.0 and ad["_gemini_bekleme"]("yok") == 1.5 and ad["_gemini_bekleme"]('"retryDelay": "0.1s"') == 0.5)
 # v0.80.10: günlük sınır — beklemeden öteki model; ikisi de doluysa istek atılmadan False; kayıt dosyası yeniden yüklenince de geçerli
+# v0.127: varsayılan — sınır dolunca yedek model yok, False (çağıran yerel sese, Pocket'e döner); gemini_izinli de kapanır
+DAVRANIS.update(tur="gunluk"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); rv = ad["gemini_oku"]("Günlük sınır varsayılan.")
+bak(f"günlük sınır (varsayılan): yedek modele geçmez, False ({len(GELEN) - n} istek); model yok, Gemini izinli değil", rv is False and len(GELEN) - n == 1 and ad["gemini_model"]() is None)
+os.remove(os.path.join(T, "gemini-kota.json")); ad["GEMINI_KOTA"]["dolu"] = None; ad["GEMINI"]["hata_t"] = 0
+ad["AYAR"]["gemini_yedek_model"] = True  # eski yedek zinciri ayarla açılır
 DAVRANIS.update(tur="gunluk"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); t0 = time.time(); rg = ad["gemini_oku"]("Günlük sınır.")
 yollar = [g["yol"] for g in GELEN[n:]]
 bak(f"günlük sınır: beklemeden 3.8 Flash'a geçer ({time.time() - t0:.1f} sn, {yollar})", rg is True and len(yollar) == 2 and "flash-lite" in yollar[0] and "flash-lite" not in yollar[1] and time.time() - t0 < 1.5)
@@ -91,7 +96,51 @@ bak(f"yedek sırası 3.8 Flash → 3.1 Flash → 2.5 Flash, hepsi dolu: False, s
     rg2 is False and rg3 is False and yl == ["gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts"] and len(GELEN) == n2)
 ad["GEMINI_KOTA"]["dolu"] = None; bak("kayıt dosyasından yüklenir (aktarıcı yeniden başlasa da)", ad["gemini_model"]() is None and "kota_dolu" in ad["gemini_view"]())
 os.remove(os.path.join(T, "gemini-kota.json")); ad["GEMINI_KOTA"]["dolu"] = None; ad["GEMINI"]["hata_t"] = 0; DAVRANIS.update(tur="normal")
+ad["AYAR"].pop("gemini_yedek_model")
 bak("kayıt yoksa ayardaki model", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
+# v0.127: günlük sayaç Pasifik gece yarısı sıfırlanır (America/Los_Angeles; yaz saatinde UTC 07.00 = TR 10.00, kışın UTC 08.00 = TR 11.00)
+import datetime as _dtz
+_u = lambda *a: _dtz.datetime(*a, tzinfo=_dtz.timezone.utc).timestamp()
+gb = ad["gemini_gun_basi"]
+bak("sayaç günü: yaz saati (PDT) — UTC 06.59'da önceki gün, 07.00'de yeni gün",
+    gb(_u(2026, 10, 24, 6, 59)) == _u(2026, 10, 23, 7, 0) and gb(_u(2026, 10, 24, 7, 0)) == _u(2026, 10, 24, 7, 0))
+bak("sayaç günü: kış saati (PST) — UTC 07.59'da önceki gün, 08.00'de yeni gün",
+    gb(_u(2026, 12, 1, 7, 59)) == _u(2026, 11, 30, 8, 0) and gb(_u(2026, 12, 1, 8, 0)) == _u(2026, 12, 1, 8, 0))
+bak("sayaç günü: saat değişimi günü (1 Kasım 2026) gece yarısı PDT", gb(_u(2026, 11, 1, 12, 0)) == _u(2026, 11, 1, 7, 0))
+# v0.127: kendi sayacımız (gemini-ses.jsonl, Google günü) — %80'de bir kez uyarı, 100'de istek atılmaz (429 beklenmez), günlükte birer satır
+import contextlib, io, datetime as _dt
+UYARI = []; ad["yerel_uyari"] = UYARI.append; ad["_t"] = lambda a, b: a
+yol_k = os.path.join(T, "gemini-ses.jsonl"); simdi_ = _dt.datetime.now().isoformat(timespec="seconds")
+def _say(n_): open(yol_k, "w").write("".join(json.dumps({"t": simdi_, "model": "gemini-3.8-flash-lite-tts"}) + "\n" for _ in range(n_))); ad["_BUGUN"]["t"] = 0.0
+cikti = io.StringIO()
+with contextlib.redirect_stdout(cikti):
+    _say(79); ad["_kota_bak"]("gemini-3.8-flash-lite-tts"); u0 = len(UYARI)
+    _say(80); ad["_kota_bak"]("gemini-3.8-flash-lite-tts"); _say(85); ad["_kota_bak"]("gemini-3.8-flash-lite-tts")
+bak(f"%80 uyarısı: 79'da yok, 80'de bir kez (85'te yinelenmez) — {UYARI}", u0 == 0 and len(UYARI) == 1 and "yüzde seksen" in UYARI[0] and cikti.getvalue().count("%80'i doldu") == 1)
+bak("panoya: gemini_gunluk uyari işareti", ad["gemini_gunluk_view"]()["uyari"] is True)
+_say(100); n = len(GELEN); cikti = io.StringIO()
+with contextlib.redirect_stdout(cikti): ad["_kota_bak"]("gemini-3.8-flash-lite-tts"); r100 = ad["gemini_oku"]("Sınırda."); ad["_kota_bak"]("gemini-3.8-flash-lite-tts")
+bak(f"sayaç 100: istek atılmaz, False; model yok; günlükte tek satır ({cikti.getvalue().count('günlük sınır doldu')})", r100 is False and len(GELEN) == n and ad["gemini_model"]() is None and cikti.getvalue().count("günlük sınır doldu") == 1)
+bak("panoda model dolu görünür", ad["gemini_gunluk_view"]()["modeller"][0]["dolu"] is True)
+os.remove(yol_k); ad["_BUGUN"]["t"] = 0.0; ad["GEMINI_KOTA"].pop("uyari_gun", None); ad["GEMINI_KOTA"].pop("dolu_gun", None)
+bak("sayaç sıfırlanınca yine Gemini", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
+# v0.127: önceden isteme — çalan okuma sürerken sıradaki parçanın sesi istenir; okuma sırası gelince yeni istek atılmadan çalar; anahtar metin + ses
+n = len(GELEN); ok_ = ad["gemini_onceden"]("Sıradaki söz burada.", "Kore", "neşeli"); time.sleep(0.6)
+bak(f"önceden isteme: bir istek, metin + ses + üslup ({len(GELEN) - n})", ok_ and len(GELEN) - n == 1 and '"voice_name": "Kore"' in json.dumps(GELEN[-1]["govde"]) and "neşeli" in GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"])
+bak("aynı söz ikinci kez istenmez", ad["gemini_onceden"]("Sıradaki  söz burada.", "Kore") and len(GELEN) - n == 1)
+CAL_ = []; kayit_ = {}; ad["ses_basladi"] = lambda k=None: CAL_.append(time.time())
+t0 = time.time(); ro = ad["gemini_oku"]("Sıradaki söz burada.", ses="Kore", kayit=kayit_)
+bak(f"okuma sırası gelince istek atılmadan çalar ({len(GELEN) - n} istek, {time.time() - t0:.2f} sn, çalma anı {len(CAL_)})", ro is True and len(GELEN) - n == 1 and len(CAL_) == 1)
+n = len(GELEN); ad["gemini_oku"]("Sıradaki söz burada.", ses="Kore"); bak("kullanılan önceden alınmış ses bir daha kullanılmaz (yeni istek)", len(GELEN) - n == 1)
+n = len(GELEN); ad["gemini_onceden"]("Başka sesle.", "Kore"); time.sleep(0.4); ad["gemini_oku"]("Başka sesle.", ses="Charon")
+bak("ses farklıysa önceden alınan kullanılmaz", len(GELEN) - n == 2)
+ad["gemini_onceden"]("Kesilecek söz.", "Kore"); time.sleep(0.4); ad["gemini_onceden_temizle"]("deneme"); n = len(GELEN); ad["gemini_oku"]("Kesilecek söz.", ses="Kore")
+bak("okuma kesilince önceden alınanlar atılır", len(GELEN) - n == 1)
+DAVRANIS["tur"] = "yavas"; n = len(GELEN); ad["gemini_onceden"]("Yavaş gelen.", "Kore"); time.sleep(0.2); DAVRANIS["tur"] = "ok"; time.sleep(3)
+t0 = time.time(); ry = ad["gemini_oku"]("Yavaş gelen.", ses="Kore")
+bak(f"önceden isteme yavaşsa (ses gelmedi) normal istekle okunur ({len(GELEN) - n} istek, {time.time() - t0:.1f} sn)", ry is True and len(GELEN) - n == 2)
+ad["GEMINI"]["hata_t"] = 0; _say(100)
+bak("sayaç doluyken önceden istenmez", ad["gemini_onceden"]("Dolu.", "Kore") is False); os.remove(yol_k); ad["_BUGUN"]["t"] = 0.0
 bak("ayarda yedek model seçilemez (3.1 → Flash-Lite)", (ad["AYAR"].__setitem__("gemini_model", "gemini-3.1-flash-tts-preview"), ad["gemini_model"]())[1] == "gemini-3.8-flash-lite-tts"); ad["AYAR"].pop("gemini_model")
 # v0.80.11: sabit cümle önbelleği — ilk GEMINI_SABIT_N okuyuş Gemini'den (kaydedilir), sonra istek yok; art arda aynı okuyuş değil; sabit olmayan cümle önbelleğe girmez
 ad["BEKLE_GENEL"] = {"tr": ["Bir saniye.", "Bakayım."]}; ad["GEMINI"]["hata_t"] = 0
@@ -107,7 +156,9 @@ n = len(GELEN); ad["gemini_oku"]("Bir saniye.", ses="Kore"); bak("başka ses ayr
 n = len(GELEN); ad["gemini_oku"]("Bu sabit değil."); ad["gemini_oku"]("Bu sabit değil.")
 bak("sabit olmayan cümle her seferinde Gemini'ye gider", len(GELEN) - n == 2)
 n = len(GELEN); [ad["gemini_oku"]("Hı hı.", ses="Charon", duzey=0.5) for _ in range(4)]; bak(f"hı hı da önbellekte (4 okumada {len(GELEN) - n} istek)", len(GELEN) - n == 3)
-bak("sohbetin 30 sn uyarısı ('Buradayım.') sabit cümle", ad["_sabit_mi"]("Buradayım.") and ad["_sabit_mi"]("I'm here.") and not ad["_sabit_mi"]("Buradayım, söyle."))
+bak("sohbetin 30 sn uyarısı ('Buradayım.') sabit cümle", ad["_sabit_mi"]("Buradayım.") and ad["_sabit_mi"]("I'm here.") and not ad["_sabit_mi"]("Buradayım, söyle bakalım ne istiyorsun."))
+bak("v0.127: kısa söz (≤ 3 sözcük, ≤ 24 karakter) ve sahne tepki havuzu sabit; uzun söz değil", ad["_sabit_mi"]("Hadi ya!") and ad["_sabit_mi"]("Haklısın, kabul.")
+    and (ad.__setitem__("SAHNE_ONAY", ["Bunu bu açıdan görmemiştim."]), ad["_sabit_mi"]("Bunu bu açıdan görmemiştim."))[1] and not ad["_sabit_mi"]("Bunu hiç bu açıdan görmemiştim."))
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
 
@@ -136,12 +187,12 @@ bak(f"toplantıya söyle Gemini: BlackHole (59) + kulaklık, Kore ({argl}, {r})"
 # v0.81.0 (S92): tanıtım ayrı okunup cevabın önüne eklenir ve önbelleğe girer; ikinci toplantıda tanıtım için istek yok
 def _tan(toplanti):
     ts_ = tsn; eski_ = (ts_["kisilik"], ts_["STATE"]); ts_["kisilik"] = lambda: {"ses_uslup": "ölçülü", "tanitim": "Merhaba, ben Atlas."}; ts_["TS"]["tanitti"] = None; ts_["STATE"] = {"masaustu": {"toplantida": True, "baslik": toplanti}}
-    ts_["TS"]["p"] = []; n = len(GELEN); r_ = ts_["toplantiya_soyle"]("Bütçe onaylandı."); time.sleep(0.3); ts_["kisilik"], ts_["STATE"] = eski_
+    ts_["TS"]["p"] = []; n = len(GELEN); r_ = ts_["toplantiya_soyle"]("Bütçe bu hafta onaylandı, sevkiyat da başlıyor."); time.sleep(0.3); ts_["kisilik"], ts_["STATE"] = eski_
     return r_, [g["govde"]["contents"][0]["parts"][0]["text"].split("## Transcript:\n")[-1] for g in GELEN[n:]]
 for i_ in range(3): r1_, m1_ = _tan(f"T{i_}")
 r2_, m2_ = _tan("T9")
-bak(f"tanıtım ayrı istek, ilk 3 toplantıda önbelleğe yazılır ({m1_})", r1_.get("ok") and m1_ == ["Bütçe onaylandı.", "Merhaba, ben Atlas."] and "Merhaba, ben Atlas." in r1_.get("metin", ""))
-bak(f"sonra tanıtım önbellekten, yalnız cevap Gemini'ye ({m2_})", r2_.get("ok") and m2_ == ["Bütçe onaylandı."])
+bak(f"tanıtım ayrı istek, ilk 3 toplantıda önbelleğe yazılır ({m1_})", r1_.get("ok") and m1_ == ["Bütçe bu hafta onaylandı, sevkiyat da başlıyor.", "Merhaba, ben Atlas."] and "Merhaba, ben Atlas." in r1_.get("metin", ""))
+bak(f"sonra tanıtım önbellekten, yalnız cevap Gemini'ye ({m2_})", r2_.get("ok") and m2_ == ["Bütçe bu hafta onaylandı, sevkiyat da başlıyor."])
 # 1d) hı hı: Gemini sesiyle konuşan kişilikte klip değil o anda Gemini (tepki_cal)
 bs = open(os.path.join(K, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); i = bs.index("def tepki_cal("); tc = dict(ad)
 tc.update(AYAR={}, piper_acik=lambda: False, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Charon", 1.0), threading=threading); n0 = len(GELEN)
@@ -149,6 +200,39 @@ exec(bs[i:bs.index("\n_TEPKI_BAS", i)], tc)
 r1 = tc["tepki_cal"]("alindi", hemen=True, ses=0.4); time.sleep(0.8)
 bak("hı hı: Gemini'den o anda (klip yok), kısık, Charon", r1 is True and len(GELEN) == n0 + 1 and '"voice_name": "Charon"' in json.dumps(GELEN[-1]["govde"]) and "Hı" in GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"] + "Hım")
 bak("bekleme (düşünme) klibi Gemini'de çalmaz → çağıran cümleyi okur", tc["tepki_cal"]("dusunme") is False)
+
+# 1e) v0.127 karışık okuma (bas-konus.py _konus_cumle): Gemini sesinde ilk cümle hemen ve tek başına, kalanlar cevap bitince tek okumada; Claude geç
+# bitirirse ilk okuma bitince biriken okunur; okuma kesildiyse biriken okunmaz; uzun cevap iki parça; Pocket'te cümle cümle; okuma sınırı (5 cümle) aynen
+import ast as _ast
+bk_ = _ast.parse(open(os.path.join(K, "aktarici", "bas-konus.py"), encoding="utf-8").read())
+fk_ = [f for f in bk_.body if (isinstance(f, _ast.FunctionDef) and f.name in ("_konus_cumle", "_konus_g_biriktir", "_konus_g_bosalt", "_konus_g_bekci"))
+       or (isinstance(f, _ast.Assign) and any(getattr(t, "id", "") in ("KONUS_OKU_EN_COK", "_KG_K") for t in f.targets))]
+def karisik(motor, cumleler, son_bekle=0.0, kes_ara=False, calan=lambda: False):
+    OKU = []; SES_ = {"kes": 0}
+    kn = {"re": __import__("re"), "time": time, "threading": threading, "print": lambda *a, **k: None, "SES": SES_, "GEMINI_BIRLESIK_EN_COK": 600,
+          "kisilik_sesi": lambda m=None, toplantiya=False: (motor, None, 1.0), "konusma_dili": lambda c: c, "sesli_terim_suz": lambda c: c,
+          "seslendir": lambda c, kuyruk=False, cal=None: (OKU.append(c), True)[1], "ses_caliyor": calan}
+    exec(compile(_ast.Module(fk_, []), "bas-konus.py", "exec"), kn)
+    tur = {"tampon": "", "sesli": True}
+    for i_, c_ in enumerate(cumleler):
+        tur["tampon"] += c_ + " "; kn["_konus_cumle"](tur)
+        if kes_ara and i_ == 1: SES_["kes"] += 1
+    time.sleep(son_bekle); kn["_konus_cumle"](tur, son=True); tur["t_son"] = time.time(); time.sleep(0.15)
+    return OKU
+CV = ["Merhaba, bugün iki konu var.", "Birincisi bütçe onayı.", "İkincisi tedarik takvimi.", "Ayrıntılar panoda."]
+o_ = karisik("gemini", CV, calan=lambda: True)
+bak(f"Gemini: ilk cümle tek başına, kalan 3 cümle tek okumada ({o_})", o_ == [CV[0], " ".join(CV[1:])])
+o_ = karisik("pocket", CV)
+bak(f"Pocket: cümle cümle (bugünkü gibi) ({len(o_)} okuma)", o_ == CV)
+o_ = karisik("gemini", CV, son_bekle=0.3, calan=lambda: False)
+bak(f"Claude geç bitirirse ilk okuma bitince biriken okunur, sonra kalan ({o_})", o_[0] == CV[0] and " ".join(o_[1:]) == " ".join(CV[1:]) and len(o_) <= 3)
+o_ = karisik("gemini", CV, kes_ara=True, calan=lambda: True)
+bak(f"okuma kesildiyse (dur / Option + Shift + S) biriken okunmaz ({o_})", o_ == [CV[0]])
+UZ = ["Bu birinci cümle ve oldukça uzun bir açıklama içeriyor, " * 2 + "tamam."] + ["Bu cümle de uzun ve ayrıntılı bir açıklama, " * 5 + "bitti."] * 4
+o_ = karisik("gemini", UZ, calan=lambda: True)
+bak(f"uzun cevap: okuma sınırı 5 cümle, kalan 600 karakteri aşınca iki parça ({[len(x) for x in o_]})", len(o_) == 3 and o_[0] == UZ[0] and all(len(x) <= 600 for x in o_))
+o_ = karisik("gemini", CV + ["Beşinci cümle burada.", "Altıncı okunmaz."], calan=lambda: True)
+bak(f"okuma sınırı (KONUS_OKU_EN_COK = 5) aynen: altıncı cümle okunmaz ({o_})", "Altıncı" not in " ".join(o_) and "Beşinci" in o_[-1])
 
 # 2) Gerçek aktarıcı: ⚙ Ayarlar'da Gemini seçenekleri ve kaydetme
 for f in ("relay.py", "manifest.json", "teshis.py"): shutil.copy(os.path.join(K, f), T)

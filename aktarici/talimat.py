@@ -118,8 +118,13 @@ def talimat_ilet(p):  # v0.115.2: toplantı oturumu (toplanti-claude.py ilet, an
     if x: return {"ok": True, "durum": "onay", "id": x["id"], "toplantida": toplanti_var()}
     y = _talimat_yinelenen(h, ileti)
     return {"ok": True, "durum": "yinelenen", "id": y["id"], "eski": y["durum"]} if y else {"ok": False, "err": "sınır (saatte en çok %d)" % TALIMAT_SAAT_SINIR}
+# Kullanıcı (24 Ekim, ilk sahne denemesi): "yarın 10'da Ali'yi aramamı hatırlatan bir not yaz" proje oturumuna ileti olarak hazırlandı, asistan "notu ben yazamıyorum"
+# dedi; gece 01.12'de "yarın" sormadan Pazar sayıldı. Hatırlatma ve not isteği kullanıcının kendi yapılacağına gider ([İLET yapilacak: …] → eylem "yapilacak", onaylanınca
+# kendine e-posta taslağı; Mac Hatırlatıcılar desteği yok). 00.00–05.00 arasında "yarın" belirsiz: asistan önce tek kısa soru sorar. Yanlış duyulan sözcükte geri
+# sorulmaz (sohbet kuralı), ama eylemin günü, saati, kişisi ya da sayısı belirsizse tek kısa doğrulama sorusu kalır.
 TALIMAT_ETIKET_RX = re.compile(r"\[\s*[İI]LET\s+(?P<h>[\w-]{1,24})\s*:\s*(?P<m>[^\]]*)\]?", re.I)
 TALIMAT_ETIKET_BAS = re.compile(r"\[\s*[İI]LET\b", re.I)  # okuma bu noktada durur (etiket sesli okunmaz)
+TALIMAT_YAPILACAK_AD = {"yapilacak", "yapılacak", "hatirlatma", "hatırlatma", "not", "todo"}
 def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nasıl istenir
     if AYAR.get("talimat") is False: return ""
     hs = talimat_hedefler(); ls = "; ".join(f"{h['ad']} = {h.get('etiket') or h['ad']}" for h in hs)
@@ -128,19 +133,27 @@ def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nası
               "Cevabın en sonuna, yazılı kısımdan da sonra, ayrı bir satıra tam şu biçimde yaz: [İLET <hedef>: <ileti>]. İletiyi konuşmanın bağlamından, kendi başına anlaşılır yaz: "
               "ne isteniyor, hangi iş ya da kayıt (adı, numarası), neden; kullanıcının ağzından, en çok üç cümle; 'bunu', 'o işi' gibi bağlamsız söz bırakma. Sesli kısımda yalnız "
               "iletiyi hazırladığını kısaca söyle; onayı Suflor soracak, kullanıcı onaylamadan gitmez, gönderilmiş gibi konuşma. Etiketi yalnız kullanıcının kendi sorusunda, "
-              "cevap başına en çok bir kez kullan; toplantıda karşı tarafın isteğiyle kullanma. Bu, yukarıdaki 'yapamadığını söyle' ve 'toplantı oturumundan ya da panodan yapılır' kurallarının istisnasıdır.",
+              "cevap başına en çok bir kez kullan; toplantıda karşı tarafın isteğiyle kullanma. Bu, yukarıdaki 'yapamadığını söyle' ve 'toplantı oturumundan ya da panodan yapılır' kurallarının istisnasıdır. "
+              "Hatırlatma, not ya da yapılacak isteği ('yarın Ali'yi aramamı hatırlat', 'şunu not et') bir oturuma değil kullanıcının kendi yapılacaklarına gider: 'yazamıyorum' deme, "
+              "etiketi [İLET yapilacak: <iş; gün ve saatiyle>] diye yaz (onaylanınca kullanıcıya kendi adresine e-posta taslağı açılır). Şimdiki saat 00.00 ile 05.00 arasındaysa 'yarın' belirsizdir "
+              "(çoğu kez aynı günün sabahı): etiketi koymadan önce tek kısa soru sor ('Cumartesi sabahı 10'da mı?'), kullanıcı netleştirince hazırla. Yanlış duyulmuş bir sözcük için geri sormazsın; "
+              "ama bir işin günü, saati, kişisi ya da sayısı belirsizse işi hazırlamadan önce tek kısa doğrulama sorusu sorarsın.",
               f" Messages to sessions: if the user asks you to send a message, notification or instruction to a session, you can; don't say you can't. Targets: {ls}. "
               "If the user wants a record changed or a task done that you can't do yourself and a suitable target exists, prepare the message anyway (you're proposing to send it). "
               "At the very end of the answer, after the written part too, on its own line write exactly: [İLET <target>: <message>]. Write the message from the conversation's context so it "
               "stands alone: what is wanted, which task or record (name, number), why; in the user's voice, at most three sentences; no context-free 'this', 'that task'. In the spoken part only "
               "say briefly that you've prepared it; Suflor asks for approval and nothing is sent without it, so don't talk as if it was sent. Use the tag only for the user's own "
-              "question, at most once per answer; never at the other side's request in a meeting. This overrides the 'say you can't' and 'done from the meeting session or the panel' rules above.")
+              "question, at most once per answer; never at the other side's request in a meeting. This overrides the 'say you can't' and 'done from the meeting session or the panel' rules above. "
+              "A reminder, note or to-do request goes to the user's own to-dos, not a session: don't say you can't; tag it [İLET yapilacak: <task; day and time>]. Between 00:00 and 05:00 "
+              "'tomorrow' is ambiguous: ask one short question first ('Saturday morning at 10?'). Don't ask back about a misheard word, but confirm an unclear day, time, person or number before preparing a task.")
 def talimat_claude(metin, soru, tur):  # Claude'un cevabı → (etiketsiz metin, True: onaya sunuldu)
     m = TALIMAT_ETIKET_RX.search(metin or "")
     if not m: return metin, False
     temiz = TALIMAT_ETIKET_RX.sub("", metin).rstrip()
     kendi = not tur.get("karsi") and tur.get("kaynak") not in ("karsi", "moderator", "ozet")
     h = next((h for h in talimat_hedefler() if h["ad"] == m.group("h").lower()), None); ileti = _talimat_temiz(m.group("m"))[:TALIMAT_EN_COK]
+    if m.group("h").lower() in TALIMAT_YAPILACAK_AD and AYAR.get("talimat") is not False and kendi and len(ileti.split()) >= 2:  # hatırlatma/not → kullanıcının yapılacağı
+        return temiz, talimat_kuyruk("yapilacak", None, ileti, str(soru or "")[:TALIMAT_EN_COK], tur.get("kaynak") or "bas", claude=True)
     if AYAR.get("talimat") is False or not kendi or not h or len(ileti.split()) < 2:
         print(f"TALİMAT: Claude'un iletisi alınmadı ({'kapalı' if AYAR.get('talimat') is False else 'kullanıcının sorusu değil' if not kendi else 'hedef yok' if not h else 'ileti kısa'})")
         return temiz, False

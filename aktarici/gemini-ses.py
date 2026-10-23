@@ -61,7 +61,7 @@ def gemini_gecis_komut(metin):  # → okunacak kısa onay ya da None (komut değ
     print(f"GEMINI: geçiş açıldı ({dk} dk, kullanıcı)")
     return _t(f"Tamam, {dk} dakika Gemini sesiyle konuşuyorum.", f"OK, I'll use the Gemini voice for {dk} minutes.")
 def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" or gemini_gecis_acik() else "toplanti"
-def gemini_izinli(toplantiya=False): return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi")  # v0.89.0: gizli toplantıda hiç
+def gemini_izinli(toplantiya=False): return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi") and gemini_model() is not None  # v0.89.0: gizli toplantıda hiç; sınır dolunca yerel ses
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
     return v if v in GEMINI_SESLER else "Charon"
@@ -84,15 +84,24 @@ def _kota_doldu(model, govde):
     except OSError: pass
     return sn
 def _gunluk_mu(govde): return "per_day" in (govde or "") or "PerDay" in (govde or "")
-def gemini_model():  # ayardaki model; günlük sınırı dolduysa öteki; ikisi de doluysa None
+# v0.127 (kullanıcı 24 Ekim): sınır dolunca yedek modellere değil yerel sese (Pocket) — yedekler daha pahalı, 3.1/2.5 daha yavaş ve duygusuz. Kendi sayacımız
+# (gemini_bugun) sınıra varınca da istek atılmaz (429 beklenmez). Eski yedek zinciri ayar gemini_yedek_model: true ile.
+def gemini_model():  # ayardaki model; günlük sınırı dolduysa None (yerel ses) — gemini_yedek_model açıksa öteki modeller sırayla
     m = str(AYAR.get("gemini_model") or GEMINI_MODELLER[0])
     m = m if m in GEMINI_SECILIR else GEMINI_MODELLER[0]
-    dolu = _kota()
-    for x in (m,) + tuple(y for y in GEMINI_MODELLER if y != m):
-        if x not in dolu: return x
+    dolu = _kota(); b = gemini_bugun()
+    for x in (m,) + (tuple(y for y in GEMINI_MODELLER if y != m) if AYAR.get("gemini_yedek_model") else ()):
+        if x not in dolu and b.get(x, 0) < GEMINI_GUN_SINIR: return x
     return None
-def gemini_gun_basi():  # Google'ın günlük sayacının başı: 19 Ekim'de 429'un önerdiği bekleme UTC gece yarısını (TR 03.00) gösterdi — gerçek sıfırlanma _kota_doldu'da kayıtlı
-    return datetime.datetime.now(datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+def gemini_gun_basi(simdi=None):  # Google'ın günlük sayacının başı: Pasifik gece yarısı (America/Los_Angeles, yaz/kış saati dahil; TR'de 10.00, kış saatinde 11.00).
+    # Google'ın belgesi böyle der; 24 Ekim'de AI Studio kullanım grafikleri de UTC-8/PDT ile çiziliyordu (kesin kanıt değil). v0.127'ye kadar UTC gece yarısı
+    # sayılıyordu (19 Ekim 429'unun bekleme süresinden). Sayaç kayarsa gerçek 429 _kota_doldu'ya Google'ın verdiği sıfırlanma anını yazar (o kayıt önce gelir).
+    try:
+        from zoneinfo import ZoneInfo
+        bolge = ZoneInfo("America/Los_Angeles")
+    except Exception: bolge = datetime.timezone(datetime.timedelta(hours=-8))  # tz verisi yoksa PST
+    t = datetime.datetime.fromtimestamp(time.time() if simdi is None else simdi, bolge)
+    return t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
 _BUGUN = {"t": 0.0, "v": {}}
 GEMINI_GUN_SINIR = 100  # Tier 1, model başına günlük istek (19 Ekim 429 yanıtı)
 def gemini_bugun():  # model başına bugün (Google günü) yapılan başarılı istek sayısı (canli/gemini-ses.jsonl; önbellekten çalınanlar sayılmaz); 10 sn önbellek (pano sık yoklar)
@@ -109,7 +118,21 @@ def gemini_bugun():  # model başına bugün (Google günü) yapılan başarıl�
 def gemini_gunluk_view():  # panoya (⚙ Ayarlar → Gemini nerede): model sırasıyla bugünkü istek, sınır, dolu mu
     if not gemini_var(): return None
     b = gemini_bugun(); dolu = _kota()
-    return {"modeller": [{"ad": m, "n": b.get(m, 0), "dolu": m in dolu} for m in GEMINI_MODELLER], "sinir": GEMINI_GUN_SINIR, "toplam": sum(b.values())}
+    return {"modeller": [{"ad": m, "n": b.get(m, 0), "dolu": m in dolu or b.get(m, 0) >= GEMINI_GUN_SINIR} for m in GEMINI_MODELLER], "sinir": GEMINI_GUN_SINIR,
+            "toplam": sum(b.values()), "uyari": GEMINI_KOTA.get("uyari_gun") == gemini_gun_basi()}
+# v0.127: günlük sayaç %80'e (GEMINI_UYARI_ORAN) gelince Google günü başına bir kez kısa sesli uyarı (yerel sesle, okuma ve sohbet sırası boşalınca; Gemini isteği
+# harcanmaz) ve günlükte bir satır; sınır dolunca bir satır (okumalar yerel sese döner).
+GEMINI_UYARI_ORAN = 0.8
+GEMINI_UYARI = ("Gemini sesinin bugünkü sınırının yüzde sekseni doldu; dolunca yerel sese döneceğim.", "Gemini voice is at 80 percent of today's limit; I'll switch to the local voice when it runs out.")
+def _kota_bak(model):  # başarılı her istekten sonra
+    n = gemini_bugun().get(model, 0); gun = gemini_gun_basi()
+    if n >= GEMINI_GUN_SINIR and GEMINI_KOTA.get("dolu_gun") != gun:
+        GEMINI_KOTA["dolu_gun"] = gun
+        print(f"GEMINI: günlük sınır doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — okumalar yerel seste" + (" (yedek model açık)" if AYAR.get("gemini_yedek_model") and gemini_model() else ""))
+    elif n >= GEMINI_GUN_SINIR * GEMINI_UYARI_ORAN and GEMINI_KOTA.get("uyari_gun") != gun:
+        GEMINI_KOTA["uyari_gun"] = gun
+        print(f"GEMINI: günlük sınırın %{round(GEMINI_UYARI_ORAN * 100)}'i doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — sesli uyarı sırada")
+        if "yerel_uyari" in globals(): yerel_uyari(_t(*GEMINI_UYARI))
 def gemini_view():
     return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
             "kapsam": gemini_kapsam(), "bugun": gemini_bugun()}
@@ -134,6 +157,16 @@ def _gemini_kayit(metin, ses_sn, ilk, model=None):
     try: write([(os.path.join(BASE, "gemini-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "model": model or gemini_model() or "",
                                                                      "karakter": len(metin), "ses_sn": round(ses_sn, 2), "ilk_ses": round(ilk, 2) if ilk else None}) + "\n")])
     except Exception as e: print(f"GEMINI: kayıt yazılamadı ({e.__class__.__name__})")
+    _BUGUN["t"] = 0.0  # sayaç yeniden okunsun
+def _oynat_bekle(oyn, sn):  # çalıcının bitmesini bekler; bu arada sıradaki parça belli olursa sesi önceden istenir (brifing-ses.py ses_sonraki_hazirla)
+    son = time.time() + max(0.5, sn); bakildi = 0.0
+    while oyn.poll() is None and time.time() < son:
+        if "ses_sonraki_hazirla" in globals() and time.time() - bakildi > 0.1:
+            bakildi = time.time()
+            try: ses_sonraki_hazirla()
+            except Exception as e: print(f"GEMINI: sıradaki hazırlanamadı ({e.__class__.__name__})")
+        time.sleep(0.03)
+    if oyn.poll() is None: raise subprocess.TimeoutExpired("oynat", sn)
 def gemini_pcm(metin, ses=None, uslup=None, sabit=None):  # v0.79.0: çalmadan 24 kHz 16 bit ham ses (toplantıya söyle); olmazsa None
     return gemini_oku(metin, ses=ses, uslup=uslup, topla=True, sabit=sabit)
 def _duzey(b, duzey):  # ham sesi kısar (hı hı); duzey 0–1
@@ -156,10 +189,15 @@ def _gemini_bekleme(govde, retry_after=None):  # sunucunun önerdiği bekleme (R
 GEMINI_SABIT_N = 3
 GEMINI_SABIT_EK = ("Buradayım.", "I'm here.")  # sohbette 30 sn sessizlik uyarısı (aktarici/sohbet.py); bekleme cümleleri BEKLE_* havuzlarından
 _SABIT_SON = {}
+GEMINI_SABIT_KISA = (3, 24)  # v0.127: en çok 3 sözcük ve 24 karakterlik söz de sabit sayılır (üçlü sahnedeki "Hadi ya!", "Haklısın, kabul." yinelenir; önbelleğe
+# yazmak fazladan istek gerektirmez, yinelenince istek atılmaz). Üçlü sahnenin tepki ve onay havuzları (uclu-sahne.py) da öyle.
 def _sabit_mi(metin):
     m = (metin or "").strip()
     if m in GEMINI_ONAY or m in GEMINI_SABIT_EK: return True
+    if m and len(m) <= GEMINI_SABIT_KISA[1] and len(m.split()) <= GEMINI_SABIT_KISA[0]: return True
     g = globals()
+    for ad in ("SAHNE_ARAYA", "SAHNE_TEPKI", "SAHNE_ONAY"):
+        if m in (g.get(ad) or ()): return True
     for ad in ("BEKLE_GENEL", "BEKLE_TUR", "BEKLE_TUR_EN"):
         v = g.get(ad)
         vs = [x for l in v.values() for x in (l if isinstance(l, list) else [l])] if isinstance(v, dict) else (v or [])
@@ -169,6 +207,9 @@ def _sabit_klasor(metin, ses, uslup):
     import hashlib
     h = hashlib.sha1(f"{gemini_ses(ses)}\n{' '.join(str(uslup or '').split())}\n{metin.strip()}".encode()).hexdigest()[:16]
     return os.path.join(BASE, "gemini-onbellek", h)
+def _sabit_dolu(metin, ses, uslup):
+    try: return len([f for f in os.listdir(_sabit_klasor(metin, ses, uslup)) if f.endswith(".pcm")]) >= GEMINI_SABIT_N
+    except OSError: return False
 def _sabit_al(metin, ses, uslup):  # dolu önbellekten rastgele bir okuyuş (ham ses) ya da None (henüz GEMINI_SABIT_N okuyuş yok)
     import random
     k = _sabit_klasor(metin, ses, uslup)
@@ -200,7 +241,7 @@ def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekt
                 if iptal and iptal(): break
                 oyn.stdin.write(pcm[i:i + 9600]); oyn.stdin.flush()
             oyn.stdin.close()
-            oyn.wait(timeout=len(pcm) / 2 / GEMINI_SR + 5)
+            _oynat_bekle(oyn, len(pcm) / 2 / GEMINI_SR + 5)
         except (BrokenPipeError, OSError, ValueError, subprocess.TimeoutExpired): pass
         if oyn.poll() is None: oyn.terminate()
         return True
@@ -215,6 +256,96 @@ def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekt
     finally:
         try: os.remove(yol)
         except OSError: pass
+    return True
+def _gemini_govde(metin, ses, uslup):
+    return json.dumps({"contents": [{"role": "user", "parts": [{"text": (f"## Style:\n{' '.join(str(uslup).split())}\n" if uslup else "") + "## Transcript:\n" + metin}]}],
+                       "generationConfig": {"responseModalities": ["audio"], "temperature": 1,
+                                            "speech_config": {"voice_config": {"prebuilt_voice_config": {"voice_name": gemini_ses(ses)}}}}}, ensure_ascii=False).encode()
+# --- Önceden isteme (v0.127, kullanıcı 24 Ekim: "karışık yol" — istek azalsın, sesler arası boşluk kısalsın) ---------------------------------------
+# Sıradaki parça belliyse (kuyrukta bekleyen Gemini parçası ya da üçlü sohbette öbür asistanın hazır sözü) sesi, çalan okuma sürerken ayrı bağlantıyla
+# istenir ve bellekte biriktirilir; okuma sırası gelince istek atılmadan hemen çalar (boşluk ilk ses gecikmesi ~0,6 sn yerine çalıcının açılışı). İstek sayısı
+# değişmez: aynı metin aynı sesle bir kez istenir. Kullanılmayan önceden alınmış ses GEMINI_ONCEDEN_SN sonra atılır (okuma kesildiyse hemen; istek boşa gider).
+GEMINI_ONCEDEN = {}  # (metin, ses) → {"pcm": bytearray, "bitti": bool, "ok": bool, "t": zaman, "ilk": sn}
+GEMINI_ONCEDEN_SN = 90
+_ONCEDEN_K = threading.Lock()
+def _onceden_anahtar(metin, ses): return (" ".join(str(metin or "").split()), gemini_ses(ses))
+def gemini_onceden_var(metin, ses):
+    with _ONCEDEN_K: return _onceden_anahtar(metin, ses) in GEMINI_ONCEDEN
+def gemini_onceden_temizle(neden=None):
+    with _ONCEDEN_K: n = len(GEMINI_ONCEDEN); GEMINI_ONCEDEN.clear()
+    if n and neden: print(f"GEMINI: önceden alınan {n} ses atıldı ({neden})")
+def gemini_onceden(metin, ses=None, uslup=None):  # sesi şimdiden iste (okumadan); → True: istendi ya da zaten isteniyor
+    if not metin or not gemini_var() or (_sabit_mi(metin) and _sabit_dolu(metin, ses, uslup)) or time.time() - GEMINI["hata_t"] < GEMINI_BEKLE_SN: return False
+    model = gemini_model()
+    if not model: return False
+    a = _onceden_anahtar(metin, ses); simdi = time.time()
+    with _ONCEDEN_K:
+        for k in [k for k, v in GEMINI_ONCEDEN.items() if simdi - v["t"] > GEMINI_ONCEDEN_SN]:
+            GEMINI_ONCEDEN.pop(k); print(f"GEMINI: önceden alınan ses kullanılmadı · {k[0][:40]}")
+        if a in GEMINI_ONCEDEN: return True
+        o = GEMINI_ONCEDEN[a] = {"pcm": bytearray(), "bitti": False, "ok": False, "t": simdi, "ilk": None, "ev": threading.Event()}
+    def al():
+        c = None; t0 = time.time()
+        try:
+            c = (http.client.HTTPConnection if GEMINI_HOST.startswith("127.0.0.1") else http.client.HTTPSConnection)(GEMINI_HOST, timeout=GEMINI_ILK_SN)
+            c.request("POST", f"/v1beta/models/{model}:streamGenerateContent?alt=sse", body=_gemini_govde(metin, ses, uslup),
+                      headers={"Content-Type": "application/json", "x-goog-api-key": gemini_anahtar(), "Accept": "text/event-stream"})
+            r = c.getresponse()
+            if r.status != 200:
+                hata = r.read()[:3000].decode("utf-8", "replace")
+                if r.status == 429 and _gunluk_mu(hata): _kota_doldu(model, hata); print(f"GEMINI: {model} günlük sınırı doldu (önceden isterken)")
+                else: print(f"GEMINI: önceden isteme HTTP {r.status} — okuma sırası gelince yeniden istenecek")
+                return
+            while True:
+                satir = r.readline()
+                if not satir: break
+                s_ = satir.decode("utf-8", "replace").strip()
+                if not s_.startswith("data:"): continue
+                try: ol = json.loads(s_[5:])
+                except ValueError: continue
+                for b in _gemini_parcalar(ol):
+                    if o["ilk"] is None: o["ilk"] = time.time() - t0
+                    o["pcm"].extend(b); o["ev"].set()
+            o["ok"] = bool(o["pcm"])
+        except Exception as e: print(f"GEMINI: önceden isteme olmadı ({e.__class__.__name__})")
+        finally:
+            o["bitti"] = True; o["ev"].set()
+            try: c and c.close()
+            except OSError: pass
+            if o["ok"]:
+                _gemini_kayit(metin, len(o["pcm"]) / 2 / GEMINI_SR, o["ilk"], model); _kota_bak(model)
+                print(f"GEMINI: {len(metin)} karakter önceden · ilk ses {o['ilk'] or 0:.2f} sn · {len(o['pcm']) / 2 / GEMINI_SR:.1f} sn ses · {time.time() - t0:.1f} sn'de geldi")
+    threading.Thread(target=al, daemon=True).start()
+    return True
+def _onceden_al(metin, ses):
+    with _ONCEDEN_K: return GEMINI_ONCEDEN.pop(_onceden_anahtar(metin, ses), None)
+def _onceden_cal(o, metin, iptal, kayit):  # önceden istenen sesi çal (gelmeye devam ediyorsa akarak) → True/False; None: hiç ses gelmedi, normal istekle okunsun
+    son = o["t"] + GEMINI_ILK_SN  # önceden isteme başladığından beri ilk ses süresi (okumadaki zaman aşımıyla aynı); geçtiyse normal istek
+    while not o["pcm"] and not o["bitti"] and time.time() < son:
+        if iptal and iptal(): return True
+        o["ev"].wait(0.05)
+    if not o["pcm"]: return None
+    if o["bitti"]: return _pcm_cal(bytes(o["pcm"]), iptal=iptal, kayit=kayit) or None
+    if os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ") or not os.access(PIPER_OYNAT, os.X_OK):  # kesintisiz çalıcı yok: hepsi gelince
+        while not o["bitti"]: o["ev"].wait(0.05)
+        return _pcm_cal(bytes(o["pcm"]), iptal=iptal, kayit=kayit) or None
+    try: oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError: return None
+    if kayit is not None: kayit["p"] = oyn
+    yazilan = 0; ilk = True
+    try:
+        while True:
+            if iptal and iptal(): break
+            n = len(o["pcm"])
+            if n > yazilan:
+                oyn.stdin.write(bytes(o["pcm"][yazilan:n])); oyn.stdin.flush(); yazilan = n
+                if ilk: ses_basladi(kayit); ilk = False
+            elif o["bitti"]: break
+            else: o["ev"].clear(); o["ev"].wait(0.05)
+        oyn.stdin.close(); _oynat_bekle(oyn, yazilan / 2 / GEMINI_SR + 5)
+    except (BrokenPipeError, OSError, ValueError, subprocess.TimeoutExpired): pass
+    if oyn.poll() is None: oyn.terminate()
+    print(f"GEMINI: önceden alınan ses çalındı · {len(metin)} karakter")
     return True
 def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
@@ -232,16 +363,19 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
     if time.time() - GEMINI["hata_t"] < GEMINI_BEKLE_SN: return None if topla else False
     model = gemini_model()
     if not model: return None if topla else False  # iki modelin de günlük sınırı dolu: istek atılmaz
-    govde = json.dumps({"contents": [{"role": "user", "parts": [{"text": (f"## Style:\n{' '.join(str(uslup).split())}\n" if uslup else "") + "## Transcript:\n" + metin}]}],
-                        "generationConfig": {"responseModalities": ["audio"], "temperature": 1,
-                                             "speech_config": {"voice_config": {"prebuilt_voice_config": {"voice_name": gemini_ses(ses)}}}}}, ensure_ascii=False).encode()
+    on = _onceden_al(metin, ses) if not topla and not aygit and duzey is None else None
+    if on:
+        r = _onceden_cal(on, metin, iptal, kayit)
+        if r and sabit and on["ok"]: _sabit_yaz(metin, ses, uslup, bytes(on["pcm"]))
+        if r is not None: return r
+    govde = _gemini_govde(metin, ses, uslup)
     t0 = time.time(); ilk = None; nbayt = 0; oyn = None; sessiz = bool(os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ")) or topla; tampon = bytearray(); ham = bytearray()
     def bitir(bekle):
         if oyn:
             try: oyn.stdin.close()
             except (OSError, ValueError): pass
             if bekle:
-                try: oyn.wait(timeout=nbayt / 2 / GEMINI_SR - (time.time() - (t0 + (ilk or 0))) + 5)
+                try: _oynat_bekle(oyn, nbayt / 2 / GEMINI_SR - (time.time() - (t0 + (ilk or 0))) + 5)
                 except subprocess.TimeoutExpired: pass
             if oyn.poll() is None: oyn.terminate()
         elif bekle and tampon and not sessiz:  # çalıcı yok: tek WAV, afplay
@@ -317,9 +451,8 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
             print(f"GEMINI: akış yarıda kesildi ({e.__class__.__name__})"); ham.clear()  # yarım okuyuş önbelleğe girmez
     GEMINI.update(durum="hazir", hata=None)
     if sabit and ham and not (iptal and iptal()): _sabit_yaz(metin, ses, uslup, bytes(ham))
-    _BUGUN["t"] = 0.0  # sayaç yeniden okunsun
     bitir(True)
-    _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk, model)
+    _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk, model); _kota_bak(model)
     print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")
     if topla: return bytes(tampon) if tampon else None
     return nbayt > 0

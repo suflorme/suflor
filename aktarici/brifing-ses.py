@@ -136,6 +136,7 @@ def ses_basladi(kayit=None):
         except Exception: pass
 def ses_durdur():
     with SES_K: SES["q"].clear(); SES["kes"] = SES.get("kes", 0) + 1; p = SES.get("p"); SES["test_bit"] = 0; SES["bek"] = []  # kes: Piper'ın kalan cümleleri de çalınmaz
+    if "gemini_onceden_temizle" in globals(): gemini_onceden_temizle("okuma kesildi")
     if p and p.poll() is None: p.terminate(); print("SES: durduruldu"); return True
     return False
 # Ses seçimi (v0.20.2): ayar "ses" yoksa ve Türkçe sistem sesi seçiliyse (Erişilebilirlik → Oku ve Seslendir → Sistem sesi, ör. Siri → Ses 2
@@ -497,18 +498,67 @@ def seslendir(metin, kuyruk=False, tepkisiz=False, k=None, cal=None):
         SES_K.notify()
         if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
     return True
+def ses_onceden(metin, k=None):  # v0.127: sıradaki söz Gemini'yle okunacaksa sesini şimdiden iste (üçlü sohbet: öbür asistan konuşurken); seslendir'in
+    # Gemini dalıyla aynı metin ve ses (yoksa önceden alınan kullanılmaz, istek boşa gider). Okuma yine seslendir'le sıraya girer.
+    if not AYAR.get("konusma", True) or not metin or os.environ.get("SUFLOR_TEST_BASLAT") or "gemini_onceden" not in globals(): return False
+    metin = ton_ayikla(metin)[0]
+    if not metin: return False
+    if not ((k is not None and str(k.get("ses") or "").startswith("gemini") and gemini_izinli()) or kisilik_sesi()[0] == "gemini"): return False
+    kk = k if k is not None else kisilik(); d = metin_dili(metin) or (_DIL["son"] if _DIL["son"] and time.time() - _DIL["t"] < 20 else "tr")
+    m = ses_duzen(metin if ARAYUZ_DILI == "tr" and d == "en" else kisilik_telaffuz(metin), False)
+    return bool(m) and gemini_onceden(m, gemini_kisilik_sesi(kk) if k is not None else kisilik_sesi()[1], ses_uslup_bul(m, kk))
+def yerel_uyari(metin):  # v0.127: kısa sistem uyarısı (Gemini sınırı) yerel sesle, okuma ve sohbet sırası boşalınca (2 sn sessiz); en çok 10 dk bekler
+    def bekle():
+        t0 = time.time(); bos = None
+        while time.time() - t0 < 600:
+            mesgul = ("ses_caliyor" in globals() and ses_caliyor()) or _KS.get("tur") or ("_UCLU" in globals() and _UCLU.get("okuyor"))
+            bos = None if mesgul else (bos or time.time())
+            if bos and time.time() - bos >= 2:
+                with SES_K:
+                    SES["q"].append(("yerel", metin)); SES_K.notify()
+                    if not SES["isci"]: SES["isci"] = True; threading.Thread(target=_ses_isci, daemon=True).start()
+                return
+            time.sleep(0.2)
+        print("SES: uyarı okunamadı (10 dk sessiz an yok)")
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): uyarı · {metin}"); return
+    threading.Thread(target=bekle, daemon=True).start()
 GEMINI_BIRLESIK_EN_COK = 600  # v0.80.8: birleşik Gemini okumasının en uzun metni (karakter); Konuş cevabı en çok 5 cümle
-def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] in ("g", "en") else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
+def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] in ("g", "en", "yerel") else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
+def _g_birlestir(v):  # (SES_K içinde) baştaki Gemini parçasını al; arkada bekleyen aynı ses ve üsluptaki parçalar tek istekte (v0.80.8). Sesi önceden istenmiş
+    oge = SES["q"].pop(0)  # parçaya eklenmez (önceden alınan boşa gitmesin)
+    if isinstance(oge, tuple) and oge[0] == "g" and not ("gemini_onceden_var" in globals() and gemini_onceden_var(oge[1], oge[2] or v)):
+        parca = [oge[1]]
+        while (SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g" and SES["q"][0][2:] == oge[2:]
+               and sum(len(x) for x in parca) + len(SES["q"][0][1]) <= GEMINI_BIRLESIK_EN_COK): parca.append(SES["q"].pop(0)[1])
+        if len(parca) > 1: oge = ("g", " ".join(parca), oge[2], oge[3])
+    return oge
+def ses_sonraki_hazirla():  # v0.127: Gemini okuması çalarken (gemini-ses.py _oynat_bekle) kuyruğun başındaki Gemini parçasının sesi önceden istenir
+    if "gemini_onceden" not in globals(): return
+    with SES_K:
+        if not SES["q"] or not (isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g") or not gemini_izinli(): return
+        v = kisilik_sesi()[1]; oge = _g_birlestir(v); SES["q"].insert(0, oge)
+    gemini_onceden(oge[1], oge[2] or v, oge[3])
+SES_MESGUL_SN = 8  # işçi parçayı aldı, ses henüz çalmıyor (Gemini ilk ses ~0,6 sn, Pocket üretimi): ses_caliyor bunu da sayar — üçlü sohbet önceki söz bitti sanmasın
 def _ses_isci():
     while True:
         with SES_K:
-            while not SES["q"]: SES_K.wait()
+            while not SES["q"]: SES["mesgul_t"] = 0.0; SES_K.wait()
+            SES["mesgul_t"] = time.time()
             dosya = SES["q"].pop(0)[1] if isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "dosya" else None  # v0.80.1: ("g", …) Gemini parçası da demet — dosya sanılıp afplay'e gidiyordu, cevap hiç okunmuyordu
             if dosya:
                 try: SES["p"] = p = subprocess.Popen(["/usr/bin/afplay", dosya], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except OSError as e: print(f"SES: tepki çalınamadı {e.__class__.__name__}"); continue
         if dosya: p.wait(); continue
         with SES_K: bas = SES["q"][0] if SES["q"] else None
+        if isinstance(bas, tuple) and bas[0] == "yerel":  # v0.127: sistem uyarısı yerel sesle (Gemini isteği harcanmaz); Pocket yoksa Mac sesi
+            with SES_K:
+                if not SES["q"] or SES["q"][0] is not bas: continue
+                SES["q"].pop(0); kes = SES.get("kes", 0); SES["simdi"] = bas[1]
+            ys = str((kisilik() or {}).get("yerel_ses") or "")
+            if "pocket_var" in globals() and pocket_var() and pocket_oku(bas[1], ses=(pocket_ses_adi(ys) if ys.startswith("pocket") else None) or pocket_varsayilan(),
+                                                                         iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
+            with SES_K: SES["q"].insert(0, ("mac", bas[1]))
+            bas = SES["q"][0]
         if isinstance(bas, tuple) and bas[0] == "en":  # v0.101.3: İngilizce cümle kişiliğin İngilizce Pocket sesiyle; okunamazsa düz metin olarak yerel sese düşer
             with SES_K:
                 if not SES["q"] or SES["q"][0] is not bas: continue
@@ -518,21 +568,19 @@ def _ses_isci():
             with SES_K: SES["q"].insert(0, bas[1])
         motor, v, khiz = kisilik_sesi()
         with SES_K: bas = SES["q"][0] if SES["q"] else None
+        if isinstance(bas, tuple) and bas[0] == "mac": motor = "mac"; v, khiz = kisilik_sesi("mac")[1:]
         if isinstance(bas, tuple) and bas[0] == "g" and gemini_izinli(): motor = "gemini"  # v0.81.0: kapsam bu arada daraldıysa yerel sese düşer  # v0.80.0: parça Gemini için hazırlandı (kendi sesi/üslubu)
         if motor == "gemini":  # v0.78.0: bulut ses; okunamazsa (ağ, anahtar) Mac sesi
             with SES_K:
                 if not SES["q"]: continue
-                oge = SES["q"].pop(0); kes = SES.get("kes", 0)
-                if isinstance(oge, tuple) and oge[0] == "g":  # v0.80.8: arkada bekleyen aynı ses ve üsluptaki parçalar tek istekte (ilk cümle tek başına hemen çalar;
-                    parca = [oge[1]]                           # o okunurken gelen cümleler birleşir → istek sayısı ~üçte bir, hız sınırına (429) daha az takılır)
-                    while (SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g" and SES["q"][0][2:] == oge[2:]
-                           and sum(len(x) for x in parca) + len(SES["q"][0][1]) <= GEMINI_BIRLESIK_EN_COK): parca.append(SES["q"].pop(0)[1])
-                    if len(parca) > 1: oge = ("g", " ".join(parca), oge[2], oge[3])
+                oge = _g_birlestir(v); kes = SES.get("kes", 0)  # ilk cümle tek başına hemen çalar; o okunurken gelenler birleşir
             metin = _ses_metin(oge); oses, ousl = (oge[2], oge[3]) if isinstance(oge, tuple) else (None, (kisilik() or {}).get("ses_uslup")); SES["simdi"] = metin
             if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=oses or v, uslup=ousl): continue
             with SES_K: SES["q"].insert(0, metin)
+            if not gemini_izinli():  # v0.127: günlük sınır bu istekte doldu → kişiliğin yerel sesi (Pocket), Mac sesi değil
+                motor, v, khiz = kisilik_sesi()
         with SES_K:
-            if SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] == "g": SES["q"][0] = etiket_sil(SES["q"][0][1])  # Gemini yok: düz metin
+            if SES["q"] and isinstance(SES["q"][0], tuple) and SES["q"][0][0] in ("g", "mac"): SES["q"][0] = etiket_sil(SES["q"][0][1])  # Gemini yok: düz metin
         if motor == "pocket":  # S93: yerel Türkçe ses (Pocket); okunamazsa Mac sesi (19 Ekim kararı: sıra Pocket → Mac → Piper)
             with SES_K:
                 if not SES["q"]: continue

@@ -52,13 +52,13 @@ try:
     exec(open(os.path.join(KOD, "aktarici", "bellek.py"), encoding="utf-8").read(), ns)  # v0.64.0: istemin sonundaki kullanıcı kartı (ayar yok → boş)
     ist = ns["konus_istem"]()
     ok("Konuş istemi: kişilik metni sonda, biçim kuralları önce, neşeli ünlem satırı çıktı",
-       ist.endswith("KİŞİLİK-İŞARETİ") and "biçim kuralları" in ist.split("## Kişilik")[0][-400:] and "'Vay!'" not in ist and "en çok dört cümle" in ist and "Şey," not in ist)
+       ist.split("\n\nYanlış yazılmış sözcükler")[0].endswith("KİŞİLİK-İŞARETİ") and ist.rstrip().endswith("bilgi sorusunda soru hiç yok.") and "biçim kuralları" in ist.split("## Kişilik")[0][-400:] and "'Vay!'" not in ist and "en çok dört cümle" in ist and "Şey," not in ist)
     # v0.61.0: iki kişilik — toplantı dışı kişilik (ayar kisilik_toplanti_disi), adla seçim, toplantıda yalnız kulağa
     kd2 = os.path.join(T, "kisilik2.md")
     open(kd2, "w", encoding="utf-8").write("---\nad: Matlas\nhitap: Matlas, Oh Matlas\nhitap_bicimi: sen\nselam: Selam, ben Matlas.\ntelaffuz: Sir=sör\n---\n## Kişilik: Matlas\nAdın Matlas. Sen dersin. İKİNCİ-İŞARET\n")
     ns["AYAR"]["kisilik_toplanti_disi"] = kd2
     ist2 = ns["konus_istem"]()
-    ok("iki kişilik: istemde ikisi de, açıklama satırı, biçim kuralları önce", "KİŞİLİK-İŞARETİ" in ist2 and ist2.endswith("İKİNCİ-İŞARET") and "Aşağıda iki kişilik var: Atlas toplantıda, Matlas toplantı dışında" in ist2)
+    ok("iki kişilik: istemde ikisi de, açıklama satırı, biçim kuralları önce", "KİŞİLİK-İŞARETİ" in ist2 and ist2.split("\n\nYanlış yazılmış sözcükler")[0].endswith("İKİNCİ-İŞARET") and "\n\nYanlış yazılmış sözcükler" in ist2 and "Aşağıda iki kişilik var: Atlas toplantıda, Matlas toplantı dışında" in ist2)
     ok("adın söylenişleri kuralı: hitap listesi, düzeltme yok, kişilik metninden önce (v0.97.5)", "Adının söylenişleri" in ist2 and "Matlas: Oh Matlas" in ist2
        and "Adını düzeltme" in ist2 and ist2.index("Adının söylenişleri") < ist2.index("## Kişilik"))
     ok("toplantı yokken etkin kişilik ikincisi", ns["kisilik"]()["ad"] == "Matlas")
@@ -354,9 +354,11 @@ try:
     ok("uydurma kuralı: söz mesajında ve ana cevap notunda alıntı/olgu uydurma yasağı",
        "tırnaklı alıntı ya da replik uydurma" in ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas", "tepki") and "tırnaklı alıntı ya da replik uydurma" in blok({"kisi": "Matlas", "kaynak": "sohbet"}))
     ok("üçlü: /status görünümü (açık, özel paylaşım kapalı)", ns["uclu_view"]() == {"acik": True, "ozel_paylas": False})
+    ns["AYAR"]["ad"] = "Deniz Test"; hn = ns["_uclu_hitap_notu"]({"kisi": "Atlas"}); hn0 = ns["_uclu_hitap_notu"]({}); ns["AYAR"].pop("ad")
+    ok(f"üçlü ana cevap: kullanıcıya kendi adıyla, öbürünün adı yalnız ona ({hn.strip()})", "«Deniz» de" in hn and "«Matti» adını yalnız Matti" in hn and hn0 == "")
     ns["AYAR"].pop("uclu_sohbet"); ns["AYAR"].pop("kisilik_bellek")
     ns["TOP"][0] = False; ns["AYAR"]["kisilik_toplanti_disi"] = ""
-    ok("ikinci kaldırılınca tek kişilik (eski istem)", ns["konus_istem"]().endswith("KİŞİLİK-İŞARETİ") and ns["kisilik"]()["ad"] == "Atlas")
+    ok("ikinci kaldırılınca tek kişilik (eski istem)", ns["konus_istem"]().split("\n\nYanlış yazılmış sözcükler")[0].endswith("KİŞİLİK-İŞARETİ") and ns["kisilik"]()["ad"] == "Atlas")
     ns["AYAR"]["kisilik"] = ""; ok("kişilik yokken istem nötr (ünlem satırı yerinde)", "'Vay!'" in ns["konus_istem"]() and "KİŞİLİK-İŞARETİ" not in ns["konus_istem"]())
     # kişilik dosyası silinince nötr
     os.remove(kd); time.sleep(0.2)

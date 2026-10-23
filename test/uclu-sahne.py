@@ -127,4 +127,32 @@ ok("tetik: seçenekli sohbet sorusu engellenmez", ns["uclu_talimat"](dict(ana, m
 ns["TOP"][0] = True; ok("tetik: toplantıda sahne kipi kapalı", not ns["sahne_acik"]()); ns["TOP"][0] = False
 ns["AYAR"]["uclu_sahne"] = False; ok("ayar uclu_sahne: false → sahne kipi kapalı", not ns["sahne_acik"]()); ns["AYAR"].pop("uclu_sahne")
 ok("ana not: sahne kipinde kullanıcıya kısa cevap", "kısa konuş" in ns["sahne_ana_notu"]())
+# 7) v0.126.1 — kullanıcının ilk sahne denemesi (24 Ekim)
+v = ns["uclu_veda"]
+ok("veda: teşekkür + ikinize, test oturumu, görüşmek üzere, sitem", all(v(x) for x in ("Teşekkür ederim ikinize de, bu bir test oturumuydu, görüşmek üzere.", "İyi geceler demiştim, hâlâ konuşuyorsunuz.", "Tamam, yeter bu kadar.")))
+ok("veda değil: sözün ortasındaki 'demiştim', teşekkürlü istek", not any(v(x) for x in ("Ben sana demiştim, kahvaltı önemli.", "Bir film önerin, teşekkürler.")))
+sifirla(); t0 = time.time()
+U["akis"].extend([{"t": t0 - 30, "ad": None, "metin": "Kahvaltı mı akşam yemeği mi daha önemli?"}, {"t": t0 - 29, "ad": A, "metin": "Kahvaltı bence, simit ve çayla."},
+                  {"t": t0 - 25, "ad": B, "metin": "Kahvaltı tartışılmaz, simit şart."}, {"t": t0 - 5, "ad": None, "metin": "Kahvaltı sorusunu geçtim. Matlas, dün akşam ne yaptım?"},
+                  {"t": t0 - 4, "ad": B, "metin": "Dün akşam film izledin galiba."}])
+sz, gc, es = ns["sahne_konu"]()
+ok(f"konu geçişi: 'geçtim' işareti tanındı, eski konu sözcükleri yasak ({es})", gc and sz.startswith("Kahvaltı sorusunu geçtim") and "simit" in es and "kahvaltı" in es and "matlas" not in es)
+m = ns["sahne_mesaj"]({"kisi": B}, ns["sahne_plan"](A, 3, rng=random.Random(1)))
+ok("konu geçişi: mesajda son söz esas, önceki konu kapandı, eski konuşma gitmedi", "son sözünden açılır" in m and "konuyu değiştirdi" in m and "Kahvaltı bence, simit" not in m)
+U["akis"].append({"t": t0, "ad": None, "metin": "Peki bu akşam ne yiyelim?"}); sz, gc, _ = ns["sahne_konu"]()
+ok("işaretsiz yeni söz: konu değişmedi sayılır ama son söz esas", not gc and sz == "Peki bu akşam ne yiyelim?" and "son sözünden açılır" in ns["sahne_mesaj"]({"kisi": B}, ns["sahne_plan"](A, 3)))
+pl3 = [ns["sahne_plan"](A, random.Random(i).choice((3, 3, 4)), rng=random.Random(i)) for i in range(50)]; ok("sahne uzunluğu: varsayılan 3–4 satır", all(3 <= len(p) <= 4 for p in pl3))
+ns["SOHBET"]["acik"] = True
+def kapat_sonra(): time.sleep(0.35); ns["SOHBET"]["acik"] = False
+sifirla(); tur = {"kaynak": "uclu", "kisi": A, "metin": "", "sahne": {"plan": pl5, "bitti": False, "ev": threading.Event()},
+                  "uclu": {"nesil": U["nesil"], "ksec": {"ad": None, "t": 0.0}, "t0": time.time(), "sohbet_acik": True}}
+threading.Thread(target=ns["_sahne_okuyucu"], args=(tur,), daemon=True).start(); threading.Thread(target=kapat_sonra, daemon=True).start()
+for x in parca: time.sleep(0.25); tur["metin"] += x
+tur["sahne"]["bitti"] = True; tur["sahne"]["ev"].wait(5)
+ok(f"sohbet kapanınca sahne durdu ({len(SES)} satır okundu), sürdürme tetiklenmedi", 1 <= len(SES) <= 2 and not any("sıra kullanıcıda" in l for l in LOG))
+ok("sohbet kapalıyken canlan sahnesi başlamaz", ns["sahne_tetik"]({"kisi": A, "kaynak": "uclu", "uclu": {"sohbet_acik": True}}, canlan=True) is False and ns["_KS"]["tur"] is None)
+ns["SOHBET"]["acik"] = True; ns["SAHNE_TAVAN_SN"] = 0.05
+tur, _ = sahne(parca, pl5, ara=0.05)
+ok(f"süre tavanı: aradaki satırlar atlandı, kullanıcıya dönen son satır okundu ({[m for _, m, _ in SES]})", len(SES) < 5 and SES[-1][1] == "Deniz, sen bugün dışarı çıktın mı?")
+ns["SAHNE_TAVAN_SN"] = 20.0
 print("üçlü sahne:", "✓ hepsi geçti" if not any(hata) else f"✗ {sum(hata)} kaldı"); sys.exit(1 if any(hata) else 0)

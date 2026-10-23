@@ -32,7 +32,7 @@ ns["AYAR"]["talimat"] = False; ok("ayar talimat: false kapatır", ns["talimat_co
 ns["AYAR"] = {}; ok("ayar yoksa yalnız proje hedefi (geliştirme yok)", ns["talimat_coz"]("geliştirme oturumuna ilet: renk değişsin") is None and ns["talimat_coz"]("proje oturumuna ilet: renk değişsin"))
 # 1a) v0.101.1: Claude'un hazırladığı ileti — [İLET <hedef>: <ileti>] etiketi silinir, yalnız kullanıcının kendi sorusunda onaya gider
 nc = dict(ns, AYAR={"talimat_hedefler": HEDEF}, TALIMAT_EN_COK=1000); giden = []
-nc["talimat_kuyruk"] = lambda tur, h, ileti, metin, kaynak, claude=False: giden.append((tur, h["ad"], ileti, kaynak, claude)) or True
+nc["talimat_kuyruk"] = lambda tur, h, ileti, metin, kaynak, claude=False: giden.append((tur, h["ad"] if h else None, ileti, kaynak, claude)) or True
 exec(src[src.index("TALIMAT_FIIL ="):src.index("def _talimat_kayit")] + src[src.index("TALIMAT_ETIKET_RX ="):src.index("def talimat_karar")], nc); exec("def print(*a, **k): pass", nc)
 c_ = "Tamam, hazırladım.\n---\nAyrıntı.\n[İLET proje: R12 Ali raporu işini listeden çıkar.]"
 t_, g_ = nc["talimat_claude"](c_, "o işi listeden çıkaralım", {"kaynak": "bas"})
@@ -47,6 +47,10 @@ t_, g_ = nc["talimat_claude"]("Cevap.", "s", {"kaynak": "bas"}); ok("etiketsiz c
 nc["AYAR"] = {"talimat": False}; ok("ayar talimat: false → istemde yol yok", nc["talimat_istem"]() == "")
 nc["AYAR"] = {"talimat_hedefler": HEDEF}; i_ = nc["talimat_istem"]()
 ok("istemde hedef listesi ve etiket biçimi", "proje = proje oturumu" in i_ and "gelistirme = geliştirme oturumu" in i_ and "[İLET <hedef>: <ileti>]" in i_)
+t_, g_ = nc["talimat_claude"]("Hazırladım.\n[İLET yapilacak: Cumartesi 10.00'da Ali'yi ara.]", "yarın onda Ali'yi aramamı hatırlatan bir not yaz", {"kaynak": "sohbet"})
+ok("24 Ekim: hatırlatma/not → kullanıcının yapılacağı (oturuma değil), etiket silindi", g_ and t_ == "Hazırladım." and giden[-1] == ("yapilacak", None, "Cumartesi 10.00'da Ali'yi ara", "sohbet", True))
+t_, g_ = nc["talimat_claude"]("Tamam. [İLET hatırlatma: süt al]", "s", {"kaynak": "karsi", "karsi": True}); ok("karşı tarafın isteğinde yapılacak da gitmez", not g_ and t_ == "Tamam.")
+ok("istemde hatırlatma yolu, 'yazamıyorum' yok, gece 'yarın' sorusu, eylemde kısa doğrulama", "[İLET yapilacak:" in i_ and "'yazamıyorum' deme" in i_ and "00.00 ile 05.00" in i_ and "tek kısa doğrulama sorusu" in i_)
 ok("okuma sınırı: etiketin başı yakalanır (kapanış gelmeden)", nc["TALIMAT_ETIKET_BAS"].search("Hazırladım. [İLET pro") is not None)
 # 1b) onay sözcükleri (v0.77.1, kullanıcı: evet dışında gönder, bildir, onaylıyorum, yes, tamam da onay)
 bs = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); nb = {"re": re}; exec(bs[bs.index("SES_CEVAP = {"):bs.index("def sesli_cevap(")], nb)

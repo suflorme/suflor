@@ -520,7 +520,8 @@
      }
     ],
     "sinir": "int",
-    "toplam": "int"
+    "toplam": "int",
+    "uyari": "bool"
    },
    "gizli": "NoneType",
    "guncelleme": {
