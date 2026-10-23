@@ -293,10 +293,11 @@ def konus_istem(vt=None):
         a, b = ks[0]["ad"], ks[1]["ad"]
         return t + _t(f"\n\nAşağıda iki kişilik var: {a} toplantıda, {b} toplantı dışında varsayılandır; kullanıcı adıyla seslenerek öbürünü çağırabilir. Her mesajın başında "
                       f"«[Bu soruyu <ad> cevaplıyor]» yazar: yalnız o kişiliğin adı, tonu ve hitabıyla konuş; önceki cevaplar öteki kişilikten olabilir, onun üslubunu sürdürme. "
+                      "Bu işaret iç nottur: sesli söylemezsin, 'bu soruyu ben cevaplıyorum' gibi sözlerle sırayı ya da düzeni anlatmazsın. "
                       "Kişilikler yalnız tonu ve kimliği belirler; yukarıdaki biçim kuralları (uzunluk, sesli kısım, ---) her zaman önce gelir.\n\n",
                       f"\n\nTwo personas follow: {a} is the default in meetings, {b} outside meetings; the user can call the other by name. Each message starts with "
                       "«[Bu soruyu <name> cevaplıyor]» (this question is answered by <name>): speak only with that persona's name, tone and form of address; earlier answers may be "
-                      "from the other persona, don't carry its style over. Personas set only tone and identity; the format rules above always come first.\n\n") + _hitap_istem(ks) + "\n\n".join(x["metin"] for x in ks) + _etiket_istem(ks) + kart_istem()
+                      "from the other persona, don't carry its style over. This marker is an internal note: never say it aloud or narrate who is answering. Personas set only tone and identity; the format rules above always come first.\n\n") + _hitap_istem(ks) + "\n\n".join(x["metin"] for x in ks) + _etiket_istem(ks) + kart_istem()
     return t + _t("\n\nAşağıdaki kişilik yalnız tonu ve kimliği belirler; yukarıdaki biçim kuralları (uzunluk, sesli kısım, ---) her zaman önce gelir.\n\n",
                   "\n\nThe persona below sets only tone and identity; the format rules above (length, spoken part, ---) always come first.\n\n") + _hitap_istem([k]) + k["metin"] + _etiket_istem([k]) + kart_istem()
 # --- Hızlı bilgi (S47, v0.40.0): yerel ön arama --------------------------------------------------------------------------------------------
@@ -978,7 +979,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                      "yazim": u.get("cache_creation_input_tokens") or 0, "yazim_1h": (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0,  # v0.92.0: önbellek yazımı ve 1 saatlik payı (kota dışında 5 dk'ya düşerse görünsün)
                      "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))), 2),
                      "hata": bool(j.get("is_error")), "kaynak": tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True))}
-                _KS["maliyet"] = m; _KS["tur"] = None; _KS["son"] = time.time(); _KS["sayac"] += 1
+                _KS["maliyet"] = m; _KS["tur"] = None; _KS["son"] = time.time(); _KS["sayac"] += 0 if tur.get("kaynak") == "uclu" else 1  # üçlü söz kısa: tur sınırı kullanıcı sorusuyla (giriş sınırı yine geçerli)
                 # v0.55.1: sınır API çağrısı başına ortalama girişe göre (o["giris"] araç turlarının toplamı: 3 turluk veritabanı sorusu ~68k → her sorudan sonra
                 # süreç kapanıyordu, sonraki soru soğuk başlıyordu). Geçmiş büyüdükçe çağrı başına giriş büyür; tek turluk soruda eskisiyle aynı.
                 cagri = o["giris"] / max(1, int(o.get("tur") or 1))
@@ -1297,8 +1298,8 @@ def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen p
 def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsın (kayıt sürerken)
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
-    if _KS["tur"] and _KS["tur"].get("kaynak") == "uclu": uclu_iptal("kullanıcı bastı")  # üçlü sohbet: söz kullanıcıda; söz alma cümlesi okunmaz, bırakınca biter
-    elif _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
+    if "uclu_kes" in globals() and not toplanti_var(): uclu_kes("kullanıcı bastı")  # üçlü sohbet: söz kullanıcıda; bekleyen söz okunmaz, zincir biter
+    if _KS["tur"] and _KS["tur"].get("kaynak") != "uclu": return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}  # söz alma turu bırakınca biter (uclu_bekle)
     if giris_sanal(): print("KONUŞ: varsayılan giriş sanal aygıt (BlackHole) — başlamadı"); return {"ok": False, "err": _t(*GIRIS_SANAL_UYARI)}  # v0.80.3
     _akis_sifirla(); onara_isit()
     if not toplanti_var(): ses_durdur()  # toplantıda yalnız okunan cevap durur (aşağıda konus_sus)
@@ -1470,6 +1471,10 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if gc:
             if kbg: kisilik_sec(kbg["ad"])
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=gc); seslendir(gc, kuyruk=True); return
+    if not toplanti_var() and tur.get("kaynak") in ("bas", "sohbet") and "uclu_acik" in globals() and uclu_acik():  # üçlü sohbet: "dur" / "<Ad>, dur" — susar, cevap yok
+        kbd, md = kisilik_hitap_bul(metin)
+        if ASISTAN_DUR_RX.match(md if kbd else metin):
+            uclu_kes("kullanıcı 'dur' dedi", sustur=True); ses_durdur(); _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=_t("🔇 Sustular", "🔇 Stopped")); return
     _konus_kur(durum="dusunuyor", soru=metin)
     simdi = datetime.datetime.now().astimezone(); top = toplanti_var()
     if tur.get("kaynak") not in ("hitap", "karsi"):  # bas-konuş/sohbet: cümle başında kişilik adı → o kişilik (hitap yolu konus_hitap'ta seçti)

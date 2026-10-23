@@ -140,6 +140,10 @@ def sohbet_parca(p):
     # v0.54.3 (S70, kullanıcı 16 Ekim: "arka plan seslerinden sürekli kesiliyor ve susuyor"): araya girme varsayılan kapalı (ayar sohbet_araya_girme) — cevap
     # sonuna kadar okunur, okuma sırasında gelen ses atılır (arka plan sesi okumayı kesmez, sonraki soru da olmaz); Claude düşünürken söylenen yine biriktirilir.
     if not AYAR.get("sohbet_araya_girme") and _okuma_izle(simdi):
+        if "uclu_kes" in globals() and _UCLU.get("okuyor") and kutu_kulaklik():  # üçlü sohbet: asistanlar arası sözde kullanıcı ~1 sn kesintisiz konuşunca susarlar
+            SOHBET["uclu_sn"] = SOHBET.get("uclu_sn", 0.0) + konusma if konusma >= len(pen) * AKIS_PENCERE / 2 / WH_SR * 0.6 else 0.0  # (yalnız kulaklıkta: hoparlörde
+            if SOHBET["uclu_sn"] >= SOHBET_KESME_SN * 1.5 and uclu_kes("kullanıcı sohbette konuştu", sustur=True):  # kendi sesleri mikrofona girer; orada bas, "dur"
+                SOHBET.update(t_okuma=0.0, uclu_sn=0.0); return {"ok": True, "mesgul": True}  # ya da Option + Shift + S)
         SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET["kesme_sn"] = 0.0
         if konusma >= SOHBET_BIRIK_SN and SOHBET.get("yok_t") != SOHBET["t_okuma"]:
             SOHBET["yok_t"] = SOHBET["t_okuma"]; print("SOHBET: okuma sürerken ses — yok sayıldı (araya girme kapalı), okuma sürüyor")
@@ -157,6 +161,7 @@ def sohbet_parca(p):
             if simdi - SOHBET["t_okuma"] >= SOHBET_KORU_SN and SOHBET["kesme_sn"] >= SOHBET_KESME_SN:
                 SOHBET["biriken"] = bytearray(b"".join(onceki)); _sohbet_kes(tur, "araya girildi")
         elif konusma >= SOHBET_BIRIK_SN:  # v0.49.2: Claude düşünürken (yazıya dökme, cevap bekleme) konuşma atılmaz, sonraki soru olur
+            if "uclu_kes" in globals(): uclu_kes("kullanıcı sohbette konuştu")
             SOHBET["biriken"] = bytearray(b"".join(onceki)); print("SOHBET: Claude düşünürken konuşma — biriktiriliyor, sonraki soru olacak")
         return {"ok": True, "mesgul": True}
     SOHBET["t_okuma"] = 0.0; SOHBET["kesme_sn"] = 0.0; SOHBET.pop("onceki", None)

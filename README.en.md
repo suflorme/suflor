@@ -91,7 +91,11 @@ by voice: *"Defne, what date did we discuss for the beta last week?"* The answer
   on the right to ask by voice. Double-tap the microphone for a hands-free conversation.
 - **Work for another session:** say *"Defne, forward this to the project session"* and the message is shown on a confirmation card;
   it is sent only if you approve.
-- **Two assistants:** optionally add a second, more relaxed assistant for outside meetings.
+- **Two assistants:** optionally add a second, more relaxed assistant for outside meetings. Turn it on in Settings and the two hear each
+  other and join the conversation on their own; the three of you talk together.
+- **Choice of AI:** the assistant's brain is Claude by default. Without a Claude subscription you can use a Gemini or OpenAI-compatible API key,
+  or a local model on your Mac (Ollama) to work without the internet; each job (Talk, translation, project card) can be set separately.
+  If the chosen service fails, that job is done once with Claude.
 - **Voice:** your Mac's built-in voice, natural Turkish voices that run on your Mac (Pocket) or the optional Gemini voice.
 
 ## It remembers your project and its history
@@ -122,6 +126,8 @@ conversion and search all run on this Mac.
 
 - Suflor.me's local server only accepts connections from this Mac (`127.0.0.1`). Meeting content is not sent to any server.
 - The text sent to Claude goes through your own Claude Code session; Anthropic's terms of use apply.
+- If you pick another service instead of Claude, the text context (transcript, notes, document passages) goes to that service; audio does not.
+  With a local model the text never leaves your Mac either.
 - The beta is voluntary development participation and can't be turned off. A copy of every package sent is kept in
   `~/Library/Application Support/Suflor/teshis/gonderilen/`, so you can read exactly what was sent.
 - Meeting files stay in your project folder. They contain people's names; treat them as internal documents.
@@ -145,7 +151,7 @@ separate Settings and Help windows, and light/dark themes. The interface is avai
 curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 ```
 
-**2.** The setup wizard opens in your browser. One task per screen: Mac check, Claude connection, your name, the assistant's name and
+**2.** The setup wizard opens in your browser. One task per screen: Mac check, AI connection (Claude, API key or local model), your name, the assistant's name and
 voice, project folder, model downloads, calendar and the Chrome extension. The wizard checks every step itself. If you close it, the
 same command picks up where you left off.
 
@@ -164,7 +170,7 @@ if it doesn't match. When a new version is out, an **Update** button appears on 
 | Memory | at least 16 GB (about 4 GB in use during a meeting) |
 | Disk | about 12 GB free (models about 5 GB; document conversion and search about 3.3 GB) |
 | Browser | Google Chrome |
-| Claude | [Claude Code](https://claude.com/claude-code) and a Claude subscription (Pro or higher). The wizard installs Claude Code if needed; sign in once in Terminal with `claude` → `/login`. |
+| AI | Recommended: [Claude Code](https://claude.com/claude-code) and a Claude subscription (Pro or higher). The wizard installs Claude Code if needed; sign in once in Terminal with `claude` → `/login`. Alternatives: a Gemini or OpenAI-compatible API key, or a local model on your Mac (Ollama, ~3–7 GB; weak in Turkish, best as a fallback). |
 
 ## Shortcuts
 

@@ -99,6 +99,7 @@ def otonom_kisayol():  # Option + Shift + S: otonom cevap bekliyor ya da okunuyo
     otonom_karar(None, "iptal"); return {"ok": True, "metin": _t("🔇 Toplantıya söylenmeyecek", "🔇 Won't be said in the meeting")}
 def asistan_dur():  # S94: "<Ad>, dur" / "sus" ve Option + Shift + S — bekleyen ya da okunan cevap ve toplantıya okuma susar (moderatör sürer)
     r = otonom_kisayol()
+    if not toplanti_var() and "uclu_kes" in globals() and uclu_kes("Option + Shift + S / dur", sustur=True): return {"ok": True, "metin": _t("🔇 Asistanlar sustu", "🔇 Assistants stopped")}  # üçlü sohbet
     if ts_durdur(): print("ASİSTAN: sustu (okuma durdu)"); return {"ok": True, "metin": _t("🔇 Asistan sustu", "🔇 Assistant stopped")}
     return r or {"ok": True, "metin": _t("🔇 Okunan bir şey yok", "🔇 Nothing is being read")}
 def _ot_dongu(i):

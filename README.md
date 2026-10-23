@@ -88,7 +88,11 @@ Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad 
 - **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
   Mikrofona iki kez dokunursan eller serbest sohbet başlar.
 - **Başka oturuma iş:** *"Defne, bunu proje oturumuna ilet"* dediğinde ileti bir onay kartıyla sunulur; onaylarsan iletilir.
-- **İki asistan:** istersen toplantı dışında daha rahat konuşan ikinci bir asistan eklersin.
+- **İki asistan:** istersen toplantı dışında daha rahat konuşan ikinci bir asistan eklersin. Ayarlar'dan açarsan ikisi birbirini duyar ve
+  sohbete kendiliğinden katılır; üçünüz birlikte konuşursunuz.
+- **Yapay zekâ seçimi:** asistanın beyni varsayılan olarak Claude'dur. Claude aboneliğin yoksa Gemini ya da OpenAI uyumlu bir API anahtarı,
+  internet olmadan da çalışsın istersen Mac'te yerel bir model (Ollama) seçebilirsin; iş başına (Konuş, çeviri, proje kartı) ayrı ayarlanır.
+  Seçtiğin servis hata verirse o iş bir kez Claude'la yapılır.
 - **Ses:** Mac'in Türkçe sesi, Mac'te çalışan doğal Türkçe kadın ve erkek sesi (Pocket) ya da isteğe bağlı Gemini sesi.
 
 ## Projeni ve geçmişini hatırlar
@@ -118,6 +122,8 @@ Suflor.me baştan bu kuralla yazıldı: **ses Mac'inden çıkmaz.** Konuşma tan
 
 - Suflor.me'nin yerel sunucusu yalnız bu Mac'ten gelen bağlantıyı kabul eder (`127.0.0.1`). Toplantı içeriği hiçbir sunucuya gönderilmez.
 - Claude'a giden metni senin Claude Code oturumun görür; Anthropic'in kullanım koşulları geçerlidir.
+- Claude yerine başka bir servis seçersen metin bağlamı (döküm, not, belge parçası) o servise gider, ses gitmez. Yerel model seçersen metin de
+  Mac'ten çıkmaz.
 - Beta sürümü gönüllü geliştirme katılımıdır ve kapatılmaz. Giden her paketin kopyası
   `~/Library/Application Support/Suflor/teshis/gonderilen/` altında durur; neyin gittiğini kendin okuyabilirsin.
 - Toplantı dosyaları senin proje klasöründe durur. Kişi adı içerirler; iç belge gibi davran.
@@ -143,7 +149,7 @@ ayrı Ayarlar ve Yardım pencereleri ve açık/koyu tema var.
 curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 ```
 
-**2.** Kurulum sihirbazı tarayıcıda açılır. Her ekranda tek iş var: Mac denetimi, Claude bağlantısı, senin adın,
+**2.** Kurulum sihirbazı tarayıcıda açılır. Her ekranda tek iş var: Mac denetimi, yapay zekâ bağlantısı (Claude, API anahtarı ya da yerel model), senin adın,
 asistanın adı ve sesi, proje klasörü, modellerin indirilmesi, takvim ve Chrome eklentisi. Sihirbaz her adımı kendisi denetler. Kapatırsan aynı komut kaldığın yerden sürdürür.
 
 **3.** Bir toplantıya katıl. Panodaki takvimden **Başlat**'a bas; gerisini asistan yürütür.
@@ -161,7 +167,7 @@ Yeni sürüm çıkınca panoda **Güncelle** düğmesi belirir.
 | Bellek | en az 16 GB (toplantı sırasında ~4 GB kullanılır) |
 | Disk | ~12 GB boş alan (modeller ~5 GB; belge çevirme ve arama ~3,3 GB) |
 | Tarayıcı | Google Chrome |
-| Claude | [Claude Code](https://claude.com/claude-code) ve Claude aboneliği (Pro ya da üstü). Claude Code yoksa sihirbaz kurar; Terminal'de `claude` → `/login` ile giriş gerekir. |
+| Yapay zekâ | Önerilen: [Claude Code](https://claude.com/claude-code) ve Claude aboneliği (Pro ya da üstü). Claude Code yoksa sihirbaz kurar; Terminal'de `claude` → `/login` ile giriş gerekir. Yerine: Gemini ya da OpenAI uyumlu API anahtarı, ya da Mac'te yerel model (Ollama, ~3–7 GB; Türkçede zayıf, yedek olarak). |
 
 ## Kısayollar
 
