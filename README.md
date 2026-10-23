@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="#kurulum">Kurulum</a> ·
-  <a href="#toplantıda-ne-olur">Toplantıda ne olur</a> ·
+  <a href="#toplantıya-sesle-katılır">Toplantıya sesle katılır</a> ·
   <a href="#gizlilik">Gizlilik</a> ·
   <a href="KILAVUZ.md">Kılavuz</a>
 </p>
@@ -25,29 +25,54 @@
 Tiyatroda suflör, oyuncu repliğini unuttuğunda kulisten fısıldayan kişidir. Suflor.me toplantıda aynı işi yapar. Sen konuşmaya
 odaklanırsın. O dinler, projenin geçmişini hatırlar ve gerektiğinde tek bir cümle söyler.
 
-<table>
-<tr>
-<td valign="top" width="33%"><b>Dinler</b><br>Senin sesini ve karşı tarafın sesini Mac'inde, canlı olarak yazıya döker. Ses diske yazılmaz, Mac'ten çıkmaz.</td>
-<td valign="top" width="33%"><b>Hatırlar</b><br>Projenin belgelerini ve geçmiş toplantıları bilir. Bugün söylenen bir rakam geçen haftakiyle çelişirse fark eder.</td>
-<td valign="top" width="33%"><b>Fısıldar</b><br>Ne sorman, neyi açmaman, neyi not etmen gerektiğini küçük kartlarla söyler. Adıyla seslenirsen cevap verir.</td>
-</tr>
-</table>
+<p align="center"><img src="gorsel/ozellikler.png" alt="Öne çıkanlar: toplantıda konuşur, katılımcıyı cevaplar, toplantıyı yönetir, canlı çeviri, kulağına fısıldar, geçmişi hatırlar, eller serbest, gizli toplantı" width="100%"></p>
 
-## Toplantıda ne olur
+## Toplantıya sesle katılır
+
+Suflor.me yalnız not tutan bir araç değil. İstersen asistanın toplantıya katılır: ona adıyla seslenirsin, cevabını herkes duyar.
+Bir kez çağırdıktan sonra öbür katılımcılar da ona soru sorabilir. İstersen toplantıyı bütünüyle ona devredersin.
+
+<p align="center"><img src="gorsel/toplantida.png" alt="Toplantıdan bir an: Deniz toplantıyı Defne'ye devrediyor; Defne gündemi açıyor, Ayla'nın sorusunu geçmiş toplantıdan cevaplıyor, sessiz kalan Can'a söz veriyor" width="100%"></p>
+
+- **Toplantıda konuşur:** *"Defne, bu hafta hangi işler kaldı?"* Cevap herkesin duyacağı şekilde okunur. Asistan sözü kesmez, sırasını
+  bekler; biri konuşmaya başlarsa susar. *"Defne, dur"* ya da Option + Shift + S onu hemen susturur. Ayardan açılır
+  (Ayarlar → Asistanlar toplantıda konuşsun); web toplantısında ses yalnız okuma süresince mikrofon kanalına karışır.
+- **Katılımcının sorusunu cevaplar:** sen bir kez çağırdıktan sonra toplantıdaki herkes ona *"Defne, …"* diye sorabilir. Yalnız sana
+  cevap vermesini istediğinde panodaki Konuş düğmesini kullanırsın.
+- **Toplantıyı yönetir:** *"Defne, toplantıyı sen yönet. Gündem: kayıt sayfası, destek ve fiyat."* Gündemi bu cümleden ya da
+  takvimdeki toplantıdan alır. Maddeyi açar, sessiz kalana söz verir, uzun konuşanı nazikçe toparlar, uzun bir sessizlikte konuşmayı
+  canlandırır. Süre dolunca özetler, kararı sorar; kapanışta kararları ve sorumluları okur. Sen istediğin an araya girersin:
+  *"sonraki madde"*, *"süreyi uzat"*, *"özetle"*, *"bekle"*, *"yönetimi bırak"*.
+- **Gizli toplantı:** tek dokunuşla Suflor.me hiçbir şeyi dinlemez, yazmaz ve işlemez; asistan konuşmaz.
+
+## Dil engelini kaldırır
+
+- **Canlı çeviri:** karşı tarafın İngilizce sözleri panoda, satırın hemen altında Türkçesiyle görünür. Art arda konuşmada çeviri
+  yaklaşık bir saniyede gelir.
+- **Sesli çeviri:** kulaklık takılıyken çevirinin kısa özü (en çok sekiz sözcük) kulağına okunur; tam çeviri panoda kalır.
+  Tarayıcıdaki toplantıda karşı tarafın sesi bu sırada kısılır.
+- **Sorunun dilinde cevap:** asistana İngilizce sorarsan İngilizce cevap verir ve İngilizce bir sesle okur.
+
+## Kulağına fısıldar
 
 Asistan toplantıyı izler ve dört tür kart gönderir. Kartlar toplantı ekranının köşesindeki küçük şeritte ve panoda belirir.
 Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 
 <p align="center"><img src="gorsel/kartlar.png" alt="Dört kart türü: Söyle, Dur, Cevap, Not" width="100%"></p>
 
-Asistan araya girmeyi ölçülü yapar. Toplantıdaki rolüne (yöneten, katılımcı, dinleyici) göre az ya da çok konuşur. Kendiliğinden gelen
-Söyle ve Not kartları dakikada en çok bir kez araya girer. **Sessiz** düğmesi 10 dakika boyunca hiç kart göndermez.
+- **Ölçülü:** toplantıdaki rolüne (yöneten, katılımcı, dinleyici) göre az ya da çok konuşur. Kendiliğinden gelen Söyle ve Not kartları
+  dakikada en çok bir kez araya girer. **Sessiz** düğmesi 10 dakika boyunca hiç kart göndermez.
+- **Gerçekten fısıldar (isteğe bağlı):** kulaklık takılıyken Dur kartı kısa bir sesle kulağına okunur; ekrana bakman gerekmez.
+- **Ne diyeyim?:** takıldığın an tek dokunuşla (Option + Shift + O) o ana uygun tek cümlelik bir replik önerir.
+- **Kanıt:** *"kanıt al"* dediğinde ya da Option + Shift + K'ye bastığında toplantı ekranının görüntüsü kaydedilir.
+  Ekranda şifre görünürse uyarır.
+- **Adın geçince haber verir:** karşı taraf adını söylediğinde ya da sen bir buçuk dakikadan uzun konuştuğunda panoda hemen görünür.
 
 ### Bir toplantının üç anı
 
 | Önce | Sırasında | Sonra |
 |---|---|---|
-| Takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, **Ne diyeyim?** (tek cümlelik replik önerisi), **Kanıt** (toplantı ekranının görüntüsü), sesli çeviri. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
+| Takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, çeviri; istersen asistan konuşur ya da toplantıyı yönetir. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
 
 ## Asistanına adıyla seslen
 
@@ -58,8 +83,7 @@ Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad 
 
 - **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
   Mikrofona iki kez dokunursan eller serbest sohbet başlar.
-- **Toplantıda konuşabilir (isteğe bağlı):** açarsan asistan cevabını herkesin duyacağı şekilde okur. Sözü kesmez, sırasını bekler.
-  *"Defne, dur"* ya da Option + Shift + S onu susturur.
+- **Başka oturuma iş:** *"Defne, bunu proje oturumuna ilet"* dediğinde ileti bir onay kartıyla sunulur; onaylarsan iletilir.
 - **İki asistan:** istersen toplantı dışında daha rahat konuşan ikinci bir asistan eklersin.
 - **Ses:** Mac'in Türkçe sesi, Mac'te çalışan doğal Türkçe kadın ve erkek sesi (Pocket) ya da isteğe bağlı Gemini sesi.
 
