@@ -7,7 +7,8 @@
 # Düzenli klasör kipi (kökte CLAUDE.md, DURUM ya da karar kaydı belgesi varsa): kart önce bunlardan beslenir; yalnız diğer belgelerden gelen satırlar
 # "fark" işaretli; belgelere dokunulmaz. Veritabanı kipi (ayar veritabani): kişiler veritabanından (ayar veritabani.kisiler; varsa .kararlar,
 # .gorevler), belgelerden yalnız özet ve sözlük. Taslak <uygulama>/proje-karti-taslak.json; onay (T6'da sihirbaz E ekranı) → proje-karti.json,
-# sözlük maddeleri sozluk.json'a (Whisper istemine de girer), düzenli olmayan klasörde CLAUDE.md'ye kısa taslak not.
+# sözlük maddeleri sozluk.json'a (Whisper istemine de girer), düzenli olmayan klasörde CLAUDE.md'ye kısa taslak not (yalnız CLAUDE.md varsa).
+# v0.121.0: onaylı kart <uygulama>/proje.db'ye de yazılır (baglam.py proje_vt_guncelle) — yapay zekâdan bağımsız: Konuş ve toplantı oturumu SQL ile okur.
 #   python3 proje-karti.py cikar [--sinir 300] [--model sonnet] [--paralel 4] [--tahmin]
 #   python3 proje-karti.py goster | onayla
 import argparse, collections, concurrent.futures, datetime, hashlib, importlib.util, json, os, re, sqlite3, subprocess, sys, threading, time
@@ -261,7 +262,10 @@ def onayla(taslak=None, kim="kullanici", terimler=None):  # terimler: sihirbazı
     duz_yol = {y for y in {s[0] for m in k.get("sozluk") or [] for s in m.get("kaynaklar") or []} if y.count("/") <= 1 and DUZENLI_RX.match(os.path.basename(y))}
     eklenen = sozluge_aktar(k.get("sozluk") or [], duz_yol, terimler)
     notu = claude_notu(k) if k.get("kip") != "duzenli" else False  # düzenli klasörde belgeler değişmez
-    return {"sozluk_eklenen": eklenen, "claude_notu": notu}
+    # v0.121.0: onaylı kart proje veritabanına (kisi, karar, acik_is… — Konuş ve toplantı oturumu vt_sor ile okur; kayıt veritabanı kipinde kurulmaz)
+    try: pv = B.proje_vt_guncelle()
+    except Exception as e: pv = {"hata": e.__class__.__name__}
+    return {"sozluk_eklenen": eklenen, "claude_notu": notu, "proje_vt": pv}
 
 SOZ_KONUSULMAZ = re.compile(r"[/@\\#\[\]()]|\.\w|^[a-z0-9_-]+$")  # dosya/alan adı, komut, adres, işaretli ya da tümü küçük harf: söylenmez
 SOZ_AKTAR_EN_COK = 60  # Whisper istemi ~200 belirteç (whisper-hat istem_metni): 17 Ekim gerçek proje kartında (201 belge) 1.228 terim, süzgeçten sonra 303 kalıyordu

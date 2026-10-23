@@ -6,6 +6,7 @@
 # her aramada değişen dosyalar kendiliğinden yeniden dizinlenir.
 #   python3 baglam.py dizin [--yeniden]          dizini kur/güncelle, özet yaz
 #   python3 baglam.py tara [--json]               proje taraması (SHA-256, kopya, sürüm grubu, kaynak türü, adla hariç) → <uygulama>/tarama.json
+#   python3 baglam.py proje-vt [--zorla]           proje veritabanı (<uygulama>/proje.db): tablo dosyaları + onaylı proje kartı
 #   python3 baglam.py ara "yedek ayşe" [--kim Ayşe] [--tur gorusme,toplanti] [--son 30] [--n 8] [--kapsam ortak]
 # v0.64.0: ayardaki bellek kaynakları (karar listeleri, kural dosyaları) ve Konuş geçmişi de dizinde (aşağıda "Bellek kaynakları").
 # Sözlük (sozluk.json + ayardaki sozluk_kaynagi tsv'si): doğru adı arayınca dökümlerdeki yanlış yazımları da bulunur.
@@ -33,8 +34,11 @@ SOZLUK_KOPYA = os.path.join(AYAR["uygulama"], "dis-sozluk.tsv")  # dış sözlü
 HARIC_GENEL = ["_yedek", "_arsiv", ".claude", ".git", "suflor", os.path.basename(str(AYAR.get("kod") or "").rstrip("/")) or "suflor"]
 HARIC = list(dict.fromkeys(HARIC_GENEL + list(AYAR.get("haric") or [])))  # ayar "haric": alanın kendi listesi (proje köküne göre)
 CANLI_HARIC = {"takvim-secilen.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "agenda.json", "hazir.json", "karneler.jsonl", "karsilastirmalar.jsonl"}  # karne · v0.7.2: karşılaştırma
-UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx", ".eml"}
-CEVIR_UZ = {".pdf", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".tif", ".tiff", ".bmp"}  # T2: metne çevirme işçisiyle (önbellekten dizine)
+TEXTUTIL_UZ = {".doc", ".rtf", ".odt"}  # v0.121.0: macOS textutil ile .docx'e çevrilip docx_metin'den (Docling bunlar için LibreOffice ister)
+UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx", ".eml"} | TEXTUTIL_UZ
+# T2: metne çevirme işçisiyle (önbellekten dizine). v0.121.0: Pages/Keynote/Numbers (Docling iWork) ve eski Excel (.xls, xlrd); tablolar proje veritabanına da
+CEVIR_UZ = {".pdf", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".tif", ".tiff", ".bmp", ".pages", ".key", ".numbers", ".xls"}
+PAKET_KLASOR = (".pages", ".numbers", ".key", ".rtfd", ".app", ".bundle")  # macOS paket klasörü (eski iWork): içindeki önizleme görüntüsü ayrı dosya sanılmasın
 PARCA = 700  # bir parçanın hedef uzunluğu (karakter)
 
 # --- Türkçe sadeleştirme: harf harf 1:1 (özgün metinde konum bulunabilsin) ---------------------------------------
@@ -170,6 +174,16 @@ def docx_metin(yol):
             if i == 0: out.append("|" + "---|" * len(s))
         out.append("")
     return "\n".join(out)
+def textutil_metin(yol):  # .doc/.rtf/.odt → macOS textutil → geçici .docx → docx_metin (yerel, ağ yok)
+    import subprocess, tempfile
+    d = tempfile.mkdtemp(prefix="suflor-textutil-"); hedef = os.path.join(d, "belge.docx")
+    try:
+        subprocess.run(["/usr/bin/textutil", "-convert", "docx", "-output", hedef, yol], capture_output=True, timeout=60, check=True)
+        return docx_metin(hedef)
+    finally:
+        try: os.remove(hedef)
+        except OSError: pass
+        os.rmdir(d)
 
 # --- Dosya türü, tarih, başlık ----------------------------------------------------------------------------------
 GORUSME = tuple(AYAR.get("gorusme_klasorleri") or ["gorusmeler/"])  # görüşme dökümü klasörleri (proje köküne göre)
@@ -181,7 +195,7 @@ def tur_bul(kisa):
     if kisa.startswith(GORUSME) or re.search(r"dokum|transkript", kisa, re.I): return "gorusme"
     if ANALIZ and kisa.startswith(ANALIZ): return "analiz"
     if kisa.startswith(("Sunum/", "sunum/")) or re.search(r"sunum|sunu|deck", kisa, re.I): return "sunum"
-    if kisa.endswith(".xlsx"): return "tablo"
+    if kisa.endswith((".xlsx", ".xls", ".numbers")): return "tablo"
     return "belge"
 AYLAR = {a: i + 1 for i, a in enumerate("ocak şubat mart nisan mayıs haziran temmuz ağustos eylül ekim kasım aralık".split())}
 def tarih_bul(kisa, bas, mtime):
@@ -206,9 +220,11 @@ def parcala(yol, kisa, sha=None):
         ps = cevrilmis(yol, sha)
         if ps is None: raise Bekliyor()
         t = "\n".join(m for _, m in ps)
-        return baslik_bul(kisa, t) if ext in (".pdf", ".pptx") else os.path.basename(kisa), t[:1500], [(k, "", m) for k0, m0 in ps for k, _, m in metin_parcala(m0, k0 + " · " if k0 else "")]
+        if ext in (".xls", ".numbers"): return os.path.basename(kisa), "", [(k, "", m) for k, m in ps]  # satır başına bir parça (xlsx_parcala gibi)
+        return baslik_bul(kisa, t) if ext in (".pdf", ".pptx", ".pages", ".key") else os.path.basename(kisa), t[:1500], [(k, "", m) for k0, m0 in ps for k, _, m in metin_parcala(m0, k0 + " · " if k0 else "")]
     if ext == ".eml": t = eml_metin(yol)
     elif ext == ".docx": t = docx_metin(yol)
+    elif ext in TEXTUTIL_UZ: t = textutil_metin(yol)
     elif ext == ".jsonl":
         bas = open(yol.replace(".jsonl", ".md"), encoding="utf-8", errors="replace").read(600) if kisa.startswith("_canli/") and os.path.exists(yol.replace(".jsonl", ".md")) else ""
         return baslik_bul(kisa, bas), bas, jsonl_parcala(yol, kisa)
@@ -219,7 +235,9 @@ def parcala(yol, kisa, sha=None):
         except Exception: o = None
         if o is not None: return os.path.basename(kisa), "", [(y, "", s) for y, s in json_dizeler(o) if len(s) > 15][:5000] or []
     if ext in (".tsv", ".csv"):
-        ay = "\t" if ext == ".tsv" else ","; ls = t.splitlines(); bas = ls[0].split(ay) if ls else []
+        ls = t.splitlines(); ilk = "\n".join(ls[:20])
+        ay = "\t" if ext == ".tsv" else (";" if ilk.count(";") > ilk.count(",") else ",")  # v0.121.0: Türkçe Excel CSV'si noktalı virgüllü
+        bas = ls[0].split(ay) if ls else []
         return os.path.basename(kisa), "", [(f"s{i}", "", " · ".join(f"{a}: {b}" for a, b in zip(bas, ln.split(ay)) if b)) for i, ln in enumerate(ls[1:], 2) if ln.strip()]
     return baslik_bul(kisa, t), t[:1500], (dokum_parcala(t) if dokum_mu(t) else metin_parcala(t))
 
@@ -365,7 +383,7 @@ def dosyalar(erisilemeyen=None):
     yield from bellek_dosyalari(erisilemeyen)  # önce: proje içindeki bellek kaynağının türü (BELLEK_TUR) proje taramasından önce bilinsin
     for kok, dirs, fs in os.walk(PROJE, onerror=hata, followlinks=False):
         rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else rel
-        dirs[:] = [d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC)]
+        dirs[:] = [d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC) and not d.lower().endswith(PAKET_KLASOR)]
         for f in fs:
             k = os.path.join(rel, f)
             if os.path.splitext(f)[1].lower() in UZANTI | CEVIR_UZ and k not in HARIC and not f.startswith("~$") and not dokum_kopyasi(os.path.join(kok, f)): yield os.path.join(kok, f), k
@@ -433,6 +451,8 @@ def guncelle(c, yeniden=False, sessiz=True):
     if eris and not sessiz: print(f"dizin: okunamayan klasör ({', '.join(e or 'proje kökü' for e in eris)}) — eski kayıtları korundu", file=sys.stderr)
     if not sessiz or n_yeni:
         print(f"dizin: {n_yeni} dosya güncellendi · {n_parca} parça · {time.time() - t0:.1f} sn" + (f" · okunamayan: {', '.join(hata)}" if hata else ""), file=sys.stderr)
+    try: proje_vt_guncelle(c, sessiz=sessiz)  # v0.121.0: değişen tablo dosyaları ve onaylı kart → proje.db (değişiklik yoksa birkaç ms)
+    except Exception as e: print(f"proje veritabanı: güncellenemedi ({e.__class__.__name__}: {str(e)[:80]})", file=sys.stderr)
     return n_yeni
 def sil(c, kisa):
     ids = [r[0] for r in c.execute("SELECT id FROM parca WHERE yol=?", (kisa,))]
@@ -592,7 +612,7 @@ def tara(c=None, sessiz=True):
     except OSError: eris.append("")
     for kok, dirs, fs in os.walk(PROJE, onerror=hata_kayit, followlinks=False):
         rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else rel
-        dirs[:] = sorted(d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC))
+        dirs[:] = sorted(d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC) and not d.lower().endswith(PAKET_KLASOR))
         for f in sorted(fs):
             k = os.path.join(rel, f); y = os.path.join(kok, f)
             if k in HARIC: atlanan["ayar: haric"] += 1; continue
@@ -735,6 +755,11 @@ def cevrilmis(yol, sha=None):
     try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
     except (OSError, ValueError): return None
     return [] if o.get("hata") else [(k, m) for k, m in o.get("parcalar") or []]
+def cevrilmis_tablolar(yol, sha=None):  # çevirme önbelleğindeki tablolar [(sayfa, [[hücre…], …])] ya da None (önbellek yok)
+    sha = sha or _sha256(yol)
+    try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
+    except (OSError, ValueError): return None
+    return [(str(t.get("sayfa") or ""), t.get("satirlar") or []) for t in o.get("tablolar") or [] if isinstance(t, dict)]
 
 _GIZLI_RX = [
     ("anahtar", re.compile(r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----")),
@@ -848,7 +873,9 @@ def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR
             if o.get("hata") in ("zaman_asimi", "işçi kapandı"): isci = None
             kayit = {"yol": kisa, "arac": isci.hazir.get("arac") if isci else None, "t": int(time.time()), "sure": round(time.time() - t1, 2)}
             if o.get("hata"): kayit["hata"] = o["hata"]; say["hata"] += 1; hatalar.append((kisa, o["hata"]))
-            else: kayit["parcalar"] = o.get("parcalar") or []; say["cevrildi"] += 1; say["karakter"] += sum(len(m) for _, m in kayit["parcalar"])
+            else:
+                kayit["parcalar"] = o.get("parcalar") or []; say["cevrildi"] += 1; say["karakter"] += sum(len(m) for _, m in kayit["parcalar"])
+                if o.get("tablolar"): kayit["tablolar"] = o["tablolar"]  # v0.121.0: .xls/.numbers sayfaları → proje veritabanı
             y = _onbellek_yol(sha); os.makedirs(os.path.dirname(y), exist_ok=True)
             with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(kayit, f, ensure_ascii=False)
             os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
@@ -869,6 +896,244 @@ def cevir_ozet(r):
     if r["hatalar"]: s.append("  hatalar: " + ", ".join(f"{k} ({h})" for k, h in r["hatalar"][:8]))
     if r["durdu"]: s.append("  durdu: " + r["durdu"])
     return "\n".join(s)
+
+# --- Proje veritabanı (v0.121.0; plan proje-hazirligi §9 "tek mimari") ---------------------------------------------------------
+# Kayıt veritabanı ayarlı olmayan kurulumda (beta varsayılanı) Suflor kendi veritabanını kurar: <uygulama>/proje.db (0600; proje klasörüne yazılmaz).
+#   t_<dosya>[_<sayfa>] — Excel (.xlsx, .xls), Numbers ve CSV/TSV sayfaları; ilk sütun `satir` (kaynaktaki satır no); sayı sayı, tarih ISO olarak.
+#   tablolar(tablo, dosya, sayfa, satir_sayisi, sutunlar) — her tablonun kaynak dosyası ve özgün sütun başlıkları.
+#   kisi, kurum, karar, acik_is, olay, terim, proje — kullanıcının onayladığı proje kartından (proje-karti.json), her satırda kaynak.
+# Konuş ve toplantı oturumu bu dosyayı kayıt veritabanıyla aynı araçlarla okur (toplanti-claude.py vt_sema / vt_sor; MCP sunucusu): hangi yapay
+# zekâ kullanılırsa kullanılsın bilgi aynı yerde, aynı SQL'le. Dizin turunun sonunda yalnız değişen tablo dosyası ve kart yeniden yazılır (proje-vt.json).
+# Okunamayan dosyanın eski tablosu korunur; eski sürüm, kopya, adla hariç ve gizli bilgi taşıyan hücre ([gizli]) girmez. Kayıt veritabanı
+# ayarlıysa (ayar veritabani) kurulmaz; ayar `proje_vt: false` kapatır.
+PROJE_VT = os.path.join(AYAR["uygulama"], "proje.db"); PROJE_VT_KAYIT = os.path.join(AYAR["uygulama"], "proje-vt.json")
+PROJE_KART = os.path.join(AYAR["uygulama"], "proje-karti.json")
+TABLO_UZ = {".xlsx", ".xls", ".numbers", ".csv", ".tsv"}
+TABLO_SATIR_EN_COK, TABLO_SUTUN_EN_COK, PROJE_VT_SATIR_EN_COK = 20000, 80, 300000
+def proje_vt_acik(): return not (isinstance(AYAR.get("veritabani"), dict) and AYAR["veritabani"].get("yol")) and AYAR.get("proje_vt", True) is not False
+def _slug(s, en_cok=40):
+    s = re.sub(r"[^0-9a-z]+", "_", norm(str(s or ""))).strip("_")
+    return (s[:en_cok].rstrip("_") or "x") if not s[:1].isdigit() else ("s" + s)[:en_cok]
+_SAYI_RX = re.compile(r"^[-+]?\d{1,3}(?:\.\d{3})+(?:,\d+)?$|^[-+]?\d+(?:,\d+)$")  # Türkçe: 1.234,56 · 12,5
+_TARIH_RX = re.compile(r"^(\d{1,2})[./](\d{1,2})[./](\d{4})$")
+def hucre_deger(v):
+    # metin hücresi → int/float/ISO tarih ya da metin (SQL'de toplama ve tarih karşılaştırması doğru çalışsın)
+    if v is None: return None
+    if isinstance(v, (int, float)) and not isinstance(v, bool): return int(v) if float(v).is_integer() and abs(v) < 2 ** 53 else float(v)
+    s = str(v).strip()
+    if not s: return None
+    if re.fullmatch(r"[-+]?\d+", s) and not (len(s) > 1 and s.lstrip("+-").startswith("0")) and len(s) < 16: return int(s)  # baştaki sıfır: kod/telefon, metin kalır
+    if re.fullmatch(r"[-+]?\d*\.\d+", s) and len(s) < 20: return float(s)
+    if _SAYI_RX.match(s): return float(s.replace(".", "").replace(",", "."))
+    m = _TARIH_RX.match(s)
+    if m and 1 <= int(m.group(1)) <= 31 and 1 <= int(m.group(2)) <= 12: return f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+    return "[gizli]" if gizli_bilgi(s) else s
+def _xlsx_tarih_bicimleri(z):  # styles.xml: tarih biçimli hücre stillerinin sırası (Excel tarihi sayı olarak saklar)
+    try: x = z.read("xl/styles.xml").decode("utf-8", "replace")
+    except KeyError: return set()
+    ozel = {int(i) for i, k in re.findall(r'<numFmt [^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"', x)
+            if re.search(r"[dy]", re.sub(r'"[^"]*"|\[[^\]]*\]', "", k).lower()) and not re.search(r"0", re.sub(r'"[^"]*"', "", k))}
+    xfs = re.search(r"<cellXfs[^>]*>(.*?)</cellXfs>", x, re.S)
+    sira = [int(i) for i in re.findall(r'<xf [^>]*numFmtId="(\d+)"', xfs.group(1))] if xfs else []
+    return {n for n, f in enumerate(sira) if 14 <= f <= 22 or 45 <= f <= 47 or f in ozel}
+def xlsx_tablolar(yol):
+    # → [(sayfa, [[hücre…], …])] — hücreler sütun harfine göre yerinde (boş hücre atlanmaz), tarih biçimli sayı ISO tarih
+    z = zipfile.ZipFile(yol); ss = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        x = z.read("xl/sharedStrings.xml").decode("utf-8", "replace")
+        ss = [html.unescape(re.sub(r"<[^>]+>", "", si)) for si in re.findall(r"<si>(.*?)</si>", x, re.S)]
+    tarihli = _xlsx_tarih_bicimleri(z)
+    wb = z.read("xl/workbook.xml").decode("utf-8", "replace"); rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8", "replace")
+    rid = dict(re.findall(r'<Relationship [^>]*Id="([^"]+)"[^>]*Target="([^"]+)"', rels))
+    rid.update({a: b for b, a in re.findall(r'<Relationship [^>]*Target="([^"]+)"[^>]*Id="([^"]+)"', rels)})
+    def sutun(ref):
+        n = 0
+        for ch in re.match(r"[A-Z]*", ref or "").group(0): n = n * 26 + ord(ch) - 64
+        return n - 1
+    out = []
+    for ad, r in re.findall(r'<sheet [^>]*name="([^"]+)"[^>]*r:id="([^"]+)"', wb):
+        hedef = rid.get(r, "").lstrip("/"); hedef = hedef if hedef.startswith("xl/") else "xl/" + hedef
+        if hedef not in z.namelist(): continue
+        x = z.read(hedef).decode("utf-8", "replace"); satirlar = []
+        for rx in re.findall(r"<row [^>]*>(.*?)</row>", x, re.S):
+            hucre = {}
+            for attrs, ic in re.findall(r"<c ([^>]*?)(?:/>|>(.*?)</c>)", rx, re.S):
+                v = re.search(r"<v>(.*?)</v>", ic or "", re.S); t = re.search(r'\bt="(\w+)"', attrs); ref = re.search(r'\br="([A-Z]+)\d+"', attrs)
+                s_ = re.search(r'\bs="(\d+)"', attrs); i = sutun(ref.group(1)) if ref else len(hucre)
+                if t and t.group(1) == "s" and v: d = ss[int(v.group(1))] if int(v.group(1)) < len(ss) else ""
+                elif t and t.group(1) == "inlineStr": d = re.sub(r"<[^>]+>", "", ic or "")
+                elif t and t.group(1) in ("str", "e"): d = v.group(1) if v else ""
+                elif t and t.group(1) == "b": d = "doğru" if v and v.group(1) == "1" else "yanlış"
+                elif v:
+                    try: f = float(v.group(1))
+                    except ValueError: d = v.group(1)
+                    else:
+                        d = f
+                        if s_ and int(s_.group(1)) in tarihli and 0 < f < 2958466:
+                            g = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=f)
+                            d = g.date().isoformat() if f.is_integer() else g.isoformat(timespec="minutes")
+                else: d = ""
+                if 0 <= i < 1000: hucre[i] = html.unescape(d).strip() if isinstance(d, str) else d
+            if hucre: satirlar.append([hucre.get(j, "") for j in range(max(hucre) + 1)])
+            else: satirlar.append([])
+        out.append((html.unescape(ad), satirlar))
+    return out
+def csv_tablolar(yol):
+    import csv, io
+    t = open(yol, encoding="utf-8-sig", errors="replace").read(8 << 20)
+    if yol.lower().endswith(".tsv"): ay = "\t"
+    else:
+        ilk = "\n".join(t.splitlines()[:20]); ay = max(",;\t|", key=ilk.count)
+    return [("", [r for r in csv.reader(io.StringIO(t), delimiter=ay)])]
+def tablo_kur(satirlar):
+    # ham satırlar → (özgün başlıklar, sütun adları, [(kaynak satır no, [değer…])]); başlık: ilk 10 satırda ≥ 2 dolu hücreli ilk satır
+    dolu = lambda r: [c for c in r if str(c).strip()]
+    bi = next((i for i, r in enumerate(satirlar[:10]) if len(dolu(r)) >= 2), None)
+    if bi is None: return None
+    gen = min(TABLO_SUTUN_EN_COK, max(len(r) for r in satirlar[bi:bi + 2000] or [[]]))
+    bas = [str(c).strip() if i < len(satirlar[bi]) else "" for i, c in enumerate((satirlar[bi] + [""] * gen)[:gen])]
+    tum_sayi = all(isinstance(hucre_deger(c), (int, float)) for c in dolu(satirlar[bi]))  # başlık değil, veri: sütunlar s1, s2…
+    if tum_sayi: bas, bi = [""] * gen, bi - 1
+    adlar, gor = [], {"satir"}
+    for i, b in enumerate(bas):
+        a = _slug(b, 40) if b else f"s{i + 1}"
+        while a in gor: a = f"{a}_{i + 1}"
+        gor.add(a); adlar.append(a)
+    veri = []
+    for n, r in enumerate(satirlar[bi + 1:], bi + 2):
+        if not dolu(r): continue
+        veri.append((n, [hucre_deger(c) for c in (list(r) + [""] * gen)[:gen]]))
+        if len(veri) >= TABLO_SATIR_EN_COK: break
+    if not veri: return None
+    bos = [i for i in range(gen) if not bas[i] and all(v[i] is None for _, v in veri)]  # tamamen boş, başlıksız sütun (Numbers'ın boş kenarı)
+    if bos:
+        tut = [i for i in range(gen) if i not in bos]
+        bas, adlar = [bas[i] for i in tut], [adlar[i] for i in tut]; veri = [(n, [v[i] for i in tut]) for n, v in veri]
+    return bas, adlar, veri
+def dosya_tablolari(yol, kisa, sha=None):  # → [(sayfa, satırlar)] ya da None (okunamadı / çevrilmedi: eski tablo korunur)
+    ext = os.path.splitext(kisa)[1].lower()
+    if ext == ".xlsx": return xlsx_tablolar(yol)
+    if ext in (".csv", ".tsv"): return csv_tablolar(yol)
+    return cevrilmis_tablolar(yol, sha)  # .xls, .numbers: çevirme işçisinin önbelleğinden
+def _pvt_baglan():
+    os.makedirs(os.path.dirname(PROJE_VT), exist_ok=True)
+    yeni = not os.path.exists(PROJE_VT); v = sqlite3.connect(PROJE_VT, timeout=10, isolation_level=None)  # işlem elle: tablo silme/kurma tek seferde görünsün
+    if yeni:
+        try: os.chmod(PROJE_VT, 0o600)
+        except OSError: pass
+    v.execute("CREATE TABLE IF NOT EXISTS tablolar(tablo TEXT PRIMARY KEY, dosya TEXT, sayfa TEXT, satir_sayisi INTEGER, sutunlar TEXT)")
+    return v
+def _pvt_kayit():
+    try: return json.load(open(PROJE_VT_KAYIT, encoding="utf-8"))
+    except (OSError, ValueError): return {}
+def _pvt_tablo_yaz(v, kisa, sayfalar, kullanilan):
+    kok = "t_" + _slug(os.path.splitext(os.path.basename(kisa))[0], 34); out = []
+    tek = sum(1 for _, s in sayfalar if s) <= 1
+    for sayfa, satirlar in sayfalar:
+        k = tablo_kur(satirlar or [])
+        if not k: continue
+        bas, adlar, veri = k
+        ad = kok if tek or not sayfa else f"{kok}_{_slug(sayfa, 20)}"; a0, i = ad, 2
+        while ad in kullanilan: ad = f"{a0}_{i}"; i += 1
+        kullanilan.add(ad)
+        v.execute(f'DROP TABLE IF EXISTS "{ad}"')
+        v.execute(f'CREATE TABLE "{ad}"(satir INTEGER, ' + ", ".join(f'"{a}"' for a in adlar) + ")")
+        v.executemany(f'INSERT INTO "{ad}" VALUES(?, {",".join("?" * len(adlar))})', [(n, *d) for n, d in veri])
+        v.execute("INSERT OR REPLACE INTO tablolar VALUES(?,?,?,?,?)", (ad, kisa, sayfa, len(veri),
+                  "; ".join(f"{a} = {b}" if b and b != a else a for a, b in zip(adlar, bas))))
+        out.append(ad)
+    return out
+def _kaynak_metni(x): return "; ".join(f"{k[0]}" + (f" @{k[1]}" if len(k) > 1 and k[1] else "") for k in (x.get("kaynaklar") or [])[:3] if k)
+def _pvt_kart_yaz(v, k):
+    ys = lambda xs: ", ".join(str(x) for x in xs or [] if x)
+    g = lambda m: "[gizli]" if gizli_bilgi(str(m or "")) else (str(m) if m is not None else "")
+    cel = lambda x: "; ".join(f"{a}: {', '.join(b)}" for a, b in (x.get("celiski") or {}).items())
+    tablolar = {
+        "kisi": ("ad, takma_adlar, roller, kurumlar, kaynak", [(g(x.get("ad")), ys(x.get("takma_adlar")), ys(x.get("roller")), ys(x.get("kurumlar")), _kaynak_metni(x)) for x in k.get("kisiler") or []]),
+        "kurum": ("ad, kaynak", [(g(x.get("ad")), _kaynak_metni(x)) for x in k.get("kurumlar") or []]),
+        "karar": ("ne, ne_zaman, kim, celiski, kaynak", [(g(x.get("ne")), x.get("ne_zaman") or "", ys(x.get("kim")), cel(x), _kaynak_metni(x)) for x in k.get("kararlar") or []]),
+        "acik_is": ("ne, sahip, tarih, celiski, kaynak", [(g(x.get("is")), ys(x.get("sahip")), x.get("tarih") or "", cel(x), _kaynak_metni(x)) for x in k.get("acik_isler") or []]),
+        "olay": ("ne, tarih, celiski, kaynak", [(g(x.get("ne")), x.get("tarih") or "", cel(x), _kaynak_metni(x)) for x in k.get("tarihler") or []]),
+        "terim": ("terim, aciklama, kaynak", [(g(x.get("terim")), g(x.get("aciklama")), _kaynak_metni(x)) for x in k.get("sozluk") or []]),
+        "proje": ("ozet, belge_sayisi, onay", [(g(k.get("ozet")), k.get("belge"), datetime.datetime.fromtimestamp((k.get("onay") or {}).get("t") or 0).isoformat(timespec="minutes"))])}
+    for ad, (sutun, satirlar) in tablolar.items():
+        v.execute(f"DROP TABLE IF EXISTS {ad}"); v.execute(f"CREATE TABLE {ad}({sutun})")
+        v.executemany(f"INSERT INTO {ad} VALUES({','.join('?' * len(sutun.split(',')))})", satirlar)
+    return {ad: len(s) for ad, (_, s) in tablolar.items()}
+def proje_vt_guncelle(c=None, zorla=False, sessiz=True):
+    # dizin turunun sonunda: değişen tablo dosyaları ve onaylı kart → proje.db → {"tablo", "satir", "yazilan", "silinen", "kart"} ya da None (kapalı)
+    if not proje_vt_acik(): return None
+    c = c or baglan(); kay = _pvt_kayit(); eski = kay.get("kaynak") or {}
+    try: kart_mt = os.path.getmtime(PROJE_KART)
+    except OSError: kart_mt = None
+    adaylar = {}
+    for yol, mt, boy, sha in c.execute("SELECT d.yol, d.mtime, d.boy, t.sha256 FROM dosya d LEFT JOIN tarama t ON t.yol = d.yol "
+                                       "WHERE COALESCE(d.gecerli, 1) = 1 AND COALESCE(d.kapsam, 'ortak') = 'ortak'"):
+        if os.path.splitext(yol)[1].lower() in TABLO_UZ and not yol.startswith("_canli/"): adaylar[yol] = (mt, boy, sha)
+    degisen = [k for k, (mt, boy, _) in adaylar.items() if zorla or (eski.get(k) or [None, None])[:2] != [mt, boy]]
+    silinen = [k for k in eski if k not in adaylar]
+    kart_degisti = zorla or kart_mt != kay.get("kart_mt") or (kart_mt is None and kay.get("kart"))
+    if not (degisen or silinen or kart_degisti) and os.path.exists(PROJE_VT): return {"degismedi": True, "tablo": kay.get("tablo") or 0, "satir": kay.get("satir") or 0, "kart": kay.get("kart")}
+    v = _pvt_baglan(); yazilan, toplam = 0, 0
+    try:
+        v.execute("BEGIN IMMEDIATE")
+        for k in silinen:
+            for t in eski[k][2] if len(eski[k]) > 2 else []: v.execute(f'DROP TABLE IF EXISTS "{t}"'); v.execute("DELETE FROM tablolar WHERE tablo=?", (t,))
+            eski.pop(k, None)
+        kullanilan = {r[0] for r in v.execute("SELECT tablo FROM tablolar")}
+        for k in sorted(degisen):
+            mt, boy, sha = adaylar[k]
+            try: sayfalar = dosya_tablolari(os.path.join(PROJE, k), k, sha if sha and not str(sha).startswith("bulut:") else None)
+            except Exception as e:
+                if not sessiz: print(f"proje veritabanı: {k} okunamadı ({e.__class__.__name__}) — eski tablosu korundu", file=sys.stderr)
+                continue
+            if sayfalar is None: continue  # çevrilmedi ya da okunamadı: eski tablo kalır, sonraki tur yeniden dener
+            for t in (eski.get(k) or [None, None, []])[2]:
+                v.execute(f'DROP TABLE IF EXISTS "{t}"'); v.execute("DELETE FROM tablolar WHERE tablo=?", (t,)); kullanilan.discard(t)
+            if toplam >= PROJE_VT_SATIR_EN_COK: sayfalar = []
+            adlar = _pvt_tablo_yaz(v, k, sayfalar, kullanilan); yazilan += 1
+            toplam += sum(r[0] for r in v.execute(f"SELECT satir_sayisi FROM tablolar WHERE tablo IN ({','.join('?' * len(adlar))})", adlar)) if adlar else 0
+            eski[k] = [mt, boy, adlar]
+        kart_say = kay.get("kart")
+        if kart_degisti:
+            k = None
+            if kart_mt is not None:
+                try: k = json.load(open(PROJE_KART, encoding="utf-8"))
+                except (OSError, ValueError): k = None
+            if k and k.get("onay"): kart_say = _pvt_kart_yaz(v, k)
+            elif kart_mt is None:
+                for t in ("kisi", "kurum", "karar", "acik_is", "olay", "terim", "proje"): v.execute(f"DROP TABLE IF EXISTS {t}")
+                kart_say = None
+        v.execute("COMMIT")
+        sayi = v.execute("SELECT count(*), coalesce(sum(satir_sayisi), 0) FROM tablolar").fetchone()
+    except BaseException:
+        if v.in_transaction: v.execute("ROLLBACK")
+        raise
+    finally: v.close()
+    kay = {"t": time.time(), "kaynak": eski, "kart_mt": kart_mt, "kart": kart_say, "tablo": sayi[0], "satir": sayi[1]}
+    try:
+        with open(PROJE_VT_KAYIT + ".tmp", "w", encoding="utf-8") as f: json.dump(kay, f, ensure_ascii=False)
+        os.replace(PROJE_VT_KAYIT + ".tmp", PROJE_VT_KAYIT)
+    except OSError: pass
+    r = {"tablo": sayi[0], "satir": sayi[1], "yazilan": yazilan, "silinen": len(silinen), "kart": kart_say}
+    if not sessiz or yazilan or silinen: print(f"proje veritabanı: {sayi[0]} tablo, {sayi[1]} satır · bu tur {yazilan} dosya yazıldı, {len(silinen)} silindi"
+                                              + (" · kart " + ", ".join(f"{a} {n}" for a, n in kart_say.items()) if kart_degisti and kart_say else ""), file=sys.stderr)
+    return r
+def proje_ozeti(en_cok=1800, dil="tr"):
+    # onaylı proje kartının kısa özeti (Konuş istemi, toplantı oturumu `tc proje`) — kayıt veritabanı kipinde ya da kart yoksa ""
+    if not proje_vt_acik(): return ""
+    try: k = json.load(open(PROJE_KART, encoding="utf-8"))
+    except (OSError, ValueError): return ""
+    if not k.get("onay"): return ""
+    en = dil == "en"; s = []; temiz = lambda xs, n: [x for x in xs if not gizli_bilgi(x)][:n]  # gizli bilgi taşıyan madde tek tek düşer
+    if k.get("ozet") and not gizli_bilgi(str(k["ozet"])): s.append(str(k["ozet"]).strip()[:700])
+    kis = temiz([p["ad"] + (f" ({', '.join(p['roller'][:2])})" if p.get("roller") else "") for p in k.get("kisiler") or [] if p.get("ad")], 15)
+    if kis: s.append(("People: " if en else "Kişiler: ") + "; ".join(kis))
+    isl = temiz([x["is"] + (f" — {', '.join(x['sahip'])}" if x.get("sahip") else "") + (f" ({x['tarih']})" if x.get("tarih") else "") for x in k.get("acik_isler") or [] if x.get("is")], 8)
+    if isl: s.append(("Open items: " if en else "Açık işler: ") + "; ".join(isl))
+    kar = temiz([x["ne"] + (f" ({x['ne_zaman']})" if x.get("ne_zaman") else "") for x in k.get("kararlar") or [] if x.get("ne")], 5)
+    if kar: s.append(("Decisions: " if en else "Kararlar: ") + "; ".join(kar))
+    return "\n".join(s)[:en_cok]
 
 # --- Anlama göre arama (proje hazırlığı T4, planlar/proje-hazirligi.md §2 Adım 3) ------------------------------------
 # multilingual-e5-base gömmeleri <uygulama>/gomme/ altında (gomme-isci.py; <ortak>/cevir-venv). Yalnız sonuçta görünebilen parçalar gömülür
@@ -1125,6 +1390,8 @@ if __name__ == "__main__":
     a = sub.add_parser("ara"); a.add_argument("sorgu"); a.add_argument("--kim"); a.add_argument("--tur", help="virgüllü: toplanti,gorusme,analiz,sunum,tablo,belge,karar,kural,konusma")
     a.add_argument("--son", type=int, help="son N gün"); a.add_argument("--n", type=int, default=8); a.add_argument("--kapsam", choices=["ortak"], help="yalnız ortak kaynaklar")
     a.add_argument("--eski", action="store_true", help="eski sürümler dahil"); a.add_argument("--disa", action="store_true", help="dışa aktarımlar dahil (veritabanı kipinde)")
+    pv = sub.add_parser("proje-vt", help="v0.121.0: proje veritabanını (<uygulama>/proje.db: Excel/CSV/Numbers sayfaları + onaylı kart) güncelle")
+    pv.add_argument("--zorla", action="store_true", help="hepsini yeniden yaz")
     A = ap.parse_args()
     if A.cmd == "dizin":
         c = baglan(); guncelle(c, A.yeniden, sessiz=False)
@@ -1142,5 +1409,8 @@ if __name__ == "__main__":
         r = cevir(sinir=A.n, yeniden_dene=A.yeniden_dene, sessiz=False); print(cevir_ozet(r))
     elif A.cmd == "tara":
         r = tara(); print(json.dumps(r, ensure_ascii=False, indent=1) if A.json else tara_ozet(r))
+    elif A.cmd == "proje-vt":
+        c = baglan(); guncelle(c); r = proje_vt_guncelle(c, zorla=A.zorla, sessiz=False)
+        print("proje veritabanı kapalı (kayıt veritabanı ayarlı ya da ayar proje_vt: false)" if r is None else json.dumps(r, ensure_ascii=False))
     else:
         r = ara(A.sorgu, A.kim, A.tur.split(",") if A.tur else None, A.son, A.n, kapsam=A.kapsam, eski=A.eski, disa=True if A.disa else None); yaz(r, A.sorgu, r[1])

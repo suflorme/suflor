@@ -48,6 +48,9 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
   `items` boş. Yeni gündemden sonra `tc acik sifirla` (eski açık sorular `acik-arsiv.jsonl`'e taşınır, silinmez).
 
 ## 3. Bağlam ve hazır kartlar
+- `tc proje` (bir kez): kullanıcının onayladığı proje kartının özeti (kişiler, açık işler, kararlar) ve proje veritabanının tabloları. Sayı, toplam,
+  ortalama, kişi ya da iş listesi gerekince `tc vt-sor "SELECT …"` (yalnız okunur; `t_` tabloları Excel/CSV/Numbers sayfaları, kaynak dosyası
+  `tablolar`'da; `kisi`, `karar`, `acik_is`, `olay` karttan): satırları kendin toplama, kaynağı `dosya` olarak yaz.
 - `tc hazirlik --kim <kişi>`: kişinin geçmişte söyledikleri, gündem maddesi başına ilk 3 sonuç, önceki toplantılarda ona sorulup
   cevapsız kalan sorular, kapanmamış sözleri (sözler defteri) ve esas belgelerde geçtiği satırlar. Yetmeyen madde için `tc ara "<sorgu>" [--kim] [--tur …] [--n 8]`
   (tüm proje klasörü: belgeler, tablolar, görüşmeler, `_canli/` toplantıları). Kişiye ait hazırlık notu varsa oku.

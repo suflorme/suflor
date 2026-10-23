@@ -40,7 +40,8 @@ def beta_say(ad, bas, son):
 BETA_RX = [("dur", re.compile(r"^ASİSTAN: '.*, dur'$")), ("sus_kisayol", re.compile(r"^ASİSTAN: sustu")),
            ("hitap_yinelenen", re.compile(r"^KONUŞ: aynı hitap sorusu")), ("kanit", re.compile(r"^KANIT \d+: ")),
            ("gizli", re.compile(r"^GİZLİ: açıldı")), ("moderator", re.compile(r"^MODERATÖR: başladı")),
-           ("zaman_asimi", re.compile(r"^KONUŞ: .*zaman aşımı"))]
+           ("zaman_asimi", re.compile(r"^KONUŞ: .*zaman aşımı")),
+           ("on_arama", re.compile(r"^KONUŞ: ön arama \d+ sonuç")), ("on_arama_bos", re.compile(r"^KONUŞ: ön arama sonuç yok"))]  # v0.121.0: proje bilgisine ulaşma
 def beta_satir(l):
     for ad, rx in BETA_RX:
         if rx.search(l): beta_olay(ad); return
@@ -95,6 +96,22 @@ def _beta_sistem(bas, son):  # sistem izi (toplantıda dakikada bir): en az boş
     bb = [x["bellek_bos"] for x in si if isinstance(x.get("bellek_bos"), (int, float))]; sw = [x["swap_gb"] for x in si if isinstance(x.get("swap_gb"), (int, float))]
     return {"olcum": len(si), "bellek_bos_en_az": min(bb) if bb else None, "takas_gb_en_cok": max(sw) if sw else None,
             "isi_ciddi_dk": sum(1 for x in si if (x.get("isi") or 0) >= 2)}
+# v0.121.0: proje bilgisine ulaşma — Konuş cevabının "bulamadım" türünden olması yerelde sayılır (soru/cevap metni gitmez), veritabanı sorgusu sayısı,
+# ön aramanın boş dönmesi; proje veritabanının büyüklüğü (tablo/satır sayısı, kart var mı). Yeniden sıralayıcı ve tablo işinin gerekliliği bu sayılardan.
+BULAMADI_RX = re.compile(r"bulamad|kayıtta (yok|bulun)|bilgi(m)? yok|göremiyorum|elimde (yok|bilgi)|couldn'?t find|could not find|no record|don'?t have (that|any) information", re.I)
+def _beta_bilgi(bas, son):
+    g = [r for r in _jsonl("konus-gecmis.jsonl") if bas <= (_ts(r) or 0) < son]
+    sq = [r for r in _jsonl("konus-sorgu.jsonl") if bas <= (_ts(r, "t") or 0) < son]
+    return {"konus_cevap": len(g), "bulamadi": sum(1 for r in g if BULAMADI_RX.search(str(r.get("sesli") or "") + " " + str(r.get("ayrinti") or ""))),
+            "veritabani_sorgu": len(sq), "on_arama": beta_say("on_arama", bas, son), "on_arama_bos": beta_say("on_arama_bos", bas, son)}
+def _beta_proje_vt():
+    v = AYAR.get("veritabani")
+    if isinstance(v, dict) and v.get("yol"): return {"kayit_vt": True, "kuruldu": False}  # yalnız seçenek ve sayı (teshis.temizle: "tur" sabit değerli anahtar)
+    try: k = json.load(open(os.path.join(AYAR["uygulama"], "proje-vt.json"), encoding="utf-8"))
+    except (OSError, ValueError): return {"kayit_vt": False, "kuruldu": False}
+    kart = k.get("kart") if isinstance(k.get("kart"), dict) else {}
+    return {"kayit_vt": False, "kuruldu": True, "tablo": int(k.get("tablo") or 0), "satir": int(k.get("satir") or 0), "kart": bool(kart),
+            "kart_kisi": int(kart.get("kisi") or 0), "kart_is": int(kart.get("acik_is") or 0), "kart_karar": int(kart.get("karar") or 0)}
 def _beta_olaylar(bas, son):
     return {a: beta_say(a, bas, son) for a in ("dur", "sus_kisayol", "hitap_yinelenen", "kanit", "sessiz", "sesli_ceviri", "gizli", "moderator", "zaman_asimi", "sorun", "hata")}
 
@@ -158,9 +175,9 @@ def beta_haftalik_paket(ad):
             "ozellik": {"ne_diyeyim": sum(1 for r in soru if r.get("tur") == "ozet"), "kanit": o["kanit"], "sessiz": o["sessiz"], "sesli_ceviri": o["sesli_ceviri"],
                         "canli_ceviri_toplanti": sum(1 for v in tps if v.get("ceviri")), "gizli": o["gizli"], "moderator": o["moderator"], "dur": o["dur"]},
             "kalite": {"konus": _beta_konus(kon), "hitap_yinelenen": o["hitap_yinelenen"], "zaman_asimi": o["zaman_asimi"], "acilis": beta_say("acilis", bas, son),
-                       "hata": o["hata"], "sorun": o["sorun"], "sistem": _beta_sistem(bas, son)},
+                       "hata": o["hata"], "sorun": o["sorun"], "sistem": _beta_sistem(bas, son), "bilgi": _beta_bilgi(bas, son)},
             "maliyet": _beta_maliyet(bas, son, sum(sure)), "profil": _beta_profil(),
-            "proje": teshis.proje_olcu(AYAR.get("proje"), AYAR["uygulama"])}  # klasör türü + son taramanın sayıları (klasör değişebilir)
+            "proje": teshis.proje_olcu(AYAR.get("proje"), AYAR["uygulama"]), "proje_vt": _beta_proje_vt()}  # klasör türü + son taramanın sayıları (klasör değişebilir)
 def _beta_haftalik():
     simdi = datetime.datetime.now()
     ad = _KUL.hafta_adi(simdi) if BETA_TEST else _KUL.hafta_adi(simdi - datetime.timedelta(days=7))  # biten hafta

@@ -69,7 +69,7 @@ Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 - **Gerçekten fısıldar (isteğe bağlı):** kulaklık takılıyken Dur kartı kısa bir sesle kulağına okunur; ekrana bakman gerekmez.
 - **Ne diyeyim?:** takıldığın an tek dokunuşla (Option + Shift + O) o ana uygun tek cümlelik bir replik önerir.
 - **Kanıt:** *"kanıt al"* dediğinde ya da Option + Shift + K'ye bastığında toplantı ekranının görüntüsü kaydedilir.
-  Ekranda şifre görünürse uyarır.
+  Karşı taraf ekran paylaşırken ekran her değiştiğinde görüntüsü kendiliğinden alınır. Ekranda şifre görünürse uyarır.
 - **Adın geçince haber verir:** karşı taraf adını söylediğinde ya da sen bir buçuk dakikadan uzun konuştuğunda panoda hemen görünür.
 
 ### Bir toplantının üç anı
@@ -93,11 +93,16 @@ Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad 
 
 ## Projeni ve geçmişini hatırlar
 
-Kurulumda proje klasörünü gösterirsin. Suflor.me klasördeki belgeleri, sunumları ve PDF'leri bu Mac'te metne çevirir ve dizinler.
+Kurulumda proje klasörünü gösterirsin. Suflor.me klasördeki belgeleri (Word, Pages, PDF, eski .doc ve .rtf dahil), sunumları
+(PowerPoint, Keynote), tabloları (Excel, Numbers, CSV) ve görüntüleri bu Mac'te metne çevirir ve dizinler.
 Arama sözcükle sınırlı değildir. Soruda geçen sözcük belgede hiç geçmese de anlamca yakın parçayı bulur.
 
 <p align="center"><img src="gorsel/toplantilar.png" alt="Toplantılar penceresi: 'beta' araması, dört toplantıda sekiz sonuç" width="100%"></p>
 
+- **Tablolar ve proje kartı tek veritabanında:** Excel, Numbers ve CSV sayfaları bu Mac'te küçük bir veritabanına girer. "Bu ay toplam
+  ne harcadık?", "Kaç açık iş var?" gibi sorularda asistan satırları göz kararı toplamaz, hesaplar ve kaynak dosyayı söyler. Kurulumda
+  onayladığın proje kartı (kişiler, kararlar, açık işler, kaynaklarıyla) da aynı yerdedir. Bilgi yapay zekâya özel bir dosyada değil,
+  standart bir veritabanında durur. Veritabanı proje klasörüne yazılmaz.
 - **Çelişkiyi yakalar:** konuşmada geçen bir iddia, rakam ya da sorumluluk daha önceki bir belgede ya da toplantıda farklı geçiyorsa
   kaynağıyla söyler.
 - **Karar grafı:** kararlar ve iddialar bu Mac'te birikir. Aynı kişi bir sonraki toplantıda farklı bir rakam söylerse fark edilir.
@@ -162,7 +167,7 @@ Yeni sürüm çıkınca panoda **Güncelle** düğmesi belirir.
 
 | Kısayol | Ne yapar |
 |---|---|
-| Option + Shift + K | Kanıt: toplantı ekranının görüntüsünü kaydeder (ekranda şifre görünürse uyarır) |
+| Option + Shift + K | Kanıt: toplantı ekranının görüntüsünü kaydeder (ekranda şifre görünürse uyarır; ekran paylaşımında kendiliğinden) |
 | Option + Shift + O | Ne diyeyim? Tek cümlelik replik önerisi |
 | Option + Shift + M | Sessiz: 10 dakika kart yok |
 | Option + Shift + S | Asistan sussun |

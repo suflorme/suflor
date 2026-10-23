@@ -100,7 +100,7 @@
       hz_ozet: "Özet", hz_kisiler: "Kişiler", hz_kurumlar: "Kurumlar", hz_kararlar: "Kararlar", hz_tarihler: "Tarihler", hz_isler: "Açık işler", hz_sozluk: "Sözlüğe eklenecek terimler",
       hz_sozluk_i: "En çok {n} terim; konuşma tanıma bunları doğru yazar.", hz_celiski: "farklı tarihler", hz_kaynak: "kaynak", hz_onayla: "Onayla", hz_onaylandi: "Onaylandı",
       hz_vt: "Kişiler, kararlar ve işler kayıt veritabanından gelir; burada yalnız özet ve sözlük var.", hz_sonra: "Sonra onaylarım",
-      hz_bitti_hazir: "Proje hazır: {b} belge, {p} parça, {c} dosya metne çevrildi.", hz_bitti_hazir0: "Proje hazır: {b} belge, {p} parça.", hz_bitti_suruyor: "Proje hazırlığı arka planda sürüyor; bitince Suflor.me kendiliğinden kullanır.",
+      hz_bitti_hazir: "Proje hazır: {b} belge, {p} parça, {c} dosya metne çevrildi.", hz_bitti_hazir0: "Proje hazır: {b} belge, {p} parça.", hz_bitti_tablo: "Tablolar: {n} sayfa, {r} satır proje veritabanında; toplam ve sayı sorularını asistan buradan hesaplar.", hz_bitti_suruyor: "Proje hazırlığı arka planda sürüyor; bitince Suflor.me kendiliğinden kullanır.",
       hz_bitti_b: "Proje hazırlığı tamam", hz_bitti_a: "Suflor.me toplantıda bu dizini ve proje kartını kullanır.", hz_bitir: "Panoya dön",
                                      },
     en: {
@@ -195,7 +195,7 @@
       hz_ozet: "Summary", hz_kisiler: "People", hz_kurumlar: "Organisations", hz_kararlar: "Decisions", hz_tarihler: "Dates", hz_isler: "Open tasks", hz_sozluk: "Terms to add to the glossary",
       hz_sozluk_i: "Up to {n} terms; speech recognition will spell them right.", hz_celiski: "conflicting dates", hz_kaynak: "source", hz_onayla: "Approve", hz_onaylandi: "Approved",
       hz_vt: "People, decisions and tasks come from the records database; only the summary and glossary are here.", hz_sonra: "Approve later",
-      hz_bitti_hazir: "Project ready: {b} documents, {p} passages, {c} files converted to text.", hz_bitti_hazir0: "Project ready: {b} documents, {p} passages.", hz_bitti_suruyor: "Project preparation is still running in the background; Suflor.me uses it as soon as it's done.",
+      hz_bitti_hazir: "Project ready: {b} documents, {p} passages, {c} files converted to text.", hz_bitti_hazir0: "Project ready: {b} documents, {p} passages.", hz_bitti_tablo: "Tables: {n} sheets, {r} rows in the project database; the assistant works out totals and counts from here.", hz_bitti_suruyor: "Project preparation is still running in the background; Suflor.me uses it as soon as it's done.",
       hz_bitti_b: "Project preparation done", hz_bitti_a: "Suflor.me uses this index and the project card in meetings.", hz_bitir: "Back to the panel",
                                      },
   };
@@ -488,7 +488,8 @@
       icerik: () => { const e = hzIsDurum(), s = e.sonuc;
         if (!D.hz || hzBos()) return "";
         if (e.calisiyor) return `<div class="liste">${satir("bekle", t.hz_bitti_suruyor)}</div>`;
-        return s && !s.bos ? `<div class="liste">${satir("iyi", tf(s.cevrilen ? t.hz_bitti_hazir : t.hz_bitti_hazir0, { b: s.belge, p: s.parca, c: s.cevrilen }))}</div>` : ""; } },
+        return s && !s.bos ? `<div class="liste">${satir("iyi", tf(s.cevrilen ? t.hz_bitti_hazir : t.hz_bitti_hazir0, { b: s.belge, p: s.parca, c: s.cevrilen }))}`
+          + (s.tablo ? satir("iyi", tf(t.hz_bitti_tablo, { n: s.tablo, r: s.tablo_satir })) : "") + `</div>` : ""; } },
   ];
   const gorunen = () => ADIMLAR.filter(a => (!hzMod() || HZ_ADIM.includes(a.id)) && (!a.kosul || a.kosul()));
 

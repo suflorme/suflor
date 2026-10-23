@@ -69,8 +69,8 @@ on the panel. Three small buttons next to each card: done, later, not needed.
   cards interrupt at most once a minute. **Quiet** sends no cards for 10 minutes.
 - **Really whispers (optional):** with headphones on, a Stop card is read into your ear in a short voice; no need to look at the screen.
 - **What do I say?:** when you're stuck, one tap (Option + Shift + O) suggests a one-sentence line for the moment.
-- **Evidence:** press Option + Shift + K (or say *"kanıt al"*, the Turkish voice command) to save a picture of the meeting screen. It warns you if a
-  password is visible.
+- **Evidence:** press Option + Shift + K (or say *"kanıt al"*, the Turkish voice command) to save a picture of the meeting screen. While the other
+  side is sharing their screen, a picture is saved automatically every time the screen changes. It warns you if a password is visible.
 - **Tells you when your name comes up:** when the other side says your name, or when you've been talking for more than ninety
   seconds, the panel shows it right away.
 
@@ -96,11 +96,15 @@ by voice: *"Defne, what date did we discuss for the beta last week?"* The answer
 
 ## It remembers your project and its history
 
-During setup you point it to your project folder. Suflor.me converts documents, presentations and PDFs to text on this Mac and indexes
-them. Search goes beyond keywords: it finds passages close in meaning even when the words in your question never appear in the document.
+During setup you point it to your project folder. Suflor.me converts documents (Word, Pages, PDF, including old .doc and .rtf),
+presentations (PowerPoint, Keynote), spreadsheets (Excel, Numbers, CSV) and images to text on this Mac and indexes them. Search goes beyond keywords: it finds passages close in meaning even when the words in your question never appear in the document.
 
 <p align="center"><img src="gorsel/en/toplantilar.png" alt="Meetings window: a search for 'beta', eight results in four meetings" width="100%"></p>
 
+- **Spreadsheets and the project card in one database:** Excel, Numbers and CSV sheets go into a small database on this Mac. For questions
+  like "How much did we spend this month?" or "How many open items are there?", the assistant computes the answer instead of eyeballing
+  rows, and names the source file. The project card you approve during setup (people, decisions, open items, each with its source) lives
+  there too. The knowledge sits in a standard database, not in a file tied to one AI. The database is never written to your project folder.
 - **Catches contradictions:** if a claim, number or responsibility in the conversation differs from an earlier document or meeting,
   it tells you, with the source.
 - **Decision graph:** decisions and claims accumulate on this Mac. If the same person gives a different number at the next meeting,
@@ -166,7 +170,7 @@ if it doesn't match. When a new version is out, an **Update** button appears on 
 
 | Shortcut | What it does |
 |---|---|
-| Option + Shift + K | Evidence: saves a picture of the meeting screen (warns if a password is visible) |
+| Option + Shift + K | Evidence: saves a picture of the meeting screen (warns if a password is visible; automatic while a screen is shared) |
 | Option + Shift + O | What do I say? A one-sentence line |
 | Option + Shift + M | Quiet: no cards for 10 minutes |
 | Option + Shift + S | Silence the assistant |

@@ -962,7 +962,7 @@ def tur_kur(ort):  # tur sonu modeli (smart-turn v3, BSD-2, 8,7 MB) + küçük o
 # Kurulamazsa not düşer, aktarıcı ve dizin çalışmaya devam eder (PDF/görüntü dizine girmez).
 PBS_URL = "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.12.11%2B20250918-aarch64-apple-darwin-install_only_stripped.tar.gz"
 PBS_SHA = "559fb918c10f0cff226604257dcc390b391c87e6cbb2426824e99069c143e714"
-CEVIR_DOCLING = "2.140.0"
+CEVIR_DOCLING = "2.140.0"; CEVIR_XLRD = "2.0.2"
 def python312(ort):  # <ortak>/python312 (belge çevirme ve Pocket ortak kullanır); yoksa indirilir, SHA-256 doğrulanır
     py = os.path.join(ort, "python312", "bin", "python3.12")
     if (r := sessiz(py, "-c", "import sys; assert sys.version_info >= (3, 12)")) and r.returncode == 0: return py
@@ -984,6 +984,10 @@ def cevir_kur(ort):
     model_ok = os.path.isdir(os.path.join(md, "docling-project--docling-layout-heron")) and os.path.isdir(os.path.join(md, "docling-project--docling-models"))
     am = os.path.join(ort, "anlam-modeller"); anlam_ok = bool(glob_(os.path.join(am, "hub", "models--intfloat--multilingual-e5-base", "snapshots", "*", "model.safetensors")))
     venv_ok = venv_ok and bool((r := sessiz(vpy, "-c", "import sentence_transformers")) and r.returncode == 0)
+    if venv_ok and os.access(ort, os.W_OK) and not ((r := sessiz(vpy, "-c", "import xlrd")) and r.returncode == 0):
+        # v0.121.0: eski Excel (.xls) — kurulu ortama yalnız bu küçük paket (~100 KB; Docling .xls için LibreOffice ister)
+        r = subprocess.run([vpy, "-m", "pip", "install", "-q", "--no-deps", f"xlrd=={CEVIR_XLRD}"], capture_output=True, timeout=300)
+        say("✓ eski Excel (.xls) okuyucu eklendi" if not r.returncode else "Not: eski Excel (.xls) okuyucu kurulamadı — .xls dosyaları aranamaz, sonraki güncellemede yeniden denenir")
     if venv_ok and model_ok and anlam_ok: say("✓ belge çevirme ve anlam araması ortamı var"); return
     if not os.access(ort, os.W_OK): say("Not: belge çevirme ortamı yok ve ortak klasör başka hesabın — PDF ve görüntüler aranamaz"); return
     if platform.machine() != "arm64": say("Not: belge çevirme yalnız Apple işlemcili Mac'te (M1 ve sonrası) — PDF ve görüntüler aranamaz"); return

@@ -109,6 +109,22 @@ try:
     rb = m.cevir(c, butce_sn=1e-6)
     kontrol("tur süresi dolunca durur, dosya sonraki tura kalır", rb["cevrildi"] == 0 and "süre" in (rb["durdu"] or "") and rb["kalan"] == 1, json.dumps(rb)[:200])
     os.remove(os.path.join(P, "ekran/butce.png"))
+    # v0.121.0: Pages, Numbers, .xls — kurgu örnekler depo dışında (../_yedek/test-araclari/bicim/; Pages/Numbers'la ve xlwt ile üretildi); yoksa atlanır
+    BICIM = os.path.join(os.path.dirname(KOD), "_yedek", "test-araclari", "bicim")
+    if os.path.isdir(BICIM) and subprocess.run([VPY, "-c", "import xlrd"], capture_output=True).returncode == 0:
+        os.makedirs(f"{P}/bicim", exist_ok=True)
+        for f in ("ornek.pages", "ornek.numbers", "ornek.xls"): shutil.copy(os.path.join(BICIM, f), f"{P}/bicim/{f}")
+        rb2 = m.cevir(c)
+        kontrol("Pages, Numbers, .xls çevrildi", rb2["cevrildi"] == 3 and rb2["hata"] == 0, json.dumps(rb2, ensure_ascii=False)[:300])
+        kontrol("Pages metni aranıyor; .xls ve Numbers satırları aranıyor", "bicim/ornek.pages" in bul(c, "depo taşınmasını İzmir")
+                and {"bicim/ornek.xls", "bicim/ornek.numbers"} <= bul(c, "Elektrik 830"), str(bul(c, "Elektrik 830")))
+        import sqlite3
+        v = sqlite3.connect(m.PROJE_VT); tb = dict(v.execute("SELECT dosya, tablo FROM tablolar WHERE dosya LIKE 'bicim/%'").fetchall())
+        top = {d: v.execute(f'SELECT sum(tutar) FROM "{t}"').fetchone()[0] for d, t in tb.items()}
+        tr = v.execute(f'SELECT tarih FROM "{tb.get("bicim/ornek.xls", "yok")}" ORDER BY satir').fetchall() if "bicim/ornek.xls" in tb else []; v.close()
+        kontrol("Numbers ve .xls sayfaları proje veritabanında: toplam 13330.5, .xls tarihi ISO", top == {"bicim/ornek.xls": 13330.5, "bicim/ornek.numbers": 13330.5}
+                and tr == [("2026-11-01",), ("2026-11-05",)], f"{top} {tr}")
+    else: print("  (Pages/Numbers/.xls örnekleri ya da xlrd yok — o kısım atlandı)")
     m.CEVIR_ISCI = os.path.join(T, "yok.py")
     open(os.path.join(P, "ekran/son.png"), "wb").write(open(os.path.join(P, "ekran/depo-sayimi.png"), "rb").read() + b"3")
     r6 = m.cevir(c)

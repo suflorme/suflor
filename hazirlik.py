@@ -17,7 +17,7 @@ B = _yukle("suflor_baglam_hz", "baglam.py")
 UYG = B.AYAR["uygulama"]; DURUM = os.path.join(UYG, "hazirlik.json"); KILIT = os.path.join(UYG, "hazirlik.kilit")
 # süre tahmini (sn): görüntü ölçüm (17 Ekim, 43 görüntü: ortanca 0,9 sn, ort. 1,4); PDF/sunum tahmin; gömme 18.349 parça 3–5 dk → ~75 parça/sn;
 # kart 201 belge 15 dk (4 paralel) → ~4,5 sn/belge, 9,33 $ → ~0,05 $/belge (Sonnet karşılığı)
-CEVIR_SN = {".pdf": 8.0, ".pptx": 5.0}; CEVIR_GORUNTU_SN = 1.4; GOMME_PARCA_SN = 75.0; KART_BELGE_SN = 4.5; KART_BELGE_USD = 0.05
+CEVIR_SN = {".pdf": 8.0, ".pptx": 5.0, ".key": 5.0, ".pages": 2.0, ".numbers": 1.0, ".xls": 0.5}; CEVIR_GORUNTU_SN = 1.4; GOMME_PARCA_SN = 75.0; KART_BELGE_SN = 4.5; KART_BELGE_USD = 0.05
 KART_TURLER = {"belge", "sunum", "gorusme", "tablo"}
 
 def yaz(d):
@@ -148,6 +148,7 @@ def calis(kart=False):
         evre("cevir"); cv = B.cevir(c, ilerleme=lambda n, t: ilerle("cevir", n, t))
         d["cevir"] = {k: cv[k] for k in ("cevrildi", "hata", "kalan", "durdu", "gizli_dosya", "gizli_parca", "onbellekte")}
         evre("dizin"); B.guncelle(c)
+        pv = B.proje_vt_guncelle(c) or {}  # v0.121.0: Excel/CSV/Numbers sayfaları → proje veritabanı (kart onayda eklenir)
         evre("gomme"); g = B.gomme(c, ilerleme=lambda n, t: ilerle("gomme", n, t))
         d["gomme"] = g
         durdu = cv.get("durdu") if cv.get("durdu") and "ortamı yok" not in str(cv.get("durdu")) else None
@@ -158,7 +159,8 @@ def calis(kart=False):
             d["kart"] = {k: t.get(k) for k in ("belge", "aday", "maliyet_usd", "durdu", "sure_sn")}; d["kart"]["hata"] = len(t.get("hatalar") or [])
             if t.get("durdu"): durdu = t["durdu"]
         sat = c.execute("SELECT count(*), coalesce(sum(parca), 0) FROM dosya").fetchone()
-        sonuc = {"belge": sat[0], "parca": sat[1], "cevrilen": cv["cevrildi"] + cv["onbellekte"], "gizli_parca": cv.get("gizli_parca", 0)}
+        sonuc = {"belge": sat[0], "parca": sat[1], "cevrilen": cv["cevrildi"] + cv["onbellekte"], "gizli_parca": cv.get("gizli_parca", 0),
+                 "tablo": pv.get("tablo") or 0, "tablo_satir": pv.get("satir") or 0}
         evre("durdu" if durdu else "bitti", sonuc=sonuc, durdu=durdu)
         return 0
     except Exception as e:
