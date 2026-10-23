@@ -2,21 +2,22 @@
 # Canlı çeviri (aktarici/ceviri.py, v0.27.0; ayar ceviri: true). Yalıtılmış aktarıcı, deneme çevirmeni (SUFLOR_TEST_CEVIRI: Claude çağrılmaz):
 # karşı tarafın İngilizce Whisper satırı çevrilir, panonun /status tail'inde "ceviri" alanı, <toplantı>.ceviri.jsonl'e yazılır, .jsonl değişmez ·
 # Türkçe satır ve kullanıcının kendi satırı çevrilmez · ayar kapalıyken çevrilmez · dil tahmini tablosu. İsteğe bağlı gerçek Claude denemesi:
-# SUFLOR_CEVIRI_GERCEK=1 (az kota: tek öbek).
+# SUFLOR_CEVIRI_GERCEK=1 (az kota: tek öbek). Faz 11 Aşama 2: ayar beyin.ceviri openai-uyumlu → sahte OpenAI uyumlu sunucu (beyin.py calis, araçsız; kayıtta
+# saglayici), sağlayıcı 503 verince öbek bir kez sahte Claude Code'la (günlükte BEYİN: yedek; yuva yedek süresince Claude'da).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/ceviri.py      (kaldı → çıkış 1; ~15 sn)
-import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
+import http.server, json, os, re, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8779)
 hata = []
 def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: hata.append(ad)
-def calistir(ceviri=True, gercek=False, kulaklik=None):
+def calistir(ceviri=True, gercek=False, kulaklik=None, ek=None, env_ek=None):
     T = tempfile.mkdtemp(prefix="suflor-cv-"); canli = os.path.join(T, "canli"); os.makedirs(canli)
     for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
     shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
-    ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Ali K", "port": PORT, "uygulama": T, "proje": T, "ortak": T, "ceviri": ceviri}, open(ay, "w"))
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1")
+    ay = os.path.join(T, "ayar.json"); json.dump(dict({"alan": "Deneme", "ad": "Ali K", "port": PORT, "uygulama": T, "proje": T, "ortak": T, "ceviri": ceviri}, **(ek or {})), open(ay, "w"))
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", **(env_ek or {}))
     if not gercek: env["SUFLOR_TEST_CEVIRI"] = "1"
     if kulaklik is not None: env["SUFLOR_TEST_KULAKLIK"] = "1" if kulaklik else "0"
     r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT, env=env)
@@ -70,6 +71,56 @@ try:
     istek("/komut", {"tur": "sesli_ceviri"})
     bak("tekrar basınca kapandı", not istek("/cards").get("sesli_ceviri"))
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# --- Faz 11 Aşama 2: başka sağlayıcı ve Claude Code yedeği (sahte sunucu + sahte claude; ağ ve kota yok) ---
+GELEN, DURUM = [], {"kod": 200}
+def _cevir(icerik, on):  # "1. metin" satırları → {"1": "[on] metin", "k1": …}
+    o = {}
+    for m in re.finditer(r"^(\d+)\. (.*)$", icerik, re.M): o[m.group(1)] = f"[{on}] {m.group(2)}"; o["k" + m.group(1)] = f"[{on}-kısa] {' '.join(m.group(2).split()[:3])}"
+    return json.dumps(o, ensure_ascii=False)
+class Sahte(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    def log_message(self, *a): pass
+    def do_POST(self):
+        g = json.loads(self.rfile.read(int(self.headers["Content-Length"]))); GELEN.append(g)
+        if DURUM["kod"] != 200: b = b'{"error":{"message":"overloaded"}}'; self.send_response(DURUM["kod"]); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
+        p = [{"choices": [{"delta": {"content": _cevir(g["messages"][-1]["content"], "gemini")}, "finish_reason": "stop"}]}, {"choices": [], "usage": {"prompt_tokens": 500, "completion_tokens": 50}}]
+        b = ("".join("data: " + json.dumps(x, ensure_ascii=False) + "\n\n" for x in p) + "data: [DONE]\n\n").encode()
+        self.send_response(200); self.send_header("Content-Type", "text/event-stream"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+so = socket.socket(); so.bind(("127.0.0.1", 0)); SPORT = so.getsockname()[1]; so.close()
+SV = http.server.ThreadingHTTPServer(("127.0.0.1", SPORT), Sahte); threading.Thread(target=SV.serve_forever, daemon=True).start()
+TD = tempfile.mkdtemp(prefix="suflor-cv-claude-"); SAHTE = os.path.join(TD, "claude")
+open(SAHTE, "w").write("#!/usr/bin/env python3\nimport sys, json, re\n" + "def _cevir(icerik, on):\n    o = {}\n    for m in re.finditer(r'^(\\d+)\\. (.*)$', icerik, re.M): o[m.group(1)] = f'[{on}] {m.group(2)}'; o['k' + m.group(1)] = f'[{on}-kısa] ' + ' '.join(m.group(2).split()[:3])\n    return json.dumps(o, ensure_ascii=False)\n"
+                     "for l in sys.stdin:\n    j = json.loads(l); c = j['message']['content']; t = _cevir(c, 'claude')\n"
+                     "    print(json.dumps({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': t}]}}), flush=True)\n"
+                     "    print(json.dumps({'type': 'result', 'result': t, 'usage': {'input_tokens': 10}, 'total_cost_usd': 0.001}), flush=True)\n")
+os.chmod(SAHTE, 0o755)
+BEYIN_AYAR = {"claude": SAHTE, "ceviri_surec": 1, "beyin": {"ceviri": {"tur": "openai-uyumlu", "saglayici": "gemini", "adres": f"http://127.0.0.1:{SPORT}/v1", "model": "gemini-3.8-flash", "anahtar": "x", "fiyat": [1, 0.1, 10]}}}
+def _tail(istek, lid):
+    t = time.time()
+    while time.time() - t < 15:
+        x = next((x.get("ceviri") for x in istek("/status")["tail"] if x.get("id") == lid and x.get("ceviri")), None)
+        if x: return x
+        time.sleep(0.3)
+    return ""
+r, T, canli, istek = calistir(gercek=True, ek=BEYIN_AYAR, env_ek={"SUFLOR_TEST_BEYIN_ANAHTAR": "deneme"})
+try:
+    satirlar(istek); cv1 = _tail(istek, "wh/karsi/1")
+    bak("başka sağlayıcı: satır beyin.py ile çevrildi (araçsız, ısınma turu yok, anahtar Bearer)", cv1.startswith("[gemini] We can ship") and len(GELEN) == 1 and "tools" not in GELEN[0])
+    bak("istek dosyası 0600, anahtar içermez", all(os.stat(os.path.join(canli, f)).st_mode & 0o777 == 0o600 and "deneme" not in open(os.path.join(canli, f)).read() for f in os.listdir(canli) if f.startswith("ceviri-istek")))
+    DURUM["kod"] = 503; t = time.time()
+    istek("/ingest", {"meeting": {"title": "Çeviri Deneme"}, "source": "whisper", "entries": [{"id": "wh/karsi/7", "speaker": "John", "time": "10:02:00", "text": "The supplier will send the invoice next week.", "kanal": "karsi", "t0": t, "t1": t + 3}]})
+    cv2 = _tail(istek, "wh/karsi/7"); log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
+    bak("sağlayıcı 503 → öbek bir kez Claude Code'la çevrildi, günlükte tek BEYİN: yedek satırı", cv2.startswith("[claude] The supplier") and log.count("BEYİN: yedek — ceviri: gemini") == 1)
+    if not cv2.startswith("[claude]"): print("   ", cv2, "|", log[-600:])
+    DURUM["kod"] = 200; n = len(GELEN); t = time.time()
+    istek("/ingest", {"meeting": {"title": "Çeviri Deneme"}, "source": "whisper", "entries": [{"id": "wh/karsi/8", "speaker": "John", "time": "10:03:00", "text": "Can we move the meeting to Friday then?", "kanal": "karsi", "t0": t, "t1": t + 3}]})
+    bak("yedek süresinde yuva Claude Code'da kalır (sağlayıcıya her satırda yeniden gidilmez)", _tail(istek, "wh/karsi/8").startswith("[claude]") and len(GELEN) == n)
+    cg = [json.loads(l) for l in open(os.path.join(canli, "claude-cagri.jsonl"), encoding="utf-8")] if os.path.exists(os.path.join(canli, "claude-cagri.jsonl")) else []
+    bak("kayıtta saglayici (gemini: model + maliyet; yedek: claude-code)", any(x.get("is") == "ceviri" and x.get("saglayici") == "gemini" and x.get("model") == "gemini-3.8-flash" and abs(x["maliyet"] - 0.001) < 1e-6 for x in cg)
+        and any(x.get("is") == "ceviri" and x.get("saglayici") == "claude-code" and x.get("model") == "haiku" for x in cg))
+    if not cg: print("   kayıt yok")
+finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+SV.shutdown(); shutil.rmtree(TD, ignore_errors=True)
 if os.environ.get("SUFLOR_CEVIRI_GERCEK"):
     r, T, canli, istek = calistir(gercek=True)
     try:

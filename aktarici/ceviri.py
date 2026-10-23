@@ -7,11 +7,13 @@
 # 3 tur kala yedek süreç açılır (açılış 4–7 sn gizlenir). Satır başına ~6 sn → ~1,5 sn; çeviri satırın altında soluk görünür (pano, mini pano) ve <toplantı>.ceviri.jsonl'e yazılır
 # (.md/.jsonl değişmez). Gizlilik: metin yalnız Claude'a gider, ses gitmez (kural: üçüncü taraf yok). Süreç CEVIRI_TUR_EN_COK turda ya da
 # 10 dk boşta kalınca kapanır; sonraki satır yenisini açar. Claude yoksa ya da cevap gelmezse satır çevirisiz kalır (döküm etkilenmez).
+# Faz 11 Aşama 2: ayar beyin.ceviri openai-uyumluysa süreç `python3 -I -B aktarici/beyin.py calis <istek>` (araçsız; aynı stream-json, Brifing.app'siz: dosya okumaz).
+# Sağlayıcı hata verirse öbek bir kez Claude Code'la çevrilir ve o yuva CEVIRI_YEDEK_SN boyunca Claude Code'da kalır (günlükte "BEYİN: yedek").
 CEVIRI = {}; CEVIRI_Q = []; CEVIRI_K = threading.Condition()
 # v0.28.2: iki süreç (ayar ceviri_surec, varsayılan 2) aynı kuyruktan alır — biri turunu bitirirken (result ~1,5 sn) öbürü sıradaki satırı
 # çevirir; art arda satırlarda ortanca ~4 sn → ~1 sn. Her süreç ~300 MB; ikisi de ilk satırda açılır, 10 dk boşta kalınca kapanır.
 _CV = {"son": 0.0, "isci": False, "hata": None, "n": 0, "gec": [], "yuva": []}
-CEVIRI_TUR_EN_COK, CEVIRI_BOSTA_SN, CEVIRI_CEVAP_SN = 40, 600, 30
+CEVIRI_TUR_EN_COK, CEVIRI_BOSTA_SN, CEVIRI_CEVAP_SN, CEVIRI_YEDEK_SN = 40, 600, 30, 300
 def _cv_yuva(): return {"p": None, "tur": 0, "bekleyen": 0, "atla": 0, "yedek": None, "ad": len(_CV["yuva"]) + 1}
 CEVIRI_ISTEM = {"tr": "Sen bir toplantı çevirmenisin. Her mesajda numaralı konuşma satırları gelir (yerel konuşma tanımadan, yazım hatası olabilir). "
                       "Her satırı doğal, kısa Türkçeye çevir; özel adları ve ürün adlarını olduğu gibi bırak; açıklama ekleme. Ayrıca her satırın kulağa "
@@ -59,25 +61,40 @@ def _cv_kapat(y, neden, p=None):
         try: p.wait(3)
         except subprocess.TimeoutExpired: p.kill()
         print(f"ÇEVİRİ: süreç {y['ad']} kapandı ({neden})")
-def _cv_baslat():  # yeni `claude -p` süreci (ya da None)
-    cl = claude_yolu()
-    if not cl: _CV["hata"] = "Claude Code yok"; return None
-    args = [cl] + BEYIN.ceviri_args(AYAR, CEVIRI_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"])  # v0.121.1: beyin katmanı
-    try: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=BASE, text=True, encoding="utf-8", bufsize=1)
+def _cv_secim(y=None):  # bu yuvanın sağlayıcısı: ayar beyin.ceviri; yedek süresinde Claude Code
+    sec = BEYIN.secim(AYAR, "ceviri")
+    return BEYIN.claude_secim(AYAR, "ceviri") if sec["tur"] != "claude-code" and y and time.time() - (y.get("yedek_t") or 0) < CEVIRI_YEDEK_SN else sec
+def _cv_baslat(y=None):  # yeni `claude -p` (ya da beyin.py) süreci (ya da None); süreçte suflor_tur/suflor_sag/suflor_model (ölçüm ve yedek için)
+    sec = _cv_secim(y); dil = "en" if ARAYUZ_DILI == "en" else "tr"
+    if sec["tur"] == "openai-uyumlu":  # Faz 11 Aşama 2: istek dosyası (0600; anahtar değil yalnız Anahtar Zinciri öğe adı) → beyin.py calis
+        istek = os.path.join(BASE, f"ceviri-istek-{y['ad'] if y else 0}.json")
+        fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(BEYIN.ceviri_istek(AYAR, CEVIRI_ISTEM[dil], dil), f, ensure_ascii=False)
+        args = ["/usr/bin/python3" if os.path.exists("/usr/bin/python3") else sys.executable, "-I", "-B", BEYIN.__file__, "calis", istek]
+    else:
+        cl = claude_yolu()
+        if not cl: _CV["hata"] = "Claude Code yok"; return None
+        args = [cl] + BEYIN.ceviri_args(AYAR, CEVIRI_ISTEM[dil], sec["model"])  # v0.121.1: beyin katmanı (yedekte Claude modeli)
+    try: p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=BASE, text=True, encoding="utf-8", bufsize=1)
     except OSError as e: _CV["hata"] = f"{e.__class__.__name__}"; return None
+    p.suflor_tur, p.suflor_sag, p.suflor_model = sec["tur"], sec.get("saglayici") or "claude-code", sec["model"]; return p
 def _cv_isit(p):  # yedek süreç: ilk mesajdaki hazırlık (~4,5 sn) önceden — cevabı devralınca atlanır (atla)
     try: p.stdin.write(json.dumps({"type": "user", "message": {"role": "user", "content": "1. Hello."}}) + "\n"); p.stdin.flush(); return p
     except OSError: return None
 def _cv_ac(y):
+    tur = _cv_secim(y)["tur"]
+    if y["p"] and y["p"].poll() is None and getattr(y["p"], "suflor_tur", tur) != tur: _cv_kapat(y, "sağlayıcı değişti")  # yedek süresi bitti ya da ayar değişti
     if y["p"] and y["p"].poll() is None: return True
     yd = y["yedek"]; y["yedek"] = None
-    y["p"] = yd if yd and yd.poll() is None else _cv_baslat()
+    if yd and getattr(yd, "suflor_tur", tur) != tur: _cv_kapat(y, "yedek", yd); yd = None
+    y["p"] = yd if yd and yd.poll() is None else _cv_baslat(y)
     if not y["p"]: return False
     y.update(tur=0, bekleyen=0, atla=1 if y["p"] is yd else 0, maliyet=0, api_ms=0); print(f"ÇEVİRİ: süreç {y['ad']} açıldı" + (" (yedekten)" if y["p"] is yd else "")); return True
 def _cv_kayit(y, j):  # her turun "result" satırı → canli/claude-cagri.jsonl (yalnız sayılar; olcum.py toplanti okur). Maliyet süreç başına birikir: fark yazılır
     try:
         k = BEYIN.kullanim(j); g = k["giris"]; m = k["maliyet"]
-        o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": "ceviri", "model": BEYIN.secim(AYAR, "ceviri")["model"],
+        p = y.get("p"); o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": "ceviri", "saglayici": getattr(p, "suflor_sag", "claude-code"),
+             "model": getattr(p, "suflor_model", None) or BEYIN.secim(AYAR, "ceviri")["model"],
              "api_ms": j.get("duration_api_ms"), "api_tur_ms": max(0, (j.get("duration_api_ms") or 0) - (y.get("api_ms") or 0)),  # süre de maliyet gibi süreç boyunca birikir
              "maliyet": round(max(0, m - (y.get("maliyet") or 0)), 4), "giris": g,
              "onbellek_orani": round(k["okunan"] / max(1, g), 2), "hata": bool(j.get("is_error"))}
@@ -91,7 +108,7 @@ def _cv_sor(y, satirlar):
     p = y["p"]; govde = "\n".join(f"{i}. {m}" for i, m in enumerate(satirlar, 1))
     try: p.stdin.write(json.dumps({"type": "user", "message": {"role": "user", "content": govde}}, ensure_ascii=False) + "\n"); p.stdin.flush()
     except OSError: _cv_kapat(y, "yazılamadı"); return {}
-    son = time.time() + CEVIRI_CEVAP_SN; metin = None
+    son = time.time() + CEVIRI_CEVAP_SN; metin = None; hata = None
     while time.time() < son:
         l = p.stdout.readline()
         if not l: break
@@ -108,11 +125,17 @@ def _cv_sor(y, satirlar):
         if j.get("type") == "result":
             _cv_kayit(y, j)
             if y["bekleyen"]: y["bekleyen"] -= 1; continue  # önceki turun sonu
+            if j.get("is_error") and getattr(p, "suflor_tur", "") == "openai-uyumlu": hata = j.get("result"); break  # sağlayıcı hatası → yedek
             metin = j.get("result") or ""; break
     y["tur"] += 1
-    if metin is None: _cv_kapat(y, "cevap yok"); return {}
+    if metin is None:
+        _cv_kapat(y, "cevap yok")
+        sec = BEYIN.secim(AYAR, "ceviri")
+        if getattr(p, "suflor_tur", "") == "openai-uyumlu" and not y.get("yedek_t", 0) > time.time() - CEVIRI_YEDEK_SN and BEYIN.yedek_var(AYAR, sec):
+            print(BEYIN.yedek_satiri("ceviri", sec, hata or "cevap yok")); y["yedek_t"] = time.time(); return _cv_sor(y, satirlar)  # bir kez, Claude Code'la
+        return {}
     if y["tur"] >= CEVIRI_TUR_EN_COK - 3 and not y["yedek"]:  # sınırdan önce aç ve ısıt
-        yd = _cv_baslat(); y["yedek"] = yd and _cv_isit(yd)
+        yd = _cv_baslat(y); y["yedek"] = yd and _cv_isit(yd)
     if y["tur"] >= CEVIRI_TUR_EN_COK:
         eski = y["p"]; y.update(p=None, tur=0, bekleyen=0, atla=0)
         threading.Thread(target=_cv_kapat, args=(y, "tur sınırı", eski), daemon=True).start()  # kapanış (≤ 3 sn) çeviriyi bekletmesin
@@ -125,7 +148,7 @@ def _cv_sor(y, satirlar):
     return {str(k): " ".join(str(x).split())[:600] for k, x in v.items() if isinstance(x, str)} if isinstance(v, dict) else {}
 def _ceviri_isci(y):
     # ikisi de ısınsın: komut satırı asıl hazırlığını ilk mesajda yapıyor (süreç açık olsa da ilk satır ~4,5 sn) → atılan kısa bir ısınma turu
-    if not os.environ.get("SUFLOR_TEST_CEVIRI"): _cv_sor(y, ["Hello."])
+    if not os.environ.get("SUFLOR_TEST_CEVIRI") and BEYIN.secim(AYAR, "ceviri")["tur"] == "claude-code": _cv_sor(y, ["Hello."])  # HTTP sağlayıcıda gerek yok (bağlantı açılışta ısınır)
     while True:
         with CEVIRI_K:
             while not CEVIRI_Q:

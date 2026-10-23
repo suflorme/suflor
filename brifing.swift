@@ -52,6 +52,44 @@ if let i = a.firstIndex(of: "--vt-izle") {
     do { try p.run() } catch { bitir(4) }
     p.waitUntilExit(); bitir(p.terminationStatus)
 }
+// Beyin kipi (v0.122.0, Faz 11 Aşama 1): --beyin <istek> → Konuş başka bir yapay zekâyla (openai-uyumlu: Gemini, OpenAI, Ollama, LM Studio).
+// Yalnız uygulama klasöründeki aktarici/beyin.py'yi `/usr/bin/python3 -I -B … calis <istek>` ile çalıştırır; claude çalıştırılmaz. Güvence Suflor'un kendi
+// araç kodunda (beyin.py: salt okunur, kök sınırlı araçlar; ağ yalnız https ya da 127.0.0.1). Burada da: istek ve FIFO'lar uygulama klasörünün altında aynı
+// klasörde, istek anahtarları izin listesinden, araç sunucusu yalnız istek klasöründeki konus-mcp.json, kökler var olan klasörler; anahtarın kendisi istekte yok.
+if let bi = a.firstIndex(of: "--beyin") {
+    guard bi + 1 < a.count, let veri = FileManager.default.contents(atPath: a[bi + 1]),
+          let j = (try? JSONSerialization.jsonObject(with: veri)) as? [String: Any],
+          let giris = j["giris"] as? String, let cikis = j["cikis"] as? String, let b = j["beyin"] as? [String: Any] else { bitir(2) }
+    let klasor = (gercek(a[bi + 1]) as NSString).deletingLastPathComponent
+    guard altinda(klasor, uygulamaKlasor) else { bitir(3) }
+    for y in [giris, cikis] where (gercek(y) as NSString).deletingLastPathComponent != klasor { bitir(3) }
+    var izinli: Set<String> = ["beyin", "sistem", "mcp", "kokler", "cwd", "giris", "cikis", "dil", "sure"]
+    #if SUFLOR_DENEME
+    izinli.insert("ayar")  // deneme aktarıcısının ayar dosyası (SUFLOR_AYAR)
+    #endif
+    guard Set(j.keys).isSubset(of: izinli),
+          Set(b.keys).isSubset(of: ["tur", "model", "saglayici", "adres", "anahtar", "effort", "fiyat"]), b["tur"] as? String == "openai-uyumlu",
+          let adres = b["adres"] as? String, let u = URLComponents(string: adres), u.user == nil, u.password == nil, u.query == nil, let h = u.host, !h.isEmpty,
+          u.scheme == "https" || (u.scheme == "http" && ["127.0.0.1", "localhost", "::1"].contains(h)) else { bitir(3) }
+    if let m = j["mcp"] as? String { guard gercek(m) == (klasor as NSString).appendingPathComponent("konus-mcp.json") else { bitir(3) } }
+    for k in (j["kokler"] as? [String]) ?? [] { var d: ObjCBool = false; guard FileManager.default.fileExists(atPath: k, isDirectory: &d), d.boolValue else { bitir(3) } }
+    let beyin = (uygulamaKlasor as NSString).appendingPathComponent("aktarici/beyin.py")
+    guard FileManager.default.isReadableFile(atPath: beyin), let gir = FileHandle(forReadingAtPath: giris), let cik = FileHandle(forWritingAtPath: cikis) else { bitir(7) }
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); p.arguments = ["-I", "-B", beyin, "calis", gercek(a[bi + 1])]
+    p.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
+    var e = ProcessInfo.processInfo.environment; e["PYTHONDONTWRITEBYTECODE"] = "1"; e["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"; p.environment = e
+    signal(SIGPIPE, SIG_IGN)
+    let boru = Pipe()
+    p.standardInput = boru; p.standardOutput = cik; p.standardError = FileHandle.nullDevice
+    do { try p.run() } catch { bitir(4) }
+    Thread.detachNewThread {  // açık süreç kipindeki gibi: FIFO kapanınca boru kapanır, beyin.py çıkar
+        while true { let d = gir.availableData; if d.isEmpty { break }; do { try boru.fileHandleForWriting.write(contentsOf: d) } catch { break } }
+        try? boru.fileHandleForWriting.close()
+    }
+    let sure = (j["sure"] as? Double) ?? 7200
+    DispatchQueue.global().asyncAfter(deadline: .now() + sure) { if p.isRunning { p.terminate() } }
+    p.waitUntilExit(); bitir(p.terminationStatus)
+}
 guard let i = a.firstIndex(of: "--istek"), i + 1 < a.count,
       let veri = FileManager.default.contents(atPath: a[i + 1]),
       let j = (try? JSONSerialization.jsonObject(with: veri)) as? [String: Any],

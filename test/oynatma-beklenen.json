@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 246758,
-   "sha": "53255c98a64e1d64"
+   "uzunluk": 251430,
+   "sha": "140705757b23eb08"
   },
   "/mini": {
-   "uzunluk": 246758,
-   "sha": "53255c98a64e1d64"
+   "uzunluk": 251430,
+   "sha": "140705757b23eb08"
   },
   "/status": {
    "_ping_son": "float",
@@ -257,8 +257,26 @@
    "arayuz_dili": "str",
    "asistan": "str",
    "ayarlar": {
+    "beyin": {
+     "gemini": "bool",
+     "ollama": "bool",
+     "ozel": "bool",
+     "saglik": [
+      {
+       "ad": "str",
+       "metin": "str",
+       "metin_en": "str",
+       "ok": "bool",
+       "oneri": "str"
+      }
+     ]
+    },
     "deger": {
      "adin_gecti": "bool",
+     "beyin_ceviri": "str",
+     "beyin_konus": "str",
+     "beyin_proje_karti": "str",
+     "beyin_varsayilan": "str",
      "bildirim": "bool",
      "ceviri": "bool",
      "ceviri_kis": "bool",
@@ -297,6 +315,8 @@
      "toplanti_ses": "str",
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
+     "uclu_sohbet": "bool",
+     "uclu_sohbet_ozel_paylas": "bool",
      "uzun_konusma_sn": "int"
     },
     "gemini": "bool",
@@ -341,6 +361,8 @@
      "toplanti_ses": "str",
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
+     "uclu_sohbet": "bool",
+     "uclu_sohbet_ozel_paylas": "bool",
      "uzun_konusma_sn": "int"
     }
    },
@@ -362,6 +384,22 @@
      }
     ],
     "uyari": "str"
+   },
+   "beyin": {
+    "etkin": {
+     "ceviri": "str",
+     "konus": "str",
+     "proje_karti": "str"
+    },
+    "saglik": [
+     {
+      "ad": "str",
+      "metin": "str",
+      "metin_en": "str",
+      "ok": "bool",
+      "oneri": "str"
+     }
+    ]
    },
    "bildirim": "NoneType",
    "brifing": {},
@@ -518,7 +556,8 @@
      "kulaklik": "bool"
     },
     "soru": "NoneType",
-    "toplanti": "bool"
+    "toplanti": "bool",
+    "uclu": "NoneType"
    },
    "last": "str",
    "lines": "int",

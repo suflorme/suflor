@@ -1556,7 +1556,7 @@ def kutu_kulaklik():
     return _KUTU_KUL["v"]
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
-    "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "kayit_sesi": ("bool", True, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "sesli_not": ("bool", True, None),"kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
+    "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "kayit_sesi": ("bool", True, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "uclu_sohbet": ("bool", False, None), "uclu_sohbet_ozel_paylas": ("bool", False, None), "sesli_not": ("bool", True, None),"kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
     "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac ve Piper sesinde çarpan
     "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
@@ -1565,7 +1565,10 @@ AYAR_PANO = {
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None),
     "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "sure_duyuru": ("bool", False, None),
-    "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None)}  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
+    "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None),  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
+    # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
+    "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel", "ollama")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")),
+    "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama"))}
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, gemini_kapsam (sesli "Gemini sesiyle
 # konuş" geçişi aynı işi görür), toplanti_duyuru panodan kalktı; ayar dosyasında elle yazılırsa kod eskisi gibi okur.
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
@@ -1584,17 +1587,25 @@ def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki
 MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar", "toplantiya_ses")
 def ayarlar_view():
     d = {k: AYAR.get(k, v[1]) for k, v in AYAR_PANO.items()}
+    d.update({"beyin_" + k: v for k, v in sg_secim(AYAR).items()})
     if d["ses_motoru"] not in ("piper", "pocket", "gemini"): d["ses_motoru"] = "mac"
     if "konus_gecmis" not in AYAR: d["konus_gecmis"] = konus_gecmis_acik()
     d["dil"] = ARAYUZ_DILI; d["ses_hizi"] = str(AYAR.get("ses_hizi") or "1.0")
-    vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] != "kisilik" and k != "dil"}  # kişilik ve dil "varsayılana dön"le değişmez
+    vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin") and k != "dil"}  # kişilik, yapay zekâ ve dil "varsayılana dön"le değişmez
     vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
-    return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici()}
+    return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici(),
+            "beyin": sg_ayar_view()}
 def ayar_yaz(deg):
-    hata, yeni = {}, {}
+    hata, yeni, beyin = {}, {}, {}
     for k, v in (deg or {}).items():
         if k not in AYAR_PANO: hata[k] = _t("bilinmeyen ayar", "unknown setting"); continue
         tur, _, sinir = AYAR_PANO[k]
+        if tur == "beyin":
+            hazir = sg_ayar_view() if v in ("gemini", "ozel", "ollama") else {}
+            if str(v) not in sinir: hata[k] = _t("geçersiz", "invalid")
+            elif v in ("gemini", "ozel", "ollama") and not hazir.get(v): hata[k] = _t("anahtar yok" if v != "ollama" else "yerel model kurulu değil", "no key" if v != "ollama" else "local model not installed")
+            else: beyin[k[len("beyin_"):]] = str(v)
+            continue
         if tur == "bool" and isinstance(v, bool): yeni[k] = v
         elif tur == "sec" and str(v) in sinir: yeni[k] = str(v)
         elif tur == "adres" and (not str(v).strip() or re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", str(v).strip())): yeni[k] = str(v).strip().lower()
@@ -1602,13 +1613,16 @@ def ayar_yaz(deg):
         elif tur == "sayi" and isinstance(v, (int, float)) and not isinstance(v, bool) and sinir[0] <= v <= sinir[1]: yeni[k] = int(v)
         else: hata[k] = _t("Adres geçersiz", "Invalid address") if tur == "adres" else _t(f"{sinir[0]}–{sinir[1]} arası", f"between {sinir[0]} and {sinir[1]}") if tur == "sayi" else _t("geçersiz", "invalid")
     if hata: return {"ok": False, "hata": hata, "err": next(iter(hata.values()))}
-    if not yeni: return {"ok": True, "degisen": []}
+    if not yeni and not beyin: return {"ok": True, "degisen": []}
     import fcntl
     try:
         with open(AYAR_YOL + ".kilit", "a") as kilit:  # sihirbaz (kurulum.py ayar_degistir) da aynı kilitle oku-değiştir-yaz yapar: biri ötekini ezmez
             fcntl.flock(kilit, fcntl.LOCK_EX)
             try: a = json.load(open(AYAR_YOL, encoding="utf-8"))
             except (OSError, ValueError): a = {}
+            if beyin:
+                h = sg_yaz(a, beyin)
+                if h: return {"ok": False, "err": h}
             for k, v in yeni.items():
                 if (k in ("eposta", "eposta_adres", "kisilik", "kisilik_toplanti_disi") and not v) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
@@ -1619,6 +1633,10 @@ def ayar_yaz(deg):
     for k, v in yeni.items():
         if k in a: AYAR[k] = v
         else: AYAR.pop(k, None)
+    if beyin:
+        if "beyin" in a: AYAR["beyin"] = a["beyin"]
+        else: AYAR.pop("beyin", None)
+        _SG_DURUM["t"] = 0; yeni.update({"beyin_" + k: v for k, v in beyin.items()}); threading.Thread(target=sg_bak, daemon=True).start()  # Ollama gerekirse hemen açılır/kapanır
     if "dil" in yeni: global ARAYUZ_DILI; ARAYUZ_DILI = "en" if AYAR.get("dil") == "en" else "tr"  # aktarıcının kendi metinleri de yeni dille
     print("AYAR: panodan değişti — " + ", ".join(sorted(yeni)))
     menu = None
@@ -1661,6 +1679,7 @@ bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslendirme (ayar ses_motoru: piper)
 bolum("pocket-ses")  # aktarici/pocket-ses.py — Pocket TTS ile yerel Türkçe ses (kişilikte yerel_ses: pocket:…; S93)
 bolum("gemini-ses")  # aktarici/gemini-ses.py — Gemini TTS ile seslendirme (ayar ses_motoru: gemini; v0.78.0)
+bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /status beyin), Anahtar Zinciri, Ollama'yı gerekince başlatma (Faz 11 Aşama 4)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
@@ -1964,7 +1983,8 @@ class H(BaseHTTPRequestHandler):
                 if time.time() - (STATE.get("_pano_t") or 0) > 300: STATE["_pano_ilk"] = time.time()
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
@@ -2224,6 +2244,7 @@ if __name__ == "__main__":
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=menu_baslat, daemon=True).start()  # ayar menu_cubugu
     threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
+    threading.Thread(target=sg_bekci, daemon=True).start()  # Faz 11: ayar yerel modeli (Ollama) gösteriyorsa sunucusu açık tutulur
     threading.Thread(target=_bitis_dongu, daemon=True).start()  # toplantı bitişi → /status toplanti_bitti
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi

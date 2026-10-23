@@ -362,6 +362,37 @@ try:
         ok("v0.117.0: toplantı yokken kutudaki soru asistana yazılı, cevap panoda, okunmadı, döküm açılmadı", g.get("tur") == "asistan" and k["durum"] == "hazir"
            and "Sorduğun" in (k.get("cevap") or "") and "SES (deneme)" not in l2 and not [f for f in os.listdir(canli2) if f.endswith(".md")] and "Traceback" not in l2)
     finally: r2.terminate(); r2.wait()
+    # Faz 11 Aşama 2: Konuş başka sağlayıcıda (beyin.konus; sahte OpenAI uyumlu sunucu hep 503) → soru bir kez Claude Code'la (sahte claude), günlükte BEYİN: yedek
+    import http.server, threading
+    GL = []
+    class _S503(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        def log_message(self, *a): pass
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"])); GL.append(1); b_ = b'{"error":{"message":"high demand"}}'
+            self.send_response(503); self.send_header("Content-Length", str(len(b_))); self.end_headers(); self.wfile.write(b_)
+    P3s = bos_port(PORT + 9); SV3 = http.server.ThreadingHTTPServer(("127.0.0.1", P3s), _S503); threading.Thread(target=SV3.serve_forever, daemon=True).start()
+    ay3 = os.path.join(T, "ayar3.json"); a3 = json.load(open(ay)); a3["beyin"] = {"konus": {"tur": "openai-uyumlu", "saglayici": "gemini", "adres": f"http://127.0.0.1:{P3s}/v1", "model": "gemini-3.8-flash"}}
+    P3 = bos_port(PORT + 11); a3["port"] = P3; json.dump(a3, open(ay3, "w"))
+    canli3 = os.path.join(T, "canli3"); os.makedirs(canli3)
+    r3 = subprocess.Popen([sys.executable, "relay.py", "--dir", canli3, "--port", str(P3)], cwd=T, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay3, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0"),
+                          stdout=open(os.path.join(T, "relay3.log"), "w"), stderr=subprocess.STDOUT)
+    try:
+        for _ in range(50):
+            if os.path.exists(os.path.join(canli3, "kart-anahtari.txt")): break
+            time.sleep(0.2)
+        time.sleep(1); H3 = {"X-Suflor-Anahtar": open(os.path.join(canli3, "kart-anahtari.txt")).read().strip(), "Origin": f"http://127.0.0.1:{P3}"}
+        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{P3}/girdi", data=json.dumps({"text": "?Yedek deneme sorusu"}).encode(), headers=H3), timeout=20).read()
+        st3 = lambda: json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{P3}/status", headers=H3), timeout=10).read())["konus"]
+        t0 = time.time()
+        while time.time() - t0 < 60 and not (("Sorduğun" in (st3().get("cevap") or "") and st3()["durum"] == "hazir") or st3()["durum"] == "hata"): time.sleep(0.3)
+        time.sleep(1)  # ölçüm satırı cevaptan sonra yazılır
+        k3 = st3(); l3 = open(os.path.join(T, "relay3.log"), encoding="utf-8").read()
+        cg3 = [json.loads(x) for x in open(os.path.join(canli3, "claude-cagri.jsonl"))] if os.path.exists(os.path.join(canli3, "claude-cagri.jsonl")) else []
+        ok("Aşama 2: sağlayıcı 503 → Konuş sorusu bir kez Claude Code'la cevaplandı (günlükte tek BEYİN: yedek, kayıtta iki sağlayıcı)", GL and k3["durum"] == "hazir" and "Yedek deneme" in (k3.get("cevap") or "")
+           and l3.count("BEYİN: yedek — konus: gemini") == 1 and [x.get("saglayici") for x in cg3 if x.get("is") == "bas-konus"] == ["gemini", "claude-code"] and "Traceback" not in l3)
+        if k3["durum"] != "hazir" or "BEYİN: yedek" not in l3: print("   ", k3, l3[-800:])
+    finally: r3.terminate(); r3.wait(); SV3.shutdown()
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     r.terminate(); r.wait(); subprocess.run(["pkill", "-f", T])

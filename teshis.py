@@ -23,7 +23,7 @@ DENEME = bool(os.environ.get("SUFLOR_AYAR") or os.environ.get("SUFLOR_EV"))
 def acik(ayar):
     if DENEME: return str(ayar.get("teshis_adres") or "").startswith("http://127.0.0.1:")
     return True
-KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "bellek.py", "sozluk.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "beyin.py", "bas-konus.py", "sohbet.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
+KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "bellek.py", "sozluk.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "beyin.py", "bas-konus.py", "sohbet.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "saglayici.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
                  "content.js", "platform-teams.js", "background.js", "offscreen.js", "mic-main.js", "popup.js", "launcher.js")
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 SOZLUK_DOSYA = os.path.join(_BURASI, "teshis-sozluk.txt")
@@ -133,7 +133,8 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          "ses_motoru": {"mac", "piper", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
          "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"},
          "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
-         "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"}}
+         "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"},
+         **{"beyin_" + i: {"claude-code", "gemini", "ozel", "ollama", ""} for i in ("varsayilan", "konus", "ceviri", "proje_karti")}}  # Faz 11: yalnız seçenek (ortam)
 # sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için
 # (kaynak, kanal, kart türü, dönüş, karne boyutu) yalnız bilinen değerler. Uymayan anahtar "?<sıra>" olur (değer yine süzülür).
 ANAHTAR = re.compile(r"[a-z_][a-z0-9_]{0,39}")
@@ -184,8 +185,17 @@ def ortam(ayar, uyg, eklenti=None, aktarici=None):
     return {"kurulum": kurulum_id(uyg), "kod": kod or "?", "surum": aktarici or "?", "eklenti": eklenti or "?",
             "model": _sh("sysctl", "-n", "hw.model") or "?", "macos": platform.mac_ver()[0] or "?",
             "bellek_gb": round(int(_sh("sysctl", "-n", "hw.memsize") or 0) / 2**30), "arayuz": "en" if ayar.get("dil") == "en" else "tr",
-            "claude_model": str(ayar.get("claude_model") or "varsayilan"), "python": platform.python_version(),
+            "claude_model": str(ayar.get("claude_model") or "varsayilan"), "python": platform.python_version(), **beyin_secenek(ayar),
             "gelistirici": os.path.isdir(os.path.join(os.path.expanduser(str(ayar.get("kod") or _BURASI)), ".git"))}  # geliştiricinin git klonu: beta özetine karışmaz
+
+def beyin_secenek(ayar):  # Faz 11: işlerin yapay zekâ seçeneği (aktarici/saglayici.py sg_ad ile aynı ayrım) — yalnız tür; adres, model, anahtar öğesi gitmez
+    b = ayar.get("beyin") if isinstance(ayar.get("beyin"), dict) else {}
+    def ad(d):
+        if not isinstance(d, dict) or not d.get("tur"): return ""
+        if d.get("tur") != "openai-uyumlu": return "claude-code"
+        sg = str(d.get("saglayici") or "").lower()
+        return sg if sg in ("gemini", "ollama") else "ollama" if re.match(r"^http://(127\.0\.0\.1|localhost):\d+/v1/?$", str(d.get("adres") or "")) and ":1234" not in str(d.get("adres")) else "ozel"
+    return {"beyin_varsayilan": ad(b.get("varsayilan")) or "claude-code", **{"beyin_" + i: ad(b.get(i)) for i in ("konus", "ceviri", "proje_karti")}}
 
 # ---------- proje klasörü (S141: "proje klasörü buluttaysa?") ----------
 # Klasör türü yalnız yoldan (sağlayıcı adı; ~/Library/CloudStorage/<Sağlayıcı>-<hesap> içindeki hesap/e-posta kısmı alınmaz). Sayılar son proje

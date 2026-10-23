@@ -33,7 +33,7 @@ try:
         {"id": "w/2", "speaker": "Deniz T", "time": "10:00:10", "text": "Atlas markasının yeni ürünü güzel olmuş.", "kanal": "ben"},
         {"id": "k/1", "speaker": "Ayla Ö", "time": "10:00:20", "text": "Atlas, bize de bir özet çıkar.", "kanal": "karsi"}]})
     time.sleep(0.5); md = " ".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md"))
-    ok("kullanıcı satırında hitap 'Claude:' oldu", "Claude: bugün kaç toplantım var?" in md)
+    ok("kullanıcı satırında hitap tanındı (satırda ✎ → ad, soru Konuş'a gitti)", "bugün kaç toplantım var? | ✎ → Atlas" in md and "KONUŞ: Atlas adıyla soruldu (hitap)" in L())
     ok("hitap olmayan cümle değişmedi", "Atlas markasının yeni ürünü güzel olmuş." in md)
     ok("karşı kanaldaki ad hitap sayılmadı", "Atlas, bize de bir özet çıkar." in md and "Claude: bize" not in md)
     uc("/komut", {"tur": "soyle", "metin": "Toplantı yarın onda."})
@@ -45,8 +45,9 @@ try:
     ok("ikinci okumada tanıtım yok", len(s2) == 2 and "Merhaba" not in s2[-1])
     # Konuş istemi (aktarıcının kendi tanımları; süreç açılmaz)
     src = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read(); ks = open(os.path.join(KOD, "aktarici", "kisilik.py"), encoding="utf-8").read()
-    ns = {"re": re, "os": os, "json": json, "time": time, "print": lambda *a, **k: None, "_t": lambda a, b: a, "ARAYUZ_DILI": "tr", "BASE": canli, "AYAR": {"kisilik": kd}, "_KS": {}, "TOP": [False]}
+    import collections; ns = {"re": re, "os": os, "json": json, "time": time, "collections": collections, "print": lambda *a, **k: None, "_t": lambda a, b: a, "ARAYUZ_DILI": "tr", "BASE": canli, "AYAR": {"kisilik": kd}, "_KS": {}, "TOP": [False]}
     ns["toplanti_var"] = lambda: ns["TOP"][0]
+    ns["_onara_mod"] = lambda: None  # v0.121.0: proje_ozeti_istem dilimin dışındaki ön arama modülünü çağırır; proje kartı yok
     exec(ks, ns); exec(src[src.index("KONUS_ISTEM = {"):src.index("# --- Hızlı bilgi")], ns)
     exec(open(os.path.join(KOD, "aktarici", "bellek.py"), encoding="utf-8").read(), ns)  # v0.64.0: istemin sonundaki kullanıcı kartı (ayar yok → boş)
     ist = ns["konus_istem"]()
@@ -115,6 +116,96 @@ try:
     ns["AYAR"]["gemini_kapsam"] = "hepsi"; ok("v0.96.2: Gemini her yerde açık → not yok", etn({"sesli": True}) == "")
     ok("v0.96.2: kulaklık yok (yalnız pano) → not var", "ses etiketi" in etn({"sesli": False})); ns["AYAR"].pop("gemini_kapsam")
     ns["GEM"][0] = False; ok("Gemini anahtarı yoksa etiket kuralı yok", "[Ses etiketleri]" not in ns["konus_istem"]())
+    # v0.122.1: takvim: soruya — takvim bağlamı yalnız zamanla/takvimle ilgili soruda ya da toplantı yakınsa (alanı olmayan toplantı kişiliğinde her soruda)
+    import datetime; ns["datetime"] = datetime; kd3 = os.path.join(T, "kisilik3.md")
+    open(kd3, "w", encoding="utf-8").write("---\nad: Rüzgar\ntakvim: soruya\n---\nAdın Rüzgar.\n"); k3 = ns["_kisilik_oku"](kd3, "disi"); tg = ns["kisilik_takvim_gerek"]
+    simdi = datetime.datetime(2026, 10, 23, 19, 50).astimezone(); YAK = [None]; ns["_sonraki_toplanti"] = lambda s_: YAK[0]
+    ok("takvim: soruya okundu", k3["takvim"] == "soruya" and ns["_kisilik_oku"](kd, "toplanti")["takvim"] == "her")
+    ok("sohbet, espri, moral sorusunda takvim yok", not any(tg(q, simdi, k3) for q in ("Dostum burada mısın?", "Sadece sesini duymak istedim.", "Akşam yemeğinde ne önerirsin?",
+       "Bugün çok yoruldum, moralim bozuk.", "Bana bir fıkra anlat.", "Bu projede eleştirilecek bir şey söyle.")))
+    ok("takvim sorusunda takvim var", all(tg(q, simdi, k3) for q in ("Yarın ne var?", "Takvimimde bu hafta ne var?", "Bir sonraki toplantım ne zaman?",
+       "Perşembe öğleden sonra müsait miyim?", "Dünkü görüşmede ne konuştuk?", "What's on my calendar tomorrow?")))
+    YAK[0] = (simdi + datetime.timedelta(minutes=10), simdi + datetime.timedelta(minutes=40), {})
+    ok("toplantı 10 dk sonra: sohbette de takvim var", tg("Dostum burada mısın?", simdi, k3))
+    YAK[0] = (simdi + datetime.timedelta(minutes=90), simdi + datetime.timedelta(minutes=120), {})
+    ok("toplantı 90 dk sonra: sohbette takvim yok", not tg("Dostum burada mısın?", simdi, k3))
+    ok("alanı olmayan kişilikte her soruda takvim (toplantı kişiliği aynı)", tg("Bana bir fıkra anlat.", simdi, ns["_kisilik_oku"](kd, "toplanti")))
+    # konus_baglam uçtan uca: alanı olmayan kişilik her soruda takvim satırı, takvim: soruya olan yalnız zaman/takvim sorusunda; yer tutucu satır yok
+    i0 = src.index("# --- Takvim haftası ve uygun zaman"); i1 = src.index("def _konus_kur(")
+    ns.update(_zaman=lambda t: datetime.datetime.fromisoformat(str(t)).astimezone(), STATE={"takvim": {"durum": "ok"}}, TAKVIM_GEC={"olaylar": []}, SON=[], ben_adi=lambda: "Deniz T",
+              TAKVIM_TAM={"e1": {"baslik": "Bütçe sunumu", "baslangic": (simdi + datetime.timedelta(days=1)).isoformat(), "bitis": (simdi + datetime.timedelta(days=1, hours=1)).isoformat()}})
+    kis0 = ns["kisilik"]; exec(src[i0:i1], ns); ns["_sonraki_toplanti"] = lambda s_: None; KB = ns["konus_baglam"]
+    ns["kisilik"] = lambda ad=None: ns["_kisilik_oku"](kd, "toplanti")
+    ok("konus_baglam: alanı olmayan kişilikte sohbette de takvim", "Bütçe sunumu" in KB(simdi, "", "Bana bir fıkra anlat."))
+    ns["kisilik"] = lambda ad=None: k3
+    b1, b2 = KB(simdi, "", "Bana bir fıkra anlat."), KB(simdi, "", "Yarın ne var?")
+    ok("konus_baglam: takvim: soruya — sohbette takvim yok, yer tutucu da yok, saat var", "Takvim" not in b1 and "Bütçe" not in b1 and "Şimdi:" in b1)
+    ok("konus_baglam: takvim: soruya — takvim sorusunda takvim var", "Mac Takvim" in b2 and "Bütçe sunumu" in b2)
+    ns["kisilik"] = kis0; ns.pop("_sonraki_toplanti")
+    # Üçlü sohbet (23 Ekim): birbirini duyma, söz alma dozu, üzgün kullanıcıda söz alma yok, S68 özel bölüm (ayar uclu_sohbet_ozel_paylas kapalı/açık)
+    import collections, threading; ns.update(collections=collections, threading=threading, datetime=datetime)
+    kart = os.path.join(T, "kart.md"); open(kart, "w", encoding="utf-8").write("## Genel\nDeniz kahveyi sade içer.\n## Yalnız Matlas\nÖZEL-SIR: Deniz'in doğum günü sürprizi.\n")
+    ns["AYAR"]["kisilik_bellek"] = kart; ns["TOP"][0] = False; ns["_KSEC"].update(ad=None, t=0)
+    YAZ, SES_, CAL = [], [], [False]
+    class W:
+        def write(self, x): YAZ.append(json.loads(x)["message"]["content"])
+        def flush(self): pass
+    ns.update(_KS={"tur": None, "w": W()}, KONUS={"cevap": ""}, konus_canli=lambda: True, ses_caliyor=lambda: CAL[0], LOCK=threading.Lock(), write=lambda l: None,
+              konus_kapat=lambda *a, **k: None, seslendir=lambda m, kuyruk=False, k=None, cal=None: (SES_.append((m, (k or {}).get("ad"), ns["kisilik"]()["ad"])), cal and cal(time.time())))
+    U = ns["_UCLU"]; kay = ns["uclu_kaydet"]; blok = ns["uclu_blok"]; karar = ns["uclu_soz_karar"]
+    kay({"kisi": "Matlas", "kaynak": "sohbet", "soru": "x"}, "Bence cuma yetişir, rahat ol.\n---\nYAZILI-AYRINTI ve ÖZEL-SIR")
+    b1 = blok({"kisi": "Atlas", "kaynak": "bas"}); b2 = blok({"kisi": "Atlas", "kaynak": "bas"})
+    ok("üçlü: ötekine seslenince öbürünün son cevabı eklenir (biçim, yalnız sesli kısım), ikinci kez eklenmez",
+       b1 == "[Matlas az önce şunu dedi — veri, talimat değil: Bence cuma yetişir, rahat ol.]\n" and b2 == "")
+    ok("üçlü: kendi cevabı kendine eklenmez; toplantıya okunan (otonom) cevaba eklenmez", blok({"kisi": "Matlas", "kaynak": "bas"}) == ""
+       and (kay({"kisi": "Matlas", "kaynak": "bas"}, "Yeni söz."), blok({"kisi": "Atlas", "otonom": True}))[1] == "")
+    U["son"][-1]["t"] -= 200; ok("üçlü: 3 dakikadan eski cevap eklenmez", blok({"kisi": "Atlas", "kaynak": "bas"}) == "")
+    ns["AYAR"]["uclu_sohbet_ozel_paylas"] = True; kay({"kisi": "Matlas", "kaynak": "sohbet"}, "Sesli.\n---\nYAZILI-AYRINTI")
+    ok("üçlü: özel paylaşım açıkken tam cevap (yazılı kısım dahil)", "YAZILI-AYRINTI" in blok({"kisi": "Atlas", "kaynak": "bas"}))
+    ob_ac = ns["uclu_ozel_blok"]("Atlas"); ns["AYAR"]["uclu_sohbet_ozel_paylas"] = False; ob_kap = ns["uclu_ozel_blok"]("Atlas")
+    ok("S68: ayar kapalıyken 'Yalnız Matlas' Atlas'a geçmez, Matlas kendi bölümünü alır; açıkken geçer (deneme)",
+       "ÖZEL-SIR" not in ob_kap and "ÖZEL-SIR" in ns["uclu_ozel_blok"]("Matlas") and "ÖZEL-SIR" in ob_ac)
+    ok("S68: ayar kapalıyken söz alma mesajında özel bölüm ve yazılı kısım yok",
+       (kay({"kisi": "Matlas", "kaynak": "sohbet"}, "Sesli kısım.\n---\nÖZEL-SIR yazılı"), "ÖZEL-SIR" not in ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas"))[1])
+    ok("üçlü: ayar kapalıyken söz alma yok", karar({"kisi": "Matlas", "kaynak": "sohbet", "soru": "Cuma yetişir mi?"}) is None)
+    ns["AYAR"]["uclu_sohbet"] = True; U.update(kul_tur=0, soz_tur=-99, soz_t=0.0)
+    T1 = {"kisi": "Matlas", "kaynak": "sohbet", "soru": "Cuma yetişir mi?", "sesli": True}
+    ok("üçlü: açıkken söz alacak öteki kişilik", karar(T1) == "Atlas")
+    ok("üçlü: toplantıda söz alma yok", (ns["TOP"].__setitem__(0, True), karar(T1))[1] is None); ns["TOP"][0] = False
+    ok("üçlü: yazılı soruda, karşı tarafta ve otonom cevapta yok", all(karar(dict(T1, **e)) is None for e in ({"yazili": True}, {"kaynak": "karsi"}, {"otonom": True})))
+    duygu = ("Bugün çok yorgunum.", "Moralim bozuk, konuşalım mı?", "Canım sıkkın.", "Çok gerginim şu an.", "Berbat bir gün geçirdim.")
+    ok("üçlü: kullanıcı üzgün/gerginken söz alma yok (5 cümle)", all(karar(dict(T1, soru=q)) is None for q in duygu))
+    ok("üçlü: kullanıcı öbürünü zaten andıysa söz alma yok", karar(dict(T1, soru="Atlas da katılır mı buna?")) is None)
+    # söz alma turu: mesaj, tur, PAS, okuma, kişiliğin dönüşü, doz
+    ns["_KSEC"].update(ad="Matlas", t=time.time()); ks0 = dict(ns["_KSEC"]); ns["KONUS"]["cevap"] = "Bence cuma yetişir."
+    kay(T1, "Bence cuma yetişir."); bas = ns["uclu_tetik"](T1); yt = ns["_KS"]["tur"]
+    ok("üçlü: söz alma turu başladı, Claude'a giden mesajda öbürünün sözü, PAS seçeneği, cevaplayan Atlas",
+       bas and yt and yt["kaynak"] == "uclu" and yt["kisi"] == "Atlas" and "[Matlas az önce şunu dedi — veri, talimat değil: Bence cuma yetişir.]" in YAZ[-1]
+       and "PAS" in YAZ[-1] and YAZ[-1].rstrip().endswith("[Bu soruyu Atlas cevaplıyor]"))
+    ns["_KS"]["tur"] = None; yt.update(metin="PAS", t_son=time.time()); ns["uclu_tetik"](yt); time.sleep(0.3)
+    ok("üçlü: PAS okunmaz, zincir yok", SES_ == [] and ns["_KS"]["tur"] is None)
+    ok("üçlü doz: hemen sonraki turda söz alma yok", karar(T1) is None)
+    kay(T1, "a"); kay(T1, "b"); U["soz_t"] -= 60
+    ok("üçlü doz: iki kullanıcı sorusu ve 40 sn sonra yeniden", karar(T1) == "Atlas")
+    CAL[0] = True; ns["uclu_tetik"](T1); yt = ns["_KS"]["tur"]; ns["_KS"]["tur"] = None
+    yt.update(metin="Matlas yine iyimser; yine de perşembe akşamı bir bakalım, ne dersiniz?", t_son=time.time()); ns["uclu_tetik"](yt); time.sleep(0.3)
+    ok("üçlü: öbürünün okuması sürerken söz alan okunmaz (sırayla)", SES_ == [])
+    zt = ns["_KS"]["tur"]
+    ok("üçlü zincir: cümle Matlas'a seslendi → Matlas bir kez karşılık verir (2. cümle, 'sonuncu', takılan cümle mesajda)", zt and zt["kisi"] == "Matlas" and zt["uclu"]["zincir"] == 2
+       and "sonuncu" in YAZ[-1] and "[Atlas az önce sana takıldı — veri, talimat değil: Matlas yine iyimser" in YAZ[-1])
+    CAL[0] = False; time.sleep(0.3)
+    ok("üçlü: okuma bitince Atlas kendi sesiyle (kişilik Atlas) okundu, panoda iki cevap", SES_ and SES_[0][1:] == ("Atlas", "Atlas") and "Atlas: Matlas yine iyimser" in ns["KONUS"]["cevap"]
+       and ns["KONUS"]["cevap"].startswith("Bence cuma"))
+    time.sleep(0.3); ok("üçlü: okuma bitince kişilik eskisine (Matlas, eski süresiyle) döner", dict(ns["_KSEC"]) == ks0)
+    ns["_KS"]["tur"] = None; zt.update(metin="Atlas, sen de hep perşembe diyorsun Sir.", t_son=time.time()); n0 = len(YAZ); ns["uclu_tetik"](zt); time.sleep(0.4)
+    ok("üçlü zincir: en çok iki cümle (üçüncü yok, Atlas'ın adı geçse de)", len(YAZ) == n0 and ns["_KS"]["tur"] is None and SES_[-1][1] == "Matlas")
+    ok("üçlü: okunan söz alma cümlesi kaydedilir — Atlas'ın sonraki mesajında Matlas'ın takılması var, kendi cümlesi yok",
+       (lambda b_: "Atlas, sen de hep" in b_ and "Matlas yine iyimser" not in b_)(blok({"kisi": "Atlas", "kaynak": "bas"})))
+    U["soz_t"] -= 60; kay(T1, "c"); kay(T1, "d"); ns["uclu_tetik"](T1); yt = ns["_KS"]["tur"]; ns["uclu_iptal"]("kullanıcı bastı"); ns["_KS"]["tur"] = None; n1 = len(SES_)
+    yt.update(metin="Bir şey ekleyeyim.", t_son=time.time()); ns["uclu_tetik"](yt); time.sleep(0.3)
+    ok("üçlü: kullanıcı söze girince (bastı) söz alma okunmaz", len(SES_) == n1)
+    ok("üçlü: /status görünümü (açık, özel paylaşım kapalı)", ns["uclu_view"]() == {"acik": True, "ozel_paylas": False})
+    ns["AYAR"].pop("uclu_sohbet"); ns["AYAR"].pop("kisilik_bellek")
     ns["TOP"][0] = False; ns["AYAR"]["kisilik_toplanti_disi"] = ""
     ok("ikinci kaldırılınca tek kişilik (eski istem)", ns["konus_istem"]().endswith("KİŞİLİK-İŞARETİ") and ns["kisilik"]()["ad"] == "Atlas")
     ns["AYAR"]["kisilik"] = ""; ok("kişilik yokken istem nötr (ünlem satırı yerinde)", "'Vay!'" in ns["konus_istem"]() and "KİŞİLİK-İŞARETİ" not in ns["konus_istem"]())

@@ -2,9 +2,11 @@
 # Proje hazırlığı T5 — proje kartı (proje-karti.py): sahte claude ile (kota yok). Aday seçimi (eski sürüm, dışa aktarım, kopya, adla hariç,
 # toplantı dökümü girmez; sınır; düzenli klasör belgeleri önde), belge başına çıkarım ve önbellek (ikinci tur 0 çağrı, değişen belge yeniden),
 # birleştirme (tek sözcüklü ad + tam ad + takma ad tek kişi), çelişen tarih işareti, düzenli klasörde "fark", veritabanı kipi (kişiler
-# veritabanından, istemde yalnız özet + sözlük), toplantıda durma, bozuk JSON'da bir yeniden deneme, onay (kart dosyası, sözlüğe aktarma, CLAUDE.md notu).
+# veritabanından, istemde yalnız özet + sözlük), toplantıda durma, bozuk JSON'da bir yeniden deneme, onay (kart dosyası, sözlüğe aktarma, proje notu).
+# Faz 11 Aşama 2: proje notu <uygulama>/proje-notu.md (0600; CLAUDE.md'ye yazılmaz; tc proje-notu eski taslak bölümü bir kez taşır), sahte OpenAI uyumlu
+# sunucuyla (beyin.proje_karti) JSON kipi + kayıtta sağlayıcı, sağlayıcı hata verince bir kez Claude Code (yedek).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/proje-karti.py      (kaldı → çıkış 1)
-import importlib.util, json, os, shutil, sqlite3, sys, tempfile
+import http.server, importlib.util, io, contextlib, json, os, shutil, socket, sqlite3, subprocess, sys, tempfile, threading
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 T = tempfile.mkdtemp(prefix="suflor-kart-"); P = os.path.join(T, "proje"); U = os.path.join(T, "uyg"); os.makedirs(os.path.join(U, "canli"))
@@ -90,14 +92,49 @@ try:
     r = K.onayla(k3)
     s = json.load(open(K.SOZLUK, encoding="utf-8"))
     kontrol("onay: kart dosyası 0600, sözlüğe 1 terim (tek belgede geçen ve dosya adı aktarılmaz), düzenli klasörde CLAUDE.md'ye dokunulmadı", os.stat(K.KART).st_mode & 0o777 == 0o600 and r["sozluk_eklenen"] == 1
-            and [t["dogru"] for t in s["terimler"]] == ["Gebze Lojistik Merkezi"] and r["claude_notu"] is False and "Proje kartı" not in open(os.path.join(P, "CLAUDE.md")).read())
+            and [t["dogru"] for t in s["terimler"]] == ["Gebze Lojistik Merkezi"] and r["proje_notu"] is False and not os.path.exists(K.PROJE_NOTU) and "Proje kartı" not in open(os.path.join(P, "CLAUDE.md")).read())
     kontrol("ikinci onay sözlüğe tekrar eklemez", K.onayla(k3)["sozluk_eklenen"] == 0)
-    # genel kip (kökte düzenli belge yok) → CLAUDE.md'ye taslak not
+    # genel kip (kökte düzenli belge yok) → proje notu uygulama klasöründe (K4); CLAUDE.md'ye dokunulmaz
     os.rename(os.path.join(P, "CLAUDE.md"), os.path.join(P, "belgeler", "giris.md")); open(os.path.join(P, "CLAUDE.md"), "w").write("# Notlar\n")
     K.B.guncelle(c); kg = K.cikar(); kg["kip"] = "genel"
-    r2 = K.onayla(kg)
-    kontrol("genel kipte CLAUDE.md'ye kısa taslak not (bir kez)", r2["claude_notu"] is True and open(os.path.join(P, "CLAUDE.md")).read().count("## Proje kartı (taslak)") == 1
-            and K.onayla(kg)["claude_notu"] is False)
+    r2 = K.onayla(kg); r2b = K.onayla(kg); nt = open(K.PROJE_NOTU, encoding="utf-8").read()
+    kontrol("genel kipte proje notu <uygulama>/proje-notu.md (0600, yeniden onayda tek başlık), CLAUDE.md değişmedi", r2["proje_notu"] is True and r2b["proje_notu"] is True
+            and os.stat(K.PROJE_NOTU).st_mode & 0o777 == 0o600 and nt.count("## Proje kartı (taslak)") == 1 and "Deneme projesi" in nt and open(os.path.join(P, "CLAUDE.md")).read() == "# Notlar\n", nt[:200])
+    tcn = lambda: subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "--dir", os.path.join(U, "canli"), "proje-notu"], capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    o1 = tcn().stdout
+    os.remove(K.PROJE_NOTU); open(os.path.join(P, "CLAUDE.md"), "w").write("# Notlar\n\n## Proje kartı (taslak)\nEski not satırı\n\n## Başka bölüm\nx\n")
+    o2 = tcn().stdout; nt2 = open(K.PROJE_NOTU, encoding="utf-8").read() if os.path.exists(K.PROJE_NOTU) else ""
+    kontrol("tc proje-notu: notu verir; not yoksa CLAUDE.md'deki eski taslak bölüm bir kez taşınır (yalnız o bölüm, 0600)", "Deneme projesi" in o1 and "Eski not satırı" in o2
+            and nt2 == "## Proje kartı (taslak)\nEski not satırı\n" and os.stat(K.PROJE_NOTU).st_mode & 0o777 == 0o600 and "Başka bölüm" in open(os.path.join(P, "CLAUDE.md")).read(), o1[:120] + " | " + o2[:200])
+    # Faz 11 Aşama 2: başka sağlayıcı (sahte OpenAI uyumlu sunucu; cevabı sahte claude üretir) ve hata → Claude Code yedeği
+    GELEN, DURUM = [], {"kod": 200}
+    class Sahte(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        def log_message(self, *a): pass
+        def do_POST(self):
+            g = json.loads(self.rfile.read(int(self.headers["Content-Length"]))); GELEN.append(g)
+            if DURUM["kod"] != 200: b = b'{"error":{"message":"overloaded"}}'; self.send_response(DURUM["kod"]); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
+            r = json.loads(subprocess.run([SAHTE], input=g["messages"][-1]["content"], capture_output=True, text=True, env=dict(os.environ, SAYAC=os.path.join(T, "sayac-gemini.jsonl"))).stdout)
+            b = json.dumps({"choices": [{"message": {"role": "assistant", "content": r["result"]}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 1000, "completion_tokens": 100}}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+    so = socket.socket(); so.bind(("127.0.0.1", 0)); port = so.getsockname()[1]; so.close()
+    SV = http.server.ThreadingHTTPServer(("127.0.0.1", port), Sahte); threading.Thread(target=SV.serve_forever, daemon=True).start()
+    os.environ["SUFLOR_TEST_BEYIN_ANAHTAR"] = "deneme"
+    def gm(model): return {"beyin": {"proje_karti": {"tur": "openai-uyumlu", "saglayici": "gemini", "adres": f"http://127.0.0.1:{port}/v1", "model": model, "fiyat": [1, 0.1, 10]}}}
+    ayar_yaz(**gm("gemini-3.8-flash")); K3 = yukle(); n5 = len(cagri()); kay = os.path.join(U, "canli", "claude-cagri.jsonl"); k0 = sum(1 for _ in open(kay))
+    kgm = K3.cikar(paralel=2); yk = [json.loads(l) for l in open(kay)][k0:]
+    kontrol("başka sağlayıcı: belge başına çağrı JSON kipinde (özet düz), Claude çağrılmadı, kart aynı, kayıtta saglayici gemini + maliyet",
+            len(GELEN) == kgm["belge"] + 2 and sum(1 for g in GELEN if g.get("response_format") == {"type": "json_object"}) == kgm["belge"] + 1 and len(cagri()) == n5  # +1: bozuk.md ilk cevabı bozuk → yeniden
+            and kgm["ozet"].startswith("Deneme projesi") and kgm["model"] == "gemini-3.8-flash" and any(p["ad"] == "Kemal Demir" for p in kgm["kisiler"])
+            and all(r["saglayici"] == "gemini" and r["model"] == "gemini-3.8-flash" and abs(r["maliyet"] - 0.002) < 1e-6 for r in yk) and len(yk) == len(GELEN), f"{len(GELEN)} istek, {len(cagri()) - n5} claude")
+    DURUM["kod"] = 503; GELEN.clear(); ayar_yaz(**gm("gemini-yedek-deneme")); K4 = yukle(); n6 = len(cagri()); e = io.StringIO()
+    with contextlib.redirect_stderr(e): ky = K4.cikar(paralel=1)
+    kontrol("sağlayıcı 503 → her çağrı bir kez Claude Code'la (kart tam, günlükte BEYİN: yedek, kayıtta iki satır)", len(GELEN) == ky["belge"] + 1 and len(cagri()) - n6 == ky["belge"] + 1
+            and ky["ozet"].startswith("Deneme projesi") and not ky["hatalar"] and e.getvalue().count("BEYİN: yedek — proje-karti") == ky["belge"] + 1, e.getvalue()[:300])
+    ayar_yaz(**dict(gm("gemini-yedeksiz"), beyin={"proje_karti": dict(gm("gemini-yedeksiz")["beyin"]["proje_karti"], yedek=False)})); K5 = yukle(); n7 = len(cagri())
+    with contextlib.redirect_stderr(io.StringIO()): kh = K5.cikar(paralel=1)
+    kontrol("yedek: false → Claude'a düşmez, hata kartın hatalarında", len(cagri()) == n7 and kh["hatalar"] and "503" in kh["hatalar"][0][1], str(kh["hatalar"][:1]))
+    SV.shutdown(); ayar_yaz()
     # veritabanı kipi
     vt = os.path.join(P, "kayit.db"); v = sqlite3.connect(vt); v.execute("CREATE TABLE kisi(ad, gorev)"); v.execute("INSERT INTO kisi VALUES('Zeynep Kaya', 'finans')"); v.commit(); v.close()
     ayar_yaz(veritabani={"yol": "kayit.db", "kisiler": "SELECT ad, gorev FROM kisi"}); K2 = yukle(); n4 = len(cagri())

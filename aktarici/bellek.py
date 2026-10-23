@@ -20,6 +20,8 @@ def _gizli_ekle(ad, metin):  # 0600 dosyaya satır ekle (ilk satırda dosyayı i
         except OSError: pass
     with LOCK: write([(yol, metin)])
 def konus_gecmis_yaz(tur, metin, toplanti=None):  # biten Konuş turu → geçmiş (yalnız kullanıcının kendi sorusu)
+    if "uclu_kaydet" in globals(): uclu_kaydet(tur, metin)  # üçlü sohbet: kişiliklerin son cevapları (kisilik.py; geçmiş kapalıyken de)
+    if tur.get("kaynak") == "uclu": return  # söz alma turu: kullanıcının sorusu yok
     if not konus_gecmis_acik() or tur.get("kaynak") in ("karsi", "ozet") or tur.get("karsi"): return
     soru = " ".join(str(tur.get("soru") or KONUS.get("soru") or "").split())
     if not soru or not metin: return

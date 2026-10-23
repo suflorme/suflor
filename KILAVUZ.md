@@ -6,6 +6,7 @@ README'de kısaca anlatılanların ayrıntısı: kurulumdan sonra, kullanım, ay
 - [Kurulumdan sonra](#kurulumdan-sonra)
 - [Kullanım](#kullanım)
 - [İsteğe bağlı ayarlar](#isteğe-bağlı-ayarlar)
+- [Yapay zekâ seçimi](#yapay-zekâ-seçimi)
 - [Sesler](#sesler)
 - [Gizlilik ayrıntıları](#gizlilik-ayrıntıları)
 - [Gerekenler](#gerekenler)
@@ -45,7 +46,7 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
    Taslağın açılacağı yeri (Gmail, Outlook web ya da Mac'in posta uygulaması) ve gönderen adresini sihirbazın takvim ekranında seçersin;
    sonradan ayar.json'da `"eposta"` ve `"eposta_adres"`. Seçmezsen takvimine bakılarak seçilir.
 
-**Ayarlar:** panonun üst çubuğundaki ⚙ — e-posta, ses ve konuşma, toplantı uyarıları, çeviri ve masaüstü, gizlilik; kaydedince hemen geçerli.
+**Ayarlar:** panonun üst çubuğundaki ⚙ — yapay zekâ seçimi, e-posta, ses ve konuşma, toplantı uyarıları, çeviri ve masaüstü, gizlilik; kaydedince hemen geçerli.
 
 ## İsteğe bağlı ayarlar
 **İsteğe bağlı (ayar.json, varsayılan kapalı):** `"menu_cubugu": true` — menü çubuğu uygulaması (buzlu cam panelde mini pano,
@@ -92,6 +93,20 @@ uyarı, acele); kişilik dosyasında `gerginlik_tonu: evet` o kişiliğin tonunu
 ⚙ Ayarlar → Toplantıda duyuru (deneme): asistanlar toplantıda konuşurken Suflor toplantı başında kendini tanıtır ve onaylanan işi "Not aldım" diye duyurur.
 Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
 
+## Yapay zekâ seçimi
+Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulum sihirbazının **Yapay zekâ bağla** adımında seçersin; sonra
+⚙ Ayarlar → Genel'den hem genel seçimi (**Yapay zekâ**) hem iş başına seçimi (**Konuş'ta**, **Çeviride**, **Proje kartında**; boş = genel seçimi izler) değiştirirsin.
+- **Claude Code** (varsayılan, önerilen): Claude aboneliğinle. Toplantı sırasında kart ve özet yazan oturum şimdilik yalnız bununla çalışır.
+- **API anahtarı:** Gemini (Google; model `gemini-3.8-flash`) ya da OpenAI uyumlu başka bir hizmet (adres + model adı). Kullandıkça ücretlendirilir.
+  Anahtar yalnız macOS **Anahtar Zinciri**'ne yazılır (öğe `suflor-gemini` — ayar `gemini_anahtar` başka öğe seçer — ya da `suflor-ozel`); ayar dosyasında yalnız öğenin adı,
+  hizmetin adresi ve model adı durur. Sihirbaz anahtarı hizmetin model listesini isteyerek dener (metin gitmez).
+- **Bu Mac'te yerel model (Ollama):** resmî Ollama sürümü (yalnız komut satırı aracı, ~181 MB; SHA-256 ve Apple imzası denetlenir) ve `qwen3.5:4b-q4_K_M`
+  modeli (~3,3 GB) ortak klasöre (`/Users/Shared/Suflor/ollama`) iner. Mac açılışında kendiliğinden başlamaz: aktarıcı, ayar yerel modeli gösterdiği sürece
+  sunucuyu `127.0.0.1:11434`'te (ayar `ollama_port`) ve 32 768 belirteçlik bağlamla açar, seçim değişince kapatır; günlük `canli/ollama.log`.
+  Yerel model Türkçe belgelerde aramayı çoğu zaman yanlış yapıyor; yedek olarak önerilir. Başka model için ayar `ollama_model`.
+- Seçilen hizmet hata verirse ve Claude Code kuruluysa o soru Claude Code'la cevaplanır. Seçilen hizmetin durumu (anahtar var mı, yerel model kurulu mu) ⚙ Ayarlar → Genel'deki Yapay zekâ satırında.
+- Ayar dosyasında: `"beyin": {"varsayilan": {…}, "konus": {…}, "ceviri": {…}, "proje_karti": {…}}` — sihirbaz ve pano yazar; elle yazılan model ve `effort` korunur.
+
 ## Gizlilik ayrıntıları
 - Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
 - Aktarıcı yalnız `127.0.0.1` adresinde çalışır; toplantı içeriğini hiçbir sunucuya göndermez. İstisna isteğe bağlı Gemini sesi: açarsan (⚙ Ayarlar → Ses → Gemini)
@@ -102,6 +117,10 @@ Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
   ve asistan adı, e-posta, takvim, ses, ses izi ve ekran görüntüsü gitmez. Kimlik yalnız rastgele bir kurulum numarasıdır. Beta sürümünde kapatılmaz;
   giden her paketin kopyası `~/Library/Application Support/Suflor/teshis/gonderilen/` altında durur.
 - Claude'a giden metin, senin Claude Code oturumunun gördükleridir (Anthropic'in kullanım koşulları geçerli).
+- **Claude dışında bir sağlayıcı seçersen metin bağlamı o sağlayıcıya gider, ses gitmez; yerel model seçersen metin de Mac'ten çıkmaz.** Metin bağlamı:
+  sorun, toplantı dökümünden ve notlardan parçalar, proje belgelerinden aranan parçalar, proje kartı. O hizmetin kullanım koşulları geçerlidir
+  (Gemini'nin ücretsiz katmanında Google gönderilen metni ürünlerini geliştirmek için kullanabiliyor; ücretli katman önerilir). Beta verisine yalnız seçeneğin türü girer
+  (Claude Code / Gemini / OpenAI uyumlu / yerel); adres, model ve anahtar girmez.
 - Toplantı dosyaları senin proje klasöründe durur; kişi adı içerir, iç belge gibi davran.
 
 ## Gerekenler
@@ -109,8 +128,10 @@ Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
 - En az 16 GB bellek (konuşma tanıma ve ses modeli toplantı sırasında ~4 GB kullanır)
 - ~12 GB boş disk (modeller ~5 GB, belge çevirme ve anlam araması ~3,3 GB)
 - Google Chrome
-- [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü). Claude Code kurulu değilse sihirbaz kurar;
-  Terminal'de `claude` → `/login` ile giriş gerekir (Claude masaüstü uygulamasındaki giriş Terminal'e geçmez).
+- [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü) önerilir. Claude Code kurulu değilse sihirbaz kurar;
+  Terminal'de `claude` → `/login` ile giriş gerekir (Claude masaüstü uygulamasındaki giriş Terminal'e geçmez). Yerine bir API anahtarı ya da
+  yerel model seçilebilir ([Yapay zekâ seçimi](#yapay-zekâ-seçimi)); o zaman toplantıdaki kartlar ve özet olmaz, döküm, pano ve Konuş çalışır.
+- Yerel model seçilirse ~3,5 GB ek disk.
 
 ## Bileşenler
 | Parça | Ne iş yapar |
@@ -125,6 +146,8 @@ Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
 | Anlama göre arama (`gomme-isci.py`; `baglam.py gomme`) | multilingual-e5-base (MIT, ~1,1 GB, yerel): sorudaki sözcükler belgede geçmese de anlamca yakın parçaları bulur; sözcük aramasıyla birleştirilir. Arka planda bir sunucu açık kalır (~1 GB bellek), 30 dk sorgu gelmezse kapanır |
 | Belge çevirme (`cevir-isci.py`; `baglam.py tara`, `baglam.py cevir`) | Proje klasörünü tarar (kopya, eski sürüm, dışa aktarım, gizli görünen dosya) ve PDF, sunum (PowerPoint, Keynote), Pages, Numbers, eski Excel (.xls) ve görüntüleri Mac'te metne çevirir: Docling + Apple Vision (.xls için xlrd), ayrı Python 3.12 ortamında, ağ kapalı. Eski Word (.doc), .rtf ve .odt macOS'un `textutil` aracıyla okunur. Şifre, anahtar, kart ya da IBAN geçen parça aramaya girmez |
 | Proje veritabanı (`baglam.py proje-vt`; `<uygulama>/proje.db`) | Excel, Numbers, CSV/TSV sayfaları (`t_…` tabloları; sayı sayı, tarih ISO; kaynak dosyası `tablolar` tablosunda) ve onaylı proje kartı (`kisi`, `kurum`, `karar`, `acik_is`, `olay`, `terim`, `proje`) tek SQLite dosyasında. Konuş ve toplantı oturumu yalnız okuyan SQL ile bakar (`vt_sema`, `vt_sor`; toplantıda `toplanti-claude.py proje`). Yalnız değişen dosya yeniden yazılır; gizli bilgi taşıyan hücre `[gizli]`. Kendi kayıt veritabanın ayarlıysa (`veritabani`) kurulmaz; `"proje_vt": false` kapatır |
+| Yapay zekâ katmanı (`aktarici/beyin.py`, `aktarici/saglayici.py`) | Konuş, çeviri, telaffuz ve proje kartının yapay zekâ çağrıları tek yerden: Claude Code ya da OpenAI uyumlu uç (Gemini, OpenAI, Ollama, LM Studio); seçim, Anahtar Zinciri, yerel modeli gerekince açma |
+| Ollama (isteğe bağlı, `/Users/Shared/Suflor/ollama`) | Yerel model sunucusu; yalnız 127.0.0.1, yalnız yapay zekâ seçimi yerel modeli gösterirken çalışır |
 | Claude köprüsü (`toplanti-claude.py`, `baglam.py`, `yapi.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
 | Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
 
@@ -134,3 +157,4 @@ MIT — ayrıntı [LICENSE](LICENSE).
 İsteğe bağlı indirilen bileşenler Suflor.me ile gelmez, kendi lisanslarıyla kullanılır: doğal Türkçe ses modeli
 [wite-tech/pocket-tts-turkish](https://huggingface.co/wite-tech/pocket-tts-turkish) (CC-BY-4.0, wite-tech), Pocket TTS (Kyutai, MIT),
 pocket-tts-turkish paketi (Apache-2.0); elle kurulursa [alperiox/pocket-tts-turkish](https://huggingface.co/alperiox/pocket-tts-turkish) (MIT).
+Yerel model seçilirse [Ollama](https://github.com/ollama/ollama) (MIT) ve qwen3.5 modeli (lisansı Ollama kütüphanesindeki model sayfasında) indirilir.

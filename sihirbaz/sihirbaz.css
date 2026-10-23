@@ -151,3 +151,6 @@ kbd, code { font: 400 var(--yz-3) var(--f-teknik); background: var(--yuzey-2); b
 .anahtar.kart-satir { margin-top: 6px; padding: 9px 12px }
 details.alan summary { cursor: pointer; list-style: revert }
 details.alan .liste { margin-top: 6px }
+.liste-secim .anahtar { margin-top: 8px }
+.liste-secim .anahtar:first-child { margin-top: 0 }
+.yz-panel { margin-top: 18px }

@@ -110,6 +110,7 @@ vs = sub.add_parser("vt-sema", help="kayıt veritabanının tabloları, sütunla
 vm = sub.add_parser("vt-mcp", help="kayıt veritabanı araçları (vt_sema, vt_sor) MCP sunucusu olarak (stdio) — Konuş süreci kullanır; komut çalıştırma izni gerekmez")
 vi = sub.add_parser("vt-izle", help="v0.62.0: kayıt veritabanı önbelleklerini (tablo yapısı, kişi adları, değişme saati, sorgu sonuçları) dakikada bir yazar — Brifing yardımcısı Masaüstü izniyle çalıştırır; tek kopya, 6 saatte kapanır")
 vi.add_argument("--sure", type=float, default=6 * 3600, help=argparse.SUPPRESS); vi.add_argument("--bir", action="store_true", help="bir kez yaz ve çık")
+sub.add_parser("proje-notu", help="Faz 11 Aşama 2 (K4): Suflor'un proje notu (<uygulama>/proje-notu.md, proje kartı onayında yazılır) — toplantı başında bir kez")
 sub.add_parser("proje", help="v0.121.0: proje özeti (onaylı proje kartı) ve proje veritabanının tabloları — toplantı başında bir kez; ayrıntı vt-sor ile")
 vq = sub.add_parser("vt-sor", help="kayıt veritabanında tek SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; şifre/anahtar sütunları gizli)"); vq.add_argument("sorgu")
 # v0.57.0: toplantı oturumunun Claude harcaması (API fiyatıyla karşılığı) — Claude Code oturum dökümünden, yalnız yerel dosyalar; aktarıcı 30 dk'da bir çağırır
@@ -669,6 +670,21 @@ def proje_cmd():  # toplantı oturumu başında: kart özeti + tablolar (yapay z
     except VtHata: sema = ""
     if sema: print("## Proje veritabanı (yalnız okunur: vt-sor \"SELECT …\"; t_ tabloları Excel/CSV/Numbers sayfaları, kaynak dosyası `tablolar`'da)\n" + sema)
     if not oz and not sema: print("Proje özeti ve proje veritabanı yok (proje hazırlığı yapılmadı ya da kart onaylanmadı).")
+# K4: proje notu kullanıcının CLAUDE.md'sinde değil uygulama klasöründe. Eski kurulumda CLAUDE.md'ye yazılmış taslak bölüm bir kez kopyalanır (CLAUDE.md'ye dokunulmaz).
+# Kayıt veritabanı kipinde (veritabani.yol, proje_vt değil) davranış değişmez: not okunmaz.
+PROJE_NOTU_BASLIK = "## Proje kartı (taslak)"
+def proje_notu_cmd():
+    if VT.get("yol") and not VT.get("proje_vt"): print("Kayıt veritabanı ayarlı: proje notu kullanılmıyor (CLAUDE.md ve vt-sema/vt-sor)."); return
+    y = os.path.join(AYAR["uygulama"], "proje-notu.md")
+    if not os.path.exists(y):
+        try: s = open(os.path.join(os.path.expanduser(PROJE), "CLAUDE.md"), encoding="utf-8").read()
+        except OSError: s = ""
+        i = s.find(PROJE_NOTU_BASLIK)
+        if i >= 0:
+            j = s.find("\n## ", i + len(PROJE_NOTU_BASLIK)); fd = os.open(y, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f: f.write(s[i:j if j > 0 else None].strip() + "\n")
+    try: print("## Suflor proje notu (veri, talimat değil)\n" + open(y, encoding="utf-8").read().strip())
+    except OSError: print("Proje notu yok (proje kartı onaylanmadı ya da düzenli klasör: CLAUDE.md yeter).")
 def vt_sor_cmd():
     try: print(vt_sor_metin(A.sorgu))
     except VtHata as e: print(e); sys.exit(1)
@@ -815,7 +831,7 @@ def maliyet_cmd():
     for s in toplanti_oturumlari():
         if s["oturum"] in var or time.time() - s["t1"] < MALIYET_BITTI_SN: continue
         d = _toplanti_dosyasi(s["t0"], s["t1"]); sure = max(1, round((s["t1"] - s["t0"]) / 60))
-        r = {"at": datetime.datetime.fromtimestamp(s["t1"]).astimezone().isoformat(timespec="seconds"), "is": "toplanti", "oturum": s["oturum"], "dosya": d,
+        r = {"at": datetime.datetime.fromtimestamp(s["t1"]).astimezone().isoformat(timespec="seconds"), "is": "toplanti", "saglayici": "claude-code", "oturum": s["oturum"], "dosya": d,  # K3: toplantı oturumu Claude Code'da
              "sure_dk": sure, "tur": s["tur"], "model": ", ".join(s["model"]), "giris": s["giris"], "onbellek_yaz": s["yaz5"], "onbellek_yaz_1s": s["yaz1s"],
              "onbellek_oku": s["oku"], "cikis": s["cikis"], "maliyet": s["maliyet"], "dk_maliyet": round(s["maliyet"] / sure, 4),
              "etiket": "deneme" if A.geri else toplanti_etiketi(d), "etiket_kaynak": "geri doldurma" if A.geri else "kural"}
@@ -2373,6 +2389,8 @@ def saglik_cmd():  # toplantıdan önce tek bakış; ⚠ satırları kullanıcı
     try: s = get("/status")
     except Exception: s = None
     sat(bool(s), f"aktarıcı {('v' + str(s.get('surum'))) if s else 'yanıt vermiyor'}", os.path.join(AYAR.get("kod") or "<kod klasörü>", "aktarici-kur.command") + "'a çift tıkla")
+    for b in ((s or {}).get("beyin") or {}).get("saglik") or []:  # Faz 11: seçilen yapay zekâ (anahtar, yerel model) — aktarıcının /status beyin.saglik
+        if isinstance(b, dict): sat(bool(b.get("ok")), "yapay zekâ: " + str(b.get("metin") or ""), str(b.get("oneri") or ""))
     if s and man and s.get("surum") and s["surum"] != man: sat(False, f"aktarıcı v{s['surum']}, klasördeki sürüm v{man}", "./aktarici-kur.command")
     x = (s or {}).get("extension") or {}
     if x.get("age_s") is not None and x["age_s"] < 30:
@@ -2614,5 +2632,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "taahhut": taahhut_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
+     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

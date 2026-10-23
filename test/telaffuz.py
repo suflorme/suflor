@@ -51,5 +51,48 @@ telaffuz_ekle({"Hubspot": "Habspot", "Biweekly": "Bayvikli"})
 bak("oto okunuş", telaffuz("Hubspot'ta Biweekly var"), "Habspot'ta Bayvikli var")
 json.dump({"Hubspot": "Hab spat"}, open(os.path.join(BASE, "telaffuz.json"), "w")); _TEL["re"] = None
 bak("elle düzeltme önce", telaffuz("Hubspot"), "Hab spat")
+# 4) Faz 11 Aşama 2: okunuş tamamlama başka sağlayıcıda (beyin.telaffuz → `beyin.py tek`, sahte OpenAI uyumlu sunucu) ve hata olunca bir kez Claude Code (Brifing.app taklidi)
+import http.server, socket, types, importlib.util
+_GEL, _DUR = [], {"kod": 200}
+class _Sahte(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    def log_message(self, *a): pass
+    def do_POST(self):
+        g = json.loads(self.rfile.read(int(self.headers["Content-Length"]))); _GEL.append(g)
+        if _DUR["kod"] != 200: b = b'{"error":{"message":"busy"}}'; self.send_response(_DUR["kod"]); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
+        b = json.dumps({"choices": [{"message": {"content": json.dumps({"Salesforce": "Seylsfors"})}}], "usage": {"prompt_tokens": 300, "completion_tokens": 20}}).encode()
+        self.send_response(200); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+_so = socket.socket(); _so.bind(("127.0.0.1", 0)); _sp = _so.getsockname()[1]; _so.close()
+_SV = http.server.ThreadingHTTPServer(("127.0.0.1", _sp), _Sahte); threading.Thread(target=_SV.serve_forever, daemon=True).start()
+_b = importlib.util.spec_from_file_location("beyin_tel", os.path.join(KOD, "aktarici", "beyin.py")); BEYIN = importlib.util.module_from_spec(_b); _b.loader.exec_module(BEYIN)
+os.environ["SUFLOR_TEST_BEYIN_ANAHTAR"] = "x"
+A = types.SimpleNamespace(port=1); LOCK = threading.Lock(); datetime = __import__("datetime")
+def write(l):
+    for y, m in l: open(y, "a", encoding="utf-8").write(m)
+_ACIK = []
+class _Sub:  # Brifing.app (open -a …) taklidi: çıktı dosyasına Claude Code json'u yazar; gerisi gerçek subprocess
+    TimeoutExpired = subprocess.TimeoutExpired
+    @staticmethod
+    def run(args, **k):
+        if args[0] == "open":
+            ist = json.load(open(args[-1])); _ACIK.append(ist["args"])
+            json.dump({"result": json.dumps({"Salesforce": "Seylsfors (claude)"}), "usage": {"input_tokens": 5}, "total_cost_usd": 0.01}, open(ist["cikti"], "w")); return None
+        return subprocess.run(args, **k)
+_gercek_sub = subprocess
+exec(src[src.index("def claude_yalin"):src.index("# --- Sesli brifing")].replace("subprocess.", "_Sub."))
+exec(src[src.index("def telaffuz_tamamla"):src.index("def _telaffuz_dongu")].replace("subprocess.", "_Sub."))
+BRIFING_APP = BASE; claude_yolu = lambda: "/bin/echo"
+def _kayit(): return [json.loads(l) for l in open(os.path.join(BASE, "claude-cagri.jsonl"))] if os.path.exists(os.path.join(BASE, "claude-cagri.jsonl")) else []
+_cik = io_ = __import__("io").StringIO(); _std = sys.stdout
+AYAR = {"port": 1, "beyin": {"telaffuz": {"tur": "openai-uyumlu", "saglayici": "gemini", "adres": f"http://127.0.0.1:{_sp}/v1", "model": "gemini-3.8-flash", "fiyat": [1, 0.1, 10]}}}
+sys.stdout = _cik; telaffuz_tamamla(["Salesforce"]); sys.stdout = _std
+bak("başka sağlayıcı: okunuş yazıldı, JSON kipi, Claude çağrılmadı, kayıtta saglayici gemini", (telaffuz_oto().get("Salesforce"), bool(_GEL and _GEL[0].get("response_format")), _ACIK,
+    [(r["is"], r["saglayici"], r.get("model")) for r in _kayit()]), ("Seylsfors", True, [], [("telaffuz", "gemini", "gemini-3.8-flash")]))
+_DUR["kod"] = 500; _TEL_OTO["calisiyor"] = False; sys.stdout = _cik; telaffuz_tamamla(["Salesforce"]); sys.stdout = _std
+bak("sağlayıcı 500 → bir kez Claude Code (Claude modeli sonnet), günlükte BEYİN: yedek", (telaffuz_oto().get("Salesforce"), len(_ACIK), _ACIK[0][_ACIK[0].index("--model") + 1] if _ACIK else None,
+    _cik.getvalue().count("BEYİN: yedek — telaffuz: gemini"), _kayit()[-1]["saglayici"]), ("Seylsfors (claude)", 1, "sonnet", 1, "claude-code"))
+AYAR["beyin"]["telaffuz"]["yedek"] = False; claude_yolu = lambda: None; _TEL_OTO["calisiyor"] = False; sys.stdout = _cik; telaffuz_tamamla(["Hubspot2"]); sys.stdout = _std
+bak("Claude Code yokken sağlayıcı hatası: yedek yok, tek satır", (len(_ACIK), "yanıt vermedi" in _cik.getvalue()), (1, True))
+_SV.shutdown()
 print(f"telaffuz: " + ("✓ hepsi geçti" if not hata else f"{hata} hata"))
 sys.exit(1 if hata else 0)

@@ -2,12 +2,13 @@
 # Proje kartı (proje hazırlığı T5; planlar/proje-hazirligi.md §2 Adım 4, §2b, §8). Dizindeki asıl ve geçerli belgelerden (en çok 300, en yeniden;
 # dışa aktarım, eski sürüm, kopya, adla hariç, toplantı dökümü ve özel bellek kaynakları girmez) belge başına bir Claude çağrısı → JSON:
 # kişiler, kurumlar, kararlar, tarihler, açık işler, sözlük (her satırda kaynak: dosya + konum). Metin dizinden gelir (gizli bilgi parçaları
-# zaten dışarıda); yalnız Claude'a gider. Sonuç belge metninin özetiyle önbelleklenir (<uygulama>/kart-onbellek/): değişmeyen belge yeniden sorulmaz.
+# zaten dışarıda); ayardaki yapay zekâya gider (varsayılan Claude Code; v0.123'ten ayar beyin.proje_karti ile başka sağlayıcı, hata olursa bir kez Claude Code). Sonuç belge metninin özetiyle önbelleklenir (<uygulama>/kart-onbellek/): değişmeyen belge yeniden sorulmaz.
 # Yerelde birleştirme: aynı kişinin yazımları ve takma adları tek kişi; aynı karar/iş/olayın farklı tarihleri silinmez, "celiski" diye işaretlenir.
 # Düzenli klasör kipi (kökte CLAUDE.md, DURUM ya da karar kaydı belgesi varsa): kart önce bunlardan beslenir; yalnız diğer belgelerden gelen satırlar
 # "fark" işaretli; belgelere dokunulmaz. Veritabanı kipi (ayar veritabani): kişiler veritabanından (ayar veritabani.kisiler; varsa .kararlar,
 # .gorevler), belgelerden yalnız özet ve sözlük. Taslak <uygulama>/proje-karti-taslak.json; onay (T6'da sihirbaz E ekranı) → proje-karti.json,
-# sözlük maddeleri sozluk.json'a (Whisper istemine de girer), düzenli olmayan klasörde CLAUDE.md'ye kısa taslak not (yalnız CLAUDE.md varsa).
+# sözlük maddeleri sozluk.json'a (Whisper istemine de girer), düzenli olmayan klasörde kısa taslak not <uygulama>/proje-notu.md'ye (K4, Faz 11 Aşama 2: kullanıcının
+# klasöründeki CLAUDE.md'ye artık yazılmaz; toplantı oturumu `tc proje-notu` ile okur).
 # v0.121.0: onaylı kart <uygulama>/proje.db'ye de yazılır (baglam.py proje_vt_guncelle) — yapay zekâdan bağımsız: Konuş ve toplantı oturumu SQL ile okur.
 #   python3 proje-karti.py cikar [--sinir 300] [--model sonnet] [--paralel 4] [--tahmin]
 #   python3 proje-karti.py goster | onayla
@@ -61,19 +62,28 @@ def belge_metni(c, yol):
         out.append(s); boy += len(s)
     return "\n".join(out)
 
-def claude_cagir(istem, model, is_="proje-karti"):
+def _kaydet(j, is_, t0, sag, model):  # → canli/claude-cagri.jsonl satırı (yalnız sayılar; olcum.py maliyet sağlayıcıya göre ayırır)
+    k = BY.kullanim(j)
+    o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "saglayici": sag, "model": model, "sure_ms": j.get("duration_ms"),
+         "duvar_ms": round((time.time() - t0) * 1000), "maliyet": round(k["maliyet"], 4), "giris": k["giris"], "cikti": k["cikti"], "hata": bool(j.get("is_error"))}
+    try:
+        with open(os.path.join(UYG, "canli", "claude-cagri.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(o, ensure_ascii=False) + "\n")
+    except OSError: pass
+    return o
+def claude_cagir(istem, model, is_="proje-karti", json_kip=False):  # → (metin, $). Sağlayıcı ayar beyin.proje_karti (yoksa Claude Code); hata olursa bir kez Claude Code
+    sec = BY.secim(AYAR, "proje_karti")
+    if sec["tur"] == "openai-uyumlu":
+        t0 = time.time(); j = BY.tek_cagri(dict(sec, model=model or sec["model"]), istem, json_kip=json_kip); o = _kaydet(j, is_, t0, sec["saglayici"], model or sec["model"])
+        if not j.get("is_error"): return str(j.get("result") or ""), o["maliyet"]
+        if not BY.yedek_var(AYAR, sec): raise RuntimeError(str(j.get("result") or "sağlayıcı hatası")[:160])
+        print(BY.yedek_satiri(is_, sec, j.get("result")), file=sys.stderr); model = BY.claude_secim(AYAR, "proje_karti")["model"]
     cl = BY.claude_yolu(B.AYAR)
     if not cl: raise RuntimeError("claude bulunamadı")
     t0 = time.time()
     r = BY.tek(cl, BY.kart_args(model), istem, UYG)
     try: j = json.loads(r.stdout)
     except ValueError: raise RuntimeError(f"claude çıktısı okunamadı ({(r.stderr or r.stdout)[-120:]})")
-    k = BY.kullanim(j)
-    o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "sure_ms": j.get("duration_ms"), "duvar_ms": round((time.time() - t0) * 1000),
-         "maliyet": round(k["maliyet"], 4), "giris": k["giris"], "cikti": k["cikti"], "hata": bool(j.get("is_error"))}
-    try:
-        with open(os.path.join(UYG, "canli", "claude-cagri.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(o, ensure_ascii=False) + "\n")
-    except OSError: pass
+    o = _kaydet(j, is_, t0, "claude-code", model)
     if j.get("is_error"): raise RuntimeError(str(j.get("result") or "claude hatası")[:160])
     return str(j.get("result") or ""), o["maliyet"]
 
@@ -90,7 +100,7 @@ def belge_cikar(yol, metin, model, vt_kipi):
     toplam = 0.0; hata = None
     for _ in range(2):  # JSON bozuksa bir kez daha
         try:
-            cevap, usd = claude_cagir(istem, model); toplam += usd; o = json_al(cevap)
+            cevap, usd = claude_cagir(istem, model, json_kip=True); toplam += usd; o = json_al(cevap)
             if isinstance(o, dict): break
             hata = "JSON yok"
         except (RuntimeError, ValueError, subprocess.TimeoutExpired) as e: hata = f"{e.__class__.__name__}: {str(e)[:120]}"
@@ -262,11 +272,11 @@ def onayla(taslak=None, kim="kullanici", terimler=None):  # terimler: sihirbazı
     with open(GECMIS, "a", encoding="utf-8") as f: f.write(json.dumps({"t": k["onay"]["t"], "kim": kim, "belge": k["belge"], "kisi": len(k["kisiler"]), "sozluk": len(k["sozluk"])}) + "\n")
     duz_yol = {y for y in {s[0] for m in k.get("sozluk") or [] for s in m.get("kaynaklar") or []} if y.count("/") <= 1 and DUZENLI_RX.match(os.path.basename(y))}
     eklenen = sozluge_aktar(k.get("sozluk") or [], duz_yol, terimler)
-    notu = claude_notu(k) if k.get("kip") != "duzenli" else False  # düzenli klasörde belgeler değişmez
+    notu = proje_notu(k) if k.get("kip") != "duzenli" else False  # düzenli klasörde kendi notu (CLAUDE.md, DURUM) var
     # v0.121.0: onaylı kart proje veritabanına (kisi, karar, acik_is… — Konuş ve toplantı oturumu vt_sor ile okur; kayıt veritabanı kipinde kurulmaz)
     try: pv = B.proje_vt_guncelle()
     except Exception as e: pv = {"hata": e.__class__.__name__}
-    return {"sozluk_eklenen": eklenen, "claude_notu": notu, "proje_vt": pv}
+    return {"sozluk_eklenen": eklenen, "proje_notu": notu, "proje_vt": pv}
 
 SOZ_KONUSULMAZ = re.compile(r"[/@\\#\[\]()]|\.\w|^[a-z0-9_-]+$")  # dosya/alan adı, komut, adres, işaretli ya da tümü küçük harf: söylenmez
 SOZ_AKTAR_EN_COK = 60  # Whisper istemi ~200 belirteç (whisper-hat istem_metni): 17 Ekim gerçek proje kartında (201 belge) 1.228 terim, süzgeçten sonra 303 kalıyordu
@@ -293,18 +303,21 @@ def sozluge_aktar(maddeler, duz_yol=frozenset(), terimler=None):
         os.replace(SOZLUK + ".tmp", SOZLUK)
     return eklenen
 
-NOT_BASLIK = "## Proje kartı (taslak)"
-def claude_notu(k):
-    cm = os.path.join(PROJE, "CLAUDE.md")
-    if not os.path.isfile(cm): return False
-    s = open(cm, encoding="utf-8").read()
-    if NOT_BASLIK in s: return False
-    satir = [f"\n\n{NOT_BASLIK}", f"_Suflor.me proje kartından ({datetime.date.today().isoformat()}); onaylı kart uygulama klasöründe. İstediğin zaman düzenleyebilirsin._", ""]
+# K4 (Faz 11 Aşama 2): proje notu Suflor'un kendi dosyası — <uygulama>/proje-notu.md (0600). Kullanıcının klasörüne (CLAUDE.md) yazılmaz; hangi yapay zekâ
+# olursa olsun aynı not metin olarak verilir (toplantı oturumu: tc proje-notu). Yeni onayda yeniden yazılır. Eski kurulumda CLAUDE.md'deki taslak bölümü
+# tc proje-notu bir kez buraya kopyalar (CLAUDE.md'ye dokunulmaz).
+NOT_BASLIK = "## Proje kartı (taslak)"; PROJE_NOTU = os.path.join(UYG, "proje-notu.md")
+def _not_yaz(metin):
+    os.makedirs(UYG, exist_ok=True); fd = os.open(PROJE_NOTU + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f: f.write(metin)
+    os.chmod(PROJE_NOTU + ".tmp", 0o600); os.replace(PROJE_NOTU + ".tmp", PROJE_NOTU)
+def proje_notu(k):
+    satir = [NOT_BASLIK, f"_Suflor.me proje kartından ({datetime.date.today().isoformat()}); onaylı kart uygulama klasöründe._", ""]
     if k.get("ozet"): satir += [k["ozet"], ""]
     if k.get("kisiler"): satir += ["Kişiler: " + "; ".join(p["ad"] + (f" ({', '.join(p['roller'][:2])})" if p.get("roller") else "") for p in k["kisiler"][:15]), ""]
     if k.get("acik_isler"): satir += ["Açık işler:"] + [f"- {x['is']}" + (f" — {', '.join(x['sahip'])}" if x.get("sahip") else "") + (f" ({x['tarih']})" if x.get("tarih") else "") for x in k["acik_isler"][:10]] + [""]
     if k.get("sozluk"): satir += ["Terimler: " + ", ".join(m["terim"] for m in k["sozluk"][:30])]
-    open(cm, "w", encoding="utf-8").write(s.rstrip() + "\n".join(satir) + "\n")
+    _not_yaz("\n".join(satir).rstrip() + "\n")
     return True
 
 if __name__ == "__main__":

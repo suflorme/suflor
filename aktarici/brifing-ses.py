@@ -90,18 +90,31 @@ BEYIN = _beyin_yukle()
 # Kişisel ayar, bağlayıcı (MCP), komut ve oturum kaydı yüklenmez; proje ayarı ve CLAUDE.md kalır (8 Ekim, aynı brifing istemi: tam 0,38 $ ·
 # 21 sn, yalın 0,23 $ · 24 sn, kalite aynı; tamamen yalın 0,27 $ ama dosyaları el yordamıyla aradı). Ayar claude_yalin: false → tam çağrı.
 def claude_yalin(): return BEYIN.yalin(AYAR)
-def claude_json(ham, is_, t0, yalin):
-    # --output-format json → (sonuç metni, ölçüm). Ölçüm canli/claude-cagri.jsonl'e (olcum.py toplanti okur); yalnız sayılar, metin yok.
+def claude_json(ham, is_, t0, yalin, saglayici=None, model=None):
+    # --output-format json → (sonuç metni, ölçüm). Ölçüm canli/claude-cagri.jsonl'e (olcum.py toplanti okur); yalnız sayılar, metin yok. Faz 11 Aşama 2: saglayici, model
     try: j = json.loads(ham)
     except ValueError: return ham, None
     if not isinstance(j, dict) or "result" not in j: return ham, None
     k = BEYIN.kullanim(j); giris = k["giris"]
-    o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "yalin": yalin, "sure_ms": j.get("duration_ms"),
+    o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "saglayici": saglayici or "claude-code", **({"model": model} if model else {}), "yalin": yalin, "sure_ms": j.get("duration_ms"),
          "api_ms": j.get("duration_api_ms"), "duvar_ms": round((time.time() - t0) * 1000), "tur": j.get("num_turns"),
          "maliyet": round(k["maliyet"], 4), "giris": giris, "cikti": k["cikti"],
          "onbellek_orani": round(k["okunan"] / giris, 2) if giris else None, "hata": bool(j.get("is_error"))}
     with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     return str(j.get("result") or ""), o
+def beyin_tek(is_, sec, istem, json_kip=False, sistem=None, zaman=180):
+    # Faz 11 Aşama 2: başka sağlayıcıda tek çağrı. Alt süreç (`beyin.py tek <istek>`; aktarıcı ağa kendisi bağlanmaz, anahtarı beyin.py Anahtar Zinciri'nden okur)
+    # → (metin, ölçüm); ölçüm None ya da hata=True ise çağıran yedeğe (Claude Code) düşebilir.
+    istek = os.path.join(BASE, f"{is_}-beyin-istek.json"); t0 = time.time(); ham = ""
+    fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(dict(BEYIN.tek_istek(AYAR, is_, istem, sistem, json_kip), zaman=zaman), f, ensure_ascii=False)
+    try: ham = subprocess.run(["/usr/bin/python3" if os.path.exists("/usr/bin/python3") else sys.executable, "-I", "-B", BEYIN.__file__, "tek", istek],
+                              capture_output=True, text=True, timeout=zaman + 30).stdout
+    except (OSError, subprocess.TimeoutExpired): pass
+    finally:
+        try: os.remove(istek)
+        except OSError: pass
+    return claude_json(ham, is_, t0, False, sec.get("saglayici"), sec.get("model"))
 # --- Sesli brifing (karar #83: Başlat'a basınca; Faz 4) ----------------------------------------------------------------------------
 # Yerel macOS sesi (say; Türkçe: sistem sesi ya da Yelda, aşağıda ses_secimi): ses Mac'ten çıkmaz. Toplantı başladıysa okunmaz, okurken ilk döküm satırı gelince susar
 # (mikrofon brifingi dökmesin). Ayar konusma: false kapatır; ses: "<ad>" sesi seçer.
@@ -334,22 +347,31 @@ def telaffuz_adaylari():
 def telaffuz_tamamla(ad=None):
     # aktarıcı açılınca ve sözlük değişince (_telaffuz_dongu); deneme aktarıcısında çalışmaz (Claude çağrısı, kota)
     if _TEL_OTO["calisiyor"] or os.environ.get("SUFLOR_AYAR") or A.port != int(AYAR["port"]) or ARAYUZ_DILI != "tr" or not AYAR.get("konusma", True): return
-    ad = telaffuz_adaylari() if ad is None else ad; cl = claude_yolu()
-    if not ad or not cl or not os.path.isdir(BRIFING_APP): return
+    ad = telaffuz_adaylari() if ad is None else ad; cl = claude_yolu(); sec = BEYIN.secim(AYAR, "telaffuz")  # Faz 11 Aşama 2: ayar beyin.telaffuz
+    claude_var = bool(cl) and os.path.isdir(BRIFING_APP)
+    if not ad or (sec["tur"] == "claude-code" and not claude_var): return
     _TEL_OTO.update(calisiyor=True, son=time.time())
     try:
-        cikti = os.path.join(BASE, "telaffuz-cikti.json"); istek = os.path.join(BASE, "telaffuz-istek.json"); t0 = time.time()
-        if os.path.exists(cikti): os.remove(cikti)
-        args = BEYIN.telaffuz_args(AYAR, TEL_OTO_ISTEM + json.dumps(ad, ensure_ascii=False))
-        fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": BASE, "cikti": cikti, "sure": 120}, f, ensure_ascii=False)
-        subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=180)
-        for f in (istek,):
-            try: os.remove(f)
-            except OSError: pass
-        try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
-        except OSError: print("SES: okunuş tamamlanamadı (Claude yanıt vermedi)"); return
-        ham, _ = claude_json(ham, "telaffuz", t0, bool(claude_yalin()))
+        istem = TEL_OTO_ISTEM + json.dumps(ad, ensure_ascii=False); ham = None; t0 = time.time()
+        if sec["tur"] != "claude-code":
+            ham, olc = beyin_tek("telaffuz", sec, istem, json_kip=True)
+            if not olc or olc.get("hata"):
+                if not (claude_var and BEYIN.yedek_var(AYAR, sec)): print(f"SES: okunuş tamamlanamadı ({sec.get('saglayici')} yanıt vermedi)"); return
+                print(BEYIN.yedek_satiri("telaffuz", sec, ham if olc else "çıktı okunamadı")); ham = None
+        if ham is None:  # Claude Code (Brifing.app); yedekte Claude modeli
+            cikti = os.path.join(BASE, "telaffuz-cikti.json"); istek = os.path.join(BASE, "telaffuz-istek.json"); t0 = time.time()
+            if os.path.exists(cikti): os.remove(cikti)
+            model = BEYIN.claude_secim(AYAR, "telaffuz")["model"]
+            args = BEYIN.telaffuz_args(AYAR, istem, model)
+            fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": BASE, "cikti": cikti, "sure": 120}, f, ensure_ascii=False)
+            subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=180)
+            for f in (istek,):
+                try: os.remove(f)
+                except OSError: pass
+            try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
+            except OSError: print("SES: okunuş tamamlanamadı (Claude yanıt vermedi)"); return
+            ham, _ = claude_json(ham, "telaffuz", t0, bool(claude_yalin()), "claude-code", model)
         m = re.search(r"\{.*\}", ham, re.S)
         try: j = json.loads(m.group(0)) if m else None
         except ValueError: j = None

@@ -608,7 +608,6 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       d.addEventListener("mousedown", gizle, true); w.addEventListener("blur", gizle);
     }
     // asistanın adına yönelme eki (pano ile aynı): Suflor'a, Elif'e, Ada'ya
-    const yonelme = ad => { const k = String(ad || "").replace(/İ/g, "i").toLowerCase(), u = (k.match(/[aıoueiöü]/g) || ["e"]).pop(); return ad + "'" + (/[aıoueiöü]$/.test(k) ? "y" : "") + ("aıou".includes(u) ? "a" : "e"); };
     const SES_UZ = /\.(m4a|mp4|mov|m4v|wav|mp3|aac|caf|aif|aiff|3gp)$/i;
     let kIpT = 0, sk = null, skSon = { t: 0 }, skMk = null;
     function kutuIp(d, m) { const n = d.querySelector(".kal"); if (!n) return; n.textContent = m || ""; clearTimeout(kIpT); if (m && !sk) kIpT = setTimeout(() => { if (!sk) n.textContent = ""; }, 2500); }
@@ -665,7 +664,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const f = d.createElement("div"); f.className = "gir";
       const ek = d.createElement("button"); ek.append(ikon(d, "arti")); ek.title = L("Belge ekle");
       const ed = d.createElement("input"); ed.type = "file"; ed.multiple = true; ed.hidden = true;
-      const ta = d.createElement("textarea"); ta.rows = 1; ta.placeholder = L("{ad} yaz", { ad: yonelme(AS) });
+      const ta = d.createElement("textarea"); ta.rows = 1; ta.placeholder = L("Asistanla konuş");
       const dz = d.createElement("span"); dz.className = "kdz"; for (let i = 0; i < 5; i++) dz.append(d.createElement("i"));
       const mk = d.createElement("button"); mk.className = "ktm"; mk.append(ikon(d, "mic")); mk.title = L("Basılı tut: sesle sor (Option + Shift + Boşluk)");
       const git = async soru => {

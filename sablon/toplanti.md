@@ -7,8 +7,8 @@ Kullanıcı birazdan toplantısına (Teams, Zoom web ya da Meet) giriyor: **$ARG
 çalışma alanının proje klasöründe ({{PROJE}}) çalışır; yollar ona göredir. Kısa yaz; kullanıcı birkaç dakika içinde toplantıda olacak.
 
 ## 0. Kurallar
-`{{KOD}}/TOPLANTI-KURALLARI.md` dosyasını ve bu klasörün `CLAUDE.md`'sini oku ve toplantı boyunca uygula. Toplantı sırasındaki kurallar orada;
-burada tekrarlanmaz. Aşağıda `tc` = `python3 {{KOD}}/toplanti-claude.py` (yalnız yazım kısaltması; çalıştırırken tam yaz).
+`{{KOD}}/TOPLANTI-KURALLARI.md` dosyasını, bu klasörün `CLAUDE.md`'sini (varsa) ve Suflor'un proje notunu (`tc proje-notu`) oku ve toplantı boyunca
+uygula. Toplantı sırasındaki kurallar orada; burada tekrarlanmaz. Aşağıda `tc` = `python3 {{KOD}}/toplanti-claude.py` (yalnız yazım kısaltması; çalıştırırken tam yaz).
 
 ## 1. Kontrol (tek mesajda, eksikleri tek satırda)
 `tc saglik` — ⚠ satırlarını önerisiyle kullanıcıya tek satırda ilet ("eklenti sinyali yok" toplantıdan önce normaldir). Sonra
