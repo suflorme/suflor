@@ -32,6 +32,13 @@ hatalar = []
 def kontrol(ad, kosul):
     print(("✓ " if kosul else "✗ ") + ad)
     if not kosul: hatalar.append(ad)
+# 23 Ekim üçlü sohbet: altyazı imzası gerçek sözün başına yapıştı — imza kırpılır, söz kalır (işçinin süzgeci, modelsiz)
+import importlib.util
+_sp = importlib.util.spec_from_file_location("whisper_isci", os.path.join(KOD, "whisper-isci.py")); WI = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(WI)
+for ham, bek in [("- Sous-titrage: N-S-T-R, O Arkadaşlar sakin olun ikiniz de.", "Arkadaşlar sakin olun ikiniz de."), ("Sous-titrage ST' 501", ""),
+                 ("Sous-titrage Société Radio-Canada", ""), ("Sous-titres réalisés para la communauté d'Amara.org", ""), ("Untertitel im Auftrag des ZDF, 2021", ""),
+                 ("Arkadaşlar sakin olun.", "Arkadaşlar sakin olun."), ("O film çok güzeldi.", "O film çok güzeldi.")]:
+    kontrol(f"imza kırpma: {ham[:40]!r} → {bek[:30]!r}", WI.uydurma_on_kirp(ham)[0] == bek)
 try:
     ilk = json.loads(p.stdout.readline())
     kontrol("işçi hazır", ilk.get("hazir"))

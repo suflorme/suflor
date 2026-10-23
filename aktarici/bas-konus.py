@@ -1480,6 +1480,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     if tur.get("kaynak") not in ("hitap", "karsi"):  # bas-konuş/sohbet: cümle başında kişilik adı → o kişilik (hitap yolu konus_hitap'ta seçti)
         kb, _m = kisilik_hitap_bul(metin)
         if kb: kisilik_sec(kb["ad"])
+        if "uclu_muhatap" in globals(): uclu_muhatap(metin, tur, kb)  # v0.125.1: veda; üçlüde cümle içindeki ad, ikinize soru, son soruyu soran
     kis = kisilik(); tur["kisi"] = kis["ad"] if kis and len(kisilikler()) >= 2 else None
     if top and tur.get("kaynak") not in ("hitap", "karsi", "moderator"):  # S94: toplantıda Konuş düğmesi (ve sohbet) yalnız kullanıcıya; herkese cevap yalnız adıyla seslenince
         tur["otonom"] = False

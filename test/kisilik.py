@@ -125,6 +125,9 @@ try:
        "Bugün çok yoruldum, moralim bozuk.", "Bana bir fıkra anlat.", "Bu projede eleştirilecek bir şey söyle.")))
     ok("takvim sorusunda takvim var", all(tg(q, simdi, k3) for q in ("Yarın ne var?", "Takvimimde bu hafta ne var?", "Bir sonraki toplantım ne zaman?",
        "Perşembe öğleden sonra müsait miyim?", "Dünkü görüşmede ne konuştuk?", "What's on my calendar tomorrow?")))
+    ok("v0.125.1: plan sözcüğü yalnız soran cümlede ('Yarın için … planım yok' takvim değil; 'Yarın planım ne?' takvim)",
+       not tg("Yarın için işle ilgili bir planım yok ama ailemle beraber vakit geçirmek istiyorum.", simdi, k3) and not tg("Hafta sonu programım belli değil, bakarız.", simdi, k3)
+       and tg("Yarın planım ne?", simdi, k3) and tg("Bu akşam programım var mı?", simdi, k3))
     YAK[0] = (simdi + datetime.timedelta(minutes=10), simdi + datetime.timedelta(minutes=40), {})
     ok("toplantı 10 dk sonra: sohbette de takvim var", tg("Dostum burada mısın?", simdi, k3))
     YAK[0] = (simdi + datetime.timedelta(minutes=90), simdi + datetime.timedelta(minutes=120), {})
@@ -201,7 +204,7 @@ try:
     kay(T1, "Bence cuma yetişir."); U["hedef"] = 3; bas = tetik(T1); yt = ns["_KS"]["tur"]
     ok("üçlü: söz alma turu başladı — mesajda son konuşma (kullanıcı + cevap), takma adla seslenme, hamle notu, PAS, sonda işaret",
        bas and yt and yt["kaynak"] == "uclu" and yt["kisi"] == "Atlas" and "Deniz: Cuma yetişir mi?" in YAZ[-1] and "Matti: Bence cuma yetişir." in YAZ[-1]
-       and "«Matti» diye seslenirsin" in YAZ[-1] and "[Bu sözde:" in YAZ[-1] and "PAS" in YAZ[-1] and YAZ[-1].rstrip().endswith("[Bu soruyu Atlas cevaplıyor]")
+       and "«Matti» dersin" in YAZ[-1] and "[Bu sözde:" in YAZ[-1] and "PAS" in YAZ[-1] and YAZ[-1].rstrip().endswith("[Bu soruyu Atlas cevaplıyor]")
        and "Deniz'e soru sorma" in YAZ[-1])
     ok("üçlü: Atlas'ın takılma adı 'Atti Hanım' Atlas'ın kendi mesajında izinli değil (o Matlas'ın)", "Atti Hanım" not in YAZ[-1])
     CAL[0] = True
@@ -258,6 +261,89 @@ try:
         U["takilma"]["Matlas"] = U["takilma"].get("Matlas", 0) + 1
     ok(f"üçlü: takılma adı seyrek ({izin}/60 sözde; en az {ns['UCLU_TAKILMA_ARA']} sözde bir) ve öbürü (takılma adı yok) kullanamaz",
        1 <= izin <= 60 // ns["UCLU_TAKILMA_ARA"] and ara_ok and not ns["_uclu_takilma_izin"]("Atlas", "takil"))
+    # v0.125.1 (23 Ekim gerçek deneme): ad tanıma, denge, motif, ad sıklığı, kısa söz, üçlü hitap, devir, veda, duygu sorusu
+    ns["_KS"]["tur"] = None; U["akis"].clear(); U["dagilim"].clear(); U["kul_soru"].clear(); ns["_KSEC"].update(ad="Matlas", t=time.time())
+    ki = ns["kisilik_hitap_icte"]
+    ok("ad tanıma: takma ad hitap listesinde; ikinci cümlenin başındaki ad ve sondaki seslenme o kişiliği çağırır",
+       "Atti" in ns["kisilik"]("Atlas")["hitap"] and (ki("Yani tabi ki cuma günlerini seviyoruz. Atti sen hangi günü en çok seversin?") or {}).get("ad") == "Atlas"
+       and (ki("Sen ne dersin, Atti?") or {}).get("ad") == "Atlas" and (ki("Peki. Matti, sen?") or {}).get("ad") == "Matlas" and ki("Yarın ne yapalım? Bilemedim.") is None
+       and ki("Atti'nin önerisi güzeldi. Ben de katılıyorum.") is None)
+    tm = {"kaynak": "sohbet"}; ns["uclu_muhatap"]("Yani tabi ki cuma günlerini seviyoruz. Atti sen hangi günü en çok seversin?", tm)
+    ok("ad tanıma: cümle içinde seslenince cevabı o verir (uclu_muhatap)", ns["_KSEC"]["ad"] == "Atlas")
+    U["ana"] = "Matlas"; tg2 = {"kaynak": "sohbet"}; ns["uclu_muhatap"]("Arkadaşlar, ikinizden de film önerisi istiyorum.", tg2)
+    ok("denge: ikinize soruda cevabı geçen sefer cevaplamayan verir, ilk söz 'cevap2'", ns["_KSEC"]["ad"] == "Atlas" and tg2.get("grup"))
+    U["donen"] = ("Atlas", time.time()); ns["_KSEC"].update(ad="Matlas", t=time.time()); ns["uclu_muhatap"]("Bence sahil daha iyi.", {"kaynak": "sohbet"})
+    ok("denge: adsız söz son soruyu sorana gider", ns["_KSEC"]["ad"] == "Atlas")
+    # benzetim: kullanıcı hep adsız konuşur — 12 bölüm; asistanlar arası sözler ve kullanıcıya dönen
+    random.seed(3); U["dagilim"].clear(); U["son_donen"] = None; ana, say_, donenler = "Matlas", collections.Counter(), []
+    for b_ in range(12):
+        bas_ = "Atlas" if ana == "Matlas" else "Matlas"; n_ = ns["_uclu_hedef"](bas_); sira = [bas_ if i % 2 == 0 else ana for i in range(n_)]
+        for a_ in sira: U["dagilim"].append((time.time(), a_)); say_[a_] += 1
+        U["son_donen"] = sira[-1]; donenler.append(sira[-1]); ana = sira[-1]
+    ok(f"denge: 12 bölümde asistanlar arası söz {say_['Atlas']}/{say_['Matlas']} (fark ≤ 2), kullanıcıya dönen sırayla değişir ({''.join(x[0] for x in donenler)})",
+       abs(say_["Atlas"] - say_["Matlas"]) <= 2 and sum(a == b for a, b in zip(donenler, donenler[1:])) <= 2)
+    U["dagilim"].clear(); [U["dagilim"].append((time.time(), "Atlas")) for _ in range(3)]
+    ok("denge: başlatan öndeyse bölüm çift (eşit söz), gerideyse tek", all(ns["_uclu_hedef"]("Atlas") % 2 == 0 for _ in range(20)) and all(ns["_uclu_hedef"]("Matlas") % 2 == 1 for _ in range(20)))
+    U["dagilim"].clear()
+    # motif: tekrar eden imge yasak listesine girer; kullanıcının konusu ve özel adlar girmez
+    U["akis"].clear(); t0_ = time.time()
+    for i_, (a_, m_) in enumerate([(None, "Ailecek izlenecek bir film önerin."), ("Atlas", "Tutanağa yazıyorum, Matti; Paddington güzel seçim."),
+                                   ("Matlas", "Tutanak senin, hakem de sensin; buna mahkeme denir."), ("Atlas", "Mahkeme başkanı olarak film saatini ben seçerim."),
+                                   ("Matlas", "Marmelat kokulu bir dosya açtın yine."), ("Atlas", "Tutanaklara marmelat sızıntısı yok diye geçtim.")]):
+        U["akis"].append({"t": t0_ + i_, "ad": a_, "metin": m_})
+    mo = {b: n for _, b, n in ns["uclu_motif"]()}
+    ok(f"motif: tekrar eden sözcükler bulunur, konu (film) ve özel ad (Paddington, Matti) bulunmaz ({mo})",
+       any(x.startswith("tutana") for x in mo) and "mahkeme" in mo and "marmelat" in mo and not any(x.startswith("film") or x.startswith("paddington") or x.startswith("matti") for x in mo))
+    mm = ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas", "tepki")
+    ok("motif: söz mesajında 'artık kullanma' listesi", "artık kullanma" in mm and "mahkeme" in mm)
+    ok("motif: ≥ 3 sözde geçen kökü taşıyan cümle atılır (başka cümle varsa)",
+       ns["uclu_motif_suz"]("Tutanağa bunu da yazarım. Ama cumartesi sahile gidelim.", "Atlas") == "Ama cumartesi sahile gidelim."
+       and ns["uclu_motif_suz"]("Tutanak tamam.", "Atlas") == "Tutanak tamam.")
+    # ad sıklığı: öbürünün adı son iki sözde geçtiyse bu sözde yok; seslenme kırpılır, soru cümlesinde kalır
+    U["akis"].append({"t": time.time(), "ad": "Atlas", "metin": "Cumartesi sahil olur, Matti."})
+    ok("ad sıklığı: Atlas son sözlerinde 'Matti' dedi — bu sözde ad yok (soru hamlesinde serbest)", not ns["adizin"]("Atlas", "tepki") and ns["adizin"]("Atlas", "soru") and ns["adizin"]("Matlas", "tepki"))
+    ok("ad sıklığı: mesajda 'adını hiç kullanma' notu", "adını hiç kullanma" in ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas", "tepki"))
+    sil = ns["_uclu_ad_sil"]
+    ok("ad sıklığı: seslenme kırpılır ('…, Matti.' / 'Matti, …' / '…, Matti; …'), soru cümlesinde kalır",
+       sil("Güzel fikir, Matti. Bence yeter.", "Atlas") == "Güzel fikir. Bence yeter." and sil("Matti, iyi dedin.", "Atlas") == "İyi dedin."
+       and sil("Kumandayı bırakman centilmence, Matti; yalnız saat benden.", "Atlas") == "Kumandayı bırakman centilmence; yalnız saat benden."
+       and sil("Peki. Hakemi kim yapacak, Matti?", "Atlas") == "Peki. Hakemi kim yapacak, Matti?" and sil("Matti'nin fikri güzel.", "Atlas") == "Matti'nin fikri güzel.")
+    uz_ = "Kuş gözlemi güzel fikir; üstelik kızları da işin içine katarsanız kim en çok türü görecek diye küçük bir yarışma çıkar. Akşam filmini de ailece oylayıp seçerseniz kimse itiraz edemez. Bir de mısır."
+    ok(f"kısa söz: uzun söz cümle sınırında kısalır ({len(ns['uclu_kisalt'](uz_))} karakter), soruyla biten sözde soru kalır",
+       len(ns["uclu_kisalt"](uz_)) <= ns["UCLU_SINIR"] and ns["uclu_kisalt"](uz_ + " Sen hangisini seçersin?").endswith("Sen hangisini seçersin?") and ns["uclu_kisalt"]("Kısa söz.") == "Kısa söz.")
+    ok("kısa söz: mesajda tek cümle / 120 karakter ya da iki kısa cümle", ("Tek cümle, en çok 120 karakter" in mm or "En çok iki kısa cümle" in mm) and "1–2 kısa cümle" not in mm)
+    # üçlü hitap: Atlas toplantıda "siz", üçlüde "sen" + ad
+    s_ = open(kd, encoding="utf-8").read(); open(kd, "w", encoding="utf-8").write(s_.replace("---\n", "---\nuclu_hitap: sen\n", 1)); os.utime(kd, (time.time() + 60, time.time() + 60))
+    ka = ns["kisilik"]("Atlas")
+    ok("üçlü hitap: dosyada uclu_hitap: sen — üçlüde sen, toplantı ve tek başına hitap aynı (siz)", ka["uclu_bicim"] == "sen" and ka["bicim"] == "siz")
+    ok("üçlü hitap: ana cevap ve söz mesajında «Deniz» de, «Deniz Bey» yok notu; Matlas'ta (zaten sen) yok",
+       "«Deniz» de ve «sen» diye" in blok({"kisi": "Atlas", "kaynak": "sohbet"}) and "«Deniz» de" in ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas", "kullanici")
+       and "«Deniz» de" not in ns["uclu_mesaj"]({"kisi": "Atlas"}, "Matlas", "kullanici"))
+    ok("üçlü hitap: sen diyen kişilikte '-siniz' sorusu kullanıcıya sayılmaz, adıyla soru sayılır", ns["uclu_kullaniciya"]("Deniz, sen hangisini seçersin?", "Atlas"))
+    mk = ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas", "kullanici")
+    ok("kullanıcıya soru: hazır kalıp yasağı ve dönüş yolu notu", "«Siz söyleyin…»" in mk and any(y[0].format(k="Deniz")[:20] in mk for y in ns["UCLU_KUL_YOL"]))
+    # devir: ana cevapta devir cümlesi istenmez; ikinize soruda ilk söz cevap2
+    bd = blok({"kisi": "Matlas", "kaynak": "sohbet"}); bg = blok({"kisi": "Matlas", "kaynak": "sohbet", "grup": True})
+    ok("devir: ana cevap notunda 'de dinleyelim / duyalım' yasağı; ikinize soruda 'önce sen cevaplıyorsun'", "dinleyelim / duyalım" in bd and "önce sen cevaplıyorsun" in bg)
+    ns["_KS"]["tur"] = None; TG = {"kisi": "Matlas", "kaynak": "sohbet", "soru": "İkinizden de film önerisi istiyorum.", "sesli": True, "grup": True}
+    kay(TG, "Benim önerim Paddington 2."); U["hedef"] = 3; tetik(TG); g1 = ns["_KS"]["tur"]
+    ok("devir: ikinize soruda öbürünün ilk sözü kendi cevabı (hamle cevap2)", g1 and g1["kisi"] == "Atlas" and g1["uclu"]["hamle"] == "cevap2" and "kendi cevabını ver" in YAZ[-1])
+    ns["_KS"]["tur"] = None
+    # veda
+    vd = ns["uclu_veda"]
+    ok("veda: 'Teşekkürler sohbetiniz için. Kapatıyorum.' / 'iyi geceler' / 'görüşürüz' veda; sıradan söz değil",
+       vd("Tamam arkadaşlar. Teşekkürler sohbetiniz için. Kapatıyorum.") and vd("Hadi iyi geceler size.") and vd("Yarın görüşürüz.") and not vd("Film seansı yapalım.") and not vd("Kapadokya'ya gidelim mi?"))
+    TV = {"kaynak": "sohbet"}; ns["uclu_muhatap"]("Tamam arkadaşlar. Teşekkürler sohbetiniz için. Kapatıyorum.", TV)
+    TV.update(kisi="Matlas", soru="Kapatıyorum.", sesli=True); bv = blok(TV)
+    KAP = []; ns["SOHBET"] = {"acik": True}; ns["sohbet_kapat"] = lambda n, soz=None: KAP.append(n)
+    kay(TV, "Ben de keyif aldım, iyi geceler."); r_v = tetik(TV)
+    ok("veda: tek kısa veda notu ('kapatamam' yok), söz alma yok, sohbet kipi kapanır",
+       TV.get("veda") and "vedalaşıyor" in bv and "kapatamam" in bv and karar(TV) is None and not r_v and ns["_KS"]["tur"] is None and bekle(lambda: KAP == ["kullanıcı: veda"]))
+    ns.pop("SOHBET"); ns.pop("sohbet_kapat")
+    # duygu: karşıdakinin hâlini soran cümle işaret değil
+    T1b = dict(T1, soru="Evet arkadaşlar ikinize de iyi akşamlar. Sadece sizleri duymak istedim. Keyifleriniz nasıl? İyi misiniz?")
+    ok("duygu: 'Keyifleriniz nasıl? İyi misiniz?' ve 'Sadece…' işaret sayılmaz; 'Yorgun musun?' sayılmaz, 'Ben çok yorgunum, sen nasılsın?' sayılır",
+       karar(T1b) == "Atlas" and not ns["uclu_duygu"]("Yorgun musun?") and ns["uclu_duygu"]("Ben çok yorgunum, sen nasılsın?"))
     ok("üçlü: /status görünümü (açık, özel paylaşım kapalı)", ns["uclu_view"]() == {"acik": True, "ozel_paylas": False})
     ns["AYAR"].pop("uclu_sohbet"); ns["AYAR"].pop("kisilik_bellek")
     ns["TOP"][0] = False; ns["AYAR"]["kisilik_toplanti_disi"] = ""

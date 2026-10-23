@@ -18,6 +18,17 @@ MODEL = os.environ.get("SUFLOR_WHISPER_MODEL", "mlx-community/whisper-large-v3-t
 UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|субтитр|yoyo television|优优独播|abone ol(mayı|un)|beğenmeyi unutma|bir sonraki videoda|"
                      r"thanks? (you )?for watching|subtitles? by|please subscribe|amara\.org|transcribed by|"
                      r"^\W*(müzik|music|alkış|applause|\[.*\]|\(.*\))\W*$", re.I)
+# 23 Ekim üçlü sohbet denemesi: Fransızca altyazı imzası kullanıcının gerçek sözünün başına yapıştı ("- Sous-titrage: N-S-T-R, O Arkadaşlar sakin olun…");
+# bölümü atmak sözü de atardı — imza ve ardından gelen büyük harf kısaltmaları kırpılır, kalan söz tutulur (kalan yoksa bölüm uydurma sayılır).
+UYDURMA_ON = re.compile(r"^\W*(?i:sous[- ]?titr\w*|untertitel\w*|ondertitel\w*|sottotitol\w*|subt[ií]tul\w*|napisy|legendas?)\b\W*"
+                        r"(?:(?:[A-ZÇĞİÖŞÜ](?:[-.]?[A-ZÇĞİÖŞÜ0-9])*|\d+|[A-Z][a-zé]+-[A-Z][a-zé]+)['’]?[^\w\s]*(?:\s+|$))*")
+UYDURMA_ON_YABANCI = re.compile(r"(?i)amara\.org|radio-canada|\b(im auftrag|réalis|par |por la|des ZDF)")  # imzanın kendisi (Fransızca/Almanca/İspanyolca) — kalan da uydurma
+def uydurma_on_kirp(x):  # → (kalan metin, kırpılan imza ya da "")
+    m = UYDURMA_ON.match(x or "")
+    if not m: return x, ""
+    kal = x[m.end():].strip()
+    if UYDURMA_ON_YABANCI.search(kal): return "", x
+    return kal[:1].upper() + kal[1:], x[:m.end()].strip()
 # ses sinyalleri (kullanıcı, 2 Ekim: kişiye özel duygu): parçanın ses yüksekliği, perdesi (F0, otokorelasyon) ve perde
 # dalgalanması. Kişinin kendi tabanıyla karşılaştırma toplanti-claude.py izle'de. Yalnız sayılar döner; ses saklanmaz.
 def ses_olc(a, np, sr=16000):
@@ -295,7 +306,8 @@ def main():
                     if not _bos(r2): r = r2; gec_dil = (obur, round(float(pr[obur]), 2))
             tut, atla, atilan = [], 0, []  # atilan: aktarıcı canli/uydurma-adaylari.jsonl'e yazar (uydurma listesini kendi kayıtlarımızdan büyütmek için)
             for s in r.get("segments") or []:
-                x = (s.get("text") or "").strip()
+                x, imza = uydurma_on_kirp((s.get("text") or "").strip())
+                if imza: atilan.append(imza)
                 if not x or UYDURMA.search(x) or (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
                         or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; atilan += [x] if x else []; continue
                 tut.append((s, x))
@@ -371,7 +383,7 @@ def dosya_tut(sure, segler):
     # Dosya kipinde parça başına: canlıdaki süzgeç (gecerli) + yoğunluk. 10 Ekim gerçek kayıt ölçümü (gercek-ses/): müzikli 8–25 sn parçalar
     # yalnız "Thank you." gibi 1–2 sözcük üretti (≤ 0,2 sözcük/sn); gerçek konuşmada 6 sn'yi aşan parçada en düşük 1,9 sözcük/sn. Güven
     # (avg_logprob) ayırmıyor: gerçek "Thank you, counsel" −0,16…−0,73, uydurma −0,43…−1,0. 6 sn'den uzun parçada < 0,35 sözcük/sn → atılır.
-    tut = [(s, (s.get("text") or "").strip()) for s in segler]; tut = [(s, x) for s, x in tut if gecerli(s, x)]
+    tut = [(s, uydurma_on_kirp((s.get("text") or "").strip())[0]) for s in segler]; tut = [(s, x) for s, x in tut if gecerli(s, x)]
     if sure >= DOSYA_YOGUN_SN and sum(len(x.split()) for _, x in tut) / sure < DOSYA_YOGUNLUK: return [], len(segler)
     return tut, len(segler) - len(tut)
 DOSYA_KUME_ESIK = 0.35  # toplu kümeleme birleşme eşiği (ortalama kosinüs); gercek-ses/kume-ayar.py ile seçildi
