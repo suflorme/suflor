@@ -37,7 +37,8 @@ import importlib.util
 _sp = importlib.util.spec_from_file_location("whisper_isci", os.path.join(KOD, "whisper-isci.py")); WI = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(WI)
 for ham, bek in [("- Sous-titrage: N-S-T-R, O Arkadaşlar sakin olun ikiniz de.", "Arkadaşlar sakin olun ikiniz de."), ("Sous-titrage ST' 501", ""),
                  ("Sous-titrage Société Radio-Canada", ""), ("Sous-titres réalisés para la communauté d'Amara.org", ""), ("Untertitel im Auftrag des ZDF, 2021", ""),
-                 ("Arkadaşlar sakin olun.", "Arkadaşlar sakin olun."), ("O film çok güzeldi.", "O film çok güzeldi.")]:
+                 ("Arkadaşlar sakin olun.", "Arkadaşlar sakin olun."), ("O film çok güzeldi.", "O film çok güzeldi."),
+                 ("*sad* İnce Memed'i bırakalım.", "İnce Memed'i bırakalım."), ("*sigh*", "")]:
     kontrol(f"imza kırpma: {ham[:40]!r} → {bek[:30]!r}", WI.uydurma_on_kirp(ham)[0] == bek)
 try:
     ilk = json.loads(p.stdout.readline())

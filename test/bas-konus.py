@@ -282,6 +282,26 @@ try:
     # v0.54.0 anlamsız söz: Whisper'ın "!" gibi metni Claude'a gitmez
     ad2 = {"re": _re}; exec(kod_[kod_.index("KONUS_SES_SOZ = "):kod_.index("# İş talimatı (toplantı")], ad2)
     ok("anlamsız söz Claude'a gitmez ('!', 'Hı hı.', 'A.'), gerçek söz gider ('Evet.', soru)", all(ad2["konus_anlamsiz"](x) for x in ("!", "?", "Hı hı.", "A.", "Ee, ıı.")) and not any(ad2["konus_anlamsiz"](x) for x in ("Evet.", "Bugün ne var?", "Tamam")))
+    # v0.125.2 (23 Ekim üçlü sohbet ikinci denemesi): ses etiketi ve İngilizce uydurma kırpılır; ilk parça "en" + Türkçe söz → kayıt Türkçe yeniden çözülür
+    ad4 = {"re": _re}; exec(kod_[kod_.index("KONUS_TR_RX = "):kod_.index("def _konus_yeniden_coz")], ad4); kr = lambda x: ad4["konus_uydurma_kirp"](x)[0]
+    ok("uydurma: '- Thank you. Evet…' ve '*sad* …' kırpılır, '[Music]' kırpılır; tek başına 'Thank you.' ve İngilizce cümle kalır",
+       kr("- Thank you. Evet, ben de İnce Memed'i seçiyorum.") == "Evet, ben de İnce Memed'i seçiyorum." and kr("*sad* İnce Memed'i bırakalım, başka kitap konuşalım.") == "İnce Memed'i bırakalım, başka kitap konuşalım."
+       and kr("[Music] Tamam arkadaşlar, başlayalım.") == "Tamam arkadaşlar, başlayalım." and kr("Thank you.") == "Thank you." and kr("Thank you for the update, see you tomorrow.") == "Thank you for the update, see you tomorrow."
+       and kr("Bence film güzeldi, izleyelim. Thank you for watching!") == "Bence film güzeldi, izleyelim." and kr("Peki.") == "Peki.")
+    import threading as _th
+    ad5 = {"re": _re, "time": time, "threading": _th, "print": lambda *a, **k: KAYIT5.append(" ".join(map(str, a))), "ARAYUZ_DILI": "tr", "AYAR": {}, "SORU": {}, "WH_SR": 16000,
+           "AKIS": {"pcm": bytearray(), "kesik": 0, "metin": {}, "bekleyen": 0, "sira": 0, "kilit": _th.Lock(), "kosul": _th.Condition(), "nesil": 0},
+           "_rms": lambda b: 5000, "sohbet_ses_izi_red": lambda iz: False, "AKIS_PENCERE": 640}; KAYIT5 = []
+    exec(kod_[kod_.index("KONUS_DIL_SN, KONUS_DIL_EN_AZ_SN = "):kod_.index("def _akis_kesim(")], ad5); exec(kod_[kod_.index("def _akis_birlestir("):kod_.index("def konus_basla(")], ad5)
+    ad5["_akis_sifirla"] = lambda: ad5["AKIS"].update(pcm=bytearray(), kesik=0, metin={}, sira=0, dil=None); YC = []
+    ad5["_konus_yeniden_coz"] = lambda pcm, dil, sn=20.0: (YC.append((len(pcm), dil)), "Evet, ben de İnce Memed'i seçiyorum.")[1]
+    def birles(metinler, dil):
+        A = ad5["AKIS"]; pcm = b"\x01" * 32000 * len(metinler); A.update(pcm=bytearray(pcm), kesik=len(pcm), sira=len(metinler), metin=dict(enumerate(metinler)), dil=dil, bekleyen=0)
+        out = []; ev = _th.Event(); ad5["_akis_birlestir"](pcm, lambda m, h: (out.append(m), ev.set())); ev.wait(3); return out[0] if out else None
+    ad5["_KDIL"].update(son="en", t=time.time()); r1 = birles(["- Thank you. Evet, ben de", "İnce Memed'i seçiyorum."], "en")
+    ok(f"dil: ilk parça 'en', söz Türkçe → bütün kayıt Türkçe yeniden çözülür, dil Türkçeye döner ({r1!r})", r1 == "Evet, ben de İnce Memed'i seçiyorum." and YC == [(64000, "tr")] and ad5["konus_dil_son"]() == "tr")
+    YC.clear(); r2 = birles(["Let me check the", "budget for next week."], "en"); r3 = birles(["Bugün ne var", "takvimde?"], "tr")
+    ok("dil: gerçek İngilizce söz ve Türkçe bulunan söz yeniden çözülmez", r2 == "Let me check the budget for next week." and r3 == "Bugün ne var takvimde?" and YC == [])
     ok("bekleme cümlelerinde ve istemde 'şey' yok", "Şey" not in kod_[kod_.index("BEKLE_GENEL = "):kod_.index("BEKLE_TUR = ")] and "'Şey,'" not in kod_[kod_.index("KONUS_ISTEM = {"):kod_.index("# --- Hızlı bilgi")])
     # v0.57.5 veritabanı tazelik notu: son vt_sor'dan sonra dosya değişince bir kez; okunamazsa son sorgu VT_TAZE_SN'den eskiyse
     vtd = os.path.join(proje, "vt.db"); open(vtd, "w").close()

@@ -344,6 +344,15 @@ try:
     T1b = dict(T1, soru="Evet arkadaşlar ikinize de iyi akşamlar. Sadece sizleri duymak istedim. Keyifleriniz nasıl? İyi misiniz?")
     ok("duygu: 'Keyifleriniz nasıl? İyi misiniz?' ve 'Sadece…' işaret sayılmaz; 'Yorgun musun?' sayılmaz, 'Ben çok yorgunum, sen nasılsın?' sayılır",
        karar(T1b) == "Atlas" and not ns["uclu_duygu"]("Yorgun musun?") and ns["uclu_duygu"]("Ben çok yorgunum, sen nasılsın?"))
+    # v0.125.2 (23 Ekim ikinci deneme): yıldızlı etiket üzüntü sayılmaz; seçim nedeni günlükte doğru; alıntı/olgu uydurma kuralı
+    ok("duygu: '*sad* İnce Memed'i bırakalım…' üzüntü sayılmaz (etiket), 'Çok üzgünüm.' sayılır",
+       not ns["uclu_duygu"]("*sad* İnce Memed'i bırakalım, başka kitap konuşalım.") and not ns["uclu_duygu"]("[sad] Tamam.") and ns["uclu_duygu"]("Çok üzgünüm."))
+    pr0 = ns["print"]; GL = []; ns["print"] = lambda *a, **k: GL.append(" ".join(map(str, a)))
+    ns["_KSEC"].update(ad=None, t=0); U["donen"] = ("Atlas", time.time()); ns["uclu_muhatap"]("Bence sahil daha iyi.", {"kaynak": "sohbet"})
+    ns["_KSEC"].update(ad=None, t=0); ns["kisilik_sec"]("Matlas"); ns["print"] = pr0
+    ok(f"günlük: seçim nedeni doğru ({[x for x in GL if 'KİŞİLİK' in x]})", "KİŞİLİK: bu soru Atlas ile (üçlü: son soruyu o sordu)" in GL and "KİŞİLİK: bu soru Matlas ile (adıyla seslenildi)" in GL)
+    ok("uydurma kuralı: söz mesajında ve ana cevap notunda alıntı/olgu uydurma yasağı",
+       "tırnaklı alıntı ya da replik uydurma" in ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas", "tepki") and "tırnaklı alıntı ya da replik uydurma" in blok({"kisi": "Matlas", "kaynak": "sohbet"}))
     ok("üçlü: /status görünümü (açık, özel paylaşım kapalı)", ns["uclu_view"]() == {"acik": True, "ozel_paylas": False})
     ns["AYAR"].pop("uclu_sohbet"); ns["AYAR"].pop("kisilik_bellek")
     ns["TOP"][0] = False; ns["AYAR"]["kisilik_toplanti_disi"] = ""

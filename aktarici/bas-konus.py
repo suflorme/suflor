@@ -1154,6 +1154,36 @@ def konus_dil_kaydet(d, nesil=None):  # Whisper'ın bulduğu dil (whisper-hat'ta
     _KDIL.update(son=d, t=time.time())
     with AKIS["kilit"]:
         if nesil is None or AKIS.get("nesil", 0) == nesil: AKIS["dil"] = d
+# v0.125.2 (23 Ekim üçlü sohbet, ikinci deneme: iki sözde ilk akış parçası (2,9 sn) "en" bulundu, Türkçe sözün başına "- Thank you." ve "*sad*" girdi;
+# sonraki parçalar İngilizce sabitte de Türkçe yazıldı): ilk parça "en", birleşik metin Türkçe görünüyorsa bütün kayıt bir kez Türkçe yeniden çözülür ve dil
+# Türkçeye döner. Ayrıca Konuş metninden yıldızlı/köşeli ses etiketleri ("*sad*", "[Music]") ve Türkçe sözün başındaki/sonundaki bilinen İngilizce uydurma
+# ("Thank you.", "Thanks for watching") kırpılır; tek başına "Thank you." (İngilizce gerçek söz) kalır.
+KONUS_TR_RX = re.compile(r"[çğıöşüİ]|^(ve|bir|bu|ben|sen|biz|de|da|mi|mı|mu|ne|evet|hayır|için|çok|ama|var|yok|şey|tamam|peki|bence|bunu|şimdi|yani|gibi|daha|olsun)$", re.I)
+KONUS_UYDURMA_ETIKET = re.compile(r"\*[^*\n]{1,30}\*|\[[^\]\n]{1,30}\]|\((?:music|laughs?|laughter|sighs?|applause|müzik|alkış|gülüyor|gülüşmeler)\)", re.I)
+KONUS_UYDURMA_EN_BAS = re.compile(r"^\W*(?:thank you(?: for watching| very much| so much)?|thanks(?: for watching)?|you|bye|okay)[.!,]*\s+", re.I)
+KONUS_UYDURMA_EN_SON = re.compile(r"[\s,.!?]*\b(?:thank you(?: for watching)?|thanks for watching)[.!]*\s*$", re.I)
+def konus_tr_gibi(metin):  # metin Türkçe mi (Türkçe harf ya da sık Türkçe sözcük oranı)
+    w = re.findall(r"[^\W\d_]+", metin or "")
+    if len(w) < 3: return False
+    n = sum(1 for x in w if KONUS_TR_RX.search(x)); return n >= 2 and n / len(w) >= 0.3
+def konus_uydurma_kirp(metin):  # → (temiz metin, kırpılan parçalar)
+    kes = KONUS_UYDURMA_ETIKET.findall(metin or ""); m = " ".join(KONUS_UYDURMA_ETIKET.sub(" ", metin or "").split())
+    if kes: m = re.sub(r"^[-–—\s]+", "", m)
+    for _ in range(2):
+        k = KONUS_UYDURMA_EN_BAS.match(re.sub(r"^[-–—\s]+", "", m))
+        if not k: break
+        m2 = re.sub(r"^[-–—\s]+", "", m)[k.end():]
+        if not konus_tr_gibi(m2): break
+        kes.append(k.group(0).strip()); m = m2
+    k = KONUS_UYDURMA_EN_SON.search(m)
+    if k and k.start() > 0 and konus_tr_gibi(m[:k.start()]): kes.append(k.group(0).strip()); m = m[:k.start()].rstrip() + ("" if re.search(r"[.!?…]$", m[:k.start()].rstrip()) else ".")
+    return (m[:1].upper() + m[1:] if kes else m), kes
+def _konus_yeniden_coz(pcm, dil, sn=20.0):  # bütün kaydı verilen dilde bir kez çöz (akış birleşirken) → metin ya da None
+    ev = threading.Event(); out = {}
+    def g(m, h): out.update(m=m, h=h); ev.set()
+    wh_bas_sira({"id": f"bas-yeniden-{int(time.time() * 1000)}", "bas": True, "kanal": "bas", "baslik": None, "pcm": pcm, "t0": time.time() - len(pcm) / 2 / WH_SR,
+                 "t1": time.time(), "kuyruga": time.time(), "dil": dil, "oto_dil": False, "geri": g}); _isci_baslat()
+    return out.get("m") if ev.wait(sn) and not out.get("h") else None
 def _akis_kesim(b, bas):  # b[bas:] içinde, sonu ≥ AKIS_SESSIZ_SN sessiz kesim noktası (bayt) ya da None; kısa kuyrukta ≥ AKIS_DURAK_SN duraksama (v0.80.4)
     n = len(b) - bas
     if n < int(AKIS_DURAK_EN_AZ_SN * WH_SR * 2): return None
@@ -1291,7 +1321,13 @@ def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen p
             t = time.time()
             while AKIS["bekleyen"] > 0 and time.time() - t < 30: AKIS["kosul"].wait(1)
             metin = " ".join(" ".join(str(AKIS["metin"].get(i) or "").split()) for i in range(sira)).strip(); izler = list((AKIS.get("iz") or {}).values())
-        print(f"KONUŞ: akış — {sira} parça birleşti (kuyruk {kuyruk / 2 / WH_SR:.1f} sn)"); _akis_sifirla()
+        print(f"KONUŞ: akış — {sira} parça birleşti (kuyruk {kuyruk / 2 / WH_SR:.1f} sn)")
+        with AKIS["kilit"]: d_ = AKIS.get("dil"); tum = bytes(AKIS["pcm"])
+        if metin and d_ == "en" and ARAYUZ_DILI != "en" and konus_tr_gibi(KONUS_UYDURMA_ETIKET.sub(" ", metin)):  # v0.125.2: ilk parça yanlış dilde bulundu
+            t_ = time.time(); m2 = _konus_yeniden_coz(tum, "tr"); konus_dil_kaydet("tr")
+            print(f"KONUŞ: ilk parça 'en' ama söz Türkçe — kayıt Türkçe yeniden çözüldü ({(time.time() - t_) * 1000:.0f} ms){'' if m2 else ' (olmadı, eski metin)'}")
+            if m2: metin = " ".join(m2.split())
+        _akis_sifirla()
         if metin and izler and sohbet_ses_izi_red(izler): return geri(metin, "ses_izi")
         geri(metin, None if metin else "boş")
     threading.Thread(target=bekle, daemon=True).start(); return True
@@ -1344,6 +1380,10 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
         if hata == "ses_izi":  # sohbet: ses izi kullanıcıya benzemedi, Claude'a gitmez; sessiz kalmasın (v0.51.2: kullanıcının kendi sözü de reddedilebiliyor)
             _KS["tur"] = None; _konus_kur(durum="dinliyor", hata=None)
             seslendir(_t(kis_t("Sesini tanıyamadım; yeniden söyler misin?", "Sesinizi tanıyamadım; tekrar eder misiniz?"), "I didn't recognise your voice; could you say that again?"), kuyruk=True); return
+        if metin and not hata:  # v0.125.2: ses etiketi ve bilinen İngilizce uydurma kırpılır; Türkçe söz İngilizce sanıldıysa dil Türkçeye döner
+            metin, kes = konus_uydurma_kirp(metin)
+            if kes: print(f"KONUŞ: uydurma kırpıldı: {' · '.join(kes)}")
+            if _KDIL.get("son") == "en" and ARAYUZ_DILI != "en" and konus_tr_gibi(metin): konus_dil_kaydet("tr")
         if hata or not metin: _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Anlaşılmadı — yeniden dene", "Didn't catch that — try again")); return
         if sid and SORU["aktif"] == sid:  # "yazayım mı?" sorusuna sesli cevap — Claude'a gitmez
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, sesli_cevap=True, cevap=sesli_cevap(metin, sid), olcum={"wh_ms": round((tur["t_metin"] - tur["t_birak"]) * 1000)}); return

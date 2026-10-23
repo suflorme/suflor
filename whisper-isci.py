@@ -23,7 +23,13 @@ UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|су
 UYDURMA_ON = re.compile(r"^\W*(?i:sous[- ]?titr\w*|untertitel\w*|ondertitel\w*|sottotitol\w*|subt[ií]tul\w*|napisy|legendas?)\b\W*"
                         r"(?:(?:[A-ZÇĞİÖŞÜ](?:[-.]?[A-ZÇĞİÖŞÜ0-9])*|\d+|[A-Z][a-zé]+-[A-Z][a-zé]+)['’]?[^\w\s]*(?:\s+|$))*")
 UYDURMA_ON_YABANCI = re.compile(r"(?i)amara\.org|radio-canada|\b(im auftrag|réalis|par |por la|des ZDF)")  # imzanın kendisi (Fransızca/Almanca/İspanyolca) — kalan da uydurma
+UYDURMA_ETIKET = re.compile(r"\*[^*\n]{1,30}\*")  # v0.125.2: "*sad*", "*sigh*" — Whisper'ın yıldızlı ses etiketi (köşeli/parantezli tek başına UYDURMA'da)
 def uydurma_on_kirp(x):  # → (kalan metin, kırpılan imza ya da "")
+    et = UYDURMA_ETIKET.findall(x or "")
+    if et: x = " ".join(UYDURMA_ETIKET.sub(" ", x).split()); x = re.sub(r"^[-–—\s]+", "", x)
+    k, imza = _uydurma_imza(x)
+    return k, " ".join(et + ([imza] if imza else []))
+def _uydurma_imza(x):
     m = UYDURMA_ON.match(x or "")
     if not m: return x, ""
     kal = x[m.end():].strip()

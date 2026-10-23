@@ -1560,7 +1560,7 @@ AYAR_PANO = {
     "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac ve Piper sesinde çarpan
     "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
-    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "eposta_oku": ("bool", False, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
+    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "eposta_oku": ("bool", False, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None),
@@ -1569,8 +1569,8 @@ AYAR_PANO = {
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel", "ollama")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")),
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama"))}
-# v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, gemini_kapsam (sesli "Gemini sesiyle
-# konuş" geçişi aynı işi görür), toplanti_duyuru panodan kalktı; ayar dosyasında elle yazılırsa kod eskisi gibi okur.
+# v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
+# ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
     ev = os.path.expanduser("~"); bel = os.path.expanduser(str(AYAR.get("kisilik_bellek") or "")); out = []
     yer = next((os.path.dirname(os.path.expanduser(str(AYAR.get(a)))) for a in ("kisilik", "kisilik_toplanti_disi", "kisilik_bellek") if AYAR.get(a)), os.path.join(os.path.dirname(AYAR_YOL), "kisilik"))
@@ -1687,6 +1687,7 @@ bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak 
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
+bolum("uclu-sahne")  # aktarici/uclu-sahne.py — Üçlü sohbetin sahne kipi: bölüm tek çağrıda, söz türü planı, araya kısa tepki (v0.126)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
 bolum("posta")  # aktarici/posta.py — E-posta: Mac Mail'in yerel dizininden son iletiler Konuş bağlamına (v0.85.0)
 bolum("moderator")  # aktarici/moderator.py — Toplantı moderatörü: gündem, söz, özet ve karar (v0.83.0, S93)
