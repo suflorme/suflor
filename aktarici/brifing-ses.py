@@ -54,8 +54,7 @@ def _brifing_is(oid, olay):
         t0 = time.time(); ham = None
         for yalin in ([True, False] if claude_yalin() else [False]):  # eski Claude Code yalın seçenekleri tanımazsa bir kez tam çağrı
             if os.path.exists(cikti): os.remove(cikti)
-            args = ["-p", istem, "--allowedTools", "Read,Grep,Glob", "--add-dir", BASE, "--output-format", "json"] + (claude_yalin() if yalin else []) + \
-                   (["--model", str(AYAR["claude_model"])] if AYAR.get("claude_model") else [])
+            args = BEYIN.brifing_args(AYAR, istem, BASE, yalin)
             fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": cikti, "sure": 240}, f, ensure_ascii=False)
             t1 = time.time()
@@ -81,22 +80,26 @@ def _brifing_is(oid, olay):
         if sesli: brifing_sesli(oid, "baslat")
     except Exception as e:
         print(f"BRİFİNG: hata {e.__class__.__name__}"); bitir(durum="hata", hata=_t("Brifing hazırlanamadı", "Couldn't prepare the briefing"))
+# --- Beyin katmanı (v0.121.1, aktarici/beyin.py): yapay zekâ çağrılarının argümanları ve ölçümü tek yerde; ayrı modül, burada bir kez yüklenir ---
+def _beyin_yukle():
+    import importlib.util
+    yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "beyin.py"); sys.dont_write_bytecode = True
+    sp = importlib.util.spec_from_file_location("suflor_beyin", yol); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
+BEYIN = _beyin_yukle()
 # --- Yalın `claude -p` ve ölçümü (karar #83–84) -----------------------------------------------------------------------------------
 # Kişisel ayar, bağlayıcı (MCP), komut ve oturum kaydı yüklenmez; proje ayarı ve CLAUDE.md kalır (8 Ekim, aynı brifing istemi: tam 0,38 $ ·
 # 21 sn, yalın 0,23 $ · 24 sn, kalite aynı; tamamen yalın 0,27 $ ama dosyaları el yordamıyla aradı). Ayar claude_yalin: false → tam çağrı.
-def claude_yalin():
-    return ["--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence",
-            "--tools", "Read,Grep,Glob"] if AYAR.get("claude_yalin", True) else []
+def claude_yalin(): return BEYIN.yalin(AYAR)
 def claude_json(ham, is_, t0, yalin):
     # --output-format json → (sonuç metni, ölçüm). Ölçüm canli/claude-cagri.jsonl'e (olcum.py toplanti okur); yalnız sayılar, metin yok.
     try: j = json.loads(ham)
     except ValueError: return ham, None
     if not isinstance(j, dict) or "result" not in j: return ham, None
-    u = j.get("usage") or {}; giris = sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+    k = BEYIN.kullanim(j); giris = k["giris"]
     o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "yalin": yalin, "sure_ms": j.get("duration_ms"),
          "api_ms": j.get("duration_api_ms"), "duvar_ms": round((time.time() - t0) * 1000), "tur": j.get("num_turns"),
-         "maliyet": round(j.get("total_cost_usd") or 0, 4), "giris": giris, "cikti": u.get("output_tokens"),
-         "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / giris, 2) if giris else None, "hata": bool(j.get("is_error"))}
+         "maliyet": round(k["maliyet"], 4), "giris": giris, "cikti": k["cikti"],
+         "onbellek_orani": round(k["okunan"] / giris, 2) if giris else None, "hata": bool(j.get("is_error"))}
     with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     return str(j.get("result") or ""), o
 # --- Sesli brifing (karar #83: Başlat'a basınca; Faz 4) ----------------------------------------------------------------------------
@@ -337,7 +340,7 @@ def telaffuz_tamamla(ad=None):
     try:
         cikti = os.path.join(BASE, "telaffuz-cikti.json"); istek = os.path.join(BASE, "telaffuz-istek.json"); t0 = time.time()
         if os.path.exists(cikti): os.remove(cikti)
-        args = ["-p", TEL_OTO_ISTEM + json.dumps(ad, ensure_ascii=False), "--output-format", "json", "--model", "sonnet"] + claude_yalin()
+        args = BEYIN.telaffuz_args(AYAR, TEL_OTO_ISTEM + json.dumps(ad, ensure_ascii=False))
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": BASE, "cikti": cikti, "sure": 120}, f, ensure_ascii=False)
         subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=180)

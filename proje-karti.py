@@ -15,6 +15,8 @@ import argparse, collections, concurrent.futures, datetime, hashlib, importlib.u
 
 _B = os.path.join(os.path.dirname(os.path.abspath(__file__)), "baglam.py"); sys.dont_write_bytecode = True
 _sp = importlib.util.spec_from_file_location("suflor_baglam_kart", _B); B = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(B)
+_sp = importlib.util.spec_from_file_location("suflor_beyin_kart", os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "beyin.py"))
+BY = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(BY)  # v0.121.1: beyin katmanı (yapay zekâ çağrısı tek yerde)
 AYAR = B.AYAR; UYG = AYAR["uygulama"]; PROJE = B.PROJE
 ONB = os.path.join(UYG, "kart-onbellek"); TASLAK = os.path.join(UYG, "proje-karti-taslak.json"); KART = os.path.join(UYG, "proje-karti.json")
 GECMIS = os.path.join(UYG, "proje-karti-gecmis.jsonl"); SOZLUK = os.path.join(UYG, "canli", "sozluk.json")
@@ -60,16 +62,15 @@ def belge_metni(c, yol):
     return "\n".join(out)
 
 def claude_cagir(istem, model, is_="proje-karti"):
-    cl = B.AYAR.get("claude") or next((y for y in (os.path.expanduser("~/.local/bin/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude") if os.path.exists(y)), None)
+    cl = BY.claude_yolu(B.AYAR)
     if not cl: raise RuntimeError("claude bulunamadı")
     t0 = time.time()
-    r = subprocess.run([cl, "-p", "--output-format", "json", "--model", model, "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands",
-                        "--no-session-persistence", "--tools", ""], input=istem, capture_output=True, text=True, timeout=300, cwd=UYG)
+    r = BY.tek(cl, BY.kart_args(model), istem, UYG)
     try: j = json.loads(r.stdout)
     except ValueError: raise RuntimeError(f"claude çıktısı okunamadı ({(r.stderr or r.stdout)[-120:]})")
-    u = j.get("usage") or {}; giris = sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+    k = BY.kullanim(j)
     o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "sure_ms": j.get("duration_ms"), "duvar_ms": round((time.time() - t0) * 1000),
-         "maliyet": round(j.get("total_cost_usd") or 0, 4), "giris": giris, "cikti": u.get("output_tokens"), "hata": bool(j.get("is_error"))}
+         "maliyet": round(k["maliyet"], 4), "giris": k["giris"], "cikti": k["cikti"], "hata": bool(j.get("is_error"))}
     try:
         with open(os.path.join(UYG, "canli", "claude-cagri.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(o, ensure_ascii=False) + "\n")
     except OSError: pass
@@ -201,7 +202,7 @@ def vt_oku():
 
 # --- Komutlar ---------------------------------------------------------------------------------------------------------
 def cikar(sinir=SINIR, model=None, paralel=4, tahmin=False, sessiz=True, ilerleme=None):  # ilerleme(n, toplam): sihirbaz (hazirlik.py)
-    model = model or AYAR.get("kart_model") or "sonnet"; c = B.baglan(); t0 = time.time()
+    model = model or BY.secim(AYAR, "proje_karti")["model"]; c = B.baglan(); t0 = time.time()
     adaylar = aday_belgeler(c, sinir); duzenli_var = any(d for *_, d in adaylar)
     metinler = [(y, d, belge_metni(c, y)) for y, _, _, d in adaylar]
     if tahmin:

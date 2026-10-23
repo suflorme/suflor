@@ -222,12 +222,9 @@ def _etiket_tur_notu(tur):
 # Ayar konus_onek_sabit: false eski davranış.
 # v0.95.0: düşünme düzeyi denemesi (ayar konus_effort: low|medium|high; yoksa Claude Code'un varsayılanı). Süreç başına: o süreçteki bütün sorulara uygulanır.
 # 17 Ekim'de veritabanı sorularında low ~0,6 sn kazandırdı ama bir soruda tutarsız sayı verdi; araçsız/sohbet soruları için kör deneme _yedek/test-araclari/konus-effort/.
-def konus_effort():
-    e = str(AYAR.get("konus_effort") or "").strip().lower()
-    return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
-def konus_onek_ayar():
-    if AYAR.get("konus_onek_sabit", True) is False: return []
-    return ["--settings", json.dumps({"env": {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"}})]
+# v0.121.1: ikisi de beyin katmanında (aktarici/beyin.py) — Claude Code'a özgü.
+def konus_effort(): return BEYIN.konus_effort(AYAR)
+def konus_onek_ayar(): return BEYIN.konus_onek_ayar(AYAR)
 def proje_kart_mt():
     try: return os.path.getmtime(os.path.join(os.path.expanduser(AYAR["uygulama"]), "proje-karti.json"))
     except (OSError, KeyError): return None
@@ -800,9 +797,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
             except OSError: pass
             os.mkfifo(f, 0o600)
         vt = konus_vt_hazirla()
-        args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-                "--allowedTools", "Read,Grep,Glob" + ("," + VT_MCP_ARACLAR if vt else ""), "--add-dir", BASE, "--append-system-prompt", konus_istem(vt)] + (["--mcp-config", vt] if vt else []) + \
-               (claude_yalin() or ["--no-session-persistence"]) + ["--model", str(AYAR.get("konus_model") or "sonnet")] + konus_onek_ayar() + konus_effort()  # v0.20.3: 6 soruluk kıyas (8 Ekim) Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın
+        args = BEYIN.konus_args(AYAR, konus_istem(vt), VT_MCP_ARACLAR if vt else "", vt, BASE)  # v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "konus-bos"),
                                                                    "giris": gir, "cikis": cik, "sure": 7200}, f, ensure_ascii=False)

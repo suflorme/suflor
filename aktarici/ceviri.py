@@ -62,9 +62,7 @@ def _cv_kapat(y, neden, p=None):
 def _cv_baslat():  # yeni `claude -p` süreci (ya da None)
     cl = claude_yolu()
     if not cl: _CV["hata"] = "Claude Code yok"; return None
-    args = [cl, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--model", str(AYAR.get("ceviri_model") or "haiku"),
-            "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence",
-            "--system-prompt", CEVIRI_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]]
+    args = [cl] + BEYIN.ceviri_args(AYAR, CEVIRI_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"])  # v0.121.1: beyin katmanı
     try: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=BASE, text=True, encoding="utf-8", bufsize=1)
     except OSError as e: _CV["hata"] = f"{e.__class__.__name__}"; return None
 def _cv_isit(p):  # yedek süreç: ilk mesajdaki hazırlık (~4,5 sn) önceden — cevabı devralınca atlanır (atla)
@@ -78,11 +76,11 @@ def _cv_ac(y):
     y.update(tur=0, bekleyen=0, atla=1 if y["p"] is yd else 0, maliyet=0, api_ms=0); print(f"ÇEVİRİ: süreç {y['ad']} açıldı" + (" (yedekten)" if y["p"] is yd else "")); return True
 def _cv_kayit(y, j):  # her turun "result" satırı → canli/claude-cagri.jsonl (yalnız sayılar; olcum.py toplanti okur). Maliyet süreç başına birikir: fark yazılır
     try:
-        u = j.get("usage") or {}; g = sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")); m = j.get("total_cost_usd") or 0
-        o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": "ceviri", "model": str(AYAR.get("ceviri_model") or "haiku"),
+        k = BEYIN.kullanim(j); g = k["giris"]; m = k["maliyet"]
+        o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": "ceviri", "model": BEYIN.secim(AYAR, "ceviri")["model"],
              "api_ms": j.get("duration_api_ms"), "api_tur_ms": max(0, (j.get("duration_api_ms") or 0) - (y.get("api_ms") or 0)),  # süre de maliyet gibi süreç boyunca birikir
              "maliyet": round(max(0, m - (y.get("maliyet") or 0)), 4), "giris": g,
-             "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, g), 2), "hata": bool(j.get("is_error"))}
+             "onbellek_orani": round(k["okunan"] / max(1, g), 2), "hata": bool(j.get("is_error"))}
         y["maliyet"] = m; y["api_ms"] = j.get("duration_api_ms") or 0
         with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     except Exception as e: print(f"ÇEVİRİ: ölçüm yazılamadı {e.__class__.__name__}")
