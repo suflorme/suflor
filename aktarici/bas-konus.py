@@ -1024,6 +1024,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                     threading.Thread(target=lambda: (konus_kapat("yedek: sağlayıcı hatası", durum_koru=True), _KS.__setitem__("tur", tur), tur["gonder"]()), daemon=True).start(); continue
                 _konus_kur(durum="hazir", olcum={k: o[k] for k in ("wh_ms", "ilk_ms", "ses_ms", "sure_ms", "maliyet")})
                 if o["hata"] and not (tur.get("metin") or "").strip(): _konus_kur(durum="hata", hata=str(j.get("result") or _t("cevap alınamadı", "no answer"))[:200])  # v0.122.0: sağlayıcı hatası panoda görünsün
+                if "claude_ok" in globals() and (o.get("saglayici") or "claude-code") == "claude-code": claude_hata_bildir(j.get("result"), tur.get("kaynak") or "konus") if o["hata"] else claude_ok()  # v0.130.0
                 if any("suflorvt__vt_so" in x for x in tur.get("araclar") or []): _KS["vt_son"] = (time.time(), _vt_mt())  # v0.57.5
                 if tur.get("sorgular") and not o["hata"] and tur.get("kaynak") != "karsi" and not tur.get("karsi"): _vt_sorgu_kaydet(tur.get("soru") or KONUS.get("soru"), tur["sorgular"])  # v0.57.6
                 if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"))  # v0.56.0 (S68); S94: konuşan asistanın adı

@@ -101,6 +101,7 @@ def claude_json(ham, is_, t0, yalin, saglayici=None, model=None):
          "maliyet": round(k["maliyet"], 4), "giris": giris, "cikti": k["cikti"],
          "onbellek_orani": round(k["okunan"] / giris, 2) if giris else None, "hata": bool(j.get("is_error"))}
     with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
+    if (saglayici or "claude-code") == "claude-code" and "claude_ok" in globals(): claude_hata_bildir(j.get("result"), is_) if o["hata"] else claude_ok()  # v0.130.0
     return str(j.get("result") or ""), o
 def beyin_tek(is_, sec, istem, json_kip=False, sistem=None, zaman=180):
     # Faz 11 Aşama 2: başka sağlayıcıda tek çağrı. Alt süreç (`beyin.py tek <istek>`; aktarıcı ağa kendisi bağlanmaz, anahtarı beyin.py Anahtar Zinciri'nden okur)

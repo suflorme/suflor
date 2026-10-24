@@ -138,6 +138,8 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
 - [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü) önerilir. Claude Code kurulu değilse sihirbaz kurar;
   Terminal'de `claude` → `/login` ile giriş gerekir (Claude masaüstü uygulamasındaki giriş Terminal'e geçmez). Yerine bir API anahtarı ya da
   yerel model seçilebilir ([Yapay zekâ seçimi](#yapay-zekâ-seçimi)); o zaman toplantıdaki kartlar ve özet olmaz, döküm, pano ve Konuş çalışır.
+  Claude Code'un oturumu zamanla düşebilir: Suflor.me bunu yarım saatte bir küçük bir denemeyle yoklar; düşünce sesli söyler, bildirim gösterir ve
+  Konuş satırında yazar — Terminal'de `claude` → `/login` ile yeniden giriş yeter (yoklamayı kapatmak: ayar `claude_giris_yokla: false`).
 - Yerel model seçilirse ~3,5 GB ek disk.
 
 ## Bileşenler

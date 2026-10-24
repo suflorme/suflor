@@ -1684,6 +1684,7 @@ bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /s
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
+bolum("claude-giris")  # aktarici/claude-giris.py — Claude Code girişi düşünce: günlük, sesli uyarı, bildirim, 30 dk yoklama (v0.130.0)
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
