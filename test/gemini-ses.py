@@ -80,9 +80,18 @@ bak(f"beklerken okuma kesilirse beklemez, Mac sesine düşmez ({time.time() - t0
 ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"
 bak("bekleme süresi: Retry-After başlığı, gövdedeki retryDelay, sınırlar", ad["_gemini_bekleme"]("", "2") == 2.0 and ad["_gemini_bekleme"]('"retryDelay": "9s"') == 4.0 and ad["_gemini_bekleme"]("yok") == 1.5 and ad["_gemini_bekleme"]('"retryDelay": "0.1s"') == 0.5)
 # v0.80.10: günlük sınır — beklemeden öteki model; ikisi de doluysa istek atılmadan False; kayıt dosyası yeniden yüklenince de geçerli
-# v0.127: varsayılan — sınır dolunca yedek model yok, False (çağıran yerel sese, Pocket'e döner); gemini_izinli de kapanır
-DAVRANIS.update(tur="gunluk"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); rv = ad["gemini_oku"]("Günlük sınır varsayılan.")
-bak(f"günlük sınır (varsayılan): yedek modele geçmez, False ({len(GELEN) - n} istek); model yok, Gemini izinli değil", rv is False and len(GELEN) - n == 1 and ad["gemini_model"]() is None)
+# v0.127.0: varsayılan zincir Lite → 3.8 Flash; ikisi de dolunca False (çağıran yerel sese, Pocket'e döner), 3.1/2.5 denenmez; gemini_izinli de kapanır
+bak("varsayılan zincir: Lite → 3.8 Flash", ad["gemini_zincir"]() == ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"))
+ad["AYAR"]["gemini_model"] = "gemini-3.8-flash-tts"; bak("ayarda Flash seçiliyse: Flash → Lite", ad["gemini_zincir"]() == ("gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts")); ad["AYAR"].pop("gemini_model")
+DAVRANIS.update(tur="gunluk"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); t0 = time.time(); rv = ad["gemini_oku"]("Günlük sınır varsayılan.")
+yollar = [g["yol"] for g in GELEN[n:]]
+bak(f"günlük sınır (varsayılan): beklemeden 3.8 Flash'a geçer ({time.time() - t0:.1f} sn, {len(yollar)} istek)", rv is True and len(yollar) == 2 and "flash-lite" not in yollar[1] and time.time() - t0 < 1.5)
+DAVRANIS.update(tur="gunluk2"); n = len(GELEN); rv2 = ad["gemini_oku"]("İkisi de dolu varsayılan."); yl = [g["yol"].split("/")[3].split(":")[0] for g in GELEN[n:]]
+bak(f"ikisi de dolu (varsayılan): 3.1/2.5 denenmez, False; model yok ({yl})", rv2 is False and yl == ["gemini-3.8-flash-tts"] and ad["gemini_model"]() is None)
+os.remove(os.path.join(T, "gemini-kota.json")); ad["GEMINI_KOTA"]["dolu"] = None; ad["GEMINI"]["hata_t"] = 0
+ad["AYAR"]["gemini_yedek_model"] = False
+DAVRANIS.update(tur="gunluk"); n = len(GELEN); rv3 = ad["gemini_oku"]("Yedeksiz.")
+bak(f"gemini_yedek_model: false — yalnız ayardaki model, dolunca False ({len(GELEN) - n} istek)", rv3 is False and len(GELEN) - n == 1 and ad["gemini_model"]() is None)
 os.remove(os.path.join(T, "gemini-kota.json")); ad["GEMINI_KOTA"]["dolu"] = None; ad["GEMINI"]["hata_t"] = 0
 ad["AYAR"]["gemini_yedek_model"] = True  # eski yedek zinciri ayarla açılır
 DAVRANIS.update(tur="gunluk"); ad["GEMINI"]["hata_t"] = 0; n = len(GELEN); t0 = time.time(); rg = ad["gemini_oku"]("Günlük sınır.")
@@ -112,17 +121,28 @@ import contextlib, io, datetime as _dt
 UYARI = []; ad["yerel_uyari"] = UYARI.append; ad["_t"] = lambda a, b: a
 yol_k = os.path.join(T, "gemini-ses.jsonl"); simdi_ = _dt.datetime.now().isoformat(timespec="seconds")
 def _say(n_): open(yol_k, "w").write("".join(json.dumps({"t": simdi_, "model": "gemini-3.8-flash-lite-tts"}) + "\n" for _ in range(n_))); ad["_BUGUN"]["t"] = 0.0
-cikti = io.StringIO()
+ad["AYAR"]["gemini_yedek_model"] = False; cikti = io.StringIO()
 with contextlib.redirect_stdout(cikti):
     _say(79); ad["_kota_bak"]("gemini-3.8-flash-lite-tts"); u0 = len(UYARI)
     _say(80); ad["_kota_bak"]("gemini-3.8-flash-lite-tts"); _say(85); ad["_kota_bak"]("gemini-3.8-flash-lite-tts")
-bak(f"%80 uyarısı: 79'da yok, 80'de bir kez (85'te yinelenmez) — {UYARI}", u0 == 0 and len(UYARI) == 1 and "yüzde seksen" in UYARI[0] and cikti.getvalue().count("%80'i doldu") == 1)
+bak(f"%80 uyarısı (yalnız ayardaki model): 79'da yok, 80'de bir kez (85'te yinelenmez) — {UYARI}", u0 == 0 and len(UYARI) == 1 and "yüzde seksen" in UYARI[0] and cikti.getvalue().count("%80'i doldu") == 1)
 bak("panoya: gemini_gunluk uyari işareti", ad["gemini_gunluk_view"]()["uyari"] is True)
+ad["GEMINI_KOTA"].pop("uyari_gun", None); UYARI.clear(); ad["AYAR"].pop("gemini_yedek_model")
+def _say2(nl, nf):
+    open(yol_k, "w").write("".join(json.dumps({"t": simdi_, "model": m_}) + "\n" for m_, k_ in (("gemini-3.8-flash-lite-tts", nl), ("gemini-3.8-flash-tts", nf)) for _ in range(k_))); ad["_BUGUN"]["t"] = 0.0
+cikti = io.StringIO()
+with contextlib.redirect_stdout(cikti):
+    _say2(100, 0); ad["_kota_bak"]("gemini-3.8-flash-lite-tts"); u1 = len(UYARI)
+    _say2(100, 59); ad["_kota_bak"]("gemini-3.8-flash-tts"); u2 = len(UYARI)
+    _say2(100, 60); ad["_kota_bak"]("gemini-3.8-flash-tts")
+bak(f"zincirde %80 iki modelin toplamına göre: Lite 100'de uyarı yok, 159'da yok, 160'ta bir kez; Lite dolunca 'sıradaki model' satırı",
+    u1 == 0 and u2 == 0 and len(UYARI) == 1 and "sıradaki model gemini-3.8-flash-tts" in cikti.getvalue() and ad["gemini_model"]() == "gemini-3.8-flash-tts")
+ad["GEMINI_KOTA"].pop("uyari_gun", None); ad["GEMINI_KOTA"].pop("dolu_gun", None); UYARI.clear(); ad["AYAR"]["gemini_yedek_model"] = False
 _say(100); n = len(GELEN); cikti = io.StringIO()
 with contextlib.redirect_stdout(cikti): ad["_kota_bak"]("gemini-3.8-flash-lite-tts"); r100 = ad["gemini_oku"]("Sınırda."); ad["_kota_bak"]("gemini-3.8-flash-lite-tts")
 bak(f"sayaç 100: istek atılmaz, False; model yok; günlükte tek satır ({cikti.getvalue().count('günlük sınır doldu')})", r100 is False and len(GELEN) == n and ad["gemini_model"]() is None and cikti.getvalue().count("günlük sınır doldu") == 1)
 bak("panoda model dolu görünür", ad["gemini_gunluk_view"]()["modeller"][0]["dolu"] is True)
-os.remove(yol_k); ad["_BUGUN"]["t"] = 0.0; ad["GEMINI_KOTA"].pop("uyari_gun", None); ad["GEMINI_KOTA"].pop("dolu_gun", None)
+os.remove(yol_k); ad["_BUGUN"]["t"] = 0.0; ad["GEMINI_KOTA"].pop("uyari_gun", None); ad["GEMINI_KOTA"].pop("dolu_gun", None); ad["AYAR"].pop("gemini_yedek_model")
 bak("sayaç sıfırlanınca yine Gemini", ad["gemini_model"]() == "gemini-3.8-flash-lite-tts")
 # v0.127: önceden isteme — çalan okuma sürerken sıradaki parçanın sesi istenir; okuma sırası gelince yeni istek atılmadan çalar; anahtar metin + ses
 n = len(GELEN); ok_ = ad["gemini_onceden"]("Sıradaki söz burada.", "Kore", "neşeli"); time.sleep(0.6)
@@ -139,8 +159,8 @@ bak("okuma kesilince önceden alınanlar atılır", len(GELEN) - n == 1)
 DAVRANIS["tur"] = "yavas"; n = len(GELEN); ad["gemini_onceden"]("Yavaş gelen.", "Kore"); time.sleep(0.2); DAVRANIS["tur"] = "ok"; time.sleep(3)
 t0 = time.time(); ry = ad["gemini_oku"]("Yavaş gelen.", ses="Kore")
 bak(f"önceden isteme yavaşsa (ses gelmedi) normal istekle okunur ({len(GELEN) - n} istek, {time.time() - t0:.1f} sn)", ry is True and len(GELEN) - n == 2)
-ad["GEMINI"]["hata_t"] = 0; _say(100)
-bak("sayaç doluyken önceden istenmez", ad["gemini_onceden"]("Dolu.", "Kore") is False); os.remove(yol_k); ad["_BUGUN"]["t"] = 0.0
+ad["GEMINI"]["hata_t"] = 0; _say2(100, 100)
+bak("sayaç doluyken (iki model) önceden istenmez", ad["gemini_onceden"]("Dolu.", "Kore") is False); os.remove(yol_k); ad["_BUGUN"]["t"] = 0.0
 bak("ayarda yedek model seçilemez (3.1 → Flash-Lite)", (ad["AYAR"].__setitem__("gemini_model", "gemini-3.1-flash-tts-preview"), ad["gemini_model"]())[1] == "gemini-3.8-flash-lite-tts"); ad["AYAR"].pop("gemini_model")
 # v0.80.11: sabit cümle önbelleği — ilk GEMINI_SABIT_N okuyuş Gemini'den (kaydedilir), sonra istek yok; art arda aynı okuyuş değil; sabit olmayan cümle önbelleğe girmez
 ad["BEKLE_GENEL"] = {"tr": ["Bir saniye.", "Bakayım."]}; ad["GEMINI"]["hata_t"] = 0

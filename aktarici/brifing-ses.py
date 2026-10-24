@@ -574,7 +574,7 @@ def _ses_isci():
             with SES_K:
                 if not SES["q"]: continue
                 oge = _g_birlestir(v); kes = SES.get("kes", 0)  # ilk cümle tek başına hemen çalar; o okunurken gelenler birleşir
-            metin = _ses_metin(oge); oses, ousl = (oge[2], oge[3]) if isinstance(oge, tuple) else (None, (kisilik() or {}).get("ses_uslup")); SES["simdi"] = metin
+            metin = _ses_metin(oge); oses, ousl = (oge[2], oge[3]) if isinstance(oge, tuple) else (None, kisilik_uslup(kisilik()) or None); SES["simdi"] = metin
             if gemini_oku(metin, iptal=lambda: SES.get("kes", 0) != kes, kayit=SES, ses=oses or v, uslup=ousl): continue
             with SES_K: SES["q"].insert(0, metin)
             if not gemini_izinli():  # v0.127: günlük sınır bu istekte doldu → kişiliğin yerel sesi (Pocket), Mac sesi değil
@@ -668,7 +668,7 @@ def fisilti_kart(c):
         except (OSError, subprocess.TimeoutExpired): pass
         t_oku = time.time(); km, kv = kisilik_sesi()[:2]
         # v0.80.0 (S87): Gemini açıksa fısıltı da o anki kişiliğin Gemini sesiyle, kısık; olmazsa yerel ses (Pocket → Piper, S93), sonra Mac sesi
-        if km == "gemini" and gemini_kisa(metin, ses=kv, uslup=_t("Kulağa fısıldar gibi: çok kısa, alçak ve sakin.", "Whispering in the ear: very short, low and calm."), duzey=0.7): pass
+        if km == "gemini" and gemini_kisa(metin, ses=kv, uslup="Whispering in the ear: very short, low and calm.", duzey=0.7): pass
         elif not yerel_oku(telaffuz(metin), kisa=True):
             v = ses_secimi()
             try: subprocess.run(["/usr/bin/say", "-r", "210"] + (["-v", str(v)] if v else []) + [ses_duzen(telaffuz(metin, mac=True))], timeout=10)

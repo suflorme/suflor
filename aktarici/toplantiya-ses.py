@@ -108,7 +108,7 @@ def toplantiya_soyle(metin=None):
     # v0.79.0 (kullanıcı 18 Ekim: "toplantı kişiliğinin sesi"): kişiliğin sesi Gemini ise ses Gemini'den (ör. toplantı kişiliği Kore); alınamazsa Mac sesi
     km, kses = toplanti_ses_motoru(); gpcm = None  # v0.81.0 (S92): katılımcıların duyduğu ses — Gemini burada; v0.113.0: ayar toplanti_ses / sesle Pocket
     if km == "gemini" and os.access(PIPER_OYNAT, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
-        usl = (kisilik() or {}).get("ses_uslup"); govde = m[len(tanitim) + 1:] if tanitim else m
+        usl = kisilik_uslup(kisilik()) or None; govde = m[len(tanitim) + 1:] if tanitim else m
         # tanıtım ve toplantı başı duyurusu sabit: bir kez okunup önbellekte (günlük sınırdan yemez); tanıtım ayrı okunup cevabın önüne eklenir
         gpcm = gemini_pcm(ses_duzen(kisilik_telaffuz(govde), False), ses=kses, uslup=usl, sabit=True if govde.strip() in DUYURU_SABIT() else None)
         if gpcm and tanitim:

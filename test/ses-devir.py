@@ -53,12 +53,16 @@ m.ton_kur("sakin"); bak("Claude'un tonu kuralın önünde", m.ton_bul("Maalesef 
 m.ton_kur("normal"); bak("<ton:normal> kural tonunu da kapatır", m.ton_bul("Maalesef olmadı.") is None)
 m.ton_sifirla()
 k_m = m.kisilik("BETA"); u1 = m.ses_uslup_bul("Maalesef olmadı.", k_m)
-bak(f"üslup = kişilik + durum: {u1!r}", u1.startswith("nüktedan, dostça") and "Kötü bir haber" in u1)
+bak(f"üslup = kişilik + durum: {u1!r}", u1.startswith("nüktedan, dostça") and "Delivering bad news" in u1)
 bak("tonsuz cümlede yalnız kişilik üslubu", m.ses_uslup_bul("Yarın görüşürüz.", k_m) == "nüktedan, dostça")
+# v0.127.0: Gemini'ye İngilizce yönerge — kişilikte ses_uslup_en varsa o; yoksa Türkçe üslubun ilk cümlesi (Türkçe yönerge metinle karışıp sesli okunuyordu)
+bak("ses_uslup_en varsa Gemini'ye o gider", m.kisilik_uslup({"ses_uslup": "Sıcak; bir dost gibi. Esprili cümlede ritmi ver.", "ses_uslup_en": "Warm, like a friend."}) == "Warm, like a friend.")
+bak("yoksa Türkçe üslubun yalnız ilk cümlesi", m.kisilik_uslup({"ses_uslup": "Sıcak, rahat ve akıcı; bir dost gibi. Esprili cümlede ritmi ver."}) == "Sıcak, rahat ve akıcı"
+    and m.kisilik_uslup({"ses_uslup": "Ölçülü ve net."}) == "Ölçülü ve net." and m.kisilik_uslup({}) == "")
 # 3) okuma kuyruğu: Konuş cevabının ilk cümlesindeki etiket sonraki cümlelere de geçer
 m.ton_sifirla(); _, o = cikti(m.seslendir, "<ton:sakin> Anlıyorum.", kuyruk=True); _, o2 = cikti(m.seslendir, "Bir de şuna bakalım.", kuyruk=True)
-bak("seslendir: etiket okunmaz, ton üsluba girer", "<ton" not in o and "Ortam gergin" in o)
-bak("aynı cevabın sonraki cümlesi de o tonla", "Ortam gergin" in o2)
+bak("seslendir: etiket okunmaz, ton üsluba girer", "<ton" not in o and "The room is tense" in o)
+bak("aynı cevabın sonraki cümlesi de o tonla", "The room is tense" in o2)
 # 4) iki sesli özet
 m.STATE["_cagri_son"] = 0; _, o = cikti(m.ozet_sesli, {"dosya": "x.md", "degerlendirme": "Toplantı verimliydi", "oneri": "Bütçeyi haftaya bağlayın"})
 bak("iki sesli özet: ALFA (Kore) özeti, BETA (Charon) değerlendirmeyi okur", "iki sesle okunuyor (ALFA + BETA)" in o and "ses Kore" in o and "ses Charon" in o

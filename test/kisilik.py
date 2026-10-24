@@ -105,9 +105,9 @@ try:
     ns["AYAR"]["ses_motoru"] = "gemini"; ok("S92: Ayarlar'da Gemini seçiliyken toplantı dışı Piper", ns["kisilik_sesi"]() == ("piper", None, 1.15)); ns["AYAR"].pop("ses_motoru"); ns["AYAR"]["piper_model"] = ""
     ns["GEM"][0] = False; ok("Gemini anahtarı yoksa Mac sistem sesi", ns["kisilik_sesi"]() == ("mac", None, 1.15))
     # v0.79.0: ses üslubu ve sözsüz ses etiketleri (yalnız Gemini sesli, ses_etiket: evet kişilikte; istemde yalnız onun adı)
-    open(kd2, "w", encoding="utf-8").write(s2.replace("ses: piper", "ses: gemini:Kore\nses_uslup: nüktedan, dostça\nses_etiket: evet")); os.utime(kd2, (time.time() + 15, time.time() + 15))
+    open(kd2, "w", encoding="utf-8").write(s2.replace("ses: piper", "ses: gemini:Kore\nses_uslup: nüktedan, dostça\nses_uslup_en: witty, friendly\nses_etiket: evet")); os.utime(kd2, (time.time() + 15, time.time() + 15))
     ns["GEM"][0] = True; kk = ns["kisilik"]()
-    ok("kişilik alanları: ses_uslup, ses_etiket", kk["ses_uslup"] == "nüktedan, dostça" and kk["ses_etiket"] is True)
+    ok("kişilik alanları: ses_uslup, ses_uslup_en, ses_etiket", kk["ses_uslup"] == "nüktedan, dostça" and kk["ses_uslup_en"] == "witty, friendly" and kk["ses_etiket"] is True)
     ist3 = ns["konus_istem"](); ok("istemde etiket kuralı yalnız etiketli kişiliğe", "[Ses etiketleri] Matlas sesli kısımda" in ist3 and "<chuckle>" in ist3 and "Öteki kişilik etiket kullanmaz" in ist3)
     # v0.96.2: toplantı dışında Gemini kapalıyken (kapsam toplanti) yerel ses okur → o cevapta etiket yok; toplantıya okunan (otonom) cevapta etiket serbest
     etn = ns["_etiket_tur_notu"]; ns["AYAR"].pop("gemini_kapsam", None)

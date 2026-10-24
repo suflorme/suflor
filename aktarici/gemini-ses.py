@@ -84,13 +84,17 @@ def _kota_doldu(model, govde):
     except OSError: pass
     return sn
 def _gunluk_mu(govde): return "per_day" in (govde or "") or "PerDay" in (govde or "")
-# v0.127 (kullanıcı 24 Ekim): sınır dolunca yedek modellere değil yerel sese (Pocket) — yedekler daha pahalı, 3.1/2.5 daha yavaş ve duygusuz. Kendi sayacımız
-# (gemini_bugun) sınıra varınca da istek atılmaz (429 beklenmez). Eski yedek zinciri ayar gemini_yedek_model: true ile.
-def gemini_model():  # ayardaki model; günlük sınırı dolduysa None (yerel ses) — gemini_yedek_model açıksa öteki modeller sırayla
+# v0.127 (kullanıcı 24 Ekim): sınır dolunca 3.1/2.5'e değil yerel sese (Pocket) — onlar daha yavaş ve duygusuz. v0.127.0: ayardaki model dolunca öbür ana model
+# (Lite ↔ 3.8 Flash; ayrı günlük sınır, günde 100 → 200 istek), o da dolunca yerel ses. Kendi sayacımız (gemini_bugun) sınıra varınca istek atılmaz (429 beklenmez).
+# Ayar gemini_yedek_model: false → yalnız ayardaki model; true → eski uzun zincir (3.1, 2.5 dahil).
+def gemini_zincir():
     m = str(AYAR.get("gemini_model") or GEMINI_MODELLER[0])
     m = m if m in GEMINI_SECILIR else GEMINI_MODELLER[0]
+    y = AYAR.get("gemini_yedek_model")
+    return (m,) + tuple(x for x in (GEMINI_MODELLER if y is True else () if y is False else GEMINI_SECILIR) if x != m)
+def gemini_model():  # zincirde sınırı dolmamış ilk model; hepsi doluysa None (yerel ses)
     dolu = _kota(); b = gemini_bugun()
-    for x in (m,) + (tuple(y for y in GEMINI_MODELLER if y != m) if AYAR.get("gemini_yedek_model") else ()):
+    for x in gemini_zincir():
         if x not in dolu and b.get(x, 0) < GEMINI_GUN_SINIR: return x
     return None
 def gemini_gun_basi(simdi=None):  # Google'ın günlük sayacının başı: Pasifik gece yarısı (America/Los_Angeles, yaz/kış saati dahil; TR'de 10.00, kış saatinde 11.00).
@@ -103,7 +107,7 @@ def gemini_gun_basi(simdi=None):  # Google'ın günlük sayacının başı: Pasi
     t = datetime.datetime.fromtimestamp(time.time() if simdi is None else simdi, bolge)
     return t.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
 _BUGUN = {"t": 0.0, "v": {}}
-GEMINI_GUN_SINIR = 100  # Tier 1, model başına günlük istek (19 Ekim 429 yanıtı)
+GEMINI_GUN_SINIR = 100  # Tier 1, model başına günlük istek (19 Ekim 429 yanıtı); dakikada 10 istek de model başına (24 Ekim: Lite ve 3.8 Flash)
 def gemini_bugun():  # model başına bugün (Google günü) yapılan başarılı istek sayısı (canli/gemini-ses.jsonl; önbellekten çalınanlar sayılmaz); 10 sn önbellek (pano sık yoklar)
     if time.time() - _BUGUN["t"] < 10: return dict(_BUGUN["v"])
     bas = gemini_gun_basi(); say = {}
@@ -120,18 +124,19 @@ def gemini_gunluk_view():  # panoya (⚙ Ayarlar → Gemini nerede): model sıra
     b = gemini_bugun(); dolu = _kota()
     return {"modeller": [{"ad": m, "n": b.get(m, 0), "dolu": m in dolu or b.get(m, 0) >= GEMINI_GUN_SINIR} for m in GEMINI_MODELLER], "sinir": GEMINI_GUN_SINIR,
             "toplam": sum(b.values()), "uyari": GEMINI_KOTA.get("uyari_gun") == gemini_gun_basi()}
-# v0.127: günlük sayaç %80'e (GEMINI_UYARI_ORAN) gelince Google günü başına bir kez kısa sesli uyarı (yerel sesle, okuma ve sohbet sırası boşalınca; Gemini isteği
-# harcanmaz) ve günlükte bir satır; sınır dolunca bir satır (okumalar yerel sese döner).
+# v0.127: zincirin toplam günlük sınırının %80'i (GEMINI_UYARI_ORAN) dolunca Google günü başına bir kez kısa sesli uyarı (yerel sesle, okuma ve sohbet sırası
+# boşalınca; Gemini isteği harcanmaz) ve günlükte bir satır; bir model dolunca bir satır (sıradaki model ya da yerel ses).
 GEMINI_UYARI_ORAN = 0.8
 GEMINI_UYARI = ("Gemini sesinin bugünkü sınırının yüzde sekseni doldu; dolunca yerel sese döneceğim.", "Gemini voice is at 80 percent of today's limit; I'll switch to the local voice when it runs out.")
 def _kota_bak(model):  # başarılı her istekten sonra
-    n = gemini_bugun().get(model, 0); gun = gemini_gun_basi()
-    if n >= GEMINI_GUN_SINIR and GEMINI_KOTA.get("dolu_gun") != gun:
-        GEMINI_KOTA["dolu_gun"] = gun
-        print(f"GEMINI: günlük sınır doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — okumalar yerel seste" + (" (yedek model açık)" if AYAR.get("gemini_yedek_model") and gemini_model() else ""))
-    elif n >= GEMINI_GUN_SINIR * GEMINI_UYARI_ORAN and GEMINI_KOTA.get("uyari_gun") != gun:
+    b = gemini_bugun(); n = b.get(model, 0); gun = gemini_gun_basi(); z = gemini_zincir(); dolu = _kota()
+    kalan = sum(0 if x in dolu else max(0, GEMINI_GUN_SINIR - b.get(x, 0)) for x in z); top = GEMINI_GUN_SINIR * len(z)
+    if n >= GEMINI_GUN_SINIR and (GEMINI_KOTA.get("dolu_gun") or {}).get(model) != gun:
+        GEMINI_KOTA["dolu_gun"] = {**(GEMINI_KOTA.get("dolu_gun") or {}), model: gun}; s = gemini_model()
+        print(f"GEMINI: günlük sınır doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — " + (f"sıradaki model {s}" if s else "okumalar yerel seste"))
+    if top - kalan >= top * GEMINI_UYARI_ORAN and kalan > 0 and GEMINI_KOTA.get("uyari_gun") != gun:
         GEMINI_KOTA["uyari_gun"] = gun
-        print(f"GEMINI: günlük sınırın %{round(GEMINI_UYARI_ORAN * 100)}'i doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — sesli uyarı sırada")
+        print(f"GEMINI: günlük sınırın %{round(GEMINI_UYARI_ORAN * 100)}'i doldu ({top - kalan}/{top}, {len(z)} model) — sesli uyarı sırada")
         if "yerel_uyari" in globals(): yerel_uyari(_t(*GEMINI_UYARI))
 def gemini_view():
     return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
@@ -503,10 +508,19 @@ def ton_bul(metin):  # → durum adı ya da None
     for ad, rx in TON_KURAL:
         if rx.search(metin or ""): return ad
     return None
+# v0.127.0 (24 Ekim ölçümü, testler/arastirma-ses-20261024/sizinti): Türkçe yönerge Türkçe metinle aynı dilde olunca Gemini onu ara sıra sesli okuyor
+# (uzun Türkçe üslupla Lite + 3.8 Flash 6/55; İngilizce yönergeyle okuma 0, yalnız cümleyi iki kez okuma 3/55). Bu yüzden Gemini'ye giden üslup İngilizce: kişilikte ses_uslup_en,
+# yoksa Türkçe üslubun yalnız ilk cümlesi (kısa yönerge Flash 1/27); durum tonu, fısıltı ve çevirmen yönergesinin İngilizcesi.
+def kisilik_uslup(k=None):
+    k = kisilik() if k is None and "kisilik" in globals() else k
+    en = str((k or {}).get("ses_uslup_en") or "").strip()
+    if en: return en
+    tr = str((k or {}).get("ses_uslup") or "").strip()
+    return re.split(r"(?<=[.;!?])\s", tr, maxsplit=1)[0].rstrip(";").strip()
 def ses_uslup_bul(metin, k=None, ek=None):  # kişiliğin üslubu + durum tonu + ek (fısıltı, çevirmen …); boşsa None
     k = kisilik() if k is None else k
-    ton = ton_bul(metin); p = [str((k or {}).get("ses_uslup") or "").strip()]
-    if ton: p.append(_t(*TON_USLUP[ton]))
+    ton = ton_bul(metin); p = [kisilik_uslup(k)]
+    if ton: p.append(TON_USLUP[ton][1])
     if ek: p.append(ek)
     u = " ".join(x for x in p if x)
     return u or None
