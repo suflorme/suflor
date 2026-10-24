@@ -53,7 +53,7 @@ b = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
 ok("Konuş yolunda kullanıcının toplantıdaki kendi hitabı da komut olur (otonom tur), karşı taraf olmaz",
    'ses_komut(' in b and '(not tur.get("otonom") or tur.get("kaynak") == "hitap")' in b and 'not in ("karsi", "moderator") and not tur.get("karsi")' in b)
 ok("v0.131.0: son cümle ses komutuysa ses değişir, kalanı soru olarak gider; bağlamda okunan ses satırı",
-   "gc = ses_komut(cm[-1]) if len(cm) > 1 else None" in b and 'metin = " ".join(cm[:-1])' in b and "{ses_s}{toplanti}" in b and "def okuma_sesi_satiri" in b)
+   "gc = ses_komut(cm[-1]) if len(cm) > 1 else None" in b and 'metin = " ".join(cm[:-1])' in b and "{ses_s}{toplanti}" in b and "def okuma_sesi_satiri" in b and 'SES_SORU_RX.search(soru or "")' in b)
 ok("ayar panoda: toplanti_ses (kisilik|gemini|pocket|mac)", '"toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac"))' in r)
 ok("durumda Pocket görünür (seslendirme.motor) ve toplantı sesi ayrı", 'motor="pocket") if pocket_acik()' in r and "toplanti=toplanti_ses_motoru()[0]" in r)
 print("toplantı sesi: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

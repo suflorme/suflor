@@ -10,7 +10,9 @@ var cikti = (NSHomeDirectory() as NSString).appendingPathComponent("Library/Appl
 var saatOnce = 3.0, saatSonra = 24.0
 var adaylar = false  // --adaylar: olay yerine kullanıcının olası takvim adresleri (kurulum sihirbazı seçtirir)
 var ayrinti = false  // --ayrinti: her olaya katılımcı adresleri ve "current user" işareti (teşhis; aktarıcı kullanmaz)
-var animsatici: String? = nil  // v0.131.0: --animsatici <istek.json> {"baslik", "zaman": "YYYY-MM-DDTHH:MM" (yerel, isteğe bağlı), "not"} → Anımsatıcılar'a ekler
+var etkinlik: String? = nil  // v0.132.0: --etkinlik <istek.json> {"baslik", "zaman": "YYYY-MM-DDTHH:MM" (yerel), "dk", "not", "takvim"} → takvime hatırlatma etkinliği
+var etkinlikSil: String? = nil  // --etkinlik-sil <kimlik>: Suflor'un eklediği etkinliği siler
+var takvimler = false  // --takvimler: yazılabilir takvimler (ayar hatirlatma_takvim seçimi için)
 var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
 var i = 1
 let a = CommandLine.arguments
@@ -20,7 +22,9 @@ while i < a.count {
   else if a[i] == "--sonra", i + 1 < a.count { saatSonra = Double(a[i + 1]) ?? 24; i += 1 }
   else if a[i] == "--ayrinti" { ayrinti = true }
   else if a[i] == "--adaylar" { adaylar = true }
-  else if a[i] == "--animsatici", i + 1 < a.count { animsatici = a[i + 1]; i += 1 }
+  else if a[i] == "--etkinlik", i + 1 < a.count { etkinlik = a[i + 1]; i += 1 }
+  else if a[i] == "--etkinlik-sil", i + 1 < a.count { etkinlikSil = a[i + 1]; i += 1 }
+  else if a[i] == "--takvimler" { takvimler = true }
   else if a[i] == "--adres", i + 1 < a.count {
     adresler = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }); i += 1
   }
@@ -133,32 +137,41 @@ func oku(_ izin: Bool, _ hata: Error?) {
   }
   yaz(["durum": "ok", "olaylar": olaylar])
 }
-// v0.131.0 (kullanıcı 24 Ekim: hatırlatma isteği e-posta taslağı değil Anımsatıcılar olsun): varsayılan listeye, saat verildiyse o saatte çalan anımsatıcı.
-// İzin ayrı: ilk eklemede "Suflor Takvim anımsatıcılarınıza erişmek istiyor" sorulur. Ağ yok; yalnız yerel Anımsatıcılar veritabanı (iCloud eşitlemesi Apple'ın).
+// v0.132.0 (kullanıcı 25 Ekim: hatırlatma Anımsatıcılar'da değil takvimde görünsün): sesle istenen hatırlatma takvime saatinde başlayan, başında uyaran
+// kısa etkinlik olur (varsayılan takvim ya da istekteki "takvim" adı — Exchange/Google takvimiyse sunucuya, telefona eşitlenir). Silme yalnız verilen kimlikle.
 func zamanOku(_ s: String) -> Date? {
   let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone.current
   for b in ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm"] { f.dateFormat = b; if let d = f.date(from: s) { return d } }
   return nil
 }
-func anımsatıcıEkle(_ izin: Bool, _ hata: Error?) {
+func yazilabilir() -> [EKCalendar] { store.calendars(for: .event).filter { $0.allowsContentModifications } }
+func etkinlikIs(_ izin: Bool, _ hata: Error?) {
   defer { bitti.signal() }
-  guard izin else { yaz(["durum": "izin_yok", "hata": hata?.localizedDescription ?? "Anımsatıcılar izni verilmedi (Sistem Ayarları → Gizlilik ve Güvenlik → Anımsatıcılar → Suflor Takvim)"]); return }
-  guard let yol = animsatici, let d = FileManager.default.contents(atPath: yol), let j = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
-        let baslik = j["baslik"] as? String, !baslik.isEmpty else { yaz(["durum": "hata", "hata": "istek okunamadı"]); return }
-  guard let liste = store.defaultCalendarForNewReminders() else { yaz(["durum": "hata", "hata": "Anımsatıcılar'da varsayılan liste yok"]); return }
-  let r = EKReminder(eventStore: store); r.title = String(baslik.prefix(300)); r.calendar = liste
-  if let n = j["not"] as? String, !n.isEmpty { r.notes = String(n.prefix(2000)) }
-  var saatli = false
-  if let z = j["zaman"] as? String, let t = zamanOku(z) {
-    r.dueDateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: t); r.addAlarm(EKAlarm(absoluteDate: t)); saatli = true
+  guard izin else { yaz(["durum": "izin_yok", "hata": hata?.localizedDescription ?? "Takvim izni verilmedi"]); return }
+  if takvimler {
+    let v = store.defaultCalendarForNewEvents
+    yaz(["durum": "ok", "takvimler": yazilabilir().map { ["ad": $0.title, "hesap": $0.source.title, "varsayilan": $0.calendarIdentifier == v?.calendarIdentifier] }]); return
   }
-  do { try store.save(r, commit: true); yaz(["durum": "ok", "id": r.calendarItemIdentifier, "liste": liste.title, "saatli": saatli]) }
+  if let k = etkinlikSil {
+    guard let e = store.event(withIdentifier: k) else { yaz(["durum": "yok", "hata": "etkinlik bulunamadı (silinmiş olabilir)"]); return }
+    do { try store.remove(e, span: .thisEvent, commit: true); yaz(["durum": "ok", "baslik": e.title ?? ""]) } catch { yaz(["durum": "hata", "hata": error.localizedDescription]) }
+    return
+  }
+  guard let yol = etkinlik, let d = FileManager.default.contents(atPath: yol), let j = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+        let baslik = j["baslik"] as? String, !baslik.isEmpty, let z = j["zaman"] as? String, let t = zamanOku(z) else { yaz(["durum": "hata", "hata": "istek okunamadı (başlık ve saat gerekir)"]); return }
+  let ad = (j["takvim"] as? String) ?? ""
+  guard let tk = (ad.isEmpty ? nil : yazilabilir().first { $0.title == ad }) ?? store.defaultCalendarForNewEvents, tk.allowsContentModifications else {
+    yaz(["durum": "hata", "hata": ad.isEmpty ? "yazılabilir varsayılan takvim yok" : "takvim bulunamadı: \(ad)"]); return }
+  let e = EKEvent(eventStore: store); e.title = String(baslik.prefix(300)); e.calendar = tk
+  e.startDate = t; e.endDate = t.addingTimeInterval(Double((j["dk"] as? Int) ?? 15) * 60); e.addAlarm(EKAlarm(relativeOffset: 0))
+  if let n = j["not"] as? String, !n.isEmpty { e.notes = String(n.prefix(2000)) }
+  do { try store.save(e, span: .thisEvent, commit: true); yaz(["durum": "ok", "id": e.eventIdentifier ?? "", "takvim": tk.title, "hesap": tk.source.title]) }
   catch { yaz(["durum": "hata", "hata": error.localizedDescription]) }
 }
-if animsatici != nil {
-  if #available(macOS 14.0, *) { store.requestFullAccessToReminders { izin, hata in anımsatıcıEkle(izin, hata) } }
-  else { store.requestAccess(to: .reminder) { izin, hata in anımsatıcıEkle(izin, hata) } }
-  if bitti.wait(timeout: .now() + 120) == .timedOut { yaz(["durum": "zaman_asimi", "hata": "Anımsatıcılar izni penceresi yanıtlanmadı"]) }
+if etkinlik != nil || etkinlikSil != nil || takvimler {
+  if #available(macOS 14.0, *) { store.requestFullAccessToEvents { izin, hata in etkinlikIs(izin, hata) } }
+  else { store.requestAccess(to: .event) { izin, hata in etkinlikIs(izin, hata) } }
+  if bitti.wait(timeout: .now() + 120) == .timedOut { yaz(["durum": "zaman_asimi", "hata": "Takvim izni penceresi yanıtlanmadı"]) }
   exit(0)
 }
 if #available(macOS 14.0, *) { store.requestFullAccessToEvents { izin, hata in oku(izin, hata) } }

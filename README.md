@@ -88,8 +88,8 @@ Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad 
 - **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
   Mikrofona iki kez dokunursan eller serbest sohbet başlar.
 - **Başka oturuma iş:** *"Defne, bunu proje oturumuna ilet"* dediğinde ileti bir onay kartıyla sunulur; onaylarsan iletilir.
-- **Hatırlatma:** *"Defne, yarın sabah onda Ali'yi aramamı hatırlat"* dediğinde asistan doğal bir soruyla onay ister; "evet" dersen Mac'in
-  Anımsatıcılar'ına o saatte çalacak biçimde eklenir (ilk seferde macOS Anımsatıcılar izni sorar).
+- **Hatırlatma:** *"Defne, yarın sabah onda Ali'yi aramamı hatırlat"* dediğinde asistan doğal bir soruyla onay ister; "evet" dersen takvimine
+  o saatte uyaran kısa bir etkinlik olarak eklenir. Asistan eklediği işin durumunu bilir; *"onu kaldır"* dersen yine onayınla takvimden siler.
 - **İki asistan:** istersen toplantı dışında daha rahat konuşan ikinci bir asistan eklersin. Ayarlar'dan açarsan ikisi birbirini duyar ve
   sohbete kendiliğinden katılır; üçünüz birlikte konuşursunuz.
 - **Yapay zekâ seçimi:** asistanın beyni varsayılan olarak Claude'dur. Claude aboneliğin yoksa Gemini ya da OpenAI uyumlu bir API anahtarı,

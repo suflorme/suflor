@@ -892,10 +892,8 @@ TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleIdentifier</key><string>local.suflor.takvim</string><key>CFBundleName</key><string>Suflor Takvim</string>
   <key>CFBundleExecutable</key><string>SuflorTakvim</string><key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
-  <key>NSCalendarsFullAccessUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak, gündemini ve katılımcılarını toplantı asistanına vermek için takvimini okur. Hiçbir şey değiştirmez, bu Mac dışına göndermez.</string>
-  <key>NSCalendarsUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak için takvimini okur. Hiçbir şey değiştirmez.</string>
-  <key>NSRemindersFullAccessUsageDescription</key><string>Suflor.me sesle istediğin hatırlatmayı, sen onaylayınca Anımsatıcılar'a ekler. Bu Mac dışına göndermez.</string>
-  <key>NSRemindersUsageDescription</key><string>Suflor.me sesle istediğin hatırlatmayı, sen onaylayınca Anımsatıcılar'a ekler.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak, gündemini ve katılımcılarını toplantı asistanına vermek için takvimini okur; sesle istediğin hatırlatmayı, sen onaylayınca takvime ekler. Takvim içeriğini bu Mac dışına göndermez.</string>
+  <key>NSCalendarsUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak için takvimini okur; onayladığın hatırlatmayı takvime ekler.</string>
 </dict></plist>
 """
 POSTA_PLIST = """<?xml version="1.0" encoding="UTF-8"?>

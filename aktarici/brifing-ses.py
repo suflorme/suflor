@@ -720,7 +720,8 @@ EYLEM_FIIL = {"kayit": (("Bunu kayda geçireyim mi?", "Kayda geçiriyorum.", "Pe
               "mesaj": (("Metnini hazırlayayım mı?", "Hazırlıyorum.", "Peki, hazırlamıyorum."), ("Shall I prepare the text?", "Preparing it.", "Okay, not preparing it.")),
               "diger": (("Yapayım mı?", "Yapıyorum.", "Peki, yapmıyorum."), ("Shall I do it?", "Doing it.", "Okay, not doing it.")),
               "oturum": (("İleteyim mi?", "İletiyorum.", "Peki, iletmiyorum."), ("Shall I send it?", "Sending it.", "Okay, not sending it.")),
-              "yapilacak": (("Hatırlatma olarak ekleyeyim mi?", "Anımsatıcılara ekliyorum.", "Peki, eklemiyorum."), ("Shall I add it as a reminder?", "Adding it to Reminders.", "Okay, not adding it."))}
+              "yapilacak": (("Takvimine hatırlatma olarak ekleyeyim mi?", "Takvimine ekliyorum.", "Peki, eklemiyorum."), ("Shall I add it to your calendar as a reminder?", "Adding it to your calendar.", "Okay, not adding it.")),
+              "sil": (("Takviminden kaldırayım mı?", "Kaldırıyorum.", "Peki, kalsın."), ("Shall I remove it from your calendar?", "Removing it.", "Okay, keeping it."))}
 SORU_YENIDEN = (("Tam duyamadım {ad}, {s}", "Kusura bakma, kaçırdım. {s0}, yoksa vazgeçelim mi?", "Evet ya da hayır demen yeterli: {s}"),
                 ("Sorry {ad}, I didn't catch that. {S}", "I missed that. {S0}, or shall we skip it?", "Just yes or no is fine: {s}"))
 SORU_UZUN = ("Anladım, yalnız emin olayım: {s}", "Got it, just to be sure: {s}")

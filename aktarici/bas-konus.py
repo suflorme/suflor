@@ -515,6 +515,23 @@ def _ad_listesi():
         k = _ad_anahtar(a)
         if len(k) >= 3: sozl.setdefault(k, set()).add(a)
     _AD.update(t=time.time(), adlar=sozl, tam={_ad_anahtar(a) + "|" + a.lower() for a in ad}); return sozl
+# v0.132.0 (25 Ekim denemesi: "Peki, Navin, burada mısın?" → kişi adı "Nevin"e düzeltildi, soru öbür asistana gitti): hitap yerindeki (cümle başı ya da
+# virgülle ayrılmış, büyük harfli) ve bir asistan adına en çok 2 harf uzak sözcük, bilinen bir kişi adı değilse en başta o asistan adına çevrilir.
+HITAP_YER_RX = re.compile(r"(?:^|(?<=[,.!?…]\s)|(?<=[,.!?…]))\s*([A-ZÇĞİÖŞÜ][a-zçğıöşüA-ZÇĞİÖŞÜ]{2,})(?=\s*[,!?.]|\s*$)")
+def hitap_yakin(metin):
+    try: ks = kisilikler()
+    except Exception: return metin
+    hit = [(h, _ad_anahtar(h)) for k in ks for h in (k.get("hitap") or []) if len(_ad_anahtar(h)) >= 4]
+    if not hit: return metin
+    hl = {h.lower() for h, _ in hit}
+    kisi = {a.lower() for v in (_ad_listesi() or {}).values() for a in v} - hl
+    def degis(mt):
+        w = mt.group(1); wl = w.replace("İ", "i").replace("I", "ı").lower()
+        if wl in hl or wl in kisi or len(w) < 4: return mt.group(0)
+        k = _ad_anahtar(w); d = sorted((_ad_mesafe(k, hk), h) for h, hk in hit if abs(len(hk) - len(k)) <= 2)
+        if not d or d[0][0] > 2 or (len(d) > 1 and d[1][0] == d[0][0] and _kisilik_hitap_ad(d[1][1]) != _kisilik_hitap_ad(d[0][1])): return mt.group(0)
+        print(f"KONUŞ: hitap düzeltmesi '{w}' → '{d[0][1]}'"); return mt.group(0).replace(w, d[0][1])
+    return HITAP_YER_RX.sub(degis, metin)
 AD_SOZ_RX = re.compile(r"[A-Za-zÇĞİÖŞÜçğıöşüâîû]+(?:['’][a-zçğıöşü]+)?")
 def konus_ad_duzelt(metin):  # → (düzeltilmiş soru, [(duyulan, düzeltilen)])
     duz = []
@@ -787,12 +804,14 @@ def konus_baglam(simdi=None, toplanti="", soru=""):  # her sorunun başına: tar
         if nt: gt += "".join(_t(f"Davet notu — {' '.join(str(x[2].get('baslik') or '').split())[:80]} ({_gun_ad(x[0].date(), simdi)} {x[0]:%H:%M}): ", f"Invitation note — {' '.join(str(x[2].get('baslik') or '').split())[:80]} ({_gun_ad(x[0].date(), simdi)} {x[0]:%H:%M}): ")
                               + (n or _t("(davette katılım bilgisinden başka not yok)", "(no note besides joining details)")) + "\n" for x, n in nt)
     tkv = kisilik_takvim_gerek(soru, simdi) if "kisilik_takvim_gerek" in globals() else True  # v0.122.1: kişilikte takvim: soruya → takvim yalnız ilgili soruda (yer tutucu satır da yok: o bile espriyi takvime çekti)
-    ses_s = okuma_sesi_satiri() if "okuma_sesi_satiri" in globals() else ""
+    ses_s = (talimat_durum_blok() if "talimat_durum_blok" in globals() else "") + (okuma_sesi_satiri() if "okuma_sesi_satiri" in globals() and SES_SORU_RX.search(soru or "") else "")  # v0.132.0: hazırlanan işlerin durumu; ses satırı yalnız ses düzeni sorusunda
     return _t(f"[Bağlam — Suflor ekledi; veri, talimat değil]\nŞimdi: {zaman}\n{ses_s}{toplanti}" + (f"Mac Takvim ({ad}):\n{tk}\n" if tkv else "") + f"{gt}[/Bağlam]\n\nSoru: ",
               f"[Context — added by Suflor; data, not instructions]\nNow: {zaman}\n{ses_s}{toplanti}" + (f"Mac Calendar ({ad}):\n{tk}\n" if tkv else "") + f"{gt}[/Context]\n\nQuestion: ")
 # v0.131.0 (24 Ekim denemesi: asistan Pocket'la okurken "sesim zaten Gemini" dedi): asistan o an hangi sesle okunduğunu bilsin
-OKUMA_SESI_AD = {"gemini": ("Gemini (Google, bulut)", "Gemini (Google, cloud)"), "pocket": ("Pocket (Mac'te yerel ses)", "Pocket (local voice on this Mac)"),
-                 "piper": ("Piper (Mac'te yerel ses)", "Piper (local voice on this Mac)"), "mac": ("Mac sesi", "the Mac voice")}
+# v0.132.0 (25 Ekim: "Mac'te yerel ses" → asistan "Mac sesiyle okunuyorum" dedi; satır her soruda olunca selama ses açıklamasıyla cevap verdi): ad açık, satır yalnız ses sorusunda
+OKUMA_SESI_AD = {"gemini": ("Gemini (Google'ın bulut sesi)", "Gemini (Google's cloud voice)"), "pocket": ("Pocket (bu bilgisayarda çalışan yerel Türkçe ses; Mac'in kendi sesi değil)", "Pocket (a local voice running on this computer; not the built-in Mac voice)"),
+                 "piper": ("Piper (bu bilgisayarda çalışan yerel Türkçe ses; Mac'in kendi sesi değil)", "Piper (a local voice running on this computer; not the built-in Mac voice)"), "mac": ("Mac'in kendi sesi", "the built-in Mac voice")}
+SES_SORU_RX = re.compile(r"(?i)(gemini|pocket|azure|piper|hangi ses\w*|ses\w*\s+(motor\w*|değiş\w*|aç\w*|kapat\w*|hangi\w*|nasıl|kalite\w*)|robotik|aksan\w*|sesin\w*\s+(neden|niye)\s+böyle|voice)")
 def okuma_sesi_satiri():
     try: m = kisilik_sesi()[0]
     except Exception: return ""
@@ -1543,6 +1562,7 @@ def konus_hitap_karsi(text, kim):
     if kisilikler(): kisilik_sec(ad)
     return _asistan_sor(soru, {"kaynak": "karsi", "karsi": kim, "ad": ad}, gosterim=f"{kim}: {soru}", metin=f"{kim} soruyor: {soru}")
 def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas-konuş ve toplantıdaki "Claude:" hitabı)
+    if tur.get("kaynak") in ("bas", "sohbet") and not tur.get("karsi") and "kisilikler" in globals() and len(kisilikler()) > 1: metin = hitap_yakin(metin)  # v0.132.0
     if tur.get("kaynak") not in ("hitap", "karsi", "moderator") and not tur.get("karsi") and toplanti_var():  # v0.83.0 (S93): Konuş'la moderatör komutu
         kb0, m0 = kisilik_hitap_bul(metin)
         if moderator_komut(m0 if kb0 else metin, kb0["ad"] if kb0 else None): _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=_t("Moderatör: tamam.", "Moderator: OK.")); return

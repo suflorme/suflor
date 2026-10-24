@@ -55,7 +55,7 @@ ok(f"v0.131.0: etiketteki saat ayrılır (Anımsatıcılar): {giden[-1][2]!r} ·
 ok("saat biçimleri: '2026-10-25 9.30' → 09:30, saatsiz → None, bozuk tarih → None", nc["animsatici_zaman_ayir"]("a b | 2026-10-25 9.30") == ("a b", "2026-10-25T09:30")
    and nc["animsatici_zaman_ayir"]("süt al") == ("süt al", None) and nc["animsatici_zaman_ayir"]("x y | 2026-13-40T10:00")[1] is None)
 t_, g_ = nc["talimat_claude"]("Tamam. [İLET hatırlatma: süt al]", "s", {"kaynak": "karsi", "karsi": True}); ok("karşı tarafın isteğinde yapılacak da gitmez", not g_ and t_ == "Tamam.")
-ok("istemde saat alanı ve Anımsatıcılar", "| <YYYY-MM-DDTHH:MM>]" in i_ and "Anımsatıcılar" in i_)
+ok("istemde saat alanı, takvim, gerçek durum listesi ve silme etiketi", "| <YYYY-MM-DDTHH:MM>]" in i_ and "takvimine o saatte etkinlik" in i_ and "[İLET sil: <no>]" in i_ and "Hazırladığın işler" in i_)
 ok("istemde hatırlatma yolu, 'yazamıyorum' yok, gece 'yarın' sorusu, eylemde kısa doğrulama", "[İLET yapilacak:" in i_ and "'yazamıyorum' deme" in i_ and "00.00 ile 05.00" in i_ and "tek kısa doğrulama sorusu" in i_)
 ok("okuma sınırı: etiketin başı yakalanır (kapanış gelmeden)", nc["TALIMAT_ETIKET_BAS"].search("Hazırladım. [İLET pro") is not None)
 # 1b) onay sözcükleri (v0.77.1, kullanıcı: evet dışında gönder, bildir, onaylıyorum, yes, tamam da onay)
@@ -128,13 +128,11 @@ try:
     k3 = next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and "vergi" in c.get("text", "") and c.get("status") == "acik"), None)
     ok("yapılacak → onay kartı", bool(k3))
     uc("/card-ack", {"id": k3["id"], "status": "onaylandi"}, pano=True); time.sleep(2)
-    t0 = time.time()
-    while time.time() - t0 < 20 and "anımsatıcı · vergi" not in L(): time.sleep(0.5)  # sesli değil kartla onay: Geri al beklemesi yok
-    ok(f"v0.131.0: onaylanan yapılacak Anımsatıcılar'a (toplantı sürerken de; e-posta taslağı açılmaz) — {time.time() - t0:.0f} sn",
-       "TALİMAT (deneme): anımsatıcı · vergi beyannamesini kontrol et" in L() and "taslak gmail" not in L() and "Anımsatıcılar'a eklendi" in L())
+    ok("toplantı sürerken taslak açılmadı", "taslak gmail" not in L())
     NABIZ.set(); t0 = time.time()
-    while time.time() - t0 < 40 and (uc("/status").get("extension") or {}).get("call"): time.sleep(0.5)  # SUFLOR_TEST_HIZLI: toplantı 6 sn nabızsız biter
-    time.sleep(1)
+    while time.time() - t0 < 40 and "taslak gmail" not in L(): time.sleep(0.5)  # SUFLOR_TEST_HIZLI: toplantı 6 sn nabızsız biter
+    ok(f"saatsiz yapılacak: toplantı bitince e-posta taslağı (kendi adresine) — {time.time() - t0:.0f} sn", "TALİMAT (deneme): taslak gmail · Yapılacak: vergi beyannamesini kontrol et" in L()
+       and "takvime eklenemedi (saat yok)" in L())
     # toplantı dışında: Konuş'a söylenen talimat → sesli geri okuma + "İleteyim mi?", panodan Onayla → gelen kutusu
     uc("/bas-konus", {"metin": "Proje oturumuna şunu söyle: haftalık raporu pazartesiye çek."}, pano=True); time.sleep(1)
     ok("toplantı dışında: sesli geri okuma ve 'İleteyim mi?'", "haftalık raporu pazartesiye çek. İleteyim mi?" in L())
@@ -147,4 +145,33 @@ finally:
     r.terminate(); r.wait(5)
     if HATA or sys.exc_info()[0]: print("günlük:", log)
     else: shutil.rmtree(T, ignore_errors=True)
+# v0.132.0: saatli hatırlatma takvime (etkinlik kimliği işe yazılır), Konuş bağlamında gerçek durum, sesle silme ([İLET sil: no]) → onay → takvimden silinir
+import threading as _th
+os.environ["SUFLOR_TEST_BASLAT"] = "1"
+EY = []; YAMA = []
+def _yama(x, **k): x.update(k); YAMA.append(k)
+n3 = {"re": re, "os": os, "json": json, "time": time, "datetime": __import__("datetime"), "subprocess": __import__("subprocess"), "threading": _th, "urllib": __import__("urllib"),
+      "AYAR": {}, "BASE": tempfile.mkdtemp(), "LOCK": _th.RLock(), "EYLEMLER": EY, "_eylem_yama": _yama, "_t": lambda a, b: a, "write": lambda x: None, "toplanti_var": lambda: False,
+      "GERI_AL_SN": 0, "CARDS": [], "EYLEM_TUR": {}, "eylem_sonuc": lambda p: next(x for x in EY if x["id"] == p["id"]).update(durum=p["durum"], sonuc=p["sonuc"]),
+      "soru_baslat": lambda ids: None, "_konus_kur": lambda **k: None, "seslendir": lambda *a, **k: None, "add_card": lambda c: None,
+      "eylem_ekle": lambda p: EY.append(dict(p, id="e17920000000" + str(len(EY)).zfill(4) + "ab", at=__import__("datetime").datetime.now().isoformat(timespec="seconds"), durum="bekliyor")) or EY[-1]}
+exec(compile(open(os.path.join(KOD, "aktarici", "talimat.py"), encoding="utf-8").read(), "talimat.py", "exec"), n3)
+import io, contextlib
+with contextlib.redirect_stdout(io.StringIO()):
+    t_, g_ = n3["talimat_claude"]("Hazırladım. [İLET yapilacak: Kardeşini ara; bugün 14.00 | 2026-10-25T14:00]", "s", {"kaynak": "sohbet"})
+x = EY[-1]; x["durum"] = "onaylandi"
+with contextlib.redirect_stdout(io.StringIO()): n3["_talimat_uygula"](x["id"])
+ok(f"saatli hatırlatma takvime: etkinlik kimliği işte, sonuç {x.get('sonuc')!r}", x.get("etkinlik") == "deneme-2026-10-25T14:00" and x["durum"] == "yapildi" and "takvime eklendi" in x["sonuc"])
+b_ = n3["talimat_durum_blok"]()
+ok(f"Konuş bağlamında gerçek durum: {b_.splitlines()[-1]!r}", "Hazırladığın işler" in b_ and x["id"][-6:] in b_ and "takvime eklendi" in b_)
+with contextlib.redirect_stdout(io.StringIO()):
+    t_, g_ = n3["talimat_claude"](f"Tamam. [İLET sil: {x['id'][-6:]}]", "s", {"kaynak": "sohbet"})
+s_ = EY[-1]
+ok("sesle silme isteği: 'sil' işi, etkinlik kimliğiyle, onay bekliyor", g_ and t_ == "Tamam." and s_["tur"] == "sil" and json.loads(s_["ayrinti"])["etkinlik"] == x["etkinlik"])
+s_["durum"] = "onaylandi"
+with contextlib.redirect_stdout(io.StringIO()): n3["_talimat_uygula"](s_["id"])
+ok("onaylanınca takvimden silindi, hatırlatma 'silindi' görünür", s_["durum"] == "yapildi" and x.get("silindi") is True and "takvimden silindi" in n3["talimat_durum_blok"]())
+with contextlib.redirect_stdout(io.StringIO()):
+    t_, g_ = n3["talimat_claude"]("Tamam. [İLET sil: 999999]", "s", {"kaynak": "sohbet"})
+ok("bilinmeyen numara: silme işi açılmaz, etiket silinir", not g_ and t_ == "Tamam.")
 print("talimat:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

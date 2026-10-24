@@ -79,7 +79,7 @@ _ns2 = {"re": __import__("re"), "datetime": __import__("datetime"), "AYAR": {"ad
 exec(compile(ast.Module([n for n in ast.parse(_k).body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in _ad2 for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in _ad2)], []), "relay", "exec"), _ns2)
 yil = __import__("datetime").date.today().year
 s = _ns2["_soru_metni"]({"tur": "yapilacak", "baslik": f"Yarın Pazar 25 Ekim {yil} sabah 10.00'da Ali'yi ara"})
-ok(f"ilk soru doğal, adla, yılsız: {s!r}", s == "Deniz, Yarın Pazar 25 Ekim sabah 10.00'da Ali'yi ara. Hatırlatma olarak ekleyeyim mi?")
+ok(f"ilk soru doğal, adla, yılsız: {s!r}", s == "Deniz, Yarın Pazar 25 Ekim sabah 10.00'da Ali'yi ara. Takvimine hatırlatma olarak ekleyeyim mi?")
 x = {"tur": "takvim", "baslik": "Toplantı"}; y1 = _ns2["_yeniden_sor"](x); y2 = _ns2["_yeniden_sor"](x)
 ok(f"anlaşılmazsa seçenek saymadan bir kez daha sorar, ikincisinde bırakır: {y1!r}", y1 and "takvimine ekleyeyim mi" in y1.lower() and "sonra" not in y1 and y2 is None)
 _ns2["SORU"]["deneme"] = 0; u = _ns2["_yeniden_sor"](x, uzun=True); ok(f"uzun cevapta: {u!r}", u == "Anladım, yalnız emin olayım: takvimine ekleyeyim mi?")
