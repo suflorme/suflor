@@ -353,6 +353,7 @@ try:
     ok(f"günlük: seçim nedeni doğru ({[x for x in GL if 'KİŞİLİK' in x]})", "KİŞİLİK: bu soru Atlas ile (üçlü: son soruyu o sordu)" in GL and "KİŞİLİK: bu soru Matlas ile (adıyla seslenildi)" in GL)
     ok("uydurma kuralı: söz mesajında ve ana cevap notunda alıntı/olgu uydurma yasağı",
        "tırnaklı alıntı ya da replik uydurma" in ns["uclu_mesaj"]({"kisi": "Matlas"}, "Atlas", "tepki") and "tırnaklı alıntı ya da replik uydurma" in blok({"kisi": "Matlas", "kaynak": "sohbet"}))
+    ok("v0.131.0: ana cevapta kendine dair arkadaşça soruda karakterle oyun, kayıt saati saymama", "karakterinle oyuna gir" in blok({"kisi": "Matlas", "kaynak": "sohbet"}) and "saatlerini sayma" in blok({"kisi": "Matlas", "kaynak": "sohbet"}))
     ok("üçlü: /status görünümü (açık, özel paylaşım kapalı)", ns["uclu_view"]() == {"acik": True, "ozel_paylas": False})
     ns["AYAR"]["ad"] = "Deniz Test"; hn = ns["_uclu_hitap_notu"]({"kisi": "Atlas"}); hn0 = ns["_uclu_hitap_notu"]({}); ns["AYAR"].pop("ad")
     ok(f"üçlü ana cevap: kullanıcıya kendi adıyla, öbürünün adı yalnız ona ({hn.strip()})", "«Deniz» de" in hn and "«Matti» adını yalnız Matti" in hn and hn0 == "")

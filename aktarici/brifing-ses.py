@@ -710,6 +710,36 @@ EYLEM_SORU = {"kayit": ("Yazayım mı?", "Shall I record it?"), "belge": ("Yazay
               "eposta": ("Taslak olarak yazayım mı?", "Shall I write it as a draft?"), "takip": ("Taslak olarak yazayım mı?", "Shall I write it as a draft?"),
               "mesaj": ("Metni hazırlayayım mı?", "Shall I prepare the text?"), "diger": ("Yapayım mı?", "Shall I do it?"),
               "oturum": ("İleteyim mi?", "Shall I send it?"), "yapilacak": ("E-posta taslağını açayım mı?", "Shall I open the email draft?")}
+# v0.131.0 (kullanıcı 24 Ekim: "evet, hayır ya da sus" hatırlatması çok robotik): soru ve cevap doğal konuşma gibi — adıyla, işin özü + tek soru; anlaşılmazsa
+# seçenek saymadan, her seferinde farklı bir cümleyle bir kez daha sorulur, ikincisinde iş panoda bekletilir. Tür başına (soru, onay sözü, red sözü) TR/EN.
+EYLEM_FIIL = {"kayit": (("Bunu kayda geçireyim mi?", "Kayda geçiriyorum.", "Peki, kayda geçirmiyorum."), ("Shall I record it?", "Recording it.", "Okay, not recording it.")),
+              "belge": (("Yazayım mı?", "Yazıyorum.", "Peki, yazmıyorum."), ("Shall I write it?", "Writing it.", "Okay, not writing it.")),
+              "takvim": (("Takvimine ekleyeyim mi?", "Takvimine ekliyorum.", "Peki, eklemiyorum."), ("Shall I add it to your calendar?", "Adding it to your calendar.", "Okay, not adding it.")),
+              "eposta": (("Taslağını hazırlayayım mı?", "Taslağı hazırlıyorum.", "Peki, hazırlamıyorum."), ("Shall I draft it?", "Drafting it.", "Okay, no draft.")),
+              "takip": (("Taslağını hazırlayayım mı?", "Taslağı hazırlıyorum.", "Peki, hazırlamıyorum."), ("Shall I draft it?", "Drafting it.", "Okay, no draft.")),
+              "mesaj": (("Metnini hazırlayayım mı?", "Hazırlıyorum.", "Peki, hazırlamıyorum."), ("Shall I prepare the text?", "Preparing it.", "Okay, not preparing it.")),
+              "diger": (("Yapayım mı?", "Yapıyorum.", "Peki, yapmıyorum."), ("Shall I do it?", "Doing it.", "Okay, not doing it.")),
+              "oturum": (("İleteyim mi?", "İletiyorum.", "Peki, iletmiyorum."), ("Shall I send it?", "Sending it.", "Okay, not sending it.")),
+              "yapilacak": (("Hatırlatma olarak ekleyeyim mi?", "Anımsatıcılara ekliyorum.", "Peki, eklemiyorum."), ("Shall I add it as a reminder?", "Adding it to Reminders.", "Okay, not adding it."))}
+SORU_YENIDEN = (("Tam duyamadım {ad}, {s}", "Kusura bakma, kaçırdım. {s0}, yoksa vazgeçelim mi?", "Evet ya da hayır demen yeterli: {s}"),
+                ("Sorry {ad}, I didn't catch that. {S}", "I missed that. {S0}, or shall we skip it?", "Just yes or no is fine: {s}"))
+SORU_UZUN = ("Anladım, yalnız emin olayım: {s}", "Got it, just to be sure: {s}")
+SORU_BIRAK = ("Şimdilik bekletiyorum {ad}, panoda duruyor.", "I'll leave it for now, {ad}; it's on the panel.")
+def kullanici_ilk_ad(): return (str(AYAR.get("ad") or "").split() or [""])[0]
+def _eylem_fiil(tur): return EYLEM_FIIL.get(tur, EYLEM_FIIL["diger"])[0 if ARAYUZ_DILI == "tr" else 1]
+def _soru_metni(x):  # "Deniz, yarın sabah 10.00'da Ali'yi ara. Hatırlatma olarak ekleyeyim mi?"
+    b = re.sub(rf"\s+{datetime.date.today().year}\b", "", _cumle(x["baslik"]))
+    kim = (" " + _t("Kişi: ", "Person: ") + _cumle(x["kim"])) if x.get("kim") and str(x["kim"]).lower() not in b.lower() else ""
+    ad = kullanici_ilk_ad()
+    return f"{ad + ', ' if ad else ''}{b}{kim} {_eylem_fiil(x['tur'])[0]}"
+def _yeniden_sor(x, uzun=False):  # → okunacak cümle; ikinci kez anlaşılmazsa iş bekletilir (None: soru bırakıldı)
+    ad = kullanici_ilk_ad(); s = _eylem_fiil(x["tur"])[0] if x else _t("Yapayım mı?", "Shall I do it?")
+    SORU["deneme"] = SORU.get("deneme", 0) + 1
+    if SORU["deneme"] > 1: return None
+    if uzun: return _t(*SORU_UZUN).format(s=s[:1].lower() + s[1:])
+    sec = [c for c in SORU_YENIDEN[0 if ARAYUZ_DILI == "tr" else 1] if c != SORU.get("son_cumle")]
+    c = __import__("random").choice(sec); SORU["son_cumle"] = c
+    return re.sub(r"\s+,", ",", c.format(ad=ad, s=s[:1].lower() + s[1:], S=s, s0=s.rstrip("?").rstrip(), S0=s.rstrip("?").rstrip())).replace(" , ", ", ")
 def _ses_serbest(): return AYAR.get("konusma", True) and not toplanti_var()
 def _cumle(x):
     x = " ".join(re.sub(r"[*`_#>]", "", str(x or "")).split()).strip()
@@ -752,10 +782,9 @@ def soru_sonraki():
         bek = {x["id"]: x for x in eylem_gorunen() if x["durum"] == "bekliyor"}
         SORU["liste"] = [i for i in SORU["liste"] if i in bek]
         x = bek[SORU["liste"].pop(0)] if SORU["liste"] else None
-        SORU.update(aktif=x["id"] if x else None, t=time.time())
+        SORU.update(aktif=x["id"] if x else None, t=time.time(), deneme=0)
     if not x: return False
-    soru = EYLEM_SORU.get(x["tur"], EYLEM_SORU["diger"])
-    seslendir(f"{_t(EYLEM_TUR.get(x['tur'], ''), x['tur'])}: {_cumle(x['baslik'])}{(' ' + _t('Kişi: ', 'Person: ') + _cumle(x['kim'])) if x.get('kim') else ''} {_t(*soru)}", kuyruk=True)
+    seslendir(_soru_metni(x), kuyruk=True)
     print(f"SES: yazayım mı? ({x['id']})"); return True
 def soru_bitir(neden):
     with LOCK: var = bool(SORU["aktif"] or SORU["liste"]); SORU.update(liste=[], aktif=None)
@@ -775,11 +804,13 @@ SES_CEVAP = {  # sözcük ve kalıplar (Türkçe + İngilizce; Whisper'ın verdi
     "tekrar": ["ne dedin", "bir daha", "tekrar eder misin", "what did you say", "say again", "tekrar", "tekrarla", "efendim", "pardon", "repeat", "again"],
     "sus": ["sessiz ol", "sus", "dur", "yeter", "kapat", "stop", "enough", "quiet"],
     "sonra": ["daha sonra", "sonra bak", "sonra", "atla", "geç", "gec", "sonraki", "later", "skip", "next"],
-    "red": ["gerek yok", "no thanks", "hayır", "hayir", "yok", "yazma", "ekleme", "kaydetme", "reddet", "istemiyorum", "iptal", "no", "nope", "don't", "dont", "reject", "cancel", "gönderme", "iletme", "bildirme", "yollama"],
+    "red": ["gerek yok", "no thanks", "hayır", "hayir", "yok", "yazma", "ekleme", "kaydetme", "reddet", "istemiyorum", "iptal", "no", "nope", "don't", "dont", "reject", "cancel", "gönderme", "iletme", "bildirme", "yollama",
+            "boş ver", "bos ver", "vazgeç", "vazgec", "vazgeçtim", "vazgeçelim", "kalsın", "istemem", "yapma", "açma", "hazırlama", "gerek kalmadı"],
     "onay": ["do it", "go ahead", "evet", "evt", "tamam", "tamamdır", "olur", "yaz", "yazabilirsin", "onayla", "onaylıyorum", "ekle", "ekleyebilirsin", "kaydet",
              "peki", "aynen", "uygun", "uygundur", "yes", "yeah", "yep", "ok", "okay", "sure", "approve", "approved",
              "gönder", "gönderebilirsin", "gönderin", "gonder", "bildir", "bildirebilirsin", "ilet", "iletebilirsin", "yolla", "send", "send it",
-             "kabul ediyorum", "kabul", "ileti", "iletin", "gönderebilirsiniz"]}  # v0.77.1 (kullanıcı): talimat onayı; v0.101.1: "İlet" Whisper'da "İleti"
+             "kabul ediyorum", "kabul", "ileti", "iletin", "gönderebilirsiniz",
+             "aç", "açabilirsin", "yap", "yapabilirsin", "hazırla", "hazırlayabilirsin", "olsun", "ekleyelim", "geçir", "iyi olur"]}  # v0.131.0: sorunun fiili ("aç", "ekle") onay  # v0.77.1 (kullanıcı): talimat onayı; v0.101.1: "İlet" Whisper'da "İleti"
 # v0.101.1 (kullanıcı, 21 Ekim: "Evet, evet, gönder. Kabul ediyorum, ilet." uzun sayılıp reddedilmişti): 4 sözcükten uzun cevap yalnız tek yönlüyse (yalnız onay ya da
 # yalnız red sözcükleri) ve kalan sözcükler pekiştirme ise karar verir; başka bir şey söylendiyse ("evet, Ali'yi de ekle") yine uzun.
 SES_PEKISTIRME = {"tabii", "tabi", "elbette", "kesinlikle", "hemen", "şimdi", "simdi", "de", "da", "bunu", "onu", "iletiyi", "mesajı", "bildirimi", "sure", "absolutely", "now", "it"}
@@ -804,14 +835,16 @@ def sesli_cevap(metin, sid):  # bas-konuş metni soru aktifken; dönen: okunan c
     tur = _t(EYLEM_TUR.get(x["tur"], ""), x["tur"]) if x else ""
     print(f"SES: sesli cevap \"{metin[:80]}\" → {sinif}")
     if sinif in ("onay", "red") and x:
-        cevap = _t(f"{tur} onaylandı.", "Approved.") if sinif == "onay" else _t(f"{tur} reddedildi.", "Rejected.")
+        cevap = _eylem_fiil(x["tur"])[1 if sinif == "onay" else 2]
         seslendir(cevap, kuyruk=True); eylem_karar({"id": sid, "durum": "onaylandi" if sinif == "onay" else "reddedildi", "ses_metin": metin}, "ses"); return cevap
     if sinif == "hepsi":
-        cevap = _t("Hepsi onaylandı.", "All approved."); seslendir(cevap, kuyruk=True); eylem_karar({"id": "hepsi", "durum": "onaylandi", "ses_metin": metin}, "ses"); return cevap
-    if sinif == "sonra": cevap = _t("Sonraya bıraktım.", "Left for later."); seslendir(cevap, kuyruk=True); soru_sonraki(); return cevap
+        cevap = _t("Tamam, hepsini onaylıyorum.", "Okay, approving all of them."); seslendir(cevap, kuyruk=True); eylem_karar({"id": "hepsi", "durum": "onaylandi", "ses_metin": metin}, "ses"); return cevap
+    if sinif == "sonra": cevap = _t("Tamam, sonraya bırakıyorum.", "Okay, leaving it for later."); seslendir(cevap, kuyruk=True); soru_sonraki(); return cevap
     if sinif == "sus": cevap = _t("Tamam, susuyorum.", "Okay, stopping."); seslendir(cevap, kuyruk=True); soru_bitir("sus (sesle)"); return cevap
     if sinif == "tekrar":
         with LOCK: SORU["liste"].insert(0, sid); SORU["aktif"] = None
         soru_sonraki(); return _t("Soruyu yeniden okudum.", "Read the question again.")
-    cevap = _t("Kısa cevap ver: evet, hayır, sonra ya da sus.", "Answer briefly: yes, no, later or stop.") if sinif == "uzun" else _t("Anlamadım: evet, hayır ya da sonra?", "Didn't catch that: yes, no or later?")
+    cevap = _yeniden_sor(x, uzun=sinif == "uzun")
+    if cevap is None:  # ikinci kez anlaşılmadı: iş panoda bekler, sıradaki soruya geçilir
+        cevap = _t(*SORU_BIRAK).format(ad=kullanici_ilk_ad()).replace(" ,", ","); seslendir(cevap, kuyruk=True); soru_sonraki(); return cevap
     seslendir(cevap, kuyruk=True); return cevap

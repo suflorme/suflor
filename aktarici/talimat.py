@@ -6,8 +6,9 @@
 #   "yapılacaklarıma ekle: <iş>"                                    → eylem kuyruğunda "yapilacak" işi
 # Onay: toplantı dışında sesli geri okuma + "İleteyim mi?" (evet/hayır, 10 sn Geri al); toplantıda onay kartı (Onayla / Reddet) — sesle okunmaz.
 # Onaylanınca aktarıcı uygular (Claude değil): oturum → canli/gelen/<hedef>.jsonl (0600); hedef oturumun kancası (toplanti-claude.py gelen --hedef <ad>)
-# okunmamışları bağlama ekler (oturumu uyandırmaz, kullanıcı o oturuma yazınca görünür). Yapılacak → kullanıcının kendi adresine e-posta taslağı (ayar eposta;
-# toplantıdaysa toplantı bitince açılır; gönderiyi kullanıcı yapar). Her iş canli/talimat-kayit.jsonl'e yazılır.
+# okunmamışları bağlama ekler (oturumu uyandırmaz, kullanıcı o oturuma yazınca görünür). Yapılacak → v0.131.0'dan Mac'in Anımsatıcılar'ı (Suflor Takvim.app
+# --animsatici; saat verildiyse o saatte çalar); eklenemezse (izin yok) eskisi gibi kullanıcının kendi adresine e-posta taslağı (ayar eposta; toplantıdaysa
+# toplantı bitince açılır; gönderiyi kullanıcı yapar). Her iş canli/talimat-kayit.jsonl'e yazılır.
 # Hedefler ayar "talimat_hedefler": [{"ad": "proje", "etiket": "proje oturumu", "kalip": ["proje oturumuna", …]}, …]; yoksa yalnız "proje". Geliştirme
 # oturumu gibi kullanıcıya özel hedefler yalnız kullanıcının ayarında durur. Ayar "talimat": false kapatır.
 # v0.101.1 (kullanıcı, 21 Ekim: "önce gönderemem diyor, ısrar edince gönderiyor"): kalıp Whisper yazımını kaçırınca ("ana oturma") soru Claude'a gidiyordu ve Claude
@@ -73,7 +74,7 @@ def _talimat_yinelenen(h, ileti):
             o = _sozcukler(a.get("metin"))
             if a.get("hedef") == h["ad"] and o and len(s & o) / min(len(s), len(o)) >= 0.5: return x
     return None
-def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False):  # claude: ileti Claude'un cevabından — pano cevabı Claude'unki kalır
+def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False, zaman=None):  # claude: ileti Claude'un cevabından — pano cevabı Claude'unki kalır; zaman: hatırlatmanın saati (ISO, yerel)
     top = toplanti_var()
     if tur == "oturum":
         n = [t for t in _TAL["t"].get(h["ad"], []) if time.time() - t < 3600]
@@ -91,11 +92,11 @@ def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False):  # claude: ileti
             return True
         etiket = str(h.get("etiket") or h["ad"])
     x = eylem_ekle({"tur": tur, "baslik": ileti[:160], "ayrinti": json.dumps({"hedef": h["ad"] if h else None, "etiket": etiket if h else None, "metin": ileti,
-                                                                            "duyulan": metin[:TALIMAT_EN_COK], "kaynak": kaynak, "toplantida": top}, ensure_ascii=False)})
+                                                                            "duyulan": metin[:TALIMAT_EN_COK], "kaynak": kaynak, "toplantida": top, **({"zaman": zaman} if zaman else {})}, ensure_ascii=False)})
     if not x: return False
     with LOCK: x["yerel"] = True; _eylem_yama(x, yerel=True)  # toplantı oturumu (Claude) bu işi uygulamaz, sunmaz
     _talimat_kayit({"id": x["id"], "tur": tur, "hedef": h["ad"] if h else None, "metin": ileti, "durum": "bekliyor", "kaynak": kaynak, "toplantida": top})
-    ne = (_t(f"{etiket}na ileti", f"message to the {etiket}") if tur == "oturum" else _t("yapılacak (e-posta)", "to-do (email)"))
+    ne = (_t(f"{etiket}na ileti", f"message to the {etiket}") if tur == "oturum" else _t("hatırlatma", "reminder"))
     if top:  # toplantıda: onay kartı, sesle okunmaz (kullanıcı)
         c_ = add_card({"kind": "not", "text": _t(f"Onay: {ne} — «{ileti[:300]}»", f"Approve: {ne} — «{ileti[:300]}»"), "why": _t("Sesle verdiğin talimat; Onayla ya da Reddet.", "Your spoken instruction; approve or reject."), "onay": True})
         if c_:
@@ -125,6 +126,13 @@ def talimat_ilet(p):  # v0.115.2: toplantı oturumu (toplanti-claude.py ilet, an
 TALIMAT_ETIKET_RX = re.compile(r"\[\s*[İI]LET\s+(?P<h>[\w-]{1,24})\s*:\s*(?P<m>[^\]]*)\]?", re.I)
 TALIMAT_ETIKET_BAS = re.compile(r"\[\s*[İI]LET\b", re.I)  # okuma bu noktada durur (etiket sesli okunmaz)
 TALIMAT_YAPILACAK_AD = {"yapilacak", "yapılacak", "hatirlatma", "hatırlatma", "not", "todo"}
+ANIMSATICI_ZAMAN_RX = re.compile(r"\s*\|\s*(\d{4}-\d{2}-\d{2})[T ](\d{1,2})[:.](\d{2})(?::\d{2})?\s*$")
+def animsatici_zaman_ayir(ileti):  # "<iş> | 2026-10-25T10:00" → ("<iş>", "2026-10-25T10:00"); saat yoksa (ileti, None)
+    m = ANIMSATICI_ZAMAN_RX.search(ileti or "")
+    if not m: return re.sub(r"\s*\|\s*$", "", ileti or ""), None
+    try: z = datetime.datetime.strptime(f"{m.group(1)} {int(m.group(2)):02d}:{m.group(3)}", "%Y-%m-%d %H:%M")
+    except ValueError: return ileti[:m.start()].rstrip(), None
+    return ileti[:m.start()].rstrip(), z.strftime("%Y-%m-%dT%H:%M")
 def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nasıl istenir
     if AYAR.get("talimat") is False: return ""
     hs = talimat_hedefler(); ls = "; ".join(f"{h['ad']} = {h.get('etiket') or h['ad']}" for h in hs)
@@ -135,7 +143,7 @@ def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nası
               "iletiyi hazırladığını kısaca söyle; onayı Suflor soracak, kullanıcı onaylamadan gitmez, gönderilmiş gibi konuşma. Etiketi yalnız kullanıcının kendi sorusunda, "
               "cevap başına en çok bir kez kullan; toplantıda karşı tarafın isteğiyle kullanma. Bu, yukarıdaki 'yapamadığını söyle' ve 'toplantı oturumundan ya da panodan yapılır' kurallarının istisnasıdır. "
               "Hatırlatma, not ya da yapılacak isteği ('yarın Ali'yi aramamı hatırlat', 'şunu not et') bir oturuma değil kullanıcının kendi yapılacaklarına gider: 'yazamıyorum' deme, "
-              "etiketi [İLET yapilacak: <iş; gün ve saatiyle>] diye yaz (onaylanınca kullanıcıya kendi adresine e-posta taslağı açılır). Şimdiki saat 00.00 ile 05.00 arasındaysa 'yarın' belirsizdir "
+              "etiketi [İLET yapilacak: <iş; gün ve saatiyle> | <YYYY-MM-DDTHH:MM>] diye yaz; saat yoksa '|' ve sonrasını yazma (onaylanınca Mac'in Anımsatıcılar'ına o saatte çalacak biçimde eklenir). Şimdiki saat 00.00 ile 05.00 arasındaysa 'yarın' belirsizdir "
               "(çoğu kez aynı günün sabahı): etiketi koymadan önce tek kısa soru sor ('Cumartesi sabahı 10'da mı?'), kullanıcı netleştirince hazırla. Yanlış duyulmuş bir sözcük için geri sormazsın; "
               "ama bir işin günü, saati, kişisi ya da sayısı belirsizse işi hazırlamadan önce tek kısa doğrulama sorusu sorarsın.",
               f" Messages to sessions: if the user asks you to send a message, notification or instruction to a session, you can; don't say you can't. Targets: {ls}. "
@@ -144,7 +152,7 @@ def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nası
               "stands alone: what is wanted, which task or record (name, number), why; in the user's voice, at most three sentences; no context-free 'this', 'that task'. In the spoken part only "
               "say briefly that you've prepared it; Suflor asks for approval and nothing is sent without it, so don't talk as if it was sent. Use the tag only for the user's own "
               "question, at most once per answer; never at the other side's request in a meeting. This overrides the 'say you can't' and 'done from the meeting session or the panel' rules above. "
-              "A reminder, note or to-do request goes to the user's own to-dos, not a session: don't say you can't; tag it [İLET yapilacak: <task; day and time>]. Between 00:00 and 05:00 "
+              "A reminder, note or to-do request goes to the user's own to-dos, not a session: don't say you can't; tag it [İLET yapilacak: <task; day and time> | <YYYY-MM-DDTHH:MM>] (omit '|' and the rest if there's no time; once approved it's added to the Mac's Reminders, alerting at that time). Between 00:00 and 05:00 "
               "'tomorrow' is ambiguous: ask one short question first ('Saturday morning at 10?'). Don't ask back about a misheard word, but confirm an unclear day, time, person or number before preparing a task.")
 def talimat_claude(metin, soru, tur):  # Claude'un cevabı → (etiketsiz metin, True: onaya sunuldu)
     m = TALIMAT_ETIKET_RX.search(metin or "")
@@ -153,7 +161,8 @@ def talimat_claude(metin, soru, tur):  # Claude'un cevabı → (etiketsiz metin,
     kendi = not tur.get("karsi") and tur.get("kaynak") not in ("karsi", "moderator", "ozet")
     h = next((h for h in talimat_hedefler() if h["ad"] == m.group("h").lower()), None); ileti = _talimat_temiz(m.group("m"))[:TALIMAT_EN_COK]
     if m.group("h").lower() in TALIMAT_YAPILACAK_AD and AYAR.get("talimat") is not False and kendi and len(ileti.split()) >= 2:  # hatırlatma/not → kullanıcının yapılacağı
-        return temiz, talimat_kuyruk("yapilacak", None, ileti, str(soru or "")[:TALIMAT_EN_COK], tur.get("kaynak") or "bas", claude=True)
+        ileti, zaman = animsatici_zaman_ayir(ileti)
+        return temiz, talimat_kuyruk("yapilacak", None, ileti, str(soru or "")[:TALIMAT_EN_COK], tur.get("kaynak") or "bas", claude=True, zaman=zaman)
     if AYAR.get("talimat") is False or not kendi or not h or len(ileti.split()) < 2:
         print(f"TALİMAT: Claude'un iletisi alınmadı ({'kapalı' if AYAR.get('talimat') is False else 'kullanıcının sorusu değil' if not kendi else 'hedef yok' if not h else 'ileti kısa'})")
         return temiz, False
@@ -174,8 +183,11 @@ def _talimat_uygula(eid):
     except ValueError: a = {}
     if x["tur"] == "oturum": ok, sonuc = _gelen_yaz(eid, a)
     else:
-        while toplanti_var(): time.sleep(20)  # toplantıda tarayıcıda taslak açılmasın
-        ok, sonuc = _yapilacak_taslak(a)
+        ok, sonuc = animsatici_ekle(a)
+        if not ok:  # Anımsatıcılar olmadı (izin, liste): eski yol — kendine e-posta taslağı
+            print(f"TALİMAT: Anımsatıcılar'a eklenemedi ({sonuc}) — e-posta taslağına düşüldü")
+            while toplanti_var(): time.sleep(20)  # toplantıda tarayıcıda taslak açılmasın
+            ok, sonuc = _yapilacak_taslak(a)
     eylem_sonuc({"id": eid, "durum": "yapildi" if ok else "hata", "sonuc": sonuc})
     _talimat_kayit({"id": eid, "tur": x["tur"], "hedef": a.get("hedef"), "durum": "yapildi" if ok else "hata", "sonuc": sonuc})
     print(f"TALİMAT: {eid} {'uygulandı' if ok else 'uygulanamadı'} — {sonuc}")
@@ -191,6 +203,26 @@ def _gelen_yaz(eid, a):
     o = {"id": eid, "at": datetime.datetime.now().isoformat(timespec="seconds"), "metin": a.get("metin"), "duyulan": a.get("duyulan"), "toplantida": a.get("toplantida")}
     with LOCK: write([(yol, json.dumps(o, ensure_ascii=False) + "\n")])
     return True, _t(f"{h.get('etiket') or h['ad']} gelen kutusuna yazıldı", f"written to the {h.get('etiket') or h['ad']} inbox")
+def animsatici_ekle(a):  # Suflor Takvim.app --animsatici → (ok, sonuç metni)
+    is_ = str(a.get("metin") or "").strip(); z = a.get("zaman")
+    if not is_: return False, "boş"
+    app = globals().get("TAKVIM_APP") or ""
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"TALİMAT (deneme): anımsatıcı · {is_[:60]}{' · ' + z if z else ''}"); return True, _t("Anımsatıcılar'a eklendi (deneme)", "added to Reminders (test)")
+    if not os.path.isdir(app): return False, "Suflor Takvim.app yok"
+    istek = os.path.join(BASE, "animsatici-istek.json"); cikti = os.path.join(BASE, "animsatici-cikti.json")
+    try:
+        if os.path.exists(cikti): os.remove(cikti)
+        fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"baslik": is_, "zaman": z, "not": _t("Suflor.me — sesle eklendi", "Suflor.me — added by voice")}, f, ensure_ascii=False)
+        subprocess.run(["open", "-g", "-W", "-n", "-a", app, "--args", "--animsatici", istek, "--cikti", cikti], capture_output=True, timeout=150)
+        o = json.load(open(cikti, encoding="utf-8"))
+    except (OSError, ValueError, subprocess.TimeoutExpired) as e: return False, e.__class__.__name__
+    finally:
+        for f in (istek, cikti):
+            try: os.remove(f)
+            except OSError: pass
+    if o.get("durum") != "ok": return False, str(o.get("hata") or o.get("durum"))[:120]
+    return True, _t(f"Anımsatıcılar'a eklendi ({o.get('liste')}{', ' + z.replace('T', ' ') if o.get('saatli') else ''})", f"added to Reminders ({o.get('liste')}{', ' + z.replace('T', ' ') if o.get('saatli') else ''})")
 def _yapilacak_taslak(a):
     ben = eposta_ben() if "eposta_ben" in globals() else None
     if not ben: return False, _t("e-posta adresi yok (ayar eposta_adres)", "no email address (setting eposta_adres)")

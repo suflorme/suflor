@@ -367,6 +367,9 @@ def _uclu_ana_notu(tur, ad):  # üçlü sohbet açıkken kullanıcıya verilen c
     k = kisilik(ad) or {}; oad = _uclu_takma(_uclu_obur(ad)); kul = _uclu_kul()
     out = _t("[Üçlü sohbet: kitap, film ya da kişi hakkında bildiğini rahatça söyle; ama tırnaklı alıntı ya da replik uydurma, olmayan olay ekleme; emin olmadığın olguda (cilt, yıl, sayı) kısaca «emin değilim» de; şaka açıkça şaka olsun; bu kuralı anlatma.]\n",
              "[Three-way chat: say what you know about books, films or people freely, but never invent quotes or lines or add events that didn't happen; if unsure of a fact (volumes, years, numbers) just say you're not sure; a joke must be clearly a joke; don't mention this rule.]\n")
+    # v0.131.0 (24 Ekim denemesi: "Marvin, dün akşam ne yaptın?" → konuşma kaydındaki saatleri saydı): kendine dair arkadaşça soruda karakterle oyuna girer
+    out += _t("[Sana kendinle ilgili arkadaşça bir soru gelirse (dün akşam ne yaptın, nasılsın, hafta sonun nasıldı) karakterinle oyuna gir: kısa, sıcak, şaka olduğu belli bir cevap ver (asistan olduğunu unutmadan); konuşma kaydının saatlerini sayma, kaynak gösterme.]\n",
+              "[If you're asked a friendly question about yourself (what you did last night, how you are), play along in character: short, warm, clearly playful (still an assistant); don't list conversation-log times or cite sources.]\n")
     if _uclu_bicim(k) == "sen" and k.get("bicim") != "sen":
         out += _t(f"[Üçlü sohbet: {kul}'e bu sohbette «{kul}» de ve «sen» diye konuş; «{kul} Bey» ve «siz» yok.]\n", f"[Three-way chat: call {kul} by first name, informally.]\n")
     if tur.get("veda"): return out

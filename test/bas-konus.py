@@ -134,29 +134,29 @@ try:
     t0 = time.time(); k = sor("Evet."); sn_ = time.time() - t0; t_karar = time.time()
     e = ey()
     ok(f"'Evet.' → takvim onaylandı (kaynak ses, duyulan metin kayıtta), Claude'a gitmedi ({sn_:.1f} sn)", e[ids[0]]["durum"] == "onaylandi" and e[ids[0]]["kaynak"] == "ses" and "evet" in (e[ids[0]]["ses_metin"] or "").lower()
-       and len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) == cagri0 and "Takvim onaylandı" in (k.get("cevap") or ""))
-    ok("geri okuma sonra sıradaki soru okundu", log().rfind("Takvim onaylandı.") < log().rfind("Kayıt: Karar yaz") and sesli() == ids[1])
+       and len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) == cagri0 and "Takvimine ekliyorum" in (k.get("cevap") or ""))
+    ok("geri okuma sonra sıradaki soru okundu", log().rfind("Takvimine ekliyorum.") < log().rfind("Karar yaz. Bunu kayda") and sesli() == ids[1])
     ok("panoda Geri al süresi (≤ 10 sn)", 0 < e[ids[0]]["geri_al_sn"] <= 10)
     bekle_p = subprocess.Popen([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", "eylem", "bekle", "--sn", "40"],
                                stdout=subprocess.PIPE, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay))
     k = sor("Hayır, gerek yok.")
     erken = (bekle_p.poll() is None) if time.time() - t_karar < 9 else None  # (9 sn geçtiyse ölçülemez)
     ok("'Hayır, gerek yok.' → kayıt reddedildi", ey()[ids[1]]["durum"] == "reddedildi" and sesli() == ids[2])
-    ok("Geri al → kayıt yeniden bekliyor, soru yeniden okundu", uc("/eylem-geri-al", {"id": ids[1]}, pano=True)["ok"] and ey()[ids[1]]["durum"] == "bekliyor" and sesli() == ids[1] and log().count("Kayıt: Karar yaz") == 2)
+    ok("Geri al → kayıt yeniden bekliyor, soru yeniden okundu", uc("/eylem-geri-al", {"id": ids[1]}, pano=True)["ok"] and ey()[ids[1]]["durum"] == "bekliyor" and sesli() == ids[1] and log().count("Karar yaz. Bunu kayda") == 2)
     try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/eylem-geri-al", data=b'{"id": "x"}', headers={"X-Suflor-Anahtar": K}), timeout=5); kod = 200
     except urllib.error.HTTPError as e_: kod = e_.code
     ok("pano dışından Geri al yok (403)", kod == 403)
     k = sor("Evet yazma.")
-    ok("'Evet yazma.' (iki yönlü) → karar yok, yeniden sorar", ey()[ids[1]]["durum"] == "bekliyor" and "Anlamadım" in (k.get("cevap") or "") and sesli() == ids[1])
+    ok(f"'Evet yazma.' (iki yönlü) → karar yok, doğal cümleyle yeniden sorar ({k.get('cevap')!r})", ey()[ids[1]]["durum"] == "bekliyor" and re.search("duyamadım|kaçırdım|yeterli", k.get("cevap") or "") and "evet, hayır ya da" not in (k.get("cevap") or "").lower() and sesli() == ids[1])
     k = sor("Sonra.")
     ok("'Sonra.' → iş bekler, sıradaki soru", ey()[ids[1]]["durum"] == "bekliyor" and sesli() == ids[2])
     k = sor("Evet ama saati on bir yap.")
-    ok("'Evet ama…' → kısa cevap iste, karar yok", ey()[ids[2]]["durum"] == "bekliyor" and "Kısa cevap" in (k.get("cevap") or ""))
+    ok("'Evet ama…' → kısa cevap iste, karar yok", ey()[ids[2]]["durum"] == "bekliyor" and "emin olayım" in (k.get("cevap") or ""))
     t1 = time.time(); out = bekle_p.communicate(timeout=60)[0]
     ok("eylem bekle sesli onayı 10 sn dolmadan vermedi, sonra verdi; geri alınan reddi vermedi", erken is not False and f"UYGULA: {ids[0]}" in out and ids[1] not in out)
     k = sor("Hepsini onayla.")
     e = ey()
-    ok("'Hepsini onayla.' → kalan sunulanlar onaylandı, dizi bitti", all(e[i]["durum"] == "onaylandi" for i in ids[1:]) and sesli() is None and "Hepsi onaylandı" in (k.get("cevap") or ""))
+    ok("'Hepsini onayla.' → kalan sunulanlar onaylandı, dizi bitti", all(e[i]["durum"] == "onaylandi" for i in ids[1:]) and sesli() is None and "hepsini onaylıyorum" in (k.get("cevap") or ""))
     ok("sesli cevaplarda Claude süreci hiç çağrılmadı", len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) == cagri0)
     # S48: biten toplantının defteri — süreç başına bir kez tam defter, aynı süreçte yalnız ek, "---" sonrası okunmaz, toplantı değişince yeni süreç
     ok("toplantı yokken panoda defter satırı yok", st().get("defter") is None)
@@ -362,7 +362,7 @@ try:
     ist = json.load(open(os.path.join(canli, "konus-istek.json")))["args"]
     ok("istemde oturuma ileti yolu ve hedef (iki kişilikte de ortak kısımda)", any("[İLET <hedef>: <ileti>]" in a and "proje = " in a for a in ist))
     ok("Claude'un [İLET …] etiketi okunmadı, panoda görünmedi; ileti onaya sunuldu (aynı yol)", kt["durum"] == "hazir" and "iletiyi hazırladım" in (kt.get("cevap") or "")
-       and "[İLET" not in (kt.get("cevap") or "") and "İLET" not in okunan and "R12" not in okunan.split("Oturuma talimat")[0]
+       and "[İLET" not in (kt.get("cevap") or "") and "İLET" not in okunan and "R12" not in "\n".join(okunan.split("\n")[:next((i for i, x in enumerate(okunan.split("\n")) if "İleteyim mi?" in x), 0)]) and "İleteyim mi?" in okunan
        and "TALİMAT: Claude hazırladı · oturum → proje onay bekliyor" in log())
     if "TALİMAT: Claude hazırladı" not in log(): print("   okunan:", okunan[:300], "| cevap:", (kt.get("cevap") or "")[:200])
     # v0.117.0 (S136): toplantı yokken pano kutusundaki soru asistana yazılı gider — cevap panoda, sesli okunmaz. Ayrı deneme aktarıcısıyla

@@ -32,11 +32,11 @@ try:
     time.sleep(0.5); L = log()
     ok("özet sesli okundu (karar/iş/açık sayısı, kararlar, öneri, bekleyen sayısı)", "Toplantı özeti hazır. 2 karar, 3 iş, 1 açık. Bütçe onaylandı; süre uzatıldı. Öneri: Gündemi kısalt." in L and "3 iş var" in L)
     post("/eylem-sun", {}); time.sleep(0.5)
-    ok("sun → ilk iş soruldu", "Kayıt: Karar: erişim listesi cuma güncellenir. Yazayım mı?" in log() and st()["eylem"]["sesli"] == ids[0])
+    ok("sun → ilk iş soruldu", "Karar: erişim listesi cuma güncellenir. Bunu kayda geçireyim mi?" in log() and st()["eylem"]["sesli"] == ids[0])
     post("/eylem-karar", {"id": ids[0], "durum": "onaylandi"}, pano=True); time.sleep(0.5)
-    ok("Onayla → ikinci iş soruldu", "Takip e-postası: Deniz — takip e-postası. Kişi: Deniz. Taslak olarak yazayım mı?" in log() and st()["eylem"]["sesli"] == ids[1])
+    ok("Onayla → ikinci iş soruldu", "Deniz — takip e-postası. Taslağını hazırlayayım mı?" in log() and st()["eylem"]["sesli"] == ids[1])
     post("/eylem-sesli", {"komut": "sonra"}, pano=True); time.sleep(0.5)
-    ok("Sonra → üçüncü iş, ikinci bekliyor", st()["eylem"]["sesli"] == ids[2] and "Metni hazırlayayım mı?" in log()
+    ok("Sonra → üçüncü iş, ikinci bekliyor", st()["eylem"]["sesli"] == ids[2] and "Metnini hazırlayayım mı?" in log()
        and next(x for x in st()["eylem"]["liste"] if x["id"] == ids[1])["durum"] == "bekliyor")
     try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/eylem-sesli", data=b'{"komut":"sus"}', headers={"X-Suflor-Anahtar": K})); kod = 200
     except urllib.error.HTTPError as e: kod = e.code
@@ -69,7 +69,21 @@ TABLO = [("Evet.", "onay"), ("Evet, yaz.", "onay"), ("Tamam.", "onay"), ("Olur o
          ("Ne dedin?", "tekrar"), ("Tekrar.", "tekrar"), ("Repeat.", "tekrar"),
          ("Evet yazma.", "karisik"), ("Hayır evet.", "karisik"), ("Hepsini reddet.", "karisik"), ("Tamam dur.", "karisik"),
          ("Evet ama saati on bir yap.", "uzun"), ("Evet ama.", "uzun"), ("Bunu yarın sabah ilk iş olarak yaz.", "uzun"),
+         ("Aç.", "onay"), ("Aç lütfen.", "onay"), ("Olsun.", "onay"), ("Boş ver.", "red"), ("Vazgeç.", "red"), ("Açma.", "red"),  # v0.131.0: sorunun fiili onay
          ("Altyazı M.K.", "yok"), ("Teşekkürler.", "yok"), ("", "yok"), ("Hı.", "yok")]
 yanlis = [(m, b, _ns["sesli_ayir"](m)) for m, b in TABLO if _ns["sesli_ayir"](m) != b]
 ok(f"sesli cevap ayırıcısı {len(TABLO) - len(yanlis)}/{len(TABLO)}" + (f" — yanlış: {yanlis}" if yanlis else ""), not yanlis)
+# v0.131.0: doğal soru ve yeniden sorma (aktarıcının kendi tanımları)
+_ad2 = {"EYLEM_FIIL", "SORU_YENIDEN", "SORU_UZUN", "SORU_BIRAK", "kullanici_ilk_ad", "_eylem_fiil", "_yeniden_sor", "_soru_metni", "_cumle"}
+_ns2 = {"re": __import__("re"), "datetime": __import__("datetime"), "AYAR": {"ad": "Deniz K"}, "ARAYUZ_DILI": "tr", "_t": lambda a, b: a, "SORU": {}}
+exec(compile(ast.Module([n for n in ast.parse(_k).body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in _ad2 for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in _ad2)], []), "relay", "exec"), _ns2)
+yil = __import__("datetime").date.today().year
+s = _ns2["_soru_metni"]({"tur": "yapilacak", "baslik": f"Yarın Pazar 25 Ekim {yil} sabah 10.00'da Ali'yi ara"})
+ok(f"ilk soru doğal, adla, yılsız: {s!r}", s == "Deniz, Yarın Pazar 25 Ekim sabah 10.00'da Ali'yi ara. Hatırlatma olarak ekleyeyim mi?")
+x = {"tur": "takvim", "baslik": "Toplantı"}; y1 = _ns2["_yeniden_sor"](x); y2 = _ns2["_yeniden_sor"](x)
+ok(f"anlaşılmazsa seçenek saymadan bir kez daha sorar, ikincisinde bırakır: {y1!r}", y1 and "takvimine ekleyeyim mi" in y1.lower() and "sonra" not in y1 and y2 is None)
+_ns2["SORU"]["deneme"] = 0; u = _ns2["_yeniden_sor"](x, uzun=True); ok(f"uzun cevapta: {u!r}", u == "Anladım, yalnız emin olayım: takvimine ekleyeyim mi?")
+cumleler = set()
+for _ in range(20): _ns2["SORU"]["deneme"] = 0; cumleler.add(_ns2["_yeniden_sor"](x))
+ok(f"yeniden sorma cümleleri değişir ({len(cumleler)} farklı)", len(cumleler) >= 2 and all("  " not in c and " ," not in c for c in cumleler))
 print("yazayım:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

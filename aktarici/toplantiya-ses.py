@@ -69,7 +69,7 @@ def toplanti_ses_motoru():
 # Sesle ses değiştirme (v0.113.0): yalnız tüm cümle komutsa ("tamam, Pocket sesine dön", "Pocket'a geç", "Gemini sesine geç", "Mac sesine geç"; Whisper
 # "Pocket"ı paket/pakıt yazabiliyor). Toplantıda toplanti_ses ayarını kalıcı değiştirir (⚙ Ayarlar'da da görünür); toplantı dışında v0.98.0 Gemini geçişi.
 SES_KOMUT_RX = re.compile(r"(?i)^\W*(?:(?:tamam|peki|lütfen|hadi|şimdi|o\s+zaman)\W+)*(?P<m>pocket|poket|pakıt|paket|yerel|kendi|normal|gemini|cemini|mac)"
-                          r"(?:'?(?:[ıiuü]n|y?[ae]))?\s*(?:ses\w*\s+)?(?:dön|geç|konuş|kullan|başla)\w*(?:\s+m[ıiuü]s[ıiuü]n)?(?:\W+lütfen)?\W*$")
+                          r"(?:'?(?:n?[ıiuü]n|n|y?[ae]))?\s*(?:ses\w*\s+)?(?:dön|geç|konuş|kullan|başla)\w*(?:\s+m[ıiuü]s[ıiuü]n)?(?:\W+lütfen)?\W*$")
 def ses_komut(metin):  # → okunacak kısa onay ya da None (komut değil)
     m = SES_KOMUT_RX.search(" ".join(str(metin or "").split()))
     if not m: return gemini_gecis_komut(metin)

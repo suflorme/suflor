@@ -8,6 +8,7 @@
 # izin-kanca → /izin-iste), karşı tarafın sorusuna sesli cevap (Y2, bas-konus/otonom).
 EYLEM_TUR["izin"] = "İzin"
 EYLEM_SORU["izin"] = ("İzin vereyim mi?", "Shall I allow it?")
+EYLEM_FIIL["izin"] = (("İzin vereyim mi?", "İzin veriyorum.", "Peki, izin vermiyorum."), ("Shall I allow it?", "Allowing it.", "Okay, not allowing it."))  # v0.131.0
 IZIN = {}            # id → {"olay": Event, "karar": None|str, "tur": str}
 IZIN_KAYNAK = {}     # Y1: anahtarsız kaynak → {"durum": bekliyor|onaylandi|reddedildi, "t": zaman, "id": eylem id}
 IZIN_KAYNAK_SN = 12 * 3600; IZIN_RED_SN = 30 * 60; IZIN_BEKLE_SN = 180

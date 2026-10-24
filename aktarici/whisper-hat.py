@@ -249,7 +249,11 @@ def _isci_ac():
         pr.kill(); w.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"WHISPER: {w['hata']}"); return False
     _ISCI.update(p=pr, satirlar=q, baslik=None); w.update(durum="hazir", model=j.get("model"), motor=j.get("motor") or "mlx"); kume_sifirla()
     STATE["ses_model"].update(durum="hazir" if j.get("ecapa") else "yok", hata=None if j.get("ecapa") else f"ses izi ağırlıkları yok ({ECAPA})", sn=j.get("sn"))
-    print(f"WHISPER: hazır ({j.get('model')}, {time.time() - t:.1f} sn{', ses izi (ECAPA, MLX)' if j.get('ecapa') else ', ses izi yok'})")
+    sn_ = time.time() - t; yavas = ""
+    if sn_ > 15 and "sistem_anlik" in globals():  # v0.131.0 (24 Ekim: 29 sn, olağanı 4–6 sn): yavaş yüklemede bellek durumu — sıkışma mı, ayırmak için
+        try: sa = sistem_anlik(); yavas = f" · YAVAŞ: boş bellek %{sa.get('bos_yuzde')}, takas {sa.get('takas_mb')} MB, yük {sa.get('yuk')}"
+        except Exception: pass
+    print(f"WHISPER: hazır ({j.get('model')}, {sn_:.1f} sn{', ses izi (ECAPA, MLX)' if j.get('ecapa') else ', ses izi yok'}{yavas})")
     return True
 def _isci_kapat(neden):
     pr = _ISCI["p"]; _ISCI.update(p=None, satirlar=None)

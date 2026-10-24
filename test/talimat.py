@@ -13,7 +13,7 @@ def ok(ad, k): print(("✓ " if k else "✗ ") + ad, flush=True); HATA.append(ad
 HEDEF = [{"ad": "proje", "etiket": "proje oturumu", "kalip": ["proje oturumuna", "ana oturuma"]}, {"ad": "gelistirme", "etiket": "geliştirme oturumu", "kalip": ["geliştirme oturumuna"]}]
 # 1) ayrıştırma
 src = open(os.path.join(KOD, "aktarici", "talimat.py"), encoding="utf-8").read()
-ns = {"re": re, "os": os, "json": json, "time": time, "AYAR": {"talimat_hedefler": HEDEF}, "_t": lambda a, b: a, "kisilik_hitap_bul": lambda m: (None, re.sub(r"^Atlas,\s*", "", m))}
+ns = {"re": re, "os": os, "json": json, "time": time, "datetime": __import__("datetime"), "AYAR": {"talimat_hedefler": HEDEF}, "_t": lambda a, b: a, "kisilik_hitap_bul": lambda m: (None, re.sub(r"^Atlas,\s*", "", m))}
 exec(src[src.index("TALIMAT_FIIL ="):src.index("def _talimat_kayit")], ns)
 for g, b in [("proje oturumuna ilet: sözleşme taslağını cuma 17.00'ye kadar hazırla", ("oturum", "proje", "sözleşme taslağını cuma 17.00'ye kadar hazırla")),
              ("Geliştirme oturumuna şunu söyle, panodaki düğme rengini koyulaştır.", ("oturum", "gelistirme", "panodaki düğme rengini koyulaştır")),
@@ -32,7 +32,8 @@ ns["AYAR"]["talimat"] = False; ok("ayar talimat: false kapatır", ns["talimat_co
 ns["AYAR"] = {}; ok("ayar yoksa yalnız proje hedefi (geliştirme yok)", ns["talimat_coz"]("geliştirme oturumuna ilet: renk değişsin") is None and ns["talimat_coz"]("proje oturumuna ilet: renk değişsin"))
 # 1a) v0.101.1: Claude'un hazırladığı ileti — [İLET <hedef>: <ileti>] etiketi silinir, yalnız kullanıcının kendi sorusunda onaya gider
 nc = dict(ns, AYAR={"talimat_hedefler": HEDEF}, TALIMAT_EN_COK=1000); giden = []
-nc["talimat_kuyruk"] = lambda tur, h, ileti, metin, kaynak, claude=False: giden.append((tur, h["ad"] if h else None, ileti, kaynak, claude)) or True
+ZAMAN = []
+nc["talimat_kuyruk"] = lambda tur, h, ileti, metin, kaynak, claude=False, zaman=None: ZAMAN.append(zaman) or giden.append((tur, h["ad"] if h else None, ileti, kaynak, claude)) or True
 exec(src[src.index("TALIMAT_FIIL ="):src.index("def _talimat_kayit")] + src[src.index("TALIMAT_ETIKET_RX ="):src.index("def talimat_karar")], nc); exec("def print(*a, **k): pass", nc)
 c_ = "Tamam, hazırladım.\n---\nAyrıntı.\n[İLET proje: R12 Ali raporu işini listeden çıkar.]"
 t_, g_ = nc["talimat_claude"](c_, "o işi listeden çıkaralım", {"kaynak": "bas"})
@@ -49,7 +50,12 @@ nc["AYAR"] = {"talimat_hedefler": HEDEF}; i_ = nc["talimat_istem"]()
 ok("istemde hedef listesi ve etiket biçimi", "proje = proje oturumu" in i_ and "gelistirme = geliştirme oturumu" in i_ and "[İLET <hedef>: <ileti>]" in i_)
 t_, g_ = nc["talimat_claude"]("Hazırladım.\n[İLET yapilacak: Cumartesi 10.00'da Ali'yi ara.]", "yarın onda Ali'yi aramamı hatırlatan bir not yaz", {"kaynak": "sohbet"})
 ok("24 Ekim: hatırlatma/not → kullanıcının yapılacağı (oturuma değil), etiket silindi", g_ and t_ == "Hazırladım." and giden[-1] == ("yapilacak", None, "Cumartesi 10.00'da Ali'yi ara", "sohbet", True))
+t_, g_ = nc["talimat_claude"]("Hazırladım. [İLET yapilacak: Pazar sabah 10.00'da Ali'yi ara | 2026-10-25T10:00]", "s", {"kaynak": "sohbet"})
+ok(f"v0.131.0: etiketteki saat ayrılır (Anımsatıcılar): {giden[-1][2]!r} · {ZAMAN[-1]!r}", g_ and giden[-1][2] == "Pazar sabah 10.00'da Ali'yi ara" and ZAMAN[-1] == "2026-10-25T10:00")
+ok("saat biçimleri: '2026-10-25 9.30' → 09:30, saatsiz → None, bozuk tarih → None", nc["animsatici_zaman_ayir"]("a b | 2026-10-25 9.30") == ("a b", "2026-10-25T09:30")
+   and nc["animsatici_zaman_ayir"]("süt al") == ("süt al", None) and nc["animsatici_zaman_ayir"]("x y | 2026-13-40T10:00")[1] is None)
 t_, g_ = nc["talimat_claude"]("Tamam. [İLET hatırlatma: süt al]", "s", {"kaynak": "karsi", "karsi": True}); ok("karşı tarafın isteğinde yapılacak da gitmez", not g_ and t_ == "Tamam.")
+ok("istemde saat alanı ve Anımsatıcılar", "| <YYYY-MM-DDTHH:MM>]" in i_ and "Anımsatıcılar" in i_)
 ok("istemde hatırlatma yolu, 'yazamıyorum' yok, gece 'yarın' sorusu, eylemde kısa doğrulama", "[İLET yapilacak:" in i_ and "'yazamıyorum' deme" in i_ and "00.00 ile 05.00" in i_ and "tek kısa doğrulama sorusu" in i_)
 ok("okuma sınırı: etiketin başı yakalanır (kapanış gelmeden)", nc["TALIMAT_ETIKET_BAS"].search("Hazırladım. [İLET pro") is not None)
 # 1b) onay sözcükleri (v0.77.1, kullanıcı: evet dışında gönder, bildir, onaylıyorum, yes, tamam da onay)
@@ -122,13 +128,16 @@ try:
     k3 = next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and "vergi" in c.get("text", "") and c.get("status") == "acik"), None)
     ok("yapılacak → onay kartı", bool(k3))
     uc("/card-ack", {"id": k3["id"], "status": "onaylandi"}, pano=True); time.sleep(2)
-    ok("toplantı sürerken taslak açılmadı", "taslak gmail" not in L())
+    t0 = time.time()
+    while time.time() - t0 < 20 and "anımsatıcı · vergi" not in L(): time.sleep(0.5)  # sesli değil kartla onay: Geri al beklemesi yok
+    ok(f"v0.131.0: onaylanan yapılacak Anımsatıcılar'a (toplantı sürerken de; e-posta taslağı açılmaz) — {time.time() - t0:.0f} sn",
+       "TALİMAT (deneme): anımsatıcı · vergi beyannamesini kontrol et" in L() and "taslak gmail" not in L() and "Anımsatıcılar'a eklendi" in L())
     NABIZ.set(); t0 = time.time()
-    while time.time() - t0 < 40 and "taslak gmail" not in L(): time.sleep(0.5)  # SUFLOR_TEST_HIZLI: toplantı 6 sn nabızsız biter
-    ok(f"toplantı bitince e-posta taslağı (kendi adresine) — {time.time() - t0:.0f} sn", "TALİMAT (deneme): taslak gmail · Yapılacak: vergi beyannamesini kontrol et" in L())
+    while time.time() - t0 < 40 and (uc("/status").get("extension") or {}).get("call"): time.sleep(0.5)  # SUFLOR_TEST_HIZLI: toplantı 6 sn nabızsız biter
+    time.sleep(1)
     # toplantı dışında: Konuş'a söylenen talimat → sesli geri okuma + "İleteyim mi?", panodan Onayla → gelen kutusu
     uc("/bas-konus", {"metin": "Proje oturumuna şunu söyle: haftalık raporu pazartesiye çek."}, pano=True); time.sleep(1)
-    ok("toplantı dışında: sesli geri okuma ve 'İleteyim mi?'", "Oturuma talimat: haftalık raporu pazartesiye çek. İleteyim mi?" in L())
+    ok("toplantı dışında: sesli geri okuma ve 'İleteyim mi?'", "haftalık raporu pazartesiye çek. İleteyim mi?" in L())
     x = next((x for x in (uc("/cards").get("eylem") or {}).get("liste") or [] if "haftalık raporu" in x["baslik"]), None)
     ok("panoda onay bekliyor, Claude'a gitmedi", bool(x) and x["durum"] == "bekliyor" and "açık süreç açıldı" not in L())
     uc("/eylem-karar", {"id": x["id"], "durum": "onaylandi"}, pano=True); time.sleep(1)
