@@ -1679,6 +1679,7 @@ bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslendirme (ayar ses_motoru: piper)
 bolum("pocket-ses")  # aktarici/pocket-ses.py — Pocket TTS ile yerel Türkçe ses (kişilikte yerel_ses: pocket:…; S93)
 bolum("gemini-ses")  # aktarici/gemini-ses.py — Gemini TTS ile seslendirme (ayar ses_motoru: gemini; v0.78.0)
+bolum("azure-ses")  # aktarici/azure-ses.py — Azure MAI sesi, Gemini okuyamayınca yedek (ayar azure_yedek; v0.128.0, S151)
 bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /status beyin), Anahtar Zinciri, Ollama'yı gerekince başlatma (Faz 11 Aşama 4)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)

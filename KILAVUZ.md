@@ -87,7 +87,11 @@ En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API
 11 hazır ses (Gemini sesi) ve model (3.8 Flash-Lite, ilk ses ~0,7 sn; 3.8 Flash) oradan seçilir. Okunacak cevap metni Google'a gider (ses kaydı
 gitmez); canlı kullanım için ücretli katman gerekir (ücretsiz katman günde 10 istek; metni eğitimde kullanır). İnternet yoksa Mac sesi okur.
 Model başına günde 100 istek var; ayardaki model dolunca öbürüne (Flash-Lite ↔ 3.8 Flash) geçilir, ikisi de dolunca yerel ses okur
-(ayar `gemini_yedek_model: false` yalnız seçili model). Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi), `ses_uslup_en: …` (aynı
+(ayar `gemini_yedek_model: false` yalnız seçili model).
+Yedek bulut ses (isteğe bağlı): Azure MAI sesi. Gemini okuyamayınca (sınır dolu ya da hata) Elif (kadın Gemini sesleri) ya da Aydın (erkek) okur, o da olmazsa yerel ses.
+Azure Speech kaynağının anahtarını Anahtar Zinciri'ne koy (`security add-generic-password -a "$USER" -s suflor-azure-speech -w`), ayara `"azure_yedek": true` yaz;
+bölge `azure_bolge` (varsayılan westeurope), ses `azure_ses_kadin` / `azure_ses_erkek`. Okunacak cevap metni Microsoft'a gider (ses kaydı gitmez; Azure anlık
+seslendirmede metni saklamaz); ücretsiz katman (F0) sınırda durur, ücret çıkmaz. Gizli toplantıda hiçbir bulut sesi kullanılmaz. Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi), `ses_uslup_en: …` (aynı
 yönergenin İngilizcesi; Gemini'ye bu gider, Türkçe yönerge ara sıra sesli okunuyor — yoksa Türkçenin ilk cümlesi gider) ve `ses_etiket: evet` (<chuckle> gibi sözsüz sesler) kişiliğe özel ses verir;
 toplantıda asistanın cevabı da o kişiliğin Gemini sesiyle okunur. Gemini açıkken sesli çeviri (çevirmen sesi ayar `ceviri_gemini_ses`), fısıltı ve
 toplantı özeti de Gemini'yle okunur; iki kişiliğin sesi de Gemini ise özet iki sesle (⚙ Ayarlar → İki sesli özet). Ton cümleye göre değişir (kötü haber,

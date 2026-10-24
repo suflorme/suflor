@@ -61,7 +61,8 @@ def gemini_gecis_komut(metin):  # → okunacak kısa onay ya da None (komut değ
     print(f"GEMINI: geçiş açıldı ({dk} dk, kullanıcı)")
     return _t(f"Tamam, {dk} dakika Gemini sesiyle konuşuyorum.", f"OK, I'll use the Gemini voice for {dk} minutes.")
 def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" or gemini_gecis_acik() else "toplanti"
-def gemini_izinli(toplantiya=False): return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi") and gemini_model() is not None  # v0.89.0: gizli toplantıda hiç; sınır dolunca yerel ses
+def gemini_izinli(toplantiya=False):  # v0.89.0: gizli toplantıda hiç; sınır dolunca yerel ses — v0.128.0: Azure yedeği hazırsa o (azure-ses.py)
+    return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi") and (gemini_model() is not None or ("azure_hazir" in globals() and azure_hazir()))
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
     return v if v in GEMINI_SESLER else "Charon"
@@ -128,19 +129,20 @@ def gemini_gunluk_view():  # panoya (⚙ Ayarlar → Gemini nerede): model sıra
 # boşalınca; Gemini isteği harcanmaz) ve günlükte bir satır; bir model dolunca bir satır (sıradaki model ya da yerel ses).
 GEMINI_UYARI_ORAN = 0.8
 GEMINI_UYARI = ("Gemini sesinin bugünkü sınırının yüzde sekseni doldu; dolunca yerel sese döneceğim.", "Gemini voice is at 80 percent of today's limit; I'll switch to the local voice when it runs out.")
+GEMINI_UYARI_AZURE = ("Gemini sesinin bugünkü sınırının yüzde sekseni doldu; dolunca yedek sese geçeceğim.", "Gemini voice is at 80 percent of today's limit; I'll switch to the backup voice when it runs out.")
 def _kota_bak(model):  # başarılı her istekten sonra
     b = gemini_bugun(); n = b.get(model, 0); gun = gemini_gun_basi(); z = gemini_zincir(); dolu = _kota()
     kalan = sum(0 if x in dolu else max(0, GEMINI_GUN_SINIR - b.get(x, 0)) for x in z); top = GEMINI_GUN_SINIR * len(z)
     if n >= GEMINI_GUN_SINIR and (GEMINI_KOTA.get("dolu_gun") or {}).get(model) != gun:
         GEMINI_KOTA["dolu_gun"] = {**(GEMINI_KOTA.get("dolu_gun") or {}), model: gun}; s = gemini_model()
-        print(f"GEMINI: günlük sınır doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — " + (f"sıradaki model {s}" if s else "okumalar yerel seste"))
+        print(f"GEMINI: günlük sınır doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — " + (f"sıradaki model {s}" if s else "okumalar Azure yedeğinde" if "azure_hazir" in globals() and azure_hazir() else "okumalar yerel seste"))
     if top - kalan >= top * GEMINI_UYARI_ORAN and kalan > 0 and GEMINI_KOTA.get("uyari_gun") != gun:
         GEMINI_KOTA["uyari_gun"] = gun
         print(f"GEMINI: günlük sınırın %{round(GEMINI_UYARI_ORAN * 100)}'i doldu ({top - kalan}/{top}, {len(z)} model) — sesli uyarı sırada")
-        if "yerel_uyari" in globals(): yerel_uyari(_t(*GEMINI_UYARI))
+        if "yerel_uyari" in globals(): yerel_uyari(_t(*(GEMINI_UYARI_AZURE if "azure_hazir" in globals() and azure_hazir() else GEMINI_UYARI)))
 def gemini_view():
     return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
-            "kapsam": gemini_kapsam(), "bugun": gemini_bugun()}
+            "kapsam": gemini_kapsam(), "bugun": gemini_bugun(), "azure": azure_view() if "azure_view" in globals() else None}
 def _gemini_baglanti():
     if GEMINI["c"] is None:
         GEMINI["c"] = (http.client.HTTPConnection if GEMINI_HOST.startswith("127.0.0.1") else http.client.HTTPSConnection)(GEMINI_HOST, timeout=GEMINI_ILK_SN)
@@ -352,7 +354,13 @@ def _onceden_cal(o, metin, iptal, kayit):  # önceden istenen sesi çal (gelmeye
     if oyn.poll() is None: oyn.terminate()
     print(f"GEMINI: önceden alınan ses çalındı · {len(metin)} karakter")
     return True
-def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None):
+def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, sabit=None):
+    # v0.128.0 (S151): Gemini okuyamazsa (sınır dolu, hata, bekleme) Azure MAI sesi (azure-ses.py, ayar azure_yedek); o da olmazsa çağıran yerel sese düşer
+    r = _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, sabit=sabit)
+    if (r is None if topla else r is False) and metin and "azure_hazir" in globals() and azure_hazir():
+        return azure_oku(metin, iptal=iptal, kayit=kayit, ses=ses, topla=topla, aygit=aygit, duzey=duzey)
+    return r
+def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
     # duzey: 0–1 ses düzeyi (kısık "hı hı").
@@ -409,8 +417,8 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                 hata = r.read()[:3000].decode("utf-8", "replace"); _gemini_kapat()
                 if r.status == 429 and _gunluk_mu(hata):  # günlük sınır: beklemek işe yaramaz — model sıfırlanana kadar bırakılır, öteki hemen denenir
                     sn = _kota_doldu(model, hata); oteki = gemini_model()
-                    print(f"GEMINI: {model} günlük sınırı doldu ({sn / 3600:.1f} saat sonra açılır)" + (f" — {oteki} ile devam" if oteki else " — iki model de dolu, Mac sesi"))
-                    if oteki: return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden, sabit=sabit)
+                    print(f"GEMINI: {model} günlük sınırı doldu ({sn / 3600:.1f} saat sonra açılır)" + (f" — {oteki} ile devam" if oteki else " — iki model de dolu (yedek ya da yerel ses)"))
+                    if oteki: return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden, sabit=sabit)
                     return None if topla else False
                 if r.status in (429, 503) and not _yeniden:  # v0.80.6: hız sınırı / geçici yoğunluk — önerilen süre (en çok GEMINI_429_EN_COK_SN) beklenip bir kez daha
                     bekle = _gemini_bekleme(hata, r.getheader("Retry-After")); t_b = time.time()
@@ -418,7 +426,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
                     while time.time() - t_b < bekle:
                         if iptal and iptal(): return None if topla else True  # okuma kesildi: Mac sesine düşülmez
                         time.sleep(0.1)
-                    return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
+                    return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
                 raise RuntimeError(f"HTTP {r.status}: {' '.join(hata.split())[:160]}")
             while True:
                 satir = r.readline()
@@ -449,7 +457,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
             _gemini_kapat()
             if not nbayt and not _yeniden and not isinstance(e, RuntimeError):  # zaman aşımı / bağlantı: yeni bağlantıyla bir kez daha (HTTP hatası kalıcı, denenmez)
                 print(f"GEMINI: ses gelmedi ({e.__class__.__name__}) — yeni bağlantıyla yeniden")
-                return gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
+                return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
             if not nbayt:
                 GEMINI.update(durum="hata", hata=str(e)[:200] or e.__class__.__name__, hata_t=time.time())
                 print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, {GEMINI_BEKLE_SN:.0f} sn Gemini denenmez"); return None if topla else False
