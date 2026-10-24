@@ -358,7 +358,7 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
     # v0.128.0 (S151): Gemini okuyamazsa (sınır dolu, hata, bekleme) Azure MAI sesi (azure-ses.py, ayar azure_yedek); o da olmazsa çağıran yerel sese düşer
     r = _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, sabit=sabit)
     if (r is None if topla else r is False) and metin and "azure_hazir" in globals() and azure_hazir():
-        return azure_oku(metin, iptal=iptal, kayit=kayit, ses=ses, topla=topla, aygit=aygit, duzey=duzey)
+        return azure_oku(metin, iptal=iptal, kayit=kayit, ses=ses, topla=topla, aygit=aygit, duzey=duzey, uslup=uslup)
     return r
 def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;

@@ -13,6 +13,19 @@ AZURE = {"anahtar": None, "anahtar_t": 0.0, "hata_t": 0.0, "hata": None, "kilit"
 AZURE_KADIN = {"Kore", "Aoede", "Leda", "Zephyr", "Sulafat"}  # GEMINI_SESLER'in kadın sesleri
 AZURE_ILK_SN = 4.0
 AZURE_BEKLE_SN = 30.0  # hata sonrası bu kadar denenmez
+# v0.129.0: MAI seslerinin 11 duygu biçimi (SSML mstts:express-as). Sıra: Gemini'deki durum tonu (ton_bul) → fısıltı/çevirmen nötr → cümle kuralı →
+# kişiliğin azure_stil'i (Gemini sesi o kişiliğinkiyse) → nötr. Ayar azure_stil: false biçimsiz okur. Standart nöral seslerde (modelsiz ad) biçim yok.
+AZURE_STILLER = ("adventurous", "caringempathy", "curious", "encouraging", "excited", "friendlycheerful", "neutral", "nostalgic", "reflective", "saddisappointed", "serious")
+AZURE_TON = {"kotu_haber": "saddisappointed", "uyari": "serious", "ciddi": "serious", "acele": "serious", "sakin": "caringempathy", "yumusak": "caringempathy"}
+AZURE_KURAL = [  # (biçim, kalıp) — ilk eşleşen
+    ("saddisappointed", re.compile(r"\b(maalesef|ne yazık ki|üzgünüm|üzüldüm|kaybettik|iptal edildi|başaramadık)\b", re.I)),
+    ("encouraging", re.compile(r"\b(merak etme|endişelenme|yapabilirsin|başarırsın|hallederiz|halledersin|sorun değil|üzülme)\b", re.I)),
+    ("excited", re.compile(r"\b(harika|müthiş|süper|tebrik\w*|inanılmaz|muhteşem|kazandı\w*|başardı\w*)\b", re.I)),
+    ("nostalgic", re.compile(r"\b(eskiden|o zamanlar|hatırlıyor mus\w*|yıllar önce|çocukken)\b", re.I)),
+    ("adventurous", re.compile(r"\b(hadi|haydi|deneyelim|keşfedelim|maceraya)\b", re.I)),
+    ("reflective", re.compile(r"\b(düşünüyorum da|bir yandan bakınca|enine boyuna)\b", re.I)),
+    ("curious", re.compile(r"\?\s*$")),
+]
 AZURE_ETIKET_RX = re.compile(r"\s*<[a-z_ ]{1,20}(?::\s*[a-z_]+)?>\s*", re.I)  # Gemini'nin sözsüz ses ve ton etiketleri (<chuckle>, <ton:uyari>)
 def azure_anahtar():
     if os.environ.get("SUFLOR_TEST_AZURE_ANAHTAR") is not None: return os.environ["SUFLOR_TEST_AZURE_ANAHTAR"]
@@ -27,22 +40,35 @@ def azure_ses_adi(gses=None):  # Gemini sesi → Azure ses adı (tr-TR-Elif:MAI-
     ad = str(AYAR.get("azure_ses_kadin" if kadin else "azure_ses_erkek") or ("Elif" if kadin else "Aydin"))
     model = str(AYAR.get("azure_model", "MAI-Voice-2.1-Flash") or "")  # "" → standart nöral sesler
     return f"tr-TR-{ad}:{model}" if model else f"tr-TR-{ad}"
+def azure_stil(metin, ses=None, uslup=None, ham=None):  # → biçim adı ya da None (biçimsiz)
+    if AYAR.get("azure_stil") is False: return None
+    ton = ton_bul(ham or metin) if "ton_bul" in globals() else None
+    if ton in AZURE_TON: return AZURE_TON[ton]
+    if uslup and re.search(r"whisper|interpreter", str(uslup), re.I): return "neutral"
+    for ad, rx in AZURE_KURAL:
+        if rx.search(metin or ""): return ad
+    try:
+        for k in (kisilikler() if "kisilikler" in globals() else []):
+            if k.get("azure_stil") in AZURE_STILLER and gemini_kisilik_sesi(k) == gemini_ses(ses): return k["azure_stil"]
+    except Exception: pass
+    return "neutral"
 def _azure_host(): return os.environ.get("SUFLOR_TEST_AZURE_HOST") or f"{AYAR.get('azure_bolge') or 'westeurope'}.tts.speech.microsoft.com"
-def _azure_kayit(ses, metin, ses_sn, ilk):
-    try: write([(os.path.join(BASE, "azure-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "ses": ses, "karakter": len(metin),
+def _azure_kayit(ses, metin, ses_sn, ilk, stil=None):
+    try: write([(os.path.join(BASE, "azure-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "ses": ses, "stil": stil, "karakter": len(metin),
                                                                     "ses_sn": round(ses_sn, 2), "ilk_ses": round(ilk, 2) if ilk else None}) + "\n")])
     except Exception as e: print(f"AZURE: kayıt yazılamadı ({e.__class__.__name__})")
 def azure_view():
     if AYAR.get("azure_yedek") is not True: return None
     return {"hazir": azure_hazir(), "hata": AZURE["hata"]}
-def azure_oku(metin, iptal=None, kayit=None, ses=None, topla=False, aygit=None, duzey=None):
+def azure_oku(metin, iptal=None, kayit=None, ses=None, topla=False, aygit=None, duzey=None, uslup=None):
     # gemini_oku ile aynı sözleşme: bitince True (topla: ham ses), hiç ses çalınamadıysa False (topla: None)
-    metin = re.sub(r"\s{2,}", " ", AZURE_ETIKET_RX.sub(" ", metin or "")).strip()
+    ham = metin; metin = re.sub(r"\s{2,}", " ", AZURE_ETIKET_RX.sub(" ", metin or "")).strip()
     if not metin or not azure_hazir(): return None if topla else False
     if aygit and not os.access(PIPER_OYNAT, os.X_OK): return False
-    ad = azure_ses_adi(ses)
-    ssml = (f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="tr-TR"><voice name="{_xml_escape(ad)}">'
-            f'{_xml_escape(metin)}</voice></speak>').encode()
+    ad = azure_ses_adi(ses); stil = azure_stil(metin, ses, uslup, ham) if ":" in ad else None
+    govde = f'<mstts:express-as style="{stil}">{_xml_escape(metin)}</mstts:express-as>' if stil else _xml_escape(metin)
+    ssml = (f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="tr-TR">'
+            f'<voice name="{_xml_escape(ad)}">{govde}</voice></speak>').encode()
     host = _azure_host(); t0 = time.time(); ilk = None; nbayt = 0; oyn = None; tampon = bytearray()
     sessiz = bool(os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ")) or topla
     with AZURE["kilit"]:
@@ -87,7 +113,7 @@ def azure_oku(metin, iptal=None, kayit=None, ses=None, topla=False, aygit=None, 
         except subprocess.TimeoutExpired: pass
         if oyn.poll() is None: oyn.terminate()
     elif tampon and not sessiz: _pcm_cal(bytes(tampon), iptal=iptal, kayit=kayit, aygit=aygit)
-    _azure_kayit(ad, metin, nbayt / 2 / GEMINI_SR, ilk)
-    print(f"AZURE: {ad} · {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")
+    _azure_kayit(ad, metin, nbayt / 2 / GEMINI_SR, ilk, stil)
+    print(f"AZURE: {ad} · {stil or 'biçimsiz'} · {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")
     if topla: return bytes(tampon) if tampon else None
     return nbayt > 0

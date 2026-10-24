@@ -58,6 +58,21 @@ ad["AYAR"]["azure_ses_kadin"] = "Emel"; ad["AYAR"]["azure_model"] = ""; ad["gemi
 bak("ayarla ses ve model değişir (Emel, modelsiz standart ses)", 'name="tr-TR-Emel"' in A["gelen"][-1]["govde"]); ad["AYAR"].pop("azure_ses_kadin"); ad["AYAR"].pop("azure_model")
 pcm = ad["gemini_pcm"]("Toplantıya söyle."); bak("topla (toplantıya söyle): ham ses döner", isinstance(pcm, bytes) and len(pcm) == 48000)
 r = ad["gemini_oku"]("Kesilecek.", iptal=lambda: True); bak("iptal: True (yerel sese düşmez)", r is True)
+# 2b) duygu biçimi (v0.129.0)
+st = ad["azure_stil"]
+bak("biçim kuralı: soru → curious, maalesef → saddisappointed, tebrikler → excited, merak etme → encouraging, düz → neutral",
+    st("Yarın gelir misin?") == "curious" and st("Maalesef teklif reddedildi.") == "saddisappointed" and st("Tebrikler, harika iş!") == "excited"
+    and st("Merak etme, hallederiz.") == "encouraging" and st("Toplantı saat üçte.") == "neutral")
+ad["TON"].update(ad="kotu_haber", t=time.time()); bak("Gemini'deki durum tonu önce gelir (kötü haber → saddisappointed, soru olsa da)", st("Gelir misin?") == "saddisappointed"); ad["ton_sifirla"]()
+bak("fısıltı ve çevirmen üslubu → neutral", st("Harika!", uslup="Whispering in the ear: very short") == "neutral" and st("Harika!", uslup="Simultaneous interpreter: plain") == "neutral")
+ad["kisilikler"] = lambda: [{"ad": "A", "ses": "gemini:Charon", "azure_stil": "friendlycheerful"}, {"ad": "B", "ses": "gemini:Kore", "azure_stil": "serious"}]
+bak("kural yoksa kişiliğin azure_stil'i (Gemini sesine göre)", st("Toplantı saat üçte.", ses="Charon") == "friendlycheerful" and st("Toplantı saat üçte.", ses="Kore") == "serious")
+ad.pop("kisilikler")
+ad["gemini_oku"]("Maalesef olmadı.", ses="Charon"); g = A["gelen"][-1]["govde"]
+bak("SSML: mstts ad alanı ve express-as biçimi", 'xmlns:mstts="http://www.w3.org/2001/mstts"' in g and '<mstts:express-as style="saddisappointed">Maalesef olmadı.</mstts:express-as>' in g)
+bak("kullanım kaydında biçim", json.loads(YAZILAN[-1][1]).get("stil") == "saddisappointed")
+ad["AYAR"]["azure_stil"] = False; ad["gemini_oku"]("Maalesef.", ses="Charon"); bak("ayar azure_stil: false → biçimsiz", "express-as" not in A["gelen"][-1]["govde"]); ad["AYAR"].pop("azure_stil")
+ad["AYAR"]["azure_model"] = ""; ad["gemini_oku"]("Maalesef.", ses="Charon"); bak("standart nöral seste (modelsiz) biçim yok", "express-as" not in A["gelen"][-1]["govde"]); ad["AYAR"].pop("azure_model")
 # 3) Gemini hata verince de (sınır değil) Azure
 for x in ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"): ad["_kota"]().pop(x, None) if isinstance(ad["_kota"](), dict) else None
 try: os.remove(os.path.join(T, "gemini-kota.json"))

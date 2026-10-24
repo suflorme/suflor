@@ -90,7 +90,8 @@ Model başına günde 100 istek var; ayardaki model dolunca öbürüne (Flash-Li
 (ayar `gemini_yedek_model: false` yalnız seçili model).
 Yedek bulut ses (isteğe bağlı): Azure MAI sesi. Gemini okuyamayınca (sınır dolu ya da hata) Elif (kadın Gemini sesleri) ya da Aydın (erkek) okur, o da olmazsa yerel ses.
 Azure Speech kaynağının anahtarını Anahtar Zinciri'ne koy (`security add-generic-password -a "$USER" -s suflor-azure-speech -w`), ayara `"azure_yedek": true` yaz;
-bölge `azure_bolge` (varsayılan westeurope), ses `azure_ses_kadin` / `azure_ses_erkek`. Okunacak cevap metni Microsoft'a gider (ses kaydı gitmez; Azure anlık
+bölge `azure_bolge` (varsayılan westeurope), ses `azure_ses_kadin` / `azure_ses_erkek`. Duygu biçimi (11: meraklı, heyecanlı, üzgün, ciddi, şefkatli …) cümleye ve Gemini'deki duruma göre seçilir;
+kişilik dosyasında `azure_stil: friendlycheerful` o kişiliğin varsayılanı, ayar `azure_stil: false` biçimsiz okur. Okunacak cevap metni Microsoft'a gider (ses kaydı gitmez; Azure anlık
 seslendirmede metni saklamaz); ücretsiz katman (F0) sınırda durur, ücret çıkmaz. Gizli toplantıda hiçbir bulut sesi kullanılmaz. Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi), `ses_uslup_en: …` (aynı
 yönergenin İngilizcesi; Gemini'ye bu gider, Türkçe yönerge ara sıra sesli okunuyor — yoksa Türkçenin ilk cümlesi gider) ve `ses_etiket: evet` (<chuckle> gibi sözsüz sesler) kişiliğe özel ses verir;
 toplantıda asistanın cevabı da o kişiliğin Gemini sesiyle okunur. Gemini açıkken sesli çeviri (çevirmen sesi ayar `ceviri_gemini_ses`), fısıltı ve
