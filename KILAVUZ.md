@@ -34,8 +34,9 @@ eklentisi de kendini yeniler. Elle: `~/Suflor.me/guncelle.command`'a çift tıkl
 belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensions` → Suflor.me → yenile.
 
 **Kaldırma:** `~/Suflor.me/kaldir.command`'a çift tıkla. Aktarıcıyı durdurur; Mac uygulamasını, ayarları, dökümleri, günlükleri ve verilen
-izinleri kaldırır. Hiçbir şeyi silmez, Çöp Sepeti'ne taşır: Çöp boşaltılana dek geri alınabilir. Modelleri, proje klasörünü (belgelerin) ve
-`~/Suflor.me` klasörünü ayrıca sorar. Sonra Chrome'da `chrome://extensions` → Suflor.me → Kaldır.
+izinleri kaldırır. Hiçbir şeyi silmez, Çöp Sepeti'ne taşır (Finder'da Çöp Sepeti → sağ tık → Geri Koy). Proje klasörünün kendisine ve
+belgelerine dokunmaz; yalnız Suflor'un eklediklerini (`_canli` kısayolu, `/toplanti` komutu, değiştirmediğin `CLAUDE.md`, boş klasörler)
+kaldırır. Toplantı notlarını (`gorusmeler/`), modelleri ve `~/Suflor.me` klasörünü ayrıca sorar. Sonra Chrome'da `chrome://extensions` → Suflor.me → Kaldır.
 
 **Modellerin yeri:** `/Users/Shared/Suflor`. Aynı Mac'te bu klasörü başka bir hesap kurduysa her hesap kendi modellerini
 `~/Library/Application Support/Suflor-ortak` altına indirir (~5–12 GB).

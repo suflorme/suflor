@@ -1178,23 +1178,55 @@ def kaldir():
     say(f"Otomatik başlatma kaldırıldı. Veri {os.path.join(yollar()['uygulama'], 'canli')} içinde duruyor (proje klasöründeki _canli kısayolu çalışmaya devam eder).")
 
 # v0.134.0: tamamen kaldırma (kaldir.command) — beta kullanıcısı ya da baştan kurmak isteyen. Silmez, Çöp Sepeti'ne taşır (Çöp boşaltılana
-# dek geri alınabilir). Modeller, proje klasörü (kullanıcının belgeleri) ve kod klasörü yalnız sorulup "e" denince (--evet'te bayrakla).
+# dek geri alınabilir). Modeller ve kod klasörü yalnız sorulup "e" denince (--evet'te bayrakla). v0.135.0: proje klasörünün kendisine hiç
+# dokunulmaz (26 Ekim: "proje klasörü de kaldırılsın mı?" sorusuna "e" denince kullanıcının belge klasörü bütünüyle Çöp'e gitti) — yalnız
+# Suflor'un eklediği: _canli kısayolu, /toplanti komutu, şablondan değişmemiş CLAUDE.md, boş iskelet klasörleri; toplantı notları sorulur.
+# Finder'la taşınır ("Geri Koy" çalışsın); Finder izni yoksa ya da kısayolsa doğrudan.
 # Geliştiricinin git klonunda çalışmaz: yanlışlıkla canlı kurulum gitmesin.
 SIL_KIMLIK = ("local.suflor.takvim", "local.suflor.posta", "local.suflor.ses", "local.suflor.oynat", "local.suflor.metin", "local.suflor.brifing", "local.suflor.menu")
 SIL_SUREC = ("SuflorMenu", "SuflorSes", "SuflorBrifing", "SuflorTakvim", "SuflorPosta", "SuflorOynat", "SuflorMetin")
 def _cope(y):
-    if DENEME and not os.path.realpath(y).startswith(os.path.realpath(EV) + os.sep): raise PermissionError("deneme: ev klasörü dışı")
+    gercek = os.path.join(os.path.realpath(os.path.dirname(y.rstrip("/"))), os.path.basename(y.rstrip("/")))  # kısayolun kendisi, hedefi değil
+    if DENEME and not gercek.startswith(os.path.realpath(EV) + os.sep): raise PermissionError("deneme: ev klasörü dışı")
     cop = os.path.join(EV, ".Trash"); os.makedirs(cop, exist_ok=True)
     ad = os.path.basename(y.rstrip("/")); h = os.path.join(cop, ad)
     if os.path.lexists(h): h = os.path.join(cop, f"{ad} {time.strftime('%H.%M.%S')}")
+    if not DENEME and not os.path.islink(y):
+        r = sessiz("osascript", "-e", 'on run a', "-e", 'tell application "Finder" to delete (POSIX file (item 1 of a) as alias)', "-e", 'end run', y, timeout=60)
+        if r and r.returncode == 0 and not os.path.lexists(y): return y
+    if os.path.islink(y): os.remove(y); return y  # kısayol (kırık olabilir): Finder taşıyamıyor (-5000), yalnız bağlantı silinir
     shutil.move(y, h); return h
+def _proje_temizle(pr, a, sor, notlar_de):  # proje klasöründe yalnız Suflor'un ekledikleri; klasörün kendisi ve kullanıcı dosyaları kalır
+    def sablon(ad):  # kurulumun yazdığı hâli (tamamla'daki doldur ile aynı yer tutucular)
+        t = open(os.path.join(KOD, "sablon", ad), encoding="utf-8").read()
+        for k, v in {"{{ALAN}}": str(a.get("alan", "")), "{{AD}}": str(a.get("ad", "")), "{{PORT}}": str(a.get("port", "")), "{{PROJE}}": pr, "{{KOD}}": KOD}.items(): t = t.replace(k, v)
+        return t
+    git, kal = [], []
+    for y in (os.path.join(pr, "_canli"), os.path.join(pr, ".claude", "commands", "toplanti.md"), os.path.join(pr, ".claude", "commands", "toplanti.md.eski")):
+        if os.path.lexists(y): git.append(y)
+    cm = os.path.join(pr, "CLAUDE.md")
+    if os.path.isfile(cm):
+        try: ayni = open(cm, encoding="utf-8").read() == sablon("CLAUDE.md")
+        except OSError: ayni = False
+        (git if ayni else kal).append(cm)
+    for ad in ("gorusmeler", "_kanit", "_arsiv"):  # Suflor'un yazdığı toplantı notları ve kanıtlar: doluysa sorulur
+        d = os.path.join(pr, ad); n = sum(len(f) for _, _, f in os.walk(d)) if os.path.isdir(d) else 0
+        if n and sor(f"{d} içinde Suflor'un yazdığı {n} dosya (toplantı notları/kanıtlar) var. Bunlar da Çöp Sepeti'ne taşınsın mı?", notlar_de): git.append(d)
+        elif n: kal.append(d)
+    return git, kal
+def _bos_iskelet(pr):  # taşımadan sonra boş kalan iskelet klasörleri (belgeler/ dahil, yalnız boşsa)
+    for ad in ("gorusmeler", "_kanit", "_arsiv", "belgeler", ".claude/commands", ".claude"):
+        d = os.path.join(pr, ad)
+        try:
+            if os.path.isdir(d) and not os.path.islink(d) and not [f for f in os.listdir(d) if f != ".DS_Store"]: shutil.rmtree(d)
+        except OSError: pass
 def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False):
     if os.path.isdir(os.path.join(KOD, ".git")) and not DENEME and not zorla: sys.exit("Geliştirici klonunda kaldırma yapılmaz (gerekirse --zorla).")
     m = None if zorla else mesgul()
     if m: sys.exit(f"Kaldırılmadı: {m}. Bitince yeniden çalıştır (beklemeden: --zorla).")
     Y = yollar(); a = ayar(); Y["uygulama"] = os.path.expanduser(str(a["uygulama"])) if a.get("uygulama") else DESTEK  # ayarsız varsayılan "~" deneme evini görmez
     if not a.get("proje"): Y["proje"] = os.path.join(EV, "Suflor")
-    gb = lambda y: (_boyut(y) if os.path.isdir(y) else os.path.getsize(y)) / 2 ** 30
+    gb = lambda y: (_boyut(y) if os.path.isdir(y) and not os.path.islink(y) else os.lstat(y).st_size) / 2 ** 30
     sor = (lambda q, bayrak: bayrak) if evet else (lambda q, bayrak: input(q + " (e/h) ").strip().lower() in ("e", "evet"))
     liste = []
     for y in (Y["uygulama"], DESTEK, menu_yolu(), plist_yolu()):
@@ -1210,8 +1242,10 @@ def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False
     if os.path.isdir(ort) and os.access(ort, os.W_OK):
         if sor(f"Modeller de ({ort}, {gb(ort):.1f} GB) kaldırılsın mı? Bu Mac'te başka bir hesap Suflor.me kullanıyorsa h de.", modeller_de): liste.append(ort)
     elif os.path.isdir(ort): say(f"Not: modeller başka bir hesabın klasöründe ({ort}) — dokunulmadı.")
-    pr = Y["proje"]
-    if os.path.isdir(pr) and sor(f"Proje klasörü de ({pr}: belgelerin, toplantı notların) kaldırılsın mı?", proje_de): liste.append(pr)
+    pr = Y["proje"]; kal = []
+    if os.path.isdir(pr):
+        say(f"Proje klasörün ({pr}) yerinde kalır; yalnız Suflor'un eklediği dosyalar kaldırılır.")
+        g, kal = _proje_temizle(pr, a, sor, proje_de); liste += g
     if not DENEME:
         sessiz("launchctl", "bootout", f"{gui()}/{LABEL}")
         for ad in SIL_SUREC: sessiz("pkill", "-u", str(os.getuid()), "-x", ad)
@@ -1222,7 +1256,9 @@ def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False
     for y in liste:
         try: g = gb(y); _cope(y); top += g; say(f"✓ Çöp Sepeti'ne: {y}")
         except OSError as e: say(f"UYARI: taşınamadı ({e.__class__.__name__}): {y}")
-    say(f"\nBitti: {top:.1f} GB Çöp Sepeti'nde (boşaltınca yer açılır; boşaltmadan geri alınabilir).")
+    if os.path.isdir(pr): _bos_iskelet(pr)
+    say(f"\nBitti: {top:.1f} GB Çöp Sepeti'nde (boşaltınca yer açılır; Finder'da Çöp Sepeti → sağ tık → Geri Koy).")
+    if os.path.isdir(pr): say(f"Proje klasörün yerinde: {pr}" + (" · dokunulmayanlar: " + ", ".join(os.path.relpath(x, pr) for x in kal) if kal else ""))
     say("Elle kalanlar: Chrome'da chrome://extensions → Suflor.me → Kaldır · Anahtar Zinciri Erişimi'nde 'suflor' ile başlayan öğe varsa (Gemini/Azure anahtarı) sil.")
     if not DENEME: sessiz("open", "-a", "Google Chrome", "chrome://extensions")
     if os.path.isdir(KOD) and sor(f"Son olarak bu kod klasörü ({KOD}) de Çöp Sepeti'ne taşınsın mı?", kod_de):
@@ -1527,7 +1563,8 @@ if __name__ == "__main__":
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
     ap.add_argument("--zorla", action="store_true", help="guncelle: toplantı/sohbet sürse de güncelle")
     ap.add_argument("--evet", action="store_true", help="sil: sormadan (modeller, proje, kod yalnız aşağıdaki bayraklarla)")
-    for b in ("modeller", "proje", "kod"): ap.add_argument(f"--{b}", action="store_true", help=f"sil --evet: {b} klasörünü de")
+    for b, ne in (("modeller", "modelleri"), ("proje", "projedeki toplantı notlarını (proje klasörünün kendisi asla)"), ("kod", "kod klasörünü")):
+        ap.add_argument(f"--{b}", action="store_true", help=f"sil --evet: {ne} de")
     ap.add_argument("--adim", choices=["hazirlik"], help="yalnız proje hazırlığı ekranları (panodaki 'Projeyi yeniden hazırla' → hazirla.command)"); A = ap.parse_args()
     if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
     if A.is_ == "pocket": sys.exit(0 if pocket_kur() else 1)

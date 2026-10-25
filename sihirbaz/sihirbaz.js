@@ -91,7 +91,7 @@
       t_adres_bekle: "Takvimdeki adresleri okuyorum…", t_adres_ek: "Listede olmayan bir adresin", t_adres_yok: "Adres seçmezsen macOS'un seni tanıdığı yere bakarım; Takvim'e başkalarının takvimi eklenmişse onların toplantıları da görünebilir.",
                                     ek_b: "Chrome eklentisini ekle", ek_a: "Eklenti Teams sayfasından sesi ve altyazıyı alır, kartları ekranın köşesinde gösterir.",
       e1: "Chrome'un eklenti sayfasını aç ve sağ üstte Geliştirici modu'nu aç.", e1d: "Eklenti sayfasını aç",
-      e2: "\"Paketlenmemiş öğe yükle\"ye bas ve Suflor.me klasörünü seç.", e2d: "Klasörü Finder'da göster",
+      e2: "\"Paketlenmemiş öğe yükle\"ye bas ve Suflor.me klasörünü seç: açılan pencerede Command + Shift + G'ye bas, bu yolu yapıştır, Enter, sonra Seç.", e2d: "Klasörü Finder'da göster", e2k: "Yolu kopyala", e2k_ok: "Kopyalandı",
       e3: "Araç çubuğundaki yapboz simgesinden Suflor.me'yi sabitle.",
       e_bekle: "Eklentiyi bekliyorum…", e_bagli: "Eklenti bağlandı",
       e_coklu: "Bu Mac'te başka bir hesabın Suflor.me'si de çalışıyor. Chrome'da Suflor.me simgesine tıkla ve bu hesabın alanını seç: ", e_profil: "Eklentiyi Teams'e girdiğin Chrome profiline ekle; birden fazla Chrome profilin varsa doğru pencerede olduğuna bak.",
@@ -204,7 +204,7 @@
       t_adres_bekle: "Reading the addresses in your calendar…", t_adres_ek: "Another address of yours", t_adres_yok: "With no address selected I go by who macOS thinks you are; if other people's calendars are added, their meetings may show too.",
                                     ek_b: "Add the Chrome extension", ek_a: "The extension takes sound and captions from the Teams page and shows the cards in a corner of the screen.",
       e1: "Open Chrome's extensions page and switch on Developer mode at the top right.", e1d: "Open extensions page",
-      e2: "Click \"Load unpacked\" and choose the Suflor.me folder.", e2d: "Show the folder in Finder",
+      e2: "Click \"Load unpacked\" and choose the Suflor.me folder: in the window press Command + Shift + G, paste this path, press Enter, then Select.", e2d: "Show the folder in Finder", e2k: "Copy path", e2k_ok: "Copied",
       e3: "Pin Suflor.me from the puzzle icon in the toolbar.",
       e_bekle: "Waiting for the extension…", e_bagli: "Extension connected",
       e_coklu: "Another account's Suflor.me is also running on this Mac. Click the Suflor.me icon in Chrome and pick this account's workspace: ", e_profil: "Add the extension to the Chrome profile you use for Teams; if you have several profiles, make sure you're in the right window.",
@@ -538,7 +538,7 @@
     { id: "eklenti", simge: "eklenti", b: "ek_b", a: "ek_a", hazir: () => ((D.durum || {}).eklenti || {}).bagli, gir: () => eklentiBekle(),
       icerik: () => { const e = (D.durum || {}).eklenti || {};
         return `<ol class="adimlar"><li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e1)}<div class="eylem">${dug("chrome-eklentiler", t.e1d)}</div></div></li>
-          <li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e2)}<div class="eylem">${dug("eklenti-klasoru", t.e2d)}</div></div></li><li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e3)}</div></li></ol>
+          <li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e2)}${(D.durum || {}).kod ? ` <code>${esc(D.durum.kod)}</code>` : ""}<div class="eylem">${(D.durum || {}).kod ? dug("kod-kopyala", t.e2k) : ""}${dug("eklenti-klasoru", t.e2d)}</div></div></li><li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e3)}</div></li></ol>
           <div class="liste">${satir(e.bagli ? "iyi" : "bekle", e.bagli ? t.e_bagli : t.e_bekle, e.surum ? "v" + e.surum : "")}</div>
           ${!e.bagli && e.coklu ? `<div class="kart-not uyari">${esc(t.e_coklu + (e.alan || ""))}</div>` : ""}
           ${e.bagli ? "" : `<p class="dipnot">${esc(t.e_profil)}</p><p class="dipnot">${dug("atla", t.atla)}</p>`}
@@ -659,6 +659,7 @@
     if (ey) {
       const n = ey.dataset.eylem;
       if (n === "kartsiz") { C.kartsiz = true; kaydet(); ciz(); return; }
+      if (n === "kod-kopyala") { try { await navigator.clipboard.writeText((D.durum || {}).kod || ""); ey.textContent = t.e2k_ok; } catch (e) {} return; }  // eklenti adımı: Command + Shift + G'ye yapıştırılacak yol
       if (n === "atla") { git(D.adim + 1); return; }
       if (n === "as-atla") { asistanHazirla(); C.asistan.atla = true; kaydet(); git(D.adim + 1); return; }
       if (n === "pk-yeniden") { await api("pocket/baslat", {}).catch(() => {}); await durumAl(); pkGoster(); return; }
