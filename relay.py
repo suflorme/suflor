@@ -1169,7 +1169,7 @@ def _yerel_ses_dongu():
                 print("YEREL SES: yardımcı başlatıldı")
             except Exception as e: print(f"YEREL SES: hata başlatılamadı ({e})")
 
-# --- Menü çubuğu uygulaması (v0.27.0, Faz 5; ayar menu_cubugu: true): aktarıcı açılırken bir kez açar (kapatılırsa aktarıcı yeniden
+# --- Menü çubuğu uygulaması (v0.27.0, Faz 5; v0.133.0: ayar menu_cubugu: false değilse açık): aktarıcı açılırken bir kez açar (kapatılırsa aktarıcı yeniden
 # başlayana kadar kapalı kalır). Uygulama anahtarı kart-anahtari.txt'den okur; panel panonun ?gorunum=panel görünümü.
 # v0.119.0: ~/Applications/Suflor.me.app (kurulum.py menu_yolu); argümanlar menu-argumanlar.json'a da yazılır — kullanıcı uygulamayı
 # Launchpad'den ya da Spotlight'tan açınca (argümansız) aynı port, anahtar ve seçeneklerle açılsın.
@@ -1179,7 +1179,7 @@ MENU_LOG = os.path.expanduser("~/Library/Logs/suflor-menu.log")
 MENU_HATA_LOG = os.path.expanduser("~/Library/Logs/suflor-menu-hata.log")  # v0.97.0: stdout ve stderr aynı dosyaya ayrı açılınca (open --stdout X --stderr X) iki ayrı
 # dosya konumu birbirinin üstüne yazıyordu — günlükte yarım satırlar ("apandı", "neli okundu"); stderr ayrı dosyada
 def menu_baslat():
-    if AYAR.get("menu_cubugu") is not True or deneme_aktarici() or not os.path.isdir(MENU_APP): return
+    if AYAR.get("menu_cubugu") is False or deneme_aktarici() or not os.path.isdir(MENU_APP): return
     try:
         if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: return
         ma = (["--port", str(A.port), "--anahtar", os.path.join(BASE, "kart-anahtari.txt")] + (["--masaustu-kapali"] if AYAR.get("masaustu") is False else [])
@@ -1646,7 +1646,7 @@ def ayar_yaz(deg):
 def menu_yeniden():  # menü uygulamasını kapatıp (gerekirse) yeni ayarlarla açar; toplantı sürerken bekler
     while toplanti_var(): time.sleep(30)
     subprocess.run(["pkill", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=10); time.sleep(1.5)
-    print("MENÜ: ayar değişti — yeniden açılıyor" if AYAR.get("menu_cubugu") is True else "MENÜ: ayar kapandı — uygulama kapatıldı"); menu_baslat()
+    print("MENÜ: ayar değişti — yeniden açılıyor" if AYAR.get("menu_cubugu") is not False else "MENÜ: ayar kapandı — uygulama kapatıldı"); menu_baslat()
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
     sinir = (datetime.datetime.now() - datetime.timedelta(days=7)).isoformat()
     return [dict({k: v for k, v in r.items() if k != "ozet"}, ad=os.path.basename(r.get("ozet") or "")) for r in reversed(SON) if (r.get("at") or "") >= sinir][:3]

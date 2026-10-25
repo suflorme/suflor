@@ -738,7 +738,7 @@ def ac(hedef):
     elif hedef == "eklenti-klasoru": subprocess.Popen(["open", "-R", os.path.join(KOD, "manifest.json")])
     elif hedef == "pano" and a.get("port"):
         # v0.105.0: menü uygulaması varsa pano onun Mac penceresinde (aktarıcı yeni kalktıysa menünün ilk yoklamasını 5 sn'ye kadar bekle)
-        for _ in range(5 if a.get("menu_cubugu") is True else 0):
+        for _ in range(5 if a.get("menu_cubugu") is not False else 0):
             try:
                 if json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{a['port']}/pano-ac", data=b"{}", method="POST"), timeout=3)).get("pencere"): return
             except Exception: pass
@@ -1253,8 +1253,8 @@ def kur():
     pst = os.path.join(app, "Suflor Posta.app"); r = derle(pst, "posta.swift", "SuflorPosta", POSTA_PLIST)
     if r is True: say(f"Posta yardımcısı derlendi: {pst}")
     elif r: say(f"UYARI: posta yardımcısı derlenemedi ({r}) — e-posta okuma kapalı kalır")
-    # menü çubuğu uygulaması (Faz 5): yalnız ayar menu_cubugu: true iken (beta kurulumunda kapalı); aktarıcı açar. v0.119.0: ~/Applications/Suflor.me.app
-    mnu = menu_yolu(); eski = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn, mtn, pst]; menu_acik = ayar().get("menu_cubugu") is True
+    # menü çubuğu uygulaması (Faz 5): ayar menu_cubugu: false değilse (v0.133.0: beta kurulumunda da varsayılan açık; pano Mac penceresinde); aktarıcı açar. v0.119.0: ~/Applications/Suflor.me.app
+    mnu = menu_yolu(); eski = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn, mtn, pst]; menu_acik = ayar().get("menu_cubugu") is not False
     tasindi = menu_acik and os.path.isdir(eski) and not os.path.isdir(mnu)
     if menu_acik:
         os.makedirs(os.path.dirname(mnu), exist_ok=True)

@@ -198,7 +198,7 @@ def _ts_nobet():
     while True:
         time.sleep(5)
         try:
-            if AYAR.get("toplantiya_ses") is not True or AYAR.get("menu_cubugu") is not True or deneme_aktarici() or not os.path.isdir(MENU_APP): continue
+            if AYAR.get("toplantiya_ses") is not True or AYAR.get("menu_cubugu") is False or deneme_aktarici() or not os.path.isdir(MENU_APP): continue
             if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: continue
             time.sleep(3)  # menu_yeniden kapatıp açıyor olabilir
             if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=5).returncode == 0: continue

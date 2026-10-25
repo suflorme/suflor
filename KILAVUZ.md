@@ -52,10 +52,10 @@ belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensio
 **Sesle hatırlatma:** onayladığın saatli hatırlatma Mac Takvim'in varsayılan takvimine 15 dakikalık, başında uyaran bir etkinlik olarak eklenir
 (Exchange/Google takvimiyse telefonuna da eşitlenir); başka bir takvim için `"hatirlatma_takvim": "<takvim adı>"`. Saati olmayan istek kendine e-posta taslağı olur.
 
-**İsteğe bağlı (ayar.json, varsayılan kapalı):** `"menu_cubugu": true` — menü çubuğu uygulaması (buzlu cam panelde mini pano,
+**Menü çubuğu uygulaması (varsayılan açık; kapatmak için ayar.json'da `"menu_cubugu": false`):** pano Mac penceresinde açılır; menü çubuğu uygulaması (buzlu cam panelde mini pano,
 Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da
 çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, kanıt ve
-paylaşılan ekran görüntüsünü toplantı penceresinden alır; Erişilebilirlik, mikrofon ve Ekran Kaydı izni sorar; sonra `guncelle.command`.
+paylaşılan ekran görüntüsünü toplantı penceresinden alır; Erişilebilirlik, mikrofon ve Ekran Kaydı izni sorar (ayarı değiştirdiysen sonra `guncelle.command`).
 Uygulama `~/Applications/Suflor.me.app`'e kurulur (hesaba özel): Launchpad'de, Spotlight'ta ve Finder'daki Uygulamalar'da Suflor.me adıyla
 bulunur; açıkken simgesine tıklamak pano penceresini öne getirir.
 Kapatmak için `"masaustu_mic": false`, `"kisayollar": false`; Kişiler panelinden ad okuma `"masaustu_kisiler": true` ile açılır — panel
