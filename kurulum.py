@@ -7,6 +7,7 @@
 # Kurulumun geri kalanı da burada (tek kurulum komutu; .command dosyaları bunları çağıran tek satırlık sarmalayıcı):
 #   python3 kurulum.py kur        aktarıcıyı kurar / günceller (Mac açılışında kendiliğinden başlar)   ← aktarici-kur.command
 #   python3 kurulum.py kaldir     otomatik başlatmayı kaldırır (veri yerinde kalır)                      ← aktarici-kur.command --kaldir
+#   python3 kurulum.py sil        Suflor.me'yi bu hesaptan tamamen kaldırır (Çöp Sepeti'ne taşır)        ← kaldir.command
 #   python3 kurulum.py modeller   yerel modeller ve Python ortamı (olanı yeniden kurmaz)                ← modeller-kur.command
 #   python3 kurulum.py guncelle   son sürümü alır (git klonu: git pull; değilse açık depodan), kurar     ← guncelle.command
 # Deneme: SUFLOR_EV=<geçici klasör> ev klasörünü değiştirir (ayar, uygulama, proje oraya yazılır; aktarıcı kurulmaz).
@@ -21,7 +22,16 @@ DESTEK = os.path.join(EV, "Library", "Application Support", "Suflor")
 AYAR_YOL = os.path.join(DESTEK, "ayar.json")
 KAYIT = os.path.join(DESTEK, "kurulum.json")
 YUKLEME = os.path.join(DESTEK, "kurulum")
-ORTAK = "/Users/Shared/Suflor"
+# Modeller ve Python ortamları (~3–15 GB). v0.134.0: paylaşılan klasör yoksa ya da bu hesap yazabiliyorsa orası (eski iki hesap düzeni); başka
+# hesabınsa hesaba özel klasör — ikinci hesap kendi modellerini indirir, ilk hesabın klasörüne bağlı kalmaz. Ayarda yol varsa o korunur.
+PAYLASILAN = os.environ.get("SUFLOR_TEST_PAYLASILAN") or "/Users/Shared/Suflor"
+def _ortak_sec():
+    o = (json.load(open(AYAR_YOL, encoding="utf-8")) if os.path.isfile(AYAR_YOL) else {}).get("ortak")
+    if o: return os.path.expanduser(str(o))
+    if not os.path.isdir(PAYLASILAN) or os.access(PAYLASILAN, os.W_OK): return PAYLASILAN
+    return os.path.join(EV, "Library", "Application Support", "Suflor-ortak")
+try: ORTAK = _ortak_sec()
+except Exception: ORTAK = PAYLASILAN  # bozuk ayar: eski varsayılan (sihirbaz ayarı yeniden yazar)
 PY = "/usr/bin/python3"
 A = None  # komut satırı (aşağıda, __main__)
 
@@ -1167,6 +1177,58 @@ def kaldir():
     if os.path.exists(plist_yolu()): os.remove(plist_yolu())
     say(f"Otomatik başlatma kaldırıldı. Veri {os.path.join(yollar()['uygulama'], 'canli')} içinde duruyor (proje klasöründeki _canli kısayolu çalışmaya devam eder).")
 
+# v0.134.0: tamamen kaldırma (kaldir.command) — beta kullanıcısı ya da baştan kurmak isteyen. Silmez, Çöp Sepeti'ne taşır (Çöp boşaltılana
+# dek geri alınabilir). Modeller, proje klasörü (kullanıcının belgeleri) ve kod klasörü yalnız sorulup "e" denince (--evet'te bayrakla).
+# Geliştiricinin git klonunda çalışmaz: yanlışlıkla canlı kurulum gitmesin.
+SIL_KIMLIK = ("local.suflor.takvim", "local.suflor.posta", "local.suflor.ses", "local.suflor.oynat", "local.suflor.metin", "local.suflor.brifing", "local.suflor.menu")
+SIL_SUREC = ("SuflorMenu", "SuflorSes", "SuflorBrifing", "SuflorTakvim", "SuflorPosta", "SuflorOynat", "SuflorMetin")
+def _cope(y):
+    if DENEME and not os.path.realpath(y).startswith(os.path.realpath(EV) + os.sep): raise PermissionError("deneme: ev klasörü dışı")
+    cop = os.path.join(EV, ".Trash"); os.makedirs(cop, exist_ok=True)
+    ad = os.path.basename(y.rstrip("/")); h = os.path.join(cop, ad)
+    if os.path.lexists(h): h = os.path.join(cop, f"{ad} {time.strftime('%H.%M.%S')}")
+    shutil.move(y, h); return h
+def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False):
+    if os.path.isdir(os.path.join(KOD, ".git")) and not DENEME and not zorla: sys.exit("Geliştirici klonunda kaldırma yapılmaz (gerekirse --zorla).")
+    m = None if zorla else mesgul()
+    if m: sys.exit(f"Kaldırılmadı: {m}. Bitince yeniden çalıştır (beklemeden: --zorla).")
+    Y = yollar(); a = ayar(); Y["uygulama"] = os.path.expanduser(str(a["uygulama"])) if a.get("uygulama") else DESTEK  # ayarsız varsayılan "~" deneme evini görmez
+    if not a.get("proje"): Y["proje"] = os.path.join(EV, "Suflor")
+    gb = lambda y: (_boyut(y) if os.path.isdir(y) else os.path.getsize(y)) / 2 ** 30
+    sor = (lambda q, bayrak: bayrak) if evet else (lambda q, bayrak: input(q + " (e/h) ").strip().lower() in ("e", "evet"))
+    liste = []
+    for y in (Y["uygulama"], DESTEK, menu_yolu(), plist_yolu()):
+        if os.path.lexists(y) and y not in liste and not any(y.startswith(x + os.sep) for x in liste): liste.append(y)
+    lg = os.path.join(EV, "Library", "Logs")
+    liste += sorted(os.path.join(lg, f) for f in (os.listdir(lg) if os.path.isdir(lg) else []) if f.startswith("suflor"))
+    liste += [y for y in (os.path.join(EV, "Library", "Application Support", t, "NativeMessagingHosts", "me.suflor.anahtar.json") for t in
+              ("Google/Chrome", "Google/Chrome Beta", "Google/Chrome Canary", "Chromium", "Microsoft Edge", "BraveSoftware/Brave-Browser")) if os.path.exists(y)]
+    say("Suflor.me bu hesaptan kaldırılacak. Çöp Sepeti'ne taşınacaklar:"); [say(f"  · {y}  ({gb(y):.1f} GB)") for y in liste]
+    if not liste: say("  (kurulu bir şey bulunmadı)")
+    if not sor("Devam edilsin mi?", True): sys.exit("Vazgeçildi; hiçbir şey değişmedi.")
+    ort = Y["ortak"]
+    if os.path.isdir(ort) and os.access(ort, os.W_OK):
+        if sor(f"Modeller de ({ort}, {gb(ort):.1f} GB) kaldırılsın mı? Bu Mac'te başka bir hesap Suflor.me kullanıyorsa h de.", modeller_de): liste.append(ort)
+    elif os.path.isdir(ort): say(f"Not: modeller başka bir hesabın klasöründe ({ort}) — dokunulmadı.")
+    pr = Y["proje"]
+    if os.path.isdir(pr) and sor(f"Proje klasörü de ({pr}: belgelerin, toplantı notların) kaldırılsın mı?", proje_de): liste.append(pr)
+    if not DENEME:
+        sessiz("launchctl", "bootout", f"{gui()}/{LABEL}")
+        for ad in SIL_SUREC: sessiz("pkill", "-u", str(os.getuid()), "-x", ad)
+        for y in (Y["uygulama"], ort): sessiz("pkill", "-u", str(os.getuid()), "-f", re.escape(y))  # aktarıcı, işçiler, Ollama
+        time.sleep(1); sessiz(LSREGISTER, "-u", menu_yolu())
+        for k in SIL_KIMLIK: sessiz("tccutil", "reset", "All", k)  # verilen izinler (mikrofon, ekran kaydı, takvim…) listeden düşer
+    top = 0.0
+    for y in liste:
+        try: g = gb(y); _cope(y); top += g; say(f"✓ Çöp Sepeti'ne: {y}")
+        except OSError as e: say(f"UYARI: taşınamadı ({e.__class__.__name__}): {y}")
+    say(f"\nBitti: {top:.1f} GB Çöp Sepeti'nde (boşaltınca yer açılır; boşaltmadan geri alınabilir).")
+    say("Elle kalanlar: Chrome'da chrome://extensions → Suflor.me → Kaldır · Anahtar Zinciri Erişimi'nde 'suflor' ile başlayan öğe varsa (Gemini/Azure anahtarı) sil.")
+    if not DENEME: sessiz("open", "-a", "Google Chrome", "chrome://extensions")
+    if os.path.isdir(KOD) and sor(f"Son olarak bu kod klasörü ({KOD}) de Çöp Sepeti'ne taşınsın mı?", kod_de):
+        try: _cope(KOD); say(f"✓ Çöp Sepeti'ne: {KOD}")
+        except OSError as e: say(f"UYARI: taşınamadı ({e.__class__.__name__}): {KOD}")
+
 # Yerel Türkçe sesler (21 Ekim): ortak klasörde Pocket/Piper kuruluysa (ilk hesap elle kurdu) bu hesabın ayarına yolları yaz — ikinci hesapta
 # anahtarlar yoktu, kişilikteki yerel ses (pocket:…) sessizce Mac sesine düşüyordu. Yalnız eksik anahtar yazılır (elle verilen yol korunur);
 # ses_motoru seçimine dokunulmaz. Ortak klasörde yoksa (beta kullanıcısı) hiçbir şey yazmaz.
@@ -1460,14 +1522,17 @@ def guncelle(kaynak=None, zorla=False):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
-    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "modeller", "guncelle", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|modeller|guncelle|profil|mesgul")
+    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "guncelle", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|profil|mesgul")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
     ap.add_argument("--zorla", action="store_true", help="guncelle: toplantı/sohbet sürse de güncelle")
+    ap.add_argument("--evet", action="store_true", help="sil: sormadan (modeller, proje, kod yalnız aşağıdaki bayraklarla)")
+    for b in ("modeller", "proje", "kod"): ap.add_argument(f"--{b}", action="store_true", help=f"sil --evet: {b} klasörünü de")
     ap.add_argument("--adim", choices=["hazirlik"], help="yalnız proje hazırlığı ekranları (panodaki 'Projeyi yeniden hazırla' → hazirla.command)"); A = ap.parse_args()
     if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
     if A.is_ == "pocket": sys.exit(0 if pocket_kur() else 1)
     if A.is_ == "ollama": sys.exit(0 if ollama_kur() else 1)
+    if A.is_ == "sil": sil(A.evet, A.zorla, A.modeller, A.proje, A.kod); sys.exit(0)
     if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak, A.zorla), "profil": profil}[A.is_](); sys.exit(0)
     os.makedirs(DESTEK, exist_ok=True)
     # port doluysa (ör. diğer macOS hesabının sihirbazı) sonrakini dene — önceden ikinci sihirbaz açılmıyor, kur.sh

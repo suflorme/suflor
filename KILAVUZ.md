@@ -33,6 +33,13 @@ olduğu için bugün okunmaz.
 eklentisi de kendini yeniler. Elle: `~/Suflor.me/guncelle.command`'a çift tıkla (son sürümü indirir, aktarıcıyı yeniden kurar; ayarlarına ve
 belgelerine dokunmaz). Eklenti kendini yenilemezse: Chrome'da `chrome://extensions` → Suflor.me → yenile.
 
+**Kaldırma:** `~/Suflor.me/kaldir.command`'a çift tıkla. Aktarıcıyı durdurur; Mac uygulamasını, ayarları, dökümleri, günlükleri ve verilen
+izinleri kaldırır. Hiçbir şeyi silmez, Çöp Sepeti'ne taşır: Çöp boşaltılana dek geri alınabilir. Modelleri, proje klasörünü (belgelerin) ve
+`~/Suflor.me` klasörünü ayrıca sorar. Sonra Chrome'da `chrome://extensions` → Suflor.me → Kaldır.
+
+**Modellerin yeri:** `/Users/Shared/Suflor`. Aynı Mac'te bu klasörü başka bir hesap kurduysa her hesap kendi modellerini
+`~/Library/Application Support/Suflor-ortak` altına indirir (~5–12 GB).
+
 ## Kullanım
 1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).
    Gündem kurulur, hazır olunca toplantıya katılırsın.
@@ -111,7 +118,7 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
   Anahtar yalnız macOS **Anahtar Zinciri**'ne yazılır (öğe `suflor-gemini` — ayar `gemini_anahtar` başka öğe seçer — ya da `suflor-ozel`); ayar dosyasında yalnız öğenin adı,
   hizmetin adresi ve model adı durur. Sihirbaz anahtarı hizmetin model listesini isteyerek dener (metin gitmez).
 - **Bu Mac'te yerel model (Ollama):** resmî Ollama sürümü (yalnız komut satırı aracı, ~181 MB; SHA-256 ve Apple imzası denetlenir) ve `qwen3.5:4b-q4_K_M`
-  modeli (~3,3 GB) ortak klasöre (`/Users/Shared/Suflor/ollama`) iner. Mac açılışında kendiliğinden başlamaz: aktarıcı, ayar yerel modeli gösterdiği sürece
+  modeli (~3,3 GB) modellerin yerine (`ollama/`) iner. Mac açılışında kendiliğinden başlamaz: aktarıcı, ayar yerel modeli gösterdiği sürece
   sunucuyu `127.0.0.1:11434`'te (ayar `ollama_port`) ve 32 768 belirteçlik bağlamla açar, seçim değişince kapatır; günlük `canli/ollama.log`.
   Yerel model Türkçe belgelerde aramayı çoğu zaman yanlış yapıyor; yedek olarak önerilir. Başka model için ayar `ollama_model`.
 - Seçilen hizmet hata verirse ve Claude Code kuruluysa o soru Claude Code'la cevaplanır. Seçilen hizmetin durumu (anahtar var mı, yerel model kurulu mu) ⚙ Ayarlar → Genel'deki Yapay zekâ satırında.
@@ -150,7 +157,7 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
 |---|---|
 | Chrome eklentisi (`manifest.json`, `content.js`, `platform-teams.js`, `platform-meet.js`, `platform-zoom.js`, …) | Teams/Meet/Zoom sayfasından altyazı/döküm ve mikrofon sesini alır, şeridi gösterir |
 | Aktarıcı (`relay.py`) | Yerel sunucu: satırları dosyaya yazar, kartları tutar, panoyu sunar |
-| Menü çubuğu uygulaması (`menu-cubugu.swift` → `~/Applications/Suflor.me.app`, isteğe bağlı) | Mini pano paneli, Mac geneli bas-konuş, masaüstü toplantı sinyali |
+| Menü çubuğu uygulaması (`menu-cubugu.swift` → `~/Applications/Suflor.me.app`) | Pano penceresi, mini pano paneli, Mac geneli bas-konuş, masaüstü toplantı sinyali |
 | Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
 | Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
 | Toplantıda asistan (`aktarici/toplantiya-ses.py`, `aktarici/otonom.py`, `soyle-main.js`; ⚙ Ayarlar → Asistanlar toplantıda konuşsun, ayar `toplantiya_ses`, varsayılan kapalı) | Toplantıda “<ad>, …” diye seslendiğin asistanın cevabını herkesin duyacağı şekilde okur (söz sırası gelince; “<ad>, dur” ya da Option + Shift + S susturur; sen bir kez çağırdıktan sonra diğer katılımcılar da ona adıyla sorabilir; yalnız sana cevap için Konuş düğmesi): web toplantısında yalnız okuma süresince mikrofon kanalına karıştırır (sessizdeysen okumaz); masaüstü Teams'te BlackHole ile |
@@ -159,7 +166,7 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
 | Belge çevirme (`cevir-isci.py`; `baglam.py tara`, `baglam.py cevir`) | Proje klasörünü tarar (kopya, eski sürüm, dışa aktarım, gizli görünen dosya) ve PDF, sunum (PowerPoint, Keynote), Pages, Numbers, eski Excel (.xls) ve görüntüleri Mac'te metne çevirir: Docling + Apple Vision (.xls için xlrd), ayrı Python 3.12 ortamında, ağ kapalı. Eski Word (.doc), .rtf ve .odt macOS'un `textutil` aracıyla okunur. Şifre, anahtar, kart ya da IBAN geçen parça aramaya girmez |
 | Proje veritabanı (`baglam.py proje-vt`; `<uygulama>/proje.db`) | Excel, Numbers, CSV/TSV sayfaları (`t_…` tabloları; sayı sayı, tarih ISO; kaynak dosyası `tablolar` tablosunda) ve onaylı proje kartı (`kisi`, `kurum`, `karar`, `acik_is`, `olay`, `terim`, `proje`) tek SQLite dosyasında. Konuş ve toplantı oturumu yalnız okuyan SQL ile bakar (`vt_sema`, `vt_sor`; toplantıda `toplanti-claude.py proje`). Yalnız değişen dosya yeniden yazılır; gizli bilgi taşıyan hücre `[gizli]`. Kendi kayıt veritabanın ayarlıysa (`veritabani`) kurulmaz; `"proje_vt": false` kapatır |
 | Yapay zekâ katmanı (`aktarici/beyin.py`, `aktarici/saglayici.py`) | Konuş, çeviri, telaffuz ve proje kartının yapay zekâ çağrıları tek yerden: Claude Code ya da OpenAI uyumlu uç (Gemini, OpenAI, Ollama, LM Studio); seçim, Anahtar Zinciri, yerel modeli gerekince açma |
-| Ollama (isteğe bağlı, `/Users/Shared/Suflor/ollama`) | Yerel model sunucusu; yalnız 127.0.0.1, yalnız yapay zekâ seçimi yerel modeli gösterirken çalışır |
+| Ollama (isteğe bağlı, modellerin yerinde `ollama/`) | Yerel model sunucusu; yalnız 127.0.0.1, yalnız yapay zekâ seçimi yerel modeli gösterirken çalışır |
 | Claude köprüsü (`toplanti-claude.py`, `baglam.py`, `yapi.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
 | Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
 
