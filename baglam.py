@@ -35,7 +35,8 @@ HARIC_GENEL = ["_yedek", "_arsiv", ".claude", ".git", "suflor", os.path.basename
 HARIC = list(dict.fromkeys(HARIC_GENEL + list(AYAR.get("haric") or [])))  # ayar "haric": alanın kendi listesi (proje köküne göre)
 CANLI_HARIC = {"takvim-secilen.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "agenda.json", "hazir.json", "karneler.jsonl", "karsilastirmalar.jsonl"}  # karne · v0.7.2: karşılaştırma
 TEXTUTIL_UZ = {".doc", ".rtf", ".odt"}  # v0.121.0: macOS textutil ile .docx'e çevrilip docx_metin'den (Docling bunlar için LibreOffice ister)
-UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx", ".eml"} | TEXTUTIL_UZ
+ODF_UZ = {".ods", ".odp"}  # v0.136.0: OpenDocument tablo/sunum — zip içindeki content.xml'den (ek bileşen yok); .odt textutil'de
+UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx", ".eml"} | TEXTUTIL_UZ | ODF_UZ
 # T2: metne çevirme işçisiyle (önbellekten dizine). v0.121.0: Pages/Keynote/Numbers (Docling iWork) ve eski Excel (.xls, xlrd); tablolar proje veritabanına da
 CEVIR_UZ = {".pdf", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".tif", ".tiff", ".bmp", ".pages", ".key", ".numbers", ".xls"}
 PAKET_KLASOR = (".pages", ".numbers", ".key", ".rtfd", ".app", ".bundle")  # macOS paket klasörü (eski iWork): içindeki önizleme görüntüsü ayrı dosya sanılmasın
@@ -185,6 +186,25 @@ def textutil_metin(yol):  # .doc/.rtf/.odt → macOS textutil → geçici .docx 
         except OSError: pass
         os.rmdir(d)
 
+def odf_metin(yol, en_cok_sutun=60):  # .ods → sayfa başına "## ad" + "| a | b |" satırları; .odp → slayt başına "## Slayt n" + paragraflar (notlar dahil)
+    import zipfile, xml.etree.ElementTree as ET
+    TB, TX, DR = "{urn:oasis:names:tc:opendocument:xmlns:table:1.0}", "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}", "{urn:oasis:names:tc:opendocument:xmlns:drawing:1.0}"
+    with zipfile.ZipFile(yol) as z: kok = ET.fromstring(z.read("content.xml"))
+    paragraflar = lambda e: [" ".join("".join(p.itertext()).split()) for p in e.iter(TX + "p") if "".join(p.itertext()).strip()]
+    out = []
+    for t in kok.iter(TB + "table"):
+        out.append("## " + (t.get(TB + "name") or "Sayfa"))
+        for tr in t.iter(TB + "table-row"):
+            hucre = []
+            for tc in tr:
+                if tc.tag not in (TB + "table-cell", TB + "covered-table-cell"): continue
+                hucre += [" ".join(paragraflar(tc))] * min(int(tc.get(TB + "number-columns-repeated") or 1), en_cok_sutun)
+            while hucre and not hucre[-1]: hucre.pop()  # sağdaki boş (tekrarlı) hücreler
+            if hucre: out.append("| " + " | ".join(hucre[:en_cok_sutun]) + " |")
+        out.append("")
+    for i, s in enumerate(kok.iter(DR + "page"), 1): out += ["## Slayt " + str(i)] + paragraflar(s) + [""]
+    return "\n".join(out)
+
 # --- Dosya türü, tarih, başlık ----------------------------------------------------------------------------------
 GORUSME = tuple(AYAR.get("gorusme_klasorleri") or ["gorusmeler/"])  # görüşme dökümü klasörleri (proje köküne göre)
 ANALIZ = tuple(AYAR.get("analiz_klasorleri") or [])
@@ -195,7 +215,7 @@ def tur_bul(kisa):
     if kisa.startswith(GORUSME) or re.search(r"dokum|transkript", kisa, re.I): return "gorusme"
     if ANALIZ and kisa.startswith(ANALIZ): return "analiz"
     if kisa.startswith(("Sunum/", "sunum/")) or re.search(r"sunum|sunu|deck", kisa, re.I): return "sunum"
-    if kisa.endswith((".xlsx", ".xls", ".numbers")): return "tablo"
+    if kisa.endswith((".xlsx", ".xls", ".numbers", ".ods")): return "tablo"
     return "belge"
 AYLAR = {a: i + 1 for i, a in enumerate("ocak şubat mart nisan mayıs haziran temmuz ağustos eylül ekim kasım aralık".split())}
 def tarih_bul(kisa, bas, mtime):
@@ -225,6 +245,7 @@ def parcala(yol, kisa, sha=None):
     if ext == ".eml": t = eml_metin(yol)
     elif ext == ".docx": t = docx_metin(yol)
     elif ext in TEXTUTIL_UZ: t = textutil_metin(yol)
+    elif ext in ODF_UZ: t = odf_metin(yol)
     elif ext == ".jsonl":
         bas = open(yol.replace(".jsonl", ".md"), encoding="utf-8", errors="replace").read(600) if kisa.startswith("_canli/") and os.path.exists(yol.replace(".jsonl", ".md")) else ""
         return baslik_bul(kisa, bas), bas, jsonl_parcala(yol, kisa)
@@ -476,7 +497,7 @@ TARA_TUR = {"belge": "md txt rtf docx doc odt pages pdf", "sunum": "pptx ppt key
             "eposta": "eml msg mbox", "ses": "mp3 m4a wav aac flac ogg opus", "video": "mp4 mov m4v webm mkv avi",
             "arsiv": "zip rar 7z tar gz tgz", "kod": "py js ts gs sql sh swift rb go java c h css ipynb drawio vtt srt"}
 TARA_TUR = {u: t for t, us in TARA_TUR.items() for u in us.split()}
-TARA_METIN = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".csv", ".tsv", ".xml", ".yaml", ".yml", ".vtt", ".srt", ".docx", ".xlsx"}  # MinHash için okunabilenler (+ çevrilmiş PDF/görüntü önbellekten)
+TARA_METIN = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".csv", ".tsv", ".xml", ".yaml", ".yml", ".vtt", ".srt", ".docx", ".xlsx", ".ods", ".odp"}  # MinHash için okunabilenler (+ çevrilmiş PDF/görüntü önbellekten)
 TARA_GIZLI_UZ = {".env", ".key", ".pem", ".p12", ".pfx", ".kdbx", ".keychain", ".gpg", ".asc", ".ovpn", ".ppk"}
 TARA_GIZLI_AD = re.compile(r"parola|sifre(?!lem|li)|password|passwd|credential|maas|salary|bordro|payroll|(^|[^a-z])(id_rsa|id_ed25519|\.?env)($|[^a-z])")
 TARA_KIMLIK_AD = re.compile(r"kimlik|pasaport|passport|ehliyet|nufus|surucu belgesi|id[ _-]?card|kimlik karti")  # yalnız görüntü/PDF: kimlik taraması
@@ -484,7 +505,8 @@ TARA_DISA_KLASOR = re.compile(r"^(disa|disa[ _-]?aktarim|export|exports|dump|dok
 TARA_DISA_UZ = {".csv", ".tsv", ".json", ".jsonl", ".xlsx", ".xls", ".xml", ".db", ".sqlite"}
 TARA_TURETILMIS_KLASOR = re.compile(r"^_?(son[ _-]?yayin|yayin|yayinlanan|publish|published|dist|build|_site|site[ _-]?cikti)$")  # yayımlanmış/derlenmiş kopyalar
 TARA_TURETILMIS_AD = re.compile(r"(^|[^a-z])(ozet|ozeti|summary|gorunum|view|pivot|anonim|anonymized|cikti|output)($|[^a-z])")
-TARA_ASIL_UZ = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".key", ".numbers", ".pages", ".odt", ".ods", ".odp"}  # yanındaki aynı adlı md/csv/pdf bunun dışa çıktısı
+# yanındaki aynı adlı md/csv/pdf bunun dışa çıktısı. v0.136.0: yalnız okunabilen türler (.ppt okunmuyor: yanındaki PDF tek kaynak olabilir)
+TARA_ASIL_UZ = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".key", ".numbers", ".pages", ".odt", ".ods", ".odp"}
 TARA_TARIH = re.compile(r"(?<!\d)(20\d\d[-_.]?[01]\d[-_.]?[0-3]\d(?:[-_ t]?[0-2]\d[-_.:h]?[0-5]\d(?:[-_.:]?[0-5]\d)?)?|[0-3]?\d[-_.][01]?\d[-_.](?:20)?\d\d)(?!\d)")
 TARA_SAAT = re.compile(r"(?<!\d)20\d\d[-_.]?[01]\d[-_.]?[0-3]\d[-_ t]?[0-2]\d[-_.:h]?[0-5]\d(?!\d)")  # tarih + saat damgası (otomatik çıktı)
 TARA_SURUM = re.compile(r"\(\d{1,3}\)|(^|[^a-z0-9])(v\d+(?:[._]\d+)*|rev\d*|r\d|surum\s?\d+|versiyon\s?\d+|version\s?\d+|son|final|nihai|guncel|latest|yeni|eski|"
@@ -565,6 +587,7 @@ def tara_metin(yol, ext, sinir=200_000, sha=None):
     try:
         if ext == ".docx": return docx_metin(yol)[:sinir]
         if ext == ".xlsx": return " ".join(m for _, _, m in xlsx_parcala(yol))[:sinir]
+        if ext in ODF_UZ: return odf_metin(yol)[:sinir]
         if ext in CEVIR_UZ: ps = cevrilmis(yol, sha); return " ".join(m for _, m in ps)[:sinir] if ps else None
         if ext in (".html", ".htm"): return html_metin(open(yol, encoding="utf-8", errors="replace").read(sinir * 2))[:sinir]
         return open(yol, encoding="utf-8", errors="replace").read(sinir)

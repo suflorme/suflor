@@ -117,6 +117,7 @@ try:
         kontrol("toplantı sonu: kalite — satır gecikmesi, Konuş ilk ses ve 10 sn üstü oran, hitap",
                 "satir_gecikme_sn" in k and (k.get("konus") or {}).get("cevap") == 2 and (k["konus"].get("on_sn_ustu_yuzde") == 50) and k.get("hitap") == 1, json.dumps(k)[:400])
         kontrol("toplantı sonu: Claude gözlemi ve son günlük satırları yok", not gel("toplanti_sonu")[-1].get("son_olaylar"))
+        kontrol("toplantı sonu: platform toplantının kendisinden (meet)", (gel("toplanti_sonu")[-1].get("toplanti") or {}).get("platform") == "meet")
     # haftalık paket toplantı sürerken ilk turda kurulur (deneme kipinde hemen): toplantı sonrası sayılar ikinci pakette yok, bu yüzden kalanı sayıdan bak
     if gel("haftalik"):
         h = gel("haftalik")[-1]

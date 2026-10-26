@@ -30,7 +30,20 @@ ssh-keygen -Y verify -f "$IZIN" -I suflor-yayin -n suflor-yayin -s "$M.sig" < "$
 [ "$(cd "$GECICI" && find . -type f ! -path './IMZA/*' | sed 's|^\./||' | LC_ALL=C sort)" = "$(tail -n +2 "$M" | cut -c67- | LC_ALL=C sort)" ] || dur "pakette imzalı listede olmayan dosya var"
 rm -f "$IZIN"
 mkdir -p "$KOD"
-# kod dosyaları güncellenir; kullanıcının bu klasöre koyduğu başka bir şey silinmez
+# kod dosyaları güncellenir; kullanıcının bu klasöre koyduğu başka bir şey silinmez. Önceki imzalı listede olup yenisinde olmayan ve
+# değiştirilmemiş dosya silinir (kurulum.py eski_dosyalari_temizle ile aynı kural)
+# eski-dosya-basi
+if [ -f "$KOD/IMZA/dosyalar.sha256" ]; then
+  YENI="$(mktemp)"; tail -n +2 "$M" | cut -c67- > "$YENI"
+  tail -n +2 "$KOD/IMZA/dosyalar.sha256" | while IFS= read -r s; do
+    h="${s:0:64}"; f="${s:66}"
+    case "$f" in ""|/*|IMZA/*|../*|*/../*) continue;; esac
+    grep -qxF -- "$f" "$YENI" && continue
+    if [ -f "$KOD/$f" ] && [ ! -L "$KOD/$f" ] && [ "$(shasum -a 256 "$KOD/$f" | cut -c1-64)" = "$h" ]; then rm -f "$KOD/$f" && echo "  eski dosya kaldırıldı: $f"; fi
+  done
+  rm -f "$YENI"
+fi
+# eski-dosya-sonu
 (cd "$GECICI" && tar -cf - .) | (cd "$KOD" && tar -xf -)
 rm -rf "$GECICI"
 chmod +x "$KOD"/*.command "$KOD"/*.sh 2>/dev/null || true

@@ -895,6 +895,24 @@ class H(BaseHTTPRequestHandler):
 LABEL = "local.suflor.aktarici"
 KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "taahhut.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
+# v0.136.0 (26 Ekim kişisel hesap: ses-isci.py, pano/hazirlik.html, test/platform.py kalmıştı): önceki imzalı listede olup yenisinde olmayan ve
+# özeti değişmemiş dosya silinir; kullanıcının koyduğu ya da değiştirdiği dosya kalır. Aynı kural kur.sh'de (bash).
+def imza_listesi(yol):  # IMZA/dosyalar.sha256 → {göreli yol: sha256}; ilk satır başlık
+    try: sat = open(yol, encoding="utf-8").read().splitlines()[1:]
+    except OSError: return {}
+    return {s[66:]: s[:64] for s in sat if len(s) > 66 and s[64:66] == "  "}
+def eski_dosyalari_temizle(kod, eski, yeni):
+    import hashlib
+    silinen = []
+    for yol, sha in eski.items():
+        if yol in yeni or yol.startswith(("IMZA/", "/")) or ".." in yol.split("/"): continue
+        tam = os.path.join(kod, yol)
+        try:
+            if os.path.islink(tam) or not os.path.isfile(tam) or hashlib.sha256(open(tam, "rb").read()).hexdigest() != sha: continue
+            os.remove(tam); silinen.append(yol); d = os.path.dirname(tam)
+            while d != kod and os.path.isdir(d) and not os.listdir(d): os.rmdir(d); d = os.path.dirname(d)  # boş kalan alt klasör
+        except OSError: pass
+    return silinen
 ESKI_BETIK = ["kur.command", "relay-baslat.command"]  # tek kurulum komutuyla kalktı; açık depodan güncellemede kod klasöründen silinir
 TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1506,7 +1524,7 @@ def guncelle(kaynak=None, zorla=False):
         say(f"✓ zaten güncel ({sonra})" if once == sonra else f"✓ güncellendi: {once} → {sonra}\n" + g("log", "--oneline", f"{once}..{sonra}").stdout.rstrip())
     else:
         import io, tarfile
-        once = surum(KOD); url = kaynak or f"https://codeload.github.com/{depo}/tar.gz/refs/heads/main"
+        once = surum(KOD); url = kaynak or f"https://codeload.github.com/{depo}/tar.gz/refs/heads/main"; eski_liste = imza_listesi(os.path.join(KOD, "IMZA", "dosyalar.sha256"))
         say(f"→ son sürüm indiriliyor ({url if kaynak else 'github.com/' + depo})")
         gecici = tempfile.mkdtemp()
         try:
@@ -1531,6 +1549,7 @@ def guncelle(kaynak=None, zorla=False):
                 for f in fs:
                     h = os.path.join(KOD, os.path.relpath(os.path.join(k, f), gecici)); os.makedirs(os.path.dirname(h), exist_ok=True)
                     shutil.copy2(os.path.join(k, f), h)
+            for f in eski_dosyalari_temizle(KOD, eski_liste, imza_listesi(os.path.join(gecici, "IMZA", "dosyalar.sha256"))): say(f"  eski dosya kaldırıldı: {f}")
         finally: shutil.rmtree(gecici, ignore_errors=True)
         for f in ESKI_BETIK:
             if os.path.isfile(os.path.join(KOD, f)) and not os.path.isfile(os.path.join(KOD, ".git", "HEAD")): os.remove(os.path.join(KOD, f))

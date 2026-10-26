@@ -123,7 +123,8 @@ def _toplanti_paketi(f):
     return {"kalite": kalite, "toplanti_kimlik": toplanti_kimlik(f), "kaynak": "aktarici",
             "toplanti": {"sure_dk": round((son - bas) / 60) if bas and son else None, "satir": len(metin), "kaynak": dict(kaynak), "kanal": dict(kanal),
                          "not": sum(1 for x in satir if "note" in x), "kanit": len(STATE["kanitlar"].get(f, [])),
-                         "platform": (STATE.get("extension") or {}).get("platform"),
+                         "platform": ((BETA["toplanti"].get(toplanti_kimlik(f)) or {}).get("platform") if "BETA" in globals() else None)
+                                     or (STATE.get("extension") or {}).get("platform"),  # v0.136.0: toplantının kendi platformu (eskiden eklentinin o anki durumu)
                          "duygu_etiketli": sum(1 for x in metin if x.get("duygu")), "ses_olcumlu": sum(1 for x in metin if x.get("ses"))},
             "kartlar": {"kart": len(cs), "tur": dict(collections.Counter(c.get("kind") for c in cs)),
                         "donus": dict(collections.Counter(c.get("status") or "acik" for c in cs)), "soru": len(qs_),
@@ -530,7 +531,8 @@ def _kanit_iste(p):  # LOCK tutulurken (ingest içinden sesli istek: LOCK yenide
 _KOMUT_FIIL = r"(?:al|alın|alalım|alayım|alsana|alır\s+mısın|alabilir\s+misin|alır\s+mıyız|alabilir\s+miyiz)"
 _KOMUT_SON = r"(?=\s*(?:$|[.,:;!?…]|\s(?:lütfen|hemen|şimdi|bakalım|şunu|bunu|şuna|buna|şunun|bunun)\b))"
 SESLI_KANIT_RX = re.compile(r"\b(?:kanıt|ekran\s+(?:görüntü|resm|resim|kayd|kayıt)\w*)\s+(?:bir\s+)?(?:" + _KOMUT_FIIL[3:-1] + r"|çek|çekelim|çekeyim|kaydet|başlat)" + _KOMUT_SON
-                            + r"|\btake\s+a\s+screenshot\b", re.I)
+                            + r"|\b(?:take|grab|capture)\s+(?:a\s+|the\s+)?(?:screenshot|screen\s*shot|screen\s*grab)\b"  # v0.136.0 (00R2): İngilizce biçimler; evidence → toplantı ekranı
+                            + r"|\b(?:take|capture|grab|save)\s+(?:some\s+|the\s+)?evidence\b", re.I)
 SESLI_NOT_RX = re.compile(r"\bnot\s*" + _KOMUT_FIIL + _KOMUT_SON, re.I)
 SESLI_KANIT_YOK = re.compile(r"\b(alma|almay|çekme|çekmey|kaydetme|başlatma)\w*|gerek\s+yok|istemiyorum|don'?t", re.I)
 SESLI_KANIT = {"t": 0.0}; SESLI_NOT = {"t": 0.0}; SON_SATIRLAR = []  # (t, konuşan, metin): sesli notun içeriği boşsa önceki satır
@@ -551,7 +553,7 @@ def sesli_kanit_bak(metin, onceki=None):  # yalnız ingest'in LOCK bloğundan ç
     cumle = next((c for c in re.split(r"(?<=[.!?…])\s+", metin) if SESLI_KANIT_RX.search(c)), metin)
     if SESLI_KANIT_YOK.search(cumle): return False
     if time.time() - SESLI_KANIT["t"] < 20 or kart_okunuyor(cumle) or suflor_konusuyor(): return False
-    hedef = "toplanti" if SESLI_KANIT_RX.search(cumle).group(0).lower().startswith("kanıt") else "ekran"
+    g = SESLI_KANIT_RX.search(cumle).group(0).lower(); hedef = "toplanti" if g.startswith("kanıt") or "evidence" in g else "ekran"
     SESLI_KANIT["t"] = time.time(); _kanit_iste({"kaynak": "sesli", "not": cumle[:120], "hedef": hedef}); kart_bildir()
     print(f"KANIT: sesli istek ({(STATE['kanit_iste'] or {}).get('hedef') or 'toplantı'}) — \"{cumle[:60]}\""); return True
 def sesli_not_bak(metin):

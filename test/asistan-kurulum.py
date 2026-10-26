@@ -1,11 +1,11 @@
 # Sihirbazın asistan adımı (S133): kurulum.py asistan_uygula/asistan_dosya/asistan_durum — kişilik dosyası, ayar bağlantısı, var olan dosyaya dokunmama,
 # atlama, iki asistan, Pocket sesi, var olan asistanda yalnız değişen alan (S135), arka plandaki yapay zekâ adının metinde geçmemesi. Yazılan dosya aktarıcının ayrıştırıcısıyla (aktarici/kisilik.py) okunur.
 # Deneme kipinde (SUFLOR_EV: geçici ev klasörü; gerçek ayara dokunmaz). Çalıştır: PYTHONDONTWRITEBYTECODE=1 python3 test/asistan-kurulum.py
-import os, sys, json, re, tempfile, shutil, importlib.util, time
+import collections, os, sys, json, re, tempfile, shutil, importlib.util, time
 KOD = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 EV = tempfile.mkdtemp(prefix="asistan-"); os.environ["SUFLOR_EV"] = EV; sys.dont_write_bytecode = True
 sp = importlib.util.spec_from_file_location("kurulum", os.path.join(KOD, "kurulum.py")); K = importlib.util.module_from_spec(sp); sp.loader.exec_module(K)
-ns = {"os": os, "re": re, "time": time, "AYAR": {}, "print": lambda *a, **k: None}
+ns = {"os": os, "re": re, "time": time, "collections": collections, "AYAR": {}, "print": lambda *a, **k: None}
 exec(open(os.path.join(KOD, "aktarici", "kisilik.py"), encoding="utf-8").read(), ns)
 ok = []
 def kontrol(ad, kosul): ok.append(bool(kosul)); print(("✓ " if kosul else "✗ ") + ad)

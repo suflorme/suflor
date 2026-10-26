@@ -10,6 +10,8 @@ src = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
 exec(src[src.index("_KOMUT_FIIL ="):src.index("SESLI_KANIT = {")])
 ORNEK = [("Kanıt al.", 1), ("Ekran görüntüsünü alır mısın?", 1), ("şunun ekran görüntüsü alalım", 1), ("Claude: ekran kaydı başlat", 1),
          ("Can you take a screenshot?", 1), ("ekran resmini çek", 1), ("Bir kanıt alsana şuna", 1),
+         ("Take evidence.", 1), ("please capture the screen shot", 1), ("grab a screenshot now", 1), ("Could you save the evidence?", 1),
+         ("we have no evidence for that", 0), ("the evidence was clear", 0), ("don't take evidence", 0), ("screenshots are in the folder", 0),
          ("Ekran görüntüsü almayalım şimdi", 0), ("kanıt almaya gerek yok", 0), ("bu konuda kanıt var mı", 0), ("ekran görüntüsü paylaştım", 0),
          ("ekran kaydı var elimizde", 0), ("kanıtı aldık zaten geçen hafta", 0), ("don't take a screenshot", 0),
          # v0.32.15 (deneme 9): kullanıcı kartı okurken / özelliği anlatırken tetiklememeli; öneksiz birinci çoğul/tekil tetiklemeli

@@ -25,6 +25,21 @@ def xlsx(satirlar):  # en küçük geçerli xlsx (satır içi metin hücreleri)
         z.writestr("xl/_rels/workbook.xml.rels", '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')
         z.writestr("xl/worksheets/sheet1.xml", "<worksheet><sheetData>" + "".join(f'<row r="{i}">' + "".join(hucre(v) for v in sat) + "</row>" for i, sat in enumerate(satirlar, 1)) + "</sheetData></worksheet>")
     return b.getvalue()
+def odf(govde):  # en küçük OpenDocument (.ods/.odp): content.xml (v0.136.0)
+    import io
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("content.xml", '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+                   'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+                   'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body>' + govde + '</office:body></office:document-content>')
+    return b.getvalue()
+ODS = odf('<office:spreadsheet><table:table table:name="Takvim"><table:table-row><table:table-cell><text:p>Hafta</text:p></table:table-cell>'
+          '<table:table-cell><text:p>Konu</text:p></table:table-cell><table:table-cell table:number-columns-repeated="1000"/></table:table-row>'
+          '<table:table-row><table:table-cell><text:p>3</text:p></table:table-cell><table:table-cell><text:p>Regresyon atölyesi</text:p></table:table-cell></table:table-row>'
+          '</table:table></office:spreadsheet>')
+ODP = odf('<office:presentation><draw:page draw:name="s1"><draw:frame><draw:text-box><text:p>Webinar planı</text:p><text:p>Konuşmacı: Deniz</text:p>'
+          '</draw:text-box></draw:frame></draw:page><draw:page draw:name="s2"><draw:frame><draw:text-box><text:p>Karar: kayıt açılsın</text:p></draw:text-box></draw:frame>'
+          '</draw:page></office:presentation>')
 uzun = lambda tohum, n=120: " ".join(f"{tohum}{i % 17} sözcük{i} bütçe yedekleme planı madde{i}" for i in range(n))
 TEKLIF = uzun("teklif")
 # birebir kopya
@@ -63,6 +78,9 @@ yaz("veri/disa/kisi.csv", "ad,rol\nDeniz,yonetici\n"); yaz("Export/sistemler.jso
 yaz("veri/gorunum.xlsx", ikili=docx("tablo")); yaz("tablolar/butce.xlsx", ikili=docx("bütçe")); yaz("tablolar/butce.md", "| bütçe |")
 yaz("belgeler/proje-ozeti.md", "Proje özeti"); yaz("site/son-yayin/sayfa.html", "<p>yayımlanmış kopya</p>"); yaz("analiz/bulgular.md", "bulgular")
 yaz("belgeler/sartname.docx", ikili=docx("Şartname metni")); yaz("belgeler/sartname.pdf", ikili=b"%PDF-1.4 sartname")
+# v0.136.0: .ods/.odp okunur (yanındaki PDF türetilmiş); .ppt okunmaz (yanındaki PDF asıl kalır, içerik kaybolmasın)
+yaz("odf/takvim.ods", ikili=ODS); yaz("odf/takvim.pdf", ikili=b"%PDF-1.4 takvim"); yaz("odf/webinar.odp", ikili=ODP)
+yaz("odf/eski-sunum.ppt", ikili=b"\xd0\xcf\x11\xe0eski"); yaz("odf/eski-sunum.pdf", ikili=b"%PDF-1.4 eski sunum")
 # T3: arama önceliği ve harf katlaması
 KARS = "Lojistik karşılaştırma: Bursa ve Sakarya depolarında yükleme süresi ölçüldü, Sakarya daha hızlı çıktı."
 yaz("belgeler/karsilastirma.md", KARS + " Ayrıntı ekte.", gun=2); yaz("belgeler/karsilastirma-ozeti.md", KARS, gun=2)
@@ -116,6 +134,12 @@ try:
     kontrol("türetilmiş: aynı adlı xlsx'in md'si, docx'in pdf'i, 'özeti' adı, analiz klasörü, yayın kopyası klasörü",
             [kt[k] for k in ("tablolar/butce.md", "belgeler/sartname.pdf", "belgeler/proje-ozeti.md", "analiz/bulgular.md", "site/son-yayin/sayfa.html")] == ["turetilmis"] * 5)
     kontrol("asıl: özgün belgeler ve tarihli döküm/not", [kt[k] for k in ("tablolar/butce.xlsx", "belgeler/sartname.docx", "belgeler/teklif-v1.md", "notlar/toplanti-2026-10-16.md")] == ["asil"] * 4)
+    kontrol(".ods'nin aynı adlı PDF'i türetilmiş, .ppt'ninki asıl (.ppt okunmuyor)", kt.get("odf/takvim.pdf") == "turetilmis" and kt.get("odf/eski-sunum.pdf") == "asil",
+            f"{kt.get('odf/takvim.pdf')} {kt.get('odf/eski-sunum.pdf')}")
+    om = m.odf_metin(os.path.join(P, "odf/takvim.ods")); op = m.odf_metin(os.path.join(P, "odf/webinar.odp"))
+    kontrol(".ods metni: sayfa adı ve satırlar, 1000 boş tekrar hücre yok", "## Takvim" in om and "| Hafta | Konu |" in om and "| 3 | Regresyon atölyesi |" in om and len(om) < 200, om[:300])
+    kontrol(".odp metni: slayt başına paragraflar", op.split() == "## Slayt 1 Webinar planı Konuşmacı: Deniz ## Slayt 2 Karar: kayıt açılsın".split(), op)
+    kontrol(".ods/.odp dizinde (aranabilir)", c.execute("SELECT count(*) FROM dosya WHERE yol IN ('odf/takvim.ods', 'odf/webinar.odp')").fetchone()[0] == 2)
     sat = dict(c.execute("SELECT yol, gecerli FROM dosya WHERE yol LIKE 'belgeler/teklif%' OR yol LIKE 'belgeler/Teklif%'").fetchall())
     sha = c.execute("SELECT sha256, kaynak_turu FROM dosya WHERE yol='tablolar/butce.md'").fetchone()
     kontrol("dizindeki dosya satırına alanlar yazıldı", sat == {"belgeler/teklif-v1.md": 0, "belgeler/teklif-v2.md": 0, "belgeler/Teklif_final.md": 1}

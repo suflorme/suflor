@@ -71,7 +71,8 @@ def _beta_toplanti_izle():  # dakikada bir: süren toplantının kimliği → pl
     with BETA_K:
         r = BETA["toplanti"].setdefault(k, {"bas": simdi, "platform": "bilinmeyen"})
         r["son"] = simdi; p = _beta_platform()
-        if p != "bilinmeyen": r["platform"] = p
+        if p != "bilinmeyen":  # v0.136.0: aynı dosyada iki platform (Meet + masaüstü Teams) → en çok dakika geçen; önceden son görülen yazılıyordu
+            dk = r.setdefault("dk", {}); dk[p] = dk.get(p, 0) + 1; r["platform"] = max(dk, key=dk.get)
         r["ceviri"] = r.get("ceviri") or bool("ceviri_acik" in globals() and ceviri_acik())
 
 def _yuzde(xs, q): xs = sorted(xs); return round(xs[min(len(xs) - 1, int(len(xs) * q))], 1) if xs else None

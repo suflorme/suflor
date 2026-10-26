@@ -5,7 +5,7 @@
 import ast, os, shutil, sys, tempfile
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 agac = ast.parse(open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read())
-ns = {"os": os}; exec(compile(ast.Module([n for n in agac.body if isinstance(n, ast.FunctionDef) and n.name == "yerel_ses_bul"], []), "kurulum.py", "exec"), ns)
+ns = {"os": os}; exec(compile(ast.Module([n for n in agac.body if isinstance(n, ast.FunctionDef) and n.name in ("yerel_ses_bul", "pocket_yollar")], []), "kurulum.py", "exec"), ns)
 bul = ns["yerel_ses_bul"]; ok = []
 def kontrol(ad, k): ok.append(bool(k)); print(("✓ " if k else "✗ ") + ad)
 T = tempfile.mkdtemp(prefix="yerel-ses-ayar-")
