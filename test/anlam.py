@@ -78,6 +78,26 @@ try:
     t = time.time()
     while os.path.exists(m.ANLAM_SOKET) and time.time() - t < 40: time.sleep(1)
     kontrol("sunucu boşta kapandı (soket kalktı)", not os.path.exists(m.ANLAM_SOKET))
+    # v0.139.0: refs/main'i olmayan düzen (yeni xet indirmesi, 27 Ekim ikinci hesap) — işçi anlık görüntüden açar; model açılmazsa asıl hata durdu'da
+    kok = os.path.join(ORTAK, "anlam-modeller", "hub", "models--intfloat--multilingual-e5-base")
+    def sahte_ortak(ad, snap):
+        o = os.path.join(T, ad); h = os.path.join(o, "anlam-modeller", "hub", "models--intfloat--multilingual-e5-base"); os.makedirs(h)
+        os.symlink(os.path.join(ORTAK, "cevir-venv"), os.path.join(o, "cevir-venv"))
+        if snap: os.symlink(os.path.join(kok, "snapshots"), os.path.join(h, "snapshots")); os.symlink(os.path.join(kok, "blobs"), os.path.join(h, "blobs"))
+        return o
+    for ad, snap in (("refsiz", True), ("bos", False)):
+        o = sahte_ortak(ad, snap)
+        r = subprocess.run([m.CEVIR_PY, "-B", "-c", "import sys; exec(open(sys.argv[1]).read().split('if __name__')[0]); m, _ = model_ac(); "
+                            "print('anlam-tamam', len(m.encode(['query: deneme'])[0]))", os.path.join(KOD, "gomme-isci.py")],
+                           capture_output=True, text=True, timeout=300, env=dict(os.environ, SUFLOR_ORTAK=o, PYTHONDONTWRITEBYTECODE="1"))
+        if snap: kontrol("refs/main yokken model anlık görüntüden açıldı", "anlam-tamam 768" in r.stdout, (r.stdout + r.stderr)[-300:])
+        else:
+            m.AYAR["ortak"] = o; m.CEVIR_PY = os.path.join(o, "cevir-venv", "bin", "python")
+            open(os.path.join(P, "ik/izin.md"), "a", encoding="utf-8").write("\nYeni satır.\n"); m.guncelle(c)
+            g4 = m.gomme(c); m.AYAR["ortak"] = ORTAK; m.CEVIR_PY = os.path.join(ORTAK, "cevir-venv", "bin", "python")
+            log = open(os.path.join(U, "anlam-sunucu.log"), encoding="utf-8").read() if os.path.exists(os.path.join(U, "anlam-sunucu.log")) else ""
+            kontrol("model yokken gömme hatası asıl nedeni söylüyor (durdu + anlam-sunucu.log)",
+                    (g4["durdu"] or "").startswith("işçi hatası (IndexError): ") and len(g4["durdu"]) > 30 and "gömme işçisi hatası" in log, json.dumps(g4, ensure_ascii=False))
 finally:
     subprocess.run(["pkill", "-f", f"gomme-isci.py --sunucu --db {m.DB}"], capture_output=True)
     c.close(); shutil.rmtree(T, ignore_errors=True)

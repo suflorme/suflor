@@ -1098,7 +1098,10 @@ def cevir_kur(ort):
         # v0.121.0: eski Excel (.xls) — kurulu ortama yalnız bu küçük paket (~100 KB; Docling .xls için LibreOffice ister)
         r = subprocess.run([vpy, "-m", "pip", "install", "-q", "--no-deps", f"xlrd=={CEVIR_XLRD}"], capture_output=True, timeout=300)
         say("✓ eski Excel (.xls) okuyucu eklendi" if not r.returncode else "Not: eski Excel (.xls) okuyucu kurulamadı — .xls dosyaları aranamaz, sonraki güncellemede yeniden denenir")
-    if venv_ok and model_ok and anlam_ok: say("✓ belge çevirme ve anlam araması ortamı var"); return
+    if venv_ok and model_ok and anlam_ok:
+        if os.access(am, os.W_OK): anlam_refs_yaz(am)
+        say("✓ belge çevirme ve anlam araması ortamı var" if anlam_dene(vpy, ort) else
+            "Not: anlam araması modeli var ama açılmadı — arama yalnız sözcükle; ayrıntı ~/Library/Application Support/Suflor/anlam-dene.log"); return
     if not os.access(ort, os.W_OK): say("Not: belge çevirme ortamı yok ve ortak klasör başka hesabın — PDF ve görüntüler aranamaz"); return
     if platform.machine() != "arm64": say("Not: belge çevirme yalnız Apple işlemcili Mac'te (M1 ve sonrası) — PDF ve görüntüler aranamaz"); return
     if shutil.disk_usage(ort).free < 4 * 2 ** 30: say("Not: belge çevirme için en az 4 GB boş yer gerekli — atlandı"); return
@@ -1121,15 +1124,40 @@ def cevir_kur(ort):
             r = subprocess.run([vpy, "-c", "from huggingface_hub import snapshot_download as s; s('intfloat/multilingual-e5-base', revision='d128750597153bb5987e10b1c3493a34e5a4502a', allow_patterns=['*.json', '*.txt', "
                                 "'sentencepiece.bpe.model', 'model.safetensors', '1_Pooling/*'])"], capture_output=True, timeout=1800, env=dict(os.environ, HF_HOME=am))
             if r.returncode: raise RuntimeError("anlam modeli indirilemedi")
+            anlam_refs_yaz(am)
         r = subprocess.run([vpy, "-B", os.path.join(KOD, "cevir-isci.py")], input="", capture_output=True, text=True, timeout=300,
                            env=dict(os.environ, SUFLOR_ORTAK=ort))
         if '"hazir": true' not in r.stdout: raise RuntimeError("deneme açılışı: " + (r.stdout + r.stderr)[-160:])
-        r = subprocess.run([vpy, "-B", "-c", "import sys; exec(open(sys.argv[1]).read().split('if __name__')[0]); m, _ = model_ac(); "
-                            "print('anlam-tamam', len(m.encode(['query: deneme'])[0]))", os.path.join(KOD, "gomme-isci.py")],
-                           capture_output=True, text=True, timeout=600, env=dict(os.environ, SUFLOR_ORTAK=ort))
-        if "anlam-tamam 768" not in r.stdout: raise RuntimeError("anlam modeli açılmadı: " + (r.stdout + r.stderr)[-160:])
+        if not anlam_dene(vpy, ort, zorla=True): raise RuntimeError("anlam modeli açılmadı (ayrıntı anlam-dene.log)")
         sessiz("chmod", "-R", "go+rX", os.path.join(ort, "python312"), os.path.join(ort, "cevir-venv"), md, am); say("✓ belge çevirme ve anlam araması hazır (çevrimdışı açıldı)")
     except Exception as e: say(f"Not: belge çevirme kurulamadı ({str(e)[:160]}) — PDF ve görüntüler aranamaz, sonraki güncellemede yeniden denenir")
+ANLAM_REV = "d128750597153bb5987e10b1c3493a34e5a4502a"
+def anlam_refs_yaz(am):
+    # v0.139.0: yeni (xet) indirme düzeni refs/main'i yazmayabiliyor (27 Ekim, ikinci hesap); işçi artık anlık görüntüden açıyor, refs yine yazılır
+    y = os.path.join(am, "hub", "models--intfloat--multilingual-e5-base", "refs", "main")
+    if os.path.isdir(os.path.join(os.path.dirname(os.path.dirname(y)), "snapshots", ANLAM_REV)) and not os.path.exists(y):
+        try: os.makedirs(os.path.dirname(y), exist_ok=True); open(y, "w").write(ANLAM_REV)
+        except OSError: pass
+def anlam_dene(vpy, ort, zorla=False):
+    # gerçek açılış denemesi (klasörün varlığı yetmedi: 27 Ekim'de model diskteydi ama açılmıyordu). Hesap başına, anlık görüntü başına bir kez
+    # (~10 sn); sonuç DESTEK/anlam-dene.json, hata çıktısı anlam-dene.log
+    snap = sorted(glob_(os.path.join(ort, "anlam-modeller", "hub", "models--intfloat--multilingual-e5-base", "snapshots", "*", "model.safetensors")))
+    imza = [os.path.dirname(x) for x in snap]; kayit = os.path.join(DESTEK, "anlam-dene.json")
+    try:
+        if not zorla and json.load(open(kayit)).get("tamam") == imza: return True
+    except (OSError, ValueError, AttributeError): pass
+    r = sessiz(vpy, "-B", "-c", "import sys; exec(open(sys.argv[1]).read().split('if __name__')[0]); m, _ = model_ac(); "
+               "print('anlam-tamam', len(m.encode(['query: deneme'])[0]))", os.path.join(KOD, "gomme-isci.py"),
+               timeout=600, env=dict(os.environ, SUFLOR_ORTAK=ort, PYTHONDONTWRITEBYTECODE="1"))
+    tamam = bool(r and "anlam-tamam 768" in r.stdout)
+    try:
+        os.makedirs(DESTEK, exist_ok=True)
+        if tamam: json.dump({"tamam": imza, "t": time.time()}, open(kayit, "w"))
+        else:
+            if os.path.exists(kayit): os.remove(kayit)
+            open(os.path.join(DESTEK, "anlam-dene.log"), "a", encoding="utf-8").write(time.strftime("%Y-%m-%d %H:%M:%S") + " anlam modeli açılmadı\n" + ((r.stdout + r.stderr)[-3000:] if r else "çalıştırılamadı") + "\n")
+    except OSError: pass
+    return tamam
 def glob_(desen):
     import glob; return glob.glob(desen)
 

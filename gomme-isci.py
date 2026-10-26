@@ -13,15 +13,22 @@ ORTAK = os.environ.get("SUFLOR_ORTAK") or "/Users/Shared/Suflor"
 MODEL_KOK = os.path.join(ORTAK, "anlam-modeller")
 os.environ.setdefault("HF_HUB_OFFLINE", "1"); os.environ.setdefault("TRANSFORMERS_OFFLINE", "1"); os.environ.setdefault("HF_HOME", MODEL_KOK)
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-MODEL = "intfloat/multilingual-e5-base"; PAKET = 2048
+MODEL = "intfloat/multilingual-e5-base"; MODEL_REV = "d128750597153bb5987e10b1c3493a34e5a4502a"; PAKET = 2048
 SURUM = 2  # gömme biçimi (2: parçanın başında dosya başlığı — gerçek proje ölçümünde anlam araması 17 → 24/46); değişince eski gömmeler silinir
 def gunluk(*m): print(time.strftime("%H:%M:%S"), *m, file=sys.stderr, flush=True)
 
+def model_yolu(kok=MODEL_KOK):
+    # v0.139.0: model anlık görüntü (snapshot) klasöründen açılır, refs/main'e bakılmaz — yeni (xet) indirme düzeni refs/main'i yazmayabiliyor,
+    # o zaman depo adıyla çevrimdışı açılış "couldn't find them in the cached files" ile düşüyordu (27 Ekim, ikinci hesap). Önce sabit sürüm.
+    s = os.path.join(kok, "hub", "models--" + MODEL.replace("/", "--"), "snapshots")
+    for d in [os.path.join(s, MODEL_REV)] + sorted(glob.glob(os.path.join(s, "*"))):
+        if os.path.exists(os.path.join(d, "model.safetensors")) and os.path.exists(os.path.join(d, "modules.json")): return d
+    return None
 def model_ac():
     import torch
     from sentence_transformers import SentenceTransformer
     aygit = "mps" if torch.backends.mps.is_available() else "cpu"
-    m = SentenceTransformer(MODEL, device=aygit); m.max_seq_length = 512
+    m = SentenceTransformer(model_yolu() or MODEL, device=aygit); m.max_seq_length = 512
     if aygit == "mps": m = m.half()
     return m, aygit
 def crc(t): return zlib.crc32(t.encode("utf-8", "replace"))

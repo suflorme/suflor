@@ -1214,12 +1214,23 @@ def gomme(c=None, butce_sn=None, sessiz=True, ilerleme=None):
         if toplantida(): top["durdu"] = "toplantı"; break
         kalan = None if not butce_sn else butce_sn - (time.time() - t0)
         if kalan is not None and kalan < 20: top["durdu"] = "tur süresi doldu — sonraki turda sürer"; break
+        r = None
         try:
             r = subprocess.run([CEVIR_PY, "-B", GOMME_ISCI, "--dizinle", "--db", DB, "--klasor", GOMME, "--kosul", gomme_kosul(), "--nabiz", nabiz,
                                 "--paket-sinir", "4"] + (["--sure", str(int(kalan))] if kalan else []), capture_output=True, text=True,
                                timeout=(kalan + 120) if kalan else 7200, env=dict(os.environ, SUFLOR_ORTAK=AYAR["ortak"], PYTHONDONTWRITEBYTECODE="1"))
             o = json.loads(r.stdout.strip().splitlines()[-1])
-        except (subprocess.TimeoutExpired, ValueError, IndexError, OSError) as e: top["durdu"] = f"işçi hatası ({e.__class__.__name__})"; break
+        except (subprocess.TimeoutExpired, ValueError, IndexError, OSError) as e:
+            # v0.139.0: işçinin asıl hatası stderr'de kalıyordu ("işçi hatası (IndexError)" teşhiste işe yaramadı, 27 Ekim) → son satırı
+            # durdu'ya, son 20 satırı anlam-sunucu.log'a
+            se = (r.stderr if r is not None else getattr(e, "stderr", None)) or ""
+            hata = [x for x in (se.decode("utf-8", "replace") if isinstance(se, bytes) else se).splitlines() if x.strip()]
+            top["durdu"] = f"işçi hatası ({e.__class__.__name__})" + (f": {hata[-1].strip()[:200]}" if hata else "")
+            try:
+                with open(os.path.join(AYAR["uygulama"], "anlam-sunucu.log"), "a", encoding="utf-8") as f:
+                    f.write(time.strftime("%H:%M:%S") + f" gömme işçisi hatası ({e.__class__.__name__})\n" + "".join(x + "\n" for x in hata[-20:]))
+            except OSError: pass
+            break
         if top["eksik"] is None: top["eksik"] = o["eksik"]
         top["yapilan"] += o["yapilan"]
         if ilerleme and top["eksik"]: ilerleme(top["yapilan"], top["eksik"])
