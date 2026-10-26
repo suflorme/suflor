@@ -53,6 +53,13 @@ try:
     for ad, govde, bek in [("önceki satırla aynı gerçek söz korunur", {"onceki": "Test toplantısı başladım. Bir iki üç."}, True)]:
         p.stdin.write(json.dumps(dict({"id": "o", "pcm": pcm(a), "dil": "tr", "ana_dil": "tr", "kanal": "ben", "baslik": "d"}, **govde)) + "\n"); p.stdin.flush()
         r = json.loads(p.stdout.readline()); kontrol(f"{ad} → {r.get('text')!r}" + (f" (atılan: {r['atilan']})" if r.get("atilan") else ""), bool((r.get("text") or "").strip()) == bek)
+    # v0.140.0 (27 Ekim, ikinci hesap): tek başına söylenen asistan adı istemin başında geçtiği için "istemi geri okuma" diye atılıyordu, talimat hitapsız kaldı
+    a = soyle("Yelda", "Atlas."); ist = "Atlas, Matlas, AWS, IAM, MFA, Google Workspace."
+    for ad, ek, ses, bek in [("yalnız asistan adı korunur (konuşma var)", {"hitap": ["Atlas", "Matlas"]}, a, True),
+                             ("ad listesi yoksa eskisi gibi atılır (kök neden)", {}, a, False),
+                             ("konuşmasız parçada ad listesiyle de atılır", {"hitap": ["Atlas"]}, rng.normal(0, 0.003, SR * 2), False)]:
+        p.stdin.write(json.dumps(dict({"id": "h", "pcm": pcm(ses), "dil": "tr", "ana_dil": "tr", "kanal": "ben", "baslik": "d", "istem": ist}, **ek)) + "\n"); p.stdin.flush()
+        r = json.loads(p.stdout.readline()); kontrol(f"{ad} → {r.get('text')!r}" + (f" (atılan: {r['atilan']})" if r.get("atilan") else ""), bool((r.get("text") or "").strip()) == bek)
 finally:
     p.stdin.close(); p.wait(10)
 print("GEÇTİ" if not hatalar else f"KALDI: {len(hatalar)} — " + "; ".join(hatalar))

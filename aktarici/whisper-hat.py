@@ -331,6 +331,7 @@ def _isci_dongu():
         istem = "" if is_.get("bas") and SORU.get("aktif") else istem_metni()
         istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem, "onceki": (k.onceki if k else "")[-150:],
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
+        if is_["kanal"] != "karsi": istek["hitap"] = _hitap_adlari() or ["Suflor", "Suflör", "Süflör"]  # v0.140.0: yalnız asistan adı olan parça istem yankısı sayılmaz
         if not dil: istek.update(diller=["tr", "en"], dil_yedek=getattr(k, "dil_son", None))  # karışık: yalnız tr/en
         elif dil in ("tr", "en"):
             # dil geçişi (v0.29.2, S36): dayatılan dil boş çıkarsa işçi öbür dile bakar (olasılık ≥ %80); kanal son 60 sn'de öbür dilde satır

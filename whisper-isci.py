@@ -325,7 +325,10 @@ def main():
             if metin and len(metin.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", metin, re.I): atilan.append(metin); metin = ""; atla += 1
             # istemi geri okuma. v0.88.2 (19 Ekim 18.20 deneme): istemde toplantının önceki satırları da var; kullanıcı aynı sözü yeniden söyleyince
             # ("Test toplantısı başladı") gerçek satır atılıyordu. Yalnız önceki satırlarla eşleşen metin, parçada konuşma sesi varsa kalır.
-            if istem and metin and metin.lower().strip(" .") in istem.lower():
+            # v0.140.0 (27 Ekim, ikinci hesap): kullanıcının tek başına söylediği asistan adı ("Sera,") istemin başında geçtiği için atılıyordu, arkasından gelen
+            # talimat hitapsız kalıp kayboldu. Parçada konuşma sesi varsa yalnız addan oluşan satır kalır (aktarıcı onu sonraki satırlara hitap olarak taşır).
+            adli = bool(metin and p.get("hitap") and metin.strip(" .,:;!?…").lower() in {str(x).lower() for x in p["hitap"]} and konusma_var(a, np))
+            if istem and metin and not adli and metin.lower().strip(" .") in istem.lower():
                 terim = metin.lower().strip(" .") in (p.get("istem") or "").lower()
                 if terim or not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1
             # yarım yarım geri okuma (20 Ekim, whisper.cpp + sessiz parça: "Grafan, Jira, Promethu."): her sözcüğün en az %60'ı (≥ 3 harf) bir

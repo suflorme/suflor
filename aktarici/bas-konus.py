@@ -1058,6 +1058,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if tur.get("sorgular") and not o["hata"] and tur.get("kaynak") != "karsi" and not tur.get("karsi"): _vt_sorgu_kaydet(tur.get("soru") or KONUS.get("soru"), tur["sorgular"])  # v0.57.6
                 if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"))  # v0.56.0 (S68); S94: konuşan asistanın adı
                 if not o["hata"]: konus_gecmis_yaz(tur, tur.get("metin") or "", tur.get("toplanti_ad"))  # v0.64.0 (S76)
+                if tur.get("kaynak") == "hitap" and not tur.get("karsi"): asistan_soru_kaydet(None if o["hata"] else tur.get("ad"), tur.get("metin") or "")  # v0.140.0
                 if not o["hata"] and "uclu_tetik" in globals(): uclu_tetik(tur, zincir=not yenile)  # üçlü sohbet: öteki kişilik söz alabilir (kisilik.py; tur sınırında yok)
                 print(f"KONUŞ: cevap · yazıya {o['wh_ms']} ms · ilk metin {o['ilk_ms']} ms · ilk ses {o['ses_ms']} ms · {o['maliyet']} $")
                 if yenile:  # pano durumu "hazır" kalır (cevap görünür); süreç arka planda kapanır, sonraki basış yenisini açar
@@ -1109,12 +1110,29 @@ def _defter_blogu(df, dm, dk):  # süreç başına bir kez tam defter (açık s�
 # panoda. İş talimatı ("kuyruğa al", "not al", rol …) toplantı oturumunda kalır. Toplantıdan önce (3 saat içinde başlayacak toplantı) sürecin
 # ilk sorusuna "Sıradaki toplantı" bloğu: brifing (hazırsa) ve aynı kişilerle ya da aynı adla geçmiş toplantılar (dosya yolu + özet başı).
 def toplanti_konus(): return True  # S94: ayar toplanti_konus kalktı — toplantıda Konuş düğmesi her zaman (yalnız kullanıcıya), adıyla seslenme asistan_toplanti'ya bağlı
-def hitap_aski_zaman(metin):  # S94: askıdaki yarım hitaba HITAP_ASKI_SN içinde devam gelmedi → tek başına asistana ("<Ad> gelsin" kaybolmasın)
-    time.sleep(HITAP_ASKI_SN + 0.3)
+def hitap_aski_zaman(metin):  # S94: askıdaki hitaba süre içinde devam gelmedi → tek başına asistana ("<Ad> gelsin" kaybolmasın)
+    time.sleep(max(HITAP_ASKI_SN, HITAP_DEVAM_SN) + 0.3)
     m = hitap_aski_bitti(metin)
     if not m: return
     t2 = hitap_duzelt(m)[0]
-    if "Claude:" in t2 and konus_hitap(t2): print(f"KONUŞ: askıdaki hitap tek başına gitti — \"{m[:60]}\"")
+    if "Claude:" in t2 and konus_hitap(t2): print(f"KONUŞ: askıdaki hitap gitti — \"{m[:80]}\"")
+    elif "Claude:" in t2: print(f"KONUŞ: askıdaki hitap asistana gitmedi — \"{m[:80]}\"")
+# v0.140.0 (27 Ekim, ikinci hesap: asistan "bugün mü, salı mı?" diye sordu, kullanıcı hitapsız cevap verdi, cevap kayboldu): kullanıcının adıyla sorduğu
+# soruya asistan soruyla cevap verdiyse (okunan kısmın sonu "?"), okuma bitiminden ASISTAN_SORU_SN içinde başlayan hitapsız kullanıcı satırı o asistana gider. Tek sefer.
+ASISTAN_SORU_SN = 20.0; _ASISTAN_SORU = {"ad": None, "t": 0.0, "bit": 0.0}
+def asistan_soru_kaydet(ad, cevap):
+    oku = re.split(r"(?:^|\n)\s*-{3,}", cevap or "")[0].strip(); t = time.time()
+    if ad and "?" in oku[-160:]: _ASISTAN_SORU.update(ad=ad, t=t, bit=t + len(oku) / 14)  # okuma sonu tahmini (~14 karakter/sn)
+    else: _ASISTAN_SORU.update(ad=None)
+def asistan_cevap_bekliyor(t0=None):  # → asistanın adı (bir kez) ya da None
+    a = _ASISTAN_SORU; t0 = t0 or time.time()
+    if not a["ad"] or t0 < a["t"] - 1: return None
+    bit = a["bit"]
+    try:
+        if (TS.get("son_t") or 0) > a["t"]: bit = max(bit, TS["son_t"])  # toplantıya okunduysa gerçek okuma sonu
+    except NameError: pass
+    ad = a["ad"]; a.update(ad=None)
+    return ad if t0 - bit <= ASISTAN_SORU_SN else None
 KONUS_ONCE_SN = 3 * 3600
 _GECMIS_ON = {}  # dosya → (mtime, konuşan adlarının ilk sözcükleri)
 _BOS_SOZ = {"toplantı", "toplantısı", "görüşme", "görüşmesi", "meeting", "call", "sync", "with", "ile", "haftalık", "weekly", "teams", "zoom"}

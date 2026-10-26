@@ -87,20 +87,50 @@ def _kisilik_hitap_ad(soz):  # tanınan hitap sözü → kişiliğin adı
 # Bölünen hitap (19 Ekim test toplantısı): Whisper "<kişilik adı> şu an" ve "toplantıda kaç tane şey var? … kontrol eder misin?" diye iki satıra böldü; ilk satırda soru
 # işareti olmadığı için hitap sayılmadı, Konuş cevap vermedi. Kullanıcı satırı ad (ya da Claude/Suflor) ile başlayıp noktalamasız biterse (en çok 6 sözcük) askıda
 # tutulur; HITAP_ASKI_SN içinde başlayan sonraki kullanıcı satırıyla birleşik metinde hitap aranır (döküm satırları ayrı kalır).
-HITAP_ASKI = {"metin": None, "t1": 0.0}; HITAP_ASKI_SN = 2.0
-def hitap_aski(metin, t0=None, t1=None):  # → askıdaki yarım hitap + bu satır (birleşik) ya da None; bu satır yarım hitapsa askıya alınır
+HITAP_ASKI = {"metin": None, "t1": 0.0, "satir": None, "pen": 2.0, "bas": 0.0, "cevap": False}; HITAP_ASKI_SN = 2.0
+# v0.140.0 (27 Ekim, ikinci hesap: "yarın / on ikide / Sera, / [kişi] ile / bir toplantı planına / takvime ekle." — ad tek başına bir parça, talimat
+# hitapsız kalıp kayboldu): yalnız addan oluşan satır askıya alınır; hemen önündeki noktalamasız kullanıcı satırları (en çok HITAP_ONCE_N, aralar
+# ≤ HITAP_DEVAM_SN) adın arkasına eklenir; sonraki satırlar HITAP_DEVAM_SN içinde geldikçe cümle (. ? ! …) bitene dek birikir. Asistanın sorusuna
+# hitapsız cevap (hitap_cevap_baslat) yalnız süreyle biter (cevap birkaç cümle olabilir). En çok HITAP_EN_COK_SN / HITAP_EN_COK_SOZ.
+HITAP_DEVAM_SN = 3.0; HITAP_ONCE_N = 3; HITAP_EN_COK_SN = 20.0; HITAP_EN_COK_SOZ = 45
+HITAP_ONCE = []  # son kullanıcı satırları [(metin, t0, t1)]
+def _hitap_adlari(): return [x for k in kisilikler() for x in k["hitap"]]
+def _hitap_alt():
+    adlar = _hitap_adlari()
+    return "(?:" + "|".join([re.escape(x) for x in sorted(adlar, key=len, reverse=True)] + ([] if adlar else [HITAP_AD])) + ")"
+def _hitap_rx(): return r"\W*" + _hitap_alt() + r"\b"
+def hitap_yalniz_ad(metin):  # satır yalnız asistanın adı mı ("Sera," / "Sera") → adın yazıldığı biçim, değilse None
+    m = re.fullmatch(r"\W*(" + _hitap_alt() + r")[\s.,:;!?…]*", metin or "", re.I)
+    return m.group(1) if m else None
+def hitap_aski(metin, t0=None, t1=None):  # → askıdaki hitap + bu satır (birleşik, tamamlandı) ya da None; bu satır askıya alınır ya da askıdakine eklenirse None
     a = HITAP_ASKI; t0 = time.time() if t0 is None else t0; t1 = time.time() if t1 is None else t1
-    if a["metin"] and 0 <= t0 - a["t1"] <= HITAP_ASKI_SN:
-        m = a["metin"] + " " + metin; a.update(metin=None); return m
+    once = [x for x in HITAP_ONCE]; HITAP_ONCE.append((metin, t0, t1)); del HITAP_ONCE[:-HITAP_ONCE_N - 1]
+    a.update(satir=None)
+    if a["metin"] and 0 <= t0 - a["t1"] <= a["pen"]:
+        m = a["metin"] + " " + metin
+        if not a["cevap"] and (re.search(r"[.!?…]\s*$", metin) or len(m.split()) >= HITAP_EN_COK_SOZ or t1 - a["bas"] >= HITAP_EN_COK_SN or a["pen"] == HITAP_ASKI_SN):
+            a.update(metin=None); return m
+        if a["cevap"] and (len(m.split()) >= HITAP_EN_COK_SOZ or t1 - a["bas"] >= HITAP_EN_COK_SN): a.update(metin=None); return m
+        a.update(metin=m, t1=t1, satir=metin, pen=HITAP_DEVAM_SN); return None
     a.update(metin=None)
-    adlar = [x for k in kisilikler() for x in k["hitap"]]
-    rx = r"\W*(?:" + "|".join([re.escape(x) for x in sorted(adlar, key=len, reverse=True)] + ([] if adlar else [HITAP_AD])) + r")\b"
-    if re.match(rx, metin or "", re.I) and not re.search(r"[.!?…:,]\s*$", metin) and len(metin.split()) <= 6: a.update(metin=metin, t1=t1)
+    ad = hitap_yalniz_ad(metin)
+    if ad:  # yalnız ad: önündeki noktalamasız satırlar (aynı cümlenin başı) arkasına
+        on, son_t0 = [], t0
+        for x, x0, x1 in reversed(once):
+            if not (0 <= son_t0 - x1 <= HITAP_DEVAM_SN) or re.search(r"[.!?…]\s*$", x) or len(on) >= HITAP_ONCE_N: break
+            on.insert(0, x); son_t0 = x0
+        a.update(metin=" ".join([ad + ","] + on), t1=t1, satir=metin, pen=HITAP_DEVAM_SN, bas=son_t0, cevap=False); return None
+    if re.match(_hitap_rx(), metin or "", re.I) and not re.search(r"[.!?…:,]\s*$", metin) and len(metin.split()) <= 6:
+        a.update(metin=metin, t1=t1, satir=metin, pen=HITAP_ASKI_SN, bas=t0, cevap=False)
     return None
-def hitap_askida(metin): return bool(metin) and HITAP_ASKI["metin"] == metin  # S94: bu satır az önce askıya alındı (tek başına gönderilmez; süre dolarsa hitap_aski_bitti)
-def hitap_aski_bitti(metin):  # S94: askıdaki satıra HITAP_ASKI_SN içinde devam gelmedi → tek başına hitap ("<Ad> gelsin" kaybolmasın) — metni döndürür, yoksa None
-    if HITAP_ASKI["metin"] != metin: return None
-    HITAP_ASKI.update(metin=None); return metin
+def hitap_cevap_baslat(ad, metin, t0=None, t1=None):  # asistanın sorusuna hitapsız cevap → "<ad>, <cevap>" askıya (süre dolunca gider); askıdaki metni döndürür
+    t0 = time.time() if t0 is None else t0; t1 = time.time() if t1 is None else t1
+    HITAP_ASKI.update(metin=f"{ad}, {metin}", t1=t1, satir=metin, pen=HITAP_DEVAM_SN, bas=t0, cevap=True); return HITAP_ASKI["metin"]
+def hitap_askida(metin): return bool(metin) and HITAP_ASKI["satir"] == metin and bool(HITAP_ASKI["metin"])  # bu satır askıya alındı ya da askıdakine eklendi
+def hitap_aski_metin(): return HITAP_ASKI["metin"]
+def hitap_aski_bitti(metin):  # S94: askıdaki metne HITAP_DEVAM_SN içinde devam gelmedi → tek başına hitap ("<Ad> gelsin" kaybolmasın) — metni döndürür, yoksa None
+    if not metin or HITAP_ASKI["metin"] != metin: return None
+    HITAP_ASKI.update(metin=None, satir=None); return metin
 # S133 (kullanıcı, 22 Ekim): dışarı aktarılan dökümde kullanıcının satırı "<kullanıcı>: Claude: …" görünüyordu. İçeride (jsonl, izle, Konuş) hitap biçimi
 # "Claude:" kalır; kullanıcıya görünen dökümde (.md, panodaki canlı döküm, Dökümler penceresi) seslenilen asistanın adı yazılır ("<ad>, …").
 _ASG_RX = re.compile(r"(^|[.!?…]\s+|(?:\.{3}|…)\s*)Claude:\s*")

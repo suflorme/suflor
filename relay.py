@@ -704,11 +704,15 @@ def ingest(p):
             text, soz = sozluk_uygula(raw, base_key)
             if p.get("source") == "captions" and (e.get("speaker") or "").strip().lower() in ("you", "siz", "sen"): e["speaker"] = AYAR.get("ad") or e["speaker"]  # Meet kendi satırına "You" yazar
             if (e.get("speaker") or "") == ben_adi():
-                birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if p.get("source") == "whisper" and not onceki else None  # 19 Ekim: bölünen hitap
-                askida = text if hitap_askida(text) else None  # S94: yarım hitap tek başına gitmez; devamı gelmezse HITAP_ASKI_SN sonra tek başına
+                yeni_w = p.get("source") == "whisper" and not onceki; ham = text
+                birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if yeni_w else None  # 19 Ekim: bölünen hitap; v0.140.0: yalnız ad + sonraki satırlar
                 text, hd = hitap_duzelt(text); soz += hd
                 if _KHR["satir"] and "Claude:" in text: e["_hitap_ad"] = _KHR["satir"]  # S133: kullanıcıya görünen dökümde bu ad yazılır (asistan_goster)
-                if askida and "Claude:" in text and e.get("komut_ses") != "uymuyor":
+                # v0.140.0: asistan soru sorduysa ASISTAN_SORU_SN içindeki hitapsız cevap o asistana (askıda birikir, süre dolunca gider)
+                if yeni_w and not birlesik and "Claude:" not in text and not hitap_askida(ham) and e.get("komut_ses") != "uymuyor" and (ad_ := asistan_cevap_bekliyor(e.get("t0"))):
+                    hitap_cevap_baslat(ad_, ham, e.get("t0"), e.get("t1")); print(f"KONUŞ: hitapsız cevap {ad_}'nın sorusuna sayıldı — \"{ham[:60]}\"")
+                askida = hitap_aski_metin() if hitap_askida(ham) else None  # S94: yarım hitap tek başına gitmez; devamı gelmezse süre dolunca tek başına
+                if askida and e.get("komut_ses") != "uymuyor" and ("Claude:" in text or "Claude:" in hitap_duzelt(askida)[0]):
                     e["_konusan"] = True; threading.Thread(target=hitap_aski_zaman, args=(askida,), daemon=True).start()
                 if e.get("komut_ses") != "uymuyor":  # yanındaki birinin sesi kanıt/not istemez
                     sesli_kanit_bak(text, onceki)
@@ -720,6 +724,8 @@ def ingest(p):
                     elif p.get("source") == "whisper" and not onceki and "Claude:" in text and konus_hitap(text): e["_konusan"] = True  # S48: soru konuşana (bas-konus.py)
                     elif birlesik and "Claude:" not in text and "Claude:" in (bt := hitap_duzelt(birlesik)[0]) and konus_hitap(bt):  # yarım hitap + bu satır
                         e["_konusan"] = True; print(f"KONUŞ: bölünen hitap birleştirildi — \"{birlesik[:60]}\"")
+                    elif yeni_w and "Claude:" not in text and not birlesik and toplanti_var() and (talimat_coz(text) or HITAP_IS_RX.search(text)):  # v0.140.0: neden yapılmadığı günlükte
+                        print(f"TALİMAT: hitapsız söz iş/talimat sayılmadı (asistanın adıyla başlamalı) — \"{text[:60]}\"")
             elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker")): e["_konusan"] = True  # v0.44.0
             if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text)); del SON_SATIRLAR[:-20]
             low = text.lower()
