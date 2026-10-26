@@ -20,6 +20,7 @@ def ayar_oku():
     try: v.update(json.load(open(AYAR_YOL, encoding="utf-8")))
     except (OSError, ValueError): pass
     for k in ("uygulama", "proje", "ortak"): v[k] = os.path.expanduser(str(v[k]))
+    v["calisma"] = os.path.expanduser(str(v.get("calisma") or v["proje"]))  # v0.137.0: Claude oturumlarının klasörü (dolu proje klasöründe <proje>/Suflor)
     return v
 AYAR = ayar_oku()
 ARAYUZ_DILI = "en" if AYAR.get("dil") == "en" else "tr"  # arayüz dili (sihirbaz yazar); /status ile eklentiye de gider
@@ -1906,7 +1907,7 @@ def baslat(p):
     try:
         with open(ky, "w", encoding="utf-8") as f: json.dump(kanca, f, ensure_ascii=False)
     except OSError: ky = None
-    sh = f"#!/bin/bash\n# Suflor.me — panodan başlatılan toplantı oturumu (her başlatmada yeniden yazılır)\ncd {shlex.quote(AYAR['proje'])} || exit 1\nexec {shlex.quote(cl)}" + \
+    sh = f"#!/bin/bash\n# Suflor.me — panodan başlatılan toplantı oturumu (her başlatmada yeniden yazılır)\ncd {shlex.quote(AYAR['calisma'])} || exit 1\nexec {shlex.quote(cl)}" + \
          (f" --model {shlex.quote(str(model))}" if model else "") + (f" --settings {shlex.quote(ky)}" if ky else "") + f" {shlex.quote(arg)}\n"
     cp = os.path.join(AYAR["uygulama"], "toplanti-baslat.command")
     with open(cp, "w", encoding="utf-8") as f: f.write(sh)

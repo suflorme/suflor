@@ -79,7 +79,7 @@ def klasorler(r):
         ust = d["yol"].split("/", 1)[0] if "/" in d["yol"] else ""
         if ust: k[ust][0] += 1; k[ust][1] += d["boy"]
     haric = set(B.AYAR.get("haric") or [])
-    try: tum = sorted(x for x in os.listdir(B.PROJE) if os.path.isdir(os.path.join(B.PROJE, x)) and not x.startswith(".") and x not in B.HARIC_GENEL)
+    try: tum = sorted(x for x in os.listdir(B.PROJE) if os.path.isdir(os.path.join(B.PROJE, x)) and not x.startswith(".") and x not in B.HARIC_GENEL and x + "/" != B.CAL_ON)  # v0.137.0: Suflor'un çalışma klasörü listede yok
     except OSError: tum = sorted(k)
     return [{"ad": a, "dosya": k[a][0] if a in k else 0, "boy": k[a][1] if a in k else 0, "haric": a in haric} for a in tum]
 

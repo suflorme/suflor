@@ -559,7 +559,7 @@ def profil_gerekli(c):  # yalnız adla not yazılmaz (uydurmaya iter); döküm y
     return not c.get("kartsiz") and (bool(c.get("gorusmeler")) or any(c.get(k) for k in ("rol", "is_alani", "araclar_ek", "kisiler")))
 def profil():  # komut satırı: kurulum.py profil — kurulum.json'daki cevaplar + proje/gorusmeler → CLAUDE.md taslak notu
     a = ayar(); k = oku_json(KAYIT); c = k.get("cevap") or {}; dil = a.get("dil") or k.get("dil") or "tr"; cl = claude_yolu()
-    proje = gen(a.get("proje") or "~/Suflor"); cm = os.path.join(proje, "CLAUDE.md")
+    proje = gen(a.get("calisma") or a.get("proje") or "~/Suflor"); cm = os.path.join(proje, "CLAUDE.md")  # v0.137.0: çalışma klasörü
     if not cl or not os.path.isfile(cm) or not profil_gerekli(c): say("profil: gerek yok ya da Claude/CLAUDE.md yok"); return
     if PROFIL_BASLIK[dil] in open(cm, encoding="utf-8").read(): say("profil: not zaten var"); return
     ornek = {os.path.basename(f) for f in glob_ornek(dil)}; gd = os.path.join(proje, "gorusmeler")
@@ -665,6 +665,9 @@ def tamamla(c, dil):
               "whisper_terimler": list(dict.fromkeys((eski.get("whisper_terimler") or []) + araclar + kisiler + terimler))[:60],
               "takvim_haric": [x for x in (c.get("takvim_cikar") or [])], "takvim_adreslerim": [x for x in (c.get("takvim_adres") or eski.get("takvim_adreslerim") or [])]})
     a.pop("teshis", None)  # S141: geliştirme verisi beta şartı; eski izin anahtarı okunmaz
+    cal = calisma_sec(proje, eski)
+    if cal != proje: a["calisma"] = cal
+    else: a.pop("calisma", None)
     if "eposta" in c or "eposta_adres" in c:  # takvim ekranındaki e-posta seçimi (boş = tahmin)
         et, ea = eposta_temiz(c.get("eposta"), c.get("eposta_adres"))
         for k, v in (("eposta", et), ("eposta_adres", ea)):
@@ -684,19 +687,22 @@ def tamamla(c, dil):
     try: ayar_degistir(fn); sonuc["ayar"] = "iyi"
     except Exception as e: sonuc.update(ayar="kotu", hata=f"Ayar yazılamadı: {e}"); return sonuc
     try:
-        for k in ("belgeler", "gorusmeler", "_kanit", "_arsiv", ".claude/commands"): os.makedirs(os.path.join(proje, k), exist_ok=True)
-        dold = {"{{ALAN}}": a["alan"], "{{AD}}": a["ad"], "{{PORT}}": str(a["port"]), "{{PROJE}}": proje, "{{KOD}}": KOD}
+        for k in ("belgeler", "gorusmeler", "_kanit", "_arsiv", ".claude/commands"): os.makedirs(os.path.join(cal, k), exist_ok=True)
+        ayr = os.path.join(cal, ".claude", "settings.json")
+        if cal != proje and not os.path.exists(ayr):  # oturumlar çalışma klasöründe açılır; proje belgelerini izin sormadan okusun
+            yaz_json(ayr, {"permissions": {"additionalDirectories": [proje]}})
+        dold = {"{{ALAN}}": a["alan"], "{{AD}}": a["ad"], "{{PORT}}": str(a["port"]), "{{PROJE}}": proje, "{{CALISMA}}": cal, "{{KOD}}": KOD}
         def doldur(kaynak, hedef):
             s = open(os.path.join(KOD, "sablon", kaynak), encoding="utf-8").read()
             for k, v in dold.items(): s = s.replace(k, v)
             open(hedef, "w", encoding="utf-8").write(s)
-        if not os.path.exists(os.path.join(proje, "CLAUDE.md")): doldur("CLAUDE.md", os.path.join(proje, "CLAUDE.md"))
-        doldur("toplanti.md", os.path.join(proje, ".claude", "commands", "toplanti.md"))
+        if not os.path.exists(os.path.join(cal, "CLAUDE.md")): doldur("CLAUDE.md", os.path.join(cal, "CLAUDE.md"))
+        doldur("toplanti.md", os.path.join(cal, ".claude", "commands", "toplanti.md"))
         g = os.path.join(YUKLEME, "gorusmeler")
         if os.path.isdir(g):
-            for f in os.listdir(g): shutil.copy2(os.path.join(g, f), os.path.join(proje, "gorusmeler", f))
+            for f in os.listdir(g): shutil.copy2(os.path.join(g, f), os.path.join(cal, "gorusmeler", f))
         if c.get("ornek"):
-            for f in glob_ornek(dil): shutil.copy2(f, os.path.join(proje, "gorusmeler", os.path.basename(f)))
+            for f in glob_ornek(dil): shutil.copy2(f, os.path.join(cal, "gorusmeler", os.path.basename(f)))
         sonuc["proje"] = "iyi"
     except Exception as e: sonuc.update(proje="kotu", hata=f"Proje klasörü kurulamadı: {e}"); return sonuc
     # çalışma notu: bağımsız süreçte (sihirbaz kapansa da sürer); kurulum.json bu çağrıdan önce kaydedildi
@@ -881,6 +887,9 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/asistan/dinle": return self._json(asistan_dinle(p, str(p.get("dil") or "tr")))
         if yol == "/api/kur/tamamla": return self._json(tamamla(p.get("cevap") or {}, p.get("dil") or "tr"))
         if yol == "/api/klasor-sec": return self._json({"yol": klasor_sec()})
+        if yol == "/api/klasor-bilgi":  # v0.137.0: proje adımı — klasör dolu mu, Suflor'un dosyaları nereye yazılacak
+            pj = gen(str(p.get("yol") or "~/Suflor")); cal = calisma_sec(pj, ayar())
+            return self._json({"dolu": klasor_dolu(pj), "calisma": cal, "alt": cal != pj})
         if yol == "/api/ac": ac(str(p.get("hedef") or "")); return self._json({"ok": True})
         if yol == "/api/hazirlik/tara": return self._json(hz_tara())
         if yol == "/api/hazirlik/isaret": return self._json(hz_isaret(p))
@@ -976,7 +985,21 @@ MENU_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 """
 def yollar():  # ayar.json'dan; yoksa varsayılanlar
     v = {"port": 8765, "uygulama": "~/Library/Application Support/Suflor", "proje": "~/Suflor", "ortak": ORTAK}; v.update(ayar())
-    y = {k: os.path.expanduser(str(v[k])) for k in ("uygulama", "proje", "ortak")}; y["port"] = int(v["port"]); return y
+    y = {k: os.path.expanduser(str(v[k])) for k in ("uygulama", "proje", "ortak")}; y["port"] = int(v["port"])
+    y["calisma"] = os.path.expanduser(str(v.get("calisma") or y["proje"])); return y
+# v0.137.0 (26 Ekim: kullanıcı belge klasörünü proje seçti, kaldırırken Suflor'un iskeletiyle birlikte klasörün tamamı gitti): Suflor'un dosyaları
+# (CLAUDE.md, .claude/, _canli, gorusmeler/, belgeler/, _kanit/, _arsiv/) "çalışma klasörü"nde (ayar calisma). İçi dolu bir klasör proje seçilince
+# çalışma klasörü <proje>/Suflor; proje klasörü yalnız okunur ve aranır (Claude oturumları çalışma klasöründe açılır, proje .claude/settings.json'daki
+# additionalDirectories ile okunur). Boş/yeni klasörde ya da eski düzende (kökte _canli ya da /toplanti komutu) çalışma klasörü = proje (eskisi gibi).
+CALISMA_AD = "Suflor"
+SUFLOR_IZ = {"CLAUDE.md", ".claude", "_canli", "gorusmeler", "belgeler", "_kanit", "_arsiv", CALISMA_AD, ".DS_Store", "Icon\r", ".localized"}
+def klasor_dolu(yol):  # proje klasöründe kullanıcıya ait (Suflor'un iskeleti dışında, gizli olmayan) öğe sayısı
+    try: return sum(1 for f in os.listdir(yol) if f not in SUFLOR_IZ and not f.startswith("."))
+    except OSError: return 0
+def calisma_sec(proje, eski):
+    if eski.get("calisma") and gen(eski.get("proje") or "") == proje: return gen(eski["calisma"])
+    if os.path.lexists(os.path.join(proje, "_canli")) or os.path.isfile(os.path.join(proje, ".claude", "commands", "toplanti.md")): return proje  # eski düzen
+    return os.path.join(proje, CALISMA_AD) if klasor_dolu(proje) else proje
 def say(*m): print(*m, flush=True)
 def sessiz(*c, **k):  # sonucu önemsiz komut (bash'teki "|| true")
     try: return subprocess.run(list(c), capture_output=True, text=True, **k)
@@ -1214,21 +1237,23 @@ def _cope(y):
         if r and r.returncode == 0 and not os.path.lexists(y): return y
     if os.path.islink(y): os.remove(y); return y  # kısayol (kırık olabilir): Finder taşıyamıyor (-5000), yalnız bağlantı silinir
     shutil.move(y, h); return h
-def _proje_temizle(pr, a, sor, notlar_de):  # proje klasöründe yalnız Suflor'un ekledikleri; klasörün kendisi ve kullanıcı dosyaları kalır
+def _proje_temizle(ws, pr, a, sor, notlar_de):  # çalışma klasöründe (ws; eski düzende = proje) yalnız Suflor'un ekledikleri; kullanıcı dosyaları kalır
     def sablon(ad):  # kurulumun yazdığı hâli (tamamla'daki doldur ile aynı yer tutucular)
         t = open(os.path.join(KOD, "sablon", ad), encoding="utf-8").read()
-        for k, v in {"{{ALAN}}": str(a.get("alan", "")), "{{AD}}": str(a.get("ad", "")), "{{PORT}}": str(a.get("port", "")), "{{PROJE}}": pr, "{{KOD}}": KOD}.items(): t = t.replace(k, v)
+        for k, v in {"{{ALAN}}": str(a.get("alan", "")), "{{AD}}": str(a.get("ad", "")), "{{PORT}}": str(a.get("port", "")), "{{PROJE}}": pr, "{{CALISMA}}": ws, "{{KOD}}": KOD}.items(): t = t.replace(k, v)
         return t
     git, kal = [], []
-    for y in (os.path.join(pr, "_canli"), os.path.join(pr, ".claude", "commands", "toplanti.md"), os.path.join(pr, ".claude", "commands", "toplanti.md.eski")):
+    for y in (os.path.join(ws, "_canli"), os.path.join(ws, ".claude", "commands", "toplanti.md"), os.path.join(ws, ".claude", "commands", "toplanti.md.eski")):
         if os.path.lexists(y): git.append(y)
-    cm = os.path.join(pr, "CLAUDE.md")
+    ay = os.path.join(ws, ".claude", "settings.json")  # v0.137.0: kurulumun yazdığı izin (değiştirilmediyse)
+    if ws != pr and oku_json(ay, None) == {"permissions": {"additionalDirectories": [pr]}}: git.append(ay)
+    cm = os.path.join(ws, "CLAUDE.md")
     if os.path.isfile(cm):
         try: ayni = open(cm, encoding="utf-8").read() == sablon("CLAUDE.md")
         except OSError: ayni = False
         (git if ayni else kal).append(cm)
     for ad in ("gorusmeler", "_kanit", "_arsiv"):  # Suflor'un yazdığı toplantı notları ve kanıtlar: doluysa sorulur
-        d = os.path.join(pr, ad); n = sum(len(f) for _, _, f in os.walk(d)) if os.path.isdir(d) else 0
+        d = os.path.join(ws, ad); n = sum(len(f) for _, _, f in os.walk(d)) if os.path.isdir(d) else 0
         if n and sor(f"{d} içinde Suflor'un yazdığı {n} dosya (toplantı notları/kanıtlar) var. Bunlar da Çöp Sepeti'ne taşınsın mı?", notlar_de): git.append(d)
         elif n: kal.append(d)
     return git, kal
@@ -1260,10 +1285,10 @@ def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False
     if os.path.isdir(ort) and os.access(ort, os.W_OK):
         if sor(f"Modeller de ({ort}, {gb(ort):.1f} GB) kaldırılsın mı? Bu Mac'te başka bir hesap Suflor.me kullanıyorsa h de.", modeller_de): liste.append(ort)
     elif os.path.isdir(ort): say(f"Not: modeller başka bir hesabın klasöründe ({ort}) — dokunulmadı.")
-    pr = Y["proje"]; kal = []
-    if os.path.isdir(pr):
-        say(f"Proje klasörün ({pr}) yerinde kalır; yalnız Suflor'un eklediği dosyalar kaldırılır.")
-        g, kal = _proje_temizle(pr, a, sor, proje_de); liste += g
+    pr = Y["proje"]; ws = os.path.expanduser(str(a["calisma"])) if a.get("calisma") else pr; kal = []
+    if os.path.isdir(ws):
+        say(f"Proje klasörün ({pr}) yerinde kalır; yalnız Suflor'un eklediği dosyalar kaldırılır" + (f" ({ws})." if ws != pr else "."))
+        g, kal = _proje_temizle(ws, pr, a, sor, proje_de); liste += g
     if not DENEME:
         sessiz("launchctl", "bootout", f"{gui()}/{LABEL}")
         for ad in SIL_SUREC: sessiz("pkill", "-u", str(os.getuid()), "-x", ad)
@@ -1274,7 +1299,11 @@ def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False
     for y in liste:
         try: g = gb(y); _cope(y); top += g; say(f"✓ Çöp Sepeti'ne: {y}")
         except OSError as e: say(f"UYARI: taşınamadı ({e.__class__.__name__}): {y}")
-    if os.path.isdir(pr): _bos_iskelet(pr)
+    if os.path.isdir(ws):
+        _bos_iskelet(ws)
+        if ws != pr:
+            try: os.rmdir(ws)  # boş kaldıysa Suflor klasörü de gider
+            except OSError: pass
     say(f"\nBitti: {top:.1f} GB Çöp Sepeti'nde (boşaltınca yer açılır; Finder'da Çöp Sepeti → sağ tık → Geri Koy).")
     if os.path.isdir(pr): say(f"Proje klasörün yerinde: {pr}" + (" · dokunulmayanlar: " + ", ".join(os.path.relpath(x, pr) for x in kal) if kal else ""))
     say("Elle kalanlar: Chrome'da chrome://extensions → Suflor.me → Kaldır · Anahtar Zinciri Erişimi'nde 'suflor' ile başlayan öğe varsa (Gemini/Azure anahtarı) sil.")
@@ -1301,7 +1330,7 @@ def yerel_ses_bul(a, ort):
 
 def kur():
     if DENEME: sys.exit("Deneme kipinde (SUFLOR_EV) aktarıcı kurulmaz.")
-    Y = yollar(); app, port = Y["uygulama"], Y["port"]; canli = os.path.join(app, "canli"); desk = os.path.join(Y["proje"], "_canli")
+    Y = yollar(); app, port = Y["uygulama"], Y["port"]; canli = os.path.join(app, "canli"); desk = os.path.join(Y["calisma"], "_canli")
     # bozuk relay.py kurulursa KeepAlive çöken aktarıcıyı döngüde kaldırmaya çalışır: önce sözdizimi
     import ast
     try: [ast.parse(open(y, encoding="utf-8").read()) for y in [os.path.join(KOD, "relay.py")] + sorted(glob_(os.path.join(KOD, "aktarici", "*.py")))]
@@ -1567,9 +1596,9 @@ def guncelle(kaynak=None, zorla=False):
     else: say(f"✓ aktarıcı v{calisan} çalışıyor")
     a = ayar()
     if a.get("komut_sablondan"):  # kendi komutunu yazan alan (komut_sablondan yok): dokunma; eskisi .eski olarak kalır
-        proje = os.path.expanduser(a["proje"]); hedef = os.path.join(proje, ".claude", "commands", "toplanti.md")
+        proje = os.path.expanduser(a["proje"]); hedef = os.path.join(os.path.expanduser(a.get("calisma") or proje), ".claude", "commands", "toplanti.md")
         s = open(os.path.join(KOD, "sablon", "toplanti.md"), encoding="utf-8").read()
-        for k, v in {"{{ALAN}}": a["alan"], "{{AD}}": a["ad"], "{{PORT}}": str(a["port"]), "{{PROJE}}": proje, "{{KOD}}": KOD}.items(): s = s.replace(k, v)
+        for k, v in {"{{ALAN}}": a["alan"], "{{AD}}": a["ad"], "{{PORT}}": str(a["port"]), "{{PROJE}}": proje, "{{CALISMA}}": os.path.expanduser(a.get("calisma") or proje), "{{KOD}}": KOD}.items(): s = s.replace(k, v)
         if os.path.isdir(os.path.dirname(hedef)):
             if os.path.exists(hedef) and open(hedef, encoding="utf-8").read() != s: shutil.copy(hedef, hedef + ".eski")
             open(hedef, "w", encoding="utf-8").write(s); say("✓ /toplanti komutu şablondan yenilendi")

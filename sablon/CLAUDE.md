@@ -34,6 +34,7 @@ bu klasördeki belgelere dayandırır ve özetleri buraya yazar. İçerik iç be
 - `belgeler/KARARLAR.md` — karar listesi (numaralı, eski satır değiştirilmez)
 
 ## Klasör haritası
+- Proje belgeleri: `{{PROJE}}` (alt klasörleriyle) — Claude toplantıda bunlarda arar.
 - `belgeler/` — notlar, raporlar, tablolar (.md, .txt, .docx, .xlsx, .csv, .html, .json). Claude toplantıda bunlarda arar.
 - `gorusmeler/` — toplantı özetleri ve görüşme dökümleri (Suflor.me özetleri buraya yazar; "görüşme" türünde aranır).
 - `_canli/` — canlı dökümler, kartlar, gündem (Suflor.me yönetir; kısayol). Elle düzenleme.

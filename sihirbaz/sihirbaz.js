@@ -78,6 +78,8 @@
                                                                               gor_tur: ".docx · .vtt · .txt · .md",
       gor_ornek: "Dökümüm yok, örnek bir görüşmeyle dene",       proje_b: "Belgelerin nerede dursun?", proje_a: "Suflor.me toplantı özetlerini bu klasöre yazar; buraya koyduğun belgeler kartlara kaynak olur.",
       proje_sec: "Başka bir klasör seç…", proje_icerik: "İçinde belgeler, görüşmeler ve kanıtlar için alt klasörler açılır.",
+      proje_dolu: "Bu klasörde {n} öğe var. Suflor belgelerine dokunmaz, yalnız okur ve arar; kendi dosyalarını (toplantı notları, kanıtlar, çalışma notu) içine açacağı tek bir klasöre yazar: {yol}",
+      proje_kaldir: "Suflor'u kaldırırken bu klasörü silme: ~/Suflor.me/kaldir.command yalnız Suflor'un eklediklerini kaldırır.",
                                                 kur_b: "Kuruyorum", kur_a: "Ayarlarını yazıyor, arka plan hizmetini, takvim ve ses yardımcılarını kuruyorum. macOS \"Suflor Ses\" için sistem sesi kaydı izni sorarsa İzin Ver de.",
       k_ayar: "Ayarlar", k_proje: "Proje klasörü", k_not: "Çalışma notu", k_not_a: "Claude arka planda taslağını hazırlıyor; ilk toplantının sonunda onaylarsın", k_aktarici: "Arka plan hizmeti", k_modeller: "Konuşma tanıma modelleri",
       k_m_yeniden: "Yeniden dene", k_m_hata: "Modeller kurulamadı. İnternet bağlantını denetleyip yeniden dene.", k_m_baska: "Modeller bu Mac'teki başka bir hesabın klasöründe ve eksik. O hesapta Suflor.me'yi güncelle (guncelle.command), sonra burada yeniden dene.",
@@ -190,6 +192,8 @@
                                                                               gor_tur: ".docx · .vtt · .txt · .md",
       gor_ornek: "No transcripts, try a sample meeting",       proje_b: "Where should your documents live?", proje_a: "Suflor.me writes meeting summaries here; documents you keep here become sources for the cards.",
       proje_sec: "Choose another folder…", proje_icerik: "Subfolders for documents, meetings and evidence are created inside.",
+      proje_dolu: "This folder has {n} items. Suflor never changes your documents, it only reads and searches them; its own files (meeting notes, evidence, working note) go into a single folder inside: {yol}",
+      proje_kaldir: "When removing Suflor, don't delete this folder: ~/Suflor.me/kaldir.command removes only what Suflor added.",
                                                 kur_b: "Setting up", kur_a: "Writing your settings and installing the background service, calendar and audio helpers. If macOS asks for system audio recording permission for \"Suflor Ses\", choose Allow.",
       k_ayar: "Settings", k_proje: "Project folder", k_not: "Working note", k_not_a: "Claude is drafting it in the background; you approve it after your first meeting", k_aktarici: "Background service", k_m_yeniden: "Try again", k_m_hata: "The models couldn't be installed. Check your internet connection and try again.",
       k_m_baska: "The models are in another account's folder on this Mac and incomplete. Update Suflor.me in that account (guncelle.command), then try again here.",
@@ -264,6 +268,11 @@
   };
   let kayitSira = Promise.resolve();
   const kaydet = () => { kayitSira = kayitSira.then(() => api("kaydet", { dil: D.dil, adim: (D.durum || {}).mod === "hazirlik" ? D.kayitAdim : D.adim, adim_id: (D.durum || {}).mod === "hazirlik" ? D.kayitAdimId : ((gorunen()[D.adim] || {}).id), cevap: D.cevap })).catch(() => {}); return kayitSira; };  // hazırlık kipinde kurulumun kaldığı adım korunur
+  async function klasorBilgi() {  // proje adımı: seçili klasör dolu mu (v0.137.0)
+    const yol = C.proje || "~/Suflor";
+    try { D.klasor = { ...(await api("klasor-bilgi", { yol })), yol }; } catch (e) { D.klasor = null; }
+    const a = gorunen()[D.adim]; if (a && a.id === "proje") ciz();
+  }
   async function durumAl() { try { D.durum = await api("durum"); } catch (e) { D.durum = D.durum || {}; } indirmeGoster(); if (C.asistan) pkGoster(); return D.durum; }
 
   // örnek veriler (önizleme)
@@ -466,8 +475,10 @@
           ${asTr() ? `<p class="dipnot" data-pk-durum>${pkDurum()}</p>` : ""}
           <label class="anahtar"><input type="checkbox" data-as-iki ${iki ? "checked" : ""}><span><b>${esc(t.as_iki)}</b><br><span class="ipucu">${esc(t.as_iki_a)}</span></span></label>
           <p class="dipnot">${dug("as-atla", t.atla)}<br>${esc(t.as_atla_a)}</p>`; } },
-    { id: "proje", simge: "klasor", b: "proje_b", a: "proje_a", gir: () => { if (!C.proje && D.durum) C.proje = D.durum.proje; },
-      icerik: () => `<div class="liste">${satir("iyi", C.proje || "~/Suflor", t.proje_icerik, dug("klasor-sec", t.proje_sec))}</div>` },
+    { id: "proje", simge: "klasor", b: "proje_b", a: "proje_a", gir: () => { if (!C.proje && D.durum) C.proje = D.durum.proje; klasorBilgi(); },
+      icerik: () => { const k = D.klasor && D.klasor.yol === (C.proje || "~/Suflor") ? D.klasor : null;  // v0.137.0: dolu klasör → Suflor'un dosyaları tek alt klasörde
+        return `<div class="liste">${satir("iyi", C.proje || "~/Suflor", k && k.alt ? "" : t.proje_icerik, dug("klasor-sec", t.proje_sec))}</div>
+          ${k && k.alt ? `<div class="kart-not" data-proje-dolu>${esc(t.proje_dolu.replace("{n}", k.dolu).replace("{yol}", k.calisma))}</div><p class="dipnot">${esc(t.proje_kaldir)}</p>` : ""}`; } },
     { id: "kur", simge: "kur", b: "kur_b", a: "kur_a", hazir: () => { const k = D.kurDurum || {}; return k.ayar === "iyi" && k.aktarici === "iyi"; },
       gir: async () => { D.kurDurum = { ayar: "bekle", proje: "bekle", not: "bekle", aktarici: "bekle" }; ciz();
         try { D.kurDurum = await api("kur/tamamla", { cevap: C, dil: D.dil }); } catch (e) { D.kurDurum = { ...D.kurDurum, hata: String(e.message || e) }; } await durumAl(); ciz(); },
@@ -672,7 +683,7 @@
       if (n === "kur-yeniden") { const a = gorunen()[D.adim]; if (a && a.gir) await a.gir(); return; }  // kurulum adımı başarısızsa
       if (n === "modeller-yeniden") { await api("modeller/baslat", {}).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "claude-yol") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
-      if (n === "klasor-sec") { const r = await api("klasor-sec", {}).catch(() => ({})); if (r.yol) { C.proje = r.yol; kaydet(); ciz(); } return; }
+      if (n === "klasor-sec") { const r = await api("klasor-sec", {}).catch(() => ({})); if (r.yol) { C.proje = r.yol; kaydet(); ciz(); klasorBilgi(); } return; }
       if (n === "takvim-izin") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
       api("ac", { hedef: n }).catch(() => {});
       return;

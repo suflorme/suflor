@@ -23,6 +23,10 @@ def ayar_oku():
     return v
 AYAR = ayar_oku()
 PROJE = AYAR["proje"]  # hesabın proje (bağlam) klasörü
+# v0.137.0: Suflor'un kendi dosyaları (_canli, gorusmeler, _arsiv, .claude) çalışma klasöründe — içi dolu belge klasörü proje seçildiyse <proje>/Suflor
+CALISMA = os.path.expanduser(str(AYAR.get("calisma") or PROJE))
+_ck = os.path.relpath(CALISMA, PROJE) if CALISMA != PROJE else ""
+CAL_ON = "" if not _ck or _ck.startswith("..") else _ck.rstrip("/") + "/"  # proje köküne göre çalışma klasörü öneki ("Suflor/" ya da "")
 DB = os.environ.get("SUFLOR_DIZIN") or os.path.join(AYAR["uygulama"], "dizin.sqlite")  # SUFLOR_DIZIN: deneme (kör kıyasta kol başına ayrı dizin)
 SOZLUK = os.path.join(AYAR.get("sozluk_kaynagi") or "-", "duzeltme_sozlugu_oneri.tsv")
 SUFLOR_SOZLUK = os.path.join(AYAR["uygulama"], "canli", "sozluk.json")  # esas sözlük
@@ -32,7 +36,7 @@ SOZLUK_KOPYA = os.path.join(AYAR["uygulama"], "dis-sozluk.tsv")  # dış sözlü
 # (1 Ekim: .xlsx'in eski .md dışa aktarımları silindi, zip'i _arsiv/'de; _arsiv dizine girmez.)
 # her alanda: _yedek, _arsiv, .claude, .git, Suflor kod klasörü; ayar.json "haric" ile alan kendi listesini ekler
 HARIC_GENEL = ["_yedek", "_arsiv", ".claude", ".git", "suflor", os.path.basename(str(AYAR.get("kod") or "").rstrip("/")) or "suflor"]
-HARIC = list(dict.fromkeys(HARIC_GENEL + list(AYAR.get("haric") or [])))  # ayar "haric": alanın kendi listesi (proje köküne göre)
+HARIC = list(dict.fromkeys(HARIC_GENEL + ([CAL_ON + h for h in ("_yedek", "_arsiv", ".claude")] if CAL_ON else []) + list(AYAR.get("haric") or [])))  # ayar "haric": alanın kendi listesi (proje köküne göre)
 CANLI_HARIC = {"takvim-secilen.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "agenda.json", "hazir.json", "karneler.jsonl", "karsilastirmalar.jsonl"}  # karne · v0.7.2: karşılaştırma
 TEXTUTIL_UZ = {".doc", ".rtf", ".odt"}  # v0.121.0: macOS textutil ile .docx'e çevrilip docx_metin'den (Docling bunlar için LibreOffice ister)
 ODF_UZ = {".ods", ".odp"}  # v0.136.0: OpenDocument tablo/sunum — zip içindeki content.xml'den (ek bileşen yok); .odt textutil'de
@@ -206,7 +210,7 @@ def odf_metin(yol, en_cok_sutun=60):  # .ods → sayfa başına "## ad" + "| a |
     return "\n".join(out)
 
 # --- Dosya türü, tarih, başlık ----------------------------------------------------------------------------------
-GORUSME = tuple(AYAR.get("gorusme_klasorleri") or ["gorusmeler/"])  # görüşme dökümü klasörleri (proje köküne göre)
+GORUSME = tuple(AYAR.get("gorusme_klasorleri") or [CAL_ON + "gorusmeler/"])  # görüşme dökümü klasörleri (proje köküne göre)
 ANALIZ = tuple(AYAR.get("analiz_klasorleri") or [])
 BEN = ((str(AYAR.get("ad") or "").split() or ["-"])[0])  # kullanıcının adı: konuşmacı sayımında kendisi hariç
 def tur_bul(kisa):
@@ -397,7 +401,7 @@ def dokum_kopyasi(yol):
     if not re.search(r"-transkript-\d{8}\.md$", yol): return False
     try: m = re.search(r"Kaynak: `_canli/([^`]+)\.md`", open(yol, encoding="utf-8", errors="replace").read(800))
     except OSError: return False
-    return bool(m) and os.path.exists(os.path.join(PROJE, "_canli", m.group(1) + ".jsonl"))
+    return bool(m) and os.path.exists(os.path.join(CALISMA, "_canli", m.group(1) + ".jsonl"))
 ERISILEMEYEN = []  # son guncelle'de okunamayan klasörler (proje köküne göre; "" = kök): launchd'nin Masaüstü engeli (TCC) os.walk'ta sessizce boş döner
 def dosyalar(erisilemeyen=None):
     hata = (lambda e: erisilemeyen.append(os.path.relpath(e.filename, PROJE) if e.filename else "")) if erisilemeyen is not None else None
@@ -408,7 +412,7 @@ def dosyalar(erisilemeyen=None):
         for f in fs:
             k = os.path.join(rel, f)
             if os.path.splitext(f)[1].lower() in UZANTI | CEVIR_UZ and k not in HARIC and not f.startswith("~$") and not dokum_kopyasi(os.path.join(kok, f)): yield os.path.join(kok, f), k
-    canli = os.path.join(PROJE, "_canli")  # kısayol: os.walk takip etmez, ayrıca gez
+    canli = os.path.join(CALISMA, "_canli")  # kısayol: os.walk takip etmez, ayrıca gez (dizindeki adı yine "_canli/…")
     if os.path.isdir(canli):
         for f in sorted(os.listdir(canli)):
             if f in CANLI_HARIC or not f.endswith((".jsonl",)) or not f.startswith("20"): continue

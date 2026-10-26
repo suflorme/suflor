@@ -45,7 +45,7 @@ def _dosyadan_ad(ad):
 def _dosyadan_cikti():
     ev = os.path.expanduser("~")
     korunan = [os.path.join(ev, x) for x in ("Desktop", "Documents", "Downloads", "Library/Mobile Documents")]
-    p = os.path.realpath(AYAR["proje"])
+    p = os.path.realpath(AYAR.get("calisma") or AYAR["proje"])  # v0.137.0: Suflor'un çalışma klasörü
     if not any(p == k or p.startswith(k + "/") for k in korunan):
         for y in (os.path.join(p, "gorusmeler"), p):
             if os.path.isdir(y) and os.access(y, os.W_OK): return y

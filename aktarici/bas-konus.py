@@ -846,9 +846,9 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         vt = konus_vt_hazirla()
         if sec["tur"] == "claude-code":
             args = BEYIN.konus_args(AYAR, konus_istem(vt), VT_MCP_ARACLAR if vt else "", vt, BASE, sec["model"])  # v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
-            ist, kip = {"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "konus-bos"), "giris": gir, "cikis": cik, "sure": 7200}, "--istek"
+            ist, kip = {"claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "konus-bos"), "giris": gir, "cikis": cik, "sure": 7200}, "--istek"
         else:  # v0.122.0 (Faz 11 Aşama 1): openai-uyumlu — Brifing.app --beyin → aktarici/beyin.py (araç döngüsü, aynı stream-json)
-            ist, kip = BEYIN.konus_istek(AYAR, konus_istem(vt), vt, [AYAR["proje"], BASE], AYAR["proje"], gir, cik, "en" if ARAYUZ_DILI == "en" else "tr"), "--beyin"
+            ist, kip = BEYIN.konus_istek(AYAR, konus_istem(vt), vt, [AYAR["proje"], BASE], AYAR["calisma"], gir, cik, "en" if ARAYUZ_DILI == "en" else "tr"), "--beyin"
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(ist, f, ensure_ascii=False)
         _KS["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", kip, istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

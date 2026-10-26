@@ -4,7 +4,7 @@ argument-hint: <kişi — konu>   örn. Ayşe — bütçe ve takvim
 ---
 
 Kullanıcı birazdan toplantısına (Teams, Zoom web ya da Meet) giriyor: **$ARGUMENTS**. Suflor.me toplantı modunu başlat. Bu komut
-çalışma alanının proje klasöründe ({{PROJE}}) çalışır; yollar ona göredir. Kısa yaz; kullanıcı birkaç dakika içinde toplantıda olacak.
+çalışma alanının klasöründe ({{CALISMA}}) çalışır; yollar ona göredir (proje belgeleri: {{PROJE}}). Kısa yaz; kullanıcı birkaç dakika içinde toplantıda olacak.
 
 ## 0. Kurallar
 `{{KOD}}/TOPLANTI-KURALLARI.md` dosyasını, bu klasörün `CLAUDE.md`'sini (varsa) ve Suflor'un proje notunu (`tc proje-notu`) oku ve toplantı boyunca

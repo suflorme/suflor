@@ -198,6 +198,7 @@ def hazir():
     olcum_yaz({"t": "hazir-gonder", "hid": A.hid, "card_id": cid, "card_at": simdi()})
 
 PROJE = AYAR["proje"]  # hesabın proje (bağlam) klasörü
+CALISMA = os.path.expanduser(str(AYAR.get("calisma") or PROJE))  # v0.137.0: Suflor'un dosyaları (CLAUDE.md, gorusmeler, Claude oturumu) — dolu klasörde <proje>/Suflor
 # Dış sözlük kaynağı (ayar sozluk_kaynagi: tsv + xlsx) isteğe bağlı; yoksa birleştirme "kaynak yok" der
 SOZ_TSV = os.path.join(PROJE, AYAR.get("sozluk_kaynagi") or "-", "duzeltme_sozlugu_oneri.tsv")
 SOZ_XLSX = os.path.join(PROJE, AYAR.get("sozluk_kaynagi") or "-", AYAR.get("sozluk_xlsx") or "-")
@@ -677,7 +678,7 @@ def proje_notu_cmd():
     if VT.get("yol") and not VT.get("proje_vt"): print("Kayıt veritabanı ayarlı: proje notu kullanılmıyor (CLAUDE.md ve vt-sema/vt-sor)."); return
     y = os.path.join(AYAR["uygulama"], "proje-notu.md")
     if not os.path.exists(y):
-        try: s = open(os.path.join(os.path.expanduser(PROJE), "CLAUDE.md"), encoding="utf-8").read()
+        try: s = open(os.path.join(CALISMA, "CLAUDE.md"), encoding="utf-8").read()
         except OSError: s = ""
         i = s.find(PROJE_NOTU_BASLIK)
         if i >= 0:
@@ -764,7 +765,7 @@ def _zt(s):
     except (TypeError, ValueError): return None
 def toplanti_oturumlari():  # → [{oturum, t0, t1, tur, model, giris, yaz5, yaz1s, oku, cikis, maliyet}]
     import glob
-    kok = os.path.join(os.path.expanduser("~"), ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", os.path.expanduser(PROJE)))
+    kok = os.path.join(os.path.expanduser("~"), ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", CALISMA))  # oturum çalışma klasöründe açılır
     out = []
     for f in glob.glob(os.path.join(kok, "*.jsonl")):
         top, ilk_k, gor, ts, mod = False, 0, {}, [], set()
@@ -1957,7 +1958,7 @@ def hazirlik_cmd():
         try:
             db = AYAR.get("durum_belgesi")  # alanın durum belgesi
             if not db: raise FileNotFoundError
-            dur = [l.strip() for l in open(os.path.join(PROJE, db), encoding="utf-8") if k.split()[0] in kucuk(l)][:8]
+            dur = [l.strip() for l in open(os.path.join(CALISMA, db), encoding="utf-8") if k.split()[0] in kucuk(l)][:8]
             print(f"\n## {db}'de {A.kim} geçen satırlar"); print("\n".join("  " + l[:250] for l in dur) or "  yok")
         except FileNotFoundError: pass
     try: sz = [x for x in sozler_graf(A.kim or None) if x.get("durum") == "acik"]
@@ -2061,7 +2062,7 @@ def dokum_cmd():
     dokum_yaz(sat, toplanti_basligi(md), "Kaynak: `_canli/" + md + "`")
 def dokum_kok(kim, bas):  # <hedef>/<alan>-<kim>-transkript-<YYYYMMDD>; varsa ve --uzerine yoksa durur
     kim = re.sub(r"[^\w-]+", "-", kim, flags=re.UNICODE).strip("-")[:60] or "toplanti"
-    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(os.path.expanduser(AYAR["proje"]), "gorusmeler"), os.path.expanduser(AYAR["proje"])) if os.path.isdir(y))
+    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(CALISMA, "gorusmeler"), CALISMA) if os.path.isdir(y))
     os.makedirs(hedef, exist_ok=True)
     kok = os.path.join(hedef, f"{AYAR.get('alan') or 'Suflor'}-{kim}-transkript-{bas:%Y%m%d}")
     var = [y for y in (kok + ".md", kok + ".vtt") if os.path.exists(y)]
@@ -2125,7 +2126,7 @@ def adimlar_cmd():
     an = lambda r: (zaman(r.get("at")) or datetime.datetime.now()).timestamp()
     bas = datetime.datetime.fromtimestamp(min([an(ks[0])] + [x["t"] for x in met[:1]])).astimezone()
     kim = re.sub(r"[^\w-]+", "-", A.kim or toplanti_basligi(md), flags=re.UNICODE).strip("-")[:60] or "toplanti"
-    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(os.path.expanduser(AYAR["proje"]), "gorusmeler"), os.path.expanduser(AYAR["proje"])) if os.path.isdir(y))
+    hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(CALISMA, "gorusmeler"), CALISMA) if os.path.isdir(y))
     on = f"{AYAR.get('alan') or 'Suflor'}-{kim}"; kok = f"{on}-ekranlar-{bas:%Y%m%d}"; gk = os.path.join(hedef, kok); os.makedirs(gk, exist_ok=True)
     ac_fp = os.path.join(A.dir, "kanit", md[:-3], "aciklama.json")
     try: acik = json.load(open(ac_fp, encoding="utf-8"))

@@ -38,6 +38,10 @@ izinleri kaldırır. Hiçbir şeyi silmez, Çöp Sepeti'ne taşır (Finder'da Ç
 belgelerine dokunmaz; yalnız Suflor'un eklediklerini (`_canli` kısayolu, `/toplanti` komutu, değiştirmediğin `CLAUDE.md`, boş klasörler)
 kaldırır. Toplantı notlarını (`gorusmeler/`), modelleri ve `~/Suflor.me` klasörünü ayrıca sorar. Sonra Chrome'da `chrome://extensions` → Suflor.me → Kaldır.
 
+**Proje klasörü:** sihirbazda içi dolu bir belge klasörü seçersen Suflor belgelerine dokunmaz, yalnız okur ve arar; kendi dosyalarını
+(`CLAUDE.md`, `/toplanti` komutu, toplantı notları, kanıtlar, `_canli` kısayolu) o klasörün içindeki tek bir `Suflor/` klasörüne yazar ve Claude
+oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar klasörün kendisinde durur.
+
 **Modellerin yeri:** `/Users/Shared/Suflor`. Aynı Mac'te bu klasörü başka bir hesap kurduysa her hesap kendi modellerini
 `~/Library/Application Support/Suflor-ortak` altına indirir (~5–12 GB).
 

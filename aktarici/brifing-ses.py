@@ -56,7 +56,7 @@ def _brifing_is(oid, olay):
             if os.path.exists(cikti): os.remove(cikti)
             args = BEYIN.brifing_args(AYAR, istem, BASE, yalin)
             fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": cikti, "sure": 240}, f, ensure_ascii=False)
+            with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": cikti, "sure": 240}, f, ensure_ascii=False)
             t1 = time.time()
             subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=300)
             try: os.remove(istek)

@@ -77,7 +77,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
                 "--append-system-prompt", TOPO_ISTEM] + (["--model", str(model)] if model else []) + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": os.path.expanduser(AYAR["proje"]), "cikti": os.path.join(BASE, "toplanti-bos"),
+            json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "toplanti-bos"),
                        "giris": gir, "cikis": cik, "sure": TOPO_SURE_SN}, f, ensure_ascii=False)
         if not sid: TOPO.update(mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None)
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
