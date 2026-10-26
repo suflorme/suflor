@@ -68,7 +68,8 @@ ok("TSV sayıları", v.execute("SELECT sum(adet) FROM t_stok").fetchone()[0] == 
 ok("proje.db yalnız sahibine açık (0600)", os.stat(B.PROJE_VT).st_mode & 0o777 == 0o600)
 v.close()
 # aramada: .doc/.rtf/.odt metni, noktalı virgüllü CSV sütunlara bölünmüş
-r, _ = B.ara("Rize lojistik merkezi", n=8, guncel=False); yollar = {x[1] for x in r}
+_ye = B.YAKIN_ESIK; B.YAKIN_ESIK = None  # üç biçimde aynı metin: okunma denetimi (sıralamadaki yakın kopya ayıklaması değil)
+r, _ = B.ara("Rize lojistik merkezi", n=8, guncel=False); yollar = {x[1] for x in r}; B.YAKIN_ESIK = _ye
 ok(".doc, .rtf, .odt (macOS textutil) dizinde ve aranır", {"not-doc.doc", "not-rtf.rtf", "not-odt.odt"} <= yollar, str(yollar))
 r, _ = B.ara("Ankara satış", n=3, guncel=False)
 ok("noktalı virgüllü CSV aramada 'Bölge: Ankara · Satış: 980'", any("Bölge: Ankara · Satış: 980" in x[4] for x in r), str([x[4] for x in r])[:200])

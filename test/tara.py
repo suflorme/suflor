@@ -154,7 +154,9 @@ try:
     kontrol("T3: eski=True ile eski sürümler de", {"belgeler/teklif-v1.md", "belgeler/teklif-v2.md"} <= set(yollar("teklif bütçe yedekleme", eski=True)))
     kontrol("T3: veritabanı kipinde dışa aktarım sonuçta yok, disa=True ile var", not yollar("palet kaldırıcı") and yollar("palet kaldırıcı", disa=True) == ["veri/disa/stok-durumu.csv"],
             f"{yollar('palet kaldırıcı')} {yollar('palet kaldırıcı', disa=True)}")
-    kontrol("T3: aynı metinde asıl kaynak türetilmişin önünde", yollar("Sakarya yükleme süresi")[:2] == ["belgeler/karsilastirma.md", "belgeler/karsilastirma-ozeti.md"], str(yollar("Sakarya yükleme süresi")))
+    kontrol("T3: aynı metinde asıl kaynak türetilmişin önünde", yollar("Sakarya yükleme süresi")[0] == "belgeler/karsilastirma.md", str(yollar("Sakarya yükleme süresi")))
+    kontrol("v0.138.0: neredeyse aynı metin (türetilmiş özet) ikinci sırayı kaplamaz", "belgeler/karsilastirma-ozeti.md" not in yollar("Sakarya yükleme süresi")[:2],
+            str(yollar("Sakarya yükleme süresi")))
     kontrol("T3: I/İ/ı katlaması (büyük harfli OCR metni)", all(yollar(q) == ["belgeler/sube.md"] for q in ("İzmir şubesi", "izmir", "Ilgaz", "ılgaz deposu")),
             str([yollar(q) for q in ("İzmir şubesi", "izmir", "Ilgaz", "ılgaz deposu")]))
     m.VT_KIPI = False

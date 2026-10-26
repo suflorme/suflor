@@ -1344,7 +1344,11 @@ def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2, guncel=True, ka
             return (once + [r for r in genel if r[0] not in gor])[:n], ek or ek2
     return ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam, aralik, eski, disa)
 VT_KIPI = isinstance(AYAR.get("veritabani"), dict) and bool(AYAR["veritabani"].get("yol"))
-IKINCIL = 0.9  # türetilmiş/dışa aktarım parçasının BM25 puanı çarpanı (puan eksi; küçük çarpan = geride)
+IKINCIL = 0.7  # türetilmiş/dışa aktarım parçasının puan çarpanı (küçük = geride). v0.138.0: 0,9 → 0,7 (YAKIN_ESIK ile proje seti 6/11 → 8/11, görüşme 34/46 aynı)
+# v0.138.0: sonuçta neredeyse aynı metin ikinci kez yer kaplamaz (aynı adlı .md/.xlsx ikizi, tablonun tekrar eden satırları ilk 5'i dolduruyordu);
+# sözcük kümesi örtüşmesi (Jaccard) bu eşiğin üstündeyse sonraki atlanır. None: kapalı. Eşik proje + görüşme soru setiyle seçildi (olcum.py proje).
+YAKIN_ESIK = 0.8
+def _sozluk_kume(m): return {w for w in kelimeler(m or "") if len(w) > 2}
 def ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam=None, aralik=None, eski=False, disa=None):
     gruplar, eklenen = sorgu_kur(q)
     if not gruplar and not kim: return [], eklenen
@@ -1386,9 +1390,13 @@ def ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam=None, aralik=None, es
         ikincil = {i for i, kt in c.execute(f"SELECT p.id, d.kaynak_turu FROM parca p JOIN dosya d ON d.yol = p.yol WHERE p.id IN ({','.join('?' * len(puan))})", list(puan))
                    if kt in ("turetilmis", "disa_aktarim")}
         sirali = [satir[i] for i in sorted(puan, key=lambda i: -puan[i] * (IKINCIL if i in ikincil else 1.0) * yakinlik(satir[i]))]
-    secilen, say = [], {}
+    secilen, say, kume = [], {}, []
     for r in sirali:
         if say.get(r[1], 0) >= dosya_basina: continue
+        if YAKIN_ESIK is not None:
+            k = _sozluk_kume(r[4])
+            if k and any(len(k & x) / len(k | x) >= YAKIN_ESIK for x in kume): continue
+            kume.append(k)
         say[r[1]] = say.get(r[1], 0) + 1; secilen.append(r)
         if len(secilen) >= n: break
     return secilen, eklenen
