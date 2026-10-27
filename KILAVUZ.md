@@ -64,6 +64,16 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
 
 **Ayarlar:** panonun üst çubuğundaki ⚙ — yapay zekâ seçimi, e-posta, ses ve konuşma, toplantı uyarıları, çeviri ve masaüstü, gizlilik; kaydedince hemen geçerli.
 
+## Kurulumu denetle
+Güncellemeden sonra ya da toplantıdan önce "her şey yerinde mi" diye bakmak için. Hiçbir şeyi değiştirmez, yalnız okur ve her madde için ✓ (tamam), ✗ (düzeltilmeli) ya da ? (okunamadı) yazar; ✗ ve ? satırlarının altında tek satırlık "ne yapmalı" gelir.
+
+- **Panodan:** ⚙ Ayarlar → altta "Kurulumu denetle". ✗ olan maddeler listelenir (en çok dakikada bir yenilenir).
+- **Terminalden:** `python3 kurulum.py dogrula` (makine okunur çıktı için `--json`; ✗ varsa çıkış kodu 1). Güncelleme bitince bu denetim kendiliğinden çalışır ve kısa özetini yazar.
+- **Maddeler:** kod, çalışan aktarıcı, Chrome eklentisi ve Swift yardımcılarının sürümleri tutuyor mu · arka plan ajanı yüklü mü, port cevap veriyor mu · Whisper ve anlam modelleri hazır mı · macOS izinleri (mikrofon, erişilebilirlik, ekran ve sistem sesi kaydı; bildirimler ve Masaüstü erişimi macOS dışarıdan okutmadığı için çoğunlukla "?") · asistan toplantıya sesle konuşacaksa (`toplantiya_ses`) BlackHole kurulu mu ve bir süreç onu okuyor mu (okunamazsa "Teams'te mikrofon BlackHole mu, elle bak") · boş bellek, takas, yük ve öbür hesabın aktarıcısı · varsayılandan farklı ayarların adları.
+- **Ne yazılır:** sonuç uygulama klasöründeki `dogrula.json`'a gider. Beta kullanıcısında ayrıca ortak `geri-bildirim` klasörüne (`<tarih>-dogrula-<hesap>.md`) yazılır; geliştirici o dosyayı okuyabilir. Dosya yalnız sayı, durum ve ayar adı içerir: kişi, toplantı, proje ya da dosya adı, yol ve ayar değeri yazılmaz. Ağa hiçbir şey gitmez.
+
+Toplantı sürerken 60 saniye hiçbir kanaldan (altyazı, sen, karşı taraf) satır gelmezse pano sarı uyarı gösterir: "Toplantı sürüyor ama 60 sn'dir döküm gelmiyor", yanında kanalların durumu. Satır gelince uyarı kendiliğinden kalkar.
+
 ## İsteğe bağlı ayarlar
 **Sesle hatırlatma:** onayladığın saatli hatırlatma Mac Takvim'in varsayılan takvimine 15 dakikalık, başında uyaran bir etkinlik olarak eklenir
 (Exchange/Google takvimiyse telefonuna da eşitlenir); başka bir takvim için `"hatirlatma_takvim": "<takvim adı>"`. Saati olmayan istek kendine e-posta taslağı olur.

@@ -1294,7 +1294,7 @@ def izle():
                      f"masaüstü {ms.get('uygulama') or 'toplantı'} (menü uygulaması) — eklenti gerekmez, uyarma" if ms.get("toplantida") else "EKLENTİ SİNYALİ YOK") + \
                     (f" · katılımcı sayısı {ms['kisi_sayisi']} (uygulamadaki Kişiler düğmesinden; kendin dahil)" if ms.get("toplantida") and ms.get("kisi_sayisi") else
                      f" · katılımcı sayısı {s['ext_kisi']} (toplantı sayfasındaki Kişiler düğmesinden; kendin dahil)" if s.get("ext_kisi") and x.get("call") else "") + \
-                    ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + (("✓ (yerel yardımcı)" if wv.get("yerel_akiyor") else "✓") if wv.get("karsi") else  # yerel ses yardımcısı
+                    ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + (("✓ (yerel yardımcı)" if wv.get("yerel_akiyor") else "✓") + (" ama son 60 sn'de satır gelmedi" if s.get("veri_yok") else "") if wv.get("karsi") else  # yerel ses yardımcısı
                      "✗ (yerel yardımcı hazır, karşı ses henüz gelmedi — kart gönderme)" if wv.get("yerel") in ("bekliyor", "dinliyor") else
                      "✗ (yerel yardımcıda Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses)" if wv.get("yerel") == "izin" else
                      "✗ (karşı ses kapalı — " + ("masaüstü toplantı: ses yardımcısını aktarici-kur ile yeniden kur" if (s.get("masaustu") or {}).get("toplantida") else
@@ -1302,6 +1302,7 @@ def izle():
                      (" · panel açık" if x.get("panel") else (" · YALNIZ ALTYAZI (konuşmacı adı olmayabilir; özette kişiye bağlama)" if x.get("captions") else
                      (f" · ⚠ TOPLANTIDA ama döküm/altyazı kapalı — satır gelmiyor ({PLATFORM_AD.get(x.get('platform'), 'toplantı sayfası')}'te kullanıcıya uyarı çıktı; 2 dk sürerse DUR kartı: \"{(x.get('yonerge') or {}).get('altyazi') or ('Diğer → Dil ve konuşma → Canlı altyazı' if x.get('platform') == 'teams' else 'platformun canlı altyazı düğmesi')}\")" if x.get("call") else " · panel kapalı")))) + \
                     (f" · ⚠ WHISPER {wv['durum']}: {wv.get('hata')}" if wv.get("durum") == "hata" else "") + \
+                    (f" · ⚠ VERİ YOK: toplantı sürüyor ama 60 sn'den uzundur hiçbir kanaldan satır gelmiyor (kanallar: {s['veri_yok']['kanallar']}) — kullanıcıya DUR kartı: döküm gelmiyor" if s.get("veri_yok") else "") + \
                     (" · ⚠ SES İZİ hata (konuşmacı ayırma yok; Whisper çalışıyor)" if wv.get("ses_model") == "hata" else "") + \
                     (f" · altyazıyı kendisi açamadı ({x['capAuto'][11:]})" if str(x.get("capAuto") or "").startswith("basarisiz") and not (x.get("panel") or x.get("captions") or wak) else "") + \
                     (f" · ⚠ DİL: {(s.get('dil') or {}).get('uyari')} → kullanıcıya DUR kartı gönder; düzelene kadar metinden çıkarım yapma" if (s.get("dil") or {}).get("uyari") else "") + \

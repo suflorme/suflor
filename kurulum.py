@@ -9,6 +9,7 @@
 #   python3 kurulum.py kaldir     otomatik başlatmayı kaldırır (veri yerinde kalır)                      ← aktarici-kur.command --kaldir
 #   python3 kurulum.py sil        Suflor.me'yi bu hesaptan tamamen kaldırır (Çöp Sepeti'ne taşır)        ← kaldir.command
 #   python3 kurulum.py modeller   yerel modeller ve Python ortamı (olanı yeniden kurmaz)                ← modeller-kur.command
+#   python3 kurulum.py dogrula    kurulumu denetler (salt okur): sürümler, ajan, modeller, izinler, BlackHole, kaynaklar; [--json]   ← pano: Kurulumu denetle
 #   python3 kurulum.py guncelle   son sürümü alır (git klonu: git pull; değilse açık depodan), kurar     ← guncelle.command
 # Deneme: SUFLOR_EV=<geçici klasör> ev klasörünü değiştirir (ayar, uygulama, proje oraya yazılır; aktarıcı kurulmaz).
 import argparse, shlex, datetime, getpass, json, os, platform, re, secrets, shutil, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
@@ -1640,6 +1641,165 @@ def guncelle(kaynak=None, zorla=False):
     r = subprocess.run([PY, os.path.join(KOD, "kurulum.py"), "guncelleme-sonrasi"])
     if r.returncode: sys.exit(r.returncode)
 
+# ---------- Kurulumu denetle (Faz D, S162, v0.147.0) ----------
+# 27 Ekim beta denemelerindeki 38 hatanın çoğu ortam kaynaklıydı (eksik model dosyası, güncelleme sonrası adım, Teams mikrofonu, izinler, yük) ve testler hiçbirini
+# yakalamadı. `kurulum.py dogrula` salt okur, hiçbir şeyi değiştirmez; her madde ✓ / ✗ / ? ve "ne yapmalı" satırı. Güncelleme sonunda kendiliğinden çalışır;
+# panodaki "Kurulumu denetle" (aktarıcı /dogrula) aynı komutu arka planda koşturur. Sonuç <uygulama>/dogrula.json; beta kullanıcısında (ayar gelistirici yok)
+# ortak posta kutusuna (<ortak>/geri-bildirim/<tarih>-dogrula-<hesap>.md) da yazılır. İçerik: yalnız sayı, durum, ayar ADI — kişi/toplantı/proje/dosya adı ve yol yok.
+SWIFT_YARDIMCI = (("Suflor Takvim.app", "takvim.swift", "SuflorTakvim"), ("Suflor Ses.app", "ses-yardimcisi.swift", "SuflorSes"), ("Suflor Brifing.app", "brifing.swift", "SuflorBrifing"),
+                  ("Suflor Oynat.app", "oynat.swift", "SuflorOynat"), ("Suflor Metin.app", "metin-tani.swift", "SuflorMetin"), ("Suflor Posta.app", "posta.swift", "SuflorPosta"))
+DOGRULA_KURULUM_ANAHTAR = {"alan", "ad", "port", "uygulama", "proje", "ortak", "kod", "calisma", "haric", "durum_belgesi", "sozluk_xlsx", "sozluk_siki", "sozluk_kaynagi", "komut_sablondan",
+                           "takvim_adreslerim", "takvim_haric", "eposta_adres", "dahil", "asil", "veritabani", "oto_haric"}
+def _core_audio(ad_parcasi):  # → (aygıt var mı, "bir süreç kullanıyor" 0/1 ya da None); Core Audio okunamazsa (None, None)
+    import ctypes, struct
+    try:
+        fcc = lambda s: struct.unpack(">I", s.encode())[0]
+        ca = ctypes.CDLL("/System/Library/Frameworks/CoreAudio.framework/CoreAudio"); cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+        class Adr(ctypes.Structure): _fields_ = [("s", ctypes.c_uint32), ("sc", ctypes.c_uint32), ("e", ctypes.c_uint32)]
+        def al(obj, sel, boyut=4):
+            a = Adr(fcc(sel), fcc("glob"), 0); n = ctypes.c_uint32(boyut); b = ctypes.create_string_buffer(boyut)
+            return b.raw[:n.value] if ca.AudioObjectGetPropertyData(obj, ctypes.byref(a), 0, None, ctypes.byref(n), b) == 0 else None
+        a = Adr(fcc("dev#"), fcc("glob"), 0); n = ctypes.c_uint32(0)
+        if ca.AudioObjectGetPropertyDataSize(1, ctypes.byref(a), 0, None, ctypes.byref(n)): return None, None
+        b = ctypes.create_string_buffer(n.value)
+        if ca.AudioObjectGetPropertyData(1, ctypes.byref(a), 0, None, ctypes.byref(n), b): return None, None
+        cf.CFStringGetCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
+        for d in struct.unpack(f"={n.value // 4}I", b.raw):
+            r = al(d, "lnam", 8)
+            if not r: continue
+            p = ctypes.c_void_p(struct.unpack("=Q", r)[0]); buf = ctypes.create_string_buffer(256); ok = cf.CFStringGetCString(p, buf, 256, 0x08000100); cf.CFRelease(p)
+            if ok and ad_parcasi.lower() in buf.value.decode("utf-8", "ignore").lower():
+                g = al(d, "gone"); return True, (struct.unpack("=I", g)[0] if g else None)
+        return False, None
+    except Exception: return None, None
+def _pano_ayar_varsayilan():  # relay.py'deki AYAR_PANO'nun varsayılanları (ad → değer); okunamazsa {}
+    import ast
+    try:
+        for d in ast.parse(open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()).body:
+            if isinstance(d, ast.Assign) and any(getattr(t, "id", "") == "AYAR_PANO" for t in d.targets):
+                return {k.value: ast.literal_eval(v.elts[1]) for k, v in zip(d.value.keys, d.value.values) if isinstance(v, ast.Tuple) and len(v.elts) > 1}
+    except Exception: pass
+    return {}
+def _kaynak_durumu():  # {"bos_gb", "takas_kullanilan_gb", "takas_toplam_gb", "yuk", "cekirdek", "baski_bos_yuzde"} — olcum.py sistem() ile aynı okuma
+    sayfa = int(sh("sysctl", "-n", "hw.pagesize") or 16384); vm = {m.group(1): int(m.group(2)) * sayfa / 2 ** 30 for m in re.finditer(r'"?Pages ([\w -]+)"?:\s+(\d+)', sh("vm_stat"))}
+    sw = re.search(r"total = ([\d.]+)M\s+used = ([\d.]+)M", sh("sysctl", "vm.swapusage")); t = os.environ.get("SUFLOR_TEST_TAKAS")  # deneme: "kullanılan,toplam" GB
+    kul, top = (float(t.split(",")[0]), float(t.split(",")[1])) if t else ((float(sw.group(2)) / 1024, float(sw.group(1)) / 1024) if sw else (None, None))
+    bp = re.search(r"free percentage: (\d+)%", sh("memory_pressure"))
+    try: yuk = round(os.getloadavg()[0], 1)
+    except OSError: yuk = None
+    return {"bos_gb": round(vm.get("free", 0) + vm.get("inactive", 0) + vm.get("speculative", 0), 1), "takas_kullanilan_gb": round(kul, 1) if kul is not None else None,
+            "takas_toplam_gb": round(top, 1) if top is not None else None, "yuk": yuk, "cekirdek": os.cpu_count() or 1, "baski_bos_yuzde": int(bp.group(1)) if bp else None}
+def dogrula_topla(hizli=False):  # → [{"id", "durum": ok|hata|?, "ad", "not", "yap"}]
+    M = []
+    def m(i, d, ad, n="", yap=""): M.append({"id": i, "durum": d, "ad": ad, "not": n, "yap": yap if d != "ok" else ""})
+    Y = yollar(); a = ayar(); kod_s = surum(KOD); s = aktarici("/status") if not os.environ.get("SUFLOR_TEST_DURUMSUZ") else None; busy = mesgul() if s else ""
+    kur_yap = "kod klasöründeki aktarici-kur.command dosyasına çift tıkla"
+    # --- sürümler
+    if s is None: m("surum-aktarici", "hata", "Aktarıcı sürümü", "aktarıcı cevap vermiyor", kur_yap)
+    elif s.get("surum") == kod_s: m("surum-aktarici", "ok", "Aktarıcı sürümü", f"v{kod_s} çalışıyor")
+    else: m("surum-aktarici", "hata", "Aktarıcı sürümü", f"çalışan v{s.get('surum') or '?'}, kod v{kod_s}", kur_yap + "; düzelmezse Mac'i yeniden başlat")
+    ek = (s or {}).get("eklenti_kurulu")
+    if not ek: m("surum-eklenti", "?", "Eklenti sürümü", "eklentiden henüz nabız gelmedi", "Chrome'u aç; chrome://extensions'ta Suflor.me açık mı bak")
+    elif ek.get("ver") != kod_s: m("surum-eklenti", "hata", "Eklenti sürümü", f"eklenti v{ek.get('ver')}, kod v{kod_s} (son görülme {ek.get('age_s')} sn önce)", "chrome://extensions → Suflor.me → ↻ yenile")
+    elif (ek.get("age_s") or 0) > 6 * 3600: m("surum-eklenti", "?", "Eklenti sürümü", f"v{kod_s} ama {round(ek['age_s'] / 3600)} saattir görülmedi", "Chrome açık mı, eklenti etkin mi bak")
+    else: m("surum-eklenti", "ok", "Eklenti sürümü", f"v{kod_s}, son görülme {ek.get('age_s')} sn önce")
+    uyg = Y["uygulama"]; eski = []; yok = []
+    if True:
+        import hashlib
+        for kl, kaynak, ikili in SWIFT_YARDIMCI + (("", "menu-cubugu.swift", "SuflorMenu"),):
+            ik = os.path.join(menu_yolu(), "Contents", "MacOS", ikili) if ikili == "SuflorMenu" else os.path.join(uyg, kl, "Contents", "MacOS", ikili)
+            try: sha = hashlib.sha256(open(os.path.join(KOD, kaynak), "rb").read()).hexdigest()
+            except OSError: continue
+            if not os.access(ik, os.X_OK): yok.append(ikili)
+            elif _derleme_kaydi(uyg, ikili) != sha: eski.append(ikili)
+    if DENEME and not (eski or yok) and not os.path.isdir(uyg): m("swift", "?", "Swift yardımcıları", "deneme ortamında bakılmaz", "gerçek kurulumda python3 kurulum.py dogrula")
+    elif yok or eski: m("swift", "hata", "Swift yardımcıları", f"{len(yok)} eksik, {len(eski)} eski ({', '.join(yok + eski)})", kur_yap)
+    else: m("swift", "ok", "Swift yardımcıları", f"{len(SWIFT_YARDIMCI) + 1} yardımcı kaynakla aynı")
+    # --- aktarıcı ajanı ve port
+    if DENEME: m("ajan", "?", "Arka plan ajanı (launchd)", "deneme ortamında bakılmaz", "gerçek kurulumda python3 kurulum.py dogrula")
+    else:
+        r = sessiz("launchctl", "print", f"{gui()}/{LABEL}")
+        if not (r and r.returncode == 0): m("ajan", "hata", "Arka plan ajanı (launchd)", "yüklü değil", kur_yap)
+        elif not _yanit_var(f"http://127.0.0.1:{Y['port']}/status", 2): m("ajan", "hata", "Arka plan ajanı (launchd)", f"yüklü ama {Y['port']} portu cevap vermiyor", kur_yap + "; olmazsa ~/Library/Logs/suflor-aktarici.log'a bak")
+        else: m("ajan", "ok", "Arka plan ajanı (launchd)", f"yüklü, {Y['port']} portu cevap veriyor")
+    # --- modeller: ağır yükleme yok; refs/anlık görüntü varlığı + anlam-dene.json (modeller_dene'nin kaydı)
+    ort = Y["ortak"]; ws = whisper_snap(ort); wr = os.path.join(ort, "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo", "refs", "main"); wcpp = os.path.isdir(os.path.join(ort, "whisper-cpp"))
+    if not ws and not wcpp: m("model-whisper", "hata", "Whisper modeli", "model dosyası ortak klasörde yok", "python3 kurulum.py modeller (modeller-kur.command)")
+    elif ws and not os.path.isfile(wr) and os.path.basename(ws) == WHISPER_REV: m("model-whisper", "hata", "Whisper modeli", "model var ama refs/main eksik", "python3 kurulum.py guncelleme-sonrasi")
+    else: m("model-whisper", "ok", "Whisper modeli", "model dosyaları yerinde")
+    am = glob_(os.path.join(ort, "anlam-modeller", "hub", "models--intfloat--multilingual-e5-base", "snapshots", "*", "model.safetensors")); ad_ = oku_json(os.path.join(DESTEK, "anlam-dene.json"))
+    if not am: m("model-anlam", "?", "Anlam araması modeli", "kurulu değil (arama yalnız sözcükle)", "gerekmezse bir şey yapma; istersen python3 kurulum.py modeller")
+    elif ad_.get("tamam") == [os.path.dirname(x) for x in sorted(am)]: m("model-anlam", "ok", "Anlam araması modeli", "açılış denemesi başarılı")
+    elif busy: m("model-anlam", "?", "Anlam araması modeli", "açılış denenmedi (toplantı/sohbet sürüyor)", "toplantı bitince tekrar denetle")
+    else: m("model-anlam", "hata", "Anlam araması modeli", "model var ama açılış denemesi yok ya da başarısız", "python3 kurulum.py guncelleme-sonrasi; olmazsa anlam-dene.log'a bak")
+    # --- macOS izinleri
+    iz = {}
+    if not DENEME and not busy and not hizli and os.path.isdir(menu_yolu()): iz = menu_izin_durum(menu_yolu())
+    for k, ad in IZIN_AD.items():
+        v = iz.get(k)
+        if v == "var": m("izin-" + k, "ok", f"İzin: {ad}", "verilmiş")
+        elif v: m("izin-" + k, "hata", f"İzin: {ad}", f"durum: {v}", "Sistem Ayarları → Gizlilik ve Güvenlik → " + ad + " → Suflor.me")
+        else: m("izin-" + k, "?", f"İzin: {ad}", "okunamadı" + (" (toplantı/sohbet sürüyor)" if busy else ""), "Sistem Ayarları → Gizlilik ve Güvenlik → " + ad + " → Suflor.me'ye bak")
+    m("izin-bildirim", "?", "İzin: Bildirimler", "macOS dışarıdan okutmuyor", "Sistem Ayarları → Bildirimler → Suflor.me'ye bak")
+    pe = (s or {}).get("proje_erisim")
+    if pe and pe.get("uyari"): m("izin-masaustu", "hata", "İzin: Masaüstü/dosya erişimi", "aktarıcı proje belgelerini ya da kayıt veritabanını okuyamıyor", pe.get("yol") or "Sistem Ayarları → Gizlilik ve Güvenlik → Dosyalar ve Klasörler → Suflor Brifing")
+    else: m("izin-masaustu", "?", "İzin: Masaüstü/dosya erişimi", "okuma hatası bildirilmedi ama doğrudan okunamıyor", "proje Masaüstü'ndeyse Dosyalar ve Klasörler → Suflor Brifing'e bak")
+    # --- asistan toplantıya sesle konuşacaksa: BlackHole
+    if a.get("toplantiya_ses") is True:
+        t = os.environ.get("SUFLOR_TEST_BLACKHOLE")
+        var, calisiyor = ({"yok": (False, None), "var": (True, 0), "calisiyor": (True, 1)}[t] if t else _core_audio("BlackHole"))
+        top = bool(((s or {}).get("extension") or {}).get("call") or ((s or {}).get("masaustu") or {}).get("toplantida"))
+        if var is False: m("blackhole", "hata", "BlackHole (toplantıya ses)", "aygıt kurulu değil", "BlackHole 2ch'yi kur (web toplantısında gerekmez)")
+        elif var is None: m("blackhole", "?", "BlackHole (toplantıya ses)", "Core Audio okunamadı", "? Teams'te mikrofon BlackHole mu, elle bak")
+        elif calisiyor == 1: m("blackhole", "ok", "BlackHole (toplantıya ses)", "aygıt kurulu ve bir süreç onu kullanıyor")
+        elif top: m("blackhole", "hata", "BlackHole (toplantıya ses)", "aygıt kurulu ama toplantı sürerken hiçbir süreç onu okumuyor", "Teams → Ayarlar → Cihazlar → Mikrofon = BlackHole 2ch (ya da Suflor.me menüsünden ortak mikrofon)")
+        else: m("blackhole", "?", "BlackHole (toplantıya ses)", "aygıt kurulu; toplantı dışında kimin okuduğu görünmez", "toplantıda Teams'te mikrofon BlackHole mu, elle bak")
+    else: m("blackhole", "ok", "BlackHole (toplantıya ses)", "ayar kapalı (toplantiya_ses)")
+    # --- kaynak durumu (eşikler olcum.py bulgular() ile aynı: takas > %50, bellek baskısı < %40, öbür hesap > 1,5 GB)
+    k = _kaynak_durumu(); sorun = []
+    if k["takas_toplam_gb"] and k["takas_kullanilan_gb"] / k["takas_toplam_gb"] > 0.5: sorun.append(f"takas {k['takas_kullanilan_gb']}/{k['takas_toplam_gb']} GB dolu")
+    if k["bos_gb"] < 1.5: sorun.append(f"boş bellek {k['bos_gb']} GB")
+    if k["yuk"] is not None and k["yuk"] > 2 * k["cekirdek"]: sorun.append(f"yük ortalaması {k['yuk']} ({k['cekirdek']} çekirdek)")
+    ozet = f"boş {k['bos_gb']} GB, takas {k['takas_kullanilan_gb']}/{k['takas_toplam_gb']} GB, yük {k['yuk']}, bellek baskısı boş %{k['baski_bos_yuzde']}"
+    if sorun: m("kaynak", "hata", "Mac kaynakları", "; ".join(sorun), "toplantıdan önce kullanılmayan uygulama ve sekmeleri, öbür macOS hesabını kapat")
+    else: m("kaynak", "ok", "Mac kaynakları", ozet)
+    diger = [p for p in range(8765, 8769) if p != Y["port"] and _acik(p)]; sikisik = (k["takas_kullanilan_gb"] or 0) > 0.5 or (k["baski_bos_yuzde"] or 100) < 40; dm = []
+    for p in diger:
+        try: x = json.load(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{p}/status"), timeout=2)); dm.append((p, bool(x.get("aktif") or (x.get("whisper") or {}).get("durum") == "hazir")))
+        except Exception: dm.append((p, None))
+    if not diger: m("diger-hesap", "ok", "Öbür hesabın aktarıcısı", "bu Mac'te başka aktarıcı çalışmıyor")
+    elif sikisik: m("diger-hesap", "hata", "Öbür hesabın aktarıcısı", f"{len(diger)} aktarıcı daha çalışıyor ve Mac sıkışık", "toplantıdan önce öbür hesaptan çıkış yap")
+    else: m("diger-hesap", "?", "Öbür hesabın aktarıcısı", f"{len(diger)} aktarıcı daha çalışıyor (şu an bellek rahat)", "toplantıda iki hesap birlikte ~9–13 GB tutar; sıkışırsa öbür hesaptan çıkış yap")
+    # --- ayar farkı: yalnız adlar
+    vs = _pano_ayar_varsayilan(); fark = sorted(k_ for k_, v in a.items() if k_ not in DOGRULA_KURULUM_ANAHTAR and ((k_ in vs and vs[k_] != v) or k_ not in vs))
+    m("ayar-fark", "ok", "Varsayılandan farklı ayarlar", f"{len(fark)}: " + (", ".join(fark) if fark else "yok"))
+    return M
+def _dogrula_temiz(x):  # içerik kuralı: yol ve kullanıcı adı çıkar
+    u = getpass.getuser(); x = x.replace(EV, "[kullanıcı-klasörü]") if EV and EV != "/" else x
+    x = re.sub(r"/Users/[^/\s]+", "/Users/[kullanıcı]", x)
+    return re.sub(rf"\b{re.escape(u)}\b", "[kullanıcı]", x) if u and len(u) > 2 else x
+DOGRULA_SIM = {"ok": "✓", "hata": "✗", "?": "?"}
+def dogrula_metin(M, baslik):
+    t = [baslik] + [f"{DOGRULA_SIM[x['durum']]} {x['ad']} — {x['not']}" + (f"\n    → {x['yap']}" if x["yap"] else "") for x in M]
+    return "\n".join(t)
+def dogrula(json_cikti=False, sessiz_=False, hizli=False):  # → sonuç sözlüğü; dogrula.json + (beta) ortak posta kutusu
+    Y = yollar(); M = dogrula_topla(hizli)
+    for x in M: x["not"] = _dogrula_temiz(x["not"]); x["yap"] = _dogrula_temiz(x["yap"])
+    sy = {d: sum(1 for x in M if x["durum"] == d) for d in ("ok", "hata", "?")}
+    r = {"t": datetime.datetime.now().isoformat(timespec="seconds"), "surum": surum(KOD), "maddeler": M, "ozet": sy, "beta": not ayar().get("gelistirici")}
+    try: yaz_json(os.path.join(Y["uygulama"], "dogrula.json"), r)
+    except OSError: pass
+    if r["beta"]:  # ortak posta kutusu (geliştirici oturumu okur); yerel kalır, ağa gitmez
+        gb = os.path.join(Y["ortak"], "geri-bildirim"); hesap = re.sub(r"[^a-z0-9_-]", "", getpass.getuser().lower()) or "hesap"
+        try:
+            os.makedirs(gb, exist_ok=True)
+            open(os.path.join(gb, f"{time.strftime('%Y%m%d-%H%M')}-dogrula-{hesap}.md"), "w", encoding="utf-8").write(
+                f"# Kurulum denetimi — v{r['surum']} ({r['t']})\n\n" + "\n".join(f"- {DOGRULA_SIM[x['durum']]} **{x['ad']}** — {x['not']}" + (f"\n  - ne yapmalı: {x['yap']}" if x["yap"] else "") for x in M) + f"\n\nÖzet: {sy['ok']} ✓, {sy['hata']} ✗, {sy['?']} ?\n")
+        except OSError: pass
+    if not sessiz_:
+        if json_cikti: print(json.dumps(r, ensure_ascii=False, indent=1))
+        else: print(dogrula_metin(M, f"Kurulum denetimi (v{r['surum']}): {sy['ok']} ✓, {sy['hata']} ✗, {sy['?']} ?"), flush=True)
+    return r
 def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla ayrı süreç olarak çağrılır (kurulum.py guncelleme-sonrasi)
     if subprocess.run([PY, os.path.join(KOD, "kurulum.py"), "kur"]).returncode:
         say("\nUYARI: aktarıcı kurulamadı — kod güncellendi ama çalışan aktarıcı eski sürümde kalmış olabilir.")
@@ -1660,10 +1820,18 @@ def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla 
             if os.path.exists(hedef) and open(hedef, encoding="utf-8").read() != s: shutil.copy(hedef, hedef + ".eski")
             open(hedef, "w", encoding="utf-8").write(s); say("✓ /toplanti komutu şablondan yenilendi")
     say("Chrome eklentisi toplantı yokken bir dakika içinde kendini yeniler. Açık bir Teams sekmesi varsa onu yenile.")
+    try:  # Faz D: güncellemeden sonra "her şey yerinde mi" denetimi (salt okur); kısa özet ekrana, ayrıntı: python3 kurulum.py dogrula
+        time.sleep(0 if DENEME else 3)  # aktarıcının /status'u yeni açılmış olabilir
+        r = dogrula(sessiz_=True); say(f"\nKurulum denetimi: {r['ozet']['ok']} ✓, {r['ozet']['hata']} ✗, {r['ozet']['?']} ?")
+        for x in r["maddeler"]:
+            if x["durum"] == "hata": say(f"  ✗ {x['ad']} — {x['not']}\n      → {x['yap']}")
+        say("  (ayrıntı: python3 kurulum.py dogrula)")
+    except Exception as e: say(f"Not: kurulum denetimi çalışmadı ({e.__class__.__name__})")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
-    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "guncelle", "guncelleme-sonrasi", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|profil|mesgul")
+    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "guncelle", "guncelleme-sonrasi", "dogrula", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|dogrula|profil|mesgul")
+    ap.add_argument("--json", action="store_true", help="dogrula: makine okunur çıktı"); ap.add_argument("--hizli", action="store_true", help="dogrula: menü uygulamasını açan izin okumasını atla")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
     ap.add_argument("--zorla", action="store_true", help="guncelle: toplantı/sohbet sürse de güncelle")
@@ -1671,6 +1839,7 @@ if __name__ == "__main__":
     for b, ne in (("modeller", "modelleri"), ("proje", "projedeki toplantı notlarını (proje klasörünün kendisi asla)"), ("kod", "kod klasörünü")):
         ap.add_argument(f"--{b}", action="store_true", help=f"sil --evet: {ne} de")
     ap.add_argument("--adim", choices=["hazirlik"], help="yalnız proje hazırlığı ekranları (panodaki 'Projeyi yeniden hazırla' → hazirla.command)"); A = ap.parse_args()
+    if A.is_ == "dogrula": r = dogrula(A.json, hizli=A.hizli); sys.exit(1 if r["ozet"]["hata"] else 0)
     if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
     if A.is_ == "pocket": sys.exit(0 if pocket_kur() else 1)
     if A.is_ == "ollama": sys.exit(0 if ollama_kur() else 1)

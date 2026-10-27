@@ -183,7 +183,7 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 </style>
 <header><div class=hl><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span><span id=sure></span></div>
 <div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=yb class="ib gh" title="Yardım ve sık sorulanlar" aria-label="Yardım">?</button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
-<dialog id=ayd><form method=dialog id=ayf><div class=ayb><b class=gbb>Ayarlar</b><input id=ayara type=search placeholder="Ara" aria-label="Ayarlarda ara" autocomplete=off><button id=ayx class="ib gh" type=button title="Kaydetmeden kapat"></button></div><div id=ayt class=ayt role=tablist aria-label="Ayar grupları"></div><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet ve kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet ve kapat'a basana kadar bir şey değişmez">Varsayılanlara dön</button><span class=sp1></span><span id=aym class=hint></span></div></form></dialog>
+<dialog id=ayd><form method=dialog id=ayf><div class=ayb><b class=gbb>Ayarlar</b><input id=ayara type=search placeholder="Ara" aria-label="Ayarlarda ara" autocomplete=off><button id=ayx class="ib gh" type=button title="Kaydetmeden kapat"></button></div><div id=ayt class=ayt role=tablist aria-label="Ayar grupları"></div><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet ve kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet ve kapat'a basana kadar bir şey değişmez">Varsayılanlara dön</button><button id=ayk class=gh type=button title="Sürümleri, modelleri, izinleri, BlackHole'u ve Mac'in yükünü denetler; hiçbir şeyi değiştirmez">Kurulumu denetle</button><span class=sp1></span><span id=aym class=hint></span></div><div id=ayks class=hint hidden></div></form></dialog>
 <dialog id=yrd><div class=yrdi>
 <div lang=tr>
 <h2>Suflor.me yardımı</h2>
@@ -486,6 +486,10 @@ function durum(s){
   if(s.anlik)so.push([s.anlik.tur==="uzun"?"er":"wa",s.anlik.metin,s.anlik.ayrinti||""])  // adın geçti (20 sn) / uzun konuşma (kırmızı, 45 sn; aktarici/anlik.py)
   if(s.anahtarsiz)so.push(["wa",L(s.anahtarsiz.tur==="yerel"?"Anahtarsız yerel istek geldi":"Eklenti eski sürümde"),L(s.anahtarsiz.tur==="yerel"?"toplantı yardımcısı eski olabilir — aktarici-kur ile yeniden kur":"chrome://extensions → Suflor.me → ↻ yenile")])
   if(s.dil&&s.dil.uyari)so.push(["er",L("Döküm dili yanlış"),s.dil.uyari])
+  if(s.veri_yok){const v=s.veri_yok,k=v.kanallar||{}  // Faz D: toplantı sürüyor ama hiçbir kanaldan satır yok — sağlık "süreç çalışıyor" değil "veri akıyor mu"
+    const A={acik:L("açık"),yok:L("yok")},B={yok:L("mikrofon bilgisi yok"),hata:L("mikrofon açılamadı"),kapali:L("mikrofon kanalı kapalı"),sessiz:L("mikrofon sessizde"),sorun:L("mikrofon açık ama ses gelmiyor")}
+    const C={izin:L("ses kaydı izni yok"),yok:L("ses yardımcısı yok"),kapali:L("ses yardımcısı kapalı"),bekliyor:L("ses yardımcısı hazır, ses gelmiyor"),dinliyor:L("ses yardımcısı dinliyor, satır yok"),web:L("tarayıcı sesi, satır yok")}
+    so.push(["wa",L("Toplantı sürüyor ama {n} sn'dir döküm gelmiyor",{n:v.sn}),L("altyazı")+": "+(A[k.altyazi]||k.altyazi)+" · "+L("ben")+": "+(B[k.ben]||k.ben)+" · "+L("karşı taraf")+": "+(C[k.karsi]||k.karsi)])}
   if(mt){  // masaüstü: altyazı yok, satırlar Whisper'dan (karşı: ses yardımcısı, sen: menü uygulamasının mikrofonu)
     const mm=s.masaustu_mic||{}
     if(!w.durum||w.durum==="yok")so.push(["wa",L("Satır gelmiyor"),L("masaüstü toplantıda döküm Whisper'la yazılır — Whisper kurulu değil")])
@@ -969,6 +973,12 @@ if(AYAR_PEN){document.documentElement.classList.add('ayarlar');const d=document.
   d.addEventListener('close',()=>{try{webkit.messageHandlers.suflor.postMessage({kapat:1})}catch(e){}})}  // Kaydet ve kapat / ✕ pencereyi de kapatır
 {const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear');document.getElementById('ayx').innerHTML=ic('x');document.getElementById('ayx').onclick=()=>d.close()
   document.getElementById('ay').onclick=()=>ayarAc()
+  document.getElementById('ayk').onclick=async()=>{const b=document.getElementById('ayk'),o=document.getElementById('ayks');o.hidden=false;o.textContent=L('Denetleniyor…');b.disabled=true  // Faz D: aktarıcı /dogrula (kurulum.py dogrula)
+    try{let r=await j('/dogrula?yenile=1');for(let i=0;i<60&&r.calisiyor;i++){await new Promise(z=>setTimeout(z,1500));r=await j('/dogrula')}
+      if(!r.ok||!r.var){o.textContent=r.err||L('Denetim sonucu alınamadı');return}
+      const M=r.maddeler||[],kotu=M.filter(x=>x.durum==='hata'),bil=M.filter(x=>x.durum==='?').length
+      o.innerHTML='<b>'+esc(L('{ok} ✓ · {hata} ✗ · {bil} ?',{ok:M.filter(x=>x.durum==='ok').length,hata:kotu.length,bil}))+'</b>'+(kotu.length?kotu.map(x=>'<div>✗ '+esc(x.ad)+' — '+esc(x.not)+'<br>→ '+esc(x.yap)+'</div>').join(''):'<div>'+esc(L('Hiçbir madde ✗ değil'))+'</div>')+(bil?'<div>'+esc(L('? olanlar okunamayanlar; ayrıntı için Terminal: python3 kurulum.py dogrula'))+'</div>':'')}
+    catch(e){o.textContent=L('Denetim sonucu alınamadı')}finally{b.disabled=false}}
   // varsayılanlara dön (v0.34.1): yalnız formu doldurur; Kaydet'e basılmazsa hiçbir şey değişmez (e-posta gibi elle girilenler yanlışlıkla silinmesin)
   document.getElementById('ayv').onclick=()=>{const v=(last&&last.ayarlar||{}).varsayilan||{};let n=0
     // v0.110.0: yalnız görünen satırlar (seçili grup ya da arama sonucu) ve önce onay — Ayarlar penceresinde değişiklik hemen kaydedildiği için tek tık her şeyi geri alıyordu

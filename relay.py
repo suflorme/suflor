@@ -756,6 +756,7 @@ def ingest(p):
             # kümelenip konuşmacılar yeniden etiketlenir (toplanti-claude.py konusmaci → <toplantı>.konusmaci.json)
             if e.get("iz") and e.get("id"): iz_out.append(json.dumps({"id": e["id"], "t0": e.get("t0"), "t1": e.get("t1"), "iz": e["iz"], **({"bol": e["bol"]} if e.get("bol") else {})}) + "\n")
             STATE["son_satir"] = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "speaker": e.get("speaker"), "file": base_key}  # kart penceresi canlılık satırı
+            veri_satiri(p.get("source"), e.get("kanal"))  # aktarici/saglik.py: "veri akıyor mu"
             if SES.get("p"): ses_durdur()  # sesli brifing sürerken toplantı başladı
             # satır sayısı dosya bazında tutulur (STATE["lines"] tek bir global sayaç olursa, yeni bir
             # dosyaya geçilince eski oturumdan kalan sayıyla toplanıp yanlış gösterir — 29 Eylül gerçek
@@ -1393,7 +1394,7 @@ TAKVIM_SN = 300; TAKVIM_TAM = {}
 # Chrome yerel mesajlaşmasıyla (native messaging) bu kullanıcının anahtar yardımcısından; pano/hazırlık sayfası kendi deposundan
 # (localStorage — köken porta bağlı; çerez porta bağlı olmadığı için diğer hesabın aktarıcısına giderdi). Geçiş: eski eklentinin
 # yazma istekleri anahtarsız da kabul edilir, pano "eklentiyi yenile" der; ayar "anahtar_zorunlu": true bunu kapatır.
-VERI_GET = {"/status", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1715,6 +1716,7 @@ bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun kon
 bolum("gerginlik")  # aktarici/gerginlik.py — Toplantı gerginliği → kişiliğin ses tonu (v0.80.0, S87)
 bolum("oto-toplanti")  # aktarici/oto-toplanti.py — Toplantıyı kendisi tanıma: tanınan toplantı → takvim adı, dosya, toplantı oturumu (S161, v0.144.0)
 bolum("beta-veri")  # aktarici/beta-veri.py — Beta geliştirme verisi: olay sayacı, haftalık paket, toplantı sonu kalitesi (S141; en sonda: öbür bölümlerin işlevlerini sarar)
+bolum("saglik")  # aktarici/saglik.py — "toplantı var, veri yok" uyarısı (/status veri_yok) ve Kurulumu denetle (/dogrula; Faz D, v0.147.0)
 # --- v0.13.9: panodan güncelleme ---------------------------------------------------------------------------------
 # Aktarıcı 6 saatte bir açık deponun manifest.json'undaki sürüme bakar (yalnız okuma; Mac'ten bağlam bilgisi çıkmaz). Yeni sürüm varsa
 # pano "Güncelle" düğmesini gösterir; tıklanınca guncelle.command ayrı oturumda (setsid) çalışır — aktarici-kur aktarıcıyı yeniden
@@ -2009,7 +2011,7 @@ class H(BaseHTTPRequestHandler):
                 if time.time() - (STATE.get("_pano_t") or 0) > 300: STATE["_pano_ilk"] = time.time()
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
             af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
@@ -2032,6 +2034,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
+        if yol == "/dogrula": return self._json(dogrula_istek("yenile=1" in self.path))  # Faz D: Kurulumu denetle (aktarici/saglik.py)
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))  # v0.116.0: Toplantılarda ara, Dökümler (aktarici/arsiv.py)
         if self.path == "/konus-gecmis": return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
@@ -2272,7 +2275,8 @@ if __name__ == "__main__":
     threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
     threading.Thread(target=sg_bekci, daemon=True).start()  # Faz 11: ayar yerel modeli (Ollama) gösteriyorsa sunucusu açık tutulur
     threading.Thread(target=_bitis_dongu, daemon=True).start()
-    threading.Thread(target=_heartbeat_dongu, daemon=True).start()  # S162: heartbeat.json 8 sn'de bir
+    threading.Thread(target=_heartbeat_dongu, daemon=True).start()
+    threading.Thread(target=_veri_yok_dongu, daemon=True).start()  # Faz D: toplantı var, veri yok  # S162: heartbeat.json 8 sn'de bir
     threading.Thread(target=_oto_dongu, daemon=True).start()  # S161: tanınan toplantı → dosya + toplantı oturumu  # toplantı bitişi → /status toplanti_bitti
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi
