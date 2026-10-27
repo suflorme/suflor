@@ -15,6 +15,10 @@
 import sys, os, json, time, base64, re
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # model diskte; ağa çıkma
 MODEL = os.environ.get("SUFLOR_WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
+if "/" in MODEL and not os.path.isdir(MODEL):  # depo adı: çevrimdışı açılış refs/main ister; yoksa diskteki anlık görüntüden aç
+    import glob as _g
+    _s = sorted(_g.glob(os.path.join(os.environ.get("HF_HOME") or os.path.expanduser("~/.cache/huggingface"), "hub", "models--" + MODEL.replace("/", "--"), "snapshots", "*", "weights.safetensors")))
+    if _s and not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(_s[0]))), "refs", "main")): MODEL = os.path.dirname(_s[0])
 UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|субтитр|yoyo television|优优独播|abone ol(mayı|un)|beğenmeyi unutma|bir sonraki videoda|"
                      r"thanks? (you )?for watching|subtitles? by|please subscribe|amara\.org|transcribed by|"
                      r"^\W*(müzik|music|alkış|applause|\[.*\]|\(.*\))\W*$", re.I)

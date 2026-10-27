@@ -1476,6 +1476,17 @@ def kur():
         try: p.wait(120)
         except subprocess.TimeoutExpired: p.kill()
 
+WHISPER_REV = "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb"
+def whisper_snap(ort):  # ağırlığı olan anlık görüntü (önce sabit sürüm); aktarıcı da modeli buradan açar (whisper-hat), refs/main gerekmez
+    kok = os.path.join(ort, "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots")
+    for d in [os.path.join(kok, WHISPER_REV)] + sorted(glob_(os.path.join(kok, "*"))):
+        if os.path.isfile(os.path.join(d, "weights.safetensors")) and os.path.isfile(os.path.join(d, "config.json")): return d
+    return None
+def whisper_refs_yaz(ort):  # v0.141.0: anlam modelindeki gibi (v0.139.0) yeni indirme düzeni refs/main'i yazmayabilir; depo adıyla açan eski araçlar için yazılır
+    y = os.path.join(ort, "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo", "refs", "main")
+    if os.path.exists(y) or not whisper_snap(ort) or os.path.basename(whisper_snap(ort)) != WHISPER_REV: return
+    try: os.makedirs(os.path.dirname(y), exist_ok=True); open(y, "w").write(WHISPER_REV)
+    except OSError: pass
 def modeller():
     # Yerel modeller ve Python ortamı — yeni Mac'te ya da bozulunca; olanı yeniden kurmaz. İnternet yalnız burada gerekir; aktarıcı
     # modelleri çevrimdışı açar (HF_HUB_OFFLINE=1). İki macOS hesabında ortak klasör (ayar "ortak"): başka hesap kurduysa bu hesap
@@ -1514,10 +1525,11 @@ def modeller():
         zorunlu(vpy, "-m", "pip", "install", "-q", "--upgrade", "pip")
         zorunlu(vpy, "-m", "pip", "install", "-q", "mlx-whisper==0.4.3", "mlx==0.29.3", "numpy==2.0.2")
     hf = dict(os.environ, HF_HOME=os.path.join(ort, "whisper-modeller"))
-    if os.path.isdir(os.path.join(ort, "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo")): say("✓ Whisper modeli var")
+    if whisper_snap(ort): say("✓ Whisper modeli var")
     elif not rel_indir("suflor-whisper-large-v3-turbo.tar"):
         say("→ Whisper modeli Hugging Face'ten indiriliyor (~1,6 GB)…")
-        zorunlu(vpy, "-c", "from huggingface_hub import snapshot_download as s; s('mlx-community/whisper-large-v3-turbo', revision='a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb')", env=hf)
+        zorunlu(vpy, "-c", f"from huggingface_hub import snapshot_download as s; s('mlx-community/whisper-large-v3-turbo', revision='{WHISPER_REV}')", env=hf)
+    whisper_refs_yaz(ort)
     ek = os.path.join(ort, "ses-modeller", "spkrec-ecapa-voxceleb"); os.makedirs(os.path.dirname(ek), exist_ok=True)
     if os.path.isfile(os.path.join(ek, "embedding_model.ckpt")): say("✓ ses izi modeli var")
     else:
@@ -1528,8 +1540,9 @@ def modeller():
     else: ecapa_donustur(ort, onbellek=False)
     whisper_8bit(ort); tur_kur(ort); cevir_kur(ort)
     say("→ Deneme: modeller çevrimdışı açılıyor mu…")
-    zorunlu(vpy, "-c", "import numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), "
-            "path_or_hf_repo='mlx-community/whisper-large-v3-turbo', language='tr'); print('✓ Whisper açılıyor')", env=dict(hf, HF_HUB_OFFLINE="1"))
+    zorunlu(vpy, "-c", "import sys, numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), "
+            "path_or_hf_repo=sys.argv[1], language='tr'); print('✓ Whisper açılıyor')", whisper_snap(ort) or "mlx-community/whisper-large-v3-turbo",
+            env=dict(hf, HF_HUB_OFFLINE="1"))
     sessiz("chmod", "-R", "go+rX", ort)  # diğer hesap okuyabilsin
     say("Tamam. Şimdi: ./aktarici-kur.command")
 
