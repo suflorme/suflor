@@ -220,12 +220,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 257544,
-   "sha": "d086d1347b26edee"
+   "uzunluk": 260915,
+   "sha": "4acd6e7cc816377d"
   },
   "/mini": {
-   "uzunluk": 257544,
-   "sha": "d086d1347b26edee"
+   "uzunluk": 260915,
+   "sha": "4acd6e7cc816377d"
   },
   "/status": {
    "_ping_son": "float",
@@ -460,6 +460,7 @@
     "since": "NoneType"
    },
    "dosyadan": "NoneType",
+   "duman": "NoneType",
    "eklenti_kurulu": "NoneType",
    "eposta": "str",
    "eposta_ayar": "str",
@@ -879,7 +880,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 7,
+  "DURUM": 8,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

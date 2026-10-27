@@ -57,6 +57,8 @@ try:
     ok("posta kutusu: ✗ maddeleri ve ne yapmalı var", "✗" in md and "ne yapmalı" in md and "Eklenti sürümü" in md)
     kul = getpass.getuser()
     ok("posta kutusu/dogrula.json: yol, kullanıcı adı, ayar değeri, ad yok", all(x not in (md + json.dumps(d, ensure_ascii=False)) for x in ("/Users/", T, EV, GIZLI_DEGER, "Deniz", "ornek.com") + ((kul,) if len(kul) > 2 else ())))
+    src = open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read(); ok("izin ✗ önerisi: listede açık görünse de − ile kaldırıp + ile yeniden ekle (~/Applications/Suflor.me.app)", "IZIN_YENIDEN.format(ad=ad)" in src and "− ile kaldırın, + ile yeniden ekleyin" in src and "Command + Shift + G → ~/Applications/Suflor.me.app" in src)
+    ok("dogrula --yazma: dosya yazmaz", subprocess.run([sys.executable, "-B", os.path.join(KOD, "kurulum.py"), "dogrula", "--json", "--hizli", "--yazma"], capture_output=True, text=True, env=dict(ORT, SUFLOR_TEST_DURUMSUZ="1"), timeout=120).returncode in (0, 1) and len(os.listdir(os.path.join(ORTAK, "geri-bildirim"))) == len(dos))
     ok("dogrula.json uygulama klasörüne yazıldı", os.path.isfile(os.path.join(APP, "dogrula.json")))
     ok("metin çıktısında ✓/✗/? simgeleri", all(s in dogrula().stdout for s in ("✓", "✗", "?")))
     # geliştirici: posta kutusu yazılmaz

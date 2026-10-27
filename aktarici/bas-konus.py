@@ -1048,6 +1048,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 o["defter"] = bool(_KS.get("defter_md")); o["sistem"] = sistem_anlik()
                 yenile = _KS["sayac"] >= KONUS_TUR_EN_COK or cagri >= max(KONUS_GIRIS_SINIR, _KS["defter_taban"] + 40000 if _KS.get("defter_md") else 0)
                 _konus_kayit_yaz(o, tur)
+                if "duman_konus" in globals(): duman_konus(o)  # v0.148.0: deneme toplantısı kipi (aktarici/duman.py) — yalnız süre ve tür
                 if o["hata"] and not (tur.get("metin") or "").strip() and tur.get("gonder") and not tur.get("yedek") and konus_yedege(j.get("result")):  # sağlayıcı hatası → Claude Code
                     tur["yedek"] = tur["yeniden"] = True; _KS["tur"] = tur; _konus_kur(durum="dusunuyor")
                     threading.Thread(target=lambda: (konus_kapat("yedek: sağlayıcı hatası", durum_koru=True), _KS.__setitem__("tur", tur), tur["gonder"]()), daemon=True).start(); continue

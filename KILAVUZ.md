@@ -74,6 +74,14 @@ Güncellemeden sonra ya da toplantıdan önce "her şey yerinde mi" diye bakmak 
 
 Toplantı sürerken 60 saniye hiçbir kanaldan (altyazı, sen, karşı taraf) satır gelmezse pano sarı uyarı gösterir: "Toplantı sürüyor ama 60 sn'dir döküm gelmiyor", yanında kanalların durumu. Satır gelince uyarı kendiliğinden kalkar.
 
+## Deneme toplantısı
+Önemli bir toplantıdan önce kısa bir toplantıya girip (ya da toplantı başında) "her şey gerçekten akıyor mu" diye bakmak için. **Toplantıya girdikten sonra** ⚙ Ayarlar → "Deneme toplantısı (3 dk)" düğmesine bas; en çok 3 dakika süren bir liste açılır, maddeler canlı ✓ (tamam), ✗ (olmadı), ? (ölçülemedi) ya da … (bekleniyor) olur. Toplantı yoksa başlamaz ("önce toplantıya gir"). Aynı anda tek deneme çalışır; "Bitir" erken kapatır.
+
+- **Maddeler:** toplantı tanındı mı (platform ve adın kaynağı: takvim, Başlat ya da sinyal) · döküm dosyası açıldı mı · altyazı, sen ve karşı taraf kanallarından 30 saniyede en az bir satır geldi mi (kanal kurulu ya da açık değilse "?" ve nedeni) · Claude toplantı oturumu açık mı, açılışta kaç izin kartı çıktı · asistana sorduğun kısa soruya 60 saniyede cevap geldi mi, ilk metin kaç saniyede · asistan toplantıya sesle konuşacaksa (`toplantiya_ses`) BlackHole okunuyor mu · Mac kaynakları (takas, yük; "Kurulumu denetle"yle aynı eşikler).
+- **Senin yapacakların:** bir-iki cümle konuş, karşı tarafın da konuşmasını bekle, asistana kısa bir soru sor. Deneme asistanı kendisi konuşturmaz.
+- **Toplantıya dokunmaz:** döküme not düşmez, toplantıya bir şey yazmaz; yalnız okur ve ölçer.
+- **Bitince:** panoda tek satırlık özet çıkar ("Meet: 6/7 geçti — karşı taraf satırı gelmedi"). Sonuç uygulama klasöründe `duman/<tarih>.json` dosyasına yazılır; beta kullanıcısında ayrıca ortak `geri-bildirim` klasörüne `<tarih>-duman-<platform>-<hesap>.md` yazılır. Dosyalar yalnız sayı, durum, süre ve platform içerir: toplantı, kişi ya da dosya adı, döküm metni ve yol yazılmaz; ad için yalnız kaynağı ("takvim", "Başlat", "sinyal") yazılır. Ağa hiçbir şey gitmez.
+
 ## İsteğe bağlı ayarlar
 **Sesle hatırlatma:** onayladığın saatli hatırlatma Mac Takvim'in varsayılan takvimine 15 dakikalık, başında uyaran bir etkinlik olarak eklenir
 (Exchange/Google takvimiyse telefonuna da eşitlenir); başka bir takvim için `"hatirlatma_takvim": "<takvim adı>"`. Saati olmayan istek kendine e-posta taslağı olur.

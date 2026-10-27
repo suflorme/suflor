@@ -9,7 +9,7 @@
 # Panoda Durdur (interrupt) ve "Terminal'de göster" (süreç kapanır, aynı oturum `claude --resume` ile Terminal'de açılır). Süreç beklenmedik çıkarsa
 # aynı oturum en çok TOPO_YENIDEN kez kaldığı yerden açılır. Ayar toplanti_terminal: true eski davranış (Terminal penceresi).
 TOPO = {"app": None, "w": None, "durum": "kapali", "sid": None, "mesaj": [], "n": 0, "konu": None, "t0": 0.0, "t_durum": 0.0, "maliyet": 0.0, "nesil": 0,
-        "kapali_nesil": None, "yeniden": 0, "izin": 0, "hata": None, "acilis": None, "secenek_i": None, "etkinlik": None, "kilit": threading.RLock()}
+        "kapali_nesil": None, "yeniden": 0, "izin": 0, "izin_toplam": 0, "hata": None, "acilis": None, "secenek_i": None, "etkinlik": None, "kilit": threading.RLock()}
 TOPO_YENIDEN, TOPO_MESAJ_EN_COK, TOPO_METIN_EN_COK, TOPO_SURE_SN = 2, 400, 6000, 8 * 3600
 TOPO_TERMINAL_ILETI = "(Suflor) Oturum arka plandan Terminal'e alındı; arka plandaki Monitor durdu. Toplantı sürüyorsa izle'yi yeniden başlat, sürmüyorsa kaldığın yerden devam et."
 TOPO_BOSTA_SN = 2 * 3600  # tur bitmiş ve izle yokken bu kadar boşta kalırsa süreç kapanır (~250 MB); "Terminal'de göster" yine aynı oturumu açar
@@ -67,6 +67,7 @@ def _topo_gonder(o):
 def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
     # cl: claude yolu · model: ayar claude_model · ky: toplanti-kanca.json (ya da None) · ilk: ilk kullanıcı iletisi · sid: kaldığı yerden (--resume)
     with TOPO["kilit"]:
+        TOPO["izin_toplam"] = 0  # deneme toplantısı kipi: açılışta kaç izin kartı çıktı (aktarici/duman.py)
         if topo_canli(): toplanti_oturum_kapat("yeni başlatma")
         gir, cik, istek = (os.path.join(BASE, f) for f in ("toplanti-giris.fifo", "toplanti-cikis.fifo", "toplanti-istek.json"))
         for f in (gir, cik):
@@ -170,7 +171,7 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         cevap = {"behavior": "deny", "message": _t("Bu oturumda AskUserQuestion yok: soruyu düz metin olarak yaz ve turu bitir; kullanıcı panodan cevaplar.",
                                                    "AskUserQuestion isn't available in this session: write the question as plain text and end the turn; the user answers from the panel.")}
     else:
-        ozet = _topo_arac_ozet(ad, gi); TOPO["izin"] += 1
+        ozet = _topo_arac_ozet(ad, gi); TOPO["izin"] += 1; TOPO["izin_toplam"] += 1
         _topo_mesaj("izin", arac_cumlesi(ad, gi))  # v0.112.2: düz cümle, komut yalnız eylem ayrıntısında ve izin-kayit.jsonl'de
         iid = izin_iste("arac", izin_metni(ad, gi), {"arac": ad, "ozet": ozet}, oturum=True)  # v0.115.0: kart değil, Claude bölümünde Onayla / Reddet
         k = izin_bekle(iid) if iid else "zaman_asimi"; TOPO["izin"] = max(0, TOPO["izin"] - 1)

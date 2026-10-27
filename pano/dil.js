@@ -710,5 +710,11 @@ globalThis.SUFLOR_EN = {
   "Denetim sonucu alınamadı": "Could not get the check result",
   "{ok} ✓ · {hata} ✗ · {bil} ?": "{ok} ✓ · {hata} ✗ · {bil} ?",
   "Hiçbir madde ✗ değil": "No item is ✗",
+  // --- Faz D2 (v0.148.0): Deneme toplantısı
+  "Deneme toplantısı (3 dk)": "Test meeting (3 min)",
+  "Deneme toplantısı": "Test meeting",
+  "Toplantıya girdikten sonra bas: 3 dakikada tanıma, döküm, kanallar, asistan cevabı, BlackHole ve Mac kaynaklarını sınar; toplantıya hiçbir şey yazmaz": "Press after joining a meeting: in 3 minutes it checks recognition, transcript, channels, assistant answer, BlackHole and Mac resources; it writes nothing to the meeting",
+  "Süre: {g}/{s} sn": "Time: {g}/{s} s",
+  "Deneme başlatılamadı": "Could not start the test",
   "? olanlar okunamayanlar; ayrıntı için Terminal: python3 kurulum.py dogrula": "Items marked ? could not be read; for details run in Terminal: python3 kurulum.py dogrula",
 };

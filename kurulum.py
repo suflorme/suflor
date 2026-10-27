@@ -1689,6 +1689,8 @@ def _kaynak_durumu():  # {"bos_gb", "takas_kullanilan_gb", "takas_toplam_gb", "y
     except OSError: yuk = None
     return {"bos_gb": round(vm.get("free", 0) + vm.get("inactive", 0) + vm.get("speculative", 0), 1), "takas_kullanilan_gb": round(kul, 1) if kul is not None else None,
             "takas_toplam_gb": round(top, 1) if top is not None else None, "yuk": yuk, "cekirdek": os.cpu_count() or 1, "baski_bos_yuzde": int(bp.group(1)) if bp else None}
+IZIN_YENIDEN = ("Sistem Ayarları → Gizlilik ve Güvenlik → {ad}: listede açık görünse de Suflor.me'yi − ile kaldırın, + ile yeniden ekleyin "
+                "(Finder'da Command + Shift + G → ~/Applications/Suflor.me.app); uygulama yeniden imzalanınca macOS eski izni geçersiz sayar")  # 27 Ekim gecesi work hesabında görüldü
 def dogrula_topla(hizli=False):  # → [{"id", "durum": ok|hata|?, "ad", "not", "yap"}]
     M = []
     def m(i, d, ad, n="", yap=""): M.append({"id": i, "durum": d, "ad": ad, "not": n, "yap": yap if d != "ok" else ""})
@@ -1738,7 +1740,7 @@ def dogrula_topla(hizli=False):  # → [{"id", "durum": ok|hata|?, "ad", "not", 
     for k, ad in IZIN_AD.items():
         v = iz.get(k)
         if v == "var": m("izin-" + k, "ok", f"İzin: {ad}", "verilmiş")
-        elif v: m("izin-" + k, "hata", f"İzin: {ad}", f"durum: {v}", "Sistem Ayarları → Gizlilik ve Güvenlik → " + ad + " → Suflor.me")
+        elif v: m("izin-" + k, "hata", f"İzin: {ad}", f"durum: {v}", IZIN_YENIDEN.format(ad=ad))
         else: m("izin-" + k, "?", f"İzin: {ad}", "okunamadı" + (" (toplantı/sohbet sürüyor)" if busy else ""), "Sistem Ayarları → Gizlilik ve Güvenlik → " + ad + " → Suflor.me'ye bak")
     m("izin-bildirim", "?", "İzin: Bildirimler", "macOS dışarıdan okutmuyor", "Sistem Ayarları → Bildirimler → Suflor.me'ye bak")
     pe = (s or {}).get("proje_erisim")
@@ -1782,14 +1784,15 @@ DOGRULA_SIM = {"ok": "✓", "hata": "✗", "?": "?"}
 def dogrula_metin(M, baslik):
     t = [baslik] + [f"{DOGRULA_SIM[x['durum']]} {x['ad']} — {x['not']}" + (f"\n    → {x['yap']}" if x["yap"] else "") for x in M]
     return "\n".join(t)
-def dogrula(json_cikti=False, sessiz_=False, hizli=False):  # → sonuç sözlüğü; dogrula.json + (beta) ortak posta kutusu
+def dogrula(json_cikti=False, sessiz_=False, hizli=False, yaz=True):  # → sonuç sözlüğü; dogrula.json + (beta) ortak posta kutusu
     Y = yollar(); M = dogrula_topla(hizli)
     for x in M: x["not"] = _dogrula_temiz(x["not"]); x["yap"] = _dogrula_temiz(x["yap"])
     sy = {d: sum(1 for x in M if x["durum"] == d) for d in ("ok", "hata", "?")}
     r = {"t": datetime.datetime.now().isoformat(timespec="seconds"), "surum": surum(KOD), "maddeler": M, "ozet": sy, "beta": not ayar().get("gelistirici")}
-    try: yaz_json(os.path.join(Y["uygulama"], "dogrula.json"), r)
-    except OSError: pass
-    if r["beta"]:  # ortak posta kutusu (geliştirici oturumu okur); yerel kalır, ağa gitmez
+    if yaz:
+        try: yaz_json(os.path.join(Y["uygulama"], "dogrula.json"), r)
+        except OSError: pass
+    if r["beta"] and yaz:  # ortak posta kutusu (geliştirici oturumu okur); yerel kalır, ağa gitmez
         gb = os.path.join(Y["ortak"], "geri-bildirim"); hesap = re.sub(r"[^a-z0-9_-]", "", getpass.getuser().lower()) or "hesap"
         try:
             os.makedirs(gb, exist_ok=True)
@@ -1831,7 +1834,7 @@ def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
     ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "guncelle", "guncelleme-sonrasi", "dogrula", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|dogrula|profil|mesgul")
-    ap.add_argument("--json", action="store_true", help="dogrula: makine okunur çıktı"); ap.add_argument("--hizli", action="store_true", help="dogrula: menü uygulamasını açan izin okumasını atla")
+    ap.add_argument("--json", action="store_true", help="dogrula: makine okunur çıktı"); ap.add_argument("--hizli", action="store_true", help="dogrula: menü uygulamasını açan izin okumasını atla"); ap.add_argument("--yazma", action="store_true", help="dogrula: dogrula.json ve posta kutusuna yazma (deneme toplantısı kipi çağırır)")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
     ap.add_argument("--zorla", action="store_true", help="guncelle: toplantı/sohbet sürse de güncelle")
@@ -1839,7 +1842,7 @@ if __name__ == "__main__":
     for b, ne in (("modeller", "modelleri"), ("proje", "projedeki toplantı notlarını (proje klasörünün kendisi asla)"), ("kod", "kod klasörünü")):
         ap.add_argument(f"--{b}", action="store_true", help=f"sil --evet: {ne} de")
     ap.add_argument("--adim", choices=["hazirlik"], help="yalnız proje hazırlığı ekranları (panodaki 'Projeyi yeniden hazırla' → hazirla.command)"); A = ap.parse_args()
-    if A.is_ == "dogrula": r = dogrula(A.json, hizli=A.hizli); sys.exit(1 if r["ozet"]["hata"] else 0)
+    if A.is_ == "dogrula": r = dogrula(A.json, hizli=A.hizli, yaz=not A.yazma); sys.exit(1 if r["ozet"]["hata"] else 0)
     if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
     if A.is_ == "pocket": sys.exit(0 if pocket_kur() else 1)
     if A.is_ == "ollama": sys.exit(0 if ollama_kur() else 1)

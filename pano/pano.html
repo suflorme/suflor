@@ -151,7 +151,8 @@ body.surukle{outline:3px dashed var(--ac);outline-offset:-6px}.km a{color:var(--
 .bg{padding:4px 0;border-bottom:1px solid var(--bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bg .sp{color:var(--t3);margin-left:4px}
 #tkf input,#tkf select{font:inherit;font-size:var(--yz-2);color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose-s);padding:5px 7px;width:100%}
 dialog#ayd{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:18px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}
-dialog#ayd::backdrop,dialog#kgd::backdrop{background:rgba(12,18,15,.4)}
+dialog#ayd::backdrop,dialog#kgd::backdrop,dialog#dmd::backdrop{background:rgba(12,18,15,.4)}
+dialog#dmd{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:18px;width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}#dmi .dr{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd);font-size:var(--yz-2)}#dmi .dr b{flex:none;width:1.3em}#dmi .ok b{color:var(--ok)}#dmi .hata b{color:var(--er)}#dmi .dr small{display:block;color:var(--tx2)}#dmy{margin:6px 0 8px}#dmd .bt{margin-top:12px}
 dialog#kgd{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:18px;width:min(620px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 18px 50px rgba(0,0,0,.25)}
 #kgf{display:flex;flex-direction:column;gap:10px;margin:0;min-height:0;flex:1}#kgi{overflow:auto;flex:1;min-height:60px;padding-right:12px}
 /* v0.116.0: Toplantılar penceresi — liste, arama, döküm (aktarici/arsiv.py) */
@@ -183,7 +184,8 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 </style>
 <header><div class=hl><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span><span id=sure></span></div>
 <div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=yb class="ib gh" title="Yardım ve sık sorulanlar" aria-label="Yardım">?</button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button><button id=mini class="ib gh" title="Mini pano: her zaman üstte duran küçük pencere"></button></div></header>
-<dialog id=ayd><form method=dialog id=ayf><div class=ayb><b class=gbb>Ayarlar</b><input id=ayara type=search placeholder="Ara" aria-label="Ayarlarda ara" autocomplete=off><button id=ayx class="ib gh" type=button title="Kaydetmeden kapat"></button></div><div id=ayt class=ayt role=tablist aria-label="Ayar grupları"></div><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet ve kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet ve kapat'a basana kadar bir şey değişmez">Varsayılanlara dön</button><button id=ayk class=gh type=button title="Sürümleri, modelleri, izinleri, BlackHole'u ve Mac'in yükünü denetler; hiçbir şeyi değiştirmez">Kurulumu denetle</button><span class=sp1></span><span id=aym class=hint></span></div><div id=ayks class=hint hidden></div></form></dialog>
+<dialog id=ayd><form method=dialog id=ayf><div class=ayb><b class=gbb>Ayarlar</b><input id=ayara type=search placeholder="Ara" aria-label="Ayarlarda ara" autocomplete=off><button id=ayx class="ib gh" type=button title="Kaydetmeden kapat"></button></div><div id=ayt class=ayt role=tablist aria-label="Ayar grupları"></div><div id=ayi></div><div class=bt><button id=ays class=pri type=button>Kaydet ve kapat</button><button id=ayv class=gh type=button title="Formu varsayılan değerlere çeker; Kaydet ve kapat'a basana kadar bir şey değişmez">Varsayılanlara dön</button><button id=ayk class=gh type=button title="Sürümleri, modelleri, izinleri, BlackHole'u ve Mac'in yükünü denetler; hiçbir şeyi değiştirmez">Kurulumu denetle</button><button id=ayd2 class=gh type=button title="Toplantıya girdikten sonra bas: 3 dakikada tanıma, döküm, kanallar, asistan cevabı, BlackHole ve Mac kaynaklarını sınar; toplantıya hiçbir şey yazmaz">Deneme toplantısı (3 dk)</button><span class=sp1></span><span id=aym class=hint></span></div><div id=ayks class=hint hidden></div></form></dialog>
+<dialog id=dmd aria-label="Deneme toplantısı"><div class=ayb><b class=gbb>Deneme toplantısı</b><button id=dmx class="ib gh" type=button title="Kapat" aria-label="Kapat"></button></div><div id=dmy class=hint></div><div id=dmi></div><div class=bt><button id=dmb class=pri type=button>Bitir</button></div></dialog>
 <dialog id=yrd><div class=yrdi>
 <div lang=tr>
 <h2>Suflor.me yardımı</h2>
@@ -973,6 +975,9 @@ if(AYAR_PEN){document.documentElement.classList.add('ayarlar');const d=document.
   d.addEventListener('close',()=>{try{webkit.messageHandlers.suflor.postMessage({kapat:1})}catch(e){}})}  // Kaydet ve kapat / ✕ pencereyi de kapatır
 {const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear');document.getElementById('ayx').innerHTML=ic('x');document.getElementById('ayx').onclick=()=>d.close()
   document.getElementById('ay').onclick=()=>ayarAc()
+  document.getElementById('ayd2').onclick=async()=>{const o=document.getElementById('ayks');o.hidden=false  // Faz D2: deneme toplantısı (aktarıcı /duman → aktarici/duman.py); canlı liste dumanCiz'de
+    try{const r=await j('/duman',{method:'POST',body:JSON.stringify({islem:'baslat'})});if(!r.ok&&!r.duman){o.textContent=r.err||L('Deneme başlatılamadı');return}o.textContent='';if(!AYAR_PEN)document.getElementById('ayd').close();if(r.duman)dumanCiz({duman:r.duman},true)}
+    catch(e){o.textContent=L('Deneme başlatılamadı')}}
   document.getElementById('ayk').onclick=async()=>{const b=document.getElementById('ayk'),o=document.getElementById('ayks');o.hidden=false;o.textContent=L('Denetleniyor…');b.disabled=true  // Faz D: aktarıcı /dogrula (kurulum.py dogrula)
     try{let r=await j('/dogrula?yenile=1');for(let i=0;i<60&&r.calisiyor;i++){await new Promise(z=>setTimeout(z,1500));r=await j('/dogrula')}
       if(!r.ok||!r.var){o.textContent=r.err||L('Denetim sonucu alınamadı');return}
@@ -1109,10 +1114,19 @@ function miniOturum(d,s){const e=d.getElementById("mto"),o=s.toplanti_oturum,q=o
   if(!q){const t=tosSatir(o);e.hidden=!t;if(!t){e.dataset.sig="";return}const sig="t|"+t;if(e.dataset.sig===sig)return;e.dataset.sig=sig;setH(e,`<div class=meta>${esc(t)}</div>`);return}
   const sig=q.i+"|"+(q.secenek?1:0);e.hidden=false;if(e.dataset.sig===sig)return;e.dataset.sig=sig
   setH(e,`<div class=meta><b>${esc(L("{asistan} soruyor"))}</b></div><div class=d>${tosMd(q.metin.length>=400?"…"+q.metin:q.metin)}</div>${q.secenek?tosSecHtml(q):`<div class=meta>${esc(L("Cevabı aşağıdaki kutuya yaz."))}</div>`}`)}
+// Faz D2: Deneme toplantısı penceresi — /status duman (aktarici/duman.py); koşarken canlı ✓ ✗ ? …, bitince özet. Kip toplantıya hiçbir şey yazmaz.
+let DM_ID=null;const DM_SIM={ok:'✓',hata:'✗','?':'?',bekliyor:'…',atla:'—'}
+function dumanCiz(s,zorla){const d=s&&s.duman,w=document.getElementById('dmd');if(!d||!w)return
+  if(d.aktif&&(zorla||DM_ID!==d.t0)){DM_ID=d.t0;if(!w.open)w.showModal()}
+  if(!w.open)return
+  document.getElementById('dmy').textContent=d.aktif?L('Süre: {g}/{s} sn',{g:d.gecen,s:d.sure})+' · '+(d.yonerge||[]).join(' '):(d.ozet||'')
+  document.getElementById('dmi').innerHTML=(d.maddeler||[]).map(x=>'<div class="dr '+esc(x.durum)+'"><b>'+(DM_SIM[x.durum]||'?')+'</b><span>'+esc(x.ad)+'<small>'+esc(x.not||'')+'</small></span></div>').join('')+(!d.aktif&&d.ozet?'<div class=dr><b></b><span><b>'+esc(d.ozet)+'</b></span></div>':'')
+  const b=document.getElementById('dmb');b.textContent=d.aktif?L('Bitir'):L('Kapat');b.onclick=async()=>{if(d.aktif){try{await j('/duman',{method:'POST',body:JSON.stringify({islem:'bitir'})})}catch(e){}refresh()}else w.close()}}
+{const x=document.getElementById('dmx');if(x){x.innerHTML=ic('x');x.onclick=()=>document.getElementById('dmd').close()}}
 async function refresh(){let s;try{s=await j('/status')}catch(e){s=null}
 if(s&&s.asistan&&s.asistan!==AS){AS=s.asistan;asYaz(document)}
   if(s&&s.err==="anahtar"){document.title=L("Suflor.me — anahtar gerekli");const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Pano anahtarsız açıldı")));setH(document.getElementById('da'),esc(L("Suflor.me simgesine tıkla → Panoyu aç")));return}
-  if(!s){const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Suflor.me'ye ulaşılamıyor")));setH(document.getElementById('da'),esc(L('birkaç saniye içinde yeniden denenir')));return}last=s;guncellemeCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
+  if(!s){const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Suflor.me'ye ulaşılamıyor")));setH(document.getElementById('da'),esc(L('birkaç saniye içinde yeniden denenir')));return}last=s;guncellemeCiz(s);dumanCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
 setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||s.meeting||'Toplantı')):masaustuTop(s)?esc(s.masaustu.baslik||s.masaustu.uygulama||L('Toplantı')):'')
 setH(document.getElementById('chips'),s.aktif&&ag.rol?`<span class=chip>${ROL[ag.rol]||esc(ag.rol)}</span>`:"")
 {const [t,c,ti]=sureTxt(s),e=document.getElementById('sure');setH(e,s.aktif&&t?ic('clock',esc(t)):"");e.className=c;e.title=ti}
