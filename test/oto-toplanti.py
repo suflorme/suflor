@@ -52,7 +52,7 @@ r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(
 U = f"http://127.0.0.1:{PORT}"; L = lambda: open(LOG, encoding="utf-8").read()
 def istek(yol, g=None):
     k = open(os.path.join(canli, "kart-anahtari.txt")).read().strip(); h = {"Content-Type": "application/json", "X-Suflor-Anahtar": k}
-    if yol == "/baslat": h["Origin"] = U  # yalnız pano ya da eklenti başlatır
+    if yol in ("/baslat", "/ayar"): h["Origin"] = U  # yalnız pano (ya da eklenti) başlatır / ayar yazar
     q = urllib.request.Request(U + yol, data=json.dumps(g).encode() if g is not None else None, headers=h)
     return json.load(urllib.request.urlopen(q, timeout=10))
 def bekle(kosul, sn=15):
@@ -111,6 +111,15 @@ try:
     hb = next((open(os.path.join(canli, f), encoding="utf-8").read() for f in dosyalar() if f.endswith("-Haftalık-plan.md")), "")
     ok("masaüstü dosyasının başlığı Teams", "Teams toplantısı" in hb)
     NABIZ["g"] = None
+    # 4) v0.145.0: panodaki ⚙ Ayarlar — hariç listesi virgüllü metinden; "Toplantıyı kendisi tanısın" kapalıyken tanınmaz
+    ra = istek("/ayar", {"degisen": {"oto_haric": " özel, Bire  Bir ,özel,", "oto_toplanti": False}})
+    ayj = json.load(open(ay, encoding="utf-8")); dg = istek("/status")["ayarlar"]["deger"]
+    ok(f"ayar kaydı: liste tekilleşti, panoda virgüllü ({ra}, {ayj.get('oto_haric')}, {dg.get('oto_haric')!r})",
+       ra.get("ok") and ayj.get("oto_haric") == ["özel", "Bire Bir"] and ayj.get("oto_toplanti") is False and dg.get("oto_haric") == "özel, Bire Bir" and dg.get("oto_toplanti") is False)
+    time.sleep(25); n_ = L().count("OTO: toplantı tanındı"); NABIZ["g"] = "meet"; time.sleep(5); NABIZ["g"] = None
+    ok("'Toplantıyı kendisi tanısın' kapalıyken tanınmadı", L().count("OTO: toplantı tanındı") == n_)
+    ra = istek("/ayar", {"degisen": {"oto_haric": "", "oto_toplanti": True}}); ayj = json.load(open(ay, encoding="utf-8"))
+    ok("boş liste ve açık (varsayılan) ayar dosyasından çıkar", ra.get("ok") and "oto_haric" not in ayj and "oto_toplanti" not in ayj)
     ok("aktarıcıda hata yok", "Traceback" not in L() and "OTO: denetim hatası" not in L())
 finally:
     r.terminate()

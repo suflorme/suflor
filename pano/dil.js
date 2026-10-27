@@ -603,6 +603,11 @@ globalThis.SUFLOR_EN = {
   "{adlar} toplantıda": "{adlar} in the meeting",
   "{adlar} dinliyor — adıyla seslen": "{adlar} listening — call them by name",
   "Asistanlar toplantıda konuşsun": "Assistants speak in meetings",
+  "Toplantıyı kendisi tanısın": "Recognise meetings automatically",
+  "Teams, Meet ya da Zoom toplantısına nereden girersen gir (tarayıcı ya da masaüstü) Suflor toplantıyı tanır: takvimdeki adla döküm başlar, {asistan} toplantı oturumunu sormadan açar. Kapalıyken döküm yine tutulur, {asistan} yalnız Başlat’la açılır.": "However you join a Teams, Meet or Zoom meeting (browser or desktop), Suflor recognises it: the transcript starts under the calendar name and {asistan} opens the meeting session without asking. When off, the transcript is still kept and {asistan} opens only with Start.",
+  "Kendiliğinden açılmasın": "Don’t open automatically",
+  "Adında bu sözcüklerden biri geçen toplantıda {asistan} kendiliğinden açılmaz; döküm yine tutulur. Virgülle ayır.": "In a meeting whose name contains one of these words, {asistan} doesn’t open automatically; the transcript is still kept. Separate with commas.",
+  "örnek: özel, bire bir": "e.g. private, one-on-one",
   "Toplantıda “<ad>, …” diye seslendiğin asistan herkesin duyacağı şekilde cevap verir; sen bir kez çağırdıktan sonra diğer katılımcılar da ona adıyla sorabilir. Yalnız senin duyacağın soru için Konuş düğmesi; susturmak için “<ad>, dur” ya da Option + Shift + S. Web toplantısında kurulum gerekmez; masaüstü Teams’te BlackHole kurulu olmalı ve mikrofon olarak BlackHole 2ch seçilmeli.": "In a meeting, the assistant you address as “<name>, …” answers so that everyone hears it; once you have called it, other participants can ask it by name too. For a question only you should hear, use Talk; to stop it say “<name>, stop” or press Option + Shift + S. Web meetings need no setup; in desktop Teams BlackHole must be installed and BlackHole 2ch chosen as the microphone.",
   // --- v0.111.0: arka plandaki toplantı oturumu (panoda asistan bölümü)
   "Kısa": "Brief",
