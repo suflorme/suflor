@@ -157,6 +157,7 @@ def paths(title):
     # yani LOCK altında çağrılır).
     # eşlenen dosyaya RESUME_MAX_AGE_MIN'den uzun süredir yazılmadıysa bu yeni bir toplantıdır → yeni dosya
     # (29 Eylül: aynı başlıklı iki toplantı aynı dosyaya düştü; aktarıcı açık kaldıkça eşleme sürüyordu)
+    if "oto_ad" in globals(): title = oto_ad(title)  # S161: süren toplantının ham adları (sayfa başlığı, "Toplantı") tek dosyaya
     base = STATE["meeting_files"].get(title)
     if base and time.time() - STATE["file_last"].get(os.path.basename(base) + ".md", 0) > RESUME_MAX_AGE_MIN * 60: base = None
     if not base and title != YER_TUTUCU: base = yer_tutucu_birlestir(title)
@@ -274,11 +275,14 @@ def ensure_header(md, title, m, source=None):
     # başlık metnini döndürür (dosya yoksa ve daha önce sıraya konmadıysa); yazım write() ile, satırlarla aynı grupta
     if md in HEADERED or os.path.exists(md): HEADERED.add(md); return ""
     HEADERED.add(md)
+    if "oto_ad" in globals(): title = oto_ad(title)
     # altyazı modunda başlık bunu söyler (konuşmacı adı olmayabilir, dil yanlış seçilmiş olabilir)
     # platform adı eklentiden (meeting.platform; Whisper satırlarında son ping'in platformu)
-    pl = PLATFORM_AD.get((m or {}).get("platform") or (STATE.get("extension") or {}).get("platform") or "teams", "Teams")
+    # S161: tanınan toplantının platformu (masaüstü/Whisper satırında meeting.platform yok; 27 Ekim Meet toplantısının başlığı "Teams" dedi)
+    pl = PLATFORM_AD.get((m or {}).get("platform") or (oto_platform() if "oto_platform" in globals() else None) or (STATE.get("extension") or {}).get("platform") or "teams", "Teams")
     src = f"Whisper (yerel konuşma tanıma, large-v3-turbo; konuşmacı: kullanıcı mikrofonu / karşı taraf {pl} sesi)" if source == "whisper" else \
-          f"{pl} canlı altyazı (döküm yetkisi yok; konuşmacı adı eksik, dil yanlış seçilmişse metin anlamsız olabilir)" if source == "captions" else f"{pl} transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir)"
+          f"{pl} canlı altyazı (döküm yetkisi yok; konuşmacı adı eksik, dil yanlış seçilmişse metin anlamsız olabilir)" if source == "captions" else \
+          f"{pl} toplantısı (Suflor.me kendiliğinden tanıdı; satırlar Whisper ya da canlı altyazıdan)" if source == "oto" else f"{pl} transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir)"
     # 19 Ekim test toplantısı: masaüstü Teams'te eklenti yok → "Başlangıç: ?"; başlangıç bilinmiyorsa dosyanın ilk kaydının saati (canlı dosya geliş sırasıyla yazılır:
     # Whisper satırı ~5 sn geç gelir, Suflor'un sesli satırı okunduğu an — toplantı sonundaki döküm (toplanti-claude.py dokum) zamana göre sıralar)
     bas = (m or {}).get("startedAt") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M") + " (ilk kayıt; satırlar geliş sırasıyla)"

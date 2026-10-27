@@ -173,6 +173,7 @@
   ],
   "heartbeat.json": "<var>",
   "izle-paketler.jsonl": [
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
    "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
    "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
    "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
@@ -511,18 +512,7 @@
      "time": "str"
     }
    ],
-   "gemini_gunluk": {
-    "modeller": [
-     {
-      "ad": "str",
-      "dolu": "bool",
-      "n": "int"
-     }
-    ],
-    "sinir": "int",
-    "toplam": "int",
-    "uyari": "bool"
-   },
+   "gemini_gunluk": "NoneType",
    "gizli": "NoneType",
    "guncelleme": {
     "durum": "str"
@@ -577,6 +567,7 @@
    },
    "notes": "int",
    "notlar": [],
+   "oto_toplanti": "NoneType",
    "pano_ac": "NoneType",
    "pay": {
     "adsiz": "int",
@@ -677,7 +668,6 @@
      "ton": "str"
     }
    },
-   "toplanti_bitti": "NoneType",
    "toplanti_oturum": "NoneType",
    "uyari": "NoneType",
    "whisper": {
@@ -887,7 +877,7 @@
   "KATILIMCI": 1,
   "NE DİYEYİM": 1,
   "NOT": 2,
-  "SATIRLAR": 24,
+  "SATIRLAR": 25,
   "SORU": 1,
   "SÜRE": 6,
   "İZLEME BAŞLADI": 1

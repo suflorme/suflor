@@ -46,8 +46,11 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
 `~/Library/Application Support/Suflor-ortak` altına indirir (~5–12 GB).
 
 ## Kullanım
-1. Toplantıdan önce panodaki takvimden **Başlat**'a bas (ya da proje klasöründeki Claude Code oturumunda `/toplanti`).
-   Gündem kurulur, hazır olunca toplantıya katılırsın.
+1. Toplantıya nereden istersen katıl: takvimdeki bağlantı, Teams, Meet ya da Zoom sayfası, masaüstü Teams ya da Zoom. Suflor toplantıyı kendisi tanır.
+   Takvimde o saatte (±15 dk) bir toplantı varsa adı, katılımcıları ve gündemi oradan alır, döküm dosyasını hemen açar ve asistanın toplantı
+   oturumunu sormadan başlatır. Önceden hazırlanmak istersen panodaki takvimden **Başlat**'a basabilirsin; toplantı sürerken basılan Başlat yeni
+   kayıt açmaz, süren toplantıya katılır. Gizli toplantı açıkken toplantı tanınmaz. Asistanın kendiliğinden açılmasını istemediğin toplantılar için
+   ayar.json'da `"oto_haric": ["<adın bir parçası>", …]` (döküm yine tutulur); hepsini kapatmak için `"oto_toplanti": false`.
 2. Karşı tarafın sesi kendiliğinden yazıya dökülür (Suflor Ses yardımcısı, macOS 14.4+; ilk kurulumda macOS "Sistem Sesi Kaydı" izni
    sorar — İzin Ver). Yardımcı yoksa ya da izin verilmediyse Chrome'daki toplantıda **Suflor.me simgesi → "Karşı taraf" satırındaki Aç** (satır yalnız sorun varken görünür; masaüstü Teams/Zoom'da yedek yok).
 3. Kartlar toplantı ekranının sol altındaki küçük şeritte ve panoda görünür. ✓ yaptım · 👁 okudum · ✕ gerek yok. Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin.

@@ -76,7 +76,7 @@ Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 
 | Önce | Sırasında | Sonra |
 |---|---|---|
-| Takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, çeviri; istersen asistan konuşur ya da toplantıyı yönetir. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
+| Toplantıya katıl ya da takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, çeviri; istersen asistan konuşur ya da toplantıyı yönetir. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
 
 ## Asistanına adıyla seslen
 
@@ -154,7 +154,7 @@ curl -fsSL https://raw.githubusercontent.com/suflorme/suflor/main/kur.sh | bash
 **2.** Kurulum sihirbazı tarayıcıda açılır. Her ekranda tek iş var: Mac denetimi, yapay zekâ bağlantısı (Claude, API anahtarı ya da yerel model), senin adın,
 asistanın adı ve sesi, proje klasörü, modellerin indirilmesi, takvim ve Chrome eklentisi. Sihirbaz her adımı kendisi denetler. Kapatırsan aynı komut kaldığın yerden sürdürür.
 
-**3.** Bir toplantıya katıl. Panodaki takvimden **Başlat**'a bas; gerisini asistan yürütür.
+**3.** Bir toplantıya katıl. Suflor toplantıyı kendisi tanır (Teams, Meet, Zoom; tarayıcıda ya da masaüstünde); gerisini asistan yürütür. İstersen önceden panodaki takvimden **Başlat**'a basarsın.
 
 <p align="center"><img src="gorsel/sihirbaz.png" alt="Kurulum sihirbazı: Asistanına bir ad koy" width="72%"></p>
 
