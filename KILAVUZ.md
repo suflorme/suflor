@@ -48,7 +48,8 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
 ## Kullanım
 1. Toplantıya nereden istersen katıl: takvimdeki bağlantı, Teams, Meet ya da Zoom sayfası, masaüstü Teams ya da Zoom. Suflor toplantıyı kendisi tanır.
    Takvimde o saatte (±15 dk) bir toplantı varsa adı, katılımcıları ve gündemi oradan alır, döküm dosyasını hemen açar ve asistanın toplantı
-   oturumunu sormadan başlatır. Önceden hazırlanmak istersen panodaki takvimden **Başlat**'a basabilirsin; toplantı sürerken basılan Başlat yeni
+   oturumunu sormadan başlatır (yalnız toplantı uygulaması ya da sayfası toplantıyı bildirdiğinde; yalnızca mikrofon ve takvim eşleşmesiyle
+   başlatmaz — panoda "Toplantı algılandı — Claude'u başlat" kartı çıkar, Onayla'ya basınca başlar). Önceden hazırlanmak istersen panodaki takvimden **Başlat**'a basabilirsin; toplantı sürerken basılan Başlat yeni
    kayıt açmaz, süren toplantıya katılır. Gizli toplantı açıkken toplantı tanınmaz. Asistanın kendiliğinden açılmasını istemediğin toplantılar için
    ayar.json'da `"oto_haric": ["<adın bir parçası>", …]` (döküm yine tutulur); hepsini kapatmak için `"oto_toplanti": false`.
 2. Karşı tarafın sesi kendiliğinden yazıya dökülür (Suflor Ses yardımcısı, macOS 14.4+; ilk kurulumda macOS "Sistem Sesi Kaydı" izni

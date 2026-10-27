@@ -50,11 +50,17 @@ while True:
     if o.get("type") == "control_request": continue  # boşta gelen durdurma
     q = o["message"]["content"]
     if q.startswith("/toplanti"): yaz("Gündem hazır. **Rolün** yürütücü mü?"); bitti()
-    elif "izin" in q: c = izin("Bash", {"command": "python3 -c 'print(1)'", "description": "Deneme komutu"}, "r-" + str(time.time())); yaz("İzin: " + c["behavior"]); bitti()
+    elif "izin" in q: c = izin("Bash", {"command": "python3 -c 'print(1)' # " + str(time.time()), "description": "Deneme komutu"}, "r-" + str(time.time())); yaz("İzin: " + c["behavior"]); bitti()
     elif "asili" in q: asili = True; yaz("Arka plan işi sürüyor"); bitti()
     elif "secim" in q: yaz("Bu kararda anlaştınız mı?\\n\\n[[seç: Anlaştık | Anlaşmadık | Emin değilim]]"); bitti()
     elif "monitor-izle" in q: c = izin("Monitor", {"command": "PYTHONDONTWRITEBYTECODE=1 python3 -u " + D + "/../toplanti-claude.py izle", "description": "izle"}, "m-1"); yaz("Monitor izle: " + c["behavior"]); bitti()
     elif "monitor-baska" in q: c = izin("Monitor", {"command": "python3 -u /tmp/toplanti-claude.py izle", "description": "x"}, "m-2"); yaz("Monitor başka: " + c["behavior"]); bitti()
+    elif "oku-izni" in q:
+        c1 = izin("Read", {"file_path": "/x/y/z.md"}, "o-1"); c2 = izin("Grep", {"pattern": "x"}, "o-2"); c3 = izin("Bash", {"command": "python3 -B " + D + "/../toplanti-claude.py saglik", "description": "sağlık"}, "o-3")
+        c4 = izin("Bash", {"command": "python3 -B " + D + "/../toplanti-claude.py dokum", "description": "döküm kaydı"}, "o-4"); yaz("Okuma: " + "/".join(c["behavior"] for c in (c1, c2, c3, c4))); bitti()
+    elif "yazma-izni" in q: c = izin("Bash", {"command": "python3 -B " + D + "/../toplanti-claude.py eylem ekle kayit x", "description": "yaz"}, "y-1"); yaz("Yazma: " + c["behavior"]); bitti()
+    elif "hatirla" in q:
+        c1 = izin("WebFetch", {"url": "https://example.com/a"}, "h-1"); c2 = izin("WebFetch", {"url": "https://example.com/a"}, "h-2"); yaz("Hatırla: " + c1["behavior"] + "/" + c2["behavior"]); bitti()
     elif "soru-araci" in q: c = izin("AskUserQuestion", {"questions": []}, "s-1"); yaz("AskUserQuestion: " + c["behavior"] + " · " + c.get("message", "")[:40]); bitti()
     elif "uzun" in q:
         pr({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "sleep 99", "description": "Proje belgelerini taramak"}}]}})
@@ -150,6 +156,17 @@ try:
     k = izin_bekle_(); ok("başka yerdeki toplanti-claude.py ile Monitor izin ister", len(k) == 1)
     if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"})
     claude_der("Monitor başka: deny")
+    # Faz A (S162): salt okuma araçları, Suflor'un okuma komutları ve toplantı sonu döküm kaydı sorulmaz; yazma sorulur; onaylanan izin oturumda hatırlanır; ikinci Başlat oturumu öldürmez
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "oku-izni"})
+    ok("Read, Grep, toplanti-claude.py saglik ve dokum kartsız izinli", claude_der("Okuma: allow/allow/allow/allow") and not izin_kartlari() and not izinler())
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "yazma-izni"}); k = izin_bekle_(); ok("toplanti-claude.py eylem ekle (yazma) yine sorulur", len(k) == 1)
+    if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"})
+    claude_der("Yazma: deny")
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "hatirla"}); k = izin_bekle_(); ok("dışarı erişim (WebFetch) ilk kez sorulur", len(k) == 1)
+    if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "onaylandi"})
+    ok("verilen izin oturumda hatırlanır: ikincisi yeniden sorulmaz", claude_der("Hatırla: allow/allow") and not izinler())
+    sid0 = to().get("n"); kod, y = uc("/baslat", {"konu": "Deneme oturum", "rol": "yurutucu", "dil": "tr"})
+    ok(f"ikinci Başlat canlı oturumu kapatmaz: katıldı ({y})", y.get("ok") and y.get("katildi") is True and to().get("durum") in ("bekliyor", "izliyor") and to().get("n") == sid0)
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "soru-araci"})
     ok("AskUserQuestion kartsız reddedilir (soru düz metin olsun)", claude_der("AskUserQuestion: deny") and not izin_kartlari() and not izinler())
 

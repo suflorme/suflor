@@ -162,6 +162,7 @@ globalThis.SUFLOR_EN = {
   "Bugün": "Today",
   "Takvimde toplantı yok": "No meetings in your calendar",
   "Toplantı başlat": "Start a meeting",
+  "Toplantı sürüyor": "Meeting in progress",
   "Pano eski — sayfayı yenileyip tekrar dene": "The panel is out of date — reload the page and try again",
   "Suflor.me'ye ulaşılamadı": "Couldn't reach Suflor.me",
   "Suflor.me'ye ulaşılamıyor": "Can't reach Suflor.me",

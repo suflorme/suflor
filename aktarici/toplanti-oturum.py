@@ -79,7 +79,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "toplanti-bos"),
                        "giris": gir, "cikis": cik, "sure": TOPO_SURE_SN}, f, ensure_ascii=False)
-        if not sid: TOPO.update(mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None)
+        if not sid: TOPO.update(izin_hatirla=set(), mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None)
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
         _topo_durum("aciliyor", hata=None)
         TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -144,10 +144,28 @@ def _topo_izle_mi(ad, gi):
     if not m: return False
     yer = {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
     return os.path.realpath(os.path.expanduser(m.group(1))) in yer
+# Faz A (S162, 27 Ekim: toplantıda her okuma için onay soruluyordu, Monitor 30 dk'da bir yenilenince yeniden soruldu): salt okuma araçları (Read, Grep, Glob), Suflor'un kendi
+# okuma komutları ve toplantı sonu döküm kaydı sorulmaz; verilen izin oturum boyunca hatırlanır. Yazma, dışarıya gönderim ve satır içi python yine sorulur
+# (izin-kanca ayrıca PreToolUse'ta riskliyi sorar; o kanca bu karardan bağımsızdır).
+TOPO_OKU_ARAC = {"Read", "Grep", "Glob"}
+TOPO_TC_OKUMA = {"saglik", "takvim", "gundem", "durum", "ara", "hazirlik", "hazir", "graf", "vt-sema", "vt-sor", "proje", "proje-notu", "olcum", "izle",
+                 "dokum"}  # dokum: toplantı sonu temiz döküm kaydı (proje klasörüne yazar) — izne bağlı kalmaz
+TOPO_TC_RX = re.compile(r"^(?:PYTHONDONTWRITEBYTECODE=1\s+)?(?:/usr/bin/)?python3\s+(?:-[uBI]+\s+)*(\S+/toplanti-claude\.py)(?:\s+--dir\s+\S+)?(?:\s+--relay\s+http://127\.0\.0\.1:\d+)?\s+([a-z-]+)((?:\s+[^\s;&|`$()<>\\\"']+|\s+\"[^\"`$\\]*\"|\s+'[^']*')*)\s*$")
+def _topo_tc_okuma(ad, gi):
+    m = TOPO_TC_RX.match(str(gi.get("command") or "").strip()) if ad == "Bash" else None
+    if not m or m.group(2) not in TOPO_TC_OKUMA: return False
+    yer = {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
+    return os.path.realpath(os.path.expanduser(m.group(1))) in yer
+def _topo_izin_anahtar(ad, gi): return ad + "\0" + (str(gi.get("command") or "") if ad in ("Bash", "Monitor") else json.dumps(gi, sort_keys=True, ensure_ascii=False))
 def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay → control_response
     r = o.get("request") or {}; ad = str(r.get("tool_name") or "?"); gi = r.get("input") if isinstance(r.get("input"), dict) else {}
+    hat = TOPO.setdefault("izin_hatirla", set()); anh = _topo_izin_anahtar(ad, gi)
     if _topo_izle_mi(ad, gi):
         cevap = {"behavior": "allow", "updatedInput": gi}; print("TOPLANTI OTURUMU: izin Monitor (izle) → kendiliğinden")
+    elif ad in TOPO_OKU_ARAC or _topo_tc_okuma(ad, gi):
+        cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} (salt okuma) → kendiliğinden")
+    elif anh in hat:
+        cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} → oturumda daha önce verilmişti")
     elif ad == "AskUserQuestion":  # soru düz metin olarak panoya gelsin
         cevap = {"behavior": "deny", "message": _t("Bu oturumda AskUserQuestion yok: soruyu düz metin olarak yaz ve turu bitir; kullanıcı panodan cevaplar.",
                                                    "AskUserQuestion isn't available in this session: write the question as plain text and end the turn; the user answers from the panel.")}
@@ -162,6 +180,7 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
                                                      "Kullanıcı onay vermedi (süre doldu); bu adımı atla, gerekirse ona sor.",
                                                      "The user declined (Suflor); skip this step and ask them if needed." if k == "reddedildi" else
                                                      "No approval from the user (timed out); skip this step and ask them if needed.")})
+        if k == "onaylandi": hat.add(anh)  # oturum boyunca hatırla (yeniden soru yok)
         print(f"TOPLANTI OTURUMU: izin {ad} → {k}")
     _topo_gonder({"type": "control_response", "response": {"subtype": "success", "request_id": o.get("request_id"), "response": cevap}})
 def _topo_oku(cik, nesil):

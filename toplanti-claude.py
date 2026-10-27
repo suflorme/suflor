@@ -568,7 +568,7 @@ def emit(*lines):
 # ve ilk 2 sonucu pakete ekler — Claude çelişkiyi SORU beklemeden görür (Suflor'un asıl farkı: proje bağlamı).
 # Aynı sistem 10 dk'da bir; pakette en çok 2 sistem; süren toplantının kendi dosyası sonuçlardan çıkarılır.
 KATALOG = os.path.join(PROJE, AYAR.get("sistem_katalogu") or "-")  # alanın sistem tablosu (SistemKatalogu sekmesi)
-PLATFORM_AD = {"teams": "Teams", "meet": "Google Meet", "zoom": "Zoom"}  # eklenti ping'indeki platform → görünen ad
+PLATFORM_AD = {"teams": "Teams", "meet": "Google Meet", "zoom": "Zoom", "bilinmeyen": "toplantı sayfası"}  # eklenti ping'indeki platform → görünen ad
 GENEL = {"not", "kagit", "banka", "lokal", "kendi", "tarayici", "sifre", "vendor", "komisyon", "finansman", "yapay", "teams",
          "microsoft 365", "google", "meta", "uygulamalar", "password", "token", "api", "api anahtarlari", "ceo", "chrome profili"} \
         | set(AYAR.get("sistem_genel") or [])  # ayar: alanın katalogundaki genel adlar
@@ -1293,14 +1293,14 @@ def izle():
             state = ("eklenti bağlı" if (x.get("age_s") is not None and x["age_s"] < 30) else
                      f"masaüstü {ms.get('uygulama') or 'toplantı'} (menü uygulaması) — eklenti gerekmez, uyarma" if ms.get("toplantida") else "EKLENTİ SİNYALİ YOK") + \
                     (f" · katılımcı sayısı {ms['kisi_sayisi']} (uygulamadaki Kişiler düğmesinden; kendin dahil)" if ms.get("toplantida") and ms.get("kisi_sayisi") else
-                     f" · katılımcı sayısı {s['ext_kisi']} (Teams sayfasındaki Kişiler düğmesinden; kendin dahil)" if s.get("ext_kisi") and x.get("call") else "") + \
+                     f" · katılımcı sayısı {s['ext_kisi']} (toplantı sayfasındaki Kişiler düğmesinden; kendin dahil)" if s.get("ext_kisi") and x.get("call") else "") + \
                     ((" · WHISPER (yerel konuşma tanıma): {BEN} " + ("✓" if wv.get("ben") else "✗" + (f" ({wv['ben_neden']})" if wv.get("ben_neden") else "")) + " · karşı taraf " + (("✓ (yerel yardımcı)" if wv.get("yerel_akiyor") else "✓") if wv.get("karsi") else  # yerel ses yardımcısı
                      "✗ (yerel yardımcı hazır, karşı ses henüz gelmedi — kart gönderme)" if wv.get("yerel") in ("bekliyor", "dinliyor") else
                      "✗ (yerel yardımcıda Sistem sesi kaydı izni yok olabilir — Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı → Suflor Ses)" if wv.get("yerel") == "izin" else
                      "✗ (karşı ses kapalı — " + ("masaüstü toplantı: ses yardımcısını aktarici-kur ile yeniden kur" if (s.get("masaustu") or {}).get("toplantida") else
                      "Chrome'daki toplantıda Suflor.me eklenti simgesi → \"Karşı taraf\" satırındaki Aç") + "; karşı tarafın satırları " + ("altyazıdan" if (x.get("panel") or x.get("captions")) else "GELMİYOR") + ")")) if wak else
                      (" · panel açık" if x.get("panel") else (" · YALNIZ ALTYAZI (konuşmacı adı olmayabilir; özette kişiye bağlama)" if x.get("captions") else
-                     (f" · ⚠ TOPLANTIDA ama döküm/altyazı kapalı — satır gelmiyor ({PLATFORM_AD.get(x.get('platform'), 'Teams')}'te kullanıcıya uyarı çıktı; 2 dk sürerse DUR kartı: \"{(x.get('yonerge') or {}).get('altyazi') or 'Diğer → Dil ve konuşma → Canlı altyazı'}\")" if x.get("call") else " · panel kapalı")))) + \
+                     (f" · ⚠ TOPLANTIDA ama döküm/altyazı kapalı — satır gelmiyor ({PLATFORM_AD.get(x.get('platform'), 'toplantı sayfası')}'te kullanıcıya uyarı çıktı; 2 dk sürerse DUR kartı: \"{(x.get('yonerge') or {}).get('altyazi') or ('Diğer → Dil ve konuşma → Canlı altyazı' if x.get('platform') == 'teams' else 'platformun canlı altyazı düğmesi')}\")" if x.get("call") else " · panel kapalı")))) + \
                     (f" · ⚠ WHISPER {wv['durum']}: {wv.get('hata')}" if wv.get("durum") == "hata" else "") + \
                     (" · ⚠ SES İZİ hata (konuşmacı ayırma yok; Whisper çalışıyor)" if wv.get("ses_model") == "hata" else "") + \
                     (f" · altyazıyı kendisi açamadı ({x['capAuto'][11:]})" if str(x.get("capAuto") or "").startswith("basarisiz") and not (x.get("panel") or x.get("captions") or wak) else "") + \

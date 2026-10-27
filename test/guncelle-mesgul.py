@@ -29,6 +29,24 @@ ok(f"--zorla denetimi geçer (sonra olmayan kaynak → indirilemedi): {r[:40]!r}
 ok("guncelle.command --zorla'yı iletir", '"$@"' in open(os.path.join(KOD, "guncelle.command"), encoding="utf-8").read())
 ok("aktarici-kur.command mesgul'e bakar", "kurulum.py\" mesgul" in open(os.path.join(KOD, "aktarici-kur.command"), encoding="utf-8").read())
 
+# 1b) Faz A (S162): güncelleme sonrası adımlar YENİ kodla, ayrı süreçte (alt komut guncelleme-sonrasi) — eski sürümün kodu modeller_dene'yi yürütmüyordu
+import inspect
+ok("guncelle() sonrası adımları alt komuta devreder (kendisi modeller_dene çağırmaz)", "guncelleme-sonrasi" in inspect.getsource(g["guncelle"]) and "modeller_dene()" not in inspect.getsource(g["guncelle"]))
+ok("alt komut komut satırında tanımlı", "guncelleme-sonrasi" in open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read().split('if __name__ == "__main__":')[1])
+CAGRI = []
+class SP:
+    DEVNULL = None
+    @staticmethod
+    def run(c, *a, **k): CAGRI.append(("run", [os.path.basename(x) for x in c[1:3]])); return type("R", (), {"returncode": 0})
+g.update(subprocess=SP, modeller_dene=lambda: CAGRI.append(("modeller_dene",)), say=lambda *a, **k: None, ayar=lambda: {},
+         urllib=type("U", (), {"request": type("Q", (), {"urlopen": staticmethod(lambda *a, **k: (_ for _ in ()).throw(OSError("yok")))})}))
+g["guncelleme_sonrasi"]()
+ok(f"guncelleme_sonrasi sırası: kur → modeller_dene {CAGRI}", CAGRI[:2] == [("run", ["kurulum.py", "kur"]), ("modeller_dene",)])
+g["subprocess"] = type("SP2", (), {"run": staticmethod(lambda c, *a, **k: type("R", (), {"returncode": 1})), "DEVNULL": None})
+try: g["guncelleme_sonrasi"](); r = ""
+except SystemExit as e: r = str(e)
+ok("kur başarısızsa alt komut hata ile çıkar", "geliştiriciye" in r)
+
 # 2) relay.py guncelle_baslat: panodaki düğme toplantı, sohbet ve Konuş cevabında reddeder; boşta güncelleme betiğini başlatır
 fn = next(f for f in ast.parse(open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()).body if isinstance(f, ast.FunctionDef) and f.name == "guncelle_baslat")
 class P:

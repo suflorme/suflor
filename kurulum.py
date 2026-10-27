@@ -1635,6 +1635,12 @@ def guncelle(kaynak=None, zorla=False):
         for f in glob_(os.path.join(KOD, "*.command")) + glob_(os.path.join(KOD, "*.sh")): os.chmod(f, os.stat(f).st_mode | 0o111)
         sessiz("xattr", "-dr", "com.apple.quarantine", KOD)
         if once != sonra: say(f"✓ güncellendi: v{once} → v{sonra}")
+    # Faz A (S162, 27 Ekim: modeller_dene ve anlam-dene.json ilk güncellemede çalışmadı — güncellemeyi ESKİ sürümün kodu yürütüyordu): dosyalar kopyalandıktan sonraki
+    # her adım YENİ kurulum.py'nin "guncelleme-sonrasi" alt komutunda, ayrı süreçte çalışır (bu işlev yalnız dosyaları getirir)
+    r = subprocess.run([PY, os.path.join(KOD, "kurulum.py"), "guncelleme-sonrasi"])
+    if r.returncode: sys.exit(r.returncode)
+
+def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla ayrı süreç olarak çağrılır (kurulum.py guncelleme-sonrasi)
     if subprocess.run([PY, os.path.join(KOD, "kurulum.py"), "kur"]).returncode:
         say("\nUYARI: aktarıcı kurulamadı — kod güncellendi ama çalışan aktarıcı eski sürümde kalmış olabilir.")
         sys.exit(f"Bu pencerenin yukarısındaki hatayı geliştiriciye ilet ya da {KOD}/aktarici-kur.command dosyasına çift tıkla.")
@@ -1657,7 +1663,7 @@ def guncelle(kaynak=None, zorla=False):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
-    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "guncelle", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|profil|mesgul")
+    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "guncelle", "guncelleme-sonrasi", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|profil|mesgul")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
     ap.add_argument("--zorla", action="store_true", help="guncelle: toplantı/sohbet sürse de güncelle")
@@ -1669,7 +1675,7 @@ if __name__ == "__main__":
     if A.is_ == "pocket": sys.exit(0 if pocket_kur() else 1)
     if A.is_ == "ollama": sys.exit(0 if ollama_kur() else 1)
     if A.is_ == "sil": sil(A.evet, A.zorla, A.modeller, A.proje, A.kod); sys.exit(0)
-    if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak, A.zorla), "profil": profil}[A.is_](); sys.exit(0)
+    if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak, A.zorla), "guncelleme-sonrasi": guncelleme_sonrasi, "profil": profil}[A.is_](); sys.exit(0)
     os.makedirs(DESTEK, exist_ok=True)
     # port doluysa (ör. diğer macOS hesabının sihirbazı) sonrakini dene — önceden ikinci sihirbaz açılmıyor, kur.sh
     # tarayıcıda öbür hesabın sihirbazını açıyordu

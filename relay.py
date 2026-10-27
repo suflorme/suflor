@@ -1142,7 +1142,7 @@ def yerel_ses_al(p):
         sonra = yerel_ses_durum()
         if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else ""))
         return {"ok": True, "toplanti": toplanti_var(), "tarayici": STATE.get("_tarayici") or "Chrome"}
-    if not toplanti_var(): return {"ok": True, "bekle": True}
+    if not toplanti_var() and not ("oto_ses_sayilir" in globals() and oto_ses_sayilir()): return {"ok": True, "bekle": True}  # S162: eklenti tanımasa da ses toplantı uygulamasından + takvim/Başlat doğruluyorsa işlenir (oto-toplanti.py)
     y["son"] = now
     mb = masaustu_baslik()
     r = ses_al(dict(p, kanal="karsi", kaynak="yerel", **({"meeting": {"title": mb}} if mb else {})))
@@ -1474,7 +1474,7 @@ TEAMS_ANA = "https://teams.microsoft.com/v2/"
 # Bağlantısız başlatmada açılan ana sayfa (toplantı oradan seçilir). Varsayılan yok (kullanıcı, 21 Ekim): Başlat formunda uygulama seçilmediyse
 # hazırlık sekmesi üçünü düğme olarak sunar.
 PLATFORM_ANA = {"teams": TEAMS_ANA, "meet": "https://meet.google.com/", "zoom": "https://app.zoom.us/wc/home"}
-PLATFORM_AD = {"teams": "Teams", "meet": "Google Meet", "zoom": "Zoom"}
+PLATFORM_AD = {"teams": "Teams", "meet": "Google Meet", "zoom": "Zoom", "bilinmeyen": "Toplantı"}
 CHROME_APP = next((y for y in ("/Applications/Google Chrome.app", os.path.expanduser("~/Applications/Google Chrome.app")) if os.path.isdir(y)), None)
 # --- Son toplantılar (test toplantısı 7 Ekim) ------------------------------------------------------------------------
 # Toplantı sonu değerlendirmesi terminalde kalıyordu. Claude özeti kaydedince `toplanti-claude.py ozet-hazir <dosya>` → POST
@@ -1869,7 +1869,9 @@ def gundem_maddeleri(v):
 def baslat(p):
     # S161: toplantı sürerken (oturum izliyor ya da açılıyor) elle Başlat yeni oturum ve yeni kayıt açmaz — süren toplantıya katılır
     a = (OTO.get("aktif") or {}) if "OTO" in globals() else {}
-    if STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60 or (not p.get("oto") and a.get("oturum") and topo_canli()):
+    # Faz A (S162): canlı oturumu ikinci Başlat öldürmesin — toplantı sürüyorsa ya da aynı konuysa katılır; toplantı yokken boşta kalmış eski oturum (2 sa) yeni konuyla yenilenir
+    k_ = " ".join(str(p.get("konu") or "").split())[:200]
+    if STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60 or (topo_canli() and (not k_ or k_ == TOPO.get("konu") or toplanti_var() or a.get("ad") or (STATE.get("masaustu") or {}).get("toplantida"))):
         print(f"BAŞLAT: toplantı oturumu zaten açık — süren toplantıya katıldı{' (' + a['ad'] + ')' if a.get('ad') else ''}")
         return {"ok": True, "katildi": True, "konu": a.get("ad") or STATE.get("meeting")}
     olay = TAKVIM_TAM.get(str(p.get("olay") or "")) if p.get("olay") else None
@@ -1934,6 +1936,8 @@ def baslat(p):
     elif not os.environ.get("SUFLOR_TEST_BASLAT"):  # deneme: Terminal açılmaz, yalnız dosyalar yazılır
         subprocess.Popen(["open", "-a", "Terminal", cp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     STATE["baslatma"] = {"at": time.time(), "oto": bool(p.get("oto")), "konu": konu, "olay": (olay or {}).get("id"), "baglanti": baglanti, "ana": ana, "platform": plat if ana else None, "baslangic": (olay or {}).get("baslangic")}
+    try: heartbeat()  # S162: Başlat'ta da heartbeat.json yazılır
+    except Exception: pass
     try: modelleri_isit()
     except Exception as e: print(f"BAŞLAT: model ısıtma hatası {e}")
     if olay:
@@ -2238,7 +2242,7 @@ class H(BaseHTTPRequestHandler):
                     if p.get("call") and (p.get("meeting") or {}).get("title"): STATE["_web_toplanti"] = {"t": simdi, "ad": str(p["meeting"]["title"])[:200]}
                 if isinstance(p.get("mic"), dict): STATE["mic"] = {"on": bool(p["mic"].get("on")), "sessiz": bool(p["mic"].get("sessiz")), "hata": str(p["mic"].get("hata") or "")[:120], "t": simdi}
                 _o_ext = STATE.get("extension") or {}
-                STATE["extension"] = {"ver": p.get("ver") or (STATE.get("extension") or {}).get("ver"), "seen": datetime.datetime.now().isoformat(timespec="seconds"), "panel": bool(p.get("panel")), "rows": p.get("rows", 0), "captions": bool(p.get("captions")), "call": bool(p.get("call")), "lang": p.get("lang") or p.get("capLang"), "langSrc": p.get("langSrc") or ("captions" if p.get("capLang") else None), "meeting": (p.get("meeting") or {}).get("title"), "sent": p.get("sent", 0), "capAuto": p.get("capAuto") or (STATE.get("extension") or {}).get("capAuto", ""), "platform": p.get("platform") or (STATE.get("extension") or {}).get("platform") or "teams", "yonerge": p.get("yonerge") or (STATE.get("extension") or {}).get("yonerge")}; eklenti_birlestir(p, _o_ext, simdi); heartbeat()  # altyazıyı kendisi açma sonucu; iframe pingleri (all_frames) boş gönderir, üzerine yazmasın
+                STATE["extension"] = {"ver": p.get("ver") or (STATE.get("extension") or {}).get("ver"), "seen": datetime.datetime.now().isoformat(timespec="seconds"), "panel": bool(p.get("panel")), "rows": p.get("rows", 0), "captions": bool(p.get("captions")), "call": bool(p.get("call")), "lang": p.get("lang") or p.get("capLang"), "langSrc": p.get("langSrc") or ("captions" if p.get("capLang") else None), "meeting": (p.get("meeting") or {}).get("title"), "sent": p.get("sent", 0), "capAuto": p.get("capAuto") or (STATE.get("extension") or {}).get("capAuto", ""), "platform": p.get("platform") or (STATE.get("extension") or {}).get("platform") or "bilinmeyen", "yonerge": p.get("yonerge") or (STATE.get("extension") or {}).get("yonerge")}; eklenti_birlestir(p, _o_ext, simdi); heartbeat()  # altyazıyı kendisi açma sonucu; iframe pingleri (all_frames) boş gönderir, üzerine yazmasın
             if isinstance(p.get("paylasim"), bool): paylasim_bildir(p["paylasim"], p.get("paylasim_neden"))  # yalnız üst çerçeve gönderir
             # v0.84.1: katılımcı sayısı (web, Kişiler düğmesi) — etiket değişince günlüğe (biçim doğrulaması); sayı gelmezse çağrı sürdükçe eskisi
             try: ksay = int(p["kisi_sayisi"]) if p.get("kisi_sayisi") is not None and 0 < int(p["kisi_sayisi"]) < 1000 else None
@@ -2268,6 +2272,7 @@ if __name__ == "__main__":
     threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
     threading.Thread(target=sg_bekci, daemon=True).start()  # Faz 11: ayar yerel modeli (Ollama) gösteriyorsa sunucusu açık tutulur
     threading.Thread(target=_bitis_dongu, daemon=True).start()
+    threading.Thread(target=_heartbeat_dongu, daemon=True).start()  # S162: heartbeat.json 8 sn'de bir
     threading.Thread(target=_oto_dongu, daemon=True).start()  # S161: tanınan toplantı → dosya + toplantı oturumu  # toplantı bitişi → /status toplanti_bitti
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi

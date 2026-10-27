@@ -267,10 +267,16 @@ def heartbeat():
     except OSError:
         try: os.remove(tmp)
         except OSError: pass
+def _heartbeat_dongu():  # S162: heartbeat.json yalnız eklenti nabzında yazılıyordu → eklenti yokken (masaüstü, tanınmayan sayfa) donup kalıyordu; zamanlayıcı da yazar
+    while True:
+        time.sleep(2 if os.environ.get("SUFLOR_TEST_HIZLI") else 8)
+        try:
+            with LOCK: heartbeat()
+        except Exception as e: print(f"HEARTBEAT: yazılamadı ({e.__class__.__name__})")
 # platform katmanı: /ses'i kabul eden toplantı siteleri (içerik betiği kökeni) ve görünen adları. Meet/Zoom eklentide
 # henüz yüklenmiyor (v0.9.1/v0.9.2); kökenleri burada şimdiden durur ki eklenti tarafı eklenince aktarıcı kurulumu gerekmesin.
 PLATFORM_KOKEN = [r"https://teams\.(microsoft\.com|cloud\.microsoft|live\.com)$", r"https://meet\.google\.com$", r"https://([a-z0-9-]+\.)?zoom\.us$"]
-PLATFORM_AD = {"teams": "Teams", "meet": "Google Meet", "zoom": "Zoom"}
+PLATFORM_AD = {"teams": "Teams", "meet": "Google Meet", "zoom": "Zoom", "bilinmeyen": "Toplantı"}  # S162: platform bilinmiyorsa varsayılan Teams değil
 def ensure_header(md, title, m, source=None):
     # başlık metnini döndürür (dosya yoksa ve daha önce sıraya konmadıysa); yazım write() ile, satırlarla aynı grupta
     if md in HEADERED or os.path.exists(md): HEADERED.add(md); return ""
@@ -279,10 +285,10 @@ def ensure_header(md, title, m, source=None):
     # altyazı modunda başlık bunu söyler (konuşmacı adı olmayabilir, dil yanlış seçilmiş olabilir)
     # platform adı eklentiden (meeting.platform; Whisper satırlarında son ping'in platformu)
     # S161: tanınan toplantının platformu (masaüstü/Whisper satırında meeting.platform yok; 27 Ekim Meet toplantısının başlığı "Teams" dedi)
-    pl = PLATFORM_AD.get((m or {}).get("platform") or (oto_platform() if "oto_platform" in globals() else None) or (STATE.get("extension") or {}).get("platform") or "teams", "Teams")
+    pl = PLATFORM_AD.get((m or {}).get("platform") or (oto_platform() if "oto_platform" in globals() else None) or (STATE.get("extension") or {}).get("platform") or "bilinmeyen", "Toplantı")
     src = f"Whisper (yerel konuşma tanıma, large-v3-turbo; konuşmacı: kullanıcı mikrofonu / karşı taraf {pl} sesi)" if source == "whisper" else \
           f"{pl} canlı altyazı (döküm yetkisi yok; konuşmacı adı eksik, dil yanlış seçilmişse metin anlamsız olabilir)" if source == "captions" else \
-          f"{pl} toplantısı (Suflor.me kendiliğinden tanıdı; satırlar Whisper ya da canlı altyazıdan)" if source == "oto" else f"{pl} transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir)"
+          f"{pl if pl == 'Toplantı' else pl + ' toplantısı'} (Suflor.me kendiliğinden tanıdı; satırlar Whisper ya da canlı altyazıdan)" if source == "oto" else f"{pl} transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir)"
     # 19 Ekim test toplantısı: masaüstü Teams'te eklenti yok → "Başlangıç: ?"; başlangıç bilinmiyorsa dosyanın ilk kaydının saati (canlı dosya geliş sırasıyla yazılır:
     # Whisper satırı ~5 sn geç gelir, Suflor'un sesli satırı okunduğu an — toplantı sonundaki döküm (toplanti-claude.py dokum) zamana göre sıralar)
     bas = (m or {}).get("startedAt") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M") + " (ilk kayıt; satırlar geliş sırasıyla)"

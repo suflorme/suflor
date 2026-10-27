@@ -367,7 +367,15 @@
       toast(whAkiyor ? L("Ad için altyazıyı aç: {y}", { y: P.yonerge.altyazi }) : L("Altyazı kapalı: {y}", { y: P.yonerge.altyazi }), "#b26a00", 12000); }
   }
   const sayfaUygun = () => !P.toplantiSayfasi || P.toplantiSayfasi();  // platform "toplantı değil" diyorsa (Meet ana/bağlantı sayfası) susar
+  // Faz A (S162): çağrı düğmesi var ama yol tanınmadı (Meet adres biçimi değişti) → sekme başına bir kez aktarıcı günlüğüne yalnız yol (sorgu ve içerik yok); /olay çağrısı arka plan vekilinden gider
+  let yolBildirildi = false;
+  function yolBildir() {
+    if (yolBildirildi || window.top !== window || sayfaUygun()) return;
+    try { if (!(P.cagrida && P.cagrida())) return; } catch (e) { return; }
+    yolBildirildi = true; olay("sayfa-tanınmadı", `${P.ad} · sayfa tanınmadı (${location.pathname.slice(0, 120)})`);
+  }
   function tick() {
+    if (cfg.enabled) yolBildir();
     if (!cfg.enabled || !sayfaUygun()) return;
     let entries = [], source = "";
     const panel = findTranscriptPanel();

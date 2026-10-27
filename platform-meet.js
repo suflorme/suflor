@@ -12,13 +12,14 @@
   // Toplantı adresi meet.google.com/abc-defg-hij (bekleme odası dahil). Ana sayfa ve "Share your new meeting" (/getalink) toplantı değil:
   // 21 Ekim denemesinde bağlantı sayfasının nabzı toplantınınkini eziyordu (ad yanlış, "çağrıda değil"). Meet tek sayfa uygulaması —
   // ana sayfadan toplantıya adres değişerek geçer, bu yüzden her çağrıda bakılır.
-  const KOD_RE = /^\/[a-z]{3,4}-[a-z]{4}-[a-z]{3,4}(?:\/|$)/i;
+  // 27 Ekim: Meet toplantıyı meet.google.com/meet/<kod> adresinde açmaya başladı — kod yolun herhangi bir yerinde aranır (eski /<kod> da çalışır).
+  const KOD_RE = /(?:^|\/)([a-z]{3,4}-[a-z]{4}-[a-z]{3,4})(?:\/|$)/i;
   function toplantiSayfasi() { return KOD_RE.test(location.pathname); }
   function toplantiAdi() {
     const m = document.querySelector("[data-meeting-title]");
     if (m && m.getAttribute("data-meeting-title")) return m.getAttribute("data-meeting-title").trim();
     const t = document.title.replace(/^Meet\s*[-–—:]\s*/i, "").replace(/\s*[-–—]\s*Google Meet$/i, "").trim();
-    return t && !/^(Google )?Meet$/i.test(t) ? t : (location.pathname.replace(/^\//, "") || "Meet");
+    return t && !/^(Google )?Meet$/i.test(t) ? t : ((location.pathname.match(KOD_RE) || [])[1] || "Meet");
   }
   const LEAVE = /^(görüşmeden ayrıl|aramadan ayrıl|ayrıl|leave call|leave)$/i;
   function cagrida() { return [...document.querySelectorAll('button[aria-label], [role="button"][aria-label]')].some(b => LEAVE.test((b.getAttribute("aria-label") || "").trim())); }

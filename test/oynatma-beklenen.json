@@ -51,7 +51,7 @@
   "<TARIH>-Deneme-toplantısı-altyapı.md": [
    "# Canlı transkript — Deneme toplantısı — altyapı",
    "",
-   "**Başlangıç: <AN> (ilk kayıt; satırlar geliş sırasıyla) · Kaynak: Teams transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir) · Aktarıcı: Suflor.me**",
+   "**Başlangıç: <AN> (ilk kayıt; satırlar geliş sırasıyla) · Kaynak: Toplantı transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir) · Aktarıcı: Suflor.me**",
    "**Gizlilik: iç belge, kişi adı içerir.**",
    "",
    "| Saat | Konuşmacı | Metin | İşaret |",
@@ -220,12 +220,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 252246,
-   "sha": "189a56535ab321e4"
+   "uzunluk": 254041,
+   "sha": "d8d75fd2482d3881"
   },
   "/mini": {
-   "uzunluk": 252246,
-   "sha": "189a56535ab321e4"
+   "uzunluk": 254041,
+   "sha": "d8d75fd2482d3881"
   },
   "/status": {
    "_ping_son": "float",
@@ -304,6 +304,8 @@
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
      "oda": "bool",
+     "oto_haric": "str",
+     "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
@@ -351,6 +353,8 @@
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
      "oda": "bool",
+     "oto_haric": "str",
+     "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",

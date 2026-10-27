@@ -1025,7 +1025,7 @@ document.getElementById('sn').addEventListener('click',async ev=>{if(akTik(ev,re
   let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son,tur:b.dataset.tur||''})})}catch(e){}
   if(!r.ok)geciciDurum(b.dataset.tur?L('Zihin haritası açılamadı'):L('Özet açılamadı'),r.err||'')})
 // boş pano = "Sıradaki · Başlat": ilk (süren ya da gelecek) toplantı büyük kart, kalanlar altında soluk satır. Claude izlerken gizli.
-function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks'),x=s.extension
+function renderTakvim(s){const sur=!!((s.oto_toplanti&&s.oto_toplanti.oturum)||(s.toplanti_oturum&&['aciliyor','calisiyor','bekliyor','izliyor'].includes(s.toplanti_oturum.durum))),t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks'),x=s.extension
   // toplantı sürerken büyük kart yok: durum cümlesindeki Başlat yalnız formu açar
   const top=s.aktif||!!(x&&x.age_s<30&&x.call)||masaustuTop(s),form=!document.getElementById('tkf').hidden
   sec.hidden=izliyor||(top&&!form);if(sec.hidden&&izliyor)document.getElementById('tkf').hidden=true;  // v0.112.0: gizli bölümde açık kalan form Mac'te gri perdeyi bırakıyordu (tıklanamayan pencere)
@@ -1034,8 +1034,8 @@ function renderTakvim(s){const t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null
   h.textContent=!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.'):t.durum==='bekliyor'?L('takvim okunuyor…'):(t.durum&&t.durum!=='ok'?(t.hata||t.durum):'')
   const [o,...ki]=tkOlaylar, ne=x=>esc([x.suruyor?L('şimdi'):x.dk<=60?L('{n} dk sonra',{n:x.dk}):'',(x.katilimcilar||[]).slice(0,3).join(', ')+(x.kisi_sayisi>4?' +'+(x.kisi_sayisi-4):''),x.ben_duzenleyen?L('düzenleyen sen'):'',x.reddettin?L('daveti reddettin'):''].filter(Boolean).join(' · '))
   if(!tkOlaylar.some(x=>x.id===tkGor))tkGor=o?o.id:null
-  const buyuk=o?`<div class="sira${tkGor===o.id?' sec':''}" data-sec="${esc(o.id)}"><div class=t><div class=e>${L(o.suruyor?'Şimdi':'Sıradaki')}</div><div class=b><span class=z>${esc(o.saat)}</span>${esc(o.baslik)}</div><div class=sp>${ne(o)}</div></div><button class=pri data-bas="${esc(o.id)}">${L('Başlat')}</button></div>`
-    :`<div class=sira><div class=t><div class=e>${L('Bugün')}</div><div class=b>${L('Takvimde toplantı yok')}</div></div><button class=pri data-bas="">${L('Toplantı başlat')}</button></div>`
+  const buyuk=o?`<div class="sira${tkGor===o.id?' sec':''}" data-sec="${esc(o.id)}"><div class=t><div class=e>${L(o.suruyor?'Şimdi':'Sıradaki')}</div><div class=b><span class=z>${esc(o.saat)}</span>${esc(o.baslik)}</div><div class=sp>${ne(o)}</div></div><button class=pri data-bas="${esc(o.id)}">${L(sur&&o.suruyor?'Toplantı sürüyor':'Başlat')}</button></div>`
+    :`<div class=sira><div class=t><div class=e>${L('Bugün')}</div><div class=b>${L('Takvimde toplantı yok')}</div></div><button class=pri data-bas="">${L(sur?'Toplantı sürüyor':'Toplantı başlat')}</button></div>`
   setH(document.getElementById('tk'),buyuk+ki.slice(0,4).map(x=>`<div class="tko${tkGor===x.id?' sec':''}" data-sec="${esc(x.id)}"><div class=t><div><b class=z>${esc(x.saat)}</b>${esc(x.baslik)}${x.platform?` <span class=chip>${PL[x.platform]||esc(x.platform)}</span>`:''}</div><div class=sp>${ne(x)}</div></div><button class=gh data-bas="${esc(x.id)}" style="flex:none">${L('Başlat')}</button></div>`).join(''))
   document.getElementById('tkalt').hidden=!o}
 // panodan güncelleme düğmesi; aktarıcı yeni sürümle kalkınca pano kendini yeniler
