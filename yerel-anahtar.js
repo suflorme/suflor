@@ -48,7 +48,7 @@
   }
   const portu = u => { const m = /^http:\/\/(?:127\.0\.0\.1|localhost):(\d{4,5})\//.exec(String(u)); return m ? +m[1] : 0; };
   const f0 = globalThis.fetch.bind(globalThis);
-  globalThis.fetch = async (u, o) => {
+  const anahtarli = async (u, o) => {
     const p = typeof u === "string" ? portu(u) : 0;
     if (!p) return f0(u, o);
     let k = await al();
@@ -65,9 +65,44 @@
     const k2 = await al(true);  // anahtar değişmiş (aktarıcı yeniden kuruldu): bir kez yeniden dene
     return k2 && k2.port === p && k2.anahtar !== k.anahtar && await dogrula(p, k2.anahtar) ? f0(u, ekle(k2.anahtar)) : r;
   };
+  // v0.142.0: Chrome 142'den beri herkese açık siteden (https://meet.google.com …) 127.0.0.1'e istek "yerel ağ erişimi" izni ister; izin yoksa
+  // gönderilmez (27 Ekim, ikinci hesapta Meet: içerik betiğinden hiç nabız gelmedi, arka planın istekleri geçti). İçerik betiği aktarıcı
+  // isteğini arka plana iletir (eklenti kökeni bu izne takılmaz); arka plana ulaşılamazsa eskisi gibi doğrudan gider.
+  const icerik = typeof location !== "undefined" && !/^chrome-extension:$/.test(location.protocol);
+  const b64e = b => { const u8 = new Uint8Array(b); let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+  const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  async function vekil(u, o) {
+    if (!portu(u)) return f0(u, o);
+    const sig = o && o.signal; if (sig && sig.aborted) throw new DOMException("aborted", "AbortError");
+    const h = {}; new Headers((o && o.headers) || {}).forEach((v, k) => { h[k] = v; });
+    const istek = { type: "aktarici-istek", url: u, method: (o && o.method) || "GET", headers: h, body: o && typeof o.body === "string" ? o.body : null };
+    let c;
+    try {
+      c = await new Promise((coz, red) => {
+        if (sig) sig.addEventListener("abort", () => red(new DOMException("aborted", "AbortError")), { once: true });
+        chrome.runtime.sendMessage(istek).then(coz, red);
+      });
+    } catch (e) { if (e && e.name === "AbortError") throw e; c = null; }
+    if (!c || c.vekil !== 1) return anahtarli(u, o);  // arka plan yok ya da eski: doğrudan
+    if (c.hata) throw new TypeError(c.hata);
+    return new Response(c.b64 != null ? b64d(c.b64) : c.metin, { status: c.status, headers: c.ct ? { "Content-Type": c.ct } : {} });
+  }
+  globalThis.fetch = icerik && !yerli ? vekil : anahtarli;
   if (yerli && chrome.runtime.onMessage) chrome.runtime.onMessage.addListener((m, _s, cevap) => {
     if (!m || m.type !== "anahtar") return;
     al().then(cevap); return true;
+  });
+  const arkaPlan = typeof ServiceWorkerGlobalScope !== "undefined" && globalThis instanceof ServiceWorkerGlobalScope;
+  if (arkaPlan && chrome.runtime.onMessage) chrome.runtime.onMessage.addListener((m, s, cevap) => {  // yalnız arka plan (popup cevap vermez: istek iki kez gitmesin)
+    if (!m || m.type !== "aktarici-istek" || !s || s.id !== chrome.runtime.id || !portu(m.url)) return;
+    (async () => {
+      try {
+        const r = await anahtarli(m.url, { method: m.method, headers: m.headers, body: m.body, signal: AbortSignal.timeout(40000) });
+        const ct = r.headers.get("Content-Type") || "";
+        return /json|text|javascript/i.test(ct) || !ct ? { vekil: 1, status: r.status, ct, metin: await r.text() } : { vekil: 1, status: r.status, ct, b64: b64e(await r.arrayBuffer()) };
+      } catch (e) { return { vekil: 1, hata: String(e && e.message || e).slice(0, 200) }; }
+    })().then(cevap);
+    return true;
   });
   globalThis.SuflorAnahtar = { al, hata: () => (yerli ? hata : chrome.tabs ? "nativeMessaging izni yok (eklentiyi yeniden yükle)" : "içerik betiği") };
 })();

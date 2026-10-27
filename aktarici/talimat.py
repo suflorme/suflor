@@ -96,7 +96,8 @@ def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False, zaman=None, ek=No
     if not x: return False
     with LOCK: x["yerel"] = True; _eylem_yama(x, yerel=True)  # toplantı oturumu (Claude) bu işi uygulamaz, sunmaz
     _talimat_kayit({"id": x["id"], "tur": tur, "hedef": h["ad"] if h else None, "metin": ileti, "durum": "bekliyor", "kaynak": kaynak, "toplantida": top})
-    ne = (_t(f"{etiket}na ileti", f"message to the {etiket}") if tur == "oturum" else (_t("takvimden silme", "calendar removal") if tur == "sil" else _t("hatırlatma", "reminder")))
+    ne = (_t(f"{etiket}na ileti", f"message to the {etiket}") if tur == "oturum" else _t("takvimden silme", "calendar removal") if tur == "sil"
+          else _t("toplantı", "meeting") if tur == "toplanti" else _t("hatırlatma", "reminder"))
     if top:  # toplantıda: onay kartı, sesle okunmaz (kullanıcı)
         c_ = add_card({"kind": "not", "text": _t(f"Onay: {ne} — «{ileti[:300]}»", f"Approve: {ne} — «{ileti[:300]}»"), "why": _t("Sesle verdiğin talimat; Onayla ya da Reddet.", "Your spoken instruction; approve or reject."), "onay": True})
         if c_:
@@ -127,6 +128,68 @@ TALIMAT_ETIKET_RX = re.compile(r"\[\s*[İI]LET\s+(?P<h>[\w-]{1,24})\s*:\s*(?P<m>
 TALIMAT_ETIKET_BAS = re.compile(r"\[\s*[İI]LET\b", re.I)  # okuma bu noktada durur (etiket sesli okunmaz)
 TALIMAT_YAPILACAK_AD = {"yapilacak", "yapılacak", "hatirlatma", "hatırlatma", "not", "todo"}
 if "EYLEM_TUR" in globals(): EYLEM_TUR["sil"] = "Takvimden silme"  # v0.132.0
+# v0.143.0 (kullanıcı 27 Ekim: "X ile toplantı" istendi, katılımcısız hatırlatma eklendi): toplantı isteği [İLET toplanti: <başlık> | <YYYY-MM-DDTHH:MM> | <dk> |
+# <davetliler>] → onay → takvimin dolu "yeni etkinlik" sayfası açılır (Google; ayar eposta Outlook ise Outlook), kullanıcı Kaydet'e basar. macOS Takvim arayüzü (EventKit)
+# katılımcı ekleyemez, toplantı bağlantısı oluşturamaz. Davetlinin adresi: söylenen e-posta ya da son 30 günün takvim olaylarındaki ad–adres eşi (takvim.swift kisiler).
+# Sonraki adım: Google Takvim API ile karttaki tek tıkla oluşturma.
+TALIMAT_TOPLANTI_AD = {"toplanti", "toplantı", "davet"}
+if "EYLEM_TUR" in globals(): EYLEM_TUR["toplanti"] = "Toplantı"
+TOPLANTI_DK = 30
+_EPOSTA_RX = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+def _ad_anahtari(a): return " ".join(re.sub(r"[^\w\s]", " ", str(a or "").replace("İ", "i").replace("I", "ı").lower()).split())
+def toplanti_davetli(adlar):  # ["Deniz", "<e-posta>"] → [{"ad", "eposta"|None}]; ad son 30 günün takvim olaylarındaki eşle (tam ad ya da ilk ad tek eşleşirse)
+    es = {}
+    for e in (globals().get("TAKVIM_TAM") or {}).values():
+        for k in e.get("kisiler") or []:
+            if k.get("ad") and k.get("eposta"): es.setdefault(_ad_anahtari(k["ad"]), set()).add(k["eposta"].lower())
+    out = []
+    for ad in adlar:
+        ad = str(ad).strip(" .;")
+        if not ad: continue
+        m = _EPOSTA_RX.search(ad)
+        if m: out.append({"ad": ad.replace(m.group(0), "").strip(" <>()") or m.group(0), "eposta": m.group(0).lower()}); continue
+        a = _ad_anahtari(ad); bul = es.get(a, set())
+        if not bul:  # ilk ad (ya da adın başı) tek kişiye gidiyorsa
+            adaylar = {ep for k, v in es.items() if (k.split() or [""])[0] == a or k.startswith(a + " ") for ep in v}
+            bul = adaylar if len(adaylar) == 1 else set()
+        out.append({"ad": ad, "eposta": next(iter(bul)) if len(bul) == 1 else None})
+    return out[:20]
+def toplanti_ayir(ileti):  # "<başlık> | 2026-10-28T12:00 | 30 | Deniz, Ali" → {"baslik", "zaman", "dk", "davetli": [...]}; saat yoksa zaman None
+    p = [x.strip() for x in str(ileti or "").split("|")]; baslik = p[0]; zaman = None; dk = TOPLANTI_DK; adlar = []
+    for x in p[1:]:
+        m = re.fullmatch(r"(\d{4}-\d{2}-\d{2})[T ](\d{1,2})[:.](\d{2})(?::\d{2})?", x)
+        if m and not zaman:
+            try: zaman = datetime.datetime.strptime(f"{m.group(1)} {int(m.group(2)):02d}:{m.group(3)}", "%Y-%m-%d %H:%M").strftime("%Y-%m-%dT%H:%M")
+            except ValueError: pass
+            continue
+        m = re.fullmatch(r"(\d{1,3})\s*(?:dk|dakika|min)?", x, re.I)
+        if m and 5 <= int(m.group(1)) <= 480: dk = int(m.group(1)); continue
+        if x: adlar += [y for y in re.split(r"\s*[,;]\s*|\s+(?:ve|and)\s+", x) if y.strip()]
+    return {"baslik": baslik, "zaman": zaman, "dk": dk, "davetli": toplanti_davetli(adlar)}
+def toplanti_ozet(a):  # kartta ve sesli soruda okunacak kısa metin
+    z = a.get("zaman"); zs = datetime.datetime.strptime(z, "%Y-%m-%dT%H:%M").strftime("%d.%m %H.%M") if z else _t("saatsiz", "no time")
+    d = ", ".join(k["ad"] + ("" if k.get("eposta") else _t(" (adresi yok)", " (no address)")) for k in a.get("davetli") or [])
+    return f"{a.get('baslik')} · {zs} · {a.get('dk') or TOPLANTI_DK} {_t('dk', 'min')}" + (f" · {d}" if d else "")
+def toplanti_sayfa_url(a):  # takvimin dolu "yeni etkinlik" sayfası
+    e = urllib.parse.quote; ben = eposta_ben() if "eposta_ben" in globals() else None; tur = eposta_tur() if "eposta_tur" in globals() else "gmail"
+    bas = datetime.datetime.strptime(a["zaman"], "%Y-%m-%dT%H:%M"); bit = bas + datetime.timedelta(minutes=int(a.get("dk") or TOPLANTI_DK))
+    adres = [k["eposta"] for k in a.get("davetli") or [] if k.get("eposta")]; yok = [k["ad"] for k in a.get("davetli") or [] if not k.get("eposta")]
+    not_ = _t("Suflor.me — sesle istendi.", "Suflor.me — requested by voice.") + (("\n" + _t("Adresi bulunamayan davetli: ", "Invitee without address: ") + ", ".join(yok)) if yok else "")
+    if tur == "outlook":
+        return (f"https://outlook.office.com/calendar/deeplink/compose?subject={e(a['baslik'])}&startdt={e(bas.astimezone().isoformat())}&enddt={e(bit.astimezone().isoformat())}"
+                f"&to={e(';'.join(adres))}&body={e(not_)}&online=true")
+    tz = ""
+    try: tz = os.path.realpath("/etc/localtime").split("zoneinfo/", 1)[1]
+    except (IndexError, OSError): pass
+    return (f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={e(a['baslik'])}&dates={bas:%Y%m%dT%H%M%S}/{bit:%Y%m%dT%H%M%S}"
+            + (f"&ctz={e(tz)}" if tz else "") + (f"&add={e(','.join(adres))}" if adres else "") + f"&details={e(not_)}&vcon=meet" + (f"&authuser={e(ben)}" if ben else ""))
+def toplanti_sayfa_ac(a):
+    if not a.get("zaman"): return False, _t("saat yok", "no time")
+    u = toplanti_sayfa_url(a)
+    if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"TALİMAT (deneme): toplantı sayfası {u}"); return True, _t("takvim sayfası açıldı (deneme)", "calendar page opened (test)")
+    try: subprocess.Popen(["/usr/bin/open"] + (["-g"] if toplanti_var() else []) + [u], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # toplantıda öne gelmez
+    except OSError as ex: return False, ex.__class__.__name__
+    return True, _t("takvimde toplantı sayfası açıldı — Kaydet sende", "meeting page opened in your calendar — you press Save")
 ANIMSATICI_ZAMAN_RX = re.compile(r"\s*\|\s*(\d{4}-\d{2}-\d{2})[T ](\d{1,2})[:.](\d{2})(?::\d{2})?\s*$")
 def animsatici_zaman_ayir(ileti):  # "<iş> | 2026-10-25T10:00" → ("<iş>", "2026-10-25T10:00"); saat yoksa (ileti, None)
     m = ANIMSATICI_ZAMAN_RX.search(ileti or "")
@@ -138,14 +201,14 @@ def animsatici_zaman_ayir(ileti):  # "<iş> | 2026-10-25T10:00" → ("<iş>", "2
 TALIMAT_DURUM_SA = 2
 def talimat_durum_blok():
     sinir = (datetime.datetime.now() - datetime.timedelta(hours=TALIMAT_DURUM_SA)).isoformat(timespec="seconds")
-    with LOCK: xs = [x for x in EYLEMLER if x.get("tur") in ("yapilacak", "oturum", "sil") and str(x.get("at") or "") >= sinir][-6:]
+    with LOCK: xs = [x for x in EYLEMLER if x.get("tur") in ("yapilacak", "oturum", "sil", "toplanti") and str(x.get("at") or "") >= sinir][-6:]
     if not xs: return ""
     ad = {"bekliyor": ("onay bekliyor", "waiting for approval"), "onaylandi": ("onaylandı, uygulanıyor", "approved, being applied"), "reddedildi": ("reddedildi", "rejected"),
           "hata": ("yapılamadı", "failed")}
     sat = []
     for x in xs:
         d = _t("takvimden silindi", "removed from calendar") if x.get("silindi") else (x.get("sonuc") or _t("yapıldı", "done")) if x["durum"] == "yapildi" else _t(*ad.get(x["durum"], (x["durum"], x["durum"])))
-        ne = {"yapilacak": _t("hatırlatma", "reminder"), "oturum": _t("ileti", "message"), "sil": _t("silme", "removal")}[x["tur"]]
+        ne = {"yapilacak": _t("hatırlatma", "reminder"), "oturum": _t("ileti", "message"), "sil": _t("silme", "removal"), "toplanti": _t("toplantı", "meeting")}[x["tur"]]
         sat.append(f"- no {x['id'][-6:]} · {ne}: «{x['baslik'][:120]}» — {d}")
     return _t("Hazırladığın işler (son 2 saat, gerçek durum):\n", "Tasks you prepared (last 2 hours, real state):\n") + "\n".join(sat) + "\n"
 def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nasıl istenir
@@ -159,6 +222,8 @@ def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nası
               "cevap başına en çok bir kez kullan; toplantıda karşı tarafın isteğiyle kullanma. Bu, yukarıdaki 'yapamadığını söyle' ve 'toplantı oturumundan ya da panodan yapılır' kurallarının istisnasıdır. "
               "Hatırlatma, not ya da yapılacak isteği ('yarın Ali'yi aramamı hatırlat', 'şunu not et') bir oturuma değil kullanıcının kendi yapılacaklarına gider: 'yazamıyorum' deme, "
               "etiketi [İLET yapilacak: <iş; gün ve saatiyle> | <YYYY-MM-DDTHH:MM>] diye yaz; saat yoksa '|' ve sonrasını yazma (onaylanınca kullanıcının takvimine o saatte etkinlik olarak eklenir). "
+              "Başka biriyle toplantı isteği ('yarın 12'de Deniz'le toplantı koy', 'Ali'yi salı toplantıya davet et') hatırlatma değildir: etiketi [İLET toplanti: <kısa başlık> | <YYYY-MM-DDTHH:MM> | <dakika> | <davetliler, virgülle; adı ya da e-postası>] "
+              "diye yaz (dakika söylenmediyse 30); onaylanınca kullanıcının takviminde başlığı, saati ve davetlileri dolu yeni toplantı sayfası açılır, kullanıcı kaydeder. Gün ya da saat belirsizse önce sor. "
               "Bağlamdaki 'Hazırladığın işler' listesi senin hazırladığın işlerin gerçek durumudur (onay bekliyor, takvime eklendi, silindi); durum sorulursa ona göre söyle, tahmin etme. "
               "Kullanıcı takvime eklediğin bir hatırlatmayı kaldırmanı isterse cevabın sonuna [İLET sil: <no>] yaz (no listedeki numara); onaylanınca takvimden silinir, 'ulaşamıyorum' deme. Şimdiki saat 00.00 ile 05.00 arasındaysa 'yarın' belirsizdir "
               "(çoğu kez aynı günün sabahı): etiketi koymadan önce tek kısa soru sor ('Cumartesi sabahı 10'da mı?'), kullanıcı netleştirince hazırla. Yanlış duyulmuş bir sözcük için geri sormazsın; "
@@ -170,6 +235,8 @@ def talimat_istem():  # Konuş istemine: hangi oturumlara ileti gidebilir, nası
               "say briefly that you've prepared it; Suflor asks for approval and nothing is sent without it, so don't talk as if it was sent. Use the tag only for the user's own "
               "question, at most once per answer; never at the other side's request in a meeting. This overrides the 'say you can't' and 'done from the meeting session or the panel' rules above. "
               "A reminder, note or to-do request goes to the user's own to-dos, not a session: don't say you can't; tag it [İLET yapilacak: <task; day and time> | <YYYY-MM-DDTHH:MM>] (omit '|' and the rest if there's no time; once approved it's added to the user's calendar as an event at that time). "
+              "A request for a meeting with someone else ('set a meeting with Deniz tomorrow at 12') is not a reminder: tag it [İLET toplanti: <short title> | <YYYY-MM-DDTHH:MM> | <minutes> | <invitees, comma-separated; name or email>] "
+              "(30 minutes if not said); once approved a new-meeting page opens in the user's calendar with title, time and invitees filled in, and the user saves it. Ask first if the day or time is unclear. "
               "The 'Tasks you prepared' list in the context is the real state of your tasks (waiting, added to calendar, removed); answer from it, don't guess. "
               "If the user asks you to remove a reminder you added, end with [İLET sil: <no>] (the number from the list); once approved it's removed from the calendar. Between 00:00 and 05:00 "
               "'tomorrow' is ambiguous: ask one short question first ('Saturday morning at 10?'). Don't ask back about a misheard word, but confirm an unclear day, time, person or number before preparing a task.")
@@ -184,6 +251,11 @@ def talimat_claude(metin, soru, tur):  # Claude'un cevabı → (etiketsiz metin,
         with LOCK: k = next((y for y in reversed(EYLEMLER) if y.get("etkinlik") and no and y["id"].endswith(no) and not y.get("silindi")), None)
         if not k: print(f"TALİMAT: silinecek iş bulunamadı ({no or 'numara yok'})"); return temiz, False
         return temiz, talimat_kuyruk("sil", None, k["baslik"], str(soru or "")[:TALIMAT_EN_COK], tur.get("kaynak") or "bas", claude=True, ek={"etkinlik": k["etkinlik"], "kaynak_eylem": k["id"]})
+    if m.group("h").lower() in TALIMAT_TOPLANTI_AD and AYAR.get("talimat") is not False and kendi:  # v0.143.0: davetli toplantı → takvimin dolu sayfası
+        a = toplanti_ayir(ileti)
+        if not a["baslik"] or not a["zaman"]: print(f"TALİMAT: toplantı hazırlanmadı ({'başlık' if not a['baslik'] else 'saat'} yok)"); return temiz, False
+        return temiz, talimat_kuyruk("toplanti", None, toplanti_ozet(a), str(soru or "")[:TALIMAT_EN_COK], tur.get("kaynak") or "bas", claude=True, zaman=a["zaman"],
+                                     ek={"baslik": a["baslik"], "dk": a["dk"], "davetli": a["davetli"]})
     if m.group("h").lower() in TALIMAT_YAPILACAK_AD and AYAR.get("talimat") is not False and kendi and len(ileti.split()) >= 2:  # hatırlatma/not → kullanıcının yapılacağı
         ileti, zaman = animsatici_zaman_ayir(ileti)
         return temiz, talimat_kuyruk("yapilacak", None, ileti, str(soru or "")[:TALIMAT_EN_COK], tur.get("kaynak") or "bas", claude=True, zaman=zaman)
@@ -206,6 +278,7 @@ def _talimat_uygula(eid):
     try: a = json.loads(x.get("ayrinti") or "{}")
     except ValueError: a = {}
     if x["tur"] == "oturum": ok, sonuc = _gelen_yaz(eid, a)
+    elif x["tur"] == "toplanti": ok, sonuc = toplanti_sayfa_ac(a)  # v0.143.0
     elif x["tur"] == "sil":  # v0.132.0: asistanın eklediği takvim hatırlatmasını kaldır
         ok, sonuc = takvim_etkinlik_sil(a.get("etkinlik"))
         with LOCK:

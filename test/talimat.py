@@ -182,4 +182,41 @@ ok("onaylanınca takvimden silindi, hatırlatma 'silindi' görünür", s_["durum
 with contextlib.redirect_stdout(io.StringIO()):
     t_, g_ = n3["talimat_claude"]("Tamam. [İLET sil: 999999]", "s", {"kaynak": "sohbet"})
 ok("bilinmeyen numara: silme işi açılmaz, etiket silinir", not g_ and t_ == "Tamam.")
+# v0.143.0: davetli toplantı — [İLET toplanti: başlık | zaman | dk | davetliler] → onay → takvimin dolu "yeni etkinlik" sayfası (hatırlatma değil)
+import urllib.parse as _up
+EP = lambda k: k + chr(64) + "ornek.test"  # adres kaynakta yazılmaz (açık depo taraması)
+n3["TAKVIM_TAM"] = {"a": {"kisiler": [{"ad": "Deniz Yıldız", "eposta": EP("Deniz.Y")}, {"ad": "Ali Kaya", "eposta": EP("ali")}]},
+                    "b": {"kisiler": [{"ad": "Ali Demir", "eposta": EP("ali.d")}]}}
+n3["eposta_ben"] = lambda: EP("ben"); n3["eposta_tur"] = lambda: "gmail"
+d_ = n3["toplanti_davetli"](["Deniz", "Ali", "Ali Kaya", EP("zeynep"), "Misafir"])
+ok(f"davetli: tek eşleşen ilk ad bulunur, iki 'Ali' belirsiz kalır, tam ad bulunur, e-posta olduğu gibi, bilinmeyen adressiz: {d_}",
+   [k["eposta"] for k in d_] == [EP("deniz.y"), None, EP("ali"), EP("zeynep"), None])
+a_ = n3["toplanti_ayir"]("Deniz ile proje toplantısı | 2026-10-28T12:00 | 45 dk | Deniz ve Misafir")
+ok(f"toplantı ayrıştırma: başlık, saat, süre, davetliler: {a_}", a_["baslik"] == "Deniz ile proje toplantısı" and a_["zaman"] == "2026-10-28T12:00" and a_["dk"] == 45
+   and [k["ad"] for k in a_["davetli"]] == ["Deniz", "Misafir"])
+ok("süre söylenmezse 30 dk", n3["toplanti_ayir"]("Kısa görüşme | 2026-10-28 9.30 | Ali Kaya")["dk"] == 30)
+u_ = _up.urlsplit(n3["toplanti_sayfa_url"](a_)); q_ = _up.parse_qs(u_.query)
+ok(f"Google sayfası: başlık, 12.00–12.45, davetli adresi, adressiz ad notta, Meet, hesap: {q_}", u_.netloc == "calendar.google.com" and q_["action"] == ["TEMPLATE"]
+   and q_["text"] == ["Deniz ile proje toplantısı"] and q_["dates"] == ["20261028T120000/20261028T124500"] and q_["add"] == [EP("deniz.y")]
+   and "Misafir" in q_["details"][0] and q_["vcon"] == ["meet"] and q_["authuser"] == [EP("ben")])
+n3["eposta_tur"] = lambda: "outlook"; uo_ = n3["toplanti_sayfa_url"](a_); n3["eposta_tur"] = lambda: "gmail"
+ok("Outlook ayarında Outlook takvim sayfası", uo_.startswith("https://outlook.office.com/calendar/deeplink/compose?") and "deniz.y%40ornek.test" in uo_)
+cikti_ = io.StringIO()
+with contextlib.redirect_stdout(cikti_):
+    t_, g_ = n3["talimat_claude"]("Hazırladım. [İLET toplanti: Deniz ile toplantı | 2026-10-28T12:00 | 30 | Deniz]", "yarın on ikide Deniz'le toplantı koy", {"kaynak": "sohbet"})
+y_ = EY[-1]; ay_ = json.loads(y_["ayrinti"])
+ok(f"Claude etiketi: 'toplanti' işi (hatırlatma değil), onay bekliyor, başlıkta davetli: {y_['baslik']!r}", g_ and t_ == "Hazırladım." and y_["tur"] == "toplanti"
+   and ay_["zaman"] == "2026-10-28T12:00" and ay_["davetli"][0]["eposta"] == EP("deniz.y") and "Deniz" in y_["baslik"] and "12.00" in y_["baslik"])
+y_["durum"] = "onaylandi"; cikti_ = io.StringIO()
+with contextlib.redirect_stdout(cikti_): n3["_talimat_uygula"](y_["id"])
+ok(f"onaylanınca takvim sayfası açıldı (takvime hatırlatma yazılmadı): {y_.get('sonuc')!r}", y_["durum"] == "yapildi" and "toplantı sayfası https://calendar.google.com" in cikti_.getvalue()
+   and "TALİMAT (deneme): takvim ·" not in cikti_.getvalue() and not y_.get("etkinlik"))
+ok("Konuş bağlamında toplantının durumu", "toplantı" in n3["talimat_durum_blok"]())
+n_ = len(EY)
+with contextlib.redirect_stdout(io.StringIO()):
+    t_, g_ = n3["talimat_claude"]("Tamam. [İLET toplanti: Ali ile görüşme | Ali]", "s", {"kaynak": "sohbet"})
+    t2_, g2_ = n3["talimat_claude"]("Tamam. [İLET toplanti: X | 2026-10-28T12:00 | Ali]", "s", {"kaynak": "karsi", "karsi": True})
+ok("saatsiz toplantı ve karşı tarafın isteği iş açmaz, etiket silinir", not g_ and not g2_ and t_ == "Tamam." and t2_ == "Tamam." and len(EY) == n_)
+i2_ = n3["talimat_istem"]()
+ok("istemde toplantı etiketi ve 'hatırlatma değildir'", "[İLET toplanti:" in i2_ and "hatırlatma değildir" in i2_)
 print("talimat:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

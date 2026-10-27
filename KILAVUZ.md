@@ -64,6 +64,10 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
 **Sesle hatırlatma:** onayladığın saatli hatırlatma Mac Takvim'in varsayılan takvimine 15 dakikalık, başında uyaran bir etkinlik olarak eklenir
 (Exchange/Google takvimiyse telefonuna da eşitlenir); başka bir takvim için `"hatirlatma_takvim": "<takvim adı>"`. Saati olmayan istek kendine e-posta taslağı olur.
 
+**Sesle toplantı:** "yarın on ikide Deniz'le toplantı koy" gibi başka biriyle toplantı isteği hatırlatma değil toplantı olur. Onaylayınca takviminde
+yeni toplantı sayfası açılır: başlık, saat, süre (söylenmezse 30 dk) ve davetliler dolu, Google'da Meet bağlantısıyla. Sen Kaydet'e basarsın. Davetlinin
+adresi söylediğin e-postadan ya da son 30 günün takvim toplantılarından bulunur; bulunamayan ad sayfadaki notta yazar. Ayar `eposta` Outlook ise Outlook takvimi açılır.
+
 **Menü çubuğu uygulaması (varsayılan açık; kapatmak için ayar.json'da `"menu_cubugu": false`):** pano Mac penceresinde açılır; menü çubuğu uygulaması (buzlu cam panelde mini pano,
 Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da
 çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, kanıt ve

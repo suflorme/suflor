@@ -1158,6 +1158,15 @@ def anlam_dene(vpy, ort, zorla=False):
             open(os.path.join(DESTEK, "anlam-dene.log"), "a", encoding="utf-8").write(time.strftime("%Y-%m-%d %H:%M:%S") + " anlam modeli açılmadı\n" + ((r.stdout + r.stderr)[-3000:] if r else "çalıştırılamadı") + "\n")
     except OSError: pass
     return tamam
+def modeller_dene():  # v0.143.0: güncelleme de modellerin gerçekten açıldığını bir kez dener (27 Ekim, ikinci hesap: anlam-dene.json güncellemeden sonra yoktu —
+    # deneme yalnız modeller()/sihirbazdaydı); refs/main eksikse yazılır. Anlam denemesi hesap ve anlık görüntü başına bir kez (~10 sn), sonra atlanır.
+    if DENEME: return
+    ort = yollar()["ortak"]; vpy = os.path.join(ort, "cevir-venv", "bin", "python"); am = os.path.join(ort, "anlam-modeller")
+    if os.access(os.path.join(ort, "whisper-modeller", "hub"), os.W_OK): whisper_refs_yaz(ort)
+    if not os.access(vpy, os.X_OK) or not glob_(os.path.join(am, "hub", "models--intfloat--multilingual-e5-base", "snapshots", "*", "model.safetensors")): return
+    if os.access(am, os.W_OK): anlam_refs_yaz(am)
+    say("✓ anlam araması modeli açılıyor" if anlam_dene(vpy, ort) else
+        "Not: anlam araması modeli var ama açılmadı — arama yalnız sözcükle; ayrıntı ~/Library/Application Support/Suflor/anlam-dene.log")
 def glob_(desen):
     import glob; return glob.glob(desen)
 
@@ -1629,6 +1638,7 @@ def guncelle(kaynak=None, zorla=False):
     if subprocess.run([PY, os.path.join(KOD, "kurulum.py"), "kur"]).returncode:
         say("\nUYARI: aktarıcı kurulamadı — kod güncellendi ama çalışan aktarıcı eski sürümde kalmış olabilir.")
         sys.exit(f"Bu pencerenin yukarısındaki hatayı geliştiriciye ilet ya da {KOD}/aktarici-kur.command dosyasına çift tıkla.")
+    modeller_dene()
     # kişisel hesapta kod v0.13.6 iken çalışan aktarıcı v0.13.2'de kalmıştı — sürümler karşılaştırılır
     try: calisan = json.load(urllib.request.urlopen(f"http://127.0.0.1:{yollar()['port']}/status", timeout=3)).get("surum", "?")
     except Exception: calisan = "?"

@@ -133,6 +133,10 @@ func oku(_ izin: Bool, _ hata: Error?) {
     if let org = e.organizer, !benDuzenleyen, !ep.contains(adres(org)) { ep.append(adres(org)) }
     ep = ep.filter { $0.contains("@") && !$0.contains("/") && !$0.contains(" ") }
     if !ep.isEmpty { o["katilimci_eposta"] = Array(ep.prefix(30)) }
+    // v0.143.0: ad–adres eşleri (sesle istenen toplantının davetlileri adla söylenir; adres geçmiş toplantılardan bulunur)
+    let kisiler: [[String: String]] = (katilan + (e.organizer.map { [$0] } ?? [])).filter { !ben($0) }.compactMap { k in
+      let a = adres(k); guard let n = k.name, !n.isEmpty, a.contains("@"), !a.contains("/"), !a.contains(" ") else { return nil }; return ["ad": n, "eposta": a] }
+    if !kisiler.isEmpty { o["kisiler"] = Array(kisiler.prefix(30)) }
     olaylar.append(o)
   }
   yaz(["durum": "ok", "olaylar": olaylar])
