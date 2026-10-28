@@ -48,7 +48,7 @@ try:
         toplantida()
         urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ingest", data=json.dumps({"meeting": {"title": "Deneme TS"}, "source": "transcript", "entries": [{"id": "a/1", "speaker": "Ayla Ö", "time": "10:00", "text": "Bütçe ne durumda?"}]}).encode(), headers={"X-Suflor-Anahtar": k}), timeout=5)
         a = soyle("Bu uzun bir deneme cümlesidir, birkaç saniye sürsün diye biraz daha uzatıyorum ve devam ediyorum."); time.sleep(1); b = soyle("x")
-        md = [f for f in os.listdir(os.path.join(T, "canli")) if f.endswith(".md") and "Deneme-TS" in f]
+        md = [f for f in os.listdir(os.path.join(T, "canli")) if f.endswith(".md") and "Bütçe ne durumda?" in open(os.path.join(T, "canli", f)).read()]  # Faz B: ad sayfa başlığından değil
         mt = open(os.path.join(T, "canli", md[0])).read() if md else ""; jt = open(os.path.join(T, "canli", md[0][:-3] + ".jsonl")).read() if md else ""
         bak("dökümde ayrı etiket (SUFLOR (sesli), kullanıcı notu değil), .jsonl'de kaynak: suflor", any("**SUFLOR (sesli)** |" in l and "Bu uzun bir deneme" in l for l in mt.splitlines()) and "NOTU" not in mt and '"kaynak": "suflor"' in jt)
         bak(f"gerçek say (aygıt {ayg[0]}) başladı, ikinci basış susturdu: {b!r}", a.startswith("⌨ 🔊") and "sustu" in b)

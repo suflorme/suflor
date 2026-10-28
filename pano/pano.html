@@ -482,7 +482,7 @@ const PL={teams:"Teams",meet:"Google Meet",zoom:"Zoom"}, ROL={yurutucu:L("yürü
 // masaüstü toplantı (v0.31.0): menü uygulaması Teams/Zoom masaüstünde toplantıda olduğunu son 30 sn'de bildirdi
 function masaustuTop(s){const m=s.masaustu;return!!(m&&m.toplantida&&Date.now()/1000-m.t<30)}
 function durum(s){
-  const x=s.extension, w=s.whisper||{}, ek=x&&x.age_s<30, mt=masaustuTop(s)&&!(ek&&x.call), cagri=(ek&&x.call)||mt, ca=s.claude_age_s, izl=ca!=null&&ca<120, so=[]
+  const x=s.extension, w=s.whisper||{}, ek=x&&x.age_s<30, top=!!s.aktif, mt=top&&masaustuTop(s)&&!(ek&&x.call), cagri=top&&ek&&x.call, ca=s.claude_age_s, izl=ca!=null&&ca<120, so=[]
   try{const g=JSON.parse(sessionStorage.getItem("guncellendi")||"null");if(g&&Date.now()-g.t<90000)so.push(["wa",L("Suflor.me güncellendi"),L("açık bir toplantı sekmesi varsa yenile")])}catch(e){}
   if(s.uyari)so.push(["er",s.uyari,""])
   if(s.anlik)so.push([s.anlik.tur==="uzun"?"er":"wa",s.anlik.metin,s.anlik.ayrinti||""])  // adın geçti (20 sn) / uzun konuşma (kırmızı, 45 sn; aktarici/anlik.py)
@@ -508,7 +508,8 @@ function durum(s){
       else if(!w.karsi&&!x.captions&&!x.panel&&!["bekliyor","dinliyor"].includes(w.yerel))so.push(["wa",L("Karşı tarafın sesi yazılmıyor"),L("Suflor.me simgesi → Karşı taraf → Aç")])
       if(!w.ben&&["hata","sorun"].includes(w.ben_kod))so.push(["wa",L("Senin sesin yazılmıyor"),w.ben_kod==="hata"?L("mikrofon açılamadı — toplantı sekmesini yenile"):L("mikrofon açık ama ses gelmiyor")])}
     if(!izl)so.push(["wa",L("{asistan} izlemiyor — kart gelmez"),"",L("Başlat")])}
-  else if(s.aktif&&x&&x.age_s>=30&&x.age_s<300)so.push(["wa",L("Toplantı sekmesinden sinyal gelmiyor"),L("sekmeyi yenile")])
+  else if(top&&s.toplanti&&s.toplanti.durum==="suruyor"&&!izl&&!(s.toplanti.neden||"").includes("öneri"))so.push(["wa",L("{asistan} izlemiyor — kart gelmez"),"",L("Başlat")])  // Faz B: eklenti yok (S165): ses + takvim; eklentinin yokluğu uyarı değil
+  if(top&&s.toplanti&&s.toplanti.mic_bilinmiyor)so.push(["wa",L("Eklenti çalışmıyor: sessize alman Suflor'a ulaşmıyor"),L("özel bir şey söyleyeceksen gizli kipi aç")])
   if(s.bellek&&s.bellek.uyari)so.push(["wa",s.bellek.uyari,""])
   if(s.proje_erisim&&s.proje_erisim.uyari)so.push(["wa",s.proje_erisim.uyari,s.proje_erisim.yol||""])
   // masaüstü toplantıda mikrofon hoparlörle kullanılıyor: karşı ses mikrofona girer (yankı ayırıcı süzer ama kaçan olur)
@@ -704,7 +705,7 @@ function renderHat(d,s){const el=d.getElementById(d===document?'hat':'mhat'),h=s
 // toplantıda ve kulaklıksız açılmaz); Sohbet açıkken bir dokunuş kapatır. Option + Shift + Boşluk her yerde basılı tut. Kayıtta simge vurgu renginde,
 // yanında sesin gerçek düzeyi (AnalyserNode), altta "Dinliyorum". Köşedeki soluk nokta: asistan dinliyor (toplantıda Whisper seni duyuyor ya da Sohbet açık).
 let mkT=null,mkSon=0,mkBas=0,kIp='',kIpT=0
-function toplantidaMi(s){const x=s&&s.extension;return!!(s&&(s.aktif||(x&&x.age_s<30&&x.call)||masaustuTop(s)))}
+function toplantidaMi(s){return!!(s&&s.aktif)}  // Faz B: tek kayıt (/status toplanti; aktif = algılandı/sürüyor/bitiyor)
 function kutuIpucu(m){kIp=m;clearTimeout(kIpT);kIpT=setTimeout(()=>{kIp='';altCiz()},2500);altCiz()}
 function altCiz(){const m=kRec?L('Dinliyorum · bırakınca gönderir'):kSoh?L('Sohbet açık · bir dokunuş kapatır'):kIp
   for(const d of [document,mini&&!mini.closed&&mini.document])if(d){const e=d.getElementById(d===document?'kal':'mkal');if(e&&e.textContent!==m)e.textContent=m}}
@@ -1042,7 +1043,7 @@ document.getElementById('sn').addEventListener('click',async ev=>{if(akTik(ev,re
 // boş pano = "Sıradaki · Başlat": ilk (süren ya da gelecek) toplantı büyük kart, kalanlar altında soluk satır. Claude izlerken gizli.
 function renderTakvim(s){const sur=!!((s.oto_toplanti&&s.oto_toplanti.oturum)||(s.toplanti_oturum&&['aciliyor','calisiyor','bekliyor','izliyor'].includes(s.toplanti_oturum.durum))),t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks'),x=s.extension
   // toplantı sürerken büyük kart yok: durum cümlesindeki Başlat yalnız formu açar
-  const top=s.aktif||!!(x&&x.age_s<30&&x.call)||masaustuTop(s),form=!document.getElementById('tkf').hidden
+  const top=!!s.aktif,form=!document.getElementById('tkf').hidden
   sec.hidden=izliyor||(top&&!form);if(sec.hidden&&izliyor)document.getElementById('tkf').hidden=true;  // v0.112.0: gizli bölümde açık kalan form Mac'te gri perdeyi bırakıyordu (tıklanamayan pencere)
   ;['tk','tkh','tkalt'].forEach(i=>document.getElementById(i).style.display=top?'none':'');if(izliyor||top)return
   tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh')
@@ -1127,7 +1128,7 @@ async function refresh(){let s;try{s=await j('/status')}catch(e){s=null}
 if(s&&s.asistan&&s.asistan!==AS){AS=s.asistan;asYaz(document)}
   if(s&&s.err==="anahtar"){document.title=L("Suflor.me — anahtar gerekli");const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Pano anahtarsız açıldı")));setH(document.getElementById('da'),esc(L("Suflor.me simgesine tıkla → Panoyu aç")));return}
   if(!s){const d=document.getElementById('durum');d.className='er';setH(document.getElementById('dm'),esc(L("Suflor.me'ye ulaşılamıyor")));setH(document.getElementById('da'),esc(L('birkaç saniye içinde yeniden denenir')));return}last=s;guncellemeCiz(s);dumanCiz(s);const x=s.extension, ag=s.agenda||{items:[]}
-setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||s.meeting||'Toplantı')):masaustuTop(s)?esc(s.masaustu.baslik||s.masaustu.uygulama||L('Toplantı')):'')
+setH(document.getElementById('t'),s.aktif?esc(L(((ag.items||[]).length&&ag.title)||(s.toplanti||{}).ad||s.meeting||'Toplantı')):'')
 setH(document.getElementById('chips'),s.aktif&&ag.rol?`<span class=chip>${ROL[ag.rol]||esc(ag.rol)}</span>`:"")
 {const [t,c,ti]=sureTxt(s),e=document.getElementById('sure');setH(e,s.aktif&&t?ic('clock',esc(t)):"");e.className=c;e.title=ti}
 durumCiz()
@@ -1140,7 +1141,7 @@ if(s.ayarlar&&s.ayarlar.deger)temaUygula(s.ayarlar.deger.tema||'sistem')  // tem
 // arayüz dili başka pencereden (Ayarlar) değiştiyse bu sayfa da yeni dille yeniden yüklenir
 if(s.ayarlar&&s.ayarlar.deger&&s.ayarlar.deger.dil&&s.ayarlar.deger.dil!==DIL&&!new URLSearchParams(location.search).get('dil')&&!window._dilYeni){window._dilYeni=1;location.reload()}
 // Mac penceresi (html.mac, v0.106.0): toplantıda mı (araç çubuğundaki toplantı düğmeleri), toplantı dışında yan sütun boş mu (gizlenir)
-{const x=s.extension,top=!!(s.aktif||(x&&x.age_s<30&&x.call)||masaustuTop(s)),h=document.documentElement;h.classList.toggle('toplantida',top)
+{const top=!!s.aktif,h=document.documentElement;h.classList.toggle('toplantida',top)
   h.classList.toggle('yan-bos',!top&&![...document.querySelectorAll('#yan>section[id]')].some(e=>!e.hidden));kenarCiz(s,top)}
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
@@ -1154,7 +1155,7 @@ document.title=((s.cards||[]).length?`(${s.cards.length}) `:"")+"Suflor.me pano"
 {const b=s.baglam||[],NK={baslat:L("Başlat"),kutu:L("kutu"),birak:L("bırakıldı")};document.getElementById('bgs').hidden=!b.length;setH(document.getElementById('bg'),b.map(x=>`<div class=bg title="${esc(x.ad)}">${ic(x.tur==="dosya"?"dosya":"bag")}<span>${esc(x.ad)}</span><span class=sp>${esc(NK[x.kaynak]||x.kaynak)}</span></div>`).join(''))}
 {const a=s.acik||[];document.getElementById('aks').hidden=!a.length;setH(document.getElementById('ak'),a.map(q=>`<div class=ak>${esc(q.metin)}${q.kim?`<span class=sp>— ${esc(q.kim)}</span>`:''}</div>`).join(''))}
 // gündem her yenilemede karşılaştırılır — Claude `gundem i` ile işaretleyince ya da agenda.json değişince görünsün
-const bos=!s.aktif&&!(s.claude_age_s!=null&&s.claude_age_s<120)&&!(x&&x.age_s<30&&x.call)&&!masaustuTop(s)
+const bos=!s.aktif&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 if(bos&&Date.now()-agTamT>10000){agTamT=Date.now();j('/agenda').then(v=>{agTam=v}).catch(()=>{})}  // /status boşken gündemi gizler; eşleştirme için tamı
 if(bos&&tkGor){const g=seciliGundem(agTam)
   const sig='sec|'+JSON.stringify([tkGor,g&&g.items,g&&g.kaynak]);if(g&&sig!==agSig){agSig=sig;agTotal=0
@@ -1179,7 +1180,7 @@ cubukAdlari(document)
 // onu bu sayfa çizer); görünür olunca hemen. Önceden koşulsuz 2 sn (sohbette Chrome işlemcisi). Kartlar ayrıca uzun yoklamayla anında gelir.
 let sonEtkin=Date.now()  // etkinlik bittikten sonra 15 sn daha hızlı (kapanış, Geri al gibi kısa süreli durumlar kaçmasın)
 function yenileAralik(){const s=last||{},k=s.konus||{},mOn=mini&&!mini.closed
-  if(s.aktif||masaustuTop(s)||["aciliyor","calisiyor","bekliyor","izliyor"].includes((s.toplanti_oturum||{}).durum)||(k.durum&&!["kapali","hazir","hata"].includes(k.durum))||(k.sohbet||{}).acik)sonEtkin=Date.now()
+  if(s.aktif||["aciliyor","calisiyor","bekliyor","izliyor"].includes((s.toplanti_oturum||{}).durum)||(k.durum&&!["kapali","hazir","hata"].includes(k.durum))||(k.sohbet||{}).acik)sonEtkin=Date.now()
   if(document.hidden&&!mOn)return 15000
   return Date.now()-sonEtkin<15000?2000:5000}
 let yT=0;async function yDongu(){clearTimeout(yT);try{await refresh()}catch(e){}clearTimeout(yT);yT=setTimeout(yDongu,yenileAralik())}

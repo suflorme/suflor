@@ -86,7 +86,7 @@ def cards_view():
     # ve henüz dosyası belli olmayan (PRE'de bekleyen) kartlar
     # dosyası belli olmayan kayıt (toplantı dışında sorulan soru, PRE kartı) yalnız 30 dk görünür — yoksa eski bir
     # "test" sorusu panoda ve şeritte süresiz "1 soru bekliyor" diye kalıyordu
-    af = aktif_dosya(); yeni = lambda r: (datetime.datetime.now() - datetime.datetime.fromisoformat(r.get("at") or "2000-01-01T00:00:00")).total_seconds() < 1800
+    af = gorunen_dosya(); yeni = lambda r: (datetime.datetime.now() - datetime.datetime.fromisoformat(r.get("at") or "2000-01-01T00:00:00")).total_seconds() < 1800
     bu = lambda r: r.get("file") == af if r.get("file") is not None else yeni(r)
     cs = [c for c in CARDS if bu(c)]; qs_ = [q for q in QUESTIONS if bu(q)]
     answered = {c.get("reply_to") for c in CARDS if c.get("reply_to")}
@@ -227,7 +227,7 @@ def ask(p):
             answered = {c.get("reply_to") for c in CARDS if c.get("reply_to")}
             q = next((q for q in reversed(QUESTIONS) if q.get("tur") == "ozet" and q["id"] not in answered and (now - datetime.datetime.fromisoformat(q["at"])).total_seconds() < 60), None)
             if q: return q
-        q = {"id": "q" + str(int(time.time() * 1000)) + secrets.token_hex(2), "at": now.isoformat(timespec="seconds"), "file": aktif_dosya() or bitmis_dosya(), "text": text}
+        q = {"id": "q" + str(int(time.time() * 1000)) + secrets.token_hex(2), "at": now.isoformat(timespec="seconds"), "file": aktif_dosya(), "text": text}
         if ozet: q["tur"] = "ozet"
         if p.get("tur") == "girdi": q["tur"] = "girdi"; QUESTIONS.append(q); _log("sorular.jsonl", q); return q  # dökümde not satırı zaten var
         QUESTIONS.append(q); _log("sorular.jsonl", q)

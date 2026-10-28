@@ -21,8 +21,13 @@
     const t = document.title.replace(/^Meet\s*[-–—:]\s*/i, "").replace(/\s*[-–—]\s*Google Meet$/i, "").trim();
     return t && !/^(Google )?Meet$/i.test(t) ? t : ((location.pathname.match(KOD_RE) || [])[1] || "Meet");
   }
-  const LEAVE = /^(görüşmeden ayrıl|aramadan ayrıl|ayrıl|leave call|leave)$/i;
-  function cagrida() { return [...document.querySelectorAll('button[aria-label], [role="button"][aria-label]')].some(b => LEAVE.test((b.getAttribute("aria-label") || "").trim())); }
+  // 28 Ekim (mrt, v0.148): Türkçe Meet'te "Ayrıl" düğmesinin etiketi tam eşleşmeyle bulunmadı — çağrı hiç görülmedi. Etikette ayrıl/leave geçmesi yeter;
+  // bulunamazsa toplantı sayfasındaki mikrofon düğmesi (data-is-muted) çağrı sayılır.
+  const LEAVE = /ayrıl|leave/i;
+  function cagrida() {
+    if ([...document.querySelectorAll('button[aria-label], [role="button"][aria-label]')].some(b => LEAVE.test(b.getAttribute("aria-label") || ""))) return true;
+    return toplantiSayfasi() && !!document.querySelector('[data-is-muted][aria-label*="mikrofon" i], [data-is-muted][aria-label*="microphone" i]');
+  }
   function micDugme() {
     return document.querySelector('button[data-is-muted][aria-label*="mikrofon" i], button[data-is-muted][aria-label*="microphone" i], [role="button"][data-is-muted][aria-label*="microphone" i]')
       || [...document.querySelectorAll("button[aria-label]")].find(b => /mikrofonu (aç|kapat)|turn (on|off) microphone/i.test(b.getAttribute("aria-label") || ""));

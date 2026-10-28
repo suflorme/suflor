@@ -26,7 +26,7 @@ def cikti(fn, *a, bekle=0.0, **k):
         r = fn(*a, **k)
         if bekle: time.sleep(bekle)
     return r, o.getvalue()
-def toplanti(): m.STATE["_cagri_son"] = time.time()
+def toplanti(): m.eklenti_nabiz({"platform": "teams", "sekme": "t1", "call": True, "panel": True, "rows": 1}, "Chrome/1"); m.toplanti_bak()  # Faz B: eklenti nabzı çağrıda = toplantı var (eski _cagri_son yok)
 
 # 1) gizli toplantı — v0.89.1: tamamen steril, tekrar basana kadar
 import threading, urllib.request
@@ -54,7 +54,7 @@ bak("Gemini yok, asistanlar konuşmaz, duyuru yok", not m.gemini_izinli(True) an
 r, _ = cikti(m.toplantiya_soyle, "Merhaba"); bak("toplantıya söyle reddedilir", r.get("ok") is False and "Gizli" in r.get("err", ""))
 _, o = cikti(m._whisper_yaz, {"kanal": "karsi"}, "GİZLİ WHISPER"); bak("Whisper satırı yazılmaz (kuyrukta kalmış parça)", "GİZLİ WHISPER" not in open(md, encoding="utf-8").read())
 m.FISILTI.update(son=0, ipucu=0); _, o = cikti(m.paylasim_bildir, True, "deneme"); bak("kendiliğinden kanıt (ekran paylaşımı) açılmaz", "KANIT" not in o and not m.STATE.get("paylasim", {}).get("acik") if isinstance(m.STATE.get("paylasim"), dict) else "KANIT" not in o)
-m.STATE["_cagri_son"] = 0; m.STATE.pop("masaustu", None); time.sleep(4)
+m.EKLENTI.clear(); m.STATE.pop("masaustu", None); time.sleep(4)
 bak("toplantı bitse de kendiliğinden kapanmaz", m.gizli_acik())
 bak("durum diskte: aktarıcı yeniden başlasa da sürer", os.path.exists(m.GIZLI_FP))
 v = m.cards_view(); bak("pano verisinde gizli görünür", (v.get("gizli") or {}).get("acik") is True)

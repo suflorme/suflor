@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Toplantı adı geç gelince döküm tek dosyada kalıyor mu (7 Ekim: ilk Whisper satırı adsız geldi, 1 satırlık "…-Toplantı.md" ayrı
-# kaldı). Yalıtılmış aktarıcıya sırayla adsız, adlı, yeniden adsız ve başka adlı satır gönderir; dosyaları ve /status'u denetler.
+# Faz B (v0.149.0): toplantının adı geç gelse de (ilk satırlar adsız) döküm tek dosyada, dosya adı açılışta bir kez verilir ve değişmez (eski yer tutucu
+# birleştirme dosyayı yeniden adlandırıyordu). Eklentinin gönderdiği sayfa başlığı ("Haftalık Plan", "İkinci Toplantı") ad olmaz, yeni dosya açmaz.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/yer-tutucu.py      (kaldı → çıkış 1)
 import glob, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -28,22 +28,19 @@ try:
     for _ in range(50):
         try: istek("/status"); break
         except Exception: time.sleep(0.1)
-    satir(1, "adsız ilk satır"); satir(2, "adlı satır", "Haftalık Plan"); satir(3, "yeniden adsız")
-    s = istek("/status")
-    if s.get("meeting") != "Haftalık Plan": hatalar.append(f"adsız satırdan sonra süren ad {s.get('meeting')!r}")
-    satir(4, "başka toplantı", "İkinci Toplantı")
+    satir(1, "adsız ilk satır"); ilk = sorted(os.path.basename(f) for f in glob.glob(os.path.join(canli, "*.md")))
+    satir(2, "adlı satır", "Haftalık Plan"); satir(3, "yeniden adsız"); satir(4, "başka başlıklı satır", "İkinci Toplantı")
     md = sorted(os.path.basename(f) for f in glob.glob(os.path.join(canli, "*.md")))
-    if len(md) != 2 or "Toplantı.md" in [m[16:] for m in md]: hatalar.append(f"dosyalar: {md}")
-    plan = [m for m in md if m.endswith("Haftalık-Plan.md")]
-    if plan:
-        m = open(os.path.join(canli, plan[0]), encoding="utf-8").read()
-        if not m.startswith("# Canlı transkript — Haftalık Plan\n"): hatalar.append("başlık yeni adla güncellenmedi")
-        for t in ("adsız ilk satır", "adlı satır", "yeniden adsız"):
+    if len(md) != 1 or md != ilk: hatalar.append(f"dosyalar: {ilk} → {md}")
+    else:
+        m = open(os.path.join(canli, md[0]), encoding="utf-8").read()
+        for t in ("adsız ilk satır", "adlı satır", "yeniden adsız", "başka başlıklı satır"):
             if t not in m: hatalar.append(f"satır eksik: {t}")
-        if "başka toplantı" in m: hatalar.append("ikinci toplantının satırı birinciye yazıldı")
-    if istek("/status").get("meeting") != "İkinci Toplantı": hatalar.append("ikinci toplantı süren toplantı olmadı")
+        if "Haftalık" in md[0] or "İkinci" in md[0]: hatalar.append(f"sayfa başlığı dosya adına girdi: {md[0]}")
+    s = istek("/status")
+    if s.get("meeting") != (s.get("toplanti") or {}).get("ad") or s.get("meeting") in ("Haftalık Plan", "İkinci Toplantı"): hatalar.append(f"süren ad {s.get('meeting')!r}")
     if "Traceback" in open(os.path.join(T, "relay.log"), encoding="utf-8").read(): hatalar.append("aktarıcıda hata (relay.log)")
 finally:
     r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
-print(f"yer tutucu: {len(hatalar)} sorun" + "".join(f"\n  KALDI: {h}" for h in hatalar) if hatalar else "yer tutucu: ✓ adsız ilk satırlar adı gelen toplantının dosyasında; ikinci toplantı ayrı")
+print(f"yer tutucu: {len(hatalar)} sorun" + "".join(f"\n  KALDI: {h}" for h in hatalar) if hatalar else "yer tutucu: ✓ ad geç gelse de tek dosya, dosya adı değişmedi, sayfa başlığı ad olmadı")
 sys.exit(1 if hatalar else 0)

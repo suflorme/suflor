@@ -86,7 +86,7 @@ def bekle_hazir():
 MASKE = [(re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?"), "<AN>"),
          (re.compile(r"\d{4}-\d{2}-\d{2}-\d{4}"), "<TARIH>"), (re.compile(r"\d{4}-\d{2}-\d{2}"), "<GUN>"),
          (re.compile(r"\b[0-9a-f]{32}\b"), "<ANAHTAR>"), (re.compile(r"\b[kqe]\d{13}[0-9a-f]{0,4}\b"), "<ID>"), (re.compile(r"\b1[6-9]\d{8}(\.\d+)?\b"), "<EPOCH>"),
-         (re.compile(r"\b\d{1,2}:\d{2}(:\d{2})?\b"), "<SAAT>")]
+         (re.compile(r"\b\d{1,2}:\d{2}(:\d{2})?\b"), "<SAAT>"), (re.compile(r"(toplant[ıi]s?ı?)-\d{4}\b", re.I), r"\1-<SS>")]  # Faz B: nötr ad "Toplantı HH:MM"
 def maskele(s, surum=None):
     if surum: s = s.replace(surum, "<SURUM>")
     for rx, y in MASKE: s = rx.sub(y, s)
@@ -172,7 +172,7 @@ def kos():
             if p:
                 try: p.wait(5)
                 except subprocess.TimeoutExpired: p.kill()
-    DEGISKEN = {"heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "sistem-izi.jsonl"}  # anahtar rastgele, nabız/ölçüm zamana bağlı; sistem izi Mac'in o anki bellek/swap değeri
+    DEGISKEN = {"toplanti.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "sistem-izi.jsonl"}  # anahtar rastgele, nabız/ölçüm zamana bağlı; sistem izi Mac'in o anki bellek/swap değeri
     dosyalar = {}
     for kok, _, fs in os.walk(canli):
         for f in sorted(fs):

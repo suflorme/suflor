@@ -1434,7 +1434,7 @@ def konus_yazili(metin):  # v0.117.0 (S136): toplantı yokken pano kutusundan ya
     if _KS["tur"] and not ("uclu_bekle" in globals() and uclu_bekle()): return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
     tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True}; _KS["tur"] = tur
     threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
-    print("KONUŞ: yazılı soru (pano kutusu, toplantı yok)"); return {"ok": True}
+    print("KONUŞ: yazılı soru (pano kutusu)"); return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
     if _KS["tur"] and _KS["tur"].get("kaynak") == "uclu": uclu_iptal("kullanıcı sordu")
@@ -1708,14 +1708,9 @@ def hizli_ozet_tetik(kaynak):
     if AYAR.get("hizli_ozet", True) is False or not AYAR.get("konusma", True) or not konus_beyin_var() or not os.path.isdir(BRIFING_APP): return
     HIZLI.update(dosya=f, t=time.time(), okundu=False)
     threading.Thread(target=_hizli_ozet, args=(f, kaynak), daemon=True).start()
-def _tarayici_cagrida():
-    x = STATE.get("extension") or {}
-    try: return bool(x.get("call")) and (datetime.datetime.now() - datetime.datetime.fromisoformat(x["seen"])).total_seconds() < 15
-    except (KeyError, TypeError, ValueError): return False
 def _hizli_ozet(f, kaynak):
     time.sleep(OZET_HIZLI_ONAY_SN)
-    if (STATE.get("masaustu") or {}).get("toplantida") or _tarayici_cagrida(): HIZLI["dosya"] = None; print("ÖZET (hızlı): toplantıya geri dönüldü — yapılmadı"); return
-    STATE["_cagri_son"] = 0  # toplantıdan çıkıldı: sesli okuma için 60 sn beklenmez (yeniden katılınca nabız günceller)
+    if toplanti_var(): HIZLI["dosya"] = None; print("ÖZET (hızlı): toplantıya geri dönüldü — yapılmadı"); return
     t0 = time.time()
     while _KS["tur"] and time.time() - t0 < 20: time.sleep(0.3)
     if _KS["tur"]: print("ÖZET (hızlı): Konuş meşgul — yapılmadı"); HIZLI["dosya"] = None; return

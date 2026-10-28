@@ -106,7 +106,7 @@ try:
     ok("itiraz penceresi yok (söz sırası bekleniyor)", "itiraz penceresi" not in log() and "söz sırası bekleniyor" in log())
     v, t2 = bekle(lambda v: v.get("durum") == "okundu", 15); ok("toplantıya bir kez okundu", t2 is not None and son() == s0 + 1)
     ok("cevap kulağa ayrıca okunmadı", "SES (deneme): " + "Teslim tarihi cuma" not in log())
-    time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md") and "Otonom" in f)
+    time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md"))  # Faz B: tek toplantı, ad sayfa başlığından değil
     sat = [l for l in md.splitlines() if "SUFLOR" in l]
     ok(f"dökümde SUFLOR (sesli) satırı: tanıtım + sesli kısım, ayrıntı yok ({len(sat)} satır)", sat and "Merhaba, ben Atlas." in sat[-1] and "Teslim tarihi cuma" in sat[-1] and "Ayrıntı" not in sat[-1])
     ok("/status: ATLAS toplantıda", ((st().get("konus") or {}).get("asistan") or {}).get("katilan") == ["ATLAS"])
@@ -151,7 +151,7 @@ try:
     c = (st().get("konus") or {}).get("cevap") or ""
     ok("ikinci kişilik de herkese: toplantıya okundu", t9 is not None and "Kişi MATLAS." in c and "Otonom bağlam geldi" in c and "ASİSTAN: MATLAS toplantıya katıldı" in log())
     ok("panoda etiket ikinci kişiliğin adı", (st().get("konus") or {}).get("kisilik") == "MATLAS")
-    time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md") and "Otonom" in f)
+    time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md"))  # Faz B: tek toplantı, ad sayfa başlığından değil
     ok("toplantıya okunan metinde konuşma dili yok (Bakıyorum)", "Bakıyorum." in [l for l in md.splitlines() if "SUFLOR" in l][-1])
     SUSKU(); s0 = son(); satir("karsi", "Matlas, bize de özet verir misin?"); izin_ver()
     v, t10 = bekle(lambda v: v.get("durum") == "okundu" and son() == s0 + 1, 25)

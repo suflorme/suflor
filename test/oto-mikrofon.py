@@ -5,7 +5,7 @@
 #  3) yalnız mikrofon + takvim güvenilir değil: toplantı oturumu açılmaz, panoda "Toplantı algılandı — Claude'u başlat" onay kartı çıkar
 #  4) karttaki Onayla → baslat çalışır (günlükte "öneri onaylandı"), kart kapanır; ikinci toplantıda Reddet → oturum açılmaz
 #  5) heartbeat.json eklenti nabzı olmadan da zamanlayıcıyla yazılır
-# aktarici/oto-toplanti.py, relay.py yerel_ses_al ya da heartbeat döngüsü değişince:  PYTHONDONTWRITEBYTECODE=1 python3 test/oto-mikrofon.py
+# aktarici/toplanti.py, relay.py yerel_ses_al ya da heartbeat döngüsü değişince:  PYTHONDONTWRITEBYTECODE=1 python3 test/oto-mikrofon.py
 import datetime, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8783)
@@ -54,12 +54,13 @@ try:
     ses_nabiz()
     # 1) yakın toplantı yok
     yan = istek("/ses-yerel", {"kanal": "karsi", "pcm": ""}, "ses-anahtari.txt")
-    ok(f"takvimde yakın toplantı yokken ses işlenmez ({yan})", yan.get("bekle") is True)
+    ok(f"takvim yokken de ses işlenir, dosya açılır (28 Ekim: 'hiçbir şey olmadı' kalmasın) ({yan})", not yan.get("bekle") and "TOPLANTI: algılandı" in L())
+    ok("takvimsiz yalnız ses: satır gelmeden öneri kartı yok, gerekçe günlükte", "öneri kartı" not in L() and "TOPLANTI: sinyal zayıf" in L())
     # 2-3) takvimde şimdi başlayan toplantı
-    r.terminate(); r.wait(8); takvim([olay("e1", "Deniz ile proje", -3, 27)]); r = ac()  # takvim açılışta okunur
+    r.terminate(); r.wait(8); os.remove(os.path.join(canli, "toplanti.json")); takvim([olay("e1", "Deniz ile proje", -3, 27)]); r = ac()  # takvim açılışta okunur
     ok("aktarıcı yeniden açıldı", bekle(lambda: os.path.exists(os.path.join(T, "ses-anahtari.txt")) and "çalışıyor" in L(), 20)); time.sleep(1.5)
     for _ in range(6): ses_nabiz(); time.sleep(0.5)
-    ok("toplantı tanındı (mikrofon + takvim)", bekle(lambda: "OTO: toplantı tanındı — Deniz ile proje" in L(), 15))
+    ok("toplantı tanındı (mikrofon + takvim)", bekle(lambda: "TOPLANTI: algılandı" in L() and "Deniz-ile-proje" in L(), 15))
     yan = istek("/ses-yerel", {"kanal": "karsi", "pcm": ""}, "ses-anahtari.txt")
     ok(f"eklenti tanımasa da ses toplantı sayılır ({str(yan)[:60]})", not yan.get("bekle"))
     ok("oturum açılmadı: güvenilir sinyal yok", bekle(lambda: "güvenilir sinyal yok" in L(), 8) and "toplantı oturumu açıldı" not in L())

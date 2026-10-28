@@ -13,6 +13,9 @@ function L(s, v) { let t = DIL === "en" && EN[s] || s; if (v) for (const k in v)
 // Yeni platform yalnız manifest'e eklenir. tabs.query kalıbında port olmaz (test sayfası 127.0.0.1:8797 → 127.0.0.1).
 const TOPLANTI_URL = [...new Set(chrome.runtime.getManifest().content_scripts
   .filter(cs => (cs.js || []).some(j => j.startsWith("platform-"))).flatMap(cs => cs.matches).map(m => m.replace(/:\d+\//, "/")))];
+// Faz B (v0.149.0): içerik betiği sekme kimliğini sorar — aktarıcı eklenti durumunu sekme başına tutar (Teams ana sayfası çağrıdaki Meet'i ezmesin);
+// aynı sekmenin bütün çerçeveleri aynı kimliği gönderir
+chrome.runtime.onMessage.addListener((msg, sender, reply) => { if (msg.type === "sekme") reply({ id: sender.tab ? sender.tab.id : null }); });
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.type === "status") {
     state = Object.assign(state, msg);

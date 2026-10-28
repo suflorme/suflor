@@ -61,8 +61,9 @@ _beta_sar("sesli_ceviri_degistir", "sesli_ceviri", lambda r: bool(r and r[0]))
 beta_olay("acilis")  # aktarıcı açıldı (toplantı sırasında açılış = çökme ya da kurulum)
 
 def _beta_platform():
-    if masaustu_baslik(): return "masaustu"
-    p = str((STATE.get("extension") or {}).get("platform") or "")
+    a = TOPLANTI.get("aktif") or {}  # Faz B: toplantının kendi platformu (kayıt); masaüstü uygulaması ayrıca sayılır
+    if masaustu_toplantida(): return "masaustu"
+    p = str(a.get("platform") or "")
     return p if p in ("teams", "meet", "zoom") else "bilinmeyen"
 def _beta_toplanti_izle():  # dakikada bir: süren toplantının kimliği → platform, baş, son (ad tutulmaz)
     f = aktif_dosya()

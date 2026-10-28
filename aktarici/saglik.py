@@ -9,7 +9,8 @@ def veri_satiri(kaynak, kanal):  # ingest her satırda çağırır: altyazı ("t
     now = time.time(); _VY["son"] = now; _VY["kanal"]["altyazi" if kaynak != "whisper" else (kanal if kanal in ("ben", "karsi") else "karsi")] = now
 def toplanti_suruyor():
     if gizli_acik(): return False
-    return bool(toplanti_var() or OTO.get("aktif") or (STATE.get("masaustu") or {}).get("toplantida"))
+    a = TOPLANTI.get("aktif") or {}  # Faz B: süren kayıt; Başlat'la açılıp henüz sinyali olmayan (toplantı başlamadı) sayılmaz
+    return toplanti_var() or (a.get("durum") == "algilandi" and bool(sinyaller()))
 def kanal_akiyor(k, sn=None): return time.time() - _VY["kanal"].get(k, 0) < (sn or VERI_YOK_SN)  # pano sağlığı: süreç değil, veri akıyor mu
 def kanal_son(k): return _VY["kanal"].get(k, 0)  # kanalın son satır zamanı (deneme toplantısı kipi: başladıktan sonra satır geldi mi)
 def veri_yok_view():
@@ -19,7 +20,7 @@ def veri_yok_view():
         _VY.update(bas=None, yazildi=False); return None
     if _VY["bas"] is None: _VY["bas"] = now
     sn = now - max(_VY["bas"], _VY["son"])
-    if sn < VERI_YOK_SN:
+    if sn < VERI_YOK_SN * (2 if yerel_ses_durum() == "dinliyor" else 1):  # mrt 28 Ekim B4: ses dinleniyorsa kimse konuşmuyor olabilir — eşik 2 katı
         if _VY["yazildi"]: print("VERİ YOK: kalktı (satır geldi)"); _VY["yazildi"] = False
         return None
     x = STATE.get("extension") or {}; w = STATE.get("whisper") or {}

@@ -162,7 +162,7 @@ def _surum_oku():  # tek sürüm kaynağı manifest.json: aktarıcının yanınd
         except (OSError, ValueError, KeyError): pass
     print("UYARI: manifest.json okunamadı — sürüm bilinmiyor (aktarici-kur.command ile yeniden kur)"); return "?"
 SURUM = _surum_oku()  # sürüm geçmişi: git log
-LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "meeting_files": {}, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
+LOCK = threading.Lock(); STATE = {"surum": SURUM, "meeting": None, "file": None, "lines": 0, "flags": [], "notes": 0, "last": None, "started": datetime.datetime.now().isoformat(timespec="seconds"), "agenda_ticks": {}, "extension": None, "file_lines": {}, "file_last": {}, "file_start": {}, "kanitlar": {}, "kanit_iste": None, "agenda_aktif": None, "disk": {"ok": True, "low": False, "free_mb": None, "held": 0, "since": None, "err": None, "lost": 0}}
 # --- Disk yazımı ------------------------------------------------------------------------------------------------
 # 30 Eylül'de disk doldu: aktarıcı 14 kez ENOSPC verdi, en az bir satır kaybolmuş olabilir. Artık her dosya eki
 # write() üzerinden gider: bir grup (ör. aynı satırın .jsonl + .md hâli) ya tamamen yazılır ya hiç — yarım kalan ek
@@ -276,7 +276,7 @@ def kayit_dondur():
 def _kayit_dongu():
     time.sleep(5)
     while True:
-        if not toplanti_var() and time.time() - max(STATE["file_last"].values(), default=0) > RESUME_MAX_AGE_MIN * 60: kayit_dondur()
+        if not toplanti_acik() and time.time() - max(STATE["file_last"].values(), default=0) > 1200: kayit_dondur()  # toplantı yok, 20 dk yazım yok
         time.sleep(6 * 3600)
 # --- Toplantı oturumu maliyeti (v0.57.0) ------------------------------------------------------------------------------------
 # Biten /toplanti oturumlarının Claude harcaması (API fiyatıyla karşılığı) toplanti-claude.py maliyet'ten gelir, claude-cagri.jsonl'e is: toplanti satırı olarak
@@ -338,65 +338,30 @@ def _sistem_izi_dongu():
             except Exception as e: print(f"SİSTEM İZİ: yazılamadı ({e.__class__.__name__})")
 # --- Bekleyen kart/soru satırları ----------------------------------------------------------------------------
 # 30 Eylül: yeni toplantının ilk satırı gelmeden gönderilen kartlar önceki (29 Eylül) dosyaya yazıldı. Artık kart/soru
-# yalnız "etkin" toplantı dosyasına yazılır: son RESUME_MAX_AGE_MIN dakikada yazılmış ve eklentinin gördüğü toplantıyla
-# aynı. Değilse satır PRE'de bekler; yeni toplantının ilk satırı/notu/gündem işaretiyle o dosyaya yazılır ve kaydın
-# "file" alanı sonradan işlenir (kartlar.jsonl / sorular.jsonl'e {"id","at","file"} yama satırı).
-PRE = []  # (md satırı, kayıt ya da None, kayıt dosyası)
-# v0.88.2 (19 Ekim 18.13 deneme: altyazı paneli açıkken /status "panel/captions false"): eklenti her çerçevede (all_frames) çalışır ve her çerçeve
-# nabız atar; paneli/altyazıyı görmeyen çerçevenin nabzı üst çerçevenin bilgisini siliyordu. Panel ve altyazı: herhangi bir çerçeve son
-# EKLENTI_GOR_SN içinde gördüyse açık. Çağrı, toplantı adı ve dil yalnız üst çerçeveden (mic alanını yalnız o gönderir); iç çerçeve eskisini korur.
-EKLENTI_GOR_SN = 25
-def eklenti_birlestir(p, o, simdi):
-    x = STATE["extension"]; ust = not ("mic" in p and p["mic"] is None)  # iç çerçeve mic: null gönderir (content.js); alansız istemci (test, curl) üst sayılır
-    for k in ("panel", "captions"):
-        if p.get(k): STATE[f"_ext_{k}_t"] = simdi
-        x[k] = simdi - (STATE.get(f"_ext_{k}_t") or 0) < EKLENTI_GOR_SN
-    if p.get("panel"): STATE["_ext_rows"] = p.get("rows", 0)
-    x["rows"] = STATE.get("_ext_rows", 0) if x["panel"] else 0
-    if ust: STATE["_ext_ust_t"] = simdi
-    elif o:
-        for k in ("meeting", "lang", "langSrc"): x[k] = o.get(k)
-        x["call"] = bool(o.get("call")) and simdi - (STATE.get("_ext_ust_t") or 0) < 60  # üst çerçeve 60 sn susarsa çağrı yok sayılır
+# yalnız süren toplantının dosyasına yazılır (Faz B: aktarici/toplanti.py kaydı). Toplantı yoksa satır PRE'de bekler; yeni toplantının dosyası
+# açılınca oraya yazılır ve kaydın "file" alanı sonradan işlenir (kartlar.jsonl / sorular.jsonl'e {"id","at","file"} yama satırı).
+PRE = []  # (md satırı, kayıt ya da None, kayıt dosyası, eklenme anı)
 def _yas_sn(x):
     try: return (datetime.datetime.now() - datetime.datetime.fromisoformat(x["seen"])).total_seconds()
     except Exception: return 1e9
-def aktif_dosya():
-    f = STATE["file"]
-    if not f or time.time() - STATE["file_last"].get(f, 0) > RESUME_MAX_AGE_MIN * 60: return None
-    b = STATE.get("bitti")  # özet hazır (POST /son-toplanti) → pano hemen "Son toplantılar"a geçer; sonra satır gelirse toplantı sürüyor
-    if b and b.get("file") == f and STATE["file_last"].get(f, 0) <= b.get("t", 0): return None
-    x = STATE["extension"]
-    if x and (x.get("panel") or x.get("captions")) and x.get("meeting") and x["meeting"] != STATE["meeting"] and _yas_sn(x) < 30: return None
-    return f
-BITMIS_YAZ_SN = 7200
-def bitmis_dosya():
-    # Toplantı bittikten sonra (özet hazır ya da bitiş algılandı, toplantı sinyali yok) panodan gelen not, soru, kart ve gündem işareti
-    # biten toplantının dosyasına yazılır ama dosyanın son yazma zamanı ilerlemez: pano toplantı görünümüne dönmez, özet ve onaylar
-    # kalır (13 Ekim deneme 9: bitişten sonra gönderilen not toplantıyı yeniden açtı). Sonraki 2 saat; sonra eskisi gibi.
-    # Bitişten sonra yeni Başlat ya da yeni gündem varsa yeni toplantı hazırlanıyor: kart ve soru eskiye değil yeni toplantıya (PRE) gider.
-    f = STATE["file"]
-    if not f or aktif_dosya() or toplanti_var() or time.time() - STATE["file_last"].get(f, 0) > BITMIS_YAZ_SN: return None
-    b, tb = STATE.get("bitti") or {}, STATE.get("toplanti_bitti") or {}
-    son = [b.get("t") or 0] if b.get("file") == f else []
-    if tb.get("file") == f: son.append(_epoch(tb.get("t")))
-    if not son: return None
-    for yeni in ("takvim-secilen.json", "agenda.json"):
-        try:
-            if os.path.getmtime(os.path.join(BASE, yeni)) > min(son): return None
-        except OSError: pass
-    return f
+# Faz B (v0.149.0): aktif_dosya, toplanti_var, eklentinin sekme başına durumu ve satırın hedef toplantısı aktarici/toplanti.py'de (tek kayıt). Biten toplantıya
+# panodan not/kart/gündem işareti yazılmaz (S163; eski bitmis_dosya 2 sa kuralı kalktı); toplantı yokken PRE'de bekler, PRE_EN_COK_SN'den eskisi atılır.
+PRE_EN_COK_SN = 1800
 def _md(line, rec=None, log=None):
-    f = aktif_dosya() or bitmis_dosya()
+    f = aktif_dosya()
     if f: write([(os.path.join(BASE, f), line + "\n")])
-    else: PRE.append((line, rec, log))
+    else: PRE.append((line, rec, log, time.time()))
 def pre_al(md):
     # bekleyen satırları döndürür (çağıran başlıktan hemen sonra aynı grupta yazar); kayıtlara dosya adı işlenir
     if not PRE: return ""
     key = os.path.basename(md); now = datetime.datetime.now().isoformat(timespec="seconds")
-    for _, rec, log in PRE:
+    eski = [x for x in PRE if time.time() - x[3] > PRE_EN_COK_SN]
+    if eski: print(f"Bekleyen {len(eski)} kart/soru satırı {PRE_EN_COK_SN // 60} dk'dan eski — yeni toplantıya yazılmadı"); PRE[:] = [x for x in PRE if x not in eski]
+    if not PRE: return ""
+    for _, rec, log, _t0 in PRE:
         if rec is not None and rec.get("file") is None:
             rec["file"] = key; _log(log, {"id": rec["id"], "at": now, "file": key})
-    txt = "".join(l + "\n" for l, _, _ in PRE); PRE.clear()
+    txt = "".join(l + "\n" for l, _, _, _ in PRE); PRE.clear()
     print(f"Bekleyen {txt.count(chr(10))} kart/soru satırı {key} dosyasına yazıldı")
     return txt
 def load_cards():
@@ -578,17 +543,19 @@ def kanit(p):
     try: b = base64.b64decode(d, validate=True)
     except Exception: return {"ok": False, "err": "görüntü okunamadı"}
     if not b.startswith(b"\x89PNG") or len(b) > KANIT_MAX: return {"ok": False, "err": "PNG değil ya da çok büyük"}
-    m = p.get("meeting") or {}; title = m.get("title") or STATE["meeting"] or "Toplantı"
     with LOCK:
+        key = toplanti_satir(None, icerik=False)[0]  # Faz B: süren toplantının dosyası (eklentinin başlığı değil); toplantı yoksa kanıt yok
+        if not key: return {"ok": False, "err": _t("Süren toplantı yok — kanıt alınmadı", "No meeting in progress — no evidence captured")}
+        md = os.path.join(BASE, key); jl = md[:-3] + ".jsonl"
         ki = STATE["kanit_iste"]; rid = p.get("istek")
         if rid and ki and ki["id"] == rid: STATE["kanit_iste"] = None
         elif rid: return {"ok": True, "dup": True}  # aynı istek ikinci sekmeden: bir kez kaydedilir
         if p.get("kaynak") == "oto":
             if not yaparken_acik(): return {"ok": False, "err": "ekran kaydı kapalı"}
-            if sum(1 for k in STATE["kanitlar"].get(os.path.basename(paths(title)[0]), []) if k.get("kaynak") == "oto") >= YAPARKEN_MAX:
+            if sum(1 for k in STATE["kanitlar"].get(key, []) if k.get("kaynak") == "oto") >= YAPARKEN_MAX:
                 return {"ok": False, "err": "sinir", "sinir": True}
         not_ = " ".join(str(p.get("not") or (ki.get("not") if ki and rid else "") or "").split())[:300]
-        md, jl = paths(title); key = os.path.basename(md); hdr = ensure_header(md, title, m); show(md, title)
+        hdr = ""
         lst = STATE["kanitlar"].setdefault(key, []); n = len(lst) + 1; now = datetime.datetime.now()
         klasor = os.path.join(KANIT_DIR, key[:-3]); rel = f"kanit/{key[:-3]}/{now.strftime('%H%M%S')}-{n}.png"
         fp = os.path.join(BASE, rel); tmp = fp + ".tmp"
@@ -689,11 +656,22 @@ def komut_uygula(tur, gov, title, durum=None):  # tur: onemli | ozet | sessiz | 
     else: ask({"tur": "ozet"}); onay = _t(f"💬 Ne diyeyim? — {asistan_ad()} replik hazırlıyor", f"💬 What do I say? — {asistan_ad()} is preparing a line")
     STATE["komut"] = {"id": secrets.token_hex(4), "at": at, "tur": tur, "metin": "⌨ " + onay}
     print(f"KOMUT: {tur} · \"{gov[:80]}\"")
+_HITAP_ALTYAZI = set()  # günlüğe bir kez yazılan altyazı hitapları (satır kimliği)
+def _yerel_saat(t):  # eklentinin ISO (UTC) anı → yerel HH:MM:SS; yoksa boş
+    if not t: return ""
+    try: return datetime.datetime.fromtimestamp(_epoch(t)).strftime("%H:%M:%S")
+    except Exception: return ""
 def ingest(p):
     if gizli_acik(): return  # v0.89.1: gizli toplantıda satır yazılmaz
     m = p.get("meeting") or {}; title = m.get("title", "Toplantı"); entries = p.get("entries", [])
+    # Faz B: dosya satırın yakalandığı ana göre (Whisper t0, eklenti capturedAt); eklentinin sayfa başlığı ad olmaz. Biten toplantının geç satırı yazılmaz.
+    e0 = entries[0] if entries else {}
+    t_yak = e0.get("t0") if isinstance(e0.get("t0"), (int, float)) else (_epoch(p["capturedAt"]) if p.get("capturedAt") and p.get("source") != "whisper" else None)
     with LOCK:
-        md, jl = paths(title); hdr = ensure_header(md, title, m, p.get("source")); base_key = os.path.basename(md); show(md, title)
+        base_key, kayit = toplanti_satir(t_yak, kaynak=p.get("source"))
+        if not base_key: return
+        md = os.path.join(BASE, base_key); jl = md[:-3] + ".jsonl"; hdr = ""; title = kayit["ad"]
+        STATE["file_last"][base_key] = time.time()
         md_out, jl_out, golge_out, iz_out = [], [], [], []  # önce bellekte kurulur, sonra tek grup olarak yazılır
         seen = SEEN.setdefault(base_key, {})
         for e in entries:
@@ -726,6 +704,9 @@ def ingest(p):
                         e["_konusan"] = True; print(f"KONUŞ: bölünen hitap birleştirildi — \"{birlesik[:60]}\"")
                     elif yeni_w and "Claude:" not in text and not birlesik and toplanti_var() and (talimat_coz(text) or HITAP_IS_RX.search(text)):  # v0.140.0: neden yapılmadığı günlükte
                         print(f"TALİMAT: hitapsız söz iş/talimat sayılmadı (asistanın adıyla başlamalı) — \"{text[:60]}\"")
+                    elif p.get("source") in ("captions", "transcript") and "Claude:" in text and e.get("id") not in _HITAP_ALTYAZI and not whisper_akiyor("ben"):
+                        _HITAP_ALTYAZI.add(e.get("id"))
+                        print(f"KONUŞ: hitap altyazıda duyuldu, Whisper kapalı — cevaplanmadı (konuşana yalnız Whisper satırı gider) — \"{text[:60]}\"")  # mrt 28 Ekim 01:06 B1
             elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker")): e["_konusan"] = True  # v0.44.0
             if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text)); del SON_SATIRLAR[:-20]
             low = text.lower()
@@ -738,10 +719,19 @@ def ingest(p):
             pay_ekle(base_key, e.get("speaker") or "?", len(raw.split()) - (len(onceki.split()) if onceki else 0))
             flags = [k for k in KEYWORDS if k in low] + list(e.get("flags") or [])
             flags = sorted(set(flags)); mark = "⚠ " + ", ".join(flags) if flags else ""
-            if e.get("revised"): mark = ("↻ düzeltme " + mark).strip()
+            goster = text
+            if e.get("revised"):
+                # mrt 28 Ekim B2: Meet aynı altyazı bloğunu tek kimlikle büyütür; md'ye her düzeltmede tam metin yazılınca döküm katlanıyordu. Metin öncekinin
+                # devamıysa md'ye yalnız eklenen kısım (.jsonl'de tam metin kalır); gerçek düzeltmede tam metin.
+                if onceki and raw.startswith(onceki):
+                    ek_ = raw[len(onceki):].strip()
+                    if not ek_: continue
+                    goster = "… " + sozluk_uygula(ek_, base_key)[0]; mark = ("↻ devam " + mark).strip()
+                else: mark = ("↻ düzeltme " + mark).strip()
             if soz:  # ✎ düzeltildi · ? şüpheli (bağlam yok, düzeltilmedi)
                 mark = (mark + " " + " ".join(("✎ " if z["durum"] == "duzeltildi" else "? ") + f"{z['bicim']}={z['dogru']}" for z in soz)).strip()
-            md_out.append(f"| {e.get('time','')} | {e.get('speaker','?')} | {asistan_goster(text, e.get('_hitap_ad'))} | {asistan_goster(mark, e.get('_hitap_ad'))} |\n")
+            zaman = e.get("time") or _yerel_saat(e.get("chg") or e.get("seen"))  # B3: Meet altyazısında saat yok
+            md_out.append(f"| {zaman} | {e.get('speaker','?')} | {asistan_goster(goster, e.get('_hitap_ad'))} | {asistan_goster(mark, e.get('_hitap_ad'))} |\n")
             rec = {"at": p.get("capturedAt"), "id": e.get("id"), "revised": bool(e.get("revised")), "time": e.get("time"), "speaker": e.get("speaker"), "text": text, "flags": flags, "src": p.get("source")}
             if e.get("kanal"): rec["kanal"] = e["kanal"]  # whisper ben/karsi
             if e.get("_hitap_ad"): rec["hitap"] = e["_hitap_ad"]
@@ -765,41 +755,29 @@ def ingest(p):
             if flags: STATE["flags"].append(rec)
         if golge_out: write([(md[:-3] + ".altyazi.log", "".join(golge_out))])
         if iz_out: write([(md[:-3] + ".sesizi.log", "".join(iz_out))])
-        if not md_out and not jl_out:
-            # ilk paket tümüyle gölgeye (altyazı, Whisper akarken) gittiyse başlık yazılmadı — sonraki pakette yazılsın
-            # (3 Ekim denemesinde .md başlıksız kaldı; toplantı adı ve devam ettirme başlıktan okunur)
-            if hdr: HEADERED.discard(md)
-            return
-        write([(md, hdr), (md, pre_al(md)), (jl, "".join(jl_out)), (md, "".join(md_out))])  # tek grup: ya hepsi ya hiçbiri
-        STATE["meeting"] = YT_AD.get(md, title); STATE["file"] = base_key; STATE["lines"] = STATE["file_lines"].get(base_key, 0)
+        if not md_out and not jl_out: return  # paket tümüyle gölgeye gitti (başlık kayıt açılırken yazıldı)
+        write([(md, pre_al(md)), (jl, "".join(jl_out)), (md, "".join(md_out))])  # tek grup: ya hepsi ya hiçbiri
+        if base_key == aktif_dosya(): STATE["lines"] = STATE["file_lines"].get(base_key, 0)
         STATE["last"] = datetime.datetime.now().isoformat(timespec="seconds"); heartbeat()
 def note(p):
-    m = p.get("meeting") or {}; title = m.get("title", STATE["meeting"] or "Toplantı")
+    m = p.get("meeting") or {}
     with LOCK:
         now = datetime.datetime.now().strftime("%H:%M:%S")
         cell = asistan_goster(" / ".join((p.get("text") or "").replace("|", "¦").splitlines()))  # çok satırlı not tabloyu bozmasın; S133: "Claude: …" notu asistanın adıyla (jsonl'de değişmez)
         etk = "SUFLOR (sesli)" if p.get("kaynak") == "suflor" else NOT_ETIKET; ek = {"kaynak": "suflor"} if p.get("kaynak") == "suflor" else {}  # v0.40.0: Suflor'un toplantıya söylediği
-        b = None if m.get("title") else bitmis_dosya()
-        if b:  # biten toplantının dosyasına, toplantıyı yeniden açmadan
-            md = os.path.join(BASE, b)
-            write([(md, f"| {now} | **{etk}** | {cell} | ✎ (toplantıdan sonra) |\n"), (md[:-3] + ".jsonl", json.dumps({"at": p.get("at"), "note": p.get("text"), "sonra": True, **ek}, ensure_ascii=False) + "\n")])
-            STATE["notes"] += 1; heartbeat(); return
-        md, jl = paths(title); hdr = ensure_header(md, title, m)
-        write([(md, hdr), (md, pre_al(md)), (md, f"| {now} | **{etk}** | {cell} | {'sesli' if ek else '✎'} |\n"), (jl, json.dumps({"at": p.get("at"), "note": p.get("text"), **ek}, ensure_ascii=False) + "\n")])
-        show(md, title); STATE["notes"] += 1; STATE["last"] = now; heartbeat()
-def show(md, title):
-    # Pano, notun/gündem işaretinin yazıldığı dosyayı göstersin (v0.3.4: aktarıcı yeniden başlayınca pano eski
-    # toplantıyı gösterirken not görünmeyen yeni bir dosyaya gidiyordu; kullanıcı "test" yazıp göremedi)
-    base_key = os.path.basename(md); title = oto_ad(title) if "oto_ad" in globals() else title
-    if STATE["file"] != base_key:
-        STATE["file"] = base_key; STATE["notes"] = 0; STATE["flags"] = []
-        STATE["lines"] = STATE["file_lines"].get(base_key, 0)
-    STATE["meeting"] = YT_AD.get(md, title)
+        satir = f"| {now} | **{etk}** | {cell} | {'sesli' if ek else '✎'} |"; rec = {"at": p.get("at"), "note": p.get("text"), **ek}
+        f = toplanti_satir(None, icerik=False)[0]  # Faz B: süren toplantı; yoksa not bekler (PRE) ve sonraki toplantının dosyasına yazılır
+        if not f:
+            PRE.append((satir, None, None, time.time())); PRE_NOT.append(rec); STATE["notes"] += 1; heartbeat(); return
+        md = os.path.join(BASE, f)
+        write([(md, pre_al(md)), (md, satir + "\n"), (md[:-3] + ".jsonl", json.dumps(rec, ensure_ascii=False) + "\n")])
+        STATE["notes"] += 1; STATE["last"] = now; heartbeat()
+PRE_NOT = []  # toplantı yokken alınan notların .jsonl kaydı (kayıt açılınca toplanti.py yazar)
 AG = {"mtime": None, "data": {"title": "Gündem yok", "items": []}}
 def gundem_gorunur():
     # (kullanıcı, 3 Ekim) pano açılınca eski toplantının gündemi görünmesin. Gündem yalnız süren toplantıda, Claude
     # izlerken/hazırlanırken (son 2 dk yoklama) ya da agenda.json son 30 dk'da yeni kurulduysa gösterilir; /agenda tam döner.
-    if aktif_dosya() or (STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 120): return True
+    if gorunen_dosya() or (STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 120): return True
     try: return time.time() - os.path.getmtime(os.path.join(BASE, "agenda.json")) < 1800
     except OSError: return False
 def agenda():
@@ -1009,7 +987,7 @@ def acik_view():
             if q.get("durum") == "acik" and q.get("file") in (None, STATE["file"])]
 def tail(n=200):
     # (kullanıcı) pano yeniden açılınca son oturumdan kalan döküm görünmesin — yalnız süren toplantı
-    if not STATE["file"] or not aktif_dosya(): return []
+    if not STATE["file"] or not gorunen_dosya(): return []
     jl = os.path.join(BASE, STATE["file"].replace(".md", ".jsonl"))
     try: lines = open(jl, encoding="utf-8").read().splitlines()[-n:]; rs = ceviri_uygula([json.loads(x) for x in lines], STATE["file"])
     except Exception: return []
@@ -1062,9 +1040,6 @@ def karsi_konusuyor(sn=90):
     # sekme sesinde ses. Yoksa "1 dk sıfır" yalnız sessizliktir (9 Ekim tek kişilik deneme: 4 yanlış "izin" uyarısı).
     now = time.time(); ben = ben_adi()
     return now - (STATE["yerel_ses"].get("eklenti_karsi_ses") or 0) < sn or any(now - t < sn and k not in (ben, "?") for t, k in ALTYAZI_SON[-50:])
-def toplanti_var():  # eklenti son 60 sn'de toplantıda olduğunu bildirdi mi (iframe nabızları call=false gönderir, ayrı tutulur)
-    return time.time() - (STATE.get("_cagri_son") or 0) < TOPLANTI_VAR_SN
-TOPLANTI_VAR_SN = 6 if os.environ.get("SUFLOR_TEST_HIZLI") else 60
 # --- Deneme hatırlatması (v0.35.2): canli/hatirlatma.json (geliştirme oturumu yazar: {"id", "baslik", "maddeler": [...], "altyazi_olc": bool}) — sıradaki
 # gerçek toplantıda (toplantı sürerken kullanıcıdan başka birinin satırı gelince) panoda bir kez, "Tamam" kapatır. altyazi_olc: masaüstü toplantıda
 # ≥ 3 katılımcı görülünce menü uygulamasının `--ax-altyazi 180` teşhisi bir kez kendiliğinden (kullanıcı komutu hatırlamak zorunda kalmasın).
@@ -1142,18 +1117,21 @@ def yerel_ses_al(p):
         y["kis_kipi"] = kk
         sonra = yerel_ses_durum()
         if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else ""))
-        return {"ok": True, "toplanti": toplanti_var(), "tarayici": STATE.get("_tarayici") or "Chrome"}
-    if not toplanti_var() and not ("oto_ses_sayilir" in globals() and oto_ses_sayilir()): return {"ok": True, "bekle": True}  # S162: eklenti tanımasa da ses toplantı uygulamasından + takvim/Başlat doğruluyorsa işlenir (oto-toplanti.py)
+        # yardımcıya "toplantı var" yalnız sesten bağımsız sinyalde (eklenti çağrıda / masaüstü): ses kendi sinyalini doğrulayıp tarayıcıyı bırakmazdı
+        return {"ok": True, "toplanti": toplanti_dis_sinyal(), "tarayici": (eklenti_cagri() or {}).get("tarayici") or (STATE.get("masaustu") or {}).get("uygulama") or "Chrome"}
+    with LOCK:
+        if not toplanti_acik():
+            for f in toplanti_bak(): threading.Thread(target=f, daemon=True).start()  # Faz B: ses de sinyal; eklenti tanımasa da işlenir
+    if not toplanti_acik(): return {"ok": True, "bekle": True}  # Faz B: toplantı kaydı açıksa (aktarici/toplanti.py)
     y["son"] = now
-    mb = masaustu_baslik()
-    r = ses_al(dict(p, kanal="karsi", kaynak="yerel", **({"meeting": {"title": mb}} if mb else {})))
+    r = ses_al(dict(p, kanal="karsi", kaynak="yerel"))
     km = masaustu_kis_ms()
     return dict(r, kis_ms=km) if km else r
 # Masaüstü toplantıda sesli çeviri okunurken toplantı sesi kısılır (v0.31.8; ayar masaustu_ses_kis: true, varsayılan kapalı — kullanıcı onayı
 # 12 Ekim). Ses yardımcısı --kis ile açılınca masaüstü toplantı uygulamasının sesini kendi üzerinden çalar; bu yanıttaki kis_ms boyunca %30'a
 # indirir (yardımcı 0,5 sn'de bir sorar). Tarayıcıdaki toplantıda kısmayı eklenti yapar (sesli_ceviri_view "kis").
 def masaustu_kis_ms():
-    if AYAR.get("masaustu_ses_kis") is not True or AYAR.get("ceviri_kis", True) is False or not masaustu_baslik(): return 0
+    if AYAR.get("masaustu_ses_kis") is not True or AYAR.get("ceviri_kis", True) is False or not masaustu_toplantida(): return 0
     k = (globals().get("SESLI") or {}).get("kis")
     return max(0, int((k["bitis"] - time.time()) * 1000)) if k else 0
 def deneme_aktarici():
@@ -1206,16 +1184,9 @@ def menu_baslat():
 # Masaüstü toplantı uygulaması (v0.27.0): menü çubuğu uygulaması Erişilebilirlik ile Teams/Zoom masaüstünde "Ayrıl" ve "Sesi aç/kapat"
 # düğmelerini okur, POST /masaustu {uygulama, toplantida, sessiz, baslik} (anahtarla) — eklenti olmadan toplantı sinyali: karşı ses (ses
 # yardımcısının Teams/Zoom sesi) işlenir, döküm toplantı penceresinin başlığıyla açılır. Kullanıcının mikrofonu bu yoldan alınmaz (sonraki adım).
-def masaustu_temiz(b):
-    # Teams pencere başlığı (12 Ekim gerçek): "[Görünüm |] <toplantı> | <kurum> | <hesap e-postası> | Microsoft Teams" — e-posta ve kurum günlüğe/dosya adına girmez
-    p = [x.strip() for x in re.split(r"\s+\|\s+", " ".join(str(b or "").split())) if x.strip()]
-    p = [x for x in p if not re.fullmatch(r"Microsoft Teams|Zoom.*", x)]
-    e = [x for x in p if "@" not in x]
-    if not e: return None
-    return (e[-2] if len(e) >= 2 and len(e) < len(p) else e[-1])[:120]
 def masaustu_al(p):
     m = {"uygulama": str(p.get("uygulama") or "")[:20], "toplantida": bool(p.get("toplantida")), "sessiz": p.get("sessiz") if isinstance(p.get("sessiz"), bool) else None,
-         "baslik": masaustu_temiz(p.get("baslik")), "t": time.time()}
+         "t": time.time()}  # Faz B: pencere başlığı tutulmaz (kişi adı dosya adına giriyordu — 1826-teams B2)
     o = STATE.get("masaustu") or {}
     # menü uygulaması "Ayrıl"ı görmüyor ama toplantı uygulaması ses çıkarmayı sürdürüyorsa toplantı sürüyor sayılır (13 Ekim deneme 8: Teams
     # toplantıdayken 78 sn "Ayrıl" bulunmadı, toplantı bitti sayıldı). En çok MASAUSTU_TUT_SN; ses MASAUSTU_SESSIZ_SN kesilince biter.
@@ -1225,7 +1196,7 @@ def masaustu_al(p):
         if (yerel_ses_durum() == "dinliyor" and y.get("uygulama") == m["uygulama"] and now - (y.get("sesli_t") or 0) < MASAUSTU_SESSIZ_SN
                 and now - bas < MASAUSTU_TUT_SN):
             if not o.get("tut_bas"): print(f"MASAÜSTÜ: {m['uygulama']} · \"Ayrıl\" görünmüyor ama toplantı sesi sürüyor — toplantıda sayıldı")
-            m.update(toplantida=True, sessiz=o.get("sessiz"), baslik=o.get("baslik"), tut_bas=bas)
+            m.update(toplantida=True, sessiz=o.get("sessiz"), tut_bas=bas)
     # v0.31.0: katılımcı listesi (Kişiler paneli, ara sıra gelir — gelmeyen gönderimde eskisi kalır), konuşan kişi (oy), ekran paylaşımı
     kat = p.get("katilimcilar")
     m["katilimcilar"] = [" ".join(str(k).split())[:60] for k in kat if str(k).strip()][:50] if isinstance(kat, list) else (o.get("katilimcilar") if m["toplantida"] else None)
@@ -1237,57 +1208,22 @@ def masaustu_al(p):
     m["bitti_t"] = o.get("bitti_t") if m["toplantida"] or not o.get("toplantida") else time.time()
     STATE["masaustu"] = m
     if not o: print(f"MASAÜSTÜ: menü uygulaması bağlandı · {m['uygulama'] or '?'}" + ("" if m["toplantida"] else " · toplantı yok"))
-    if not m["toplantida"] and o.get("toplantida"): hizli_ozet_tetik("masaüstü")  # v0.52.0 hızlı sesli özet
-    if m["toplantida"] and not o.get("toplantida"):
-        masaustu_ad_sabitle(o)
-        if o: masaustu_yeni_toplanti(o)
-    if m["toplantida"]: STATE["_cagri_son"] = time.time(); STATE["_tarayici"] = m["uygulama"] or "Teams"
+    with LOCK:
+        if not m["toplantida"] and o.get("toplantida") and toplanti_cikis("masaüstü toplantı penceresi kapandı"): hizli_ozet_tetik("masaüstü")  # v0.52.0 hızlı sesli özet
+        isler = toplanti_bak() if m["toplantida"] and not o.get("toplantida") else []  # Faz B: kayıt hemen (3 sn döngüsü beklenmez)
+    for f in isler: threading.Thread(target=f, daemon=True).start()
     if m["toplantida"] != bool(o.get("toplantida")) or m["sessiz"] != o.get("sessiz"):
         print(f"MASAÜSTÜ: {m['uygulama']} · " + ("toplantıda" if m["toplantida"] else "toplantı yok") + (" · sessizde" if m["sessiz"] else " · mikrofon açık" if m["sessiz"] is False else "")
-              + (f" · {m['baslik']}" if m["baslik"] and m["toplantida"] else ""))
+              )
     if isinstance(kat, list) and m["katilimcilar"] != o.get("katilimcilar"): print(f"MASAÜSTÜ: katılımcılar {len(m['katilimcilar'])} kişi")
     if ksay and ksay != o.get("kisi_sayisi"): print(f"MASAÜSTÜ: katılımcı sayısı {ksay} (Kişiler düğmesinden)")
     ks = " ".join(str(p.get("konusan") or "").split())[:60]
     if ks and m["toplantida"] and ks != ben_adi(): kume_oyla(ks, taslak=True)  # konuşan kişi göstergesi: altyazı taslağı gibi oy
-    if m["toplantida"] and masaustu_baslik() and m["paylasim"] is not None and m["paylasim"] != o.get("paylasim"): paylasim_bildir(m["paylasim"])
-    return {"ok": True, "tut": bool(m.get("tut_bas"))}  # menü uygulaması tutma sırasında mikrofonu ve kanıtı açık tutar
+    if m["toplantida"] and not eklenti_cagri() and m["paylasim"] is not None and m["paylasim"] != o.get("paylasim"): paylasim_bildir(m["paylasim"])
+    return {"ok": True, "tut": bool(m.get("tut_bas")) or mic_iste()}  # menü uygulaması tutma sırasında mikrofonu ve kanıtı açık tutar
+def mic_iste():  # Faz B (S165): eklentisiz web toplantıda kullanıcının mikrofonu menü uygulamasından — toplantı sürüyor, masaüstünde değil, çağrıda eklenti yok
+    return toplanti_var() and not masaustu_toplantida() and not eklenti_cagri() and AYAR.get("masaustu_mic") is not False
 MASAUSTU_TUT_SN, MASAUSTU_SESSIZ_SN = (20, 4) if os.environ.get("SUFLOR_TEST_HIZLI") else (600, 30)
-MASAUSTU_YENI_SN = float(os.environ.get("SUFLOR_TEST_YENI_SN") or 120)  # masaüstü toplantıdan bu süreden uzun çıkılıp yeniden girilince yeni döküm dosyası (kısa kopma aynı dosyada sürer)
-# Toplantı adı toplantı başında sabitlenir (13 Ekim deneme 9: Teams pencere başlığı toplantı içinde önceki toplantının adı → kurum adı → toplantının
-# adı diye değişti, döküm ve kanıt üç dosyaya bölündü). Ad önce Başlat'ın konusundan (takvim-secilen.json; son 30 dk'da ya da toplantı saatinde
-# seçildiyse ve önceki masaüstü toplantısında kullanılmadıysa), yoksa ilk başlıktan; kısa kopmada (MASAUSTU_YENI_SN) eski ad sürer.
-def masaustu_ad_sabitle(o):
-    s = STATE.get("masaustu_ad") or {}; b = o.get("bitti_t")
-    if s and b is not None and time.time() - b < MASAUSTU_YENI_SN: return
-    ad, kaynak, at = None, "başlık", None
-    # v0.88.1 (19 Ekim 17.45 deneme): kullanıcı web'deki toplantıdan çıkıp 2 sn sonra masaüstü uygulamasıyla aynı toplantıya girdi; masaüstü yolu
-    # Başlat'ın adıyla yeni dosya açtı, döküm ikiye bölündü. Tarayıcıda son MASAUSTU_YENI_SN içinde süren toplantının dosyası varsa o sürer.
-    w = STATE.get("_web_toplanti") or {}
-    if w.get("ad") and time.time() - w.get("t", 0) < MASAUSTU_YENI_SN and w["ad"] in STATE["meeting_files"]:
-        STATE["masaustu_ad"] = {"ad": w["ad"], "devir": True}
-        print(f"MASAÜSTÜ: toplantı adı sabit — {w['ad']} (tarayıcıdaki toplantı sürüyor)"); return
-    try:
-        with open(os.path.join(BASE, "takvim-secilen.json"), encoding="utf-8") as f: ts = json.load(f)
-        at = str(ts.get("at") or ""); now = datetime.datetime.now().astimezone()
-        sec = datetime.datetime.fromisoformat(at).astimezone()
-        try: zaman_ici = _zaman(ts["baslangic"]) - datetime.timedelta(minutes=15) <= now <= _zaman(ts["bitis"])
-        except (KeyError, TypeError, ValueError): zaman_ici = False
-        if at != STATE.get("masaustu_ad_at") and not ts.get("oto") and ((now - sec).total_seconds() < 1800 or zaman_ici):  # S161: kendiliğinden başlatmanın seçimi sonraki toplantıya ad olmaz
-            ad = " ".join(str(ts.get("konu") or "").split())[:120] or None; kaynak = "Başlat"
-    except (OSError, ValueError, TypeError, AttributeError): pass
-    STATE["masaustu_ad"] = {}  # masaustu_baslik() ilk başlığı versin
-    ad = ad or masaustu_baslik()
-    STATE["masaustu_ad"] = {"ad": ad} if ad else {}
-    if ad and kaynak == "Başlat": STATE["masaustu_ad_at"] = at
-    if ad: print(f"MASAÜSTÜ: toplantı adı sabit — {ad} ({kaynak})")
-def masaustu_yeni_toplanti(o):
-    # aynı adlı toplantı 20 dk içinde yeniden başlayınca eski dosyaya yazılıyordu (12 Ekim: tarayıcı denemesinin dosyasına masaüstü denemesi)
-    b = o.get("bitti_t")
-    if b is not None and time.time() - b < MASAUSTU_YENI_SN: return
-    if (STATE.get("masaustu_ad") or {}).get("devir"): return  # tarayıcıdan geçiş: aynı dosya sürer
-    with LOCK:
-        t = masaustu_baslik()
-        if t and STATE["meeting_files"].pop(t, None): print(f"MASAÜSTÜ: yeni toplantı — yeni döküm dosyası ({t})")
 def masaustu_diger_katilimci():
     # Kişiler panelinden okunan listede kullanıcıdan başka tek kişi varsa onun adı (bire bir toplantıda karşı tarafın adı altyazısız da bulunur)
     m = STATE.get("masaustu") or {}
@@ -1295,15 +1231,6 @@ def masaustu_diger_katilimci():
     ben = sade(ben_adi()).split(" ")[0] if ben_adi() else ""
     diger = [k for k in (m.get("katilimcilar") or []) if not (ben and sade(k).split(" ")[0] == ben)]
     return diger[0] if len(diger) == 1 else None
-def masaustu_baslik():  # eklenti toplantıda değilken masaüstü toplantısının döküm başlığı
-    m = STATE.get("masaustu") or {}
-    if not m.get("toplantida") or time.time() - m.get("t", 0) > 30: return None
-    x = STATE.get("extension") or {}
-    if x.get("call") and _yas_sn(x) < 30: return None
-    if (STATE.get("masaustu_ad") or {}).get("ad"): return STATE["masaustu_ad"]["ad"]
-    b = re.sub(r"\s*[|–-]\s*(Microsoft Teams|Zoom.*)$", "", m.get("baslik") or "").strip()
-    return b if b and not re.fullmatch(r"(Microsoft Teams|Zoom( Meeting| Toplantısı)?|Toplantı|Meeting)", b, re.I) else f"{m.get('uygulama') or 'Masaüstü'} toplantısı"
-
 # Masaüstü toplantıda kullanıcının mikrofonu (v0.30.0, onaylı plan 12 Ekim): menü uygulaması toplantıda mikrofonu açar, 1 sn parçaları
 # 1 sn bekletip (arada sessize alınırsa atar) POST /ses-masaustu ile gönderir {t, pcm, aygit} ya da {olay: acildi|kapandi|izin, aygit}.
 # Yalnız masaüstü toplantı sürerken ve mikrofon sessizde değilken "ben" kanalına girer (web davranışı: sessizde hiçbir şey yazılmaz); tarayıcıda
@@ -1318,9 +1245,9 @@ def masaustu_mic_al(p):
         else: print("MASAÜSTÜ MİKROFON: izin yok (Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me)")
         return {"ok": True}
     m = STATE.get("masaustu") or {}
-    if not masaustu_baslik() or m.get("sessiz") is True: mm["atilan"] += 1; return {"ok": True, "bekle": True}
+    if not ((masaustu_toplantida() and not eklenti_cagri()) or mic_iste()) or m.get("sessiz") is True: mm["atilan"] += 1; return {"ok": True, "bekle": True}
     if ayg and ayg != mm["aygit"]: mm["aygit"] = ayg; print(f"MASAÜSTÜ MİKROFON: aygıt {ayg}")
-    r = ses_al(dict(p, kanal="ben", kaynak="masaustu", meeting={"title": masaustu_baslik()}))
+    r = ses_al(dict(p, kanal="ben", kaynak="masaustu"))
     if r.get("eklenti"): mm["atilan"] += 1
     elif r.get("ok"): mm["parca"] += 1; mm["son"] = now
     return r
@@ -1332,37 +1259,7 @@ def masaustu_mic_view():
         mm["t_kulaklik"] = now
     return {"akiyor": akiyor, "aygit": mm["aygit"], "parca": mm["parca"], "atilan": mm["atilan"], "kulaklik": mm["kulaklik"] if akiyor else None}
 
-# Toplantı bitişi (v0.27.2): aktarıcı kendisi algılar, /status "toplanti_bitti" {file, t, neden}; izle "TOPLANTI BİTTİ" olayını bir kez verir.
-# 11 Ekim denemesi: eklenti sinyali 17:27'de koptu, kullanıcı 17:29'da ayrıldı, bitiş Claude'a ulaşmadı. Kural: toplantı sinyali (eklenti
-# çağrısı ya da masaüstü) 60 sn yok VE toplantı uygulaması mikrofonu bıraktı (ses yardımcısı "dinliyor" değil) → bitti; ses yardımcısı
-# kurulu/açık değilse yedek: son satır ≥ 5 dk önce. Sinyal kopsa da toplantı sürüyorsa tarayıcı mikrofonu tutar, yardımcı dinler → bitmez.
-BITIS = {"aktif": None, "t_aktif": 0.0}; BITIS_SATIRSIZ_SN = 8 if os.environ.get("SUFLOR_TEST_HIZLI") else 300
-BITIS_SESLI_SN = 6 if os.environ.get("SUFLOR_TEST_HIZLI") else 60
-def toplanti_bitis_bak():
-    af = STATE.get("file"); now = time.time()
-    if toplanti_var():
-        BITIS.update(aktif=af or BITIS["aktif"], t_aktif=now)
-        if (STATE.get("toplanti_bitti") or {}).get("file") == af: STATE["toplanti_bitti"] = None  # yeniden katıldı
-        return
-    f = BITIS["aktif"]
-    if not f or (STATE.get("toplanti_bitti") or {}).get("file") == f or STATE["file_lines"].get(f, 0) < 1: return
-    ys = yerel_ses_durum(); son_satir = STATE["file_last"].get(f, 0); m = STATE.get("masaustu") or {}
-    if ys in ("dinliyor", "izin") and now - son_satir < BITIS_SATIRSIZ_SN: return  # toplantı uygulaması mikrofonu hâlâ tutuyor
-    # satır gelmese de toplantı uygulaması son 60 sn'de ses çıkardıysa sürüyor (13 Ekim deneme 8: eklenti sustu, Chrome'daki toplantı sürerken 5 dk sonra bitti sayıldı)
-    if ys == "dinliyor" and now - (STATE["yerel_ses"].get("sesli_t") or 0) < BITIS_SESLI_SN: return
-    if ys not in ("bekliyor", "dinliyor", "izin") and now - son_satir < BITIS_SATIRSIZ_SN: return  # yardımcı yok: satırsız 5 dk beklenir
-    neden = ("masaüstü toplantı penceresi kapandı" if not m.get("toplantida") and (m.get("bitti_t") or 0) > BITIS["t_aktif"] - 30 else
-             f"{round((now - son_satir) / 60)} dk satır yok" if now - son_satir >= BITIS_SATIRSIZ_SN else
-             "toplantı sinyali yok, toplantı uygulaması mikrofonu bıraktı")
-    STATE["toplanti_bitti"] = {"file": f, "t": datetime.datetime.now().isoformat(timespec="seconds"), "neden": neden}
-    print(f"TOPLANTI: bitti ({neden}) · {f}")
-    if SESLI["acik"]:  # sesli çeviri toplantıyla kapanır (deneme 9: bitişten sonra açık kaldı, elle kapatıldı)
-        print(f"SESLİ ÇEVİRİ: toplantı bitti — kapandı · okunan {SESLI['okunan']}, atlanan {SESLI['atlanan']}"); SESLI.update(acik=False, q=[])
-def _bitis_dongu():
-    while True:
-        time.sleep(1 if os.environ.get("SUFLOR_TEST_HIZLI") else 10)
-        try: toplanti_bitis_bak()
-        except Exception as e: print(f"TOPLANTI: bitiş denetimi hata ({e.__class__.__name__})")
+# Toplantı bitişi: Faz B'den aktarici/toplanti.py (bitiyor → bitti; /status toplanti_bitti {file, t, neden}; izle "TOPLANTI BİTTİ" olayını bir kez verir).
 
 # --- v0.9.3: takvim + panodan /toplanti başlatma ------------------------------------------------------------------
 # Mac Takvim (Takvim uygulamasına eklenmiş tüm hesaplar) "Suflor Takvim.app" yardımcısıyla okunur: aktarıcı 5 dk'da bir
@@ -1491,9 +1388,6 @@ def cikti_metin(c):
 def son_yukle():
     try: SON[:] = [json.loads(l) for l in open(os.path.join(BASE, "son-toplantilar.jsonl"), encoding="utf-8") if l.strip()][-20:]
     except (OSError, ValueError): return
-    if SON and SON[-1].get("dosya"):  # yeniden başlatmada biten toplantı yeniden "süren" görünmesin
-        try: STATE["bitti"] = {"file": SON[-1]["dosya"], "t": SON[-1].get("t") or datetime.datetime.fromisoformat(SON[-1]["at"]).timestamp() + 1}
-        except (KeyError, ValueError): pass
 def bildirim(baslik, alt, metin, son=None):
     # menü uygulaması açıksa bildirimi o gösterir (v0.31.3): tıklayınca özet açılır (son: SON kaydının kimliği) ya da pano. osascript'in
     # bildirimine tıklayınca Betik Düzenleyici boş açılıyordu (12 Ekim). Menü uygulaması yoksa (beta) eski yol.
@@ -1533,7 +1427,7 @@ def son_ekle(p):
         except OSError as e: print(f"ÖZET: harita yazılamadı ({e.__class__.__name__})")
     with LOCK:
         _log("son-toplantilar.jsonl", r); SON.append(r); del SON[:-20]
-        if r["dosya"]: STATE["bitti"] = {"file": r["dosya"], "t": r["t"]}
+    if r["dosya"]: toplanti_bitir("özet hazır", r["dosya"])  # Faz B: özet hazır = toplantı bitti (pano hemen "Son toplantılar"a geçer)
     print(f"ÖZET: hazır" + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""))
     bildirim("Suflor.me", _t("Toplantı özeti hazır", "Meeting summary ready"),
              (r["baslik"] or os.path.basename(ozet)) + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""), son=r["id"])
@@ -1714,7 +1608,7 @@ bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, t
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
 bolum("gerginlik")  # aktarici/gerginlik.py — Toplantı gerginliği → kişiliğin ses tonu (v0.80.0, S87)
-bolum("oto-toplanti")  # aktarici/oto-toplanti.py — Toplantıyı kendisi tanıma: tanınan toplantı → takvim adı, dosya, toplantı oturumu (S161, v0.144.0)
+bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
 bolum("beta-veri")  # aktarici/beta-veri.py — Beta geliştirme verisi: olay sayacı, haftalık paket, toplantı sonu kalitesi (S141; en sonda: öbür bölümlerin işlevlerini sarar)
 bolum("duman")  # aktarici/duman.py — Deneme toplantısı (duman testi) kipi: 3 dk denetim listesi, panoda canlı (Faz D2, v0.148.0)
 bolum("saglik")  # aktarici/saglik.py — "toplantı var, veri yok" uyarısı (/status veri_yok) ve Kurulumu denetle (/dogrula; Faz D, v0.147.0)
@@ -1869,12 +1763,19 @@ def gundem_maddeleri(v):
         if l and l not in out: out.append(l)
     return out[:15]
 
+def soru_oturumsuz(metin):  # mrt 28 Ekim (kritik): toplantıda panodan soru, toplantı oturumu izlemiyorsa cevapsız kalıyordu — yazılı Konuş cevaplar (panoda, okunmaz)
+    if (STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60) or topo_canli(): return None
+    r = konus_yazili(metin); print(f"SORU: toplantı oturumu izlemiyor — yazılı asistana gitti ({'ok' if r.get('ok') else r.get('err')})"); return r
 def baslat(p):
     # S161: toplantı sürerken (oturum izliyor ya da açılıyor) elle Başlat yeni oturum ve yeni kayıt açmaz — süren toplantıya katılır
-    a = (OTO.get("aktif") or {}) if "OTO" in globals() else {}
+    a = TOPLANTI.get("aktif") or {}
     # Faz A (S162): canlı oturumu ikinci Başlat öldürmesin — toplantı sürüyorsa ya da aynı konuysa katılır; toplantı yokken boşta kalmış eski oturum (2 sa) yeni konuyla yenilenir
+    # Faz B: bitiyor'daki toplantıya farklı konuyla Başlat yeni toplantıdır (1826-teams: biten masaüstü toplantısından 70 sn sonra "Test")
     k_ = " ".join(str(p.get("konu") or "").split())[:200]
-    if STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60 or (topo_canli() and (not k_ or k_ == TOPO.get("konu") or toplanti_var() or a.get("ad") or (STATE.get("masaustu") or {}).get("toplantida"))):
+    suren = a.get("durum") in ("algilandi", "suruyor") or (a.get("durum") == "bitiyor" and (not k_ or k_ == a.get("ad")))
+    if STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60 or (topo_canli() and (not k_ or k_ == TOPO.get("konu") or suren)):
+        try: a = toplanti_baslatta(k_, TAKVIM_TAM.get(str(p.get("olay") or "")) if p.get("olay") else None, p.get("platform") if p.get("platform") in PLATFORM_ANA else None, None) or {}  # kayıt yoksa ya da bitmekteyse
+        except Exception as e: print(f"BAŞLAT: toplantı kaydı hatası {e.__class__.__name__}: {e}")
         print(f"BAŞLAT: toplantı oturumu zaten açık — süren toplantıya katıldı{' (' + a['ad'] + ')' if a.get('ad') else ''}")
         return {"ok": True, "katildi": True, "konu": a.get("ad") or STATE.get("meeting")}
     olay = TAKVIM_TAM.get(str(p.get("olay") or "")) if p.get("olay") else None
@@ -1939,6 +1840,8 @@ def baslat(p):
     elif not os.environ.get("SUFLOR_TEST_BASLAT"):  # deneme: Terminal açılmaz, yalnız dosyalar yazılır
         subprocess.Popen(["open", "-a", "Terminal", cp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     STATE["baslatma"] = {"at": time.time(), "oto": bool(p.get("oto")), "konu": konu, "olay": (olay or {}).get("id"), "baglanti": baglanti, "ana": ana, "platform": plat if ana else None, "baslangic": (olay or {}).get("baslangic")}
+    try: toplanti_baslatta(konu, olay, plat, baglanti)  # Faz B: kayıt yoksa açılır (ad: Başlat konusu ya da takvim), sürüyorsa katılır
+    except Exception as e: print(f"BAŞLAT: toplantı kaydı hatası {e.__class__.__name__}: {e}")
     try: heartbeat()  # S162: Başlat'ta da heartbeat.json yazılır
     except Exception: pass
     try: modelleri_isit()
@@ -2012,9 +1915,10 @@ class H(BaseHTTPRequestHandler):
                 if time.time() - (STATE.get("_pano_t") or 0) > 300: STATE["_pano_ilk"] = time.time()
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_cagri_son", None); s.pop("_tarayici", None); s.pop("_ext_cagri", None); s.pop("_web_toplanti", None); [s.pop(k, None) for k in ("_ext_panel_t", "_ext_captions_t", "_ext_rows", "_ext_ust_t")]; ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
-            af = aktif_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s.pop("bitti", None); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
+            # Faz B: aktif = süren kayıt, yoksa yeni biten (özet gelene dek) — yalnız gösterim
+            af = gorunen_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
             s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
             if s.get("extension"):
@@ -2188,7 +2092,9 @@ class H(BaseHTTPRequestHandler):
             if not p.get("teknik", True): ek.update(durum={}, son_olaylar=[])
             r_ = teshis_gonder("geri_bildirim", ek, anahtar=("gb", time.time()), zorla=True)
             print(f"GERİ BİLDİRİM: gönderildi ({r_.get('durum')})"); return self._json(r_)
-        if self.path == "/ask": q = ask(p); return self._json({"ok": bool(q), "question": q})
+        if self.path == "/ask":
+            q = ask(p); y = soru_oturumsuz(p.get("text")) if q and p.get("tur") != "ozet" else None
+            return self._json(dict({"ok": bool(q), "question": q}, **({"asistan": y} if y else {})))
         if self.path == "/girdi":  # tek kutu (pano, mini pano, eklenti penceresi)
             # kullanıcı (21 Ekim): not mu soru mu Claude karar verir — toplantı oturumu izliyorsa yazı not olarak dökümde kalır ve
             # GİRDİ olayıyla hemen Claude'a gider (soruysa cevaplar). Claude izlemiyorsa eski kural (başta ? → soru). ⌘Enter her zaman soru.
@@ -2197,7 +2103,9 @@ class H(BaseHTTPRequestHandler):
             if toplantisiz():  # v0.117.0 (S136): toplantı yokken soru toplantı dışı asistana yazılı, not Notlar defterine (sahte "Toplantı" dökümü açılmaz)
                 if tur == "soru" or p.get("soru"): return self._json(dict(konus_yazili(metin), tur="asistan"))
                 baglam_ekle(baglam_ayir(metin)[0], "kutu"); return self._json(dict(not_defter_yaz(metin, p.get("at")), tur="defter"))
-            if tur == "soru" or p.get("soru"): q = ask({"text": metin}); return self._json({"ok": bool(q), "tur": "soru", "question": q})
+            if tur == "soru" or p.get("soru"):
+                q = ask({"text": metin}); y = soru_oturumsuz(metin) if q else None
+                return self._json(dict({"ok": bool(q), "tur": "soru", "question": q}, **({"asistan": y} if y else {})))
             claude = bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
             # v0.111.0: arka plandaki toplantı oturumu kullanıcıyı bekliyor (soru sordu) ya da çalışıyor ama izle'de değil (hazırlık) — yazı doğrudan ona gider
             # (izle çalışıyorsa — Monitor'da — eski yol: not + GİRDİ olayı; oturum turu bitirmiş görünse de izliyordur)
@@ -2230,7 +2138,10 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ses-masaustu": return self._json(masaustu_mic_al(p))
         if self.path == "/kanit-masaustu":  # menü uygulamasının toplantı penceresi görüntüsü (anahtarla; Origin yalnız aktarıcının kendisi ya da yok)
             if o and not o.startswith(f"http://127.0.0.1:{A.port}"): return self._json({"ok": False, "err": "köken"}, 403)
-            r = kanit(dict(p, meeting={"title": masaustu_baslik() or STATE.get("meeting") or "Toplantı"})); return self._json(r, 200 if r.get("ok") else 400)  # menü uygulamasının mikrofonu (anahtarla; geçiş listesinde yok)
+            r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)  # menü uygulamasının mikrofonu (anahtarla; geçiş listesinde yok)
+        if self.path == "/toplanti":  # Faz B: elle bitir (yalnız API; panoda düğme yok — S162 dondurma). {"islem": "bitir"}
+            if p.get("islem") != "bitir": return self._json({"ok": False, "err": "islem"}, 400)
+            return self._json({"ok": toplanti_bitir("elle bitirildi")})
         if self.path == "/agenda-aktif":  # izle konuşulan gündem maddesini tahmin eder; pano ▶ gösterir (yalnız görünüm)
             i = p.get("i"); STATE["agenda_aktif"] = int(i) if isinstance(i, int) else None; return self._json({"ok": True})
         if self.path == "/ping":
@@ -2239,17 +2150,13 @@ class H(BaseHTTPRequestHandler):
                 # ~7 dk kesinti vardı, nedeni (Chrome zamanlayıcı kısıtlaması mı, takılan istek mi) günlükten anlaşılmıyordu
                 simdi = time.time(); son = STATE.get("_ping_son") or 0; STATE["_ping_son"] = simdi
                 if 30 < simdi - son < 3600: print(f"EKLENTİ: nabız {round(simdi - son)} sn sonra geldi · {str(p.get('kim') or '?')[:20]} · sekme {str(p.get('vis') or '?')[:12]}")
-                if p.get("call") or p.get("panel") or p.get("captions"):  # yerel ses yalnız toplantıdayken; tarayıcı yardımcıya ipucu
-                    ua = str(self.headers.get("User-Agent", "")); STATE["_cagri_son"] = simdi
-                    STATE["_tarayici"] = "Edge" if "Edg/" in ua else "Safari" if ("Safari/" in ua and "Chrome/" not in ua) else "Chrome"
-                if isinstance(p.get("mic"), dict):  # yalnız üst çerçeve mic gönderir: çağrı bitti geçişi → hızlı sesli özet (v0.52.0)
-                    if STATE.get("_ext_cagri") and not p.get("call"): hizli_ozet_tetik("tarayıcı")
-                    STATE["_ext_cagri"] = bool(p.get("call"))
-                    # v0.88.1: tarayıcıdaki toplantının adı — kullanıcı aynı toplantıya masaüstü uygulamasıyla geçerse o dosya sürer (masaustu_ad_sabitle)
-                    if p.get("call") and (p.get("meeting") or {}).get("title"): STATE["_web_toplanti"] = {"t": simdi, "ad": str(p["meeting"]["title"])[:200]}
-                if isinstance(p.get("mic"), dict): STATE["mic"] = {"on": bool(p["mic"].get("on")), "sessiz": bool(p["mic"].get("sessiz")), "hata": str(p["mic"].get("hata") or "")[:120], "t": simdi}
-                _o_ext = STATE.get("extension") or {}
-                STATE["extension"] = {"ver": p.get("ver") or (STATE.get("extension") or {}).get("ver"), "seen": datetime.datetime.now().isoformat(timespec="seconds"), "panel": bool(p.get("panel")), "rows": p.get("rows", 0), "captions": bool(p.get("captions")), "call": bool(p.get("call")), "lang": p.get("lang") or p.get("capLang"), "langSrc": p.get("langSrc") or ("captions" if p.get("capLang") else None), "meeting": (p.get("meeting") or {}).get("title"), "sent": p.get("sent", 0), "capAuto": p.get("capAuto") or (STATE.get("extension") or {}).get("capAuto", ""), "platform": p.get("platform") or (STATE.get("extension") or {}).get("platform") or "bilinmeyen", "yonerge": p.get("yonerge") or (STATE.get("extension") or {}).get("yonerge")}; eklenti_birlestir(p, _o_ext, simdi); heartbeat()  # altyazıyı kendisi açma sonucu; iframe pingleri (all_frames) boş gönderir, üzerine yazmasın
+                # Faz B: eklentinin durumu sekme başına (aktarici/toplanti.py EKLENTI); çağrıdaki sekmeden STATE["extension"] türer. Eklenti kapı değil, sinyallerden biri.
+                if isinstance(p.get("mic"), dict) and (p.get("call") or not eklenti_cagri()):  # çağrısız ikinci sekme çağrıdakinin mikrofonunu ezmesin
+                    STATE["mic"] = {"on": bool(p["mic"].get("on")), "sessiz": bool(p["mic"].get("sessiz")), "hata": str(p["mic"].get("hata") or "")[:120], "t": simdi}
+                if eklenti_nabiz(p, str(self.headers.get("User-Agent", ""))) and toplanti_cikis("tarayıcıda çağrıdan çıkıldı"): hizli_ozet_tetik("tarayıcı")  # v0.52.0
+                isler = toplanti_bak() if p.get("call") else []  # çağrı nabzı kaydı hemen günceller (3 sn döngüsü beklenmez)
+                heartbeat()
+            for f in isler: threading.Thread(target=f, daemon=True).start()
             if isinstance(p.get("paylasim"), bool): paylasim_bildir(p["paylasim"], p.get("paylasim_neden"))  # yalnız üst çerçeve gönderir
             # v0.84.1: katılımcı sayısı (web, Kişiler düğmesi) — etiket değişince günlüğe (biçim doğrulaması); sayı gelmezse çağrı sürdükçe eskisi
             try: ksay = int(p["kisi_sayisi"]) if p.get("kisi_sayisi") is not None and 0 < int(p["kisi_sayisi"]) < 1000 else None
@@ -2263,10 +2170,10 @@ class H(BaseHTTPRequestHandler):
                 STATE["agenda_ticks"][str(p.get("i"))] = bool(p.get("v"))
                 # not ile aynı hedef: süren toplantı, yoksa "Toplantı" dosyası (eski, salt-okunur dosyaya yazılmaz)
                 satir = f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **GÜNDEM** | {'✓' if p.get('v') else '✗'} {p.get('label','')} | |\n"
-                b = bitmis_dosya()  # biten toplantıda işaret onu yeniden açmaz
-                if b: write([(os.path.join(BASE, b), satir)]); heartbeat(); return self._json({"ok": True})
-                title = STATE["meeting"] or "Toplantı"; md, _ = paths(title); hdr = ensure_header(md, title, {}); show(md, title)
-                write([(md, hdr), (md, pre_al(md)), (md, satir)]); heartbeat()
+                f = toplanti_satir(None, icerik=False)[0]  # Faz B: süren toplantıya; yoksa bekler (PRE), biten toplantıya yazılmaz
+                if f: md = os.path.join(BASE, f); write([(md, pre_al(md)), (md, satir)])
+                else: PRE.append((satir.rstrip("\n"), None, None, time.time()))
+                heartbeat()
             return self._json({"ok": True})
         self._json({"ok": False}, 404)
     def log_message(self, *a): pass
@@ -2278,10 +2185,9 @@ if __name__ == "__main__":
     threading.Thread(target=menu_baslat, daemon=True).start()  # ayar menu_cubugu
     threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
     threading.Thread(target=sg_bekci, daemon=True).start()  # Faz 11: ayar yerel modeli (Ollama) gösteriyorsa sunucusu açık tutulur
-    threading.Thread(target=_bitis_dongu, daemon=True).start()
     threading.Thread(target=_heartbeat_dongu, daemon=True).start()
     threading.Thread(target=_veri_yok_dongu, daemon=True).start()  # Faz D: toplantı var, veri yok  # S162: heartbeat.json 8 sn'de bir
-    threading.Thread(target=_oto_dongu, daemon=True).start()  # S161: tanınan toplantı → dosya + toplantı oturumu  # toplantı bitişi → /status toplanti_bitti
+    threading.Thread(target=_toplanti_dongu, daemon=True).start()  # Faz B: tek toplantı kaydı — algılama, bitiş (/status toplanti, toplanti_bitti), canli/toplanti.json
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi
     threading.Thread(target=_kayit_dongu, daemon=True).start()  # ölçüm kayıtlarını döndür

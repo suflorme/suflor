@@ -1,13 +1,13 @@
 # Suflor.me aktarıcı bölümü: Notlar defteri — toplantı yokken pano kutusu (v0.117.0, S136).
 # Ayrı modül değildir — relay.py bunu kendi ad alanında çalıştırır (bolum("notlar")): BASE, write, aktif_dosya … relay.py'nin. import etme.
 # Kullanıcı (22 Ekim): toplantı yokken kutuya yazılan not sahte bir "Toplantı" dökümü açıyor, pano 20 dk toplantı görünümüne geçiyordu
-# (Başlat ve takvim gizli); soru izleyen olmadığı için cevapsız kalıyordu. Artık ne süren, ne yeni biten (bitmis_dosya: 2 sa), ne de hazırlanan
+# (Başlat ve takvim gizli); soru izleyen olmadığı için cevapsız kalıyordu. Artık ne süren, ne de hazırlanan
 # (son 30 dk'da Başlat/gündem, arka planda toplantı oturumu) toplantı varsa: soru toplantı dışı asistana yazılı gider (konus_yazili: cevap
 # panoda, okunmaz), not canli/notlar.jsonl'e. Defter kişisel: panoya yalnız anahtarlı /status ile gider. Silme ayrı satırla ({"sil": id}).
 NOTLAR_DOSYA, NOT_HAZIRLIK_SN, NOT_GOSTER_SA, NOT_GOSTER_EN_COK = "notlar.jsonl", 1800, 24, 20
 
 def toplantisiz():  # kutu: süren, yeni biten ya da hazırlanan toplantı yok
-    if aktif_dosya() or toplanti_var() or bitmis_dosya() or topo_canli(): return False
+    if aktif_dosya() or topo_canli(): return False  # Faz B: süren (algılandı/sürüyor/bitiyor) toplantı
     for y in ("takvim-secilen.json", "agenda.json"):  # Başlat ya da gündem: yeni toplantı hazırlanıyor, not ona (PRE) gider
         try:
             if time.time() - os.path.getmtime(os.path.join(BASE, y)) < NOT_HAZIRLIK_SN: return False

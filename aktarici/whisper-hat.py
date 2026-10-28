@@ -115,7 +115,7 @@ def ses_al(p):
             STATE["yerel_ses"]["eklenti_karsi_ses"] = time.time()  # "izin" kuralının kanıtı
         if time.time() - (STATE["yerel_ses"].get("son") or 0) < 3: return {"ok": True, "yerel": True}
     if len(pcm) > WH_SR * 2 * 10: return {"ok": False, "err": "parça çok büyük"}
-    baslik = (p.get("meeting") or {}).get("title") or STATE.get("meeting") or "Toplantı"
+    baslik = toplanti_anahtar()  # Faz B: parçanın toplantısı kaydın kimliği (küme/ad sıfırlama); hangi dosyaya yazılacağı satırın zamanından (toplanti_satir)
     with W_LOCK:
         k = KANALLAR.setdefault(kanal, Kanal(kanal)); k.besle(pcm, (p.get("t") or time.time() * 1000) / 1000.0, baslik)
     _isci_baslat()

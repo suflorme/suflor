@@ -90,6 +90,7 @@
   }
   setTimeout(dilOku, 2000); setInterval(dilOku, 60000);
 
+  let SEKME = ""; chrome.runtime.sendMessage({ type: "sekme" }).then(r => { if (r && r.id != null) SEKME = "t" + r.id; }).catch(() => {});  // Faz B: aktarıcıda sekme başına durum
   function meetingInfo() {
     const title = P.toplantiAdi();
     if (!meeting || meeting.title !== title) { meeting = { title, startedAt: new Date().toISOString(), url: location.origin, platform: P.ad }; capWords = []; capEn = []; capLang = null; } // yeni toplantıda dil yeniden ölçülür
@@ -439,7 +440,7 @@
     if (queue.length) drainQueue(); // yeni satır gelmese de kuyruğu boşaltmayı dene
     const panel = findTranscriptPanel();
     const caps = !!findCaptions(); captureHint(panel, caps); if (queue.length) saveQueue(); else adoptQueues();
-    const body = { ver: chrome.runtime.getManifest().version, meeting: meetingInfo(), panel: !!panel, rows: panel ? P.dokumSatirSayisi(panel) : 0, platform: P.ad, yonerge: P.yonerge, captions: caps, call: window.top === window ? inCall() : false, lang: capLang, langSrc, capAuto, sent: sentById.size + sentKeys.size, at: new Date().toISOString(), kim, vis: document.visibilityState, ...(window.top === window ? { paylasim: paylasimDurum(), ...(paylas.deger && paylas.neden ? { paylasim_neden: paylas.neden } : {}) } : {}), mic: window.top === window ? { on: mic.on, sessiz: mic.on && teamsSessiz(), hata: mic.hata || "" } : null };
+    const body = { ver: chrome.runtime.getManifest().version, meeting: meetingInfo(), panel: !!panel, rows: panel ? P.dokumSatirSayisi(panel) : 0, platform: P.ad, yonerge: P.yonerge, captions: caps, call: window.top === window ? inCall() : false, ...(SEKME ? { sekme: SEKME } : {}), ...(window.top === window && P.toplantiSayfasi ? { sayfa: !!P.toplantiSayfasi() } : {}), lang: capLang, langSrc, capAuto, sent: sentById.size + sentKeys.size, at: new Date().toISOString(), kim, vis: document.visibilityState, ...(window.top === window ? { paylasim: paylasimDurum(), ...(paylas.deger && paylas.neden ? { paylasim_neden: paylas.neden } : {}) } : {}), mic: window.top === window ? { on: mic.on, sessiz: mic.on && teamsSessiz(), hata: mic.hata || "" } : null };
     if (window.top === window && P.kisiSayisi && body.call) {  // v0.84.1: katılımcı sayısı (Kişiler düğmesi); etiket yalnız değişince (teşhis)
       try { const k = P.kisiSayisi(); if (k.n) body.kisi_sayisi = k.n; if (k.etiket !== kisiEtiketSon) { kisiEtiketSon = k.etiket; body.kisiler_etiket = k.etiket; } } catch (e) {}
     }

@@ -151,73 +151,18 @@ def hitap_duzelt(text):
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])
 
 def slug(s): s = re.sub(r"[^\w\s-]", "", s, flags=re.U).strip(); s = re.sub(r"\s+", "-", s); return s[:60] or "toplanti"
-def paths(title):
-    # Aynı toplantı için ilk çağrıda saat damgalı dosya adı üretilir, sonraki çağrılar aynı dosyaya yazar
-    # (böylece aynı başlıklı iki toplantı aynı gün farklı dosyaya düşer; adlandırma yalnız ingest/note içinde,
-    # yani LOCK altında çağrılır).
-    # eşlenen dosyaya RESUME_MAX_AGE_MIN'den uzun süredir yazılmadıysa bu yeni bir toplantıdır → yeni dosya
-    # (29 Eylül: aynı başlıklı iki toplantı aynı dosyaya düştü; aktarıcı açık kaldıkça eşleme sürüyordu)
-    if "oto_ad" in globals(): title = oto_ad(title)  # S161: süren toplantının ham adları (sayfa başlığı, "Toplantı") tek dosyaya
-    base = STATE["meeting_files"].get(title)
-    if base and time.time() - STATE["file_last"].get(os.path.basename(base) + ".md", 0) > RESUME_MAX_AGE_MIN * 60: base = None
-    if not base and title != YER_TUTUCU: base = yer_tutucu_birlestir(title)
-    if not base:
-        d = datetime.date.today().strftime("%Y-%m-%d"); t = datetime.datetime.now().strftime("%H%M")
-        base = os.path.join(BASE, f"{d}-{t}-{slug(title)}")
-        if os.path.exists(base + ".md"):  # aynı dakikada aynı adlı ikinci toplantı (v0.31.0: masaüstünde yeniden girilen toplantı yeni dosya açar)
-            n = 2
-            while os.path.exists(f"{base}-{n}.md"): n += 1
-            base = f"{base}-{n}"
-        STATE["meeting_files"][title] = base
-        STATE["file_start"][os.path.basename(base) + ".md"] = datetime.datetime.now().isoformat(timespec="seconds")
-    STATE["file_last"][os.path.basename(base) + ".md"] = time.time()  # yalnız yazarken çağrılır (ingest/note/gündem)
-    return base + ".md", base + ".jsonl"
-RESUME_MAX_AGE_MIN = 20  # bu süreden eski bir dosya "hâlâ süren toplantı" sayılmaz, yeniden bağlanmaz
-YER_TUTUCU = "Toplantı"; BIRLESTIR_DK = 10; YT_AD = {}  # taşınan dosya (.md yolu) → gerçek toplantı adı (adsız satır süren adı bozmasın)
-def yer_tutucu_birlestir(title):
-    # toplantının ilk satırları (çoğu kez Whisper) eklenti toplantı adını göndermeden gelir ve "Toplantı" dosyasına düşer; ad gelince
-    # yeni dosya açılıyordu (7 Ekim: 1 satırlık "…-1803-Toplantı.md" + asıl dosya). Yer tutucu dosya süren dosyaysa ve son
-    # BIRLESTIR_DK içinde başladıysa gerçek ada taşınır (saat damgası korunur); sonraki adsız satırlar da oraya gider. LOCK altında.
-    eski = STATE["meeting_files"].get(YER_TUTUCU)
-    if not eski or not os.path.basename(eski).endswith("-" + slug(YER_TUTUCU)): return None  # zaten taşındıysa (takma ad) yeniden taşınmaz
-    emd = os.path.basename(eski) + ".md"
-    try: bas = datetime.datetime.fromisoformat(STATE["file_start"].get(emd) or "").timestamp()
-    except ValueError: return None
-    if STATE["file"] != emd or time.time() - bas > BIRLESTIR_DK * 60 or time.time() - STATE["file_last"].get(emd, 0) > RESUME_MAX_AGE_MIN * 60: return None
-    yeni = os.path.join(BASE, os.path.basename(eski)[:16] + slug(title)); ymd = os.path.basename(yeni) + ".md"
-    if any(os.path.exists(yeni + u) for u in (".md", ".jsonl", ".altyazi.log", ".sesizi.log")): return None
-    try:
-        for u in (".md", ".jsonl", ".altyazi.log", ".sesizi.log"):
-            if os.path.exists(eski + u): os.rename(eski + u, yeni + u)
-        if os.path.exists(yeni + ".md"):
-            m = open(yeni + ".md", encoding="utf-8").read()
-            m = m.replace(f"# Canlı transkript — {YER_TUTUCU}\n", f"# Canlı transkript — {title}\n", 1)
-            open(yeni + ".md.tmp", "w", encoding="utf-8").write(m); os.replace(yeni + ".md.tmp", yeni + ".md")
-    except OSError as e: print(f"UYARI: yer tutucu dosya taşınamadı ({e}) — ad gelince yeni dosya açılır"); return None
-    for k in ("file_lines", "file_last", "file_start", "kanitlar"):
-        if emd in STATE[k]: STATE[k][ymd] = STATE[k].pop(emd)
-    if emd in SEEN: SEEN[ymd] = SEEN.pop(emd)
-    if emd in PAY: PAY[ymd] = PAY.pop(emd)
-    for k in [k for k in _PAY_ONCEKI if k[0] == emd]: _PAY_ONCEKI[(ymd, k[1])] = _PAY_ONCEKI.pop(k)
-    HEADERED.add(yeni + ".md"); STATE["file"] = ymd
-    now = datetime.datetime.now().isoformat(timespec="seconds")
-    for liste, log in ((CARDS, "kartlar.jsonl"), (QUESTIONS, "sorular.jsonl")):
-        for r in liste:
-            if r.get("file") == emd: r["file"] = ymd; _log(log, {"id": r["id"], "at": now, "file": ymd})
-    STATE["meeting_files"][title] = STATE["meeting_files"][YER_TUTUCU] = yeni; YT_AD[yeni + ".md"] = title
-    print(f"DOSYA: toplantı adı geldi — {emd} → {ymd} (ilk satırlar aynı dosyada)")
-    return yeni
+# Faz B (v0.149.0): dosyanın adı ve açılışı aktarici/toplanti.py'de (_kayit_ac, bir kez); eski paths/yer tutucu birleştirme (dosyayı yeniden adlandırıyordu) kalktı.
 def restore_state():
-    # Aktarıcı yeniden başlatıldığında bugünün en son yazılan toplantı dosyasından sayaçları kurar
-    # (STATE sıfırlanınca sayaçların toplantı ortasında tutarsızlaşması sorununa karşı). Dosya
-    # RESUME_MAX_AGE_MIN'den eskiyse (leftover/önceki oturum) başlığı yeni yazıma bağlamaz — aksi halde
-    # aynı adlı yeni bir toplantı, eski (belki dünkü) dosyaya karışır (29 Eylül gerçek testinde yaşandı).
+    # Aktarıcı yeniden başlatıldığında sayaçlar (satır, işaret, kanıt, gündem, görülen satırlar) dosyadan kurulur. Faz B: süren toplantı canli/toplanti.json'dan
+    # (toplanti_kur: ≤ 5 dk önce yazılmışsa bitiyor olarak sürer, sinyal gelirse aynı dosya); yoksa bugünün son dökümü yalnız gösterim için (yeni yazım ayrı dosyaya).
     try:
+        suren = toplanti_kur()
+        if suren: STATE["file"] = suren; STATE["meeting"] = TOPLANTI["aktif"]["ad"]  # .jsonl henüz yoksa da (yalnız başlık yazıldı) süren toplantı bilinsin
         today = datetime.date.today().strftime("%Y-%m-%d")
-        # yalnız toplantı dökümü (tek noktalı ad): yan dosyalar (.ceviri.jsonl …) seçilirse süren toplantıya bağlanılamıyor, toplantı yeni dosyaya
-        # bölünüyordu (12 Ekim deneme 6: üç dosya)
-        cands = sorted((f for f in glob.glob(os.path.join(BASE, f"{today}-*.jsonl")) if os.path.basename(f).count(".") == 1), key=os.path.getmtime)
-        if not cands: return
+        # yalnız toplantı dökümü (tek noktalı ad): yan dosyalar (.ceviri.jsonl …) seçilmesin (12 Ekim deneme 6: üç dosya)
+        cands = [os.path.join(BASE, suren[:-3] + ".jsonl")] if suren else \
+                sorted((f for f in glob.glob(os.path.join(BASE, f"{today}-*.jsonl")) if os.path.basename(f).count(".") == 1), key=os.path.getmtime)
+        if not cands or not os.path.exists(cands[-1]): return
         jl = cands[-1]; base = jl[:-6]; md = base + ".md"
         age_min = (datetime.datetime.now().timestamp() - os.path.getmtime(jl)) / 60
         lines = 0; flags = []; notes = 0; key = os.path.basename(md); first_at = None
@@ -240,8 +185,8 @@ def restore_state():
         except Exception: pass
         STATE["file_last"][key] = os.path.getmtime(jl)
         if first_at: STATE["file_start"][key] = datetime.datetime.fromtimestamp(_epoch(first_at)).isoformat(timespec="seconds")
-        if title and age_min <= RESUME_MAX_AGE_MIN:
-            STATE["meeting_files"][title] = base; STATE["meeting"] = title
+        if suren:
+            STATE["meeting"] = title = (TOPLANTI["aktif"] or {}).get("ad") or title
             # gündem işaretleri .md'deki GÜNDEM satırlarından geri kurulur (kalan süre/kayma hesabı bunlara dayanır)
             items = agenda().get("items", [])
             try:
@@ -252,7 +197,7 @@ def restore_state():
         STATE["file"] = os.path.basename(md); STATE["file_lines"][os.path.basename(md)] = lines
         STATE["lines"] = lines; STATE["flags"] = flags[-50:]; STATE["notes"] = notes  # pano "not 0" demesin
         STATE["last"] = datetime.datetime.fromtimestamp(os.path.getmtime(jl)).isoformat(timespec="seconds")
-        resumed = "devam ediliyor" if (title and age_min <= RESUME_MAX_AGE_MIN) else f"salt-okunur gösterim (dosya {age_min:.0f} dk önceki, yeni yazım ayrı dosyaya gidecek)"
+        resumed = "süren toplantı (sinyal bekleniyor)" if suren else f"salt-okunur gösterim (dosya {age_min:.0f} dk önceki, yeni yazım ayrı dosyaya gidecek)"
         print(f"Durum kuruldu: {STATE['file']} · {lines} satır · {resumed}")
     except Exception as e:
         print(f"Durum kurulamadı (yeni oturum gibi devam): {e}")
@@ -281,11 +226,10 @@ def ensure_header(md, title, m, source=None):
     # başlık metnini döndürür (dosya yoksa ve daha önce sıraya konmadıysa); yazım write() ile, satırlarla aynı grupta
     if md in HEADERED or os.path.exists(md): HEADERED.add(md); return ""
     HEADERED.add(md)
-    if "oto_ad" in globals(): title = oto_ad(title)
     # altyazı modunda başlık bunu söyler (konuşmacı adı olmayabilir, dil yanlış seçilmiş olabilir)
     # platform adı eklentiden (meeting.platform; Whisper satırlarında son ping'in platformu)
     # S161: tanınan toplantının platformu (masaüstü/Whisper satırında meeting.platform yok; 27 Ekim Meet toplantısının başlığı "Teams" dedi)
-    pl = PLATFORM_AD.get((m or {}).get("platform") or (oto_platform() if "oto_platform" in globals() else None) or (STATE.get("extension") or {}).get("platform") or "bilinmeyen", "Toplantı")
+    pl = PLATFORM_AD.get((m or {}).get("platform") or "bilinmeyen", "Toplantı")  # Faz B: platform toplantı kaydından (toplanti.py), eklentinin son nabzından değil
     src = f"Whisper (yerel konuşma tanıma, large-v3-turbo; konuşmacı: kullanıcı mikrofonu / karşı taraf {pl} sesi)" if source == "whisper" else \
           f"{pl} canlı altyazı (döküm yetkisi yok; konuşmacı adı eksik, dil yanlış seçilmişse metin anlamsız olabilir)" if source == "captions" else \
           f"{pl if pl == 'Toplantı' else pl + ' toplantısı'} (Suflor.me kendiliğinden tanıdı; satırlar Whisper ya da canlı altyazıdan)" if source == "oto" else f"{pl} transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir)"

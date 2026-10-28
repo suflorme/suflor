@@ -47,7 +47,7 @@ try:
     bak("olmayan notu silme: ok false", istek("/notlar", {"sil": "nyok"}).get("ok") is False)
     json.dump({"title": "Yeni toplantı", "items": ["Bütçe"]}, open(os.path.join(canli, "agenda.json"), "w"))  # Başlat/gündem: toplantı hazırlanıyor
     g = istek("/girdi", {"text": "hazırlık notu"})
-    bak("gündem yeni yazılmışsa not eski yoldan (toplantı dökümüne, tur not)", g.get("tur") == "not" and len(dokumler()) == 1)
+    bak("gündem yeni yazılmışsa not eski yoldan (tur not; Faz B: toplantı açılınca dökümüne, şimdilik bekler — sahte 'Toplantı' dosyası yok)", g.get("tur") == "not" and dokumler() == [])
     bak("aktarıcıda hata yok", "Traceback" not in log())
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print("notlar: ✓ hepsi geçti" if not hata else f"notlar: ✗ {len(hata)} kaldı")

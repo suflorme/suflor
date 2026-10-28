@@ -1,7 +1,7 @@
 {
  "surum_maskeli": true,
  "dosyalar": {
-  "<TARIH>-Deneme-toplantısı-altyapı.jsonl": [
+  "<TARIH>-Toplantı-<SS>.jsonl": [
    "{\"at\": null, \"id\": \"o/1\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Merhaba, bugün yedekleri, AWS tarafını ve GitHub erişimini konuşacağız.\", \"flags\": [], \"src\": \"transcript\"}",
    "{\"at\": null, \"id\": \"o/2\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Merhaba, hazırım. Nereden başlayalım?\", \"flags\": [], \"src\": \"transcript\"}",
    "{\"at\": null, \"id\": \"o/3\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Yedeklerden başlayalım. Yedekler şu an nerede tutuluyor?\", \"flags\": [], \"src\": \"transcript\"}",
@@ -48,8 +48,8 @@
    "{\"at\": null, \"id\": \"o/42\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Ayla Örnek\", \"text\": \"Yok, teşekkürler.\", \"flags\": [], \"src\": \"transcript\"}",
    "{\"at\": null, \"id\": \"o/43\", \"revised\": false, \"time\": \"<SAAT>\", \"speaker\": \"Deniz Test\", \"text\": \"Teşekkürler, görüşmek üzere.\", \"flags\": [], \"src\": \"transcript\"}"
   ],
-  "<TARIH>-Deneme-toplantısı-altyapı.md": [
-   "# Canlı transkript — Deneme toplantısı — altyapı",
+  "<TARIH>-Toplantı-<SS>.md": [
+   "# Canlı transkript — Toplantı <SAAT>",
    "",
    "**Başlangıç: <AN> (ilk kayıt; satırlar geliş sırasıyla) · Kaynak: Toplantı transkript paneli (otomatik döküm; isim ve sistem adları hatalı olabilir) · Aktarıcı: Suflor.me**",
    "**Gizlilik: iç belge, kişi adı içerir.**",
@@ -111,7 +111,7 @@
    "| <SAAT> | Ayla Örnek | Yok, teşekkürler. |  |",
    "| <SAAT> | Deniz Test | Teşekkürler, görüşmek üzere. |  |"
   ],
-  "<TARIH>-Deneme-toplantısı-altyapı.taahhut.log": [
+  "<TARIH>-Toplantı-<SS>.taahhut.log": [
    "{\"tur\": \"net_degil\", \"kim\": \"Ayla Örnek\", \"saat\": \"<SAAT>\", \"metin\": \"Kayıt ortak klasördeki tabloda, ben sana gönderirim.\", \"isaret\": \"tarih yok\"}"
   ],
   "acik-arsiv.jsonl": [
@@ -141,7 +141,7 @@
    "   \"gundem\": null,",
    "   \"durum\": \"acik\",",
    "   \"baslik\": \"Deneme toplantısı — altyapı\",",
-   "   \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\"",
+   "   \"file\": \"<TARIH>-Toplantı-<SS>.md\"",
    "  }",
    " ]",
    "}"
@@ -155,7 +155,7 @@
   "baglam.json": [
    "{\"son\": 1, \"kaynaklar\": [{\"id\": \"b1\", \"at\": \"<AN>\", \"tur\": \"baglanti\", \"deger\": \"https://ornek.example/teklif\", \"ad\": \"https://ornek.example/teklif\", \"kaynak\": \"baslat\", \"file\": null}]}"
   ],
-  "gundemler/<TARIH>-Deneme-toplantısı-altyapı.json": [
+  "gundemler/<TARIH>-Toplantı-<SS>.json": [
    "{",
    " \"title\": \"Deneme toplantısı — altyapı\",",
    " \"items\": [",
@@ -173,59 +173,60 @@
   ],
   "heartbeat.json": "<var>",
   "izle-paketler.jsonl": [
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"sana-soru\", \"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [], \"neden\": \"sure\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"sistem\", \"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 9, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [], \"neden\": \"soru\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [\"sistem\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
-   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"satir\": 2, \"aday\": [], \"neden\": \"sure\"}"
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"sana-soru\", \"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [], \"neden\": \"sure\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"sistem\", \"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 9, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"iddia\"], \"neden\": \"sure\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"iddia\", \"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [], \"neden\": \"soru\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [\"sistem\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",
+   "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 2, \"aday\": [], \"neden\": \"sure\"}"
   ],
   "kart-anahtari.txt": "<var>",
   "kartlar.jsonl": [
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"soyle\", \"text\": \"Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne?\", \"why\": \"Sahip ve tarih belirsiz\", \"status\": \"acik\", \"agenda_i\": 1}",
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"dur\", \"text\": \"Root hesabını toplantıda paylaşma\", \"why\": \"\", \"status\": \"acik\", \"gizli\": true}",
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"not\", \"text\": \"IAM kullanıcılarının listesi Ayla'da\", \"why\": \"\", \"status\": \"acik\", \"tavan_t\": <EPOCH>}",
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"duygu\", \"ton\": \"tedirgin\", \"text\": \"\", \"status\": \"etiket\", \"kim\": \"Ayla Örnek\"}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"kind\": \"soyle\", \"text\": \"Eski çalışanların IAM kullanıcılarını kim silecek, tarih ne?\", \"why\": \"Sahip ve tarih belirsiz\", \"status\": \"acik\", \"agenda_i\": 1}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"kind\": \"dur\", \"text\": \"Root hesabını toplantıda paylaşma\", \"why\": \"\", \"status\": \"acik\", \"gizli\": true}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"kind\": \"not\", \"text\": \"IAM kullanıcılarının listesi Ayla'da\", \"why\": \"\", \"status\": \"acik\", \"tavan_t\": <EPOCH>}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"kind\": \"duygu\", \"ton\": \"tedirgin\", \"text\": \"\", \"status\": \"etiket\", \"kim\": \"Ayla Örnek\"}",
    "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"status\": \"yapildi\", \"yetkili\": true}",
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"kind\": \"cevap\", \"text\": \"Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı.\", \"why\": \"\", \"status\": \"acik\", \"reply_to\": \"<ID>\", \"q\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}"
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"kind\": \"cevap\", \"text\": \"Bulut kopyasını şu an kimse düzenli kontrol etmiyor; sahibi atanmalı.\", \"why\": \"\", \"status\": \"acik\", \"reply_to\": \"<ID>\", \"q\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}"
   ],
   "olcum.jsonl": "<var>",
   "sistem-izi.jsonl": "<var>",
   "sorular.jsonl": [
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}",
-   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Deneme-toplantısı-altyapı.md\", \"text\": \"Ne diyeyim?\", \"tur\": \"ozet\"}"
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"text\": \"Yedeklerin bulut kopyasını kim kontrol ediyor?\"}",
+   "{\"id\": \"<ID>\", \"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"text\": \"Ne diyeyim?\", \"tur\": \"ozet\"}"
   ],
   "sozluk.json": [
    "{\"terimler\": [{\"dogru\": \"GitHub\", \"yanlis\": [\"git hab\", \"gidhab\"]}, {\"dogru\": \"Bitwarden\", \"yanlis\": [\"bitvarden\"]}]}"
-  ]
+  ],
+  "toplanti.json": "<var>"
  },
  "http": {
   "/": {
-   "uzunluk": 260915,
-   "sha": "4acd6e7cc816377d"
+   "uzunluk": 261143,
+   "sha": "4731eb7e137b270b"
   },
   "/mini": {
-   "uzunluk": 260915,
-   "sha": "4acd6e7cc816377d"
+   "uzunluk": 261143,
+   "sha": "4731eb7e137b270b"
   },
   "/status": {
    "_ping_son": "float",
@@ -473,13 +474,13 @@
     "call": "bool",
     "capAuto": "str",
     "captions": "bool",
-    "lang": "NoneType",
-    "langSrc": "NoneType",
     "meeting": "str",
     "panel": "bool",
     "platform": "str",
     "rows": "int",
     "seen": "str",
+    "sekme": "str",
+    "sekme_sayisi": "int",
     "sent": "int",
     "ver": "str",
     "yonerge": "NoneType"
@@ -487,13 +488,13 @@
    "eylem": "NoneType",
    "file": "str",
    "file_last": {
-    "<TARIH>-Deneme-toplantısı-altyapı.md": "float"
+    "<TARIH>-Toplantı-<SS>.md": "float"
    },
    "file_lines": {
-    "<TARIH>-Deneme-toplantısı-altyapı.md": "int"
+    "<TARIH>-Toplantı-<SS>.md": "int"
    },
    "file_start": {
-    "<TARIH>-Deneme-toplantısı-altyapı.md": "str"
+    "<TARIH>-Toplantı-<SS>.md": "str"
    },
    "flags": [
     {
@@ -567,9 +568,6 @@
     "parca": "int"
    },
    "meeting": "str",
-   "meeting_files": {
-    "Deneme toplantısı — altyapı": "str"
-   },
    "notes": "int",
    "notlar": [],
    "oto_toplanti": "NoneType",
@@ -673,6 +671,22 @@
      "ton": "str"
     }
    },
+   "toplanti": {
+    "durum": "str",
+    "eklenti_yok": "bool",
+    "onceki": {
+     "ad": "str",
+     "bitti": "str",
+     "dosya": "str",
+     "gec_atilan": "int",
+     "neden": "str"
+    }
+   },
+   "toplanti_bitti": {
+    "file": "str",
+    "neden": "str",
+    "t": "str"
+   },
    "toplanti_oturum": "NoneType",
    "uyari": "NoneType",
    "veri_kanal": {
@@ -692,7 +706,7 @@
     "eski_atlanan": {},
     "gecikme_max": "float",
     "gecikme_sn": "NoneType",
-    "hata": "NoneType",
+    "hata": "str",
     "karsi": "bool",
     "kumeler": {},
     "kuyruk": "int",
@@ -850,7 +864,7 @@
     "eski_atlanan": {},
     "gecikme_max": "float",
     "gecikme_sn": "NoneType",
-    "hata": "NoneType",
+    "hata": "str",
     "karsi": "bool",
     "kumeler": {},
     "kuyruk": "int",
@@ -891,6 +905,7 @@
   "SATIRLAR": 25,
   "SORU": 1,
   "SÜRE": 6,
+  "TOPLANTI BİTTİ": 1,
   "İZLEME BAŞLADI": 1
  },
  "izle_satir_kapsami": "41/43",

@@ -13,7 +13,7 @@ shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"),
-                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOKEN="http://sahte.test", SUFLOR_TEST_YENI_SN="2"))
+                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOKEN="http://sahte.test", SUFLOR_TEST_BITIYOR_SN="1"))
 def anahtar():
     try: return open(os.path.join(canli, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     except OSError: return ""
@@ -62,7 +62,7 @@ try:
         return b"\x89PNG\r\n\x1a\n" + c(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 0, 0, 0, 0)) + c(b"IDAT", zlib.compress(b"\0\0")) + c(b"IEND", b"")
     PNG = base64.b64encode(png1()).decode()
     bak("masaüstü kanıt: köken yanlışsa ret", istek("/kanit-masaustu", {"png": PNG}, koken="http://sahte.test").get("_kod") == 403)
-    v = istek("/kanit-masaustu", {"png": PNG, "kaynak": "kisayol", "w": 1, "h": 1}); bak("masaüstü kanıt kaydedilir (Deneme dosyasına)", v.get("ok") is True and "Deneme" in str(v.get("path")))
+    v = istek("/kanit-masaustu", {"png": PNG, "kaynak": "kisayol", "w": 1, "h": 1}); bak("masaüstü kanıt kaydedilir (toplantının dosyasına; ad pencere başlığından değil)", v.get("ok") is True and "Teams-toplant" in str(v.get("path")))
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams", "katilimcilar": ["Deniz K", "Ayşe Yılmaz"]})
     s = istek("/status"); bak("katılımcılar /status'ta", (s.get("masaustu") or {}).get("katilimcilar") == ["Deniz K", "Ayşe Yılmaz"])
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams"})
@@ -80,36 +80,34 @@ try:
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Deneme | Microsoft Teams", "konusan": "Ayşe Yılmaz"})
     istek("/masaustu", {"uygulama": "Teams", "toplantida": False})
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams"})
-    bak("kısa kopma (< 2 dk): aynı dosya", "yeni döküm dosyası" not in open(os.path.join(T, "relay.log"), encoding="utf-8").read())
-    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
+    import glob
+    n_md = lambda: len(glob.glob(os.path.join(canli, "*.md")))
+    n0 = n_md(); bak("kısa kopma: aynı dosya", n0 == 1)
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(4.5)
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Deneme | Microsoft Teams"})
     istek("/ingest", {"meeting": {"title": "Deneme"}, "source": "transcript", "entries": [{"id": "d/2", "speaker": "Deniz K", "time": "10:05", "text": "ikinci toplantı"}]})
-    import glob
-    md = glob.glob(os.path.join(canli, "*-Deneme*.md"))
-    bak("uzun aradan sonra yeni toplantı: yeni döküm dosyası", "yeni döküm dosyası" in open(os.path.join(T, "relay.log"), encoding="utf-8").read() and len(md) == 2)
+    bak("uzun aradan sonra yeni toplantı: yeni döküm dosyası", n_md() == 2)
     # --- v0.32.15: toplantı adı toplantı başında sabit (deneme 9: pencere başlığı toplantı içinde değişti, döküm bölündü) ---
     def kanit_yolu(): return str(istek("/kanit-masaustu", {"png": PNG, "kaynak": "kisayol", "w": 1, "h": 1}).get("path"))
-    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
-    with open(os.path.join(canli, "takvim-secilen.json"), "w", encoding="utf-8") as f:
-        json.dump({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "konu": "Haftalık Plan", "rol": "yurutucu", "dil": "tr"}, f)
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(4.5)
+    istek("/baslat", {"konu": "Haftalık Plan", "platform": "teams"}, koken=URL)
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Eski Toplantı | Microsoft Teams"})
     k1 = kanit_yolu()
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Kurum Adı | Microsoft Teams"}); k2 = kanit_yolu()
     bak("ad Başlat konusundan, başlık değişince aynı toplantı", "Haftal" in k1 and "Haftal" in k2 and os.path.dirname(k1) == os.path.dirname(k2))
-    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(4.5)
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Üçüncü | Microsoft Teams"}); k3 = kanit_yolu()
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Başka | Microsoft Teams"}); k4 = kanit_yolu()
-    bak("kullanılmış Başlat konusu yeni toplantıya geçmez; ilk başlık sabit", "nc" in k3 and "Haftal" not in k3 and os.path.dirname(k3) == os.path.dirname(k4))
+    bak("kullanılmış Başlat konusu yeni toplantıya geçmez; ilk başlık sabit", "Teams-toplant" in k3 and "Haftal" not in k3 and os.path.dirname(k3) == os.path.dirname(k4))
     # --- v0.88.1: web'deki toplantıdan masaüstü uygulamasına geçiş aynı dosyada sürer (19 Ekim 17.45: Başlat adıyla yeni dosya açılmıştı) ---
-    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(2.3)
-    with open(os.path.join(canli, "takvim-secilen.json"), "w", encoding="utf-8") as f:
-        json.dump({"at": time.strftime("%Y-%m-%dT%H:%M:%S") + "x", "konu": "Baslat Adi", "rol": "yurutucu", "dil": "tr"}, f)
+    istek("/masaustu", {"uygulama": "Teams", "toplantida": False}); time.sleep(4.5)
     istek("/ping", {"meeting": {"title": "Web Gecis"}, "call": True, "panel": True, "rows": 1, "mic": {"on": True}}, koken="http://sahte.test")
     istek("/ingest", {"meeting": {"title": "Web Gecis"}, "source": "transcript", "entries": [{"id": "w/1", "speaker": "Deniz K", "time": "11:00", "text": "web satırı"}]})
     istek("/ping", {"meeting": {"title": "Web Gecis"}, "call": False, "panel": False, "rows": 0, "mic": {"on": False}}, koken="http://sahte.test")
+    web = istek("/status").get("file") or "?"
     istek("/masaustu", {"uygulama": "Teams", "toplantida": True, "sessiz": False, "baslik": "Web Gecis | Microsoft Teams"}); k5 = kanit_yolu()
-    bak(f"web → masaüstü geçişi: tarayıcıdaki toplantının dosyası sürer ({os.path.basename(os.path.dirname(k5))})", "Web-Gecis" in k5 and "Baslat" not in k5
-        and "tarayıcıdaki toplantı sürüyor" in open(os.path.join(T, "relay.log"), encoding="utf-8").read())
+    bak(f"web → masaüstü geçişi (bitiyor'da sinyal döndü): aynı dosya sürer ({os.path.basename(os.path.dirname(k5))})", web[:-3] in k5 and "Web-Gecis" not in k5
+        and "sinyal geri geldi" in open(os.path.join(T, "relay.log"), encoding="utf-8").read())
     log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
     # --- v0.31.3: bildirim menü uygulamasından (tıklayınca özet açılır) ---
     def menu_cards():
@@ -133,6 +131,6 @@ exec(kod[kod.index("def masaustu_kis_ms"):kod.index("def deneme_aktarici")], ns)
 for ayar, top, beklenen, ad in [({"masaustu_ses_kis": True}, "Deneme", True, "ayar açık, masaüstü toplantı, okunuyor → kıs"),
                                  ({}, "Deneme", False, "ayar yok → kısma yok"), ({"masaustu_ses_kis": True}, None, False, "masaüstü toplantı yok → kısma yok"),
                                  ({"masaustu_ses_kis": True, "ceviri_kis": False}, "Deneme", False, "ceviri_kis kapalı → kısma yok")]:
-    ns.update(AYAR=ayar, masaustu_baslik=lambda t=top: t); bak(ad, (ns["masaustu_kis_ms"]() > 0) == beklenen)
+    ns.update(AYAR=ayar, masaustu_toplantida=lambda t=top: bool(t)); bak(ad, (ns["masaustu_kis_ms"]() > 0) == beklenen)
 print(f"masaüstü mikrofon: {len(hata)} sorun" if hata else "masaüstü mikrofon: ✓ GEÇTİ")
 sys.exit(1 if hata else 0)

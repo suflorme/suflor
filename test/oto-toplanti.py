@@ -4,7 +4,7 @@
 #     oturumu sormadan açılır; Meet kodlu ve "Toplantı" adlı satır/not aynı dosyaya gider; süren toplantıda elle Başlat yeni oturum ve kayıt açmaz;
 #     sinyal kesilince toplantı biter.
 #  2) Gizli kipte tanınmaz. 3) Masaüstü Teams: aynı anda süren iki takvim toplantısından platformu tutan seçilir; ayar oto_haric'teki adda oturum açılmaz.
-# aktarici/oto-toplanti.py, baslat, paths/ensure_header (ad eşleme) değişince koştur:  PYTHONDONTWRITEBYTECODE=1 python3 test/oto-toplanti.py
+# aktarici/toplanti.py, baslat, paths/ensure_header (ad eşleme) değişince koştur:  PYTHONDONTWRITEBYTECODE=1 python3 test/oto-toplanti.py
 import datetime, glob, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8781)
@@ -78,7 +78,7 @@ try:
     threading.Thread(target=nabiz_dongu, daemon=True).start()
     # 1) Meet, Başlat'sız
     NABIZ["g"] = "meet"
-    ok("Meet toplantısı Başlat'sız tanındı (takvimden ad, platform Meet)", bekle(lambda: "OTO: toplantı tanındı — Deniz ile proje · Google Meet · eklenti · takvimden" in L()))
+    ok("Meet toplantısı Başlat'sız tanındı (takvimden ad, platform Meet)", bekle(lambda: "Deniz-ile-proje.md · Google Meet · eklenti · ad takvim" in L()))
     d1 = [f for f in dosyalar() if f.endswith("-Deniz-ile-proje.md")]
     ok(f"döküm dosyası satır beklemeden açıldı: {dosyalar()}", len(d1) == 1 and len(dosyalar()) == 1)
     bas = open(os.path.join(canli, d1[0]), encoding="utf-8").read() if d1 else ""
@@ -98,14 +98,14 @@ try:
     time.sleep(2)
     ok(f"süren toplantıda elle Başlat: katıldı, yeni oturum ve kayıt yok ({rb})", rb.get("ok") and rb.get("katildi") and len([x for x in iletiler() if "/toplanti" in x]) == n_il and len(dosyalar()) == 1)
     NABIZ["g"] = None
-    ok("sinyal kesilince toplantı bitti", bekle(lambda: "OTO: toplantı bitti — Deniz ile proje" in L(), 40))
+    ok("sinyal kesilince toplantı bitti", bekle(lambda: "TOPLANTI: bitti" in L() and "Deniz-ile-proje.md" in L().split("TOPLANTI: bitti")[-1][:200], 40))
     # 2) gizli kipte tanınmaz
     istek("/komut", {"tur": "gizli"}); NABIZ["g"] = "meet"; time.sleep(5)
-    ok("gizli kipte tanınmadı", L().count("OTO: toplantı tanındı") == 1)
+    ok("gizli kipte tanınmadı", L().count("TOPLANTI: algılandı") == 1)
     NABIZ["g"] = None; time.sleep(8); istek("/komut", {"tur": "gizli"}); time.sleep(2)  # önce eklenti çağrısı düşsün (hızlı kipte 6 sn), sonra gizli kapanır
     # 3) masaüstü Teams: platformu tutan takvim toplantısı, hariç tutulan adda oturum yok
     NABIZ["g"] = "masaustu"
-    ok("masaüstü Teams tanındı, iki süren toplantıdan Teams olanı seçildi", bekle(lambda: "OTO: toplantı tanındı — Haftalık plan · Teams · masaüstü · takvimden" in L(), 20))
+    ok("masaüstü Teams tanındı, iki süren toplantıdan Teams olanı seçildi", bekle(lambda: "Haftalık-plan.md · Teams · masaustu · ad takvim" in L(), 20))
     ok("hariç tutulan adda toplantı oturumu açılmadı", bekle(lambda: "OTO: toplantı oturumu açılmadı (hariç (haftalık))" in L(), 10))
     ok(f"masaüstü toplantısının dosyası takvim adıyla: {dosyalar()}", bekle(lambda: any(f.endswith("-Haftalık-plan.md") for f in dosyalar()), 10))
     hb = next((open(os.path.join(canli, f), encoding="utf-8").read() for f in dosyalar() if f.endswith("-Haftalık-plan.md")), "")
@@ -116,8 +116,8 @@ try:
     ayj = json.load(open(ay, encoding="utf-8")); dg = istek("/status")["ayarlar"]["deger"]
     ok(f"ayar kaydı: liste tekilleşti, panoda virgüllü ({ra}, {ayj.get('oto_haric')}, {dg.get('oto_haric')!r})",
        ra.get("ok") and ayj.get("oto_haric") == ["özel", "Bire Bir"] and ayj.get("oto_toplanti") is False and dg.get("oto_haric") == "özel, Bire Bir" and dg.get("oto_toplanti") is False)
-    time.sleep(25); n_ = L().count("OTO: toplantı tanındı"); NABIZ["g"] = "meet"; time.sleep(5); NABIZ["g"] = None
-    ok("'Toplantıyı kendisi tanısın' kapalıyken tanınmadı", L().count("OTO: toplantı tanındı") == n_)
+    time.sleep(25); n_ = L().count("toplantı oturumu açıldı"); NABIZ["g"] = "meet"; time.sleep(5); NABIZ["g"] = None
+    ok("'Toplantıyı kendisi tanısın' kapalıyken oturum açılmadı (döküm yine tutulur, Faz B)", L().count("toplantı oturumu açıldı") == n_ and "ayar kapalı (oto_toplanti)" in L())
     ra = istek("/ayar", {"degisen": {"oto_haric": "", "oto_toplanti": True}}); ayj = json.load(open(ay, encoding="utf-8"))
     ok("boş liste ve açık (varsayılan) ayar dosyasından çıkar", ra.get("ok") and "oto_haric" not in ayj and "oto_toplanti" not in ayj)
     ok("aktarıcıda hata yok", "Traceback" not in L() and "OTO: denetim hatası" not in L())

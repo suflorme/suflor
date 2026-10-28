@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Toplantı bitişi (v0.27.2): aktarıcı bitişi kendisi algılar (/status toplanti_bitti), izle "TOPLANTI BİTTİ" olayını bir kez verir. Deneme kipinde
-# (SUFLOR_TEST_HIZLI) toplantı sinyali penceresi 6 sn, satırsız bekleme 8 sn. Senaryolar: eklenti sinyali kopar ama toplantı uygulaması mikrofonu
-# tutuyor (ses yardımcısı "dinliyor") → bitmez · yardımcı "bekliyor" (mikrofon bırakıldı) → bitti · yeniden katılınca sıfırlanır · yardımcı yokken
-# 8 sn satırsız → bitti (yedek kural) · izle olayı bir kez.
+# Toplantı bitişi (v0.27.2; Faz B v0.149.0: aktarici/toplanti.py kaydı): aktarıcı bitişi kendisi algılar (/status toplanti_bitti), izle "TOPLANTI BİTTİ"
+# olayını bir kez verir. Deneme kipinde (SUFLOR_TEST_HIZLI) sinyal penceresi 6 sn, bitiyor 8 sn. Senaryolar: eklenti sinyali kopar ama toplantı uygulaması
+# mikrofonu tutuyor (ses yardımcısı "dinliyor") → bitmez · yardımcı "bekliyor" (mikrofon bırakıldı) → bitti · yeniden katılınca YENİ dosya (S163) ·
+# yardımcı yokken satırsız → bitti · izle olayı bir kez · bitişten sonra not biten dosyaya yazılmaz (S163).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/bitis.py      (kaldı → çıkış 1; ~60 sn)
 import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -41,27 +41,31 @@ try:
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
     for _ in range(9): time.sleep(1); nabiz("dinliyor"); post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": f"a/{_+2}", "speaker": "Ayşe", "time": "10:00", "text": f"satır {_}"}]})
     bak("sinyal koptu (9 sn ping yok) ama uygulama mikrofonu tutuyor: bitmedi", not st().get("toplanti_bitti"))
-    nabiz("bekliyor"); time.sleep(2.5)
+    for _ in range(25):
+        nabiz("bekliyor"); time.sleep(1)
+        if st().get("toplanti_bitti"): break
     tb = st().get("toplanti_bitti") or {}
-    bak(f"mikrofon bırakıldı: bitti ({tb.get('neden')})", tb.get("file") == md and "mikrofonu bıraktı" in (tb.get("neden") or ""))
-    time.sleep(3)
+    bak(f"mikrofon bırakıldı: bitti ({tb.get('neden')})", tb.get("file") == md and "sinyal" in (tb.get("neden") or ""))
+    time.sleep(6)  # izle bitişten ≥ 5 sn sonra açılsın (izle'nin "eski bitiş" payı)
     # izle bitişten sonra yeniden başlarsa eski bitişi yeni olay gibi vermez (13 Ekim deneme 8)
     iz2 = subprocess.Popen([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", "izle", "--aralik", "1"],
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
     time.sleep(4); iz2.terminate(); o2 = iz2.communicate(timeout=10)[0]
     bak("yeniden başlayan izle eski bitişi olay olarak vermez", "TOPLANTI BİTTİ" not in o2 and "bitti saymıştı" in o2)
     post("/ping", {"call": True, "panel": True, "meeting": M}); nabiz("dinliyor"); time.sleep(1.5)
-    bak("yeniden katıldı: sıfırlandı", not st().get("toplanti_bitti"))
-    for _ in range(9): time.sleep(1); nabiz("bekliyor")
+    bak("yeniden katıldı: yeni toplantı (S163: biten toplantıya dönülmez)", not st().get("toplanti_bitti") and st().get("file") != md)
+    for _ in range(25):
+        time.sleep(1); nabiz("bekliyor")
+        if st().get("toplanti_bitti"): break
     tb2 = st().get("toplanti_bitti") or {}
-    bak("ikinci kez bitti", tb2.get("file") == md)
+    bak("ikinci toplantı da bitti", tb2.get("file") and tb2.get("file") != md)
 finally:
     time.sleep(3)
     if iz: iz.terminate(); out = iz.communicate(timeout=10)[0]
     else: out = ""
     r.terminate(); r.wait(5)
 olay = [l for l in out.splitlines() if "TOPLANTI BİTTİ" in l]
-bak(f"izle: TOPLANTI BİTTİ olayı ({len(olay)} kez; ilk bitiş + yeniden katılıştan sonraki)", len(olay) == 2 and "mikrofonu bıraktı" in olay[0])
+bak(f"izle: TOPLANTI BİTTİ olayı ({len(olay)} kez; ilk bitiş + yeniden katılıştan sonraki)", len(olay) == 2 and "sinyal" in olay[0])
 shutil.rmtree(T, ignore_errors=True)
 # 13 Ekim deneme 8: eklenti sustu, satır gelmiyor ama toplantı uygulaması ses çıkarıyor → bitmez; ses kesilince "satır yok" ile biter.
 # Masaüstü uygulaması toplantı dışı bildirse de (hiç toplantıda değildi) neden "masaüstü penceresi kapandı" yazılmaz.
@@ -72,7 +76,9 @@ try:
     post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": "c/1", "speaker": "Ayşe", "time": "10:00", "text": "merhaba"}]})
     for _ in range(14): time.sleep(1); nabiz("dinliyor", 2000); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
     bak("eklenti sustu, satır yok ama toplantı sesi akıyor: bitmedi", not st().get("toplanti_bitti"))
-    for _ in range(12): time.sleep(1); nabiz("dinliyor", 0); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+    for _ in range(25):
+        time.sleep(1); nabiz("dinliyor", 0); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+        if st().get("toplanti_bitti"): break
     tb = st().get("toplanti_bitti") or {}
     bak(f"ses de kesildi: bitti, neden masaüstü penceresi değil ({tb.get('neden')})", tb.get("neden") and "masaüstü" not in tb["neden"])
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
@@ -98,7 +104,9 @@ try:
     post("/masaustu", {"uygulama": "Teams", "toplantida": True, "baslik": "Bitiş Deneme | Microsoft Teams"}); nabiz("dinliyor")
     post("/ingest", {"meeting": {"title": "Bitiş Deneme"}, "source": "transcript", "entries": [{"id": "d/1", "speaker": "Ayşe", "time": "10:00", "text": "merhaba"}]})
     post("/masaustu", {"uygulama": "Teams", "toplantida": False}); nabiz("bekliyor")
-    for _ in range(10): time.sleep(1); nabiz("bekliyor"); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+    for _ in range(25):
+        time.sleep(1); nabiz("bekliyor"); post("/masaustu", {"uygulama": "Teams", "toplantida": False})
+        if st().get("toplanti_bitti"): break
     tb = st().get("toplanti_bitti") or {}
     bak(f"masaüstü penceresi kapandı: neden doğru ({tb.get('neden')})", "masaüstü toplantı penceresi kapandı" == tb.get("neden"))
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
@@ -106,7 +114,10 @@ T, canli, r, post, st, nabiz = kur(False)
 try:
     post("/ping", {"call": True, "panel": True, "meeting": M})
     post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": "b/1", "speaker": "Ayşe", "time": "10:00", "text": "merhaba"}]})
-    time.sleep(15); tb = st().get("toplanti_bitti") or {}
+    for _ in range(25):
+        time.sleep(1)
+        if st().get("toplanti_bitti"): break
+    tb = st().get("toplanti_bitti") or {}
     bak(f"yardımcı yokken yedek kural: satırsız → bitti ({tb.get('neden')})", "satır yok" in (tb.get("neden") or ""))
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 # v0.32.15 (deneme 9): bitişten sonra panodan not/soru toplantıyı yeniden açmaz, biten dosyaya yazılır; sesli çeviri bitişle kapanır;
@@ -119,7 +130,7 @@ try:
     md = st()["file"]
     sc = post("/komut", {"tur": "sesli_ceviri"})
     nabiz("bekliyor")
-    for _ in range(12):
+    for _ in range(25):
         time.sleep(1); nabiz("bekliyor")
         if st().get("toplanti_bitti"): break
     time.sleep(1.5)
@@ -129,11 +140,8 @@ try:
     post("/note", {"text": "bitişten sonra not", "at": "2026-10-13T20:50:00"})
     q = post("/ask", {"text": "bitişten sonra soru"}); s = st()
     metin = open(os.path.join(canli, md), encoding="utf-8").read()
-    bak("bitişten sonra not toplantıyı yeniden açmaz", s.get("file") == md and not s.get("aktif") and "bitişten sonra not" in metin and "toplantıdan sonra" in metin)
-    bak("bitişten sonra soru biten dosyaya", (q.get("question") or {}).get("file") == md and "bitişten sonra soru" in metin)
-    time.sleep(1.1); open(os.path.join(canli, "takvim-secilen.json"), "w").write('{"at": "2099-01-01T00:00:00", "konu": "Yeni"}')
-    post("/note", {"text": "yeni başlattan sonra not", "at": "2026-10-13T21:00:00"})
-    bak("yeni Başlat'tan sonra not eski dosyaya 'toplantıdan sonra' diye yazılmaz", "yeni başlattan sonra not | ✎ (toplantıdan sonra)" not in open(os.path.join(canli, md), encoding="utf-8").read())
+    bak("bitişten sonra not toplantıyı yeniden açmaz, biten dosyaya yazılmaz (S163)", s.get("file") == md and not s.get("aktif") and "bitişten sonra not" not in metin)
+    bak("bitişten sonra soru biten dosyaya gitmez", not (q.get("question") or {}).get("file") and "bitişten sonra soru" not in metin)
     bak("aktarıcıda hata yok", "Traceback" not in open(os.path.join(T, "relay.log")).read())
 finally: r.terminate(); r.wait(5); os.environ.pop("SUFLOR_TEST_KULAKLIK", None); shutil.rmtree(T, ignore_errors=True)
 print("bitiş: ✓ hepsi geçti" if not hata else f"bitiş: ✗ {len(hata)} kaldı")

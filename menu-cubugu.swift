@@ -578,12 +578,15 @@ final class Masaustu {
                 || v["katilimcilar"] != nil || (v["konusan"] as? String) != nil
             // toplantı dışında da 60 sn'de bir: aktarıcı yeniden başlayınca durumu (menü uygulaması bağlı, toplantı yok) değişiklik beklemeden alır
             // çıkıştan sonraki 10 dk da 10 sn'de bir: aktarıcı toplantı sesi sürüyorsa toplantıyı sürüyor sayar ve sık durum ister
-            let sik = top || Date().timeIntervalSince(self.cikis) < 600
-            if !v.isEmpty && (degisti || Date().timeIntervalSince(self.sonGonder) > (sik ? 10 : 60)) {
+            // Faz B (S165): eklentisiz web toplantıda aktarıcı "tut" der → mikrofon (ben kanalı) açılır; açılması ≤ 15 sn, kapanması ≤ 10 sn sürsün
+            let sik = top || self.tutuluyor || Date().timeIntervalSince(self.cikis) < 600
+            if !v.isEmpty && (degisti || Date().timeIntervalSince(self.sonGonder) > (sik ? 10 : 15)) {
                 var g = v; if g["sessiz"] is NSNull || (g["sessiz"] as? Bool) == nil { g.removeValue(forKey: "sessiz") }
                 istek("/masaustu", g) { y in
                     let t = (y?["tut"] as? Bool) ?? false
-                    self.kilit.lock(); let once = self.tutuluyor; self.tutuluyor = t && !top; self.kilit.unlock()
+                    self.kilit.lock(); let once = self.tutuluyor; self.tutuluyor = t && !top
+                    if self.tutuluyor && !once && Date().timeIntervalSince(self.cikis) > 600 { self.tutSessiz = nil }  // web toplantısı: eski masaüstü sessiz durumu taşınmasın
+                    self.kilit.unlock()
                     if t && !top && !once { print("MASAÜSTÜ: aktarıcı toplantıyı tutuyor (\"Ayrıl\" yok, ses sürüyor) — mikrofon ve kanıt açık") }
                 }; self.sonGonder = Date()
             }
