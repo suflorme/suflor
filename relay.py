@@ -685,9 +685,11 @@ def ingest(p):
                 yeni_w = p.get("source") == "whisper" and not onceki; ham = text
                 birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if yeni_w else None  # 19 Ekim: bölünen hitap; v0.140.0: yalnız ad + sonraki satırlar
                 text, hd = hitap_duzelt(text); soz += hd
+                if yeni_w and "Claude:" not in text: vokatif_ogren(ham)
+                if yeni_w and "Claude:" in text: LAT.clear(); LAT.update(konusma_bit=e.get("t1"), satir=time.time())  # v0.152.0: hitap satırı gecikme ölçümü (otonom.py)
                 if _KHR["satir"] and "Claude:" in text: e["_hitap_ad"] = _KHR["satir"]  # S133: kullanıcıya görünen dökümde bu ad yazılır (asistan_goster)
                 # v0.140.0: asistan soru sorduysa ASISTAN_SORU_SN içindeki hitapsız cevap o asistana (askıda birikir, süre dolunca gider)
-                if yeni_w and not birlesik and "Claude:" not in text and not hitap_askida(ham) and e.get("komut_ses") != "uymuyor" and (ad_ := asistan_cevap_bekliyor(e.get("t0"))):
+                if yeni_w and not birlesik and "Claude:" not in text and not hitap_askida(ham) and e.get("komut_ses") != "uymuyor" and not vokatif_mi(ham) and (ad_ := asistan_cevap_bekliyor(e.get("t0"))):
                     hitap_cevap_baslat(ad_, ham, e.get("t0"), e.get("t1")); print(f"KONUŞ: hitapsız cevap {ad_}'nın sorusuna sayıldı — \"{ham[:60]}\"")
                 askida = hitap_aski_metin() if hitap_askida(ham) else None  # S94: yarım hitap tek başına gitmez; devamı gelmezse süre dolunca tek başına
                 if askida and e.get("komut_ses") != "uymuyor" and ("Claude:" in text or "Claude:" in hitap_duzelt(askida)[0]):
@@ -707,7 +709,7 @@ def ingest(p):
                     elif p.get("source") in ("captions", "transcript") and "Claude:" in text and e.get("id") not in _HITAP_ALTYAZI and not whisper_akiyor("ben"):
                         _HITAP_ALTYAZI.add(e.get("id"))
                         print(f"KONUŞ: hitap altyazıda duyuldu, Whisper kapalı — cevaplanmadı (konuşana yalnız Whisper satırı gider) — \"{text[:60]}\"")  # mrt 28 Ekim 01:06 B1
-            elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker")): e["_konusan"] = True  # v0.44.0
+            elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker"), e.get("t0"), e.get("t1")): e["_konusan"] = True  # v0.44.0
             if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text)); del SON_SATIRLAR[:-20]
             low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye

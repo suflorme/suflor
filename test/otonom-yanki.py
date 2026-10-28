@@ -69,4 +69,17 @@ ns["KENDI_SES"].append((time.time() - 5, time.time() + 5, ["bir", "dakika", "son
 ok("söylediğimiz metinde 'bir dakika' geçiyorsa (yankı olabilir) kesmez", not ds("Bir dakika.", time.time() - 3))
 ns["TS"]["web"]["dur"] = True
 ok("okuma bittiyse kesmez", not ds("Dur."))
+# v0.152.0: başkasına seslenilen ad hitapsız cevap sayılmaz; karşı hitap yalnız okunan metne benzerse atılır; ikinci cevap öncekinin okumasını kesmez; "siz" kuralı
+_VK = {"_VOKATIF": set()}; ns.update(_VK, kisilikler=lambda: [{"hitap": ["Deniz"]}])
+_ayikla("bas-konus.py", {"_VOKATIF", "_vk_ad", "vokatif_ogren", "vokatif_mi"})
+vo, vm = ns["vokatif_ogren"], ns["vokatif_mi"]
+ok("başkasına seslenilmemişken ad cevap dışı sayılmaz", not vm("Esra öyle deme."))
+vo("Esra, duyuyor musun beni?"); vo("Deniz, beni duyuyor musun?")
+ok("virgülle seslenilen ad öğrenilir: 'Esra öyle deme' cevap sayılmaz", vm("Esra öyle deme.") and vm("Esra duydun mu konuşmayı?"))
+ok("asistanın kendi adı öğrenilmez", not vm("Deniz tamam."))
+ok("başka bir söz cevap sayılabilir ('Bugün değil, salı')", not vm("Bugün değil, salı."))
+kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read(); kod_o = open(os.path.join(KOD, "aktarici", "otonom.py"), encoding="utf-8").read()
+ok("karşı hitap: satır zamanı varsa yalnız _kendi_mi yankısı atılır", "def konus_hitap_karsi(text, kim, t0=None, t1=None)" in kod_ and "_kendi_mi((t0, t1, _yk(text)), k) for k in KENDI_SES" in kod_)
+ok("toplantıya okunan cevap istemine 'siz' kuralı (TR+EN)", "kullanıcıya her zaman «siz» diye hitap et" in kod_ and "always address the user formally" in kod_)
+ok("otonom_sun öncekinin okuması sürerken bekler; gecikme satırı yazılır", "önceki cevap sürüyordu" in kod_o and "OTONOM: gecikme" in kod_o)
 print("otonom yankı: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

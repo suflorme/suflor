@@ -39,6 +39,7 @@ def ts_web_ses(i):
     w = TS.get("web"); return w["ses"] if w and w["id"] == i else None
 def ts_web_durum(d):  # eklentinin sonucu: caliyor | bitti | durdu | sessiz | baglanti-yok | hata:<ad>
     d = str(d or "")[:60]; print(f"TOPLANTIYA SÖYLE (web): {d}")
+    if d == "caliyor": TS["t_caliyor"] = time.time()  # v0.152.0 gecikme ölçümü (otonom.py)
     w = TS.get("web")
     if w and d != "caliyor": w["bitti"] = True  # sonraki basış susturma değil, yeni okuma
     uy = {"sessiz": _t("🔇 Toplantıda mikrofonun kapalı — Suflor okumadı", "🔇 Your mic is muted in the meeting — Suflor didn't speak"),
@@ -120,6 +121,7 @@ def toplantiya_soyle(metin=None):
         gpcm = pocket_pcm(kisilik_telaffuz(etiket_sil(m)), ses=kses)
         if gpcm: print(f"TOPLANTIYA SÖYLE: Pocket sesi ({kses}, {len(gpcm) / 2 / GEMINI_SR:.1f} sn)")
         else: print("TOPLANTIYA SÖYLE: Pocket sesi alınamadı — Mac sesi")
+    TS["t_sentez_bit"] = time.time()  # v0.152.0 gecikme ölçümü (otonom.py)
     if web: return _ts_web_hazirla(m, sesli, okunan, gpcm)
     if os.environ.get("SUFLOR_TEST_BASLAT"):
         print(f"TOPLANTIYA SÖYLE (deneme): aygıt {aygit} · {okunan}"); TS["son"] = m; TS["son_t"] = TS["test_bit"] = time.time() + len(m) / 14
@@ -136,6 +138,7 @@ def toplantiya_soyle(metin=None):
             if kulaklik(): ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
     except OSError as e: print(f"TOPLANTIYA SÖYLE: hata {e.__class__.__name__}"); return {"ok": False, "err": "say"}
     with TS_KILIT: TS["p"] = ps
+    TS["t_caliyor"] = time.time()  # v0.152.0: BlackHole yolunda çalıcı başladı (web yolunda eklenti "caliyor" der)
     TS["zarf"] = (time.time(), ses_zarfi(gpcm, GEMINI_SR)) if gpcm else None  # 19 Ekim: otonom okurken kanaldaki ses kendi yankımız mı (otonom.py)
     TS["son"] = m; TS["son_t"] = time.time() + (len(gpcm) / 2 / GEMINI_SR if gpcm else len(m) / 14)  # okuma sonu (Mac sesinde tahmin ~14 karakter/sn): karşı taraf hitabı ardından 10 sn sayılmaz
     kendi_ses_kaydet(m, time.time(), TS["son_t"])

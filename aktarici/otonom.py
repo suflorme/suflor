@@ -19,7 +19,7 @@ def otonom_kesilsin(ts, zarf, t_bas, esik):  # → (kesilsin mi, son 3 sn'de aç
     if n >= esik: return True, n, d  # biz susarken ≥ esik ses, ya da yankı değil
     son = sum(1 for t in ts if t >= ts[-1] - 3.0) if ts else 0
     return (d is not None and n >= OTONOM_ARA_KARE and son >= esik), n, d  # üstümüze konuşma: son 3 sn'de ≥ esik ses ve bir kısmı aralarımızda
-OT = {"id": None}; OT_K = threading.Lock()
+OT = {"id": None}; OT_K = threading.Lock(); LAT = {}  # LAT: son hitap satırının konuşma bitişi ve geliş zamanı (relay ingest); gecikme satırı için
 OT_SON = ("iptal", "okundu", "kesildi", "soylenmedi", "okunamadi")
 def otonom_acik(): return asistan_toplanti() and toplanti_var()  # S94: tek anahtar (moderatör de toplantiya_ses ister)
 def _ot_ayar(ad, v):
@@ -73,6 +73,11 @@ def otonom_onay_ver(karar="onaylandi", kaynak="ses"):  # bekleyen karşı taraf 
 def otonom_sun(cevap, kaynak, kim=None, ad=None):  # konuşanın cevabı hazır → (itiraz penceresi, S94'ten 0) → söz sırası → toplantıya; ad: konuşan asistan
     m = ts_sesli_kisim(cevap)
     if not m: return False
+    # 28 Ekim: iki cevap üst üste hazır olunca ikincisi birincinin okumasını kesip çelişti; öncekinin okuması/sırası bitene (en çok 20 sn) beklenir
+    t_b = time.time()
+    while time.time() - t_b < 20 and OT.get("id") and OT.get("durum") in ("itiraz", "sira", "okunuyor"): time.sleep(0.2)
+    if time.time() - t_b >= 0.4: print(f"OTONOM: önceki cevap sürüyordu — {time.time() - t_b:.1f} sn beklendi")
+    tur_ = _KS.get("tur") or {}; lat = dict(tur_.get("lat") or {}, gonder=tur_.get("t_gonder"), ilk=tur_.get("t_ilk_yanit"), hazir=time.time())
     i = secrets.token_hex(4); itz = _ot_ayar("otonom_itiraz_sn", OTONOM_ITIRAZ_SN)
     iz = None
     if kaynak == "karsi" and AYAR.get("karsi_onay", True) is not False and "izin_iste" in globals():
@@ -80,7 +85,7 @@ def otonom_sun(cevap, kaynak, kim=None, ad=None):  # konuşanın cevabı hazır 
                                          f"{kim or 'The other side'} asked; {ad or 'the assistant'} will say in the meeting: «{m[:220]}» — read it? (by voice: «{ad or 'Suflor'}, read it»)"),
                        {"kim": kim, "ad": ad, "metin": m[:600]}, sesli=False)
         itz = max(itz, _ot_ayar("karsi_onay_sn", KARSI_ONAY_SN))
-    with OT_K: OT.clear(); OT.update(id=i, metin=m, kaynak=kaynak, kim=kim, ad=ad, durum="itiraz", t=time.time(), t_durum=time.time(), son=time.time() + itz, **({"izin": iz} if iz else {}))
+    with OT_K: OT.clear(); OT.update(id=i, metin=m, kaynak=kaynak, kim=kim, ad=ad, durum="itiraz", t=time.time(), t_durum=time.time(), son=time.time() + itz, lat=lat, **({"izin": iz} if iz else {}))
     if itz > 0: _ot_uyari()
     print(f"OTONOM: cevap hazır ({kaynak}{' · ' + kim if kim else ''}{' · ' + ad if ad else ''})" + (f" — {itz:.0f} sn itiraz penceresi" if itz > 0 else " — söz sırası bekleniyor"))
     threading.Thread(target=_ot_dongu, args=(i,), daemon=True).start(); return True
@@ -122,6 +127,14 @@ def okuma_dur_soz(metin, t0=None):
     with YANKI_LOCK: kendi = [k for k in KENDI_SES if t0 is None or k[1] >= t0 - 1.0]
     if kel and any(all(any(_kok_ayni(w, o) for o in k[2]) for w in kel) for k in kendi): return False  # söylediğimiz metinde geçiyor: yankı olabilir
     return True
+def _ot_gecikme(lat):  # v0.152.0 (ölçüm): hitap satırından çalmaya kadar aşamalar tek günlük satırı; davranışı değiştirmez
+    t = time.time()
+    while not TS.get("t_caliyor") and time.time() - t < 10: time.sleep(0.1)
+    cal = TS.get("t_caliyor") or time.time(); sen = TS.get("t_sentez_bit") or lat["soyle"]
+    a = lambda x, y: f"{max(0.0, x - y):.1f}" if x and y else "?"
+    print(f"OTONOM: gecikme {a(cal, lat.get('konusma_bit'))} sn (konuşma bitişi → çalma) · satır geldi {a(lat.get('satir'), lat.get('konusma_bit'))} · algı {a(lat.get('algi'), lat.get('satir'))} · "
+          f"hazırlık {a(lat.get('gonder'), lat.get('algi'))} · Claude ilk metin {a(lat.get('ilk'), lat.get('gonder'))} · Claude bitti {a(lat.get('hazir'), lat.get('ilk'))} · söz sırası {a(lat.get('soyle'), lat.get('hazir'))} · "
+          f"ses sentezi {a(sen, lat['soyle'])} · çalma başlangıcı {a(cal, sen)}")
 def _ot_dongu(i):
     iz = OT.get("izin")
     if iz:  # v0.97.0 (Y2): karşı tarafa cevap — kullanıcı onayı
@@ -146,7 +159,8 @@ def _ot_dongu(i):
         time.sleep(0.1)
     if not _ot_gec(i, "okunuyor"): return
     print(f"OTONOM: söz sırası ({time.time() - bas:.1f} sn bekledi) — toplantıya okunuyor")
-    r = toplantiya_soyle(OT["metin"])
+    lat = dict(OT.get("lat") or {}, soyle=time.time()); TS.pop("t_caliyor", None); r = toplantiya_soyle(OT["metin"])
+    threading.Thread(target=_ot_gecikme, args=(lat,), daemon=True).start()
     if not r.get("ok"): _ot_gec(i, "okunamadi", neden=str(r.get("err") or "?")); print(f"OTONOM: okunamadı ({r.get('err')})"); return
     t0 = time.time(); esik = int(_ot_ayar("otonom_kesme_sn", OTONOM_KESME_SN) / 0.02); zarf = TS.get("zarf"); son_bak = 0.0; yanki_yazildi = False  # 20 ms'lik kareler
     while time.time() < (TS.get("son_t") or 0) + 0.5:
