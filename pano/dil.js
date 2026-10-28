@@ -144,6 +144,8 @@ globalThis.SUFLOR_EN = {
   "Teşekkürler — gönderildi": "Thanks — sent",
   "Gönderilemedi — sonra yeniden denenecek": "Couldn't send — will retry later",
   "Elle başlat": "Start manually",
+  "Toplantı platformu seçmediniz": "You haven't chosen a meeting platform",
+  "Toplantı hangi uygulamada yapılacak? Seçince Başlat o uygulamayla sürer ve ana sayfası açılır.": "Which app will the meeting be in? Once you choose, Start continues with it and opens its home page.",
   "Suflor.me güncellendi": "Suflor.me was updated",
   "açık bir toplantı sekmesi varsa yenile": "reload any open meeting tab",
   "Diğer → Dil ve konuşma → Canlı altyazı": "More → Language and speech → Live captions",

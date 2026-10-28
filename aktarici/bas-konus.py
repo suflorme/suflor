@@ -1512,7 +1512,8 @@ def konus_is_ilet(metin):
 # kullanıcıya cevap tek yoldan: Konuş düğmesi. "<Ad>, dur/sus" okumayı keser. İş talimatı ("<Ad>, not al / e-posta taslağı hazırla") toplantı oturumunda
 # yapılır, asistan kısa onay verir. Önceki cevap sürerken gelen soru ASISTAN_BEKLE_SN'ye kadar sırada bekler (önceden toplantı oturumuna düşüp çift cevap oluyordu).
 ASISTAN_OKU_RX = re.compile(r"^\W*(oku|okuyabilirsin|söyle|soyle|evet|evet oku|tamam|tamam oku|cevapla|cevap ver|onaylıyorum|go ahead|read it|yes)\W*$", re.I)  # v0.97.0 (Y2): bekleyen karşı taraf cevabını onayla
-ASISTAN_DUR_RX = re.compile(r"^\W*(dur|sus|sus artık|yeter|kes|bekle|tamam yeter|stop|be quiet|that'?s enough)\W*$", re.I)
+# tek durdurma kalıbı: "<Ad>, dur" (konus_hitap) ve okuma sürerken kullanıcının adsız kısa sözü (otonom.py okuma_dur_soz) — 28 Ekim: "bir dakika" 12 sn geç durdurdu
+ASISTAN_DUR_RX = re.compile(r"^\W*(?:dur|sus|sus artık|yeter|kes|bekle|tamam yeter|dur bir dakika|bir dakika|bir saniye|bir dk|bir sn|biraz bekle|dur biraz|stop|be quiet|that'?s enough|wait|hold on|one (?:moment|minute|second))\W*$", re.I)
 ASISTAN_BEKLE_SN = 30
 def _hitap_ad():  # bu satırda adıyla seslenilen asistan (hitap_duzelt bıraktı); kişiliksiz kurulumda Claude/Suflor hitabı → "Suflor"
     return _KHR.get("satir") or (None if kisilikler() else "Suflor")

@@ -102,6 +102,26 @@ def asistan_dur():  # S94: "<Ad>, dur" / "sus" ve Option + Shift + S — bekleye
     if not toplanti_var() and "uclu_kes" in globals() and uclu_kes("Option + Shift + S / dur", sustur=True): return {"ok": True, "metin": _t("🔇 Asistanlar sustu", "🔇 Assistants stopped")}  # üçlü sohbet
     if ts_durdur(): print("ASİSTAN: sustu (okuma durdu)"); return {"ok": True, "metin": _t("🔇 Asistan sustu", "🔇 Assistant stopped")}
     return r or {"ok": True, "metin": _t("🔇 Okunan bir şey yok", "🔇 Nothing is being read")}
+def okuma_suruyor():  # toplantıya okuma (web ya da BlackHole) şu an sürüyor mu
+    w = TS.get("web")
+    if w and not w["dur"] and not w.get("bitti") and time.time() - w["t"] < w["sure"] + 3: return True
+    with TS_KILIT: return any(p.poll() is None for p in TS["p"])
+def okuma_dur_soz(metin, t0=None):
+    # 28 Ekim: asistan okurken kullanıcı "bir dakika" dedi, okuma 12 sn geç durdu (yankı sınıflayıcısı gerçek sesi yankı saydı). Okuma sürerken kullanıcının kendi (ben) satırının son
+    # cümlesi kısa durdurma sözüyse (ASISTAN_DUR_RX; başındaki kişilik adı atılır) zarf/yankı ölçümü beklenmeden okuma kesilir. Söz bizim okuduğumuz metinde geçiyorsa (yankı) kesmez.
+    if not okuma_suruyor(): return False
+    try: adlar = {sade(x) for k in kisilikler() for x in k.get("hitap") or []}
+    except Exception: adlar = set()
+    c = [x for x in re.split(r"(?<=[.!?…])\s+", " ".join(str(metin or "").split())) if x.strip()]
+    if not c or len(str(metin).split()) > 8: return False
+    sw = c[-1].split()
+    while sw and sade(sw[0].strip(",.;:!?…")) in adlar: sw = sw[1:]
+    son = " ".join(sw)
+    if not ASISTAN_DUR_RX.match(son): return False
+    kel = [sade(w) for w in re.findall(r"\w+", son) if len(w) > 2]
+    with YANKI_LOCK: kendi = [k for k in KENDI_SES if t0 is None or k[1] >= t0 - 1.0]
+    if kel and any(all(any(_kok_ayni(w, o) for o in k[2]) for w in kel) for k in kendi): return False  # söylediğimiz metinde geçiyor: yankı olabilir
+    return True
 def _ot_dongu(i):
     iz = OT.get("izin")
     if iz:  # v0.97.0 (Y2): karşı tarafa cevap — kullanıcı onayı

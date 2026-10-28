@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 28 Ekim (teams-duzelt): ben_kod/ben_neden — mikrofon açık ve ses parçaları akıyorsa "akiyor" (konuşan yok), "sorun" yalnız parça da gelmiyorsa;
-# veri_yok kanalındaki ben kodu yanlış "mikrofon sorunu" kartına yol açmasın. Başlat seçimsiz: son tanınan toplantının platformu (son_tanin_platform).
+# veri_yok kanalındaki ben kodu yanlış "mikrofon sorunu" kartına yol açmasın. Başlat seçimsiz: S166'da geri alındı (hiçbir uygulama açılmaz, pano platform sorar).
 import os, re, sys, time
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 s = open(os.path.join(KOD, "aktarici", "whisper-hat.py"), encoding="utf-8").read()
@@ -19,5 +19,5 @@ ST["mic"]["sessiz"] = True; ok("sessizde → sessiz", ns["ben_kod"]() == "sessiz
 ST["mic"].update(sessiz=False, on=False); ok("kapalı → kapali", ns["ben_kod"]() == "kapali")
 ST["mic"].update(on=True, hata="x"); ok("hata → hata", ns["ben_kod"]() == "hata")
 r = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
-ok("Başlat seçimsiz son_tanin_platform'a düşer", "plat = son_tanin_platform()" in r and "def son_tanin_platform" in r)
+ok("Başlat seçimsiz hiçbir platforma düşmez (S166)", "son_tanin_platform" not in r)
 print("SONUÇ:", "hepsi geçti" if all(ok_) else "başarısız"); sys.exit(0 if all(ok_) else 1)

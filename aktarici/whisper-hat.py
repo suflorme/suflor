@@ -664,6 +664,8 @@ def whisper_yaz(is_, metin, ses=None, model=None):
             STATE["whisper"]["kendi_ses"] = STATE["whisper"].get("kendi_ses", 0) + 1
             if STATE["whisper"]["kendi_ses"] in (1, 10, 50): print(f"YANKI: Suflor'un okuduğu ses mikrofona girdi ({STATE['whisper']['kendi_ses']}. kez, yazılmadı) — \"{metin[:60]}\"")
             return "yanki"
+    if kanal == "ben" and not is_.get("oda") and "okuma_dur_soz" in globals() and okuma_dur_soz(metin, is_["t0"]):  # okuma sürerken kısa durdurma sözü: hemen sus
+        print(f"ASİSTAN: okurken kullanıcı '{metin[:30]}' dedi — okuma durdu"); threading.Thread(target=asistan_dur, daemon=True).start()
     karsi_akiyor = now - STATE["whisper"]["kanallar"].get("karsi", 0) < WH_AKIS_SN
     if kanal == "karsi":
         with YANKI_LOCK: YANKI_KARSI.append((is_["t0"], is_["t1"], _yk(metin))); del YANKI_KARSI[:-20]

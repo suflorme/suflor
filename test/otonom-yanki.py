@@ -48,4 +48,25 @@ ok(f"30 sn okumada %12 dağınık gürültü: kesmez (son 3 sn'de {n} kare)", no
 pcm = b"".join(struct.pack("<h", int(8000 * math.sin(2 * math.pi * 220 * i / 24000)) if (i // 2400) % 5 < 3 else 0) for i in range(24000))
 z = ns["ses_zarfi"](pcm, 24000)
 ok(f"ses_zarfi: 50 kare, sesli/sessiz örüntü ({sum(z)} sesli ≈ 30)", len(z) == 50 and 28 <= sum(z) <= 32 and z[0] and not z[16])
+# okuma sürerken kullanıcının kısa durdurma sözü (28 Ekim "bir dakika"): yankı ölçümü beklenmeden keser; söylediğimiz metinde geçiyorsa kesmez
+import re, time, threading
+def _ayikla(dosya, adlar):
+    a = ast.parse(open(os.path.join(KOD, "aktarici", dosya), encoding="utf-8").read())
+    sec = [n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in adlar) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in adlar for x in n.targets))]
+    exec(compile(ast.Module(sec, []), dosya, "exec"), ns)
+import unicodedata
+ns.update(re=re, time=time, threading=threading, TS={"web": None, "p": []}, TS_KILIT=threading.Lock(), YANKI_LOCK=threading.Lock(), KENDI_SES=[],
+          kisilikler=lambda: [{"hitap": ["Deniz"]}], sade=lambda t: unicodedata.normalize("NFKD", t.lower().replace("ı", "i")).encode("ascii", "ignore").decode(), _kok_ayni=lambda x, y: x[:3] == y[:3])
+_ayikla("bas-konus.py", {"ASISTAN_DUR_RX"}); _ayikla("otonom.py", {"okuma_suruyor", "okuma_dur_soz"})
+ds = ns["okuma_dur_soz"]
+ok("okuma yokken 'Bir dakika' kesmez", not ds("Bir dakika."))
+ns["TS"]["web"] = {"t": time.time(), "sure": 15.0, "dur": False}
+for m in ("Bir dakika.", "Dur.", "Sus artık", "Deniz, bekle", "Beni dinler misin? Bir dakika.", "Wait", "Dur bir dakika"):
+    ok(f"okurken '{m}' → keser", ds(m))
+for m in ("Bir dakika içinde toplantıya katılacağım ve sizi arayacağım", "Evet tamam", "Bunu bir dakika sonra konuşalım"):
+    ok(f"okurken '{m}' → kesmez", not ds(m))
+ns["KENDI_SES"].append((time.time() - 5, time.time() + 5, ["bir", "dakika", "sonra"]))
+ok("söylediğimiz metinde 'bir dakika' geçiyorsa (yankı olabilir) kesmez", not ds("Bir dakika.", time.time() - 3))
+ns["TS"]["web"]["dur"] = True
+ok("okuma bittiyse kesmez", not ds("Dur."))
 print("otonom yankı: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)
