@@ -183,7 +183,11 @@ def ben_kod():
     # ben_neden'in dilden bağımsız kodu — pano yalnız hata/sorun'da uyarır (sessizde olmak sorun değil)
     m = STATE.get("mic") or {}
     if not m or time.time() - m.get("t", 0) > 60: return "yok"
-    return "hata" if m.get("hata") else "kapali" if not m.get("on") else "sessiz" if m.get("sessiz") else "sorun"
+    if m.get("hata"): return "hata"
+    if not m.get("on"): return "kapali"
+    if m.get("sessiz"): return "sessiz"
+    # 28 Ekim: ses parçaları akıyorsa mikrofon çalışıyordur, yalnız konuşan yok ("sorun" yanlış alarm verdi); "sorun" = açık ama parça da gelmiyor
+    return "akiyor" if time.time() - STATE["whisper"]["kanallar"].get("ben", 0) < WH_AKIS_SN else "sorun"
 def ben_neden():
     # ben kanalı ✗ iken neden — eklentinin son nabzındaki mikrofon durumu (sessizlikte de ses akar; ✗ = ses gelmiyor)
     m = STATE.get("mic") or {}
@@ -191,6 +195,7 @@ def ben_neden():
     if m.get("hata"): return _t("mikrofon açılamadı: ", "microphone could not be opened: ") + m["hata"]
     if not m.get("on"): return _t("mikrofon kanalı açılmadı (toplantıda değil ya da Whisper kapalı)", "microphone channel not open (not in a meeting, or Whisper is off)")
     if m.get("sessiz"): return _t("Teams'te mikrofonun kapalı (sessizde)", "your microphone is muted in the meeting")
+    if ben_kod() == "akiyor": return _t("mikrofon çalışıyor, konuşan yok", "microphone is working, nobody is speaking")
     return _t("mikrofon açık ama ses gelmiyor", "microphone is on but no audio is coming in")
 def whisper_view():
     w = STATE["whisper"]; now = time.time()

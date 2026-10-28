@@ -12,7 +12,7 @@
 import getpass as _gp
 DUMAN_HIZLI = bool(os.environ.get("SUFLOR_TEST_HIZLI"))
 DUMAN_SN, DUMAN_KANAL_SN, DUMAN_SORU_SN, DUMAN_DOGRULA_SN = (24, 5, 8, 3) if DUMAN_HIZLI else (180, 30, 60, 20)
-DUMAN = {"aktif": False, "t0": 0.0, "t_bit": None, "platform": None, "kaynak": None, "m": [], "sonuc": None, "dogrula": None, "dogrula_n": 0, "konus": None, "izin_ilk": 0, "dosya": None, "nesil": 0, "yok_t": None}
+DUMAN = {"aktif": False, "t0": 0.0, "t_bit": None, "platform": None, "kaynak": None, "m": [], "sonuc": None, "dogrula": None, "dogrula_n": 0, "konus": None, "izin_ilk": 0, "dosya": None, "nesil": 0, "yok_t": None, "ilk": {}, "ses": {}}
 DUMAN_KISA = {"teams": "Teams", "meet": "Meet", "zoom": "Zoom"}
 DUMAN_KANAL_AD = {"altyazi": ("altyazı", "captions"), "ben": ("ben", "me"), "karsi": ("karşı taraf", "other side")}
 def _dm_temiz(x):  # kurulum.py _dogrula_temiz ile aynı kural: yol ve kullanıcı adı çıkar
@@ -43,10 +43,20 @@ def _dm_kanal(k, t0, gecen, x, mas):  # → (durum, not)
         yd = yerel_ses_durum(); neden = {"yok": _t("ses yardımcısı kurulu değil", "audio helper not installed"), "kapali": _t("ses yardımcısı kapalı", "audio helper off"),
                                          "izin": _t("ses kaydı izni yok", "no audio recording permission")}.get(yd)
         if neden: return "?", neden
-    son = kanal_son(k)
-    if son > t0: return "ok", _t(f"satır {round(son - t0)} sn'de geldi", f"line arrived after {round(son - t0)} s")
+    ilk = DUMAN["ilk"].get(k)  # kanalın ilk satırı (döngü saniyede bir mandallar) — sonradan gelen satır pencerede sayılmaz
+    if ilk and ilk - t0 <= DUMAN_KANAL_SN: return "ok", _t(f"satır {round(ilk - t0)} sn'de geldi", f"line arrived after {round(ilk - t0)} s")
     if gecen < DUMAN_KANAL_SN: return "bekliyor", _t("satır bekleniyor", "waiting for a line")
-    return "hata", _t(f"{DUMAN_KANAL_SN} sn'de satır gelmedi", f"no line within {DUMAN_KANAL_SN} s")
+    # 28 Ekim: kimse konuşmadıysa satır gelmemesi arıza değil — ses seviyesinde konuşma görülmediyse "?" (altyazı için: ben ya da karşı konuşma var mı)
+    ses = DUMAN["ses"]; kanallar = ("ben", "karsi") if k == "altyazi" else (k,)
+    if not any(ses.get(c) and ses[c] - t0 <= DUMAN_KANAL_SN for c in kanallar):
+        return "?", _t("kimse konuşmadı" + (f" (satır {round(ilk - t0)} sn'de geldi, pencere dışı)" if ilk else ""), "nobody spoke" + (f" (line came after {round(ilk - t0)} s, outside the window)" if ilk else ""))
+    return "hata", _t(f"{DUMAN_KANAL_SN} sn'de satır gelmedi" + (f" ({round(ilk - t0)} sn'de geldi)" if ilk else ""), f"no line within {DUMAN_KANAL_SN} s" + (f" (came after {round(ilk - t0)} s)" if ilk else ""))
+def _dm_mandal(t0):  # her turda: kanalların ilk satırı ve ilk konuşma (ses seviyesi) zamanı
+    for k in ("altyazi", "ben", "karsi"):
+        if k not in DUMAN["ilk"] and kanal_son(k) > t0: DUMAN["ilk"][k] = kanal_son(k)
+    for c in ("ben", "karsi"):
+        kn = KANALLAR.get(c)
+        if c not in DUMAN["ses"] and kn and kn.t_ses > t0: DUMAN["ses"][c] = kn.t_ses
 def _dm_oturum(now):  # d: Claude toplantı oturumu açık mı, açılışta kaç izin kartı
     v = toplanti_oturum_view() if "toplanti_oturum_view" in globals() else None; a = OTO.get("aktif") if "OTO" in globals() else None; nd = (a or {}).get("neden") or ""
     iz = max(DUMAN["izin_ilk"], TOPO.get("izin_toplam", 0) if "TOPO" in globals() else 0)
@@ -73,7 +83,7 @@ def _dm_dogrula_madde(i):  # f / g: kurulum.py dogrula'nın maddesi
     if not x: return "?", _t("denetim okunamadı", "check could not be read")
     return x["durum"], x["not"]
 def _dm_maddeler(now):
-    t0 = DUMAN["t0"]; gecen = now - t0; x = STATE.get("extension") or {}; mas = bool((STATE.get("masaustu") or {}).get("toplantida")); M = []
+    t0 = DUMAN["t0"]; gecen = now - t0; _dm_mandal(t0); x = STATE.get("extension") or {}; mas = bool((STATE.get("masaustu") or {}).get("toplantida")); M = []
     def m(i, ad, d, n, **ek): M.append(dict({"id": i, "ad": ad, "durum": d, "not": _dm_temiz(n)}, **ek))
     plat = DUMAN["platform"] or "bilinmeyen"
     m("a", _t("Toplantı tanındı", "Meeting recognised"), "?" if plat == "bilinmeyen" else "ok", _t(f"platform: {DUMAN_KISA.get(plat, plat)} · ad kaynağı: {DUMAN['kaynak']}", f"platform: {DUMAN_KISA.get(plat, plat)} · name from: {DUMAN['kaynak']}"))
@@ -93,7 +103,13 @@ def _dm_dogrula_kos(nesil):  # kurulum.py dogrula'yı (yazmadan) ayrı iş parç
     try:
         if k and os.path.isfile(os.path.join(k, "kurulum.py")):
             p = subprocess.run([sys.executable, "-B", os.path.join(k, "kurulum.py"), "dogrula", "--json", "--hizli", "--yazma"], cwd=k, capture_output=True, text=True, timeout=90, stdin=subprocess.DEVNULL)
-            d = [x for x in json.loads(p.stdout).get("maddeler", []) if x.get("id") in ("blackhole", "kaynak")]
+            try: d = [x for x in json.loads(p.stdout).get("maddeler", []) if x.get("id") in ("blackhole", "kaynak")]
+            except ValueError:
+                # 28 Ekim: launchd altında Masaüstü okunamaz (kurulum.py açılmaz, stdout boş → JSONDecodeError). Nedeni günlüğe yaz; son Kurulumu denetle sonucu 15 dk'dan tazeyse onu kullan
+                print(f"DUMAN: denetim JSON vermedi (çıkış {p.returncode}): {(p.stderr or '').strip()[-160:] or 'stderr boş'}")
+                o = dogrula_oku()
+                if o and time.time() - os.path.getmtime(os.path.join(AYAR["uygulama"], "dogrula.json")) < 900:
+                    d = [x for x in o.get("maddeler", []) if x.get("id") in ("blackhole", "kaynak")]
     except Exception as e: print(f"DUMAN: denetim koşmadı ({e.__class__.__name__})")
     if DUMAN["nesil"] == nesil: DUMAN["dogrula"] = d if d else []
 def duman_konus(o):  # bas-konus.py: bir Konuş/hitap turu bitti (o = ölçüm kaydı) — kip sürerken ilk cevap sayılır; yalnız süre ve tür saklanır
@@ -152,7 +168,7 @@ def duman_islem(p):
     if islem != "baslat": return {"ok": False, "err": "islem"}
     if DUMAN["aktif"]: return {"ok": False, "err": _t("deneme zaten sürüyor", "a test is already running"), "duman": duman_view()}
     if not toplanti_suruyor(): return {"ok": False, "err": _t("önce toplantıya gir", "join a meeting first")}
-    DUMAN["nesil"] += 1; DUMAN.update(aktif=True, t0=time.time(), t_bit=None, platform=_dm_platform(), kaynak=_dm_ad_kaynagi(), m=[], sonuc=None, dogrula=None, dogrula_n=0, konus=None, dosya=None, yok_t=None,
+    DUMAN["nesil"] += 1; DUMAN.update(aktif=True, t0=time.time(), t_bit=None, platform=_dm_platform(), kaynak=_dm_ad_kaynagi(), m=[], sonuc=None, dogrula=None, dogrula_n=0, konus=None, dosya=None, yok_t=None, ilk={}, ses={},
                                        izin_ilk=TOPO.get("izin_toplam", 0) if "TOPO" in globals() else 0)
     print(f"DUMAN: başladı — {DUMAN['platform']} · ad kaynağı {DUMAN['kaynak']}"); DUMAN["m"] = _dm_maddeler(time.time())
     threading.Thread(target=_dm_dongu, args=(DUMAN["nesil"],), daemon=True).start(); return {"ok": True, "duman": duman_view()}

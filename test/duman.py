@@ -71,18 +71,26 @@ try:
     D["konus"] = None; ok("e: süre dolunca cevap yok → ✗", ns["_dm_konus"](999)[0] == "hata")
     D["aktif"] = False; ns["duman_konus"]({"ilk_ms": 5, "sure_ms": 5, "kaynak": "bas"}); ok("e: kip kapalıyken gelen cevap sayılmaz", D["konus"] is None)
     D["aktif"] = True; ns["duman_konus"]({"ilk_ms": 5, "sure_ms": 5, "kaynak": "bas", "hata": True}); ok("e: cevap hata verdiyse ✗", ns["_dm_konus"](1)[0] == "hata")
+    # yalıtılmış: konuşma görüldü ama satır gelmedi → ✗; konuşma yok → ?
+    ns["kanal_son"] = lambda k: 0.0; ns["ben_kod"] = lambda: "akiyor"; ns["yerel_ses_durum"] = lambda: "dinliyor"; ns["DUMAN_KANAL_SN"] = 30
+    D.update(ilk={}, ses={}); ok("c: konuşma yok, satır yok → ?", ns["_dm_kanal"]("ben", 1000.0, 40, {}, False)[0] == "?")
+    D["ses"] = {"ben": 1005.0}; ok("c: konuşma var, satır yok → ✗", ns["_dm_kanal"]("ben", 1000.0, 40, {}, False)[0] == "hata")
+    D["ses"] = {"karsi": 1005.0}; ok("c: altyazı: karşı konuştu, satır yok → ✗", ns["_dm_kanal"]("altyazi", 1000.0, 40, {"captions": True}, False)[0] == "hata")
+    D.update(ilk={"ben": 1178.0}, ses={}); ok("c: satır 178 sn'de → pencerede ✓ değil", ns["_dm_kanal"]("ben", 1000.0, 200, {}, False)[0] == "?")
+    D.update(ilk={"ben": 1010.0}); ok("c: satır 10 sn'de → ✓", ns["_dm_kanal"]("ben", 1000.0, 200, {}, False)[0] == "ok")
     # ben kanalı susar → ✗; karşı kanal kurulu değil → ?
-    ok("c: ben susunca ✗ (mikrofon açık)", bekle(lambda: ((M(dm(), "c").get("kanal") or {}).get("ben") or {}).get("durum") == "hata", 12))
+    # 28 Ekim: ses seviyesinde konuşma yoksa satır gelmemesi arıza değil → ? ve "kimse konuşmadı"; konuşma olup satır gelmediyse ✗ (aşağıda yalıtılmış)
+    ok("c: ben susunca ? ve kimse konuşmadı (mikrofon açık)", bekle(lambda: ((M(dm(), "c").get("kanal") or {}).get("ben") or {}).get("durum") == "?", 12) and "kimse konuşmadı" in M(dm(), "c")["kanal"]["ben"]["not"])
     k = M(dm(), "c").get("kanal") or {}
     ok(f"c: karşı kanal kurulu değil → ? ve neden: {k.get('karsi')}", k.get("karsi", {}).get("durum") == "?" and k["karsi"]["not"])
-    ok("c: genel ✗ (bir kanal sustu)", M(dm(), "c").get("durum") == "hata")
+    ok("c: genel ? (kimse konuşmadı, ✗ değil)", M(dm(), "c").get("durum") == "?")
     ok("d: Claude oturumu açık değil → ✗ ya da ? (deneme)", M(dm(), "d").get("durum") in ("hata", "?"))
     ok("f: BlackHole ✗ (kurulu değil) kurulum.py dogrula'dan", bekle(lambda: M(dm(), "f").get("durum") == "hata", 25) and "kurulu değil" in M(dm(), "f")["not"])
     ok("g: Mac kaynakları ✗ (takas dolu)", M(dm(), "g").get("durum") == "hata" and "takas" in M(dm(), "g")["not"])
     ok("dogrula.json ve posta kutusuna yazılmadı (--yazma)", not os.path.exists(os.path.join(APP, "dogrula.json")) and not os.path.isdir(os.path.join(ORTAK, "geri-bildirim")))
     # Whisper ben satırı sonradan gelirse ✓'ya döner (canlı ölçüm)
     istek("/ingest", {"meeting": {"title": TOPLANTI_AD}, "source": "whisper", "entries": [{"id": "w/1", "speaker": "Deniz T", "time": "10:01", "text": "evet tamam", "kanal": "ben"}]})
-    ok("c/ben ✓ satır sonradan gelince", bekle(lambda: ((M(dm(), "c").get("kanal") or {}).get("ben") or {}).get("durum") == "ok", 5))
+    ok("c/ben pencereden sonra gelen satır ✓ saymaz (tutarlı: ? ve pencere dışı)", bekle(lambda: "pencere dışı" in (((M(dm(), "c").get("kanal") or {}).get("ben") or {}).get("not") or ""), 5) and ((M(dm(), "c").get("kanal") or {}).get("ben") or {}).get("durum") != "ok")
     # Bitir
     x = istek("/duman", {"islem": "bitir"}); d = x.get("duman") or {}
     ok(f"Bitir: özet: {d.get('ozet')}", x.get("ok") is True and d.get("aktif") is False and re.match(r"Meet: \d/\d geçti", d.get("ozet") or "") is not None)

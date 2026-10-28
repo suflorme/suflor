@@ -1750,6 +1750,13 @@ def son_platform():
     try: v = json.load(open(SON_PLATFORM_YOL, encoding="utf-8")).get("platform")
     except (OSError, ValueError, AttributeError): v = None
     return v if v in PLATFORM_ANA else "teams"
+def son_tanin_platform():  # son tanınan/biten toplantının platformu, yoksa son seçilen (dosyada açıkça kayıtlı); hiçbiri yoksa None
+    for k_ in ("aktif", "onceki"):
+        v = (TOPLANTI.get(k_) or {}).get("platform")
+        if v in PLATFORM_ANA: return v
+    try: v = json.load(open(SON_PLATFORM_YOL, encoding="utf-8")).get("platform")
+    except (OSError, ValueError, AttributeError): v = None
+    return v if v in PLATFORM_ANA else None
 def son_platform_yaz(plat):
     try:
         with open(SON_PLATFORM_YOL, "w", encoding="utf-8") as f: json.dump({"platform": plat}, f)
@@ -1799,7 +1806,8 @@ def baslat(p):
     baglanti = (olay or {}).get("baglanti") or guvenli_baglanti(elle); ana = not baglanti
     plat = p.get("platform") if p.get("platform") in PLATFORM_ANA else None
     if plat: son_platform_yaz(plat)  # v0.112.1: Başlat formu sonra bunu seçili açar
-    if ana: baglanti = PLATFORM_ANA.get(plat)  # seçilmediyse None: hazırlık sekmesi sorar
+    if ana and not plat: plat = son_tanin_platform()  # 28 Ekim: Başlat seçimsiz basılınca Teams elle açıldı — son tanınan toplantının (yoksa son seçilen) uygulaması
+    if ana: baglanti = PLATFORM_ANA.get(plat)  # hiç bilinmiyorsa None: hazırlık sekmesi sorar
     simdi = datetime.datetime.now().astimezone()
     gundem = gundem_maddeleri(p.get("gundem"))
     sec = {"at": simdi.replace(tzinfo=None).isoformat(timespec="seconds"), "konu": konu, "rol": rol, "dil": dil, "olay": olay, **({"oto": True} if p.get("oto") else {}),
