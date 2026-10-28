@@ -17,7 +17,7 @@ import CoreAudio
 import AudioToolbox
 import AVFoundation
 
-let SURUM = "0.22.0"
+let SURUM = "0.23.0"
 var arg: [String: String] = [:]
 var izinKipi = false, kisKipi = false
 do {
@@ -111,7 +111,7 @@ func tapDurdur() {
     if let p = ioProc { AudioDeviceStop(topluID, p); AudioDeviceDestroyIOProcID(topluID, p); ioProc = nil }
     if topluID != kAudioObjectUnknown { AudioHardwareDestroyAggregateDevice(topluID); topluID = AudioObjectID(kAudioObjectUnknown) }
     if tapID != kAudioObjectUnknown { AudioHardwareDestroyProcessTap(tapID); tapID = AudioObjectID(kAudioObjectUnknown) }
-    tapSurecler = []
+    tapSurecler = []; yenidenIstek = false
     kilit.lock(); halka.ornek.removeAll(keepingCapacity: true); kilit.unlock()
 }
 func tapKur(_ hedef: [AudioObjectID]?, kis: Bool = false) -> String? {  // hedef nil: tüm sistem (yalnız --izin)
@@ -228,6 +228,9 @@ func tarayiciAilesi(_ ss: [Surec]) -> (onek: String, ad: String)? {
     return sirali.first { a in ss.contains { $0.bundle.hasPrefix(a.onek) && $0.cikis } } ?? sirali.first { a in ss.contains { $0.bundle.hasPrefix(a.onek) } }
 }
 var sonKurma = Date.distantPast, sonHata: String? = nil, tepe: Int16 = 0, kurmaSay = 0, kurmaNeden = ""
+// v0.23.0: aktarıcı nabız yanıtında "yeniden_kur" derse (sıfır ses sürerken karşı taraf altyazıda/sekme sesinde konuştu) tap bir kez yeniden kurulur;
+// örnekSay nabızda "akis" olur (sıfır ses mi geliyor, okuyucu mu durdu — teşhis)
+var yenidenIstek = false, ornekSay = 0
 func adim() {
     let ss = surecler(), simdi = Date()
     var micAileler = Set<String>()
@@ -258,7 +261,7 @@ func adim() {
         let eski = Set(tapSurecler), yeni = Set(hedef)
         let sesliYeni = ss.contains { yeni.contains($0.id) && !eski.contains($0.id) && $0.cikis }
         let neden = ioProc == nil ? "okuyucu yok" : cikis != tapCikis ? "çıkış aygıtı değişti" : sesliYeni ? "ses çıkaran yeni süreç"
-            : (!yeni.isEmpty && eski.isDisjoint(with: yeni)) ? "dinlenen süreçler kapandı" : nil
+            : (!yeni.isEmpty && eski.isDisjoint(with: yeni)) ? "dinlenen süreçler kapandı" : yenidenIstek ? "sıfır ses, karşı taraf konuşuyor" : nil
         if let n = neden, simdi.timeIntervalSince(sonKurma) >= 3 {
             sonKurma = simdi; sonHata = tapKur(hedef, kis: kisKipi && !tarayiciMi); kurmaSay += 1; kurmaNeden = n
             gunluk(sonHata.map { "yeniden kurulamadı (\(n)): \($0)" } ?? "yeniden kuruldu (\(n), \(hedef.count) süreç)")
@@ -280,6 +283,7 @@ func adim() {
 func paket() {   // 0,5 sn: halkadaki örnekleri 16 kHz'e indirip gönder
     kilit.lock(); let x = halka.ornek; let ilk = halka.ilkHost; halka.ornek.removeAll(keepingCapacity: true); kilit.unlock()
     guard let ak = aktif, !x.isEmpty, let pcm = donustur(x) else { return }
+    ornekSay += x.count
     let t = Date().timeIntervalSince1970 * 1000 - (hostSn(mach_absolute_time()) - hostSn(ilk)) * 1000
     pcm.withUnsafeBytes { b in for v in b.bindMemory(to: Int16.self) { let m = v == Int16.min ? Int16.max : abs(v); if m > tepe { tepe = m } } }
     gonder(["kanal": "karsi", "kaynak": "yerel", "uygulama": ak.ad, "t": Int64(t), "pcm": pcm.base64EncodedString()]) { j in
@@ -289,13 +293,14 @@ func paket() {   // 0,5 sn: halkadaki örnekleri 16 kHz'e indirip gönder
 }
 func nabiz() {   // 5 sn: durum + son 5 sn'nin tepe seviyesi (izin yoksa tap yalnız sıfır verir — aktarıcı uzun sürerse işaretler)
     var g: [String: Any] = ["nabiz": true, "surum": SURUM, "durum": aktif == nil ? "bekliyor" : "dinliyor", "tepe": Int(tepe),
-                            "kurma": kurmaSay, "kurma_neden": kurmaNeden]
+                            "kurma": kurmaSay, "kurma_neden": kurmaNeden, "akis": ornekSay > 0]
     if let a = aktif { g["uygulama"] = a.ad }
     if tapYenidenCal { g["kis_kipi"] = true }
     g["kis_ayar"] = kisKipi   // aktarıcı ayar değişince (masaustu_ses_kis) toplantı dışında yeniden başlatır
     if let h = sonHata { g["hata"] = h }
-    tepe = 0
+    tepe = 0; ornekSay = 0
     gonder(g) { j in
+        if (j?["yeniden_kur"] as? Bool) == true, aktif != nil { yenidenIstek = true; gunluk("aktarıcı yeniden kurma istedi (sıfır ses, karşı taraf konuşuyor)") }
         if (j?["toplanti"] as? Bool) == true { aktarıcıToplanti = Date() }
         if let t = j?["tarayici"] as? String { tarayiciIpucu = t }
     }

@@ -1033,15 +1033,24 @@ def _ses_anahtari():
     with os.fdopen(fd, "w") as f: f.write(k + "\n")
     return k
 SES_KEY = _ses_anahtari()
+YEREL_YENIDEN_SN, YEREL_YENIDEN_ARA = 15, 45  # sıfır ses + karşı konuşuyor: yeniden kurma isteği (v0.155.0)
 SES_DUYULUR_TEPE = 300  # Int16 tepe: bunun üstü sessizlik değil (yaklaşık -40 dB)
 STATE["yerel_ses"] = {"durum": None, "nabiz_t": 0, "son": 0, "acildi": 0, "sesli_t": 0, "uygulama": None, "hata": None, "surum": None, "sifir_bas": None,
                       "kurma": 0, "eklenti_karsi_ses": 0}
 SES_LOG = os.path.expanduser("~/Library/Logs/suflor-ses.log")  # yardımcının kendi günlüğü (yeniden kurma, hata)
-def karsi_konusuyor(sn=90):
+def karsi_konusuyor(sn=90, sonra=0):
     # Karşı tarafın konuştuğuna yardımcıdan bağımsız kanıt: son sn saniyede Teams altyazısında başka birinin satırı ya da eklentinin
     # sekme sesinde ses. Yoksa "1 dk sıfır" yalnız sessizliktir (9 Ekim tek kişilik deneme: 4 yanlış "izin" uyarısı).
-    now = time.time(); ben = ben_adi()
-    return now - (STATE["yerel_ses"].get("eklenti_karsi_ses") or 0) < sn or any(now - t < sn and k not in (ben, "?") for t, k in ALTYAZI_SON[-50:])
+    # sonra: kanıt bu andan sonra olmalı (v0.155.0: sessizlik başlamadan önceki konuşma sayılmaz)
+    now = time.time(); ben = ben_adi(); es = max(now - sn, sonra)
+    return (STATE["yerel_ses"].get("eklenti_karsi_ses") or 0) > es or any(t > es and k not in (ben, "?") for t, k in ALTYAZI_SON[-50:])
+# Sıfır ses sürerken karşı taraf konuştu mu (v0.155.0). 28 Ekim Teams web denemesi: paylaşım bittikten sonra kimse konuşmadı (altyazı da boş), ama 90 sn'lik
+# pencere sessizlikten önceki son karşı satırı da saydığı için 60 sn'de "izin" denildi, VERİ YOK uyarısı erken çıktı. Kanıt artık sıfırların başlamasından
+# YEREL_KANIT_PAY sn sonra gelmeli (altyazı satırı konuşmadan birkaç sn sonra düşer; sınırdaki satır sessizlik öncesi sözün kuyruğu olabilir).
+YEREL_KANIT_PAY = 10
+def yerel_sessiz_konusuyor():
+    y = STATE["yerel_ses"]
+    return bool(y["durum"] == "dinliyor" and y["sifir_bas"] and toplanti_var() and karsi_konusuyor(sonra=y["sifir_bas"] + YEREL_KANIT_PAY))
 # --- Deneme hatırlatması (v0.35.2): canli/hatirlatma.json (geliştirme oturumu yazar: {"id", "baslik", "maddeler": [...], "altyazi_olc": bool}) — sıradaki
 # gerçek toplantıda (toplantı sürerken kullanıcıdan başka birinin satırı gelince) panoda bir kez, "Tamam" kapatır. altyazi_olc: masaüstü toplantıda
 # ≥ 3 katılımcı görülünce menü uygulamasının `--ax-altyazi 180` teşhisi bir kez kendiliğinden (kullanıcı komutu hatırlamak zorunda kalmasın).
@@ -1088,7 +1097,7 @@ def yerel_ses_durum():
     if AYAR.get("yerel_ses") is False: return "kapali"
     if not os.path.isdir(SES_APP): return "yok"
     if now - y["nabiz_t"] > 20: return "kapali"
-    if y["durum"] == "dinliyor" and y["sifir_bas"] and now - y["sifir_bas"] > 60 and toplanti_var() and karsi_konusuyor(): return "izin"  # 1 dk hep sıfır, karşı taraf konuşuyor: izin yok olabilir
+    if y["sifir_bas"] and now - y["sifir_bas"] > 60 and yerel_sessiz_konusuyor(): return "izin"  # 1 dk hep sıfır, bu arada karşı taraf konuştu: izin yok olabilir
     return y["durum"] or "kapali"
 def yerel_ses_view():
     y = STATE["yerel_ses"]; now = time.time()
@@ -1098,7 +1107,7 @@ def yerel_ses_view():
 def yerel_ses_al(p):
     y = STATE["yerel_ses"]; now = time.time()
     if p.get("nabiz"):
-        once = yerel_ses_durum()
+        once = y.get("yazilan") or yerel_ses_durum()  # son yazılan durum: süreyle gelen geçiş (dinliyor → izin) de günlüğe girsin
         y.update(nabiz_t=now, durum=str(p.get("durum") or "")[:20] or None, uygulama=str(p.get("uygulama") or "")[:30] or None,
                  surum=str(p.get("surum") or "")[:12] or None, hata=str(p.get("hata") or "")[:120] or None)
         if y["durum"] != "dinliyor" or int(p.get("tepe") or 0) > 0: y["sifir_bas"] = None
@@ -1117,10 +1126,19 @@ def yerel_ses_al(p):
         if kk != bool(y.get("kis_kipi")) and (kk or AYAR.get("masaustu_ses_kis") is True):
             print(f"YEREL SES: kısma kipi {'etkin — toplantı sesi yardımcıdan çalıyor' if kk else 'etkin değil'}" + (f" · {y['uygulama']}" if y["uygulama"] else ""))
         y["kis_kipi"] = kk
-        sonra = yerel_ses_durum()
-        if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else ""))
+        y["akis"] = p.get("akis")  # v0.155.0 teşhis: yardımcıya son 5 sn'de örnek geldi mi (sıfır ses mi, okuyucu mu durdu)
+        sonra = yerel_ses_durum(); y["yazilan"] = sonra
+        if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else "")
+                                + (f" · {round(now - y['sifir_bas'])} sn sıfır ses, örnek {'geliyor' if y['akis'] else 'gelmiyor' if y['akis'] is False else '?'}" if sonra == "izin" else ""))
         # yardımcıya "toplantı var" yalnız sesten bağımsız sinyalde (eklenti çağrıda / masaüstü): ses kendi sinyalini doğrulayıp tarayıcıyı bırakmazdı
-        return {"ok": True, "toplanti": toplanti_dis_sinyal(), "tarayici": (eklenti_cagri() or {}).get("tarayici") or (STATE.get("masaustu") or {}).get("uygulama") or "Chrome"}
+        r = {"ok": True, "toplanti": toplanti_dis_sinyal(), "tarayici": (eklenti_cagri() or {}).get("tarayici") or (STATE.get("masaustu") or {}).get("uygulama") or "Chrome"}
+        # v0.155.0: sıfır ses ≥ YEREL_YENIDEN_SN sürerken karşı taraf konuştuysa yardımcı yakalamayı yeniden kursun (eski süreç nesnesinde kalmış tap'e karşı;
+        # gerçek sessizlikte kurmaz, kesinti olmaz). En çok YEREL_YENIDEN_ARA sn'de bir; kurulduktan sonra da sıfırsa 60 sn'de "izin".
+        if y["sifir_bas"] and now - y["sifir_bas"] >= YEREL_YENIDEN_SN and now - y.get("yeniden_iste", 0) >= YEREL_YENIDEN_ARA and yerel_sessiz_konusuyor():
+            y["yeniden_iste"] = now; r["yeniden_kur"] = True
+            print(f"YEREL SES: {round(now - y['sifir_bas'])} sn sıfır ses ama karşı taraf konuşuyor — yardımcıdan yakalamayı yeniden kurması istendi"
+                  + f" (örnek {'geliyor' if y['akis'] else 'gelmiyor' if y['akis'] is False else '?'})")
+        return r
     with LOCK:
         if not toplanti_acik():
             for f in toplanti_bak(): threading.Thread(target=f, daemon=True).start()  # Faz B: ses de sinyal; eklenti tanımasa da işlenir

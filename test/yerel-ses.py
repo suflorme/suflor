@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Yerel ses yardımcısının "izin" uyarısı ve yeniden kurma kaydı (v0.20.4): 1 dk hep sıfır ses tek başına uyarı değildir (karşı taraf
 # sessiz olabilir); uyarı için karşı tarafın konuştuğuna kanıt gerekir (altyazıda başka birinin satırı ya da eklentinin sekme sesi).
-# Aktarıcıda yerel_ses_* / karsi_konusuyor / ses_al değişince koştur (~75 sn; sahte nabız, gerçek yardımcı gerekmez):
+# v0.155.0: kanıt sıfırlar başladıktan sonra gelmeli; o sırada karşı taraf konuşursa yardımcıdan yeniden kurma istenir (nabız yanıtında yeniden_kur).
+# Aktarıcıda yerel_ses_* / karsi_konusuyor / ses_al değişince koştur (~2,5 dk; sahte nabız, gerçek yardımcı gerekmez):
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/yerel-ses.py
 import base64, json, os, shutil, struct, subprocess, sys, tempfile, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -39,6 +40,18 @@ try:
     post("/ingest", {"meeting": {"title": "Deneme"}, "source": "captions", "entries": [{"id": "c/2", "speaker": "Deniz T", "time": "00:02", "text": "karşı taraf konuşuyor"}]})
     ok("karşı taraf altyazıda konuşuyor, yardımcı sıfır: izin", durum() == "izin")
     nabiz(tepe=1200); ok("ses gelince izin kalkar", durum() == "dinliyor")
+    # v0.155.0 (28 Ekim Teams web, paylaşım sonrası): karşı taraf konuştu, SONRA herkes sustu — sessizlikten önceki satır "izin" kanıtı sayılmaz
+    post("/ingest", {"meeting": {"title": "Deneme"}, "source": "captions", "entries": [{"id": "c/3", "speaker": "Deniz T", "time": "00:03", "text": "son sözüm bu"}]})
+    istek = []; t0 = time.time()
+    while time.time() - t0 < 66: toplanti(); istek.append(nabiz(akis=True).get("yeniden_kur")); time.sleep(5)
+    ok("sessizlikten önce konuşan karşı taraf + 1 dk sıfır: izin yok (dinliyor)", durum() == "dinliyor")
+    ok("gerçek sessizlikte yeniden kurma istenmez", not any(istek))
+    post("/ingest", {"meeting": {"title": "Deneme"}, "source": "captions", "entries": [{"id": "c/4", "speaker": "Deniz T", "time": "00:04", "text": "duyuyor musun"}]})
+    y1 = nabiz(akis=True)
+    ok("sıfır ses sürerken karşı taraf konuştu: yeniden kurma istenir", y1.get("yeniden_kur") is True and "yardımcıdan yakalamayı yeniden kurması istendi (örnek geliyor)" in log())
+    ok("aynı istek 45 sn içinde yinelenmez", not nabiz(akis=True).get("yeniden_kur"))
+    ok("sessizlik sırasında konuşma + 1 dk sıfır: izin, geçiş günlükte", durum() == "izin" and "YEREL SES: dinliyor → izin · Chrome ·" in log() and "örnek geliyor" in log())
+    nabiz(tepe=1200); ok("ses gelince yine kalkar", durum() == "dinliyor")
     nabiz(kurma=1, kurma_neden="ses çıkaran yeni süreç")
     ok("yeniden kurma aktarıcı günlüğünde nedeniyle", "ses yakalama yeniden kuruldu (ses çıkaran yeni süreç; toplam 1)" in log())
     nabiz(kurma=1); ok("aynı sayı tekrar yazılmaz", log().count("ses yakalama yeniden kuruldu") == 1)
