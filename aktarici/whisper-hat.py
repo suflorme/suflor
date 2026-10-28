@@ -674,7 +674,9 @@ def whisper_yaz(is_, metin, ses=None, model=None):
         m = (is_["t0"], is_["t1"], _yk(metin))
         with YANKI_LOCK:
             if any(_yanki_mi(m, k) for k in YANKI_KARSI): _yanki_say(metin); return "yanki"
-            if _karsi_bekleniyor(is_["t0"], is_["t1"]):
+            # 28 Ekim (kullanıcı isteği): asistana seslenilen satır yankı için 4 sn bekletilmez (gecikmenin en büyük kalemiydi); gelmiş karşı satırıyla yankı denetimi yine yapılır
+            hitapli = "_hitap_alt" in globals() and re.search(r"(?<!\w)" + _hitap_alt() + r"(?!\w)", metin, re.I)
+            if not hitapli and _karsi_bekleniyor(is_["t0"], is_["t1"]):
                 YANKI_BEKLEYEN.append((is_, metin, ses, model, now + 4.0)); threading.Timer(4.1, _yanki_bosalt).start(); return "bekletildi"
     _whisper_yaz(is_, metin, ses, model); return "satir"
 def _whisper_yaz(is_, metin, ses=None, model=None):
