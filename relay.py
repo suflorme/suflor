@@ -682,7 +682,9 @@ def ingest(p):
             text, soz = sozluk_uygula(raw, base_key)
             if p.get("source") == "captions" and (e.get("speaker") or "").strip().lower() in ("you", "siz", "sen"): e["speaker"] = AYAR.get("ad") or e["speaker"]  # Meet kendi satırına "You" yazar
             if (e.get("speaker") or "") == ben_adi():
-                yeni_w = p.get("source") == "whisper" and not onceki; ham = text
+                yeni_w = p.get("source") == "whisper" and not onceki
+                if yeni_w: text = hitap_ses_duzelt(text)  # 28 Ekim: adın ses benzeri yazılışı ("mermis") hitap sayılsın (sozluk.py)
+                ham = text
                 birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if yeni_w else None  # 19 Ekim: bölünen hitap; v0.140.0: yalnız ad + sonraki satırlar
                 text, hd = hitap_duzelt(text); soz += hd
                 if yeni_w and "Claude:" not in text: vokatif_ogren(ham)
@@ -714,6 +716,8 @@ def ingest(p):
             low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye
                 kim_ = e.get("speaker") or "?"; ALTYAZI_SON.append((time.time(), kim_)); del ALTYAZI_SON[:-400]; kume_oyla(kim_)
+                if kim_ == ben_adi() and "okuma_dur_soz" in globals() and okuma_dur_soz(text, time.time() - 6):  # 28 Ekim: okurken mikrofon satırı yankı sayılıp atılıyor; kullanıcının kendi altyazı satırı da durdurur (söz okunan metinde geçiyorsa durdurmaz)
+                    print(f"ASİSTAN: okurken kullanıcı '{text[:30]}' dedi (altyazı) — okuma durdu"); threading.Thread(target=asistan_dur, daemon=True).start()
                 golgede = whisper_akiyor("ben" if kim_ == ben_adi() else "karsi"); taslak_sabit(dict(e, text=text), p.get("source"), golgede)
                 if golgede:
                     golge_out.append(json.dumps({"at": p.get("capturedAt"), "id": e.get("id"), "speaker": kim_, "text": text, "src": p.get("source"),

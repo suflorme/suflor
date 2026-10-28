@@ -92,7 +92,7 @@ HITAP_ASKI = {"metin": None, "t1": 0.0, "satir": None, "pen": 2.0, "bas": 0.0, "
 # hitapsız kalıp kayboldu): yalnız addan oluşan satır askıya alınır; hemen önündeki noktalamasız kullanıcı satırları (en çok HITAP_ONCE_N, aralar
 # ≤ HITAP_DEVAM_SN) adın arkasına eklenir; sonraki satırlar HITAP_DEVAM_SN içinde geldikçe cümle (. ? ! …) bitene dek birikir. Asistanın sorusuna
 # hitapsız cevap (hitap_cevap_baslat) yalnız süreyle biter (cevap birkaç cümle olabilir). En çok HITAP_EN_COK_SN / HITAP_EN_COK_SOZ.
-HITAP_DEVAM_SN = 3.0; HITAP_ONCE_N = 3; HITAP_EN_COK_SN = 20.0; HITAP_EN_COK_SOZ = 45
+HITAP_DEVAM_SN = 3.0; HITAP_AD_DEVAM_SN = 7.0; HITAP_ONCE_N = 3; HITAP_EN_COK_SN = 20.0; HITAP_EN_COK_SOZ = 45
 HITAP_ONCE = []  # son kullanıcı satırları [(metin, t0, t1)]
 def _hitap_adlari(): return [x for k in kisilikler() for x in k["hitap"]]
 def _hitap_alt():
@@ -119,7 +119,7 @@ def hitap_aski(metin, t0=None, t1=None):  # → askıdaki hitap + bu satır (bir
         for x, x0, x1 in reversed(once):
             if not (0 <= son_t0 - x1 <= HITAP_DEVAM_SN) or re.search(r"[.!?…]\s*$", x) or len(on) >= HITAP_ONCE_N: break
             on.insert(0, x); son_t0 = x0
-        a.update(metin=" ".join([ad + ","] + on), t1=t1, satir=metin, pen=HITAP_DEVAM_SN, bas=son_t0, cevap=False); return None
+        a.update(metin=" ".join([ad + ","] + on), t1=t1, satir=metin, pen=HITAP_AD_DEVAM_SN, bas=son_t0, cevap=False); return None  # 28 Ekim: yalnız ad → soru 5 sn sonra geldi, 3 sn pencere kaçırdı; ilk devam 7 sn (sonrakiler HITAP_DEVAM_SN)
     if re.match(_hitap_rx(), metin or "", re.I) and not re.search(r"[.!?…:,]\s*$", metin) and len(metin.split()) <= 6:
         a.update(metin=metin, t1=t1, satir=metin, pen=HITAP_ASKI_SN, bas=t0, cevap=False)
     return None
@@ -138,6 +138,24 @@ def asistan_goster(metin, ad=None):  # ad: satırda seslenilen asistan (jsonl "h
     if not metin or "Claude:" not in metin: return metin
     ad = ad or (asistan_ad() if "asistan_ad" in globals() else None) or "Suflor"
     return _ASG_RX.sub(lambda m: m.group(1) + ad + ", ", metin).replace("Cloud=Claude:", "→ " + ad)
+def hitap_ses_duzelt(metin):  # 28 Ekim: Whisper adı "mermis"/"merviz" yazdı, hitap sayılmadı. Cümle başındaki (ya da giriş sözcüğünden sonraki) tek sözcük asistan adının ses benzeri ise
+    # adın yazılışına çevrilir (sonra olağan hitap kalıbı çalışır). Yalnız ≥ 5 harfli adlarda, aynı baş harf ve ses anahtarında en çok 1 harf farkla; gündelik sözcükler uzak kalır.
+    if not metin or "_ad_anahtar" not in globals(): return metin
+    adlar = _hitap_adlari()
+    if not adlar: return metin
+    ham = {x.lower() for x in adlar}
+    try: ham |= {x.lower() for v in _ad_listesi().values() for x in v}  # kayıtlardaki başka kişi adları (benzer yazılsa da) asistan adına çevrilmez
+    except Exception: pass
+    rx = re.compile(r"((?:^|[.!?…]\s+)(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?\W*)([^\W\d_]{4,})(?=['’]|[\s,:.!?…]|$)", re.I)
+    def degis(m):
+        w = m.group(2)
+        if w.lower() in ham: return m.group(0)
+        k = _ad_anahtar(w); en = None
+        for a in adlar:
+            ka = _ad_anahtar(a)
+            if len(ka) >= 5 and k[:1] == ka[:1] and abs(len(k) - len(ka)) <= 1 and _ad_mesafe(k, ka) <= 1: en = a; break
+        return m.group(1) + en if en else m.group(0)
+    return rx.sub(degis, metin, count=1)
 def hitap_duzelt(text):
     krx = _kisilik_hitap_rx(); _KHR["satir"] = None
     def kd(m):

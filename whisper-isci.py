@@ -67,31 +67,41 @@ def ses_olc(a, np, sr=16000):
 SR, NFFT, HOP = 16000, 400, 160
 # Tekrar döngüsü (19 Ekim test toplantısı): karşı kanaldan geri gelen kendi sesimiz "OBSERV, PARA, OLI, AKMU" + 9 kez "AKMU" yazıldı; kısa satırda sıkıştırma
 # oranı süzgeci (2,4) yakalamıyor. Aynı sözcük ya da 2–3 sözcüklük öbek art arda ≥ 4 kez ve satırın en az yarısıysa uydurma (gerçek "evet evet evet" 3 kez kalır).
-def tekrar_dongu(metin):
-    w = re.findall(r"\w+", (metin or "").lower())
-    for n in (1, 2, 3):
+def _tekrar_bul(w):
+    # Art arda tekrar eden birimi bulur → (başlangıç, birim uzunluğu, tekrar sayısı) ya da None. 1–3 sözcüklük birim ≥ 4 kez ve satırın en az yarısıysa;
+    # 4–12 sözcüklük birim (cümle ya da cümle çifti, noktalama farklı olsa da) ≥ 3 kez gelirse (28 Ekim Teams testi: iki cümlelik öbek 3 kez + yarım kopya;
+    # gerçek konuşmada 4 sözcüklük sözün üç kez aynen tekrarı yok).
+    for n in range(1, 13):
         i = 0
         while i + n <= len(w):
             k = 1
             while w[i + k * n:i + (k + 1) * n] == w[i:i + n]: k += 1
-            if k >= 4 and k * n >= len(w) / 2: return True
-            i += 1
-    return False
-# v0.88.2 (19 Ekim 18.23 deneme): gerçek cümlenin ardına öbek döngüsü eklenince ("Eklentiyi yeniledim. Web toplantısına girdim." + öbek ×N) tüm satır
-# atılıyordu. Döngü 2–3 sözcüklük öbekse ve önünde en az 2 sözcük varsa öndeki söz + öbeğin bir kopyası kalır; tek sözcük döngüsü ("AKMU" ×9) yine atılır.
-def tekrar_kirp(metin):
-    m = list(re.finditer(r"\w+", metin or "")); w = [x.group().lower() for x in m]
-    for n in (2, 3):
-        i = 0
-        while i + n <= len(w):
-            k = 1
-            while w[i + k * n:i + (k + 1) * n] == w[i:i + n]: k += 1
-            if k >= 4 and k * n >= len(w) / 2:
-                if i < 2 or len(set(w[i:i + n])) == 1: return None  # öbek tek sözcüğün tekrarıysa ("AKMU AKMU") tek sözcük döngüsü
-                son = metin[:m[i + n - 1].end()]; j = m[i + n - 1].end()
-                return (son + (metin[j] if j < len(metin) and metin[j] in ".!?" else "")).strip()
+            if (n <= 3 and k >= 4 and k * n >= len(w) / 2) or (n >= 4 and k >= 3 and len(set(w[i:i + n])) > 1): return i, n, k
             i += 1
     return None
+def tekrar_dongu(metin):
+    return _tekrar_bul([x.lower() for x in re.findall(r"\w+", metin or "")]) is not None
+# v0.88.2 (19 Ekim 18.23 deneme): gerçek cümlenin ardına öbek döngüsü eklenince ("Eklentiyi yeniledim. Web toplantısına girdim." + öbek ×N) tüm satır
+# atılıyordu. Döngü 2–3 sözcüklük öbekse ve önünde en az 2 sözcük varsa öndeki söz + öbeğin bir kopyası kalır; tek sözcük döngüsü ("AKMU" ×9) yine atılır.
+# Uzun birimde (≥ 4 sözcük) önceki söz + birimin bir kopyası + döngüden sonra gelen farklı söz kalır; döngünün yarım son kopyası düşer.
+def tekrar_kirp(metin):
+    for _ in range(3):
+        m = list(re.finditer(r"\w+", metin or "")); w = [x.group().lower() for x in m]
+        r = _tekrar_bul(w)
+        if not r: return (metin or "").strip() or None
+        i, n, k = r
+        if n == 1 or (n <= 3 and (i < 2 or len(set(w[i:i + n])) == 1)): return None  # öbek tek sözcüğün tekrarıysa ("AKMU AKMU") tek sözcük döngüsü
+        son = k * n + i  # döngünün tam kopyalarının bittiği sözcük; yalnız birimin başından oluşan kuyruk (yarım kopya) düşer
+        kuyruk = w[son:]
+        if kuyruk and kuyruk == w[i:i + len(kuyruk)]: son = len(w)
+        bas = metin[:m[i + n - 1].end()]; j = m[i + n - 1].end()
+        bas += metin[j] if j < len(metin) and metin[j] in ".!?" else ""
+        metin = (bas + (" " + metin[m[son].start():] if son < len(w) else "")).strip()
+    return metin
+# Hız denetimi (28 Ekim: 1 sn'lik parçada 58 sözcük): sürekli konuşma saniyede ~6 sözcüğü geçmez; uzun ve imkânsız hızlı satır uydurmadır.
+def hiz_asiri(metin, sn):
+    n = len(re.findall(r"\w+", metin or ""))
+    return n >= 15 and sn > 0 and n / max(sn, 1.0) > 8
 # v0.113.1 (22 Ekim test toplantısı): iki uydurma biçimi süzgeçten geçti — (1) harf döngüsü tek sözcükte ("bildiririririr…" yüzlerce harf; sözcük düzeyindeki
 # tekrar_dongu görmez), (2) cümlenin art arda aynen tekrarı ("Marvin burada mısın? Marvin burada mısın? Marvin burada mısın?": asistan iki kez cevap verdi).
 # Harf döngüsü: 1–4 harflik birim art arda ≥ 7 kez → bir kez (rakam sayılmaz: "10000000" kalır). Cümle: ≥ 3 sözcüklük cümle art arda aynen gelirse bir kez.
@@ -341,6 +351,7 @@ def main():
                 tw = re.findall(r"\w{3,}", (p.get("istem") or "").lower()); mw = re.findall(r"\w+", metin.lower())
                 ortak = lambda w, t: len(os.path.commonprefix([w, t])) >= max(3, int(0.6 * len(w) + 0.5))  # bozuk yazılan terim de ("promethu")
                 if mw and all(len(w) >= 3 and any(ortak(w, t) for t in tw) for w in mw): atilan.append(metin); metin = ""; atla += 1
+            if metin and hiz_asiri(metin, len(a) / SR): atilan.append(metin); atla += 1; metin = ""  # imkânsız söz hızı (kısa parçada yüzlerce sözcük)
             if metin and tekrar_dongu(metin):  # tekrar döngüsü uydurması (öndeki gerçek söz kalır)
                 kirp = tekrar_kirp(metin); atilan.append(metin); atla += 1; metin = kirp or ""
             if metin and (s_ := tekrar_sadelestir(metin)) != metin: atilan.append(metin); metin = s_  # v0.113.1: harf döngüsü, art arda aynı cümle

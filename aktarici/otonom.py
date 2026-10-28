@@ -70,14 +70,14 @@ def otonom_onay_ver(karar="onaylandi", kaynak="ses"):  # bekleyen karşı taraf 
     with OT_K: iz = OT.get("izin") if OT.get("id") and OT.get("durum") not in OT_SON else None
     if not iz or IZIN.get(iz, {}).get("karar"): return False
     threading.Thread(target=eylem_karar, args=({"id": iz, "durum": karar}, kaynak), daemon=True).start(); return True  # ingest LOCK altında çağrılabilir (sesli onay)
-def otonom_sun(cevap, kaynak, kim=None, ad=None):  # konuşanın cevabı hazır → (itiraz penceresi, S94'ten 0) → söz sırası → toplantıya; ad: konuşan asistan
+def otonom_sun(cevap, kaynak, kim=None, ad=None, tur=None):  # konuşanın cevabı hazır → (itiraz penceresi, S94'ten 0) → söz sırası → toplantıya; ad: konuşan asistan
     m = ts_sesli_kisim(cevap)
     if not m: return False
     # 28 Ekim: iki cevap üst üste hazır olunca ikincisi birincinin okumasını kesip çelişti; öncekinin okuması/sırası bitene (en çok 20 sn) beklenir
     t_b = time.time()
     while time.time() - t_b < 20 and OT.get("id") and OT.get("durum") in ("itiraz", "sira", "okunuyor"): time.sleep(0.2)
     if time.time() - t_b >= 0.4: print(f"OTONOM: önceki cevap sürüyordu — {time.time() - t_b:.1f} sn beklendi")
-    tur_ = _KS.get("tur") or {}; lat = dict(tur_.get("lat") or {}, gonder=tur_.get("t_gonder"), ilk=tur_.get("t_ilk_yanit"), hazir=time.time())
+    tur_ = tur or _KS.get("tur") or {}; lat = dict(tur_.get("lat") or {}, gonder=tur_.get("t_gonder"), ilk=tur_.get("t_ilk_yanit"), hazir=time.time())
     i = secrets.token_hex(4); itz = _ot_ayar("otonom_itiraz_sn", OTONOM_ITIRAZ_SN)
     iz = None
     if kaynak == "karsi" and AYAR.get("karsi_onay", True) is not False and "izin_iste" in globals():

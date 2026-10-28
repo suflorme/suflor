@@ -1057,7 +1057,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if "claude_ok" in globals() and (o.get("saglayici") or "claude-code") == "claude-code": claude_hata_bildir(j.get("result"), tur.get("kaynak") or "konus") if o["hata"] else claude_ok()  # v0.130.0
                 if any("suflorvt__vt_so" in x for x in tur.get("araclar") or []): _KS["vt_son"] = (time.time(), _vt_mt())  # v0.57.5
                 if tur.get("sorgular") and not o["hata"] and tur.get("kaynak") != "karsi" and not tur.get("karsi"): _vt_sorgu_kaydet(tur.get("soru") or KONUS.get("soru"), tur["sorgular"])  # v0.57.6
-                if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"))  # v0.56.0 (S68); S94: konuşan asistanın adı
+                if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"), tur)  # v0.56.0 (S68); S94: konuşan asistanın adı; tur: gecikme ölçümü (tur _KS'den silinmiş olur)
                 if not o["hata"]: konus_gecmis_yaz(tur, tur.get("metin") or "", tur.get("toplanti_ad"))  # v0.64.0 (S76)
                 if tur.get("kaynak") == "hitap" and not tur.get("karsi"): asistan_soru_kaydet(None if o["hata"] else tur.get("ad"), tur.get("metin") or "")  # v0.140.0
                 if not o["hata"] and "uclu_tetik" in globals(): uclu_tetik(tur, zincir=not yenile)  # üçlü sohbet: öteki kişilik söz alabilir (kisilik.py; tur sınırında yok)
@@ -1112,7 +1112,7 @@ def _defter_blogu(df, dm, dk):  # süreç başına bir kez tam defter (açık s�
 # ilk sorusuna "Sıradaki toplantı" bloğu: brifing (hazırsa) ve aynı kişilerle ya da aynı adla geçmiş toplantılar (dosya yolu + özet başı).
 def toplanti_konus(): return True  # S94: ayar toplanti_konus kalktı — toplantıda Konuş düğmesi her zaman (yalnız kullanıcıya), adıyla seslenme asistan_toplanti'ya bağlı
 def hitap_aski_zaman(metin):  # S94: askıdaki hitaba süre içinde devam gelmedi → tek başına asistana ("<Ad> gelsin" kaybolmasın)
-    time.sleep(max(HITAP_ASKI_SN, HITAP_DEVAM_SN) + 0.3)
+    time.sleep(max(HITAP_ASKI_SN, HITAP_DEVAM_SN, HITAP_ASKI["pen"]) + 0.3)  # pen: yalnız ad için HITAP_AD_DEVAM_SN
     m = hitap_aski_bitti(metin)
     if not m: return
     t2 = hitap_duzelt(m)[0]

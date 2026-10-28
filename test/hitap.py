@@ -8,7 +8,7 @@ KIS = {"v": None, "v2": None}; ns = {"re": re, "time": __import__("time"), "kisi
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
 sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "hitap_aski", "hitap_askida", "hitap_aski_bitti",
                                                                     "_hitap_adlari", "_hitap_alt", "_hitap_rx", "hitap_yalniz_ad", "hitap_cevap_baslat", "hitap_aski_metin")) or
-       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR", "HITAP_ASKI", "HITAP_ASKI_SN", "HITAP_DEVAM_SN",
+       (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR", "HITAP_ASKI", "HITAP_ASKI_SN", "HITAP_DEVAM_SN", "HITAP_AD_DEVAM_SN",
                                                                       "HITAP_ONCE_N", "HITAP_EN_COK_SN", "HITAP_EN_COK_SOZ", "HITAP_ONCE"} for x in n.targets))]
 ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").read())  # 19 Ekim: söz etme kalıbı kisilik.py'de (iki yer aynı tanımı kullanır)
 sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS") for x in n.targets)] + sec
@@ -125,9 +125,9 @@ ha("Tamam teşekkürler.", 300, 301); ha("yarın on ikide Deniz ile", 301.5, 303
 ha("bir toplantı planına", 304.5, 306); ok = ok and ask("bir toplantı planına") and ak() == "Atlas, yarın on ikide Deniz ile bir toplantı planına"
 ok = ok and ab("Atlas, yarın on ikide Deniz ile") is None and ab(ak()) == "Atlas, yarın on ikide Deniz ile bir toplantı planına" and ak() is None; hata += not ok
 print(("✓ " if ok else "✗ ") + "noktalı satırda önceki ek durur; cümle bitmezse süre dolunca birikmiş metin gider (eski zamanlayıcı boşa)")
-ha("Atlas,", 400, 400.5); r9 = ha("bütçe ne durumda?", 404.0, 405.5)
+ha("Atlas,", 400, 400.5); r9 = ha("bütçe ne durumda?", 408.5, 410)
 ok = r9 is None and not ask("bütçe ne durumda?") and ak() is None; hata += not ok  # askıdaki ad zamanlayıcıyla zaten gitmişti (hitap_aski_zaman)
-print(("✓ " if ok else "✗ ") + f"yalnız addan {ns['HITAP_DEVAM_SN']:.0f} sn'den geç gelen satır eklenmez")
+print(("✓ " if ok else "✗ ") + f"yalnız addan {ns['HITAP_AD_DEVAM_SN']:.0f} sn'den geç gelen satır eklenmez")
 ok = ns["hitap_yalniz_ad"]("Atlaz.") == "Atlaz" and ns["hitap_yalniz_ad"]("Atlas gelsin") is None and ns["hitap_yalniz_ad"]("Atlası") is None; hata += not ok
 print(("✓ " if ok else "✗ ") + "yalnız ad tanıma (Whisper yazımı, ekli ad ve devamlı satır değil)")
 # asistanın sorusuna hitapsız cevap: noktalama bitirmez, süre bitirir (gerçek dizi: üç kısa cümle)
