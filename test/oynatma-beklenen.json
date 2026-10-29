@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 264605,
-   "sha": "54de0788e1a817e7"
+   "uzunluk": 266120,
+   "sha": "376e0e53fedc17f8"
   },
   "/mini": {
-   "uzunluk": 264605,
-   "sha": "54de0788e1a817e7"
+   "uzunluk": 266120,
+   "sha": "376e0e53fedc17f8"
   },
   "/status": {
    "_ping_son": "float",
@@ -324,6 +324,7 @@
      "uclu_sohbet_ozel_paylas": "bool",
      "uzun_konusma_sn": "int"
     },
+    "gelistirici": "bool",
     "gemini": "bool",
     "kisiler": [],
     "menu": "bool",
@@ -527,6 +528,13 @@
    "kanit_iste": "NoneType",
    "kanit_n": "int",
    "kanitlar": [],
+   "kaynak": {
+    "bos_yuzde": "int",
+    "duzey": "str",
+    "t": "float",
+    "takas_gb": "float",
+    "yuk": "float"
+   },
    "komut": {
     "at": "str",
     "id": "str",
@@ -715,6 +723,7 @@
     "ses_model": "str",
     "son_sn": "NoneType",
     "yanki": "int",
+    "yavas": "bool",
     "yerel": "str",
     "yerel_akiyor": "bool"
    },
@@ -873,6 +882,7 @@
     "ses_model": "str",
     "son_sn": "NoneType",
     "yanki": "int",
+    "yavas": "bool",
     "yerel": "str",
     "yerel_akiyor": "bool"
    },
@@ -894,7 +904,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 7,
+  "DURUM": 8,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

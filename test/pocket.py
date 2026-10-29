@@ -72,10 +72,12 @@ bak("hı hı: Piper ayarında Pocket kişiliği onayı Pocket'la okur; bekleme v
 if not GERCEK: print("pocket: gerçek işçi kısmı atlandı (pocket_python / pocket_hf yok)")
 else:
     try:
-        t = time.time(); ok = ns["pocket_oku"]("Merhaba, toplantı başladı. Bütçe 1.250.000 lira.", ses="alperiox:female_2")
-        bak(f"ilk okuma işçiyi açar (iki model önceden) ve biter ({time.time() - t:.1f} sn)", ok is True and ns["POCKET"]["durum"] == "hazir")
+        t = time.time(); ok = ns["pocket_oku"]("Merhaba, toplantı başladı. Bütçe 1.250.000 lira.", ses="alperiox:female_2", bekle=True)  # 28 Ekim: bekle verilmezse hazır değilken False döner (tembel açılış; test/agir-isci.py)
+        bak(f"ilk okuma işçiyi açar (yalnız istenen model önceden) ve biter ({time.time() - t:.1f} sn)", ok is True and ns["POCKET"]["durum"] == "hazir")
+        ns["pocket_oku"]("Isınma.", ses="wite:male_1"); print(f"  (28 Ekim: model ilk kullanımda tembel yüklenir; wite soğuk ilk ses {ns['POCKET'].get('ilk', 9):.2f} sn — ölçüt ısınmış model için)")
         t = time.time(); ok = ns["pocket_oku"]("Harika haber, müşteri teklifi kabul etti!", ses="wite:male_1")
         bak(f"ikinci okuma (wite, mutlu) ilk ses {ns['POCKET'].get('ilk', 9):.3f} sn ≤ 0,15 sn", ok is True and ns["POCKET"].get("ilk", 9) <= 0.15)
+        ns["pocket_oku"]("Warm up.", ses="en:michael"); print(f"  (İngilizce soğuk ilk ses {ns['POCKET'].get('ilk', 9):.2f} sn)")
         t = time.time(); ok = ns["pocket_oku"]("Happy to help, Sir. You have three meetings on Friday, the first one at 10:30.", ses="en:michael")
         bak(f"v0.101.3: İngilizce model (en:michael) okur, ilk ses {ns['POCKET'].get('ilk', 9):.3f} sn ≤ 0,15 sn ({time.time() - t:.1f} sn)", ok is True and ns["POCKET"].get("ilk", 9) <= 0.15)
         t = time.time(); pcm = ns["pocket_pcm"]("Tamam, toplantıda Pocket sesiyle konuşuyorum.", ses="wite:male_1")

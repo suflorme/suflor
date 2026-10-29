@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Suflor.me — canlı toplantı asistanı",
-  "version": "0.157.0",
-  "description": "Toplantıyı canlı yazıya döker (Teams, Google Meet, Zoom web), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
+  "version": "0.158.0",
+  "description": "Toplantıyı canlı yazıya döker (Teams, Google Meet), yerel Whisper ile konuşmayı Mac'te metne çevirir, Claude'un kartlarını toplantı ekranında küçük bir şeritte gösterir. Veri yalnız bu Mac'teki aktarıcıya (127.0.0.1) gider.",
   "permissions": [
     "storage",
     "notifications",
@@ -114,41 +114,6 @@
     {
       "matches": [
         "https://meet.google.com/*"
-      ],
-      "js": [
-        "soyle-main.js"
-      ],
-      "world": "MAIN",
-      "run_at": "document_start",
-      "all_frames": true,
-      "match_about_blank": true
-    },
-    {
-      "matches": [
-        "https://*.zoom.us/wc/*"
-      ],
-      "all_frames": true,
-      "js": [
-        "pano/dil.js",
-        "yerel-anahtar.js",
-        "platform-zoom.js",
-        "content.js"
-      ],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://*.zoom.us/wc/*"
-      ],
-      "js": [
-        "mic-main.js"
-      ],
-      "world": "MAIN",
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://*.zoom.us/wc/*"
       ],
       "js": [
         "soyle-main.js"

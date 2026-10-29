@@ -1121,7 +1121,7 @@ def yerel_ses_al(p):
         # (13 Ekim deneme 8: aktarici-kur yardımcıyı yeniden başlatmadı, kısma hiç devreye girmedi)
         if bool(p.get("kis_ayar")) != (AYAR.get("masaustu_ses_kis") is True) and not toplanti_var() and now - y.get("kis_yeniden", 0) > 300:
             y["kis_yeniden"] = now; print("YEREL SES: ses kısma ayarı değişti — yardımcı yeniden başlatılıyor")
-            threading.Thread(target=lambda: subprocess.run(["pkill", "-u", str(os.getuid()), "-f", "MacOS/SuflorSes --port"], capture_output=True, timeout=5), daemon=True).start()
+            threading.Thread(target=lambda: surec_kapat("MacOS/SuflorSes --port"), daemon=True).start()
         k_ = int(p.get("kurma") or 0)
         if k_ > y["kurma"]: print(f"YEREL SES: ses yakalama yeniden kuruldu ({str(p.get('kurma_neden') or '?')[:40]}; toplam {k_})")
         y["kurma"] = k_
@@ -1175,7 +1175,7 @@ def _yerel_ses_dongu():
             try:
                 # yanıt vermeyen eski kopya açıksa (open -a çalışanı yeniden açmaz) yalnız bu hesabınkini kapat
                 # yalnız normal kopya (--port) — kurulumun izin penceresini bekleyen kopyası (--izin) kapanmasın
-                subprocess.run(["pkill", "-u", str(os.getuid()), "-f", "MacOS/SuflorSes --port"], capture_output=True, timeout=5)
+                surec_kapat("MacOS/SuflorSes --port")
                 subprocess.run(["open", "-g", "-a", SES_APP, "--stderr", SES_LOG, "--args", "--port", str(A.port), "--anahtar", SES_KEY_FILE]
                                + (["--kis"] if AYAR.get("masaustu_ses_kis") is True else []), capture_output=True, timeout=20)
                 print("YEREL SES: yardımcı başlatıldı")
@@ -1208,7 +1208,11 @@ def menu_baslat():
 # Masaüstü toplantı uygulaması (v0.27.0): menü çubuğu uygulaması Erişilebilirlik ile Teams/Zoom masaüstünde "Ayrıl" ve "Sesi aç/kapat"
 # düğmelerini okur, POST /masaustu {uygulama, toplantida, sessiz, baslik} (anahtarla) — eklenti olmadan toplantı sinyali: karşı ses (ses
 # yardımcısının Teams/Zoom sesi) işlenir, döküm toplantı penceresinin başlığıyla açılır. Kullanıcının mikrofonu bu yoldan alınmaz (sonraki adım).
+MASAUSTU_AX_ALANLAR = ("konusan", "paylasim", "katilimcilar", "kisi_sayisi")
 def masaustu_al(p):
+    # Beta profili (C fazı): menü uygulamasının Erişilebilirlikle okuduğu konuşan/paylaşım/katılımcı alanları yerelleştirilmiş arayüz yazısına bağlı —
+    # varsayılan kapalı (yok sayılır); yalnız "toplantı bitti" ipucu (toplantida/sessiz) kalır. Geri açmak: ayar masaustu_ax: true.
+    if AYAR.get("masaustu_ax") is not True: p = {k: v for k, v in p.items() if k not in MASAUSTU_AX_ALANLAR}
     m = {"uygulama": str(p.get("uygulama") or "")[:20], "toplantida": bool(p.get("toplantida")), "sessiz": p.get("sessiz") if isinstance(p.get("sessiz"), bool) else None,
          "t": time.time()}  # Faz B: pencere başlığı tutulmaz (kişi adı dosya adına giriyordu — 1826-teams B2)
     o = STATE.get("masaustu") or {}
@@ -1514,6 +1518,10 @@ def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki
         out.append({"yol": "~/" + os.path.relpath(y, ev) if y.startswith(ev + os.sep) else y, "ad": ad})
     return out
 MENU_AYAR = ("menu_cubugu", "masaustu_mic", "masaustu_kisiler", "kisayollar", "toplantiya_ses")
+def gelistirici_mi():  # ayar gelistirici: true ya da kod klasörü git klonu (kod ayarı, yoksa relay.py'nin klasörü; teshis.py ile aynı ölçüt). /tmp deneme kopyasında .git yok
+    if AYAR.get("gelistirici") is True: return True
+    k = os.path.expanduser(os.environ.get("SUFLOR_TEST_KOD") or str(AYAR.get("kod") or "")) or os.path.dirname(os.path.abspath(__file__))
+    return os.path.isdir(os.path.join(k, ".git"))
 def ayarlar_view():
     d = {k: AYAR.get(k, v[1]) for k, v in AYAR_PANO.items()}
     d.update({"beyin_" + k: v for k, v in sg_secim(AYAR).items()})
@@ -1524,7 +1532,7 @@ def ayarlar_view():
     vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin") and k != "dil"}  # kişilik, yapay zekâ ve dil "varsayılana dön"le değişmez
     vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
     return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici(),
-            "beyin": sg_ayar_view()}
+            "beyin": sg_ayar_view(), "gelistirici": gelistirici_mi()}  # beta profili: geliştirici kurulumunda gizli ayarlar "Gelişmiş" grubunda görünür
 def ayar_yaz(deg):
     hata, yeni, beyin = {}, {}, {}
     for k, v in (deg or {}).items():
@@ -1577,7 +1585,7 @@ def ayar_yaz(deg):
     return {"ok": True, "degisen": sorted(yeni), "menu": menu}
 def menu_yeniden():  # menü uygulamasını kapatıp (gerekirse) yeni ayarlarla açar; toplantı sürerken bekler
     while toplanti_var(): time.sleep(30)
-    subprocess.run(["pkill", "-u", str(os.getuid()), "-x", "SuflorMenu"], capture_output=True, timeout=10); time.sleep(1.5)
+    surec_kapat("SuflorMenu", tam=True); time.sleep(1.5)
     print("MENÜ: ayar değişti — yeniden açılıyor" if AYAR.get("menu_cubugu") is not False else "MENÜ: ayar kapandı — uygulama kapatıldı"); menu_baslat()
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
     sinir = (datetime.datetime.now() - datetime.timedelta(days=7)).isoformat()
@@ -1607,6 +1615,7 @@ def son_ac(p):
     except subprocess.TimeoutExpired: return {"ok": False, "err": _t("özet uygulaması yanıt vermedi", "the summary app did not respond")}
     if k.returncode: print(f"ÖZET: açılamadı ({(k.stderr or '').strip()[:160]})"); return {"ok": False, "err": (k.stderr or "").strip()[:160]}
     return {"ok": True}
+bolum("kaynak")  # aktarici/kaynak.py — kaynak bekçisi (normal/dar/kritik, /status kaynak) ve PID ile süreç kapatma (mimari plan C, K4)
 bolum("dosyadan")  # aktarici/dosyadan.py — Panodan dosyadan döküm
 bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslendirme (ayar ses_motoru: piper)
 bolum("pocket-ses")  # aktarici/pocket-ses.py — Pocket TTS ile yerel Türkçe ses (kişilikte yerel_ses: pocket:…; S93)
@@ -1940,7 +1949,7 @@ class H(BaseHTTPRequestHandler):
                 if time.time() - (STATE.get("_pano_t") or 0) > 300: STATE["_pano_ilk"] = time.time()
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["kaynak"] = kaynak_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
             # Faz B: aktif = süren kayıt, yoksa yeni biten (özet gelene dek) — yalnız gösterim
             af = gorunen_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
@@ -2211,6 +2220,7 @@ if __name__ == "__main__":
     threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
     threading.Thread(target=sg_bekci, daemon=True).start()  # Faz 11: ayar yerel modeli (Ollama) gösteriyorsa sunucusu açık tutulur
     threading.Thread(target=_heartbeat_dongu, daemon=True).start()
+    threading.Thread(target=_kaynak_dongu, daemon=True).start()  # C fazı: kaynak bekçisi
     threading.Thread(target=_veri_yok_dongu, daemon=True).start()  # Faz D: toplantı var, veri yok  # S162: heartbeat.json 8 sn'de bir
     threading.Thread(target=_toplanti_dongu, daemon=True).start()  # Faz B: tek toplantı kaydı — algılama, bitiş (/status toplanti, toplanti_bitti), canli/toplanti.json
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()

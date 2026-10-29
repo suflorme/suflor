@@ -24,11 +24,18 @@ def model_yolu(kok=MODEL_KOK):
     for d in [os.path.join(s, MODEL_REV)] + sorted(glob.glob(os.path.join(s, "*"))):
         if os.path.exists(os.path.join(d, "model.safetensors")) and os.path.exists(os.path.join(d, "modules.json")): return d
     return None
+def _kilit():  # aktarici/agir-kilit.py (aynı klasörün aktarici/'sı): iki hesap aynı anda ağır model yüklemesin; dosya yoksa kilitsiz
+    try:
+        yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "agir-kilit.py"); ns = {}
+        exec(compile(open(yol, encoding="utf-8").read(), yol, "exec"), ns); return ns["agir_kilit"]
+    except Exception: return None
 def model_ac():
-    import torch
+    import torch, contextlib
     from sentence_transformers import SentenceTransformer
     aygit = "mps" if torch.backends.mps.is_available() else "cpu"
-    m = SentenceTransformer(model_yolu() or MODEL, device=aygit); m.max_seq_length = 512
+    k = _kilit()
+    with (k("gomme", 120, gunluk) if k else contextlib.nullcontext()):
+        m = SentenceTransformer(model_yolu() or MODEL, device=aygit); m.max_seq_length = 512
     if aygit == "mps": m = m.half()
     return m, aygit
 def crc(t): return zlib.crc32(t.encode("utf-8", "replace"))

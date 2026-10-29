@@ -23,7 +23,7 @@ ACILAN = []
 def konus_ac():
     w, a = W(), App(); ns["_KS"].update(w=w, app=a, nesil=ns["_KS"].get("nesil_en", 0) + 1, ozel_gitti=False, maliyet=0, sayac=0); ns["_KS"]["nesil_en"] = ns["_KS"]["nesil"]; ACILAN.append(w); return True
 ns = {"threading": threading, "time": __import__("time"), "subprocess": __import__("subprocess"), "os": os, "print": lambda *a, **k: None, "AYAR": {}, "KONUS": {"durum": "kapali"},
-      "_KS": {"w": None, "app": None, "tur": None, "kilit": threading.Lock(), "nesil_en": 0}, "claude_yolu": lambda: "/x", "konus_beyin_var": lambda: True, "BRIFING_APP": KOD, "konus_ac": konus_ac}
+      "_KS": {"w": None, "app": None, "tur": None, "kilit": threading.Lock(), "nesil_en": 0}, "claude_yolu": lambda: "/x", "konus_beyin_var": lambda: True, "BRIFING_APP": KOD, "konus_ac": konus_ac, "kaynak_dar": lambda: False}
 ns["konus_canli"] = lambda: bool(ns["_KS"]["w"]) and ns["_KS"]["app"] is not None and ns["_KS"]["app"].poll() is None
 exec(compile(ast.Module(sec, []), "bas-konus.py", "exec"), ns)
 K, Y = ns["_KS"], ns["_KS_YEDEK"]
@@ -40,6 +40,7 @@ ok("ölü bekleyen süreç: kapatılır, etkin yuva boşalır, özel süreç bek
 ns["konus_yedek_kapat"]("boşta"); ok("bekleyen süreç boşta kapanır", ozel_w.kapali and not Y)
 n = len(ACILAN); K["tur"] = {"x": 1}; ok("önceden açma: tur sürerken açmaz", ns["konus_on_ac"]("deneme") is False and len(ACILAN) == n)
 K["tur"] = None; ns["AYAR"]["konus_on_ac"] = False; ok("önceden açma: ayar kapalıyken açmaz", ns["konus_on_ac"]("deneme") is False and len(ACILAN) == n)
-ns["AYAR"].pop("konus_on_ac"); ok("önceden açma: açar, panodaki durum değişmez", ns["konus_on_ac"]("deneme") is True and len(ACILAN) == n + 1 and ns["KONUS"]["durum"] == "kapali")
+ok("önceden açma: varsayılan kapalı (beta profili)", ns["AYAR"].pop("konus_on_ac", None) is False and ns["konus_on_ac"]("deneme") is False and len(ACILAN) == n)
+ns["AYAR"]["konus_on_ac"] = True; ok("önceden açma: açar, panodaki durum değişmez", ns["konus_on_ac"]("deneme") is True and len(ACILAN) == n + 1 and ns["KONUS"]["durum"] == "kapali")
 ok("önceden açma: süreç açıkken ikinciyi açmaz", ns["konus_on_ac"]("deneme") is False and len(ACILAN) == n + 1)
 print("konuş yuva: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

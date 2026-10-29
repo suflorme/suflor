@@ -453,7 +453,7 @@
       // adıma girince oturum bilinmiyorsa kendiliğinden denetler; Terminal'den dönünce (pencere odağı) yeniden denetler
       gir: async () => { await durumAl(); if (C.yz == null) { const s = ((D.durum || {}).beyin || {}).secim; C.yz = s || "claude-code"; } const c = (D.durum || {}).claude || {};
         if (yzSec() === "claude-code" && c.kurulu && c.giris !== true) await claudeDenetle(); if (yzSec() === "ollama") ollamaBekle(); },
-      icerik: () => `<div class="liste-secim">${[["claude-code", t.yz_claude, t.yz_claude_a], ["anahtar", t.yz_anahtar, t.yz_anahtar_a], ["ollama", t.yz_yerel, t.yz_yerel_a]].map(([v, b, a]) =>
+      icerik: () => `<div class="liste-secim">${[["claude-code", t.yz_claude, t.yz_claude_a], ["anahtar", t.yz_anahtar, t.yz_anahtar_a], ["ollama", t.yz_yerel, t.yz_yerel_a]].filter(([v]) => v !== "ollama" || yzGrup() === "ollama").map(([v, b, a]) =>
           `<label class="anahtar"><input type="radio" name="yz" data-yz="${v}" ${yzGrup() === v ? "checked" : ""}><span><b>${esc(b)}</b><br><span class="ipucu">${esc(a)}</span></span></label>`).join("")}</div>
         <div class="yz-panel">${yzGrup() === "anahtar" ? yzAnahtarIcerik() : yzGrup() === "ollama" ? yzYerelIcerik() : claudeIcerik()}</div>
         <p class="dipnot" data-yz-gizlilik>${esc(t.yz_gizlilik)}</p>${yzGrup() === "claude-code" ? "" : `<p class="dipnot">${esc(t.yz_toplanti)}</p>`}` },

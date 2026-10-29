@@ -342,6 +342,7 @@ def _onara_guncelle():
     while True:
         m = _onara_mod()
         if not m: return
+        if kaynak_dar(): time.sleep(60); continue  # C fazı: Mac dar/kritikken dizin turu (ve yardımcının çevirme/gömme turu) ertelenir
         try:
             with _ONARA["kilit"]: t = time.time(); m.guncelle(m.baglan()); _ONARA["guncel_t"] = time.time()
             if time.time() - t > 2: print(f"KONUŞ: ön arama dizini güncellendi ({time.time() - t:.1f} sn)")
@@ -429,7 +430,7 @@ VT_IZLE_TAZE_SN, VT_IZLE_YENIDEN_SN = 150, 300
 _VTI = {"t": 0.0, "durum": None}
 def vt_izle_bak(simdi=None):  # → True: yardımcı açıldı
     v = AYAR.get("veritabani")
-    if not isinstance(v, dict) or not v.get("yol") or not os.path.isdir(BRIFING_APP): return False
+    if not isinstance(v, dict) or not v.get("yol") or not os.path.isdir(BRIFING_APP) or kaynak_dar(): return False  # C fazı: dar/kritikte yardımcı açılmaz
     # yalnız asıl aktarıcı (deneme aktarıcıları gerçek ayarla çalışınca gerçek yardımcıyı kendi deneme klasörü için 6 saatliğine açıyordu)
     if os.path.realpath(BASE) != os.path.realpath(os.path.join(os.path.expanduser(AYAR.get("uygulama") or ""), "canli")) and not os.environ.get("SUFLOR_VT_IZLE_DENEME"): return False
     simdi = simdi or time.time()
@@ -898,10 +899,10 @@ def konus_yuva_degis(neden):  # etkin süreci bekleyen yuvaya alır; bekleyen ca
     print(f"KONUŞ: süreç yuvası değişti ({neden}) · etkin {'özel' if _KS.get('ozel_gitti') else 'ortak'}" + (" (bekleyen süreç)" if y else " (yeni süreç açılacak)"))
 # Önceden açma (v0.96.0): mesaj gönderilmez (token yok), süreç boşta yalnız bellek tutar (~150–250 MB). Pano açıkken ya da toplantıda bekçi açar; tur sınırında
 # kapanınca hemen yenisi. Boşta (KONUS_BOSTA_SN) kapandıktan sonra pano yeniden açılana kadar açılmaz. Ölçüm: ilk soruda sürecin hazır olmasını bekleme ortanca 0,67 sn
-# (sonraki sorularda 0,21). Ayar konus_on_ac: false kapatır (toplantıdaki önceden açma da).
+# (sonraki sorularda 0,21). Beta profili (C fazı): varsayılan KAPALI; ayar konus_on_ac: true açar (toplantıdaki önceden açma da).
 KONUS_PANO_SN = 90
 def konus_on_ac(neden):
-    if AYAR.get("konus_on_ac") is False or not AYAR.get("konusma", True) or konus_canli() or _KS["tur"] or not konus_beyin_var() or not os.path.isdir(BRIFING_APP): return False
+    if AYAR.get("konus_on_ac") is not True or kaynak_dar() or not AYAR.get("konusma", True) or konus_canli() or _KS["tur"] or not konus_beyin_var() or not os.path.isdir(BRIFING_APP): return False
     _KS["on_ac"] = time.time(); k = {x: KONUS.get(x) for x in ("durum", "hata", "at")}
     if not konus_ac():  # önceden açma sessiz: başarısızsa panoda hata görünmez, soru gelince yeniden denenir (bu arada soru geldiyse onun durumu kalır)
         if KONUS.get("durum") == "hata" and not _KS["tur"]: KONUS.update(k)
@@ -1637,7 +1638,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["otonom"] = False
     tur["sesli"] = ((not top) or kulaklik()) and not tur.get("otonom") and not tur.get("yazili"); tur["toplantida"] = top  # otonom: cevap toplantıya okunur, kulakta da duyulur
     tur["bellek_kapsam"] = bellek_kapsam(tur, kis); bsn = bellek_sira(metin, tur, kis)  # v0.64.0 (S78)
-    iki = AYAR.get("konus_iki_surec", True) is not False
+    iki = AYAR.get("konus_iki_surec") is True and not kaynak_dar()  # beta profili (C fazı): varsayılan kapalı; ayar.json'da true yazılıysa açık
     if tur["bellek_kapsam"] == "ortak" and _KS.get("ozel_gitti") and konus_canli():  # v0.68.0: kartın özel bölümü süreç geçmişinde kalmasın (toplantı kişiliği görmesin)
         if iki: konus_yuva_degis("ortak cevap — özel süreç bekliyor")
         else: konus_kapat("kartın özel bölümü süreçte — ortak cevap için yeni süreç", durum_koru=True); _KS["tur"] = tur

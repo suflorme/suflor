@@ -12,8 +12,9 @@ for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
+AYAR_T = os.path.join(T, "ayar.json"); _gercek = os.path.expanduser("~/Library/Application Support/Suflor/ayar.json"); _a = json.load(open(_gercek, encoding="utf-8")) if os.path.exists(_gercek) else {}; _a["masaustu_ax"] = True; json.dump(_a, open(AYAR_T, "w"))  # C fazı: AX alanları (konuşan/katılımcı) varsayılan kapalı; bu test onları sınar
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"),
-                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOKEN="http://sahte.test", SUFLOR_TEST_BITIYOR_SN="1"))
+                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOKEN="http://sahte.test", SUFLOR_TEST_BITIYOR_SN="1", SUFLOR_AYAR=AYAR_T))
 def anahtar():
     try: return open(os.path.join(canli, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     except OSError: return ""

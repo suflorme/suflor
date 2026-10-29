@@ -16,6 +16,8 @@ import base64, subprocess, queue, struct, math
 try: import audioop  # Python ≤ 3.12 (sistem 3.9)
 except ImportError: audioop = None
 _UYG = os.path.dirname(os.path.abspath(__file__)); _APP = AYAR["uygulama"]; _ORT = AYAR["ortak"]
+if "agir_kilit_al" not in globals():  # 28 Ekim: iki hesap aynı anda ağır model yüklemesin (aktarici/agir-kilit.py)
+    _ak = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "agir-kilit.py"); exec(compile(open(_ak, encoding="utf-8").read(), _ak, "exec"), globals())
 def _ilk(*yollar): return next((y for y in yollar if os.path.exists(y)), yollar[-1])
 # önce ortak klasör (/Users/Shared/Suflor, iki hesap), sonra eski yerler (aktarıcının yanı, hesabın App Support'u)
 WH_PY = _ilk(os.path.join(_ORT, "whisper-venv", "bin", "python"), os.path.join(_UYG, "whisper-venv", "bin", "python"), os.path.join(_APP, "whisper-venv", "bin", "python"))
@@ -45,7 +47,7 @@ WH_AKIS_SN = 20; WH_GUVENCE_SN = 90; WH_ATLA_SN = 120
 WH_BIRLES_ESIK = 3; WH_BIRLES_MAX_SN = 18; WH_BIRLES_ARA = b"\x00\x00" * int(WH_SR * 0.25)
 STATE["whisper"] = {"durum": "kapali", "model": None, "kuyruk": 0, "satir": 0, "atlanan": 0, "son_sn": None, "gecikme_sn": None,
                     "hata": None, "kanallar": {}, "kanal_son_satir": {}, "kanal_son_parca": {}, "gecikme_max": 0.0, "durgun_max": 0.0,
-                    "parca": {}, "eski_atlanan": {}, "birlesen": {}}  # kanal başına: kuyruğa giren · 120 sn'yi geçip atılan · birleştirilen
+                    "parca": {}, "eski_atlanan": {}, "birlesen": {}, "yavas": False}  # kanal başına: kuyruğa giren · 120 sn'yi geçip atılan · birleştirilen
 W_LOCK = threading.Lock(); WH_Q = queue.Queue(); ALTYAZI_SON = []  # (epoch, konuşmacı) son 10 dk
 def wh_one_al(is_):  # bas-konuş işi kuyruğun başına (S24): toplantı sonundan kalan parçalar "evet"i bekletmesin
     with WH_Q.not_empty: WH_Q.queue.appendleft(is_); WH_Q.unfinished_tasks += 1; WH_Q.not_empty.notify()
@@ -202,7 +204,7 @@ def whisper_view():
     return {"durum": w["durum"], "ben": now - w["kanallar"].get("ben", 0) < WH_AKIS_SN, "ben_neden": ben_neden(), "ben_kod": ben_kod(), "karsi": now - w["kanallar"].get("karsi", 0) < WH_AKIS_SN,
             "kuyruk": WH_Q.qsize(), "satir": w["satir"], "gecikme_sn": w["gecikme_sn"], "hata": w["hata"],
             "atlanan": w.get("atlanan", 0), "son_sn": w.get("son_sn"), "gecikme_max": w.get("gecikme_max"), "durgun_max": w.get("durgun_max"),
-            "parca": w.get("parca"), "eski_atlanan": w.get("eski_atlanan"), "birlesen": w.get("birlesen"),
+            "yavas": bool(w.get("yavas")), "parca": w.get("parca"), "eski_atlanan": w.get("eski_atlanan"), "birlesen": w.get("birlesen"),
             "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
 def ben_adi():
     a = agenda().get("ben")
@@ -228,7 +230,34 @@ def istem_metni():
     for d in ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []):  # ayar: alanın sık sistem adları
         if d not in adlar: adlar.append(d)
     return (", ".join(adlar))[:3000] + "."
-_ISCI = {"p": None, "satirlar": None, "kilit": threading.Lock(), "thread": None, "baslik": None}
+_ISCI = {"p": None, "satirlar": None, "kilit": threading.Lock(), "thread": None, "baslik": None, "zs": 0, "yk": 0, "sonraki": 0.0}
+# 28 Ekim (mimari plan C / K4): bir parçaya cevap gelmemesi (60 sn) işçiyi ÖLDÜRMEZ — 27 Ekim'de takasta her zaman aşımı işçiyi öldürüp yeniden yükledi,
+# yük arttı, zaman aşımları üst üste bindi. Parça bırakılır, işçi yaşar; art arda WH_ZA_N zaman aşımında ya da işçi ölünce yeniden başlatılır ve
+# yeniden başlatmalar arasına bekleme konur (ilk hemen/15 sn, sonra 15·2ⁿ, en çok 300 sn); bekleme sürerken gelen parçalar atlanır (kuyruk birikmesin).
+WH_CEVAP_SN = 60; WH_ZA_N = 3; WH_GERI_CEKIL_MAX = 300; WH_YUKLE_SN = 180; WH_YUKLE_UZAT_SN = 300
+def _isci_geri_cekil(neden, ilk_hemen=False):  # kapat + bir sonraki açılış için bekleme belirle; "sonraki" = en erken açılış zamanı
+    n = _ISCI["yk"]; bek = 0 if (ilk_hemen and n == 0) else min(WH_GERI_CEKIL_MAX, 15 * 2 ** n); _ISCI["yk"] = n + 1; _ISCI["sonraki"] = time.time() + bek
+    _isci_kapat(neden); print(f"WHISPER: işçi yeniden başlatılacak ({neden})" + (f" — en erken {bek} sn sonra" if bek else ""))
+def _isci_zaman_asimi(is_):  # cevap gelmedi: işçi yaşıyorsa yaşat ve bildir; yalnız art arda WH_ZA_N olursa (ya da ölmüşse) yeniden başlat
+    w = STATE["whisper"]; pr = _ISCI["p"]; _ISCI["zs"] += 1; yasiyor = bool(pr and pr.poll() is None)
+    w["yavas"] = True; w["hata"] = f"yanıt vermiyor ({_ISCI['zs']}/{WH_ZA_N}): parça {WH_CEVAP_SN} sn'de çevrilemedi"
+    ek = ""
+    if "sistem_anlik" in globals():
+        try: sa = sistem_anlik(); ek = f" · boş bellek %{sa.get('bos_yuzde')}, takas {sa.get('takas_mb')} MB, yük {sa.get('yuk')}"
+        except Exception: pass
+    print(f"WHISPER: parça {WH_CEVAP_SN} sn'de çevrilemedi ({is_.get('kanal')}) — işçi {'yaşıyor, öldürülmedi' if yasiyor else 'kapanmış'} ({_ISCI['zs']}/{WH_ZA_N}){ek}")
+    if not yasiyor: _ISCI["zs"] = 0; _isci_geri_cekil("işçi kapanmış")
+    elif _ISCI["zs"] >= WH_ZA_N: _ISCI["zs"] = 0; _isci_geri_cekil(f"art arda {WH_ZA_N} zaman aşımı")
+def _isci_cevap(kim, sn=None):  # bu isteğin cevabı; öncekinin geç gelen cevabı (id farklı) atlanır. Zaman aşımı → {"zaman_asimi": True}; işçi kapandı → {"hata": "işçi kapandı"}
+    son = time.time() + (WH_CEVAP_SN if sn is None else sn)
+    while True:
+        try: l = _ISCI["satirlar"].get(timeout=max(0.01, son - time.time()))
+        except queue.Empty: return {"hata": "zaman_asimi", "zaman_asimi": True}
+        if not l: return {"hata": "işçi kapandı"}
+        try: j = json.loads(l)
+        except ValueError: continue
+        if j.get("id") in (kim, None): return j
+        if time.time() >= son: return {"hata": "zaman_asimi", "zaman_asimi": True}
 def _isci_baslat():
     with _ISCI["kilit"]:
         if _ISCI["thread"] and _ISCI["thread"].is_alive(): return
@@ -238,21 +267,31 @@ def _isci_ac():
     if not (os.path.exists(WH_PY) and os.path.exists(WH_ISCI)):
         w.update(durum="yok", hata=f"whisper-venv ya da whisper-isci.py yok ({WH_PY})"); print(f"WHISPER: kullanılamıyor — {w['hata']}"); return False
     w.update(durum="yukleniyor", hata=None); t = time.time()
+    kilit = agir_kilit_al("whisper", 90, print)  # öteki hesap/model yüklüyorsa en çok 90 sn bekler (toplantıdaki işçi aç kalmasın), sonra kilitsiz yükler
+    t = time.time()  # yükleme süresi kilit beklemesini saymaz
     env = dict(os.environ, HF_HOME=WH_MODELLER, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", **({"SUFLOR_WHISPER_MODEL": WH_MODEL} if WH_MODEL else {}),
                **({"SUFLOR_ECAPA": ECAPA} if os.path.exists(ECAPA) else {}), **({"SUFLOR_WHISPER_CPP": WH_CPP} if wh_cpp() else {}))
-    pr = subprocess.Popen([WH_PY, "-u", WH_ISCI], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
+    try: pr = subprocess.Popen([WH_PY, "-u", WH_ISCI], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
+    except Exception:
+        agir_kilit_birak(kilit); raise
     q = queue.Queue()
     def oku():
         for l in pr.stdout: q.put(l)
         q.put(None)
     threading.Thread(target=oku, daemon=True).start()
-    try: ilk = q.get(timeout=180)
-    except queue.Empty: ilk = None
+    try: ilk = q.get(timeout=WH_YUKLE_SN)
+    except queue.Empty:
+        ilk = None
+        if pr.poll() is None:  # yavaş yükleme (takas): öldürüp baştan yüklemek yükü artırır — işçi yaşıyorsa bir süre daha beklenir
+            w["yavas"] = True; print(f"WHISPER: yükleme {WH_YUKLE_SN} sn'yi geçti (yavaş), {WH_YUKLE_UZAT_SN} sn daha bekleniyor")
+            try: ilk = q.get(timeout=WH_YUKLE_UZAT_SN)
+            except queue.Empty: ilk = None
+    agir_kilit_birak(kilit)  # model yüklendi (ya da vazgeçildi): sıradaki yükleme başlayabilir
     try: j = json.loads(ilk) if ilk else {}
     except ValueError: j = {}
     if not j.get("hazir"):
         pr.kill(); w.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"WHISPER: {w['hata']}"); return False
-    _ISCI.update(p=pr, satirlar=q, baslik=None); w.update(durum="hazir", model=j.get("model"), motor=j.get("motor") or "mlx"); kume_sifirla()
+    _ISCI.update(p=pr, satirlar=q, baslik=None, zs=0); w.update(yavas=False, durum="hazir", model=j.get("model"), motor=j.get("motor") or "mlx"); kume_sifirla()
     STATE["ses_model"].update(durum="hazir" if j.get("ecapa") else "yok", hata=None if j.get("ecapa") else f"ses izi ağırlıkları yok ({ECAPA})", sn=j.get("sn"))
     sn_ = time.time() - t; yavas = ""
     if sn_ > 15 and "sistem_anlik" in globals():  # v0.131.0 (24 Ekim: 29 sn, olağanı 4–6 sn): yavaş yüklemede bellek durumu — sıkışma mı, ayırmak için
@@ -320,10 +359,16 @@ def _isci_dongu():
                   f"{is_['t_al'] - o['bit']:.1f} sn önce bitti" if o else " · önceki iş yok"))
         acildi = False
         if not _ISCI["p"] or _ISCI["p"].poll() is not None:
+            if _ISCI["p"]: _isci_geri_cekil("işçi beklenmedik kapandı", ilk_hemen=True)  # ölmüş işçi: ilk seferde hemen, art arda ölürse bekleme katlanır
+            bek = _ISCI["sonraki"] - time.time()
+            if bek > 0:  # art arda yeniden başlatma: bekleme sürerken parça atlanır (kuyruk birikmesin, yük artmasın); bas-konuşa cevap verilir
+                if is_.get("bas"): threading.Thread(target=is_["geri"], args=("", f"işçi yeniden başlatma beklemesi ({bek:.0f} sn)"), daemon=True).start()
+                else: w["atlanan"] += 1; is_kaydet(is_, "bekleme", time.time(), q_n)
+                continue
             acildi = True
             if not _isci_ac():
                 if w["durum"] == "yok": return
-                hata_say += 1; time.sleep(min(60, 5 * hata_say)); continue
+                hata_say += 1; time.sleep(min(300, 10 * 2 ** (hata_say - 1))); continue
         dil = {"tr": "tr", "en": "en"}.get(agenda().get("dil") or "tr")  # karisik → None: Whisper dili kendisi seçer
         if is_.get("bas"): dil = is_.get("dil") or dil  # bas-konuş: arayüz dili (toplantı dışı, gündem eski olabilir)
         k = KANALLAR.get(is_["kanal"])
@@ -349,16 +394,21 @@ def _isci_dongu():
         if is_.get("iz_iste"): istek["iz_iste"] = True  # sohbet sorusu: ses izi süzgeci (aktarici/sohbet.py sohbet_ses_izi_red)
         try:
             _ISCI["p"].stdin.write(json.dumps(istek) + "\n"); _ISCI["p"].stdin.flush()
-            l = _ISCI["satirlar"].get(timeout=60); j = json.loads(l) if l else {"hata": "işçi kapandı"}
+            j = _isci_cevap(istek["id"])
         except Exception as e: j = {"hata": f"{e.__class__.__name__}"}
+        if j.get("zaman_asimi"): _isci_zaman_asimi(is_)  # işçi öldürülmez (yalnız art arda WH_ZA_N ya da ölmüşse yeniden başlar)
+        elif not j.get("hata"):
+            _ISCI["zs"] = 0; _ISCI["yk"] = 0
+            if w.get("yavas"): w["yavas"] = False; w["hata"] = None if str(w.get("hata") or "").startswith("yanıt vermiyor") else w.get("hata")
         if is_.get("bas"):  # bas-konuş: metin dökümüne değil, soruya (konus_metin)
             if is_.get("iz_iste"): is_["iz"] = j.get("iz")
             if is_.get("oto_dil") and j.get("dil") in ("tr", "en") and "konus_dil_kaydet" in globals(): konus_dil_kaydet(j["dil"], is_.get("akis_nesil"))
             threading.Thread(target=is_["geri"], args=(" ".join(str(j.get("text") or "").split()), j.get("hata")), daemon=True).start()
-            if j.get("hata"): _isci_kapat("hata")
+            if j.get("hata") and not j.get("zaman_asimi"): _isci_geri_cekil("hata", ilk_hemen=True)
             continue
         if j.get("hata"):
-            print(f"WHISPER: parça çevrilemedi ({j['hata']}) — işçi yeniden başlatılacak"); w["hata"] = j["hata"]; _isci_kapat("hata")
+            if j.get("zaman_asimi"): is_kaydet(is_, "zaman_asimi", time.time(), q_n, acildi=acildi); continue
+            print(f"WHISPER: parça çevrilemedi ({j['hata']})"); w["hata"] = j["hata"]; _isci_geri_cekil("hata", ilk_hemen=True)
             is_kaydet(is_, "hata", time.time(), q_n, acildi=acildi); continue
         hata_say = 0; metin = " ".join(str(j.get("text") or "").split()); is_["t_wh"] = time.time(); is_["isci_sn"] = j.get("sn")
         gec = round(time.time() - is_["t1"], 1)

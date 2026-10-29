@@ -137,7 +137,7 @@ conversion and search all run on this Mac.
 | Meeting | How |
 |---|---|
 | Microsoft Teams, Google Meet (web) | With the Chrome extension |
-| Zoom (web) | With the Chrome extension (experimental) |
+| Zoom (web) | Not for now — use the Zoom desktop app |
 | Teams and Zoom desktop apps | With the Suflor.me Mac app (menu bar) |
 
 The panel opens in two places: in the Suflor.me Mac app's window or in Chrome. The Mac window has a sidebar (Now · Today · Archive),

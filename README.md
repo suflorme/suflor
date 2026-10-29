@@ -137,7 +137,7 @@ Ayrıntı: [Kılavuz → Gizlilik ayrıntıları](KILAVUZ.md#gizlilik-ayrıntıl
 | Toplantı | Nasıl |
 |---|---|
 | Microsoft Teams, Google Meet (web) | Chrome eklentisiyle |
-| Zoom (web) | Chrome eklentisiyle (deneme aşamasında) |
+| Zoom (web) | Şimdilik yok — Zoom'u masaüstü uygulamasından kullanın |
 | Teams ve Zoom masaüstü uygulaması | Suflor.me Mac uygulamasıyla (menü çubuğu) |
 
 Pano iki yerde açılır: Suflor.me Mac uygulamasının penceresinde ya da Chrome'da. Mac penceresinde kenar çubuğu (Şimdi · Bugün · Arşiv),
