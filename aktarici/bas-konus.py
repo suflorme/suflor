@@ -914,11 +914,12 @@ KONUS_OKU_EN_COK = 5  # v0.54.0: 3 → 5 (kullanıcı: "iki cümle bazı sorular
 def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okuma kuyruğuna
     while True:
         m = re.search(r"^(.+?[.!?…])(\s+|$)", tur["tampon"], re.S) if not son else (re.match(r"^(.+)$", tur["tampon"].strip(), re.S) if tur["tampon"].strip() else None)
-        if not m and not son and not tur.get("t_ses"):  # v0.57.3 (T10 ölçümü): ilk ses uzun ilk cümleyi beklemesin — "Şöyle diyebilirsiniz: "…"" gibi 200–340 karakterlik
+        if not m and not son and not tur.get("t_ses") and not tur.get("ot_akis"):  # v0.57.3 (T10 ölçümü): ilk ses uzun ilk cümleyi beklemesin — "Şöyle diyebilirsiniz: "…"" gibi 200–340 karakterlik
             # ilk cümlede ilk ses +1–1,9 sn gecikiyordu (kişilik açıkken daha sık). Yalnız ilk parça: ≥ 25 karakterden sonra iki nokta/noktalı virgül/uzun tire, 140'ı aşınca virgül.
             m = re.search(r"^(.{25,}?[:;—])(\s+)", tur["tampon"], re.S) or (re.search(r"^(.{40,}?,)(\s+)", tur["tampon"], re.S) if len(tur["tampon"]) > 140 else None)
         if not m: break  # cümle sonu işareti görünür görünmez okunur (tek cümlelik cevapta sonucu bekleme: ölçüm 8 Ekim, +1,8 sn)
         c = m.group(1).strip(); tur["tampon"] = tur["tampon"][m.end():] if not son else ""
+        if c and tur.get("otonom") and "otonom_akis_ekle" in globals(): otonom_akis_ekle(tur, c)  # v0.157.0: toplantıda asistan ilk cümlede konuşmaya başlar (otonom.py)
         if c and tur.get("sesli", True) and tur.get("okunan", 0) >= KONUS_OKU_EN_COK:
             if not tur.get("kesik"): tur["kesik"] = True; print(f"KONUŞ: okuma {KONUS_OKU_EN_COK} cümlede durdu — kalanı panoda")
             c = ""
@@ -1057,7 +1058,8 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if "claude_ok" in globals() and (o.get("saglayici") or "claude-code") == "claude-code": claude_hata_bildir(j.get("result"), tur.get("kaynak") or "konus") if o["hata"] else claude_ok()  # v0.130.0
                 if any("suflorvt__vt_so" in x for x in tur.get("araclar") or []): _KS["vt_son"] = (time.time(), _vt_mt())  # v0.57.5
                 if tur.get("sorgular") and not o["hata"] and tur.get("kaynak") != "karsi" and not tur.get("karsi"): _vt_sorgu_kaydet(tur.get("soru") or KONUS.get("soru"), tur["sorgular"])  # v0.57.6
-                if tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"), tur)  # v0.56.0 (S68); S94: konuşan asistanın adı; tur: gecikme ölçümü (tur _KS'den silinmiş olur)
+                if tur.get("ot_akis") is not None: otonom_akis_bitir(tur, KONUS.get("cevap"))  # v0.157.0: okuma ilk cümlede başladı — devamı akıyordu
+                elif tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"), tur)  # v0.56.0 (S68); S94: konuşan asistanın adı; tur: gecikme ölçümü (tur _KS'den silinmiş olur)
                 if not o["hata"]: konus_gecmis_yaz(tur, tur.get("metin") or "", tur.get("toplanti_ad"))  # v0.64.0 (S76)
                 if tur.get("kaynak") == "hitap" and not tur.get("karsi"): asistan_soru_kaydet(None if o["hata"] else tur.get("ad"), tur.get("metin") or "")  # v0.140.0
                 if not o["hata"] and "uclu_tetik" in globals(): uclu_tetik(tur, zincir=not yenile)  # üçlü sohbet: öteki kişilik söz alabilir (kisilik.py; tur sınırında yok)
@@ -1692,7 +1694,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if KONUS_ARA_SN > 0 and not tur.get("yeniden"): threading.Thread(target=ara_bilgi, daemon=True).start()
     def ara_bilgi():  # v0.113.1: cevap KONUS_ARA_SN'yi geçince bir kez
         time.sleep(KONUS_ARA_SN)
-        if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("ara_bilgi"): return  # cevap bitti ya da okunmaya başladı
+        if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("ara_bilgi") or tur.get("ot_akis") is not None: return  # cevap bitti ya da okunmaya başladı (v0.157.0: toplantıda ilk cümle geldi)
         tur["ara_bilgi"] = True
         import random
         c = random.choice(BEKLE_UZUN[konus_soru_dili(tur.get("soru"))])

@@ -81,6 +81,18 @@ try:
     ok("S94: asistan adları iki kişilik", ns["asistan_adlari"]() == ["Atlas", "Matlas"])
     ok("S94: toplantı başında katılan yok", ns["asistan_katilan"]() == [])
     ns["asistan_katil"]("Matlas"); ns["asistan_katil"]("Matlas"); ok("S94: çağrılan asistan katılır (bir kez)", ns["asistan_katilan"]() == ["Matlas"])
+
+    # v0.157.0: görünen ad (gorunen_ad) — alan varken görünen ad, yokken iç ad; hitap iç ad + görünen ad ile çalışır
+    kd3 = os.path.join(T, "kisilik3.md")
+    open(kd3, "w", encoding="utf-8").write("---\nad: ZETA\ngorunen_ad: Kemal\nhitap: ZETA, Zeta\nokunus: \n---\n## Kişilik: ZETA\nAdın ZETA. GORUNEN-İŞARET\n")
+    ns3 = {k_: v_ for k_, v_ in ns.items() if k_ in ("re", "os", "json", "time", "collections", "print", "_t", "ARAYUZ_DILI", "BASE", "_KS", "TOP", "toplanti_var")}; ns3["AYAR"] = {"kisilik": kd3}
+    exec(ks, ns3)
+    ok("görünen ad: alan varken asistan_ad/asistan_adlari görünen ad, iç ad aynı", ns3["asistan_ad"]() == "Kemal" and ns3["asistan_adlari"]() == ["Kemal"] and ns3["kisilik_ad"]() == "ZETA")
+    ok("görünen ad: hitap listesinde iç ad, yazılışlar ve görünen ad var", all(a in ns3["kisilik"]()["hitap"] for a in ("ZETA", "Zeta", "Kemal")))
+    ok("görünen ad: dökümdeki etiket görünen adla", ns3["asistan_buyuk"]() == "KEMAL" and ns3["asistan_goster"]("Claude: saat kaç") == "Kemal, saat kaç" if "asistan_goster" in ns3 else ns3["asistan_buyuk"]() == "KEMAL")
+    ok("görünen ad: okunuş yokken iç ad görünen adla okunur", ns3["kisilik_telaffuz"]("ZETA burada") == "Kemal burada")
+    ns4 = dict(ns3); ns4["AYAR"] = {"kisilik": kd2}; ns4["_KSEC"] = {"ad": None, "t": 0.0}; ns4["_KIS_TANIT"] = {"yuklendi": False, "adlar": set()}; ns4["_KISILIK"] = {}; exec(ks, ns4)
+    ok("görünen ad: alan yokken iç ad (Matlas)", ns4["asistan_ad"]() == "Matlas" and ns4["asistan_adlari"]() == ["Matlas"])
     ns["STATE"]["meeting"] = "T2"; ok("S94: yeni toplantıda katılım sıfırlanır", ns["asistan_katilan"]() == [])
     ns["TOP"][0] = False; ok("S94: toplantı yokken durum yok", ns["asistan_view"]() is None and ns["asistan_katilan"]() == []); ns["TOP"][0] = True
     # v0.71.0: kişilik başına ses ve hız (brifing-ses.py kisilik_sesi)

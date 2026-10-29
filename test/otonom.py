@@ -3,7 +3,7 @@
 # İki kanala (ben, karşı) 0,25 sn'de bir yapay ses beslenir (konuşma = ton, sessizlik = hafif gürültü). Senaryolar: kullanıcı çağırmadan karşı taraf seslenemez;
 # kullanıcı "<Ad>, …" → asistan katılır, itirazsız söz sırası → toplantıya okuma; katıldıktan sonra karşı taraf sorar; Dur (pano) ve Option + Shift + S;
 # konuşma sürerken bekleme; okurken biri konuşursa susma; fırsat çıkmazsa söylenmez; ikinci kişilik de herkese; Konuş düğmesi yalnız kullanıcıya;
-# kişilik varken "Claude:" asistan değil; ayar (toplantiya_ses) kapalıyken toplantıya okunmaz. otonom.py, konus_hitap*, toplantiya_soyle ya da Kanal değişince koştur:
+# kişilik varken "Claude:" asistan değil; ayar (toplantiya_ses) kapalıyken toplantıya okunmaz; v0.157.0: ilk cümlede okuma başlar, devamı ikinci parça. otonom.py, konus_hitap*, toplantiya_soyle ya da Kanal değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/otonom.py
 import base64, json, math, os, shutil, struct, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -29,6 +29,10 @@ for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1
     ot = "toplantıya okunur, herkes duyar" in q; kim = next((a for a in ("MATLAS", "ATLAS") if f"[Bu soruyu {a} cevaplıyor]" in q), "?")
     yk = "yalnız kullanıcı duyar" in q
+    if "zebra" in q[-200:]:  # v0.157.0 (yalnız sorunun kendisinde; defter önceki soruları da taşır): ilk cümle hemen, ikincisi 4 sn sonra (okuma ilk cümlede başlamalı)
+        for parca, bek in (("İlk cümle hemen geldi.", 0.05), (" İkinci cümle sonra geldi.", 4.0), ("\\n---\\n", 0.05), ("Ayrıntı yavaş.", 0.05)):
+            time.sleep(bek); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
+        pr({"type": "result", "duration_api_ms": 300, "total_cost_usd": 0.01 * n, "num_turns": 1, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}}); continue
     for parca in ["Teslim tarihi cuma.", " Bakıyorum." if kim == "MATLAS" else "", " Otonom bağlam geldi." if ot else " Otonom bağlam yok.", "\\n---\\n", "Ayrıntı.", f" Kişi {kim}.", " Yalnız kullanıcı." if yk else ""]:
         time.sleep(0.05); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": parca}}})
     pr({"type": "result", "duration_api_ms": 300, "total_cost_usd": 0.01 * n, "num_turns": 1, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
@@ -85,7 +89,7 @@ try:
             if kosul(v): return v, time.time() - t
             time.sleep(0.1)
         return ot(), None
-    son = lambda: log().count("TOPLANTIYA SÖYLE (")  # web yolu (ping call=true) ya da BlackHole (deneme)
+    son = lambda: log().count("OTONOM: söz sırası (")  # okuma başladı (v0.157.0: bir cevap birden çok parçada okunabilir — parça değil cevap sayılır)
     hazir = lambda: log().count("OTONOM: cevap hazır")
     def izin_kart(): return next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and c.get("status") == "acik" and "okuyayım mı" in c.get("text", "")), None)
     def izin_ver(durum="onaylandi", sn=20):  # v0.97.0 (Y2): karşı tarafa cevap onay kartı
@@ -102,14 +106,28 @@ try:
     s0 = son(); satir("ben", "Atlas, teslim tarihi ne zaman?")
     v, t1 = bekle(lambda v: v.get("durum") in ("itiraz", "sira", "okunuyor", "okundu"), 20)
     ok("kullanıcı adıyla çağırdı: asistan katıldı", t1 is not None and "ASİSTAN: ATLAS toplantıya katıldı" in log())
-    ok("istemde 'herkes duyar' bağlamı", "Otonom bağlam geldi" in ((st().get("konus") or {}).get("cevap") or ""))
     ok("itiraz penceresi yok (söz sırası bekleniyor)", "itiraz penceresi" not in log() and "söz sırası bekleniyor" in log())
     v, t2 = bekle(lambda v: v.get("durum") == "okundu", 15); ok("toplantıya bir kez okundu", t2 is not None and son() == s0 + 1)
+    ok("istemde 'herkes duyar' bağlamı", "Otonom bağlam geldi" in ((st().get("konus") or {}).get("cevap") or ""))  # v0.157.0: okuma ilk cümlede başlar — cevap okunurken tamamlanır
     ok("cevap kulağa ayrıca okunmadı", "SES (deneme): " + "Teslim tarihi cuma" not in log())
     time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md"))  # Faz B: tek toplantı, ad sayfa başlığından değil
     sat = [l for l in md.splitlines() if "SUFLOR" in l]
-    ok(f"dökümde SUFLOR (sesli) satırı: tanıtım + sesli kısım, ayrıntı yok ({len(sat)} satır)", sat and "Merhaba, ben Atlas." in sat[-1] and "Teslim tarihi cuma" in sat[-1] and "Ayrıntı" not in sat[-1])
+    ok(f"dökümde SUFLOR (sesli) satırı: tanıtım + sesli kısım, ayrıntı yok ({len(sat)} satır)", sat and "Merhaba, ben Atlas." in " ".join(sat) and "Teslim tarihi cuma" in " ".join(sat) and "Otonom bağlam geldi" in " ".join(sat) and "Ayrıntı" not in " ".join(sat))
     ok("/status: ATLAS toplantıda", ((st().get("konus") or {}).get("asistan") or {}).get("katilan") == ["ATLAS"])
+    # 1b) v0.157.0: ilk cümlede konuşma — Claude ikinci cümleyi 4 sn sonra yazar; okuma ilk cümleyle başlar, ikincisi aynı okumanın devamı
+    SUSKU(); s0 = son(); i0 = ot().get("id"); g0 = log().count("OTONOM: gecikme"); satir("ben", "Atlas, zebra planını anlatır mısın?")
+    v, tb = bekle(lambda v: v.get("id") != i0 and v.get("durum") in ("okunuyor", "okundu"), 20); c_ilk = (st().get("konus") or {}).get("cevap") or ""; i1 = v.get("id")
+    time.sleep(0.3); uc("/olay", {"tur": "soyle-web", "metin": "caliyor"}, koken=KOKEN)  # eklentinin bildirimi (deneme: eklenti yok)
+    ok(f"ilk cümle hazırken okuma başladı, ikinci cümle henüz yoktu ({c_ilk[:40]!r})", tb is not None and "İlk cümle hemen geldi." in c_ilk and "İkinci" not in c_ilk and "Claude yazıyor, ilk" in log())
+    v, tb2 = bekle(lambda v: v.get("id") == i1 and v.get("durum") == "okundu", 25)
+    ok("ikinci cümle aynı okumanın 2. parçası olarak okundu", tb2 is not None and son() == s0 + 1 and "OTONOM: 2. parça okunuyor" in log() and "OTONOM: toplantıya okundu (2 parça)" in log())
+    ok(f"panoda tam cevap (sesli kısmın tamamı, ayrıntı yok): {v.get('metin')!r}", "İlk cümle hemen geldi." in (v.get("metin") or "") and "İkinci cümle sonra geldi." in (v.get("metin") or "") and "Ayrıntı" not in (v.get("metin") or ""))
+    time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md")); sat = [l for l in md.splitlines() if "SUFLOR" in l]
+    ok("dökümde iki parça da, ayrıntı yok", any("İlk cümle hemen geldi." in l for l in sat) and any("İkinci cümle sonra geldi." in l for l in sat) and not any("Ayrıntı yavaş" in l for l in sat))
+    t_g = time.time()
+    while time.time() - t_g < 15 and log().count("OTONOM: gecikme") == g0: time.sleep(0.3)
+    gs = [l for l in log().splitlines() if "OTONOM: gecikme" in l][g0:]
+    ok(f"gecikme satırı: ilk cümle hazır + Claude cevabı çalma başladıktan sonra bitti ({gs[-1][gs[-1].find('ilk cümle'):] if gs else '-'})", gs and "ilk cümle hazır" in gs[-1] and "çalma başladıktan" in gs[-1])
     # 2) katıldıktan sonra karşı taraf sorar; konuşma sürerken bekler, susunca okur
     SUSKU(); s0 = son(); MOD["karsi"] = "konus"; satir("karsi", "Atlas, kaç kişi katılacak?")
     v, _ = bekle(lambda v: v.get("durum") == "itiraz" and v.get("kim") == "Ayla Ö", 20); time.sleep(1.5)
@@ -123,13 +141,13 @@ try:
     ok(f"susunca ≥ 1,5 sn sonra okumaya başladı ({time.time() - tk:.1f} sn)", t3 is not None and 1.4 <= time.time() - tk <= 4)
     bekle(lambda v: v.get("durum") == "okundu", 15); ok("bekledikten sonra bir kez okundu", son() == s0 + 1)
     # 3) Dur (pano) söz sırası beklerken
-    SUSKU(); s0 = son(); MOD["karsi"] = "konus"; satir("ben", "Atlas, bütçe ne kadar?")
+    SUSKU(); s0 = son(); MOD["karsi"] = "konus"; time.sleep(1.0); satir("ben", "Atlas, bütçe ne kadar?")  # v0.157.0: ilk cümle ~60 ms'de hazır — karşı konuşma önce işlensin
     v, _ = bekle(lambda v: v.get("durum") == "sira", 20)
     uc("/otonom", {"id": v.get("id"), "karar": "iptal"}, pano=True); MOD["karsi"] = "sessiz"; time.sleep(4)
     ok("Dur ile iptal: toplantıya okunmadı", ot().get("durum") == "iptal" and son() == s0)
     ok("/otonom yalnız pano kökeninden", uc("/otonom", {"karar": "iptal"}, koken="http://kotu.ornek").get("kod") == 403)
     # 4) Option + Shift + S (metinsiz /komut soyle) söz sırası beklerken durdurur
-    s0 = son(); MOD["karsi"] = "konus"; satir("ben", "Atlas, sonraki adım ne?")
+    s0 = son(); MOD["karsi"] = "konus"; time.sleep(1.0); satir("ben", "Atlas, sonraki adım ne?")
     v, _ = bekle(lambda v: v.get("durum") == "sira", 20)
     r6 = uc("/komut", {"tur": "soyle"}, pano=True); MOD["karsi"] = "sessiz"; time.sleep(4)
     ok("Option + Shift + S durdurdu", ot().get("durum") == "iptal" and son() == s0 and "söylenmeyecek" in (r6.get("metin") or ""))
@@ -152,7 +170,7 @@ try:
     ok("ikinci kişilik de herkese: toplantıya okundu", t9 is not None and "Kişi MATLAS." in c and "Otonom bağlam geldi" in c and "ASİSTAN: MATLAS toplantıya katıldı" in log())
     ok("panoda etiket ikinci kişiliğin adı", (st().get("konus") or {}).get("kisilik") == "MATLAS")
     time.sleep(0.5); md = "".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md"))  # Faz B: tek toplantı, ad sayfa başlığından değil
-    ok("toplantıya okunan metinde konuşma dili yok (Bakıyorum)", "Bakıyorum." in [l for l in md.splitlines() if "SUFLOR" in l][-1])
+    ok("toplantıya okunan metinde konuşma dili yok (Bakıyorum)", "Bakıyorum." in " ".join([l for l in md.splitlines() if "SUFLOR" in l][-3:]))
     SUSKU(); s0 = son(); satir("karsi", "Matlas, bize de özet verir misin?"); izin_ver()
     v, t10 = bekle(lambda v: v.get("durum") == "okundu" and son() == s0 + 1, 25)
     ok("katılan ikinci kişiliğe karşı taraf sordu → MATLAS herkese", t10 is not None and "Kişi MATLAS." in ((st().get("konus") or {}).get("cevap") or ""))

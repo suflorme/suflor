@@ -30,10 +30,11 @@ def _kisilik_oku(yol, rol):
     try:
         s = open(yol, encoding="utf-8").read()
         m = re.match(r"\s*---\s*\n(.*?)\n---\s*\n?(.*)\Z", s, re.S)
-        v = {"ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "yerel_ses_en": None, "hiz": None, "ses_uslup": None, "ses_uslup_en": None, "azure_stil": None, "ses_etiket": False, "gerginlik_tonu": False, "takvim": "her", "kdili": False, "uclu_ad": None, "uclu_takilma": None, "uclu_bicim": None, "rol": rol, "metin": (m.group(2) if m else s).strip()}
+        v = {"ad": None, "gorunen_ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "yerel_ses_en": None, "hiz": None, "ses_uslup": None, "ses_uslup_en": None, "azure_stil": None, "ses_etiket": False, "gerginlik_tonu": False, "takvim": "her", "kdili": False, "uclu_ad": None, "uclu_takilma": None, "uclu_bicim": None, "rol": rol, "metin": (m.group(2) if m else s).strip()}
         for sat in (m.group(1).splitlines() if m else []):
             k, _, d_ = sat.partition(":"); k = k.strip().lower(); d_ = d_.strip()
             if k in ("ad", "okunus", "tanitim", "selam"): v[k] = d_ or None
+            elif k == "gorunen_ad": v[k] = d_[:40] or None  # v0.157.0: kullanıcıya görünen ad (pano, döküm, hata metni); yoksa ad. İç ad (dosya, ayar, kayıt anahtarı) değişmez
             elif k in ("uclu_ad", "uclu_takilma"): v[k] = d_[:40] or None  # v0.125: üçlü sohbette öbür kişiliğin ona seslendiği ad ve ara sıra takılma adı
             elif k == "hitap": v["hitap"] = [x.strip() for x in d_.split(",") if x.strip()]
             elif k == "hitap_bicimi": v["bicim"] = "sen" if d_.lower() == "sen" else "siz"
@@ -59,7 +60,7 @@ def _kisilik_oku(yol, rol):
             if isinstance(AYAR.get("hitap_ad"), list) and AYAR["hitap_ad"]: v["hitap"] = [str(x).strip() for x in AYAR["hitap_ad"] if str(x).strip()]
             if AYAR.get("tanitim"): v["tanitim"] = str(AYAR["tanitim"]).strip()
         if not v["hitap"]: v["hitap"] = [v["ad"]]
-        for x in (v["uclu_ad"], v["uclu_takilma"]):  # v0.125.1 (23 Ekim denemesi): üçlüde kullanıcı da takma adla seslenir ("<takma ad>, …")
+        for x in (v["gorunen_ad"], v["uclu_ad"], v["uclu_takilma"]):  # v0.125.1 (23 Ekim denemesi): üçlüde kullanıcı da takma adla seslenir ("<takma ad>, …")
             if x and x.lower() not in {h.lower() for h in v["hitap"]}: v["hitap"].append(x)
         print(f"KİŞİLİK: {v['ad']} ({rol}) · {len(v['metin'])} karakter · hitap {', '.join(v['hitap'][:8])}")
     d.update(mt=mt, v=v, uyari=None); return v
@@ -127,10 +128,12 @@ def kisilik_hitap_icte(metin):  # → kişilik ya da None (ilk cümledeki seslen
 # --- S94: toplantıda asistanlar — katılma durumu (toplantı başına) ---------------------------------------------------------------------
 _KATIL = {"toplanti": None, "adlar": []}
 def asistan_toplanti(): return AYAR.get("toplantiya_ses") is True and AYAR.get("konusma", True) is not False and not ("gizli_acik" in globals() and gizli_acik())  # tek anahtar: "Asistanlar toplantıda konuşsun"; v0.89.0: gizli toplantıda kapalı
-def asistan_adlari(): ks = kisilikler(); return [k["ad"] for k in ks] if ks else ["Suflor"]  # kişilik yoksa (nötr kurulum) asistanın adı Suflor
+def kisilik_gorunen(k): return (k or {}).get("gorunen_ad") or (k or {}).get("ad")  # v0.157.0: kullanıcıya görünen ad; gorunen_ad alanı yoksa iç ad
+def gorunen_ad_bul(ad): return next((kisilik_gorunen(k) for k in kisilikler() if k["ad"] == ad), ad)  # iç ad → görünen ad (bilinmiyorsa aynen)
+def asistan_adlari(): ks = kisilikler(); return [kisilik_gorunen(k) for k in ks] if ks else ["Suflor"]  # kişilik yoksa (nötr kurulum) asistanın adı Suflor
 def asistan_buyuk(): return asistan_ad().replace("i", "İ").replace("ı", "I").upper()  # dökümdeki kart etiketi (Türkçe büyük harf)
 def asistan_ad():  # S133: kullanıcıya görünen tek muhatap — toplantı kişiliğinin adı (yoksa ilk kişilik, kişiliksiz kurulumda Suflor)
-    ks = kisilikler(); return next((k["ad"] for k in ks if k["rol"] == "toplanti"), ks[0]["ad"] if ks else "Suflor")
+    ks = kisilikler(); return next((kisilik_gorunen(k) for k in ks if k["rol"] == "toplanti"), kisilik_gorunen(ks[0]) if ks else "Suflor")
 def asistan_katilan():
     if not toplanti_var(): return []
     a = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
@@ -140,7 +143,7 @@ def asistan_katil(ad):
     if ad and ad not in asistan_katilan(): _KATIL["adlar"].append(ad); print(f"ASİSTAN: {ad} toplantıya katıldı (kullanıcı adıyla çağırdı)")
 def asistan_view():  # /status konus.asistan — pano: "<adlar> dinliyor" / "<ad> toplantıda"
     if not toplanti_var(): return None
-    return {"acik": asistan_toplanti(), "adlar": asistan_adlari(), "katilan": asistan_katilan()}
+    return {"acik": asistan_toplanti(), "adlar": asistan_adlari(), "katilan": [gorunen_ad_bul(a) for a in asistan_katilan()]}
 def kisilik_ad(): k = kisilik(); return k["ad"] if k else None
 def kis_t(notr, kisilikli):  # sabit sesli cümle: kişilik açıkken "siz"li sürümü (Türkçe arayüzde; kişilik "sen" diyorsa nötr); İngilizce ayrı _t ile
     k = kisilik(); return kisilikli if k and k.get("bicim") != "sen" and ARAYUZ_DILI == "tr" else notr
@@ -166,7 +169,7 @@ def kisilik_telaffuz(metin):  # okunacak metinde ad → okunuş ve dosyadaki tel
     es = {}
     for k in ks:  # iki kişiliğin telaffuzu da (biri ötekinin adını söyleyebilir)
         for a, b in k["telaffuz"].items(): es.setdefault(a, b)
-        es.setdefault(k["ad"], k.get("okunus") or k["ad"])
+        es.setdefault(k["ad"], k.get("okunus") or kisilik_gorunen(k))  # v0.157.0: okunuş yoksa görünen ad
     for a, b in es.items():
         if a != b: metin = re.sub(r"(?<!\w)" + re.escape(a) + r"(?!\w)", b, metin)
     return metin

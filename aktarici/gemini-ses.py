@@ -21,6 +21,13 @@ GEMINI_SECILIR = GEMINI_MODELLER[:2]  # ayarda seçilebilen (ana) modeller
 GEMINI_SR = 24000
 GEMINI_HOST = os.environ.get("SUFLOR_TEST_GEMINI_HOST") or "generativelanguage.googleapis.com"  # deneme: 127.0.0.1:<port> (TLS'siz)
 GEMINI_ILK_SN = 3.0  # v0.80.2: 5 → 3 sn (ilk ses p90 0,7 sn); ses gelmezse yeni bağlantıyla bir kez daha denenir
+# v0.157.0 süre bekçisi (29 Ekim 11:37: 47 karakter → 13,4 sn ses; bilinen "cümleyi iki kez okuma" ~%5): üretilen ses GEMINI_SISME_TABAN_SN + GEMINI_SISME_KAR_SN ×
+# karakteri aşarsa ses şişmiş sayılır. Eşik gemini-ses.jsonl'den (243 okuma, 18–29 Ekim): ortanca 0,074 sn/karakter, p95 0,122, p99 0,21 (kısa metinde oran yüksek: taban);
+# 2,0 + 0,10 × karakter yalnız üç okumayı aşar — 13,3 sn/32, 13,4 sn/47, 7,5 sn/49 karakter (üçü de normalinin ~2 katı ve üstü, iki kez okuma). Toplanan seste
+# (toplantıya söyle) şişen ses çalınmadan atılır, bir kez yeniden istenir; yine şişerse Azure (varsa), sonra çağıranın yerel sesi (Pocket/Mac). Akarak çalarken
+# (kulaktaki okuma) şişme ancak üretim sınırı geçince belli olur: sınıra kadar verilen ses çalınır (doğru ilk okuyuş sınırın içinde kalır), fazlası atılır, yeniden
+# okunmaz (dinleyen cümleyi zaten duydu; yeniden istemek iki kez duyurur). Ayar gemini_sure_bekci: false kapatır.
+GEMINI_SISME_TABAN_SN, GEMINI_SISME_KAR_SN = 2.0, 0.10
 GEMINI_BEKLE_SN = 15.0  # v0.80.2: iki deneme de olmazsa Gemini bu kadar denenmez (60 sn'de kullanıcı bir dakika Mac sesi duydu, 18 Ekim)
 GEMINI_ONAY = ("Hı hı.", "Hıhı.", "Hı hı, evet.", "Hım hım.")  # v0.79.0: aktif dinleme / alındı (tepki_cal), o anda üretilir; aynı klip tekrarlanmaz
 GEMINI_ONAY_USLUP = "Dinlerken araya giren kısa, kısık ve doğal bir onay sesi; tek nefeste, vurgusuz."
@@ -160,9 +167,9 @@ def _gemini_parcalar(o):  # SSE olayındaki base64 ses parçaları (inlineData.d
             else: yield from _gemini_parcalar(v)
     elif isinstance(o, list):
         for x in o: yield from _gemini_parcalar(x)
-def _gemini_kayit(metin, ses_sn, ilk, model=None):
+def _gemini_kayit(metin, ses_sn, ilk, model=None, sisme=False):  # sisme (v0.157.0): süre bekçisi bu sesi attı ya da kesti (istek yine sayılır)
     try: write([(os.path.join(BASE, "gemini-ses.jsonl"), json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"), "model": model or gemini_model() or "",
-                                                                     "karakter": len(metin), "ses_sn": round(ses_sn, 2), "ilk_ses": round(ilk, 2) if ilk else None}) + "\n")])
+                                                                     "karakter": len(metin), "ses_sn": round(ses_sn, 2), "ilk_ses": round(ilk, 2) if ilk else None, **({"sisme": True} if sisme else {})}) + "\n")])
     except Exception as e: print(f"GEMINI: kayıt yazılamadı ({e.__class__.__name__})")
     _BUGUN["t"] = 0.0  # sayaç yeniden okunsun
 def _oynat_bekle(oyn, sn):  # çalıcının bitmesini bekler; bu arada sıradaki parça belli olursa sesi önceden istenir (brifing-ses.py ses_sonraki_hazirla)
@@ -360,7 +367,9 @@ def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False,
     if (r is None if topla else r is False) and metin and "azure_hazir" in globals() and azure_hazir():
         return azure_oku(metin, iptal=iptal, kayit=kayit, ses=ses, topla=topla, aygit=aygit, duzey=duzey, uslup=uslup)
     return r
-def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None):
+def gemini_sinir_sn(metin):  # v0.157.0: bu metnin sesi en çok kaç sn olabilir (süre bekçisi); kapalıysa None
+    return None if AYAR.get("gemini_sure_bekci") is False else GEMINI_SISME_TABAN_SN + GEMINI_SISME_KAR_SN * len(metin or "")
+def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None, _sisme=False):
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
     # duzey: 0–1 ses düzeyi (kısık "hı hı").
@@ -383,6 +392,7 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
         if r is not None: return r
     govde = _gemini_govde(metin, ses, uslup)
     t0 = time.time(); ilk = None; nbayt = 0; oyn = None; sessiz = bool(os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ")) or topla; tampon = bytearray(); ham = bytearray()
+    sinir = gemini_sinir_sn(metin); sisti = False
     def bitir(bekle):
         if oyn:
             try: oyn.stdin.close()
@@ -418,7 +428,7 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
                 if r.status == 429 and _gunluk_mu(hata):  # günlük sınır: beklemek işe yaramaz — model sıfırlanana kadar bırakılır, öteki hemen denenir
                     sn = _kota_doldu(model, hata); oteki = gemini_model()
                     print(f"GEMINI: {model} günlük sınırı doldu ({sn / 3600:.1f} saat sonra açılır)" + (f" — {oteki} ile devam" if oteki else " — iki model de dolu (yedek ya da yerel ses)"))
-                    if oteki: return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden, sabit=sabit)
+                    if oteki: return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden, sabit=sabit, _sisme=_sisme)
                     return None if topla else False
                 if r.status in (429, 503) and not _yeniden:  # v0.80.6: hız sınırı / geçici yoğunluk — önerilen süre (en çok GEMINI_429_EN_COK_SN) beklenip bir kez daha
                     bekle = _gemini_bekleme(hata, r.getheader("Retry-After")); t_b = time.time()
@@ -426,7 +436,7 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
                     while time.time() - t_b < bekle:
                         if iptal and iptal(): return None if topla else True  # okuma kesildi: Mac sesine düşülmez
                         time.sleep(0.1)
-                    return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
+                    return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit, _sisme=_sisme)
                 raise RuntimeError(f"HTTP {r.status}: {' '.join(hata.split())[:160]}")
             while True:
                 satir = r.readline()
@@ -437,6 +447,15 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
                 except ValueError: continue
                 for b in _gemini_parcalar(o):
                     if iptal and iptal(): _gemini_kapat(); bitir(False); return True
+                    if sinir and (nbayt + len(b)) / 2 / GEMINI_SR > sinir:  # v0.157.0 süre bekçisi
+                        sn_ = (nbayt + len(b)) / 2 / GEMINI_SR; _gemini_kapat(); sisti = True; ham.clear()
+                        if not oyn:  # toplanıyordu (ya da afplay için tamponda): hiçbiri çalınmadı — at, bir kez yeniden iste
+                            _gemini_kayit(metin, sn_, ilk, model, sisme=True)
+                            if not _sisme:
+                                print(f"GEMINI: süre şişti ({sn_:.1f} sn / {len(metin)} karakter, sınır {sinir:.1f}) — atıldı, yeniden isteniyor")
+                                return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=_yeniden, sabit=sabit, _sisme=True)
+                            print(f"GEMINI: süre şişti ({sn_:.1f} sn / {len(metin)} karakter, sınır {sinir:.1f}) — yine şişti, yedek ses"); return None if topla else False
+                        print(f"GEMINI: süre şişti ({sn_:.1f} sn / {len(metin)} karakter, sınır {sinir:.1f}) — çalınırken sınırda kesildi"); break
                     if ilk is None:
                         ilk = time.time() - t0
                         if sessiz and not topla: ses_basladi(kayit)  # deneme kipi: ses çalınmaz, ilk parça geldi
@@ -453,11 +472,12 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
                         except (BrokenPipeError, OSError, ValueError): _gemini_kapat(); return True  # çalıcı kesildi (ses_durdur)
                         if nbayt == len(b): ses_basladi(kayit)  # v0.95.0: ilk ses parçası çalıcıda
                     else: tampon.extend(b)
+                if sisti: break
         except Exception as e:
             _gemini_kapat()
             if not nbayt and not _yeniden and not isinstance(e, RuntimeError):  # zaman aşımı / bağlantı: yeni bağlantıyla bir kez daha (HTTP hatası kalıcı, denenmez)
                 print(f"GEMINI: ses gelmedi ({e.__class__.__name__}) — yeni bağlantıyla yeniden")
-                return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit)
+                return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, _yeniden=True, sabit=sabit, _sisme=_sisme)
             if not nbayt:
                 GEMINI.update(durum="hata", hata=str(e)[:200] or e.__class__.__name__, hata_t=time.time())
                 print(f"GEMINI: okunamadı ({e.__class__.__name__}: {str(e)[:120]}) — Mac sesi, {GEMINI_BEKLE_SN:.0f} sn Gemini denenmez"); return None if topla else False
@@ -465,8 +485,8 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
     GEMINI.update(durum="hazir", hata=None)
     if sabit and ham and not (iptal and iptal()): _sabit_yaz(metin, ses, uslup, bytes(ham))
     bitir(True)
-    _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk, model); _kota_bak(model)
-    print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}")
+    _gemini_kayit(metin, nbayt / 2 / GEMINI_SR, ilk, model, sisme=sisti); _kota_bak(model)
+    print(f"GEMINI: {len(metin)} karakter · ilk ses {ilk or 0:.2f} sn · {nbayt / 2 / GEMINI_SR:.1f} sn ses{' (toplandı)' if topla else ''}{' (yeniden istendi)' if _sisme else ''}")
     if topla: return bytes(tampon) if tampon else None
     return nbayt > 0
 # --- v0.80.0 (S87, kullanıcı 18 Ekim: "sesle ilgili her şey Gemini'ye") ------------------------------------------------------------------------

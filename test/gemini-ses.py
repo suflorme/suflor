@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Gemini ile seslendirme (v0.78.0, aktarici/gemini-ses.py): sahte Gemini sunucusuna (SSE, 24 kHz ham ses) karşı — akış okunur ve kayda girer, HTTP hatası
+# Gemini ile seslendirme (v0.78.0, aktarici/gemini-ses.py; v0.157.0 süre bekçisi: şişen ses atılır, bir kez yeniden): sahte Gemini sunucusuna (SSE, 24 kHz ham ses) karşı — akış okunur ve kayda girer, HTTP hatası
 # ve ses gelmemesi False döner (çağıran Mac sesine düşer; zaman aşımında önce yeni bağlantıyla bir kez daha, v0.80.2) ve 15 sn Gemini denenmez, okuma yarıda kesilebilir, ses adı ve model ayardan;
 # kişilik sesi seçimi (gemini / gemini:Kore / anahtar yoksa Mac); ⚙ Ayarlar'da ses_motoru: gemini + gemini_ses kaydedilir. Ses çalınmaz, Google'a gidilmez.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/gemini-ses.py     (~15 sn)
@@ -26,8 +26,9 @@ class Sahte(http.server.BaseHTTPRequestHandler):
             b = b'{"error":{"code":400,"message":"API key not valid"}}'
             self.send_response(400); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if DAVRANIS["tur"] == "yavas": time.sleep(7)
-        olaylar = []
-        for i in range(4):  # 4 parça × 0,25 sn ses
+        olaylar = []; npar = 4
+        if DAVRANIS["tur"] == "sisme" or (DAVRANIS["tur"] == "sisme_bir" and not DAVRANIS.get("sisti")): npar = 40; DAVRANIS["sisti"] = True  # v0.157.0: 10 sn ses (iki kez okuma gibi)
+        for i in range(npar):  # 4 parça × 0,25 sn ses
             pcm = (bytes([i, 0]) * 6000)
             olaylar.append("data: " + json.dumps({"candidates": [{"content": {"parts": [{"inlineData": {"mimeType": "audio/l16;rate=24000", "data": base64.b64encode(pcm).decode()}}]}}]}) + "\r\n\r\n")
         b = "".join(olaylar).encode()
@@ -70,6 +71,29 @@ def _ilk_yavas(self):
 Sahte.do_POST = _ilk_yavas; ad["_gemini_kapat"](); t0 = time.time(); r6b = ad["gemini_oku"]("Bir yavaş bir hızlı."); Sahte.do_POST = eski; DAVRANIS["tur"] = "ok"
 bak(f"ilk deneme zaman aşımı, ikinci başarılı → True, Mac sesine düşmez ({time.time() - t0:.1f} sn)", r6b is True and ad["GEMINI"]["durum"] == "hazir")
 ad["GEMINI"]["hata_t"] = 0; DAVRANIS["tur"] = "ok"; bak("sonra yeniden çalışır", ad["gemini_oku"]("Tekrar.") is True)
+# v0.157.0 süre bekçisi: sınır 2,0 + 0,10 × karakter; 29 Ekim'deki gibi 47 karakterde 10 sn ses şişmiş sayılır
+import contextlib as _cl, io as _io
+M47 = "Evet, teslim tarihi cuma; ekip hazır görünüyor."; bak(f"sınır: 47 karakter → {ad['gemini_sinir_sn'](M47):.1f} sn", abs(ad["gemini_sinir_sn"](M47) - 6.7) < 0.05)
+DAVRANIS.update(tur="sisme_bir", sisti=False); n = len(GELEN); out = _io.StringIO()
+with _cl.redirect_stdout(out): pcm = ad["gemini_pcm"](M47)
+bak(f"şişen ses (10 sn / 47 karakter) atıldı, bir kez yeniden istendi, ikincisi alındı ({len(GELEN) - n} istek, {len(pcm or b'') / 48000:.1f} sn)",
+    pcm is not None and len(pcm) == 48000 and len(GELEN) - n == 2 and "GEMINI: süre şişti (" in out.getvalue() and "atıldı, yeniden isteniyor" in out.getvalue())
+kk = [json.loads(x[1]) for x in YAZILAN[-2:]]; bak(f"iki istek de kayıtta, şişen 'sisme' işaretli ({kk})", kk[0].get("sisme") is True and "sisme" not in kk[1])
+DAVRANIS.update(tur="sisme"); n = len(GELEN); out = _io.StringIO()
+with _cl.redirect_stdout(out): pcm2 = ad["gemini_pcm"](M47); r_s = ad["gemini_oku"]("Kısa söz.")
+bak(f"yine şişerse None/False (yedek sese düşer), en çok iki istek ({len(GELEN) - n} istek)", pcm2 is None and r_s is False and len(GELEN) - n == 4 and out.getvalue().count("yine şişti, yedek ses") == 2)
+bak("şişme hata sayılmaz (Gemini 15 sn kapanmaz)", ad["GEMINI"]["hata_t"] == 0)
+ad["AYAR"]["gemini_sure_bekci"] = False; n = len(GELEN); pcm3 = ad["gemini_pcm"](M47); ad["AYAR"].pop("gemini_sure_bekci")
+bak("ayar gemini_sure_bekci: false → bekçi kapalı", pcm3 is not None and len(pcm3) == 480000 and len(GELEN) - n == 1)
+# akarak çalarken: sınıra kadar çalıcıya verilir, fazlası atılır, yeniden istenmez
+cal_say = os.path.join(T, "calinan"); calici = os.path.join(T, "calici")
+open(calici, "w").write(f"#!/bin/sh\nwc -c > {cal_say}\n"); os.chmod(calici, 0o755)
+ad["PIPER_OYNAT"] = calici; os.environ.pop("SUFLOR_TEST_GEMINI_SESSIZ"); n = len(GELEN); out = _io.StringIO()
+with _cl.redirect_stdout(out): r_c = ad["gemini_oku"](M47)
+os.environ["SUFLOR_TEST_GEMINI_SESSIZ"] = "1"; ad["PIPER_OYNAT"] = "/yok"; time.sleep(0.3)
+cb = int(open(cal_say).read().strip() or 0) if os.path.exists(cal_say) else -1
+bak(f"akarak çalarken şişme: sınıra kadar ({cb / 48000:.2f} sn ≤ 6,7) çalındı, yeniden istenmedi", r_c is True and 0 < cb <= 6.7 * 48000 and len(GELEN) - n == 1 and "çalınırken sınırda kesildi" in out.getvalue())
+DAVRANIS.update(tur="ok"); ad["GEMINI"]["hata_t"] = 0
 # v0.80.6: 429 (hız sınırı) — önerilen süre beklenip bir kez daha; ikinci de 429 ise Mac sesine düşer
 DAVRANIS.update(tur="429bir", verildi=False); n = len(GELEN); t0 = time.time(); r429 = ad["gemini_oku"]("Hız sınırı bir kez.")
 bak(f"429 bir kez: retryDelay (1 sn) beklenip yeniden, ses alınır ({time.time() - t0:.1f} sn, {len(GELEN) - n} istek)", r429 is True and len(GELEN) - n == 2 and 0.9 < time.time() - t0 < 3.5)

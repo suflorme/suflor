@@ -85,7 +85,7 @@ try:
             if kosul(v): return v, time.time() - t
             time.sleep(0.1)
         return ot(), None
-    son = lambda: log().count("TOPLANTIYA SÖYLE (")
+    son = lambda: log().count("OTONOM: söz sırası (")  # v0.157.0: cevap sayılır (bir cevap ilk cümleden başlayıp birden çok parçada okunabilir)
     cevap = lambda: ((st().get("konus") or {}).get("cevap") or "")
     mod = lambda: (st().get("konus") or {}).get("moderator") or {}
     def bekle_log(parca, sn, n0=0):
@@ -101,8 +101,8 @@ try:
     ok("komut Claude'a soru olarak gitmedi (başla görevi gitti)", bekle_log("MODERATÖR: basla · Bütçe", 10))
     v, t1 = bekle(lambda v: v.get("durum") in ("itiraz", "sira", "okunuyor", "okundu"), 25)
     ok("başla görevi otonom yoldan (S94: itirazsız söz sırası)", t1 is not None and "OTONOM: cevap hazır (moderator" in log() and "ASİSTAN: MATLAS toplantıya katıldı" in log())
-    ok("görevi MATLAS cevapladı, istemde 'doğrudan toplantıya okunur'", "Kişi MATLAS moderatör-basla" in cevap() and "Otonom bağlam geldi" in cevap())
     bekle(lambda v: v.get("durum") == "okundu", 20); ok("açılış toplantıya okundu", son() == s0 + 1)
+    ok("görevi MATLAS cevapladı, istemde 'doğrudan toplantıya okunur'", "Kişi MATLAS moderatör-basla" in cevap() and "Otonom bağlam geldi" in cevap())  # v0.157.0: okuma bitince (cevap okunurken tamamlanır)
     m = mod(); ok(f"durum: madde 1/2 Bütçe, kalan süre var ({m.get('kalan_sn')} sn)", m.get("acik") and m.get("sira") == 1 and m.get("madde") == "Bütçe" and (m.get("kalan_sn") or 0) > 200)
     # 2) karşı taraf moderatör kişiliğine seslenir (S94: kullanıcı onu çağırdığı için katılmış)
     time.sleep(13); s0 = son(); satir("karsi", "Matlas, bütçe ne kadar?")

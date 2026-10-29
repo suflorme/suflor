@@ -39,8 +39,10 @@ def ts_web_ses(i):
     w = TS.get("web"); return w["ses"] if w and w["id"] == i else None
 def ts_web_durum(d):  # eklentinin sonucu: caliyor | bitti | durdu | sessiz | baglanti-yok | hata:<ad>
     d = str(d or "")[:60]; print(f"TOPLANTIYA SÖYLE (web): {d}")
-    if d == "caliyor": TS["t_caliyor"] = time.time()  # v0.152.0 gecikme ölçümü (otonom.py)
     w = TS.get("web")
+    # v0.152.0 gecikme ölçümü (otonom.py). v0.157.0: eklenti "caliyor"u çerçevelerin cevabını 1,5 sn topladıktan sonra bildirir (content.js soyleCal) —
+    # çalma o bildirimden ~1,5 sn önce başladı (WAV hazır olmadan önce olamaz). 29 Ekim'deki "çalma başlangıcı 1,5–1,6" bu bekleme payıydı.
+    if d == "caliyor": TS["t_caliyor"] = max(w["t"], time.time() - 1.5) if w else time.time()
     if w and d != "caliyor": w["bitti"] = True  # sonraki basış susturma değil, yeni okuma
     uy = {"sessiz": _t("🔇 Toplantıda mikrofonun kapalı — Suflor okumadı", "🔇 Your mic is muted in the meeting — Suflor didn't speak"),
           "baglanti-yok": _t("⚠ Toplantı bağlantısı bulunamadı — Suflor okumadı (sayfayı yenileyip yeniden dene)", "⚠ No meeting connection found — Suflor didn't speak (reload the page and retry)")}.get(d)
@@ -89,9 +91,32 @@ def ses_komut(metin):  # → okunacak kısa onay ya da None (komut değil)
     print(f"TOPLANTIYA SÖYLE: ses sesle değişti — {eski} → {hedef}")
     return _t(f"Tamam, toplantıda {ad} sesiyle konuşuyorum." if eski != hedef else f"Zaten {ad} sesiyle konuşuyorum.",
               f"OK, I'll use the {ad} voice in the meeting." if eski != hedef else f"I'm already using the {ad} voice.")
-def toplantiya_soyle(metin=None):
+# v0.157.0 (29 Ekim ölçümü: uzun cevapta Claude bitti 7,7 + ses sentezi 3,6 sn): otonom cevap ilk cümleden okunur (otonom.py), sonraki parçalar aynı okumanın
+# devamıdır — devam=True: susturma geçişi (ikinci basış = sus) ve tanıtım yok; hazir: ts_sentez'in önceden ürettiği (ses, ses adı), önceki parça çalarken.
+# Ses parça içinde toplanır (akarak çalınmaz): web toplantısında eklenti bütün WAV'ı alır (decodeAudioData), yankı zarfı ve okuma sonu (son_t) sesin tamamından,
+# tanıtım cevabın önüne eklenir, Gemini olmazsa parça yerel sese düşer (yarısı Gemini yarısı Mac olmaz), şişen ses (gemini-ses.py) çalınmadan atılır.
+def ts_sentez(m, tanitim=None):  # → (24 kHz 16 bit ham ses ya da None = Mac sesi, ses adı); m tanıtımı içerir (tanitim verilirse ayrı okunur)
+    km, kses = toplanti_ses_motoru(); gpcm = None  # v0.81.0 (S92): katılımcıların duyduğu ses — Gemini burada; v0.113.0: ayar toplanti_ses / sesle Pocket
+    if km == "gemini" and os.access(PIPER_OYNAT, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
+        usl = kisilik_uslup(kisilik()) or None; govde = m[len(tanitim) + 1:] if tanitim else m
+        # tanıtım ve toplantı başı duyurusu sabit: bir kez okunup önbellekte (günlük sınırdan yemez); tanıtım ayrı okunup cevabın önüne eklenir
+        gpcm = gemini_pcm(ses_duzen(kisilik_telaffuz(govde), False), ses=kses, uslup=usl, sabit=True if govde.strip() in DUYURU_SABIT() else None)
+        if gpcm and tanitim:
+            tp = gemini_pcm(ses_duzen(kisilik_telaffuz(tanitim), False), ses=kses, uslup=usl, sabit=True)
+            gpcm = (tp + b"\0\0" * int(GEMINI_SR * 0.35) + gpcm) if tp else None
+        if not gpcm and pocket_var():  # v0.157.0: Gemini (ve Azure) okuyamadı ya da sesi şişti → yerel Pocket, o da yoksa Mac
+            km, kses = "pocket", (pocket_ses_adi((kisilik() or {}).get("yerel_ses")) if str((kisilik() or {}).get("yerel_ses") or "").startswith("pocket") else None) or pocket_varsayilan()
+            print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Pocket")
+        elif not gpcm: print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Mac sesi")
+    if km == "pocket" and not gpcm and os.access(PIPER_OYNAT, os.X_OK) and (not os.environ.get("SUFLOR_TEST_BASLAT") or os.environ.get("SUFLOR_TEST_TS_POCKET")):
+        # v0.113.0: Pocket da 24 kHz 16 bit — Gemini'nin yolu (BlackHole / web toplantısında eklenti) aynen; okunacak metin toplanır, sonra çalınır
+        gpcm = pocket_pcm(kisilik_telaffuz(etiket_sil(m)), ses=kses)
+        if gpcm: print(f"TOPLANTIYA SÖYLE: Pocket sesi ({kses}, {len(gpcm) / 2 / GEMINI_SR:.1f} sn)")
+        else: print("TOPLANTIYA SÖYLE: Pocket sesi alınamadı — Mac sesi")
+    return gpcm, kses
+def toplantiya_soyle(metin=None, devam=False, hazir=None):
     if AYAR.get("toplantiya_ses") is not True: return {"ok": False, "err": _t("Toplantıya sesli söyleme kapalı (⚙ Ayarlar)", "Speaking into the meeting is off (⚙ Settings)")}
-    if ts_durdur(): print("TOPLANTIYA SÖYLE: susturuldu"); return {"ok": True, "metin": _t("🔇 Suflor sustu", "🔇 Suflor stopped")}
+    if not devam and ts_durdur(): print("TOPLANTIYA SÖYLE: susturuldu"); return {"ok": True, "metin": _t("🔇 Suflor sustu", "🔇 Suflor stopped")}
     if "gizli_acik" in globals() and gizli_acik(): print("TOPLANTIYA SÖYLE: gizli toplantı — okunmadı"); return {"ok": False, "err": _t("Gizli toplantı açık — toplantıya ses gitmez", "Private meeting is on — nothing is said into the meeting")}
     if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")):
         print("TOPLANTIYA SÖYLE: toplantı yok — okunmadı"); return {"ok": False, "err": _t("Toplantı yok — toplantıya söylenecek bir yer yok", "No meeting — nowhere to say it")}
@@ -101,26 +126,13 @@ def toplantiya_soyle(metin=None):
     if not m: return {"ok": False, "err": _t("Söylenecek cevap yok — önce Konuş'la sor", "Nothing to say — ask with Talk first")}
     toplanti = STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
     tanitim = None
-    if TS["tanitti"] != toplanti:
+    if TS["tanitti"] != toplanti and not devam:
         k = kisilik(); tn = (k or {}).get("tanitim") or str(AYAR.get("tanitim") or "").strip()  # v0.53.0: kişilik/ayar tanıtımı; yoksa nötr varsayılan
         tanitim = tn or TS_TANITIM.get(ARAYUZ_DILI, TS_TANITIM["en"]).format(ad=(AYAR.get("ad") or "").split(" ")[0] or "kullanıcı")
         TS["tanitti"] = toplanti; m = tanitim + " " + m
     v = ses_secimi(); okunan = ses_duzen(telaffuz(m, mac=True)); sesli = ["/usr/bin/say"] + (["-v", str(v)] if v else [])
-    # v0.79.0 (kullanıcı 18 Ekim: "toplantı kişiliğinin sesi"): kişiliğin sesi Gemini ise ses Gemini'den (ör. toplantı kişiliği Kore); alınamazsa Mac sesi
-    km, kses = toplanti_ses_motoru(); gpcm = None  # v0.81.0 (S92): katılımcıların duyduğu ses — Gemini burada; v0.113.0: ayar toplanti_ses / sesle Pocket
-    if km == "gemini" and os.access(PIPER_OYNAT, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
-        usl = kisilik_uslup(kisilik()) or None; govde = m[len(tanitim) + 1:] if tanitim else m
-        # tanıtım ve toplantı başı duyurusu sabit: bir kez okunup önbellekte (günlük sınırdan yemez); tanıtım ayrı okunup cevabın önüne eklenir
-        gpcm = gemini_pcm(ses_duzen(kisilik_telaffuz(govde), False), ses=kses, uslup=usl, sabit=True if govde.strip() in DUYURU_SABIT() else None)
-        if gpcm and tanitim:
-            tp = gemini_pcm(ses_duzen(kisilik_telaffuz(tanitim), False), ses=kses, uslup=usl, sabit=True)
-            gpcm = (tp + b"\0\0" * int(GEMINI_SR * 0.35) + gpcm) if tp else None
-        if not gpcm: print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Mac sesi")
-    elif km == "pocket" and os.access(PIPER_OYNAT, os.X_OK) and (not os.environ.get("SUFLOR_TEST_BASLAT") or os.environ.get("SUFLOR_TEST_TS_POCKET")):
-        # v0.113.0: Pocket da 24 kHz 16 bit — Gemini'nin yolu (BlackHole / web toplantısında eklenti) aynen; okunacak metin toplanır, sonra çalınır
-        gpcm = pocket_pcm(kisilik_telaffuz(etiket_sil(m)), ses=kses)
-        if gpcm: print(f"TOPLANTIYA SÖYLE: Pocket sesi ({kses}, {len(gpcm) / 2 / GEMINI_SR:.1f} sn)")
-        else: print("TOPLANTIYA SÖYLE: Pocket sesi alınamadı — Mac sesi")
+    # v0.79.0 (kullanıcı 18 Ekim: "toplantı kişiliğinin sesi"): kişiliğin sesi Gemini ise ses Gemini'den (ör. toplantı kişiliği Kore); alınamazsa Pocket/Mac sesi
+    gpcm, kses = hazir if hazir is not None else ts_sentez(m, tanitim)
     TS["t_sentez_bit"] = time.time()  # v0.152.0 gecikme ölçümü (otonom.py)
     if web: return _ts_web_hazirla(m, sesli, okunan, gpcm)
     if os.environ.get("SUFLOR_TEST_BASLAT"):
@@ -192,7 +204,7 @@ def _ts_web_hazirla(m, sesli, okunan, gpcm=None):
         except Exception as e: print(f"TOPLANTIYA SÖYLE: not yazılamadı ({e.__class__.__name__})")
     kart_bildir()
     print(f"TOPLANTIYA SÖYLE (web): {len(m)} karakter · {sure:.1f} sn ses{' · kulaklıkta da' if ps else ''}")
-    return {"ok": True, "metin": "🔊 " + m[:120]}
+    return {"ok": True, "metin": "🔊 " + m[:120], "web": True}  # v0.157.0: otonom parça sonunu eklentinin "bitti"sinden bilir
 
 # Menü uygulaması nöbeti (v0.39.0): Teams'in mikrofonu BlackHole'sa ve menü uygulaması kapanırsa karşı taraf kullanıcıyı da duymaz. Ayar açıkken
 # 5 sn'de bir bakılır; kapalıysa yeniden açılır ve bildirim gelir (en çok 5 dk'da bir). menu_yeniden'in kısa kapanışı da yeniden açmayla biter (zararsız).
