@@ -34,6 +34,11 @@ try:
     ok("menü uygulamasının yeri ~/Applications/Suflor.me.app", K.menu_yolu() == os.path.join(K.EV, "Applications", "Suflor.me.app"))
     ok("menü uygulamasının adı Suflor.me, kimliği aynı", "<key>CFBundleName</key><string>Suflor.me</string>" in K.MENU_PLIST
        and "<key>CFBundleDisplayName</key><string>Suflor.me</string>" in K.MENU_PLIST and "local.suflor.menu" in K.MENU_PLIST)
+    # 30 Ekim: yeniden derlemede macOS ekran kaydı iznini düşürdü, kurulum söylemedi — artık izin notu
+    n = K.menu_izin_notu({"mikrofon": "var", "erisilebilirlik": "var", "ekran": "yok"})
+    ok("yeniden derlemede düşen izin adıyla ve düzeltme yoluyla söylenir", n.startswith("UYARI") and "Ekran ve Sistem Sesi Kaydı" in n and "Mikrofon" not in n.split(".")[0] and "Suflor.me.app" in n)
+    ok("izinler yerindeyse uyarı yok", K.menu_izin_notu({"mikrofon": "var", "erisilebilirlik": "var", "ekran": "var"}).startswith("İzinler yerinde"))
+    ok("izin okunamazsa dogrula'ya yönlendirir", "kurulum.py dogrula" in K.menu_izin_notu({}))
 finally:
     shutil.rmtree(T, ignore_errors=True)
 print("derle:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

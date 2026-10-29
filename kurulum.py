@@ -1221,7 +1221,12 @@ def menu_izin_durum(mnu):  # {"mikrofon": "var|yok|sorulmadı", …}; uygulama k
         return dict(x.split("=", 1) for x in open(cik, encoding="utf-8").read().split() if "=" in x)
     except OSError: return {}
     finally: os.remove(cik)
-def menu_yerlestir(mnu, eski, tasindi):  # imzadan sonra: eski kopyayı kaldırır, Launchpad/Spotlight'a tanıtır, taşındıysa izinleri ölçer
+def menu_izin_notu(d):  # yeniden derleme sonrası: macOS yeni imzada izni düşürebilir (28 Ekim: ekran kaydı düştü, mikrofon/erişilebilirlik kaldı; görüntü alınamadı)
+    if not d: return "Not: menü uygulaması yeniden derlendi; izin durumu okunamadı — python3 kurulum.py dogrula"
+    dusen = [IZIN_AD[k] for k in IZIN_AD if d.get(k) and d[k] != "var"]
+    if not dusen: return "İzinler yerinde: menü uygulaması yeniden derlendi, mikrofon, erişilebilirlik ve ekran kaydı duruyor."
+    return "UYARI: menü uygulaması yeniden derlendi ve macOS şu izni düşürdü: " + ", ".join(dusen) + ".\n  " + "\n  ".join(IZIN_YENIDEN.format(ad=a) for a in dusen)
+def menu_yerlestir(mnu, eski, tasindi, yeniden=False):  # imzadan sonra: eski kopyayı kaldırır, Launchpad/Spotlight'a tanıtır, taşındıysa ya da yeniden derlendiyse izinleri ölçer
     if os.path.isdir(eski) and os.access(os.path.join(mnu, "Contents", "MacOS", "SuflorMenu"), os.X_OK):
         sessiz("pkill", "-u", str(os.getuid()), "-f", "Suflor Menü.app/Contents/MacOS/SuflorMenu"); sessiz(LSREGISTER, "-u", eski)
         shutil.rmtree(eski, ignore_errors=True); say(f"Menü uygulaması Uygulamalar klasörüne taşındı: {mnu} (Launchpad ve Spotlight'ta \"Suflor.me\")")
@@ -1231,6 +1236,7 @@ def menu_yerlestir(mnu, eski, tasindi):  # imzadan sonra: eski kopyayı kaldır�
         if not d: say("Not: izin durumu okunamadı — macOS Suflor.me için mikrofon, erişilebilirlik ya da ekran kaydı iznini yeniden sorarsa İzin Ver de.")
         elif eksik: say(f"Not: macOS Suflor.me için şu izni yeniden sorabilir: {', '.join(eksik)} — sorunca İzin Ver de (Sistem Ayarları → Gizlilik ve Güvenlik).")
         else: say("İzinler yerinde: mikrofon, erişilebilirlik, ekran kaydı taşınmadan etkilenmedi.")
+    elif yeniden: say(menu_izin_notu(menu_izin_durum(mnu)))
     r = sessiz("defaults", "read", "com.apple.dock", "persistent-apps")
     if r and "Suflor%20Men" in (r.stdout or ""):
         say("Not: Dock'a sabitlediğin eski \"Suflor Menü\" artık açılmaz — onu Dock'tan sürükleyip çıkar, Uygulamalar'daki Suflor.me'yi sabitle.")
@@ -1438,17 +1444,17 @@ def kur():
     elif r: say(f"UYARI: posta yardımcısı derlenemedi ({r}) — e-posta okuma kapalı kalır")
     # menü çubuğu uygulaması (Faz 5): ayar menu_cubugu: false değilse (v0.133.0: beta kurulumunda da varsayılan açık; pano Mac penceresinde); aktarıcı açar. v0.119.0: ~/Applications/Suflor.me.app
     mnu = menu_yolu(); eski = os.path.join(app, "Suflor Menü.app"); imz = [tak, ses, brf, oyn, mtn, pst]; menu_acik = ayar().get("menu_cubugu") is not False
-    tasindi = menu_acik and os.path.isdir(eski) and not os.path.isdir(mnu)
+    tasindi = menu_acik and os.path.isdir(eski) and not os.path.isdir(mnu); menu_yeni = False
     if menu_acik:
-        os.makedirs(os.path.dirname(mnu), exist_ok=True)
+        os.makedirs(os.path.dirname(mnu), exist_ok=True); mnu_vardi = os.path.isdir(mnu)  # ilk kurulumda izin henüz sorulmadı: uyarı yok
         r = derle(mnu, "menu-cubugu.swift", "SuflorMenu", MENU_PLIST, kayit_dizin=app)
-        if r is True: say(f"Menü çubuğu uygulaması derlendi: {mnu}"); sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorMenu")
+        if r is True: say(f"Menü çubuğu uygulaması derlendi: {mnu}"); sessiz("pkill", "-u", str(os.getuid()), "-x", "SuflorMenu"); menu_yeni = mnu_vardi
         elif r: say(f"UYARI: menü çubuğu uygulaması derlenemedi ({r})")
         if r is True or not os.path.exists(os.path.join(mnu, "Contents", "Resources", "AppIcon.icns")):
             say("Menü uygulamasına Dock simgesi eklendi" if menu_simge(mnu) else "UYARI: Dock simgesi yazılamadı — pencere kapanınca Dock'ta genel simge görünür")
         imz.append(mnu)
     imzala(imz)
-    if menu_acik and os.path.isdir(mnu): menu_yerlestir(mnu, eski, tasindi)
+    if menu_acik and os.path.isdir(mnu): menu_yerlestir(mnu, eski, tasindi, yeniden=menu_yeni and not DENEME)
     from xml.sax.saxutils import escape as x
     log = os.path.join(EV, "Library", "Logs", "suflor-aktarici.log")
     os.makedirs(os.path.dirname(plist_yolu()), exist_ok=True)
