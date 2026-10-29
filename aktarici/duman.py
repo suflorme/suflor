@@ -99,10 +99,10 @@ def _dm_maddeler(now):
     m("g", _t("Mac kaynakları", "Mac resources"), *_dm_dogrula_madde("kaynak"))
     return M
 def _dm_dogrula_kos(nesil):  # kurulum.py dogrula'yı (yazmadan) ayrı iş parçacığında koştur; yalnız blackhole ve kaynak maddeleri tutulur
-    k = _kod_dir(); d = None
+    ky, kc, ke = _kurulum_py(); d = None
     try:
-        if k and os.path.isfile(os.path.join(k, "kurulum.py")):
-            p = subprocess.run([sys.executable, "-B", os.path.join(k, "kurulum.py"), "dogrula", "--json", "--hizli", "--yazma"], cwd=k, capture_output=True, text=True, timeout=90, stdin=subprocess.DEVNULL)
+        if ky:
+            p = subprocess.run([sys.executable, "-B", ky, "dogrula", "--json", "--hizli", "--yazma"], cwd=kc, env=dict(os.environ, **ke), capture_output=True, text=True, timeout=90, stdin=subprocess.DEVNULL)
             try: d = [x for x in json.loads(p.stdout).get("maddeler", []) if x.get("id") in ("blackhole", "kaynak")]
             except ValueError:
                 # 28 Ekim: launchd altında Masaüstü okunamaz (kurulum.py açılmaz, stdout boş → JSONDecodeError). Nedeni günlüğe yaz; son Kurulumu denetle sonucu 15 dk'dan tazeyse onu kullan
@@ -129,7 +129,7 @@ def _dm_yaz(r):  # <uygulama>/duman/<tarih>.json; beta kullanıcısında ayrıca
     try:
         os.makedirs(d, exist_ok=True); json.dump(r, open(os.path.join(d, ts + ".json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1); DUMAN["dosya"] = ts + ".json"
     except OSError as e: print(f"DUMAN: yazılamadı ({e.__class__.__name__})")
-    if not AYAR.get("gelistirici"):
+    if not gelistirici_mi():
         gb = os.path.join(AYAR.get("ortak") or "/Users/Shared/Suflor", "geri-bildirim"); hesap = re.sub(r"[^a-z0-9_-]", "", _gp.getuser().lower()) or "hesap"
         sim = {"ok": "✓", "hata": "✗", "?": "?", "bekliyor": "…", "atla": "—"}
         try:

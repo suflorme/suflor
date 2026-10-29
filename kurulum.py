@@ -903,7 +903,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "taahhut.py", "teshis.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "taahhut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 # v0.136.0 (26 Ekim kişisel hesap: ses-isci.py, pano/hazirlik.html, test/platform.py kalmıştı): önceki imzalı listede olup yenisinde olmayan ve
 # özeti değişmemiş dosya silinir; kullanıcının koyduğu ya da değiştirdiği dosya kalır. Aynı kural kur.sh'de (bash).
@@ -1644,12 +1644,22 @@ def guncelle(kaynak=None, zorla=False):
 # ---------- Kurulumu denetle (Faz D, S162, v0.147.0) ----------
 # 27 Ekim beta denemelerindeki 38 hatanın çoğu ortam kaynaklıydı (eksik model dosyası, güncelleme sonrası adım, Teams mikrofonu, izinler, yük) ve testler hiçbirini
 # yakalamadı. `kurulum.py dogrula` salt okur, hiçbir şeyi değiştirmez; her madde ✓ / ✗ / ? ve "ne yapmalı" satırı. Güncelleme sonunda kendiliğinden çalışır;
-# panodaki "Kurulumu denetle" (aktarıcı /dogrula) aynı komutu arka planda koşturur. Sonuç <uygulama>/dogrula.json; beta kullanıcısında (ayar gelistirici yok)
+# panodaki "Kurulumu denetle" (aktarıcı /dogrula) aynı komutu arka planda koşturur. Sonuç <uygulama>/dogrula.json; beta kullanıcısında (ayar gelistirici yok, kod klasörü git klonu değil)
 # ortak posta kutusuna (<ortak>/geri-bildirim/<tarih>-dogrula-<hesap>.md) da yazılır. İçerik: yalnız sayı, durum, ayar ADI — kişi/toplantı/proje/dosya adı ve yol yok.
 SWIFT_YARDIMCI = (("Suflor Takvim.app", "takvim.swift", "SuflorTakvim"), ("Suflor Ses.app", "ses-yardimcisi.swift", "SuflorSes"), ("Suflor Brifing.app", "brifing.swift", "SuflorBrifing"),
                   ("Suflor Oynat.app", "oynat.swift", "SuflorOynat"), ("Suflor Metin.app", "metin-tani.swift", "SuflorMetin"), ("Suflor Posta.app", "posta.swift", "SuflorPosta"))
 DOGRULA_KURULUM_ANAHTAR = {"alan", "ad", "port", "uygulama", "proje", "ortak", "kod", "calisma", "haric", "durum_belgesi", "sozluk_xlsx", "sozluk_siki", "sozluk_kaynagi", "komut_sablondan",
                            "takvim_adreslerim", "takvim_haric", "eposta_adres", "dahil", "asil", "veritabani", "oto_haric"}
+def _gelistirici():  # relay.py gelistirici_mi() ile aynı ölçüt: ayar gelistirici true ya da kod klasörü git klonu (SUFLOR_TEST_KOD deneme için)
+    a = ayar()
+    if a.get("gelistirici") is True: return True
+    k = os.path.expanduser(os.environ.get("SUFLOR_TEST_KOD") or str(a.get("kod") or "")) or KOD
+    return os.path.isdir(os.path.join(k, ".git"))
+def _kod_okunamaz():  # kopya uygulama klasöründen (launchd altında) koşuyoruz: Swift kaynakları ve geliştirici kodu yok ya da Masaüstü okunamıyor
+    if os.environ.get("SUFLOR_KOD_OKUNAMAZ"): return True
+    k = ayar().get("kod")
+    try: return bool(k) and os.path.realpath(os.path.expanduser(str(k))) != os.path.realpath(KOD)
+    except OSError: return False
 def _core_audio(ad_parcasi):  # → (aygıt var mı, "bir süreç kullanıyor" 0/1 ya da None); Core Audio okunamazsa (None, None)
     import ctypes, struct
     try:
@@ -1696,25 +1706,28 @@ def dogrula_topla(hizli=False):  # → [{"id", "durum": ok|hata|?, "ad", "not", 
     def m(i, d, ad, n="", yap=""): M.append({"id": i, "durum": d, "ad": ad, "not": n, "yap": yap if d != "ok" else ""})
     Y = yollar(); a = ayar(); kod_s = surum(KOD); s = aktarici("/status") if not os.environ.get("SUFLOR_TEST_DURUMSUZ") else None; busy = mesgul() if s else ""
     kur_yap = "kod klasöründeki aktarici-kur.command dosyasına çift tıkla"
+    kopya = _kod_okunamaz(); kn = " (kurulu kopyaya göre)" if kopya else ""
     # --- sürümler
     if s is None: m("surum-aktarici", "hata", "Aktarıcı sürümü", "aktarıcı cevap vermiyor", kur_yap)
-    elif s.get("surum") == kod_s: m("surum-aktarici", "ok", "Aktarıcı sürümü", f"v{kod_s} çalışıyor")
-    else: m("surum-aktarici", "hata", "Aktarıcı sürümü", f"çalışan v{s.get('surum') or '?'}, kod v{kod_s}", kur_yap + "; düzelmezse Mac'i yeniden başlat")
+    elif s.get("surum") == kod_s: m("surum-aktarici", "ok", "Aktarıcı sürümü", f"v{kod_s} çalışıyor{kn}")
+    else: m("surum-aktarici", "hata", "Aktarıcı sürümü", f"çalışan v{s.get('surum') or '?'}, kod v{kod_s}{kn}", kur_yap + "; düzelmezse Mac'i yeniden başlat")
     ek = (s or {}).get("eklenti_kurulu")
     if not ek: m("surum-eklenti", "?", "Eklenti sürümü", "eklentiden henüz nabız gelmedi", "Chrome'u aç; chrome://extensions'ta Suflor.me açık mı bak")
-    elif ek.get("ver") != kod_s: m("surum-eklenti", "hata", "Eklenti sürümü", f"eklenti v{ek.get('ver')}, kod v{kod_s} (son görülme {ek.get('age_s')} sn önce)", "chrome://extensions → Suflor.me → ↻ yenile")
-    elif (ek.get("age_s") or 0) > 6 * 3600: m("surum-eklenti", "?", "Eklenti sürümü", f"v{kod_s} ama {round(ek['age_s'] / 3600)} saattir görülmedi", "Chrome açık mı, eklenti etkin mi bak")
-    else: m("surum-eklenti", "ok", "Eklenti sürümü", f"v{kod_s}, son görülme {ek.get('age_s')} sn önce")
-    uyg = Y["uygulama"]; eski = []; yok = []
+    elif ek.get("ver") != kod_s: m("surum-eklenti", "hata", "Eklenti sürümü", f"eklenti v{ek.get('ver')}, kod v{kod_s} (son görülme {ek.get('age_s')} sn önce){kn}", "chrome://extensions → Suflor.me → ↻ yenile")
+    elif (ek.get("age_s") or 0) > 6 * 3600: m("surum-eklenti", "?", "Eklenti sürümü", f"v{kod_s}{kn} ama {round(ek['age_s'] / 3600)} saattir görülmedi", "Chrome açık mı, eklenti etkin mi bak")
+    else: m("surum-eklenti", "ok", "Eklenti sürümü", f"v{kod_s}{kn}, son görülme {ek.get('age_s')} sn önce")
+    uyg = Y["uygulama"]; eski = []; yok = []; okunamayan = 0; toplam_k = 0
     if True:
         import hashlib
         for kl, kaynak, ikili in SWIFT_YARDIMCI + (("", "menu-cubugu.swift", "SuflorMenu"),):
             ik = os.path.join(menu_yolu(), "Contents", "MacOS", ikili) if ikili == "SuflorMenu" else os.path.join(uyg, kl, "Contents", "MacOS", ikili)
+            toplam_k += 1
             try: sha = hashlib.sha256(open(os.path.join(KOD, kaynak), "rb").read()).hexdigest()
-            except OSError: continue
+            except OSError: okunamayan += 1; continue
             if not os.access(ik, os.X_OK): yok.append(ikili)
             elif _derleme_kaydi(uyg, ikili) != sha: eski.append(ikili)
     if DENEME and not (eski or yok) and not os.path.isdir(uyg): m("swift", "?", "Swift yardımcıları", "deneme ortamında bakılmaz", "gerçek kurulumda python3 kurulum.py dogrula")
+    elif kopya or (toplam_k and okunamayan == toplam_k): m("swift", "?", "Swift yardımcıları", "arka planda kaynak okunamıyor", "Terminal'de python3 kurulum.py dogrula")  # sessizce ✓ verme
     elif yok or eski: m("swift", "hata", "Swift yardımcıları", f"{len(yok)} eksik, {len(eski)} eski ({', '.join(yok + eski)})", kur_yap)
     else: m("swift", "ok", "Swift yardımcıları", f"{len(SWIFT_YARDIMCI) + 1} yardımcı kaynakla aynı")
     # --- aktarıcı ajanı ve port
@@ -1788,7 +1801,7 @@ def dogrula(json_cikti=False, sessiz_=False, hizli=False, yaz=True):  # → sonu
     Y = yollar(); M = dogrula_topla(hizli)
     for x in M: x["not"] = _dogrula_temiz(x["not"]); x["yap"] = _dogrula_temiz(x["yap"])
     sy = {d: sum(1 for x in M if x["durum"] == d) for d in ("ok", "hata", "?")}
-    r = {"t": datetime.datetime.now().isoformat(timespec="seconds"), "surum": surum(KOD), "maddeler": M, "ozet": sy, "beta": not ayar().get("gelistirici")}
+    r = {"t": datetime.datetime.now().isoformat(timespec="seconds"), "surum": surum(KOD), "maddeler": M, "ozet": sy, "beta": not _gelistirici()}
     if yaz:
         try: yaz_json(os.path.join(Y["uygulama"], "dogrula.json"), r)
         except OSError: pass

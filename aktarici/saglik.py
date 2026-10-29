@@ -35,17 +35,26 @@ def _veri_yok_dongu():  # /status yoklanmasa da günlüğe yazılsın
         try: veri_yok_view()
         except Exception as e: print(f"VERİ YOK: bakılamadı ({e.__class__.__name__})")
 
+def _kurulum_py():  # → (yol, cwd, ek_ortam): launchd altında Masaüstü'ndeki kod klasörü AÇILAMAZ (stat çalışır, open çalışmaz); o zaman uygulama klasöründeki kopya (aktarici-kur KOPYA'da)
+    k = _kod_dir()
+    if k:
+        y = os.path.join(k, "kurulum.py")
+        try: open(y, "rb").close(); return y, k, {}
+        except OSError: pass
+    u = str(AYAR.get("uygulama") or ""); y = os.path.join(u, "kurulum.py") if u else ""
+    if y and os.path.isfile(y): return y, u, {"SUFLOR_KOD_OKUNAMAZ": "1"}
+    return None, None, {}
 DOGRULA = {"p": None, "t": 0.0}
 def dogrula_oku():
     try: return json.load(open(os.path.join(AYAR["uygulama"], "dogrula.json"), encoding="utf-8"))
     except Exception: return None
 def dogrula_istek(yenile=False):
-    now = time.time(); p = DOGRULA["p"]; calisiyor = bool(p and p.poll() is None); k = _kod_dir()
+    now = time.time(); p = DOGRULA["p"]; calisiyor = bool(p and p.poll() is None); ky, kc, ke = _kurulum_py()
     if yenile and not calisiyor:
-        if not k or not os.path.isfile(os.path.join(k, "kurulum.py")): return {"ok": False, "err": _t("Kurulum klasörü bulunamadı (ayar kod)", "Install folder not found (setting kod)")}
+        if not ky: return {"ok": False, "err": _t("Kurulum klasörü bulunamadı (ayar kod)", "Install folder not found (setting kod)")}
         if now - DOGRULA["t"] < 60: return dict(dogrula_oku() or {}, ok=True, calisiyor=False, bekle=round(60 - (now - DOGRULA["t"])))
         DOGRULA["t"] = now
-        DOGRULA["p"] = subprocess.Popen([sys.executable, "-B", os.path.join(k, "kurulum.py"), "dogrula", "--json"], cwd=k, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
+        DOGRULA["p"] = subprocess.Popen([sys.executable, "-B", ky, "dogrula", "--json"], cwd=kc, env=dict(os.environ, **ke), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
         calisiyor = True
     d = dogrula_oku() or {}
     return dict(d, ok=True, var=bool(d), calisiyor=calisiyor)

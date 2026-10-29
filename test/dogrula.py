@@ -16,9 +16,9 @@ ay = os.path.join(DESTEK, "ayar.json"); GIZLI_DEGER = "gizli-deger-93817"
 AYAR = {"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": APP, "proje": os.path.join(T, "proje"), "ortak": ORTAK, "kod": KOD, "toplantiya_ses": True, "konusma": False, "yerel_ses": False,
         "oto_toplanti": False, "tepki_sesleri": os.path.join(T, "yok"), "eposta_adres": f"{GIZLI_DEGER}@ornek.com", "kisilik_bellek": GIZLI_DEGER, "sozluk_ek": ["Deniz Yıldız"], "tema": "koyu"}
 json.dump(AYAR, open(ay, "w"))
-for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), APP)
+for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py", "kurulum.py"): shutil.copy(os.path.join(KOD, f), APP)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(APP, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(APP, "pano"))
-ORT = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_EV=EV, SUFLOR_AYAR=ay, SUFLOR_TEST_PAYLASILAN=ORTAK, SUFLOR_TEST_TAKAS="9.5,10.0", SUFLOR_TEST_BLACKHOLE="yok", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_KULAKLIK="0")
+ORT = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_EV=EV, SUFLOR_AYAR=ay, SUFLOR_TEST_PAYLASILAN=ORTAK, SUFLOR_TEST_TAKAS="9.5,10.0", SUFLOR_TEST_BLACKHOLE="yok", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOD=os.path.join(T, "yok-kod"))  # kod klasörü yok: git klonu değil (beta); aktarıcı da uygulama klasöründeki kopyaya düşer
 LOG = os.path.join(T, "relay.log")
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=APP, stdout=open(LOG, "w"), stderr=subprocess.STDOUT, env=ORT)
 U = f"http://127.0.0.1:{PORT}"
@@ -65,6 +65,20 @@ try:
     shutil.rmtree(kd); AYAR["gelistirici"] = True; json.dump(AYAR, open(ay, "w")); dogrula("--json")
     ok("geliştiricide posta kutusu dosyası yazılmadı", not os.path.isdir(kd) or not os.listdir(kd))
     del AYAR["gelistirici"]; json.dump(AYAR, open(ay, "w"))
+    # geliştirici ölçütü: ayar gelistirici yok ama kod klasörü git klonu → beta değil, posta kutusu yazılmaz
+    gk = os.path.join(T, "gk"); os.makedirs(os.path.join(gk, ".git")); d7 = json.loads(dogrula("--json", env=dict(ORT, SUFLOR_TEST_KOD=gk)).stdout)
+    ok("git klonu (ayarda gelistirici yok) → beta False, posta kutusu yazılmadı", d7["beta"] is False and not os.path.isdir(kd))
+    ok("ayar gelistirici yok, .git yok → beta True", json.loads(dogrula("--json", env=dict(ORT, SUFLOR_TEST_DURUMSUZ="1")).stdout)["beta"] is True); shutil.rmtree(kd, ignore_errors=True)
+    # kod okunamıyor (launchd altında Masaüstü): uygulama klasöründeki kopya koşar; Swift kaynakları yok → ✓ DEĞİL ?; sürüm notunda kopya ibaresi
+    uy = os.path.join(T, "uyg-kopya"); os.makedirs(os.path.join(uy, "Contents")); shutil.copy(os.path.join(KOD, "kurulum.py"), uy); shutil.copy(os.path.join(KOD, "manifest.json"), uy)
+    shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(uy, "aktarici"))  # kurulum.py modül düzeyinde aktarici/saglayici.py yükler (uygulama klasöründe KOPYA ile var)
+    pk = subprocess.run([sys.executable, "-B", os.path.join(uy, "kurulum.py"), "dogrula", "--json", "--hizli", "--yazma"], capture_output=True, text=True, env=dict(ORT, SUFLOR_TEST_DURUMSUZ="1"), cwd=uy, timeout=120)
+    dk = {x["id"]: x for x in json.loads(pk.stdout)["maddeler"]}
+    ok(f"kopyadan koşunca Swift maddesi ? (yanlış ✓ yok): {dk['swift']['durum']} {dk['swift']['not']}", dk["swift"]["durum"] == "?" and "okunamıyor" in dk["swift"]["not"] and "python3 kurulum.py dogrula" in dk["swift"]["yap"])
+    dk2 = {x["id"]: x for x in json.loads(subprocess.run([sys.executable, "-B", os.path.join(KOD, "kurulum.py"), "dogrula", "--json", "--hizli", "--yazma"], capture_output=True, text=True, env=dict(ORT, SUFLOR_KOD_OKUNAMAZ="1"), timeout=120).stdout)["maddeler"]}
+    ok("SUFLOR_KOD_OKUNAMAZ=1: Swift ? ve sürüm notunda 'kurulu kopyaya göre'", dk2["swift"]["durum"] == "?" and "kurulu kopyaya göre" in dk2["surum-aktarici"]["not"])
+    ok("kod okunabilirken Swift maddesi '?' değil (kaynaklarla karşılaştırır)", {x["id"]: x for x in json.loads(dogrula("--json", "--hizli", "--yazma", env=dict(ORT, SUFLOR_TEST_DURUMSUZ="1")).stdout)["maddeler"]}["swift"]["durum"] in ("ok", "hata"))
+    ok("kurulum.py KOPYA listesinde", '"kurulum.py"' in open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read().split("KOPYA = [")[1].split("]")[0])
     # BlackHole var + bir süreç okuyor → ✓; kurulu ama toplantıda kimse okumuyor → ? (toplantı dışı)
     d2 = json.loads(dogrula("--json", env=dict(ORT, SUFLOR_TEST_BLACKHOLE="calisiyor")).stdout)
     ok("BlackHole çalışıyor ✓", {x["id"]: x for x in d2["maddeler"]}["blackhole"]["durum"] == "ok")
@@ -83,6 +97,8 @@ try:
     os.remove(os.path.join(APP, "dogrula.json")); g = istek("/dogrula"); ok("dogrula.json yokken var: false", g.get("var") is False)
     g = istek("/dogrula?yenile=1"); ok("?yenile=1 arka planda başlattı", g.get("ok") and g.get("calisiyor"))
     ok("denetim bitince sonuç geldi", bekle(lambda: istek("/dogrula").get("var") and not istek("/dogrula").get("calisiyor"), 60))
+    sw = {x["id"]: x for x in istek("/dogrula").get("maddeler", [])}.get("swift", {})
+    ok(f"kod klasörü yok → aktarıcı uygulama klasöründeki kurulum.py kopyasını koşturdu (swift {sw.get('durum')}: {sw.get('not')})", sw.get("durum") == "?" and "okunamıyor" in sw.get("not", ""))
     g = istek("/dogrula?yenile=1"); ok(f"dakikada bir sınırı (bekle={g.get('bekle')})", g.get("ok") and not g.get("calisiyor") and g.get("bekle", 0) > 0)
     # güncelleme sonrası denetim kendiliğinden
     src = open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read(); gs = src[src.index("def guncelleme_sonrasi"):]
