@@ -16,6 +16,18 @@ def _brifing_kaydet():
     tmp = _brifing_yol() + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump({"gun": datetime.date.today().isoformat(), "olaylar": BRIFING}, f, ensure_ascii=False)
     os.replace(tmp, _brifing_yol())
+def hazirlik_esle():  # takvim okununca (relay.py takvim_oku): bugün başlayan ya da süren toplantının kayıtlı hazırlığı BRIFING'e (Başlat, panodaki brifing, sesli okuma)
+    bugun = datetime.date.today().isoformat(); simdi = datetime.datetime.now().astimezone()
+    for oid, e in list(TAKVIM_TAM.items()):
+        try: an = hazirlik_anahtar(e); b = BRIFING.get(oid) or {}
+        except Exception: continue
+        if b.get("anahtar") and b["anahtar"] != an and b.get("durum") != "calisiyor": BRIFING.pop(oid, None); b = {}  # tekrarın kimliği sonrakine kaydı
+        if b.get("durum") in ("hazir", "calisiyor"): continue
+        try:
+            if not (str(e.get("baslangic") or "")[:10] == bugun or _zaman(e["baslangic"]) <= simdi < _zaman(e["bitis"])): continue
+        except (KeyError, ValueError, TypeError): continue
+        k = hazirlik_oku(an)
+        if k: BRIFING[oid] = k
 def brifing_view():
     return {k: {x: v.get(x) for x in ("durum", "at", "sonuc", "hata")} for k, v in BRIFING.items()}
 BRIFING_ISTEM = {"tr": """Suflor.me toplantı öncesi brifingi. Bu tek seferlik, salt okunur bir çağrıdır: CLAUDE.md'deki oturum başlatma adımlarını (giriş
@@ -76,7 +88,9 @@ def _brifing_is(oid, olay):
         sonuc = {"ozet": " ".join(str(j.get("ozet") or "").split())[:240], "gecmis": temiz(j.get("gecmis"), 4), "acik": temiz(j.get("acik"), 4), "dikkat": temiz(j.get("dikkat"), 5)}
         print(f"BRİFİNG: hazır ({round(time.time() - t0)} sn)")
         with LOCK: sesli = BRIFING.get(oid, {}).pop("sesli", None)
-        bitir(durum="hazir", sonuc=sonuc, hata=None)
+        try: an = hazirlik_yaz(olay, {"durum": "hazir", "at": (BRIFING.get(oid) or {}).get("at"), "sonuc": sonuc, "hata": None})  # toplantı başına kalıcı (hafta görünümü)
+        except OSError as e: an = None; print(f"BRİFİNG: hazırlık kaydı yazılamadı {e.__class__.__name__}")
+        bitir(durum="hazir", sonuc=sonuc, hata=None, anahtar=an)
         if sesli: brifing_sesli(oid, "baslat")
     except Exception as e:
         print(f"BRİFİNG: hata {e.__class__.__name__}"); bitir(durum="hata", hata=_t("Brifing hazırlanamadı", "Couldn't prepare the briefing"))

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Whisper tekrar döngüsü uydurması (whisper-isci.py tekrar_dongu; 19 Ekim test toplantısı "OBSERV, PARA, OLI, AKMU" + 9 kez "AKMU"): aynı sözcük/öbek art arda ≥ 4
-# kez ve satırın en az yarısıysa satır atılır; gerçek tekrar ("evet evet evet") ve uzun cümlede geçen tekrar kalır. İşçi yüklenmez (~0 sn).
+# kez ve satırın en az yarısıysa satır atılır; gerçek tekrar ("evet evet evet") ve uzun cümlede geçen tekrar kalır. Nokta öbeği (nokta_ayikla, 30 Ekim). İşçi yüklenmez (~0 sn).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/tekrar-dongu.py
 import ast, os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); ns = {"re": re}
 a = ast.parse(open(os.path.join(KOD, "whisper-isci.py"), encoding="utf-8").read())
-exec(compile(ast.Module([n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in ("_tekrar_bul", "tekrar_dongu", "tekrar_kirp", "tekrar_sadelestir", "hiz_asiri")) or
-                         (isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "HARF_DONGU_RX" for t in n.targets))], []), "whisper-isci.py", "exec"), ns)
+exec(compile(ast.Module([n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in ("_tekrar_bul", "tekrar_dongu", "tekrar_kirp", "tekrar_sadelestir", "hiz_asiri", "nokta_ayikla")) or
+                         (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("HARF_DONGU_RX", "NOKTA_OBEK", "NOKTA_YOGUNLUK") for t in n.targets))], []), "whisper-isci.py", "exec"), ns)
 TABLO = [("OBSERV, PARA, OLI, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU,", True, "19 Ekim gerçek satır"),
          ("Teşekkürler teşekkürler teşekkürler teşekkürler.", True, "tek sözcük döngüsü"), ("Bir iki, bir iki, bir iki, bir iki.", True, "iki sözcüklük öbek"),
          ("Evet evet evet, tamam.", False, "gerçek üçlü tekrar"), ("Evet evet evet evet, anladım ama bütçe konusunda henüz bir karar vermedik, haftaya bakalım.", False, "uzun cümlede tekrar"),
@@ -44,4 +44,16 @@ for m, b, ad in [(" ".join([IKI] * 3) + " Merhaba, bu deneme", IKI, "iki cümlel
 for m, sn, b, ad in [(" ".join(["kelime"] * 58), 1.02, True, "1 sn'de 58 sözcük → imkânsız hız"), (" ".join(["kelime"] * 20), 4.0, False, "saniyede 5 sözcük kalır"),
                      ("Evet tamam anladım.", 0.3, False, "kısa satır hız denetimine girmez")]:
     v = ns["hiz_asiri"](m, sn); hata += v != b; print(("✓ " if v == b else "✗ ") + f"{ad}: {v}")
+# 30 Ekim test toplantısı (kurgu metinle aynı biçim): sözsüz sürekli seste "... ... ..." öbekleri; arada 1–3 sözcük çıkan satır döküme ve askıdaki hitaba giriyordu
+N = " ".join(["..."] * 40)
+for m, sn, hit, b, ad in [(N, 5.5, (), "", "yalnız üç nokta → atılır"),
+                          ("...Bunu yazalım, tamam mı? " + N + " ..", 5.5, (), "...Bunu yazalım, tamam mı?", "sözlü kısım + 40 öbek → öbekler silinir"),
+                          ("... Atlas, cevap ver. " + " ".join(["..."] * 8), 5.6, ("Atlas",), "Atlas, cevap ver.", "hitaplı satır: ad ve söz kalır, öbekler gider"),
+                          ("... ... ... dedim. " + N, 5.8, (), "", "tek sözcük + öbekler → atılır"),
+                          ("... ... ... Atlas. ... ...", 2.0, ("Atlas",), "Atlas.", "yalnız asistan adı + öbekler → ad kalır"),
+                          ("... ... ... bir iki ... ... ...", 8.0, (), "", "8 sn'de 2 sözcük (seyrek) → atılır"),
+                          ("Şey... bilmiyorum... bakarız.", 3.0, (), "Şey... bilmiyorum... bakarız.", "sözcüğe yapışık üç nokta (gerçek duraksama) kalır"),
+                          ("Evet ... tamam ... olur.", 3.0, (), "Evet ... tamam ... olur.", "iki ayrı öbek kalır (eşik 3)"),
+                          (". . .", 1.0, (), "", "sözcüksüz noktalama → atılır"), ("Toplantı yarın saat onda.", 2.0, (), "Toplantı yarın saat onda.", "düz cümle")]:
+    v = ns["nokta_ayikla"](m, sn, hit)[0]; hata += v != b; print(("✓ " if v == b else "✗ ") + f"{ad}: {v[:50]!r}")
 print("tekrar döngüsü: " + ("✓ hepsi geçti" if not hata else f"✗ {hata} hata")); sys.exit(1 if hata else 0)

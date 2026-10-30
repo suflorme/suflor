@@ -338,8 +338,10 @@ func kRenk(_ h: UInt32, _ a: CGFloat = 1) -> NSColor { NSColor(srgbRed: CGFloat(
 func kDinamik(_ acik: NSColor, _ koyu: NSColor) -> NSColor { NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? koyu : acik } }
 func TE(_ tr: String, _ en: String) -> String { ARAYUZ_EN ? en : tr }
 enum KR {  // pano/renk.css ile aynı aile; zemin krem
-    // buzlu camın üstündeki zeminin örtücülüğü: önemli kartta arka planın şekli sezilir, yazısı okunmaz; bilgi satırı daha saydam
-    static let ORTU: CGFloat = 0.72, BILGI_ORTU: CGFloat = 0.55
+    // buzlu camın üstündeki krem/koyu tülün örtücülüğü. Bulanıklığı ve kendi açık/koyu tülünü malzeme (NSVisualEffectView) zaten veriyor;
+    // tül yalnız rengi kreme çeker. Yüksek tutulursa (eski 0.72) malzemenin tülüyle üst üste binip kart düz, opak kutu gibi görünür.
+    static let ORTU: CGFloat = 0.32, BILGI_ORTU: CGFloat = 0.2
+    static let MALZEME: NSVisualEffectView.Material = .hudWindow  // en saydam, belirgin bulanık sistem malzemesi (açık/koyu görünüme uyar)
     static func zemin(_ a: CGFloat) -> NSColor { kDinamik(kRenk(0xFBF6EC, a), kRenk(0x1B221E, a)) }
     static let cizgi = kDinamik(kRenk(0x18201C, 0.14), kRenk(0xE8EBE6, 0.16))
     static let yazi = kDinamik(kRenk(0x18201C), kRenk(0xE8EBE6)), yazi2 = kDinamik(kRenk(0x5C655F), kRenk(0xA5ADA7)), yazi3 = kDinamik(kRenk(0x7A827C), kRenk(0x8A928C))
@@ -661,9 +663,11 @@ final class KartKatmani {
         p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = golge; p.becomesKeyOnlyIfNeeded = true; p.isReleasedWhenClosed = false
         return p
     }
-    // buzlu cam (pencerenin arkası bulanık) + üstünde örtücü krem/koyu zemin (görünüm çizer)
+    // buzlu cam (pencerenin arkası bulanık) + üstünde ince krem/koyu tül (görünüm çizer). Panel hiç anahtar olmadığı için state .active şart:
+    // .followsWindowActiveState pasif pencerede bulanıklığı kapatıp düz zemin çizer
     func buzlu(_ p: KartPanel, _ g: NSView, kose: CGFloat) {
-        let ve = NSVisualEffectView(frame: p.contentView!.bounds); ve.material = .popover; ve.blendingMode = .behindWindow; ve.state = .active; ve.maskImage = KartKatmani.maske(kose)
+        let ve = NSVisualEffectView(frame: p.contentView!.bounds); ve.material = KR.MALZEME; ve.blendingMode = .behindWindow; ve.state = .active; ve.isEmphasized = false
+        ve.maskImage = KartKatmani.maske(kose)
         g.frame = ve.bounds; g.autoresizingMask = [.width, .height]; ve.addSubview(g); p.contentView = ve
     }
     static func maske(_ r: CGFloat) -> NSImage {  // yuvarlak köşeli, uzayabilir maske (buzlu cam için)
@@ -1885,7 +1889,10 @@ if args.contains("--kart-dene") {
                             let olc = CGFloat(cg.width) / fr.width
                             if let cik = f.outputImage, let bul = CIContext().createCGImage(cik, from: CGRect(x: kr.minX * olc, y: kr.minY * olc, width: kr.width * olc, height: kr.height * olc)) {
                                 NSGraphicsContext.saveGraphicsState(); NSBezierPath(roundedRect: kr, xRadius: kose, yRadius: kose).addClip()
-                                NSImage(cgImage: bul, size: kr.size).draw(in: kr); NSGraphicsContext.restoreGraphicsState()
+                                NSImage(cgImage: bul, size: kr.size).draw(in: kr)
+                                // malzemenin kendi tülü (yaklaşık; gerçeğini WindowServer çizer): bunsuz benzetim gerçek ekrandan saydam görünür
+                                g.effectiveAppearance.performAsCurrentDrawingAppearance { kDinamik(NSColor(white: 1, alpha: 0.4), NSColor(white: 0.1, alpha: 0.45)).setFill() }
+                                kr.fill(using: .sourceOver); NSGraphicsContext.restoreGraphicsState()
                             }
                         }
                         g.effectiveAppearance.performAsCurrentDrawingAppearance {

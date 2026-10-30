@@ -736,6 +736,7 @@ def son_toplanti_metni():
 # Davet notu yalnız gündem/davet/konu sorusunda (DAVET_RX), sorulan toplantıya (başlıkta ortak sözcük; yoksa sıradaki toplantı), en çok iki olay;
 # Teams/Zoom katılım metni, bağlantı, toplantı kimliği ve parola (Passcode) silinir — parola Claude'a da gitmez.
 TAKVIM_GECMIS_GUN, TAKVIM_GECMIS_SN = 7, 1800
+TAKVIM_GECMIS_OKU_GUN = 14  # yardımcı 14 gün okur (panodaki hafta görünümünde geçen hafta tam); Konuş bağlamına yine son TAKVIM_GECMIS_GUN gün girer
 TAKVIM_GECMIS_JSON = os.path.join(os.path.dirname(os.path.abspath(BASE)), "takvim-gecmis.json")
 TAKVIM_GEC = {"olaylar": [], "t": 0.0}
 _GUNLER_RX = r"pazartesi|salı|çarşamba|perşembe|cuma|cumartesi|pazar"
@@ -758,7 +759,7 @@ def takvim_gecmis_yenile(zorla=False):
     TAKVIM_GEC["t"] = time.time()
     if not os.path.isdir(TAKVIM_APP): return
     adr = ",".join(str(x).strip() for x in (AYAR.get("takvim_adreslerim") or []) if "@" in str(x) and "," not in str(x))
-    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_GECMIS_JSON, "--once", str(24 * TAKVIM_GECMIS_GUN), "--sonra", "0"] + (["--adres", adr] if adr else []),
+    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_GECMIS_JSON, "--once", str(24 * TAKVIM_GECMIS_OKU_GUN), "--sonra", "0"] + (["--adres", adr] if adr else []),
                         timeout=150, capture_output=True)
     except subprocess.TimeoutExpired: return
     try: TAKVIM_GEC["olaylar"] = [e for e in (json.load(open(TAKVIM_GECMIS_JSON, encoding="utf-8")).get("olaylar") or []) if isinstance(e, dict)]
@@ -1834,6 +1835,9 @@ def brifing_iste(p):
     oid = str(p.get("olay") or ""); olay = TAKVIM_TAM.get(oid)
     if not olay: return {"ok": False, "err": _t("Toplantı takvimde bulunamadı", "Meeting not found in the calendar")}
     b = BRIFING.get(oid) or {}
+    if b.get("durum") not in ("hazir", "calisiyor"):  # başka gün hazırlanmış (hafta görünümünden Hazırla): kayıttan
+        k = hazirlik_oku(hazirlik_anahtar(olay))
+        if k: BRIFING[oid] = b = k
     if p.get("dinle"):  # panodaki 🔊: okuyorsa susar, değilse okur
         if ses_durdur(): return {"ok": True, "ses": False}
         return {"ok": brifing_sesli(oid, "dinle"), "ses": True}
@@ -1875,6 +1879,109 @@ def takvim_view(tam=False, gun=1):  # gun > 1 (toplanti-claude.py takvim --gun):
     if gun > 1: return dict(STATE["takvim"], olaylar=ol[:150], uygulama=os.path.isdir(TAKVIM_APP), gun=gun,
                             bos=[{"tarih": str(d), "araliklar": [f"{b:%H:%M}–{e:%H:%M}" for b, e in ar]} for d, ar in bos_zamanlar(simdi, gun)])
     return dict(STATE["takvim"], olaylar=ol[:12], uygulama=os.path.isdir(TAKVIM_APP))
+# Hafta görünümü (panoda hafta ızgarası): /takvim?hafta=<n> — n = 0 bu hafta, -1 geçen, +1 sonraki (Pazartesi–Pazar). Kaynak: ileri günler TAKVIM_TAM
+# (3 sa öncesinden TAKVIM_SONRA_SA ileri), geçmiş günler TAKVIM_GEC (son TAKVIM_GECMIS_OKU_GUN gün); ikisinde de olan (başlık + başlangıç) bir kez.
+# "kapsam" verinin olduğu gün aralığı (pano dışını "takvim okunmadı" diye soluk gösterir).
+# Hazırlık toplantı başına (S hazirlik2): hazir = bu toplantının brifingi kayıtlı (<canli>/hazirlik/<anahtar>.json, ya da bugünkü BRIFING) · eksik = brifing yok
+# ama bağlam var (davet notunda gündem, belge bağlantısı ya da katılımcılardan biriyle son HAZIRLIK_ARSIV_GUN günde Suflor kaydı) ya da brifing sürüyor/hata verdi · yok.
+HAZIRLIK_ARSIV_GUN, HAZIRLIK_SAKLA_GUN = 30, 45
+HAZIRLIK_BELGE_RX = re.compile(r"(?i)(sharepoint\.com|onedrive\.|1drv\.ms|docs\.google\.com|drive\.google\.com|dropbox\.com|notion\.so|box\.com/s/|\.(docx?|xlsx?|pptx?|pdf|key|pages|numbers)\b)")
+def hazirlik_anahtar(e):
+    # takvim kimliği (tekrarın "@başlangıç" eki atılır) + başlangıç; kimlik yoksa başlık + başlangıç. TAKVIM_TAM'da en yakın tekrarın kimliği sonrakine kayınca da,
+    # geçmiş okumasında (TAKVIM_GEC) da aynı anahtar çıkar. Dosya adına uysun diye özet.
+    import hashlib
+    bas = str(e.get("baslangic") or ""); i = str(e.get("id") or "")
+    if bas and i.endswith("@" + bas): i = i[:-len(bas) - 1]
+    tem = f"id:{i}|{bas}" if i else f"ad:{' '.join(str(e.get('baslik') or '').split())[:80]}|{bas}"
+    return hashlib.sha1(tem.encode("utf-8")).hexdigest()[:20]
+def hazirlik_dizin(): return os.path.join(BASE, "hazirlik")
+def hazirlik_oku(a):
+    try: j = json.load(open(os.path.join(hazirlik_dizin(), a + ".json"), encoding="utf-8"))
+    except (OSError, ValueError): return None
+    return j if isinstance(j, dict) and j.get("durum") == "hazir" and isinstance(j.get("sonuc"), dict) else None
+def hazirlik_yaz(e, kayit):  # brifing hazır olunca (aktarici/brifing-ses.py _brifing_is); içerik BRIFING kaydıyla aynı + anahtar, başlangıç. Eskiler (toplantıdan 45 gün sonra) silinir.
+    d = hazirlik_dizin(); os.makedirs(d, exist_ok=True); a = hazirlik_anahtar(e)
+    j = dict({k: kayit.get(k) for k in ("durum", "at", "sonuc", "hata")}, anahtar=a, baslangic=e.get("baslangic"))
+    tmp = os.path.join(d, a + ".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f: json.dump(j, f, ensure_ascii=False)
+    os.replace(tmp, os.path.join(d, a + ".json"))
+    sinir = (datetime.datetime.now().astimezone() - datetime.timedelta(days=HAZIRLIK_SAKLA_GUN)).isoformat()
+    for f in os.listdir(d):
+        if not f.endswith(".json") or f == a + ".json": continue
+        try:
+            b = str(json.load(open(os.path.join(d, f), encoding="utf-8")).get("baslangic") or "")
+            if b and _zaman(b).isoformat() < sinir: os.remove(os.path.join(d, f))
+        except (OSError, ValueError, TypeError, AttributeError): pass
+    return a
+def _hz_ad(s):  # ad → küçük harf, aksansız sözcükler ("Ayla K." → ["ayla", "k"])
+    import unicodedata
+    s = "".join("i" if c in "İIı" else (unicodedata.normalize("NFKD", c)[:1] or c).lower() for c in str(s or ""))
+    return re.findall(r"[^\W\d_]+", s)
+def _hz_ayni_kisi(a, b):  # iki sözcüklü adlarda ad aynı, soyadı biri ötekinin başı ("Ayla K" = "Ayla Kaya"); tek sözcükte tam eşitlik
+    if not a or not b: return False
+    if len(a) >= 2 and len(b) >= 2: return a[0] == b[0] and (a[1].startswith(b[1]) or b[1].startswith(a[1]))
+    return a == b
+def _hz_arsiv_kisiler(simdi):  # son HAZIRLIK_ARSIV_GUN günün Suflor dökümlerinde konuşanlar (kullanıcı hariç) — arşiv bölümü yoksa boş
+    rx, dosyalar, oku = globals().get("ARSIV_DOSYA_RX"), globals().get("_ar_dosyalar"), globals().get("_ar_oku")
+    if not (rx and dosyalar and oku): return []
+    sinir = str((simdi - datetime.timedelta(days=HAZIRLIK_ARSIV_GUN)).date()); ben = _hz_ad(AYAR.get("ad")); out = []
+    for f in dosyalar():
+        m = rx.match(f)
+        if not m or f"{m.group(1)}-{m.group(2)}-{m.group(3)}" < sinir: continue
+        d = oku(f) or {}
+        for kim in {s[1] for s in d.get("satirlar") or [] if not s[4]}:
+            k = _hz_ad(kim)
+            if k and not _hz_ayni_kisi(k, ben) and k not in out: out.append(k)
+    return out
+def hazirlik_baglam(e, arsiv_kisiler):  # → bağlam nedenleri: gundem | belge | gecmis
+    n = str(e.get("notlar") or ""); temiz = globals().get("davet_notu_temiz"); out = []
+    if (temiz(n) if temiz else " ".join(n.split())).strip(): out.append("gundem")
+    if HAZIRLIK_BELGE_RX.search(n): out.append("belge")
+    if any(_hz_ayni_kisi(_hz_ad(k), a) for k in e.get("katilimcilar") or [] for a in arsiv_kisiler): out.append("gecmis")
+    return out
+HAFTA_OFSET = (-1, 4)
+def takvim_hafta(ofset=0, simdi=None):
+    simdi = simdi or datetime.datetime.now().astimezone(); ofset = max(HAFTA_OFSET[0], min(int(ofset or 0), HAFTA_OFSET[1]))
+    g0 = simdi.replace(hour=0, minute=0, second=0, microsecond=0)
+    hb = g0 - datetime.timedelta(days=g0.weekday()) + datetime.timedelta(days=7 * ofset); hs = hb + datetime.timedelta(days=7)
+    haric = AYAR.get("takvim_haric") or []; br = globals().get("BRIFING") or {}; gorulen = set(); ol = []; ark = None
+    try: hzd = set(os.listdir(hazirlik_dizin()))
+    except OSError: hzd = set()
+    kaynak = [(e, False) for e in TAKVIM_TAM.values()] + [(e, True) for e in (globals().get("TAKVIM_GEC") or {}).get("olaylar") or []]
+    for e, gec in kaynak:
+        if f'{e.get("takvim")} · {e.get("hesap")}' in haric: continue
+        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
+        except (KeyError, ValueError, TypeError): continue
+        if s_ <= hb or b >= hs: continue
+        k = (" ".join(str(e.get("baslik") or "").split()), b.isoformat())
+        if k in gorulen: continue
+        gorulen.add(k)
+        oid = (f'g:{e.get("id")}@{e.get("baslangic")}' if gec else e.get("id")) or f"x:{len(ol)}"
+        bk = (br.get(oid) or {}) if not gec else {}; bd = bk.get("durum")
+        an = hazirlik_anahtar(e)
+        if bk.get("anahtar") and bk["anahtar"] != an: bk, bd = {}, None  # tekrarın kimliği kaymış: önceki tekrarın brifingi
+        kay = hazirlik_oku(an) if an + ".json" in hzd else None
+        if bd == "hazir" and not kay: kay = bk
+        if kay or bd or s_ <= simdi: neden = []  # geçmiş toplantı hep gri (hazırlığı anlamsız; ayrıntıda hazırlık yine açılır)
+        else:
+            if ark is None: ark = _hz_arsiv_kisiler(simdi)
+            neden = hazirlik_baglam(e, ark)
+        v = {x: e.get(x) for x in ("baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "reddettin", "yer")}
+        v.update(id=oid, baslangic=b.isoformat(timespec="minutes"), bitis=s_.isoformat(timespec="minutes"), tum_gun=bool(e.get("tum_gun")),
+                 tarih=b.strftime("%Y-%m-%d"), saat=b.strftime("%H:%M"), bitis_saat=s_.strftime("%H:%M"), gecmis=s_ <= simdi, suruyor=b <= simdi < s_,
+                 katilimcilar=[str(x) for x in (e.get("katilimcilar") or [])[:12]], baslatilir=not gec and s_ > simdi,
+                 hazirlik="yok" if s_ <= simdi else "hazir" if kay else "eksik" if bd in ("calisiyor", "hata") or neden else "yok", hazirlik_neden=neden,
+                 brifing=bd if bd in ("calisiyor", "hata") else None, brifing_hata=bk.get("hata") if bd == "hata" else None,
+                 hazirlik_sonuc=(kay or {}).get("sonuc") if kay else None)
+        ol.append(v)
+    ol.sort(key=lambda v: (v["baslangic"], v["bitis"]))
+    gec_gun = TAKVIM_GECMIS_OKU_GUN if (globals().get("TAKVIM_GEC") or {}).get("olaylar") else 0
+    ilk = min((str(e["baslangic"])[:10] for e in TAKVIM_TAM.values() if re.match(r"\d{4}-\d\d-\d\d", str(e.get("baslangic") or ""))), default=str(g0.date()))  # ileri listede bugünden önce başlayan (sürüyor)
+    kapsam = {"bas": min(str((g0 - datetime.timedelta(days=gec_gun)).date()), ilk, str(g0.date())), "son": str((simdi + datetime.timedelta(hours=TAKVIM_SONRA_SA)).date())}
+    gunler, gb, ge = calisma_saatleri()
+    return dict(STATE["takvim"], uygulama=os.path.isdir(TAKVIM_APP), ofset=ofset, en_az=HAFTA_OFSET[0], en_cok=HAFTA_OFSET[1], hafta_bas=str(hb.date()),
+                bugun=str(g0.date()), simdi=simdi.isoformat(timespec="seconds"), kapsam=kapsam, olaylar=ol[:300],
+                calisma={"gunler": sorted(gunler), "bas": gb, "bit": ge})
 def takvim_yenile():
     if not os.path.isdir(TAKVIM_APP): STATE["takvim"].update(durum="yok", hata="takvim yardımcısı kurulu değil (aktarici-kur.command derler)"); return
     # ayar takvim_adreslerim: kullanıcının takvim adresleri (Google, Exchange …) — yardımcı yalnız bu adreslerin davetli ya da

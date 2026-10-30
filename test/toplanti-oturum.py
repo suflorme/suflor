@@ -39,6 +39,10 @@ def izin(ad, gi, rid):
     pr({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": ad, "input": gi}]}})
     pr({"type": "control_request", "request_id": rid, "request": {"subtype": "can_use_tool", "tool_name": ad, "input": gi}})
     return bekle_cevap(rid)
+def izin_id(ad, gi, rid):  # gerçek claude gibi tool_use kimliğiyle (süre günlüğü tool_result'la eşleşir)
+    pr({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": rid, "name": ad, "input": gi}]}})
+    pr({"type": "control_request", "request_id": rid, "request": {"subtype": "can_use_tool", "tool_name": ad, "input": gi}})
+    return bekle_cevap(rid)
 pr({"type": "system", "subtype": "init", "session_id": SID})
 open(os.path.join(D, "pid"), "w").write(str(os.getpid())); asili = False
 while True:
@@ -50,6 +54,23 @@ while True:
     if o.get("type") == "control_request": continue  # boşta gelen durdurma
     q = o["message"]["content"]
     if q.startswith("/toplanti"): yaz("Gündem hazır. **Rolün** yürütücü mü?"); bitti()
+    elif q.startswith("metrik-"):  # dış bilgi kaynağı (kurgu bağlayıcı "claude.ai Deneme Metrik"); başka bağlayıcı "Baska"
+        def mcp(ad, rid):
+            c = izin_id(ad, {"donem": "son_7_gun"}, rid)
+            if c["behavior"] == "allow": pr({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": rid, "content": "{}"}]}})
+            return c["behavior"]
+        M = "mcp__claude_ai_Deneme_Metrik__"
+        if q == "metrik-oku": yaz("Metrik oku: " + mcp(M + "get_store_sales", "b-1") + "/" + mcp(M + "list_available_metrics", "b-2")); bitti()
+        elif q == "metrik-yaz": yaz("Metrik yaz: " + mcp(M + "update_campaign_settings", "b-3") + "/" + mcp(M + "export_report", "b-4") + "/" + mcp(M + "get_budget_set", "b-5")); bitti()
+        elif q == "metrik-baska": yaz("Başka bağlayıcı: " + mcp("mcp__claude_ai_Baska__get_messages", "b-6")); bitti()
+        elif q == "metrik-tavan": yaz("Tavan: " + "/".join(mcp(M + "query_metrics", "t-" + str(i)) for i in range(7))); bitti()
+        elif q.startswith("metrik-kart"):  # toplantıda konu geçti: sorgu → bilgi kartı (kaynak satırı --neden'de)
+            c = mcp(M + "get_paid_performance", "b-7")
+            O = json.load(open(os.path.join(D, "ortam.json")))
+            import subprocess
+            r = subprocess.run([sys.executable, "-B", O["tc"], "--dir", O["canli"], "--relay", O["relay"], "kart", "not", "Ücretli kanal son 7 gün dönüşüm %8 — toplantıda %12 dendi",
+                                "--neden", "Kaynak: Deneme Metrik, 14:05"], capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=O["ayar"], PYTHONDONTWRITEBYTECODE="1"))
+            yaz("Metrik kart: " + c + " · " + ("kart" if "kart gönderildi" in r.stdout else "kart yok " + r.stderr[-200:])); bitti()
     elif "izin" in q: c = izin("Bash", {"command": "python3 -c 'print(1)' # " + str(time.time()), "description": "Deneme komutu"}, "r-" + str(time.time())); yaz("İzin: " + c["behavior"]); bitti()
     elif "asili" in q: asili = True; yaz("Arka plan işi sürüyor"); bitti()
     elif "secim" in q: yaz("Bu kararda anlaştınız mı?\\n\\n[[seç: Anlaştık | Anlaşmadık | Emin değilim]]"); bitti()
@@ -76,7 +97,10 @@ while True:
 ''')
 os.chmod(sahte, 0o755)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
-                                               "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False, "yerel_ses": False}, open(ay, "w"))
+                                               "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False, "yerel_ses": False,
+                                               "toplanti_bilgi_kaynaklari": [{"sunucu": "claude.ai Deneme Metrik", "araclar": ["get_*", "list_*", "query_*", "compare_*"],
+                                                                              "konu": "deneme satış ve kanal metrikleri", "ad": "Deneme Metrik"}]}, open(ay, "w"))
+json.dump({"tc": os.path.join(T, "toplanti-claude.py"), "canli": canli, "relay": f"http://127.0.0.1:{PORT}", "ayar": ay}, open(os.path.join(T, "bin", "ortam.json"), "w"))
 for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T,
@@ -169,6 +193,44 @@ try:
     ok(f"ikinci Başlat canlı oturumu kapatmaz: katıldı ({y})", y.get("ok") and y.get("katildi") is True and to().get("durum") in ("bekliyor", "izliyor") and to().get("n") == sid0)
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "soru-araci"})
     ok("AskUserQuestion kartsız reddedilir (soru düz metin olsun)", claude_der("AskUserQuestion: deny") and not izin_kartlari() and not izinler())
+    # dış bilgi kaynağı (ayar toplanti_bilgi_kaynaklari; kurgu bağlayıcı)
+    ist = __import__("unicodedata").normalize("NFC", a[a.index("--append-system-prompt") + 1])  # Brifing.app argümanı NFD'ye çevirebiliyor
+    ok("oturum istemi kaynağın adını ve konusunu ayardan alır", "«Deneme Metrik»" in ist and "deneme satış ve kanal metrikleri" in ist)
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "metrik-oku"})
+    ok("kaynağın okuma araçları sorulmadan geçer", claude_der("Metrik oku: allow/allow") and not izinler() and not izin_kartlari())
+    lg = open(os.path.join(T, "relay.log")).read()
+    ok("günlükte BİLGİ KAYNAĞI: sunucu · araç · süre (içerik yok)", "BİLGİ KAYNAĞI: claude_ai_Deneme_Metrik · get_store_sales · " in lg and "son_7_gun" not in lg)
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "metrik-yaz"})
+    ok("aynı kaynağın yazma/desen dışı araçları sorulmadan reddedilir", claude_der("Metrik yaz: deny/deny/deny") and not izinler())
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "metrik-baska"}); k = izin_bekle_()
+    ok("başka bağlayıcının aracı eskisi gibi onaya gider", len(k) == 1)
+    if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"})
+    claude_der("Başka bağlayıcı: deny")
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "metrik-kart"})
+    ok("konu geçince sorgu → bilgi kartı (not, kaynak satırı --neden'de)", claude_der("Metrik kart: allow · kart", 20))
+    kk = [c for c in uc("/cards")[1].get("cards") or [] if "dönüşüm %8" in c.get("text", "")]
+    ok(f"kart türü not, kaynak görünür ({[(c.get('kind'), c.get('why')) for c in kk]})", len(kk) == 1 and kk[0].get("kind") == "not" and "Kaynak: Deneme Metrik" in (kk[0].get("why") or ""))
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "metrik-tavan"}); sorulan = 0  # önceki 3 sorgu + 5 = 8; sonrakiler sorulur
+    for _ in range(3):
+        k = izin_bekle_(5)
+        if not k: break
+        sorulan += 1; uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"}); time.sleep(0.3)
+    ok(f"oturum tavanı (8) dolunca sorgu kullanıcıya sorulur ({sorulan} soru)", sorulan == 2 and claude_der("Tavan: allow/allow/allow/allow/allow/deny/deny", 10))
+    # izin-kanca (PreToolUse; Terminal kipinde de çalışır): okuma dışı reddedilir, okuma karar almaz; ayar yokken eski davranış
+    def kanca(ad, ayar):
+        r = subprocess.run(["/usr/bin/python3", "-I", "-B", os.path.join(T, "toplanti-claude.py"), "--dir", canli, "--relay", "http://127.0.0.1:1", "izin-kanca"],
+                           input=json.dumps({"tool_name": ad, "tool_input": {}}), capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=ayar), timeout=30)
+        return (json.loads(r.stdout).get("hookSpecificOutput") or {}).get("permissionDecision") if r.stdout.strip() else None
+    bos = os.path.join(T, "ayar-bos.json"); json.dump({k_: v_ for k_, v_ in json.load(open(ay)).items() if k_ != "toplanti_bilgi_kaynaklari"}, open(bos, "w"))
+    M = "mcp__claude_ai_Deneme_Metrik__"
+    ok("kanca: okuma aracında karar yok", kanca(M + "get_store_sales", ay) is None and kanca(M + "compare_channels", ay) is None)
+    ok("kanca: okuma dışı araç deny", kanca(M + "update_campaign_settings", ay) == "deny" and kanca(M + "export_report", ay) == "deny" and kanca(M + "get_budget_set", ay) == "deny")
+    ok("kanca: başka bağlayıcıda değişiklik yok", kanca("mcp__claude_ai_Baska__get_messages", ay) is None)
+    ok("kanca: ayar yokken eski davranış (karar yok)", kanca(M + "update_campaign_settings", bos) is None)
+    ns = {"re": __import__("re"), "threading": __import__("threading"), "AYAR": {}, "_t": lambda a_, b_: a_}
+    exec(compile(open(os.path.join(KOD, "aktarici", "toplanti-oturum.py"), encoding="utf-8").read(), "toplanti-oturum.py", "exec"), ns)
+    ok("aktarıcı: ayar yokken kaynak yok, istem değişmez", ns["bilgi_kaynagi_arac"](M + "get_store_sales") is None and ns["topo_istem"]() == ns["TOPO_ISTEM"])
+    ok("sunucu adı biçimi: 'claude.ai X Y' → claude_ai_X_Y", ns["mcp_sunucu_adi"]("claude.ai Deneme Metrik") == "claude_ai_Deneme_Metrik" and ns["mcp_sunucu_adi"]("claude_ai_Deneme_Metrik") == "claude_ai_Deneme_Metrik")
 
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "uzun iş"}); ok("uzun iş sürüyor", claude_der("Uzun iş başladı") and to().get("durum") == "calisiyor")
     v = bekle(lambda v: (v.get("etkinlik") or {}).get("metin", "").startswith("“rapor"), 5)

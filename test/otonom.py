@@ -2,7 +2,7 @@
 # Toplantıda asistanlar (S94 tek kural; aktarici/otonom.py, konus_hitap*) uçtan uca, kota harcamadan: yalıtılmış aktarıcı + Brifing.app açık süreç + sahte "claude".
 # İki kanala (ben, karşı) 0,25 sn'de bir yapay ses beslenir (konuşma = ton, sessizlik = hafif gürültü). Senaryolar: kullanıcı çağırmadan karşı taraf seslenemez;
 # kullanıcı "<Ad>, …" → asistan katılır, itirazsız söz sırası → toplantıya okuma; katıldıktan sonra karşı taraf sorar; Dur (pano) ve Option + Shift + S;
-# konuşma sürerken bekleme; okurken biri konuşursa susma; fırsat çıkmazsa söylenmez; ikinci kişilik de herkese; Konuş düğmesi yalnız kullanıcıya;
+# konuşma sürerken bekleme; okurken biri konuşursa susma; fırsat çıkmazsa söylenmez; kullanıcı kanalının sözsüz sesi (30 Ekim) söz sırasını tutmaz; ikinci kişilik de herkese; Konuş düğmesi yalnız kullanıcıya;
 # kişilik varken "Claude:" asistan değil; ayar (toplantiya_ses) kapalıyken toplantıya okunmaz; v0.157.0: ilk cümlede okuma başlar, devamı ikinci parça. otonom.py, konus_hitap*, toplantiya_soyle ya da Kanal değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/otonom.py
 import base64, json, math, os, shutil, struct, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
@@ -13,6 +13,22 @@ HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad, flush=True)
     if not k: HATA.append(ad)
+# 30 Ekim test toplantısı: kullanıcının mikrofonunda sözsüz sürekli ses söz sırasını hiç bırakmadı. Saf karar (soz_firsati) aktarıcısız sınanır.
+import ast as _ast
+_ns = {}; _a = _ast.parse(open(os.path.join(KOD, "aktarici", "otonom.py"), encoding="utf-8").read())
+exec(compile(_ast.Module([n for n in _a.body if (isinstance(n, _ast.FunctionDef) and n.name == "soz_firsati") or (isinstance(n, _ast.Assign) and any(
+    getattr(t, "id", "") == "OTONOM_YEDEK_SN" for t in getattr(n.targets[0], "elts", n.targets)))], []), "otonom.py", "exec"), _ns)
+_sf = _ns["soz_firsati"]
+for arg, bek, ad in [((2.0, 2.0, 1, 1.5, False, 99), "sessiz", "herkes sessiz → söz sırası"),
+                     ((0.1, 3.0, 2, 1.5, True, 20), "sozsuz", "kullanıcı kanalı sözsüz ses, karşı sessiz → söylenir"),
+                     ((0.1, None, 2, 1.5, True, 20), "sozsuz", "yalnız kullanıcı kanalı akıyor, sözsüz → söylenir"),
+                     ((0.1, 0.2, 2, 1.5, True, 20), None, "karşı taraf konuşuyor → kullanıcı kanalı sözsüz olsa da beklenir"),
+                     ((0.1, 3.0, 10, 1.5, False, 20), None, "kural yok, 10 sn → beklenir"),
+                     ((0.1, 3.0, 16, 1.5, False, 20), "yedek", "16 sn, kullanıcının sözlü satırı yok, karşı sessiz → yedek kural"),
+                     ((0.1, 3.0, 16, 1.5, False, 3), None, "16 sn ama kullanıcı 3 sn önce sözlü satır verdi → beklenir"),
+                     ((0.1, 0.5, 16, 1.5, False, 20), None, "16 sn ama karşı taraf konuşuyor → beklenir"),
+                     ((0.1, 3.0, 16, 1.5, False, 20, 0), None, "yedek kapalı (otonom_yedek_sn 0) → beklenir")]:
+    v = _sf(*arg); ok(f"soz_firsati: {ad} ({v})", v == bek)
 try: _uyg = json.load(open(os.path.expanduser("~/Library/Application Support/Suflor/ayar.json"), encoding="utf-8")).get("uygulama")
 except (OSError, ValueError): _uyg = None
 kaynak = os.path.join(os.path.expanduser(_uyg or "~/Library/Application Support/Suflor"), "Suflor Brifing.app")
@@ -181,6 +197,12 @@ try:
     SUSKU(); s0 = son(); satir("karsi", "Atlas, toplantı nerede?")
     v, tz = bekle(lambda v: v.get("durum") == "soylenmedi", 25)
     ok(f"onay gelmedi → okunmadı, kart kapandı ({v.get('neden')})", tz is not None and son() == s0 and "onay gelmedi" in (v.get("neden") or "") and izin_kart() is None)
+    # 8c) 30 Ekim: kullanıcı kanalında sözsüz sürekli ses (ton → Whisper sözsüz döner) söz sırasını tutmaz; okuma da o sesle kesilmez; karşı kanal sessiz
+    SUSKU(); s0 = son(); MOD["ben"] = "konus"; time.sleep(16)  # ≥ 2 parça sözsüz dönsün (parça en çok 6 sn)
+    satir("karsi", "Atlas, salon hazır mı?"); izin_ver()
+    v, t12 = bekle(lambda v: v.get("durum") in ("okundu", "kesildi", "soylenmedi"), 25); MOD["ben"] = "sessiz"
+    ok(f"kullanıcı kanalında sözsüz ses varken okundu ({v.get('durum')}, {v.get('neden')})", t12 is not None and v.get("durum") == "okundu" and son() == s0 + 1
+       and "kullanıcı kanalındaki ses söz sırasını tutmadı (son parçalar sözsüz" in log())
     # 9) Konuş düğmesi (bas) toplantıda yalnız kullanıcıya
     SUSKU(); n9 = hazir(); s0 = son(); uc("/bas-konus", {"metin": "Atlas, bütçe kalemleri neler?"}, pano=True); time.sleep(4)
     c = (st().get("konus") or {}).get("cevap") or ""

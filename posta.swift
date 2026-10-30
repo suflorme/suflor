@@ -163,6 +163,22 @@ while sqlite3_step(st) == SQLITE_ROW {
 }
 func eslesir(_ re: NSRegularExpression, _ k: String) -> Bool { re.firstMatch(in: k, range: NSRange(k.startIndex..., in: k)) != nil }
 let benim = Set(satirlar.filter { eslesir(gonder, $0.kutu) && !$0.adres.isEmpty }.map { $0.adres }).union(benAdres)
+// Gönderilen iletinin alıcı adresleri (tür ayrımı yok; en çok 10): "tc posta-uslup" bir kişiye gönderdiklerini bulur. Tablo/sütun yoksa alan yazılmaz.
+let rc = sutunlar("recipients")
+var alSt: OpaquePointer?
+if rc.isSuperset(of: ["message", "address"]) {
+  if sqlite3_prepare_v2(db, "SELECT a.address, \(ad.contains("comment") ? "a.comment" : "NULL") FROM recipients r JOIN addresses a ON a.ROWID = r.address WHERE r.message = ? ORDER BY \(rc.contains("position") ? "r.position" : "r.ROWID") LIMIT 10", -1, &alSt, nil) != SQLITE_OK { alSt = nil }
+}
+func alicilar(_ id: Int64) -> (adres: [String], ad: [String]) {
+  guard let s = alSt else { return ([], []) }
+  sqlite3_reset(s); sqlite3_bind_int64(s, 1, id)
+  var adr: [String] = [], adlar: [String] = []
+  while sqlite3_step(s) == SQLITE_ROW {
+    if let c = sqlite3_column_text(s, 0) { adr.append(String(cString: c).lowercased()) }
+    if let c = sqlite3_column_text(s, 1), !String(cString: c).isEmpty { adlar.append(String(cString: c)) }
+  }
+  return (adr, adlar)
+}
 var goruldu = Set<String>()
 var iletiler: [[String: Any]] = []
 for x in satirlar where iletiler.count < enCok {
@@ -174,9 +190,10 @@ for x in satirlar where iletiler.count < enCok {
   var o: [String: Any] = ["id": x.id, "t": iso.string(from: Date(timeIntervalSince1970: t)), "adres": x.adres, "konu": x.konu,
                           "kutu": String(kutu.suffix(60)), "gonderilen": eslesir(gonder, kutu) || benim.contains(x.adres)]
   if let y = x.ad, !y.isEmpty { o["ad"] = y }
+  if o["gonderilen"] as? Bool == true, alSt != nil { let r = alicilar(x.id); o["alici"] = r.adres; if !r.ad.isEmpty { o["alici_ad"] = r.ad } }
   if let r = x.okundu { o["okundu"] = r != 0 }
   if let z = x.ozet, !z.isEmpty { o["ozet"] = String(z.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ").prefix(300)) }
   iletiler.append(o)
 }
-sqlite3_finalize(st); sqlite3_close(db)
+sqlite3_finalize(st); if let s = alSt { sqlite3_finalize(s) }; sqlite3_close(db)
 yaz(["durum": "ok", "hata": NSNull(), "iletiler": iletiler, "dizin": (yol as NSString).deletingLastPathComponent.components(separatedBy: "/").suffix(2).joined(separator: "/")])

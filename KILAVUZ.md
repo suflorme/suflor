@@ -61,6 +61,8 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
 6. Brifing ve özet panoda **Dışarı aktar** ile PDF, e-posta taslağı (alıcısız, katılımcılara ya da kendine), panoya kopya ya da .md dosyası olur.
    Taslağın açılacağı yeri (Gmail, Outlook web ya da Mac'in posta uygulaması) ve gönderen adresini sihirbazın takvim ekranında seçersin;
    sonradan ayar.json'da `"eposta"` ve `"eposta_adres"`. Seçmezsen takvimine bakılarak seçilir.
+   Toplantı sonundaki takip e-postası taslağının üslubu ayar.json'da `"eposta_uslup"` (kısa serbest metin; yoksa sade, samimi ama profesyonel).
+   Mac Mail okuma açıksa (`"eposta_oku": true`) ve taslak tek kişiye gidiyorsa, o kişiye gönderdiğin son iletilerin üslubu örnek alınır (yalnız üslup, içerik değil).
 
 **Ayarlar:** panonun üst çubuğundaki ⚙ — yapay zekâ seçimi, e-posta, ses ve konuşma, toplantı uyarıları, çeviri ve masaüstü, gizlilik; kaydedince hemen geçerli.
 
@@ -106,6 +108,12 @@ Claude'un soruya bağlı olmayan SÖYLE/NOT kartları araya dakikada en çok bir
 `"kart_tavan_sn"` (varsayılan 60, 0 kapatır).
 Karşı taraf adını söyleyince panoda ve şeritte hemen "Adın geçti — kim" (Claude'u beklemeden, yalnız sana); karşı taraf araya girmeden
 90 sn'den uzun konuşursan "1,5 dk'dır sen konuşuyorsun". Sana başka adla da hitap ediliyorsa `"lakaplar": ["…"]`. Kapatmak için `"adin_gecti": false`, `"uzun_konusma_sn": 0` (süre de bu ayarla).
+
+**Toplantıda dış bilgi kaynağı (varsayılan kapalı):** Claude Code'da bağlı bir MCP bağlayıcısı (ör. pazarlama ya da satış metrikleri) toplantıda konuşulan konuya
+güncel rakam getirsin istersen: `"toplanti_bilgi_kaynaklari": [{"sunucu": "<bağlayıcının claude mcp list'teki adı>", "araclar": ["get_*", "list_*", "query_*", "compare_*"],
+"konu": "<kısa tarif>", "ad": "<kartta görünecek kaynak adı>"}]`. Panodan başlatılan toplantı oturumunda o bağlayıcının yalnız okuma adlı araçları
+(get_, list_, query_, compare_ … ile başlayan ve listedeki desene uyan) sorulmadan çalışır (toplantı başına en çok 8; sonrası sorulur); aynı bağlayıcının öbür araçları
+reddedilir, başka bağlayıcılar eskisi gibi sorulur. Sonuç kısa bir NOT kartı olur ("Kaynak: <ad>, <saat>"); asistan sesli söylemez.
 
 ## Sesler
 Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)
@@ -165,6 +173,7 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
   ve asistan adı, e-posta, takvim, ses, ses izi ve ekran görüntüsü gitmez. Kimlik yalnız rastgele bir kurulum numarasıdır. Beta sürümünde kapatılmaz;
   giden her paketin kopyası `~/Library/Application Support/Suflor/teshis/gonderilen/` altında durur.
 - Claude'a giden metin, senin Claude Code oturumunun gördükleridir (Anthropic'in kullanım koşulları geçerli).
+- Toplantıda dış bilgi kaynağı açarsan (`toplanti_bilgi_kaynaklari`) Claude'un o kaynağa yazdığı sorgu (metrik, dönem, kanal) o hizmete gider; döküm, ad ve ses gitmez.
 - **Claude dışında bir sağlayıcı seçersen metin bağlamı o sağlayıcıya gider, ses gitmez; yerel model seçersen metin de Mac'ten çıkmaz.** Metin bağlamı:
   sorun, toplantı dökümünden ve notlardan parçalar, proje belgelerinden aranan parçalar, proje kartı. O hizmetin kullanım koşulları geçerlidir
   (Gemini'nin ücretsiz katmanında Google gönderilen metni ürünlerini geliştirmek için kullanabiliyor; ücretli katman önerilir). Beta verisine yalnız seçeneğin türü girer

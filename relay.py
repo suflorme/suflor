@@ -1322,7 +1322,7 @@ TAKVIM_SN = 300; TAKVIM_TAM = {}
 # Kart katmanı (30 Ekim): menü uygulaması kartları ekranın alt ortasında tek tek kutu olarak gösterir. Açık sayılır: ayar kart_katmani
 # False değil ve menü uygulaması son 60 sn'de yokladı (/cards uzun yoklaması 25 sn'de bir yenilenir). Açıkken eklenti şeridi ve Mac paneli listeyi göstermez.
 def kart_katmani_acik(): return AYAR.get("kart_katmani") is not False and time.time() - (STATE.get("_menu_yokluyor") or 0) < 60
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1390,6 +1390,10 @@ def takvim_oku():
         tam[k] = dict(e, id=k, baglanti=guvenli_baglanti(e.get("baglanti")))
     TAKVIM_TAM = tam
     STATE["takvim"] = {"durum": j.get("durum"), "hata": j.get("hata"), "guncel": j.get("guncel")}
+    if "hazirlik_esle" in globals():  # toplantı başına kayıtlı hazırlık (aktarici/brifing-ses.py)
+        try:
+            with LOCK: hazirlik_esle()
+        except Exception as e: print(f"HAZIRLIK: eşlenemedi {e.__class__.__name__}")
 def guvenli_baglanti(u):
     # (güvenlik denetimi D2) davetteki bağlantı yalnız https ve bilinen toplantı alan adıysa açılır (evilzoom.us gibi
     # benzer adlar hazırlık sekmesinde kendiliğinden açılmasın)
@@ -1973,12 +1977,17 @@ class H(BaseHTTPRequestHandler):
             # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)
             m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
             if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
+            h = re.search(r"[?&]hafta=(-?\d{1,2})(?:&|$)", self.path)  # hafta görünümü: Pazartesi–Pazar, geçmiş ve ileri (aktarici/bas-konus.py takvim_hafta)
+            if h: return self._json(takvim_hafta(int(h.group(1))))
             g = re.search(r"[?&]gun=(\d{1,2})(?:&|$)", self.path)  # v0.55.0: ?gun=7 → 7 günün etkinlikleri + boş zamanlar (v0.59.0: en çok 30)
             return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
         if yol == "/dogrula": return self._json(dogrula_istek("yenile=1" in self.path))  # Faz D: Kurulumu denetle (aktarici/saglik.py)
-        if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))  # v0.116.0: Toplantılarda ara, Dökümler (aktarici/arsiv.py)
+        if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
+        if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)
+            from urllib.parse import urlsplit, parse_qs
+            return self._json(posta_uslup((parse_qs(urlsplit(self.path).query).get("kim") or [""])[0]))  # v0.116.0: Toplantılarda ara, Dökümler (aktarici/arsiv.py)
         if self.path == "/konus-gecmis": return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
         if (self.headers.get("X-Suflor-Istemci") or "").startswith("menu"): STATE["_menu_yokluyor"] = time.time()  # pano penceresi açılabilir (bildirim izni olmasa da)

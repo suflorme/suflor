@@ -98,6 +98,19 @@ def tekrar_kirp(metin):
         bas += metin[j] if j < len(metin) and metin[j] in ".!?" else ""
         metin = (bas + (" " + metin[m[son].start():] if son < len(w) else "")).strip()
     return metin
+# Nokta öbeği (30 Ekim test toplantısı): kullanıcı kanalında sözsüz sürekli seste Whisper yüzlerce "..." üretti; yalnız noktadan oluşan bölümler atılıyordu ama
+# arada 1–3 sözcük çıkan bölüm noktalarıyla birlikte döküme yazılıyor, askıdaki hitaba ekleniyordu. Ayrı duran noktalama öbekleri (≥ 3 tane) silinir; kalan
+# sözcük ≤ 1 ya da 3 sn'den uzun parçada saniyede < NOKTA_YOGUNLUK sözcükse satır uydurmadır (asistan adı geçiyorsa kalır). Sözcüksüz metin her zaman atılır.
+NOKTA_OBEK = re.compile(r"^[.…·]+[,;:!?]*$"); NOKTA_YOGUNLUK = 0.35
+def nokta_ayikla(metin, sn=0.0, hitap=()):  # → (kalan metin, atılan ya da None)
+    if not metin or not metin.strip(): return metin, None
+    if not re.search(r"\w", metin): return "", metin
+    t = metin.split()
+    if sum(1 for x in t if NOKTA_OBEK.match(x)) < 3: return metin, None
+    kalan = " ".join(x for x in t if not NOKTA_OBEK.match(x)).strip(); n = len(re.findall(r"\w+", kalan))
+    adli = any(re.search(r"(?<!\w)" + re.escape(str(h)) + r"(?!\w)", kalan, re.I) for h in hitap or () if str(h).strip())
+    if not adli and (n <= 1 or (sn >= 3 and n / sn < NOKTA_YOGUNLUK)): return "", metin
+    return kalan, metin
 # Hız denetimi (28 Ekim: 1 sn'lik parçada 58 sözcük): sürekli konuşma saniyede ~6 sözcüğü geçmez; uzun ve imkânsız hızlı satır uydurmadır.
 def hiz_asiri(metin, sn):
     n = len(re.findall(r"\w+", metin or ""))
@@ -355,6 +368,9 @@ def main():
             if metin and tekrar_dongu(metin):  # tekrar döngüsü uydurması (öndeki gerçek söz kalır)
                 kirp = tekrar_kirp(metin); atilan.append(metin); atla += 1; metin = kirp or ""
             if metin and (s_ := tekrar_sadelestir(metin)) != metin: atilan.append(metin); metin = s_  # v0.113.1: harf döngüsü, art arda aynı cümle
+            if metin:  # 30 Ekim: "... ... ..." öbekleri (sözsüz seste) — öbekler silinir, sözcüğü kalmayan satır atılır
+                m_, at_ = nokta_ayikla(metin, len(a) / SR, p.get("hitap"))
+                if at_ is not None: atilan.append(at_); atla += 0 if m_ else 1; metin = m_
             try: ses = ses_olc(a, np) if metin else None
             except Exception: ses = None
             km = {}

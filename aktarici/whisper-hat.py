@@ -60,7 +60,7 @@ def _rms(b):
     if audioop: return audioop.rms(b, 2)
     import array; a = array.array("h"); a.frombytes(b); return int((sum(x * x for x in a) / max(1, len(a))) ** 0.5)
 class Kanal:
-    def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0; self.ses_t = collections.deque(maxlen=600)  # t_ses/n_ses: otonom söz sırası (v0.56.0); ses_t: sesli karelerin zamanı (son ~12 sn; otonomun yankı ayrımı, 19 Ekim)
+    def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0; self.ses_t = collections.deque(maxlen=600); self.sonuclar = collections.deque(maxlen=12)  # t_ses/n_ses: otonom söz sırası (v0.56.0); ses_t: sesli karelerin zamanı (son ~12 sn; otonomun yankı ayrımı, 19 Ekim); sonuclar: son parçaların (geliş, sonuç) — söz sırası sözsüz sesi ayırır (30 Ekim)
     def reset(self): self.parca = bytearray(); self.on = bytearray(); self.konusuyor = False; self.sessiz = 0; self.sesli = 0; self.ust = 0; self.t0 = 0.0; self.rmsler = []
     def besle(self, pcm, t_bas, baslik):
         if t_bas - self.son_bitis > 0.5 and self.konusuyor: self.kes(baslik)  # boşluk (mikrofon kapalıydı / parça kayıp)
@@ -430,6 +430,7 @@ def _isci_dongu():
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
             is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz", "bol") if j.get(k)} or None) or "satir"
         is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
+        if KANALLAR.get(is_["kanal"]) is not None: KANALLAR[is_["kanal"]].sonuclar.append((time.time(), sonuc))  # otonom: kanal sözsüz ses mi (kanal_sozsuz)
         if AYAR.get("parca_kaydet"): parca_kaydet(is_, istek, j, sonuc)
 # Teşhis (v0.29.2, 12 Ekim: İngilizce YouTube denemesinde karşı kanalın 62 parçası "uydurma"; ses saklanmadığı için neden bilinemedi): ayar
 # parca_kaydet: true iken her kanalın son PARCA_KAYIT_EN_COK parçası 16 kHz WAV + sonucu (dil, metin, atlanan) canli/teshis-parcalar/'a yazılır.

@@ -25,13 +25,44 @@ def otonom_acik(): return asistan_toplanti() and toplanti_var()  # S94: tek anah
 def _ot_ayar(ad, v):
     try: return max(0.0, float(AYAR.get(ad, v)))
     except (TypeError, ValueError): return v
-def kanal_sessizlik():  # → sn: akan kanalların hepsinde son konuşma sesinden bu yana geçen (yakalanan sese göre); akan kanal yoksa None
+def kanal_sessizlik(haric=()):  # → sn: akan kanalların hepsinde son konuşma sesinden bu yana geçen (yakalanan sese göre); akan kanal yoksa None
     now = time.time(); s = []
     for ad, k in list(KANALLAR.items()):
-        if now - STATE["whisper"]["kanallar"].get(ad, 0) > 3: continue  # bu kanal akmıyor
+        if ad in haric or now - STATE["whisper"]["kanallar"].get(ad, 0) > 3: continue  # bu kanal akmıyor (ya da sayılmıyor)
         if now - k.son_bitis > 1.5: s.append(0.0); continue  # parça gecikti: bilinmiyor → sessiz sayılmaz
         s.append(max(0.0, k.son_bitis - k.t_ses))
     return min(s) if s else None
+# 30 Ekim test toplantısı (Teams web): kullanıcının mikrofonunda 27 dk sözsüz sürekli ses — ben kanalı ~5 sn'lik parçaları art arda keser, Whisper'dan neredeyse
+# hepsi uydurma ("... ... ...") döndü. Söz sırası sese baktığı için ben kanalı hiç 1,5 sn susmadı; üç hitaplı sorunun cevabı hazırlandı, hiç okunmadı ("fırsat
+# çıkmadı"). İki kural: (1) sözsüz kanal — kullanıcı kanalının son sözlü satırından sonra en az OTONOM_SOZSUZ_PARCA parça sözsüz döndüyse (uydurma/boş/yankı), son
+# parça OTONOM_SOZSUZ_TAZE sn içinde geldiyse ve son sözlü satır OTONOM_SOZSUZ_SN'den eskiyse o kanalın sesi söz sırasını tutmaz. (2) yedek — OTONOM_YEDEK_SN
+# beklendiyse ve kullanıcının son sözlü satırı OTONOM_YEDEK_SATIR_SN'den eskiyse kullanıcı kanalı yine sayılmaz. İkisinde de karşı kanal (toplantıdaki öbür
+# kişiler) her zamanki gibi OTONOM_SESSIZ_SN susmalı: karşı taraf konuşurken araya girilmez. Okurken kullanıcı "dur" derse okuma_dur_soz keser.
+OTONOM_SOZSUZ_PARCA, OTONOM_SOZSUZ_TAZE, OTONOM_SOZSUZ_SN, OTONOM_YEDEK_SN, OTONOM_YEDEK_SATIR_SN = 2, 9.0, 6.0, 15.0, 8.0
+SOZSUZ_SONUC = ("uydurma", "bos", "yanki")
+def kanal_sozsuz(ad="ben"):  # → True: kanalın sesi şu an sözsüz (kural 1)
+    k = KANALLAR.get(ad); now = time.time()
+    if k is None: return False
+    t_sat = STATE["whisper"]["kanal_son_satir"].get(ad, 0)
+    if now - t_sat < _ot_ayar("otonom_sozsuz_sn", OTONOM_SOZSUZ_SN): return False
+    son = [x for x in list(getattr(k, "sonuclar", ())) if x[0] > t_sat]  # son sözlü satırdan sonra gelen parça sonuçları
+    if len(son) < OTONOM_SOZSUZ_PARCA or now - son[-1][0] > OTONOM_SOZSUZ_TAZE: return False
+    return all(x[1] in SOZSUZ_SONUC for x in son)
+def soz_firsati(s, s_ben_haric, beklenen, ses, sozsuz, ben_satir_yasi, yedek=OTONOM_YEDEK_SN):  # → None | "sessiz" | "sozsuz" | "yedek" (saf karar; test/otonom.py)
+    # s: bütün akan kanallarda sessizlik; s_ben_haric: kullanıcı kanalı sayılmadan (None: başka akan kanal yok); beklenen: söz sırası için geçen sn
+    if s is not None and s >= ses: return "sessiz"
+    karsi_sus = s_ben_haric is None or s_ben_haric >= ses
+    if not karsi_sus: return None  # karşı taraf konuşuyor
+    if sozsuz: return "sozsuz"
+    if yedek > 0 and beklenen >= yedek and ben_satir_yasi >= OTONOM_YEDEK_SATIR_SN: return "yedek"
+    return None
+def kanal_durum_ozet():  # fırsat çıkmayınca günlüğe: hangi kanal tuttu (içeriksiz)
+    now = time.time(); o = []
+    for ad, k in list(KANALLAR.items()):
+        if now - STATE["whisper"]["kanallar"].get(ad, 0) > 3: o.append(f"{ad} akmıyor"); continue
+        son = list(getattr(k, "sonuclar", ()))[-4:]
+        o.append(f"{ad}: son ses {max(0.0, now - k.t_ses):.1f} sn önce, son parçalar {'/'.join(x[1] for x in son) or '-'}, sözlü satır {now - STATE['whisper']['kanal_son_satir'].get(ad, 0):.0f} sn önce")
+    return "; ".join(o) or "kanal yok"
 def kanal_ses_sayaci(): return {ad: k.n_ses for ad, k in list(KANALLAR.items())}
 def yanki_disi(ts, zarf, t_bas, kare=0.02, en_cok_gecikme=None, son_sn=3.0):
     # ts: kanalın sesli kare zamanları (okuma başından); zarf: okunan sesin kareleri (t_bas'tan). Gecikme bütün ts'ten bulunur (20 ms adım), açıklanamayan
@@ -198,13 +229,20 @@ def _ot_dongu(i):
         time.sleep(0.1)
     if not _ot_gec(i, "sira"): return
     bas = time.time(); bek, ses = _ot_ayar("otonom_bekle_sn", OTONOM_BEKLE_SN), _ot_ayar("otonom_sessiz_sn", OTONOM_SESSIZ_SN)
+    ben_haric, t_ben = False, 0.0
     while True:  # söz sırası: akan kanalların hepsi sessiz
         if OT.get("id") != i or OT.get("durum") != "sira": return
         if not toplanti_var(): _ot_gec(i, "soylenmedi", neden=_t("toplantı bitti", "the meeting ended")); return
         s = kanal_sessizlik()
         if s is None: _ot_gec(i, "soylenmedi", neden=_t("toplantı sesi gelmiyor — söz sırası ölçülemedi", "no meeting audio — turn-taking unavailable")); print("OTONOM: kanal akmıyor — söylenmedi"); return
-        if s >= ses or OT.get("simdi"): break
-        if time.time() - bas >= bek: _ot_gec(i, "soylenmedi", neden=_t(f"{bek:.0f} sn içinde söz fırsatı çıkmadı", f"no opening within {bek:.0f} s")); print("OTONOM: fırsat çıkmadı — söylenmedi"); return
+        if OT.get("simdi"): break
+        f = "sessiz" if s >= ses else soz_firsati(s, kanal_sessizlik(haric=("ben",)), time.time() - bas, ses, kanal_sozsuz("ben"),
+                                                  time.time() - STATE["whisper"]["kanal_son_satir"].get("ben", 0), _ot_ayar("otonom_yedek_sn", OTONOM_YEDEK_SN))
+        if f:
+            ben_haric = f in ("sozsuz", "yedek"); t_ben = STATE["whisper"]["kanal_son_satir"].get("ben", 0)  # okurken de kullanıcı kanalının sözsüz sesi kesmez (sözlü satır gelene dek)
+            if f != "sessiz": print(f"OTONOM: kullanıcı kanalındaki ses söz sırasını tutmadı ({'son parçalar sözsüz' if f == 'sozsuz' else f'{time.time() - bas:.0f} sn beklendi, kullanıcının sözlü satırı yok'}; karşı kanal sessiz)")
+            break
+        if time.time() - bas >= bek: _ot_gec(i, "soylenmedi", neden=_t(f"{bek:.0f} sn içinde söz fırsatı çıkmadı", f"no opening within {bek:.0f} s")); print(f"OTONOM: fırsat çıkmadı — söylenmedi ({kanal_durum_ozet()})"); return
         time.sleep(0.1)
     if not _ot_gec(i, "okunuyor"): return
     ak = OT.get("akis"); m = _ot_al(ak) if ak else OT["metin"]  # v0.157.0: akışta o an hazır bütün cümleler
@@ -239,6 +277,7 @@ def _ot_dongu(i):
         if time.time() - t0 >= 0.3 and time.time() - son_bak >= 0.25:  # okumanın başında önceki sözün kuyruğu sayılmasın; çeyrek saniyede bir bak
             son_bak = time.time()
             for ad, k in list(KANALLAR.items()):
+                if ad == "ben" and ben_haric and STATE["whisper"]["kanal_son_satir"].get("ben", 0) <= t_ben: continue  # 30 Ekim: sözsüz ses okumayı kesmesin
                 ts = [t for t in list(getattr(k, "ses_t", ())) if t >= t0 + 0.3]
                 kes, n, d = otonom_kesilsin(ts, zk, zb if zb is not None else t0, esik)
                 if kes:

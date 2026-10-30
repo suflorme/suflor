@@ -20,6 +20,47 @@ TOPO_ISTEM = ("Bu toplantı oturumu Suflor.me panosundan arka planda açıldı; 
               "gerekiyorsa neden (ör. \"Kulis'in veri dosyasını okuyup test listesini çıkarmak\"); komut, kod ya da dosya yolu yazma: onay kartında bu cümle görünür. Kullanıcıdan seçim isterken (onay, evet/hayır, birkaç seçenek) mesajının son satırına seçenekleri "
               "şu biçimde yaz: [[seç: Seçenek 1 | Seçenek 2 | Seçenek 3]] — en çok 5 seçenek, her biri kısa; panoda düğme olur, basılan seçenek cevap "
               "olarak gelir. Kullanıcı düğme yerine serbest metin de yazabilir.")
+# Dış bilgi kaynağı (30 Ekim; kullanıcı onayı: toplantıda konuşulan konuyla ilgili güncel veri kaynaktan çekilip bilgi kartına yazılabilir — sorgu metni
+# o kaynağa gider, asistan sesli konuşmaz). Ayar toplanti_bilgi_kaynaklari = [{"sunucu": "<MCP sunucu adı>", "araclar": ["get_*", …], "konu": "…", "ad": "…"}];
+# yoksa kapalı. Sunucu adı claude -p'deki biçimiyle ya da araç adındaki biçimiyle yazılabilir ("claude.ai X Y" → araç mcp__claude_ai_X_Y__<araç>).
+# Ayardaki sunucunun yalnız okuma adlı (BILGI_OKUMA_RX) ve listedeki desene uyan araçları sorulmadan geçer (oturumda en çok TOPO_BILGI_EN_COK; sonrası sorulur);
+# aynı sunucunun öbür araçları reddedilir; başka MCP araçları eskisi gibi sorulur. Aynı kural toplanti-claude.py izin-kanca'da (bilgi_kaynagi_arac): ikisini birlikte değiştir.
+BILGI_OKUMA_RX = re.compile(r"^(?:get|list|query|compare|search|fetch|read|describe|lookup|find)_[A-Za-z0-9_]+$")
+BILGI_YAZMA = {"send", "forward", "reply", "create", "update", "delete", "remove", "trash", "upload", "share", "move", "rename", "copy", "respond", "set", "write",
+               "post", "put", "patch", "edit", "modify", "add", "insert", "pause", "resume", "enable", "disable", "publish", "archive", "cancel", "approve", "execute",
+               "run", "javascript", "navigate", "computer", "label", "draft", "mark", "schedule", "import", "sync", "trigger", "start", "stop", "apply", "assign",
+               "invite", "grant", "revoke", "reset", "change", "save", "submit", "merge", "duplicate", "launch", "activate", "deactivate"}
+BILGI_RISK_RX = re.compile(r"send|forward|reply|create_event|update_event|delete|trash|javascript|navigate|computer|form_input|file_upload|share_file|upload|"
+                           r"move_item|rename_item|update_file|create_file|copy_file|respond_to_event|set_vacation|create_filter|label_", re.I)  # = toplanti-claude.py IZIN_MCP
+TOPO_BILGI_EN_COK = 8  # kural ~6 der; teknik tavan biraz üstünde, sonrası kullanıcıya sorulur
+def mcp_sunucu_adi(s):  # Claude Code'un araç adındaki sunucu biçimi (claude.ai bağlayıcısında alt çizgiler birleşir, baş/son atılır)
+    s = str(s or "").strip(); r = re.sub(r"[^A-Za-z0-9_-]", "_", s)
+    return re.sub(r"_+", "_", r).strip("_") if s.startswith("claude.ai ") else r
+def bilgi_kaynaklari():
+    out = []
+    for k in AYAR.get("toplanti_bilgi_kaynaklari") or []:
+        if not isinstance(k, dict) or not str(k.get("sunucu") or "").strip(): continue
+        ar = [str(x).strip() for x in (k.get("araclar") or []) if re.fullmatch(r"[A-Za-z0-9_*?]{1,64}", str(x).strip())]
+        ad = " ".join(str(k.get("ad") or re.sub(r"^claude\.ai\s+", "", str(k["sunucu"]).strip())).split())[:60]
+        out.append({"sunucu": mcp_sunucu_adi(k["sunucu"]), "araclar": ar, "konu": " ".join(str(k.get("konu") or "").split())[:200], "ad": ad})
+    return out
+def bilgi_kaynagi_arac(ad):  # ayardaki bir kaynağın aracıysa {"kaynak", "arac", "izinli"}, değilse None
+    import fnmatch
+    ad = str(ad or "")
+    for k in bilgi_kaynaklari():
+        on = "mcp__" + k["sunucu"] + "__"
+        if not ad.startswith(on): continue
+        a = ad[len(on):]
+        izinli = (bool(BILGI_OKUMA_RX.match(a)) and not (set(a.lower().split("_")) & BILGI_YAZMA) and not BILGI_RISK_RX.search(a)
+                  and any(fnmatch.fnmatchcase(a, d) for d in k["araclar"]))
+        return {"kaynak": k, "arac": a, "izinli": izinli}
+    return None
+def topo_istem():
+    ks = bilgi_kaynaklari()
+    if not ks: return TOPO_ISTEM
+    return TOPO_ISTEM + " Toplantıda kullanabileceğin dış bilgi kaynakları (yalnız okuma; toplantı kurallarındaki 'Dış bilgi kaynağı' maddesine göre): " + "; ".join(
+        f"«{k['ad']}» — konu: {k['konu'] or 'belirtilmedi'}; araçlar: mcp__{k['sunucu']}__ altında {', '.join(k['araclar']) or '(yok)'}" for k in ks) + \
+        ". Sonucu not kartı olarak yaz; --neden'de 'Kaynak: <kaynak adı>, <sorgu saati>'. Sorguya kişi adı ya da dökümden alıntı koyma."
 # v0.112.0 (S122 2. adım): Claude'un seçim sorusu — mesajdaki [[seç: A | B]] satırı ayıklanır, panoda ve mini panoda düğme olur; basınca seçim oturuma gider.
 TOPO_SECENEK_RX = re.compile(r"^[ \t]*\[\[\s*(?:seç|sec|seçenek|secenek|options?|choices?)\s*:\s*(.+?)\s*\]\][ \t]*$", re.M | re.I)
 def _topo_secenek_ayir(metin):
@@ -75,12 +116,13 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
             except OSError: pass
             os.mkfifo(f, 0o600)
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-prompt-tool", "stdio",
-                "--append-system-prompt", TOPO_ISTEM] + (["--model", str(model)] if model else []) + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
+                "--append-system-prompt", topo_istem()] + (["--model", str(model)] if model else []) + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "toplanti-bos"),
                        "giris": gir, "cikis": cik, "sure": TOPO_SURE_SN}, f, ensure_ascii=False)
-        if not sid: TOPO.update(izin_hatirla=set(), mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None)
+        if not sid: TOPO.update(izin_hatirla=set(), mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None,
+                                bilgi_sorgu=0, bilgi_t={})
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
         _topo_durum("aciliyor", hata=None)
         TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -160,8 +202,15 @@ def _topo_tc_okuma(ad, gi):
 def _topo_izin_anahtar(ad, gi): return ad + "\0" + (str(gi.get("command") or "") if ad in ("Bash", "Monitor") else json.dumps(gi, sort_keys=True, ensure_ascii=False))
 def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay → control_response
     r = o.get("request") or {}; ad = str(r.get("tool_name") or "?"); gi = r.get("input") if isinstance(r.get("input"), dict) else {}
-    hat = TOPO.setdefault("izin_hatirla", set()); anh = _topo_izin_anahtar(ad, gi)
-    if _topo_izle_mi(ad, gi):
+    hat = TOPO.setdefault("izin_hatirla", set()); anh = _topo_izin_anahtar(ad, gi); bk = bilgi_kaynagi_arac(ad)
+    if bk and not bk["izinli"]:  # ayardaki bilgi kaynağının okuma dışı aracı: sorulmaz, reddedilir
+        cevap = {"behavior": "deny", "message": _t("Bu araç bilgi kaynağının okuma araçlarından değil; toplantıda yalnız okuma araçları kullanılır.",
+                                                   "This tool isn't one of the information source's read tools; only read tools are used in the meeting.")}
+        print(f"TOPLANTI OTURUMU: izin {bk['kaynak']['sunucu']} · {bk['arac']} (bilgi kaynağı, okuma dışı) → reddedildi")
+    elif bk and TOPO.get("bilgi_sorgu", 0) < TOPO_BILGI_EN_COK:
+        TOPO["bilgi_sorgu"] = TOPO.get("bilgi_sorgu", 0) + 1; cevap = {"behavior": "allow", "updatedInput": gi}
+        print(f"TOPLANTI OTURUMU: izin {bk['kaynak']['sunucu']} · {bk['arac']} (bilgi kaynağı, okuma {TOPO['bilgi_sorgu']}/{TOPO_BILGI_EN_COK}) → kendiliğinden")
+    elif _topo_izle_mi(ad, gi):
         cevap = {"behavior": "allow", "updatedInput": gi}; print("TOPLANTI OTURUMU: izin Monitor (izle) → kendiliğinden")
     elif ad in TOPO_OKU_ARAC or _topo_tc_okuma(ad, gi):
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} (salt okuma) → kendiliğinden")
@@ -203,8 +252,13 @@ def _topo_oku(cik, nesil):
                     if b.get("type") == "text": _topo_mesaj("claude", b.get("text")); TOPO["etkinlik"] = None
                     elif b.get("type") == "tool_use":
                         _topo_mesaj("arac", (str(b.get("name") or "?") + " — " + _topo_arac_ozet(b.get("name"), b.get("input"))).strip(" —")); _topo_etkinlik(b.get("name"), b.get("input"))
+                        bk = bilgi_kaynagi_arac(b.get("name"))
+                        if bk and b.get("id"): TOPO.setdefault("bilgi_t", {})[str(b["id"])] = (bk["kaynak"]["sunucu"], bk["arac"], time.time())
             elif t == "user":
                 c = (j.get("message") or {}).get("content")
+                for x in (c if isinstance(c, list) else []):  # bilgi kaynağı süresi: günlüğe yalnız sunucu, araç, süre (içerik yok)
+                    s = TOPO.get("bilgi_t", {}).pop(str(x.get("tool_use_id")), None) if isinstance(x, dict) and x.get("type") == "tool_result" else None
+                    if s: print(f"BİLGİ KAYNAĞI: {s[0]} · {s[1]} · {time.time() - s[2]:.1f} sn{' · hata' if x.get('is_error') else ''}")
                 if isinstance(c, list) and any(isinstance(x, dict) and x.get("type") == "tool_result" for x in c): TOPO["etkinlik"] = None  # araç bitti: sıradaki adıma kadar "düşünüyor"
             elif t == "result":
                 try: TOPO["maliyet"] = round(TOPO["maliyet"] + float(j.get("total_cost_usd") or 0), 4)

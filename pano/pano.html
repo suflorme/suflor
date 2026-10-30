@@ -98,7 +98,6 @@ html.mac.kc-kapali #kenar{display:none}html.mac.kc-kapali .grid{grid-template-co
 #kenar .ko svg.i{width:16px;height:16px;color:var(--t2);stroke-width:1.6}#kenar .ko .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}#kenar .ko .r{font-size:var(--yz-1);color:var(--t3);font-variant-numeric:tabular-nums}
 #kenar .ko:hover{background:var(--hov)}#kenar .ko.sec{background:var(--bd)}#kenar .ko[data-canli]{font-weight:600}
 #kenar .nok{width:8px;height:8px;border-radius:50%;background:#d6453b;flex:none;margin:0 4px;box-shadow:0 0 0 3px rgba(214,69,59,.18)}
-html.mac #sn .sn:nth-child(n+2){display:none}  /* Mac penceresinde ana alanda yalnız en son toplantı; hepsi kenar çubuğunda */
 #kenar .kalt{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px;font-size:var(--yz-2);color:var(--t2);border-top:.5px solid var(--bd);position:sticky;bottom:0}#kenar .kalt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:720px){html.mac #kenar{display:none}html.mac .grid{grid-template-columns:minmax(0,1fr)!important}}
 /* v0.111.0: arka plandaki toplantı oturumu (Terminal yok) — Claude'un yazdıkları, soru sorunca vurgu */
@@ -143,7 +142,7 @@ html.mac .sira .b{font-size:var(--yz-5)}
 .tko b{font-weight:600;margin-right:4px}.tko.yakin{background:var(--ac-bg);margin:0 -8px;padding:7px 8px;border-radius:var(--kose-s);border-bottom:0}.tko.yakin b{color:var(--ac)}
 .sira{background:transparent;border:0;border-radius:var(--kose-l);padding:14px 0;margin:8px 0 10px;display:flex;align-items:center;gap:16px}.sira .t{flex:1;min-width:0}.sira .e{font-size:var(--yz-1);color:var(--t3);margin-bottom:3px}.sira .b{font:300 22px/1.25 var(--f-baslik);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis}.sira .b .z{font-family:var(--f-govde);font-weight:500;color:var(--ac);margin-right:6px}.sira .sp{margin-top:4px;font-size:var(--yz-2)}.sira button{padding:7px 18px;font-size:var(--yz-3)}.sira,.tko{cursor:pointer}.sira.sec{background:var(--hov);padding-left:14px;padding-right:14px}.tko.sec{background:var(--ac-bg);margin:0 -8px;padding:7px 8px;border-radius:var(--kose-s);border-bottom-color:transparent}
 #agn{max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.agm{padding:5px 0;border-bottom:1px solid var(--bd);line-height:1.45}#ag .hint{margin-top:6px}
-.tkw .gun{font-size:var(--yz-1);color:var(--t3);margin:12px 0 2px;letter-spacing:.02em}.tkw .gun:first-child{margin-top:4px}.tkw .tko.red{opacity:.5}#tks.hf #tk{display:none!important}.tkalt{display:flex;gap:4px;align-items:center;margin:2px 0 4px}#tkh:empty{display:none}#tkh{margin:4px 0}#tkf{background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose);padding:10px;margin:6px 0 8px;display:flex;flex-direction:column;gap:7px}#tkf[hidden]{display:none}
+.tkalt{display:flex;gap:4px;align-items:center;margin:2px 0 4px}#tkh:empty{display:none}#tkh{margin:4px 0}#tkf{background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose);padding:10px;margin:6px 0 8px;display:flex;flex-direction:column;gap:7px}#tkf[hidden]{display:none}
 #tkf textarea{font:inherit;font-size:var(--yz-2);color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose-s);padding:5px 7px;width:100%;resize:vertical;box-sizing:border-box}
 body.surukle{outline:3px dashed var(--ac);outline-offset:-6px}.km a{color:var(--ac);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 #br .b{font-size:var(--yz-3);color:var(--tx);margin:2px 0 8px;line-height:1.5}#br .bb{font-size:var(--yz-1);color:var(--t3);margin:8px 0 2px;text-transform:uppercase;letter-spacing:.04em}#br ul{margin:0;padding-left:18px}#br li{font-size:var(--yz-3);line-height:1.5;margin:2px 0;color:var(--t2)}#br .bt{margin-top:8px}
@@ -180,7 +179,87 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 #gbd p{margin:0}#gbd pre{font:var(--yz-1)/1.45 var(--f-teknik);background:var(--s2);border:1px solid var(--bd);border-radius:var(--kose);padding:8px;max-height:220px;overflow:auto;white-space:pre-wrap;margin:6px 0 0}#gbd summary{cursor:pointer}
 #tkf .r2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 @media (max-width:720px){body{height:auto;min-height:100vh;overflow:auto;grid-template-rows:auto auto;align-content:start}header{flex-wrap:wrap;padding:9px 16px}.hl{flex-wrap:wrap;row-gap:4px}.hr{flex-wrap:wrap}#durum{max-width:100%;flex-wrap:wrap}#durum .da{white-space:normal}
-.grid{grid-template-columns:minmax(0,1fr)}#rz{display:none}main>.sc{padding:8px 16px 12px}aside{border-top:1px solid var(--bd)}#dkg{max-height:60vh}.sira{flex-wrap:wrap}}  /* dar pencere — tek sütun */#tkm{font-size:var(--yz-2)}#tkm.er{color:var(--er)}#tkm.ok{color:var(--ok)}
+.grid{grid-template-columns:minmax(0,1fr)}#rz{display:none}main>.sc{padding:8px 16px 12px}aside{border-top:1px solid var(--bd)}#dkg{max-height:60vh}.sira{flex-wrap:wrap}}  /* dar pencere — tek sütun */
+/* Hafta görünümü: ana alanda tam genişlik Pazartesi–Pazar ızgarası (saat şeridi, saatine göre bloklar, çakışan yan yana, şimdi çizgisi); blok rengi hazırlık durumu */
+html.hafta-ac main>.sc>section:not(#hfs){display:none!important}html.hafta-ac aside,html.hafta-ac #rz{display:none!important}html.hafta-ac .grid{grid-template-columns:minmax(0,1fr)!important}
+@media (min-width:721px){html.mac.hafta-ac:not(.kc-kapali) .grid{grid-template-columns:220px minmax(0,1fr)!important}}
+html.hafta-ac main>.sc{display:flex;flex-direction:column;overflow:hidden;padding-bottom:10px}html.hafta-ac main>.sc>section#hfs{max-width:none;margin:0;flex:1;min-height:0;display:flex;flex-direction:column}
+.hft{display:flex;align-items:center;gap:6px;padding:0 0 10px;flex-wrap:wrap}.hft .ib{width:28px;padding:0;justify-content:center;font-size:18px;line-height:1}.hft h2{font:400 18px/1.2 var(--f-baslik);margin:0 0 0 6px;white-space:nowrap}
+.hft .sp1{flex:1}.hfl{display:flex;gap:10px;font-size:var(--yz-1);color:var(--t2);white-space:nowrap}.hfl i,#hfd .hz i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px;border-left:3px solid}
+.hfl .hz-hazir,#hfd .hz-hazir{background:var(--ok-bg);border-color:var(--ok)}.hfl .hz-eksik,#hfd .hz-eksik{background:var(--wa-bg);border-color:var(--wa)}.hfl .hz-yok,#hfd .hz-yok{background:var(--gr-bg);border-color:var(--gr)}
+#hfn{margin:-4px 0 8px}#hfn:empty{display:none}
+.hfk{--hh:44px;flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--bd);border-radius:var(--kose);background:var(--s1);overflow:hidden}
+.hfu,.hfa,.hfg{display:grid;grid-template-columns:52px repeat(7,minmax(0,1fr));scrollbar-gutter:stable;flex:none}.hfu,.hfa{overflow:hidden}
+.hfu{border-bottom:1px solid var(--bd)}.hfu>div{text-align:center;padding:6px 2px 6px;font-size:var(--yz-1);color:var(--t2);letter-spacing:.04em;min-width:0;overflow:hidden}
+.hfu .n{display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin:2px auto 0;border-radius:50%;font:400 18px/1 var(--f-baslik);color:var(--tx);letter-spacing:0}
+.hfu .bg{color:var(--ac);font-weight:600}.hfu .bg .n{background:var(--ac-dolgu);color:#fff}.hfu .gc .n{color:var(--t3)}
+.hfa{border-bottom:1px solid var(--bd)}.hfa>div{border-left:1px solid var(--bd);padding:2px;display:flex;flex-direction:column;gap:2px;min-width:0;min-height:8px}.hfa>.ad{border:0;font-size:10px;color:var(--t3);align-items:flex-end;justify-content:center;padding-right:6px}
+.hfa .hfo{position:static;height:20px;padding:2px 6px}
+.hfg{flex:1;min-height:0;overflow-y:auto;position:relative;align-items:start}.hfs{position:relative}.hfs span{position:absolute;right:6px;transform:translateY(-50%);font-size:10px;color:var(--t3);font-variant-numeric:tabular-nums}.hfs span:first-child{transform:none}
+.hfc{position:relative;border-left:1px solid var(--bd);background-image:linear-gradient(to bottom,var(--bd) 1px,transparent 1px);background-size:100% var(--hh)}.hfc.bg{background-color:color-mix(in srgb,var(--ac) 4%,transparent)}
+.hfc.okuyok,.hfu .okuyok,.hfa .okuyok{background-color:var(--hov);background-image:repeating-linear-gradient(135deg,var(--hov) 0 5px,transparent 5px 11px)}
+.hfo{position:absolute;display:block;border:0;border-left:3px solid;border-radius:5px;padding:2px 5px;margin:0;font:inherit;font-size:var(--yz-1);line-height:1.25;text-align:left;overflow:hidden;cursor:pointer;color:var(--tx);box-shadow:0 0 0 1px var(--s1);min-width:0}
+.hfo .z{color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap}.hfo b{font-weight:600;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--sat,1);overflow:hidden;overflow-wrap:anywhere}
+.hfo.kisa b{display:block;white-space:nowrap;text-overflow:ellipsis}.hfo.kisa .z{font-weight:400}
+.hfo.hz-hazir{background:var(--ok-bg);border-color:var(--ok)}.hfo.hz-eksik{background:var(--wa-bg);border-color:var(--wa)}.hfo.hz-yok{background:var(--gr-bg);border-color:var(--gr)}
+.hfo:hover{filter:brightness(.96)}.hfo.sec{outline:2px solid var(--ac);outline-offset:-1px;z-index:2}.hfo.gec{opacity:.55}.hfo.red{background:transparent;border:1px dashed var(--bd2);border-left:3px dashed var(--gr)}.hfo.red b{text-decoration:line-through;font-weight:500}
+.hfsim{position:absolute;left:-1px;right:0;height:2px;background:#d6453b;z-index:3;pointer-events:none;box-shadow:0 0 0 .5px var(--s1)}.hfsim::before{content:"";position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:#d6453b}
+#hfd{position:fixed;z-index:60;width:min(330px,calc(100vw - 24px));background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose-l);box-shadow:0 12px 32px rgba(0,0,0,.2);padding:12px 14px 12px 16px}
+#hfd .bas{display:flex;gap:8px;align-items:flex-start}#hfd .bas b{font:400 17px/1.3 var(--f-baslik);flex:1;overflow-wrap:anywhere}#hfd .bas b.red{text-decoration:line-through}
+#hfd .hzb{margin-top:8px;padding:8px 10px;border-radius:var(--kose);background:var(--ok-bg);font-size:var(--yz-2);max-height:40vh;overflow-y:auto}#hfd .hzb .b{font-weight:600;margin-bottom:4px}#hfd .hzb .bb{font-size:var(--yz-1);color:var(--t2);margin-top:6px;text-transform:uppercase;letter-spacing:.04em}#hfd .hzb ul{margin:2px 0 0;padding-left:16px}
+#hfd .sat{font-size:var(--yz-3);color:var(--t2);margin-top:6px;overflow-wrap:anywhere}#hfd .sat.kim{font-size:var(--yz-2)}#hfd .bt{display:flex;gap:6px;justify-content:flex-end;margin-top:12px}#hfd .bt:empty{display:none}
+@media (max-width:720px){html.hafta-ac main>.sc{overflow:visible}.hfk{flex:none}.hfg{max-height:70vh}.hfu,.hfa,.hfg{grid-template-columns:38px repeat(7,minmax(0,1fr))}.hfl{display:none}.hft h2{font-size:15px}}#tkm{font-size:var(--yz-2)}#tkm.er{color:var(--er)}#tkm.ok{color:var(--ok)}
+/* Bugün (toplantı yokken; html.bugun — 30 Ekim, kullanıcı onayladı): üç soru — sırada ne var (kart), beni ne bekliyor (Bekleyenler), ne oldu (Son toplantılar).
+   Yan sütun (Gündem/Döküm) yalnız toplantıda. Her grup tek zemin (kutu içinde kutu yok), satır arası simgeden sonra başlayan ince ayraç; tek vurgu Başlat ve bağlantılar;
+   durum rengi yalnız ince şerit ya da tek sözcük. Satırlar en çok iki satır, gerisi dokununca. */
+button.lnk,button.gh.lnk{border:0;background:none;color:var(--ac);padding:2px 4px;font-weight:500;border-radius:var(--kose-s)}button.lnk:hover,button.gh.lnk:hover{background:none;color:var(--ac);text-decoration:underline}
+html.bugun .grid{grid-template-columns:minmax(0,1fr)}html.bugun aside,html.bugun #rz{display:none}
+html.bugun:has(#bgs:not([hidden])) .grid{grid-template-columns:minmax(0,1fr) 5px var(--aw,min(380px,36vw))}html.bugun:has(#bgs:not([hidden])) aside,html.bugun:has(#bgs:not([hidden])) #rz{display:revert}  /* toplantı öncesi bağlam dosyası bırakıldıysa yan sütun (bağlam + davet gündemi) görünür */
+html.bugun:not(.hafta-ac) main{container-type:inline-size}
+html.bugun:not(.hafta-ac) main>.sc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:26px 28px;align-content:start;padding:20px max(28px,calc((100% - 920px)/2)) 24px}
+html.bugun:not(.hafta-ac) main>.sc>section{grid-column:1/-1;max-width:none;margin:0;min-width:0}
+html.bugun:not(.hafta-ac) main>.sc>#eys:has(+#sns:not([hidden])),html.bugun:not(.hafta-ac) main>.sc>#eys:not([hidden])+#sns{grid-column:span 1}
+html.bugun:not(.hafta-ac) main>.sc>#brs{margin-top:-16px}
+@container (max-width:640px){html.bugun:not(.hafta-ac) main>.sc{grid-template-columns:minmax(0,1fr);padding-inline:16px}}
+html.bugun main .sh{position:static;background:none;padding:0 4px 8px;font:600 var(--yz-4)/1.3 var(--f-govde);color:var(--tx)}html.bugun main .sh .meta{font-size:var(--yz-3);font-weight:400;color:var(--t3)}
+html.bugun .nb{padding:6px max(28px,calc((100% - 920px)/2)) 12px}html.bugun :is(#kns,.kt,.kal){max-width:none}
+@container (max-width:640px){html.bugun .nb{padding-inline:16px}}
+html.bugun .kt{border-radius:var(--kose-tam);padding:3px 6px;border-color:var(--bd)}
+html.bugun #kns{padding:0 6px 8px}html.bugun #knd .b{max-height:none;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+html.bugun #kns.acik #knd .b{display:block;-webkit-line-clamp:unset;max-height:min(40vh,18em);overflow-y:auto}
+/* başlık satırı: küçük tarih + büyük Bugün; sağda Bugün | Bu hafta, elle başlat (+), takvimi yenile */
+.bgb{display:flex;align-items:flex-end;gap:4px;margin:0 0 14px;flex-wrap:wrap}.bgt{min-width:0}#tktr{font-size:var(--yz-2);font-weight:500;color:var(--t2);margin:0 0 2px 1px}
+.bgt h1{margin:0;font:700 30px/1.1 var(--f-baslik);letter-spacing:-.02em;color:var(--tx)}html.mac .bgt h1{font:700 30px/1.1 -apple-system,"SF Pro Display",var(--f-govde)}
+.bgb>.ib{color:var(--t2)}.seg{display:inline-flex;background:var(--hov);border-radius:var(--kose-s);padding:2px;margin-right:4px;align-self:flex-end}
+.seg button{border:0;background:transparent;border-radius:var(--kose-s);padding:3px 12px;font-size:var(--yz-2);color:var(--tx)}.seg button:hover{background:transparent}.seg button.on{background:var(--s1);box-shadow:0 1px 2px rgba(0,0,0,.16),0 0 0 .5px rgba(0,0,0,.06);font-weight:500}
+/* sıradaki toplantı kartı */
+.sira,.sira.sec{position:relative;background:var(--s1);border-radius:var(--kose-l);padding:16px 18px 16px 22px;margin:0;display:flex;align-items:center;gap:16px;overflow:hidden;cursor:default}
+.sira::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bd2)}.sira.hz-hazir::before{background:var(--ok)}.sira.hz-eksik::before{background:var(--wa)}.sira.bos::before{display:none}.sira.bos{padding-left:18px}
+.sira .e{font-size:var(--yz-2);color:var(--t2);margin-bottom:4px;font-variant-numeric:tabular-nums}
+.sira .b,html.mac .sira .b{font:600 20px/1.25 var(--f-baslik);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}html.mac .sira .b{font-family:-apple-system,"SF Pro Display",var(--f-govde)}.sira.bos .b{font-weight:500;color:var(--t2)}
+.sira .sp{margin-top:6px;font-size:var(--yz-2);color:var(--t2);display:flex;flex-wrap:wrap;align-items:center;gap:0 6px}.sira .pl{display:inline-flex;align-items:center;gap:5px}.sira .pl svg.i{width:15px;height:15px}
+.nk{font-style:normal;color:var(--t3);margin:0 1px}.hzw.hz-hazir{color:var(--ok)}.hzw.hz-eksik{color:var(--wa)}.hzw.hz-yok{color:var(--t3)}
+.sira .ss{display:flex;align-items:center;gap:12px;flex:none}.sira button.pri{padding:7px 20px;border-radius:var(--kose-tam);font-weight:500}
+.sonra{margin:10px 4px 0;font-size:var(--yz-2);color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sonra button.lnk{color:var(--t2);font-weight:400;padding:0 2px}.sonra button.lnk:hover{color:var(--tx)}
+@container (max-width:520px){.sira{flex-wrap:wrap}.sira .ss{width:100%;justify-content:flex-end}}
+/* gruplar: tek zemin, satır arası iç girintili ayraç */
+html.bugun :is(#ey,#sn,#nt){background:var(--s1);border-radius:var(--kose-l);padding:0 14px}
+html.bugun :is(.ey,.sn,.nt){position:relative;border-bottom:0;padding:11px 0}
+html.bugun :is(.ey,.sn)+:is(.ey,.sn)::before,html.bugun .nt+.nt::before{content:"";position:absolute;left:32px;right:-14px;top:0;height:1px;background:var(--bd)}html.bugun .nt+.nt::before{left:0}
+html.bugun #brs,html.bugun #tos{background:var(--s1);border-radius:var(--kose-l);padding:12px 16px}html.bugun #snt{margin:6px 0 0 2px}
+.eyi{flex:none;width:20px;display:flex;justify-content:center;color:var(--t2);padding-top:1px}.eyi svg.i{width:17px;height:17px}
+.ey{display:block}.ey summary{list-style:none;display:flex;align-items:center;gap:12px;cursor:pointer;font-size:var(--yz-3);color:var(--tx);margin:0}.ey summary::-webkit-details-marker{display:none}
+.ey summary .t{flex:1;min-width:0;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ey .ea{display:flex;gap:4px;flex:none;align-items:center}.ey .ea button{padding:3px 12px}.ey .ea button.pri{border-radius:var(--kose-tam)}
+.chev{flex:none;display:flex;color:var(--t3);transition:transform .15s}.chev svg.i{width:14px;height:14px}.ey details[open] .chev{transform:rotate(90deg)}
+.eyb{padding:6px 0 2px 32px}.eyb .chip{display:inline-block;margin-bottom:2px}.eyb .bt{margin-top:8px}.ey.ey-reddedildi summary .t{color:var(--t3)}
+.sn{align-items:flex-start;gap:12px}.sn .t{cursor:pointer}.sn .b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sn .m{font-size:var(--yz-2);color:var(--t3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.snx{margin-top:4px}.snx .bt{margin-top:6px}.sn .akw{align-self:center}
+/* toplantı oturumu: toplantı yokken katlı (başlıkta durum, altında son iletinin iki satırı) */
+.tosn{font-size:var(--yz-3);line-height:1.45;color:var(--t2);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+html.bugun #tos.kapali :is(.tod,#tol,#tom){display:none}html.bugun #tos .sh{cursor:pointer}html.bugun #tos.kapali .sh{padding-bottom:0}
+html.bugun #tos.kapali .sh::after{content:"";flex:none;width:7px;height:7px;margin-right:4px;border-right:1.6px solid var(--t3);border-bottom:1.6px solid var(--t3);transform:rotate(-45deg)}
+html.bugun #tos .sh{padding-inline:0}html.bugun #tos .tob{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 </style>
 <header><div class=hl><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span><span id=sure></span></div>
 <div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=yb class="ib gh" title="Yardım ve sık sorulanlar" aria-label="Yardım">?</button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button></div></header>
@@ -256,16 +335,17 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 <div class=grid>
 <nav id=kenar aria-label="Gezinme"></nav>
 <main><div class=sc>
-<section id=tks hidden><div id=tk></div><div id=tkh class=hint></div><div id=tkw class=tkw hidden></div><div id=tkalt class=tkalt><button id=tkh7 class=gh title="Önümüzdeki 7 günün toplantıları">Bu hafta</button><button id=tke class=gh title="Takvimde olmayan bir toplantı için">Elle başlat</button><button id=tky class="gh ib" title="Takvimi yenile" aria-label="Takvimi yenile"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button></div>
+<section id=hfs hidden aria-label="Haftalık takvim"></section>
+<section id=tks hidden><div id=tkalt class=bgb><div class=bgt><div id=tktr></div><h1>Bugün</h1></div><span class=sp1></span><div class=seg role=group aria-label="Görünüm"><button id=tkbg type=button class=on aria-pressed=true>Bugün</button><button id=tkh7 type=button title="Haftalık takvim" aria-pressed=false>Bu hafta</button></div><button id=tke class="gh ib" title="Takvimde olmayan bir toplantı için" aria-label="Elle başlat"></button><button id=tky class="gh ib" title="Takvimi yenile" aria-label="Takvimi yenile"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button></div><div id=tk></div><div id=tkh class=hint></div>
 <div id=tkf hidden><div class=tkfb>Toplantı başlat</div><input id=tkk placeholder="Kişi — konu (ör. Ayşe — bütçe)"><input id=tkl type=url placeholder="Toplantı bağlantısı (isteğe bağlı)"><div class="ayt sg" id=tkp data-bos=1 title="Bağlantı yoksa açılacak uygulama"><button type=button data-v=teams>Teams</button><button type=button data-v=meet>Meet</button><button type=button data-v=zoom>Zoom</button></div><textarea id=tkc rows=2 placeholder="Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin"></textarea><textarea id=tkg rows=3 placeholder="Gündem (isteğe bağlı): her satıra bir madde — {asistan} bu maddelerle başlar"></textarea><div class=sgs><div class="ayt sg" id=tkr><button type=button data-v=yurutucu title="Toplantıyı ben yönetiyorum">Yürütücü</button><button type=button data-v=katilimci>Katılımcı</button><button type=button data-v=dinleyici>Dinleyici</button></div><div class="ayt sg" id=tkd><button type=button data-v=tr>Türkçe</button><button type=button data-v=en>İngilizce</button><button type=button data-v=karisik>Karışık</button></div></div>
 <div class=bt><span id=tkm></span><span class=sp1></span><a href="#" id=tky2 class=hint hidden>Suflor.me olmadan katıl</a><button id=tki class=gh>Vazgeç</button><button id=tkb class=pri>Başlat</button></div></div></section>
-<section id=hat class=hat hidden></section>
 <section id=brs hidden><div class=sh><span class=brb>Brifing <span id=brn class=meta></span></span><button id=brk class=gh aria-expanded=true>Gizle</button></div><div id=br></div></section>
+<section id=hat class=hat hidden></section>
 <section id=dds hidden><div class=sh>Dosyadan döküm <span id=ddn class=meta></span></div><div id=dd></div></section>
+<section id=eys hidden><div class=sh><span>Bekleyenler <span id=eyn class=meta></span></span><button id=eyh class="gh lnk" title="Listedeki bekleyen işlerin hepsini onayla — {asistan} yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
+<section id=sns hidden><div class=sh><span>Son toplantılar</span></div><div id=sn></div><button id=snt class="gh lnk" type=button title="Tüm toplantılar">Tümü</button></section>
 <section id=nts hidden><div class=sh><span>Notlar <span id=ntn class=meta></span></span></div><div id=nt></div></section>
-<section id=sns hidden><div class=sh><span>Son toplantılar</span><button id=snt class=gh type=button>Tüm toplantılar</button></div><div id=sn></div></section>
-<section id=eys hidden><div class=sh><span>Yapılacaklar <span id=eyn class=meta></span></span><button id=eyh class=pri title="Listedeki bekleyen işlerin hepsini onayla — {asistan} yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
-<section id=tos hidden><div class=sh><span class=brb><span id=tosad>Suflor</span> <span id=tosd class=meta></span></span><span class=tod><button id=tosa class=gh title="Araç adımlarını da göster (komutlar, dosyalar)">Ayrıntı</button><button id=tosx class=gh title="Şu anki işi durdurur; yazarsan kaldığı yerden sürer">Durdur</button><button id=tost class=gh title="Aynı oturumu Terminal'de açar; arka plandaki kapanır. Terminal'e alınınca arka plandaki toplantı izlemesi durur (Terminal'de yeniden başlatman gerekir) ve kutuya yazdığın notlar oturuma gitmez — Terminal'den yaz.">Terminal'de göster</button><button id=tosk class=gh title="Toplantı oturumunu kapatır; toplantı sonu işleri (özet) yapılmaz. Sürdürmek için sonra Terminal'de göster.">Kapat</button></span></div><div id=tol class=tol hidden></div><div id=tom class=tom></div><div id=tiz></div><div id=tob class=tob></div></section>
+<section id=tos hidden><div class=sh><span class=brb><span id=tosad>Suflor</span> <span id=tosd class=meta></span></span><span class=tod><button id=tosa class=gh title="Araç adımlarını da göster (komutlar, dosyalar)">Ayrıntı</button><button id=tosx class=gh title="Şu anki işi durdurur; yazarsan kaldığı yerden sürer">Durdur</button><button id=tost class=gh title="Aynı oturumu Terminal'de açar; arka plandaki kapanır. Terminal'e alınınca arka plandaki toplantı izlemesi durur (Terminal'de yeniden başlatman gerekir) ve kutuya yazdığın notlar oturuma gitmez — Terminal'den yaz.">Terminal'de göster</button><button id=tosk class=gh title="Toplantı oturumunu kapatır; toplantı sonu işleri (özet) yapılmaz. Sürdürmek için sonra Terminal'de göster.">Kapat</button></span></div><div id=tosn class=tosn hidden></div><div id=tol class=tol hidden></div><div id=tom class=tom></div><div id=tiz></div><div id=tob class=tob></div></section>
 <section id=sk><div class=sh><span>Şimdi <span id=szd class=meta></span></span><span id=tone></span></div><div id=py class=py></div><div id=kc></div></section>
 </div>
 <div class=nb id=nb><section id=kns hidden><div id=knd></div></section><div id=tbr class=tbr hidden><button id=oz class=ib title="Ne diyeyim? · Option + Shift + O"></button><button id=kz class=ib title="Kanıt · Option + Shift + K"></button><button id=sz class=ib title="Sessiz · Option + Shift + M"></button><details class=dm id=tbm><summary class=ib title="Diğer" aria-label="Diğer"></summary><div class=dmk><button id=yz class=ib title="Önemli an: şu anı özette öne çıkar"></button><button id=gz class=ib title="Gizli toplantı: tekrar basana kadar Suflor tamamen kapalı — ses, Whisper, döküm, kanıt yok; yapay zekâ servislerine hiçbir şey gitmez"></button><button id=sc class=ib title="Sesli çeviri: karşı tarafın yabancı dildeki sözünün kısa özü kulaklığına okunur (yalnız kulaklık takılıyken; tekrar basınca kapanır)"></button></div></details></div><div class=kt><button id=ek class="ib kte" title="Belge ekle" aria-label="Belge ekle"></button><input type=file id=ekd multiple hidden><textarea id=n rows=1 placeholder="Asistanla konuş"></textarea><span id=kdz class=kdz aria-hidden=true><i></i><i></i><i></i><i></i><i></i></span><button id=kb class="ib ktm" title="Basılı tut: sesle sor · iki kez dokun: sohbet (Option + Shift + Boşluk)" aria-label="Mikrofon"></button></div><div id=kal class=kal></div></div></main>
@@ -293,8 +373,11 @@ const EN=globalThis.SUFLOR_EN || {}
 let AS="Suflor"
 function L(s,v){let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k+"}").join(v[k]);return t.split("{asistan}").join(AS)}
 // durağan HTML'deki {asistan}: özgün metin saklanır, ad değişince yeniden yazılır
-function yazIpucu(){return L('Asistanla konuş')}  // ad geçmez: toplantıda ve dışında asistan farklı, kutu konuşmak için de
-function asYaz(kok){kok.querySelectorAll("[placeholder],[title],[aria-label]").forEach(e=>["placeholder","title","aria-label"].forEach(a=>{const o=(e.__as||{})[a]||e.getAttribute(a);if(o&&o.includes("{asistan}")){(e.__as=e.__as||{})[a]=o;e.setAttribute(a,o.split("{asistan}").join(AS))}}));const t=kok.getElementById&&kok.getElementById("tosad");if(t)t.textContent=AS;for(const id of ["n","mn"]){const n=kok.getElementById&&kok.getElementById(id);if(n&&!n.dataset.cevap)n.placeholder=yazIpucu()}const b=kok.getElementById&&kok.getElementById("bgas");if(b)b.textContent=L("{asistan} okur")}
+// kutu ipucu: toplantıda (ve mini panoda) genel "Asistanla konuş" — toplantıda ve dışında asistan farklı; panoda toplantı yokken (Bugün) toplantı dışı kişiliğin adıyla "Marvin'e sor"
+function yonelme(a){a=String(a||'').trim();const t=a.toLowerCase(),v=(t.match(/[aeıioöuü](?=[^aeıioöuü]*$)/)||['e'])[0];return a+"'"+(/[aeıioöuü]$/.test(t)?'y':'')+('aıou'.includes(v)?'a':'e')}
+function yazIpucu(d){let s=null;try{s=last}catch(e){}  // ilk çizimde last henüz tanımlı değil
+  if(d===document&&s&&!s.aktif){const ad=(s.konus&&s.konus.kisilik)||AS;return L('{ad} sor',{ad:DIL==='en'?ad:yonelme(ad)})}return L('Asistanla konuş')}
+function asYaz(kok){kok.querySelectorAll("[placeholder],[title],[aria-label]").forEach(e=>["placeholder","title","aria-label"].forEach(a=>{const o=(e.__as||{})[a]||e.getAttribute(a);if(o&&o.includes("{asistan}")){(e.__as=e.__as||{})[a]=o;e.setAttribute(a,o.split("{asistan}").join(AS))}}));const t=kok.getElementById&&kok.getElementById("tosad");if(t)t.textContent=AS;for(const id of ["n","mn"]){const n=kok.getElementById&&kok.getElementById(id);if(n&&!n.dataset.cevap)n.placeholder=yazIpucu(id==="n"?kok:null)}const b=kok.getElementById&&kok.getElementById("bgas");if(b)b.textContent=L("{asistan} okur")}
 function cevir(kok){if(DIL!=="en")return;const w=document.createTreeWalker(kok,NodeFilter.SHOW_TEXT);const d=[];while(w.nextNode())d.push(w.currentNode)
   d.forEach(n=>{const k=n.nodeValue.trim();if(k&&EN[k])n.nodeValue=n.nodeValue.replace(k,EN[k])})
   kok.querySelectorAll("[placeholder],[title],[aria-label]").forEach(e=>["placeholder","title","aria-label"].forEach(a=>{const k=e.getAttribute(a);if(k&&EN[k])e.setAttribute(a,EN[k])}))}
@@ -305,9 +388,10 @@ const ICO={hoparlor:'<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a
  win:'<rect x=3 y=5 width=18 height=14 rx=2 /><rect x=12 y=11 width=7 height=6 rx=1 />',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx=12 cy=12 r=2.8 />',x:'<path d="M6 6l12 12M18 6L6 18"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',replik:'<path d="M4 5h16v11H9l-5 4z"/><path d="M10 8.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4"/><path d="M12 13.6v.1"/>',pause:'<path d="M9 6v12M15 6v12"/>',rec:'<rect x=3 y=5 width=18 height=13 rx=2 /><circle cx=12 cy=11.5 r=3 /><path d="M8 21h8"/>',kulak:'<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x=3.5 y=14 width=4 height=6 rx=1.5 /><rect x=16.5 y=14 width=4 height=6 rx=1.5 />',kilit:'<rect x=5 y=10.5 width=14 height=10 rx=2 /><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>',mute:'<path d="M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path d="M4 4l16 16"/>',
  arti:'<path d="M12 5.5v13M5.5 12h13"/>', dahasi:'<circle cx=5.5 cy=12 r=.9 /><circle cx=12 cy=12 r=.9 /><circle cx=18.5 cy=12 r=.9 />',belge:'<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4M9 13h6M9 16.5h4"/>',
  kopya:'<rect x=8.5 y=8.5 width=11 height=12 rx=2 /><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"/>',indir:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
- posta:'<rect x=3.5 y=5.5 width=17 height=13 rx=2 /><path d="M4 7l8 6 8-6"/>',harita:'<circle cx=12 cy=12 r=2.5 /><circle cx=5 cy=6 r=1.8 /><circle cx=19 cy=6 r=1.8 /><circle cx=19 cy=18 r=1.8 /><path d="M7 7l3.2 3.4M17 7l-3.2 3.4M17.3 16.7l-3.3-3"/>',bos:'',takvim:'<rect x=4 y=5 width=16 height=15 rx=2 /><path d="M4 10h16M9 3v4M15 3v4"/>',mik:'<rect x=9 y=3 width=6 height=11 rx=3 /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'}
+ posta:'<rect x=3.5 y=5.5 width=17 height=13 rx=2 /><path d="M4 7l8 6 8-6"/>',harita:'<circle cx=12 cy=12 r=2.5 /><circle cx=5 cy=6 r=1.8 /><circle cx=19 cy=6 r=1.8 /><circle cx=19 cy=18 r=1.8 /><path d="M7 7l3.2 3.4M17 7l-3.2 3.4M17.3 16.7l-3.3-3"/>',bos:'',hafta:'<rect x=4 y=5 width=16 height=15 rx=2 /><path d="M4 10h16M9 3v4M15 3v4M9.3 10v10M14.7 10v10"/>',takvim:'<rect x=4 y=5 width=16 height=15 rx=2 /><path d="M4 10h16M9 3v4M15 3v4"/>',mik:'<rect x=9 y=3 width=6 height=11 rx=3 /><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'}
+ICO.ileri='<path d="M9.5 6l6 6-6 6"/>';ICO.video='<rect x="3" y="6.5" width="12.5" height="11" rx="2.5"/><path d="M15.5 10.5l5-3v9l-5-3"/>'
 const ic=(n,t)=>`<svg class=i viewBox="0 0 24 24" aria-hidden=true>${ICO[n]}</svg>${t?'<span>'+t+'</span>':''}`
-document.getElementById('oz').innerHTML=ic('replik');document.getElementById('ek').innerHTML=ic('arti');document.getElementById('kb').innerHTML=ic('mic');document.querySelector('#tbm>summary').innerHTML=ic('dahasi'); document.getElementById('yz').innerHTML=ic('star'); document.getElementById('sz').innerHTML=ic('mute'); document.getElementById('gz').innerHTML=ic('kilit'); document.getElementById('kz').innerHTML=ic('cam'); document.getElementById('sc').innerHTML=ic('kulak')
+document.getElementById('oz').innerHTML=ic('replik');document.getElementById('tke').innerHTML=ic('arti');document.getElementById('ek').innerHTML=ic('arti');document.getElementById('kb').innerHTML=ic('mic');document.querySelector('#tbm>summary').innerHTML=ic('dahasi'); document.getElementById('yz').innerHTML=ic('star'); document.getElementById('sz').innerHTML=ic('mute'); document.getElementById('gz').innerHTML=ic('kilit'); document.getElementById('kz').innerHTML=ic('cam'); document.getElementById('sc').innerHTML=ic('kulak')
 // Sağ sütun sürüklenerek genişletilir; genişlik bu tarayıcıda hatırlanır (v0.3.3)
 const rz=document.getElementById('rz'), root=document.documentElement
 function setAw(px){px=Math.max(260,Math.min(innerWidth*0.7,px));root.style.setProperty('--aw',px+'px');return px}
@@ -445,11 +529,22 @@ function eyAyr(a){
 }
 const EYT={kayit:L("Kayıt"),takvim:L("Takvim"),eposta:L("E-posta"),belge:L("Belge"),takip:L("Takip e-postası"),mesaj:L("Ekip mesajı"),diger:L("Diğer"),oturum:L("Oturuma talimat"),yapilacak:L("Yapılacak")}
 const EYD={onaylandi:L("onaylandı — uygulanıyor"),reddedildi:L("reddedildi"),yapildi:L("yapıldı"),hata:L("yapılamadı")}
+// Bekleyenler (30 Ekim): satır = tür simgesi + tek satır başlık; sağda yalnız tek tıkla biten işte (takvim, kayıt, yapılacak, oturuma talimat; sesli sorulan) Onayla,
+// diğerlerinde ›. Satıra dokununca ayrıntı ve eylemler (Reddet, Kopyala, e-posta metni) yerinde açılır; açık satırlar yenilemede açık kalır.
+const EYI={kayit:'dosya',takvim:'takvim',eposta:'posta',belge:'belge',takip:'posta',mesaj:'chat',diger:'liste',oturum:'sohbet',yapilacak:'check'},EY_TEK=['takvim','kayit','yapilacak','oturum'],eyAcik=new Set()
 function renderEylem(s){const e=s.eylem||{},ls=(e.liste||[]).filter(x=>x.sunuldu),sec=document.getElementById('eys');sec.hidden=!ls.length;if(!ls.length)return
-  const bek=ls.filter(x=>x.durum==="bekliyor").length;document.getElementById('eyn').textContent=bek?L("{n} onay bekliyor",{n:bek}):"";document.getElementById('eyh').hidden=bek<2
-  setH(document.getElementById('ey'),ls.map(x=>`<div class="ey ey-${esc(x.durum)}${x.id===e.sesli?' ey-ses':''}"><div class=t><div class=b>${x.id===e.sesli?`<span class=chip title="${L('Şimdi sesli soruluyor')}">${ic('hoparlor')}</span> `:''}<span class=chip>${esc(EYT[x.tur]||x.tur)}</span> ${esc(x.baslik)}${x.kim?' — '+esc(x.kim):''}</div>${x.ayrinti?`<details><summary>${L('Ayrıntı')}</summary>${eyAyr(x.ayrinti)}</details>`:''}${x.sonuc?`<div class=d>${esc(x.sonuc)}</div>`:''}</div><div class=ea>${x.tur==="mesaj"&&x.ayrinti&&x.durum!=="reddedildi"?`<button class=gh data-kopyala="${esc(x.id)}" title="${L('Metni kopyala — ekip aracına sen yapıştırırsın')}">${L('Kopyala')}</button>`:''}${x.durum==="bekliyor"?`<button class=pri data-ey="${esc(x.id)}" data-d=onaylandi>${L('Onayla')}</button><button class=gh data-ey="${esc(x.id)}" data-d=reddedildi>${L('Reddet')}</button>${x.id===e.sesli?`<button class=gh data-ses=sonra title="${L('Bu işi şimdilik geç; panoda bekler')}">${L('Sonra')}</button><button class=gh data-ses=sus title="${L('Sesli soruları bitir; işler panoda bekler')}">${L('Sus')}</button>`:''}`:`<span class=meta>${esc(EYD[x.durum]||x.durum)}${x.kaynak==='ses'?' · <span class=eyses>'+ic('mic')+'</span>':''}</span>${x.geri_al_sn>0?`<button class=gh data-geri="${esc(x.id)}" title="${esc(L('Sesli karar: duyulan "{m}"',{m:x.ses_metin||''}))}">${L('Geri al')} · ${Math.ceil(x.geri_al_sn)}</button>`:''}`}</div></div>`).join(''))}
+  const bek=ls.filter(x=>x.durum==="bekliyor").length;document.getElementById('eyn').textContent=bek?String(bek):"";document.getElementById('eyh').hidden=bek<2
+  setH(document.getElementById('ey'),ls.map(x=>{const b=x.durum==="bekliyor",ses=x.id===e.sesli,tek=b&&(ses||EY_TEK.includes(x.tur)),id=esc(x.id)
+    const onay=`<button class=pri data-ey="${id}" data-d=onaylandi>${L('Onayla')}</button>`,red=`<button class=gh data-ey="${id}" data-d=reddedildi>${L('Reddet')}</button>`
+    const kop=x.tur==="mesaj"&&x.ayrinti&&x.durum!=="reddedildi"?`<button class=gh data-kopyala="${id}" title="${L('Metni kopyala — ekip aracına sen yapıştırırsın')}">${L('Kopyala')}</button>`:''
+    const sag=b?(tek?onay:'')+(ses?`<button class=gh data-ses=sonra title="${L('Bu işi şimdilik geç; panoda bekler')}">${L('Sonra')}</button><button class=gh data-ses=sus title="${L('Sesli soruları bitir; işler panoda bekler')}">${L('Sus')}</button>`:'')
+      :`<span class=meta>${esc(EYD[x.durum]||x.durum)}${x.kaynak==='ses'?' · <span class=eyses>'+ic('mic')+'</span>':''}</span>${x.geri_al_sn>0?`<button class=gh data-geri="${id}" title="${esc(L('Sesli karar: duyulan "{m}"',{m:x.ses_metin||''}))}">${L('Geri al')} · ${Math.ceil(x.geri_al_sn)}</button>`:''}`
+    return `<div class="ey ey-${esc(x.durum)}${ses?' ey-ses':''}"><details data-eyid="${id}"${eyAcik.has(x.id)?' open':''}><summary><span class=eyi title="${esc(EYT[x.tur]||x.tur)}">${ses?`<span title="${L('Şimdi sesli soruluyor')}">${ic('hoparlor')}</span>`:ic(EYI[x.tur]||'liste')}</span><span class=t>${esc(x.baslik)}${x.kim?' — '+esc(x.kim):''}</span><span class=ea>${sag}</span>${tek?'':`<span class=chev>${ic('ileri')}</span>`}</summary>`
+      +`<div class=eyb><span class=chip>${esc(EYT[x.tur]||x.tur)}</span>${x.ayrinti?eyAyr(x.ayrinti):''}${x.sonuc?`<div class=d>${esc(x.sonuc)}</div>`:''}${b||kop?`<div class=bt>${kop}${b&&!tek?onay:''}${b?red:''}</div>`:''}</div></details></div>`}).join(''))}
+document.getElementById('ey').addEventListener('toggle',ev=>{const d=ev.target;if(d&&d.dataset&&d.dataset.eyid){if(d.open)eyAcik.add(d.dataset.eyid);else eyAcik.delete(d.dataset.eyid)}},true)
 async function eylemKarar(id,d,b){if(b)b.disabled=true;try{await fetch('/eylem-karar',{method:'POST',body:JSON.stringify({id,durum:d})})}catch(e){}refresh()}
-document.getElementById('ey').addEventListener('click',async ev=>{const k=ev.target.closest('button[data-kopyala]')
+document.getElementById('ey').addEventListener('click',async ev=>{if(ev.target.closest('summary button'))ev.preventDefault()  // satırdaki düğme satırı açıp kapamasın
+  const k=ev.target.closest('button[data-kopyala]')
   if(k){const x=((last&&last.eylem||{}).liste||[]).find(y=>y.id===k.dataset.kopyala);try{await navigator.clipboard.writeText(x?x.ayrinti:'');k.textContent='✓ '+L('kopyalandı')}catch(e){k.textContent=L('kopyalanamadı')}setTimeout(()=>{k.textContent=L('Kopyala')},1500);return}
   const g=ev.target.closest('button[data-geri]');if(g){g.disabled=true;let r={};try{r=await j('/eylem-geri-al',{method:'POST',body:JSON.stringify({id:g.dataset.geri})})}catch(e){}if(!r.ok)geciciDurum(L('Geri alınamadı'),L('süre doldu'));refresh();return}
   const z=ev.target.closest('button[data-ses]');if(z){z.disabled=true;try{await j('/eylem-sesli',{method:'POST',body:JSON.stringify({komut:z.dataset.ses})})}catch(e){}refresh();return}
@@ -603,7 +698,7 @@ let agTotal=0
   dd.textContent=L("gönderiliyor…");let r={};try{r=await j("/geri-bildirim",{method:"POST",body:JSON.stringify({metin:t,teknik:document.getElementById("gbt").checked})})}catch(e){}
   if(r.ok){m.value="";dd.textContent=L("Teşekkürler — gönderildi");setTimeout(()=>d.close(),1400)}else dd.textContent=L("Gönderilemedi — sonra yeniden denenecek")}}
 // takvimden sıradaki toplantılar + panodan başlatma (Claude izlemiyorken görünür). Anahtar sunucu tarafından gömülür.
-let tkSecili=null, tkOlaylar=[], tkGor=null  // tkGor: boş panoda gündemi gösterilen toplantı
+let tkSecili=null, tkOlaylar=[], tkListe=[], tkGor=null  // tkGor: boş panoda gündemi gösterilen toplantı
 // boş panoda seçili toplantının gündemi: Claude'un hazırladığı gündem başlığı uyuşuyorsa onun maddeleri, yoksa davet notundaki
 // maddeler (ayırıcı çizgiden önceki kısım; bağlantı, parola, kimlik satırları atılır — Teams/Zoom katılım bilgisi gösterilmez)
 const tkNot={}; let agTam=null, agTamT=0
@@ -630,19 +725,110 @@ document.getElementById('tkg').addEventListener('input',e=>e.target.dataset.el='
 // Elle başlat aç/kapat: form zaten elle açıksa ikinci tıklama kapatır
 document.getElementById('tke').onclick=()=>{const f=document.getElementById('tkf');if(!f.hidden&&tkSecili===null){f.hidden=true;if(last)renderTakvim(last)}else tkForm(null)}
 document.getElementById('tki').onclick=()=>{document.getElementById('tkf').hidden=true;if(last)renderTakvim(last)}
-document.getElementById('tky2').onclick=ev=>{ev.preventDefault();const o=tkOlaylar.find(x=>x.id===tkSecili);if(o&&o.baglanti){if(CHROME)window.open(o.baglanti,'_blank');else chromeAc({olay:o.id})}}
-// "Bu hafta" (S167): önümüzdeki 7 günün toplantıları, günlere bölünmüş; ikinci basış Bugün'e döner. Veri: /takvim?gun=7 (reddedilenler soluk)
-let tkHafta=false
-async function haftaCiz(){const w=document.getElementById('tkw'),b=document.getElementById('tkh7'),sec=document.getElementById('tks');b.classList.toggle('on',tkHafta);b.textContent=L(tkHafta?'Bugün':'Bu hafta');sec.classList.toggle('hf',tkHafta);w.hidden=!tkHafta;if(!tkHafta)return
-  w.textContent=L('takvim okunuyor…');let t={};try{t=await j('/takvim?gun=7')}catch(e){}
-  if(!tkHafta)return
-  const ol=t.olaylar||[];if(!ol.length){w.textContent=L('Bu hafta takvimde toplantı yok');return}
-  const g={};ol.forEach(o=>(g[o.tarih]=g[o.tarih]||[]).push(o));const loc=L('tr-TR')
-  w.innerHTML=Object.keys(g).sort().map(d=>{const x=new Date(d+'T00:00');return`<div class=gun>${esc(x.toLocaleDateString(loc,{weekday:'long'})+' '+x.toLocaleDateString(loc,{day:'numeric',month:'long'}))}</div>`
-    +g[d].sort((a,c)=>a.saat<c.saat?-1:1).map(o=>`<div class="tko${o.reddettin?' red':''}"><div class=t><div><b class=z>${esc(o.saat)}${o.bitis_saat?'–'+esc(o.bitis_saat):''}</b>${esc(o.baslik)}${o.platform?` <span class=chip>${PL[o.platform]||esc(o.platform)}</span>`:''}</div><div class=sp>${esc([o.suruyor?L('şimdi'):'',o.kisi_sayisi?L('{n} kişi',{n:o.kisi_sayisi}):'',o.reddettin?L('daveti reddettin'):''].filter(Boolean).join(' · '))}</div></div></div>`).join('')}).join('')}
-document.getElementById('tkh7').onclick=()=>{tkHafta=!tkHafta;haftaCiz()}
+document.getElementById('tky2').onclick=ev=>{ev.preventDefault();const o=tkBul(tkSecili);if(o&&o.baglanti){if(CHROME)window.open(o.baglanti,'_blank');else chromeAc({olay:o.id})}}
+// Hafta görünümü (S167'nin yerine; kullanıcının seçtiği tasarım A — Google/Mac Takvim düzeni): ana alanda tam genişlik Pazartesi–Pazar ızgarası, solda saat şeridi
+// (07–21, haftanın ilk/son toplantısına göre genişler), saatine ve süresine göre bloklar, çakışanlar yan yana, bugün sütununda şimdi çizgisi, tüm gün şeridi.
+// Blok rengi hazırlık (toplantı başına): hazır (bu toplantının brifingi kayıtlı) · eksik (brifing yok ama gündem, belge ya da aynı kişilerle son 30 günde Suflor kaydı var;
+// ya da brifing sürüyor/hata) · yok. Gelecekteki toplantıda Hazırla (/brifing, toplantıyı başlatmadan), hazırsa Hazırlığı aç (kutuda brifing). Geçmiş soluk, reddedilen üstü çizili. ‹ › hafta gezer (aktarıcının verdiği
+// aralıkta), bloğa tıklayınca ayrıntı kutusu: gelecekte Başlat (mevcut form), geçmişte Suflor kaydı varsa Özeti aç / Dökümü aç. Veri: /takvim?hafta=<n> (takvim_hafta).
+// Chrome panosunda takvimdeki "Bu hafta" düğmesi, Mac penceresinde kenar çubuğundaki "Bu hafta" açar.
+let hfAcik=false,hfOnceTop=false,hfOf=0,hfVeri=null,hfArsiv=null,hfArsivT=0,hfZam=null,hfAralik=[7,21],hfSecI=null,hfHzAcik=null,hfBekle=null,hfCizT=0
+const tkBul=id=>tkListe.find(x=>x.id===id)||tkOlaylar.find(x=>x.id===id)||((hfVeri&&hfVeri.olaylar)||[]).find(x=>x.id===id)
+const hfGun=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y,m-1,d)}, hfGunEk=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n)
+const hfIso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+function hfAc(ac){hfAcik=!!ac;document.documentElement.classList.toggle('hafta-ac',hfAcik);document.getElementById('hfs').hidden=!hfAcik;document.getElementById('tkh7').classList.toggle('on',hfAcik);hfDetayKapat()
+  clearInterval(hfZam);hfZam=null
+  if(hfAcik){hfOf=0;hfYukle(true);hfZam=setInterval(()=>{if(hfVeri)hfCiz(false)},60000)}
+  else if(kcSec==='hf'){kcSec='tks';if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))}}
+async function hfYukle(kaydir){const s=document.getElementById('hfs');if(!hfVeri)s.innerHTML=`<p class=hint>${L('takvim okunuyor…')}</p>`
+  let t=null;try{t=await j('/takvim?hafta='+hfOf)}catch(e){}
+  if(!hfAcik)return;if(!t||!t.hafta_bas){s.innerHTML=`<p class=hint>${L("Suflor.me'ye ulaşılamadı")}</p>`;return}
+  hfVeri=t;hfCiz(kaydir);if(t.olaylar.some(o=>o.gecmis))hfArsivAl()
+  const d=document.getElementById('hfd'),sid=d&&d.dataset.id  // açık ayrıntı kutusu yeni veriyle (brifing bitince yeşil, Hazırlığı aç)
+  if(sid){const i=t.olaylar.findIndex(o=>o.id===sid),el=i>=0&&document.querySelector(`#hfs .hfo[data-hf="${i}"]`);if(el)hfDetay(i,el,true);else hfDetayKapat()}
+  clearTimeout(hfBekle);hfBekle=t.olaylar.some(o=>o.brifing==='calisiyor')?setTimeout(()=>{if(hfAcik)hfYukle(false)},5000):null}
+async function hfArsivAl(){if(hfArsiv&&Date.now()-hfArsivT<60000)return;try{const r=await j('/toplantilar');hfArsiv=r.toplantilar||[];hfArsivT=Date.now()}catch(e){}}
+function hfKayit(o){if(!hfArsiv)return null;const b=+new Date(o.baslangic),e=+new Date(o.bitis);let en=null,f=1e15  // Suflor kaydı: başlangıcı toplantı saatinde (20 dk erken açılmış olabilir)
+  for(const x of hfArsiv){const t=+new Date(x.at);if(t>=b-20*6e4&&t<=e&&Math.abs(t-b)<f){f=Math.abs(t-b);en=x}}return en}
+function hfYerlesim(ss){ss.sort((a,b)=>a.s-b.s||b.e-a.e);let kume=[],son=-1;const kol=[]  // çakışan kümeler: her blok ilk boş kolona, küme genişliği en çok kolon
+  const bitir=()=>{const n=Math.max(...kume.map(x=>x.k))+1;kume.forEach(x=>x.n=n);kume=[];kol.length=0;son=-1}
+  for(const x of ss){if(kume.length&&x.s>=son)bitir();let k=kol.findIndex(e=>e<=x.s);if(k<0){k=kol.length;kol.push(x.e)}else kol[k]=x.e;x.k=k;kume.push(x);son=Math.max(son,x.e)}
+  if(kume.length)bitir();return ss}
+function hfCiz(kaydir){const t=hfVeri,s=document.getElementById('hfs'),loc=L('tr-TR'),H=44,simdi=new Date(),bas=hfGun(t.hafta_bas),bugun=hfIso(simdi)
+  const gun=[...Array(7)].map((_,i)=>hfGunEk(bas,i)),ol=t.olaylar||[],kb=t.kapsam&&t.kapsam.bas,ks=t.kapsam&&t.kapsam.son
+  const okuyok=d=>{const x=hfIso(d);return(kb&&x<kb)||(ks&&x>ks)}
+  const son=gun[6],ayni=bas.getFullYear()===son.getFullYear()
+  const baslik=bas.toLocaleDateString(loc,ayni?{day:'numeric',month:'long'}:{day:'numeric',month:'long',year:'numeric'})+' – '+son.toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'})
+  // saat aralığı: 07–21, haftanın ilk/son toplantısına göre genişler
+  const seg=gun.map(()=>[]),tum=gun.map(()=>[]);let a0=7*60,a1=21*60
+  ol.forEach((o,i)=>{const b=new Date(o.baslangic),e=new Date(o.bitis)
+    gun.forEach((d,g)=>{const g0=+d,g1=+hfGunEk(d,1);if(+e<=g0||+b>=g1)return
+      if(o.tum_gun){tum[g].push(i);return}
+      const sb=Math.max(+b,g0),se=Math.min(+e,g1),x={i,s:Math.round((sb-g0)/6e4),e:Math.max(Math.round((se-g0)/6e4),Math.round((sb-g0)/6e4)+15)};seg[g].push(x);a0=Math.min(a0,Math.floor(x.s/60)*60);a1=Math.max(a1,Math.ceil(Math.min(x.e,1440)/60)*60)})})
+  hfAralik=[a0,a1];const yuk=(a1-a0)/60*H,y=m=>(m-a0)/60*H
+  const hz={hazir:L('Hazır'),eksik:L('Eksik'),yok:L('Hazırlık yok')}
+  const blok=(x,g)=>{const o=ol[x.i],top=y(x.s),h=Math.max(y(x.e)-top-2,18),kisa=h<34,w=100/x.n,l=x.k*w
+    return`<button type=button class="hfo hz-${esc(o.hazirlik)}${o.gecmis?' gec':''}${o.reddettin?' red':''}${kisa?' kisa':''}${hfSecI===x.i?' sec':''}" data-hf="${x.i}" style="top:${top+1}px;height:${h}px;left:calc(${l}% + 2px);width:calc(${w}% - 4px);--sat:${Math.max(1,Math.floor((h-18)/15))}" title="${esc(o.saat+'–'+o.bitis_saat+' · '+o.baslik)}">`
+      +(kisa?`<b><span class=z>${esc(o.saat)}</span> ${esc(o.baslik)}</b>`:`<span class=z>${esc(o.saat)}–${esc(o.bitis_saat)}</span><b>${esc(o.baslik)}</b>`)+`</button>`}
+  const not=!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.')
+    :t.durum&&t.durum!=='ok'&&t.durum!=='bekliyor'?(t.hata||t.durum):gun.some(okuyok)?L('Takvim {a} – {b} arasını okuyor; taralı günlerde bilgi yok.',{a:hfGun(kb).toLocaleDateString(loc,{day:'numeric',month:'long'}),b:hfGun(ks).toLocaleDateString(loc,{day:'numeric',month:'long'})})
+    :!ol.length?L(hfOf===0?'Bu hafta takvimde toplantı yok':'Bu aralıkta takvimde toplantı yok'):''
+  const simdiDk=(simdi-hfGun(bugun))/6e4,bg=gun.findIndex(d=>hfIso(d)===bugun)
+  const h=`<div class=hft><button type=button class=gh data-hfg=bugun ${hfOf===0?'disabled':''}>${L('Bugün')}</button><button type=button class="gh ib" data-hfg=-1 title="${L('Önceki hafta')}" aria-label="${L('Önceki hafta')}" ${hfOf<=t.en_az?'disabled':''}>‹</button><button type=button class="gh ib" data-hfg=1 title="${L('Sonraki hafta')}" aria-label="${L('Sonraki hafta')}" ${hfOf>=t.en_cok?'disabled':''}>›</button><h2 id=hfb>${esc(baslik)}</h2><span class=sp1></span>`
+    +`<span class=hfl title="${L('Blok rengi toplantının hazırlık durumu')}">${['hazir','eksik','yok'].map(k=>`<span><i class=hz-${k}></i>${hz[k]}</span>`).join('')}</span><button type=button class="ib gh kgx" data-hfg=kapat title="${L('Kapat')}" aria-label="${L('Kapat')}">${ic('x')}</button></div>`
+    +`<p id=hfn class=hint>${esc(not)}</p>`
+    +`<div class=hfk><div class=hfu><div></div>${gun.map(d=>{const x=hfIso(d);return`<div class="${x===bugun?'bg':x<bugun?'gc':''}${okuyok(d)?' okuyok':''}">${esc(d.toLocaleDateString(loc,{weekday:'short'}))}<span class=n>${d.getDate()}</span></div>`}).join('')}</div>`
+    +(tum.some(x=>x.length)?`<div class=hfa><div class=ad>${L('tüm gün')}</div>${tum.map((ix,g)=>`<div class="${okuyok(gun[g])?'okuyok':''}">${ix.map(i=>{const o=ol[i];return`<button type=button class="hfo kisa hz-${esc(o.hazirlik)}${o.gecmis?' gec':''}${o.reddettin?' red':''}" data-hf="${i}" title="${esc(o.baslik)}"><b>${esc(o.baslik)}</b></button>`}).join('')}</div>`).join('')}</div>`:'')
+    +`<div class=hfg id=hfg><div class=hfs style="height:${yuk}px">${[...Array((a1-a0)/60)].map((_,k)=>`<span style="top:${k*H}px">${k?String(a0/60+k).padStart(2,'0')+':00':''}</span>`).join('')}</div>`
+    +gun.map((d,g)=>`<div class="hfc${g===bg?' bg':''}${okuyok(d)?' okuyok':''}" style="height:${yuk}px">${hfYerlesim(seg[g]).map(x=>blok(x,g)).join('')}${g===bg&&simdiDk>=a0&&simdiDk<=a1?`<div class=hfsim style="top:${y(simdiDk)}px"></div>`:''}</div>`).join('')+`</div></div>`
+  const gg=document.getElementById('hfg'),st=gg?gg.scrollTop:0
+  hfCizT=Date.now();s.innerHTML=h;const g2=document.getElementById('hfg')
+  if(kaydir){const ilk=Math.min(...seg.flat().map(x=>x.s),1440),hedef=bg>=0?simdiDk-90:ilk<1440?ilk-30:8*60;g2.scrollTop=Math.max(0,y(hedef))}else g2.scrollTop=st}
+function hfDetayKapat(tut){const d=document.getElementById('hfd');if(d)d.remove();if(!tut)hfHzAcik=null;if(hfSecI!==null){hfSecI=null;document.querySelectorAll('#hfs .hfo.sec').forEach(x=>x.classList.remove('sec'))}}
+function hfDetay(i,el,tut){hfDetayKapat(tut);const o=(hfVeri.olaylar||[])[i];if(!o)return;hfSecI=i;el.classList.add('sec');const loc=L('tr-TR'),b=new Date(o.baslangic)
+  const kim=(o.katilimcilar||[]),ks=o.kisi_sayisi||kim.length,kay=o.gecmis?hfKayit(o):null
+  const hz={hazir:L('Hazırlık hazır — brifing var'),eksik:o.brifing?L('Hazırlık eksik'):L('Hazırlık eksik — bağlam var, brifing yok'),yok:L('Hazırlık yok')}
+  const nd={gundem:L('davette gündem var'),belge:L('davette belge bağlantısı var'),gecmis:L('bu kişilerle son 30 günde Suflor kaydı var')}
+  const hzs=o.brifing==='calisiyor'?L('{asistan} brifingi hazırlıyor… (1–2 dk)'):o.brifing==='hata'?(o.brifing_hata||L('Brifing hazırlanamadı')):o.hazirlik==='eksik'&&(o.hazirlik_neden||[]).length?o.hazirlik_neden.map(x=>nd[x]).filter(Boolean).join(' · '):''
+  const hr=o.hazirlik_sonuc,ls=(a,t)=>a&&a.length?`<div class=bb>${L(t)}</div><ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''
+  const hzAcik=!!hr&&hfHzAcik===o.id,yeni=!o.gecmis&&o.baslatilir
+  const hzDug=o.brifing==='calisiyor'?`<button type=button class=gh disabled>${L('Hazırlanıyor…')}</button>`:hr?`<button type=button class=gh data-hfhz="${esc(o.id)}" aria-expanded="${hzAcik}">${L(hzAcik?'Hazırlığı gizle':'Hazırlığı aç')}</button>`
+    :yeni?`<button type=button class=gh data-hfhb="${esc(o.id)}" title="${L('{asistan} geçmiş görüşmelere, açık sorulara ve belgelere bakıp kısa bir brifing hazırlar.')}">${L(o.brifing==='hata'?'Yeniden dene':'Hazırla')}</button>`:''
+  const d=document.createElement('div');d.id='hfd';d.dataset.id=o.id;d.setAttribute('role','dialog');d.setAttribute('aria-label',o.baslik||'')
+  d.innerHTML=`<div class=bas><b class="${o.reddettin?'red':''}">${esc(o.baslik||L('(başlıksız)'))}</b><button type=button class="ib gh kgx" data-hfx title="${L('Kapat')}" aria-label="${L('Kapat')}">${ic('x')}</button></div>`
+    +`<div class=sat>${esc(b.toLocaleDateString(loc,{weekday:'long',day:'numeric',month:'long'}))} · ${o.tum_gun?L('tüm gün'):esc(o.saat+'–'+o.bitis_saat)}${o.suruyor?' · '+L('şimdi'):''}</div>`
+    +(o.platform||o.yer?`<div class=sat>${o.platform?`<span class=chip>${PL[o.platform]||esc(o.platform)}</span> `:''}${o.yer&&!/^https?:/i.test(o.yer)?esc(o.yer):''}</div>`:'')
+    +(ks?`<div class="sat kim">${esc(L('{n} kişi',{n:ks}))}${kim.length?': '+esc(kim.slice(0,8).join(', '))+(kim.length>8||ks>kim.length+1?' …':''):''}</div>`:'')
+    +(o.ben_duzenleyen?`<div class="sat kim">${L('düzenleyen sen')}</div>`:o.duzenleyen?`<div class="sat kim">${esc(L('Düzenleyen: {ad}',{ad:o.duzenleyen}))}</div>`:'')
+    +(o.reddettin?`<div class="sat kim">${L('daveti reddettin')}</div>`:'')
+    +`<div class="sat hz"><i class=hz-${esc(o.hazirlik)}></i>${hz[o.hazirlik]||hz.yok}</div>`+(hzs?`<div class="sat kim">${esc(hzs)}</div>`:'')
+    +(hzAcik?`<div class=hzb>${hr.ozet?`<div class=b>${esc(hr.ozet)}</div>`:''}${ls(hr.dikkat,'Dikkat')}${ls(hr.acik,'Açık kalanlar')}${ls(hr.gecmis,'Geçmişte')}</div>`:'')
+    +(o.gecmis&&hfArsiv&&!kay?`<div class="sat kim">${L('Bu toplantının Suflor kaydı yok')}</div>`:'')
+    +`<div class=bt>${hzDug}${o.baslatilir?`<button type=button class=pri data-hfb="${esc(o.id)}">${L('Başlat')}</button>`:''}${kay&&kay.ozet?`<button type=button class=pri data-hfoz="${esc(kay.ozet)}">${L('Özeti aç')}</button>`:''}${kay?`<button type=button class=gh data-hfdk="${esc(kay.id)}">${L('Dökümü aç')}</button>`:''}</div>`
+  document.body.appendChild(d)
+  const r=el.getBoundingClientRect(),w=d.offsetWidth,hh=d.offsetHeight,vw=innerWidth,vh=innerHeight
+  let x=r.right+8,yy=Math.max(8,Math.min(r.top,vh-hh-8))  // sağına; sığmazsa soluna; ikisi de sığmazsa altına (dar pencere)
+  if(x+w>vw-8){x=r.left-w-8;if(x<8){x=Math.max(8,Math.min(vw-w-8,r.left));yy=r.bottom+6+hh<vh?r.bottom+6:Math.max(8,r.top-hh-6)}}
+  d.style.left=x+'px';d.style.top=yy+'px'
+  if(o.gecmis&&!hfArsiv)hfArsivAl().then(()=>{if(hfSecI===i&&document.getElementById('hfd'))hfDetay(i,document.querySelector(`#hfs .hfo[data-hf="${i}"]`)||el)})}
+document.getElementById('hfs').addEventListener('click',ev=>{const g=ev.target.closest('[data-hfg]');if(g){const v=g.dataset.hfg
+    if(v==='kapat'){hfAc(false);return}hfDetayKapat();hfOf=v==='bugun'?0:Math.max(hfVeri.en_az,Math.min(hfVeri.en_cok,hfOf+Number(v)));hfYukle(true);return}
+  const b=ev.target.closest('.hfo[data-hf]');if(b){ev.stopPropagation();if(hfSecI===Number(b.dataset.hf)){hfDetayKapat();return}hfDetay(Number(b.dataset.hf),b)}})
+document.addEventListener('click',async ev=>{const d=document.getElementById('hfd');if(!d)return
+  if(!d.contains(ev.target)){if(!ev.target.closest('#hfs .hfo'))hfDetayKapat();return}
+  if(ev.target.closest('[data-hfx]')){hfDetayKapat();return}
+  const hzb=ev.target.closest('[data-hfhz]');if(hzb){const i=hfSecI;hfHzAcik=hfHzAcik===hzb.dataset.hfhz?null:hzb.dataset.hfhz;hfDetay(i,document.querySelector(`#hfs .hfo[data-hf="${i}"]`),true);return}
+  const hh=ev.target.closest('[data-hfhb]');if(hh){hh.disabled=true;let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:hh.dataset.hfhb})})}catch(e){}
+    if(!r.ok){hh.disabled=false;geciciDurum(L('Brifing başlatılamadı'),r.err||'');return}hfYukle(false);return}
+  const bs=ev.target.closest('[data-hfb]');if(bs){const o=tkBul(bs.dataset.hfb);hfAc(false);if(o)tkForm(o);return}
+  const oz=ev.target.closest('[data-hfoz]');if(oz){hfDetayKapat();arOzet(oz.dataset.hfoz);return}
+  const dk=ev.target.closest('[data-hfdk]');if(dk){hfDetayKapat();const a=document.getElementById('ard');if(!a.open)a.showModal();arDokumAc(dk.dataset.hfdk)}})
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&document.getElementById('hfd')){hfDetayKapat();ev.stopPropagation()}},true)
+document.getElementById('hfs').addEventListener('scroll',()=>{if(Date.now()-hfCizT>500)hfDetayKapat()},true)  // yeniden çizimin kaydırma geri yüklemesi kutuyu kapatmasın
+document.getElementById('tkh7').onclick=()=>hfAc(!hfAcik);document.getElementById('tkbg').onclick=()=>{if(hfAcik)hfAc(false)}
 document.getElementById('tky').onclick=()=>{fetch('/takvim-yenile',{method:'POST',body:'{}'});document.getElementById('tkh').textContent=L('takvim yenileniyor…')}
-document.getElementById('tk').addEventListener('click',ev=>{const k=ev.target.closest('button[data-kat]');if(k&&/^https:\/\//.test(k.dataset.kat))return window.open(k.dataset.kat,'_blank');const b=ev.target.closest('button[data-bas]');if(b)return tkForm(b.dataset.bas?tkOlaylar.find(o=>o.id===b.dataset.bas):null)
+document.getElementById('tk').addEventListener('click',ev=>{const k=ev.target.closest('button[data-kat]');if(k&&/^https:\/\//.test(k.dataset.kat))return window.open(k.dataset.kat,'_blank');const b=ev.target.closest('button[data-bas]');if(b)return tkForm(b.dataset.bas?tkBul(b.dataset.bas):null)
+  const hz=ev.target.closest('button[data-hz]');if(hz)return hazirlikTik(hz.dataset.hz,hz)
   const sec=ev.target.closest('[data-sec]');if(sec){tkGor=sec.dataset.sec;if(last){renderTakvim(last);agSig="";refresh()}}})
 function platformSor(){return new Promise(res=>{const d=document.getElementById('pld');let v='';const bitir=()=>{d.removeEventListener('close',bitir);d.querySelectorAll('#plp button').forEach(x=>x.onclick=null);res(v)}
   d.querySelectorAll('#plp button').forEach(x=>x.onclick=()=>{v=x.dataset.v;d.close()});document.getElementById('plv').onclick=()=>d.close();d.addEventListener('close',bitir);d.showModal()})}
@@ -650,7 +836,7 @@ document.getElementById('tkb').onclick=async ev=>{const b=ev.currentTarget,m=doc
   b.disabled=true;m.className='';m.textContent=L('başlatılıyor…')
   // toplantı hemen açılır (kullanıcı, 21 Ekim: hazırlık sekmesi kalktı — izle dökümü baştan okur, erken katılınca satır kaybolmaz): takvim olayının
   // bağlantısı, yoksa formdaki, o da yoksa seçilen uygulamanın ana sayfası; hiçbiri yoksa sayfa açılmaz. Aktarıcı Chrome'da açar (pano Safari'de olabilir).
-  const o0=tkOlaylar.find(x=>x.id===tkSecili), bl=(o0&&o0.baglanti)?"":document.getElementById('tkl').value.trim()
+  const o0=tkBul(tkSecili), bl=(o0&&o0.baglanti)?"":document.getElementById('tkl').value.trim()
   // S166: bağlantı da platform da yoksa hiçbir uygulama açılmaz; kullanıcıya platform seçtirilir (vazgeçerse Başlat olmaz)
   let pl=bl?'':sgVal('tkp')
   if(!bl&&!(o0&&o0.baglanti)&&!pl){pl=await platformSor();if(!pl){m.textContent='';b.disabled=false;return}sgSet('tkp',pl)}
@@ -752,14 +938,15 @@ function konusGorunum(s,mini_){const k=s.konus||{},cvp=!!(s.eylem&&s.eylem.sesli
   const df=k.defter&&!kRec&&!k.soru?`<div class=meta>${esc(L('Son toplantı hazır: {a} ({s}) — ne konuşulduğunu sorabilirsin',{a:k.defter.ad||'',s:k.defter.saat||''}))}</div>`:''
   const cp=String(taze&&k.cevap||'').replace(/\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm|ton:\s*[a-z_]+)>\s*/gi,' ').split(/\n\s*-{3,}\s*\n?/),ky=cp[0].trim(),ay=cp.slice(1).join('\n').trim()
   const ust=modHtml(k)+(otonomHtml(k)||asistanHtml(k))+ucluHtml(k),sus=k.durum==='konusuyor'?`<button class=gh data-sus>${L('Sus')}</button>`:'',sb=ky&&!kRec&&!sur?soyleBtn(ky):''
-  const h=`${ust}${df}${d?`<div class=meta>${esc(d)}</div>`:''}${k.soru&&taze&&!kRec?`<div class=d><b>${L(k.sesli_cevap?'Duyulan':'Soru')}:</b> ${esc(k.soru)}</div>`:''}${ky&&!kRec?`<div class=ca>${esc(ad)}</div><div class=b data-kos title="${esc(L(mini_?'Tamamını göster':'Konuşma geçmişini aç'))}">${esc(ky)}</div>`:''}${sus||sb?`<div class=kdb>${sus}${sb}</div>`:''}${ay&&!kRec?`<details class=kay><summary>${L('Ayrıntı')}</summary><div class=d style="white-space:pre-wrap">${esc(ay)}</div></details>`:''}`
+  const h=`${ust}${df}${d?`<div class=meta>${esc(d)}</div>`:''}${k.soru&&taze&&!kRec?`<div class=d><b>${L(k.sesli_cevap?'Duyulan':'Soru')}:</b> ${esc(k.soru)}</div>`:''}${ky&&!kRec?`<div class=ca>${esc(ad)}</div><div class=b data-kos title="${esc(L(mini_||!s.aktif?'Tamamını göster':'Konuşma geçmişini aç'))}">${esc(ky)}</div>`:''}${sus||sb||(ky&&!kRec&&!mini_&&!s.aktif)?`<div class=kdb>${sus}${sb}${ky&&!kRec&&!mini_&&!s.aktif?`<button class=gh data-kgec title="${esc(L('Konuşma geçmişini aç'))}">${L('Tümü')}</button>`:''}</div>`:''}${ay&&!kRec?`<details class=kay><summary>${L('Ayrıntı')}</summary><div class=d style="white-space:pre-wrap">${esc(ay)}</div></details>`:''}`
   return h.trim()}
 function renderKonus(s){const sec=document.getElementById('kns'),h=konusGorunum(s,false);sec.hidden=!h;mikCiz(document.getElementById('kb'),s);document.getElementById('kb').hidden=!!s.aktif&&!(s.konus||{}).toplanti
   document.getElementById('tbr').hidden=!toplantidaMi(s);if(h&&sec.dataset.h!==h){sec.dataset.h=h;setH(document.getElementById('knd'),h)}}
 {document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.altKey&&e.shiftKey&&!document.getElementById('kb').hidden){e.preventDefault();if(!e.repeat)konusBasla()}})
   document.addEventListener('keyup',e=>{if(kRec&&(e.code==='Space'||e.key==='Alt'||e.key==='Shift')){e.preventDefault();konusBitir()}})}
 function susBagla(d){d.addEventListener('click',ev=>{if(ev.target.closest('button[data-sus]')){ev.stopPropagation();j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'sus'})}).catch(()=>{});return}
-  const b=ev.target.closest('[data-kos]');if(!b)return;if(d===document)konusmaAc();else{const m=d.getElementById('mk');if(m)m.classList.toggle('acik')}})}
+  if(ev.target.closest('button[data-kgec]')){gecmisAc();return}
+  const b=ev.target.closest('[data-kos]');if(!b)return;if(d===document){if(last&&!last.aktif)document.getElementById('kns').classList.toggle('acik');else konusmaAc()}else{const m=d.getElementById('mk');if(m)m.classList.toggle('acik')}})}
 susBagla(document)
 // yan panelde konuşma geçmişi (cevaba dokununca; kaynak Konuş geçmişi — /konus-gecmis); "Tümü" Arşiv'deki pencereyi açar
 async function konusmaAc(){const sec=document.getElementById('kos');sec.hidden=false;document.documentElement.classList.remove('yan-kapali','yan-bos');let r={};try{r=await j('/konus-gecmis')}catch(e){}
@@ -769,18 +956,17 @@ async function konusmaAc(){const sec=document.getElementById('kos');sec.hidden=f
 document.getElementById('kosx').innerHTML=ic('x');document.getElementById('kosx').onclick=()=>{document.getElementById('kos').hidden=true}
 document.getElementById('kosa').onclick=()=>gecmisAc()
 // toplantı öncesi brifing: boş panoda seçili takvim toplantısı için, dokununca (Claude yalnız okur; sonuç gün boyu saklanır)
-function renderBrifing(s){const sec=document.getElementById('brs'),izliyor=s.claude_age_s!=null&&s.claude_age_s<120,o=tkOlaylar.find(x=>x.id===tkGor)
-  sec.hidden=!!s.aktif||izliyor||!o;if(sec.hidden)return
+function renderBrifing(s){const sec=document.getElementById('brs'),izliyor=s.claude_age_s!=null&&s.claude_age_s<120,o=tkGor&&tkBul(tkGor)
+  if(!!s.aktif||izliyor||!o){sec.hidden=true;return}
+  sec.hidden=hzAc!==o.id  // 30 Ekim: kartın altında, yalnız kartın Hazırlık bağlantısıyla açılır
   // okunan brifing başlık hariç gizlenebilir (kullanıcı, 9 Ekim); toplantı başına tarayıcıda hatırlanır
-  const kapali=brKapali().includes(o.id),kb=document.getElementById('brk');kb.textContent=L(kapali?'Göster':'Gizle');kb.setAttribute('aria-expanded',!kapali);kb.dataset.olay=o.id
-  document.getElementById('br').hidden=kapali
-  document.getElementById('brn').textContent=o.baslik;const b=(s.brifing||{})[o.id]||{},ls=(a,t)=>a&&a.length?`<div class=bb>${L(t)}</div><ul>${a.map(x=>`<li>${bag(esc(x))}</li>`).join('')}</ul>`:''
+  const kb=document.getElementById('brk');kb.textContent=L('Gizle');kb.setAttribute('aria-expanded',!sec.hidden);kb.dataset.olay=o.id
+  document.getElementById('brn').textContent=o.baslik;const b=(s.brifing||{})[o.id]||(o.hazirlik_sonuc?{durum:'hazir',sonuc:o.hazirlik_sonuc}:{}),ls=(a,t)=>a&&a.length?`<div class=bb>${L(t)}</div><ul>${a.map(x=>`<li>${bag(esc(x))}</li>`).join('')}</ul>`:''
   setH(document.getElementById('br'),b.durum==='hazir'?`${b.sonuc.ozet?`<div class=b>${esc(b.sonuc.ozet)}</div>`:''}${ls(b.sonuc.dikkat,'Dikkat')}${ls(b.sonuc.acik,'Açık kalanlar')}${ls(b.sonuc.gecmis,'Geçmişte')}<div class=bt><button class=gh data-brf="${esc(o.id)}" data-dinle=1 title="${L('Brifingi sesli okur (Mac sesi); tekrar basınca susar')}">${ic('hoparlor',L('Dinle'))}</button><button class=gh data-brf="${esc(o.id)}" data-yeniden=1>${L('Yeniden hazırla')}</button>${akDug('br:'+o.id,(o.katilimci_eposta||[]).length)}</div>`
     :b.durum==='calisiyor'?`<div class=empty>${L('{asistan} brifingi hazırlıyor… (1–2 dk)')}</div>`
     :`${b.durum==='hata'?`<div class=empty>${esc(b.hata||'')}</div>`:`<div class=empty>${L('{asistan} geçmiş görüşmelere, açık sorulara ve belgelere bakıp kısa bir brifing hazırlar.')}</div>`}<div class=bt><button class=pri data-brf="${esc(o.id)}">${L(b.durum==='hata'?'Yeniden dene':'Brifing hazırla')}</button></div>`)}
 let brMem=[];function brKapali(){try{return JSON.parse(localStorage.getItem('brk')||'[]')}catch(e){return brMem}}
-document.getElementById('brk').onclick=()=>{const id=document.getElementById('brk').dataset.olay;if(!id)return;let l=brKapali();l=l.includes(id)?l.filter(x=>x!==id):[...l,id].slice(-30)
-  brMem=l;try{localStorage.setItem('brk',JSON.stringify(l))}catch(e){}const k=l.includes(id),kb=document.getElementById('brk');document.getElementById('br').hidden=k;kb.textContent=L(k?'Göster':'Gizle');kb.setAttribute('aria-expanded',!k)}
+document.getElementById('brk').onclick=()=>{hzAc=null;if(last){renderTakvim(last);renderBrifing(last)}}
 // dışarı aktar (v0.33.2; v0.33.3 özet ve alıcılar): PDF (yazdır penceresi → "PDF olarak kaydet"), e-posta taslağı (ayar eposta: outlook | gmail | mailto;
 // 14 Ekim: mailto Chrome'a düşüp hiçbir şey açmadı — web postada yeni sekmede taslak), katılımcılara e-posta (takvimdeki adresler), kopyala, .md.
 // Gönderen hep kullanıcı. Metin yalnız kullanıcının seçtiği posta hizmetine (taslak adresinde) gider; aktarıcı dışarı bir şey göndermez.
@@ -842,7 +1028,7 @@ function kenarCiz(s,top){if(!document.documentElement.classList.contains('mac'))
   const sec=top&&kcSec==='tks'?'kc':!top&&kcSec==='kc'?'tks':kcSec==='kns'?'tks':kcSec  // toplantıda varsayılan seçim Şimdi
   const o=(id,ikon,ad,r,ek)=>`<button class="ko${sec===id?' sec':''}" data-git="${esc(id)}"${ek||''}>${ikon}<span class=tx>${esc(ad)}</span>${r?`<span class=r>${esc(r)}</span>`:''}</button>`
   const h=(top?`<div class=kb>${L('Şimdi')}</div>`+o('kc','<span class=nok></span>',t,su,' data-canli=1'):'')
-    +o('tks',ic('takvim'),L('Bugün'))
+    +o('tks',ic('takvim'),L('Bugün'))+o('hf',ic('hafta'),L('Bu hafta'))
     +(ls.length?`<div class=kb>${L('Son toplantılar')}</div>`+ls.map(r=>o('son:'+r.id,ic('chat'),r.baslik||r.ad,kisaGun(r.at),` title="${L('Özeti aç')} — ${esc(r.ad||'')}"`)).join(''):'')
     +`<div class=kb>${L('Arşiv')}</div>`+o('ar-ara',ic('liste'),L('Toplantılarda ara'))+o('ar-dok',ic('dosya'),L('Dökümler'))+o('gecmis',ic('hist'),L('Konuşma geçmişi'))
     +`<div class=kalt><i class="dot ${dc?dc[1]:''}"></i><span>${esc(dm)}</span></div>`
@@ -852,6 +1038,7 @@ document.getElementById('kenar').addEventListener('click',async ev=>{const b=ev.
   if(g.startsWith('son:')){let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:g.slice(4),tur:''})})}catch(e){}if(!r.ok)geciciDurum(L('Özet açılamadı'),r.err||'');return}
   if(g==='gecmis'){gecmisAc();return}
   if(g==='ar-ara'||g==='ar-dok'){arsivAc(g==='ar-ara');return}
+  if((g==='hf')!==hfAcik){if(g!=='hf')kcSec=g;hfAc(g==='hf')}  // hafta görünümü kenar çubuğundan açılır, başka seçim kapatır
   kcSec=g;if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))
   const sc=document.querySelector('main .sc');if(sc)sc.scrollTo({top:0,behavior:'smooth'})})  // her seçim kendi görünümünü baştan açar
 function kenarAcKapa(){const k=document.documentElement.classList.toggle('kc-kapali');try{localStorage.setItem('kcKapali',k?'1':'')}catch(e){}}
@@ -1047,24 +1234,60 @@ function renderNotlar(s){const ls=s.notlar||[],sec=document.getElementById('nts'
   setH(document.getElementById('nt'),ls.map(x=>`<div class=nt><span class=z>${esc(gunTxt(x.at))}</span><span class=m>${esc(x.metin)}</span><button class="ib gh" data-not-sil="${esc(x.id)}" title="${L('Notu sil')}" aria-label="${L('Notu sil')}">${ic('x')}</button></div>`).join(''))}
 document.getElementById('nt').addEventListener('click',async ev=>{const b=ev.target.closest('[data-not-sil]');if(!b)return;let r={};try{r=await j('/notlar',{method:'POST',body:JSON.stringify({sil:b.dataset.notSil})})}catch(e){}
   if(!r.ok)geciciDurum(L('Not silinemedi'),r.err||'');refresh()})
-function renderSon(s){const ls=s.son_toplantilar||[],sec=document.getElementById('sns');sec.hidden=!!s.aktif||!ls.length;if(sec.hidden)return
-  setH(document.getElementById('sn'),ls.map(r=>`<div class=sn><div class=t data-son="${esc(r.id)}" title="${L('Özeti aç')} — ${esc(r.ad)}"><div class=b><span class=z>${esc(gunTxt(r.at))}</span>${esc(r.baslik||r.ad)}${cikti(r.cikti)}</div>${r.degerlendirme&&!/^(yok|-|—)\.?$/i.test(String(r.degerlendirme).trim())?`<div class=d>${esc(r.degerlendirme)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}</div><span class=akw><button class="ib akd" data-aktar="sn:${esc(r.id)}" aria-haspopup=menu aria-expanded="${akAcik==='sn:'+r.id}" title="${L('Zihin haritası, dışarı aktar')}" aria-label="${L('Zihin haritası, dışarı aktar')}">${ic('dahasi')}</button>${akAcik==='sn:'+r.id?akMenu('sn:'+r.id,-1,r.harita?`<button class=aki data-son="${esc(r.id)}" data-tur=harita role=menuitem>${ic('harita',L('Zihin haritası'))}</button><hr>`:''):''}</span></div>`).join(''))}
-document.getElementById('sn').addEventListener('click',async ev=>{if(akTik(ev,renderSon))return;const b=ev.target.closest('[data-son]');if(!b)return
+// Son toplantılar (30 Ekim): başlık + tek satır gri meta (Dün 14:30 · 4 karar · 10 iş · 4 açık); değerlendirme ve öneri yalnız satıra dokununca, Özeti aç orada; ⋯ dışarı aktar
+const snAcik=new Set()
+function ciktiP(c){c=c||{};return[['karar','{n} karar'],['is','{n} iş'],['acik','{n} açık']].filter(([k])=>c[k]>0).map(([k,m])=>L(m,{n:c[k]}))}
+function renderSon(s){const ls=(s.son_toplantilar||[]).slice(0,4),sec=document.getElementById('sns');sec.hidden=!!s.aktif||!ls.length;if(sec.hidden)return
+  setH(document.getElementById('sn'),ls.map(r=>{const ac=snAcik.has(r.id),de=r.degerlendirme&&!/^(yok|-|—)\.?$/i.test(String(r.degerlendirme).trim())?r.degerlendirme:''
+    return `<div class="sn${ac?' acik':''}"><span class=eyi>${ic('chat')}</span><div class=t data-snac="${esc(r.id)}" title="${esc(r.ad||'')}"><div class=b>${esc(r.baslik||r.ad)}</div><div class=m>${esc([gunTxt(r.at),...ciktiP(r.cikti)].join(' · '))}</div>`
+      +(ac?`<div class=snx>${de?`<div class=d>${esc(de)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}<div class=bt><button class=gh data-son="${esc(r.id)}">${L('Özeti aç')}</button></div></div>`:'')
+      +`</div><span class=akw><button class="ib akd" data-aktar="sn:${esc(r.id)}" aria-haspopup=menu aria-expanded="${akAcik==='sn:'+r.id}" title="${L('Zihin haritası, dışarı aktar')}" aria-label="${L('Zihin haritası, dışarı aktar')}">${ic('dahasi')}</button>${akAcik==='sn:'+r.id?akMenu('sn:'+r.id,-1,r.harita?`<button class=aki data-son="${esc(r.id)}" data-tur=harita role=menuitem>${ic('harita',L('Zihin haritası'))}</button><hr>`:''):''}</span></div>`}).join(''))}
+document.getElementById('sn').addEventListener('click',async ev=>{if(akTik(ev,renderSon))return;const b=ev.target.closest('[data-son]')
+  if(!b){const a=ev.target.closest('[data-snac]');if(a&&!ev.target.closest('button')){const id=a.dataset.snac;if(snAcik.has(id))snAcik.delete(id);else snAcik.add(id);if(last)renderSon(last)}return}
   let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son,tur:b.dataset.tur||''})})}catch(e){}
   if(!r.ok)geciciDurum(b.dataset.tur?L('Zihin haritası açılamadı'):L('Özet açılamadı'),r.err||'')})
-// boş pano = "Sıradaki · Başlat": ilk (süren ya da gelecek) toplantı büyük kart, kalanlar altında soluk satır. Claude izlerken gizli.
-function renderTakvim(s){const sur=!!((s.oto_toplanti&&s.oto_toplanti.oturum)||(s.toplanti_oturum&&['aciliyor','calisiyor','bekliyor','izliyor'].includes(s.toplanti_oturum.durum))),t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks'),x=s.extension
+// Bugün (toplantı yokken, 30 Ekim — kullanıcı onayladı: "sırada ne var, beni ne bekliyor, ne oldu"): başlık satırı (tarih + Bugün, Bugün | Bu hafta), sıradaki
+// toplantı kartı (solda hazırlık şeridi — hafta görünümünün hazir/eksik/yok'u; saat, başlık, platform · kişi · hazırlık; Hazırlık / Başlat), altında tek satır
+// "Sonra …". Bugün toplantı kalmadıysa ilk gelecek toplantı (Yarın 09:30): /takvim?hafta=0 (gerekirse 1), hazırlık da oradan. Claude izlerken gizli.
+let bgHz=[],bgHzT=0,bgHzYuk=false,hzAc=null
+async function bgHzYukle(zorla){if(bgHzYuk||(!zorla&&Date.now()-bgHzT<60000))return;bgHzYuk=true;bgHzT=Date.now()
+  try{let ol=[];for(const h of [0,1]){const t=await j('/takvim?hafta='+h);ol=ol.concat((t.olaylar||[]).filter(o=>!o.gecmis&&!o.tum_gun&&o.baslatilir));if(ol.length>=3||!(t.en_cok>=1))break}
+    if(JSON.stringify(ol)!==JSON.stringify(bgHz)){bgHz=ol;if(last){renderTakvim(last);renderBrifing(last)}}}catch(e){}
+  bgHzYuk=false}
+const HZW={hazir:'Hazır',eksik:'Eksik',yok:'Hazırlık yok'}
+function hzDurum(o,s){const b=((s&&s.brifing)||{})[o.id]||{};return b.durum==='hazir'||o.hazirlik==='hazir'?'hazir':b.durum==='calisiyor'||b.durum==='hata'?'eksik':(o.hazirlik||'yok')}
+function gunAd(o){const [y,m,d]=String(o.tarih||'').split('-').map(Number);if(!y)return'';const b=new Date();b.setHours(0,0,0,0);const g=Math.round((new Date(y,m-1,d)-b)/864e5)
+  return g<=0?'':g===1?L('Yarın'):new Date(y,m-1,d).toLocaleDateString(L('tr-TR'),{weekday:'long'})}
+// Hazırlık bağlantısı: hazırsa (ya da hazırlanıyor/hata) kartın altındaki brifingi açar-kapar; değilse brifingi başlatır (/brifing, hafta görünümündeki Hazırla ile aynı) ve açar
+async function hazirlikTik(id,b){const o=tkBul(id);if(!o)return;const s=last||{},bd=((s.brifing||{})[id]||{}).durum
+  if(hzAc===id)hzAc=null
+  else if(bd||hzDurum(o,s)==='hazir')hzAc=id
+  else{b.disabled=true;let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify({olay:id})})}catch(e){}b.disabled=false
+    if(!r.ok){geciciDurum(L('Brifing başlatılamadı'),r.err||'');return}hzAc=id;bgHzT=0}
+  tkGor=id;if(last){renderTakvim(last);renderBrifing(last)}refresh()}
+function renderTakvim(s){const sur=!!((s.oto_toplanti&&s.oto_toplanti.oturum)||(s.toplanti_oturum&&['aciliyor','calisiyor','bekliyor','izliyor'].includes(s.toplanti_oturum.durum))),t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks')
   // toplantı sürerken büyük kart yok: durum cümlesindeki Başlat yalnız formu açar
   const top=!!s.aktif,form=!document.getElementById('tkf').hidden
+  if(top&&!hfOnceTop&&hfAcik)hfAc(false);hfOnceTop=top  // toplantı başlayınca hafta görünümü kapanır (Şimdi bölümü görünsün)
   sec.hidden=izliyor||(top&&!form);if(sec.hidden&&izliyor)document.getElementById('tkf').hidden=true;  // v0.112.0: gizli bölümde açık kalan form Mac'te gri perdeyi bırakıyordu (tıklanamayan pencere)
   ;['tk','tkh','tkalt'].forEach(i=>document.getElementById(i).style.display=top?'none':'');if(izliyor||top)return
-  tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh')
+  bgHzYukle()
+  tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh'),loc=L('tr-TR'),nw=new Date()
   h.textContent=!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.'):t.durum==='bekliyor'?L('takvim okunuyor…'):(t.durum&&t.durum!=='ok'?(t.hata||t.durum):'')
-  const [o,...ki]=tkOlaylar, ne=x=>esc([x.suruyor?L('şimdi'):x.dk<=60?L('{n} dk sonra',{n:x.dk}):'',(x.katilimcilar||[]).slice(0,3).join(', ')+(x.kisi_sayisi>4?' +'+(x.kisi_sayisi-4):''),x.ben_duzenleyen?L('düzenleyen sen'):'',x.reddettin?L('daveti reddettin'):''].filter(Boolean).join(' · '))
-  if(!tkOlaylar.some(x=>x.id===tkGor))tkGor=o?o.id:null
-  const buyuk=o?`<div class="sira${tkGor===o.id?' sec':''}" data-sec="${esc(o.id)}"><div class=t><div class=e>${L(o.suruyor?'Şimdi':'Sıradaki')}</div><div class=b><span class=z>${esc(o.saat)}</span>${esc(o.baslik)}</div><div class=sp>${ne(o)}</div></div><button class=pri data-bas="${esc(o.id)}">${L(sur&&o.suruyor?'Toplantı sürüyor':'Başlat')}</button></div>`
-    :`<div class=sira><div class=t><div class=e>${L('Bugün')}</div><div class=b>${L('Takvimde toplantı yok')}</div></div><button class=pri data-bas="">${L(sur?'Toplantı sürüyor':'Toplantı başlat')}</button></div>`
-  setH(document.getElementById('tk'),buyuk+ki.slice(0,4).map(x=>`<div class="tko${tkGor===x.id?' sec':''}" data-sec="${esc(x.id)}"><div class=t><div><b class=z>${esc(x.saat)}</b>${esc(x.baslik)}${x.platform?` <span class=chip>${PL[x.platform]||esc(x.platform)}</span>`:''}</div><div class=sp>${ne(x)}</div></div><button class=gh data-bas="${esc(x.id)}" style="flex:none">${L('Başlat')}</button></div>`).join(''))
+  setH(document.getElementById('tktr'),esc(nw.toLocaleDateString(loc,{weekday:'long'})+', '+nw.toLocaleDateString(loc,{day:'numeric',month:'long'})))
+  const hz=Object.fromEntries(bgHz.map(x=>[x.id,x])),bid=new Set(tkOlaylar.map(x=>x.id)),an=Date.now()
+  tkListe=[...tkOlaylar.map(x=>Object.assign({},hz[x.id],x)),...bgHz.filter(x=>!bid.has(x.id)&&!x.reddettin&&+new Date(x.baslangic)>an).map(x=>Object.assign({},x,{dk:Math.round((+new Date(x.baslangic)-an)/6e4)}))]
+  if(!tkListe.some(x=>x.id===tkGor))tkGor=tkListe.length?tkListe[0].id:null
+  const o=tkListe.find(x=>x.id===tkGor),ilk=o&&o===tkListe[0];let html
+  if(o){const hd=hzDurum(o,s),bd=((s.brifing||{})[o.id]||{}).durum,gn=gunAd(o),ks=o.kisi_sayisi||(o.katilimcilar||[]).length,ac=hzAc===o.id
+    const e=[o.suruyor?L('Şimdi'):gn||(ilk?L('Sıradaki'):L('Bugün')),`${o.saat}–${o.bitis_saat}`,!o.suruyor&&!gn&&o.dk>0&&o.dk<=60?L('{n} dk sonra',{n:o.dk}):''].filter(Boolean).join(' · ')
+    const alt=[o.platform?`<span class=pl>${ic('video')}${esc(PL[o.platform]||o.platform)}</span>`:'',ks?esc(L('{n} kişi',{n:ks})):'',o.ben_duzenleyen?esc(L('düzenleyen sen')):'',o.reddettin?esc(L('daveti reddettin')):'',`<span class="hzw hz-${esc(hd)}">${esc(L(HZW[hd]||HZW.yok))}</span>`].filter(Boolean).join('<i class=nk>·</i>')
+    const hzl=bd==='calisiyor'?L('Hazırlanıyor…'):hd==='hazir'||bd==='hata'?L('Hazırlık'):L('Hazırla')
+    html=`<div class="sira hz-${esc(hd)}" data-sec="${esc(o.id)}"><div class=t><div class=e>${esc(e)}</div><div class=b title="${esc(o.baslik||'')}">${esc(o.baslik||L('(başlıksız)'))}</div><div class=sp>${alt}</div></div><div class=ss><button class="gh lnk" data-hz="${esc(o.id)}" aria-expanded="${ac}" title="${L('{asistan} geçmiş görüşmelere, açık sorulara ve belgelere bakıp kısa bir brifing hazırlar.')}">${esc(hzl)}</button><button class=pri data-bas="${esc(o.id)}">${L(sur&&o.suruyor?'Toplantı sürüyor':'Başlat')}</button></div></div>`
+    const dig=tkListe.filter(x=>x!==o).slice(0,2)
+    if(dig.length)html+=`<div class=sonra><span>${L(ilk?'Sonra':'Diğer')}</span> ${dig.map(x=>{const g=gunAd(x);return`<button type=button class=lnk data-sec="${esc(x.id)}" title="${esc(x.baslik||'')}">${esc((g?g+' ':'')+x.saat+' '+(x.baslik||''))}</button>`}).join('<i class=nk>·</i>')}</div>`}
+  else html=`<div class="sira bos"><div class=t><div class=b>${L('Takvimde yakın toplantı yok')}</div></div><div class=ss><button class=pri data-bas="">${L(sur?'Toplantı sürüyor':'Toplantı başlat')}</button></div></div>`
+  setH(document.getElementById('tk'),html)
   document.getElementById('tke').hidden=!o}
 // panodan güncelleme düğmesi; aktarıcı yeni sürümle kalkınca pano kendini yeniler
 let ilkSurum=null
@@ -1079,7 +1302,7 @@ document.getElementById('gun').onclick=async ev=>{const b=ev.currentTarget
   delete b.dataset.onay;b.disabled=true;b.textContent=L("Güncelleniyor…");let r={};try{r=await j('/guncelle',{method:'POST',body:"{}"})}catch(e){}
   if(!r.ok){b.disabled=false;b.textContent=L("Güncelleme başarısız — yeniden dene");geciciDurum(L("Güncellenemedi"),r.err||"")}}
 // v0.111.0: arka plandaki toplantı oturumu — /status'ta özet (n: ileti sayısı), yeni iletiler /toplanti-oturum?n= ile; kutudaki yazı oturum soru sorunca ona gider
-let tosM=[],tosN=0,tosT0=null,tosAyr=false,tosYuk=false
+let tosM=[],tosN=0,tosT0=null,tosAyr=false,tosYuk=false,tosAcik=false
 const TOS_D={aciliyor:"açılıyor…",calisiyor:"çalışıyor",izliyor:"toplantıyı izliyor",bekliyor:"cevabını bekliyor",kapali:"kapandı",hata:"durdu",terminalde:"Terminal'de"}
 // v0.115.0 (kullanıcı, 22 Ekim: Claude'un ne yaptığı görünmüyordu): tek satır canlı durum — panoda, mini panoda ve Mac panelinde aynı
 function tosSatir(o){if(!o)return"";if((o.izinler||[]).length)return L("{asistan} iznini bekliyor")
@@ -1090,7 +1313,7 @@ function tosSatir(o){if(!o)return"";if((o.izinler||[]).length)return L("{asistan
 function tosIzinHtml(o){return (o.izinler||[]).map(x=>`<div class=tiz><div class=d>${esc(x.metin)}</div><div class=tsc><button class=pri data-tiz="${esc(x.id)}" data-d=onaylandi>${esc(L("Onayla"))}</button><button class=gh data-tiz="${esc(x.id)}" data-d=reddedildi>${esc(L("Reddet"))}</button></div></div>`).join('')}
 function tosMd(t){return esc(t).replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/`([^`\n]+)`/g,'<code>$1</code>')}
 async function renderOturum(s){const o=s.toplanti_oturum,sec=document.getElementById('tos'),ta=document.getElementById('n');sec.hidden=!o
-  if(!o){if(ta){delete ta.dataset.cevap;ta.placeholder=yazIpucu()}return}
+  if(!o){if(ta){delete ta.dataset.cevap;ta.placeholder=yazIpucu(document)}return}
   if(o.t0!==tosT0){tosT0=o.t0;tosM=[];tosN=0}
   if(o.n>tosN&&!tosYuk){tosYuk=true;try{const v=await j('/toplanti-oturum?n='+tosN);(v.mesaj||[]).forEach(m=>{if(m.i>tosN){tosM.push(m);tosN=m.i}});tosM=tosM.slice(-400)}catch(e){}tosYuk=false}
   const sor=o.soru&&o.soru.secenek?o.soru:null,bek=o.durum==="bekliyor"||!!sor,canli=["aciliyor","calisiyor","bekliyor","izliyor"].includes(o.durum);sec.classList.toggle('bek',bek)
@@ -1103,7 +1326,11 @@ async function renderOturum(s){const o=s.toplanti_oturum,sec=document.getElement
    const z=document.getElementById('tiz'),zs=(o.izinler||[]).map(x=>x.id).join();if(z.dataset.sig!==zs){z.dataset.sig=zs;setH(z,tosIzinHtml(o))}}
   const b=document.getElementById('tob');b.className='tob'+(o.durum==="hata"?' er':'')
   b.textContent=o.durum==="hata"?(o.hata||L("Oturum kapandı")):(o.izinler||[]).length?"":sor?L("{asistan} cevabını bekliyor — bir düğmeye bas ya da kutuya yaz."):bek?L("{asistan} cevabını bekliyor — aşağıdaki kutuya yaz, Return'e bas."):""
-  if(ta){if(bek)ta.dataset.cevap=1;else delete ta.dataset.cevap;ta.placeholder=bek?L("Cevabını yaz"):yazIpucu()}}
+  if(ta){if(bek)ta.dataset.cevap=1;else delete ta.dataset.cevap;ta.placeholder=bek?L("Cevabını yaz"):yazIpucu(document)}
+  // 30 Ekim (Bugün): toplantı yokken oturumun durum/rapor metinleri katlı — başlıkta durum, altında son iletinin iki satırı; dokununca tamamı ve düğmeler
+  {const kap=!s.aktif&&!tosAcik&&!bek&&!(o.izinler||[]).length,p=document.getElementById('tosn'),son=[...tosM].reverse().find(m=>m.kim==="claude"),t=son?String(son.metin).replace(/[*`#>|]/g,'').replace(/\s+/g,' ').trim():''
+   sec.classList.toggle('kapali',kap);p.hidden=!kap||!t;p.textContent=t}}
+document.getElementById('tos').addEventListener('click',ev=>{if(last&&last.aktif)return;if(ev.target.closest('button,a,.tom,#tiz'))return;if(!ev.target.closest('.sh,#tosn'))return;tosAcik=!tosAcik;if(last)renderOturum(last)})
 document.getElementById('tosx').onclick=async ev=>{ev.currentTarget.disabled=true;try{await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"durdur"})})}catch(e){}ev.currentTarget.disabled=false;refresh()}
 document.getElementById('tost').onclick=async ev=>{ev.currentTarget.disabled=true;try{const r=await (await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"terminal"})})).json();if(!r.ok)geciciDurum(r.err||L("Açılamadı"),"",6000)}catch(e){}ev.currentTarget.disabled=false;refresh()}
 document.getElementById('tosa').onclick=()=>{tosAyr=!tosAyr;if(last)renderOturum(last)}
@@ -1153,8 +1380,8 @@ if(s.ayarlar&&s.ayarlar.deger)temaUygula(s.ayarlar.deger.tema||'sistem')  // tem
 // arayüz dili başka pencereden (Ayarlar) değiştiyse bu sayfa da yeni dille yeniden yüklenir
 if(s.ayarlar&&s.ayarlar.deger&&s.ayarlar.deger.dil&&s.ayarlar.deger.dil!==DIL&&!new URLSearchParams(location.search).get('dil')&&!window._dilYeni){window._dilYeni=1;location.reload()}
 // Mac penceresi (html.mac, v0.106.0): toplantıda mı (araç çubuğundaki toplantı düğmeleri), toplantı dışında yan sütun boş mu (gizlenir)
-{const top=!!s.aktif,h=document.documentElement;h.classList.toggle('toplantida',top)
-  h.classList.toggle('yan-bos',!top&&![...document.querySelectorAll('#yan>section[id]')].some(e=>!e.hidden));kenarCiz(s,top)}
+{const top=!!s.aktif,h=document.documentElement;h.classList.toggle('toplantida',top);h.classList.toggle('bugun',!top)  // 30 Ekim: yan sütun (Gündem/Döküm) yalnız toplantıda
+  h.classList.toggle('yan-bos',!top);kenarCiz(s,top)}
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id+(c.geri||""))); firstCards=false
