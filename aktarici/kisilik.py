@@ -19,6 +19,14 @@ KISILIK_SURE_SN = 180
 _KIS = {"yol": None, "mt": None, "v": None, "uyari": None}  # geriye uyum: tek kişilikte eski alanlar (konus_istem kisilik_mt)
 _KIS_D = {}  # yol → {"mt", "v", "uyari"}
 _KSEC = {"ad": None, "t": 0.0}
+HITAP_GUNDELIK = {"oh", "ah", "eh", "ha", "hı", "hm", "hmm", "evet", "hayır", "hayir", "tamam", "peki", "bak", "abi", "hocam", "şey", "sey", "yani", "ok", "okay", "yes", "no", "hey", "merhaba", "selam"}
+def hitap_suz(liste, ad=None):  # 30 Ekim: listede "Oh, <ad>" virgülle bölünüp tek başına "Oh" hitap oldu, kullanıcının "oh"u asistana soru gitti. 3 harften kısa ya da gündelik sözcük atılır
+    kalan, atilan = [], []
+    for x in liste:
+        if x.lower() == str(ad or "").lower() or (len(re.sub(r"\W", "", x)) >= 3 and x.lower() not in HITAP_GUNDELIK): kalan.append(x)
+        else: atilan.append(x)
+    if atilan: print(f"KİŞİLİK: seslenme listesinden atıldı (kısa ya da gündelik sözcük): {', '.join(atilan)}")
+    return kalan
 def _kisilik_oku(yol, rol):
     d = _KIS_D.setdefault(yol, {"mt": None, "v": None, "uyari": None})
     try: mt = os.path.getmtime(yol)
@@ -59,6 +67,7 @@ def _kisilik_oku(yol, rol):
         if rol == "toplanti":  # ayardaki hitap_ad/tanitim ilk (toplantı) kişiliğe
             if isinstance(AYAR.get("hitap_ad"), list) and AYAR["hitap_ad"]: v["hitap"] = [str(x).strip() for x in AYAR["hitap_ad"] if str(x).strip()]
             if AYAR.get("tanitim"): v["tanitim"] = str(AYAR["tanitim"]).strip()
+        v["hitap"] = hitap_suz(v["hitap"], v["ad"])
         if not v["hitap"]: v["hitap"] = [v["ad"]]
         for x in (v["gorunen_ad"], v["uclu_ad"], v["uclu_takilma"]):  # v0.125.1 (23 Ekim denemesi): üçlüde kullanıcı da takma adla seslenir ("<takma ad>, …")
             if x and x.lower() not in {h.lower() for h in v["hitap"]}: v["hitap"].append(x)

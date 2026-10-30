@@ -380,6 +380,7 @@ try:
     uc("/ingest", {"meeting": {"title": "Kişilik deneme"}, "source": "whisper", "entries": [{"id": "w/3", "speaker": "Deniz T", "time": "10:01:00", "text": "Atlas, yarın ne var?", "kanal": "ben"}]})
     time.sleep(0.5); md = " ".join(open(os.path.join(canli, f), encoding="utf-8").read() for f in os.listdir(canli) if f.endswith(".md"))
     ok("dosya silinince ad hitap sayılmıyor, günlükte 'KİŞİLİK: okunamadı'", "Atlas, yarın ne var?" in md and "KİŞİLİK: okunamadı" in L())
+    ok("seslenme listesi: kısa/gündelik sözcük atılır, adı içeren öbek kalır", ns["hitap_suz"](["Atlas", "Oh", "evet", "Oh Atlas", "At"], "Atlas") == ["Atlas", "Oh Atlas"])
     ok("aktarıcıda hata yok", "Traceback" not in L())
 finally:
     r.terminate(); r.wait(5)
