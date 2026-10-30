@@ -60,7 +60,7 @@ Once you've called it, the other participants can ask it questions too. You can 
 
 ## It whispers to you
 
-The assistant follows the meeting and sends four kinds of cards. They appear in a small strip in the corner of the meeting screen and
+The assistant follows the meeting and sends four kinds of cards. With the Mac app running they appear as separate boxes at the bottom centre of the screen, over the meeting video; click one to open it, and they are not visible when you share your screen. Without the app they appear in a small strip in the corner of the meeting screen and
 on the panel. Three small buttons next to each card: done, later, not needed.
 
 <p align="center"><img src="gorsel/en/kartlar.png" alt="Four card types: Say, Stop, Answer, Note" width="100%"></p>

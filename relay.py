@@ -1319,6 +1319,9 @@ TAKVIM_SN = 300; TAKVIM_TAM = {}
 # Chrome yerel mesajlaşmasıyla (native messaging) bu kullanıcının anahtar yardımcısından; pano/hazırlık sayfası kendi deposundan
 # (localStorage — köken porta bağlı; çerez porta bağlı olmadığı için diğer hesabın aktarıcısına giderdi). Geçiş: eski eklentinin
 # yazma istekleri anahtarsız da kabul edilir, pano "eklentiyi yenile" der; ayar "anahtar_zorunlu": true bunu kapatır.
+# Kart katmanı (30 Ekim): menü uygulaması kartları ekranın alt ortasında tek tek kutu olarak gösterir. Açık sayılır: ayar kart_katmani
+# False değil ve menü uygulaması son 60 sn'de yokladı (/cards uzun yoklaması 25 sn'de bir yenilenir). Açıkken eklenti şeridi ve Mac paneli listeyi göstermez.
+def kart_katmani_acik(): return AYAR.get("kart_katmani") is not False and time.time() - (STATE.get("_menu_yokluyor") or 0) < 60
 VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
@@ -1950,6 +1953,7 @@ class H(BaseHTTPRequestHandler):
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
             s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["kaynak"] = kaynak_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s["kart_katmani"] = kart_katmani_acik()  # kartları Mac'in kart katmanı gösteriyor: şerit ve panel listeyi göstermez
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
             # Faz B: aktif = süren kayıt, yoksa yeni biten (özet gelene dek) — yalnız gösterim
             af = gorunen_dosya(); s["aktif"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
@@ -1978,13 +1982,13 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/konus-gecmis": return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
         if (self.headers.get("X-Suflor-Istemci") or "").startswith("menu"): STATE["_menu_yokluyor"] = time.time()  # pano penceresi açılabilir (bildirim izni olmasa da)
-        if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); return self._json(v)
+        if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); v["kart_katmani"] = kart_katmani_acik(); return self._json(v)
         if self.path.startswith("/cards?"):  # uzun yoklama
             from urllib.parse import urlsplit, parse_qs
             q = parse_qs(urlsplit(self.path).query)
             try: sn = float((q.get("bekle") or ["0"])[0])
             except ValueError: sn = 0
-            return self._json(cards_bekle((q.get("imza") or [""])[0], sn))
+            return self._json(dict(cards_bekle((q.get("imza") or [""])[0], sn), kart_katmani=kart_katmani_acik()))
         if yol == "/soyle-ses":  # toplantıya söyle web sürümü: okunacak WAV (eklenti, anahtarla)
             from urllib.parse import parse_qs, urlsplit
             b = ts_web_ses((parse_qs(urlsplit(self.path).query).get("id") or [""])[0])

@@ -54,7 +54,7 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
    ayar.json'da `"oto_haric": ["<adın bir parçası>", …]` (döküm yine tutulur); hepsini kapatmak için `"oto_toplanti": false`.
 2. Karşı tarafın sesi kendiliğinden yazıya dökülür (Suflor Ses yardımcısı, macOS 14.4+; ilk kurulumda macOS "Sistem Sesi Kaydı" izni
    sorar — İzin Ver). Yardımcı yoksa ya da izin verilmediyse Chrome'daki toplantıda **Suflor.me simgesi → "Karşı taraf" satırındaki Aç** (satır yalnız sorun varken görünür; masaüstü Teams/Zoom'da yedek yok).
-3. Kartlar toplantı ekranının sol altındaki küçük şeritte ve panoda görünür. ✓ yaptım · 👁 okudum · ✕ gerek yok. Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin.
+3. Mac uygulaması açıkken kartlar ekranın alt ortasında, toplantı görüntüsünün üzerinde ayrı kutular olarak çıkar (tıklayınca açılır, ekran paylaşımında görünmez); uygulama yoksa toplantı ekranının sol altındaki küçük şeritte ve panoda görünür. ✓ yaptım · 👁 okudum · ✕ gerek yok. Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin.
 4. Toplantıda kutunun üstünde sağda: **Ne diyeyim?** (tek cümlelik replik önerisi), **Kanıt**, **Sessiz** (10 dk kart yok); "⋯" içinde önemli an, gizli toplantı, sesli çeviri.
    Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? · **Option + Shift + M** sessiz · **Option + Shift + S** asistan sussun.
 5. Toplantı bitince özet hazırlanır ve sana sunulur.
@@ -90,7 +90,7 @@ Toplantı sürerken 60 saniye hiçbir kanaldan (altyazı, sen, karşı taraf) sa
 yeni toplantı sayfası açılır: başlık, saat, süre (söylenmezse 30 dk) ve davetliler dolu, Google'da Meet bağlantısıyla. Sen Kaydet'e basarsın. Davetlinin
 adresi söylediğin e-postadan ya da son 30 günün takvim toplantılarından bulunur; bulunamayan ad sayfadaki notta yazar. Ayar `eposta` Outlook ise Outlook takvimi açılır.
 
-**Menü çubuğu uygulaması (varsayılan açık; kapatmak için ayar.json'da `"menu_cubugu": false`):** pano Mac penceresinde açılır; menü çubuğu uygulaması (buzlu cam panelde mini pano,
+**Menü çubuğu uygulaması (varsayılan açık; kapatmak için ayar.json'da `"menu_cubugu": false`):** pano Mac penceresinde açılır; menü çubuğu uygulaması (buzlu cam panelde yazı kutusu, mikrofon ve Claude'un durumu; kartlar ekranın alt ortasında ayrı kutularda,
 Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da
 çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, kanıt ve
 paylaşılan ekran görüntüsünü toplantı penceresinden alır; Erişilebilirlik, mikrofon ve Ekran Kaydı izni sorar (ayarı değiştirdiysen sonra `guncelle.command`).
@@ -188,7 +188,7 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
 |---|---|
 | Chrome eklentisi (`manifest.json`, `content.js`, `platform-teams.js`, `platform-meet.js`, `platform-zoom.js`, …) | Teams/Meet/Zoom sayfasından altyazı/döküm ve mikrofon sesini alır, şeridi gösterir |
 | Aktarıcı (`relay.py`) | Yerel sunucu: satırları dosyaya yazar, kartları tutar, panoyu sunar |
-| Menü çubuğu uygulaması (`menu-cubugu.swift` → `~/Applications/Suflor.me.app`) | Pano penceresi, mini pano paneli, Mac geneli bas-konuş, masaüstü toplantı sinyali |
+| Menü çubuğu uygulaması (`menu-cubugu.swift` → `~/Applications/Suflor.me.app`) | Pano penceresi, menü çubuğu paneli, ekranın alt ortasında kart kutuları, Mac geneli bas-konuş, masaüstü toplantı sinyali |
 | Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
 | Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
 | Toplantıda asistan (`aktarici/toplantiya-ses.py`, `aktarici/otonom.py`, `soyle-main.js`; ⚙ Ayarlar → Asistanlar toplantıda konuşsun, ayar `toplantiya_ses`, varsayılan kapalı) | Toplantıda “<ad>, …” diye seslendiğin asistanın cevabını herkesin duyacağı şekilde okur (söz sırası gelince; “<ad>, dur” ya da Option + Shift + S susturur; sen bir kez çağırdıktan sonra diğer katılımcılar da ona adıyla sorabilir; yalnız sana cevap için Konuş düğmesi): web toplantısında yalnız okuma süresince mikrofon kanalına karıştırır (sessizdeysen okumaz); masaüstü Teams'te BlackHole ile |

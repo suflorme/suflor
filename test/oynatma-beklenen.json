@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 266120,
-   "sha": "376e0e53fedc17f8"
+   "uzunluk": 264881,
+   "sha": "33f0234dd9cf98c9"
   },
   "/mini": {
-   "uzunluk": 266120,
-   "sha": "376e0e53fedc17f8"
+   "uzunluk": 264881,
+   "sha": "33f0234dd9cf98c9"
   },
   "/status": {
    "_ping_son": "float",
@@ -528,6 +528,7 @@
    "kanit_iste": "NoneType",
    "kanit_n": "int",
    "kanitlar": [],
+   "kart_katmani": "bool",
    "kaynak": {
     "bos_yuzde": "int",
     "duzey": "str",
@@ -800,6 +801,7 @@
    "imza": "str",
    "kanit_iste": "NoneType",
    "kanit_n": "int",
+   "kart_katmani": "bool",
    "komut": {
     "at": "str",
     "id": "str",

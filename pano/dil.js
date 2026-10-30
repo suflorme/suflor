@@ -1,7 +1,7 @@
 // Suflor.me — arayüz metinlerinin İngilizcesi (tek kaynak). Anahtar Türkçe metnin kendisi; L("…") Türkçe arayüzde metni olduğu
 // gibi, İngilizcede buradaki karşılığını gösterir. Yükleyenler: eklenti (manifest içerik betiği, background.js importScripts,
 // popup.html) ve aktarıcı (pano.html / hazirlik.html'e gömer). Kurulum sihirbazı kendi anahtarlı sözlüğünü kullanır (ortak metin 2).
-// Kural: pano = "panel", mini pano = "mini panel" ("dashboard"/"board" yok); yeni metin eklenince test/dil.py koştur.
+// Kural: pano = "panel", menü paneli = "menu bar panel" ("dashboard"/"board" yok); yeni metin eklenince test/dil.py koştur.
 globalThis.SUFLOR_EN = {
   // --- birden çok yüzeyde
   "Türkçe": "Turkish",
@@ -58,7 +58,6 @@ globalThis.SUFLOR_EN = {
   "Panoyu aç": "Open panel",
   // --- pano ve mini pano
   "toplantı bekleniyor": "waiting for a meeting",
-  "Mini pano: her zaman üstte duran küçük pencere": "Mini panel: a small window that stays on top",
   "Döküm": "Transcript",
   "↓ Canlıya dön": "↓ Back to live",
   "Sürükleyerek genişlet/daralt · çift tıkla: varsayılan": "Drag to resize · double-click: default",
@@ -131,7 +130,6 @@ globalThis.SUFLOR_EN = {
   "Tahmin: şu an bu madde konuşuluyor": "Estimate: this item is being discussed now",
   "Toplantı başlayınca gündem burada görünür.": "The agenda appears here once the meeting starts.",
   "Gündem yok": "No agenda",
-  "Mini pano": "Mini panel",
   "Güncelleniyor…": "Updating…",
   "Güncelleme başarısız — yeniden dene": "Update failed — try again",
   "Geri bildirim gönder": "Send feedback",
@@ -161,8 +159,6 @@ globalThis.SUFLOR_EN = {
   "özel bir şey söyleyeceksen gizli kipi aç": "if you're about to say something private, turn on private mode",
   "Toplantıdasın": "In a meeting",
   "bağlanıyor…": "connecting…",
-  "Mini pano açılamadı": "Couldn't open the mini panel",
-  "açılır pencereye izin ver": "allow pop-ups",
   "Takvim bağlı değil — toplantıyı elle başlatabilirsin.": "Calendar isn't connected — you can start a meeting manually.",
   "Sıradaki": "Up next",
   "Bugün": "Today",
@@ -229,7 +225,7 @@ globalThis.SUFLOR_EN = {
   "Arayüz dili": "Interface language",
   "Pano, eklenti ve menülerin dili. Değişince pano yeniden yüklenir.": "Language of the panel, extension and menus. The panel reloads when it changes.",
   "Tema": "Theme",
-  "Pano, mini pano, menü paneli ve Mac pencereleri. Sistem: Mac’in açık ya da koyu görünümüne uyar.": "Panel, mini panel, menu bar panel and Mac windows. System follows the Mac’s light or dark appearance.",
+  "Pano, menü paneli ve Mac pencereleri. Sistem: Mac’in açık ya da koyu görünümüne uyar.": "Panel, menu bar panel and Mac windows. System follows the Mac’s light or dark appearance.",
   "Sistem": "System",
   "Açık": "Light",
   "Koyu": "Dark",
@@ -665,7 +661,6 @@ globalThis.SUFLOR_EN = {
   "Belge ekle": "Add a document",
   "Mikrofon": "Microphone",
   "Basılı tut: sesle sor · iki kez dokun: sohbet (Option + Shift + Boşluk)": "Hold: ask by voice · double-tap: chat (Option + Shift + Space)",
-  "Basılı tut: sesle sor (Option + Shift + Boşluk)": "Hold: ask by voice (Option + Shift + Space)",
   "Dinliyorum · bırakınca gönderir": "Listening · sends when you let go",
   "Sohbet açık · bir dokunuş kapatır": "Chat on · one tap ends it",
   "Basılı tut ve konuş · iki kez dokun: sohbet": "Hold and speak · double-tap: chat",
@@ -680,7 +675,6 @@ globalThis.SUFLOR_EN = {
   "Mikrofona basınca ve bırakınca kısa, kısık bir ton. Toplantıda yalnız kulaklık takılıyken çalar.": "A short, quiet tone when you press and release the microphone. In meetings it plays only with headphones.",
   "Mikrofon açılamadı": "Couldn't open the microphone",
   "Basılı tut ve konuş": "Hold and speak",
-  "Ses dosyasını panoya bırak: dökümü orada başlar": "Drop the audio file on the panel: the transcript starts there",
   // --- ⚙ Ayarlar → Genel → Yapay zekâ (Faz 11 Aşama 4)
   "Yapay zekâ": "AI",
   "Konuş’taki cevapları, çeviriyi ve proje kartını yazan yapay zekâ. Claude dışında bir sağlayıcı seçersen metin bağlamı o sağlayıcıya gider, ses gitmez; yerel model seçersen metin Mac’ten çıkmaz. Toplantıdaki kartlar ve özet şimdilik yalnız Claude Code’la. Anahtar ve yerel model kurulum sihirbazının Yapay zekâ adımından.": "The AI that writes Talk answers, translation and the project card. If you pick a provider other than Claude, text context goes to that provider, audio doesn't; with a local model text doesn't leave your Mac. Cards and summaries during meetings use only Claude Code for now. Keys and the local model are set up in the setup wizard's AI step.",

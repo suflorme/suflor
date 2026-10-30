@@ -59,7 +59,7 @@ Bir kez çağırdıktan sonra öbür katılımcılar da ona soru sorabilir. İst
 
 ## Kulağına fısıldar
 
-Asistan toplantıyı izler ve dört tür kart gönderir. Kartlar toplantı ekranının köşesindeki küçük şeritte ve panoda belirir.
+Asistan toplantıyı izler ve dört tür kart gönderir. Mac uygulaması açıkken kartlar ekranın alt ortasında, toplantı görüntüsünün üzerinde ayrı kutular olarak çıkar; tıklayınca açılır, ekran paylaşımında görünmez. Uygulama yoksa toplantı ekranının köşesindeki küçük şeritte ve panoda belirir.
 Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 
 <p align="center"><img src="gorsel/kartlar.png" alt="Dört kart türü: Söyle, Dur, Cevap, Not" width="100%"></p>

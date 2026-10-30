@@ -118,7 +118,8 @@ def serit_imza(v):
     import hashlib
     sv = v.get("sure") or {}
     ss = v.get("sessiz") or {}
-    x = [[(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
+    x = [kart_katmani_acik() if "kart_katmani_acik" in globals() else None,  # Mac kart katmanı açılıp kapanınca şerit ve panel hemen uyansın
+         [(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
          (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"), bool(v.get("gizli")),
          [(x["id"], x["durum"], x.get("sunuldu")) for x in ((v.get("eylem") or {}).get("liste") or [])],
          (v.get("kanit_iste") or {}).get("id"), (v.get("bildirim") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), ((v.get("sesli_ceviri") or {}).get("kis") or {}).get("id"), (v.get("komut") or {}).get("id"), (v.get("anlik") or {}).get("id"), [(v.get("soyle_web") or {}).get(k) for k in ("id", "dur")], str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
