@@ -1063,6 +1063,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 elif tur.get("otonom") and not o["hata"]: otonom_sun(KONUS.get("cevap"), tur.get("kaynak"), tur.get("karsi"), tur.get("ad") or tur.get("kisi"), tur)  # v0.56.0 (S68); S94: konuşan asistanın adı; tur: gecikme ölçümü (tur _KS'den silinmiş olur)
                 if not o["hata"]: konus_gecmis_yaz(tur, tur.get("metin") or "", tur.get("toplanti_ad"))  # v0.64.0 (S76)
                 if tur.get("kaynak") == "hitap" and not tur.get("karsi"): asistan_soru_kaydet(None if o["hata"] else tur.get("ad"), tur.get("metin") or "")  # v0.140.0
+                if tur.get("kaynak") == "hitap" and not tur.get("karsi") and not o["hata"]: hitap_devam_ac(tur.get("ad") or tur.get("kisi") or _hitap_ad())  # 30 Ekim: adsız devam sorusu penceresi
                 if not o["hata"] and "uclu_tetik" in globals(): uclu_tetik(tur, zincir=not yenile)  # üçlü sohbet: öteki kişilik söz alabilir (kisilik.py; tur sınırında yok)
                 print(f"KONUŞ: cevap · yazıya {o['wh_ms']} ms · ilk metin {o['ilk_ms']} ms · ilk ses {o['ses_ms']} ms · {o['maliyet']} $")
                 if yenile:  # pano durumu "hazır" kalır (cevap görünür); süreç arka planda kapanır, sonraki basış yenisini açar
@@ -1128,6 +1129,74 @@ def asistan_soru_kaydet(ad, cevap):
     oku = re.split(r"(?:^|\n)\s*-{3,}", cevap or "")[0].strip(); t = time.time()
     if ad and "?" in oku[-160:]: _ASISTAN_SORU.update(ad=ad, t=t, bit=t + len(oku) / 14)  # okuma sonu tahmini (~14 karakter/sn)
     else: _ASISTAN_SORU.update(ad=None)
+# 30 Ekim (gerçek toplantı, bulgu 9): ardışık sorularda ad her seferinde söylenmek zorundaydı. Kullanıcının adıyla sorduğu soruya asistan cevap verince pencere açılır:
+# cevap okunuyorsa (toplantıya ya da kulağa) okuma bittiği andan, okunmuyorsa cevap hazır olduğu andan ayar hitap_devam_sn (20; 0 = kapalı) saniye. Bu sürede kullanıcının
+# kendi yeni Whisper satırı soru ya da istekse (?, mı/mi/mu/mü, -mısın, soru sözcüğü, "peki/ya/bir de …", İngilizce wh-/yardımcı fiille başlama, istek fiili) ve başka
+# birine seslenmiyorsa ad olmadan o asistana gider (hitap_duzelt "Claude:" koyar; cümle bitmemişse "<ad>, …" askıya girer). Her cevap pencereyi yeniler. Kapanır: karşı taraf
+# ≥ 3 sözcüklük satır söyleyince (cevap hazır olduktan sonra), kullanıcı teşekkür/kapanış deyince ("tamam", "teşekkürler", "bu kadar", "that's all"), başka katılımcıya ya
+# da topluluğa ("arkadaşlar", "-elim") seslenince, süre dolunca. Asistan düşünürken, okurken, soru sorup cevap beklerken (asistan_cevap_bekliyor yolu) devam sayılmaz.
+HITAP_DEVAM = {"ad": None, "t": 0.0, "bit": None, "nesil": 0}
+DEVAM_SORU_RX = re.compile(r"\?|\bm[ıiuü](?:s[ıiuü]n(?:[ıiuü]z)?|y[ıiuü]m|d[ıiuü]r|yd[ıiuü]|y[ıiuü]z)?\b", re.I)
+DEVAM_SOZ_RX = re.compile(r"\b(?:ne|neden|niye|niçin|nasıl|kim|kimi|kime|kimin|hangi|hangisi|kaç|nerede|nereye|nereden|ne zaman)\b", re.I)
+DEVAM_BAS_RX = re.compile(r"^\W*(?:(?:tamam|evet|okay|ok)[,.]?\s+)?(?:peki|ya(?!\s+da\b)|bir de|what|why|how|who|whom|which|when|where|is|are|do|does|did|can|could|would|will|should|have|has|and what|what about|also)\b", re.I)
+DEVAM_KAPAT_RX = re.compile(r"\b(?:teşekkür\w*|tşk|sağ ?ol\w*|eyvallah|bu kadar|that'?s all|thanks|thank you)\b|^\W*(?:tamam|okay|ok|anladım|anlaşıldı|güzel|süper|harika)(?:\W+(?:tamam|okay|ok|anladım|güzel|süper|harika|o zaman))*\W*$", re.I)
+DEVAM_GRUP_RX = re.compile(r"\b(?:arkadaşlar|herkes|ekip|millet|beyler|hanımlar|guys|everyone|everybody|team|folks|let'?s)\b|\b\w+(?:[ae]l[ıi]m)\b", re.I)
+def _devam_kapat(neden):
+    if HITAP_DEVAM["ad"]: print(f"KONUŞ: devam penceresi kapandı — {neden}")
+    HITAP_DEVAM.update(ad=None, bit=None); HITAP_DEVAM["nesil"] += 1; return None
+def hitap_devam_ac(ad):  # konuşan süreç: hitap sorusunun cevabı hazır → okuma bitince pencere
+    sn = float(AYAR.get("hitap_devam_sn", 20) or 0)
+    if not ad or sn <= 0: return
+    d = HITAP_DEVAM; d["nesil"] += 1; n = d["nesil"]; d.update(ad=ad, t=time.time(), bit=None)
+    def izle():
+        t = time.time(); time.sleep(0.5)
+        while time.time() - t < 180 and d["nesil"] == n:
+            try: suren = bool(OT.get("id") and OT.get("durum") in ("itiraz", "sira", "okunuyor")) or okuma_suruyor() or ses_caliyor()
+            except NameError: suren = False
+            if not suren: break
+            time.sleep(0.3)
+        if d["nesil"] != n: return
+        d["bit"] = time.time(); print(f"KONUŞ: devam penceresi açıldı — {ad}, {sn:.0f} sn (ad olmadan soru ona gider)")
+    threading.Thread(target=izle, daemon=True).start()
+def _devam_baskasina(metin):  # satır başka birine seslenme mi: "Can, …" / "…, Can?" / öğrenilmiş seslenme / toplantıdaki başka konuşanın adı
+    m = str(metin or "").strip()
+    w = re.match(r"\W*([A-ZÇĞİÖŞÜ][\wçğıöşü]+)\s*,", m)
+    if w and not re.fullmatch(KISILIK_GIRIS + r"|ya|bir|hayır|yani|bak|şimdi|sonra|ayrıca|also|so|and|but|well|okay|ok", w.group(1), re.I): return True
+    if re.search(r",\s*[A-ZÇĞİÖŞÜ][\wçğıöşü]+\s*[?!.…]*\s*$", m): return True
+    if vokatif_mi(m): return True
+    sw = {_vk_ad(x) for x in re.findall(r"[\wçğıöşüÇĞİÖŞÜ]+", m)}
+    try: ben = _vk_ad(str(ben_adi() or "").split(" ")[0])
+    except NameError: ben = ""
+    kon = {_vk_ad(str(k).split(" ")[0]) for _, k, _ in list(globals().get("SON_SATIRLAR") or [])} - {ben, "", "?"}
+    return bool(sw & {k for k in kon if len(k) >= 3})
+def hitap_devam_bak(metin, t0=None, t1=None):  # hitap_duzelt: kullanıcının adsız yeni Whisper satırı → (asistanın adı, geçen sn) ya da None
+    d = HITAP_DEVAM; sn = float(AYAR.get("hitap_devam_sn", 20) or 0)
+    if not d["ad"] or sn <= 0: return None
+    if not toplanti_var(): return _devam_kapat("toplantı yok")
+    if d["bit"] is None: return None  # cevap okunuyor ya da söz sırası bekliyor
+    t0 = time.time() if t0 is None else t0; gecen = t0 - d["bit"]
+    if gecen > sn: return _devam_kapat(f"süre doldu ({sn:.0f} sn)")
+    try: ben = ben_adi()
+    except NameError: ben = None
+    for t, k, x in list(globals().get("SON_SATIRLAR") or []):
+        if t >= d["t"] and k not in (ben, "?") and len(re.findall(r"\w+", x)) >= 3: return _devam_kapat(f"karşı taraf konuştu ({k})")
+    if DEVAM_KAPAT_RX.search(metin or ""): return _devam_kapat(f"kullanıcı kapattı (\"{metin[:30]}\")")
+    if _devam_baskasina(metin): return _devam_kapat(f"başka birine seslendi (\"{metin[:30]}\")")
+    if DEVAM_GRUP_RX.search(metin or ""): return _devam_kapat(f"topluluğa döndü (\"{metin[:30]}\")")
+    if gecen < -0.5 or _KS.get("tur"): return None  # okuma bitmeden başlamış satır ya da asistan düşünüyor
+    a = _ASISTAN_SORU
+    if a["ad"] and t0 - max(a["bit"], (globals().get("TS") or {}).get("son_t") or 0) <= ASISTAN_SORU_SN: return None  # asistan soru sordu: cevap yolu (asistan_cevap_bekliyor)
+    if len(re.findall(r"\w+", metin or "")) < 2: return None
+    soru = DEVAM_SORU_RX.search(metin) or DEVAM_BAS_RX.match(metin) or re.search(KISILIK_ISTEK, metin, re.I) or (DEVAM_SOZ_RX.search(metin) and not re.search(r"[.!]\s*$", metin))
+    if not soru: return None
+    try:
+        if t1 is not None and "_kendi_mi" in globals():
+            with YANKI_LOCK: yank = any(_kendi_mi((t0, t1, _yk(metin)), k) for k in KENDI_SES)
+            if yank: print(f"KONUŞ: devam adayı okunan sesimizin yankısı — sayılmadı"); return None
+    except NameError: pass
+    return d["ad"], max(0, round(gecen))
+def hitap_devam_karsi(metin, kim):  # karşı kanalın yeni Whisper satırı: ≥ 3 sözcük → pencere kapanır
+    if HITAP_DEVAM["ad"] and len(re.findall(r"\w+", metin or "")) >= 3: _devam_kapat(f"karşı taraf konuştu ({kim or '?'})")
 # 28 Ekim: kullanıcı "Esra, duyuyor musun?" diye başkasına seslendi; ardından "Esra öyle deme" asistanın sorusuna cevap sayıldı ve iki cevap çıktı. Kullanıcının
 # virgülle seslendiği adlar (asistanın adı değil) öğrenilir; bu adla başlayan hitapsız satır asistana cevap sayılmaz.
 _VOKATIF = set()
@@ -1563,6 +1632,8 @@ def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses ki
     ad = _hitap_ad()
     if not m or not ad: return False
     soru = text[m[-1].end():].strip()
+    if _KHR.get("icte"): print(f"KONUŞ: hitap (cümle içinde) — \"{text[:80]}\"")
+    if _KHR.get("devam") is not None: print(f"KONUŞ: devam sorusu (ad olmadan, {_KHR['devam']} sn içinde) — \"{text[:80]}\"")
     if ASISTAN_DUR_RX.match(soru): print(f"ASİSTAN: '{ad}, dur'"); asistan_dur(); return True
     if ASISTAN_OKU_RX.match(soru) and "otonom_onay_ver" in globals() and otonom_onay_ver(): print(f"ASİSTAN: '{ad}, oku' — karşı tarafa cevap onaylandı"); return True  # v0.97.0 (Y2)
     if len(soru.split()) < 2: return False
@@ -1584,6 +1655,7 @@ def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses ki
 KARSI_HITAP_RX = re.compile(r"(?:^|[.!?…]\s+)(?:hey\s+|merhaba\s+)?(?:suflor|suflör|süflör|sufle|süfle|suflo|soflor|sufler|souffle)(?:\.me)?\s*[,:!]?\s+(?=\w)", re.I)
 KARSI_HITAP_SUSKU_SN = 10
 def konus_hitap_karsi(text, kim, t0=None, t1=None):
+    hitap_devam_karsi(text, kim)  # 30 Ekim: karşı taraf konuşunca adsız devam penceresi kapanır
     if not toplanti_var() or not AYAR.get("konusma", True): return False
     kat = asistan_katilan()
     if not kat: return False

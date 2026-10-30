@@ -6,7 +6,7 @@
 //   turuncu nokta (onay bekleyen iş). Durum aktarıcının şerit uzun yoklamasından (GET /cards?bekle=25).
 // - Tıkla: buzlu cam (NSVisualEffectView) panelde mini pano — panonun ?gorunum=panel görünümü (WKWebView, saydam). Panel ekran
 //   paylaşımında görünmez (sharingType none), odak çalmaz (nonactivating). Sağ tık: Panoyu aç · kısayol · Çık.
-// - Kart katmanı (30 Ekim, KartKatmani): yeni kartlar ekranın alt ortasında tek tek saydamsız kutu (aktarıcı `kart_katmani: true` verirken).
+// - Kart katmanı (30 Ekim, KartKatmani; v2 aynı gün): önemli kart alt ortada tek tek, bilgi satırları sağ altta, yan şerit sağ kenarda (aktarıcı `kart_katmani: true` verirken).
 // - Pano penceresi (v0.104.0): "Panoyu aç" ve bildirim tam panoyu bu uygulamanın Mac penceresinde açar (PanoPencere); "Panoyu tarayıcıda aç" eski yol.
 // - Mac geneli bas-konuş: Option + Shift + Boşluk basılı tut → mikrofon (16 kHz) → bırakınca POST /bas-konus (anahtar + pano kökeni).
 //   Carbon sıcak tuşu basma/bırakmayı ayrı verir; Erişilebilirlik izni gerekmez, mikrofon izni bu uygulamaya sorulur.
@@ -97,15 +97,16 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!; var pano: PanoPencere?
     var durum: Durum = .bekliyor; var imza = ""; var gorulenKart = Set<String>(); var acikKart = Set<String>()
     var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?
-    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var sonPanoAc = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?
-    var kartKatmani: KartKatmani?  // v0.159.0: kartlar ekranın alt ortasında tek tek kutu (mini panonun yerine)
+    var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var sonPanoAc = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?; var sonDurum: [String: Any]?
+    var kartKatmani: KartKatmani?  // v0.159.0: kart katmanı (mini panonun yerine); 30 Ekim v2: önemli kart + bilgi akışı + yan şerit
     func applicationDidFinishLaunching(_ n: Notification) {
         oge = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
         oge.button?.target = self; oge.button?.action = #selector(tiklandi(_:)); oge.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         panelKur(); sicakTusKur()
         kartKatmani = KartKatmani(ack: { id, durum, bitti in istek("/card-ack", ["id": id, "status": durum]) { v in bitti((v?["ok"] as? Bool) == true) } },
-                                  panoAc: { [weak self] in self?.panoPencere() })
+                                  eylemKarar: { id, durum, bitti in istek("/eylem-karar", ["id": id, "durum": durum]) { v in bitti((v?["ok"] as? Bool) == true) } },
+                                  panoAc: { [weak self] in self?.panoPencere() }, panelAc: { [weak self] in self?.yanPanelAc() })
         yoklamaDongusu()
         istek("/status") { v in let dg = (v?["ayarlar"] as? [String: Any])?["deger"] as? [String: Any]; DispatchQueue.main.async { dilAyarla(dg?["dil"] as? String); if !args.contains("--koyu") { temaAyarla(dg?["tema"] as? String) } } }
         if args.contains("--ortak-mik") { let o = OrtakMik(); ortakMik = o; o.dongu() }  // toplantıya sesli söyle (v0.38.0)
@@ -172,6 +173,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             panel.setFrameOrigin(NSPoint(x: x, y: r.minY - panel.frame.height - 6))
         }
         panel.makeKeyAndOrderFront(nil); gorulenKart = acikKart; simgeGuncelle()
+        if let v = sonDurum { kartKatmani?.isle(v, panelAcik: true) }  // yan şeridin rozeti hemen sıfırlansın
     }
     func menuGoster() {
         let m = NSMenu()
@@ -191,7 +193,17 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     @objc func panelBuyut() { panel.orderOut(nil); panoPencere() }
     @objc func panoTarayici() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
     @objc func panoPencere() { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.goster() }
-    func panelGoster() { if !panel.isVisible { tiklandi(oge.button!) } }  // panodaki "mini pano" düğmesi: menüdeki panel
+    func panelGoster() { if !panel.isVisible { tiklandi(oge.button!) } }
+    // kart katmanının yan şeridi ya da bilgi satırı: panel ekranın sağ kenarında, dikeyde ortada (bütün kartlar tam metinle); açıksa kapanır
+    func yanPanelAc() {
+        if panel.isVisible { panel.orderOut(nil); return }
+        if web.url == nil { panelYukle() }
+        let e = (NSScreen.screens.first ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 875)
+        let h = min(e.height - 40, max(panel.frame.height, 620)), w = panel.frame.width
+        panel.setFrame(NSRect(x: e.maxX - w - 14, y: round(e.midY - h / 2), width: w, height: h), display: true)
+        panel.makeKeyAndOrderFront(nil); gorulenKart = acikKart; simgeGuncelle()
+        if let v = sonDurum { kartKatmani?.isle(v, panelAcik: true) }  // rozet hemen sıfırlansın
+    }  // panodaki "mini pano" düğmesi: menüdeki panel
     @objc func panelYenile() { panelYukle() }
     @objc func panelKapat() { panel.orderOut(nil) }
     @objc func cik() { NSApp.terminate(nil) }
@@ -207,14 +219,14 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         }
     }
     func isle(_ v: [String: Any]) {
-        imza = v["imza"] as? String ?? ""
+        imza = v["imza"] as? String ?? ""; sonDurum = v
         masaustuKanit?.iste(v["kanit_iste"] as? [String: Any])  // masaüstü toplantıdayken kanıtı toplantı penceresinden al
         if let id = (v["pano_ac"] as? [String: Any])?["id"] as? String, id != sonPanoAc { sonPanoAc = id; panoPencere() }  // /pano-ac (kurulum, eklenti)
         if let b = v["bildirim"] as? [String: Any], let id = b["id"] as? String, id != sonBildirim {
             let ilk = sonBildirim.isEmpty; sonBildirim = id
             if !ilk || ((b["t"] as? Double).map { Date().timeIntervalSince1970 - $0 < 30 } ?? false) { bildir(b) }  // açılışta eski bildirim yinelenmesin
         }
-        kartKatmani?.isle(v["cards"] as? [[String: Any]] ?? [], acik: (v["kart_katmani"] as? Bool) == true)  // aktarıcı eskiyse alan yok: katman kapalı
+        kartKatmani?.isle(v, panelAcik: panel.isVisible)
         let kartlar = (v["cards"] as? [[String: Any]] ?? []).filter { ($0["status"] as? String) == "acik" && ($0["sessiz"] == nil) }
         acikKart = Set(kartlar.compactMap { $0["id"] as? String })
         let eylem = ((v["eylem"] as? [String: Any])?["liste"] as? [[String: Any]] ?? []).contains { ($0["durum"] as? String) == "bekliyor" && ($0["sunuldu"] != nil) }
@@ -309,24 +321,32 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func uyar(_ m: String) { NSSound(named: "Basso")?.play(); oge.button?.toolTip = "Suflor.me — " + m; print("UYARI: " + m) }
 }
 
-// --- Kart katmanı (30 Ekim, mini panonun yerine): her kart ekranın alt ortasında kendi küçük NSPanel'inde, saydamsız kutu ---------------
-// Yer: ana ekranın altından 110 pt yukarı (toplantı uygulamasının denetim çubuğunun üstü, altyazı bandı), genişlik ekranın %46'sı (en çok 720 pt).
-// Yeni kart en altta ve belirgin; eskiler üste kayar, yazıları solar (pencere saydamlaşmaz); en çok 3 kart. Kendiliğinden kaybolur (Dur 8 sn,
-// Not 15 sn, öbürleri 25 sn; onay kartı süresiz, 3 kart sınırında da en son gider; ayar.json `kart_sure`: {"dur": 8, "not": 15, "soyle": 25, "cevap": 25, "onay": 25} ya da tek sayı); fare üstündeyken
-// ya da kart açıkken süre işlemez. Kaybolan kart yalnız katmandan gider (panoda kalır). Tıkla: yerinde açılır (tam metin, soru, durum, ayrıntı,
-// düğmeler: Tamam · Sonra · Gerek yok · Kaynağı aç; onay kartında Onayla · Reddet — panodaki /card-ack karşılıkları). Sürüklenir; yer
-// UserDefaults `kartKatmaniYer`; çift tık ya da sağ tık → "Kartların yerini sıfırla". Paylaşımda görünmez, odak çalmaz, tam ekranda da görünür.
-// Aktarıcı /cards cevabında `kart_katmani: true` verirken çalışır (ayar kart_katmani: false kapatır); yalnız uygulama açıldıktan sonra gelen kartlar.
+// --- Kart katmanı (30 Ekim; v2 aynı gün, gerçek toplantı bulgularıyla): üç katman, hepsi kendi küçük NSPanel'inde ----------------------------
+// 1) Önemli kart (Söyle, Dur, Cevap, Ne diyeyim, onay kartı, sesle sorulan "yazayım mı?" işi): ekranın alt ortasında (varsayılan ana ekranın
+//    altından 110 pt yukarı; sürüklenir, yer UserDefaults `kartKatmaniYer`, çift tık ya da sağ tık → sıfırla). Aynı anda yalnız bir tane; tam metin
+//    (çok uzunsa kart içinde kayar); kullanıcı kapatana kadar kalır: ✕ (katmandan çıkar, okunmuş sayılır; kart yan panelde kalır), Tamam · Sonra · Gerek yok
+//    (/card-ack), onay kartında Onayla · Reddet, "yazayım mı?" işinde Onayla · Reddet (/eylem-karar). Bekleyenler sırada ("+2 sırada"), Dur sıranın
+//    başına geçer; kapatınca sıradaki yumuşak geçişle gelir. Panodan, şeritten ya da sesle kapanan kart katmandan da çıkar.
+// 2) Bilgi akışı (Not kartı, anlık uyarı — uzun konuşma, adın geçti —, kalan süre 15/5/0 dk, gündem kayması, sessiz kip, disk ve dil uyarısı):
+//    ekranın sağ altında küçük, yarı saydam satır; gelişte bir kez yumuşak nabız; ayar.json `kart_sure.bilgi` (10) sn sonra söner (fare üstündeyken
+//    beklemez); üst üste en çok 3; düğme yok, tıklayınca yan panel açılır.
+// 3) Yan şerit: ekranın sağ kenarında ince dikey çizgi ve okunmamış kart rozeti (yan panel son açıldıktan sonra gelen açık kartlar); fare gelince
+//    genişler; tıklayınca menü uygulamasının paneli sağ kenarda açılır (bütün kartlar tam metinle, yazı kutusu, mikrofon).
+// Üçü de paylaşımda görünmez, odak çalmaz, tam ekranda görünür; kart dışına tıklama alttaki uygulamaya gider (ekranı kaplayan pencere yok).
+// Aktarıcı /cards cevabında `kart_katmani: true` verirken çalışır (ayar kart_katmani: false kapatır); yalnız uygulama açıldıktan sonra gelenler.
 func kRenk(_ h: UInt32, _ a: CGFloat = 1) -> NSColor { NSColor(srgbRed: CGFloat((h >> 16) & 255) / 255, green: CGFloat((h >> 8) & 255) / 255, blue: CGFloat(h & 255) / 255, alpha: a) }
 func kDinamik(_ acik: NSColor, _ koyu: NSColor) -> NSColor { NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? koyu : acik } }
+func TE(_ tr: String, _ en: String) -> String { ARAYUZ_EN ? en : tr }
 enum KR {  // pano/renk.css ile aynı aile; zemin krem
-    static let ORTU: CGFloat = 0.86  // buzlu camın üstündeki zeminin örtücülüğü: arka planın rengi sezilir, yazısı okunmaz
-    static let zemin = kDinamik(kRenk(0xFBF6EC, ORTU), kRenk(0x1B221E, ORTU)), cizgi = kDinamik(kRenk(0x18201C, 0.16), kRenk(0xE8EBE6, 0.16))
+    // buzlu camın üstündeki zeminin örtücülüğü: önemli kartta arka planın şekli sezilir, yazısı okunmaz; bilgi satırı daha saydam
+    static let ORTU: CGFloat = 0.72, BILGI_ORTU: CGFloat = 0.55
+    static func zemin(_ a: CGFloat) -> NSColor { kDinamik(kRenk(0xFBF6EC, a), kRenk(0x1B221E, a)) }
+    static let cizgi = kDinamik(kRenk(0x18201C, 0.14), kRenk(0xE8EBE6, 0.16))
     static let yazi = kDinamik(kRenk(0x18201C), kRenk(0xE8EBE6)), yazi2 = kDinamik(kRenk(0x5C655F), kRenk(0xA5ADA7)), yazi3 = kDinamik(kRenk(0x7A827C), kRenk(0x8A928C))
     static let dur = kDinamik(kRenk(0xB3412E), kRenk(0xE0705C)), soyle = kDinamik(kRenk(0x1F7A4F), kRenk(0x47B07C))
     static let cevap = kDinamik(kRenk(0x2C62A8), kRenk(0x6EA0E0)), not = kDinamik(kRenk(0x6B736D), kRenk(0xA5ADA7)), onay = kDinamik(kRenk(0x94600F), kRenk(0xD9A03C))
     static func tur(_ c: [String: Any]) -> NSColor {
-        if c["onay"] != nil { return onay }
+        if c["onay"] != nil || c["eylem"] != nil { return onay }
         switch c["kind"] as? String { case "dur": return dur; case "soyle": return soyle; case "cevap": return cevap; default: return not }
     }
 }
@@ -334,22 +354,26 @@ final class KartPanel: NSPanel {
     override var canBecomeKey: Bool { false }  // odak çalmaz: toplantıdaki yazma ve kısayollar bozulmaz
     override var canBecomeMain: Bool { false }
 }
+final class TersGorunum: NSView { override var isFlipped: Bool { true } }
+// --- 1) önemli kart ---
 final class KartGorunum: NSView {
     let kart: [String: Any]; let anahtar: String; weak var katman: KartKatmani?
-    var acik = false, ustunde = false, sira = 0, kalan: Double
+    var sirada = 0, ustunde = false, mesgul = false
     var basNokta: NSPoint?, basYer = NSPoint.zero, surukledi = false
-    init(_ c: [String: Any], anahtar a: String, sure: Double) { kart = c; anahtar = a; kalan = sure; super.init(frame: .zero) }
+    var kaydirma: NSScrollView?; var dugmeler: [NSButton] = []
+    init(_ c: [String: Any], anahtar a: String) { kart = c; anahtar = a; super.init(frame: .zero) }
     required init?(coder: NSCoder) { nil }
     override var isFlipped: Bool { true }
     override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
-    override func hitTest(_ p: NSPoint) -> NSView? {  // yazılar tıklamayı tutmasın: düğme dışında her yer kartın kendisi
+    override func hitTest(_ p: NSPoint) -> NSView? {  // yazılar tıklamayı tutmasın: düğme ve kaydırma çubuğu dışında her yer kartın kendisi
         guard let v = super.hitTest(p) else { return nil }
-        var u: NSView? = v; while let x = u, x !== self { if x is NSButton { return x }; u = x.superview }
+        var u: NSView? = v; while let x = u, x !== self { if x is NSButton || x is NSScroller { return x }; u = x.superview }
         return self
     }
     var tur: String { kart["kind"] as? String ?? "not" }
+    var onayli: Bool { kart["onay"] != nil || kart["eylem"] != nil }
     var baslik: String {
-        let ad = kart["onay"] != nil ? T("Onay bekliyor") : kart["replik"] != nil ? T("Ne diyeyim") : T(["soyle": "Söyle", "dur": "Dur", "cevap": "Cevap"][tur] ?? "Not")
+        let ad = onayli ? T("Onay bekliyor") : kart["replik"] != nil ? T("Ne diyeyim") : T(["soyle": "Söyle", "dur": "Dur", "cevap": "Cevap"][tur] ?? "Not")
         return (kart["geri"] != nil ? "↩ " : "") + ad.uppercased(with: Locale(identifier: ARAYUZ_EN ? "en" : "tr")) + (kart["gizli"] != nil ? " · " + T("gizli") : "")
     }
     var kaynak: URL? {  // kart metninde ya da ayrıntısında ilk bağlantı
@@ -357,57 +381,72 @@ final class KartGorunum: NSView {
         guard let r = t.range(of: "https?://[^\\s<>\"']+", options: .regularExpression) else { return nil }
         return URL(string: String(t[r]).replacingOccurrences(of: "[.,;:!?)]+$", with: "", options: .regularExpression))
     }
-    static func yazi(_ s: String, _ f: NSFont, _ c: NSColor) -> NSTextField {
+    static func yazi(_ s: String, _ f: NSFont, _ c: NSColor, satir: Int = 0) -> NSTextField {
         let t = NSTextField(wrappingLabelWithString: s); t.font = f; t.textColor = c; t.isSelectable = false; t.drawsBackground = false; t.isBordered = false
-        t.lineBreakMode = .byWordWrapping; t.cell?.truncatesLastVisibleLine = true; return t
+        t.lineBreakMode = .byWordWrapping; t.maximumNumberOfLines = satir; t.cell?.truncatesLastVisibleLine = satir > 0; return t
     }
     static func boy(_ t: NSTextField, _ w: CGFloat) -> NSSize { t.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10000)) }
-    // içeriği kurar, kartın boyunu döndürür (en: katmanın genişliği)
-    func kur(en W: CGFloat) -> NSSize {
-        subviews.forEach { $0.removeFromSuperview() }
-        let sol: CGFloat = 18, sag: CGFloat = 16, ust: CGFloat = 10, alt: CGFloat = 11, ara: CGFloat = 4
-        let yeni = sira == 0
-        let fBas = NSFont.systemFont(ofSize: 10.5, weight: .semibold), fMetin = NSFont.systemFont(ofSize: yeni ? 15 : 13, weight: yeni ? .medium : .regular), fEk = NSFont.systemFont(ofSize: 12)
-        let b = KartGorunum.yazi(baslik, fBas, yeni ? KR.tur(kart) : KR.tur(kart).withAlphaComponent(0.75))
-        let m = KartGorunum.yazi(kart["text"] as? String ?? "", fMetin, yeni || acik ? KR.yazi : KR.yazi2)
-        var ekler: [NSTextField] = []
-        if acik {
-            if let q = kart["q"] as? String, !q.isEmpty { ekler.append(KartGorunum.yazi("↳ " + q, fEk, KR.yazi2)) }
-            if let d = kart["durum"] as? String, !d.isEmpty { ekler.append(KartGorunum.yazi(d, fEk, KR.yazi2)) }
-            if let w = kart["why"] as? String, !w.isEmpty { ekler.append(KartGorunum.yazi(w, fEk, KR.yazi3)) }
+    // içeriği kurar, kartın boyunu döndürür (W: en çok genişlik, H: en çok boy — metin bundan uzunsa kart içinde kayar)
+    func kur(en W: CGFloat, enBoy H: CGFloat) -> NSSize {
+        subviews.forEach { $0.removeFromSuperview() }; kaydirma = nil; dugmeler = []
+        let sol: CGFloat = 18, sag: CGFloat = 12, ust: CGFloat = 10, alt: CGFloat = 12
+        let fBas = NSFont.systemFont(ofSize: 10.5, weight: .semibold), fMetin = NSFont.systemFont(ofSize: 15, weight: .medium), fEk = NSFont.systemFont(ofSize: 12.5)
+        let b = KartGorunum.yazi(baslik, fBas, KR.tur(kart))
+        let sr = sirada > 0 ? KartGorunum.yazi(TE("+\(sirada) sırada", "+\(sirada) waiting"), NSFont.systemFont(ofSize: 11, weight: .medium), KR.yazi3) : nil
+        let x = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: T("Kapat"))!.withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))!,
+                         target: self, action: #selector(dugme(_:)))
+        x.identifier = .init("kapat"); x.isBordered = false; x.contentTintColor = KR.yazi2; x.toolTip = TE("Kapat (kart yan panelde kalır)", "Close (the card stays in the side panel)")
+        var govdeler = [KartGorunum.yazi(kart["text"] as? String ?? "", fMetin, KR.yazi)]
+        if let q = kart["q"] as? String, !q.isEmpty { govdeler.insert(KartGorunum.yazi("↳ " + q, fEk, KR.yazi2), at: 0) }
+        if let d = kart["durum"] as? String, !d.isEmpty { govdeler.append(KartGorunum.yazi(d, fEk, KR.yazi2)) }
+        if let w = kart["why"] as? String, !w.isEmpty { govdeler.append(KartGorunum.yazi(w, fEk, KR.yazi3)) }
+        let liste: [(String, String)] = onayli ? [("onaylandi", "Onayla"), ("reddedildi", "Reddet")]
+            : [(["cevap", "not"].contains(tur) ? "okundu" : "yapildi", "Tamam"), ("ertele", "Sonra"), ("gecildi", "Gerek yok")] + (kaynak != nil ? [("kaynak", "Kaynağı aç")] : [])
+        for (i, (s, ad)) in liste.enumerated() {
+            let d = NSButton(title: T(ad), target: self, action: #selector(dugme(_:))); d.identifier = .init(s); d.bezelStyle = .rounded; d.controlSize = .small
+            d.font = .systemFont(ofSize: 12); if i == 0 { d.bezelColor = KR.tur(kart) }; d.isEnabled = !mesgul; d.sizeToFit(); dugmeler.append(d)
         }
-        var dugmeler: [NSButton] = []
-        if acik {
-            let liste: [(String, String)] = kart["onay"] != nil ? [("onaylandi", "Onayla"), ("reddedildi", "Reddet")]
-                : [(["cevap", "not"].contains(tur) ? "okundu" : "yapildi", "Tamam"), ("ertele", "Sonra"), ("gecildi", "Gerek yok")] + (kaynak != nil ? [("kaynak", "Kaynağı aç")] : [])
-            for (s, ad) in liste {
-                let d = NSButton(title: T(ad), target: self, action: #selector(dugme(_:))); d.identifier = .init(s); d.bezelStyle = .rounded; d.controlSize = .small
-                d.font = .systemFont(ofSize: 12); d.sizeToFit(); dugmeler.append(d)
-            }
-        }
-        // genişlik: kapalı kart yazısına göre (en az 340, en çok W), açık kart W
-        let dogal = max(KartGorunum.boy(b, 10000).width, KartGorunum.boy(m, 10000).width)
-        let en = acik ? W : max(min(340, W), min(W, ceil(dogal) + sol + sag + 2)), ic = en - sol - sag
+        // genişlik: yazıya göre (en az 380, en çok W); düğmeler sığsın
+        let dw = dugmeler.reduce(CGFloat(0)) { $0 + $1.frame.width + 4 }
+        let dogal = max(KartGorunum.boy(b, 10000).width + (sr.map { KartGorunum.boy($0, 10000).width } ?? 0) + 40, govdeler.map { KartGorunum.boy($0, 10000).width }.max() ?? 0, dw)
+        let en = max(min(380, W), min(W, ceil(dogal) + sol + sag + 8)), ic = en - sol - sag
         var y = ust
-        let bh = KartGorunum.boy(b, ic).height; b.frame = NSRect(x: sol, y: y, width: ic, height: bh); addSubview(b); y += bh + 2
-        var mh = KartGorunum.boy(m, ic).height
-        if !acik { mh = min(mh, KartGorunum.boy(KartGorunum.yazi(Array(repeating: "Ag", count: yeni ? 3 : 2).joined(separator: "\n"), fMetin, KR.yazi), ic).height) }  // kapalı: yenisi 3, eskiler 2 satır
-        m.frame = NSRect(x: sol, y: y, width: ic, height: mh); addSubview(m); y += mh
-        for e in ekler { let h = KartGorunum.boy(e, ic).height; y += ara + 2; e.frame = NSRect(x: sol, y: y, width: ic, height: h); addSubview(e); y += h }
+        let bh = KartGorunum.boy(b, ic).height
+        x.frame = NSRect(x: en - sag - 18, y: y - 3, width: 20, height: 20); addSubview(x)
+        var bsag = en - sag - 24
+        if let sr = sr { let s = KartGorunum.boy(sr, 10000); sr.frame = NSRect(x: bsag - s.width, y: y, width: s.width, height: s.height); addSubview(sr); bsag -= s.width + 8 }
+        b.frame = NSRect(x: sol, y: y, width: bsag - sol, height: bh); addSubview(b); y += bh + 5
+        // gövde: soru, metin, durum, ayrıntı — kesilmez; sığmazsa kaydırılır
+        let gv = TersGorunum(); var gy: CGFloat = 0
+        for (i, t) in govdeler.enumerated() { if i > 0 { gy += 5 }; let h = KartGorunum.boy(t, ic - 4).height; t.frame = NSRect(x: 0, y: gy, width: ic - 4, height: h); gv.addSubview(t); gy += h }
+        let dh: CGFloat = dugmeler.isEmpty ? 0 : 10 + dugmeler[0].frame.height
+        let gorunen = min(ceil(gy), max(60, H - y - dh - alt))
+        gv.frame = NSRect(x: 0, y: 0, width: ic, height: ceil(gy))
+        if gorunen < ceil(gy) {
+            let sv = NSScrollView(frame: NSRect(x: sol, y: y, width: ic + 6, height: gorunen)); sv.drawsBackground = false; sv.hasVerticalScroller = true
+            sv.scrollerStyle = .overlay; sv.autohidesScrollers = true; sv.borderType = .noBorder; sv.contentView.drawsBackground = false
+            sv.documentView = gv; addSubview(sv); kaydirma = sv
+        } else { gv.frame.origin = NSPoint(x: sol, y: y); addSubview(gv) }
+        y += gorunen
         if !dugmeler.isEmpty {
-            y += 10; var x = sol - 6
-            for d in dugmeler { d.frame.origin = NSPoint(x: x, y: y); addSubview(d); x += d.frame.width + 4 }
+            y += 10; var dx = sol - 6
+            for d in dugmeler { d.frame.origin = NSPoint(x: dx, y: y); addSubview(d); dx += d.frame.width + 4 }
             y += dugmeler[0].frame.height
         }
         y += alt
-        needsDisplay = true
+        dugmeAlfa(canli: false); needsDisplay = true
         return NSSize(width: en, height: ceil(y))
     }
+    // düğmeler sakin durur, üstüne gelince belirginleşir; onay kartında hep belirgin
+    func dugmeAlfa(canli: Bool) {
+        let a: CGFloat = onayli || ustunde ? 1 : 0.42
+        for d in dugmeler { if canli { d.animator().alphaValue = a } else { d.alphaValue = a } }
+    }
     override func draw(_ r: NSRect) {
-        let yol = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 10, yRadius: 10)
-        KR.zemin.setFill(); yol.fill()
+        let yol = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 12, yRadius: 12)
+        KR.zemin(KR.ORTU).setFill(); yol.fill()
         NSGraphicsContext.saveGraphicsState(); yol.addClip()
-        KR.tur(kart).withAlphaComponent(sira == 0 || acik ? 1 : 0.55).setFill(); NSRect(x: 0, y: 0, width: 4, height: bounds.height).fill()
+        KR.tur(kart).setFill(); NSRect(x: 0, y: 0, width: 3, height: bounds.height).fill()
         NSGraphicsContext.restoreGraphicsState()
         KR.cizgi.setStroke(); yol.lineWidth = 1; yol.stroke()
     }
@@ -415,15 +454,17 @@ final class KartGorunum: NSView {
     @objc func dugme(_ d: NSButton) {
         guard let s = d.identifier?.rawValue else { return }
         if s == "kaynak" { if let u = kaynak { NSWorkspace.shared.open(u) }; return }
-        d.isEnabled = false; katman?.yanitla(self, s)
+        if s == "kapat" { katman?.okunduKapat(self); return }
+        mesgul = true; dugmeler.forEach { $0.isEnabled = false }; katman?.yanitla(self, s)
     }
-    // fare: üstündeyken süre durur; tıkla aç/kapat; sürükle taşı; çift tık yer sıfırla
+    override func scrollWheel(with e: NSEvent) { if let k = kaydirma { k.scrollWheel(with: e) } else { super.scrollWheel(with: e) } }
+    // fare: üstüne gelince düğmeler belirginleşir; sürükle taşı; çift tık yer sıfırla
     override func updateTrackingAreas() {
         trackingAreas.forEach(removeTrackingArea)
         addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
     }
-    override func mouseEntered(with e: NSEvent) { ustunde = true }
-    override func mouseExited(with e: NSEvent) { ustunde = false }
+    override func mouseEntered(with e: NSEvent) { ustunde = true; NSAnimationContext.runAnimationGroup { c in c.duration = 0.15; dugmeAlfa(canli: true) } }
+    override func mouseExited(with e: NSEvent) { ustunde = false; NSAnimationContext.runAnimationGroup { c in c.duration = 0.3; dugmeAlfa(canli: true) } }
     override func mouseDown(with e: NSEvent) {
         if e.clickCount == 2 { katman?.yerSifirla(); return }
         basNokta = NSEvent.mouseLocation; basYer = katman?.yer ?? .zero; surukledi = false
@@ -432,146 +473,309 @@ final class KartGorunum: NSView {
         guard let b = basNokta, let k = katman else { return }
         let p = NSEvent.mouseLocation, dx = p.x - b.x, dy = p.y - b.y
         if !surukledi && hypot(dx, dy) < 3 { return }
-        surukledi = true; k.yer = NSPoint(x: basYer.x + dx, y: basYer.y + dy); k.yerlestir(canli: false)
+        surukledi = true; k.yer = NSPoint(x: basYer.x + dx, y: basYer.y + dy); k.onemliYerlestir()
     }
-    override func mouseUp(with e: NSEvent) {
-        defer { basNokta = nil }
-        if surukledi { katman?.yerKaydet(); return }
-        if e.clickCount <= 1 { katman?.ac(self) }
-    }
+    override func mouseUp(with e: NSEvent) { defer { basNokta = nil }; if surukledi { katman?.yerKaydet() } }
     override func rightMouseDown(with e: NSEvent) {
         let m = NSMenu()
         m.addItem(withTitle: T("Kartların yerini sıfırla"), action: #selector(yerSifirla), keyEquivalent: "").target = self
-        m.addItem(withTitle: T("Kartı gizle"), action: #selector(gizle), keyEquivalent: "").target = self
+        m.addItem(withTitle: TE("Kartı kapat", "Close card"), action: #selector(kapat), keyEquivalent: "").target = self
+        m.addItem(withTitle: TE("Tüm kartlar (yan panel)", "All cards (side panel)"), action: #selector(panelAc), keyEquivalent: "").target = self
         m.addItem(withTitle: T("Panoyu aç"), action: #selector(panoAc), keyEquivalent: "").target = self
         NSMenu.popUpContextMenu(m, with: e, for: self)
     }
     @objc func yerSifirla() { katman?.yerSifirla() }
-    @objc func gizle() { katman?.kaldir(anahtar) }
+    @objc func kapat() { katman?.okunduKapat(self) }
+    @objc func panelAc() { katman?.panelAc() }
     @objc func panoAc() { katman?.panoAc() }
 }
+// --- 2) bilgi satırı ---
+final class BilgiGorunum: NSView {
+    let metin: String; let renk: NSColor; weak var katman: KartKatmani?
+    var kalan: Double, ustunde = false
+    init(_ m: String, renk r: NSColor, sure: Double) { metin = m; renk = r; kalan = sure; super.init(frame: .zero) }
+    required init?(coder: NSCoder) { nil }
+    override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+    override func hitTest(_ p: NSPoint) -> NSView? { super.hitTest(p) != nil ? self : nil }
+    func kur() -> NSSize {
+        subviews.forEach { $0.removeFromSuperview() }
+        let t = KartGorunum.yazi(metin, NSFont.systemFont(ofSize: 12, weight: .regular), KR.yazi2, satir: 2)
+        let sol: CGFloat = 22, sag: CGFloat = 12, enCok: CGFloat = 340
+        let ic = min(enCok - sol - sag, ceil(KartGorunum.boy(t, 10000).width) + 2), h = KartGorunum.boy(t, ic).height
+        t.frame = NSRect(x: sol, y: 7, width: ic, height: h); addSubview(t)
+        needsDisplay = true
+        return NSSize(width: ic + sol + sag, height: ceil(h + 14))
+    }
+    override func draw(_ r: NSRect) {
+        let yol = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 9, yRadius: 9)
+        KR.zemin(KR.BILGI_ORTU).setFill(); yol.fill(); KR.cizgi.setStroke(); yol.lineWidth = 1; yol.stroke()
+        renk.setFill(); NSBezierPath(ovalIn: NSRect(x: 10, y: 13, width: 6, height: 6)).fill()
+    }
+    override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
+    override func updateTrackingAreas() {
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    override func mouseEntered(with e: NSEvent) { ustunde = true }
+    override func mouseExited(with e: NSEvent) { ustunde = false }
+    override func mouseUp(with e: NSEvent) { katman?.panelAc() }
+}
+// --- 3) yan şerit ---
+final class SeritGorunum: NSView {
+    weak var katman: KartKatmani?; var sayi = 0 { didSet { if sayi != oldValue { needsDisplay = true } } }; var genis = false
+    static let EN: CGFloat = 40, BOY: CGFloat = 150, CIZGI: CGFloat = 120
+    override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+    override func draw(_ r: NSRect) {
+        // fare alanı (sağdaki 14 pt) neredeyse görünmez dolgu: saydam piksele gelen fare olayı alttaki pencereye gider
+        NSColor.black.withAlphaComponent(0.01).setFill(); NSRect(x: bounds.width - 14, y: 0, width: 14, height: bounds.height).fill()
+        let w: CGFloat = genis ? 6 : 3, cy = (bounds.height - SeritGorunum.CIZGI) / 2
+        let c = NSRect(x: bounds.width - w - 3, y: cy, width: w, height: SeritGorunum.CIZGI)
+        (sayi > 0 ? KR.cevap.withAlphaComponent(genis ? 0.95 : 0.75) : KR.yazi2.withAlphaComponent(genis ? 0.7 : 0.4)).setFill()
+        NSBezierPath(roundedRect: c, xRadius: w / 2, yRadius: w / 2).fill()
+        guard sayi > 0 else { return }
+        let s = sayi > 99 ? "99+" : "\(sayi)" as NSString
+        let at: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10.5, weight: .semibold), .foregroundColor: NSColor.white]
+        let ts = s.size(withAttributes: at), bw = max(18, ts.width + 9)
+        let br = NSRect(x: c.minX - bw - 4, y: bounds.midY - 9, width: bw, height: 18)
+        KR.cevap.setFill(); NSBezierPath(roundedRect: br, xRadius: 9, yRadius: 9).fill()
+        s.draw(at: NSPoint(x: br.midX - ts.width / 2, y: br.midY - ts.height / 2), withAttributes: at)
+    }
+    override func updateTrackingAreas() {
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    override func mouseEntered(with e: NSEvent) { genis = true; needsDisplay = true }
+    override func mouseExited(with e: NSEvent) { genis = false; needsDisplay = true }
+    override func mouseUp(with e: NSEvent) { katman?.panelAc() }
+}
 final class KartKatmani {
-    struct Oge { let panel: KartPanel; let gorunum: KartGorunum }
-    var ogeler: [Oge] = []  // eskiden yeniye; yenisi en altta
-    var goruldu = Set<String>(), ilk = true, dondur = false
-    let paylasim: NSWindow.SharingType; let ack: (String, String, @escaping (Bool) -> Void) -> Void; let panoAc: () -> Void
-    var zaman: Timer?, disTik: Any?, icTik: Any?
-    static let EN_COK = 3, ARA: CGFloat = 8
-    init(paylasim: NSWindow.SharingType = .none, ack: @escaping (String, String, @escaping (Bool) -> Void) -> Void, panoAc: @escaping () -> Void) {
-        self.paylasim = paylasim; self.ack = ack; self.panoAc = panoAc
+    let paylasim: NSWindow.SharingType
+    let ack: (String, String, @escaping (Bool) -> Void) -> Void, eylemKarar: (String, String, @escaping (Bool) -> Void) -> Void
+    let panoAc: () -> Void, panelAc: () -> Void
+    var goruldu = Set<String>(), panelGoruldu = Set<String>(), ilk = true, acik = false, dondur = false
+    var sira: [[String: Any]] = []                       // bekleyen önemli kartlar
+    var simdiki: (panel: KartPanel, gorunum: KartGorunum)?  // ekrandaki önemli kart
+    var bilgiler: [(panel: KartPanel, gorunum: BilgiGorunum)] = []  // eskiden yeniye; yenisi en altta
+    var serit: (panel: KartPanel, gorunum: SeritGorunum)?
+    var zaman: Timer?
+    static let BILGI_EN_COK = 3, BILGI_ARA: CGFloat = 6
+    init(paylasim: NSWindow.SharingType = .none, ack: @escaping (String, String, @escaping (Bool) -> Void) -> Void,
+         eylemKarar: @escaping (String, String, @escaping (Bool) -> Void) -> Void, panoAc: @escaping () -> Void, panelAc: @escaping () -> Void) {
+        self.paylasim = paylasim; self.ack = ack; self.eylemKarar = eylemKarar; self.panoAc = panoAc; self.panelAc = panelAc
         yer = KartKatmani.kayitliYer() ?? KartKatmani.varsayilanYer()
-        // açık kartın dışına tıklayınca kapanır: başka uygulamada (genel izleyici, izin istemez) ya da bu uygulamanın başka penceresinde
-        disTik = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in self?.kapat() }
-        icTik = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] e in if !(e.window is KartPanel) { self?.kapat() }; return e }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
-            if !KartKatmani.ekrandaMi(self.yer) { self.yer = KartKatmani.varsayilanYer() }; self.yerlestir(canli: false)
+            if !KartKatmani.ekrandaMi(self.yer) { self.yer = KartKatmani.varsayilanYer() }
+            self.onemliYerlestir(); self.bilgiYerlestir(); self.seritYerlestir()
         }
     }
-    // --- yer: yığının alt ortası (ekran koordinatı) ---
+    // --- yer: önemli kartın alt ortası (ekran koordinatı) ---
     var yer: NSPoint
-    static func anaEkran() -> NSRect { (NSScreen.screens.first ?? NSScreen.main)?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900) }
-    static func varsayilanYer() -> NSPoint { let e = anaEkran(); return NSPoint(x: e.midX, y: e.minY + 110) }
+    static func anaEkran() -> NSScreen? { NSScreen.screens.first ?? NSScreen.main }
+    static func varsayilanYer() -> NSPoint { let e = anaEkran()?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900); return NSPoint(x: e.midX, y: e.minY + 110) }
     static func ekrandaMi(_ p: NSPoint) -> Bool { NSScreen.screens.contains { $0.frame.insetBy(dx: -1, dy: -1).contains(p) } }
     static func kayitliYer() -> NSPoint? {
         guard let a = UserDefaults.standard.array(forKey: "kartKatmaniYer") as? [Double], a.count == 2 else { return nil }
         let p = NSPoint(x: a[0], y: a[1]); return ekrandaMi(p) ? p : nil
     }
-    var genislik: CGFloat {
-        let e = NSScreen.screens.first { $0.frame.insetBy(dx: -1, dy: -1).contains(yer) }?.frame ?? KartKatmani.anaEkran()
-        return min(720, floor(e.width * 0.46))
-    }
+    var yerEkrani: NSRect { NSScreen.screens.first { $0.frame.insetBy(dx: -1, dy: -1).contains(yer) }?.frame ?? KartKatmani.anaEkran()?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900) }
     func yerKaydet() { UserDefaults.standard.set([Double(yer.x), Double(yer.y)], forKey: "kartKatmaniYer") }
-    func yerSifirla() { UserDefaults.standard.removeObject(forKey: "kartKatmaniYer"); yer = KartKatmani.varsayilanYer(); yerlestir(canli: true) }
-    // --- süre (ayar.json kart_sure) ---
-    static func sure(_ c: [String: Any]) -> Double {
-        let tur = c["onay"] != nil ? "onay" : (c["kind"] as? String ?? "not")
-        let vars: [String: Double] = ["dur": 8, "not": 15]
+    func yerSifirla() { UserDefaults.standard.removeObject(forKey: "kartKatmaniYer"); yer = KartKatmani.varsayilanYer(); onemliYerlestir(canli: true) }
+    static func bilgiSure() -> Double {  // ayar.json kart_sure.bilgi (sn)
         let yol = NSHomeDirectory() + "/Library/Application Support/Suflor/ayar.json"
         let ay = FileManager.default.contents(atPath: yol).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
-        if let n = ay["kart_sure"] as? Double, n > 0 { return n }
-        if let s = (ay["kart_sure"] as? [String: Any])?[tur] as? Double, s > 0 { return s }
-        return vars[tur] ?? 25
+        if let s = (ay["kart_sure"] as? [String: Any])?["bilgi"] as? Double, s > 0 { return s }
+        return 10
     }
-    // --- aktarıcıdan gelen liste (/cards "cards": görünür açık kartlar; sessizde tutulan ve tavanda bekleyen zaten yok) ---
-    func isle(_ kartlar: [[String: Any]], acik: Bool) {
-        let anahtarlar = kartlar.map { KartKatmani.anahtar($0) }
-        let simdiki = Set(kartlar.compactMap { $0["id"] as? String })
-        for o in ogeler where !simdiki.contains(o.gorunum.kart["id"] as? String ?? "") { kaldir(o.gorunum.anahtar) }  // panodan, şeritten ya da sesle kapandı
-        if !acik || ilk { goruldu.formUnion(anahtarlar); ilk = false; if !acik { for o in ogeler { kaldir(o.gorunum.anahtar) } }; return }
-        for (c, a) in zip(kartlar, anahtarlar) where !goruldu.contains(a) { goruldu.insert(a); goster(c) }
-    }
+    // --- tür eşlemesi ---
+    static func onemliMi(_ c: [String: Any]) -> Bool { c["onay"] != nil || c["eylem"] != nil || c["replik"] != nil || ["soyle", "dur", "cevap"].contains(c["kind"] as? String ?? "") }
     static func anahtar(_ c: [String: Any]) -> String { (c["id"] as? String ?? "") + (c["geri"] as? String ?? "") }
+    static func eylemKart(_ x: [String: Any]) -> [String: Any] {  // sesle sorulan "yazayım mı?" işi → onay görünümlü önemli kart
+        var t = x["baslik"] as? String ?? ""; if let k = x["kim"] as? String, !k.isEmpty { t += " — " + k }
+        var c: [String: Any] = ["id": "e:" + (x["id"] as? String ?? ""), "eid": x["id"] as? String ?? "", "eylem": true, "kind": "not", "text": t]
+        if let a = x["ayrinti"] as? String, !a.isEmpty { c["why"] = a }
+        else if let a = x["ayrinti"], JSONSerialization.isValidJSONObject(a), let d = try? JSONSerialization.data(withJSONObject: a, options: [.prettyPrinted, .sortedKeys]),
+                let s = String(data: d, encoding: .utf8) { c["why"] = s }
+        return c
+    }
+    // aktarıcının durum alanlarından bilgi satırları: (anahtar, metin, renk). "d:" ile başlayan anahtar durum sürdükçe bir kez gösterilir,
+    // durum kalkınca unutulur (yeniden gelirse yeniden gösterilir)
+    static func durumBilgileri(_ v: [String: Any]) -> [(String, String, NSColor)] {
+        var o: [(String, String, NSColor)] = []
+        if let a = v["anlik"] as? [String: Any], let id = a["id"] as? String, let m = a["metin"] as? String {
+            let ay = a["ayrinti"] as? String ?? ""
+            o.append(("a:" + id, m + (ay.isEmpty ? "" : " — " + ay), (a["tur"] as? String) == "uzun" ? KR.dur : KR.onay))
+        }
+        if let s = v["sure"] as? [String: Any], let k = s["kalan_dk"] as? Int {
+            if k <= 0 { o.append(("d:sure:0", k == 0 ? TE("Süre doldu", "Time is up") : TE("Süre \(-k) dk aşıldı", "\(-k) min over time"), KR.dur)) }
+            else if k <= 5 { o.append(("d:sure:5", TE("Son \(k) dk", "Last \(k) min"), KR.onay)) }
+            else if k <= 15 { o.append(("d:sure:15", TE("\(k) dk kaldı", "\(k) min left"), KR.not)) }
+            if let ky = s["kayma"] as? Int, ky >= 2 { o.append(("d:kayma:\(ky)", TE("Gündemde \(ky) madde geride", "\(ky) agenda items behind"), KR.onay)) }
+        }
+        if let ss = v["sessiz"] as? [String: Any], (ss["acik"] as? Bool) == true {
+            o.append(("d:sessiz", TE("Sessiz: kartlar bekliyor · bitiş \(ss["bitis"] as? String ?? "")", "Quiet: cards are held · ends \(ss["bitis"] as? String ?? "")"), KR.not))
+        }
+        if let u = v["uyari"] as? String, !u.isEmpty { o.append(("d:disk:" + (u.contains("DOLU") || u.contains("FULL") ? "dolu" : "az"), u, KR.onay)) }
+        if let d = (v["dil"] as? [String: Any])?["uyari"] as? String, !d.isEmpty { o.append(("d:dil", d, KR.onay)) }
+        return o
+    }
+    // --- aktarıcıdan gelen durum (/cards: "cards" görünür açık kartlar — sessizde tutulan ve tavanda bekleyen zaten yok; "eylem", "anlik", "sure"…) ---
+    func isle(_ v: [String: Any], panelAcik: Bool) {
+        acik = (v["kart_katmani"] as? Bool) == true  // aktarıcı eskiyse alan yok: katman kapalı
+        let kartlar = v["cards"] as? [[String: Any]] ?? []
+        let eylemler = ((v["eylem"] as? [String: Any])?["liste"] as? [[String: Any]] ?? [])
+            .filter { ($0["durum"] as? String) == "bekliyor" && $0["sunuldu"] != nil && !($0["sunuldu"] is NSNull) }.map(KartKatmani.eylemKart)
+        let hepsi = kartlar + eylemler
+        let gecerli = Set(hepsi.filter(KartKatmani.onemliMi).map(KartKatmani.anahtar))
+        sira.removeAll { !gecerli.contains(KartKatmani.anahtar($0)) }  // panodan, şeritten ya da sesle kapandı
+        if let s = simdiki, !gecerli.contains(s.gorunum.anahtar) { onemliKapat(s.gorunum) } else if let s = simdiki, s.gorunum.sirada != sira.count { onemliYerlestir() }
+        // okunmamış: yan panel son açıldıktan sonra gelen açık kartlar
+        let ids = Set(kartlar.filter { $0["sessiz"] == nil }.compactMap { $0["id"] as? String }); sonIds = ids
+        if panelAcik || ilk { panelGoruldu.formUnion(ids) }
+        panelGoruldu.formIntersection(ids)
+        let durumlar = KartKatmani.durumBilgileri(v), simdi = Set(durumlar.map { $0.0 })
+        goruldu = goruldu.filter { !$0.hasPrefix("d:") || simdi.contains($0) }
+        if !acik || ilk {
+            goruldu.formUnion(hepsi.map(KartKatmani.anahtar)); goruldu.formUnion(simdi); ilk = false
+            if !acik { hepsiniKaldir() } else { seritGuncelle(ids.subtracting(panelGoruldu).count) }
+            return
+        }
+        for c in hepsi {
+            let a = KartKatmani.anahtar(c); guard !goruldu.contains(a) else { continue }; goruldu.insert(a)
+            if KartKatmani.onemliMi(c) { kuyruga(c) } else { bilgiGoster(c["text"] as? String ?? "", renk: KR.not) }
+        }
+        for (a, m, r) in durumlar where !goruldu.contains(a) { goruldu.insert(a); bilgiGoster(m, renk: r) }
+        seritGuncelle(ids.subtracting(panelGoruldu).count)
+    }
+    func hepsiniKaldir() {
+        sira = []; if let s = simdiki { s.panel.orderOut(nil); simdiki = nil }
+        for b in bilgiler { b.panel.orderOut(nil) }; bilgiler = []
+        serit?.panel.orderOut(nil)
+    }
+    func yeniPanel(golge: Bool = true) -> KartPanel {
+        let p = KartPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 60), styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
+        p.isFloatingPanel = true; p.level = .statusBar; p.hidesOnDeactivate = false; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        p.sharingType = paylasim  // ekran paylaşımında görünmesin (kartlar karşı tarafa gitmesin)
+        p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = golge; p.becomesKeyOnlyIfNeeded = true; p.isReleasedWhenClosed = false
+        return p
+    }
+    // buzlu cam (pencerenin arkası bulanık) + üstünde örtücü krem/koyu zemin (görünüm çizer)
+    func buzlu(_ p: KartPanel, _ g: NSView, kose: CGFloat) {
+        let ve = NSVisualEffectView(frame: p.contentView!.bounds); ve.material = .popover; ve.blendingMode = .behindWindow; ve.state = .active; ve.maskImage = KartKatmani.maske(kose)
+        g.frame = ve.bounds; g.autoresizingMask = [.width, .height]; ve.addSubview(g); p.contentView = ve
+    }
     static func maske(_ r: CGFloat) -> NSImage {  // yuvarlak köşeli, uzayabilir maske (buzlu cam için)
         let e = r * 2 + 1
         let im = NSImage(size: NSSize(width: e, height: e), flipped: false) { b in NSColor.black.set(); NSBezierPath(roundedRect: b, xRadius: r, yRadius: r).fill(); return true }
         im.capInsets = NSEdgeInsets(top: r, left: r, bottom: r, right: r); im.resizingMode = .stretch; return im
     }
-    func goster(_ c: [String: Any]) {
-        let a = KartKatmani.anahtar(c); guard !ogeler.contains(where: { $0.gorunum.anahtar == a }) else { return }
-        let p = KartPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 60), styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
-        p.isFloatingPanel = true; p.level = .statusBar; p.hidesOnDeactivate = false; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        p.sharingType = paylasim  // ekran paylaşımında görünmesin (kartlar karşı tarafa gitmesin)
-        p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = true; p.becomesKeyOnlyIfNeeded = true; p.isReleasedWhenClosed = false
-        // buzlu cam (pencerenin arkası bulanık) + üstünde %86 örtücü krem/koyu zemin: arkadaki altyazı seçilmez, rengi hafif sezilir; yazı tam kontrast
-        let ve = NSVisualEffectView(frame: p.contentView!.bounds); ve.material = .popover; ve.blendingMode = .behindWindow; ve.state = .active; ve.maskImage = KartKatmani.maske(10)
-        let g = KartGorunum(c, anahtar: a, sure: KartKatmani.sure(c)); g.katman = self; g.frame = ve.bounds; g.autoresizingMask = [.width, .height]
-        ve.addSubview(g); p.contentView = ve
-        ogeler.append(Oge(panel: p, gorunum: g))
-        if !TANI { print("KART KATMANI: \(c["onay"] != nil ? "onay" : g.tur) gösterildi, \(Int(g.kalan)) sn") }  // içerik günlüğe yazılmaz
-        while ogeler.count > KartKatmani.EN_COK {  // en eskisi katmandan çıkar (panoda kalır); onay kartı en son
-            kaldir((ogeler.first { $0.gorunum.kart["onay"] == nil } ?? ogeler[0]).gorunum.anahtar)
-        }
-        yerlestir(canli: true, yeni: p)
-        if zaman == nil {
-            let t = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in self?.tik() }; RunLoop.main.add(t, forMode: .common); zaman = t
-        }
+    func saatiKur() {
+        if zaman == nil { let t = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in self?.tik() }; RunLoop.main.add(t, forMode: .common); zaman = t }
     }
     func tik() {
         guard !dondur else { return }
-        for o in ogeler where !o.gorunum.ustunde && !o.gorunum.acik && o.gorunum.kart["onay"] == nil {  // onay kartı Onayla/Reddet'e kadar kalır
-            o.gorunum.kalan -= 0.25; if o.gorunum.kalan <= 0 { kaldir(o.gorunum.anahtar) }
-        }
-        if ogeler.isEmpty { zaman?.invalidate(); zaman = nil }
+        for b in bilgiler where !b.gorunum.ustunde { b.gorunum.kalan -= 0.25; if b.gorunum.kalan <= 0 { bilgiKaldir(b.panel) } }
+        if bilgiler.isEmpty { zaman?.invalidate(); zaman = nil }
     }
-    func kaldir(_ a: String) {
-        guard let i = ogeler.firstIndex(where: { $0.gorunum.anahtar == a }) else { return }
-        let p = ogeler.remove(at: i).panel
-        NSAnimationContext.runAnimationGroup({ c in c.duration = 0.25; p.animator().alphaValue = 0 }, completionHandler: { p.orderOut(nil) })
-        yerlestir(canli: true)
+    // --- 1) önemli kart: tek, sıralı ---
+    func kuyruga(_ c: [String: Any]) {
+        if !TANI { print("KART KATMANI: \(c["eylem"] != nil ? "eylem" : c["onay"] != nil ? "onay" : (c["kind"] as? String ?? "?")) önemli\(simdiki == nil ? "" : ", sırada \(sira.count + 1)")") }  // içerik günlüğe yazılmaz
+        if simdiki == nil { onemliGoster(c); return }
+        if (c["kind"] as? String) == "dur" && c["onay"] == nil, let i = sira.firstIndex(where: { ($0["kind"] as? String) != "dur" }) { sira.insert(c, at: i) } else { sira.append(c) }
+        onemliYerlestir()
     }
-    // yığını kur: yenisi (sıra 0) yer'in hemen üstünde, eskiler üste
-    func yerlestir(canli: Bool, yeni: KartPanel? = nil) {
-        let W = genislik; var y = yer.y
-        for (i, o) in ogeler.reversed().enumerated() {
-            o.gorunum.sira = i
-            let s = o.gorunum.kur(en: W), r = NSRect(x: round(yer.x - s.width / 2), y: round(y), width: s.width, height: s.height)
-            if o.panel === yeni {
-                o.panel.setFrame(r.offsetBy(dx: 0, dy: -12), display: false); o.panel.alphaValue = 0; o.panel.orderFrontRegardless()
-                NSAnimationContext.runAnimationGroup { c in c.duration = 0.22; o.panel.animator().setFrame(r, display: true); o.panel.animator().alphaValue = 1 }
-            } else {  // hep animator'dan: süren bir kayma (yeni kartın girişi) doğrudan setFrame'i sonradan ezmesin
-                NSAnimationContext.runAnimationGroup { c in c.duration = canli && o.panel.frame.size == r.size ? 0.18 : 0; o.panel.animator().setFrame(r, display: true) }
+    var enCokBoy: CGFloat { min(440, floor(yerEkrani.height * 0.45)) }
+    var genislik: CGFloat { min(720, floor(yerEkrani.width * 0.46)) }
+    func onemliGoster(_ c: [String: Any]) {
+        let p = yeniPanel(), g = KartGorunum(c, anahtar: KartKatmani.anahtar(c)); g.katman = self; buzlu(p, g, kose: 12)
+        simdiki = (p, g); g.sirada = sira.count
+        let s = g.kur(en: genislik, enBoy: enCokBoy), r = NSRect(x: round(yer.x - s.width / 2), y: round(yer.y), width: s.width, height: s.height)
+        p.setFrame(r.offsetBy(dx: 0, dy: -12), display: false); p.alphaValue = 0; p.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { c in c.duration = 0.2; c.timingFunction = CAMediaTimingFunction(name: .easeOut); p.animator().setFrame(r, display: true); p.animator().alphaValue = 1 }
+        p.invalidateShadow()
+    }
+    func onemliYerlestir(canli: Bool = false) {
+        guard let (p, g) = simdiki else { return }
+        g.sirada = sira.count
+        let s = g.kur(en: genislik, enBoy: enCokBoy), r = NSRect(x: round(yer.x - s.width / 2), y: round(yer.y), width: s.width, height: s.height)
+        NSAnimationContext.runAnimationGroup { c in c.duration = canli ? 0.18 : 0; p.animator().setFrame(r, display: true) }
+        p.invalidateShadow()
+    }
+    var sonIds = Set<String>()
+    func okunduKapat(_ g: KartGorunum) {  // ✕: kart okunmuş sayılır (yan şerit rozetinden düşer), aktarıcıda açık kalır
+        if let id = g.kart["id"] as? String { panelGoruldu.insert(id); seritGuncelle(sonIds.subtracting(panelGoruldu).count) }
+        onemliKapat(g)
+    }
+    func onemliKapat(_ g: KartGorunum) {
+        guard let (p, gg) = simdiki, gg === g else { sira.removeAll { KartKatmani.anahtar($0) == g.anahtar }; return }
+        simdiki = nil
+        NSAnimationContext.runAnimationGroup({ c in c.duration = 0.18; c.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            p.animator().setFrame(p.frame.offsetBy(dx: 0, dy: -8), display: true); p.animator().alphaValue = 0 }, completionHandler: { p.orderOut(nil) })
+        if !sira.isEmpty {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
+                guard let self = self, self.simdiki == nil, !self.sira.isEmpty else { return }
+                self.onemliGoster(self.sira.removeFirst())
             }
-            o.panel.invalidateShadow()
-            y += s.height + KartKatmani.ARA
         }
-    }
-    func ac(_ g: KartGorunum) {
-        let yeniDurum = !g.acik
-        for o in ogeler where o.gorunum.acik && o.gorunum !== g { o.gorunum.acik = false; o.gorunum.kalan = max(o.gorunum.kalan, 6) }
-        g.acik = yeniDurum; if !yeniDurum { g.kalan = max(g.kalan, 6) }
-        yerlestir(canli: false)
-    }
-    func kapat() {
-        guard ogeler.contains(where: { $0.gorunum.acik }) else { return }
-        for o in ogeler where o.gorunum.acik { o.gorunum.acik = false; o.gorunum.kalan = max(o.gorunum.kalan, 6) }
-        yerlestir(canli: false)
     }
     func yanitla(_ g: KartGorunum, _ durum: String) {
-        guard let id = g.kart["id"] as? String else { return }
-        ack(id, durum) { [weak self] ok in DispatchQueue.main.async {
-            if ok { self?.kaldir(g.anahtar) } else { NSSound(named: "Basso")?.play(); g.acik = true; self?.yerlestir(canli: false) }
+        let bitti: (Bool) -> Void = { [weak self] ok in DispatchQueue.main.async {
+            if ok { self?.onemliKapat(g) } else { NSSound(named: "Basso")?.play(); g.mesgul = false; self?.onemliYerlestir() }
         } }
+        if g.kart["eylem"] != nil, let eid = g.kart["eid"] as? String { eylemKarar(eid, durum, bitti) }
+        else if let id = g.kart["id"] as? String { ack(id, durum, bitti) }
+    }
+    // --- 2) bilgi akışı: sağ alt ---
+    func bilgiGoster(_ m: String, renk: NSColor) {
+        guard !m.isEmpty else { return }
+        if !TANI { print("KART KATMANI: bilgi") }
+        let p = yeniPanel(golge: false), g = BilgiGorunum(m, renk: renk, sure: KartKatmani.bilgiSure()); g.katman = self; buzlu(p, g, kose: 9)
+        bilgiler.append((p, g))
+        while bilgiler.count > KartKatmani.BILGI_EN_COK { bilgiKaldir(bilgiler[0].panel) }
+        bilgiYerlestir(yeni: p); saatiKur()
+    }
+    func bilgiKaldir(_ p: KartPanel) {
+        guard let i = bilgiler.firstIndex(where: { $0.panel === p }) else { return }
+        bilgiler.remove(at: i)
+        NSAnimationContext.runAnimationGroup({ c in c.duration = 0.3; p.animator().alphaValue = 0 }, completionHandler: { p.orderOut(nil) })
+        bilgiYerlestir()
+    }
+    func bilgiYerlestir(yeni: KartPanel? = nil) {
+        let e = KartKatmani.anaEkran()?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 875)
+        var y = e.minY + 18
+        for (p, g) in bilgiler.reversed() {
+            let s = g.kur(), r = NSRect(x: round(e.maxX - 18 - s.width), y: round(y), width: s.width, height: s.height)
+            if p === yeni {
+                p.setFrame(r.offsetBy(dx: 16, dy: 0), display: false); p.alphaValue = 0; p.orderFrontRegardless()
+                NSAnimationContext.runAnimationGroup({ c in c.duration = 0.2; c.timingFunction = CAMediaTimingFunction(name: .easeOut); p.animator().setFrame(r, display: true); p.animator().alphaValue = 1 },
+                    completionHandler: {  // bir kez yumuşak nabız
+                        NSAnimationContext.runAnimationGroup({ c in c.duration = 0.45; p.animator().alphaValue = 0.5 }, completionHandler: {
+                            NSAnimationContext.runAnimationGroup { c in c.duration = 0.45; p.animator().alphaValue = 1 } })
+                    })
+            } else { NSAnimationContext.runAnimationGroup { c in c.duration = 0.18; p.animator().setFrame(r, display: true) } }
+            y += s.height + KartKatmani.BILGI_ARA
+        }
+    }
+    // --- 3) yan şerit: sağ kenar ---
+    func seritGuncelle(_ okunmamis: Int) {
+        if serit == nil {
+            let p = yeniPanel(golge: false), g = SeritGorunum(frame: NSRect(x: 0, y: 0, width: SeritGorunum.EN, height: SeritGorunum.BOY)); g.katman = self
+            g.toolTip = TE("Tüm kartlar", "All cards"); p.contentView = g; serit = (p, g); seritYerlestir()
+        }
+        serit?.gorunum.sayi = okunmamis
+        if serit?.panel.isVisible == false { serit?.panel.orderFrontRegardless() }
+    }
+    func seritYerlestir() {
+        guard let (p, _) = serit else { return }
+        let e = KartKatmani.anaEkran()?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 875)
+        p.setFrame(NSRect(x: e.maxX - SeritGorunum.EN, y: round(e.midY - SeritGorunum.BOY / 2), width: SeritGorunum.EN, height: SeritGorunum.BOY), display: true)
+    }
+    // teşhis görüntüsü için: ekrandaki bütün katman pencereleri (pencere, çizen görünüm, buzlu mu, köşe)
+    var paneller: [(KartPanel, NSView, Bool, CGFloat)] {
+        (simdiki.map { [($0.panel, $0.gorunum as NSView, true, CGFloat(12))] } ?? []) + bilgiler.map { ($0.panel, $0.gorunum as NSView, true, CGFloat(9)) }
+            + (serit.map { [($0.panel, $0.gorunum as NSView, false, CGFloat(0))] } ?? [])
     }
 }
 
@@ -1626,61 +1830,70 @@ if let yol = arg("--simge-yaz") {
     guard let d = rep.representation(using: .png, properties: [:]) else { exit(1) }
     do { try d.write(to: URL(fileURLWithPath: yol)); exit(0) } catch { exit(1) }
 }
-// Teşhis: `--kart-dene [<dosya.png>] [--koyu|--acik] [--onay] [--kapali] [--uzun] [--sn <n>]` → kurgu kartlarla kart katmanı (Cevap açık, Söyle, Dur; --kapali
-// hepsi kapalı, --uzun Dur'un yazısı uzun: kapalı kartta kaç satır kaldığı); süre işlemez,
-// paylaşım .readOnly (screencapture -l <pencere no> alınabilsin), pencere numaralarını yazar; dosya verilirse kartların birleşik görüntüsü (izin istemez)
+// Teşhis: `--kart-dene [<dosya.png>] [--koyu|--acik] [--onay] [--uzun] [--sn <n>]` → kurgu verilerle kart katmanının üç katmanı: önemli kart (Cevap;
+// --onay uzun metinli onay kartı, --uzun kayan çok uzun onay kartı) + "+2 sırada", sağ altta 3 bilgi satırı, sağ kenarda 4 okunmamışlı yan şerit.
+// Süre işlemez; paylaşım .readOnly (screencapture -l <pencere no> alınabilsin), pencere numaralarını yazar; dosya verilirse birleşik görüntü (izin istemez)
 if args.contains("--kart-dene") {
     final class KDene: NSObject, NSApplicationDelegate {
         var k: KartKatmani?
         func applicationDidFinishLaunching(_ n: Notification) {
             if args.contains("--koyu") { NSApp.appearance = NSAppearance(named: .darkAqua) } else if args.contains("--acik") { NSApp.appearance = NSAppearance(named: .aqua) }
-            let k = KartKatmani(paylasim: .readOnly, ack: { id, s, b in print("ack:", id, s); b(true) }, panoAc: { print("pano istendi") }); self.k = k; k.dondur = true
-            let ilk: [String: Any] = args.contains("--onay")
-                ? ["id": "d1", "kind": "not", "onay": true, "text": "Toplantı notunu proje klasörüne kaydedeyim mi?", "why": "Kayıt yalnız onayınla yapılır."]
+            let k = KartKatmani(paylasim: .readOnly, ack: { id, s, b in print("ack:", id, s); b(true) }, eylemKarar: { id, s, b in print("eylem:", id, s); b(true) },
+                                panoAc: { print("pano istendi") }, panelAc: { print("yan panel istendi") }); self.k = k; k.dondur = true; k.acik = true
+            let uzunOnay = "Toplantıda konuşulanlara göre üç iş çıkardım. Birincisi: teslim planı iki hafta ileri alınacak; yeni tarihi proje takvimine işleyip ekibe kısa bir not geçeyim. "
+                + "İkincisi: bütçe tablosundaki ikinci kalem finans onayı gelene kadar taslak olarak işaretlensin; tabloya bir açıklama satırı ekleyeceğim. "
+                + "Üçüncüsü: tedarik tarafındaki gecikme için ayrı bir görüşme açılacak; takvimde gelecek salı öğleden sonra boş görünen bir saate taslak davet hazırlayayım, gönderimi sen yaparsın. "
+                + "Bunların hepsi yalnız senin onayınla yapılır; istersen tek tek de onaylayabilirsin."
+            let ilk: [String: Any] = args.contains("--uzun")
+                ? ["id": "d1", "kind": "not", "onay": true, "text": Array(repeating: uzunOnay, count: 3).joined(separator: "\n\n"), "why": "Kayıt yalnız onayınla yapılır."]
+                : args.contains("--onay") ? ["id": "d1", "kind": "not", "onay": true, "text": uzunOnay, "why": "Kayıt yalnız onayınla yapılır."]
                 : ["id": "d1", "kind": "cevap", "text": "Teslim tarihi sözleşmede 15 Kasım olarak geçiyor; ek protokolde iki haftalık uzatma hakkı var.", "q": "Teslim tarihi ne zamandı?",
                    "why": "Kaynak: sözleşme taslağı, madde 4.2 — https://ornek.test/sozlesme", "durum": "Konu: teslim planı"]
             for c in [ilk, ["id": "d2", "kind": "soyle", "text": "Bütçe kalemlerini bir sonraki toplantıya kadar netleştirmeyi önerebilirsin."],
-                      ["id": "d3", "kind": "dur", "text": args.contains("--uzun") ? "Bu rakam henüz onaylanmadı; finans ekibi son tabloyu cuma günü gönderecek. Şimdilik yalnız aralık ver, kesin sayıyı ve dağılımı paylaşma; ayrıca tedarik tarafındaki gecikme konusunu da bu toplantıda açma, ayrı bir görüşmede ele alınacak. Sunumdaki ikinci tabloyu da güncellenmeden göstermemek gerek." : "Bu rakam henüz onaylanmadı; şimdilik paylaşma."]] { k.goster(c) }
+                      ["id": "d3", "kind": "dur", "text": "Bu rakam henüz onaylanmadı; şimdilik paylaşma."]] { k.kuyruga(c) }
+            k.bilgiGoster("Ek protokol klasörde: sozlesme-ek-2.pdf", renk: KR.not)
+            k.bilgiGoster("90 sn'dir kesintisiz konuşuyorsun — söz vermek iyi olabilir", renk: KR.dur)
+            k.bilgiGoster(TE("12 dk kaldı", "12 min left"), renk: KR.not)
+            k.seritGuncelle(4)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                if !args.contains("--kapali"), let o = k.ogeler.first { k.ac(o.gorunum) }
-                for o in k.ogeler { print("pencere no: \(o.panel.windowNumber) · \(o.gorunum.tur) · \(NSStringFromRect(o.panel.frame))") }
+                for (p, g, _, _) in k.paneller { print("pencere no: \(p.windowNumber) · \(type(of: g)) · \(NSStringFromRect(p.frame))") }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {  // nabız bitsin
                 if let yol = arg("--kart-dene"), yol.hasSuffix(".png") {
-                    let fr = k.ogeler.map { $0.panel.frame }.reduce(NSRect.null) { $0.union($1) }.insetBy(dx: -40, dy: -40)
+                    let fr = k.paneller.map { $0.0.frame }.reduce(NSRect.null) { $0.union($1) }.insetBy(dx: -30, dy: -30)
                     // arka plan: toplantı görüntüsü yerine renkli kutular + sahte altyazı satırları (saydamlık seviyesi görülsün)
                     let arka = NSImage(size: fr.size, flipped: false) { b in
                         kRenk(0x2B2E2C).setFill(); b.fill()
-                        kRenk(0x3D6FB6).setFill(); NSRect(x: b.width * 0.08, y: b.height * 0.35, width: b.width * 0.34, height: b.height * 0.55).fill()
-                        kRenk(0xD98A3A).setFill(); NSRect(x: b.width * 0.55, y: b.height * 0.1, width: b.width * 0.3, height: b.height * 0.5).fill()
-                        kRenk(0xF2F2F2).setFill(); NSRect(x: b.width * 0.3, y: b.height * 0.62, width: b.width * 0.4, height: b.height * 0.2).fill()
+                        kRenk(0x3D6FB6).setFill(); NSRect(x: b.width * 0.08, y: b.height * 0.05, width: b.width * 0.34, height: b.height * 0.55).fill()
+                        kRenk(0xD98A3A).setFill(); NSRect(x: b.width * 0.55, y: b.height * 0.02, width: b.width * 0.42, height: b.height * 0.3).fill()
+                        kRenk(0xF2F2F2).setFill(); NSRect(x: b.width * 0.3, y: b.height * 0.12, width: b.width * 0.4, height: b.height * 0.12).fill()
+                        kRenk(0x6A8F5A).setFill(); NSRect(x: b.width * 0.86, y: b.height * 0.35, width: b.width * 0.14, height: b.height * 0.4).fill()
                         let at: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 22, weight: .semibold), .foregroundColor: NSColor.white]
                         let ak: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 22, weight: .semibold), .foregroundColor: NSColor.black]
                         var y: CGFloat = 20
-                        while y < b.height { ("Deniz T: Altyazı satırı burada akıyor, toplantıda konuşulanlar bu bantta görünür — " as NSString).draw(at: NSPoint(x: 10, y: y), withAttributes: y > b.height * 0.62 && y < b.height * 0.8 ? ak : at); y += 34 }
+                        while y < b.height { ("Deniz T: Altyazı satırı burada akıyor, toplantıda konuşulanlar bu bantta görünür — Deniz T: Altyazı satırı burada akıyor — " as NSString).draw(at: NSPoint(x: 10, y: y), withAttributes: y > b.height * 0.12 && y < b.height * 0.24 ? ak : at); y += 34 }
                         return true
                     }
                     let im = NSImage(size: fr.size); im.lockFocus()
                     arka.draw(in: NSRect(origin: .zero, size: fr.size))
                     let arkaCG = arka.cgImage(forProposedRect: nil, context: nil, hints: nil)
-                    for o in k.ogeler {
-                        let g = o.gorunum
-                        let kr = NSRect(x: o.panel.frame.minX - fr.minX, y: o.panel.frame.minY - fr.minY, width: g.bounds.width, height: g.bounds.height)
+                    for (p, g, buz, kose) in k.paneller {
+                        let kr = NSRect(x: p.frame.minX - fr.minX, y: p.frame.minY - fr.minY, width: g.bounds.width, height: g.bounds.height)
                         // buzlu camın benzeri: arka planın o bölgesi bulanık (gerçek pencerede WindowServer yapar)
-                        if let cg = arkaCG, let f = CIFilter(name: "CIGaussianBlur") {
+                        if buz, let cg = arkaCG, let f = CIFilter(name: "CIGaussianBlur") {
                             let ci = CIImage(cgImage: cg).clampedToExtent(); f.setValue(ci, forKey: kCIInputImageKey); f.setValue(24 * CGFloat(cg.width) / fr.width, forKey: kCIInputRadiusKey)
                             let olc = CGFloat(cg.width) / fr.width
                             if let cik = f.outputImage, let bul = CIContext().createCGImage(cik, from: CGRect(x: kr.minX * olc, y: kr.minY * olc, width: kr.width * olc, height: kr.height * olc)) {
-                                NSGraphicsContext.saveGraphicsState(); NSBezierPath(roundedRect: kr, xRadius: 10, yRadius: 10).addClip()
+                                NSGraphicsContext.saveGraphicsState(); NSBezierPath(roundedRect: kr, xRadius: kose, yRadius: kose).addClip()
                                 NSImage(cgImage: bul, size: kr.size).draw(in: kr); NSGraphicsContext.restoreGraphicsState()
                             }
                         }
                         g.effectiveAppearance.performAsCurrentDrawingAppearance {
-                            let sc = o.panel.backingScaleFactor
+                            let sc = p.backingScaleFactor
                             if let r = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(g.bounds.width * sc), pixelsHigh: Int(g.bounds.height * sc), bitsPerSample: 8, samplesPerPixel: 4,
                                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {  // saydam köşeler
                                 r.size = g.bounds.size; g.cacheDisplay(in: g.bounds, to: r)
-                                r.draw(in: NSRect(x: o.panel.frame.minX - fr.minX, y: o.panel.frame.minY - fr.minY, width: g.bounds.width, height: g.bounds.height), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                                r.draw(in: kr, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
                             }
                         }
                     }

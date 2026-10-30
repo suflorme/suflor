@@ -1,5 +1,5 @@
 // Suflor.me eklenti penceresi (tr/en): tek durum cümlesi (panoyla aynı mantık) + varsa tek çözüm düğmesi, Panoyu aç, tek ayar
-// (sesi Mac'te yazıya çevir); çalışma alanı seçimi yalnız bu Mac'te birden fazla aktarıcı varken.
+// (sesi Mac'te yazıya çevir); en üstte mesaj kutusu (pano kutusuyla aynı /girdi ucu); çalışma alanı seçimi yalnız bu Mac'te birden fazla aktarıcı varken.
 // Durum doğrudan aktarıcıdan (/status) okunur — hangi sekme önde olursa olsun çalışır; öndeki toplantı sekmesi varsa
 // bekleyen satır sayısı da ondan gelir.
 const $ = id => document.getElementById(id);
@@ -61,6 +61,7 @@ const karsiAc = () => { chrome.runtime.sendMessage({ type: "whisperKarsi" }); $(
 async function durum() {
   let s = null; try { const r = await fetch(cfg.relay + "/status"); s = await r.json(); } catch {}
   if (s && s.asistan) AS = s.asistan;
+  const ilk = !$("kn").dataset.odak; kutuDurum(s); if (s && ilk) { $("kn").dataset.odak = 1; $("kn").focus(); }
   const t = await sekmeDurumu(), bek = t && t.queued ? L("{n} satır bekliyor; Suflor.me açılınca gönderilir.", { n: t.queued }) : "";
   if (!s) return ciz("er", L("Suflor.me kapalı"), bek || L("kurulum klasöründe aktarici-kur'a çift tıkla"));
   dilGuncelle(s.arayuz_dili);  // alan yoksa "tr"
@@ -95,5 +96,28 @@ async function panoAc(relay) {
   const [t] = (await chrome.tabs.query({ url: kok + "*" })).filter(t => t.url === kok || t.url.startsWith(kok + "?") || t.url.startsWith(kok + "#"));
   if (t) { await chrome.tabs.update(t.id, Object.assign({ active: true }, /^🔑|anahtar gerekli|key required/.test(t.title || "") ? { url: await anahtarli(kok) } : {})); await chrome.windows.update(t.windowId, { focused: true }); }
   else await chrome.tabs.create({ url: await anahtarli(kok) });
+}
+// Mesaj kutusu: panodaki yazı kutusuyla aynı uç ve gövde (POST /girdi {text, soru, at}); aktarıcı toplantıda mı değil mi kendisi ayırır.
+// Enter gönderir, Shift + Enter yeni satır, ⌘/Ctrl + Enter her zaman soru. Başarısızsa yazı kutuda kalır.
+let kutuOnTimer = 0;
+function kutuOn(m, ok) { const e = $("kon"); e.className = ok ? "ok-t" : ""; e.textContent = m; clearTimeout(kutuOnTimer); if (m) kutuOnTimer = setTimeout(() => { e.textContent = ""; }, 3500); }
+async function kutuGonder(soru) {
+  const ta = $("kn"), t = ta.value; if (!t.trim() || ta.disabled) return;
+  ta.value = ""; let r = {};
+  try { const y = await fetch(cfg.relay + "/girdi", { method: "POST", body: JSON.stringify({ text: t, soru, at: new Date().toISOString() }) }); r = await y.json().catch(() => ({})); if (!y.ok) r = {}; } catch (e) {}
+  const ad = { oturum: "{asistan} aldı", asistan: r.ok === false ? "" : "{asistan} cevaplıyor", defter: "Notlara yazıldı" }[r.tur];
+  if (ad === "" || (!r.ok && !r.tur)) { if (!ta.value) ta.value = t; return kutuOn(L("gönderilemedi"), false); }
+  kutuOn("✓ " + L(ad === undefined ? "İletildi" : ad), true); durum();
+}
+$("kn").onkeydown = ev => { if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); kutuGonder(ev.metaKey || ev.ctrlKey); } };
+function kutuDurum(s) {  // aktarıcı yoksa kutu soluk ve kapalı; varsa son cevabın başı (en çok 3 satır)
+  const ta = $("kn"), acik = !!s; ta.disabled = !acik; $("kt").classList.toggle("soluk", !acik);
+  $("knot").textContent = acik ? "" : L("Suflor.me çalışmıyor");
+  const k = (s && s.konus) || {}, yas = k.at ? (Date.now() - Date.parse(k.at)) / 1000 : 1e9, ca = $("kca");
+  const m = acik && k.cevap && yas < 300 ? String(k.cevap).replace(/\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm|ton:\s*[a-z_]+)>\s*/gi, " ").split(/\n\s*-{3,}\s*\n?/)[0].trim() : "";
+  if ((ca.dataset.m || "") === m) return; ca.dataset.m = m; ca.replaceChildren(); if (!m) return;
+  const b = document.createElement("div"); b.className = "b"; b.textContent = m;
+  const d = document.createElement("button"); d.className = "sm"; d.textContent = L("Panoda aç"); d.onclick = () => $("pano").click();
+  ca.append(b, d);
 }
 $("pano").onclick = () => panoAc(cfg.relay).then(() => window.close());

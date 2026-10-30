@@ -215,6 +215,15 @@ try:
     ok("sesli 'Suflor, …' sorusu konuşana gitti, cevap panoda", k15["durum"] == "hazir" and "bütçe ne kadardı" in (k15.get("soru") or "") and "Sorduğun" in (k15.get("cevap") or "")
        and c[-1].get("kaynak") == "hitap" and c[-1].get("toplantida") is True and c[-1].get("sesli") is False)
     ok("döküm satırında konusan işareti (izle: toplantı oturumu cevap kartı yazmaz)", bool(jl) and jl[-1].get("konusan") is True)
+    # 30 Ekim (bulgu 9): cevaptan sonra hitap_devam_sn (20) içinde adsız soru da konuşana gider; karşı taraf konuşunca pencere kapanır
+    time.sleep(1.0); c0 = len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines())
+    ben("1b", "Peki bu bütçe kimde kaldı?"); t0 = time.time()
+    while time.time() - t0 < 30 and not (len(open(os.path.join(canli, "claude-cagri.jsonl")).readlines()) > c0 and st()["durum"] in ("hazir", "hata")): time.sleep(0.2)
+    ok("adsız devam sorusu (cevaptan sonra 20 sn içinde) konuşana gitti", "KONUŞ: devam sorusu (ad olmadan" in log() and "kimde kaldı" in (st().get("soru") or ""))
+    time.sleep(1.0); karsi_ = lambda i, metin: uc2("/ingest", {"meeting": {"title": "Başka toplantı"}, "source": "whisper", "entries": [{"id": f"kd/{i}", "speaker": "Ayla Ö", "time": f"11:0{i}:30", "text": metin, "kanal": "karsi"}]})
+    karsi_(1, "Bence bunu yarın tekrar konuşalım."); time.sleep(0.5); nd = log().count("KONUŞ: devam sorusu (ad olmadan")
+    ben("1c", "Peki takvim ne durumda?"); time.sleep(1.0)
+    ok("karşı taraf konuşunca devam penceresi kapandı, adsız soru gitmedi", "devam penceresi kapandı — karşı taraf konuştu" in log() and log().count("KONUŞ: devam sorusu (ad olmadan") == nd)
     n0 = log().count("konuşana gitti")
     ben(2, "Claude: kuyruğa al teklif e-postasını."); time.sleep(1)
     jl2 = [json.loads(l) for f in os.listdir(canli) if f.endswith(".jsonl") and not f.startswith("claude") for l in open(os.path.join(canli, f)) if '"w/2"' in l]

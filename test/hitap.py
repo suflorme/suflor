@@ -7,9 +7,10 @@ KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KIS = {"v": None, "v2": None}; ns = {"re": re, "time": __import__("time"), "kisilikler": lambda: [x for x in (KIS["v"], KIS["v2"]) if x]}  # v0.53.0: kişilik hitabı (nötr örnek ad "Atlas")
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
 sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "hitap_aski", "hitap_askida", "hitap_aski_bitti",
-                                                                    "_hitap_adlari", "_hitap_alt", "_hitap_rx", "hitap_yalniz_ad", "hitap_cevap_baslat", "hitap_aski_metin")) or
+                                                                    "_hitap_adlari", "_hitap_alt", "_hitap_rx", "hitap_yalniz_ad", "hitap_cevap_baslat", "hitap_aski_metin", "hitap_icte")) or
        (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR", "HITAP_ASKI", "HITAP_ASKI_SN", "HITAP_DEVAM_SN", "HITAP_AD_DEVAM_SN",
-                                                                      "HITAP_ONCE_N", "HITAP_EN_COK_SN", "HITAP_EN_COK_SOZ", "HITAP_ONCE"} for x in n.targets))]
+                                                                      "HITAP_ONCE_N", "HITAP_EN_COK_SN", "HITAP_EN_COK_SOZ", "HITAP_ONCE",
+                                                                      "HITAP_IC_2K", "HITAP_IC_YAKIN", "HITAP_IC_EDAT", "HITAP_IC_SOZ"} for x in n.targets))]
 ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").read())  # 19 Ekim: söz etme kalıbı kisilik.py'de (iki yer aynı tanımı kullanır)
 sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS") for x in n.targets)] + sec
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
@@ -163,6 +164,88 @@ for girdi, bek, ac in [
     c = kim(girdi); ok = c == bek; hata += not ok
     print(f"{'✓' if ok else '✗'} üçlü hitap — {ac}: {girdi!r} → {c}" + ("" if ok else f" (beklenen {bek})"))
 KIS["v"] = KIS["v2"] = None
+
+# 30 Ekim (gerçek toplantı, bulgu 9): ad cümle içinde — yalnız doğrudan seslenme (kullanıcının kendi satırı; hitap_duzelt yalnız ona çağrılır)
+KIS["v"] = {"ad": "Atlas", "rol": "toplanti", "hitap": ["Atlas", "Atlaz"]}; KIS["v2"] = None
+for girdi, bek, ic, ac in [
+    ("Bunu Can'a değil de Atlas sana soruyorum, bugün kaç kart açık?", "Claude: Bunu Can'a değil de sana soruyorum, bugün kaç kart açık?", True, "gerçek kalıp: '…değil de <Ad> sana soruyorum'"),
+    ("By the way Atlas, what is the budget for next quarter?", "Claude: By the way, what is the budget for next quarter?", True, "gerçek kalıp: 'By the way <Ad>,'"),
+    ("Hey Atlas, can you check the open items?", "Hey Claude: can you check the open items?", False, "'Hey <Ad>,' cümle başı (eski kural, giriş + virgül)"),
+    ("Bunu bilmiyorum Atlas, sen söyler misin bütçe ne durumda?", "Claude: Bunu bilmiyorum, sen söyler misin bütçe ne durumda?", True, "ad + virgül + istek, cümle ortası"),
+    ("Şimdi şunu merak ettim Atlas sence bu karar doğru mu?", "Claude: Şimdi şunu merak ettim sence bu karar doğru mu?", True, "ad + 'sence'"),
+    ("Ne düşünüyorsun Atlas?", "Claude: Ne düşünüyorsun?", True, "ad cümle sonunda + ikinci kişi fiili"),
+    ("Bugün kaç kart açık, Atlas?", "Claude: Bugün kaç kart açık?", True, "ad cümle sonunda, virgülle ayrılmış soru"),
+    ("Tamam bunu konuştuk. Peki Atlas, yarın neler var?", "Tamam bunu konuştuk. Peki Claude: yarın neler var?", False, "ikinci cümlede giriş + ad (eski kural)"),
+    ("What do you think about the timeline, Atlas?", "Claude: What do you think about the timeline?", True, "İngilizce, ad sonda"),
+    ("Dün Atlas iyi cevap verdi.", None, False, "olumsuz: üçüncü kişi anlatım"),
+    ("Atlas dün iyi cevap verdi.", None, False, "olumsuz: üçüncü kişi, cümle başı"),
+    ("Bence Atlas'ın sesi güzel değil mi?", None, False, "olumsuz: kesmeli ekli ad"),
+    ("Bence Atlasın sesi güzel, sen ne dersin?", None, False, "olumsuz: eksiz yazılmış ekli ad"),
+    ("Toplantıdan sonra Atlas hakkında konuşalım mı?", None, False, "olumsuz: ad + söz etme (hakkında)"),
+    ("Bunu Atlas ile yaptık, sen ne düşünüyorsun?", None, False, "olumsuz: ad + ile (başka birine soru)"),
+    ("Dün Atlas sana ne dedi?", None, False, "olumsuz: üçüncü kişi + 'sana' (ikinci kişi fiili yok)"),
+    ("Mardin'e gittin mi sen hiç?", None, False, "olumsuz: benzer gündelik sözcük"),
+    ("Dünya atlası sende mi, bakar mısın?", None, False, "olumsuz: küçük harfli ortak ad (atlas)"),
+    ("I talked to Atlas, can you check the notes?", None, False, "olumsuz: edattan sonra ad (to Atlas)"),
+    ("Dün Atlas, Can ve ben toplandık, sen ne düşünüyorsun?", None, False, "olumsuz: sayım dizisi"),
+    ("Can, sen ne düşünüyorsun?", None, False, "olumsuz: başka katılımcıya soru, ad yok"),
+    ("Toplantıyı Atlas yönetti, sence nasıldı?", None, False, "olumsuz: ad özne, 'sence' addan sonra değil"),
+    ("Bak Atlas ne güzel olmuş.", None, False, "olumsuz: 'bak' giriş sayılmaz (v0.101.1 kuralı)"),
+    ("Sunumda Atlas, yani asistan, bize yardım etti mi?", None, False, "olumsuz: ara söz (ad + 'yani')"),
+    ("Yarın bunu kontrol et Atlas.", "Claude: Yarın bunu kontrol et.", True, "istek + ad sonda")]:
+    cik, _ = ns["hitap_duzelt"](girdi); bek = girdi if bek is None else bek; ok = cik == bek and bool(ns["_KHR"].get("icte")) == ic and (ns["_KHR"]["satir"] == "Atlas") == (bek != girdi); hata += not ok
+    print(f"{'✓' if ok else '✗'} cümle içinde — {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r}, icte {ic})"))
+
+# 30 Ekim: adsız devam sorusu (bas-konus.py hitap_devam_*): asistan cevap verdikten sonra hitap_devam_sn içinde kullanıcının sorusu ad olmadan ona gider
+import threading as _th
+exec(compile(ast.Module([n for n in bk.body if (isinstance(n, ast.FunctionDef) and n.name in ("_devam_kapat", "hitap_devam_ac", "_devam_baskasina", "hitap_devam_bak", "hitap_devam_karsi", "vokatif_mi", "vokatif_ogren", "_vk_ad")) or
+                         (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("HITAP_DEVAM", "DEVAM_SORU_RX", "DEVAM_SOZ_RX", "DEVAM_BAS_RX", "DEVAM_KAPAT_RX", "DEVAM_GRUP_RX", "_VOKATIF") for x in n.targets))], []), "bas-konus.py", "exec"), ns)
+ns.update(threading=_th, AYAR={}, toplanti_var=lambda: True, _KS={"tur": None}, ben_adi=lambda: "Ben Kullanıcı", SON_SATIRLAR=[], OT={}, okuma_suruyor=lambda: False, ses_caliyor=lambda: False)
+ns["_ASISTAN_SORU"].update(ad=None); ns["TS"] = {}
+_tm = __import__("time")
+def pencere(sn_once=1.0):  # cevap hazır + okuma bitti (izleyici iş parçacığı beklenmeden)
+    ns["hitap_devam_ac"]("Atlas"); d = ns["HITAP_DEVAM"]; d["nesil"] += 1; d.update(t=_tm.time() - sn_once - 0.5, bit=_tm.time() - sn_once)
+def satir(m, gecikme=0.0):  # yeni Whisper kullanıcı satırı: hitap_aski → hitap_duzelt (aktarıcının sırası)
+    t0 = _tm.time() + gecikme; ns["HITAP_ASKI"].update(metin=None); ns["hitap_aski"](m, t0, t0 + 1.5); return ns["hitap_duzelt"](m)[0]
+for kur, girdi, bek, ac in [
+    (lambda: pencere(), "Peki bütçe ne durumda?", "Claude: Peki bütçe ne durumda?", "devam: 'peki …' soru"),
+    (lambda: pencere(5), "Bu karar kimde kaldı?", "Claude: Bu karar kimde kaldı?", "devam: soru işareti, 5 sn sonra"),
+        (lambda: pencere(), "And what about the risks?", "Claude: And what about the risks?", "devam: İngilizce"),
+    (lambda: pencere(), "Bir de son kararları özetle.", "Claude: Bir de son kararları özetle.", "devam: istek"),
+    (lambda: pencere(), "Bu iyi bir fikir.", "Bu iyi bir fikir.", "olumsuz: soru/istek değil"),
+    (lambda: pencere(25), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: süre doldu (20 sn)"),
+    (lambda: pencere(), "Can, sen ne düşünüyorsun?", "Can, sen ne düşünüyorsun?", "olumsuz: başka katılımcıya seslenme"),
+    (lambda: pencere(), "Bütçe ne durumda, Deniz?", "Bütçe ne durumda, Deniz?", "olumsuz: sonda başka bir ada seslenme"),
+    (lambda: pencere(), "Peki arkadaşlar, devam edelim mi?", "Peki arkadaşlar, devam edelim mi?", "olumsuz: topluluğa dönüş"),
+    (lambda: pencere(), "Tamam teşekkürler.", "Tamam teşekkürler.", "olumsuz: teşekkür kapatır"),
+    (lambda: (pencere(), ns["SON_SATIRLAR"].append((_tm.time(), "Deniz Kaya", "Bence bunu yarın konuşalım"))), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: karşı taraf ≥ 3 sözcük konuştu"),
+    (lambda: (pencere(), ns["SON_SATIRLAR"].append((_tm.time(), "Deniz Kaya", "Evet"))), "Peki bütçe ne durumda?", "Claude: Peki bütçe ne durumda?", "karşı tarafın kısa 'Evet'i kapatmaz"),
+    (lambda: (pencere(), ns["SON_SATIRLAR"].append((_tm.time(), "Deniz Kaya", "Evet")), ns["_KS"].update(tur={"x": 1})), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: asistan düşünürken devam yok"),
+    (lambda: (ns["_KS"].update(tur=None), pencere(), ns["HITAP_DEVAM"].update(bit=None)), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: cevap okunurken (pencere henüz açılmadı)"),
+    (lambda: (pencere(), ns["_ASISTAN_SORU"].update(ad="Atlas", t=_tm.time() - 2, bit=_tm.time() - 1)), "Salı olsun ne dersin?", "Salı olsun ne dersin?", "olumsuz: asistan soru sordu — cevap yolu (asistan_cevap_bekliyor)"),
+    (lambda: (ns["_ASISTAN_SORU"].update(ad=None), pencere(), ns["AYAR"].update(hitap_devam_sn=0)), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: ayar hitap_devam_sn 0 = kapalı"),
+    (lambda: (ns["AYAR"].clear(), pencere(), ns.update(toplanti_var=lambda: False)), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: toplantı dışında yok")]:
+    ns["SON_SATIRLAR"].clear(); kur(); cik = satir(girdi); ok = cik == bek; hata += not ok
+    ns.update(toplanti_var=lambda: True); ns["_KS"]["tur"] = None
+    print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
+# pencere kapanınca (karşı taraf, teşekkür) sonraki soru da gitmez; her cevap pencereyi yeniler
+pencere(); ns["hitap_devam_karsi"]("Bence bunu yarın konuşalım", "Deniz Kaya"); c1 = satir("Peki bütçe ne durumda?")
+pencere(); satir("Tamam teşekkürler."); c2 = satir("Peki bütçe ne durumda?")
+pencere(); c3 = satir("Peki bütçe ne durumda?"); c4 = satir("Bir de riskler ne?")
+pencere(); c5 = satir("Peki"); c6 = satir("Peki bu ne?"); c10 = satir("Yarın toplantı var mı"); ask10 = ns["hitap_aski_metin"]() == "Atlas, Yarın toplantı var mı"
+ok = c1 == "Peki bütçe ne durumda?" and c2 == "Peki bütçe ne durumda?" and c3.startswith("Claude:") and c4.startswith("Claude:") and c5 == "Peki" and c6.startswith("Claude:") and c10 == "Yarın toplantı var mı" and ask10; hata += not ok
+print(("✓ " if ok else "✗ ") + f"karşı taraf ve teşekkür pencereyi kapatır; açık pencerede ardışık sorular gider; tek sözcük gitmez; noktalamasız soru askıya: {[c1, c2, c3, c4, c5, c6, c10]}")
+# cümle bitmemiş devam (Whisper böldü): "<ad>, …" askıya girer, sonraki parçayla birleşir
+pencere(); ns["HITAP_ASKI"].update(metin=None); t0 = _tm.time(); ns["hitap_aski"]("Peki bütçe tablosunda", t0, t0 + 1); c7 = ns["hitap_duzelt"]("Peki bütçe tablosunda")[0]
+ask1 = ns["hitap_askida"]("Peki bütçe tablosunda") and ns["hitap_aski_metin"]() == "Atlas, Peki bütçe tablosunda"
+b8 = ns["hitap_aski"]("son rakam ne?", t0 + 1.5, t0 + 2.5); bt = ns["hitap_duzelt"](b8 or "")[0]
+ok = c7 == "Peki bütçe tablosunda" and ask1 and b8 == "Atlas, Peki bütçe tablosunda son rakam ne?" and bt == "Claude: Peki bütçe tablosunda son rakam ne?"; hata += not ok
+print(("✓ " if ok else "✗ ") + f"bölünen devam sorusu askıda birleşir: {bt!r}")
+# kişi adı bilgisi: toplantıda konuşan başka birinin adı satırda geçerse devam değil
+pencere(); ns["SON_SATIRLAR"].append((_tm.time() - 60, "Deniz Kaya", "Merhaba"))
+c9 = satir("Deniz sen ne düşünüyorsun?"); ok = c9 == "Deniz sen ne düşünüyorsun?"; hata += not ok
+print(("✓ " if ok else "✗ ") + f"toplantıdaki başka konuşanın adı geçen satır devam sayılmaz: {c9!r}")
+ns["SON_SATIRLAR"].clear(); KIS["v"] = None
 
 print("GEÇTİ" if not hata else f"KALDI: {hata}")
 sys.exit(1 if hata else 0)

@@ -552,7 +552,7 @@ function paintMini(s){
   if(!mini||mini.closed)return; const d=mini.document, mc=d.getElementById("mc"); if(!mc)return
   const du=durum(s), [sk,sc]=sureTxt(s)
   setH(d.getElementById("mh"),(du.c==="wa"||du.c==="er"?`<span class=w title="${esc(du.hep)}">${esc(du.m)}${du.a?" — "+esc(du.a):""}</span>`:"")+(sk?`<span style="color:${sc?'var(--wa)':'inherit'}">${esc(sk)}</span>`:"")+(sessizTxt(s)?`<span>${esc(sessizTxt(s))}</span>`:"")+toneHtml(s.tone,s.tone_kisi,true))
-  mc.hidden=!!s.kart_katmani; if(!mc.hidden)paintCards(mc,s,true);  // Mac kart katmanı kartları gösteriyorsa panelde liste yok (alan yoksa eski aktarıcı = false)
+  paintCards(mc,s,!s.kart_katmani);  // Mac kart katmanı açıkken menü paneli "tüm kartlar" listesidir (yan şeritten açılır): ayrıntı da görünür, metin kesilmez
    sessizCiz(d.getElementById("msz"),s); gizliCiz(d.getElementById("mgz"),s); sesliCiz(d.getElementById("msc"),s); miniKonus(d,s); renderHat(d,s); miniOturum(d,s)
   // Döküm yerine tek satır canlılık (v0.4.3, kullanıcı ✓): metni toplantıda zaten görüyor, burada yalnız akış sürüyor mu
   const le=(s.tail||[]).filter(e=>!e.note&&e.at).slice(-1)[0], ml=d.getElementById("ml")

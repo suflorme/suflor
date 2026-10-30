@@ -70,7 +70,7 @@ HITAP_ORTA_RX = re.compile(r"(?<=\w)([,]?\s+)(?:Suflor)(?:\s*[,:]\s*|\s+(?!(?:mi
 # Cümle başında ad + virgül/iki nokta/nokta ya da cümle soru ise hitap: "<Ad> markasının yeni ürünü…" tetiklemez. İçeride yine "Claude:" olur.
 # S94 (19 Ekim test toplantısı: "<Ad> gelsin" virgülsüz ve sorusuz kaçtı): noktalamasız/sorusuz cümlede istek varsa da hitap (KISILIK_ISTEK, kisilik.py).
 # Kişilik varken "Claude"/"Suflor" artık seslenme değil (toplantıda tek kural: asistanın adı); kişiliksiz (nötr) kurulumda eskisi gibi.
-_KHR = {"k": {}, "rx": {}, "son": None, "satir": None}  # v0.61.0: iki kişilik — kalıp tüm adlarla; "son" = (az önce tanınan kişiliğin adı, zaman), konus_hitap okur; "satir" = son hitap_duzelt satırındaki ad
+_KHR = {"k": {}, "rx": {}, "son": None, "satir": None, "icte": False, "devam": None, "aday": None}  # v0.61.0: iki kişilik — kalıp tüm adlarla; "son" = (az önce tanınan kişiliğin adı, zaman), konus_hitap okur; "satir" = son hitap_duzelt satırındaki ad
 def _kisilik_hitap_rx(rol=None):  # rol "toplanti": yalnız toplantı kişiliğinin adları (karşı taraf için)
     ks = [k for k in kisilikler() if not rol or k["rol"] == rol]; adlar = tuple(a for k in ks for a in k["hitap"])
     if _KHR["k"].get(rol) != adlar:
@@ -83,6 +83,44 @@ def _kisilik_hitap_rx(rol=None):  # rol "toplanti": yalnız toplantı kişiliği
 def _kisilik_hitap_ad(soz):  # tanınan hitap sözü → kişiliğin adı
     for k in kisilikler():
         if any(a.lower() == soz.lower() for a in k["hitap"]): return k["ad"]
+    return None
+# 30 Ekim (gerçek toplantı, bulgu 9): ad cümlenin ortasında geçince ("…değil de <Ad> sana soruyorum, …", "By the way <Ad>, …") seslenme kaçtı. hitap_duzelt yalnız
+# kullanıcının kendi satırına çağrılır; cümle başı kuralı tutmazsa bu kural bakar ve yalnız doğrudan seslenmeyi alır. Ad listedeki yazımla, cümle ortasında büyük harfle,
+# eksiz (-'ın, -a, -ı … değil) geçer; ardından söz etme sözcüğü (ile, hakkında, mı …) ve önünde edat/bağlaç (ve, to, with, about …) olmaz. Ve şunlardan biri:
+#  1) addan sonra virgül/iki nokta, ardından ≥ 2 sözcük ve cümlede soru (?, soru sözcüğü) ya da ikinci kişi/istek;  2) adın hemen önünde selam/giriş (hey, by the way, tamam,
+#  peki …) ve aynısı;  3) addan hemen sonra ikinci kişi sözcüğü (sana, sen, sence, you, can you, lütfen …) ve cümlede ikinci kişi fiili ya da istek (soruyorum, -yorsun,
+#  -ır mısın, söyle …; yalnız "?" yetmez: "<Ad> sana ne dedi?" üçüncü kişi);  4) ad cümlenin sonunda ve cümlede ikinci kişi fiili/istek ya da virgülle ayrılmış soru ("…, <Ad>?").
+# Cümlenin başına "Claude:" girer, ad (ve virgülü) çıkar: soru bütün cümledir. Sayım dizisi ("<Ad>, Can ve ben …") ve ara söz ("<Ad>, yani …") seslenme değil.
+HITAP_IC_2K = (r"\w+yorsun(?:uz)?\b|\bm[ıiuü]s[ıiuü]n(?:[ıiuü]z)?\b|\b(?:soruyorum|sorayım|soracağım|lütfen|sence|sizce)\b|\btell me\b|\bplease\b|"
+               r"\b(?:can|could|would|will|do|did|are|have|should)\s+you\b|\byour\b")
+HITAP_IC_YAKIN = r"\s*,?\s*(?:sana|sen|senden|seni|sence|size|siz|sizce|sizden|soruyorum|lütfen|bak|you|can you|could you|would you|tell me|please)\b"
+HITAP_IC_EDAT = r"(?:^|\s)(?:ve|ile|veya|and|or|with|to|for|about|of|from|than|like|the|a|an|bir|bu|şu|o|asked|told|ask|tell)\s*$"
+HITAP_IC_SOZ = r"\b(?:ne|neden|niye|nasıl|kim|hangi|kaç|nerede|what|why|how|who|which|when|where)\b"
+def hitap_icte(text):  # → (yeni metin, adın yazımı) ya da None
+    adlar = _hitap_adlari() if kisilikler() else []
+    if not adlar or not text: return None
+    alt = "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True))
+    on_rx = r"(?:^|\W)(?:hey|by the way|btw|sevgili|dear|" + KISILIK_GIRIS + r")[\s,]*$"
+    fiil = HITAP_IC_2K + "|" + KISILIK_ISTEK
+    for cm in re.finditer(r"[^.!?…]+[.!?…]*", text):
+        s = cm.group(0)
+        soru = "?" in s or re.search(fiil, s, re.I) or (re.search(HITAP_IC_SOZ, s, re.I) and not re.search(r"[.!]\s*$", s))
+        for m in re.finditer(r"(?<![\w'’])(" + alt + r")(?![\w'’])", s, re.I):
+            w, on, ar = m.group(1), s[:m.start()], s[m.end():]
+            bas = not on.strip(" \t\"'“”(-")
+            if (not bas and not w[:1].isupper()) or re.match(r"\s+" + KISILIK_SOZ_ETME, ar, re.I) or re.search(HITAP_IC_EDAT, on, re.I): continue
+            vg = re.match(r"\s*[,:]\s*", ar); kalan = ar[vg.end():] if vg else ar.lstrip()
+            if vg and re.match(r"[A-ZÇĞİÖŞÜ][\wçğıöşü]*\s*(?:,|ve\b|and\b)", kalan): continue  # sayım dizisi
+            if vg and re.match(r"(?:yani|ve|ama|fakat|ki|da|de|hem|veya|ya da|gibi|and|but|or|which|who|that|i\.?e\.?)\b", kalan, re.I): continue  # ara söz ("<Ad>, yani asistan, …")
+            sonda = not re.sub(r"[\s.!?…,]", "", ar)
+            if (vg and len(kalan.split()) >= 2 and soru) or (re.search(on_rx, on, re.I) and len(kalan.split()) >= 2 and soru) \
+               or (re.match(HITAP_IC_YAKIN, ar, re.I) and re.search(fiil, s, re.I)) \
+               or (sonda and not bas and (re.search(fiil, s, re.I) or (re.search(r",\s*$", on) and "?" in ar))):
+                lead = s[:len(s) - len(s.lstrip())]; on_ = on.strip()
+                if sonda: govde = on_.rstrip(" ,:") + ar.strip(" ,")
+                elif not on_: govde = kalan
+                else: govde = on_.rstrip(" ,:") + (", " if vg else " ") + kalan
+                return text[:cm.start()] + lead + "Claude: " + govde + text[cm.end():], w
     return None
 # Bölünen hitap (19 Ekim test toplantısı): Whisper "<kişilik adı> şu an" ve "toplantıda kaç tane şey var? … kontrol eder misin?" diye iki satıra böldü; ilk satırda soru
 # işareti olmadığı için hitap sayılmadı, Konuş cevap vermedi. Kullanıcı satırı ad (ya da Claude/Suflor) ile başlayıp noktalamasız biterse (en çok 6 sözcük) askıda
@@ -104,6 +142,7 @@ def hitap_yalniz_ad(metin):  # satır yalnız asistanın adı mı ("Sera," / "Se
     return m.group(1) if m else None
 def hitap_aski(metin, t0=None, t1=None):  # → askıdaki hitap + bu satır (birleşik, tamamlandı) ya da None; bu satır askıya alınır ya da askıdakine eklenirse None
     a = HITAP_ASKI; t0 = time.time() if t0 is None else t0; t1 = time.time() if t1 is None else t1
+    _KHR["aday"] = None  # 30 Ekim: devam sorusu adayı — askıya girmeyen yeni Whisper satırı (hitap_duzelt hemen ardından bakar)
     once = [x for x in HITAP_ONCE]; HITAP_ONCE.append((metin, t0, t1)); del HITAP_ONCE[:-HITAP_ONCE_N - 1]
     a.update(satir=None)
     if a["metin"] and 0 <= t0 - a["t1"] <= a["pen"]:
@@ -122,6 +161,7 @@ def hitap_aski(metin, t0=None, t1=None):  # → askıdaki hitap + bu satır (bir
         a.update(metin=" ".join([ad + ","] + on), t1=t1, satir=metin, pen=HITAP_AD_DEVAM_SN, bas=son_t0, cevap=False); return None  # 28 Ekim: yalnız ad → soru 5 sn sonra geldi, 3 sn pencere kaçırdı; ilk devam 7 sn (sonrakiler HITAP_DEVAM_SN)
     if re.match(_hitap_rx(), metin or "", re.I) and not re.search(r"[.!?…:,]\s*$", metin) and len(metin.split()) <= 6:
         a.update(metin=metin, t1=t1, satir=metin, pen=HITAP_ASKI_SN, bas=t0, cevap=False)
+    else: _KHR["aday"] = (metin, t0, t1)
     return None
 def hitap_cevap_baslat(ad, metin, t0=None, t1=None):  # asistanın sorusuna hitapsız cevap → "<ad>, <cevap>" askıya (süre dolunca gider); askıdaki metni döndürür
     t0 = time.time() if t0 is None else t0; t1 = time.time() if t1 is None else t1
@@ -157,7 +197,7 @@ def hitap_ses_duzelt(metin):  # 28 Ekim: Whisper adı "mermis"/"merviz" yazdı, 
         return m.group(1) + en if en else m.group(0)
     return rx.sub(degis, metin, count=1)
 def hitap_duzelt(text):
-    krx = _kisilik_hitap_rx(); _KHR["satir"] = None
+    krx = _kisilik_hitap_rx(); _KHR.update(satir=None, icte=False, devam=None)  # icte/devam: konus_hitap günlüğü (bu satırın seslenme yolu)
     def kd(m):
         ad = _kisilik_hitap_ad(m.group(2))
         if ad: _KHR["son"] = (ad, time.time()); _KHR["satir"] = ad
@@ -166,6 +206,18 @@ def hitap_duzelt(text):
     if not kisilikler():  # S94: kişilik varken Claude/Suflor seslenme değil
         out = HITAP_RX.sub(lambda m: m.group(1) + "Claude: ", out)
         if out == text: out = HITAP_ORTA_RX.sub(lambda m: ". Claude: ", text, count=1)
+    elif "Claude:" not in out and (r := hitap_icte(out)):  # 30 Ekim: ad cümle içinde, doğrudan seslenme
+        out = r[0]; ad = _kisilik_hitap_ad(r[1])
+        if ad: _KHR["son"] = (ad, time.time()); _KHR.update(satir=ad, icte=True)
+    aday = _KHR.get("aday"); _KHR["aday"] = None
+    if "Claude:" not in out and aday and aday[0] == text and "hitap_devam_bak" in globals():  # 30 Ekim: adsız devam sorusu (bas-konus.py; yalnız yeni Whisper satırı)
+        r = hitap_devam_bak(text, aday[1], aday[2])
+        if r and not re.search(r"[.!?…]\s*$", text):  # cümle sürüyor (Whisper böldü): "<ad>, …" askıya, sonraki parçayla ya da süre dolunca gider
+            HITAP_ASKI.update(metin=f"{r[0]}, {text}", t1=aday[2], satir=text, pen=HITAP_DEVAM_SN, bas=aday[1], cevap=False)
+            print(f"KONUŞ: devam sorusu (ad olmadan, {r[1]} sn içinde; cümle sürüyor, askıda) — \"{text[:80]}\"")
+        elif r:
+            out = "Claude: " + out; _KHR["devam"] = r[1]
+            if kisilikler(): _KHR["son"] = (r[0], time.time()); _KHR["satir"] = r[0]
     return out, ([{"bicim": "Cloud", "dogru": "Claude:", "durum": "duzeltildi"}] if out != text else [])
 
 def slug(s): s = re.sub(r"[^\w\s-]", "", s, flags=re.U).strip(); s = re.sub(r"\s+", "-", s); return s[:60] or "toplanti"
