@@ -17,8 +17,9 @@ def isle(o, n=1):
     for _ in range(n): ns["kaynak_isle"](o, ES)
     return ns["KAYNAK"]["duzey"]
 ok("başlangıç normal; kaynak_dar() yanlış", ns["KAYNAK"]["duzey"] == "normal" and not ns["kaynak_dar"]())
-ok("ham düzey: eşiklere göre", ns["kaynak_ham"](olc(60), ES) == "normal" and ns["kaynak_ham"](olc(20), ES) == "dar" and ns["kaynak_ham"](olc(60, 4.2), ES) == "dar"
-   and ns["kaynak_ham"](olc(60, 0, cek * 1.6), ES) == "dar" and ns["kaynak_ham"](olc(10), ES) == "kritik" and ns["kaynak_ham"](olc(60, 7), ES) == "kritik" and ns["kaynak_ham"](olc(60, 0, cek * 3.5), ES) == "kritik")
+ok("ham düzey: eşiklere göre", ns["kaynak_ham"](olc(60), ES) == "normal" and ns["kaynak_ham"](olc(20), ES) == "dar" and ns["kaynak_ham"](olc(35, 4.2), ES) == "dar"
+   and ns["kaynak_ham"](olc(60, 0, cek * 1.6), ES) == "dar" and ns["kaynak_ham"](olc(10), ES) == "kritik" and ns["kaynak_ham"](olc(35, 7), ES) == "kritik" and ns["kaynak_ham"](olc(60, 0, cek * 3.5), ES) == "kritik")
+ok("takas boş bellek bolken sayılmaz (30 Ekim: boş %84, takas 3,7 GB dar'da takılmıştı)", ns["kaynak_ham"](olc(84, 3.7), ES) == "normal" and ns["kaynak_ham"](olc(60, 7), ES) == "normal" and ns["kaynak_ham"](olc(42, 11.9), ES) == "normal")
 ok("tek bozuk ölçüm düzeyi değiştirmez (titreşim yok)", isle(olc(20)) == "normal" and isle(olc(20)) == "normal" and isle(olc(60)) == "normal")
 ok("3 ardışık dar ölçüm → dar; günlükte geçiş satırı", isle(olc(20), 3) == "dar" and ns["kaynak_dar"]() and any(l.startswith("KAYNAK: normal → dar (boş %20") for l in LOG))
 ok("eşiğin hemen üstü (çıkış payı içinde) düzeyi düşürmez", isle(olc(24), 10) == "dar")

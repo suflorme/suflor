@@ -6,7 +6,7 @@
 # süreci ve toplantı oturumu HİÇBİR düzeyde durdurulmaz. KRİTİK'te ek olarak /status kaynak.duzey "kritik" → panoda kalıcı sarı kart.
 # Eşikler (ayar kaynak_*; AYAR_PANO'da yok). Veri: 28 Ekim sistem-izi.jsonl (toplantı içi, 291 ölçüm): boş bellek en az %29, p5 %37, medyan %63;
 # takas p50 0, p90 3,2, p99 3,9, en çok 3,9 GB (16 GB'lık Mac). 27 Ekim olayı: takas dolu, yük 246 (10 çekirdek). Dar eşiği gözlenen en düşüğün altında
-# (boş ≤ %22, takas ≥ 4 GB, yük ≥ 1,5 × çekirdek), kritik çok daha aşağıda (boş ≤ %12, takas ≥ 6 GB, yük ≥ 3 × çekirdek). Titreşim: düzey ancak
+# (boş ≤ %22, takas ≥ 4 GB — yalnız boş ≤ %40 iken, yük ≥ 1,5 × çekirdek), kritik çok daha aşağıda (boş ≤ %12, takas ≥ 6 GB, yük ≥ 3 × çekirdek). Titreşim: düzey ancak
 # 3 ardışık ölçümde (30 sn) yükselir; düşmek için ölçümler çıkış payını da geçmeli (boş +5 puan, takas −0,5 GB, yük × 0,8) ve 6 ardışık (60 sn) sürmeli.
 import subprocess, signal
 KAYNAK_DUZEYLER = ("normal", "dar", "kritik")
@@ -20,12 +20,15 @@ def _kaynak_esikler():
     return {"dar": {"bos": f("kaynak_dar_bos", 22), "takas": f("kaynak_dar_takas", 4.0), "yuk": f("kaynak_dar_yuk", 1.5) * cek},
             "kritik": {"bos": f("kaynak_kritik_bos", 12), "takas": f("kaynak_kritik_takas", 6.0), "yuk": f("kaynak_kritik_yuk", 3.0) * cek},
             "pay": {"bos": f("kaynak_cikis_bos", 5), "takas": f("kaynak_cikis_takas", 0.5), "yuk": f("kaynak_cikis_yuk", 0.8)},
+            "takas_bos": f("kaynak_takas_bos", 40),
             "yukari_n": int(f("kaynak_yukari_n", 3)), "asagi_n": int(f("kaynak_asagi_n", 6))}
 def kaynak_ham(o, es, cikis=False):  # → düzey adı; cikis=True: mevcut düzeyde kalma ölçütü (eşiklere çıkış payı eklenir)
     b, t, y = o.get("bos_yuzde"), o.get("takas_gb"), o.get("yuk"); p = es["pay"]; d = "normal"
     for ad in ("dar", "kritik"):
         e = es[ad]; bos_e = e["bos"] + (p["bos"] if cikis else 0); tak_e = e["takas"] - (p["takas"] if cikis else 0); yuk_e = e["yuk"] * (p["yuk"] if cikis else 1)
-        if (b is not None and b <= bos_e) or (t is not None and t >= tak_e) or (y is not None and y >= yuk_e): d = ad
+        # 30 Ekim: macOS baskı bitince takası saatlerce boşaltmaz (boş %84, takas 3,7 GB → düzey 'dar'da takıldı); takas yalnız boş bellek de azken sayılır
+        tak_ok = t is not None and t >= tak_e and (b is None or b <= es["takas_bos"] + (p["bos"] if cikis else 0))
+        if (b is not None and b <= bos_e) or tak_ok or (y is not None and y >= yuk_e): d = ad
     return d
 def kaynak_isle(o, es=None):  # bir ölçüm: sayaçları ve düzeyi günceller, geçişte günlük satırı yazar → düzey
     es = es or _kaynak_esikler(); K = KAYNAK; once = K["duzey"]; sira = KAYNAK_DUZEYLER.index
