@@ -8,6 +8,7 @@ README'de kısaca anlatılanların ayrıntısı: kurulumdan sonra, kullanım, ay
 - [İsteğe bağlı ayarlar](#isteğe-bağlı-ayarlar)
 - [Yapay zekâ seçimi](#yapay-zekâ-seçimi)
 - [Sesler](#sesler)
+- [Sorun giderme](#sorun-giderme)
 - [Gizlilik ayrıntıları](#gizlilik-ayrıntıları)
 - [Gerekenler](#gerekenler)
 - [Bileşenler](#bileşenler)
@@ -162,6 +163,68 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
   Yerel model Türkçe belgelerde aramayı çoğu zaman yanlış yapıyor; yedek olarak önerilir. Başka model için ayar `ollama_model`.
 - Seçilen hizmet hata verirse ve Claude Code kuruluysa o soru Claude Code'la cevaplanır. Seçilen hizmetin durumu (anahtar var mı, yerel model kurulu mu) ⚙ Ayarlar → Genel'deki Yapay zekâ satırında.
 - Ayar dosyasında: `"beyin": {"varsayilan": {…}, "konus": {…}, "ceviri": {…}, "proje_karti": {…}}` — sihirbaz ve pano yazar; elle yazılan model ve `effort` korunur.
+
+## Sorun giderme
+
+Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu denetle**'ye bak (✗ olan maddenin altında ne yapacağın yazar). Aşağıdakiler en sık karşılaşılanlar; her satır "belirti: ne yapmalı" biçimindedir. Ayar adları `ayar.json`'a `"ayar_adi": değer` diye yazılır; panoda ⚙ Ayarlar'da karşılığı varsa oradan değiştirmek daha kolaydır.
+
+### Döküm ve karşı tarafın sesi
+- **Karşı taraf satırı hiç gelmiyor:** Kurulumu denetle'yi çalıştır; Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı'nda "Suflor Ses" açık olmalı. Altyazı açıksa Chrome'da Suflor.me simgesindeki "Karşı taraf → Aç" yedek yoldur.
+- **Ekran paylaşımından sonra karşı ses kesildi:** karşı taraf konuşunca yardımcı yakalamayı kendisi yeniden kurar; kurmazsa Suflor Ses'in iznini kapatıp açmak yeterli.
+- **Whisper'ın yazdığı bir ad ya da terim yanlış (ör. asistanın adı başka sözcük yazılıyor):** adı proje sözlüğüne ya da kişi listesine ekle; asistan adıyla seslenince cevap gelmiyorsa ilk bakılacak yer burasıdır.
+- **Dökümde hı hı gibi kısa sözler senin adına çıkıyor:** hoparlör yerine kulaklık kullan; tepki seslerini kapatmak için `"tepki_sesi": false`.
+- **Çok uzun toplantıda (4,5 saati aşınca) eski bölümler "kayıtta yok" çıkıyor:** döküm dosyasının kendisi eksiksizdir; yalnız Konuş'un bakabildiği pencere sınırlıdır, eski bir şeyi dosyadan açıp sor.
+- **Terimli konuşmalarda döküm hataları arttı:** `"whisper_motor"` ayarını kaldır; varsayılan döküm motoruna dönülür.
+
+### Toplantı, platform ve kartlar
+- **Google Meet'te altyazı açık ama satır gelmiyor ya da dökümde menü metinleri var:** Meet arayüzü değişmiş olabilir; Chrome'da Suflor.me eklentisini yenile (`chrome://extensions`) ve güncelleme çıkmışsa **Güncelle**'ye bas.
+- **Toplantıya söyle (🔊) web'de çalışmıyor ya da "Toplantı bağlantısı bulunamadı" diyor:** masaüstü Teams ya da Zoom uygulamasını ve BlackHole sesini kullan; web sürümlerinde bu yol her zaman çalışmaz.
+- **Karşı taraf seni duymuyor, "Menü uygulaması kapandı" bildirimi geldi:** uygulama 5 saniyede kendiliğinden açılır; açılmazsa Teams'te mikrofonu "Harici Mikrofon"a al.
+- **Konuş'la sorduğun soruyu karşı taraf da duydu:** önce Teams'te kendini sessize al (hatırlatma kartı bunu yazar).
+- **Toplantıda asistan hoparlörden okudu, karşı taraf duydu:** kulaklık algısı yanılmış olabilir; kulaklığı çıkarıp yeniden tak. Sürerse ⚙ Ayarlar → Toplantı → "Asistanlar toplantıda konuşsun"u kapat.
+- **Hiçbir toplantı kaydedilmiyor, panoda 🔒 Gizli ve kırmızı şerit var:** gizli kip açık kalmış; 🔒'ye bas.
+- **Ayarı yanlışlıkla değiştirdin:** ayarlar anında kaydedilir; aynı ayarı geri çevir.
+- **Arka plandaki toplantı oturumu uzun süre "çalışıyor" görünüyor:** panoda Ayrıntı'dan araç adımlarına bak; gerekirse Terminal'de göster.
+- **Paylaşım yokken "sunulan ekran" açılıyor:** `"ekran_oto": false` ile kendiliğinden ekran kaydını kapat.
+- **Ekran görüntüsü yanlış pencereyi aldı ya da boş geldi:** tüm ekranı paylaşmayı dene; masaüstü toplantıda pencere adı değişmiş olabilir.
+- **Sesli toplantı notu ("not al.") istemediğin yerde çıkıyor:** `"sesli_not": false`.
+- **Takvime hatırlatma eklenemedi, e-posta taslağı açıldı:** Sistem Ayarları'nda Suflor Takvim'e tam erişim ver; farklı bir takvim için `"hatirlatma_takvim": "<takvim adı>"`.
+- **Gmail taslağı yanlış hesapta açılıyor:** Chrome'da o hesapla oturum aç ya da ⚙ Ayarlar → E-posta'da gönderen adresini düzelt.
+
+### Asistan ve seslenme
+- **Asistan istenmeden cevap veriyor ya da üstüne konuşuyor:** "<asistanın adı>, dur" de ya da Option + Shift + S'ye bas. Sık oluyorsa insanlara sorduğun soruyu asistana saymasın diye `"hitap_devam_sn": 10` yap (0 kapatır).
+- **Asistanın adını yalnızca anarken (ör. "… dün iyi cevap verdi") konuşuyor:** "<asistanın adı>, dur" de; sık oluyorsa toplantı başında ilk seslenmeyi sen yap.
+- **Yanlış asistan ya da yanlış dilde cevap geliyor:** Konuş dilini ve otomatik dil seçimini ⚙ Ayarlar'dan kontrol et; kısa Türkçe cümleler bazen İngilizce sanılır, uzun cümle kurmak çözer.
+- **"Hı hı" ya da "Tamam" araları yersiz geliyor:** `"konus_alindi": false`.
+- **Sesle verdiğin onay yanlış anlaşıldı:** panoda 10 saniye içinde **Geri al**'a bas.
+- **Sesle iletilen not hedef oturumda eksik ya da anlamsız:** aynı talimatı daha yavaş ve tam cümleyle tekrar et.
+
+### Ses ve okuma
+- **Okuma birden Mac'in kendi sesiyle geliyor:** buluttaki ses (Gemini) kotası dolmuş ya da anahtar geçersiz olabilir. Günlük kotası dolunca öbür modele geçilir, ikisi de dolarsa yerel ses okur. AI Studio'da faturalamayı ve anahtarı kontrol et; yedek için `"azure_yedek": true` açılabilir.
+- **Azure yedek sesi okumuyor:** ses adları değişmiş olabilir; `"azure_ses_kadin"`, `"azure_ses_erkek"` ve `"azure_model"` ayarlarını güncel adlarla doldur.
+- **Okuma panoda görünüyor ama duyulmuyor (kulaklığı takıp çıkarınca):** bir sonraki okuma yeni süreç açar; sürerse Suflor.me uygulamasını kapatıp yeniden aç.
+- **Bir ad ya da sözcük garip okunuyor:** doğru okunuşu `canli/telaffuz.json` dosyasına `{"Ad": "Okunuş"}` biçiminde yaz.
+- **Kulaklık takılı ama Suflor kendi sesini duyuyor ("araya girildi"):** Sohbet'i kapat; bas-tut (Option + Shift + Boşluk) ile konuş.
+- **Sohbet açık kaldı ve odadaki konuşma soru sayıldı:** Sohbet'i kapat; 60 saniye sessizlikte kendiliğinden kapanır.
+
+### Konuş
+- **Cevap yaklaşık 30 saniye gecikti ya da "Claude cevap vermedi" yazdı:** soruyu yeniden sor; sık oluyorsa `"konus_zaman_asimi_sn"` değerini kısalt.
+- **Konuş ve toplantı oturumu hiç cevap vermiyor:** Claude Code oturumun kapanmış olabilir. Terminal'de `claude` yazıp `/login` ile giriş yap.
+- **Mac'te bellek baskısı var (iki Claude süreci açık):** `"konus_iki_surec": false`.
+- **Her seferinde izin soruluyor:** proje klasörü Suflor klasörünün dışındaysa Claude belge okumak için izin ister; Claude Code'da o klasöre kalıcı izin ver.
+- **Giriş denetimi kullanım payını yiyor:** `"claude_giris_yokla": false`.
+
+### Proje ve arama
+- **Toplantı başında Mac yavaşlıyor (Etkinlik İzleme'de `cevir-isci` ya da `gomme-isci`):** belge çevirme ve anlam araması bellek kullanır. `"cevir": false` çevirmeyi, `"anlam_arama": false` anlam aramasını kapatır; `"cevir_tur_sn"` ve `"anlam_bos_dk"` küçültülebilir. Çevirme toplantı başlayınca bir sonraki dosyada durur.
+- **Proje hazırlığı takıldı (ilerleme durmuyor ya da eski):** sihirbazdan ya da ⚙ Ayarlar → Proje → **Projeyi yeniden hazırla** ile yeniden başlat.
+- **Proje belgeleri, veritabanı ya da sözlük eskidi ("okuyamıyor" uyarısı):** Sistem Ayarları → Gizlilik ve Güvenlik → Dosyalar ve Klasörler → Suflor Brifing → Masaüstü'nü aç; sonra Kurulumu denetle'yi çalıştır.
+
+### Kurulum ve izinler
+- **Güncelleme ya da kurulum sonrası bir izin sessizce düştü (ekran kaydı, e-posta, mikrofon):** Sistem Ayarları'nda o iznin Suflor satırını − ile kaldır, + ile yeniden ekle; sonra Kurulumu denetle'yi çalıştır.
+- **"Kurulmadı: sohbet açık" ya da Güncelle sürekli reddediliyor:** açık toplantı ya da Sohbet'i bitir; hâlâ olmuyorsa Kurulumu denetle'yi çalıştır ve gerekirse güncellemeyi toplantı dışında yap.
+- **Panoya ulaşılamıyor (aktarıcı açılmıyor):** kurulum dosyalarından biri eksik kopyalanmış olabilir; `~/Suflor.me/guncelle.command`'a çift tıklayıp yeniden kur.
+- **Panoda "Eklenti eski sürümde" yazıyor, şerit kart göstermiyor:** `chrome://extensions` → Suflor.me → yenile. Eklentiyi başka klasörden yüklediysen ayara `"eklenti_kimlik": ["<eklenti kimliği>"]` ekleyip güncellemeyi yeniden çalıştır.
+- **Karşı ses ya da Whisper hiç yüklenmedi (panoda "kapalı"):** Kurulumu denetle'yi çalıştır; aktarıcı kendiliğinden yeniden başlayınca model geç kalkabilir, bir dakika sonra yeniden bak.
 
 ## Gizlilik ayrıntıları
 - Ses ve döküm **Mac'inden çıkmaz.** Konuşma tanıma yereldir; ses diske yazılmaz.
