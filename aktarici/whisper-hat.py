@@ -212,24 +212,105 @@ def ben_adi():
     for _, k in reversed(ALTYAZI_SON):
         if sade(k).split(" ")[0] == sade(AYAR["ad"]).split(" ")[0]: return k
     return AYAR["ad"]  # hesabın kullanıcı adı (ayar.json "ad")
+# --- Whisper istemi: önem sırası (v0.162.4) -------------------------------------------------------------------------------
+# İstem en çok ~215 belirteç (işçide istem_kur kırpar, sığmayanı bütün terim olarak atar: sondakiler). Eski sıra (gündemde geçen sözlük
+# adı, kullanıcının eklediği, otomatik) bu toplantının kişilerini hiç koymuyor, asistanın hitap yazımlarını da yalnız ad olarak veriyordu;
+# toplantı başı 32–44 terim düşüyor, proje kartı adları (kişi/proje) hep sondaydı. Yeni sıra, kategori etiketleriyle:
+#   asistan (görünen ad + ad + en çok 2 hitap yazımı; uzun hitap listesi bozuk yazımları Whisper'a öğretir, belirteç de yer)
+#   kişi    (bu toplantının katılımcıları: takvim olayı, masaüstü kişiler paneli, konuşan adları, kullanıcının adı)
+#   gündem  (başlık/gündem/hazır kartlarda geçen sözlük adları + başlık/gündemdeki CamelCase/BÜYÜKHARF/rakamlı sözcükler)
+#   sık     (sözlük adları: son 3 toplantı dökümünde geçme sayısına göre)   ayar (whisper_terimler + sabitler)
+#   sözlük  (kalanı: kullanıcı eklediği önce; önce yanlış biçimi bilinenler — Whisper onları gerçekten yanlış yazdı —, sonra yanlışsızlar)
+# Tümü küçük harfli terim girmez (Whisper genel sözcüğü zaten yazar). Büyük/küçük harf ve aksan farkıyla aynı terim bir kez gelir;
+# çok sözcüklü bir terimde zaten geçen tek sözcük ayrıca yazılmaz.
+_TRSD = str.maketrans("İIıŞşĞğÜüÖöÇç", "iiissgguuoocc")
+def _sd(t): return str(t).translate(_TRSD).lower()  # hızlı sadeleştirme (anahtar ve sayım için; sozluk.py sade() sözlük eşlemesi için kalır)
+_ISTEM_ZEL = {"t": 0, "metin": ""}; ISTEM_KAT_ADLARI = ("asistan", "kişi", "gündem", "sık", "ayar", "sözlük")
+def _istem_kisi(ad):  # katılımcı satırından yalın ad: parantez/köşeli parantez, e-posta ekleri atılır; en az 2 harf
+    ad = re.sub(r"[\(\[][^)\]]*[\)\]]", " ", str(ad or "")); ad = re.sub(r"\S+@\S+", " ", ad); ad = " ".join(ad.replace("|", " ").split()).strip(" ,;-")
+    return ad if len(re.sub(r"[^A-Za-zÇĞİÖŞÜçğıöşü]", "", ad)) >= 2 and len(ad) <= 40 else ""
+def _istem_olay(ag):  # şu anki toplantının takvim olayı: başlığı gündem başlığıyla aynı olan, yoksa şimdi (−5 dk … bitiş) süren en yeni
+    simdi = datetime.datetime.now().astimezone(); ad = _sd(ag.get("title") or "").strip(); en = None
+    for e in list(TAKVIM_TAM.values()):
+        if e.get("tum_gun") or e.get("reddettin"): continue
+        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
+        except (KeyError, ValueError): continue
+        if not (b - datetime.timedelta(minutes=5) <= simdi <= s_): continue
+        if ad and _sd(e.get("baslik") or "").strip() == ad: return e
+        if en is None or b > _zaman(en["baslangic"]): en = e
+    return en
+def _istem_dokumler():  # son 3 toplantı dökümünün sonu (sadeleştirilmiş), 5 dk önbellek: sözlük adlarının son toplantılardaki sıklığı için
+    if time.time() - _ISTEM_ZEL["t"] < 300: return _ISTEM_ZEL["metin"]
+    _ISTEM_ZEL["t"] = time.time(); m = ""
+    try:
+        for f in sorted((x for x in glob.glob(os.path.join(BASE, "20*.md")) if os.path.basename(x).count(".") == 1), key=os.path.getmtime)[-3:]:
+            with open(f, "rb") as h:
+                h.seek(0, 2); n = h.tell(); h.seek(max(0, n - 150000)); m += _sd(h.read().decode("utf-8", "ignore")) + "\n"
+    except Exception: pass
+    _ISTEM_ZEL["metin"] = m; return m
+def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben=""):
+    # → [(kategori, terim)] önem sırasında (yukarıdaki kural). Saf işlev: dış durum almaz (test/istem-sira.py). ter: sözlük terimleri; ag: gündem sözlüğü;
+    # hz: hazır kartlar; ks: kişilikler [{ad, gorunen_ad, hitap}]; kisiler: bu toplantının ad listesi (öncelik sırasıyla); ayar_ek: sabit + ayar terimleri.
+    cikti, anahtar, sozcuk = [], set(), set()
+    def ekle(kat, t):
+        t = str(t or "").strip().replace(",", " "); k = _sd(t).strip()
+        if not t or k in anahtar or (" " not in k and k in sozcuk): return False
+        anahtar.add(k); cikti.append((kat, t))
+        if " " in k: sozcuk.update(k.split())
+        return True
+    for k in ks:  # asistan: görünen ad, ad, sonra ilk 2 farklı hitap (aynı kökle başlayan yazım sayılmaz)
+        for x in (k.get("gorunen_ad"), k.get("ad")): ekle("asistan", x)
+    for k in ks:
+        n = 0
+        for x in k.get("hitap") or []:
+            if n >= 2: break
+            xs = _sd(x)
+            if len(xs) < 3 or any(xs[:4] == a[:4] for a in anahtar): continue
+            n += ekle("asistan", x)
+    tam = [k for k in kisiler if k]
+    for t in tam:  # kişi: ≤ 8 kişide tam ad, kalabalıkta yalnız ilk ad (kısa biçim)
+        ek = _istem_kisi(t)
+        if ek: ekle("kişi", ek if len(tam) <= 8 else ek.split(" ")[0])
+    if ben: ekle("kişi", ben)
+    bu = _sd(" ".join([str(ag.get("title") or "")] + [str(x) for x in ag.get("items") or []] + [str(k.get("metin") or "") for k in hz if isinstance(k, dict)]))
+    adaylar = [(str(t.get("dogru") or "").strip(), t) for t in ter]
+    adaylar = [(d, t) for d, t in adaylar if d and d != d.lower()]  # tümü küçük harf: Whisper zaten yazar
+    kullanici = lambda t: t.get("kaynak") in BEN_ESKI
+    for d, t in adaylar:
+        if _sd(d) in bu: ekle("gündem", d)
+    for m in re.findall(r"[A-ZÇĞİÖŞÜ][a-zçğıöşü]+[A-ZÇĞİÖŞÜ]\w*|[A-ZÇĞİÖŞÜ]{2,}\w*|\w*\d\w*[A-Za-zÇĞİÖŞÜçğıöşü]\w*", " ".join([str(ag.get("title") or "")] + [str(x) for x in ag.get("items") or []])):
+        if len(m) >= 3 and not re.fullmatch(r"\d+[A-Za-z]{0,2}", m): ekle("gündem", m)
+    sayi = lambda d: dokum.count(_sd(d)) if dokum and len(d) >= 3 else 0
+    for _, d, _t in sorted(((sayi(d), d, t) for d, t in adaylar if sayi(d) > 0), key=lambda x: (-x[0], not kullanici(x[2]))): ekle("sık", d)
+    for d in ayar_ek: ekle("ayar", d)
+    yanlisli = lambda t: any(_sd(y) != _sd(t.get("dogru") or "") for y in t.get("yanlis") or [])  # yanlış biçimi yalnız harf/aksan farkı olan: Whisper aslında doğru yazıyor
+    for d, t in sorted(adaylar, key=lambda x: (not kullanici(x[1]), not yanlisli(x[1]))): ekle("sözlük", d)
+    return cikti
+def istem_kat_ozet(dusen, tok=None):  # günlük eki: " · 180 token · kişi 12/12 · asistan 6/6 · …" (düşenler sondan; kategoriler sırayla dolar)
+    kat = STATE["whisper"].get("istem_kat") or []; kalan = sum(n for _, n in kat) - dusen; ek = []
+    for k, n in kat:
+        g = max(0, min(n, kalan)); kalan -= g; ek.append(f"{k} {g}/{n}")
+    return (f" · {tok} token" if tok else "") + "".join(" · " + x for x in ek)
 def istem_metni():
-    # Whisper'a önceden verilen terimler (initial_prompt), önem sırasıyla: bu toplantının gündeminde/hazır kartlarında geçenler,
-    # kullanıcının eklediği sözlük adları, diğer sözlük adları, sabitler. Sınır belirteçle işçide (whisper-isci.py istem_kur):
+    # Whisper'a önceden verilen terimler (initial_prompt), önem sırasıyla (istem_siralama). Sınır belirteçle işçide (whisper-isci.py istem_kur):
     # Whisper 223 belirteci aşan istemin BAŞINI atıyordu — en önemli terimler düşüyordu (7 Ekim ölçümü: 176 + önceki ~45).
+    # Kategori sayıları STATE["whisper"]["istem_kat"] = [(kategori, toplam)] — işçi kaç terimin sığmadığını söyleyince günlükte kategori başına sığan yazılır.
     try: ter = json.load(open(os.path.join(BASE, "sozluk.json"), encoding="utf-8")).get("terimler", [])
     except Exception: ter = []
     try: hz = json.load(open(os.path.join(BASE, "hazir.json"), encoding="utf-8")).get("kartlar", [])
     except Exception: hz = []
-    ag = agenda(); bu = " ".join([str(ag.get("title") or "")] + [str(x) for x in ag.get("items") or []] + [str(k.get("metin") or "") for k in hz if isinstance(k, dict)]).lower()
-    # Tümü küçük harfli sözlük terimi ("product", "customer service") istemde yer yemesin: Whisper genel sözcüğü zaten yazar,
-    # istem özel adlar için (9 Ekim: 57 terim 182 belirteç, bütçe 155 → sondaki özel adlar düşüyordu). Sözlük düzeltmesi bundan bağımsız.
-    adlar = list(dict.fromkeys(x for k in kisilikler() for x in (kisilik_gorunen(k), k["ad"]) if x))  # v0.157.0: görünen ad da (Whisper ona seslenilen adı yazsın); v0.61.0: iki kişiliğin adı da; v0.53.0: hitap adı istemin başında (ölçüm: istemsiz 9/14, istemle 13/14)
-    for t in sorted(ter, key=lambda t: (str(t.get("dogru") or "").strip().lower() not in bu, t.get("kaynak") not in BEN_ESKI)):
-        d = str(t.get("dogru") or "").strip().replace(",", " ")
-        if d and d != d.lower() and d not in adlar: adlar.append(d)
-    for d in ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []):  # ayar: alanın sık sistem adları
-        if d not in adlar: adlar.append(d)
-    return (", ".join(adlar))[:3000] + "."
+    ag = agenda(); kisiler = []
+    try:
+        ol = _istem_olay(ag); m = STATE.get("masaustu") or {}
+        kisiler += list((ol or {}).get("katilimcilar") or [])
+        if m.get("toplantida") and time.time() - m.get("t", 0) < 120: kisiler += list(m.get("katilimcilar") or [])
+        kisiler += [kume_adi(k) for k in list(KUME_AD)] + [k for _, k in reversed(ALTYAZI_SON[-60:]) if k and k != "?"]
+    except Exception: pass
+    sira = istem_siralama(ter, ag, hz, kisilikler(), kisiler, ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []), _istem_dokumler(), ben_adi())  # sabitler: alanın sık sistem adları
+    sayac = collections.Counter(k for k, _ in sira)
+    STATE["whisper"]["istem_kat"] = [(k, sayac[k]) for k in ISTEM_KAT_ADLARI if sayac.get(k)]
+    STATE["whisper"]["istem_kisi"] = [t for k, t in sira if k == "kişi"][:40]  # işçi: istemdeki kişi adı tek başına söylenince istem yankısı sayılmasın
+    return (", ".join(t for _, t in sira))[:3000] + "."
 _ISCI = {"p": None, "satirlar": None, "kilit": threading.Lock(), "thread": None, "baslik": None, "zs": 0, "yk": 0, "sonraki": 0.0}
 # 28 Ekim (mimari plan C / K4): bir parçaya cevap gelmemesi (60 sn) işçiyi ÖLDÜRMEZ — 27 Ekim'de takasta her zaman aşımı işçiyi öldürüp yeniden yükledi,
 # yük arttı, zaman aşımları üst üste bindi. Parça bırakılır, işçi yaşar; art arda WH_ZA_N zaman aşımında ya da işçi ölünce yeniden başlatılır ve
@@ -382,6 +463,7 @@ def _isci_dongu():
         istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem, "onceki": (k.onceki if k else "")[-150:],
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
         if is_["kanal"] != "karsi": istek["hitap"] = _hitap_adlari() or ["Suflor", "Suflör", "Süflör"]  # v0.140.0: yalnız asistan adı olan parça istem yankısı sayılmaz
+        if istem: istek["kisiler"] = STATE["whisper"].get("istem_kisi") or []  # 1 Kasım: kişi adları istemde; tek başına "Ayşe." konuşma sesiyle gelirse atılmaz
         if not dil: istek.update(diller=["tr", "en"], dil_yedek=getattr(k, "dil_son", None))  # karışık: yalnız tr/en
         elif dil in ("tr", "en"):
             # dil geçişi (v0.29.2, S36): dayatılan dil boş çıkarsa işçi öbür dile bakar (olasılık ≥ %80); kanal son 60 sn'de öbür dilde satır
@@ -416,7 +498,7 @@ def _isci_dongu():
         # sığmayan terim sayısı önceki metnin uzunluğuyla her parçada oynuyor: günlüğe yarım saatte bir ya da 10'dan fazla artınca (22 Ekim: toplantıda 50 satır)
         il = w.get("istem_log") or (0, 0)
         if j.get("istem_dusen") and (j["istem_dusen"] > il[1] + 10 or time.time() - il[0] > 1800):
-            print(f"WHISPER: istem sınırı — {j['istem_dusen']} terim sığmadı (önem sırasında sondakiler)"); w["istem_log"] = (time.time(), j["istem_dusen"])
+            print(f"WHISPER: istem sınırı — {j['istem_dusen']} terim sığmadı (önem sırasında sondakiler){istem_kat_ozet(j['istem_dusen'], j.get('istem_tok'))}"); w["istem_log"] = (time.time(), j["istem_dusen"])
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         sonuc = "uydurma" if j.get("atlanan") else "bos"

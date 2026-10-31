@@ -354,7 +354,9 @@ def main():
             # ("Test toplantısı başladı") gerçek satır atılıyordu. Yalnız önceki satırlarla eşleşen metin, parçada konuşma sesi varsa kalır.
             # v0.140.0 (27 Ekim, ikinci hesap): kullanıcının tek başına söylediği asistan adı ("Sera,") istemin başında geçtiği için atılıyordu, arkasından gelen
             # talimat hitapsız kalıp kayboldu. Parçada konuşma sesi varsa yalnız addan oluşan satır kalır (aktarıcı onu sonraki satırlara hitap olarak taşır).
-            adli = bool(metin and p.get("hitap") and metin.strip(" .,:;!?…").lower() in {str(x).lower() for x in p["hitap"]} and konusma_var(a, np))
+            # 1 Kasım: bu toplantının kişi adları da istemde (aktarıcı "kisiler" verir); tek başına söylenen ad ("Ayşe.") konuşma sesiyle gelirse kalır.
+            adlar = {str(x).lower() for x in (p.get("hitap") or [])} | {w for x in (p.get("kisiler") or []) for w in (str(x).lower(), str(x).lower().split()[0] if str(x).split() else "")} - {""}
+            adli = bool(metin and adlar and metin.strip(" .,:;!?…").lower() in adlar and konusma_var(a, np))
             if istem and metin and not adli and metin.lower().strip(" .") in istem.lower():
                 terim = metin.lower().strip(" .") in (p.get("istem") or "").lower()
                 if terim or not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1
@@ -389,7 +391,7 @@ def main():
                         km["bol"] = [dict({"s": round(sg["start"], 2), "e": round(sg["end"], 2), "n": len(x.split())},
                                           **({"iz": b64(iz(a[int(sg["start"] * SR):int(sg["end"] * SR)]))} if (sg["end"] - sg["start"]) >= 0.5 else {})) for sg, x in tut]
                 except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"ses": ses} if ses else {}), **km})
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **km})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0

@@ -28,6 +28,12 @@ for g, b in [("proje oturumuna ilet: sözleşme taslağını cuma 17.00'ye kadar
              ("Proje oturumu bugün ne yaptı?", None), ("Yarın ne var?", None), ("proje oturumuna ilet", None)]:
     c = ns["talimat_coz"](g); c = (c[0], c[1]["ad"] if c[1] else None, c[2]) if c else None
     ok(f"ayrıştırma: {g!r} → {c}", c == b)
+nb = {"re": re}; exec(src[src.index("def _talimat_benzer"):src.index("def _talimat_yinelenen")], nb); sz = lambda t: {w for w in re.findall(r"\w+", t.lower()) if len(w) > 2}
+_u = " ".join(f"kelime{i}" for i in range(24)); _v = " ".join(f"kelime{i}" for i in range(13)) + " " + " ".join(f"baska{i}" for i in range(38))
+ok("benzerlik: 24 sözcüklü ile 51 sözcüklü, 13 ortak (0,54 / 0,21) → farklı", not nb["_talimat_benzer"](sz(_u), sz(_v)))
+ok("benzerlik: aynı sözcükler → benzer", nb["_talimat_benzer"](sz(_u), sz(_u)))
+ok("benzerlik: bir sözcük eksik/fazla → benzer", nb["_talimat_benzer"](sz(_u), sz(_u + " ekstra")) and nb["_talimat_benzer"](sz(_u + " ekstra"), sz(" ".join(f"kelime{i}" for i in range(22)))))
+ok("benzerlik: küçük ileti büyüğün içinde ama boyut çok farklı → farklı", not nb["_talimat_benzer"](sz("kelime1 kelime2 kelime3 kelime4"), sz(_u)))
 ns["AYAR"]["talimat"] = False; ok("ayar talimat: false kapatır", ns["talimat_coz"]("proje oturumuna ilet: deneme yapalım") is None)
 ns["AYAR"] = {}; ok("ayar yoksa yalnız proje hedefi (geliştirme yok)", ns["talimat_coz"]("geliştirme oturumuna ilet: renk değişsin") is None and ns["talimat_coz"]("proje oturumuna ilet: renk değişsin"))
 # 1a) v0.101.1: Claude'un hazırladığı ileti — [İLET <hedef>: <ileti>] etiketi silinir, yalnız kullanıcının kendi sorusunda onaya gider
@@ -128,6 +134,11 @@ try:
     ok("aynı istek asistandan da gelince ikinci kart açılmadı", len(acik()) == 1 and "TALİMAT: yinelenmedi — gelistirme" in L())
     ok("ilet ikinci kez → yinelenmedi", "yinelenmedi" in tc2("ilet", "gelistirme", "Ayarlar sayfasına yazı boyutu seçeneği ekle") and len(acik()) == 1)
     ok("başka iletiler yinelenen sayılmaz", "onay kartı panoda" in tc2("ilet", "gelistirme", "Mini panoda saat de görünsün.") and len(acik()) == 1)
+    # v0.162.4 (31 Ekim beta): kısa iletinin sözcüklerinin yarısı uzun, içeriği farklı bir iletide geçince "yinelenen" sayılıyordu (ortak/küçük); artık Jaccard + boyut koşulu
+    c = tc2("ilet", "gelistirme", "Raporlar ekranına tarih süzgeci ve dışa aktarma düğmesi eklensin, tablo sütunları sıralanabilsin, ayrıca koyu tema renkleri yumuşatılsın, yazı tipi biraz büyüsün, yüklenirken ilerleme çubuğu görünsün."); time.sleep(0.5)
+    ok("kısa iletinin sözcükleri uzun, farklı iletide geçse de yeni kart açılır", "onay kartı panoda" in c and "yinelenmedi" not in c)
+    c = tc2("ilet", "gelistirme", "Raporlar ekranına tarih süzgeci ve dışa aktarma düğmesi eklensin, tablo sütunları sıralanabilsin, ayrıca koyu tema renkleri yumuşatılsın, yazı tipi biraz büyüsün, yüklenirken ilerleme çubuğu görünsün")
+    ok("birebir tekrar yine yinelenmedi; çıktıda 'gidecek deme' uyarısı (kart bekliyor)", "yinelenmedi" in c and "gidecek' deme" in c and "onay kartı panoda bekliyor" in c)
     ok("yanlış hedef → geçerli adlar", "geçerli hedefler: proje, gelistirme" in tc2("ilet", "yok", "bir iki üç"))
     try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/ilet", data=b'{"hedef":"proje","metin":"bir iki"}'), timeout=5); izinsiz = False
     except urllib.error.HTTPError as e: izinsiz = e.code == 401

@@ -58,6 +58,7 @@ try:
     kontrol("/cards bağlam listesini veriyor", [x["kaynak"] for x in istek("/cards").get("baglam", [])] == ["kutu", "kutu", "birak"])
     y = istek("/baslat", {"konu": "Yeni — dış", "baglam": "https://yeni.example/sunum\nbu satır kaynak değil"}, PANO)
     kontrol("Başlat: tanınmayan bağlam satırı reddedildi", y.get("ok") is False and "tanınmadı" in (y.get("err") or "") and len(bg()["kaynaklar"]) == 3)
+    json.dump({"toplanti": "Eski toplantı", "kartlar": [{"id": f"h{i}", "gundem": 0, "tetik": ["x"], "tur": "not", "metin": "k"} for i in range(33)]}, open(os.path.join(canli, "hazir.json"), "w"))
     ag = os.path.join(canli, "agenda.json"); json.dump({"title": "Eski", "baslangic": "21:48", "bitis": "22:18", "items": ["madde"]}, open(ag, "w"))
     os.utime(ag, (time.time() - 86400, time.time() - 86400))  # dünden kalan gündem
     y = istek("/baslat", {"konu": "Yeni — dış", "baglam": f"https://yeni.example/sunum\n{belge}"}, PANO)
@@ -66,12 +67,18 @@ try:
     kontrol("Başlat (takvimsiz, yeni konu): eski gündem arşive, yeni konunun boş gündemi yazıldı (19 Ekim); seçimde başlangıç/bitiş var",
             a_["title"] == "Yeni — dış" and a_["items"] == [] and a_["baslangic"] == time.strftime("%H:%M") and arsiv[-1]["title"] == "Eski" and arsiv[-1]["items"] == ["madde"]
             and sec.get("baslangic") and sec.get("bitis"))
+    hz = json.load(open(os.path.join(canli, "hazir.json"), encoding="utf-8"))
+    hza = [json.loads(x) for x in open(os.path.join(canli, "hazir-arsiv.jsonl"), encoding="utf-8")]
+    kontrol("Başlat (yeni konu): önceki toplantının hazır kartları arşive, bu toplantının boş hazir.json'u yazıldı (30 Ekim)",
+            hz == {"toplanti": "Yeni — dış", "kartlar": []} and hza[-1]["toplanti"] == "Eski toplantı" and len(hza[-1]["kartlar"]) == 33)
     k = bg()["kaynaklar"]
     kontrol("Başlat: eski toplantının kaynakları arşive, yeniler eklendi", y.get("ok") and [x["kaynak"] for x in k] == ["baslat", "baslat"]
             and len(open(os.path.join(canli, "baglam-arsiv.jsonl"), encoding="utf-8").read().splitlines()) == 3)
     kontrol("kimlik sayacı arşivden sonra sürüyor (b4, b5)", [x["id"] for x in k] == ["b4", "b5"])
     json.dump({"title": "Yeni — dış", "baslangic": "21:48", "bitis": "22:18", "items": ["madde"]}, open(ag, "w")); os.utime(ag, (time.time() - 86400, time.time() - 86400))
+    json.dump({"toplanti": "Yeni — dış", "kartlar": [{"id": "h1"}]}, open(os.path.join(canli, "hazir.json"), "w"))
     istek("/baslat", {"konu": "Yeni — dış"}, PANO); a_ = json.load(open(ag))
+    kontrol("Başlat (aynı konu): bu toplantının hazır kartlarına dokunulmaz", json.load(open(os.path.join(canli, "hazir.json")))["kartlar"] == [{"id": "h1"}])
     kontrol("Başlat (aynı konu): dünkü gündemin saati şimdiye çekildi, maddeler kaldı", a_["baslangic"] == time.strftime("%H:%M") and a_["items"] == ["madde"])
     # --- v0.14.0 yerel anahtar ---
     k_ = anahtar(); TEAMS = "https://teams.microsoft.com"

@@ -1769,6 +1769,22 @@ def gundem_saat_tazele(simdi):
     tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
     os.replace(tmp, fp); print(f"BAŞLAT: gündem saati tazelendi ({a['baslangic']}–{a['bitis']}; eski bitiş geçmişte)")
+def hazir_yeni_konu(konu, simdi):
+    # 30 Ekim beta: Başlat önceki toplantının 33 hazır kartını yükledi (hazir.json toplantıya bağlı değildi, izle dosyayı olduğu gibi okur; kartların "gundem" indeksi de
+    # eski gündeme aitti). Gündem yeni konuyla yenilendiğinde hazir.json da arşive (canli/hazir-arsiv.jsonl) gider, yerine bu toplantının boş dosyası yazılır;
+    # toplantı oturumu kartları sonra yazar. Aynı konuda (yeniden Başlat) dokunulmaz. → True: sıfırlandı
+    fp = os.path.join(BASE, "hazir.json")
+    try: h = json.load(open(fp, encoding="utf-8"))
+    except (OSError, ValueError): h = None
+    if isinstance(h, dict) and " ".join(str(h.get("toplanti") or "").split()).casefold() == konu.casefold(): return False
+    try:
+        if isinstance(h, dict) and h.get("kartlar"):
+            with open(os.path.join(BASE, "hazir-arsiv.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(dict(h, arsiv_at=simdi.isoformat(timespec="seconds")), ensure_ascii=False) + "\n")
+        tmp = fp + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f: json.dump({"toplanti": konu, "kartlar": []}, f, ensure_ascii=False)
+        os.replace(tmp, fp)
+    except OSError: return False
+    print(f"BAŞLAT: hazır kartlar yenilendi ({len(h.get('kartlar') or []) if isinstance(h, dict) else 0} kart eski toplantıdan; eskisi hazir-arsiv.jsonl)"); return True
 def gundem_yeni_konu(konu, rol, dil, simdi, maddeler, bas=None, bit=None):
     # 19 Ekim test toplantısı: "test" konusuyla Başlat'a basılınca agenda.json önceki toplantının gündemiyle (15 madde) kaldı — toplantı oturumu gündem başlığı uyuşmazsa
     # kullanıcıya "mevcut mu, yeni mi" diye soruyor, o arada panoda eski gündem görünüyordu. Başlatılan konu gündem başlığından farklıysa eski gündem
@@ -1848,10 +1864,11 @@ def baslat(p):
     if not olay:  # takvimsiz başlatma: toplantı şimdi başlıyor, 30 dk varsayılır (9 Ekim denemesi: gündemde eski toplantının saati kaldı)
         sec.update(baslangic=simdi.isoformat(timespec="minutes"), bitis=(simdi + datetime.timedelta(minutes=30)).isoformat(timespec="minutes"))
         if not gundem_yeni_konu(konu, rol, dil, simdi, gundem): gundem_saat_tazele(simdi)  # aynı konu: yalnız saat tazelenir, maddeler kalır
+        else: hazir_yeni_konu(konu, simdi)
     else:
         try: ob, obt = _zaman(olay["baslangic"]).strftime("%H:%M"), _zaman(olay["bitis"]).strftime("%H:%M")
         except Exception: ob = obt = None
-        gundem_yeni_konu(konu, rol, dil, simdi, gundem, ob, obt)
+        if gundem_yeni_konu(konu, rol, dil, simdi, gundem, ob, obt): hazir_yeni_konu(konu, simdi)
     fp = os.path.join(BASE, "takvim-secilen.json"); tmp = fp + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(sec, f, ensure_ascii=False, indent=1)
     os.replace(tmp, fp)

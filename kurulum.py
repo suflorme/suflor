@@ -60,11 +60,16 @@ def gen(p): return os.path.expanduser(p.replace("~", EV, 1)) if p.startswith("~"
 
 # ---------- Mac ----------
 _MAC = {}
+BELLEK_KARARLI_GB = 16  # S173 (30 Ekim): 16 GB altı kararlı sayılmaz (uyarı, devam edilir); Intel desteklenmez (kurulum durur)
+def donanim_durum(arm, gb):  # → "intel" (durdurur) | "az_bellek" (uyarı) | "tamam"; sihirbazın Mac adımı bunu gösterir
+    return "intel" if not arm else "az_bellek" if gb < BELLEK_KARARLI_GB else "tamam"
 def mac():
     if not _MAC:
         mv = platform.mac_ver()[0] or "0"
-        _MAC.update(islemci=sh("sysctl", "-n", "machdep.cpu.brand_string") or platform.machine(), arm=platform.machine() == "arm64",
-                    macos=mv, macos_ok=int(mv.split(".")[0]) >= 14, bellek_gb=round(int(sh("sysctl", "-n", "hw.memsize") or 0) / 2 ** 30),
+        arm = platform.machine() == "arm64" or sh("sysctl", "-n", "hw.optional.arm64") == "1"  # Rosetta altında Python x86_64 görünür; donanım yine Apple Silicon
+        gb = round(int(sh("sysctl", "-n", "hw.memsize") or 0) / 2 ** 30)
+        _MAC.update(islemci=sh("sysctl", "-n", "machdep.cpu.brand_string") or platform.machine(), arm=arm,
+                    macos=mv, macos_ok=int(mv.split(".")[0]) >= 14, bellek_gb=gb, donanim=donanim_durum(arm, gb),
                     python=platform.python_version() if sys.version_info >= (3, 9) else None)
     teams = [a for a in ("Microsoft Teams.app", "Microsoft Teams (work or school).app", "Microsoft Teams classic.app") if os.path.isdir(os.path.join("/Applications", a))]
     return dict(_MAC, disk_gb=round(shutil.disk_usage(EV).free / 2 ** 30), chrome=os.path.isdir("/Applications/Google Chrome.app"), teams_uygulama=bool(teams))

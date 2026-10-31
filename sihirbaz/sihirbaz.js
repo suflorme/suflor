@@ -28,6 +28,8 @@
       m_islemci: "Apple Silicon işlemci", m_macos: "macOS 14 ya da üstü", m_bellek: "Bellek", m_disk: "Boş disk", m_python: "Python", m_chrome: "Google Chrome",
       m_python_ac: "Komut satırı araçları gerekiyor", m_python_dug: "Yükle", m_chrome_ac: "Teams toplantıları Chrome'da açılır", m_chrome_dug: "İndir",
       m_bellek_az: "16 GB önerilir; daha azında toplantıda diğer uygulamaları kapatman gerekebilir",
+      m_az: "Bu Mac'te {gb} GB bellek var. Suflor.me 16 GB altında kararlı değil: toplantıda konuşma tanıma ve yapay zekâ birlikte çalışırken Mac yavaşlayabilir, döküm geç kalabilir. Devam edebilirsin; sorun yaşarsan önce diğer uygulamaları kapat. 8 GB için daha hafif bir kurulum planlanıyor.",
+      m_intel: "Bu Mac'te Intel işlemci var. Suflor.me yalnız Apple Silicon (M1 ve sonrası) işlemcili Mac'lerde çalışır; konuşma tanıma Intel'de desteklenmiyor. Kurulum burada duruyor.",
       indiriliyor: "Modeller iniyor", indi: "Modeller hazır",
       claude_b: "Yapay zekâyı bağlayalım", claude_a: "Konuş'taki cevapları, kartları ve özetleri bir yapay zekâ yazar. Üç yoldan birini seç; sonra panodaki ⚙ Ayarlar'dan iş başına değiştirebilirsin.",
       yz_claude: "Claude Code (önerilen)", yz_claude_a: "Claude aboneliğinle. Toplantıdaki kartlar ve özet bununla çalışır.",
@@ -142,6 +144,8 @@
       m_islemci: "Apple silicon", m_macos: "macOS 14 or later", m_bellek: "Memory", m_disk: "Free disk space", m_python: "Python", m_chrome: "Google Chrome",
       m_python_ac: "Command line tools are needed", m_python_dug: "Install", m_chrome_ac: "Teams meetings open in Chrome", m_chrome_dug: "Download",
       m_bellek_az: "16 GB recommended; with less you may need to close other apps during meetings",
+      m_az: "This Mac has {gb} GB of memory. Suflor.me is not stable below 16 GB: while speech recognition and the AI run together in a meeting, the Mac may slow down and the transcript may lag. You can continue; if you run into trouble, close other apps first. A lighter setup for 8 GB is planned.",
+      m_intel: "This Mac has an Intel processor. Suflor.me only runs on Macs with Apple silicon (M1 and later); speech recognition is not supported on Intel. Setup stops here.",
       indiriliyor: "Downloading models", indi: "Models ready",
       claude_b: "Connect an AI", claude_a: "An AI writes the Talk answers, cards and summaries. Pick one of three ways; later you can change it per task in ⚙ Settings on the panel.",
       yz_claude: "Claude Code (recommended)", yz_claude_a: "With your Claude subscription. Cards and summaries during meetings use it.",
@@ -278,7 +282,7 @@
   // örnek veriler (önizleme)
   function ornek(yol) {
     const d = {
-      mac: { islemci: "Apple M3", arm: true, macos: "15.1", macos_ok: true, bellek_gb: 16, disk_gb: 84, python: "3.9.6", chrome: true, teams_uygulama: true },
+      mac: { islemci: "Apple M3", arm: true, macos: "15.1", macos_ok: true, bellek_gb: 16, donanim: "tamam", disk_gb: 84, python: "3.9.6", chrome: true, teams_uygulama: true },
       claude: { kurulu: true, surum: "2.1.4", giris: true },
       beyin: { secim: "claude-code", gemini: false, ozel: { adres: "", model: "", anahtar: false }, ollama: { durum: "yok", yuzde: 0 }, ollama_gb: 3.3, ollama_mb: 181, dene: {} },
       modeller: { durum: "iniyor", yuzde: 38 }, eklenti: { bagli: false }, kod: "~/Suflor.me",
@@ -446,7 +450,8 @@
           ${satir(m.bellek_gb >= 16 ? "iyi" : "uyari", t.m_bellek + " · " + m.bellek_gb + " GB", m.bellek_gb >= 16 ? "" : t.m_bellek_az)}
           ${satir(m.disk_gb >= 7 ? "iyi" : "kotu", t.m_disk + " · " + m.disk_gb + " GB", m.disk_gb >= 7 ? "" : "7 GB")}
           ${satir(m.python ? "iyi" : "kotu", t.m_python, m.python ? m.python : t.m_python_ac, m.python ? "" : dug("python", t.m_python_dug))}
-          ${satir(m.chrome ? "iyi" : "uyari", t.m_chrome, m.chrome ? "" : t.m_chrome_ac, m.chrome ? "" : dug("chrome-indir", t.m_chrome_dug))}</div>`; } },
+          ${satir(m.chrome ? "iyi" : "uyari", t.m_chrome, m.chrome ? "" : t.m_chrome_ac, m.chrome ? "" : dug("chrome-indir", t.m_chrome_dug))}</div>
+          ${m.donanim === "intel" ? `<div class="kart-not uyari" data-donanim="intel">${esc(t.m_intel)}</div>` : m.donanim === "az_bellek" ? `<div class="kart-not uyari" data-donanim="az-bellek">${esc(tf(t.m_az, { gb: m.bellek_gb }))}</div>` : ""}`; } },
     // Faz 11 Aşama 4: "Yapay zekâ bağla" — Claude Code (bugünkü adım) · API anahtarı (Gemini / OpenAI uyumlu) · yerel model (Ollama). Kimlik "claude" kalır
     // (kurulum.json'daki kayıtlı adım). Seçim kurulumda beyin.varsayilan'a yazılır (kurulum.py tamamla); Claude Code seçilmediyse Claude denetimi beklenmez.
     { id: "claude", simge: "claude", b: "claude_b", a: "claude_a", hazir: () => yzHazir(),

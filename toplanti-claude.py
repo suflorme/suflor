@@ -437,7 +437,11 @@ def ilet_cmd():  # v0.115.2: aktarıcı onay kartı açar, onaylanınca kendisi 
     try: r = _post("/ilet", {"hedef": A.hedef, "metin": " ".join(A.metin), "duyulan": A.duyulan})
     except Exception as e: sys.exit(f"aktarıcı yanıt vermiyor ({e.__class__.__name__})")
     if r.get("durum") == "onay": print(f"onay kartı panoda ({r['id']}): kullanıcı onaylayınca aktarıcı iletir. İletildi deme; 'Onay kartı panoda' de."); return
-    if r.get("durum") == "yinelenen": print(f"yinelenmedi: bu oturuma benzer ileti 5 dk içinde zaten var ({r['id']}, {r.get('eski')}); yeni kart açılmadı."); return
+    if r.get("durum") == "yinelenen":  # v0.162.4: 31 Ekim — asistan "yinelenmedi"den sonra "gidecek/onay kartı gelecek" dedi, kart yoktu: durumu açık yaz, söz verdirme
+        bek = r.get("eski") == "bekliyor"
+        print(f"yinelenmedi: bu oturuma benzer ileti 5 dk içinde zaten var ({r['id']}, {r.get('eski')}); yeni kart açılmadı. BU İLETİ İÇİN YENİ KART YOK: "
+              + ("öncekinin onay kartı panoda bekliyor; onu onaylamak yeter, ayrıca 'gidecek' deme." if bek else "benzer ileti zaten gitti; bu ileti ayrıca GİTMEYECEK, 'gidecek' ya da 'onay kartı gelecek' deme.")
+              + " Kullanıcı sesle 'onayı veriyorum' dese de bekleyen kart yoksa hiçbir şey onaylanmaz; ek bilgi ayrıysa içeriğini farklı yazıp yeniden dene, olmadı kullanıcıya 'iletilmedi' de."); return
     sys.exit(f"iletilmedi: {r.get('err') or '?'}" + (f" — geçerli hedefler: {', '.join(r['hedefler'])}" if r.get("hedefler") else ""))
 def _eylemler(): return [x for x in (get("/cards").get("eylem") or {}).get("liste") or [] if not x.get("yerel")]  # v0.75.0: yerel işi (oturuma talimat, yapılacak) aktarıcı uygular
 def eylem_satir(x, i=None, ayrinti=False):

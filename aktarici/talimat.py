@@ -63,6 +63,13 @@ def talimat_yakala(metin, kaynak):  # kullanıcının kendi sözü → True: tal
 # açtı. Artık toplantı oturumu da bu yolu kullanır (toplanti-claude.py ilet → /ilet → talimat_ilet) ve aynı oturuma 5 dk içinde benzer ileti (sözcüklerin
 # yarısı ortak) bekliyor/onaylandı/iletildi ise yenisi açılmaz.
 TALIMAT_YINELEME_SN = 300
+# v0.162.4 (31 Ekim 02:47–02:51 beta): ilk ileti 24, ikincisi 51 sözcük, ortak 13 → ortak/küçük = 0,54 ≥ 0,5 sayılıp içeriği farklı ek ileti "yinelenen" diye reddedildi
+# (asistan sonra "gidecek" dedi, kart hiç açılmamıştı). Artık ortak/birleşim (Jaccard, o çiftte 0,21) ≥ 0,6; ya da küçük ileti büyüğün neredeyse içindeyse (ortak/küçük ≥ 0,85) VE
+# boyutları yakınsa (küçük/büyük ≥ 0,6) — kısaltılmış tekrar. Küçük ileti uzun ilete "gömülü" olsa bile boyut çok farklıysa yeni ileti sayılır.
+def _talimat_benzer(s, o):
+    k = len(s & o)
+    if not k: return False
+    return k / len(s | o) >= 0.6 or (k / min(len(s), len(o)) >= 0.85 and min(len(s), len(o)) / max(len(s), len(o)) >= 0.6)
 def _talimat_yinelenen(h, ileti):
     s = _sozcukler(ileti); sinir = (datetime.datetime.now() - datetime.timedelta(seconds=TALIMAT_YINELEME_SN)).isoformat(timespec="seconds")
     if not s: return None
@@ -72,7 +79,7 @@ def _talimat_yinelenen(h, ileti):
             try: a = json.loads(x.get("ayrinti") or "{}")
             except ValueError: continue
             o = _sozcukler(a.get("metin"))
-            if a.get("hedef") == h["ad"] and o and len(s & o) / min(len(s), len(o)) >= 0.5: return x
+            if a.get("hedef") == h["ad"] and o and _talimat_benzer(s, o): return x
     return None
 def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False, zaman=None, ek=None):  # claude: ileti Claude'un cevabından — pano cevabı Claude'unki kalır; zaman: hatırlatmanın saati (ISO, yerel)
     top = toplanti_var()
