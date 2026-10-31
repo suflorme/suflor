@@ -43,7 +43,8 @@ bak("ton etiketi ayıklanır", m.ton_ayikla("<ton:sakin> Anladım, bakıyorum.")
 bak("bilinmeyen ton yok sayılır, etiket yine silinir", m.ton_ayikla("<ton:kizgin> Peki.") == ("Peki.", None))
 bak("Mac sesinde, panoda ve toplantıya söylerken de silinir (etiket_sil)", m.etiket_sil("<ton:yumusak> Tamam <chuckle> olur.") == "Tamam olur.")
 pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read()
-bak("pano cevap gösteriminde ton etiketi gizli (iki yer)", pano.count("hmm|ton:\\s*[a-z_]+)>") == 2)
+# v0.118.0'dan beri pano ve mini pano cevabı tek işlevden (konusGorunum) çizer; temizleme kalıbı tek yerde
+bak("pano cevap gösteriminde ton etiketi gizli (konusGorunum, pano + mini pano)", pano.count("hmm|ton:\\s*[a-z_]+)>") == 1 and "function konusGorunum(s,mini_)" in pano)
 # 2) durum tonu kuralı
 m.ton_sifirla()
 bak("kural: kötü haber", m.ton_bul("Maalesef toplantı iptal edildi.") == "kotu_haber")
@@ -78,7 +79,8 @@ gergin = m.gerginlik_hesap(olagan + [satir(0, "Ayşe", n, -14, "Bu kabul etmiyor
 bak(f"sakin döküm: {sakin['duzey']} ({sakin['puan']})", sakin["duzey"] == "sakin")
 bak(f"gergin döküm: {gergin['duzey']} ({gergin['puan']}) {gergin['sayim']}", gergin["duzey"] == "gergin" and gergin["sayim"]["kesme"] >= 1 and gergin["sayim"]["yuksek"] >= 2)
 bak("toplantı yokken blok yok", m.gerginlik_notu("BETA") == "")
-m.STATE["_cagri_son"] = time.time()
+# v0.149.0'dan beri toplantı sinyali tek kayıttan (toplanti_var); denemede süren toplantı yerine sabitlenir
+m.toplanti_var = lambda: True
 _, o = cikti(m.gerginlik_notu, "BETA"); blok = m.gerginlik_notu("BETA")
 bak("toplantıda BETA'e blok (ton seçimi Claude'da)", "[Toplantı havası" in blok and "<ton:sakin>" in blok and "<ton:normal>" in blok)
 bak("ALFA'e (gerginlik_tonu yok) blok yok", m.gerginlik_notu("ALFA") == "")
@@ -99,6 +101,7 @@ m.DUYURU["son"] = 0; m.kanal_sessizlik = lambda: 0.2; m.DUYURU_SIRA_SN = 1.0
 r, o = cikti(m.toplanti_duyuru, "not", "Üçüncü iş", bekle=1.6)
 bak("biri konuşuyorsa beklenir, sıra boşalmazsa okunmaz", "söz sırası boşalmadı" in o and "Not aldım: Üçüncü" not in o)
 m.AYAR["toplanti_duyuru"] = False; bak("ayar kapalıyken duyuru yok", m.toplanti_duyuru("not", "X") is False)
+m.toplanti_var = lambda: False
 # 8) v0.80.3: Mac'in girişi sanal aygıttaysa (BlackHole) Konuş ve sohbet başlamaz, nedenini söyler
 m.STATE["_cagri_son"] = 0; os.environ.update(SUFLOR_TEST_GIRIS_SANAL="1", SUFLOR_TEST_KULAKLIK="1")
 r1, _ = cikti(m.konus_basla); r2, _ = cikti(m.sohbet_basla)
