@@ -61,11 +61,17 @@
   function dokumPaneli() {
     const vp = document.querySelector('[data-tid="call-transcript-panel-viewport"], [data-tid="call-transcript-panel"]');
     if (vp) return vp;
-    const byTid = document.querySelector('[data-tid*="transcript" i], [data-testid*="transcript" i], [aria-label*="Transkript" i], [aria-label*="Transcript" i]');
+    const byTid = document.querySelector('[data-tid*="transcript" i], [data-testid*="transcript" i], [aria-label*="Transkript" i], [aria-label*="Transcript" i], [aria-label*="Döküm" i]');
     if (byTid && byTid.innerText && byTid.innerText.length > 20) return byTid;
     // Başlık metninden geriye doğru: "Transkript" yazan küçük düğüm → kaydırılabilir üst kapsayıcı
-    const cands = [...document.querySelectorAll("h1,h2,h3,span,div")].filter(e => e.childElementCount === 0 && /^(Transkript|Transcript)$/i.test((e.textContent || "").trim()));
+    const cands = [...document.querySelectorAll("h1,h2,h3,span,div")].filter(e => e.childElementCount === 0 && /^(Transkript|Transcript|Döküm|Dökümü|Transkripsiyon)$/i.test((e.textContent || "").trim()));
     for (const c of cands) { let p = c.parentElement, i = 0; while (p && i < 8) { if (p.scrollHeight > p.clientHeight + 40 && p.innerText.length > 40) return p; p = p.parentElement; i++; } }
+    // Yedek (v0.162.2, 31 Ekim gerçek toplantıda panel açıkken panel:false): başlık metni sağ paneli (complementary/dialog/region)
+    // aria-label'ı olmadan taşıyorsa: rol sahibi, başlığı Transkript/Döküm olan ve kayan içerikli en yakın üst düğüm
+    for (const c of document.querySelectorAll('[role="complementary"],[role="dialog"],[role="region"],[role="tabpanel"],aside')) {
+      const h = c.querySelector('h1,h2,h3,[role="heading"]');
+      if (h && /^(Transkript|Transcript|Döküm|Dökümü)$/i.test((h.textContent || "").trim()) && (c.innerText || "").length > 40) return c;
+    }
     return null;
   }
   function dokumSatirSayisi(panel) { return panel.querySelectorAll('[data-tid="transcript-message-wrapper"]').length; }

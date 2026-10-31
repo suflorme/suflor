@@ -674,18 +674,59 @@ def _ca_ozellik(nesne, secici, kapsam="glob"):
     a = Adres(d(secici), d(kapsam), 0); v = ctypes.c_uint32(0); n = ctypes.c_uint32(4)
     if ca.AudioObjectGetPropertyData(ctypes.c_uint32(nesne), ctypes.byref(a), 0, None, ctypes.byref(n), ctypes.byref(v)): return None
     return v.value
-def kulaklik():
-    # varsayılan çıkış aygıtı kulaklık mı: Bluetooth / BLE / USB → evet (çoğu kulaklık); yerleşik aygıtta veri kaynağı "hdpn" (kulaklık girişi);
-    # HDMI, AirPlay, yerleşik hoparlör → hayır. SUFLOR_TEST_KULAKLIK=1/0 deneme için.
-    if os.environ.get("SUFLOR_TEST_KULAKLIK"): return os.environ["SUFLOR_TEST_KULAKLIK"] == "1"
+def _ca_ad(nesne):  # aygıt adı (kAudioObjectPropertyName 'lnam' → CFString → UTF-8); herhangi bir hata → "?"
     try:
-        cik = _ca_ozellik(1, "dOut")
-        if not cik: return False
-        tasima = struct.pack(">I", _ca_ozellik(cik, "tran") or 0).decode("latin-1")
-        if tasima in ("blue", "bleo", "usb "): return True
-        if tasima == "bltn": return struct.pack(">I", _ca_ozellik(cik, "ssrc", "outp") or 0).decode("latin-1") == "hdpn"
+        import ctypes
+        ca = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreAudio.framework/CoreAudio"); cf = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+        class Adres(ctypes.Structure): _fields_ = [("s", ctypes.c_uint32), ("k", ctypes.c_uint32), ("e", ctypes.c_uint32)]
+        d = lambda x: struct.unpack(">I", x.encode())[0]
+        a = Adres(d("lnam"), d("glob"), 0); v = ctypes.c_void_p(0); n = ctypes.c_uint32(8)
+        if ca.AudioObjectGetPropertyData(ctypes.c_uint32(nesne), ctypes.byref(a), 0, None, ctypes.byref(n), ctypes.byref(v)) or not v.value: return "?"
+        cf.CFStringGetCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]; cf.CFRelease.argtypes = [ctypes.c_void_p]
+        tamp = ctypes.create_string_buffer(256); ok = cf.CFStringGetCString(v, tamp, 256, 0x08000100)  # kCFStringEncodingUTF8
+        cf.CFRelease(v)
+        return tamp.value.decode("utf-8", "replace") if ok else "?"
+    except Exception: return "?"
+def _cikis_bilgi():  # varsayılan çıkış aygıtı: (kimlik, ad, tür, veri kaynağı); yoksa None
+    cik = _ca_ozellik(1, "dOut")
+    if not cik: return None
+    tr = lambda x: struct.pack(">I", x or 0).decode("latin-1")
+    tasima = tr(_ca_ozellik(cik, "tran")); ssrc = tr(_ca_ozellik(cik, "ssrc", "outp")) if tasima == "bltn" else ""
+    return cik, _ca_ad(cik), tasima, ssrc
+KULAKLIK_AD_RX = re.compile(r"kulakl[ıi]k|headphone|airpods|headset|earbuds|earpods", re.I)  # veri kaynağı "hdpn" demese de adı kulaklık diyen (hoparlör/HDMI/AirPlay hariç) aygıt
+KUL_TANI = {"anahtar": None, "yok": False, "ad": None}  # son görülen çıkış (kimlik+tür+kaynak) ve toplantıda kulaklık yok mu: günlük yalnız değişimde, pano uyarısı buradan
+def _kulaklik_karar(b):
+    cik, ad, tasima, ssrc = b
+    if tasima in ("blue", "bleo", "usb "): return True
+    if tasima == "bltn" and ssrc == "hdpn": return True
+    return tasima not in ("hdmi", "airp", "dprt", "virt") and bool(KULAKLIK_AD_RX.search(ad or ""))  # yerleşik/bilinmeyen türde adı kulaklık diyen
+def _kulaklik_tani(b, kulakta):  # toplantıdayken çıkış aygıtı değişince bir satır: kulaklık algılanmadı / algılandı (kulaklik() sık çağrılır, çağrı başına yazılmaz)
+    try: top = bool(toplanti_var())
+    except Exception: top = False
+    if not top: KUL_TANI.update(yok=False); return
+    anh = (b[0], b[2], b[3], kulakta) if b else (None, None, None, kulakta)
+    if KUL_TANI["anahtar"] != anh:
+        eski = KUL_TANI["anahtar"]; KUL_TANI["anahtar"] = anh
+        if not kulakta: print(f'SES: kulaklık algılanmadı — çıkış "{b[1] if b else "yok"}" (tür {(b[2] if b else "?") or "?"}, kaynak {(b[3] if b else "") or "-"})')
+        elif eski is not None and not eski[3]: print(f'SES: kulaklık algılandı — çıkış "{b[1]}" (tür {b[2]}, kaynak {b[3] or "-"})')
+    KUL_TANI.update(yok=not kulakta, ad=(b[1] if b else None))
+def kulaklik_yok_view():  # /status kulaklik_yok: toplantı sürerken kulaklık algılanmıyorsa {"cihaz": ad} — pano kalıcı uyarı gösterir; yoksa None
+    if os.environ.get("SUFLOR_TEST_KULAKLIK"): return None
+    try:
+        if not toplanti_var(): return None
+        kulaklik()  # önbellek tazele (tanı satırı da burada)
+    except Exception: return None
+    return {"cihaz": KUL_TANI["ad"] or "?"} if KUL_TANI["yok"] else None
+def kulaklik():
+    # varsayılan çıkış aygıtı kulaklık mı: Bluetooth / BLE / USB → evet (çoğu kulaklık); yerleşik aygıtta veri kaynağı "hdpn" (kulaklık girişi) ya da adı kulaklık diyorsa evet;
+    # HDMI, AirPlay, yerleşik hoparlör → hayır. SUFLOR_TEST_KULAKLIK=1/0 deneme için. 31 Ekim: toplantıda kulaklık varken False döndü, nedeni bilinemedi → aygıt adı/türü/kaynağı günlüğe.
+    if os.environ.get("SUFLOR_TEST_KULAKLIK"): return os.environ["SUFLOR_TEST_KULAKLIK"] == "1"
+    b = None; v = False
+    try:
+        b = _cikis_bilgi(); v = bool(b) and _kulaklik_karar(b)
     except Exception as e: print(f"FISILTI: çıkış aygıtı okunamadı ({e.__class__.__name__})")
-    return False
+    _kulaklik_tani(b, v)
+    return v
 GIRIS_SANAL_UYARI = ("Mac'in mikrofonu sanal bir aygıtta (BlackHole) — Suflor seni duyamaz. Sistem Ayarları → Ses → Giriş'te kendi mikrofonunu seç.",
                      "Your Mac's input is a virtual device (BlackHole) — Suflor can't hear you. Pick your microphone in System Settings → Sound → Input.")
 def giris_sanal():  # v0.80.3: varsayılan giriş sanal aygıt mı (BlackHole, Teams Audio: bağlantı türü "virt") — 18 Ekim: macOS girişi kendiliğinden BlackHole'a almıştı

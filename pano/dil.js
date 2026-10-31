@@ -44,6 +44,8 @@ globalThis.SUFLOR_EN = {
   "Döküm dili yanlış": "Transcript language is wrong",
   "Satır gelmiyor": "No lines coming in",
   "Kulaklık önerilir": "Headphones recommended",
+  "Kulaklık algılanmadı — cevaplar yalnız yazılı": "No headphones detected — answers are text only",
+  "çıkış aygıtı": "output device",
   "masaüstü toplantıda döküm Whisper'la yazılır — Whisper kurulu değil": "in a desktop meeting the transcript comes from Whisper — Whisper is not installed",
   "ses yardımcısı kapalı — aktarici-kur ile yeniden kur": "the audio helper is off — reinstall with aktarici-kur",
   "Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me": "System Settings → Privacy & Security → Microphone → Suflor.me",

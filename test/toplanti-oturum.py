@@ -77,6 +77,9 @@ while True:
                 ("Write", {"file_path": P + "/ozet-20261031.md.yapi.json"}), ("Bash", {"command": "sleep 5"}), ("Bash", {"command": "sleep 120"}),
                 ("Bash", {"command": 'python3 -c "import time; time.sleep(3)"'}), ("Bash", {"command": "python3 -B " + TC + " maliyet"}),
                 ("Bash", {"command": "mv " + P + "/a.md.yapi.json " + P + "/b.yapi.json"})]
+        K = D + "/../kod"; OL = "python3 -B " + K + "/.claude/skills/suflor-olcum/olcum.py"  # 31 Ekim testinde kartlanan üç girdi: deneme klasörü (<kod>/testler) özet .md, .yapi.json ve ölçüm raporu
+        vaka += [("Write", {"file_path": K + "/testler/Deneme-1031-2328-teams-web-toplanti-ozeti-20261031.md"}), ("Write", {"file_path": K + "/testler/Deneme-1031-2328-teams-web-toplanti-ozeti-20261031.yapi.json"}),
+                 ("Bash", {"command": "PYTHONDONTWRITEBYTECODE=1 " + OL + " toplanti --kaydet", "description": "Toplantı oturumunun teknik ölçüm raporunu kaydetmek"})]
         r = []
         for i, (ad, gi) in enumerate(vaka): r.append(izin(ad, gi, "oto-%d" % i)["behavior"])
         yaz("Oto: " + "/".join(r)); bitti()
@@ -87,6 +90,8 @@ while True:
                 ("Bash", {"command": 'python3 -c "import time; time.sleep(3); import os"'}), ("Bash", {"command": "python3 -B " + TC + " eylem onay hepsi"}),
                 ("Bash", {"command": "python3 -B " + TC + " maliyet; rm x"}), ("Bash", {"command": "mv " + P + "/a.md " + D + "/b.md"}),
                 ("Bash", {"command": "python3 -B " + TC + " maliyet\\nrm x"}), ("Bash", {"command": "sleep 3 > " + P + "/a.md"})]
+        K = D + "/../kod"; OL = "python3 -B " + K + "/.claude/skills/suflor-olcum/olcum.py"
+        vaka += [("Bash", {"command": OL + " deneme --kaydet"}), ("Bash", {"command": "python3 -B " + D + "/olcum.py toplanti --kaydet"}), ("Write", {"file_path": K + "/testler/betik.sh"}), ("Write", {"file_path": K + "/relay.py"})]
         r = []
         for i, (ad, gi) in enumerate(vaka): r.append(izin(ad, gi, "disi-%d" % i)["behavior"])
         yaz("Disi: " + "/".join(r)); bitti()
@@ -115,7 +120,7 @@ while True:
     else: yaz("Aldım: " + q); bitti()
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "kod": os.path.join(T, "kod"),
                                                "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False, "yerel_ses": False,
                                                "toplanti_bilgi_kaynaklari": [{"sunucu": "claude.ai Deneme Metrik", "araclar": ["get_*", "list_*", "query_*", "compare_*"],
                                                                               "konu": "deneme satış ve kanal metrikleri", "ad": "Deneme Metrik"}]}, open(ay, "w"))
@@ -211,15 +216,15 @@ try:
     try: os.symlink("/etc/hosts", os.path.join(proje, "gorusmeler", "kacak.md"))
     except OSError: pass
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "rutin-ok"})
-    ok("rutin adımlar (agenda.json, hazir.json, özet .md/.yapi.json, sleep, python bekleme, maliyet, mv) kartsız izinli",
-       claude_der("Oto: " + "/".join(["allow"] * 9)) and not izin_kartlari() and not izinler())
+    ok("rutin adımlar (agenda.json, hazir.json, özet .md/.yapi.json, sleep, python bekleme, maliyet, mv, <kod>/testler özet + .yapi.json, olcum toplanti --kaydet) kartsız izinli",
+       claude_der("Oto: " + "/".join(["allow"] * 12)) and not izin_kartlari() and not izinler())
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "rutin-disi"}); kesin = 0
-    for _ in range(12):
+    for _ in range(16):
         k = izin_bekle_(8)
         if not k: break
         kesin += 1; uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"}); time.sleep(0.4)
-    ok(f"kuralın dışı (başka yol, .., sembolik bağ, .sh, sleep 121, metakarakter, eylem onay, mv dışarı, yeni satır) hepsi sorulur ({kesin}/12)",
-       kesin == 12 and claude_der("Disi: " + "/".join(["deny"] * 12)))
+    ok(f"kuralın dışı (başka yol, .., sembolik bağ, .sh, sleep 121, metakarakter, eylem onay, mv dışarı, yeni satır, başka olcum komutu/yolu, <kod>/testler'de .sh ve kod dosyası) hepsi sorulur ({kesin}/16)",
+       kesin == 16 and claude_der("Disi: " + "/".join(["deny"] * 16)))
     _lg = open(os.path.join(T, "relay.log"), encoding="utf-8", errors="replace").read()
     ok("otomatik izinler günlüğe İZİN: otomatik satırı olarak yazıldı", "İZİN: otomatik — Write agenda.json" in _lg and "İZİN: otomatik — Bash bekleme 5 sn" in _lg)
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "yazma-izni"}); k = izin_bekle_(); ok("toplanti-claude.py eylem ekle (yazma) yine sorulur", len(k) == 1)

@@ -409,6 +409,8 @@
         const sentText = sentById.get(e.id);
         if (sentText === e.text) return;
         if (sentText !== undefined) e.revised = true;
+        // altyazıda saat yok: ilk görülme anı yerel HH:MM:SS olarak yazılır (jsonl "time" boş kalıyordu; Claude okuyucusu ve defter ona bakar)
+        if (!e.time && source === "captions") { const d = new Date(prev.seen), z = n => String(n).padStart(2, "0"); e.time = z(d.getHours()) + ":" + z(d.getMinutes()) + ":" + z(d.getSeconds()); }
         e.seen = new Date(prev.seen).toISOString(); e.chg = new Date(prev.since).toISOString(); e.stableMs = need; delete e.last;
         sentById.set(e.id, e.text); fresh.push(e); trackLang(e.text, source); return;
       }
@@ -541,6 +543,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       cam: ["M4 8h3l2-2.5h6L17 8h3v11H4z", "M12 9.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7z"],
       kulak: ["M4 15v-3a8 8 0 0 1 16 0v3", "M5 14h2.5v6H6a1.5 1.5 0 0 1-1.5-1.5V15z", "M19 14h-2.5v6H18a1.5 1.5 0 0 0 1.5-1.5V15z"],
       kilit: ["M7 10.5h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z", "M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"],
+      disli: ["M12 9a3 3 0 1 1 0 6a3 3 0 1 1 0-6z", "M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M18 6l-1.6 1.6M7.6 16.4L6 18"],
       pin: ["M9 4h6l-1 5.5 3 3H7l3-3z", "M12 12.5V20"] };
     function ikon(d, ad) {
       const NS = "http://www.w3.org/2000/svg", s = d.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "i"); s.setAttribute("aria-hidden", "true");
@@ -596,7 +599,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       addEventListener("resize", konumUygula);
     }
     // kısayol satırı: panodaki kısayollar (aynı aktarıcı uçları, anahtarlı rf); Konuş basılı tutulur (aktarıcı /bas-konus: basla + ses)
-    const KISAYOL = [["konus", "mic", "Konuş"], ["ne", "replik", "Ne diyeyim?"], ["onemli", "star", "Önemli an"], ["kanit", "cam", "Kanıt"], ["sessiz", "mute", "Sessiz"], ["ceviri", "kulak", "Sesli çeviri"], ["gizli", "kilit", "Gizli toplantı"], ["sabit", "pin", ""]];
+    const KISAYOL = [["konus", "mic", "Konuş"], ["ne", "replik", "Ne diyeyim?"], ["onemli", "star", "Önemli an"], ["kanit", "cam", "Kanıt"], ["sessiz", "mute", "Sessiz"], ["ceviri", "kulak", "Sesli çeviri"], ["gizli", "kilit", "Gizli toplantı"], ["ayar", "disli", "Ayarlar"], ["sabit", "pin", ""]];
     const KS_IPUCU = { konus: "Konuş — basılı tut, bırakınca sorar", sabit: sb => sb ? "Şeridi sabitlemeyi bırak" : "Şeridi açık tut" };
     let konum = null, sabit = false, ksDurum = {};
     function satirDil() {
@@ -679,6 +682,11 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     async function ksIstek(yol, govde) { return (await rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(govde) })).json().catch(() => ({})); }
     async function ksTikla(b) {
       const k = b.dataset.ks;
+      if (k === "ayar") {  // ⚙ Ayarlar: pano yalnız-Ayarlar görünümünde (?gorunum=ayarlar) yeni sekmede; yerel anahtar ?k= ile (pano kendi deposuna alıp adresten siler)
+        try { const kk = await globalThis.SuflorAnahtar.al(), kok = (relayGecerli(cfg.relay) || RELAY_VARSAYILAN).replace(/\/$/, "") + "/";
+          window.open(kok + "?gorunum=ayarlar" + (kk && kok.startsWith(`http://127.0.0.1:${kk.port}/`) ? "&k=" + kk.anahtar : ""), "_blank", "noopener"); }
+        catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); }
+        return; }
       if (k === "sabit") { sabit = !sabit; root.querySelector(".w").classList.toggle("sabit", sabit); satirDil(); try { chrome.storage.local.set({ seritSabit: sabit }); } catch (e) {} return; }
       const tur = { ne: "ozet", onemli: "onemli", sessiz: "sessiz", ceviri: "sesli_ceviri", gizli: "gizli" }[k]; b.disabled = true;
       try {

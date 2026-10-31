@@ -450,6 +450,13 @@ def eylem_grafa():  # kuyruğun dış işleri karar grafında kullanıcının i�
 def eylem_durum_esitle(Y=None):  # okumadan önce: panodan verilen onay/ret ve sonuç grafa (yeni kayıt eklemez; aktarıcı kapalıysa sessiz geçer)
     try: (Y or _yapi()).eylem_esle(A.dir, _eylemler(), AYAR.get("ad") or BEN, ekle=False)
     except Exception: pass
+def _bil_dosya(): return os.path.join(A.dir, "eylem-bildirilen.json")
+def _bildirilen():
+    try: return set(json.load(open(_bil_dosya(), encoding="utf-8")))
+    except (OSError, ValueError): return set()
+def _bildirildi(i): json.dump(sorted(_bildirilen() | {i}), open(_bil_dosya(), "w", encoding="utf-8"))
+def _karar_bildirilmemis():  # kararı verilmiş ama toplantı oturumuna henüz bildirilmemiş iş (sesli Geri al süresi dolmuş olanlar)
+    bil = _bildirilen(); return [x for x in _eylemler() if x["durum"] in ("onaylandi", "reddedildi") and x["id"] not in bil and not x.get("geri_al_sn")]
 def eylem_cmd():
     try: _eylem_cmd()
     finally:
@@ -462,8 +469,9 @@ def _eylem_cmd():
         print("kuyruğa eklendi: " + eylem_satir(r["eylem"])); return
     if A.islem == "sun":
         n = _post("/eylem-sun", {}).get("n", 0); xs = [x for x in _eylemler() if x["durum"] == "bekliyor"]
-        print(f"{n} iş panoda onaya sunuldu. Kullanıcıya bu listeyi göster; panodan ya da sohbette ('hepsi evet', '1 ve 3 evet') onaylar:")
+        if xs: print(f"{n} iş panoda onaya sunuldu. Kullanıcıya bu listeyi göster; panodan ya da sohbette ('hepsi evet', '1 ve 3 evet') onaylar:")
         for i, x in enumerate(xs, 1): print(eylem_satir(x, i, ayrinti=True))
+        for x in _karar_bildirilmemis(): print(("UYGULA (toplantıda panodan zaten onaylandı): " if x["durum"] == "onaylandi" else "YAPMA (toplantıda reddedildi): ") + eylem_satir(x, ayrinti=x["durum"] == "onaylandi")); _bildirildi(x["id"])  # 31 Ekim: sunulmadan panodan onaylanan iş "0 iş" diye kayboldu
         print("Sonra: eylem bekle (onaylananları ayrıntısıyla verir) → yalnız onaylananı, ayrıntıdaki gibi uygula → eylem sonuc eN --durum yapildi|hata --not \"…\"")
         return
     if A.islem == "onay":  # kullanıcı sohbette onayladı; kimlikler ya da "hepsi"; sıra numarası da olur (sun'daki sıra)
@@ -1860,6 +1868,17 @@ def ozet_degerlendirme(metin):  # (eski biçim) "## Değerlendirme — not 3/5" 
     oneri = re.sub(r"^[^:]{0,60}(?:öneri|suggestion|recommendation)[^:]{0,20}:\s*", "", oneri, flags=re.I)  # "Bir dahaki toplantıya öneri: …" → "…"
     if oneri: oneri = ("İ" if oneri[0] == "i" else oneri[0].upper()) + oneri[1:]
     return m.group(1).replace(",", "."), deg, oneri
+def _toplanti_eylem_say(dosya):  # toplantıda kuyruğa eklenen dış işler (reddedilen hariç): yapı dosyası yalnız toplantı sonu çıkarımını sayar
+    if not dosya: return 0
+    son = {}
+    try:
+        for l in open(os.path.join(A.dir, "eylemler.jsonl"), encoding="utf-8"):
+            try: x = json.loads(l)
+            except ValueError: continue
+            if isinstance(x, dict) and x.get("id"): son[x["id"]] = {**son.get(x["id"], {}), **x}
+    except OSError: return 0
+    return sum(1 for x in son.values() if os.path.basename(str(x.get("file") or "")) == os.path.basename(dosya)
+               and x.get("tur") in ("takvim", "eposta", "takip", "mesaj", "diger") and not x.get("yerel") and x.get("durum") != "reddedildi")
 def ozet_hazir_cmd():
     yol = os.path.abspath(os.path.expanduser(A.yol))
     try: metin = open(yol, encoding="utf-8").read()
@@ -1873,6 +1892,8 @@ def ozet_hazir_cmd():
         except (OSError, ValueError) as e: print(f"(yapı dosyası okunamadı, özetten: {e})")
     try: st = get("/status")
     except Exception: sys.exit("aktarıcıya ulaşılamadı — özet kayıtlı, pano/bildirim yok")
+    ek = _toplanti_eylem_say(st.get("file"))
+    if ek: say["is"] = (say.get("is") or 0) + ek  # 31 Ekim: toplantıda eklenen iş özette "0 iş" görünüyordu
     try: agj = json.load(open(os.path.join(A.dir, "agenda.json"), encoding="utf-8"))
     except Exception: agj = {}
     baslik = A.baslik or ((agj.get("title") if agj.get("items") else None) or st.get("meeting") or os.path.basename(yol))
@@ -1957,7 +1978,7 @@ def bitir_cmd():
                      + " — özette \"sahipsiz\"/\"tarihsiz\" yazılı olsun; kullanıcıya sor")
     else: print(f"UYARI: yapı dosyası yok ({os.path.basename(yj)}) — karar grafı ve sözler defteri dolmadı; yazıp `bitir`i yeniden çalıştır")
     ozet_hazir_cmd()
-    try: bek = [x for x in _eylemler() if x["durum"] == "bekliyor"]
+    try: bek = [x for x in _eylemler() if x["durum"] == "bekliyor"] + _karar_bildirilmemis()
     except Exception: bek = []
     if bek: A.islem, A.deger = "sun", []; eylem_cmd()
     else: print("eylem kuyruğu boş")

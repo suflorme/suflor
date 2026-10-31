@@ -152,6 +152,14 @@ try:
     tc("eylem", "sonuc", ids[0], "--not", "karar #81 yazıldı")
     x0 = istek("/cards")["eylem"]["liste"][0]
     kontrol("sonuc: yapıldı + not panoda", x0["durum"] == "yapildi" and x0["sonuc"] == "karar #81 yazıldı")
+    # 31 Ekim: toplantıda eklenen iş sunulmadan panodan onaylandı → toplantı sonunda sun/bitir "0 iş" dedi, iş uygulanmadı
+    e5 = tc("eylem", "ekle", "mesaj", "Erken onay — ekip notu", "--ayrinti", "Ayrıntı: erken onay").stdout
+    id5 = e5.split("kuyruğa eklendi: ")[1].split()[0]
+    istek("/eylem-karar", {"id": id5, "durum": "onaylandi"})
+    s5 = tc("eylem", "sun").stdout
+    kontrol("sun: sunulmadan onaylanan iş UYGULA olarak listelenir", "UYGULA (toplantıda panodan zaten onaylandı): " + id5 in s5 and "Ayrıntı: erken onay" in s5 and "0 iş" not in s5)
+    kontrol("sun: bildirilen iş ikinci kez verilmez", id5 not in tc("eylem", "sun").stdout and id5 not in tc("eylem", "bekle", "--sn", "1").stdout)
+    tc("eylem", "sonuc", id5, "--not", "yapıldı")
     md = open(os.path.join(canli, next(f for f in os.listdir(canli) if f.endswith(".md"))), encoding="utf-8").read()
     kontrol("dökümde EYLEM satırı", "**EYLEM** | kuyruğa (Kayıt): Karar: yedek raporu haftalık" in md)
     kontrol("dökümde SESSİZ, ⏸ ve ↩ satırları", "**SESSİZ** | açıldı" in md and "**SESSİZ** | bitti (kullanıcı kapattı)" in md and "**KART ⏸ sonra**" in md and "**KART ↩ geri geldi**" in md)
@@ -171,7 +179,7 @@ finally:
             try: istek("/status"); break
             except Exception: time.sleep(0.1)
         kontrol("yeniden başlayınca sessizde bekleyen kart görünür", k3 in gorunen())
-        kontrol("yeniden başlayınca eylem kuyruğu ve kararlar duruyor", [x["durum"] for x in (istek("/cards").get("eylem") or {}).get("liste", [])] == ["yapildi", "reddedildi", "reddedildi"])
+        kontrol("yeniden başlayınca eylem kuyruğu ve kararlar duruyor", [x["durum"] for x in (istek("/cards").get("eylem") or {}).get("liste", [])] == ["yapildi", "reddedildi", "reddedildi", "yapildi"])
     except NameError: pass
     finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print(f"faz3: {len(hatalar)} sorun" if hatalar else "faz3: ✓ hepsi geçti")

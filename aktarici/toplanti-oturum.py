@@ -206,14 +206,20 @@ def _topo_tc_okuma(ad, gi):
 TOPO_TC_OTO = {"maliyet", "sonuc", "yapi", "bitir", "ozet-hazir"}  # dışarıya göndermeyen, silmeyen, ayar değiştirmeyen kayıt komutları; eylem/ilet/rapor/geri-bildirim/sozluk/hafiza/konusmaci dahil DEĞİL
 TOPO_SLEEP_RX = re.compile(r"^sleep (\d{1,3})$")
 TOPO_PYSLEEP_RX = re.compile(r"^(?:/usr/bin/)?python3 (?:-[BIu]+ )?-c (['\"])import time; ?time\.sleep\((\d{1,3})\)\1$")
+TOPO_OLCUM_RX = re.compile(r"^(?:PYTHONDONTWRITEBYTECODE=1 )?(?:/usr/bin/)?python3 (?:-B )?(\S+/\.claude/skills/suflor-olcum/olcum\.py) toplanti --kaydet$")
 TOPO_META_RX = re.compile(r"[;&|`$()<>\\\n\r]")
-def _topo_oz_klasor(): return os.path.realpath(os.path.join(os.path.expanduser(str(AYAR.get("calisma") or "")), "gorusmeler")) if AYAR.get("calisma") else None
+def _topo_oz_klasorler():  # özet klasörü <çalışma>/gorusmeler; deneme toplantısında (toplanti.md: --cikti <kod>/testler) <kod>/testler — 31 Ekim testinde özet ve .yapi.json oraya yazıldığı için kartlandı
+    k = []
+    if AYAR.get("calisma"): k.append(os.path.realpath(os.path.join(os.path.expanduser(str(AYAR["calisma"])), "gorusmeler")))
+    if AYAR.get("kod"): k.append(os.path.realpath(os.path.join(os.path.expanduser(str(AYAR["kod"])), "testler")))
+    return k
 def _topo_oz_icinde(yol, dosya=True):
-    k = _topo_oz_klasor(); yol = str(yol or "")
-    if not k or not yol or "\0" in yol: return False
+    yol = str(yol or "")
+    if not yol or "\0" in yol: return False
     g = os.path.realpath(os.path.expanduser(yol)); ad = os.path.basename(g)
-    if os.path.dirname(g) == k or g.startswith(k + os.sep):  # eski toplantının belgesi üzerine yazılmaz: yalnız yeni dosya ya da adında bugünün tarihi olan
-        return not dosya or (not ad.startswith(".") and ad.endswith((".md", ".json")) and (not os.path.exists(g) or time.strftime("%Y%m%d") in ad or time.strftime("%Y-%m-%d") in ad))
+    for k in _topo_oz_klasorler():
+        if os.path.dirname(g) == k or g.startswith(k + os.sep):  # eski toplantının belgesi üzerine yazılmaz: yalnız yeni dosya ya da adında bugünün tarihi olan
+            return not dosya or (not ad.startswith(".") and ad.endswith((".md", ".json")) and (not os.path.exists(g) or time.strftime("%Y%m%d") in ad or time.strftime("%Y-%m-%d") in ad))
     return False
 def _topo_oto(ad, gi):  # kural uyuyorsa kısa açıklama (günlük için), değilse None
     if ad in ("Write", "Edit"):
@@ -227,6 +233,8 @@ def _topo_oto(ad, gi):  # kural uyuyorsa kısa açıklama (günlük için), değ
     m = TOPO_SLEEP_RX.match(c) or TOPO_PYSLEEP_RX.match(c)
     if m: n = int(m.group(m.lastindex)); return f"Bash bekleme {n} sn" if 1 <= n <= 120 else None
     if TOPO_META_RX.search(c): return None
+    m = TOPO_OLCUM_RX.match(c)  # toplantı sonu teknik ölçüm raporu (toplanti.md adım 6): kodun kendi olcum.py'si, yalnız `toplanti --kaydet` (testler/olcum-toplanti-<tarih>.md'ye yazar)
+    if m and AYAR.get("kod") and os.path.realpath(os.path.expanduser(m.group(1))) == os.path.realpath(os.path.join(os.path.expanduser(str(AYAR["kod"])), ".claude/skills/suflor-olcum/olcum.py")): return "Bash olcum toplanti --kaydet"
     m = TOPO_TC_RX.match(c)
     if m and m.group(2) in TOPO_TC_OTO and os.path.realpath(os.path.expanduser(m.group(1))) in _topo_tc_yerler(): return f"Bash toplanti-claude {m.group(2)}"
     try: av = shlex.split(c)

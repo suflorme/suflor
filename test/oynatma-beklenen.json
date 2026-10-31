@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 301279,
-   "sha": "ac6ac914836e9b16"
+   "uzunluk": 301670,
+   "sha": "c4cde8b0cea1d636"
   },
   "/mini": {
-   "uzunluk": 301279,
-   "sha": "ac6ac914836e9b16"
+   "uzunluk": 301670,
+   "sha": "c4cde8b0cea1d636"
   },
   "/status": {
    "_ping_son": "float",
@@ -567,6 +567,7 @@
     "toplanti": "bool",
     "uclu": "NoneType"
    },
+   "kulaklik_yok": "NoneType",
    "last": "str",
    "lines": "int",
    "masaustu_mic": {
