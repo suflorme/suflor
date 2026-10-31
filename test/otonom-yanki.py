@@ -8,7 +8,7 @@ def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
 ns = {"math": math}
-for dosya, adlar in (("otonom.py", {"yanki_disi", "otonom_kesilsin", "OTONOM_YANKI_GECIKME_SN", "OTONOM_ARA_KARE", "OTONOM_KESME_SN"}), ("toplantiya-ses.py", {"ses_zarfi"})):
+for dosya, adlar in (("otonom.py", {"yanki_disi", "otonom_kesilsin", "OTONOM_YANKI_GECIKME_SN", "OTONOM_ARA_KARE", "OTONOM_ARA_YAYILIM_SN", "OTONOM_KESME_SN"}), ("toplantiya-ses.py", {"ses_zarfi"})):
     a = ast.parse(open(os.path.join(KOD, "aktarici", dosya), encoding="utf-8").read())
     sec = [n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in adlar) or (isinstance(n, ast.Assign) and any(
         (getattr(x, "id", None) in adlar) or (isinstance(x, ast.Tuple) and any(getattr(e, "id", None) in adlar for e in x.elts)) for x in n.targets))]
@@ -35,6 +35,9 @@ ts = [T0 + 2 + i * 0.02 for i in range(80)]; n, d = yd(ts, [False] * 500, T0)
 ok(f"okunan ses sessizken gelen 1,6 sn ses: gerçek ses ({n} kare), yankı değil", n >= ESIK and d is None)
 ts = sorted(t for t in set(yanki(0.45)) | {T0 + 4 + i * 0.02 for i in range(75)} if t <= T0 + 5.55); n, d = yd(ts, zarf, T0)  # döngü 0,25 sn'de bir bakar: o anki görünüm
 ok(f"biz konuşurken yankının üstüne 1,5 sn konuşma: keser (aralarımızda {n} kare)", ks(ts, zarf))
+ts = sorted(set(yanki(0.45)) | {T0 + 4.0 + 0.02 * i for i in range(25)})
+ok("31 Ekim: yankı + 0,5 sn kelimesiz ses (nefes, hareket): kesmez", not ks([t for t in ts if t <= T0 + 5.5], zarf) and not ks(ts, zarf))
+ts = sorted(set(yanki(0.45)) | {T0 + 4 + i * 0.02 for i in range(75)}); ok("yankı + 1,5 sn gerçek ses: yine keser", ks([t for t in ts if t <= T0 + 5.55], zarf))
 ok("yalnız yankı: kesmez (otonom_kesilsin)", not ks(yanki(0.45), zarf) and not ks(yanki(0.0, kayip=0.3), zarf))
 n, d = yd([T0 + 1 + i * 0.02 for i in range(30)], None, T0)
 ok("zarf yoksa (Mac sesi) eski sayım: 0,6 sn ses kesmez", n == 30 and n < ESIK)

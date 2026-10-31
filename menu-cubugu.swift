@@ -338,11 +338,14 @@ func kRenk(_ h: UInt32, _ a: CGFloat = 1) -> NSColor { NSColor(srgbRed: CGFloat(
 func kDinamik(_ acik: NSColor, _ koyu: NSColor) -> NSColor { NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? koyu : acik } }
 func TE(_ tr: String, _ en: String) -> String { ARAYUZ_EN ? en : tr }
 enum KR {  // pano/renk.css ile aynı aile; zemin krem
-    // buzlu camın üstündeki krem/koyu tülün örtücülüğü. Bulanıklığı ve kendi açık/koyu tülünü malzeme (NSVisualEffectView) zaten veriyor;
-    // tül yalnız rengi kreme çeker. Yüksek tutulursa (eski 0.72) malzemenin tülüyle üst üste binip kart düz, opak kutu gibi görünür.
-    static let ORTU: CGFloat = 0.32, BILGI_ORTU: CGFloat = 0.2
-    static let MALZEME: NSVisualEffectView.Material = .hudWindow  // en saydam, belirgin bulanık sistem malzemesi (açık/koyu görünüme uyar)
-    static func zemin(_ a: CGFloat) -> NSColor { kDinamik(kRenk(0xFBF6EC, a), kRenk(0x1B221E, a)) }
+    // Kartın saydamlığı tek sabitte: cam üstündeki krem tülün örtücülüğü (açık görünüm); koyu görünümde KOYU_KAT katı — sistem camı arkadaki
+    // görüntünün parlaklığına uyar, açık zeminde koyu kartın açık yazısı yalnız böyle okunur (31 Ekim: 0.10 koyu tül beyaz zeminde okunmuyordu). macOS 26+'da kart Bildirim Merkezi'nin
+    // camı (NSGlassEffectView .regular): arkadaki görüntü bulanık ve hafif seçilir, renk ve ışık geçer; tül yalnız yazıyı her zeminde okunur tutar.
+    // 31 Ekim ölçümü (gerçek ekran görüntüsü): NSVisualEffectView'in arka pencere malzemeleri (hudWindow, popover, menu…) macOS 27'de arkayı
+    // tamamen eritip tek renge çeviriyor — kart buzlu değil düz renkli kutu gibi görünüyordu; üstündeki 0.32 tül bunu daha da opak yapıyordu.
+    static let ORTU: CGFloat = 0.14, KOYU_KAT: CGFloat = 2.5
+    static let MALZEME: NSVisualEffectView.Material = .popover  // yalnız macOS 26 öncesi yedek (cam yok)
+    static func zemin(_ a: CGFloat = ORTU) -> NSColor { kDinamik(kRenk(0xFBF6EC, a), kRenk(0x1B221E, min(1, a * KOYU_KAT))) }
     static let cizgi = kDinamik(kRenk(0x18201C, 0.14), kRenk(0xE8EBE6, 0.16))
     static let yazi = kDinamik(kRenk(0x18201C), kRenk(0xE8EBE6)), yazi2 = kDinamik(kRenk(0x5C655F), kRenk(0xA5ADA7)), yazi3 = kDinamik(kRenk(0x7A827C), kRenk(0x8A928C))
     static let dur = kDinamik(kRenk(0xB3412E), kRenk(0xE0705C)), soyle = kDinamik(kRenk(0x1F7A4F), kRenk(0x47B07C))
@@ -446,7 +449,7 @@ final class KartGorunum: NSView {
     }
     override func draw(_ r: NSRect) {
         let yol = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 12, yRadius: 12)
-        KR.zemin(KR.ORTU).setFill(); yol.fill()
+        KR.zemin().setFill(); yol.fill()
         NSGraphicsContext.saveGraphicsState(); yol.addClip()
         KR.tur(kart).setFill(); NSRect(x: 0, y: 0, width: 3, height: bounds.height).fill()
         NSGraphicsContext.restoreGraphicsState()
@@ -511,7 +514,7 @@ final class BilgiGorunum: NSView {
     }
     override func draw(_ r: NSRect) {
         let yol = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 9, yRadius: 9)
-        KR.zemin(KR.BILGI_ORTU).setFill(); yol.fill(); KR.cizgi.setStroke(); yol.lineWidth = 1; yol.stroke()
+        KR.zemin().setFill(); yol.fill(); KR.cizgi.setStroke(); yol.lineWidth = 1; yol.stroke()
         renk.setFill(); NSBezierPath(ovalIn: NSRect(x: 10, y: 13, width: 6, height: 6)).fill()
     }
     override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
@@ -552,6 +555,28 @@ final class SeritGorunum: NSView {
     override func mouseExited(with e: NSEvent) { genis = false; needsDisplay = true }
     override func mouseUp(with e: NSEvent) { katman?.panelAc() }
 }
+// --- 4) sırada bekleyen kart: kart tavanı (dakikada bir) yüzünden bekleyen SÖYLE/NOT varsa küçük cam kapsül, kart yerinin hemen üstünde ---
+final class BekleGorunum: NSView {
+    weak var katman: KartKatmani?; var metin = "" { didSet { if metin != oldValue { needsDisplay = true } } }
+    static let BOY: CGFloat = 24
+    static let font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .medium)
+    override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+    static func en(_ m: String) -> CGFloat { ceil((m as NSString).size(withAttributes: [.font: font]).width) + 40 }
+    override func draw(_ r: NSRect) {
+        let yol = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: bounds.height / 2, yRadius: bounds.height / 2)
+        KR.zemin().setFill(); yol.fill(); KR.cizgi.setStroke(); yol.lineWidth = 1; yol.stroke()
+        if let im = NSImage(systemSymbolName: "clock", accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 11, weight: .medium)) {
+            let t = NSImage(size: im.size, flipped: false) { b in im.draw(in: b); KR.yazi.set(); b.fill(using: .sourceAtop); return true }
+            t.draw(in: NSRect(x: 11, y: (bounds.height - im.size.height) / 2, width: im.size.width, height: im.size.height), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+        let at: [NSAttributedString.Key: Any] = [.font: BekleGorunum.font, .foregroundColor: KR.yazi]
+        let ts = (metin as NSString).size(withAttributes: at)
+        (metin as NSString).draw(at: NSPoint(x: 29, y: (bounds.height - ts.height) / 2), withAttributes: at)
+    }
+    override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
+    override func mouseUp(with e: NSEvent) { katman?.panelAc() }
+}
 final class KartKatmani {
     let paylasim: NSWindow.SharingType
     let ack: (String, String, @escaping (Bool) -> Void) -> Void, eylemKarar: (String, String, @escaping (Bool) -> Void) -> Void
@@ -561,6 +586,7 @@ final class KartKatmani {
     var simdiki: (panel: KartPanel, gorunum: KartGorunum)?  // ekrandaki önemli kart
     var bilgiler: [(panel: KartPanel, gorunum: BilgiGorunum)] = []  // eskiden yeniye; yenisi en altta
     var serit: (panel: KartPanel, gorunum: SeritGorunum)?
+    var bekle: (panel: KartPanel, gorunum: BekleGorunum)?, bekleT: Double = 0, bekleN = 0, bekleSaat: Timer?
     var zaman: Timer?
     static let BILGI_EN_COK = 3, BILGI_ARA: CGFloat = 6
     init(paylasim: NSWindow.SharingType = .none, ack: @escaping (String, String, @escaping (Bool) -> Void) -> Void,
@@ -570,7 +596,7 @@ final class KartKatmani {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
             if !KartKatmani.ekrandaMi(self.yer) { self.yer = KartKatmani.varsayilanYer() }
-            self.onemliYerlestir(); self.bilgiYerlestir(); self.seritYerlestir()
+            self.onemliYerlestir(); self.bilgiYerlestir(); self.seritYerlestir(); self.bekleYerlestir()
         }
     }
     // --- yer: önemli kartın alt ortası (ekran koordinatı) ---
@@ -637,6 +663,8 @@ final class KartKatmani {
         let ids = Set(kartlar.filter { $0["sessiz"] == nil }.compactMap { $0["id"] as? String }); sonIds = ids
         if panelAcik || ilk { panelGoruldu.formUnion(ids) }
         panelGoruldu.formIntersection(ids)
+        let tv = v["tavan"] as? [String: Any]
+        bekleGuncelle(acik ? (tv?["n"] as? Int ?? 0) : 0, t: (tv?["t"] as? Double) ?? 0)
         let durumlar = KartKatmani.durumBilgileri(v), simdi = Set(durumlar.map { $0.0 })
         goruldu = goruldu.filter { !$0.hasPrefix("d:") || simdi.contains($0) }
         if !acik || ilk {
@@ -654,7 +682,7 @@ final class KartKatmani {
     func hepsiniKaldir() {
         sira = []; if let s = simdiki { s.panel.orderOut(nil); simdiki = nil }
         for b in bilgiler { b.panel.orderOut(nil) }; bilgiler = []
-        serit?.panel.orderOut(nil)
+        serit?.panel.orderOut(nil); bekleGuncelle(0, t: 0)
     }
     func yeniPanel(golge: Bool = true) -> KartPanel {
         let p = KartPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 60), styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
@@ -663,9 +691,13 @@ final class KartKatmani {
         p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = golge; p.becomesKeyOnlyIfNeeded = true; p.isReleasedWhenClosed = false
         return p
     }
-    // buzlu cam (pencerenin arkası bulanık) + üstünde ince krem/koyu tül (görünüm çizer). Panel hiç anahtar olmadığı için state .active şart:
-    // .followsWindowActiveState pasif pencerede bulanıklığı kapatıp düz zemin çizer
+    // buzlu cam (pencerenin arkası bulanık) + üstünde ince krem/koyu tül (görünüm çizer). macOS 26+: sistem camı (köşeyi kendisi yuvarlatır).
+    // Yedek: NSVisualEffectView — panel hiç anahtar olmadığı için state .active şart (.followsWindowActiveState pasif pencerede düz zemin çizer)
     func buzlu(_ p: KartPanel, _ g: NSView, kose: CGFloat) {
+        if #available(macOS 26.0, *) {
+            let c = NSGlassEffectView(frame: p.contentView!.bounds); c.style = .regular; c.cornerRadius = kose
+            g.frame = c.bounds; g.autoresizingMask = [.width, .height]; c.contentView = g; p.contentView = c; return
+        }
         let ve = NSVisualEffectView(frame: p.contentView!.bounds); ve.material = KR.MALZEME; ve.blendingMode = .behindWindow; ve.state = .active; ve.isEmphasized = false
         ve.maskImage = KartKatmani.maske(kose)
         g.frame = ve.bounds; g.autoresizingMask = [.width, .height]; ve.addSubview(g); p.contentView = ve
@@ -698,14 +730,14 @@ final class KartKatmani {
         let s = g.kur(en: genislik, enBoy: enCokBoy), r = NSRect(x: round(yer.x - s.width / 2), y: round(yer.y), width: s.width, height: s.height)
         p.setFrame(r.offsetBy(dx: 0, dy: -12), display: false); p.alphaValue = 0; p.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { c in c.duration = 0.2; c.timingFunction = CAMediaTimingFunction(name: .easeOut); p.animator().setFrame(r, display: true); p.animator().alphaValue = 1 }
-        p.invalidateShadow()
+        p.invalidateShadow(); bekleYerlestir(ust: r.maxY)
     }
     func onemliYerlestir(canli: Bool = false) {
         guard let (p, g) = simdiki else { return }
         g.sirada = sira.count
         let s = g.kur(en: genislik, enBoy: enCokBoy), r = NSRect(x: round(yer.x - s.width / 2), y: round(yer.y), width: s.width, height: s.height)
         NSAnimationContext.runAnimationGroup { c in c.duration = canli ? 0.18 : 0; p.animator().setFrame(r, display: true) }
-        p.invalidateShadow()
+        p.invalidateShadow(); bekleYerlestir(ust: r.maxY)
     }
     var sonIds = Set<String>()
     func okunduKapat(_ g: KartGorunum) {  // ✕: kart okunmuş sayılır (yan şerit rozetinden düşer), aktarıcıda açık kalır
@@ -714,7 +746,7 @@ final class KartKatmani {
     }
     func onemliKapat(_ g: KartGorunum) {
         guard let (p, gg) = simdiki, gg === g else { sira.removeAll { KartKatmani.anahtar($0) == g.anahtar }; return }
-        simdiki = nil
+        simdiki = nil; bekleYerlestir(ust: yer.y)
         NSAnimationContext.runAnimationGroup({ c in c.duration = 0.18; c.timingFunction = CAMediaTimingFunction(name: .easeIn)
             p.animator().setFrame(p.frame.offsetBy(dx: 0, dy: -8), display: true); p.animator().alphaValue = 0 }, completionHandler: { p.orderOut(nil) })
         if !sira.isEmpty {
@@ -776,10 +808,47 @@ final class KartKatmani {
         let e = KartKatmani.anaEkran()?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 875)
         p.setFrame(NSRect(x: e.maxX - SeritGorunum.EN, y: round(e.midY - SeritGorunum.BOY / 2), width: SeritGorunum.EN, height: SeritGorunum.BOY), display: true)
     }
+    // --- 4) sırada bekleyen kart: "1 kart sırada · 40 sn" — sayaç yerelde saniyede bir, süre dolunca aktarıcı kartı açar ve kapsül kalkar ---
+    func bekleMetin() -> String {
+        let k = max(1, Int((bekleT - Date().timeIntervalSince1970).rounded()))
+        return TE("\(bekleN) kart sırada · \(k) sn", "\(bekleN) card\(bekleN == 1 ? "" : "s") queued · \(k) s")
+    }
+    func bekleGuncelle(_ n: Int, t: Double) {
+        bekleN = n; bekleT = t
+        guard n > 0, t > Date().timeIntervalSince1970 else {
+            bekleSaat?.invalidate(); bekleSaat = nil
+            if let (p, _) = bekle, p.isVisible { NSAnimationContext.runAnimationGroup({ c in c.duration = 0.25; p.animator().alphaValue = 0 }, completionHandler: { p.orderOut(nil) }) }
+            return
+        }
+        if bekle == nil {
+            let p = yeniPanel(golge: false), g = BekleGorunum(frame: NSRect(x: 0, y: 0, width: 160, height: BekleGorunum.BOY)); g.katman = self
+            g.toolTip = TE("Kartlar dakikada bir gelir; bu kart sırası gelince görünecek", "Cards arrive at most once a minute; this one will show when its turn comes")
+            buzlu(p, g, kose: BekleGorunum.BOY / 2); bekle = (p, g)
+        }
+        let (p, g) = bekle!; g.metin = bekleMetin(); bekleYerlestir()
+        if !p.isVisible || p.alphaValue < 1 {
+            p.alphaValue = 0; p.orderFrontRegardless(); NSAnimationContext.runAnimationGroup { c in c.duration = 0.25; p.animator().alphaValue = 1 }
+        }
+        if bekleSaat == nil {
+            let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                if self.bekleT <= Date().timeIntervalSince1970 { self.bekleGuncelle(0, t: 0) } else if let (_, g) = self.bekle { g.metin = self.bekleMetin(); self.bekleYerlestir() }
+            }
+            RunLoop.main.add(t, forMode: .common); bekleSaat = t
+        }
+    }
+    // yer: önemli kart ekrandaysa onun hemen üstü, yoksa kartın geleceği yer (alt orta)
+    func bekleYerlestir(ust: CGFloat? = nil) {
+        guard let (p, g) = bekle else { return }
+        let w = BekleGorunum.en(g.metin), y = ust ?? (simdiki.map { $0.panel.frame.maxY } ?? yer.y)
+        let r = NSRect(x: round(yer.x - w / 2), y: round(y + 8), width: w, height: BekleGorunum.BOY)
+        if p.frame != r { p.setFrame(r, display: true) }
+    }
     // teşhis görüntüsü için: ekrandaki bütün katman pencereleri (pencere, çizen görünüm, buzlu mu, köşe)
     var paneller: [(KartPanel, NSView, Bool, CGFloat)] {
         (simdiki.map { [($0.panel, $0.gorunum as NSView, true, CGFloat(12))] } ?? []) + bilgiler.map { ($0.panel, $0.gorunum as NSView, true, CGFloat(9)) }
             + (serit.map { [($0.panel, $0.gorunum as NSView, false, CGFloat(0))] } ?? [])
+            + (bekle.map { $0.panel.isVisible ? [($0.panel, $0.gorunum as NSView, true, BekleGorunum.BOY / 2)] : [] } ?? [])
     }
 }
 
@@ -1834,7 +1903,7 @@ if let yol = arg("--simge-yaz") {
     guard let d = rep.representation(using: .png, properties: [:]) else { exit(1) }
     do { try d.write(to: URL(fileURLWithPath: yol)); exit(0) } catch { exit(1) }
 }
-// Teşhis: `--kart-dene [<dosya.png>] [--koyu|--acik] [--onay] [--uzun] [--sn <n>]` → kurgu verilerle kart katmanının üç katmanı: önemli kart (Cevap;
+// Teşhis: `--kart-dene [<dosya.png>] [--koyu|--acik] [--onay] [--uzun] [--tavan] [--sn <n>]` → kurgu verilerle kart katmanının üç katmanı: önemli kart (Cevap;
 // --onay uzun metinli onay kartı, --uzun kayan çok uzun onay kartı) + "+2 sırada", sağ altta 3 bilgi satırı, sağ kenarda 4 okunmamışlı yan şerit.
 // Süre işlemez; paylaşım .readOnly (screencapture -l <pencere no> alınabilsin), pencere numaralarını yazar; dosya verilirse birleşik görüntü (izin istemez)
 if args.contains("--kart-dene") {
@@ -1859,6 +1928,7 @@ if args.contains("--kart-dene") {
             k.bilgiGoster("90 sn'dir kesintisiz konuşuyorsun — söz vermek iyi olabilir", renk: KR.dur)
             k.bilgiGoster(TE("12 dk kaldı", "12 min left"), renk: KR.not)
             k.seritGuncelle(4)
+            if args.contains("--tavan") { k.bekleGuncelle(1, t: Date().timeIntervalSince1970 + 40) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 for (p, g, _, _) in k.paneller { print("pencere no: \(p.windowNumber) · \(type(of: g)) · \(NSStringFromRect(p.frame))") }
             }

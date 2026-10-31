@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 300070,
-   "sha": "29a55fb6def9e99e"
+   "uzunluk": 300919,
+   "sha": "18b437293753440a"
   },
   "/mini": {
-   "uzunluk": 300070,
-   "sha": "29a55fb6def9e99e"
+   "uzunluk": 300919,
+   "sha": "18b437293753440a"
   },
   "/status": {
    "_ping_son": "float",
@@ -673,6 +673,7 @@
     "uygulama": "bool"
    },
    "taslak": [],
+   "tavan": "NoneType",
    "tone": "NoneType",
    "tone_kisi": {
     "Ayla Örnek": {
@@ -856,6 +857,7 @@
     "toplam": "int",
     "toplam_dk": "int"
    },
+   "tavan": "NoneType",
    "tone": "NoneType",
    "tone_kisi": {
     "Ayla Örnek": {

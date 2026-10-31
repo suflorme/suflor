@@ -96,6 +96,9 @@ def cards_view():
                for c in cs if c.get("kind") != "duygu"]
     open_ = sorted((c for c in kartlar if c.get("status") == "acik" and not c.get("ertele") and not tutulan(c) and not tavanda(c)), key=lambda c: c.get("geri") or c.get("at") or "")
     ertelenen = sum(1 for c in kartlar if c.get("status") == "acik" and c.get("ertele"))
+    # tavanda bekleyen kartlar görünür olsun (31 Ekim: bekleme hiçbir yerde görünmüyordu, kart gelmedi sanıldı): sayı + en erken çıkış (epoch, kalan sn)
+    tv = [c["tavan_t"] for c in kartlar if c.get("status") == "acik" and not c.get("ertele") and not tutulan(c) and tavanda(c)]
+    tavan = {"n": len(tv), "t": round(min(tv), 1), "kalan_sn": max(1, round(min(tv) - time.time()))} if tv else None
     closed = sorted((c for c in kartlar if c.get("status") not in ("acik", "ozetlendi")), key=lambda c: c.get("acted_at") or "")[-5:]
     tone = next(({"ton": c["ton"], "at": c["at"]} for c in reversed(cs) if c.get("kind") == "duygu" and not c.get("kim")), None)
     tone_kisi = {}  # kişi başına son duygu etiketi (kullanıcı, 2 Ekim)
@@ -107,7 +110,7 @@ def cards_view():
     return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered and not (q.get("tur") == "girdi" and (datetime.datetime.now() - datetime.datetime.fromisoformat(q["at"])).total_seconds() > 45)][-5:],
             "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "bildirim": bi, "pano_ac": pa, "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano"), **({"hedef": ki["hedef"]} if ki.get("hedef") else {})} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
-            "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "gizli": gizli_view(), "ertelenen": ertelenen, "eylem": eylem_view(),
+            "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "gizli": gizli_view(), "ertelenen": ertelenen, "tavan": tavan, "eylem": eylem_view(),
             "baglam": baglam_view(), "yaparken": yaparken_view(), "sesli_ceviri": sesli_ceviri_view(), "anlik": anlik_view(), "soyle_web": ts_web_view(),
             "son": {k: v for k, v in (STATE.get("son_satir") or {}).items() if k != "file"} if (STATE.get("son_satir") or {}).get("file") == af and af else None}
 # şerit uzun yoklaması — GET /cards?bekle=25&imza=<son> şeridin gösterdiği durum değişene kadar (en çok 25 sn)
@@ -122,7 +125,7 @@ def serit_imza(v):
     ss = v.get("sessiz") or {}
     x = [kart_katmani_acik() if "kart_katmani_acik" in globals() else None,  # Mac kart katmanı açılıp kapanınca şerit ve panel hemen uyansın
          [(c.get("id"), c.get("status"), c.get("geri")) for c in v["cards"]], [q.get("id") for q in v["questions"]], v.get("uyari"), v.get("dil"), (sv.get("kalan_dk"), sv.get("kayma")),
-         (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"), bool(v.get("gizli")),
+         (ss.get("acik"), (ss.get("kalan_sn") or 0) // 60, len(ss.get("tutulan") or [])), v.get("ertelenen"), [(v.get("tavan") or {}).get(k) for k in ("n", "t")], bool(v.get("gizli")),
          [(x["id"], x["durum"], x.get("sunuldu")) for x in ((v.get("eylem") or {}).get("liste") or [])],
          (v.get("kanit_iste") or {}).get("id"), (v.get("bildirim") or {}).get("id"), v.get("kanit_n"), bool(v.get("yaparken")), ((v.get("sesli_ceviri") or {}).get("kis") or {}).get("id"), (v.get("komut") or {}).get("id"), (v.get("anlik") or {}).get("id"), [(v.get("soyle_web") or {}).get(k) for k in ("id", "dur")], str((v.get("son") or {}).get("at") or "")[:18]]  # son satır 10 sn adımla
     x.append((v.get("pano_ac") or {}).get("id"))

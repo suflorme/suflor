@@ -306,6 +306,7 @@
   // Whisper: kullanıcının mikrofonu → aktarıcı (/ses, kanal "ben"; aktarıcı sessizliğe göre böler, Whisper metne çevirir).
   // Teams sayfasının mikrofon izni kullanılır (ayrı izin sorulmaz). Teams'te mikrofon kapalıyken ("Sesi aç" görünüyorsa)
   // gönderilmez. Ses diske yazılmaz; yalnız 127.0.0.1'e gider. Karşı tarafın sesi ayrı: yerel ses yardımcısı ya da popup → arka plan + offscreen.
+  let ks = null;  // şeritteki Konuş (basılı tut) kaydı
   const mic = { on: false, busy: false, buf: [], n: 0, t0: 0, kapaliTil: 0, hata: "", gonderilen: 0 };
   let whisperView = null, karsiIpucu = "", callOnce = false;
   function olay(tur, metin) { rf("/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur, metin }) }).catch(() => {}); }
@@ -324,6 +325,7 @@
   window.addEventListener("message", e => {
     if (e.source !== window || !e.data || window.top !== window) return;
     if (e.data.__suflor === "micPcm" && mic.on) {
+      if (ks && e.data.pcm) { const k = new Int16Array(e.data.pcm.slice(0)); ks.buf.push(k); ks.n += k.length; }  // şeritteki Konuş basılıyken ses ona da gider
       if (teamsSessiz()) { if (mic.n) micGonder(); return; }  // Teams'te mikrofon kapalı: kullanıcının odadaki sesi yazılmaz
       const i16 = new Int16Array(e.data.pcm); if (!mic.n) mic.t0 = e.data.t;
       mic.buf.push(i16); mic.n += i16.length; if (mic.n >= 16000) micGonder();
@@ -532,7 +534,14 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     // v0.57.9: panodaki ince çizgi simgeler (renkli emoji yerine); Teams sayfası innerHTML'e izin vermeyebilir — DOM ile çizilir
     const IKON = { mute: ["M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8", "M10 20.5a2 2 0 0 0 4 0", "M4 4l16 16"],
       check: ["M5 12.5l4.5 4.5L19 7.5"], x: ["M6 6l12 12M18 6L6 18"], pause: ["M9 6v12M15 6v12"], zil: ["M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z", "M10 20.5a2 2 0 0 0 4 0"], uyari: ["M12 4l9 15.5H3z", "M12 10v4M12 17v.01"],
-      saat: ["M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z", "M12 7v5l3 2"] };
+      saat: ["M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z", "M12 7v5l3 2"],
+      mic: ["M12 2.5a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0v-6a3 3 0 0 1 3-3z", "M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"],
+      replik: ["M4 5h16v11H9l-5 4z", "M10 8.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4", "M12 13.6v.1"],
+      star: ["M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"],
+      cam: ["M4 8h3l2-2.5h6L17 8h3v11H4z", "M12 9.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7z"],
+      kulak: ["M4 15v-3a8 8 0 0 1 16 0v3", "M5 14h2.5v6H6a1.5 1.5 0 0 1-1.5-1.5V15z", "M19 14h-2.5v6H18a1.5 1.5 0 0 0 1.5-1.5V15z"],
+      kilit: ["M7 10.5h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z", "M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"],
+      pin: ["M9 4h6l-1 5.5 3 3H7l3-3z", "M12 12.5V20"] };
     function ikon(d, ad) {
       const NS = "http://www.w3.org/2000/svg", s = d.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "i"); s.setAttribute("aria-hidden", "true");
       for (const yol of IKON[ad] || []) { const p = d.createElementNS(NS, "path"); p.setAttribute("d", yol); s.append(p); }
@@ -546,8 +555,19 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .pill{display:inline-flex;align-items:center;gap:6px;background:var(--s1);color:var(--tx);border:1px solid var(--bd2);border-radius:var(--kose-tam);padding:5px 10px;min-height:28px;box-sizing:border-box;
           box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;user-select:none;font-size:var(--yz-2);font-weight:600;white-space:nowrap}
         .pill i{width:8px;height:8px;border-radius:50%;background:var(--pc,#8c8b85);flex:none}.pill:empty{display:none}
-        .list{display:none;width:320px;max-height:58vh;overflow:auto;background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose);box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px;margin-bottom:8px}
-        .w.acik .list{display:block}
+        .w{position:relative}.pill{touch-action:none}
+        .list{display:none;position:absolute;left:0;bottom:calc(100% + 8px);width:320px;max-height:58vh;overflow:auto;background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose);box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px;box-sizing:border-box;max-width:calc(100vw - 24px)}
+        .w.acik .list{display:block}.w.sag .list{left:auto;right:0}.w.alt .list{bottom:auto;top:calc(100% + 8px)}
+        .row{display:none;position:absolute;top:50%;left:calc(100% + 6px);transform:translateY(-50%);align-items:center;gap:4px;padding:2px;touch-action:none;cursor:grab;flex-direction:row}
+        .w.acik .row,.w.sabit .row{display:flex}.w.sag .row{left:auto;right:calc(100% + 6px);flex-direction:row-reverse}
+        .w.suruk,.w.suruk .pill,.w.suruk .row{cursor:grabbing}
+        .row button.rb{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--s1);color:var(--t2);border:1px solid var(--bd2);box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;flex:none}
+        .row button.rb:hover{color:var(--tx);background:var(--s2)}.row button.rb svg.i{width:15px;height:15px}
+        .row button.rb.on{color:#8a6420;background:rgba(176,131,46,.2);border-color:#b0832e}
+        .row button.rb.bas{color:#fff;background:#b0832e;border-color:#b0832e}.row button.rb.tmm{animation:tm .9s}
+        @keyframes tm{0%{background:rgba(31,122,79,.45)}100%{background:var(--s1)}}
+        .row .ay{width:1px;height:16px;background:var(--bd2);margin:0 2px;flex:none}
+        @media (prefers-color-scheme:dark){.row button.rb.on{color:#e0b868}}
         .k{position:relative;background:transparent;border:0;border-radius:var(--kose-s);padding:6px 6px 6px 12px;margin:0 0 6px;overflow:hidden;color:var(--tx);cursor:pointer;display:flex;gap:6px;align-items:flex-start}
         .k:hover{background:var(--hov)}.k .m{flex:1;min-width:0}
         .k::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:var(--kose-tam);background:var(--kc,#8c8b85)}.k.bil::before{display:none}
@@ -563,16 +583,116 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     function ensure() {
       if (host && host.isConnected) return;
       host = el("div"); host.id = "suflor-serit";
-      Object.assign(host.style, { position: "fixed", left: "12px", bottom: "12px", zIndex: 999998 });
+      Object.assign(host.style, { position: "fixed", left: "12px", top: "auto", bottom: "12px", zIndex: 999998, width: "max-content" });
       root = host.attachShadow({ mode: "open" });
       const st = el("style"); st.textContent = CSS;
-      const w = el("div", "w"); w.append(el("div", "list"), el("div", "pill"));
+      const w = el("div", "w"), satir = el("div", "row"); satir.setAttribute("role", "toolbar");
+      for (const [k, ic, ad] of KISAYOL) { const b = el("button", "rb"); b.type = "button"; b.dataset.ks = k; b.append(ikon(document, ic)); satir.append(b); if (k === "gizli") satir.append(el("span", "ay")); }
+      w.append(el("div", "list"), el("div", "pill"), satir); satirDil();
       root.append(st, w); document.body.appendChild(host);
-      root.addEventListener("click", tikla);
+      root.addEventListener("click", tikla); root.addEventListener("pointerdown", ptrAsagi); root.addEventListener("pointermove", ptrTasi);
+      root.addEventListener("pointerup", ptrYukari); root.addEventListener("pointercancel", ptrYukari);
+      try { chrome.storage.local.get({ ["seritKonum_" + P.ad]: null, seritSabit: false }, v => { konum = v["seritKonum_" + P.ad]; sabit = !!v.seritSabit; w.classList.toggle("sabit", sabit); satirDil(); konumUygula(); }); } catch (e) {}
+      addEventListener("resize", konumUygula);
+    }
+    // kısayol satırı: panodaki kısayollar (aynı aktarıcı uçları, anahtarlı rf); Konuş basılı tutulur (aktarıcı /bas-konus: basla + ses)
+    const KISAYOL = [["konus", "mic", "Konuş"], ["ne", "replik", "Ne diyeyim?"], ["onemli", "star", "Önemli an"], ["kanit", "cam", "Kanıt"], ["sessiz", "mute", "Sessiz"], ["ceviri", "kulak", "Sesli çeviri"], ["gizli", "kilit", "Gizli toplantı"], ["sabit", "pin", ""]];
+    const KS_IPUCU = { konus: "Konuş — basılı tut, bırakınca sorar", sabit: sb => sb ? "Şeridi sabitlemeyi bırak" : "Şeridi açık tut" };
+    let konum = null, sabit = false, ksDurum = {};
+    function satirDil() {
+      if (!root) return;
+      root.querySelectorAll("button[data-ks]").forEach(b => { const k = b.dataset.ks, a = KISAYOL.find(x => x[0] === k)[2];
+        const t = L(k === "sabit" ? KS_IPUCU.sabit(sabit) : KS_IPUCU[k] || a); b.title = t; b.setAttribute("aria-label", t); b.classList.toggle("on", k === "sabit" ? sabit : !!ksDurum[k]); b.setAttribute("aria-pressed", k === "sabit" ? String(sabit) : ksDurum[k] != null ? String(!!ksDurum[k]) : "false"); });
+    }
+    // konum: kaydı pil (0–1) olarak tutulur, pencere değişince ekranda kalır; varsayılan sol alt
+    function konumUygula() {
+      if (!host || !host.isConnected) return;
+      const w = host.offsetWidth || 80, h = host.offsetHeight || 28, mx = Math.max(0, innerWidth - w), my = Math.max(0, innerHeight - h);
+      let x = 12, y = innerHeight - 12 - h; if (konum && isFinite(konum.fx) && isFinite(konum.fy)) { x = konum.fx * mx; y = konum.fy * my; }
+      x = Math.min(Math.max(0, x), mx); y = Math.min(Math.max(0, y), my); host.style.left = x + "px"; host.style.top = y + "px"; host.style.bottom = "auto"; yonSec(x, y, w, h);
+    }
+    function yonSec(x, y, w, h) {
+      const satirG = 276, sag0 = x + w / 2 > innerWidth / 2, bosSag = innerWidth - (x + w), bosSol = x; let sag = sag0;
+      if (sag && bosSol < satirG && bosSag >= satirG) sag = false; else if (!sag && bosSag < satirG && bosSol >= satirG) sag = true;
+      const alt = y + h / 2 < innerHeight / 2, w0 = root.querySelector(".w"), list = root.querySelector(".list");
+      w0.classList.toggle("sag", sag); w0.classList.toggle("alt", alt);
+      const bos = alt ? innerHeight - (y + h) - 16 : y - 16; list.style.maxHeight = Math.max(120, Math.min(innerHeight * 0.58, bos)) + "px";
+    }
+    let sur = null, surSon = 0;
+    function ptrAsagi(ev) {
+      if (ev.button > 0) return;
+      const kb = ev.target.closest("button[data-ks=konus]");
+      if (kb) { try { kb.setPointerCapture(ev.pointerId); } catch (e) {} return konusAsagi(kb); }
+      if (ev.target.closest("button")) return;
+      const t = ev.target.closest(".pill, .row"); if (!t) return;
+      const r = host.getBoundingClientRect(); sur = { id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, x0: r.left, y0: r.top, w: r.width, h: r.height, tasindi: false, t };
+      try { t.setPointerCapture(ev.pointerId); } catch (e) {}
+    }
+    function ptrTasi(ev) {
+      if (!sur || ev.pointerId !== sur.id) return;
+      const dx = ev.clientX - sur.sx, dy = ev.clientY - sur.sy;
+      if (!sur.tasindi) { if (Math.hypot(dx, dy) < 4) return; sur.tasindi = true; root.querySelector(".w").classList.add("suruk"); }
+      const x = Math.min(Math.max(0, sur.x0 + dx), Math.max(0, innerWidth - sur.w)), y = Math.min(Math.max(0, sur.y0 + dy), Math.max(0, innerHeight - sur.h));
+      host.style.left = x + "px"; host.style.top = y + "px"; host.style.bottom = "auto"; yonSec(x, y, sur.w, sur.h);
+      sur.x = x; sur.y = y;
+    }
+    function ptrYukari(ev) {
+      if (ks && !sur && ev.target.closest && ev.target.closest("button[data-ks=konus]")) return konusYukari();
+      if (!sur || ev.pointerId !== sur.id) return;
+      const s = sur; sur = null; try { s.t.releasePointerCapture(ev.pointerId); } catch (e) {}
+      root.querySelector(".w").classList.remove("suruk");
+      if (!s.tasindi) return;
+      surSon = Date.now();  // sürüklemenin ardından gelen tıklama sayılmaz
+      konum = { fx: s.x / Math.max(1, innerWidth - s.w), fy: s.y / Math.max(1, innerHeight - s.h) };
+      try { chrome.storage.local.set({ ["seritKonum_" + P.ad]: konum }); } catch (e) {}
+    }
+    // Konuş (basılı tut): ≥ 0,3 sn basılınca aktarıcıya basla, bırakınca mikrofon sesi (16 kHz, mic-main.js akışı) gider
+    function konusAsagi(b) {
+      if (ks) return;
+      if (!mic.on) return toast(L("Mikrofon hazır değil — toplantıda mikrofon açıkken dene"), "#b4690e", 3500);
+      const k = ks = { buf: [], n: 0, hazir: false, doldu: false, birak: false, b }; b.classList.add("bas");
+      k.zaman = setTimeout(async () => {
+        k.doldu = true;
+        try {
+          const r = await ksIstek("/bas-konus", { komut: "basla" });
+          if (ks !== k) return;
+          if (!r.ok) { toast("⚠ " + String(r.err || L("Konuş başlamadı")).slice(0, 160), "#b4690e", 5000); konusIptal(); return; }
+          k.hazir = true; if (k.birak) gonderKonus(k);
+        } catch (e) { if (ks === k) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); konusIptal(); } }
+      }, 300);
+      k.sinir = setTimeout(() => { if (ks === k) { k.birak = true; if (k.hazir) gonderKonus(k); } }, 60000);
+    }
+    function konusIptal() { const k = ks; if (!k) return; clearTimeout(k.zaman); clearTimeout(k.sinir); k.b.classList.remove("bas"); ks = null; }
+    function konusYukari() {
+      const k = ks; if (!k) return;
+      if (k.hazir) return gonderKonus(k);
+      if (k.doldu) { k.birak = true; return; }  // basla yanıtı bekleniyor
+      toast(L("Konuş: basılı tut, bırakınca sorar"), "#646c66", 2500); konusIptal();  // kısa dokunuş
+    }
+    async function gonderKonus(k) {
+      ks = null; clearTimeout(k.zaman); clearTimeout(k.sinir); k.b.classList.remove("bas");
+      if (k.n < 3200) return toast(L("Ses alınamadı — biraz daha uzun konuş"), "#b4690e", 3000);  // < 0,2 sn
+      const a = new Int16Array(k.n); let o = 0; k.buf.forEach(p => { a.set(p, o); o += p.length; });
+      try { const r = await (await rf("/bas-konus", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pcm: b64(a) }) })).json();
+        if (r && r.ok === false) toast("⚠ " + String(r.err || "").slice(0, 160), "#b4690e", 5000); } catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); }
+    }
+    async function ksIstek(yol, govde) { return (await rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(govde) })).json().catch(() => ({})); }
+    async function ksTikla(b) {
+      const k = b.dataset.ks;
+      if (k === "sabit") { sabit = !sabit; root.querySelector(".w").classList.toggle("sabit", sabit); satirDil(); try { chrome.storage.local.set({ seritSabit: sabit }); } catch (e) {} return; }
+      const tur = { ne: "ozet", onemli: "onemli", sessiz: "sessiz", ceviri: "sesli_ceviri", gizli: "gizli" }[k]; b.disabled = true;
+      try {
+        if (k === "kanit") await rf("/kanit-iste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ not: "", kaynak: "serit" }) });
+        else await rf("/komut", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur }) });
+        b.classList.remove("tmm"); void b.offsetWidth; b.classList.add("tmm"); pollCards();
+      } catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); }
+      setTimeout(() => { b.disabled = false; }, 600);
     }
     // hap: kartların listesini hapın üstünde aç/kapat
-    function hapTik() { acik = !acik; root.querySelector(".w").classList.toggle("acik", acik); }
+    function hapTik() { acik = !acik; root.querySelector(".w").classList.toggle("acik", acik); konumUygula(); }  // açık: kısayol düğmeleri yana, kart listesi alta/üste
     function tikla(ev) {
+      const kb = ev.target.closest("button[data-ks]"); if (kb) { if (kb.dataset.ks !== "konus") ksTikla(kb); return; }
+      if (Date.now() - surSon < 350) return;  // sürükleme bırakılırken tıklama sayılmaz
       if (ev.target.closest(".pill")) return hapTik();
       const b = ev.target.closest("button[data-ack]"), k = ev.target.closest(".k[data-id]");
       if (!b && (!k || k.dataset.onay)) return;  // onay kartına dokunmak onay değil (#76)
@@ -691,8 +811,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       dilHedef = (v.dil && v.dil.hedef) || null;
       if (dil && dil !== dilUyari) toast(L("Döküm dili yanlış — panoya bak")); dilUyari = dil;
       if (!document.body || (!cards.length && !qs.length && !warn && !dil && !live)) { if (host) host.style.display = "none"; return; }
-      ensure(); host.style.display = "block";
-      const ss = v.sessiz;  // sessiz: hapta 🔇; ertelenip geri gelen kart yeni sayılır (hap yeniden parlar)
+      ensure(); host.style.display = "block"; konumUygula();
+      const ss = v.sessiz;
+      ksDurum = { sessiz: !!(ss && ss.acik), ceviri: !!v.sesli_ceviri, gizli: !!v.gizli }; satirDil();  // sessiz: hapta 🔇; ertelenip geri gelen kart yeni sayılır (hap yeniden parlar)
       const s = JSON.stringify([cards.map(c => c.id + (c.geri || "")), qs.map(q => q.id), warn, dil, v.sure && [v.sure.kalan_dk, v.sure.kayma], live, DIL, katman,
         ss && [ss.acik, Math.ceil(ss.kalan_sn / 60), (ss.tutulan || []).length], v.ertelenen]); if (s === sig) return; sig = s;
       const top = PRI.find(k => cards.some(c => c.kind === k)) || "cevap";
@@ -701,7 +822,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const pc = (warn || dil) ? COL.dur : cards.length ? COL[top] : (live ? "#1f7a4f" : "#646c66");
       pill.style.setProperty("--pc", pc); pill.replaceChildren(el("i")); if (cards.length) pill.append(el("span", null, String(cards.length)));
       if (ss && ss.acik) pill.append(ikon(document, "mute"));
-      pill.title = ss && ss.acik ? L("Suflor.me — sessiz; kartlar bekliyor") : L("Suflor.me — kartlar için tıkla");
+      pill.title = ss && ss.acik ? L("Suflor.me — sessiz; kartlar bekliyor") : L("Suflor.me — kısayollar ve kartlar için tıkla; sürükleyerek taşı");
       const fresh = cards.some(c => !seen.has(c.id + (c.geri || ""))); cards.forEach(c => seen.add(c.id + (c.geri || "")));
       if (fresh && !first) { pill.classList.remove("yeni"); void pill.offsetWidth; pill.classList.add("yeni"); }
       first = false;

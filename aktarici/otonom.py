@@ -13,12 +13,18 @@ OTONOM_ITIRAZ_SN, OTONOM_SESSIZ_SN, OTONOM_BEKLE_SN, OTONOM_KESME_SN, OTONOM_GOR
 # 19 Ekim test toplantısı: okumaların hepsi 2–3 sn'de "biri konuştu" diye kesildi — kesen, karşı taraftan (aynı odadaki ikinci cihaz) geri gelen kendi sesimizdi.
 # Kesme eşiği 0,3 → 1,0 sn ve kanaldaki ses, okunan sesin (TS["zarf"], 20 ms kareler) 0–OTONOM_YANKI_GECIKME_SN gecikmeli kopyasıyla açıklanıyorsa
 # yankı sayılır; yalnız açıklanamayan ses (biz susarken konuşan) eşiği doldurursa okuma kesilir. Zarf yoksa (Mac sesi) eski sayım.
-OTONOM_YANKI_GECIKME_SN, OTONOM_ARA_KARE = 1.5, 12  # ara kare: okunan sesin sessiz aralarına düşen ses (yankı oraya düşmez; üstümüze konuşan düşürür) ≥ 0,24 sn
+OTONOM_YANKI_GECIKME_SN, OTONOM_ARA_KARE, OTONOM_ARA_YAYILIM_SN = 1.5, 12, 0.9  # ara kare: okunan sesin sessiz aralarına düşen ses (yankı oraya düşmez; üstümüze konuşan düşürür) ≥ 0,24 sn ve ≥ 0,9 sn'ye yayılmış
+# 31 Ekim test toplantısı: ara kare eşiği, yankının yanına düşen tek kısa kelimesiz sesle (nefes, hareket; 0,5 sn) okumayı kesti; konuşma yoktu (ilk söz 6 sn sonra).
+# Üstümüze gerçek konuşma birkaç aralığa yayılır; tek patlama yayılmaz: açıklanamayan karelerin ilk-son aralığı OTONOM_ARA_YAYILIM_SN olmalı.
 def otonom_kesilsin(ts, zarf, t_bas, esik):  # → (kesilsin mi, son 3 sn'de açıklanamayan kare, gecikme ya da None)
     n, d = yanki_disi(ts, zarf, t_bas)
     if n >= esik: return True, n, d  # biz susarken ≥ esik ses, ya da yankı değil
     son = sum(1 for t in ts if t >= ts[-1] - 3.0) if ts else 0
-    return (d is not None and n >= OTONOM_ARA_KARE and son >= esik), n, d  # üstümüze konuşma: son 3 sn'de ≥ esik ses ve bir kısmı aralarımızda
+    if not (d is not None and n >= OTONOM_ARA_KARE and son >= esik): return False, n, d  # üstümüze konuşma: son 3 sn'de ≥ esik ses ve bir kısmı aralarımızda
+    def dolu(t):
+        i = int((t - t_bas) / 0.02); return any(0 <= j < len(zarf) and zarf[j] for j in (i - 1, i, i + 1))
+    acik = [t for t in ts if t >= ts[-1] - 3.0 and not dolu(t - d)]
+    return bool(acik) and acik[-1] - acik[0] >= OTONOM_ARA_YAYILIM_SN, n, d  # tek kısa patlama (nefes, hareket) üstümüze konuşma sayılmaz
 OT = {"id": None}; OT_K = threading.Lock(); LAT = {}  # LAT: son hitap satırının konuşma bitişi ve geliş zamanı (relay ingest); gecikme satırı için
 OT_SON = ("iptal", "okundu", "kesildi", "soylenmedi", "okunamadi")
 def otonom_acik(): return asistan_toplanti() and toplanti_var()  # S94: tek anahtar (moderatör de toplantiya_ses ister)
@@ -282,7 +288,7 @@ def _ot_dongu(i):
                 kes, n, d = otonom_kesilsin(ts, zk, zb if zb is not None else t0, esik)
                 if kes:
                     ts_durdur(); _ot_gec(i, "kesildi", neden=_t("biri konuşmaya başladı", "someone started talking"))
-                    print(f"OTONOM: biri konuştu ({ad}, {n * 0.02:.1f} sn yankıyla açıklanmayan ses) — okuma durdu, yeniden başlamayacak"); return
+                    print(f"OTONOM: biri konuştu ({ad} kanalı, enerji ölçümü: {n * 0.02:.1f} sn yankıyla açıklanmayan ses, eşik {esik * 0.02:.1f} sn" + ("" if d is None else f", ara eşiği {OTONOM_ARA_KARE * 0.02:.2f} sn + {OTONOM_ARA_YAYILIM_SN:.1f} sn yayılım, yankı gecikmesi {d:.2f} sn") + f"; okumanın {time.time() - t0:.1f}. sn'si; kelime ölçümü yok) — okuma durdu, yeniden başlamayacak"); return
                 if d is not None and len(ts) >= esik and not yanki_yazildi:
                     yanki_yazildi = True; print(f"OTONOM: {ad} kanalında kendi sesimizin yankısı (~{d:.2f} sn gecikme) — okuma sürüyor")
         time.sleep(0.05)
