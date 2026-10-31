@@ -683,6 +683,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     async function ksTikla(b) {
       const k = b.dataset.ks;
       if (k === "ayar") {  // ⚙ Ayarlar: pano yalnız-Ayarlar görünümünde (?gorunum=ayarlar) yeni sekmede; yerel anahtar ?k= ile (pano kendi deposuna alıp adresten siler)
+        try { // önce menü uygulamasının Ayarlar penceresi (/pano-ac gorunum: ayarlar); pencere: false ya da hata → yeni sekme
+          const pr = await ksIstek("/pano-ac", { gorunum: "ayarlar" }); if (pr && pr.pencere) return;
+        } catch (e) {}
         try { const kk = await globalThis.SuflorAnahtar.al(), kok = (relayGecerli(cfg.relay) || RELAY_VARSAYILAN).replace(/\/$/, "") + "/";
           window.open(kok + "?gorunum=ayarlar" + (kk && kok.startsWith(`http://127.0.0.1:${kk.port}/`) ? "&k=" + kk.anahtar : ""), "_blank", "noopener"); }
         catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); }

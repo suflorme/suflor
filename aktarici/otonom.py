@@ -14,6 +14,9 @@ OTONOM_ITIRAZ_SN, OTONOM_SESSIZ_SN, OTONOM_BEKLE_SN, OTONOM_KESME_SN, OTONOM_GOR
 # Kesme eşiği 0,3 → 1,0 sn ve kanaldaki ses, okunan sesin (TS["zarf"], 20 ms kareler) 0–OTONOM_YANKI_GECIKME_SN gecikmeli kopyasıyla açıklanıyorsa
 # yankı sayılır; yalnız açıklanamayan ses (biz susarken konuşan) eşiği doldurursa okuma kesilir. Zarf yoksa (Mac sesi) eski sayım.
 OTONOM_YANKI_GECIKME_SN, OTONOM_ARA_KARE, OTONOM_ARA_YAYILIM_SN = 1.5, 12, 0.9  # ara kare: okunan sesin sessiz aralarına düşen ses (yankı oraya düşmez; üstümüze konuşan düşürür) ≥ 0,24 sn ve ≥ 0,9 sn'ye yayılmış
+# 1 Kasım test toplantısı: okurken söylenen "hı hı" (iki kısa hece, ~1 sn'ye yayılmış, 0,3 sn açıklanamayan) 0,9 sn yayılımı geçip okumayı kesti.
+# Gerçek konuşma aralarımızın çoğuna düşer, "hı hı" en çok iki kümeye: açıklanamayan kareler ≥ OTONOM_ARA_KUME ayrı kümede olmalı (0,1 sn'den uzun boşluk ayırır).
+OTONOM_ARA_KUME = 3
 # 31 Ekim test toplantısı: ara kare eşiği, yankının yanına düşen tek kısa kelimesiz sesle (nefes, hareket; 0,5 sn) okumayı kesti; konuşma yoktu (ilk söz 6 sn sonra).
 # Üstümüze gerçek konuşma birkaç aralığa yayılır; tek patlama yayılmaz: açıklanamayan karelerin ilk-son aralığı OTONOM_ARA_YAYILIM_SN olmalı.
 def otonom_kesilsin(ts, zarf, t_bas, esik):  # → (kesilsin mi, son 3 sn'de açıklanamayan kare, gecikme ya da None)
@@ -24,7 +27,8 @@ def otonom_kesilsin(ts, zarf, t_bas, esik):  # → (kesilsin mi, son 3 sn'de aç
     def dolu(t):
         i = int((t - t_bas) / 0.02); return any(0 <= j < len(zarf) and zarf[j] for j in (i - 1, i, i + 1))
     acik = [t for t in ts if t >= ts[-1] - 3.0 and not dolu(t - d)]
-    return bool(acik) and acik[-1] - acik[0] >= OTONOM_ARA_YAYILIM_SN, n, d  # tek kısa patlama (nefes, hareket) üstümüze konuşma sayılmaz
+    kume = 1 + sum(1 for a, b in zip(acik, acik[1:]) if b - a > 0.1)
+    return bool(acik) and acik[-1] - acik[0] >= OTONOM_ARA_YAYILIM_SN and kume >= OTONOM_ARA_KUME, n, d  # tek kısa patlama (nefes, hareket) ya da "hı hı" üstümüze konuşma sayılmaz
 OT = {"id": None}; OT_K = threading.Lock(); LAT = {}  # LAT: son hitap satırının konuşma bitişi ve geliş zamanı (relay ingest); gecikme satırı için
 OT_SON = ("iptal", "okundu", "kesildi", "soylenmedi", "okunamadi")
 def otonom_acik(): return asistan_toplanti() and toplanti_var()  # S94: tek anahtar (moderatör de toplantiya_ses ister)

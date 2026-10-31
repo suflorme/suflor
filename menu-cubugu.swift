@@ -221,7 +221,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func isle(_ v: [String: Any]) {
         imza = v["imza"] as? String ?? ""; sonDurum = v
         masaustuKanit?.iste(v["kanit_iste"] as? [String: Any])  // masaüstü toplantıdayken kanıtı toplantı penceresinden al
-        if let id = (v["pano_ac"] as? [String: Any])?["id"] as? String, id != sonPanoAc { sonPanoAc = id; panoPencere() }  // /pano-ac (kurulum, eklenti)
+        if let pa = v["pano_ac"] as? [String: Any], let id = pa["id"] as? String, id != sonPanoAc { sonPanoAc = id; if pa["gorunum"] as? String == "ayarlar" { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.ayarPenceresi("") } else { panoPencere() } }  // /pano-ac (kurulum, eklenti)
         if let b = v["bildirim"] as? [String: Any], let id = b["id"] as? String, id != sonBildirim {
             let ilk = sonBildirim.isEmpty; sonBildirim = id
             if !ilk || ((b["t"] as? Double).map { Date().timeIntervalSince1970 - $0 < 30 } ?? false) { bildir(b) }  // açılışta eski bildirim yinelenmesin

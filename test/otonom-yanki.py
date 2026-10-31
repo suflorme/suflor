@@ -8,7 +8,7 @@ def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
 ns = {"math": math}
-for dosya, adlar in (("otonom.py", {"yanki_disi", "otonom_kesilsin", "OTONOM_YANKI_GECIKME_SN", "OTONOM_ARA_KARE", "OTONOM_ARA_YAYILIM_SN", "OTONOM_KESME_SN"}), ("toplantiya-ses.py", {"ses_zarfi"})):
+for dosya, adlar in (("otonom.py", {"yanki_disi", "otonom_kesilsin", "OTONOM_YANKI_GECIKME_SN", "OTONOM_ARA_KARE", "OTONOM_ARA_YAYILIM_SN", "OTONOM_ARA_KUME", "OTONOM_KESME_SN"}), ("toplantiya-ses.py", {"ses_zarfi"})):
     a = ast.parse(open(os.path.join(KOD, "aktarici", dosya), encoding="utf-8").read())
     sec = [n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in adlar) or (isinstance(n, ast.Assign) and any(
         (getattr(x, "id", None) in adlar) or (isinstance(x, ast.Tuple) and any(getattr(e, "id", None) in adlar for e in x.elts)) for x in n.targets))]
@@ -37,6 +37,11 @@ ts = sorted(t for t in set(yanki(0.45)) | {T0 + 4 + i * 0.02 for i in range(75)}
 ok(f"biz konuşurken yankının üstüne 1,5 sn konuşma: keser (aralarımızda {n} kare)", ks(ts, zarf))
 ts = sorted(set(yanki(0.45)) | {T0 + 4.0 + 0.02 * i for i in range(25)})
 ok("31 Ekim: yankı + 0,5 sn kelimesiz ses (nefes, hareket): kesmez", not ks([t for t in ts if t <= T0 + 5.5], zarf) and not ks(ts, zarf))
+bos = [k for k in range(1, 490) if not zarf[k] and zarf[k - 1] and not any(zarf[k:k + 8])]  # ≥ 0,16 sn'lik aralıklar  # okunan sesteki aralıkların başı (kare)
+g1 = next(k for k in bos if k >= 200); g2 = next(k for k in bos if k >= g1 + 48)  # "hı hı": iki hece, iki aralığa ~1 sn arayla düşer (gerçek 1 Kasım: 0,3 sn açıklanamayan, 0,9 sn yayılım)
+hh = {T0 + 0.45 + (k + m) * 0.02 for k in (g1, g2) for m in range(-6, 14) if 0 <= k + m < 500}
+ts = sorted(set(yanki(0.45)) | hh)
+ok("1 Kasım: yankı + okurken \"hı hı\": kesmez", not any(ks([t for t in ts if t <= T0 + u], zarf) for u in (4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0)) and not ks(ts, zarf))
 ts = sorted(set(yanki(0.45)) | {T0 + 4 + i * 0.02 for i in range(75)}); ok("yankı + 1,5 sn gerçek ses: yine keser", ks([t for t in ts if t <= T0 + 5.55], zarf))
 ok("yalnız yankı: kesmez (otonom_kesilsin)", not ks(yanki(0.45), zarf) and not ks(yanki(0.0, kayip=0.3), zarf))
 n, d = yd([T0 + 1 + i * 0.02 for i in range(30)], None, T0)

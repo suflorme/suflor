@@ -2101,7 +2101,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/pano-ac":  # v0.105.0: panoyu menü uygulamasının Mac penceresinde aç (kurulum, eklentinin "Panoyu aç"ı) — anahtarla;
             # menü uygulaması son 60 sn'de yoklamadıysa pencere: false → istemci eskisi gibi tarayıcıda açar
             if time.time() - STATE.get("_menu_yokluyor", 0) > 60: return self._json({"ok": True, "pencere": False})
-            STATE["pano_ac"] = {"id": "p" + str(int(time.time() * 1000)), "t": time.time()}; kart_bildir(); return self._json({"ok": True, "pencere": True})
+            # gorunum: yalnız "ayarlar" (eklenti şeridindeki ⚙) → menü uygulaması Ayarlar penceresini açar
+            STATE["pano_ac"] = {"id": "p" + str(int(time.time() * 1000)), "t": time.time(), **({"gorunum": "ayarlar"} if isinstance(p, dict) and p.get("gorunum") == "ayarlar" else {})}; kart_bildir(); return self._json({"ok": True, "pencere": True})
         if self.path == "/notlar":  # v0.117.0: panoda notu sil — yalnız pano
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(notlar_islem(p))
