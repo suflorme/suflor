@@ -26,7 +26,7 @@
   }
   // toplantıda mı (çağrı denetimleri görünüyor). Seçiciler gerçek Teams'te kısmen doğrulandı (ayrıl düğmesi).
   function cagrida() { return !!document.querySelector('[data-tid="hangup-main-btn"], [data-tid="call-hangup"], #hangup-button, button[aria-label^="Ayrıl"], button[aria-label^="Leave"], [data-tid="call-control-bar"]'); }
-  function micDugme() { return document.querySelector('[data-tid="microphone-button"], #microphone-button, [data-tid="toggle-mute"], button[aria-label*="Sesi aç"], button[aria-label*="Sesi kapat"], button[aria-label*="Unmute"], button[aria-label*="Mute"]'); }
+  function micDugme() { return document.querySelector('[data-tid="microphone-button"], #microphone-button, [data-inp="microphone-button"], [data-tid="toggle-mute"], button[aria-label*="Sesi aç"], button[aria-label*="Sesi kapat"], button[aria-label*="Unmute"], button[aria-label*="Mute"]'); }
   // karşı tarafın ekran paylaşımı (v0.28.0): Teams sahnesindeki paylaşım öğesi (data-tid tahmini; gerçek paylaşımda doğrulanmadı).
   // Kendi paylaşımında "Paylaşmayı durdur" görünür → hayır. Öğe bulunmazsa null: çekirdek genel yolu dener (etiket, ekran boyutlu video).
   function paylasimVar() {
@@ -37,7 +37,7 @@
   }
   // katılımcı sayısı (v0.84.1; v0.85.1 web'de doğrulandı): Kişiler düğmesinin rozeti, yoksa sayfadaki "N katılımcı / N participants" (masaüstü Teams'te sohbet
   // başlığında "Kişi ve aracı ekle, 1 katılımcı" görüldü). Klavye kısayolundaki rakam sayılmaz. Etiket aktarıcıya yalnız değişince gider (günlükte teşhis).
-  const KISI_DUGME = '[data-tid="roster-button"], #roster-button, [data-tid="call-roster-button"], button[aria-label^="Kişiler"], button[aria-label^="People"], button[aria-label^="Katılımcılar"], button[aria-label^="Participants"]';
+  const KISI_DUGME = '[data-tid="roster-button"], #roster-button, [data-inp="roster-button"], [data-tid="call-roster-button"], button[aria-label^="Kişiler"], button[aria-label^="People"], button[aria-label^="Katılımcılar"], button[aria-label^="Participants"]';
   const KISI_SAYI = /(?:^|[\s(,])(\d{1,3})(?:\)|\s*(?:kişi|katılımcı|participant|people|person)|$)/i, KISAYOL = /[⌘⌥⇧⌃]|\b(ctrl|shift|alt|cmd|option|command)\b/i;
   function kisiSayisi() {
     const et = [], b = document.querySelector(KISI_DUGME);

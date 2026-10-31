@@ -255,7 +255,7 @@ def karisik(motor, cumleler, son_bekle=0.0, kes_ara=False, calan=lambda: False):
     OKU = []; SES_ = {"kes": 0}
     kn = {"re": __import__("re"), "time": time, "threading": threading, "print": lambda *a, **k: None, "SES": SES_, "GEMINI_BIRLESIK_EN_COK": 600,
           "kisilik_sesi": lambda m=None, toplantiya=False: (motor, None, 1.0), "konusma_dili": lambda c: c, "sesli_terim_suz": lambda c: c,
-          "seslendir": lambda c, kuyruk=False, cal=None: (OKU.append(c), True)[1], "ses_caliyor": calan}
+          "seslendir": lambda c, kuyruk=False, cal=None, ozet=False: (OKU.append(c), True)[1], "ses_caliyor": calan}
     exec(compile(_ast.Module(fk_, []), "bas-konus.py", "exec"), kn)
     tur = {"tampon": "", "sesli": True}
     for i_, c_ in enumerate(cumleler):

@@ -41,7 +41,8 @@ BETA_RX = [("dur", re.compile(r"^ASİSTAN: '.*, dur'$")), ("sus_kisayol", re.com
            ("hitap_yinelenen", re.compile(r"^KONUŞ: aynı hitap sorusu")), ("kanit", re.compile(r"^KANIT \d+: ")),
            ("gizli", re.compile(r"^GİZLİ: açıldı")), ("moderator", re.compile(r"^MODERATÖR: başladı")),
            ("zaman_asimi", re.compile(r"^KONUŞ: .*zaman aşımı")),
-           ("on_arama", re.compile(r"^KONUŞ: ön arama \d+ sonuç")), ("on_arama_bos", re.compile(r"^KONUŞ: ön arama sonuç yok"))]  # v0.121.0: proje bilgisine ulaşma
+           ("on_arama", re.compile(r"^KONUŞ: ön arama \d+ sonuç")), ("on_arama_bos", re.compile(r"^KONUŞ: ön arama sonuç yok")),
+           ("oto_izin", re.compile(r"^İZİN: otomatik — "))]  # v0.121.0: proje bilgisine ulaşma
 def beta_satir(l):
     for ad, rx in BETA_RX:
         if rx.search(l): beta_olay(ad); return

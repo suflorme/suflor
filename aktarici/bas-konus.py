@@ -650,7 +650,7 @@ def selam_metni(soru, asama, saat=None):  # → selam cümlesi ya da None
 def konus_selam(soru, tur):  # her soruda çağrılır: selam gerekiyorsa okur ve döner; son soru zamanını yazar
     t = time.time(); asama = selam_asamasi(t); s = None
     if AYAR.get("konus_selam") is not False and tur.get("sesli") and not tur.get("toplantida") and not tur.get("karsi") and not tur.get("otonom") \
-            and tur.get("kaynak") not in ("karsi", "moderator") and not tur.get("tanitim"):
+            and tur.get("kaynak") not in ("karsi", "moderator", "ozet") and not tur.get("tanitim"):
         s = selam_metni(soru, asama)
     if s:
         seslendir(s, kuyruk=True); _SELAM["gun"] = time.strftime("%Y-%m-%d", time.localtime(t)); print(f"KONUŞ: selam ({asama or 'karşılık'}): {s}")
@@ -928,7 +928,7 @@ def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okum
         if c and len(c.split()) > 1: tur["okunan"] = tur.get("okunan", 0) + 1
         if c and tur.get("sesli", True): c = konusma_dili(sesli_terim_suz(c))  # v0.73.0: kişilik konuşma dili istiyorsa günlük söyleniş (yalnız okunan)
         if c and tur.get("sesli", True) and tur.get("t_ses") and _konus_g_biriktir(tur, c): pass
-        elif c and tur.get("sesli", True) and seslendir(c, kuyruk=True, cal=None if tur.get("t_ses") else lambda t: tur.setdefault("t_ses_cal", t)) and not tur.get("t_ses"): tur["t_ses"] = time.time()
+        elif c and tur.get("sesli", True) and seslendir(c, kuyruk=True, ozet=tur.get("kaynak") == "ozet", cal=None if tur.get("t_ses") else lambda t: tur.setdefault("t_ses_cal", t)) and not tur.get("t_ses"): tur["t_ses"] = time.time()
         if son: break
     if son: _konus_g_bosalt(tur, "cevap bitti")
 # Gemini sesinde karışık okuma (v0.127, kullanıcı 24 Ekim: günlük 100 istek sınırı ~25 dk'da doluyordu — 26 söz 60 isteğe bölünmüştü): ilk cümle bugünkü gibi
@@ -949,7 +949,7 @@ def _konus_g_bosalt(tur, neden):
     if not kal: return
     if not tur.get("sesli", True) or SES.get("kes", 0) != tur.get("g_kes"): print(f"KONUŞ: okuma kesildi — biriken {len(kal)} cümle okunmadı"); return
     print(f"KONUŞ: kalan {len(kal)} cümle tek okumada ({neden})")
-    seslendir(" ".join(kal), kuyruk=True)
+    seslendir(" ".join(kal), kuyruk=True, ozet=tur.get("kaynak") == "ozet")
 def _konus_g_bekci(tur):  # ilk cümle okunup bittiyse ve Claude hâlâ yazıyorsa biriken beklemeden okunur
     t0 = time.time()
     while time.time() - t0 < 120:
@@ -1005,7 +1005,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 tur.setdefault("araclar", []).append(str(e["content_block"].get("name") or "?")[:20]); tur["_arac"] = [str(e["content_block"].get("name") or ""), ""]
                 if not tur.get("t_arac"): tur["t_arac"] = time.time()
                 if not tur.get("t_ses") and not tur.get("bakiyor") and tur.get("sesli", True):  # dosya/veritabanı araması sessiz geçmesin; v0.94.0: konuya özgü
-                    tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur")), konus_soru_dili(tur.get("soru"))); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t))
+                    tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur")), konus_soru_dili(tur.get("soru"))); seslendir(c, kuyruk=True, ozet=tur.get("kaynak") == "ozet", cal=lambda t: tur.setdefault("t_dolgu_cal", t))
                     print(f"KONUŞ: araç cümlesi ({tur['_arac'][0][:20]}): {c}")
                 tur["tampon"] = ""  # araçtan önce yarım kalan anlatım okunmasın
             if j.get("type") == "stream_event" and e.get("type") == "content_block_delta" and (e.get("delta") or {}).get("type") == "input_json_delta" and tur.get("_arac"):
@@ -1723,7 +1723,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         konus_kapat("kullanıcı kartı değişti" if _KS.get("kart_mt") != kart_mt() else "proje kartı değişti" if _KS.get("proje_kart_mt") != proje_kart_mt() else "kişilik değişti", durum_koru=True); _KS["tur"] = tur
     if tur["sesli"]:
         sel = kisilik_selam()
-        if sel: seslendir(sel, kuyruk=True); tur["tanitim"] = True
+        if sel and tur.get("kaynak") != "ozet": seslendir(sel, kuyruk=True); tur["tanitim"] = True  # özet turunda kişilik tanıtımı okunmaz (tek özet tek ses)
     try: tur["selam"] = konus_selam(metin, tur)
     except Exception as e: tur["selam"] = None; print(f"KONUŞ: selam atlandı ({type(e).__name__}: {e})")  # selam hatası soruyu düşürmesin (22 Ekim: durum 'dusunuyor'da takılı kaldı)
     if dk and _KS.get("defter_md") and _KS["defter_md"] != dk and konus_canli():  # başka toplantının defteri süreçte kalmasın
@@ -1775,14 +1775,14 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if tur.get("otonom") and "toplantiya_soyle" in globals():  # soru herkesin önünde soruldu: herkes bekliyor
             r = toplantiya_soyle(c); print(f"KONUŞ: ara bilgi ({KONUS_ARA_SN:.0f} sn cevap yok) toplantıya — {c}" + ("" if r.get("ok") else f" (okunamadı: {r.get('err')})"))
         elif tur.get("sesli", True):  # toplantıda kulaklık yoksa okunmaz (hoparlörden toplantıya gitmesin)
-            seslendir(c, kuyruk=True); print(f"KONUŞ: ara bilgi ({KONUS_ARA_SN:.0f} sn cevap yok) — {c}")
+            seslendir(c, kuyruk=True, ozet=tur.get("kaynak") == "ozet"); print(f"KONUŞ: ara bilgi ({KONUS_ARA_SN:.0f} sn cevap yok) — {c}")
     def bekle_dolgu(tur_ad):  # v0.94.0: yalnız cevap gecikince; metin geldiyse (okunmayı bekliyor) ara cümle yok
         bek = KONUS_BEKLE_SN + (KONUS_BEKLE_ALINDI_EK_SN if tur.get("alindi") else 0); time.sleep(bek)
         if _KS["tur"] is not tur or tur.get("t_ses") or tur.get("t_ilk") or tur.get("bakiyor") or not tur.get("sesli", True): return
         tur["bakiyor"] = True
         import random
         if random.random() < 1 / 3 and tepki_cal("dusunme"): print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): düşünme tepki sesi"); return
-        c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur_ad=tur_ad), konus_soru_dili(tur.get("soru"))); seslendir(c, kuyruk=True, cal=lambda t: tur.setdefault("t_dolgu_cal", t)); print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): {c}")
+        c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur_ad=tur_ad), konus_soru_dili(tur.get("soru"))); seslendir(c, kuyruk=True, ozet=tur.get("kaynak") == "ozet", cal=lambda t: tur.setdefault("t_dolgu_cal", t)); print(f"KONUŞ: bekleme cümlesi (gönderimden {bek:.1f} sn sonra ses yok): {c}")
     def bekci(sn):
         t = time.time()
         while time.time() - t < sn:

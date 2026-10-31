@@ -32,9 +32,9 @@ def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False):
             with LOCK: c["eylem"] = x["id"]
     else: kart_bildir()
     top = toplanti_var()
-    if sesli and not top: soru_baslat([x["id"]])
+    if sesli and not top and not oturum: soru_baslat([x["id"]])  # 31 Ekim: toplantı oturumunun araç izni yalnız kart; sesli okunmaz
     _izin_kayit({"id": x["id"], "tur": tur, "ne": ne, "durum": "bekliyor", "toplantida": top})
-    print(f"İZİN: {tur} onay bekliyor ({'Claude bölümü' if oturum else 'kart'}{' + sesli' if sesli and not top else ''}) — \"{ne[:80]}\"")
+    print(f"İZİN: {tur} onay bekliyor ({'Claude bölümü' if oturum else 'kart'}{' + sesli' if sesli and not top and not oturum else ''}) — \"{ne[:80]}\"")
     return x["id"]
 def izin_bekleyen_oturum():  # panonun Claude bölümü ve mini pano: arka plandaki toplantı oturumunun onay bekleyen araç izinleri
     return [{"id": x["id"], "metin": x["baslik"]} for x in eylem_gorunen() if x["tur"] == "izin" and x.get("oturum") and x["durum"] == "bekliyor"]

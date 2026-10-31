@@ -480,23 +480,42 @@ def kisilik_en_sesi(k=None):  # kişiliğin İngilizce yerel sesi ("en:michael")
     kk = k if k is not None else kisilik()
     v = str((kk or {}).get("yerel_ses_en") or "")
     return pocket_ses_adi(v) if v.startswith("pocket") and "pocket_var" in globals() and pocket_var() and (pocket_ses_adi(v) or "").startswith("en:") else None
-def seslendir(metin, kuyruk=False, tepkisiz=False, k=None, cal=None):
+# Toplantı sonu özeti (hızlı ve yazılı) yalnız yerel Pocket sesiyle okunur (kullanıcının Pocket sesi). Gemini, Azure, Piper ve Mac sesine düşülmez; Pocket hazır
+# değilse en çok OZET_YEREL_BEKLE_SN beklenir, yine hazır değilse ya da kurulu değilse o parça okunmaz (yazılı özet ve kart zaten var).
+OZET_YEREL_BEKLE_SN = 8.0
+def ozet_ses_motoru(k=None):  # → ("pocket", ses) ; motor None: okunacak ses yok (ses = neden)
+    if not pocket_var(): return None, "Pocket kurulu ya da ayarlı değil"
+    kk = kisilik() or {}; y = str(kk.get("yerel_ses") or (kk.get("ses") if str(kk.get("ses") or "").startswith("pocket") else "") or "")
+    return "pocket", (pocket_ses_adi(y) if y.startswith("pocket") else None) or pocket_varsayilan()
+def seslendir(metin, kuyruk=False, tepkisiz=False, k=None, cal=None, ozet=False):
     # k: bu metni okuyacak kişilik (v0.80.0 iki sesli özet); verilmezse o anki kişilik. Gemini'de her parça kendi sesi ve üslubuyla kuyruğa girer.
+    # ozet: toplantı sonu özeti — ozet_ses_motoru'nun sesiyle, Mac sesine düşmeden (_ozet_oku).
     if not AYAR.get("konusma", True) or not metin: return False
     metin, ton = ton_ayikla(metin)  # v0.80.0: Claude'un <ton:ad> etiketi (hiçbir seste okunmaz)
     if ton: ton_kur(ton)
     if not metin: return False
-    if k is not None and str(k.get("ses") or "").startswith("gemini") and gemini_izinli(): motor = "gemini"
+    ozet_oge = None
+    if ozet:
+        km, kv = ozet_ses_motoru(k)
+        if km is None: print(f"SES: özet sesli okunmadı — {kv}"); return False
+        m = ses_duzen(telaffuz(etiket_sil(metin), mac=False), False)
+        if not m: return False
+        ozet_oge = ("ozet", m, kv, None, km)
+    if ozet_oge: motor = ozet_oge[4]
+    elif k is not None and str(k.get("ses") or "").startswith("gemini") and gemini_izinli(): motor = "gemini"
     else: motor = kisilik_sesi()[0]
-    mac = motor == "mac"; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
+    mac = motor == "mac" and not ozet_oge; klip = None  # v0.73.0: kişiliğin sesi Piper ise telaffuz Piper'a göre
     if mac and not tepkisiz: klip, metin = tepki_ayir(metin)  # tepki klipleri Elif tınısında: yalnız Mac sesinde
-    if motor != "gemini": metin = etiket_sil(metin)
-    en = ARAYUZ_DILI == "tr" and okuma_dili(metin) == "en"; en_ses = kisilik_en_sesi(k) if en and motor == "pocket" else None  # ⚙ Ayarlar'da Mac sesi seçiliyse dokunulmaz
-    if motor == "gemini": metin = ses_duzen(metin if en else kisilik_telaffuz(metin), False) if metin else ""  # v0.78.0: Gemini Türkçeyi ve yabancı sözcükleri kendisi okur; yalnız kişilik okunuşları
+    if ozet_oge: metin = ozet_oge[1]
+    elif motor != "gemini": metin = etiket_sil(metin)
+    en = ARAYUZ_DILI == "tr" and okuma_dili(metin) == "en"; en_ses = kisilik_en_sesi(k) if en and motor == "pocket" and not ozet_oge else None  # ⚙ Ayarlar'da Mac sesi seçiliyse dokunulmaz
+    if ozet_oge: pass
+    elif motor == "gemini": metin = ses_duzen(metin if en else kisilik_telaffuz(metin), False) if metin else ""  # v0.78.0: Gemini Türkçeyi ve yabancı sözcükleri kendisi okur; yalnız kişilik okunuşları
     elif en_ses: metin = ses_duzen(metin, False) if metin else ""  # v0.101.3: İngilizce cümle İngilizce sesle, Türkçe okunuş yok
     else: metin = ses_duzen(telaffuz(metin, mac=mac), mac) if metin else ""
     oge = ("en", metin, en_ses) if en_ses and metin else metin
-    if motor == "gemini" and metin:  # v0.80.0: ses ve üslup (kişilik + durum tonu) şimdi belirlenir; çalınırken kişilik değişse de bu parça bu sesle
+    if ozet_oge: oge = ozet_oge
+    elif motor == "gemini" and metin:  # v0.80.0: ses ve üslup (kişilik + durum tonu) şimdi belirlenir; çalınırken kişilik değişse de bu parça bu sesle
         kk = k if k is not None else kisilik()
         oge = ("g", metin, gemini_kisilik_sesi(kk) if k is not None else None, ses_uslup_bul(metin, kk))
     if not kuyruk: ses_durdur()
@@ -538,7 +557,7 @@ def yerel_uyari(metin):  # v0.127: kısa sistem uyarısı (Gemini sınırı) yer
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"SES (deneme): uyarı · {metin}"); return
     threading.Thread(target=bekle, daemon=True).start()
 GEMINI_BIRLESIK_EN_COK = 600  # v0.80.8: birleşik Gemini okumasının en uzun metni (karakter); Konuş cevabı en çok 5 cümle
-def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] in ("g", "en", "yerel") else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
+def _ses_metin(x): return x[1] if isinstance(x, tuple) and x[0] in ("g", "en", "yerel", "ozet") else x  # kuyruk öğesinin düz metni (Piper/Mac'e düşünce)
 def _g_birlestir(v):  # (SES_K içinde) baştaki Gemini parçasını al; arkada bekleyen aynı ses ve üsluptaki parçalar tek istekte (v0.80.8). Sesi önceden istenmiş
     oge = SES["q"].pop(0)  # parçaya eklenmez (önceden alınan boşa gitmesin)
     if isinstance(oge, tuple) and oge[0] == "g" and not ("gemini_onceden_var" in globals() and gemini_onceden_var(oge[1], oge[2] or v)):
@@ -554,6 +573,12 @@ def ses_sonraki_hazirla():  # v0.127: Gemini okuması çalarken (gemini-ses.py _
         v = kisilik_sesi()[1]; oge = _g_birlestir(v); SES["q"].insert(0, oge)
     gemini_onceden(oge[1], oge[2] or v, oge[3])
 SES_MESGUL_SN = 8  # işçi parçayı aldı, ses henüz çalmıyor (Gemini ilk ses ~0,6 sn, Pocket üretimi): ses_caliyor bunu da sayar — üçlü sohbet önceki söz bitti sanmasın
+def _ozet_oku(motor, metin, ses, uslup, iptal):  # → None: okundu ya da kesildi; yoksa okunmama nedeni. Yalnız Pocket; hiçbir koşulda başka sese düşmez
+    if motor != "pocket": return f"özet yalnız Pocket'la okunur ({motor} değil)"
+    t0 = time.time(); pocket_baslat(ses, bekle=False)  # hazır değilse en çok OZET_YEREL_BEKLE_SN beklenir; ilk cümle başka sesle okunmaz
+    while POCKET["durum"] == "yukleniyor" and time.time() - t0 < OZET_YEREL_BEKLE_SN and not iptal(): time.sleep(0.05)
+    if POCKET["durum"] != "hazir": return f"Pocket {OZET_YEREL_BEKLE_SN:g} sn içinde hazır olmadı"
+    return None if pocket_oku(metin, ses=ses, iptal=iptal, kayit=SES) or iptal() else "Pocket okuyamadı"
 def _ses_isci():
     while True:
         with SES_K:
@@ -581,6 +606,14 @@ def _ses_isci():
             if pocket_oku(bas[1], ses=bas[2], iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             print("SES: İngilizce ses okuyamadı — yerel sese düştü")
             with SES_K: SES["q"].insert(0, bas[1])
+        if isinstance(bas, tuple) and bas[0] == "ozet":  # toplantı sonu özeti: tek ses, Mac sesine düşme yok (okunamazsa parça atlanır)
+            with SES_K:
+                if not SES["q"] or SES["q"][0] is not bas: continue
+                oge = SES["q"].pop(0); parca = [oge[1]]; kes = SES.get("kes", 0)
+                metin = " ".join(parca); SES["simdi"] = metin
+            neden = _ozet_oku(oge[4], metin, oge[2], oge[3], lambda: SES.get("kes", 0) != kes)
+            if neden and SES.get("kes", 0) == kes: print(f"SES: özet sesli okunmadı — {neden}")
+            continue
         motor, v, khiz = kisilik_sesi()
         with SES_K: bas = SES["q"][0] if SES["q"] else None
         if isinstance(bas, tuple) and bas[0] == "mac": motor = "mac"; v, khiz = kisilik_sesi("mac")[1:]
@@ -768,15 +801,15 @@ def ozet_sesli(r):
     a = [_t("Toplantı özeti hazır.", "The meeting summary is ready.")] + ([cikti_metin(r["cikti"]) + "."] if r.get("cikti") else [])  # 1. ses: özet + sayılar
     b = [_cumle(r.get("degerlendirme"))] + ([_t("Öneri: ", "Suggestion: ") + _cumle(r["oneri"])] if r.get("oneri") else [])  # 2. ses: değerlendirme + öneri
     c = [_t(f"Onayını bekleyen {bek} iş var.", f"{bek} item{'s' if bek > 1 else ''} waiting for your approval.")] if bek else []
-    iki = ozet_iki_ses()
+    iki = None  # özet tek sesle (Pocket) okunur; iki sesli okuma kapalı
     if iki and any(b):  # v0.80.0 (S87): iki kişilik de Gemini sesliyse özet iki sesle — toplantı kişiliği özeti, öteki değerlendirmeyi okur
         k1, k2 = iki; ok = False
         for kk, parca in ((k1, a), (k2, b), (k1, c)):
             m = " ".join(x for x in parca if x)
-            if m: ok = seslendir(m, kuyruk=True, k=kk) or ok
+            if m: ok = seslendir(m, kuyruk=True, k=kk, ozet=True) or ok
         if ok: print(f"SES: özet iki sesle okunuyor ({k1['ad']} + {k2['ad']})")
         return ok
-    ok = seslendir(" ".join(x for x in a + b + c if x), kuyruk=True)
+    ok = seslendir(" ".join(x for x in a + b + c if x), kuyruk=True, ozet=True)
     if ok: print("SES: özet okunuyor")
     return ok
 def ozet_iki_ses():  # → (toplantı kişiliği, öteki) ikisi de Gemini sesliyse ve ayar ozet_iki_ses kapalı değilse; yoksa None

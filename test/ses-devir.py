@@ -65,10 +65,9 @@ bak("seslendir: etiket okunmaz, ton üsluba girer", "<ton" not in o and "The roo
 bak("aynı cevabın sonraki cümlesi de o tonla", "The room is tense" in o2)
 # 4) iki sesli özet
 m.STATE["_cagri_son"] = 0; _, o = cikti(m.ozet_sesli, {"dosya": "x.md", "degerlendirme": "Toplantı verimliydi", "oneri": "Bütçeyi haftaya bağlayın"})
-bak("iki sesli özet: ALFA (Kore) özeti, BETA (Charon) değerlendirmeyi okur", "iki sesle okunuyor (ALFA + BETA)" in o and "ses Kore" in o and "ses Charon" in o
-    and o.index("Toplantı özeti hazır") < o.index("verimliydi"))
+bak("özet iki sesle okunmaz (yalnız Pocket; bu denemede Pocket yok → okunmaz, Gemini/Mac yok)", "iki sesle" not in o and "ses Kore" not in o and "ses Charon" not in o and "özet sesli okunmadı — Pocket kurulu" in o)
 m.AYAR["ozet_iki_ses"] = False; _, o = cikti(m.ozet_sesli, {"dosya": "y.md", "degerlendirme": "İyi geçti"})
-bak("ayar kapalıyken tek ses", "iki sesle" not in o and "SES: özet okunuyor" in o); m.AYAR.pop("ozet_iki_ses")
+bak("ayar kapalıyken de iki ses yok", "iki sesle" not in o); m.AYAR.pop("ozet_iki_ses")
 # 5) gerginlik puanı
 def satir(i, kim, t0, db, metin, sure=2.0, kanal="karsi"):
     return {"id": f"w-{kanal}-{int(t0 * 1000)}", "speaker": kim, "text": metin, "ses": {"db": db, "sure": sure, "f0": 120, "hiz": 150}}

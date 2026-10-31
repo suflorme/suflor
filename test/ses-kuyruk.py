@@ -10,7 +10,7 @@ def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
 agac = ast.parse(open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read())
-fn = [f for f in agac.body if isinstance(f, ast.FunctionDef) and f.name in ("_ses_metin", "_ses_isci", "_cal_anahtar", "ses_basladi", "_g_birlestir", "ses_sonraki_hazirla")]
+fn = [f for f in agac.body if isinstance(f, ast.FunctionDef) and f.name in ("_ses_metin", "_ozet_oku", "_ses_isci", "_cal_anahtar", "ses_basladi", "_g_birlestir", "ses_sonraki_hazirla")]
 CALAN = []
 class P:  # sahte afplay/say süreci
     def __init__(self, k, **a): self.k = k; self.stdin = self; self.yazi = b""
@@ -114,4 +114,21 @@ while time.time() - t1 < 3 and not bas: time.sleep(0.02)
 bosluk = round(((bas.get("t") or time.time()) - t_bos) * 1000)
 ok(f"üçlü boşluk ölçümü gerçek ilk ses gecikmesi (≈ 400 ms, 3000 değil): {bosluk} ms", 300 <= bosluk <= 800)
 time.sleep(1.2); ok("okuma bitince ses_caliyor False", n2["ses_caliyor"]() is False)
+# Toplantı sonu özeti ("ozet" öğesi): tek ses, Mac sesine hiçbir koşulda düşmez; okunamayan parça atlanır, neden günlüğe yazılır
+LOG = []; pr = lambda *a, **k: LOG.append(" ".join(str(x) for x in a))
+P_YOK = {"durum": "yukleniyor"}
+def pbas(ses, bekle=False): pass
+def ozet_dene(q, **ek):
+    del LOG[:]
+    return deneme(ek.pop("g", False), motor="mac", pocket=ek.pop("pocket", None), q=q, bekle=ek.pop("bekle", 1), ek=dict({"print": pr, "_ozet_oku": None, "OZET_YEREL_BEKLE_SN": 0.3, "POCKET": {"durum": "hazir"}, "pocket_baslat": pbas}, **ek))
+fn.append([f for f in agac.body if isinstance(f, ast.FunctionDef) and f.name == "_ozet_oku"][0]) if not any(f.name == "_ozet_oku" for f in fn) else None
+c = ozet_dene([("ozet", "Özet.", "Achird", "u", "gemini")], g=True)
+ok(f"özet öğesi Gemini ise bile okunmaz, Mac yok: {c} {LOG}", c == [] and any("yalnız Pocket" in x for x in LOG))
+c = ozet_dene([("ozet", "Özet.", "wite", None, "pocket")], pocket=True)
+ok(f"özet Pocket hazır: Pocket'la okunur: {c}", c == [("pocket", "Özet.")])
+c = ozet_dene([("ozet", "Özet.", "wite", None, "pocket")], pocket=True, POCKET={"durum": "yukleniyor"}, bekle=0)
+time.sleep(0.6)
+ok(f"özet Pocket hazır değil (bekleme dolunca): ilk cümle Mac'e gitmez, atlanır: {list(CALAN)} {LOG}", CALAN == [] and any("Pocket" in x and "hazır olmadı" in x for x in LOG))
+c = ozet_dene([("ozet", "Özet.", "wite", None, "pocket")], pocket=False)
+ok(f"özet Pocket okuyamadı: Mac yok: {c} {LOG}", c == [] and any("Pocket okuyamadı" in x for x in LOG))
 print("ses-kuyruk: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

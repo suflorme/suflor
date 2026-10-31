@@ -195,14 +195,53 @@ TOPO_TC_OKUMA = {"saglik", "takvim", "gundem", "durum", "ara", "hazirlik", "hazi
                  "dokum"}  # dokum: toplantı sonu temiz döküm kaydı (proje klasörüne yazar) — izne bağlı kalmaz
 TOPO_TC_RX = re.compile(r"^(?:PYTHONDONTWRITEBYTECODE=1\s+)?(?:/usr/bin/)?python3\s+(?:-[uBI]+\s+)*(\S+/toplanti-claude\.py)(?:\s+--dir\s+\S+)?(?:\s+--relay\s+http://127\.0\.0\.1:\d+)?\s+([a-z-]+)((?:\s+[^\s;&|`$()<>\\\"']+|\s+\"[^\"`$\\]*\"|\s+'[^']*')*)\s*$")
 def _topo_tc_okuma(ad, gi):
-    m = TOPO_TC_RX.match(str(gi.get("command") or "").strip()) if ad == "Bash" else None
+    c = str(gi.get("command") or "").strip(); m = TOPO_TC_RX.match(c) if ad == "Bash" and "\n" not in c and "\r" not in c else None
     if not m or m.group(2) not in TOPO_TC_OKUMA: return False
     yer = {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
     return os.path.realpath(os.path.expanduser(m.group(1))) in yer
+# 31 Ekim (test toplantısı: oturum kendi rutin adımları için izin kartı açtı): dar, kesin kalıplı otomatik izin. Yalnız (1) canlı klasördeki agenda.json / hazir.json ile
+# özet klasöründeki (<çalışma>/gorusmeler) .md ve .json dosyalarına Write/Edit, (2) `sleep 1–120` ve `python3 -c "import time; time.sleep(N)"`, (3) bu oturumun
+# toplanti-claude.py'sinin kayıt amaçlı alt komutları, (4) özet klasörü içinde iki yol arasında `mv`. Hedef yollar realpath ile çözülür (.. ve sembolik bağ dışarı kaçamaz).
+# Başka her şey eskisi gibi sorulur. Kanca (toplanti-claude.py izin-kanca) aynı bekleme kalıbını riskli saymaz: IZIN_BEKLE_RX'i birlikte değiştir.
+TOPO_TC_OTO = {"maliyet", "sonuc", "yapi", "bitir", "ozet-hazir"}  # dışarıya göndermeyen, silmeyen, ayar değiştirmeyen kayıt komutları; eylem/ilet/rapor/geri-bildirim/sozluk/hafiza/konusmaci dahil DEĞİL
+TOPO_SLEEP_RX = re.compile(r"^sleep (\d{1,3})$")
+TOPO_PYSLEEP_RX = re.compile(r"^(?:/usr/bin/)?python3 (?:-[BIu]+ )?-c (['\"])import time; ?time\.sleep\((\d{1,3})\)\1$")
+TOPO_META_RX = re.compile(r"[;&|`$()<>\\\n\r]")
+def _topo_oz_klasor(): return os.path.realpath(os.path.join(os.path.expanduser(str(AYAR.get("calisma") or "")), "gorusmeler")) if AYAR.get("calisma") else None
+def _topo_oz_icinde(yol, dosya=True):
+    k = _topo_oz_klasor(); yol = str(yol or "")
+    if not k or not yol or "\0" in yol: return False
+    g = os.path.realpath(os.path.expanduser(yol)); ad = os.path.basename(g)
+    if os.path.dirname(g) == k or g.startswith(k + os.sep):  # eski toplantının belgesi üzerine yazılmaz: yalnız yeni dosya ya da adında bugünün tarihi olan
+        return not dosya or (not ad.startswith(".") and ad.endswith((".md", ".json")) and (not os.path.exists(g) or time.strftime("%Y%m%d") in ad or time.strftime("%Y-%m-%d") in ad))
+    return False
+def _topo_oto(ad, gi):  # kural uyuyorsa kısa açıklama (günlük için), değilse None
+    if ad in ("Write", "Edit"):
+        yol = str(gi.get("file_path") or "")
+        if not yol or "\0" in yol: return None
+        g = os.path.realpath(os.path.expanduser(yol))
+        if g in {os.path.realpath(os.path.join(BASE, f)) for f in ("agenda.json", "hazir.json")} or _topo_oz_icinde(yol): return f"{ad} {os.path.basename(g)}"
+        return None
+    if ad != "Bash": return None
+    c = str(gi.get("command") or "").strip()
+    m = TOPO_SLEEP_RX.match(c) or TOPO_PYSLEEP_RX.match(c)
+    if m: n = int(m.group(m.lastindex)); return f"Bash bekleme {n} sn" if 1 <= n <= 120 else None
+    if TOPO_META_RX.search(c): return None
+    m = TOPO_TC_RX.match(c)
+    if m and m.group(2) in TOPO_TC_OTO and os.path.realpath(os.path.expanduser(m.group(1))) in _topo_tc_yerler(): return f"Bash toplanti-claude {m.group(2)}"
+    try: av = shlex.split(c)
+    except ValueError: return None
+    if av and av[0] == "mv":
+        yollar = [x for x in av[1:] if not x.startswith("-")]; secenek = [x for x in av[1:] if x.startswith("-")]
+        if len(yollar) == 2 and all(x in ("-n",) for x in secenek) and all(_topo_oz_icinde(y) for y in yollar): return "Bash mv (özet klasörü)"
+    return None
+def _topo_tc_yerler(): return {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
 def _topo_izin_anahtar(ad, gi): return ad + "\0" + (str(gi.get("command") or "") if ad in ("Bash", "Monitor") else json.dumps(gi, sort_keys=True, ensure_ascii=False))
 def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay → control_response
     r = o.get("request") or {}; ad = str(r.get("tool_name") or "?"); gi = r.get("input") if isinstance(r.get("input"), dict) else {}
     hat = TOPO.setdefault("izin_hatirla", set()); anh = _topo_izin_anahtar(ad, gi); bk = bilgi_kaynagi_arac(ad)
+    try: oto = _topo_oto(ad, gi)
+    except Exception: oto = None
     if bk and not bk["izinli"]:  # ayardaki bilgi kaynağının okuma dışı aracı: sorulmaz, reddedilir
         cevap = {"behavior": "deny", "message": _t("Bu araç bilgi kaynağının okuma araçlarından değil; toplantıda yalnız okuma araçları kullanılır.",
                                                    "This tool isn't one of the information source's read tools; only read tools are used in the meeting.")}
@@ -214,6 +253,8 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         cevap = {"behavior": "allow", "updatedInput": gi}; print("TOPLANTI OTURUMU: izin Monitor (izle) → kendiliğinden")
     elif ad in TOPO_OKU_ARAC or _topo_tc_okuma(ad, gi):
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} (salt okuma) → kendiliğinden")
+    elif oto:
+        cevap = {"behavior": "allow", "updatedInput": gi}; print(f"İZİN: otomatik — {oto}")  # beta sayacı: beta-veri.py BETA_RX "oto_izin" (satır metni tutulmaz)
     elif anh in hat:
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} → oturumda daha önce verilmişti")
     elif ad == "AskUserQuestion":  # soru düz metin olarak panoya gelsin

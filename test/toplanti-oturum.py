@@ -71,6 +71,25 @@ while True:
             r = subprocess.run([sys.executable, "-B", O["tc"], "--dir", O["canli"], "--relay", O["relay"], "kart", "not", "Ücretli kanal son 7 gün dönüşüm %8 — toplantıda %12 dendi",
                                 "--neden", "Kaynak: Deneme Metrik, 14:05"], capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=O["ayar"], PYTHONDONTWRITEBYTECODE="1"))
             yaz("Metrik kart: " + c + " · " + ("kart" if "kart gönderildi" in r.stdout else "kart yok " + r.stderr[-200:])); bitti()
+    elif "rutin-ok" in q:  # 31 Ekim: rutin adımlar kartsız
+        C, P, TC = D + "/../canli", D + "/../proje/gorusmeler", D + "/../toplanti-claude.py"
+        vaka = [("Write", {"file_path": C + "/agenda.json"}), ("Write", {"file_path": C + "/hazir.json"}), ("Edit", {"file_path": P + "/ozet-20261031.md"}),
+                ("Write", {"file_path": P + "/ozet-20261031.md.yapi.json"}), ("Bash", {"command": "sleep 5"}), ("Bash", {"command": "sleep 120"}),
+                ("Bash", {"command": 'python3 -c "import time; time.sleep(3)"'}), ("Bash", {"command": "python3 -B " + TC + " maliyet"}),
+                ("Bash", {"command": "mv " + P + "/a.md.yapi.json " + P + "/b.yapi.json"})]
+        r = []
+        for i, (ad, gi) in enumerate(vaka): r.append(izin(ad, gi, "oto-%d" % i)["behavior"])
+        yaz("Oto: " + "/".join(r)); bitti()
+    elif "rutin-disi" in q:
+        C, P, TC = D + "/../canli", D + "/../proje/gorusmeler", D + "/../toplanti-claude.py"
+        vaka = [("Write", {"file_path": C + "/baska.json"}), ("Write", {"file_path": P + "/../x.md"}), ("Write", {"file_path": P + "/kacak.md"}),
+                ("Write", {"file_path": P + "/betik.sh"}), ("Bash", {"command": "sleep 121"}), ("Bash", {"command": "sleep 5; rm -rf x"}),
+                ("Bash", {"command": 'python3 -c "import time; time.sleep(3); import os"'}), ("Bash", {"command": "python3 -B " + TC + " eylem onay hepsi"}),
+                ("Bash", {"command": "python3 -B " + TC + " maliyet; rm x"}), ("Bash", {"command": "mv " + P + "/a.md " + D + "/b.md"}),
+                ("Bash", {"command": "python3 -B " + TC + " maliyet\\nrm x"}), ("Bash", {"command": "sleep 3 > " + P + "/a.md"})]
+        r = []
+        for i, (ad, gi) in enumerate(vaka): r.append(izin(ad, gi, "disi-%d" % i)["behavior"])
+        yaz("Disi: " + "/".join(r)); bitti()
     elif "izin" in q: c = izin("Bash", {"command": "python3 -c 'print(1)' # " + str(time.time()), "description": "Deneme komutu"}, "r-" + str(time.time())); yaz("İzin: " + c["behavior"]); bitti()
     elif "asili" in q: asili = True; yaz("Arka plan işi sürüyor"); bitti()
     elif "secim" in q: yaz("Bu kararda anlaştınız mı?\\n\\n[[seç: Anlaştık | Anlaşmadık | Emin değilim]]"); bitti()
@@ -160,6 +179,10 @@ try:
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "izin iste"})
     k = izin_bekle_(); v = to()
     ok(f"araç izni Claude bölümünde ({len(k)}), ayrı kart yok ({len(izin_kartlari())}), oturum özeti izin={v.get('izin')}", len(k) == 1 and not izin_kartlari() and v.get("izin") == 1)
+    _ey = ((uc("/status")[1].get("eylem") or {}).get("liste")) or []; _iz = [x for x in _ey if x.get("tur") == "izin" and x.get("durum") == "bekliyor"]
+    ok("izin işinin ayrıntısı görünümde boş (ham JSON yok), başlık cümlesi var", bool(_iz) and all(x.get("ayrinti") == "" and "arac" not in json.dumps(x, ensure_ascii=False) and x.get("baslik") for x in _iz))
+    ok("toplantı oturumunun izni sesli sorulmaz (günlükte '+ sesli' yok)", "onay bekliyor (Claude bölümü)" in open(os.path.join(T, "relay.log"), encoding="utf-8", errors="replace").read()
+       and "(Claude bölümü + sesli)" not in open(os.path.join(T, "relay.log"), encoding="utf-8", errors="replace").read())
     ok(f"izinde açıklama cümlesi, komut yok ({k[0]['metin'][:80] if k else ''})", bool(k) and "Şunu yapmak istiyorum: Deneme komutu" in k[0]["metin"] and "Claude" not in k[0]["metin"] and "print(1)" not in k[0]["metin"])
     ok("panodaki izin iletisi düz cümle (komut yok)", any(x["kim"] == "izin" and x["metin"] == "Deneme komutu" for x in mesaj()))
     kod, y = uc("/eylem-karar", {"id": k[0]["id"], "durum": "onaylandi"}) if k else (0, {})
@@ -183,6 +206,22 @@ try:
     # Faz A (S162): salt okuma araçları, Suflor'un okuma komutları ve toplantı sonu döküm kaydı sorulmaz; yazma sorulur; onaylanan izin oturumda hatırlanır; ikinci Başlat oturumu öldürmez
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "oku-izni"})
     ok("Read, Grep, toplanti-claude.py saglik ve dokum kartsız izinli", claude_der("Okuma: allow/allow/allow/allow") and not izin_kartlari() and not izinler())
+    # 31 Ekim: rutin adımlar (agenda/hazir/özet yazımı, bekleme, kayıt komutu, özet klasöründe mv) kartsız; dışındakiler sorulur
+    os.makedirs(os.path.join(proje, "gorusmeler"), exist_ok=True)
+    try: os.symlink("/etc/hosts", os.path.join(proje, "gorusmeler", "kacak.md"))
+    except OSError: pass
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "rutin-ok"})
+    ok("rutin adımlar (agenda.json, hazir.json, özet .md/.yapi.json, sleep, python bekleme, maliyet, mv) kartsız izinli",
+       claude_der("Oto: " + "/".join(["allow"] * 9)) and not izin_kartlari() and not izinler())
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "rutin-disi"}); kesin = 0
+    for _ in range(12):
+        k = izin_bekle_(8)
+        if not k: break
+        kesin += 1; uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"}); time.sleep(0.4)
+    ok(f"kuralın dışı (başka yol, .., sembolik bağ, .sh, sleep 121, metakarakter, eylem onay, mv dışarı, yeni satır) hepsi sorulur ({kesin}/12)",
+       kesin == 12 and claude_der("Disi: " + "/".join(["deny"] * 12)))
+    _lg = open(os.path.join(T, "relay.log"), encoding="utf-8", errors="replace").read()
+    ok("otomatik izinler günlüğe İZİN: otomatik satırı olarak yazıldı", "İZİN: otomatik — Write agenda.json" in _lg and "İZİN: otomatik — Bash bekleme 5 sn" in _lg)
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "yazma-izni"}); k = izin_bekle_(); ok("toplanti-claude.py eylem ekle (yazma) yine sorulur", len(k) == 1)
     if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"})
     claude_der("Yazma: deny")
@@ -223,6 +262,12 @@ try:
         return (json.loads(r.stdout).get("hookSpecificOutput") or {}).get("permissionDecision") if r.stdout.strip() else None
     bos = os.path.join(T, "ayar-bos.json"); json.dump({k_: v_ for k_, v_ in json.load(open(ay)).items() if k_ != "toplanti_bilgi_kaynaklari"}, open(bos, "w"))
     M = "mcp__claude_ai_Deneme_Metrik__"
+    def kanca_bash(c):
+        r = subprocess.run(["/usr/bin/python3", "-I", "-B", os.path.join(T, "toplanti-claude.py"), "--dir", canli, "--relay", "http://127.0.0.1:1", "izin-kanca"],
+                           input=json.dumps({"tool_name": "Bash", "tool_input": {"command": c}}), capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=ay), timeout=30)
+        return (json.loads(r.stdout).get("hookSpecificOutput") or {}).get("permissionDecision") if r.stdout.strip() else None
+    ok("kanca: python ile bekleme (1–120 sn) riskli sayılmaz; başka satır içi python ve 121 sn yine sorulur (ask: aktarıcı yok)",
+       kanca_bash('python3 -c "import time; time.sleep(3)"') is None and kanca_bash('python3 -c "import time; time.sleep(121)"') == "ask" and kanca_bash("python3 -c 'print(1)'") == "ask")
     ok("kanca: okuma aracında karar yok", kanca(M + "get_store_sales", ay) is None and kanca(M + "compare_channels", ay) is None)
     ok("kanca: okuma dışı araç deny", kanca(M + "update_campaign_settings", ay) == "deny" and kanca(M + "export_report", ay) == "deny" and kanca(M + "get_budget_set", ay) == "deny")
     ok("kanca: başka bağlayıcıda değişiklik yok", kanca("mcp__claude_ai_Baska__get_messages", ay) is None)

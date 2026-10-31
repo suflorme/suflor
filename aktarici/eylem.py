@@ -78,7 +78,9 @@ def _geri_al_sn(x):
     return max(0, round(GERI_AL_SN - (time.time() - (x.get("karar_t") or 0)), 1))
 def eylem_view():
     xs = eylem_gorunen(); soru_zaman()
-    return {"liste": [dict({k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc", "kaynak", "ses_metin", "yerel")}, geri_al_sn=_geri_al_sn(x)) for x in xs],
+    # izin işinin ayrıntısı makine verisidir (JSON: araç, özet, ne); kullanıcıya yalnız başlık cümlesi gösterilir (31 Ekim: kartta ham JSON görünüyordu)
+    return {"liste": [dict({k: x.get(k) for k in ("id", "at", "tur", "baslik", "ayrinti", "kim", "durum", "sunuldu", "sonuc", "kaynak", "ses_metin", "yerel")},
+                           geri_al_sn=_geri_al_sn(x), **({"ayrinti": ""} if x["tur"] == "izin" else {})) for x in xs],
             "bekleyen": sum(1 for x in xs if x["durum"] == "bekliyor"), "sesli": SORU["aktif"]} if xs else None
 def cards_view():
     ertele_kontrol()

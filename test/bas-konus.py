@@ -50,7 +50,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True, "konus_on_ac": True, "konus_iki_surec": True}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True, "konus_on_ac": True, "konus_iki_surec": True, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
@@ -286,7 +286,7 @@ try:
     import re as _re
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
     import threading as _th0
-    ad_ = {"re": _re, "time": time, "threading": _th0, "print": lambda *a, **k: None, "konusma_dili": lambda m: m, "SES": {"kes": 0}, "kisilik_sesi": lambda *a, **k: ("pocket", None, 1.0)}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False, cal=None: okunan_.append(m) or True
+    ad_ = {"re": _re, "time": time, "threading": _th0, "print": lambda *a, **k: None, "konusma_dili": lambda m: m, "SES": {"kes": 0}, "kisilik_sesi": lambda *a, **k: ("pocket", None, 1.0)}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False, cal=None, ozet=False: okunan_.append(m) or True
     exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)
     t_ = {"tampon": "Vay! Birinci cümle burada. İkinci cümle de var. Üçüncü cümle geliyor. Dördüncü cümle de. Beşinci cümle son. Altıncı okunmamalı. Yedinci de okunmamalı"}
     ad_["_konus_cumle"](t_); ad_["_konus_cumle"](t_, son=True)

@@ -2586,6 +2586,7 @@ def rapor_cmd():
 # gönderme, tarayıcıyı yönetme gibi araçları onaysız çalıştırıyordu; döküm/davet/e-postadaki gizli talimata karşı teknik engel yoktu. Bu kanca riskli araçta
 # aktarıcıya sorar (/izin-iste, anahtarlı) ve kullanıcının kararını Claude Code'a verir: onay → allow, red → deny, cevap yok/aktarıcı yok → ask (Terminal'de tık).
 IZIN_BASH = re.compile(r"(?:^|[;&|(]\s*|\bxargs\s+(?:-\S+\s+)*)(?:\w+=\S*\s+)*(?:/usr/bin/)?python3?(?:\.\d+)?\s+(?:-[IBEsSuOq]+\s+)*(?:-c\b|-\s*(?:<|$|\|))", re.M)
+IZIN_BEKLE_RX = re.compile(r"^(?:/usr/bin/)?python3 (?:-[BIu]+ )?-c (['\"])import time; ?time\.sleep\((\d{1,3})\)\1$")  # yalnız bekleme: riskli sayılmaz (aktarici/toplanti-oturum.py TOPO_PYSLEEP_RX ile aynı; 1–120 sn)
 IZIN_MCP = re.compile(r"send|forward|reply|create_event|update_event|delete|trash|javascript|navigate|computer|form_input|file_upload|share_file|upload|"
                       r"move_item|rename_item|update_file|create_file|copy_file|respond_to_event|set_vacation|create_filter|label_", re.I)
 # Dış bilgi kaynağı (30 Ekim): ayar toplanti_bilgi_kaynaklari — ayardaki MCP sunucusunun okuma dışı aracı (ad deseni ya da listeye uymayan) burada reddedilir;
@@ -2618,7 +2619,10 @@ def izin_kanca_cmd():
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                                  "permissionDecisionReason": "Bu araç bilgi kaynağının okuma araçlarından değil (Suflor); toplantıda yalnız okuma araçları kullanılır."}}, ensure_ascii=False))
         return
-    if ad == "Bash": c = str(gi.get("command") or ""); risk = IZIN_BASH.search(c); arac, ozet = "Bash (satır içi python)", c
+    if ad == "Bash":
+        c = str(gi.get("command") or ""); risk = IZIN_BASH.search(c); bm = IZIN_BEKLE_RX.match(c.strip())
+        if bm and 1 <= int(bm.group(2)) <= 120: risk = None
+        arac, ozet = "Bash (satır içi python)", c
     elif ad.startswith("mcp__"): arac = ad.split("__")[-1]; risk = IZIN_MCP.search(arac); ozet = json.dumps(gi, ensure_ascii=False)
     else: return
     if not risk: return  # karar yok: oturumun kendi izin kuralları

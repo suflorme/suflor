@@ -5,7 +5,7 @@ import shutil, json, os, sys, subprocess, tempfile, time, urllib.request, urllib
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8795)
 T = tempfile.mkdtemp(prefix="yaz-"); canli = os.path.join(T, "canli"); os.makedirs(canli)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": os.path.join(T, "yok")}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": os.path.join(T, "yok"), "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))  # özet yalnız Pocket ayarlıysa okunur (deneme kipinde ses çalınmaz)
 for f in ("relay.py", "manifest.json"): subprocess.run(["cp", os.path.join(KOD, f), T])
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 subprocess.run(["cp", "-R", os.path.join(KOD, "pano"), T]); open(os.path.join(T, "ozet.md"), "w").write("# özet\n")
