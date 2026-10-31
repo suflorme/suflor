@@ -755,6 +755,7 @@ globalThis.SUFLOR_EN = {
   "Denetim sonucu alınamadı": "Could not get the check result",
   "{ok} ✓ · {hata} ✗ · {bil} ?": "{ok} ✓ · {hata} ✗ · {bil} ?",
   "Hiçbir madde ✗ değil": "No item is ✗",
+  "Sık görülen sorunlar ve çözümleri: Kılavuz → Sorun giderme": "Common problems and fixes: Guide → Troubleshooting (Turkish)",
   // --- Faz D2 (v0.148.0): Deneme toplantısı
   "Deneme toplantısı (3 dk)": "Test meeting (3 min)",
   "Deneme toplantısı": "Test meeting",
