@@ -9,7 +9,7 @@ def ok(ad, k):
     if not k: HATA.append(ad)
 BASE = tempfile.mkdtemp(prefix="defter-"); os.makedirs(os.path.join(BASE, "gundemler")); os.makedirs(os.path.join(BASE, "ozetler"))
 STATE = {"file": None, "file_last": {}}; AYAR = {}; ARAYUZ_DILI = "tr"; BRIFING = {}; SON = []
-_t = lambda a, b: a; toplanti_var = lambda: False
+_t = lambda a, b: a; toplanti_var = lambda: False; toplanti_durum = lambda: "bos"
 _AY_TR = ("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
 simdi = datetime.datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)  # sabit öğlen: dosya adları gece yarısında da aynı güne sığar
 class _Saat:  # defter.py'nin gördüğü saat (dosya saatleri de buna göre)
@@ -64,6 +64,9 @@ AYAR["konus_defter_saat"] = 0; yenile(); ok("ayar 0 → defter yok", defter_topl
 AYAR["konus_defter_saat"] = 0.02; yenile(); ok("son yazma sınırdan eski → defter yok (2 dk > 1,2 dk)", defter_toplanti() is None)
 AYAR.pop("konus_defter_saat"); yenile(); ok("varsayılan 3 saat içinde → var", defter_toplanti() is not None)
 toplanti_var = lambda: True; ok("toplantı sürerken panoda satır yok", defter_view() is None); toplanti_var = lambda: False
+for _d in ("algilandi", "suruyor"):
+    toplanti_durum = lambda: _d; ok(f"yeni toplantı {_d} (ilk satırdan önce de) panoda öncekinin satırı yok", defter_view() is None)
+toplanti_durum = lambda: "bitiyor"; ok("toplantı bitiyorken satır görünür (biten toplantı)", defter_view() is not None); toplanti_durum = lambda: "bos"
 # önbellek: toplantı değişince hemen
 STATE["file"] = c; ok("toplantı değişince önbellek beklemez", (defter_toplanti() or {}).get("dosyalar") == [c])
 # uzun toplantı → kısa defter: işaretli satırlar + son 30 dk + tam dosya yolu

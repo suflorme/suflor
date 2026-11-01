@@ -139,6 +139,6 @@ def defter_metni(d=None):
     k = "\n".join(p) + "\n\n" + (oz + "\n\n" if oz else "") + kisiler + "\n\n" + "\n\n".join(kisa)
     return k[-DEFTER_EN_COK:] if len(k) > DEFTER_EN_COK else k, True
 def defter_view():  # /status konus.defter: panoda "Son toplantı hazır" satırı (toplantı yokken)
-    if toplanti_var(): return None
+    if toplanti_var() or toplanti_durum() in ("algilandi", "suruyor"): return None  # yeni toplantı algılanınca (ilk satırı beklerken de) öncekinin satırı kalkar
     d = defter_toplanti()
     return {"ad": d["ad"], "saat": datetime.datetime.fromtimestamp(d["son"]).strftime("%H:%M")} if d else None

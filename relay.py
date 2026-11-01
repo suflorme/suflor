@@ -253,7 +253,7 @@ def _log(name, rec):
 # aktif dosyada kalır (yakın toplantıların ölçümü bozulmasın), eskisi canli/arsiv/<ad>.gz'ye eklenir (gzip ardışık üyeler; olcum.py ikisini
 # birlikte okur). Durum dosyaları (kartlar, sorular, eylemler) döndürülmez: sonradan gelen durum satırları eski kayda bağlanır, küçükler.
 # Toplantı sürerken yapılmaz (izle-paketler başka süreçten kilitsiz eklenir). Açılışta ve 6 saatte bir.
-KAYIT_DONEN = ("whisper-isler.jsonl", "izle-paketler.jsonl", "claude-cagri.jsonl", "uydurma-adaylari.jsonl", "sistem-izi.jsonl")
+KAYIT_DONEN = ("whisper-isler.jsonl", "izle-paketler.jsonl", "claude-cagri.jsonl", "uydurma-adaylari.jsonl", "sistem-izi.jsonl", "ses-izi-kapi.jsonl")
 KAYIT_SINIR = int(os.environ.get("SUFLOR_KAYIT_SINIR_KB") or 2048) * 1024; KAYIT_KALAN = KAYIT_SINIR // 2
 def kayit_dondur():
     import gzip

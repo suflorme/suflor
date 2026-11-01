@@ -473,6 +473,11 @@ def _isci_dongu():
         # kullanıcı kanalında ses izi: oda açıksa ad için, değilse yalnız ses kilidi için ("Claude:" komutu kullanıcının sesi mi; ayar ses_kilidi)
         if is_["kanal"] == "ben" and not is_.get("bas") and (oda_acik() or AYAR.get("ses_kilidi", True) is not False): istek["oda"] = is_["oda"] = True
         if is_.get("bas") and is_.get("oto_dil"): istek["oto_dil"] = True  # v0.101.4: Konuş sorusunun ilk parçası — dil Whisper'dan (yalnız tr/en)
+        if is_["kanal"] == "ben" and not is_.get("bas") and kapi_acik():  # gölge kip: profil varsa işçi pencere benzerliklerini de döndürür
+            try: kp = kapi_profil_b64()
+            except Exception: kp = None
+            is_["kapi_istendi"] = True
+            if kp: istek["kapi_profil"] = kp; is_["kapi_profil_var"] = True
         if is_.get("iz_iste"): istek["iz_iste"] = True  # sohbet sorusu: ses izi süzgeci (aktarici/sohbet.py sohbet_ses_izi_red)
         try:
             _ISCI["p"].stdin.write(json.dumps(istek) + "\n"); _ISCI["p"].stdin.flush()
@@ -512,6 +517,7 @@ def _isci_dongu():
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
             is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz", "bol") if j.get(k)} or None) or "satir"
         is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
+        kapi_kaydet(is_, sonuc, metin, j)
         if KANALLAR.get(is_["kanal"]) is not None: KANALLAR[is_["kanal"]].sonuclar.append((time.time(), sonuc))  # otonom: kanal sözsüz ses mi (kanal_sozsuz)
         if AYAR.get("parca_kaydet"): parca_kaydet(is_, istek, j, sonuc)
 # Teşhis (v0.29.2, 12 Ekim: İngilizce YouTube denemesinde karşı kanalın 62 parçası "uydurma"; ses saklanmadığı için neden bilinemedi): ayar
@@ -658,6 +664,54 @@ def kullanici_benzer(iz):  # parçanın ses izi ile kullanıcı profilinin (ses-
     except Exception: return None
     n = math.sqrt(sum(x * x for x in ODA["profil"])) or 1.0
     return sum(a * x / n for a, x in zip(v, ODA["profil"]))
+# --- Ses izi kapısı, gölge kip (2 Kasım; çevrimdışı deneme: _yedek/test-araclari/kalabalik/SONUC.md, "C-kırp") -----------------------------------------
+# "ben" kanalı parçasını işçi 1,5 sn / 0,5 sn pencerelerle tarar (whisper-isci.py kapi_benzerlik) ve pencere benzerliklerini döndürür; burada eşik başına karar
+# hesaplanıp yalnız canli/ses-izi-kapi.jsonl'e yazılır (metin yok, yalnız sayı). Whisper'a giden ses, satırlar, whisper-isler.jsonl DEĞİŞMEZ.
+# Profil: ses-izi-ben.json (oda_kim, toplantıdaki "ben" parçalarından kurar; mikrofona özgü değil). Yoksa istekte profil yok, işçi hesaplamaz. Ayar ses_izi_kapi: false kapatır.
+KAPI_ESIKLER = [0.15, 0.20, 0.25, 0.30]; KAPI = {"pb": None, "anahtar": None, "mik": (0.0, "?")}
+def kapi_acik(): return AYAR.get("ses_izi_kapi", True) is not False
+def kapi_esikler():
+    e = AYAR.get("ses_izi_kapi_esikler")
+    try:
+        l = sorted({float(x) for x in e}) if isinstance(e, (list, tuple)) and e else []
+        if l and all(-1.0 <= x <= 1.0 for x in l): return l
+    except (TypeError, ValueError): pass
+    return list(KAPI_ESIKLER)
+def kapi_profil_b64():  # kullanıcı profili (birim vektör, float16 base64); yoksa None. Profil güncellendikçe (ODA["sn"]) yeniden kodlanır
+    if not ODA["yuklendi"]:
+        ODA["yuklendi"] = True
+        try: x = json.load(open(_oda_yol(), encoding="utf-8")); ODA.update(profil=_iz_coz(x["iz"]), sn=float(x.get("sn") or 0))
+        except (OSError, ValueError, KeyError, TypeError, struct.error): pass
+    pr = ODA["profil"]
+    if not pr: return None
+    k = (len(pr), round(ODA["sn"], 1))
+    if KAPI["anahtar"] != k:
+        n = math.sqrt(sum(x * x for x in pr)) or 1.0
+        KAPI["pb"] = base64.b64encode(struct.pack(f"<{len(pr)}e", *(x / n for x in pr))).decode(); KAPI["anahtar"] = k
+    return KAPI["pb"]
+def kapi_karar(pencere, esikler):  # → ({eşik: gecir|kirp|at}, {eşik: kırpılan pencere payı}); eşik anahtarı "0.15"
+    karar, pay = {}, {}
+    for e in esikler:
+        ust = sum(1 for x in pencere if x >= e); n = len(pencere); a = f"{e:.2f}"
+        karar[a] = "gecir" if ust == n else ("at" if ust == 0 else "kirp"); pay[a] = round(1 - ust / n, 2)
+    return karar, pay
+def _kapi_mikrofon():  # girişin bağlantı türü (sohbet.py _giris_turu); 60 sn önbellekli
+    t, v = KAPI["mik"]
+    if time.time() - t > 60:
+        try: v = _giris_turu() if "_giris_turu" in globals() else "?"
+        except Exception: v = "?"
+        KAPI["mik"] = (time.time(), v)
+    return v
+def kapi_kaydet(is_, sonuc, metin, j):  # kayıt satırı; metnin kendisi yazılmaz
+    if not kapi_acik() or not is_.get("kapi_istendi"): return
+    pen = j.get("kapi")
+    r = {"t": round(time.time(), 2), "kanal": "ben", "parca_sn": round(is_["t1"] - is_["t0"], 2), "profil": bool(is_.get("kapi_profil_var")), "sonuc": sonuc, "harf": sum(1 for c in (metin or "") if c.isalpha()),
+         "mikrofon": _kapi_mikrofon(), **({"birlesik": is_["birlesik"]} if is_.get("birlesik") else {})}
+    if pen:
+        karar, pay = kapi_karar(pen, kapi_esikler())
+        r.update(pencere=pen, karar=karar, kirp_pay=pay, atilan_harf=int(j.get("atilan_harf") or 0), ek_ms=j.get("kapi_ms"))
+    try: _log("ses-izi-kapi.jsonl", r)
+    except Exception: pass
 def kume_sifirla(): KUME_AD.clear(); del KUME_BEKLEYEN[:]; del CAP_OY[:]; KUME_IZ.clear(); KUME_HAFIZA.clear()
 def konusmaci_karsi(t0, t1, kume=None):
     ben = ben_adi(); now = time.time()

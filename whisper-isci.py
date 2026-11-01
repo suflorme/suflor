@@ -255,6 +255,17 @@ def kumele(iz, ks, a, np, e=None):
     if uzun and len(ks) < KUME_EN_COK:
         ks.append([e, 1]); return {"kume": f"k{len(ks)}", "benzerlik": round(max(sim), 2) if sim else None}
     return {"kume": None}
+# Ses izi kapısı, gölge kip (2 Kasım): "ben" kanalı parçası 1,5 sn pencere / 0,5 sn adımla taranır, her pencerenin kullanıcı profiline kosinüs benzerliği döner.
+# Karar aktarıcıda (yalnız kayda yazılır; Whisper'a giden ses değişmez). Kısa parça (≤ 1,5 sn) tek pencere; sonda 0,25 sn'den fazla açıkta kalırsa sona hizalı son pencere.
+KAPI_PEN_SN, KAPI_ADIM_SN, KAPI_EN_COK = 1.5, 0.5, 40
+def kapi_pencereler(n, sr=SR):
+    w, h = int(KAPI_PEN_SN * sr), int(KAPI_ADIM_SN * sr)
+    if n <= w: return [(0, n)]
+    o = [(i, i + w) for i in range(0, n - w + 1, h)]
+    if o[-1][1] < n - sr // 4: o.append((n - w, n))
+    return o[:KAPI_EN_COK]
+def kapi_benzerlik(iz, a, profil, np):  # profil: birim vektör; dönen: pencere başına kosinüs (2 ondalık)
+    return [round(float(np.dot(iz(a[b:e]), profil)), 2) for b, e in kapi_pencereler(len(a))]
 # Whisper istemi en çok 223 belirteç (n_text_ctx // 2 - 1) ve aşınca BAŞINI atar — baştaki en önemli terimler düşüyordu. Önceki
 # metne son ONCEKI_EN_COK belirteç, kalan bütçeye terimler sırayla ve bütün olarak (aktarıcı önem sırasıyla dizer); payı 8.
 ISTEM_SINIR, ONCEKI_EN_COK = 223 - 8, 60
@@ -391,7 +402,13 @@ def main():
                         km["bol"] = [dict({"s": round(sg["start"], 2), "e": round(sg["end"], 2), "n": len(x.split())},
                                           **({"iz": b64(iz(a[int(sg["start"] * SR):int(sg["end"] * SR)]))} if (sg["end"] - sg["start"]) >= 0.5 else {})) for sg, x in tut]
                 except Exception as e: km = {"kume_hata": f"{e.__class__.__name__}: {str(e)[:120]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **km})
+            kapi = {}
+            if iz and p.get("kanal") == "ben" and p.get("kapi_profil") and len(a) >= SR * 0.3:  # gölge kip: yalnız ölçer, metni/sesi değiştirmez
+                try:
+                    t_k = time.time(); pf = np.frombuffer(base64.b64decode(p["kapi_profil"]), np.float16).astype(np.float32); pf = pf / (np.linalg.norm(pf) + 1e-9)
+                    kapi = {"kapi": kapi_benzerlik(iz, a, pf, np), "kapi_ms": round((time.time() - t_k) * 1000), "atilan_harf": sum(len(re.findall(r"\w", x)) for x in atilan)}
+                except Exception as e: kapi = {"kapi_hata": f"{e.__class__.__name__}: {str(e)[:80]}"}
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **km, **kapi})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0
