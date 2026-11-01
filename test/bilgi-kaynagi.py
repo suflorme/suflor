@@ -66,7 +66,7 @@ kontrol("okuma önekleri Swift'te aynı", re.findall(r'"(\w+)"', re.search(r"let
 
 # 4. bas-konus.py: kaynak seçimi, istem eki, sağlama
 kod = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-ns = {"time": time, "BEYIN": BY, "AYAR": {}, "_KS": {}, "print": lambda *x: ns["_g"].append(" ".join(map(str, x))), "_g": [],
+ns = {"time": time, "re": __import__("re"), "BEYIN": BY, "AYAR": {}, "_KS": {}, "print": lambda *x: ns["_g"].append(" ".join(map(str, x))), "_g": [],
       "_t": lambda tr, en: tr, "bilgi_kaynaklari": lambda: [dict(K)], "gizli_acik": lambda: ns["_gizli"], "_gizli": False}
 exec(kod[kod.index("BILGI_YEDEK_SN = "):kod.index("def konus_istem(")], ns)
 exec(kod[kod.index("BILGI_ILK_SN, "):kod.index("def _konus_oku(")], ns)
@@ -97,14 +97,25 @@ for st in ("failed", "needs-auth"):
     yeni(); ns["bilgi_saglama"](durum(st))
     kontrol(f"{st}: ilk init'te hemen yedek (günlük + 30 dk)", ns["_g"] == [f"KONUŞ: bilgi kaynağı bağlanamadı — {AD} ({st})"] and 1790 < ns["_KS"]["bilgi_yedek_t"] - time.time() <= 1800, ns["_g"])
     kontrol(f"  yedek sürerken kaynaksız ({st})", ns["konus_bilgi_kaynaklari"]() == [])
-yeni(); ns["bilgi_saglama"](init([], [])); ns["bilgi_saglama"](durum("pending"))
+yeni(t0=time.time() - 10); ns["bilgi_saglama"](init([], [])); ns["bilgi_saglama"](durum("pending"))
 kontrol("60 sn içinde 2 turda hiç connected yok → yedek", ns["_g"] == [f"KONUŞ: bilgi kaynağı bağlanamadı — {AD} (pending)"] and ns["_KS"].get("bilgi_yedek_t"), ns["_g"])
 yeni(t0=time.time() - 61); ns["bilgi_saglama"](init([], [])); ns["bilgi_saglama"](init([], [])); ns["bilgi_saglama"](durum("pending"))
 kontrol("60 sn geçtikten sonra boş/pending turları yedeğe geçirmez", not ns["_KS"].get("bilgi_yedek_t") and ns["_g"] == [], ns["_g"])
 yeni(); ns["bilgi_saglama"](BAGLI); ns["bilgi_saglama"](init([], [])); ns["bilgi_saglama"](init([], []))
 kontrol("bir kez connected görüldükten sonra boş turlar yedeğe geçirmez", not ns["_KS"].get("bilgi_yedek_t"))
-yeni(); ns["bilgi_saglama"](init([{"name": "claude.ai Ornek Kaynak", "status": "connected"}], ["Read"])); ns["bilgi_saglama"](init([{"name": "claude.ai Ornek Kaynak", "status": "connected"}], ["Read"]))
+yeni(t0=time.time() - 10); ns["bilgi_saglama"](init([{"name": "claude.ai Ornek Kaynak", "status": "connected"}], ["Read"])); ns["bilgi_saglama"](init([{"name": "claude.ai Ornek Kaynak", "status": "connected"}], ["Read"]))
 kontrol("bağlı ama araç yok: sayılır, 2 turda yedek (araç yok)", ns["_g"] == [f"KONUŞ: bilgi kaynağı bağlanamadı — {AD} (araç yok)"], ns["_g"])
+yeni(); ns["bilgi_saglama"](init([], [])); ns["bilgi_saglama"](durum("pending")); ns["bilgi_saglama"](durum("pending"))
+kontrol("bağlanma süresi (8 sn) içindeki erken turlar yedeğe geçirmez", not ns["_KS"].get("bilgi_yedek_t") and ns["_g"] == [], ns["_g"])
+# 4b. Yeni süreçte kaynağı anan soru bağlantıyı bekler (1 Kasım canlı: ilk soru 6 sn'lik bağlantıdan önce gidip "bağlanamıyorum" dedi)
+yeni(); b = ns["bilgi_bekle_sn"]("Örnek verisine göre son 7 günün satışı?")
+kontrol("yeni süreç + soru kaynağı anıyor → ~8 sn bekle", 7 < b <= 8, b)
+kontrol("büyük harf / İ ile de tanır", ns["bilgi_bekle_sn"]("ÖRNEK KAYNAĞI'NDAN ne var?") > 0)
+kontrol("kaynağı anmayan soru beklemez", ns["bilgi_bekle_sn"]("Bugün günlerden ne?") == 0)
+yeni(t0=time.time() - 9); kontrol("süreç 8 sn'den eskiyse beklemez", ns["bilgi_bekle_sn"]("Örnek verisi?") == 0)
+yeni(); ns["bilgi_saglama"](BAGLI); kontrol("kaynak bu süreçte bağlandıysa beklemez", ns["bilgi_bekle_sn"]("Örnek verisi?") == 0)
+yeni(); ns["_KS"].update(bilgi_bekle=[]); kontrol("kaynaksız süreçte beklemez", ns["bilgi_bekle_sn"]("Örnek verisi?") == 0)
+kontrol("gonder() soruyu yazmadan önce bekler", kod.index("bks = bilgi_bekle_sn(ms)") < kod.index('tur["t_gonder"] = time.time(); tur.pop("t_ilk_yanit"'))
 ns["_KS"]["bilgi_yedek_t"] = time.time() - 1; kontrol("yedek süresi dolunca kaynak geri gelir", len(ns["konus_bilgi_kaynaklari"]()) == 1)
 yeni(); ns["_KS"].update(bilgi_bekle=[]); ns["bilgi_saglama"](init([], [])); kontrol("kaynaksız süreçte sağlama sessiz", ns["_g"] == [])
 rl = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); gd = rl[rl.index("def gizli_degistir("):rl.index("def gizli_view(")]

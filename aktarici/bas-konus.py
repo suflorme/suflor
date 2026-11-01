@@ -992,6 +992,17 @@ def sesli_terim_suz(c):
     if o != c: print(f"KONUŞ: sesli kısımda iç terim süzüldü")
     return o.strip() or c
 BILGI_ILK_SN, BILGI_ILK_TUR = 60, 2
+BILGI_BAGLAN_SN = 8  # bağlayıcı süreç açılışından ~6 sn sonra bağlanır (1 Kasım ölçümü); bu süreden önceki "pending" tur bozuk sayılmaz
+def bilgi_bekle_sn(soru):  # → soruyu sürece yazmadan önce beklenecek sn: soru bekleyen kaynağın adını anıyor, kaynak bu süreçte henüz bağlanmadı ve süreç yeni açıldıysa
+    bekle = _KS.get("bilgi_bekle") or []
+    if not bekle: return 0
+    yas = time.time() - _KS.get("bilgi_t0", 0); kalan = BILGI_BAGLAN_SN - yas
+    if kalan <= 0: return 0
+    s = (soru or "").replace("İ", "i").replace("I", "ı").lower()
+    for sn, ad in bekle:
+        if sn in (_KS.get("bilgi_bagli") or set()): continue
+        if any(len(k) >= 4 and k[:4] in s for k in re.findall(r"\w+", ad.replace("İ", "i").replace("I", "ı").lower())): return round(kalan, 1)
+    return 0
 def bilgi_saglama(init):  # stream-json'da her turun başında init gelir (ilk tur süreç açılır açılmaz gelirse mcp_servers boş/pending: "henüz bağlanmadı", bozuk sayılmaz).
     # Yedek (BILGI_YEDEK_SN kaynaksız, bugünkü strict düzen) yalnız: kaynak failed/needs-auth ya da süreç açılışından BILGI_ILK_SN içinde en az BILGI_ILK_TUR turda hiç connected görülmedi.
     bekle = _KS.get("bilgi_bekle") or []
@@ -1006,7 +1017,7 @@ def bilgi_saglama(init):  # stream-json'da her turun başında init gelir (ilk t
         elif sn in bagli: continue
         elif d in ("failed", "needs-auth"): kesin.append((ad, d))
         else: henuz.append((ad, d if d != "connected" else "araç yok"))
-    if henuz: _KS["bilgi_tur"] = _KS.get("bilgi_tur", 0) + 1
+    if henuz and time.time() - _KS.get("bilgi_t0", 0) >= BILGI_BAGLAN_SN: _KS["bilgi_tur"] = _KS.get("bilgi_tur", 0) + 1  # bağlanma süresi içindeki erken tur sayılmaz
     if not kesin and henuz and _KS["bilgi_tur"] >= BILGI_ILK_TUR and time.time() - _KS.get("bilgi_t0", 0) <= BILGI_ILK_SN and not bagli: kesin = henuz
     for ad, d in kesin: print(f"KONUŞ: bilgi kaynağı bağlanamadı — {ad} ({d})")
     if kesin: _KS["bilgi_yedek_t"] = time.time() + BILGI_YEDEK_SN; _KS["bilgi_bekle"] = []
@@ -1799,6 +1810,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else (uclu_ozel_blok if "uclu_ozel_blok" in globals() else kart_ozel_blok)(tur.get("kisi") or kisilik_ad())  # üçlü: ayar uclu_sohbet_ozel_paylas açıkken iki bölüm
         if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
         ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi")) + _etiket_tur_notu(tur)  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
+        bks = bilgi_bekle_sn(ms)
+        if bks:  # yeni açılan süreçte kaynağı anan soru bağlantıdan önce giderse "bağlanamıyorum" der (1 Kasım canlı deneme)
+            print(f"KONUŞ: bilgi kaynağının bağlanması bekleniyor ({bks} sn)"); time.sleep(bks)
         tur["t_gonder"] = time.time(); tur.pop("t_ilk_yanit", None)  # v0.77.3 ölçüm: soru sürece yazıldı (yeniden gönderimde de)
         try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + obl + selam_notu(tur.get("selam")) + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + gnb + (uclu_blok(tur) if "uclu_blok" in globals() else "") + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + _uclu_hitap_notu(tur) + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} cevap veremedi — yeniden bas", f"{asistan_ad()} couldn't answer — press again")); konus_kapat("yazılamadı"); return
