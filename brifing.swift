@@ -172,11 +172,40 @@ if j["kip"] as? String == "toplanti" {
 // izin listesi: değersiz bayraklar, değerli bayraklar (değer denetimiyle); -p'den hemen sonraki tek metin istemdir, başka konumsal argüman yok
 let tekBayrak: Set<String> = ["-p", "--print", "--verbose", "--include-partial-messages", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"]
 let araclar: Set<String> = ["Read", "Grep", "Glob"]
-func aracUygun(_ v: String) -> Bool { v.split(separator: ",").allSatisfy { let t = $0.trimmingCharacters(in: .whitespaces); return araclar.contains(t) || t.hasPrefix("mcp__suflorvt__") } }
-func ayarUygun(_ v: String) -> Bool {  // --settings: yalnız {"env": {CLAUDE_CODE_DISABLE_CLAUDE_MDS, CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS}} (kanca, izin, model yok)
-    guard let d = v.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], Set(o.keys) == ["env"],
-          let e = o["env"] as? [String: Any] else { return false }
-    return Set(e.keys).isSubset(of: ["CLAUDE_CODE_DISABLE_CLAUDE_MDS", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"]) && e.values.allSatisfy { $0 is String }
+// Dış bilgi kaynağı araçları (Konuş, 1 Kasım): mcp__<sunucu>__<okuma önekli desen>; sunucu adında "__" yok, desen yalnız [A-Za-z0-9_*], okuma öneki
+// (get|list|query|compare|search|fetch|read|describe|lookup|find)_ ile başlar ve "_" parçalarında yazma sözcüğü yok. Python'daki beyin.py BILGI_YAZMA ile AYNI küme:
+// ikisini birlikte değiştir (test/bilgi-kaynagi.py eşitliği denetler). mcp__suflorvt__ eskisi gibi.
+let bilgiYazma: Set<String> = ["send", "forward", "reply", "create", "update", "delete", "remove", "trash", "upload", "share", "move", "rename", "copy", "respond", "set", "write",
+    "post", "put", "patch", "edit", "modify", "add", "insert", "pause", "resume", "enable", "disable", "publish", "archive", "cancel", "approve", "execute",
+    "run", "javascript", "navigate", "computer", "label", "draft", "mark", "schedule", "import", "sync", "trigger", "start", "stop", "apply", "assign",
+    "invite", "grant", "revoke", "reset", "change", "save", "submit", "merge", "duplicate", "launch", "activate", "deactivate"]
+let bilgiOkuma: [String] = ["get", "list", "query", "compare", "search", "fetch", "read", "describe", "lookup", "find"]
+func bilgiAracUygun(_ t: String) -> Bool {
+    guard t.hasPrefix("mcp__") else { return false }
+    let r = String(t.dropFirst(5)), p = r.components(separatedBy: "__")
+    guard p.count == 2, p[0].range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil else { return false }
+    let d = p[1]
+    guard d.range(of: "^(get|list|query|compare|search|fetch|read|describe|lookup|find)_[A-Za-z0-9_*]*$", options: .regularExpression) != nil else { return false }
+    return Set(d.lowercased().replacingOccurrences(of: "*", with: "").components(separatedBy: "_")).isDisjoint(with: bilgiYazma)
+}
+func aracUygun(_ v: String) -> Bool { v.split(separator: ",").allSatisfy { let t = $0.trimmingCharacters(in: .whitespaces); return araclar.contains(t) || t.hasPrefix("mcp__suflorvt__") || bilgiAracUygun(t) } }
+func ayarUygun(_ v: String) -> Bool {  // --settings: yalnız "env" (CLAUDE_CODE_DISABLE_CLAUDE_MDS, CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS) ve "allowedMcpServers" (kanca, izin, model yok)
+    guard let d = v.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], !o.isEmpty, Set(o.keys).isSubset(of: ["env", "allowedMcpServers"]) else { return false }
+    if let e0 = o["env"] {
+        guard let e = e0 as? [String: Any], Set(e.keys).isSubset(of: ["CLAUDE_CODE_DISABLE_CLAUDE_MDS", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"]),
+              e.values.allSatisfy({ $0 is String }) else { return false }
+    }
+    if let a0 = o["allowedMcpServers"] {
+        guard let a = a0 as? [[String: Any]], a.count >= 1, a.count <= 4 else { return false }
+        for k in a {
+            if Set(k.keys) == ["serverUrl"] {
+                guard let u = k["serverUrl"] as? String, u.hasPrefix("https://"), u.count <= 200, u.count > 8,
+                      u.range(of: "^https://[^\\s\"'\\\\]+$", options: .regularExpression) != nil else { return false }
+            } else if Set(k.keys) == ["serverName"] { guard k["serverName"] as? String == "suflorvt" else { return false } }
+            else { return false }
+        }
+    }
+    return true
 }
 // --mcp-config: yalnız istek klasöründeki konus-mcp.json ve içeriği tek sunucu "suflorvt" = /usr/bin/python3 -I -B <uygulama>/toplanti-claude.py --dir <istek klasörü> vt-mcp.
 // Denetlenen içerik Claude'a dosya yolu olarak değil metin olarak verilir (denetimden sonra dosya değişse de fark etmez).
@@ -215,6 +244,10 @@ while k < arg.count {
     } else { bitir(3) }
     k += 1
 }
+// Dış bilgi kaynağı aracı izinliyse bağlayıcılar allowedMcpServers ile sınırlı olmalı (yoksa strict'siz süreçte bu Mac'teki her bağlayıcı yüklenir).
+func degerOf(_ b: String) -> [String] { arg.indices.filter { arg[$0] == b && $0 + 1 < arg.count }.map { arg[$0 + 1] } }
+if degerOf("--allowedTools").contains(where: { $0.split(separator: ",").contains { bilgiAracUygun($0.trimmingCharacters(in: .whitespaces)) && !$0.contains("mcp__suflorvt__") } }),
+   !degerOf("--settings").contains(where: { ($0.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any])?["allowedMcpServers"] != nil }) { bitir(3) }
 
 let p = Process()
 if let giris = j["giris"] as? String, let cikis = j["cikis"] as? String {

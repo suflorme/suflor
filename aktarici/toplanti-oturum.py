@@ -42,7 +42,8 @@ def bilgi_kaynaklari():
         if not isinstance(k, dict) or not str(k.get("sunucu") or "").strip(): continue
         ar = [str(x).strip() for x in (k.get("araclar") or []) if re.fullmatch(r"[A-Za-z0-9_*?]{1,64}", str(x).strip())]
         ad = " ".join(str(k.get("ad") or re.sub(r"^claude\.ai\s+", "", str(k["sunucu"]).strip())).split())[:60]
-        out.append({"sunucu": mcp_sunucu_adi(k["sunucu"]), "araclar": ar, "konu": " ".join(str(k.get("konu") or "").split())[:200], "ad": ad})
+        u = str(k.get("url") or "").strip()  # yalnız Konuş kullanır (https; claude.ai bağlayıcısının sunucu adresi, allowedMcpServers için); toplantı oturumu bakmaz
+        out.append({"sunucu": mcp_sunucu_adi(k["sunucu"]), "araclar": ar, "konu": " ".join(str(k.get("konu") or "").split())[:200], "ad": ad, "url": u if len(u) <= 200 and re.fullmatch(r"https://[^\s\"'\\]+", u) else ""})
     return out
 def bilgi_kaynagi_arac(ad):  # ayardaki bir kaynağın aracıysa {"kaynak", "arac", "izinli"}, değilse None
     import fnmatch

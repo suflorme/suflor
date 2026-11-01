@@ -73,20 +73,61 @@ def claude_yolu(ayar):  # relay.py claude_yolu ile aynı arama sırası (ayardak
     return None
 # Yalın `claude -p` (karar #83–84): kişisel ayar, bağlayıcı (MCP), komut ve oturum kaydı yüklenmez; proje ayarı kalır. Ayar claude_yalin: false → tam çağrı.
 YALIN = ["--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence"]
-def yalin(ayar):
-    return YALIN + ["--tools", "Read,Grep,Glob"] if ayar.get("claude_yalin", True) else []
+def yalin(ayar, bilgi=False):  # bilgi: Konuş'ta dış bilgi kaynağı açık → yalnız --strict-mcp-config yok (aşağıdaki not)
+    if not ayar.get("claude_yalin", True): return []
+    return ([x for x in YALIN if x != "--strict-mcp-config"] if bilgi else YALIN) + ["--tools", "Read,Grep,Glob"]
 # Konuş (v0.90.0 reçete 1): proje CLAUDE.md'si ve git bilgisi ilk kullanıcı mesajına girip önbelleği bozuyordu → Konuş sürecinde kapalı (ortam değişkeni
 # --settings env ile; Brifing.app yalnız bu iki anahtara izin verir). Ayar konus_onek_sabit: false eski davranış. konus_effort: low|medium|high|xhigh|max.
-def konus_onek_ayar(ayar):
-    if ayar.get("konus_onek_sabit", True) is False: return []
-    return ["--settings", json.dumps({"env": {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"}})]
+def konus_onek_ayar(ayar, bilgi=None, mcp_ad=None):  # bilgi: konus_bilgi() çıktısı (varsa allowlist eklenir; tek --settings)
+    ek = {}
+    if bilgi:
+        ek = {"allowedMcpServers": [{"serverUrl": k["url"]} for k in bilgi] + ([{"serverName": mcp_ad}] if mcp_ad else [])}
+    sabit = ayar.get("konus_onek_sabit", True) is not False
+    if not sabit and not ek: return []
+    env = {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"} if sabit else {}
+    return ["--settings", json.dumps(dict({"env": env} if env else {}, **ek))]
+# Dış bilgi kaynağı (Konuş, 1 Kasım; kullanıcı onayı S171): ayar toplanti_bilgi_kaynaklari öğesinde https `url` varsa Konuş o kaynağı YALNIZ okuma araçlarıyla kullanır.
+# Düzen (Konuş'un gerçek çalışma klasöründe elle doğrulandı, sürüm 2.1.310): strict YOK (strict claude.ai bağlayıcılarını hiç yüklemez) + --setting-sources project (bugünkü
+# gibi; local eklenmez: o klasörün kanca ve izin listesini Konuş'a sokar) + --settings allowedMcpServers (yalnız o url'ler; `serverName` claude.ai adlarında işe yaramaz,
+# suflorvt stdio sunucusu `serverName` ile geçer) + --allowedTools içinde mcp__ deseni (desen yoksa bağlayıcı "pending" kalır). PREWAIT env'i işe yaramadı, kullanılmaz.
+# stream-json'da her turun başında yeni init gelir; ilk tur süreç açılır açılmaz gelirse mcp_servers boş olabilir, sonraki turlarda connected (bas-konus.py bilgi_saglama).
+# Kural toplanti-oturum.py `bilgi_kaynagi_arac` ve brifing.swift `aracUygun` ile aynı: okuma önekli, yazma sözcüğü içermeyen desen. Üçünü birlikte değiştir
+# (test/bilgi-kaynagi.py küme eşitliğini denetler).
+BILGI_OKUMA_ON = ("get", "list", "query", "compare", "search", "fetch", "read", "describe", "lookup", "find")
+BILGI_YAZMA = {"send", "forward", "reply", "create", "update", "delete", "remove", "trash", "upload", "share", "move", "rename", "copy", "respond", "set", "write",
+               "post", "put", "patch", "edit", "modify", "add", "insert", "pause", "resume", "enable", "disable", "publish", "archive", "cancel", "approve", "execute",
+               "run", "javascript", "navigate", "computer", "label", "draft", "mark", "schedule", "import", "sync", "trigger", "start", "stop", "apply", "assign",
+               "invite", "grant", "revoke", "reset", "change", "save", "submit", "merge", "duplicate", "launch", "activate", "deactivate"}
+BILGI_RISK_RX = re.compile(r"send|forward|reply|create_event|update_event|delete|trash|javascript|navigate|computer|form_input|file_upload|share_file|upload|"
+                           r"move_item|rename_item|update_file|create_file|copy_file|respond_to_event|set_vacation|create_filter|label_", re.I)
+BILGI_DESEN_RX = re.compile(r"^(?:" + "|".join(BILGI_OKUMA_ON) + r")_[A-Za-z0-9_*]*$")
+def mcp_ad(s):  # Claude Code'un araç adındaki sunucu biçimi (claude.ai bağlayıcısında alt çizgiler birleşir, baş/son atılır)
+    s = str(s or "").strip(); r = re.sub(r"[^A-Za-z0-9_-]", "_", s)
+    return re.sub(r"_+", "_", r).strip("_") if s.startswith("claude.ai ") else r
+def bilgi_desen_uygun(d):
+    d = str(d or "")
+    return bool(BILGI_DESEN_RX.match(d)) and not (set(d.lower().replace("*", "").split("_")) & BILGI_YAZMA) and not BILGI_RISK_RX.search(d)
+def bilgi_url_uygun(u): return isinstance(u, str) and len(u) <= 200 and re.fullmatch(r"https://[^\s\"'\\]+", u) is not None
+def konus_bilgi(kaynaklar):  # bilgi_kaynaklari() çıktısı → Konuş'ta kullanılabilecekler: https url'si, geçerli sunucu adı ve en az bir okuma deseni olanlar (en çok 4)
+    out = []
+    for k in kaynaklar or []:
+        if not isinstance(k, dict) or not bilgi_url_uygun(k.get("url")): continue
+        sn = str(k.get("sunucu") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", sn) or "__" in sn: continue
+        ar = [d for d in (k.get("araclar") or []) if bilgi_desen_uygun(d)]
+        if ar: out.append({"sunucu": sn, "url": k["url"], "araclar": ar, "ad": str(k.get("ad") or sn)[:60], "konu": str(k.get("konu") or "")[:200]})
+    return out[:4]
+def bilgi_araclar(bilgi): return ",".join(f"mcp__{k['sunucu']}__{d}" for k in bilgi for d in k["araclar"])
 def konus_effort(ayar):
     e = str(ayar.get("konus_effort") or "").strip().lower()
     return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
-def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli
+def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None, bilgi=None):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli; bilgi: konus_bilgi() çıktısı
+    bilgi = konus_bilgi(bilgi) if bilgi else []
+    ek = ",".join(x for x in (ek_araclar, bilgi_araclar(bilgi)) if x)
     return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-            "--allowedTools", "Read,Grep,Glob" + ("," + ek_araclar if ek_araclar else ""), "--add-dir", ek_dizin, "--append-system-prompt", sistem] + (["--mcp-config", mcp] if mcp else []) + \
-           (yalin(ayar) or ["--no-session-persistence"]) + ["--model", model or secim(ayar, "konus")["model"]] + konus_onek_ayar(ayar) + konus_effort(ayar)
+            "--allowedTools", "Read,Grep,Glob" + ("," + ek if ek else ""), "--add-dir", ek_dizin, "--append-system-prompt", sistem] + (["--mcp-config", mcp] if mcp else []) + \
+           (yalin(ayar, bool(bilgi)) or ["--no-session-persistence"]) + ["--model", model or secim(ayar, "konus")["model"]] + \
+           konus_onek_ayar(ayar, bilgi, "suflorvt" if mcp else None) + konus_effort(ayar)
 def ceviri_args(ayar, sistem, model=None):  # açık süreç, araçsız (Popen; stdin/stdout stream-json); model: yedekte Claude modeli
     return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--model", model or secim(ayar, "ceviri")["model"],
             "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", sistem]

@@ -38,6 +38,34 @@ BRIFING = ["-p", "Toplantı bağlamı: …", "--allowedTools", "Read,Grep,Glob",
 try:
     # deneme derlemesi: aktarıcının gerçek argüman kümeleri geçer, sahte claude çalışır
     kontrol("Konuş argümanları kabul (sahte claude çalıştı)", calistir(den, KONUS) != 3 and sahte_calisti())
+    # v0.164 (Konuş dış bilgi kaynağı): okuma desenli araç, allowedMcpServers (https url + suflorvt); strict'siz, setting-sources project
+    SA = "mcp__claude_ai_Ornek_Kaynak__"; ES = {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"}
+    AL = [{"serverUrl": "https://ornek.test/mcp"}, {"serverName": "suflorvt"}]
+    def konus_bilgi(araclar=None, ayar=None, kaynak="project", strict=False):
+        a = list(KONUS); a[a.index("--allowedTools") + 1] += "," + (araclar or ",".join(SA + d for d in ("get_*", "list_*", "query_metrics", "compare_*")))
+        a[a.index("--settings") + 1] = json.dumps(ayar or {"env": ES, "allowedMcpServers": AL})
+        a[a.index("--setting-sources") + 1] = kaynak
+        if not strict: a.remove("--strict-mcp-config")
+        return a
+    kontrol("Konuş + bilgi kaynağı argümanları kabul", calistir(den, konus_bilgi()) != 3 and sahte_calisti())
+    for ad, args in [("yazan araç adı (create_)", konus_bilgi(SA + "create_report")), ("yazan sözcük sonda (get_and_delete)", konus_bilgi(SA + "get_and_delete")),
+                     ("okuma öneksiz araç (send_*)", konus_bilgi(SA + "send_*")), ("yıldızlı yazma (get_*_update)", konus_bilgi(SA + "get_x_update")),
+                     ("çift alt çizgili sunucu", konus_bilgi("mcp__a__b__get_x")), ("mcp__ önekli ama araç adı yok", konus_bilgi("mcp__x")),
+                     ("http adres", konus_bilgi(ayar={"allowedMcpServers": [{"serverUrl": "http://ornek.test/mcp"}]})),
+                     ("adreste boşluk", konus_bilgi(ayar={"allowedMcpServers": [{"serverUrl": "https://ornek.test/m cp"}]})),
+                     ("adres 200 karakterden uzun", konus_bilgi(ayar={"allowedMcpServers": [{"serverUrl": "https://ornek.test/" + "a" * 190}]})),
+                     ("allowedMcpServers öğesinde fazla anahtar", konus_bilgi(ayar={"allowedMcpServers": [{"serverUrl": "https://ornek.test/mcp", "serverName": "x"}]})),
+                     ("yanlış serverName", konus_bilgi(ayar={"allowedMcpServers": [{"serverName": "baska"}]})),
+                     ("serverCommand", konus_bilgi(ayar={"allowedMcpServers": [{"serverCommand": ["/bin/sh"]}]})),
+                     ("5 öğe", konus_bilgi(ayar={"allowedMcpServers": [{"serverUrl": f"https://ornek.test/{i}"} for i in range(5)]})),
+                     ("boş liste", konus_bilgi(ayar={"allowedMcpServers": []})),
+                     ("izin listesi anahtarı", konus_bilgi(ayar={"env": ES, "allowedMcpServers": AL, "permissions": {"allow": ["Bash"]}})),
+                     ("kanca anahtarı", konus_bilgi(ayar={"allowedMcpServers": AL, "hooks": {}})),
+                     ("PREWAIT ortam değişkeni (artık yok)", konus_bilgi(ayar={"env": dict(ES, CLAUDE_CODE_MCP_CONNECTOR_PREWAIT_MS="10000"), "allowedMcpServers": AL})),
+                     ("başka ortam değişkeni", konus_bilgi(ayar={"env": dict(ES, PATH="/tmp")})),
+                     ("bilinmeyen --setting-sources değeri", konus_bilgi(kaynak="project,managed")),
+                     ("bilgi aracı var ama allowedMcpServers yok (tüm bağlayıcılar yüklenirdi)", konus_bilgi(ayar={"env": ES}))]:
+        kontrol(f"reddedildi: {ad}", calistir(den, args) == 3 and not sahte_calisti())
     kontrol("brifing argümanları kabul", calistir(den, BRIFING) != 3 and sahte_calisti())
     kontrol("telaffuz argümanları kabul", calistir(den, ["-p", "adlar", "--output-format", "json", "--model", "sonnet"]) != 3 and sahte_calisti())
     for ad, args in [("Bash aracı", ["-p", "x", "--allowedTools", "Read,Bash"]), ("Write --tools", ["-p", "x", "--tools", "Write"]),

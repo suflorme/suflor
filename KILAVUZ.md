@@ -115,6 +115,9 @@ güncel rakam getirsin istersen: `"toplanti_bilgi_kaynaklari": [{"sunucu": "<ba�
 "konu": "<kısa tarif>", "ad": "<kartta görünecek kaynak adı>"}]`. Panodan başlatılan toplantı oturumunda o bağlayıcının yalnız okuma adlı araçları
 (get_, list_, query_, compare_ … ile başlayan ve listedeki desene uyan) sorulmadan çalışır (toplantı başına en çok 8; sonrası sorulur); aynı bağlayıcının öbür araçları
 reddedilir, başka bağlayıcılar eskisi gibi sorulur. Sonuç kısa bir NOT kartı olur ("Kaynak: <ad>, <saat>"); asistan sesli söylemez.
+Kaynağa `"url": "<bağlayıcının https adresi>"` da yazarsan Konuş da (yalnız Claude Code'da) aynı okuma araçlarıyla o kaynaktan cevap verir ve rakamı
+kaynağı ve dönemiyle söyler ("<ad>'a göre son 7 günde …"); Konuş'a yalnız bu bağlayıcı yüklenir. Gizli toplantıda kullanılmaz; bağlanamazsa 30 dk kaynaksız
+devam eder. Kapatmak için `"konus_bilgi_kaynagi": false`.
 
 ## Sesler
 Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)

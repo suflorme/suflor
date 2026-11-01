@@ -241,7 +241,22 @@ def proje_ozeti_istem():  # onaylı proje kartının kısa özeti (baglam.py pro
     if oz and any(re.search(r"\b" + y + r"\b", oz) for y in BRIFING_YASAK): print("KONUŞ: proje kartında yardımcının yasak sözcüğü var — isteme konmadı (vt_sor ile okunur)"); return ""
     if oz: print(f"KONUŞ: proje kartı istemde ({len(oz)} karakter)")
     return oz
-def konus_istem(vt=None):
+# Dış bilgi kaynağı (1 Kasım): ayar toplanti_bilgi_kaynaklari'nda https url'si olan kaynak Konuş'ta yalnız okuma araçlarıyla kullanılır (beyin.py konus_bilgi/konus_args).
+# Gizli toplantıda, ayar konus_bilgi_kaynagi: false iken, beyin Claude Code değilken ve "kaynak bozuk" yedeği (BILGI_YEDEK_SN) sürerken kaynaksız (bugünkü strict düzen).
+BILGI_YEDEK_SN = 1800
+def konus_bilgi_kaynaklari():
+    if AYAR.get("konus_bilgi_kaynagi", True) is False or "bilgi_kaynaklari" not in globals(): return []
+    if "gizli_acik" in globals() and gizli_acik(): return []
+    if time.time() < _KS.get("bilgi_yedek_t", 0): return []
+    return BEYIN.konus_bilgi(bilgi_kaynaklari())
+def bilgi_istem(bilgi):
+    if not bilgi: return ""
+    ks = "; ".join(f"«{k['ad']}»" + (f" (konu: {k['konu']})" if k["konu"] else "") for k in bilgi)
+    return (_t(f"\n\nDış bilgi kaynağı (yalnız okuma): {ks}. Yalnız soru bu kaynağın konusuna giriyorsa araçlarını kullan; girmiyorsa sorgulama. Rakam verirken kaynağı ve dönemi "
+               "söyle (ör. \"<kaynak>'a göre son 7 günde …\"). Sorguya kişi adı ya da dökümden alıntı koyma. Yazan ya da değiştiren araç yok; sonucu kısa ve tek cümleyle söyle.",
+               f"\n\nExternal information source (read-only): {ks}. Use its tools only when the question is about this source's topic; otherwise don't query. When giving a number, say the source "
+               "and the period (e.g. \"according to <source>, over the last 7 days …\"). Never put a person's name or a quote from the transcript in a query. No tool writes or changes anything; say the result in one short sentence."))
+def konus_istem(vt=None, bilgi=None):
     t = KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]; k = kisilik()
     _KS["kisilik_mt"] = _KIS.get("mt") if k else None; _KS["kart_mt"] = kart_mt(); _KS["proje_kart_mt"] = proje_kart_mt()
     if vt:  # tablo yapısı istemde: her soruda vt_sema turu (~3–5 sn) gerekmesin
@@ -289,7 +304,7 @@ def konus_istem(vt=None):
     t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Belirsizliği de iç terimsiz söyle: 'dökümde bozuk duyulmuş' değil 'bu kısım net duyulmamış'; 'dökümde' değil 'görüşmede' ya da 'toplantıda'. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası). Araç kullandığın cevapta (dosya okuma, arama, veritabanı) yazılı kısım en çok iki kısa satır olsun: ölçüt ya da kaynak; tablo, liste ve uzun açıklama yazma.",
             " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Say uncertainty without internal terms too: not 'garbled in the transcript' but 'that part wasn't clear'; not 'in the transcript' but 'in the conversation' or 'in the meeting'. Source and method only in the written part (after ---). When you used a tool (file read, search, database), keep the written part to at most two short lines: criterion or source; no tables, lists or long explanations.")
     if "talimat_istem" in globals(): t += talimat_istem()  # v0.101.1: oturumlara ileti (iki kişilikte de)
-    if not k: return t + _ys_istem() + kart_istem()
+    if not k: return t + _ys_istem() + kart_istem() + bilgi_istem(bilgi)
     t = re.sub(r"gerçekten şaşırtıcı.*?kullanabilirsin; ", "", t)
     t = t.replace("Sen Suflor.me'nin sesli asistanısın.", "Sen kullanıcının sesli asistanısın.")  # v0.54.3: kimlik kişilikten (kullanıcı: tanıtımda ürün adı yok)
     ks = kisilikler()
@@ -304,7 +319,7 @@ def konus_istem(vt=None):
                       "«[Bu soruyu <name> cevaplıyor]» (this question is answered by <name>): speak only with that persona's name, tone and form of address; earlier answers may be "
                       "from the other persona, don't carry its style over. This marker is an internal note: never say it aloud or narrate who is answering. Personas set only tone and identity; the format rules above always come first.\n\n") + _hitap_istem(ks) + "\n\n".join(x["metin"] for x in ks) + _etiket_istem(ks) + _ys_istem() + kart_istem()
     return t + _t("\n\nAşağıdaki kişilik yalnız tonu ve kimliği belirler; yukarıdaki biçim kuralları (uzunluk, sesli kısım, ---) her zaman önce gelir.\n\n",
-                  "\n\nThe persona below sets only tone and identity; the format rules above (length, spoken part, ---) always come first.\n\n") + _hitap_istem([k]) + k["metin"] + _etiket_istem([k]) + _ys_istem() + kart_istem()
+                  "\n\nThe persona below sets only tone and identity; the format rules above (length, spoken part, ---) always come first.\n\n") + _hitap_istem([k]) + k["metin"] + _etiket_istem([k]) + _ys_istem() + kart_istem() + bilgi_istem(bilgi)
 # --- Hızlı bilgi (S47, v0.40.0): yerel ön arama --------------------------------------------------------------------------------------------
 # 15 Ekim ölçümü (claude-cagri.jsonl, 42 Konuş): araçsız soruda ilk ses ortanca 3,3 sn, Grep/Glob/Read'li soruda 9,6 sn (en kötü 25). Soru Claude'a
 # gitmeden baglam.py dizininde (SQLite FTS5) aranır, en iyi ONARA_N parça (tür · tarih · başlık · dosya @konum · kim + ~260 karakter kesit) bağlam
@@ -846,8 +861,12 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
             except OSError: pass
             os.mkfifo(f, 0o600)
         vt = konus_vt_hazirla()
+        bilgi = konus_bilgi_kaynaklari() if sec["tur"] == "claude-code" else []  # dış bilgi kaynağı (yalnız Claude Code beyninde; yukarıdaki kural)
+        _KS["bilgi_bekle"] = [(k["sunucu"], k["ad"]) for k in bilgi]
+        _KS.update(bilgi_bagli=set(), bilgi_tur=0, bilgi_t0=time.time())
+        if bilgi: print("KONUŞ: dış bilgi kaynağı açık — " + ", ".join(k["ad"] for k in bilgi))
         if sec["tur"] == "claude-code":
-            args = BEYIN.konus_args(AYAR, konus_istem(vt), VT_MCP_ARACLAR if vt else "", vt, BASE, sec["model"])  # v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
+            args = BEYIN.konus_args(AYAR, konus_istem(vt, bilgi), VT_MCP_ARACLAR if vt else "", vt, BASE, sec["model"], bilgi)  # v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
             ist, kip = {"claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "konus-bos"), "giris": gir, "cikis": cik, "sure": 7200}, "--istek"
         else:  # v0.122.0 (Faz 11 Aşama 1): openai-uyumlu — Brifing.app --beyin → aktarici/beyin.py (araç döngüsü, aynı stream-json)
             ist, kip = BEYIN.konus_istek(AYAR, konus_istem(vt), vt, [AYAR["proje"], BASE], AYAR["calisma"], gir, cik, "en" if ARAYUZ_DILI == "en" else "tr"), "--beyin"
@@ -972,6 +991,25 @@ def sesli_terim_suz(c):
     o = re.sub(r"^\W*(\w)", lambda m: m.group(0)[:-1] + ({"i": "İ", "ı": "I"}.get(m.group(1)) or m.group(1).upper()), o, count=1) if o and o != c else o
     if o != c: print(f"KONUŞ: sesli kısımda iç terim süzüldü")
     return o.strip() or c
+BILGI_ILK_SN, BILGI_ILK_TUR = 60, 2
+def bilgi_saglama(init):  # stream-json'da her turun başında init gelir (ilk tur süreç açılır açılmaz gelirse mcp_servers boş/pending: "henüz bağlanmadı", bozuk sayılmaz).
+    # Yedek (BILGI_YEDEK_SN kaynaksız, bugünkü strict düzen) yalnız: kaynak failed/needs-auth ya da süreç açılışından BILGI_ILK_SN içinde en az BILGI_ILK_TUR turda hiç connected görülmedi.
+    bekle = _KS.get("bilgi_bekle") or []
+    if not bekle: return
+    sunucular = {BEYIN.mcp_ad(m.get("name")): str(m.get("status")) for m in init.get("mcp_servers") or [] if isinstance(m, dict)}
+    bagli = _KS.setdefault("bilgi_bagli", set()); henuz = []; kesin = []
+    for sn, ad in bekle:
+        n = sum(1 for x in init.get("tools") or [] if str(x).startswith(f"mcp__{sn}__")); d = sunucular.get(sn, "yok")
+        if d == "connected" and n >= 1:
+            bagli.add(sn)
+            if ad not in _KS.setdefault("bilgi_hazir", set()): _KS["bilgi_hazir"].add(ad); print(f"KONUŞ: bilgi kaynağı hazır — {ad} ({n} araç)")
+        elif sn in bagli: continue
+        elif d in ("failed", "needs-auth"): kesin.append((ad, d))
+        else: henuz.append((ad, d if d != "connected" else "araç yok"))
+    if henuz: _KS["bilgi_tur"] = _KS.get("bilgi_tur", 0) + 1
+    if not kesin and henuz and _KS["bilgi_tur"] >= BILGI_ILK_TUR and time.time() - _KS.get("bilgi_t0", 0) <= BILGI_ILK_SN and not bagli: kesin = henuz
+    for ad, d in kesin: print(f"KONUŞ: bilgi kaynağı bağlanamadı — {ad} ({d})")
+    if kesin: _KS["bilgi_yedek_t"] = time.time() + BILGI_YEDEK_SN; _KS["bilgi_bekle"] = []
 def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenisinin turuna dokunmasın (S48: toplantı değişince süreç yenilenir)
     try: r = open(cik, encoding="utf-8")
     except OSError: return
@@ -979,6 +1017,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
         for l in r:
             try: j = json.loads(l)
             except ValueError: continue
+            if j.get("type") == "system" and j.get("subtype") == "init" and _KS.get("nesil") == nesil: bilgi_saglama(j)
             tur = _KS["tur"]
             if not tur or _KS.get("nesil") != nesil: continue
             e = j.get("event") or {}
