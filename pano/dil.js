@@ -237,6 +237,7 @@ globalThis.SUFLOR_EN = {
   "Gizle": "Hide",
   "Dikkat": "Watch for",
   "Açık kalanlar": "Still open",
+  "Güncel veri": "Current figures",
   "Geçmişte": "Previously",
   "Yeniden hazırla": "Prepare again",
   "{asistan} brifingi hazırlıyor… (1–2 dk)": "{asistan} is preparing the briefing… (1–2 min)",

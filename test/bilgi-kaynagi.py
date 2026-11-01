@@ -130,5 +130,25 @@ exec(to[to.index("BILGI_OKUMA_RX = "):to.index("def bilgi_kaynagi_arac(")], n2)
 bk = n2["bilgi_kaynaklari"]()
 kontrol("bilgi_kaynaklari: url yalnız geçerli https ise gelir, öbür alanlar aynı", [k["url"] for k in bk] == ["https://ornek.test/mcp", "", ""] and bk[0]["sunucu"] == "claude_ai_Ornek_Kaynak" and bk[0]["ad"] == "Ornek Kaynak")
 kontrol("beyin.mcp_ad = toplantı oturumunun mcp_sunucu_adi'si", all(BY.mcp_ad(x) == n2["mcp_sunucu_adi"](x) for x in ("claude.ai Ornek Kaynak", "claude.ai  A-B (c)", "suflorvt", "x y")))
+# 6. Hazırlıkta kaynak (brifing; 2 Kasım): tek seferlik -p bağlayıcıyı ilk turda göremediği için FIFO kipi, istem stdin'den
+ba = BY.brifing_args(A, "ISTEM", B, True, [K]); bs = json.loads(arg(ba, "--settings"))
+kontrol("brifing kaynaklı: stream-json giriş/çıkış, istem argümanda yok", ba[:6] == ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"] and "ISTEM" not in ba, ba[:8])
+kontrol("brifing kaynaklı: okuma araçları + Read/Grep/Glob, strict yok, allowedMcpServers yalnız kaynağın url'si",
+        arg(ba, "--allowedTools").startswith("Read,Grep,Glob,mcp__claude_ai_Ornek_Kaynak__get_*") and "--strict-mcp-config" not in ba and bs.get("allowedMcpServers") == [{"serverUrl": K["url"]}] and arg(ba, "--add-dir") == B)
+kontrol("brifing: kaynak yoksa ya da tam (yalın olmayan) çağrıda eski tek seferlik düzen", BY.brifing_args(A, "ISTEM", B, True, []) == BY.brifing_args(A, "ISTEM", B) and
+        BY.brifing_args(A, "ISTEM", B, False, [K]) == BY.brifing_args(A, "ISTEM", B, False) and "--strict-mcp-config" in BY.brifing_args(A, "ISTEM", B))
+kontrol("brifing: url'siz kaynak süzülür (eski düzen)", BY.brifing_args(A, "ISTEM", B, True, [dict(K, url="")]) == BY.brifing_args(A, "ISTEM", B))
+bf = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); n3 = {"json": json, "os": os, "time": time}
+exec(bf[bf.index("BRIFING_ISTEM = "):bf.index("BRIFING_BILGI_SN")], n3)
+for dl in ("tr", "en"):
+    bos = n3["BRIFING_ISTEM"][dl].format(canli="/c", olay="{}", bilgi="", veri="", va="")
+    bi, vj, va = n3["BRIFING_BILGI"][dl]; dolu = n3["BRIFING_ISTEM"][dl].format(canli="/c", olay="{}", bilgi=bi.format(kay="«Örnek»"), veri=vj, va=va)
+    kontrol(f"brifing istemi ({dl}): kaynaksız 'veri' ve kaynak satırı yok; kaynaklıda ikisi de var, kişi adı yasağı ve konu dışı kuralı",
+            '"veri"' not in bos and "«Örnek»" not in bos and '"dikkat": ["…"], "veri": ["…"]}' in dolu and "«Örnek»" in dolu and ("kişi adı" in dolu or "person names" in dolu) and ("Konu dışıysa" in dolu or "off-topic" in dolu))
+kontrol("brifing sonucu: veri yalnız kaynak açıkken ve doluysa eklenir", 'if bilgi and temiz(j.get("veri"), 3): sonuc["veri"]' in bf)
+kontrol("brifing kaynağı Konuş'la aynı kuraldan (ayar, gizli kip, yedek)", "bilgi = konus_bilgi_kaynaklari()" in bf and "BEYIN.brifing_args(AYAR, istem, BASE, yalin, bilgi if yalin else None)" in bf)
+kontrol("FIFO kipinde mesaj BRIFING_BILGI_SN sonra yazılır, giriş kapanır", "time.sleep(max(0, BRIFING_BILGI_SN - (time.time() - t0)))" in bf and "os.close(w)" in bf)
+pn = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); df = open(os.path.join(KOD, "aktarici", "defter.py"), encoding="utf-8").read()
+kontrol("'Güncel veri' panoda üç yerde, defterde ve Konuş'un sıradaki toplantı bloğunda", pn.count("'Güncel veri'") == 3 and '("veri", "dikkat", "acik", "gecmis")' in df and '("veri", _t("Güncel veri"' in kod)
 kontrol("__pycache__ yazılmadı", not [d for d, _, f in os.walk(KOD) if "__pycache__" in d and ".git" not in d and "_yedek" not in d])
 print(f"{len(hatalar) and 'KALDI: ' + str(len(hatalar)) or 'hepsi geçti'}"); sys.exit(1 if hatalar else 0)

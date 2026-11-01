@@ -133,8 +133,12 @@ def ceviri_args(ayar, sistem, model=None):  # açık süreç, araçsız (Popen; 
             "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", sistem]
 def telaffuz_args(ayar, istem, model=None):  # tek çağrı (Brifing.app), json çıktı; model: yedekte Claude modeli
     return ["-p", istem, "--output-format", "json", "--model", model or secim(ayar, "telaffuz")["model"]] + yalin(ayar)
-def brifing_args(ayar, istem, ek_dizin, yalin_mi=True):  # tek çağrı + Read/Grep/Glob (sesli brifing, rafta)
-    m = secim(ayar, "brifing")["model"]
+def brifing_args(ayar, istem, ek_dizin, yalin_mi=True, bilgi=None):  # tek çağrı + Read/Grep/Glob; bilgi (konus_bilgi çıktısı) varsa FIFO kipi:
+    # istem stdin'den stream-json gider (bağlayıcı ~6 sn'de bağlanır, tek seferlik -p ilk turda göremez — 2 Kasım denemesi; PREWAIT ortamı da yetmedi)
+    m = secim(ayar, "brifing")["model"]; bilgi = konus_bilgi(bilgi) if bilgi and yalin_mi else []
+    if bilgi:
+        return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--allowedTools", "Read,Grep,Glob," + bilgi_araclar(bilgi),
+                "--add-dir", ek_dizin] + yalin(ayar, True) + (["--model", m] if m else []) + konus_onek_ayar(ayar, bilgi, None)
     return ["-p", istem, "--allowedTools", "Read,Grep,Glob", "--add-dir", ek_dizin, "--output-format", "json"] + (yalin(ayar) if yalin_mi else []) + (["--model", m] if m else [])
 def kart_args(model):  # tek çağrı, araçsız, istem stdin'den
     return ["-p", "--output-format", "json", "--model", model, "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands",

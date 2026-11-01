@@ -117,7 +117,9 @@ güncel rakam getirsin istersen: `"toplanti_bilgi_kaynaklari": [{"sunucu": "<ba�
 reddedilir, başka bağlayıcılar eskisi gibi sorulur. Sonuç kısa bir NOT kartı olur ("Kaynak: <ad>, <saat>"); asistan sesli söylemez.
 Kaynağa `"url": "<bağlayıcının https adresi>"` da yazarsan Konuş da (yalnız Claude Code'da) aynı okuma araçlarıyla o kaynaktan cevap verir ve rakamı
 kaynağı ve dönemiyle söyler ("<ad>'a göre son 7 günde …"); Konuş'a yalnız bu bağlayıcı yüklenir. Gizli toplantıda kullanılmaz; bağlanamazsa 30 dk kaynaksız
-devam eder. Kapatmak için `"konus_bilgi_kaynagi": false`.
+devam eder. Toplantı öncesi brifing de aynı kaynağa bakar: toplantının konusu kaynağın konusuna giriyorsa brifinge kaynağı ve dönemiyle en çok üç rakam
+ekler ("Güncel veri"); konu dışıysa kaynağa sormaz. Kaynaklı brifing bağlayıcının bağlanmasını beklediği için birkaç saniye uzun sürer.
+İkisini birden kapatmak için `"konus_bilgi_kaynagi": false`.
 
 ## Sesler
 Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)

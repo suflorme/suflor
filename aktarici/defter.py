@@ -112,7 +112,7 @@ def defter_metni(d=None):
     try:
         ts = json.load(open(os.path.join(BASE, "takvim-secilen.json"), encoding="utf-8")); b = BRIFING.get(str(ts.get("olay") or "")) or {}
         if ts.get("konu") == d["ad"] and b.get("durum") == "hazir" and b.get("sonuc"):
-            r = b["sonuc"]; p += ["", f"## {_t('Toplantı öncesi brifing', 'Pre-meeting briefing')}", r.get("ozet") or ""] + [f"- {x}" for k in ("dikkat", "acik", "gecmis") for x in (r.get(k) or [])]
+            r = b["sonuc"]; p += ["", f"## {_t('Toplantı öncesi brifing', 'Pre-meeting briefing')}", r.get("ozet") or ""] + [f"- {x}" for k in ("veri", "dikkat", "acik", "gecmis") for x in (r.get(k) or [])]
     except (OSError, ValueError, AttributeError): pass
     ozet = yapi = None
     for r in reversed(SON):

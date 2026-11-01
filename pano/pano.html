@@ -803,7 +803,7 @@ function hfDetay(i,el,tut){hfDetayKapat(tut);const o=(hfVeri.olaylar||[])[i];if(
     +(o.ben_duzenleyen?`<div class="sat kim">${L('düzenleyen sen')}</div>`:o.duzenleyen?`<div class="sat kim">${esc(L('Düzenleyen: {ad}',{ad:o.duzenleyen}))}</div>`:'')
     +(o.reddettin?`<div class="sat kim">${L('daveti reddettin')}</div>`:'')
     +`<div class="sat hz"><i class=hz-${esc(o.hazirlik)}></i>${hz[o.hazirlik]||hz.yok}</div>`+(hzs?`<div class="sat kim">${esc(hzs)}</div>`:'')
-    +(hzAcik?`<div class=hzb>${hr.ozet?`<div class=b>${esc(hr.ozet)}</div>`:''}${ls(hr.dikkat,'Dikkat')}${ls(hr.acik,'Açık kalanlar')}${ls(hr.gecmis,'Geçmişte')}</div>`:'')
+    +(hzAcik?`<div class=hzb>${hr.ozet?`<div class=b>${esc(hr.ozet)}</div>`:''}${ls(hr.veri,'Güncel veri')}${ls(hr.dikkat,'Dikkat')}${ls(hr.acik,'Açık kalanlar')}${ls(hr.gecmis,'Geçmişte')}</div>`:'')
     +(o.gecmis&&hfArsiv&&!kay?`<div class="sat kim">${L('Bu toplantının Suflor kaydı yok')}</div>`:'')
     +`<div class=bt>${hzDug}${o.baslatilir?`<button type=button class=pri data-hfb="${esc(o.id)}">${L('Başlat')}</button>`:''}${kay&&kay.ozet?`<button type=button class=pri data-hfoz="${esc(kay.ozet)}">${L('Özeti aç')}</button>`:''}${kay?`<button type=button class=gh data-hfdk="${esc(kay.id)}">${L('Dökümü aç')}</button>`:''}</div>`
   document.body.appendChild(d)
@@ -963,7 +963,7 @@ function renderBrifing(s){const sec=document.getElementById('brs'),izliyor=s.cla
   // okunan brifing başlık hariç gizlenebilir (kullanıcı, 9 Ekim); toplantı başına tarayıcıda hatırlanır
   const kb=document.getElementById('brk');kb.textContent=L('Gizle');kb.setAttribute('aria-expanded',!sec.hidden);kb.dataset.olay=o.id
   document.getElementById('brn').textContent=o.baslik;const b=(s.brifing||{})[o.id]||(o.hazirlik_sonuc?{durum:'hazir',sonuc:o.hazirlik_sonuc}:{}),ls=(a,t)=>a&&a.length?`<div class=bb>${L(t)}</div><ul>${a.map(x=>`<li>${bag(esc(x))}</li>`).join('')}</ul>`:''
-  setH(document.getElementById('br'),b.durum==='hazir'?`${b.sonuc.ozet?`<div class=b>${esc(b.sonuc.ozet)}</div>`:''}${ls(b.sonuc.dikkat,'Dikkat')}${ls(b.sonuc.acik,'Açık kalanlar')}${ls(b.sonuc.gecmis,'Geçmişte')}<div class=bt><button class=gh data-brf="${esc(o.id)}" data-dinle=1 title="${L('Brifingi sesli okur (Mac sesi); tekrar basınca susar')}">${ic('hoparlor',L('Dinle'))}</button><button class=gh data-brf="${esc(o.id)}" data-yeniden=1>${L('Yeniden hazırla')}</button>${akDug('br:'+o.id,(o.katilimci_eposta||[]).length)}</div>`
+  setH(document.getElementById('br'),b.durum==='hazir'?`${b.sonuc.ozet?`<div class=b>${esc(b.sonuc.ozet)}</div>`:''}${ls(b.sonuc.veri,'Güncel veri')}${ls(b.sonuc.dikkat,'Dikkat')}${ls(b.sonuc.acik,'Açık kalanlar')}${ls(b.sonuc.gecmis,'Geçmişte')}<div class=bt><button class=gh data-brf="${esc(o.id)}" data-dinle=1 title="${L('Brifingi sesli okur (Mac sesi); tekrar basınca susar')}">${ic('hoparlor',L('Dinle'))}</button><button class=gh data-brf="${esc(o.id)}" data-yeniden=1>${L('Yeniden hazırla')}</button>${akDug('br:'+o.id,(o.katilimci_eposta||[]).length)}</div>`
     :b.durum==='calisiyor'?`<div class=empty>${L('{asistan} brifingi hazırlıyor… (1–2 dk)')}</div>`
     :`${b.durum==='hata'?`<div class=empty>${esc(b.hata||'')}</div>`:`<div class=empty>${L('{asistan} geçmiş görüşmelere, açık sorulara ve belgelere bakıp kısa bir brifing hazırlar.')}</div>`}<div class=bt><button class=pri data-brf="${esc(o.id)}">${L(b.durum==='hata'?'Yeniden dene':'Brifing hazırla')}</button></div>`)}
 let brMem=[];function brKapali(){try{return JSON.parse(localStorage.getItem('brk')||'[]')}catch(e){return brMem}}
@@ -983,7 +983,7 @@ function yerelGun(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStar
 function akDosya(t,d){return `${t} - ${yerelGun(d||new Date())}`.replace(/[\/\\:*?"<>|]+/g,' ').slice(0,120)}
 function brIcerik(id){const o=tkOlaylar.find(x=>x.id===id),b=last&&(last.brifing||{})[id];if(!o||!b||b.durum!=='hazir')return null
   const r=b.sonuc||{},tarih=new Date().toLocaleDateString(L('tr-TR'),{day:'numeric',month:'long',year:'numeric'}),saat=`${o.saat||''}${o.bitis_saat?'–'+o.bitis_saat:''}`
-  const bol=[['Dikkat',r.dikkat],['Açık kalanlar',r.acik],['Geçmişte',r.gecmis]].filter(x=>x[1]&&x[1].length),baslik=`${L('Brifing')} — ${o.baslik}`
+  const bol=[['Güncel veri',r.veri],['Dikkat',r.dikkat],['Açık kalanlar',r.acik],['Geçmişte',r.gecmis]].filter(x=>x[1]&&x[1].length),baslik=`${L('Brifing')} — ${o.baslik}`
   return {baslik,dosya:akDosya(`${L('Brifing')} - ${o.baslik}`),alicilar:o.katilimci_eposta||[],
     md:`# ${baslik}\n${tarih}${saat?', '+saat:''}\n\n${r.ozet||''}\n`+bol.map(([t,a])=>`\n## ${L(t)}\n`+a.map(x=>'- '+x).join('\n')+'\n').join('')}}
 async function snIcerik(id){if(akOn[id])return akOn[id];let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id,tur:'metin'})})}catch(e){}

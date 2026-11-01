@@ -1318,7 +1318,7 @@ def _once_blogu(simdi):  # → (blok, anahtar) — toplantı sürerken yok
     r = (BRIFING.get(oid) or {}); r = r.get("sonuc") if r.get("durum") == "hazir" else None
     if r:
         sat.append(_t("Brifing: ", "Briefing: ") + " ".join(str(r.get("ozet") or "").split()))
-        for k, a in (("dikkat", _t("Dikkat", "Watch")), ("acik", _t("Açık konu", "Open")), ("gecmis", _t("Geçmiş", "History"))):
+        for k, a in (("veri", _t("Güncel veri", "Current figures")), ("dikkat", _t("Dikkat", "Watch")), ("acik", _t("Açık konu", "Open")), ("gecmis", _t("Geçmiş", "History"))):
             sat += [f"- {a}: {' '.join(str(x).split())}" for x in (r.get(k) or [])[:6]]
     gt = gecmis_toplantilar(kim, e.get("baslik"))
     if gt:
