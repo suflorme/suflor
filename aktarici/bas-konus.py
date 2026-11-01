@@ -879,12 +879,56 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
             except OSError: time.sleep(0.05)
         if w is None:
             _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} açılamadı (izin penceresi?) — yeniden dene", f"Couldn't start {asistan_ad()} (permission prompt?) — try again")); konus_kapat("açılmadı"); return False
+        _KS["brifing_pid"] = konus_yeni_pid()  # yardımcı girişi açtı: artık süreç listesinde
         os.set_blocking(w, True); _KS["w"] = os.fdopen(w, "w", encoding="utf-8", buffering=1); _KS["son"] = time.time(); _KS["maliyet"] = 0; _KS["sayac"] = 0; _KS["acilis_t"] = time.time()
         _KS["nesil"] = _KS["nesil_en"] = _KS.get("nesil_en", 0) + 1; threading.Thread(target=_konus_oku, args=(cik, _KS["nesil"]), daemon=True).start()
         print(f"KONUŞ: açık süreç açıldı ({time.time() - t0:.1f} sn" + (f"; {_KS['saglayici']} {sec['model']}" if sec["tur"] != "claude-code" else "") + ")"); return True
+# Takılı süreç temizliği (2 Kasım: macOS izni bekleyen claude girişin kapandığını görmedi; Brifing + claude "sure" (2 sa) dolana kadar açık kaldı).
+# Yardımcının pid'i açılışta bulunur (iki yuva aynı istek dosyasını kullandığından daha önce görülmemiş pid), yuvayla taşınır; kapanışta 5 sn'de çıkmazsa
+# önce alt süreçleri (claude, onun MCP sunucuları), sonra yardımcı sonlandırılır.
+import signal
+KONUS_PIDLER = set()
+def konus_yardimci_pidler():  # bu aktarıcının Konuş istek dosyasıyla açılmış Suflor Brifing süreçleri
+    istek = os.path.join(BASE, "konus-istek.json")
+    try: r = subprocess.run(["pgrep", "-f", r"SuflorBrifing --(istek|beyin) " + re.sub(r"([.\[\]()*+?{}|^$\\])", r"\\\1", istek) + "$"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired): return []
+    return [int(x) for x in r.stdout.split() if x.isdigit()]
+def konus_yeni_pid():
+    yeni = [x for x in konus_yardimci_pidler() if x not in KONUS_PIDLER]
+    if len(yeni) == 1: KONUS_PIDLER.add(yeni[0]); return yeni[0]
+    return None
+def _alt_surecler(pid):
+    try: r = subprocess.run(["pgrep", "-P", str(pid)], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired): return []
+    alt = [int(x) for x in r.stdout.split() if x.isdigit()]
+    return [y for x in alt for y in _alt_surecler(x)] + alt  # en derindekiler önce
+def _canli_mi(pid):
+    try: os.kill(pid, 0); return True
+    except ProcessLookupError: return False
+    except PermissionError: return True
+def konus_sure_bitir(pid, neden, bekle=5):  # arka planda: yardımcı bekle sn'de çıkmazsa ağacını sonlandırır
+    if not pid: return
+    def is_():
+        t = time.time()
+        while time.time() - t < bekle and _canli_mi(pid): time.sleep(0.2)
+        if _canli_mi(pid):
+            agac = _alt_surecler(pid) + [pid]
+            for sg in (signal.SIGTERM, signal.SIGKILL):
+                for x in agac:
+                    try: os.kill(x, sg)
+                    except (ProcessLookupError, PermissionError): pass
+                if sg == signal.SIGTERM:
+                    t2 = time.time()
+                    while time.time() - t2 < 2 and any(_canli_mi(x) for x in agac): time.sleep(0.1)
+            print(f"KONUŞ: takılı süreç sonlandırıldı ({neden}; {len(agac)} süreç)")
+        KONUS_PIDLER.discard(pid)
+    threading.Thread(target=is_, daemon=True).start()
+def konus_artik_temizle():  # aktarıcı açılışında: önceki çalışmadan kalan Konuş yardımcıları (iki yuva da boş, hepsi artık)
+    for pid in konus_yardimci_pidler(): KONUS_PIDLER.add(pid); konus_sure_bitir(pid, "önceki çalışmadan kalmış", bekle=0)
+threading.Thread(target=konus_artik_temizle, daemon=True).start()
 def konus_kapat(neden, durum_koru=False):
     if _KS["w"] or _KS["app"]: _KS["kapali_nesil"] = _KS.get("nesil")  # v0.70.1: bilerek kapatılan sürecin okuyucusu çıkınca "hata" demesin
-    w, app = _KS["w"], _KS["app"]; _KS.update(w=None, app=None, tur=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None, ozel_gitti=False)  # yeni süreçte defter (ve kartın özel bölümü) yeniden gider
+    w, app, pid = _KS["w"], _KS["app"], _KS.get("brifing_pid") or (konus_yeni_pid() if _KS["app"] else None); _KS.update(w=None, app=None, brifing_pid=None, tur=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None, ozel_gitti=False)  # yeni süreçte defter (ve kartın özel bölümü) yeniden gider
     if w:
         try: w.close()  # giriş kapanınca claude çıkar, uygulama da biter
         except OSError: pass
@@ -892,15 +936,16 @@ def konus_kapat(neden, durum_koru=False):
         try: app.wait(timeout=5)
         except subprocess.TimeoutExpired: pass
     if w: print(f"KONUŞ: süreç kapandı ({neden})")
+    konus_sure_bitir(pid, neden)
     if KONUS["durum"] not in ("hata",) and not durum_koru: KONUS["durum"] = "kapali"
 # v0.96.0 (ısıtma ölçümü, 20 Ekim: 122 sorunun 31'i yeni sürecin ilk sorusu — ortanca +0,9 sn, +0,07 $; 7 yeni süreç kartın özel bölümü yüzünden):
 # özel ve ortak cevap için iki süreç. Etkin süreç _KS'te; öteki _KS_YEDEK'te açık bekler, kapsam değişince yer değiştirir (özel bilgi ortak sürece yine
 # girmez). Ayar konus_iki_surec: false eski davranış (ortak soruda özel süreç kapanır). Bekleyen süreç KONUS_BOSTA_SN boşta kalınca kapanır.
-KONUS_P = ("saglayici", "w", "app", "son", "maliyet", "sayac", "acilis_t", "nesil", "defter_md", "defter_satir", "defter_taban", "once_k", "ozel_gitti", "kisilik_mt", "kart_mt", "proje_kart_mt", "model", "vt_son")
+KONUS_P = ("saglayici", "w", "app", "brifing_pid", "son", "maliyet", "sayac", "acilis_t", "nesil", "defter_md", "defter_satir", "defter_taban", "once_k", "ozel_gitti", "kisilik_mt", "kart_mt", "proje_kart_mt", "model", "vt_son")
 _KS_YEDEK = {}
 def _yedek_canli(): return bool(_KS_YEDEK.get("w")) and _KS_YEDEK.get("app") is not None and _KS_YEDEK["app"].poll() is None
 def konus_yedek_kapat(neden):
-    y = dict(_KS_YEDEK); _KS_YEDEK.clear()
+    y = dict(_KS_YEDEK); _KS_YEDEK.clear(); pid = y.get("brifing_pid")
     if y.get("w"):
         try: y["w"].close()
         except OSError: pass
@@ -908,6 +953,7 @@ def konus_yedek_kapat(neden):
         try: y["app"].wait(timeout=5)
         except subprocess.TimeoutExpired: pass
     if y.get("w"): print(f"KONUŞ: bekleyen süreç kapandı ({neden})")
+    konus_sure_bitir(pid, neden)
 def konus_yuva_degis(neden):  # etkin süreci bekleyen yuvaya alır; bekleyen canlıysa etkin olur, değilse etkin yuva boşalır (soru yenisini açar)
     with _KS["kilit"]:
         y = dict(_KS_YEDEK) if _yedek_canli() else None
@@ -915,7 +961,7 @@ def konus_yuva_degis(neden):  # etkin süreci bekleyen yuvaya alır; bekleyen ca
         _KS_YEDEK.clear()
         if konus_canli(): _KS_YEDEK.update({k: _KS.get(k) for k in KONUS_P})
         if y: _KS.update({k: y.get(k) for k in KONUS_P})
-        else: _KS.update(w=None, app=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None, ozel_gitti=False, model=None, vt_son=None)
+        else: _KS.update(w=None, app=None, brifing_pid=None, defter_md=None, defter_satir=None, defter_taban=0, once_k=None, ozel_gitti=False, model=None, vt_son=None)
     print(f"KONUŞ: süreç yuvası değişti ({neden}) · etkin {'özel' if _KS.get('ozel_gitti') else 'ortak'}" + (" (bekleyen süreç)" if y else " (yeni süreç açılacak)"))
 # Önceden açma (v0.96.0): mesaj gönderilmez (token yok), süreç boşta yalnız bellek tutar (~150–250 MB). Pano açıkken ya da toplantıda bekçi açar; tur sınırında
 # kapanınca hemen yenisi. Boşta (KONUS_BOSTA_SN) kapandıktan sonra pano yeniden açılana kadar açılmaz. Ölçüm: ilk soruda sürecin hazır olmasını bekleme ortanca 0,67 sn
