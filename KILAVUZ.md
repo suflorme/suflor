@@ -93,6 +93,8 @@ Toplantı sürerken 60 saniye hiçbir kanaldan (altyazı, sen, karşı taraf) sa
 yeni toplantı sayfası açılır: başlık, saat, süre (söylenmezse 30 dk) ve davetliler dolu, Google'da Meet bağlantısıyla. Sen Kaydet'e basarsın. Davetlinin
 adresi söylediğin e-postadan ya da son 30 günün takvim toplantılarından bulunur; bulunamayan ad sayfadaki notta yazar. Ayar `eposta` Outlook ise Outlook takvimi açılır.
 
+**Paylaşılan takvimler:** Takvim'ine başkalarının paylaşılan takvimleri de eklenmişse (Google'dan eklenen bir iş arkadaşının takvimi gibi), Suflor bunlardaki toplantıları senin toplantın saymaz: Konuş, brifing ve toplantıyı kendiliğinden tanıma onlara bakmaz. Bu takvimleri panoda yine de görmek istersen Ayarlar → Toplantı → "Panoda gösterilecek paylaşılan takvimler" listesinden işaretle (ayar.json'da `"takvim_paylasilan": ["<takvim adı> · <hesap>"]`). Pano bu toplantıları soluk, kesikli bir blok olarak gösterir; Hazırla yoktur, Başlat vardır. Takvim 62 gün ileri okunur (pano hafta ve ay görünümü); Konuş ve brifing yine 30 günü görür.
+
 **Menü çubuğu uygulaması (varsayılan açık; kapatmak için ayar.json'da `"menu_cubugu": false`):** pano Mac penceresinde açılır; menü çubuğu uygulaması (buzlu cam panelde yazı kutusu, mikrofon ve Claude'un durumu; kartlar ekranın alt ortasında ayrı kutularda,
 Mac genelinde **Option + Shift + Boşluk** basılı tut-konuş ve yukarıdaki kısayollar, Teams/Zoom masaüstü toplantılarında da
 çalışma: toplantıyı ve sessizi tanır, senin mikrofonunu ve karşı tarafın sesini yazar, kanıt ve

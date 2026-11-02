@@ -14,6 +14,7 @@ var etkinlik: String? = nil  // v0.132.0: --etkinlik <istek.json> {"baslik", "za
 var etkinlikSil: String? = nil  // --etkinlik-sil <kimlik>: Suflor'un eklediği etkinliği siler
 var takvimler = false  // --takvimler: yazılabilir takvimler (ayar hatirlatma_takvim seçimi için)
 var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
+var goster = Set<String>()  // v0.167.0: --goster "<takvim adı> · <hesap>" (yinelenir): bu takvimlerde süzgeçten geçmeyen etkinlikler de "paylasilan": true ile yazılır (aktarıcı yalnız panoda gösterir; ayar takvim_paylasilan)
 var i = 1
 let a = CommandLine.arguments
 while i < a.count {
@@ -25,6 +26,7 @@ while i < a.count {
   else if a[i] == "--etkinlik", i + 1 < a.count { etkinlik = a[i + 1]; i += 1 }
   else if a[i] == "--etkinlik-sil", i + 1 < a.count { etkinlikSil = a[i + 1]; i += 1 }
   else if a[i] == "--takvimler" { takvimler = true }
+  else if a[i] == "--goster", i + 1 < a.count { goster.insert(a[i + 1].trimmingCharacters(in: .whitespaces)); i += 1 }
   else if a[i] == "--adres", i + 1 < a.count {
     adresler = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }); i += 1
   }
@@ -74,6 +76,20 @@ func adres(_ p: EKParticipant) -> String {
   return u.hasPrefix("mailto:") ? String(u.dropFirst(7)) : u
 }
 func ben(_ p: EKParticipant?) -> Bool { guard let p = p else { return false }; return adresler.isEmpty ? p.isCurrentUser : adresler.contains(adres(p)) }
+// v0.167.0: Ayarlar'daki "paylaşılan takvimler" listesi için her okumada tüm etkinlik takvimleri (ad, hesap, tür)
+func takvimTur(_ c: EKCalendar) -> String {
+  let ad = c.title.lowercased(), kaynak = c.source.title.lowercased()
+  switch c.source.sourceType {
+  case .exchange: return "exchange"
+  case .local: return "yerel"
+  case .birthdays: return "dogumgunu"
+  case .subscribed: return ad.contains("tatil") || ad.contains("holiday") ? "tatil" : "abonelik"
+  case .mobileMe: return "icloud"
+  default:
+    if c.type == .subscription { return ad.contains("tatil") || ad.contains("holiday") ? "tatil" : "abonelik" }
+    return kaynak.contains("google") ? "google" : kaynak.contains("icloud") ? "icloud" : "caldav"
+  }
+}
 func kendiTakvimi(_ e: EKEvent) -> Bool { ((e.attendees ?? []) + (e.organizer.map { [$0] } ?? [])).contains { ben($0) && $0.isCurrentUser } }
 
 let store = EKEventStore()
@@ -115,7 +131,7 @@ func olayAlinir(digerBos: Bool, duzenleyenVar: Bool, benDuzenleyen: Bool, benKat
 }
 // SUZGEC-SON
 
-  var gorulen = Set<String>()
+  var gorulen = Set<String>(), gorulenPay = Set<String>()
   for e in store.events(matching: p).sorted(by: { $0.startDate != $1.startDate ? $0.startDate < $1.startDate : kendiTakvimi($0) && !kendiTakvimi($1) }) {
     if e.status == .canceled { continue }
     let katilan = e.attendees ?? []
@@ -128,13 +144,19 @@ func olayAlinir(digerBos: Bool, duzenleyenVar: Bool, benDuzenleyen: Bool, benKat
                       "baglanti": baglanti([e.url?.absoluteString, e.location, e.notes]) != nil])
       continue
     }
-    if !olayAlinir(digerBos: digerleri.isEmpty, duzenleyenVar: e.organizer != nil, benDuzenleyen: benDuzenleyen, benKatilan: benKatilan != nil,
-                   yazilabilir: e.calendar.allowsContentModifications, baglantiVar: baglanti([e.url?.absoluteString, e.location, e.notes]) != nil) { continue }
-    if !gorulen.insert("\(e.startDate.timeIntervalSince1970)|\(e.title ?? "")").inserted { continue }  // başka takvimdeki kopya
+    let alinir = olayAlinir(digerBos: digerleri.isEmpty, duzenleyenVar: e.organizer != nil, benDuzenleyen: benDuzenleyen, benKatilan: benKatilan != nil,
+                            yazilabilir: e.calendar.allowsContentModifications, baglantiVar: baglanti([e.url?.absoluteString, e.location, e.notes]) != nil)
+    let anahtar = "\(e.startDate.timeIntervalSince1970)|\(e.title ?? "")"
+    var paylasilan = false
+    if !alinir {  // v0.167.0: kullanıcının seçtiği paylaşılan takvimde süzgeçten geçmeyen etkinlik (reddedilen hariç); süzgeç mantığı değişmez
+      guard goster.contains("\(e.calendar.title) · \(e.calendar.source.title)"), benKatilan?.participantStatus != .declined, !gorulen.contains(anahtar), gorulenPay.insert(anahtar).inserted else { continue }
+      paylasilan = true
+    } else if !gorulen.insert(anahtar).inserted { continue }  // başka takvimdeki kopya
     var o: [String: Any] = [
       "id": e.calendarItemIdentifier, "baslik": e.title ?? "", "baslangic": iso.string(from: e.startDate), "bitis": iso.string(from: e.endDate),
       "tum_gun": e.isAllDay, "takvim": e.calendar.title, "hesap": e.calendar.source.title,
     ]
+    if paylasilan { o["paylasilan"] = true }
     if let y = e.location, !y.isEmpty { o["yer"] = y }
     if let n = e.notes, !n.isEmpty { o["notlar"] = String(n.prefix(4000)) }
     let b = baglanti([e.url?.absoluteString, e.location, e.notes])
@@ -153,7 +175,7 @@ func olayAlinir(digerBos: Bool, duzenleyenVar: Bool, benDuzenleyen: Bool, benKat
     if !kisiler.isEmpty { o["kisiler"] = Array(kisiler.prefix(30)) }
     olaylar.append(o)
   }
-  yaz(["durum": "ok", "olaylar": olaylar])
+  yaz(["durum": "ok", "olaylar": olaylar, "takvimler": store.calendars(for: .event).map { ["ad": $0.title, "hesap": $0.source.title, "tur": takvimTur($0)] }])
 }
 // v0.132.0 (kullanıcı 25 Ekim: hatırlatma Anımsatıcılar'da değil takvimde görünsün): sesle istenen hatırlatma takvime saatinde başlayan, başında uyaran
 // kısa etkinlik olur (varsayılan takvim ya da istekteki "takvim" adı — Exchange/Google takvimiyse sunucuya, telefona eşitlenir). Silme yalnız verilen kimlikle.

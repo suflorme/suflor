@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 315359,
-   "sha": "22b0ad4e8d1c0219"
+   "uzunluk": 318148,
+   "sha": "35588359b633deb5"
   },
   "/mini": {
-   "uzunluk": 315359,
-   "sha": "22b0ad4e8d1c0219"
+   "uzunluk": 318148,
+   "sha": "35588359b633deb5"
   },
   "/status": {
    "_ping_son": "float",
@@ -316,6 +316,7 @@
      "sohbet_araya_girme": "bool",
      "sohbet_ses_izi": "bool",
      "sure_duyuru": "bool",
+     "takvim_paylasilan": [],
      "tema": "str",
      "toplanti_ses": "str",
      "toplanti_terminal": "bool",
@@ -330,6 +331,7 @@
     "menu": "bool",
     "piper": "bool",
     "pocket": "bool",
+    "takvimler": [],
     "varsayilan": {
      "adin_gecti": "bool",
      "bildirim": "bool",
@@ -366,6 +368,7 @@
      "sohbet_araya_girme": "bool",
      "sohbet_ses_izi": "bool",
      "sure_duyuru": "bool",
+     "takvim_paylasilan": [],
      "tema": "str",
      "toplanti_ses": "str",
      "toplanti_terminal": "bool",

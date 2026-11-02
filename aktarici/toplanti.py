@@ -133,7 +133,7 @@ def _ad_temiz(s): return " ".join(str(s or "").split())[:200]
 def _kayit_ac(kaynak, platform, guvenli, olay=None, konu=None, platform_kaynak=None):  # LOCK içinde; dosya burada bir kez açılır
     now = time.time(); b = _elle_baslat(now) if konu is None else None
     if konu is None and b: konu = b["konu"]
-    if b and not olay and b.get("olay"): olay = TAKVIM_TAM.get(str(b["olay"]))
+    if b and not olay and b.get("olay"): olay = takvim_olay(str(b["olay"]))
     o = olay if olay is not None else oto_takvim(platform)
     if not olay and konu and o and _ad_temiz(o.get("baslik")) != _ad_temiz(konu) and not (b or {}).get("olay"): o_ad = None
     else: o_ad = (o or {}).get("baslik")

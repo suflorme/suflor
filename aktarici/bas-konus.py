@@ -682,7 +682,7 @@ def selam_notu(s):
 # v0.59.0 (kullanıcı, 17 Ekim): yardımcı 30 gün ileriyi okur; Konuş bağlamında her soruda 7 gün (bugün-yarınla sınırlı kalınca kalıba uymayan soruda
 # "yalnız bugün ve yarına erişimim var" deniyordu). 7 günden ötesi (ay adı, gelecek ay, iki hafta sonra) TAKVIM_UZAK_RX'te 30 gün; çalışma saatlerindeki
 # boşluklar (≥ BOS_EN_AZ_DK) yalnız boş/uygun zaman sorusunda (TAKVIM_BOS_RX). Hesap yerel: takvim bağlayıcısı gerekmez, Mac Takvim'deki tüm hesaplar.
-TAKVIM_SONRA_SA, TAKVIM_GENIS_GUN, TAKVIM_UZAK_GUN, BOS_EN_AZ_DK = 1080, 7, 30, 30  # v0.166.1: okuma 45 gün (pano hafta/ay görünümü); Konuş/brifing bağlamı TAKVIM_UZAK_GUN = 30 günde kalır
+TAKVIM_SONRA_SA, TAKVIM_GENIS_GUN, TAKVIM_UZAK_GUN, BOS_EN_AZ_DK = 1488, 7, 30, 30  # v0.167.0: okuma 62 gün (pano hafta/ay görünümü; ay görünümünde sonraki ay tam dolar); Konuş/brifing bağlamı TAKVIM_UZAK_GUN = 30 günde kalır
 _AYLAR = r"ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık|january|february|march|april|may|june|july|august|september|october|november|december"
 TAKVIM_UZAK_RX = re.compile(r"(?i)(\b(" + _AYLAR + r")\b|\b(" + _AYLAR + r")\w+|\bay(ın)? (sonu|başı|ortası)|(gelecek|önümüzdeki|sonraki|bir sonraki|bu) ay\b|\bayın\b"
                             r"|(iki|üç|dört|\d+) hafta|\d+ gün sonra|next month|this month|end of (the )?month|(two|three|\d+) weeks)")
@@ -753,7 +753,7 @@ def son_toplanti_metni():
 TAKVIM_GECMIS_GUN, TAKVIM_GECMIS_SN = 7, 1800
 TAKVIM_GECMIS_OKU_GUN = 14  # yardımcı 14 gün okur (panodaki hafta görünümünde geçen hafta tam); Konuş bağlamına yine son TAKVIM_GECMIS_GUN gün girer
 TAKVIM_GECMIS_JSON = os.path.join(os.path.dirname(os.path.abspath(BASE)), "takvim-gecmis.json")
-TAKVIM_GEC = {"olaylar": [], "t": 0.0}
+TAKVIM_GEC = {"olaylar": [], "pay": [], "t": 0.0}  # pay: ayar takvim_paylasilan etkinlikleri (yalnız panonun aralık görünümü; Konuş bağlamına girmez)
 _GUNLER_RX = r"pazartesi|salı|çarşamba|perşembe|cuma|cumartesi|pazar"
 GECMIS_GUN_RX = re.compile(r"(?i)\b(dün|dünkü|evvelsi gün|önceki gün|geçen (hafta|" + _GUNLER_RX + r")|geçenlerde|bu hafta (kim|ne|hangi)\w*|kiminle (görüştüm|toplandım|konuştum)"
                            r"|görüştüm|toplandım|toplantım vardı|toplantı yaptım|toplantı(lar)?ım (ne|nasıl) geçti|(" + _GUNLER_RX + r")(ki|günkü) (toplantı|görüşme)"
@@ -769,16 +769,22 @@ def davet_notu_temiz(n, en_cok=400):  # davet notundan katılım metni, bağlant
         if len(l) < 2 or _DAVET_KALIP.search(l): continue
         out.append(l)
     return " ".join(" ".join(out).split())[:en_cok]
+def takvim_goster_arg():  # ayar takvim_paylasilan → yardımcıya her takvim için ayrı "--goster <ad · hesap>" (ad içinde virgül olabilir, bu yüzden yinelenen argüman)
+    out = []
+    for x in AYAR.get("takvim_paylasilan") or []:
+        if isinstance(x, str) and x.strip(): out += ["--goster", " ".join(x.split())]
+    return out
 def takvim_gecmis_yenile(zorla=False):
     if not zorla and time.time() - TAKVIM_GEC["t"] < TAKVIM_GECMIS_SN: return
     TAKVIM_GEC["t"] = time.time()
     if not os.path.isdir(TAKVIM_APP): return
     adr = ",".join(str(x).strip() for x in (AYAR.get("takvim_adreslerim") or []) if "@" in str(x) and "," not in str(x))
-    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_GECMIS_JSON, "--once", str(24 * TAKVIM_GECMIS_OKU_GUN), "--sonra", "0"] + (["--adres", adr] if adr else []),
+    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_GECMIS_JSON, "--once", str(24 * TAKVIM_GECMIS_OKU_GUN), "--sonra", "0"] + (["--adres", adr] if adr else []) + takvim_goster_arg(),
                         timeout=150, capture_output=True)
     except subprocess.TimeoutExpired: return
-    try: TAKVIM_GEC["olaylar"] = [e for e in (json.load(open(TAKVIM_GECMIS_JSON, encoding="utf-8")).get("olaylar") or []) if isinstance(e, dict)]
-    except (OSError, ValueError): pass
+    try: ol = [e for e in (json.load(open(TAKVIM_GECMIS_JSON, encoding="utf-8")).get("olaylar") or []) if isinstance(e, dict)]
+    except (OSError, ValueError): return
+    TAKVIM_GEC["olaylar"] = [e for e in ol if not e.get("paylasilan")]; TAKVIM_GEC["pay"] = [e for e in ol if e.get("paylasilan")]
 def _olay_satir(e, b, s_, simdi, gun=None):
     kim = ", ".join((e.get("katilimcilar") or [])[:5]) + (f" +{e['kisi_sayisi'] - 6}" if (e.get("kisi_sayisi") or 0) > 6 else "")
     return (f"- {gun or _gun_ad(b.date(), simdi)} " + (_t("tüm gün", "all day") if e.get("tum_gun") else f"{b:%H:%M}–{s_:%H:%M}") + f" · {' '.join(str(e.get('baslik') or '').split())[:120]}"
@@ -1954,7 +1960,7 @@ def chrome_ac(p):
     # sinyal vermedi. Varsayılan tarayıcı Safari kalır; toplantı bağlantısı Chrome'da açılır. Rastgele adres açılmaz: yalnız takvimdeki
     # olayın ya da son Başlat'ın (ikisi de guvenli_baglanti / PLATFORM_ANA'dan geçmiş) bağlantısı.
     if p.get("baslatma"): url = (STATE.get("baslatma") or {}).get("baglanti") if time.time() - ((STATE.get("baslatma") or {}).get("at") or 0) < 120 else None
-    else: url = (TAKVIM_TAM.get(str(p.get("olay") or "")) or {}).get("baglanti")
+    else: url = (takvim_olay(str(p.get("olay") or "")) or {}).get("baglanti")
     if not url: return {"ok": False, "err": "bağlantı yok"}
     k = ["open", "-a", CHROME_APP, url] if CHROME_APP else ["open", url]
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): {' '.join(k[:-1])} <adres>"); return {"ok": True, "chrome": bool(CHROME_APP)}
@@ -2039,8 +2045,8 @@ def hazirlik_baglam(e, arsiv_kisiler):  # → bağlam nedenleri: gundem | belge 
     if HAZIRLIK_BELGE_RX.search(n): out.append("belge")
     if any(_hz_ayni_kisi(_hz_ad(k), a) for k in e.get("katilimcilar") or [] for a in arsiv_kisiler): out.append("gecmis")
     return out
-HAFTA_OFSET = (-1, 5)  # +5 hafta her zaman TAKVIM_SONRA_SA (45 gün) içinde
-AY_OFSET = (-1, 1)  # ay görünümü: geçen ay … gelecek ay (veri geriye 14 gün, ileri 1080 saat; kapsam dışı günler panoda taralı)
+HAFTA_OFSET = (-1, 8)  # +8: haftanın Pazar'ı bugün + 62 gün (TAKVIM_SONRA_SA = 1488 sa) içinde kalan en büyük ofset (Pazartesi'de tam 62 gün, diğer günlerde pay var)
+AY_OFSET = (-1, 1)  # ay görünümü: geçen ay … gelecek ay (veri geriye 14 gün, ileri 1488 saat; sonraki ayın son günü en çok bugün + 61 gün; kapsam dışı günler panoda taralı)
 def takvim_hafta(ofset=0, simdi=None):
     simdi = simdi or datetime.datetime.now().astimezone(); ofset = max(HAFTA_OFSET[0], min(int(ofset or 0), HAFTA_OFSET[1]))
     g0 = simdi.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -2056,8 +2062,9 @@ def _takvim_aralik(hb, hs, simdi, sinir):  # [hb, hs) aralığındaki olaylar (h
     haric = AYAR.get("takvim_haric") or []; br = globals().get("BRIFING") or {}; gorulen = set(); ol = []; ark = None
     try: hzd = set(os.listdir(hazirlik_dizin()))
     except OSError: hzd = set()
-    kaynak = [(e, False) for e in TAKVIM_TAM.values()] + [(e, True) for e in (globals().get("TAKVIM_GEC") or {}).get("olaylar") or []]
-    for e, gec in kaynak:
+    kaynak = [(e, False, False) for e in TAKVIM_TAM.values()] + [(e, True, False) for e in (globals().get("TAKVIM_GEC") or {}).get("olaylar") or []]
+    kaynak += [(e, False, True) for e in (globals().get("TAKVIM_PAY") or {}).values()] + [(e, True, True) for e in (globals().get("TAKVIM_GEC") or {}).get("pay") or []]  # paylaşılan en sona: aynı toplantı kendi takvimindeyse o kalır
+    for e, gec, pay in kaynak:
         if f'{e.get("takvim")} · {e.get("hesap")}' in haric: continue
         try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
         except (KeyError, ValueError, TypeError): continue
@@ -2065,7 +2072,14 @@ def _takvim_aralik(hb, hs, simdi, sinir):  # [hb, hs) aralığındaki olaylar (h
         k = (" ".join(str(e.get("baslik") or "").split()), b.isoformat())
         if k in gorulen: continue
         gorulen.add(k)
-        oid = (f'g:{e.get("id")}@{e.get("baslangic")}' if gec else e.get("id")) or f"x:{len(ol)}"
+        oid = (f'g:{"p:" if pay else ""}{e.get("id")}@{e.get("baslangic")}' if gec else e.get("id")) or f"x:{len(ol)}"
+        if pay:  # v0.167.0: paylaşılan takvim — yalnız görünür; hazırlık hesaplanmaz, Hazırla yok, Başlat var (kullanıcı katılabilir)
+            v = {x: e.get(x) for x in ("baslik", "platform", "baglanti", "kisi_sayisi", "yer")}
+            v.update(id=oid, baslangic=b.isoformat(timespec="minutes"), bitis=s_.isoformat(timespec="minutes"), tum_gun=bool(e.get("tum_gun")),
+                     tarih=b.strftime("%Y-%m-%d"), saat=b.strftime("%H:%M"), bitis_saat=s_.strftime("%H:%M"), gecmis=s_ <= simdi, suruyor=b <= simdi < s_,
+                     katilimcilar=[str(x) for x in (e.get("katilimcilar") or [])[:12]], baslatilir=not gec and s_ > simdi, hazirlik="yok", hazirlik_neden=[],
+                     brifing=None, brifing_hata=None, hazirlik_sonuc=None, paylasilan=True, takvim_adi=str(e.get("takvim") or "")[:120])
+            ol.append(v); continue
         bk = (br.get(oid) or {}) if not gec else {}; bd = bk.get("durum")
         an = hazirlik_anahtar(e)
         if bk.get("anahtar") and bk["anahtar"] != an: bk, bd = {}, None  # tekrarın kimliği kaymış: önceki tekrarın brifingi
@@ -2096,7 +2110,7 @@ def takvim_yenile():
     # ayar takvim_adreslerim: kullanıcının takvim adresleri (Google, Exchange …) — yardımcı yalnız bu adreslerin davetli ya da
     # düzenleyen olduğu toplantıları yazar (Takvim'e eklenmiş başkalarının paylaşılan takvimleri listeye girmesin)
     adr = ",".join(str(x).strip() for x in (AYAR.get("takvim_adreslerim") or []) if "@" in str(x) and "," not in str(x))
-    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_JSON, "--sonra", str(TAKVIM_SONRA_SA)] + (["--adres", adr] if adr else []), timeout=150, capture_output=True)
+    try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_JSON, "--sonra", str(TAKVIM_SONRA_SA)] + (["--adres", adr] if adr else []) + takvim_goster_arg(), timeout=150, capture_output=True)
     except subprocess.TimeoutExpired: STATE["takvim"].update(durum="zaman_asimi", hata="takvim yardımcısı yanıt vermedi (izin penceresi açık olabilir)")
     takvim_oku()
 def _takvim_dongu():

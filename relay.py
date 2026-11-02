@@ -1312,6 +1312,11 @@ def _eklenti_kimlikleri():
     return {f"chrome-extension://{x}" for x in k}
 EKLENTI_KOKEN = _eklenti_kimlikleri()
 TAKVIM_SN = 300; TAKVIM_TAM = {}
+# v0.167.0: ayar takvim_paylasilan'daki takvimlerin süzgeçten geçmeyen etkinlikleri ("paylasilan": true) TAKVIM_TAM'a GİRMEZ — burada ayrı durur, yalnız panonun
+# hafta/ay/gün görünümü (_takvim_aralik) ve kullanıcının elle bastığı Başlat (takvim_olay) bakar. Konuş/brifing/hazırlık/toplantıyı tanıma TAKVIM_TAM'dan okur, etkilenmez.
+# TAKVIM_LISTE: Mac Takvim'deki tüm etkinlik takvimleri [{ad, hesap, tur}] (⚙ Ayarlar'daki seçim listesi).
+TAKVIM_PAY = {}; TAKVIM_LISTE = []
+def takvim_olay(oid): return TAKVIM_TAM.get(oid) or TAKVIM_PAY.get(oid)  # yalnız kullanıcı eylemi (Başlat, bağlantıyı aç) için; paylaşılan etkinlik de bulunur
 # --- v0.14.0 yerel anahtar (#76) ---------------------------------------------------------------------------------------
 # 127.0.0.1 bu Mac'teki her macOS hesabına açık ve Origin başlığı curl ile taklit edilebilir: diğer hesap dökümü, kartları
 # okuyabiliyor, panoya gömülü başlatma anahtarını alıp Terminal açtırabiliyordu. Artık okuma uçları ve pano işlemleri yerel
@@ -1379,16 +1384,20 @@ def anahtar_yardimcisi_kur():
 STATE["takvim"] = {"durum": "bekliyor", "hata": None, "guncel": None}
 def _zaman(t): return datetime.datetime.fromisoformat(str(t).replace("Z", "+00:00")).astimezone()
 def takvim_oku():
-    global TAKVIM_TAM
+    global TAKVIM_TAM, TAKVIM_PAY, TAKVIM_LISTE
     try: j = json.load(open(TAKVIM_JSON, encoding="utf-8"))
     except (OSError, ValueError): return
     # v0.59.1: tekrarlanan toplantının her tekrarı aynı kimlikle gelir (30 günde haftalık toplantı dört kez); sözlükte yalnız sonuncusu kalıyordu.
     # En yakın tekrar kimliği korur (pano, brifing, Başlat onunla bulur), sonrakiler "<kimlik>@<başlangıç>" olur.
-    tam = {}
+    tam, pay = {}, {}
     for e in sorted((e for e in j.get("olaylar") or [] if e.get("id")), key=lambda e: str(e.get("baslangic") or "")):
+        if e.get("paylasilan"):
+            k = "p:" + e["id"]; k = k if k not in pay else f'{k}@{e.get("baslangic")}'
+            pay[k] = dict(e, id=k, baglanti=guvenli_baglanti(e.get("baglanti"))); continue
         k = e["id"] if e["id"] not in tam else f'{e["id"]}@{e.get("baslangic")}'
         tam[k] = dict(e, id=k, baglanti=guvenli_baglanti(e.get("baglanti")))
-    TAKVIM_TAM = tam
+    TAKVIM_TAM, TAKVIM_PAY = tam, pay
+    if isinstance(j.get("takvimler"), list): TAKVIM_LISTE = [{x: str(t.get(x) or "")[:120] for x in ("ad", "hesap", "tur")} for t in j["takvimler"] if isinstance(t, dict) and t.get("ad")]
     STATE["takvim"] = {"durum": j.get("durum"), "hata": j.get("hata"), "guncel": j.get("guncel")}
     if "hazirlik_esle" in globals():  # toplantı başına kayıtlı hazırlık (aktarici/brifing-ses.py)
         try:
@@ -1508,6 +1517,7 @@ AYAR_PANO = {
     "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None),  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel", "ollama")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")),
+    "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama"))}
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
@@ -1539,7 +1549,7 @@ def ayarlar_view():
     vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin") and k != "dil"}  # kişilik, yapay zekâ ve dil "varsayılana dön"le değişmez
     vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
     return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici(),
-            "beyin": sg_ayar_view(), "gelistirici": gelistirici_mi()}  # beta profili: geliştirici kurulumunda gizli ayarlar "Gelişmiş" grubunda görünür
+            "beyin": sg_ayar_view(), "gelistirici": gelistirici_mi(), "takvimler": TAKVIM_LISTE}  # beta profili: geliştirici kurulumunda gizli ayarlar "Gelişmiş" grubunda görünür
 def ayar_yaz(deg):
     hata, yeni, beyin = {}, {}, {}
     for k, v in (deg or {}).items():
@@ -1558,6 +1568,8 @@ def ayar_yaz(deg):
         elif tur == "sayi" and isinstance(v, (int, float)) and not isinstance(v, bool) and sinir[0] <= v <= sinir[1]: yeni[k] = int(v)
         elif tur == "liste" and isinstance(v, (str, list)):  # virgüllü metin → tekilleşmiş liste (en çok 20 parça, 60 harf)
             yeni[k] = list(dict.fromkeys(" ".join(str(x).split())[:60] for x in (v if isinstance(v, list) else str(v).split(",")) if str(x).strip()))[:20]
+        elif tur == "takvimler" and isinstance(v, list):  # "ad · hesap" metinleri (en çok 60, 160 harf)
+            yeni[k] = list(dict.fromkeys(" ".join(x.split())[:160] for x in v if isinstance(x, str) and x.strip()))[:60]
         else: hata[k] = _t("Adres geçersiz", "Invalid address") if tur == "adres" else _t(f"{sinir[0]}–{sinir[1]} arası", f"between {sinir[0]} and {sinir[1]}") if tur == "sayi" else _t("geçersiz", "invalid")
     if hata: return {"ok": False, "hata": hata, "err": next(iter(hata.values()))}
     if not yeni and not beyin: return {"ok": True, "degisen": []}
@@ -1571,7 +1583,7 @@ def ayar_yaz(deg):
                 h = sg_yaz(a, beyin)
                 if h: return {"ok": False, "err": h}
             for k, v in yeni.items():
-                if (k in ("eposta", "eposta_adres", "kisilik", "kisilik_toplanti_disi", "oto_haric") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
+                if (k in ("eposta", "eposta_adres", "kisilik", "kisilik_toplanti_disi", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
             gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
             with open(gec, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
@@ -1584,6 +1596,7 @@ def ayar_yaz(deg):
         if "beyin" in a: AYAR["beyin"] = a["beyin"]
         else: AYAR.pop("beyin", None)
         _SG_DURUM["t"] = 0; yeni.update({"beyin_" + k: v for k, v in beyin.items()}); threading.Thread(target=sg_bak, daemon=True).start()  # Ollama gerekirse hemen açılır/kapanır
+    if "takvim_paylasilan" in yeni: threading.Thread(target=lambda: (takvim_yenile(), takvim_gecmis_yenile(True)), daemon=True).start()  # seçilen takvimler hemen okunur
     if "dil" in yeni: global ARAYUZ_DILI; ARAYUZ_DILI = "en" if AYAR.get("dil") == "en" else "tr"  # aktarıcının kendi metinleri de yeni dille
     print("AYAR: panodan değişti — " + ", ".join(sorted(yeni)))
     menu = None
@@ -1830,11 +1843,11 @@ def baslat(p):
     k_ = " ".join(str(p.get("konu") or "").split())[:200]
     suren = a.get("durum") in ("algilandi", "suruyor") or (a.get("durum") == "bitiyor" and (not k_ or k_ == a.get("ad")))
     if STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60 or (topo_canli() and (not k_ or k_ == TOPO.get("konu") or suren)):
-        try: a = toplanti_baslatta(k_, TAKVIM_TAM.get(str(p.get("olay") or "")) if p.get("olay") else None, p.get("platform") if p.get("platform") in PLATFORM_ANA else None, None) or {}  # kayıt yoksa ya da bitmekteyse
+        try: a = toplanti_baslatta(k_, takvim_olay(str(p.get("olay") or "")) if p.get("olay") else None, p.get("platform") if p.get("platform") in PLATFORM_ANA else None, None) or {}  # kayıt yoksa ya da bitmekteyse
         except Exception as e: print(f"BAŞLAT: toplantı kaydı hatası {e.__class__.__name__}: {e}")
         print(f"BAŞLAT: toplantı oturumu zaten açık — süren toplantıya katıldı{' (' + a['ad'] + ')' if a.get('ad') else ''}")
         return {"ok": True, "katildi": True, "konu": a.get("ad") or STATE.get("meeting")}
-    olay = TAKVIM_TAM.get(str(p.get("olay") or "")) if p.get("olay") else None
+    olay = takvim_olay(str(p.get("olay") or "")) if p.get("olay") else None
     konu = " ".join(str(p.get("konu") or (olay or {}).get("baslik") or "").split())[:200]
     if not konu: return {"ok": False, "err": "konu yok"}
     rol = p.get("rol") if p.get("rol") in ("yurutucu", "katilimci", "dinleyici") else ("yurutucu" if olay and (olay.get("ben_duzenleyen") or not (olay.get("duzenleyen") or olay.get("kisi_sayisi"))) else "katilimci")

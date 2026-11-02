@@ -92,9 +92,32 @@ ok("geçmiş: geçmiş kaynaktan, başlatılamaz; gelecek başlatılır; reddedi
    b0["Hafta 11"]["gecmis"] and not b0["Hafta 11"]["baslatilir"] and b0["Hafta 11"]["id"].startswith("g:") and b0["Hafta 1"]["baslatilir"] and not b0["Hafta 1"]["gecmis"]
    and b0["Hafta 3"]["reddettin"] and b0["Hafta 5"]["tum_gun"] and b0["Hafta 1"]["saat"] == "11:00" and b0["Hafta 1"]["bitis_saat"] == "12:00")
 ok("sonraki hafta: Pazartesi 19 Ekim, yalnız o haftanın toplantısı", h1["hafta_bas"] == "2026-10-19" and [o["baslik"] for o in h1["olaylar"]] == ["Hafta 4"])
-ok("geçen hafta (geçmiş kaynaktan) ve gezinme sınırı -1…+5", hm["hafta_bas"] == "2026-10-05" and [o["baslik"] for o in hm["olaylar"]] == ["Hafta 12"] and hk["ofset"] == 5 and ad["takvim_hafta"](-7, simdi)["ofset"] == -1)
-ok(f"kapsam: geçmiş 14 gün, ileri {ad['TAKVIM_SONRA_SA']} sa ({h0['kapsam']})", h0["kapsam"] == {"bas": "2026-10-02", "son": "2026-11-30"} and h0["en_az"] == -1 and h0["en_cok"] == 5)
-ok("okuma 45 gün (1080 sa); bağlam sınırı 30 gün, bağlamda 7 gün", ad["TAKVIM_SONRA_SA"] == 1080 and ad["TAKVIM_UZAK_GUN"] == 30 and ad["TAKVIM_GENIS_GUN"] == 7 and ad["HAFTA_OFSET"][1] == 5 and ad["TAKVIM_UZAK_GUN"] * 24 < ad["TAKVIM_SONRA_SA"])
+ok("geçen hafta (geçmiş kaynaktan) ve gezinme sınırı -1…+8", hm["hafta_bas"] == "2026-10-05" and [o["baslik"] for o in hm["olaylar"]] == ["Hafta 12"] and hk["ofset"] == 8 and ad["takvim_hafta"](-7, simdi)["ofset"] == -1)
+ok(f"kapsam: geçmiş 14 gün, ileri {ad['TAKVIM_SONRA_SA']} sa ({h0['kapsam']})", h0["kapsam"] == {"bas": "2026-10-02", "son": "2026-12-17"} and h0["en_az"] == -1 and h0["en_cok"] == 8)
+ok("okuma 62 gün (1488 sa); bağlam sınırı 30 gün, bağlamda 7 gün", ad["TAKVIM_SONRA_SA"] == 1488 and ad["TAKVIM_UZAK_GUN"] == 30 and ad["TAKVIM_GENIS_GUN"] == 7 and ad["HAFTA_OFSET"][1] == 8 and ad["TAKVIM_UZAK_GUN"] * 24 < ad["TAKVIM_SONRA_SA"])
+# haftanın son günü her gün için okuma kapsamında mı (HAFTA_OFSET üst sınırı): hafta 8'in Pazar'ı bugün + 62 gün içinde, hafta 9'unki dışında
+ok("HAFTA_OFSET üst sınırı: haftanın Pazar'ı 62 gün içinde (her gün için), bir fazlası dışında",
+   all((lambda g: (g - dt.timedelta(days=g.weekday()) + dt.timedelta(days=7 * ad["HAFTA_OFSET"][1] + 6) - g).days <= ad["TAKVIM_SONRA_SA"] // 24 < (g - dt.timedelta(days=g.weekday()) + dt.timedelta(days=7 * (ad["HAFTA_OFSET"][1] + 1) + 6) - g).days)(dt.date(2026, 10, 12) + dt.timedelta(days=i)) for i in range(14)))
+# v0.167.0: paylaşılan takvim (ayar takvim_paylasilan) — yalnız aralık görünümünde, hazırlıksız, TAKVIM_TAM/Konuş bağlamında yok
+def pol(i, gun, b, s_, **k): return dict(olay(i, gun, b, s_), **dict(dict(id=f"p:pay{i}", baslik=f"Paylaşılan {i}", takvim="Kurgu Takvim 1", hesap="Kurgu", katilimcilar=[], kisi_sayisi=None), **k))
+ad["TAKVIM_PAY"] = {e["id"]: e for e in [pol(1, 1, 9, 10), pol(2, 0, 11, 12), pol(3, 3, 9, 10, takvim="Gizli Takvim", hesap="Kurgu")]}
+ad["TAKVIM_GEC"] = {"olaylar": [], "pay": [pol(4, -2, 14, 15), pol(2, 0, 11, 12)], "t": 0}
+ad["AYAR"]["takvim_haric"] = ["Gizli Takvim · Kurgu"]
+hp0, hp1 = ad["takvim_hafta"](0, simdi), ad["takvim_hafta"](1, simdi); bp = {o["baslik"]: o for o in hp0["olaylar"]}
+ok("paylaşılan: aralık görünümünde paylasilan işaretli, takvim_adi, hazirlik yok, brifing/Hazırla alanı yok; Başlat (gelecek) açık",
+   bp["Paylaşılan 1"].get("paylasilan") is True and bp["Paylaşılan 1"]["takvim_adi"] == "Kurgu Takvim 1" and bp["Paylaşılan 1"]["hazirlik"] == "yok" and bp["Paylaşılan 1"]["hazirlik_neden"] == []
+   and bp["Paylaşılan 1"]["brifing"] is None and bp["Paylaşılan 1"]["baslatilir"] and bp["Paylaşılan 1"]["id"] == "p:pay1" and not any(o.get("paylasilan") for o in hp0["olaylar"] if o["baslik"].startswith("Hafta")))
+ok("paylaşılan: geçmiş kopya başlatılamaz (g:p: kimliği), aynı başlık+saat bir kez, takvim_haric paylaşılanı da gizler",
+   bp["Paylaşılan 4"]["gecmis"] and not bp["Paylaşılan 4"]["baslatilir"] and bp["Paylaşılan 4"]["id"].startswith("g:p:") and [o["baslik"] for o in hp0["olaylar"]].count("Paylaşılan 2") == 1
+   and "Paylaşılan 3" not in {o["baslik"] for o in hp0["olaylar"] + hp1["olaylar"]})
+ok("paylaşılan: kendi takvimindeki aynı toplantı varsa o kalır (paylaşılan kopya düşer)",
+   (lambda: (ad["TAKVIM_PAY"].update({"p:x": pol(9, 0, 11, 12, baslik="Hafta 1")}), [o for o in ad["takvim_hafta"](0, simdi)["olaylar"] if o["baslik"] == "Hafta 1"])[1])()[0].get("paylasilan") is None)
+ad["TAKVIM_PAY"].pop("p:x")
+ad["TAKVIM_PAY"] = {}; ad["TAKVIM_GEC"] = {"olaylar": [], "pay": [], "t": 0}; ad["AYAR"]["takvim_haric"] = ["Paylaşılan · Başkası"]
+ok("ayar boş: çıktıda paylaşılan etkinlik yok (v0.166.1 ile aynı anahtarlar)", not any(o.get("paylasilan") for o in ad["takvim_hafta"](0, simdi)["olaylar"]) and all("paylasilan" not in o for o in ad["takvim_hafta"](0, simdi)["olaylar"]))
+ad["AYAR"]["takvim_paylasilan"] = ["Kurgu, Takvim 1 · Kurgu", " Kurgu  Takvim 2 · Kurgu "]
+ok("yardımcı argümanı: her takvim ayrı --goster (virgül ad içinde korunur, boşluklar sadeleşir); ayar boşken yok",
+   ad["takvim_goster_arg"]() == ["--goster", "Kurgu, Takvim 1 · Kurgu", "--goster", "Kurgu Takvim 2 · Kurgu"] and not (ad["AYAR"].pop("takvim_paylasilan") and ad["takvim_goster_arg"]()))
 ad["TAKVIM_GEC"]["olaylar"] = []
 ok("geçmiş okunmadıysa kapsam bugünden başlar", ad["takvim_hafta"](0, simdi)["kapsam"]["bas"] == "2026-10-16")
 # --- ay görünümü: takvim_ay(ofset) — ayın 1'ini içeren haftanın Pazartesi'sinden 42 gün; ayın dışındaki (ızgaraya düşen) olaylar da gelir ---------------------------------
@@ -160,7 +183,10 @@ s0 = dt.datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
 json.dump({"durum": "ok", "olaylar": [{"id": "u1", "baslik": "Uzak toplantı", "baslangic": (s0 + dt.timedelta(days=4)).isoformat(), "bitis": (s0 + dt.timedelta(days=4, hours=1)).isoformat(),
            "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Ayla K"], "kisi_sayisi": 2}]
            + [{"id": "h1", "baslik": "Haftalık", "baslangic": (s0 + dt.timedelta(days=d, hours=1)).isoformat(), "bitis": (s0 + dt.timedelta(days=d, hours=2)).isoformat(),
-               "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": [], "kisi_sayisi": 0} for d in (16, 2, 9)]}, open(os.path.join(T, "takvim.json"), "w"))
+               "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": [], "kisi_sayisi": 0} for d in (16, 2, 9)]
+           + [{"id": "pay1", "baslik": "Paylaşılan toplantı", "baslangic": (s0 + dt.timedelta(days=2)).isoformat(), "bitis": (s0 + dt.timedelta(days=2, hours=1)).isoformat(),
+               "tum_gun": False, "takvim": "Kurgu Takvim 1", "hesap": "Kurgu", "paylasilan": True}],
+           "takvimler": [{"ad": "Kurgu Takvim 1", "hesap": "Kurgu", "tur": "google"}, {"ad": "İş", "hesap": "Yerel", "tur": "yerel"}]}, open(os.path.join(T, "takvim.json"), "w"))
 # sahte Brifing.app (istekteki çıktı dosyasına Claude'un json çıktısını yazar) + sahte claude (yalnız var olsun) — kota yok
 app = os.path.join(T, "Suflor Brifing.app", "Contents"); os.makedirs(os.path.join(app, "MacOS"))
 open(os.path.join(app, "Info.plist"), "w").write('<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>brifing</string>'
@@ -213,6 +239,18 @@ try:
     out = subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", "takvim", "--gun", "7"],
                          capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay)).stdout
     ok("toplanti-claude.py takvim --gun 7: boş zamanlar + uzak toplantı tarihli", "# Boş zamanlar (7 gün" in out and "Uzak toplantı" in out and (s0 + dt.timedelta(days=4)).strftime("%Y-%m-%d") in out)
+    # v0.167.0: paylaşılan etkinlik takvim.json'da var; TAKVIM_TAM'a girmez (Konuş/brifing/tanıma okumaz), yalnız aralık görünümünde
+    hpw = get("/takvim?hafta=0")["olaylar"] + get("/takvim?hafta=1")["olaylar"]; hpa = [o for o in hpw if o["id"] == "p:pay1"]
+    ok("relay: paylaşılan etkinlik /takvim (gün, tam, gun=30) çıktısında yok; hafta görünümünde paylasilan + hazirlik yok",
+       not any(o["id"] in ("pay1", "p:pay1") for o in t1["olaylar"] + t7["olaylar"] + t30["olaylar"]) and len(hpa) == 1 and hpa[0].get("paylasilan") and hpa[0]["hazirlik"] == "yok" and hpa[0]["baslatilir"], hpa)
+    ay_t = get("/status")["ayarlar"]
+    ok("relay: /status ayarlar.takvimler yardımcının listesi; takvim_paylasilan varsayılan boş", [t["ad"] for t in ay_t["takvimler"]] == ["Kurgu Takvim 1", "İş"] and ay_t["deger"]["takvim_paylasilan"] == [], ay_t["takvimler"])
+    pr = post("/ayar", {"degisen": {"takvim_paylasilan": ["Kurgu Takvim 1 · Kurgu", " Kurgu Takvim 1 · Kurgu", "", 5]}}); pk = post("/ayar", {"degisen": {"takvim_paylasilan": "metin"}})
+    ok("ayar: takvim_paylasilan listesi temizlenip kaydedilir (yinelenen, boş ve metin dışı atılır); liste olmayan reddedilir",
+       pr.get("ok") and json.load(open(ay)).get("takvim_paylasilan") == ["Kurgu Takvim 1 · Kurgu"] and not pk.get("ok") and get("/status")["ayarlar"]["deger"]["takvim_paylasilan"] == ["Kurgu Takvim 1 · Kurgu"], (pr, pk))
+    ok("ayar: boş liste ayar.json'dan kaldırır", post("/ayar", {"degisen": {"takvim_paylasilan": []}}).get("ok") and "takvim_paylasilan" not in json.load(open(ay)))
+    pb = post("/baslat", {"olay": "p:pay1", "rol": "katilimci"})
+    ok("Başlat: paylaşılan etkinlik kimliğiyle toplantı başlar (konu etkinlikten; yanıtta ok)", pb.get("ok") is True and pb.get("konu") in (None, "Paylaşılan toplantı") , pb)
     ok("aktarıcıda hata yok", "Traceback" not in open(os.path.join(T, "relay.log")).read() and "HAZIRLIK: eşlenemedi" not in open(os.path.join(T, "relay.log")).read())
 finally:
     r.terminate(); r.wait(); shutil.rmtree(T, ignore_errors=True)

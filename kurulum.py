@@ -267,7 +267,7 @@ def takvim():
     a = ayar(); tj = oku_json(os.path.join(gen(a.get("uygulama") or "~/Library/Application Support/Suflor"), "takvim.json"))
     tk = {}
     for e in tj.get("olaylar", []):
-        if e.get("takvim"): tk[f'{e["takvim"]} · {e.get("hesap") or ""}'] = {"ad": e["takvim"], "hesap": e.get("hesap") or ""}
+        if e.get("takvim") and not e.get("paylasilan"): tk[f'{e["takvim"]} · {e.get("hesap") or ""}'] = {"ad": e["takvim"], "hesap": e.get("hesap") or ""}
     return {"durum": t.get("durum"), "takvimler": list(tk.values()), "adaylar": takvim_adaylari(a) if t.get("durum") == "ok" else [],
             "adresler": a.get("takvim_adreslerim"), "eposta": a.get("eposta"), "eposta_adres": a.get("eposta_adres"), "olaylar": [{"saat": o["saat"], "bitis": o["bitis_saat"], "baslik": o["baslik"], "platform": o.get("platform")} for o in t.get("olaylar", [])]}
 

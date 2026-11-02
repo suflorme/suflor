@@ -9,7 +9,7 @@ def kontrol(ad, kosul, ek=""):
 kaynak = open(os.path.join(KOD, "takvim.swift"), encoding="utf-8").read()
 kontrol("süzgeç işaretleri var", "// SUZGEC-BAS" in kaynak and "// SUZGEC-SON" in kaynak)
 blok = kaynak[kaynak.index("// SUZGEC-BAS"):kaynak.index("// SUZGEC-SON")]
-kontrol("döngü olayAlinir( çağırıyor", bool(re.search(r"if !olayAlinir\(", kaynak[kaynak.index("// SUZGEC-SON"):])))
+kontrol("döngü olayAlinir( çağırıyor", bool(re.search(r"(if !|let alinir = )olayAlinir\(", kaynak[kaynak.index("// SUZGEC-SON"):])))
 kontrol("kendi ayrinti çıktısında hâlâ var", '"kendi": kendi' in kaynak)
 # durum: (ad, digerBos, duzenleyenVar, benDuzenleyen, benKatilan, yazilabilir, baglantiVar, beklenen)
 D = [
