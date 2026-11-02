@@ -38,6 +38,7 @@ try:
     u = urllib.parse.unquote(o.get("url", ""))
     ok("önizleme URL'si: başlık, başlangıç–bitiş (45 dk), davetli adresleri", "Bütçe" in u and gel.strftime("%Y%m%dT%H%M00") + "/" + (gel + dt.timedelta(minutes=45)).strftime("%Y%m%dT%H%M00") in u
        and EP("ayse.demir", "ornek.test") in u and EP("ali", "firma.test") in u and "Bilinmeyen" in u, u)
+    ok("açıklama panoyu anar, \"sesle istendi\" demez (v0.167.1)", "panodaki takvimden" in u and "sesle istendi" not in u, u)
     k, o = post({"onizle": True, "zaman": Z, "davetli": []})
     ok("önizleme başlıksız çalışır, geçmiş değil", k == 200 and o.get("ok") and o.get("gecmis") is False and o.get("davetli") == [])
     ok("geçmiş saat önizlemede işaretli", post({"onizle": True, "zaman": "2020-01-01T10:00"})[1].get("gecmis") is True)

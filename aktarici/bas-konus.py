@@ -1602,13 +1602,18 @@ def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen p
         if metin and izler and sohbet_ses_izi_red(izler): return geri(metin, "ses_izi")
         geri(metin, None if metin else "boş")
     threading.Thread(target=bekle, daemon=True).start(); return True
+def konus_pocket_isit():  # v0.167.1: Pocket boşta kapandıysa (pocket_bos_dk) basınca ısınır; açılış ~3,8 sn — açılmadan gelen selam/ilk cümle Mac sesiyle (Elif) okunuyordu
+    if os.environ.get("SUFLOR_TEST_BASLAT") or not AYAR.get("konusma", True) or not pocket_var() or POCKET["durum"] in ("hazir", "yukleniyor"): return
+    try:
+        if kisilik_sesi()[0] == "pocket" and pocket_baslat(None, bekle=False) is False and POCKET["durum"] == "yukleniyor": print("KONUŞ: Pocket kapalıydı — ısınıyor")
+    except Exception as e: print(f"KONUŞ: Pocket ısıtılamadı {e.__class__.__name__}")
 def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsın (kayıt sürerken)
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
     if "uclu_kes" in globals() and not toplanti_var(): uclu_kes("kullanıcı bastı")  # üçlü sohbet: söz kullanıcıda; bekleyen söz okunmaz, zincir biter
     if _KS["tur"] and _KS["tur"].get("kaynak") != "uclu": return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}  # söz alma turu bırakınca biter (uclu_bekle)
     if giris_sanal(): print("KONUŞ: varsayılan giriş sanal aygıt (BlackHole) — başlamadı"); return {"ok": False, "err": _t(*GIRIS_SANAL_UYARI)}  # v0.80.3
-    _akis_sifirla(); onara_isit()
+    _akis_sifirla(); onara_isit(); konus_pocket_isit()
     if not toplanti_var(): ses_durdur()  # toplantıda yalnız okunan cevap durur (aşağıda konus_sus)
     _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None, sesli_cevap=False, kaynak="bas")
     if STATE["whisper"].get("durum") != "yok" and not toplanti_var(): wh_one_al({"isinma": True, "kuyruga": time.time()}); _isci_baslat()  # toplantıda model zaten bellekte
@@ -1623,7 +1628,7 @@ def konus_yazili(metin):  # v0.117.0 (S136): toplantı yokken pano kutusundan ya
     if _KS["tur"] and _KS["tur"].get("kaynak") == "uclu": uclu_iptal("kullanıcı sordu")
     if _KS["tur"] and not ("uclu_bekle" in globals() and uclu_bekle()): return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
     tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True}; _KS["tur"] = tur
-    threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
+    konus_pocket_isit(); threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
     print("KONUŞ: yazılı soru (pano kutusu)"); return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}

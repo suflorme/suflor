@@ -181,7 +181,7 @@ def toplanti_sayfa_url(a):  # takvimin dolu "yeni etkinlik" sayfası
     e = urllib.parse.quote; ben = eposta_ben() if "eposta_ben" in globals() else None; tur = eposta_tur() if "eposta_tur" in globals() else "gmail"
     bas = datetime.datetime.strptime(a["zaman"], "%Y-%m-%dT%H:%M"); bit = bas + datetime.timedelta(minutes=int(a.get("dk") or TOPLANTI_DK))
     adres = [k["eposta"] for k in a.get("davetli") or [] if k.get("eposta")]; yok = [k["ad"] for k in a.get("davetli") or [] if not k.get("eposta")]
-    not_ = _t("Suflor.me — sesle istendi.", "Suflor.me — requested by voice.") + (("\n" + _t("Adresi bulunamayan davetli: ", "Invitee without address: ") + ", ".join(yok)) if yok else "")
+    not_ = (_t("Suflor.me — panodaki takvimden oluşturuldu.", "Suflor.me — created from the panel calendar.") if a.get("kaynak") == "pano" else _t("Suflor.me — sesle istendi.", "Suflor.me — requested by voice.")) + (("\n" + _t("Adresi bulunamayan davetli: ", "Invitee without address: ") + ", ".join(yok)) if yok else "")
     if tur == "outlook":
         return (f"https://outlook.office.com/calendar/deeplink/compose?subject={e(a['baslik'])}&startdt={e(bas.astimezone().isoformat())}&enddt={e(bit.astimezone().isoformat())}"
                 f"&to={e(';'.join(adres))}&body={e(not_)}&online=true")
@@ -205,7 +205,7 @@ def takvim_toplanti(p, simdi=None):  # v0.166.0: panodaki takvimden toplantı ol
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", zaman): return {"ok": False, "err": _t("saat geçersiz", "invalid time")}
     try: bas = datetime.datetime.strptime(zaman, "%Y-%m-%dT%H:%M")
     except ValueError: return {"ok": False, "err": _t("saat geçersiz", "invalid time")}
-    a = {"baslik": baslik or _t("Toplantı", "Meeting"), "zaman": zaman, "dk": dk, "davetli": toplanti_davetli([x for x in dv or [] if x.strip()])}
+    a = {"baslik": baslik or _t("Toplantı", "Meeting"), "zaman": zaman, "dk": dk, "davetli": toplanti_davetli([x for x in dv or [] if x.strip()]), "kaynak": "pano"}
     gecmis = bas < (simdi or datetime.datetime.now()) - datetime.timedelta(minutes=1)
     if p.get("onizle"): return {"ok": True, "davetli": a["davetli"], "url": toplanti_sayfa_url(a), "gecmis": gecmis}
     if not baslik: return {"ok": False, "err": _t("başlık yok", "no title")}
