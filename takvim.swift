@@ -102,13 +102,25 @@ func oku(_ izin: Bool, _ hata: Error?) {
     yaz(["durum": "ok", "adaylar": ad.values.sorted { ($0["sayi"] as? Int ?? 0) > ($1["sayi"] as? Int ?? 0) }.prefix(20).map { $0 }])
     return
   }
+// SUZGEC-BAS
+// Etkinlik süzgeci (EventKit'siz saf karar; test/takvim-suzgec.py bu bloğu metinden çıkarıp derler)
+// Exchange davetsiz etkinlikte düzenleyeni boş bırakır: kullanıcının yazabildiği takvimdeki düzenleyensiz etkinlik onundur
+func kendiMi(duzenleyenVar: Bool, benDuzenleyen: Bool, yazilabilir: Bool) -> Bool { benDuzenleyen || (!duzenleyenVar && yazilabilir) }
+func olayAlinir(digerBos: Bool, duzenleyenVar: Bool, benDuzenleyen: Bool, benKatilan: Bool, yazilabilir: Bool, baglantiVar: Bool) -> Bool {
+  let kendi = kendiMi(duzenleyenVar: duzenleyenVar, benDuzenleyen: benDuzenleyen, yazilabilir: yazilabilir)
+  // katılımcısız kayıt (yalnız kullanıcı) atlanır; kullanıcının düzenlediği bağlantılı toplantı kalır (deneme toplantısı tek kişilik açılır)
+  if digerBos && !(duzenleyenVar && !benDuzenleyen) && !(kendi && baglantiVar) { return false }
+  if !benKatilan && !kendi { return false }  // kullanıcının olmadığı etkinlik (paylaşılan takvim)
+  return true
+}
+// SUZGEC-SON
+
   var gorulen = Set<String>()
   for e in store.events(matching: p).sorted(by: { $0.startDate != $1.startDate ? $0.startDate < $1.startDate : kendiTakvimi($0) && !kendiTakvimi($1) }) {
     if e.status == .canceled { continue }
     let katilan = e.attendees ?? []
     let benKatilan = katilan.first(where: { ben($0) }), benDuzenleyen = ben(e.organizer)
-    // Exchange davetsiz etkinlikte düzenleyeni boş bırakır: kullanıcının yazabildiği takvimdeki düzenleyensiz etkinlik onundur
-    let kendi = benDuzenleyen || (e.organizer == nil && e.calendar.allowsContentModifications)
+    let kendi = kendiMi(duzenleyenVar: e.organizer != nil, benDuzenleyen: benDuzenleyen, yazilabilir: e.calendar.allowsContentModifications)
     let digerleri = katilan.filter { !ben($0) && !($0.url == e.organizer?.url && benDuzenleyen) }
     if ayrinti {  // teşhis: atlananlar da yazılır
       olaylar.append(["baslik": e.title ?? "", "takvim": e.calendar.title, "duzenleyen": e.organizer.map { "\(adres($0)) cu=\($0.isCurrentUser)" } ?? "-",
@@ -116,9 +128,8 @@ func oku(_ izin: Bool, _ hata: Error?) {
                       "baglanti": baglanti([e.url?.absoluteString, e.location, e.notes]) != nil])
       continue
     }
-    // katılımcısız kayıt (yalnız kullanıcı) atlanır; kullanıcının düzenlediği bağlantılı toplantı kalır (deneme toplantısı tek kişilik açılır)
-    if digerleri.isEmpty && !(e.organizer != nil && !benDuzenleyen) && !(kendi && baglanti([e.url?.absoluteString, e.location, e.notes]) != nil) { continue }
-    if benKatilan == nil && !kendi { continue }  // kullanıcının olmadığı etkinlik (paylaşılan takvim)
+    if !olayAlinir(digerBos: digerleri.isEmpty, duzenleyenVar: e.organizer != nil, benDuzenleyen: benDuzenleyen, benKatilan: benKatilan != nil,
+                   yazilabilir: e.calendar.allowsContentModifications, baglantiVar: baglanti([e.url?.absoluteString, e.location, e.notes]) != nil) { continue }
     if !gorulen.insert("\(e.startDate.timeIntervalSince1970)|\(e.title ?? "")").inserted { continue }  // başka takvimdeki kopya
     var o: [String: Any] = [
       "id": e.calendarItemIdentifier, "baslik": e.title ?? "", "baslangic": iso.string(from: e.startDate), "bitis": iso.string(from: e.endDate),
