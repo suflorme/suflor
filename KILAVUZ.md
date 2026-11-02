@@ -121,6 +121,9 @@ devam eder. Toplantı öncesi brifing de aynı kaynağa bakar: toplantının kon
 ekler ("Güncel veri"); konu dışıysa kaynağa sormaz. Kaynaklı brifing bağlayıcının bağlanmasını beklediği için birkaç saniye uzun sürer.
 İkisini birden kapatmak için `"konus_bilgi_kaynagi": false`.
 
+**Süreli ses arşivi (`"ses_arsivi": true`, varsayılan kapalı):** Whisper'a giden her ses parçası sonucuyla birlikte `canli/ses-arsivi/<toplantı>/` altına (WAV + `parcalar.jsonl`) yazılır; eşik, mikrofon ve uydurma kurallarını gerçek veriyle ayarlamak içindir. Ses yalnız bu Mac'te kalır: ağa, geri bildirime, teşhis paketine ve Time Machine'e girmez.
+**`"ses_arsivi_gun": 14`:** arşivin saklama süresi (gün); süresi geçen toplantı klasörleri silinir, toplam boyut 5 GB'ı aşarsa en eskiden silinir. Kapatınca eski kayıtlar da süresi dolunca silinir.
+
 ## Sesler
 Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)
 — sesli çeviri, fısıltı, sesli özet ve cevaplar bu sesle okunur (Mac'te, yerel); ses dosyası Suflor.me ile gelmez. Hız: `"piper_hiz"`

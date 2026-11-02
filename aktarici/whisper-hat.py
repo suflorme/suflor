@@ -488,6 +488,7 @@ def _isci_dongu():
             _ISCI["zs"] = 0; _ISCI["yk"] = 0
             if w.get("yavas"): w["yavas"] = False; w["hata"] = None if str(w.get("hata") or "").startswith("yanıt vermiyor") else w.get("hata")
         if is_.get("bas"):  # bas-konuş: metin dökümüne değil, soruya (konus_metin)
+            if AYAR.get("ses_arsivi"): ses_arsivi_yaz(is_, istek, j, "bas-hata" if j.get("hata") else "bas", " ".join(str(j.get("text") or "").split()))
             if is_.get("iz_iste"): is_["iz"] = j.get("iz")
             if is_.get("oto_dil") and j.get("dil") in ("tr", "en") and "konus_dil_kaydet" in globals(): konus_dil_kaydet(j["dil"], is_.get("akis_nesil"))
             threading.Thread(target=is_["geri"], args=(" ".join(str(j.get("text") or "").split()), j.get("hata")), daemon=True).start()
@@ -520,6 +521,7 @@ def _isci_dongu():
         kapi_kaydet(is_, sonuc, metin, j)
         if KANALLAR.get(is_["kanal"]) is not None: KANALLAR[is_["kanal"]].sonuclar.append((time.time(), sonuc))  # otonom: kanal sözsüz ses mi (kanal_sozsuz)
         if AYAR.get("parca_kaydet"): parca_kaydet(is_, istek, j, sonuc)
+        if AYAR.get("ses_arsivi"): ses_arsivi_yaz(is_, istek, j, sonuc, metin)
 # Teşhis (v0.29.2, 12 Ekim: İngilizce YouTube denemesinde karşı kanalın 62 parçası "uydurma"; ses saklanmadığı için neden bilinemedi): ayar
 # parca_kaydet: true iken her kanalın son PARCA_KAYIT_EN_COK parçası 16 kHz WAV + sonucu (dil, metin, atlanan) canli/teshis-parcalar/'a yazılır.
 # Varsayılan kapalı; ses yalnız bu Mac'te kalır, eskiler silinir. Kapatınca klasörü elle sil.
@@ -535,6 +537,59 @@ def parca_kaydet(is_, istek, j, sonuc):
         es = sorted(f for f in os.listdir(kl) if f.startswith(is_["kanal"] + "-") and f.endswith(".wav"))
         for f in es[:-PARCA_KAYIT_EN_COK]: os.remove(os.path.join(kl, f))
     except Exception as e: print(f"TEŞHİS: parça yazılamadı ({e.__class__.__name__})")
+# Süreli ses arşivi (2 Kasım): ayar ses_arsivi: true iken Whisper'a giden HER parça (ben, karsi, bas-konuş) sonucuyla canli/ses-arsivi/<toplantı>/ altına
+# WAV + parcalar.jsonl olarak yazılır (eşik, mikrofon profili, VAD ve uydurma kurallarını gerçek veriyle ayarlamak için). Varsayılan KAPALI. SES VE METİN MAC'TEN
+# ÇIKMAZ: teshis/beta paketi, geri bildirim, toplantı listesi ve kayit_dondur bu klasöre bakmaz. Süre ses_arsivi_gun (14), toplam SES_ARSIVI_GB (5) aşılırsa en eski silinir.
+SES_ARSIVI_GB = 5; _SA = {"son": 0.0, "tm": False}
+def _sa_kok(): return os.path.join(BASE, "ses-arsivi")
+def ses_arsivi_klasor():  # toplantı sürüyorsa dosya kökü (aktif_dosya, toplanti.py), değilse toplanti-disi-YYYYMMDD
+    try: d = aktif_dosya() if "aktif_dosya" in globals() else None
+    except Exception: d = None
+    ad = os.path.basename(d)[:-3] if d and d.endswith(".md") else "toplanti-disi-" + datetime.datetime.now().strftime("%Y%m%d")
+    return os.path.join(_sa_kok(), ad)
+def ses_arsivi_temizle(gun=None, sinir_bayt=None, kok=None):  # → silinen klasör sayısı; yalnız kok altındaki gerçek klasörler
+    try:
+        kok = os.path.realpath(kok or _sa_kok()); gun = float(gun if gun is not None else AYAR.get("ses_arsivi_gun") or 14)
+        sinir = sinir_bayt if sinir_bayt is not None else SES_ARSIVI_GB * 1024 ** 3
+        if not os.path.isdir(kok): return 0
+        ds = []
+        for ad in os.listdir(kok):
+            y = os.path.join(kok, ad)
+            if os.path.islink(y) or not os.path.isdir(y) or os.path.dirname(os.path.realpath(y)) != kok: continue
+            boy = sum(os.path.getsize(os.path.join(y, f)) for f in os.listdir(y) if os.path.isfile(os.path.join(y, f)))
+            ds.append((os.path.getmtime(y), y, boy))
+        ds.sort(); n = 0; simdi = time.time()
+        def sil(y):
+            nonlocal n
+            if os.path.dirname(os.path.realpath(y)) == kok: shutil.rmtree(y, ignore_errors=True); n += 1
+        for t, y, boy in list(ds):
+            if simdi - t > gun * 86400: sil(y); ds.remove((t, y, boy))
+        top = sum(x[2] for x in ds)
+        while top > sinir and len(ds) > 1: t, y, boy = ds.pop(0); sil(y); top -= boy  # en yeni klasör (süren toplantı) kalır
+        if n: print(f"SES ARŞİVİ: {n} eski klasör silindi")
+        return n
+    except Exception as e: print(f"SES ARŞİVİ: temizlenemedi ({e.__class__.__name__})"); return 0
+def _sa_tmutil(y):  # Time Machine'e girmesin (sudo'suz yapışkan öznitelik); bir kez, hata günlüğe
+    try:
+        r = subprocess.run(["tmutil", "addexclusion", y], capture_output=True, timeout=10)
+        if r.returncode: print(f"SES ARŞİVİ: tmutil addexclusion çıkış {r.returncode}")
+    except Exception as e: print(f"SES ARŞİVİ: tmutil çalışmadı ({e.__class__.__name__})")
+def ses_arsivi_yaz(is_, istek, j, sonuc, metin):
+    try:
+        import wave
+        kl = ses_arsivi_klasor(); yeni = not os.path.isdir(kl); os.makedirs(kl, exist_ok=True)
+        if yeni and not _SA["tm"]: _SA["tm"] = True; _sa_tmutil(_sa_kok())
+        t0 = float(is_.get("t0") or time.time()); sn = round(len(is_["pcm"]) / 32000, 2); t1 = float(is_.get("t1") or (t0 + sn))
+        ad = f"{is_['kanal']}-{datetime.datetime.fromtimestamp(t0).strftime('%H%M%S')}-{str(is_.get('id'))[-6:]}.wav"
+        with wave.open(os.path.join(kl, ad), "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(is_["pcm"])
+        pen = j.get("kapi")
+        r = {"dosya": ad, "kanal": is_["kanal"], "bas": bool(is_.get("bas")), "t0": round(t0, 2), "t1": round(t1, 2), "sn": sn, "sonuc": sonuc, "metin": metin, "dil_istek": istek.get("dil"),
+             "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
+        write([(os.path.join(kl, "parcalar.jsonl"), json.dumps(r, ensure_ascii=False) + "\n")])
+        if time.time() - _SA["son"] > 3600: _SA["son"] = time.time(); ses_arsivi_temizle()
+    except Exception as e: print(f"SES ARŞİVİ: parça yazılamadı ({e.__class__.__name__})")
+try: _sa_t = threading.Timer(30, lambda: (_SA.update(son=time.time()), ses_arsivi_temizle())); _sa_t.daemon = True; _sa_t.start()  # açılışta bir denetim (ayar kapalıyken de: eski kayıt kalmasın)
+except Exception: pass
 # --- Konuşmacı ses izi (v0.8.4 ses işçisi → v0.13.12 Whisper işçisinin içinde) ------------------------------------------------
 # ECAPA (SpeechBrain VoxCeleb ağırlıkları, MLX) karşı kanal parçalarını kümeler: k1, k2… Kümenin adı altyazıdan oylanır: altyazı satırı
 # konuşmadan 3–6 sn sonra geldiği için o anda bekleyen parçalar geriye dönük oy alır. Ad yoksa tek kümede "Karşı taraf", çok kümede
