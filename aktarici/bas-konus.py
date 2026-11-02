@@ -682,7 +682,7 @@ def selam_notu(s):
 # v0.59.0 (kullanıcı, 17 Ekim): yardımcı 30 gün ileriyi okur; Konuş bağlamında her soruda 7 gün (bugün-yarınla sınırlı kalınca kalıba uymayan soruda
 # "yalnız bugün ve yarına erişimim var" deniyordu). 7 günden ötesi (ay adı, gelecek ay, iki hafta sonra) TAKVIM_UZAK_RX'te 30 gün; çalışma saatlerindeki
 # boşluklar (≥ BOS_EN_AZ_DK) yalnız boş/uygun zaman sorusunda (TAKVIM_BOS_RX). Hesap yerel: takvim bağlayıcısı gerekmez, Mac Takvim'deki tüm hesaplar.
-TAKVIM_SONRA_SA, TAKVIM_GENIS_GUN, TAKVIM_UZAK_GUN, BOS_EN_AZ_DK = 720, 7, 30, 30
+TAKVIM_SONRA_SA, TAKVIM_GENIS_GUN, TAKVIM_UZAK_GUN, BOS_EN_AZ_DK = 1080, 7, 30, 30  # v0.166.1: okuma 45 gün (pano hafta/ay görünümü); Konuş/brifing bağlamı TAKVIM_UZAK_GUN = 30 günde kalır
 _AYLAR = r"ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık|january|february|march|april|may|june|july|august|september|october|november|december"
 TAKVIM_UZAK_RX = re.compile(r"(?i)(\b(" + _AYLAR + r")\b|\b(" + _AYLAR + r")\w+|\bay(ın)? (sonu|başı|ortası)|(gelecek|önümüzdeki|sonraki|bir sonraki|bu) ay\b|\bayın\b"
                             r"|(iki|üç|dört|\d+) hafta|\d+ gün sonra|next month|this month|end of (the )?month|(two|three|\d+) weeks)")
@@ -2039,8 +2039,8 @@ def hazirlik_baglam(e, arsiv_kisiler):  # → bağlam nedenleri: gundem | belge 
     if HAZIRLIK_BELGE_RX.search(n): out.append("belge")
     if any(_hz_ayni_kisi(_hz_ad(k), a) for k in e.get("katilimcilar") or [] for a in arsiv_kisiler): out.append("gecmis")
     return out
-HAFTA_OFSET = (-1, 4)
-AY_OFSET = (-1, 1)  # ay görünümü: geçen ay … gelecek ay (veri geriye 14 gün, ileri 720 saat; kapsam dışı günler panoda taralı)
+HAFTA_OFSET = (-1, 5)  # +5 hafta her zaman TAKVIM_SONRA_SA (45 gün) içinde
+AY_OFSET = (-1, 1)  # ay görünümü: geçen ay … gelecek ay (veri geriye 14 gün, ileri 1080 saat; kapsam dışı günler panoda taralı)
 def takvim_hafta(ofset=0, simdi=None):
     simdi = simdi or datetime.datetime.now().astimezone(); ofset = max(HAFTA_OFSET[0], min(int(ofset or 0), HAFTA_OFSET[1]))
     g0 = simdi.replace(hour=0, minute=0, second=0, microsecond=0)

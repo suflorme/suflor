@@ -222,11 +222,11 @@
  "http": {
   "/": {
    "uzunluk": 315359,
-   "sha": "9fd6f40975967d76"
+   "sha": "22b0ad4e8d1c0219"
   },
   "/mini": {
    "uzunluk": 315359,
-   "sha": "9fd6f40975967d76"
+   "sha": "22b0ad4e8d1c0219"
   },
   "/status": {
    "_ping_son": "float",

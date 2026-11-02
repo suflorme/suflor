@@ -92,8 +92,9 @@ ok("geçmiş: geçmiş kaynaktan, başlatılamaz; gelecek başlatılır; reddedi
    b0["Hafta 11"]["gecmis"] and not b0["Hafta 11"]["baslatilir"] and b0["Hafta 11"]["id"].startswith("g:") and b0["Hafta 1"]["baslatilir"] and not b0["Hafta 1"]["gecmis"]
    and b0["Hafta 3"]["reddettin"] and b0["Hafta 5"]["tum_gun"] and b0["Hafta 1"]["saat"] == "11:00" and b0["Hafta 1"]["bitis_saat"] == "12:00")
 ok("sonraki hafta: Pazartesi 19 Ekim, yalnız o haftanın toplantısı", h1["hafta_bas"] == "2026-10-19" and [o["baslik"] for o in h1["olaylar"]] == ["Hafta 4"])
-ok("geçen hafta (geçmiş kaynaktan) ve gezinme sınırı -1…+4", hm["hafta_bas"] == "2026-10-05" and [o["baslik"] for o in hm["olaylar"]] == ["Hafta 12"] and hk["ofset"] == 4 and ad["takvim_hafta"](-7, simdi)["ofset"] == -1)
-ok(f"kapsam: geçmiş 14 gün, ileri {ad['TAKVIM_SONRA_SA']} sa ({h0['kapsam']})", h0["kapsam"] == {"bas": "2026-10-02", "son": "2026-11-15"} and h0["en_az"] == -1 and h0["en_cok"] == 4)
+ok("geçen hafta (geçmiş kaynaktan) ve gezinme sınırı -1…+5", hm["hafta_bas"] == "2026-10-05" and [o["baslik"] for o in hm["olaylar"]] == ["Hafta 12"] and hk["ofset"] == 5 and ad["takvim_hafta"](-7, simdi)["ofset"] == -1)
+ok(f"kapsam: geçmiş 14 gün, ileri {ad['TAKVIM_SONRA_SA']} sa ({h0['kapsam']})", h0["kapsam"] == {"bas": "2026-10-02", "son": "2026-11-30"} and h0["en_az"] == -1 and h0["en_cok"] == 5)
+ok("okuma 45 gün (1080 sa); bağlam sınırı 30 gün, bağlamda 7 gün", ad["TAKVIM_SONRA_SA"] == 1080 and ad["TAKVIM_UZAK_GUN"] == 30 and ad["TAKVIM_GENIS_GUN"] == 7 and ad["HAFTA_OFSET"][1] == 5 and ad["TAKVIM_UZAK_GUN"] * 24 < ad["TAKVIM_SONRA_SA"])
 ad["TAKVIM_GEC"]["olaylar"] = []
 ok("geçmiş okunmadıysa kapsam bugünden başlar", ad["takvim_hafta"](0, simdi)["kapsam"]["bas"] == "2026-10-16")
 # --- ay görünümü: takvim_ay(ofset) — ayın 1'ini içeren haftanın Pazartesi'sinden 42 gün; ayın dışındaki (ızgaraya düşen) olaylar da gelir ---------------------------------
