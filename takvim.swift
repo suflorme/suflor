@@ -107,15 +107,18 @@ func oku(_ izin: Bool, _ hata: Error?) {
     if e.status == .canceled { continue }
     let katilan = e.attendees ?? []
     let benKatilan = katilan.first(where: { ben($0) }), benDuzenleyen = ben(e.organizer)
+    // Exchange davetsiz etkinlikte düzenleyeni boş bırakır: kullanıcının yazabildiği takvimdeki düzenleyensiz etkinlik onundur
+    let kendi = benDuzenleyen || (e.organizer == nil && e.calendar.allowsContentModifications)
     let digerleri = katilan.filter { !ben($0) && !($0.url == e.organizer?.url && benDuzenleyen) }
-    // katılımcısız kayıt (yalnız kullanıcı) atlanır; kullanıcının düzenlediği bağlantılı toplantı kalır (deneme toplantısı tek kişilik açılır)
-    if digerleri.isEmpty && !(e.organizer != nil && !benDuzenleyen) && !(benDuzenleyen && baglanti([e.url?.absoluteString, e.location, e.notes]) != nil) { continue }
-    if ayrinti {
+    if ayrinti {  // teşhis: atlananlar da yazılır
       olaylar.append(["baslik": e.title ?? "", "takvim": e.calendar.title, "duzenleyen": e.organizer.map { "\(adres($0)) cu=\($0.isCurrentUser)" } ?? "-",
-                      "katilan": katilan.map { "\(adres($0)) cu=\($0.isCurrentUser) \($0.participantStatus.rawValue)" }])
+                      "katilan": katilan.map { "\(adres($0)) cu=\($0.isCurrentUser) \($0.participantStatus.rawValue)" }, "kendi": kendi,
+                      "baglanti": baglanti([e.url?.absoluteString, e.location, e.notes]) != nil])
       continue
     }
-    if benKatilan == nil && !benDuzenleyen { continue }  // kullanıcının olmadığı etkinlik (paylaşılan takvim)
+    // katılımcısız kayıt (yalnız kullanıcı) atlanır; kullanıcının düzenlediği bağlantılı toplantı kalır (deneme toplantısı tek kişilik açılır)
+    if digerleri.isEmpty && !(e.organizer != nil && !benDuzenleyen) && !(kendi && baglanti([e.url?.absoluteString, e.location, e.notes]) != nil) { continue }
+    if benKatilan == nil && !kendi { continue }  // kullanıcının olmadığı etkinlik (paylaşılan takvim)
     if !gorulen.insert("\(e.startDate.timeIntervalSince1970)|\(e.title ?? "")").inserted { continue }  // başka takvimdeki kopya
     var o: [String: Any] = [
       "id": e.calendarItemIdentifier, "baslik": e.title ?? "", "baslangic": iso.string(from: e.startDate), "bitis": iso.string(from: e.endDate),
