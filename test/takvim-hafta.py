@@ -96,6 +96,26 @@ ok("geçen hafta (geçmiş kaynaktan) ve gezinme sınırı -1…+4", hm["hafta_b
 ok(f"kapsam: geçmiş 14 gün, ileri {ad['TAKVIM_SONRA_SA']} sa ({h0['kapsam']})", h0["kapsam"] == {"bas": "2026-10-02", "son": "2026-11-15"} and h0["en_az"] == -1 and h0["en_cok"] == 4)
 ad["TAKVIM_GEC"]["olaylar"] = []
 ok("geçmiş okunmadıysa kapsam bugünden başlar", ad["takvim_hafta"](0, simdi)["kapsam"]["bas"] == "2026-10-16")
+# --- ay görünümü: takvim_ay(ofset) — ayın 1'ini içeren haftanın Pazartesi'sinden 42 gün; ayın dışındaki (ızgaraya düşen) olaylar da gelir ---------------------------------
+ad["TAKVIM_GEC"] = {"olaylar": [hol(11, -2, 14, 15), hol(12, -11, 9, 10), hol(13, -17, 9, 10), hol(14, -3, 22, 23.5)], "t": 0}  # 13 = 29 Eylül (ızgarada, ay dışı), 14 = 22:00 akşam
+ad["TAKVIM_TAM"]["e90"] = hol(90, 23, 9, 10); ad["TAKVIM_TAM"]["e91"] = hol(91, 24, 9, 10)  # 8 Kasım (42. gün) içeride, 9 Kasım dışarıda
+ad["TAKVIM_TAM"]["e92"] = hol(92, 15, 22, 24.5); ad["TAKVIM_TAM"]["e92"]["baslik"] = "Gece yarısını aşan"  # 31 Ekim 22:00 → 1 Kasım 00:30
+y0, y1, ym, yk = (ad["takvim_ay"](o, simdi) for o in (0, 1, -1, 9))
+bj = {o["baslik"]: o for o in y0["olaylar"]}
+ok(f"ay 0: ay_bas 2026-10-01, ızgara Pzt 28 Eylül'den 42 gün, ofset sınırları -1…+1 ({y0['aralik_bas']})", y0["ay_bas"] == "2026-10-01" and y0["aralik_bas"] == "2026-09-28" and y0["gun"] == 42
+   and y0["ofset"] == 0 and y0["en_az"] == -1 and y0["en_cok"] == 1)
+ok("ayın dışındaki ama ızgaradaki olaylar dahil (29 Eylül, 8 Kasım); ızgara dışı (9 Kasım) yok", {"Hafta 13", "Hafta 90"} <= set(bj) and "Hafta 91" not in bj)
+ok("ay: hafta bölümündeki olaylar ve 22:00 akşam olayı var, hazırlık alanı hafta ile aynı", {"Hafta 1", "Hafta 3", "Hafta 11", "Hafta 12", "Hafta 14"} <= set(bj)
+   and bj["Hafta 14"]["saat"] == "22:00" and bj["Hafta 1"]["hazirlik"] == "hazir")
+ok("ay: gece yarısını aşan olay (31 Ekim–1 Kasım) bir kez gelir", [o["baslik"] for o in y0["olaylar"]].count("Gece yarısını aşan") == 1)
+ok("ay +1: Kasım, ızgara Pzt 26 Ekim'den; ay -1: Eylül, Pzt 31 Ağustos'tan; sınır dışı ofset kırpılır", y1["ay_bas"] == "2026-11-01" and y1["aralik_bas"] == "2026-10-26"
+   and ym["ay_bas"] == "2026-09-01" and ym["aralik_bas"] == "2026-08-31" and yk["ofset"] == 1 and ad["takvim_ay"](-9, simdi)["ofset"] == -1)
+ok("ay: yıl dönümü (Aralık +1 → Ocak) ayın 1'i doğru", ad["takvim_ay"](1, dt.datetime(2026, 12, 20, 9, 0).astimezone())["ay_bas"] == "2027-01-01")
+ok("ay: ortak alanlar hafta ile aynı kaynak (bugun, kapsam, calisma)", y0["bugun"] == "2026-10-16" and "bas" in y0["kapsam"] and "gunler" in y0["calisma"])
+w0 = ad["takvim_hafta"](0, simdi)
+ok("takvim_hafta çıktısı değişmedi: ay anahtarları yok, hafta anahtarları var", "ay_bas" not in w0 and "aralik_bas" not in w0 and "gun" not in w0 and {"hafta_bas", "ofset", "en_az", "en_cok", "olaylar", "kapsam", "bugun", "simdi", "calisma", "uygulama"} <= set(w0))
+for k in ("e90", "e91", "e92"): ad["TAKVIM_TAM"].pop(k)
+ad["TAKVIM_GEC"]["olaylar"] = []
 # --- hazırlık toplantı başına (S hazirlik2): kayıtlı brifing → hazir; gündem, belge bağlantısı ya da aynı kişiyle son 30 günde Suflor kaydı → eksik; hiçbiri → yok ----------
 HZ = tempfile.mkdtemp(prefix="hazirlik-"); ad["BASE"] = HZ; ad["AYAR"]["ad"] = "Deniz T"
 def hk(i, gun, **k): return dict(olay(i, gun, 10, 11), **dict({"baslik": f"Hazırlık {i}", "katilimcilar": ["Ece Y"]}, **k))

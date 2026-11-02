@@ -197,6 +197,25 @@ def toplanti_sayfa_ac(a):
     try: subprocess.Popen(["/usr/bin/open"] + (["-g"] if toplanti_var() else []) + [u], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # toplantıda öne gelmez
     except OSError as ex: return False, ex.__class__.__name__
     return True, _t("takvimde toplantı sayfası açıldı — Kaydet sende", "meeting page opened in your calendar — you press Save")
+def takvim_toplanti(p, simdi=None):  # v0.166.0: panodaki takvimden toplantı oluşturma — {baslik, zaman "YYYY-MM-DDTHH:MM", dk, davetli [ad|e-posta], onizle, ac}; sayfa dolu açılır, Kaydet kullanıcıda (takvime doğrudan yazılmaz)
+    if not isinstance(p, dict): return {"ok": False, "err": _t("geçersiz istek", "invalid request")}
+    baslik = " ".join(str(p.get("baslik") or "").split()); dv = p.get("davetli"); zaman = str(p.get("zaman") or ""); dk = p.get("dk", TOPLANTI_DK)
+    if len(baslik) > 300 or not isinstance(dv, (list, type(None))) or len(dv or []) > 20 or any(not isinstance(x, str) or len(x) > 200 for x in dv or []): return {"ok": False, "err": _t("geçersiz istek", "invalid request")}
+    if isinstance(dk, bool) or not isinstance(dk, int) or not 5 <= dk <= 480: return {"ok": False, "err": _t("süre 5–480 dakika olmalı", "duration must be 5–480 minutes")}
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", zaman): return {"ok": False, "err": _t("saat geçersiz", "invalid time")}
+    try: bas = datetime.datetime.strptime(zaman, "%Y-%m-%dT%H:%M")
+    except ValueError: return {"ok": False, "err": _t("saat geçersiz", "invalid time")}
+    a = {"baslik": baslik or _t("Toplantı", "Meeting"), "zaman": zaman, "dk": dk, "davetli": toplanti_davetli([x for x in dv or [] if x.strip()])}
+    gecmis = bas < (simdi or datetime.datetime.now()) - datetime.timedelta(minutes=1)
+    if p.get("onizle"): return {"ok": True, "davetli": a["davetli"], "url": toplanti_sayfa_url(a), "gecmis": gecmis}
+    if not baslik: return {"ok": False, "err": _t("başlık yok", "no title")}
+    if gecmis: return {"ok": False, "err": _t("geçmiş bir saate toplantı oluşturulamaz", "can't create a meeting in the past")}
+    url = toplanti_sayfa_url(a)
+    if p.get("ac"):
+        ok, msg = toplanti_sayfa_ac(a)
+        if not ok: return {"ok": False, "err": msg}
+        return {"ok": True, "url": url, "acildi": True, "davetli": a["davetli"], "ileti": msg}
+    return {"ok": True, "url": url, "acildi": False, "davetli": a["davetli"]}  # Chrome panosu sayfayı kendisi açar
 ANIMSATICI_ZAMAN_RX = re.compile(r"\s*\|\s*(\d{4}-\d{2}-\d{2})[T ](\d{1,2})[:.](\d{2})(?::\d{2})?\s*$")
 def animsatici_zaman_ayir(ileti):  # "<iş> | 2026-10-25T10:00" → ("<iş>", "2026-10-25T10:00"); saat yoksa (ileti, None)
     m = ANIMSATICI_ZAMAN_RX.search(ileti or "")

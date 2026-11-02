@@ -2040,10 +2040,19 @@ def hazirlik_baglam(e, arsiv_kisiler):  # → bağlam nedenleri: gundem | belge 
     if any(_hz_ayni_kisi(_hz_ad(k), a) for k in e.get("katilimcilar") or [] for a in arsiv_kisiler): out.append("gecmis")
     return out
 HAFTA_OFSET = (-1, 4)
+AY_OFSET = (-1, 1)  # ay görünümü: geçen ay … gelecek ay (veri geriye 14 gün, ileri 720 saat; kapsam dışı günler panoda taralı)
 def takvim_hafta(ofset=0, simdi=None):
     simdi = simdi or datetime.datetime.now().astimezone(); ofset = max(HAFTA_OFSET[0], min(int(ofset or 0), HAFTA_OFSET[1]))
     g0 = simdi.replace(hour=0, minute=0, second=0, microsecond=0)
     hb = g0 - datetime.timedelta(days=g0.weekday()) + datetime.timedelta(days=7 * ofset); hs = hb + datetime.timedelta(days=7)
+    return dict(_takvim_aralik(hb, hs, simdi, 300), ofset=ofset, en_az=HAFTA_OFSET[0], en_cok=HAFTA_OFSET[1], hafta_bas=str(hb.date()))
+def takvim_ay(ofset=0, simdi=None):  # ayın 1'ini içeren haftanın Pazartesi'sinden 42 gün (6 satır × 7 sütun); ay_bas = ayın 1'i
+    simdi = simdi or datetime.datetime.now().astimezone(); ofset = max(AY_OFSET[0], min(int(ofset or 0), AY_OFSET[1]))
+    ay = simdi.year * 12 + simdi.month - 1 + ofset; bir = datetime.datetime(ay // 12, ay % 12 + 1, 1)
+    hb0 = bir - datetime.timedelta(days=bir.weekday()); hb = hb0.astimezone(); hs = (hb0 + datetime.timedelta(days=42)).astimezone()  # yerel saatle (gün ışığı kayması yok)
+    return dict(_takvim_aralik(hb, hs, simdi, 600), ofset=ofset, en_az=AY_OFSET[0], en_cok=AY_OFSET[1], ay_bas=str(bir.date()), aralik_bas=str(hb.date()), gun=42)
+def _takvim_aralik(hb, hs, simdi, sinir):  # [hb, hs) aralığındaki olaylar (hafta ve ay görünümünün ortak gövdesi)
+    g0 = simdi.replace(hour=0, minute=0, second=0, microsecond=0)
     haric = AYAR.get("takvim_haric") or []; br = globals().get("BRIFING") or {}; gorulen = set(); ol = []; ark = None
     try: hzd = set(os.listdir(hazirlik_dizin()))
     except OSError: hzd = set()
@@ -2079,8 +2088,8 @@ def takvim_hafta(ofset=0, simdi=None):
     ilk = min((str(e["baslangic"])[:10] for e in TAKVIM_TAM.values() if re.match(r"\d{4}-\d\d-\d\d", str(e.get("baslangic") or ""))), default=str(g0.date()))  # ileri listede bugünden önce başlayan (sürüyor)
     kapsam = {"bas": min(str((g0 - datetime.timedelta(days=gec_gun)).date()), ilk, str(g0.date())), "son": str((simdi + datetime.timedelta(hours=TAKVIM_SONRA_SA)).date())}
     gunler, gb, ge = calisma_saatleri()
-    return dict(STATE["takvim"], uygulama=os.path.isdir(TAKVIM_APP), ofset=ofset, en_az=HAFTA_OFSET[0], en_cok=HAFTA_OFSET[1], hafta_bas=str(hb.date()),
-                bugun=str(g0.date()), simdi=simdi.isoformat(timespec="seconds"), kapsam=kapsam, olaylar=ol[:300],
+    return dict(STATE["takvim"], uygulama=os.path.isdir(TAKVIM_APP),
+                bugun=str(g0.date()), simdi=simdi.isoformat(timespec="seconds"), kapsam=kapsam, olaylar=ol[:sinir],
                 calisma={"gunler": sorted(gunler), "bas": gb, "bit": ge})
 def takvim_yenile():
     if not os.path.isdir(TAKVIM_APP): STATE["takvim"].update(durum="yok", hata="takvim yardımcısı kurulu değil (aktarici-kur.command derler)"); return

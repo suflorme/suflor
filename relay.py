@@ -1996,6 +1996,8 @@ class H(BaseHTTPRequestHandler):
             if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
             h = re.search(r"[?&]hafta=(-?\d{1,2})(?:&|$)", self.path)  # hafta görünümü: Pazartesi–Pazar, geçmiş ve ileri (aktarici/bas-konus.py takvim_hafta)
             if h: return self._json(takvim_hafta(int(h.group(1))))
+            h = re.search(r"[?&]ay=(-?\d{1,2})(?:&|$)", self.path)  # ay görünümü: 42 günlük ızgara (takvim_ay)
+            if h: return self._json(takvim_ay(int(h.group(1))))
             g = re.search(r"[?&]gun=(\d{1,2})(?:&|$)", self.path)  # v0.55.0: ?gun=7 → 7 günün etkinlikleri + boş zamanlar (v0.59.0: en çok 30)
             return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
@@ -2103,6 +2105,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(brifing_iste(p))
+        if self.path == "/takvim-toplanti":  # panodaki takvimden toplantı oluştur / önizle (davetli çözümü) — yalnız pano (aynı köken + pano anahtarı); aktarici/talimat.py
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(takvim_toplanti(p))
         if self.path == "/duman":  # Deneme toplantısı: başlat | bitir — yalnız pano (aktarici/duman.py)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(duman_islem(p))
