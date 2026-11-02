@@ -1938,7 +1938,8 @@ def brifing_iste(p):
         k = hazirlik_oku(hazirlik_anahtar(olay))
         if k: BRIFING[oid] = b = k
     if p.get("dinle"):  # panodaki 🔊: okuyorsa susar, değilse okur
-        if ses_durdur(): return {"ok": True, "ses": False}
+        bekliyor = BRIFING_BEKLE["v"]  # v0.165.6: Pocket beklenirken basılırsa susar (ses_durdur beklemeyi iptal eder)
+        if ses_durdur() or bekliyor: return {"ok": True, "ses": False}
         return {"ok": brifing_sesli(oid, "dinle"), "ses": True}
     if b.get("durum") == "calisiyor" or (b.get("durum") == "hazir" and not p.get("yeniden")): return {"ok": True, "durum": b["durum"]}
     if not BRIFING_KILIT.acquire(blocking=False): return {"ok": False, "err": _t("Başka bir brifing hazırlanıyor — biraz sonra dene", "Another briefing is being prepared — try again shortly")}

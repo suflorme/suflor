@@ -154,6 +154,7 @@ def _brifing_is(oid, olay):
         try: an = hazirlik_yaz(olay, {"durum": "hazir", "at": (BRIFING.get(oid) or {}).get("at"), "sonuc": sonuc, "hata": None})  # toplantı başına kalıcı (hafta görünümü)
         except OSError as e: an = None; print(f"BRİFİNG: hazırlık kaydı yazılamadı {e.__class__.__name__}")
         bitir(durum="hazir", sonuc=sonuc, hata=None, anahtar=an)
+        brifing_pocket_onden(oid)  # v0.165.6
         if sesli: brifing_sesli(oid, "baslat")
     except Exception as e:
         print(f"BRİFİNG: hata {e.__class__.__name__}"); bitir(durum="hata", hata=_t("Brifing hazırlanamadı", "Couldn't prepare the briefing"))
@@ -828,10 +829,30 @@ def fisilti_kart(c):
         kendi_ses_kaydet(metin, t_oku, time.time())
         print(f"FISILTI: {metin}")
     threading.Thread(target=calis, daemon=True).start()
-def brifing_konusma(s):
+def brifing_konusma(s):  # v0.165.6: özet → Güncel veri (en çok 3) → Dikkat edilecekler (ilk 3) → okunmayan varsa "Ayrıntılar panoda."; açık işler ve geçmiş yazılı kalır
     tem = lambda x: re.sub(r"\s*\([^()]*\)\s*\.?\s*$", "", " ".join(str(x).split())).strip()  # sondaki kaynak parantezi okunmaz
-    d = [tem(x) for x in (s.get("dikkat") or [])[:3] if tem(x)]
-    return " ".join([tem(s.get("ozet") or "")] + ([_t("Dikkat edilecekler.", "Things to watch.")] + [x if x.endswith((".", "?", "!")) else x + "." for x in d] if d else [])).strip()
+    cum = lambda x: x if x.endswith((".", "?", "!")) else x + "."
+    v = [tem(x) for x in (s.get("veri") or []) if tem(x)]; d = [tem(x) for x in (s.get("dikkat") or []) if tem(x)]
+    p = [tem(s.get("ozet") or "")]
+    if v: p += [_t("Güncel veri.", "Current figures.")] + [cum(x) for x in v[:3]]
+    if d: p += [_t("Dikkat edilecekler.", "Things to watch.")] + [cum(x) for x in d[:3]]
+    if len(v) > 3 or len(d) > 3 or any(str(x).strip() for x in (s.get("acik") or []) + (s.get("gecmis") or [])): p.append(_t("Ayrıntılar panoda.", "Details are on the panel."))
+    return " ".join(x for x in p if x).strip()
+BRIFING_POCKET_BEKLE_SN = 8  # v0.165.6: Dinle'de Pocket işçisi kapalıysa (boşta kapanır) açılıp hazır olması en çok bu kadar beklenir; sonra yine okunur (hazır değilse Mac sesine düşer)
+BRIFING_BEKLE = {"v": False}  # Pocket beklenirken panodaki 🔊 ikinci basışta susar (bas-konus.py dinle); ses_durdur'un kes sayacı beklemeyi iptal eder
+def _brifing_oku(metin, neden, bekle):
+    if bekle:
+        t0 = time.time(); kes = SES.get("kes", 0); BRIFING_BEKLE["v"] = True
+        try:
+            pocket_baslat(None, bekle=False)
+            while POCKET["durum"] == "yukleniyor" and time.time() - t0 < BRIFING_POCKET_BEKLE_SN and SES.get("kes", 0) == kes: time.sleep(0.05)
+        finally: BRIFING_BEKLE["v"] = False
+        if SES.get("kes", 0) != kes: print("SES: brifing okunmadı — Pocket beklenirken durduruldu"); return False
+        gec = time.time() - t0
+        print(f"SES: brifing Pocket'ı bekledi ({gec:.1f} sn)" if POCKET["durum"] == "hazir" else f"SES: Pocket {BRIFING_POCKET_BEKLE_SN:g} sn'de açılmadı — Mac sesi")
+    ok = seslendir(metin)
+    if ok: print(f"SES: brifing okunuyor ({neden})")
+    return ok
 def brifing_sesli(oid, neden):
     b = BRIFING.get(oid) or {}
     if b.get("durum") != "hazir": return False
@@ -841,9 +862,15 @@ def brifing_sesli(oid, neden):
         if not AYAR.get("brifing_sesli", False): print("SES: brifing kendiliğinden okunmadı (brifing_sesli kapalı; panoda Dinle)"); return False
         bs = STATE.get("baslatma") or {}
         if bs.get("olay") != oid or time.time() - (bs.get("at") or 0) > 300 or toplanti_var(): print("SES: brifing okunmadı — toplantı başladı ya da süre geçti"); return False
-    ok = seslendir(brifing_konusma(b.get("sonuc") or {}))
-    if ok: print(f"SES: brifing okunuyor ({neden})")
-    return ok
+    metin = brifing_konusma(b.get("sonuc") or {})
+    if AYAR.get("konusma", True) and metin and pocket_var() and POCKET["durum"] != "hazir" and kisilik_sesi()[0] == "pocket":
+        threading.Thread(target=_brifing_oku, args=(metin, neden, True), daemon=True).start(); return True  # bekleme HTTP isteğini bloklamaz; pano "okunuyor" gösterir
+    return _brifing_oku(metin, neden, False)
+def brifing_pocket_onden(oid):  # brifing hazır olunca Pocket arka planda açılır; Dinle çoğu zaman beklemez. Deneme kipinde gerçek işçi açılmaz
+    if os.environ.get("SUFLOR_TEST_BASLAT") or not AYAR.get("konusma", True) or not pocket_var(): return
+    try:
+        if kisilik_sesi()[0] == "pocket" and POCKET["durum"] != "hazir": pocket_baslat(None, bekle=False)
+    except Exception as e: print(f"SES: Pocket önceden açılamadı {e.__class__.__name__}")
 def brifing_baslatta(oid):  # Başlat: hazırsa hemen oku; değilse hazırla, hazır olunca oku
     if not AYAR.get("konusma", True) or not oid or oid not in TAKVIM_TAM: return
     b = BRIFING.get(oid) or {}

@@ -232,7 +232,7 @@ def toplanti_bak():  # LOCK içinde; geçişleri yapar, LOCK dışında koşacak
     else:
         # yalnız mikrofon (eklenti çağrı/toplantı sekmesi yok): 28 Ekim — takvim/Başlat yoksa da dosya ve döküm açılır (S162: sormadan), Claude oturumu
         # yerine öneri kartı; takvim de yoksa öneri ilk satırla (Konuş/Safari mikrofonu boşuna kart çıkarmasın; satırsız kayıt 120 sn'de silinir)
-        if (globals().get("KONUS") or {}).get("durum") in ("dinliyor", "yaziya"): return sonra  # panodaki Konuş mikrofonu toplantı değil
+        if konus_mikrofonu(now): return sonra  # panodaki Konuş mikrofonu toplantı değil
         b = _elle_baslat(now); o = oto_takvim(None)
         kaynak, platform, guvenli = "ses", s["ses"]["platform"], bool(b)
     a = _kayit_ac(kaynak, platform, guvenli); sonra.append(modelleri_isit)  # mrt 28 Ekim B1: Whisper toplantı başında açılsın (bitince açılıyordu)
@@ -241,6 +241,12 @@ def toplanti_bak():  # LOCK içinde; geçişleri yapar, LOCK dışında koşacak
     if guvenli or b or o: a["_bak"] = True; sonra.append(lambda a=a: _oto_oturum(a, {"guvenli": a["guvenli"]}, _baslatla(a)))
     else: a["oner_satirla"] = True
     return sonra
+KONUS_MIK_SN = 20  # v0.165.6: Konuş bittikten sonra da bu kadar (2 Kasım: cevap beklenirken pano sekmesinin mikrofonu takvimdeki toplantıyla birleşip toplantı sanıldı)
+def konus_mikrofonu(now):  # yalnız mikrofon sinyali Konuş'tan mı: soru, yazıya dökme, düşünme, okuma sürüyor ya da son durum değişikliği KONUS_MIK_SN içinde
+    k = globals().get("KONUS") or {}
+    if k.get("durum") in ("dinliyor", "yaziya", "dusunuyor", "konusuyor"): return True
+    try: return bool(k.get("at")) and now - datetime.datetime.fromisoformat(k["at"]).timestamp() < KONUS_MIK_SN
+    except (TypeError, ValueError): return False
 _TESHIS = {"son": None}
 def _teshis(a, s=None):  # toplantı sayfası/altyazı var ama güvenli sinyal yok → gerekçe günlüğe bir kez (28 Ekim mrt: hiç iz yoktu)
     x = eklenti_sayfa() or next((v for v in EKLENTI.values() if time.time() - v["t_captions"] < EKLENTI_GOR_SN), None)

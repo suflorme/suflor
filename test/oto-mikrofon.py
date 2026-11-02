@@ -77,4 +77,14 @@ finally:
     try: r.wait(5)
     except Exception: r.kill()
     shutil.rmtree(T, ignore_errors=True)
+# 6) Konuş'un mikrofonu toplantı sayılmaz (v0.165.6 konus_mikrofonu): soru/cevap sürerken ve bittikten sonra KONUS_MIK_SN
+import datetime as _dt
+_k = open(os.path.join(KOD, "aktarici", "toplanti.py"), encoding="utf-8").read()
+_ns = {"datetime": _dt, "KONUS": {}}; exec(_k[_k.index("KONUS_MIK_SN ="):_k.index("_TESHIS = {")], _ns); km = _ns["konus_mikrofonu"]; su = time.time()
+def _at(sn): return _dt.datetime.fromtimestamp(su - sn).isoformat(timespec="seconds")
+for d in ("dinliyor", "yaziya", "dusunuyor", "konusuyor"): _ns["KONUS"] = {"durum": d, "at": _at(300)}; ok(f"Konuş {d}: mikrofon toplantı sayılmaz", km(su))
+_ns["KONUS"] = {"durum": "kapali", "at": _at(5)}; ok("Konuş 5 sn önce bitti: sayılmaz", km(su))
+_ns["KONUS"] = {"durum": "kapali", "at": _at(60)}; ok("Konuş 60 sn önce bitti: mikrofon toplantı olabilir", not km(su))
+_ns["KONUS"] = {"durum": "kapali", "at": None}; ok("Konuş hiç kullanılmadı: mikrofon toplantı olabilir", not km(su))
+ok("algılama konus_mikrofonu'nu kullanır", "if konus_mikrofonu(now): return sonra" in _k)
 print("oto-mikrofon: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)
