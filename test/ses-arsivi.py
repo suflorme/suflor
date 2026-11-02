@@ -83,5 +83,42 @@ for f in ("teshis.py", "aktarici/beta-veri.py", "aktarici/arsiv.py", "relay.py")
     s = open(os.path.join(KOD, f), encoding="utf-8").read(); kontrol(f"{f}: ses-arsivi/ses_arsivi anılmaz", "ses-arsivi" not in s and "ses_arsivi" not in s)
 ar = open(os.path.join(KOD, "aktarici", "arsiv.py"), encoding="utf-8").read()
 kontrol("arsiv.py yalnız BASE altındaki .md dosyalarını sayar (klasör toplantı sayılmaz)", "ARSIV_DOSYA_RX.match" in ar and r"\.md$" in ar)
+# 10) eğitim havuzu (ses_arsivi_egitim)
+HK = os.path.join(BASE, "egitim-havuzu")
+def yap(ad, yas, bayt=1000):
+    y = os.path.join(KOK, ad); os.makedirs(y, exist_ok=True); open(os.path.join(y, "x.wav"), "wb").write(b"0" * bayt); t = time.time() - yas * 86400; os.utime(y, (t, t))
+for x in os.listdir(KOK):
+    y = os.path.join(KOK, x); shutil.rmtree(y) if os.path.isdir(y) and not os.path.islink(y) else os.remove(y)
+AYAR["ses_arsivi_egitim"] = False; yap("h-eski", 20); yap("h-yeni", 1)
+ns["ses_arsivi_temizle"](gun=14)
+kontrol("havuz kapalı: süresi dolan silinir, havuz oluşmaz", not os.path.exists(os.path.join(KOK, "h-eski")) and not os.path.exists(HK))
+AYAR["ses_arsivi_egitim"] = True; yap("h-eski", 20); TM.clear()
+n = ns["ses_arsivi_temizle"](gun=14)
+kontrol("havuz açık: süresi dolan havuza taşındı (içerik sağlam)", n == 1 and not os.path.exists(os.path.join(KOK, "h-eski")) and os.path.isfile(os.path.join(HK, "h-eski", "x.wav")) and os.path.exists(os.path.join(KOK, "h-yeni")))
+kontrol("havuz kökü Time Machine dışı bırakıldı", TM == [HK])
+yap("h-eski", 20); ns["ses_arsivi_temizle"](gun=14)
+kontrol("ad çakışmasında sonek eklenir, eskisi ezilmez", os.path.isfile(os.path.join(HK, "h-eski", "x.wav")) and os.path.isfile(os.path.join(HK, "h-eski-2", "x.wav")))
+for ad, yas in (("z-eski", 5), ("z-orta", 3), ("z-yeni", 0.5)): yap(ad, yas)
+for x in ("h-yeni",): shutil.rmtree(os.path.join(KOK, x))
+ns["ses_arsivi_temizle"](gun=14, sinir_bayt=1)
+kontrol("boyut sınırı: atılanlar havuza taşındı, en yeni kaldı", os.path.exists(os.path.join(HK, "z-eski")) and os.path.exists(os.path.join(HK, "z-orta")) and os.path.exists(os.path.join(KOK, "z-yeni")) and not os.path.exists(os.path.join(HK, "z-yeni")))
+# havuz sınırı: dolu havuz → taşıma yok, silme; havuzdaki eski veri silinmez
+once = sorted(os.listdir(HK)); AYAR["ses_arsivi_egitim_gb"] = 1e-9  # ~1 bayt: sığmaz
+yap("s-eski", 20); yap("s-yeni", 1); ns["ses_arsivi_temizle"](gun=14)
+kontrol("havuz sınırı aşılınca klasör silinir, havuza girmez, eski veri durur", not os.path.exists(os.path.join(KOK, "s-eski")) and not os.path.exists(os.path.join(HK, "s-eski")) and sorted(os.listdir(HK)) == once and os.path.exists(os.path.join(KOK, "s-yeni")))
+kontrol("havuz uyarısı bir kez", ns["_SA"]["havuz_uyari"] is True)
+yap("s2-eski", 20); ns["ses_arsivi_temizle"](gun=14, sinir_bayt=1)
+kontrol("sınırda da en yeni klasör (z-yeni) kalır", os.path.exists(os.path.join(KOK, "z-yeni")))
+AYAR["ses_arsivi_egitim_gb"] = 50
+# sembolik bağ havuza taşınmaz, hedef dokunulmaz
+os.symlink(dis, os.path.join(KOK, "baglanti2")); t = time.time() - 30 * 86400; os.utime(os.path.join(KOK, "baglanti2"), (t, t), follow_symlinks=False)
+ns["ses_arsivi_temizle"](gun=14); kontrol("havuz açıkken sembolik bağ taşınmaz/silinmez", os.path.exists(os.path.join(dis, "onemli.txt")) and not os.path.exists(os.path.join(HK, "baglanti2")))
+# taşıma hatası düşürmez: havuz kökü dosya olsun
+shutil.rmtree(HK); open(HK, "w").write("x"); yap("e-eski", 20); yap("e-yeni", 1)
+ns["_SA"]["havuz_tm"] = True; kontrol("havuz yazılamıyorsa istisna yok, klasör silinir", ns["ses_arsivi_temizle"](gun=14) == 1 and not os.path.exists(os.path.join(KOK, "e-eski")))
+os.remove(HK)
+# havuz diğer yollara görünmez
+for f in ("teshis.py", "aktarici/beta-veri.py", "aktarici/arsiv.py", "relay.py", "kullanim.py"):
+    s_ = open(os.path.join(KOD, f), encoding="utf-8").read(); kontrol(f"{f}: egitim-havuzu anılmaz", "egitim-havuzu" not in s_ and "egitim_havuzu" not in s_)
 shutil.rmtree(T, ignore_errors=True)
 print("\nTüm denetimler geçti." if not hatalar else f"\n{len(hatalar)} denetim kaldı: {hatalar}"); sys.exit(1 if hatalar else 0)

@@ -540,8 +540,30 @@ def parca_kaydet(is_, istek, j, sonuc):
 # Süreli ses arşivi (2 Kasım): ayar ses_arsivi: true iken Whisper'a giden HER parça (ben, karsi, bas-konuş) sonucuyla canli/ses-arsivi/<toplantı>/ altına
 # WAV + parcalar.jsonl olarak yazılır (eşik, mikrofon profili, VAD ve uydurma kurallarını gerçek veriyle ayarlamak için). Varsayılan KAPALI. SES VE METİN MAC'TEN
 # ÇIKMAZ: teshis/beta paketi, geri bildirim, toplantı listesi ve kayit_dondur bu klasöre bakmaz. Süre ses_arsivi_gun (14), toplam SES_ARSIVI_GB (5) aşılırsa en eski silinir.
-SES_ARSIVI_GB = 5; _SA = {"son": 0.0, "tm": False}
+# Eğitim havuzu (S186): ayar ses_arsivi_egitim: true iken atılacak klasör silinmez, canli/egitim-havuzu/ altına TAŞINIR (Kaggle ince ayarı için yerel biriktirme; ağa hiçbir şey gitmez).
+# Havuz ses_arsivi_egitim_gb (50) aşılacaksa taşınmaz, klasör silinir (günlüğe bir kez); havuzdakini yalnız insan temizler. Havuz da teşhis/beta/arşiv/kayit_dondur'a girmez.
+SES_ARSIVI_GB = 5; _SA = {"son": 0.0, "tm": False, "havuz_uyari": False}
 def _sa_kok(): return os.path.join(BASE, "ses-arsivi")
+def _sa_havuz(): return os.path.join(BASE, "egitim-havuzu")
+def _sa_boy(y):
+    t = 0
+    for d, _, fs in os.walk(y):
+        for f in fs:
+            try: t += os.path.getsize(os.path.join(d, f))
+            except OSError: pass
+    return t
+def _sa_havuza_tasi(y, boy):  # → True: taşındı; False: sığmadı/başarısız (çağıran siler)
+    try:
+        hk = _sa_havuz(); os.makedirs(hk, exist_ok=True)
+        if not _SA.get("havuz_tm"): _SA["havuz_tm"] = True; _sa_tmutil(hk)
+        sinir = float(AYAR.get("ses_arsivi_egitim_gb") or 50) * 1024 ** 3
+        if _sa_boy(hk) + boy > sinir:
+            if not _SA["havuz_uyari"]: _SA["havuz_uyari"] = True; print("SES ARŞİVİ: eğitim havuzu sınırda, klasörler taşınmayıp silinecek")
+            return False
+        ad = os.path.basename(y); hedef = os.path.join(hk, ad); k = 2
+        while os.path.lexists(hedef): hedef = os.path.join(hk, f"{ad}-{k}"); k += 1
+        os.rename(y, hedef); return True
+    except Exception as e: print(f"SES ARŞİVİ: havuza taşınamadı ({e.__class__.__name__})"); return False
 def ses_arsivi_klasor():  # toplantı sürüyorsa dosya kökü (aktif_dosya, toplanti.py), değilse toplanti-disi-YYYYMMDD
     try: d = aktif_dosya() if "aktif_dosya" in globals() else None
     except Exception: d = None
@@ -559,14 +581,17 @@ def ses_arsivi_temizle(gun=None, sinir_bayt=None, kok=None):  # → silinen klas
             boy = sum(os.path.getsize(os.path.join(y, f)) for f in os.listdir(y) if os.path.isfile(os.path.join(y, f)))
             ds.append((os.path.getmtime(y), y, boy))
         ds.sort(); n = 0; simdi = time.time()
-        def sil(y):
-            nonlocal n
-            if os.path.dirname(os.path.realpath(y)) == kok: shutil.rmtree(y, ignore_errors=True); n += 1
+        egitim = bool(AYAR.get("ses_arsivi_egitim")); tasinan = 0
+        def sil(y, boy=0):
+            nonlocal n, tasinan
+            if os.path.dirname(os.path.realpath(y)) != kok: return
+            if egitim and _sa_havuza_tasi(y, boy): tasinan += 1; n += 1; return
+            shutil.rmtree(y, ignore_errors=True); n += 1
         for t, y, boy in list(ds):
-            if simdi - t > gun * 86400: sil(y); ds.remove((t, y, boy))
+            if simdi - t > gun * 86400: sil(y, boy); ds.remove((t, y, boy))
         top = sum(x[2] for x in ds)
-        while top > sinir and len(ds) > 1: t, y, boy = ds.pop(0); sil(y); top -= boy  # en yeni klasör (süren toplantı) kalır
-        if n: print(f"SES ARŞİVİ: {n} eski klasör silindi")
+        while top > sinir and len(ds) > 1: t, y, boy = ds.pop(0); sil(y, boy); top -= boy  # en yeni klasör (süren toplantı) kalır
+        if n: print(f"SES ARŞİVİ: {n - tasinan} eski klasör silindi" + (f", {tasinan} klasör eğitim havuzuna taşındı" if tasinan else ""))
         return n
     except Exception as e: print(f"SES ARŞİVİ: temizlenemedi ({e.__class__.__name__})"); return 0
 def _sa_tmutil(y):  # Time Machine'e girmesin (sudo'suz yapışkan öznitelik); bir kez, hata günlüğe
