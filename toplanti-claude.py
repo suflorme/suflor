@@ -251,9 +251,10 @@ def sozluk_birlestir(d):
         if b not in t["yanlis"]: t["yanlis"].append(b)
     elle = [t for t in d.get("terimler", []) if elle_mi(t)]
     grup = elle_oncelik(list(grup.values()), elle)
-    kart = [t for t in d.get("terimler", []) if t.get("kaynak") == "proje-karti"]  # dış sözlükten değil: yeniden kurmada korunur
-    ogren = [t for t in d.get("terimler", []) if str(t.get("kaynak") or "").startswith("ogrenme-")]  # 3 Kasım: öğrenen sözlüğün kuralları da (geri alma: sozluk --geri-al)
-    grup = elle_oncelik(grup, ogren)
+    # 3 Kasım: birleştirmenin kendi ürettiği kaynak ("otomatik") dışındaki HER terim korunur (proje-karti, ogrenme-* — geri alma: sozluk --geri-al —, sozluk-genisletme-* ve başka kaynaklar;
+    # yalnız elle eklenenler ayrıca elle'de). Biçim çakışırsa elle eklenen kazanır (kipi korunur), kalan biçimler ayrı kayıtta yan yana durur
+    diger = elle_oncelik([t for t in d.get("terimler", []) if t.get("kaynak") != "otomatik" and not elle_mi(t)], elle)
+    grup = elle_oncelik(grup, [t for t in diger if t.get("yanlis")])
     vendor = []
     try:
         for k, _, m in baglam.xlsx_parcala(SOZ_XLSX):
@@ -263,7 +264,7 @@ def sozluk_birlestir(d):
     return {"surum": 2, "guncelleme": datetime.date.today().isoformat(),
             "aciklama": "Suflor.me özel sözlüğü. duzelt: her geçiş düzeltilir · baglam: yalnız aynı satırda bağlam kelimesi varsa · isaret: düzeltilmez, '?' işareti. Kaynak: ayardaki sozluk_kaynagi (sozluk --birlestir ile yeniden kurulur) + elle eklenenler (kaynak=kullanici).",
             "kaynak_mtime": max(os.path.getmtime(SOZ_TSV), os.path.getmtime(SOZ_XLSX)),
-            "terimler": grup + kart + ogren + elle, "vendor": sorted(dict.fromkeys(vendor)), "kisiler": KISILER}
+            "terimler": grup + diger + elle, "vendor": sorted(dict.fromkeys(vendor)), "kisiler": KISILER}
 # --- Sözlük deneme aracı (3 Kasım, sözlük 1. aşama) ----------------------------------------------------------------------------------------
 # Çekirdek: sozluk_uygulayici(kod_yolu, sozluk_yolu) → (metin → (çıktı, olaylar)); sozluk_dene(satirlar, eski, yeni) → karşılaştırma. 2. aşamadaki "kabul kapısı"
 # (öğrenilen aday kural geçmiş dökümde X satırı değiştiriyorsa reddet) bunları çağırır. Salt okuma: sözlük dosyası geçici klasöre kopyalanır, canlı dosyalara yazılmaz.

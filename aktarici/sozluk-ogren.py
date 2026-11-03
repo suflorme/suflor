@@ -31,6 +31,9 @@ SO_YEDEK_EN_COK = 20; SO_GECMIS_GUN = 30; SO_TARAMA_GUN = 3; SO_EN_AZ_SATIR = 10
 # değişebilir; gündelik sözcük = İngilizce sözlükte küçük harfli giriş, ya da geçmiş dökümde ≥ SO_GUNDELIK_TOPLANTI toplantıda küçük harfle, ya da proje belgelerinde
 # ≥ SO_GUNDELIK_BELGE belgede küçük harfle geçen sözcük.
 SO_DIS_EN_AZ = 2; SO_GUNDELIK_TOPLANTI = 3; SO_GUNDELIK_BELGE = 2; SO_BAGLAM_N = 4
+# Kural sürümü (3 Kasım, v0.180.1): kapının kuralı değişince (ör. ad muafiyeti) kuraldan gelen retler yeniden değerlendirilir; OHOT "yanlış" cevabı kalıcıdır
+SO_KURAL = 2; SO_RET_KALICI = ("ohot_yanlis",)
+def so_yeniden(a): return a["durum"] == "ret" and a.get("kural") != SO_KURAL and a.get("neden") not in SO_RET_KALICI  # eski kural sürümünün reti
 SO_SAYI = set("sifir bir iki uc dort bes alti yedi sekiz dokuz on yirmi otuz kirk elli altmis yetmis seksen doksan yuz bin milyon milyar bucuk yarim one two three four five six "
               "seven eight nine ten hundred thousand million billion percent yuzde".split())
 SO_DUR = set("acaba aslinda bence boyle buna bunu bunun burada daha dedi diye evet gibi hani hayir henuz hepsi icin iste kadar kendi lazim nasil neden olan olarak oldu "
@@ -187,6 +190,45 @@ def so_gundelik_dogru(d, ctx):  # doğru biçim gündelik mi: bu kurulumun dök�
     if len(ws) != 1: return None  # çok sözcüklü ad (iki İngilizce sözcükten marka adı) gündelik sayılmaz
     w = ws[0]; s = sade(w)
     return "dokum" if ctx["kucuk"].get(s, 0) >= SO_GUNDELIK_TOPLANTI else "belge" if _so_dizin_ara(ctx.get("dizin"), w.replace("İ", "i").replace("I", "ı").lower(), kucuk=True) >= SO_GUNDELIK_BELGE else None
+SO_MUAF_BUYUK_EN_AZ = 2  # 3 Kasım: doğru biçim proje belgelerinde cümle ortasında büyük harfle ≥ 2 kez geçmeli ve küçük harfli geçişinden çok olmalı ("Marvin" 8/1; "Transkript" 1/18, "Evet" 175/5796, "Panoda" 5/54 muaf değil)
+def so_kisilik_adlari():  # kişilik dosyalarının (ayar kisilik, kisilik_toplanti_disi) ad / gorunen_ad / uclu_ad / uclu_takilma / hitap girişleri → sade anahtarlar (aktarıcı ve toplanti-claude.py ad alanında aynı: kisilik.py'ye bağımlı değil)
+    out = set(); gundelik = globals().get("HITAP_GUNDELIK") or {"oh", "ah", "eh", "evet", "hayır", "tamam", "peki", "merhaba", "selam"}
+    for ayar in ("kisilik", "kisilik_toplanti_disi"):
+        yol = os.path.expanduser(str(AYAR.get(ayar) or "").strip())
+        if not yol: continue
+        try: s = open(yol, encoding="utf-8").read()
+        except OSError: continue
+        m = re.match(r"\s*---\s*\n(.*?)\n---", s, re.S)
+        for sat in (m.group(1).splitlines() if m else []):
+            k, _, v = sat.partition(":"); k = k.strip().lower()
+            if k in ("ad", "gorunen_ad", "uclu_ad", "uclu_takilma", "hitap"):
+                for x in (v.split(",") if k == "hitap" else [v]):
+                    x = x.strip()
+                    if len(_so_k(x).replace(" ", "")) >= 3 and x.lower() not in gundelik: out.add(_so_k(x))
+    return out
+def _so_dizin_buyuk(c, yazim, n=200):  # → (cümle ortasında tam bu büyük harfli yazımla geçiş, küçük harfle geçiş) — dökümler sayılmaz; cümle başı (nokta/soru/ünlem/iki nokta/satır başı/liste ve başlık işareti sonrası) büyük sayımına girmez
+    if c is None: return 0, 0
+    k = _so_k(yazim)
+    if not k: return 0, 0
+    try: rows = c.execute("SELECT p.yol, p.metin FROM ara JOIN parca p ON p.id = ara.rowid JOIN dosya d ON d.yol = p.yol WHERE ara MATCH ? AND coalesce(d.gizli, 0) = 0 "
+                          "AND d.tur NOT IN (?, ?, ?) LIMIT ?", ('n : "' + k + '"',) + SO_BELGE_DISI + (n,)).fetchall()
+    except Exception: return 0, 0
+    rx = re.compile(r"(?<![^\W\d_])" + re.escape(yazim) + r"(?![^\W\d_])", re.I); b = kc = 0
+    for y, m in rows:
+        for mm in rx.finditer(m or ""):
+            if mm.group(0)[:1].islower() and yazim[:1].isupper(): kc += 1; continue
+            if mm.group(0) != yazim: continue
+            onc = (m[:mm.start()]).rstrip(" \t")
+            if onc and onc[-1] not in ".!?:;\n|#*>-•—\"“": b += 1
+    return b, kc
+def so_dogru_muaf(d, ctx):  # → gerekçe ya da None: doğru biçim gerçek bir ad (kişilik adı/hitabı, onaylı proje kartında aynı yazım, proje belgelerinde cümle ortasında büyük harfle baskın) — terim_degil süzgecinden muaf. Ay ve gün adı muaf olmaz
+    if not re.search(r"[A-ZÇĞİÖŞÜ]", d) or _so_k(d) in SO_AY_GUN: return None
+    if "kis" not in ctx: ctx["kis"] = so_kisilik_adlari()
+    if _so_k(d) in ctx["kis"]: return "kisilik"
+    for t in (ctx["B"]["k"][0], ctx["B"]["tok"][0]):
+        if t.get(_so_k(d), (None, None))[1] == "kart" and t[_so_k(d)][0] == d: return "kart"
+    b, kc = _so_dizin_buyuk(ctx.get("dizin"), d)
+    return "belge_buyuk" if b >= SO_MUAF_BUYUK_EN_AZ and kc < b else None
 def _so_baglam_sec(a, ctx):  # bağlam kipi için adayın cümlelerinden en ayırt edici (geçmişte en az toplantıda geçen) ≥ 5 harfli sözcükler
     harici = set(_so_k(a["yanlis"]).split()) | set(_so_k(a["dogru"]).split()); say = collections.Counter()
     for k in a["kanit"]:
@@ -335,7 +377,9 @@ def _so_sozluk_bicimleri():
         for y in t.get("yanlis") or []: out.setdefault(_so_k(y), set()).add(t.get("dogru"))
     return out
 def so_karar(a, ctx, cev, kuru=False):  # adayın durumunu günceller; kabul edilirse (kuru değilse) uygular. → durum
+    if so_yeniden(a): a.update(durum="bekliyor", neden="", onceki_ret=a.get("neden"))
     if a["durum"] in ("kabul", "ret", "geri_alindi"): return a["durum"]
+    a["kural"] = SO_KURAL
     B = ctx["B"]; ys = _so_k(a["yanlis"])
     if ys in ctx["bicim"]: a.update(durum="ret", neden="sozlukte_var" if a["dogru"] in ctx["bicim"][ys] else "cakisma"); return a["durum"]
     if ys in B["kucuk"]: a.update(durum="ret", neden="bilinen_terim"); return a["durum"]  # yanlış biçim kendisi bilinen bir ad/terim: başka bir ada çevrilmez
@@ -352,7 +396,9 @@ def so_karar(a, ctx, cev, kuru=False):  # adayın durumunu günceller; kabul edi
     gercek = sorted({k["toplanti"] for k in a["kanit"] if k.get("tur") == "gercek" and k["toplanti"]})
     # sözlük ad/terim içindir: doğru biçim büyük harfli bir ad/terim olmalı ve gündelik sözcük olmamalı ("panoda", "Evet", "Liste") — kullanıcının sözlüğündeki ve kayıt veritabanındaki terim hariç
     if not ohot and a["katman_kaynak"] not in ("sozluk",) and not str(a["katman_kaynak"] or "").startswith("vt:") and (not re.search(r"[A-ZÇĞİÖŞÜ]", a["dogru"]) or so_gundelik_dogru(a["dogru"], ctx)):
-        a.update(durum="ret", neden="terim_degil"); return a["durum"]
+        m = so_dogru_muaf(a["dogru"], ctx)
+        if m: a["muaf"] = m  # 3 Kasım: gerçek ad (kişilik/kart/belgede büyük harfle) gündelik sayılmaz; kanıt ve geçmiş deneme kapıları yine uygulanır
+        else: a.update(durum="ret", neden="terim_degil"); return a["durum"]
     if a["katman"] == 4 and not ohot:
         if not so_oh_var(): a.update(durum="bekliyor", neden="kapali_kume_disi"); return a["durum"]  # beta: soru dosyası yok
         if not VT_BELLEK["terimler"]: a.update(durum="bekliyor", neden="oh_bekleniyor"); return a["durum"]  # yardımcı henüz göndermedi: ikinci katman bilinmeden sorulmaz
@@ -478,7 +524,7 @@ def so_calistir(dosyalar=None, kuru=False, gun=SO_GECMIS_GUN):  # → özet {top
         durum["islenen"][md] = {"t": time.time(), "yapi": bool(y), "tur": tur}
     cev = so_cevaplar(); say = collections.Counter(); ret = collections.Counter(); sure = False
     for a in sorted(D.values(), key=lambda a: (-len({k['toplanti'] for k in a['kanit']}), -len(a['kanit']), a['id'])):  # en çok kanıtlı önce (aynı biçime iki aday: güçlüsü)
-        if a["durum"] not in ("bekliyor", "soruldu", "bulunamadi"): continue
+        if a["durum"] not in ("bekliyor", "soruldu", "bulunamadi") and not so_yeniden(a): continue
         if time.time() - t0 > SO_SURE_SN: sure = True; break  # kalan adaylar bir sonraki çalışmada
         try: d = so_karar(a, ctx, cev, kuru)
         except Exception as e: print(f"SÖZLÜK ÖĞRENME: {a['id']} karar hatası ({e.__class__.__name__}: {e})"); continue

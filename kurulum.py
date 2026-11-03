@@ -1027,6 +1027,26 @@ def plist_yolu(): return os.path.join(EV, "Library", "LaunchAgents", LABEL + ".p
 def aktarici_durdur(port):  # yalnız bu hesabın canlı aktarıcısı (diğer hesabınki ve başka porttaki deneme aktarıcıları çalışmaya devam eder)
     sessiz("launchctl", "bootout", f"{gui()}/{LABEL}"); sessiz("pkill", "-u", str(os.getuid()), "-f", rf"relay\.py --dir .* --port {port}( |$)"); time.sleep(1)
 
+def vt_izle_surecleri(ps_satirlari, canli):  # 3 Kasım: ps çıktısından ("pid args" satırları) YALNIZ bu canli klasörünün veritabanı yardımcısı: "…/SuflorBrifing --vt-izle <canli>" ve onun Python alt süreci "… toplanti-claude.py --dir <canli> vt-izle". Brifing'in başka kipleri (toplantı, açık süreç, Konuş) ve başka canli klasörü eşleşmez → [pid]
+    def yol(x):
+        x = x.strip().rstrip("/"); return os.path.realpath(x) if os.path.exists(x) else x
+    hedef = yol(canli); out = []
+    for l in ps_satirlari:
+        pid, _, a = l.strip().partition(" "); a = a.strip()
+        if not pid.isdigit(): continue
+        on, ayrac, arka = a.partition(" --vt-izle ")
+        if ayrac and on.endswith("/SuflorBrifing") and yol(arka) == hedef: out.append(int(pid)); continue
+        m = re.search(r"/toplanti-claude\.py --dir (.+) vt-izle$", a)
+        if m and yol(m.group(1)) == hedef: out.append(int(pid))
+    return out
+def vt_izle_kapat(canli):  # eski kodla çalışan yardımcı 6 saate kadar açık kalıp önbelleği taze tuttuğu için aktarıcı yenisini açmıyordu (3 Kasım, v0.180.0 kurulumu: Konuş ad listesi boş kaldı); aktarıcı yenisini kendisi açar
+    r = sessiz("ps", "-ww", "-U", str(os.getuid()), "-o", "pid=,args=")
+    n = 0
+    for pid in vt_izle_surecleri((r.stdout if r else "").splitlines(), canli):
+        try: os.kill(pid, 15); n += 1
+        except OSError: pass
+    if n: say(f"Eski veritabanı yardımcısı kapatıldı ({n} süreç); aktarıcı yenisini açar")
+    return n
 def ecapa_donustur(ort, onbellek=True):  # ses izi (ECAPA) ağırlıkları MLX için bir kez; ortak klasör yazılamıyorsa hesabın önbelleğine
     ek = os.path.join(ort, "ses-modeller", "spkrec-ecapa-voxceleb"); vpy = os.path.join(ort, "whisper-venv", "bin", "python")
     cache = os.path.join(EV, "Library", "Caches", "Suflor", "ecapa-mlx.npz")
@@ -1467,6 +1487,7 @@ def kur():
             say("Menü uygulamasına Dock simgesi eklendi" if menu_simge(mnu) else "UYARI: Dock simgesi yazılamadı — pencere kapanınca Dock'ta genel simge görünür")
         imz.append(mnu)
     imzala(imz)
+    vt_izle_kapat(canli)  # yeni kod ve imza yerinde; kurulum meşgul denetiminden (aktarici-kur.command, guncelle) sonra çalışır
     if menu_acik and os.path.isdir(mnu): menu_yerlestir(mnu, eski, tasindi, yeniden=menu_yeni and not DENEME)
     from xml.sax.saxutils import escape as x
     log = os.path.join(EV, "Library", "Logs", "suflor-aktarici.log")

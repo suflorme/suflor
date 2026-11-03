@@ -139,6 +139,36 @@ try:
     for i in range(4): toplanti(f"Rota-dis-{i}", DOLGU + ["Ruvenna şehrine tatile gittik."], gun=4)
     belge("rota.md", "Ruvenno rota sistemi"); N["so_calistir"]([r1, r2]); r = aday("Ruvenna", "Ruvenno")
     ok("geçmiş deneme: tam düzeltme başka toplantıları değiştiriyor → bağlam kipiyle kabul", r.get("durum") == "kabul" and r.get("kip") == "baglam" and r["dene"]["dis"] == 0, str(r)[:300])
+    # 9b) doğru biçim gerçek bir ad ise gündelik sözcük süzgecinden (terim_degil) muaf: kişilik adı/hitabı, kartta aynı yazım, belgede cümle ortasında büyük harfle baskın; ay adı ve cümle başı muaf değil
+    for i in range(3): belge(f"zorvak-{i}.md", "Dünkü görüşmede Zorvak ekibi yeni tarihi bildirdi.")
+    for i in range(2): belge(f"zorvak-k{i}.md", "zorvak sözcüğü bu belgede küçük harfle geçiyor.")
+    for i in range(3): belge(f"zelvin-{i}.md", "Zelvin dün geldi. Zelvin yarın gelecek.")  # yalnız cümle başı
+    for i in range(2): belge(f"zelvin-k{i}.md", "bu belgede zelvin küçük harfle geçiyor.")
+    for i in range(3): belge(f"kasim-{i}.md", "Toplantı Kasım ayında yapılacak, Kasım sonunda bitecek.")
+    for i in range(2): belge(f"kasim-k{i}.md", "bu kasım küçük harfli.")
+    for i in range(2): belge(f"lunebra-k{i}.md", "lunebra küçük harfle geçen belge.")
+    kk = os.path.join(uyg, "proje-karti.json"); kd_ = json.load(open(kk)); kd_["sozluk"].append({"terim": "Lunebra"}); json.dump(kd_, open(kk, "w"))
+    for i in range(2): belge(f"tavira-k{i}.md", "tavira küçük harfle geçen belge.")
+    kis = os.path.join(T, "kisilik-deneme.md"); open(kis, "w", encoding="utf-8").write("---\nad: ORKAN\ngorunen_ad: Tavira\nhitap: Tavira, Tavyra, Oh\n---\nKişilik metni burada.\n")
+    AYAR["kisilik"] = kis; mc = {"gecmis": [], "kucuk": {}, "df": {}, "en": set(), "dizin": N["_so_dizin"](), "bicim": {}}; mc["B"] = N["so_bilinen"](mc)
+    def kd(y, dg):
+        a = {"id": "x" + y, "yanlis": y, "dogru": dg, "kanit": [{"kaynak": "claude", "toplanti": f"{i}.md", "tur": "gercek", "cumle": "x", "n": 1, "t": 0} for i in (1, 2)], "durum": "bekliyor", "neden": None}
+        N["so_karar"](a, mc, {}, True); return a
+    ok("muaf: belgede cümle ortasında büyük harfle baskın ('Zorvak' 3 büyük/2 küçük) → terim_degil değil", N["so_dogru_muaf"]("Zorvak", mc) == "belge_buyuk" and kd("Zorfak", "Zorvak")["neden"] != "terim_degil")
+    ok("muaf: kartta aynı yazım ('Lunebra', küçük harfli belgeler gündelik gösterse de)", N["so_dogru_muaf"]("Lunebra", mc) == "kart" and kd("Lunebro", "Lunebra")["neden"] != "terim_degil")
+    ok("muaf: kişilik adı/görünen adı/hitabı ('Tavira'); gündelik hitap ('Oh') değil", N["so_dogru_muaf"]("Tavira", mc) == "kisilik" and kd("Davira", "Tavira")["neden"] != "terim_degil" and "oh" not in N["so_kisilik_adlari"]())
+    ok("muaf değil: cümle başında büyük harf ('Zelvin') → terim_degil", N["so_dogru_muaf"]("Zelvin", mc) is None and kd("Zelfin", "Zelvin")["neden"] == "terim_degil")
+    ok("muaf değil: ay adı ('Kasım') belgede büyük harfle geçse de → terim_degil", N["so_dogru_muaf"]("Kasım", mc) is None and kd("Kasan", "Kasım")["neden"] == "terim_degil")
+    ok("muaf kanıt kapısını atlamaz: tek toplantı → bekliyor", (lambda a: (N["so_karar"](a, mc, {}, True), a)[1]["neden"])({"id": "y", "yanlis": "Zorfax", "dogru": "Zorvak", "kanit": [{"kaynak": "claude", "toplanti": "1.md", "tur": "gercek", "cumle": "x", "n": 1, "t": 0}], "durum": "bekliyor", "neden": None}) == "kanit_az")
+    def eski_ret(y, dg, neden):  # v0.180.0'da (kural sürümü yok) verilmiş ret
+        a = kd(y, dg); a.update(durum="ret", neden=neden); a.pop("kural", None); N["so_karar"](a, mc, {}, True); return a
+    ok("kural sürümü değişince eski terim_degil reti yeniden değerlendirilir ('Davira' → 'Tavira' artık muaf)", eski_ret("Davira", "Tavira", "terim_degil")["neden"] != "terim_degil")
+    ok("OHOT 'yanlış' reti kalıcı", eski_ret("Davira", "Tavira", "ohot_yanlis")["neden"] == "ohot_yanlis")
+    Dd = N["_so_defter_oku"](); ai = N["_so_aday_id"]("Drawento", "Dravento"); Dd[ai].update(durum="ret", neden="terim_degil"); Dd[ai].pop("kural", None); N["_so_defter_yaz"](Dd)
+    N["so_calistir"]([m1], kuru=True); ok("döngü eski kural sürümünün retini kapıya yeniden gönderir (kuru: defter değişmez)", N["_so_defter_oku"]()[ai]["neden"] == "terim_degil")
+    N["so_calistir"]([m1]); ok("döngü eski kural sürümünün retini yeniden değerlendirir ve kural sürümünü yazar", N["_so_defter_oku"]()[ai].get("kural") == N["SO_KURAL"] and N["_so_defter_oku"]()[ai].get("onceki_ret") == "terim_degil", str(N["_so_defter_oku"]()[ai])[:200])
+    ok("aynı kural sürümündeki ret yeniden açılmaz", (lambda a: (a.update(durum="ret", neden="terim_degil"), N["so_karar"](a, mc, {}, True), a)[2]["durum"])(kd("Zelfin", "Zelvin")) == "ret")
+    AYAR.pop("kisilik", None)
     # 10) bilinen terim ve sözlükte olan biçim; kısa toplantı atlanır; sayı düzeltmesi aday olmaz
     k1 = toplanti("Bilinen-1", DOLGU + ["Kalendix ve kalendiks aynı şey."], yapi=[{"saat": "10:00:10", "yanlis": "kalendiks", "dogru": "Kalendix"}, {"saat": "10:00:10", "yanlis": "Kalendix", "dogru": "Pelvora"},
                                                                               {"saat": "10:00:10", "yanlis": "on iki", "dogru": "yüz yirmi"}])

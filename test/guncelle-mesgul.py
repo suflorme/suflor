@@ -29,6 +29,30 @@ ok(f"--zorla denetimi geçer (sonra olmayan kaynak → indirilemedi): {r[:40]!r}
 ok("guncelle.command --zorla'yı iletir", '"$@"' in open(os.path.join(KOD, "guncelle.command"), encoding="utf-8").read())
 ok("aktarici-kur.command mesgul'e bakar", "kurulum.py\" mesgul" in open(os.path.join(KOD, "aktarici-kur.command"), encoding="utf-8").read())
 
+# 1a) 3 Kasım: kurulum eski veritabanı yardımcısını (Suflor Brifing.app --vt-izle <canli> ve Python alt süreci) kapatır — yalnız bu canli klasörünün; Brifing'in başka kipleri, başka canli ve başka kullanıcının kopyası değil
+import tempfile
+_t = tempfile.mkdtemp(prefix="suflor-vtizle-"); C1 = os.path.join(_t, "Application Support", "Uyg", "canli"); C2 = os.path.join(_t, "Application Support", "Uyg2", "canli")
+os.makedirs(C1); os.makedirs(C2); A1 = os.path.dirname(C1)
+BR = A1 + "/Suflor Brifing.app/Contents/MacOS/SuflorBrifing"; PY_ = "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+PS = [f"101 {BR} --vt-izle {C1}", f"102 {PY_} -I -B {A1}/toplanti-claude.py --dir {C1} vt-izle",                         # eşleşir: bu canli
+      f"103 {BR} --vt-izle {C2}", f"104 {PY_} -I -B {os.path.dirname(C2)}/toplanti-claude.py --dir {C2} vt-izle",           # başka canli klasörü
+      f"105 {BR} --kip toplanti --dir {C1}", f"106 {BR}", f"107 {BR} --acik-surec {C1}",                                  # Brifing'in başka kipleri
+      f"108 {PY_} -I -B {A1}/toplanti-claude.py --dir {C1} izle", f"109 /usr/bin/claude -p --dir {C1} vt-izle sorusu",     # izle ve Konuş süreçleri
+      f"110 {BR} --vt-izle {C1}/ek", f"111 {BR} --vt-izle {C1}x", "bozuk satir", f"112 {BR} --vt-izle {C1}/"]            # önek/sonek benzerleri değil; sondaki eğik çizgi aynı klasör
+ok("vt-izle süreç seçimi: bu canli'nin yardımcısı + Python alt süreci (boşluklu 'Application Support' yolu, sondaki /)", g["vt_izle_surecleri"](PS, C1) == [101, 102, 112])
+ok("vt-izle süreç seçimi: başka canli klasörü yalnız kendi sürecini eşler", g["vt_izle_surecleri"](PS, C2) == [103, 104])
+ok("vt-izle süreç seçimi: toplantı/açık süreç/izle/Konuş kipleri ve bozuk satır eşleşmez", not set(g["vt_izle_surecleri"](PS, C1)) & {105, 106, 107, 108, 109, 110, 111} and g["vt_izle_surecleri"]([], C1) == [])
+_oldkill = os.kill; _oldsessiz = g["sessiz"]; _oldsay = g["say"]; OLDU = []
+g["sessiz"] = lambda *c, **k: type("R", (), {"stdout": "\n".join(PS), "returncode": 0})(); g["say"] = lambda *a, **k: None
+os.kill = lambda pid, sig: OLDU.append((pid, sig))
+try: n = g["vt_izle_kapat"](C1)
+finally: os.kill = _oldkill; g["sessiz"] = _oldsessiz; g["say"] = _oldsay
+ok("vt_izle_kapat: yalnız eşleşen süreçlere SIGTERM", n == 3 and OLDU == [(101, 15), (102, 15), (112, 15)])
+_kur = inspect.getsource(g["kur"]) if "inspect" in globals() else __import__("inspect").getsource(g["kur"])
+ok("kur(): vt_izle_kapat kodu ve imzaları yerleştirdikten sonra çalışır", 0 < _kur.index("copytree") < _kur.index("imzala(imz)") < _kur.index("vt_izle_kapat(canli)"))
+ok("aktarici-kur.command meşgul denetimini kurulumdan önce yapar", (lambda t: t.index("kurulum.py\" mesgul") < t.index("kurulum.py\" kur"))(open(os.path.join(KOD, "aktarici-kur.command"), encoding="utf-8").read()))
+shutil_ = __import__("shutil"); shutil_.rmtree(_t, ignore_errors=True)
+
 # 1b) Faz A (S162): güncelleme sonrası adımlar YENİ kodla, ayrı süreçte (alt komut guncelleme-sonrasi) — eski sürümün kodu modeller_dene'yi yürütmüyordu
 import inspect
 ok("guncelle() sonrası adımları alt komuta devreder (kendisi modeller_dene çağırmaz)", "guncelleme-sonrasi" in inspect.getsource(g["guncelle"]) and "modeller_dene()" not in inspect.getsource(g["guncelle"]))

@@ -25,7 +25,9 @@ json.dump({"surum": 2, "terimler": [
     {"dogru": "StokKöprü", "yanlis": [], "kip": "duzelt", "kaynak": "proje-karti", "not": ""},
     {"dogru": "Sonnet", "yanlis": ["Soneme"], "kip": "duzelt", "baglam": [], "kaynak": "kullanici"},
     {"dogru": "Pazaryeri Pro", "yanlis": ["pazaryer pro"], "kip": "duzelt", "baglam": [], "kaynak": "ogrenme-20261103", "aday": "a1b2c3d4"},  # 3 Kasım: öğrenen sözlük
-    {"dogru": "Dravento", "yanlis": ["Drawento"], "kip": "baglam", "baglam": ["siparis"], "kaynak": "ogrenme-20261102", "aday": "a5e6f7a8"}]}, open(FP, "w"), ensure_ascii=False)
+    {"dogru": "Dravento", "yanlis": ["Drawento"], "kip": "baglam", "baglam": ["siparis"], "kaynak": "ogrenme-20261102", "aday": "a5e6f7a8"},
+    {"dogru": "Zelmora", "yanlis": ["zelmora x"], "kip": "duzelt", "baglam": [], "kaynak": "sozluk-genisletme-20261103"},  # 3 Kasım: birleştirmenin üretmediği kaynak da korunur
+    {"dogru": "Sonnet", "yanlis": ["Soneme", "Sonet"], "kip": "duzelt", "baglam": [], "kaynak": "sozluk-genisletme-20261103"}]}, open(FP, "w"), ensure_ascii=False)
 
 kalan = 0
 def sozluk(*arg):
@@ -52,5 +54,10 @@ og = [t for t in ts if str(t.get("kaynak", "")).startswith("ogrenme-")]
 bak("--birlestir öğrenilen kuralları korur (kaynak, aday, kip, bağlam)", sorted((t["dogru"], t["aday"], t["kip"]) for t in og) == [("Dravento", "a5e6f7a8", "baglam"), ("Pazaryeri Pro", "a1b2c3d4", "duzelt")]
     and next(t for t in og if t["dogru"] == "Dravento")["baglam"] == ["siparis"])
 bak("--birlestir: öğrenilen biçim otomatik terimde yinelenmez", not any("pazaryer pro" in t["yanlis"] for t in ts if t.get("kaynak") == "otomatik"))
+gen = [t for t in ts if str(t.get("kaynak", "")).startswith("sozluk-genisletme-")]
+bak("--birlestir birleştirmenin üretmediği kaynağı (sozluk-genisletme-*) korur", any(t["dogru"] == "Zelmora" and t["yanlis"] == ["zelmora x"] for t in gen) and len(gen) == 2)
+bak("--birlestir: elle eklenenle çakışan biçim elle'de kalır, öteki biçim korunur, elle terimin kipi bozulmaz",
+    next(t for t in gen if t["dogru"] == "Sonnet")["yanlis"] == ["Sonet"] and next(t for t in ts if t.get("kaynak") == "kullanici" and t["dogru"] == "Sonnet")["yanlis"] == ["Soneme"])
+bak("--birlestir ikinci kez: terim sayısı değişmez (yinelenmez)", len(sozluk("--birlestir")) == len(ts))
 print("GEÇTİ" if not kalan else f"KALDI: {kalan}")
 sys.exit(1 if kalan else 0)
