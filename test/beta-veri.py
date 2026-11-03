@@ -69,7 +69,9 @@ ADRES = f"http://127.0.0.1:{AP}/"
 def bekle(kosul, sn):
     son = time.time() + sn
     while time.time() < son:
-        if kosul(): return True
+        try:
+            if kosul(): return True
+        except OSError: pass  # 4 Kasım: anahtar dosyası yazılınca aktarıcı portu henüz açmamış olabilir (yarış)
         time.sleep(0.3)
     return False
 

@@ -201,6 +201,15 @@ try:
     NO = ad_alani(AYAR); NO["VT_BELLEK"]["terimler"] = []
     mo = toplanti("Bekle-1", DOLGU + ["Hurmavex sözleşmesi."], yapi=[{"saat": "10:00:10", "yanlis": "Hurmavex", "dogru": "Hurmavexa"}]); NO["so_calistir"]([mo])
     ok("kayıt veritabanı terimleri bellekte yokken katman 4 sorulmaz (oh_bekleniyor)", NO["_so_defter_oku"]()[NO["_so_aday_id"]("Hurmavex", "Hurmavexa")]["neden"] == "oh_bekleniyor" and not os.path.exists(KANAL))
+    # 14b) (önce 14'teki oh_bekleniyor adayı işlensin) eski kural sürümünün reti döngüyü kendiliğinden tetikler, yalnız defterdeki adaylar değerlendirilir (toplantı yeniden taranmaz), bir çalışmadan sonra döngü boşuna çalışmaz
+    N["so_calistir"]([]); once = N["so_dongu_gerek"](); Dx = D(); Dx["aeskiret1"] = {"id": "aeskiret1", "yanlis": "Kurdanix", "dogru": "kurdanixa", "durum": "ret", "neden": "terim_degil", "kural": 1,
+                                                             "kanit": [{"kaynak": "claude", "toplanti": m1, "tur": "gercek", "cumle": "Kurdanix", "n": 1, "t": 0}]}
+    N["_so_defter_yaz"](Dx); gerek = N["so_dongu_gerek"](); ist0 = dict(json.load(open(os.path.join(canli, "sozluk-ogren.json")))["islenen"])
+    ok("eski kural sürümünün reti döngüyü tetikler (işlenecek toplantı olmadan)", once is None and gerek == [], f"önce {once}, sonra {gerek}")
+    N["so_calistir"](gerek); e = D()["aeskiret1"]; ist1 = json.load(open(os.path.join(canli, "sozluk-ogren.json")))["islenen"]
+    ok("boş listeyle yalnız defterdeki adaylar değerlendirilir (toplantı yeniden işlenmez), adaya yeni kural yazılır", e.get("kural") == N["SO_KURAL"] and e.get("onceki_ret") == "terim_degil"
+       and ist1 == ist0, str(e)[:200])
+    ok("bir çalışmadan sonra döngü yeniden tetiklenmez (her 5 dk boşuna çalışmaz)", N["so_dongu_gerek"]() is None)
     # --- 15) aktarıcıda: /vt-bellek (anahtarlı, dosyasız), eski vt-adlar.json silinir, döngü biten toplantıyı işler, /status sozluk_ogrenme -------------------------------------
     AKT2 = tempfile.mkdtemp(prefix="suflor-so-akt-", dir=T); c2 = os.path.join(AKT2, "canli"); os.makedirs(os.path.join(c2, "ozetler")); PORT = bos_port(8774)
     for f in ("relay.py", "manifest.json", "baglam.py"): shutil.copy(os.path.join(KOD, f), AKT2)

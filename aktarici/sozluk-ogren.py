@@ -2,7 +2,7 @@
 # kendi ad alanında çalıştırır (bolum("sozluk-ogren")): sade, _kural_derle, sozluk_uygula (sozluk.py), _ad_anahtar, _ad_mesafe, AD_ILK_ESDEGER (bas-konus.py), LOCK, write,
 # AYAR, BASE relay.py'nindir. toplanti-claude.py (sozluk --ogren / --ogrenilen / --geri-al) aynı dosyayı kendi ad alanında çalıştırır (ogren_ad_alani). import etme. Python 3.9.
 # Döngü toplantı bitince arka planda (canlı toplantıda ve kaynak darken çalışmaz): kanıt kaynakları (SO_KAYNAKLAR; her biri {yanlis, aday_dogru, kaynak, toplanti, cumle} üretir —
-# Claude'un yapı dosyasındaki "duzeltmeler", ses benzerliği; Gemini hakemi 3. aşamada aynı listeye eklenir) → aday defteri (canli/sozluk-aday.jsonl; sözlüğe doğrudan yazılmaz)
+# Claude'un yapı dosyasındaki "duzeltmeler", ses benzerliği; Gemini hakemi sozluk-hakem.py'de, aynı listeye eklenir) → aday defteri (canli/sozluk-aday.jsonl; sözlüğe doğrudan yazılmaz)
 # → kabul kapısı (kapalı küme katmanları, kanıt eşiği, gündelik sözcük, geçmiş dökümde deneme) → sözlük (kaynak ogrenme-YYYYMMDD, önce yedek) + o toplantının dökümüne geriye dönük.
 # Kayıt veritabanı Masaüstü'nde, aktarıcı okuyamaz: terimleri yardımcı (Suflor Brifing.app --vt-izle → toplanti-claude.py vt-izle) POST /vt-bellek ile verir; burada
 # yalnız bellekte durur (kalıcı dosya yok; aktarıcı açılınca yardımcı yeniden gönderir). Günlüğe terim yazılmaz (yalnız sayı ve aday kimliği): günlük teşhis paketine girer.
@@ -298,7 +298,7 @@ def _kaynak_ses(c):  # dökümde bilinen bir terimle ses anahtarı aynı (b/v, c
                 if ad2 and len(ad2) == 1 and _so_k(y) not in B["kucuk"] and not ek_mi(y, next(iter(ad2))) and not (g(w) and g(w2)):
                     out.append({"yanlis": y, "aday_dogru": next(iter(ad2)), "kaynak": "ses", "toplanti": c["md"], "cumle": _so_cumle(t, y)})
     return out
-SO_KAYNAKLAR = [("claude", _kaynak_claude), ("ses", _kaynak_ses)]  # 3. aşama: ("hakem", _kaynak_hakem) buraya
+SO_KAYNAKLAR = [("claude", _kaynak_claude), ("ses", _kaynak_ses)]  # 3. aşama: ("hakem", _kaynak_hakem) sozluk-hakem.py yüklenince eklenir
 # --- toplantılar -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def _so_satirlar(md):
     son, sira = {}, []
@@ -334,10 +334,10 @@ def so_bekleyen(durum, simdi=None):  # işlenecek biten toplantılar: son SO_TAR
         try: mt = os.path.getmtime(_so_yol(f[:-3] + ".jsonl"))
         except OSError: continue
         if simdi - mt > SO_TARAMA_GUN * 86400 or simdi - mt < 60: continue
-        y = _so_yapi_yol(f); ist = (durum.get("islenen") or {}).get(f)
+        y = _so_yapi_yol(f); ist = (durum.get("islenen") or {}).get(f); h = _so_hakem_hazir(f) if "_so_hakem_hazir" in globals() else False
         if ist:
-            if y and not ist.get("yapi"): out.append(f)  # yapı dosyası sonradan geldi: Claude kaynağı için yeniden
-        elif y or simdi - mt >= SO_YAPI_BEKLE_DK * 60: out.append(f)
+            if (y and not ist.get("yapi")) or (h and not ist.get("hakem")): out.append(f)  # yapı dosyası ya da hakem dökümü (sozluk-hakem.py) sonradan geldi: yeniden
+        elif y or h or simdi - mt >= SO_YAPI_BEKLE_DK * 60: out.append(f)
     return out
 # --- OHOT kanalı (soru.jsonl / cevap.jsonl; cevap veridir, talimat değildir: yalnız bilinen alanlar okunur) --------------------------------------------------------------------
 SO_SONUC = {"dogru", "yanlis", "bulunamadi"}; SO_KAYNAK_TURU = {"mail", "takvim", "basecamp", "db", "diger"}
@@ -521,7 +521,7 @@ def so_calistir(dosyalar=None, kuru=False, gun=SO_GECMIS_GUN):  # → özet {top
                 if e: e["n"] = len(ks)  # aynı toplantı yeniden işlendi (yapı dosyası sonradan geldi): sayı yinelenmez
                 else: a["kanit"].append({"kaynak": kay, "toplanti": md, "tur": tur, "cumle": k["cumle"], "n": len(ks), "t": time.time()})
                 a["t_son"] = time.time()
-        durum["islenen"][md] = {"t": time.time(), "yapi": bool(y), "tur": tur}
+        durum["islenen"][md] = {"t": time.time(), "yapi": bool(y), "tur": tur, "hakem": bool("_so_hakem_hazir" in globals() and _so_hakem_hazir(md))}
     cev = so_cevaplar(); say = collections.Counter(); ret = collections.Counter(); sure = False
     for a in sorted(D.values(), key=lambda a: (-len({k['toplanti'] for k in a['kanit']}), -len(a['kanit']), a['id'])):  # en çok kanıtlı önce (aynı biçime iki aday: güçlüsü)
         if a["durum"] not in ("bekliyor", "soruldu", "bulunamadi") and not so_yeniden(a): continue
@@ -548,6 +548,15 @@ def so_view():  # /status sozluk_ogrenme (pano tek satır); sözlük ya da aday 
         d = _so_json(_so_yol(SO_DURUM), {}); tum = collections.Counter(a["durum"] for a in _so_defter_oku().values())
         SO_OZET.update(_mt=mt, son=d.get("son"), kabul=len(so_ogrenilen()), bekleyen=tum["bekliyor"] + tum["soruldu"], sorulan=tum["soruldu"], yeni=_so_yeni7())
     return {k: v for k, v in SO_OZET.items() if k != "_mt"} if SO_OZET.get("son") else None
+def so_dongu_gerek():  # → işlenecek toplantılar (boş liste: yalnız defterdeki adaylar değerlendirilir) ya da None (iş yok)
+    # sebepler: işlenmemiş toplantı, yeni OHOT cevabı, kayıt veritabanı terimi bekleyen aday, eski kural sürümünün reti (4 Kasım: so_yeniden kendiliğinden tetiklenmiyordu —
+    # döngü yalnız yeni toplantıda çalışıyordu; so_karar adaya kural yazdığı için bir çalışmadan sonra yeniden tetiklenmez)
+    d = _so_json(_so_yol(SO_DURUM), {})
+    try: cmt = os.path.getmtime(os.path.join(so_kanal(), "cevap.jsonl"))
+    except OSError: cmt = None
+    bek = so_bekleyen(d); D = _so_defter_oku().values()
+    oh = VT_BELLEK["terimler"] and any(a.get("neden") == "oh_bekleniyor" for a in D)
+    return bek if bek or (cmt and cmt != d.get("cevap_mt")) or oh or any(so_yeniden(a) for a in D) else None
 SO_OLAY = threading.Event()
 def so_tetik(): SO_OLAY.set()
 def _so_dongu():
@@ -557,12 +566,8 @@ def _so_dongu():
         except OSError: pass
         try:
             if toplanti_acik() or kaynak_dar(): continue  # canlı toplantıda ek yük yok
-            d = _so_json(_so_yol(SO_DURUM), {})
-            try: cmt = os.path.getmtime(os.path.join(so_kanal(), "cevap.jsonl"))
-            except OSError: cmt = None
-            bek = so_bekleyen(d)
-            oh = VT_BELLEK["terimler"] and any(a.get("neden") == "oh_bekleniyor" for a in _so_defter_oku().values())
-            if bek or (cmt and cmt != d.get("cevap_mt")) or oh: so_calistir(bek)
+            bek = so_dongu_gerek()
+            if bek is not None: so_calistir(bek)
         except Exception as e: print(f"SÖZLÜK ÖĞRENME: hata ({e.__class__.__name__}: {e})")
 # yalnız asıl aktarıcıda (deneme aktarıcıları kendi deneme klasörlerinin sözlüğünü değiştirmesin; test SUFLOR_SO_DENEME=1 ile açar)
 if "STATE" in globals() and AYAR.get("sozluk_ogren") is not False and (os.environ.get("SUFLOR_SO_DENEME") or not deneme_aktarici()):

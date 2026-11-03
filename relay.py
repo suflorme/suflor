@@ -1678,6 +1678,7 @@ bolum("moderator")  # aktarici/moderator.py — Toplantı moderatörü: gündem,
 bolum("otonom")  # aktarici/otonom.py — Toplantıda otonom katılım: seslenince cevap, itiraz penceresi, söz sırası (S68)
 bolum("defter")  # aktarici/defter.py — Toplantı defteri: biten toplantıyı bas-konuşla sorma (S48)
 bolum("sozluk-ogren")  # aktarici/sozluk-ogren.py — Kendi kendine öğrenen sözlük: toplantı sonu kanıt → aday defteri → kabul kapısı; kayıt veritabanı terimleri bellekte (/vt-bellek; 3 Kasım)
+bolum("sozluk-hakem")  # aktarici/sozluk-hakem.py — Gemini hakemi: toplantı sonrası ses arşivi → Gemini dökümü → öğrenen sözlüğe kanıt + ölçüm (yalnız geliştiricide, S186; 3 Kasım)
 bolum("notlar")  # aktarici/notlar.py — Notlar defteri: toplantı yokken kutu, soru asistana yazılı (v0.117.0, S136)
 bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, toplantılarda arama, dökümü panoda okuma (v0.116.0)
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)

@@ -329,7 +329,8 @@ def ogren_ad_alani(oh=True):
     sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("_ad_anahtar", "_ad_mesafe"))
            or (isinstance(n, ast.Assign) and any(getattr(t, "id", None) in ("_AD_HARF", "AD_ILK_ESDEGER") for t in n.targets))]
     exec(compile(ast.Module(body=sec, type_ignores=[]), os.path.join(ak, "bas-konus.py"), "exec"), ns)
-    yol = os.path.join(ak, "sozluk-ogren.py"); exec(compile(open(yol, encoding="utf-8").read(), yol, "exec"), ns)
+    for ad in ("sozluk-ogren.py", "sozluk-hakem.py"):  # hakem: yalnız hakem.jsonl kanıtı okunur (burada ağ yok: gelistirici_mi/gemini_anahtar tanımlı değil)
+        yol = os.path.join(ak, ad); exec(compile(open(yol, encoding="utf-8").read(), yol, "exec"), ns)
     if oh: ns["VT_BELLEK"].update(terimler=_vt_terimler(), t=time.time())
     return ns
 def sozluk_ogren_cmd():
