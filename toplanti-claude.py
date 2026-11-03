@@ -77,6 +77,7 @@ sz.add_argument("--birlestir", action="store_true", help="v0.5.2: ayardaki sözl
 sz.add_argument("--ogren", nargs="*", metavar="TOPLANTI", default=None, help="3 Kasım (sözlük 2. aşama): öğrenme döngüsünü çalıştır — toplantı .md adları ya da hiçbiri (son --gun gündeki toplantılar); --kuru ile hiçbir şey yazmaz")
 sz.add_argument("--kuru", action="store_true", help="--ogren: yazmadan (aday defteri, sözlük, döküm, soru dosyası değişmez) — yalnız sayılar ve adaylar terminale")
 sz.add_argument("--ogrenilen", action="store_true", help="öğrenilen kuralları listele (kaynak ogrenme-YYYYMMDD)")
+sz.add_argument("--kullanim", action="store_true", help="4 Kasım (sözlük 4. aşama): terim kullanım kaydını (canli/sozluk-kullanim.json) geçmiş dökümden doldur — dökümler yalnız okunur; --kuru ile kayıt da yazılmaz, yalnız terminale")
 sz.add_argument("--geri-al", dest="geri_al", default=None, metavar="TARIH|ADAY", help="öğrenilen kuralı geri al: aday kimliği (a…) ya da tarih (YYYYMMDD); dökümdeki geriye dönük düzeltme de geri döner")
 ey = sub.add_parser("eylem", help="eylem kuyruğu: ekle <tur> \"başlık\" --ayrinti … | liste | sun | onay <eN,eM|hepsi> [--red] | bekle [--sn] | sonuc eN --durum yapildi|hata --not …")
 ey.add_argument("islem", choices=["ekle", "liste", "sun", "onay", "bekle", "sonuc"]); ey.add_argument("deger", nargs="*")
@@ -338,6 +339,13 @@ def sozluk_ogren_cmd():
     if A.ogrenilen:
         for t in ns["so_ogrenilen"](): print(f"{t.get('aday', '?'):<10} {t.get('kaynak'):<18} {'·'.join(t.get('yanlis', []))} → {t['dogru']}" + (f"   [bağlam: {', '.join(t.get('baglam') or [])}]" if t.get("kip") == "baglam" else ""))
         return
+    if A.kullanim:  # terimler sözlüğün kendi terimleri; yalnız terminale
+        oz, K = ns["so_kullanim_guncelle"](kuru=A.kuru); bugun = datetime.date.today()
+        yas = int(AYAR.get("istem_yasi_gun") or 60); gun = lambda s: (bugun - datetime.date.fromisoformat(s)).days
+        print(f"{'(kuru) ' if A.kuru else ''}{oz['toplanti']} toplantı işlendi · {oz['kayitli']}/{oz['terim']} terim en az bir toplantıda geçti · izlem başlangıcı {K.get('baslangic')}")
+        print(f"son {yas} günde geçmeyen (istemden düşer; elle eklenen ve yeni öğrenilen hariç): {sum(1 for r in K['terimler'].values() if gun(r.get('son') or r.get('ilk') or bugun.isoformat()) > yas)}")
+        for d, r in sorted(K["terimler"].items(), key=lambda x: (-(x[1].get("toplanti_sayisi") or 0), x[0]))[:A.goster]: print(f"  {r.get('toplanti_sayisi', 0):>3} toplantı · son {r.get('son') or '-'}  {d}")
+        return
     if A.geri_al:
         n = ns["so_geri_al"](A.geri_al); print(f"geri alındı: {n} kural" if n else "geri alınacak öğrenilmiş kural yok (aday kimliği a… ya da tarih YYYYMMDD)"); return
     if A.ogren: dosyalar = [os.path.basename(x) if x.endswith(".md") else os.path.basename(x)[:-6] + ".md" for x in A.ogren]
@@ -355,7 +363,7 @@ def sozluk_ogren_cmd():
                   + (f" · deneme kendi {a['dene']['kendi']}/dış {a['dene']['dis']}" if a.get("dene") else "") + (f"\n      \"{a['kanit'][0].get('cumle')}\"" if A.kuru else ""))
 def sozluk_cmd():
     if A.dene: return sozluk_dene_cmd()
-    if A.ogren is not None or A.ogrenilen or A.geri_al: return sozluk_ogren_cmd()
+    if A.ogren is not None or A.ogrenilen or A.geri_al or A.kullanim: return sozluk_ogren_cmd()
     fp = os.path.join(A.dir, "sozluk.json")
     try: d = json.load(open(fp, encoding="utf-8"))
     except FileNotFoundError: d = {"surum": 1, "terimler": []}

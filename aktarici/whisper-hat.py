@@ -287,7 +287,7 @@ def whisper_view():
             "kuyruk": WH_Q.qsize(), "satir": w["satir"], "gecikme_sn": w["gecikme_sn"], "hata": w["hata"],
             "atlanan": w.get("atlanan", 0), "son_sn": w.get("son_sn"), "gecikme_max": w.get("gecikme_max"), "durgun_max": w.get("durgun_max"),
             "yavas": bool(w.get("yavas")), "parca": w.get("parca"), "eski_atlanan": w.get("eski_atlanan"), "birlesen": w.get("birlesen"),
-            "motor": w.get("motor"), "istenen_motor": wh_motor(), "cpp": w.get("cpp"),
+            "motor": w.get("motor"), "istenen_motor": wh_motor(), "cpp": w.get("cpp"), **({"istem": w["istem_ozet"]} if w.get("istem_ozet") else {}),  # 4 Kasım: istem özeti {kip, terim, baglam, yasli} (istem kurulduysa)
             "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
 # 3 Kasım (gerçek Teams denemesi: kullanıcı "Deniz T" + misafir hesabı "Deniz"): eski kural son altyazı konuşmacılarından ilk adı uyanı döndürüyordu; misafir son
 # konuştuysa "ben" o oldu, misafirin soruları kullanıcı sorusu sayıldı (karşı taraf onay kapısı atlandı). Sıra: tam ad (sadeleştirilmiş) → ayardaki adın her sözcüğü
@@ -324,7 +324,27 @@ def ben_satiri(e, kaynak=None):  # → True: satır kullanıcının kendi sözü
 # çok sözcüklü bir terimde zaten geçen tek sözcük ayrıca yazılmaz.
 _TRSD = str.maketrans("İIıŞşĞğÜüÖöÇç", "iiissgguuoocc")
 def _sd(t): return str(t).translate(_TRSD).lower()  # hızlı sadeleştirme (anahtar ve sayım için; sozluk.py sade() sözlük eşlemesi için kalır)
-_ISTEM_ZEL = {"t": 0, "metin": ""}; ISTEM_KAT_ADLARI = ("asistan", "kişi", "gündem", "sık", "ayar", "sözlük")
+# 4 Kasım (sözlük 4. aşama, ayar istem_secim): kullanım kaydı (canli/sozluk-kullanim.json, sozluk-ogren.py so_kullanim_guncelle) varken "sık" ve "sözlük" yerine
+# sözlük terimleri puanla sıralanır (ISTEM_PUAN): bu toplantıda geçti 8 (bir kez geçen terim istemde kalır) · proje dizininde bu toplantının başlık/gündem/kart sözcükleriyle
+# aynı parçada 3 · yakınlık 0–2 (bugün 2, istem_yasi_gun gün önce 0) · sıklık 0–2 (log2(1 + toplantı sayısı) / 2) · ≤ 14 gün önce öğrenilen 2 · elle eklenen 1,5 · yanlış biçimi
+# bilinen 0,5 (eşitlikte eski sıra). Bağlamlı olanlar "bağlam" kategorisinde ayarın önüne. istem_yasi_gun gündür geçmeyen terim istemden düşer (sözlükte kalır, düzeltme sürer);
+# elle eklenen ve yeni öğrenilen yaşlanmaz. Kayıt yoksa (yeni kurulum, beta) ya da ayar kapalıysa (varsayılan, ISTEM_SECIM_VARSAYILAN) eski sıra aynen; kayıt her durumda tutulur.
+# Sıra ters çevrilmez (en önemli en sonda): 4 Kasım ölçümünde tersi tekrar döngüsünü artırdı (arşiv: 2 terim kaybı, 3 boş satır).
+_ISTEM_ZEL = {"t": 0, "metin": ""}; ISTEM_KAT_ADLARI = ("asistan", "kişi", "gündem", "bağlam", "sık", "ayar", "sözlük")
+ISTEM_PUAN = {"canli": 8, "baglam": 3, "yakin": 2, "sik": 2, "yeni": 2, "elle": 1.5, "yanlisli": 0.5}; ISTEM_YASI_GUN = 60; ISTEM_YENI_GUN = 14
+def istem_elle(t): k = str(t.get("kaynak") or ""); return k in BEN_ESKI or k.startswith(("sozluk-genisletme", "elle"))  # kullanıcı ya da geliştirme oturumunun elle eklediği
+def _istem_gun(s, bugun):  # "YYYY-MM-DD" → bugünden kaç gün önce (okunamazsa None)
+    try: return (bugun - datetime.date.fromisoformat(str(s)[:10])).days
+    except (TypeError, ValueError): return None
+def istem_puan(t, kul):  # → (puan, bağlamlı mı, yaşlı mı) — kul: {terimler, bugun, canli, baglam, yas_gun}
+    d = str(t.get("dogru") or ""); k = _sd(d); r = (kul.get("terimler") or {}).get(d) or {}; P = ISTEM_PUAN; bugun = kul["bugun"]
+    kay = str(t.get("kaynak") or ""); og = _istem_gun(f"{kay[8:12]}-{kay[12:14]}-{kay[14:16]}", bugun) if kay.startswith("ogrenme-") else None
+    yeni = og is not None and og <= ISTEM_YENI_GUN; elle = istem_elle(t); canli = k in (kul.get("canli") or ()); bag = k in (kul.get("baglam") or ())
+    g = _istem_gun(r.get("son"), bugun); yas = kul.get("yas_gun") or ISTEM_YASI_GUN
+    p = P["canli"] * canli + P["baglam"] * bag + P["yeni"] * yeni + P["elle"] * elle + P["yanlisli"] * any(_sd(y) != k for y in t.get("yanlis") or [])
+    if g is not None: p += P["yakin"] * max(0.0, 1 - g / yas) + min(P["sik"], math.log2(1 + (r.get("toplanti_sayisi") or 0)) / 2)
+    ref = g if g is not None else _istem_gun(r.get("ilk"), bugun)  # hiç geçmediyse izlemin başladığı gün
+    return p, canli or bag, not (elle or yeni or canli or bag) and ref is not None and ref > yas
 def _istem_kisi(ad):  # katılımcı satırından yalın ad: parantez/köşeli parantez, e-posta ekleri atılır; en az 2 harf
     ad = re.sub(r"[\(\[][^)\]]*[\)\]]", " ", str(ad or "")); ad = re.sub(r"\S+@\S+", " ", ad); ad = " ".join(ad.replace("|", " ").split()).strip(" ,;-")
     return ad if len(re.sub(r"[^A-Za-zÇĞİÖŞÜçğıöşü]", "", ad)) >= 2 and len(ad) <= 40 else ""
@@ -349,7 +369,7 @@ def _istem_dokumler():  # son 3 toplantı dökümünün sonu (sadeleştirilmiş)
     _ISTEM_ZEL["metin"] = m; return m
 def _onceki_istem(s):  # isteme giden önceki metin kopyası: binlik ayraçlı sayı ayraçsız ("290.000" → "290000"); döküm satırı değişmez. Whisper "290.000" görünce "%83" yerine "%83.000" gibi sayı uyduruyordu (13:09 toplantısı, 3 Kasım)
     return re.sub(r"(?<![\d.])\d{1,3}(?:\.\d{3})+(?!\d)(?!\.\d)", lambda m: m.group(0).replace(".", ""), s or "")
-def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben=""):
+def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben="", kul=None):
     # → [(kategori, terim)] önem sırasında (yukarıdaki kural). Saf işlev: dış durum almaz (test/istem-sira.py). ter: sözlük terimleri; ag: gündem sözlüğü;
     # hz: hazır kartlar; ks: kişilikler [{ad, gorunen_ad, hitap}]; kisiler: bu toplantının ad listesi (öncelik sırasıyla); ayar_ek: sabit + ayar terimleri.
     cikti, anahtar, sozcuk = [], set(), set()
@@ -381,17 +401,27 @@ def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben=""):
         if _sd(d) in bu: ekle("gündem", d)
     for m in re.findall(r"[A-ZÇĞİÖŞÜ][a-zçğıöşü]+[A-ZÇĞİÖŞÜ]\w*|[A-ZÇĞİÖŞÜ]{2,}\w*|\w*\d\w*[A-Za-zÇĞİÖŞÜçğıöşü]\w*", " ".join([str(ag.get("title") or "")] + [str(x) for x in ag.get("items") or []])):
         if len(m) >= 3 and not re.fullmatch(r"\d+[A-Za-z]{0,2}", m): ekle("gündem", m)
+    yanlisli = lambda t: any(_sd(y) != _sd(t.get("dogru") or "") for y in t.get("yanlis") or [])  # yanlış biçimi yalnız harf/aksan farkı olan: Whisper aslında doğru yazıyor
+    if kul is not None:  # 4 Kasım: kullanım kaydı var — puanlı seçim ve yaşlandırma (yukarıda); kul["yasli"] = yaşlandığı için dışarıda kalan terim sayısı
+        pu = [(istem_puan(t, kul), i, d) for i, (d, t) in enumerate(adaylar)]; pu.sort(key=lambda x: (-x[0][0], not kullanici(adaylar[x[1]][1]), not yanlisli(adaylar[x[1]][1]), x[1]))
+        kul["yasli"] = sum(1 for (p, b, y), _, d in pu if y and _sd(d) not in anahtar)
+        for (p, b, y), _, d in pu:
+            if b: ekle("bağlam", d)
+        for d in ayar_ek: ekle("ayar", d)
+        for (p, b, y), _, d in pu:
+            if not y: ekle("sözlük", d)
+        return cikti
     sayi = lambda d: dokum.count(_sd(d)) if dokum and len(d) >= 3 else 0
     for _, d, _t in sorted(((sayi(d), d, t) for d, t in adaylar if sayi(d) > 0), key=lambda x: (-x[0], not kullanici(x[2]))): ekle("sık", d)
     for d in ayar_ek: ekle("ayar", d)
-    yanlisli = lambda t: any(_sd(y) != _sd(t.get("dogru") or "") for y in t.get("yanlis") or [])  # yanlış biçimi yalnız harf/aksan farkı olan: Whisper aslında doğru yazıyor
     for d, t in sorted(adaylar, key=lambda x: (not kullanici(x[1]), not yanlisli(x[1]))): ekle("sözlük", d)
     return cikti
 def istem_kat_ozet(dusen, tok=None):  # günlük eki: " · 180 token · kişi 12/12 · asistan 6/6 · …" (düşenler sondan; kategoriler sırayla dolar)
     kat = STATE["whisper"].get("istem_kat") or []; kalan = sum(n for _, n in kat) - dusen; ek = []
     for k, n in kat:
         g = max(0, min(n, kalan)); kalan -= g; ek.append(f"{k} {g}/{n}")
-    return (f" · {tok} token" if tok else "") + "".join(" · " + x for x in ek)
+    oz = STATE["whisper"].get("istem_ozet") or {}
+    return (f" · {tok} token" if tok else "") + "".join(" · " + x for x in ek) + (f" · seçim: bağlam {oz.get('baglam', 0)}, yaşlı {oz.get('yasli', 0)} dışarıda" if oz.get("kip") == "secim" else "")
 _KISALTMA = {"mtime": None, "liste": []}
 def sozluk_kisaltmalari():
     # R17 (3 Kasım): işçi tamamı büyük harfli Türkçe çıktıyı küçültür ("BÜPÇE KAÇ LİRA?" → "Büpçe kaç lira?") ve yalnız istemde geçen büyük harfli kısaltmaları korur;
@@ -406,6 +436,56 @@ def sozluk_kisaltmalari():
     ks = {w.strip(".,:;!?…()\"'") for t in ter for w in str(t.get("dogru") or "").split()}
     _KISALTMA.update(mtime=m, liste=sorted(w for w in ks if len(w) >= 2 and w.isalpha() and w.isupper()))
     return _KISALTMA["liste"]
+_ISTEM_KUL = {"mt": None, "kayit": None, "canli": (None, 0, frozenset()), "baglam": (None, frozenset())}
+def _istem_kayit():  # canli/sozluk-kullanim.json (dosya değişince yeniden); yok ya da bozuksa None → eski sıra
+    fp = os.path.join(BASE, "sozluk-kullanim.json")
+    try: m = os.path.getmtime(fp)
+    except OSError: _ISTEM_KUL.update(mt=None, kayit=None); return None
+    if m != _ISTEM_KUL["mt"]:
+        try: k = json.load(open(fp, encoding="utf-8")); k = k if isinstance(k, dict) and isinstance(k.get("terimler"), dict) else None
+        except Exception: k = None
+        _ISTEM_KUL.update(mt=m, kayit=k)
+    return _ISTEM_KUL["kayit"]
+def _istem_canli(ter):  # bu toplantıda şimdiye kadar geçen sözlük terimleri (sade): süren toplantının .jsonl metni, 30 sn önbellek (dosya değişmediyse yeniden okunmaz)
+    ak = aktif_dosya() if "aktif_dosya" in globals() else None; o = _ISTEM_KUL["canli"]
+    if not ak: return frozenset()
+    fp = os.path.join(BASE, ak[:-3] + ".jsonl")
+    try: m = os.path.getmtime(fp)
+    except OSError: return frozenset()
+    if o[0] == (ak, m) or (o[0] and o[0][0] == ak and time.time() - o[1] < 30): return o[2]
+    try: metin = " " + " ".join(re.findall(r"[0-9a-z]+", _sd(" ".join(str(json.loads(l).get("text") or "") for l in open(fp, encoding="utf-8", errors="replace") if l.startswith("{"))))) + " "
+    except Exception: metin = " "
+    g = frozenset(_sd(t.get("dogru") or "") for t in ter if (lambda k: k and f" {k} " in metin)(" ".join(re.findall(r"[0-9a-z]+", _sd(t.get("dogru") or "")))))
+    _ISTEM_KUL["canli"] = ((ak, m), time.time(), g); return g
+def _istem_baglam(ter, ag, hz):  # proje dizininde (dökümler hariç) bu toplantının başlık/gündem/kart sözcükleriyle aynı parçada geçen sözlük terimleri; bağlam değişince bir sorgu (~50 ms)
+    soz = sorted({w for w in re.findall(r"[0-9a-z]+", _sd(" ".join([str(ag.get("title") or "")] + [str(x) for x in ag.get("items") or []] + [str(k.get("metin") or "") for k in hz if isinstance(k, dict)])))
+                  if len(w) >= 5 and not w.isdigit() and w not in ISTEM_BAGLAM_DISI})[:24]
+    a = tuple(soz)
+    if _ISTEM_KUL["baglam"][0] == a: return _ISTEM_KUL["baglam"][1]
+    g = frozenset()
+    if soz and "_so_dizin" in globals():
+        c = _so_dizin()
+        if c is not None:
+            try:
+                rows = c.execute("SELECT p.metin FROM ara JOIN parca p ON p.id = ara.rowid JOIN dosya d ON d.yol = p.yol WHERE ara MATCH ? AND coalesce(d.gizli, 0) = 0 AND d.tur NOT IN (?, ?, ?) ORDER BY rank LIMIT 60",
+                                 ("n : (" + " OR ".join(f'"{w}"' for w in soz) + ")",) + SO_BELGE_DISI).fetchall()
+                metin = " " + " ".join(re.findall(r"[0-9a-z]+", _sd(" ".join(r[0] or "" for r in rows)))) + " "
+                g = frozenset(_sd(t.get("dogru") or "") for t in ter if (lambda k: k and f" {k} " in metin)(" ".join(re.findall(r"[0-9a-z]+", _sd(t.get("dogru") or "")))))
+            except Exception: pass
+            finally: c.close()
+    _ISTEM_KUL["baglam"] = (a, g); return g
+ISTEM_BAGLAM_DISI = set("toplanti toplantisi gundem deneme durum hafta haftalik gorusme bilgi konusu konular hakkinda genel yeniden guncel guncelleme".split())
+def istem_kullanim(ter, ag, hz, kisiler):  # → istem_siralama'nın kul'u ya da None (ayar istem_secim kapalı ya da kayıt yok: eski sıra)
+    if not AYAR.get("istem_secim", ISTEM_SECIM_VARSAYILAN): return None
+    k = _istem_kayit()
+    if k is None: return None
+    ki = " " + " ".join(re.findall(r"[0-9a-z]+", _sd(" ".join(str(x) for x in kisiler if x)))) + " "  # katılımcı listesinde geçen sözlük terimi de bağlam
+    try: bag = _istem_baglam(ter, ag, hz) | frozenset(_sd(t.get("dogru") or "") for t in ter if (lambda k: k and f" {k} " in ki)(" ".join(re.findall(r"[0-9a-z]+", _sd(t.get("dogru") or "")))))
+    except Exception: bag = frozenset()
+    try: cn = _istem_canli(ter)
+    except Exception: cn = frozenset()
+    return {"terimler": k["terimler"], "bugun": datetime.date.today(), "canli": cn, "baglam": bag, "yas_gun": int(AYAR.get("istem_yasi_gun") or ISTEM_YASI_GUN)}
+ISTEM_SECIM_VARSAYILAN = False  # 4 Kasım ölçümü: geçmiş dökümde kapsama arttı (ilk geçiş %75 → %85) ama seste terim isabeti artmadı (sentetik 76/81 = 76/81, arşiv 62/62 = 62/62) → ayarla açılır
 def istem_metni():
     # Whisper'a önceden verilen terimler (initial_prompt), önem sırasıyla (istem_siralama). Sınır belirteçle işçide (whisper-isci.py istem_kur):
     # Whisper 223 belirteci aşan istemin BAŞINI atıyordu — en önemli terimler düşüyordu (7 Ekim ölçümü: 176 + önceki ~45).
@@ -421,9 +501,11 @@ def istem_metni():
         if m.get("toplantida") and time.time() - m.get("t", 0) < 120: kisiler += list(m.get("katilimcilar") or [])
         kisiler += [kume_adi(k) for k in list(KUME_AD)] + [k for _, k in reversed(ALTYAZI_SON[-60:]) if k and k != "?"]
     except Exception: pass
-    sira = istem_siralama(ter, ag, hz, kisilikler(), kisiler, ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []), _istem_dokumler(), ben_adi())  # sabitler: alanın sık sistem adları
+    kul = istem_kullanim(ter, ag, hz, kisiler)
+    sira = istem_siralama(ter, ag, hz, kisilikler(), kisiler, ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []), _istem_dokumler(), ben_adi(), kul)  # sabitler: alanın sık sistem adları
     sayac = collections.Counter(k for k, _ in sira)
     STATE["whisper"]["istem_kat"] = [(k, sayac[k]) for k in ISTEM_KAT_ADLARI if sayac.get(k)]
+    STATE["whisper"]["istem_ozet"] = {"kip": "secim" if kul is not None else "eski", "terim": len(sira), "baglam": sayac.get("bağlam", 0), "yasli": (kul or {}).get("yasli", 0)}
     STATE["whisper"]["istem_kisi"] = [t for k, t in sira if k == "kişi"][:40]  # işçi: istemdeki kişi adı tek başına söylenince istem yankısı sayılmasın
     return (", ".join(t for _, t in sira))[:3000] + "."
 _ISCI = {"p": None, "satirlar": None, "kilit": threading.Lock(), "thread": None, "baslik": None, "zs": 0, "yk": 0, "sonraki": 0.0}

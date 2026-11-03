@@ -498,6 +498,47 @@ def so_geri_al(hedef):  # hedef: aday kimliği (a…) ya da tarih (YYYYMMDD) →
 def _so_yeni7(): s = f"ogrenme-{datetime.date.today() - datetime.timedelta(days=7):%Y%m%d}"; return sum(1 for t in so_ogrenilen() if str(t.get("kaynak")) >= s)  # son 7 günde öğrenilen (pano satırı)
 def so_ogrenilen():
     return [t for t in _so_json(_so_yol("sozluk.json"), {}).get("terimler", []) if str(t.get("kaynak") or "").startswith("ogrenme-")]
+# --- terim kullanım kaydı (sözlük 4. aşama, 4 Kasım) → canli/sozluk-kullanim.json: sözlük terimi → {son: son geçtiği toplantının günü, toplanti_sayisi, ilk: izlemin başladığı gün}.
+# Whisper istemi (whisper-hat.py istem_siralama) yakın/sık kullanılanı öne alır, istem_yasi_gun gündür geçmeyeni istemden düşürür. Sayılır: doğru biçim dökümün metninde (text =
+# sözlüğün düzelttiği hâl; konuşmacı sütunu sayılmaz). Yalnız sozluk.json terimleri — kayıt veritabanı listesi (VT_BELLEK) girmez (toplu kopya yok). Biten toplantı bir kez işlenir.
+# İlk doldurmada (dosya yok) var olan terimlerin izlemi en eski dökümün gününden başlar; sonradan sözlüğe giren terimin izlemi girdiği gün (öğrenilende öğrenme günü).
+SO_KULLANIM = "sozluk-kullanim.json"; SO_KUL_ISLENEN_EN_COK = 3000
+def _so_terim_k(d): return " ".join(re.findall(r"[0-9a-z]+", sade(str(d or "")).lower()))
+def so_gecen_terimler(ter, recs):  # → toplantının metninde geçen doğru biçimler (sözlük terimleri)
+    m = " " + " ".join(_so_terim_k(r.get("text")) for r in recs) + " "
+    return sorted({t["dogru"] for t in ter if t.get("dogru") and (lambda k: k and f" {k} " in m)(_so_terim_k(t["dogru"]))})
+def so_kullanim_guncelle(dosyalar=None, kuru=False, simdi=None):  # → (özet, kayıt); dosyalar None: işlenmemiş biten toplantıların hepsi (ad sırasıyla = zaman sırası)
+    simdi = simdi or time.time(); fp = _so_yol(SO_KULLANIM); K = _so_json(fp, None); ilk_kez = not isinstance(K, dict) or not isinstance(K.get("terimler"), dict)
+    if ilk_kez: K = {"surum": 1, "terimler": {}, "islenen": {}}
+    ter = [t for t in _so_json(_so_yol("sozluk.json"), {}).get("terimler", []) if isinstance(t, dict) and t.get("dogru")]
+    ak = aktif_dosya() if "aktif_dosya" in globals() else None; bugun = datetime.date.fromtimestamp(simdi).isoformat()
+    tum = sorted(f for f in os.listdir(BASE) if SO_MD_RX.match(f))
+    if dosyalar is None:
+        dosyalar = []
+        for f in tum:
+            if f == ak or f in K["islenen"]: continue
+            try: mt = os.path.getmtime(_so_yol(f[:-3] + ".jsonl"))
+            except OSError: continue
+            if simdi - mt >= 60: dosyalar.append(f)
+    if ilk_kez: K["baslangic"] = (tum[0][:10] if tum else bugun)
+    for t in ter:  # izlem başlangıcı (yaşlandırma hiç geçmeyen terimde buna bakar)
+        r = K["terimler"].setdefault(t["dogru"], {"toplanti_sayisi": 0}); kay = str(t.get("kaynak") or "")
+        if "ilk" not in r: r["ilk"] = K["baslangic"] if ilk_kez else (f"{kay[8:12]}-{kay[12:14]}-{kay[14:16]}" if re.fullmatch(r"ogrenme-\d{8}", kay) else bugun)
+    n = 0; yeni = set()
+    for md in sorted(set(dosyalar)):
+        if md in K["islenen"]: continue
+        gun = md[:10]; n += 1
+        for d in so_gecen_terimler(ter, _so_satirlar(md)):
+            r = K["terimler"].setdefault(d, {"toplanti_sayisi": 0, "ilk": gun}); r["toplanti_sayisi"] = r.get("toplanti_sayisi", 0) + 1; yeni.add(d)
+            if not r.get("son") or gun > r["son"]: r["son"] = gun
+        K["islenen"][md] = bugun
+    if len(K["islenen"]) > SO_KUL_ISLENEN_EN_COK: K["islenen"] = dict(sorted(K["islenen"].items())[-SO_KUL_ISLENEN_EN_COK:])
+    sozde = {t["dogru"] for t in ter}; K["terimler"] = {d: r for d, r in K["terimler"].items() if d in sozde}  # sözlükten çıkan terim kayıttan da çıkar
+    K["guncelleme"] = bugun
+    if not kuru and (n or ilk_kez or len(K["terimler"]) != len(sozde)): _so_yaz(fp, json.dumps(K, ensure_ascii=False, indent=0), 0o600)
+    kul = sum(1 for r in K["terimler"].values() if r.get("son"))
+    if n: print(f"SÖZLÜK KULLANIM: {'(kuru) ' if kuru else ''}{n} toplantı işlendi · {len(yeni)} terim geçti · {kul}/{len(K['terimler'])} terimin kaydı var")
+    return {"toplanti": n, "gecen": len(yeni), "kayitli": kul, "terim": len(K["terimler"]), "ilk_kez": ilk_kez}, K
 # --- döngü -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def so_calistir(dosyalar=None, kuru=False, gun=SO_GECMIS_GUN):  # → özet {toplanti, aday, yeni, kabul, ret{neden}, soruldu, bekliyor, adaylar}
     t0 = time.time(); D = _so_defter_oku(); durum = _so_json(_so_yol(SO_DURUM), {}); durum.setdefault("islenen", {})
@@ -566,6 +607,8 @@ def _so_dongu():
         except OSError: pass
         try:
             if toplanti_acik() or kaynak_dar(): continue  # canlı toplantıda ek yük yok
+            try: so_kullanim_guncelle()  # 4 Kasım: terim kullanım kaydı (Whisper istemi seçimi) — işlenmemiş biten toplantılar
+            except Exception as e: print(f"SÖZLÜK KULLANIM: hata ({e.__class__.__name__}: {e})")
             bek = so_dongu_gerek()
             if bek is not None: so_calistir(bek)
         except Exception as e: print(f"SÖZLÜK ÖĞRENME: hata ({e.__class__.__name__}: {e})")
