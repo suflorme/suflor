@@ -1341,7 +1341,7 @@ def takvim_olay(oid): return TAKVIM_TAM.get(oid) or TAKVIM_PAY.get(oid)  # yaln�
 # Kart katmanı (30 Ekim): menü uygulaması kartları ekranın alt ortasında tek tek kutu olarak gösterir. Açık sayılır: ayar kart_katmani
 # False değil ve menü uygulaması son 60 sn'de yokladı (/cards uzun yoklaması 25 sn'de bir yenilenir). Açıkken eklenti şeridi ve Mac paneli listeyi göstermez.
 def kart_katmani_acik(): return AYAR.get("kart_katmani") is not False and time.time() - (STATE.get("_menu_yokluyor") or 0) < 60
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1486,6 +1486,7 @@ def son_ekle(p):
     with LOCK:
         _log("son-toplantilar.jsonl", r); SON.append(r); del SON[:-20]
     if r["dosya"]: toplanti_bitir("özet hazır", r["dosya"])  # Faz B: özet hazır = toplantı bitti (pano hemen "Son toplantılar"a geçer)
+    if r.get("yapi") and "so_tetik" in globals(): so_tetik()  # 3 Kasım: öğrenen sözlük — yapı dosyasındaki düzeltmeler (toplantı bitince işlenir)
     print(f"ÖZET: hazır" + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""))
     bildirim("Suflor.me", _t("Toplantı özeti hazır", "Meeting summary ready"),
              (r["baslik"] or os.path.basename(ozet)) + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""), son=r["id"])
@@ -1676,6 +1677,7 @@ bolum("posta")  # aktarici/posta.py — E-posta: Mac Mail'in yerel dizininden so
 bolum("moderator")  # aktarici/moderator.py — Toplantı moderatörü: gündem, söz, özet ve karar (v0.83.0, S93)
 bolum("otonom")  # aktarici/otonom.py — Toplantıda otonom katılım: seslenince cevap, itiraz penceresi, söz sırası (S68)
 bolum("defter")  # aktarici/defter.py — Toplantı defteri: biten toplantıyı bas-konuşla sorma (S48)
+bolum("sozluk-ogren")  # aktarici/sozluk-ogren.py — Kendi kendine öğrenen sözlük: toplantı sonu kanıt → aday defteri → kabul kapısı; kayıt veritabanı terimleri bellekte (/vt-bellek; 3 Kasım)
 bolum("notlar")  # aktarici/notlar.py — Notlar defteri: toplantı yokken kutu, soru asistana yazılı (v0.117.0, S136)
 bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, toplantılarda arama, dökümü panoda okuma (v0.116.0)
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
@@ -2054,6 +2056,8 @@ class H(BaseHTTPRequestHandler):
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
             s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["kulaklik_yok"] = kulaklik_yok_view() if "kulaklik_yok_view" in globals() else None; s["kaynak"] = kaynak_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             s["kart_katmani"] = kart_katmani_acik()  # kartları Mac'in kart katmanı gösteriyor: şerit ve panel listeyi göstermez
+            so = so_view()  # 3 Kasım: öğrenen sözlük — son çalışma, öğrenilen, bekleyen (döngü hiç çalışmadıysa alan yok)
+            if so: s["sozluk_ogrenme"] = so
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
             # 3 Kasım (ardışık toplantı): aktif = canlı toplantı (algılandı/sürüyor) — pano toplantı ekranı; gosterim = görünen dosya (süren, bitiyor'daki ya da
             # özeti gelmemiş yeni biten — eski "aktif" anlamı; kartlar, kanıt, taslak buna bağlı). Bitiyor/bitti'de pano takvime ve Başlat'a döner.
@@ -2084,6 +2088,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/agenda": return self._json(agenda())
         if yol == "/dogrula": return self._json(dogrula_istek("yenile=1" in self.path))  # Faz D: Kurulumu denetle (aktarici/saglik.py)
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
+        if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
         if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)
             from urllib.parse import urlsplit, parse_qs
             return self._json(posta_uslup((parse_qs(urlsplit(self.path).query).get("kim") or [""])[0]))  # v0.116.0: Toplantılarda ara, Dökümler (aktarici/arsiv.py)
@@ -2182,6 +2187,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(soru_komut(p))
         if self.path == "/son-toplanti":  # toplantı sonu özeti hazır (toplanti-claude.py ozet-hazir) — kart gibi anahtarla
             return self._json(son_ekle(p))
+        if self.path == "/vt-bellek": return self._json(vt_bellek_al(p))  # 3 Kasım: kayıt veritabanının adları ve terimleri (vt-izle / vt-mcp) — yalnız anahtarlı (geçiş listesinde yok), bellekte
         if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(brifing_iste(p))

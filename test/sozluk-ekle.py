@@ -23,7 +23,9 @@ json.dump({"surum": 2, "terimler": [
     {"dogru": "Yankıhat", "yanlis": ["yangı hat"], "kip": "duzelt", "baglam": [], "kaynak": "otomatik"},
     {"dogru": "Kasaburç", "yanlis": [], "kip": "duzelt", "kaynak": "proje-karti", "not": "kasa"},
     {"dogru": "StokKöprü", "yanlis": [], "kip": "duzelt", "kaynak": "proje-karti", "not": ""},
-    {"dogru": "Sonnet", "yanlis": ["Soneme"], "kip": "duzelt", "baglam": [], "kaynak": "kullanici"}]}, open(FP, "w"), ensure_ascii=False)
+    {"dogru": "Sonnet", "yanlis": ["Soneme"], "kip": "duzelt", "baglam": [], "kaynak": "kullanici"},
+    {"dogru": "Pazaryeri Pro", "yanlis": ["pazaryer pro"], "kip": "duzelt", "baglam": [], "kaynak": "ogrenme-20261103", "aday": "a1b2c3d4"},  # 3 Kasım: öğrenen sözlük
+    {"dogru": "Dravento", "yanlis": ["Drawento"], "kip": "baglam", "baglam": ["siparis"], "kaynak": "ogrenme-20261102", "aday": "a5e6f7a8"}]}, open(FP, "w"), ensure_ascii=False)
 
 kalan = 0
 def sozluk(*arg):
@@ -46,5 +48,9 @@ bak("--birlestir kullanıcı terimleri yerinde", {"Yankıhat", "Sonnet"} <= set(
 bak("--birlestir dış sözlükten otomatik terim kurar", "Pazaryeri Pro" in dogrular(ts, "otomatik"))
 bak("--birlestir kaynaktan kalkan otomatik terim kalkar", "Yankıhat" not in dogrular(ts, "otomatik"))
 bak("proje kartı terimi tek kez", len([t for t in ts if t["dogru"] == "Kasaburç"]) == 1)
+og = [t for t in ts if str(t.get("kaynak", "")).startswith("ogrenme-")]
+bak("--birlestir öğrenilen kuralları korur (kaynak, aday, kip, bağlam)", sorted((t["dogru"], t["aday"], t["kip"]) for t in og) == [("Dravento", "a5e6f7a8", "baglam"), ("Pazaryeri Pro", "a1b2c3d4", "duzelt")]
+    and next(t for t in og if t["dogru"] == "Dravento")["baglam"] == ["siparis"])
+bak("--birlestir: öğrenilen biçim otomatik terimde yinelenmez", not any("pazaryer pro" in t["yanlis"] for t in ts if t.get("kaynak") == "otomatik"))
 print("GEÇTİ" if not kalan else f"KALDI: {kalan}")
 sys.exit(1 if kalan else 0)

@@ -15,6 +15,20 @@ def _nc(c):
     import unicodedata; d = unicodedata.normalize("NFKD", c)
     return (d[0] if d else c).lower()[:1] or " "
 def sade(t): return "".join(_nc(c) for c in t)
+def _kural_derle(t):  # tek sözlük girdisi → [(kalıp, doğru, sade biçim, kip, bağlam)]; 3 Kasım: öğrenen sözlük (sozluk-ogren.py) tek kuralı da aynı yoldan derler
+    dogru = str(t.get("dogru") or "").strip()
+    if not dogru: return []
+    bag = [sade(b) for b in t.get("baglam") or [] if str(b).strip()]; kur = []
+    for y in t.get("yanlis") or []:
+        ys = sade(str(y)).strip()
+        if len(ys) < 3 or ys == sade(dogru): continue
+        govde = r"[\s\-]+".join(re.escape(w) for w in ys.split())
+        # kısa biçimde (< 5 harf) ya da son kelimesi < 3 harf olan çok kelimeli biçimde yalnız KESME İŞARETLİ ek kabul edilir ("ozzy'e", "vaut ar'den"): kesmesiz ek yanlış eşleşme
+        # üretiyordu (v0.7.3: iki kısa sözcüklü biçim bir sonraki sözcüğün başını ek sanıp yanlış düzeltti, 20 dökümde 14 kez); kesme işareti ek olduğunu kesinleştirir (3 Kasım).
+        # Uzun biçimde kesmesiz ek de kabul (git hub'da / githubda).
+        ek = r"(?P<ek>'?[a-z]{1,6})?" if len(ys) >= 5 and len(ys.split()[-1]) >= 3 else r"(?P<ek>'[a-z]{1,6})?"
+        kur.append((re.compile(r"(?<![0-9a-z])" + govde + ek + r"(?![0-9a-z])"), dogru, ys, t.get("kip", "duzelt"), bag))
+    return kur
 def sozluk_yukle():
     fp = os.path.join(BASE, "sozluk.json")
     try: m = os.path.getmtime(fp)
@@ -22,28 +36,15 @@ def sozluk_yukle():
     if m == SOZ["mtime"]: return
     try: terimler = json.load(open(fp, encoding="utf-8")).get("terimler", [])
     except Exception as e: print(f"SÖZLÜK: okunamadı ({e}) — önceki hâl kullanılıyor"); SOZ["mtime"] = m; return
-    kur = []
-    for t in terimler:
-        dogru = str(t.get("dogru") or "").strip()
-        if not dogru: continue
-        bag = [sade(b) for b in t.get("baglam") or [] if str(b).strip()]
-        for y in t.get("yanlis") or []:
-            ys = sade(str(y)).strip()
-            if len(ys) < 3 or ys == sade(dogru): continue
-            govde = r"[\s\-]+".join(re.escape(w) for w in ys.split())
-            # kısa biçimde (< 5 harf) ya da son kelimesi < 3 harf olan çok kelimeli biçimde yalnız KESME İŞARETLİ ek kabul edilir ("ozzy'e", "vaut ar'den"): kesmesiz ek yanlış eşleşme
-            # üretiyordu (v0.7.3: iki kısa sözcüklü biçim bir sonraki sözcüğün başını ek sanıp yanlış düzeltti, 20 dökümde 14 kez); kesme işareti ek olduğunu kesinleştirir (3 Kasım).
-            # Uzun biçimde kesmesiz ek de kabul (git hub'da / githubda).
-            ek = r"(?P<ek>'?[a-z]{1,6})?" if len(ys) >= 5 and len(ys.split()[-1]) >= 3 else r"(?P<ek>'[a-z]{1,6})?"
-            kur.append((re.compile(r"(?<![0-9a-z])" + govde + ek + r"(?![0-9a-z])"), dogru, ys, t.get("kip", "duzelt"), bag))
+    kur = [k for t in terimler for k in _kural_derle(t)]
     kur.sort(key=lambda k: -len(k[2]))  # uzun biçim önce ("shoppy fay" "fay"dan önce)
     SOZ.update(mtime=m, kurallar=kur); print(f"SÖZLÜK: {len(terimler)} terim, {len(kur)} biçim yüklendi")
-def sozluk_uygula(text, dosya):
-    # dönen: (düzeltilmiş metin, [{"bicim", "dogru", "durum": "duzeltildi"|"supheli"}])
-    sozluk_yukle()
-    if not SOZ["kurallar"]: return text, []
+def sozluk_uygula(text, dosya, kurallar=None):
+    # dönen: (düzeltilmiş metin, [{"bicim", "dogru", "durum": "duzeltildi"|"supheli"}]); kurallar: _kural_derle çıktısı (verilmezse sözlüğün tamamı)
+    if kurallar is None: sozluk_yukle(); kurallar = SOZ["kurallar"]
+    if not kurallar: return text, []
     pencere = sade(text); out, olay = text, []
-    for rx, dogru, ys, kip, bag in SOZ["kurallar"]:
+    for rx, dogru, ys, kip, bag in kurallar:
         n = sade(out); parcalar, son = [], 0
         for m in rx.finditer(n):
             if n[m.start():m.end()].replace("'", "").startswith(sade(dogru).replace(" ", "")): continue  # "discont"+"inued" zaten doğru

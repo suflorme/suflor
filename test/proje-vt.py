@@ -118,8 +118,21 @@ for m in ({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}, {"j
     p.stdin.write(json.dumps(m) + "\n"); p.stdin.flush(); cevap = p.stdout.readline()
 p.stdin.close(); p.wait(timeout=10)
 ok("MCP vt_sor (Konuş'un aracı) proje veritabanını okur", "Gebze" in cevap, cevap[:200])
-ad = json.load(open(os.path.join(U, "canli", "vt-adlar.json"))).get("adlar") if os.path.exists(os.path.join(U, "canli", "vt-adlar.json")) else []
-ok("kişi adları Konuş ad düzeltmesine (vt-adlar.json) karttan", "Ayşe Yılmaz" in ad and "Ayşe" in ad, str(ad))
+# 3 Kasım: adlar dosyaya yazılmaz, aktarıcıya POST /vt-bellek ile gider (bellekte) — sahte aktarıcı gelenleri tutar
+import http.server, threading
+import importlib.util as _iu; _bp = _iu.spec_from_file_location("bosport", os.path.join(os.path.dirname(os.path.abspath(__file__)), "bosport.py")); _bm = _iu.module_from_spec(_bp); _bp.loader.exec_module(_bm); bos_port = _bm.bos_port  # test/ yola eklenmez (test/baglam.py baglam'ı gölgeler)
+GELEN = []
+class _S(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_POST(self):
+        GELEN.append(json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")); b = b'{"ok": true}'
+        self.send_response(200); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+SP = bos_port(8776); SRV = http.server.ThreadingHTTPServer(("127.0.0.1", SP), _S); threading.Thread(target=SRV.serve_forever, daemon=True).start()
+p = subprocess.Popen([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "--dir", os.path.join(U, "canli"), "--relay", f"http://127.0.0.1:{SP}", "vt-mcp"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n"); p.stdin.flush(); p.stdout.readline(); p.stdin.close(); p.wait(timeout=10); SRV.shutdown()
+ad = (GELEN[-1] if GELEN else {}).get("adlar") or []
+ok("kişi adları Konuş ad düzeltmesine (POST /vt-bellek, dosya yok) karttan", "Ayşe Yılmaz" in ad and "Ayşe" in ad and not os.path.exists(os.path.join(U, "canli", "vt-adlar.json")), str(ad))
 kod_tc = open(os.path.join(KOD, "toplanti-claude.py"), encoding="utf-8").read()
 ns = {"os": os, "re": re, "json": json, "sys": sys, "time": time, "PROJE": P, "AYAR": json.load(open(AY))}
 exec(kod_tc[kod_tc.index("VT = AYAR.get(\"veritabani\")"):kod_tc.index("VT_GIZLI = re.compile")], ns)

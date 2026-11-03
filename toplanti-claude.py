@@ -73,7 +73,11 @@ sz.add_argument("--not", dest="aciklama", default="")
 sz.add_argument("--dene", action="store_true", help="3 Kasım: geçmiş dökümde iki sözlüğü/sözlük kodunu karşılaştır (salt okuma; yalnız terminale yazar) — --gun N, --sozluk <yeni.json>, --eski-sozluk <eski.json>, --eski-kod <eski sozluk.py>, --yeni-kod <yeni sozluk.py>")
 sz.add_argument("--gun", type=int, default=30); sz.add_argument("--sozluk", default=None); sz.add_argument("--eski-sozluk", default=None)
 sz.add_argument("--eski-kod", default=None); sz.add_argument("--yeni-kod", default=None); sz.add_argument("--goster", type=int, default=20, help="--dene: ilk kaç farklı satır yazılsın")
-sz.add_argument("--birlestir", action="store_true", help="v0.5.2: ayardaki sözlük kaynağından (tsv + xlsx Vendor sekmesi) yeniden kur; --ekle ile eklenenler korunur")
+sz.add_argument("--birlestir", action="store_true", help="v0.5.2: ayardaki sözlük kaynağından (tsv + xlsx Vendor sekmesi) yeniden kur; --ekle ile eklenenler ve öğrenilenler korunur")
+sz.add_argument("--ogren", nargs="*", metavar="TOPLANTI", default=None, help="3 Kasım (sözlük 2. aşama): öğrenme döngüsünü çalıştır — toplantı .md adları ya da hiçbiri (son --gun gündeki toplantılar); --kuru ile hiçbir şey yazmaz")
+sz.add_argument("--kuru", action="store_true", help="--ogren: yazmadan (aday defteri, sözlük, döküm, soru dosyası değişmez) — yalnız sayılar ve adaylar terminale")
+sz.add_argument("--ogrenilen", action="store_true", help="öğrenilen kuralları listele (kaynak ogrenme-YYYYMMDD)")
+sz.add_argument("--geri-al", dest="geri_al", default=None, metavar="TARIH|ADAY", help="öğrenilen kuralı geri al: aday kimliği (a…) ya da tarih (YYYYMMDD); dökümdeki geriye dönük düzeltme de geri döner")
 ey = sub.add_parser("eylem", help="eylem kuyruğu: ekle <tur> \"başlık\" --ayrinti … | liste | sun | onay <eN,eM|hepsi> [--red] | bekle [--sn] | sonuc eN --durum yapildi|hata --not …")
 ey.add_argument("islem", choices=["ekle", "liste", "sun", "onay", "bekle", "sonuc"]); ey.add_argument("deger", nargs="*")
 ey.add_argument("--ayrinti", default="", help="ekle: uygulanacak işin tam hâli (komut; e-postada Kime/Konu/metin; davette kişiler/saat/konu)")
@@ -248,6 +252,8 @@ def sozluk_birlestir(d):
     elle = [t for t in d.get("terimler", []) if elle_mi(t)]
     grup = elle_oncelik(list(grup.values()), elle)
     kart = [t for t in d.get("terimler", []) if t.get("kaynak") == "proje-karti"]  # dış sözlükten değil: yeniden kurmada korunur
+    ogren = [t for t in d.get("terimler", []) if str(t.get("kaynak") or "").startswith("ogrenme-")]  # 3 Kasım: öğrenen sözlüğün kuralları da (geri alma: sozluk --geri-al)
+    grup = elle_oncelik(grup, ogren)
     vendor = []
     try:
         for k, _, m in baglam.xlsx_parcala(SOZ_XLSX):
@@ -257,7 +263,7 @@ def sozluk_birlestir(d):
     return {"surum": 2, "guncelleme": datetime.date.today().isoformat(),
             "aciklama": "Suflor.me özel sözlüğü. duzelt: her geçiş düzeltilir · baglam: yalnız aynı satırda bağlam kelimesi varsa · isaret: düzeltilmez, '?' işareti. Kaynak: ayardaki sozluk_kaynagi (sozluk --birlestir ile yeniden kurulur) + elle eklenenler (kaynak=kullanici).",
             "kaynak_mtime": max(os.path.getmtime(SOZ_TSV), os.path.getmtime(SOZ_XLSX)),
-            "terimler": grup + kart + elle, "vendor": sorted(dict.fromkeys(vendor)), "kisiler": KISILER}
+            "terimler": grup + kart + ogren + elle, "vendor": sorted(dict.fromkeys(vendor)), "kisiler": KISILER}
 # --- Sözlük deneme aracı (3 Kasım, sözlük 1. aşama) ----------------------------------------------------------------------------------------
 # Çekirdek: sozluk_uygulayici(kod_yolu, sozluk_yolu) → (metin → (çıktı, olaylar)); sozluk_dene(satirlar, eski, yeni) → karşılaştırma. 2. aşamadaki "kabul kapısı"
 # (öğrenilen aday kural geçmiş dökümde X satırı değiştiriyorsa reddet) bunları çağırır. Salt okuma: sözlük dosyası geçici klasöre kopyalanır, canlı dosyalara yazılmaz.
@@ -310,8 +316,44 @@ def sozluk_dene_cmd():
     print(f"son {A.gun} gün: {r['satir']} satır · eski {r['eski_duzeltme']} satırı düzeltti, yeni {r['yeni_duzeltme']} · çıktısı FARKLI: {len(r['fark'])}")
     for d, n in sorted(r["terim"].items(), key=lambda x: -x[1]): print(f"  terim {d}: {n} satırda değişim")
     for i, (h, e, y) in enumerate(r["fark"][:A.goster], 1): print(f"[{i}] ham : {h}\n    eski: {e}\n    yeni: {y}")  # yalnız terminal: dökümler kişi adı içerir
+# --- Öğrenen sözlük (3 Kasım, 2. aşama): çekirdek aktarici/sozluk-ogren.py; aktarıcı toplantı bitince kendisi çalıştırır, burada elle / kuru çalıştırma ve geri alma.
+# Ad alanı aktarıcınınki gibi kurulur (import yok): sozluk.py'nin sözlük kısmı + bas-konus.py'den yalnız ses anahtarı işlevleri (ast ile; dosyanın geri kalanı çalışmaz).
+# Kayıt veritabanının terimleri doğrudan okunur (bu süreç Masaüstü izniyle çalışır); belleğe alınır, dosyaya yazılmaz.
+def ogren_ad_alani(oh=True):
+    import ast, threading
+    ak = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici")
+    ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "BASE": A.dir, "AYAR": AYAR, "AYAR_YOL": AYAR_YOL, "LOCK": threading.Lock(), "__name__": "sozluk_ogren"}
+    src = open(os.path.join(ak, "sozluk.py"), encoding="utf-8").read(); exec(compile(src[:src.index('# Sesli "Claude:"')], os.path.join(ak, "sozluk.py"), "exec"), ns)
+    agac = ast.parse(open(os.path.join(ak, "bas-konus.py"), encoding="utf-8").read())
+    sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("_ad_anahtar", "_ad_mesafe"))
+           or (isinstance(n, ast.Assign) and any(getattr(t, "id", None) in ("_AD_HARF", "AD_ILK_ESDEGER") for t in n.targets))]
+    exec(compile(ast.Module(body=sec, type_ignores=[]), os.path.join(ak, "bas-konus.py"), "exec"), ns)
+    yol = os.path.join(ak, "sozluk-ogren.py"); exec(compile(open(yol, encoding="utf-8").read(), yol, "exec"), ns)
+    if oh: ns["VT_BELLEK"].update(terimler=_vt_terimler(), t=time.time())
+    return ns
+def sozluk_ogren_cmd():
+    ns = ogren_ad_alani()
+    if A.ogrenilen:
+        for t in ns["so_ogrenilen"](): print(f"{t.get('aday', '?'):<10} {t.get('kaynak'):<18} {'·'.join(t.get('yanlis', []))} → {t['dogru']}" + (f"   [bağlam: {', '.join(t.get('baglam') or [])}]" if t.get("kip") == "baglam" else ""))
+        return
+    if A.geri_al:
+        n = ns["so_geri_al"](A.geri_al); print(f"geri alındı: {n} kural" if n else "geri alınacak öğrenilmiş kural yok (aday kimliği a… ya da tarih YYYYMMDD)"); return
+    if A.ogren: dosyalar = [os.path.basename(x) if x.endswith(".md") else os.path.basename(x)[:-6] + ".md" for x in A.ogren]
+    else:
+        sinir = time.time() - A.gun * 86400
+        dosyalar = sorted(f for f in os.listdir(A.dir) if ns["SO_MD_RX"].match(f) and os.path.exists(os.path.join(A.dir, f[:-3] + ".jsonl")) and os.path.getmtime(os.path.join(A.dir, f[:-3] + ".jsonl")) >= sinir)
+    oz = ns["so_calistir"](dosyalar, kuru=A.kuru)
+    say = {}
+    for a in oz["adaylar"]: say.setdefault(a["durum"], []).append(a)
+    for d in ("kabul", "soruldu", "bekliyor", "bulunamadi", "ret"):  # yalnız terminal: adaylar kişi adı içerebilir
+        for a in say.get(d, [])[:A.goster]:
+            print(f"[{d}{'/' + a['neden'] if a.get('neden') else ''}] {a['yanlis']} → {a['dogru']} · katman {a.get('katman', '?')} ({a.get('katman_kaynak') or '-'}) · "
+                  f"kanıt {'+'.join(sorted({k['kaynak'] for k in a['kanit']}))} / {len({k['toplanti'] for k in a['kanit'] if k['toplanti']})} toplantı"
+                  + (f" · kip {a.get('kip')}" + (f" [{', '.join(a.get('baglam') or [])}]" if a.get("kip") == "baglam" else "") if d == "kabul" else "")
+                  + (f" · deneme kendi {a['dene']['kendi']}/dış {a['dene']['dis']}" if a.get("dene") else "") + (f"\n      \"{a['kanit'][0].get('cumle')}\"" if A.kuru else ""))
 def sozluk_cmd():
     if A.dene: return sozluk_dene_cmd()
+    if A.ogren is not None or A.ogrenilen or A.geri_al: return sozluk_ogren_cmd()
     fp = os.path.join(A.dir, "sozluk.json")
     try: d = json.load(open(fp, encoding="utf-8"))
     except FileNotFoundError: d = {"surum": 1, "terimler": []}
@@ -782,15 +824,50 @@ def _vt_mt_yaz(dosya):
         with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"mt": _vt_mt(), "kontrol": round(time.time())}, f)
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except OSError: pass
-VT_ADLAR_DOSYA = "vt-adlar.json"  # v0.60.0: kişi ve takma adlar (ayar veritabani.kisiler sorgusunun ilk sütunu, virgüllü) — aktarıcının Konuş ad düzeltmesi için
-def _vt_adlar_yaz(dosya):
-    adlar = sorted({x.strip() for r in vt_sorgu("kisiler") for x in str((r or [""])[0] or "").split(",") if len(x.strip()) >= 3})
-    if not adlar: return
+# 3 Kasım (sözlük 2. aşama): kişi adları (ayar veritabani.kisiler, ilk sütun virgüllü) ve öğrenen sözlüğün
+# terimleri (veritabani.terimler; yoksa VT_TERIMLER_SORGU — yalnız terim + tür, takma adın bağlamı yalnız süzgeçte) dosyaya yazılmaz: aktarıcıya
+# anahtarlı POST /vt-bellek ile gider, aktarıcı bellekte tutar (Konuş ad düzeltmesi + sozluk-ogren.py ikinci katmanı). Aktarıcı yeniden açılınca vt-izle yeniden gönderir.
+VT_TERIMLER_SORGU = """with t as (
+  select k.ad terim, 'kisi' tur,
+    (select group_concat(kt.ad, ' | ') from kisi_takma kt
+      where kt.kisi_id = k.id and kt.ad <> k.ad and kt.ad not like '%@%'
+        and coalesce(kt.baglam,'') not like '%adı değil%') takma_adlar,
+    k.guncelleme son_gorulme
+  from kisi k where k.durum <> 'Birleştirildi' and k.tur <> 'ortak_hesap'
+  union all select ad, 'firma', null, son_gorulme from dis_firma
+  union all select ad, 'sistem', null, guncelleme from sistem
+  union all select ad, 'sistem', null, null from ajan
+) select * from t where terim is not null"""
+def _vt_terimler():  # → [{terim, tur, takma}] — kilit hatasında 1,5 sn bekleyip bir kez daha (WAL; immutable=1 kullanılmaz)
+    if not VT.get("yol") or VT.get("proje_vt"): return []
+    q = str(VT.get("terimler") or VT_TERIMLER_SORGU).strip().rstrip(";")
+    if not re.match(r"(?is)^(select|with)\b", q) or ";" in q: return []
+    import sqlite3, pathlib
+    for den in range(2):
+        try:
+            con = sqlite3.connect(pathlib.Path(os.path.join(PROJE, VT["yol"])).resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+            try: rows = con.execute(q).fetchall()
+            finally: con.close()
+            return [{"terim": str(r[0]).strip(), "tur": str(r[1] or "") if len(r) > 1 else "", "takma": [x.strip() for x in str((r[2] if len(r) > 2 else "") or "").split("|") if x.strip()]}
+                    for r in rows if r and r[0] and str(r[0]).strip()]
+        except sqlite3.OperationalError as e:
+            if den == 0 and re.search(r"locked|busy", str(e), re.I): time.sleep(1.5); continue
+            return []
+        except Exception: return []
+    return []
+def _vt_adlar(): return sorted({x.strip() for r in vt_sorgu("kisiler") for x in str((r or [""])[0] or "").split(",") if len(x.strip()) >= 3})
+def _vt_bellek_gonder():  # → True: aktarıcı aldı
+    ad, tr = _vt_adlar(), _vt_terimler()
+    if not ad and not tr: return False
     try:
-        y = os.path.join(dosya, VT_ADLAR_DOSYA)
-        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"adlar": adlar, "t": round(time.time())}, f, ensure_ascii=False)
-        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
-    except OSError: pass
+        r = json.load(urllib.request.urlopen(urllib.request.Request(A.relay + "/vt-bellek", data=json.dumps({"adlar": ad, "terimler": tr}, ensure_ascii=False).encode(), method="POST",
+                                                                     headers={"Content-Type": "application/json"}), timeout=5))
+        return bool(r.get("ok"))
+    except Exception: return False
+def _vt_bellek_bos():  # aktarıcı yeniden açıldı (bellek boş) ya da yanıt yok → yeniden gönderilmeli; kimlik: aktarıcının açılış kimliği
+    try: r = get("/vt-bellek")
+    except Exception: return None
+    return r.get("acilis") if not (r.get("adlar") or r.get("terimler")) else False
 VT_KISI_ADRES_DOSYA = "vt-kisi-adres.json"  # v0.88.0: kişi başına adlar (ad, lakap, takma) + e-posta adresleri (ayar veritabani.kisi_adres: 1. sütun adlar, 2. sütun adresler, virgüllü)
 def _vt_kisi_adres_yaz(dosya):  # aktarıcının e-posta seçimi için: "Ayla'dan mail" → kişinin adresleri ve lakapları (Mail'de lakabıyla görünse de bulunur)
     kayit = []
@@ -932,10 +1009,11 @@ def vt_izle_cmd():
     kf = open(os.path.join(A.dir, VT_IZLE_KILIT), "a")
     try: fcntl.flock(kf, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError: print("vt-izle zaten çalışıyor"); return
-    son = time.time() + max(60, A.sure); mt0 = object()
+    son = time.time() + max(60, A.sure); mt0 = object(); gitti = False
     while True:
         mt = _vt_mt()
-        if mt != mt0: _vt_sema_yaz(A.dir); _vt_adlar_yaz(A.dir); _vt_kisi_adres_yaz(A.dir); mt0 = mt
+        if mt != mt0: _vt_sema_yaz(A.dir); _vt_kisi_adres_yaz(A.dir); gitti = _vt_bellek_gonder(); mt0 = mt
+        elif not gitti or _vt_bellek_bos() is not False: gitti = _vt_bellek_gonder()  # aktarıcı yeniden açıldıysa (bellek boş) yeniden
         _vt_onbellek(A.dir, yenile=True); _vt_mt_yaz(A.dir)
         if A.bir or time.time() >= son: return
         time.sleep(VT_DENETIM_SN)
@@ -947,7 +1025,7 @@ def vt_mcp_cmd():
         os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
     except (VtHata, OSError): pass
     _vt_mt_yaz(A.dir)  # açılışta hemen (denetim iş parçacığını beklemeden)
-    _vt_adlar_yaz(A.dir); _vt_kisi_adres_yaz(A.dir)
+    _vt_bellek_gonder(); _vt_kisi_adres_yaz(A.dir)
     import threading
     kilit = threading.Lock()
     def denetle():  # açılışta bir kez, sonra dakikada bir: veritabanı değiştiyse önbellekteki sorgular yeniden çalışır

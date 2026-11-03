@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 327230,
-   "sha": "d7fdb78fea5c9462"
+   "uzunluk": 327712,
+   "sha": "4d5acbc1d145b3cc"
   },
   "/mini": {
-   "uzunluk": 327230,
-   "sha": "d7fdb78fea5c9462"
+   "uzunluk": 327712,
+   "sha": "4d5acbc1d145b3cc"
   },
   "/status": {
    "_ping_son": "float",
@@ -939,7 +939,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 7,
+  "DURUM": 8,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

@@ -483,7 +483,7 @@ def proje_erisim_view(simdi=None):
 # --- Ad düzeltmesi (v0.60.0; 17 Ekim gerçek uçtan uca deneme: Whisper görüşmecilerin adını V yerine B ile, ya da büyük harfle kısaltarak yazıyordu; Claude yanlış adla arayıp
 # dökümü bulamıyordu). Soru Claude'a ve ön aramaya gitmeden önce: 1) sözlük düzeltmesi (döküm satırlarıyla aynı), 2) bilinen adlarla ses benzerliği
 # (b/v, c/k, z/s, ie/i, çift harf; Türkçe harfler sadeleşir). Bilinen adlar: arama dizinindeki konuşmacılar ve görüşme dosyası adları, sözlükteki
-# büyük harfli terimler, kayıt veritabanının kişi ve takma adları (araç sunucusunun yazdığı canli/vt-adlar.json; aktarıcı veritabanını okuyamaz).
+# büyük harfli terimler, kayıt veritabanının kişi ve takma adları (aktarıcı veritabanını okuyamaz: yardımcı POST /vt-bellek ile gönderir, bellekte — 3 Kasım'a dek canli/vt-adlar.json).
 # Eşleşme: ses anahtarı aynıysa ya da (≥ 5 harfte) bir harf farklıysa ve sözcük büyük harfle yazılmışsa; birden çok ada uyan sözcük değişmez.
 # Düzeltme bağlamda açıkça yazılır ("duyulan → düzeltilen"), Claude yanlışsa duyulanı da düşünür.
 AD_TAZE_SN = 300
@@ -522,9 +522,8 @@ def _ad_listesi():
             d = str(t.get("dogru") or "").strip()
             if d[:1].isupper() and " " not in d and len(d) >= 3: ad.add(d)
     except (OSError, ValueError, AttributeError): pass
-    try: ad.update(w for x in json.load(open(os.path.join(BASE, "vt-adlar.json"), encoding="utf-8")).get("adlar", []) if isinstance(x, str)
-                   for w in re.split(r"[\s(),/]+", x) if len(w) >= 3 and w[:1].isupper())
-    except (OSError, ValueError, AttributeError): pass
+    ad.update(w for x in (globals().get("VT_BELLEK") or {}).get("adlar", []) if isinstance(x, str)  # 3 Kasım: yardımcının gönderdiği adlar bellekte (sozluk-ogren.py VT_BELLEK; dosya yok)
+              for w in re.split(r"[\s(),/]+", x) if len(w) >= 3 and w[:1].isupper())
     for kisi in kisilikler(): ad.update(kisi.get("hitap") or [])
     sozl = {}
     for a in ad:

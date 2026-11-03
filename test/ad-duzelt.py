@@ -11,12 +11,12 @@ def ok(ad, k):
     if not k: HATA.append(ad)
 T = tempfile.mkdtemp(prefix="ad-duzelt-")
 json.dump({"terimler": [{"dogru": "Lizzie", "yanlis": []}, {"dogru": "Zentra", "yanlis": ["zentira"]}]}, open(os.path.join(T, "sozluk.json"), "w"))
-json.dump({"adlar": ["Vedran Kaya", "Juliana", "Jolene", "Shelby (Destek)", "Ömer", "Selin", "Elvan", "Elcan", "Deniz"]}, open(os.path.join(T, "vt-adlar.json"), "w"))
+VT_BELLEK = {"adlar": ["Vedran Kaya", "Juliana", "Jolene", "Shelby (Destek)", "Ömer", "Selin", "Elvan", "Elcan", "Deniz"]}  # 3 Kasım: kayıt veritabanı adları bellekte (aktarıcıda POST /vt-bellek), dosya yok
 kod = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
 sz = {"re": re, "os": os, "json": json, "BASE": T, "print": lambda *a: None}
 src = open(os.path.join(KOD, "aktarici", "sozluk.py"), encoding="utf-8").read(); exec(src[:src.index('# Sesli "Claude:"')], sz)
 ad = {"re": re, "time": time, "json": json, "os": os, "BASE": T, "print": lambda *a: None, "_onara_mod": lambda: None, "kisilik": lambda: {"hitap": ["Orvo"]}, "kisilikler": lambda: [{"hitap": ["Orvo"]}],
-      "sozluk_uygula": sz["sozluk_uygula"], "_t": lambda a, b: a}
+      "sozluk_uygula": sz["sozluk_uygula"], "_t": lambda a, b: a, "VT_BELLEK": VT_BELLEK}
 exec(kod[kod.index("# --- Ad düzeltmesi"):kod.index("# --- Bekleme cümlesi")], ad)
 d = lambda q: ad["konus_ad_duzelt"](q)
 ok("b/v: 'Bedran' → Vedran", d("Bedran iskonto taleplerinde nasıl karar veriyor?") == ("Vedran iskonto taleplerinde nasıl karar veriyor?", [("Bedran", "Vedran")]))
@@ -34,7 +34,7 @@ n = ad["konus_ad_notu"]([("Bedran", "Vedran")])
 ok("bağlam notu duyulanı ve düzelteni yazar", "'Bedran' → 'Vedran'" in n and n.startswith("[Ad düzeltmesi"))
 ok("düzeltme yoksa not yok", ad["konus_ad_notu"]([]) == "")
 # v0.132.0: hitap yerindeki yakın sözcük asistan adına (kişi adına değil); bilinen kişi adı ve hitap dışı yer değişmez
-json.dump({"adlar": ["Nevin Kaya", "Deniz"]}, open(os.path.join(T, "vt-adlar.json"), "w")); ad["_AD"]["t"] = 0.0
+VT_BELLEK["adlar"] = ["Nevin Kaya", "Deniz"]; ad["_AD"]["t"] = 0.0
 KS = [{"ad": "MATLAS", "hitap": ["Matlas", "Marvin", "Mervin"]}, {"ad": "ATLAS", "hitap": ["Atlas", "Orni"]}]
 ad["kisilikler"] = lambda: KS; ad["_kisilik_hitap_ad"] = lambda h: next((k["ad"] for k in KS if h in k["hitap"]), None)
 hy = ad["hitap_yakin"]
@@ -44,5 +44,6 @@ ok("bilinen kişi adı değişmez: 'Nevin, gel.'", hy("Nevin, gel.") == "Nevin, 
 ok("hitap yerinde değilse değişmez: 'Bunu Navin söyledi.'", hy("Bunu Navin söyledi.") == "Bunu Navin söyledi.")
 ok("uzak sözcük değişmez: 'Peki, Kemal, gel.'", hy("Peki, Kemal, gel.") == "Peki, Kemal, gel.")
 ok("asistan adı düzeltmede kişi adına çevrilmez: 'Marvin' kalır", ad["konus_ad_duzelt"]("Marvin, burada mısın?")[1] == [])
+ok("adlar dosyadan okunmaz (vt-adlar.json yok sayılır)", (json.dump({"adlar": ["Zarvan"]}, open(os.path.join(T, "vt-adlar.json"), "w")), ad["_AD"].update(t=0.0), "zarvan" not in {a.lower() for v in ad["_ad_listesi"]().values() for a in v})[-1])
 import shutil; shutil.rmtree(T, ignore_errors=True)
 print("ad düzeltmesi:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

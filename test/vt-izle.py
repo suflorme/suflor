@@ -21,18 +21,32 @@ json.dump({"alan": "Test", "ad": "Deneme", "port": PORT, "uygulama": os.path.joi
 ENV = dict(os.environ, SUFLOR_AYAR=os.path.join(T, "ayar.json"), PYTHONDONTWRITEBYTECODE="1")
 tc = lambda *a, **k: subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, *a], env=ENV, capture_output=True, text=True, **k)
 oku = lambda f: json.load(open(os.path.join(canli, f), encoding="utf-8"))
+# 3 Kasım: kişi adları dosyaya (vt-adlar.json) yazılmaz, aktarıcıya POST /vt-bellek ile gider — sahte aktarıcı gelenleri tutar
+import threading, http.server
+GELEN = []; BELLEK = {"dolu": False}
+class Sahte(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def _j(self, o): b = json.dumps(o).encode(); self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+    def do_POST(self):
+        p = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}"); GELEN.append((self.path, p, self.headers.get("X-Suflor-Anahtar"))); BELLEK["dolu"] = True; self._j({"ok": True})
+    def do_GET(self): self._j({"ok": True, "adlar": 1 if BELLEK["dolu"] else 0, "terimler": 0, "acilis": "a1"})
+SRV = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Sahte); threading.Thread(target=SRV.serve_forever, daemon=True).start()
+open(os.path.join(canli, "kart-anahtari.txt"), "w").write("deneme-anahtar")
 try:
     r = tc("vt-izle", "--bir")
-    ok("vt-izle --bir: dört önbellek yazıldı", all(os.path.exists(os.path.join(canli, f)) for f in ("vt-sema.txt", "vt-mt.json", "vt-adlar.json", "vt-sonuc.json")) and r.returncode == 0)
+    ok("vt-izle --bir: üç önbellek yazıldı, ad dosyası (vt-adlar.json) yazılmadı", all(os.path.exists(os.path.join(canli, f)) for f in ("vt-sema.txt", "vt-mt.json", "vt-sonuc.json"))
+       and not os.path.exists(os.path.join(canli, "vt-adlar.json")) and r.returncode == 0)
     ok("tablo yapısı, gizli sütun işaretli", "kisi (tablo, 1 satır)" in open(os.path.join(canli, "vt-sema.txt")).read() and "sifre [gizli]" in open(os.path.join(canli, "vt-sema.txt")).read())
-    ok("kişi ve takma adlar", set(oku("vt-adlar.json")["adlar"]) == {"Vedran Kaya", "Vedo"})
+    ok("kişi ve takma adlar aktarıcıya anahtarlı POST /vt-bellek ile", GELEN and GELEN[-1][0] == "/vt-bellek" and set(GELEN[-1][1]["adlar"]) == {"Vedran Kaya", "Vedo"} and GELEN[-1][2] == "deneme-anahtar")
     m = oku("vt-mt.json"); ok("değişme saati ve denetim anı", abs(m["mt"] - os.path.getmtime(DB)) < 1 and time.time() - m["kontrol"] < 10)
-    ok("önbellek dosyaları yalnız sahibine açık (0600)", all(oct(os.stat(os.path.join(canli, f)).st_mode & 0o777) == "0o600" for f in ("vt-sema.txt", "vt-mt.json", "vt-adlar.json")))
+    ok("önbellek dosyaları yalnız sahibine açık (0600)", all(oct(os.stat(os.path.join(canli, f)).st_mode & 0o777) == "0o600" for f in ("vt-sema.txt", "vt-mt.json")))
     # önbellekteki sorgu veritabanı değişince yeniden çalışır
     json.dump({"SELECT count(*) AS n FROM kisi": {"t": 0, "kontrol": 0, "mt": 0, "sonuc": "n\n0\n(1 satır)"}}, open(os.path.join(canli, "vt-sonuc.json"), "w"))
     con = sqlite3.connect(DB); con.execute("INSERT INTO kisi VALUES ('b','Selin Ak',NULL,'x')"); con.commit(); con.close()
     tc("vt-izle", "--bir"); s = oku("vt-sonuc.json")["SELECT count(*) AS n FROM kisi"]
-    ok("veritabanı değişince önbellekteki sorgu yeniden çalıştı ve adlar güncellendi", "\n2\n" in s["sonuc"] and time.time() - s["kontrol"] < 10 and "Selin Ak" in oku("vt-adlar.json")["adlar"])
+    ok("veritabanı değişince önbellekteki sorgu yeniden çalıştı ve adlar güncellendi", "\n2\n" in s["sonuc"] and time.time() - s["kontrol"] < 10 and "Selin Ak" in GELEN[-1][1]["adlar"])
+    BELLEK["dolu"] = False; n0 = len(GELEN); tc("vt-izle", "--bir")
+    ok("her açılışta adlar yeniden gönderilir (aktarıcı yeniden açıldıysa belleği boş)", len(GELEN) > n0)
     p = subprocess.Popen([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "vt-izle", "--sure", "60"], env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1.5); r2 = tc("vt-izle", "--bir"); p.terminate(); p.wait()
     ok("tek kopya: ikincisi çalışmaz", "zaten çalışıyor" in r2.stdout)
@@ -48,7 +62,7 @@ try:
         def Popen(k, **_): acilan.append(k)
     app = os.path.join(T, "Suflor Brifing.app"); os.makedirs(app)
     ad = {"os": os, "json": json, "time": time, "subprocess": SP, "print": lambda *a: None, "BASE": canli, "BRIFING_APP": app,
-          "AYAR": {"veritabani": {"yol": "kayit.db"}, "uygulama": T}, "threading": None}
+          "AYAR": {"veritabani": {"yol": "kayit.db"}, "uygulama": T}, "threading": None, "kaynak_dar": lambda: False}  # 3 Kasım: kaynak_dar (C fazı) eksikti, test burada duruyordu
     bol = kod[kod.index("# --- Veritabanı önbelleği yardımcısı"):kod.index("def _vt_izle_dongu(")]
     exec(bol, ad); bak = ad["vt_izle_bak"]; os.remove(os.path.join(canli, "vt-mt.json"))
     t0 = 1_000_000.0
@@ -70,5 +84,5 @@ try:
     ok("yardımcı belgeleri dizinleyemediyse: proje belgeleri uyarısı", u and u["uyari"].endswith("proje belgelerini okuyamıyor"))
     ad["_ONARA"]["eris"] = ([""], "tamam"); ok("yardımcı dizinlediyse uyarı yok", pv(t0 + 200) is None)
 finally:
-    shutil.rmtree(T, ignore_errors=True)
+    SRV.shutdown(); shutil.rmtree(T, ignore_errors=True)
 print("vt-izle:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

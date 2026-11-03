@@ -529,6 +529,7 @@ globalThis.SUFLOR_EN = {
   "Ses kapalı (ayar konusma) ya da brifing hazır değil": "Voice is off (setting konusma) or the briefing isn't ready",
   "Brifing başlatılamadı": "Couldn't start the briefing",
   "Özeti aç": "Open summary",
+  "Sözlük: {n} yeni biçim öğrenildi, {m} aday bekliyor": "Dictionary: {n} new spellings learned, {m} candidates waiting",
   "Dosyadan döküm": "Transcript from file",
   "Döküm başlamadı": "Transcription did not start",
   "Dosya aktarılıyor": "Transferring file",
