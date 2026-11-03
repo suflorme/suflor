@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 326996,
-   "sha": "75d3057cc7ed5df8"
+   "uzunluk": 327606,
+   "sha": "4fd2cd7f1c8d6186"
   },
   "/mini": {
-   "uzunluk": 326996,
-   "sha": "75d3057cc7ed5df8"
+   "uzunluk": 327606,
+   "sha": "4fd2cd7f1c8d6186"
   },
   "/status": {
    "_ping_son": "float",
@@ -312,6 +312,7 @@
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
+     "sesli_ceviri_tam": "bool",
      "sesli_kanit": "bool",
      "sesli_not": "bool",
      "sohbet_araya_girme": "bool",
@@ -366,6 +367,7 @@
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
+     "sesli_ceviri_tam": "bool",
      "sesli_kanit": "bool",
      "sesli_not": "bool",
      "sohbet_araya_girme": "bool",

@@ -392,6 +392,8 @@ globalThis.SUFLOR_EN = {
   "Karşı tarafın İngilizce satırları panoda Türkçesiyle (metin yapay zekâ servisine gider).": "The other side's English lines with their Turkish on the panel (text goes to the AI service).",
   "Sesli çeviride sesi kıs": "Lower volume in spoken translation",
   "Çeviri okunurken toplantı sesi kısılır.": "Meeting audio is lowered while the translation is read.",
+  "Sesli çeviride tam çeviri": "Full translation in voice translation",
+  "Kapalıyken kulaklığa her satırın kısa özü (en çok 8 sözcük) okunur; açıkken tam çeviri. Uzun konuşmada okuma geride kalırsa eski satırlar atlanır.": "When off, a short gist of each line (up to 8 words) is read into your headphones; when on, the full translation. In long speech, older lines are skipped if reading falls behind.",
   "Masaüstü Teams/Zoom'da da kıs": "Also lower in desktop Teams/Zoom",
   "Ses yardımcısı toplantı sesini kendi üzerinden çalar; takılırsa ses kesilebilir.": "The audio helper plays the meeting audio itself; if it stalls, audio may cut out.",
   "Menü çubuğu uygulaması": "Menu bar app",
