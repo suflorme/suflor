@@ -6,10 +6,10 @@
 # sözlüğün sistem/ürün biçimli terimleri (kişi adı değil) eklenir. Hakem dökümü doğru sayılmaz, kanıttır: aday kabul kapısının bütün şartlarından geçer (tek başına tek toplantıda kabul yok).
 # Çıktı: <ses-arsivi>/<toplantı>/hakem.jsonl (0600; ses arşiviyle birlikte döner/silinir/eğitim havuzuna taşınır), ölçüm canli/hakem-olcum.jsonl (yalnız sayı), kullanım gemini-ses.jsonl (is: hakem).
 import base64, collections, difflib, http.client, threading
-HAKEM_MODEL = "gemini-3.5-flash"  # 4 Kasım: 3.8-flash 503 "yoğun talep" verdi (3.5-flash tek parça 7 sn, 36 parça 283 sn); 3 Kasım'daki varsayılan 3.8-flash'tı: ses girişi 0,75 $/M (32 belirteç/sn), çıkış 3,75 $/M (düşünme dahil) — 1 Ocak 2027'den iki katı
-HAKEM_FIYAT = {"gemini-3.8-flash": (0.75, 3.75, "2027-01-01"), "gemini-3.6-flash": (0.75, 3.75, "2027-01-01"), "gemini-4-argon": (2.0, 10.0, "2026-12-01"),
+HAKEM_MODEL = "gemini-3.6-flash"  # 4 Kasım: 3.5-flash kullanımdan kalktı, istekleri 3.6-flash'e yönlendiriliyor (Google deprecations sayfası) — doğrudan 3.6-flash; fiyat 0,75 / 3,75 $/M (ses dahil tek giriş fiyatı), 1 Ocak 2027'den iki katı
+HAKEM_FIYAT = {"gemini-3.8-flash": (0.75, 3.75, "2027-01-01"), "gemini-3.6-flash": (0.75, 3.75, "2027-01-01"), "gemini-3.5-flash": (0.75, 3.75, "2027-01-01"), "gemini-4-argon": (2.0, 10.0, "2026-12-01"),
                "gemini-3.5-flash-lite": (0.30, 2.50, None), "gemini-3.1-flash-lite": (0.50, 1.50, None), "gemini-3-flash-preview": (1.0, 3.0, None)}  # $/M belirteç: (giriş, çıkış, iki katına çıktığı gün)
-HAKEM_YEDEK = ("gemini-3.8-flash", "gemini-3.6-flash")  # 4 Kasım: 3.8-flash "yoğun talep" 503 veriyordu (küçük yazı isteği de); 503/5xx/429 (günlük değil) gelince sıradaki model
+HAKEM_YEDEK = ("gemini-3.8-flash",)  # 4 Kasım: yoğunlukta (503/5xx/429 günlük değil) sıradaki model; aynı fiyat
 HAKEM_FIYAT_BILINMEYEN = (2.0, 12.0, None)  # fiyatı bilinmeyen model: pahalı say (sınır erken dolsun)
 HK_TOKEN_SN = 32; HK_CIKIS_SN = 8  # ses 32 belirteç/sn (belge); çıkış tahmini ~8 belirteç/sn konuşma (metin + JSON + düşük düşünme) — yalnız ön sınır denetimi için
 HK_OBEK_SN = 300; HK_OBEK_PARCA = 60; HK_EN_KISA_SN = 0.5  # öbek ≤ 5 dk ses (WAV base64 ≈ 12,8 MB < 20 MB satır içi sınırı), ≤ 60 parça

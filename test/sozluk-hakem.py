@@ -23,7 +23,7 @@ class Sahte(http.server.BaseHTTPRequestHandler):
         ham = self.rfile.read(int(self.headers["Content-Length"])); g = json.loads(ham)
         GELEN.append({"yol": self.path, "anahtar": self.headers.get("x-goog-api-key"), "govde": g}); DAV["n"] += 1; tur = DAV["tur"]
         if tur == "500bir" and DAV["n"] % 2 == 1: return self.yaz(500, '{"error":{"code":500}}')
-        if tur == "503ilk" and "3.5-flash" in self.path: return self.yaz(503, '{"error":{"code":503,"message":"high demand"}}')
+        if tur == "503ilk" and "3.6-flash" in self.path: return self.yaz(503, '{"error":{"code":503,"message":"high demand"}}')
         if tur == "kota": return self.yaz(429, '{"error":{"code":429,"message":"Quota exceeded for metric: generate_requests_per_model_per_day"}}')
         if tur == "401": return self.yaz(401, '{"error":{"code":401}}')
         ids, parts = [], g["contents"][0]["parts"]; out = []
@@ -120,7 +120,7 @@ try:
     r = N["hakem_toplanti"](m1); g = GELEN[-1] if len(GELEN) > n0 else {}
     ok("geliştiricide istek gitti, durum bitti", r["durum"] == "bitti" and len(GELEN) == n0 + 1, str(r)[:200])
     pr = g.get("govde", {}).get("contents", [{}])[0].get("parts", []); yazi = " ".join(p.get("text", "") for p in pr)
-    ok("istek: generateContent + model + anahtar başlıkta (adreste değil)", g.get("yol") == "/v1beta/models/gemini-3.5-flash:generateContent" and g.get("anahtar") == "deneme-anahtar")
+    ok("istek: generateContent + model + anahtar başlıkta (adreste değil)", g.get("yol") == "/v1beta/models/gemini-3.6-flash:generateContent" and g.get("anahtar") == "deneme-anahtar")
     ok("istekte yalnız sabit yönerge + [pN] + ses (Konuş parçası yok)", sum(1 for p in pr if "inlineData" in p) == 3 and [p["text"] for p in pr if "text" in p][1:] == ["[p1]", "[p2]", "[p3]"]
        and yazi.split(" [p1]")[0] == N["HK_YONERGE"])
     yasak = ["Belvora", "Pelvora", "Nerim", "Kovak", "DravenSync", "Kalendix", "stok", "Hakem-1", "ben-", "karsi-", ".wav", "Konuşmacı"]
@@ -133,7 +133,7 @@ try:
        and next(x for x in hs if x.get("kanal") == "karsi")["metin"] == "Pelvora ekranında stok görünmüyor.")
     ku = [x for x in satirlar(os.path.join(canli, "gemini-ses.jsonl")) if x.get("is") == "hakem"]
     ok("kullanım kaydı gemini-ses.jsonl (is: hakem, belirteç, tutar)", len(ku) == 1 and ku[0]["giris_token"] == 1000 and ku[0]["cikis_token"] == 200 and ku[0]["dusunce_token"] == 50
-       and abs(ku[0]["usd"] - (1000 * N["HAKEM_FIYAT_BILINMEYEN"][0] + 250 * N["HAKEM_FIYAT_BILINMEYEN"][1]) / 1e6) < 1e-5 and ku[0]["durum"] == "ok", str(ku)[:300])
+       and abs(ku[0]["usd"] - (1000 * N["HAKEM_FIYAT"]["gemini-3.6-flash"][0] + 250 * N["HAKEM_FIYAT"]["gemini-3.6-flash"][1]) / 1e6) < 1e-5 and ku[0]["durum"] == "ok", str(ku)[:300])
     ol = satirlar(os.path.join(canli, "hakem-olcum.jsonl"))
     ok("ölçüm kaydı yazıldı (kanal başına, sözcük hata oranı)", len(ol) == 1 and ol[0]["parca"] == 3 and set(ol[0]["kanal"]) == {"ben", "karsi"} and ol[0]["kanal"]["karsi"]["wer_sozluk"] == 0.25
        and ol[0]["wer_ham"] is not None, str(ol)[:300])
