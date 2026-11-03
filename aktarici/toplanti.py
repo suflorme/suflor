@@ -323,6 +323,8 @@ def toplanti_cikis(neden):  # açık çıkış (eklenti çağrı → yok, masaü
 def toplanti_bitir(neden, dosya=None):  # elle: özet hazır, toplantı oturumu kapat, duman, POST /toplanti — kuyruk boşalınca (≤ 30 sn) bitti
     with LOCK:
         a = TOPLANTI["aktif"]; o = TOPLANTI.get("onceki")
+        if neden == "özet hazır" and dosya and o and a and a["dosya"] == dosya and oturum_onceki():  # 3 Kasım: süren toplantının dosyasıyla gelen özet, oturum önceki
+            print(f"TOPLANTI: özet süren toplantının dosyasıyla geldi ama oturum önceki toplantının sonunu yapıyordu — önceki toplantıya sayıldı · {o['dosya']}"); dosya = o["dosya"]  # toplantınınsa
         if neden == "özet hazır" and o and (not dosya or o["dosya"] == dosya) and not (a and a["dosya"] == dosya): o["ozet"] = True; _durum_yaz()
         if not a or (dosya and a["dosya"] != dosya): return False
         a["elle"] = True; a["ozet"] = neden == "özet hazır"
@@ -365,6 +367,18 @@ def oto_takvim_uygun(e):  # oto_takvim'in pencere kuralı tek olay için
 def onceki_sonu_suruyor():  # son biten toplantının Claude oturumu vardı ve özeti henüz gelmedi (toplantı sonu işleri sürüyor olabilir)
     o = TOPLANTI.get("onceki")
     return bool(o and o.get("oturum") and not o.get("ozet") and time.time() - (o.get("t_kapanis") or 0) < GOSTER_SN)
+# 3 Kasım (ardışık toplantı): canlı Claude oturumu önceki toplantı kapanmadan açılmış ve o toplantının özeti gelmemişse oturum hâlâ önceki toplantınındır —
+# toplantı sonu komutları (döküm, sonuç, özet) o toplantının dosyasına gider (/status toplanti.oturum_dosya), yeni toplantı ona bağlanmaz, oturumu sonra açılır
+def oturum_onceki():
+    o = TOPLANTI.get("onceki")
+    return o if onceki_sonu_suruyor() and topo_canli() and (TOPO.get("t0") or 0) <= (o.get("t_kapanis") or 0) + 1 else None
+def oto_baslat(p, kayit=None):  # kendiliğinden ya da öneriyle açılan oturum: oturum önceki toplantının sonunu yapıyorsa bu toplantınınki o bitince (relay baslat_ertelenen)
+    if kayit and oturum_onceki():
+        STATE["baslatma"] = {"at": time.time(), "oto": True, "konu": p.get("konu"), "olay": p.get("olay"), "baglanti": None, "ana": False, "platform": None, "baslangic": None, "kayit": kayit}
+        threading.Thread(target=baslat_ertelenen, args=(dict(p, _ertelendi=True), STATE["baslatma"]["at"], kayit), daemon=True).start()
+        print(f"OTO: {p.get('konu')} · toplantı oturumu önceki toplantının sonu bitince açılacak (en çok {round(BASLAT_ERTELE_SN / 60) if BASLAT_ERTELE_SN >= 60 else BASLAT_ERTELE_SN} {'dk' if BASLAT_ERTELE_SN >= 60 else 'sn'})")
+        return {"ok": True, "ertelendi": True}
+    return baslat(p)
 
 # --- Claude toplantı oturumu (S161–S162 kuralı aynen) -------------------------------------------------------------------------------------------------------
 def _oto_oturum(a, s, elle):  # a["karar"]: oturum kararı verildi; güvenilmeyen sinyalde (öneri) yanlış kalır, güvenilir sinyal gelince yeniden denenir
@@ -375,15 +389,15 @@ def _oto_oturum_(a, s, elle):
     now = time.time()
     if AYAR.get("oto_toplanti") is False: a["neden"] = "ayar kapalı (oto_toplanti)"; a["karar"] = True
     elif a["haric"]: a["neden"] = f"hariç ({a['haric']})"; a["karar"] = True
-    elif elle or topo_canli() or (STATE.get("izle_seen") and now - STATE["izle_seen"] < 60) or (TOPO.get("durum") == "aciliyor"):
+    elif elle or (not oturum_onceki() and (topo_canli() or (STATE.get("izle_seen") and now - STATE["izle_seen"] < 60))) or (TOPO.get("durum") == "aciliyor"):  # önceki toplantının oturumu sayılmaz
         a["neden"] = "oturum zaten var (Başlat)"; a["oturum"] = True; a["karar"] = True
     elif deneme_aktarici() and os.environ.get("SUFLOR_TEST_OTO") != "1": a["neden"] = "deneme aktarıcısı"; a["karar"] = True
     elif not s.get("guvenli"):
         a["neden"] = "güvenilir sinyal yok (yalnız mikrofon + takvim) — öneri kartı"; oto_oner(a)
         print("OTO: toplantı oturumu açılmadı (" + a["neden"] + ")"); return
     else:
-        a["karar"] = True; r = baslat({"olay": a["olay"], "konu": a["ad"], "platform": a["platform"], "oto": True})
-        a["oturum"] = bool(r.get("ok")); a["neden"] = None if r.get("ok") else str(r.get("err") or "?")[:160]
+        a["karar"] = True; r = oto_baslat({"olay": a["olay"], "konu": a["ad"], "platform": a["platform"], "oto": True}, a["id"])
+        a["oturum"] = bool(r.get("ok")); a["neden"] = "oturum önceki toplantının sonunu bekliyor" if r.get("ertelendi") else None if r.get("ok") else str(r.get("err") or "?")[:160]
         if r.get("ok") and a.get("oner"):  # önce öneri kartı çıkmıştı (yalnız ses), sonra güvenli sinyal geldi: kart kendiliğinden kapanır
             with LOCK:
                 for x in eylem_gorunen():
@@ -412,8 +426,8 @@ def oto_karar(x, durum):  # eylem_karar'dan: Onayla → baslat; Reddet → bu to
     try: ay = json.loads(x.get("ayrinti") or "{}")
     except ValueError: ay = {}
     def is_():
-        r = baslat({"olay": ay.get("olay"), "konu": ay.get("konu"), "platform": ay.get("platform"), "oto": True})
-        if a.get("oner") == x["id"]: a["karar"] = True; a["oturum"] = bool(r.get("ok")); a["neden"] = None if r.get("ok") else str(r.get("err") or "?")[:160]
+        r = oto_baslat({"olay": ay.get("olay"), "konu": ay.get("konu"), "platform": ay.get("platform"), "oto": True}, a.get("id") if a.get("oner") == x["id"] else None)
+        if a.get("oner") == x["id"]: a["karar"] = True; a["oturum"] = bool(r.get("ok")); a["neden"] = "oturum önceki toplantının sonunu bekliyor" if r.get("ertelendi") else None if r.get("ok") else str(r.get("err") or "?")[:160]
         print("OTO: öneri onaylandı — toplantı oturumu " + ("açıldı" if r.get("ok") else f"açılmadı ({str(r.get('err'))[:80]})"))
     threading.Thread(target=is_, daemon=True).start()
 
@@ -430,6 +444,8 @@ def toplanti_view():  # /status toplanti — pano yalnız buna bakar
                  oturum=a["oturum"], neden=a["neden"], gec_atilan=a["gec_atilan"], bitis_neden=a.get("bitis_neden"))
         v["mic_bilinmiyor"] = a["durum"] == "suruyor" and not eklenti_cagri() and not masaustu_toplantida() and (STATE.get("masaustu_mic") or {}).get("acik", False)
     if o: v["onceki"] = {"dosya": o["dosya"], "ad": o["ad"], "bitti": datetime.datetime.fromtimestamp(o["t_kapanis"] or now).strftime("%H:%M"), "neden": o.get("bitis_neden"), "gec_atilan": o["gec_atilan"]}
+    oo = oturum_onceki()
+    if oo: v["oturum_dosya"] = oo["dosya"]; v["oturum_ad"] = oo["ad"]  # toplantı oturumu önceki toplantının sonunu yapıyor (toplanti-claude.py dosyayı buradan alır)
     # 3 Kasım (ardışık toplantı): canlı = toplantı ekranı (algılandı/sürüyor); son = bitiyor'daki ya da özeti gelmemiş yeni biten toplantı (yalnız gösterim, engellemez)
     v["canli"] = v["durum"] in ("algilandi", "suruyor"); v["bitiyor"] = v["durum"] == "bitiyor"
     if a and a["durum"] == "bitiyor": v["son"] = {"ad": a["ad"], "dosya": a["dosya"], "durum": "bitiyor", "bas": v["bas"], "ozet": False}

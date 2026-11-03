@@ -110,7 +110,7 @@ def wh_mlx_indir():
 WH_SR = 16000; WH_KARE = 320  # 20 ms
 # parça üst sınırı 12 → 6 sn. Ölçüm (6 Ekim, 115 sn kesintisiz Türkçe, gerçek zamanlı): kelime → satır ortanca 7,7 → 4,6 sn,
 # %90 12,2 → 6,7 sn; WER 12 sn %16,0 · 8 sn %11,9 · 6 sn %15,6–18,1 (aynı ayarda tur farkı kadar — kesim noktasına bağlı gürültü)
-WH_SESSIZ_MS = 700; WH_ON_MS = 300; WH_MAX_SN = 6; WH_MIN_KONUSMA_MS = 400; WH_BOSTA_KAPAT_SN = 600
+WH_SESSIZ_MS = 700; WH_SESSIZ_OKUMA_MS = 450; WH_ON_MS = 300; WH_MAX_SN = 6; WH_MIN_KONUSMA_MS = 400; WH_BOSTA_KAPAT_SN = 600
 WH_AKIS_SN = 20; WH_GUVENCE_SN = 90; WH_ATLA_SN = 120; WH_DIP_BLOK = 50  # taban penceresi: 50 blok × 100 ms = 5 sn
 # kuyruk birikince aynı kanalın sıradaki parçaları tek çağrıda: işçi süresi parça boyundan bağımsız ~1,2 sn (7 Ekim 18:03 ölçümü:
 # <2 sn 1,15 · 4–6 sn 1,24), kuyruk iki dönemde 25–27 parçaya çıkıp gecikme 135 sn'yi buldu. ben kanalı yalnız karşı akmıyorken
@@ -152,7 +152,8 @@ class Kanal:
                 self.parca += kare; self.rmsler.append(r)
                 if r > esik: self.sesli += 1; self.sessiz = 0
                 else: self.sessiz += 1
-                if self.sessiz * 20 >= WH_SESSIZ_MS: self.kes(baslik)
+                # 3 Kasım: "Bir dakika" konuşma bitişinden 2,0 sn sonra durdurdu (0,7 sessizlik + ~0,7 gönderim grubu + 0,6 Whisper); okuma sürerken ben kanalı 0,45 sn'de kapanır
+                if self.sessiz * 20 >= WH_SESSIZ_OKUMA_MS and (self.sessiz * 20 >= WH_SESSIZ_MS or (self.ad == "ben" and "okuma_suruyor" in globals() and okuma_suruyor())): self.kes(baslik)
                 elif len(self.parca) >= WH_MAX_SN * WH_SR * 2: self.bol(baslik)
         self.son_bitis = t_bas + len(pcm) / 2 / WH_SR
     def taban_izle(self, r):
@@ -620,11 +621,12 @@ def _isci_dongu():
             try: _log("uydurma-adaylari.jsonl", {"t": round(time.time(), 1), "kanal": is_.get("kanal"), "atilan": j["atilan"], "satir": bool(metin)})
             except Exception: pass
         if metin and j.get("dil") in ("tr", "en") and KANALLAR.get(is_["kanal"]): KANALLAR[is_["kanal"]].dil_son = j["dil"]; KANALLAR[is_["kanal"]].dil_son_t = time.time()
+        if metin and j.get("sayi_suphe"): print(f"WHISPER: sayı şüphesi ({is_.get('kanal')} kanalı) — satır işaretlendi, atılmadı")
         if metin and j.get("dil_gecis"): print(f"WHISPER: {is_['kanal']} kanalı {j.get('dil')} ({j['dil_gecis']}) — toplantı dili dışında konuşma")
         if metin:
             if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
-            is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz", "bol") if j.get(k)} or None) or "satir"
+            is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz", "bol", "sayi_suphe") if j.get(k)} or None) or "satir"
         is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
         kapi_kaydet(is_, sonuc, metin, j)
         if KANALLAR.get(is_["kanal"]) is not None: KANALLAR[is_["kanal"]].sonuclar.append((time.time(), sonuc))  # otonom: kanal sözsüz ses mi (kanal_sozsuz)
@@ -930,7 +932,7 @@ def _taslak_temizle(now):
         for i in list(TASLAK_BITEN)[:-400]: del TASLAK_BITEN[i]
 def taslak_al(p):
     # POST /taslak: {"meeting": {"title"}, "source": "captions"|"transcript", "entries": [{"id", "speaker", "text"}]}
-    now = time.time(); baslik = (p.get("meeting") or {}).get("title") or STATE.get("meeting") or "Toplantı"; n = 0
+    now = time.time(); baslik = (p.get("meeting") or {}).get("title") or STATE.get("meeting") or "Toplantı"; n = 0; dur_bak = []
     gelen = [(str(e.get("id") or "")[:160], " ".join(str(e.get("text") or "").replace("|", "¦").split())[:2000], str(e.get("speaker") or "?")[:80])
              for e in (p.get("entries") or [])[:20] if isinstance(e, dict)]
     gelen = [(i, t, k, _taslak_kanal(k)) for i, t, k in gelen if i and t]
@@ -941,9 +943,20 @@ def taslak_al(p):
             d = TASLAK.get(i)
             if d is None: d = TASLAK[i] = {"id": i, "ilk": now, "tuketilen": 0, "sabit": False}
             if d.get("text") != t: d["sabit"] = False
+            if d.get("text") != t: d["degisti"] = now; d["dur_bakildi"] = False
             d.update(speaker=kim, text=t, son=now, kanal=kanal, src=p.get("source"), baslik=baslik); n += 1
+            if kanal == "ben" and not d.get("dur_bakildi") and now - d.get("degisti", now) >= TASLAK_DUR_SN: dur_bak.append(d)
         _taslak_temizle(now)
+    for d in dur_bak: d["dur_bakildi"] = True; _taslak_dur_bak(d)
     return {"ok": True, "n": n}
+# 3 Kasım: durdurma sözü Whisper satırını (parça kapanışı + işçi + gönderim grubu, ~2 sn) beklemeden altyazı taslağından yakalanır: okuma sürerken kullanıcının (ben)
+# taslağı TASLAK_DUR_SN değişmeden duruyorsa ve metni kısa durdurma sözüyse (okuma_dur_soz: ASISTAN_DUR_RX, okunan metinde geçiyorsa yankı) okuma kesilir. "Peki"/"hı hı" kalıpta yok.
+TASLAK_DUR_SN = 0.6
+def _taslak_dur_bak(d):
+    try:
+        if "okuma_dur_soz" not in globals() or ("oda_acik" in globals() and oda_acik()) or not okuma_dur_soz(d["text"], d["ilk"]): return
+        print(f"ASİSTAN: okurken kullanıcı '{d['text'][:30]}' dedi (taslak, {time.time() - d['ilk']:.1f} sn) — okuma durdu"); threading.Thread(target=asistan_dur, daemon=True).start()
+    except Exception as e: print(f"ASİSTAN: taslak durdurma bakışı hata — {e}")
 def taslak_sabit(e, src, golgede):
     # ingest'ten: eklentinin sabitlenmiş satırı. Gölgeye gittiyse (Whisper akıyor) Whisper'ı bekleyen taslak olarak kalır.
     i = str(e.get("id") or ""); t = " ".join(str(e.get("text") or "").split())
@@ -1081,7 +1094,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
     ingest({"meeting": {"title": is_["baslik"]}, "source": "whisper", "capturedAt": datetime.datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
             "entries": [{"id": is_["id"], "speaker": kim, "time": datetime.datetime.fromtimestamp(is_["t0"]).strftime("%H:%M:%S"), "text": metin,
                          "seen": datetime.datetime.utcfromtimestamp(is_["t1"]).isoformat(timespec="milliseconds") + "Z", "kanal": kanal,
-                         "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2), **({"komut_ses": komut_ses} if komut_ses else {}),
+                         "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2), **({"komut_ses": komut_ses} if komut_ses else {}), **({"sayi_suphe": True} if (model or {}).get("sayi_suphe") else {}),
                          **({"_benzerlik": ODA["son_b"]} if kanal == "ben" and is_.get("oda") and ODA.get("son_b") is not None else {}),  # 3 Kasım: okuma_ustune_soz (dosyaya yazılmaz)
                          **({"kume": kume} if kume else {}), **({k: model[k] for k in ("iz", "bol") if model.get(k)} if kanal == "karsi" and model else {}),  # # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
                          **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,

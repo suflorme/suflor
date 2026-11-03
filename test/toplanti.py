@@ -10,6 +10,9 @@
 #     eski kapanır + yeni dosya; bitiyor'da konusuz Başlat → yeni dosya (ad "<Platform> toplantısı HH:MM").  M) bitiyor'da başka sekme + başka başlık → yeni
 #     dosya; aynı sekme (başlık değişse de) ya da aynı başlık → aynı dosya; başlıksız başka sekme 10 sn'den önce aynı, sonra yeni.
 #  N) konuşmacı etiketlemesi (toplu Whisper, sahte) yeni toplantı sürerken ertelenir, toplantı bitince arka planda yapılır.
+#  O) ardışık toplantıda Claude oturumu (3 Kasım canlı hata): 1. biter → 2. Başlat'la açılır (oturum ertelenir) → 1.'nin oturumu özet yazar (toplanti-claude.py
+#     ozet-hazir) → özet 1.'ye sayılır, 2. sürer, ertelenen oturum açılır; 3. kendiliğinden tanınır (oturum yine ertelenir), eski istemci özeti 3.'nün dosyasıyla
+#     gönderse de 3. bitmez. Oturum sahte (aktarıcının deneme kopyasında toplanti_oturum_ac yerine `cat` süreci).
 # aktarici/toplanti.py, ingest/not/kanıt yönlendirmesi, /ping, /masaustu, /ses-yerel değişince koştur:  PYTHONDONTWRITEBYTECODE=1 python3 test/toplanti.py
 import base64, datetime, glob, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -302,7 +305,73 @@ def senaryo_N():
         ok("N hata yok", "Traceback" not in R.gunluk())
     finally: R.kapat(); R.sil()
 
-for s in [s for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H, senaryo_L, senaryo_M, senaryo_N) if not sys.argv[1:] or s.__name__[8:] in sys.argv[1:]]:  # ör. test/toplanti.py L M
+SAHTE_OTURUM = '''
+# test/toplanti.py O: sahte toplantı oturumu (yalnız deneme kopyasında) — Brifing.app yerine stdin'i kapanınca çıkan `cat`
+def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
+    with TOPO["kilit"]:
+        if topo_canli(): toplanti_oturum_kapat("yeni başlatma")
+        TOPO.update(mesaj=[], sid=None, konu=konu, t0=time.time(), hata=None, etkinlik=None)
+        TOPO["app"] = subprocess.Popen(["cat"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True); TOPO["w"] = TOPO["app"].stdin
+        TOPO["nesil"] += 1; _topo_durum("calisiyor")
+        print(f"TOPLANTI OTURUMU: arka planda açıldı (sahte) · {konu}"); return True
+'''
+def senaryo_O():
+    print("— O) ardışık toplantıda Claude oturumu: önceki toplantının özeti yenisini bitirmez, ertelenen oturum açılır")
+    T = os.path.realpath(tempfile.mkdtemp(prefix="toplanti-")); os.makedirs(os.path.join(T, "canli"))
+    cl = os.path.join(T, "claude"); open(cl, "w").write("#!/bin/sh\necho '{\"loggedIn\": true}'\n"); os.chmod(cl, 0o755)
+    port = bos_port(8783); json.dump({"durum": "ok", "olaylar": []}, open(os.path.join(T, "takvim.json"), "w"))
+    os.makedirs(os.path.join(T, "Suflor Ses.app")); os.makedirs(os.path.join(T, "calisma"))
+    json.dump({"alan": "Deneme", "ad": "Ali T", "port": port, "uygulama": T, "ortak": "/Users/Shared/Suflor", "konusma": False, "claude": cl, "calisma": os.path.join(T, "calisma"),
+               "tepki_sesleri": os.path.join(T, "tepki-yok")}, open(os.path.join(T, "ayar.json"), "w"))
+    for f in ("relay.py", "manifest.json", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
+    for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
+    open(os.path.join(T, "aktarici", "toplanti-oturum.py"), "a", encoding="utf-8").write(SAHTE_OTURUM)
+    R = Aktarici(T=T, ek_env={"SUFLOR_TEST_OTURUM": "1"})
+    DUR = {"sekme": None, "baslik": None}
+    def nabiz():
+        while DUR["sekme"] != "dur":
+            if DUR["sekme"]: R.ping("teams", True, DUR["baslik"], DUR["sekme"])
+            time.sleep(1)
+    import threading; threading.Thread(target=nabiz, daemon=True).start()
+    acildi = lambda: R.gunluk().count("arka planda açıldı (sahte)")
+    def ozet(ad):
+        y = os.path.join(T, "calisma", ad); open(y, "w", encoding="utf-8").write("# Özet\n\n## Toplantı çıktısı\n- 1 karar\n"); return y
+    def son_dosya():
+        try: return json.loads(open(os.path.join(R.canli, "son-toplantilar.jsonl"), encoding="utf-8").read().splitlines()[-1]).get("dosya")
+        except (OSError, IndexError, ValueError): return None
+    try:
+        r = R.istek("/baslat", {"konu": "Toplantı bir", "platform": "teams"}); DUR.update(sekme="t1", baslik="Toplantı bir | Microsoft Teams"); time.sleep(1.5)
+        R.altyazi("birinci toplantının satırı", DUR["baslik"]); d1 = R.durum()
+        ok("O1 1. toplantı sürüyor, oturum açık (sahte)", r.get("ok") and d1.get("durum") == "suruyor" and d1.get("oturum") and acildi() == 1, f"{r} {d1}")
+        f1 = d1.get("dosya"); DUR["sekme"] = None; R.ping("teams", False, "Toplantı bir | Microsoft Teams", "t1")
+        ok("O2 1. toplantı bitti", bekle(lambda: R.durum()["durum"] == "bos", 40), str(R.durum()))
+        ok("O3 oturum önceki toplantının sonunu yapıyor (/status oturum_dosya = 1.)", R.durum().get("oturum_dosya") == f1, str(R.durum()))
+        r = R.istek("/baslat", {"konu": "Toplantı iki", "platform": "teams"})
+        ok("O4 2. Başlat: kayıt açıldı, oturum ertelendi", r.get("ok") and r.get("ertelendi") and "önceki toplantının sonu bitince açılacak" in R.gunluk(), str(r))
+        DUR.update(sekme="t2", baslik="Toplantı iki | Microsoft Teams"); time.sleep(1.5); R.altyazi("ikinci toplantının satırı", DUR["baslik"]); d2 = R.durum(); f2 = d2.get("dosya")
+        ok("O5 2. sürüyor, oturum_dosya hâlâ 1.", d2.get("durum") == "suruyor" and f2 != f1 and d2.get("oturum_dosya") == f1, str(d2))
+        c = subprocess.run([sys.executable, "-B", os.path.join(T, "toplanti-claude.py"), "--dir", R.canli, "--relay", R.U, "ozet-hazir", ozet("Deneme-Toplanti-bir-ozeti.md")],
+                           capture_output=True, text=True, timeout=30, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json")))
+        ok("O6 1.'nin özeti gönderildi, kaydı 1.'nin dosyasıyla", c.returncode == 0 and son_dosya() == f1, c.stdout + c.stderr + str(son_dosya()))
+        time.sleep(2); d = R.durum()
+        ok("O7 2. özetle bitmedi, sürüyor", d.get("durum") == "suruyor" and d.get("dosya") == f2 and "(özet hazır) · " + f2 not in R.gunluk(), str(d))
+        ok("O8 ertelenen oturum açıldı (önceki toplantının özeti hazır)", bekle(lambda: acildi() == 2, 15) and "ertelenen toplantı oturumu açılıyor (önceki toplantının özeti hazır)" in R.gunluk()
+           and "ertelenen oturum açılmadı" not in R.gunluk(), R.gunluk()[-900:])
+        d = R.durum(); ok("O9 oturum artık 2.'nin: oturum_dosya yok, kayıtta oturum var", not d.get("oturum_dosya") and d.get("oturum") and not d.get("neden"), str(d))
+        DUR["sekme"] = None; R.ping("teams", False, "Toplantı iki | Microsoft Teams", "t2")
+        ok("O10 2. bitti", bekle(lambda: R.durum()["durum"] == "bos", 40), str(R.durum()))
+        DUR.update(sekme="t3", baslik="Toplantı üç | Microsoft Teams"); time.sleep(1.5); R.altyazi("üçüncü toplantının satırı", DUR["baslik"])
+        ok("O11 3. kendiliğinden tanındı, oturum ertelendi (eski oturuma bağlanmadı)", bekle(lambda: R.durum().get("durum") == "suruyor" and "OTO: " in R.gunluk()
+           and "önceki toplantının sonu bitince açılacak" in R.gunluk().split("Toplantı iki")[-1], 10) and acildi() == 2, str(R.durum()) + R.gunluk()[-700:])
+        f3 = R.durum().get("dosya")
+        r = R.istek("/son-toplanti", {"ozet": ozet("Deneme-Toplanti-iki-ozeti.md"), "baslik": "Toplantı iki", "dosya": f3})  # eski istemci: süren toplantının dosyası
+        time.sleep(2); d = R.durum()
+        ok("O12 eski istemcinin özeti 3.'yü bitirmedi, önceki toplantıya sayıldı", r.get("ok") and d.get("durum") == "suruyor" and d.get("dosya") == f3 and "önceki toplantıya sayıldı" in R.gunluk(), str(d))
+        ok("O13 3.'nün ertelenen oturumu açıldı", bekle(lambda: acildi() == 3, 15) and not R.durum().get("oturum_dosya"), R.gunluk()[-700:])
+        ok("O hata yok", "Traceback" not in R.gunluk(), R.gunluk()[-1500:])
+    finally: DUR["sekme"] = "dur"; R.kapat(); R.sil()
+
+for s in [s for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H, senaryo_L, senaryo_M, senaryo_N, senaryo_O) if not sys.argv[1:] or s.__name__[8:] in sys.argv[1:]]:  # ör. test/toplanti.py L M
     try: s()
     except Exception as e: ok(f"{s.__name__} istisna {e.__class__.__name__}: {e}", False)
 print(f"toplantı kaydı: {len(HATA)} sorun" + "".join(f"\n  KALDI: {h}" for h in HATA) if HATA else "toplantı kaydı: ✓ tüm senaryolar")

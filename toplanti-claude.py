@@ -369,7 +369,7 @@ def acik_cmd():
         n = 1 + max([int(q["id"][1:]) for q in qs if str(q.get("id", "")).startswith("a") and q["id"][1:].isdigit()] or [0])
         q = {"id": f"a{n}", "at": simdi(), "metin": " ".join(A.deger.split())[:200], "tetik": [kucuk(t.strip()) for t in A.tetik.split(",") if t.strip()],
              "kim": A.kim, "gundem": A.gundem, "durum": "acik", "baslik": gundem_basligi()}  # başlık: gündem değişince izle arşive taşır
-        try: q["file"] = get("/status").get("file")  # karne ve sonraki hazırlık hangi toplantıda sorulduğunu bilsin
+        try: q["file"] = oturum_dosyasi(get("/status"))  # karne ve sonraki hazırlık hangi toplantıda sorulduğunu bilsin
         except Exception: pass
         qs.append(q)
     elif A.islem == "sifirla":
@@ -1482,10 +1482,12 @@ def izle():
         time.sleep(2)
 
 # --- v0.7.0: kanıt listesi / açıklama ----------------------------------------------------------------------------
+def oturum_dosyasi(st):  # 3 Kasım (ardışık toplantı): oturum önceki toplantının sonunu yapıyorsa onun dosyası (aktarıcının toplanti.oturum_dosya), değilse süren toplantınınki
+    return ((st or {}).get("toplanti") or {}).get("oturum_dosya") or (st or {}).get("file")
 def toplanti_dosyasi(ad=None):
     if ad: return os.path.basename(ad).replace(".jsonl", ".md")
     try:
-        f = get("/status").get("file")
+        f = oturum_dosyasi(get("/status"))
         # (3 Ekim geri bildirimi) aynı kullanıcı ikinci kez katılınca aktarıcı yalnız altyazı günlüğü olan yeni bir
         # "toplantı" açtı; rapor onu seçip boş çıktı. Dökümü (.jsonl) olmayan dosya seçilmez, en son dökümlü toplantıya düşülür.
         if f and os.path.exists(os.path.join(A.dir, f.replace(".md", ".jsonl"))): return f
@@ -1935,14 +1937,14 @@ def ozet_hazir_cmd():
         except (OSError, ValueError) as e: print(f"(yapı dosyası okunamadı, özetten: {e})")
     try: st = get("/status")
     except Exception: sys.exit("aktarıcıya ulaşılamadı — özet kayıtlı, pano/bildirim yok")
-    ek = _toplanti_eylem_say(st.get("file"))
+    od = oturum_dosyasi(st); ek = _toplanti_eylem_say(od)
     if ek: say["is"] = (say.get("is") or 0) + ek  # 31 Ekim: toplantıda eklenen iş özette "0 iş" görünüyordu
     try: agj = json.load(open(os.path.join(A.dir, "agenda.json"), encoding="utf-8"))
     except Exception: agj = {}
-    baslik = A.baslik or ((agj.get("title") if agj.get("items") else None) or st.get("meeting") or os.path.basename(yol))
+    baslik = A.baslik or ((agj.get("title") if agj.get("items") else None) or (st.get("toplanti") or {}).get("oturum_ad") or st.get("meeting") or os.path.basename(yol))
     key = open(os.path.join(A.dir, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     # metin de gider: aktarıcı launchd'den çalıştığı için Masaüstü'ndeki özeti açamıyor; kendi klasörüne kopyasını yazar (panoda "Özeti aç")
-    body = {"ozet": yol, "baslik": baslik, "dosya": st.get("file"), "cikti": say, "degerlendirme": deg, "oneri": oneri, "metin": metin[:500000]}
+    body = {"ozet": yol, "baslik": baslik, "dosya": od, "cikti": say, "degerlendirme": deg, "oneri": oneri, "metin": metin[:500000]}
     if yj and os.path.exists(yj):  # S48 defter turu: kararlar/işler/düzeltmeler toplantı defterine (aktarıcı Masaüstü'nü okuyamaz; kopyası gider)
         try: body["yapi"] = json.load(open(yj, encoding="utf-8"))
         except (OSError, ValueError): pass
@@ -1956,7 +1958,7 @@ def ozet_hazir_cmd():
     print(f"panoda Son toplantılar + bildirim: {baslik}" + (" · zihin haritası" if body.get("harita") else "") + (" · " + ", ".join(f"{n} {a}" for a, n in (("karar", say.get("karar")), ("iş", say.get("is")), ("açık", say.get("acik"))) if n is not None) if say else " · '## Toplantı çıktısı' bölümü bulunamadı") + (" · öneri var" if oneri else ""))
 
 def _defter_dogrula(Y, v):  # toplantının döküm satır saatleri (aynı günün .jsonl'leri; bölünmüş dosyalar dahil) → kaynak sorunları; döküm yoksa None
-    try: f = (get("/status") or {}).get("file") or ""
+    try: f = oturum_dosyasi(get("/status")) or ""
     except Exception: f = ""
     gun = os.path.basename(f)[:10] or datetime.date.today().isoformat(); saat = []
     for g in os.listdir(A.dir):

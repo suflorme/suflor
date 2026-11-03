@@ -12,7 +12,7 @@
 # kümeleme olmaz, Whisper aynen çalışır. SpeechBrain'le aynı sonuç (6 Ekim, 18 parça: kosinüs ≥ 0,99999), parça başına ~25 ms.
 # Uydurma süzgeci: sessiz/gürültülü parçada Whisper altyazı kalıpları üretir ("Altyazı M.K.", "İzlediğiniz için
 # teşekkürler") — 1 Ekim yapay ses denemesinde görüldü. Kalıp + düşük güven + tekrar oranıyla atılır.
-import sys, os, json, time, base64, re
+import sys, os, json, time, base64, re, zlib
 os.environ.setdefault("HF_HUB_OFFLINE", "1")  # model diskte; ağa çıkma
 MODEL = os.environ.get("SUFLOR_WHISPER_MODEL", "mlx-community/whisper-large-v3-turbo")
 if "/" in MODEL and not os.path.isdir(MODEL):  # depo adı: çevrimdışı açılış refs/main ister; yoksa diskteki anlık görüntüden aç
@@ -20,6 +20,7 @@ if "/" in MODEL and not os.path.isdir(MODEL):  # depo adı: çevrimdışı açı
     _s = sorted(_g.glob(os.path.join(os.environ.get("HF_HOME") or os.path.expanduser("~/.cache/huggingface"), "hub", "models--" + MODEL.replace("/", "--"), "snapshots", "*", "weights.safetensors")))
     if _s and not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(_s[0]))), "refs", "main")): MODEL = os.path.dirname(_s[0])
 UYDURMA = re.compile(r"altyaz[ıi]\s*m\.?\s*k|izlediğiniz için teşekkür|субтитр|yoyo television|优优独播|abone ol(mayı|un)|beğenmeyi unutma|bir sonraki videoda|"
+                     r"^\W*(abone ol|[İi]zlediğiniz için)\W*$|"  # 3 Kasım: tek başına duran kalıp (cümle içindeki "abone olmak istiyorum" gerçek söz, kalır)
                      r"thanks? (you )?for watching|subtitles? by|please subscribe|amara\.org|transcribed by|"
                      r"^\W*(müzik|music|alkış|applause|\[.*\]|\(.*\))\W*$", re.I)
 # 23 Ekim üçlü sohbet denemesi: Fransızca altyazı imzası kullanıcının gerçek sözünün başına yapıştı ("- Sous-titrage: N-S-T-R, O Arkadaşlar sakin olun…");
@@ -67,6 +68,9 @@ def ses_olc(a, np, sr=16000):
 SR, NFFT, HOP = 16000, 400, 160
 # Tekrar döngüsü (19 Ekim test toplantısı): karşı kanaldan geri gelen kendi sesimiz "OBSERV, PARA, OLI, AKMU" + 9 kez "AKMU" yazıldı; kısa satırda sıkıştırma
 # oranı süzgeci (2,4) yakalamıyor. Aynı sözcük ya da 2–3 sözcüklük öbek art arda ≥ 4 kez ve satırın en az yarısıysa uydurma (gerçek "evet evet evet" 3 kez kalır).
+# 3 Kasım: 2 sözcüklük öbeğin tam 3 kez tekrarı da döngü; gerçek tepkiler ("tamam tamam", "evet anladım" ×3) muaf (öbek yalnız bu sözcüklerden oluşuyorsa)
+TEPKI_SOZ = frozenset("evet hayır hı hıhı hıı hm hmm mhm mm mmm ım ıı ee eh ah oh ha he tamam anladım anladık peki olur aynen tabii tabi yok ya işte yani ok okay yes no right yeah sure".split())
+def _tepki_obegi(b): return all(x in TEPKI_SOZ for x in b)
 def _tekrar_bul(w):
     # Art arda tekrar eden birimi bulur → (başlangıç, birim uzunluğu, tekrar sayısı) ya da None. 1–3 sözcüklük birim ≥ 4 kez ve satırın en az yarısıysa;
     # 4–12 sözcüklük birim (cümle ya da cümle çifti, noktalama farklı olsa da) ≥ 3 kez gelirse (28 Ekim Teams testi: iki cümlelik öbek 3 kez + yarım kopya;
@@ -76,7 +80,8 @@ def _tekrar_bul(w):
         while i + n <= len(w):
             k = 1
             while w[i + k * n:i + (k + 1) * n] == w[i:i + n]: k += 1
-            if (n <= 3 and k >= 4 and k * n >= len(w) / 2) or (n >= 4 and k >= 3 and len(set(w[i:i + n])) > 1): return i, n, k
+            if (n <= 3 and k >= 4 and k * n >= len(w) / 2) or (n >= 4 and k >= 3 and len(set(w[i:i + n])) > 1) \
+                    or (n == 2 and k == 3 and k * n >= len(w) / 2 and len(set(w[i:i + n])) > 1 and not _tepki_obegi(w[i:i + n])): return i, n, k
             i += 1
     return None
 def tekrar_dongu(metin):
@@ -111,6 +116,12 @@ def nokta_ayikla(metin, sn=0.0, hitap=()):  # → (kalan metin, atılan ya da No
     adli = any(re.search(r"(?<!\w)" + re.escape(str(h)) + r"(?!\w)", kalan, re.I) for h in hitap or () if str(h).strip())
     if not adli and (n <= 1 or (sn >= 3 and n / sn < NOKTA_YOGUNLUK)): return "", metin
     return kalan, metin
+# 3 Kasım (13:09 toplantısı): istemdeki "290.000" biçimini taklit eden uydurma sayı ("%83.000'ü" = yüzde 83; "2.000…" = "iki,"). Satır ATILMAZ, yalnız işaretlenir
+# (dökümün .jsonl kaydında sayi_suphe). Yüzde + binlik ayraç (başı 0 olmayan) ya da bağlamsız yalnız "N.000" satırı; "290.000 TL", "%83", "2.000 kişi" işaretlenmez.
+SAYI_YUZDE_RX = re.compile(r"%\s?[1-9]\d{0,2}\.\d{3}(?!\d)"); SAYI_CIPLAK_RX = re.compile(r"^\W*\d{1,3}\.000\W*$")
+def sayi_suphe(metin):
+    x = (metin or "").strip()
+    return bool(SAYI_YUZDE_RX.search(x) or SAYI_CIPLAK_RX.match(x))
 # Hız denetimi (28 Ekim: 1 sn'lik parçada 58 sözcük): sürekli konuşma saniyede ~6 sözcüğü geçmez; uzun ve imkânsız hızlı satır uydurmadır.
 def hiz_asiri(metin, sn):
     n = len(re.findall(r"\w+", metin or ""))
@@ -205,10 +216,13 @@ class CppMotor:
     def __call__(s, a, language=None, initial_prompt=None, **_):  # mlx_whisper.transcribe biçiminde sonuç
         r = s.istek(a, language, initial_prompt)
         seg = [{"text": x.get("text") or "", "start": float(x.get("start") or 0), "end": float(x.get("end") or 0),
-                "no_speech_prob": x.get("no_speech_prob", 0), "avg_logprob": x.get("avg_logprob", 0)} for x in r.get("segments") or []]
+                "no_speech_prob": x.get("no_speech_prob", 0), "avg_logprob": x.get("avg_logprob", 0),
+                "compression_ratio": sikisma_orani(x.get("text") or "")} for x in r.get("segments") or []]  # 3 Kasım: sunucu vermiyor; MLX'teki 2,4 süzgeci cpp'de de çalışsın
         d = str(r.get("language") or "").lower()
         return {"text": "".join(x["text"] for x in seg), "segments": seg, "language": s.kod.get(d, d) or language}
 CPP = None
+def sikisma_orani(t):  # Whisper'ın compression_ratio'su (metin bayt / zlib bayt); tekrar döngüsünde büyür
+    b = t.strip().encode("utf-8"); return round(len(b) / len(zlib.compress(b)), 3) if b else 0
 def mlx_model_var():  # MLX Whisper modeli diskte mi (çevrimdışı açılabilir mi) — yoksa yedek MLX'e geçmeden aktarıcıya "mlx_yok" denir
     if os.path.isdir(MODEL): return os.path.exists(os.path.join(MODEL, "weights.safetensors")) or os.path.exists(os.path.join(MODEL, "weights.npz"))
     import glob as _g
@@ -460,7 +474,7 @@ def main():
                     t_k = time.time(); pf = np.frombuffer(base64.b64decode(p["kapi_profil"]), np.float16).astype(np.float32); pf = pf / (np.linalg.norm(pf) + 1e-9)
                     kapi = {"kapi": kapi_benzerlik(iz, a, pf, np), "kapi_ms": round((time.time() - t_k) * 1000), "atilan_harf": sum(len(re.findall(r"\w", x)) for x in atilan)}
                 except Exception as e: kapi = {"kapi_hata": f"{e.__class__.__name__}: {str(e)[:80]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **km, **kapi})
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"sayi_suphe": True} if sayi_suphe(metin) else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **km, **kapi})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0

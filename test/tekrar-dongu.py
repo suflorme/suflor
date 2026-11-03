@@ -5,8 +5,8 @@
 import ast, os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); ns = {"re": re}
 a = ast.parse(open(os.path.join(KOD, "whisper-isci.py"), encoding="utf-8").read())
-exec(compile(ast.Module([n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in ("_tekrar_bul", "tekrar_dongu", "tekrar_kirp", "tekrar_sadelestir", "hiz_asiri", "nokta_ayikla")) or
-                         (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("HARF_DONGU_RX", "NOKTA_OBEK", "NOKTA_YOGUNLUK") for t in n.targets))], []), "whisper-isci.py", "exec"), ns)
+exec(compile(ast.Module([n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in ("_tekrar_bul", "tekrar_dongu", "tekrar_kirp", "tekrar_sadelestir", "hiz_asiri", "nokta_ayikla", "_tepki_obegi", "sayi_suphe")) or
+                         (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("HARF_DONGU_RX", "NOKTA_OBEK", "NOKTA_YOGUNLUK", "TEPKI_SOZ", "UYDURMA", "SAYI_YUZDE_RX", "SAYI_CIPLAK_RX") for t in n.targets))], []), "whisper-isci.py", "exec"), ns)
 TABLO = [("OBSERV, PARA, OLI, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU,", True, "19 Ekim gerçek satır"),
          ("Teşekkürler teşekkürler teşekkürler teşekkürler.", True, "tek sözcük döngüsü"), ("Bir iki, bir iki, bir iki, bir iki.", True, "iki sözcüklük öbek"),
          ("Evet evet evet, tamam.", False, "gerçek üçlü tekrar"), ("Evet evet evet evet, anladım ama bütçe konusunda henüz bir karar vermedik, haftaya bakalım.", False, "uzun cümlede tekrar"),
@@ -56,4 +56,23 @@ for m, sn, hit, b, ad in [(N, 5.5, (), "", "yalnız üç nokta → atılır"),
                           ("Evet ... tamam ... olur.", 3.0, (), "Evet ... tamam ... olur.", "iki ayrı öbek kalır (eşik 3)"),
                           (". . .", 1.0, (), "", "sözcüksüz noktalama → atılır"), ("Toplantı yarın saat onda.", 2.0, (), "Toplantı yarın saat onda.", "düz cümle")]:
     v = ns["nokta_ayikla"](m, sn, hit)[0]; hata += v != b; print(("✓ " if v == b else "✗ ") + f"{ad}: {v[:50]!r}")
+# 3 Kasım (rapor testler/whisper-uydurma-20261103.md): (1) 2 sözcüklük öbek tam ×3 döngü, gerçek tepkiler (17 gerçek örnek türü) muaf; (2) çıplak kalıp; (3) sayı şüphesi
+for m, b, ad in [("Bir iki, bir iki, bir iki.", True, "2 sözcük ×3 (sayma benzeri)"), ("Gel bak gel bak gel bak", True, "2 sözcük ×3 öbek"),
+                 ("Görüşürüz iyi günler görüşürüz iyi günler görüşürüz iyi günler", False, "3 sözcük ×3 kalır (kural 4+ sözcük)"),
+                 ("Tamam tamam tamam.", False, "tepki: tamam ×3"), ("Evet evet evet.", False, "tepki: evet ×3"), ("Hı hı hı.", False, "tepki: hı hı hı"),
+                 ("Mhm mhm mhm.", False, "tepki: mhm ×3"), ("Hmm hmm hmm.", False, "tepki: hmm ×3"), ("Anladım anladım anladım.", False, "tepki: anladım ×3"),
+                 ("Tamam anladım tamam anladım tamam anladım.", False, "tepki öbeği ×3"), ("Evet tamam evet tamam evet tamam.", False, "tepki öbeği ×3 (evet tamam)"),
+                 ("Tık tık tık.", False, "tık tık tık kalır"), ("Gibi gibi gibi.", False, "gibi gibi gibi kalır"),
+                 ("Dün akşam toplantıya girdik, bütçe bu bu bu şekilde gitti ama yine de bir bakalım şimdi.", False, "cümle içinde tek sözcük ×3 kalır"),
+                 ("Konu şu: bir ara bir ara bir ara bakalım diye konuşuruz ve haftaya karar veririz kesin.", False, "2 sözcük ×3 ama satırın yarısından az → kalır")]:
+    v = ns["tekrar_dongu"](m); hata += v != b; print(("✓ " if v == b else "✗ ") + f"{ad}: {'atılır' if v else 'kalır'}")
+for m, b, ad in [("abone ol", True, "çıplak abone ol"), ("Abone ol.", True, "büyük harfli, noktalı"), ("İzlediğiniz için.", True, "çıplak İzlediğiniz için"), ("izlediğiniz için", True, "küçük harf"),
+                 ("izlediğiniz için teşekkür ederim", True, "eski kalıp (teşekkür) hâlâ yakalanır"), ("Abone olmak istiyorum, fiyat nedir?", False, "cümle içi abone olmak kalır"),
+                 ("Yeni sisteme abone ol dediler.", False, "cümlede abone ol kalır"), ("Bunu izlediğiniz için teşekkür ederiz Ayşe Hanım.", True, "eski kalıp davranışı değişmedi"),
+                 ("Bu videoyu izlediğiniz için", False, "cümle sonunda 'izlediğiniz için' kalır")]:
+    v = bool(ns["UYDURMA"].search(m)); hata += v != b; print(("✓ " if v == b else "✗ ") + f"kalıp {ad}: {'atılır' if v else 'kalır'}")
+for m, b, ad in [("%83.000'ü", True, "yüzde + binlik ayraç"), ("Bütçenin %83.000'ü harcandı.", True, "cümlede yüzde + binlik"), ("2.000…", True, "bağlamsız 2.000"), ("3.000...", True, "bağlamsız 3.000"),
+                 ("290.000 TL", False, "normal tutar"), ("Toplam 290.000 TL harcadık.", False, "cümlede tutar"), ("%83", False, "normal yüzde"), ("yüzde 83", False, "sözlü yüzde"),
+                 ("2.000 kişi geldi.", False, "2.000 kişi"), ("%0.500", False, "ondalık yüzde"), ("%30.8", False, "ondalık yüzde 30.8"), ("Rakam 8.000 civarı.", False, "cümlede N.000"), ("", False, "boş")]:
+    v = ns["sayi_suphe"](m); hata += v != b; print(("✓ " if v == b else "✗ ") + f"sayı şüphesi {ad}: {'işaretli' if v else 'temiz'}")
 print("tekrar döngüsü: " + ("✓ hepsi geçti" if not hata else f"✗ {hata} hata")); sys.exit(1 if hata else 0)

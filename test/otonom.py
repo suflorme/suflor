@@ -186,6 +186,17 @@ try:
         ben_sozu("Bütçe tablosunu yarın gönderelim mi", 0.72); v, t5b = bekle(lambda v: v.get("durum") == "kesildi", 3)
         ok("okurken kullanıcı üstüne konuştu (ses izi 0,72, 5 sözcük) → okuma durdu", t5b is not None and "söz ölçümü: ses izi kullanıcıya benziyor" in log())
     else: ok("5b: okuma üstüne konuşma denemesi için yeterince uzun sürmedi", False)
+    # 5c) 3 Kasım: durdurma sözü Whisper satırını beklemeden altyazı taslağından (≥ 0,6 sn değişmeden) yakalanır; "Peki" ve "hı hı" taslağı kesmez, değişen taslak beklenir
+    def taslak(metin, i="tas/1"): uc("/taslak", {"meeting": {"title": "Otonom deneme"}, "source": "captions", "entries": [{"id": i, "speaker": "Deniz T", "text": metin}]})
+    SUSKU(); satir("ben", "Atlas, ekipte kaç kişi var, uzunca anlatır mısın?")
+    v, _ = bekle(lambda v: v.get("durum") == "okunuyor", 20); i5c = v.get("id"); time.sleep(0.6)
+    taslak("Peki.", "tas/0"); taslak("Hı hı.", "tas/0b"); time.sleep(0.8); taslak("Peki.", "tas/0"); taslak("Hı hı.", "tas/0b")
+    ok(f"okurken 'Peki' ve 'hı hı' taslağı kesmedi ({ot().get('durum')})", ot().get("id") == i5c and ot().get("durum") == "okunuyor" and "(taslak" not in log())
+    taslak("Bir"); time.sleep(0.3); taslak("Bir dakika."); t_tas = time.time(); time.sleep(0.3); taslak("Bir dakika.")
+    ok(f"taslak 0,3 sn'dir aynı: henüz kesmedi ({ot().get('durum')})", ot().get("durum") == "okunuyor")
+    time.sleep(0.5); taslak("Bir dakika.")
+    v, t5c = bekle(lambda v: v.get("durum") != "okunuyor", 3)
+    ok(f"okurken 'Bir dakika.' taslağı değişmeden durdu → okuma durdu, Whisper satırı beklenmedi ({ot().get('durum')}, {time.time() - t_tas:.1f} sn)", t5c is not None and "okurken kullanıcı 'Bir dakika.' dedi (taslak" in log() and time.time() - t_tas < 1.5)
     # 6) fırsat çıkmazsa söylenmez (otonom_bekle_sn 6)
     SUSKU(); s0 = son(); MOD["ben"] = "konus"; satir("karsi", "Atlas, sunumu kim yapacak?"); izin_ver()
     v, t5 = bekle(lambda v: v.get("durum") == "soylenmedi", 20); MOD["ben"] = "sessiz"
