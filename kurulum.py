@@ -147,41 +147,19 @@ def claude_denetle():
     CLAUDE.update(giris=ok, neden=neden)
     k = oku_json(KAYIT); k["claude_giris"] = ok; k["claude_neden"] = neden; yaz_json(KAYIT, k)  # sunucu yeniden başlasa da hatırlansın
 
-# ---------- yapay zekâ (Faz 11 Aşama 4): Claude Code · API anahtarı (Gemini ya da OpenAI uyumlu) · bu Mac'te yerel model (Ollama) ----------
-# Seçim, ayar yazımı, Anahtar Zinciri ve Ollama kurulumu aktarıcıyla ortak: aktarici/saglayici.py (modül olarak yüklenir). Anahtar kurulum.json'a
+# ---------- yapay zekâ (Faz 11 Aşama 4): Claude Code · API anahtarı (Gemini ya da OpenAI uyumlu) ----------
+# Seçim, ayar yazımı, Anahtar Zinciri aktarıcıyla ortak: aktarici/saglayici.py (modül olarak yüklenir). Anahtar kurulum.json'a
 # (sihirbazın cevapları) girmez: yalnız /api/beyin/anahtar ile Anahtar Zinciri'ne gider; ayara öğe adı.
 def _sg_yukle():
     import importlib.util
     sp = importlib.util.spec_from_file_location("suflor_saglayici", os.path.join(KOD, "aktarici", "saglayici.py"))
     m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
 SG = _sg_yukle()
-OLLAMA = {"p": None}
-def ollama_durum_yol(): return os.path.join(DESTEK, "ollama-kur.json")
-def ollama_durum():
-    a = ayar(); m = str(a.get("ollama_model") or SG.SG_OLLAMA_MODEL)
-    if SG.sg_ollama_kurulu(ORTAK) and SG.sg_ollama_model_var(ORTAK, m): return {"durum": "hazir", "yuzde": 100}
-    if os.path.isdir(ORTAK) and not os.access(ORTAK, os.W_OK) and not DENEME: return {"durum": "hata", "tur": "baska_hesap", "mesaj": ORTAK}
-    d = oku_json(ollama_durum_yol())
-    if OLLAMA["p"] is None or OLLAMA["p"].poll() is not None:
-        return d if d.get("durum") == "hata" else {"durum": "yok", "yuzde": 0}
-    return d if d.get("durum") == "iniyor" else {"durum": "iniyor", "yuzde": 0}
-def ollama_baslat():  # /api/ollama/baslat: araç (~181 MB) + model (~3,3 GB) ayrı süreçte; sihirbaz kapansa da sürer
-    if profil_hafif(): return {"durum": "hata", "yuzde": 0, "mesaj": "hafif profilde yerel model kapalı"}  # S188
-    if (OLLAMA["p"] and OLLAMA["p"].poll() is None) or ollama_durum().get("durum") == "hazir": return ollama_durum()
-    if DENEME: return {"durum": "iniyor", "yuzde": 0}
-    try: os.remove(ollama_durum_yol())
-    except OSError: pass
-    OLLAMA["p"] = subprocess.Popen([PY, "-u", os.path.abspath(__file__), "ollama"], stdout=open(os.path.join(DESTEK, "ollama-kur.log"), "a"),
-                                   stderr=subprocess.STDOUT, start_new_session=True)
-    return {"durum": "iniyor", "yuzde": 0}
-def ollama_kur():  # komut satırı: python3 kurulum.py ollama
-    a = ayar(); SG.sg_ollama_kur(ORTAK, ollama_durum_yol(), str(a.get("ollama_model") or SG.SG_OLLAMA_MODEL), SG.sg_ollama_port(a))
-    d = oku_json(ollama_durum_yol()); say(f"Ollama: {d.get('durum')} {d.get('mesaj') or ''}".strip()); return d.get("durum") == "hazir"
 def beyin_durum():  # /api/durum → "Yapay zekâ bağla" adımı
     a = ayar(); o = a.get("beyin_ozel") if isinstance(a.get("beyin_ozel"), dict) else {}
     return {"secim": SG.sg_secim(a)["varsayilan"], "gemini": SG.sg_anahtar_var(SG.sg_oge("gemini", a)), "gemini_oge": SG.sg_oge("gemini", a),
             "ozel": {"adres": o.get("adres") or "", "model": o.get("model") or "", "anahtar": SG.sg_anahtar_var(SG.SG_OZEL_OGE)},
-            "ollama": ollama_durum(), "ollama_gb": SG.SG_OLLAMA_MODEL_GB, "ollama_mb": SG.SG_OLLAMA["mb"], "dene": BEYIN_DENE}
+            "dene": BEYIN_DENE}
 BEYIN_DENE = {}  # son anahtar denemesi: saglayici → "iyi" | "anahtar" | "ag" (+ ayrıntı)
 def beyin_anahtar(p):  # /api/beyin/anahtar {saglayici: gemini|ozel, anahtar, adres?, model?} → Anahtar Zinciri + kısa deneme (model listesi; metin gitmez)
     sg = str(p.get("saglayici") or "")
@@ -710,7 +688,6 @@ def tamamla(c, dil):
     if adlar: a["whisper_terimler"] = list(dict.fromkeys(adlar + a["whisper_terimler"]))[:60]  # asistanın adı konuşma tanımada doğru yazılsın
     a.setdefault("claude_model", "sonnet")
     if c.get("profil") in ("hafif", "tam"): profil_uygula(a, c["profil"])  # S188: Mac adımındaki seçim (yalnız ≤ 8 GB'ta sorulur; yoksa mevcut profil kalır)
-    if c.get("yz") == "ollama" and profil_hafif(a): c = dict(c, yz="claude-code")  # S188: hafif profilde yerel model seçilemez
     if c.get("yz") in SG.SG_SECENEK:  # Faz 11: "Yapay zekâ bağla" adımı → beyin.varsayilan (iş başına seçim panodaki ⚙ Ayarlar'da); Claude Code seçilince dokunulmaz
         h = SG.sg_yaz(a, {"varsayilan": c["yz"]})
         if h: sonuc["uyarilar"] = sonuc.get("uyarilar", []) + [h]
@@ -914,7 +891,6 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/modeller/baslat": modeller_baslat(); return self._json(modeller_durum())
         if yol == "/api/claude/denetle": claude_denetle(); return self._json(claude_durum())
         if yol == "/api/beyin/anahtar": return self._json(beyin_anahtar(p))
-        if yol == "/api/ollama/baslat": return self._json(ollama_baslat())
         if yol == "/api/takvim": return self._json(takvim_ayarla(p.get("adresler"), p.get("cikar")))
         if yol == "/api/eposta": return self._json(eposta_ayarla(p.get("eposta"), p.get("eposta_adres")))
         if yol == "/api/profil": return self._json(profil_ayarla(p))
@@ -1373,7 +1349,7 @@ def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False
     if not DENEME:
         sessiz("launchctl", "bootout", f"{gui()}/{LABEL}")
         for ad in SIL_SUREC: sessiz("pkill", "-u", str(os.getuid()), "-x", ad)
-        for y in (Y["uygulama"], ort): sessiz("pkill", "-u", str(os.getuid()), "-f", re.escape(y))  # aktarıcı, işçiler, Ollama
+        for y in (Y["uygulama"], ort): sessiz("pkill", "-u", str(os.getuid()), "-f", re.escape(y))  # aktarıcı, işçiler
         time.sleep(1); sessiz(LSREGISTER, "-u", menu_yolu())
         for k in SIL_KIMLIK: sessiz("tccutil", "reset", "All", k)  # verilen izinler (mikrofon, ekran kaydı, takvim…) listeden düşer
     top = 0.0
@@ -2047,7 +2023,7 @@ def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
-    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "whispercpp", "guncelle", "guncelleme-sonrasi", "dogrula", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|dogrula|profil|mesgul")
+    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "whispercpp", "guncelle", "guncelleme-sonrasi", "dogrula", "profil", "mesgul", "pocket"], metavar="kur|kaldir|sil|modeller|guncelle|dogrula|profil|mesgul")
     ap.add_argument("--json", action="store_true", help="dogrula: makine okunur çıktı"); ap.add_argument("--hizli", action="store_true", help="dogrula: menü uygulamasını açan izin okumasını atla"); ap.add_argument("--yazma", action="store_true", help="dogrula: dogrula.json ve posta kutusuna yazma (deneme toplantısı kipi çağırır)")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
@@ -2059,7 +2035,6 @@ if __name__ == "__main__":
     if A.is_ == "dogrula": r = dogrula(A.json, hizli=A.hizli, yaz=not A.yazma); sys.exit(1 if r["ozet"]["hata"] else 0)
     if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
     if A.is_ == "pocket": sys.exit(0 if pocket_kur() else 1)
-    if A.is_ == "ollama": sys.exit(0 if ollama_kur() else 1)
     if A.is_ == "whispercpp": sys.exit(0 if whispercpp_kur() else 1)
     if A.is_ == "sil": sil(A.evet, A.zorla, A.modeller, A.proje, A.kod); sys.exit(0)
     if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak, A.zorla), "guncelleme-sonrasi": guncelleme_sonrasi, "profil": profil}[A.is_](); sys.exit(0)

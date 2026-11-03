@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 327606,
-   "sha": "4fd2cd7f1c8d6186"
+   "uzunluk": 327230,
+   "sha": "d7fdb78fea5c9462"
   },
   "/mini": {
-   "uzunluk": 327606,
-   "sha": "4fd2cd7f1c8d6186"
+   "uzunluk": 327230,
+   "sha": "d7fdb78fea5c9462"
   },
   "/status": {
    "_ping_son": "float",
@@ -261,7 +261,6 @@
    "ayarlar": {
     "beyin": {
      "gemini": "bool",
-     "ollama": "bool",
      "ozel": "bool",
      "saglik": [
       {
@@ -940,7 +939,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 8,
+  "DURUM": 7,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

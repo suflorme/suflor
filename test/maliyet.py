@@ -63,7 +63,7 @@ try:
     # Faz 11 Aşama 2: sağlayıcı alanı (eski satırda yok → claude-code); toplantı oturumu her zaman claude-code
     simdi_iso = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     with open(y, "a") as f:
-        for sg, is_, m_ in (("gemini", "bas-konus", 0.01), ("gemini", "proje-karti", 0.02), (None, "telaffuz", 0.03), ("ollama", "ceviri", 0)):
+        for sg, is_, m_ in (("gemini", "bas-konus", 0.01), ("gemini", "proje-karti", 0.02), (None, "telaffuz", 0.03), ("ozel", "ceviri", 0)):
             f.write(json.dumps(dict({"at": simdi_iso, "is": is_, "maliyet": m_}, **({"saglayici": sg} if sg else {}))) + "\n")
     ok("toplantı oturumu kaydında saglayici claude-code", all(json.loads(l).get("saglayici") == "claude-code" for l in open(y) if '"is": "toplanti"' in l))
     o = subprocess.run([sys.executable, "-B", os.path.join(KOD, ".claude/skills/suflor-olcum/olcum.py"), "maliyet", "--json"], capture_output=True, text=True, env=env)
@@ -75,8 +75,8 @@ try:
        len(m.get("toplantilar", [])) == n_oz == 19 and abs(tb - oz) < 0.02)
     ok("etiket düzeltmesi raporda (b-sonnet gerçek)", (m.get("gercek") or {}).get("toplanti") == 2)
     sg = m.get("saglayici") or {}
-    ok(f"olcum.py sağlayıcıya göre ayırır (gemini 2 çağrı 0,03 $, ollama 1, eski satır claude-code) {sg}", (sg.get("gemini") or {}).get("cagri") == 2 and abs((sg.get("gemini") or {}).get("maliyet", 0) - 0.03) < 1e-6
-       and (sg.get("ollama") or {}).get("cagri") == 1 and (sg.get("claude-code") or {}).get("isler", {}).get("telaffuz") == 1 and list(sg)[0] == "claude-code")
+    ok(f"olcum.py sağlayıcıya göre ayırır (gemini 2 çağrı 0,03 $, ozel 1, eski satır claude-code) {sg}", (sg.get("gemini") or {}).get("cagri") == 2 and abs((sg.get("gemini") or {}).get("maliyet", 0) - 0.03) < 1e-6
+       and (sg.get("ozel") or {}).get("cagri") == 1 and (sg.get("claude-code") or {}).get("isler", {}).get("telaffuz") == 1 and list(sg)[0] == "claude-code")
     o2 = subprocess.run([sys.executable, "-B", os.path.join(KOD, ".claude/skills/suflor-olcum/olcum.py"), "maliyet"], capture_output=True, text=True, env=env)
     ok("olcum.py maliyet raporunda sağlayıcı satırı", "Sağlayıcıya göre" in o2.stdout and "gemini 2 çağrı" in o2.stdout, )
     r = tc("--geri", "--json")

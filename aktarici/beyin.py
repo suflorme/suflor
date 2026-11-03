@@ -2,13 +2,13 @@
 # Ayrı modüldür (relay.py'nin ad alanında bölüm olarak çalışmaz): aktarıcı (brifing-ses.py BEYIN) ve proje-karti.py importlib ile yükler. Python 3.9 uyumlu.
 # İşler: konus, ceviri, telaffuz, brifing, proje_karti. Toplantı oturumu bilerek dışarıda (K3: Claude Code'da kalır, aktarici/toplanti-oturum.py).
 # İki uyarlayıcı: claude-code (`claude -p`; abonelik, önbellek tam; varsayılan) ve v0.122.0'dan (Aşama 1) openai-uyumlu (Gemini'nin OpenAI uyumlu ucu, OpenAI,
-# Ollama, LM Studio). Aşama 1 (v0.122.0) Konuş; Aşama 2: tek çağrılar da (proje kartı, telaffuz: tek_cagri / `beyin.py tek`; çeviri: araçsız açık süreç).
+# LM Studio gibi OpenAI uyumlu uç). Aşama 1 (v0.122.0) Konuş; Aşama 2: tek çağrılar da (proje kartı, telaffuz: tek_cagri / `beyin.py tek`; çeviri: araçsız açık süreç).
 # Yedek (§3.8): sağlayıcı hata ya da zaman aşımı verirse ve Claude Code kuruluysa o iş bir kez Claude Code ile yapılır (çağıran yerde; günlükte "BEYİN: yedek").
 # Çıktı Claude Code'un json / stream-json biçimidir ve iç protokol olarak kalır: okuyucular
 # (bas-konus.py _konus_oku, ceviri.py, brifing-ses.py claude_json) sağlayıcı değişse de aynı satırları okur.
 # Ayar (isteğe bağlı): "beyin": {"varsayilan": {"tur": "claude-code"}, "<iş>": {"tur": …, "model": …}}. Yoksa eski anahtarlar (konus_model,
 # ceviri_model, kart_model, claude_model) ve bugünkü varsayılanlar — ayarsız kurulumda argümanlar v0.121.0'dakiyle birebir aynı (test/beyin.py).
-# openai-uyumlu: {"tur": "openai-uyumlu", "saglayici": "gemini"|"openai"|"ollama"|"lmstudio" (adres hazır) ya da "adres": "https://…/v1", "model": …,
+# openai-uyumlu: {"tur": "openai-uyumlu", "saglayici": "gemini"|"openai"|"lmstudio" (adres hazır) ya da "adres": "https://…/v1", "model": …,
 # "anahtar": Anahtar Zinciri öğe adı (dosyaya anahtar yazılmaz; gemini'de yoksa ayar gemini_anahtar), "effort": reasoning_effort, "fiyat": [giriş, önbellek, çıkış] $/M belirteç,
 # "yedek": false → hata olunca Claude Code'a düşmez}.
 import glob as _glob, http.client, json, os, re, shutil, ssl, subprocess, sys, threading, time, urllib.parse, uuid
@@ -19,7 +19,7 @@ DESTEK = {"claude-code": ISLER, "openai-uyumlu": ("konus", "ceviri", "telaffuz",
 VARSAYILAN_MODEL = {"konus": "sonnet", "ceviri": "haiku", "telaffuz": "sonnet", "brifing": None, "proje_karti": "sonnet"}
 ESKI_ANAHTAR = {"konus": "konus_model", "ceviri": "ceviri_model", "brifing": "claude_model", "proje_karti": "kart_model"}
 HAZIR = {"gemini": "https://generativelanguage.googleapis.com/v1beta/openai", "openai": "https://api.openai.com/v1",
-         "ollama": "http://127.0.0.1:11434/v1", "lmstudio": "http://127.0.0.1:1234/v1"}
+         "lmstudio": "http://127.0.0.1:1234/v1"}
 # $/M belirteç (giriş, önbellekten okunan, çıkış — düşünme dahil). Kaynak ai.google.dev/gemini-api/docs/pricing, erişim 23.10.2026 (ücretli katman);
 # 3.8 Flash 1 Ocak 2027'de iki katına çıkıyor. Yerel adreste 0. Bilinmeyen modelde ayardaki "fiyat"; o da yoksa 0 (kayıtta maliyet 0 görünür).
 FIYAT_MTOK = {"gemini-3.8-flash": (0.75, 0.075, 3.75), "gemini-3.6-flash": (0.75, 0.075, 3.75), "gemini-3.5-flash-lite": (0.30, 0.03, 2.50),
@@ -28,7 +28,7 @@ _UYARILDI = set()
 
 def _uyar(anahtar, metin):
     if anahtar not in _UYARILDI: _UYARILDI.add(anahtar); sys.stderr.write(metin + "\n")
-def adres_uygun(a):  # ağ sınırı: https (sağlayıcının adresi) ya da yalnız bu Mac'teki http (yerel model); kullanıcı adı/sorgu yok
+def adres_uygun(a):  # ağ sınırı: https (sağlayıcının adresi) ya da yalnız bu Mac'teki http (elle verilen yerel uç); kullanıcı adı/sorgu yok
     try: u = urllib.parse.urlsplit(str(a or ""))
     except ValueError: return False
     if u.username or u.password or u.query or u.fragment or not u.hostname: return False
@@ -43,6 +43,8 @@ def secim(ayar, is_):  # → {"tur": uyarlayıcı, "model": ad ya da None} (+ op
     tur = str(s.get("tur") or "claude-code")
     if tur not in UYARLAYICILAR or is_ not in DESTEK[tur]:  # bilinmeyen ya da bu işi henüz yapamayan uyarlayıcı → bugünkü yol, bir kez uyarı
         _uyar((is_, tur), f"BEYİN: '{tur}' uyarlayıcısı {is_} için yok — claude-code kullanılıyor"); tur, s = "claude-code", {}
+    if tur == "openai-uyumlu" and str(s.get("saglayici") or "").lower() == "ollama":  # iptal edilen yerel model seçeneği (v0.178.0)
+        _uyar((is_, "ollama"), f"BEYİN: yerel model (Ollama) seçeneği kaldırıldı — {is_} için claude-code kullanılıyor"); tur, s = "claude-code", {}
     if tur == "openai-uyumlu":
         sg = str(s.get("saglayici") or "").lower(); adres = str(s.get("adres") or HAZIR.get(sg) or "").rstrip("/"); model = s.get("model")
         if not adres_uygun(adres) or not model:
@@ -128,9 +130,12 @@ def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None,
             "--allowedTools", "Read,Grep,Glob" + ("," + ek if ek else ""), "--add-dir", ek_dizin, "--append-system-prompt", sistem] + (["--mcp-config", mcp] if mcp else []) + \
            (yalin(ayar, bool(bilgi)) or ["--no-session-persistence"]) + ["--model", model or secim(ayar, "konus")["model"]] + \
            konus_onek_ayar(ayar, bilgi, "suflorvt" if mcp else None) + konus_effort(ayar)
+def ceviri_effort(ayar):  # varsayılan low (40 cümlede Haiku düşünme belirteci 455 → 0, ortanca 2,56 → 1,22 sn); ayar ceviri_effort: low|medium|high|xhigh|max, boş metin = bayrak yok
+    e = str(ayar["ceviri_effort"] if "ceviri_effort" in ayar and ayar["ceviri_effort"] is not None else "low").strip().lower()
+    return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
 def ceviri_args(ayar, sistem, model=None):  # açık süreç, araçsız (Popen; stdin/stdout stream-json); model: yedekte Claude modeli
     return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--model", model or secim(ayar, "ceviri")["model"],
-            "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", sistem]
+            "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", sistem] + ceviri_effort(ayar)
 def telaffuz_args(ayar, istem, model=None):  # tek çağrı (Brifing.app), json çıktı; model: yedekte Claude modeli
     return ["-p", istem, "--output-format", "json", "--model", model or secim(ayar, "telaffuz")["model"]] + yalin(ayar)
 def brifing_args(ayar, istem, ek_dizin, yalin_mi=True, bilgi=None):  # tek çağrı + Read/Grep/Glob; bilgi (konus_bilgi çıktısı) varsa FIFO kipi:

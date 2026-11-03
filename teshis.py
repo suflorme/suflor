@@ -134,7 +134,7 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"}, "kurulum_profil": {"hafif", "tam"}, "calisan_motor": {"mlx", "cpp"},  # S188: haftalık whisper_cpp'de son açılan motor
          "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"},
-         **{"beyin_" + i: {"claude-code", "gemini", "ozel", "ollama", ""} for i in ("varsayilan", "konus", "ceviri", "proje_karti")}}  # Faz 11: yalnız seçenek (ortam)
+         **{"beyin_" + i: {"claude-code", "gemini", "ozel", ""} for i in ("varsayilan", "konus", "ceviri", "proje_karti")}}  # Faz 11: yalnız seçenek (ortam)
 # sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için
 # (kaynak, kanal, kart türü, dönüş, karne boyutu) yalnız bilinen değerler. Uymayan anahtar "?<sıra>" olur (değer yine süzülür).
 ANAHTAR = re.compile(r"[a-z_][a-z0-9_]{0,39}")
@@ -196,7 +196,7 @@ def beyin_secenek(ayar):  # Faz 11: işlerin yapay zekâ seçeneği (aktarici/sa
         if not isinstance(d, dict) or not d.get("tur"): return ""
         if d.get("tur") != "openai-uyumlu": return "claude-code"
         sg = str(d.get("saglayici") or "").lower()
-        return sg if sg in ("gemini", "ollama") else "ollama" if re.match(r"^http://(127\.0\.0\.1|localhost):\d+/v1/?$", str(d.get("adres") or "")) and ":1234" not in str(d.get("adres")) else "ozel"
+        return "gemini" if sg == "gemini" else "claude-code" if sg == "ollama" else "ozel"  # ollama: kaldırılan eski seçenek, Claude Code'a düşer
     return {"beyin_varsayilan": ad(b.get("varsayilan")) or "claude-code", **{"beyin_" + i: ad(b.get(i)) for i in ("konus", "ceviri", "proje_karti")}}
 
 # ---------- proje klasörü (S141: "proje klasörü buluttaysa?") ----------

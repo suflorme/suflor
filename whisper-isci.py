@@ -252,6 +252,33 @@ def konusma_var(a, np, sr=16000):
     return p90 >= 0.02 and p90 / float(np.percentile(r, 10)) >= 3
 def tr_harf(x, dil):  # Türkçe çözümde Azerice "ə" (11 Ekim: arka plandaki haber "muhabirənin … adreslər" yazıldı) → "e"
     return x.replace("ə", "e").replace("Ə", "E") if dil == "tr" else x
+# Tamamı büyük harfli çıktı (3 Kasım, testler/kisa-soru-cpp-mlx-20261103.md): istem yalnız büyük harfli kısaltmalardan oluşunca (sözlüğü boş yeni kurulum)
+# whisper.cpp kısa Türkçe soruyu "BÜPÇE KAÇ LİRA?" diye büyük harfle yazıyor. Dil tr iken ≥ 3 harf ve ≥ 2 sözcük, harflerin tamamı büyükse Türkçe kuralla küçültülür;
+# istemde geçen kısaltmalar büyük kalır, cümle başları büyütülür. Tek sözcük ("AWS.") dokunulmaz.
+def _tr_alt(w): return w.replace("İ", "i").replace("I", "ı").lower()
+def _tr_ust(c): return {"i": "İ", "ı": "I"}.get(c, c.upper())
+def buyuk_harf_duzelt(x, dil, istem=""):
+    if dil != "tr" or not x: return x
+    harf = [c for c in x if c.isalpha()]
+    if len(harf) < 3 or not all(c.isupper() for c in harf) or len(x.split()) < 2: return x
+    kisa = {w.strip(".,:;!?…()\"'") for w in (istem or "").split()}; kisa = {w for w in kisa if len(w) >= 2 and w.isalpha() and w.isupper()}
+    cikti, bas = [], True
+    for w in x.split():
+        cek = w.strip(".,:;!?…()\"'")
+        if cek in kisa: y = w
+        else:
+            y = _tr_alt(w)
+            if bas:
+                i = next((k for k, c in enumerate(y) if c.isalpha()), None)
+                if i is not None: y = y[:i] + _tr_ust(y[i]) + y[i + 1:]
+        bas = w[-1:] in ".?!…"
+        cikti.append(y)
+    y = " ".join(cikti)
+    if y == x: return x
+    global _BUYUK_LOG
+    if not _BUYUK_LOG: _BUYUK_LOG = True; sys.stderr.write("WHISPER: tamamı büyük harf çıktı küçültüldü\n")
+    return y
+_BUYUK_LOG = False
 KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den aynen
 class Ecapa:
     def __init__(s, yol, np, mx):
@@ -421,7 +448,7 @@ def main():
                 if not x or UYDURMA.search(x) or (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
                         or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; atilan += [x] if x else []; continue
                 tut.append((s, x))
-            metin = tr_harf(" ".join(x for _, x in tut).strip(), r.get("language"))
+            metin = buyuk_harf_duzelt(tr_harf(" ".join(x for _, x in tut).strip(), r.get("language")), r.get("language"), istem)
             # toplantı dili dışındaki İngilizce (geçişle ya da kanal belleğiyle) kısa kalıp → uydurma
             if p.get("ana_dil") and r.get("language") == "en" != p["ana_dil"] and UYDURMA_EN.match(metin): atilan.append(metin); metin = ""; atla += 1
             if metin and UYDURMA_EN.match(metin) and not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1

@@ -32,7 +32,10 @@ def eski_konus(A, istem, vt, BASE, VT="mcp__suflorvt__vt_sema,mcp__suflorvt__vt_
            (eski_yalin(A) or ["--no-session-persistence"]) + ["--model", str(A.get("konus_model") or "sonnet")] + eski_onek(A) + eski_effort(A)
 def eski_ceviri(A, istem):
     return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--model", str(A.get("ceviri_model") or "haiku"),
-            "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", istem]
+            "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", istem] + eski_ceviri_effort(A)
+def eski_ceviri_effort(A):  # v0.178.0: varsayılan low, ayar ceviri_effort ile değişir, boş = yok
+    e = str(A["ceviri_effort"] if A.get("ceviri_effort") is not None else "low").strip().lower()
+    return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
 def eski_telaffuz(A, istem): return ["-p", istem, "--output-format", "json", "--model", "sonnet"] + eski_yalin(A)
 def eski_brifing(A, istem, BASE, yalin):
     return ["-p", istem, "--allowedTools", "Read,Grep,Glob", "--add-dir", BASE, "--output-format", "json"] + (eski_yalin(A) if yalin else []) + \
@@ -64,10 +67,12 @@ kontrol("bilinmeyen uyarlayıcı → claude-code, tek uyarı", s1["tur"] == "cla
 kontrol("bozuk beyin ayarı (liste/metin) bugünkü yola düşer", BY.secim({"beyin": ["x"], "ceviri_model": "sonnet"}, "ceviri") == {"tur": "claude-code", "model": "sonnet"}
         and BY.secim({"beyin": {"konus": "opus"}}, "konus")["model"] == "sonnet")
 AYAR_IS = {"beyin": {"varsayilan": {"tur": "openai-uyumlu", "saglayici": "gemini", "model": "gemini-3.8-flash", "effort": "low"},
-               "konus": {"tur": "openai-uyumlu", "saglayici": "ollama", "model": "qwen3.5:4b-q4_K_M"}}}
+               "konus": {"tur": "openai-uyumlu", "saglayici": "lmstudio", "model": "yerel-model"}}}
 s3 = BY.secim(AYAR_IS, "konus"); s4 = BY.secim(AYAR_IS, "ceviri") if "ceviri" in BY.DESTEK.get("openai-uyumlu", ()) else None
-kontrol("iş başına sağlayıcı: varsayılanın model/effort/saglayici alanı işe sızmaz", s3.get("saglayici") == "ollama" and s3.get("model") == "qwen3.5:4b-q4_K_M"
+kontrol("iş başına sağlayıcı: varsayılanın model/effort/saglayici alanı işe sızmaz", s3.get("saglayici") == "lmstudio" and s3.get("model") == "yerel-model"
         and s3.get("effort") is None and (s4 is None or s4.get("saglayici") == "gemini"), f"{s3} {s4}")
+kontrol("çeviri: varsayılan --effort low; ayar ceviri_effort değiştirir, boş = bayrak yok", BY.ceviri_args({}, "Ç")[-2:] == ["--effort", "low"]
+        and BY.ceviri_args({"ceviri_effort": "medium"}, "Ç")[-2:] == ["--effort", "medium"] and "--effort" not in BY.ceviri_args({"ceviri_effort": ""}, "Ç"))
 kontrol("brifing: model ayarı yoksa --model yok", "--model" not in BY.brifing_args({}, "b", "/x"))
 
 # --- ölçüm ---
@@ -114,9 +119,11 @@ kontrol("yedek_var: Claude Code kurulu ve yedek: false değilse; claude-code se�
 y_ = BY.yedek_satiri("ceviri", sk, "HTTP 503:\n çok   yoğun")
 kontrol("yedek günlük satırı tek satır, sağlayıcı + model + kısa neden", y_ == "BEYİN: yedek — ceviri: gemini gemini-3.8-flash olmadı (HTTP 503: çok yoğun) → claude-code", y_)
 with contextlib.redirect_stderr(io.StringIO()):
-    so = BY.secim({"beyin": {"konus": {"tur": "openai-uyumlu", "saglayici": "ollama", "model": "qwen3.5:4b"}}}, "konus")
+    so = BY.secim({"beyin": {"konus": {"tur": "openai-uyumlu", "saglayici": "lmstudio", "model": "m-yerel"}}}, "konus")
+    sol = BY.secim({"beyin": {"konus": {"tur": "openai-uyumlu", "saglayici": "ollama", "model": "qwen3.5:4b"}}}, "konus")
     sx = BY.secim({"beyin": {"konus": {"tur": "openai-uyumlu", "adres": "http://10.0.0.5/v1", "model": "m"}}}, "konus")
-kontrol("ollama: yerel adres, anahtarsız, maliyet 0 (fiyat yok)", so["adres"] == "http://127.0.0.1:11434/v1" and so["saglayici"] == "ollama" and not so["anahtar"] and not so["fiyat"], str(so))
+kontrol("elle verilen yerel uç (LM Studio): yerel adres, anahtarsız, maliyet 0 (fiyat yok)", so["adres"] == "http://127.0.0.1:1234/v1" and so["saglayici"] == "lmstudio" and not so["anahtar"] and not so["fiyat"], str(so))
+kontrol("eski ollama ayarı (seçenek kaldırıldı) → claude-code", sol == {"tur": "claude-code", "model": "sonnet"}, str(sol))
 kontrol("yerel ağdaki http adresi reddedilir → claude-code", sx == {"tur": "claude-code", "model": "sonnet"}, str(sx))
 kontrol("ayar yoksa Konuş claude-code (varsayılan değişmedi)", BY.secim({}, "konus") == {"tur": "claude-code", "model": "sonnet"})
 u = BY.istem_uyarla("gerekirse Read, Grep, Glob ile oku. dökümde Grep ile ara (output_mode content, -i, head_limit 60, en az iki); Read ile aç. Readme dosyası")

@@ -29,7 +29,7 @@
       m_python_ac: "Komut satırı araçları gerekiyor", m_python_dug: "Yükle", m_chrome_ac: "Teams toplantıları Chrome'da açılır", m_chrome_dug: "İndir",
       m_bellek_az: "16 GB önerilir; daha azında toplantıda diğer uygulamaları kapatman gerekebilir",
       m_az: "Bu Mac'te {gb} GB bellek var. Suflor.me 16 GB altında kararlı değil: toplantıda konuşma tanıma ve yapay zekâ birlikte çalışırken Mac yavaşlayabilir, döküm geç kalabilir. Devam edebilirsin; sorun yaşarsan önce diğer uygulamaları kapat.",
-      m_hafif_b: "Hafif kurulum (önerilir)", m_hafif_a: "Yerel Türkçe ses, belgelerde anlamla arama, yerel model ve ikinci Konuş süreci kapalı olur; asistan Mac sesiyle konuşur. Toplantıda Mac daha rahat çalışır.",
+      m_hafif_b: "Hafif kurulum (önerilir)", m_hafif_a: "Yerel Türkçe ses, belgelerde anlamla arama ve ikinci Konuş süreci kapalı olur; asistan Mac sesiyle konuşur. Toplantıda Mac daha rahat çalışır.",
       m_tam_b: "Tam kurulum", m_tam_a: "Hepsi açık; bu Mac'te toplantıda yavaşlama olabilir.",
       m_hafif: "Bu Mac'te {gb} GB bellek var. Suflor.me 16 GB altında kararlı değil; 8 GB ve altı için hafif kurulum öneriyoruz (aşağıda seçili). İstersen tam kuruluma geçebilirsin.",
       m_intel: "Bu Mac'te Intel işlemci var. Suflor.me yalnız Apple Silicon (M1 ve sonrası) işlemcili Mac'lerde çalışır; konuşma tanıma Intel'de desteklenmiyor. Kurulum burada duruyor.",
@@ -37,8 +37,7 @@
       claude_b: "Yapay zekâyı bağlayalım", claude_a: "Konuş'taki cevapları, kartları ve özetleri bir yapay zekâ yazar. Üç yoldan birini seç; sonra panodaki ⚙ Ayarlar'dan iş başına değiştirebilirsin.",
       yz_claude: "Claude Code (önerilen)", yz_claude_a: "Claude aboneliğinle. Toplantıdaki kartlar ve özet bununla çalışır.",
       yz_anahtar: "API anahtarı", yz_anahtar_a: "Gemini ya da OpenAI uyumlu bir hizmet; kullandıkça ücretlendirilir.",
-      yz_yerel: "Bu Mac'te yerel model", yz_yerel_a: "Ollama ile; internet ve ücret gerekmez. Türkçe aramada zayıf, yedek olarak önerilir.",
-      yz_gizlilik: "Claude dışında bir sağlayıcı seçersen metin bağlamı (döküm, not, belge parçası) o sağlayıcıya gider, ses gitmez; yerel model seçersen metin de Mac'ten çıkmaz.",
+      yz_gizlilik: "Claude dışında bir sağlayıcı seçersen metin bağlamı (döküm, not, belge parçası) o sağlayıcıya gider, ses gitmez.",
       yz_toplanti: "Toplantı sırasında kart ve özet yazan oturum şimdilik yalnız Claude Code'la çalışır. Claude Code yoksa döküm, pano ve Konuş çalışır.",
       yz_gemini: "Gemini (Google)", yz_ozel: "OpenAI uyumlu başka hizmet",
       yz_gemini_al: "Anahtarı Google AI Studio'dan alırsın (aistudio.google.com → Get API key). Ücretli katman önerilir: ücretsiz katmanda Google gönderilen metni ürünlerini geliştirmek için kullanabiliyor.",
@@ -47,11 +46,6 @@
       yz_kaydet: "Kaydet ve dene", yz_deneniyor: "Deneniyor…", yz_an_var: "Anahtar Anahtar Zinciri'nde", yz_an_yok: "Anahtar girilmedi",
       yz_an_iyi: "Hizmet anahtarı kabul etti", yz_an_anahtar: "Hizmet anahtarı kabul etmedi; anahtarı yeniden yapıştır.", yz_an_ag: "Hizmete ulaşılamadı; internet bağlantına ya da adrese bak.",
       yz_an_bicim: "Anahtar biçimi tanınmadı (harf, rakam, - _ . ; en az 16 karakter).", yz_an_zincir: "Anahtar Zinciri'ne yazılamadı.", yz_an_adres: "Adres https:// ile başlamalı.", yz_an_model: "Model adını yaz.",
-      yz_ol_kur: "İndir ve kur", yz_ol_boyut: "İndirme ~{gb} GB: Ollama aracı (~{mb} MB, resmî sürüm, imzası denetlenir) ve qwen3.5 4B modeli. Mac açılışında kendiliğinden çalışmaz; Suflor.me gerekince açar.",
-      yz_ol_uyari: "Yerel model kısa sorularda işe yarar ama Türkçe belgelerde aramayı çoğu zaman yanlış yapıyor (denemede 4 sorudan 0 doğru). Yedek olarak önerilir; daha iyi sonuç için Claude Code ya da bir API anahtarı.",
-      yz_ol_iniyor: "Yerel model iniyor", yz_ol_hazir: "Yerel model hazır", yz_ol_yok: "Yerel model kurulu değil", yz_ol_hata: "Yerel model kurulamadı", yz_ol_yeniden: "Yeniden dene",
-      yz_ol_baska: "Ortak klasöre yazılamıyor (başka macOS hesabı kurmuş); yerel modeli o hesapta kur.", yz_ol_bekle: "İndirme arka planda sürer; kuruluma devam edebilirsin.",
-      yz_ol_bellek: "Bu Mac'te 16 GB'tan az bellek var; yerel model toplantıda konuşma tanımayla birlikte Mac'i yavaşlatabilir.",
       c_kurulu: "Claude Code kurulu", c_yok: "Claude Code bulunamadı", c_giris: "Oturum açık", c_giris_yok: "Oturum açılmamış ya da denetlenmedi", c_giris_degil: "Oturum açık değil",
       c_kur: "Terminal'de kur ve giriş yap", c_denetle: "Yeniden denetle",
       c_aciklama: "Terminal açılır ve kurulum komutu hazır yazılı olur. Bitince açılan Claude'da hesabınla giriş yap, sonra buraya dön.",
@@ -150,7 +144,7 @@
       m_python_ac: "Command line tools are needed", m_python_dug: "Install", m_chrome_ac: "Teams meetings open in Chrome", m_chrome_dug: "Download",
       m_bellek_az: "16 GB recommended; with less you may need to close other apps during meetings",
       m_az: "This Mac has {gb} GB of memory. Suflor.me is not stable below 16 GB: while speech recognition and the AI run together in a meeting, the Mac may slow down and the transcript may lag. You can continue; if you run into trouble, close other apps first.",
-      m_hafif_b: "Light setup (recommended)", m_hafif_a: "Local Turkish voice, meaning-based document search, the local model and the second Ask process stay off; the assistant speaks with the Mac voice. The Mac runs more comfortably in meetings.",
+      m_hafif_b: "Light setup (recommended)", m_hafif_a: "Local Turkish voice, meaning-based document search and the second Ask process stay off; the assistant speaks with the Mac voice. The Mac runs more comfortably in meetings.",
       m_tam_b: "Full setup", m_tam_a: "Everything on; this Mac may slow down in meetings.",
       m_hafif: "This Mac has {gb} GB of memory. Suflor.me is not stable below 16 GB; for 8 GB and less we recommend the light setup (selected below). You can switch to the full setup if you like.",
       m_intel: "This Mac has an Intel processor. Suflor.me only runs on Macs with Apple silicon (M1 and later); speech recognition is not supported on Intel. Setup stops here.",
@@ -158,8 +152,7 @@
       claude_b: "Connect an AI", claude_a: "An AI writes the Talk answers, cards and summaries. Pick one of three ways; later you can change it per task in ⚙ Settings on the panel.",
       yz_claude: "Claude Code (recommended)", yz_claude_a: "With your Claude subscription. Cards and summaries during meetings use it.",
       yz_anahtar: "API key", yz_anahtar_a: "Gemini or an OpenAI-compatible service; billed by usage.",
-      yz_yerel: "Local model on this Mac", yz_yerel_a: "With Ollama; no internet or fees. Weak at Turkish search, recommended as a fallback.",
-      yz_gizlilik: "If you pick a provider other than Claude, text context (transcript, notes, document passages) goes to that provider, audio doesn't; with a local model, text doesn't leave your Mac either.",
+      yz_gizlilik: "If you pick a provider other than Claude, text context (transcript, notes, document passages) goes to that provider, audio doesn't.",
       yz_toplanti: "For now the session that writes cards and summaries during meetings works only with Claude Code. Without Claude Code, transcription, the panel and Talk work.",
       yz_gemini: "Gemini (Google)", yz_ozel: "Other OpenAI-compatible service",
       yz_gemini_al: "Get a key from Google AI Studio (aistudio.google.com → Get API key). The paid tier is recommended: on the free tier Google may use the text sent to improve its products.",
@@ -168,11 +161,6 @@
       yz_kaydet: "Save and test", yz_deneniyor: "Testing…", yz_an_var: "Key is in the Keychain", yz_an_yok: "No key entered",
       yz_an_iyi: "The service accepted the key", yz_an_anahtar: "The service rejected the key; paste it again.", yz_an_ag: "Couldn't reach the service; check your internet connection or the address.",
       yz_an_bicim: "Key format not recognised (letters, digits, - _ . ; at least 16 characters).", yz_an_zincir: "Couldn't write to the Keychain.", yz_an_adres: "The address must start with https://.", yz_an_model: "Enter the model name.",
-      yz_ol_kur: "Download and install", yz_ol_boyut: "Download ~{gb} GB: the Ollama tool (~{mb} MB, official release, signature checked) and the qwen3.5 4B model. It doesn't start at login; Suflor.me starts it when needed.",
-      yz_ol_uyari: "The local model handles short questions but often searches Turkish documents wrongly (0 of 4 right in our test). Recommended as a fallback; for better results use Claude Code or an API key.",
-      yz_ol_iniyor: "Local model downloading", yz_ol_hazir: "Local model ready", yz_ol_yok: "Local model not installed", yz_ol_hata: "Local model couldn't be installed", yz_ol_yeniden: "Try again",
-      yz_ol_baska: "Can't write to the shared folder (another macOS account installed it); install the local model from that account.", yz_ol_bekle: "The download continues in the background; you can go on with setup.",
-      yz_ol_bellek: "This Mac has less than 16 GB of memory; during meetings the local model plus speech recognition may slow it down.",
       c_kurulu: "Claude Code is installed", c_yok: "Claude Code not found", c_giris: "Signed in", c_giris_yok: "Not signed in or not checked yet", c_giris_degil: "Not signed in",
       c_kur: "Install and sign in with Terminal", c_denetle: "Check again",
       c_aciklama: "Terminal opens with the install command ready. When it finishes, sign in to Claude, then come back here.",
@@ -296,7 +284,7 @@
     const d = {
       mac: { islemci: "Apple M3", arm: true, macos: "15.1", macos_ok: true, bellek_gb: 16, donanim: "tamam", disk_gb: 84, python: "3.9.6", chrome: true, teams_uygulama: true },
       claude: { kurulu: true, surum: "2.1.4", giris: true },
-      beyin: { secim: "claude-code", gemini: false, ozel: { adres: "", model: "", anahtar: false }, ollama: { durum: "yok", yuzde: 0 }, ollama_gb: 3.3, ollama_mb: 181, dene: {} },
+      beyin: { secim: "claude-code", gemini: false, ozel: { adres: "", model: "", anahtar: false }, dene: {} },
       modeller: { durum: "iniyor", yuzde: 38, cpp: { durum: "iniyor", yuzde: 12 } }, eklenti: { bagli: false }, kod: "~/Suflor.me",
       proje: "~/Suflor", varsayilan_ad: "Ayşe Yılmaz", asistan: { pocket: true },
       takvim: { durum: "ok", takvimler: [{ ad: "İş", hesap: "Exchange", sec: true }, { ad: "Kişisel", hesap: "iCloud", sec: true }, { ad: "Türkiye tatilleri", hesap: "iCloud", sec: false }],
@@ -359,12 +347,11 @@
   }
   // ---------- yapay zekâ (Faz 11 Aşama 4) ----------
   const yzSec = () => C.yz || "claude-code";
-  const yzGrup = () => ({ gemini: "anahtar", ozel: "anahtar", ollama: "ollama" })[yzSec()] || "claude-code";
+  const yzGrup = () => ({ gemini: "anahtar", ozel: "anahtar" })[yzSec()] || "claude-code";
   const BY = () => (D.durum || {}).beyin || {};
   function yzHazir() { const c = (D.durum || {}).claude || {}, b = BY(), y = yzSec();
     if (y === "gemini") return !!b.gemini && (((b.dene || {}).gemini || {}).sonuc !== "anahtar");
     if (y === "ozel") return !!((b.ozel || {}).anahtar && (b.ozel || {}).adres && (b.ozel || {}).model);
-    if (y === "ollama") return ["hazir", "iniyor"].includes((b.ollama || {}).durum);
     return !!(c.kurulu && c.giris) || !!C.kartsiz; }
   const kartYz = () => { const c = (D.durum || {}).claude || {}, y = C.yz || BY().secim; return !!(c.kurulu && c.giris) || (["gemini", "ozel"].includes(y) && yzHazir()); };
   const YZ_HATA = { bicim: "yz_an_bicim", zincir: "yz_an_zincir", adres: "yz_an_adres", model: "yz_an_model", yok: "yz_an_yok" };
@@ -378,23 +365,12 @@
       <div class="alan"><label for="yz_anahtar">${esc(t.yz_anahtar_alan)}</label><input type="password" id="yz_anahtar" data-yz-alan="anahtar" placeholder="${esc(t.yz_anahtar_ph)}" autocomplete="off" spellcheck="false"><div class="ipucu">${esc(t.yz_anahtar_i)}</div></div>
       <div class="liste">${durum}</div>
       ${y === "gemini" ? `<p class="dipnot">${esc(t.yz_gemini_al)}</p>` : ""}`; }
-  function yzYerelIcerik() { const b = BY(), o = b.ollama || {}, m = (D.durum || {}).mac || {};
-    const st = o.durum === "hazir" ? satir("iyi", t.yz_ol_hazir) : o.durum === "iniyor" ? satir("bekle", `${t.yz_ol_iniyor} · %${o.yuzde || 0}`, t.yz_ol_bekle)
-      : o.durum === "hata" ? satir("kotu", t.yz_ol_hata, o.tur === "baska_hesap" ? t.yz_ol_baska : (o.mesaj || ""), o.tur === "baska_hesap" ? "" : dug("yz-ollama", t.yz_ol_yeniden))
-      : satir("uyari", t.yz_ol_yok, "", dug("yz-ollama", t.yz_ol_kur));
-    return `<div class="liste">${st}</div><p class="dipnot">${esc(tf(t.yz_ol_boyut, { gb: (Number(b.ollama_gb || 3.3) + Number(b.ollama_mb || 181) / 1024).toLocaleString(D.dil === "en" ? "en" : "tr", { maximumFractionDigits: 1 }), mb: b.ollama_mb || 181 }))}</p>
-      <div class="kart-not uyari" data-yz-uyari>${esc(t.yz_ol_uyari)}</div>${m.bellek_gb && m.bellek_gb < 16 ? `<p class="dipnot">${esc(t.yz_ol_bellek)}</p>` : ""}`; }
   async function yzKaydet() {  // anahtar alandan okunur, gönderilince alan boşalır (yeniden çizim); kurulum.json'a yazılmaz
     const y = yzSec(), e = $("[data-yz-alan=anahtar]"), anahtar = e ? e.value.trim() : "";
     if (y === "ozel") { const a = $("[data-yz-alan=adres]"), md = $("[data-yz-alan=model]"); if (a) C.yz_adres = a.value.trim(); if (md) C.yz_model = md.value.trim(); kaydet(); }
     D.yzDen = true; ciz(); let r;
     try { r = await api("beyin/anahtar", { saglayici: y, anahtar, adres: C.yz_adres, model: C.yz_model }); } catch (x) { r = { ok: false, hata: "zincir" }; }
     D.yzDen = false; D.yzSonuc = { ...r, sg: y }; await durumAl(); ciz();
-  }
-  async function ollamaBekle() {
-    if (D.olBek) return; D.olBek = true;
-    try { while (gorunen()[D.adim] && gorunen()[D.adim].id === "claude" && yzSec() === "ollama") {
-      await durumAl(); ciz(); if (((BY().ollama || {}).durum) !== "iniyor") break; await new Promise(r => setTimeout(r, 3000)); } } finally { D.olBek = false; }
   }
   function claudeIcerik() { const c = (D.durum || {}).claude || {};
         // Terminal'de komut yoksa söyle; denetim başarısızsa nedeni. v0.13.5: oturum yoksa giriş düğmesi her zaman + adım adım yönerge
@@ -467,15 +443,15 @@
           ${m.donanim === "intel" ? `<div class="kart-not uyari" data-donanim="intel">${esc(t.m_intel)}</div>` : m.donanim === "az_bellek" ? `<div class="kart-not uyari" data-donanim="az-bellek">${esc(tf(t.m_az, { gb: m.bellek_gb }))}</div>` : m.donanim === "hafif" ? `<div class="kart-not uyari" data-donanim="hafif">${esc(tf(t.m_hafif, { gb: m.bellek_gb }))}</div>
           <div class="liste-secim" data-profil-secim>${[["hafif", t.m_hafif_b, t.m_hafif_a], ["tam", t.m_tam_b, t.m_tam_a]].map(([v, b, a]) =>
             `<label class="anahtar"><input type="radio" name="profil" data-profil="${v}" ${(C.profil || "hafif") === v ? "checked" : ""}><span><b>${esc(b)}</b><br><span class="ipucu">${esc(a)}</span></span></label>`).join("")}</div>` : ""}`; } },
-    // Faz 11 Aşama 4: "Yapay zekâ bağla" — Claude Code (bugünkü adım) · API anahtarı (Gemini / OpenAI uyumlu) · yerel model (Ollama). Kimlik "claude" kalır
+    // Faz 11 Aşama 4: "Yapay zekâ bağla" — Claude Code (bugünkü adım) · API anahtarı (Gemini / OpenAI uyumlu). Kimlik "claude" kalır
     // (kurulum.json'daki kayıtlı adım). Seçim kurulumda beyin.varsayilan'a yazılır (kurulum.py tamamla); Claude Code seçilmediyse Claude denetimi beklenmez.
     { id: "claude", simge: "claude", b: "claude_b", a: "claude_a", hazir: () => yzHazir(),
       // adıma girince oturum bilinmiyorsa kendiliğinden denetler; Terminal'den dönünce (pencere odağı) yeniden denetler
       gir: async () => { await durumAl(); if (C.yz == null) { const s = ((D.durum || {}).beyin || {}).secim; C.yz = s || "claude-code"; } const c = (D.durum || {}).claude || {};
-        if (yzSec() === "claude-code" && c.kurulu && c.giris !== true) await claudeDenetle(); if (yzSec() === "ollama") ollamaBekle(); },
-      icerik: () => `<div class="liste-secim">${[["claude-code", t.yz_claude, t.yz_claude_a], ["anahtar", t.yz_anahtar, t.yz_anahtar_a], ["ollama", t.yz_yerel, t.yz_yerel_a]].filter(([v]) => v !== "ollama" || yzGrup() === "ollama").map(([v, b, a]) =>
+        if (yzSec() === "claude-code" && c.kurulu && c.giris !== true) await claudeDenetle(); },
+      icerik: () => `<div class="liste-secim">${[["claude-code", t.yz_claude, t.yz_claude_a], ["anahtar", t.yz_anahtar, t.yz_anahtar_a]].map(([v, b, a]) =>
           `<label class="anahtar"><input type="radio" name="yz" data-yz="${v}" ${yzGrup() === v ? "checked" : ""}><span><b>${esc(b)}</b><br><span class="ipucu">${esc(a)}</span></span></label>`).join("")}</div>
-        <div class="yz-panel">${yzGrup() === "anahtar" ? yzAnahtarIcerik() : yzGrup() === "ollama" ? yzYerelIcerik() : claudeIcerik()}</div>
+        <div class="yz-panel">${yzGrup() === "anahtar" ? yzAnahtarIcerik() : claudeIcerik()}</div>
         <p class="dipnot" data-yz-gizlilik>${esc(t.yz_gizlilik)}</p>${yzGrup() === "claude-code" ? "" : `<p class="dipnot">${esc(t.yz_toplanti)}</p>`}` },
     // profil tek ekran (17 → 10 ekran, 8 Ekim): ad zorunlu, gerisi isteğe bağlı; Claude'un çalışma notu kurulumda dökümlerden
     // arka planda taslak olarak yazılır (kurulum.py profil), ilk toplantı sonunda /toplanti onayını sorar
@@ -701,7 +677,6 @@
       if (n === "ornek") { C.ornek = !C.ornek; kaydet(); ciz(); return; }
       if (n === "claude-denetle") { await claudeDenetle(); return; }
       if (n === "yz-kaydet") { await yzKaydet(); return; }
-      if (n === "yz-ollama") { await api("ollama/baslat", {}).catch(() => {}); await durumAl(); ciz(); ollamaBekle(); return; }
       if (n === "kur-yeniden") { const a = gorunen()[D.adim]; if (a && a.gir) await a.gir(); return; }  // kurulum adımı başarısızsa
       if (n === "modeller-yeniden") { await api("modeller/baslat", {}).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "claude-yol") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
@@ -739,7 +714,7 @@
   document.addEventListener("change", e => {  // yapay zekâ seçimi (radyo): anahtar grubunda önceki hizmet (yoksa Gemini)
     if (!e.target.matches || !e.target.matches("[data-yz]")) return; const v = e.target.dataset.yz;
     C.yz = v === "anahtar" ? (["gemini", "ozel"].includes(C.yz) ? C.yz : C.yz_sg || "gemini") : v; D.yzSonuc = null; kaydet(); ciz();
-    const c = (D.durum || {}).claude || {}; if (v === "claude-code" && c.kurulu && c.giris !== true) claudeDenetle(); if (v === "ollama") ollamaBekle(); });
+    const c = (D.durum || {}).claude || {}; if (v === "claude-code" && c.kurulu && c.giris !== true) claudeDenetle(); });
   document.addEventListener("change", e => { if (e.target.matches && e.target.matches("[data-as-iki]")) { asistanHazirla(); C.asistan.iki = e.target.checked; kaydet(); ciz(); } });
   document.addEventListener("change", e => { if (e.target.dataset && e.target.dataset.asAd != null) ciz(); });  // ad alanından çıkınca: var olan asistan notu ve tarz seçeneği yeni ada göre
   document.addEventListener("input", e => { const k = e.target.dataset && e.target.dataset.cevap; if (k) { C[k] = e.target.value; const a = gorunen()[D.adim]; if (a.hazir) $("#devam").disabled = !a.hazir(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500); } });

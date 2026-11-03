@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # Yapay zekâ sağlayıcısı seçimi (Faz 11 Aşama 4, aktarici/saglayici.py): seçenek ↔ "beyin" ayarı (sg_profil, sg_ad, sg_yaz; elle yazılmış model korunur),
 # beyin.py secim()'in yazılan ayarı doğru okuması, teshis.py beta seçeneğinin (yalnız tür) aynı ayrımı yapması, Anahtar Zinciri yazımının biçim denetimi
-# (deneme kipinde Anahtar Zinciri'ne dokunulmaz), anahtar denemesi sahte sunucuya, Ollama kurulumu sahte sürümle (SHA-256 uyuşmazlığı, arşiv denetimi,
-# model indirme ilerlemesi), deneme aktarıcısında panodaki ⚙ Ayarlar (beyin_* satırları, anahtarsız seçenek reddi, Varsayılanlara dön dışında) ve Ollama'nın
-# yalnız ayar onu gösterirken açılıp kapanması (OLLAMA_CONTEXT_LENGTH, 127.0.0.1), /status beyin sağlığı; kurulum sihirbazının /api/beyin/anahtar ve
-# kur/tamamla'nın beyin.varsayilan yazması (deneme ev klasörü).
+# (deneme kipinde Anahtar Zinciri'ne dokunulmaz), anahtar denemesi sahte sunucuya, deneme aktarıcısında panodaki ⚙ Ayarlar (beyin_* satırları,
+# anahtarsız seçenek reddi, kaldırılan "ollama" seçeneğinin reddi ve eski ayarın Claude Code'a düşmesi, Varsayılanlara dön dışında), /status beyin sağlığı;
+# kurulum sihirbazının /api/beyin/anahtar ve kur/tamamla'nın beyin.varsayilan yazması (deneme ev klasörü).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/saglayici.py      (~20 sn; kaldı → çıkış 1)
 import hashlib, http.server, importlib.util, io, json, os, re, shutil, socket, subprocess, sys, tarfile, tempfile, threading, time, urllib.error, urllib.request
 
@@ -35,28 +34,30 @@ kontrol("gemini varsayılan", SG.sg_yaz(a, {"varsayilan": "gemini"}) is None and
 s = BY.secim(a, "konus")
 kontrol("beyin.py: Konuş Gemini'ye (adres hazır, öğe suflor-gemini, effort low)", s["tur"] == "openai-uyumlu" and s["adres"] == BY.HAZIR["gemini"] and s["anahtar"] == "suflor-gemini" and s["effort"] == "low", s)
 kontrol("beyin.py: ayardaki gemini_anahtar öğesi geçerli", BY.secim(dict(a, gemini_anahtar="benim-oge"), "konus")["anahtar"] == "benim-oge")
-SG.sg_yaz(a, {"ceviri": "claude-code", "konus": "ollama"})
-kontrol("iş başına: çeviri Claude Code, Konuş yerel", SG.sg_secim(a) == {"varsayilan": "gemini", "konus": "ollama", "ceviri": "claude-code", "proje_karti": ""}, SG.sg_secim(a))
+a["beyin_ozel"] = {"adres": "https://api.ornek.com/v1", "model": "m-1"}; SG.sg_yaz(a, {"ceviri": "claude-code", "konus": "ozel"})
+kontrol("iş başına: çeviri Claude Code, Konuş OpenAI uyumlu", SG.sg_secim(a) == {"varsayilan": "gemini", "konus": "ozel", "ceviri": "claude-code", "proje_karti": ""}, SG.sg_secim(a))
 s = BY.secim(a, "konus")
-kontrol("beyin.py: Konuş Ollama'ya (127.0.0.1:11434, effort none)", s["adres"] == "http://127.0.0.1:11434/v1" and s["effort"] == "none" and s["fiyat"] is None, s)
+kontrol("beyin.py: Konuş ozel hizmete (adres, öğe suflor-ozel, effort/öğe sızmaz)", s["adres"] == "https://api.ornek.com/v1" and s["effort"] is None and s["anahtar"] == "suflor-ozel", s)
 kontrol("beyin.py: çeviri claude-code (haiku)", BY.secim(a, "ceviri") == {"tur": "claude-code", "model": "haiku"})
 kontrol("sg_etkin: proje kartı varsayılanı izler", SG.sg_etkin(a)["proje_karti"] == "gemini")
-a["beyin"]["konus"]["model"] = "qwen3:4b"; SG.sg_yaz(a, {"konus": "ollama"})
-kontrol("aynı seçenek yeniden: elle yazılmış model korunur", a["beyin"]["konus"]["model"] == "qwen3:4b")
-b = dict(a, ollama_port=11499); SG.sg_yaz(b, {"proje_karti": "ollama"})
-kontrol("ollama_port: adres yazılır, ad yine ollama", b["beyin"]["proje_karti"]["adres"] == "http://127.0.0.1:11499/v1" and SG.sg_ad(b["beyin"]["proje_karti"]) == "ollama")
-kontrol("ozel tanımsızken hata", SG.sg_yaz(dict(a), {"konus": "ozel"}) is not None)
-o = dict(a, beyin_ozel={"adres": "https://api.ornek.com/v1", "model": "m-1"}); SG.sg_yaz(o, {"konus": "ozel"})
+a["beyin"]["konus"]["model"] = "m-elle"; SG.sg_yaz(a, {"konus": "ozel"})
+kontrol("aynı seçenek yeniden: elle yazılmış model korunur", a["beyin"]["konus"]["model"] == "m-elle")
+b = {"beyin": {"konus": {"tur": "openai-uyumlu", "saglayici": "ollama", "model": "qwen3.5:4b-q4_K_M"}, "ceviri": {"tur": "openai-uyumlu", "adres": "http://127.0.0.1:11434/v1", "model": "x"}}}
+kontrol("eski ayar (ollama): seçenek Claude Code'a düşer, loopback adres elle verilen ozel sayılır", SG.sg_ad(b["beyin"]["konus"]) == "claude-code" and SG.sg_ad(b["beyin"]["ceviri"]) == "ozel")
+kontrol("beyin.py: eski ollama ayarı Claude Code'a düşer (çökmez)", BY.secim(b, "konus") == {"tur": "claude-code", "model": "sonnet"}, BY.secim(b, "konus"))
+kontrol("ollama artık seçenek değil", "ollama" not in SG.SG_SECENEK and SG.sg_yaz({}, {"konus": "ollama"}) is not None)
+kontrol("ozel tanımsızken hata", SG.sg_yaz({}, {"konus": "ozel"}) is not None)
+o = dict(a); o.pop("beyin", None); SG.sg_yaz(o, {"varsayilan": "gemini"}); SG.sg_yaz(o, {"konus": "ozel"})
 kontrol("ozel: adres + model + öğe suflor-ozel", {k: v for k, v in o["beyin"]["konus"].items() if v is not None} == {"tur": "openai-uyumlu", "adres": "https://api.ornek.com/v1", "model": "m-1", "anahtar": "suflor-ozel"})
 s = BY.secim(o, "konus")
 kontrol("beyin.py: ozel (varsayılan Gemini'yken) → saglayici diger, effort/öğe sızmaz", s["saglayici"] == "diger" and s["effort"] is None and s["anahtar"] == "suflor-ozel" and s["fiyat"] is None, s)
-kontrol("LM Studio (127.0.0.1:1234) ollama sayılmaz", SG.sg_ad({"tur": "openai-uyumlu", "adres": "http://127.0.0.1:1234/v1"}) == "ozel")
+kontrol("LM Studio (127.0.0.1:1234) ozel sayılır", SG.sg_ad({"tur": "openai-uyumlu", "adres": "http://127.0.0.1:1234/v1"}) == "ozel")
 SG.sg_yaz(a, {"konus": "", "ceviri": "", "varsayilan": "claude-code"})
 kontrol("hepsi geri: beyin anahtarı kalkar", "beyin" not in a, a)
 kontrol("bilinmeyen iş/seçenek reddedilir", SG.sg_yaz({}, {"toplanti": "gemini"}) and SG.sg_yaz({}, {"konus": "x"}))
 
 # --- 2. beta: yalnız seçenek, aynı ayrım -------------------------------------------------------------------------------------------
-for d in ({}, {"beyin": {"konus": SG.sg_profil("ollama", {}), "varsayilan": SG.sg_profil("gemini", {})}}, o, b):
+for d in ({}, {"beyin": {"konus": SG.sg_profil("ozel", o), "varsayilan": SG.sg_profil("gemini", {})}}, o, b):
     tb = teshis.beyin_secenek(d); sg = SG.sg_secim(d)
     kontrol(f"teshis.beyin_secenek = sg_secim ({sorted(set(sg.values()))})", all(tb["beyin_" + k] == v for k, v in sg.items()), (tb, sg))
 p = teshis.temizle(teshis.beyin_secenek(o))
@@ -83,67 +84,17 @@ kontrol("http (yerel olmayan) adres reddedilir", SG.sg_anahtar_dene("http://orne
 os.environ["SUFLOR_TEST_BEYIN_ANAHTAR"] = ""
 kontrol("anahtar yoksa denenmez", SG.sg_anahtar_dene(f"http://127.0.0.1:{api_port}/v1", "x")[0] == "anahtar")
 
-# --- 4. Ollama kurulumu (sahte sürüm) -------------------------------------------------------------------------------------------------
-GEC = tempfile.mkdtemp(prefix="suflor-sg-")
-SAHTE = r'''#!/usr/bin/python3
-# sahte ollama: yalnız "serve" — /api/version, /api/tags, /api/pull (akışlı ilerleme, sonra bildirim dosyası); ortamı kayda yazar
-import json, os, sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
-if sys.argv[1:2] != ["serve"]: sys.exit(0)
-h, p = os.environ["OLLAMA_HOST"].rsplit(":", 1); mod = os.environ["OLLAMA_MODELS"]
-os.makedirs(mod, exist_ok=True)
-json.dump({k: os.environ.get(k) for k in ("OLLAMA_HOST", "OLLAMA_CONTEXT_LENGTH", "OLLAMA_MODELS")}, open(os.path.join(mod, "..", "ortam.json"), "w"))
-class H(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200); self.end_headers(); self.wfile.write(b'{"version":"0-sahte"}')
-    def do_POST(self):
-        b = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}"); ad, _, et = b["model"].partition(":")
-        self.send_response(200); self.end_headers()
-        for c in (0, 1 << 27, 1 << 28):
-            self.wfile.write((json.dumps({"status": "pulling", "total": 1 << 28, "completed": c}) + "\n").encode()); self.wfile.flush()
-        y = os.path.join(mod, "manifests", "registry.ollama.ai", "library", ad); os.makedirs(y, exist_ok=True); open(os.path.join(y, et), "w").write("{}")
-        self.wfile.write(b'{"status":"success"}\n')
-    def log_message(self, *a): pass
-HTTPServer((h, int(p)), H).serve_forever()
-'''
-paket = os.path.join(GEC, "sunucu"); os.makedirs(paket)
-bilgi = tarfile.TarInfo("ollama"); veri = SAHTE.encode(); bilgi.size = len(veri); bilgi.mode = 0o755
-with tarfile.open(os.path.join(paket, "ollama-darwin.tgz"), "w:gz") as t: t.addfile(bilgi, io.BytesIO(veri))
-kotu = tarfile.TarInfo("../kacis"); kotu.size = 1
-with tarfile.open(os.path.join(paket, "kotu.tgz"), "w:gz") as t: t.addfile(kotu, io.BytesIO(b"x"))
-sha = hashlib.sha256(open(os.path.join(paket, "ollama-darwin.tgz"), "rb").read()).hexdigest()
-class Dosya(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *a, **k): super().__init__(*a, directory=paket, **k)
-    def log_message(self, *a): pass
-dosya_port = bos_port(); threading.Thread(target=http.server.HTTPServer(("127.0.0.1", dosya_port), Dosya).serve_forever, daemon=True).start()
-ol_port = bos_port()
-def kur(ortak, url, sha_):
-    os.environ["SUFLOR_TEST_OLLAMA_URL"] = url; os.environ["SUFLOR_TEST_OLLAMA_SHA"] = sha_
-    dy = os.path.join(ortak, "ollama-kur.json"); os.makedirs(ortak, exist_ok=True); SG.sg_ollama_kur(ortak, dy, port=ol_port); return json.load(open(dy))
-o1 = os.path.join(GEC, "ortak1")
-d = kur(o1, f"http://127.0.0.1:{dosya_port}/ollama-darwin.tgz", "0" * 64)
-kontrol("SHA-256 uyuşmazlığı → hata, araç kurulmaz", d["durum"] == "hata" and "SHA" in d.get("mesaj", "") and not SG.sg_ollama_kurulu(o1), d)
-o2 = os.path.join(GEC, "ortak2")
-d = kur(o2, f"http://127.0.0.1:{dosya_port}/kotu.tgz", hashlib.sha256(open(os.path.join(paket, "kotu.tgz"), "rb").read()).hexdigest())
-kontrol("klasör dışına çıkan arşiv öğesi → hata", d["durum"] == "hata" and not os.path.exists(os.path.join(o2, "kacis")), d)
-o3 = os.path.join(GEC, "ortak3")
-d = kur(o3, f"http://127.0.0.1:{dosya_port}/ollama-darwin.tgz", sha)
-kontrol("kurulum: araç + model hazır", d["durum"] == "hazir" and SG.sg_ollama_kurulu(o3) and SG.sg_ollama_model_var(o3), d)
-ort = json.load(open(os.path.join(o3, "ollama", "ortam.json")))
-kontrol("kurulumda sunucu: 127.0.0.1, bağlam 32768, modeller ortak klasörde", ort == {"OLLAMA_HOST": f"127.0.0.1:{ol_port}", "OLLAMA_CONTEXT_LENGTH": "32768", "OLLAMA_MODELS": os.path.join(o3, "ollama", "modeller")}, ort)
-kontrol("kurulum bitince geçici sunucu kapandı", bekle(lambda: not SG.sg_ollama_acik(ol_port), 5))
-kontrol("indirme dosyası silindi", not os.path.exists(os.path.join(o3, "ollama", ".indirme.tgz")))
-kontrol("sağlık: yerel model hazır", SG.sg_saglik({"ortak": o3, "beyin": {"konus": SG.sg_profil("ollama", {})}, "ollama_port": ol_port}, True)[-1]["ok"])
-kontrol("sağlık: yerel seçili ama kurulu değil → ⚠", not SG.sg_saglik({"ortak": o1, "beyin": {"konus": SG.sg_profil("ollama", {})}})[-1]["ok"])
+# --- 4. sağlık ---------------------------------------------------------------------------------------------------------------------------
 kontrol("sağlık: Gemini anahtarsız → ⚠", not [x for x in SG.sg_saglik({"beyin": {"varsayilan": SG.sg_profil("gemini", {})}}, True) if x["ad"] == "gemini"][0]["ok"])
+GEC = tempfile.mkdtemp(prefix="suflor-sg-"); o3 = os.path.join(GEC, "ortak3"); os.makedirs(o3)
 
-# --- 5. deneme aktarıcısı: panodaki Ayarlar + Ollama'yı başlatma -------------------------------------------------------------------------------
+# --- 5. deneme aktarıcısı: panodaki Ayarlar -------------------------------------------------------------------------------
 subprocess.run(["pkill", "-f", "relay.py --dir " + GEC], capture_output=True)
 RL = os.path.join(GEC, "relay"); shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(RL, "aktarici")); shutil.copy(os.path.join(KOD, "relay.py"), RL)
 shutil.copy(os.path.join(KOD, "manifest.json"), RL); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(RL, "pano"))
 rport = bos_port(); ayar_yol = os.path.join(GEC, "ayar.json"); os.makedirs(os.path.join(GEC, "uyg"))
-json.dump({"port": rport, "uygulama": os.path.join(GEC, "uyg"), "ortak": o3, "proje": os.path.join(GEC, "proje"), "ollama_port": ol_port}, open(ayar_yol, "w"))
-ort = dict(os.environ, SUFLOR_AYAR=ayar_yol, SUFLOR_TEST_OLLAMA="1", SUFLOR_TEST_BEYIN_ANAHTAR="", PYTHONDONTWRITEBYTECODE="1")
+json.dump({"port": rport, "uygulama": os.path.join(GEC, "uyg"), "ortak": o3, "proje": os.path.join(GEC, "proje"), "beyin": {"konus": {"tur": "openai-uyumlu", "saglayici": "ollama", "model": "qwen3.5:4b-q4_K_M"}}}, open(ayar_yol, "w"))  # eski ayar: kaldırılan seçenek
+ort = dict(os.environ, SUFLOR_AYAR=ayar_yol, SUFLOR_TEST_BEYIN_ANAHTAR="", PYTHONDONTWRITEBYTECODE="1")
 canli = os.path.join(GEC, "canli"); gunluk = open(os.path.join(GEC, "relay.log"), "w")
 rp = subprocess.Popen([sys.executable, os.path.join(RL, "relay.py"), "--dir", canli, "--port", str(rport)], env=ort, stdout=gunluk, stderr=subprocess.STDOUT, cwd=RL)
 try:
@@ -158,25 +109,18 @@ try:
                                    headers={"X-Suflor-Anahtar": an, "Origin": f"http://127.0.0.1:{rport}", "Content-Type": "application/json"})
         return json.load(urllib.request.urlopen(r, timeout=10))
     st = istek("/status"); ay = st["ayarlar"]
-    kontrol("/status beyin: ayarsızken Claude Code", st["beyin"]["etkin"] == {"konus": "claude-code", "ceviri": "claude-code", "proje_karti": "claude-code"}, st.get("beyin"))
-    kontrol("Ayarlar: beyin_* değerleri + kullanılabilirlik", ay["deger"]["beyin_varsayilan"] == "claude-code" and ay["deger"]["beyin_konus"] == "" and ay["beyin"]["ollama"] is True and ay["beyin"]["gemini"] is False, ay.get("beyin"))
+    kontrol("/status beyin: eski ollama ayarı Claude Code'a düşer", st["beyin"]["etkin"] == {"konus": "claude-code", "ceviri": "claude-code", "proje_karti": "claude-code"}, st.get("beyin"))
+    kontrol("Ayarlar: beyin_* değerleri + kullanılabilirlik", ay["deger"]["beyin_varsayilan"] == "claude-code" and ay["deger"]["beyin_konus"] == "claude-code" and "ollama" not in ay["beyin"] and ay["beyin"]["gemini"] is False, ay.get("beyin"))
+    kontrol("Ayarlar: kullanılabilirlikte ollama yok", "ollama" not in json.dumps(ay["beyin"]))
     kontrol("Varsayılanlara dön yapay zekâ seçimine dokunmaz", not any(k.startswith("beyin_") for k in ay["varsayilan"]))
     r = istek("/ayar", {"degisen": {"beyin_konus": "gemini"}})
     kontrol("anahtarsız Gemini reddedilir", r.get("ok") is False and "beyin_konus" in r.get("hata", {}), r)
-    kontrol("Ollama seçilmeden açılmadı", not SG.sg_ollama_acik(ol_port))
     r = istek("/ayar", {"degisen": {"beyin_konus": "ollama"}})
-    kontrol("Konuş → yerel model kaydedildi", r.get("ok") and json.load(open(ayar_yol))["beyin"]["konus"]["saglayici"] == "ollama", r)
-    kontrol("ayar yerel modeli gösterince Ollama açıldı", bekle(lambda: SG.sg_ollama_acik(ol_port), 10))
-    kontrol("günlük: OLLAMA: başlatıldı", "OLLAMA: başlatıldı" in open(os.path.join(GEC, "relay.log")).read())
-    st = istek("/status")
-    kontrol("/status beyin: Konuş ollama, sağlık ✓", st["beyin"]["etkin"]["konus"] == "ollama" and all(x["ok"] for x in st["beyin"]["saglik"] if x["ad"] == "ollama"), st["beyin"])
-    r = istek("/ayar", {"degisen": {"beyin_konus": ""}})
-    kontrol("Konuş varsayılana dönünce Ollama kapandı", r.get("ok") and bekle(lambda: not SG.sg_ollama_acik(ol_port), 10) and "beyin" not in json.load(open(ayar_yol)))
+    kontrol("kaldırılan 'ollama' seçeneği reddedilir", r.get("ok") is False and "beyin_konus" in r.get("hata", {}), r)
     r = istek("/ayar", {"degisen": {"beyin_proje_karti": "bilinmeyen"}})
     kontrol("bilinmeyen seçenek reddedilir", r.get("ok") is False)
 finally:
     rp.terminate(); rp.wait(5); gunluk.close()
-    subprocess.run(["pkill", "-f", os.path.join(o3, "ollama", "ollama")], capture_output=True)
 
 # --- 6. kurulum sihirbazı (deneme ev klasörü) ------------------------------------------------------------------------------------------
 EVK = os.path.join(GEC, "ev"); os.makedirs(EVK)
@@ -193,7 +137,7 @@ try:
                                    headers={"Origin": f"http://127.0.0.1:{kp}", "Content-Type": "application/json"})
         return json.load(op.open(r, timeout=30))
     d = kapi("durum")["beyin"]
-    kontrol("sihirbaz /api/durum beyin", d["secim"] == "claude-code" and "ollama" in d and d["ollama_gb"] == SG.SG_OLLAMA_MODEL_GB, d)
+    kontrol("sihirbaz /api/durum beyin", d["secim"] == "claude-code" and "ollama" not in d and "ollama_gb" not in d, d)
     r = kapi("beyin/anahtar", {"saglayici": "gemini", "anahtar": "kisa"})
     kontrol("sihirbaz: biçimsiz anahtar → hata bicim", r == {"ok": False, "hata": "bicim", "ayrinti": r.get("ayrinti")}, r)
     r = kapi("beyin/anahtar", {"saglayici": "ozel", "anahtar": "A" * 20, "adres": "http://ornek.com/v1", "model": "m"})

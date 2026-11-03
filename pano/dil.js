@@ -763,7 +763,7 @@ globalThis.SUFLOR_EN = {
   "Basılı tut ve konuş": "Hold and speak",
   // --- ⚙ Ayarlar → Genel → Yapay zekâ (Faz 11 Aşama 4)
   "Yapay zekâ": "AI",
-  "Konuş’taki cevapları, çeviriyi ve proje kartını yazan yapay zekâ. Claude dışında bir sağlayıcı seçersen metin bağlamı o sağlayıcıya gider, ses gitmez; yerel model seçersen metin Mac’ten çıkmaz. Toplantıdaki kartlar ve özet şimdilik yalnız Claude Code’la. Anahtar ve yerel model kurulum sihirbazının Yapay zekâ adımından.": "The AI that writes Talk answers, translation and the project card. If you pick a provider other than Claude, text context goes to that provider, audio doesn't; with a local model text doesn't leave your Mac. Cards and summaries during meetings use only Claude Code for now. Keys and the local model are set up in the setup wizard's AI step.",
+  "Konuş’taki cevapları, çeviriyi ve proje kartını yazan yapay zekâ. Claude dışında bir sağlayıcı seçersen metin bağlamı o sağlayıcıya gider, ses gitmez. Toplantıdaki kartlar ve özet şimdilik yalnız Claude Code’la. Anahtar kurulum sihirbazının Yapay zekâ adımından.": "The AI that writes Talk answers, translation and the project card. If you pick a provider other than Claude, text context goes to that provider, audio doesn't. Cards and summaries during meetings use only Claude Code for now. The key is set up in the setup wizard's AI step.",
   "Bas-konuş, sohbet ve toplantıda asistanın cevapları.": "Push-to-talk, conversation and the assistant's answers in meetings.",
   "Çeviride": "In translation",
   "Canlı ve sesli çeviri.": "Live and spoken translation.",
@@ -773,7 +773,6 @@ globalThis.SUFLOR_EN = {
   "Claude Code": "Claude Code",
   "Gemini (API anahtarı)": "Gemini (API key)",
   "OpenAI uyumlu (API anahtarı)": "OpenAI-compatible (API key)",
-  "Bu Mac’te yerel model": "Local model on this Mac",
   // --- Faz D (v0.147.0): toplantı var veri yok, Kurulumu denetle
   "açık": "on",
   "yok": "none",

@@ -1531,9 +1531,9 @@ AYAR_PANO = {
     "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "sure_duyuru": ("bool", False, None),
     "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None),  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
-    "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel", "ollama")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")),
+    "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
-    "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel", "ollama"))}
+    "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel"))}
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
@@ -1571,9 +1571,9 @@ def ayar_yaz(deg):
         if k not in AYAR_PANO: hata[k] = _t("bilinmeyen ayar", "unknown setting"); continue
         tur, _, sinir = AYAR_PANO[k]
         if tur == "beyin":
-            hazir = sg_ayar_view() if v in ("gemini", "ozel", "ollama") else {}
+            hazir = sg_ayar_view() if v in ("gemini", "ozel") else {}
             if str(v) not in sinir: hata[k] = _t("geçersiz", "invalid")
-            elif v in ("gemini", "ozel", "ollama") and not hazir.get(v): hata[k] = _t("anahtar yok" if v != "ollama" else "yerel model kurulu değil", "no key" if v != "ollama" else "local model not installed")
+            elif v in ("gemini", "ozel") and not hazir.get(v): hata[k] = _t("anahtar yok", "no key")
             else: beyin[k[len("beyin_"):]] = str(v)
             continue
         if tur == "bool" and isinstance(v, bool): yeni[k] = v
@@ -1615,7 +1615,7 @@ def ayar_yaz(deg):
     if beyin:
         if "beyin" in a: AYAR["beyin"] = a["beyin"]
         else: AYAR.pop("beyin", None)
-        _SG_DURUM["t"] = 0; yeni.update({"beyin_" + k: v for k, v in beyin.items()}); threading.Thread(target=sg_bak, daemon=True).start()  # Ollama gerekirse hemen açılır/kapanır
+        _SG_DURUM["t"] = 0; yeni.update({"beyin_" + k: v for k, v in beyin.items()})
     if "takvim_paylasilan" in yeni: threading.Thread(target=lambda: (takvim_yenile(), takvim_gecmis_yenile(True)), daemon=True).start()  # seçilen takvimler hemen okunur
     if "dil" in yeni: global ARAYUZ_DILI; ARAYUZ_DILI = "en" if AYAR.get("dil") == "en" else "tr"  # aktarıcının kendi metinleri de yeni dille
     print("AYAR: panodan değişti — " + ", ".join(sorted(yeni)))
@@ -1661,7 +1661,7 @@ bolum("piper-ses")  # aktarici/piper-ses.py — Piper ile yerel Türkçe seslend
 bolum("pocket-ses")  # aktarici/pocket-ses.py — Pocket TTS ile yerel Türkçe ses (kişilikte yerel_ses: pocket:…; S93)
 bolum("gemini-ses")  # aktarici/gemini-ses.py — Gemini TTS ile seslendirme (ayar ses_motoru: gemini; v0.78.0)
 bolum("azure-ses")  # aktarici/azure-ses.py — Azure MAI sesi, Gemini okuyamayınca yedek (ayar azure_yedek; v0.128.0, S151)
-bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /status beyin), Anahtar Zinciri, Ollama'yı gerekince başlatma (Faz 11 Aşama 4)
+bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /status beyin), Anahtar Zinciri (Faz 11 Aşama 4)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
@@ -2338,7 +2338,6 @@ if __name__ == "__main__":
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=menu_baslat, daemon=True).start()  # ayar menu_cubugu
     threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
-    threading.Thread(target=sg_bekci, daemon=True).start()  # Faz 11: ayar yerel modeli (Ollama) gösteriyorsa sunucusu açık tutulur
     threading.Thread(target=_heartbeat_dongu, daemon=True).start()
     threading.Thread(target=_kaynak_dongu, daemon=True).start()  # C fazı: kaynak bekçisi
     threading.Thread(target=_veri_yok_dongu, daemon=True).start()  # Faz D: toplantı var, veri yok  # S162: heartbeat.json 8 sn'de bir
