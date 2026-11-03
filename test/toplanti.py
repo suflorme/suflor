@@ -6,6 +6,10 @@
 #     yenisinin olayları yenisinde; E) 296 sn gecikmiş satır: bitiyor'da eski dosyaya, bitti'den sonra yazılmaz (GEÇ SATIR, gec_atilan).
 #  F) Meet kodlu sayfa başlığı → dosya adı takvimden.  G) 2016-meet B1: çağrısız Teams sekmesi çağrıdaki Meet'i ezmez.
 #  H) kısa kopma aynı dosya; aktarıcı yeniden başlayınca aynı dosya; elle bitir → sekme hâlâ çağrıda iken yeniden açılmaz.
+#  L) ardışık toplantı (3 Kasım): /status aktif yalnız canlı toplantı, gosterim + toplanti.son bitiyor/bitti'de; sürerken farklı konuyla Başlat → soru, onayla →
+#     eski kapanır + yeni dosya; bitiyor'da konusuz Başlat → yeni dosya (ad "<Platform> toplantısı HH:MM").  M) bitiyor'da başka sekme + başka başlık → yeni
+#     dosya; aynı sekme (başlık değişse de) ya da aynı başlık → aynı dosya; başlıksız başka sekme 10 sn'den önce aynı, sonra yeni.
+#  N) konuşmacı etiketlemesi (toplu Whisper, sahte) yeni toplantı sürerken ertelenir, toplantı bitince arka planda yapılır.
 # aktarici/toplanti.py, ingest/not/kanıt yönlendirmesi, /ping, /masaustu, /ses-yerel değişince koştur:  PYTHONDONTWRITEBYTECODE=1 python3 test/toplanti.py
 import base64, datetime, glob, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -22,8 +26,8 @@ MEET = olay("e1", "Örnek ile proje", "meet", -3, 27, "https://meet.google.com/a
 TEAMS = olay("e2", "Haftalık plan", "teams", -1, 29, "https://teams.microsoft.com/l/meetup-join/x")
 
 class Aktarici:
-    def __init__(self, olaylar=(), T=None):
-        self.T = T or os.path.realpath(tempfile.mkdtemp(prefix="toplanti-")); self.canli = os.path.join(self.T, "canli"); os.makedirs(self.canli, exist_ok=True)
+    def __init__(self, olaylar=(), T=None, ek_env=None):
+        self.ek_env = ek_env or {}; self.T = T or os.path.realpath(tempfile.mkdtemp(prefix="toplanti-")); self.canli = os.path.join(self.T, "canli"); os.makedirs(self.canli, exist_ok=True)
         self.port = bos_port(8783); self.U = f"http://127.0.0.1:{self.port}"; self.log = os.path.join(self.T, "relay.log")
         if not T:
             json.dump({"durum": "ok", "olaylar": list(olaylar)}, open(os.path.join(self.T, "takvim.json"), "w"), ensure_ascii=False)
@@ -36,7 +40,7 @@ class Aktarici:
     def ac(self):
         self.p = subprocess.Popen([sys.executable, "relay.py", "--dir", self.canli, "--port", str(self.port)], cwd=self.T, stdout=open(self.log, "a"), stderr=subprocess.STDOUT,
                                   env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(self.T, "ayar.json"), SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_OTO="1", SUFLOR_TEST_HIZLI="1",
-                                           SUFLOR_TEST_KULAKLIK="0"))
+                                           SUFLOR_TEST_KULAKLIK="0", **self.ek_env))
         for _ in range(100):
             try: self.istek("/status"); return
             except Exception: time.sleep(0.1)
@@ -203,7 +207,102 @@ def senaryo_JK():
         ok("JK hata yok", "Traceback" not in R.gunluk())
     finally: R.kapat(); R.sil()
 
-for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H):
+def senaryo_L():
+    print("— L) ardışık toplantı: /status alanları, sürerken farklı konu sorusu, bitiyor'da konusuz Başlat")
+    R = Aktarici([])
+    try:
+        nab = lambda sk="t1", b="Proje A görüşmesi": R.ping("teams", True, b, sk)
+        r = R.istek("/baslat", {"konu": "Proje A", "platform": "teams"}); nab(); R.altyazi("A'nın ilk satırı", "Proje A görüşmesi")
+        s = R.istek("/status"); ok("L1 sürüyor: aktif ve gosterim", s["toplanti"]["durum"] == "suruyor" and s["aktif"] is True and s["gosterim"] is True and s["toplanti"].get("canli") is True, str(s["toplanti"]))
+        r = R.istek("/baslat", {"konu": "Proje B", "platform": "teams"})
+        ok("L2 sürerken farklı konu → soru (sessizce katılmaz)", r.get("soru") == "suruyor" and not r.get("ok") and r.get("ad") == "Proje A" and r.get("konu") == "Proje B" and "Proje A" in (r.get("err") or ""), str(r))
+        ok("L3 soru sonrası tek dosya, kayıt sürüyor", len(R.md()) == 1 and R.durum()["ad"] == "Proje A", str(R.md()))
+        r = R.istek("/baslat", {"konu": "Proje A"}); ok("L4 sürerken aynı konu → katılır (soru yok)", r.get("ok") and not r.get("soru") and len(R.md()) == 1, str(r))
+        r = R.istek("/baslat", {}); ok("L4b sürerken konusuz → katılır", r.get("ok") and not r.get("soru") and len(R.md()) == 1, str(r))
+        r = R.istek("/baslat", {"konu": "Proje B", "platform": "teams", "onay": "bitir"}); d = R.durum()
+        ok("L5 onaylanınca eski kapandı, yeni dosya", r.get("ok") and len(R.md()) == 2 and d.get("ad") == "Proje B" and (d.get("onceki") or {}).get("ad") == "Proje A"
+           and "onaylandı" in str((d.get("onceki") or {}).get("neden")), f"{r} {d}")
+        R.altyazi("B'nin satırı", "Proje B görüşmesi")
+        yb = [m for m in R.md() if m.endswith("Proje-B.md")]; ya = [m for m in R.md() if m.endswith("Proje-A.md")]
+        ok("L6 yeni satır yeni dosyada", yb and ya and "B'nin satırı" in R.oku(yb[0]) and "B'nin satırı" not in R.oku(ya[0]), str(R.md()))
+        ok("L7 bitiyor", bekle(lambda: R.durum()["durum"] == "bitiyor", 20), str(R.durum()))
+        s = R.istek("/status"); t = s["toplanti"]
+        ok("L8 bitiyor'da aktif yok (pano Bugün + Başlat), gosterim var, son = bitiyor", s["aktif"] is False and s["gosterim"] is True and t.get("bitiyor") is True and t.get("canli") is False
+           and (t.get("son") or {}).get("durum") == "bitiyor" and (t.get("son") or {}).get("ad") == "Proje B", str(t))
+        r = R.istek("/baslat", {"platform": "teams"}); d = R.durum(); md = R.md()
+        ok("L9 bitiyor'da konusuz Başlat → yeni dosya, nötr ad", r.get("ok") and not r.get("katildi") and len(md) == 3 and str(d.get("ad")).startswith("Teams toplantısı")
+           and (d.get("onceki") or {}).get("ad") == "Proje B", f"{r} {d} {md}")
+        nab("t2", "Microsoft Teams"); R.altyazi("üçüncü toplantı")
+        ok("L10 yeni kayıt sürüyor", bekle(lambda: R.durum()["durum"] == "suruyor", 8), str(R.durum()))
+        ok("L11 bitti", bekle(lambda: R.durum()["durum"] == "bos", 40), str(R.durum()))
+        s = R.istek("/status"); t = s["toplanti"]
+        ok("L12 bitti sonrası: aktif yok, son toplantı gösterimi (özet bekleniyor)", s["aktif"] is False and s["gosterim"] is True and (t.get("son") or {}).get("durum") == "bitti"
+           and (t.get("son") or {}).get("ozet") is False and t.get("bitiyor") is False, str(t))
+        ok("L hata yok", "Traceback" not in R.gunluk())
+    finally: R.kapat(); R.sil()
+
+def senaryo_M():
+    print("— M) bitiyor'da eklentinin başka sekmesinde başka çağrı")
+    R = Aktarici([], ek_env={"SUFLOR_TEST_BITIYOR_SN": "40"})
+    try:
+        bitiyor = lambda: bekle(lambda: R.durum()["durum"] == "bitiyor", 20)
+        surekli(lambda: R.ping("teams", True, "Satış görüşmesi | Microsoft Teams", "t1"), 2); R.altyazi("satış satırı", "Satış görüşmesi | Microsoft Teams")
+        ok("M1 ilk kayıt", len(R.md()) == 1 and R.durum()["durum"] == "suruyor", str(R.md()))
+        ok("M2 bitiyor", bitiyor(), str(R.durum()))
+        R.ping("teams", True, "Bütçe toplantısı | Microsoft Teams", "t2"); d = R.durum()
+        ok("M3 başka sekme + başka başlık → yeni dosya, eski kapandı", len(R.md()) == 2 and d["durum"] == "suruyor" and "başka sekmede başka bir çağrı — yeni toplantı" in R.gunluk(), f"{d} {R.md()}")
+        R.altyazi("bütçe satırı", "Bütçe toplantısı | Microsoft Teams"); yeni = R.durum()["dosya"]
+        ok("M4 yeni çağrının satırı yeni dosyada", "bütçe satırı" in R.oku(yeni) and not any("bütçe satırı" in R.oku(m) for m in R.md() if m != yeni))
+        ok("M5 bitiyor", bitiyor(), str(R.durum()))
+        R.ping("teams", True, "Microsoft Teams", "t2")
+        ok("M6 aynı sekme (başlık değişti) → aynı dosya", len(R.md()) == 2 and R.durum()["durum"] == "suruyor" and R.durum()["dosya"] == yeni, str(R.durum()))
+        ok("M7 bitiyor", bitiyor(), str(R.durum()))
+        R.ping("teams", True, "Bütçe toplantısı | Microsoft Teams", "t3")
+        ok("M8 başka sekme, aynı başlık (yeniden katılma) → aynı dosya", len(R.md()) == 2 and R.durum()["dosya"] == yeni, str(R.durum()))
+        ok("M9 bitiyor", bitiyor(), str(R.durum()))
+        R.ping("teams", True, "Microsoft Teams", "t4")
+        ok("M10 başlıksız başka sekme 10 sn'den önce → aynı dosya", len(R.md()) == 2 and R.durum()["dosya"] == yeni and R.durum()["durum"] == "suruyor", str(R.durum()))
+        ok("M11 bitiyor", bitiyor(), str(R.durum())); time.sleep(11)
+        R.ping("teams", True, "Microsoft Teams", "t5")
+        ok("M12 başlıksız başka sekme 10 sn'den sonra → yeni dosya", len(R.md()) == 3 and R.durum()["dosya"] != yeni, f"{R.durum()} {R.md()}")
+        ok("M13 kayıt dosyasında başlık metni yok (yalnız iz)", "Bütçe" not in open(os.path.join(R.canli, "toplanti.json"), encoding="utf-8").read())
+        ok("M hata yok", "Traceback" not in R.gunluk())
+    finally: R.kapat(); R.sil()
+
+def senaryo_N():
+    print("— N) konuşmacı etiketlemesi yeni toplantı sürerken ertelenir")
+    R = Aktarici([])
+    try:
+        surekli(lambda: R.ping("teams", True, "Eski görüşme", "t1"), 2); R.altyazi("eski satır", "Eski görüşme"); eski = R.durum()["dosya"]
+        R.istek("/toplanti", {"islem": "bitir"}); ok("N1 eski bitti", bekle(lambda: R.durum()["durum"] == "bos", 20), str(R.durum()))
+        # elle bitir kilidi aynı sekmeyi tutar; başka sekmedeki başka çağrı hemen yeni toplantıdır
+        DUR = {"nabiz": True}
+        def nabiz():
+            while DUR["nabiz"]: R.ping("teams", True, "Yeni görüşme", "t2"); time.sleep(1)
+        import threading; th = threading.Thread(target=nabiz, daemon=True); th.start()
+        ok("N2 elle bitirdikten hemen sonra başka sekmedeki yeni çağrı kilide takılmadı, sürüyor", bekle(lambda: R.durum()["durum"] in ("algilandi", "suruyor") and R.durum().get("dosya") != eski, 15), str(R.durum()) + R.gunluk()[-800:])
+        open(os.path.join(R.canli, eski[:-3] + ".sesizi.log"), "w").write('{"id": "x", "iz": ""}\n')
+        sahte = os.path.join(R.T, "ortak-sahte", "whisper-venv", "bin"); os.makedirs(sahte); kayit = os.path.join(R.T, "toplu.log")
+        open(os.path.join(sahte, "python"), "w").write(f"#!{sys.executable}\nimport sys, time\nopen({kayit!r}, 'a').write(str(time.time()) + ' ' + ' '.join(sys.argv[1:]) + '\\n')\nprint('{{\"kume\": {{}}, \"bol\": {{}}}}')\n")
+        os.chmod(os.path.join(sahte, "python"), 0o755)
+        ay = json.load(open(os.path.join(R.T, "ayar.json"))); ay["ortak"] = os.path.join(R.T, "ortak-sahte"); json.dump(ay, open(os.path.join(R.T, "ayar2.json"), "w"))
+        t0 = time.time()
+        c = subprocess.run([sys.executable, "-B", os.path.join(R.T, "toplanti-claude.py"), "--dir", R.canli, "--relay", R.U, "konusmaci", eski], capture_output=True, text=True, timeout=60,
+                           env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(R.T, "ayar2.json"), SUFLOR_TEST_HIZLI="1"))
+        ok("N3 komut beklemeden döndü, 'ertelendi'", time.time() - t0 < 10 and "ertelendi" in c.stdout, c.stdout + c.stderr)
+        ok("N4 toplu Whisper başlamadı", not os.path.exists(kayit))
+        ok("N5 aktarıcı günlüğünde 'ertelendi'", bekle(lambda: "KONUŞMACI: etiketleme ertelendi" in R.gunluk(), 5))
+        c2 = subprocess.run([sys.executable, "-B", os.path.join(R.T, "toplanti-claude.py"), "--dir", R.canli, "--relay", R.U, "konusmaci", eski], capture_output=True, text=True, timeout=60,
+                            env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(R.T, "ayar2.json"), SUFLOR_TEST_HIZLI="1"))
+        ok("N6 ikinci çağrı ikinci bekçi açmaz", R.gunluk().count("KONUŞMACI: etiketleme ertelendi") == 1, R.gunluk()[-400:])
+        time.sleep(3); ok("N7 toplantı sürerken hâlâ başlamadı", not os.path.exists(kayit))
+        DUR["nabiz"] = False
+        ok("N8 yeni toplantı bitince toplu iş arka planda yapıldı", bekle(lambda: os.path.exists(kayit), 60) and bekle(lambda: "ertelenen etiketleme yapıldı" in R.gunluk(), 10), R.gunluk()[-600:])
+        ok("N9 toplu iş tek kez, eşleme yazıldı", os.path.exists(kayit) and len(open(kayit).read().splitlines()) == 1 and os.path.exists(os.path.join(R.canli, eski[:-3] + ".konusmaci.json")))
+        ok("N hata yok", "Traceback" not in R.gunluk())
+    finally: R.kapat(); R.sil()
+
+for s in [s for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H, senaryo_L, senaryo_M, senaryo_N) if not sys.argv[1:] or s.__name__[8:] in sys.argv[1:]]:  # ör. test/toplanti.py L M
     try: s()
     except Exception as e: ok(f"{s.__name__} istisna {e.__class__.__name__}: {e}", False)
 print(f"toplantı kaydı: {len(HATA)} sorun" + "".join(f"\n  KALDI: {h}" for h in HATA) if HATA else "toplantı kaydı: ✓ tüm senaryolar")

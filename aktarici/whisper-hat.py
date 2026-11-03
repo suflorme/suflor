@@ -31,11 +31,82 @@ WH_MODEL = os.path.dirname(WH_MODEL) if WH_MODEL else None
 # aynı doğruluk, parça +0,06 sn. Ayar "whisper_model": "turbo" tam modele döndürür.
 _WH_Q8 = os.path.join(WH_MODELLER, "hub", "models--suflor--whisper-large-v3-turbo-q8", "snapshots", "yerel")
 if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(_WH_Q8, "weights.safetensors")): WH_MODEL = _WH_Q8
-# ayar "whisper_motor": "cpp" → canlı döngüde whisper.cpp + Core ML (aynı turbo q8, kodlayıcı Neural Engine'de; ~2,3 kat hızlı, doğruluk ve
-# uydurma süzgeci aynı — 20 Ekim kıyası). Dosyalar <ortak>/whisper-cpp/ (whisper-server, ggml-large-v3-turbo-q8_0.bin + Core ML kodlayıcı);
-# yoksa MLX'e düşülür. Dosyadan ve toplu döküm her durumda MLX.
+# whisper.cpp + Core ML canlı döngüde (aynı turbo q8, kodlayıcı Neural Engine'de; ~2,3 kat hızlı, doğruluk ve uydurma süzgeci aynı — 20 Ekim kıyası).
+# S188 (3 Kasım): Apple Silicon'da varsayılan motor; ayar "whisper_motor" ("cpp" | "mlx") varsa o kazanır. Dosyalar <ortak>/whisper-cpp/ (whisper-server,
+# ggml-large-v3-turbo-q8_0.bin, Core ML kodlayıcı; kurulum.py whispercpp_kur indirir); yoksa MLX. Dosyadan ve toplu döküm her durumda MLX (2. adımda taşınacak).
+# Geçici MLX yedeği: işçi cpp'yi açamazsa aynı süreçte MLX'e geçer ("cpp": {"sonuc": "yedek", "hata": sınıf}); aktarıcı o gün cpp'yi yeniden denemez
+# (<uygulama>/whisper-cpp-yedek.json), her açılış sonucunu canli/whisper-cpp-acilis.jsonl'e yazar (beta verisi sayar). MLX modeli diskte yoksa iner (wh_mlx_indir).
 WH_CPP = os.path.join(_ORT, "whisper-cpp")
-def wh_cpp(): return AYAR.get("whisper_motor") == "cpp" and os.path.exists(os.path.join(WH_CPP, "whisper-server")) and os.path.exists(os.path.join(WH_CPP, "ggml-large-v3-turbo-q8_0.bin"))
+WH_CPP_DOSYA = ("whisper-server", "ggml-large-v3-turbo-q8_0.bin", "ggml-large-v3-turbo-encoder.mlmodelc")
+WH_CPP_YEDEK = os.path.join(_APP, "whisper-cpp-yedek.json"); WH_CPP_ILK = os.path.join(_APP, "whisper-cpp-ilk.json")
+def _wh_arm():  # Rosetta altında Python x86_64 görünür; donanım yine Apple Silicon (kurulum.py mac() ile aynı)
+    import platform
+    if platform.machine() == "arm64": return True
+    try: return subprocess.run(["sysctl", "-n", "hw.optional.arm64"], capture_output=True, text=True, timeout=3).stdout.strip() == "1"
+    except Exception: return False
+WH_ARM = _wh_arm()
+def wh_motor():  # istenen motor (açılabilir olup olmadığından bağımsız)
+    m = AYAR.get("whisper_motor"); return m if m in ("cpp", "mlx") else ("cpp" if WH_ARM else "mlx")
+def wh_cpp_yedek():  # bugün cpp açılamadıysa işaret ({gun, hata}); aynı gün yeniden denenmez — ertesi gün (ya da işaret silinince) yeniden
+    try: d = json.load(open(WH_CPP_YEDEK, encoding="utf-8")); return d if d.get("gun") == time.strftime("%Y-%m-%d") else None
+    except (OSError, ValueError, AttributeError): return None
+def wh_cpp(): return wh_motor() == "cpp" and all(os.path.exists(os.path.join(WH_CPP, f)) for f in WH_CPP_DOSYA) and not wh_cpp_yedek()
+def _wh_cpp_parmak():  # Core ML kodlayıcı + sunucu değişince ilk açılış (Neural Engine derlemesi) yeniden sayılır
+    try: return "|".join(f"{os.path.getsize(y)}:{int(os.path.getmtime(y))}" for y in (os.path.join(WH_CPP, "whisper-server"), os.path.join(WH_CPP, "ggml-large-v3-turbo-encoder.mlmodelc", "weights", "weight.bin")))
+    except OSError: return ""
+def wh_cpp_kaydet(c):  # işçinin "cpp" alanı → kayıt, günlük, o günün işareti
+    c = c if isinstance(c, dict) else {}; w = STATE["whisper"]
+    r = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "sonuc": c.get("sonuc"), "hata": c.get("hata"), "sn": c.get("sn"), "acilis_sn": c.get("acilis_sn")}
+    if c.get("sonuc") == "basarili":
+        pm = _wh_cpp_parmak()
+        try: eski = json.load(open(WH_CPP_ILK, encoding="utf-8")).get("parmak")
+        except (OSError, ValueError, AttributeError): eski = None
+        if pm and pm != eski:
+            r["coreml_ilk"] = True
+            try: json.dump({"parmak": pm, "sn": c.get("acilis_sn"), "t": time.time()}, open(WH_CPP_ILK, "w", encoding="utf-8"))
+            except OSError: pass
+    else:
+        try: json.dump({"gun": time.strftime("%Y-%m-%d"), "hata": c.get("hata"), "t": time.time()}, open(WH_CPP_YEDEK, "w", encoding="utf-8"))
+        except OSError: pass
+        print(f"WHISPER: cpp açılamadı ({c.get('hata')}: {c.get('mesaj') or '?'}) — MLX yedeği (bugün yeniden denenmez)")
+    w["cpp"] = {k: v for k, v in r.items() if k != "at" and v is not None}
+    try: _log("whisper-cpp-acilis.jsonl", r)
+    except Exception: pass
+# MLX modeli yalnız yedekte gerekirse indirilir (S188); bu adımda kurulum yine indiriyor (dosyadan/toplu döküm ve konuşmacı etiketlemesi MLX'e muhtaç).
+# İnerken durum "indiriliyor": parçalar atlanır, kanallar altyazıyla sürer; inince işçi MLX'le açılır. Ortak klasör yazılamıyorsa (öbür hesap) "yok".
+WH_MLX_REV = "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb"  # kurulum.py WHISPER_REV ile aynı
+_WH_INDIR = {"th": None}
+def wh_mlx_indir():
+    if _WH_INDIR["th"] and _WH_INDIR["th"].is_alive(): return
+    w = STATE["whisper"]
+    w.update(durum="indiriliyor", hata=_t("whisper.cpp açılamadı; yedek MLX Whisper modeli iniyor (~1,6 GB) — bitene kadar döküm altyazıdan",
+                                          "whisper.cpp couldn't start; downloading the fallback MLX Whisper model (~1.6 GB) — captions are used until it finishes"))
+    print("WHISPER: MLX modeli diskte yok — yedek için indiriliyor")
+    def is_():
+        global WH_MODEL
+        t = time.time(); neden = ""
+        hedef = os.path.join(WH_MODELLER, "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots", WH_MLX_REV)
+        try:
+            os.makedirs(WH_MODELLER, exist_ok=True)
+            if not os.access(WH_MODELLER, os.W_OK): raise PermissionError("model klasörü yazılamıyor (başka hesabın)")
+            kaynak = os.environ.get("SUFLOR_TEST_MLX_KAYNAK")  # test: ağ yerine diskteki bir anlık görüntüden kopya
+            if kaynak:
+                time.sleep(float(os.environ.get("SUFLOR_TEST_MLX_BEKLE") or 0)); shutil.copytree(kaynak, hedef + ".indir", dirs_exist_ok=True); os.replace(hedef + ".indir", hedef)
+            else:
+                r = subprocess.run([WH_PY, "-c", "import sys; from huggingface_hub import snapshot_download as s; s('mlx-community/whisper-large-v3-turbo', revision=sys.argv[1])", WH_MLX_REV],
+                                   env=dict(os.environ, HF_HOME=WH_MODELLER, HF_HUB_OFFLINE="0", PYTHONDONTWRITEBYTECODE="1"), capture_output=True, text=True, timeout=3600)
+                if r.returncode: raise RuntimeError((r.stderr or r.stdout or "").strip().splitlines()[-1][:160] if (r.stderr or r.stdout).strip() else f"çıkış {r.returncode}")
+                try: os.makedirs(os.path.join(os.path.dirname(os.path.dirname(hedef)), "refs"), exist_ok=True); open(os.path.join(os.path.dirname(os.path.dirname(hedef)), "refs", "main"), "w").write(WH_MLX_REV)
+                except OSError: pass
+            if not os.path.exists(os.path.join(hedef, "weights.safetensors")): raise RuntimeError("indirilen modelde ağırlık yok")
+            WH_MODEL = hedef
+        except Exception as e: neden = f"{e.__class__.__name__}: {str(e)[:160]}"
+        if neden:
+            w.update(durum="yok", hata=_t(f"Whisper açılamadı: whisper.cpp çalışmadı, MLX modeli inemedi ({neden})", f"Whisper unavailable: whisper.cpp failed, MLX model download failed ({neden})"))
+            print(f"WHISPER: MLX modeli inemedi ({neden}) — altyazıyla devam")
+        else:
+            w.update(durum="kapali", hata=None); print(f"WHISPER: MLX modeli indi ({time.time() - t:.0f} sn) — işçi MLX'le açılacak")
+    _WH_INDIR["th"] = threading.Thread(target=is_, daemon=True); _WH_INDIR["th"].start()
 WH_SR = 16000; WH_KARE = 320  # 20 ms
 # parça üst sınırı 12 → 6 sn. Ölçüm (6 Ekim, 115 sn kesintisiz Türkçe, gerçek zamanlı): kelime → satır ortanca 7,7 → 4,6 sn,
 # %90 12,2 → 6,7 sn; WER 12 sn %16,0 · 8 sn %11,9 · 6 sn %15,6–18,1 (aynı ayarda tur farkı kadar — kesim noktasına bağlı gürültü)
@@ -215,6 +286,7 @@ def whisper_view():
             "kuyruk": WH_Q.qsize(), "satir": w["satir"], "gecikme_sn": w["gecikme_sn"], "hata": w["hata"],
             "atlanan": w.get("atlanan", 0), "son_sn": w.get("son_sn"), "gecikme_max": w.get("gecikme_max"), "durgun_max": w.get("durgun_max"),
             "yavas": bool(w.get("yavas")), "parca": w.get("parca"), "eski_atlanan": w.get("eski_atlanan"), "birlesen": w.get("birlesen"),
+            "motor": w.get("motor"), "istenen_motor": wh_motor(), "cpp": w.get("cpp"),
             "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
 # 3 Kasım (gerçek Teams denemesi: kullanıcı "Deniz T" + misafir hesabı "Deniz"): eski kural son altyazı konuşmacılarından ilk adı uyanı döndürüyordu; misafir son
 # konuştuysa "ben" o oldu, misafirin soruları kullanıcı sorusu sayıldı (karşı taraf onay kapısı atlandı). Sıra: tam ad (sadeleştirilmiş) → ayardaki adın her sözcüğü
@@ -371,6 +443,8 @@ def _isci_baslat():
         _ISCI["thread"] = threading.Thread(target=_isci_dongu, daemon=True); _ISCI["thread"].start()
 def _isci_ac():
     w = STATE["whisper"]
+    if w["durum"] == "indiriliyor": return False  # yedek MLX modeli iniyor: bitince açılır
+    if not WH_MODEL and not wh_cpp() and wh_cpp_yedek() and os.path.exists(WH_PY): wh_mlx_indir(); return False  # bugün cpp açılamamıştı (aktarıcı yeniden açıldı), MLX modeli hâlâ yok
     if not (os.path.exists(WH_PY) and os.path.exists(WH_ISCI)):
         w.update(durum="yok", hata=f"whisper-venv ya da whisper-isci.py yok ({WH_PY})"); print(f"WHISPER: kullanılamıyor — {w['hata']}"); return False
     w.update(durum="yukleniyor", hata=None); t = time.time()
@@ -396,8 +470,11 @@ def _isci_ac():
     agir_kilit_birak(kilit)  # model yüklendi (ya da vazgeçildi): sıradaki yükleme başlayabilir
     try: j = json.loads(ilk) if ilk else {}
     except ValueError: j = {}
+    if j.get("cpp"): wh_cpp_kaydet(j["cpp"])  # whisper.cpp denendi: sonuç (başarılı / MLX yedeği) kayda ve günlüğe
     if not j.get("hazir"):
-        pr.kill(); w.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"WHISPER: {w['hata']}"); return False
+        pr.kill()
+        if j.get("mlx_yok"): wh_mlx_indir(); return False  # cpp açılamadı, yedek MLX modeli diskte yok: iner, sonra MLX'le açılır
+        w.update(durum="hata", hata=j.get("hata") or "işçi başlamadı"); print(f"WHISPER: {w['hata']}"); return False
     _ISCI.update(p=pr, satirlar=q, baslik=None, zs=0); w.update(yavas=False, durum="hazir", model=j.get("model"), motor=j.get("motor") or "mlx"); kume_sifirla()
     STATE["ses_model"].update(durum="hazir" if j.get("ecapa") else "yok", hata=None if j.get("ecapa") else f"ses izi ağırlıkları yok ({ECAPA})", sn=j.get("sn"))
     sn_ = time.time() - t; yavas = ""
@@ -473,8 +550,13 @@ def _isci_dongu():
                 else: w["atlanan"] += 1; is_kaydet(is_, "bekleme", time.time(), q_n)
                 continue
             acildi = True
+            if w["durum"] == "indiriliyor":  # yedek MLX modeli iniyor: parça atlanır (altyazı sürer), kuyruk birikmez, bekleme katlanmaz
+                if is_.get("bas"): threading.Thread(target=is_["geri"], args=("", "Whisper modeli iniyor"), daemon=True).start()
+                else: w["atlanan"] += 1; is_kaydet(is_, "indiriliyor", time.time(), q_n)
+                continue
             if not _isci_ac():
                 if w["durum"] == "yok": return
+                if w["durum"] == "indiriliyor": continue
                 hata_say += 1; time.sleep(min(300, 10 * 2 ** (hata_say - 1))); continue
         dil = {"tr": "tr", "en": "en"}.get(agenda().get("dil") or "tr")  # karisik → None: Whisper dili kendisi seçer
         if is_.get("bas"): dil = is_.get("dil") or dil  # bas-konuş: arayüz dili (toplantı dışı, gündem eski olabilir)

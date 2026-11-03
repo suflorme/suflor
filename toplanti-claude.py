@@ -130,6 +130,7 @@ ks.add_argument("teams", help="Teams'ten indirilen döküm dosyası"); ks.add_ar
 ks.add_argument("--n", type=int, default=12, help="en çok kaç kaçan bölüm listelensin"); ks.add_argument("--kaydet", action="store_true")
 kc = sub.add_parser("konusmaci", help="toplantı sonu: karşı taraf konuşmacılarını ses izinden toplu kümele, altyazı adlarına bağla → <toplantı>.konusmaci.json (sonuc ve dokum kendiliğinden çağırır)")
 kc.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); kc.add_argument("--geri", action="store_true", help="eşlemeyi kaldır (canlı adlar)")
+kc.add_argument("--bekle", action="store_true", help=argparse.SUPPRESS)  # ertelenen iş (arka planda): yeni toplantı bitene dek bekler, sonra etiketler
 hf = sub.add_parser("hafiza", help="ses izi hafızası: altyazıdan ad öğrenilen kişiler (canli/ses-izi-hafiza.json, yalnız bu Mac); altyazısız toplantıda adı buradan bulunur")
 hf.add_argument("--sil", default=None, help="bu adı hafızadan sil"); hf.add_argument("--hepsini-sil", action="store_true", help="hafıza dosyasını sil")
 dk = sub.add_parser("dokum", help="v0.12.6: temiz döküm dosyası (.md + .vtt) → <proje>/gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>")
@@ -1583,15 +1584,40 @@ def hafiza_guncelle(md, merkez, sn, adli, h):
         else: x = h[a] = {"iz": _iz_yaz(m), "sn": round(float(sn[k]), 1)}; durum[a] = "yeni"
         x["son"] = simdi()[:10]; x["toplantilar"] = ((x.get("toplantilar") or []) + [md])[-20:]
     return durum
-def konusmaci_esle(md, zorla=False, sessiz=False):
+# 3 Kasım (ardışık toplantı): toplu Whisper (ses izi kümeleme) yeni bir toplantının canlı Whisper'ı sürerken başlamaz — iki Whisper ikisini de 2,5–3,3 kat
+# yavaşlatır (20 Ekim ölçümü). Yeni toplantı sürüyorsa iş arka plana ertelenir (komut beklemez: Claude'un toplantı sonu adımları canlı adlarla sürer),
+# bekçi süreç aktarıcıyı yoklar, toplantı bitince .konusmaci.json'u yazar. Toplu iş sürerken yeni toplantı başlarsa iş kesilmez (kısa: ~5–30 sn), düşük
+# öncelikle (nice 10) biter — durdurup yeniden denemek ses izi işini baştan yapmak demek, kazancı yok.
+KONUSMACI_BEKLE_SN = 4 * 3600; KONUSMACI_YOKLA_SN = 1 if os.environ.get("SUFLOR_TEST_HIZLI") else 15
+def _canli_toplanti(md):  # aktarıcıya göre başka bir toplantı canlı mı (algılandı/sürüyor); aktarıcıya ulaşılamazsa hayır
+    try: t = get("/status").get("toplanti") or {}
+    except Exception: return None
+    return (t.get("ad") or "?") if t.get("durum") in ("algilandi", "suruyor") and t.get("dosya") != md else None
+def _aktarici_gunluk(metin):  # aktarıcının günlüğüne tek satır (KONUŞMACI: …)
+    try: urllib.request.urlopen(urllib.request.Request(A.relay + "/olay", data=json.dumps({"tur": "konusmaci", "metin": metin}).encode(), headers={"Content-Type": "application/json"}), timeout=3)
+    except Exception: pass
+def konusmaci_ertele(md):  # arka planda bekçi süreç (bir toplantı için tek)
+    bk = os.path.join(A.dir, md[:-3] + ".konusmaci.bekle")
+    try:
+        if time.time() - os.path.getmtime(bk) < 2 * KONUSMACI_YOKLA_SN + 60: return False  # bekçi zaten yokluyor
+    except OSError: pass
+    open(bk, "w").write(str(os.getpid()))
+    subprocess.Popen([sys.executable, "-B", os.path.abspath(__file__), "--dir", A.dir, "--relay", A.relay, "konusmaci", md, "--bekle"], stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    return True
+def konusmaci_esle(md, zorla=False, sessiz=False, bekle=False):
     iz_yol = os.path.join(A.dir, md[:-3] + ".sesizi.log"); es_yol = _esleme_yol(md)
     if not os.path.exists(iz_yol): return None
     if not zorla and os.path.exists(es_yol) and os.path.getmtime(es_yol) >= os.path.getmtime(iz_yol): return json.load(open(es_yol, encoding="utf-8"))
     py = next((y for y in (os.path.join(d, "whisper-venv", "bin", "python") for d in (AYAR["ortak"], AYAR["uygulama"])) if os.path.exists(y)), None)
     if not py: print("(konuşmacı yeniden etiketleme yok: whisper-venv bulunamadı)"); return None
+    ad_ = _canli_toplanti(md)
+    if ad_ and not bekle:
+        if konusmaci_ertele(md): _aktarici_gunluk(f"etiketleme ertelendi — yeni toplantı sürüyor; bitince arka planda yapılacak · {md}")
+        print(f"(konuşmacı yeniden etiketleme ertelendi: yeni bir toplantı sürüyor — bitince arka planda yapılır; şimdilik canlı adlar)"); return None
     try:
         c = subprocess.run([py, os.path.join(os.path.dirname(os.path.abspath(__file__)), "whisper-isci.py"), "--toplu", iz_yol], capture_output=True, text=True,
-                           timeout=120, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+                           timeout=120, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"), preexec_fn=lambda: os.nice(10))
         j = json.loads(c.stdout.strip().splitlines()[-1]); km, bl = j["kume"], j.get("bol") or {}
         merkez = {int(k): v for k, v in (j.get("merkez") or {}).items()}; msn = {int(k): float(v) for k, v in (j.get("sn") or {}).items()}
     except Exception as e: print(f"(konuşmacı yeniden etiketleme yapılamadı: {e.__class__.__name__})"); return None
@@ -1658,6 +1684,19 @@ def konusmaci_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
     md = os.path.basename(md).replace(".jsonl", ".md")
+    if A.bekle:  # ertelenen iş: yeni toplantı bitene dek yokla (en çok KONUSMACI_BEKLE_SN), sonra etiketle
+        bk = os.path.join(A.dir, md[:-3] + ".konusmaci.bekle"); t0 = time.time()
+        try:
+            while _canli_toplanti(md) and time.time() - t0 < KONUSMACI_BEKLE_SN:
+                time.sleep(KONUSMACI_YOKLA_SN)
+                try: os.utime(bk)
+                except OSError: pass
+            v = konusmaci_esle(md, zorla=True, sessiz=True, bekle=True)
+            _aktarici_gunluk(f"ertelenen etiketleme yapıldı ({round((time.time() - t0) / 60)} dk sonra) · {md}" if v else f"ertelenen etiketleme yapılamadı · {md}")
+        finally:
+            try: os.remove(bk)
+            except OSError: pass
+        return
     if A.geri:
         try: os.remove(_esleme_yol(md)); print("eşleme kaldırıldı — canlı adlara dönüldü")
         except FileNotFoundError: print("eşleme yok")

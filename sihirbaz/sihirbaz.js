@@ -84,6 +84,8 @@
       proje_kaldir: "Suflor'u kaldırırken bu klasörü silme: ~/Suflor.me/kaldir.command yalnız Suflor'un eklediklerini kaldırır.",
                                                 kur_b: "Kuruyorum", kur_a: "Ayarlarını yazıyor, arka plan hizmetini, takvim ve ses yardımcılarını kuruyorum. macOS \"Suflor Ses\" için sistem sesi kaydı izni sorarsa İzin Ver de.",
       k_ayar: "Ayarlar", k_proje: "Proje klasörü", k_not: "Çalışma notu", k_not_a: "Claude arka planda taslağını hazırlıyor; ilk toplantının sonunda onaylarsın", k_aktarici: "Arka plan hizmeti", k_modeller: "Konuşma tanıma modelleri",
+      k_cpp: "Hızlı konuşma tanıma (whisper.cpp + Core ML)", k_cpp_ilk: "İlk açılış birkaç dakika sürebilir (Core ML hazırlanıyor); sonra hızlı açılır.",
+      k_cpp_hata: "İnemedi; konuşma tanıma şimdilik MLX ile çalışır, sonraki güncellemede yeniden denenir.",
       k_m_yeniden: "Yeniden dene", k_m_hata: "Modeller kurulamadı. İnternet bağlantını denetleyip yeniden dene.", k_m_baska: "Modeller bu Mac'teki başka bir hesabın klasöründe ve eksik. O hesapta Suflor.me'yi güncelle (guncelle.command), sonra burada yeniden dene.",
       k_ses: "Karşı tarafın sesi (Suflor Ses)", k_ses_ok: "Hazır; ilk toplantıda izin istenebilir", k_ses_yok: "Kurulamadı; karşı ses için Suflor.me simgesi → Karşı taraf → Aç", k_ses_izin: "İzin ayarını aç",
       takvim_b: "Takvimini bağlayalım", takvim_a: "Toplantından birkaç dakika önce hatırlatır, gündemi ve katılımcıları davetten alır.",
@@ -203,6 +205,8 @@
       k_m_baska: "The models are in another account's folder on this Mac and incomplete. Update Suflor.me in that account (guncelle.command), then try again here.",
       k_ses: "Other side's audio (Suflor Ses)", k_ses_ok: "Ready; permission may be asked in your first meeting", k_ses_yok: "Couldn't be installed; for the other side's audio: Suflor.me icon → Other side → Open", k_ses_izin: "Open permission settings",
       k_modeller: "Speech recognition models",
+      k_cpp: "Fast speech recognition (whisper.cpp + Core ML)", k_cpp_ilk: "The first start may take a few minutes (Core ML is being prepared); after that it starts quickly.",
+      k_cpp_hata: "Couldn't download; speech recognition uses MLX for now and it's retried at the next update.",
       takvim_b: "Connect your calendar", takvim_a: "It reminds you a few minutes before a meeting and takes the agenda and attendees from the invitation.",
       t_izin: "Allow access", t_izin_b: "Calendar permission", t_izin_a: "macOS will ask for permission: choose \"Full Access\".",
       t_hesap_yok: "No accounts in the Mac Calendar app.", t_hesap_ekle: "Add your Google, iCloud or Outlook account",
@@ -277,7 +281,9 @@
     try { D.klasor = { ...(await api("klasor-bilgi", { yol })), yol }; } catch (e) { D.klasor = null; }
     const a = gorunen()[D.adim]; if (a && a.id === "proje") ciz();
   }
-  async function durumAl() { try { D.durum = await api("durum"); } catch (e) { D.durum = D.durum || {}; } indirmeGoster(); if (C.asistan) pkGoster(); return D.durum; }
+  async function durumAl() { try { D.durum = await api("durum"); } catch (e) { D.durum = D.durum || {}; } indirmeGoster(); if (C.asistan) pkGoster();
+    const a = gorunen()[D.adim]; if (a && a.id === "kur" && D.kurDurum && D.kurDurum.aktarici !== "bekle") ciz();  // S188: model ve whisper.cpp satırları canlı (girdi alanı yok)
+    return D.durum; }
 
   // örnek veriler (önizleme)
   function ornek(yol) {
@@ -285,7 +291,7 @@
       mac: { islemci: "Apple M3", arm: true, macos: "15.1", macos_ok: true, bellek_gb: 16, donanim: "tamam", disk_gb: 84, python: "3.9.6", chrome: true, teams_uygulama: true },
       claude: { kurulu: true, surum: "2.1.4", giris: true },
       beyin: { secim: "claude-code", gemini: false, ozel: { adres: "", model: "", anahtar: false }, ollama: { durum: "yok", yuzde: 0 }, ollama_gb: 3.3, ollama_mb: 181, dene: {} },
-      modeller: { durum: "iniyor", yuzde: 38 }, eklenti: { bagli: false }, kod: "~/Suflor.me",
+      modeller: { durum: "iniyor", yuzde: 38, cpp: { durum: "iniyor", yuzde: 12 } }, eklenti: { bagli: false }, kod: "~/Suflor.me",
       proje: "~/Suflor", varsayilan_ad: "Ayşe Yılmaz", asistan: { pocket: true },
       takvim: { durum: "ok", takvimler: [{ ad: "İş", hesap: "Exchange", sec: true }, { ad: "Kişisel", hesap: "iCloud", sec: true }, { ad: "Türkiye tatilleri", hesap: "iCloud", sec: false }],
         adaylar: [["ayse", "Ayşe Yılmaz", 40], ["ekip", null, 12], ["ayse.yilmaz", null, 3]].map(([k, ad, sayi]) => ({ adres: k + "@" + "ornek.test", ad, sayi })), adresler: null,  // uydurma adresler
@@ -490,6 +496,8 @@
       icerik: () => { const k = D.kurDurum || {}, m = (D.durum || {}).modeller || {}, ys = (D.durum || {}).yerel_ses;
         return `<div class="liste">${satir(k.ayar || "bekle", t.k_ayar)}${satir(k.proje || "bekle", t.k_proje, C.proje || "")}${k.not === "bos" ? "" : satir(k.not || "bekle", t.k_not, k.not === "iyi" ? t.k_not_a : "")}${satir(k.aktarici || "bekle", t.k_aktarici)}
           ${satir(m.durum === "hazir" ? "iyi" : m.durum === "hata" ? "kotu" : "bekle", t.k_modeller, m.durum === "hazir" ? "" : m.durum === "hata" ? (m.tur === "baska_hesap" ? t.k_m_baska : t.k_m_hata + (m.mesaj ? " (" + m.mesaj + ")" : "")) : `%${m.yuzde || 0}`, m.durum === "hata" ? dug("modeller-yeniden", t.k_m_yeniden) : "")}
+          ${m.cpp && ["iniyor", "hazir", "hata"].includes(m.cpp.durum) ? satir(m.cpp.durum === "hazir" ? "iyi" : m.cpp.durum === "hata" ? "uyari" : "bekle", t.k_cpp,
+            m.cpp.durum === "hata" ? (m.cpp.tur === "baska_hesap" ? t.k_m_baska : t.k_cpp_hata) : (m.cpp.durum === "iniyor" ? `%${m.cpp.yuzde || 0} · ` : "") + t.k_cpp_ilk) : ""}
           ${k.aktarici === "iyi" && ys ? satir(ys.kurulu ? "iyi" : "uyari", t.k_ses, ys.kurulu ? t.k_ses_ok : t.k_ses_yok, ys.kurulu ? dug("ses-izni", t.k_ses_izin) : "") : ""}</div>
           ${k.hata ? `<div class="kart-not uyari">${esc(k.hata)}</div><p class="dipnot">${dug("kur-yeniden", t.k_m_yeniden)}</p>` : ""}${k.asistan_hata ? `<div class="kart-not uyari">${esc(k.asistan_hata)}</div>` : ""}${(k.uyarilar || []).map(u => `<div class="kart-not uyari">${esc(u)}</div>`).join("")}
           <p class="dipnot" data-beta-veri>${esc(t.p_veri)}</p>`; } },  // S141: beta şartı — onay kutusu yok, tek cümle

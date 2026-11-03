@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 320923,
-   "sha": "37509aaa83f9c0c9"
+   "uzunluk": 325333,
+   "sha": "2e14cdd5fc52d405"
   },
   "/mini": {
-   "uzunluk": 320923,
-   "sha": "37509aaa83f9c0c9"
+   "uzunluk": 325333,
+   "sha": "2e14cdd5fc52d405"
   },
   "/status": {
    "_ping_son": "float",
@@ -529,6 +529,7 @@
     "dusen": "int",
     "satir": "int"
    },
+   "gosterim": "bool",
    "guncelleme": {
     "durum": "str"
    },
@@ -691,6 +692,8 @@
     }
    },
    "toplanti": {
+    "bitiyor": "bool",
+    "canli": "bool",
     "durum": "str",
     "eklenti_yok": "bool",
     "onceki": {
@@ -699,6 +702,13 @@
      "dosya": "str",
      "gec_atilan": "int",
      "neden": "str"
+    },
+    "son": {
+     "ad": "str",
+     "bitti": "str",
+     "dosya": "str",
+     "durum": "str",
+     "ozet": "bool"
     }
    },
    "toplanti_bitti": {
@@ -720,15 +730,18 @@
     "ben_kod": "str",
     "ben_neden": "str",
     "birlesen": {},
+    "cpp": "NoneType",
     "durgun_max": "float",
     "durum": "str",
     "eski_atlanan": {},
     "gecikme_max": "float",
     "gecikme_sn": "NoneType",
     "hata": "str",
+    "istenen_motor": "str",
     "karsi": "bool",
     "kumeler": {},
     "kuyruk": "int",
+    "motor": "NoneType",
     "parca": {},
     "satir": "int",
     "ses_model": "str",
@@ -881,15 +894,18 @@
     "ben_kod": "str",
     "ben_neden": "str",
     "birlesen": {},
+    "cpp": "NoneType",
     "durgun_max": "float",
     "durum": "str",
     "eski_atlanan": {},
     "gecikme_max": "float",
     "gecikme_sn": "NoneType",
     "hata": "str",
+    "istenen_motor": "str",
     "karsi": "bool",
     "kumeler": {},
     "kuyruk": "int",
+    "motor": "NoneType",
     "parca": {},
     "satir": "int",
     "ses_model": "str",

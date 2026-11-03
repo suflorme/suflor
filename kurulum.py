@@ -203,7 +203,12 @@ def _gunluk_son():
     except OSError: return ""
     son = [x for x in sat if re.search(r"hata|error|uyarı|not:|gerekli|failed|denied|no space", x, re.I)] or sat
     return son[-1][:200] if son else ""
-def modeller_durum():
+def modeller_durum():  # S188: whisper.cpp ayrı satır (cpp) — inmezse kurulum durmaz, aktarıcı MLX'le çalışır
+    d = _modeller_durum()
+    try: d["cpp"] = whispercpp_durum()
+    except Exception: pass
+    return d
+def _modeller_durum():
     if modeller_hazir(): return {"durum": "hazir", "yuzde": 100}
     # modeller ortak klasörde; başka macOS hesabı kurduysa ve eksikse bu hesap tamamlayamaz (yazma izni yok)
     if os.path.isdir(ORTAK) and not os.access(ORTAK, os.W_OK) and not DENEME:
@@ -214,8 +219,9 @@ def modeller_durum():
     if time.time() - _BOY["t"] > 5: _BOY.update(t=time.time(), gb=_boyut(ORTAK) / 2 ** 30)
     MODEL["yuzde"] = min(99, round(100 * _BOY["gb"] / GEREKEN_GB)); return {"durum": "iniyor", "yuzde": MODEL["yuzde"]}
 def modeller_baslat():
-    if modeller_hazir() or (MODEL["p"] and MODEL["p"].poll() is None): return  # biten (hatalı) işlem varsa yeniden başlatılır
     if DENEME: return
+    if modeller_hazir() and not (MODEL["p"] and MODEL["p"].poll() is None): whispercpp_baslat(); return  # S188: eski kurulumda yalnız whisper.cpp eksik olabilir
+    if modeller_hazir() or (MODEL["p"] and MODEL["p"].poll() is None): return  # biten (hatalı) işlem varsa yeniden başlatılır
     os.makedirs(DESTEK, exist_ok=True)
     MODEL["p"] = subprocess.Popen([PY, "-u", os.path.abspath(__file__), "modeller"], stdout=open(os.path.join(DESTEK, "modeller-kur.log"), "a"),
                                   stderr=subprocess.STDOUT, start_new_session=True)
@@ -610,7 +616,7 @@ def izi_adim(adim_id):
         if not a or a[-1][0] != adim_id: a.append([adim_id[:20], round(time.time(), 1)])
     z = _izi_degistir(fn)
     if adim_id == "bitti" and not z.get("gitti"): threading.Thread(target=kurulum_paketi, args=("bitti",), daemon=True).start()
-def izi_indirme(ad, durum):  # ad: model | pocket; durum: modeller_durum()/pocket_durum() sonucu — ilk görülen başlangıç ve sonuç
+def izi_indirme(ad, durum):  # ad: model | pocket | cpp; durum: modeller_durum()/pocket_durum() sonucu — ilk görülen başlangıç ve sonuç
     if not IZI["acik"]: return
     d = durum.get("durum")
     z = oku_json(IZI_YOL).get(ad) or {}
@@ -632,13 +638,14 @@ def kurulum_paketi(sonuc, arka=True):
         sys.path.insert(0, KOD); import teshis
         ad, son = z.get("adimlar") or [], time.time()
         sure = lambda x: round(x["son"] - x["bas"]) if x.get("bas") and x.get("son") else None
-        c = claude_durum(); m = mac(); md, pk = z.get("model") or {}, z.get("pocket") or {}
+        c = claude_durum(); m = mac(); md, pk, cp = z.get("model") or {}, z.get("pocket") or {}, z.get("cpp") or {}
         p = {"tur": "kurulum", "sonuc": sonuc, "ilk_kurulum": bool(z.get("ilk")), "toplam_dk": round((son - z["bas"]) / 60, 1),
              "adimlar": [{"adim": a, "sn": round((ad[i + 1][1] if i + 1 < len(ad) else son) - t)} for i, (a, t) in enumerate(ad[:40])],
              "birakilan": ad[-1][0] if sonuc == "yarida" and ad else None,
              "claude": {"kurulu": c.get("kurulu"), "giris": c.get("giris"), "neden": (c.get("neden") or {}).get("tur")},
              "izin": _izinler(), "model": {"sonuc": md.get("sonuc") or ("iniyor" if md.get("bas") else "yok"), "sn": sure(md), "neden": md.get("tur")},
              "pocket": {"sonuc": pk.get("sonuc") or ("iniyor" if pk.get("bas") else "secilmedi"), "sn": sure(pk)},
+             "whisper_cpp": {"sonuc": cp.get("sonuc") or ("iniyor" if cp.get("bas") else "yok"), "sn": sure(cp), "neden": cp.get("tur")},  # S188
              "mac": {"arm": m.get("arm"), "disk_bos_gb": m.get("disk_gb"), "chrome": m.get("chrome"), "teams_uygulama": m.get("teams_uygulama")}}
         a = ayar(); uyg = yollar()["uygulama"]; p["ortam"] = teshis.ortam(dict(a, kod=KOD), uyg)
         p["proje"] = teshis.proje_olcu(gen(a.get("proje") or (z.get("cevap") or {}).get("proje") or ""), uyg)  # klasör türü + son taramanın bulut sayıları
@@ -856,7 +863,7 @@ class H(BaseHTTPRequestHandler):
             if not self._cerezli(): return self._kapali()
         elif yol.startswith("/api/") and not self._cerezli(): return self._json({"hata": "anahtar"}, 403)
         if yol == "/api/durum":
-            a = ayar(); mdl = modeller_durum(); izi_indirme("model", mdl)
+            a = ayar(); mdl = modeller_durum(); izi_indirme("model", mdl); izi_indirme("cpp", mdl.get("cpp") or {})
             asd = asistan_durum(); izi_indirme("pocket", asd.get("pocket_kur") or {})
             return self._json({"mac": mac(), "claude": claude_durum(), "beyin": beyin_durum(), "modeller": mdl, "eklenti": eklenti(), "takvim": takvim(), "yerel_ses": yerel_ses(), "asistan": asd,
                                "kod": KOD, "mod": A.adim if A else None, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
@@ -1508,11 +1515,161 @@ def whisper_refs_yaz(ort):  # v0.141.0: anlam modelindeki gibi (v0.139.0) yeni i
     if os.path.exists(y) or not whisper_snap(ort) or os.path.basename(whisper_snap(ort)) != WHISPER_REV: return
     try: os.makedirs(os.path.dirname(y), exist_ok=True); open(y, "w").write(WHISPER_REV)
     except OSError: pass
+# ---------- whisper.cpp + Core ML (S188, 3 Kasım: Apple Silicon'da varsayılan Whisper motoru) ----------
+# <ortak>/whisper-cpp/: ggml modeli + Core ML kodlayıcısı + Silero VAD Hugging Face'ten (resmî whisper.cpp depoları, sabit sürüm, boyut + SHA-256);
+# whisper-server (bizim yamalı derlememiz: v1.9.5, Core ML, Metal, WHISPER_TEMP_MAX) açık deponun sürüm sayfasından tek paket — paketin SHA-256'sı
+# imzalı listede (yayın anahtarı, ad alanı suflor-whisper-cpp; yayinla.py --whisper-cpp-paket hazırlar). Olan ve doğru olan yeniden inmez (geliştiricinin
+# elle kurduğu klasör aynı yerde, aynı dosyalar). İnemezse kurulum durmaz: aktarıcı MLX'le çalışır (aktarici/whisper-hat.py wh_cpp).
+WCPP_DIZIN = "whisper-cpp"
+WCPP_HF = os.environ.get("SUFLOR_TEST_WCPP_HF") or "https://huggingface.co"
+# (yerel ad, HF deposu, sürüm (commit), uzak ad, bayt, sha256, tür) — 3 Kasım'da geliştiricinin klasörüyle birebir aynı olduğu doğrulandı (boyut, SHA-256; kodlayıcıda CRC32)
+WCPP_PARCA = [
+    ("ggml-large-v3-turbo-q8_0.bin", "ggerganov/whisper.cpp", "5359861c739e955e79d9a303bcbc70fb988958b1", "ggml-large-v3-turbo-q8_0.bin",
+     874188075, "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1", "dosya"),
+    ("ggml-large-v3-turbo-encoder.mlmodelc", "ggerganov/whisper.cpp", "5359861c739e955e79d9a303bcbc70fb988958b1", "ggml-large-v3-turbo-encoder.mlmodelc.zip",
+     1173393014, "84bedfe895bd7b5de6e8e89a0803dfc5addf8c0c5bc4c937451716bf7cf7988a", "zip"),
+    ("ggml-silero-v6.2.0.bin", "ggml-org/whisper-vad", "9ffd54a1e1ee413ddf265af9913beaf518d1639b", "ggml-silero-v6.2.0.bin",
+     885098, "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987", "dosya")]
+WCPP_KODLAYICI = {"weights/weight.bin": 1273969152, "model.mil": 1148532, "coremldata.bin": 319, "metadata.json": 1767, "analytics/coremldata.bin": 243}
+WCPP_SURUM = "1.9.5-suflor1"  # sunucu paketi: whisper-server + SURUM.txt (sürüm sayfası etiketi whisper-cpp-<sürüm>)
+WCPP_PAKET = f"suflor-whisper-cpp-{WCPP_SURUM}.tar.gz"
+WCPP_REL = os.environ.get("SUFLOR_TEST_WCPP_REL") or f"https://github.com/suflorme/suflor/releases/download/whisper-cpp-{WCPP_SURUM}"
+WCPP_AD_ALANI = "suflor-whisper-cpp"  # imza ad alanı: açık depo dosya listesinin imzası (suflor-yayin) bu pakete geçmez, tersi de
+WCPP_GB = 2.1  # inen toplam (~0,9 + 1,2 sıkıştırılmış kodlayıcı açılınca 1,3 + 8 MB); geçici yerle en az 4 GB boş disk istenir
+def wcpp_yol(ort): return os.path.join(ort, WCPP_DIZIN)
+def _wcpp_kayit(): return os.path.join(DESTEK, "whispercpp-kur.json")
+def wcpp_parca_tamam(ort, ad):  # boyut denetimi (hızlı); SHA-256 indirirken bakılır
+    y = os.path.join(wcpp_yol(ort), ad); p = next((x for x in WCPP_PARCA if x[0] == ad), None)
+    if ad == "whisper-server": return sunucu_calisiyor(y)
+    if not p: return False
+    if p[6] == "zip": return all(os.path.isfile(os.path.join(y, k)) and os.path.getsize(os.path.join(y, k)) == b for k, b in WCPP_KODLAYICI.items())
+    return os.path.isfile(y) and os.path.getsize(y) == p[4]
+_SUNUCU_OK = {}
+def sunucu_calisiyor(y):  # ikili bu Mac'te açılıyor mu (macOS sürümü, mimari, imza): --help 0 ile çıkmalı; sonuç dosya değişene kadar akılda
+    if not os.access(y, os.X_OK): return False
+    try: st = os.stat(y); k = (y, st.st_size, st.st_mtime)
+    except OSError: return False
+    if k not in _SUNUCU_OK:
+        try: _SUNUCU_OK[k] = subprocess.run([y, "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15).returncode == 0
+        except Exception: _SUNUCU_OK[k] = False
+    return _SUNUCU_OK[k]
+def wcpp_eksik(ort): return [a for a in [p[0] for p in WCPP_PARCA] + ["whisper-server"] if not wcpp_parca_tamam(ort, a)]
+def whispercpp_hazir(ort=None): return not wcpp_eksik(ort or ORTAK)
+def whispercpp_durum():  # sihirbaz (/api/durum → modeller.cpp) ve kurulum paketi: hazir | iniyor | hata | yok | atlandi (Intel)
+    if not mac().get("arm"): return {"durum": "atlandi"}
+    if whispercpp_hazir(): return {"durum": "hazir", "yuzde": 100}
+    k = oku_json(_wcpp_kayit())
+    if k.get("durum") == "iniyor" and time.time() - (k.get("t") or 0) > 120: k["durum"] = "hata"; k.setdefault("tur", "kurulamadi")  # yarıda kalmış
+    return {"durum": k.get("durum") or "yok", "yuzde": k.get("yuzde") or 0, **({"tur": k["tur"]} if k.get("tur") else {}), **({"mesaj": k["mesaj"]} if k.get("mesaj") else {})}
+def _indir(url, hedef, boyut, sha, ilerle):  # akışla indir, SHA-256 ve boyut denetle, sonra yerine koy; tutmazsa siler
+    import hashlib
+    gec = hedef + ".indir"; h = hashlib.sha256(); n = 0
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Suflor.me-kurulum"}), timeout=60) as y, open(gec, "wb") as f:
+            for parca in iter(lambda: y.read(1 << 20), b""):
+                f.write(parca); h.update(parca); n += len(parca); ilerle(n)
+        if (boyut and n != boyut) or (sha and h.hexdigest() != sha): raise RuntimeError(f"doğrulama tutmadı ({os.path.basename(hedef)})")
+        os.replace(gec, hedef); return h.hexdigest()
+    except BaseException:
+        try: os.remove(gec)
+        except OSError: pass
+        raise
+def _wcpp_imza_dogrula(liste, sig, acik=None):
+    acik = acik or os.environ.get("SUFLOR_TEST_IMZA_ACIK") or YAYIN_ACIK
+    with tempfile.TemporaryDirectory() as t:
+        izin = os.path.join(t, "izinli"); open(izin, "w").write(f'suflor-yayin namespaces="{WCPP_AD_ALANI}" {acik}\n')
+        with open(liste, "rb") as g:
+            r = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", izin, "-I", "suflor-yayin", "-n", WCPP_AD_ALANI, "-s", sig], stdin=g, capture_output=True)
+    return r.returncode == 0
+def whispercpp_kur(ort=None, ilerle=None):  # → True: hepsi yerinde. Komut: python3 kurulum.py whispercpp (modeller() ve güncelleme sonrası çağırır)
+    import hashlib, tarfile, zipfile
+    ort = ort or yollar()["ortak"]; d = wcpp_yol(ort); kayit = _wcpp_kayit()
+    def durum(**k):
+        k["t"] = time.time()
+        try: os.makedirs(DESTEK, exist_ok=True); yaz_json(kayit, k)
+        except OSError: pass
+        if ilerle: ilerle(k)
+    if not (platform.machine() == "arm64" or sh("sysctl", "-n", "hw.optional.arm64") == "1"): say("Not: whisper.cpp yalnız Apple Silicon'da — atlandı"); return False
+    eksik = wcpp_eksik(ort)
+    if not eksik: say("✓ whisper.cpp (Core ML) var"); durum(durum="hazir", yuzde=100); return True
+    try: os.makedirs(d, exist_ok=True)
+    except OSError: pass
+    if not os.access(d, os.W_OK):
+        say(f"Not: whisper.cpp eksik ({', '.join(eksik)}) ve {d} başka hesabın — o hesapta modeller-kur.command; bu hesap MLX'le çalışır"); durum(durum="hata", tur="baska_hesap"); return False
+    if shutil.disk_usage(d).free < 4 * 2 ** 30: say("Not: whisper.cpp için en az 4 GB boş disk gerekli — atlandı, MLX'le çalışır"); durum(durum="hata", tur="kurulamadi", mesaj="disk"); return False
+    toplam = sum(p[4] for p in WCPP_PARCA if p[0] in eksik) + (9 * 2 ** 20 if "whisper-server" in eksik else 0); bitti = [0]; son = [0.0]
+    def ilerleme(n):
+        if time.time() - son[0] > 2: son[0] = time.time(); durum(durum="iniyor", yuzde=min(99, round(100 * (bitti[0] + n) / max(1, toplam))))
+    say(f"→ whisper.cpp (Core ML) indiriliyor (~{round(toplam / 2 ** 30, 1)} GB): {', '.join(eksik)}"); durum(durum="iniyor", yuzde=0)
+    hatalar = []
+    if "whisper-server" in eksik:
+        t = tempfile.mkdtemp(dir=d, prefix=".sunucu-")
+        try:
+            liste, sig, paket = os.path.join(t, WCPP_PAKET + ".sha256"), os.path.join(t, WCPP_PAKET + ".sha256.sig"), os.path.join(t, WCPP_PAKET)
+            _indir(f"{WCPP_REL}/{WCPP_PAKET}.sha256", liste, 0, None, lambda n: None); _indir(f"{WCPP_REL}/{WCPP_PAKET}.sha256.sig", sig, 0, None, lambda n: None)
+            if not _wcpp_imza_dogrula(liste, sig): raise RuntimeError("imza tutmadı")
+            sat = open(liste, encoding="utf-8").read().splitlines()
+            if not sat or sat[0].strip() != f"# suflor-whisper-cpp {WCPP_SURUM}": raise RuntimeError("imzalı liste başka sürümün")
+            bek = next((l.split()[0] for l in sat[1:] if l.split()[-1:] == [WCPP_PAKET] and re.fullmatch(r"[0-9a-f]{64}", l.split()[0])), None)
+            if not bek: raise RuntimeError("imzalı listede paket yok")
+            _indir(f"{WCPP_REL}/{WCPP_PAKET}", paket, 0, bek, ilerleme)
+            ac = os.path.join(t, "ac"); os.makedirs(ac)
+            with tarfile.open(paket, "r:gz") as tf:
+                for u in tf.getmembers():  # yalnız iki düz dosya
+                    if u.isfile() and u.name in ("whisper-server", "SURUM.txt"): tf.extract(u, ac)
+            yeni = os.path.join(ac, "whisper-server"); os.chmod(yeni, 0o755)
+            if not sunucu_calisiyor(yeni): raise RuntimeError("indirilen whisper-server bu Mac'te açılmadı (macOS sürümü?)")
+            for f in ("SURUM.txt", "whisper-server"):  # sunucu en son: yarım kalırsa eski (varsa) yerinde
+                if os.path.isfile(os.path.join(ac, f)): os.replace(os.path.join(ac, f), os.path.join(d, f))
+            say("  ✓ whisper-server")
+        except Exception as e: hatalar.append(f"whisper-server: {str(e)[:120]}"); say(f"  ✗ whisper-server inemedi ({str(e)[:160]})")
+        finally: shutil.rmtree(t, ignore_errors=True)
+    # S188 ek (3 Kasım): önce sunucu — sürüm sayfasında paket yoksa ya da bu Mac'te açılmıyorsa ~2 GB model boşuna inmesin (MLX ile devam; sonraki güncellemede yeniden)
+    if not wcpp_parca_tamam(ort, "whisper-server"):
+        say("Not: whisper.cpp sunucusu yok ya da açılmıyor — modeller indirilmedi, konuşma tanıma MLX ile; sonraki güncellemede yeniden denenir")
+        sessiz("chmod", "-R", "go+rX", d); durum(durum="hata", tur="kurulamadi", mesaj="sunucu yok — MLX ile devam; " + "; ".join(hatalar)[:250]); return False
+    for ad, depo, rev, uzak, boyut, sha, tur in WCPP_PARCA:
+        if ad not in eksik: continue
+        url = f"{WCPP_HF}/{depo}/resolve/{rev}/{uzak}"; hedef = os.path.join(d, ad)
+        try:
+            if tur == "dosya": _indir(url, hedef, boyut, sha, ilerleme)
+            else:  # Core ML kodlayıcı: zip → yalnız <ad>/ altındaki dosyalar (macOS'un __MACOSX ekleri atılır); zipfile her dosyanın CRC'sini denetler
+                z = hedef + ".zip"; _indir(url, z, boyut, sha, ilerleme); gec = hedef + ".acilis"
+                shutil.rmtree(gec, ignore_errors=True); os.makedirs(gec)
+                try:
+                    with zipfile.ZipFile(z) as zf:
+                        for u in zf.infolist():
+                            ic = u.filename.split("/", 1)
+                            if ic[0] != ad or len(ic) < 2 or not ic[1] or u.is_dir() or ic[1].startswith("/") or ".." in ic[1].split("/"): continue
+                            os.makedirs(os.path.dirname(os.path.join(gec, ic[1])), exist_ok=True)
+                            with zf.open(u) as kay, open(os.path.join(gec, ic[1]), "wb") as hed: shutil.copyfileobj(kay, hed, 1 << 20)
+                    if not all(os.path.isfile(os.path.join(gec, k)) and os.path.getsize(os.path.join(gec, k)) == b for k, b in WCPP_KODLAYICI.items()):
+                        raise RuntimeError("kodlayıcı paketi eksik")
+                    if os.path.isdir(hedef): shutil.rmtree(hedef + ".eski", ignore_errors=True); os.replace(hedef, hedef + ".eski")
+                    os.replace(gec, hedef); shutil.rmtree(hedef + ".eski", ignore_errors=True)
+                finally:
+                    shutil.rmtree(gec, ignore_errors=True)
+                    try: os.remove(z)
+                    except OSError: pass
+            bitti[0] += boyut; say(f"  ✓ {ad}")
+        except Exception as e: hatalar.append(f"{ad}: {str(e)[:120]}"); say(f"  ✗ {ad} inemedi ({str(e)[:160]})")
+    sessiz("chmod", "-R", "go+rX", d)  # öbür hesap okuyabilsin
+    if hatalar or wcpp_eksik(ort):
+        say("Not: whisper.cpp tamamlanamadı — aktarıcı MLX'le çalışır; sonraki güncellemede yeniden denenir"); durum(durum="hata", tur="kurulamadi", mesaj="; ".join(hatalar)[:300]); return False
+    say("✓ whisper.cpp hazır (ilk toplantıda Core ML bir kez hazırlanır: birkaç dakika sürebilir)"); durum(durum="hazir", yuzde=100); return True
+def whispercpp_baslat():  # arka planda (güncelleme sonrası, sihirbaz): kurulum.py whispercpp → whispercpp-kur.log
+    if DENEME or whispercpp_hazir(yollar()["ortak"]) or not mac().get("arm"): return None
+    k = oku_json(_wcpp_kayit())
+    if k.get("durum") == "iniyor" and time.time() - (k.get("t") or 0) < 120: return None  # başka süreç indiriyor
+    os.makedirs(DESTEK, exist_ok=True)
+    return subprocess.Popen([PY, "-u", os.path.abspath(__file__), "whispercpp"], stdout=open(os.path.join(DESTEK, "whispercpp-kur.log"), "a"),
+                            stderr=subprocess.STDOUT, start_new_session=True)
 def modeller():
     # Yerel modeller ve Python ortamı — yeni Mac'te ya da bozulunca; olanı yeniden kurmaz. İnternet yalnız burada gerekir; aktarıcı
     # modelleri çevrimdışı açar (HF_HUB_OFFLINE=1). İki macOS hesabında ortak klasör (ayar "ortak"): başka hesap kurduysa bu hesap
     # yalnız okur — eksik yoksa hiçbir şey indirmez. Sürümler 2 Ekim 2026'da çalışan kurulumdan sabitlendi.
     #   whisper-venv: mlx-whisper (Apple GPU) ~760 MB · whisper-modeller: whisper-large-v3-turbo ~1,6 GB (+ yerel 8 bit ~0,8 GB)
+    #   whisper-cpp: whisper.cpp + Core ML (S188 varsayılan motor) ~2,1 GB — ggml turbo q8, Core ML kodlayıcı, Silero VAD (HF) + whisper-server (sürüm sayfası)
     #   ses-modeller: speechbrain/spkrec-ecapa-voxceleb ~85 MB → ecapa-mlx.npz (konuşmacı ayırma, Whisper işçisinde MLX ile)
     #   smart-turn-venv (onnxruntime + numpy) ~125 MB + ses-modeller/smart-turn ~9 MB: tur sonu modeli (isteğe bağlı, tur_kur)
     #   python312 + cevir-venv (Docling + Vision) ~1,5 GB + cevir-modeller ~0,7 GB: PDF/sunum/görüntü → metin (proje hazırlığı, cevir_kur)
@@ -1559,6 +1716,9 @@ def modeller():
                 "allow_patterns=['embedding_model.ckpt', 'hyperparams.yaml'])", ek)
     if os.path.isfile(os.path.join(ek, "ecapa-mlx.npz")): say("✓ ses izi ağırlıkları (MLX) var")
     else: ecapa_donustur(ort, onbellek=False)
+    # S188: whisper.cpp varsayılan motor. MLX modeli bu adımda yine iner: dosyadan/toplu döküm, konuşmacı etiketlemesi ve cpp açılamazsa yedek ona muhtaç
+    try: whispercpp_kur(ort)
+    except Exception as e: say(f"Not: whisper.cpp kurulamadı ({e.__class__.__name__}: {str(e)[:120]}) — aktarıcı MLX'le çalışır")
     whisper_8bit(ort); tur_kur(ort); cevir_kur(ort)
     say("→ Deneme: modeller çevrimdışı açılıyor mu…")
     zorunlu(vpy, "-c", "import sys, numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), "
@@ -1750,6 +1910,10 @@ def dogrula_topla(hizli=False):  # → [{"id", "durum": ok|hata|?, "ad", "not", 
         else: m("ajan", "ok", "Arka plan ajanı (launchd)", f"yüklü, {Y['port']} portu cevap veriyor")
     # --- modeller: ağır yükleme yok; refs/anlık görüntü varlığı + anlam-dene.json (modeller_dene'nin kaydı)
     ort = Y["ortak"]; ws = whisper_snap(ort); wr = os.path.join(ort, "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo", "refs", "main"); wcpp = os.path.isdir(os.path.join(ort, "whisper-cpp"))
+    if mac().get("arm"):  # S188: whisper.cpp varsayılan motor (ayar whisper_motor: mlx değilse); eksikse aktarıcı MLX'le çalışır — hata değil uyarı
+        we = wcpp_eksik(ort); mlx_secili = a.get("whisper_motor") == "mlx"
+        if not we: m("model-whispercpp", "ok", "whisper.cpp (Core ML)", "dosyalar yerinde, sunucu açılıyor" + (" (ayar whisper_motor: mlx — kullanılmıyor)" if mlx_secili else ""))
+        else: m("model-whispercpp", "?", "whisper.cpp (Core ML)", f"eksik: {', '.join(we)} — konuşma tanıma MLX'le", "python3 kurulum.py whispercpp")
     if not ws and not wcpp: m("model-whisper", "hata", "Whisper modeli", "model dosyası ortak klasörde yok", "python3 kurulum.py modeller (modeller-kur.command)")
     elif ws and not os.path.isfile(wr) and os.path.basename(ws) == WHISPER_REV: m("model-whisper", "hata", "Whisper modeli", "model var ama refs/main eksik", "python3 kurulum.py guncelleme-sonrasi")
     else: m("model-whisper", "ok", "Whisper modeli", "model dosyaları yerinde")
@@ -1832,6 +1996,7 @@ def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla 
         say("\nUYARI: aktarıcı kurulamadı — kod güncellendi ama çalışan aktarıcı eski sürümde kalmış olabilir.")
         sys.exit(f"Bu pencerenin yukarısındaki hatayı geliştiriciye ilet ya da {KOD}/aktarici-kur.command dosyasına çift tıkla.")
     modeller_dene()
+    if whispercpp_baslat(): say("→ whisper.cpp (Core ML, ~2,1 GB) arka planda iniyor; bitene kadar konuşma tanıma MLX'le (günlük: ~/Library/Application Support/Suflor/whispercpp-kur.log)")
     # kişisel hesapta kod v0.13.6 iken çalışan aktarıcı v0.13.2'de kalmıştı — sürümler karşılaştırılır
     try: calisan = json.load(urllib.request.urlopen(f"http://127.0.0.1:{yollar()['port']}/status", timeout=3)).get("surum", "?")
     except Exception: calisan = "?"
@@ -1857,7 +2022,7 @@ def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Suflor.me kurulumu: komutsuz sihirbaz; kur | kaldir | modeller | guncelle")
-    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "guncelle", "guncelleme-sonrasi", "dogrula", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|dogrula|profil|mesgul")
+    ap.add_argument("is_", nargs="?", choices=["kur", "kaldir", "sil", "modeller", "whispercpp", "guncelle", "guncelleme-sonrasi", "dogrula", "profil", "mesgul", "pocket", "ollama"], metavar="kur|kaldir|sil|modeller|guncelle|dogrula|profil|mesgul")
     ap.add_argument("--json", action="store_true", help="dogrula: makine okunur çıktı"); ap.add_argument("--hizli", action="store_true", help="dogrula: menü uygulamasını açan izin okumasını atla"); ap.add_argument("--yazma", action="store_true", help="dogrula: dogrula.json ve posta kutusuna yazma (deneme toplantısı kipi çağırır)")
     ap.add_argument("--port", type=int, default=8770); ap.add_argument("--ac", action="store_true")
     ap.add_argument("--kaynak", help="guncelle: açık depo yerine bu tar.gz (deneme)")
@@ -1870,6 +2035,7 @@ if __name__ == "__main__":
     if A.is_ == "mesgul": m = mesgul(); print(m); sys.exit(1 if m else 0)
     if A.is_ == "pocket": sys.exit(0 if pocket_kur() else 1)
     if A.is_ == "ollama": sys.exit(0 if ollama_kur() else 1)
+    if A.is_ == "whispercpp": sys.exit(0 if whispercpp_kur() else 1)
     if A.is_ == "sil": sil(A.evet, A.zorla, A.modeller, A.proje, A.kod); sys.exit(0)
     if A.is_: {"kur": kur, "kaldir": kaldir, "modeller": modeller, "guncelle": lambda: guncelle(A.kaynak, A.zorla), "guncelleme-sonrasi": guncelleme_sonrasi, "profil": profil}[A.is_](); sys.exit(0)
     os.makedirs(DESTEK, exist_ok=True)

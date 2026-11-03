@@ -188,7 +188,9 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 - **Whisper'ın yazdığı bir ad ya da terim yanlış (ör. asistanın adı başka sözcük yazılıyor):** adı proje sözlüğüne ya da kişi listesine ekle; asistan adıyla seslenince cevap gelmiyorsa ilk bakılacak yer burasıdır.
 - **Dökümde hı hı gibi kısa sözler senin adına çıkıyor:** hoparlör yerine kulaklık kullan; tepki seslerini kapatmak için `"tepki_sesi": false`.
 - **Çok uzun toplantıda (4,5 saati aşınca) eski bölümler "kayıtta yok" çıkıyor:** döküm dosyasının kendisi eksiksizdir; yalnız Konuş'un bakabildiği pencere sınırlıdır, eski bir şeyi dosyadan açıp sor.
-- **Terimli konuşmalarda döküm hataları arttı:** `"whisper_motor"` ayarını kaldır; varsayılan döküm motoruna dönülür.
+- **Terimli konuşmalarda döküm hataları arttı:** `"whisper_motor": "mlx"` ile eski motora (MLX) dönülür; ayarı kaldırınca yine whisper.cpp.
+- **Toplantının ilk dakikasında döküm geç başladı:** whisper.cpp'nin ilk açılışında Core ML kodlayıcısı bir kez hazırlanır (birkaç dakika sürebilir); o sırada satırlar altyazıdan gelir. Sonraki açılışlar birkaç saniyedir.
+- **Günlükte "WHISPER: cpp açılamadı (…) — MLX yedeği":** whisper.cpp bu Mac'te açılmadı; o gün MLX'le sürer, ertesi gün yeniden denenir. MLX modeli diskte yoksa o an iner (~1,6 GB; panoda/`/status`'ta Whisper "indiriliyor", bitene kadar döküm altyazıdan). Kurulumu denetle'deki "whisper.cpp" satırına bak; eksikse `python3 kurulum.py whispercpp`.
 
 ### Toplantı, platform ve kartlar
 - **Google Meet'te altyazı açık ama satır gelmiyor ya da dökümde menü metinleri var:** Meet arayüzü değişmiş olabilir; Chrome'da Suflor.me eklentisini yenile (`chrome://extensions`) ve güncelleme çıkmışsa **Güncelle**'ye bas.
@@ -245,7 +247,7 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 - Aktarıcı yalnız `127.0.0.1` adresinde çalışır; toplantı içeriğini hiçbir sunucuya göndermez. İstisna isteğe bağlı Gemini sesi: açarsan (⚙ Ayarlar → Ses → Gemini)
   yalnız okunacak metin (cevap, özet, çeviri, fısıltı, duyuru) Google'a gider, ses kaydı gitmez; kapalıyken (varsayılan) sesler Mac'te üretilir.
 - **Beta geliştirme verisi:** beta sürümü gönüllü geliştirme katılımıdır. Suflor.me'yi geliştirmek için yalnız sayılar gönderilir (kullanım, hız, hata):
-  kurulum adımlarının süresi ve izinler, haftalık kullanım sayıları, toplantı sonu gecikme ve hata sayıları, çağrı ve simge sayısı, seçili ayarlar
+  kurulum adımlarının süresi ve izinler, haftalık kullanım sayıları, toplantı sonu gecikme ve hata sayıları, konuşma tanıma motorunun açılış sonucu ve süresi, çağrı ve simge sayısı, seçili ayarlar
   (ses motoru, dil, tema gibi). Konuşmaların, metinlerin ve adların hiçbiri Mac'inden çıkmaz: döküm, kart, soru ve cevap, kişi/toplantı/proje/dosya
   ve asistan adı, e-posta, takvim, ses, ses izi ve ekran görüntüsü gitmez. Kimlik yalnız rastgele bir kurulum numarasıdır. Beta sürümünde kapatılmaz;
   giden her paketin kopyası `~/Library/Application Support/Suflor/teshis/gonderilen/` altında durur.
@@ -260,7 +262,7 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 ## Gerekenler
 - Apple Silicon (M serisi) işlemcili Mac, macOS 14 ya da üstü
 - En az 16 GB bellek (konuşma tanıma ve ses modeli toplantı sırasında ~4 GB kullanır)
-- ~12 GB boş disk (modeller ~5 GB, belge çevirme ve anlam araması ~3,3 GB)
+- ~14 GB boş disk (modeller ~7 GB — whisper.cpp ~2,1 GB dahil, belge çevirme ve anlam araması ~3,3 GB)
 - Google Chrome
 - [Claude Code](https://claude.com/claude-code) ve bir Claude aboneliği (Pro ya da üstü) önerilir. Claude Code kurulu değilse sihirbaz kurar;
   Terminal'de `claude` → `/login` ile giriş gerekir (Claude masaüstü uygulamasındaki giriş Terminal'e geçmez). Yerine bir API anahtarı ya da
@@ -276,7 +278,7 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 | Aktarıcı (`relay.py`) | Yerel sunucu: satırları dosyaya yazar, kartları tutar, panoyu sunar |
 | Menü çubuğu uygulaması (`menu-cubugu.swift` → `~/Applications/Suflor.me.app`) | Pano penceresi, menü çubuğu paneli, ekranın alt ortasında kart kutuları, Mac geneli bas-konuş, masaüstü toplantı sinyali |
 | Ses yardımcısı (`ses-yardimcisi.swift` → Suflor Ses.app) | Toplantı uygulamasının sesini (karşı taraf) macOS'tan alır; mikrofonu almaz, ses diske yazılmaz |
-| Konuşma tanıma (`whisper-isci.py`) | Whisper large-v3-turbo (kurulumda yerelde 8 bite indirilir) ve konuşmacı ses izi (ECAPA), ikisi de MLX ile yerel |
+| Konuşma tanıma (`whisper-isci.py`) | Canlı döküm: Apple Silicon'da varsayılan whisper.cpp + Core ML (Whisper large-v3-turbo 8 bit, kodlayıcı Neural Engine'de; `<ortak>/whisper-cpp/`, ~2,1 GB: model, Core ML kodlayıcısı ve Silero VAD Hugging Face'ten, `whisper-server` açık deponun sürüm sayfasından, boyut, SHA-256 ve imza denetlenerek). İlk açılışta Core ML bir kez hazırlanır (birkaç dakika). Açılamazsa aynı süreçte MLX'e geçer (geçici yedek; o gün yeniden denenmez). `"whisper_motor": "mlx"` eski motoru seçer. Dosyadan döküm, toplantı sonu konuşmacı etiketlemesi ve konuşmacı ses izi (ECAPA) MLX ile (Whisper turbo, kurulumda yerelde 8 bite indirilir) |
 | Toplantıda asistan (`aktarici/toplantiya-ses.py`, `aktarici/otonom.py`, `soyle-main.js`; ⚙ Ayarlar → Asistanlar toplantıda konuşsun, ayar `toplantiya_ses`, varsayılan kapalı) | Toplantıda “<ad>, …” diye seslendiğin asistanın cevabını herkesin duyacağı şekilde okur (söz sırası gelince; “<ad>, dur” ya da Option + Shift + S susturur; sen bir kez çağırdıktan sonra diğer katılımcılar da ona adıyla sorabilir; yalnız sana cevap için Konuş düğmesi): web toplantısında yalnız okuma süresince mikrofon kanalına karıştırır (sessizdeysen okumaz); masaüstü Teams'te BlackHole ile |
 | Tur sonu (`tur-isci.py`) | smart-turn v3 (8,7 MB, yerel): konuşurken sözün bitip bitmediğini tahmin eder; kurulamazsa sessizlik süresine bakılır |
 | Anlama göre arama (`gomme-isci.py`; `baglam.py gomme`) | multilingual-e5-base (MIT, ~1,1 GB, yerel): sorudaki sözcükler belgede geçmese de anlamca yakın parçaları bulur; sözcük aramasıyla birleştirilir. Arka planda bir sunucu açık kalır (~1 GB bellek), 30 dk sorgu gelmezse kapanır |
@@ -294,3 +296,6 @@ MIT — ayrıntı [LICENSE](LICENSE).
 [wite-tech/pocket-tts-turkish](https://huggingface.co/wite-tech/pocket-tts-turkish) (CC-BY-4.0, wite-tech), Pocket TTS (Kyutai, MIT),
 pocket-tts-turkish paketi (Apache-2.0); elle kurulursa [alperiox/pocket-tts-turkish](https://huggingface.co/alperiox/pocket-tts-turkish) (MIT).
 Yerel model seçilirse [Ollama](https://github.com/ollama/ollama) (MIT) ve qwen3.5 modeli (lisansı Ollama kütüphanesindeki model sayfasında) indirilir.
+Konuşma tanıma için kurulumda indirilenler: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT; `whisper-server` küçük bir yamayla derlenmiş hâli sürüm sayfasında),
+Whisper large-v3-turbo ağırlıkları (OpenAI, MIT; ggml ve Core ML biçimi [ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp), MLX biçimi mlx-community),
+Silero VAD (MIT; [ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad)).

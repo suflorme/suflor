@@ -138,9 +138,17 @@ def _beta_profil():
         tarz.add("rahat" if ("Ton (rahat)" in m or "Tone (relaxed)" in m) else "olculu" if ("Ton (ölçülü)" in m or "Tone (measured)" in m) else "elle")
     tek = lambda s: (next(iter(s)) if len(s) == 1 else "karisik") if s else None
     return {"ses_motoru": str(AYAR.get("ses_motoru") or "mac"), "arayuz": "en" if AYAR.get("dil") == "en" else "tr", "tema": str(AYAR.get("tema") or "sistem"),
-            "asistan_sayisi": len(ks), "hitap_bicimi": tek(bic), "tarz": tek(tarz), "whisper_motor": str(AYAR.get("whisper_motor") or "mlx"),
+            "asistan_sayisi": len(ks), "hitap_bicimi": tek(bic), "tarz": tek(tarz), "whisper_motor": wh_motor() if "wh_motor" in globals() else str(AYAR.get("whisper_motor") or "mlx"),
             "toplantiya_ses": AYAR.get("toplantiya_ses") is True, "konusma": AYAR.get("konusma", True) is not False,
             "proje_karti": os.path.exists(os.path.join(AYAR["uygulama"], "proje-karti.json")), "takvim": (STATE.get("takvim") or {}).get("durum")}
+def _beta_cpp(bas, son):  # S188: whisper.cpp açılışları (canli/whisper-cpp-acilis.jsonl, whisper-hat wh_cpp_kaydet) — yalnız sonuç, hata sınıfı ve süre; yol, ileti gitmez
+    rs = [r for r in _jsonl("whisper-cpp-acilis.jsonl") if bas <= (_ts(r) or 0) < son]
+    ok = [r for r in rs if r.get("sonuc") == "basarili"]; sn = lambda r, k: float(r[k]) if isinstance(r.get(k), (int, float)) else None
+    ilk = [sn(r, "acilis_sn") for r in ok if r.get("coreml_ilk") and sn(r, "acilis_sn") is not None]
+    return {"acilis": len(rs), "basarili": len(ok), "yedek": len(rs) - len(ok),
+            "cpp_hata": dict(collections.Counter(str(r.get("hata") or "diger") for r in rs if r.get("sonuc") != "basarili")),
+            "acilis_sn": _ort([x for x in (sn(r, "sn") for r in ok) if x is not None]), "coreml_ilk_sn": max(ilk) if ilk else None,
+            "calisan_motor": (STATE.get("whisper") or {}).get("motor") or None}
 def _beta_maliyet(bas, son, toplanti_dk):
     cg = [r for r in _jsonl("claude-cagri.jsonl") if bas <= (_ts(r) or 0) < son]
     isler = {}
@@ -179,7 +187,7 @@ def beta_haftalik_paket(ad):
                         "canli_ceviri_toplanti": sum(1 for v in tps if v.get("ceviri")), "gizli": o["gizli"], "moderator": o["moderator"], "dur": o["dur"]},
             "kalite": {"konus": _beta_konus(kon), "hitap_yinelenen": o["hitap_yinelenen"], "zaman_asimi": o["zaman_asimi"], "acilis": beta_say("acilis", bas, son),
                        "hata": o["hata"], "sorun": o["sorun"], "sistem": _beta_sistem(bas, son), "bilgi": _beta_bilgi(bas, son)},
-            "maliyet": _beta_maliyet(bas, son, sum(sure)), "profil": _beta_profil(),
+            "maliyet": _beta_maliyet(bas, son, sum(sure)), "profil": _beta_profil(), "whisper_cpp": _beta_cpp(bas, son),
             "proje": teshis.proje_olcu(AYAR.get("proje"), AYAR["uygulama"]), "proje_vt": _beta_proje_vt()}  # klasör türü + son taramanın sayıları (klasör değişebilir)
 def _beta_haftalik():
     simdi = datetime.datetime.now()

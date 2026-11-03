@@ -792,6 +792,16 @@ globalThis.SUFLOR_EN = {
   "{ok} ✓ · {hata} ✗ · {bil} ?": "{ok} ✓ · {hata} ✗ · {bil} ?",
   "Hiçbir madde ✗ değil": "No item is ✗",
   "Sık görülen sorunlar ve çözümleri: Kılavuz → Sorun giderme": "Common problems and fixes: Guide → Troubleshooting (Turkish)",
+  // --- ardışık toplantı (3 Kasım): bitiyor'da Bugün + Başlat, sürerken farklı konu sorusu
+  "Toplantı bitiyor": "Meeting ending",
+  "bir toplantı": "a meeting",
+  "Şu an «{a}» sürüyor": "«{a}» is in progress",
+  "Bitirip «{k}» toplantısını başlatayım mı? Bitenin özeti arka planda hazırlanır.": "End it and start «{k}»? The summary of the ended meeting is prepared in the background.",
+  "Bitir ve başlat": "End and start",
+  "Bu toplantıya devam": "Stay in this meeting",
+  "bitti {t}": "ended {t}",
+  "özet hazır": "summary ready",
+  "özet hazırlanıyor": "summary in progress",
   // --- Faz D2 (v0.148.0): Deneme toplantısı
   "Deneme toplantısı (3 dk)": "Test meeting (3 min)",
   "Deneme toplantısı": "Test meeting",

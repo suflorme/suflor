@@ -131,7 +131,7 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          "adim": ADIMLAR, "birakilan": ADIMLAR, "sonuc": {"bitti", "yarida", "hazir", "hata", "yok", "iniyor", "secilmedi", "onceden"},
          "neden": {"abonelik", "giris", "hata", "zaman", "yok", "kurulamadi", "baska_hesap"}, "mikrofon": IZIN, "erisilebilirlik": IZIN, "ekran": IZIN, "takvim": _DURUMLAR,
          "ses_motoru": {"mac", "piper", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
-         "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"},
+         "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"}, "calisan_motor": {"mlx", "cpp"},  # S188: haftalık whisper_cpp'de son açılan motor
          "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"},
          **{"beyin_" + i: {"claude-code", "gemini", "ozel", "ollama", ""} for i in ("varsayilan", "konus", "ceviri", "proje_karti")}}  # Faz 11: yalnız seçenek (ortam)
@@ -148,7 +148,9 @@ SAYIM = {"kaynak": {"transcript", "captions", "whisper", "bilinmeyen"}, "kanal":
          "platformlar": {"teams", "meet", "zoom", "masaustu", "bilinmeyen"},
          "toplanti_disi": {"sesli", "yazili", "sohbet", "herkese", "karsi", "ozet", "diger", "kulaga", "toplam"},
          "toplanti_ici": {"sesli", "yazili", "sohbet", "herkese", "karsi", "ozet", "diger", "kulaga", "toplam"},
-         "claude_is": {"bas_konus", "toplanti", "proje_karti", "telaffuz", "ceviri", "brifing", "diger"}}
+         "claude_is": {"bas_konus", "toplanti", "proje_karti", "telaffuz", "ceviri", "brifing", "diger"},
+         # S188: whisper.cpp açılamama sınıfı (whisper-isci.py CPP_HATA) — haftalık whisper_cpp.cpp_hata sayımı
+         "cpp_hata": {"dosya_yok", "calismiyor", "macos_surum", "coreml", "sunucu_kapandi", "zaman_asimi", "isinma", "diger"}}
 SERBEST = {"kullanici_metni"}  # kullanıcının panoda yazdığı metin (gönderilmeden önce gösterilir); v0.12.3: gozlem artık sade()'den geçer
 def _anahtar(k, ust, i):
     k = ANAHTAR_CEVIR.get(str(k), str(k))

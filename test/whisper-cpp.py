@@ -6,7 +6,8 @@
 import base64, json, os, re, subprocess, sys, tempfile, time
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import bosport  # noqa: canlı kullanım koruması (gerçek model)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ORT = "/Users/Shared/Suflor"; CPP = os.path.join(ORT, "whisper-cpp"); PY = os.path.join(ORT, "whisper-venv", "bin", "python")
+ORT = "/Users/Shared/Suflor"; CPP = os.environ.get("SUFLOR_TEST_WCPP_DIZIN") or os.path.join(ORT, "whisper-cpp")  # SUFLOR_TEST_WCPP_DIZIN: başka derlemeyi denemek
+PY = os.path.join(ORT, "whisper-venv", "bin", "python")
 ECAPA = os.path.join(ORT, "ses-modeller", "spkrec-ecapa-voxceleb", "ecapa-mlx.npz")
 if not (os.path.exists(os.path.join(CPP, "whisper-server")) and os.path.exists(PY)): print("whisper.cpp ya da whisper-venv kurulu değil — atlandı"); sys.exit(0)
 ok = []
@@ -54,7 +55,8 @@ kontrol("whisper-server işçinin alt süreci, yalnız 127.0.0.1", srv and "127.
 p.kill(); time.sleep(4)
 kontrol("işçi öldürülünce whisper-server kapandı", not any(subprocess.run(["ps", "-p", s], capture_output=True).returncode == 0 for s in srv))
 
-# aktarıcı: ayar whisper_motor → işçi ortamı (whisper-hat.py wh_cpp)
+# aktarıcı: ayar whisper_motor → işçi ortamı (whisper-hat.py wh_motor/wh_cpp; S188: ayar yoksa Apple Silicon'da cpp, "mlx" kapatır; uçtan uca test/whisper-yedek.py)
 src = open(os.path.join(KOD, "aktarici", "whisper-hat.py"), encoding="utf-8").read()
-kontrol("aktarıcı SUFLOR_WHISPER_CPP'yi yalnız whisper_motor: cpp iken verir", 'AYAR.get("whisper_motor") == "cpp"' in src and '"SUFLOR_WHISPER_CPP": WH_CPP} if wh_cpp()' in src)
+kontrol("aktarıcı SUFLOR_WHISPER_CPP'yi istenen motor cpp iken verir (ayar yoksa Apple Silicon'da cpp, ayar kazanır)",
+        'm if m in ("cpp", "mlx") else ("cpp" if WH_ARM else "mlx")' in src and 'wh_motor() == "cpp"' in src and '"SUFLOR_WHISPER_CPP": WH_CPP} if wh_cpp()' in src)
 print(f"\n{sum(ok)}/{len(ok)} geçti"); sys.exit(0 if all(ok) else 1)

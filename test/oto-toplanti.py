@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # S161 (v0.144.0) — toplantıyı kendisi tanıma, kota harcamadan (sahte claude, Brifing.app bu sınamada derlenir):
 #  1) Başlat'sız Meet (eklenti nabzı, Meet kodu adıyla): takvimdeki toplantının adıyla dosya hemen açılır, başlık "Google Meet" der (Teams değil), toplantı
-#     oturumu sormadan açılır; Meet kodlu ve "Toplantı" adlı satır/not aynı dosyaya gider; süren toplantıda elle Başlat yeni oturum ve kayıt açmaz;
-#     sinyal kesilince toplantı biter.
+#     oturumu sormadan açılır; Meet kodlu ve "Toplantı" adlı satır/not aynı dosyaya gider; süren toplantıda farklı konuyla elle Başlat yeni oturum ve kayıt
+#     açmaz, panoya soru döner (3 Kasım); onaylanınca eski kapanır, yeni dosya açılır, yeni oturum önceki toplantının özeti gelene dek bekler; sinyal kesilince biter.
 #  2) Gizli kipte tanınmaz. 3) Masaüstü Teams: aynı anda süren iki takvim toplantısından platformu tutan seçilir; ayar oto_haric'teki adda oturum açılmaz.
 # aktarici/toplanti.py, baslat, paths/ensure_header (ad eşleme) değişince koştur:  PYTHONDONTWRITEBYTECODE=1 python3 test/oto-toplanti.py
 import datetime, glob, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
@@ -94,14 +94,27 @@ try:
     ok(f"Meet kodlu ve 'Toplantı' adlı satırlar aynı dosyada: {dosyalar()}", "başlayalım mı" in icerik and "gündemle başlayalım" in icerik and len(dosyalar()) == 1)
     n_il = len([x for x in iletiler() if "/toplanti" in x])
     istek("/status", None)  # pano görünümü
+    rb = istek("/baslat", {"konu": "Deniz ile proje", "rol": "katilimci", "dil": "tr"})
+    time.sleep(1)
+    ok(f"süren toplantıda aynı konuyla Başlat: katıldı, yeni oturum ve kayıt yok ({rb})", rb.get("ok") and rb.get("katildi") and len([x for x in iletiler() if "/toplanti" in x]) == n_il and len(dosyalar()) == 1)
     rb = istek("/baslat", {"konu": "Başka bir konu", "rol": "katilimci", "dil": "tr"})
     time.sleep(2)
-    ok(f"süren toplantıda elle Başlat: katıldı, yeni oturum ve kayıt yok ({rb})", rb.get("ok") and rb.get("katildi") and len([x for x in iletiler() if "/toplanti" in x]) == n_il and len(dosyalar()) == 1)
+    ok(f"süren toplantıda farklı konuyla Başlat: soru döndü, yeni oturum ve kayıt yok ({rb})", rb.get("soru") == "suruyor" and not rb.get("ok") and rb.get("ad") == "Deniz ile proje"
+       and len([x for x in iletiler() if "/toplanti" in x]) == n_il and len(dosyalar()) == 1)
+    rb = istek("/baslat", {"konu": "Başka bir konu", "rol": "katilimci", "dil": "tr", "onay": "bitir"})
+    ok(f"onaylanınca: eski kapandı, yeni dosya, oturum önceki toplantının sonunu bekliyor ({rb})", rb.get("ok") and rb.get("ertelendi") and any(f.endswith("-Başka-bir-konu.md") for f in dosyalar())
+       and "TOPLANTI: bitti (yeni Başlat (onaylandı))" in L() and "toplantı oturumu önceki toplantının sonu bitince açılacak" in L())
+    time.sleep(2); ok("bekleme sürerken eski oturum kapatılmadı, yeni /toplanti gitmedi", len([x for x in iletiler() if "/toplanti" in x]) == n_il and "ertelenen toplantı oturumu açılıyor" not in L())
+    istek("/son-toplanti", {"ozet": os.path.join(T, "ozet-deneme.md"), "dosya": d1[0] if d1 else "", "baslik": "Deniz ile proje"})
+    ok("önceki toplantının özeti gelince yeni toplantının oturumu açıldı", bekle(lambda: "ertelenen toplantı oturumu açılıyor (önceki toplantının özeti hazır)" in L(), 15)
+       and bekle(lambda: len([x for x in iletiler() if "/toplanti" in x and "panodan başlatıldı" in x]) >= 1, 20))
+    sec = json.load(open(os.path.join(canli, "takvim-secilen.json"), encoding="utf-8")); ok(f"takvim-secilen.json yeni konuyla ({sec.get('konu')})", sec.get("konu") == "Başka bir konu")
     NABIZ["g"] = None
-    ok("sinyal kesilince toplantı bitti", bekle(lambda: "TOPLANTI: bitti" in L() and "Deniz-ile-proje.md" in L().split("TOPLANTI: bitti")[-1][:200], 40))
+    ok("sinyal kesilince toplantı bitti", bekle(lambda: any("TOPLANTI: bitti" in l and "Başka-bir-konu.md" in l for l in L().splitlines()), 40))
+    n_alg = L().count("TOPLANTI: algılandı")
     # 2) gizli kipte tanınmaz
     istek("/komut", {"tur": "gizli"}); NABIZ["g"] = "meet"; time.sleep(5)
-    ok("gizli kipte tanınmadı", L().count("TOPLANTI: algılandı") == 1)
+    ok("gizli kipte tanınmadı", L().count("TOPLANTI: algılandı") == n_alg)
     NABIZ["g"] = None; time.sleep(8); istek("/komut", {"tur": "gizli"}); time.sleep(2)  # önce eklenti çağrısı düşsün (hızlı kipte 6 sn), sonra gizli kapanır
     # 3) masaüstü Teams: platformu tutan takvim toplantısı, hariç tutulan adda oturum yok
     NABIZ["g"] = "masaustu"

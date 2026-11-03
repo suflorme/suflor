@@ -91,6 +91,12 @@ try:
                   {"is": "bas-konus", "kaynak": "bas", "toplantida": True, "ses_ms": 12500, "ilk_ms": 9000, "giris": 900, "maliyet": 0.02},
                   {"is": "bas-konus", "kaynak": "yazili", "toplantida": False, "ses_ms": None, "ilk_ms": 1800, "giris": 800, "maliyet": 0.01}):
             f.write(json.dumps(dict(r, at=simdi)) + "\n")
+    # S188: whisper.cpp açılışları (aktarıcının wh_cpp_kaydet kaydı) — biri ilk Core ML derlemesiyle başarılı, biri MLX yedeği; iletide yol ve ad var, gitmemeli
+    with open(os.path.join(canli, "whisper-cpp-acilis.jsonl"), "w") as f:
+        for r in ({"sonuc": "basarili", "hata": None, "sn": 44.5, "acilis_sn": 41.2, "coreml_ilk": True},
+                  {"sonuc": "basarili", "hata": None, "sn": 3.1, "acilis_sn": 2.4},
+                  {"sonuc": "yedek", "hata": "coreml", "sn": 6.0, "mesaj": "/Users/Zeynep/Kumbara/ggml-large-v3-turbo-encoder.mlmodelc yüklenemedi"}):
+            f.write(json.dumps(dict(r, at=simdi), ensure_ascii=False) + "\n")
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json"), SUFLOR_TEST_BETA="1")
     rl = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=kod, env=env, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
     procs.append(rl)
@@ -129,6 +135,14 @@ try:
                 json.dumps([h.get("ozellik"), h.get("profil")])[:300])
         kontrol("haftalık: maliyet (bas_konus 3 çağrı) ve kimlik yalnız kurulum numarası", ((h.get("maliyet") or {}).get("claude") or {}).get("bas_konus", {}).get("cagri") == 3
                 and re.fullmatch(r"[0-9a-f]{12}", h["ortam"]["kurulum"]), json.dumps(h.get("maliyet"))[:300])
+    if gel("haftalik"):
+        wc = gel("haftalik")[-1].get("whisper_cpp") or {}
+        kontrol("haftalık: whisper.cpp açılışları — 3 açılış, 2 başarılı, 1 yedek (coreml), ilk Core ML derlemesi 41,2 sn, ileti/yol yok",
+                wc.get("acilis") == 3 and wc.get("basarili") == 2 and wc.get("yedek") == 1 and wc.get("cpp_hata") == {"coreml": 1} and wc.get("coreml_ilk_sn") == 41.2
+                and (wc.get("acilis_sn") or {}).get("n") == 2 and "mesaj" not in json.dumps(wc) and "mlmodelc" not in json.dumps(gel("haftalik")), json.dumps(wc)[:300])
+        kontrol("haftalık: profilde istenen Whisper motoru (ayar yok → Apple Silicon'da cpp)", gel("haftalik")[-1]["profil"].get("whisper_motor") == "cpp", gel("haftalik")[-1]["profil"])
+        _ts_ = teshis.temizle({"whisper_cpp": {"cpp_hata": {"Zeynep": 1, "coreml": 2}, "calisan_motor": "Kumbara"}})["whisper_cpp"]
+        kontrol("süzgeç: bilinmeyen hata sınıfı anahtarı ve motor değeri gitmez", not sizinti(_ts_) and _ts_["cpp_hata"].get("coreml") == 2 and _ts_["calisan_motor"] == "?", _ts_)
     kontrol("istek kendi kimliğiyle (Cloudflare Python-urllib'i 1010 ile engelliyor)", UA and all(u.startswith("Suflor.me/") for u in UA), UA[:2])
     gk = os.listdir(os.path.join(uyg, "teshis", "gonderilen")) if os.path.isdir(os.path.join(uyg, "teshis", "gonderilen")) else []
     kontrol("gönderilen paketlerin kopyası teshis/gonderilen/'de", any("haftalik" in f for f in gk) and any("toplanti_sonu" in f for f in gk), gk)

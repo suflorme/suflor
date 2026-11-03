@@ -1,7 +1,8 @@
 # --- Tek toplantı kaydı (Faz B, v0.149.0; mimari plan §3 ilke 1–2, S162–S165; tasarım planlar/faz-b-tasarim.md) ------------------------------------
 # Toplantının adı, dosyası, platformu, başlangıç ve bitişi yalnız burada: TOPLANTI["aktif"] (süren) ve TOPLANTI["onceki"] (son biten). Durum akışı:
 #   boş → algılandı (dosya bir kez açılır) → sürüyor (ilk satır ya da güvenli sinyal) → bitiyor (sinyal SINYAL_SN yok ya da açık çıkış) → bitti → boş
-# bitiyor'dayken sinyal dönerse aynı dosyada sürer (kısa kopma, sekme yenileme, web↔masaüstü); BITIYOR_SN dolup Whisper kuyruğunda o toplantının parçası
+# bitiyor'dayken sinyal dönerse aynı dosyada sürer (kısa kopma, sekme yenileme, web↔masaüstü) — ancak eklentinin başka sekmesi başka başlıkla (başlık
+# yoksa YENI_CAGRI_SN sonra) çağrıdaysa yeni çağrıdır: eski kayıt kapanır, yenisi açılır (ardışık toplantı, 3 Kasım); BITIYOR_SN dolup Whisper kuyruğunda o toplantının parçası
 # kalmayınca (en çok KUYRUK_BEKLE_SN) bitti. Biten toplantıya satır yazılmaz (S163): geç gelen satır günlüğe ve gec_atilan sayacına.
 # Sinyaller: menü uygulaması (masaüstü toplantıda) ve eklenti (bir sekme çağrıda) güvenli; ses yardımcısı (toplantı uygulaması/tarayıcı mikrofonu tutuyor)
 # tek başına yalnız takvimde ±TAKVIM_PAY_DK toplantı ya da elle Başlat varsa açar ve Claude oturumu yerine öneri kartı çıkarır (S162). Eklenti kapı değil (S165):
@@ -20,6 +21,8 @@ KUYRUK_BEKLE_SN = 20 if _TH else 300  # bitti için Whisper kuyruğunun boşalma
 TAKVIM_PAY_DK = OTO_ESLE_DK = 15
 BITIR_KILIT_SN = 600                  # elle bitirince aynı sinyal sürse de bu kadar (ya da sinyal 10 sn kesilene dek) yeniden açılmaz
 EKLENTI_GOR_SN = 25; EKLENTI_DUS_SN = 120
+BASLAT_ERTELE_SN = 20 if _TH else 600  # ardışık toplantı: yeni toplantının Claude oturumu önceki toplantının sonunu (özet) en çok bu kadar bekler
+YENI_CAGRI_SN = 10                    # bitiyor'da başlıksız sinyal başka sekmeden bu kadar sonra gelirse yeni çağrı (sekme aynıysa asla)
 TOPLANTI = {"aktif": None, "onceki": None, "kilit": None}
 OTO = TOPLANTI  # eski ad (duman, saglik): OTO["aktif"] süren kayıt
 EKLENTI = {}  # sekme → eklentinin son durumu (sekme kimliği content.js'te sayfa başına; eski eklenti "eski-<platform>")
@@ -71,6 +74,11 @@ def eklenti_cagri():  # çağrıdaki sekme (birden çoksa süren toplantının p
 def eklenti_sayfa():  # toplantı sayfası açık sekme (çağrı görülmese de; 28 Ekim mrt: Türkçe Meet'te "Ayrıl" bulunamadı, call hep false)
     simdi = time.time(); ls = [x for x in EKLENTI.values() if x.get("sayfa") and simdi - x.get("t_ust", 0) < SINYAL_SN]
     return max(ls, key=lambda x: x["t_ust"]) if ls else None
+import hashlib
+_GENEL_BASLIK = re.compile(r"^(microsoft teams|teams|google meet|meet|zoom|zoom meeting|zoom toplantısı|toplantı|meeting|yok sayılır)?$")
+def baslik_iz(t):  # çağrı başlığının izi (kişi adı olabilir: metin tutulmaz, kısa özet); genel uygulama adı bilinmiyor sayılır
+    t = " ".join(str(t or "").split()).lower()
+    return None if _GENEL_BASLIK.match(t) else hashlib.sha1(t.encode()).hexdigest()[:12]
 def eklenti_ozet():  # geriye uyum: /status extension, izle DURUM satırı, beta, duman — çağrıdaki sekme, yoksa en taze
     if not EKLENTI: return None
     simdi = time.time(); x = eklenti_cagri() or max(EKLENTI.values(), key=lambda v: v["seen"])
@@ -88,7 +96,7 @@ def toplanti_dis_sinyal():  # ses yardımcısının nabız yanıtı: yalnız ses
     return bool(eklenti_cagri() or masaustu_toplantida())
 def sinyaller():  # {kaynak: {"platform", "guvenli"}}
     s = {}; e = eklenti_cagri()
-    if e: s["eklenti"] = {"platform": e.get("platform") or "bilinmeyen", "guvenli": True}
+    if e: s["eklenti"] = {"platform": e.get("platform") or "bilinmeyen", "guvenli": True, "sekme": e.get("sekme"), "baslik": baslik_iz(e.get("meeting"))}
     if masaustu_toplantida(): s["masaustu"] = {"platform": MASAUSTU_PLATFORM.get((STATE.get("masaustu") or {}).get("uygulama") or "", "bilinmeyen"), "guvenli": True}
     a = TOPLANTI.get("aktif"); y = STATE["yerel_ses"]; now = time.time()
     # mikrofonu tutmak tek başına sürdürmez: toplantı uygulaması son SES_SESSIZ_SN'de ses çıkardı ya da son SATIRSIZ_SN'de satır geldi (eski bitiş kuralı;
@@ -97,7 +105,7 @@ def sinyaller():  # {kaynak: {"platform", "guvenli"}}
     if yerel_ses_durum() in ("dinliyor", "izin") and canli_ and not (globals().get("SOHBET") or {}).get("acik"):  # pano sohbeti de mikrofonu tutar
         s["ses"] = {"platform": MASAUSTU_PLATFORM.get(STATE["yerel_ses"].get("uygulama") or "", "bilinmeyen"), "guvenli": False}
         t = None if e else eklenti_sayfa()
-        if t: s["eklenti"] = {"platform": t.get("platform") or "bilinmeyen", "guvenli": True, "sayfa": True}  # toplantı sekmesi + tarayıcı mikrofonu tutuyor
+        if t: s["eklenti"] = {"platform": t.get("platform") or "bilinmeyen", "guvenli": True, "sayfa": True, "sekme": t.get("sekme"), "baslik": baslik_iz(t.get("meeting"))}  # toplantı sekmesi + tarayıcı mikrofonu tutuyor
     if a and now - (a["kaynaklar"].get("altyazi") or 0) < SINYAL_SN and (a["kaynaklar"].get("altyazi") or 0) > (a.get("t_bitis") or 0) + 2: s["altyazi"] = {"platform": a["platform"], "guvenli": True}  # eklentinin altyazı/döküm satırı
     return s
 def _elle_baslat(now):  # toplantı açılmadan önce elle basılmış, henüz bir kayda ad olmamış Başlat
@@ -156,7 +164,8 @@ def _kayit_ac(kaynak, platform, guvenli, olay=None, konu=None, platform_kaynak=N
     a = {"id": secrets.token_hex(4), "durum": "algilandi", "ad": ad, "ad_kaynak": ad_k, "dosya": dosya, "platform": platform or "bilinmeyen",
          "platform_kaynak": platform_kaynak or (kaynak if platform and platform != "bilinmeyen" else None), "kaynak": kaynak, "olay": (o or {}).get("id"),
          "t0": now, "t_sinyal": now, "t_satir": 0.0, "t_bitis": None, "t_kapanis": None, "satir": 0, "gec_atilan": 0, "kaynaklar": {kaynak: now},
-         "guvenli": bool(guvenli), "oturum": False, "karar": False, "neden": None, "haric": haric, "oner": None, "bitis_neden": None, "elle": False, "cikis": False}
+         "guvenli": bool(guvenli), "oturum": False, "karar": False, "neden": None, "haric": haric, "oner": None, "bitis_neden": None, "elle": False, "cikis": False, "sekmeler": [], "basliklar": []}
+    _sekme_isle(a, (sinyaller() if kaynak == "eklenti" else {}).get("eklenti"))
     if b: b["kayit"] = a["id"]
     TOPLANTI["aktif"] = a
     x = STATE.get("extension") or {}
@@ -190,6 +199,19 @@ def _iptal(a):  # algılandı ama hiç satır gelmedi: yalnız başlıklı dosya
         for k in ("file_last", "file_start", "file_lines"): STATE[k].pop(a["dosya"], None)
         if STATE.get("file") == a["dosya"]: STATE["file"] = (TOPLANTI.get("onceki") or {}).get("dosya"); STATE["meeting"] = (TOPLANTI.get("onceki") or {}).get("ad")
     print(f"TOPLANTI: algılanan toplantı başlamadı — kayıt kaldırıldı ({a['dosya']})"); _durum_yaz()
+def _sekme_isle(a, e):  # kayda ait eklenti sekmeleri ve çağrı başlığı izleri (yeni çağrı ayrımı için; en çok 8'er)
+    if not a or not e or not e.get("sekme"): return
+    for k, v in (("sekmeler", e["sekme"]), ("basliklar", e.get("baslik"))):
+        ls = a.get(k) or []
+        if v and v not in ls: a[k] = (ls + [v])[-8:]
+def _yeni_cagri(a, s, now):  # bitiyor'daki kayda gelen güvenli sinyal başka bir çağrı mı (eklentinin başka sekmesi + başka başlık)
+    e = s.get("eklenti")
+    if not e or not e.get("sekme") or "masaustu" in s: return False  # masaüstü/ses sinyali ayırt edilmez (web↔masaüstü geçişi aynı toplantı)
+    sk = a.get("sekmeler") or []
+    if not sk or e["sekme"] in sk: return False  # kayıt eklentisiz açıldı ya da aynı sekme (yenileme, kısa kopma; başlık değişse de)
+    bs = a.get("basliklar") or []
+    if e.get("baslik") and bs: return e["baslik"] not in bs
+    return now - (a.get("t_bitis") or now) >= YENI_CAGRI_SN
 def _kuyruk_bos(t):  # Whisper kuyruğunda t'den önce başlamış (bas-konuş dışı) parça yok
     try: return not any(not x.get("bas") and not x.get("isinma") and x.get("t0", 0) <= t for x in list(WH_Q.queue))
     except Exception: return True
@@ -197,6 +219,9 @@ def _kuyruk_bos(t):  # Whisper kuyruğunda t'den önce başlamış (bas-konuş d
 def toplanti_bak():  # LOCK içinde; geçişleri yapar, LOCK dışında koşacak işleri (oturum, öneri, hızlı özet) döndürür
     now = time.time(); s = sinyaller(); a = TOPLANTI["aktif"]; sonra = []
     STATE["extension"] = eklenti_ozet()
+    if a and a["durum"] == "bitiyor" and not a["elle"] and _yeni_cagri(a, s, now):  # hızlı özet bitiyor'a geçerken tetiklendi
+        print(f"TOPLANTI: bitiyor'dayken başka sekmede başka bir çağrı — yeni toplantı ({a['dosya']} kapanıyor)")
+        _kapat(a, "yeni çağrı"); a = None
     if a:
         guvenli = any(v["guvenli"] for v in s.values())
         for k in s:
@@ -206,6 +231,7 @@ def toplanti_bak():  # LOCK içinde; geçişleri yapar, LOCK dışında koşacak
             p = next((v["platform"] for v in s.values() if v["platform"] != "bilinmeyen"), None)
             if p: a["platform"], a["platform_kaynak"] = p, next(k for k, v in s.items() if v["platform"] == p); print(f"TOPLANTI: platform {PLATFORM_AD.get(p, p)} ({a['platform_kaynak']})")
         d = a["durum"]
+        if d != "bitiyor" or guvenli: _sekme_isle(a, s.get("eklenti"))
         if d == "algilandi":
             if guvenli or a["satir"]: _gecis(a, "suruyor", "güvenli sinyal" if guvenli else "ilk satır")
             elif not s and now - a["t_sinyal"] > (BASLAT_BEKLE_DK * 60 if a["kaynak"] == "başlat" else ALGILANDI_BEKLE_SN): _iptal(a); a = None
@@ -221,6 +247,8 @@ def toplanti_bak():  # LOCK içinde; geçişleri yapar, LOCK dışında koşacak
             a["_bak"] = True; sonra.append(lambda a=a: _oto_oturum(a, {"guvenli": True}, _baslatla(a)))
         return sonra
     k = TOPLANTI.get("kilit")
+    if k and s and _yeni_cagri(dict(k, t_bitis=k["t"]), s, now):  # 3 Kasım: başka sekmedeki başka çağrı kilide takılmaz (ardışık toplantı)
+        print("TOPLANTI: elle bitirilen toplantıdan sonra başka sekmede başka bir çağrı — yeni toplantı"); TOPLANTI["kilit"] = k = None
     if k:  # elle bitirildi: aynı sinyal kesilene (10 sn) ya da BITIR_KILIT_SN dolana dek yeniden açılmaz
         if s: k["t_sinyal"] = now
         if now - k["t_sinyal"] < 10 and now - k["t"] < BITIR_KILIT_SN: return sonra
@@ -260,7 +288,11 @@ def _baslatla(a): return (STATE.get("baslatma") or {}).get("kayit") == a["id"]  
 def _alt_satir(kaynak):  # altyazı/döküm satırı ve eklentinin bir sekmesi son SINYAL_SN'de nabız attı (nabızsız istemci — curl, test — sinyal değil)
     return kaynak in ("captions", "transcript") and any(time.time() - x["seen"] < SINYAL_SN for x in EKLENTI.values())
 def toplanti_satir(t, icerik=True, kaynak=None):  # LOCK içinde; satırın yakalandığı ana göre hedef kayıt → (dosya, kayit) ya da (None, None) (yazılmaz)
-    now = time.time(); t = t or now; a = TOPLANTI["aktif"]; o = TOPLANTI.get("onceki")
+    now = time.time(); t = t or now; a = TOPLANTI["aktif"]
+    if a and a["durum"] == "bitiyor" and icerik and not a["elle"] and _yeni_cagri(a, sinyaller(), now):  # yeni çağrının satırı eski kaydı sürdürmesin
+        for f in toplanti_bak(): threading.Thread(target=f, daemon=True).start()
+        a = TOPLANTI["aktif"]
+    o = TOPLANTI.get("onceki")
     if not a and icerik and not gizli_acik():  # satırın kendisi sinyaldir (eklenti satırı, sesten satır)
         for f in toplanti_bak(): threading.Thread(target=f, daemon=True).start()
         a = TOPLANTI["aktif"]
@@ -296,7 +328,7 @@ def toplanti_bitir(neden, dosya=None):  # elle: özet hazır, toplantı oturumu 
         a["elle"] = True; a["ozet"] = neden == "özet hazır"
         if a["durum"] != "bitiyor": _gecis(a, "bitiyor", neden)
         else: a["bitis_neden"] = neden
-        TOPLANTI["kilit"] = {"t": time.time(), "t_sinyal": time.time()}
+        TOPLANTI["kilit"] = {"t": time.time(), "t_sinyal": time.time(), "sekmeler": list(a.get("sekmeler") or []), "basliklar": list(a.get("basliklar") or [])}
         for f in toplanti_bak(): threading.Thread(target=f, daemon=True).start()
     return True
 def toplanti_baslatta(konu, olay, platform, baglanti):  # baslat()'tan (LOCK dışında): kayıt yoksa açar, sürüyorsa katılır, bitiyorsa konuya göre
@@ -305,7 +337,10 @@ def toplanti_baslatta(konu, olay, platform, baglanti):  # baslat()'tan (LOCK dı
         if a and a["durum"] == "bitiyor":
             if not konu or _ad_temiz(konu) == a["ad"]: _gecis(a, "suruyor", "Başlat"); a["elle"] = a["cikis"] = False; return a
             _kapat(a, "yeni Başlat"); a = None
-        if a: return a
+        if a:  # sürüyor: katılır (Başlat bu kayda ad olmuş sayılır — sonraki kayda konusu taşınmasın)
+            b = STATE.get("baslatma") or {}
+            if b.get("konu") and not b.get("kayit"): b["kayit"] = a["id"]
+            return a
         TOPLANTI["kilit"] = None
         p = platform or url_platform(baglanti) or "bilinmeyen"
         a = _kayit_ac("başlat", p, True, olay=olay, konu=None if olay and _ad_temiz(olay.get("baslik")) == _ad_temiz(konu) else konu,
@@ -314,6 +349,22 @@ def toplanti_baslatta(konu, olay, platform, baglanti):  # baslat()'tan (LOCK dı
         b = STATE.get("baslatma") or {}
         if b.get("konu"): b["kayit"] = a["id"]
         return a
+
+def yeni_toplanti_adi(platform=None, haric=None):  # konusuz yeni Başlat: takvimdeki (bitenin olayı hariç) toplantının adı, yoksa "<Platform> toplantısı HH:MM"
+    o = oto_takvim(platform)
+    if o and haric and o.get("id") == haric:
+        o = next((e for e in (globals().get("TAKVIM_TAM") or {}).values() if e.get("id") != haric and oto_takvim_uygun(e)), None)
+    if o and o.get("baslik"): return _ad_temiz(o["baslik"])
+    saat = datetime.datetime.now().strftime("%H:%M")
+    return f"{PLATFORM_AD[platform]} toplantısı {saat}" if platform in PLATFORM_AD and platform != "bilinmeyen" else f"Toplantı {saat}"
+def oto_takvim_uygun(e):  # oto_takvim'in pencere kuralı tek olay için
+    try: b, s = _zaman(e["baslangic"]), _zaman(e["bitis"])
+    except (KeyError, TypeError, ValueError): return False
+    now = datetime.datetime.now().astimezone()
+    return not e.get("tum_gun") and not e.get("reddettin") and b - datetime.timedelta(minutes=TAKVIM_PAY_DK) <= now <= s + datetime.timedelta(minutes=5)
+def onceki_sonu_suruyor():  # son biten toplantının Claude oturumu vardı ve özeti henüz gelmedi (toplantı sonu işleri sürüyor olabilir)
+    o = TOPLANTI.get("onceki")
+    return bool(o and o.get("oturum") and not o.get("ozet") and time.time() - (o.get("t_kapanis") or 0) < GOSTER_SN)
 
 # --- Claude toplantı oturumu (S161–S162 kuralı aynen) -------------------------------------------------------------------------------------------------------
 def _oto_oturum(a, s, elle):  # a["karar"]: oturum kararı verildi; güvenilmeyen sinyalde (öneri) yanlış kalır, güvenilir sinyal gelince yeniden denenir
@@ -368,7 +419,7 @@ def oto_karar(x, durum):  # eylem_karar'dan: Onayla → baslat; Reddet → bu to
 
 # --- görünüm ve kalıcılık ------------------------------------------------------------------------------------------------------------------------------------
 _KAYIT_ALAN = ("id", "durum", "ad", "ad_kaynak", "dosya", "platform", "platform_kaynak", "kaynak", "olay", "t0", "t_sinyal", "t_satir", "t_bitis", "t_kapanis",
-               "satir", "gec_atilan", "guvenli", "oturum", "karar", "neden", "bitis_neden", "elle", "cikis", "ozet")
+               "satir", "gec_atilan", "guvenli", "oturum", "karar", "neden", "bitis_neden", "elle", "cikis", "ozet", "sekmeler", "basliklar")
 def _kayit_dis(a): return {k: a.get(k) for k in _KAYIT_ALAN} if a else None
 def toplanti_view():  # /status toplanti — pano yalnız buna bakar
     a = TOPLANTI.get("aktif"); o = TOPLANTI.get("onceki"); now = time.time()
@@ -379,6 +430,10 @@ def toplanti_view():  # /status toplanti — pano yalnız buna bakar
                  oturum=a["oturum"], neden=a["neden"], gec_atilan=a["gec_atilan"], bitis_neden=a.get("bitis_neden"))
         v["mic_bilinmiyor"] = a["durum"] == "suruyor" and not eklenti_cagri() and not masaustu_toplantida() and (STATE.get("masaustu_mic") or {}).get("acik", False)
     if o: v["onceki"] = {"dosya": o["dosya"], "ad": o["ad"], "bitti": datetime.datetime.fromtimestamp(o["t_kapanis"] or now).strftime("%H:%M"), "neden": o.get("bitis_neden"), "gec_atilan": o["gec_atilan"]}
+    # 3 Kasım (ardışık toplantı): canlı = toplantı ekranı (algılandı/sürüyor); son = bitiyor'daki ya da özeti gelmemiş yeni biten toplantı (yalnız gösterim, engellemez)
+    v["canli"] = v["durum"] in ("algilandi", "suruyor"); v["bitiyor"] = v["durum"] == "bitiyor"
+    if a and a["durum"] == "bitiyor": v["son"] = {"ad": a["ad"], "dosya": a["dosya"], "durum": "bitiyor", "bas": v["bas"], "ozet": False}
+    elif o and gorunen_dosya() == o["dosya"]: v["son"] = {"ad": o["ad"], "dosya": o["dosya"], "durum": "bitti", "bitti": v["onceki"]["bitti"], "ozet": bool(o.get("ozet"))}
     return v
 def oto_view():  # eski /status oto_toplanti (pano: oturum açık mı)
     a = TOPLANTI.get("aktif")
@@ -397,6 +452,7 @@ def toplanti_kur():  # aktarıcı açılırken: süren kayıt ≤ 5 dk önce yaz
         a = {k: r.get(k) for k in _KAYIT_ALAN}; a.update(kaynaklar={}, oner=None, haric=None)
         for k in ("satir", "gec_atilan"): a[k] = a.get(k) or 0
         for k in ("t0", "t_sinyal", "t_satir"): a[k] = a.get(k) or 0.0
+        for k in ("sekmeler", "basliklar"): a[k] = list(a.get(k) or [])
         return a
     TOPLANTI["onceki"] = kayit(d.get("onceki")); a = kayit(d.get("aktif")); now = time.time()
     if a and a["durum"] in ("algilandi", "suruyor", "bitiyor") and now - float(d.get("t") or 0) < 300 and os.path.exists(os.path.join(BASE, a["dosya"])):

@@ -167,7 +167,7 @@ Yeni sürüm çıkınca panoda **Güncelle** düğmesi belirir.
 |---|---|
 | Mac | Apple Silicon (M serisi), macOS 14 ya da üstü |
 | Bellek | en az 16 GB (toplantı sırasında ~4 GB kullanılır) |
-| Disk | ~12 GB boş alan (modeller ~5 GB; belge çevirme ve arama ~3,3 GB) |
+| Disk | ~14 GB boş alan (modeller ~7 GB, hızlı konuşma tanıma whisper.cpp + Core ML dahil; belge çevirme ve arama ~3,3 GB) |
 | Tarayıcı | Google Chrome |
 | Yapay zekâ | Önerilen: [Claude Code](https://claude.com/claude-code) ve Claude aboneliği (Pro ya da üstü). Claude Code yoksa sihirbaz kurar; Terminal'de `claude` → `/login` ile giriş gerekir. Yerine: Gemini ya da OpenAI uyumlu API anahtarı, ya da Mac'te yerel model (Ollama, ~3–7 GB; Türkçede zayıf, yedek olarak). |
 

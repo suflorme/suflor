@@ -131,34 +131,66 @@ def cozme_ayari(sn):
     # canlı parça: yeniden deneme 2 sıcaklıkla, belirteç sesin süresiyle sınırlı (sn başına 20, en az 48). Varsayılan 6 sıcaklık × 224 belirteç
     # kısa parçada tekrar döngüsünü 6 kez baştan çözüyordu: 11 Ekim toplantılarında uydurma işleri ortalama 11,6 sn, işçi süresinin %59'u.
     return {"temperature": (0.0, 0.2), "sample_len": min(224, max(48, int(sn * 20)))}
-# whisper.cpp + Core ML motoru (ayar whisper_motor: cpp → aktarıcı SUFLOR_WHISPER_CPP=<ortak>/whisper-cpp verir). Aynı turbo q8 modeli,
+# whisper.cpp + Core ML motoru (S188: Apple Silicon'da varsayılan, ayar whisper_motor: mlx kapatır; aktarıcı SUFLOR_WHISPER_CPP=<ortak>/whisper-cpp verir). Aynı turbo q8 modeli,
 # kodlayıcı Neural Engine'de. 20 Ekim kıyası (testler/asr-kiyas-20261020.md, 1.093 öğe): 4–6 sn parça 1,40 → 0,60 sn, kısa parça p90
 # 2,57 → 0,55 sn, canlı parça Türkçe hata %12,5 → %12,7, uydurma bu dosyanın süzgeciyle aynı (%23). Yalnız canlı döngü; dosyadan ve
 # toplu döküm MLX'te kalır. Sunucu yalnız 127.0.0.1'de; işçi öldürülse de bekçi kabuk sunucuyu kapatır.
+# Açılamazsa (CppHata.sinif): dosya_yok · calismiyor (ikili başlamadı) · macos_surum (ikili bu macOS için derlenmemiş) · coreml (kodlayıcı yüklenemedi) ·
+# sunucu_kapandi (başka nedenle çıktı) · zaman_asimi · isinma (sunucu açık, ilk çözüm başarısız) · diger. main() bunu MLX yedeğine çevirir; sınıf beta verisine gider.
+CPP_HATA = ("dosya_yok", "calismiyor", "macos_surum", "coreml", "sunucu_kapandi", "zaman_asimi", "isinma", "diger")
+class CppHata(RuntimeError):
+    def __init__(s, sinif, mesaj): RuntimeError.__init__(s, mesaj); s.sinif = sinif
+def cpp_hata_sinif(e):
+    if isinstance(e, CppHata): return e.sinif
+    if isinstance(e, FileNotFoundError): return "dosya_yok"
+    if isinstance(e, (PermissionError, OSError)): return "calismiyor"
+    return "diger"
+def cpp_cikti_sinif(son):
+    if re.search(r"(?i)dyld|newer than running OS|incompatible|Symbol not found|bad CPU type", son): return "macos_surum"
+    if re.search(r"(?i)core ?ml|mlmodelc", son): return "coreml"
+    return "sunucu_kapandi"
 class CppMotor:
     def __init__(s, dizin):
-        import socket, subprocess, urllib.request
+        import socket, subprocess, urllib.request, threading, collections
         so = socket.socket(); so.bind(("127.0.0.1", 0)); s.port = so.getsockname()[1]; so.close()
         s.ad = "whisper.cpp:ggml-large-v3-turbo-q8_0+coreml"; s.url = f"http://127.0.0.1:{s.port}/inference"
+        for f in ("whisper-server", "ggml-large-v3-turbo-q8_0.bin", "ggml-large-v3-turbo-encoder.mlmodelc"):
+            if not os.path.exists(os.path.join(dizin, f)): raise CppHata("dosya_yok", f"{f} yok")
         # -nlp: yoksa her istekte dil olasılığı için kodlayıcı ikinci kez çalışıyor; -ml 100000: yoksa bölüm 60 karakterde sözcük ortasından kesiliyor
-        s.p = subprocess.Popen([os.path.join(dizin, "whisper-server"), "-m", os.path.join(dizin, "ggml-large-v3-turbo-q8_0.bin"), "--host", "127.0.0.1",
-                                "--port", str(s.port), "-t", "4", "-l", "tr", "-bs", "-1", "-et", "2.4", "-lpt", "-1.0", "-nth", "0.6", "-nlp",
-                                "-ml", "100000", "--public", "/nonexistent"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                               env=dict(os.environ, WHISPER_TEMP_MAX="0.2"))  # yeniden deneme 0 → 0,2'de durur (MLX'teki cozme_ayari gibi; yamalı sunucu)
+        # sunucunun çıktısı yalnız son satırları bellekte tutulur (açılmazsa nedeni sınıflamak için: Core ML, macOS sürümü); diske yazılmaz
+        try:
+            s.p = subprocess.Popen([os.path.join(dizin, "whisper-server"), "-m", os.path.join(dizin, "ggml-large-v3-turbo-q8_0.bin"), "--host", "127.0.0.1",
+                                    "--port", str(s.port), "-t", "4", "-l", "tr", "-bs", "-1", "-et", "2.4", "-lpt", "-1.0", "-nth", "0.6", "-nlp",
+                                    "-ml", "100000", "--public", "/nonexistent"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                   env=dict(os.environ, WHISPER_TEMP_MAX="0.2"))  # yeniden deneme 0 → 0,2'de durur (MLX'teki cozme_ayari gibi; yamalı sunucu)
+        except OSError as e: raise CppHata(cpp_hata_sinif(e), f"whisper-server başlatılamadı ({e.__class__.__name__})")
+        s.cikti = collections.deque(maxlen=40)
+        def _oku():
+            for l in iter(s.p.stderr.readline, b""): s.cikti.append(l.decode("utf-8", "replace").rstrip())
+        threading.Thread(target=_oku, daemon=True).start()
         # bekçi: işçi çıkınca (öldürülüp zombi kalsa da) sunucuyu kapatır; normal çıkışta atexit hemen kapatır
         subprocess.Popen(["/bin/sh", "-c", f"while d=$(ps -o stat= -p {os.getpid()} 2>/dev/null) && [ \"${{d#Z}}\" = \"$d\" ] && kill -0 {s.p.pid} 2>/dev/null; "
                           f"do sleep 1; done; kill {s.p.pid} 2>/dev/null"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         import atexit; atexit.register(lambda: s.p.poll() is None and s.p.terminate())
-        t0 = time.time()  # ilk açılışta Neural Engine derlemesi 30–60 sn (macOS sonra önbellekten verir)
+        t0 = time.time()  # ilk açılışta Neural Engine derlemesi 30–60 sn (macOS sonra önbellekten verir; M1/M2'de ölçülmedi)
+        sinir = float(os.environ.get("SUFLOR_CPP_ACILIS_SN") or 170)
         while True:
-            if s.p.poll() is not None: raise RuntimeError(f"whisper-server kapandı ({s.p.returncode})")
+            if s.p.poll() is not None:
+                time.sleep(0.2); raise CppHata(cpp_cikti_sinif("\n".join(s.cikti)), f"whisper-server kapandı ({s.p.returncode})")
             try: urllib.request.urlopen(f"http://127.0.0.1:{s.port}/", timeout=2); break
             except urllib.error.HTTPError: break
             except Exception: pass
-            if time.time() - t0 > 170: s.p.kill(); raise RuntimeError("whisper-server açılmadı")
+            if time.time() - t0 > sinir: s.p.kill(); raise CppHata("zaman_asimi", f"whisper-server {sinir:.0f} sn'de açılmadı")
             time.sleep(0.2)
+        s.acilis_sn = round(time.time() - t0, 1)
         try: from mlx_whisper.tokenizer import LANGUAGES; s.kod = {v: k for k, v in LANGUAGES.items()}
         except Exception: s.kod = {"turkish": "tr", "english": "en"}
+    def kapat(s):
+        try:
+            if s.p.poll() is None: s.p.terminate(); s.p.wait(5)
+        except Exception:
+            try: s.p.kill()
+            except Exception: pass
     def istek(s, a, language=None, initial_prompt=None):
         import io, wave, uuid, urllib.request, numpy as np
         b = io.BytesIO()
@@ -177,6 +209,11 @@ class CppMotor:
         d = str(r.get("language") or "").lower()
         return {"text": "".join(x["text"] for x in seg), "segments": seg, "language": s.kod.get(d, d) or language}
 CPP = None
+def mlx_model_var():  # MLX Whisper modeli diskte mi (çevrimdışı açılabilir mi) — yoksa yedek MLX'e geçmeden aktarıcıya "mlx_yok" denir
+    if os.path.isdir(MODEL): return os.path.exists(os.path.join(MODEL, "weights.safetensors")) or os.path.exists(os.path.join(MODEL, "weights.npz"))
+    import glob as _g
+    kok = os.path.join(os.environ.get("HF_HOME") or os.path.expanduser("~/.cache/huggingface"), "hub", "models--" + MODEL.replace("/", "--"))
+    return bool(_g.glob(os.path.join(kok, "snapshots", "*", "weights.*"))) and os.path.exists(os.path.join(kok, "refs", "main"))
 def dil_olasilik(a):  # Whisper'ın dil tahmini (ilk 30 sn): {dil: olasılık}; yalnız kodlayıcı + tek belirteç, çözmeden ucuz
     if CPP:  # whisper.cpp: olasılık istenmiyor (-nlp); algılanan dil tek aday olarak döner, metin boşsa geçiş zaten yapılmaz
         r = CPP(a); return {r["language"]: 1.0} if r.get("language") else {}
@@ -283,17 +320,32 @@ def istem_kur(tok, terimler, onceki):
 def out(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
 def main():
     global CPP
-    t = time.time(); model_ad = MODEL
-    try:
-        import numpy as np
-        if os.environ.get("SUFLOR_WHISPER_CPP"):
-            CPP = CppMotor(os.environ["SUFLOR_WHISPER_CPP"]); model_ad = CPP.ad; coz = CPP
-        else:
+    t = time.time(); model_ad = MODEL; cpp = None
+    try: import numpy as np
+    except Exception as e: out({"hata": f"model yüklenemedi: {e.__class__.__name__}: {str(e)[:200]}"}); return 1
+    # S188 (3 Kasım): whisper.cpp varsayılan motor; açılamazsa (sunucu başlamadı, Core ML, ısınma) aynı süreçte MLX'e geçilir — geçici yedek. Sonuç "cpp"
+    # alanıyla döner (aktarıcı günlüğe yazar, o gün cpp'yi yeniden denemez, beta verisine sayar). MLX modeli diskte yoksa "mlx_yok": aktarıcı indirir.
+    if os.environ.get("SUFLOR_WHISPER_CPP"):
+        tc = time.time(); m = None
+        try:
+            m = CppMotor(os.environ["SUFLOR_WHISPER_CPP"])
+            try: m(np.zeros(16000, np.float32), language="tr")  # ısınma: model belleğe, Core ML çalışıyor mu
+            except Exception as e: raise CppHata("isinma", f"ilk çözüm başarısız ({e.__class__.__name__}: {str(e)[:120]})")
+            CPP = m; model_ad = m.ad; coz = CPP
+            cpp = {"sonuc": "basarili", "sn": round(time.time() - tc, 1), "acilis_sn": m.acilis_sn}
+        except Exception as e:
+            if m: m.kapat()
+            cpp = {"sonuc": "yedek", "hata": cpp_hata_sinif(e), "mesaj": str(e)[:200], "sn": round(time.time() - tc, 1)}
+            sys.stderr.write(f"whisper.cpp açılamadı ({cpp['hata']}): {e}\n")
+    if not CPP:
+        if cpp and not mlx_model_var():
+            out({"hata": "whisper.cpp açılamadı, MLX modeli diskte yok", "cpp": cpp, "mlx_yok": True}); return 1
+        try:
             import mlx_whisper
             def coz(a, **k): return mlx_whisper.transcribe(a, path_or_hf_repo=MODEL, **k)
-        coz(np.zeros(16000, np.float32), language="tr")  # ısınma: model belleğe
-    except Exception as e:
-        out({"hata": f"model yüklenemedi: {e.__class__.__name__}: {str(e)[:200]}"}); return 1
+            coz(np.zeros(16000, np.float32), language="tr")  # ısınma: model belleğe
+        except Exception as e:
+            out({"hata": f"model yüklenemedi: {e.__class__.__name__}: {str(e)[:200]}", **({"cpp": cpp} if cpp else {})}); return 1
     # MLX ara bellek önbelleği kapalı. Sınırsızken parça boyları değiştikçe önbellek büyüyor: 47 parçalık oturumda
     # işçi 5 805 MB'a çıktı (kısa ölçüm 2 700 gösteriyordu — toplantıdaki swap'ın asıl nedeni); 0 ile 2 449 MB, parça 1,15 → 1,19 sn,
     # metin aynı (6 Ekim). SUFLOR_MLX_ONBELLEK_MB ile değiştirilebilir.
@@ -308,7 +360,7 @@ def main():
         from mlx_whisper.tokenizer import get_tokenizer
         tok = get_tokenizer(multilingual=True, num_languages=100)  # düz metin belirteçleri dilden bağımsız
     except Exception as e: tok = None; sys.stderr.write(f"belirteçleyici yok, istem kırpılmaz: {e}\n")
-    out({"hazir": True, "model": model_ad, "motor": "cpp" if CPP else "mlx", "sn": round(time.time() - t, 1), "ecapa": bool(iz)})
+    out({"hazir": True, "model": model_ad, "motor": "cpp" if CPP else "mlx", "sn": round(time.time() - t, 1), "ecapa": bool(iz), **({"cpp": cpp, "yedek": not CPP} if cpp else {})})
     kumeler = []; baslik = None  # karşı kanal kümeleri; yeni toplantıda sıfırlanır
     for satir in sys.stdin:
         if not satir.strip(): continue
