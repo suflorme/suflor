@@ -31,9 +31,10 @@ def sozluk_yukle():
             ys = sade(str(y)).strip()
             if len(ys) < 3 or ys == sade(dogru): continue
             govde = r"[\s\-]+".join(re.escape(w) for w in ys.split())
-            # kısa biçimde ek kabul edilmez (yanlış eşleşme). v0.7.3: son kelimesi < 3 harf olan çok kelimeli biçimde de
-            # (iki kısa sözcüklü biçim bir sonraki sözcüğün başını ek sanıp yanlış düzeltiyordu: 20 dökümde 14 kez)
-            ek = r"(?P<ek>'?[a-z]{1,6})?" if len(ys) >= 5 and len(ys.split()[-1]) >= 3 else ""
+            # kısa biçimde (< 5 harf) ya da son kelimesi < 3 harf olan çok kelimeli biçimde yalnız KESME İŞARETLİ ek kabul edilir ("ozzy'e", "vaut ar'den"): kesmesiz ek yanlış eşleşme
+            # üretiyordu (v0.7.3: iki kısa sözcüklü biçim bir sonraki sözcüğün başını ek sanıp yanlış düzeltti, 20 dökümde 14 kez); kesme işareti ek olduğunu kesinleştirir (3 Kasım).
+            # Uzun biçimde kesmesiz ek de kabul (git hub'da / githubda).
+            ek = r"(?P<ek>'?[a-z]{1,6})?" if len(ys) >= 5 and len(ys.split()[-1]) >= 3 else r"(?P<ek>'[a-z]{1,6})?"
             kur.append((re.compile(r"(?<![0-9a-z])" + govde + ek + r"(?![0-9a-z])"), dogru, ys, t.get("kip", "duzelt"), bag))
     kur.sort(key=lambda k: -len(k[2]))  # uzun biçim önce ("shoppy fay" "fay"dan önce)
     SOZ.update(mtime=m, kurallar=kur); print(f"SÖZLÜK: {len(terimler)} terim, {len(kur)} biçim yüklendi")

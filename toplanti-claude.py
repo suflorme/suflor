@@ -70,6 +70,9 @@ sz = sub.add_parser("sozluk", help="v0.5.1: özel sözlük — listele ya da ekl
 sz.add_argument("--ekle", nargs=2, metavar=("YANLIS", "DOGRU"), help="yanlış biçim ve doğru ad; kullanıcı onaylamadan ekleme")
 sz.add_argument("--baglam", default="", help="virgüllü: yalnız aynı satırda bu kelimelerden biri varsa düzelt (gerçek kelime olabilen biçimler için)")
 sz.add_argument("--not", dest="aciklama", default="")
+sz.add_argument("--dene", action="store_true", help="3 Kasım: geçmiş dökümde iki sözlüğü/sözlük kodunu karşılaştır (salt okuma; yalnız terminale yazar) — --gun N, --sozluk <yeni.json>, --eski-sozluk <eski.json>, --eski-kod <eski sozluk.py>, --yeni-kod <yeni sozluk.py>")
+sz.add_argument("--gun", type=int, default=30); sz.add_argument("--sozluk", default=None); sz.add_argument("--eski-sozluk", default=None)
+sz.add_argument("--eski-kod", default=None); sz.add_argument("--yeni-kod", default=None); sz.add_argument("--goster", type=int, default=20, help="--dene: ilk kaç farklı satır yazılsın")
 sz.add_argument("--birlestir", action="store_true", help="v0.5.2: ayardaki sözlük kaynağından (tsv + xlsx Vendor sekmesi) yeniden kur; --ekle ile eklenenler korunur")
 ey = sub.add_parser("eylem", help="eylem kuyruğu: ekle <tur> \"başlık\" --ayrinti … | liste | sun | onay <eN,eM|hepsi> [--red] | bekle [--sn] | sonuc eN --durum yapildi|hata --not …")
 ey.add_argument("islem", choices=["ekle", "liste", "sun", "onay", "bekle", "sonuc"]); ey.add_argument("deger", nargs="*")
@@ -255,7 +258,60 @@ def sozluk_birlestir(d):
             "aciklama": "Suflor.me özel sözlüğü. duzelt: her geçiş düzeltilir · baglam: yalnız aynı satırda bağlam kelimesi varsa · isaret: düzeltilmez, '?' işareti. Kaynak: ayardaki sozluk_kaynagi (sozluk --birlestir ile yeniden kurulur) + elle eklenenler (kaynak=kullanici).",
             "kaynak_mtime": max(os.path.getmtime(SOZ_TSV), os.path.getmtime(SOZ_XLSX)),
             "terimler": grup + kart + elle, "vendor": sorted(dict.fromkeys(vendor)), "kisiler": KISILER}
+# --- Sözlük deneme aracı (3 Kasım, sözlük 1. aşama) ----------------------------------------------------------------------------------------
+# Çekirdek: sozluk_uygulayici(kod_yolu, sozluk_yolu) → (metin → (çıktı, olaylar)); sozluk_dene(satirlar, eski, yeni) → karşılaştırma. 2. aşamadaki "kabul kapısı"
+# (öğrenilen aday kural geçmiş dökümde X satırı değiştiriyorsa reddet) bunları çağırır. Salt okuma: sözlük dosyası geçici klasöre kopyalanır, canlı dosyalara yazılmaz.
+def sozluk_uygulayici(kod_yolu, sozluk_yolu):
+    import shutil, tempfile
+    tmp = tempfile.mkdtemp(prefix="sozluk-dene-")
+    try:
+        shutil.copyfile(sozluk_yolu, os.path.join(tmp, "sozluk.json"))
+        src = open(kod_yolu, encoding="utf-8").read()
+        ns = {"re": re, "os": os, "json": json, "BASE": tmp, "print": lambda *a, **k: None}
+        exec(src[:src.index('# Sesli "Claude:"')], ns)  # aktarıcı bölümü: yalnız sözlük kısmı (relay.py ad alanı gibi)
+        ns["sozluk_yukle"](); ns["sozluk_yukle"] = lambda: None  # geçici dosya silinecek: kurallar bellekte kalır, sozluk_uygula yeniden yüklemeye (ve boşaltmaya) kalkmaz
+        return ns["sozluk_uygula"]
+    finally: shutil.rmtree(tmp, ignore_errors=True)
+def sozluk_gecmis_satirlar(dizin, gun=30):
+    # son `gun` günün toplantı .jsonl satırları: ham metin = "raw" (sözlük değiştirdiyse özgün hâli) yoksa "text". Aynı (dosya, id) tek sayılır (son kayıt).
+    import glob
+    sinir = time.time() - gun * 86400; out = {}
+    for f in sorted(glob.glob(os.path.join(dizin, "20*.jsonl"))):
+        if "-" not in os.path.basename(f) or os.path.getmtime(f) < sinir: continue
+        for sat in open(f, encoding="utf-8", errors="replace"):
+            try: o = json.loads(sat)
+            except ValueError: continue
+            t = o.get("raw") or o.get("text")
+            if not t or not isinstance(t, str): continue
+            try: ts = datetime.datetime.fromisoformat(str(o.get("at", "")).replace("Z", "+00:00")).timestamp()
+            except ValueError: ts = os.path.getmtime(f)
+            if ts >= sinir: out[(os.path.basename(f), o.get("id") or len(out))] = t
+    return list(out.values())
+def sozluk_dene(satirlar, eski, yeni):
+    # eski/yeni: sozluk_uygulayici çıktısı. Dönen: {"satir", "fark": [(ham, eski_cikti, yeni_cikti)], "terim": {dogru: değişen satır sayısı}, "eski_duzeltme", "yeni_duzeltme"}
+    fark, terim, ed, yd = [], {}, 0, 0
+    for t in satirlar:
+        (ea, eo), (ya, yo) = eski(t, "dene"), yeni(t, "dene")
+        ed += bool(eo); yd += bool(yo)
+        if ea == ya: continue
+        fark.append((t, ea, ya))
+        sa = {}
+        for o in eo: sa[o["dogru"]] = sa.get(o["dogru"], 0) - 1
+        for o in yo: sa[o["dogru"]] = sa.get(o["dogru"], 0) + 1
+        for d, n in sa.items():
+            if n: terim[d] = terim.get(d, 0) + 1
+    return {"satir": len(satirlar), "fark": fark, "terim": terim, "eski_duzeltme": ed, "yeni_duzeltme": yd}
+def sozluk_dene_cmd():
+    kod = os.path.dirname(os.path.abspath(__file__)); canli_soz = os.path.join(A.dir, "sozluk.json")
+    yeni_kod = A.yeni_kod or os.path.join(kod, "aktarici", "sozluk.py"); eski_kod = A.eski_kod or yeni_kod
+    yeni_soz = A.sozluk or canli_soz; eski_soz = A.eski_sozluk or canli_soz
+    sat = sozluk_gecmis_satirlar(A.dir, A.gun)
+    r = sozluk_dene(sat, sozluk_uygulayici(eski_kod, eski_soz), sozluk_uygulayici(yeni_kod, yeni_soz))
+    print(f"son {A.gun} gün: {r['satir']} satır · eski {r['eski_duzeltme']} satırı düzeltti, yeni {r['yeni_duzeltme']} · çıktısı FARKLI: {len(r['fark'])}")
+    for d, n in sorted(r["terim"].items(), key=lambda x: -x[1]): print(f"  terim {d}: {n} satırda değişim")
+    for i, (h, e, y) in enumerate(r["fark"][:A.goster], 1): print(f"[{i}] ham : {h}\n    eski: {e}\n    yeni: {y}")  # yalnız terminal: dökümler kişi adı içerir
 def sozluk_cmd():
+    if A.dene: return sozluk_dene_cmd()
     fp = os.path.join(A.dir, "sozluk.json")
     try: d = json.load(open(fp, encoding="utf-8"))
     except FileNotFoundError: d = {"surum": 1, "terimler": []}

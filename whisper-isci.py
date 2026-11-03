@@ -3,7 +3,7 @@
 # model bir kez yüklenir, sonra stdin'den gelen konuşma parçalarını metne çevirir. Tamamen yerel: ağ yok (model diskten).
 # Protokol (satır başına bir JSON):
 #   giriş : {"id": "...", "pcm": "<base64 int16, 16 kHz, tek kanal>", "dil": "tr"|"en"|null, "istem": "terimler…", "onceki": "son metin",
-#            "kanal": "ben"|"karsi", "baslik": "toplantı", "oda": true (yalnız ben: ses izi de döner),
+#            "kanal": "ben"|"karsi", "baslik": "toplantı", "kisaltma": ["SKU", …] (sözlüğün büyük harfli terimleri), "oda": true (yalnız ben: ses izi de döner),
 #            "diller": ["tr", "en"] + "dil_yedek" (dil yokken: başka dil bulunursa yedek dilde yeniden)}
 #   çıkış : {"hazir": true, "model": "...", "sn": yükleme, "ecapa": bool} · {"id": "...", "text": "...", "sn": süre, "dil": "tr", "atlanan": n,
 #            "kume": "k1"|null, "benzerlik", "iz": karşı kanal ses izi (float16 base64), "bol": [{"s", "e", "n", "iz"}] bölüm başına} · {"id": "...", "hata": "..."}
@@ -254,14 +254,14 @@ def tr_harf(x, dil):  # Türkçe çözümde Azerice "ə" (11 Ekim: arka plandaki
     return x.replace("ə", "e").replace("Ə", "E") if dil == "tr" else x
 # Tamamı büyük harfli çıktı (3 Kasım, testler/kisa-soru-cpp-mlx-20261103.md): istem yalnız büyük harfli kısaltmalardan oluşunca (sözlüğü boş yeni kurulum)
 # whisper.cpp kısa Türkçe soruyu "BÜPÇE KAÇ LİRA?" diye büyük harfle yazıyor. Dil tr iken ≥ 3 harf ve ≥ 2 sözcük, harflerin tamamı büyükse Türkçe kuralla küçültülür;
-# istemde geçen kısaltmalar büyük kalır, cümle başları büyütülür. Tek sözcük ("AWS.") dokunulmaz.
+# istemde geçen ve istekle gelen "kisaltma" (sözlüğün büyük harfli terimleri; istem 215 belirteçle sınırlı) kısaltmalar büyük kalır, cümle başları büyütülür. Tek sözcük ("AWS.") dokunulmaz.
 def _tr_alt(w): return w.replace("İ", "i").replace("I", "ı").lower()
 def _tr_ust(c): return {"i": "İ", "ı": "I"}.get(c, c.upper())
-def buyuk_harf_duzelt(x, dil, istem=""):
+def buyuk_harf_duzelt(x, dil, istem="", kisaltma=()):
     if dil != "tr" or not x: return x
     harf = [c for c in x if c.isalpha()]
     if len(harf) < 3 or not all(c.isupper() for c in harf) or len(x.split()) < 2: return x
-    kisa = {w.strip(".,:;!?…()\"'") for w in (istem or "").split()}; kisa = {w for w in kisa if len(w) >= 2 and w.isalpha() and w.isupper()}
+    kisa = {w.strip(".,:;!?…()\"'") for w in (istem or "").split()}; kisa = {w for w in kisa if len(w) >= 2 and w.isalpha() and w.isupper()} | set(kisaltma or ())  # R17: kisaltma = aktarıcının gönderdiği sözlük kısaltmaları (istemde olmasa da korunur)
     cikti, bas = [], True
     for w in x.split():
         cek = w.strip(".,:;!?…()\"'")
@@ -448,7 +448,7 @@ def main():
                 if not x or UYDURMA.search(x) or (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
                         or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; atilan += [x] if x else []; continue
                 tut.append((s, x))
-            metin = buyuk_harf_duzelt(tr_harf(" ".join(x for _, x in tut).strip(), r.get("language")), r.get("language"), istem)
+            metin = buyuk_harf_duzelt(tr_harf(" ".join(x for _, x in tut).strip(), r.get("language")), r.get("language"), istem, p.get("kisaltma"))
             # toplantı dili dışındaki İngilizce (geçişle ya da kanal belleğiyle) kısa kalıp → uydurma
             if p.get("ana_dil") and r.get("language") == "en" != p["ana_dil"] and UYDURMA_EN.match(metin): atilan.append(metin); metin = ""; atla += 1
             if metin and UYDURMA_EN.match(metin) and not konusma_var(a, np): atilan.append(metin); metin = ""; atla += 1

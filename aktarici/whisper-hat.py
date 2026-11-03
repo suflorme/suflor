@@ -392,6 +392,20 @@ def istem_kat_ozet(dusen, tok=None):  # günlük eki: " · 180 token · kişi 12
     for k, n in kat:
         g = max(0, min(n, kalan)); kalan -= g; ek.append(f"{k} {g}/{n}")
     return (f" · {tok} token" if tok else "") + "".join(" · " + x for x in ek)
+_KISALTMA = {"mtime": None, "liste": []}
+def sozluk_kisaltmalari():
+    # R17 (3 Kasım): işçi tamamı büyük harfli Türkçe çıktıyı küçültür ("BÜPÇE KAÇ LİRA?" → "Büpçe kaç lira?") ve yalnız istemde geçen büyük harfli kısaltmaları korur;
+    # istem 215 belirteçle sınırlı, sözlüğün çoğu terimi istemde yok → "SKU KAÇ ADET" "Sku kaç adet" olurdu. Sözlüğün doğru biçimlerindeki tamamı büyük harfli sözcükler (≥ 2 harf)
+    # istekle ayrıca gider (işçi dosyayı okumaz: BASE'i bilmez, istem yolunu aktarıcı kurar). Dosya değişince yenilenir.
+    fp = os.path.join(BASE, "sozluk.json")
+    try: m = os.path.getmtime(fp)
+    except OSError: _KISALTMA.update(mtime=None, liste=[]); return []
+    if m == _KISALTMA["mtime"]: return _KISALTMA["liste"]
+    try: ter = json.load(open(fp, encoding="utf-8")).get("terimler", [])
+    except Exception: return _KISALTMA["liste"]
+    ks = {w.strip(".,:;!?…()\"'") for t in ter for w in str(t.get("dogru") or "").split()}
+    _KISALTMA.update(mtime=m, liste=sorted(w for w in ks if len(w) >= 2 and w.isalpha() and w.isupper()))
+    return _KISALTMA["liste"]
 def istem_metni():
     # Whisper'a önceden verilen terimler (initial_prompt), önem sırasıyla (istem_siralama). Sınır belirteçle işçide (whisper-isci.py istem_kur):
     # Whisper 223 belirteci aşan istemin BAŞINI atıyordu — en önemli terimler düşüyordu (7 Ekim ölçümü: 176 + önceki ~45).
@@ -574,6 +588,7 @@ def _isci_dongu():
         istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem, "onceki": _onceki_istem((k.onceki if k else "")[-150:]),
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
         if is_["kanal"] != "karsi": istek["hitap"] = _hitap_adlari() or ["Suflor", "Suflör", "Süflör"]  # v0.140.0: yalnız asistan adı olan parça istem yankısı sayılmaz
+        istek["kisaltma"] = sozluk_kisaltmalari()  # R17: sözlükteki büyük harfli terimler istemde olmasa da "tamamı büyük harf" küçültmesinden korunur (işçi: buyuk_harf_duzelt)
         if istem: istek["kisiler"] = STATE["whisper"].get("istem_kisi") or []  # 1 Kasım: kişi adları istemde; tek başına "Ayşe." konuşma sesiyle gelirse atılmaz
         if not dil: istek.update(diller=["tr", "en"], dil_yedek=getattr(k, "dil_son", None))  # karışık: yalnız tr/en
         elif dil in ("tr", "en"):
