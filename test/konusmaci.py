@@ -17,13 +17,15 @@ shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # r
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"),
-                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+                     stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1"))  # deneme kipi: /baslat Terminal/Brifing açmaz
 def anahtar():
     try: return open(os.path.join(canli, "kart-anahtari.txt"), encoding="utf-8").read().strip()
     except OSError: return ""
 def istek(yol, govde=None):
+    h = {"X-Suflor-Anahtar": anahtar()}
+    if yol == "/baslat": h["Origin"] = URL  # elle Başlat yalnız panodan (aynı köken + anahtar)
     q = urllib.request.Request(URL + yol, data=json.dumps(govde).encode() if govde is not None else None, method="POST" if govde is not None else "GET",
-                               headers={"X-Suflor-Anahtar": anahtar()})
+                               headers=h)
     return json.load(urllib.request.urlopen(q, timeout=5))
 def tc(*a, ayar=None):
     return subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", URL, *a],
@@ -101,6 +103,14 @@ try:
     if sorted(h) != ["Ayşe Yılmaz", "Bora Kaya"]: hatalar.append(f"hafızadaki kişiler {sorted(h)} (beklenen Ayşe, Bora)")
     if os.path.exists(hy) and os.stat(hy).st_mode & 0o077: hatalar.append(f"hafıza dosyası izni {oct(os.stat(hy).st_mode & 0o777)} (beklenen 0600)")
     B2 = "Hafıza Deneme"; gercek2 = {}
+    # ikinci toplantı (3 Kasım, ardışık toplantı): birincisi elle bitirilir, ikincisi elle Başlat'la konusuyla açılır (Başlat biten toplantıdan sonra yeni kayıt)
+    istek("/toplanti", {"islem": "bitir"})
+    for _ in range(300):
+        if istek("/status")["toplanti"]["durum"] == "bos": break
+        time.sleep(0.1)
+    else: hatalar.append("ilk toplantı 30 sn'de bitmedi")
+    b2 = istek("/baslat", {"konu": B2, "platform": "teams"})
+    if not b2.get("ok") or b2.get("katildi"): hatalar.append(f"ikinci toplantı Başlat açamadı: {b2}")
     for n, k in enumerate(list("ADADADBABDAB")):
         t0, t1 = t, t + 3.0; t += 15.0; i = f"wh/karsi/h{n}"; gercek2[i] = k
         istek("/ingest", {"meeting": {"title": B2}, "source": "whisper", "capturedAt": utc(t1), "entries": [
@@ -109,8 +119,9 @@ try:
             istek("/ingest", {"meeting": {"title": B2}, "source": "captions", "capturedAt": utc(t1 + 3),
                               "entries": [{"id": f"cap/h{n}", "speaker": "Bora Kaya", "time": "11:00", "text": "altyazı"}]})
     time.sleep(0.5)
-    md2 = next((f for f in os.listdir(canli) if f.endswith(".md") and f[:2] == "20" and "Haf" in f), None)
-    if not md2: hatalar.append(f"ikinci toplantı dosyası yok: {os.listdir(canli)}")
+    dosya2 = istek("/status")["toplanti"].get("dosya")  # ikinci toplantının dosyası: /status toplanti.dosya (ad değil)
+    md2 = dosya2 if dosya2 and dosya2 != md and os.path.exists(os.path.join(canli, dosya2)) else None
+    if not md2: hatalar.append(f"ikinci toplantı dosyası yok (/status dosya={dosya2!r}): {os.listdir(canli)}")
     else:
         o = tc("konusmaci", md2); print(o.stdout.strip())
         es2 = json.load(open(os.path.join(canli, md2[:-3] + ".konusmaci.json"), encoding="utf-8"))
