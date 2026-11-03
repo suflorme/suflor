@@ -307,7 +307,7 @@
   // Teams sayfasının mikrofon izni kullanılır (ayrı izin sorulmaz). Teams'te mikrofon kapalıyken ("Sesi aç" görünüyorsa)
   // gönderilmez. Ses diske yazılmaz; yalnız 127.0.0.1'e gider. Karşı tarafın sesi ayrı: yerel ses yardımcısı ya da popup → arka plan + offscreen.
   let ks = null;  // şeritteki Konuş (basılı tut) kaydı
-  const mic = { on: false, busy: false, buf: [], n: 0, t0: 0, kapaliTil: 0, hata: "", gonderilen: 0 };
+  const mic = { on: false, busy: false, buf: [], n: 0, t0: 0, kapaliTil: 0, hata: "", gonderilen: 0, kisaTil: 0 };
   let whisperView = null, karsiIpucu = "", callOnce = false;
   function olay(tur, metin) { rf("/olay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur, metin }) }).catch(() => {}); }
   const micDugme = () => P.micDugme(), teamsSessiz = () => P.sessizMi();  // platformun mikrofon düğmesi "Sesi aç" gösteriyor mu
@@ -317,7 +317,7 @@
     const a = new Int16Array(n); let o = 0; parcalar.forEach(p => { a.set(p, o); o += p.length; });
     try {
       const r = await rf("/ses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kanal: "ben", t: t0, pcm: b64(a), meeting: meetingInfo() }) });
-      const j = await r.json().catch(() => ({})); mic.gonderilen += n;
+      const j = await r.json().catch(() => ({})); mic.gonderilen += n; mic.kisaTil = j.kisa ? Date.now() + 4000 : 0;  // aktarıcı okuma sürüyor derse ben sesi 0,5 sn'lik gruplarla gider (durdurma sözü çabuk yakalansın)
       if (j.kapali) { mic.kapaliTil = Date.now() + 600000; mic.hata = "aktarıcıda Whisper yok"; micDurdur(); }
     } catch (e) { /* aktarıcı kapalı: bu parça gider, akış sürer */ }
   }
@@ -328,7 +328,7 @@
       if (ks && e.data.pcm) { const k = new Int16Array(e.data.pcm.slice(0)); ks.buf.push(k); ks.n += k.length; }  // şeritteki Konuş basılıyken ses ona da gider
       if (teamsSessiz()) { if (mic.n) micGonder(); return; }  // Teams'te mikrofon kapalı: kullanıcının odadaki sesi yazılmaz
       const i16 = new Int16Array(e.data.pcm); if (!mic.n) mic.t0 = e.data.t;
-      mic.buf.push(i16); mic.n += i16.length; if (mic.n >= 16000) micGonder();
+      mic.buf.push(i16); mic.n += i16.length; if (mic.n >= (Date.now() < mic.kisaTil ? 8000 : 16000)) micGonder();
     }
     if (e.data.__suflor === "micDurum") {
       mic.busy = false;

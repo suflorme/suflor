@@ -2266,7 +2266,10 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ses":  # yalnız eklentiden (içerik betiği toplantı sitesi kökeniyle, offscreen chrome-extension:// ile)
             if not (o.startswith("chrome-extension://") or any(re.match(k, o) for k in PLATFORM_KOKEN)
                     or (os.environ.get("SUFLOR_TEST_KOKEN") and o == os.environ["SUFLOR_TEST_KOKEN"])): return self._json({"ok": False, "err": "köken"}, 403)  # test: sahte sayfa
-            p.pop("kaynak", None); return self._json(ses_al(p))
+            p.pop("kaynak", None); sy = ses_al(p)
+            try: sy["kisa"] = bool(okuma_suruyor())  # eklenti okuma sürerken ben sesini kısa gruplarla yollar
+            except Exception: pass
+            return self._json(sy)
         if self.path == "/olay":  # eklentiden tanı satırı (kanıt hatası, Whisper kanalı açıldı/kapandı) → günlük
             if p.get("tur") == "soyle-web": ts_web_durum(p.get("metin")); return self._json({"ok": True})
             if p.get("tur") == "konusmaci": print(f"KONUŞMACI: {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})  # toplanti-claude.py ertelenen etiketleme

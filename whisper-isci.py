@@ -144,8 +144,8 @@ def cozme_ayari(sn):
     return {"temperature": (0.0, 0.2), "sample_len": min(224, max(48, int(sn * 20)))}
 # whisper.cpp + Core ML motoru (S188: Apple Silicon'da varsayılan, ayar whisper_motor: mlx kapatır; aktarıcı SUFLOR_WHISPER_CPP=<ortak>/whisper-cpp verir). Aynı turbo q8 modeli,
 # kodlayıcı Neural Engine'de. 20 Ekim kıyası (testler/asr-kiyas-20261020.md, 1.093 öğe): 4–6 sn parça 1,40 → 0,60 sn, kısa parça p90
-# 2,57 → 0,55 sn, canlı parça Türkçe hata %12,5 → %12,7, uydurma bu dosyanın süzgeciyle aynı (%23). Yalnız canlı döngü; dosyadan ve
-# toplu döküm MLX'te kalır. Sunucu yalnız 127.0.0.1'de; işçi öldürülse de bekçi kabuk sunucuyu kapatır.
+# 2,57 → 0,55 sn, canlı parça Türkçe hata %12,5 → %12,7, uydurma bu dosyanın süzgeciyle aynı (%23). Canlı döngü ve (3 Kasım, S188 adım 2) dosyadan döküm; ses izi
+# (ECAPA) MLX'te kalır. Sunucu yalnız 127.0.0.1'de; işçi öldürülse de bekçi kabuk sunucuyu kapatır.
 # Açılamazsa (CppHata.sinif): dosya_yok · calismiyor (ikili başlamadı) · macos_surum (ikili bu macOS için derlenmemiş) · coreml (kodlayıcı yüklenemedi) ·
 # sunucu_kapandi (başka nedenle çıktı) · zaman_asimi · isinma (sunucu açık, ilk çözüm başarısız) · diger. main() bunu MLX yedeğine çevirir; sınıf beta verisine gider.
 CPP_HATA = ("dosya_yok", "calismiyor", "macos_surum", "coreml", "sunucu_kapandi", "zaman_asimi", "isinma", "diger")
@@ -584,7 +584,7 @@ def dosya_dok(yol, dil, terimler):
     import struct
     t = time.time()
     try:
-        import numpy as np, mlx_whisper
+        import numpy as np
         b = open(yol, "rb").read(); i, fmt, a = 12, None, None  # RIFF parçaları; afconvert WAVE_FORMAT_EXTENSIBLE yazar, wave modülü okumaz
         while i + 8 <= len(b) and b[:4] == b"RIFF":
             ad, n = b[i:i + 4], struct.unpack("<I", b[i + 4:i + 8])[0]
@@ -595,6 +595,31 @@ def dosya_dok(yol, dil, terimler):
     except Exception as e: out({"hata": f"{e.__class__.__name__}: {str(e)[:200]}"}); return 1
     try: import mlx.core as mx; mx.set_cache_limit(int(os.environ.get("SUFLOR_MLX_ONBELLEK_MB") or 0) * 2 ** 20)
     except Exception: pass
+    # Çözme motoru (3 Kasım, S188 adım 2): aktarıcı/toplanti-claude SUFLOR_WHISPER_CPP verirse whisper.cpp (kendi sunucusu, boş port — canlı işçininkiyle çakışmaz;
+    # aynı süreç grubunda, o yüzden toplantıda duraklatma SIGSTOP'u sunucuyu da durdurur). Açılamazsa ya da iş ortasında düşerse aynı işte MLX'e geçer;
+    # MLX modeli diskte yoksa {"hata", "mlx_yok"}: çağıran indirir. Dil, istem, parçalama ve uydurma süzgeci iki motorda aynı.
+    cpp = None; cpp_not = None
+    if os.environ.get("SUFLOR_WHISPER_CPP"):
+        try:
+            cpp = CppMotor(os.environ["SUFLOR_WHISPER_CPP"])
+            try: cpp(np.zeros(SR, np.float32), language="tr")  # ısınma
+            except Exception as e: raise CppHata("isinma", f"ilk çözüm başarısız ({e.__class__.__name__}: {str(e)[:120]})")
+        except Exception as e:
+            if cpp: cpp.kapat()
+            cpp = None; cpp_not = {"hata": cpp_hata_sinif(e), "mesaj": str(e)[:200]}; sys.stderr.write(f"whisper.cpp açılamadı ({cpp_not['hata']}): {e}\n")
+    if not cpp and not mlx_model_var():
+        out({"hata": "whisper.cpp açılamadı, MLX modeli diskte yok" if cpp_not else "MLX modeli diskte yok", "mlx_yok": True, **({"cpp": cpp_not} if cpp_not else {})}); return 1
+    mot = {"cpp": cpp}; mkw = dict(condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
+    def coz(p, language, istem):
+        if mot["cpp"]:
+            for den in (0, 1):  # uzun duraklatmadan (toplantı) sonra istemcinin zaman aşımı dolmuş olabilir: sunucu yaşıyorsa bir kez daha
+                try: return mot["cpp"](p, language=language, initial_prompt=istem)
+                except Exception:
+                    if den == 0 and mot["cpp"].p.poll() is None: continue
+            mot["cpp"].kapat(); mot["cpp"] = None; out({"motor": "mlx", "yedek": True}); sys.stderr.write("whisper.cpp işin ortasında düştü — MLX'e geçildi\n")
+            if not mlx_model_var(): raise CppHata("mlx_yok", "whisper.cpp düştü, MLX modeli diskte yok")
+        import mlx_whisper
+        return mlx_whisper.transcribe(p, path_or_hf_repo=MODEL, language=language, initial_prompt=istem, **mkw)
     iz = None; ey = os.environ.get("SUFLOR_ECAPA")
     if ey and os.path.exists(ey):
         try: import mlx.core as mx; iz = Ecapa(ey, np, mx)
@@ -605,17 +630,18 @@ def dosya_dok(yol, dil, terimler):
             from mlx_whisper.tokenizer import get_tokenizer
             istem = istem_kur(get_tokenizer(multilingual=True, num_languages=100), terimler, "")[0]
         except Exception: istem = terimler
-    out({"hazir": True, "model": MODEL, "sure": round(len(a) / SR, 1), "ecapa": bool(iz)})
+    out({"hazir": True, "model": cpp.ad if cpp else MODEL, "motor": "cpp" if cpp else "mlx", "sure": round(len(a) / SR, 1), "ecapa": bool(iz), **({"cpp": cpp_not} if cpp_not else {})})
     parcalar = dosya_parcala(a, np); atla, dil_son = 0, dil; adim = max(1, len(parcalar) // 20); izler, bolumler = [], []
     for k, (b0, b1) in enumerate(parcalar):
         if k % adim == 0: out({"blok": k + 1, "toplam": len(parcalar)})
         p = a[b0:b1]
         # dil: verilmediyse her parçada Whisper bulur (karışık dilli toplantı); 4 sn'den kısa parçada tahmin güvensiz → öncekinin dili
-        r = mlx_whisper.transcribe(p, path_or_hf_repo=MODEL, language=dil or (dil_son if len(p) < 4 * SR else None), initial_prompt=istem,
-                                   condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
-        if not dil and r.get("language") not in DOSYA_DILLER:  # Rusça/Çince altyazı kalıbı ya da yanlış dil: beklenen dilde yeniden, sonra süzgeç
-            r = mlx_whisper.transcribe(p, path_or_hf_repo=MODEL, language=dil_son or DOSYA_DILLER[0], initial_prompt=istem,
-                                       condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
+        try:
+            r = coz(p, dil or (dil_son if len(p) < 4 * SR else None), istem)
+            if not dil and r.get("language") not in DOSYA_DILLER:  # Rusça/Çince altyazı kalıbı ya da yanlış dil: beklenen dilde yeniden, sonra süzgeç
+                r = coz(p, dil_son or DOSYA_DILLER[0], istem)
+        except CppHata as e: out({"hata": str(e), "mlx_yok": True}); return 1
+        except Exception as e: out({"hata": f"{e.__class__.__name__}: {str(e)[:200]}"}); return 1
         if not dil and len(p) >= 4 * SR and r.get("language") in DOSYA_DILLER: dil_son = r["language"]
         tut, at = dosya_tut(len(p) / SR, r.get("segments") or []); atla += at
         for s, x in tut:
@@ -638,7 +664,8 @@ def dosya_dok(yol, dil, terimler):
         top_iz[ad[k]] = top_iz.get(ad[k], 0) + izler[n][0] * izler[n][1]; top_sn[ad[k]] = top_sn.get(ad[k], 0) + izler[n][0]
     if top_iz: out({"merkez": {k: base64.b64encode((v / (np.linalg.norm(v) + 1e-9)).astype(np.float16).tobytes()).decode() for k, v in top_iz.items()},
                     "sn": {k: round(v, 1) for k, v in top_sn.items()}})
-    out({"bitti": True, "sn": round(time.time() - t, 1), "atlanan": atla}); return 0
+    if mot["cpp"]: mot["cpp"].kapat()
+    out({"bitti": True, "sn": round(time.time() - t, 1), "atlanan": atla, "motor": "cpp" if mot["cpp"] else "mlx"}); return 0
 def ecapa_donustur(ckpt, hedef):
     # kurulumda bir kez (aktarici-kur / modeller-kur): SpeechBrain ağırlıkları (torch dosyası) → numpy .npz. torch yalnız burada gerekir
     # (whisper-venv'de mlx-whisper'ın bağımlılığı olarak var); işçi çalışırken torch içe aktarılmaz.

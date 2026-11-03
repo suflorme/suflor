@@ -57,6 +57,55 @@ if py and ec:
             len(L2) == 4 and all(("Yelda Hanım" if tr_mi(l.split(":**", 1)[1]) else "Konuşmacı 1") in l.split(":**")[0] for l in L2)
             and "ses izi hafızasından" in r5.stdout and "Ses izi hafızasından adlanan" in open(md2, encoding="utf-8").read())
 else: print("(ses izi modeli yok — hafıza denetimi atlandı)")
+# --- Çözme motoru (3 Kasım, S188 adım 2): whisper.cpp varsayılan, MLX yedek, MLX modeli yalnız gerekince iner, toplantıda duraklatma sunucuyu da durdurur ---
+import shutil, signal, glob
+AY_YOL = os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json")
+CPP_VAR = all(os.path.exists(os.path.join(AY["ortak"], "whisper-cpp", f)) for f in ("whisper-server", "ggml-large-v3-turbo-q8_0.bin", "ggml-large-v3-turbo-encoder.mlmodelc")) and AY.get("whisper_motor") != "mlx"
+def ayar_yaz(ad, **ek):
+    d = dict(AY, **ek); y = os.path.join(T, ad); json.dump(d, open(y, "w", encoding="utf-8")); return y
+def tcm(ayar, *a, **env): return subprocess.run([sys.executable, TC, "--relay", "http://127.0.0.1:9", "--dir", CANLI, *a], capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ayar, **env))
+def dokum_satirlari(c):
+    f = next((os.path.join(c, x) for x in os.listdir(c) if x.endswith(".md")), None) if os.path.isdir(c) else None
+    return f, [l for l in open(f, encoding="utf-8") if l.startswith("**[")] if f else []
+if CPP_VAR:
+    kontrol("varsayılan motor whisper.cpp ('Whisper yüklendi (whisper.cpp)')", "(whisper.cpp)" in r.stdout)
+    c = os.path.join(T, "c-mlx"); os.makedirs(c); rm = tcm(ayar_yaz("ayar-mlx.json", whisper_motor="mlx"), "dosyadan", g, "--cikti", c, "--bas", "2026-10-10 14:00")
+    f, L = dokum_satirlari(c); kontrol("whisper_motor: mlx → MLX yolu, dökümde cpp'siz aynı iki dil", "(MLX)" in rm.stdout and len(L) == 4 and any("Thursday" in l for l in L))
+    # cpp açılamaz: ikili çalıştırılamıyor (izinsiz) → aynı işte MLX
+    ort = os.path.join(T, "ortak-sahte"); os.makedirs(os.path.join(ort, "whisper-cpp", "ggml-large-v3-turbo-encoder.mlmodelc"))
+    for f_ in ("whisper-server", "ggml-large-v3-turbo-q8_0.bin"): open(os.path.join(ort, "whisper-cpp", f_), "w").close()
+    for f_ in ("whisper-venv", "whisper-modeller", "ses-modeller"):
+        if os.path.exists(os.path.join(AY["ortak"], f_)): os.symlink(os.path.join(AY["ortak"], f_), os.path.join(ort, f_))
+    ay_y = ayar_yaz("ayar-yedek.json", ortak=ort, uygulama=os.path.join(T, "uyg-sahte"), whisper_motor="cpp"); os.makedirs(os.path.join(T, "uyg-sahte"))
+    c = os.path.join(T, "c-yedek"); os.makedirs(c); ry = tcm(ay_y, "dosyadan", g, "--cikti", c, "--bas", "2026-10-10 14:00")
+    f, L = dokum_satirlari(c); kontrol("cpp açılamadı → aynı işte MLX yedeği, döküm yazıldı", ry.returncode == 0 and "(MLX)" in ry.stdout and len(L) == 4)
+    # cpp açılamaz + MLX modeli diskte yok → yalnız şimdi iner (test: yerel anlık görüntüden kopya), sonra MLX'le biter
+    kaynak = next(iter(sorted(glob.glob(os.path.join(AY["ortak"], "whisper-modeller", "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots", "*")))), None)
+    if kaynak:
+        ort2 = os.path.join(T, "ortak-bos"); shutil.copytree(ort, ort2, symlinks=True); os.remove(os.path.join(ort2, "whisper-modeller")); os.makedirs(os.path.join(ort2, "whisper-modeller"))
+        ay_b = ayar_yaz("ayar-bos.json", ortak=ort2, uygulama=os.path.join(T, "uyg-sahte"), whisper_motor="cpp")
+        c = os.path.join(T, "c-indir"); os.makedirs(c); rb = tcm(ay_b, "dosyadan", g, "--cikti", c, "--bas", "2026-10-10 14:00", SUFLOR_TEST_MLX_KAYNAK=kaynak)
+        f, L = dokum_satirlari(c); kontrol("MLX modeli yok: 'iniyor' yazar, iner, MLX'le döküm yazılır", rb.returncode == 0 and "iniyor" in rb.stdout and "(MLX)" in rb.stdout and len(L) == 4)
+        ort3 = os.path.join(T, "ortak-yazilamaz"); shutil.copytree(ort2, ort3, symlinks=True); shutil.rmtree(os.path.join(ort3, "whisper-modeller", "hub"), ignore_errors=True); os.chmod(os.path.join(ort3, "whisper-modeller"), 0o555)
+        ay_c = ayar_yaz("ayar-yazilamaz.json", ortak=ort3, uygulama=os.path.join(T, "uyg-sahte"), whisper_motor="cpp"); c = os.path.join(T, "c-hata"); os.makedirs(c)
+        rc = tcm(ay_c, "dosyadan", g, "--cikti", c, "--bas", "2026-10-10 14:00"); os.chmod(os.path.join(ort3, "whisper-modeller"), 0o755)
+        kontrol("MLX modeli indirilemezse anlaşılır hata, döküm yok", rc.returncode != 0 and "MLX modeli indirilemedi" in rc.stdout + rc.stderr and not dokum_satirlari(c)[1])
+    # toplantıda duraklatma: aktarıcının yaptığı gibi yeni oturum + SIGSTOP/SIGCONT süreç grubuna; whisper-server aynı grupta olmalı ve durmalı
+    c = os.path.join(T, "c-dur"); os.makedirs(c)
+    pr = subprocess.Popen([sys.executable, TC, "--relay", "http://127.0.0.1:9", "--dir", CANLI, "dosyadan", g, "--cikti", c, "--bas", "2026-10-10 14:00"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True, start_new_session=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=AY_YOL))
+    def sunucu(): return [x.split() for x in subprocess.run(["ps", "-axo", "pid=,pgid=,stat=,command="], capture_output=True, text=True).stdout.splitlines() if "whisper-server" in x and x.split()[1] == str(pr.pid)]
+    t_ = time.time(); sv = []
+    while time.time() - t_ < 90 and not sv and pr.poll() is None: time.sleep(0.5); sv = sunucu()
+    kontrol("whisper-server dosyadan işiyle aynı süreç grubunda", bool(sv))
+    if sv:
+        os.killpg(pr.pid, signal.SIGSTOP); time.sleep(1.5)
+        dur = [x[2] for x in sunucu()]; kontrol("SIGSTOP sunucuyu da durdurur", bool(dur) and all(d.startswith("T") for d in dur))
+        os.killpg(pr.pid, signal.SIGCONT)
+    cikti_ = pr.communicate(timeout=180)[0]; f, L = dokum_satirlari(c)
+    kontrol("duraklatılıp sürdürülen iş bitti, döküm tam", pr.returncode == 0 and len(L) == 4)
+    time.sleep(2); kontrol("iş bitince whisper-server kalmadı", not [x for x in subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.splitlines() if "whisper-server" in x and T in x] and not sunucu())
+else: print("(whisper.cpp yok ya da ayar mlx — motor denetimleri atlandı)")
 kontrol("geçici WAV kalmadı", not [f for f in os.listdir(tempfile.gettempdir()) if f.startswith("suflor-dosya-")])
 subprocess.run(["rm", "-rf", T])
 print(f"dosyadan: {'✓ hepsi geçti' if all(ok) else '✗ ' + str(ok.count(False)) + ' kaldı'} ({sum(ok)}/{len(ok)})"); sys.exit(0 if all(ok) else 1)

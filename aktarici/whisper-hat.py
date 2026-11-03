@@ -33,7 +33,7 @@ _WH_Q8 = os.path.join(WH_MODELLER, "hub", "models--suflor--whisper-large-v3-turb
 if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(_WH_Q8, "weights.safetensors")): WH_MODEL = _WH_Q8
 # whisper.cpp + Core ML canlı döngüde (aynı turbo q8, kodlayıcı Neural Engine'de; ~2,3 kat hızlı, doğruluk ve uydurma süzgeci aynı — 20 Ekim kıyası).
 # S188 (3 Kasım): Apple Silicon'da varsayılan motor; ayar "whisper_motor" ("cpp" | "mlx") varsa o kazanır. Dosyalar <ortak>/whisper-cpp/ (whisper-server,
-# ggml-large-v3-turbo-q8_0.bin, Core ML kodlayıcı; kurulum.py whispercpp_kur indirir); yoksa MLX. Dosyadan ve toplu döküm her durumda MLX (2. adımda taşınacak).
+# ggml-large-v3-turbo-q8_0.bin, Core ML kodlayıcı; kurulum.py whispercpp_kur indirir); yoksa MLX. Dosyadan döküm (toplanti-claude.py dosyadan → whisper-isci.py --dosya) de cpp'yi kendi sunucusuyla kullanır (aynı yedek mantığı); toplu etiketleme ses izi, MLX.
 # Geçici MLX yedeği: işçi cpp'yi açamazsa aynı süreçte MLX'e geçer ("cpp": {"sonuc": "yedek", "hata": sınıf}); aktarıcı o gün cpp'yi yeniden denemez
 # (<uygulama>/whisper-cpp-yedek.json), her açılış sonucunu canli/whisper-cpp-acilis.jsonl'e yazar (beta verisi sayar). MLX modeli diskte yoksa iner (wh_mlx_indir).
 WH_CPP = os.path.join(_ORT, "whisper-cpp")

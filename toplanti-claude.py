@@ -2257,10 +2257,38 @@ def dosyadan_cmd():
     _ilk = lambda *ys: next((y for y in ys if os.path.exists(y)), None)
     py = _ilk(*(os.path.join(d, "whisper-venv", "bin", "python") for d in (AYAR["ortak"], AYAR["uygulama"])))
     mdl = _ilk(*(os.path.join(d, "whisper-modeller") for d in (AYAR["ortak"], AYAR["uygulama"])))
-    if not py or not mdl: sys.exit("Whisper kurulu değil (whisper-venv / whisper-modeller yok) — modeller-kur.command")
-    q8 = os.path.join(mdl, "hub", "models--suflor--whisper-large-v3-turbo-q8", "snapshots", "yerel")
-    tam = sorted(glob.glob(os.path.join(mdl, "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots", "*", "weights.safetensors")))
-    model = q8 if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(q8, "weights.safetensors")) else (os.path.dirname(tam[0]) if tam else None)
+    # 3 Kasım (S188 adım 2): çözme whisper.cpp + Core ML (ayar whisper_motor, Apple Silicon'da varsayılan; aktarıcı bugün cpp'yi açamadıysa yedek işareti varsa MLX).
+    # MLX modeli yalnız cpp açılamazsa gerekir (işçi "mlx_yok" derse aşağıda inip yeniden denenir); whisper-venv numpy ve ses izi (ECAPA) için her durumda.
+    import platform
+    cpp_dir = next((os.path.join(d, "whisper-cpp") for d in (AYAR["ortak"], AYAR["uygulama"]) if all(os.path.exists(os.path.join(d, "whisper-cpp", f)) for f in
+                   ("whisper-server", "ggml-large-v3-turbo-q8_0.bin", "ggml-large-v3-turbo-encoder.mlmodelc"))), None)
+    istenen = AYAR.get("whisper_motor"); istenen = istenen if istenen in ("cpp", "mlx") else ("cpp" if platform.machine() == "arm64" else "mlx")
+    try: yedek = json.load(open(os.path.join(AYAR["uygulama"], "whisper-cpp-yedek.json"), encoding="utf-8")).get("gun") == time.strftime("%Y-%m-%d")
+    except (OSError, ValueError, AttributeError): yedek = False
+    cpp_kullan = bool(cpp_dir) and istenen == "cpp" and not yedek
+    if not py or (not mdl and not cpp_kullan): sys.exit("Whisper kurulu değil (whisper-venv / whisper-modeller yok) — modeller-kur.command")
+    mdl = mdl or os.path.join(AYAR["ortak"], "whisper-modeller")
+    def mlx_model():
+        q8 = os.path.join(mdl, "hub", "models--suflor--whisper-large-v3-turbo-q8", "snapshots", "yerel")
+        tam = sorted(glob.glob(os.path.join(mdl, "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots", "*", "weights.safetensors")))
+        return q8 if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(q8, "weights.safetensors")) else (os.path.dirname(tam[0]) if tam else None)
+    def mlx_indir():  # cpp açılamadı, MLX modeli yok: aktarıcıdaki wh_mlx_indir ile aynı sürüm ve yöntem; yazılamıyorsa (öbür hesabın ortak klasörü) False
+        rev = "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb"  # aktarici/whisper-hat.py WH_MLX_REV ve kurulum.py WHISPER_REV ile aynı
+        hedef = os.path.join(mdl, "hub", "models--mlx-community--whisper-large-v3-turbo", "snapshots", rev)
+        try:
+            os.makedirs(mdl, exist_ok=True)
+            if not os.access(mdl, os.W_OK): return False
+            kaynak = os.environ.get("SUFLOR_TEST_MLX_KAYNAK")  # test: ağ yerine diskteki bir anlık görüntüden kopya
+            if kaynak: shutil.copytree(kaynak, hedef + ".indir", dirs_exist_ok=True); os.replace(hedef + ".indir", hedef)
+            else:
+                r = subprocess.run([py, "-c", "import sys; from huggingface_hub import snapshot_download as s; s('mlx-community/whisper-large-v3-turbo', revision=sys.argv[1])", rev],
+                                   env=dict(os.environ, HF_HOME=mdl, HF_HUB_OFFLINE="0", PYTHONDONTWRITEBYTECODE="1"), capture_output=True, text=True, timeout=3600)
+                if r.returncode: return False
+                try: os.makedirs(os.path.join(os.path.dirname(os.path.dirname(hedef)), "refs"), exist_ok=True); open(os.path.join(os.path.dirname(os.path.dirname(hedef)), "refs", "main"), "w").write(rev)
+                except OSError: pass
+            return os.path.exists(os.path.join(hedef, "weights.safetensors"))
+        except Exception: return False
+    model = mlx_model()
     ecapa = _ilk(*(os.path.join(d, "ses-modeller", "spkrec-ecapa-voxceleb", "ecapa-mlx.npz") for d in (AYAR["ortak"], AYAR["uygulama"])))
     try: ter = json.load(open(os.path.join(A.dir, "sozluk.json"), encoding="utf-8")).get("terimler", [])
     except Exception: ter = []
@@ -2282,21 +2310,32 @@ def dosyadan_cmd():
         else: t_bas = os.path.getmtime(g) - sure; notu = " (başlangıç dosya tarihinden tahmini; kesin saat için --bas)"
         if not A.kim: A.kim = os.path.splitext(os.path.basename(g))[0]
         dokum_kok(A.kim, datetime.datetime.fromtimestamp(t_bas).astimezone())  # dosya zaten varsa Whisper'dan önce dur
-        env = dict(os.environ, HF_HOME=mdl, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", SUFLOR_ISTEM=(", ".join(adlar))[:3000] + "." if adlar else "",
-                   **({"SUFLOR_WHISPER_MODEL": model} if model else {}), **({"SUFLOR_ECAPA": ecapa} if ecapa else {}))
         isci = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whisper-isci.py")
-        p = subprocess.Popen([py, "-u", isci, "--dosya", wav, A.dil or "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
-        bol, son, merkez = [], None, {}
-        for l in p.stdout:
-            try: j = json.loads(l)
-            except ValueError: continue
-            if j.get("hata"): sys.exit("Whisper: " + j["hata"])
-            if j.get("hazir"): print(f"ses {round(sure / 60, 1)} dk · Whisper yüklendi{' · ses izi var' if j.get('ecapa') else ''}", flush=True)
-            elif j.get("blok"): print(f"  blok {j['blok']}/{j['toplam']}…", flush=True)
-            elif j.get("bolum"): bol.append(j["bolum"])
-            elif j.get("merkez"): merkez = j
-            elif j.get("bitti"): son = j
-        p.wait()
+        indirildi = False; cpp_ver = cpp_kullan
+        while True:
+            model = mlx_model()
+            env = dict(os.environ, HF_HOME=mdl, HF_HUB_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1", PYTHONUNBUFFERED="1", SUFLOR_ISTEM=(", ".join(adlar))[:3000] + "." if adlar else "",
+                       **({"SUFLOR_WHISPER_MODEL": model} if model else {}), **({"SUFLOR_ECAPA": ecapa} if ecapa else {}), **({"SUFLOR_WHISPER_CPP": cpp_dir} if cpp_ver else {}))
+            if not cpp_ver: env.pop("SUFLOR_WHISPER_CPP", None)  # dışarıdan gelen değer ayarı (whisper_motor: mlx) delmesin
+            p = subprocess.Popen([py, "-u", isci, "--dosya", wav, A.dil or "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
+            bol, son, merkez, mlx_yok = [], None, {}, None
+            for l in p.stdout:
+                try: j = json.loads(l)
+                except ValueError: continue
+                if j.get("hata"):
+                    if j.get("mlx_yok"): mlx_yok = j["hata"]; continue
+                    p.wait(); sys.exit("Whisper: " + j["hata"])
+                if j.get("hazir"): print(f"ses {round(sure / 60, 1)} dk · Whisper yüklendi ({'whisper.cpp' if j.get('motor') == 'cpp' else 'MLX'}){' · ses izi var' if j.get('ecapa') else ''}", flush=True)
+                elif j.get("blok"): print(f"  blok {j['blok']}/{j['toplam']}…", flush=True)
+                elif j.get("bolum"): bol.append(j["bolum"])
+                elif j.get("merkez"): merkez = j
+                elif j.get("bitti"): son = j
+            p.wait()
+            if not mlx_yok: break
+            # whisper.cpp açılamadı (ya da işin ortasında düştü) ve MLX modeli yok: yalnız şimdi indirilir, iş baştan MLX'le
+            if indirildi: sys.exit(f"Whisper: {mlx_yok} (indirme sonrası da)")
+            print("whisper.cpp açılamadı; yedek MLX Whisper modeli iniyor (~1,6 GB)…", flush=True); indirildi = True; cpp_ver = False
+            if not mlx_indir(): sys.exit("Whisper: whisper.cpp açılamadı ve MLX modeli indirilemedi (ağ ya da model klasörü yazılamıyor) — Suflor'u yeniden başlat ya da modeller-kur.command")
     finally: shutil.rmtree(gecici, ignore_errors=True)
     if not son: sys.exit("Whisper yarıda kaldı (bellek?) — yeniden dene")
     if not bol: sys.exit("dosyada konuşma bulunamadı")

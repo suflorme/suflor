@@ -6,7 +6,7 @@
 # ayrı süreçte). Toplantı sürerken başlamaz; aynı anda tek iş. Çıktı: proje klasörü korunan klasörde değilse <proje>/gorusmeler, değilse
 # canli/dokum/ (launchd Masaüstü/Belgeler'e yazamaz; denemek izin penceresi açabilir). Aynı adlı döküm varsa panoda Üzerine yaz / Vazgeç
 # (dosya o arada bekler, yeniden yüklenmez). İş sürerken toplantı başlarsa süreç grubu durdurulur (SIGSTOP; işlemci boşalır, bellek kalır),
-# toplantı bitince (eklenti 60 sn nabız göndermeyince) kaldığı yerden sürer (SIGCONT). Süreç grubu kimliği canli/dosyadan/surec.pid'de:
+# toplantı bitince (eklenti 60 sn nabız göndermeyince) kaldığı yerden sürer (SIGCONT). Çözme whisper.cpp ise onun sunucusu da aynı süreç grubunda: SIGSTOP/SIGCONT onu da durdurur/sürdürür (test/dosyadan.py). Süreç grubu kimliği canli/dosyadan/surec.pid'de:
 # aktarıcı duraklatılmış işin ortasında yeniden başlarsa açılışta kalan grup kapatılır (durdurulmuş süreç yoksa sonsuza dek bellekte kalırdı).
 SES_UZANTI = (".m4a", ".mp4", ".mov", ".m4v", ".wav", ".mp3", ".aac", ".caf", ".aif", ".aiff", ".3gp")
 DOSYADAN_GB = 4
