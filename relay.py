@@ -15,10 +15,17 @@ def bolum(ad):
 # klasörü, proje klasörü ve adıyla. Dosya yoksa varsayılanlar. Modeller ve
 # Python ortamları iki hesapta ortak: /Users/Shared/Suflor (salt okunur kullanılır). Kurulum: kurulum.py (sihirbaz) yazar.
 AYAR_YOL = os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json")  # SUFLOR_AYAR: deneme için
+def _profil_modul():
+    ns = {}; yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "profil.py")
+    try: exec(compile(open(yol, encoding="utf-8").read(), yol, "exec"), ns)
+    except OSError: ns = {"PROFIL_HAFIF": {}, "profil_uygula": lambda a, p: a}
+    return type("Profil", (), ns)
 def ayar_oku():
     v = {"alan": "Suflor", "ad": "", "port": 8765, "uygulama": "~/Library/Application Support/Suflor", "proje": "~/Suflor", "ortak": "/Users/Shared/Suflor"}
     try: v.update(json.load(open(AYAR_YOL, encoding="utf-8")))
     except (OSError, ValueError): pass
+    if v.get("profil") == "hafif":  # S188: hafif profil (≤ 8 GB) — tablo aktarici/profil.py'de (kurulum.py ile tek kaynak); elle verilen ayar kazanır
+        for k, x in _profil_modul().PROFIL_HAFIF.items(): v.setdefault(k, x)
     for k in ("uygulama", "proje", "ortak"): v[k] = os.path.expanduser(str(v[k]))
     v["calisma"] = os.path.expanduser(str(v.get("calisma") or v["proje"]))  # v0.137.0: Claude oturumlarının klasörü (dolu proje klasöründe <proje>/Suflor)
     return v
@@ -713,12 +720,13 @@ def ingest(p):
                     elif birlesik and "Claude:" not in text and "Claude:" in (bt := hitap_duzelt(birlesik)[0]) and konus_hitap(bt):  # yarım hitap + bu satır
                         e["_konusan"] = True; print(f"KONUŞ: bölünen hitap birleştirildi — \"{birlesik[:60]}\"")
                     elif yeni_w and "Claude:" not in text and not birlesik and toplanti_var() and (talimat_coz(text) or HITAP_IS_RX.search(text)):  # v0.140.0: neden yapılmadığı günlükte
-                        print(f"TALİMAT: hitapsız söz iş/talimat sayılmadı (asistanın adıyla başlamalı) — \"{text[:60]}\"")
+                        if gorev_hitapsiz(text) is None: print(f"TALİMAT: hitapsız söz iş/talimat sayılmadı (asistanın adıyla başlamalı) — \"{text[:60]}\"")  # 3 Kasım: kişisel asistan (gorev_cikar) öneri çıkarır (talimat.py)
                     elif p.get("source") in ("captions", "transcript") and "Claude:" in text and e.get("id") not in _HITAP_ALTYAZI and not whisper_akiyor("ben"):
                         _HITAP_ALTYAZI.add(e.get("id"))
                         print(f"KONUŞ: hitap altyazıda duyuldu, Whisper kapalı — cevaplanmadı (konuşana yalnız Whisper satırı gider) — \"{text[:60]}\"")  # mrt 28 Ekim 01:06 B1
             elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker"), e.get("t0"), e.get("t1")): e["_konusan"] = True  # v0.44.0
             if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text, ben_mi)); del SON_SATIRLAR[:-20]  # 4. alan: kullanıcının satırı mı (3 Kasım)
+            if not onceki and (p.get("source") == "whisper" or not whisper_akiyor("ben" if ben_mi else "karsi")): gorev_satir(text, e.get("speaker"), ben_mi)  # 3 Kasım: sahipsiz iş önerisi (talimat.py; altyazı Whisper akarken yinelemedir)
             low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye
                 kim_ = e.get("speaker") or "?"; ALTYAZI_SON.append((time.time(), kim_)); del ALTYAZI_SON[:-400]; kume_oyla(kim_)
@@ -1511,6 +1519,7 @@ def kutu_kulaklik():
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
     "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "kayit_sesi": ("bool", True, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "uclu_sohbet": ("bool", False, None), "uclu_sohbet_ozel_paylas": ("bool", False, None), "sesli_not": ("bool", True, None),"kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
+    "profil": ("sec", "tam", ("tam", "hafif")),  # S188: hafif = ≤ 8 GB Mac için bellek tasarruflu mod (tablo aktarici/profil.py)
     "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac ve Piper sesinde çarpan
     "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
@@ -1591,6 +1600,7 @@ def ayar_yaz(deg):
             for k, v in yeni.items():
                 if (k in ("eposta", "eposta_adres", "kisilik", "kisilik_toplanti_disi", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
+            if "profil" in yeni: _profil_modul().profil_uygula(a, yeni["profil"])  # hafif: ayarda olmayan türetilenler yazılır; tam: yalnız türetilenler silinir
             gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
             with open(gec, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
             os.replace(gec, AYAR_YOL)
@@ -1598,6 +1608,10 @@ def ayar_yaz(deg):
     for k, v in yeni.items():
         if k in a: AYAR[k] = v
         else: AYAR.pop(k, None)
+    if "profil" in yeni:
+        for k in ("profil", "profil_turetilen", *_profil_modul().PROFIL_HAFIF):
+            if k in a: AYAR[k] = a[k]
+            else: AYAR.pop(k, None)
     if beyin:
         if "beyin" in a: AYAR["beyin"] = a["beyin"]
         else: AYAR.pop("beyin", None)

@@ -28,7 +28,10 @@
       m_islemci: "Apple Silicon işlemci", m_macos: "macOS 14 ya da üstü", m_bellek: "Bellek", m_disk: "Boş disk", m_python: "Python", m_chrome: "Google Chrome",
       m_python_ac: "Komut satırı araçları gerekiyor", m_python_dug: "Yükle", m_chrome_ac: "Teams toplantıları Chrome'da açılır", m_chrome_dug: "İndir",
       m_bellek_az: "16 GB önerilir; daha azında toplantıda diğer uygulamaları kapatman gerekebilir",
-      m_az: "Bu Mac'te {gb} GB bellek var. Suflor.me 16 GB altında kararlı değil: toplantıda konuşma tanıma ve yapay zekâ birlikte çalışırken Mac yavaşlayabilir, döküm geç kalabilir. Devam edebilirsin; sorun yaşarsan önce diğer uygulamaları kapat. 8 GB için daha hafif bir kurulum planlanıyor.",
+      m_az: "Bu Mac'te {gb} GB bellek var. Suflor.me 16 GB altında kararlı değil: toplantıda konuşma tanıma ve yapay zekâ birlikte çalışırken Mac yavaşlayabilir, döküm geç kalabilir. Devam edebilirsin; sorun yaşarsan önce diğer uygulamaları kapat.",
+      m_hafif_b: "Hafif kurulum (önerilir)", m_hafif_a: "Yerel Türkçe ses, belgelerde anlamla arama, yerel model ve ikinci Konuş süreci kapalı olur; asistan Mac sesiyle konuşur. Toplantıda Mac daha rahat çalışır.",
+      m_tam_b: "Tam kurulum", m_tam_a: "Hepsi açık; bu Mac'te toplantıda yavaşlama olabilir.",
+      m_hafif: "Bu Mac'te {gb} GB bellek var. Suflor.me 16 GB altında kararlı değil; 8 GB ve altı için hafif kurulum öneriyoruz (aşağıda seçili). İstersen tam kuruluma geçebilirsin.",
       m_intel: "Bu Mac'te Intel işlemci var. Suflor.me yalnız Apple Silicon (M1 ve sonrası) işlemcili Mac'lerde çalışır; konuşma tanıma Intel'de desteklenmiyor. Kurulum burada duruyor.",
       indiriliyor: "Modeller iniyor", indi: "Modeller hazır",
       claude_b: "Yapay zekâyı bağlayalım", claude_a: "Konuş'taki cevapları, kartları ve özetleri bir yapay zekâ yazar. Üç yoldan birini seç; sonra panodaki ⚙ Ayarlar'dan iş başına değiştirebilirsin.",
@@ -146,7 +149,10 @@
       m_islemci: "Apple silicon", m_macos: "macOS 14 or later", m_bellek: "Memory", m_disk: "Free disk space", m_python: "Python", m_chrome: "Google Chrome",
       m_python_ac: "Command line tools are needed", m_python_dug: "Install", m_chrome_ac: "Teams meetings open in Chrome", m_chrome_dug: "Download",
       m_bellek_az: "16 GB recommended; with less you may need to close other apps during meetings",
-      m_az: "This Mac has {gb} GB of memory. Suflor.me is not stable below 16 GB: while speech recognition and the AI run together in a meeting, the Mac may slow down and the transcript may lag. You can continue; if you run into trouble, close other apps first. A lighter setup for 8 GB is planned.",
+      m_az: "This Mac has {gb} GB of memory. Suflor.me is not stable below 16 GB: while speech recognition and the AI run together in a meeting, the Mac may slow down and the transcript may lag. You can continue; if you run into trouble, close other apps first.",
+      m_hafif_b: "Light setup (recommended)", m_hafif_a: "Local Turkish voice, meaning-based document search, the local model and the second Ask process stay off; the assistant speaks with the Mac voice. The Mac runs more comfortably in meetings.",
+      m_tam_b: "Full setup", m_tam_a: "Everything on; this Mac may slow down in meetings.",
+      m_hafif: "This Mac has {gb} GB of memory. Suflor.me is not stable below 16 GB; for 8 GB and less we recommend the light setup (selected below). You can switch to the full setup if you like.",
       m_intel: "This Mac has an Intel processor. Suflor.me only runs on Macs with Apple silicon (M1 and later); speech recognition is not supported on Intel. Setup stops here.",
       indiriliyor: "Downloading models", indi: "Models ready",
       claude_b: "Connect an AI", claude_a: "An AI writes the Talk answers, cards and summaries. Pick one of three ways; later you can change it per task in ⚙ Settings on the panel.",
@@ -405,7 +411,7 @@
   // ---------- asistan ----------
   const AS_BOS = tarz => ({ ad: "", bicim: "siz", tarz, ses: "mac" });
   const asPocket = () => !!(((D.durum || {}).asistan || {}).pocket) && D.dil !== "en";  // kurulu
-  const asTr = () => D.dil !== "en";  // Pocket Türkçe: kadın/erkek yalnız Türkçe kurulumda; kurulu değilse seçince indirilir (S135)
+  const asTr = () => D.dil !== "en" && (C.profil || "") !== "hafif";  // Pocket Türkçe: kadın/erkek yalnız Türkçe kurulumda; kurulu değilse seçince indirilir (S135)
   function pkDurum() {  // ses satırlarının altında: indirme bilgisi, durum, atıf (CC-BY)
     const k = ((D.durum || {}).asistan || {}).pocket_kur || {}, sec = C.asistan.liste.slice(0, C.asistan.iki ? 2 : 1).some(x => x.ses && x.ses !== "mac");
     const ust = asPocket() ? "" : k.durum === "iniyor" ? `<b>${esc(t.as_pk_iniyor)} · %${k.yuzde || 0}</b><br>${esc(t.as_pk_bekle)}<br>`
@@ -448,7 +454,8 @@
     { id: "hosgeldin", simge: "isaret", b: "hosgeldin_b", a: "hosgeldin_a",
       icerik: () => `<div class="liste">${satir("iyi", t.hg1, t.hg1a)}${satir("iyi", t.hg2, t.hg2a)}${satir("iyi", t.hg3, t.hg3a)}</div>` },
     { id: "mac", simge: "mac", b: "mac_b", a: "mac_a", hazir: () => { const m = (D.durum || {}).mac; return m && m.arm && m.macos_ok && m.python; },
-      gir: async () => { await durumAl(); const m = D.durum.mac || {}; if (m.arm && m.macos_ok && m.python) api("modeller/baslat", {}).then(durumAl).catch(() => {});
+      gir: async () => { await durumAl(); const m = D.durum.mac || {}; if (m.donanim === "hafif") { C.profil = C.profil === "tam" ? "tam" : "hafif"; try { await api("profil", { profil: C.profil }); } catch (x) {} }  // S188: ≤ 8 GB — seçim indirmelerden önce yazılır (varsayılan hafif)
+        if (m.arm && m.macos_ok && m.python) api("modeller/baslat", {}).then(durumAl).catch(() => {});
         if (yon > 0 && m.arm && m.macos_ok && m.python && m.bellek_gb >= 16 && m.disk_gb >= 7 && m.chrome)
           setTimeout(() => { const a = gorunen()[D.adim]; if (a && a.id === "mac") git(D.adim + 1); }, 2000); },
       icerik: () => { const m = (D.durum || {}).mac; if (!m) return `<div class="liste">${satir("bekle", t.m_islemci)}${satir("bekle", t.m_macos)}${satir("bekle", t.m_python)}</div>`;
@@ -457,7 +464,9 @@
           ${satir(m.disk_gb >= 7 ? "iyi" : "kotu", t.m_disk + " · " + m.disk_gb + " GB", m.disk_gb >= 7 ? "" : "7 GB")}
           ${satir(m.python ? "iyi" : "kotu", t.m_python, m.python ? m.python : t.m_python_ac, m.python ? "" : dug("python", t.m_python_dug))}
           ${satir(m.chrome ? "iyi" : "uyari", t.m_chrome, m.chrome ? "" : t.m_chrome_ac, m.chrome ? "" : dug("chrome-indir", t.m_chrome_dug))}</div>
-          ${m.donanim === "intel" ? `<div class="kart-not uyari" data-donanim="intel">${esc(t.m_intel)}</div>` : m.donanim === "az_bellek" ? `<div class="kart-not uyari" data-donanim="az-bellek">${esc(tf(t.m_az, { gb: m.bellek_gb }))}</div>` : ""}`; } },
+          ${m.donanim === "intel" ? `<div class="kart-not uyari" data-donanim="intel">${esc(t.m_intel)}</div>` : m.donanim === "az_bellek" ? `<div class="kart-not uyari" data-donanim="az-bellek">${esc(tf(t.m_az, { gb: m.bellek_gb }))}</div>` : m.donanim === "hafif" ? `<div class="kart-not uyari" data-donanim="hafif">${esc(tf(t.m_hafif, { gb: m.bellek_gb }))}</div>
+          <div class="liste-secim" data-profil-secim>${[["hafif", t.m_hafif_b, t.m_hafif_a], ["tam", t.m_tam_b, t.m_tam_a]].map(([v, b, a]) =>
+            `<label class="anahtar"><input type="radio" name="profil" data-profil="${v}" ${(C.profil || "hafif") === v ? "checked" : ""}><span><b>${esc(b)}</b><br><span class="ipucu">${esc(a)}</span></span></label>`).join("")}</div>` : ""}`; } },
     // Faz 11 Aşama 4: "Yapay zekâ bağla" — Claude Code (bugünkü adım) · API anahtarı (Gemini / OpenAI uyumlu) · yerel model (Ollama). Kimlik "claude" kalır
     // (kurulum.json'daki kayıtlı adım). Seçim kurulumda beyin.varsayilan'a yazılır (kurulum.py tamamla); Claude Code seçilmediyse Claude denetimi beklenmez.
     { id: "claude", simge: "claude", b: "claude_b", a: "claude_a", hazir: () => yzHazir(),
@@ -725,6 +734,8 @@
     if (ip && (h || ip.dataset.h)) { ip.textContent = h ? t["as_" + h] : (+i ? "" : t.as_ad_i); ip.dataset.h = h || ""; }
     $("#devam").disabled = !!asistanHata(); clearTimeout(D.zz); D.zz = setTimeout(kaydet, 500);
   });
+  document.addEventListener("change", e => {  // S188: ≤ 8 GB Mac'te hafif / tam kurulum seçimi (hemen ayara yazılır)
+    if (!e.target.matches || !e.target.matches("[data-profil]")) return; C.profil = e.target.dataset.profil; kaydet(); api("profil", { profil: C.profil }).catch(() => {}); });
   document.addEventListener("change", e => {  // yapay zekâ seçimi (radyo): anahtar grubunda önceki hizmet (yoksa Gemini)
     if (!e.target.matches || !e.target.matches("[data-yz]")) return; const v = e.target.dataset.yz;
     C.yz = v === "anahtar" ? (["gemini", "ozel"].includes(C.yz) ? C.yz : C.yz_sg || "gemini") : v; D.yzSonuc = null; kaydet(); ciz();

@@ -23,7 +23,7 @@ DENEME = bool(os.environ.get("SUFLOR_AYAR") or os.environ.get("SUFLOR_EV"))
 def acik(ayar):
     if DENEME: return str(ayar.get("teshis_adres") or "").startswith("http://127.0.0.1:")
     return True
-KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "toplanti.py", "saglik.py", "kaynak.py", "agir-kilit.py", "duman.py", "bellek.py", "sozluk.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "beyin.py", "bas-konus.py", "claude-giris.py", "sohbet.py", "uclu-sahne.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "saglayici.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "azure-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "tstt-golge-isci.py", "golge-tstt.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
+KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "toplanti.py", "saglik.py", "kaynak.py", "agir-kilit.py", "duman.py", "bellek.py", "sozluk.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "beyin.py", "bas-konus.py", "claude-giris.py", "sohbet.py", "uclu-sahne.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "saglayici.py", "profil.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "azure-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "tstt-golge-isci.py", "golge-tstt.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
                  "content.js", "platform-teams.js", "background.js", "offscreen.js", "mic-main.js", "popup.js", "launcher.js")
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 SOZLUK_DOSYA = os.path.join(_BURASI, "teshis-sozluk.txt")
@@ -131,7 +131,7 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          "adim": ADIMLAR, "birakilan": ADIMLAR, "sonuc": {"bitti", "yarida", "hazir", "hata", "yok", "iniyor", "secilmedi", "onceden"},
          "neden": {"abonelik", "giris", "hata", "zaman", "yok", "kurulamadi", "baska_hesap"}, "mikrofon": IZIN, "erisilebilirlik": IZIN, "ekran": IZIN, "takvim": _DURUMLAR,
          "ses_motoru": {"mac", "piper", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
-         "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"}, "calisan_motor": {"mlx", "cpp"},  # S188: haftalık whisper_cpp'de son açılan motor
+         "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"}, "kurulum_profil": {"hafif", "tam"}, "calisan_motor": {"mlx", "cpp"},  # S188: haftalık whisper_cpp'de son açılan motor
          "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"},
          **{"beyin_" + i: {"claude-code", "gemini", "ozel", "ollama", ""} for i in ("varsayilan", "konus", "ceviri", "proje_karti")}}  # Faz 11: yalnız seçenek (ortam)

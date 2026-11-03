@@ -61,8 +61,25 @@ def gen(p): return os.path.expanduser(p.replace("~", EV, 1)) if p.startswith("~"
 # ---------- Mac ----------
 _MAC = {}
 BELLEK_KARARLI_GB = 16  # S173 (30 Ekim): 16 GB altı kararlı sayılmaz (uyarı, devam edilir); Intel desteklenmez (kurulum durur)
-def donanim_durum(arm, gb):  # → "intel" (durdurur) | "az_bellek" (uyarı) | "tamam"; sihirbazın Mac adımı bunu gösterir
-    return "intel" if not arm else "az_bellek" if gb < BELLEK_KARARLI_GB else "tamam"
+BELLEK_HAFIF_GB = 8  # S188: bu ve altında sihirbaz hafif profili önerir (seçili gelir, kullanıcı "tam kurulum"a geçebilir)
+def donanim_durum(arm, gb):  # → "intel" (durdurur) | "hafif" (≤ 8 GB: hafif profil önerilir) | "az_bellek" (uyarı) | "tamam"; sihirbazın Mac adımı bunu gösterir
+    return "intel" if not arm else "hafif" if gb <= BELLEK_HAFIF_GB else "az_bellek" if gb < BELLEK_KARARLI_GB else "tamam"
+# S188 hafif profil tablosu ve uygulama işlevi aktarici/profil.py'de (relay.py de aynısını yükler); burada yalnız yükleme
+def _profil_yukle():
+    import importlib.util
+    sp = importlib.util.spec_from_file_location("suflor_profil", os.path.join(KOD, "aktarici", "profil.py")); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
+_PR = _profil_yukle(); PROFIL_HAFIF, profil_uygula = _PR.PROFIL_HAFIF, _PR.profil_uygula
+def profil_hafif(a=None): return (a if a is not None else ayar()).get("profil") == "hafif"
+def profil_ayarla(p):  # /api/profil: sihirbazın Mac adımındaki seçim hemen yazılır (indirmeler buna bakar)
+    v = p.get("profil") if p.get("profil") in ("hafif", "tam") else None
+    if v:
+        eski = profil_hafif()
+        def fn(a): profil_uygula(a, v)
+        ayar_degistir(fn)
+        if eski and v == "tam" and not DENEME and not (MODEL["p"] and MODEL["p"].poll() is None):  # hafiften tama: atlanan indirmeler (anlam modeli) tamamlanır; çalışan işlem varsa o zaten ayarı sonradan okur
+            os.makedirs(DESTEK, exist_ok=True)
+            MODEL["p"] = subprocess.Popen([PY, "-u", os.path.abspath(__file__), "modeller"], stdout=open(os.path.join(DESTEK, "modeller-kur.log"), "a"), stderr=subprocess.STDOUT, start_new_session=True)
+    return {"profil": ayar().get("profil") or "tam"}
 def mac():
     if not _MAC:
         mv = platform.mac_ver()[0] or "0"
@@ -149,6 +166,7 @@ def ollama_durum():
         return d if d.get("durum") == "hata" else {"durum": "yok", "yuzde": 0}
     return d if d.get("durum") == "iniyor" else {"durum": "iniyor", "yuzde": 0}
 def ollama_baslat():  # /api/ollama/baslat: araç (~181 MB) + model (~3,3 GB) ayrı süreçte; sihirbaz kapansa da sürer
+    if profil_hafif(): return {"durum": "hata", "yuzde": 0, "mesaj": "hafif profilde yerel model kapalı"}  # S188
     if (OLLAMA["p"] and OLLAMA["p"].poll() is None) or ollama_durum().get("durum") == "hazir": return ollama_durum()
     if DENEME: return {"durum": "iniyor", "yuzde": 0}
     try: os.remove(ollama_durum_yol())
@@ -504,6 +522,7 @@ def _pocket_son():
     except OSError: return ""
     return next((x for x in reversed(sat) if x.startswith("Not:")), sat[-1] if sat else "")[:200]
 def pocket_baslat():  # /api/pocket/baslat: seçim kaydedilir (pocket_iste), kurulum ayrı süreçte
+    if profil_hafif(): return pocket_durum()  # S188: hafif profilde yerel ses kurulmaz (Mac sesi)
     if pocket_kurulu() or (POCKET["p"] and POCKET["p"].poll() is None): return pocket_durum()
     ayar_degistir(lambda a: False if a.get("pocket_iste") else a.update(pocket_iste=True))
     if DENEME and not os.environ.get("SUFLOR_TEST_POCKET"): return pocket_durum()  # deneme sihirbazı 1,3 GB indirmez
@@ -690,6 +709,8 @@ def tamamla(c, dil):
     except OSError as e: adlar = []; sonuc["asistan_hata"] = f"Asistan dosyası yazılamadı: {e}"
     if adlar: a["whisper_terimler"] = list(dict.fromkeys(adlar + a["whisper_terimler"]))[:60]  # asistanın adı konuşma tanımada doğru yazılsın
     a.setdefault("claude_model", "sonnet")
+    if c.get("profil") in ("hafif", "tam"): profil_uygula(a, c["profil"])  # S188: Mac adımındaki seçim (yalnız ≤ 8 GB'ta sorulur; yoksa mevcut profil kalır)
+    if c.get("yz") == "ollama" and profil_hafif(a): c = dict(c, yz="claude-code")  # S188: hafif profilde yerel model seçilemez
     if c.get("yz") in SG.SG_SECENEK:  # Faz 11: "Yapay zekâ bağla" adımı → beyin.varsayilan (iş başına seçim panodaki ⚙ Ayarlar'da); Claude Code seçilince dokunulmaz
         h = SG.sg_yaz(a, {"varsayilan": c["yz"]})
         if h: sonuc["uyarilar"] = sonuc.get("uyarilar", []) + [h]
@@ -896,6 +917,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/ollama/baslat": return self._json(ollama_baslat())
         if yol == "/api/takvim": return self._json(takvim_ayarla(p.get("adresler"), p.get("cikar")))
         if yol == "/api/eposta": return self._json(eposta_ayarla(p.get("eposta"), p.get("eposta_adres")))
+        if yol == "/api/profil": return self._json(profil_ayarla(p))
         if yol == "/api/pocket/baslat": return self._json(pocket_baslat())
         if yol == "/api/asistan/dinle": return self._json(asistan_dinle(p, str(p.get("dil") or "tr")))
         if yol == "/api/kur/tamamla": return self._json(tamamla(p.get("cevap") or {}, p.get("dil") or "tr"))
@@ -1105,12 +1127,15 @@ def cevir_kur(ort):
     md = os.path.join(ort, "cevir-modeller")
     venv_ok = bool((r := sessiz(vpy, "-c", f"from importlib.metadata import version as v; import ocrmac; assert v('docling') == '{CEVIR_DOCLING}'")) and r.returncode == 0)
     model_ok = os.path.isdir(os.path.join(md, "docling-project--docling-layout-heron")) and os.path.isdir(os.path.join(md, "docling-project--docling-models"))
+    hafif = profil_hafif()  # S188: hafif profilde anlam modeli (~1,1 GB) inmez ve açılmaz; arama yalnız sözcükle (ayar anlam_arama: false)
     am = os.path.join(ort, "anlam-modeller"); anlam_ok = bool(glob_(os.path.join(am, "hub", "models--intfloat--multilingual-e5-base", "snapshots", "*", "model.safetensors")))
     venv_ok = venv_ok and bool((r := sessiz(vpy, "-c", "import sentence_transformers")) and r.returncode == 0)
     if venv_ok and os.access(ort, os.W_OK) and not ((r := sessiz(vpy, "-c", "import xlrd")) and r.returncode == 0):
         # v0.121.0: eski Excel (.xls) — kurulu ortama yalnız bu küçük paket (~100 KB; Docling .xls için LibreOffice ister)
         r = subprocess.run([vpy, "-m", "pip", "install", "-q", "--no-deps", f"xlrd=={CEVIR_XLRD}"], capture_output=True, timeout=300)
         say("✓ eski Excel (.xls) okuyucu eklendi" if not r.returncode else "Not: eski Excel (.xls) okuyucu kurulamadı — .xls dosyaları aranamaz, sonraki güncellemede yeniden denenir")
+    if venv_ok and model_ok and hafif:
+        say("✓ belge çevirme ortamı var (hafif profil: anlam araması kapalı)"); return
     if venv_ok and model_ok and anlam_ok:
         if os.access(am, os.W_OK): anlam_refs_yaz(am)
         say("✓ belge çevirme ve anlam araması ortamı var" if anlam_dene(vpy, ort) else
@@ -1132,7 +1157,7 @@ def cevir_kur(ort):
                                 "d(Path(sys.argv[1]), with_layout=True, with_tableformer=True, with_code_formula=False, with_picture_classifier=False, "
                                 "with_rapidocr=False, with_easyocr=False)", md], capture_output=True, timeout=1800)
             if r.returncode: raise RuntimeError("modeller indirilemedi")
-        if not anlam_ok:
+        if not anlam_ok and not hafif:
             say("→ anlam araması modeli indiriliyor (~1,1 GB)…")
             r = subprocess.run([vpy, "-c", "from huggingface_hub import snapshot_download as s; s('intfloat/multilingual-e5-base', revision='d128750597153bb5987e10b1c3493a34e5a4502a', allow_patterns=['*.json', '*.txt', "
                                 "'sentencepiece.bpe.model', 'model.safetensors', '1_Pooling/*'])"], capture_output=True, timeout=1800, env=dict(os.environ, HF_HOME=am))
@@ -1141,8 +1166,8 @@ def cevir_kur(ort):
         r = subprocess.run([vpy, "-B", os.path.join(KOD, "cevir-isci.py")], input="", capture_output=True, text=True, timeout=300,
                            env=dict(os.environ, SUFLOR_ORTAK=ort))
         if '"hazir": true' not in r.stdout: raise RuntimeError("deneme açılışı: " + (r.stdout + r.stderr)[-160:])
-        if not anlam_dene(vpy, ort, zorla=True): raise RuntimeError("anlam modeli açılmadı (ayrıntı anlam-dene.log)")
-        sessiz("chmod", "-R", "go+rX", os.path.join(ort, "python312"), os.path.join(ort, "cevir-venv"), md, am); say("✓ belge çevirme ve anlam araması hazır (çevrimdışı açıldı)")
+        if not hafif and not anlam_dene(vpy, ort, zorla=True): raise RuntimeError("anlam modeli açılmadı (ayrıntı anlam-dene.log)")
+        sessiz("chmod", "-R", "go+rX", os.path.join(ort, "python312"), os.path.join(ort, "cevir-venv"), md, *([] if hafif else [am])); say("✓ belge çevirme hazır (hafif profil: anlam araması kapalı)" if hafif else "✓ belge çevirme ve anlam araması hazır (çevrimdışı açıldı)")
     except Exception as e: say(f"Not: belge çevirme kurulamadı ({str(e)[:160]}) — PDF ve görüntüler aranamaz, sonraki güncellemede yeniden denenir")
 ANLAM_REV = "d128750597153bb5987e10b1c3493a34e5a4502a"
 def anlam_refs_yaz(am):

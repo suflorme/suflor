@@ -230,4 +230,126 @@ with contextlib.redirect_stdout(io.StringIO()):
 ok("saatsiz toplantı ve karşı tarafın isteği iş açmaz, etiket silinir", not g_ and not g2_ and t_ == "Tamam." and t2_ == "Tamam." and len(EY) == n_)
 i2_ = n3["talimat_istem"]()
 ok("istemde toplantı etiketi ve 'hatırlatma değildir'", "[İLET toplanti:" in i2_ and "hatırlatma değildir" in i2_)
+# 3 Kasım: kişisel asistanın görev çıkarması (kişilik dosyasında gorev_cikar: evet) — kalıp tablosu; gerçek örnekler 3 Kasım 17.11 / 17.15 ve 13.00 / 13.12 (kişi adı kurgu)
+ng = dict(ns, AYAR={"talimat_hedefler": HEDEF}, TALIMAT_EN_COK=1000); exec(src[src.index("TALIMAT_FIIL ="):src.index("def _talimat_kayit")] + src[src.index("_GOREV_HIZLI ="):src.index("def _gorev_toplanti")], ng)
+def gk(m):  # → hitapsız sözün sınıfı: oturum:<hedef> | yapilacak | is-yok | istek-yok
+    c = ng["talimat_coz"](m)
+    if not c and not ng["GOREV_IS_RX"].search(m): return "is-yok"
+    if not ng["GOREV_ISTEK_RX"].search(m): return "istek-yok"
+    return f"oturum:{c[1]['ad']}" if c and c[0] == "oturum" else "yapilacak"
+for g, b in [("bu bulguyu geliştirme oturumuna iletli hemen lütfen.", "oturum:gelistirme"),  # 17:11:42 — eskiden "asistanın adıyla başlamalı" diye atıldı
+             ("sessiz kalırsa panoda uyaracaksın. Chrome'da başka bir mikrofon seçilir olabilir. Bugünkü sorunun kendinden", "is-yok"),  # 17:15:25 — ekrandaki metni sesli okuyordu
+             ("Saat 9.45'te. Deniz'e de ileteyim. Takvime eklesin.", "yapilacak"), ("takvim eklesin.", "yapilacak"),  # 13.12 / 13.00 deneme toplantıları
+             ("Toplantıyı takvime koymuştum zaten.", "istek-yok"), ("Geliştirme oturumuna ilettim bunu.", "is-yok"),
+             ("Yarın sabah Ayla'ya e-posta taslağı hazırla lütfen.", "yapilacak"), ("Bugün hava çok güzel.", "is-yok")]:
+    ok(f"görev (hitapsız): {g!r} → {gk(g)}", gk(g) == b)
+ok("bağlamsız ileti ('bu bulguyu', 'bunu') tanınır", ng["GOREV_BAGLAMSIZ_RX"].search("bu bulguyu geliştirme oturumuna iletli") and ng["GOREV_BAGLAMSIZ_RX"].search("Bunu ana oturuma ilet")
+   and not ng["GOREV_BAGLAMSIZ_RX"].search("panodaki düğme rengini koyulaştır"))
+def sk(m):  # sahipsiz iş: aday | sahipli | yok
+    if not ng["GOREV_SAHIPSIZ_RX"].search(m): return "yok"
+    return "sahipli" if ng["GOREV_SAHIPLI_RX"].search(m) or ng["GOREV_USTLEN_RX"].search(m) else "aday"
+for g, b in [("Raporun cumaya kadar müşteriye gönderilmesi lazım.", "aday"), ("Bu sözleşmeye kim bakacak?", "aday"), ("Bütçe tablosunun güncellenmesi gerek.", "aday"),
+             ("Birinin tedarikçiyi araması lazım.", "aday"), ("Someone needs to send the invoice.", "aday"),
+             ("Deniz'in sözleşmeyi kontrol etmesi lazım.", "sahipli"), ("Ben bakarım, raporun gönderilmesi lazım.", "sahipli"),
+             ("Bunu biraz daha konuşmamız lazım.", "yok"), ("Önce bir düşünmemiz gerekiyor.", "yok"), ("Ekibin bilgilendirilmesi lazım.", "aday"), ("Bugün hava güzel.", "yok")]:
+    ok(f"görev (sahipsiz): {g!r} → {sk(g)}", sk(g) == b)
+for g, b in [("Tamam, ben bakarım.", True), ("Deniz halletsin onu.", True), ("Bende.", True), ("I'll handle it.", True), ("Sen hazırla o zaman.", True), ("Evet, önemli.", False)]:
+    ok(f"üstlenme: {g!r}", bool(ng["GOREV_USTLEN_RX"].search(g)) == b)
+ok("Konuş istemi: bayrak yoksa görev çıkarma kuralı yok", "Görev çıkarma" not in nc["talimat_istem"]())
+nc["gorev_kisilikleri"] = lambda: [{"ad": "ATLAS"}]; nc["kisilikler"] = lambda: [{"ad": "ATLAS"}, {"ad": "KURUL"}]
+i3_ = nc["talimat_istem"](); del nc["gorev_kisilikleri"], nc["kisilikler"]
+ok("Konuş istemi: bayraklı kişilik 'yalnız ATLAS olarak' öneri hazırlar, 'ekleyeyim mi?' Suflor'da", "Görev çıkarma (yalnız ATLAS olarak cevap verirken)" in i3_ and "[İLET yapilacak:" in i3_ and "'ekleyeyim mi?'" in i3_)
+# 3 Kasım: sözlü saat → ISO (saat_coz); sabit "şimdi" = 3 Kasım 2026 Salı 14:00
+import datetime as _dt
+_S = _dt.datetime(2026, 11, 3, 14, 0)
+for g, b in [("14 Kasım 9.45", "2026-11-14T09:45"), ("14 Kasım saat 9:45", "2026-11-14T09:45"), ("Bunu 14 Kasım'daki toplantıda konuşalım, saat 9.45'te", "2026-11-14T09:45"),
+             ("yarın 10'da Deniz'i ara", "2026-11-04T10:00"), ("öbür gün sabah 9'da", "2026-11-05T09:00"), ("cuma günü raporu gönder", "2026-11-06T09:00"),
+             ("pazartesi 3'te toplantı", "2026-11-09T15:00"), ("cuma sabah 3'te", "2026-11-06T03:00"), ("yarın 6'da", "2026-11-04T18:00"), ("yarın 7'de", "2026-11-04T07:00"), ("cuma öğleden sonra 3", "2026-11-06T15:00"), ("yarın akşam 8", "2026-11-04T20:00"),
+             ("yarın sabah 10", "2026-11-04T10:00"), ("5 Aralık", "2026-12-05T09:00"), ("2 Ocak saat 11'de", "2027-01-02T11:00"), ("3 Kasım saat 13.30", "2026-11-03T13:30"),
+             ("salı 16'da", "2026-11-03T16:00"), ("salı 10'da", "2026-11-10T10:00"), ("saat 17'de ara", "2026-11-03T17:00"), ("saat 9'da ara", "2026-11-04T09:00"),
+             ("3 kişi geliyor", None), ("%30 artış", None), ("2.000 lira", None), ("30'da", None), ("rapor lazım", None), ("14.11.2026 tarihli", None), ("yarın izinliyim", "2026-11-04T09:00")]:
+    r = ns2["saat_coz"](g, _S) if "ns2" in globals() else None
+    if r is None and "ns2" not in globals():
+        ns2 = dict(ng); r = ns2["saat_coz"](g, _S)
+    ok(f"saat_coz: {g!r} → {r}", r == b)
+# yalıtılmış aktarıcı, kişilik dosyasında gorev_cikar: evet — hitapsız iş sözü ve sahipsiz iş onay kartına öneri; bayrak kalkınca bugünkü katı kural
+T2 = tempfile.mkdtemp(prefix="gorev-"); canli2 = os.path.join(T2, "canli"); os.makedirs(canli2); kis = os.path.join(T2, "kisilik.md")
+KIS = "---\nad: ATLAS\nhitap: Atlas\nhitap_bicimi: sen\n{bayrak}---\n## Kişilik: ATLAS\nKısa ve dostça konuşursun.\n"
+open(kis, "w", encoding="utf-8").write(KIS.format(bayrak="gorev_cikar: evet\n"))
+PORT2 = bos_port(PORT + 1); ay2 = os.path.join(T2, "ayar.json")
+json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT2, "uygulama": T2, "proje": T2, "talimat_hedefler": HEDEF, "kisilik": kis, "eposta": "gmail"}, open(ay2, "w"))
+for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T2)
+for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T2, d))
+log2 = os.path.join(T2, "relay.log"); env2 = dict(env, SUFLOR_AYAR=ay2)
+r2 = subprocess.Popen([sys.executable, "relay.py", "--dir", canli2, "--port", str(PORT2)], cwd=T2, env=env2, stdout=open(log2, "w"), stderr=subprocess.STDOUT)
+L2 = lambda: open(log2, encoding="utf-8", errors="replace").read()
+try:
+    for _ in range(60):
+        if os.path.exists(os.path.join(canli2, "kart-anahtari.txt")): break
+        time.sleep(0.2)
+    time.sleep(1); K2 = open(os.path.join(canli2, "kart-anahtari.txt")).read().strip()
+    def uc2(yol, v=None, ek=None):
+        h = {"X-Suflor-Anahtar": K2, **(ek or {})}
+        return json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT2}{yol}", data=json.dumps(v).encode() if v is not None else None, headers=h), timeout=10).read())
+    n2 = [0]
+    def satir2(kanal, metin, kim="Deniz T", bekle=0.4):
+        n2[0] += 1; uc2("/ingest", {"meeting": {"title": "Görev deneme"}, "source": "whisper", "entries": [{"id": f"g/{n2[0]}", "speaker": kim, "time": time.strftime("%H:%M:%S"), "text": metin, "kanal": kanal}]}); time.sleep(bekle)
+    NABIZ2 = threading.Event()
+    def nabiz2():
+        while not NABIZ2.is_set(): uc2("/ping", {"meeting": {"title": "Görev deneme"}, "call": True, "panel": True}); time.sleep(2)
+    threading.Thread(target=nabiz2, daemon=True).start(); time.sleep(0.8)
+    oneri = lambda parca: [c for c in uc2("/cards").get("cards") or [] if c.get("onay") and c.get("text", "").startswith("Öneri:") and parca in c.get("text", "")]
+    tc3 = lambda *a: (lambda r: r.stdout + r.stderr)(subprocess.run([sys.executable, "-B", os.path.join(T2, "toplanti-claude.py"), "--dir", canli2, "--relay", f"http://127.0.0.1:{PORT2}", *a], capture_output=True, text=True, env=env2, timeout=30))
+    # 17:11 gerçek dizisi (adlar çıkarıldı): istek satırı bağlamsız ("bu bulguyu") → önceki satırlarla tamamlanır
+    for m_ in ("Bu bulguyu hemen iletelim", "asistan konuşurken ben araya girince", "konuşması kesildi. Bunu"): satir2("ben", m_)
+    satir2("ben", "bu bulguyu geliştirme oturumuna iletli hemen lütfen.", bekle=1.0)
+    k_ = oneri("geliştirme oturumuna ileti")
+    ok("hitapsız ileti isteği atılmadı → öneri kartı (geliştirme oturumu)", len(k_) == 1 and "TALİMAT: hitapsız söz iş/talimat sayılmadı" not in L2() and "GÖREV: hitapsız iş sözü öneri adayı (oturum → gelistirme)" in L2())
+    ok("öneri iletisi bağlamla tamamlandı (önceki satırlar + istek)", bool(k_) and "araya girince" in k_[0]["text"] and "kesildi" in k_[0]["text"] and "Adımı söylemeden" in k_[0].get("why", ""))
+    ok("öneri sesle okunmadı, eylem kuyruğunda yerel öneri", "SES (deneme)" not in L2() and any(x["tur"] == "oturum" and x.get("yerel") and json.loads(x["ayrinti"]).get("oneri") for x in (uc2("/cards").get("eylem") or {}).get("liste") or []))
+    c_ = tc3("ilet", "gelistirme", "Test toplantısında asistan konuşurken araya girdim, konuşması kesildi; araya girme çalıştı.", "--duyulan", "bu bulguyu geliştirme oturumuna iletli hemen lütfen.")
+    kg_ = [c for c in uc2("/cards").get("cards") or [] if c.get("onay") and "geliştirme oturumu" in c.get("text", "")]
+    ok(f"toplantı oturumunun aynı isteği (aynı istek satırı) yinelenen sayıldı, ikinci kart yok ({len(kg_)} kart; {c_.strip()[:80]!r})", "yinelenmedi" in c_ and len(kg_) == 1)
+    uc2("/card-ack", {"id": k_[0]["id"], "status": "onaylandi"}, ek={"Origin": f"http://127.0.0.1:{PORT2}"}); time.sleep(1)
+    gy2 = os.path.join(canli2, "gelen", "gelistirme.jsonl")
+    ok("öneri onaylanınca gelen kutusuna yazıldı", os.path.exists(gy2) and "araya girince" in open(gy2, encoding="utf-8").read())
+    satir2("ben", "sessiz kalırsa panoda uyaracaksın. Chrome'da başka bir mikrofon seçilir olabilir. Bugünkü sorunun kendinden")  # 17:15:25
+    ok("17.15 örneği (ekrandaki metni sesli okuma) öneri olmadı", "GÖREV: hitapsız söz iş sayılmadı (iş fiili yok)" in L2() and not oneri("mikrofon"))
+    time.sleep(3.5)  # konu değişti (GOREV_BOSLUK_SN, deneme kipinde 3 sn): okunan ekran metni sonraki iletiye karışmaz
+    satir2("ben", "Bunu 14 Kasım'daki toplantıda konuşalım."); satir2("ben", "saat 9.45'te Deniz'e de iletelim, ileteyim."); satir2("ben", "takvim eklesin.", bekle=1.0)
+    k2_ = oneri("hatırlatma")
+    ok("13.00 örneği: 'takvim eklesin.' → hatırlatma önerisi, hemen önceki iki satırla (14 Kasım, 9.45), okunan ekran metni karışmadı",
+       len(k2_) == 1 and "14 Kasım" in k2_[0]["text"] and "9.45" in k2_[0]["text"] and "mikrofon" not in k2_[0]["text"])
+    zm_ = [json.loads(x["ayrinti"]).get("zaman") for x in (uc2("/cards").get("eylem") or {}).get("liste") or [] if x["tur"] == "yapilacak" and json.loads(x["ayrinti"]).get("oneri")]
+    ok(f"saatli hitapsız söz → öneride zaman dolu ({zm_})", any(z and z.endswith("-11-14T09:45") for z in zm_))
+    satir2("ben", "Bunu 14 Kasım'daki toplantıda konuşalım, saat 9.45'te. Takvime eklesin.", bekle=1.0)
+    ok("aynı iş yeniden söylenince ikinci öneri yok", len(oneri("hatırlatma")) == 1 and "GÖREV: benzer iş bu toplantıda önerildi" in L2())
+    satir2("ben", "Toplantıyı takvime koymuştum zaten.")
+    ok("geçmiş zaman ('koymuştum') öneri değil", "GÖREV: hitapsız söz iş sayılmadı (geçmiş zaman)" in L2())
+    # sahipsiz iş: kimse üstlenmezse öneri; üstlenilirse, sahibi söyleniyorsa ya da "konuşmamız lazım"sa yok; aynı iş ikinci kez önerilmez
+    satir2("karsi", "Raporun cumaya kadar müşteriye gönderilmesi lazım.", kim="Ayla Ö", bekle=4.5)
+    k3_ = oneri("sahipsiz")
+    ok("sahipsiz iş (karşı taraf) → kimse üstlenmedi → hatırlatma önerisi", len(k3_) == 1 and "Ayla Ö" in k3_[0]["text"] and "gönderilmesi lazım" in k3_[0]["text"] and "Kimse üstlenmedi" in k3_[0].get("why", ""))
+    zs_ = [json.loads(x["ayrinti"]).get("zaman") for x in (uc2("/cards").get("eylem") or {}).get("liste") or [] if x["tur"] == "yapilacak" and "sahipsiz" in x.get("baslik", "") + json.loads(x["ayrinti"]).get("metin", "")]
+    ok(f"sahipsiz iş 'cumaya kadar' → öneride zaman dolu ({zs_})", any(z and "T09:00" in z for z in zs_))
+    time.sleep(4); satir2("karsi", "Evet, raporun cumaya kadar müşteriye gönderilmesi lazım bence.", kim="Ayla Ö", bekle=4.5)
+    ok("aynı sahipsiz iş ikinci kez önerilmedi", len(oneri("sahipsiz")) == 1 and "zaten önerildi" in L2())
+    time.sleep(4); satir2("karsi", "Sunum dosyasının güncellenmesi lazım.", kim="Ayla Ö", bekle=1.0); satir2("ben", "Tamam, ben bakarım.", bekle=4.0)
+    ok("üstlenilen iş önerilmedi", not oneri("Sunum dosyası") and "GÖREV: sahipsiz iş adayı üstlenildi" in L2())
+    satir2("karsi", "Deniz'in sözleşmeyi kontrol etmesi lazım.", kim="Ayla Ö"); satir2("karsi", "Bunu biraz daha konuşmamız lazım.", kim="Ayla Ö", bekle=4.0)
+    ok("sahibi söylenen iş ve 'konuşmamız lazım' önerilmedi", "GÖREV: işin sahibi sözde var" in L2() and not oneri("sözleşmeyi") and not oneri("konuşmamız"))
+    # toplantı oturumu izliyorsa: öneri bekler, oturum o arada iş açtıysa açılmaz (çift kart yok)
+    uc2("/status", ek={"X-Suflor-Istemci": "izle"})
+    satir2("ben", "Bunu proje oturumuna ilet lütfen, sunumu cumaya çekelim.", bekle=0.3)
+    tc3("ilet", "proje", "Sunum cuma gününe çekilsin.", "--duyulan", "Bunu proje oturumuna ilet lütfen, sunumu cumaya çekelim."); time.sleep(3)
+    ok("toplantı oturumu izlerken iş açtı → asistanın önerisi açılmadı", "GÖREV: toplantı oturumu iş açtı" in L2() and not oneri("proje oturumuna"))
+    # kurumsal asistan: bayrak yok → bugünkü katı kural
+    time.sleep(1.1); open(kis, "w", encoding="utf-8").write(KIS.format(bayrak="")); time.sleep(0.3)
+    satir2("ben", "Bunu geliştirme oturumuna ilet lütfen, düğme rengi koyulaşsın.", bekle=1.0)
+    ok("bayrak yokken hitapsız söz bugünkü gibi atıldı", "TALİMAT: hitapsız söz iş/talimat sayılmadı (asistanın adıyla başlamalı) — \"Bunu geliştirme" in L2() and not oneri("düğme rengi"))
+    ok("aktarıcıda hata yok (görev)", "Traceback" not in L2())
+finally:
+    NABIZ2.set(); r2.terminate(); r2.wait(5)
+    if HATA or sys.exc_info()[0]: print("günlük:", log2)
+    else: shutil.rmtree(T2, ignore_errors=True)
 print("talimat:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

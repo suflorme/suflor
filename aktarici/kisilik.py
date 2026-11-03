@@ -15,6 +15,8 @@
 # v0.122.1 (kullanıcı, 23 Ekim: "sohbeti hep takvime bağlıyor"): takvim: soruya — Konuş bağlamına takvim ve "Sıradaki toplantı" bloğu yalnız soru zamanla,
 # takvimle ya da toplantıyla ilgiliyse ya da toplantı KISILIK_TAKVIM_YAKIN_DK içindeyse girer (kisilik_takvim_gerek). Yoksa (varsayılan "her") her soruda girer.
 # S93: yerel_ses: pocket:<model>:<ses> — kişiliğin Gemini dışındaki sesi (S92'den beri toplantı dışı ve kulağa okumalar yerel); Pocket'ta hız ayarı yok.
+# 3 Kasım: gorev_cikar: evet — kişisel asistan görev çıkarır (talimat.py gorev_*): toplantıda hitapsız iş sözü ve sahipsiz iş onay kartına öneri olur, Konuş'ta
+# konuşmadan çıkan iş "ekleyeyim mi?" diye sunulur. Satır yoksa (kurumsal asistan) iş yalnız adıyla seslenilince ya da açık istekle alınır.
 KISILIK_SURE_SN = 180
 _KIS = {"yol": None, "mt": None, "v": None, "uyari": None}  # geriye uyum: tek kişilikte eski alanlar (konus_istem kisilik_mt)
 _KIS_D = {}  # yol → {"mt", "v", "uyari"}
@@ -38,7 +40,7 @@ def _kisilik_oku(yol, rol):
     try:
         s = open(yol, encoding="utf-8").read()
         m = re.match(r"\s*---\s*\n(.*?)\n---\s*\n?(.*)\Z", s, re.S)
-        v = {"ad": None, "gorunen_ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "yerel_ses_en": None, "hiz": None, "ses_uslup": None, "ses_uslup_en": None, "azure_stil": None, "ses_etiket": False, "gerginlik_tonu": False, "takvim": "her", "kdili": False, "uclu_ad": None, "uclu_takilma": None, "uclu_bicim": None, "rol": rol, "metin": (m.group(2) if m else s).strip()}
+        v = {"ad": None, "gorunen_ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "yerel_ses_en": None, "hiz": None, "ses_uslup": None, "ses_uslup_en": None, "azure_stil": None, "ses_etiket": False, "gerginlik_tonu": False, "gorev_cikar": False, "takvim": "her", "kdili": False, "uclu_ad": None, "uclu_takilma": None, "uclu_bicim": None, "rol": rol, "metin": (m.group(2) if m else s).strip()}
         for sat in (m.group(1).splitlines() if m else []):
             k, _, d_ = sat.partition(":"); k = k.strip().lower(); d_ = d_.strip()
             if k in ("ad", "okunus", "tanitim", "selam"): v[k] = d_ or None
@@ -53,6 +55,7 @@ def _kisilik_oku(yol, rol):
             elif k == "azure_stil": v["azure_stil"] = d_.strip().lower() or None  # v0.129.0: Azure yedek sesinin varsayılan duygu biçimi (azure-ses.py AZURE_STILLER)
             elif k == "ses_etiket": v["ses_etiket"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.79.0: <chuckle> gibi sözsüz ses etiketleri (yalnız Gemini)
             elif k == "gerginlik_tonu": v["gerginlik_tonu"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.80.0: toplantı gerginliğine göre ton (yalnız Gemini sesinde)
+            elif k == "gorev_cikar": v["gorev_cikar"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # 3 Kasım: kişisel asistan hitapsız iş sözünden ve sahipsiz işten öneri çıkarır (talimat.py gorev_*)
             elif k == "takvim": v["takvim"] = "soruya" if d_.lower() in ("soruya", "soruda", "gerekince") else "her"  # v0.122.1: takvim bağlamı yalnız ilgili soruda
             elif k == "ses": v["ses"] = d_ or None  # v0.71.0: "piper" ya da Mac ses adı (say -v); yoksa ayardaki ses
             elif k == "yerel_ses_en": v["yerel_ses_en"] = d_ or None  # v0.101.3: İngilizce cümlelerin yerel sesi, ör. pocket:en:michael
@@ -154,6 +157,10 @@ def asistan_view():  # /status konus.asistan — pano: "<adlar> dinliyor" / "<ad
     if not toplanti_var(): return None
     return {"acik": asistan_toplanti(), "adlar": asistan_adlari(), "katilan": [gorunen_ad_bul(a) for a in asistan_katilan()]}
 def kisilik_ad(): k = kisilik(); return k["ad"] if k else None
+def gorev_kisilikleri(): return [k for k in kisilikler() if k.get("gorev_cikar")]  # kişilik dosyasında "gorev_cikar: evet" olanlar (kişisel asistan; kurumsal asistanda yok)
+def gorev_cikar_acik():  # toplantıda hitapsız söz ve sahipsiz iş: toplantı kişiliğinin (ayar kisilik) bayrağı — kurumsal asistan toplantıdaysa bugünkü katı kural
+    k = next((x for x in kisilikler() if x["rol"] == "toplanti"), None)
+    return bool(k and k.get("gorev_cikar"))
 def kis_t(notr, kisilikli):  # sabit sesli cümle: kişilik açıkken "siz"li sürümü (Türkçe arayüzde; kişilik "sen" diyorsa nötr); İngilizce ayrı _t ile
     k = kisilik(); return kisilikli if k and k.get("bicim") != "sen" and ARAYUZ_DILI == "tr" else notr
 _KIS_TANIT = {"yuklendi": False, "adlar": set()}

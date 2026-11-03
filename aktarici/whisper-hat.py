@@ -347,6 +347,8 @@ def _istem_dokumler():  # son 3 toplantı dökümünün sonu (sadeleştirilmiş)
                 h.seek(0, 2); n = h.tell(); h.seek(max(0, n - 150000)); m += _sd(h.read().decode("utf-8", "ignore")) + "\n"
     except Exception: pass
     _ISTEM_ZEL["metin"] = m; return m
+def _onceki_istem(s):  # isteme giden önceki metin kopyası: binlik ayraçlı sayı ayraçsız ("290.000" → "290000"); döküm satırı değişmez. Whisper "290.000" görünce "%83" yerine "%83.000" gibi sayı uyduruyordu (13:09 toplantısı, 3 Kasım)
+    return re.sub(r"(?<![\d.])\d{1,3}(?:\.\d{3})+(?!\d)(?!\.\d)", lambda m: m.group(0).replace(".", ""), s or "")
 def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben=""):
     # → [(kategori, terim)] önem sırasında (yukarıdaki kural). Saf işlev: dış durum almaz (test/istem-sira.py). ter: sözlük terimleri; ag: gündem sözlüğü;
     # hz: hazır kartlar; ks: kişilikler [{ad, gorunen_ad, hitap}]; kisiler: bu toplantının ad listesi (öncelik sırasıyla); ayar_ek: sabit + ayar terimleri.
@@ -569,7 +571,7 @@ def _isci_dongu():
         # "yazayım mı?" sorusuna bas-konuş cevabı istemsiz: whisper.cpp ad/terim listeli istemle kısa "Evet."i "Evit." yazıyordu, ayırıcı tanımıyordu
         # (20 Ekim, test34; istemsiz doğru). Cevap sözcüklerini isteme koymak olmaz: işçi istemde geçen tek sözü "istemi geri okuma" diye atar.
         istem = "" if is_.get("bas") and SORU.get("aktif") else istem_metni()
-        istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem, "onceki": (k.onceki if k else "")[-150:],
+        istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem, "onceki": _onceki_istem((k.onceki if k else "")[-150:]),
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
         if is_["kanal"] != "karsi": istek["hitap"] = _hitap_adlari() or ["Suflor", "Suflör", "Süflör"]  # v0.140.0: yalnız asistan adı olan parça istem yankısı sayılmaz
         if istem: istek["kisiler"] = STATE["whisper"].get("istem_kisi") or []  # 1 Kasım: kişi adları istemde; tek başına "Ayşe." konuşma sesiyle gelirse atılmaz
@@ -997,15 +999,28 @@ def taslak_tstt_bitti(kanal):
         s = _TSTT.get(kanal); d = TASLAK.get(s["id"]) if s else None
         if s: s["bitti"] = True
         if d: d["omur"] = TASLAK_TSTT_OMUR_SN; d["son"] = time.time()
-def taslak_tuket(kanal, t1):
-    # Whisper satırı yazılmadan önce: bu kanalda parçanın bitişinden (t1) önce görünmüş taslakların kelimeleri tüketilir.
+def _tk_soz(w): return re.sub(r"[^\w]", "", w.replace("İ", "i").replace("I", "ı").lower())
+def _tstt_tuketim(d, metin):
+    # 3 Kasım ölçümü: tstt taslağı satır yazılırken parçanın bitişinden SONRA söylenen sözcükleri de taşıyor (ortanca 4–7); hepsi tüketilince bir sonraki
+    # satıra (~5 sn) kadar ekrandan gidiyordu. Yalnız satırın son iki sözcüğüne (ya da 4+ harfli son sözcüğüne) kadar tüketilir; arama, satırın sözcük sayısından
+    # en çok 6 sözcük ötesine kadar (yinelenen öbek ileride yanlış eşleşmesin); bulunamazsa satırın sözcük sayısı kadar.
+    w = [_tk_soz(x) for x in d["text"].split()]; n = len(w); s = [x for x in (_tk_soz(x) for x in (metin or "").split()) if x]
+    if not s: return n
+    ust = min(n, d["tuketilen"] + len(s) + 6)
+    for k in (2, 1):
+        if len(s) < k or (k == 1 and len(s[-1]) < 4): continue
+        for p in range(ust, d["tuketilen"] + k - 1, -1):
+            if w[p - k:p] == s[-k:]: return p
+    return min(n, d["tuketilen"] + len(s))
+def taslak_tuket(kanal, t1, metin=None):
+    # Whisper satırı yazılmadan önce: bu kanalda parçanın bitişinden (t1) önce görünmüş taslakların kelimeleri tüketilir (tstt taslağında satırın bittiği sözcüğe kadar).
     # Döner: tüketilen en eski taslağın ilk görülme anı (epoch) — "taslak öne alma" ölçümü için; yoksa None.
     ilk = None
     with T_LOCK:
         for d in TASLAK.values():
             n = len(d["text"].split())
             if d["kanal"] != kanal or d["ilk"] > t1 + (0.5 if d.get("src") == "tstt" else 1.0) or d["tuketilen"] >= n: continue
-            ilk = d["ilk"] if ilk is None else min(ilk, d["ilk"]); d["tuketilen"] = n
+            ilk = d["ilk"] if ilk is None else min(ilk, d["ilk"]); d["tuketilen"] = max(d["tuketilen"], _tstt_tuketim(d, metin)) if d.get("src") == "tstt" and metin else n
     return ilk
 def taslak_view(baslik=None, tstt=False):
     # tstt=True yalnız panonun gösterimi (/status, /taslak?pano=1); izle'ye giden /taslak tstt taslağını içermez
@@ -1119,7 +1134,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
         if kim == ODA_AD or (b is not None and b < ODA_ESIK):
             komut_ses = "uymuyor"; print(f"SES KİLİDİ: 'Claude:' komutu kullanıcının sesine benzemiyor (benzerlik {b if b is not None else '-'}) — komut sayılmaz")
         elif b is not None: komut_ses = "uyuyor"
-    ta = taslak_tuket(kanal, is_["t1"])
+    ta = taslak_tuket(kanal, is_["t1"], metin)
     # satır başına gecikme bileşenleri (sn) — kuyruk bekleme, işçiye gidiş-dönüş, işçinin kendi süresi, ses işçisi
     # bekleme, yankı bekletmesi, toplam (parça sonu → yazım). olcum.py toplanti bunları ayrı ayrı özetler.
     t_now = time.time(); g = lambda a, b: round(is_[b] - is_[a], 2) if is_.get(a) and is_.get(b) else None

@@ -61,6 +61,8 @@ class Aktarici:
     def ses_parca(self): return self.istek("/ses-yerel", {"t": int(time.time() * 1000), "pcm": base64.b64encode(b"\0\0" * 1600).decode()}, "ses-anahtari.txt")
     def ping(self, pl="meet", call=True, baslik="abc-defg-hij", sekme="t1"):
         return self.istek("/ping", {"ver": "0.149.0", "meeting": {"title": baslik}, "panel": False, "rows": 0, "platform": pl, "call": call, "captions": call, "sekme": sekme, "mic": {"on": call}})
+    def cik(self, pl="meet", baslik="abc-defg-hij", sekme="t1"):  # çağrıdan çıkış: tek false nabzı yetmez (NABIZ_BITIS_SN) — iki false, aralarında ≥ 3 sn
+        self.ping(pl, False, baslik, sekme); time.sleep(3.2); return self.ping(pl, False, baslik, sekme)
     def whisper(self, metin, t0=None, kanal="karsi"):
         t0 = t0 or time.time()
         return self.istek("/ingest", {"meeting": {"title": "yok sayılır"}, "source": "whisper", "entries": [{"id": f"w/{t0}", "speaker": "Karşı taraf", "time": "10:00", "text": metin, "kanal": kanal, "t0": t0, "t1": t0 + 1}]})
@@ -348,7 +350,7 @@ def senaryo_O():
         r = R.istek("/baslat", {"konu": "Toplantı bir", "platform": "teams"}); DUR.update(sekme="t1", baslik="Toplantı bir | Microsoft Teams"); time.sleep(1.5)
         R.altyazi("birinci toplantının satırı", DUR["baslik"]); d1 = R.durum()
         ok("O1 1. toplantı sürüyor, oturum açık (sahte)", r.get("ok") and d1.get("durum") == "suruyor" and d1.get("oturum") and acildi() == 1, f"{r} {d1}")
-        f1 = d1.get("dosya"); DUR["sekme"] = None; R.ping("teams", False, "Toplantı bir | Microsoft Teams", "t1")
+        f1 = d1.get("dosya"); DUR["sekme"] = None; R.cik("teams", "Toplantı bir | Microsoft Teams", "t1")
         ok("O2 1. toplantı bitti", bekle(lambda: R.durum()["durum"] == "bos", 40), str(R.durum()))
         ok("O3 oturum önceki toplantının sonunu yapıyor (/status oturum_dosya = 1.)", R.durum().get("oturum_dosya") == f1, str(R.durum()))
         r = R.istek("/baslat", {"konu": "Toplantı iki", "platform": "teams"})
@@ -363,7 +365,7 @@ def senaryo_O():
         ok("O8 ertelenen oturum açıldı (önceki toplantının özeti hazır)", bekle(lambda: acildi() == 2, 15) and "ertelenen toplantı oturumu açılıyor (önceki toplantının özeti hazır)" in R.gunluk()
            and "ertelenen oturum açılmadı" not in R.gunluk(), R.gunluk()[-900:])
         d = R.durum(); ok("O9 oturum artık 2.'nin: oturum_dosya yok, kayıtta oturum var", not d.get("oturum_dosya") and d.get("oturum") and not d.get("neden"), str(d))
-        DUR["sekme"] = None; R.ping("teams", False, "Toplantı iki | Microsoft Teams", "t2")
+        DUR["sekme"] = None; R.cik("teams", "Toplantı iki | Microsoft Teams", "t2")
         ok("O10 2. bitti", bekle(lambda: R.durum()["durum"] == "bos", 40), str(R.durum()))
         DUR.update(sekme="t3", baslik="Toplantı üç | Microsoft Teams"); time.sleep(1.5); R.altyazi("üçüncü toplantının satırı", DUR["baslik"])
         ok("O11 3. kendiliğinden tanındı, oturum ertelendi (eski oturuma bağlanmadı)", bekle(lambda: R.durum().get("durum") == "suruyor" and "OTO: " in R.gunluk()
@@ -386,7 +388,7 @@ def senaryo_P():
         iz = subprocess.Popen([sys.executable, "-u", "-B", os.path.join(T, "toplanti-claude.py"), "--dir", R.canli, "--relay", R.U, "izle"], cwd=T, stdout=open(izl, "w"), stderr=subprocess.STDOUT,
                               env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json")))
         ok("P1 izle 1. toplantının dosyasında", bekle(lambda: f"DOSYA: {f1}" in izle_oku(), 30), izle_oku()[-800:])
-        DUR["sekme"] = None; R.ping("teams", False, DUR["baslik"], "t1")
+        DUR["sekme"] = None; R.cik("teams", DUR["baslik"], "t1")
         ok("P2 1. bitiyor (çağrıdan çıkıldı)", bekle(lambda: R.durum()["durum"] == "bitiyor", 10), str(R.durum()))
         r = R.istek("/baslat", {"konu": "Toplantı iki", "platform": "teams"}); d = R.durum(); f2 = d.get("dosya")
         ok("P3 2. Başlat: 1. kapandı, 2. açıldı, oturum ertelendi, oturum_dosya = 1.", r.get("ertelendi") and f2 != f1 and d.get("oturum_dosya") == f1, f"{r} {d}")
@@ -404,7 +406,7 @@ def senaryo_P():
     try:
         R.istek("/baslat", {"konu": "Toplantı bir", "platform": "teams"}); DUR.update(sekme="t1", baslik="Toplantı bir | Microsoft Teams"); time.sleep(1.5)
         R.altyazi("birinci toplantının satırı", DUR["baslik"]); f1 = R.durum().get("dosya")
-        DUR["sekme"] = None; R.ping("teams", False, DUR["baslik"], "t1"); bekle(lambda: R.durum()["durum"] == "bitiyor", 10)
+        DUR["sekme"] = None; R.cik("teams", DUR["baslik"], "t1"); bekle(lambda: R.durum()["durum"] == "bitiyor", 10)
         R.istek("/baslat", {"konu": "Toplantı iki", "platform": "teams"}); DUR.update(sekme="t2", baslik="Toplantı iki | Microsoft Teams"); time.sleep(1.5)
         R.istek("/son-toplanti", {"ozet": ozet("Deneme-bir.md"), "baslik": "Toplantı bir", "dosya": f1}); t = time.time()
         ok("P8 özetten sonra eski oturumun turu bitirilir, sonra 2.'nin oturumu açılır", bekle(lambda: acildi() == 2, 20) and time.time() - t >= 3 and son_dosya() == f1
@@ -414,13 +416,43 @@ def senaryo_P():
     T, R, DUR, acildi, ozet, son_dosya = oturumlu({"toplanti_terminal": True})
     try:
         R.istek("/baslat", {"konu": "Toplantı bir", "platform": "teams"}); DUR.update(sekme="t1", baslik="Toplantı bir | Microsoft Teams"); time.sleep(1.5)
-        R.altyazi("birinci toplantının satırı", DUR["baslik"]); DUR["sekme"] = None; R.ping("teams", False, DUR["baslik"], "t1"); bekle(lambda: R.durum()["durum"] == "bitiyor", 10)
+        R.altyazi("birinci toplantının satırı", DUR["baslik"]); DUR["sekme"] = None; R.cik("teams", DUR["baslik"], "t1"); bekle(lambda: R.durum()["durum"] == "bitiyor", 10)
         r = R.istek("/baslat", {"konu": "Toplantı iki", "platform": "teams"})
         ok("P9 terminal kipi: 2. Başlat ertelenmedi, Terminal oturumu yazıldı", r.get("ok") and not r.get("ertelendi") and "Toplantı iki · rol" in R.gunluk() and "Terminalde Claude" in R.gunluk().split("Toplantı iki")[-1]
            and not R.durum().get("oturum_dosya"), f"{r} " + R.gunluk()[-600:])
     finally: DUR["sekme"] = "dur"; R.kapat(); R.sil()
 
-for s in [s for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H, senaryo_L, senaryo_M, senaryo_N, senaryo_O, senaryo_P) if not sys.argv[1:] or s.__name__[8:] in sys.argv[1:]]:  # ör. test/toplanti.py L M
+def senaryo_Q():
+    print("— Q) tek call=false nabzı toplantıyı bitirmez; iki false ≥ 3 sn bitirir; açık bitiş beklemez (3 Kasım 17:12)")
+    R = Aktarici([])
+    try:
+        R.ping("teams", True, "Toplantı | Microsoft Teams", "t1"); R.altyazi("ilk söz", "Toplantı | Microsoft Teams")
+        ok("Q1 sürüyor", bekle(lambda: R.durum().get("durum") == "suruyor", 10), str(R.durum()))
+        R.ping("teams", False, "Toplantı | Microsoft Teams", "t1"); R.ping("teams", True, "Toplantı | Microsoft Teams", "t1")  # tek false + hemen true
+        time.sleep(0.5); R.ping("teams", False, "Toplantı | Microsoft Teams", "t1"); time.sleep(3.3); R.ping("teams", True, "Toplantı | Microsoft Teams", "t1")  # sayaç sıfırlandı: ilk false 3 sn önce ama araya true girdi
+        R.ping("teams", False, "Toplantı | Microsoft Teams", "t1")
+        time.sleep(1); g = R.gunluk()
+        ok("Q2 tek false nabzı: durum sürüyor, özet başlamadı", R.durum().get("durum") == "suruyor" and "ÖZET (hızlı)" not in g and "tarayıcıda çağrıdan çıkıldı" not in g, str(R.durum()))
+        R.ping("teams", False, "Toplantı | Microsoft Teams", "t1"); time.sleep(1)  # iki false ama aralık < 3 sn
+        ok("Q3 iki false ama < 3 sn: hâlâ sürüyor", R.durum().get("durum") == "suruyor" and "ÖZET (hızlı)" not in R.gunluk(), str(R.durum()))
+        time.sleep(2.4); R.ping("teams", False, "Toplantı | Microsoft Teams", "t1")  # ilk false'tan ≥ 3 sn, ardışık
+        ok("Q4 ardışık iki false, ≥ 3 sn: bitiyor", bekle(lambda: R.durum().get("durum") == "bitiyor", 5), str(R.durum()))
+        ok("Q5 çıkış nedeni günlükte", "suruyor → bitiyor (tarayıcıda çağrıdan çıkıldı)" in R.gunluk(), R.gunluk()[-500:])
+    finally: R.kapat(); R.sil()
+    R = Aktarici([])
+    try:
+        R.ping("teams", True, "Toplantı | Microsoft Teams", "t1"); R.altyazi("ilk söz", "Toplantı | Microsoft Teams")
+        bekle(lambda: R.durum().get("durum") == "suruyor", 10)
+        t = time.time(); R.istek("/toplanti", {"islem": "bitir"})
+        ok("Q6 POST bitir: anında bitiyor (bekleme yok)", R.durum().get("durum") in ("bitiyor", "bos") and time.time() - t < 3, str(R.durum()))
+    finally: R.kapat(); R.sil()
+    R = Aktarici([])
+    try:
+        R.masaustu(True); R.whisper("ilk söz"); R.masaustu(False)
+        ok("Q7 masaüstü toplantı bitişi: anında bitiyor", R.durum().get("durum") == "bitiyor", str(R.durum()))
+    finally: R.kapat(); R.sil()
+
+for s in [s for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H, senaryo_L, senaryo_M, senaryo_N, senaryo_O, senaryo_P, senaryo_Q) if not sys.argv[1:] or s.__name__[8:] in sys.argv[1:]]:  # ör. test/toplanti.py L M
     try: s()
     except Exception as e: ok(f"{s.__name__} istisna {e.__class__.__name__}: {e}", False)
 print(f"toplantı kaydı: {len(HATA)} sorun" + "".join(f"\n  KALDI: {h}" for h in HATA) if HATA else "toplantı kaydı: ✓ tüm senaryolar")

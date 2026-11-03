@@ -91,6 +91,15 @@ try:
     ok("görünen ad: hitap listesinde iç ad, yazılışlar ve görünen ad var", all(a in ns3["kisilik"]()["hitap"] for a in ("ZETA", "Zeta", "Kemal")))
     ok("görünen ad: dökümdeki etiket görünen adla", ns3["asistan_buyuk"]() == "KEMAL" and ns3["asistan_goster"]("Claude: saat kaç") == "Kemal, saat kaç" if "asistan_goster" in ns3 else ns3["asistan_buyuk"]() == "KEMAL")
     ok("görünen ad: okunuş yokken iç ad görünen adla okunur", ns3["kisilik_telaffuz"]("ZETA burada") == "Kemal burada")
+    # 3 Kasım: kişisel asistanın görünen adı Marvin, iç adı (dosya, "Yalnız <ad>" bölümü) NOVA; "Marvin," birincil, eski "Nova,"/"NOVA," ve Whisper yazımları hâlâ tanınır
+    kd5 = os.path.join(T, "kisilik5.md")
+    open(kd5, "w", encoding="utf-8").write("---\nad: NOVA\ngorunen_ad: Marvin\nhitap: Marvin, NOVA, Nova, Novva, Marvın\nokunus: Marvin\n---\n## Kişilik: Marvin\nAdın Marvin. MARVIN-İŞARETİ\n")
+    ns5 = {k_: v_ for k_, v_ in ns3.items() if k_ in ("re", "os", "json", "time", "collections", "print", "_t", "ARAYUZ_DILI", "BASE", "_KS", "TOP", "toplanti_var")}; ns5["AYAR"] = {"kisilik": kd, "kisilik_toplanti_disi": kd5}; ns5["_KSEC"] = {"ad": None, "t": 0.0}; ns5["_KIS_TANIT"] = {"yuklendi": False, "adlar": set()}; ns5["_KISILIK"] = {}
+    exec(ks, ns5)
+    km = ns5["kisilik"]("NOVA"); ok("Marvin: görünen ad Marvin, iç ad NOVA, okunuş Marvin", km and km["gorunen_ad"] == "Marvin" and km["ad"] == "NOVA" and "Marvin" in ns5["asistan_adlari"]() and ns5["kisilik_telaffuz"]("NOVA burada") == "Marvin burada")
+    for soz in ("Marvin, bugün ne var?", "Nova, bugün ne var?", "NOVA, bugün ne var?", "Novva, bugün ne var?", "Marvın, bugün ne var?"):
+        kb, kalan = ns5["kisilik_hitap_bul"](soz); ok(f"Marvin: «{soz.split(',')[0]},» hitabı tanındı (iç ad NOVA)", kb and kb["ad"] == "NOVA" and kalan == "bugün ne var?")
+    kb, _ = ns5["kisilik_hitap_bul"]("Dün Nova'yla konuştum"); ok("Marvin: cümle ortası ad seçmez", kb is None)
     ns4 = dict(ns3); ns4["AYAR"] = {"kisilik": kd2}; ns4["_KSEC"] = {"ad": None, "t": 0.0}; ns4["_KIS_TANIT"] = {"yuklendi": False, "adlar": set()}; ns4["_KISILIK"] = {}; exec(ks, ns4)
     ok("görünen ad: alan yokken iç ad (Matlas)", ns4["asistan_ad"]() == "Matlas" and ns4["asistan_adlari"]() == ["Matlas"])
     ns["STATE"]["meeting"] = "T2"; ok("S94: yeni toplantıda katılım sıfırlanır", ns["asistan_katilan"]() == [])

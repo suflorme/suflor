@@ -69,11 +69,11 @@ ns["_GL"]["cokme"] = [time.time()] * 3; ns["_golge_coktu"]()
 kontrol("saatte 3'ten fazla çökünce durdu ve bir saat beslenmez", G["durum"] == "durdu" and ns["_GL"]["dur"] > time.time() + 3000)
 ns["_GL"]["dur"] = 0
 # d) anlık ilk yazı (S191): ara satırları taslak deposuna, jsonl'a değil; Whisper tüketir; altyazı önceliği; ayar kapalı; gizli
-import datetime
+import datetime, re
 kaynak = open(os.path.join(KOD, "aktarici", "whisper-hat.py"), encoding="utf-8").read()
 parca = kaynak[kaynak.index("T_LOCK = threading.Lock(); TASLAK"):kaynak.index("# --- Yankı ayıklama")]
 DUR = []; OKUMA = [True]
-ns2 = dict(threading=threading, time=time, datetime=datetime, STATE={"meeting": "Deneme"}, AYAR={}, ben_adi=lambda: "Test Kullanıcı", gizli_acik=lambda: GIZLI[0], kume_oyla=lambda *a, **k: None,
+ns2 = dict(threading=threading, time=time, re=re, datetime=datetime, STATE={"meeting": "Deneme"}, AYAR={}, ben_adi=lambda: "Test Kullanıcı", gizli_acik=lambda: GIZLI[0], kume_oyla=lambda *a, **k: None,
            okuma_suruyor=lambda: OKUMA[0], okuma_dur_soz=lambda m, t=None: m.strip().lower() in ("bir dakika", "dur"), asistan_dur=lambda: DUR.append(1), _t=lambda tr, en: tr)
 exec(compile(parca, "taslak", "exec"), ns2)
 A = ns2["AYAR"]
@@ -96,6 +96,15 @@ ns2["taslak_tstt"]("karsi", "yeni söz", None)
 kontrol("yeni söz yeni kimlik alır, tüketilen sayı devralınmaz", [d["id"] for d in gor()] == ["tstt-karsi-2"] and gor()[0]["text"] == "yeni söz")
 ns2["taslak_tuket"]("karsi", time.time() - 5)  # söz Whisper parçasından sonra başladı: tüketilmez
 kontrol("parçadan sonra başlayan taslak tüketilmez", len(gor()) == 1)
+# satırın bittiği sözcüğe kadar tüketilir: parça sonundan sonra söylenenler ekranda kalır (3 Kasım ölçümü: ortanca 4–7 sözcük kayboluyordu)
+ns2["taslak_tstt_bitti"]("karsi"); ns2["taslak_tstt"]("karsi", "İkinci farkı ürün odaklı olmak demek. O", None)
+ns2["taslak_tuket"]("karsi", time.time(), "ikinci farkı ürün")
+kontrol("satırdan sonraki sözcükler taslakta kalır", [d["text"] for d in gor()] == ["odaklı olmak demek. O"])
+ns2["taslak_tstt"]("karsi", "İkinci farkı ürün odaklı olmak demek. O çıktıya biraz daha odaklı", None)
+ns2["taslak_tuket"]("karsi", time.time(), "odaklı olmak demek o çıktıya")
+kontrol("ikinci satır da kendi sonuna kadar tüketir (yinelenen 'odaklı' ileride eşleşmez)", [d["text"] for d in gor()] == ["biraz daha odaklı"])
+ns2["taslak_tuket"]("karsi", time.time(), "farklı yazılmış iki")
+kontrol("eşleşme yoksa satırın sözcük sayısı kadar tüketilir", gor() == [])
 # süre dolumu
 d2 = ns2["TASLAK"]["tstt-karsi-2"]; ns2["taslak_tstt_bitti"]("karsi"); d2["son"] -= 9; ns2["taslak_view"]("Deneme", tstt=True)
 kontrol("Whisper satırı gelmezse (yankı süzgeci) taslak 8 sn sonra düşer", "tstt-karsi-2" not in ns2["TASLAK"])

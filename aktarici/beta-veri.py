@@ -138,7 +138,7 @@ def _beta_profil():
         tarz.add("rahat" if ("Ton (rahat)" in m or "Tone (relaxed)" in m) else "olculu" if ("Ton (ölçülü)" in m or "Tone (measured)" in m) else "elle")
     tek = lambda s: (next(iter(s)) if len(s) == 1 else "karisik") if s else None
     return {"ses_motoru": str(AYAR.get("ses_motoru") or "mac"), "arayuz": "en" if AYAR.get("dil") == "en" else "tr", "tema": str(AYAR.get("tema") or "sistem"),
-            "asistan_sayisi": len(ks), "hitap_bicimi": tek(bic), "tarz": tek(tarz), "whisper_motor": wh_motor() if "wh_motor" in globals() else str(AYAR.get("whisper_motor") or "mlx"),
+            "asistan_sayisi": len(ks), "hitap_bicimi": tek(bic), "tarz": tek(tarz), "kurulum_profil": "hafif" if AYAR.get("profil") == "hafif" else "tam", "whisper_motor": wh_motor() if "wh_motor" in globals() else str(AYAR.get("whisper_motor") or "mlx"),
             "toplantiya_ses": AYAR.get("toplantiya_ses") is True, "konusma": AYAR.get("konusma", True) is not False,
             "proje_karti": os.path.exists(os.path.join(AYAR["uygulama"], "proje-karti.json")), "takvim": (STATE.get("takvim") or {}).get("durum")}
 def _beta_cpp(bas, son):  # S188: whisper.cpp açılışları (canli/whisper-cpp-acilis.jsonl, whisper-hat wh_cpp_kaydet) — yalnız sonuç, hata sınıfı ve süre; yol, ileti gitmez

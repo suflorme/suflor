@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 326149,
-   "sha": "b7b6e2fe9ef6d1ea"
+   "uzunluk": 326996,
+   "sha": "75d3057cc7ed5df8"
   },
   "/mini": {
-   "uzunluk": 326149,
-   "sha": "b7b6e2fe9ef6d1ea"
+   "uzunluk": 326996,
+   "sha": "75d3057cc7ed5df8"
   },
   "/status": {
    "_ping_son": "float",
@@ -308,6 +308,7 @@
      "oto_haric": "str",
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
+     "profil": "str",
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",
@@ -361,6 +362,7 @@
      "oto_haric": "str",
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
+     "profil": "str",
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",

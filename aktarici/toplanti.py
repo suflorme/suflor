@@ -21,6 +21,7 @@ KUYRUK_BEKLE_SN = 20 if _TH else 300  # bitti için Whisper kuyruğunun boşalma
 TAKVIM_PAY_DK = OTO_ESLE_DK = 15
 BITIR_KILIT_SN = 600                  # elle bitirince aynı sinyal sürse de bu kadar (ya da sinyal 10 sn kesilene dek) yeniden açılmaz
 EKLENTI_GOR_SN = 25; EKLENTI_DUS_SN = 120
+NABIZ_BITIS_SN = 3                    # eklenti nabzından bitiyor'a geçmek için arka arkaya ≥ 2 call=false nabzı ve ilk false'tan bu yana en az bu kadar sn (3 Kasım 17:12: tek false nabzı özeti başlatıp Konuş'u kapattı); açık bitişler (masaüstü, POST bitir) beklemez
 BASLAT_ERTELE_SN = 20 if _TH else 600  # ardışık toplantı: yeni toplantının Claude oturumu önceki toplantının sonunu (özet) en çok bu kadar bekler
 YENI_CAGRI_SN = 10                    # bitiyor'da başlıksız sinyal başka sekmeden bu kadar sonra gelirse yeni çağrı (sekme aynıysa asla)
 TOPLANTI = {"aktif": None, "onceki": None, "kilit": None}
@@ -48,7 +49,14 @@ def eklenti_nabiz(p, ua):  # /ping (LOCK içinde) → STATE["extension"] çağr�
     if p.get("panel"): x["rows"] = p.get("rows", 0)
     cikti = False
     if ust:
-        cikti = bool(x["call"]) and not p.get("call") and isinstance(p.get("mic"), dict)
+        # çıkış tek nabızla kabul edilmez: call=false ardışık ≥ 2 nabız ve ilk false'tan ≥ NABIZ_BITIS_SN; araya call=true girerse sayaç sıfırlanır
+        if p.get("call"): x["yok_say"] = 0; x["yok_t"] = 0.0
+        elif x["call"] or x.get("yok_say"):
+            if not x.get("yok_say"): x["yok_say"], x["yok_t"] = 1, simdi
+            else: x["yok_say"] += 1
+        cikti = (not p.get("call") and isinstance(p.get("mic"), dict) and x.get("yok_say", 0) >= 2 and simdi - x.get("yok_t", simdi) >= NABIZ_BITIS_SN
+                 and not x.get("yok_bitti"))
+        x["yok_bitti"] = bool(p.get("call") is False and (cikti or x.get("yok_bitti")))  # çıkış bir kez bildirilir; çağrıya dönünce yeniden hazır
         # toplantı sayfası mı (Meet kodu / toplantı yolu): eski eklenti göndermez — Meet nabzı yalnız toplantı sayfasından gelir
         x["sayfa"] = p["sayfa"] if isinstance(p.get("sayfa"), bool) else bool(pl == "meet" or p.get("call") or p.get("captions") or p.get("panel"))
         x.update(t_ust=simdi, call=bool(p.get("call")), meeting=(p.get("meeting") or {}).get("title"), lang=p.get("lang") or p.get("capLang"),

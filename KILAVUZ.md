@@ -163,6 +163,7 @@ toplantı özeti de Gemini'yle okunur; iki kişiliğin sesi de Gemini ise özet 
 uyarı, acele); kişilik dosyasında `gerginlik_tonu: evet` o kişiliğin tonunu toplantı gerginliğine göre ayarlatır (karar Claude'da).
 ⚙ Ayarlar → Toplantıda duyuru (deneme): asistanlar toplantıda konuşurken Suflor toplantı başında kendini tanıtır ve onaylanan işi "Not aldım" diye duyurur.
 Kullanım ve maliyet: `canli/gemini-ses.jsonl`.
+Kişilik dosyasında `gorev_cikar: evet`: kişisel asistan hitapsız söylenen işi ve toplantıda sahipsiz kalan işi öneri olarak sunar (toplantıda onay kartı, dışında "ekleyeyim mi?"); varsayılan kapalı.
 
 ## Yapay zekâ seçimi
 Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulum sihirbazının **Yapay zekâ bağla** adımında seçersin; sonra

@@ -71,6 +71,14 @@ try:
     istek("/komut", {"tur": "sesli_ceviri"})
     bak("tekrar basınca kapandı", not istek("/cards").get("sesli_ceviri"))
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# ayar sesli_ceviri_tam (3 Kasım): öz yerine tam çeviri okunur
+r, T, canli, istek = calistir(ceviri=False, kulaklik=True, ek={"sesli_ceviri_tam": True})
+try:
+    istek("/ingest", {"meeting": {"title": "Çeviri Deneme"}, "source": "whisper", "entries": [{"id": "wh/karsi/0", "speaker": "John", "time": "09:59:00", "text": "Hello everyone, thanks for joining today.", "kanal": "karsi"}]})
+    istek("/komut", {"tur": "sesli_ceviri"}); satirlar(istek); time.sleep(3.5)
+    log = open(os.path.join(T, "relay.log"), encoding="utf-8").read()
+    bak("tam kipte tam çeviri okundu, öz okunmadı", "SESLİ ÇEVİRİ (deneme): [çeviri] We can ship" in log and "SESLİ ÇEVİRİ (deneme): [kısa]" not in log)
+finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 # --- Faz 11 Aşama 2: başka sağlayıcı ve Claude Code yedeği (sahte sunucu + sahte claude; ağ ve kota yok) ---
 GELEN, DURUM = [], {"kod": 200}
 def _cevir(icerik, on):  # "1. metin" satırları → {"1": "[on] metin", "k1": …}

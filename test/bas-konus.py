@@ -267,6 +267,8 @@ try:
     for i in range(5, 10): ben(i, f"Toplantıda {i}. madde konuşuldu, karar alındı.")
     uc2("/ping", {"meeting": {"title": "Başka toplantı"}, "call": True, "panel": True, "mic": {"on": True}}); time.sleep(0.5)
     ses1 = log().count("SES (deneme)")
+    # gerçek eklenti gibi çıkış: tek false nabzı yetmez (NABIZ_BITIS_SN) — iki false, aralarında ≥ 3,2 sn
+    uc2("/ping", {"meeting": {"title": "Başka toplantı"}, "call": False, "panel": False, "mic": {"on": False}}); time.sleep(3.2)
     uc2("/ping", {"meeting": {"title": "Başka toplantı"}, "call": False, "panel": False, "mic": {"on": False}})
     t1 = time.time()
     while time.time() - t1 < 25 and not ("ÖZET (hızlı)" in log() and st()["durum"] == "hazir" and "az önce bitti" in (st().get("soru") or "")): time.sleep(0.3)
