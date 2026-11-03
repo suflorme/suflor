@@ -40,7 +40,7 @@ WH_SR = 16000; WH_KARE = 320  # 20 ms
 # parça üst sınırı 12 → 6 sn. Ölçüm (6 Ekim, 115 sn kesintisiz Türkçe, gerçek zamanlı): kelime → satır ortanca 7,7 → 4,6 sn,
 # %90 12,2 → 6,7 sn; WER 12 sn %16,0 · 8 sn %11,9 · 6 sn %15,6–18,1 (aynı ayarda tur farkı kadar — kesim noktasına bağlı gürültü)
 WH_SESSIZ_MS = 700; WH_ON_MS = 300; WH_MAX_SN = 6; WH_MIN_KONUSMA_MS = 400; WH_BOSTA_KAPAT_SN = 600
-WH_AKIS_SN = 20; WH_GUVENCE_SN = 90; WH_ATLA_SN = 120
+WH_AKIS_SN = 20; WH_GUVENCE_SN = 90; WH_ATLA_SN = 120; WH_DIP_BLOK = 50  # taban penceresi: 50 blok × 100 ms = 5 sn
 # kuyruk birikince aynı kanalın sıradaki parçaları tek çağrıda: işçi süresi parça boyundan bağımsız ~1,2 sn (7 Ekim 18:03 ölçümü:
 # <2 sn 1,15 · 4–6 sn 1,24), kuyruk iki dönemde 25–27 parçaya çıkıp gecikme 135 sn'yi buldu. ben kanalı yalnız karşı akmıyorken
 # birleşir: yankı süzgeci parçanın tamamını atar, birleşik parçada kullanıcının gerçek sözleri de giderdi.
@@ -60,7 +60,7 @@ def _rms(b):
     if audioop: return audioop.rms(b, 2)
     import array; a = array.array("h"); a.frombytes(b); return int((sum(x * x for x in a) / max(1, len(a))) ** 0.5)
 class Kanal:
-    def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0; self.ses_t = collections.deque(maxlen=600); self.sonuclar = collections.deque(maxlen=12)  # t_ses/n_ses: otonom söz sırası (v0.56.0); ses_t: sesli karelerin zamanı (son ~12 sn; otonomun yankı ayrımı, 19 Ekim); sonuclar: son parçaların (geliş, sonuç) — söz sırası sözsüz sesi ayırır (30 Ekim)
+    def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0; self.ses_t = collections.deque(maxlen=600); self.dipler = collections.deque(maxlen=WH_DIP_BLOK); self.dip_n = 0; self.dip_top = 0.0; self.dip = 0.0; self.sonuclar = collections.deque(maxlen=12)  # t_ses/n_ses: otonom söz sırası (v0.56.0); ses_t: sesli karelerin zamanı (son ~12 sn; otonomun yankı ayrımı, 19 Ekim); sonuclar: son parçaların (geliş, sonuç) — söz sırası sözsüz sesi ayırır (30 Ekim)
     def reset(self): self.parca = bytearray(); self.on = bytearray(); self.konusuyor = False; self.sessiz = 0; self.sesli = 0; self.ust = 0; self.t0 = 0.0; self.rmsler = []
     def besle(self, pcm, t_bas, baslik):
         if t_bas - self.son_bitis > 0.5 and self.konusuyor: self.kes(baslik)  # boşluk (mikrofon kapalıydı / parça kayıp)
@@ -70,8 +70,8 @@ class Kanal:
             kare = bytes(pcm[i:i + WH_KARE * 2]); t = t_bas + i / 2 / WH_SR; r = _rms(kare)
             esik = max(220.0, self.gurultu * 2.8)
             if r > esik: self.t_ses = t + WH_KARE / WH_SR; self.n_ses += 1; self.ses_t.append(t)
+            self.taban_izle(r)  # taban konuşurken de izlenir (sürekli gürültü eşiği bir kez geçince kanal konuşuyorda kilitlenmesin; 3 Kasım)
             if not self.konusuyor:
-                self.gurultu = self.gurultu * 0.98 + r * 0.02 if r < self.gurultu * 2.5 else self.gurultu * 0.999 + r * 0.001
                 self.on += kare; self.on = self.on[-int(WH_SR * WH_ON_MS / 1000) * 2:]
                 self.ust = self.ust + 1 if r > esik else 0
                 if self.ust >= 3:
@@ -84,6 +84,14 @@ class Kanal:
                 if self.sessiz * 20 >= WH_SESSIZ_MS: self.kes(baslik)
                 elif len(self.parca) >= WH_MAX_SN * WH_SR * 2: self.bol(baslik)
         self.son_bitis = t_bas + len(pcm) / 2 / WH_SR
+    def taban_izle(self, r):
+        # aşağı: hızlı (r tabanın altındaysa, konuşurken de); yukarı: yalnız son 5 sn'nin en sessiz 100 ms'sinden (konuşma kareleri tabanı sürüklemez)
+        self.dip_n += 1; self.dip_top += r
+        if self.dip_n == 5:
+            self.dipler.append(self.dip_top / 5); self.dip_n = 0; self.dip_top = 0.0
+            if len(self.dipler) >= WH_DIP_BLOK // 2: self.dip = min(self.dipler)
+        if r < self.gurultu: self.gurultu = self.gurultu * 0.98 + r * 0.02
+        elif self.dip > self.gurultu: self.gurultu += (self.dip - self.gurultu) * 0.02
     def bol(self, baslik):
         # uzun kesintisiz konuşma: son 1,5 sn'nin en sessiz karesinden böl (kelime ortasından kesmemek için), kalan sürer
         son = self.rmsler[-75:]; j = len(self.rmsler) - len(son) + min(range(len(son)), key=son.__getitem__)

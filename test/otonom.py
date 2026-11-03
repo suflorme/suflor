@@ -202,7 +202,7 @@ try:
     satir("karsi", "Atlas, salon hazır mı?"); izin_ver()
     v, t12 = bekle(lambda v: v.get("durum") in ("okundu", "kesildi", "soylenmedi"), 25); MOD["ben"] = "sessiz"
     ok(f"kullanıcı kanalında sözsüz ses varken okundu ({v.get('durum')}, {v.get('neden')})", t12 is not None and v.get("durum") == "okundu" and son() == s0 + 1
-       and "kullanıcı kanalındaki ses söz sırasını tutmadı (son parçalar sözsüz" in log())
+       and ("kullanıcı kanalındaki ses söz sırasını tutmadı (son parçalar sözsüz" in log() or "OTONOM: söz sırası (0.0 sn bekledi)" in log().split("salon hazır mı?")[-1]))  # v0.168.1: sürekli ton gürültü tabanına girer, söz sırası hiç tutulmaz
     # 9) Konuş düğmesi (bas) toplantıda yalnız kullanıcıya
     SUSKU(); n9 = hazir(); s0 = son(); uc("/bas-konus", {"metin": "Atlas, bütçe kalemleri neler?"}, pano=True); time.sleep(4)
     c = (st().get("konus") or {}).get("cevap") or ""
