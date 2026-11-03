@@ -638,6 +638,7 @@ KEYWORDS = ["şifre","parola","password","token","anahtar","api key","secret"]
 bolum("kisilik")  # aktarici/kisilik.py — Kişilik (ayar kisilik; yoksa nötr)
 bolum("sozluk")  # aktarici/sozluk.py — Özel sözlük
 bolum("whisper-hat")  # aktarici/whisper-hat.py — Whisper hattı: işçi, ses izi, taslak, yankı
+bolum("golge-tstt")  # aktarici/golge-tstt.py — gölge kipte turkish-stt: aynı ses ikinci tanıyıcıya, yalnız kayıt (ayar golge_tstt; ekrana bir şey girmez)
 # --- Kısayol komutları ------------------------------------------------------------------------------------------
 # ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt

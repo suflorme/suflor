@@ -524,6 +524,11 @@
    ],
    "gemini_gunluk": "NoneType",
    "gizli": "NoneType",
+   "golge_tstt": {
+    "durum": "str",
+    "dusen": "int",
+    "satir": "int"
+   },
    "guncelleme": {
     "durum": "str"
    },
@@ -912,7 +917,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 7,
+  "DURUM": 8,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

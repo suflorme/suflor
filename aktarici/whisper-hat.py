@@ -118,8 +118,10 @@ def ses_al(p):
         if time.time() - (STATE["yerel_ses"].get("son") or 0) < 3: return {"ok": True, "yerel": True}
     if len(pcm) > WH_SR * 2 * 10: return {"ok": False, "err": "parça çok büyük"}
     baslik = toplanti_anahtar()  # Faz B: parçanın toplantısı kaydın kimliği (küme/ad sıfırlama); hangi dosyaya yazılacağı satırın zamanından (toplanti_satir)
+    t_sn = (p.get("t") or time.time() * 1000) / 1000.0
     with W_LOCK:
-        k = KANALLAR.setdefault(kanal, Kanal(kanal)); k.besle(pcm, (p.get("t") or time.time() * 1000) / 1000.0, baslik)
+        k = KANALLAR.setdefault(kanal, Kanal(kanal)); k.besle(pcm, t_sn, baslik)
+    if "golge_besle" in globals(): golge_besle(kanal, t_sn, pcm)  # gölge kip (ayar golge_tstt): ekrana bir şey girmez, yalnız kayıt
     _isci_baslat()
     return {"ok": True, "durum": w["durum"]}
 def whisper_akiyor(kanal):
@@ -609,7 +611,7 @@ def ses_arsivi_yaz(is_, istek, j, sonuc, metin):
         with wave.open(os.path.join(kl, ad), "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(is_["pcm"])
         pen = j.get("kapi")
         r = {"dosya": ad, "kanal": is_["kanal"], "bas": bool(is_.get("bas")), "t0": round(t0, 2), "t1": round(t1, 2), "sn": sn, "sonuc": sonuc, "metin": metin, "dil_istek": istek.get("dil"),
-             "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
+             "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), "bitti": round(time.time(), 2), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
         write([(os.path.join(kl, "parcalar.jsonl"), json.dumps(r, ensure_ascii=False) + "\n")])
         if time.time() - _SA["son"] > 3600: _SA["son"] = time.time(); ses_arsivi_temizle()
     except Exception as e: print(f"SES ARŞİVİ: parça yazılamadı ({e.__class__.__name__})")
