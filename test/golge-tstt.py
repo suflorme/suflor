@@ -46,6 +46,8 @@ kontrol("soz satırları yazıldı (3 sn → 3 söz)", bekle(lambda: len([s for 
 sz = [s for s in satirlar() if s["tur"] == "soz"][0]
 kontrol("soz alanları ve sıra", all(k in sz for k in ("k", "t0", "ilk_ses", "ilk_duvar", "t1", "son_duvar", "metin", "degisim")) and sz["k"] == "ben" and sz["ilk_duvar"] <= sz["son_duvar"] and sz["t0"] <= sz["t1"] and sz["degisim"] >= 1)
 kontrol("ses zamanı: ilk_ses = t0 + parça süresi (0,1 sn)", abs(sz["ilk_ses"] - sz["t0"] - 0.1) < 0.01)
+kontrol("ara metin zamanları: değişim sayısı kadar, sıralı, sonuncusu kesin metin", len(sz["ara"]) == sz["degisim"] and sz["ara"][-1][2] == sz["metin"]
+        and all(a[0] <= b[0] and a[1] <= b[1] for a, b in zip(sz["ara"], sz["ara"][1:])) and sz["ara"][0][1] == round(sz["ilk_duvar"], 2))
 # gizli toplantı: beslenmez
 GIZLI[0] = True; n = ns["GOLGE_Q"].qsize(); ns["golge_besle"]("ben", time.time(), pcm100()); GIZLI[0] = False
 kontrol("gizli toplantıda besleme atlandı", ns["GOLGE_Q"].qsize() == n)
@@ -86,6 +88,7 @@ if os.path.exists(PY) and os.path.isdir(MD) and os.path.exists(WAV):
     if p: bekle(lambda: p.poll() is not None, 15)
     sl = satirlar(); hz = [s for s in sl if s["tur"] == "hazir"]; sz = [s for s in sl if s["tur"] == "soz"]
     kontrol(f"gerçek: en az bir soz satırı ({len(sz)})", len(sz) >= 1 and all(s["ilk_duvar"] <= s["son_duvar"] for s in sz))
+    kontrol("gerçek: ara metin zamanları dolu, sonuncusu kesin metin", all(s["ara"] and s["ara"][-1][2] == s["metin"] for s in sz if not s.get("yarim")))
     if hz: print(f"  yükleme {hz[0]['yukleme_sn']} sn")
     if sz: print("  örnek:", json.dumps({**sz[0], "metin": sz[0]["metin"][:50]}, ensure_ascii=False))
 else: print("- gerçek model/ses yok: atlandı")

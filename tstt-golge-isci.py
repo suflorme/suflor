@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Gölge kipte turkish-stt işçisi (ayar golge_tstt): aktarıcı canlı sesi stdin'e satır başına {"k","t","pcm"(base64 int16 16 kHz)} verir; her kanala ayrı akış
 # tanıyıcı (mihu_stt, sherpa-onnx, işlemci). Ekrana bir şey gitmez; stdout'a satır başına JSON: hazir | soz | cpu. Ağ yok (model yerel, HF_HUB_OFFLINE=1).
+# soz satırındaki "ara": ara metin her değiştiğinde [ses zamanı, duvar saati, metin] — ara metinden soru sonu/hitap ne zaman yakalanırdı, ölçümü için.
 # Çalıştırma: HF_HUB_OFFLINE=1 <tstt-venv python> -I -B tstt-golge-isci.py <model klasörü>. SUFLOR_GOLGE_SAHTE=1: gerçek model yok, deneme için sahte tanıyıcı.
 import base64, json, os, sys, time, resource
 SR = 16000
@@ -17,20 +18,20 @@ def yukle(model):
     return lambda: mihu_stt.StreamingSTT(model_dir=model, num_threads=1)
 class Kanal:
     def __init__(self, ad, st): self.ad = ad; self.st = st; self.sifirla()
-    def sifirla(self): self.t0 = self.ilk_ses = self.ilk_duvar = self.t1 = None; self.degisim = 0; self.son = ""
+    def sifirla(self): self.t0 = self.ilk_ses = self.ilk_duvar = self.t1 = None; self.degisim = 0; self.son = ""; self.ara = []
     def besle(self, t, pcm):
         bit = t + len(pcm) / 2 / SR
         metin, son = self.st.accept_pcm16(pcm, SR); metin = (metin or "").strip()
         if metin:
             if self.t0 is None: self.t0 = t; self.ilk_ses = bit; self.ilk_duvar = round(time.time(), 3)
-            if metin != self.son: self.degisim += 1; self.son = metin
+            if metin != self.son: self.degisim += 1; self.son = metin; self.ara.append([round(bit, 2), round(time.time(), 2), metin])
             self.t1 = bit
         if son:
             if metin: self.yaz_soz(metin, False)
             self.sifirla()
     def yaz_soz(self, metin, yarim):
         o = {"tur": "soz", "k": self.ad, "t0": round(self.t0, 3), "ilk_ses": round(self.ilk_ses, 3), "ilk_duvar": self.ilk_duvar, "t1": round(self.t1, 3),
-             "son_duvar": round(time.time(), 3), "metin": metin, "degisim": self.degisim}
+             "son_duvar": round(time.time(), 3), "metin": metin, "degisim": self.degisim, "ara": self.ara}
         if yarim: o["yarim"] = True
         yaz(o)
     def kapat(self):
