@@ -325,7 +325,7 @@ def toplanti_bitir(neden, dosya=None):  # elle: özet hazır, toplantı oturumu 
         a = TOPLANTI["aktif"]; o = TOPLANTI.get("onceki")
         if neden == "özet hazır" and dosya and o and a and a["dosya"] == dosya and oturum_onceki():  # 3 Kasım: süren toplantının dosyasıyla gelen özet, oturum önceki
             print(f"TOPLANTI: özet süren toplantının dosyasıyla geldi ama oturum önceki toplantının sonunu yapıyordu — önceki toplantıya sayıldı · {o['dosya']}"); dosya = o["dosya"]  # toplantınınsa
-        if neden == "özet hazır" and o and (not dosya or o["dosya"] == dosya) and not (a and a["dosya"] == dosya): o["ozet"] = True; _durum_yaz()
+        if neden == "özet hazır" and o and (not dosya or o["dosya"] == dosya) and not (a and a["dosya"] == dosya): o["ozet"] = True; o["t_ozet"] = time.time(); _durum_yaz()
         if not a or (dosya and a["dosya"] != dosya): return False
         a["elle"] = True; a["ozet"] = neden == "özet hazır"
         if a["durum"] != "bitiyor": _gecis(a, "bitiyor", neden)
@@ -364,9 +364,12 @@ def oto_takvim_uygun(e):  # oto_takvim'in pencere kuralı tek olay için
     except (KeyError, TypeError, ValueError): return False
     now = datetime.datetime.now().astimezone()
     return not e.get("tum_gun") and not e.get("reddettin") and b - datetime.timedelta(minutes=TAKVIM_PAY_DK) <= now <= s + datetime.timedelta(minutes=5)
+OZET_SONRASI_SN = 5 if _TH else 90  # ardışık toplantı: özet geldikten sonra önceki oturumun süren turu (ölçüm, kayıt) en çok bu kadar bitirilir, sonra yeni oturum açılır
 def onceki_sonu_suruyor():  # son biten toplantının Claude oturumu vardı ve özeti henüz gelmedi (toplantı sonu işleri sürüyor olabilir)
     o = TOPLANTI.get("onceki")
-    return bool(o and o.get("oturum") and not o.get("ozet") and time.time() - (o.get("t_kapanis") or 0) < GOSTER_SN)
+    if not (o and o.get("oturum") and time.time() - (o.get("t_kapanis") or 0) < GOSTER_SN): return False
+    # 3 Kasım canlı: özet gelir gelmez açılan yeni oturum eskisini toplantı sonunun son adımında (ölçüm raporu) kapattı — özetten sonra tur sürüyorsa kısa süre beklenir
+    return not o.get("ozet") or (time.time() - (o.get("t_ozet") or 0) < OZET_SONRASI_SN and TOPO.get("durum") == "calisiyor")
 # 3 Kasım (ardışık toplantı): canlı Claude oturumu önceki toplantı kapanmadan açılmış ve o toplantının özeti gelmemişse oturum hâlâ önceki toplantınındır —
 # toplantı sonu komutları (döküm, sonuç, özet) o toplantının dosyasına gider (/status toplanti.oturum_dosya), yeni toplantı ona bağlanmaz, oturumu sonra açılır
 def oturum_onceki():
@@ -445,7 +448,9 @@ def toplanti_view():  # /status toplanti — pano yalnız buna bakar
         v["mic_bilinmiyor"] = a["durum"] == "suruyor" and not eklenti_cagri() and not masaustu_toplantida() and (STATE.get("masaustu_mic") or {}).get("acik", False)
     if o: v["onceki"] = {"dosya": o["dosya"], "ad": o["ad"], "bitti": datetime.datetime.fromtimestamp(o["t_kapanis"] or now).strftime("%H:%M"), "neden": o.get("bitis_neden"), "gec_atilan": o["gec_atilan"]}
     oo = oturum_onceki()
-    if oo: v["oturum_dosya"] = oo["dosya"]; v["oturum_ad"] = oo["ad"]  # toplantı oturumu önceki toplantının sonunu yapıyor (toplanti-claude.py dosyayı buradan alır)
+    if oo:  # toplantı oturumu önceki toplantının sonunu yapıyor (toplanti-claude.py dosyayı buradan alır; izle bu dosyada kalır ve bitişini bildirir)
+        v["oturum_dosya"] = oo["dosya"]; v["oturum_ad"] = oo["ad"]
+        v["oturum_bitti"] = datetime.datetime.fromtimestamp(oo["t_kapanis"] or now).isoformat(timespec="seconds"); v["oturum_bitis_neden"] = oo.get("bitis_neden")
     # 3 Kasım (ardışık toplantı): canlı = toplantı ekranı (algılandı/sürüyor); son = bitiyor'daki ya da özeti gelmemiş yeni biten toplantı (yalnız gösterim, engellemez)
     v["canli"] = v["durum"] in ("algilandi", "suruyor"); v["bitiyor"] = v["durum"] == "bitiyor"
     if a and a["durum"] == "bitiyor": v["son"] = {"ad": a["ad"], "dosya": a["dosya"], "durum": "bitiyor", "bas": v["bas"], "ozet": False}

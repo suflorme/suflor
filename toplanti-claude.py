@@ -1295,14 +1295,22 @@ def izle():
             s = get("/status")
             for c in (s.get("cards") or []) + (s.get("closed") or []): texts[c["id"]] = f"[{c.get('kind')}] {c.get('text')}"
             x = s.get("extension") or {}; ticks = s.get("agenda_ticks") or {}
-            tb = s.get("toplanti_bitti") or {}
+            tb = s.get("toplanti_bitti") or {}; tko = s.get("toplanti") or {}
+            # 3 Kasım canlı (ardışık toplantı): eski toplantı kapanıp yenisi aynı anda açılınca toplanti_bitti hemen silinir (yenisi açıldı) — izle bitişi kaçırıp
+            # yeni dosyaya geçiyordu, oturum ilk toplantının sonunu hiç yapmadı. Oturum önceki toplantının sonunu yapıyorsa (oturum_dosya) bitiş oradan bildirilir.
+            if tko.get("oturum_dosya") and tko["oturum_dosya"] == cur and not (tb.get("file") == cur):
+                tb = {"file": cur, "t": tko.get("oturum_bitti"), "neden": tko.get("oturum_bitis_neden"), "oturum": True, "yeni": tko.get("ad") if tko.get("durum") in ("algilandi", "suruyor", "bitiyor") else None}
             if tb.get("file") and tb.get("file") == cur and tb.get("t") != bitti_son:  # aktarıcı bitişi algıladı (bir kez; yeniden katılınca sıfırlanır)
                 bitti_son = tb.get("t")
                 try: eski = datetime.datetime.fromisoformat(tb["t"]).timestamp() < izle_bas - 5
                 except (TypeError, ValueError): eski = False
-                if eski:  # izle yeniden başladı, bitiş ondan önce: yeni olay değil (13 Ekim deneme 8: eski karar yeniden yayınlandı)
+                if eski and tb.get("oturum"):  # izle yeniden başladı (Monitor yenilendi), toplantı bitmiş ve özeti gelmemiş: sürdürülür
+                    emit(f"DURUM: bu toplantı {str(tb['t'])[11:16]}'de bitti ({tb.get('neden')}) ve özeti henüz gelmedi — toplantı sonu adımlarını bitirmediysen sürdür")
+                elif eski:  # izle yeniden başladı, bitiş ondan önce: yeni olay değil (13 Ekim deneme 8: eski karar yeniden yayınlandı)
                     emit(f"DURUM: aktarıcı bu toplantıyı {tb['t'][11:16]}'de bitti saymıştı ({tb.get('neden')}) — izle sonradan başladı; toplantı sürüyorsa yok say")
-                else: emit(f"TOPLANTI BİTTİ ({tb.get('neden')}) → kullanıcı ayrıldı: toplantı sonu adımlarını başlat (bitti yazmasını bekleme)")
+                else: emit(f"TOPLANTI BİTTİ ({tb.get('neden')}) → kullanıcı ayrıldı: toplantı sonu adımlarını başlat (bitti yazmasını bekleme)"
+                           + (f" · ardından yeni toplantı «{tb['yeni']}» başladı: onun satırları bu oturuma gelmez, toplantı sonu komutları bu toplantıya gider; "
+                              "özet hazır olunca yeni toplantının oturumu ayrıca açılır" if tb.get("yeni") else ""))
             wv = s.get("whisper") or {}; wak = wv.get("durum") in ("hazir", "yukleniyor") and (wv.get("ben") or wv.get("karsi"))
             ms = s.get("masaustu") or {}  # 19 Ekim test toplantısı: masaüstü Teams'te eklenti olmadığı için "EKLENTİ SİNYALİ YOK" → gereksiz NOT kartı ("eklenti 102 sn'dir sessiz")
             tk = s.get("toplanti") or {}  # Faz B: tek toplantı kaydı; eklenti yalnız ek bilgi (S165) — yokluğu uyarı sebebi değil
@@ -1359,7 +1367,7 @@ def izle():
                     and any(k not in (pv["ben"], "?") for k, _ in pv["son"]):  # tek konuşmacıda pay anlamsız (1 Ekim testi)
                 emit(f"DİNLE: son 10 dk konuşma payı {pv['ben']} %{pv['ben_son']} (" + ", ".join(f"{k} %{v}" for k, v in pv["son"] if k != pv["ben"]) + f") · toplantı boyu {pv['ben']} %{pv['ben_top']}"
                      " → yürütücü dinlemeli: gerekirse SÖYLE kartı (soru sor, sözü ver)"); pay_son = dinle_son = time.time()
-            f = s.get("file")
+            f = oturum_dosyasi(s)  # 3 Kasım: oturum önceki toplantının sonunu yapıyorsa izle o dosyada kalır (yeni toplantıyı onun oturumu izler)
             if f and f != cur:
                 cur = f; jl = os.path.join(A.dir, f.replace(".md", ".jsonl"))
                 t_tail = Tail(jl, from_end=False); old = [r for r in t_tail.new() if "note" not in r and "kanit" not in r]

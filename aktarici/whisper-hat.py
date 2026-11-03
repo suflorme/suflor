@@ -927,7 +927,7 @@ def konusmaci_karsi(t0, t1, kume=None):
 T_LOCK = threading.Lock(); TASLAK = {}; TASLAK_BITEN = {}; TASLAK_OMUR_SN = 20
 def _taslak_kanal(kim): return "ben" if kim and kim == ben_adi() else "karsi"
 def _taslak_temizle(now):
-    for i in [i for i, d in TASLAK.items() if now - d["son"] > TASLAK_OMUR_SN]: del TASLAK[i]
+    for i in [i for i, d in TASLAK.items() if now - d["son"] > (d.get("omur") or TASLAK_OMUR_SN)]: del TASLAK[i]
     if len(TASLAK_BITEN) > 600:
         for i in list(TASLAK_BITEN)[:-400]: del TASLAK_BITEN[i]
 def taslak_al(p):
@@ -966,6 +966,37 @@ def taslak_sabit(e, src, golgede):
         d = TASLAK.get(i); now = time.time()
         if d is None: d = TASLAK[i] = {"id": i, "ilk": now, "tuketilen": 0}
         d.update(speaker=e.get("speaker") or "?", text=t, son=now, kanal=_taslak_kanal(e.get("speaker")), src=src, sabit=True)
+# 3 Kasım (S191): turkish-stt anlık ilk yazı. Gölge işçi (golge-tstt.py) ara metin değişimini taslak_tstt'ye verir; Teams altyazısı yoksa (ya da 3 sn'den eskiyse) ekranda soluk taslak olur,
+# Whisper satırı gelince taslak_tuket ile yerine geçer. Yalnız ekran: /taslak (izle → Claude bağlamı), hitap, kart, döküm, defter tstt taslağını GÖRMEZ (taslak_view tstt=False).
+# Söz bitince (soz) taslak TASLAK_TSTT_OMUR_SN'de düşer (Whisper yankı süzgeciyle satırı atarsa ekranda kalmasın); yeni söz yeni kimlik alır. Durdurma sözü: okuma sürerken ben taslağı kısa durdurma sözüyse 0,6 sn sonra okuma kesilir.
+TASLAK_TSTT_OMUR_SN = 8; TASLAK_ALTYAZI_SN = 3.0; _TSTT = {}
+def taslak_tstt(kanal, metin, t=None):
+    if AYAR.get("tstt_taslak") is False or gizli_acik() or kanal not in ("ben", "karsi"): return
+    metin = " ".join(str(metin or "").replace("|", "¦").split())[:2000]
+    if not metin: return
+    now = time.time(); zamanla = None
+    with T_LOCK:
+        s = _TSTT.get(kanal); d = TASLAK.get(s["id"]) if s else None
+        if s is None or s.get("bitti") or (d and d["tuketilen"] > len(metin.split())):  # yeni söz (soz geldi ya da metin tüketilenden kısa: sözün sonu kaçırıldı)
+            s = _TSTT[kanal] = {"n": (s["n"] + 1) if s else 1}; s["id"] = f"tstt-{kanal}-{s['n']}"; d = None
+        if d is None: d = TASLAK[s["id"]] = {"id": s["id"], "ilk": now, "tuketilen": 0, "sabit": False}
+        if d.get("text") != metin:
+            d["degisti"] = now; d["dur_bakildi"] = False
+            if kanal == "ben" and "okuma_suruyor" in globals() and okuma_suruyor(): zamanla = (d, metin)
+        ad = (ben_adi() or "Ben") if kanal == "ben" else (_t("Karşı taraf", "Other side") if "_t" in globals() else "Karşı taraf")
+        d.update(speaker=ad, text=metin, son=now, kanal=kanal, src="tstt", baslik=STATE.get("meeting") or "Toplantı", omur=None)
+    if zamanla:
+        tm = threading.Timer(TASLAK_DUR_SN + 0.05, _tstt_dur_kontrol, zamanla); tm.daemon = True; tm.start()
+def _tstt_dur_kontrol(d, metin):
+    with T_LOCK:
+        if d.get("text") != metin or d.get("dur_bakildi") or TASLAK.get(d["id"]) is not d: return
+        d["dur_bakildi"] = True
+    _taslak_dur_bak(d)
+def taslak_tstt_bitti(kanal):
+    with T_LOCK:
+        s = _TSTT.get(kanal); d = TASLAK.get(s["id"]) if s else None
+        if s: s["bitti"] = True
+        if d: d["omur"] = TASLAK_TSTT_OMUR_SN; d["son"] = time.time()
 def taslak_tuket(kanal, t1):
     # Whisper satırı yazılmadan önce: bu kanalda parçanın bitişinden (t1) önce görünmüş taslakların kelimeleri tüketilir.
     # Döner: tüketilen en eski taslağın ilk görülme anı (epoch) — "taslak öne alma" ölçümü için; yoksa None.
@@ -973,15 +1004,18 @@ def taslak_tuket(kanal, t1):
     with T_LOCK:
         for d in TASLAK.values():
             n = len(d["text"].split())
-            if d["kanal"] != kanal or d["ilk"] > t1 + 1.0 or d["tuketilen"] >= n: continue
+            if d["kanal"] != kanal or d["ilk"] > t1 + (0.5 if d.get("src") == "tstt" else 1.0) or d["tuketilen"] >= n: continue
             ilk = d["ilk"] if ilk is None else min(ilk, d["ilk"]); d["tuketilen"] = n
     return ilk
-def taslak_view(baslik=None):
+def taslak_view(baslik=None, tstt=False):
+    # tstt=True yalnız panonun gösterimi (/status, /taslak?pano=1); izle'ye giden /taslak tstt taslağını içermez
     now = time.time(); out = []
     with T_LOCK:
         _taslak_temizle(now)
+        altyazili = {d["kanal"] for d in TASLAK.values() if d.get("src") != "tstt" and now - d["son"] <= TASLAK_ALTYAZI_SN and len(d["text"].split()) > d["tuketilen"]}  # altyazı zaten anlık taslak veriyor
         for d in sorted(TASLAK.values(), key=lambda d: d["ilk"]):
             if baslik and d.get("baslik") != baslik: continue
+            if d.get("src") == "tstt" and (not tstt or d["kanal"] in altyazili or AYAR.get("tstt_taslak") is False): continue
             w = d["text"].split()[d["tuketilen"]:]
             if w: out.append({"id": d["id"], "speaker": d["speaker"], "text": " ".join(w), "kanal": d["kanal"], "sabit": bool(d.get("sabit")),
                               "yas_sn": round(now - d["son"], 1), "ilk": datetime.datetime.fromtimestamp(d["ilk"]).isoformat(timespec="milliseconds")})

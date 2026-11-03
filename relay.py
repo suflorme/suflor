@@ -1517,7 +1517,7 @@ AYAR_PANO = {
     "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "eposta_oku": ("bool", False, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
     "adin_gecti": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
-    "oto_toplanti": ("bool", True, None), "oto_haric": ("liste", "", None),  # S161 (v0.145.0): toplantıyı kendisi tanıma; hariç = ad parçaları (panoda virgülle)
+    "tstt_taslak": ("bool", True, None), "oto_toplanti": ("bool", True, None), "oto_haric": ("liste", "", None),  # S161 (v0.145.0): toplantıyı kendisi tanıma; hariç = ad parçaları (panoda virgülle)
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "masaustu_ses_kis": ("bool", False, None),
     "masaustu_mic": ("bool", True, None), "masaustu_kisiler": ("bool", False, None), "kisayollar": ("bool", True, None), "toplantiya_ses": ("bool", False, None), "sure_duyuru": ("bool", False, None),
     "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None),  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
@@ -2044,7 +2044,7 @@ class H(BaseHTTPRequestHandler):
             # 3 Kasım (ardışık toplantı): aktif = canlı toplantı (algılandı/sürüyor) — pano toplantı ekranı; gosterim = görünen dosya (süren, bitiyor'daki ya da
             # özeti gelmemiş yeni biten — eski "aktif" anlamı; kartlar, kanıt, taslak buna bağlı). Bitiyor/bitti'de pano takvime ve Başlat'a döner.
             af = gorunen_dosya(); s["aktif"] = toplanti_durum() in ("algilandi", "suruyor"); s["gosterim"] = bool(af); s["son_toplantilar"] = son_view(); s["notlar"] = notlar_view(); s["brifing"] = brifing_view(); s["dosyadan"] = dosyadan_view(); s["kanitlar"] = STATE["kanitlar"].get(af, [])[-12:] if af else []
-            s["taslak"] = taslak_view(STATE.get("meeting")) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
+            s["taslak"] = taslak_view(STATE.get("meeting"), tstt=True) if af else []; s["masaustu_mic"] = masaustu_mic_view(); s["toplanti_oturum"] = toplanti_oturum_view(); s["son_platform"] = son_platform(); s["anahtarsiz"] = anahtarsiz_view(); s.pop("_anahtarsiz", None); s.pop("_pano_t", None); s.pop("_pano_ilk", None)
             if not af: s["agenda_ticks"] = {}; s["lines"] = 0; s["notes"] = 0; s["flags"] = []
             if s.get("extension"):
                 s["extension"] = dict(s["extension"])
@@ -2054,7 +2054,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/toplanti-oturum":  # v0.111.0: arka plandaki toplantı oturumunun iletileri (?n=<son görülen>)
             m = re.search(r"[?&]n=([0-9]{1,9})(?:&|$)", self.path); return self._json(toplanti_oturum_mesajlar(int(m.group(1)) if m else 0))
         if self.path == "/geri-bildirim/onizle": return self._json(teshis_gonder("geri_bildirim", {"kullanici_metni": "(yazdığın metin)"}, onizle=True))
-        if self.path == "/taslak": return self._json({"taslak": taslak_view(STATE.get("meeting"))})  # izle (SORU/ÖZET bağlamı)
+        if yol == "/taslak": return self._json({"taslak": taslak_view(STATE.get("meeting"), tstt=("pano=1" in self.path))})  # izle (SORU/ÖZET bağlamı) tstt taslağını görmez; pano ?pano=1 ile alır
         if self.path.split("?")[0] == "/takvim":  # ?tam=1 davet notları ve tüm katılımcılarla (toplanti-claude.py takvim)
             # eklentinin arka planı (Teams açık olmasa da) ?v=<sürüm> ile yoklar. Chrome bu istekte Origin göndermeyebilir;
             # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)

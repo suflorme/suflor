@@ -681,6 +681,8 @@ globalThis.SUFLOR_EN = {
   "{adlar} dinliyor — adıyla seslen": "{adlar} listening — call them by name",
   "Asistanlar toplantıda konuşsun": "Assistants speak in meetings",
   "Toplantıyı kendisi tanısın": "Recognise meetings automatically",
+  "Anlık ilk yazı (turkish-stt)": "Instant first draft (turkish-stt)",
+  "Konuşulurken sözün ilk kelimeleri hemen soluk taslak olarak görünür; Whisper’ın kesin satırı gelince yerine geçer. Yalnız gölge tanıyıcı (golge_tstt) açıkken çalışır; taslak hiçbir kararda, karta ya da dökümde kullanılmaz.": "While someone speaks, the first words appear at once as a faint draft; Whisper’s final line replaces it. Works only while the shadow recogniser (golge_tstt) is on; the draft is never used for decisions, cards or the transcript.",
   "Teams, Meet ya da Zoom toplantısına nereden girersen gir (tarayıcı ya da masaüstü) Suflor toplantıyı tanır: takvimdeki adla döküm başlar, {asistan} toplantı oturumunu sormadan açar. Kapalıyken döküm yine tutulur, {asistan} yalnız Başlat’la açılır.": "However you join a Teams, Meet or Zoom meeting (browser or desktop), Suflor recognises it: the transcript starts under the calendar name and {asistan} opens the meeting session without asking. When off, the transcript is still kept and {asistan} opens only with Start.",
   "Panoda gösterilecek paylaşılan takvimler": "Shared calendars to show on the panel",
   "Bu takvimlerdeki toplantılar yalnız panoda görünür; Suflor bunları senin toplantın saymaz.": "Meetings in these calendars appear only on the panel; Suflor does not count them as your meetings.",

@@ -642,6 +642,16 @@ final class KartKatmani {
             else if k <= 15 { o.append(("d:sure:15", TE("\(k) dk kaldı", "\(k) min left"), KR.not)) }
             if let ky = s["kayma"] as? Int, ky >= 2 { o.append(("d:kayma:\(ky)", TE("Gündemde \(ky) madde geride", "\(ky) agenda items behind"), KR.onay)) }
         }
+        if let vy = v["veri_yok"] as? [String: Any], let sn = vy["sn"] as? Int {  // toplantı sürüyor ama satır yok (panodaki sarı uyarıyla aynı metin); anahtar sabit: sayaç her saniye değişse de bir kez
+            let k = vy["kanallar"] as? [String: Any] ?? [:], g = { (a: String) in k[a] as? String ?? "" }
+            let A = ["acik": TE("açık", "on"), "yok": TE("yok", "none")]
+            let B = ["yok": TE("mikrofon bilgisi yok", "no microphone info"), "hata": TE("mikrofon açılamadı", "microphone could not be opened"), "kapali": TE("mikrofon kanalı kapalı", "microphone channel off"),
+                     "sessiz": TE("mikrofon sessizde", "microphone muted"), "sorun": TE("mikrofon açık ama ses gelmiyor", "microphone on but no audio")]
+            let C = ["izin": TE("ses kaydı izni yok", "audio recording permission missing"), "yok": TE("ses yardımcısı yok", "audio helper missing"), "kapali": TE("ses yardımcısı kapalı", "audio helper off"),
+                     "bekliyor": TE("ses yardımcısı hazır, ses gelmiyor", "audio helper ready, no audio"), "dinliyor": TE("ses yardımcısı dinliyor, satır yok", "audio helper listening, no lines"), "web": TE("tarayıcı sesi, satır yok", "browser audio, no lines")]
+            o.append(("d:veriyok", TE("Toplantı sürüyor ama \(sn) sn'dir döküm gelmiyor", "The meeting is on but no transcript for \(sn) s") + " — " + TE("altyazı", "captions") + ": " + (A[g("altyazi")] ?? g("altyazi"))
+                + " · " + TE("ben", "you") + ": " + (B[g("ben")] ?? g("ben")) + " · " + TE("karşı taraf", "other side") + ": " + (C[g("karsi")] ?? g("karsi")), KR.onay))
+        }
         if let ss = v["sessiz"] as? [String: Any], (ss["acik"] as? Bool) == true {
             o.append(("d:sessiz", TE("Sessiz: kartlar bekliyor · bitiş \(ss["bitis"] as? String ?? "")", "Quiet: cards are held · ends \(ss["bitis"] as? String ?? "")"), KR.not))
         }

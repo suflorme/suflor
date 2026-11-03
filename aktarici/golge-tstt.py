@@ -1,5 +1,5 @@
 # Gölge kipte turkish-stt (ayar golge_tstt, varsayılan kapalı; geliştirici denemesi): Whisper'a giden aynı ses yerel turkish-stt akış tanıyıcısına da verilir,
-# EKRANA ve döküme hiçbir şey girmez; yalnız ses arşivi klasörüne tstt-golge.jsonl yazılır (kıyas: _yedek/test-araclari/tstt-golge/kiyas.py). Ses Mac'ten çıkmaz.
+# döküme hiçbir şey girmez; ekrana yalnız ayar tstt_taslak (varsayılan açık) ile soluk "anlık ilk yazı" taslağı düşer (whisper-hat.py taslak_tstt), Whisper satırı gelince yerine geçer; yalnız ses arşivi klasörüne tstt-golge.jsonl yazılır (kıyas: _yedek/test-araclari/tstt-golge/kiyas.py). Ses Mac'ten çıkmaz.
 # İşçi ayrı süreç (tstt-golge-isci.py, tstt-venv Python'u): kuyruk dolarsa parça bekletmeden atılır (dusen), 10 dk ses gelmezse kapanır, çökerse saatte ≤ 3 kez yeniden açılır.
 import queue, subprocess, base64
 GOLGE_PY = os.path.join(_ORT, "tstt-venv", "bin", "python"); GOLGE_MODEL = os.path.join(_ORT, "tstt-model")
@@ -24,10 +24,15 @@ def _golge_oku(p):  # işçinin stdout'u → tstt-golge.jsonl (satırın yazıld
     for l in p.stdout:
         try:
             o = json.loads(l)
+            if o.get("tur") == "ara":  # anlık ilk yazı (ayar tstt_taslak): yalnız taslak deposuna, tstt-golge.jsonl'a yazılmaz
+                if "taslak_tstt" in globals(): taslak_tstt(str(o.get("k")), o.get("metin"), o.get("t"))
+                continue
             if o.get("tur") == "hazir": STATE["golge_tstt"]["durum"] = "calisiyor"; print(f"GÖLGE TSTT: işçi hazır ({o.get('yukleme_sn')} sn)")
             yol = os.path.join(ses_arsivi_klasor(), "tstt-golge.jsonl"); os.makedirs(os.path.dirname(yol), exist_ok=True)
             with LOCK: write([(yol, l if l.endswith("\n") else l + "\n")])
-            if o.get("tur") == "soz": STATE["golge_tstt"]["satir"] += 1
+            if o.get("tur") == "soz":
+                STATE["golge_tstt"]["satir"] += 1
+                if "taslak_tstt_bitti" in globals(): taslak_tstt_bitti(str(o.get("k")))
         except Exception as e: print(f"GÖLGE TSTT: satır yazılamadı ({e.__class__.__name__})")
 def _golge_kapat(p, durum="kapali"):
     try:
