@@ -1244,6 +1244,28 @@ DEVAM_SOZ_RX = re.compile(r"\b(?:ne|neden|niye|niçin|nasıl|kim|kimi|kime|kimin
 DEVAM_BAS_RX = re.compile(r"^\W*(?:(?:tamam|evet|okay|ok)[,.]?\s+)?(?:peki|ya(?!\s+da\b)|bir de|what|why|how|who|whom|which|when|where|is|are|do|does|did|can|could|would|will|should|have|has|and what|what about|also)\b", re.I)
 DEVAM_KAPAT_RX = re.compile(r"\b(?:teşekkür\w*|tşk|sağ ?ol\w*|eyvallah|bu kadar|that'?s all|thanks|thank you)\b|^\W*(?:tamam|okay|ok|anladım|anlaşıldı|güzel|süper|harika)(?:\W+(?:tamam|okay|ok|anladım|güzel|süper|harika|o zaman))*\W*$", re.I)
 DEVAM_GRUP_RX = re.compile(r"\b(?:arkadaşlar|herkes|ekip|millet|beyler|hanımlar|guys|everyone|everybody|team|folks|let'?s)\b|\b\w+(?:[ae]l[ıi]m)\b", re.I)
+# 3 Kasım (gerçek Teams denemesi): yanlış devam — "Peki şimdi şöyle yapacağım. …" (peki başı), "…yanıltmasın diye değiştiriyorum demiş." (KISILIK_ISTEK'in geniş
+# -sın kalıbı), "…transkripti başlat demiş. Kaydet transkriptere." ve "…devam edebilirsin diyor." (ekrandaki ya da başkasının sözünü okuyor). Kural: soru işareti
+# yoksa aktarma fiiliyle (demiş/diyor/dedi/yazmış/istemiş/söylüyor…) biten cümle soru sözcüğü taşımıyorsa satır devam değil; "peki" başı yalnız soru işaretiyle ya da
+# cümle bitmemişse (Whisper bölmüş, askıya girer); istek kalıbında 3. kişi/2. kişi -sın eki (yanıltmasın, edebilirsin) sayılmaz.
+DEVAM_AKTARMA_SOZ = {"demiş", "diyor", "dedi", "demişler", "diyorlar", "dediler", "yazmış", "yazıyor", "yazdı", "istemiş", "istiyor", "istedi", "söylemiş", "söylüyor", "söyledi",
+                     "sormuş", "soruyor", "sordu", "anlatmış", "anlatıyor", "anlattı", "önermiş", "öneriyor", "önerdi", "says", "said", "wrote", "writes", "asks", "asked"}
+_DEVAM_ISTEK = {}
+def _devam_istek_rx():  # KISILIK_ISTEK'ten -sın/-sınlar seçeneği atılmış hali (devam yolunda)
+    if "rx" not in _DEVAM_ISTEK:
+        ki = KISILIK_ISTEK; ki2 = ki.replace(r"|\w+(?:s[ıiuü]n|s[ıiuü]nl[ae]r)\b", "")
+        _DEVAM_ISTEK["rx"] = re.compile(ki2, re.I)
+    return _DEVAM_ISTEK["rx"]
+def devam_soru_mu(metin):  # adsız kullanıcı satırı devam sorusu/isteği mi (pencere, süre, kapanış ayrıca)
+    m = str(metin or "").strip()
+    if not m: return False
+    if "?" not in m:
+        for c in re.split(r"(?<=[.!…])\s+", m):
+            w = re.findall(r"[\wçğıöşüÇĞİÖŞÜ']+", c)
+            if w and w[-1].replace("İ", "i").replace("I", "ı").lower() in DEVAM_AKTARMA_SOZ and not DEVAM_SOZ_RX.search(c): return False  # aktarma: başkasının sözü
+    bas = DEVAM_BAS_RX.match(m)
+    if bas and re.match(r"^\W*(?:(?:tamam|evet|okay|ok)[,.]?\s+)?peki\b", m, re.I) and "?" not in m and re.search(r"[.!…]", m): bas = None  # "Peki şimdi şöyle yapacağım."
+    return bool(DEVAM_SORU_RX.search(m) or bas or _devam_istek_rx().search(m) or (DEVAM_SOZ_RX.search(m) and not re.search(r"[.!]\s*$", m)))
 def _devam_kapat(neden):
     if HITAP_DEVAM["ad"]: print(f"KONUŞ: devam penceresi kapandı — {neden}")
     HITAP_DEVAM.update(ad=None, bit=None); HITAP_DEVAM["nesil"] += 1; return None
@@ -1270,7 +1292,7 @@ def _devam_baskasina(metin):  # satır başka birine seslenme mi: "Can, …" / "
     sw = {_vk_ad(x) for x in re.findall(r"[\wçğıöşüÇĞİÖŞÜ]+", m)}
     try: ben = _vk_ad(str(ben_adi() or "").split(" ")[0])
     except NameError: ben = ""
-    kon = {_vk_ad(str(k).split(" ")[0]) for _, k, _ in list(globals().get("SON_SATIRLAR") or [])} - {ben, "", "?"}
+    kon = {_vk_ad(str(x[1]).split(" ")[0]) for x in list(globals().get("SON_SATIRLAR") or []) if not (len(x) > 3 and x[3])} - {ben, "", "?"}
     return bool(sw & {k for k in kon if len(k) >= 3})
 def hitap_devam_bak(metin, t0=None, t1=None):  # hitap_duzelt: kullanıcının adsız yeni Whisper satırı → (asistanın adı, geçen sn) ya da None
     d = HITAP_DEVAM; sn = float(AYAR.get("hitap_devam_sn", 20) or 0)
@@ -1281,8 +1303,9 @@ def hitap_devam_bak(metin, t0=None, t1=None):  # hitap_duzelt: kullanıcının a
     if gecen > sn: return _devam_kapat(f"süre doldu ({sn:.0f} sn)")
     try: ben = ben_adi()
     except NameError: ben = None
-    for t, k, x in list(globals().get("SON_SATIRLAR") or []):
-        if t >= d["t"] and k not in (ben, "?") and len(re.findall(r"\w+", x)) >= 3: return _devam_kapat(f"karşı taraf konuştu ({k})")
+    for s_ in list(globals().get("SON_SATIRLAR") or []):  # 3 Kasım: kullanıcının satırı kanaldan (4. alan); eski 3'lü kayıtta ada göre
+        t, k, x = s_[:3]
+        if t >= d["t"] and k != "?" and not (s_[3] if len(s_) > 3 else k == ben) and len(re.findall(r"\w+", x)) >= 3: return _devam_kapat(f"karşı taraf konuştu ({k})")
     if DEVAM_KAPAT_RX.search(metin or ""): return _devam_kapat(f"kullanıcı kapattı (\"{metin[:30]}\")")
     if _devam_baskasina(metin): return _devam_kapat(f"başka birine seslendi (\"{metin[:30]}\")")
     if DEVAM_GRUP_RX.search(metin or ""): return _devam_kapat(f"topluluğa döndü (\"{metin[:30]}\")")
@@ -1290,8 +1313,7 @@ def hitap_devam_bak(metin, t0=None, t1=None):  # hitap_duzelt: kullanıcının a
     a = _ASISTAN_SORU
     if a["ad"] and t0 - max(a["bit"], (globals().get("TS") or {}).get("son_t") or 0) <= ASISTAN_SORU_SN: return None  # asistan soru sordu: cevap yolu (asistan_cevap_bekliyor)
     if len(re.findall(r"\w+", metin or "")) < 2: return None
-    soru = DEVAM_SORU_RX.search(metin) or DEVAM_BAS_RX.match(metin) or re.search(KISILIK_ISTEK, metin, re.I) or (DEVAM_SOZ_RX.search(metin) and not re.search(r"[.!]\s*$", metin))
-    if not soru: return None
+    if not devam_soru_mu(metin): return None
     try:
         if t1 is not None and "_kendi_mi" in globals():
             with YANKI_LOCK: yank = any(_kendi_mi((t0, t1, _yk(metin)), k) for k in KENDI_SES)
@@ -1709,7 +1731,7 @@ def konus_is_ilet(metin):
 ASISTAN_OKU_RX = re.compile(r"^\W*(oku|okuyabilirsin|söyle|soyle|evet|evet oku|tamam|tamam oku|cevapla|cevap ver|onaylıyorum|go ahead|read it|yes)\W*$", re.I)  # v0.97.0 (Y2): bekleyen karşı taraf cevabını onayla
 # tek durdurma kalıbı: "<Ad>, dur" (konus_hitap) ve okuma sürerken kullanıcının adsız kısa sözü (otonom.py okuma_dur_soz) — 28 Ekim: "bir dakika" 12 sn geç durdurdu
 ASISTAN_DUR_RX = re.compile(r"^\W*(?:dur|sus|sus artık|yeter|kes|bekle|tamam yeter|dur bir dakika|bir dakika|bir saniye|bir dk|bir sn|biraz bekle|dur biraz|stop|be quiet|that'?s enough|wait|hold on|one (?:moment|minute|second))\W*$", re.I)
-ASISTAN_BEKLE_SN = 30
+ASISTAN_BEKLE_SN = 30; LAT_ESKI_SN = 60  # LAT_ESKI_SN: asistan meşgulken soru en çok ASISTAN_BEKLE_SN bekler; daha eski hitap satırı bu sorunun değildir
 def _hitap_ad():  # bu satırda adıyla seslenilen asistan (hitap_duzelt bıraktı); kişiliksiz kurulumda Claude/Suflor hitabı → "Suflor"
     return _KHR.get("satir") or (None if kisilikler() else "Suflor")
 def asistan_onay(ad):  # iş talimatı alındı: kısa onay toplantıya (söz sırası gelince)
@@ -1719,7 +1741,7 @@ def asistan_onay(ad):  # iş talimatı alındı: kısa onay toplantıya (söz s�
 def _asistan_sor(soru, ek, gosterim=None, metin=None):  # ek: kaynak (hitap|karsi), ad, karsi → konuşana; meşgulse sırada bekler
     def tur_kur():
         tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "otonom": otonom_acik(), **ek}; _KS["tur"] = tur
-        if ek.get("kaynak") == "hitap": tur["lat"] = dict(LAT, algi=time.time())  # v0.152.0: konuşma bitişi → satır → algı (otonom.py gecikme satırı)
+        if ek.get("kaynak") == "hitap": tur["lat"] = dict(LAT if time.time() - (LAT.get("satir") or 0) < LAT_ESKI_SN else {}, algi=time.time())  # v0.152.0: konuşma bitişi → satır → algı (otonom.py gecikme satırı); 3 Kasım: eski satır zamanı ölçüme girmez ("?")
         _konus_kur(durum="dusunuyor", soru=gosterim or soru, cevap="", hata=None, olcum=None, sesli_cevap=False, kaynak=ek["kaynak"]); return tur
     if not _KS["tur"]:
         threading.Thread(target=_konus_sor, args=(metin or soru, tur_kur()), daemon=True).start()

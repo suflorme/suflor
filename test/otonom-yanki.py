@@ -44,6 +44,7 @@ ts = sorted(set(yanki(0.45)) | hh)
 ok("1 Kasım: yankı + okurken \"hı hı\": kesmez", not any(ks([t for t in ts if t <= T0 + u], zarf) for u in (4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0)) and not ks(ts, zarf))
 ts = sorted(set(yanki(0.45)) | {T0 + 4 + i * 0.02 for i in range(75)}); ok("yankı + 1,5 sn gerçek ses: yine keser", ks([t for t in ts if t <= T0 + 5.55], zarf))
 ok("yalnız yankı: kesmez (otonom_kesilsin)", not ks(yanki(0.45), zarf) and not ks(yanki(0.0, kayip=0.3), zarf))
+ok("3 Kasım: 0,18 sn gecikmeli yankı (yerleşik hoparlör → mikrofon): kesmez", not any(ks([t for t in yanki(0.18) if t <= T0 + u], zarf) for u in (3, 5, 7, 9)) and abs((yd(yanki(0.18), zarf, T0)[1] or 9) - 0.18) <= 0.06)
 n, d = yd([T0 + 1 + i * 0.02 for i in range(30)], None, T0)
 ok("zarf yoksa (Mac sesi) eski sayım: 0,6 sn ses kesmez", n == 30 and n < ESIK)
 # uzun okumada küçük uyumsuzluk birikmez: yalnız son 3 sn sayılır
@@ -77,6 +78,27 @@ ns["KENDI_SES"].append((time.time() - 5, time.time() + 5, ["bir", "dakika", "son
 ok("söylediğimiz metinde 'bir dakika' geçiyorsa (yankı olabilir) kesmez", not ds("Bir dakika.", time.time() - 3))
 ns["TS"]["web"]["dur"] = True
 ok("okuma bittiyse kesmez", not ds("Dur."))
+# 3 Kasım (gerçek Teams denemesi, yerleşik mikrofon): kullanıcı asistanın üstüne konuştu, enerji ölçümü yankı sandı. okuma_ustune_soz: okuma sürerken başlamış ben satırı,
+# ≥ 3 içerik sözcüğü ve sesi kullanıcıya benziyorsa (ses izi ≥ 0,45) keser; yankı (bozuk yazılmış da olsa) ve "hı hı/hmm/evet" kesmez. Metinler ve benzerlikler o günün günlüğünden.
+_ayikla("whisper-hat.py", {"_yk"}); _ayikla("otonom.py", {"OTONOM_USTUNE_SOZ", "ONAY_SOZ", "_kok_benzer", "okuma_ustune_soz"})
+_a2 = ast.parse(open(os.path.join(KOD, "aktarici", "otonom.py"), encoding="utf-8").read())
+exec(compile(ast.Module([n for n in _a2.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Tuple) and any(getattr(e, "id", "") == "OTONOM_USTUNE_BENZERLIK" for e in n.targets[0].elts)], []), "otonom.py", "exec"), ns)
+ns.update(OT_K=threading.Lock(), _ot_ayar=lambda a, v: v, kisilikler=lambda: [{"hitap": ["ATLAS", "Atlas"]}], KENDI_SES=[], _kok_ayni=lambda x, y: (lambda n: n >= 3 and n >= min(len(x), len(y)) - 2)(next((i for i, (p, q) in enumerate(zip(x, y)) if p != q), min(len(x), len(y)))))
+uk = ns["okuma_ustune_soz"]; tb = time.time() - 5; ns["OT"] = {"id": "x", "durum": "okunuyor", "t_durum": tb}
+ok("üstüne konuşma (12:10:32 'Deneme 13'ün tüm maddelerini yap.', ses izi 0,72): keser", bool(uk(tb + 1.0, "Deneme 13'ün tüm maddelerini yap.", 0.72)))
+ok("üstüne konuşma (12:10:47, 0,62, yankıyla karışık): keser", bool(uk(tb + 2.0, "Yani deneme 13'ün tüm test... Transpikt işi şu an bekleyişte. Asıl transpikt başlat.", 0.62)))
+ok("bozuk yazılmış yankı (11:44:44 'Evet. Evet. Sizi duyuyoruz.', 0,08): kesmez", not uk(tb + 1.0, "Evet. Evet. Sizi duyuyoruz. Sizi duyuyoruz.", 0.08))
+ok("bozuk yankı, ses izi yüksek ama içerik onay (11:43:49 'Dinliyorum. Tamam. Peki.'): kesmez", not uk(tb + 1.0, "Dinliyorum. Tamam. Peki.", 0.6))
+for m in ("Hı hı.", "Hmm.", "Evet evet.", "Tamam, evet.", "Atlas."):
+    ok(f"okurken '{m}' (ses izi 0,7): kesmez", not uk(tb + 1.0, m, 0.7))
+ok("kısa söz ('Toplantı bitince.', 2 sözcük, 0,68): kesmez (kısa durdurma okuma_dur_soz'da)", not uk(tb + 1.0, "Toplantı bitince.", 0.68))
+ok("okuma başlamadan başlamış satır (11:53:17): kesmez", not uk(tb - 0.5, "Atlas. Bargo şimdi burada ne yazıyor bak", 0.59))
+ns["OT"]["durum"] = "okundu"; ok("okuma bitmişse kesmez", not uk(tb + 1.0, "Deneme 13'ün tüm maddelerini yap.", 0.72)); ns["OT"]["durum"] = "okunuyor"
+ns["KENDI_SES"].append((tb, tb + 20, ns["_yk"]("Transkript işi şu an bekleyişte: asıl transkripti başlattınız, bekçi kurdu; toplantı bitince haber verip örneği hazırlayacak.")))
+ok("ses izi yok (kısa parça), yankının bozuk yazımı ('Asıl transpikt işi şuan bekleyin.'): kesmez", not uk(tb + 2.0, "Asıl transpikt işi şuan bekleyin.", None))
+ok("ses izi yok, okunan metinde olmayan 4 sözcük: keser (yedek kural)", bool(uk(tb + 2.0, "Bütçe tablosunu yarın gönderelim mi", None)))
+kod_w = open(os.path.join(KOD, "aktarici", "whisper-hat.py"), encoding="utf-8").read()
+ok("whisper_yaz'daki kısa durdurma sözü ses kilidinde de çalışır (yalnız oda kipinde atlanır)", 'not (is_.get("oda") and oda_acik()) and "okuma_dur_soz" in globals()' in kod_w)
 # v0.152.0: başkasına seslenilen ad hitapsız cevap sayılmaz; karşı hitap yalnız okunan metne benzerse atılır; ikinci cevap öncekinin okumasını kesmez; "siz" kuralı
 _VK = {"_VOKATIF": set()}; ns.update(_VK, kisilikler=lambda: [{"hitap": ["Deniz"]}])
 _ayikla("bas-konus.py", {"_VOKATIF", "_vk_ad", "vokatif_ogren", "vokatif_mi"})

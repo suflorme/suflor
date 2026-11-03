@@ -198,8 +198,8 @@ for girdi, bek, ic, ac in [
 
 # 30 Ekim: adsız devam sorusu (bas-konus.py hitap_devam_*): asistan cevap verdikten sonra hitap_devam_sn içinde kullanıcının sorusu ad olmadan ona gider
 import threading as _th
-exec(compile(ast.Module([n for n in bk.body if (isinstance(n, ast.FunctionDef) and n.name in ("_devam_kapat", "hitap_devam_ac", "_devam_baskasina", "hitap_devam_bak", "hitap_devam_karsi", "vokatif_mi", "vokatif_ogren", "_vk_ad")) or
-                         (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("HITAP_DEVAM", "DEVAM_SORU_RX", "DEVAM_SOZ_RX", "DEVAM_BAS_RX", "DEVAM_KAPAT_RX", "DEVAM_GRUP_RX", "_VOKATIF") for x in n.targets))], []), "bas-konus.py", "exec"), ns)
+exec(compile(ast.Module([n for n in bk.body if (isinstance(n, ast.FunctionDef) and n.name in ("_devam_kapat", "hitap_devam_ac", "_devam_baskasina", "hitap_devam_bak", "hitap_devam_karsi", "vokatif_mi", "vokatif_ogren", "_vk_ad", "devam_soru_mu", "_devam_istek_rx")) or
+                         (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("HITAP_DEVAM", "DEVAM_SORU_RX", "DEVAM_SOZ_RX", "DEVAM_BAS_RX", "DEVAM_KAPAT_RX", "DEVAM_GRUP_RX", "_VOKATIF", "DEVAM_AKTARMA_SOZ", "_DEVAM_ISTEK") for x in n.targets))], []), "bas-konus.py", "exec"), ns)
 ns.update(threading=_th, AYAR={}, toplanti_var=lambda: True, _KS={"tur": None}, ben_adi=lambda: "Ben Kullanıcı", SON_SATIRLAR=[], OT={}, okuma_suruyor=lambda: False, ses_caliyor=lambda: False)
 ns["_ASISTAN_SORU"].update(ad=None); ns["TS"] = {}
 _tm = __import__("time")
@@ -224,7 +224,22 @@ for kur, girdi, bek, ac in [
     (lambda: (ns["_KS"].update(tur=None), pencere(), ns["HITAP_DEVAM"].update(bit=None)), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: cevap okunurken (pencere henüz açılmadı)"),
     (lambda: (pencere(), ns["_ASISTAN_SORU"].update(ad="Atlas", t=_tm.time() - 2, bit=_tm.time() - 1)), "Salı olsun ne dersin?", "Salı olsun ne dersin?", "olumsuz: asistan soru sordu — cevap yolu (asistan_cevap_bekliyor)"),
     (lambda: (ns["_ASISTAN_SORU"].update(ad=None), pencere(), ns["AYAR"].update(hitap_devam_sn=0)), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: ayar hitap_devam_sn 0 = kapalı"),
-    (lambda: (ns["AYAR"].clear(), pencere(), ns.update(toplanti_var=lambda: False)), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: toplantı dışında yok")]:
+    (lambda: (ns["AYAR"].clear(), pencere(), ns.update(toplanti_var=lambda: False)), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: toplantı dışında yok"),
+    # 3 Kasım gerçek Teams denemesi: yanlış devamlar (peki başı + cümle bitti, aktarma fiili, -sın eki) ve doğru devamlar (günlükten)
+    (lambda: pencere(), "Peki şimdi şöyle yapacağım. Şu an konuştuğumda", "Peki şimdi şöyle yapacağım. Şu an konuştuğumda", "olumsuz: 'peki' başı ama cümle bitti, soru yok"),
+    (lambda: pencere(), "Yapı kaydedildi dosya adının yanıltmasın diye değiştiriyorum demiş.", "Yapı kaydedildi dosya adının yanıltmasın diye değiştiriyorum demiş.", "olumsuz: aktarma (demiş), -sın eki istek değil"),
+    (lambda: pencere(), "Asıl transkript için transkripti başlat demiş. Kaydet transkriptere.", "Asıl transkript için transkripti başlat demiş. Kaydet transkriptere.", "olumsuz: ekrandakini okuyor (demiş)"),
+    (lambda: pencere(), "denemeye devam edebilirsin diyor.", "denemeye devam edebilirsin diyor.", "olumsuz: aktarma (diyor)"),
+    (lambda: pencere(), "Ne oldu kaçtı?", "Claude: Ne oldu kaçtı?", "devam: 'Ne oldu kaçtı?' (12:09:46)"),
+    (lambda: pencere(), "Ne diyor burada?", "Claude: Ne diyor burada?", "devam: 'Ne diyor burada?' (11:53:17)"),
+    (lambda: pencere(), "Sana takılıyorum biraz. Bunu anlıyorsun değil mi?", "Claude: Sana takılıyorum biraz. Bunu anlıyorsun değil mi?", "devam: 12:05:21"),
+    (lambda: pencere(), "Dostum seni sevmemem mümkün mü? Yani seni oluşturan benim ve...", "Claude: Dostum seni sevmemem mümkün mü? Yani seni oluşturan benim ve...", "devam: 12:05:44"),
+    (lambda: pencere(), "Hesabımdan sana seslendim. Misafir hesabından seslendiğimde bana cevap veriyor musun?", "Claude: Hesabımdan sana seslendim. Misafir hesabından seslendiğimde bana cevap veriyor musun?", "devam: 11:43:11"),
+    (lambda: pencere(), "Kartı onaylama demiş. Bu nasıl bir task yani?", "Claude: Kartı onaylama demiş. Bu nasıl bir task yani?", "devam: aktarma + soru işareti (11:54:20)"),
+    (lambda: pencere(), "Kaan ne dedi", "Kaan ne dedi", "devam: soru sözcüklü aktarma (noktalamasız → askıya)"),
+    # 3 Kasım: misafir hesabı kullanıcıyla aynı ilk ad ("Deniz T" / "Deniz"): SON_SATIRLAR'ın 4. alanı (kullanıcının satırı mı, kanaldan) ada üstün
+    (lambda: (pencere(), ns["SON_SATIRLAR"].append((_tm.time(), "Ben Misafir", "Beni duyuyor musun acaba", False))), "Peki bütçe ne durumda?", "Peki bütçe ne durumda?", "olumsuz: aynı ilk adlı misafir (karşı kanal) konuştu → kapanır"),
+    (lambda: (pencere(), ns["SON_SATIRLAR"].append((_tm.time(), "Ben Misafir", "Bence bunu yarın konuşalım", True))), "Peki bütçe ne durumda?", "Claude: Peki bütçe ne durumda?", "kullanıcının kendi satırı (ad ben_adi'den farklı da olsa) kapatmaz")]:
     ns["SON_SATIRLAR"].clear(); kur(); cik = satir(girdi); ok = cik == bek; hata += not ok
     ns.update(toplanti_var=lambda: True); ns["_KS"]["tur"] = None
     print(f"{'✓' if ok else '✗'} {ac}: {girdi!r} → {cik!r}" + ("" if ok else f" (beklenen {bek!r})"))
@@ -247,5 +262,30 @@ c9 = satir("Deniz sen ne düşünüyorsun?"); ok = c9 == "Deniz sen ne düşün�
 print(("✓ " if ok else "✗ ") + f"toplantıdaki başka konuşanın adı geçen satır devam sayılmaz: {c9!r}")
 ns["SON_SATIRLAR"].clear(); KIS["v"] = None
 
+# 3 Kasım (gerçek Teams denemesi): kullanıcı "Deniz T" + misafir hesabı "Deniz" aynı toplantıda. ben_adi ilk adı uyan son konuşanı döndürüyordu (misafir son konuşunca
+# "ben" o oldu). Şimdi: tam ad → ayardaki adın sözcükleri altyazıdaki adın başı (tek aday) → yalnız ilk ad (tek aday); Whisper satırında kanal esas (ben_satiri).
+wh = ast.parse(open(os.path.join(KOD, "aktarici/whisper-hat.py"), encoding="utf-8").read()); sz = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
+bns = {"re": re, "ALTYAZI_SON": [], "AYAR": {"ad": "Deniz T"}, "agenda": lambda: {}, "BEN_ESKI": {"ben", "kullanici", "deniz"}, "ODA_AD": "Odadaki kişi"}
+exec(compile(ast.Module([n for n in sz.body if isinstance(n, ast.FunctionDef) and n.name in ("_nc", "sade")] +
+                        [n for n in wh.body if (isinstance(n, ast.FunctionDef) and n.name in ("ben_adi", "ben_satiri")) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) == "_BEN_ON" for x in n.targets))], []), "whisper-hat.py", "exec"), bns)
+ba, bs = bns["ben_adi"], bns["ben_satiri"]; AS = bns["ALTYAZI_SON"]
+for kur, bek, ac in [([], "Deniz T", "altyazı yok → ayardaki ad"),
+                     ([(1, "Deniz T"), (2, "Deniz")], "Deniz T", "misafir 'Deniz' son konuştu → yine tam ad"),
+                     ([(3, "Deniz Tuncel"), (4, "Deniz")], "Deniz Tuncel", "ayardaki 'Deniz T' altyazıda 'Deniz Tuncel' + misafir 'Deniz' → soyadı başı uyan"),
+                     ([(1, "Deniz Tuncel")], "Deniz Tuncel", "tek aday, soyadı başı uyar"),
+                     ([(5, "Deniz Kaya")], "Deniz Kaya", "tek aday yalnız ilk adla uyuyor (soyadı uymasa da; eski davranış)"),
+                     ([(6, "Deniz Kaya"), (7, "Deniz")], "Deniz T", "iki aday yalnız ilk adla → ayardaki ad"),
+                     ([(8, "Deniz")], "Deniz", "tek aday yalnız ilk ad (eski davranış)"),
+                     ([(9, "deniz t"), (10, "Ayla Ö")], "deniz t", "büyük/küçük harf farkı tam ad sayılır")]:
+    AS[:] = kur; v = ba(); ok_ = v == bek; hata += not ok_
+    print(f"{'✓' if ok_ else '✗'} ben_adi: {ac} → {v!r}" + ("" if ok_ else f" (beklenen {bek!r})"))
+AS[:] = [(1, "Deniz T"), (2, "Deniz")]
+for e, kay, bek, ac in [({"speaker": "Deniz", "kanal": "karsi"}, "whisper", False, "Whisper karşı kanal, ad kullanıcıyla aynı ilk ad → karşı"),
+                        ({"speaker": "Deniz T", "kanal": "ben"}, "whisper", True, "Whisper ben kanalı → kullanıcı"),
+                        ({"speaker": "Odadaki kişi", "kanal": "ben"}, "whisper", False, "ben kanalında odadaki kişi → kullanıcı değil"),
+                        ({"speaker": "Deniz"}, "captions", False, "altyazı: misafir 'Deniz' → kullanıcı değil"),
+                        ({"speaker": "Deniz T"}, "captions", True, "altyazı: tam ad → kullanıcı")]:
+    v = bs(e, kay); ok_ = v == bek; hata += not ok_
+    print(f"{'✓' if ok_ else '✗'} ben_satiri: {ac} → {v}")
 print("GEÇTİ" if not hata else f"KALDI: {hata}")
 sys.exit(1 if hata else 0)

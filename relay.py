@@ -501,7 +501,7 @@ SESLI_KANIT_RX = re.compile(r"\b(?:kanıt|ekran\s+(?:görüntü|resm|resim|kayd|
                             + r"|\b(?:take|capture|grab|save)\s+(?:some\s+|the\s+)?evidence\b", re.I)
 SESLI_NOT_RX = re.compile(r"\bnot\s*" + _KOMUT_FIIL + _KOMUT_SON, re.I)
 SESLI_KANIT_YOK = re.compile(r"\b(alma|almay|çekme|çekmey|kaydetme|başlatma)\w*|gerek\s+yok|istemiyorum|don'?t", re.I)
-SESLI_KANIT = {"t": 0.0}; SESLI_NOT = {"t": 0.0}; SON_SATIRLAR = []  # (t, konuşan, metin): sesli notun içeriği boşsa önceki satır
+SESLI_KANIT = {"t": 0.0}; SESLI_NOT = {"t": 0.0}; SON_SATIRLAR = []  # (t, konuşan, metin, kullanıcının mı): sesli notun içeriği boşsa önceki satır
 def _sozcukler(s): return {w for w in re.findall(r"\w+", (s or "").lower()) if len(w) > 2}
 def kart_okunuyor(metin):  # kullanıcı ekrandaki kartı yüksek sesle okuyor mu (son 3 dk'daki kartların sözcükleriyle örtüşme)
     s = _sozcukler(metin)
@@ -682,19 +682,24 @@ def ingest(p):
             if e.get("id"): seen[e["id"]] = raw
             text, soz = sozluk_uygula(raw, base_key)
             if p.get("source") == "captions" and (e.get("speaker") or "").strip().lower() in ("you", "siz", "sen"): e["speaker"] = AYAR.get("ad") or e["speaker"]  # Meet kendi satırına "You" yazar
-            if (e.get("speaker") or "") == ben_adi():
+            ben_mi = ben_satiri(e, p.get("source"))  # 3 Kasım: Whisper satırında kanal, altyazıda tam ad (iki "Deniz" aynı toplantıda)
+            if ben_mi:
                 yeni_w = p.get("source") == "whisper" and not onceki
                 if yeni_w: text = hitap_ses_duzelt(text)  # 28 Ekim: adın ses benzeri yazılışı ("mermis") hitap sayılsın (sozluk.py)
                 ham = text
                 birlesik = hitap_aski(text, e.get("t0"), e.get("t1")) if yeni_w else None  # 19 Ekim: bölünen hitap; v0.140.0: yalnız ad + sonraki satırlar
                 text, hd = hitap_duzelt(text); soz += hd
                 if yeni_w and "Claude:" not in text: vokatif_ogren(ham)
-                if yeni_w and "Claude:" in text: LAT.clear(); LAT.update(konusma_bit=e.get("t1"), satir=time.time())  # v0.152.0: hitap satırı gecikme ölçümü (otonom.py)
                 if _KHR["satir"] and "Claude:" in text: e["_hitap_ad"] = _KHR["satir"]  # S133: kullanıcıya görünen dökümde bu ad yazılır (asistan_goster)
                 # v0.140.0: asistan soru sorduysa ASISTAN_SORU_SN içindeki hitapsız cevap o asistana (askıda birikir, süre dolunca gider)
                 if yeni_w and not birlesik and "Claude:" not in text and not hitap_askida(ham) and e.get("komut_ses") != "uymuyor" and not vokatif_mi(ham) and (ad_ := asistan_cevap_bekliyor(e.get("t0"))):
                     hitap_cevap_baslat(ad_, ham, e.get("t0"), e.get("t1")); print(f"KONUŞ: hitapsız cevap {ad_}'nın sorusuna sayıldı — \"{ham[:60]}\"")
                 askida = hitap_aski_metin() if hitap_askida(ham) else None  # S94: yarım hitap tek başına gitmez; devamı gelmezse süre dolunca tek başına
+                # v0.152.0: hitap satırı gecikme ölçümü (otonom.py). 3 Kasım: bölünen hitap, askı (devam/hitapsız cevap) yolunda da bu satırla kurulur — yalnız "Claude:" satırında
+                # kurulunca eski hitabın zamanı kalıyor, "algı 33 / 141 / 621 sn" gibi sahte değerler çıkıyordu
+                if yeni_w and ("Claude:" in text or birlesik or askida): LAT.clear(); LAT.update(konusma_bit=e.get("t1"), satir=time.time())
+                if yeni_w and "okuma_ustune_soz" in globals() and (us_ := okuma_ustune_soz(e.get("t0"), ham, e.get("_benzerlik"))):  # 3 Kasım: otonom okurken kullanıcı üstüne konuştu (otonom.py)
+                    threading.Thread(target=okuma_ustune_kes, args=(us_, ham), daemon=True).start()
                 if askida and e.get("komut_ses") != "uymuyor" and ("Claude:" in text or "Claude:" in hitap_duzelt(askida)[0]):
                     e["_konusan"] = True; threading.Thread(target=hitap_aski_zaman, args=(askida,), daemon=True).start()
                 if e.get("komut_ses") != "uymuyor":  # yanındaki birinin sesi kanıt/not istemez
@@ -713,7 +718,7 @@ def ingest(p):
                         _HITAP_ALTYAZI.add(e.get("id"))
                         print(f"KONUŞ: hitap altyazıda duyuldu, Whisper kapalı — cevaplanmadı (konuşana yalnız Whisper satırı gider) — \"{text[:60]}\"")  # mrt 28 Ekim 01:06 B1
             elif p.get("source") == "whisper" and not onceki and e.get("kanal") == "karsi" and konus_hitap_karsi(text, e.get("speaker"), e.get("t0"), e.get("t1")): e["_konusan"] = True  # v0.44.0
-            if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text)); del SON_SATIRLAR[:-20]
+            if not onceki: SON_SATIRLAR.append((time.time(), e.get("speaker") or "?", text, ben_mi)); del SON_SATIRLAR[:-20]  # 4. alan: kullanıcının satırı mı (3 Kasım)
             low = text.lower()
             if p.get("source") in ("captions", "transcript"):  # Whisper akarken o tarafın altyazısı gölgeye
                 kim_ = e.get("speaker") or "?"; ALTYAZI_SON.append((time.time(), kim_)); del ALTYAZI_SON[:-400]; kume_oyla(kim_)
@@ -1073,7 +1078,7 @@ def hatirlat_view():
     if not h or h.get("kapandi"): return None
     ben = ben_adi()
     if toplanti_var():
-        if not any(k and k != ben and k != "?" for _, k, _ in SON_SATIRLAR): return None  # karşı taraf yok: tek kişilik deneme sayılmaz
+        if not any(x[1] and x[1] != "?" and not (x[3] if len(x) > 3 else x[1] == ben) for x in SON_SATIRLAR): return None  # karşı taraf yok: tek kişilik deneme sayılmaz
     elif not _hat_yakin(): return None
 
     simdi = datetime.datetime.now().isoformat(timespec="seconds"); m = STATE.get("masaustu") or {}

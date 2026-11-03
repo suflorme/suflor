@@ -216,12 +216,28 @@ def whisper_view():
             "atlanan": w.get("atlanan", 0), "son_sn": w.get("son_sn"), "gecikme_max": w.get("gecikme_max"), "durgun_max": w.get("durgun_max"),
             "yavas": bool(w.get("yavas")), "parca": w.get("parca"), "eski_atlanan": w.get("eski_atlanan"), "birlesen": w.get("birlesen"),
             "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
+# 3 Kasım (gerçek Teams denemesi: kullanıcı "Deniz T" + misafir hesabı "Deniz"): eski kural son altyazı konuşmacılarından ilk adı uyanı döndürüyordu; misafir son
+# konuştuysa "ben" o oldu, misafirin soruları kullanıcı sorusu sayıldı (karşı taraf onay kapısı atlandı). Sıra: tam ad (sadeleştirilmiş) → ayardaki adın her sözcüğü
+# altyazıdaki adın sözcüklerinin başı ("Deniz T" → "Deniz Txxx"; tek aday) → yalnız ilk ad (tek aday). İki aday kalırsa ayardaki ad. Whisper satırında kanal esastır (ben_satiri).
+_BEN_ON = {"n": -1, "son": None, "ad": None}
 def ben_adi():
     a = agenda().get("ben")
     if a: return a
-    for _, k in reversed(ALTYAZI_SON):
-        if sade(k).split(" ")[0] == sade(AYAR["ad"]).split(" ")[0]: return k
-    return AYAR["ad"]  # hesabın kullanıcı adı (ayar.json "ad")
+    ad = AYAR["ad"]; o = _BEN_ON; son = ALTYAZI_SON[-1] if ALTYAZI_SON else None
+    if o["n"] == len(ALTYAZI_SON) and o["son"] is son and o["ad"] == ad: return o["sonuc"]  # önbellek: altyazı listesi değişmediyse
+    st = sade(ad).split(); adaylar = {k for _, k in ALTYAZI_SON if k and k != "?"}; r = None
+    tam = [k for k in adaylar if sade(k).split() == st]
+    bas = [k for k in adaylar if len(st) > 1 and len(sade(k).split()) >= len(st) and all(x.startswith(y) for x, y in zip(sade(k).split(), st))]
+    ilk = [k for k in adaylar if st and sade(k).split()[:1] == st[:1]]
+    if tam: r = tam[0]
+    elif len(bas) == 1: r = bas[0]
+    elif not bas and len(ilk) == 1: r = ilk[0]
+    o.update(n=len(ALTYAZI_SON), son=son, ad=ad, sonuc=r or ad)
+    return r or ad  # hesabın kullanıcı adı (ayar.json "ad")
+def ben_satiri(e, kaynak=None):  # → True: satır kullanıcının kendi sözü. Whisper satırında kanal (ben/karşı) esastır, adı değil; altyazı/dökümde ad (ben_adi)
+    k = e.get("kanal")
+    if k in ("ben", "karsi") or (kaynak == "whisper" and k): return k in BEN_ESKI and (e.get("speaker") or "") != ODA_AD
+    return (e.get("speaker") or "") == ben_adi()
 # --- Whisper istemi: önem sırası (v0.162.4) -------------------------------------------------------------------------------
 # İstem en çok ~215 belirteç (işçide istem_kur kırpar, sığmayanı bütün terim olarak atar: sondakiler). Eski sıra (gündemde geçen sözlük
 # adı, kullanıcının eklediği, otomatik) bu toplantının kişilerini hiç koymuyor, asistanın hitap yazımlarını da yalnız ad olarak veriyordu;
@@ -941,7 +957,8 @@ def whisper_yaz(is_, metin, ses=None, model=None):
             STATE["whisper"]["kendi_ses"] = STATE["whisper"].get("kendi_ses", 0) + 1
             if STATE["whisper"]["kendi_ses"] in (1, 10, 50): print(f"YANKI: Suflor'un okuduğu ses mikrofona girdi ({STATE['whisper']['kendi_ses']}. kez, yazılmadı) — \"{metin[:60]}\"")
             return "yanki"
-    if kanal == "ben" and not is_.get("oda") and "okuma_dur_soz" in globals() and okuma_dur_soz(metin, is_["t0"]):  # okuma sürerken kısa durdurma sözü: hemen sus
+    # 3 Kasım: ses kilidi (varsayılan açık) her ben parçasına "oda" işareti koyuyor, bu denetim hiç çalışmıyordu ("Bir dakika..." okumayı durdurmadı); yalnız oda kipinde atlanır
+    if kanal == "ben" and not (is_.get("oda") and oda_acik()) and "okuma_dur_soz" in globals() and okuma_dur_soz(metin, is_["t0"]):  # okuma sürerken kısa durdurma sözü: hemen sus
         print(f"ASİSTAN: okurken kullanıcı '{metin[:30]}' dedi — okuma durdu"); threading.Thread(target=asistan_dur, daemon=True).start()
     karsi_akiyor = now - STATE["whisper"]["kanallar"].get("karsi", 0) < WH_AKIS_SN
     if kanal == "karsi":
@@ -983,6 +1000,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
             "entries": [{"id": is_["id"], "speaker": kim, "time": datetime.datetime.fromtimestamp(is_["t0"]).strftime("%H:%M:%S"), "text": metin,
                          "seen": datetime.datetime.utcfromtimestamp(is_["t1"]).isoformat(timespec="milliseconds") + "Z", "kanal": kanal,
                          "t0": round(is_["t0"], 2), "t1": round(is_["t1"], 2), **({"komut_ses": komut_ses} if komut_ses else {}),
+                         **({"_benzerlik": ODA["son_b"]} if kanal == "ben" and is_.get("oda") and ODA.get("son_b") is not None else {}),  # 3 Kasım: okuma_ustune_soz (dosyaya yazılmaz)
                          **({"kume": kume} if kume else {}), **({k: model[k] for k in ("iz", "bol") if model.get(k)} if kanal == "karsi" and model else {}),  # # v0.8.3: parça sınırları (epoch) — cevap gecikmesi, söz kesme
                          **({"taslak": datetime.datetime.utcfromtimestamp(ta).isoformat(timespec="milliseconds") + "Z"} if ta else {}), "gec": gec,
                          **({"ses": dict(ses, hiz=round(len(metin.split()) / max(0.5, ses.get("sure") or 0) * 60),

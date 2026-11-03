@@ -27,7 +27,7 @@ def anlik_satir(key, e, text, onceki):
     try: _anlik_satir(key, e, text, onceki)
     except Exception as x: print(f"ANLIK: hata {x.__class__.__name__}")
 def _anlik_satir(key, e, text, onceki):
-    kim = e.get("speaker") or "?"; ben = kim == ben_adi() or e.get("kanal") == "ben"
+    kim = e.get("speaker") or "?"; ben = ben_satiri(e)  # 3 Kasım: Whisper satırında kanal esas (aynı ilk adlı misafir "ben" sayılmasın), altyazıda ad
     now = time.time(); t = e.get("t0") if isinstance(e.get("t0"), (int, float)) and abs(now - e["t0"]) < 120 else now
     sz = len(str(text).split())
     # 2) uzun konuşma

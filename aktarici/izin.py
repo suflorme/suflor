@@ -18,7 +18,7 @@ def _izin_kayit(o):
         try: os.close(os.open(yol, os.O_WRONLY | os.O_CREAT, 0o600))
         except OSError: pass
     with LOCK: write([(yol, json.dumps(dict(o, at=datetime.datetime.now().isoformat(timespec="seconds")), ensure_ascii=False) + "\n")])
-def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False):
+def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False, sure_sn=None):
     # oturum=True (v0.115.0; kullanıcı 22 Ekim: arka plandaki toplantı oturumunun araç izni ayrı kart olmasın): kart açılmaz — panonun Claude bölümünde
     # ve mini panoda Onayla / Reddet (toplanti_oturum_view "izinler"); karar yine eylem_karar → izin_karar. Toplantı dışında sesli soru aynı.
     ne = " ".join(str(ne or "").split())[:400]
@@ -28,8 +28,8 @@ def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False):
     IZIN[x["id"]] = {"olay": threading.Event(), "karar": None, "tur": tur}
     if not oturum:
         c = add_card({"kind": "not", "text": _t(f"İzin: {ne}", f"Permission: {ne}"), "why": _t("Onayla ya da Reddet (yalnız sen).", "Approve or reject (you only)."), "onay": True})
-        if c:
-            with LOCK: c["eylem"] = x["id"]
+        if c:  # 3 Kasım: kartta izin türü ve bitiş (pano karşı taraf kartını bundan tanır, geri sayım; metindeki «» ile tahmin edilmez)
+            with LOCK: c["eylem"] = x["id"]; c["izin"] = tur; c.update({"bitis": round(time.time() + sure_sn, 1)} if sure_sn else {})
     else: kart_bildir()
     top = toplanti_var()
     if sesli and not top and not oturum: soru_baslat([x["id"]])  # 31 Ekim: toplantı oturumunun araç izni yalnız kart; sesli okunmaz

@@ -149,6 +149,7 @@ try:
     v, _ = bekle(lambda v: v.get("durum") == "itiraz" and v.get("kim") == "Ayla Ö", 20); time.sleep(1.5)
     kc = izin_kart()
     ok("karşı tarafa cevap: onay kartı, onaysız okunmadı (v0.97.0)", kc is not None and "Ayla Ö" in kc["text"] and ot().get("durum") == "itiraz" and son() == s0)
+    ok("karşı kartında tür ve bitiş (pano öne çıkarır, geri sayım)", kc is not None and kc.get("izin") == "karsi_cevap" and 5 < (kc.get("bitis") or 0) - time.time() <= 61)
     satir("ben", "Atlas, oku."); time.sleep(1)
     ok("'Atlas, oku' sesle onayladı, kart kapandı", "ASİSTAN: 'ATLAS, oku'" in log() and izin_kart() is None)
     v, _ = bekle(lambda v: v.get("durum") == "sira", 10); time.sleep(2.5)
@@ -172,6 +173,19 @@ try:
     v, _ = bekle(lambda v: v.get("durum") == "okunuyor", 20); time.sleep(0.6); MOD["karsi"] = "konus"
     v, t4 = bekle(lambda v: v.get("durum") == "kesildi", 5); MOD["karsi"] = "sessiz"
     ok("okurken karşı taraf konuştu → okuma durdu (kesildi)", t4 is not None and "OTONOM: biri konuştu" in log())
+    # 5b) 3 Kasım: okurken kullanıcı üstüne konuştu — enerji yankı sanar, Whisper satırı ayırır (okuma_ustune_soz): yankı ve "hı hı" kesmez, üstüne konuşma keser
+    def ben_sozu(metin, b):  # okuma sürerken başlamış ben satırı (ses izi benzerliği aktarıcının _whisper_yaz'ından gelir gibi)
+        n_satir[0] += 1; t_ = time.time()
+        uc("/ingest", {"meeting": {"title": "Otonom deneme"}, "source": "whisper", "entries": [{"id": f"o/{n_satir[0]}", "speaker": "Deniz T", "time": time.strftime("%H:%M:%S"), "text": metin,
+                                                                                               "kanal": "ben", "t0": t_ - 0.2, "t1": t_, **({"_benzerlik": b} if b is not None else {})}]})
+    SUSKU(); satir("ben", "Atlas, gündemde kaç madde var, uzunca anlatır mısın?")  # 5'teki soruyla aynı olmasın (20 sn yineleme süzgeci)
+    v, _ = bekle(lambda v: v.get("durum") == "okunuyor", 20); i5 = v.get("id"); time.sleep(0.6)
+    ben_sozu("Teslim tarihi cuma diyorsunuz.", 0.08); ben_sozu("Hı hı, tamam evet.", 0.7); time.sleep(0.4)
+    ok(f"okurken yankı satırı (ses izi 0,08) ve 'hı hı' kesmedi ({ot().get('durum')})", ot().get("id") == i5 and ot().get("durum") in ("okunuyor", "okundu") and "söz ölçümü" not in log())
+    if ot().get("durum") == "okunuyor":
+        ben_sozu("Bütçe tablosunu yarın gönderelim mi", 0.72); v, t5b = bekle(lambda v: v.get("durum") == "kesildi", 3)
+        ok("okurken kullanıcı üstüne konuştu (ses izi 0,72, 5 sözcük) → okuma durdu", t5b is not None and "söz ölçümü: ses izi kullanıcıya benziyor" in log())
+    else: ok("5b: okuma üstüne konuşma denemesi için yeterince uzun sürmedi", False)
     # 6) fırsat çıkmazsa söylenmez (otonom_bekle_sn 6)
     SUSKU(); s0 = son(); MOD["ben"] = "konus"; satir("karsi", "Atlas, sunumu kim yapacak?"); izin_ver()
     v, t5 = bekle(lambda v: v.get("durum") == "soylenmedi", 20); MOD["ben"] = "sessiz"
@@ -197,6 +211,14 @@ try:
     SUSKU(); s0 = son(); satir("karsi", "Atlas, toplantı nerede?")
     v, tz = bekle(lambda v: v.get("durum") == "soylenmedi", 25)
     ok(f"onay gelmedi → okunmadı, kart kapandı ({v.get('neden')})", tz is not None and son() == s0 and "onay gelmedi" in (v.get("neden") or "") and izin_kart() is None)
+    # 8d) 3 Kasım: onay kartı bekleyen karşı taraf cevabı kullanıcının yeni (hitap) cevabını bekletmez; kart sonra onaylanırsa o da okunur
+    SUSKU(); s0 = son(); b0 = log().count("önceki cevap sürüyordu"); satir("karsi", "Atlas, depo nerede?")
+    v, _ = bekle(lambda v: v.get("durum") == "itiraz" and v.get("kim") == "Ayla Ö", 20); time.sleep(1.0)
+    tk = time.time(); satir("ben", "Atlas, saat kaç?")
+    v, t13 = bekle(lambda v: not v.get("kim") and v.get("durum") in ("okunuyor", "okundu"), 15)
+    ok(f"onay bekleyen karşı cevap yeni cevabı bekletmedi ({time.time() - tk:.1f} sn, kenara alındı)", t13 is not None and log().count("önceki cevap sürüyordu") == b0 and "kenara alındı" in log())
+    izin_ver(sn=5); v, t14 = bekle(lambda v: v.get("kim") == "Ayla Ö" and v.get("durum") == "okundu", 25)
+    ok("kart sonra onaylandı → karşı cevap sırasıyla okundu (iki okuma)", t14 is not None and son() == s0 + 2)
     # 8c) 30 Ekim: kullanıcı kanalında sözsüz sürekli ses (ton → Whisper sözsüz döner) söz sırasını tutmaz; okuma da o sesle kesilmez; karşı kanal sessiz
     SUSKU(); s0 = son(); MOD["ben"] = "konus"; time.sleep(16)  # ≥ 2 parça sözsüz dönsün (parça en çok 6 sn)
     satir("karsi", "Atlas, salon hazır mı?"); izin_ver()
