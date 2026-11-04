@@ -65,7 +65,7 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
    Toplantı sonundaki takip e-postası taslağının üslubu ayar.json'da `"eposta_uslup"` (kısa serbest metin; yoksa sade, samimi ama profesyonel).
    Mac Mail okuma açıksa (`"eposta_oku": true`) ve taslak tek kişiye gidiyorsa, o kişiye gönderdiğin son iletilerin üslubu örnek alınır (yalnız üslup, içerik değil).
 
-**Saatler:** panoda Bugün başlığındaki "Bugün | Bu hafta | Saatler" seçicisinden (Mac penceresinde kenar çubuğundan) açılır. Eklediğin şehirlerin saati, sana göre farkı ve mesai durumu (gündüz, akşam, gece) görünür; alttaki kaydırıcıyla iki gün içinde bir saat seçince hepsi birlikte değişir, takvimdeki sıradaki toplantı kaydırıcıda halkayla işaretlidir. Hesap tarayıcının içinde yapılır, ağa bir şey gitmez; liste ayar.json'da `saatler`.
+**Saatler:** panoda Bugün başlığındaki "Bugün | Bu hafta | Saatler" seçicisinden (Mac penceresinde kenar çubuğundan) açılır. Eklediğin şehirlerin saati, sana göre farkı ve mesai durumu (gündüz, akşam, gece) görünür; alttaki kaydırıcıyla iki gün içinde bir saat seçince hepsi birlikte değişir, takvimdeki sıradaki toplantı kaydırıcıda halkayla işaretlidir. Arama kutusunun yanındaki seçiciyle liste saate göre (erken → geç ya da tersi), ada göre ya da eklediğin sırayla dizilir (ayar `saatler_sira`). Hesap tarayıcının içinde yapılır, ağa bir şey gitmez; liste ayar.json'da `saatler`.
 
 **Ayarlar:** panonun üst çubuğundaki ⚙ — yapay zekâ seçimi, e-posta, ses ve konuşma, toplantı uyarıları, çeviri ve masaüstü, gizlilik; kaydedince hemen geçerli.
 

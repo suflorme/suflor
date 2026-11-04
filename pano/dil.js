@@ -835,4 +835,10 @@ globalThis.SUFLOR_EN = {
   "Gece": "Night",
   "Kaldır": "Remove",
   "Saat listesi kaydedilemedi": "Could not save the clock list",
+  "Sıralama kaydedilemedi": "Could not save the sort order",
+  "Sırala": "Sort",
+  "Saate göre (erken → geç)": "By time (earliest first)",
+  "Saate göre (geç → erken)": "By time (latest first)",
+  "Ada göre (A–Z)": "By name (A–Z)",
+  "Eklediğim sırayla": "In the order I added",
 };
