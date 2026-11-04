@@ -197,7 +197,7 @@ HARITA = r"""<!doctype html><html lang=tr><meta charset=utf-8><meta name=viewpor
 header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--bd)}
 header h1{font-size:16px;font-weight:600;margin:0 auto 0 0}header button{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--bd);border-radius:7px;background:var(--s1);color:var(--tx);cursor:pointer}
 header button:hover{border-color:var(--cizgi)}#alan{overflow:auto;height:calc(100% - 56px);padding:16px}svg{display:block}
-.d rect{fill:var(--s1);stroke:var(--bd);stroke-width:1}.d rect.ser{stroke:none}.d text{fill:var(--tx);font-size:13px;dominant-baseline:middle}.d{cursor:pointer}
+.d rect{fill:var(--s1);stroke:var(--bd);stroke-width:1}.d rect.ser{stroke:none}.d text{fill:var(--tx);font:13px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;dominant-baseline:middle}.d{cursor:pointer}
 .d .say{fill:var(--t2);font-size:11px}.d:hover rect{stroke:var(--cizgi)}path.c{fill:none;stroke:var(--cizgi);stroke-width:1.4}
 #ayrinti{position:fixed;right:16px;bottom:16px;max-width:min(420px,calc(100% - 32px));background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.12);display:none}
 #ayrinti b{display:block;margin-bottom:4px}#ayrinti .k{color:var(--t2);font-size:12.5px}#ayrinti q{display:block;margin-top:6px;font-style:italic}
@@ -210,8 +210,12 @@ const V=__VERI__;const RENK=t=>getComputedStyle(document.documentElement).getPro
 const S=document.getElementById('s'),NS='http://www.w3.org/2000/svg',olc=document.createElement('canvas').getContext('2d');olc.font='13px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif';
 let sira=0,yaprak=0;(function say(d){if(!(d.alt||[]).length)yaprak++;(d.alt||[]).forEach(say)})(V);
 (function kimlik(d,der){d.id=sira++;d.der=der;d.acik=yaprak<=30||der<2;(d.alt||[]).forEach(x=>kimlik(x,der+1))})(V,0);  // küçük harita tümüyle açık
-const KISA=s=>{s=String(s);return s.length>64?s.slice(0,62)+'…':s};
-function boy(d){const w=Math.min(380,Math.max(60,olc.measureText(KISA(d.ad)).width+(d.alt&&d.alt.length?46:28)));return{w,h:30}}
+// 5 Kasım (kullanıcı): metin kesilmez — uzun satır sözcük sınırından alt satıra geçer, kutu yüksekliği satır sayısıyla büyür
+const ENX=420,SY=18;
+function satirlar(d){if(d.sat)return d.sat;const sp=(d.alt&&d.alt.length?46:28)+4,mx=ENX-sp,out=[];let s='';
+  String(d.ad).split(/\s+/).filter(Boolean).forEach(k=>{const y=s?s+' '+k:k;if(!s||olc.measureText(y).width<=mx){s=y;return}out.push(s);s=k});
+  if(s||!out.length)out.push(s);return d.sat=out.map(x=>{if(olc.measureText(x).width<=mx)return x;let i=x.length;while(i>1&&olc.measureText(x.slice(0,i)).width>mx)i--;return x.slice(0,i)})}  // tek sözcük sığmazsa (uzun bağlantı) yalnız o kırpılır
+function boy(d){const sat=satirlar(d),sp=(d.alt&&d.alt.length?46:28)+4;return{w:Math.min(ENX,Math.max(60,Math.ceil(Math.max(...sat.map(x=>olc.measureText(x).width)))+sp)),h:Math.max(30,12+sat.length*SY)}}
 const DX=48,DY=10;
 function yerles(d,x,y){const b=boy(d);d.x=x;d.w=b.w;d.h=b.h;const c=d.acik?(d.alt||[]):[];if(!c.length){d.y=y;return y+d.h+DY}
 let yy=y;c.forEach(k=>{yy=yerles(k,x+d.w+DX,yy)});const ilk=c[0].y,son=c[c.length-1].y;d.y=(ilk+son)/2;return Math.max(yy,d.y+d.h+DY)}
@@ -222,7 +226,7 @@ S.setAttribute('width',W+16);S.setAttribute('height',H+8);S.setAttribute('viewBo
 (function g(d){const gr=el('g',{class:'d',transform:`translate(${d.x},${d.y})`,tabindex:0,role:'button','aria-label':d.ad},S);
 const r=el('rect',{width:d.w,height:d.h,rx:d.der===0?15:8},gr);const renk=RENK(d.tur);
 if(d.der===0){r.style.fill=renk;r.style.stroke=renk}else el('rect',{width:4,height:d.h-10,x:6,y:5,rx:2,class:'ser'},gr).style.fill=renk;
-const t=el('text',{x:d.der===0?14:16,y:d.h/2},gr);t.textContent=KISA(d.ad);if(d.der===0)t.style.fill='#fff';
+const sat=satirlar(d),tx=d.der===0?14:16,t=el('text',{x:tx,y:d.h/2-(sat.length-1)*SY/2},gr);sat.forEach((x,i)=>{const ts=el('tspan',{x:tx,dy:i?SY:0},t);ts.textContent=x});if(d.der===0)t.style.fill='#fff';
 if(d.alt&&d.alt.length){const s=el('text',{class:'say',x:d.w-22,y:d.h/2},gr);s.textContent=d.acik?'‹':String(d.alt.length)+' ›';if(d.der===0)s.style.fill='#fff'}
 const tik=()=>{if(d.alt&&d.alt.length){d.acik=!d.acik;ciz()}else goster(d)};gr.onclick=tik;gr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tik()}};
 if(d.acik)(d.alt||[]).forEach(g)})(V)}
