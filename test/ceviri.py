@@ -67,6 +67,30 @@ bak("60 sn'den eski bellek sayılmaz (Türkçe bellek eski → kısa satır kuyr
 bak("kesin dil belleğe yazılır (dil ve zaman)", _gerekli("We can ship the new version on Monday if the tests pass.", "tr", t0, None)[1] == ("en", t0))
 bak("kesin hedef dil: atılır ve belleğe yazılır", _gerekli("Bence bu hafta bitiremeyiz, çok iş var.", "tr", t0, None) == (False, ("tr", t0)))
 bak("İngilizce arayüzde Türkçe kanalın kısa satırı kuyruğa girer", _gerekli("Tamam, evet.", "en", t0, ("tr", t0 - 5))[0] is True)
+# bağlamlı parça (v0.183.0): gövde kurma ve bağlam durumu saf işlevlerle (yalıtılmış exec)
+_bp = "".join(m.group(0) for m in re.finditer(r"^CEVIRI_BAGLAM_SN, CEVIRI_BAGLAM_EN_COK = .*\n|^def (?:cv_cumle_sonu|cv_baglam_acik|cv_baglam_metni|cv_govde|cv_baglam_isle)\(.*\n(?:[ \t].*\n)*", _kaynak, re.M))
+def _bns(ayar=None): ns = {"re": re, "time": time, "AYAR": ayar or {}}; exec(_bp, ns); return ns
+N = _bns(); B = lambda: {"kaynak": [], "ceviri": [], "t": 0.0}; t0 = 5000.0
+b = B(); bak("bağlam boşken gövde eskisiyle aynı", N["cv_govde"](["a b", "c d"], b, t0) == "1. a b\n2. c d")
+N["cv_baglam_isle"](b, "We can ship the new version", "Yeni sürümü gönderebiliriz", t0)
+g = N["cv_govde"](["on Monday if the tests pass."], b, t0 + 2).split("\n")
+bak("ikinci parçada iki bağlam satırı, sonra numaralı satır", g == ["Önceki kaynak parçalar: We can ship the new version", "Daha önce okunan çeviri: Yeni sürümü gönderebiliriz", "1. on Monday if the tests pass."])
+N["cv_baglam_isle"](b, "on Monday if the tests pass.", "Pazartesi, testler geçerse.", t0 + 4)
+bak("cümle sonu (.) bağlamı sıfırlar", b["kaynak"] == [] and b["ceviri"] == [])
+for son in ("Is that right?", "Great!", "Well…", "He said \"go.\""):
+    N["cv_baglam_isle"](b, "part", "parça", t0 + 5); N["cv_baglam_isle"](b, son, "x", t0 + 6); bak(f"? ! … ve tırnaklı bitişte sıfırlanır: {son}", b["kaynak"] == [])
+b = B(); N["cv_baglam_isle"](b, "first piece", "ilk parça", t0)
+bak("20 sn dolunca gövdeye bağlam girmez", N["cv_govde"](["x"], b, t0 + 21) == "1. x" and N["cv_govde"](["x"], b, t0 + 19).startswith("Önceki"))
+N["cv_baglam_isle"](b, "second piece", "ikinci parça", t0 + 30)
+bak("süre aşımından sonra gelen parça bağlamı baştan başlatır", b["kaynak"] == ["second piece"])
+b = B()
+for i in range(6): N["cv_baglam_isle"](b, f"p{i}", f"c{i}", t0 + i)
+bak("en çok 4 parça tutulur (kaynak ve çeviri)", b["kaynak"] == ["p2", "p3", "p4", "p5"] and b["ceviri"] == ["c2", "c3", "c4", "c5"])
+bak("ayar kapalıyken bağlam eklenmez", N["cv_govde"](["x"], b, t0 + 6, acik=False) == "1. x")
+bak("ceviri_baglam varsayılan açık, false kapatır", N["cv_baglam_acik"]() is True and _bns({"ceviri_baglam": False})["cv_baglam_acik"]() is False)
+b = B(); N["cv_baglam_isle"](b, "k part", "tam çeviri", t0)
+bak("bağlama tam çeviri (\"1\") girer, öz (\"k1\") girmez", "tam çeviri" in N["cv_govde"](["x"], b, t0) and "kısa" not in N["cv_govde"](["x"], b, t0))
+bak("istem eki tr ve en istemde", all("Önceki kaynak parçalar" in re.search(r'CEVIRI_BAGLAM_EK = \{.*?\}\n', _kaynak, re.S).group(0) for _ in [0]) and _kaynak.count('+ CEVIRI_BAGLAM_EK["') == 2)
 # sesli çeviri (v0.29.0): 🎧 kulaklıksız açılmaz; açılınca çeviri ayarı kapalı olsa da çevrilir, kısa öz okunur; tekrar basınca kapanır
 r, T, canli, istek = calistir(ceviri=False, kulaklik=False)
 try:
@@ -143,6 +167,23 @@ try:
         and any(x.get("is") == "ceviri" and x.get("saglayici") == "claude-code" and x.get("model") == "haiku" for x in cg))
     if not cg: print("   kayıt yok")
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# bağlamlı parça uçtan uca (v0.183.0): yarım cümlenin ikinci parçasında gövde bağlam taşır; ayar kapalıyken taşımaz; yeni cümlede taşımaz
+def _parca(istek, lid, metin):
+    t = time.time(); istek("/ingest", {"meeting": {"title": "Çeviri Deneme"}, "source": "whisper", "entries": [{"id": lid, "speaker": "John", "time": "10:05:00", "text": metin, "kanal": "karsi", "t0": t, "t1": t + 3}]}); return _tail(istek, lid)
+for acik in (True, False):
+    r, T, canli, istek = calistir(gercek=True, ek=dict(BEYIN_AYAR, ceviri_baglam=acik), env_ek={"SUFLOR_TEST_BEYIN_ANAHTAR": "deneme"})
+    try:
+        del GELEN[:]
+        _parca(istek, "wh/karsi/21", "We can ship the new version of the product"); _parca(istek, "wh/karsi/22", "on Monday if the tests pass."); _parca(istek, "wh/karsi/23", "Okay, and what about the budget for this?")
+        ic = [g["messages"][-1]["content"] for g in GELEN]
+        bak(f"uçtan uca ({'açık' if acik else 'kapalı'}): 3 çağrı", len(ic) == 3)
+        if len(ic) == 3:
+            bak("ilk parçada bağlam yok", ic[0] == "1. We can ship the new version of the product")
+            bak("ikinci parçada bağlam var" if acik else "ayar kapalı: ikinci parçada bağlam yok",
+                (ic[1].startswith("Önceki kaynak parçalar: We can ship the new version of the product\nDaha önce okunan çeviri: [gemini] We can ship the new version of the product\n1. on Monday") if acik else ic[1] == "1. on Monday if the tests pass."))
+            bak("cümle bitince sonraki parçada bağlam yok", ic[2] == "1. Okay, and what about the budget for this?")
+        if acik: print("   gerçek gövde örneği:", repr(ic[1]) if len(ic) > 1 else ic)
+    finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 SV.shutdown(); shutil.rmtree(TD, ignore_errors=True)
 if os.environ.get("SUFLOR_CEVIRI_GERCEK"):
     r, T, canli, istek = calistir(gercek=True)
@@ -168,6 +209,9 @@ if os.environ.get("SUFLOR_CEVIRI_GERCEK"):
         cv = [x for x in cg if x.get("is") == "ceviri"]
         print(f"   çağrı kaydı: {len(cv)} çeviri turu · {round(sum(x.get('maliyet') or 0 for x in cv), 4)} $")
         bak("çeviri turları claude-cagri.jsonl'de (sayılar, metin yok)", cv and all("giris" in x and "metin" not in x for x in cv))
+        # v0.183.0: iki parçaya bölünmüş cümle — ikinci parçanın çevirisi birincinin devamı olmalı (gözle bakılır)
+        p1 = _parca(istek, "wh/karsi/31", "So what we are proposing is that the supplier delivers the first batch"); p2 = _parca(istek, "wh/karsi/32", "before the end of the month, provided that we confirm the order by Friday.")
+        print(f"   bağlamlı parça: 1) {p1}\n                   2) {p2}"); bak("bağlamlı iki parça da çevrildi", bool(p1) and bool(p2))
     finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print("çeviri: ✓ hepsi geçti" if not hata else f"çeviri: ✗ {len(hata)} kaldı")
 sys.exit(1 if hata else 0)
