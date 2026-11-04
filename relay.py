@@ -1630,9 +1630,41 @@ def menu_yeniden():  # menü uygulamasını kapatıp (gerekirse) yeni ayarlarla 
     while toplanti_var(): time.sleep(30)
     surec_kapat("SuflorMenu", tam=True); time.sleep(1.5)
     print("MENÜ: ayar değişti — yeniden açılıyor" if AYAR.get("menu_cubugu") is not False else "MENÜ: ayar kapandı — uygulama kapatıldı"); menu_baslat()
+def gorsel_turu(hp):  # 5 Kasım (panogor): kayıtta gorsel yoksa (eski kayıt) HTML'in <title>'ından tür
+    try:
+        with open(hp, encoding="utf-8") as f: b = f.read(2000)
+    except OSError: return None
+    return "karar_is" if "— karar ve iş panosu</title>" in b else "harita"
 def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
     sinir = (datetime.datetime.now() - datetime.timedelta(days=7)).isoformat()
-    return [dict({k: v for k, v in r.items() if k != "ozet"}, ad=os.path.basename(r.get("ozet") or "")) for r in reversed(SON) if (r.get("at") or "") >= sinir][:3]
+    ls = [dict({k: v for k, v in r.items() if k != "ozet"}, ad=os.path.basename(r.get("ozet") or "")) for r in reversed(SON) if (r.get("at") or "") >= sinir][:3]
+    for r in ls:
+        if r.get("harita") and r.get("gorsel") not in ("harita", "karar_is"):
+            g = gorsel_turu(r["harita"])
+            if g: r["gorsel"] = g
+    return ls
+def harita_pdf(r, posta=False):  # 5 Kasım (panogor): pano/harita belgesinin PDF'i, ozetler/ yanına <özet>-pano.pdf; yazdırma CSS'i belgede (açık tema)
+    import tempfile, urllib.parse, subprocess
+    hp = r.get("harita")
+    if not hp or not os.path.isfile(hp): return {"ok": False, "err": _t("zihin haritası yok", "no mind map")}
+    pdf = (hp[:-len("-zihin-haritasi.html")] if hp.endswith("-zihin-haritasi.html") else hp[:-5]) + "-pano.pdf"
+    chrome = os.path.join(CHROME_APP, "Contents/MacOS/Google Chrome") if CHROME_APP else None
+    if not chrome or not os.path.isfile(chrome): return {"ok": False, "err": _t("PDF için Google Chrome gerekir", "Google Chrome is needed for the PDF")}
+    prof = tempfile.mkdtemp(prefix="suflor-pdf-")
+    try:
+        k = subprocess.run([chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--user-data-dir=" + prof, "--no-pdf-header-footer", "--virtual-time-budget=4000",
+                            "--print-to-pdf=" + pdf + ".tmp", "file://" + urllib.parse.quote(hp)], capture_output=True, text=True, timeout=45)
+        if not os.path.isfile(pdf + ".tmp") or os.path.getsize(pdf + ".tmp") < 500: return {"ok": False, "err": _t("PDF hazırlanamadı", "Couldn't prepare the PDF") + (": " + (k.stderr or "").strip()[-100:] if k.returncode else "")}
+        os.replace(pdf + ".tmp", pdf)
+    except subprocess.TimeoutExpired: return {"ok": False, "err": _t("PDF hazırlanamadı (zaman aşımı)", "Couldn't prepare the PDF (timed out)")}
+    except OSError as e: return {"ok": False, "err": e.__class__.__name__}
+    finally: shutil.rmtree(prof, ignore_errors=True)
+    if not os.environ.get("SUFLOR_TEST_BASLAT"):
+        try: subprocess.run(["pbcopy"], input=pdf, text=True, timeout=5)  # dosya yolu panoda
+        except (OSError, subprocess.SubprocessError): pass
+        subprocess.run(["open", "-a", "Mail", pdf] if posta else ["open", "-R", pdf], capture_output=True, timeout=15)  # Mail: ekli yeni taslak (gönderilmez); yoksa Finder'da seçili
+    else: print(f"PDF (deneme): {os.path.basename(pdf)}")
+    return {"ok": True, "pdf": pdf, "ad": os.path.basename(pdf)}
 def son_ac(p):
     r = next((x for x in SON if x.get("id") == str(p.get("id") or "")), None) or arsiv_ozet_kaydi(p.get("id"))  # v0.116.0: arşivden eski toplantı
     if not r: return {"ok": False, "err": "kayıt yok"}
@@ -1642,6 +1674,7 @@ def son_ac(p):
         if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): harita {os.path.basename(hp)}"); return {"ok": True}
         k = subprocess.run(["open", hp], capture_output=True, text=True, timeout=15)
         return {"ok": not k.returncode, **({"err": (k.stderr or "").strip()[:160]} if k.returncode else {})}
+    if p.get("tur") == "pdf": return harita_pdf(r, bool(p.get("posta")))
     yol = next((y for y in (r.get("kopya"), os.path.join(BASE, "ozetler", os.path.basename(r["ozet"]))) if y and os.path.isfile(y)), None)
     if not yol: return {"ok": False, "err": _t("özetin kopyası yok; dosya: ", "no copy of the summary; file: ") + os.path.basename(r["ozet"])}
     if p.get("tur") == "metin":  # panoda "Dışarı aktar" (v0.33.3): özet metni + aynı gün aynı başlıklı takvim toplantısının katılımcı adresleri

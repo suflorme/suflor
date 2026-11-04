@@ -289,6 +289,10 @@ html.bugun #brs,html.bugun #tos{background:var(--s1);border-radius:var(--kose-l)
 .eyb{padding:6px 0 2px 32px}.eyb .chip{display:inline-block;margin-bottom:2px}.eyb .bt{margin-top:8px}.ey.ey-reddedildi summary .t{color:var(--t3)}
 .sn{align-items:flex-start;gap:12px}.sn .t{cursor:pointer}.sn .b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sn .m{font-size:var(--yz-2);color:var(--t3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .snx{margin-top:4px}.snx .bt{margin-top:6px}.sn .akw{align-self:center}
+/* Son toplantı kartı (5 Kasım, panogor): Bugün'de en yeni toplantının panosu — ad, gün, sayılar, büyük pano düğmesi, PDF, özet. Tek zemin, tek vurgu düğmesi. */
+.sks .sk{background:var(--s1);border:1px solid var(--bd);border-radius:var(--kose-l);padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.sks .sk .ad{font:400 19px/1.3 var(--f-baslik);overflow-wrap:anywhere}.sks .sk .m{font-size:var(--yz-2);color:var(--t3)}
+.sks .sk .bt{margin-top:10px;gap:8px;flex-wrap:wrap}.sks .sk button.pri{padding:9px 22px;border-radius:var(--kose-tam);font-weight:500;font-size:var(--yz-4)}.sks .sk button.gh{border-radius:var(--kose-tam);padding:8px 16px}
 /* toplantı oturumu: toplantı yokken katlı (başlıkta durum, altında son iletinin iki satırı) */
 .tosn{font-size:var(--yz-3);line-height:1.45;color:var(--t2);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
 html.bugun #tos.kapali :is(.tod,#tol,#tom){display:none}html.bugun #tos .sh{cursor:pointer}html.bugun #tos.kapali .sh{padding-bottom:0}
@@ -326,7 +330,7 @@ html.bugun #tos .sh{padding-inline:0}html.bugun #tos .tob{display:-webkit-box;-w
 <details><summary>Mikrofon çalışmıyor.</summary><p>Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me açık olmalı. Karşı tarafın sesi için Ekran ve Sistem Sesi Kaydı → Yalnızca Sistem Sesi Kaydı'nda Suflor Ses'e izin ver.</p></details>
 <details><summary>Basılı tutmak ile iki kez dokunmak farkı ne?</summary><p>Mikrofonu basılı tut: tek soru sor, bırakınca gider. İki kez dokun: Sohbet açılır (kulaklık takılıyken, toplantı dışında); sustuğunda asistan cevaplar, sen yine konuşursun; bir dokunuş kapatır.</p></details>
 <details><summary>Asistanın sesini nasıl değiştiririm?</summary><p>Ayarlar → Ses ve konuşma → Ses. Mac sesi, yerel Türkçe sesler (Piper, Pocket) ya da Gemini. Gemini'de yalnız okunacak cevap metni Google'a gider, ses kaydı gitmez.</p></details>
-<details><summary>Toplantı özetine nereden ulaşırım?</summary><p>Kenar çubuğunda Son toplantılar'a tıkla. Satırdaki ⋯ ya da sağ tık: zihin haritası, PDF, kopyala, .md dosyası, e-posta taslağı.</p></details>
+<details><summary>Toplantı özetine nereden ulaşırım?</summary><p>Bugün'deki Son toplantı kartı ya da kenar çubuğunda Son toplantılar: karar ve iş panosu (ya da zihin haritası) açılır. Satırdaki ⋯ ya da sağ tık: pano PDF'i, özet PDF'i, kopyala, .md dosyası, e-posta taslağı.</p></details>
 <details><summary>Gizli toplantı ne yapar?</summary><p>Tekrar basana kadar Suflor tamamen durur: ses, döküm, kanıt yok; yapay zekâ servislerine hiçbir şey gitmez.</p></details>
 <details><summary>Verilerim nerede duruyor?</summary><p>Döküm, kart, özet ve ses izleri bu Mac'te, Suflor'un uygulama klasöründe durur. Döküm metni ve bağlam yalnız asistanın yapay zekâ servisine gider: bugün Anthropic'in Claude'u (ses motoru Gemini seçiliyse okunacak cevap metni Gemini'ye de). Teknik teşhis (Ayarlar → Gizlilik) açıksa yalnız sürüm, donanım ve hata sayıları gider.</p></details>
 <details><summary>Bir sorun bildirmek istiyorum.</summary><p>Suflor.me → Geri bildirim gönder… Yazdığın metin geliştiriciye gider; kişi adı, şifre ya da toplantı içeriği yazma.</p></details>
@@ -380,6 +384,7 @@ html.bugun #tos .sh{padding-inline:0}html.bugun #tos .tob{display:-webkit-box;-w
 <section id=brs hidden><div class=sh><span class=brb>Brifing <span id=brn class=meta></span></span><button id=brk class=gh aria-expanded=true>Gizle</button></div><div id=br></div></section>
 <section id=hat class=hat hidden></section>
 <section id=dds hidden><div class=sh>Dosyadan döküm <span id=ddn class=meta></span></div><div id=dd></div></section>
+<section id=sks class=sks hidden></section>
 <section id=eys hidden><div class=sh><span>Bekleyenler <span id=eyn class=meta></span></span><button id=eyh class="gh lnk" title="Listedeki bekleyen işlerin hepsini onayla — {asistan} yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
 <section id=sns hidden><div class=sh><span>Son toplantılar</span></div><div id=sn></div><button id=snt class="gh lnk" type=button title="Tüm toplantılar">Tümü</button></section>
 <section id=nts hidden><div class=sh><span>Notlar <span id=ntn class=meta></span></span></div><div id=nt></div></section>
@@ -1221,13 +1226,13 @@ function kenarCiz(s,top){if(!document.documentElement.classList.contains('mac'))
   const o=(id,ikon,ad,r,ek)=>`<button class="ko${sec===id?' sec':''}" data-git="${esc(id)}"${ek||''}>${ikon}<span class=tx>${esc(ad)}</span>${r?`<span class=r>${esc(r)}</span>`:''}</button>`
   const h=(top?`<div class=kb>${L('Şimdi')}</div>`+o('kc','<span class=nok></span>',t,su,' data-canli=1'):'')
     +o('tks',ic('takvim'),L('Bugün'))+o('hf',ic('hafta'),L('Bu hafta'))+o('st',ic('dunya'),L('Saatler'))
-    +(ls.length?`<div class=kb>${L('Son toplantılar')}</div>`+ls.map(r=>o('son:'+r.id,ic('chat'),r.baslik||r.ad,kisaGun(r.at),` title="${L('Özeti aç')} — ${esc(r.ad||'')}"`)).join(''):'')
+    +(ls.length?`<div class=kb>${L('Son toplantılar')}</div>`+ls.map(r=>o('son:'+r.id,ic('chat'),r.baslik||r.ad,kisaGun(r.at),` title="${r.harita?sonTurAd(r):L('Özeti aç')} — ${esc(r.ad||'')}"`)).join(''):'')
     +`<div class=kb>${L('Arşiv')}</div>`+o('ar-ara',ic('liste'),L('Toplantılarda ara'))+o('ar-dok',ic('dosya'),L('Dökümler'))+o('gecmis',ic('hist'),L('Konuşma geçmişi'))
     +`<div class=kalt><i class="dot ${dc?dc[1]:''}"></i><span>${esc(dm)}</span></div>`
   document.documentElement.dataset.gr=sec  // görünüm: CSS seçilmeyen bölümleri gizler (Şimdi ve son toplantı hepsini gösterir)
   if(h!==kcImza){kcImza=h;document.getElementById('kenar').innerHTML=h}}
 document.getElementById('kenar').addEventListener('click',async ev=>{const b=ev.target.closest('[data-git]');if(!b)return;const g=b.dataset.git
-  if(g.startsWith('son:')){let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:g.slice(4),tur:''})})}catch(e){}if(!r.ok)geciciDurum(L('Özet açılamadı'),r.err||'');return}
+  if(g.startsWith('son:')){const id=g.slice(4),sr=((last&&last.son_toplantilar)||[]).find(x=>x.id===id);sonIs(id,sr&&sr.harita?'harita':'');return}  // pano/harita varsa o açılır, özet satırın ⋯ menüsünde ve Bugün kartında
   if(g==='gecmis'){gecmisAc();return}
   if(g==='ar-ara'||g==='ar-dok'){arsivAc(g==='ar-ara');return}
   if(g==='st')stAc(true);else{if(stAcik)stAc(false);if((g==='hf')!==hfAcik){if(g!=='hf')kcSec=g;hfAc(g==='hf')}}  // hafta görünümü kenar çubuğundan açılır, başka seçim kapatır
@@ -1437,13 +1442,26 @@ function renderSon(s){const ls=(s.son_toplantilar||[]).slice(0,4),sec=document.g
   setH(document.getElementById('sn'),ls.map(r=>{const ac=snAcik.has(r.id),de=r.degerlendirme&&!/^(yok|-|—)\.?$/i.test(String(r.degerlendirme).trim())?r.degerlendirme:''
     return `<div class="sn${ac?' acik':''}"><span class=eyi>${ic('chat')}</span><div class=t data-snac="${esc(r.id)}" title="${esc(r.ad||'')}"><div class=b>${esc(r.baslik||r.ad)}</div><div class=m>${esc([gunTxt(r.at),...ciktiP(r.cikti)].join(' · '))}</div>`
       +(ac?`<div class=snx>${de?`<div class=d>${esc(de)}</div>`:''}${r.oneri?`<div class=d><b>${L('Öneri')}:</b> ${esc(r.oneri)}</div>`:''}<div class=bt><button class=gh data-son="${esc(r.id)}">${L('Özeti aç')}</button></div></div>`:'')
-      +`</div><span class=akw><button class="ib akd" data-aktar="sn:${esc(r.id)}" aria-haspopup=menu aria-expanded="${akAcik==='sn:'+r.id}" title="${r.gorsel==='karar_is'?L('Karar ve iş panosu, dışarı aktar'):L('Zihin haritası, dışarı aktar')}" aria-label="${r.gorsel==='karar_is'?L('Karar ve iş panosu, dışarı aktar'):L('Zihin haritası, dışarı aktar')}">${ic('dahasi')}</button>${akAcik==='sn:'+r.id?akMenu('sn:'+r.id,-1,r.harita?`<button class=aki data-son="${esc(r.id)}" data-tur=harita role=menuitem>${ic('harita',r.gorsel==='karar_is'?L('Karar ve iş panosu'):L('Zihin haritası'))}</button><hr>`:''):''}</span></div>`}).join('')+soSatir(s))}
+      +`</div><span class=akw><button class="ib akd" data-aktar="sn:${esc(r.id)}" aria-haspopup=menu aria-expanded="${akAcik==='sn:'+r.id}" title="${r.gorsel==='karar_is'?L('Karar ve iş panosu, dışarı aktar'):L('Zihin haritası, dışarı aktar')}" aria-label="${r.gorsel==='karar_is'?L('Karar ve iş panosu, dışarı aktar'):L('Zihin haritası, dışarı aktar')}">${ic('dahasi')}</button>${akAcik==='sn:'+r.id?akMenu('sn:'+r.id,-1,r.harita?`<button class=aki data-son="${esc(r.id)}" data-tur=harita role=menuitem>${ic('harita',r.gorsel==='karar_is'?L('Karar ve iş panosu'):L('Zihin haritası'))}</button><button class=aki data-son="${esc(r.id)}" data-tur=pdf role=menuitem>${ic('belge',r.gorsel==='karar_is'?L('Panoyu PDF olarak hazırla'):L('Haritayı PDF olarak hazırla'))}</button><button class=aki data-son="${esc(r.id)}" data-tur=pdf data-posta=1 role=menuitem>${ic('posta',L('PDF, Mail taslağına ekli'))}</button><hr>`:''):''}</span></div>`}).join('')+soSatir(s))}
+// 5 Kasım (panogor): Bugün'de son toplantı kartı. En yeni kayıt, panosu/haritası varsa; toplantı bitince ertesi toplantıya kadar (kayıt 7 gün tutulur) görünür.
+// Pano düğmesi tarayıcıda açar; PDF aktarıcıda hazırlanır (Chrome yazdırma), Finder'da seçili gösterilir ve dosya yolu panoya kopyalanır; Mail taslağı ayrı menüde, gönderme yok.
+function sonTurAd(r){return r&&r.gorsel==='karar_is'?L('Karar ve iş panosu'):L('Zihin haritası')}
+async function sonIs(id,tur,posta,dug){if(dug)dug.disabled=true;let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id,tur:tur||'',posta:!!posta})})}catch(e){}
+  if(dug)dug.disabled=false
+  if(!r.ok)geciciDurum(tur==='pdf'?L('PDF hazırlanamadı'):tur==='harita'?L('Zihin haritası açılamadı'):L('Özet açılamadı'),r.err||'')
+  else if(tur==='pdf')geciciDurum(L('PDF hazır'),(r.ad||'')+(posta?'':' · '+L('Finder\'da gösterildi, dosya yolu panoda')),9000)
+  return r}
+function renderSonKart(s){const sec=document.getElementById('sks'),r=(s.son_toplantilar||[]).find(x=>x.harita);sec.hidden=!!s.aktif||!r;if(sec.hidden)return
+  const c=ciktiP(r.cikti),ad=sonTurAd(r)
+  setH(sec,`<div class=sh><span>${L('Son toplantı')}</span></div><div class=sk><div class=ad>${esc(r.baslik||r.ad)}</div><div class=m>${esc([gunTxt(r.at),...c].join(' · '))}</div>
+    <div class=bt><button class=pri data-sk=harita>${esc(ad)}</button><button class=gh data-sk=pdf title="${L('PDF dosyası hazırlar, Finder\'da gösterir')}">PDF</button><button class="gh lnk" data-sk=ozet>${L('Özeti aç')}</button></div></div>`)}
+document.getElementById('sks').addEventListener('click',ev=>{const b=ev.target.closest('[data-sk]');if(!b||!last)return;const r=(last.son_toplantilar||[]).find(x=>x.harita);if(!r)return
+  const k=b.dataset.sk;sonIs(r.id,k==='ozet'?'':k,false,b)})
 // 3 Kasım (öğrenen sözlük): son toplantıların altında tek satır — son 7 günde öğrenilen biçim ve bekleyen aday (/status sozluk_ogrenme)
 function soSatir(s){const so=s.sozluk_ogrenme;return so&&(so.yeni||so.bekleyen)?`<div class=m data-so=1>${esc(L('Sözlük: {n} yeni biçim öğrenildi, {m} aday bekliyor',{n:so.yeni||0,m:so.bekleyen||0}))}</div>`:''}
 document.getElementById('sn').addEventListener('click',async ev=>{if(akTik(ev,renderSon))return;const b=ev.target.closest('[data-son]')
   if(!b){const a=ev.target.closest('[data-snac]');if(a&&!ev.target.closest('button')){const id=a.dataset.snac;if(snAcik.has(id))snAcik.delete(id);else snAcik.add(id);if(last)renderSon(last)}return}
-  let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:b.dataset.son,tur:b.dataset.tur||''})})}catch(e){}
-  if(!r.ok)geciciDurum(b.dataset.tur?L('Zihin haritası açılamadı'):L('Özet açılamadı'),r.err||'')})
+  sonIs(b.dataset.son,b.dataset.tur||'',!!b.dataset.posta)})
 // Bugün (toplantı yokken, 30 Ekim — kullanıcı onayladı: "sırada ne var, beni ne bekliyor, ne oldu"): başlık satırı (tarih + Bugün, Bugün | Bu hafta), sıradaki
 // toplantı kartı (solda hazırlık şeridi — hafta görünümünün hazir/eksik/yok'u; saat, başlık, platform · kişi · hazırlık; Hazırlık / Başlat), altında tek satır
 // "Sonra …". Bugün toplantı kalmadıysa ilk gelecek toplantı (Yarın 09:30): /takvim?hafta=0 (gerekirse 1), hazırlık da oradan. Claude izlerken gizli.
@@ -1574,7 +1592,7 @@ durumCiz()
 const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
-paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderNotlar(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSon(s); renderOturum(s)
+paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderNotlar(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSonKart(s);renderSon(s); renderOturum(s)
 if(s.ayarlar&&s.ayarlar.deger)temaUygula(s.ayarlar.deger.tema||'sistem')  // tema başka pencereden (Ayarlar) değiştiyse de
 // arayüz dili başka pencereden (Ayarlar) değiştiyse bu sayfa da yeni dille yeniden yüklenir
 if(s.ayarlar&&s.ayarlar.deger&&s.ayarlar.deger.dil&&s.ayarlar.deger.dil!==DIL&&!new URLSearchParams(location.search).get('dil')&&!window._dilYeni){window._dilYeni=1;location.reload()}

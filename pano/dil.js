@@ -560,6 +560,14 @@ globalThis.SUFLOR_EN = {
   "Zihin haritası": "Mind map",
   "Karar ve iş panosu": "Decisions and tasks panel",
   "Zihin haritası açılamadı": "Couldn't open the mind map",
+  "Son toplantı": "Last meeting",
+  "PDF hazırlanamadı": "Couldn't prepare the PDF",
+  "PDF hazır": "PDF ready",
+  "Finder'da gösterildi, dosya yolu panoda": "Shown in Finder, file path on the clipboard",
+  "PDF dosyası hazırlar, Finder'da gösterir": "Prepares a PDF file and shows it in Finder",
+  "Panoyu PDF olarak hazırla": "Prepare the panel as a PDF",
+  "Haritayı PDF olarak hazırla": "Prepare the map as a PDF",
+  "PDF, Mail taslağına ekli": "PDF attached to a Mail draft",
   // --- hazırlık sayfası
   "Claude izliyor": "Claude is watching",
   // --- Teams sayfası (şerit, tost, kart penceresi)
