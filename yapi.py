@@ -180,6 +180,7 @@ def cevap_alanlari(o):  # soru/sayı/iddia öğesinin doğrulama alanları → g
     if o.get("tur") not in ("soru", "sayi", "iddia") or not (c or k): return {}
     ck = kucuk(c).replace("ğ", "g").replace("ş", "s").replace("ı", "i")
     d = "dogru" if ck.startswith("dogru") else "yanlis" if ck.startswith("yanlis") else "kismen" if ck.startswith("kismen") else ""
+    if d: c = re.sub(r"^\S+(\s+do[gğ]ru)?\s*[:—–-]\s*", "", c, count=1) or c  # 5 Kasım (kullanıcı): etiket rengi ve adı zaten gösteriyor — "Kısmen: …" öneki yinelenmez
     return {"cevap": c, "kaynak": k, "kaynak_url": _url(o.get("kaynak_url")), "cd": d}
 def sayi_denetim(v, say):
     # özet .md "Toplantı çıktısı" sayıları (say: {karar, is, acik}) ↔ yapı dosyasındaki karar · iş+söz · soru öğe sayıları → [uyarı]; yalnız uyarır
