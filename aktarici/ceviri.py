@@ -38,11 +38,17 @@ def dil_tahmin(metin):  # "tr" | "en" | None (kısa ya da belirsiz)
     if en >= 2 and en > tr: return "en"
     if tr >= 2 and tr >= en: return "tr"
     return None
+CEVIRI_KANAL_DIL_SN = 60
+def ceviri_gerekli(metin, hedef, simdi=None):  # v0.182.2: kısa/belirsiz satır atılmaz (FLEURS'ta 10/68 parça çevrilmemişti): kesin dil → kanal belleğine; belirsizse son 60 sn'deki kanal diline bak
+    simdi = simdi or time.time(); d = dil_tahmin(metin)
+    if d: _CV["kanal_dil"] = (d, simdi); return d != hedef
+    bd = _CV.get("kanal_dil")
+    if bd and simdi - bd[1] < CEVIRI_KANAL_DIL_SN: return bd[0] != hedef  # kanalın dili bilinir: Türkçe "tamam", "evet" Türkçe arayüzde okunmaz
+    return not (hedef == "tr" and re.search(r"[çğıöşüÇĞİÖŞÜ]", metin))  # bellek yok/eski: yabancı say; Türkçe harf varsa Türkçe arayüzde at
 def ceviri_ekle(lid, metin, md):
     # karşı satır yazıldı: arayüz dilinden başka dildeyse kuyruğa
     if not ceviri_acik() or not lid or not metin or ("gizli_acik" in globals() and gizli_acik()): return
-    hedef = "en" if ARAYUZ_DILI == "en" else "tr"; d = dil_tahmin(metin)
-    if not d or d == hedef: return
+    if not ceviri_gerekli(metin, "en" if ARAYUZ_DILI == "en" else "tr"): return
     with CEVIRI_K: CEVIRI_Q.append((lid, metin, md, time.time())); CEVIRI_K.notify()
     ceviri_isinsin()
 def ceviri_isinsin():  # işçiler (ve süreçleri) bir kez açılır: ilk yabancı satırda ya da 🎧 açılınca (açılış 4–7 sn satırı bekletmesin)

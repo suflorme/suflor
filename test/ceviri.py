@@ -52,6 +52,21 @@ try:
     satirlar(istek); time.sleep(3.5)
     bak("ayar kapalıyken çevrilmez", not any("ceviri" in x for x in istek("/status")["tail"]))
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
+# kısa/belirsiz satır (v0.182.2): kanalın son 60 sn'deki diline göre (ceviri_gerekli; kaynaktan ayıklanıp yalıtılmış çalıştırılır)
+_kaynak = open(os.path.join(KOD, "aktarici", "ceviri.py"), encoding="utf-8").read()
+_parca = "".join(m.group(0) for m in re.finditer(r"^(?:_EN_SOZ|_TR_SOZ|CEVIRI_KANAL_DIL_SN) = .*\n|^def (?:dil_tahmin|ceviri_gerekli)\(.*\n(?:[ \t].*\n)+", _kaynak, re.M))
+def _gerekli(metin, hedef, simdi, bellek):
+    ns = {"re": re, "time": time, "_CV": {"kanal_dil": bellek} if bellek else {}}; exec(_parca, ns)
+    return ns["ceviri_gerekli"](metin, hedef, simdi), ns["_CV"].get("kanal_dil")
+t0 = 1000.0
+bak("yabancı kanalda kısa satır kuyruğa girer", _gerekli("Okay, thanks.", "tr", t0, ("en", t0 - 10))[0] is True)
+bak("Türkçe kanalda kısa satır atılır", _gerekli("Tamam, evet.", "tr", t0, ("tr", t0 - 10))[0] is False)
+bak("bellek yokken kısa İngilizce satır kuyruğa girer", _gerekli("Yes, sure.", "tr", t0, None)[0] is True)
+bak("Türkçe harfli kısa satır atılır (bellek yok, hedef Türkçe)", _gerekli("Çok güzel", "tr", t0, None)[0] is False)
+bak("60 sn'den eski bellek sayılmaz (Türkçe bellek eski → kısa satır kuyruğa)", _gerekli("Okay, thanks.", "tr", t0, ("tr", t0 - 61))[0] is True)
+bak("kesin dil belleğe yazılır (dil ve zaman)", _gerekli("We can ship the new version on Monday if the tests pass.", "tr", t0, None)[1] == ("en", t0))
+bak("kesin hedef dil: atılır ve belleğe yazılır", _gerekli("Bence bu hafta bitiremeyiz, çok iş var.", "tr", t0, None) == (False, ("tr", t0)))
+bak("İngilizce arayüzde Türkçe kanalın kısa satırı kuyruğa girer", _gerekli("Tamam, evet.", "en", t0, ("tr", t0 - 5))[0] is True)
 # sesli çeviri (v0.29.0): 🎧 kulaklıksız açılmaz; açılınca çeviri ayarı kapalı olsa da çevrilir, kısa öz okunur; tekrar basınca kapanır
 r, T, canli, istek = calistir(ceviri=False, kulaklik=False)
 try:
