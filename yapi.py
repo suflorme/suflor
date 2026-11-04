@@ -242,3 +242,194 @@ img.onload=()=>{const x=c.getContext('2d');x.fillStyle=cs.backgroundColor;x.fill
 img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(k))};
 ciz();
 </script></html>"""
+# --- toplantı görseli: tür seçimi + karar ve iş panosu (v0.186.0) ---------------------------------------------------------
+# 5 Kasım (kullanıcı): karar ve işin çok olduğu toplantıda okunacak şey "ne kararlaştı, kim neyi ne zamana yapacak"; zihin haritası bunu
+# gündem dallarına dağıtıyor. Eşik: 2 karar (tek karar şeritte yalnız kalır, haritada da okunur) ya da 3 sahipli iş (üç işte kişi sütunu
+# haritadan hızlı okunur). Yapı dosyasında "gorsel": "harita" | "karar_is" elle seçer. Dosya adı aynı kalır (<özet>-zihin-haritasi.html).
+GORSEL_KARAR, GORSEL_IS = 2, 3
+GORSEL_AD = {"harita": "Zihin haritası", "karar_is": "Karar ve iş panosu"}
+def gorsel_tur(v):
+    z = str(v.get("gorsel") or "").strip()
+    if z in GORSEL_AD: return z
+    og = [o for m in v["maddeler"] for o in m["ogeler"]]
+    k = sum(o["tur"] == "karar" for o in og); s = sum(o["tur"] in ("is", "soz") and bool(str(o.get("sahip") or o.get("kim") or "").strip()) for o in og)
+    return "karar_is" if k >= GORSEL_KARAR or s >= GORSEL_IS else "harita"
+def dokum_saatleri(yol):  # canlı döküm (.jsonl "time" ya da .md tablo satırı) → ["HH:MM:SS", …]; okunamazsa []
+    try:
+        if yol.endswith(".jsonl"): return [str(json.loads(l).get("time") or "") for l in open(yol, encoding="utf-8") if l.strip()]
+        return re.findall(r"^\|\s*(\d{1,2}:\d{2}:\d{2})\s*\|", open(yol, encoding="utf-8").read(), re.M)
+    except (OSError, ValueError): return []
+def _hm(t): t = int(round(t)) % 86400; return f"{t // 3600:02d}:{t % 3600 // 60:02d}"
+def _koken(ts):  # gece yarısını aşan toplantı: saatler çemberde, en büyük boşluktan sonraki saat başlangıç
+    ts = sorted(set(ts)); n = len(ts)
+    if n < 2: return ts[0]
+    bos = [(ts[(i + 1) % n] - ts[i]) % 86400 or 86400 for i in range(n)]
+    return ts[(bos.index(max(bos)) + 1) % n]
+def zaman_seridi(v, saatler=None):
+    # gündem şeridi: madde saatleri (madde "baslangic"/"saat", "bitis") → öğe saatleri (karar/iş/iddia…; ardışık aynı maddenin öğeleri bir blok,
+    # sınır iki öğenin ortası) → döküm saatleri (yalnız toplam süre; maddelere eşit pay) → sıra (eşit pay). Kaynak görselde yazılır.
+    M = v["maddeler"]; dk = [_sn(s) for s in (saatler or [])]; dk = [t for t in dk if t is not None]
+    msa = [(i, _sn(m.get("baslangic") or m.get("saat")), _sn(m.get("bitis")) if m.get("bitis") else None) for i, m in enumerate(M)]
+    msa = [x for x in msa if x[1] is not None]
+    noktalar = [(i, t) for i, m in enumerate(M) for o in m["ogeler"] for t in [_sn(o.get("saat")) if o.get("saat") else None] if t is not None]
+    def kirp(o, son):  # döküm saatlerinden toplantıya ait olanlar (ilk/son öğenin ± 30 dk'sı; aynı günün başka toplantısı karışmasın)
+        r = [((t - o) % 86400) for t in dk]; r = [x - 86400 if x > 86400 - 1800 else x for x in r]
+        return [x for x in r if -1800 <= x <= son + 1800]
+    if len(msa) >= 2 or len(noktalar) >= 2:
+        kaynak = "madde" if len(msa) >= 2 else "oge"
+        o = _koken([t for _, t, *_ in msa] if kaynak == "madde" else [t for _, t in noktalar])
+        rel = lambda t: (t - o) % 86400
+        if kaynak == "madde":
+            ns = sorted((rel(b), i, rel(e) if e is not None else None) for i, b, e in msa)
+        else:
+            ns = sorted((rel(t), i) for i, t in noktalar)
+        son_n = ns[-1][0]; d = kirp(o, son_n)
+        bas, son = min([0] + d), max([son_n] + ([e for *_, e in ns if e is not None] if kaynak == "madde" else []) + d)
+        bl = []
+        if kaynak == "madde":
+            for j, (b, i, e) in enumerate(ns):
+                sn_ = e if e is not None else (ns[j + 1][0] if j + 1 < len(ns) else son)
+                bl.append([i, b if j else bas, max(sn_, b)])
+        else:
+            for j, (t, i) in enumerate(ns):
+                if bl and bl[-1][0] == i: bl[-1][2] = t; continue
+                if bl: orta = (bl[-1][2] + t) / 2; bl[-1][2] = orta; bl.append([i, orta, t])
+                else: bl.append([i, bas, t])
+            bl[-1][2] = son
+        not_ = ("Süreler gündem maddelerinin saatlerinden." if kaynak == "madde" else
+                "Süreler yaklaşık: kararların, işlerin ve iddiaların saatinden; iki maddenin sınırı aradaki öğelerin ortası." + (" Toplam süre dökümden." if d else ""))
+        ber = lambda t: _hm(o + t)
+    elif len(dk) >= 2:
+        kaynak = "dokum"; o = _koken(dk); r = sorted((t - o) % 86400 for t in dk); bas, son = r[0], r[-1]
+        pay = (son - bas) / max(1, len(M)); bl = [[i, bas + i * pay, bas + (i + 1) * pay] for i in range(len(M))]
+        not_ = "Süreler tahmini: toplam süre dökümden, maddelere sırayla eşit bölündü."; ber = lambda t: _hm(o + t)
+    else:
+        kaynak = "sira"; bas, son = 0, max(1, len(M)); bl = [[i, i, i + 1] for i in range(len(M))]
+        not_ = "Süreler tahmini: saat bilgisi yok, maddeler sırayla eşit gösterildi."; ber = None
+    top = max(1e-9, son - bas); sure = None if kaynak == "sira" else round((son - bas) / 60)
+    bloklar = [{"m": i, "bas": ber(b) if ber else "", "son": ber(e) if ber else "", "dk": None if not ber else round((e - b) / 60, 1),
+                "pay": round((e - b) / top, 5)} for i, b, e in bl if e > b]
+    mad = []
+    for i, m in enumerate(M):
+        bs = [x for x in bloklar if x["m"] == i]
+        mad.append({"no": i + 1, "baslik": str(m.get("baslik") or "Gündem dışı"), "durum": str(m.get("durum") or ""),
+                    "dk": None if not ber else round(sum(x["dk"] for x in bs)), "pay": round(sum(x["pay"] for x in bs), 4),
+                    "araliklar": [f"{x['bas']}–{x['son']}" for x in bs] if ber else [],
+                    "say": {t: sum(o["tur"] == t for o in m["ogeler"]) for t in TURLER if any(o["tur"] == t for o in m["ogeler"])}})
+    return {"kaynak": kaynak, "not": not_, "tahmini": kaynak in ("dokum", "sira"), "bas": ber(bas) if ber else "", "son": ber(son) if ber else "",
+            "sure_dk": sure, "bloklar": bloklar, "maddeler": mad}
+def pano_veri(v, saatler=None):
+    kararlar, isler, sorular, diger = [], [], [], []
+    for i, m in enumerate(v["maddeler"]):
+        mb = str(m.get("baslik") or "Gündem dışı")
+        for o in m["ogeler"]:
+            ortak = {"metin": str(o["metin"]), "saat": str(o.get("saat") or ""), "alinti": str(o.get("alinti") or ""), "madde": mb, "mno": i + 1,
+                     "durum": str(o.get("durum") or "")}
+            if o["tur"] == "karar":
+                n = kucuk(o.get("netlik") or "").replace("ö", "o").replace("ü", "u"); ty = n in ("ortuk", "tek") or bool(str(o.get("varsayim") or "").strip())
+                kararlar.append(dict(ortak, kim=str(o.get("kim") or ""), varsayim=str(o.get("varsayim") or ""),
+                                     teyit=ty, neden=teyit_neden(o) if ty else "", net=(n == "acik" and not ty)))
+            elif o["tur"] in ("is", "soz"):
+                isler.append(dict(ortak, tur=o["tur"], sahip=" ".join(str(o.get("sahip") or o.get("kim") or "").split()), tarih=str(o.get("tarih") or "").strip()))
+            elif o["tur"] == "soru": sorular.append(dict(ortak, kim=str(o.get("kim") or "")))
+            else: diger.append(dict(ortak, tur=TURLER[o["tur"]], kim=str(o.get("kim") or "")))
+    kisiler = {}
+    for x in isler: kisiler.setdefault(x["sahip"] or "", []).append(x)
+    sut = sorted(([k, xs] for k, xs in kisiler.items() if k), key=lambda a: (-len(a[1]), kucuk(a[0])))
+    if "" in kisiler: sut.append(["", kisiler[""]])
+    for _, xs in sut: xs.sort(key=lambda x: (not x["tarih"], x["tarih"], x["mno"]))  # tarihli olan önce, en yakın tarih üstte
+    z = zaman_seridi(v, saatler)
+    return {"baslik": str(v.get("baslik") or "Toplantı"), "tarih": str(v.get("tarih") or ""), "kararlar": kararlar,
+            "sutunlar": [{"ad": k, "isler": xs} for k, xs in sut], "sorular": sorular, "diger": diger, "zaman": z,
+            "say": {"karar": len(kararlar), "is": len(isler), "tarihsiz": sum(not x["tarih"] for x in isler), "soru": len(sorular), "sure_dk": z["sure_dk"]}}
+def pano_html(v, saatler=None):
+    veri = json.dumps(pano_veri(v, saatler), ensure_ascii=False).replace("</", "<\\/")
+    return PANO.replace("__BASLIK__", html.escape(str(v.get("baslik") or "Toplantı"))).replace("__VERI__", veri)
+def gorsel_html(v, saatler=None):  # → (tür, html); yazılan dosya adı her iki türde <özet>-zihin-haritasi.html
+    t = gorsel_tur(v); return t, (pano_html(v, saatler) if t == "karar_is" else harita_html(v))
+PANO = r"""<!doctype html><html lang=tr><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>__BASLIK__ — karar ve iş panosu</title>
+<style>
+:root{--bg:#f6f4ee;--s1:#fffdf8;--s2:#f0ede4;--tx:#1d211e;--t2:#5b625d;--bd:rgba(29,33,30,.14);--cizgi:rgba(29,33,30,.28);
+--kok:#175e46;--karar:#1f7a4f;--is:#a86b12;--soru:#6b4f9e;--iddia:#b3412e;--soz:#8a6420;--gt:#fff;
+--g1:#3f7d6a;--g2:#9a6c2e;--g3:#55689e;--g4:#94566a;--g5:#3f7f86;--g6:#727339}
+@media (prefers-color-scheme:dark){:root{--bg:#121614;--s1:#1a201d;--s2:#222a26;--tx:#e8ebe6;--t2:#a5ada7;--bd:rgba(232,235,230,.14);--cizgi:rgba(232,235,230,.3);
+--kok:#2a8a66;--karar:#47b07c;--is:#d9a03c;--soru:#b39ddb;--iddia:#e0705c;--soz:#e0bb6c;--gt:#101412;
+--g1:#7cc2ab;--g2:#dcb06e;--g3:#9fb0e0;--g4:#dc9cb0;--g5:#7fc4cb;--g6:#c3c47e}}
+@media print{:root{--bg:#fff;--s1:#fff;--s2:#f3f1ea;--tx:#1d211e;--t2:#5b625d;--bd:rgba(29,33,30,.2);--karar:#1f7a4f;--is:#a86b12;--soru:#6b4f9e;--iddia:#b3412e;--soz:#8a6420;--gt:#fff;
+--g1:#3f7d6a;--g2:#9a6c2e;--g3:#55689e;--g4:#94566a;--g5:#3f7f86;--g6:#727339}
+header button,#ayrinti{display:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}.kart,.sutun,.mad{break-inside:avoid}}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+main{max-width:1180px;margin:0 auto;padding:0 16px 40px}
+header{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--bd);max-width:1180px;margin:0 auto}
+header h1{font-size:17px;font-weight:600;margin:0;overflow-wrap:anywhere}header .alt{color:var(--t2);font-size:12.5px;margin-right:auto}
+header button{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--bd);border-radius:7px;background:var(--s1);color:var(--tx);cursor:pointer}
+header button:hover{border-color:var(--cizgi)}
+.ozet{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
+.ozet span{background:var(--s1);border:1px solid var(--bd);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--t2)}.ozet b{color:var(--tx);font-weight:600}
+.ozet .uy{border-color:color-mix(in srgb,var(--iddia) 55%,transparent);background:color-mix(in srgb,var(--iddia) 10%,var(--s1));color:var(--iddia)}.ozet .uy b{color:var(--iddia)}
+h2{font-size:13px;font-weight:600;color:var(--t2);margin:26px 0 10px;letter-spacing:.01em}h2 small{font-weight:400}
+.izgara{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(290px,100%),1fr))}
+.kart{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:var(--s1);border:1px solid var(--bd);border-radius:9px;padding:10px 12px 10px 14px;cursor:pointer;position:relative}
+.kart:hover,.kart:focus-visible{border-color:var(--cizgi);outline:none}.kart:focus-visible{box-shadow:0 0 0 2px color-mix(in srgb,var(--kok) 40%,transparent)}
+.kart::before{content:"";position:absolute;left:5px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--renk,var(--bd))}
+.kart .m{overflow-wrap:anywhere;white-space:normal}.kart .k{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-top:6px;font-size:12px;color:var(--t2)}
+.et{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11.5px;font-weight:500;background:var(--s2);color:var(--t2)}
+.et.tarih{background:color-mix(in srgb,var(--karar) 12%,var(--s1));color:var(--karar)}
+.et.tarihsiz{background:color-mix(in srgb,var(--iddia) 14%,var(--s1));color:var(--iddia);font-weight:600}
+.et.teyit{background:color-mix(in srgb,var(--is) 15%,var(--s1));color:var(--is)}.et.net{background:color-mix(in srgb,var(--karar) 12%,var(--s1));color:var(--karar)}
+.sutunlar{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));align-items:start}
+.sutun{background:var(--s2);border-radius:11px;padding:10px}.sutun .bas{display:flex;align-items:baseline;gap:8px;padding:2px 4px 8px}
+.sutun .ad{font-weight:600;overflow-wrap:anywhere}.sutun.sahipsiz .ad{font-style:italic;color:var(--t2)}.sutun .n{margin-left:auto;color:var(--t2);font-size:12px;white-space:nowrap}
+.cubuk{height:4px;border-radius:2px;background:color-mix(in srgb,var(--is) 18%,transparent);margin:0 4px 10px}.cubuk i{display:block;height:100%;border-radius:2px;background:var(--is)}
+.sutun .kart+.kart{margin-top:8px}
+.liste{display:grid;gap:8px}
+.serit{display:flex;height:38px;border-radius:8px;overflow:hidden;background:var(--s2);margin:8px 0 4px}
+.serit button{border:0;padding:0;margin:0;min-width:3px;font:600 12px/38px -apple-system,BlinkMacSystemFont,sans-serif;color:var(--gt);cursor:pointer;overflow:hidden;white-space:nowrap;text-align:center;border-right:1px solid var(--bg)}
+.serit button:last-child{border-right:0}.serit button:hover,.serit button.sec{filter:brightness(1.12)}
+.uclar{display:flex;justify-content:space-between;font-size:12px;color:var(--t2)}.sn{font-size:12.5px;color:var(--t2);margin:2px 0 0}.sn.tah{color:var(--is);font-weight:500}
+.madlar{display:grid;gap:6px;margin-top:12px}
+.mad{display:grid;grid-template-columns:12px 1fr auto;gap:4px 10px;align-items:baseline;width:100%;text-align:left;font:inherit;color:inherit;background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;cursor:pointer}
+.mad:hover,.mad.sec{border-color:var(--cizgi)}.mad .sw{width:10px;height:10px;border-radius:3px;align-self:center}.mad .b{overflow-wrap:anywhere}.mad .d{color:var(--t2);font-size:12.5px;white-space:nowrap;text-align:right}
+.mad .a{grid-column:2/4;color:var(--t2);font-size:12px;overflow-wrap:anywhere}
+.bos{color:var(--t2);font-size:13px}
+#ayrinti{position:fixed;right:16px;bottom:16px;max-width:min(440px,calc(100% - 32px));background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.16);display:none;z-index:2}
+#ayrinti b{display:block;margin:0 20px 4px 0;overflow-wrap:anywhere}#ayrinti .k{color:var(--t2);font-size:12.5px;overflow-wrap:anywhere}#ayrinti q{display:block;margin-top:6px;font-style:italic;overflow-wrap:anywhere}
+#ayrinti p{margin:6px 0 0;font-size:12.5px;overflow-wrap:anywhere}#ayrinti button{position:absolute;right:8px;top:6px;border:0;background:none;color:var(--t2);font-size:18px;cursor:pointer}
+</style>
+<header><h1>__BASLIK__</h1><span class=alt id=alt></span><button id=yaz>Yazdır / PDF</button></header>
+<main id=ana></main><div id=ayrinti role=dialog aria-live=polite></div>
+<script>
+const V=__VERI__;const A=document.getElementById('ayrinti'),ANA=document.getElementById('ana');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const AY=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const gun=t=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(t||'');return m?`${+m[3]} ${AY[+m[2]-1]}`+(V.tarih&&V.tarih.slice(0,4)!==m[1]?' '+m[1]:''):String(t||'')};
+const sure=d=>d==null?'':d<60?`${d} dk`:`${Math.floor(d/60)} sa`+(d%60?` ${d%60} dk`:'');
+const G=i=>`var(--g${(i%6)+1})`;const S=V.say,Z=V.zaman;let say=0;const O=[];
+function kart(o,ic,renk){O.push(o);return `<button class=kart data-o="${O.length-1}" style="--renk:${renk}"><div class=m>${esc(o.metin)}</div><div class=k>${ic}</div></button>`}
+document.getElementById('alt').textContent=[gun(V.tarih),'Karar ve iş panosu'].filter(Boolean).join(' · ');
+let h=`<div class=ozet><span><b>${S.karar}</b> karar</span><span><b>${S.is}</b> iş</span>`+(S.tarihsiz?`<span class=uy><b>${S.tarihsiz}</b> tarihsiz iş</span>`:`<span><b>0</b> tarihsiz iş</span>`)
+ +`<span><b>${S.soru}</b> açık soru</span>`+(S.sure_dk!=null?`<span>Süre <b>${esc(sure(S.sure_dk))}</b></span>`:'')+`</div>`;
+h+=`<h2>Kararlar <small>(${S.karar})</small></h2>`+(V.kararlar.length?`<div class=izgara>`+V.kararlar.map(k=>kart(Object.assign({tur:'Karar'},k),
+ [k.kim&&esc(k.kim),k.saat&&esc(k.saat.slice(0,5)),k.teyit?'<span class="et teyit">teyit bekliyor</span>':k.net?'<span class="et net">açıkça onaylandı</span>':''].filter(Boolean).join(' · '),'var(--karar)')).join('')+`</div>`:`<p class=bos>Karar yok.</p>`);
+const mx=Math.max(1,...V.sutunlar.map(s=>s.isler.length));
+h+=`<h2>Kim ne yapacak <small>(${S.is} iş)</small></h2>`+(V.sutunlar.length?`<div class=sutunlar>`+V.sutunlar.map(s=>`<section class="sutun${s.ad?'':' sahipsiz'}"><div class=bas><span class=ad>${esc(s.ad||'Sahipsiz')}</span><span class=n>${s.isler.length} iş`
+ +(s.isler.filter(x=>!x.tarih).length?` · ${s.isler.filter(x=>!x.tarih).length} tarihsiz`:'')+`</span></div><div class=cubuk><i style="width:${Math.round(s.isler.length/mx*100)}%"></i></div>`
+ +s.isler.map(x=>kart(Object.assign({tur:x.tur==='soz'?'Söz':'İş',kim:x.sahip},x),[x.tarih?`<span class="et tarih">${esc(gun(x.tarih))}</span>`:'<span class="et tarihsiz">tarihsiz</span>',
+   x.tur==='soz'?'<span class=et>söz</span>':'',x.durum?`<span class=et>${esc(x.durum)}</span>`:'',`madde ${x.mno}`].filter(Boolean).join(''),x.tarih?'var(--is)':'var(--iddia)')).join('')+`</section>`).join('')+`</div>`:`<p class=bos>İş yok.</p>`);
+if(V.sorular.length)h+=`<h2>Açık sorular <small>(${V.sorular.length})</small></h2><div class=izgara>`+V.sorular.map(q=>kart(Object.assign({tur:'Açık soru'},q),[q.kim&&esc(q.kim),`madde ${q.mno}`].filter(Boolean).join(' · '),'var(--soru)')).join('')+`</div>`;
+if(V.diger.length)h+=`<h2>Sayılar ve iddialar <small>(${V.diger.length})</small></h2><div class=izgara>`+V.diger.map(q=>kart(q,[esc(q.tur),q.kim&&esc(q.kim),q.saat&&esc(q.saat.slice(0,5))].filter(Boolean).join(' · '),'var(--bd)')).join('')+`</div>`;
+h+=`<h2>Gündem ve süre</h2><p class="sn${Z.tahmini?' tah':''}">${esc(Z.not)}</p><div class=serit role=list>`+Z.bloklar.map((b,j)=>`<button role=listitem data-m="${b.m}" style="flex:${b.pay} 0 0;background:${G(b.m)}" title="${esc(V.zaman.maddeler[b.m].baslik)}${b.bas?' · '+b.bas+'–'+b.son:''}" aria-label="Madde ${b.m+1}${b.bas?', '+b.bas+'–'+b.son:''}">${b.m+1}</button>`).join('')
+ +`</div>`+(Z.bas?`<div class=uclar><span>${esc(Z.bas)}</span><span>${esc(Z.son)}</span></div>`:'')
+ +`<div class=madlar>`+Z.maddeler.map((m,i)=>`<button class=mad data-m="${i}"><span class=sw style="background:${G(i)}"></span><span class=b>${m.no}. ${esc(m.baslik)}${m.durum?` <span class=et>${esc(m.durum)}</span>`:''}</span><span class=d>${m.dk!=null?(m.dk?esc(sure(m.dk)):'saatli öğe yok'):(Math.round(m.pay*100)+'%')}</span>`
+ +(m.araliklar.length?`<span class=a>${esc(m.araliklar.join(', '))}</span>`:'')+`</button>`).join('')+`</div>`;
+ANA.innerHTML=h;
+function goster(b,k,ek){A.innerHTML=`<button aria-label="Kapat">×</button><b>${esc(b)}</b><div class=k>${k.filter(Boolean).map(esc).join(' · ')}</div>${ek||''}`;A.style.display='block';A.querySelector('button').onclick=()=>A.style.display='none'}
+ANA.addEventListener('click',e=>{const k=e.target.closest('[data-o]'),m=e.target.closest('[data-m]');
+ if(k){const o=O[+k.dataset.o];goster(o.metin,[o.tur,o.kim,o.tarih?'son tarih '+gun(o.tarih):(o.tur==='İş'||o.tur==='Söz')?'tarihsiz':'',o.saat&&'saat '+o.saat,o.madde&&('madde '+o.mno+': '+o.madde)],
+   (o.alinti?'<q>'+esc(o.alinti)+'</q>':'')+(o.neden?'<p>Teyit: '+esc(o.neden)+'</p>':'')+(o.durum?'<p>Durum: '+esc(o.durum)+'</p>':''));return}
+ if(m){const i=+m.dataset.m,d=Z.maddeler[i];document.querySelectorAll('.sec').forEach(x=>x.classList.remove('sec'));document.querySelectorAll(`[data-m="${i}"]`).forEach(x=>x.classList.add('sec'));
+   goster(d.no+'. '+d.baslik,[d.durum,d.dk!=null?(d.dk?sure(d.dk):'saatli öğe yok'):'',Object.entries(d.say).map(([t,n])=>n+' '+({karar:'karar',is:'iş',soru:'açık soru',sayi:'sayı',iddia:'iddia',soz:'söz'})[t]).join(', ')],
+     d.araliklar.length?'<p>'+esc(d.araliklar.join(', '))+'</p>':'')}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')A.style.display='none'});
+document.getElementById('yaz').onclick=()=>{A.style.display='none';window.print()};
+</script></html>"""

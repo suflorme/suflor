@@ -244,6 +244,7 @@ globalThis.SUFLOR_EN = {
   "iletildi": "sent",
   "İletildi: ": "Sent: ",
   "Zihin haritası, dışarı aktar": "Mind map, export",
+  "Karar ve iş panosu, dışarı aktar": "Decisions and tasks panel, export",
   "Gündem (isteğe bağlı): her satıra bir madde — {asistan} bu maddelerle başlar": "Agenda (optional): one item per line — {asistan} starts with these items",
   "İki sesli özet": "Two-voice summary",
   "İki kişiliğin sesi de Gemini ise toplantı özeti iki sesle okunur: biri özeti, öteki değerlendirmeyi.": "If both personas use Gemini voices, the meeting summary is read in two voices: one reads the summary, the other the assessment.",
@@ -557,6 +558,7 @@ globalThis.SUFLOR_EN = {
   "Dün": "Yesterday",
   "Özet açılamadı": "Couldn't open the summary",
   "Zihin haritası": "Mind map",
+  "Karar ve iş panosu": "Decisions and tasks panel",
   "Zihin haritası açılamadı": "Couldn't open the mind map",
   // --- hazırlık sayfası
   "Claude izliyor": "Claude is watching",

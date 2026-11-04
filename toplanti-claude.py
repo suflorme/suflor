@@ -110,6 +110,7 @@ sn.add_argument("--gecmis", action="store_true", help="son toplantıların çık
 yp = sub.add_parser("yapi", help="toplantı sonu: özetin yapı dosyası (<özet>.yapi.json) → karar grafı (canli/karar-grafi.sqlite) + zihin haritası (<özet>-zihin-haritasi.html)")
 yp.add_argument("json", nargs="?", help="yapı dosyası (yoksa --ornek)"); yp.add_argument("--ozet", default=None, help="özet .md (harita yanına yazılır; yoksa json'un yanına)")
 yp.add_argument("--dosya", default=None, help="canlı toplantı .md (grafta kaynak; yoksa en yenisi)"); yp.add_argument("--ornek", action="store_true", help="yapı dosyası biçimini yazdır")
+yp.add_argument("--dokum", default=None, help="canlı döküm .md/.jsonl (karar ve iş panosunda gündem süreleri; yoksa toplantının .jsonl'i)")
 gf = sub.add_parser("graf", help="karar grafı: son kayıtlar ya da bir kişinin iddia/karar/açık işleri (yalnız bu Mac)")
 gf.add_argument("--kim", default=None); gf.add_argument("--n", type=int, default=20); gf.add_argument("--sil-toplanti", default=None, help="bu canlı toplantının kayıtlarını sil")
 gf.add_argument("--hepsini-sil", action="store_true")
@@ -1871,11 +1872,14 @@ def yapi_cmd():
     md = toplanti_dosyasi(A.dosya); kaynak = os.path.basename(md) if md else os.path.basename(A.json)
     n = Y.graf_yaz(A.dir, v, kaynak)
     taban = os.path.expanduser(A.ozet)[:-3] if A.ozet and A.ozet.endswith(".md") else re.sub(r"(\.yapi)?\.json$", "", os.path.expanduser(A.json))
-    hy = taban + "-zihin-haritasi.html"
-    with open(hy, "w", encoding="utf-8") as f: f.write(Y.harita_html(v))
+    hy = taban + "-zihin-haritasi.html"  # 5 Kasım: ad aynı kalır (pano, aktarıcı kopyası ve toplantı komutu bu adı okur); içerik türe göre
+    dk = getattr(A, "dokum", None) and os.path.expanduser(A.dokum)
+    if not dk and md and (not v.get("tarih") or md[:10] == str(v["tarih"])[:10]): dk = os.path.join(A.dir, md.replace(".md", ".jsonl"))  # başka günün toplantısı karışmasın
+    tur, icerik = Y.gorsel_html(v, Y.dokum_saatleri(dk) if dk else None)
+    with open(hy, "w", encoding="utf-8") as f: f.write(icerik)
     say = {t: sum(1 for m in v["maddeler"] for o in m["ogeler"] if o["tur"] == t) for t in Y.TURLER}
     print(f"karar grafı: {n} kayıt ({', '.join(f'{Y.kucuk(Y.TURLER[t])} {k}' for t, k in say.items() if k)}) · kaynak {kaynak}")
-    print(f"zihin haritası: {hy}")
+    print(f"zihin haritası: {hy}" + (f" (tür: {Y.GORSEL_AD[tur].lower()})" if tur != "harita" else ""))
 def graf_cmd():
     Y = _yapi(); eylem_durum_esitle(Y)
     if A.hepsini_sil: Y.graf_sil(A.dir, hepsi=True); print("karar grafı silindi"); return
@@ -2102,6 +2106,7 @@ def ozet_hazir_cmd():
         except (OSError, ValueError): pass
     hy = yol[:-3] + "-zihin-haritasi.html" if yol.endswith(".md") else ""
     if hy and os.path.exists(hy): body["harita"] = open(hy, encoding="utf-8").read()[:2000000]  # panoda "Zihin haritası" (kopya aktarıcının klasöründe)
+    if body.get("harita"): body["gorsel"] = "karar_is" if "— karar ve iş panosu</title>" in body["harita"][:2000] else "harita"  # 5 Kasım: panodaki menü etiketi dosyanın türünden
     req = urllib.request.Request(A.relay + "/son-toplanti", data=json.dumps(body).encode(), method="POST",
                                  headers={"X-Suflor-Anahtar": key, "Content-Type": "application/json"})
     try: r = json.load(urllib.request.urlopen(req, timeout=10))

@@ -1482,6 +1482,7 @@ def son_ekle(p):
             os.makedirs(os.path.dirname(hp), exist_ok=True)
             with open(hp + ".tmp", "w", encoding="utf-8") as f: f.write(p["harita"][:2000000])
             os.replace(hp + ".tmp", hp); r["harita"] = hp
+            if p.get("gorsel") in ("harita", "karar_is"): r["gorsel"] = p["gorsel"]  # 5 Kasım: panoda menü etiketi (Zihin haritası | Karar ve iş panosu)
         except OSError as e: print(f"ÖZET: harita yazılamadı ({e.__class__.__name__})")
     with LOCK:
         _log("son-toplantilar.jsonl", r); SON.append(r); del SON[:-20]
