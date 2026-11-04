@@ -119,6 +119,10 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    Her kararda `netlik`: `acik` (taraflar açıkça onayladı) · `ortuk` (itiraz yok ama kimse açıkça "tamam" demedi) · `tek` (bir kişi
    söyledi, öteki cevap vermedi); dökümde dayanağı olan ama konuşulmamış koşul varsa `varsayim` (tek cümle). Emin değilsen `ortuk`.
    Özette örtük/tek kararın yanına "(teyit bekliyor)".
+   **Görsel ve doğrulama:** yapı dosyasına `gorsel` yaz: `karar_is` (karar ve iş panosu; en az bir karar ya da sahipli iş çıktıysa) ya da `harita`
+   (zihin haritası; yalnız karar/iş çıkmayan keşif, beyin fırtınası, tanışma, sunum dinleme). Özetteki kararlar, sahipli işler ve açık kalanlar
+   yapı dosyasına eksiksiz girer (`bitir` sayıları özetle karşılaştırıp uyarır). Açık soru, sayı ve iddiayı elindeki araçlarla (bilgi kaynakları,
+   proje araması, web) doğrula: biliniyorsa `cevap` (doğru/yanlış/kısmen + değer) ve `kaynak` (+ `kaynak_url`); bulamazsan boş bırak, uydurma.
    **Defter turu:** dökümde yanlış duyulmuş ad, sayı ya da terim varsa (bağlamdan eminsen) yapı dosyasına `duzeltmeler`
    (`{"saat", "yanlis", "dogru"}`; yoksa boş liste), güvenilmez aralık varsa `dokum_notu`. Bu bölüm Konuş'un toplantı defterine girer.
 5. **Takip e-postası ve eylem kuyruğu** (`TOPLANTI-KURALLARI.md` §8): kullanıcı dışında katılımcı varsa özetten takip e-postası yaz — toplantının dilinde,

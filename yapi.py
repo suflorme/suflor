@@ -10,16 +10,21 @@
 # Python 3.9, yalnız standart kütüphane. Metinler veridir; HTML'e kaçışlı (JSON) gömülür.
 import datetime, html, json, os, re, sqlite3
 TURLER = {"karar": "Karar", "is": "İş", "soru": "Açık soru", "sayi": "Sayı", "iddia": "İddia", "soz": "Söz"}
-YAPI_ORNEK = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": [
+YAPI_ORNEK = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "gorsel": "karar_is", "maddeler": [
     {"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [
         {"tur": "karar", "metin": "Bütçe 120 bin olarak kalıyor", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım",
          "netlik": "ortuk", "varsayim": "Kur yıl sonuna kadar aynı kalır"},
         {"tur": "is", "metin": "Teklifi revize et", "sahip": "Bora Kaya", "tarih": "2026-10-17", "saat": "10:15:02"},
         {"tur": "soz", "metin": "Geçen yılın faturalarını gönderecek", "sahip": "Ayşe Yılmaz", "tarih": "2026-10-14"},
-        {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K"}, {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz", "saat": "10:11:00"}]}],
+        {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Ali K", "cevap": "Hayır, KDV hariç", "kaynak": "proje belgesi: teklif.pdf"},
+        {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz", "saat": "10:11:00", "cevap": "Kısmen doğru: 92 bin", "kaynak": "Metrik kaynağı · get_metrics · Ekim 2026",
+         "kaynak_url": "https://ornek.example/rapor"}]}],
     "oneri": "Gündemi bir gün önce gönder",
     "duzeltmeler": [{"saat": "10:14:05", "yanlis": "Bora Kaplan", "dogru": "Bora Kaya"}, {"saat": "10:12:41", "yanlis": "on iki bin", "dogru": "yüz yirmi bin"}],
     "dokum_notu": "10:20–10:22 karşı tarafın sesi kesikti; o aradaki satırlar eksik"}
+# "gorsel" (5 Kasım): toplantı sonu görselinin türü, özeti yazan Claude belirler — "karar_is" (karar ve iş panosu; varsayılan) ya da "harita" (zihin haritası:
+# karar/iş çıkmayan keşif, beyin fırtınası, tanışma). soru/sayi/iddia öğelerinde isteğe bağlı "cevap" (doğru/yanlış/kısmen + değer ya da kısa net cevap),
+# "kaynak" (nereden doğrulandı), "kaynak_url" (yalnız http/https). Bulunamayan alan boş bırakılır; uydurulmaz. Görselde öğenin altında etiket olur.
 # Defter turu (S48, v0.35.0): toplantı sonunda oturum yapı dosyasına "duzeltmeler" (Whisper'ın yanlış duyduğu ad/sayı/terim: dökümdeki biçim → doğrusu,
 # satır saatiyle; yalnız bağlamdan emin olunanlar) ve "dokum_notu" (boşluk, kesinti, güvenilmez aralık) ekler. bitir kaynak saatlerini dökümde doğrular
 # (kaynak_dogrula); yapı dosyası aktarıcıya gider ve toplantı defterine "Toplantı sonu: kararlar, işler, düzeltmeler" bölümü olarak girer (Konuş okur).
@@ -168,6 +173,23 @@ def eylem_esle(dizin, eylemler, sahip, toplanti=None, ekle=True):
                        datetime.datetime.now().isoformat(timespec="seconds"), bag)); n += 1
     c.close(); return n
 # --- zihin haritası --------------------------------------------------------------------------------------------------
+def _url(u):  # yalnız http/https bağlantı olur (javascript:, data: vb. atılır)
+    u = str(u or "").strip(); return u if re.match(r"https?://[^\s<>\"']+$", u, re.I) else ""
+def cevap_alanlari(o):  # soru/sayı/iddia öğesinin doğrulama alanları → görselin okuyacağı sözlük; cevap/kaynak yoksa boş
+    c = " ".join(str(o.get("cevap") or "").split()); k = " ".join(str(o.get("kaynak") or "").split())
+    if o.get("tur") not in ("soru", "sayi", "iddia") or not (c or k): return {}
+    ck = kucuk(c).replace("ğ", "g").replace("ş", "s").replace("ı", "i")
+    d = "dogru" if ck.startswith("dogru") else "yanlis" if ck.startswith("yanlis") else "kismen" if ck.startswith("kismen") else ""
+    return {"cevap": c, "kaynak": k, "kaynak_url": _url(o.get("kaynak_url")), "cd": d}
+def sayi_denetim(v, say):
+    # özet .md "Toplantı çıktısı" sayıları (say: {karar, is, acik}) ↔ yapı dosyasındaki karar · iş+söz · soru öğe sayıları → [uyarı]; yalnız uyarır
+    if not say: return []
+    c = cikti_say(v); c["acik"] = sum(o["tur"] == "soru" for m in v["maddeler"] for o in m["ogeler"])  # özetin "açık kalanlar"ı görselde açık soru olarak çıkar (gündem durumu ayrı)
+    ad = {"karar": "Kararlar", "is": "Sahipli işler", "acik": "Açık kalanlar"}; out = []
+    for k in ("karar", "is", "acik"):
+        if k in say and say[k] != c[k]:
+            out.append(f"{ad[k]}: özette {say[k]}, yapı dosyasında {c[k]}" + (" — eksik olanı yapı dosyasına ekle" if c[k] < say[k] else " — fazla olanı özete ya da yapıdan kaldır"))
+    return out
 def harita_veri(v):
     kok = {"ad": str(v.get("baslik") or "Toplantı"), "alt": [], "tur": "kok", "not": str(v.get("tarih") or "")}
     for m in v["maddeler"]:
@@ -180,7 +202,7 @@ def harita_veri(v):
             for o in os_:
                 kim = o.get("sahip") if t == "is" else o.get("kim")
                 g["alt"].append({"ad": str(o["metin"]), "tur": t, "kim": str(kim or ""), "saat": str(o.get("saat") or ""), "tarih": str(o.get("tarih") or ""),
-                                 "alinti": str(o.get("alinti") or "")})
+                                 "alinti": str(o.get("alinti") or "")}); g["alt"][-1].update(cevap_alanlari(o))
             d["alt"].append(g)
         kok["alt"].append(d)
     return kok
@@ -198,10 +220,11 @@ header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 16px;
 header h1{font-size:16px;font-weight:600;margin:0 auto 0 0}header button{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--bd);border-radius:7px;background:var(--s1);color:var(--tx);cursor:pointer}
 header button:hover{border-color:var(--cizgi)}#alan{overflow:auto;height:calc(100% - 56px);padding:16px}svg{display:block}
 .d rect{fill:var(--s1);stroke:var(--bd);stroke-width:1}.d rect.ser{stroke:none}.d text{fill:var(--tx);font:13px -apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;dominant-baseline:middle}.d{cursor:pointer}
-.d .say{fill:var(--t2);font-size:11px}.d:hover rect{stroke:var(--cizgi)}path.c{fill:none;stroke:var(--cizgi);stroke-width:1.4}
+.d .say{fill:var(--t2);font-size:11px}.d .cv{font-size:12px;font-weight:500}.d .kn{font-size:12px;opacity:.85}.d:hover rect{stroke:var(--cizgi)}path.c{fill:none;stroke:var(--cizgi);stroke-width:1.4}
 #ayrinti{position:fixed;right:16px;bottom:16px;max-width:min(420px,calc(100% - 32px));background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.12);display:none}
 #ayrinti b{display:block;margin-bottom:4px}#ayrinti .k{color:var(--t2);font-size:12.5px}#ayrinti q{display:block;margin-top:6px;font-style:italic}
-#ayrinti button{float:right;border:0;background:none;color:var(--t2);font-size:16px;cursor:pointer}
+#ayrinti button{float:right;border:0;background:none;color:var(--t2);font-size:16px;cursor:pointer}#ayrinti p{margin:6px 0 0;font-size:12.5px;overflow-wrap:anywhere}#ayrinti a{color:var(--kok)}
+.cd-dogru{color:var(--karar)}.cd-yanlis{color:var(--iddia)}.cd-kismen{color:var(--is)}
 </style>
 <header><h1>__BASLIK__</h1><button id=ac>Hepsini aç</button><button id=kapa>Hepsini kapat</button><button id=png>Resim olarak indir</button></header>
 <div id=alan><svg id=s xmlns="http://www.w3.org/2000/svg"></svg></div><div id=ayrinti role=dialog aria-live=polite></div>
@@ -212,10 +235,14 @@ let sira=0,yaprak=0;(function say(d){if(!(d.alt||[]).length)yaprak++;(d.alt||[])
 (function kimlik(d,der){d.id=sira++;d.der=der;d.acik=yaprak<=30||der<2;(d.alt||[]).forEach(x=>kimlik(x,der+1))})(V,0);  // küçük harita tümüyle açık
 // 5 Kasım (kullanıcı): metin kesilmez — uzun satır sözcük sınırından alt satıra geçer, kutu yüksekliği satır sayısıyla büyür
 const ENX=420,SY=18;
-function satirlar(d){if(d.sat)return d.sat;const sp=(d.alt&&d.alt.length?46:28)+4,mx=ENX-sp,out=[];let s='';
-  String(d.ad).split(/\s+/).filter(Boolean).forEach(k=>{const y=s?s+' '+k:k;if(!s||olc.measureText(y).width<=mx){s=y;return}out.push(s);s=k});
-  if(s||!out.length)out.push(s);return d.sat=out.map(x=>{if(olc.measureText(x).width<=mx)return x;let i=x.length;while(i>1&&olc.measureText(x.slice(0,i)).width>mx)i--;return x.slice(0,i)})}  // tek sözcük sığmazsa (uzun bağlantı) yalnız o kırpılır
-function boy(d){const sat=satirlar(d),sp=(d.alt&&d.alt.length?46:28)+4;return{w:Math.min(ENX,Math.max(60,Math.ceil(Math.max(...sat.map(x=>olc.measureText(x).width)))+sp)),h:Math.max(30,12+sat.length*SY)}}
+function sar(metin,sp){const mx=ENX-sp,out=[];let s='';
+  String(metin).split(/\s+/).filter(Boolean).forEach(k=>{const y=s?s+' '+k:k;if(!s||olc.measureText(y).width<=mx){s=y;return}out.push(s);s=k});
+  if(s||!out.length)out.push(s);return out.map(x=>{if(olc.measureText(x).width<=mx)return x;let i=x.length;while(i>1&&olc.measureText(x.slice(0,i)).width>mx)i--;return x.slice(0,i)})}
+function satirlar(d){return d.sat||(d.sat=sar(d.ad,(d.alt&&d.alt.length?46:28)+4))}
+// 5 Kasım: doğrulanmış cevap ve kaynak öğenin altında küçük etiket (renk: doğru/yanlış/kısmen); bağlantı ayrıntı penceresinde
+function ekler(d){if(d.ek)return d.ek;d.ek=[];if(d.cevap)d.ek=sar((d.cd==='dogru'?'✓ ':d.cd==='yanlis'?'✗ ':d.cd==='kismen'?'~ ':'→ ')+d.cevap,32).map(x=>['cv',x]);
+  if(d.kaynak)d.ek=d.ek.concat(sar('Kaynak: '+d.kaynak,32).map(x=>['kn',x]));return d.ek}  // tek sözcük sığmazsa (uzun bağlantı) yalnız o kırpılır
+function boy(d){const sat=satirlar(d),ek=ekler(d),sp=(d.alt&&d.alt.length?46:28)+4,ts=sat.concat(ek.map(x=>x[1]));return{w:Math.min(ENX,Math.max(60,Math.ceil(Math.max(...ts.map(x=>olc.measureText(x).width)))+sp)),h:Math.max(30,12+ts.length*SY)}}
 const DX=48,DY=10;
 function yerles(d,x,y){const b=boy(d);d.x=x;d.w=b.w;d.h=b.h;const c=d.acik?(d.alt||[]):[];if(!c.length){d.y=y;return y+d.h+DY}
 let yy=y;c.forEach(k=>{yy=yerles(k,x+d.w+DX,yy)});const ilk=c[0].y,son=c[c.length-1].y;d.y=(ilk+son)/2;return Math.max(yy,d.y+d.h+DY)}
@@ -226,16 +253,18 @@ S.setAttribute('width',W+16);S.setAttribute('height',H+8);S.setAttribute('viewBo
 (function g(d){const gr=el('g',{class:'d',transform:`translate(${d.x},${d.y})`,tabindex:0,role:'button','aria-label':d.ad},S);
 const r=el('rect',{width:d.w,height:d.h,rx:d.der===0?15:8},gr);const renk=RENK(d.tur);
 if(d.der===0){r.style.fill=renk;r.style.stroke=renk}else el('rect',{width:4,height:d.h-10,x:6,y:5,rx:2,class:'ser'},gr).style.fill=renk;
-const sat=satirlar(d),tx=d.der===0?14:16,t=el('text',{x:tx,y:d.h/2-(sat.length-1)*SY/2},gr);sat.forEach((x,i)=>{const ts=el('tspan',{x:tx,dy:i?SY:0},t);ts.textContent=x});if(d.der===0)t.style.fill='#fff';
+const sat=satirlar(d),ek=ekler(d),tum=sat.map(x=>['',x]).concat(ek),tx=d.der===0?14:16,t=el('text',{x:tx,y:d.h/2-(tum.length-1)*SY/2},gr);const CR={dogru:'karar',yanlis:'iddia',kismen:'is'}[d.cd]||'madde';
+  tum.forEach((x,i)=>{const ts=el('tspan',{x:tx,dy:i?SY:0},t);if(x[0]){ts.setAttribute('class',x[0]);ts.style.fill=RENK(x[0]==='cv'?CR:'madde')}ts.textContent=x[1]});if(d.der===0)t.style.fill='#fff';
 if(d.alt&&d.alt.length){const s=el('text',{class:'say',x:d.w-22,y:d.h/2},gr);s.textContent=d.acik?'‹':String(d.alt.length)+' ›';if(d.der===0)s.style.fill='#fff'}
 const tik=()=>{if(d.alt&&d.alt.length){d.acik=!d.acik;ciz()}else goster(d)};gr.onclick=tik;gr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tik()}};
 if(d.acik)(d.alt||[]).forEach(g)})(V)}
 const A=document.getElementById('ayrinti');const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function goster(d){A.innerHTML=`<button aria-label="Kapat">×</button><b>${esc(d.ad)}</b><div class=k>${[d.kim,d.tarih&&('tarih '+d.tarih),d.saat&&('saat '+d.saat)].filter(Boolean).map(esc).join(' · ')}</div>${d.alinti?'<q>'+esc(d.alinti)+'</q>':''}`;A.style.display='block';A.querySelector('button').onclick=()=>A.style.display='none'}
+function goster(d){A.innerHTML=`<button aria-label="Kapat">×</button><b>${esc(d.ad)}</b><div class=k>${[d.kim,d.tarih&&('tarih '+d.tarih),d.saat&&('saat '+d.saat)].filter(Boolean).map(esc).join(' · ')}</div>${d.alinti?'<q>'+esc(d.alinti)+'</q>':''}${cvHtml(d)}`;A.style.display='block';A.querySelector('button').onclick=()=>A.style.display='none'}
+function cvHtml(d){return (d.cevap?'<p class="cd-'+esc(d.cd||'')+'">Cevap: '+esc(d.cevap)+'</p>':'')+(d.kaynak||d.kaynak_url?'<p>Kaynak: '+(d.kaynak_url?'<a href="'+esc(d.kaynak_url)+'" target=_blank rel="noopener noreferrer">'+esc(d.kaynak||d.kaynak_url)+'</a>':esc(d.kaynak))+'</p>':'')}
 function hepsi(v){(function g(d){d.acik=v||d.der===0;(d.alt||[]).forEach(g)})(V);ciz()}
 document.getElementById('ac').onclick=()=>hepsi(true);document.getElementById('kapa').onclick=()=>hepsi(false);
 document.getElementById('png').onclick=()=>{const k=S.cloneNode(true),cs=getComputedStyle(document.body);k.querySelectorAll('.d rect:first-child').forEach(r=>{if(!r.style.fill){r.setAttribute('fill',getComputedStyle(document.documentElement).getPropertyValue('--s1'));r.setAttribute('stroke','rgba(0,0,0,.15)')}});
-k.querySelectorAll('text').forEach(t=>{t.setAttribute('font-family','-apple-system,Helvetica Neue,sans-serif');t.setAttribute('font-size',t.classList.contains('say')?'11':'13');t.setAttribute('dominant-baseline','middle');if(!t.style.fill)t.setAttribute('fill',cs.color)});
+k.querySelectorAll('text').forEach(t=>{t.setAttribute('font-family','-apple-system,Helvetica Neue,sans-serif');t.setAttribute('font-size',t.classList.contains('say')?'11':'13');t.querySelectorAll('tspan.cv,tspan.kn').forEach(q=>q.setAttribute('font-size','12'));t.setAttribute('dominant-baseline','middle');if(!t.style.fill)t.setAttribute('fill',cs.color)});
 k.querySelectorAll('path').forEach(p=>{p.setAttribute('fill','none');p.setAttribute('stroke','rgba(120,120,120,.6)');p.setAttribute('stroke-width','1.4')});
 const w=+S.getAttribute('width'),h=+S.getAttribute('height'),o=2,img=new Image(),c=document.createElement('canvas');c.width=w*o;c.height=h*o;
 img.onload=()=>{const x=c.getContext('2d');x.fillStyle=cs.backgroundColor;x.fillRect(0,0,c.width,c.height);x.scale(o,o);x.drawImage(img,0,0);const a=document.createElement('a');a.download=document.title.replace(/[\\/:*?"<>|]/g,'-')+'.png';a.href=c.toDataURL('image/png');a.click()};
@@ -243,17 +272,16 @@ img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer
 ciz();
 </script></html>"""
 # --- toplantı görseli: tür seçimi + karar ve iş panosu (v0.186.0) ---------------------------------------------------------
-# 5 Kasım (kullanıcı): karar ve işin çok olduğu toplantıda okunacak şey "ne kararlaştı, kim neyi ne zamana yapacak"; zihin haritası bunu
+# 5 Kasım (kullanıcı): karar ve işin olduğu toplantıda okunacak şey "ne kararlaştı, kim neyi ne zamana yapacak"; zihin haritası bunu
 # gündem dallarına dağıtıyor. Eşik: 2 karar (tek karar şeritte yalnız kalır, haritada da okunur) ya da 3 sahipli iş (üç işte kişi sütunu
 # haritadan hızlı okunur). Yapı dosyasında "gorsel": "harita" | "karar_is" elle seçer. Dosya adı aynı kalır (<özet>-zihin-haritasi.html).
-GORSEL_KARAR, GORSEL_IS = 2, 3
 GORSEL_AD = {"harita": "Zihin haritası", "karar_is": "Karar ve iş panosu"}
 def gorsel_tur(v):
+    # tek kaynak "gorsel" alanı (Claude özeti yazarken doldurur); alan yoksa en az 1 karar ya da 1 sahipli iş/söz → pano, hiçbiri yoksa harita
     z = str(v.get("gorsel") or "").strip()
     if z in GORSEL_AD: return z
     og = [o for m in v["maddeler"] for o in m["ogeler"]]
-    k = sum(o["tur"] == "karar" for o in og); s = sum(o["tur"] in ("is", "soz") and bool(str(o.get("sahip") or o.get("kim") or "").strip()) for o in og)
-    return "karar_is" if k >= GORSEL_KARAR or s >= GORSEL_IS else "harita"
+    return "karar_is" if any(o["tur"] == "karar" or (o["tur"] in ("is", "soz") and str(o.get("sahip") or o.get("kim") or "").strip()) for o in og) else "harita"
 def dokum_saatleri(yol):  # canlı döküm (.jsonl "time" ya da .md tablo satırı) → ["HH:MM:SS", …]; okunamazsa []
     try:
         if yol.endswith(".jsonl"): return [str(json.loads(l).get("time") or "") for l in open(yol, encoding="utf-8") if l.strip()]
@@ -324,7 +352,7 @@ def pano_veri(v, saatler=None):
         mb = str(m.get("baslik") or "Gündem dışı")
         for o in m["ogeler"]:
             ortak = {"metin": str(o["metin"]), "saat": str(o.get("saat") or ""), "alinti": str(o.get("alinti") or ""), "madde": mb, "mno": i + 1,
-                     "durum": str(o.get("durum") or "")}
+                     "durum": str(o.get("durum") or "")}; ortak.update(cevap_alanlari(o))
             if o["tur"] == "karar":
                 n = kucuk(o.get("netlik") or "").replace("ö", "o").replace("ü", "u"); ty = n in ("ortuk", "tek") or bool(str(o.get("varsayim") or "").strip())
                 kararlar.append(dict(ortak, kim=str(o.get("kim") or ""), varsayim=str(o.get("varsayim") or ""),
@@ -373,7 +401,9 @@ h2{font-size:13px;font-weight:600;color:var(--t2);margin:26px 0 10px;letter-spac
 .kart:hover,.kart:focus-visible{border-color:var(--cizgi);outline:none}.kart:focus-visible{box-shadow:0 0 0 2px color-mix(in srgb,var(--kok) 40%,transparent)}
 .kart::before{content:"";position:absolute;left:5px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--renk,var(--bd))}
 .kart .m{overflow-wrap:anywhere;white-space:normal}.kart .k{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-top:6px;font-size:12px;color:var(--t2)}
-.et{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11.5px;font-weight:500;background:var(--s2);color:var(--t2)}
+.kart .cv{margin-top:6px;font-size:12.5px;overflow-wrap:anywhere}.kart .cv .kn{display:block;color:var(--t2);font-size:11.5px;margin-top:1px}
+.et.dogru{background:color-mix(in srgb,var(--karar) 14%,var(--s1));color:var(--karar)}.et.yanlis{background:color-mix(in srgb,var(--iddia) 14%,var(--s1));color:var(--iddia)}.et.kismen{background:color-mix(in srgb,var(--is) 15%,var(--s1));color:var(--is)}
+#ayrinti a{color:var(--kok)}.et{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11.5px;font-weight:500;background:var(--s2);color:var(--t2)}
 .et.tarih{background:color-mix(in srgb,var(--karar) 12%,var(--s1));color:var(--karar)}
 .et.tarihsiz{background:color-mix(in srgb,var(--iddia) 14%,var(--s1));color:var(--iddia);font-weight:600}
 .et.teyit{background:color-mix(in srgb,var(--is) 15%,var(--s1));color:var(--is)}.et.net{background:color-mix(in srgb,var(--karar) 12%,var(--s1));color:var(--karar)}
@@ -405,7 +435,10 @@ const AY=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos',
 const gun=t=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(t||'');return m?`${+m[3]} ${AY[+m[2]-1]}`+(V.tarih&&V.tarih.slice(0,4)!==m[1]?' '+m[1]:''):String(t||'')};
 const sure=d=>d==null?'':d<60?`${d} dk`:`${Math.floor(d/60)} sa`+(d%60?` ${d%60} dk`:'');
 const G=i=>`var(--g${(i%6)+1})`;const S=V.say,Z=V.zaman;let say=0;const O=[];
-function kart(o,ic,renk){O.push(o);return `<button class=kart data-o="${O.length-1}" style="--renk:${renk}"><div class=m>${esc(o.metin)}</div><div class=k>${ic}</div></button>`}
+const CE={dogru:'doğrulandı',yanlis:'yanlış',kismen:'kısmen'};
+function cv(o){return o.cevap||o.kaynak?`<div class=cv>${o.cevap?`<span class="et ${esc(o.cd||'')}">${o.cd?CE[o.cd]:'cevap'}</span> ${esc(o.cevap)}`:''}${o.kaynak?`<span class=kn>Kaynak: ${esc(o.kaynak)}</span>`:''}</div>`:''}
+function cvAyr(o){return (o.cevap?'<p>Cevap: '+esc(o.cevap)+'</p>':'')+(o.kaynak||o.kaynak_url?'<p>Kaynak: '+(o.kaynak_url?'<a href="'+esc(o.kaynak_url)+'" target=_blank rel="noopener noreferrer">'+esc(o.kaynak||o.kaynak_url)+'</a>':esc(o.kaynak))+'</p>':'')}
+function kart(o,ic,renk){O.push(o);return `<button class=kart data-o="${O.length-1}" style="--renk:${renk}"><div class=m>${esc(o.metin)}</div>${cv(o)}<div class=k>${ic}</div></button>`}
 document.getElementById('alt').textContent=[gun(V.tarih),'Karar ve iş panosu'].filter(Boolean).join(' · ');
 let h=`<div class=ozet><span><b>${S.karar}</b> karar</span><span><b>${S.is}</b> iş</span>`+(S.tarihsiz?`<span class=uy><b>${S.tarihsiz}</b> tarihsiz iş</span>`:`<span><b>0</b> tarihsiz iş</span>`)
  +`<span><b>${S.soru}</b> açık soru</span>`+(S.sure_dk!=null?`<span>Süre <b>${esc(sure(S.sure_dk))}</b></span>`:'')+`</div>`;
@@ -426,7 +459,7 @@ ANA.innerHTML=h;
 function goster(b,k,ek){A.innerHTML=`<button aria-label="Kapat">×</button><b>${esc(b)}</b><div class=k>${k.filter(Boolean).map(esc).join(' · ')}</div>${ek||''}`;A.style.display='block';A.querySelector('button').onclick=()=>A.style.display='none'}
 ANA.addEventListener('click',e=>{const k=e.target.closest('[data-o]'),m=e.target.closest('[data-m]');
  if(k){const o=O[+k.dataset.o];goster(o.metin,[o.tur,o.kim,o.tarih?'son tarih '+gun(o.tarih):(o.tur==='İş'||o.tur==='Söz')?'tarihsiz':'',o.saat&&'saat '+o.saat,o.madde&&('madde '+o.mno+': '+o.madde)],
-   (o.alinti?'<q>'+esc(o.alinti)+'</q>':'')+(o.neden?'<p>Teyit: '+esc(o.neden)+'</p>':'')+(o.durum?'<p>Durum: '+esc(o.durum)+'</p>':''));return}
+   (o.alinti?'<q>'+esc(o.alinti)+'</q>':'')+(o.neden?'<p>Teyit: '+esc(o.neden)+'</p>':'')+(o.durum?'<p>Durum: '+esc(o.durum)+'</p>':'')+cvAyr(o));return}
  if(m){const i=+m.dataset.m,d=Z.maddeler[i];document.querySelectorAll('.sec').forEach(x=>x.classList.remove('sec'));document.querySelectorAll(`[data-m="${i}"]`).forEach(x=>x.classList.add('sec'));
    goster(d.no+'. '+d.baslik,[d.durum,d.dk!=null?(d.dk?sure(d.dk):'saatli öğe yok'):'',Object.entries(d.say).map(([t,n])=>n+' '+({karar:'karar',is:'iş',soru:'açık soru',sayi:'sayı',iddia:'iddia',soz:'söz'})[t]).join(', ')],
      d.araliklar.length?'<p>'+esc(d.araliklar.join(', '))+'</p>':'')}});

@@ -253,6 +253,11 @@ for g, b in [("Raporun cumaya kadar müşteriye gönderilmesi lazım.", "aday"),
              ("Deniz'in sözleşmeyi kontrol etmesi lazım.", "sahipli"), ("Ben bakarım, raporun gönderilmesi lazım.", "sahipli"),
              ("Bunu biraz daha konuşmamız lazım.", "yok"), ("Önce bir düşünmemiz gerekiyor.", "yok"), ("Ekibin bilgilendirilmesi lazım.", "aday"), ("Bugün hava güzel.", "yok")]:
     ok(f"görev (sahipsiz): {g!r} → {sk(g)}", sk(g) == b)
+def sk2(m): return "anlatim" if ng["gorev_anlatim_mi"](m) and ng["GOREV_SAHIPSIZ_RX"].search(m) else sk(m)  # 5 Kasım: gorev_satir sırası (durum anlatımı önce elenir)
+for g, b in [("Üç müşteriyi ararken dördüncüsü hatta bekliyor ya da kapatıyor. Tekrar araması gerekiyor.", "anlatim"), ("Servisi açarken kullanıcı ekranda bekliyor, yeniden göndermesi lazım.", "anlatim"),
+             ("Müşterinin istediği raporun gönderilmesi lazım.", "aday"), ("Toplantıdan çıkarken Ali'nin tedarikçiyi araması lazım.", "sahipli"), ("Birinin tedarikçiyi araması lazım.", "aday"),
+             ("Faturayı kesmek için kim bakacak?", "aday"), ("Raporun cumaya kadar müşteriye gönderilmesi lazım.", "aday")]:
+    ok(f"görev (anlatım ayrımı): {g!r} → {sk2(g)}", sk2(g) == b)
 for g, b in [("Tamam, ben bakarım.", True), ("Deniz halletsin onu.", True), ("Bende.", True), ("I'll handle it.", True), ("Sen hazırla o zaman.", True), ("Evet, önemli.", False)]:
     ok(f"üstlenme: {g!r}", bool(ng["GOREV_USTLEN_RX"].search(g)) == b)
 ok("Konuş istemi: bayrak yoksa görev çıkarma kuralı yok", "Görev çıkarma" not in nc["talimat_istem"]())

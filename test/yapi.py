@@ -15,7 +15,7 @@ def bak(ad, k):
 T = tempfile.mkdtemp(prefix="suflor-yp-"); canli = os.path.join(T, "canli"); os.makedirs(canli)
 def tc(*a): return subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, "--relay", f"http://127.0.0.1:{PORT}", *a],
                                   capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"), timeout=60)
-Y = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "maddeler": [
+Y = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "gorsel": "harita", "maddeler": [
     {"baslik": "Bütçe", "durum": "konuşuldu", "ogeler": [{"tur": "karar", "metin": "Bütçe 120 bin", "kim": "Ayşe Yılmaz", "saat": "10:12:30", "alinti": "120'de kalalım",
                                                           "netlik": "örtük", "varsayim": "Kur yıl sonuna kadar aynı kalır"},
                                                          {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz"}, {"tur": "yanlis", "metin": "atılmalı"}]},
@@ -58,16 +58,16 @@ for _ in range(80):
 pr.kill(); pr.wait(5)
 p = (m.group(1).split("|") if m else ["", "", "0"])
 bak(f"Resim olarak indir: PNG ({p[0]}, {p[2]} karakter)", p[0].endswith(".png") and p[1].startswith("data:image/png;base64,") and int(p[2]) > 5000)
-# 5 Kasım: görsel türü — 2 karar ya da 3 sahipli iş → karar ve iş panosu; değilse zihin haritası (kurgu veri)
+# 5 Kasım: görsel türü — "gorsel" alanı tek kaynak; alan yoksa en az 1 karar ya da 1 sahipli iş/söz → pano, hiçbiri yoksa zihin haritası (kurgu veri)
 sys.path.insert(0, KOD); import yapi as YP
 def yk(ogeler, **ek): return dict({"baslik": "Deneme", "tarih": "2026-10-11", "maddeler": [{"baslik": "A", "ogeler": ogeler}]}, **ek)
 K2 = yk([{"tur": "karar", "metin": "K1", "kim": "Can Er", "saat": "10:00:00"}, {"tur": "karar", "metin": "K2", "kim": "Can Er", "saat": "10:05:00", "netlik": "tek"}])
-bak("tür: 2 karar → karar ve iş panosu", YP.gorsel_tur(K2) == "karar_is")
-bak("tür: 1 karar 2 iş → zihin haritası", YP.gorsel_tur(yk([{"tur": "karar", "metin": "K"}, {"tur": "is", "metin": "a", "sahip": "Can Er"}, {"tur": "is", "metin": "b", "sahip": "Ece Su"}])) == "harita")
-bak("tür: 3 sahipli iş → pano; sahipsiz sayılmaz", YP.gorsel_tur(yk([{"tur": "is", "metin": x, "sahip": "Can Er"} for x in "abc"])) == "karar_is"
-    and YP.gorsel_tur(yk([{"tur": "is", "metin": "a", "sahip": "Can Er"}, {"tur": "soz", "metin": "b", "sahip": "Ece Su"}, {"tur": "is", "metin": "c"}])) == "harita")
-bak("tür: yapı dosyasında elle seçim (gorsel)", YP.gorsel_tur(dict(K2, gorsel="harita")) == "harita")
-bak("bu testin örneği (1 karar, 2 iş) zihin haritası kalır", YP.gorsel_tur(YP.oku(yj)) == "harita")
+bak("tür: alan yok, karar var → karar ve iş panosu", YP.gorsel_tur(K2) == "karar_is" and YP.gorsel_tur(yk([{"tur": "karar", "metin": "K"}])) == "karar_is")
+bak("tür: alan yok, tek sahipli iş → pano; sahipsiz iş sayılmaz", YP.gorsel_tur(yk([{"tur": "is", "metin": "a", "sahip": "Can Er"}])) == "karar_is"
+    and YP.gorsel_tur(yk([{"tur": "is", "metin": "a"}, {"tur": "soz", "metin": "b"}])) == "harita")
+bak("tür: alan yok, karar ve iş yok → zihin haritası", YP.gorsel_tur(yk([{"tur": "soru", "metin": "Ne olacak?"}, {"tur": "iddia", "metin": "x"}])) == "harita")
+bak("tür: \"gorsel\" alanı eşiği geçersiz kılar (iki yön)", YP.gorsel_tur(dict(K2, gorsel="harita")) == "harita"
+    and YP.gorsel_tur(yk([{"tur": "soru", "metin": "Ne?"}], gorsel="karar_is")) == "karar_is" and YP.gorsel_tur(dict(K2, gorsel="saçma")) == "karar_is")
 P = yk([{"tur": "karar", "metin": "K1", "kim": "Can Er", "saat": "23:50:00"}, {"tur": "is", "metin": "Uzun " * 60 + "son", "sahip": "Can Er", "tarih": "2026-10-20", "saat": "23:55:00"},
         {"tur": "is", "metin": "tarihsiz iş", "sahip": "Ece Su", "saat": "00:20:00"}, {"tur": "is", "metin": "kimsiz", "saat": "00:21:00"}, {"tur": "soru", "metin": "S?"}])
 P["maddeler"].append({"baslik": "B", "ogeler": [{"tur": "karar", "metin": "K2", "saat": "00:10:00", "netlik": "ortuk"}]})
@@ -101,6 +101,40 @@ gd = subprocess.run([CHROME, "--headless=new", *CHROME_EK, "--disable-features=M
                      "--window-size=500,900", "--virtual-time-budget=3000", "--dump-dom", "file://" + sar], capture_output=True, text=True, timeout=60).stdout
 m2 = re.search(r'<pre id="gen">(\d+)\|(.*?)</pre>', gd); g2 = (m2.group(2).split("|") if m2 else [])
 bak(f"pano headless 420 px: genişlik {m2 and m2.group(1)}, kart/ayrıntı/sarma/şerit {g2}", bool(m2) and int(m2.group(1)) <= 420 and g2[:3] == ["6", "block", "true"] and g2[3] == "3")
+# 5 Kasım: cevap/kaynak — doğrulanan soru/sayı/iddia görselde etiket olur; bağlantı yalnız http/https; cevapsız öğe eskisi gibi (kurgu veri)
+C = yk([{"tur": "soru", "metin": "Aylık kullanıcı kaç?", "kim": "Can Er", "cevap": "Doğru: 12 bin", "kaynak": "Örnek Metrik · get_metrics · Ekim 2026", "kaynak_url": "https://ornek.example/r?a=1&b=2"},
+        {"tur": "iddia", "metin": "Oran yüzde 40", "cevap": "Yanlış, yüzde 35", "kaynak": "döküm 23:12", "kaynak_url": "javascript:alert(1)"},
+        {"tur": "sayi", "metin": "3 ekip", "cevap": "Kısmen — 2 ekip", "kaynak": "proje belgesi: plan.pdf"}, {"tur": "soru", "metin": "Cevapsız soru"},
+        {"tur": "karar", "metin": "K", "cevap": "karar öğesinde yok sayılır", "kim": "Can Er"}])
+cv = sorted([a for g in YP.harita_veri(C)["alt"][0]["alt"] for a in g["alt"]], key=lambda x: x["ad"])  # ada göre: 3 ekip, Aylık…, Cevapsız, K, Oran
+bak("cevap alanları: durum sınıfı, bağlantı süzgeci (javascript: düşer), cevapsız/karar öğesinde yok", (lambda b: b["3 ekip"]["cd"] == "kismen" and b["Aylık kullanıcı kaç?"]["cd"] == "dogru" and b["Oran yüzde 40"]["cd"] == "yanlis" and b["Aylık kullanıcı kaç?"]["kaynak_url"].startswith("https://")
+    and b["Oran yüzde 40"]["kaynak_url"] == "" and "cevap" not in b["Cevapsız soru"] and "cevap" not in b["K"])({x["ad"]: x for x in cv}))
+pc = YP.pano_veri(C)
+bak("pano verisi: sorular ve diğerleri cevap taşır, kararda yok", pc["sorular"][0]["cd"] == "dogru" and pc["diger"][0]["cd"] == "yanlis" and "cevap" not in pc["sorular"][1] and "cevap" not in pc["kararlar"][0])
+HC, PC = YP.harita_html(C), YP.pano_html(C)
+tc_ = os.path.join(T, "cv-harita.html"); open(tc_, "w", encoding="utf-8").write(HC.replace("</script></html>", ";setTimeout(()=>{let n=null;"
+    "document.querySelectorAll('.d').forEach(g=>{if(g.textContent.includes('Aylık'))n=g});n&&n.dispatchEvent(new MouseEvent('click'));document.body.insertAdjacentHTML('beforeend','<pre id=sonuc>'+document.querySelectorAll('tspan.cv').length+'|'+document.querySelectorAll('tspan.kn').length+'|'"
+    "+(document.querySelector('#ayrinti a')?document.querySelector('#ayrinti a').getAttribute('href'):'-')+'|'+document.documentElement.scrollWidth+'</pre>')},300)</script></html>"))
+tp_ = os.path.join(T, "cv-pano.html"); open(tp_, "w", encoding="utf-8").write(PC.replace("</script></html>", ";setTimeout(()=>{const a=[...document.querySelectorAll('.kart')].find(x=>x.textContent.includes('Aylık'));a.click();"
+    "const b=[...document.querySelectorAll('.kart')].find(x=>x.textContent.includes('Oran'));const l1=document.querySelector('#ayrinti a');b.click();const l2=document.querySelector('#ayrinti a');"
+    "document.body.insertAdjacentHTML('beforeend','<pre id=sonuc>'+document.querySelectorAll('.kart .cv').length+'|'+document.querySelectorAll('.kart .cv .et.dogru,.kart .cv .et.yanlis,.kart .cv .et.kismen').length+'|'+(l1?l1.getAttribute('href'):'-')+'|'+(l2?'link':'-')+'|'+(document.documentElement.scrollWidth<=innerWidth)+'</pre>')},300)</script></html>"))
+def dom(yol, w=420):
+    return subprocess.run([CHROME, "--headless=new", *CHROME_EK, "--disable-features=MacAppCodeSignClone", "--disable-gpu", "--allow-file-access-from-files", f"--user-data-dir={T}/p3", "--no-first-run",
+                           f"--window-size={w},900", "--virtual-time-budget=3000", "--dump-dom", "file://" + yol], capture_output=True, text=True, timeout=60).stdout
+import html as _h
+mh = re.search(r'<pre id="sonuc">(.*?)</pre>', dom(tc_)); mp = re.search(r'<pre id="sonuc">(.*?)</pre>', dom(tp_))
+mh = mh and _h.unescape(mh.group(1)); mp = mp and _h.unescape(mp.group(1))
+bak(f"harita headless: cevap/kaynak satırları, ayrıntıda tıklanabilir bağlantı ({mh})", bool(mh) and mh.split("|")[:3] == ["3", "3", "https://ornek.example/r?a=1&b=2"])
+bak(f"pano headless 420 px: 3 cevap etiketi, bağlantı yalnız http(s) ({mp})", bool(mp) and mp.split("|")[:5] == ["3", "3", "https://ornek.example/r?a=1&b=2", "-", "true"])
+# özet ↔ yapı sayı denetimi (yalnız uyarır)
+SV = yk([{"tur": "karar", "metin": "K", "kim": "Can Er"}, {"tur": "is", "metin": "a", "sahip": "Can Er"}, {"tur": "soru", "metin": "Q?"}])
+bak("sayı denetimi: tutarsa sessiz; eksik/fazla açık uyarı", YP.sayi_denetim(SV, {"karar": 1, "is": 1, "acik": 1}) == [] and YP.sayi_denetim(SV, {}) == []
+    and len(YP.sayi_denetim(SV, {"karar": 1, "is": 1, "acik": 5})) == 1 and "özette 5, yapı dosyasında 1" in YP.sayi_denetim(SV, {"acik": 5})[0] and "eksik" in YP.sayi_denetim(SV, {"acik": 5})[0]
+    and "fazla" in YP.sayi_denetim(SV, {"karar": 0})[0])
+sy = os.path.join(T, "sd.yapi.json"); json.dump(SV, open(sy, "w"), ensure_ascii=False); so = os.path.join(T, "sd-toplanti-ozeti-20261011.md")
+open(so, "w").write("# Özet\n\n## Toplantı çıktısı\n- **Kararlar (1):** K\n- **Sahipli işler (1):** Can — a\n- **Açık kalanlar (5):** a; b; c; d; e\n- **Öneri:** x\n")
+u = tc("yapi", sy, "--ozet", so).stdout; _m = open(so).read(); open(so, "w").write(_m.replace("(5)", "(1)")); u2 = tc("yapi", sy, "--ozet", so).stdout
+bak("yapi komutu: sayı uyuşmazlığında UYARI, tutunca onay satırı; görsel türü yazılır", "UYARI: özet ile yapı" in u and "Açık kalanlar: özette 5" in u and "tutuyor" in u2 and "UYARI" not in u2 and "tür: karar ve iş panosu" in u)
 # aktarıcı: ozet-hazir haritayı kopyalar, pano düğmesi açar
 for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))

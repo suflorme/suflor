@@ -369,7 +369,18 @@ def _istem_dokumler():  # son 3 toplantı dökümünün sonu (sadeleştirilmiş)
     _ISTEM_ZEL["metin"] = m; return m
 def _onceki_istem(s):  # isteme giden önceki metin kopyası: binlik ayraçlı sayı ayraçsız ("290.000" → "290000"); döküm satırı değişmez. Whisper "290.000" görünce "%83" yerine "%83.000" gibi sayı uyduruyordu (13:09 toplantısı, 3 Kasım)
     return re.sub(r"(?<![\d.])\d{1,3}(?:\.\d{3})+(?!\d)(?!\.\d)", lambda m: m.group(0).replace(".", ""), s or "")
-def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben="", kul=None):
+# 5 Kasım (4 Kasım toplantısı, 21:55–00:33): istem 214 belirteçle dolunca asistan/kişi/gündem/sık 50 terimi yedi, sözlükten 46 terimin hiçbiri girmedi ("sözlük 0/46") — sık
+# (son dökümlerde geçen) kategorisi 19 terimle sözlüğün önüne geçiyordu. Adil pay: sözlüğün ilk ISTEM_SOZLUK_TABAN terimi, sık (ya da seçim açıkken bağlam) grubunun ilk
+# ISTEM_SIK_ONCE teriminden hemen sonra gelir; sık'ın kalanı sözlüğün arkasına kayar (sondakiler düşer). Hangi terimler: sık/bağlam zaten bu toplantıyla ilgili olanlar (önde kalır),
+# taban sözlüğün kendi sırasıyla (kullanıcının eklediği, yanlış biçimi bilinen, sonra kullanım kaydında toplantı sayısı çok olan). istem_secim kapalıyken de geçerli.
+ISTEM_SOZLUK_TABAN = 6; ISTEM_SIK_ONCE = 6
+def _istem_pay(c):  # [(kategori, terim)] → sözlük tabanı öne alınmış liste (saf işlev)
+    anc = "sık" if any(k == "sık" for k, _ in c) else "bağlam"; ai = [i for i, (k, _) in enumerate(c) if k == anc]
+    si = [i for i, (k, _) in enumerate(c) if k == "sözlük"][:ISTEM_SOZLUK_TABAN]
+    if len(ai) <= ISTEM_SIK_ONCE or not si: return c
+    ek = set(si); yer = ai[ISTEM_SIK_ONCE - 1] + 1  # sık'ın ilk ISTEM_SIK_ONCE teriminden sonraki konum
+    return [x for i, x in enumerate(c[:yer]) if i not in ek] + [c[i] for i in si] + [x for i, x in enumerate(c[yer:], yer) if i not in ek]
+def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben="", kul=None, kayit=None):
     # → [(kategori, terim)] önem sırasında (yukarıdaki kural). Saf işlev: dış durum almaz (test/istem-sira.py). ter: sözlük terimleri; ag: gündem sözlüğü;
     # hz: hazır kartlar; ks: kişilikler [{ad, gorunen_ad, hitap}]; kisiler: bu toplantının ad listesi (öncelik sırasıyla); ayar_ek: sabit + ayar terimleri.
     cikti, anahtar, sozcuk = [], set(), set()
@@ -410,12 +421,13 @@ def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben="", kul=None
         for d in ayar_ek: ekle("ayar", d)
         for (p, b, y), _, d in pu:
             if not y: ekle("sözlük", d)
-        return cikti
+        return _istem_pay(cikti)
     sayi = lambda d: dokum.count(_sd(d)) if dokum and len(d) >= 3 else 0
     for _, d, _t in sorted(((sayi(d), d, t) for d, t in adaylar if sayi(d) > 0), key=lambda x: (-x[0], not kullanici(x[2]))): ekle("sık", d)
     for d in ayar_ek: ekle("ayar", d)
-    for d, t in sorted(adaylar, key=lambda x: (not kullanici(x[1]), not yanlisli(x[1]))): ekle("sözlük", d)
-    return cikti
+    kt = (kayit or {}).get("terimler") or {}  # kullanım kaydı (istem_secim kapalıyken de yalnız eşitlik bozucu): toplantı sayısı çok olan önde
+    for d, t in sorted(adaylar, key=lambda x: (not kullanici(x[1]), not yanlisli(x[1]), -((kt.get(x[0]) or {}).get("toplanti_sayisi") or 0))): ekle("sözlük", d)
+    return _istem_pay(cikti)
 def istem_kat_ozet(dusen, tok=None):  # günlük eki: " · 180 token · kişi 12/12 · asistan 6/6 · …" (düşenler sondan; kategoriler sırayla dolar)
     kat = STATE["whisper"].get("istem_kat") or []; kalan = sum(n for _, n in kat) - dusen; ek = []
     for k, n in kat:
@@ -502,7 +514,7 @@ def istem_metni():
         kisiler += [kume_adi(k) for k in list(KUME_AD)] + [k for _, k in reversed(ALTYAZI_SON[-60:]) if k and k != "?"]
     except Exception: pass
     kul = istem_kullanim(ter, ag, hz, kisiler)
-    sira = istem_siralama(ter, ag, hz, kisilikler(), kisiler, ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []), _istem_dokumler(), ben_adi(), kul)  # sabitler: alanın sık sistem adları
+    sira = istem_siralama(ter, ag, hz, kisilikler(), kisiler, ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []), _istem_dokumler(), ben_adi(), kul, _istem_kayit())  # sabitler: alanın sık sistem adları
     sayac = collections.Counter(k for k, _ in sira)
     STATE["whisper"]["istem_kat"] = [(k, sayac[k]) for k in ISTEM_KAT_ADLARI if sayac.get(k)]
     STATE["whisper"]["istem_ozet"] = {"kip": "secim" if kul is not None else "eski", "terim": len(sira), "baglam": sayac.get("bağlam", 0), "yasli": (kul or {}).get("yasli", 0)}

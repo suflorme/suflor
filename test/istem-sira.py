@@ -13,7 +13,7 @@ if sys.executable != VENV: os.execv(VENV, [VENV, "-I", os.path.abspath(__file__)
 ns = {"re": re, "math": math, "datetime": datetime, "json": json, "os": os, "time": time, "BEN_ESKI": {"ben", "kullanici"}, "AYAR": {}}
 agac = ast.parse(open(os.path.join(KOD, "aktarici/whisper-hat.py"), encoding="utf-8").read())
 AD = {"_TRSD", "_sd", "_istem_kisi", "istem_siralama", "ISTEM_KAT_ADLARI", "ISTEM_PUAN", "ISTEM_YASI_GUN", "ISTEM_YENI_GUN", "istem_elle", "_istem_gun", "istem_puan",
-      "_ISTEM_KUL", "_istem_kayit", "_istem_canli", "_istem_baglam", "ISTEM_BAGLAM_DISI", "istem_kullanim", "ISTEM_SECIM_VARSAYILAN"}
+      "_ISTEM_KUL", "_istem_kayit", "_istem_canli", "_istem_baglam", "ISTEM_BAGLAM_DISI", "istem_kullanim", "ISTEM_SECIM_VARSAYILAN", "_istem_pay", "ISTEM_SOZLUK_TABAN", "ISTEM_SIK_ONCE"}
 exec(compile(ast.Module([n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in AD) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in AD for x in n.targets))], []), "whisper-hat.py", "exec"), ns)
 sp = importlib.util.spec_from_file_location("whisper_isci", os.path.join(KOD, "whisper-isci.py")); WI = importlib.util.module_from_spec(sp); sp.loader.exec_module(WI)
 from mlx_whisper.tokenizer import get_tokenizer
@@ -111,6 +111,16 @@ ns["AYAR"]["istem_secim"] = False; kontrol("ayar istem_secim: false → kul None
 ns["AYAR"].update(istem_secim=True, istem_yasi_gun=30); kontrol("ayar istem_yasi_gun kul'a geçer", ns["istem_kullanim"](ter2, ag2, [], [])["yas_gun"] == 30); ns["AYAR"].clear()
 s1b = ns["istem_siralama"](ter, ag, [], ks, kisiler, ["AWS", "Google Workspace"], dokum, "Deniz K", None)
 kontrol("kul=None çıktısı parametresiz çağrıyla birebir (eski davranış)", s1b == sira)
+# 5 Kasım: kalabalık istemde sözlük adil pay alır (4 Kasım toplantısı: "sözlük 0/46"); kategori sırası bozulmaz
+tp = [{"dogru": f"Sik{chr(65 + i)}Modul", "yanlis": [], "kaynak": "x"} for i in range(19)] + [{"dogru": f"Soz{chr(65 + i)}Birim", "yanlis": [], "kaynak": "ben" if i == 3 else "x"} for i in range(20)]
+dk = " ".join(f"sik{chr(97 + i)}modul" for i in range(19)) * 3
+kr = {"terimler": {f"Soz{chr(65 + i)}Birim": {"toplanti_sayisi": i, "son": "2026-11-01", "ilk": "2026-10-01"} for i in range(20)}}
+sc = ns["istem_siralama"](tp, {}, [], [], [], ["AWS"], dk, "", None, kr); tc = [t for _, t in sc]; kc = [k for k, _ in sc]
+kontrol("kalabalık: sözlük terimleri sık'ın kalanından önce, ilk 20 terimde en az 6 sözlük", sum(1 for k in kc[:20] if k == "sözlük") >= 6, kc[:24])
+kontrol("kalabalık: sık'ın ilk 6 terimi sözlük tabanından önce", kc[:6] == ["sık"] * 6, kc[:12])
+kontrol("kalabalık: taban sırası kullanıcı terimi önde, sonra kullanım sayısı çok olan", tc[6] == "SozDBirim" and tc[7] == "SozTBirim", tc[4:10])
+kontrol("kalabalık: hiçbir terim yinelenmedi/kaybolmadı", len(tc) == len(set(tc)) and len(tc) == 40, len(tc))
+kontrol("az sık (≤ 6): sıra değişmez", [k for k, _ in ns["istem_siralama"](tp[19:], {}, [], [], [], [], "", "", None)] == ["sözlük"] * 20)
 # günlük eki
 print("kategori sayıları:", {k: kat.count(k) for k in ns["ISTEM_KAT_ADLARI"]})
 print("kaldı" if hatalar else "hepsi geçti"); sys.exit(1 if hatalar else 0)

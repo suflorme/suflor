@@ -26,7 +26,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     chrome.action.setBadgeBackgroundColor({ color: "#b3412e" });
   }
   if (msg.type === "kanit") kanit(sender.tab, msg.kaynak, msg.istek, msg.not);
-  if (msg.type === "otoKare") otoKare(sender.tab, msg.maske);
+  if (msg.type === "otoKare") otoKare(sender.tab, msg.maske, msg.bolge);
   if (msg.type === "whisperKarsi") karsiBaslat(null, "popup");       // popup düğmesi (eklenti çağrıldı: izin var)
   if (msg.type === "whisperKarsiDur") offDur();                       // toplantıdan çıkıldı
   if (msg.type === "offBitti") karsiTab = null;
@@ -170,41 +170,78 @@ async function kanit(hint, kaynak, istek, not) {
     hata(tab, /Failed to fetch/i.test(String(e)) ? "Aktarıcıya ulaşılamadı (çalışma alanının aktarıcısı kapalı)." : String(e.message || e).slice(0, 160));
   } finally { busy = false; }
 }
-// Yaparken kaydet (kip panodan ya da Claude'dan açılır): içerik betiği 3 sn'de bir çağırır. Sekme penceresinde öndeyse küçük JPEG çekilir,
-// 64×36 gri ızgarada önceki kareyle karşılaştırılır (şerit/uyarı maskeli). Belirgin değişimden (hücrelerin ≥ %6'sı) sonra ekran durulunca
-// (< %1,5) ve son kendiliğinden kanıttan ≥ 10 sn geçtiyse tam kanıt alınır (kaynak "oto"). Kip açılınca ilk ekran da alınır. Sekme arkadaysa
-// hiç çekilmez: kendiliğinden kanıt için sekme öne getirilmez. 15 sn kare gelmezse (kip kapandı, sekme arkada) karşılaştırma baştan başlar.
-const OTO = { kare: null, degisti: false, son: 0, t: 0, sinir: false };
-const OTO_W = 64, OTO_H = 36, OTO_FARK = 24, OTO_DEGISIM = 0.06, OTO_DURGUN = 0.015, OTO_ARA = 10000;
-async function otoKare(tab, maske) {
-  if (!tab || !tab.active || busy || OTO.sinir) return;
-  if (Date.now() - OTO.t > 15000) Object.assign(OTO, { kare: null, degisti: false, son: 0 });
-  OTO.t = Date.now();
+// Ekran paylaşımı kaydı (eski "yaparken kaydet"; aktarıcı paylaşım sürerken açar): içerik betiği 1,5 sn'de bir çağırır. Sekme penceresinde
+// öndeyse küçük JPEG çekilir, 64×36 gri ızgaraya indirilir. Sekme arkadaysa hiç çekilmez (kendiliğinden kanıt için sekme öne getirilmez).
+// 5 Kasım (v0.187.0) yeni kural — 4 Kasım gerçek toplantısında açılır pencere kapanınca dönüş kaydedilmedi, aynı ekran da tekrar tekrar
+// kaydedildi. İki kök neden: (1) karşılaştırma bütün sekmedeydi; canlı altyazı ve kameralar her an değiştiği için "durgun" anı rastgele
+// geliyor, paylaşılan alandaki küçük değişim (sekmenin %35'i içinde açılır pencere) %6 eşiğine yetmiyordu. (2) "Değişti" yalnız bir önceki
+// kareye göreydi, kaydedilenlerle hiç karşılaştırılmıyordu. Şimdi:
+//  · Izgara yalnız paylaşılan içeriğin bölgesinden (içerik betiğinin `bolge`si; yoksa eski gibi bütün sekme, şerit/uyarı maskeli).
+//  · Ekran durumu = iki ardışık karede (≥ 1,5 sn) hücrelerin < %1,5'i değişen görüntü (kararlı).
+//  · Kararlı durum SON kaydedilenden belirgin farklıysa (hücrelerin ≥ %6'sı) kaydedilir; son kaydedilenle aynıysa kaydedilmez (aynı ekran
+//    tekrar tekrar kaydedilmez — kare sayısından bağımsız). Açılır pencere kapanıp önceki ekrana dönünce son kaydedilen açılır pencere olduğu
+//    için dönüş de kaydedilir.
+//  · Dönüş = son 8 kaydın birine (sonuncusu dışında) eş durum. Dönüşler 2 dk'da en çok 3 (iki ekran arasında gidip gelme görüntü sayısını
+//    patlatmasın); aşılırsa dönüş kaydedilmez, bir sonraki gerçekten yeni ekran yine kaydedilir.
+//  · Bölge yoksa ayrıca iki kare arasında belirgin sıçrama (≥ %6) gerekir: altyazının yavaş birikimi kayıt üretmesin.
+//  · İki kayıt arası en az 10 sn (bekleyen durum kaybolmaz: süre dolunca hâlâ farklıysa kaydedilir); toplantı başına 200 sınırı aktarıcıda.
+// 15 sn kare gelmezse (sekme arkada) yalnız kare karşılaştırması baştan başlar, kayıt geçmişi kalır (geri gelince aynı ekran yeniden
+// kaydedilmez); 30 dk kare gelmezse (yeni toplantı) geçmiş ve sınır işareti de sıfırlanır.
+const OTO_W = 64, OTO_H = 36, OTO_FARK = 24, OTO_DEGISIM = 0.06, OTO_DURGUN = 0.015, OTO_ARA = 10000,
+  OTO_GECMIS = 8, OTO_DONUS_PENCERE = 120000, OTO_DONUS_EN_COK = 3, OTO_BOS = 15000, OTO_SIFIR = 30 * 60000;
+// OTO-KARAR-BAS (saf karar; test/ekran-oto.py bu bloğu headless Chrome'da sınar)
+function otoYeni() { return { kare: null, bolgeli: null, kayit: [], son: 0, donus: [], t: 0, sinir: false, degisti: true }; }
+function otoOran(a, b) { let n = 0; for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > OTO_FARK) n++; return n / a.length; }
+// D: durum, g: ızgara (Uint8Array), bolgeli: ızgara paylaşılan bölgeden mi, simdi: ms → null | { donus: bool, kayit: n } (kaydet)
+function otoKarar(D, g, bolgeli, simdi) {
+  if (simdi - D.t > OTO_SIFIR) Object.assign(D, otoYeni());
+  else if (simdi - D.t > OTO_BOS) { D.kare = null; D.degisti = true; }
+  D.t = simdi;
+  const once = D.kare && D.bolgeli === bolgeli ? D.kare : null; D.kare = g; D.bolgeli = bolgeli;
+  if (!once) { D.degisti = true; return null; }  // ilk kare
+  const oynak = otoOran(g, once);
+  if (oynak >= OTO_DEGISIM) D.degisti = true;
+  if (oynak >= OTO_DURGUN || D.sinir) return null;  // ekran hâlâ değişiyor
+  // bölgesiz (bütün sekme): altyazı/kamera yavaş yavaş birikip "son kayıttan farklı" olmasın — iki kare arasında belirgin bir sıçrama da gerekir
+  if (!bolgeli && !D.degisti) return null;
+  const es = D.kayit.filter(k => k.bolgeli === bolgeli);
+  const son = es[es.length - 1];
+  if (son && otoOran(g, son.g) < OTO_DEGISIM) { D.degisti = false; return null; }  // son kaydedilenle aynı ekran
+  if (simdi - D.son < OTO_ARA) return null;  // çok erken: durum bekler, süre dolunca yeniden bakılır
+  const donus = es.slice(0, -1).some(k => otoOran(g, k.g) < OTO_DEGISIM);
+  if (donus) {
+    D.donus = D.donus.filter(t => simdi - t < OTO_DONUS_PENCERE);
+    if (D.donus.length >= OTO_DONUS_EN_COK) return null;
+    D.donus.push(simdi);
+  }
+  D.kayit.push({ g, bolgeli, t: simdi }); if (D.kayit.length > OTO_GECMIS) D.kayit.shift();
+  D.son = simdi; D.degisti = false; return { donus, kayit: D.kayit.length };
+}
+// OTO-KARAR-SON
+const OTO = otoYeni();
+async function otoKare(tab, maske, bolge) {
+  if (!tab || !tab.active || busy) return;
+  const b = bolge && bolge.w > 0.05 && bolge.h > 0.05 ? bolge : null;
   let g;
   try {
     const jpg = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 40 });
     const bmp = await createImageBitmap(await (await fetch(jpg)).blob());
     const c = new OffscreenCanvas(OTO_W, OTO_H), x = c.getContext("2d", { willReadFrequently: true });
-    x.drawImage(bmp, 0, 0, OTO_W, OTO_H); bmp.close();
+    if (b) x.drawImage(bmp, b.x * bmp.width, b.y * bmp.height, b.w * bmp.width, b.h * bmp.height, 0, 0, OTO_W, OTO_H);
+    else x.drawImage(bmp, 0, 0, OTO_W, OTO_H);
+    bmp.close();
     const d = x.getImageData(0, 0, OTO_W, OTO_H).data; g = new Uint8Array(OTO_W * OTO_H);
     for (let i = 0; i < g.length; i++) g[i] = (d[i * 4] * 77 + d[i * 4 + 1] * 150 + d[i * 4 + 2] * 29) >> 8;
-    for (const m of maske || []) {
+    for (const m0 of maske || []) {  // şerit/uyarı: bölge varsa bölgeye göre koordinat
+      const m = b ? { x: (m0.x - b.x) / b.w, y: (m0.y - b.y) / b.h, w: m0.w / b.w, h: m0.h / b.h } : m0;
       const x0 = Math.max(0, Math.floor(m.x * OTO_W)), x1 = Math.min(OTO_W, Math.ceil((m.x + m.w) * OTO_W));
       const y0 = Math.max(0, Math.floor(m.y * OTO_H)), y1 = Math.min(OTO_H, Math.ceil((m.y + m.h) * OTO_H));
-      for (let y = y0; y < y1; y++) g.fill(0, y * OTO_W + x0, y * OTO_W + x1);
+      for (let y = y0; y < y1; y++) if (x1 > x0) g.fill(0, y * OTO_W + x0, y * OTO_W + x1);
     }
   } catch (e) { return; }  // sekme o an çekilemiyor (pencere simge durumunda ya da sayfa değişiyor): sonraki karede
-  const once = OTO.kare; OTO.kare = g;
-  if (!once) { OTO.degisti = true; return otoAl(tab, 0); }  // kip yeni açıldı (ya da sekme geri geldi): ilk ekran
-  let n = 0; for (let i = 0; i < g.length; i++) if (Math.abs(g[i] - once[i]) > OTO_FARK) n++;
-  return otoAl(tab, n / g.length);
+  const k = otoKarar(OTO, g, !!b, Date.now());
+  if (k) return kanit(tab, "oto", null, k.donus ? "dönüş: önceki ekrana dönüldü" : null);
 }
-function otoAl(tab, oran) {
-  if (oran >= OTO_DEGISIM) OTO.degisti = true;
-  if (!OTO.degisti || oran >= OTO_DURGUN || Date.now() - OTO.son < OTO_ARA) return;
-  OTO.degisti = false; OTO.son = Date.now(); return kanit(tab, "oto");
-}
-
 // toplantı hatırlatması: dakikada bir aktarıcının takvimine bakar (Mac Takvim, Suflor Takvim yardımcısı). Bir toplantı
 // ≤ 5 dk sonra başlıyorsa ve Claude bu alanda izlemiyorsa bildirim: "Suflor'u başlat" (Terminal'de /toplanti) · "Panoyu aç".
 // Her toplantı için bir kez. Çalışma alanı seçilmemişse (iki aktarıcı) bildirim yok.

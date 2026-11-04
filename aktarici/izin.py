@@ -117,6 +117,10 @@ def izin_arac(p):
     arac = " ".join(str(p.get("arac") or "").split())[:80]; ozet = " ".join(str(p.get("ozet") or "").split())[:240]
     if not arac: return {"ok": False, "err": "arac"}
     arka = "topo_canli" in globals() and topo_canli()  # arka plandaki oturumun kancası: izin Claude bölümünde (kart değil)
+    if arka and "topo_chrome_karar" in globals():  # 5 Kasım: Claude in Chrome (yalnız linkedin.com okuma) kanca yoluyla da kartsız karar alır
+        try: kc = topo_chrome_karar(str(p.get("ad") or ""), p.get("girdi"))
+        except Exception: kc = None
+        if kc: return {"ok": True, "id": None, "karar": "onaylandi" if kc == "allow" else "reddedildi", "arka": arka}
     iid = izin_iste("arac", izin_metni(p.get("ad") or arac, p.get("girdi"), p.get("aciklama")), {"arac": arac, "ozet": ozet}, oturum=arka)  # komut yalnız ayrıntıda/kayıtta
     if not iid: return {"ok": False, "err": "eylem"}
     k = izin_bekle(iid, min(IZIN_BEKLE_SN, float(p.get("bekle") or IZIN_BEKLE_SN)))

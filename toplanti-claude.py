@@ -1301,7 +1301,7 @@ def paket_kaydi(dosya, satir, aday, neden):
 def izle():
     import baglam  # hazır kart tetiği kök karşılaştırması
     q_tail = Tail(os.path.join(A.dir, "sorular.jsonl")); k_tail = Tail(os.path.join(A.dir, "kartlar.jsonl"))
-    cur = None; t_tail = None; oto_bildirilen = None; buf = []; acks = []; buf_since = None; last_state = None; texts = {}; aday = None; aday_t = 0.0
+    cur = None; t_tail = None; e_tail = None; ekran_ilk = None; oto_bildirilen = None; buf = []; acks = []; buf_since = None; last_state = None; texts = {}; aday = None; aday_t = 0.0
     kart_aday = set(); son_paket = 0.0  # kapıcı: tampondaki kart adaylarının türü (soru/sistem/iddia), son paket anı
     hz_path = os.path.join(A.dir, "hazir.json"); hz_mtime = None; hz = []; hz_seen = set()
     ag_path = os.path.join(A.dir, "agenda.json"); ag_mtime = None; agj = {}
@@ -1516,6 +1516,7 @@ def izle():
             if f and f != cur:
                 cur = f; jl = os.path.join(A.dir, f.replace(".md", ".jsonl"))
                 t_tail = Tail(jl, from_end=False); old = [r for r in t_tail.new() if "note" not in r and "kanit" not in r]
+                e_tail = Tail(os.path.join(A.dir, "kanit", f[:-3], "ekran.jsonl"))  # v0.187.0: paylaşılan ekranın yazısı (aktarici/ekran.py); izle yeniden açılınca eskiler yinelenmez
                 # izle başlamadan önce yazılmış satırların konuşmacıları zaten görülmüş sayılır (yeniden kurulumda tekrar duyurma);
                 # izle başladıktan sonra gelen ilk satırların konuşmacıları duyurulur (toplantı izle'den sonra başladıysa)
                 katilimci.clear()
@@ -1528,6 +1529,13 @@ def izle():
                 emit(f"DOSYA: {f} · toplantı: {s.get('meeting')} · mevcut {len(old)} satır" +
                      ("" if not old else " · son satırlar:"))
                 for r in old[-6:]: emit(satir(r))
+            if e_tail:  # v0.187.0 (5 Kasım): ilk EKRAN'da talimat, sonrakilerde yalnız özet (her olayda yinelenmesin)
+                for r in e_tail.new():
+                    if r.get("ayni"): emit(f"EKRAN {r.get('n')} ({r.get('saat')}): KANIT {r['ayni']} ile aynı yazı — önceki ekrana dönüldü"); continue
+                    ilk = ekran_ilk != cur; ekran_ilk = cur
+                    emit(f"EKRAN {r.get('n')} ({r.get('saat')}): \"{r.get('ozet')}\" · " + ("paylaşılan ekranda görünen yazı (yerel okundu, okuma hatası olabilir) → bağlamına al: "
+                         "geçen ad/firma/başlık/sayı konuşmayla ilgiliyse kartta ve cevapta kullan; emin değilsen görüntüyü Read ile aç; ekranda sır/şifre → DUR kartı; sohbete yazma · "
+                         if ilk else "") + f"görüntü {os.path.join(A.dir, r.get('gorsel') or '')}")
             if t_tail:
                 for r in t_tail.new():
                     if "note" in r and r.get("kaynak") == "suflor": emit(f"SUFLOR SÖYLEDİ (asistan adıyla çağrıldı, cevabı toplantıya okundu — not değil, iş değil; cevap kartı yazma): {r['note']}")  # S94
@@ -1535,7 +1543,7 @@ def izle():
                     elif "kanit" in r and r.get("kaynak") == "oto":  # ekran paylaşımı kaydı: tek tek değil, ilkinde bir kez
                         if oto_bildirilen != cur:
                             oto_bildirilen = cur
-                            emit("SUNULAN EKRAN: karşı taraf ekran paylaşıyor, görüntüler kendiliğinden alınıyor (kaynak oto) — tek tek bakma; toplantı sonunda `ekranlar` → özette 'Sunulan ekranlar'")
+                            emit("SUNULAN EKRAN: karşı taraf ekran paylaşıyor, görüntüler kendiliğinden alınıyor (kaynak oto) — tek tek bakma (ekrandaki yazı EKRAN olayıyla gelir); toplantı sonunda `ekranlar` → özette 'Sunulan ekranlar'")
                     elif "kanit" in r:  # hemen — ekranda sır olabilir
                         emit(f"KANIT {r.get('n')}: {os.path.join(A.dir, r['kanit'])}" + (f" · not \"{r['not']}\"" if r.get("not") else "") +
                              (f" · toplantı ekranı değil, kullanıcının o an baktığı pencere ({r['ekran']})" if r.get("ekran") else "") +
@@ -1879,7 +1887,13 @@ def yapi_cmd():
     with open(hy, "w", encoding="utf-8") as f: f.write(icerik)
     say = {t: sum(1 for m in v["maddeler"] for o in m["ogeler"] if o["tur"] == t) for t in Y.TURLER}
     print(f"karar grafı: {n} kayıt ({', '.join(f'{Y.kucuk(Y.TURLER[t])} {k}' for t, k in say.items() if k)}) · kaynak {kaynak}")
-    print(f"zihin haritası: {hy}" + (f" (tür: {Y.GORSEL_AD[tur].lower()})" if tur != "harita" else ""))
+    print(f"toplantı görseli: {hy} (tür: {Y.GORSEL_AD[tur].lower()}" + ("" if str(v.get("gorsel") or "").strip() in Y.GORSEL_AD else "; yapı dosyasında \"gorsel\" yok, öğelerden seçildi — özeti yazan Claude \"karar_is\" ya da \"harita\" yazsın") + ")")
+    # özet ↔ yapı sayı denetimi: özetin "Toplantı çıktısı" sayıları yapı dosyasındakiyle tutmuyorsa uyarır (durdurmaz)
+    try: oz = open(os.path.expanduser(A.ozet), encoding="utf-8").read() if A.ozet and os.path.exists(os.path.expanduser(A.ozet)) else ""
+    except OSError: oz = ""
+    sd = Y.sayi_denetim(v, ozet_cikti(oz)[0]) if oz else []
+    if sd: print("UYARI: özet ile yapı dosyası sayıları tutmuyor — özetteki kararlar, sahipli işler ve açık kalanlar yapı dosyasına eksiksiz çıkarılmalı (açık kalan = konuşulmayan/kısmen gündem maddesi \"durum\" ile, cevapsız soru \"soru\" öğesiyle):\n" + "\n".join("  - " + x for x in sd))
+    elif oz and ozet_cikti(oz)[0]: print("özet ↔ yapı sayıları tutuyor (karar, iş, açık)")
 def graf_cmd():
     Y = _yapi(); eylem_durum_esitle(Y)
     if A.hepsini_sil: Y.graf_sil(A.dir, hepsi=True); print("karar grafı silindi"); return
@@ -2038,6 +2052,10 @@ def sonuc_cmd():  # toplantı sonu tek komut: değerlendirme (not) + konuşma + 
           "(sahibi ya da tarihi yoksa \"sahipsiz\"/\"tarihsiz\" yaz); - **Açık kalanlar (n):** konuşulmayan gündem + cevapsız soru + kararsız konu; "
           "- **Öneri:** bir dahaki toplantıya tek cümle. Konuşma ve anlar bölümünden yalnız işe yarayanı, kesin olmayan iddiaları "
           "\"Kesinleşmesi gerekenler\" olarak ekle.")
+    print("Claude: yapı dosyası (<özet>.yapi.json; biçim `tc yapi --ornek`): özetteki kararlar, sahipli işler ve açık kalanlar eksiksiz çıkarılır (sayılar özetle tutmalı; bitir karşılaştırır). "
+          "\"gorsel\": \"karar_is\" (karar ve iş toplantısı: en az bir karar ya da sahipli iş çıktıysa) ya da \"harita\" (karar/iş çıkmayan keşif, beyin fırtınası, tanışma, sunum dinleme). "
+          "Açık soru, sayı ve iddiayı elindeki araçlarla (bilgi kaynakları, proje araması, web) doğrula: biliniyorsa \"cevap\" (\"doğru\"/\"yanlış\"/\"kısmen\" + değer ya da kısa net cevap), "
+          "\"kaynak\" (ör. \"<bilgi kaynağı> · <araç> · <dönem>\", \"proje belgesi: <dosya>\", \"döküm 23:12\"), varsa \"kaynak_url\"; bulamazsan boş bırak, uydurma.")
     if A.kaydet:
         with open(fp, "a", encoding="utf-8") as f: f.write(json.dumps(dict(v, at=simdi(), cevapsiz=[q.get("metin") for q in v.get("cevapsiz", [])]), ensure_ascii=False, default=str) + "\n")
         print("(karneler.jsonl'e eklendi)")

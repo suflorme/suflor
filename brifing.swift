@@ -134,7 +134,7 @@ func kancaDenetle(_ y: String) -> String? {
 }
 if j["kip"] as? String == "toplanti" {
     guard let giris = j["giris"] as? String, let cikis = j["cikis"] as? String else { bitir(2) }
-    let tek: Set<String> = ["-p", "--print", "--verbose"]
+    let tek: Set<String> = ["-p", "--print", "--verbose", "--chrome"]  // --chrome (5 Kasım): Claude in Chrome araçları; hangilerinin çalışacağını aktarıcının izin kararı (toplanti-oturum.py topo_chrome_karar) sınırlar
     let deg: [String: (String) -> Bool] = [
         "--input-format": { $0 == "stream-json" }, "--output-format": { $0 == "stream-json" }, "--permission-prompt-tool": { $0 == "stdio" },
         "--append-system-prompt": { _ in true }, "--settings": { kancaDenetle($0) != nil },

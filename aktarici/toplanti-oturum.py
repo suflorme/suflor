@@ -9,7 +9,7 @@
 # Panoda Durdur (interrupt) ve "Terminal'de göster" (süreç kapanır, aynı oturum `claude --resume` ile Terminal'de açılır). Süreç beklenmedik çıkarsa
 # aynı oturum en çok TOPO_YENIDEN kez kaldığı yerden açılır. Ayar toplanti_terminal: true eski davranış (Terminal penceresi).
 TOPO = {"app": None, "w": None, "durum": "kapali", "sid": None, "mesaj": [], "n": 0, "konu": None, "t0": 0.0, "t_durum": 0.0, "maliyet": 0.0, "nesil": 0,
-        "kapali_nesil": None, "yeniden": 0, "izin": 0, "izin_toplam": 0, "hata": None, "acilis": None, "secenek_i": None, "etkinlik": None, "kilit": threading.RLock()}
+        "kapali_nesil": None, "yeniden": 0, "izin": 0, "izin_toplam": 0, "hata": None, "acilis": None, "secenek_i": None, "etkinlik": None, "kilit": threading.RLock(), "kilit_sozluk": {}}
 TOPO_YENIDEN, TOPO_MESAJ_EN_COK, TOPO_METIN_EN_COK, TOPO_SURE_SN = 2, 400, 6000, 8 * 3600
 TOPO_TERMINAL_ILETI = "(Suflor) Oturum arka plandan Terminal'e alındı; arka plandaki Monitor durdu. Toplantı sürüyorsa izle'yi yeniden başlat, sürmüyorsa kaldığın yerden devam et."
 TOPO_BOSTA_SN = 2 * 3600  # tur bitmiş ve izle yokken bu kadar boşta kalırsa süreç kapanır (~250 MB); "Terminal'de göster" yine aynı oturumu açar
@@ -32,18 +32,24 @@ BILGI_YAZMA = {"send", "forward", "reply", "create", "update", "delete", "remove
                "invite", "grant", "revoke", "reset", "change", "save", "submit", "merge", "duplicate", "launch", "activate", "deactivate"}
 BILGI_RISK_RX = re.compile(r"send|forward|reply|create_event|update_event|delete|trash|javascript|navigate|computer|form_input|file_upload|share_file|upload|"
                            r"move_item|rename_item|update_file|create_file|copy_file|respond_to_event|set_vacation|create_filter|label_", re.I)  # = toplanti-claude.py IZIN_MCP
-TOPO_BILGI_EN_COK = 8  # kural ~6 der; teknik tavan biraz üstünde, sonrası kullanıcıya sorulur
+TOPO_BILGI_EN_COK = 200  # 5 Kasım: eski tavan 8'di, gerçek toplantıda dolup her sorguda onay çıktı; şimdi yalnız kaçak döngü sigortası
 def mcp_sunucu_adi(s):  # Claude Code'un araç adındaki sunucu biçimi (claude.ai bağlayıcısında alt çizgiler birleşir, baş/son atılır)
     s = str(s or "").strip(); r = re.sub(r"[^A-Za-z0-9_-]", "_", s)
     return re.sub(r"_+", "_", r).strip("_") if s.startswith("claude.ai ") else r
+# Kişi/firma kaynağı varsayılanı (5 Kasım): ayarda kisi_kaynaklari yoksa Apollo, yalnız KREDİ HARCAMAYAN okuma araçlarıyla (araç açıklamalarından doğrulandı: people_api_search ve
+# organizations_lookup ücretsiz; mixed_companies_search ve organizations_job_postings 1 kredi, enrich/match/bulk kredi harcar → kapalı; diğer her Apollo aracı reddedilir). Kapatmak: kisi_kaynaklari: [].
+KISI_VARSAYILAN = [{"sunucu": "plugin:sales:apollo", "araclar": [], "okuma": ["apollo_mixed_people_api_search", "apollo_organizations_lookup"], "konu": "kişi ve firma bilgisi (ad, unvan, şirket, alan adı); e-posta/telefon açma yok", "ad": "Apollo"}]
+def kisi_kaynaklari_liste():
+    v = AYAR.get("kisi_kaynaklari"); return KISI_VARSAYILAN if v is None else (v if isinstance(v, list) else [])
 def bilgi_kaynaklari():
     out = []
-    for k in AYAR.get("toplanti_bilgi_kaynaklari") or []:
+    for k in list(AYAR.get("toplanti_bilgi_kaynaklari") or []) + list(kisi_kaynaklari_liste()):  # kisi_kaynaklari (5 Kasım): kişi/firma bilgi bağlayıcıları, aynı şema; "okuma" = adı okuma önekli olmayan okuma araçlarının tam adları
         if not isinstance(k, dict) or not str(k.get("sunucu") or "").strip(): continue
+        ok_ = [str(x).strip() for x in (k.get("okuma") or []) if re.fullmatch(r"[A-Za-z0-9_]{1,64}", str(x).strip())]
         ar = [str(x).strip() for x in (k.get("araclar") or []) if re.fullmatch(r"[A-Za-z0-9_*?]{1,64}", str(x).strip())]
         ad = " ".join(str(k.get("ad") or re.sub(r"^claude\.ai\s+", "", str(k["sunucu"]).strip())).split())[:60]
         u = str(k.get("url") or "").strip()  # yalnız Konuş kullanır (https; claude.ai bağlayıcısının sunucu adresi, allowedMcpServers için); toplantı oturumu bakmaz
-        out.append({"sunucu": mcp_sunucu_adi(k["sunucu"]), "araclar": ar, "konu": " ".join(str(k.get("konu") or "").split())[:200], "ad": ad, "url": u if len(u) <= 200 and re.fullmatch(r"https://[^\s\"'\\]+", u) else ""})
+        out.append({"sunucu": mcp_sunucu_adi(k["sunucu"]), "araclar": ar, "okuma": ok_, "kisi": k in kisi_kaynaklari_liste(), "konu": " ".join(str(k.get("konu") or "").split())[:200], "ad": ad, "url": u if len(u) <= 200 and re.fullmatch(r"https://[^\s\"'\\]+", u) else ""})
     return out
 def bilgi_kaynagi_arac(ad):  # ayardaki bir kaynağın aracıysa {"kaynak", "arac", "izinli"}, değilse None
     import fnmatch
@@ -53,13 +59,49 @@ def bilgi_kaynagi_arac(ad):  # ayardaki bir kaynağın aracıysa {"kaynak", "ara
         if not ad.startswith(on): continue
         a = ad[len(on):]
         izinli = (bool(BILGI_OKUMA_RX.match(a)) and not (set(a.lower().split("_")) & BILGI_YAZMA) and not BILGI_RISK_RX.search(a)
-                  and any(fnmatch.fnmatchcase(a, d) for d in k["araclar"]))
+                  and any(fnmatch.fnmatchcase(a, d) for d in k["araclar"])) or (a in k.get("okuma", []) and not (set(a.lower().split("_")) & BILGI_YAZMA) and not BILGI_RISK_RX.search(a))
         return {"kaynak": k, "arac": a, "izinli": izinli}
     return None
+# Web araştırması (5 Kasım; kullanıcı kararı, gizlilik istisnası): ayar web_arastirma (varsayılan açık) — WebSearch/WebFetch açıkken müşteri, rakip ya da kişi hakkında
+# açık kaynak (web, LinkedIn'in herkese açık sayfası) araştırılabilir. Sınır istemde ve kodda: aramaya yalnız firma/kişi adı ve konu gider (döküm alıntısı, iç sayı, toplantı
+# içeriği, dosya adı gitmez); gizli toplantıda web yok (_topo_web_red); WebFetch yalnız genel internet adresleri. Onaysız geçiş ayar bilgi_onaysiz'a bağlı.
+TOPO_WEB = ("WebSearch", "WebFetch"); TOPO_WEB_EN_COK = 60
+TOPO_WEB_ISTEM = (" Web araştırması (WebSearch, WebFetch) açık: toplantıda geçen müşteri, rakip ya da kişi hakkında açık kaynaktan (web, herkese açık sayfalar) bilgi toplayabilirsin. "
+                  "SINIR: aramaya yalnız firma ya da kişi adı ve konu gider; döküm alıntısı, iç sayı, toplantı içeriği ve dosya adı arama metnine asla girmez. Gizli toplantıda web araması yok. "
+                  "Sonucu not kartı olarak yaz; --neden'de 'Kaynak: <site>, <bağlantı>' ve bulgunun tarihini ver; tek kaynaktan gelen bilgiyi 'doğrulanmadı' diye işaretle.")
+# Claude in Chrome (5 Kasım; kullanıcı: kendi LinkedIn oturumu açıkken sormadan okunabilir): oturum `--chrome` ile açılır (toplanti_oturum_ac). Yalnız linkedin.com'da
+# OKUMA: sekme açma/kapama, navigate (yalnız linkedin.com adresi), get_page_text, find, read_page. Tıklama, form, betik, yükleme vb. her şey reddedilir. Chrome kapalı,
+# eklenti bağlı değil ya da oturum kapalıysa araç hata verir/yoktur → istem zinciri: kişi bağlayıcısı → web araması; hiçbir adım toplantıyı ya da izin kuyruğunu bekletmez
+# (her izin sorusu kendi iş parçacığında, aktarıcı Chrome'u açmaz). Aynı kural kanca yolunda izin.py izin_arac → topo_chrome_karar.
+TOPO_CHROME_ON = "mcp__claude-in-chrome__"
+TOPO_CHROME_OKU = {"tabs_context_mcp", "tabs_create_mcp", "tabs_close_mcp", "navigate", "get_page_text", "find", "read_page", "list_connected_browsers"}
+def topo_chrome_acik(): return topo_web_acik() and AYAR.get("linkedin_chrome") is not False
+def topo_chrome_karar(ad, gi):  # Chrome aracı değilse None; "allow" | "deny"
+    ad = str(ad or "")
+    if not ad.startswith(TOPO_CHROME_ON): return None
+    k = ad[len(TOPO_CHROME_ON):]; gi = gi if isinstance(gi, dict) else {}
+    if k not in TOPO_CHROME_OKU or not topo_chrome_acik() or gizli_acik(): return "deny"
+    if k == "navigate":
+        m = re.match(r"^https://([A-Za-z0-9.-]+)(?::443)?(?:[/?#]|$)", str(gi.get("url") or ""))
+        if not m or not re.fullmatch(r"(?:[a-z0-9-]+\.)*linkedin\.com", m.group(1).lower()): return "deny"
+    return "allow"
+TOPO_KISI_ISTEM = (" Kişi/firma araştırması için kaynak sırası (her adım hata verirse sessizce sonrakine geç, toplantıyı bekletme; bir adım 5 sn'de cevap vermezse bırak): "
+                   "1) Claude in Chrome (mcp__claude-in-chrome__ araçları ağır olduğu için önce ToolSearch ile yükle): YALNIZ linkedin.com'da ve YALNIZ OKUMA — sekme aç (tabs_create_mcp), navigate, get_page_text, find, read_page; "
+                   "arama kutusuna yazmak, tıklamak, bağlantı isteği, mesaj, beğeni, takip, profil düzenleme gibi hiçbir yazma eylemi yok, şifre girme yok; Chrome açık değilse, araçlar yoksa ya da LinkedIn "
+                   "oturumu kapalıysa (giriş sayfası gelirse) 'LinkedIn'de oturum açık değil' diye not al, Chrome'u açmaya çalışma, kendi açtığın sekmeyi kapat ve sonrakine geç. "
+                   "2) Kişi/firma bilgi bağlayıcısı (yukarıdaki listede varsa; yalnız izinli okuma araçları — kredi harcayan zenginleştirme ve e-posta/telefon açma yok, onlar reddedilir; araç çağrısı yalnız kişi/firma adı ve alan adı alır). 3) WebSearch (gerekirse 'site:linkedin.com' ya da firmanın kendi sitesi) — her zaman son yedek. "
+                   "Kartın --neden satırına hangi kaynaktan geldiğini yaz (ör. 'Kaynak: LinkedIn (Chrome), <bağlantı>' ya da 'Kaynak: web, <bağlantı>').")
+def topo_web_acik(): return AYAR.get("web_arastirma") is not False
+def _topo_kisi_kaynak(ad):  # günlük etiketi: chrome | bağlayıcı (kisi_kaynaklari) | web
+    ad = str(ad or "")
+    if ad.startswith(TOPO_CHROME_ON): return "chrome"
+    if ad in TOPO_WEB: return "web"
+    bk = bilgi_kaynagi_arac(ad)
+    return "bağlayıcı" if bk and bk["kaynak"].get("kisi") else None
 def topo_istem():
-    ks = bilgi_kaynaklari()
-    if not ks: return TOPO_ISTEM
-    return TOPO_ISTEM + " Toplantıda kullanabileceğin dış bilgi kaynakları (yalnız okuma; toplantı kurallarındaki 'Dış bilgi kaynağı' maddesine göre): " + "; ".join(
+    ks = bilgi_kaynaklari(); web = (TOPO_WEB_ISTEM + TOPO_KISI_ISTEM.replace("1) Claude in Chrome", "1) Claude in Chrome" if topo_chrome_acik() else "1) (Chrome kapalı: atla) Claude in Chrome")) if topo_web_acik() else ""
+    if not ks: return TOPO_ISTEM + web
+    return TOPO_ISTEM + web + " Toplantıda kullanabileceğin dış bilgi kaynakları (yalnız okuma; toplantı kurallarındaki 'Dış bilgi kaynağı' maddesine göre): " + "; ".join(
         f"«{k['ad']}» — konu: {k['konu'] or 'belirtilmedi'}; araçlar: mcp__{k['sunucu']}__ altında {', '.join(k['araclar']) or '(yok)'}" for k in ks) + \
         ". Sonucu not kartı olarak yaz; --neden'de 'Kaynak: <kaynak adı>, <sorgu saati>'. Sorguya kişi adı ya da dökümden alıntı koyma."
 # v0.112.0 (S122 2. adım): Claude'un seçim sorusu — mesajdaki [[seç: A | B]] satırı ayıklanır, panoda ve mini panoda düğme olur; basınca seçim oturuma gider.
@@ -117,13 +159,13 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
             except OSError: pass
             os.mkfifo(f, 0o600)
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-prompt-tool", "stdio",
-                "--append-system-prompt", topo_istem()] + (["--model", str(model)] if model else []) + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
+                "--append-system-prompt", topo_istem()] + (["--chrome"] if topo_chrome_acik() else []) + (["--model", str(model)] if model else []) + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "toplanti-bos"),
                        "giris": gir, "cikis": cik, "sure": TOPO_SURE_SN}, f, ensure_ascii=False)
         if not sid: TOPO.update(izin_hatirla=set(), mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None,
-                                bilgi_sorgu=0, bilgi_t={})
+                                bilgi_sorgu=0, web_sorgu=0, bilgi_t={})
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
         _topo_durum("aciliyor", hata=None)
         TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -245,17 +287,43 @@ def _topo_oto(ad, gi):  # kural uyuyorsa kısa açıklama (günlük için), değ
         if len(yollar) == 2 and all(x in ("-n",) for x in secenek) and all(_topo_oz_icinde(y) for y in yollar): return "Bash mv (özet klasörü)"
     return None
 def _topo_tc_yerler(): return {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
-def _topo_izin_anahtar(ad, gi): return ad + "\0" + (str(gi.get("command") or "") if ad in ("Bash", "Monitor") else json.dumps(gi, sort_keys=True, ensure_ascii=False))
+def _topo_okuma_arac(ad):  # girdiden bağımsız hatırlanabilen araç: web araçları ve yazma izi taşımayan MCP okuma araçları (5 Kasım: aynı araç farklı girdiyle yeniden soruluyordu)
+    if ad in TOPO_WEB or (ad.startswith(TOPO_CHROME_ON) and ad[len(TOPO_CHROME_ON):] in TOPO_CHROME_OKU): return True
+    k = ad.split("__")[-1]
+    return ad.startswith("mcp__") and bool(BILGI_OKUMA_RX.match(k)) and not (set(k.lower().split("_")) & BILGI_YAZMA) and not BILGI_RISK_RX.search(k)
+def _topo_izin_anahtar(ad, gi):
+    if _topo_okuma_arac(ad): return ad
+    return ad + "\0" + (str(gi.get("command") or "") if ad in ("Bash", "Monitor") else json.dumps(gi, sort_keys=True, ensure_ascii=False))
+def _topo_web_red(ad, gi):  # web aracı reddedilecekse Türkçe/İngilizce neden, yoksa None
+    if not topo_web_acik(): return _t("Web araştırması kapalı (ayar).", "Web research is turned off (setting).")
+    if gizli_acik(): return _t("Gizli toplantıda web araması yok.", "No web search in a private meeting.")
+    if ad == "WebFetch":
+        u = str(gi.get("url") or ""); m = re.match(r"^https?://([^/:?#@\s]+)(?::\d+)?(?:[/?#]|$)", u, re.I); h = (m.group(1) if m else "").lower()
+        if not m or h in ("localhost", "0.0.0.0") or h.endswith((".local", ".internal", ".localhost", ".lan")) or re.match(r"^(\d{1,3}\.){3}\d{1,3}$", h) or ":" in h or "." not in h:
+            return _t("Yalnız genel internet adresleri açılır.", "Only public internet addresses can be opened.")
+    return None
 def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay → control_response
     r = o.get("request") or {}; ad = str(r.get("tool_name") or "?"); gi = r.get("input") if isinstance(r.get("input"), dict) else {}
     hat = TOPO.setdefault("izin_hatirla", set()); anh = _topo_izin_anahtar(ad, gi); bk = bilgi_kaynagi_arac(ad)
     try: oto = _topo_oto(ad, gi)
     except Exception: oto = None
-    if bk and not bk["izinli"]:  # ayardaki bilgi kaynağının okuma dışı aracı: sorulmaz, reddedilir
+    onaysiz = AYAR.get("bilgi_onaysiz") is not False  # 5 Kasım: varsayılan açık — okuma araçları ve web araması sorulmaz
+    web_red = _topo_web_red(ad, gi) if ad in TOPO_WEB else None
+    if web_red:
+        cevap = {"behavior": "deny", "message": web_red}; print(f"TOPLANTI OTURUMU: izin {ad} (web) → reddedildi ({web_red})")
+    elif ad in TOPO_WEB and onaysiz and TOPO.get("web_sorgu", 0) < TOPO_WEB_EN_COK:
+        TOPO["web_sorgu"] = TOPO.get("web_sorgu", 0) + 1; cevap = {"behavior": "allow", "updatedInput": gi}
+        print(f"TOPLANTI OTURUMU: izin {ad} (web araştırması {TOPO['web_sorgu']}/{TOPO_WEB_EN_COK}) → kendiliğinden")
+    elif ad.startswith(TOPO_CHROME_ON) and topo_chrome_karar(ad, gi) == "deny":
+        cevap = {"behavior": "deny", "message": _t("Claude in Chrome'da yalnız linkedin.com'u okuma araçları açık (sekme, navigate, get_page_text, find, read_page).", "Only read tools on linkedin.com are open in Claude in Chrome.")}
+        print(f"KİŞİ ARAŞTIRMA: chrome · {ad[len(TOPO_CHROME_ON):]} → reddedildi")
+    elif ad.startswith(TOPO_CHROME_ON) and onaysiz:
+        cevap = {"behavior": "allow", "updatedInput": gi}; print(f"KİŞİ ARAŞTIRMA: chrome · {ad[len(TOPO_CHROME_ON):]} → kendiliğinden")
+    elif bk and not bk["izinli"]:  # ayardaki bilgi kaynağının okuma dışı aracı: sorulmaz, reddedilir
         cevap = {"behavior": "deny", "message": _t("Bu araç bilgi kaynağının okuma araçlarından değil; toplantıda yalnız okuma araçları kullanılır.",
                                                    "This tool isn't one of the information source's read tools; only read tools are used in the meeting.")}
         print(f"TOPLANTI OTURUMU: izin {bk['kaynak']['sunucu']} · {bk['arac']} (bilgi kaynağı, okuma dışı) → reddedildi")
-    elif bk and TOPO.get("bilgi_sorgu", 0) < TOPO_BILGI_EN_COK:
+    elif bk and onaysiz and TOPO.get("bilgi_sorgu", 0) < TOPO_BILGI_EN_COK:
         TOPO["bilgi_sorgu"] = TOPO.get("bilgi_sorgu", 0) + 1; cevap = {"behavior": "allow", "updatedInput": gi}
         print(f"TOPLANTI OTURUMU: izin {bk['kaynak']['sunucu']} · {bk['arac']} (bilgi kaynağı, okuma {TOPO['bilgi_sorgu']}/{TOPO_BILGI_EN_COK}) → kendiliğinden")
     elif _topo_izle_mi(ad, gi):
@@ -270,6 +338,13 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         cevap = {"behavior": "deny", "message": _t("Bu oturumda AskUserQuestion yok: soruyu düz metin olarak yaz ve turu bitir; kullanıcı panodan cevaplar.",
                                                    "AskUserQuestion isn't available in this session: write the question as plain text and end the turn; the user answers from the panel.")}
     else:
+        # 5 Kasım: aynı araç paralel çağrılırsa (ayrı iş parçacıkları) ikisi de soruyordu — anahtar başına kilit; ikinci çağrı kilidi alınca verilmiş izni görür
+        with TOPO["kilit_sozluk"].setdefault(anh, threading.Lock()):
+            if anh in hat: cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} → aynı anda sorulan izin onaylandı, yeniden sorulmadı")
+            else: cevap = _topo_izin_sor(ad, gi, anh, hat)
+    _topo_gonder({"type": "control_response", "response": {"subtype": "success", "request_id": o.get("request_id"), "response": cevap}})
+def _topo_izin_sor(ad, gi, anh, hat):
+    if True:
         ozet = _topo_arac_ozet(ad, gi); TOPO["izin"] += 1; TOPO["izin_toplam"] += 1
         _topo_mesaj("izin", arac_cumlesi(ad, gi))  # v0.112.2: düz cümle, komut yalnız eylem ayrıntısında ve izin-kayit.jsonl'de
         iid = izin_iste("arac", izin_metni(ad, gi), {"arac": ad, "ozet": ozet}, oturum=True)  # v0.115.0: kart değil, Claude bölümünde Onayla / Reddet
@@ -282,7 +357,7 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
                                                      "No approval from the user (timed out); skip this step and ask them if needed.")})
         if k == "onaylandi": hat.add(anh)  # oturum boyunca hatırla (yeniden soru yok)
         print(f"TOPLANTI OTURUMU: izin {ad} → {k}")
-    _topo_gonder({"type": "control_response", "response": {"subtype": "success", "request_id": o.get("request_id"), "response": cevap}})
+    return cevap
 def _topo_oku(cik, nesil):
     try: r = open(cik, encoding="utf-8")
     except OSError: return
@@ -294,6 +369,9 @@ def _topo_oku(cik, nesil):
             t = j.get("type")
             if t == "system" and j.get("subtype") == "init":  # her turun başında gelir (Monitor olayı da yeni tur açar)
                 if j.get("session_id"): TOPO["sid"] = str(j["session_id"])
+                if topo_chrome_acik():  # kişi araştırma zinciri: Chrome bağlantısı (tek satır; yoksa web'e düşülür, Chrome'u açmayız)
+                    cd = next((m.get("status") for m in (j.get("mcp_servers") or []) if isinstance(m, dict) and m.get("name") == "claude-in-chrome"), None)
+                    print("KİŞİ ARAŞTIRMA: chrome " + ("bağlı" if cd == "connected" else "yok → web (ya da kişi bağlayıcısı)"))
                 if TOPO["durum"] == "bekliyor": _topo_durum("calisiyor")
             elif t == "assistant":
                 if TOPO["durum"] == "bekliyor": _topo_durum("calisiyor")  # kullanıcı yazmadan yeni tur (arka plan işi bitti bildirimi vb.)
@@ -302,12 +380,16 @@ def _topo_oku(cik, nesil):
                     if b.get("type") == "text": _topo_mesaj("claude", b.get("text")); TOPO["etkinlik"] = None
                     elif b.get("type") == "tool_use":
                         _topo_mesaj("arac", (str(b.get("name") or "?") + " — " + _topo_arac_ozet(b.get("name"), b.get("input"))).strip(" —")); _topo_etkinlik(b.get("name"), b.get("input"))
+                        kk = _topo_kisi_kaynak(b.get("name"))
+                        if kk and b.get("id"): TOPO.setdefault("kisi_t", {})[str(b["id"])] = (kk, time.time())
                         bk = bilgi_kaynagi_arac(b.get("name"))
                         if bk and b.get("id"): TOPO.setdefault("bilgi_t", {})[str(b["id"])] = (bk["kaynak"]["sunucu"], bk["arac"], time.time())
             elif t == "user":
                 c = (j.get("message") or {}).get("content")
                 for x in (c if isinstance(c, list) else []):  # bilgi kaynağı süresi: günlüğe yalnız sunucu, araç, süre (içerik yok)
                     s = TOPO.get("bilgi_t", {}).pop(str(x.get("tool_use_id")), None) if isinstance(x, dict) and x.get("type") == "tool_result" else None
+                    ks_ = TOPO.get("kisi_t", {}).pop(str(x.get("tool_use_id")), None) if isinstance(x, dict) and x.get("type") == "tool_result" else None
+                    if ks_: print(f"KİŞİ ARAŞTIRMA: {ks_[0]} → {'hata (sonraki kaynağa geçilir: ' + ('web' if ks_[0] != 'web' else 'yok') + ')' if x.get('is_error') else 'tamam'} · {time.time() - ks_[1]:.1f} sn")
                     if s: print(f"BİLGİ KAYNAĞI: {s[0]} · {s[1]} · {time.time() - s[2]:.1f} sn{' · hata' if x.get('is_error') else ''}")
                 if isinstance(c, list) and any(isinstance(x, dict) and x.get("type") == "tool_result" for x in c): TOPO["etkinlik"] = None  # araç bitti: sıradaki adıma kadar "düşünüyor"
             elif t == "result":

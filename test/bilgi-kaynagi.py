@@ -124,7 +124,7 @@ kontrol("okuyucu init'i tur beklemeden sağlar (nesil denetimiyle)", 'subtype") 
 
 # 5. toplanti-oturum.py: url alanı, Faz 1 davranışı aynı
 to = open(os.path.join(KOD, "aktarici", "toplanti-oturum.py"), encoding="utf-8").read()
-n2 = {"re": re, "AYAR": {"toplanti_bilgi_kaynaklari": [{"sunucu": "claude.ai Ornek Kaynak", "araclar": ["get_*"], "konu": "x", "url": "https://ornek.test/mcp"},
+n2 = {"re": re, "AYAR": {"kisi_kaynaklari": [], "toplanti_bilgi_kaynaklari": [{"sunucu": "claude.ai Ornek Kaynak", "araclar": ["get_*"], "konu": "x", "url": "https://ornek.test/mcp"},
                                                                    {"sunucu": "claude.ai Baska", "araclar": ["list_*"], "url": "http://x.test"}, {"sunucu": "claude.ai Yok", "araclar": ["get_*"]}]}}
 exec(to[to.index("BILGI_OKUMA_RX = "):to.index("def bilgi_kaynagi_arac(")], n2)
 bk = n2["bilgi_kaynaklari"]()
@@ -150,5 +150,82 @@ kontrol("brifing kaynağı Konuş'la aynı kuraldan (ayar, gizli kip, yedek)", "
 kontrol("FIFO kipinde mesaj BRIFING_BILGI_SN sonra yazılır, giriş kapanır", "time.sleep(max(0, BRIFING_BILGI_SN - (time.time() - t0)))" in bf and "os.close(w)" in bf)
 pn = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); df = open(os.path.join(KOD, "aktarici", "defter.py"), encoding="utf-8").read()
 kontrol("'Güncel veri' panoda üç yerde, defterde ve Konuş'un sıradaki toplantı bloğunda", pn.count("'Güncel veri'") == 3 and '("veri", "dikkat", "acik", "gecmis")' in df and '("veri", _t("Güncel veri"' in kod)
+# 7. toplantı oturumu izin kararı (5 Kasım): okuma araçları ve web onaysız; yazma sorulur; aynı araç yeniden/paralel sorulmaz; gizli toplantıda web yok
+import threading
+def izin_ns(ayar, gizli=False):
+    n = {"re": re, "threading": threading, "json": json, "os": os, "time": time, "AYAR": dict(ayar), "_t": lambda a_, b_: a_, "gizli_acik": lambda: n["_gz"], "_gz": gizli}
+    exec(compile(to, "toplanti-oturum.py", "exec"), n)
+    n.update(_gonder=[], sorulan=[], karar="onaylandi", _topo_gonder=lambda o: n["_gonder"].append(o["response"]["response"]["behavior"]), _topo_mesaj=lambda *a, **k: None,
+             _topo_izle_mi=lambda ad, gi: False, _topo_tc_okuma=lambda ad, gi: False, _topo_oto=lambda ad, gi: None, arac_cumlesi=lambda ad, gi=None: ad,
+             izin_metni=lambda ad, gi=None: ad, izin_bekle=lambda iid, *a: (time.sleep(0.2), n["karar"])[1])
+    n["izin_iste"] = lambda tur, ne, ay=None, **k: (n["sorulan"].append(ne), "i%d" % len(n["sorulan"]))[1]
+    n["TOPO"].update(izin_hatirla=set(), bilgi_sorgu=0, web_sorgu=0)
+    return n
+KS = [{"sunucu": "claude.ai Ornek Kaynak", "araclar": ["get_*", "list_*", "query_*"], "konu": "x"}]
+def sor(n, ad, gi=None):
+    n["_topo_izin"]({"request_id": "r", "request": {"tool_name": ad, "input": gi or {}}}); return n["_gonder"][-1], len(n["sorulan"])
+OK = "mcp__claude_ai_Ornek_Kaynak__"
+n = izin_ns({"toplanti_bilgi_kaynaklari": KS})
+kontrol("bilgi_onaysiz varsayılan açık: kaynağın okuma aracı sorulmadan geçer, sınırsız gibi (9 sorgu)", all(sor(n, OK + "query_metrics", {"d": i}) == ("allow", 0) for i in range(9)))
+kontrol("yazma aracı (kaynağın içinde) reddedilir, sorulmaz", sor(n, OK + "update_campaign") == ("deny", 0))
+kontrol("e-posta gönderme (başka bağlayıcı) sorulur", sor(n, "mcp__claude_ai_Posta__send_mail", {"to": "a"}) == ("allow", 1))
+kontrol("e-posta gönderme farklı girdiyle yeniden sorulur (yazma araçları girdiye bağlı hatırlanır)", sor(n, "mcp__claude_ai_Posta__send_mail", {"to": "b"}) == ("allow", 2))
+kontrol("aynı girdiyle ikinci kez sorulmaz", sor(n, "mcp__claude_ai_Posta__send_mail", {"to": "b"}) == ("allow", 2))
+kontrol("web araması varsayılan onaysız; WebFetch genel adres onaysız", sor(n, "WebSearch", {"query": "Firma Ltd"}) == ("allow", 2) and sor(n, "WebFetch", {"url": "https://www.linkedin.com/company/x"}) == ("allow", 2))
+kontrol("WebFetch yerel/özel adres reddedilir", all(sor(n, "WebFetch", {"url": u})[0] == "deny" for u in ("http://localhost:8765/status", "http://127.0.0.1/x", "http://192.168.1.5/", "file:///etc/passwd", "http://[::1]/", "http://nas.local/x", "https://tek")))
+n = izin_ns({"toplanti_bilgi_kaynaklari": KS}, gizli=True)
+kontrol("gizli toplantıda WebSearch/WebFetch reddedilir, sorulmaz", sor(n, "WebSearch", {"query": "x"}) == ("deny", 0) and sor(n, "WebFetch", {"url": "https://a.com"}) == ("deny", 0))
+n = izin_ns({"toplanti_bilgi_kaynaklari": KS, "web_arastirma": False})
+kontrol("web_arastirma kapalı: web araçları reddedilir; istemde web bölümü yok", sor(n, "WebSearch", {"query": "x"}) == ("deny", 0) and "WebSearch" not in n["topo_istem"]())
+kontrol("web_arastirma açıkken istemde sınır cümlesi (yalnız ad ve konu, döküm alıntısı yok, gizli toplantı, kaynak bağlantısı)", all(x in izin_ns({})["topo_istem"]() for x in ("yalnız firma ya da kişi adı", "döküm alıntısı", "Gizli toplantıda", "Kaynak: <site>, <bağlantı>")))
+n = izin_ns({"toplanti_bilgi_kaynaklari": KS, "bilgi_onaysiz": False})
+kontrol("bilgi_onaysiz kapalı: kaynağın okuma aracı ve web ilk kez sorulur", sor(n, OK + "get_x", {"a": 1}) == ("allow", 1) and sor(n, "WebSearch", {"query": "x"}) == ("allow", 2))
+kontrol("kapalıyken de onaylanan araç yeniden sorulmaz (farklı girdiyle bile)", sor(n, OK + "get_x", {"a": 2}) == ("allow", 2) and sor(n, "WebSearch", {"query": "y"}) == ("allow", 2) and sor(n, "WebFetch", {"url": "https://a.com"}) == ("allow", 3))
+n = izin_ns({"toplanti_bilgi_kaynaklari": KS, "bilgi_onaysiz": False}); n["karar"] = "reddedildi"
+kontrol("reddedilen araç hatırlanmaz (yeniden sorulur)", sor(n, OK + "get_x") == ("deny", 1) and sor(n, OK + "get_x") == ("deny", 2))
+n = izin_ns({"toplanti_bilgi_kaynaklari": KS, "bilgi_onaysiz": False}); n["_gonder"].clear()
+ts = [threading.Thread(target=n["_topo_izin"], args=({"request_id": "r", "request": {"tool_name": OK + "query_metrics", "input": {"d": i}}},)) for i in range(2)]
+[t.start() for t in ts]; [t.join() for t in ts]
+kontrol("aynı araç aynı anda iki kez çağrılınca tek soru (çift soru hatası)", len(n["sorulan"]) == 1 and n["_gonder"] == ["allow", "allow"], (n["sorulan"], n["_gonder"]))
+n = izin_ns({"toplanti_bilgi_kaynaklari": KS}); n["TOPO"]["bilgi_sorgu"] = n["TOPO_BILGI_EN_COK"]
+kontrol("kaçak döngü tavanı (200) dolunca sorulur", sor(n, OK + "query_metrics") == ("allow", 1) and n["TOPO_BILGI_EN_COK"] == 200)
+# 7b. Claude in Chrome (yalnız linkedin.com okuma) ve kişi araştırma yedek zinciri (5 Kasım)
+C = "mcp__claude-in-chrome__"
+n = izin_ns({})
+kontrol("chrome: okuma araçları sorulmadan geçer (tabs, navigate linkedin, get_page_text, find, read_page)", all(sor(n, C + a, g) == ("allow", 0) for a, g in (("tabs_create_mcp", {}), ("navigate", {"url": "https://www.linkedin.com/in/x"}), ("get_page_text", {}), ("find", {"query": "x"}), ("read_page", {}), ("tabs_close_mcp", {}))))
+kontrol("chrome: linkedin dışı ya da http/benzer alan adı navigate reddedilir", all(sor(n, C + "navigate", {"url": u})[0] == "deny" for u in ("https://example.com", "http://linkedin.com/x", "https://linkedin.com.evil.test/x", "https://evillinkedin.com/", "")))
+kontrol("chrome: yazma/etkileşim araçları reddedilir, sorulmaz", all(sor(n, C + a, {"action": "left_click"}) == ("deny", 0) for a in ("computer", "form_input", "javascript_tool", "file_upload", "upload_image", "browser_batch", "shortcuts_execute", "gif_creator", "read_network_requests")))
+kontrol("kanca yolu (izin_arac) aynı karar", n["topo_chrome_karar"](C + "navigate", {"url": "https://www.linkedin.com/company/x"}) == "allow" and n["topo_chrome_karar"](C + "computer", {}) == "deny" and n["topo_chrome_karar"]("Read", {}) is None)
+n = izin_ns({}, gizli=True); kontrol("gizli toplantıda chrome araçları da reddedilir", sor(n, C + "get_page_text") == ("deny", 0))
+n = izin_ns({"linkedin_chrome": False}); kontrol("linkedin_chrome kapalı: chrome reddedilir, --chrome bayrağı yok, istemde Chrome adımı atlanır", sor(n, C + "get_page_text") == ("deny", 0) and not n["topo_chrome_acik"]() and "(Chrome kapalı: atla)" in n["topo_istem"]())
+n = izin_ns({"bilgi_onaysiz": False}); kontrol("bilgi_onaysiz kapalı: izinli chrome aracı ilk kez sorulur, sonra hatırlanır", sor(n, C + "get_page_text") == ("allow", 1) and sor(n, C + "get_page_text") == ("allow", 1))
+ist = izin_ns({})["topo_istem"]()
+kontrol("istem: zincir chrome → bağlayıcı → web, yalnız okuma, oturum kapalıysa not + sonraki, kaynak kartta", all(x in ist for x in ("1) Claude in Chrome", "YALNIZ OKUMA", "2) Kişi/firma bilgi bağlayıcısı", "3) WebSearch", "oturum açık değil", "Chrome'u açmaya çalışma", "Kaynak: LinkedIn (Chrome)")))
+kt = open(os.path.join(KOD, "aktarici", "toplanti-oturum.py"), encoding="utf-8").read(); sw2 = open(os.path.join(KOD, "brifing.swift"), encoding="utf-8").read(); iz = open(os.path.join(KOD, "aktarici", "izin.py"), encoding="utf-8").read()
+kontrol("--chrome yalnız ayar açıkken oturum argümanında; Brifing.app toplantı kipi bayrağı kabul eder; kanca yolu topo_chrome_karar'ı çağırır", '(["--chrome"] if topo_chrome_acik() else [])' in kt and '["-p", "--print", "--verbose", "--chrome"]' in sw2 and "topo_chrome_karar" in iz)
+# kişi bağlayıcısı: kisi_kaynaklari + açık okuma adları (adı okuma önekli olmayan okuma araçları), yazma adı yine reddedilir
+APO = {"sunucu": "plugin:sales:apollo", "araclar": [], "okuma": ["apollo_people_match", "apollo_mixed_people_api_search", "apollo_contacts_create"], "konu": "kişi/firma", "ad": "Apollo"}
+n = izin_ns({"kisi_kaynaklari": [APO]}); P = "mcp__plugin_sales_apollo__"
+kontrol("kisi_kaynaklari: listedeki okuma araçları onaysız; yazma adı ('create') listede olsa da reddedilir; listede olmayan reddedilir", sor(n, P + "apollo_people_match") == ("allow", 0) and sor(n, P + "apollo_mixed_people_api_search") == ("allow", 0) and sor(n, P + "apollo_contacts_create") == ("deny", 0) and sor(n, P + "apollo_tasks_update") == ("deny", 0))
+kontrol("kişi bağlayıcısı istemde listelenir", "Apollo" in n["topo_istem"]())
+# günlük: akıştan tek satırlık KİŞİ ARAŞTIRMA (chrome yok → web; chrome hata; bağlayıcı yok; ikisi de yok)
+import tempfile
+def akis(satirlar, ayar):
+    n = izin_ns(ayar); g = []; n["print"] = lambda *a: g.append(" ".join(map(str, a))); n["TOPO"].update(nesil=5, kapali_nesil=5, durum="calisiyor")
+    f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8"); f.write("\n".join(json.dumps(x, ensure_ascii=False) for x in satirlar) + "\n"); f.close()
+    n["_topo_oku"](f.name, 5); os.unlink(f.name); return [x for x in g if x.startswith("KİŞİ ARAŞTIRMA")]
+init = lambda ms: {"type": "system", "subtype": "init", "session_id": "s", "mcp_servers": ms}
+tu = lambda i, ad: {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": i, "name": ad, "input": {}}]}}
+tr = lambda i, e: {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": i, "is_error": e, "content": "x"}]}}
+g1 = akis([init([])], {}); kontrol("Chrome yok: 'chrome yok → web' tek satır", len(g1) == 1 and "chrome yok → web" in g1[0], g1)
+g2 = akis([init([{"name": "claude-in-chrome", "status": "connected"}]), tu("a", C + "get_page_text"), tr("a", True), tu("b", "WebSearch"), tr("b", False)], {})
+kontrol("Chrome bağlı ama araç hata (oturum kapalı): hata satırı web'e düşülür; web tamam; kaynak etiketli", g2[0].endswith("bağlı") and "chrome → hata (sonraki kaynağa geçilir: web)" in g2[1] and "web → tamam" in g2[2], g2)
+g3 = akis([init([]), tu("c", "WebSearch"), tr("c", False)], {"kisi_kaynaklari": [APO]}); kontrol("bağlayıcı yok + chrome yok → web ile sürer (bağlayıcı çağrısı yok, hata yok)", len(g3) == 2 and "web → tamam" in g3[1], g3)
+g4 = akis([init([]), tu("d", P + "apollo_people_match"), tr("d", True), tu("e", "WebSearch"), tr("e", False)], {"kisi_kaynaklari": [APO]})
+kontrol("bağlayıcı hata verirse sonraki: web", "bağlayıcı → hata (sonraki kaynağa geçilir: web)" in g4[1] and "web → tamam" in g4[2], g4)
+ay = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
+kontrol("kisi_kaynaklari ayarsızken Apollo varsayılanı: yalnız ücretsiz iki okuma aracı onaysız; kredi harcayan/yazan her Apollo aracı reddedilir", all(sor(izin_ns({}), "mcp__plugin_sales_apollo__" + a) == (r, 0) for a, r in (("apollo_mixed_people_api_search", "allow"), ("apollo_organizations_lookup", "allow"), ("apollo_mixed_companies_search", "deny"), ("apollo_organizations_job_postings", "deny"), ("apollo_people_match", "deny"), ("apollo_organizations_enrich", "deny"), ("apollo_people_bulk_match", "deny"), ("apollo_contacts_create", "deny"), ("apollo_emailer_messages_send_now", "deny"), ("apollo_sequences_update", "deny"), ("apollo_agent_bulk_enrich", "deny"))))
+kontrol("kisi_kaynaklari: [] Apollo'yu kapatır (araç sorulur, kaynak sayılmaz)", sor(izin_ns({"kisi_kaynaklari": []}), "mcp__plugin_sales_apollo__apollo_people_match")[1] == 1)
+kontrol("ayarlar: web_arastirma ve bilgi_onaysiz varsayılan açık, AYAR_PANO'da ve panoda (AYG)", '"web_arastirma": ("bool", True, None)' in ay and '"bilgi_onaysiz": ("bool", True, None)' in ay and "['web_arastirma','bool'" in pn and "['bilgi_onaysiz','bool'" in pn)
 kontrol("__pycache__ yazılmadı", not [d for d, _, f in os.walk(KOD) if "__pycache__" in d and ".git" not in d and "_yedek" not in d])
 print(f"{len(hatalar) and 'KALDI: ' + str(len(hatalar)) or 'hepsi geçti'}"); sys.exit(1 if hatalar else 0)

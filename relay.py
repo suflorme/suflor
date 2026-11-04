@@ -579,14 +579,15 @@ def kanit(p):
         except (TypeError, ValueError, KeyError): olcek = None
         kucuk = round(olcek * 100) if olcek is not None and 0 < olcek < KANIT_KUCUK else None
         ekran = " ".join(str(p.get("uyg") or _t("ekran", "screen")).split())[:60] if p.get("hedef") == "ekran" else None  # o an bakılan pencere (toplantı ekranı değil)
+        bolge = _bolge_temiz(pay.get("bolge")) if pay and isinstance(pay.get("bolge"), dict) else None  # v0.187.0: paylaşılan içeriğin yeri (aktarici/ekran.py)
         rec = {"at": now.isoformat(timespec="seconds"), "kanit": rel, "n": n, "not": not_, "kaynak": str(p.get("kaynak") or "")[:20], "boyut": len(b), **({"ekran": ekran} if ekran else {}),
-               "w": p.get("w"), "h": p.get("h"), **({"olcek": olcek} if olcek is not None else {}), **({"kucuk": kucuk} if kucuk else {})}
+               "w": p.get("w"), "h": p.get("h"), **({"olcek": olcek} if olcek is not None else {}), **({"kucuk": kucuk} if kucuk else {}), **({"bolge": bolge} if bolge else {})}
         lst.append(rec)
         write([(md, hdr), (md, pre_al(md)), (md, f"| {now.strftime('%H:%M:%S')} | **📷 KANIT {n}**{' (oto)' if rec['kaynak'] == 'oto' else ''}{f' (ekran: {ekran.replace(chr(124), chr(166))})' if ekran else ''} | {rel}{(' — ' + not_.replace('|', '¦')) if not_ else ''}{f' ⚠ paylaşılan ekran küçük (%{kucuk})' if kucuk else ''} | |\n"),
                (jl, json.dumps(rec, ensure_ascii=False) + "\n")])
         STATE["last"] = now.isoformat(timespec="seconds"); heartbeat()
     print(f"KANIT {n}: {rel} ({len(b) // 1024} KB, {rec['kaynak']}" + (f", ekran: {ekran}" if ekran else "") + (f", paylaşılan ekran küçük %{kucuk}" if kucuk else "") + ")")
-    threading.Thread(target=kanit_metin, args=(md, rel, n, now.strftime('%H:%M:%S')), daemon=True).start()
+    threading.Thread(target=kanit_isle, args=(md, rel, n, now.strftime('%H:%M:%S'), bolge, bool(ekran)), daemon=True).start()  # yazı okuma: aktarici/ekran.py
     return {"ok": True, "n": n, "path": rel, **({"kucuk": kucuk} if kucuk else {})}
 # Kanıt görüntüsündeki yazı (v0.36.0, S48): paylaşılan ekranda görünen ama söylenmeyen bilgi (slayt, tablo, rakam) toplantı defterine girsin diye
 # görüntü yerel Apple Vision ile okunur (Suflor Metin.app; görüntü Mac'ten çıkmaz) ve .md'ye "📷 KANIT n metni" satırı yazılır (.jsonl'e girmez:
@@ -594,18 +595,7 @@ def kanit(p):
 # (15 Ekim, gerçek ekran paylaşımlı toplantı, 24 kanıt, 16 soru): ekran soruları yazısız da 12/12 — sıçramayı Konuş'un görüntüyü Read ile açması
 # (istem + defterde tam yol) yaptı; yazı ek kazanç vermedi, metnin çoğu Teams arayüzü ve altyazı (paylaşılan alan pencerede küçük), defter %47 büyüdü,
 # ilk metin ~2,5 sn gecikti. Paylaşılan alana kırpılıp arayüz/altyazı atılırsa yeniden ölçülecek.
-METIN_APP = os.path.join(AYAR["uygulama"], "Suflor Metin.app", "Contents", "MacOS", "SuflorMetin"); KANIT_METIN_EN_COK = 1500; KANIT_METIN_SON = {}
-def kanit_metin(md, rel, n, saat):
-    if AYAR.get("kanit_metin") is not True or not os.access(METIN_APP, os.X_OK): return
-    try: o = json.loads(subprocess.run([METIN_APP, os.path.join(BASE, rel)], capture_output=True, text=True, timeout=90).stdout or "{}")
-    except (OSError, ValueError, subprocess.TimeoutExpired) as e: print(f"KANIT {n} METNİ: okunamadı ({e.__class__.__name__})"); return
-    s = [" ".join(str(x).split()) for x in (o.get("satirlar") or []) if str(x).strip()]
-    if not s: print(f"KANIT {n} METNİ: yazı yok" + (f" ({o['hata']})" if o.get("hata") else "")); return
-    m = " · ".join(s).replace("|", "¦")
-    if len(m) > KANIT_METIN_EN_COK: m = m[:KANIT_METIN_EN_COK].rsplit(" ", 1)[0] + " …"
-    k = os.path.basename(md); ayni = KANIT_METIN_SON.get(k) == m; KANIT_METIN_SON[k] = m
-    with LOCK: write([(md, f"| {saat} | **📷 KANIT {n} metni** | {_t('önceki kanıtla aynı yazı', 'same text as the previous evidence') if ayni else m} |  |\n")])
-    print(f"KANIT {n} METNİ: {len(s)} satır, {len(m)} karakter" + (" (öncekiyle aynı)" if ayni else ""))
+# v0.187.0 (5 Kasım): okuma, kısa özet (EKRAN olayı, Konuş bağlamı) ve bu satır aktarici/ekran.py'de (kanit_isle); okunan yalnız paylaşılan bölge.
 # Ekran paylaşımı kaydı (eski adı "yaparken kaydet"): karşı taraf ekran paylaşırken eklenti, paylaşılan ekran belirgin biçimde değişip
 # durulunca kanıtı kendiliğinden alır (kaynak "oto"; karşılaştırma ve en sık 10 sn kuralı eklentide). v0.28.0 (S33): düğme yok — eklentinin
 # nabzındaki paylaşım sinyaliyle kendiliğinden açılır/kapanır (ayar `ekran_oto: false` kapatır); elle kanıt (Option + Shift + K) ayrı.
@@ -1534,6 +1524,7 @@ AYAR_PANO = {
     "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None),  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
+    "web_arastirma": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel"))}
@@ -1684,6 +1675,7 @@ bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la a
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
 bolum("uclu-sahne")  # aktarici/uclu-sahne.py — Üçlü sohbetin sahne kipi: bölüm tek çağrıda, söz türü planı, araya kısa tepki (v0.126)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
+bolum("ekran")  # aktarici/ekran.py — Paylaşılan ekranın yazısı: kanıtta yerel okuma, EKRAN olayı, Konuş bağlamı (v0.187.0)
 bolum("posta")  # aktarici/posta.py — E-posta: Mac Mail'in yerel dizininden son iletiler Konuş bağlamına (v0.85.0)
 bolum("moderator")  # aktarici/moderator.py — Toplantı moderatörü: gündem, söz, özet ve karar (v0.83.0, S93)
 bolum("otonom")  # aktarici/otonom.py — Toplantıda otonom katılım: seslenince cevap, itiraz penceresi, söz sırası (S68)

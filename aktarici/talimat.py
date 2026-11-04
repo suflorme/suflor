@@ -325,6 +325,10 @@ GOREV_SAHIPSIZ_RX = re.compile(r"\b" + _GOREV_IS_KOK + _GOREV_FIIL + r"\s+(?:laz
                                r"\b(?:someone|somebody)\s+(?:needs to|should|has to)\b|\bwho(?:'s| is| will)\s+(?:going to\s+)?(?:do|handle|take|send|own|follow up)\b|"
                                r"\bwe need to\s+(?:send|prepare|update|fix|check|follow up|schedule|call|email)\b", re.I)
 GOREV_SAHIPLI_RX = re.compile(r"\b(?:benim|senin|onun|sizin)\b|\b\w+['’]n?[ıiuü]n\b", re.I)  # sözün kendisinde işin sahibi ("Ali'nin bakması lazım")
+# 5 Kasım (gerçek toplantıda yanlış kart, kullanıcı reddetti: bir telefon aramasında sıra bekleyen kişiyi anlatan cümlenin sonundaki "geri araması gerekiyor"): durum anlatımı iş değil.
+# Anlatım = "-ken" zarf-fiili ya da "-dığı" ortacı + "gerek"/"lazım" dışında bir "-yor" yüklemi ("bekliyor", "kaçıyor"); iş isteği yalnız "gerek/lazım" taşır, yanında anlatım yüklemi yoktur.
+GOREV_ANLATIM_RX = re.compile(r"\b\w+ken\b|\b\w+d[ıiuü][ğg][ıiuü]\w*\b", re.I); GOREV_ANLATIM_YOR_RX = re.compile(r"\b(?!gerek|lazım)\w+[ıiuü]yor\b", re.I)
+def gorev_anlatim_mi(m): return bool(GOREV_ANLATIM_RX.search(m) and GOREV_ANLATIM_YOR_RX.search(m))
 GOREV_USTLEN_RX = re.compile(r"\b(?:ben|biz)\b.{0,30}?\b\w+(?:[ae]r[ıi]m|[ıiuü]r[ıiuü]m|[ae]r[ıi]z|[ıiuü]r[ıiuü]z|[ae]y[ıi]m|[ae]l[ıi]m)\b|\bbende\b|\büstlen\w*|"
                              r"\b\w+\s+(?:yapsın|baksın|hazırlasın|göndersin|halletsin|ilgilensin|arasın|yazsın|sorsun|takip\s+etsin|üstlensin)\b|"
                              r"\bsen\s+(?:\w+\s+){0,2}?(?:yap|bak|hazırla|gönder|hallet|ilgilen|ara|yaz|sor)\w*\b|\bI(?:'ll| will| can)\s+(?:do|take|handle|send|check|follow)\b|"
@@ -438,6 +442,7 @@ def _gorev_sun(tur, h, ileti, metin, t, neden, zaman=None):  # ayrı iş parçac
 def gorev_satir(metin, kim, ben):  # ingest (LOCK altında: burada LOCK alınmaz), her yeni satır (iki kanal): sahipsiz iş adayı → GOREV_SAHIP_SN sonra bakılır
     if AYAR.get("talimat") is False or not metin or "Claude:" in metin or not GOREV_SAHIPSIZ_RX.search(metin): return
     if not toplanti_var() or not ("gorev_cikar_acik" in globals() and gorev_cikar_acik()): return
+    if gorev_anlatim_mi(metin): print(f"GÖREV: durum anlatımı iş sayılmadı — \"{metin[:60]}\""); return
     if GOREV_SAHIPLI_RX.search(metin) or GOREV_USTLEN_RX.search(metin): print(f"GÖREV: işin sahibi sözde var — öneri yok — \"{metin[:60]}\""); return
     _gorev_toplanti()
     if _GOREV["bekleyen"] or _GOREV["sahipsiz_n"] >= GOREV_SAHIPSIZ_EN_COK or time.time() - _GOREV["sahipsiz_t"] < GOREV_SAHIPSIZ_ARA_SN:

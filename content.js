@@ -500,7 +500,27 @@ function paylasimOlcek() {
     if (alan < innerWidth * innerHeight * 0.25 || (en && alan <= en.alan)) continue;
     en = { alan, olcek: Math.round(Math.min(r.width / gw, r.height / gh) * devicePixelRatio * 100) / 100, vw: gw, vh: gh };
   }
-  return en && { olcek: en.olcek, vw: en.vw, vh: en.vh };
+  const b = paylasimBolge();
+  return en && { olcek: en.olcek, vw: en.vw, vh: en.vh, ...(b ? { bolge: b } : {}) };
+}
+// Paylaşılan içeriğin sekmedeki yeri (5 Kasım, v0.187.0): en büyük video/tuvalin (görünen alanın ≥ %15'i) içinde gerçek görüntünün
+// kapladığı dikdörtgen (sığdırma: kenar boşlukları atılır), görünen alana oranla {x,y,w,h}. Kendiliğinden kanıtın karşılaştırması ve kanıttaki
+// yazı yalnız bu bölgeye bakar: 4 Kasım toplantısında sekmenin geri kalanı (canlı altyazı, kameralar) her an değişiyordu. Bulunamazsa null.
+function paylasimBolge() {
+  let en = null; const W = innerWidth, H = innerHeight;
+  for (const v of document.querySelectorAll("video, canvas")) {
+    const gw = v.tagName === "CANVAS" ? v.width : v.videoWidth, gh = v.tagName === "CANVAS" ? v.height : v.videoHeight;
+    if (!gw || !gh) continue;
+    const r = v.getBoundingClientRect(); if (!r.width || !r.height) continue;
+    const s = Math.min(r.width / gw, r.height / gh), cw = gw * s, ch = gh * s;
+    const x0 = Math.max(0, r.left + (r.width - cw) / 2), y0 = Math.max(0, r.top + (r.height - ch) / 2);
+    const x1 = Math.min(W, r.left + (r.width + cw) / 2), y1 = Math.min(H, r.top + (r.height + ch) / 2);
+    const alan = Math.max(0, x1 - x0) * Math.max(0, y1 - y0);
+    if (alan < W * H * 0.15 || (en && alan <= en.alan)) continue;
+    en = { alan, x: x0 / W, y: y0 / H, w: (x1 - x0) / W, h: (y1 - y0) / H };
+  }
+  const k = n => Math.round(n * 10000) / 10000;
+  return en && { x: k(en.x), y: k(en.y), w: k(en.w), h: k(en.h) };
 }
 chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     if (msg.type === "nabiz") { ping("arka-plan"); reply({ ok: true, vis: document.visibilityState }); return; }
@@ -768,7 +788,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       qs.forEach(q => { const x = e("div", "q", " " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L(q.tur === "girdi" ? "İletildi: " : "Soruldu: ") + q.text)); x.prepend(ikon(d, "saat")); list.append(x); });
       if (!cards.length && !qs.length && !dil && !warn) list.append(e("div", "bos", L("Şimdilik kart yok")));
     }
-    // Ekran paylaşımı kaydı (eski "yaparken kaydet"; aktarıcı paylaşım sürerken açar): toplantı sekmesi 3 sn'de bir arka plana "kare" der;
+    // Ekran paylaşımı kaydı (eski "yaparken kaydet"; aktarıcı paylaşım sürerken açar): toplantı sekmesi 1,5 sn'de bir arka plana "kare" der;
     // karşılaştırma ve kendiliğinden kanıt background.js'te.
     // Şerit ve uyarı alanı maskelenir (kart gelince "ekran değişti" sayılmasın). Sekme görünür değilse istenmez.
     let otoZaman = null;
@@ -777,8 +797,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         if (document.visibilityState !== "visible" || !(inMeeting() || inCall())) return;
         const maske = [...document.querySelectorAll("#suflor-serit, #suflor-toast")].map(e => e.getBoundingClientRect()).filter(r => r.width && r.height)
           .map(r => ({ x: r.left / innerWidth, y: r.top / innerHeight, w: r.width / innerWidth, h: r.height / innerHeight }));
-        chrome.runtime.sendMessage({ type: "otoKare", maske }).catch(() => {});
-      }, 3000);
+        let bolge = null; try { bolge = paylasimBolge(); } catch (e) {}
+        chrome.runtime.sendMessage({ type: "otoKare", maske, bolge }).catch(() => {});
+      }, 1500);  // 5 Kasım: 3 sn → 1,5 sn (kararlılık ~1,5 sn; kısa açılır pencere de görülsün)
       else if (!acik && otoZaman) { clearInterval(otoZaman); otoZaman = null; }
     }
     // sesli çeviri okunurken toplantı sesi kısılır (v0.29.3): sayfadaki ses/video öğeleri %30'a, okuma bitince (ya da süre dolunca) eski düzeye.

@@ -62,7 +62,7 @@ while True:
         M = "mcp__claude_ai_Deneme_Metrik__"
         if q == "metrik-oku": yaz("Metrik oku: " + mcp(M + "get_store_sales", "b-1") + "/" + mcp(M + "list_available_metrics", "b-2")); bitti()
         elif q == "metrik-yaz": yaz("Metrik yaz: " + mcp(M + "update_campaign_settings", "b-3") + "/" + mcp(M + "export_report", "b-4") + "/" + mcp(M + "get_budget_set", "b-5")); bitti()
-        elif q == "metrik-baska": yaz("Başka bağlayıcı: " + mcp("mcp__claude_ai_Baska__get_messages", "b-6")); bitti()
+        elif q == "metrik-baska": yaz("Başka bağlayıcı: " + mcp("mcp__claude_ai_Baska__get_threads", "b-6")); bitti()
         elif q == "metrik-tavan": yaz("Tavan: " + "/".join(mcp(M + "query_metrics", "t-" + str(i)) for i in range(7))); bitti()
         elif q.startswith("metrik-kart"):  # toplantıda konu geçti: sorgu → bilgi kartı (kaynak satırı --neden'de)
             c = mcp(M + "get_paid_performance", "b-7")
@@ -105,7 +105,7 @@ while True:
         c4 = izin("Bash", {"command": "python3 -B " + D + "/../toplanti-claude.py dokum", "description": "döküm kaydı"}, "o-4"); yaz("Okuma: " + "/".join(c["behavior"] for c in (c1, c2, c3, c4))); bitti()
     elif "yazma-izni" in q: c = izin("Bash", {"command": "python3 -B " + D + "/../toplanti-claude.py eylem ekle kayit x", "description": "yaz"}, "y-1"); yaz("Yazma: " + c["behavior"]); bitti()
     elif "hatirla" in q:
-        c1 = izin("WebFetch", {"url": "https://example.com/a"}, "h-1"); c2 = izin("WebFetch", {"url": "https://example.com/a"}, "h-2"); yaz("Hatırla: " + c1["behavior"] + "/" + c2["behavior"]); bitti()
+        c1 = izin("mcp__claude_ai_Baska__get_messages", {"q": "a"}, "h-1"); c2 = izin("mcp__claude_ai_Baska__get_messages", {"q": "farkli girdi"}, "h-2"); yaz("Hatırla: " + c1["behavior"] + "/" + c2["behavior"]); bitti()
     elif "soru-araci" in q: c = izin("AskUserQuestion", {"questions": []}, "s-1"); yaz("AskUserQuestion: " + c["behavior"] + " · " + c.get("message", "")[:40]); bitti()
     elif "uzun" in q:
         pr({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "sleep 99", "description": "Proje belgelerini taramak"}}]}})
@@ -230,9 +230,9 @@ try:
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "yazma-izni"}); k = izin_bekle_(); ok("toplanti-claude.py eylem ekle (yazma) yine sorulur", len(k) == 1)
     if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"})
     claude_der("Yazma: deny")
-    uc("/toplanti-oturum", {"islem": "yaz", "metin": "hatirla"}); k = izin_bekle_(); ok("dışarı erişim (WebFetch) ilk kez sorulur", len(k) == 1)
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "hatirla"}); k = izin_bekle_(); ok("ayardaki kaynağın dışındaki bağlayıcı aracı ilk kez sorulur", len(k) == 1)
     if k: uc("/eylem-karar", {"id": k[0]["id"], "durum": "onaylandi"})
-    ok("verilen izin oturumda hatırlanır: ikincisi yeniden sorulmaz", claude_der("Hatırla: allow/allow") and not izinler())
+    ok("verilen izin araç adıyla oturumda hatırlanır: farklı girdili ikinci çağrı yeniden sorulmaz", claude_der("Hatırla: allow/allow") and not izinler())
     sid0 = to().get("n"); kod, y = uc("/baslat", {"konu": "Deneme oturum", "rol": "yurutucu", "dil": "tr"})
     ok(f"ikinci Başlat canlı oturumu kapatmaz: katıldı ({y})", y.get("ok") and y.get("katildi") is True and to().get("durum") in ("bekliyor", "izliyor") and to().get("n") == sid0)
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "soru-araci"})
@@ -254,12 +254,12 @@ try:
     ok("konu geçince sorgu → bilgi kartı (not, kaynak satırı --neden'de)", claude_der("Metrik kart: allow · kart", 20))
     kk = [c for c in uc("/cards")[1].get("cards") or [] if "dönüşüm %8" in c.get("text", "")]
     ok(f"kart türü not, kaynak görünür ({[(c.get('kind'), c.get('why')) for c in kk]})", len(kk) == 1 and kk[0].get("kind") == "not" and "Kaynak: Deneme Metrik" in (kk[0].get("why") or ""))
-    uc("/toplanti-oturum", {"islem": "yaz", "metin": "metrik-tavan"}); sorulan = 0  # önceki 3 sorgu + 5 = 8; sonrakiler sorulur
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "metrik-tavan"}); sorulan = 0  # 5 Kasım: tavan 200 (kaçak döngü sigortası); 7 sorgunun hepsi sorulmadan geçer
     for _ in range(3):
         k = izin_bekle_(5)
         if not k: break
         sorulan += 1; uc("/eylem-karar", {"id": k[0]["id"], "durum": "reddedildi"}); time.sleep(0.3)
-    ok(f"oturum tavanı (8) dolunca sorgu kullanıcıya sorulur ({sorulan} soru)", sorulan == 2 and claude_der("Tavan: allow/allow/allow/allow/allow/deny/deny", 10))
+    ok(f"bilgi kaynağı okuması tavana takılmadan sorulmadan geçer ({sorulan} soru)", sorulan == 0 and claude_der("Tavan: allow/allow/allow/allow/allow/allow/allow", 10))
     # izin-kanca (PreToolUse; Terminal kipinde de çalışır): okuma dışı reddedilir, okuma karar almaz; ayar yokken eski davranış
     def kanca(ad, ayar):
         r = subprocess.run(["/usr/bin/python3", "-I", "-B", os.path.join(T, "toplanti-claude.py"), "--dir", canli, "--relay", "http://127.0.0.1:1", "izin-kanca"],
@@ -279,7 +279,7 @@ try:
     ok("kanca: ayar yokken eski davranış (karar yok)", kanca(M + "update_campaign_settings", bos) is None)
     ns = {"re": __import__("re"), "threading": __import__("threading"), "AYAR": {}, "_t": lambda a_, b_: a_}
     exec(compile(open(os.path.join(KOD, "aktarici", "toplanti-oturum.py"), encoding="utf-8").read(), "toplanti-oturum.py", "exec"), ns)
-    ok("aktarıcı: ayar yokken kaynak yok, istem değişmez", ns["bilgi_kaynagi_arac"](M + "get_store_sales") is None and ns["topo_istem"]() == ns["TOPO_ISTEM"])
+    ok("aktarıcı: ayar yokken kaynak yok, istem değişmez", ns["bilgi_kaynagi_arac"](M + "get_store_sales") is None and ns["topo_istem"]().startswith(ns["TOPO_ISTEM"]) and "Deneme Metrik" not in ns["topo_istem"]())
     ok("sunucu adı biçimi: 'claude.ai X Y' → claude_ai_X_Y", ns["mcp_sunucu_adi"]("claude.ai Deneme Metrik") == "claude_ai_Deneme_Metrik" and ns["mcp_sunucu_adi"]("claude_ai_Deneme_Metrik") == "claude_ai_Deneme_Metrik")
 
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "uzun iş"}); ok("uzun iş sürüyor", claude_der("Uzun iş başladı") and to().get("durum") == "calisiyor")
