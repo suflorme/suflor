@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 327712,
-   "sha": "4d5acbc1d145b3cc"
+   "uzunluk": 344287,
+   "sha": "97d151ba8e716f7b"
   },
   "/mini": {
-   "uzunluk": 327712,
-   "sha": "4d5acbc1d145b3cc"
+   "uzunluk": 344287,
+   "sha": "97d151ba8e716f7b"
   },
   "/status": {
    "_ping_son": "float",
@@ -279,6 +279,13 @@
      "beyin_proje_karti": "str",
      "beyin_varsayilan": "str",
      "bildirim": "bool",
+     "calisma": {
+      "bas": "int",
+      "bit": "int",
+      "gunler": [
+       "int"
+      ]
+     },
      "ceviri": "bool",
      "ceviri_kis": "bool",
      "dil": "str",
@@ -308,6 +315,7 @@
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
      "profil": "str",
+     "saatler": "NoneType",
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
      "ses_motoru": "str",

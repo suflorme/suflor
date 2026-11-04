@@ -187,6 +187,24 @@ dialog#gbd::backdrop{background:rgba(12,18,15,.4)}#gbf{display:flex;flex-directi
 /* Hafta görünümü: ana alanda tam genişlik Pazartesi–Pazar ızgarası (saat şeridi, saatine göre bloklar, çakışan yan yana, şimdi çizgisi); blok rengi hazırlık durumu */
 html.hafta-ac main>.sc>section:not(#hfs){display:none!important}html.hafta-ac aside,html.hafta-ac #rz{display:none!important}html.hafta-ac .grid{grid-template-columns:minmax(0,1fr)!important}
 @media (min-width:721px){html.mac.hafta-ac:not(.kc-kapali) .grid{grid-template-columns:220px minmax(0,1fr)!important}}
+/* Saatler görünümü: Bu hafta gibi tek bölüm; şehir satırları, mesai rengi, alttaki 48 saatlik kaydırıcı */
+html.saatler-ac main>.sc>section:not(#sts){display:none!important}html.saatler-ac aside,html.saatler-ac #rz{display:none!important}html.saatler-ac .grid{grid-template-columns:minmax(0,1fr)!important}
+@media (min-width:721px){html.mac.saatler-ac:not(.kc-kapali) .grid{grid-template-columns:220px minmax(0,1fr)!important}}
+html.saatler-ac main>.sc>section#sts{max-width:820px;width:100%;margin:0 auto}
+.sta{position:relative;margin:2px 0 12px}.sta input{width:100%;font:inherit;font-size:var(--yz-3);color:var(--tx);background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose-s);padding:7px 10px}
+#stoner{position:absolute;z-index:5;left:0;right:0;top:100%;margin-top:4px;background:var(--s1);border-radius:var(--kose-l);box-shadow:0 0 0 .5px var(--bd2),0 8px 24px rgba(0,0,0,.18);padding:4px;max-height:280px;overflow:auto}
+#stoner button{display:flex;width:100%;justify-content:space-between;gap:10px;border:0;background:transparent;text-align:left;padding:7px 10px;border-radius:var(--kose-s);font-size:var(--yz-3);color:var(--tx)}#stoner button:hover,#stoner button.on{background:var(--hov)}#stoner small{color:var(--t3);font-size:var(--yz-1)}
+#stl{background:var(--s1);border-radius:var(--kose-l);padding:0 14px;box-shadow:0 0 0 .5px var(--bd)}
+.str{display:grid;grid-template-columns:minmax(0,1fr) auto auto 24px 28px;grid-template-areas:"n d t m x";align-items:center;gap:14px;padding:12px 0;border-bottom:.5px solid var(--bd)}.str:last-child{border-bottom:0}
+.str.ben{background:var(--ac-bg);margin:0 -14px;padding-left:14px;padding-right:14px}
+.stn{grid-area:n;min-width:0}.std{grid-area:d}.stt{grid-area:t}.stm{grid-area:m}.stx,.stx0{grid-area:x}
+.stn b{font-weight:500;font-size:var(--yz-4)}.stn span{display:block;font-size:var(--yz-2);color:var(--t2)}.stsen{font-style:normal;font-weight:400;font-size:var(--yz-1);color:var(--ac);border:1px solid currentColor;border-radius:var(--kose-tam);padding:0 6px;margin-left:8px;vertical-align:1px}
+.std{font-size:var(--yz-2);color:var(--t2);text-align:right;white-space:nowrap}.stt{font:400 28px/1 var(--f-baslik);font-variant-numeric:tabular-nums;min-width:4.4ch;text-align:right}
+.stm svg{width:20px;height:20px}.stm.iyi{color:var(--ok)}.stm.orta{color:var(--wa)}.stm.kotu{color:var(--er)}
+.stk{margin-top:16px;background:var(--s1);border-radius:var(--kose-l);padding:14px 16px 12px;box-shadow:0 0 0 .5px var(--bd)}.stkr{position:relative;padding-top:12px}#stsl{width:100%;margin:0;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:linear-gradient(var(--ac),var(--ac)) 0/var(--stp,0%) 100% no-repeat,var(--bd2);cursor:pointer}#stsl::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--ac);border:2px solid var(--s1);box-shadow:0 0 0 .5px var(--bd2)}
+#stmk{position:absolute;left:8px;right:8px;top:0;height:12px}.stmkb{position:absolute;top:0;width:12px;height:12px;margin-left:-6px;padding:0;border-radius:50%;border:2px solid var(--ac);background:var(--s1);cursor:pointer}
+.stkt{display:flex;justify-content:space-between;font-size:var(--yz-1);color:var(--t3);margin-top:2px}.stkb{display:flex;align-items:center;margin-top:8px;font-size:var(--yz-2);color:var(--t2)}
+@media (max-width:720px){.str{grid-template-columns:minmax(0,1fr) auto 22px 26px;grid-template-areas:"n t m x" "n d m x";gap:2px 10px}.stt{font-size:24px}.stkt span:nth-child(2n){display:none}}
 html.hafta-ac main>.sc{display:flex;flex-direction:column;overflow:hidden;padding-bottom:10px}html.hafta-ac main>.sc>section#hfs{max-width:none;margin:0;flex:1;min-height:0;display:flex;flex-direction:column}
 .hft{display:flex;align-items:center;gap:6px;padding:0 0 10px;flex-wrap:wrap}.hft .ib{width:28px;padding:0;justify-content:center;font-size:18px;line-height:1}.hft h2{font:400 18px/1.2 var(--f-baslik);margin:0 0 0 6px;white-space:nowrap}
 .hft .sp1{flex:1}.hfl{display:flex;gap:10px;font-size:var(--yz-1);color:var(--t2);white-space:nowrap}.hfl i,#hfd .hz i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px;border-left:3px solid}
@@ -353,7 +371,10 @@ html.bugun #tos .sh{padding-inline:0}html.bugun #tos .tob{display:-webkit-box;-w
 <nav id=kenar aria-label="Gezinme"></nav>
 <main><div class=sc>
 <section id=hfs hidden aria-label="Haftalık takvim"></section>
-<section id=tks hidden><div id=tkalt class=bgb><div class=bgt><div id=tktr></div><h1>Bugün</h1></div><span class=sp1></span><div class=seg role=group aria-label="Görünüm"><button id=tkbg type=button class=on aria-pressed=true>Bugün</button><button id=tkh7 type=button title="Haftalık takvim" aria-pressed=false>Bu hafta</button></div><button id=tke class="gh ib" title="Takvimde olmayan bir toplantı için" aria-label="Elle başlat"></button><button id=tky class="gh ib" title="Takvimi yenile" aria-label="Takvimi yenile"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button></div><div id=tson hidden></div><div id=tk></div><div id=tkh class=hint></div>
+<section id=sts hidden aria-label="Saatler"><div class=bgb><div class=bgt><div id=sttr></div><h1>Saatler</h1></div><span class=sp1></span><div class=seg role=group aria-label="Görünüm"><button id=stbg type=button>Bugün</button><button id=sth7 type=button title="Haftalık takvim">Bu hafta</button><button id=stst type=button class=on aria-pressed=true>Saatler</button></div></div>
+<div class=sta><input id=stq type=search placeholder="Şehir ekle (ör. Tokyo, Londra)" aria-label="Şehir ekle" autocomplete=off><div id=stoner hidden></div></div><div id=stl></div>
+<div class=stk><div class=stkr><div id=stmk></div><input id=stsl type=range min=0 max=192 step=1 value=0 aria-label="Saat kaydırıcı"></div><div class=stkt><span>Bugün 00:00</span><span>12:00</span><span>Yarın 00:00</span><span>12:00</span><span>24:00</span></div><div class=stkb><span id=stkz></span><span class=sp1></span><button id=stsim type=button class=gh>Şimdi</button></div></div></section>
+<section id=tks hidden><div id=tkalt class=bgb><div class=bgt><div id=tktr></div><h1>Bugün</h1></div><span class=sp1></span><div class=seg role=group aria-label="Görünüm"><button id=tkbg type=button class=on aria-pressed=true>Bugün</button><button id=tkh7 type=button title="Haftalık takvim" aria-pressed=false>Bu hafta</button><button id=tkst type=button title="Saat dilimi çevirici" aria-pressed=false>Saatler</button></div><button id=tke class="gh ib" title="Takvimde olmayan bir toplantı için" aria-label="Elle başlat"></button><button id=tky class="gh ib" title="Takvimi yenile" aria-label="Takvimi yenile"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button></div><div id=tson hidden></div><div id=tk></div><div id=tkh class=hint></div>
 <div id=tkf hidden><div class=tkfb>Toplantı başlat</div><input id=tkk placeholder="Kişi — konu (ör. Ayşe — bütçe)"><input id=tkl type=url placeholder="Toplantı bağlantısı (isteğe bağlı)"><div class="ayt sg" id=tkp data-bos=1 title="Bağlantı yoksa açılacak uygulama"><button type=button data-v=teams>Teams</button><button type=button data-v=meet>Meet</button><button type=button data-v=zoom>Zoom</button></div><textarea id=tkc rows=2 placeholder="Bağlam (isteğe bağlı): bağlantı ya da dosya yolu, her satıra bir — dosyayı panoya da bırakabilirsin"></textarea><textarea id=tkg rows=3 placeholder="Gündem (isteğe bağlı): her satıra bir madde — {asistan} bu maddelerle başlar"></textarea><div class=sgs><div class="ayt sg" id=tkr><button type=button data-v=yurutucu title="Toplantıyı ben yönetiyorum">Yürütücü</button><button type=button data-v=katilimci>Katılımcı</button><button type=button data-v=dinleyici>Dinleyici</button></div><div class="ayt sg" id=tkd><button type=button data-v=tr>Türkçe</button><button type=button data-v=en>İngilizce</button><button type=button data-v=karisik>Karışık</button></div></div>
 <div class=bt><span id=tkm></span><span class=sp1></span><a href="#" id=tky2 class=hint hidden>Suflor.me olmadan katıl</a><button id=tki class=gh>Vazgeç</button><button id=tkb class=pri>Başlat</button></div></div></section>
 <section id=brs hidden><div class=sh><span class=brb>Brifing <span id=brn class=meta></span></span><button id=brk class=gh aria-expanded=true>Gizle</button></div><div id=br></div></section>
@@ -771,7 +792,7 @@ const hfGun=s=>{const [y,m,d]=String(s).split('-').map(Number);return new Date(y
 const hfIso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 const hfBugunD=()=>{const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate())}, hfPzt=d=>hfGunEk(d,-((d.getDay()+6)%7))
 const hfHaftaOf=d=>Math.round((hfPzt(d)-hfPzt(hfBugunD()))/6048e5), hfAyOfs=d=>{const n=new Date();return(d.getFullYear()-n.getFullYear())*12+d.getMonth()-n.getMonth()}  // odak günün hafta / ay ofseti (bugüne göre)
-function hfAc(ac){hfAcik=!!ac;document.documentElement.classList.toggle('hafta-ac',hfAcik);document.getElementById('hfs').hidden=!hfAcik;document.getElementById('tkh7').classList.toggle('on',hfAcik);hfDetayKapat()
+function hfAc(ac){if(ac&&stAcik)stAc(false);hfAcik=!!ac;document.documentElement.classList.toggle('hafta-ac',hfAcik);document.getElementById('hfs').hidden=!hfAcik;document.getElementById('tkh7').classList.toggle('on',hfAcik);hfDetayKapat()
   clearInterval(hfZam);hfZam=null
   if(hfAcik){hfOdak=hfBugunD();hfYukle(true);hfZam=setInterval(()=>{if(hfAkt().bugun)hfCiz(false)},60000)}
   else if(kcSec==='hf'){kcSec='tks';if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))}}
@@ -915,7 +936,64 @@ document.addEventListener('click',async ev=>{const d=document.getElementById('hf
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&document.getElementById('hfd')){hfDetayKapat();ev.stopPropagation()}},true)
 document.getElementById('hfs').addEventListener('scroll',()=>{if(Date.now()-hfCizT>500)hfDetayKapat()},true)  // yeniden çizimin kaydırma geri yüklemesi kutuyu kapatmasın
 document.getElementById('hfs').addEventListener('dblclick',ev=>{const c=ev.target.closest('.hfay>div');if(!c||ev.target.closest('button')||!c.dataset.gun)return;hfYeni(c.dataset.gun,540,ev)})  // Ay: boş hücreye çift tıklama → 09:00
-document.getElementById('tkh7').onclick=()=>hfAc(!hfAcik);document.getElementById('tkbg').onclick=()=>{if(hfAcik)hfAc(false)}
+document.getElementById('tkh7').onclick=()=>hfAc(!hfAcik);document.getElementById('tkbg').onclick=()=>{if(hfAcik)hfAc(false);if(stAcik)stAc(false)}
+// Saatler (4 Kasım, kullanıcı): saat dilimi çevirici — şehir listesi, 48 saatlik kaydırıcı, mesai rengi. Hepsi tarayıcının Intl'iyle (ağ yok). Liste ayar `saatler`.
+// Bu hafta ile karşılıklı kapanır; Chrome panosunda Bugün başlığındaki seçiciden, Mac penceresinde kenar çubuğundan açılır.
+Object.assign(ICO,{dunya:'<circle cx=12 cy=12 r=8.5 /><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>',stgun:'<circle cx=12 cy=12 r=3.5 /><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M18 6l-1.4 1.4M7.4 16.6 6 18"/>',stufuk:'<path d="M7 16a5 5 0 0 1 10 0M3.5 16h17M12 6.5v2M5.8 9.3l1.4 1.4M18.2 9.3l-1.4 1.4M6 19.5h12"/>',stay:'<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>'})
+const STC=[['İstanbul','Istanbul','Europe/Istanbul'],['Londra','London','Europe/London'],['New York','New York','America/New_York'],['Doğu','Eastern','America/New_York',1],['Pasifik','Pacific','America/Los_Angeles',1],['Los Angeles','Los Angeles','America/Los_Angeles'],['San Francisco','San Francisco','America/Los_Angeles'],['Chicago','Chicago','America/Chicago'],['Denver','Denver','America/Denver'],['Toronto','Toronto','America/Toronto'],['Meksiko','Mexico City','America/Mexico_City'],['Sao Paulo','Sao Paulo','America/Sao_Paulo'],['Buenos Aires','Buenos Aires','America/Argentina/Buenos_Aires'],['Honolulu','Honolulu','Pacific/Honolulu'],['Anchorage','Anchorage','America/Anchorage'],
+ ['Köln','Cologne','Europe/Berlin',1],['Berlin','Berlin','Europe/Berlin'],['Münih','Munich','Europe/Berlin'],['Frankfurt','Frankfurt','Europe/Berlin'],['Paris','Paris','Europe/Paris'],['Madrid','Madrid','Europe/Madrid'],['Roma','Rome','Europe/Rome'],['Amsterdam','Amsterdam','Europe/Amsterdam'],['Brüksel','Brussels','Europe/Brussels'],['Zürih','Zurich','Europe/Zurich'],['Viyana','Vienna','Europe/Vienna'],['Stokholm','Stockholm','Europe/Stockholm'],['Varşova','Warsaw','Europe/Warsaw'],['Atina','Athens','Europe/Athens'],['Kiev','Kyiv','Europe/Kyiv'],['Moskova','Moscow','Europe/Moscow'],['Lizbon','Lisbon','Europe/Lisbon'],['Dublin','Dublin','Europe/Dublin'],['Reykjavik','Reykjavik','Atlantic/Reykjavik'],
+ ['Dubai','Dubai','Asia/Dubai'],['Riyad','Riyadh','Asia/Riyadh'],['Tahran','Tehran','Asia/Tehran'],['Karaçi','Karachi','Asia/Karachi'],['Delhi','Delhi','Asia/Kolkata'],['Mumbai','Mumbai','Asia/Kolkata'],['Dakka','Dhaka','Asia/Dhaka'],['Bangkok','Bangkok','Asia/Bangkok'],['Singapur','Singapore','Asia/Singapore'],['Manila','Manila','Asia/Manila'],['Hong Kong','Hong Kong','Asia/Hong_Kong'],['Şanghay','Shanghai','Asia/Shanghai'],['Pekin','Beijing','Asia/Shanghai'],['Seul','Seoul','Asia/Seoul'],['Tokyo','Tokyo','Asia/Tokyo'],
+ ['Sidney','Sydney','Australia/Sydney'],['Melbourne','Melbourne','Australia/Melbourne'],['Auckland','Auckland','Pacific/Auckland'],['Kahire','Cairo','Africa/Cairo'],['Lagos','Lagos','Africa/Lagos'],['Nairobi','Nairobi','Africa/Nairobi'],['Johannesburg','Johannesburg','Africa/Johannesburg']]
+const STVAR=[['Pasifik','America/Los_Angeles'],['Doğu','America/New_York'],['Köln','Europe/Berlin'],['İstanbul','Europe/Istanbul'],['Manila','Asia/Manila']]
+let stAcik=false,stListe=null,stT=null,stZam=null,stOner=[],stFC={}
+const stYerel=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){return 'UTC'}}
+const stKatla=s=>String(s).toLocaleLowerCase('tr').replace(/ı/g,'i').normalize('NFD').replace(/[̀-ͯ]/g,'')  // aramada Türkçe harfler ve büyük/küçük ayrımı yok
+const stAd=it=>{const e=STC.find(x=>x[0]===it.ad);return DIL==='en'&&e?e[1]:it.ad}
+function stParca(tz,t){let f=stFC[tz];if(!f)f=stFC[tz]=new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',weekday:'short',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'})
+  const o={};f.formatToParts(t).forEach(p=>o[p.type]=p.value);const sa=+o.hour%24
+  return{ofs:(Date.UTC(+o.year,+o.month-1,+o.day,sa,+o.minute,+o.second)-Math.floor(t/1000)*1000)/6e4,wd:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].indexOf(o.weekday),dk:sa*60+(+o.minute)}}
+const stUtc=m=>'UTC '+(m<0?'-':'+')+Math.floor(Math.abs(m)/60)+(Math.abs(m)%60?':'+String(Math.abs(m)%60).padStart(2,'0'):'')
+function stFark(d){if(!d)return L('senle aynı saat');const a=Math.abs(d),sa=Math.floor(a/60),dk=a%60;return(sa?sa+' '+L('sa'):'')+(dk?(sa?' ':'')+dk+' '+L('dk'):'')+' '+(d>0?L('ileride'):L('geride'))}
+// mesai içi = iyi; mesai dışında 07:00–22:00 arası (mesaiye yakın, akşam, hafta sonu gündüzü) = orta; gece = kötü
+const stRuh=(p,c)=>c.gunler.includes(p.wd)&&p.dk>=c.bas&&p.dk<c.bit?'iyi':p.dk>=420&&p.dk<1320?'orta':'kotu'
+function stSatirlar(){const a=last&&last.ayarlar&&last.ayarlar.deger&&last.ayarlar.deger.saatler,l=(stListe||(Array.isArray(a)?a:null)||STVAR.map(([ad,tz])=>({ad,tz}))).map((x,i)=>({ad:x.ad,tz:x.tz,i})),y=stYerel()
+  if(!l.some(x=>x.tz===y)){const e=STC.find(x=>x[2]===y&&!x[3]);l.unshift({ad:e?e[0]:y.split('/').pop().replace(/_/g,' '),tz:y,i:-1})}  // kullanıcının kendi dilimi listede yoksa kendiliğinden eklenir
+  return l}
+const stBaz=()=>{const d=new Date();d.setHours(0,0,0,0);return+d}, ST_ADIM=9e5, ST_N=192  // kaydırıcı: bugün 00:00'dan 48 saat, 15 dk adım
+function stCiz(){if(!stAcik)return;const loc=L('tr-TR'),t=stT==null?Date.now():stT,y=stYerel(),c=(last&&last.ayarlar&&last.ayarlar.calisma)||{gunler:[0,1,2,3,4],bas:540,bit:1080},ruhAd={iyi:L('Mesai saati'),orta:L('Mesai dışı, makul saat'),kotu:L('Gece')}
+  let py;try{py=stParca(y,t)}catch(e){return}
+  const h=stSatirlar().map(it=>{let p;try{p=stParca(it.tz,t)}catch(e){return''}const ben=it.tz===y,ruh=stRuh(p,c),dt=new Date(t)
+    const tarih=dt.toLocaleDateString(loc,{timeZone:it.tz,weekday:'short',day:'numeric',month:'short'}),saat=dt.toLocaleTimeString(loc,{timeZone:it.tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23'})
+    return`<div class="str${ben?' ben':''}" data-tz="${esc(it.tz)}"><div class=stn><b>${esc(stAd(it))}${ben?`<i class=stsen>${esc(L('sen'))}</i>`:''}</b><span>${stUtc(p.ofs)} · ${esc(stFark(p.ofs-py.ofs))}</span></div><span class=std>${esc(tarih)}</span><span class=stt>${saat}</span><span class="stm ${ruh}" title="${esc(ruhAd[ruh])}" data-ruh=${ruh}>${ic(ruh==='iyi'?'stgun':ruh==='orta'?'stufuk':'stay')}</span>${ben||it.i<0?'<span class=stx0></span>':`<button type=button class="gh ib stx" data-stx="${it.i}" title="${esc(L('Kaldır'))}" aria-label="${esc(L('Kaldır'))}">${ic('x')}</button>`}</div>`}).join('')
+  setH(document.getElementById('stl'),h)
+  document.getElementById('sttr').textContent=new Date().toLocaleDateString(loc,{weekday:'long'})+', '+new Date().toLocaleDateString(loc,{day:'numeric',month:'long'})  // başlık hep bugün; seçilen an alttaki satırda
+  const B=stBaz(),sl=document.getElementById('stsl'),v=Math.max(0,Math.min(ST_N,Math.round((t-B)/ST_ADIM)));if(String(v)!==sl.value)sl.value=v;sl.style.setProperty('--stp',v/ST_N*100+'%')  // koyu temada tarayıcının beyaz izi yerine kendi izimiz
+  document.getElementById('stkz').textContent=stT==null?L('Şimdi'):new Date(t).toLocaleString(loc,{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'})
+  document.getElementById('stsim').hidden=stT==null  // şimdideyken yalnız "Şimdi" yazısı; düğme kaydırınca çıkar
+  const an=Date.now(),bs=o=>o.baslangic?+new Date(o.baslangic):o.tarih&&o.saat?+new Date(o.tarih+'T'+o.saat):0,sr=(tkOlaylar||[]).filter(o=>o&&bs(o)>an&&!o.reddettin&&!o.tum_gun).sort((a,b)=>bs(a)-bs(b))[0],mk=document.getElementById('stmk')  // takvimde sıradaki toplantı: kaydırıcıda işaret, tıklayınca oraya gider
+  const ms=sr?Math.round(bs(sr)/ST_ADIM)*ST_ADIM:0
+  setH(mk,sr&&ms>=B&&ms<=B+ST_N*ST_ADIM?`<button type=button class=stmkb data-stmk="${ms}" style="left:${(ms-B)/(ST_N*ST_ADIM)*100}%" title="${esc((sr.baslik||L('Toplantı'))+' · '+new Date(bs(sr)).toLocaleTimeString(loc,{hour:'2-digit',minute:'2-digit',hourCycle:'h23'}))}" aria-label="${esc(sr.baslik||L('Toplantı'))}"></button>`:'')}
+function stAc(ac){stAcik=!!ac;if(stAcik&&hfAcik)hfAc(false);document.documentElement.classList.toggle('saatler-ac',stAcik);document.getElementById('sts').hidden=!stAcik;document.getElementById('tkst').classList.toggle('on',stAcik);clearInterval(stZam);stZam=null
+  if(stAcik){stT=null;kcSec='st';stCiz();stZam=setInterval(()=>{if(stT==null)stCiz()},60000);if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))}  // kaydırma şimdi değilken dakikalık yenileme yok
+  else if(kcSec==='st'){kcSec='tks';if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))}}
+async function stYaz(){let r={};try{r=await j('/ayar',{method:'POST',body:JSON.stringify({degisen:{saatler:stListe}})})}catch(e){}if(!r.ok)geciciDurum(L('Saat listesi kaydedilemedi'),r.err||'')}
+function stEkle(ad,tz){stListe=(stListe||stSatirlar().filter(x=>x.i>=0)).map(x=>({ad:x.ad,tz:x.tz})).concat([{ad,tz}]);stYaz();stCiz()}
+function stAra(q){q=stKatla(q.trim());if(!q)return[];const gor=new Set(stSatirlar().map(x=>x.tz)),out=[]
+  STC.forEach(([tr,en,tz])=>{if(gor.has(tz))return;const a=stKatla(tr),b=stKatla(en);if(a.includes(q)||b.includes(q))out.push({ad:tr,tz,etiket:DIL==='en'?en:tr,s:a.startsWith(q)||b.startsWith(q)?0:1})})
+  let z=[];try{z=Intl.supportedValuesOf('timeZone')}catch(e){}
+  z.forEach(tz=>{if(gor.has(tz)||out.some(o=>o.tz===tz))return;const se=tz.split('/').pop().replace(/_/g,' ');if(stKatla(se).includes(q)||stKatla(tz).includes(q))out.push({ad:se,tz,etiket:se,s:stKatla(se).startsWith(q)?0:2})})
+  return out.sort((a,b)=>a.s-b.s).slice(0,8)}
+function stOnerCiz(){const q=document.getElementById('stq').value,o=document.getElementById('stoner');stOner=stAra(q);o.hidden=!stOner.length;o.innerHTML=stOner.map((x,i)=>`<button type=button data-stek="${i}"${i?'':' class=on'}><span>${esc(x.etiket)}</span><small>${esc(x.tz)}</small></button>`).join('')}
+function stSec(i){const x=stOner[i];if(!x)return;stEkle(x.ad,x.tz);document.getElementById('stq').value='';stOnerCiz()}
+document.getElementById('stq').addEventListener('input',stOnerCiz)
+document.getElementById('stq').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();stSec(0)}else if(ev.key==='Escape'){ev.target.value='';stOnerCiz();ev.stopPropagation()}})
+document.getElementById('stoner').addEventListener('click',ev=>{const b=ev.target.closest('[data-stek]');if(b)stSec(+b.dataset.stek)})
+document.getElementById('stl').addEventListener('click',ev=>{const b=ev.target.closest('[data-stx]');if(!b||!stListe&&!stSatirlar().some(x=>x.i>=0))return;const i=+b.dataset.stx;stListe=stSatirlar().filter(x=>x.i>=0&&x.i!==i).map(x=>({ad:x.ad,tz:x.tz}));stYaz();stCiz()})
+document.getElementById('stsl').addEventListener('input',ev=>{stT=stBaz()+(+ev.target.value)*ST_ADIM;stCiz()})
+document.getElementById('stsim').onclick=()=>{stT=null;stCiz()}
+document.getElementById('stmk').addEventListener('click',ev=>{const b=ev.target.closest('[data-stmk]');if(b){stT=+b.dataset.stmk;stCiz()}})
+document.getElementById('stbg').onclick=()=>stAc(false);document.getElementById('sth7').onclick=()=>hfAc(true);document.getElementById('tkst').onclick=()=>stAc(true)
+document.addEventListener('click',ev=>{if(!ev.target.closest('.sta')){const o=document.getElementById('stoner');if(o)o.hidden=true}})
 document.getElementById('tky').onclick=()=>{fetch('/takvim-yenile',{method:'POST',body:'{}'});document.getElementById('tkh').textContent=L('takvim yenileniyor…')}
 document.getElementById('tk').addEventListener('click',ev=>{const k=ev.target.closest('button[data-kat]');if(k&&/^https:\/\//.test(k.dataset.kat))return window.open(k.dataset.kat,'_blank');const b=ev.target.closest('button[data-bas]');if(b){const o=b.dataset.bas?tkBul(b.dataset.bas):null;if(o&&o.baglanti&&last&&!last.aktif&&last.toplanti&&last.toplanti.son)return hizliBaslat(o,b);return tkForm(o)}
   const hz=ev.target.closest('button[data-hz]');if(hz)return hazirlikTik(hz.dataset.hz,hz)
@@ -1136,7 +1214,7 @@ function kenarCiz(s,top){if(!document.documentElement.classList.contains('mac'))
   const sec=top&&kcSec==='tks'?'kc':!top&&kcSec==='kc'?'tks':kcSec==='kns'?'tks':kcSec  // toplantıda varsayılan seçim Şimdi
   const o=(id,ikon,ad,r,ek)=>`<button class="ko${sec===id?' sec':''}" data-git="${esc(id)}"${ek||''}>${ikon}<span class=tx>${esc(ad)}</span>${r?`<span class=r>${esc(r)}</span>`:''}</button>`
   const h=(top?`<div class=kb>${L('Şimdi')}</div>`+o('kc','<span class=nok></span>',t,su,' data-canli=1'):'')
-    +o('tks',ic('takvim'),L('Bugün'))+o('hf',ic('hafta'),L('Bu hafta'))
+    +o('tks',ic('takvim'),L('Bugün'))+o('hf',ic('hafta'),L('Bu hafta'))+o('st',ic('dunya'),L('Saatler'))
     +(ls.length?`<div class=kb>${L('Son toplantılar')}</div>`+ls.map(r=>o('son:'+r.id,ic('chat'),r.baslik||r.ad,kisaGun(r.at),` title="${L('Özeti aç')} — ${esc(r.ad||'')}"`)).join(''):'')
     +`<div class=kb>${L('Arşiv')}</div>`+o('ar-ara',ic('liste'),L('Toplantılarda ara'))+o('ar-dok',ic('dosya'),L('Dökümler'))+o('gecmis',ic('hist'),L('Konuşma geçmişi'))
     +`<div class=kalt><i class="dot ${dc?dc[1]:''}"></i><span>${esc(dm)}</span></div>`
@@ -1146,7 +1224,7 @@ document.getElementById('kenar').addEventListener('click',async ev=>{const b=ev.
   if(g.startsWith('son:')){let r={};try{r=await j('/son-ac',{method:'POST',body:JSON.stringify({id:g.slice(4),tur:''})})}catch(e){}if(!r.ok)geciciDurum(L('Özet açılamadı'),r.err||'');return}
   if(g==='gecmis'){gecmisAc();return}
   if(g==='ar-ara'||g==='ar-dok'){arsivAc(g==='ar-ara');return}
-  if((g==='hf')!==hfAcik){if(g!=='hf')kcSec=g;hfAc(g==='hf')}  // hafta görünümü kenar çubuğundan açılır, başka seçim kapatır
+  if(g==='st')stAc(true);else{if(stAcik)stAc(false);if((g==='hf')!==hfAcik){if(g!=='hf')kcSec=g;hfAc(g==='hf')}}  // hafta görünümü kenar çubuğundan açılır, başka seçim kapatır
   kcSec=g;if(last)kenarCiz(last,document.documentElement.classList.contains('toplantida'))
   const sc=document.querySelector('main .sc');if(sc)sc.scrollTo({top:0,behavior:'smooth'})})  // her seçim kendi görünümünü baştan açar
 function kenarAcKapa(){const k=document.documentElement.classList.toggle('kc-kapali');try{localStorage.setItem('kcKapali',k?'1':'')}catch(e){}}
@@ -1382,7 +1460,7 @@ async function hazirlikTik(id,b){const o=tkBul(id);if(!o)return;const s=last||{}
 function renderTakvim(s){const sur=!!((s.oto_toplanti&&s.oto_toplanti.oturum)||(s.toplanti_oturum&&['aciliyor','calisiyor','bekliyor','izliyor'].includes(s.toplanti_oturum.durum))),t=s.takvim||{},ca=s.claude_age_s,izliyor=ca!=null&&ca<120,sec=document.getElementById('tks')
   // toplantı sürerken büyük kart yok: durum cümlesindeki Başlat yalnız formu açar
   const top=!!s.aktif,form=!document.getElementById('tkf').hidden
-  if(top&&!hfOnceTop&&hfAcik)hfAc(false);hfOnceTop=top  // toplantı başlayınca hafta görünümü kapanır (Şimdi bölümü görünsün)
+  if(top&&!hfOnceTop){if(hfAcik)hfAc(false);if(stAcik)stAc(false)}hfOnceTop=top  // toplantı başlayınca hafta görünümü kapanır (Şimdi bölümü görünsün)
   // 3 Kasım (ardışık toplantı): takvim ve Başlat yalnız canlı toplantıda gizli — bitiyor/bitti'de ve Claude toplantı sonunu yaparken (izliyor) görünür
   sec.hidden=top&&!form
   ;['tk','tkh','tkalt'].forEach(i=>document.getElementById(i).style.display=top?'none':'');sonCiz(s,top);if(top)return

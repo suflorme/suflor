@@ -1533,6 +1533,7 @@ AYAR_PANO = {
     "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None),  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
+    "saatler": ("saatler", None, None),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel"))}
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
@@ -1562,10 +1563,17 @@ def ayarlar_view():
     if "konus_gecmis" not in AYAR: d["konus_gecmis"] = konus_gecmis_acik()
     d["dil"] = ARAYUZ_DILI; d["ses_hizi"] = str(AYAR.get("ses_hizi") or "1.0")
     d["oto_haric"] = ", ".join(str(x) for x in (AYAR.get("oto_haric") or []) if isinstance(x, str))  # ayar.json'da liste, panoda virgüllü metin
-    vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin") and k != "dil"}  # kişilik, yapay zekâ ve dil "varsayılana dön"le değişmez
+    vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin", "saatler") and k != "dil"}  # kişilik, yapay zekâ, saat listesi ve dil "varsayılana dön"le değişmez
     vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
+    try: g_, b_, e_ = calisma_saatleri(); d["calisma"] = {"gunler": sorted(g_), "bas": b_, "bit": e_}  # Saatler görünümü: mesai içi/dışı rengi
+    except Exception: pass
     return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "piper": bool(AYAR.get("piper_python") and AYAR.get("piper_model")), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici(),
             "beyin": sg_ayar_view(), "gelistirici": gelistirici_mi(), "takvimler": TAKVIM_LISTE}  # beta profili: geliştirici kurulumunda gizli ayarlar "Gelişmiş" grubunda görünür
+def saat_dilimi_gecerli(tz):
+    if not re.fullmatch(r"[A-Za-z0-9_+\-]+(/[A-Za-z0-9_+\-]+){0,2}", tz): return False
+    try:
+        import zoneinfo; zoneinfo.ZoneInfo(tz); return True
+    except Exception: return False
 def ayar_yaz(deg):
     hata, yeni, beyin = {}, {}, {}
     for k, v in (deg or {}).items():
@@ -1584,6 +1592,8 @@ def ayar_yaz(deg):
         elif tur == "sayi" and isinstance(v, (int, float)) and not isinstance(v, bool) and sinir[0] <= v <= sinir[1]: yeni[k] = int(v)
         elif tur == "liste" and isinstance(v, (str, list)):  # virgüllü metin → tekilleşmiş liste (en çok 20 parça, 60 harf)
             yeni[k] = list(dict.fromkeys(" ".join(str(x).split())[:60] for x in (v if isinstance(v, list) else str(v).split(",")) if str(x).strip()))[:20]
+        elif tur == "saatler" and isinstance(v, list):  # 4 Kasım (kullanıcı): saat dilimi listesi — ad en çok 40 harf, tz geçerli IANA adı, en çok 30 satır
+            yeni[k] = [{"ad": " ".join(x["ad"].split())[:40], "tz": x["tz"]} for x in v if isinstance(x, dict) and isinstance(x.get("ad"), str) and x["ad"].strip() and isinstance(x.get("tz"), str) and saat_dilimi_gecerli(x["tz"])][:30]
         elif tur == "takvimler" and isinstance(v, list):  # "ad · hesap" metinleri (en çok 60, 160 harf)
             yeni[k] = list(dict.fromkeys(" ".join(x.split())[:160] for x in v if isinstance(x, str) and x.strip()))[:60]
         else: hata[k] = _t("Adres geçersiz", "Invalid address") if tur == "adres" else _t(f"{sinir[0]}–{sinir[1]} arası", f"between {sinir[0]} and {sinir[1]}") if tur == "sayi" else _t("geçersiz", "invalid")
