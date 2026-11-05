@@ -77,17 +77,20 @@ except SystemExit as e: r = str(e)
 ok("kur başarısızsa alt komut hata ile çıkar", "geliştiriciye" in r)
 
 # 2) relay.py guncelle_baslat: panodaki düğme toplantı, sohbet ve Konuş cevabında reddeder; boşta güncelleme betiğini başlatır
-fn = next(f for f in ast.parse(open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()).body if isinstance(f, ast.FunctionDef) and f.name == "guncelle_baslat")
+_g = {f.name: f for f in ast.parse(open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()).body if isinstance(f, ast.FunctionDef)}
+fn, fo = _g["guncelle_baslat"], _g["guncelle_oturum_mesgul"]
 class P:
     def __init__(self, *a, **k): BASLADI.append(a)
 for ad, durum, beklenen in [("boşta", {}, True), ("web toplantısı", {"top": True}, False), ("masaüstü toplantısı", {"masaustu": {"toplantida": True}}, False),
-                            ("sohbet açık", {"sohbet": True}, False), ("Konuş konuşuyor", {"konus": "konusuyor"}, False), ("Konuş hazır", {"konus": "hazir"}, True)]:
+                            ("sohbet açık", {"sohbet": True}, False), ("Konuş konuşuyor", {"konus": "konusuyor"}, False), ("Konuş hazır", {"konus": "hazir"}, True),
+                            ("oturum toplantı sonunda", {"to": {"durum": "calisiyor", "sonu": True}}, False), ("oturum cevap bekliyor", {"to": {"durum": "bekliyor", "acik_soru": True}}, False),
+                            ("oturum izin bekliyor", {"to": {"durum": "bekliyor", "izinler": [{"id": "x"}]}}, False), ("oturum işi bitmiş", {"to": {"durum": "bekliyor"}}, True)]:
     BASLADI = []
     n = {"guncelleme_view": lambda: {"durum": "var"}, "toplanti_var": lambda d=durum: bool(d.get("top")), "STATE": {"masaustu": durum.get("masaustu")},
          "SOHBET": {"acik": bool(durum.get("sohbet"))}, "KONUS": {"durum": durum.get("konus", "kapali")}, "_t": lambda tr, en: tr,
          "_kod_dir": lambda: "/tmp", "GUN_LOG": os.devnull, "GUN": {"son": "9.9.9"}, "SURUM": "0.0.1", "datetime": __import__("datetime"),
-         "os": os, "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "STDOUT": None}), "print": lambda *a, **k: None}
-    exec(compile(ast.Module([fn], []), "relay.py", "exec"), n); r = n["guncelle_baslat"]()
+         "os": os, "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "STDOUT": None}), "print": lambda *a, **k: None, "toplanti_oturum_view": lambda d=durum: d.get("to")}
+    exec(compile(ast.Module([fo, fn], []), "relay.py", "exec"), n); r = n["guncelle_baslat"]()
     ok(f"pano Güncelle · {ad} → {r}", bool(r.get("ok")) == beklenen and bool(BASLADI) == beklenen)
 
 print("guncelle-mesgul: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

@@ -1877,12 +1877,21 @@ def _guncelleme_dongu():
                 GUN["son"] = str(json.loads(r.read().decode()).get("version") or "")[:12] or None
         except Exception: pass  # çevrimdışı: sonra yeniden
         time.sleep(6 * 3600)
+def guncelle_oturum_mesgul():  # toplantı oturumu çalışıyor, izin/cevap bekliyor ya da toplantı sonu sürüyorsa neden; yoksa ""
+    o = (toplanti_oturum_view() if "toplanti_oturum_view" in globals() else None) or {}; od = o.get("durum")
+    if od in ("calisiyor", "aciliyor"): return _t("Asistan toplantı sonu işlerini yapıyor — bitince güncelle", "The assistant is finishing the meeting — update when it's done") if o.get("sonu") else _t("Asistan çalışıyor — bitince güncelle", "The assistant is working — update when it's done")
+    if o.get("izin") or o.get("izinler"): return _t("Asistan izin cevabını bekliyor — önce cevapla", "The assistant is waiting for a permission — answer first")
+    if od in ("bekliyor", "izliyor") and o.get("acik_soru"): return _t("Asistan cevabını bekliyor — önce cevapla", "The assistant is waiting for your answer — answer first")
+    if od == "bekliyor" and o.get("sonu"): return _t("Asistan toplantı sonu işlerini yapıyor — bitince güncelle", "The assistant is finishing the meeting — update when it's done")
+    return ""
 def guncelle_baslat():
     v = guncelleme_view()
     if v["durum"] not in ("var", "guncel", "hata"): return {"ok": False, "err": v["durum"]}
     if toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida"): return {"ok": False, "err": _t("Toplantı sürüyor — bitince güncelle", "A meeting is in progress — update when it ends")}
     if SOHBET.get("acik") or KONUS.get("durum") in ("yaziya", "dusunuyor", "konusuyor"):  # v0.77.5: güncelleme aktarıcıyı yeniden başlatır, konuşma bölünür
         return {"ok": False, "err": _t("Sohbet ya da Konuş cevabı sürüyor — bitince güncelle", "A conversation is in progress — update when it ends")}
+    m = guncelle_oturum_mesgul()  # 5 Kasım: kurulum.py mesgul ile aynı kural; panoda nedeni görünsün
+    if m: return {"ok": False, "err": m}
     k = _kod_dir(); log = open(GUN_LOG, "a", encoding="utf-8")
     log.write(f"\n--- {datetime.datetime.now().isoformat(timespec='seconds')} panodan güncelleme (v{SURUM} → v{GUN['son'] or '?'})\n"); log.flush()
     GUN.update(durum=None, hata=None, p=subprocess.Popen(["/bin/bash", os.path.join(k, "guncelle.command")], cwd=k, stdout=log, stderr=subprocess.STDOUT,
