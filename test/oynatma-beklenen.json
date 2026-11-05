@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 466579,
-   "sha": "40b98fb1d757008a"
+   "uzunluk": 468826,
+   "sha": "7b0dead0a4bfcad5"
   },
   "/mini": {
-   "uzunluk": 466579,
-   "sha": "40b98fb1d757008a"
+   "uzunluk": 468826,
+   "sha": "7b0dead0a4bfcad5"
   },
   "/status": {
    "_ping_son": "float",
@@ -336,6 +336,8 @@
      "takvim_paylasilan": [],
      "tema": "str",
      "toplanti_ses": "str",
+     "toplanti_sonrasi_hatirlat_dk": "int",
+     "toplanti_sonrasi_sesli": "bool",
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
      "tstt_taslak": "bool",
@@ -398,6 +400,8 @@
      "takvim_paylasilan": [],
      "tema": "str",
      "toplanti_ses": "str",
+     "toplanti_sonrasi_hatirlat_dk": "int",
+     "toplanti_sonrasi_sesli": "bool",
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
      "tstt_taslak": "bool",
@@ -642,6 +646,7 @@
    },
    "port": "int",
    "posta": "NoneType",
+   "proaktif": "NoneType",
    "proje_erisim": "NoneType",
    "questions": [
     {

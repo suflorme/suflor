@@ -1165,13 +1165,15 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 tur["metin"] += d
                 if tur.get("kaynak") != "uclu": KONUS["cevap"] = tur["metin"]  # üçlü sohbet: söz alma cümlesi (PAS olabilir) panoya okununca eklenir (kisilik.py)
                 if not tur.get("ayrinti"):  # S48: "---" sonrası yazılı ayrıntı — okunmaz, panoda görünür
-                    tur["tampon"] += d; m = re.search(r"(?:^|\n)\s*-{3,}", tur["tampon"]) or TALIMAT_ETIKET_BAS.search(tur["tampon"])  # v0.101.1: [İLET …] okunmaz
+                    tur["tampon"] += d; m = re.search(r"(?:^|\n)\s*-{3,}", tur["tampon"]) or TALIMAT_ETIKET_BAS.search(tur["tampon"]) or KAYIT_ETIKET_BAS.search(tur["tampon"])  # v0.101.1: [İLET …] okunmaz; 5 Kasım: [KAYIT: …] de
                     if m: tur["tampon"] = tur["tampon"][:m.start()]; _konus_cumle(tur, son=True); tur["ayrinti"] = True
                     else: _konus_cumle(tur)
             elif j.get("type") == "result":
                 if not tur.get("ayrinti"): _konus_cumle(tur, son=True)
                 if TALIMAT_ETIKET_BAS.search(tur["metin"]):  # v0.101.1: Claude'un hazırladığı oturum iletisi → onaya (etiket panoda ve geçmişte görünmez)
                     tur["metin"], _ = talimat_claude(tur["metin"], tur.get("soru") or KONUS.get("soru"), tur); KONUS["cevap"] = tur["metin"]
+                if not j.get("is_error") and KAYIT_ETIKET_BAS.search(tur["metin"] or ""):  # 5 Kasım: asistanın kayıt önerisi → panoda tek tık onay (notlar.py kayit_etiketleri; etiket görünmez)
+                    tur["metin"] = kayit_etiketleri(tur["metin"], tur); KONUS["cevap"] = tur["metin"]
                 if tur.get("kutu") and not j.get("is_error") and KUTU_ETIKET_RX.search(tur["metin"] or ""):  # 5 Kasım: asistanın [NOT: …] / [SÖZLÜK: … => …] etiketi → iş yapılır, etiket görünmez
                     tur["metin"] = kutu_etiketleri(tur["metin"], tur.get("soru")); KONUS["cevap"] = tur["metin"]
                 tur["t_son"] = time.time(); m = j.get("total_cost_usd") or 0; u = j.get("usage") or {}
@@ -1696,12 +1698,12 @@ KUTU_KURAL = {"tr": ("Bu yazı panodaki tek kutudan geldi; kullanıcı onu not, 
                      "cevabın sonuna her düzeltme için ayrı satırda tam şu etiketi koy: [SÖZLÜK: yanlış yazılış => doğru yazılış] ve «Tamam, sözlüğe ekledim: yanlış → doğru» de "
                      "(yanlış yazılış kullanıcının verdiği biçim; yalnız kişi, firma ve terim adı için; geçmiş kayıtları ve özetleri düzeltemezsin, bunu bir cümleyle söyle). "
                      "Yalnız hatırlatma ya da not niteliğindeyse (yapılacak, söz, aklında tutulacak bilgi) cevabın sonuna [NOT: kullanıcının sözleri] etiketi koy ve kısaca «Not aldım.» de. "
-                     "Etiketler panoda görünmez. Bu kural, «kayıt isteğinde yapamam» kuralının yerine geçer; not ve sözlük dışındaki bir işi (e-posta, kayıt veritabanı) yine yapamazsın, söyle."),
+                     "Etiketler panoda görünmez. Bu kural, «kayıt isteğinde yapamam» kuralının yerine geçer; karar, iş, açık soru ve özet düzeltmesi [Kayıt yazma] kuralıyla önerilir; e-posta ve başka sistem yine yapamazsın, söyle."),
               "en": ("This text came from the panel's single box; the user may have meant it as a note, a question or an instruction — you decide which. If it's a question, answer it. "
                      "If it's a correction (e.g. «not Mira Kalem but Mira Kalın»: a name or term speech recognition misspelled), end your answer with this exact tag on its own line per correction: "
                      "[SÖZLÜK: wrong spelling => correct spelling] and say «Done, added to the dictionary: wrong → right» (the wrong form as the user gave it; person, company and term names only; "
                      "you can't fix past records or summaries — say so in one sentence). If it is only a reminder or note (a to-do, a promise, something to remember), end with [NOT: the user's words] and say «Noted.» briefly. "
-                     "The tags aren't shown on the panel. This rule replaces the «can't do record requests» rule; anything other than notes and the dictionary (email, the records database) you still can't do — say so.")}
+                     "The tags aren't shown on the panel. This rule replaces the «can't do record requests» rule; decisions, tasks, open questions and summary fixes are proposed with the [Writing records] rule; email and other systems you still can't do — say so.")}
 def konus_yazili(metin, kutu=False):  # v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py); kutu: 5 Kasım — yazı not/soru/talimat olabilir, asistan ayırır
     if _KS["tur"] and _KS["tur"].get("kaynak") == "uclu": uclu_iptal("kullanıcı sordu")
     if _KS["tur"] and not ("uclu_bekle" in globals() and uclu_bekle()): return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
@@ -1929,6 +1931,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     if tur.get("yazili"): tb += _t("Kullanıcı bu soruyu panoya yazdı; cevabın sesli okunmaz, yalnız panoda yazılı görünür.\n",
                                    "The user typed this question on the panel; your answer is not read aloud, it is shown on the panel only.\n")
     if tur.get("kutu"): tb += _t(KUTU_KURAL["tr"], KUTU_KURAL["en"]) + "\n"
+    if kayit_turu_mu(tur) and (KAYIT_SONUC or tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or "")):  # 5 Kasım: kayıt önerisi kuralı + kimlikli kayıtlar (yalnız kayıt konusu geçen turda)
+        tb += kayit_sonuc_notu()
+        if tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or ""): tb += _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]) + "\n" + kayit_blogu()
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar
         _KS["bosta"] = False
         if konus_canli() and _KS.get("saglayici") == "claude-code" and konus_secim()["tur"] != "claude-code": konus_kapat("yedek süresi bitti", durum_koru=True); _KS["tur"] = tur
