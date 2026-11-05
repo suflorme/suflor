@@ -417,7 +417,7 @@ function L(s,v){let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k
 // kutu ipucu: toplantıda (ve mini panoda) genel "Asistanla konuş" — toplantıda ve dışında asistan farklı; panoda toplantı yokken (Bugün) toplantı dışı kişiliğin adıyla "Marvin'e sor"
 function yonelme(a){a=String(a||'').trim();const t=a.toLowerCase(),v=(t.match(/[aeıioöuü](?=[^aeıioöuü]*$)/)||['e'])[0];return a+"'"+(/[aeıioöuü]$/.test(t)?'y':'')+('aıou'.includes(v)?'a':'e')}
 function yazIpucu(d){let s=null;try{s=last}catch(e){}  // ilk çizimde last henüz tanımlı değil
-  if(d===document&&s&&!s.aktif){const ad=(s.konus&&s.konus.kisilik)||AS;return L('{ad} sor',{ad:DIL==='en'?ad:yonelme(ad)})}return L('Asistanla konuş')}
+  if(d===document&&s&&!s.aktif){const ad=(s.konus&&(s.konus.kisilik_gorunen||s.konus.kisilik))||AS;return L('{ad} sor',{ad:DIL==='en'?ad:yonelme(ad)})}return L('Asistanla konuş')}
 function asYaz(kok){kok.querySelectorAll("[placeholder],[title],[aria-label]").forEach(e=>["placeholder","title","aria-label"].forEach(a=>{const o=(e.__as||{})[a]||e.getAttribute(a);if(o&&o.includes("{asistan}")){(e.__as=e.__as||{})[a]=o;e.setAttribute(a,o.split("{asistan}").join(AS))}}));const t=kok.getElementById&&kok.getElementById("tosad");if(t)t.textContent=AS;for(const id of ["n","mn"]){const n=kok.getElementById&&kok.getElementById(id);if(n&&!n.dataset.cevap)n.placeholder=yazIpucu(id==="n"?kok:null)}const b=kok.getElementById&&kok.getElementById("bgas");if(b)b.textContent=L("{asistan} okur")}
 function cevir(kok){if(DIL!=="en")return;const w=document.createTreeWalker(kok,NodeFilter.SHOW_TEXT);const d=[];while(w.nextNode())d.push(w.currentNode)
   d.forEach(n=>{const k=n.nodeValue.trim();if(k&&EN[k])n.nodeValue=n.nodeValue.replace(k,EN[k])})
