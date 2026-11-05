@@ -196,6 +196,18 @@ Claude Desktop (`claude_desktop_config.json`):
 Ayar dosyasından (`~/Library/Application Support/Suflor/ayar.json`) port ve veri klasörü okunur; farklıysa `--dir <canlı klasör>` ve `--relay http://127.0.0.1:<port>` eklenir.
 Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/arsiv-mcp.py`.
 
+## Başka bir karar kaydı
+Firmada başka bir karar ya da toplantı defteri kullanılıyorsa Suflor.me onu okur, ona yazmaz. ⚙ Ayarlar → Dış karar kaydı (ayar `dis_defter`) iki tür alır:
+- **Dosya:** o defterden dışa aktarılmış CSV ya da JSON dosyasının yolu (başlık satırı: tarih, toplantı, tür, metin/karar/iş, sahip, vade, durum; İngilizce adlar da
+  tanınır). Kararlar ve işler Bugün'de ve toplantı hazırlığında (`tc hazirlik`) kaynak etiketiyle, yalnız okunur olarak görünür; Suflor'un kendi kayıtlarına karışmaz.
+  Kapalı kayıtlar (done, kapandı, iptal …) listelenmez.
+- **Bağlayıcı:** defterin MCP bağlayıcısı (sunucu adı, https adresi, okuma araçlarının deseni). Toplantı oturumu ve Konuş bu kaynağı yalnız okuma araçlarıyla
+  sorgular; sorguya kişi adı ve döküm alıntısı girmez (Dış bilgi kaynağı kuralı). Yazan ya da değiştiren araç kullanılmaz.
+
+Suflor'un kararlarını ve işlerini o deftere taşımak için Bugün'de "Kararları ve işleri dışa aktar" (CSV ya da JSON; alanlar: tarih, toplantı, tür, metin, sahip,
+vade, durum, kaynak saat). Dosya `<canlı klasör>/disa-aktar/` altına yazılır ve Finder'da gösterilir; yüklemeyi sen yaparsın. Gizli toplantıların kaydı girmez.
+Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/dis-defter.py`.
+
 ## Sorun giderme
 
 Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu denetle**'ye bak (✗ olan maddenin altında ne yapacağın yazar). Aşağıdakiler en sık karşılaşılanlar; her satır "belirti: ne yapmalı" biçimindedir. Ayar adları `ayar.json`'a `"ayar_adi": değer` diye yazılır; panoda ⚙ Ayarlar'da karşılığı varsa oradan değiştirmek daha kolaydır.

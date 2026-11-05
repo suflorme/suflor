@@ -1339,8 +1339,23 @@ def _yapi_mod():  # yapi.py aktarıcıyla aynı klasörde kurulur; yoksa (eski d
 def bugun_veri_view():  # Bugün sayfası: açık işler, teyit bekleyen kararlar, son toplantının kararları (karar grafı; gizli toplantı dönmez) — yalnız anahtarlı uç
     y = _yapi_mod()
     if not y: return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
-    try: return dict(y.bugun_veri(BASE, str(AYAR.get("ad") or "")), ok=True)
+    try: v = dict(y.bugun_veri(BASE, str(AYAR.get("ad") or "")), ok=True)
     except Exception as e: print(f"BUGÜN: veri okunamadı ({e.__class__.__name__})"); return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
+    try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), str(AYAR.get("ad") or ""), 30)  # dış karar kaydı (dosya türü): ayrı salt-okunur katman, kaynak etiketiyle
+    except Exception as e: print(f"BUGÜN: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []
+    return v
+def disa_aktar_islem(p):  # POST /disa-aktar {"bicim": "csv"|"json"} (anahtarlı pano): karar grafını dosyaya yazar (<canlı>/disa-aktar/), Finder'da gösterir; gizli toplantı girmez
+    y = _yapi_mod(); bicim = "json" if str((p or {}).get("bicim") or "") == "json" else "csv"
+    if not y: return {"ok": False, "err": "yapi.py yok"}
+    try:
+        metin, ad, n = y.disa_aktar(BASE, bicim); kl = os.path.join(BASE, "disa-aktar"); os.makedirs(kl, exist_ok=True); yol = os.path.join(kl, ad)
+        with open(yol + ".tmp", "w", encoding="utf-8") as f: f.write(metin)
+        os.replace(yol + ".tmp", yol)
+    except Exception as e: return {"ok": False, "err": _t(f"yazılamadı ({e.__class__.__name__})", f"could not write ({e.__class__.__name__})")}
+    if not os.environ.get("SUFLOR_TEST_BASLAT"):
+        try: subprocess.Popen(["open", "-R", yol], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError: pass
+    return {"ok": True, "yol": yol, "ad": ad, "n": n, "bicim": bicim}
 def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {"id": "s5", "durum": "yapildi|yapilmadi|acik"} (anahtarlı)
     y = _yapi_mod()
     if not y: return {"ok": False, "err": "yapi.py yok"}
@@ -1549,7 +1564,8 @@ AYAR_PANO = {
     "web_arastirma": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
-    "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_prova": ("beyin", "", ("", "claude-code", "gemini", "ozel"))}
+    "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_prova": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
+    "dis_defter": ("defter", [], None)}  # 5 Kasım (S212): dış karar kaydı — [{"ad", "tur": "dosya", "yol"} | {"ad", "tur": "mcp", "sunucu", "url", "araclar"}]; yalnız okuma (yapi.dis_defter_veri) + dışa aktarma, dışarıya yazma yok
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
@@ -1577,7 +1593,7 @@ def ayarlar_view():
     if "konus_gecmis" not in AYAR: d["konus_gecmis"] = konus_gecmis_acik()
     d["dil"] = ARAYUZ_DILI; d["ses_hizi"] = str(AYAR.get("ses_hizi") or "1.0")
     d["oto_haric"] = ", ".join(str(x) for x in (AYAR.get("oto_haric") or []) if isinstance(x, str))  # ayar.json'da liste, panoda virgüllü metin
-    vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin", "saatler") and k != "dil"}  # kişilik, yapay zekâ, saat listesi ve dil "varsayılana dön"le değişmez
+    vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin", "saatler", "defter") and k != "dil"}  # kişilik, yapay zekâ, saat listesi, dış defter ve dil "varsayılana dön"le değişmez
     vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
     try: g_, b_, e_ = calisma_saatleri(); d["calisma"] = {"gunler": sorted(g_), "bas": b_, "bit": e_}  # Saatler görünümü: mesai içi/dışı rengi
     except Exception: pass
@@ -1610,6 +1626,21 @@ def ayar_yaz(deg):
             yeni[k] = [{"ad": " ".join(x["ad"].split())[:40], "tz": x["tz"]} for x in v if isinstance(x, dict) and isinstance(x.get("ad"), str) and x["ad"].strip() and isinstance(x.get("tz"), str) and saat_dilimi_gecerli(x["tz"])][:30]
         elif tur == "takvimler" and isinstance(v, list):  # "ad · hesap" metinleri (en çok 60, 160 harf)
             yeni[k] = list(dict.fromkeys(" ".join(x.split())[:160] for x in v if isinstance(x, str) and x.strip()))[:60]
+        elif tur == "defter" and isinstance(v, list):  # dış karar kaydı: en çok 6 kayıt; dosya: .csv/.tsv/.json yolu; mcp: sunucu adı + https adres + okuma desenleri (beyin.bilgi_desen_uygun)
+            ds = []
+            for x in v:
+                if not isinstance(x, dict): continue
+                ad = " ".join(str(x.get("ad") or "").split())[:40]; t = str(x.get("tur") or "dosya")
+                if t == "dosya":
+                    yol = str(x.get("yol") or "").strip()[:300]
+                    if yol and os.path.splitext(yol)[1].lower() in (".csv", ".tsv", ".json"): ds.append({"ad": ad or os.path.basename(yol)[:40], "tur": "dosya", "yol": yol})
+                    elif yol: hata[k] = _t("yalnız .csv, .tsv ya da .json dosyası", "only a .csv, .tsv or .json file")
+                elif t == "mcp":
+                    sn = str(x.get("sunucu") or "").strip()[:80]; u = str(x.get("url") or "").strip()
+                    ar = [str(d).strip()[:64] for d in (x.get("araclar") if isinstance(x.get("araclar"), list) else str(x.get("araclar") or "").split(",")) if str(d).strip()][:10]
+                    if sn and re.fullmatch(r"[A-Za-z0-9_. :-]+", sn) and (not u or ("BEYIN" in globals() and BEYIN.bilgi_url_uygun(u))): ds.append({"ad": ad or sn[:40], "tur": "mcp", "sunucu": sn, "url": u, "araclar": ar})
+                    elif sn: hata[k] = _t("sunucu adı ya da adres geçersiz (yalnız https)", "server name or address invalid (https only)")
+            if k not in hata: yeni[k] = ds[:6]
         else: hata[k] = _t("Adres geçersiz", "Invalid address") if tur == "adres" else _t(f"{sinir[0]}–{sinir[1]} arası", f"between {sinir[0]} and {sinir[1]}") if tur == "sayi" else _t("geçersiz", "invalid")
     if hata: return {"ok": False, "hata": hata, "err": next(iter(hata.values()))}
     if not yeni and not beyin: return {"ok": True, "degisen": []}
@@ -1664,7 +1695,26 @@ def son_view():  # pano: son 7 günden en yeni 3 kayıt (yol yerine dosya adı)
         if r.get("harita") and r.get("gorsel") not in ("harita", "karar_is"):
             g = gorsel_turu(r["harita"])
             if g: r["gorsel"] = g
+        e = eposta_yeterdi_oku(r.get("yapi"))  # 5 Kasım: özet yapısındaki eposta_yeterdi doğruysa Bugün kartında "Bir dahakine e-postayla çözülebilirdi: <gerekçe>"
+        if e: r["eposta"] = e
     return ls
+_EPY = {}  # yapı dosyası yolu → (mtime, gerekçe ya da "")
+def eposta_yeterdi_oku(yp):
+    if not yp or not isinstance(yp, str): return ""
+    try: mt = os.path.getmtime(yp)
+    except OSError: return ""
+    on = _EPY.get(yp)
+    if on and on[0] == mt: return on[1]
+    g = ""; y = _yapi_mod()
+    try:
+        if y:
+            v = json.load(open(yp, encoding="utf-8")); v.setdefault("maddeler", [])
+            if isinstance(v.get("maddeler"), list):
+                for m in v["maddeler"]: m["ogeler"] = [o for o in (m.get("ogeler") or []) if isinstance(o, dict) and o.get("tur") in y.TURLER and str(o.get("metin") or "").strip()] if isinstance(m, dict) else []
+                v["maddeler"] = [m for m in v["maddeler"] if isinstance(m, dict)]
+                d, ger, _u = y.eposta_yeterdi(v); g = ger if d else ""
+    except (OSError, ValueError, TypeError, AttributeError): g = ""
+    _EPY[yp] = (mt, g); return g
 def harita_pdf(r, posta=False):  # 5 Kasım (panogor): pano/harita belgesinin PDF'i, ozetler/ yanına <özet>-pano.pdf; yazdırma CSS'i belgede (açık tema)
     import tempfile, urllib.parse, subprocess
     hp = r.get("harita")
@@ -2222,6 +2272,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/prova": return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
         if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
+        if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
         if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
         if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/eylem-sun": return self._json({"ok": True, "n": eylem_sun()})

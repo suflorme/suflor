@@ -212,6 +212,11 @@ html.mac #bgn .bkenar,html.mac #bgn .bmenu{display:none}
 #bgn .provagiris input:focus{outline:2px solid var(--b-vurgu);outline-offset:1px}
 #bgn .bolum.prova .giris{font-size:var(--b-yz-m);color:var(--b-m2)}
 #bgn .sat .a .varlik{font-size:var(--b-yz-k);text-underline-offset:3px}
+/* Dış karar kaydı satırı (yalnız okunur: onay yerine kesik daire, kaynak etiketi) · dışa aktar bölümü · son toplantı kartında e-posta notu */
+#bgn .sat.dis .kaynakn{width:20px;height:20px;border-radius:50%;border:1.5px dashed var(--b-cizgi2)}
+#bgn .etiketk.dis{border:1px solid var(--b-cizgi);border-radius:var(--b-k-s);padding:1px 6px;text-transform:none;letter-spacing:0}
+#bgn .giris.kucuk,#bgn .bolum.disa .giris{font-size:var(--b-yz-m);color:var(--b-m2)}
+#bgn .sakin.eposta{display:flex;gap:8px;align-items:flex-start}#bgn .sakin.eposta svg.i{flex:none;width:16px;height:16px;margin-top:3px;color:var(--b-m3)}
 
 /* Prova odası penceresi (Bugün ile aynı belirteçler; <dialog> #bgn dışında) */
 dialog#prd{border:1px solid var(--b-cizgi);border-radius:var(--b-k-l);background:var(--b-yuzey);color:var(--b-murekkep);padding:22px 24px;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:var(--b-golge-panel);font:var(--b-yz-m)/1.5 var(--f-govde);overflow:auto}

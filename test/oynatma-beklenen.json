@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 428549,
-   "sha": "efed6010e3e79256"
+   "uzunluk": 440062,
+   "sha": "58dfce6f3d156ff7"
   },
   "/mini": {
-   "uzunluk": 428549,
-   "sha": "efed6010e3e79256"
+   "uzunluk": 440062,
+   "sha": "58dfce6f3d156ff7"
   },
   "/status": {
    "_ping_son": "float",
@@ -291,6 +291,7 @@
      "ceviri": "bool",
      "ceviri_kis": "bool",
      "dil": "str",
+     "dis_defter": [],
      "ekran_oto": "bool",
      "eposta": "str",
      "eposta_adres": "str",

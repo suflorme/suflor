@@ -225,6 +225,111 @@ def _vade_gun(v, bugun):  # ISO tarih → bugüne kalan gün (negatif: gecikti);
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(v or "")): return None
     try: return (datetime.date.fromisoformat(v) - bugun).days
     except ValueError: return None
+def teyit_neden_sade(n):  # grafta tutulan iç terim → kullanıcı dili (Bugün satırı): "örtük kabul (kimse açıkça onaylamadı)" → "kimse açıkça onaylamadı"
+    out = []
+    for p in re.split(r";\s*", str(n or "")):
+        p = p.strip()
+        if not p: continue
+        if p.startswith("örtük"): out.append("kimse açıkça onaylamadı")
+        elif p.startswith("tek taraflı"): out.append("karşı taraf cevap vermedi")
+        elif p.startswith("varsayım:"): out.append("varsayıma dayanıyor: " + p[len("varsayım:"):].strip())
+        else: out.append(p)
+    return "; ".join(out)
+# --- dış karar kaydı (5 Kasım; kullanıcı kararı: önce okuma + dışa aktarma, dışarıya kendiliğinden yazma yok) -----------------------------------------
+# Ayar dis_defter: [{"ad", "tur": "dosya", "yol": "~/…/kararlar.csv"} | {"ad", "tur": "mcp", "sunucu", "url", "araclar": [...]}]. Dosya türü burada okunur:
+# CSV (virgül, noktalı virgül ya da sekme; başlık satırı zorunlu) ya da JSON (liste ya da liste alanları olan sözlük). Kayıtlar Suflor'un grafına girmez — ayrı,
+# salt-okunur katman; Bugün'de ve hazırlıkta kaynak etiketiyle görünür. mcp türünü toplantı oturumu ve Konuş bilgi kaynağı olarak (yalnız okuma) kullanır.
+DD_ALAN = {"tarih": ("tarih", "date", "created", "olusturma", "olusturuldu", "kayit tarihi"), "toplanti": ("toplanti", "meeting", "kaynak", "source", "oturum"),
+           "tur": ("tur", "type", "kind", "kategori", "category"), "metin": ("metin", "text", "karar", "decision", "is", "task", "title", "baslik", "aciklama", "description", "item", "ozet", "summary", "konu", "subject"),
+           "sahip": ("sahip", "owner", "assignee", "sorumlu", "kim", "who", "assigned to", "assigned_to", "atanan"), "vade": ("vade", "due", "due date", "due_date", "son tarih", "son_tarih", "deadline", "termin", "bitis", "hedef tarih"),
+           "durum": ("durum", "status", "state")}
+DD_KAPALI = {"yapildi", "done", "closed", "kapandi", "kapali", "tamam", "tamamlandi", "completed", "complete", "iptal", "cancelled", "canceled", "bitti", "resolved", "tutuldu"}
+DD_EN_COK = 500
+def _dd_norm(s): return re.sub(r"\s+", " ", kucuk(str(s or "")).replace("ı", "i").replace("ş", "s").replace("ğ", "g").replace("ü", "u").replace("ö", "o").replace("ç", "c")).strip()
+def _dd_tur(t, satir):
+    t = _dd_norm(t)
+    if re.search(r"karar|decision", t): return "karar"
+    if re.search(r"\bis\b|task|action|todo|gorev|yapilacak|soz|promise", t): return "is"
+    if re.search(r"soru|question", t): return "soru"
+    return "is" if (satir.get("sahip") or satir.get("vade")) else "karar"
+def _dd_satir(r, tur_ipucu=""):
+    if not isinstance(r, dict): return None
+    h = {_dd_norm(k): v for k, v in r.items() if k is not None}; o = {}
+    for alan, adlar in DD_ALAN.items():
+        for a in adlar:
+            if a in h and str(h[a] or "").strip(): o[alan] = " ".join(str(h[a]).split())[:300 if alan == "metin" else 80]; break
+    if not o.get("metin"): return None
+    o["tur"] = _dd_tur(o.get("tur") or tur_ipucu, o)
+    o["kapali"] = _dd_norm(o.get("durum")) in DD_KAPALI
+    for k in ("tarih", "toplanti", "sahip", "vade", "durum"): o.setdefault(k, "")
+    return o
+def dis_defter_oku(yol):
+    # → {"ok": bool, "kayitlar": [{tarih, toplanti, tur, metin, sahip, vade, durum, kapali}], "hata": ""}; dosya yoksa/bozuksa ok False, hata kısa metin (kullanıcıya gider)
+    import csv
+    y = os.path.expanduser(str(yol or "").strip()); out = []
+    if not y: return {"ok": False, "kayitlar": [], "hata": "dosya yolu boş"}
+    uz = os.path.splitext(y)[1].lower()
+    if uz not in (".csv", ".tsv", ".json"): return {"ok": False, "kayitlar": [], "hata": "yalnız .csv, .tsv ya da .json"}
+    try:
+        if os.path.getsize(y) > 20_000_000: return {"ok": False, "kayitlar": [], "hata": "dosya çok büyük (20 MB üstü)"}
+        with open(y, encoding="utf-8-sig", errors="replace", newline="") as fh: ham = fh.read()
+    except OSError as e: return {"ok": False, "kayitlar": [], "hata": f"dosya okunamadı ({e.__class__.__name__})"}
+    if uz == ".json":
+        try: v = json.loads(ham)
+        except ValueError: return {"ok": False, "kayitlar": [], "hata": "JSON okunamadı"}
+        listeler = [("", v)] if isinstance(v, list) else [(k, x) for k, x in v.items() if isinstance(x, list)] if isinstance(v, dict) else []
+        if not listeler: return {"ok": False, "kayitlar": [], "hata": "JSON'da kayıt listesi yok"}
+        for ad, l in listeler:
+            for r in l:
+                s = _dd_satir(r, ad)
+                if s: out.append(s)
+                if len(out) >= DD_EN_COK: break
+    else:
+        try:
+            ilk = ham.splitlines()[0] if ham.strip() else ""
+            ayrac = "\t" if uz == ".tsv" or ilk.count("\t") > ilk.count(",") else ";" if ilk.count(";") > ilk.count(",") else ","
+            rd = csv.DictReader(ham.splitlines(), delimiter=ayrac)
+            if not rd.fieldnames or not any(_dd_norm(f) in DD_ALAN["metin"] for f in rd.fieldnames): return {"ok": False, "kayitlar": [], "hata": "başlık satırında metin/karar/iş sütunu yok"}
+            for r in rd:
+                s = _dd_satir(r)
+                if s: out.append(s)
+                if len(out) >= DD_EN_COK: break
+        except csv.Error: return {"ok": False, "kayitlar": [], "hata": "CSV okunamadı"}
+    return {"ok": True, "kayitlar": out, "hata": ""}
+def dis_defter_veri(ayar, kim=None, n=50):
+    # Bugün/hazırlık için: ayar dis_defter listesindeki dosya türlerinin açık kayıtları (kapalı olanlar sayılır, listelenmez); kim verilirse o kişinin (ilk ad) kayıtları önce
+    out = []
+    for d in (ayar or []) if isinstance(ayar, list) else []:
+        if not isinstance(d, dict) or str(d.get("tur") or "dosya") != "dosya": continue
+        ad = " ".join(str(d.get("ad") or "").split())[:40] or os.path.basename(str(d.get("yol") or ""))[:40] or "dış defter"
+        r = dis_defter_oku(d.get("yol")); ks = [x for x in r["kayitlar"] if not x["kapali"]]
+        if kim: ks.sort(key=lambda x: _ilk(x.get("sahip")) != _ilk(kim))
+        out.append({"ad": ad, "ok": r["ok"], "hata": r["hata"], "toplam": len(r["kayitlar"]), "acik": len(ks), "kayitlar": ks[:n]})
+    return out
+DISA_ALANLAR = ("tarih", "toplanti", "tur", "metin", "sahip", "vade", "durum", "kaynak_saat")
+def disa_aktar(dizin, bicim="csv"):
+    # Suflor'un karar grafı → CSV ya da JSON metni (kullanıcı dosyayı başka defterine kendisi yükler). Gizli toplantının kayıtları girmez; karar metnindeki teyit eki
+    # durum sütununa taşınır ("teyit bekliyor"). → (metin, dosya adı, kayıt sayısı)
+    satirlar = []
+    if os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")):
+        c = _db(dizin)
+        try: rs = c.execute("SELECT toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, saat, durum FROM kayit WHERE tur IN ('karar', 'is', 'soz', 'soru') ORDER BY tarih, id").fetchall()
+        finally: c.close()
+        ky = son_kayitlar(dizin); gz = {}
+        for top, baslik, tarih, tur, kim, sahip, metin, son, saat, durum in rs:
+            if top:
+                if top not in gz: gz[top] = gizli_mi(dizin, top, ky)
+                if gz[top]: continue
+            m = TEYIT_RX.search(metin or "")
+            satirlar.append({"tarih": tarih or "", "toplanti": baslik or "", "tur": tur, "metin": TEYIT_RX.sub("", metin or ""), "sahip": sahip or kim or "", "vade": son or "",
+                             "durum": "teyit bekliyor" if m else (durum or "acik"), "kaynak_saat": saat or ""})
+    damga = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    if bicim == "json":
+        return json.dumps({"kaynak": "Suflor.me", "olusturma": datetime.datetime.now().isoformat(timespec="seconds"), "kayitlar": satirlar}, ensure_ascii=False, indent=1), f"suflor-kararlar-{damga}.json", len(satirlar)
+    import csv, io
+    buf = io.StringIO(); w = csv.DictWriter(buf, fieldnames=list(DISA_ALANLAR), lineterminator="\n"); w.writeheader()
+    for s in satirlar: w.writerow(s)
+    return "﻿" + buf.getvalue(), f"suflor-kararlar-{damga}.csv", len(satirlar)
 def bugun_veri(dizin, ad, bugun=None):
     # Bugün sayfası için karar grafından: kullanıcının açık işleri, başkalarına atanmış açık işler, teyit bekleyen kararlar, son toplantının kararları.
     # Gizli toplantıdan gelen kayıt dönmez. Veri yoksa listeler boş (uydurma yok). ad boşsa "kendi" ve "baskalari" ayrılamaz → ikisi de boş.
@@ -243,7 +348,7 @@ def bugun_veri(dizin, ad, bugun=None):
         if not gorunur(top): continue
         if tur == "karar":
             m = TEYIT_RX.search(metin or ""); temiz = TEYIT_RX.sub("", metin or "")
-            k = {"id": f"k{i}", "metin": temiz, "teyit": bool(m), "neden": (m.group(1) or "").strip() if m else "", "baslik": baslik or "", "tarih": tarih or "", "toplanti": top}
+            k = {"id": f"k{i}", "metin": temiz, "teyit": bool(m), "neden": teyit_neden_sade((m.group(1) or "").strip()) if m else "", "baslik": baslik or "", "tarih": tarih or "", "toplanti": top}
             if m and len(out["teyit"]) < 20: out["teyit"].append(k)
             if son_top is None: son_top = top
             if top == son_top: son_kararlar.append(k)

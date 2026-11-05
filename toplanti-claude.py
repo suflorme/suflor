@@ -2246,6 +2246,11 @@ def hazirlik_cmd():
     print("\n".join("  - " + soz_satir(x) for x in sz[-10:]) or "  yok")
     if sz: print("  → her biri için hazir.json'a soyle kartı: \"<kim> <tarih>'e kadar <ne> demişti — durumunu sor\" (GEÇTİ olanlar önce); "
                  "toplantıda tutulduğu anlaşılırsa sonunda: soz kapat sN")
+    try:  # dış karar kaydı (ayar dis_defter, dosya türü): salt-okunur katman — kişinin kayıtları önce; Suflor'un grafına karışmaz, buraya yazılmaz
+        for d in _yapi().dis_defter_veri(AYAR.get("dis_defter"), A.kim or None, 10):
+            print(f"\n## Başka karar kaydı: {d['ad']} ({d['acik']} açık kayıt; yalnız okunur)")
+            print("\n".join(f"  - {x['tur']}: {x['metin']}" + (f" — {x['sahip']}" if x['sahip'] else "") + (f" · {x['vade']}" if x['vade'] else "") + (f" · {x['toplanti']}" if x['toplanti'] else "") for x in d["kayitlar"]) or ("  " + (d["hata"] if not d["ok"] else "yok")))
+    except Exception: pass
     try:  # "Bu toplantı e-postayla çözülebilir" işareti (yapi.eposta_isaret): kural tabanlı, son kararı Claude verir
         ik = _yapi().eposta_isaret(agj.get("items") or [], agj.get("title") or "", A.kisi)
         print("\n## E-posta yeterli mi? (işaret: " + ("GÜÇLÜ" if ik["guclu"] else "zayıf") + ")\n" + "\n".join("  - " + n for n in ik["nedenler"]))

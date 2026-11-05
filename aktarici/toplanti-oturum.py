@@ -41,9 +41,16 @@ def mcp_sunucu_adi(s):  # Claude Code'un araç adındaki sunucu biçimi (claude.
 KISI_VARSAYILAN = [{"sunucu": "plugin:sales:apollo", "araclar": [], "okuma": ["apollo_mixed_people_api_search", "apollo_organizations_lookup"], "konu": "kişi ve firma bilgisi (ad, unvan, şirket, alan adı); e-posta/telefon açma yok", "ad": "Apollo"}]
 def kisi_kaynaklari_liste():
     v = AYAR.get("kisi_kaynaklari"); return KISI_VARSAYILAN if v is None else (v if isinstance(v, list) else [])
+def dis_defter_kaynaklari():  # 5 Kasım (S212): ayar dis_defter'deki mcp türü — aynı şema, yalnız okuma; dosya türünü yapi.dis_defter_veri okur (Bugün, hazırlık)
+    out = []
+    for d in (AYAR.get("dis_defter") or []) if isinstance(AYAR.get("dis_defter"), list) else []:
+        if isinstance(d, dict) and d.get("tur") == "mcp" and str(d.get("sunucu") or "").strip():
+            out.append({"sunucu": d["sunucu"], "araclar": d.get("araclar") or [], "url": d.get("url") or "", "ad": str(d.get("ad") or d["sunucu"])[:60],
+                        "konu": "dış karar kaydı: kararlar, işler, toplantı kayıtları (yalnız okuma; sorguya kişi adı ve döküm alıntısı girmez)"})
+    return out
 def bilgi_kaynaklari():
     out = []
-    for k in list(AYAR.get("toplanti_bilgi_kaynaklari") or []) + list(kisi_kaynaklari_liste()):  # kisi_kaynaklari (5 Kasım): kişi/firma bilgi bağlayıcıları, aynı şema; "okuma" = adı okuma önekli olmayan okuma araçlarının tam adları
+    for k in list(AYAR.get("toplanti_bilgi_kaynaklari") or []) + dis_defter_kaynaklari() + list(kisi_kaynaklari_liste()):  # kisi_kaynaklari (5 Kasım): kişi/firma bilgi bağlayıcıları, aynı şema; "okuma" = adı okuma önekli olmayan okuma araçlarının tam adları
         if not isinstance(k, dict) or not str(k.get("sunucu") or "").strip(): continue
         ok_ = [str(x).strip() for x in (k.get("okuma") or []) if re.fullmatch(r"[A-Za-z0-9_]{1,64}", str(x).strip())]
         ar = [str(x).strip() for x in (k.get("araclar") or []) if re.fullmatch(r"[A-Za-z0-9_*?]{1,64}", str(x).strip())]
