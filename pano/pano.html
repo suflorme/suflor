@@ -1638,10 +1638,11 @@ const bnKendi=()=>((bnV||{}).kendi||[]).filter(x=>!bnGizli.has(x.id)),bnBaskasi=
 const bnYakin=x=>x.kalan_gun!=null&&x.kalan_gun<=2
 // S226: "Senden beklenenler" yalnız son 14 günün kendi işleri + kendi yürüttüğün toplantıların onay bekleyen kararları; daha eskisi (x.geride, sunucu işaretler) ayrı, katlanmış "Geride kalanlar"
 const bnKendiT=()=>bnKendi().filter(x=>!x.geride),bnTeyitT=()=>bnTeyit().filter(x=>!x.geride),bnGeride=()=>[...bnKendi().filter(x=>x.geride),...bnTeyit().filter(x=>x.geride)]
+const emDugme=x=>x.dis||!(x.kayit_id||x.id)?'':`<button type=button class=em data-bn=emenu data-kid="${esc(x.kayit_id||x.id)}" title="${L('Eylemler')}" aria-label="${L('Eylemler')}">${ic('dahasi')}</button>`
 function bnVadeEt(x){if(!x.vade)return'';const t=x.gecikti?L('{n} gün gecikti',{n:-x.kalan_gun}):x.kalan_gun===0?L('Bugün'):x.kalan_gun===1?L('Yarın'):x.vade;return`<span class="vade${x.gecikti?' gec':''}">${esc(t)}</span>`}
 function bnIsSatir(x,baskasi){const k=baskasi&&x.kim?`<button type=button class=varlik data-bn=panel data-ref="k:${esc(x.kim)}">${esc(x.kim)}</button>`:''
   return`<div class=sat data-id="${esc(x.id)}"><button type=button class=onay data-bn=isbit data-id="${esc(x.id)}" aria-label="${L('Yapıldı')}">${ic('check')}</button>
-    <div class=m><div class=t>${esc(x.metin)}</div><div class=a>${k}<span class=etiketk>${esc(x.baslik||L('İş'))}</span></div></div><div class=eylem>${bnVadeEt(x)}</div></div>`}
+    <div class=m><div class=t>${esc(x.metin)}</div><div class=a>${k}<span class=etiketk>${esc(x.baslik||L('İş'))}</span></div></div><div class=eylem>${bnVadeEt(x)}${emDugme(x)}</div></div>`}
 // İzleme (aktarici/izleme.py): başka panonun Drive'a yazdığı anlık görüntü, yalnız okunur. Sapma/kırmızı hesabı dosyada hazırdır; burada aynen gösterilir. Kart başlığı bağlantıysa dış sekmede açılır (https).
 const izBag=(t,u)=>u&&/^https:\/\//.test(u)?`<a href="${esc(u)}" target=_blank rel="noopener noreferrer">${esc(t)}</a>`:esc(t)
 const izOk=(a,b)=>a==null?'–':b==null||b===a?String(a):a+(a>b?' ↑':' ↓')  // önceki dönemle yön; yorum yok
@@ -1675,7 +1676,7 @@ function izPanel(ref,bas){const z=izV||{},blok=(t,h)=>h?`<div class=blok>${t?`<h
 function bnDisSatir(x,kaynak){const tur=x.tur==='karar'?L('Karar'):x.tur==='soru'?L('Açık soru'):L('İş')  // dış defter satırı: onay düğmesi yok (yalnız okunur), kaynak etiketi
   return`<div class="sat dis"><span class=kaynakn aria-hidden=true></span><div class=m><div class=t>${esc(x.metin)}</div><div class=a><span class="etiketk${x.tur==='karar'?' karar':''}">${esc(tur)}</span>${x.sahip?`<span>${esc(x.sahip)}</span>`:''}${x.toplanti?`<span>${esc(x.toplanti)}</span>`:''}<span class="etiketk dis">${esc(kaynak)}</span></div></div><div class=eylem>${x.vade?`<span class=vade>${esc(x.vade)}</span>`:''}</div></div>`}
 function bnKararSatir(x){return`<div class=sat data-id="${esc(x.id)}"><button type=button class="onay karar" data-bn=kararonay data-id="${esc(x.id)}" aria-label="${L('Onayla')}">${ic('check')}</button>
-    <div class=m><div class=t>${esc(x.metin)}</div><div class=a><span class="etiketk karar">${L('Karar')}</span><span>${esc(x.neden||L('onay bekliyor'))}</span></div></div><div></div></div>`}
+    <div class=m><div class=t>${esc(x.metin)}</div><div class=a><span class="etiketk karar">${L('Karar')}</span><span>${esc(x.neden||L('onay bekliyor'))}</span>${emOnayIs(x.onay)}</div></div><div class=eylem>${emDugme(x)}</div></div>`}
 function bnKararBlok(r){const sk=(bnV||{}).son_karar;if(!sk||!r||String(sk.toplanti||'').replace(/\.md$/,'')!==String(r.dosya||'').replace(/\.md$/,''))return''
   const ks=(sk.kararlar||[]).map(x=>({...x,teyit:x.teyit&&!bnGizli.has(x.id)}));if(!ks.length)return'';const tl=ks.filter(x=>x.teyit).map(x=>x.id)
   return`<ul class=kararlar>${ks.map(x=>`<li><span class=km>${esc(x.metin)}</span>${x.teyit?`<span class=sakin>${esc(x.neden||L('onay bekliyor'))}</span>`:''}</li>`).join('')}</ul>${tl.length?`<div class=keylem><button type=button class=b data-bn=kararlar data-idler="${esc(tl.join(','))}">${ic('check')}${L('Kararları onayla')}</button></div>`:''}`}
@@ -1817,7 +1818,7 @@ function knSatir(x){const kap=x.durum==='kapandi',top=knTop(x.toplanti),tur=x.tu
   const sol=x.dis?`<span class=kaynakn aria-hidden=true></span>`:kap?`<span class=oldu>${ic('check')}</span>`:x.tur==='is'?`<button type=button class=onay data-bn=isbit data-id="${esc(x.id)}" aria-label="${L('Yapıldı')}">${ic('check')}</button>`:x.tur==='karar'?`<button type=button class="onay karar" data-bn=kararonay data-id="${esc(x.id)}" aria-label="${L('Onayla')}">${ic('check')}</button>`:`<span class="onay soru" aria-hidden=true></span>`
   const git=x.dis?'':top&&top.id?`<button type=button class="b sade" data-bn=kngit data-sid="${esc(top.id)}" data-harita="${top.harita?'1':''}" title="${esc(top.baslik||'')}">${ic(top.harita?'harita':'belge')}${L(top.harita?'Toplantı panosu':'Özet')}</button>`:x.toplanti?`<button type=button class="b sade" data-bn=kngit data-top="${esc(x.toplanti)}">${ic('belge')}${L('Döküm')}</button>`:''
   const vd=x.vade?bnVadeEt(x):(!x.dis&&x.tur==='is'&&!kap?`<span class=vade>${L('Tarihsiz')}</span>`:'')
-  return`<div class="sat${kap?' kapali':''}${x.dis?' dis':''}" data-id="${esc(x.id||'')}">${sol}<div class=m><div class=t>${esc(x.metin)}</div><div class=a><span class="etiketk${x.tur==='karar'?' karar':''}">${esc(tur)}</span>${x.kim?`<button type=button class=varlik data-bn=knkisi data-k="${esc(x.kim)}">${esc(x.kim)}</button>`:''}${x.baslik?(x.dis?`<span>${esc(x.baslik)}</span>`:`<button type=button class=varlik data-bn=kntop data-t="${esc(x.toplanti)}">${esc(x.baslik)}</button>`):''}${x.tarih?`<span class=mono>${esc(x.tarih)}</span>`:''}${x.dis?`<span class="etiketk dis">${esc(x.kaynak)}</span>`:''}${x.neden?`<span>${esc(x.neden)}</span>`:''}</div></div><div class=eylem>${vd}${git}</div></div>`}
+  return`<div class="sat${kap?' kapali':''}${x.dis?' dis':''}" data-id="${esc(x.id||'')}">${sol}<div class=m><div class=t>${esc(x.metin)}</div><div class=a><span class="etiketk${x.tur==='karar'?' karar':''}">${esc(tur)}</span>${x.kim?`<button type=button class=varlik data-bn=knkisi data-k="${esc(x.kim)}">${esc(x.kim)}</button>`:''}${x.baslik?(x.dis?`<span>${esc(x.baslik)}</span>`:`<button type=button class=varlik data-bn=kntop data-t="${esc(x.toplanti)}">${esc(x.baslik)}</button>`):''}${x.tarih?`<span class=mono>${esc(x.tarih)}</span>`:''}${x.dis?`<span class="etiketk dis">${esc(x.kaynak)}</span>`:''}${x.neden?`<span>${esc(x.neden)}</span>`:''}${emOnayIs(x.onay)}${x.gundem&&x.gundem.baslik?`<span>${L('Gündemde: {t}',{t:esc(x.gundem.baslik)})}</span>`:''}</div></div><div class=eylem>${vd}${git}${emDugme(x)}</div></div>`}
 function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[]
   const dis=v?(v.dis||[]).flatMap(d=>d.ok?d.kayitlar.map(x=>({tur:x.tur,metin:x.metin,kim:x.sahip||'',baslik:x.toplanti||'',toplanti:'',vade:x.vade||'',durum:'acik',gecikti:false,tarihsiz:!x.vade,dis:true,kaynak:d.ad,id:''})):[]):[]
   const hepsi=[...ks,...dis],say=t=>hepsi.filter(x=>x.tur===t).length,liste=hepsi.filter(x=>x.tur===knSekme&&knSuzgec(x)).sort(knSira)
@@ -1893,6 +1894,7 @@ async function bnDinle(id){if(bnDin){const o=bnDin;bnDinleBit();try{await j('/br
   const so=bnBrifing(bnOlay.find(o=>o.id===id)||{},last||{}),sn=so&&so.ozet?Math.round(String(so.ozet).split(/\s+/).length/2.4)+3:20;bnDinT=setTimeout(bnDinleBit,sn*1000)}
 async function bnTik(ev){const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn,id=b.dataset.id
   if(a==='panel')return bnPanelAc(b.dataset.ref)
+  if(a==='emenu')return emAc(b.dataset.kid)
   if(a==='kapat')return bnPanelKapat()
   if(a==='menu'){const k=bnE('bnKenar');k.classList.add('acik');bnE('bnPerde').hidden=false;return}
   if(a==='onay')return bnOnayla(id,'onaylandi',!!b.dataset.pn)
@@ -1929,6 +1931,77 @@ document.getElementById('bgn').addEventListener('click',bnTik);document.getEleme
 document.getElementById('bgn').addEventListener('input',ev=>{if(ev.target.id!=='knAra')return;knSuz.ara=ev.target.value;clearTimeout(knAraT);knAraT=setTimeout(()=>{if(last)bnCiz(last)},150)});document.getElementById('bgn').addEventListener('submit',ev=>{if(ev.target.id!=='bnPrF')return;ev.preventDefault();const k=document.getElementById('bnPrK');provaAc(k?k.value.trim():'');if(k)k.value=''});bnE('bnPanel').addEventListener('click',bnTik);bnE('bnPerde').addEventListener('click',bnPanelKapat)
 bnE('bnGeri').addEventListener('click',ev=>{ev.stopPropagation();if(bnGeri)bnGeri();bnGeri=null;bnE('bnBild').classList.remove('acik')})
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&bnRef)bnPanelKapat()})
+
+// ---- Eylem menüsü (ortak karar katmanı, yerel; 5 Kasım): her kayıtta ⋯ → ertele · böl · gündeme ekle · ata · e-posta/Teams taslağı · Claude'a çalıştır · onayla/reddet · tarihçe · Geri al.
+// Aktarıcı: GET /kayit-menu?id= (menü bilgisi), POST /kayit-eylem {id, eylem, …} (aktarici/eylem-menu.py; her eylem bir olay). Taslaklar yalnız açılır, hiçbir şey gönderilmez; gizli toplantı kaydında eylem yok.
+let emKid='',emV=null,emMod='',emMsj='',emYuk=false
+{document.body.insertAdjacentHTML('beforeend',`<dialog id=emd aria-label="${L('Eylemler')}"><div class=emb><div><div class=eb id=emt></div><h2 id=emh></h2></div><button type=button class=ikon id=emx aria-label="${L('Kapat')}">${ic('x')}</button></div><div id=emg></div></dialog>`)}
+const EML={onayla:L('Onayla'),reddet:L('Reddet'),yapildi:L('Yapıldı'),iptal:L('İptal et'),ac:L('Yeniden aç'),cevaplandi:L('Cevaplandı'),ertele:L('Ertele'),bol:L('Parçalara böl'),gundem:L('Gündeme ekle'),ata:L('Ata'),eposta:L('E-posta taslağı'),teams:L('Teams taslağı'),claude:L("Claude'a çalıştır"),tarihce:L('Tarihçe'),geri_al:L('Geri al')}
+const EMI={onayla:'check',reddet:'x',yapildi:'check',iptal:'x',ac:'yenile',cevaplandi:'check',ertele:'clock',bol:'liste',gundem:'liste',ata:'kalem',eposta:'posta',teams:'sohbet',claude:'star',tarihce:'hist',geri_al:'yenile'}
+const EMA={eposta:L('Yalnız taslak açılır; göndermek sende'),teams:L('Yalnız taslak açılır; göndermek sende'),claude:L('Özet, yapılacaklar ve taslak mesaj; dışarı bir şey gitmez'),gundem:L('Sıradaki uygun toplantının gündemine girer'),bol:L('Alt işler olur; üst iş açık kalır')}
+const EMT={onayla:L('Karar onaylandı'),reddet:L('Karar reddedildi'),yapildi:L('Yapıldı olarak işaretlendi'),iptal:L('İptal edildi'),ac:L('Yeniden açıldı'),cevaplandi:L('Cevaplandı olarak işaretlendi'),ertele:L('Vade değişti'),bol:L('Parçalara bölündü'),ata:L('Atandı'),eposta:L('E-posta taslağı açıldı; göndermek sende'),teams:L('Teams taslağı açıldı; göndermek sende'),claude:L('Claude notu tarihçeye eklendi'),geri_al:L('Son değişiklik geri alındı')}
+const EMG=[['onayla','reddet','yapildi','iptal','ac','cevaplandi'],['ertele','bol','gundem','ata'],['eposta','teams','claude'],['tarihce','geri_al']]
+const emGun=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+// onay süresi göstergesi (3. gün hatırlatma, 7. gün ya da sonraki dizi toplantısında "onaylanmadı"): ince nokta + kısa metin
+const emOnayIs=o=>!o?'':o.durum==='onaylanmadi'?`<span class="onayis son" title="${esc(o.neden||'')}">${L('Onaylanmadı')}</span>`:o.hatirlat?`<span class=onayis title="${L('Toplantıdan beri {n} gün geçti',{n:o.gun})}">${L('{n}. gün: onay bekliyor',{n:o.gun})}</span>`:''
+const emBtn=k=>`<button type=button class=emi data-em=${['ertele','bol','gundem','ata','tarihce'].includes(k)?'mod':'run'} data-e=${k}${emYuk?' disabled':''}>${ic(EMI[k])}<span>${esc(EML[k])}${EMA[k]?`<small>${esc(EMA[k])}</small>`:''}</span></button>`
+function emKayit(){const k=emKid;let x=((knV||{}).kayitlar||[]).find(y=>y.kayit_id===k||y.id===k);if(!x){const b=bnV||{};x=[...(b.kendi||[]),...(b.baskalari||[]),...(b.teyit||[])].find(y=>y.kayit_id===k||y.id===k)}return x||(emV&&emV.kayit)||null}
+function emCiz(){const g=bnE('emg'),v=emV,x=emKayit()||{}
+  bnE('emt').textContent=x.tur==='karar'?L('Karar'):x.tur==='soru'?L('Açık soru'):L('İş');bnE('emh').textContent=String(x.metin||'')
+  let h=''
+  if(!v)h=`<p class=emsoluk>${L('Yükleniyor…')}</p>`
+  else if(!v.ok)h=`<p class=emhata>${v.err==='gizli'?L('Gizli toplantının kaydı: eylem yapılmaz.'):L('Kayıt bulunamadı.')}</p>`
+  else if(!emMod)h=EMG.map(gr=>gr.filter(k=>v.eylemler.includes(k)).map(emBtn).join('')).filter(Boolean).map(s=>`<div class=emgr>${s}</div>`).join('')+(v.geri_al?`<p class=emalt>${L('Geri al')}: ${esc(v.geri_al.ozet)}</p>`:'')
+  else h=`<button type=button class="b sade" data-em=geri>← ${L('Eylemler')}</button>`+emForm(v)
+  g.innerHTML=(emMsj?`<p class="emms${emYuk?' bekle':''}" role=status>${esc(emMsj)}</p>`:'')+h}
+function emForm(v){
+  if(emMod==='ertele'){const ev=/^\d{4}-\d{2}-\d{2}$/.test(v.kayit.vade||'')?v.kayit.vade:emGun(1)
+    return`<label class=emal>${L('Yeni vade')}<input type=date id=emVade value="${ev}"></label><div class=keylem><button type=button class="b sade" data-em=gun data-n=1>${L('Yarın')}</button><button type=button class="b sade" data-em=gun data-n=7>${L('Haftaya')}</button><button type=button class="b sade" data-em=gun data-n=30>${L('Ay sonuna doğru (30 gün)')}</button><button type=button class="b ana" data-em=yap data-e=ertele>${L('Ertele')}</button></div>`}
+  if(emMod==='bol')return`<label class=emal>${L('Her satıra bir parça (en az iki)')}<textarea id=emParca rows=4 placeholder="${L('Fiyatları topla')}\n${L('Teklif metnini yaz')}"></textarea></label><div class=keylem><button type=button class="b ana" data-em=yap data-e=bol>${L('Böl')}</button></div>`
+  if(emMod==='gundem'){const l=v.gundem||[]
+    return l.length?`<div class=emal>${L('Hangi toplantının gündemine?')}</div><div class=emsec>${l.map((a,i)=>`<label><input type=radio name=emG value="${esc(a.id)}"${i?'':' checked'}><span>${esc(a.tarih+' '+a.saat)} · ${esc(a.baslik||L('(başlıksız)'))}${a.ilgili?` <small>${L('ilgili kişi katılıyor')}</small>`:''}</span></label>`).join('')}</div><div class=keylem><button type=button class="b ana" data-em=yap data-e=gundem>${L('Gündeme ekle')}</button></div>`
+      :`<p class=emsoluk>${L('Takvimde sıradaki uygun toplantı yok.')}</p>`}
+  if(emMod==='ata'){const s=v.sahip||{},kl=(((knV||{}).kisiler)||[])
+    return`<label class=emal>${L('Kim')}<input type=text id=emKisi list=emKisiL maxlength=80 autocomplete=off value="${esc(s.ad||'')}"></label><datalist id=emKisiL>${kl.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>
+      <div id=emKim class=emkim>${emKimHtml(s)}</div><label class=emal>${L('E-posta adresi')}<input type=text id=emEp maxlength=120 autocomplete=off value="${esc(s.eposta||'')}"></label>
+      <div class=keylem><button type=button class="b ana" data-em=yap data-e=ata>${L('Ata')}</button><button type=button class=b data-em=yap data-e=atamail>${L('Ata ve e-posta taslağı')}</button></div><p class=emalt>${L('Kişi Suflor kullanmıyorsa e-posta taslağıyla haber ver; göndermek sende.')}</p>`}
+  if(emMod==='tarihce'){const l=[...(v.tarihce||[])].reverse()
+    return`<ul class=emtar>${l.map(o=>`<li><span>${esc(o.ozet)}</span>${o.metin?`<pre class=emnot>${esc(o.metin)}</pre>`:''}</li>`).join('')}</ul>`}
+  return''}
+function emKimHtml(k){if(!k||!k.ad&&!k.eposta&&!(k.adaylar||[]).length)return`<small>${L('Ad yazınca e-posta adresi bulunur.')}</small>`
+  if(k.eposta)return`<small>${esc(k.eposta)}${k.kaynak?' · '+esc({takvim:L('takvim'),kisiler:L('Kişiler'),vt:L('kayıt veritabanı'),elle:L('elle'),ayar:L('ayar'),ad_icinde:L('adın içinde'),eposta_yerel:L('adresten tahmin')}[k.kaynak]||k.kaynak):''}</small>`
+  return(k.adaylar||[]).length?`<small>${L('Birden çok aday var; birini seç:')}</small> ${k.adaylar.map(a=>`<button type=button class="b sade" data-em=aday data-ep="${esc(a)}">${esc(a)}</button>`).join('')}`:`<small>${L('E-posta bulunamadı; elle yazabilirsin.')}</small>`}
+async function emAc(kid){if(!kid)return;emKid=kid;emV=null;emMod='';emMsj='';emYuk=false;const d=bnE('emd');if(!d.open)d.showModal();emCiz()
+  let v={ok:false,err:'kayıt yok'};try{v=await j('/kayit-menu?id='+encodeURIComponent(kid))}catch(e){}
+  if(emKid===kid){emV=v;emCiz()}}
+const emYenile=()=>{bnVeriYukle(true);if(bnGor==='kayit')knYukle(true)}
+function emTaslakAc(t){if(!t)return
+  if(t.tur==='teams'){const a=document.createElement('a');a.href=t.teams;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();return}
+  const p=postaUrl({md:t.govde,baslik:t.konu,alicilar:t.alicilar||[]},(t.alicilar||[]).length?'k':'');if(p.kisa)try{navigator.clipboard.writeText(p.duz)}catch(e){};brAc(p.u,p.yeni)}
+async function emRun(e,p){if(emYuk)return{ok:false};emYuk=true;emMsj=e==='claude'?L('Claude çalışıyor… yarım dakikaya kadar sürebilir.'):'';emCiz()
+  let r={};try{r=await bnYaz('/kayit-eylem',Object.assign({id:emKid,eylem:e},p||{}))}catch(x){r={ok:false,err:'ağ'}}
+  emYuk=false
+  if(!r.ok){emMsj=r.err==='gizli'?L('Gizli toplantının kaydı: eylem yapılmaz.'):r.err==='ağ'?L('Aktarıcıya ulaşılamadı.'):(r.err||L('Yapılamadı.'));emCiz();return r}
+  emMsj=e==='gundem'&&r.toplanti?L('Gündeme eklendi: {t}',{t:r.toplanti.baslik||''}):r.olay===null&&e!=='geri_al'?L('Zaten böyle; değişiklik yok.'):(EMT[e]||'')+(r.alici_yok?' — '+L('alıcı adresi bulunamadı, taslak alıcısız açıldı'):'')
+  if(r.taslak)emTaslakAc(r.taslak)
+  try{emV=await j('/kayit-menu?id='+encodeURIComponent(emKid))}catch(x){}
+  emMod=e==='claude'?'tarihce':(['ertele','bol','gundem','ata'].includes(emMod)?'':emMod);emCiz();emYenile();return r}
+async function emKimBul(){const ad=(bnE('emKisi')||{}).value||'';if(ad.trim().length<2)return;let k={};try{k=await j('/kimlik?ad='+encodeURIComponent(ad.trim()))}catch(e){}
+  const el=bnE('emKim'),ep=bnE('emEp');if(!el||(bnE('emKisi').value||'')!==ad)return;el.innerHTML=emKimHtml(Object.assign({ad},k));if(ep&&k.eposta)ep.value=k.eposta}
+async function emTik(ev){const b=ev.target.closest('[data-em]');if(!b||b.disabled)return;const a=b.dataset.em,e=b.dataset.e
+  if(a==='run')return emRun(e)
+  if(a==='mod'){emMod=e;emMsj='';emCiz();return}
+  if(a==='geri'){emMod='';emMsj='';emCiz();return}
+  if(a==='gun'){const i=bnE('emVade');if(i)i.value=emGun(+b.dataset.n);return}
+  if(a==='aday'){const i=bnE('emEp');if(i)i.value=b.dataset.ep;return}
+  if(a==='yap'){
+    if(e==='ertele')return emRun('ertele',{vade:(bnE('emVade')||{}).value||''})
+    if(e==='bol')return emRun('bol',{parcalar:((bnE('emParca')||{}).value||'').split('\n').map(s=>s.trim()).filter(Boolean)})
+    if(e==='gundem'){const r=document.querySelector('input[name=emG]:checked');return emRun('gundem',{etkinlik:r?r.value:''})}
+    if(e==='ata'||e==='atamail'){const ad=(bnE('emKisi')||{}).value||'',ep=((bnE('emEp')||{}).value||'').trim();if(!ad.trim()&&!ep){emMsj=L('Kişi adı yaz.');emCiz();return}
+      const r=await emRun('ata',{sahip:ad,eposta:ep});if(e==='atamail'&&r.ok)return emRun('eposta',{alicilar:(r.eposta||ep)?[r.eposta||ep]:[],alici_ad:ad})}}}
+{const d=bnE('emd');d.addEventListener('click',ev=>{if(ev.target===d){d.close();return}emTik(ev)});bnE('emx').addEventListener('click',()=>d.close());d.addEventListener('close',()=>{emKid='';emV=null})
+ d.addEventListener('change',ev=>{if(ev.target.id==='emKisi')emKimBul()})}
 
 // ---- Prova odası: bir karar ya da sunumu karşı taraf kişilikleriyle sına (aktarıcıda aktarici/prova.py; /prova) ----
 {document.body.insertAdjacentHTML('beforeend',`<dialog id=prd aria-label="${L('Prova odası')}"><div class=prb><div><div class=eb>${L('Prova odası')}</div><h2 id=prh></h2></div><span class=prnokta id=prn aria-hidden=true></span><button type=button class=ikon id=prx aria-label="${L('Kapat')}">${ic('x')}</button></div><div id=prg></div></dialog>`)}

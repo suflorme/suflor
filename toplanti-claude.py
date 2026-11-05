@@ -888,12 +888,14 @@ def _vt_terimler():  # → [{terim, tur, takma}] — kilit hatasında 1,5 sn bek
             return []
         except Exception: return []
     return []
+def _vt_kisi_adres():  # ortak karar katmanı: ayar veritabani.kisi_adres satırları [[adlar "Ad, lakap", adresler "a@x,b@y"], …] → aktarıcının kimlik modülüne (bellekte; /vt-bellek)
+    return [[str(r[0] or "")[:300], str(r[1])[:600]] for r in vt_sorgu("kisi_adres") if r and len(r) > 1 and r[1] and "@" in str(r[1])][:20000]
 def _vt_adlar(): return sorted({x.strip() for r in vt_sorgu("kisiler") for x in str((r or [""])[0] or "").split(",") if len(x.strip()) >= 3})
 def _vt_bellek_gonder():  # → True: aktarıcı aldı
-    ad, tr = _vt_adlar(), _vt_terimler()
-    if not ad and not tr: return False
+    ad, tr = _vt_adlar(), _vt_terimler(); ka = _vt_kisi_adres()
+    if not ad and not tr and not ka: return False
     try:
-        r = json.load(urllib.request.urlopen(urllib.request.Request(A.relay + "/vt-bellek", data=json.dumps({"adlar": ad, "terimler": tr}, ensure_ascii=False).encode(), method="POST",
+        r = json.load(urllib.request.urlopen(urllib.request.Request(A.relay + "/vt-bellek", data=json.dumps(dict({"adlar": ad, "terimler": tr}, **({"kisi_adres": ka} if ka else {})), ensure_ascii=False).encode(), method="POST",
                                                                      headers={"Content-Type": "application/json"}), timeout=5))
         return bool(r.get("ok"))
     except Exception: return False

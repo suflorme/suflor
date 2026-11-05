@@ -1395,7 +1395,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/izleme"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1821,6 +1821,8 @@ bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
 bolum("prova")  # aktarici/prova.py — Prova odası: karar/sunumu karşı taraf kişilikleriyle sına, rapor (brifing-ses ve bas-konus bölümlerinden sonra)
 bolum("claude-giris")  # aktarici/claude-giris.py — Claude Code girişi düşünce: günlük, sesli uyarı, bildirim, 30 dk yoklama (v0.130.0)
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
+bolum("kimlik")  # aktarici/kimlik.py — kişi adı → şirket e-postası eşlemesi, elle düzeltme, eşlenemeyenler (ortak karar katmanı A1)
+bolum("eylem-menu")  # aktarici/eylem-menu.py — kayıt eylem menüsü: ertele, böl, gündeme ekle, ata, taslak, Claude'a çalıştır, Geri al (/kayit-menu, /kayit-eylem; ortak karar katmanı)
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
@@ -2238,6 +2240,9 @@ class H(BaseHTTPRequestHandler):
         if yol == "/toplanti-oturum":  # v0.111.0: arka plandaki toplantı oturumunun iletileri (?n=<son görülen>)
             m = re.search(r"[?&]n=([0-9]{1,9})(?:&|$)", self.path); return self._json(toplanti_oturum_mesajlar(int(m.group(1)) if m else 0))
         if self.path == "/geri-bildirim/onizle": return self._json(teshis_gonder("geri_bildirim", {"kullanici_metni": "(yazdığın metin)"}, onizle=True))
+        if yol == "/kimlik":  # A1: ?ad=<ad> → kimlik_coz; adsız → kayıtlardaki eşlenemeyenler (yalnız okuma)
+            import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
+            return self._json(kimlik_view(ad) if "kimlik_view" in globals() else {"durum": "hata", "hata": "kimlik yok"})
         if yol == "/kisi":  # S225: Mac Kişiler'den yalnız okuma (aktarici/talimat.py kisi_bul); ?ad=<ad>; Konuş MCP aracı ve `toplanti-claude.py kisi` çağırır
             import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
             return self._json(kisi_bul(ad) if "kisi_bul" in globals() else {"durum": "hata", "hata": "kisi_bul yok"})
@@ -2259,6 +2264,7 @@ class H(BaseHTTPRequestHandler):
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
         if yol == "/prova": return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
+        if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
         if yol == "/kayitlar": return self._json(kayitlar_view())  # Kararlar ve işler görünümü (anahtarlı)
         if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
@@ -2334,6 +2340,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/prova": return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
         if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
+        if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/Claude/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
         if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
         if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
         if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)

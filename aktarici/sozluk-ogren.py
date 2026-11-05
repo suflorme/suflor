@@ -16,11 +16,14 @@ def vt_bellek_al(p):  # POST /vt-bellek (anahtarlı) — yalnız beklenen alanla
         tr.append({"terim": " ".join(x["terim"].split())[:120], "tur": str(x.get("tur") or "")[:20],
                    "takma": [" ".join(str(t).split())[:120] for t in (x.get("takma") or [])[:20] if isinstance(t, str) and t.strip()]})
     VT_BELLEK.update(t=time.time(), adlar=ad, terimler=tr)
+    if "kisi_adres" in p and "kimlik_vt_yukle" in globals():  # ortak karar katmanı: kişi ad/lakap → e-posta (ayar veritabani.kisi_adres); yalnız bellekte, günlüğe adres yazılmaz
+        ka = [[" ".join(str(r[0]).split())[:300], str(r[1])[:600]] for r in (p.get("kisi_adres") or [])[:20000] if isinstance(r, (list, tuple)) and len(r) >= 2 and isinstance(r[0], str) and isinstance(r[1], str) and "@" in r[1]]
+        print(f"KİMLİK: kayıt veritabanından {kimlik_vt_yukle(ka)} kişinin adresi belleğe alındı")
     if "_AD" in globals(): _AD["t"] = 0.0  # Konuş ad listesi yeniden kurulsun
     print(f"SÖZLÜK ÖĞRENME: kayıt veritabanından {len(ad)} ad, {len(tr)} terim belleğe alındı")
     if "so_tetik" in globals() and any(a.get("neden") == "oh_bekleniyor" for a in _so_defter_oku().values()): so_tetik()
     return {"ok": True, "adlar": len(ad), "terimler": len(tr)}
-def vt_bellek_view(): return {"ok": True, "adlar": len(VT_BELLEK["adlar"]), "terimler": len(VT_BELLEK["terimler"]), "t": round(VT_BELLEK["t"]), "acilis": globals().get("ACILIS")}
+def vt_bellek_view(): return {"ok": True, "adlar": len(VT_BELLEK["adlar"]), "terimler": len(VT_BELLEK["terimler"]), "t": round(VT_BELLEK["t"]), "acilis": globals().get("ACILIS"), "kimlik": len(globals().get("KIMLIK_VT") or {})}
 if "STATE" in globals():  # yalnız aktarıcıda: eski kalıcı ad dosyası (v0.60.0) bir kez silinir — adlar artık yalnız bellekte (3 Kasım)
     try: os.remove(os.path.join(BASE, "vt-adlar.json")); print("SÖZLÜK ÖĞRENME: eski vt-adlar.json silindi (kayıt veritabanı adları artık yalnız bellekte)")
     except OSError: pass

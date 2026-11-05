@@ -5,7 +5,8 @@
 #  - toplantı listesi, arama, döküm: aktarıcının /toplantilar uçları (127.0.0.1, X-Suflor-Anahtar = <canlı klasör>/kart-anahtari.txt; anahtar yoksa
 #    ya da reddedilirse araç hata döner). Aktarıcı kapalıysa bu araçlar "aktarıcı yanıt vermiyor" der.
 #  - özet: aktarıcının kayıt dosyası son-toplantilar.jsonl'in gösterdiği özet kopyası (canlı klasörün içinde olmalı).
-#  - karar, iş, açık soru: karar grafı (canli/karar-grafi.sqlite); yazma yapi.py'nin işleviyle (soz_kapat) — toplanti-claude.py soz/yapi ile aynı yol.
+#  - karar, iş, açık soru: karar grafı (canli/karar-grafi.sqlite); yazma yapi.py'nin işlevleriyle (soz_kapat, karar_onayla, karar_yaz) — hepsi olay günlüğüne
+#    kaynak "arsiv-mcp" ile yazar (A0); toplanti-claude.py soz/yapi ile aynı yol. Teyit artık alan (onay); metinde bugünkü biçimde "(teyit bekliyor — …)" görünür.
 # Gizli toplantılar (dökümde **GİZLİ** satırı ya da özet kaydında gizli: true) hiçbir araçta dönmez; listede, aramada, kararda, işte yok.
 # Yazma araçları (is_durumu, karar_onayla, karar_duzelt): ilk çağrı yazmaz, {"onay_gerekli": true, "ozet": …} döner; aynı çağrı "onayla": true ile uygular.
 # Kullanım (örnek yapılandırma KILAVUZ.md "Claude'dan arşive erişim"): python3 -B arsiv-mcp.py [--dir <canlı klasör>] [--relay http://127.0.0.1:<port>]
@@ -52,18 +53,24 @@ def gizli_mi(i, kayitlar=None): return yapi.gizli_mi(DIR, i, kayitlar)
 
 # --- karar grafı ------------------------------------------------------------------------------------------------------
 def _graf_yol(): return os.path.join(DIR, "karar-grafi.sqlite")
+_HAZIR = []
 def graf_oku(sorgu, param=()):
     if not os.path.exists(_graf_yol()): return []
+    if not _HAZIR:  # şema eskiyse bir kez göç (yapi._db); sonra salt okuma
+        try: yapi.graf_hazir(DIR); _HAZIR.append(1)
+        except sqlite3.Error as e: raise AracHatasi(f"karar grafı açılamadı ({e.__class__.__name__})")
     try:
         c = sqlite3.connect("file:" + urllib.parse.quote(_graf_yol()) + "?mode=ro", uri=True, timeout=5)
         try: return c.execute(sorgu, param).fetchall()
         finally: c.close()
     except sqlite3.Error as e: raise AracHatasi(f"karar grafı okunamadı ({e.__class__.__name__})")
-KOLON = "id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, saat, durum"
+KOLON = "id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, saat, durum, onay, onay_neden, kayit_id"
 def _satir(r):
-    i, top, baslik, tarih, tur, kim, sahip, metin, son, saat, durum = r
+    i, top, baslik, tarih, tur, kim, sahip, metin, son, saat, durum, onay, neden, kid = r
     on = {"karar": "k", "soru": "q"}.get(tur, "s")
-    x = {"id": f"{on}{i}", "tur": tur, "metin": metin, "toplanti": (top or "")[:-3] if (top or "").endswith(".md") else top, "baslik": baslik, "tarih": tarih, "durum": durum}
+    x = {"id": f"{on}{i}", "tur": tur, "metin": yapi.metin_gorunum(metin, onay, neden), "toplanti": (top or "")[:-3] if (top or "").endswith(".md") else top, "baslik": baslik, "tarih": tarih,
+         "durum": durum, "kayit_id": kid or ""}
+    if onay: x["onay"] = onay
     for k, v in (("kim", kim), ("sahip", sahip), ("son_tarih", son), ("saat", saat)):
         if v: x[k] = v
     return x
@@ -170,25 +177,26 @@ def t_sorular(a):
 def _onay(a, ozet, uygula):
     if a.get("onayla") is not True: return {"onay_gerekli": True, "ozet": ozet, "nasil": "Kullanıcı onaylarsa aynı çağrıyı \"onayla\": true ile yeniden gönder; yazılmadı."}
     return dict(uygula(), uygulandi=True)
+YAZAN = None  # olayın yazanı: yapi.yazan_varsayilan() (ayardaki eposta_kimlik ya da ad)
 def t_is_durumu(a):
     x = _kayit_bul(a.get("id"), ("is", "soz")); d = str(a.get("durum") or "").strip().lower()
     yeni = {"yapildi": "tutuldu" if x["tur"] == "soz" else "yapildi", "yapilmadi": "iptal", "acik": "acik"}.get(d)
     if not yeni: raise AracHatasi("durum: yapildi | yapilmadi | acik")
     if x["durum"] == yeni: return {"degisiklik_yok": True, "kayit": x}
     def uygula():
-        r = yapi.soz_kapat(DIR, x["id"], yeni)
+        r = yapi.soz_kapat(DIR, x["id"], yeni, YAZAN, "arsiv-mcp")
         if not r: raise AracHatasi("iş güncellenemedi")
         return {"kayit": dict(x, durum=yeni)}
     return _onay(a, f"{x['id']} \"{x['metin'][:120]}\" işi: {x['durum']} → {yeni}" + (f" (sahip {x['sahip']})" if x.get("sahip") else ""), uygula)
-TEYIT_RX = yapi.TEYIT_RX  # yapi.graf_yaz ekler
+TEYIT_RX = yapi.TEYIT_RX  # görüntü metnindeki ek (alan: onay)
 def _karar_yaz(id_, metin):
-    if not yapi.karar_yaz(DIR, id_, metin): raise AracHatasi("karar güncellenemedi")
+    if not yapi.karar_yaz(DIR, id_, metin, YAZAN, "arsiv-mcp"): raise AracHatasi("karar güncellenemedi")
 def t_karar_onayla(a):
     x = _kayit_bul(a.get("id"), ("karar",))
-    if not TEYIT_RX.search(x["metin"]): return {"degisiklik_yok": True, "not": "bu kararda teyit bekliyor işareti yok", "kayit": x}
+    if x.get("onay") != "bekliyor": return {"degisiklik_yok": True, "not": "bu kararda teyit bekliyor işareti yok", "kayit": x}
     yeni = TEYIT_RX.sub("", x["metin"])
     def uygula():
-        if yapi.karar_teyit_kaldir(DIR, x["id"]) is None: raise AracHatasi("karar güncellenemedi")
+        if yapi.karar_teyit_kaldir(DIR, x["id"], YAZAN, "arsiv-mcp") is None: raise AracHatasi("karar güncellenemedi")
         return {"kayit": dict(x, metin=yeni)}
     return _onay(a, f"{x['id']} kararı onaylanır (teyit bekliyor işareti kalkar): \"{yeni[:160]}\"", uygula)
 def t_karar_duzelt(a):

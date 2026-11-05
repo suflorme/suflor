@@ -14,10 +14,10 @@ def ok(ad, k):
 T = tempfile.mkdtemp(prefix="suflor-vt-izle-"); proje, canli = os.path.join(T, "proje"), os.path.join(T, "canli")
 os.makedirs(proje); os.makedirs(canli)
 DB = os.path.join(proje, "kayit.db"); con = sqlite3.connect(DB)
-con.executescript("CREATE TABLE kisi (id TEXT PRIMARY KEY, ad TEXT, lakap TEXT, sifre TEXT); INSERT INTO kisi VALUES ('a','Vedran Kaya','Vedo','gizli1');")
+con.executescript("CREATE TABLE kisi (id TEXT PRIMARY KEY, ad TEXT, lakap TEXT, sifre TEXT, eposta TEXT); INSERT INTO kisi VALUES ('a','Vedran Kaya','Vedo','gizli1','vedran.kaya' || char(64) || 'firma.test');")
 con.commit(); con.close()
 json.dump({"alan": "Test", "ad": "Deneme", "port": PORT, "uygulama": os.path.join(T, "uyg"), "proje": proje, "ortak": os.path.join(T, "ortak"), "dil": "tr",
-           "veritabani": {"yol": "kayit.db", "kisiler": "SELECT ad || coalesce(','||lakap,''), ad FROM kisi"}}, open(os.path.join(T, "ayar.json"), "w"))
+           "veritabani": {"yol": "kayit.db", "kisiler": "SELECT ad || coalesce(','||lakap,''), ad FROM kisi", "kisi_adres": "SELECT ad || coalesce(','||lakap,''), eposta FROM kisi"}}, open(os.path.join(T, "ayar.json"), "w"))
 ENV = dict(os.environ, SUFLOR_AYAR=os.path.join(T, "ayar.json"), PYTHONDONTWRITEBYTECODE="1")
 tc = lambda *a, **k: subprocess.run([sys.executable, os.path.join(KOD, "toplanti-claude.py"), "--dir", canli, *a], env=ENV, capture_output=True, text=True, **k)
 oku = lambda f: json.load(open(os.path.join(canli, f), encoding="utf-8"))
@@ -38,11 +38,12 @@ try:
        and not os.path.exists(os.path.join(canli, "vt-adlar.json")) and r.returncode == 0)
     ok("tablo yapısı, gizli sütun işaretli", "kisi (tablo, 1 satır)" in open(os.path.join(canli, "vt-sema.txt")).read() and "sifre [gizli]" in open(os.path.join(canli, "vt-sema.txt")).read())
     ok("kişi ve takma adlar aktarıcıya anahtarlı POST /vt-bellek ile", GELEN and GELEN[-1][0] == "/vt-bellek" and set(GELEN[-1][1]["adlar"]) == {"Vedran Kaya", "Vedo"} and GELEN[-1][2] == "deneme-anahtar")
+    ok("kişi adresleri (ortak karar katmanı kimlik modülü için) aynı POST'ta", GELEN[-1][1].get("kisi_adres") == [["Vedran Kaya,Vedo", "vedran.kaya" + chr(64) + "firma.test"]])
     m = oku("vt-mt.json"); ok("değişme saati ve denetim anı", abs(m["mt"] - os.path.getmtime(DB)) < 1 and time.time() - m["kontrol"] < 10)
     ok("önbellek dosyaları yalnız sahibine açık (0600)", all(oct(os.stat(os.path.join(canli, f)).st_mode & 0o777) == "0o600" for f in ("vt-sema.txt", "vt-mt.json")))
     # önbellekteki sorgu veritabanı değişince yeniden çalışır
     json.dump({"SELECT count(*) AS n FROM kisi": {"t": 0, "kontrol": 0, "mt": 0, "sonuc": "n\n0\n(1 satır)"}}, open(os.path.join(canli, "vt-sonuc.json"), "w"))
-    con = sqlite3.connect(DB); con.execute("INSERT INTO kisi VALUES ('b','Selin Ak',NULL,'x')"); con.commit(); con.close()
+    con = sqlite3.connect(DB); con.execute("INSERT INTO kisi VALUES ('b','Selin Ak',NULL,'x',NULL)"); con.commit(); con.close()
     tc("vt-izle", "--bir"); s = oku("vt-sonuc.json")["SELECT count(*) AS n FROM kisi"]
     ok("veritabanı değişince önbellekteki sorgu yeniden çalıştı ve adlar güncellendi", "\n2\n" in s["sonuc"] and time.time() - s["kontrol"] < 10 and "Selin Ak" in GELEN[-1][1]["adlar"])
     BELLEK["dolu"] = False; n0 = len(GELEN); tc("vt-izle", "--bir")

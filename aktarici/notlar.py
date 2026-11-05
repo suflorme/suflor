@@ -228,7 +228,7 @@ def kayit_dogrula(komut, arg):  # → (hazır iş sözlüğü, None) ya da (None
         if not x: return None, _t(f"{arg['id']} kaydı yok", f"no record {arg['id']}")
         temiz = y.TEYIT_RX.sub("", x["metin"] or "")
         if komut == "karar_onayla":
-            if not y.TEYIT_RX.search(x["metin"] or ""): return None, _t(f"{x['id']} zaten onaylı", f"{x['id']} is already confirmed")
+            if x.get("onay", "bekliyor" if y.TEYIT_RX.search(x["metin"] or "") else None) != "bekliyor": return None, _t(f"{x['id']} zaten onaylı", f"{x['id']} is already confirmed")
             return {"komut": komut, "id": x["id"], "ozet": _t(f"«{kisa(temiz)}» kararı onaylanır", f"decision «{kisa(temiz)}» is confirmed")}, None
         if komut == "karar_duzelt":
             yeni = _kayit_metin(arg["metin"], 3, 500)
@@ -335,11 +335,7 @@ def kayit_uygula(is_):  # onaylanmış işi yapar (önce yeniden doğrular) → 
         elif k == "karar_duzelt": ok_ = bool(y.karar_yaz(BASE, h["id"], h["metin"]))
         elif k == "is_durum": ok_ = bool(y.soz_kapat(BASE, h["id"], h["durum"]))
         elif k == "is_ekle": x = y.soz_ekle(BASE, h["kim"], h["metin"], h["tarih"], h["toplanti"], h["baslik"]); ok_ = bool(x); h["ozet"] += f" ({x['id']})" if x else ""
-        elif k == "soru_kapat":
-            c = y._db(BASE)
-            try:
-                with c: ok_ = c.execute("UPDATE kayit SET durum = 'cevaplandi' WHERE id = ? AND tur = 'soru' AND durum = 'acik'", (int(h["id"][1:]),)).rowcount == 1
-            finally: c.close()
+        elif k == "soru_kapat": ok_ = bool(y.kayit_durum(BASE, h["id"], "cevaplandi")[0])  # ortak katman: olay günlüğü üzerinden (durum_degisti)
         elif k == "proje_kayit":  # projenin kendi kayıt betiği: Brifing.app kayıt kipi (Masaüstü izni orada; kabuksuz, zaman aşımlı)
             b, r = kayit_brifing("proje_kayit", {"alt": h["alt"], "argumanlar": h["argumanlar"]})
             if not b: return False, r

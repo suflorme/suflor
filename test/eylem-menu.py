@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+# Eylem menüsü (ortak karar katmanı, yerel; yapi.py kayit_eylem / eylem_menu / taslak_icerik / gundem_adaylari / son_geri_alinabilir + aktarici/eylem-menu.py): her eylem tam bir olay yazar,
+# Geri al son olayı döndürür (art arda bir öncekine iner), gizli toplantı kaydında hiçbir eylem (Claude dahil) çalışmaz, taslak bağlantıları doğru (mailto gövdesi yok, msteams: derin bağlantı) ve
+# hiçbir şey gönderilmez, ata + kimlik e-postası, gündem taslağıyla tutarlılık, Claude'a çalıştır yalnız kaydı gönderir ve sonucu yorum olarak bağlar, aktarıcı ucu (sahte model, sahte takvim).
+#   PYTHONDONTWRITEBYTECODE=1 python3 test/eylem-menu.py      (~3 sn; ağ, Claude, aktarıcı ve gerçek veri yok)
+import datetime, json, os, re, sqlite3, sys, tempfile, time, urllib.parse
+sys.dont_write_bytecode = True; KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, KOD)
+T = tempfile.mkdtemp(prefix="suflor-eylemmenu-"); AY = os.path.join(T, "ayar.json")
+json.dump({"ad": "Ayşe Deneme"}, open(AY, "w")); os.environ["SUFLOR_AYAR"] = AY
+import yapi
+AT = chr(64); hata = []
+def bak(ad, k, ek=None):
+    print(("✓ " if k else "✗ ") + ad + ("" if k or ek is None else f" → {ek}"))
+    if not k: hata.append(ad)
+BAS = "| Saat | Konuşmacı | Metin | İşaret |\n|---|---|---|---|\n"
+def dokum(C, ad, gizli=False):
+    open(os.path.join(C, ad + ".md"), "w", encoding="utf-8").write(f"# Canlı transkript — {ad}\n\n" + BAS + "| 10:00:00 | Ayşe Deneme | merhaba | |\n" + ("| 10:00:05 | **GİZLİ** | açıldı | |\n" if gizli else ""))
+def db(C): return sqlite3.connect(os.path.join(C, "karar-grafi.sqlite"))
+def olay_say(C): return db(C).execute("SELECT COUNT(*) FROM olay").fetchone()[0]
+def son_olaylar(C, n): return [r for r in db(C).execute("SELECT olay_id, tur, kaynak FROM olay ORDER BY saat DESC LIMIT ?", (n,))][::-1]
+C = os.path.join(T, "canli"); os.makedirs(C)
+D1, G = "2026-11-03-1000-Haftalik-Butce", "2026-11-04-1500-Ozel"; dokum(C, D1); dokum(C, G, True)
+yapi.graf_yaz(C, {"baslik": "Haftalık bütçe", "tarih": "2026-11-03", "maddeler": [{"baslik": "G", "ogeler": [
+    {"tur": "is", "metin": "Tabloyu güncelle", "sahip": "Can Örnek", "tarih": "2026-11-10", "saat": "10:10:00"},
+    {"tur": "karar", "metin": "Tedarikçi Mart'ta seçilecek", "kim": "Can Örnek", "saat": "10:07:00", "netlik": "ortuk"},
+    {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Can Örnek", "saat": "10:14:00"},
+    {"tur": "soz", "metin": "Listeyi getirecek", "sahip": "Zeynep Kaya", "tarih": "2026-11-07", "saat": "10:13:00"}]}]}, D1 + ".md")
+yapi.graf_yaz(C, {"baslik": "Özel", "tarih": "2026-11-04", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "is", "metin": "Gizli iş", "sahip": "Can Örnek"}, {"tur": "karar", "metin": "Gizli karar", "netlik": "ortuk"}]}]}, G + ".md")
+v = yapi.kayit_listesi(C, "Ayşe Deneme", datetime.date(2026, 11, 5)); K = {x["metin"]: x for x in v["kayitlar"]}
+IS, KARAR, SORU, SOZ = K["Tabloyu güncelle"]["id"], K["Tedarikçi Mart'ta seçilecek"]["id"], K["KDV dahil mi?"]["id"], K["Listeyi getirecek"]["id"]
+def _id(metin, onek): return onek + str(db(C).execute("SELECT id FROM kayit WHERE metin = ?", (metin,)).fetchone()[0])
+GIZLI_IS, GIZLI_KARAR = _id("Gizli iş", "s"), _id("Gizli karar", "k")
+IS_KID = yapi.ortak_kayit(C, IS)["kayit_id"]; GIZLI_KID = yapi.ortak_kayit(C, GIZLI_IS)["kayit_id"]  # özet yeniden yazılınca yerel kimlik (s1) düşebilir; kalıcı kimlik kalır
+bak("gizli toplantının kayıtları listede yok", not any("Gizli" in x["metin"] for x in v["kayitlar"]))
+# sahte bağımlılıklar
+KIM = []
+def kimlik_f(ad): KIM.append(ad); return {"Zeynep Kaya": {"eposta": "zeynep.kaya" + AT + "firma.test", "kaynak": "takvim", "guven": 0.95, "adaylar": []}, "Deniz": {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": ["deniz.a" + AT + "firma.test", "deniz.t" + AT + "firma.test"]}}.get(ad, {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": []})
+SIMDI = datetime.datetime(2026, 11, 5, 12, 0).astimezone()
+def ev(i, saat, baslik, kisiler=(), **ek): return dict({"id": i, "baslik": baslik, "baslangic": (SIMDI.replace(hour=saat[0], minute=saat[1]) + datetime.timedelta(days=saat[2] if len(saat) > 2 else 0)).isoformat(), "kisi_sayisi": 3,
+                                                       "katilimcilar": list(kisiler), "kisiler": [{"ad": k, "eposta": ""} for k in kisiler]}, **ek)
+TAKVIM = [ev("gecmis", (9, 0), "Geçmiş"), ev("t1", (15, 0), "Satış haftalık", ["Emre Kural"]), ev("t2", (16, 0), "Tedarik", ["Zeynep Kaya"]), ev("tg", (14, 0), "Tüm gün", tum_gun=True), ev("tr", (13, 0), "Reddedilen", reddettin=True),
+          ev("tp", (13, 30), "Paylaşılan", paylasilan=True), ev("tek", (13, 40), "Tek kişi", kisi_sayisi=1), ev("yarin", (10, 0, 1), "Yarın", ["Zeynep Kaya"])]
+def eylem(kimlik, e, p=None, **k): return yapi.kayit_eylem(C, kimlik, e, p, kimlik_f=kimlik_f, takvim=TAKVIM, simdi=SIMDI, **k)
+def tek_olay(ad, kimlik, e, p=None, tur=None, ek=0, **k):  # eylem tam bir olay yazar (böl: ek = alt kayıtların kayit_olustu olayları)
+    n = olay_say(C); r = eylem(kimlik, e, p, **k); d = olay_say(C) - n
+    bak(f"{ad}: ok, tam bir olay" + (f" ({tur})" if tur else ""), r.get("ok") and d == 1 + ek and r.get("olay") and (not tur or son_olaylar(C, 1 + ek)[-1][1] == tur), (r, d))
+    return r
+# --- menü bilgisi ---
+m = yapi.eylem_menu(C, IS, TAKVIM, kimlik_f, SIMDI)
+bak("iş menüsü: yapıldı, iptal, ertele, böl, gündem, ata, taslaklar, Claude, tarihçe; Geri al yok (yalnız oluşturma olayı)", m["ok"] and m["eylemler"] == ["yapildi", "iptal", "ertele", "bol", "gundem", "ata", "eposta", "teams", "claude", "tarihce"] and m["geri_al"] is None, m)
+bak("karar menüsü: onayla/reddet; soru: cevaplandı", yapi.eylem_menu(C, KARAR, TAKVIM)["eylemler"][:2] == ["onayla", "reddet"] and yapi.eylem_menu(C, SORU, TAKVIM)["eylemler"][0] == "cevaplandi")
+bak("gündem adayları: geçmiş, tüm gün, reddedilen, paylaşılan, tek kişilik yok; saat sırası", [a["id"] for a in m["gundem"]] == ["t1", "t2", "yarin"], m["gundem"])
+bak("sahip (Can Örnek) için kimlikten e-posta yok → eşlenmedi", m["sahip"]["ad"] == "Can Örnek" and not m["sahip"].get("eposta"))
+# --- her eylem bir olay ---
+r = tek_olay("ertele", IS, "ertele", {"vade": "2026-11-20", "neden": "tedarikçi gecikti"}, "ertelendi"); bak("ertele: vade değişti", r["kayit"]["vade"] == "2026-11-20")
+bak("aynı vade yeniden: olay yok", eylem(IS, "ertele", {"vade": "2026-11-20"})["olay"] is None)
+bak("ertele: karar ertelenemez, vade boş olmaz", not eylem(KARAR, "ertele", {"vade": "2026-11-20"})["ok"] and not eylem(IS, "ertele", {})["ok"])
+r = tek_olay("gündeme ekle (önerilen toplantı)", IS, "gundem", {}, "gundeme_eklendi"); bak("gündem: sıradaki uygun toplantı (t1) seçildi, izdüşümde", r["toplanti"]["id"] == "t1" and r["kayit"]["gundem"]["etkinlik"] == "t1", r)
+bak("gündem: bilinmeyen toplantı reddedilir", not eylem(IS, "gundem", {"etkinlik": "yok"})["ok"])
+gt = yapi.gundem_taslagi(C, [], "Ayşe Deneme", "", datetime.date(2026, 11, 5), etkinlik="t1")
+bak("gündem taslağı tutarlı: eklenen iş t1 taslağında, t2'de değil", [m_["metin"] for m_ in gt["maddeler"]] == ["Tabloyu güncelle"] and gt["maddeler"][0]["eklendi"]
+    and yapi.gundem_taslagi(C, [], "Ayşe Deneme", "", datetime.date(2026, 11, 5), etkinlik="t2")["maddeler"] == [])
+r = tek_olay("ata + kimlik e-postası", IS, "ata", {"sahip": "Zeynep Kaya"}, "is_atandi"); bak("ata: e-posta kimlikten, kaynak bilgisi", r["eposta"] == "zeynep.kaya" + AT + "firma.test" and r["kimlik"]["kaynak"] == "takvim" and r["kayit"]["roller"]["sahip"]["eposta"].startswith("zeynep.kaya"), r)
+r = tek_olay("ata (e-posta elle)", SOZ, "ata", {"sahip": "Bora Kaya", "eposta": "Bora.Kaya" + AT + "Firma.test"}, "is_atandi"); bak("elle e-posta küçük harfe, kimlik sorulmaz", r["eposta"] == "bora.kaya" + AT + "firma.test" and "Bora Kaya" not in KIM)
+r = tek_olay("ata (eşlenemeyen)", IS, "ata", {"sahip": "Deniz"}, "is_atandi"); bak("eşlenemeyen: e-posta boş, adaylar döner (tahmin yok)", r["eposta"] is None and len(r["kimlik"]["adaylar"]) == 2)
+bak("ata: kişi yoksa hata", not eylem(IS, "ata", {})["ok"])
+eylem(IS, "ata", {"sahip": "Zeynep Kaya"})
+tek_olay("karar onayla", KARAR, "onayla", {}, "karar_onaylandi"); bak("onay sonrası menüde onayla/reddet yok", "onayla" not in yapi.eylem_menu(C, KARAR, TAKVIM)["eylemler"])
+tek_olay("karar reddet (onaylı karar yeniden)", KARAR, "reddet", {}, "karar_reddedildi"); bak("iş onaylanamaz", not eylem(IS, "onayla")["ok"])
+tek_olay("soru cevaplandı", SORU, "cevaplandi", {}, "durum_degisti"); tek_olay("soru yeniden açıldı", SORU, "ac", {}, "durum_degisti")
+tek_olay("iş yapıldı", SOZ, "yapildi", {}, "durum_degisti"); bak("söz yapıldı = tutuldu", yapi.ortak_kayit(C, SOZ)["durum"] == "tutuldu"); tek_olay("iş yeniden açıldı", SOZ, "ac", {}, "durum_degisti")
+r = tek_olay("böl", IS, "bol", {"parcalar": ["Fiyatları topla", {"metin": "Tablo taslağı", "sahip": "Can Örnek"}]}, "bolundu", ek=2); bak("böl: iki alt kayıt, üst açık kalır", len(r["alt"]) == 2 and yapi.ortak_kayit(C, IS)["durum"] == "acik")
+bak("böl: tek parça ya da boş reddedilir", not eylem(IS, "bol", {"parcalar": ["tek"]})["ok"] and not eylem(KARAR, "bol", {"parcalar": ["a", "b"]})["ok"])
+# --- taslaklar: gönderme yok ---
+n = olay_say(C); r = eylem(IS, "eposta", {}); t = r["taslak"]
+bak("e-posta taslağı: alıcı sahibin adresi, konu ve gövde kayıttan; olay taslak_hazirlandi", r["ok"] and t["alicilar"] == ["zeynep.kaya" + AT + "firma.test"] and "Tabloyu güncelle" in t["govde"] and t["govde"].startswith("Merhaba Zeynep,") and "2026-11-20" in t["govde"]
+    and t["konu"].startswith("İş: Tabloyu") and olay_say(C) == n + 1 and son_olaylar(C, 1)[0][1] == "taslak_hazirlandi", (r, t))
+u = urllib.parse.urlsplit(t["teams"]); q = urllib.parse.parse_qs(u.query)
+bak("Teams taslağı: msteams:/l/chat/0/0, users = alıcı, message önceden dolu", t["teams"].startswith("msteams:/l/chat/0/0?users=zeynep.kaya" + AT + "firma.test&message=") and "Tabloyu güncelle" in q["message"][0] and q["users"] == ["zeynep.kaya" + AT + "firma.test"], t["teams"])
+r2 = eylem(IS, "teams", {"alicilar": ["a" + AT + "x.test", "B" + AT + "x.test"]}); bak("Teams: verilen alıcılar, birden çoğu virgülle", r2["taslak"]["teams"].startswith("msteams:/l/chat/0/0?users=a" + AT + "x.test,b" + AT + "x.test&message="))
+r3 = eylem(KARAR, "eposta", {}); bak("alıcısı olmayan taslak: boş alıcı, alici_yok işareti, yine olay", r3["ok"] and r3["alici_yok"] and r3["taslak"]["alicilar"] == [] and "karar" in r3["taslak"]["konu"].lower() and "users=&message=" in r3["taslak"]["teams"])
+bak("taslak içinde teyit eki ve satır sonu bozulmaz; özel karakter kodlanır", "Merhaba" in yapi.taslak_icerik({"tur": "is", "metin": "a&b=c #1 (teyit bekliyor — x)", "baslik": "T", "tarih": "2026-11-05"}, "teams", ["x" + AT + "y.test"], "Ali")["teams"] is False
+    or "a%26b%3Dc" in yapi.taslak_icerik({"tur": "is", "metin": "a&b=c #1 (teyit bekliyor — x)", "baslik": "T", "tarih": "2026-11-05"}, "teams", ["x" + AT + "y.test"], "Ali")["teams"])
+en = yapi.taslak_icerik({"tur": "is", "metin": "Update the table", "baslik": "Weekly", "tarih": "2026-11-05"}, "eposta", ["x" + AT + "y.test"], "Ali", dil="en"); bak("İngilizce taslak", en["govde"].startswith("Hi Ali,") and en["konu"].startswith("Task:"))
+# --- Claude'a çalıştır ---
+ISTEMLER = []
+def model_f(istem): ISTEMLER.append(istem); return "1) Özet: tablo güncellenecek.\n2) Yapılacaklar: …\n3) Taslak: Merhaba Zeynep …", None
+n = olay_say(C); r = eylem(IS, "claude", model_f=model_f)
+bak("Claude'a çalıştır: sonuç yorum olarak kayda bağlandı (kaynak claude, uretici claude), tek olay", r["ok"] and olay_say(C) == n + 1 and son_olaylar(C, 1)[0][1:] == ("yorum_eklendi", "claude") and "Özet" in r["metin"], r)
+istem = ISTEMLER[0]; bak("istem yalnız kaydı içerir: metin, toplantı, sahip adı; e-posta ve döküm yok; veri etiketi", "Tabloyu güncelle" in istem and "Zeynep Kaya" in istem and AT not in istem and "merhaba" not in istem and "<veri>" in istem and "talimat" in istem)
+mm = yapi.eylem_menu(C, IS, TAKVIM); yk = [o for o in mm["tarihce"] if o["tur"] == "yorum_eklendi"]
+bak("tarihçede Claude notu görünür (metniyle, 'Claude hazırlık notu ekledi')", yk and yk[-1]["metin"].startswith("1) Özet") and "Claude hazırlık notu ekledi" in yk[-1]["ozet"], yk)
+bak("Claude hatası: olay yok, hata döner", (lambda r_: not r_["ok"] and olay_say(C) == n + 1 and r_["err"] == "zaman aşımı")(eylem(IS, "claude", model_f=lambda i: (None, "zaman aşımı"))))
+bak("Claude yok (model_f verilmedi): hata", not eylem(IS, "claude")["ok"])
+# --- gizli kayıtta hiçbir eylem çalışmaz ---
+n = olay_say(C); ISTEMLER.clear()
+ret = [eylem(g, e, p, model_f=model_f) for g in (GIZLI_IS, GIZLI_KARAR) for e, p in (("claude", {}), ("ertele", {"vade": "2026-12-01"}), ("ata", {"sahip": "X Y"}), ("eposta", {}), ("teams", {}), ("gundem", {}), ("onayla", {}), ("yapildi", {}))]
+bak("gizli toplantı kaydı: Claude'a çalıştır dahil hiçbir eylem çalışmaz, olay ve model çağrısı yok", all(not r_["ok"] and r_["err"] == "gizli" for r_ in ret) and olay_say(C) == n and not ISTEMLER)
+bak("gizli kayıt için menü de yok", yapi.eylem_menu(C, GIZLI_IS, TAKVIM)["err"] == "gizli")
+# --- Geri al ---
+mm = yapi.eylem_menu(C, IS, TAKVIM); bak("menüde Geri al: son geri alınabilir olay (taslak ve Claude notu sayılmaz)", mm["geri_al"] and "atad" in mm["geri_al"]["ozet"] or mm["geri_al"] and mm["geri_al"]["ozet"], mm["geri_al"])
+ol = yapi.tarihce(C, IS); son = yapi.son_geri_alinabilir(C, IS)
+n = olay_say(C); r = eylem(IS, "geri_al"); bak("Geri al: son olay (bölme) döndü: alt kayıtlar iptal, günlük yalnız eklendi", r["ok"] and olay_say(C) == n + 2 and r["geri_alinan"] == son["olay_id"] and len(r["geri"]) == 2 and son["tur"] == "bolundu", r)
+son2 = yapi.son_geri_alinabilir(C, IS); bak("art arda Geri al bir öncekine iner (geri alınan ve geri alma atlanır)", son2 and son2["olay_id"] != son["olay_id"] and "geri_al" not in son2["veri"], (son, son2))
+vade0 = yapi.ortak_kayit(C, IS)["vade"]
+for _ in range(12):  # hepsini geri al: sonunda yalnız oluşturma kalır, Geri al kalkar
+    if not eylem(IS, "geri_al")["geri"]: break
+bak("tümü geri alınınca kayıt ilk hâlinde: vade 2026-11-10, Geri al yok", yapi.ortak_kayit(C, IS)["vade"] == "2026-11-10" and yapi.eylem_menu(C, IS, TAKVIM)["geri_al"] is None and yapi.ortak_kayit(C, IS)["durum"] == "acik")
+bak("başka kaydın olayı geri alınamaz", not eylem(SORU, "geri_al", {"olay_id": ol[-1]["olay_id"]})["ok"])
+bak("kayit_eylem: bilinmeyen eylem ve kayıt", not eylem(IS, "uc")["ok"] and not eylem("s99999", "ertele", {"vade": "x"})["ok"])
+# --- onay süresi göstergesi (liste) ---
+l2 = yapi.kayit_listesi(C, "Ayşe", datetime.date(2026, 11, 5)); kk = [x for x in l2["kayitlar"] if x["tur"] == "karar"]
+bak("kayit_listesi: sahip e-postası, gündem ve alt iş alanları var", all(k_ in x for x in l2["kayitlar"] for k_ in ("sahip_eposta", "gundem", "alt")) and [x for x in l2["kayitlar"] if x["metin"] == "Fiyatları topla"][0]["alt"] is True)
+D2 = "2026-11-03-1100-Ek-Toplanti"; dokum(C, D2)
+yapi.graf_yaz(C, {"baslik": "Ek toplantı", "tarih": "2026-11-03", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "karar", "metin": "Yeni bekleyen karar", "kim": "Can Örnek", "saat": "10:20:00", "netlik": "ortuk"}]}]}, D2 + ".md")
+l3 = [x for x in yapi.kayit_listesi(C, "Ayşe", datetime.date(2026, 11, 6))["kayitlar"] if x["metin"] == "Yeni bekleyen karar"]
+bak("bekleyen kararda onay süresi: 3. gün hatırlat", l3 and l3[0]["onay"]["hatirlat"] is True and l3[0]["onay"]["durum"] == "bekliyor", l3)
+# --- aktarıcı bölümü (aktarici/eylem-menu.py): sahte ad alanı ---
+ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "AYAR": {"ad": "Ayşe Deneme"}, "BASE": C, "TAKVIM_TAM": {e["id"]: e for e in TAKVIM}, "kimlik_coz": kimlik_f,
+      "_yapi_mod": lambda: yapi, "_t": lambda a, b: a, "claude_yolu": lambda: None, "BRIFING_APP": os.path.join(T, "yok.app"), "BEYIN": None}
+exec(compile(open(os.path.join(KOD, "aktarici", "eylem-menu.py"), encoding="utf-8").read(), "eylem-menu.py", "exec"), ns)
+ns["eylem_model"] = lambda istem: ("Aktarıcı notu", None)  # bölüm model çağrısını kendi tanımladı; test sahtesi geri konur
+g = ns["kayit_menu_view"]("/kayit-menu?id=" + IS_KID); bak("kayit_menu_view: menü bilgisi", g["ok"] and g["kayit"]["kayit_id"] == IS_KID and "ertele" in g["eylemler"], g)
+bak("kayit_menu_view: id yok / kayıt yok", not ns["kayit_menu_view"]("/kayit-menu")["ok"] and not ns["kayit_menu_view"]("/kayit-menu?id=s99999")["ok"])
+r = ns["kayit_eylem_islem"]({"id": IS_KID, "eylem": "ertele", "vade": "2026-12-24"}); bak("kayit_eylem_islem: ertele", r["ok"] and r["kayit"]["vade"] == "2026-12-24")
+r = ns["kayit_eylem_islem"]({"id": IS_KID, "eylem": "claude"}); bak("kayit_eylem_islem: Claude'a çalıştır (bölümün model işlevi)", r["ok"] and r["metin"] == "Aktarıcı notu", r)
+r = ns["kayit_eylem_islem"]({"id": IS_KID, "eylem": "eposta"}); bak("kayit_eylem_islem: taslak, alici_yok işareti", r["ok"] and "taslak" in r)
+bak("kayit_eylem_islem: gizli ve bozuk girdi", ns["kayit_eylem_islem"]({"id": GIZLI_KID, "eylem": "claude"})["err"] == "gizli" and not ns["kayit_eylem_islem"]({"eylem": "ertele"})["ok"] and not ns["kayit_eylem_islem"]({"id": IS_KID})["ok"])
+bak("kayit_eylem_islem: yazan kullanıcı (ad:…), kaynak eylem", db(C).execute("SELECT yazan, kaynak FROM olay WHERE tur = 'ertelendi' ORDER BY saat DESC LIMIT 1").fetchone() == ("ad:Ayşe Deneme", "eylem"))
+# --- kayıt veritabanı adresleri → kimlik modülü (/vt-bellek kisi_adres; aktarici/sozluk-ogren.py vt_bellek_al) ---
+import collections, hashlib, threading
+ns2 = {"re": re, "os": os, "json": json, "time": time, "collections": collections, "hashlib": hashlib, "threading": threading, "AYAR": {"ad": "Ayşe Deneme"}, "BASE": C, "kisi_bul": lambda ad: {"durum": "ok", "kisiler": []},
+       "TAKVIM_TAM": {}, "TAKVIM_GEC": {"olaylar": [], "pay": []}}
+exec(compile(open(os.path.join(KOD, "aktarici", "kimlik.py"), encoding="utf-8").read(), "kimlik.py", "exec"), ns2)
+try:
+    exec(compile(open(os.path.join(KOD, "aktarici", "sozluk-ogren.py"), encoding="utf-8").read(), "sozluk-ogren.py", "exec"), ns2)
+    r = ns2["vt_bellek_al"]({"adlar": [], "terimler": [], "kisi_adres": [["Tolga Er, Tolgay", "tolga.er" + AT + "firma.test"], ["Adres Yok", ""]]})
+    c = ns2["kimlik_coz"]("Tolgay", kisiler=False)
+    bak("/vt-bellek kisi_adres: kayıt veritabanı adresi kimlik modülüne yüklenir (kaynak vt)", r["ok"] and c["eposta"] == "tolga.er" + AT + "firma.test" and c["kaynak"] == "vt" and ns2["vt_bellek_view"]()["kimlik"] >= 1, (r, c))
+    ns2["vt_bellek_al"]({"adlar": ["X"], "terimler": []}); bak("kisi_adres alanı yoksa yüklü adresler silinmez", ns2["kimlik_coz"]("Tolgay", kisiler=False)["eposta"] == "tolga.er" + AT + "firma.test")
+except Exception as e_: bak(f"/vt-bellek kisi_adres testi çalıştırılamadı ({e_.__class__.__name__}: {e_})", False)
+print("\nhepsi geçti" if not hata else f"\nKALDI: {len(hata)}"); sys.exit(1 if hata else 0)

@@ -103,9 +103,9 @@ try:
     ok("proje kayıt betiği ayarlı: kuralda izinli alt komutlar ve bayraklar", "Proje kuralı" in (k.get("cevap") or ""))
     ok("öneri panoda tek onay kartı açtı (metinde neden ve ne yazılacağı); etiket cevapta görünmez", len(kr) == 1 and "Kayda yazayım mı?" in kr[0]["text"] and "Kullanıcı istedi" in kr[0]["text"] and "Bütçe onaylandı" in kr[0]["text"]
        and "[KAYIT" not in k.get("cevap", "") and "Onayını bekliyor: 1" in k.get("cevap", ""))
-    ok("onaydan önce yazılmadı", "teyit bekliyor" in db("SELECT metin FROM kayit WHERE id = 1")[0][0])
+    ok("onaydan önce yazılmadı", db("SELECT onay FROM kayit WHERE id = 1")[0][0] == "bekliyor")  # ortak katman: teyit metinde değil onay alanında
     u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); k = u.cevap_bekle("Yazıldı")
-    ok("Onayla → karar onaylandı (teyit eki kalktı), cevabın altına «Yazıldı» düştü", db("SELECT metin FROM kayit WHERE id = 1")[0][0] == "Bütçe onaylandı" and "✓ Yazıldı" in (k.get("cevap") or ""))
+    ok("Onayla → karar onaylandı (teyit eki kalktı), cevabın altına «Yazıldı» düştü", db("SELECT metin, onay FROM kayit WHERE id = 1")[0] == ("Bütçe onaylandı", "onaylandi") and "✓ Yazıldı" in (k.get("cevap") or ""))
     # 2) Konuş (bas): iş yapıldı → Reddet → yazılmaz; sonraki turda asistana sonuç bildirilir; sesli okunan kısımda etiket yok
     time.sleep(0.5); u.post("/bas-konus", {"metin": "s3 işini yapıldı işaretle " + E("is_durum", id="s3", durum="yapildi")}); k = u.bekle("s3 işini")
     kr = u.kartlar()
