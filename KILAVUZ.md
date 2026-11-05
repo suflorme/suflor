@@ -125,6 +125,9 @@ kaynağı ve dönemiyle söyler ("<ad>'a göre son 7 günde …"); Konuş'a yaln
 devam eder. Toplantı öncesi brifing de aynı kaynağa bakar: toplantının konusu kaynağın konusuna giriyorsa brifinge kaynağı ve dönemiyle en çok üç rakam
 ekler ("Güncel veri"); konu dışıysa kaynağa sormaz. Kaynaklı brifing bağlayıcının bağlanmasını beklediği için birkaç saniye uzun sürer.
 İkisini birden kapatmak için `"konus_bilgi_kaynagi": false`.
+Konuş'ta web araştırması (`"konus_web": true`; varsayılan kapalı, `web_arastirma` da açık olmalı; Ayarlar → Toplantı → "Konuş'ta da web'de araştır"): sesle sorduğun
+kişi ya da firma sorusunda Konuş internette arar ve herkese açık sayfa okur; aramaya yalnız ad ve konu gider, döküm alıntısı ve iç sayılar gitmez; gizli toplantıda
+kapalı. Suflor Brifing yardımcısının web araçlarını tanıyan sürümü gerekir; eski sürümde ayar açık olsa da Konuş internete çıkmaz (günlükte tek satır uyarı).
 
 **Süreli ses arşivi (`"ses_arsivi": true`, varsayılan kapalı):** Whisper'a giden her ses parçası sonucuyla birlikte `canli/ses-arsivi/<toplantı>/` altına (WAV + `parcalar.jsonl`) yazılır; eşik, mikrofon ve uydurma kurallarını gerçek veriyle ayarlamak içindir. Ses yalnız bu Mac'te kalır: ağa, geri bildirime, teşhis paketine ve Time Machine'e girmez.
 **`"ses_arsivi_gun": 14`:** arşivin saklama süresi (gün); süresi geçen toplantı klasörleri silinir, toplam boyut 5 GB'ı aşarsa en eskiden silinir. Kapatınca eski kayıtlar da süresi dolunca silinir.

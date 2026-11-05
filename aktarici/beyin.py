@@ -75,9 +75,12 @@ def claude_yolu(ayar):  # relay.py claude_yolu ile aynı arama sırası (ayardak
     return None
 # Yalın `claude -p` (karar #83–84): kişisel ayar, bağlayıcı (MCP), komut ve oturum kaydı yüklenmez; proje ayarı kalır. Ayar claude_yalin: false → tam çağrı.
 YALIN = ["--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence"]
-def yalin(ayar, bilgi=False):  # bilgi: Konuş'ta dış bilgi kaynağı açık → yalnız --strict-mcp-config yok (aşağıdaki not)
+# Konuş'ta web araştırması (5 Kasım, S208 kuralı Konuş'a): web=True → --allowedTools ve --tools'a WebSearch,WebFetch. Brifing.app izin listesi (brifing.swift
+# `araclar`) bu ikisini tanımalı; tanımayan yardımcı argümanı reddedip Konuş'u hiç açmaz — bu yüzden bas-konus.py konus_web_acik kurulu yardımcıyı denetler.
+KONUS_WEB_ARACLAR = "WebSearch,WebFetch"
+def yalin(ayar, bilgi=False, web=False):  # bilgi: Konuş'ta dış bilgi kaynağı açık → yalnız --strict-mcp-config yok (aşağıdaki not); web: araç listesine web araçları
     if not ayar.get("claude_yalin", True): return []
-    return ([x for x in YALIN if x != "--strict-mcp-config"] if bilgi else YALIN) + ["--tools", "Read,Grep,Glob"]
+    return ([x for x in YALIN if x != "--strict-mcp-config"] if bilgi else YALIN) + ["--tools", "Read,Grep,Glob" + ("," + KONUS_WEB_ARACLAR if web else "")]
 # Konuş (v0.90.0 reçete 1): proje CLAUDE.md'si ve git bilgisi ilk kullanıcı mesajına girip önbelleği bozuyordu → Konuş sürecinde kapalı (ortam değişkeni
 # --settings env ile; Brifing.app yalnız bu iki anahtara izin verir). Ayar konus_onek_sabit: false eski davranış. konus_effort: low|medium|high|xhigh|max.
 def konus_onek_ayar(ayar, bilgi=None, mcp_ad=None):  # bilgi: konus_bilgi() çıktısı (varsa allowlist eklenir; tek --settings)
@@ -123,12 +126,12 @@ def bilgi_araclar(bilgi): return ",".join(f"mcp__{k['sunucu']}__{d}" for k in bi
 def konus_effort(ayar):
     e = str(ayar.get("konus_effort") or "").strip().lower()
     return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
-def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None, bilgi=None):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli; bilgi: konus_bilgi() çıktısı
+def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None, bilgi=None, web=False):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli; bilgi: konus_bilgi() çıktısı; web: WebSearch/WebFetch (bas-konus.py konus_web_acik)
     bilgi = konus_bilgi(bilgi) if bilgi else []
-    ek = ",".join(x for x in (ek_araclar, bilgi_araclar(bilgi)) if x)
+    ek = ",".join(x for x in (ek_araclar, bilgi_araclar(bilgi), KONUS_WEB_ARACLAR if web else "") if x)
     return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--allowedTools", "Read,Grep,Glob" + ("," + ek if ek else ""), "--add-dir", ek_dizin, "--append-system-prompt", sistem] + (["--mcp-config", mcp] if mcp else []) + \
-           (yalin(ayar, bool(bilgi)) or ["--no-session-persistence"]) + ["--model", model or secim(ayar, "konus")["model"]] + \
+           (yalin(ayar, bool(bilgi), web) or ["--no-session-persistence"]) + ["--model", model or secim(ayar, "konus")["model"]] + \
            konus_onek_ayar(ayar, bilgi, "suflorvt" if mcp else None) + konus_effort(ayar)
 def ceviri_effort(ayar):  # varsayılan low (40 cümlede Haiku düşünme belirteci 455 → 0, ortanca 2,56 → 1,22 sn); ayar ceviri_effort: low|medium|high|xhigh|max, boş metin = bayrak yok
     e = str(ayar["ceviri_effort"] if "ceviri_effort" in ayar and ayar["ceviri_effort"] is not None else "low").strip().lower()

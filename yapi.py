@@ -116,11 +116,16 @@ def graf_sil(dizin, toplanti=None, hepsi=False):
     with c: n = c.execute("DELETE FROM kayit WHERE toplanti = ?", (toplanti,)).rowcount
     c.close(); return n
 def cikti_say(v):
-    # toplantı çıktısı sayıları yapı dosyasından: karar · iş (iş + söz) · açık (açık soru + konuşulmayan/kısmen madde)
-    og = [o for m in v["maddeler"] for o in m["ogeler"]]
+    # toplantı çıktısı sayıları yapı dosyasından: karar · iş (iş + söz) · tarihsiz (tarihi olmayan iş/söz; panoda "4 iş · 2'si tarihsiz") ·
+    # açık (açık soru varsa yalnız soru sayısı; soru yoksa konuşulmayan/kısmen madde — 5 Kasım: ikisi toplanınca "açık" özetteki sayıyla tutmuyordu)
+    og = [o for m in v["maddeler"] for o in m["ogeler"]]; isler = [o for o in og if o["tur"] in ("is", "soz")]
+    soru = sum(o["tur"] == "soru" for o in og)
     acik_madde = sum(1 for m in v["maddeler"] if kucuk(m.get("durum") or "") in ("açık", "acik", "kısmen", "kismen", "konuşulmadı", "konusulmadi"))
-    return {"karar": sum(o["tur"] == "karar" for o in og), "is": sum(o["tur"] in ("is", "soz") for o in og),
-            "acik": sum(o["tur"] == "soru" for o in og) + acik_madde}
+    return {"karar": sum(o["tur"] == "karar" for o in og), "is": len(isler), "tarihsiz": sum(1 for o in isler if not o.get("tarih")), "acik": soru or acik_madde}
+def sayi_iyelik(n):  # sayının Türkçe iyelik eki: 2 → "'si" (2'si tarihsiz), 3 → "'ü", 10 → "'u"; 0–99
+    n = int(n); b = n % 10
+    return ({1: "'i", 2: "'si", 3: "'ü", 4: "'ü", 5: "'i", 6: "'sı", 7: "'si", 8: "'i", 9: "'u"}.get(b) if b else
+            {0: "'ı", 10: "'u", 20: "'si", 30: "'u", 40: "'ı", 50: "'si", 60: "'ı", 70: "'i", 80: "'i", 90: "'ı"}.get(n % 100)) or "'i"
 # "Bu toplantı e-postayla çözülebilir" (5 Kasım): yöneticinin zamanını korumak. İki an, ikisi de yalnız GÜÇLÜ işarette söyler (yanlış pozitif pahalı).
 #  - toplantı öncesi: eposta_isaret(gündem maddeleri, başlık, kişi sayısı) kural tabanlı işaret verir (tc hazirlik "## E-posta yeterli mi?");
 #    son kararı hazırlığı yapan Claude verir (geçmiş toplantılar, takvim notu dahil).
@@ -616,7 +621,7 @@ header button:hover{border-color:var(--cizgi)}
 .ozet .uy{border-color:color-mix(in srgb,var(--iddia) 55%,transparent);background:color-mix(in srgb,var(--iddia) 10%,var(--s1));color:var(--iddia)}.ozet .uy b{color:var(--iddia)}
 h2{font-size:13px;font-weight:600;color:var(--t2);margin:26px 0 10px;letter-spacing:.01em}h2 small{font-weight:400}
 .izgara{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(290px,100%),1fr))}
-.kart{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:var(--s1);border:1px solid var(--bd);border-radius:9px;padding:10px 12px 10px 14px;cursor:pointer;position:relative}
+.kart{display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;width:100%;text-align:left;font:inherit;color:inherit;background:var(--s1);border:1px solid var(--bd);border-radius:9px;padding:10px 12px 10px 14px;cursor:pointer;position:relative}
 .kart:hover,.kart:focus-visible{border-color:var(--cizgi);outline:none}.kart:focus-visible{box-shadow:0 0 0 2px color-mix(in srgb,var(--kok) 40%,transparent)}
 .kart::before{content:"";position:absolute;left:5px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--renk,var(--bd))}
 .kart .m{overflow-wrap:anywhere;white-space:normal}.kart .k{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin-top:6px;font-size:12px;color:var(--t2)}

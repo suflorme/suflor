@@ -57,6 +57,9 @@ for A in AYARLAR:
     m = BY.secim(A, "proje_karti")["model"]
     if m != (A.get("kart_model") or "sonnet") or BY.kart_args(m) != eski_kart(A.get("kart_model") or "sonnet"): fark.append(("kart", A))
 kontrol(f"argümanlar v0.121.0 ile birebir ({len(AYARLAR)} ayar × Konuş/çeviri/telaffuz/brifing/kart)", not fark, str(fark[:3]))
+aw = BY.konus_args({}, "İSTEM", "", None, "/x/canli", web=True)  # 5 Kasım: Konuş'ta web araştırması (bas-konus.py konus_web_acik) — yalnız web=True iken araç listesine girer
+kontrol("Konuş web=True: WebSearch,WebFetch --allowedTools ve --tools'ta; geri kalanı aynı", aw[aw.index("--allowedTools") + 1] == "Read,Grep,Glob,WebSearch,WebFetch" and aw[aw.index("--tools") + 1] == "Read,Grep,Glob,WebSearch,WebFetch"
+        and [x.replace(",WebSearch,WebFetch", "") for x in aw] == eski_konus({}, "İSTEM", None, "/x/canli"))
 
 # --- "beyin" ayarı ---
 A = {"konus_model": "opus", "beyin": {"varsayilan": {"tur": "claude-code"}, "konus": {"model": "haiku"}, "ceviri": {"tur": "gemini", "model": "x"}}}

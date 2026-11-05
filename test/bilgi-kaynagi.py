@@ -66,8 +66,8 @@ kontrol("okuma önekleri Swift'te aynı", re.findall(r'"(\w+)"', re.search(r"let
 
 # 4. bas-konus.py: kaynak seçimi, istem eki, sağlama
 kod = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-ns = {"time": time, "re": __import__("re"), "BEYIN": BY, "AYAR": {}, "_KS": {}, "print": lambda *x: ns["_g"].append(" ".join(map(str, x))), "_g": [],
-      "_t": lambda tr, en: tr, "bilgi_kaynaklari": lambda: [dict(K)], "gizli_acik": lambda: ns["_gizli"], "_gizli": False}
+ns = {"time": time, "re": __import__("re"), "os": os, "json": json, "__file__": os.path.join(KOD, "aktarici", "bas-konus.py"), "BEYIN": BY, "AYAR": {}, "_KS": {},
+      "print": lambda *x: ns["_g"].append(" ".join(map(str, x))), "_g": [], "_t": lambda tr, en: tr, "bilgi_kaynaklari": lambda: [dict(K)], "gizli_acik": lambda: ns["_gizli"], "_gizli": False}
 exec(kod[kod.index("BILGI_YEDEK_SN = "):kod.index("def konus_istem(")], ns)
 exec(kod[kod.index("BILGI_ILK_SN, "):kod.index("def _konus_oku(")], ns)
 kontrol("kaynak açık: varsayılan", [k["sunucu"] for k in ns["konus_bilgi_kaynaklari"]()] == ["claude_ai_Ornek_Kaynak"])
@@ -76,8 +76,8 @@ ns["_gizli"] = True; kontrol("gizli toplantı → kaynaksız", ns["konus_bilgi_k
 ns["bilgi_kaynaklari"] = lambda: [dict(K, url="")]; kontrol("url'siz kaynak → kaynaksız", ns["konus_bilgi_kaynaklari"]() == []); ns["bilgi_kaynaklari"] = lambda: [dict(K)]
 ist = ns["bilgi_istem"](BY.konus_bilgi([K]))
 kontrol("istem eki: kaynak adı, konu, kaynağı ve dönemi söyle, kişi adı koyma, yazan araç yok", all(x in ist for x in ("Örnek Kaynak", "yapay satış verisi", "kaynağı ve dönemi", "kişi adı", "Yazan ya da değiştiren araç yok")) and ns["bilgi_istem"]([]) == "")
-kontrol("konus_istem iki dönüş yolunda da eki ekler", kod.count("+ bilgi_istem(bilgi)") == 2 and "def konus_istem(vt=None, bilgi=None):" in kod)
-kontrol("konus_ac: yalnız Claude Code beyninde kaynak, argüman ve istem birlikte", 'bilgi = konus_bilgi_kaynaklari() if sec["tur"] == "claude-code" else []' in kod and "konus_istem(vt, bilgi)" in kod and "sec[\"model\"], bilgi)" in kod)
+kontrol("konus_istem iki dönüş yolunda da eki ekler", kod.count("+ bilgi_istem(bilgi) + web_istem(web)") == 2 and "def konus_istem(vt=None, bilgi=None, web=False):" in kod)
+kontrol("konus_ac: yalnız Claude Code beyninde kaynak, argüman ve istem birlikte", 'bilgi = konus_bilgi_kaynaklari() if sec["tur"] == "claude-code" else []' in kod and "konus_istem(vt, bilgi, web)" in kod and "sec[\"model\"], bilgi, web)" in kod)
 # sağlama: her turun init'i; boş/pending yedeğe geçirmez, failed/needs-auth geçirir, 60 sn + 2 tur kuralı
 SN, AD = "claude_ai_Ornek_Kaynak", "Örnek Kaynak"
 def init(sunucular, araclar): return {"type": "system", "subtype": "init", "mcp_servers": sunucular, "tools": araclar}
@@ -149,7 +149,7 @@ kontrol("brifing sonucu: veri yalnız kaynak açıkken ve doluysa eklenir", 'if 
 kontrol("brifing kaynağı Konuş'la aynı kuraldan (ayar, gizli kip, yedek)", "bilgi = konus_bilgi_kaynaklari()" in bf and "BEYIN.brifing_args(AYAR, istem, BASE, yalin, bilgi if yalin else None)" in bf)
 kontrol("FIFO kipinde mesaj BRIFING_BILGI_SN sonra yazılır, giriş kapanır", "time.sleep(max(0, BRIFING_BILGI_SN - (time.time() - t0)))" in bf and "os.close(w)" in bf)
 pn = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); df = open(os.path.join(KOD, "aktarici", "defter.py"), encoding="utf-8").read()
-kontrol("'Güncel veri' panoda üç yerde, defterde ve Konuş'un sıradaki toplantı bloğunda", pn.count("'Güncel veri'") == 3 and '("veri", "dikkat", "acik", "gecmis")' in df and '("veri", _t("Güncel veri"' in kod)
+kontrol("'Güncel veri' panoda dört yerde (hazırlık, brifing, brifing penceresi, Bugün), defterde ve Konuş'un sıradaki toplantı bloğunda", pn.count("'Güncel veri'") == 4 and '("veri", "dikkat", "acik", "gecmis")' in df and '("veri", _t("Güncel veri"' in kod)
 # 7. toplantı oturumu izin kararı (5 Kasım): okuma araçları ve web onaysız; yazma sorulur; aynı araç yeniden/paralel sorulmaz; gizli toplantıda web yok
 import threading
 def izin_ns(ayar, gizli=False):
@@ -227,5 +227,30 @@ ay = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()
 kontrol("kisi_kaynaklari ayarsızken Apollo varsayılanı: yalnız ücretsiz iki okuma aracı onaysız; kredi harcayan/yazan her Apollo aracı reddedilir", all(sor(izin_ns({}), "mcp__plugin_sales_apollo__" + a) == (r, 0) for a, r in (("apollo_mixed_people_api_search", "allow"), ("apollo_organizations_lookup", "allow"), ("apollo_mixed_companies_search", "deny"), ("apollo_organizations_job_postings", "deny"), ("apollo_people_match", "deny"), ("apollo_organizations_enrich", "deny"), ("apollo_people_bulk_match", "deny"), ("apollo_contacts_create", "deny"), ("apollo_emailer_messages_send_now", "deny"), ("apollo_sequences_update", "deny"), ("apollo_agent_bulk_enrich", "deny"))))
 kontrol("kisi_kaynaklari: [] Apollo'yu kapatır (araç sorulur, kaynak sayılmaz)", sor(izin_ns({"kisi_kaynaklari": []}), "mcp__plugin_sales_apollo__apollo_people_match")[1] == 1)
 kontrol("ayarlar: web_arastirma ve bilgi_onaysiz varsayılan açık, AYAR_PANO'da ve panoda (AYG)", '"web_arastirma": ("bool", True, None)' in ay and '"bilgi_onaysiz": ("bool", True, None)' in ay and "['web_arastirma','bool'" in pn and "['bilgi_onaysiz','bool'" in pn)
+# 8. Konuş'ta web araştırması (5 Kasım): ayar konus_web varsayılan kapalı; açıkken de gizli toplantıda ve web_arastirma kapalıyken kapalı; kurulu Brifing yardımcısı
+# WebSearch/WebFetch'i tanımıyorsa (derleme.json SHA'sı web'li brifing.swift'e eşit değil) kapalı + tek uyarı; destek varsa konus_args web araçlarını ekler, istemde sınır cümlesi
+import hashlib, tempfile
+kontrol("ayar konus_web varsayılan kapalı, AYAR_PANO'da ve panoda (AYG)", '"konus_web": ("bool", False, None)' in ay and "['konus_web','bool'" in pn)
+TW = tempfile.mkdtemp(prefix="konus-web-"); eski = os.path.join(TW, "eski.swift"); yeni = os.path.join(TW, "yeni.swift")
+open(eski, "w").write('let araclar: Set<String> = ["Read", "Grep", "Glob"]\n'); open(yeni, "w").write('let araclar: Set<String> = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]\n')
+def derleme(y): json.dump({"SuflorBrifing": hashlib.sha256(open(y, "rb").read()).hexdigest()}, open(os.path.join(TW, "derleme.json"), "w"))
+derleme(eski); kontrol("yardımcı eski kaynakla derlenmiş → web desteği yok", ns["konus_web_destek"](TW, [eski, yeni]) is False)
+derleme(yeni); kontrol("yardımcı web'li kaynakla derlenmiş → destek var", ns["konus_web_destek"](TW, [eski, yeni]) is True)
+kontrol("derleme kaydı yok → destek yok", ns["konus_web_destek"](os.path.join(TW, "yok"), [yeni]) is False)
+sw_gercek = open(os.path.join(KOD, "brifing.swift"), encoding="utf-8").read()
+kontrol("depodaki brifing.swift henüz web araçlarını tanımıyorsa kurulu yardımcı 'destek yok' sayılır (yeniden derleme kullanıcı yanındayken)",
+        bool(ns["KONUS_WEB_RX"].search(sw_gercek)) == ("\"WebSearch\", \"WebFetch\"" in sw_gercek))
+ns["AYAR"].clear(); ns["_KS"].clear(); ns["_g"].clear(); ns["AYAR"]["uygulama"] = TW; derleme(yeni); ns["_konus_swift_yerler"] = lambda: [yeni]
+kontrol("konus_web ayarı yokken kapalı (web_arastirma açık olsa da)", ns["konus_web_acik"]() is False and not ns["_g"])
+ns["AYAR"]["konus_web"] = True; kontrol("konus_web açık + destek var → açık", ns["konus_web_acik"]() is True)
+ns["_gizli"] = True; kontrol("gizli toplantı → kapalı", ns["konus_web_acik"]() is False); ns["_gizli"] = False
+ns["AYAR"]["web_arastirma"] = False; kontrol("web_arastirma kapalı → kapalı", ns["konus_web_acik"]() is False); del ns["AYAR"]["web_arastirma"]
+derleme(eski); kontrol("destek yok → kapalı, günlükte tek uyarı (yinelenmez)", ns["konus_web_acik"]() is False and ns["konus_web_acik"]() is False and sum("yeniden derleme" in x for x in ns["_g"]) == 1)
+wi = ns["web_istem"](True)
+kontrol("web istemi: yalnız ad ve konu, döküm alıntısı/iç sayı yasağı, kaynak ve tarih, doğrulanmadı; kapalıyken boş", all(x in wi for x in ("yalnız kişi ya da firma adı ve konu", "döküm alıntısı", "iç sayı", "kaynağı (site, bağlantı)", "doğrulanmadı")) and ns["web_istem"](False) == "")
+aw = BY.konus_args(A, "ISTEM", "", None, B, web=True); ab = BY.konus_args(A, "ISTEM", "", None, B)
+kontrol("konus_args web=True: --allowedTools ve --tools'ta WebSearch,WebFetch; web=False eskisiyle aynı", aw[aw.index("--allowedTools") + 1] == "Read,Grep,Glob,WebSearch,WebFetch" and aw[aw.index("--tools") + 1] == "Read,Grep,Glob,WebSearch,WebFetch"
+        and "WebSearch" not in " ".join(ab) and ab[ab.index("--tools") + 1] == "Read,Grep,Glob")
+kontrol("çağrı yeri: Konuş süreci konus_web_acik ile açılır, istem web_istem alır", "web = sec[\"tur\"] == \"claude-code\" and konus_web_acik()" in kod and "konus_istem(vt, bilgi, web)" in kod and "bilgi, web)" in kod)
 kontrol("__pycache__ yazılmadı", not [d for d, _, f in os.walk(KOD) if "__pycache__" in d and ".git" not in d and "_yedek" not in d])
 print(f"{len(hatalar) and 'KALDI: ' + str(len(hatalar)) or 'hepsi geçti'}"); sys.exit(1 if hatalar else 0)

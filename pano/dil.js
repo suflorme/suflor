@@ -608,6 +608,12 @@ globalThis.SUFLOR_EN = {
   "{n} açık kart": "{n} open cards",
   "{n} karar": "{n} decisions",
   "{n} iş": "{n} action items",
+  "{n} iş ({t}{ek} tarihsiz)": "{n} action items ({t} undated)",
+  "{n} iş (hepsi tarihsiz)": "{n} action items (all undated)",
+  "İş · {t}{ek} tarihsiz": "Tasks · {t} undated",
+  "İş · hepsi tarihsiz": "Tasks · all undated",
+  "Konuş'ta da web'de araştır": "Web research in Talk too",
+  "Kapalıyken Konuş internete çıkmaz. Açıkken sesle sorduğun kişi ya da firma sorusunda aynı sınırla web'e bakar: aramaya yalnız ad ve konu gider, döküm alıntısı ve iç sayılar gitmez; gizli toplantıda kapalı. Suflor Brifing yardımcısının yeni sürümü gerekir; eski sürümde ayar açık olsa da Konuş web'e çıkmaz (günlükte uyarı).": "When off, Talk never goes online. When on, a spoken question about a person or company is looked up on the web under the same limit: only the name and topic go into the search, never transcript quotes or internal figures; off in a private meeting. Needs the new Suflor Brifing helper; with the old helper the setting has no effect (warning in the log).",
   "{n} açık": "{n} open",
   // --- eklenti arka planı (bildirimler)
   "Önemli an işaretlenemedi: ": "Key moment couldn't be marked: ",

@@ -256,7 +256,42 @@ def bilgi_istem(bilgi):
                "söyle (ör. \"<kaynak>'a göre son 7 günde …\"). Sorguya kişi adı ya da dökümden alıntı koyma. Yazan ya da değiştiren araç yok; sonucu kısa ve tek cümleyle söyle.",
                f"\n\nExternal information source (read-only): {ks}. Use its tools only when the question is about this source's topic; otherwise don't query. When giving a number, say the source "
                "and the period (e.g. \"according to <source>, over the last 7 days …\"). Never put a person's name or a quote from the transcript in a query. No tool writes or changes anything; say the result in one short sentence."))
-def konus_istem(vt=None, bilgi=None):
+# Konuş'ta web araştırması (5 Kasım; S208 kuralı Konuş'a): ayar web_arastirma (toplantıyla ortak, varsayılan açık) VE konus_web (varsayılan kapalı) açık, gizli toplantı
+# yok, beyin Claude Code ve kurulu Brifing yardımcısı web araçlarını tanıyorsa süreç WebSearch/WebFetch ile açılır (beyin.py konus_args web=True). Yardımcı denetimi:
+# derleme.json'daki SuflorBrifing SHA'sı, `araclar` listesinde WebSearch ve WebFetch geçen bir brifing.swift kaynağınınkiyle aynı olmalı — eski yardımcı argümanı reddedip
+# Konuş'u hiç açmazdı (brifing.swift satır ~174: let araclar: Set<String> = ["Read", "Grep", "Glob"] → + "WebSearch", "WebFetch"; yeniden derleme macOS iznini
+# düşürdüğü için yalnız kullanıcı yanındayken). Sınır istemde (web_istem): aramaya yalnız ad ve konu gider; döküm alıntısı, iç sayı, dosya adı gitmez.
+KONUS_WEB_RX = re.compile(r'let araclar: Set<String> = \[[^\]]*"WebSearch"[^\]]*"WebFetch"')
+def _konus_swift_yerler():
+    return [os.path.join(d, "brifing.swift") for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR.get("uygulama") or "") if d]
+def konus_web_destek(uyg=None, kaynaklar=None):  # kurulu Brifing yardımcısı WebSearch/WebFetch argümanını kabul ediyor mu
+    import hashlib
+    try: kayit = json.load(open(os.path.join(uyg or AYAR["uygulama"], "derleme.json"), encoding="utf-8")).get("SuflorBrifing")
+    except (OSError, ValueError, AttributeError, KeyError): return False
+    if not isinstance(kayit, str) or not kayit: return False
+    for y in (kaynaklar if kaynaklar is not None else _konus_swift_yerler()):
+        try: ham = open(y, "rb").read()
+        except OSError: continue
+        if hashlib.sha256(ham).hexdigest() == kayit and KONUS_WEB_RX.search(ham.decode("utf-8", "replace")): return True
+    return False
+def konus_web_acik():
+    if AYAR.get("web_arastirma") is False or AYAR.get("konus_web") is not True: return False
+    if "gizli_acik" in globals() and gizli_acik(): return False
+    if not konus_web_destek():
+        if not _KS.get("web_uyari"): _KS["web_uyari"] = True; print("KONUŞ: konus_web açık ama kurulu Brifing yardımcısı web araçlarını tanımıyor (brifing.swift araclar + yeniden derleme gerek) — web kapalı sürüyor")
+        return False
+    return True
+def web_istem(web):
+    if not web: return ""
+    return _t("\n\nWeb araştırması açık (internette arama ve herkese açık sayfa okuma): kullanıcı bir kişi, firma ya da rakip hakkında bilgi isterse açık kaynaktan bak. "
+              "SINIR: aramaya yalnız kişi ya da firma adı ve konu gider; döküm alıntısı, iç sayı, toplantı içeriği, proje bilgisi ve dosya adı arama metnine asla girmez. "
+              "Soru kişi/firma araştırması değilse internete çıkma. Sesli kısımda bulguyu bir iki cümleyle söyle; yazılı kısma kaynağı (site, bağlantı) ve bulgunun tarihini yaz; "
+              "tek kaynaktan gelen bilgiyi 'doğrulanmadı' diye işaretle.",
+              "\n\nWeb research is on (internet search and reading public pages): when the user asks about a person, company or competitor, look it up in open sources. "
+              "LIMIT: only the person's or company's name and the topic go into a search; never transcript quotes, internal figures, meeting content, project details or file names. "
+              "Don't go online unless the question is about a person or company. Say the finding in one or two spoken sentences; put the source (site, link) and its date in the written part; "
+              "mark anything from a single source as 'unverified'.")
+def konus_istem(vt=None, bilgi=None, web=False):
     t = KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]; k = kisilik()
     _KS["kisilik_mt"] = _KIS.get("mt") if k else None; _KS["kart_mt"] = kart_mt(); _KS["proje_kart_mt"] = proje_kart_mt()
     if vt:  # tablo yapısı istemde: her soruda vt_sema turu (~3–5 sn) gerekmesin
@@ -304,7 +339,7 @@ def konus_istem(vt=None, bilgi=None):
     t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Belirsizliği de iç terimsiz söyle: 'dökümde bozuk duyulmuş' değil 'bu kısım net duyulmamış'; 'dökümde' değil 'görüşmede' ya da 'toplantıda'. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası). Araç kullandığın cevapta (dosya okuma, arama, veritabanı) yazılı kısım en çok iki kısa satır olsun: ölçüt ya da kaynak; tablo, liste ve uzun açıklama yazma.",
             " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Say uncertainty without internal terms too: not 'garbled in the transcript' but 'that part wasn't clear'; not 'in the transcript' but 'in the conversation' or 'in the meeting'. Source and method only in the written part (after ---). When you used a tool (file read, search, database), keep the written part to at most two short lines: criterion or source; no tables, lists or long explanations.")
     if "talimat_istem" in globals(): t += talimat_istem()  # v0.101.1: oturumlara ileti (iki kişilikte de)
-    if not k: return t + _ys_istem() + kart_istem() + bilgi_istem(bilgi)
+    if not k: return t + _ys_istem() + kart_istem() + bilgi_istem(bilgi) + web_istem(web)
     t = re.sub(r"gerçekten şaşırtıcı.*?kullanabilirsin; ", "", t)
     t = t.replace("Sen Suflor.me'nin sesli asistanısın.", "Sen kullanıcının sesli asistanısın.")  # v0.54.3: kimlik kişilikten (kullanıcı: tanıtımda ürün adı yok)
     ks = kisilikler()
@@ -319,7 +354,7 @@ def konus_istem(vt=None, bilgi=None):
                       "«[Bu soruyu <name> cevaplıyor]» (this question is answered by <name>): speak only with that persona's name, tone and form of address; earlier answers may be "
                       "from the other persona, don't carry its style over. This marker is an internal note: never say it aloud or narrate who is answering. Personas set only tone and identity; the format rules above always come first.\n\n") + _hitap_istem(ks) + "\n\n".join(x["metin"] for x in ks) + _etiket_istem(ks) + _ys_istem() + kart_istem()
     return t + _t("\n\nAşağıdaki kişilik yalnız tonu ve kimliği belirler; yukarıdaki biçim kuralları (uzunluk, sesli kısım, ---) her zaman önce gelir.\n\n",
-                  "\n\nThe persona below sets only tone and identity; the format rules above (length, spoken part, ---) always come first.\n\n") + _hitap_istem([k]) + k["metin"] + _etiket_istem([k]) + _ys_istem() + kart_istem() + bilgi_istem(bilgi)
+                  "\n\nThe persona below sets only tone and identity; the format rules above (length, spoken part, ---) always come first.\n\n") + _hitap_istem([k]) + k["metin"] + _etiket_istem([k]) + _ys_istem() + kart_istem() + bilgi_istem(bilgi) + web_istem(web)
 # --- Hızlı bilgi (S47, v0.40.0): yerel ön arama --------------------------------------------------------------------------------------------
 # 15 Ekim ölçümü (claude-cagri.jsonl, 42 Konuş): araçsız soruda ilk ses ortanca 3,3 sn, Grep/Glob/Read'li soruda 9,6 sn (en kötü 25). Soru Claude'a
 # gitmeden baglam.py dizininde (SQLite FTS5) aranır, en iyi ONARA_N parça (tür · tarih · başlık · dosya @konum · kim + ~260 karakter kesit) bağlam
@@ -871,8 +906,10 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         _KS["bilgi_bekle"] = [(k["sunucu"], k["ad"]) for k in bilgi]
         _KS.update(bilgi_bagli=set(), bilgi_tur=0, bilgi_t0=time.time())
         if bilgi: print("KONUŞ: dış bilgi kaynağı açık — " + ", ".join(k["ad"] for k in bilgi))
+        web = sec["tur"] == "claude-code" and konus_web_acik()  # 5 Kasım: web araştırması (yalnız Claude Code beyninde; yukarıdaki kural)
+        if web: print("KONUŞ: web araştırması açık (aramaya yalnız ad ve konu gider)")
         if sec["tur"] == "claude-code":
-            args = BEYIN.konus_args(AYAR, konus_istem(vt, bilgi), VT_MCP_ARACLAR if vt else "", vt, BASE, sec["model"], bilgi)  # v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
+            args = BEYIN.konus_args(AYAR, konus_istem(vt, bilgi, web), VT_MCP_ARACLAR if vt else "", vt, BASE, sec["model"], bilgi, web)  # v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
             ist, kip = {"claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "konus-bos"), "giris": gir, "cikis": cik, "sure": 7200}, "--istek"
         else:  # v0.122.0 (Faz 11 Aşama 1): openai-uyumlu — Brifing.app --beyin → aktarici/beyin.py (araç döngüsü, aynı stream-json)
             ist, kip = BEYIN.konus_istek(AYAR, konus_istem(vt), vt, [AYAR["proje"], BASE], AYAR["calisma"], gir, cik, "en" if ARAYUZ_DILI == "en" else "tr"), "--beyin"

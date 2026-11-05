@@ -1465,11 +1465,20 @@ CHROME_APP = next((y for y in ("/Applications/Google Chrome.app", os.path.expand
 # "Özeti aç"; macOS bildirimi yalnız yerel (osascript). Özet dosyası panodan yalnız kayıttaki yoldan açılır (rastgele yol değil).
 SON = []
 def _son_temiz(v, n): return " ".join(str(v or "").split())[:n]
-def _son_cikti(c):  # {karar, is, acik} → yalnız 0–99 tam sayılar (v0.32.6: tek not yerine toplantı çıktısı)
+def _son_cikti(c):  # {karar, is, tarihsiz, acik} → yalnız 0–99 tam sayılar (v0.32.6: tek not yerine toplantı çıktısı; tarihsiz 5 Kasım: tarihi olmayan iş sayısı)
     c = c if isinstance(c, dict) else {}
-    return {k: int(c[k]) for k in ("karar", "is", "acik") if isinstance(c.get(k), int) and not isinstance(c.get(k), bool) and 0 <= c[k] < 100}
+    return {k: int(c[k]) for k in ("karar", "is", "tarihsiz", "acik") if isinstance(c.get(k), int) and not isinstance(c.get(k), bool) and 0 <= c[k] < 100}
+def _iyelik(n):  # sayının Türkçe iyelik eki (yapi.sayi_iyelik ile aynı tablo; yapi her çağrıda yüklenmesin): 2 → "'si", 3 → "'ü", 10 → "'u"
+    b = int(n) % 10
+    return ({1: "'i", 2: "'si", 3: "'ü", 4: "'ü", 5: "'i", 6: "'sı", 7: "'si", 8: "'i", 9: "'u"}.get(b) if b else
+            {0: "'ı", 10: "'u", 20: "'si", 30: "'u", 40: "'ı", 50: "'si", 60: "'ı", 70: "'i", 80: "'i", 90: "'ı"}.get(int(n) % 100)) or "'i"
+def _is_metin(c):  # "4 iş (2'si tarihsiz)" / "3 iş (hepsi tarihsiz)"; tarihsiz yoksa yalnız sayı
+    n, t = c.get("is", 0), c.get("tarihsiz") or 0
+    if not t or t > n: return f"{n} {_t('iş', 'action items')}"
+    if t == n: return _t(f"{n} iş (hepsi tarihsiz)", f"{n} action items (all undated)")
+    return _t(f"{n} iş ({t}{_iyelik(t)} tarihsiz)", f"{n} action items ({t} undated)")
 def cikti_metin(c):
-    return ", ".join(f"{c[k]} {_t(a, e)}" for k, a, e in (("karar", "karar", "decisions"), ("is", "iş", "action items"), ("acik", "açık", "open")) if k in c)
+    return ", ".join((_is_metin(c) if k == "is" else f"{c[k]} {_t(a, e)}") for k, a, e in (("karar", "karar", "decisions"), ("is", "iş", "action items"), ("acik", "açık", "open")) if k in c)
 def son_yukle():
     try: SON[:] = [json.loads(l) for l in open(os.path.join(BASE, "son-toplantilar.jsonl"), encoding="utf-8") if l.strip()][-20:]
     except (OSError, ValueError): return
@@ -1562,6 +1571,7 @@ AYAR_PANO = {
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
     "web_arastirma": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
+    "konus_web": ("bool", False, None),  # 5 Kasım: Konuş'ta web araştırması (bas-konus.py konus_web_acik; kurulu Brifing yardımcısı web araçlarını tanıyana kadar etkisiz)
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_prova": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
