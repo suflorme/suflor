@@ -8,6 +8,7 @@ README'de kısaca anlatılanların ayrıntısı: kurulumdan sonra, kullanım, ay
 - [İsteğe bağlı ayarlar](#isteğe-bağlı-ayarlar)
 - [Yapay zekâ seçimi](#yapay-zekâ-seçimi)
 - [Sesler](#sesler)
+- [Claude'dan arşive erişim](#claudedan-arşive-erişim)
 - [Sorun giderme](#sorun-giderme)
 - [Gizlilik ayrıntıları](#gizlilik-ayrıntıları)
 - [Gerekenler](#gerekenler)
@@ -176,6 +177,24 @@ Konuş'taki cevapları, çeviriyi ve proje kartını yazan yapay zekâyı kurulu
   hizmetin adresi ve model adı durur. Sihirbaz anahtarı hizmetin model listesini isteyerek dener (metin gitmez).
 - Seçilen hizmet hata verirse ve Claude Code kuruluysa o soru Claude Code'la cevaplanır. Seçilen hizmetin durumu (anahtar var mı) ⚙ Ayarlar → Genel'deki Yapay zekâ satırında.
 - Ayar dosyasında: `"beyin": {"varsayilan": {…}, "konus": {…}, "ceviri": {…}, "proje_karti": {…}}` — sihirbaz ve pano yazar; elle yazılan model ve `effort` korunur.
+
+## Claude'dan arşive erişim
+`arsiv-mcp.py`, toplantı arşivini Claude Desktop ya da Claude Code'a araç olarak açan yerel bir MCP sunucusudur (Model Context Protocol). Yalnız bu Mac'te,
+standart girdi/çıktı (stdio) üzerinden çalışır; ağ portu açmaz, ek paket istemez (Python 3.9). Suflor.me açık olmalı: listeleme, arama ve döküm aktarıcının yerel
+uçlarından, kararlar ve işler kararlar grafından gelir. Gizli toplantılar hiçbir araçta görünmez.
+
+Araçlar: `toplanti_ara`, `toplanti_listesi`, `toplanti_ozeti`, `toplanti_dokumu` (sayfalı), `kararlar`, `isler` (kişiye, duruma göre), `acik_sorular`; yazma:
+`is_durumu` (yapıldı / yapılmadı), `karar_onayla`, `karar_duzelt`. Yazma araçları ilk çağrıda yalnız ne yapacaklarını söyler (`onay_gerekli`); kullanıcı onaylarsa
+`onayla: true` ile uygulanır.
+
+Claude Code: `claude mcp add suflor-arsiv -- python3 -B <SUFLOR-KLASÖRÜ>/arsiv-mcp.py`
+
+Claude Desktop (`claude_desktop_config.json`):
+```json
+{ "mcpServers": { "suflor-arsiv": { "command": "python3", "args": ["-B", "<SUFLOR-KLASÖRÜ>/arsiv-mcp.py"] } } }
+```
+Ayar dosyasından (`~/Library/Application Support/Suflor/ayar.json`) port ve veri klasörü okunur; farklıysa `--dir <canlı klasör>` ve `--relay http://127.0.0.1:<port>` eklenir.
+Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/arsiv-mcp.py`.
 
 ## Sorun giderme
 

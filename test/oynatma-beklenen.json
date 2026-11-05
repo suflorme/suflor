@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 351981,
-   "sha": "5d9f6802c7cef8f6"
+   "uzunluk": 402020,
+   "sha": "fbcd593a6c3f498a"
   },
   "/mini": {
-   "uzunluk": 351981,
-   "sha": "5d9f6802c7cef8f6"
+   "uzunluk": 402020,
+   "sha": "fbcd593a6c3f498a"
   },
   "/status": {
    "_ping_son": "float",
@@ -317,6 +317,7 @@
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
      "profil": "str",
+     "renk_duzeni": "str",
      "saatler": "NoneType",
      "saatler_sira": "str",
      "ses_hizi": "str",
@@ -377,6 +378,7 @@
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
      "profil": "str",
+     "renk_duzeni": "str",
      "saatler_sira": "str",
      "ses_hizi": "str",
      "ses_izi_hafiza": "bool",
@@ -584,6 +586,7 @@
     "durum": "str",
     "hata": "NoneType",
     "kisilik": "NoneType",
+    "kisilik_gorunen": "NoneType",
     "kulaklik": "bool",
     "moderator": "NoneType",
     "olcum": "NoneType",

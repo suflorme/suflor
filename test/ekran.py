@@ -37,6 +37,27 @@ ns["EKRAN_SON"][AKTIF["f"]]["t"] -= 16 * 60; ok("15 dk'dan eski ekran bağlama g
 ok("bölge süzgeci: geçersiz/küçük bölge atılır", ns["_bolge_temiz"]({"x": 0.1, "y": 0.1, "w": 0.01, "h": 0.5}) is None and ns["_bolge_temiz"]({"x": "a"}) is None
    and ns["_bolge_temiz"]({"x": 0.2, "y": 0.1, "w": 0.9, "h": 0.5}) == {"x": 0.2, "y": 0.1, "w": 0.8, "h": 0.5})
 
+# S212: görsel ağırlıklı işareti, görüntü yolu, tekrar, gizli toplantı
+G = ns["ekran_gorsel"]
+ok("görsel işareti: yazı yok / az yazı", G([]) == "yazı yok" and G(["Q3"]) == "yazı yok" and G(["Satış grafiği", "Q1 Q2 Q3"]) == "az yazı")
+ok("görsel işareti: çok sayı", G(["Gelir %d" % (1000 + i) + " 2024 12,5 30" for i in range(8)]) == "çok sayı")
+ok("görsel işareti: tablo", G([f"Bölge {c} adlı uzun satır metni 12 34 56" for c in "ABCDEF"] + ["Toplam açıklama metni burada devam eder"]) in ("tablo", "çok sayı"))
+ok("görsel işareti: yazı ağırlıklı slayt işaretsiz", G(["Bu slaytta uzun bir açıklama paragrafı var ve sayı içermiyor sadece metin"] * 8) == "")
+YAZILAN.clear(); ns["EKRAN_YAZILAN"].clear(); ns["EKRAN_SON"].clear()
+ns["ekran_kaydet"](md, "kanit/x/7.png", 7, "10:07", "Satış grafiği · Q3", "az yazı")
+ns["ekran_kaydet"](md, "kanit/x/8.png", 8, "10:08", "Satış grafiği · Q3", "az yazı")
+ns["ekran_kaydet"](md, "kanit/x/9.png", 9, "10:09", "", "yazı yok"); ns["ekran_kaydet"](md, "kanit/x/10.png", 10, "10:10", "", "yazı yok")
+ns["ekran_kaydet"](md, "kanit/x/11.png", 11, "10:11", "Slayt başlığı uzun metin", "")
+r2 = [json.loads(x) for p_, x in YAZILAN if p_ == kj]
+ok("görsel ekran kaydı: gorsel_neden + yol; tekrar ve boş tekrar yazılmaz", [r["n"] for r in r2] == [7, 9, 11] and r2[0]["gorsel_neden"] == "az yazı" and r2[1]["gorsel_neden"] == "yazı yok" and r2[0]["gorsel"] == "kanit/x/7.png" and "gorsel_neden" not in r2[2])
+ns["EKRAN_SON"][os.path.basename(md)] = {"n": 9, "saat": "10:09", "t": time.time(), "ozet": "", "gorsel": "kanit/x/9.png", "gorsel_neden": "yazı yok"}
+b = ns["ekran_baglam"](); ok("Konuş bağlamına görüntü yolu girer (görsel ağırlıklı)", os.path.join(T, "kanit/x/9.png") in b and "Read" in b)
+ns["EKRAN_SON"][os.path.basename(md)]["gorsel_neden"] = ""; ok("yazı ağırlıklı ekranda yol yok", "kanit/x" not in ns["ekran_baglam"]())
+GIZLI["acik"] = True; YAZILAN.clear(); ns["ekran_kaydet"](md, "kanit/x/12.png", 12, "10:12", "Gizli ekran", "az yazı")
+ok("gizli toplantıda ekran.jsonl'e (görüntü yolu dahil) yazılmaz", not YAZILAN); GIZLI["acik"] = False
+src = open(os.path.join(KOD, "toplanti-claude.py"), encoding="utf-8").read()
+ok("izle: gorsel_neden varsa 'GÖRSEL AĞIRLIKLI' + Read talimatı", "GÖRSEL AĞIRLIKLI ({r['gorsel_neden']})" in src and "Read ile oku, en çok 2 cümle" in src)
+
 # --- Bölüm 2: uçtan uca --------------------------------------------------------------------------------------------
 if not shutil.which("swiftc"): print("atlandı (bölüm 2): swiftc yok")
 else:

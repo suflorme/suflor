@@ -42,6 +42,18 @@ def ekran_ozet(satirlar, en_cok=EKRAN_OZET_EN_COK):
         sec.add(i); top += len(s) + 3
     return " · ".join(s for i, s in enumerate(sat) if i in sec)
 
+def ekran_gorsel(satirlar):
+    # Görsel ağırlıklı mı (grafik, tablo, diyagram, beyaz tahta): yazı okuması görüntüyü anlatmaya yetmez → izle olayına işaret, Claude Read ile bakar.
+    # Ölçülebilir kural (ilk eşleşen): yazı yok (toplam < 15 karakter) · az yazı (< 150 karakter ya da < 6 satır) · çok sayı (rakamlar harf+rakamın ≥ %30'u ve ≥ 15 rakam) ·
+    # tablo (≥ 4 satırda ikişer ya da daha çok sayı simgesi). Boş dize: yazı ağırlıklı (slayt metni), görüntüye bakmaya gerek yok.
+    sat = [" ".join(str(s).split()) for s in (satirlar or []) if str(s).strip()]; top = sum(len(s) for s in sat)
+    if top < 15: return "yazı yok"
+    if top < 150 or len(sat) < 6: return "az yazı"
+    rak = sum(c.isdigit() for c in "".join(sat)); har = sum(c.isalnum() for c in "".join(sat))
+    if rak >= 15 and har and rak / har >= 0.30: return "çok sayı"
+    if sum(1 for s in sat if len(re.findall(r"\d[\d.,%]*", s)) >= 2) >= 4: return "tablo"
+    return ""
+
 def _ekran_soz(s): return {w for w in re.findall(r"\w+", (s or "").lower()) if len(w) > 1}
 
 def kanit_isle(md, rel, n, saat, bolge=None, ekran=False):  # kanıt kaydedilince ayrı iş parçacığında (relay.py kanit())
@@ -50,7 +62,10 @@ def kanit_isle(md, rel, n, saat, bolge=None, ekran=False):  # kanıt kaydedilinc
     if AYAR.get("kanit_metin") is not True and not bolge: return
     s, hata = ekran_oku(os.path.join(BASE, rel), bolge)
     if s is None: print(f"KANIT {n} METNİ: okunamadı ({hata})"); return
-    if not s: print(f"KANIT {n} METNİ: yazı yok" + (f" ({hata})" if hata else "") + (" · bölge" if bolge else "")); return
+    if not s:
+        print(f"KANIT {n} METNİ: yazı yok" + (f" ({hata})" if hata else "") + (" · bölge" if bolge else ""))
+        if bolge and not hata and not gizli_acik(): ekran_kaydet(md, rel, n, saat, "", "yazı yok")  # grafik/beyaz tahta: yazı yok ama görüntü anlamlı olabilir
+        return
     if gizli_acik(): return
     k = os.path.basename(md)
     if AYAR.get("kanit_metin") is True:  # eski tam metin satırı (.md; .jsonl'e girmez: döküm satırı sayılmaz)
@@ -59,19 +74,22 @@ def kanit_isle(md, rel, n, saat, bolge=None, ekran=False):  # kanıt kaydedilinc
         ayni = KANIT_METIN_SON.get(k) == m; KANIT_METIN_SON[k] = m
         with LOCK: write([(md, f"| {saat} | **📷 KANIT {n} metni** | {_t('önceki kanıtla aynı yazı', 'same text as the previous evidence') if ayni else m} |  |\n")])
         print(f"KANIT {n} METNİ: {len(s)} satır, {len(m)} karakter" + (" (öncekiyle aynı)" if ayni else "") + (" · bölge" if bolge else ""))
-    if bolge: ekran_kaydet(md, rel, n, saat, ekran_ozet(s))
+    if bolge: ekran_kaydet(md, rel, n, saat, ekran_ozet(s), ekran_gorsel(s))
 
-def ekran_kaydet(md, rel, n, saat, ozet):
+def ekran_kaydet(md, rel, n, saat, ozet, gorsel=""):
     # EKRAN olayı: son yazılanla neredeyse aynıysa (sözcüklerin ≥ %90'ı ortak) yazılmaz; son 8 olaydan biriyle aynıysa "KANIT k ile aynı"
     # (açılır pencere kapanıp önceki ekrana dönüldü) — metin yinelenmez. Konuş için şu anki ekran her durumda güncellenir.
-    if not ozet: return
+    if not ozet and not gorsel: return
+    try:
+        if gizli_acik(): return  # gizli toplantıda ne özet ne görüntü yolu yazılır
+    except NameError: pass
     k = os.path.basename(md); sz = _ekran_soz(ozet); gec = EKRAN_YAZILAN.setdefault(k, [])
-    benzer = lambda a: len(sz | a) and len(sz & a) / len(sz | a) >= 0.9
+    benzer = lambda a: (not sz and not a) or (len(sz | a) and len(sz & a) / len(sz | a) >= 0.9)
     with LOCK:
-        EKRAN_SON[k] = {"n": n, "saat": saat, "t": time.time(), "ozet": ozet}
+        EKRAN_SON[k] = {"n": n, "saat": saat, "t": time.time(), "ozet": ozet, "gorsel": rel, "gorsel_neden": gorsel}
         if gec and benzer(gec[-1][1]): print(f"EKRAN {n}: yazı öncekiyle aynı — olay yok"); return
         es = next((x for x in reversed(gec[:-1]) if benzer(x[1])), None)
-        rec = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "n": n, "saat": saat, "gorsel": rel, **({"ayni": es[0]} if es else {"ozet": ozet})}
+        rec = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "n": n, "saat": saat, "gorsel": rel, **({"ayni": es[0]} if es else {"ozet": ozet, **({"gorsel_neden": gorsel} if gorsel else {})})}
         gec.append((n, sz, ozet)); del gec[:-EKRAN_GECMIS]
         write([(os.path.join(BASE, "kanit", k[:-3], "ekran.jsonl"), json.dumps(rec, ensure_ascii=False) + "\n")])
     print(f"EKRAN {n}: " + (f"KANIT {es[0]} ile aynı yazı" if es else f"{len(ozet)} karakter özet"))
@@ -83,5 +101,8 @@ def ekran_baglam():  # Konuş sorusunun [Bağlam]'ına: süren toplantıda son 1
     except NameError: return ""
     e = EKRAN_SON.get(f)
     if not e or time.time() - e["t"] > EKRAN_BAGLAM_SN: return ""
-    return _t(f"Paylaşılan ekranda son görünen yazı (KANIT {e['n']}, {e['saat']}; yerel okundu, okuma hatası olabilir): {e['ozet']}\n",
-              f"Text last seen on the shared screen (evidence {e['n']}, {e['saat']}; read locally, may contain recognition errors): {e['ozet']}\n")
+    yol = os.path.join(BASE, e["gorsel"]) if e.get("gorsel_neden") and e.get("gorsel") else ""  # S212: görsel ağırlıklı ekranda görüntü yolu (Konuş Read ile açabilir; yalnız kullanıcı ekranı soruyorsa)
+    return _t(f"Paylaşılan ekranda son görünen yazı (KANIT {e['n']}, {e['saat']}; yerel okundu, okuma hatası olabilir): {e['ozet'] or '(yazı yok)'}\n"
+              + (f"Bu ekran görsel ağırlıklı ({e['gorsel_neden']}); kullanıcı ekranda ne olduğunu ya da tabloyu/grafiği yorumlamanı isterse görüntüyü Read ile aç: {yol}\n" if yol else ""),
+              f"Text last seen on the shared screen (evidence {e['n']}, {e['saat']}; read locally, may contain recognition errors): {e['ozet'] or '(no text)'}\n"
+              + (f"This screen is visual-heavy ({e['gorsel_neden']}); if the user asks what is on screen or to interpret the table/chart, open the image with Read: {yol}\n" if yol else ""))

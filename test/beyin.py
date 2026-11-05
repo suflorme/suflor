@@ -113,7 +113,7 @@ kontrol("Aşama 2: çeviri de openai-uyumlu; yedekte Claude modeli (gemini adı 
         and BY.claude_secim(A, "ceviri") == {"tur": "claude-code", "model": "haiku"} and BY.ceviri_args(A, "Ç", "haiku")[BY.ceviri_args(A, "Ç", "haiku").index("--model") + 1] == "haiku", str(sc))
 with contextlib.redirect_stderr(io.StringIO()):
     sb = BY.secim({"beyin": {"brifing": {"tur": "openai-uyumlu", "saglayici": "gemini", "model": "m"}}}, "brifing")
-kontrol("sesli brifing (rafta) yalnız claude-code; telaffuz ve proje kartı openai-uyumlu", sb["tur"] == "claude-code" and set(BY.DESTEK["openai-uyumlu"]) == {"konus", "ceviri", "telaffuz", "proje_karti"})
+kontrol("sesli brifing (rafta) yalnız claude-code; telaffuz ve proje kartı openai-uyumlu", sb["tur"] == "claude-code" and set(BY.DESTEK["openai-uyumlu"]) == {"konus", "ceviri", "telaffuz", "proje_karti", "prova"})
 kontrol("yedek_var: Claude Code kurulu ve yedek: false değilse; claude-code seçiminde yok", BY.yedek_var({"claude": SAHTE}, sk) and not BY.yedek_var({"claude": os.path.join(T, "yok"), "PATH": ""}, dict(sk, yedek=False))
         and not BY.yedek_var({"claude": SAHTE}, {"tur": "claude-code"}) and not BY.yedek_var({"claude": SAHTE}, dict(sk, yedek=False)))
 y_ = BY.yedek_satiri("ceviri", sk, "HTTP 503:\n çok   yoğun")

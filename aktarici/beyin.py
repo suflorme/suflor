@@ -14,9 +14,9 @@
 import glob as _glob, http.client, json, os, re, shutil, ssl, subprocess, sys, threading, time, urllib.parse, uuid
 
 UYARLAYICILAR = ("claude-code", "openai-uyumlu")
-ISLER = ("konus", "ceviri", "telaffuz", "brifing", "proje_karti")
-DESTEK = {"claude-code": ISLER, "openai-uyumlu": ("konus", "ceviri", "telaffuz", "proje_karti")}  # sesli brifing rafta (S87): yalnız claude-code
-VARSAYILAN_MODEL = {"konus": "sonnet", "ceviri": "haiku", "telaffuz": "sonnet", "brifing": None, "proje_karti": "sonnet"}
+ISLER = ("konus", "ceviri", "telaffuz", "brifing", "proje_karti", "prova")
+DESTEK = {"claude-code": ISLER, "openai-uyumlu": ("konus", "ceviri", "telaffuz", "proje_karti", "prova")}  # sesli brifing rafta (S87): yalnız claude-code
+VARSAYILAN_MODEL = {"konus": "sonnet", "ceviri": "haiku", "telaffuz": "sonnet", "brifing": None, "proje_karti": "sonnet", "prova": "sonnet"}
 ESKI_ANAHTAR = {"konus": "konus_model", "ceviri": "ceviri_model", "brifing": "claude_model", "proje_karti": "kart_model"}
 HAZIR = {"gemini": "https://generativelanguage.googleapis.com/v1beta/openai", "openai": "https://api.openai.com/v1",
          "lmstudio": "http://127.0.0.1:1234/v1"}
@@ -138,6 +138,8 @@ def ceviri_args(ayar, sistem, model=None):  # açık süreç, araçsız (Popen; 
             "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", sistem] + ceviri_effort(ayar)
 def telaffuz_args(ayar, istem, model=None):  # tek çağrı (Brifing.app), json çıktı; model: yedekte Claude modeli
     return ["-p", istem, "--output-format", "json", "--model", model or secim(ayar, "telaffuz")["model"]] + yalin(ayar)
+def prova_args(ayar, istem, model=None):  # Prova odası: tek çağrı (Brifing.app), json çıktı; model: yedekte Claude modeli
+    return ["-p", istem, "--output-format", "json", "--model", model or secim(ayar, "prova")["model"]] + yalin(ayar)
 def brifing_args(ayar, istem, ek_dizin, yalin_mi=True, bilgi=None):  # tek çağrı + Read/Grep/Glob; bilgi (konus_bilgi çıktısı) varsa FIFO kipi:
     # istem stdin'den stream-json gider (bağlayıcı ~6 sn'de bağlanır, tek seferlik -p ilk turda göremez — 2 Kasım denemesi; PREWAIT ortamı da yetmedi)
     m = secim(ayar, "brifing")["model"]; bilgi = konus_bilgi(bilgi) if bilgi and yalin_mi else []

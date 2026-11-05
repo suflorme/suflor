@@ -1535,7 +1535,8 @@ def izle():
                     ilk = ekran_ilk != cur; ekran_ilk = cur
                     emit(f"EKRAN {r.get('n')} ({r.get('saat')}): \"{r.get('ozet')}\" · " + ("paylaşılan ekranda görünen yazı (yerel okundu, okuma hatası olabilir) → bağlamına al: "
                          "geçen ad/firma/başlık/sayı konuşmayla ilgiliyse kartta ve cevapta kullan; emin değilsen görüntüyü Read ile aç; ekranda sır/şifre → DUR kartı; sohbete yazma · "
-                         if ilk else "") + f"görüntü {os.path.join(A.dir, r.get('gorsel') or '')}")
+                         if ilk else "") + f"görüntü {os.path.join(A.dir, r.get('gorsel') or '')}" +
+                         (f" · GÖRSEL AĞIRLIKLI ({r['gorsel_neden']}) → görüntüyü Read ile oku, en çok 2 cümle not kartı (ekranda ne var + dikkat çeken sayı/eğilim/çelişki)" if r.get("gorsel_neden") else ""))
             if t_tail:
                 for r in t_tail.new():
                     if "note" in r and r.get("kaynak") == "suflor": emit(f"SUFLOR SÖYLEDİ (asistan adıyla çağrıldı, cevabı toplantıya okundu — not değil, iş değil; cevap kartı yazma): {r['note']}")  # S94
