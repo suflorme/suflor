@@ -172,6 +172,7 @@
    "{\"toplanti\": \"Deneme toplantısı — altyapı\", \"kartlar\": [{\"id\": \"h1\", \"gundem\": 1, \"tetik\": [\"mfa\"], \"tur\": \"sor\", \"metin\": \"MFA zorunlu mu, kimde kapalı?\", \"neden\": \"Gündem 2'nin özü\"}, {\"id\": \"h2\", \"gundem\": 2, \"tetik\": [\"organizasyon\"], \"tur\": \"belirt\", \"metin\": \"Organizasyonda kişisel hesaplar kalmasın\", \"neden\": \"Erişim kuralı\"}]}"
   ],
   "heartbeat.json": "<var>",
+  "izle-olay.json": "<var>",
   "izle-paketler.jsonl": [
    "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"iddia\", \"sistem\"], \"neden\": \"acil\"}",
    "{\"at\": \"<AN>\", \"file\": \"<TARIH>-Toplantı-<SS>.md\", \"satir\": 1, \"aday\": [\"soru\"], \"neden\": \"acil\"}",

@@ -706,6 +706,35 @@ class Tail:
 
 def emit(*lines):
     for l in lines: print(l, flush=True)
+    if lines and A.cmd == "izle": izle_olay_kaydet()
+# Olay anı kaydı (6 Kasım, gecikme ölçümü): izle her olayın anını canli/izle-olay.json'a yazar (son 50; 0,2 sn içindeki ardışık emit tek olay).
+# Aktarıcı, toplantı oturumu bir izni beklerken kuyrukta kalan olayları buradan sayar (aktarici/toplanti-oturum.py _topo_bekleme_kaydi).
+IZLE_OLAY = []
+def izle_olay_kaydet():
+    t = round(time.time(), 2)
+    if IZLE_OLAY and t - IZLE_OLAY[-1] < 0.2: return
+    IZLE_OLAY.append(t); del IZLE_OLAY[:-50]
+    try:
+        tmp = os.path.join(A.dir, f"izle-olay.json.{os.getpid()}")
+        with open(tmp, "w", encoding="utf-8") as f: json.dump({"pid": os.getpid(), "t": IZLE_OLAY}, f)
+        os.replace(tmp, os.path.join(A.dir, "izle-olay.json"))
+    except OSError: pass
+# izle uykusu (6 Kasım; ölçüm: 2 sn sabit uyku soru başına ~1,5–3 sn ekliyordu): en çok IZLE_UYKU_SN bekler, ama soru/kart/döküm/ekran dosyası
+# değişince IZLE_YOKLA_SN içinde uyanır. Boşta /status yoklaması eskisi gibi 2 sn'de bir; yoklama yalnız stat (dosya boyu + değişme anı).
+IZLE_UYKU_SN, IZLE_YOKLA_SN = 2.0, 0.25
+def izle_iz(yollar):
+    o = []
+    for p in yollar:
+        try: st = os.stat(p); o.append((st.st_size, st.st_mtime_ns))
+        except OSError: o.append(None)
+    return o
+def izle_uyku(yollar, ilk, sn=IZLE_UYKU_SN, adim=IZLE_YOKLA_SN):  # → True: dosya değişti (erken uyandı)
+    son = time.time() + sn
+    while True:
+        kal = son - time.time()
+        if kal <= 0: return False
+        time.sleep(min(adim, kal))
+        if izle_iz(yollar) != ilk: return True
 
 # --- v0.7.0: kendiliğinden bağlam ------------------------------------------------------------------------------
 # Konuşmada bir sistem adı geçince (veritabanı ya da SistemKatalogu + sözlük) izle, o satırların ayırt edici kelimeleriyle projede arar
@@ -1435,7 +1464,10 @@ def izle():
          (f" · bitiş {agj['bitis']}" if agj.get("bitis") else " · bitiş saati yok (kalan süre kapalı)") + f" · dil {agj.get('dil') or 'tr (varsayılan)'} · aktarıcı {A.relay}" +
          (" · ARAYÜZ DİLİ en: kartları ve özeti İngilizce yaz" if AYAR.get("dil") == "en" else ""))
     acik_gundem_disi(True)
+    def uyku_yollari():
+        return [q_tail.path, k_tail.path] + ([os.path.join(A.dir, cur.replace(".md", ".jsonl")), os.path.join(A.dir, "kanit", cur[:-3], "ekran.jsonl")] if cur else [])
     while True:
+        uyku_ilk = izle_iz(uyku_yollari())  # bu turdan sonra gelen soru/satır uykuyu keser (tur sürerken gelen de)
         # v0.89.1 (S91, kullanıcı 19 Ekim: "tamamen kör ve sağır"): gizli toplantıda aktarıcı hiçbir şey almaz; izle de olay göndermez
         try: gz = bool((get("/status") or {}).get("gizli"))
         except Exception: gz = False
@@ -1559,7 +1591,7 @@ def izle():
                     if r.get("ayni"): emit(f"EKRAN {r.get('n')} ({r.get('saat')}): KANIT {r['ayni']} ile aynı yazı — önceki ekrana dönüldü"); continue
                     ilk = ekran_ilk != cur; ekran_ilk = cur
                     emit(f"EKRAN {r.get('n')} ({r.get('saat')}): \"{r.get('ozet')}\" · " + ("paylaşılan ekranda görünen yazı (yerel okundu, okuma hatası olabilir) → bağlamına al: "
-                         "geçen ad/firma/başlık/sayı konuşmayla ilgiliyse kartta ve cevapta kullan; emin değilsen görüntüyü Read ile aç; ekranda sır/şifre → DUR kartı; sohbete yazma · "
+                         "geçen ad/firma/başlık/sayı konuşmayla ilgiliyse kartta ve cevapta kullan; emin değilsen görüntüyü Read ile aç (soru/cevap turunda açma, bu özet yeter); ekranda sır/şifre → DUR kartı; sohbete yazma · "
                          if ilk else "") + f"görüntü {os.path.join(A.dir, r.get('gorsel') or '')}" +
                          (f" · GÖRSEL AĞIRLIKLI ({r['gorsel_neden']}) → görüntüyü Read ile oku, en çok 2 cümle not kartı (ekranda ne var + dikkat çeken sayı/eğilim/çelişki)" if r.get("gorsel_neden") else ""))
             if t_tail:
@@ -1666,7 +1698,7 @@ def izle():
             emit(*acks, *sesler, *([f"SATIRLAR ({len(buf)}" + (f", kart adayı: {'/'.join(sorted(kart_aday))}" if kart_aday else "") + "):", *buf] if buf else []), *paket_baglam())
             if buf: paket_kaydi(cur, len(buf), kart_aday, "acil" if acil else "dolu" if len(buf) >= A.paket else "sure")
             buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
-        time.sleep(2)
+        izle_uyku(uyku_yollari(), uyku_ilk)
 
 # --- v0.7.0: kanıt listesi / açıklama ----------------------------------------------------------------------------
 def oturum_dosyasi(st):  # 3 Kasım (ardışık toplantı): oturum önceki toplantının sonunu yapıyorsa onun dosyası (aktarıcının toplanti.oturum_dosya), değilse süren toplantınınki

@@ -108,8 +108,22 @@ def _topo_kisi_kaynak(ad):  # günlük etiketi: chrome | bağlayıcı (kisi_kayn
     if ad in TOPO_WEB: return "web"
     bk = bilgi_kaynagi_arac(ad)
     return "bağlayıcı" if bk and bk["kaynak"].get("kisi") else None
+# 6 Kasım (5 Kasım ölçümü: 11 yazılı sorudan >10 sn sürenlerin hepsinde kart turunda ToolSearch + araç turu): ertelenmiş araç şemaları açılışta tek
+# ToolSearch'le yüklenir, kart turunda yüklenmez. Adı belli araçlar select ile; desenli (get_*) kaynak araçları sunucu adıyla anahtar sözcük araması.
+def topo_arac_onyukle(ks=None):
+    ks = bilgi_kaynaklari() if ks is None else ks; adlar = ["Monitor"] + (list(TOPO_WEB) if topo_web_acik() else []); ara = []
+    if topo_web_acik() and topo_chrome_acik(): adlar += [TOPO_CHROME_ON + x for x in sorted(TOPO_CHROME_OKU)]
+    for k in ks:
+        tam = [x for x in (k.get("araclar") or []) + (k.get("okuma") or []) if re.fullmatch(r"[A-Za-z0-9_]{1,64}", x)]
+        adlar += [f"mcp__{k['sunucu']}__{x}" for x in tam if f"mcp__{k['sunucu']}__{x}" not in adlar]
+        if any(re.search(r"[*?]", x) for x in k.get("araclar") or []): ara.append("+" + k["sunucu"])
+    return (" Hız: toplantı başında, izle'yi kurmadan önce şu araç şemalarını TEK ToolSearch çağrısıyla yükle — select:" + ",".join(adlar) +
+            ("; desenli kaynak araçları için ayrıca: " + " · ".join(ara) if ara else "") + ". Kart ya da cevap turunda ToolSearch yapma; cevabı tek turda yaz. "
+            "Cevap turunda ekran görüntüsünü (PNG) Read ile açma, EKRAN özeti yeter. Dosya ararken salt okuyan komut kullan (find, grep, ls, cat, head; veritabanında "
+            "sqlite3 -readonly): bunlar izinsiz çalışır; yönlendirme (>), silme ya da yazan seçenek izin sorar ve olaylar o sürede bekler.")
 def topo_istem():
     ks = bilgi_kaynaklari(); web = (TOPO_WEB_ISTEM + TOPO_KISI_ISTEM.replace("1) Claude in Chrome", "1) Claude in Chrome" if topo_chrome_acik() else "1) (Chrome kapalı: atla) Claude in Chrome")) if topo_web_acik() else ""
+    web += topo_arac_onyukle(ks)
     if not ks: return TOPO_ISTEM + web
     return TOPO_ISTEM + web + " Toplantıda kullanabileceğin dış bilgi kaynakları (yalnız okuma; toplantı kurallarındaki 'Dış bilgi kaynağı' maddesine göre): " + "; ".join(
         f"«{k['ad']}» — konu: {k['konu'] or 'belirtilmedi'}; araçlar: mcp__{k['sunucu']}__ altında {', '.join(k['araclar']) or '(yok)'}" for k in ks) + \
@@ -160,6 +174,9 @@ def _topo_gonder(o):
     if not w: return False
     try: w.write(json.dumps(o, ensure_ascii=False) + "\n"); w.flush(); return True
     except (OSError, ValueError): return False
+def topo_effort():  # 6 Kasım: isteğe bağlı ayar toplanti_effort (low|medium|high|xhigh|max) → claude --effort; yoksa Claude Code'un varsayılanı (değişiklik yok)
+    e = str(AYAR.get("toplanti_effort") or "").strip().lower()
+    return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
 def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
     # cl: claude yolu · model: ayar claude_model · ky: toplanti-kanca.json (ya da None) · ilk: ilk kullanıcı iletisi · sid: kaldığı yerden (--resume)
     with TOPO["kilit"]:
@@ -171,7 +188,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
             except OSError: pass
             os.mkfifo(f, 0o600)
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-prompt-tool", "stdio",
-                "--append-system-prompt", topo_istem()] + (["--chrome"] if topo_chrome_acik() else []) + (["--model", str(model)] if model else []) + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
+                "--append-system-prompt", topo_istem()] + (["--chrome"] if topo_chrome_acik() else []) + (["--model", str(model)] if model else []) + topo_effort() + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "toplanti-bos"),
@@ -212,7 +229,7 @@ def toplanti_oturum_yaz(metin, kaynak="kutu"):
     if not metin: return {"ok": False, "err": "boş"}
     if not topo_canli(): return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
     if not _topo_gonder({"type": "user", "message": {"role": "user", "content": metin}}): return {"ok": False, "err": _t("Oturuma yazılamadı", "Couldn't write to the session")}
-    _topo_mesaj("ben", metin, kaynak=kaynak); TOPO["secenek_i"] = None; _topo_durum("calisiyor")
+    _topo_mesaj("ben", metin, kaynak=kaynak); TOPO["secenek_i"] = None; TOPO["yazilan"] = TOPO.get("yazilan", 0) + 1; _topo_durum("calisiyor")
     print(f"TOPLANTI OTURUMU: kullanıcı yazdı ({kaynak}, {len(metin)} karakter)"); return {"ok": True}
 def toplanti_oturum_durdur():
     if not topo_canli() or TOPO["durum"] != "calisiyor": return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
@@ -316,6 +333,88 @@ def _topo_sonu_oto(ad, gi):  # toplantı sonunda sorulmadan verilecekse günlük
     if ad not in TOPO_SONU_ARAC: return None
     if ad == "Bash" and TOPO_SONU_RISK_RX.search(str(gi.get("command") or "")): return None
     return ad
+# 6 Kasım (5 Kasım ölçümü, testler/gecikme-olcum-20261105.md: `find` için 113 sn izin beklendi, oturum o sürede 13 olayı kuyrukta tuttu): salt okuyan kabuk
+# komutu sorulmaz. Dar kural: komut zinciri (| && || ;) yalnız TOPO_SALT_KOMUT'taki komutlardan oluşur; yazan/çalıştıran seçenek (find -delete/-exec, sort -o,
+# rg --pre, sed -n 'N,Mp' dışı sed …), /dev/null dışına yönlendirme, alt kabuk, komut yerine koyma, arka plan, satır sonu varsa None (sorulur). sqlite3 yalnız
+# -readonly ile ve okuma sorgusuyla. Tam kabuk ayrıştırıcı değil: shlex sözcükleri + izinli liste; şüphede sorulur. Ayar toplanti_salt_okur_onaysiz: false kapatır.
+TOPO_SALT_KOMUT = {"find", "grep", "egrep", "fgrep", "rg", "ls", "cat", "head", "tail", "wc", "stat", "file", "mdfind", "mdls", "sqlite3", "pwd", "cd", "echo",
+                   "sort", "uniq", "cut", "tr", "nl", "column", "basename", "dirname", "realpath", "du", "jq", "diff", "cmp", "sed", "true"}
+TOPO_SALT_YASAK_SECENEK = {"find": ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls"), "sort": ("-o", "--output", "--compress-program"),
+                           "rg": ("--pre", "--hostname-bin"), "file": ("-C", "--compile"), "sqlite3": ("-cmd", "-init")}
+def _topo_kabuk_supheli(c):  # genişleme ya da yerine koyma olabilecek her şey (tırnak içi de, tek tırnak hariç): ` $… ; tırnaksız { <( >( <<
+    tek = cift = False; i = 0
+    while i < len(c):
+        x = c[i]
+        if tek:
+            if x == "'": tek = False
+        elif x == "\\": i += 1
+        elif x == "'" and not cift: tek = True
+        elif x == '"': cift = not cift
+        elif x == "`" or (x == "$" and i + 1 < len(c) and (c[i + 1].isalnum() or c[i + 1] in "_{('\"@*#?!$-")): return True
+        elif not cift and (x == "{" or c[i:i + 2] in ("<(", ">(", "<<")): return True
+        i += 1
+    return tek or cift
+TOPO_SALT_ON_RX = re.compile(r"[\n\r\0]")
+TOPO_SED_RX = re.compile(r"^(?:\d+|\$)(?:,(?:\d+|\$))?p$")
+TOPO_SQL_RX = re.compile(r"^\s*(?:select|with|explain|pragma)\b", re.I)
+TOPO_SQL_YASAK_RX = re.compile(r"writefile|load_extension|\bedit\s*\(|\b(?:insert|update|delete|drop|create|alter|attach|detach|replace|vacuum|reindex)\b", re.I)
+TOPO_SQL_NOKTA = {".schema", ".tables", ".indexes", ".headers", ".mode"}
+def topo_salt_okur_acik(): return AYAR.get("toplanti_salt_okur_onaysiz") is not False
+def _topo_salt_komut(av):  # tek komut (yönlendirmeler ayıklanmış argv) salt okur mu
+    if not av: return False
+    k = av[0]
+    if k.startswith(("/bin/", "/usr/bin/", "/usr/local/bin/", "/opt/homebrew/bin/")): k = os.path.basename(k)
+    if k not in TOPO_SALT_KOMUT: return False
+    yasak = TOPO_SALT_YASAK_SECENEK.get(k, ())
+    if any(a == y or a.startswith(y + "=") or (k == "sort" and re.match(r"^-[A-Za-z]*o", a)) for a in av[1:] for y in yasak): return False
+    if k == "sed":  # yalnız `sed -n 'N,Mp' [dosya…]`: -i, w/e komutu ve betik dosyası yok
+        sec = [a for a in av[1:] if a.startswith("-")]; poz = [a for a in av[1:] if not a.startswith("-")]
+        return sec == ["-n"] and bool(poz) and bool(TOPO_SED_RX.match(poz[0]))
+    if k == "uniq": return sum(1 for a in av[1:] if not a.startswith("-")) <= 1  # ikinci konum argümanı çıktı dosyası olurdu
+    if k == "sqlite3":
+        sec = [a for a in av[1:] if a.startswith("-")]; poz = [a for a in av[1:] if not a.startswith("-")]
+        if "-readonly" not in sec or not set(sec) <= {"-readonly", "-header", "-noheader", "-csv", "-json", "-line", "-list", "-column", "-box", "-table", "-markdown"} or len(poz) != 2: return False
+        q = poz[1].strip()
+        if q.startswith("."): return q.split()[0] in TOPO_SQL_NOKTA and ";" not in q
+        return bool(TOPO_SQL_RX.match(q)) and not TOPO_SQL_YASAK_RX.search(q) and not (q.lower().lstrip().startswith("pragma") and "=" in q)
+    return True
+def _topo_salt_okur(ad, gi):  # sorulmadan verilecekse günlük açıklaması (yalnız komut adları), değilse None
+    if not topo_salt_okur_acik() or ad != "Bash": return None
+    c = str(gi.get("command") or "").strip()
+    if not c or len(c) > 2000 or TOPO_SALT_ON_RX.search(c) or _topo_kabuk_supheli(c): return None
+    try:
+        s = shlex.shlex(c, posix=True, punctuation_chars=True); s.whitespace_split = True; ts = list(s)
+    except ValueError: return None
+    parca, av, i = [], [], 0
+    while i < len(ts):
+        t = ts[i]
+        if t in ("|", "&&", "||", ";"):
+            if not av: return None
+            parca.append(av); av = []
+        elif t in (">", ">>", "&>", ">&", "<"):
+            hedef = ts[i + 1] if i + 1 < len(ts) else ""
+            if t == "<": ok_ = bool(hedef) and hedef not in ("|", "&", ";", ">", "<")  # dosyadan okuma
+            elif t == ">&": ok_ = hedef in ("1", "2")
+            else: ok_ = hedef == "/dev/null"
+            if not ok_: return None
+            if t != "<" and av and av[-1] in ("1", "2"): av.pop()  # 2>/dev/null, 2>&1: önündeki dosya tanımlayıcısı argüman değil
+            i += 2; continue
+        elif t and t[0] in "();<>|&": return None  # alt kabuk, arka plan, |&, başka yönlendirme
+        else: av.append(t)
+        i += 1
+    if not av: return None
+    parca.append(av)
+    if not all(_topo_salt_komut(p) for p in parca): return None
+    if any(os.path.basename(p[0]) == "sqlite3" for p in parca[1:]): return None  # sqlite3 boru sonunda değil, kendi sorgusuyla (stdin'den komut almasın)
+    return "Bash " + " | ".join(os.path.basename(p[0]) for p in parca)
+# İzin beklerken Claude Code yeni olayları (izle'nin Monitor olayları, kutudan yazılanlar) işlemez, kuyrukta tutar. Ölçüm: izle her olayın anını
+# canli/izle-olay.json'a yazar (toplanti-claude.py emit); bekleme bitince günlüğe "İZİN BEKLEME: n sn · kuyrukta k olay (en eskisi s sn) · kutudan y ileti".
+def _topo_izle_olay():
+    try: return json.load(open(os.path.join(BASE, "izle-olay.json"), encoding="utf-8")).get("t") or []
+    except (OSError, ValueError, AttributeError): return []
+def _topo_bekleme_kaydi(ad, t0, yaz0):
+    t1 = time.time(); ol = [x for x in _topo_izle_olay() if isinstance(x, (int, float)) and t0 <= x <= t1]
+    print(f"İZİN BEKLEME: {ad} {t1 - t0:.1f} sn · kuyrukta {len(ol)} olay" + (f" (en eskisi {t1 - min(ol):.1f} sn)" if ol else "") + f" · kutudan {TOPO.get('yazilan', 0) - yaz0} ileti")
 def _topo_tc_yerler(): return {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
 def _topo_okuma_arac(ad):  # girdiden bağımsız hatırlanabilen araç: web araçları ve yazma izi taşımayan MCP okuma araçları (5 Kasım: aynı araç farklı girdiyle yeniden soruluyordu)
     if ad in TOPO_WEB or (ad.startswith(TOPO_CHROME_ON) and ad[len(TOPO_CHROME_ON):] in TOPO_CHROME_OKU): return True
@@ -339,6 +438,8 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
     except Exception: oto = None
     try: sonu = _topo_sonu_oto(ad, gi)
     except Exception: sonu = None
+    try: salt = _topo_salt_okur(ad, gi)
+    except Exception: salt = None
     onaysiz = AYAR.get("bilgi_onaysiz") is not False  # 5 Kasım: varsayılan açık — okuma araçları ve web araması sorulmaz
     web_red = _topo_web_red(ad, gi) if ad in TOPO_WEB else None
     if web_red:
@@ -362,6 +463,8 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         cevap = {"behavior": "allow", "updatedInput": gi}; print("TOPLANTI OTURUMU: izin Monitor (izle) → kendiliğinden")
     elif ad in TOPO_OKU_ARAC or _topo_tc_okuma(ad, gi):
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} (salt okuma) → kendiliğinden")
+    elif salt:
+        cevap = {"behavior": "allow", "updatedInput": gi}; print(f"İZİN: salt-okur, kendiliğinden — {salt}")
     elif oto:
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"İZİN: otomatik — {oto}")  # beta sayacı: beta-veri.py BETA_RX "oto_izin" (satır metni tutulmaz)
     elif anh in hat:
@@ -381,8 +484,11 @@ def _topo_izin_sor(ad, gi, anh, hat):
     if True:
         ozet = _topo_arac_ozet(ad, gi); TOPO["izin"] += 1; TOPO["izin_toplam"] += 1
         _topo_mesaj("izin", arac_cumlesi(ad, gi))  # v0.112.2: düz cümle, komut yalnız eylem ayrıntısında ve izin-kayit.jsonl'de
+        t0, yaz0 = time.time(), TOPO.get("yazilan", 0)
         iid = izin_iste("arac", izin_metni(ad, gi), {"arac": ad, "ozet": ozet}, oturum=True)  # v0.115.0: kart değil, Claude bölümünde Onayla / Reddet
         k = izin_bekle(iid) if iid else "zaman_asimi"; TOPO["izin"] = max(0, TOPO["izin"] - 1)
+        try: _topo_bekleme_kaydi(ad, t0, yaz0)
+        except Exception: pass
         _topo_mesaj("sistem", {"onaylandi": _t("İzin verdin.", "You allowed it."), "reddedildi": _t("İzni reddettin.", "You declined.")}.get(k, _t("İzin süresi doldu; bu adım atlandı.", "The permission timed out; Claude skipped this step.")))
         cevap = ({"behavior": "allow", "updatedInput": gi} if k == "onaylandi" else
                  {"behavior": "deny", "message": _t(f"{AYAR.get('ad') or 'Kullanıcı'} reddetti (Suflor); bu adımı atla, gerekirse ona sor." if k == "reddedildi" else

@@ -172,7 +172,7 @@ def kos():
             if p:
                 try: p.wait(5)
                 except subprocess.TimeoutExpired: p.kill()
-    DEGISKEN = {"toplanti.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "sistem-izi.jsonl"}  # anahtar rastgele, nabız/ölçüm zamana bağlı; sistem izi Mac'in o anki bellek/swap değeri
+    DEGISKEN = {"toplanti.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "sistem-izi.jsonl", "izle-olay.json"}  # anahtar rastgele, nabız/ölçüm/izle olay anları zamana bağlı; sistem izi Mac'in o anki bellek/swap değeri
     dosyalar = {}
     for kok, _, fs in os.walk(canli):
         for f in sorted(fs):
