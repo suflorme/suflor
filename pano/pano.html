@@ -1687,14 +1687,23 @@ function bnSonKart(r,ust){const cp=ciktiP(r.cikti),d=new Date(r.at),z=ust?(d.toL
   return`<article class=kart><div class=kbas><span class=ad>${esc(r.baslik||r.ad)}</span><span class="zaman mono">${esc(z)}</span></div>${cp.length?`<div class=sakin>${esc(cp.join(' · '))}</div>`:''}${de}${bnKararBlok(r)}${bnSonDug(r,false)}</article>`}
 // Türkçede saate ek: dakika sıfırsa saate, değilse dakikaya göre (18:00’de, 09:30’da, 11:15’te); İngilizcede ek yok
 const bnSaatEk=s=>{if(DIL==='en')return s;const [h,m]=String(s||'').split(':').map(Number),n=m?m:(h||0),son=n%10||n;return s+'’'+({0:'da',1:'de',2:'de',3:'te',4:'te',5:'te',6:'da',7:'de',8:'de',9:'da',10:'da',20:'de',30:'da',40:'ta',50:'de',60:'ta',70:'te',80:'de',90:'da'}[son]||'de')}
-function bnDurum(s,ol,now,sira,kala,hdS,bek,son){const P=[],kalan=ol.filter(o=>bnDk(o.bitis_saat)>now),ad_=o=>bnVarlik('t:'+o.id,o.baslik||''),adSaat=o=>L('{saat} {ad}',{saat:bnSaatEk(o.saat),ad:ad_(o)})
+// Paragrafta bir toplantı bir kez anılır: kısa ad (parantez içi atılır; tam ad kartta ve yan panelde), tek toplantıda hazırlık ve "N dakika sonra" aynı cümlede
+// ("… toplantın var; hazırlığı hazır."), birden çok toplantıda sıra sözcüğüyle ("İlkinin hazırlığı eksik."; sıra = kalan toplantıların sırası, sıradaki hep ilki)
+const bnKisaAd=o=>{const t=String(o.baslik||''),k=t.replace(/\s*\([^()]*\)/g,'').replace(/\s{2,}/g,' ').trim();return k||t}
+const bnSiraSoz=i=>[L('ilkinin'),L('ikincisinin'),L('üçüncüsünün'),L('dördüncüsünün'),L('beşincisinin')][i]||''
+function bnDurum(s,ol,now,sira,kala,hdS,bek,son){const P=[],kalan=ol.filter(o=>bnDk(o.bitis_saat)>now),ad_=o=>bnVarlik('t:'+o.id,bnKisaAd(o)),adSaat=o=>L('{saat} {ad}',{saat:bnSaatEk(o.saat),ad:ad_(o)})
   const lst=ks=>{const a=ks.slice(0,2).map(adSaat);return ks.length>2?a.join(', ')+' '+L('ve {n} toplantı daha',{n:ks.length-2}):a.join(' '+L('ve')+' ')}  // toplantılar adı ve saatiyle: ilk ikisi + "ve N toplantı daha"
-  if(sira&&kala!=null&&kala>=0&&kala<=15)P.push(L('{ad} {n} dakika sonra.',{ad:ad_(sira),n:kala}))
-  if(ol.length){const liste=lst(kalan)
-    P.push(kalan.length===ol.length?(ol.length===1?L('Bugün {liste} toplantın var.',{liste}):ol.length===2?L('Bugün {liste} toplantıların var.',{liste}):L('Bugün {liste} var.',{liste}))
-      :kalan.length?L('Bugün {b} toplantın bitti; sırada {liste} var.',{b:ol.length-kalan.length,liste}):L('Bugünkü {n} toplantın bitti.',{n:ol.length}))
-    kalan.filter(o=>hzDurum(o,s)==='eksik'&&!(sira&&o===sira&&kala>=0&&kala<=15)).slice(0,2).forEach(o=>P.push(L('{ad} için hazırlık eksik.',{ad:ad_(o)})))
-    if(sira&&hdS==='hazir'&&!(kala>=0&&kala<=15))P.push(L('{ad} için hazırlık hazır.',{ad:ad_(sira)}))}
+  const bas=t=>t.charAt(0).toLocaleUpperCase(DIL==='en'?'en':'tr')+t.slice(1),birles=(c,k)=>c.replace(/\.$/,'')+'; '+k+'.'  // cümle başı büyük harf (İ) · iki cümle noktalı virgülle
+  if(ol.length){const liste=lst(kalan),tek=kalan.length===1,hepsi=kalan.length===ol.length,yakin=!!(sira&&kala!=null&&kala>=0&&kala<=15)
+    let c=hepsi?(ol.length===1?L('Bugün {liste} toplantın var.',{liste}):ol.length===2?L('Bugün {liste} toplantıların var.',{liste}):L('Bugün {liste} var.',{liste}))
+      :kalan.length?L('Bugün {b} toplantın bitti; sırada {liste} var.',{b:ol.length-kalan.length,liste}):L('Bugünkü {n} toplantın bitti.',{n:ol.length})
+    const eksik=kalan.filter(o=>hzDurum(o,s)==='eksik'),hazir=!!(sira&&hdS==='hazir'),kuyruk=[]  // tek toplantıda cümleye eklenen kuyruk; bitmiş toplantı varsa ayrı cümle
+    if(tek&&yakin)kuyruk.push(L('{n} dakika sonra başlıyor',{n:kala}));else if(tek&&hazir)kuyruk.push(L('hazırlığı hazır'));else if(tek&&eksik.length)kuyruk.push(L('hazırlığı eksik'))
+    else if(!tek&&yakin)kuyruk.push(L('ilki {n} dakika sonra başlıyor',{n:kala}))
+    if(kuyruk.length&&hepsi)c=birles(c,kuyruk[0]);P.push(c);if(kuyruk.length&&!hepsi)P.push(bas(kuyruk[0])+'.')
+    if(!tek){const ek=eksik.filter(o=>!(yakin&&o===sira)).slice(0,2),sz=ek.map(o=>bnSiraSoz(kalan.indexOf(o)))
+      if(ek.length&&sz.every(Boolean))P.push(bas(L('{k} hazırlığı eksik.',{k:sz.join(' '+L('ve')+' ')})));else ek.forEach(o=>P.push(L('{ad} için hazırlık eksik.',{ad:ad_(o)})))
+      if(hazir&&!yakin)P.push(bas(L('{k} hazırlığı hazır.',{k:bnSiraSoz(0)})))}}
   if(bek.length)P.push(L('Senden onay bekleyen {x} var.',{x:bnVarlik('bek',L('{n} iş',{n:bek.length}))}))
   {const kt=bnTeyit(),kg=bnKendi().filter(x=>x.gecikti)
     if(kt.length)P.push(L('Onayını bekleyen {x} var.',{x:bnVarlik('bek',L('{n} karar',{n:kt.length}))}))

@@ -20,9 +20,16 @@ for ad, j in (("açık", acik), ("koyu", koyu)):
     kontrol(f"{ad}: soluk yazı tüm zeminlerde ≥ 4,5 ({en:.2f})", en >= 4.5)
     kontrol(f"{ad}: ana düğme yazısı dolguda ≥ 4,5 ({oran('#ffffff', j['ac-dolgu']):.2f})", oran("#ffffff", j["ac-dolgu"]) >= 4.5)
 kontrol(f"açık: uyarı yüzeyde ve kendi zemininde ≥ 4,5 ({min(oran(acik['wa'], acik['s1']), oran(acik['wa'], acik['wa-bg'])):.2f})", min(oran(acik["wa"], acik["s1"]), oran(acik["wa"], acik["wa-bg"])) >= 4.5)
+# v0.194.1: şerit Bugün belirteçlerini (--b-*) taşır; eski adlar pano.html'deki eşlemeyle aynı karşılığa bakar. Toast (Teams sayfasında, değişken yok) TON tablosundaki değerler de --b-*'den.
 C = oku("content.js"); i = C.index(".w{font:"); wa, wk = jetonlar(C[i:C.index("@media", i)]), jetonlar(C[C.index("@media (prefers-color-scheme:dark){.w{", i):C.index(".pill{", i)])
-kontrol("Teams şeridi açık renkleri renk.css'le aynı", all(acik[k] == v for k, v in wa.items() if k in acik) and len(wa) >= 7)
-kontrol("Teams şeridi koyu renkleri renk.css'le aynı", all(koyu[k] == v for k, v in wk.items() if k in koyu) and len(wk) >= 7)
+ESLE = {"s1": "b-yuzey", "s2": "b-yuzey2", "tx": "b-murekkep", "t2": "b-m2", "t3": "b-m3", "bd": "b-cizgi", "bd2": "b-cizgi2", "hov": "b-uzerinde", "ac": "b-vurgu", "ac-yazi": "b-ana-yazi", "dikkat": "b-gec"}
+def serit_ayni(j, w): return set(w) == set(ESLE) and all(j[ESLE[k]].strip().lower() == v.strip().lower() for k, v in w.items())
+kontrol("Teams şeridi açık renkleri renk.css'in Bugün belirteçleriyle aynı", serit_ayni(acik, wa))
+kontrol("Teams şeridi koyu renkleri renk.css'in Bugün belirteçleriyle aynı", serit_ayni(koyu, wk))
+ton = dict(re.findall(r'(dikkat|vurgu|notr): \["(#[0-9A-Fa-f]{6})", "(#[0-9A-Fa-f]{6})"\]', C[C.index("const TON = "):C.index("const TON_ESKI")]) and re.findall(r'(dikkat|vurgu|notr): \["(#[0-9A-Fa-f]{6})", "(#[0-9A-Fa-f]{6})"\]', C)) if False else {m[0]: (m[1], m[2]) for m in re.findall(r'(dikkat|vurgu|notr): \["(#[0-9A-Fa-f]{6})", "(#[0-9A-Fa-f]{6})"\]', C)}
+kontrol("Teams toast tonları renk.css'le aynı (dikkat=geç, vurgu=vurgu, nötr=m3; açık/koyu)", ton == {"dikkat": (acik["b-gec"], koyu["b-gec"]), "vurgu": (acik["b-vurgu"], koyu["b-vurgu"]), "notr": (acik["b-m3"], koyu["b-m3"])})
+kontrol("eklenti penceresi eski adları Bugün belirteçlerine bağlar (pano.html ile aynı eşleme)", "--bg:var(--b-zemin);--s1:var(--b-yuzey)" in oku("popup.html") and "--dikkat:var(--b-gec)" in oku("popup.html"))
+kontrol("Teams şeridi ve eklenti penceresinde eski palet ya da sarı/pirinç dolgu kalmadı", not re.search(r"#(18201c|646c66|b0832e|8a6420|c0503b|1f7a4f|171d1a|e8ebe6)\b", "\n".join(l for l in C.split("\n") if "TON_ESKI = " not in l), re.I) and not re.search(r"#(c9973a|fff)\b", oku("popup.html")[oku("popup.html").index("<style>"):oku("popup.html").index("</style>")], re.I))  # logo SVG'deki pirinç sayılmaz
 kontrol("pano renk.css'i gömer", "/*__RENK__*/" in oku("pano/pano.html") and 'replace("/*__RENK__*/", pano_dosyasi("renk.css"))' in oku("relay.py"))
 kontrol("eklenti penceresi ve sihirbaz bağlar", 'href="pano/renk.css"' in oku("popup.html") and 'href="/pano/renk.css"' in oku("sihirbaz/index.html") and '"/pano/renk.css"' in oku("kurulum.py"))
 kopya = [p for p in ("pano/pano.html", "popup.html", "sihirbaz/sihirbaz.css") if re.search(r"--(t3|soluk|tx|murekkep)\s*:\s*#", oku(p))]

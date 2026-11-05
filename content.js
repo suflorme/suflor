@@ -57,7 +57,7 @@
     const bul = (await Promise.all([8765, 8766, 8767, 8768].map(async p => { try { const c = new AbortController(); setTimeout(() => c.abort(), 800); const r = await fetch(`http://127.0.0.1:${p}/status`, { signal: c.signal }); return r.ok || r.status === 401 ? `http://127.0.0.1:${p}` : null; } catch (e) { return null; } }))).filter(Boolean);
     alanBekliyor = bul.length > 1;
     if (bul.length === 1) { cfg.relay = bul[0]; alanSecili = true; chrome.storage.local.set({ relay: bul[0], relayOto: true }); }
-    if (alanBekliyor && !alanUyarildi && window.top === window) { alanUyarildi = true; toast(L("Çalışma alanını seç: Suflor.me simgesi"), "#b26a00", 15000); }
+    if (alanBekliyor && !alanUyarildi && window.top === window) { alanUyarildi = true; toast(L("Çalışma alanını seç: Suflor.me simgesi"), "dikkat", 15000); }
   }
   // v0.14.0: yerel anahtar yardımcısı varsa bu kullanıcının aktarıcısı odur — yoklama ve alan seçimi gerekmez. Adres belli olana
   // kadar istekler bekler (en çok 3 sn): ilk satırlar varsayılan porttaki başka hesabın aktarıcısına gitmesin.
@@ -71,7 +71,7 @@
     if (bul.length < 2) return;
     const { relayOtoUyari } = await chrome.storage.local.get({ relayOtoUyari: false }); if (relayOtoUyari) return;
     const su = bul.find(s => cfg.relay && cfg.relay.endsWith(":" + s.port)); chrome.storage.local.set({ relayOtoUyari: true });
-    toast(L("Bu Chrome \"{a}\" alanına yazıyor", { a: (su && su.alan) || cfg.relay }), "#b26a00", 8000);
+    toast(L("Bu Chrome \"{a}\" alanına yazıyor", { a: (su && su.alan) || cfg.relay }), "dikkat", 8000);
   }
   setInterval(alanKesfet, 30000);
   chrome.storage.onChanged.addListener((ch, alan) => {
@@ -183,7 +183,10 @@
   }
   // v0.99.2 (sistem analizi §3.6): bildirim sağ altta, sayfa yüzeyi renginde, solda ince renk şeridi; bilgi en çok 4 sn, işlem isteyen uyarı 8 sn
   // (önceden üst ortada doygun renkli hap, 15 sn'ye kadar — toplantıda göz kaydırıyordu). Tıklayınca kapanır; ekran okuyucu okur (role=status).
-  const TOAST_UYARI = /^#(b26a00|b4690e|b00020|c0503b|b3412e)$/i;
+  // v0.194.1: toast renkleri Bugün belirteçlerinden (kaynak: pano/renk.css --b-*; Teams sayfasında CSS değişkeni yok, değerler burada) — ton adı ("dikkat" kiremit,
+  // "vurgu" sahne yeşili, "notr" gri) ya da eski altıgen (background.js'ten gelen) → [açık, koyu]
+  const TON = { dikkat: ["#B0533A", "#DE8467"], vurgu: ["#175E46", "#3E9B78"], notr: ["#6E6E73", "#8A8A8F"] };
+  const TON_ESKI = { "#b26a00": "dikkat", "#b4690e": "dikkat", "#b00020": "dikkat", "#c0503b": "dikkat", "#b3412e": "dikkat", "#c0392b": "dikkat", "#1b8a3a": "vurgu", "#0a8f5a": "vurgu", "#1b6ef3": "vurgu", "#646c66": "notr" };
   function toast(msg, renk, ms) {
     let t = document.getElementById("suflor-toast");
     if (!t) {
@@ -192,10 +195,10 @@
         font: "13px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif", boxShadow: "0 4px 16px rgba(0,0,0,.16)", maxWidth: "min(360px,70vw)", boxSizing: "border-box" });
       t.onclick = () => { t.style.display = "none"; }; document.body.appendChild(t);
     }
-    const koyu = matchMedia("(prefers-color-scheme: dark)").matches, r = renk || "#b3412e";
-    Object.assign(t.style, { background: koyu ? "#171d1a" : "#fff", color: koyu ? "#e8ebe6" : "#18201c", border: `1px solid ${koyu ? "rgba(232,235,230,.14)" : "rgba(24,32,28,.14)"}`, borderLeft: `3px solid ${r}` });
+    const koyu = matchMedia("(prefers-color-scheme: dark)").matches, ton = TON[renk] ? renk : TON_ESKI[String(renk || "").toLowerCase()] || (renk ? "" : "dikkat"), r = ton ? TON[ton][koyu ? 1 : 0] : renk;
+    Object.assign(t.style, { background: koyu ? "#1C1C1E" : "#FFFFFF", color: koyu ? "#F2F2F2" : "#1D1D1F", border: `1px solid ${koyu ? "rgba(242,242,242,.15)" : "rgba(29,29,31,.16)"}`, borderLeft: `3px solid ${r}` });
     t.textContent = msg; t.style.display = "block"; clearTimeout(t._h);
-    t._h = setTimeout(() => t.style.display = "none", Math.min(ms || 8000, TOAST_UYARI.test(r) || !renk ? 8000 : 4000));
+    t._h = setTimeout(() => t.style.display = "none", Math.min(ms || 8000, ton === "dikkat" ? 8000 : 4000));
   }
   // toplantıda mı (çağrı denetimleri görünüyor) — döküm/altyazı kapalıyken satır kaçırmamak için uyarı.
   // Seçiciler gerçek Teams'te doğrulanmadı (ayrıl düğmesi); bulunamazsa uyarı hiç çıkmaz, başka bir şey bozulmaz.
@@ -274,8 +277,8 @@
     let hata = ohCapPath && ohCapPath.length ? await oynat(ohCapPath) : "öğrenilmiş yol yok", yol = "öğrenilmiş";
     if (hata) { const h2 = await oynat(ADIMLAR.map(([sec, re]) => ({ sec, re }))); yol = "metinle"; hata = h2 ? `${hata}; metinle: ${h2}` : ""; }
     capAuto = hata ? "basarisiz: " + hata : "acildi (" + yol + ")"; capBusy = false;
-    if (!hata) toast(L("Suflor.me: canlı altyazı açıldı"), "#1b8a3a", 4000);
-    else callWarned = m, toast(L("Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim", { y: P.yonerge.altyazi }), "#b26a00", 12000);
+    if (!hata) toast(L("Suflor.me: canlı altyazı açıldı"), "vurgu", 4000);
+    else callWarned = m, toast(L("Suflor.me: altyazıyı açamadım — bir kez elle aç ({y}), yolu öğrenirim", { y: P.yonerge.altyazi }), "dikkat", 12000);
   }
 
   // altyazının konuşma dili — aktarıcı "hedef" verirse (gündemde dil açıkça yazılı, agenda.json taze) altyazı
@@ -294,7 +297,7 @@
     for (const y of yollar) { const h = await oynat(y, null); if (!h || h === "zaten") { sonuc = h ? "zaten " + dilHedef : "ayarlandi " + dilHedef; break; } hata.push(h); }
     capBusy = false;
     capAuto = (capAuto.split(" · dil:")[0] + " · dil: " + (sonuc || "basarisiz: " + hata.join("; "))).slice(0, 600);
-    if (sonuc.startsWith("ayarlandi")) toast(L("Suflor.me: altyazı konuşma dili {d} yapıldı (gündem dili)", { d: dilHedef === "en" ? L("İngilizce") : L("Türkçe") }), "#1b8a3a", 5000);
+    if (sonuc.startsWith("ayarlandi")) toast(L("Suflor.me: altyazı konuşma dili {d} yapıldı (gündem dili)", { d: dilHedef === "en" ? L("İngilizce") : L("Türkçe") }), "vurgu", 5000);
   }
   function dilBak() {
     if (window.top !== window || !inCall() || !capSiki()) { capGorundu = 0; return; }
@@ -367,7 +370,7 @@
     // gevşek findCaptions menüdeki "altyazıyı aç" öğesini de altyazı sanıyordu (uyarıyı otomasyonun hata tostu taşıyordu);
     // buraya ancak sıkı seçici (capSiki) altyazı görmediyse gelinir, ek koşul yok
     if (Date.now() - callSince > 45000 && callWarned !== m) { callWarned = m;
-      toast(whAkiyor ? L("Ad için altyazıyı aç: {y}", { y: P.yonerge.altyazi }) : L("Altyazı kapalı: {y}", { y: P.yonerge.altyazi }), "#b26a00", 12000); }
+      toast(whAkiyor ? L("Ad için altyazıyı aç: {y}", { y: P.yonerge.altyazi }) : L("Altyazı kapalı: {y}", { y: P.yonerge.altyazi }), "dikkat", 12000); }
   }
   const sayfaUygun = () => !P.toplantiSayfasi || P.toplantiSayfasi();  // platform "toplantı değil" diyorsa (Meet ana/bağlantı sayfası) susar
   // Faz A (S162): çağrı düğmesi var ama yol tanınmadı (Meet adres biçimi değişti) → sekme başına bir kez aktarıcı günlüğüne yalnız yol (sorgu ve içerik yok); /olay çağrısı arka plan vekilinden gider
@@ -531,12 +534,12 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       document.querySelectorAll("#suflor-serit, #suflor-toast").forEach(e => { e.dataset.sfDisp = e.style.display; e.style.display = "none"; });
       requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => reply({ meeting: meetingInfo(), w: innerWidth, h: innerHeight, paylasim: paylasimOlcek() }), 30))); return true;
     }
-    if (msg.type === "bilgi") { if (window.top === window) toast(msg.text, msg.renk || "#1b6ef3", msg.ms || 5000); return; }
+    if (msg.type === "bilgi") { if (window.top === window) toast(msg.text, msg.renk || "vurgu", msg.ms || 5000); return; }
     if (msg.type === "kanitBitti") {
       if (window.top !== window) return;
       document.querySelectorAll("#suflor-serit, #suflor-toast").forEach(e => { e.style.display = e.dataset.sfDisp || ""; });
-      if (msg.ok && msg.kucuk) toast(L("Kanıt {n} kaydedildi — paylaşılan ekran küçük gösteriliyor (%{p}), yazı okunmayabilir: ekranı büyütüp yeniden al", { n: msg.n || "", p: msg.kucuk }), "#b26a00", 7000);
-      else if (msg.ok) toast(L("Kanıt {n} kaydedildi", { n: msg.n || "" }), "#1b8a3a", 2000); else if (msg.ok === false) toast(L("Kanıt kaydedilemedi: ") + (msg.err || L("bilinmiyor"))); // null: yalnız şeridi geri aç
+      if (msg.ok && msg.kucuk) toast(L("Kanıt {n} kaydedildi — paylaşılan ekran küçük gösteriliyor (%{p}), yazı okunmayabilir: ekranı büyütüp yeniden al", { n: msg.n || "", p: msg.kucuk }), "dikkat", 7000);
+      else if (msg.ok) toast(L("Kanıt {n} kaydedildi", { n: msg.n || "" }), "vurgu", 2000); else if (msg.ok === false) toast(L("Kanıt kaydedilemedi: ") + (msg.err || L("bilinmiyor"))); // null: yalnız şeridi geri aç
       return;
     }
     if (msg.type === "getStatus") { reply({ alan: { bekliyor: alanBekliyor, secili: alanSecili, relay: cfg.relay, sonHata }, meeting: meetingInfo().title, lastOk, failCount, sent: sentById.size + sentKeys.size, queued: queue.length, panel: !!findTranscriptPanel(), captions: !!findCaptions(), lang: capLang, langSrc, dilUyari,
@@ -549,7 +552,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
   // (kart_katmani) şerit kartları göstermez; hap ve kart dışı satırlar (sessiz, uyarı, süre) kalır.
   if (window.top === window) {
     const KL = { soyle: "Söyle", dur: "Dur", cevap: "Cevap" };  // gösterirken L()
-    const COL = { dur: "#c0503b", soyle: "#b0832e", cevap: "#646c66", not: "#646c66" }; // iki sınıf: Yap (Söyle pirinç, Dur kırmızı) · Bil (Cevap gri)
+    const COL = { dur: "var(--dikkat)", soyle: "var(--ac)", cevap: "var(--t3)", not: "var(--t3)" }; // iki sınıf: Yap (Söyle sahne yeşili, Dur kiremit) · Bil (Cevap gri) — değerler gölge DOM'daki .w'den
     const PRI = ["dur", "soyle", "cevap"];
     let host = null, root = null, sig = "", first = true, acik = false; const seen = new Set();
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -572,12 +575,12 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     }
     const CSS = `
         :host,:root{--yz-1:11px;--yz-2:12px;--yz-3:13px;--yz-4:14px;--yz-5:16px;--kose-s:6px;--kose:6px;--kose-l:12px;--kose-tam:999px}  /* yazı boyu ve köşe ölçeği pano/renk.css'ten (gölge DOM ve kart penceresi; test/renk.py denetler) */
-        .w{font:var(--yz-3)/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;color:#18201c;
-          --s1:#ffffff;--s2:#f9faf7;--tx:#18201c;--t2:#5c655f;--t3:#646c66;--bd:rgba(24,32,28,.11);--bd2:rgba(24,32,28,.2);--hov:rgba(24,32,28,.045)}  /* renkler pano/renk.css'ten (test/renk.py denetler) */
-        @media (prefers-color-scheme:dark){.w{color:#ecebe7;--s1:#171d1a;--s2:#1b221e;--tx:#e8ebe6;--t2:#a5ada7;--t3:#8a928c;--bd:rgba(232,235,230,.1);--bd2:rgba(232,235,230,.2);--hov:rgba(232,235,230,.06)}}
+        .w{font:var(--yz-3)/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;
+          --s1:#FFFFFF;--s2:#F2F2EF;--tx:#1D1D1F;--t2:#5E5E63;--t3:#6E6E73;--bd:rgba(29,29,31,.08);--bd2:rgba(29,29,31,.16);--hov:rgba(29,29,31,.045);--ac:#175E46;--ac-yazi:#FFFFFF;--dikkat:#B0533A;color:var(--tx)}  /* kaynak: pano/renk.css --b-* (yüzey, yüzey2, mürekkep, m2, m3, çizgi, çizgi2, üzerinde, vurgu, ana-yazı, geç); test/renk.py denetler */
+        @media (prefers-color-scheme:dark){.w{--s1:#1C1C1E;--s2:#202022;--tx:#F2F2F2;--t2:#A1A1A6;--t3:#8A8A8F;--bd:rgba(242,242,242,.08);--bd2:rgba(242,242,242,.15);--hov:rgba(242,242,242,.05);--ac:#3E9B78;--ac-yazi:#0E1411;--dikkat:#DE8467}}
         .pill{display:inline-flex;align-items:center;gap:6px;background:var(--s1);color:var(--tx);border:1px solid var(--bd2);border-radius:var(--kose-tam);padding:5px 10px;min-height:28px;box-sizing:border-box;
           box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;user-select:none;font-size:var(--yz-2);font-weight:600;white-space:nowrap}
-        .pill i{width:8px;height:8px;border-radius:50%;background:var(--pc,#8c8b85);flex:none}.pill:empty{display:none}
+        .pill i{width:8px;height:8px;border-radius:50%;background:var(--pc,var(--t3));flex:none}.pill:empty{display:none}
         .w{position:relative}.pill{touch-action:none}
         .list{display:none;position:absolute;left:0;bottom:calc(100% + 8px);width:320px;max-height:58vh;overflow:auto;background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose);box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px;box-sizing:border-box;max-width:calc(100vw - 24px)}
         .w.acik .list{display:block}.w.sag .list{left:auto;right:0}.w.alt .list{bottom:auto;top:calc(100% + 8px)}
@@ -586,22 +589,21 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .w.suruk,.w.suruk .pill,.w.suruk .row{cursor:grabbing}
         .row button.rb{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--s1);color:var(--t2);border:1px solid var(--bd2);box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;flex:none}
         .row button.rb:hover{color:var(--tx);background:var(--s2)}.row button.rb svg.i{width:15px;height:15px}
-        .row button.rb.on{color:#8a6420;background:rgba(176,131,46,.2);border-color:#b0832e}
-        .row button.rb.bas{color:#fff;background:#b0832e;border-color:#b0832e}.row button.rb.tmm{animation:tm .9s}
-        @keyframes tm{0%{background:rgba(31,122,79,.45)}100%{background:var(--s1)}}
+        .row button.rb.on{color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac)}
+        .row button.rb.bas{color:var(--ac-yazi);background:var(--ac);border-color:var(--ac)}.row button.rb.tmm{animation:tm .9s}
+        @keyframes tm{0%{background:color-mix(in srgb,var(--ac) 45%,transparent)}100%{background:var(--s1)}}
         .row .ay{width:1px;height:16px;background:var(--bd2);margin:0 2px;flex:none}
-        @media (prefers-color-scheme:dark){.row button.rb.on{color:#e0b868}}
         .k{position:relative;background:transparent;border:0;border-radius:var(--kose-s);padding:6px 6px 6px 12px;margin:0 0 6px;overflow:hidden;color:var(--tx);cursor:pointer;display:flex;gap:6px;align-items:flex-start}
         .k:hover{background:var(--hov)}.k .m{flex:1;min-width:0}
-        .k::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:var(--kose-tam);background:var(--kc,#8c8b85)}.k.bil::before{display:none}
-        .k b{display:block;font-size:var(--yz-1);font-weight:600;letter-spacing:.03em;color:var(--kc,#8c8b85);margin-bottom:1px}
+        .k::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:var(--kose-tam);background:var(--kc,var(--t3))}.k.bil::before{display:none}
+        .k b{display:block;font-size:var(--yz-1);font-weight:600;letter-spacing:.03em;color:var(--kc,var(--t3));margin-bottom:1px}
         .a{display:flex;gap:2px;flex:none}
         button{font:var(--yz-2)/1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--t3);background:transparent;border:1px solid transparent;border-radius:var(--kose-s);padding:4px 6px;cursor:pointer}
         button:hover{background:var(--hov);color:var(--tx)}button:disabled{opacity:.6}
-        .q{font-size:var(--yz-2);color:var(--t2);padding:4px 2px}.top{font-size:var(--yz-2);color:var(--t2);margin:0 2px 6px;display:flex;align-items:center;gap:5px}svg.i{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}button svg.i{width:14px;height:14px}.top:empty{display:none}.uy{color:#c0503b}
+        .q{font-size:var(--yz-2);color:var(--t2);padding:4px 2px}.top{font-size:var(--yz-2);color:var(--t2);margin:0 2px 6px;display:flex;align-items:center;gap:5px}svg.i{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}button svg.i{width:14px;height:14px}.top:empty{display:none}.uy{color:var(--dikkat)}
         .bos{font-size:var(--yz-2);color:var(--t3);padding:6px 2px}
         .kd{font-size:var(--yz-2);color:var(--t2);margin-top:2px}.rp{font-weight:600}
-        .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 rgba(176,131,46,.75)}100%{box-shadow:0 0 0 12px rgba(176,131,46,0)}}
+        .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ac) 75%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
         @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
     function ensure() {
       if (host && host.isConnected) return;
@@ -672,16 +674,16 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     // Konuş (basılı tut): ≥ 0,3 sn basılınca aktarıcıya basla, bırakınca mikrofon sesi (16 kHz, mic-main.js akışı) gider
     function konusAsagi(b) {
       if (ks) return;
-      if (!mic.on) return toast(L("Mikrofon hazır değil — toplantıda mikrofon açıkken dene"), "#b4690e", 3500);
+      if (!mic.on) return toast(L("Mikrofon hazır değil — toplantıda mikrofon açıkken dene"), "dikkat", 3500);
       const k = ks = { buf: [], n: 0, hazir: false, doldu: false, birak: false, b }; b.classList.add("bas");
       k.zaman = setTimeout(async () => {
         k.doldu = true;
         try {
           const r = await ksIstek("/bas-konus", { komut: "basla" });
           if (ks !== k) return;
-          if (!r.ok) { toast("⚠ " + String(r.err || L("Konuş başlamadı")).slice(0, 160), "#b4690e", 5000); konusIptal(); return; }
+          if (!r.ok) { toast("⚠ " + String(r.err || L("Konuş başlamadı")).slice(0, 160), "dikkat", 5000); konusIptal(); return; }
           k.hazir = true; if (k.birak) gonderKonus(k);
-        } catch (e) { if (ks === k) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); konusIptal(); } }
+        } catch (e) { if (ks === k) { toast(L("Suflor.me'ye ulaşılamadı"), "dikkat", 3500); konusIptal(); } }
       }, 300);
       k.sinir = setTimeout(() => { if (ks === k) { k.birak = true; if (k.hazir) gonderKonus(k); } }, 60000);
     }
@@ -690,14 +692,14 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const k = ks; if (!k) return;
       if (k.hazir) return gonderKonus(k);
       if (k.doldu) { k.birak = true; return; }  // basla yanıtı bekleniyor
-      toast(L("Konuş: basılı tut, bırakınca sorar"), "#646c66", 2500); konusIptal();  // kısa dokunuş
+      toast(L("Konuş: basılı tut, bırakınca sorar"), "notr", 2500); konusIptal();  // kısa dokunuş
     }
     async function gonderKonus(k) {
       ks = null; clearTimeout(k.zaman); clearTimeout(k.sinir); k.b.classList.remove("bas");
-      if (k.n < 3200) return toast(L("Ses alınamadı — biraz daha uzun konuş"), "#b4690e", 3000);  // < 0,2 sn
+      if (k.n < 3200) return toast(L("Ses alınamadı — biraz daha uzun konuş"), "dikkat", 3000);  // < 0,2 sn
       const a = new Int16Array(k.n); let o = 0; k.buf.forEach(p => { a.set(p, o); o += p.length; });
       try { const r = await (await rf("/bas-konus", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pcm: b64(a) }) })).json();
-        if (r && r.ok === false) toast("⚠ " + String(r.err || "").slice(0, 160), "#b4690e", 5000); } catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); }
+        if (r && r.ok === false) toast("⚠ " + String(r.err || "").slice(0, 160), "dikkat", 5000); } catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "dikkat", 3500); }
     }
     async function ksIstek(yol, govde) { return (await rf(yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(govde) })).json().catch(() => ({})); }
     async function ksTikla(b) {
@@ -708,7 +710,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         } catch (e) {}
         try { const kk = await globalThis.SuflorAnahtar.al(), kok = (relayGecerli(cfg.relay) || RELAY_VARSAYILAN).replace(/\/$/, "") + "/";
           window.open(kok + "?gorunum=ayarlar" + (kk && kok.startsWith(`http://127.0.0.1:${kk.port}/`) ? "&k=" + kk.anahtar : ""), "_blank", "noopener"); }
-        catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); }
+        catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "dikkat", 3500); }
         return; }
       if (k === "sabit") { sabit = !sabit; root.querySelector(".w").classList.toggle("sabit", sabit); satirDil(); try { chrome.storage.local.set({ seritSabit: sabit }); } catch (e) {} return; }
       const tur = { ne: "ozet", onemli: "onemli", sessiz: "sessiz", ceviri: "sesli_ceviri", gizli: "gizli" }[k]; b.disabled = true;
@@ -716,7 +718,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         if (k === "kanit") await rf("/kanit-iste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ not: "", kaynak: "serit" }) });
         else await rf("/komut", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tur }) });
         b.classList.remove("tmm"); void b.offsetWidth; b.classList.add("tmm"); pollCards();
-      } catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "#b4690e", 3500); }
+      } catch (e) { toast(L("Suflor.me'ye ulaşılamadı"), "dikkat", 3500); }
       setTimeout(() => { b.disabled = false; }, 600);
     }
     // hap: kartların listesini hapın üstünde aç/kapat
@@ -824,16 +826,16 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       if (sw && sw.id !== soyleSon) { if (soyleSon !== undefined && !sw.dur && window.top === window && inCall()) soyleCal(sw); soyleSon = sw.id; }
       else if (!sw && soyleSon === undefined) soyleSon = null;
       if (sw && sw.dur && soyleDur !== sw.id && window.top === window) { soyleDur = sw.id; soyleYolla({ __suflor: "soyle", komut: "dur" }); }
-      if (v.komut && v.komut.id !== komutSon) { if (komutSon !== undefined && window.top === window) toast(v.komut.metin, "#0a8f5a", 3500); komutSon = v.komut.id; }
+      if (v.komut && v.komut.id !== komutSon) { if (komutSon !== undefined && window.top === window) toast(v.komut.metin, "vurgu", 3500); komutSon = v.komut.id; }
       else if (!v.komut && komutSon === undefined) komutSon = null;
       // anlık uyarı (adın geçti / uzun konuşma) — yalnız toplantı sekmesinde kısa bildirim; ilk yoklamada eskisi gösterilmez
-      if (v.anlik && v.anlik.id !== anlikSon) { if (anlikSon !== undefined && window.top === window) toast(v.anlik.metin + (v.anlik.ayrinti ? " · " + v.anlik.ayrinti : ""), v.anlik.tur === "uzun" ? "#c0392b" : "#b4690e", v.anlik.tur === "uzun" ? 15000 : 7000); anlikSon = v.anlik.id; }
+      if (v.anlik && v.anlik.id !== anlikSon) { if (anlikSon !== undefined && window.top === window) toast(v.anlik.metin + (v.anlik.ayrinti ? " · " + v.anlik.ayrinti : ""), "dikkat", v.anlik.tur === "uzun" ? 15000 : 7000); anlikSon = v.anlik.id; }
       else if (!v.anlik && anlikSon === undefined) anlikSon = null;
       // Whisper durumu; karşı tarafın sesi henüz verilmediyse toplantı başına bir kez hatırlatma
       whisperView = v.whisper || null;
       // yerel ses yardımcısı açıksa (bekliyor/dinliyor) karşı sesi o alır — hatırlatma yok
       if (whisperView && cfg.whisper && whisperView.durum !== "yok" && inCall() && !whisperView.karsi && !["bekliyor", "dinliyor"].includes(whisperView.yerel) && karsiIpucu !== meetingInfo().title) {
-        karsiIpucu = meetingInfo().title; toast(L("Karşı tarafın sesi için: simge → Karşı taraf → Aç"), "#1b6ef3", 10000);
+        karsiIpucu = meetingInfo().title; toast(L("Karşı tarafın sesi için: simge → Karşı taraf → Aç"), "vurgu", 10000);
       }
       // Mac kart katmanı kartları ekranın alt ortasında gösteriyorsa (aktarıcı kart_katmani: true) şerit kartları yinelemez; alan yoksa eski aktarıcı = false
       const katman = v.kart_katmani === true;
@@ -851,7 +853,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       const top = PRI.find(k => cards.some(c => c.kind === k)) || "cevap";
       const pill = root.querySelector(".pill");
       // hap = nokta (en önemli kartın sınıf rengi; uyarıda kırmızı; kartsız toplantıda yeşil) + açık kart sayısı
-      const pc = (warn || dil) ? COL.dur : cards.length ? COL[top] : (live ? "#1f7a4f" : "#646c66");
+      const pc = (warn || dil) ? COL.dur : cards.length ? COL[top] : (live ? "var(--ac)" : "var(--t3)");
       pill.style.setProperty("--pc", pc); pill.replaceChildren(el("i")); if (cards.length) pill.append(el("span", null, String(cards.length)));
       if (ss && ss.acik) pill.append(ikon(document, "mute"));
       pill.title = ss && ss.acik ? L("Suflor.me — sessiz; kartlar bekliyor") : L("Suflor.me — kısayollar ve kartlar için tıkla; sürükleyerek taşı");
