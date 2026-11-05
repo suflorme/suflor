@@ -296,6 +296,21 @@ def _topo_oto(ad, gi):  # kural uyuyorsa kısa açıklama (günlük için), değ
         yollar = [x for x in av[1:] if not x.startswith("-")]; secenek = [x for x in av[1:] if x.startswith("-")]
         if len(yollar) == 2 and all(x in ("-n",) for x in secenek) and all(_topo_oz_icinde(y) for y in yollar): return "Bash mv (özet klasörü)"
     return None
+# 5 Kasım (toplantı bitince "otomatik onaylansın, sorma"): toplantı bitiyor/bitti ve oturum toplantı sonu işlerini yapıyorken izin sorulmaz.
+# Geri alınamayan ya da dışarıya giden iş yine sorulur: silme, push, sistem/ayar komutu, ağ komutu; MCP'de gönder/sil/paylaş/yanıtla/etkinlik türü araçlar.
+TOPO_SONU_RISK_RX = re.compile(r"(?:^|[\s;&|(`$])(?:rm|rmdir|srm|shred|sudo|git\s+(?:push|reset|clean|checkout|rebase)|launchctl|defaults\s+(?:write|delete)|osascript|"
+                               r"curl|wget|scp|ssh|rsync|kill|pkill|killall|chmod|chown|diskutil|security)\b|aktarici-kur|yayinla\.py|guncelle\.command|kur\.sh", re.I)
+TOPO_SONU_MCP_RISK_RX = re.compile(r"send|delete|trash|remove|forward|reply|post|publish|share|respond|event|archive|spam|move|rename|upload|purchase", re.I)
+TOPO_SONU_ARAC = {"Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "ToolSearch", "TaskStop", "TaskOutput", "TodoWrite", "Monitor"}
+def topo_toplanti_sonu():  # yeni toplantı açılmışsa (algılandı/sürüyor) sorulur
+    d = toplanti_durum(); return AYAR.get("toplanti_sonu_onaysiz") is not False and (d == "bitiyor" or (d == "bos" and onceki_sonu_suruyor()))
+def _topo_sonu_oto(ad, gi):  # toplantı sonunda sorulmadan verilecekse günlük açıklaması, değilse None
+    if not topo_toplanti_sonu(): return None
+    if ad.startswith("mcp__"):
+        return None if TOPO_SONU_MCP_RISK_RX.search(ad.split("__")[-1]) else ad
+    if ad not in TOPO_SONU_ARAC: return None
+    if ad == "Bash" and TOPO_SONU_RISK_RX.search(str(gi.get("command") or "")): return None
+    return ad
 def _topo_tc_yerler(): return {os.path.realpath(os.path.join(d, "toplanti-claude.py")) for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), AYAR["uygulama"]) if d}
 def _topo_okuma_arac(ad):  # girdiden bağımsız hatırlanabilen araç: web araçları ve yazma izi taşımayan MCP okuma araçları (5 Kasım: aynı araç farklı girdiyle yeniden soruluyordu)
     if ad in TOPO_WEB or (ad.startswith(TOPO_CHROME_ON) and ad[len(TOPO_CHROME_ON):] in TOPO_CHROME_OKU): return True
@@ -317,6 +332,8 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
     hat = TOPO.setdefault("izin_hatirla", set()); anh = _topo_izin_anahtar(ad, gi); bk = bilgi_kaynagi_arac(ad)
     try: oto = _topo_oto(ad, gi)
     except Exception: oto = None
+    try: sonu = _topo_sonu_oto(ad, gi)
+    except Exception: sonu = None
     onaysiz = AYAR.get("bilgi_onaysiz") is not False  # 5 Kasım: varsayılan açık — okuma araçları ve web araması sorulmaz
     web_red = _topo_web_red(ad, gi) if ad in TOPO_WEB else None
     if web_red:
@@ -344,6 +361,8 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"İZİN: otomatik — {oto}")  # beta sayacı: beta-veri.py BETA_RX "oto_izin" (satır metni tutulmaz)
     elif anh in hat:
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} → oturumda daha önce verilmişti")
+    elif sonu:
+        cevap = {"behavior": "allow", "updatedInput": gi}; print(f"İZİN: toplantı sonu, kendiliğinden — {sonu}")
     elif ad == "AskUserQuestion":  # soru düz metin olarak panoya gelsin
         cevap = {"behavior": "deny", "message": _t("Bu oturumda AskUserQuestion yok: soruyu düz metin olarak yaz ve turu bitir; kullanıcı panodan cevaplar.",
                                                    "AskUserQuestion isn't available in this session: write the question as plain text and end the turn; the user answers from the panel.")}
