@@ -10,6 +10,8 @@ html.bugun:not(.mac) #tkf:not([hidden]){position:fixed;top:0;left:50%;transform:
 html.bugun:not(.mac) .tkfb{display:block;font-weight:600;margin-bottom:2px}
 html.bugun .nb{position:relative;z-index:5;margin-top:-76px;background:transparent;pointer-events:none;padding:8px 16px calc(14px + env(safe-area-inset-bottom,0px))}
 html.bugun .nb>*{pointer-events:auto}
+html.bugun .nb:has(#kns:not([hidden])){margin-top:0;background:var(--b-zemin)}  /* 5 Kasım: asistan cevabı görününce kutu içeriğin üstüne binmez, akışta altta durur (opak zemin) */
+html.bugun #kns:not([hidden]){background:var(--b-zemin);border-radius:var(--b-k-tam)}
 html.bugun #bgn .icerik{padding-bottom:110px}
 html.bugun:not(.mac) .nb{padding-left:calc(236px + 56px)}
 html.bugun .nb :is(#kns,.kt,.kal){max-width:648px;margin-inline:0}
