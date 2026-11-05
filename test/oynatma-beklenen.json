@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 468826,
-   "sha": "7b0dead0a4bfcad5"
+   "uzunluk": 477042,
+   "sha": "2e130a98e2ef51b3"
   },
   "/mini": {
-   "uzunluk": 468826,
-   "sha": "7b0dead0a4bfcad5"
+   "uzunluk": 477042,
+   "sha": "2e130a98e2ef51b3"
   },
   "/status": {
    "_ping_son": "float",
@@ -301,6 +301,8 @@
      "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
+     "izleme_ad": "str",
+     "izleme_dosyasi": "str",
      "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kayit_sesi": "bool",
@@ -368,6 +370,8 @@
      "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
+     "izleme_ad": "str",
+     "izleme_dosyasi": "str",
      "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kayit_sesi": "bool",

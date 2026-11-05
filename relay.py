@@ -1395,7 +1395,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/izleme"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1608,6 +1608,7 @@ AYAR_PANO = {
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_prova": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
+    "izleme_dosyasi": ("metin", "", 300), "izleme_ad": ("metin", "", 40),  # 5 Kasım: izleme_dosyasi = başka panonun Drive'dan eşitlenen JSON anlık görüntüsü (yalnız okunur, aktarici/izleme.py); yol yoksa özellik kapalı
     "dis_defter": ("defter", [], None)}  # 5 Kasım (S212): dış karar kaydı — [{"ad", "tur": "dosya", "yol"} | {"ad", "tur": "mcp", "sunucu", "url", "araclar"}]; yalnız okuma (yapi.dis_defter_veri) + dışa aktarma, dışarıya yazma yok
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
@@ -1660,6 +1661,7 @@ def ayar_yaz(deg):
             continue
         if tur == "bool" and isinstance(v, bool): yeni[k] = v
         elif tur == "sec" and str(v) in sinir: yeni[k] = str(v)
+        elif tur == "metin" and isinstance(v, str) and len(v.strip()) <= sinir and (k != "izleme_dosyasi" or not v.strip() or v.strip().lower().endswith(".json")): yeni[k] = " ".join(v.split()) if k != "izleme_dosyasi" else v.strip()
         elif tur == "adres" and (not str(v).strip() or re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", str(v).strip())): yeni[k] = str(v).strip().lower()
         elif tur == "kisilik" and (str(v) == "" or str(v) in {x["yol"] for x in kisilik_listesi()}): yeni[k] = str(v)
         elif tur == "sayi" and isinstance(v, (int, float)) and not isinstance(v, bool) and sinir[0] <= v <= sinir[1]: yeni[k] = int(v)
@@ -1697,7 +1699,7 @@ def ayar_yaz(deg):
                 h = sg_yaz(a, beyin)
                 if h: return {"ok": False, "err": h}
             for k, v in yeni.items():
-                if (k in ("eposta", "eposta_adres", "kisilik", "kisilik_toplanti_disi", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
+                if (k in ("eposta", "eposta_adres", "izleme_dosyasi", "izleme_ad", "kisilik", "kisilik_toplanti_disi", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
             if "profil" in yeni: _profil_modul().profil_uygula(a, yeni["profil"])  # hafif: ayarda olmayan türetilenler yazılır; tam: yalnız türetilenler silinir
             gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
@@ -1837,6 +1839,7 @@ bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
 bolum("gerginlik")  # aktarici/gerginlik.py — Toplantı gerginliği → kişiliğin ses tonu (v0.80.0, S87)
 bolum("toplanti-sonrasi")  # aktarici/toplanti-sonrasi.py — toplantı sonrası proaktif hatırlatma: açık uçlar (tarihsiz/sahipsiz iş, teyit bekleyen karar) bildirim + Bugün satırı (5 Kasım)
+bolum("izleme")  # aktarici/izleme.py — İzleme: başka panonun Drive'a yazdığı JSON anlık görüntüsünü yalnız okur (ayar izleme_dosyasi; Bugün bölümü, hazırlık adayları, Konuş özeti; 5 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
 bolum("beta-veri")  # aktarici/beta-veri.py — Beta geliştirme verisi: olay sayacı, haftalık paket, toplantı sonu kalitesi (S141; en sonda: öbür bölümlerin işlevlerini sarar)
 bolum("duman")  # aktarici/duman.py — Deneme toplantısı (duman testi) kipi: 3 dk denetim listesi, panoda canlı (Faz D2, v0.148.0)
@@ -2256,6 +2259,7 @@ class H(BaseHTTPRequestHandler):
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
         if yol == "/prova": return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
+        if yol == "/izleme": return self._json(izleme_view())
         if yol == "/kayitlar": return self._json(kayitlar_view())  # Kararlar ve işler görünümü (anahtarlı)
         if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
         if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
