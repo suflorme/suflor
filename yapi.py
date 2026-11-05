@@ -74,11 +74,61 @@ def _db(dizin):
                  kim TEXT, sahip TEXT, metin TEXT, son_tarih TEXT, saat TEXT, alinti TEXT, durum TEXT DEFAULT 'acik', eklendi TEXT)""")
     c.execute("CREATE INDEX IF NOT EXISTS kayit_kim ON kayit (kim)"); c.execute("CREATE INDEX IF NOT EXISTS kayit_sahip ON kayit (sahip)")
     if "bag" not in [x[1] for x in c.execute("PRAGMA table_info(kayit)")]: c.execute("ALTER TABLE kayit ADD COLUMN bag TEXT")  # söz/eylem bağı
+    c.execute("CREATE TABLE IF NOT EXISTS kisi_es (anahtar TEXT PRIMARY KEY, yanlis TEXT, dogru TEXT)")  # kişi eş adları (yanlış/İngilizce yazılmış ad → doğru ad), yalnız yerel veri
     if yeni: os.chmod(yol, 0o600)
     return c
+# --- kişi eş adları: aynı kişinin dökümde/altyazıda hatalı ya da İngilizce yazılmış adı tek doğru ada bağlanır (okurken ve yazarken; kayıtlar `kisi-es --uygula` ile düzelir).
+# Eşleme karar-grafi.sqlite'ta `kisi_es` tablosunda (kullanıcının yerel verisi; koda ad yazılmaz). Anahtar: büyük/küçük harf, Türkçe karakter ve boşluk duyarsız tam ad.
+def kisi_anahtar(ad): return _dd_norm(ad)
+def kisi_es_oku(c): return {a: d for a, d in c.execute("SELECT anahtar, dogru FROM kisi_es")}
+def kisi_ad(es, ad): return es.get(kisi_anahtar(ad), ad) if ad and es else ad
+def kisi_es_ekle(dizin, yanlis, dogru):  # → (yanlis, dogru) ya da None (boş ya da aynı)
+    yanlis, dogru = " ".join(str(yanlis or "").split()), " ".join(str(dogru or "").split())
+    if not yanlis or not dogru or kisi_anahtar(yanlis) == kisi_anahtar(dogru): return None
+    c = _db(dizin)
+    with c:
+        es = kisi_es_oku(c); dogru = es.get(kisi_anahtar(dogru), dogru)  # zincir: doğru ad da bir eş adsa asıl adına
+        c.execute("INSERT OR REPLACE INTO kisi_es (anahtar, yanlis, dogru) VALUES (?,?,?)", (kisi_anahtar(yanlis), yanlis, dogru))
+        c.execute("UPDATE kisi_es SET dogru = ? WHERE anahtar IN (SELECT anahtar FROM kisi_es WHERE dogru = ?) AND anahtar != ?", (dogru, yanlis, kisi_anahtar(yanlis)))
+    c.close(); return yanlis, dogru
+def kisi_es_sil(dizin, yanlis):
+    c = _db(dizin)
+    with c: n = c.execute("DELETE FROM kisi_es WHERE anahtar = ?", (kisi_anahtar(yanlis),)).rowcount
+    c.close(); return n
+def kisi_es_liste(dizin):
+    c = _db(dizin); rs = c.execute("SELECT yanlis, dogru FROM kisi_es ORDER BY dogru, yanlis").fetchall(); c.close(); return rs
+def kisi_es_sozluk_ekle(dizin, yanlis, dogru, zorla=False):
+    # sözlük düzeltmesi (yanlış => doğru) kişi adıysa eş ada da girer: yanlış biçim grafta bir kişi adı olarak geçiyorsa (ya da zorla)
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return None
+    if not zorla:
+        c = _db(dizin); a = kisi_anahtar(yanlis)
+        var = any(kisi_anahtar(x) == a for (x,) in c.execute("SELECT kim FROM kayit WHERE kim IS NOT NULL UNION SELECT sahip FROM kayit WHERE sahip IS NOT NULL")); c.close()
+        if not var: return None
+    return kisi_es_ekle(dizin, yanlis, dogru)
+def kisi_es_uygula(dizin, kuru=False):
+    # kayıt veritabanındaki kim/sahip alanlarını eşlemeye göre düzeltir. Önce tarihli yedek (kuru değilse). → {"degisen": kayıt sayısı, "adlar": {yanlış: n}, "yedek": yol ya da ""}
+    out = {"degisen": 0, "adlar": {}, "yedek": ""}
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
+    c = _db(dizin); c.execute("PRAGMA busy_timeout = 30000"); es = kisi_es_oku(c)
+    try:
+        degisecek = [(i, kim, sahip, kisi_ad(es, kim), kisi_ad(es, sahip)) for i, kim, sahip in c.execute("SELECT id, kim, sahip FROM kayit WHERE kim IS NOT NULL OR sahip IS NOT NULL")]
+        degisecek = [x for x in degisecek if x[1] != x[3] or x[2] != x[4]]
+        for _, kim, sahip, kim2, sahip2 in degisecek:
+            for a, b in ((kim, kim2), (sahip, sahip2)):
+                if a != b: out["adlar"][a] = out["adlar"].get(a, 0) + 1
+        out["degisen"] = len(degisecek)
+        if kuru or not degisecek: return out
+        yol = os.path.join(dizin, "karar-grafi.sqlite.yedek-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")); y = sqlite3.connect(yol)
+        try: c.backup(y)
+        finally: y.close()
+        os.chmod(yol, 0o600); out["yedek"] = yol
+        with c:
+            for i, _, _, kim2, sahip2 in degisecek: c.execute("UPDATE kayit SET kim = ?, sahip = ? WHERE id = ?", (kim2, sahip2, i))
+        return out
+    finally: c.close()
 def graf_yaz(dizin, v, toplanti):
     # aynı toplantı yeniden yazılırsa eski kayıtları yerine geçer
-    c = _db(dizin); n = 0
+    c = _db(dizin); n = 0; es = kisi_es_oku(c)
     with c:
         c.execute("DELETE FROM kayit WHERE toplanti = ? AND bag IS NULL", (toplanti,))  # elle eklenen söz ve eylem bağları kalır
         teyitler = teyit_kararlar(v)
@@ -86,7 +136,7 @@ def graf_yaz(dizin, v, toplanti):
             for o in m["ogeler"]:
                 c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, saat, alinti, eklendi, durum) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                           (toplanti, str(v.get("baslik") or "")[:200], str(v.get("tarih") or "")[:10], str(m.get("baslik") or "")[:200], o["tur"],
-                           str(o.get("kim") or "")[:80] or None, str(o.get("sahip") or "")[:80] or None,
+                           kisi_ad(es, str(o.get("kim") or "")[:80]) or None, kisi_ad(es, str(o.get("sahip") or "")[:80]) or None,
                            (str(o["metin"])[:500] + (f" (teyit bekliyor — {teyit_neden(o)})" if o["tur"] == "karar" and o in teyitler else ""))[:600], str(o.get("tarih") or "")[:20] or None,
                            str(o.get("saat") or "")[:8] or None, str(o.get("alinti") or "")[:300] or None, datetime.datetime.now().isoformat(timespec="seconds"),
                            "cevaplandi" if o["tur"] == "soru" and str(o.get("cevap") or "").strip() else "acik"))  # 5 Kasım: cevabı yazılmış soru açık sayılmaz (Kararlar ve işler → Açık sorular)
@@ -96,8 +146,8 @@ def _ilk(ad): return (str(ad or "").split() or [""])[0].casefold()
 def graf_kisi(dizin, kim, n=5, haric=None):
     # kişinin (ad ya da ilk adı) son iddia/karar/sözleri ve sahibi olduğu açık işler — yeni toplantıdan önce
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")) or not kim: return []
-    c = _db(dizin); ilk = _ilk(kim)
-    rs = c.execute("SELECT tarih, tur, kim, sahip, metin, son_tarih, baslik, saat, toplanti FROM kayit WHERE durum = 'acik' ORDER BY tarih DESC, id DESC LIMIT 2000").fetchall()
+    c = _db(dizin); es = kisi_es_oku(c); ilk = _ilk(kisi_ad(es, kim))
+    rs = [r[:2] + (kisi_ad(es, r[2]), kisi_ad(es, r[3])) + r[4:] for r in c.execute("SELECT tarih, tur, kim, sahip, metin, son_tarih, baslik, saat, toplanti FROM kayit WHERE durum = 'acik' ORDER BY tarih DESC, id DESC LIMIT 2000").fetchall()]
     c.close()
     out = [r for r in rs if r[8] != haric and (_ilk(r[2]) == ilk or _ilk(r[3]) == ilk) and r[1] in ("iddia", "karar", "is", "soz", "sayi")]
     return out[:n]
@@ -107,8 +157,8 @@ def graf_satir(r):
 def graf_liste(dizin, kim=None, n=20):
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return []
     if kim: return graf_kisi(dizin, kim, n)
-    c = _db(dizin); rs = c.execute("SELECT tarih, tur, kim, sahip, metin, son_tarih, baslik, saat, toplanti FROM kayit ORDER BY tarih DESC, id DESC LIMIT ?", (n,)).fetchall(); c.close()
-    return rs
+    c = _db(dizin); es = kisi_es_oku(c); rs = c.execute("SELECT tarih, tur, kim, sahip, metin, son_tarih, baslik, saat, toplanti FROM kayit ORDER BY tarih DESC, id DESC LIMIT ?", (n,)).fetchall(); c.close()
+    return [r[:2] + (kisi_ad(es, r[2]), kisi_ad(es, r[3])) + r[4:] for r in rs]
 def graf_sil(dizin, toplanti=None, hepsi=False):
     yol = os.path.join(dizin, "karar-grafi.sqlite")
     if not os.path.exists(yol): return 0
@@ -163,11 +213,11 @@ def soz_dict(row):
 def sozler(dizin, kim=None):
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return []
     c = _db(dizin)
-    rs = c.execute("SELECT id, tarih, tur, kim, sahip, metin, son_tarih, baslik, durum, eklendi FROM kayit WHERE tur IN ('is', 'soz') ORDER BY id").fetchall(); c.close()
-    ilk = _ilk(kim) if kim else None
+    es = kisi_es_oku(c); rs = [x[:3] + (kisi_ad(es, x[3]), kisi_ad(es, x[4])) + x[5:] for x in c.execute("SELECT id, tarih, tur, kim, sahip, metin, son_tarih, baslik, durum, eklendi FROM kayit WHERE tur IN ('is', 'soz') ORDER BY id").fetchall()]; c.close()
+    kim = kisi_ad(es, kim); ilk = _ilk(kim) if kim else None
     return [soz_dict(x) for x in rs if not ilk or _ilk(x[4] or x[3]) == ilk or (kim and kucuk(kim) in kucuk(x[4] or x[3] or ""))]
 def soz_ekle(dizin, kim, metin, tarih=None, toplanti=None, baslik=None):
-    c = _db(dizin)
+    c = _db(dizin); kim = kisi_ad(kisi_es_oku(c), kim)
     with c:
         i = c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, eklendi, bag) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                       (toplanti, baslik, datetime.date.today().isoformat(), None, "soz", None, kim, metin, tarih, datetime.datetime.now().isoformat(timespec="seconds"), "soz")).lastrowid
@@ -212,9 +262,10 @@ def gizli_mi(dizin, i, kayitlar=None):  # kayıtta gizli: true ya da dökümde *
 def kayit_bul(dizin, kimlik, turler):  # "k12" / "s7" / "q3" → (sözlük ya da None); gizli toplantıdaysa yok sayılır
     m = re.fullmatch(r"([ksq])(\d+)", str(kimlik or ""))
     if not m or not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return None
-    c = _db(dizin)
+    c = _db(dizin); es = kisi_es_oku(c)
     try: r = c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, saat, durum FROM kayit WHERE id = ?", (int(m.group(2)),)).fetchone()
     finally: c.close()
+    if r: r = r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:]
     if not r or r[4] not in turler or (r[1] and gizli_mi(dizin, r[1])): return None
     return {"id": f"{ {'karar': 'k', 'soru': 'q'}.get(r[4], 's') }{r[0]}", "toplanti": r[1], "baslik": r[2], "tarih": r[3], "tur": r[4], "kim": r[5], "sahip": r[6], "metin": r[7], "son_tarih": r[8], "durum": r[10]}
 def karar_yaz(dizin, kimlik, metin):  # kararın metnini değiştirir (onay/düzeltme) → kayıt sayısı
@@ -318,8 +369,8 @@ def disa_aktar(dizin, bicim="csv"):
     # durum sütununa taşınır ("teyit bekliyor"). → (metin, dosya adı, kayıt sayısı)
     satirlar = []
     if os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")):
-        c = _db(dizin)
-        try: rs = c.execute("SELECT toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, saat, durum FROM kayit WHERE tur IN ('karar', 'is', 'soz', 'soru') ORDER BY tarih, id").fetchall()
+        c = _db(dizin); es = kisi_es_oku(c)
+        try: rs = [r[:4] + (kisi_ad(es, r[4]), kisi_ad(es, r[5])) + r[6:] for r in c.execute("SELECT toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, saat, durum FROM kayit WHERE tur IN ('karar', 'is', 'soz', 'soru') ORDER BY tarih, id").fetchall()]
         finally: c.close()
         ky = son_kayitlar(dizin); gz = {}
         for top, baslik, tarih, tur, kim, sahip, metin, son, saat, durum in rs:
@@ -357,8 +408,8 @@ def bugun_veri(dizin, ad, bugun=None):
     # baskalari = yalnız kullanıcının katıldığı toplantılardan ve son 30 gün ya da vadesi gelecekte olanlar.
     bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
-    c = _db(dizin)
-    try: rs = c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum FROM kayit WHERE tur IN ('is', 'soz', 'karar') ORDER BY tarih DESC, id DESC LIMIT 3000").fetchall()
+    c = _db(dizin); es = kisi_es_oku(c)
+    try: rs = [r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:] for r in c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum FROM kayit WHERE tur IN ('is', 'soz', 'karar') ORDER BY tarih DESC, id DESC LIMIT 3000").fetchall()]
     finally: c.close()
     ky = son_kayitlar(dizin); gz = {}; rl = {}
     def gorunur(t):
@@ -371,7 +422,7 @@ def bugun_veri(dizin, ad, bugun=None):
     def yas_geride(tarih, gun):
         g = _vade_gun(tarih, bugun); yas = -g if g is not None else None
         return yas, bool(yas is not None and yas > BUGUN_KENDI_GUN and not (gun is not None and gun >= 0))
-    ben = _ilk(ad); son_top = None; son_kararlar = []
+    ben = _ilk(kisi_ad(es, ad)); son_top = None; son_kararlar = []
     for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum in rs:
         if not gorunur(top): continue
         if tur == "karar":
@@ -424,10 +475,10 @@ def kayit_listesi(dizin, ad="", bugun=None):
     # tarih, kendi (kullanıcının işi). toplantilar: dosya → özet kaydının id'si ve pano/harita var mı (satırdan "toplantıya git"). kisiler: süzgeç listesi.
     bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kayitlar": [], "toplantilar": [], "kisiler": []}
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
-    c = _db(dizin)
-    try: rs = c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum FROM kayit WHERE tur IN ('is', 'soz', 'karar', 'soru') ORDER BY tarih DESC, id DESC LIMIT 5000").fetchall()
+    c = _db(dizin); es = kisi_es_oku(c)
+    try: rs = [r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:] for r in c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum FROM kayit WHERE tur IN ('is', 'soz', 'karar', 'soru') ORDER BY tarih DESC, id DESC LIMIT 5000").fetchall()]
     finally: c.close()
-    ky = son_kayitlar(dizin); gz = {}; tops = {}; kisiler = {}; ben = _ilk(ad)
+    ky = son_kayitlar(dizin); gz = {}; tops = {}; kisiler = {}; ben = _ilk(kisi_ad(es, ad))
     for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum in rs:
         if top:
             if top not in gz: gz[top] = gizli_mi(dizin, top, ky)
@@ -488,7 +539,7 @@ def sozler_tasi(dizin):
 def eylem_esle(dizin, eylemler, sahip, toplanti=None, ekle=True):
     # kuyruğun dış işleri grafta kullanıcının işi; durum kuyruktan: yapildi → yapildi, reddedildi → iptal, diğerleri açık
     # ekle=False: yalnız var olan bağların durumu (okumadan önce eşitleme — panodan onay/ret eylem komutu çalışmadan da yansır)
-    c = _db(dizin); n = 0
+    c = _db(dizin); n = 0; sahip = kisi_ad(kisi_es_oku(c), sahip)
     with c:
         for e in eylemler:
             if e.get("tur") not in ("takvim", "eposta", "takip", "mesaj", "diger") or not e.get("id"): continue

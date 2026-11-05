@@ -111,6 +111,9 @@ yp = sub.add_parser("yapi", help="toplantı sonu: özetin yapı dosyası (<özet
 yp.add_argument("json", nargs="?", help="yapı dosyası (yoksa --ornek)"); yp.add_argument("--ozet", default=None, help="özet .md (harita yanına yazılır; yoksa json'un yanına)")
 yp.add_argument("--dosya", default=None, help="canlı toplantı .md (grafta kaynak; yoksa en yenisi)"); yp.add_argument("--ornek", action="store_true", help="yapı dosyası biçimini yazdır")
 yp.add_argument("--dokum", default=None, help="canlı döküm .md/.jsonl (karar ve iş panosunda gündem süreleri; yoksa toplantının .jsonl'i)")
+ke = sub.add_parser("kisi-es", help="kişi eş adları: dökümde/altyazıda hatalı ya da İngilizce yazılmış ad → doğru ad (karar grafı; okurken ve yazarken uygulanır) — liste | --ekle YANLIS DOGRU | --sil YANLIS | --uygula [--kuru]")
+ke.add_argument("--ekle", nargs=2, metavar=("YANLIS", "DOGRU")); ke.add_argument("--sil", metavar="YANLIS")
+ke.add_argument("--uygula", action="store_true", help="kayıt veritabanındaki kişi alanlarını eşlemeye göre düzelt (önce tarihli yedek)"); ke.add_argument("--kuru", action="store_true", help="yalnız say, yazma")
 gf = sub.add_parser("graf", help="karar grafı: son kayıtlar ya da bir kişinin iddia/karar/açık işleri (yalnız bu Mac)")
 gf.add_argument("--kim", default=None); gf.add_argument("--n", type=int, default=20); gf.add_argument("--sil-toplanti", default=None, help="bu canlı toplantının kayıtlarını sil")
 gf.add_argument("--hepsini-sil", action="store_true")
@@ -364,6 +367,17 @@ def sozluk_ogren_cmd():
                   f"kanıt {'+'.join(sorted({k['kaynak'] for k in a['kanit']}))} / {len({k['toplanti'] for k in a['kanit'] if k['toplanti']})} toplantı"
                   + (f" · kip {a.get('kip')}" + (f" [{', '.join(a.get('baglam') or [])}]" if a.get("kip") == "baglam" else "") if d == "kabul" else "")
                   + (f" · deneme kendi {a['dene']['kendi']}/dış {a['dene']['dis']}" if a.get("dene") else "") + (f"\n      \"{a['kanit'][0].get('cumle')}\"" if A.kuru else ""))
+def kisi_es_cmd():
+    Y = _yapi()
+    if A.ekle:
+        r = Y.kisi_es_ekle(A.dir, *A.ekle); print(f"eş ad eklendi: {r[0]} → {r[1]}" if r else "eklenmedi (boş ya da aynı ad)")
+    if A.sil: print(f"silindi: {Y.kisi_es_sil(A.dir, A.sil)}")
+    if A.uygula or A.kuru:
+        r = Y.kisi_es_uygula(A.dir, kuru=not A.uygula or A.kuru)
+        print(("kuru: " if A.kuru or not A.uygula else "") + f"{r['degisen']} kayıtta kişi adı " + ("değişecek" if A.kuru or not A.uygula else "düzeltildi") + (f" · yedek: {r['yedek']}" if r["yedek"] else ""))
+        for a, n in sorted(r["adlar"].items(), key=lambda kv: -kv[1]): print(f"  {a}: {n}")
+    if not (A.ekle or A.sil or A.uygula or A.kuru):
+        for y, d in Y.kisi_es_liste(A.dir): print(f"{y} → {d}")
 def sozluk_cmd():
     if A.dene: return sozluk_dene_cmd()
     if A.ogren is not None or A.ogrenilen or A.geri_al or A.kullanim: return sozluk_ogren_cmd()
@@ -388,6 +402,10 @@ def sozluk_cmd():
         d["guncelleme"] = datetime.date.today().isoformat(); tmp = fp + ".tmp"
         json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, fp)
         print(f"eklendi: {y} → {dg} ({kip}{': ' + ', '.join(bag) if bag else ''})")
+        try:
+            r = _yapi().kisi_es_sozluk_ekle(A.dir, y, dg)  # yanlış biçim grafta kişi adıysa eş ada da girer
+            if r: print(f"eş ad: {r[0]} → {r[1]} (kayıtları düzeltmek için: kisi-es --uygula)")
+        except Exception: pass
         return
     for t in d["terimler"]:
         print(f"{t['dogru']:<18} {'·'.join(t.get('yanlis', []))}" + (f"   [bağlam: {', '.join(t['baglam'])}]" if t.get("kip") == "baglam" else "") + ("   [yalnız işaret]" if t.get("kip") == "isaret" else ""))
@@ -3010,5 +3028,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "taahhut": taahhut_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
+     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "kisi-es": kisi_es_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass
