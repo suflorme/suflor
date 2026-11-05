@@ -97,6 +97,7 @@ html.mac #tkf .sgs{gap:8px 12px}html.mac #tkf .bt{margin-top:4px}
 /* v0.108.0: kenar çubuğu (yalnız Mac penceresi; zemin saydam — arkasında Mac'in buzlu cam kenar çubuğu malzemesi) */
 #kenar{display:none}/* Yan paneldeki seçim ayrı görünüm: Bugün = takvim ve günün işleri (Şimdi bölümü gizli), Şimdi (toplantıda) hepsi; asistan her görünümde alttaki kutuda (v0.118.0) */
 @media (min-width:721px){html.mac:not(.kc-kapali)[data-gr=tks] main .sc>section#sk{display:none!important}}
+html.tg-bugun main>.sc>section:not(#bgn):not(#hfs):not(#sts){display:none!important}  /* toplantıda elle açılan Bugün/Kararlar: toplantı bölümleri gizli, Şimdi geri getirir */
 html.mac #kenar{display:flex;flex-direction:column;gap:1px;min-height:0;overflow:auto;padding:8px 10px 0;border-right:.5px solid var(--bd)}
 html.mac body{background:transparent}html.mac main,html.mac header{background:var(--bg)}
 html.mac .grid{grid-template-columns:220px minmax(0,1fr) 5px var(--aw,min(380px,36vw))}html.mac.yan-bos .grid,html.mac.yan-kapali .grid{grid-template-columns:220px minmax(0,1fr)}
@@ -1228,12 +1229,13 @@ async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.
   if(k==='md'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c.md.endsWith('\n')?c.md:c.md+'\n'],{type:'text/markdown;charset=utf-8'}));a.download=c.dosya+'.md';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}}
 // v0.108.0 (madde 11): Mac penceresinde solda kenar çubuğu — Şimdi (süren toplantı), Bugün, Son toplantılar (tıklayınca özet), Arşiv (Konuşma geçmişi; v0.118.0'da Asistan görünümü kalktı, asistan alttaki kutuda);
 // altta durum. Yalnız html.mac'te görünür; araç çubuğundaki düğme ya da Command + Option + S gizler. Seçim yalnız kaydırma ve vurgu.
-let kcSec='tks',kcImza=''
+let kcSec='tks',kcImza='',kcElle=false,kcTopOnce=false  // kcElle: toplantıda kullanıcı Bugün/Kararlar'ı elle seçti (5 Kasım, demo)
+function bnToplantida(){return kcElle&&(kcSec==='tks'||kcSec==='kr')}
 function kisaGun(at){const d=new Date(at),b=new Date();b.setHours(0,0,0,0);const g=Math.round((b-new Date(d).setHours(0,0,0,0))/864e5)  // kenar çubuğunda kısa: Bugün · Dün · Pzt · 19 Eki
   return g===0?L('Bugün'):g===1?L('Dün'):g>1&&g<7?d.toLocaleDateString(L('tr-TR'),{weekday:'short'}):d.toLocaleDateString(L('tr-TR'),{day:'numeric',month:'short'})}
 function kenarCiz(s,top){if(!document.documentElement.classList.contains('mac'))return;const ls=s.son_toplantilar||[],t=(document.getElementById('t').textContent||L('Toplantı')).trim(),su=(document.getElementById('sure').textContent||'').trim()
   const du=document.getElementById('durum'),dm=(document.getElementById('dm').textContent||'').trim(),dc=/\b(ok|wa|er)\b/.exec(du.className)
-  const sec=top&&kcSec==='tks'?'kc':!top&&kcSec==='kc'?'tks':kcSec==='kns'?'tks':kcSec  // toplantıda varsayılan seçim Şimdi
+  const sec=top&&kcSec==='tks'&&!kcElle?'kc':!top&&kcSec==='kc'?'tks':kcSec==='kns'?'tks':kcSec  // toplantıda varsayılan seçim Şimdi
   const o=(id,ikon,ad,r,ek)=>`<button class="ko${sec===id?' sec':''}" data-git="${esc(id)}"${ek||''}>${ikon}<span class=tx>${esc(ad)}</span>${r?`<span class=r>${esc(r)}</span>`:''}</button>`
   const h=(top?`<div class=kb>${L('Şimdi')}</div>`+o('kc','<span class=nok></span>',t,su,' data-canli=1'):'')
     +o('tks',ic('takvim'),L('Bugün'))+o('hf',ic('hafta'),L('Bu hafta'))+o('st',ic('dunya'),L('Saatler'))+o('kr',ic('karar'),L('Kararlar ve işler'))
@@ -1243,6 +1245,7 @@ function kenarCiz(s,top){if(!document.documentElement.classList.contains('mac'))
   document.documentElement.dataset.gr=sec  // görünüm: CSS seçilmeyen bölümleri gizler (Şimdi ve son toplantı hepsini gösterir)
   if(h!==kcImza){kcImza=h;document.getElementById('kenar').innerHTML=h}}
 document.getElementById('kenar').addEventListener('click',async ev=>{const b=ev.target.closest('[data-git]');if(!b)return;const g=b.dataset.git
+  if(!g.startsWith('son:')&&!['gecmis','prova','ar-ara','ar-dok'].includes(g))kcElle=g==='tks'||g==='kr'  // toplantıda Bugün/Kararlar elle açılabilir; Şimdi toplantıya döner
   if(g.startsWith('son:')){const id=g.slice(4),sr=((last&&last.son_toplantilar)||[]).find(x=>x.id===id);sonIs(id,sr&&sr.harita?'harita':'');return}  // pano/harita varsa o açılır, özet satırın ⋯ menüsünde ve Bugün kartında
   if(g==='gecmis'){gecmisAc();return}
   if(g==='prova'){provaAc();return}
@@ -1720,7 +1723,7 @@ function bnDurum(s,ol,now,sira,kala,hdS,bek,son){const P=[],kalan=ol.filter(o=>b
   if(!P.length)P.push(L('Bugün senden bekleyen bir şey yok.'))
   if(bnHazir&&!ol.length&&(s.takvim||{}).durum==='ok')P.push(L('Takviminde bugün toplantı yok.'))
   return P.join(' ')}
-function bnCiz(s){const el=document.getElementById('bgn');if(!el||s.aktif)return
+function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnToplantida()))return
   const d=new Date(),now=d.getHours()*60+d.getMinutes(),ol=bnHazir?bnOlay:[],kalan=ol.filter(o=>bnDk(o.bitis_saat)>now),sira=kalan[0]||null,kala=sira?bnDk(sira.saat)-now:null,bek=bnBekleyen(s),sl=(s.son_toplantilar||[]),son=sl[0]||null
   const taze=son&&Date.now()-new Date(son.at)<108e5&&(son.harita||ciktiP(son.cikti).length),odakOnce=sira&&kala>=0&&kala<=15
   const sa=d.getHours(),selam=sa<12?L('Günaydın'):sa<18?L('İyi günler'):L('İyi akşamlar'),ad=bnIlk(s.ad),loc=L('tr-TR')
@@ -1962,8 +1965,8 @@ if(s.ayarlar&&s.ayarlar.deger)temaUygula(s.ayarlar.deger.tema||'sistem');if(s.ay
 // arayüz dili başka pencereden (Ayarlar) değiştiyse bu sayfa da yeni dille yeniden yüklenir
 if(s.ayarlar&&s.ayarlar.deger&&s.ayarlar.deger.dil&&s.ayarlar.deger.dil!==DIL&&!new URLSearchParams(location.search).get('dil')&&!window._dilYeni){window._dilYeni=1;location.reload()}
 // Mac penceresi (html.mac, v0.106.0): toplantıda mı (araç çubuğundaki toplantı düğmeleri), toplantı dışında yan sütun boş mu (gizlenir)
-{const top=!!s.aktif,h=document.documentElement;h.classList.toggle('toplantida',top);h.classList.toggle('bugun',!top)  // 30 Ekim: yan sütun (Gündem/Döküm) yalnız toplantıda
-  h.classList.toggle('yan-bos',!top);kenarCiz(s,top)}
+{const top=!!s.aktif,h=document.documentElement;if(top&&!kcTopOnce)kcElle=false;kcTopOnce=top;const bg=!top||bnToplantida();h.classList.toggle('toplantida',top);h.classList.toggle('bugun',bg);h.classList.toggle('tg-bugun',top&&bg)  // 30 Ekim: yan sütun (Gündem/Döküm) yalnız toplantıda
+  h.classList.toggle('yan-bos',bg);kenarCiz(s,top)}
 document.getElementById('sk').hidden=!s.aktif&&!(s.cards||[]).length&&!(s.questions||[]).length&&!(s.claude_age_s!=null&&s.claude_age_s<120)
 setH(document.getElementById("tone"),toneHtml(s.tone,s.tone_kisi))
 ;(s.cards||[]).forEach(c=>seenCards.add(c.id+(c.geri||""))); firstCards=false
