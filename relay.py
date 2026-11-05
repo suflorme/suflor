@@ -1506,8 +1506,12 @@ def _is_metin(c):  # "4 iş (2'si tarihsiz)" / "3 iş (hepsi tarihsiz)"; tarihsi
     return _t(f"{n} iş ({t}{_iyelik(t)} tarihsiz)", f"{n} action items ({t} undated)")
 def cikti_metin(c):
     return ", ".join((_is_metin(c) if k == "is" else f"{c[k]} {_t(a, e)}") for k, a, e in (("karar", "karar", "decisions"), ("is", "iş", "action items"), ("acik", "açık", "open")) if k in c)
+def _son_tekil(ls):  # aynı özet dosyası listede bir kez (5 Kasım: özet iki kez kaydedilince Son toplantılar'da çift görünüyordu); en yeni kayıt kalır, sıra korunur
+    son = {}
+    for i, r in enumerate(ls): son[r.get("ozet")] = i
+    return [r for i, r in enumerate(ls) if son[r.get("ozet")] == i]
 def son_yukle():
-    try: SON[:] = [json.loads(l) for l in open(os.path.join(BASE, "son-toplantilar.jsonl"), encoding="utf-8") if l.strip()][-20:]
+    try: SON[:] = _son_tekil([json.loads(l) for l in open(os.path.join(BASE, "son-toplantilar.jsonl"), encoding="utf-8") if l.strip()])[-20:]
     except (OSError, ValueError): return
 def bildirim(baslik, alt, metin, son=None):
     # menü uygulaması açıksa bildirimi o gösterir (v0.31.3): tıklayınca özet açılır (son: SON kaydının kimliği) ya da pano. osascript'in
@@ -1548,7 +1552,7 @@ def son_ekle(p):
             if p.get("gorsel") in ("harita", "karar_is"): r["gorsel"] = p["gorsel"]  # 5 Kasım: panoda menü etiketi (Zihin haritası | Karar ve iş panosu)
         except OSError as e: print(f"ÖZET: harita yazılamadı ({e.__class__.__name__})")
     with LOCK:
-        _log("son-toplantilar.jsonl", r); SON.append(r); del SON[:-20]
+        _log("son-toplantilar.jsonl", r); SON.append(r); SON[:] = _son_tekil(SON)[-20:]
     if r["dosya"]: toplanti_bitir("özet hazır", r["dosya"])  # Faz B: özet hazır = toplantı bitti (pano hemen "Son toplantılar"a geçer)
     if r.get("yapi") and "so_tetik" in globals(): so_tetik()  # 3 Kasım: öğrenen sözlük — yapı dosyasındaki düzeltmeler (toplantı bitince işlenir)
     print(f"ÖZET: hazır" + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""))
