@@ -1934,7 +1934,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     if tur.get("kutu"): tb += _t(KUTU_KURAL["tr"], KUTU_KURAL["en"]) + "\n"
     if kayit_turu_mu(tur) and (KAYIT_SONUC or tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or "")):  # 5 Kasım: kayıt önerisi kuralı + kimlikli kayıtlar (yalnız kayıt konusu geçen turda)
         tb += kayit_sonuc_notu()
-        if tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or ""): tb += _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]) + "\n" + kayit_blogu()
+        if tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or ""): tb += kayit_kural() + "\n" + kayit_blogu()
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar
         _KS["bosta"] = False
         if konus_canli() and _KS.get("saglayici") == "claude-code" and konus_secim()["tur"] != "claude-code": konus_kapat("yedek süresi bitti", durum_koru=True); _KS["tur"] = tur

@@ -11,6 +11,7 @@
 // istek, çıktı ve FIFO'lar uygulama klasörünün (bu paketin bulunduğu klasör) altında aynı klasörde. Reddedilince çıkış 3.
 import Foundation
 import Security
+import CommonCrypto
 
 func bitir(_ kod: Int32) -> Never { exit(kod) }
 let a = CommandLine.arguments
@@ -89,6 +90,146 @@ if let bi = a.firstIndex(of: "--beyin") {
     let sure = (j["sure"] as? Double) ?? 7200
     DispatchQueue.global().asyncAfter(deadline: .now() + sure) { if p.isRunning { p.terminate() } }
     p.waitUntilExit(); bitir(p.terminationStatus)
+}
+// Kayıt kipi (5 Kasım): --kayit <iş dosyası> → asistanın önerip kullanıcının panoda onayladığı kayıt işinin Masaüstü'ne dokunan kısmı (aktarıcı oraya
+// erişemez). Claude çalıştırılmaz. İş dosyası aktarıcının canlı klasöründe tek kullanımlık: ad kayit-<32 onaltılık>.json, düz dosya, bu hesabın, 0600; okunur
+// okunmaz silinir; gövde aynı klasördeki kart-anahtari.txt ile HMAC-SHA256 imzalı, son kullanma ≤ 5 dk, kimlik (nonce) bir kez. Komut Python'a güvenilmeden
+// burada YENİDEN doğrulanır; izinli klasörler ve proje kayıt komutu iş dosyasından değil kullanıcının ayar dosyasından okunur. Yalnız iki iş:
+//  ozet_duzelt_asil {yol, eski, yeni}: <calisma|proje>/gorusmeler ya da <kod>/testler altındaki .md/.json (gizli ad yok) dosyada eski metin TAM BİR KEZ geçiyorsa değiştirir (geçici dosya + rename).
+//  proje_kayit {alt, argumanlar}: ayar kayit_komutu = [python3 yorumlayıcısı, <proje|calisma> altındaki .py betik, sabit önek…] + kayit_alt_komutlar'daki alt komut +
+//    argümanlar (metin; "-" ile başlayan yalnız kayit_bayraklar'dakiler). Kabuksuz Process, giriş boş, zaman aşımı (kayit_sure_sn, varsayılan 30). Ayar yoksa kapalı.
+// Silme, ağ, keyfi komut yok. Sonuç <klasör>/kayit-<nonce>.sonuc.json (0600): {ok, kod, cikti, hata}. Reddedince çıkış 3.
+if let ki = a.firstIndex(of: "--kayit") {
+    guard ki + 1 < a.count else { bitir(2) }
+    let isYol = gercek(a[ki + 1]), klasor = (isYol as NSString).deletingLastPathComponent, ad = (isYol as NSString).lastPathComponent
+    guard altinda(klasor, uygulamaKlasor), ad.range(of: "^kayit-[0-9a-f]{32}\\.json$", options: .regularExpression) != nil else { bitir(3) }
+    var st = stat()
+    guard lstat(isYol, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG, st.st_uid == getuid(), (st.st_mode & 0o077) == 0, st.st_size < 64_000,
+          let veri = FileManager.default.contents(atPath: isYol) else { bitir(3) }
+    guard unlink(isYol) == 0 else { bitir(3) }  // tek kullanımlık: önce sil, sonra iş
+    let anahtarYol = (klasor as NSString).appendingPathComponent("kart-anahtari.txt"); var sa = stat()
+    guard lstat(anahtarYol, &sa) == 0, (sa.st_mode & S_IFMT) == S_IFREG, sa.st_uid == getuid(),
+          let anahtar = (try? String(contentsOfFile: anahtarYol, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines), anahtar.count >= 16,
+          let dis = (try? JSONSerialization.jsonObject(with: veri)) as? [String: Any], Set(dis.keys) == ["govde", "imza"],
+          let govdeMetin = dis["govde"] as? String, let imza = dis["imza"] as? String, let govdeVeri = govdeMetin.data(using: .utf8) else { bitir(3) }
+    var mac = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+    let kv = Array(anahtar.utf8), gv = Array(govdeVeri)
+    CCHmac(CCHmacAlgorithm(kCCHmacAlgSHA256), kv, kv.count, gv, gv.count, &mac)
+    let beklenen = mac.map { String(format: "%02x", $0) }.joined()
+    guard imza.count == beklenen.count, zip(imza.utf8, beklenen.utf8).reduce(UInt8(0), { $0 | ($1.0 ^ $1.1) }) == 0 else { bitir(3) }
+    guard let g = (try? JSONSerialization.jsonObject(with: govdeVeri)) as? [String: Any], let komut = g["komut"] as? String, let arg = g["arg"] as? [String: Any],
+          let son = g["son"] as? Double, let nonce = g["nonce"] as? String, g["v"] as? Int == 1, ad == "kayit-\(nonce).json" else { bitir(3) }
+    var izinliAnahtar: Set<String> = ["v", "komut", "arg", "son", "nonce"]
+    #if SUFLOR_DENEME
+    izinliAnahtar.insert("ayar")  // deneme aktarıcısının ayar dosyası (SUFLOR_AYAR)
+    #endif
+    let simdi = Date().timeIntervalSince1970
+    guard Set(g.keys).isSubset(of: izinliAnahtar), son > simdi, son <= simdi + 300 else { bitir(3) }
+    let kullanilan = (klasor as NSString).appendingPathComponent("kayit-kullanilan.txt")
+    var satirlar = ((try? String(contentsOfFile: kullanilan, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+    guard !satirlar.contains(where: { $0.hasPrefix(nonce) }) else { bitir(3) }
+    satirlar.append("\(nonce) \(Int(simdi))"); satirlar = Array(satirlar.suffix(200))
+    FileManager.default.createFile(atPath: kullanilan, contents: (satirlar.joined(separator: "\n") + "\n").data(using: .utf8), attributes: [.posixPermissions: 0o600])
+    let sonucYol = (klasor as NSString).appendingPathComponent("kayit-\(nonce).sonuc.json")
+    func sonucYaz(_ ok: Bool, _ kod: Int, _ cikti: String, _ hata: String, _ cikis: Int32) -> Never {
+        let o: [String: Any] = ["ok": ok, "kod": kod, "cikti": String(cikti.prefix(4000)), "hata": hata]
+        if let d = try? JSONSerialization.data(withJSONObject: o) {
+            let gec = sonucYol + ".tmp"; FileManager.default.createFile(atPath: gec, contents: d, attributes: [.posixPermissions: 0o600]); _ = rename(gec, sonucYol)
+        }
+        bitir(cikis)
+    }
+    var ayarYol = NSHomeDirectory() + "/Library/Application Support/Suflor/ayar.json"
+    #if SUFLOR_DENEME
+    if let y = g["ayar"] as? String { ayarYol = y }
+    #endif
+    guard let ad0 = FileManager.default.contents(atPath: ayarYol), let ayar = (try? JSONSerialization.jsonObject(with: ad0)) as? [String: Any] else { sonucYaz(false, -1, "", "ayar okunamadı", 2) }
+    func ayarKlasor(_ k: String) -> String? { (ayar[k] as? String).flatMap { $0.isEmpty ? nil : gercek(($0 as NSString).expandingTildeInPath) } }
+    func metinUygun(_ v: Any?, _ enAz: Int, _ enCok: Int) -> String? {
+        guard let s = v as? String, !s.contains("\0"), s.count >= enAz, s.count <= enCok else { return nil }; return s
+    }
+    if komut == "ozet_duzelt_asil" {
+        guard Set(arg.keys) == ["yol", "eski", "yeni"], let y0 = metinUygun(arg["yol"], 1, 1024), let eski = metinUygun(arg["eski"], 2, 1000),
+              let yeni = metinUygun(arg["yeni"], 0, 2000), eski != yeni else { sonucYaz(false, -1, "", "argümanlar uymuyor", 3) }
+        var kokler: [String] = []
+        if let c = ayarKlasor("calisma") ?? ayarKlasor("proje") { kokler.append((c as NSString).appendingPathComponent("gorusmeler")) }
+        if let k = ayarKlasor("kod") { kokler.append((k as NSString).appendingPathComponent("testler")) }
+        let yol = gercek((y0 as NSString).expandingTildeInPath)
+        guard let kok = kokler.map({ gercek($0) }).first(where: { yol.hasPrefix($0 + "/") }),
+              !yol.dropFirst(kok.count + 1).split(separator: "/").contains(where: { $0.hasPrefix(".") }),
+              yol.hasSuffix(".md") || yol.hasSuffix(".json") else { sonucYaz(false, -1, "", "izinli özet klasörü dışında", 3) }
+        var sy = stat()
+        guard lstat(yol, &sy) == 0, (sy.st_mode & S_IFMT) == S_IFREG, sy.st_size < 4_000_000, let icerik = try? String(contentsOfFile: yol, encoding: .utf8)
+        else { sonucYaz(false, -1, "", "dosya okunamadı", 1) }
+        let ns = icerik as NSString; var n = 0, ara = NSRange(location: 0, length: ns.length)
+        while true {
+            let r = ns.range(of: eski, options: .literal, range: ara); if r.location == NSNotFound { break }
+            n += 1; let bas = r.location + r.length; ara = NSRange(location: bas, length: ns.length - bas)
+        }
+        guard n == 1 else { sonucYaz(false, -1, "", n == 0 ? "eski metin dosyada yok" : "eski metin birden çok yerde geçiyor", 1) }
+        let yeniIcerik = ns.replacingOccurrences(of: eski, with: yeni, options: .literal, range: NSRange(location: 0, length: ns.length))
+        let gec = (yol as NSString).deletingLastPathComponent + "/.suflor-\(nonce).tmp"
+        guard FileManager.default.createFile(atPath: gec, contents: yeniIcerik.data(using: .utf8), attributes: [.posixPermissions: Int(sy.st_mode & 0o777)]),
+              rename(gec, yol) == 0 else { unlink(gec); sonucYaz(false, -1, "", "yazılamadı", 1) }
+        sonucYaz(true, 0, "", "", 0)
+    }
+    guard komut == "proje_kayit" else { sonucYaz(false, -1, "", "izinli olmayan komut", 3) }
+    guard let kk = ayar["kayit_komutu"] as? [String], kk.count >= 2, let altlar = ayar["kayit_alt_komutlar"] as? [String], !altlar.isEmpty
+    else { sonucYaz(false, -1, "", "proje kayıt komutu ayarlı değil", 3) }
+    let bayraklar = Set((ayar["kayit_bayraklar"] as? [String]) ?? [])
+    let yorumlayici = (kk[0] as NSString).expandingTildeInPath, betik = gercek((kk[1] as NSString).expandingTildeInPath)
+    let pyAdi = "^python3(\\.[0-9]+)?$"  // bağ çözülmüş adı da python3: yorumlayıcı yerine başka bir araç (rm gibi) betik yolunu argüman olarak alamasın
+    let kokler = ["proje", "calisma"].compactMap { ayarKlasor($0) }
+    guard yorumlayici.hasPrefix("/"), (yorumlayici as NSString).lastPathComponent.range(of: pyAdi, options: .regularExpression) != nil,
+          (gercek(yorumlayici) as NSString).lastPathComponent.range(of: pyAdi, options: .regularExpression) != nil,
+          FileManager.default.isExecutableFile(atPath: yorumlayici), betik.hasSuffix(".py"), let kok = kokler.first(where: { betik.hasPrefix($0 + "/") }),
+          FileManager.default.isReadableFile(atPath: betik), kk.dropFirst(2).allSatisfy({ !$0.contains("\0") && $0.count <= 200 })
+    else { sonucYaz(false, -1, "", "proje kayıt komutu uygun değil", 3) }
+    guard Set(arg.keys) == ["alt", "argumanlar"], let alt = arg["alt"] as? String, altlar.contains(alt),
+          alt.range(of: "^[A-Za-z][A-Za-z0-9_-]{0,40}$", options: .regularExpression) != nil,
+          let ar = arg["argumanlar"] as? [Any], ar.count <= 20 else { sonucYaz(false, -1, "", "alt komut izinli değil", 3) }
+    var argumanlar: [String] = []
+    for x in ar {
+        guard let s = metinUygun(x, 0, 2000) else { sonucYaz(false, -1, "", "argüman uygun değil", 3) }
+        if s.hasPrefix("-") { guard bayraklar.contains(s) else { sonucYaz(false, -1, "", "izinli olmayan bayrak", 3) } }
+        argumanlar.append(s)
+    }
+    // Foundation Process argümanları NFD'ye çeviriyor ("ü" → "u" + birleşik işaret; 5 Kasım ölçümü) — Türkçe metin kayda bozuk girmesin diye posix_spawn,
+    // argümanlar UTF-8 olduğu gibi. Süreç kendi süreç grubunda: zaman aşımında alt süreçleriyle birlikte durdurulur.
+    var e = ProcessInfo.processInfo.environment.filter { !$0.key.hasPrefix("PYTHON") && !$0.key.hasPrefix("DYLD_") }
+    e["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"; e["PYTHONDONTWRITEBYTECODE"] = "1"
+    let argv: [UnsafeMutablePointer<CChar>?] = ([yorumlayici, betik] + Array(kk.dropFirst(2)) + [alt] + argumanlar).map { strdup($0) } + [nil]
+    let envp: [UnsafeMutablePointer<CChar>?] = e.map { strdup("\($0.key)=\($0.value)") } + [nil]
+    var fds: [Int32] = [0, 0]
+    guard pipe(&fds) == 0 else { sonucYaz(false, -1, "", "çalıştırılamadı", 4) }
+    var fa: posix_spawn_file_actions_t? = nil, at: posix_spawnattr_t? = nil
+    posix_spawn_file_actions_init(&fa); posix_spawnattr_init(&at)
+    posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0)
+    posix_spawn_file_actions_adddup2(&fa, fds[1], 1); posix_spawn_file_actions_adddup2(&fa, fds[1], 2)
+    posix_spawn_file_actions_addclose(&fa, fds[0]); posix_spawn_file_actions_addclose(&fa, fds[1])
+    posix_spawn_file_actions_addchdir_np(&fa, kok)
+    posix_spawnattr_setflags(&at, Int16(POSIX_SPAWN_SETPGROUP)); posix_spawnattr_setpgroup(&at, 0)
+    var pid: pid_t = 0
+    let rs = posix_spawn(&pid, yorumlayici, &fa, &at, argv, envp)
+    close(fds[1])
+    guard rs == 0 else { close(fds[0]); sonucYaz(false, -1, "", "çalıştırılamadı", 4) }
+    var cikti = Data(); let okundu = DispatchSemaphore(value: 0)
+    let okuyucu = FileHandle(fileDescriptor: fds[0], closeOnDealloc: true)
+    DispatchQueue.global().async {
+        while true { let d = okuyucu.availableData; if d.isEmpty { break }; if cikti.count < 16_000 { cikti.append(d) } }
+        okundu.signal()
+    }
+    let sure = min(max((ayar["kayit_sure_sn"] as? Double) ?? 30, 1), 120)
+    var asim = false, bitti = false
+    DispatchQueue.global().asyncAfter(deadline: .now() + sure) {
+        if !bitti { asim = true; kill(-pid, SIGTERM); Thread.sleep(forTimeInterval: 2); if !bitti { kill(-pid, SIGKILL) } }
+    }
+    var durum: Int32 = 0
+    while waitpid(pid, &durum, 0) < 0 && errno == EINTR {}
+    bitti = true; _ = okundu.wait(timeout: .now() + 3)
+    let kod: Int32 = (durum & 0x7f) == 0 ? (durum >> 8) & 0xff : -(durum & 0x7f)
+    let metin = String(decoding: cikti.prefix(8000), as: UTF8.self)
+    if asim { sonucYaz(false, -1, metin, "zaman aşımı (\(Int(sure)) sn)", 5) }
+    sonucYaz(kod == 0, Int(kod), metin, kod == 0 ? "" : "çıkış kodu \(kod)", 0)
 }
 guard let i = a.firstIndex(of: "--istek"), i + 1 < a.count,
       let veri = FileManager.default.contents(atPath: a[i + 1]),

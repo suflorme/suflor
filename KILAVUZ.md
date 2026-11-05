@@ -211,6 +211,24 @@ Suflor'un kararlarını ve işlerini o deftere taşımak için Bugün'de "Kararl
 vade, durum, kaynak saat). Dosya `<canlı klasör>/disa-aktar/` altına yazılır ve Finder'da gösterilir; yüklemeyi sen yaparsın. Gizli toplantıların kaydı girmez.
 Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/dis-defter.py`.
 
+### Asistanın kayıt yazması ve projenin kendi kayıt aracı
+Asistan (Konuş ya da kutu) kayıtta değişiklik önerir, her yazmayı panoda tek tıkla onaylarsın. Masaüstü'ndeki dosyalara aktarıcı erişemediği için o kısmı
+Masaüstü izni olan Suflor Brifing yardımcısı yapar (tek kullanımlık, imzalı, iki dakika geçerli iş dosyasıyla; Claude çalıştırmaz):
+- **Asıl özet dosyası:** özet düzeltmesi panodaki kopyanın yanında `<çalışma klasörü>/gorusmeler` (ya da `<kod>/testler`) altındaki asıl `.md`/`.json` dosyaya da
+  yazılır; eski metin dosyada tam bir kez geçmelidir.
+- **Projenin kendi kayıt betiği (isteğe bağlı, varsayılan kapalı):** projende kayıtları tutan bir Python betiği varsa asistan onun izinli alt komutlarını önerebilir.
+  ⚙ Ayarlar'da yoktur; ayar dosyasına elle yazılır:
+  ```json
+  "kayit_komutu": ["/usr/bin/python3", "~/Proje/araclar/kayit.py", "--sabit", "önek"],
+  "kayit_alt_komutlar": ["karar", "olay"],
+  "kayit_bayraklar": ["--kim", "--kaynak"],
+  "kayit_sure_sn": 30
+  ```
+  İlk öğe bir `python3` yorumlayıcısı, ikincisi proje (ya da çalışma) klasörünün içindeki `.py` betik olmalıdır; sonraki öğeler her çağrıda aynen eklenir. Asistan
+  yalnız `kayit_alt_komutlar`'daki alt komutları, `-` ile başlayan argüman olarak yalnız `kayit_bayraklar`'dakileri kullanabilir. Betik kabuksuz çalışır (argümanlar
+  olduğu gibi gider), girişi boştur, `kayit_sure_sn` saniyede (en çok 120) bitmezse durdurulur; çıktısının başı cevabın altına düşer. Gizli kipte hiçbir kayıt yazılmaz.
+  Silme ya da dosya okuyan alt komutları listeye koyma.
+
 ## Sorun giderme
 
 Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu denetle**'ye bak (✗ olan maddenin altında ne yapacağın yazar). Aşağıdakiler en sık karşılaşılanlar; her satır "belirti: ne yapmalı" biçimindedir. Ayar adları `ayar.json`'a `"ayar_adi": değer` diye yazılır; panoda ⚙ Ayarlar'da karşılığı varsa oradan değiştirmek daha kolaydır.

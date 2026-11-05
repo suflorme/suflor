@@ -19,6 +19,7 @@ def _iz_i(v):
     except (TypeError, ValueError): return None
 def _iz_k(t): return str(t or "").replace("İ", "i").replace("I", "ı").lower().replace("ı", "i").replace("ö", "o").replace("ü", "u").replace("ş", "s").replace("ç", "c").replace("ğ", "g")
 
+IZ_YAPIM, IZ_SIRADA = {"BUILDING", "YAPILIYOR"}, {"NEXT", "SIRADA"}  # aşama adları İngilizce ya da Türkçe gelebilir (_iz_k ile sadeleşmiş, büyük harf)
 def izleme_yol():
     y = str(AYAR.get("izleme_dosyasi") or "").strip()
     return os.path.expanduser(y) if y else None
@@ -130,7 +131,7 @@ def izleme_view():  # GET /izleme (anahtarlı)
     kim = sorted(v["kimde"], key=lambda k: -((k["acik"] or 0) + (k["onay"] or 0)))
     shk = v["sahipsiz"]["kartlar"]; asama = lambda k: _iz_k(k["asama"]).upper()
     r.update(eski=eski, eski_saat=saat, uretim=v["uretim"], kaynak_okuma=v["kaynak_okuma"], yeni_sapma_sayi=len(v["yeniSapmalar"]), yeni_sapmalar=v["yeniSapmalar"][:30], kimde=kim[:30],
-             sahipsiz={"toplam": v["sahipsiz"]["sayi"] if v["sahipsiz"]["sayi"] is not None else len(shk), "building": sum(1 for k in shk if asama(k) == "BUILDING"), "next": sum(1 for k in shk if asama(k) == "NEXT"), "kartlar": shk[:30]},
+             sahipsiz={"toplam": v["sahipsiz"]["sayi"] if v["sahipsiz"]["sayi"] is not None else len(shk), "building": sum(1 for k in shk if asama(k) in IZ_YAPIM), "next": sum(1 for k in shk if asama(k) in IZ_SIRADA), "kartlar": shk[:30]},
              nabiz=v["nabiz"], eslesen=izleme_eslesen(v))
     return r
 

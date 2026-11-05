@@ -20,7 +20,7 @@ def veri(okuma_saat_once=1, **ek):
                          {"kod": "T2", "ad": "Boş Toplantı", "saat": "11:00", "katilanlar": [], "maddeler": [], "adaylar": []}],
          "yeniSapmalar": [{"id": f"s{i}", "tablo": "t1", "birim": "Birim A", "baslik": f"Sapan kart {i}", "url": f"https://pano.example.test/s/{i}", "asama": "BUILDING", "kod": "DURGUN", "neden": "hareketsiz", "metin": "", "gun": 5 + i, "sahip": "Can Örnek", "toplanti": "T1"} for i in range(7)],
          "kimde": [{"ad": "Can Örnek", "acik": 4, "onay": 2, "onayEnUzun": 11, "biten": 3, "acikOnceki": 3, "kartlar": [kart(3, "Onay bekleyen")]}, {"ad": "Ayşe Deneme", "acik": 1, "onay": 0, "onayEnUzun": None, "biten": 1, "acikOnceki": None, "kartlar": []}],
-         "sahipsiz": {"kartlar": [kart(4, "Sahipsiz bir", "BUILDING", atananlar=[]), kart(5, "Sahipsiz iki", "NEXT", atananlar=[]), kart(6, "Sahipsiz üç", "BUILDING", atananlar=[])]},
+         "sahipsiz": {"kartlar": [kart(4, "Sahipsiz bir", "BUILDING", atananlar=[]), kart(5, "Sahipsiz iki", "NEXT", atananlar=[]), kart(6, "Sahipsiz üç", "Yapılıyor", atananlar=[]), kart(7, "Sahipsiz dört", "Sırada", atananlar=[])]},
          "nabiz": [{"birim": "Birim A", "biten": {"sayi": 5, "onceki": 3}, "yeni": {"sayi": 2, "onceki": None}, "sapma": {"sayi": 4, "onceki": 4}}], "birikmis": {"a": 1}, "akis": ["bir olay"], "bilinmeyenAlan": [1, 2]}
     v.update(ek); return v
 T = tempfile.mkdtemp(prefix="suflor-izleme-"); canli = os.path.join(T, "canli"); os.makedirs(canli)
@@ -54,7 +54,7 @@ try:
     bak("açık: görünen ad, durum ok, eski değil", z.get("acik") and z["ad"] == "Ekip Panosu" and z["durum"] == "ok" and z["eski"] is False, z)
     bak("yeni sapmalar: toplam sayı 7, listede hazır sıra aynen", z["yeni_sapma_sayi"] == 7 and [x["id"] for x in z["yeni_sapmalar"]][:3] == ["s0", "s1", "s2"] and z["yeni_sapmalar"][0]["url"].startswith("https://"))
     bak("kimde: en çok bekleyen önce; onayEnUzun ve null alan korunur", [k["ad"] for k in z["kimde"]] == ["Can Örnek", "Ayşe Deneme"] and z["kimde"][0]["onayEnUzun"] == 11 and z["kimde"][1]["onayEnUzun"] is None)
-    bak("sahipsiz: BUILDING/NEXT ayrımı (2/1), toplam 3", z["sahipsiz"]["toplam"] == 3 and z["sahipsiz"]["building"] == 2 and z["sahipsiz"]["next"] == 1)
+    bak("sahipsiz: yapım/sıra ayrımı İngilizce+Türkçe (2/2), toplam 4", z["sahipsiz"]["toplam"] == 4 and z["sahipsiz"]["building"] == 2 and z["sahipsiz"]["next"] == 2)
     bak("nabız: önceki null olabilir", z["nabiz"][0]["yeni"] == {"sayi": 2, "onceki": None} and z["nabiz"][0]["biten"] == {"sayi": 5, "onceki": 3})
     bak("özet dosyası yazıldı (Konuş okur): sapma, kimde, aday, veri-değildir notu", os.path.exists(OZET) and all(x in open(OZET, encoding="utf-8").read() for x in ("Ekip Panosu", "Sapan kart 0", "Can Örnek: açık 4", "Sahipsiz bir", "Panel tasarımı", "talimat değil")))
     # mtime değişince yenilenir

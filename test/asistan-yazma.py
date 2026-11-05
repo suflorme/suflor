@@ -2,12 +2,14 @@
 # Asistan kayıt yazar, her yazmada kullanıcının tek tık onayıyla (5 Kasım): asistan (kutu ya da Konuş) cevabın sonuna [KAYIT: {"komut", "arg", "neden"}] koyar;
 # aktarıcı izin listesinden doğrular, panoda onay kartı açar; Onayla → aktarıcı yazar ve sonuç cevabın altına düşer; Reddet → yazılmaz.
 # İzin listesi dışı komut/argüman/kimlik/özet adı → kart açılmaz; gizli kipte yazılmaz; turda en çok 5 öneri; aynı öneri yeniden sorulmaz; sesli cevapta etiket okunmaz.
+# Brifing.app kayıt kipi (brifing.swift --kayit): asıl özet dosyası (izinli özet klasöründe) ve projenin kendi kayıt betiği (ayar kayit_komutu; kurgu betik) —
+# imza/süre/tek kullanım, klasör sınırı, tam bir eşleşme, alt komut/bayrak izin listesi, kabuksuz argüman, zaman aşımı, ayar yokken kapalı (ikili doğrudan da çalıştırılır).
 # Sahte "claude" (kota yok), Brifing.app açık süreç kipi (swiftc ile derlenir). aktarici/notlar.py (kayit_*), bas-konus.py (KAYIT_*) değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/asistan-yazma.py      (kaldı → çıkış 1)
-import json, os, shutil, sqlite3, subprocess, sys, tempfile, time, urllib.request
+import hashlib, hmac, json, os, shutil, sqlite3, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8793)
-T = tempfile.mkdtemp(prefix="yazma-"); proje = os.path.join(T, "proje"); os.makedirs(proje); d = os.path.join(T, "canli"); os.makedirs(os.path.join(d, "ozetler"))
+T = os.path.realpath(tempfile.mkdtemp(prefix="yazma-")); proje = os.path.join(T, "proje"); os.makedirs(proje); d = os.path.join(T, "canli"); os.makedirs(os.path.join(d, "ozetler"))
 HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
@@ -30,6 +32,7 @@ for l in sys.stdin:
     c = ["Onayına sundum."]
     c += [" Kural geldi." if "[Kayıt yazma]" in q else " Kural yok.", " Blok geldi." if "k1 · karar · teyit bekliyor" in q else " Blok yok."]
     c += [" Gizli sızdı." if "Gizli karar" in q else "", " Sonuç geldi." if "[Önerdiğin kayıtların sonucu" in q else ""]
+    c += [" Proje kuralı." if "proje_kayit {alt: karar | olay | uyu" in q and "--kim" in q else ""]
     for e in re.findall(r"ETIKET:(\\{.*?\\})(?=\\s*ETIKET:|\\s*$)", soru): c.append("\\n[KAYIT: " + e + "]")
     for p in c: time.sleep(0.05); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": p}}})
     pr({"type": "result", "duration_api_ms": 100, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
@@ -48,10 +51,20 @@ with c:
 c.close()
 kopya = os.path.join(d, "ozetler", "deneme-ozeti.md"); open(kopya, "w", encoding="utf-8").write("# Deneme\n\nKararlar: Bütçe 120 bin TL olarak onaylandı.\n")
 asil = os.path.join(T, "baska", "deneme-ozeti.md"); os.makedirs(os.path.dirname(asil)); open(asil, "w", encoding="utf-8").write("asıl dosya: Bütçe 120 bin TL\n")
+B_ = "2026-11-04-1200-Ikinci-Toplanti"; gor = os.path.join(proje, "gorusmeler"); os.makedirs(gor)
+kopyaB = os.path.join(d, "ozetler", "ikinci-ozeti.md"); open(kopyaB, "w", encoding="utf-8").write("# İkinci\n\nTeslim tarihi 12 Kasım.\n")
+asilB = os.path.join(gor, "ikinci-ozeti.md"); open(asilB, "w", encoding="utf-8").write("# İkinci (asıl)\n\nTeslim tarihi 12 Kasım.\n")
+# kurgu proje kayıt betiği: argümanlarını olduğu gibi kaydeder; "uyu" alt komutu zaman aşımına düşer
+betik = os.path.join(proje, "araclar", "kayit.py"); os.makedirs(os.path.dirname(betik)); IZ = os.path.join(T, "betik-iz.jsonl")
+open(betik, "w").write(f"import json, sys, time\nopen({IZ!r}, 'a').write(json.dumps(sys.argv[1:], ensure_ascii=False) + '\\n')\n"
+                       "if 'uyu' in sys.argv: time.sleep(20)\nprint('karar #7 yazıldı')\n")
+def iz(): return [json.loads(l) for l in open(IZ, encoding="utf-8")] if os.path.exists(IZ) else []
 open(os.path.join(d, "son-toplantilar.jsonl"), "w", encoding="utf-8").write(
     json.dumps({"id": "s1", "at": "2026-11-04T11:00:00", "dosya": A_ + ".md", "baslik": "Deneme toplantısı", "ozet": asil, "kopya": kopya}) + "\n" +
-    json.dumps({"id": "s2", "at": "2026-11-04T16:00:00", "dosya": G_ + ".md", "baslik": "Gizli", "ozet": kopya, "kopya": kopya, "gizli": True}) + "\n")
-yol = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
+    json.dumps({"id": "s2", "at": "2026-11-04T16:00:00", "dosya": G_ + ".md", "baslik": "Gizli", "ozet": kopya, "kopya": kopya, "gizli": True}) + "\n" +
+    json.dumps({"id": "s3", "at": "2026-11-04T13:00:00", "dosya": B_ + ".md", "baslik": "İkinci toplantı", "ozet": asilB, "kopya": kopyaB}) + "\n")
+AYAR_PK = {"kayit_komutu": ["/usr/bin/python3", betik, "--yazan", "toplanti"], "kayit_alt_komutlar": ["karar", "olay", "uyu"], "kayit_bayraklar": ["--kim"], "kayit_sure_sn": 2}
+yol = os.path.join(T, "ayar.json"); json.dump({**AYAR_PK, "alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
     "claude": sahte, "konus_zaman_asimi_sn": 0, "konus_bekle_sn": 0, "konus_ara_sn": 0, "konus_on_ac": False, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(yol, "w"))
 P = None
 def db(sql): c = sqlite3.connect(os.path.join(d, "karar-grafi.sqlite")); r = c.execute(sql).fetchall(); c.close(); return r
@@ -87,6 +100,7 @@ try:
     kr = u.kartlar()
     if os.environ.get("HATA_AYIKLA"): print(k, "\n", log()[-3000:])
     ok("istemde kayıt kuralı ve kimlikli kayıt bloğu var; gizli toplantının kaydı blokta yok", "Kural geldi" in (k.get("cevap") or "") and "Blok geldi" in k.get("cevap", "") and "Gizli sızdı" not in k.get("cevap", ""))
+    ok("proje kayıt betiği ayarlı: kuralda izinli alt komutlar ve bayraklar", "Proje kuralı" in (k.get("cevap") or ""))
     ok("öneri panoda tek onay kartı açtı (metinde neden ve ne yazılacağı); etiket cevapta görünmez", len(kr) == 1 and "Kayda yazayım mı?" in kr[0]["text"] and "Kullanıcı istedi" in kr[0]["text"] and "Bütçe onaylandı" in kr[0]["text"]
        and "[KAYIT" not in k.get("cevap", "") and "Onayını bekliyor: 1" in k.get("cevap", ""))
     ok("onaydan önce yazılmadı", "teyit bekliyor" in db("SELECT metin FROM kayit WHERE id = 1")[0][0])
@@ -138,6 +152,86 @@ try:
     g = u.post("/girdi", {"text": "gizlide kayıt " + E("karar_duzelt", id="k2", metin="x")})
     ok("gizli kipte kutu yazısı reddedilir (asistana gitmez)", g.get("gizli") is True)
     u.post("/komut", {"tur": "gizli"})
+    # 8) asıl özet izinli özet klasöründe → Brifing.app kayıt kipiyle o da düzelir; projenin kayıt betiği kabuksuz çalışır
+    time.sleep(0.5); u.post("/girdi", {"text": "ikinci özette tarihi düzelt " + E("ozet_duzelt", ozet=B_, eski="12 Kasım", yeni="14 Kasım")}); u.bekle("tarihi düzelt"); kr = u.kartlar()
+    if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"})
+    k = u.cevap_bekle("Yazıldı", 30)
+    ok("Onayla → kopya ve izinli klasördeki asıl dosya (Brifing.app kayıt kipi) düzeldi; iş/sonuç dosyası kalmadı", len(kr) == 1 and "14 Kasım" in open(kopyaB, encoding="utf-8").read()
+       and "14 Kasım" in open(asilB, encoding="utf-8").read() and "asıl dosya da" in (k.get("cevap") or "") and not [f for f in os.listdir(d) if f.startswith("kayit-") and f.endswith(".json")])
+    META = "Bütçe; rm -rf ~ $(whoami) `id` | cat > /tmp/x && echo 'a\"b'"
+    time.sleep(0.5); u.post("/girdi", {"text": "projeye karar kaydı " + E("proje_kayit", alt="karar", argumanlar=[META, "--kim", "Ali"])}); u.bekle("projeye karar"); kr = u.kartlar()
+    ok("proje kaydı kartı (alt komut ve argüman görünür); onaydan önce betik çalışmadı", len(kr) == 1 and "proje kaydı: karar" in kr[0]["text"] and not iz())
+    if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"})
+    k = u.cevap_bekle("Yazıldı", 30)
+    ok("Onayla → betik önek + alt komut + argümanlarla kabuksuz çalıştı (metakarakterler ve Türkçe harfler olduğu gibi, NFD değil), çıktısı cevapta",
+       iz() == [["--yazan", "toplanti", "karar", META, "--kim", "Ali"]] and "karar #7 yazıldı" in (k.get("cevap") or ""))
+    time.sleep(0.5); u.post("/girdi", {"text": "kötü proje kayıtları " + " ".join([E("proje_kayit", alt="bolum", argumanlar=["x"]), E("proje_kayit", alt="karar", argumanlar=["x", "--dosya", "/etc/passwd"]),
+                                                                              E("proje_kayit", alt="karar", argumanlar="tek metin"), E("proje_kayit", alt="karar", argumanlar=["x"], kabuk="evet")])})
+    k = u.bekle("kötü proje")
+    ok("izin listesi dışı alt komut/bayrak, liste olmayan argüman, fazla anahtar: kart yok", not u.kartlar() and (k.get("cevap") or "").count("sunulmadı") == 4 and len(iz()) == 1)
+    time.sleep(0.5); u.post("/girdi", {"text": "yavaş proje kaydı " + E("proje_kayit", alt="uyu", argumanlar=[])}); u.bekle("yavaş proje"); kr = u.kartlar()
+    t0 = time.time()
+    if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"})
+    k = u.cevap_bekle("Yazılamadı", 40)
+    ok("betik zaman aşımına düşünce durdurulur, cevapta «zaman aşımı»", "zaman aşımı" in (k.get("cevap") or "") and time.time() - t0 < 15)
+    # 9) yardımcının kendi sınırı (ikili doğrudan; aktarıcıya güvenmez)
+    BIN = os.path.join(app, "Contents/MacOS/SuflorBrifing"); ANAHTAR = open(os.path.join(d, "kart-anahtari.txt")).read().strip(); n_ = [0]
+    def ayar_yaz(**ek):
+        n_[0] += 1; y = os.path.join(T, f"ayar-{n_[0]}.json"); a = json.load(open(yol)); a.update(ek); [a.pop(x) for x in [k for k, v in a.items() if v is None]]; json.dump(a, open(y, "w")); return y
+    def is_calistir(komut, arg, ayar=yol, son=None, anahtar=None, klasor=d, mod=0o600, govde_ek=None, yeniden=None):
+        nonce = os.urandom(16).hex(); g = dict({"v": 1, "komut": komut, "arg": arg, "son": int(time.time()) + 60 if son is None else son, "nonce": nonce, "ayar": ayar}, **(govde_ek or {}))
+        gm = json.dumps(g, ensure_ascii=False); y = os.path.join(klasor, f"kayit-{nonce}.json")
+        json.dump({"govde": gm, "imza": hmac.new((anahtar or ANAHTAR).encode(), gm.encode(), hashlib.sha256).hexdigest()}, open(y, "w")); os.chmod(y, mod)
+        kopya_ = open(y).read()
+        rc = subprocess.run([BIN, "--kayit", y], capture_output=True, timeout=60).returncode; kaldi = os.path.exists(y)
+        sy = os.path.join(klasor, f"kayit-{nonce}.sonuc.json"); so = json.load(open(sy)) if os.path.exists(sy) else None
+        if so: os.remove(sy)
+        if yeniden:  # aynı iş dosyası yeniden konursa
+            open(y, "w").write(kopya_); os.chmod(y, 0o600); rc2 = subprocess.run([BIN, "--kayit", y], capture_output=True, timeout=30).returncode
+            return rc, so, kaldi, rc2, os.path.exists(sy)
+        return rc, so, kaldi
+    open(asilB, "w", encoding="utf-8").write("Tutar 10 TL. Tutar 10 TL.\nSahip Deniz.\n"); ilk = open(asilB, encoding="utf-8").read()
+    rc, so, kaldi = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Deniz", "yeni": "Sahip Ali"}, anahtar="yanlis-anahtar-0123456789")
+    ok("imzası bozuk iş reddedilir (çıkış 3, sonuç yok) ve iş dosyası yine silinir", rc == 3 and so is None and not kaldi and open(asilB, encoding="utf-8").read() == ilk)
+    rc, so, _ = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Deniz", "yeni": "Sahip Ali"}, son=int(time.time()) - 5)
+    rc2, so2, _ = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Deniz", "yeni": "Sahip Ali"}, son=int(time.time()) + 3600)
+    ok("süresi geçmiş ya da çok uzun süreli iş reddedilir", rc == 3 and rc2 == 3 and so is None and so2 is None and open(asilB, encoding="utf-8").read() == ilk)
+    rc, so, _ = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Deniz", "yeni": "Sahip Ali"}, mod=0o644)
+    dis = tempfile.mkdtemp(prefix="yazma-dis-"); shutil.copy(os.path.join(d, "kart-anahtari.txt"), dis)
+    rc2, so2, _ = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Deniz", "yeni": "Sahip Ali"}, klasor=dis); shutil.rmtree(dis, ignore_errors=True)
+    ok("başkalarının okuyabildiği (0644) ya da uygulama klasörü dışındaki iş dosyası reddedilir", rc == 3 and rc2 == 3 and open(asilB, encoding="utf-8").read() == ilk)
+    r1 = is_calistir("ozet_duzelt_asil", {"yol": asil, "eski": "120 bin TL", "yeni": "1 TL"})
+    r2 = is_calistir("ozet_duzelt_asil", {"yol": os.path.join(gor, "..", "..", "baska", "deneme-ozeti.md"), "eski": "120 bin TL", "yeni": "1 TL"})
+    os.symlink(asil, os.path.join(gor, "bag.md")); r3 = is_calistir("ozet_duzelt_asil", {"yol": os.path.join(gor, "bag.md"), "eski": "120 bin TL", "yeni": "1 TL"})
+    open(os.path.join(gor, ".gizli.md"), "w").write("120 bin TL"); r4 = is_calistir("ozet_duzelt_asil", {"yol": os.path.join(gor, ".gizli.md"), "eski": "120 bin TL", "yeni": "1 TL"})
+    open(os.path.join(gor, "x.txt"), "w").write("120 bin TL"); r5 = is_calistir("ozet_duzelt_asil", {"yol": os.path.join(gor, "x.txt"), "eski": "120 bin TL", "yeni": "1 TL"})
+    ok("izinli özet klasörü dışı yol (doğrudan, ../ kaçışı, sembolik bağ), gizli ad, .md/.json dışı uzantı reddedilir",
+       all(r[0] == 3 and r[1] and not r[1]["ok"] for r in (r1, r2, r3, r4, r5)) and "120 bin TL" in open(asil, encoding="utf-8").read() and open(os.path.join(gor, "x.txt")).read() == "120 bin TL")
+    r0 = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Tutar 9 TL", "yeni": "x"}); r2_ = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Tutar 10 TL", "yeni": "x"})
+    ok("eski metin 0 ya da 2 kez geçerse yazılmaz", not r0[1]["ok"] and "yok" in r0[1]["hata"] and not r2_[1]["ok"] and "birden çok" in r2_[1]["hata"] and open(asilB, encoding="utf-8").read() == ilk)
+    rc, so, kaldi, rc2, s2 = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Deniz", "yeni": "Sahip Ali"}, yeniden=True)
+    ok("geçerli iş bir kez çalışır: asıl dosya düzeldi, aynı iş dosyası yeniden konunca reddedilir", rc == 0 and so["ok"] and "Sahip Ali" in open(asilB, encoding="utf-8").read() and not kaldi and rc2 == 3 and not s2)
+    n0 = len(iz())
+    ra = is_calistir("proje_kayit", {"alt": "karar", "argumanlar": ["x"]}, ayar=ayar_yaz(kayit_komutu=None))
+    rb = is_calistir("proje_kayit", {"alt": "karar", "argumanlar": ["x"]}, ayar=ayar_yaz(kayit_alt_komutlar=None))
+    ok("proje_kayit ayar yokken kapalı", ra[0] == 3 and rb[0] == 3 and "ayarlı değil" in ra[1]["hata"] and len(iz()) == n0)
+    rc_ = [is_calistir("proje_kayit", a_)[0] for a_ in ({"alt": "bolum", "argumanlar": []}, {"alt": "karar", "argumanlar": ["--dosya", "x"]}, {"alt": "karar", "argumanlar": ["-"]},
+                                                        {"alt": "karar", "argumanlar": [1]}, {"alt": "karar", "argumanlar": ["x"], "ek": "y"}, {"alt": "karar", "argumanlar": ["x"] * 21})]
+    ok("yardımcı da izin listesi dışı alt komutu, bayrağı, «-» girdisini, metin olmayan/fazla argümanı reddeder; betik çalışmadı", rc_ == [3] * 6 and len(iz()) == n0)
+    sahte_py = os.path.join(T, "bin", "python3"); os.symlink("/bin/rm", sahte_py) if not os.path.exists(sahte_py) else None
+    rr = [is_calistir("proje_kayit", {"alt": "karar", "argumanlar": ["x"]}, ayar=ayar_yaz(kayit_komutu=kk))[0] for kk in
+          (["/bin/rm", betik], [sahte_py, betik], ["/usr/bin/python3", asil], ["/usr/bin/python3", os.path.join(proje, "..", "baska", "x.py")], ["/usr/bin/python3", "-c", "print(1)"])]
+    ok("yorumlayıcı python3 değilse (bağla gizlense de), betik proje dışında ya da .py değilse reddedilir; betik silinmedi", rr == [3] * 5 and os.path.exists(betik) and len(iz()) == n0)
+    rc, so, _ = is_calistir("proje_kayit", {"alt": "olay", "argumanlar": ["a b", "$HOME", "x;y"]})
+    ok("kurgu betik argümanları kabuksuz ve önekle alır", rc == 0 and so["ok"] and so["kod"] == 0 and iz()[-1] == ["--yazan", "toplanti", "olay", "a b", "$HOME", "x;y"] and "karar #7" in so["cikti"])
+    t0 = time.time(); rc, so, _ = is_calistir("proje_kayit", {"alt": "uyu", "argumanlar": []})
+    ok("zaman aşımı (kayit_sure_sn 2): süreç durdurulur, çıkış 5", rc == 5 and so and not so["ok"] and "zaman aşımı" in so["hata"] and time.time() - t0 < 10)
+    rc, so, _ = is_calistir("dosya_sil", {"yol": asilB}); rc2, _, _ = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Ali", "yeni": "x"}, govde_ek={"fazla": 1})
+    ok("bilinmeyen komut ve gövdede fazla alan reddedilir", rc == 3 and rc2 == 3 and os.path.exists(asilB))
+    import re as _re, threading as _th, datetime as _dt
+    ns = {"AYAR": {}, "_t": lambda a, b: a, "re": _re, "os": os, "json": json, "time": time, "datetime": _dt, "threading": _th, "BASE": d, "LOCK": _th.Lock()}
+    exec(open(os.path.join(KOD, "aktarici", "notlar.py"), encoding="utf-8").read(), ns)
+    ok("aktarıcıda ayar yokken proje_kayit ne kuralda ne izin listesinde", "proje_kayit" not in ns["kayit_kural"]() and ns["kayit_dogrula"]("proje_kayit", {"alt": "karar", "argumanlar": []})[0] is None)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     if P: P.terminate(); P.wait()

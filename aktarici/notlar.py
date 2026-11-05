@@ -94,11 +94,15 @@ def kutu_yedek(hata=None):  # asistan çalışamadı (_konus_kur durum=hata): be
 # Kutudan ya da Konuş'tan konuşulan asistan salt okunurdur (Read/Grep/Glob; Bash yok) ve öyle kalır. Kayıt işi istendiğinde cevabın sonuna yapılandırılmış etiket koyar:
 #   [KAYIT: {"komut": "<izinli komut>", "arg": {…}, "neden": "<kısa Türkçe cümle>"}]
 # Aktarıcı etiketi yalnız asistanın KENDİ cevabından ayıklar (döküm, web, dosya içeriği buraya gelmez), komutu ve argümanları aşağıdaki izin listesinden doğrular,
-# sonra panoda onay kartı açar (izin.py izin_iste, tür "kayit"; sesli soru yok: tek tık). Onaylanınca işi aktarıcı kendisi yapar (kabuk yok, alt süreç yok: yapi.py
+# sonra panoda onay kartı açar (izin.py izin_iste, tür "kayit"; sesli soru yok: tek tık). Onaylanınca işi aktarıcı kendisi yapar (kabuk yok; Masaüstü'ne dokunan iş aşağıdaki Brifing.app kayıt kipiyle: yapi.py
 # işlevleri ve özet kopyasında tam metin değişimi); sonuç cevabın altına "Yazıldı: …" / "Yazılmadı: …" olarak düşer, bir sonraki turda asistana da bildirilir.
 # Sınırlar: gizli kip açıkken ve gizli toplantının kaydında yazılmaz; turda en çok KAYIT_TUR_EN_COK öneri; aynı öneri KAYIT_TEKRAR_SN içinde yeniden sorulmaz;
 # yalnız kullanıcının kendi turu (bas-konuş, panoya yazılan; toplantıda herkese okunan cevap ve karşı tarafın sorusu değil). Silme, ağ, komut, dışarıya gönderim yok.
-# Aktarıcı launchd'den çalıştığı için Masaüstü'ndeki asıl özet dosyasına çoğu kurulumda erişemez: özet düzeltmesi panodaki kopyaya yazılır, asıl dosyaya yazılabildiyse o da.
+# Aktarıcı launchd'den çalıştığı için Masaüstü'ne erişemez: Masaüstü'ne dokunan kısmı (asıl özet dosyası, projenin kendi kayıt betiği) Masaüstü izni olan
+# "Suflor Brifing.app --kayit <iş dosyası>" yapar (brifing.swift kayıt kipi): iş canlı klasörde tek kullanımlık, kart-anahtari.txt ile HMAC imzalı, 2 dk geçerli;
+# yardımcı komutu kendi izin listesinden ve kullanıcının ayar dosyasından yeniden doğrular. Yardımcı kurulu değilse aktarıcı asıl dosyayı kendisi dener.
+# Proje kayıt betiği (proje_kayit): ayar kayit_komutu = [python3, <proje>/…/betik.py, sabit önek…], kayit_alt_komutlar = [izinli alt komutlar], isteğe bağlı
+# kayit_bayraklar = [izinli "--bayrak"lar], kayit_sure_sn. Ayar yoksa komut izin listesinde de asistanın kuralında da yoktur. ⚙ Ayarlar'da gösterilmez (elle ayar dosyası).
 KAYIT_ETIKET_BAS = re.compile(r"\[\s*KAYIT\s*:", re.I)  # sesli okuma da bu noktada durur (bas-konus.py)
 KAYIT_TUR_EN_COK, KAYIT_TEKRAR_SN = 5, 1800
 KAYIT_SORULAN = {}  # öneri imzası → zaman (aynı öneri yeniden sorulmaz)
@@ -110,6 +114,7 @@ _KAYIT_TARIH = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 KAYIT_KOMUTLAR = {  # komut → (zorunlu, isteğe bağlı) argümanlar; hepsi metin
     "karar_onayla": (("id",), ()), "karar_duzelt": (("id", "metin"), ()), "is_durum": (("id", "durum"), ()),
     "is_ekle": (("metin",), ("kim", "tarih", "toplanti")), "soru_kapat": (("id",), ()), "ozet_duzelt": (("ozet", "eski", "yeni"), ())}
+_KAYIT_ALT_RX, _KAYIT_BAYRAK_RX = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,40}$"), re.compile(r"^--?[A-Za-z0-9][A-Za-z0-9_-]{0,40}$")
 KAYIT_KURAL = {"tr": ("[Kayıt yazma] Kullanıcı kayıtlarda bir değişiklik isterse (kararı onaylamak ya da düzeltmek, işi yapıldı/yapılmadı işaretlemek, iş eklemek, açık soruyu kapatmak, "
                       "toplantı özetinde yanlış bir ifadeyi düzeltmek) yazamazsın ama önerebilirsin: cevabın sonuna her değişiklik için ayrı satırda tam şu biçimde etiket koy: "
                       "[KAYIT: {\"komut\": \"…\", \"arg\": {…}, \"neden\": \"kısa Türkçe cümle\"}]. Komutlar: karar_onayla {id: k…} · karar_duzelt {id: k…, metin: yeni karar metni} · "
@@ -123,6 +128,24 @@ KAYIT_KURAL = {"tr": ("[Kayıt yazma] Kullanıcı kayıtlarda bir değişiklik i
                      "soru_kapat {id: q…} · ozet_duzelt {ozet: meeting name from the summary list, eski: exact text in the summary, yeni: the correct text}. Use ids only from the [Kayıtlar] block; "
                      "if it isn't there, don't invent one — ask. The user approves each write with one click on the panel: don't say «done», say «sent for your approval». "
                      "The tag isn't shown. No deleting files, email or other systems.")}
+
+def proje_kayit_ayar():  # → {"komut", "alt", "bayrak"} ya da None (ayar yoksa proje_kayit hiç yok)
+    k, alt = AYAR.get("kayit_komutu"), AYAR.get("kayit_alt_komutlar")
+    if not (isinstance(k, list) and len(k) >= 2 and all(isinstance(x, str) and x and "\0" not in x for x in k)): return None
+    if not (isinstance(alt, list) and alt and all(isinstance(x, str) and _KAYIT_ALT_RX.match(x) for x in alt)): return None
+    bay = [x for x in (AYAR.get("kayit_bayraklar") or []) if isinstance(x, str) and _KAYIT_BAYRAK_RX.match(x)]
+    return {"komut": k, "alt": list(alt), "bayrak": bay}
+
+def kayit_kural():  # asistanın kayıt kuralı; proje kayıt betiği ayarlıysa izinli alt komutlarıyla
+    m = _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]); pk = proje_kayit_ayar()
+    if not pk: return m
+    betik = os.path.expanduser(pk["komut"][1]); bay = ", ".join(pk["bayrak"]) or _t("yok", "none")
+    return m + _t(f" Projenin kendi kayıt aracı da var ({betik}): proje_kayit {{alt: {' | '.join(pk['alt'])}, argumanlar: [metin, …]}}. Yalnız bu alt komutlar; «-» ile başlayan argüman "
+                  f"yalnız şu bayraklar: {bay}. Kullanımı bilmiyorsan önce betiğin kaynağını Read ile oku; argümanları betiğe olduğu gibi (kabuksuz) gider. Aynı kayıt hem "
+                  f"Suflor'a hem projeye gerekiyorsa ikisini ayrı öner.",
+                  f" The project's own records tool is also available ({betik}): proje_kayit {{alt: {' | '.join(pk['alt'])}, argumanlar: [text, …]}}. Only these subcommands; "
+                  f"arguments starting with «-» only these flags: {bay}. If unsure of usage, Read the script's source first; arguments go to the script as-is (no shell). "
+                  f"If a record is needed both in Suflor and in the project, propose them separately.")
 
 def kayit_turu_mu(tur):  # yalnız kullanıcının kendi turu: bas-konuş ya da panoya yazılan (toplantıda herkese okunan cevap, karşı tarafın sorusu, özet, üçlü değil)
     return isinstance(tur, dict) and tur.get("kaynak") in ("bas", "yazili") and not tur.get("otonom") and not tur.get("karsi")
@@ -190,6 +213,7 @@ def _kayit_ozet_bul(y, ad):  # özet listesindeki toplantı adı → (kayıt, ko
 
 def kayit_dogrula(komut, arg):  # → (hazır iş sözlüğü, None) ya da (None, hata metni). Uygulamadan hemen önce de yeniden çağrılır.
     if "gizli_acik" in globals() and gizli_acik(): return None, _t("gizli kip açık", "private mode is on")
+    if komut == "proje_kayit": return _proje_kayit_dogrula(arg)
     if komut not in KAYIT_KOMUTLAR: return None, _t(f"izinli olmayan komut ({str(komut)[:40]})", f"command not allowed ({str(komut)[:40]})")
     if not isinstance(arg, dict): return None, _t("argümanlar sözlük değil", "arguments aren't an object")
     zor, ist = KAYIT_KOMUTLAR[komut]
@@ -245,6 +269,56 @@ def kayit_dogrula(komut, arg):  # → (hazır iş sözlüğü, None) ya da (None
     return {"komut": komut, "kopya": r[1], "asil": str(r[0].get("ozet") or ""), "eski": eski, "yeni": yeni,
             "ozet": _t(f"«{kisa(r[0].get('baslik'), 50)}» özetinde «{kisa(eski, 60)}» → «{kisa(yeni, 60)}»", f"in summary «{kisa(r[0].get('baslik'), 50)}»: «{kisa(eski, 60)}» → «{kisa(yeni, 60)}»")}, None
 
+def _proje_kayit_dogrula(arg):  # Brifing.app aynısını kendi tarafında yeniden doğrular (ayar dosyasından)
+    pk = proje_kayit_ayar()
+    if not pk: return None, _t("izinli olmayan komut (proje_kayit)", "command not allowed (proje_kayit)")
+    if not isinstance(arg, dict) or set(arg) != {"alt", "argumanlar"}: return None, _t("argümanlar uymuyor", "arguments don't match")
+    alt, ar = arg["alt"], arg["argumanlar"]
+    if not isinstance(alt, str) or alt not in pk["alt"]: return None, _t(f"alt komut izinli değil ({str(alt)[:40]})", f"subcommand not allowed ({str(alt)[:40]})")
+    if not isinstance(ar, list) or len(ar) > 20 or any(not isinstance(x, str) or len(x) > 2000 or "\0" in x for x in ar): return None, _t("argümanlar metin listesi değil", "arguments aren't a list of text")
+    kotu = [x for x in ar if x.startswith("-") and x not in pk["bayrak"]]
+    if kotu: return None, _t(f"izinli olmayan bayrak ({kotu[0][:40]})", f"flag not allowed ({kotu[0][:40]})")
+    goster = " ".join(x if x and re.match(r"^[\w.,:/@%+=-]+$", x) else "«" + " ".join(x.split())[:80] + "»" for x in ar)
+    return {"komut": "proje_kayit", "alt": alt, "argumanlar": list(ar), "ozet": _t(f"proje kaydı: {alt} {goster}", f"project record: {alt} {goster}")[:400]}, None
+
+def kayit_oz_klasorler():  # asıl özetin yazılabileceği klasörler (Brifing.app kayıt kipi aynısını ayardan kurar): <calisma|proje>/gorusmeler, <kod>/testler
+    k = []
+    c = AYAR.get("calisma") or AYAR.get("proje")
+    if c: k.append(os.path.realpath(os.path.join(os.path.expanduser(str(c)), "gorusmeler")))
+    if AYAR.get("kod"): k.append(os.path.realpath(os.path.join(os.path.expanduser(str(AYAR["kod"])), "testler")))
+    return k
+
+def kayit_brifing_yolu():  # Brifing.app kayıt kipini çağırır: argümanlar listesi (testler ikiliyi doğrudan çalıştırmak için değiştirebilir)
+    app = globals().get("BRIFING_APP")
+    return ["open", "-g", "-W", "-n", "-a", app, "--args"] if app and os.path.isdir(app) else None
+
+def kayit_brifing(komut, arg):  # → (True, sonuç sözlüğü) ya da (False, neden). İş dosyası tek kullanımlık, imzalı; sonuç dosyası okununca silinir.
+    on = kayit_brifing_yolu()
+    if not on: return False, _t("Brifing yardımcısı kurulu değil", "briefing helper not installed")
+    try: anahtar = open(os.path.join(BASE, "kart-anahtari.txt"), encoding="utf-8").read().strip()
+    except OSError: return False, _t("yerel anahtar yok", "local key missing")
+    import hmac, hashlib, secrets as _sec
+    nonce = _sec.token_hex(16); yol = os.path.join(BASE, f"kayit-{nonce}.json"); sonuc = os.path.join(BASE, f"kayit-{nonce}.sonuc.json")
+    g = {"v": 1, "komut": komut, "arg": arg, "son": int(time.time()) + 120, "nonce": nonce}
+    if os.environ.get("SUFLOR_AYAR"): g["ayar"] = os.environ["SUFLOR_AYAR"]  # deneme aktarıcısı (yalnız deneme derlemesi kabul eder)
+    govde = json.dumps(g, ensure_ascii=False)
+    sure = min(max(float(AYAR.get("kayit_sure_sn") or 30), 1), 120) + 30
+    try:
+        fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"govde": govde, "imza": hmac.new(anahtar.encode(), govde.encode(), hashlib.sha256).hexdigest()}, f, ensure_ascii=False)
+        subprocess.run(on + ["--kayit", yol], capture_output=True, timeout=sure)
+        try:
+            with open(sonuc, encoding="utf-8") as f: r = json.load(f)
+        except (OSError, ValueError): return False, _t("yardımcı sonuç vermedi (reddetti ya da açılamadı)", "the helper returned no result (rejected or couldn't start)")
+        return (True, r) if isinstance(r, dict) else (False, _t("sonuç okunamadı", "result unreadable"))
+    except (OSError, subprocess.TimeoutExpired) as e: return False, e.__class__.__name__
+    finally:
+        for y in (yol, sonuc):
+            try: os.remove(y)
+            except OSError: pass
+
+def _kayit_tek_satir(s, n=300): return " ".join(str(s or "").split())[:n]
+
 def _kayit_degistir(yol, eski, yeni):  # tam bir eşleşmeyi değiştirir (geçici dosya + yer değiştirme; izinler korunur) → True/False
     with open(yol, encoding="utf-8") as f: m = f.read()
     if m.count(eski) != 1: return False
@@ -266,12 +340,22 @@ def kayit_uygula(is_):  # onaylanmış işi yapar (önce yeniden doğrular) → 
             try:
                 with c: ok_ = c.execute("UPDATE kayit SET durum = 'cevaplandi' WHERE id = ? AND tur = 'soru' AND durum = 'acik'", (int(h["id"][1:]),)).rowcount == 1
             finally: c.close()
-        else:  # ozet_duzelt: panodaki kopya; asıl dosya izinli özet klasöründeyse ve aktarıcı erişebiliyorsa o da
+        elif k == "proje_kayit":  # projenin kendi kayıt betiği: Brifing.app kayıt kipi (Masaüstü izni orada; kabuksuz, zaman aşımlı)
+            b, r = kayit_brifing("proje_kayit", {"alt": h["alt"], "argumanlar": h["argumanlar"]})
+            if not b: return False, r
+            cik = _kayit_tek_satir(r.get("cikti"))
+            if not r.get("ok"): return False, (str(r.get("hata") or _t("betik hata verdi", "the script failed")) + (f" — {cik}" if cik else ""))[:400]
+            ok_ = True; h["ozet"] += f" — {cik}" if cik else ""
+        else:  # ozet_duzelt: panodaki kopya; asıl dosya izinli özet klasöründeyse Brifing.app kayıt kipiyle (yoksa aktarıcı kendisi dener)
             ok_ = _kayit_degistir(h["kopya"], h["eski"], h["yeni"]); asil = os.path.realpath(os.path.expanduser(h["asil"])) if h["asil"] else ""
-            kl = _topo_oz_klasorler() if "_topo_oz_klasorler" in globals() else []
-            if ok_ and asil and asil != h["kopya"] and asil.endswith(".md") and any(asil.startswith(d + os.sep) for d in kl):
-                try: h["ozet"] += "" if _kayit_degistir(asil, h["eski"], h["yeni"]) else _t(" (asıl dosyada metin bulunamadı, yalnız panodaki kopya)", " (text not found in the original, panel copy only)")
-                except OSError: h["ozet"] += _t(" (asıl dosyaya aktarıcı erişemiyor, yalnız panodaki kopya)", " (the relay can't reach the original file, panel copy only)")
+            kl = kayit_oz_klasorler()
+            if ok_ and asil and asil != h["kopya"] and asil.endswith((".md", ".json")) and any(asil.startswith(d + os.sep) for d in kl):
+                b, r = kayit_brifing("ozet_duzelt_asil", {"yol": asil, "eski": h["eski"], "yeni": h["yeni"]}) if kayit_brifing_yolu() else (None, None)
+                if b and r.get("ok"): h["ozet"] += _t(" (asıl dosya da)", " (original file too)")
+                elif b is None:
+                    try: h["ozet"] += _t(" (asıl dosya da)", " (original file too)") if _kayit_degistir(asil, h["eski"], h["yeni"]) else _t(" (asıl dosyada metin bulunamadı, yalnız panodaki kopya)", " (text not found in the original, panel copy only)")
+                    except OSError: h["ozet"] += _t(" (asıl dosyaya aktarıcı erişemiyor, yalnız panodaki kopya)", " (the relay can't reach the original file, panel copy only)")
+                else: h["ozet"] += _t(" (asıl dosyaya yazılamadı: ", " (original file not written: ") + _kayit_tek_satir(r.get("hata") if b else r, 120) + _t("; yalnız panodaki kopya)", "; panel copy only)")
             elif ok_ and asil and asil != h["kopya"]: h["ozet"] += _t(" (yalnız panodaki kopya)", " (panel copy only)")
     except Exception as ex: print(f"KAYIT: {k} uygulanamadı ({ex.__class__.__name__}: {ex})"); return False, ex.__class__.__name__
     return (True, h["ozet"]) if ok_ else (False, _t("kayıt değişmedi", "record unchanged"))
