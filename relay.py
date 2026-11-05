@@ -1395,7 +1395,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1598,6 +1598,7 @@ AYAR_PANO = {
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
     "web_arastirma": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
+    "ekran_paylasimda_goster": ("bool", False, None),  # 5 Kasım: açıkken Suflor pencereleri ekran paylaşımında/görüntüsünde görünür (demo); menu-cubugu.swift paylasimTuru
     "konus_web": ("bool", False, None),  # 5 Kasım: Konuş'ta web araştırması (bas-konus.py konus_web_acik; kurulu Brifing yardımcısı web araçlarını tanıyana kadar etkisiz)
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
@@ -2219,6 +2220,9 @@ class H(BaseHTTPRequestHandler):
         if yol == "/toplanti-oturum":  # v0.111.0: arka plandaki toplantı oturumunun iletileri (?n=<son görülen>)
             m = re.search(r"[?&]n=([0-9]{1,9})(?:&|$)", self.path); return self._json(toplanti_oturum_mesajlar(int(m.group(1)) if m else 0))
         if self.path == "/geri-bildirim/onizle": return self._json(teshis_gonder("geri_bildirim", {"kullanici_metni": "(yazdığın metin)"}, onizle=True))
+        if yol == "/kisi":  # S225: Mac Kişiler'den yalnız okuma (aktarici/talimat.py kisi_bul); ?ad=<ad>; Konuş MCP aracı ve `toplanti-claude.py kisi` çağırır
+            import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
+            return self._json(kisi_bul(ad) if "kisi_bul" in globals() else {"durum": "hata", "hata": "kisi_bul yok"})
         if yol == "/taslak": return self._json({"taslak": taslak_view(STATE.get("meeting"), tstt=("pano=1" in self.path))})  # izle (SORU/ÖZET bağlamı) tstt taslağını görmez; pano ?pano=1 ile alır
         if self.path.split("?")[0] == "/takvim":  # ?tam=1 davet notları ve tüm katılımcılarla (toplanti-claude.py takvim)
             # eklentinin arka planı (Teams açık olmasa da) ?v=<sürüm> ile yoklar. Chrome bu istekte Origin göndermeyebilir;

@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 461312,
-   "sha": "b335aeda8e9a6e2e"
+   "uzunluk": 465037,
+   "sha": "205febbdf80b7559"
   },
   "/mini": {
-   "uzunluk": 461312,
-   "sha": "b335aeda8e9a6e2e"
+   "uzunluk": 465037,
+   "sha": "205febbdf80b7559"
   },
   "/status": {
    "_ping_son": "float",
@@ -293,6 +293,7 @@
      "dil": "str",
      "dis_defter": [],
      "ekran_oto": "bool",
+     "ekran_paylasimda_goster": "bool",
      "eposta": "str",
      "eposta_adres": "str",
      "eposta_oku": "bool",
@@ -357,6 +358,7 @@
      "ceviri": "bool",
      "ceviri_kis": "bool",
      "ekran_oto": "bool",
+     "ekran_paylasimda_goster": "bool",
      "eposta": "str",
      "eposta_adres": "str",
      "eposta_oku": "bool",

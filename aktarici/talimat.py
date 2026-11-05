@@ -147,6 +147,30 @@ if "EYLEM_TUR" in globals(): EYLEM_TUR["toplanti"] = "Toplantı"
 TOPLANTI_DK = 30
 _EPOSTA_RX = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 def _ad_anahtari(a): return " ".join(re.sub(r"[^\w\s]", " ", str(a or "").replace("İ", "i").replace("I", "ı").lower()).split())
+# S225 (5 Kasım): Mac Kişiler'den yalnız okuma. Takvim geçmişinde adresi bulunamayan davetli için Suflor Takvim.app `--kisi <ad>` (en çok 5 eşleşme: ad, kurum, e-posta, telefon, adres).
+# Kişi bilgisi Claude'a gidebilir (S222); beta paketine girmez (teshis.py'ye alan eklenmez). Ayar kisiler_arama: false kapatır. Deneme kipinde (SUFLOR_TEST_BASLAT) yalnız SUFLOR_TEST_KISI ile çalışır.
+_KISI_ONBELLEK = {}; KISI_ONBELLEK_SN = 600
+def kisi_bul(ad):  # → {"durum": "ok", "kisiler": [{"ad","kurum","eposta":[],"telefon":[],"adres":[]}]} ya da {"durum": "izin_yok"|"hata"|…, "hata": metin}
+    ad = " ".join(re.sub(r"[\x00-\x1f]", " ", str(ad or "")).split())[:80]
+    if len(ad) < 2: return {"durum": "hata", "hata": _t("ad çok kısa", "name too short")}
+    if AYAR.get("kisiler_arama") is False: return {"durum": "kapali", "hata": _t("Kişiler araması kapalı (ayar kisiler_arama)", "Contacts lookup is off (setting kisiler_arama)")}
+    if os.environ.get("SUFLOR_TEST_BASLAT") and not os.environ.get("SUFLOR_TEST_KISI"): return {"durum": "hata", "hata": "deneme kipi"}
+    k = _ad_anahtari(ad); h = _KISI_ONBELLEK.get(k)
+    if h and time.time() - h[0] < KISI_ONBELLEK_SN: return h[1]
+    o = _takvim_yardimci(["--kisi", ad])
+    if o.get("durum") == "ok":
+        o = {"durum": "ok", "kisiler": [{"ad": str(c.get("ad") or ""), "kurum": str(c.get("kurum") or ""), "eposta": [str(x) for x in c.get("eposta") or [] if "@" in str(x)][:5],
+                                         "telefon": [str(x) for x in c.get("telefon") or []][:5], "adres": [str(x) for x in c.get("adres") or []][:3]}
+                                        for c in (o.get("kisiler") or [])[:5] if isinstance(c, dict)]}
+        _KISI_ONBELLEK[k] = (time.time(), o)
+    else: o = {"durum": str(o.get("durum") or "hata"), "hata": str(o.get("hata") or "")[:200]}
+    return o
+def kisi_eposta(ad):  # davet için tek bir adres: tek kişi eşleşirse onun ilk e-postası; birden çok kişi ya da adres yoksa None (kullanıcı sayfada elle yazar)
+    o = kisi_bul(ad)
+    if o.get("durum") != "ok": return None
+    ad_k = [c for c in o.get("kisiler") or [] if c.get("eposta")]
+    if len(ad_k) != 1: return None
+    return ad_k[0]["eposta"][0].lower()
 def toplanti_davetli(adlar):  # ["Deniz", "<e-posta>"] → [{"ad", "eposta"|None}]; ad son 30 günün takvim olaylarındaki eşle (tam ad ya da ilk ad tek eşleşirse)
     es = {}
     for e in (globals().get("TAKVIM_TAM") or {}).values():
@@ -162,7 +186,9 @@ def toplanti_davetli(adlar):  # ["Deniz", "<e-posta>"] → [{"ad", "eposta"|None
         if not bul:  # ilk ad (ya da adın başı) tek kişiye gidiyorsa
             adaylar = {ep for k, v in es.items() if (k.split() or [""])[0] == a or k.startswith(a + " ") for ep in v}
             bul = adaylar if len(adaylar) == 1 else set()
-        out.append({"ad": ad, "eposta": next(iter(bul)) if len(bul) == 1 else None})
+        ep = next(iter(bul)) if len(bul) == 1 else None
+        if not ep and not bul: ep = kisi_eposta(ad)  # S225: takvim geçmişinde yoksa Mac Kişiler'e bak (çoklu takvim eşleşmesi belirsizdir, Kişiler'e sorulmaz)
+        out.append({"ad": ad, "eposta": ep})
     return out[:20]
 def toplanti_ayir(ileti):  # "<başlık> | 2026-10-28T12:00 | 30 | Deniz, Ali" → {"baslik", "zaman", "dk", "davetli": [...]}; saat yoksa zaman None
     p = [x.strip() for x in str(ileti or "").split("|")]; baslik = p[0]; zaman = None; dk = TOPLANTI_DK; adlar = []

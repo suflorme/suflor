@@ -171,7 +171,8 @@ if j["kip"] as? String == "toplanti" {
 }
 // izin listesi: değersiz bayraklar, değerli bayraklar (değer denetimiyle); -p'den hemen sonraki tek metin istemdir, başka konumsal argüman yok
 let tekBayrak: Set<String> = ["-p", "--print", "--verbose", "--include-partial-messages", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"]
-let araclar: Set<String> = ["Read", "Grep", "Glob"]
+// WebSearch/WebFetch (5 Kasım, S208): yalnız Python tarafı ayar konus_web açıkken ve gizli olmayan toplantıda ister (bas-konus.py konus_web_acik); bu liste yalnız yardımcının reddetmemesi içindir. bas-konus.py KONUS_WEB_RX bu satırı arar.
+let araclar: Set<String> = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
 // Dış bilgi kaynağı araçları (Konuş, 1 Kasım): mcp__<sunucu>__<okuma önekli desen>; sunucu adında "__" yok, desen yalnız [A-Za-z0-9_*], okuma öneki
 // (get|list|query|compare|search|fetch|read|describe|lookup|find)_ ile başlar ve "_" parçalarında yazma sözcüğü yok. Python'daki beyin.py BILGI_YAZMA ile AYNI küme:
 // ikisini birlikte değiştir (test/bilgi-kaynagi.py eşitliği denetler). mcp__suflorvt__ eskisi gibi.

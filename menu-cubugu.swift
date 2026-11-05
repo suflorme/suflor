@@ -22,6 +22,13 @@ import UserNotifications
 setvbuf(stdout, nil, _IOLBF, 0)  // günlük dosyasına satır satır (open --stdout)
 let hamArg = CommandLine.arguments
 let ELLE = !hamArg.dropFirst().contains { $0.hasPrefix("--") }  // kullanıcı açtı (aktarıcı her zaman --port verir)
+// 5 Kasım (kullanıcı): ayar `ekran_paylasimda_goster: true` iken Suflor pencereleri (pano, mini panel, kartlar) ekran paylaşımında ve
+// ekran görüntüsünde görünür (tanıtım/demo için); varsayılan kapalı = gizli. Açık pencerelere 2 sn'de bir uygulanır.
+func paylasimTuru() -> NSWindow.SharingType {
+    let yol = NSHomeDirectory() + "/Library/Application Support/Suflor/ayar.json"
+    let ay = FileManager.default.contents(atPath: yol).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+    return (ay["ekran_paylasimda_goster"] as? Bool) == true ? .readOnly : .none
+}
 let args: [String] = ELLE ? [hamArg[0]] + {
     let dz = NSHomeDirectory() + "/Library/Application Support/Suflor/"
     if let d = FileManager.default.contents(atPath: dz + "menu-argumanlar.json"), let a = try? JSONSerialization.jsonObject(with: d) as? [String], a.contains("--port") { return a }
@@ -100,6 +107,9 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var sonPanoAc = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?; var sonDurum: [String: Any]?
     var kartKatmani: KartKatmani?  // v0.159.0: kart katmanı (mini panonun yerine); 30 Ekim v2: önemli kart + bilgi akışı + yan şerit
     func applicationDidFinishLaunching(_ n: Notification) {
+        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in  // ekran_paylasimda_goster değişince açık pencerelere uygula
+            let t = paylasimTuru(); for w in NSApp.windows where w.sharingType != t { w.sharingType = t }
+        }
         oge = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         oge.button?.image = isaret(.bekliyor); oge.button?.toolTip = "Suflor.me"
         oge.button?.target = self; oge.button?.action = #selector(tiklandi(_:)); oge.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -133,7 +143,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func panelKur() {
         panel = Panel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 500), styleMask: [.nonactivatingPanel, .borderless, .resizable], backing: .buffered, defer: true)
         panel.isFloatingPanel = true; panel.level = .statusBar; panel.hidesOnDeactivate = false; panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.sharingType = .none  // ekran paylaşımında görünmesin (kartlar karşı tarafa gitmesin)
+        panel.sharingType = paylasimTuru()  // ekran paylaşımında görünmesin (ayarla açılabilir) (kartlar karşı tarafa gitmesin)
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true; panel.isMovableByWindowBackground = true
         let ve = NSVisualEffectView(frame: panel.contentView!.bounds); ve.autoresizingMask = [.width, .height]
         ve.material = .popover; ve.blendingMode = .behindWindow; ve.state = .active; ve.wantsLayer = true; ve.layer?.cornerRadius = 12; ve.layer?.masksToBounds = true
@@ -697,7 +707,7 @@ final class KartKatmani {
     func yeniPanel(golge: Bool = true) -> KartPanel {
         let p = KartPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 60), styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
         p.isFloatingPanel = true; p.level = .statusBar; p.hidesOnDeactivate = false; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        p.sharingType = paylasim  // ekran paylaşımında görünmesin (kartlar karşı tarafa gitmesin)
+        p.sharingType = paylasim == .none ? paylasimTuru() : paylasim  // ekran paylaşımında görünmesin (kartlar karşı tarafa gitmesin)
         p.isOpaque = false; p.backgroundColor = .clear; p.hasShadow = golge; p.becomesKeyOnlyIfNeeded = true; p.isReleasedWhenClosed = false
         return p
     }
@@ -1555,7 +1565,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         self.mini = mini
         pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         pencere.title = "Suflor.me"; pencere.minSize = NSSize(width: 480, height: 360); pencere.isReleasedWhenClosed = false
-        pencere.sharingType = .none  // mini panel gibi: ekran paylaşımında görünmez (kartlar karşı tarafa gitmesin)
+        pencere.sharingType = paylasimTuru()  // mini panel gibi: ekran paylaşımında görünmez (kartlar karşı tarafa gitmesin)
         pencere.tabbingMode = .disallowed
         let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
         c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac');const s=document.createElement('style');s.textContent='\(MAC_STIL)';document.documentElement.appendChild(s)", injectionTime: .atDocumentStart, forMainFrameOnly: true))

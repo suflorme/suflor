@@ -64,7 +64,7 @@ _AY_TR = ("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağ
 # Kayıt veritabanı (v0.54.1; ayar veritabani.yol): güncel bilgi sorusunda ("şu anda en fazla admin yetkisi kimde?") Konuş tahmin etmez, yalnız okunur sorgu yapar.
 # Araçlar MCP sunucusu olarak (toplanti-claude.py vt-mcp; --mcp-config canli/konus-mcp.json): Brifing yardımcısı komut aracı (Bash) açan argümanı reddeder
 # (v0.54.0 bu yüzden Konuş'u hiç açtırmadı). Sorgu kuralları ve gizli sütun maskesi toplanti-claude.py'de; araçlar yalnız vt_sema ve vt_sor.
-VT_MCP_ARACLAR = "mcp__suflorvt__vt_sema,mcp__suflorvt__vt_sor"
+VT_MCP_ARACLAR = "mcp__suflorvt__vt_sema,mcp__suflorvt__vt_sor,mcp__suflorvt__kisi_bul"  # S225: + kisi_bul (Mac Kişiler, yalnız okuma)
 def _vt_sema_uret():  # tablo yapısı metni ("" = yok ya da yardımcının yasak sözcüğü var → araçla bakılır)
     try:
         r = subprocess.run(["/usr/bin/python3", "-B", os.path.join(os.path.dirname(os.path.abspath(__file__)), "toplanti-claude.py"), "--dir", BASE, "vt-sema"],
@@ -311,6 +311,8 @@ def konus_istem(vt=None, bilgi=None, web=False):
         kur = "\n".join(f"- {str(x)[:300]}" for x in (kur if isinstance(kur, list) else [kur] if kur else [])[:12])
         if kur and any(y in kur for y in BRIFING_YASAK): print("KONUŞ: veritabani.kurallar'da yardımcının yasak sözcüğü var — isteme konmadı"); kur = ""
         if kur: t += _t("\n[Sayım tanımları — aynı soruya hep bu ölçütle bak]\n", "\n[Counting definitions — always use these criteria]\n") + kur + "\n[/tanımlar]\n"
+        t += _t("Bir kişinin e-posta adresi, telefonu ya da posta adresi sorulursa kisi_bul aracıyla Mac Kişiler'e bak (yalnız okuma, adı olduğu gibi ver); bulamazsan uydurma, bulamadığını söyle.\n",
+                "If asked for a person's email, phone or postal address, look it up in Mac Contacts with the kisi_bul tool (read-only, pass the name as given); if not found, don't invent it, say so.\n")  # S225
     # v0.54.3: tablo yapısı istemdeyken vt_sema turu atlanır (16 Ekim ölçümü: istemde yapı varken de önce vt_sema çağrıldı, +1 tur); aynı soruya aynı ölçüt
     # (admin sorusu iki denemede farklı sayım verdi: biri ham tabloyu, biri görünümü kullandı)
     if vt: t += _t(" Güncel durum sorusunda (kişiler, yetkiler, hesaplar, sistemler, sayılar; 'şu anda', 'en fazla', 'kimde') tahmin etme: "

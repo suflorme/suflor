@@ -3,6 +3,7 @@
 // takvim veritabanı. Aktarıcı 5 dk'da bir `open -g -W -a "Suflor Takvim.app" --args --cikti <yol>` ile çalıştırır.
 // Takvim izni macOS'ta uygulamaya verilir: ilk çalıştırmada "Suflor Takvim takvimlerine erişmek istiyor" sorulur.
 // Kurulum: aktarici-kur.command derler (swiftc) ve uygulama klasörüne koyar.
+import Contacts
 import EventKit
 import Foundation
 
@@ -12,6 +13,7 @@ var adaylar = false  // --adaylar: olay yerine kullanıcının olası takvim adr
 var ayrinti = false  // --ayrinti: her olaya katılımcı adresleri ve "current user" işareti (teşhis; aktarıcı kullanmaz)
 var etkinlik: String? = nil  // v0.132.0: --etkinlik <istek.json> {"baslik", "zaman": "YYYY-MM-DDTHH:MM" (yerel), "dk", "not", "takvim"} → takvime hatırlatma etkinliği
 var etkinlikSil: String? = nil  // --etkinlik-sil <kimlik>: Suflor'un eklediği etkinliği siler
+var kisiAd: String? = nil  // S225 (5 Kasım): --kisi <ad> → Mac Kişiler'de ada göre arama (yalnız okuma; en çok 5 eşleşme: ad, kurum, e-postalar, telefonlar, posta adresi)
 var takvimler = false  // --takvimler: yazılabilir takvimler (ayar hatirlatma_takvim seçimi için)
 var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
 var goster = Set<String>()  // v0.167.0: --goster "<takvim adı> · <hesap>" (yinelenir): bu takvimlerde süzgeçten geçmeyen etkinlikler de "paylasilan": true ile yazılır (aktarıcı yalnız panoda gösterir; ayar takvim_paylasilan)
@@ -26,6 +28,7 @@ while i < a.count {
   else if a[i] == "--etkinlik", i + 1 < a.count { etkinlik = a[i + 1]; i += 1 }
   else if a[i] == "--etkinlik-sil", i + 1 < a.count { etkinlikSil = a[i + 1]; i += 1 }
   else if a[i] == "--takvimler" { takvimler = true }
+  else if a[i] == "--kisi", i + 1 < a.count { kisiAd = a[i + 1]; i += 1 }
   else if a[i] == "--goster", i + 1 < a.count { goster.insert(a[i + 1].trimmingCharacters(in: .whitespaces)); i += 1 }
   else if a[i] == "--adres", i + 1 < a.count {
     adresler = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }); i += 1
@@ -207,6 +210,45 @@ func etkinlikIs(_ izin: Bool, _ hata: Error?) {
   if let n = j["not"] as? String, !n.isEmpty { e.notes = String(n.prefix(2000)) }
   do { try store.save(e, span: .thisEvent, commit: true); yaz(["durum": "ok", "id": e.eventIdentifier ?? "", "takvim": tk.title, "hesap": tk.source.title]) }
   catch { yaz(["durum": "hata", "hata": error.localizedDescription]) }
+}
+// --kisi <ad> (S225): Mac Kişiler'den yalnız okuma. Çıktı {"durum": "ok", "kisiler": [{"ad","kurum","eposta":[],"telefon":[],"adres":[]}]} ya da
+// {"durum": "izin_yok"|"hata", "hata": "<açık metin>"}. Takvim izni istenmez; Kişiler izni bu uygulamaya verilir (NSContactsUsageDescription).
+func kisiFold(_ s: String) -> String { s.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: Locale(identifier: "tr_TR")).replacingOccurrences(of: "ı", with: "i") }
+func kisiAra(_ ad: String) {
+  let anahtar: [CNKeyDescriptor] = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactPostalAddressesKey].map { $0 as CNKeyDescriptor }
+  let kt = CNContactStore()
+  var bul: [CNContact] = []
+  do {
+    bul = try kt.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: ad), keysToFetch: anahtar)
+    if bul.isEmpty {  // Türkçe harf/büyük-küçük farkında sistem eşleşmesi kaçırırsa: tüm kişilerde katlanmış ad karşılaştırması (ilk ad, soyad ya da tam ad)
+      let n = kisiFold(ad).split(separator: " ").map(String.init)
+      try kt.enumerateContacts(with: CNContactFetchRequest(keysToFetch: anahtar)) { c, dur in
+        let tam = kisiFold(c.givenName + " " + c.familyName)
+        if !n.isEmpty, n.allSatisfy({ tam.contains($0) }) { bul.append(c); if bul.count >= 5 { dur.pointee = true } }
+      }
+    }
+  } catch { yaz(["durum": "hata", "hata": error.localizedDescription]); return }
+  let cikis: [[String: Any]] = bul.prefix(5).map { c in
+    let adres = c.postalAddresses.map { CNPostalAddressFormatter.string(from: $0.value, style: .mailingAddress).replacingOccurrences(of: "\n", with: ", ") }
+    return ["ad": (c.givenName + " " + c.familyName).trimmingCharacters(in: .whitespaces), "kurum": c.organizationName,
+            "eposta": c.emailAddresses.map { String($0.value) }, "telefon": c.phoneNumbers.map { $0.value.stringValue }, "adres": adres]
+  }
+  yaz(["durum": "ok", "kisiler": cikis])
+}
+if let ad = kisiAd {
+  let a = ad.trimmingCharacters(in: .whitespacesAndNewlines)
+  if a.isEmpty || a.count > 80 { yaz(["durum": "hata", "hata": "ad boş ya da çok uzun"]); exit(0) }
+  switch CNContactStore.authorizationStatus(for: .contacts) {
+  case .authorized: kisiAra(a)
+  case .notDetermined:
+    CNContactStore().requestAccess(for: .contacts) { izin, hata in
+      if izin { kisiAra(a) } else { yaz(["durum": "izin_yok", "hata": hata?.localizedDescription ?? "Kişiler izni verilmedi: Sistem Ayarları → Gizlilik ve Güvenlik → Kişiler → Suflor Takvim"]) }
+      bitti.signal()
+    }
+    if bitti.wait(timeout: .now() + 120) == .timedOut { yaz(["durum": "zaman_asimi", "hata": "Kişiler izni penceresi yanıtlanmadı"]) }
+  default: yaz(["durum": "izin_yok", "hata": "Kişiler izni yok: Sistem Ayarları → Gizlilik ve Güvenlik → Kişiler → Suflor Takvim'i aç"])
+  }
+  exit(0)
 }
 if etkinlik != nil || etkinlikSil != nil || takvimler {
   if #available(macOS 14.0, *) { store.requestFullAccessToEvents { izin, hata in etkinlikIs(izin, hata) } }

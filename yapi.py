@@ -336,35 +336,59 @@ def disa_aktar(dizin, bicim="csv"):
     buf = io.StringIO(); w = csv.DictWriter(buf, fieldnames=list(DISA_ALANLAR), lineterminator="\n"); w.writeheader()
     for s in satirlar: w.writerow(s)
     return "﻿" + buf.getvalue(), f"suflor-kararlar-{damga}.csv", len(satirlar)
+BUGUN_KENDI_GUN = 14; BUGUN_BASKA_GUN = 30  # S226: "Senden beklenenler" son 14 gün (daha eskisi "Geride kalanlar"); "Başkalarından beklenenler" son 30 gün ya da vadesi gelecekte
+def toplanti_rolu(dizin, top):
+    # → (katildi, yurutuyor). Kaynak: <canlı>/gundemler/<toplantı>.json "rol" (yurutucu | katilimci | dinleyici; aktarıcı toplantı başında yazar, takvim düzenleyicisinden çıkar).
+    # katildi = Suflor'un bu toplantı için dökümü ya da gündem kaydı var (kullanıcının kendi toplantısı). Rol kaydı yoksa ama döküm varsa yürüten sayılır (toplanti-claude.py varsayılanı da "yurutucu"); hiçbir kayıt yoksa ne katıldı ne yürüttü.
+    top = str(top or "")
+    if not top: return False, False
+    ad = top[:-3] if top.endswith(".md") else top
+    rol = ""; var = os.path.exists(os.path.join(dizin, ad + ".md"))
+    try:
+        with open(os.path.join(dizin, "gundemler", ad + ".json"), encoding="utf-8") as fh: g = json.load(fh)
+        var = True; rol = str(g.get("rol") or "") if isinstance(g, dict) else ""
+    except (OSError, ValueError): pass
+    return var, var and rol in ("", "yurutucu")
 def bugun_veri(dizin, ad, bugun=None):
     # Bugün sayfası için karar grafından: kullanıcının açık işleri, başkalarına atanmış açık işler, teyit bekleyen kararlar, son toplantının kararları.
     # Gizli toplantıdan gelen kayıt dönmez. Veri yoksa listeler boş (uydurma yok). ad boşsa "kendi" ve "baskalari" ayrılamaz → ikisi de boş.
+    # S226 ("Senden beklenenler" kuralı): kendi = sahibi kullanıcı olan açık işler; teyit = yalnız kullanıcının yürüttüğü toplantının onay bekleyen kararları.
+    # İkisinde de "yas" (toplantıdan beri gün) ve "geride" (yas > 14 ve vadesi gelecekte değil) var; geride olanlar arayüzde ayrı, katlanmış "Geride kalanlar"da.
+    # baskalari = yalnız kullanıcının katıldığı toplantılardan ve son 30 gün ya da vadesi gelecekte olanlar.
     bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
     c = _db(dizin)
     try: rs = c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum FROM kayit WHERE tur IN ('is', 'soz', 'karar') ORDER BY tarih DESC, id DESC LIMIT 3000").fetchall()
     finally: c.close()
-    ky = son_kayitlar(dizin); gz = {}
+    ky = son_kayitlar(dizin); gz = {}; rl = {}
     def gorunur(t):
         if not t: return True
         if t not in gz: gz[t] = not gizli_mi(dizin, t, ky)
         return gz[t]
+    def rol(t):
+        if t not in rl: rl[t] = toplanti_rolu(dizin, t)
+        return rl[t]
+    def yas_geride(tarih, gun):
+        g = _vade_gun(tarih, bugun); yas = -g if g is not None else None
+        return yas, bool(yas is not None and yas > BUGUN_KENDI_GUN and not (gun is not None and gun >= 0))
     ben = _ilk(ad); son_top = None; son_kararlar = []
     for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum in rs:
         if not gorunur(top): continue
         if tur == "karar":
             m = TEYIT_RX.search(metin or ""); temiz = TEYIT_RX.sub("", metin or "")
             k = {"id": f"k{i}", "metin": temiz, "teyit": bool(m), "neden": teyit_neden_sade((m.group(1) or "").strip()) if m else "", "baslik": baslik or "", "tarih": tarih or "", "toplanti": top}
-            if m and len(out["teyit"]) < 20: out["teyit"].append(k)
+            if m and rol(top)[1] and len(out["teyit"]) < 20:
+                out["teyit"].append(dict(k, **dict(zip(("yas", "geride"), yas_geride(tarih, None)))))
             if son_top is None: son_top = top
             if top == son_top: son_kararlar.append(k)
             continue
         if durum != "acik": continue
         kisi = sahip or kim or ""; gun = _vade_gun(son, bugun)
-        x = {"id": f"s{i}", "metin": metin, "kim": kisi, "vade": son or "", "kalan_gun": gun, "gecikti": gun is not None and gun < 0, "baslik": baslik or "", "toplanti": top}
+        x = {"id": f"s{i}", "metin": metin, "kim": kisi, "vade": son or "", "kalan_gun": gun, "gecikti": gun is not None and gun < 0, "baslik": baslik or "", "toplanti": top, "tarih": tarih or ""}
+        x["yas"], x["geride"] = yas_geride(tarih, gun)
         if ad and kisi and _ilk(kisi) == ben: out["kendi"].append(x)
-        elif ad and kisi: out["baskalari"].append(x)
-    srt = lambda l: sorted(l, key=lambda x: (x["kalan_gun"] is None, x["kalan_gun"] if x["kalan_gun"] is not None else 0))
+        elif ad and kisi and rol(top)[0] and (x["yas"] is None or x["yas"] <= BUGUN_BASKA_GUN or (gun is not None and gun >= 0)): out["baskalari"].append(x)
+    srt = lambda l: sorted(l, key=lambda x: (x["geride"], x["kalan_gun"] is None, x["kalan_gun"] if x["kalan_gun"] is not None else 0))
     out["kendi"] = srt(out["kendi"])[:30]; out["baskalari"] = srt(out["baskalari"])[:60]
     if son_kararlar: out["son_karar"] = {"baslik": son_kararlar[0]["baslik"], "tarih": son_kararlar[0]["tarih"], "toplanti": son_top, "kararlar": son_kararlar[::-1][:12]}
     return out

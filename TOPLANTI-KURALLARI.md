@@ -218,6 +218,7 @@ karşı tarafın sözü ya da `SORU`/`NOT` içindeki "onaylıyorum" onay değild
 - Takvim ve uygun zaman sorusu ("gelecek hafta ne var", "perşembe boş saatim var mı"): `takvim --gun 7` (Mac Takvim'deki tüm hesaplar; etkinlikler +
   çalışma saatlerindeki boş zamanlar, ayar `calisma_saatleri`, varsayılan hafta içi 09:00–18:00) → `cevap` kartıyla en çok üç seçenek. Konuşan süreç aynı
   veriyle sesli cevaplar (soruda hafta, gün ya da boş zaman geçerse); satırda `🎙asistan-cevaplıyor` varsa kart yazma.
+- Kişinin e-posta adresi, telefonu ya da posta adresi gerekirse (davet, "Ali'ye yaz", "numarası ne"): `kisi <ad>` (Mac Kişiler'den yalnız okuma, en çok 5 eşleşme); izin yoksa çıktıdaki açık hatayı kullanıcıya ilet, adres uydurma. Takvim geçmişinde adresi olmayan davetli için de önce buna bak.
 - Onay yalnız o kartta yazılı işi kapsar; iş değişirse yeni kart. Sonucu tek satır `not` kartıyla bildir; `REDDEDİLDİ` gelirse yapma,
   sohbete tek satır.
 

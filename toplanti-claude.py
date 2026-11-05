@@ -161,6 +161,8 @@ sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
 tk.add_argument("--id", default=None); tk.add_argument("--n", type=int, default=6)
 tk.add_argument("--gun", type=int, default=1, help="v0.55.0: kaç gün (v0.59.0: en çok 30); 1'den büyükse çalışma saatlerindeki boş zamanlar da (uygun zaman önerisi)")
+kp = sub.add_parser("kisi", help="S225: Mac Kişiler'de ada göre ara (yalnız okuma; e-posta, telefon, adres; en çok 5 eşleşme) — davet adresi, 'X'in numarası' soruları")
+kp.add_argument("ad", nargs="+")
 rp = sub.add_parser("rapor", help="v0.9.9: geliştiriciye geri bildirim — içeriksiz paket (sürüm, ölçüm, kart dönüşleri, günlük, gözlemler) → <ortak>/geri-bildirim")
 rp.add_argument("dosya", nargs="?", help="toplantı .md (yoksa en yenisi)"); rp.add_argument("--not", dest="notlar", default="", help="sorunlar, öneriler (Claude'un ve kullanıcının gözlemleri; toplantı içeriği yazma)")
 rp.add_argument("--github", action="store_true", help="ayrıca GitHub'da konu (issue) aç (gh oturumu gerekir)"); rp.add_argument("--goster", action="store_true", help="kaydetmeden yazdır")
@@ -817,7 +819,9 @@ def vt_sor_cmd():
 VT_ARACLAR = [{"name": "vt_sema", "description": "Kayıt veritabanının tabloları, sütunları ve satır sayıları. [gizli] sütunlar maskelidir.",
                "inputSchema": {"type": "object", "properties": {}}},
               {"name": "vt_sor", "description": "Kayıt veritabanında tek bir SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; gizli sütunlar *** döner).",
-               "inputSchema": {"type": "object", "properties": {"sorgu": {"type": "string", "description": "SQLite SELECT sorgusu"}}, "required": ["sorgu"]}}]
+               "inputSchema": {"type": "object", "properties": {"sorgu": {"type": "string", "description": "SQLite SELECT sorgusu"}}, "required": ["sorgu"]}},
+              {"name": "kisi_bul", "description": "Mac Kişiler'de ada göre arama (yalnız okuma): e-posta, telefon, posta adresi; en çok 5 eşleşme. Yalnız kullanıcı bir kişinin iletişim bilgisini isterse.",
+               "inputSchema": {"type": "object", "properties": {"ad": {"type": "string", "description": "kişinin adı (ya da ad soyad)"}}, "required": ["ad"]}}]
 VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Masaüstü'ndeki veritabanını okuyamaz; Konuş istemine tablo yapısı buradan girer
 # v0.57.8: sorgu sonucu önbelleği (canli/vt-sonuc.json, 0600) — aktarıcı veritabanını okuyamadığı için sonucu bu araç tutar. Her vt_sor sonucu sorgu metniyle yazılır;
 # açılışta ve veritabanı dosyası değişince (VT_DENETIM_SN'de bir bakılır) son sorgular yeniden çalıştırılır; "kontrol" alanı en son denetim anıdır.
@@ -1057,6 +1061,7 @@ def vt_mcp_cmd():
             p = m.get("params") or {}; ad = p.get("name"); ar = p.get("arguments") or {}
             try: metin, hata = (vt_sema_metin() if ad == "vt_sema" else vt_sor_metin(ar.get("sorgu")) if ad == "vt_sor" else None), False
             except VtHata as e: metin, hata = str(e), True
+            if ad == "kisi_bul": metin, hata = kisi_ara(ar.get("ad") or "")
             if ad == "vt_sor" and not hata:
                 with kilit: _vt_onbellek(A.dir, guncelle=(str(ar.get("sorgu") or "").strip().rstrip(";").strip(), metin))
             if metin is None: yaz({"jsonrpc": "2.0", "id": i, "error": {"code": -32602, "message": f"bilinmeyen araç {ad}"}}); continue
@@ -2751,6 +2756,15 @@ def saglik_cmd():  # toplantıdan önce tek bakış; ⚠ satırları kullanıcı
     sat(os.path.exists(os.path.join(APP, "dizin.sqlite")), "proje arama dizini", "ilk `ara` kendisi kurar")
     sat(os.path.exists(os.path.join(A.dir, "kart-anahtari.txt")), "kart anahtarı", "aktarıcıyı yeniden kur")
     print("SONUÇ: " + ("hazır" if not sorun else f"{sorun} eksik (⚠)"))
+def kisi_ara(ad):  # aktarıcı /kisi (Suflor Takvim.app --kisi); → metin
+    import urllib.parse
+    try: o = get("/kisi?ad=" + urllib.parse.quote(str(ad)[:80]))
+    except Exception as e: return f"kişi: aktarıcıya ulaşılamadı ({e.__class__.__name__})", True
+    if o.get("durum") != "ok": return f"kişi: {o.get('durum')} — {o.get('hata') or ''}".strip(" —"), True
+    if not o.get("kisiler"): return "Kişiler'de bu adla kayıt yok.", False
+    return "\n".join(f"- {c['ad']}" + (f" ({c['kurum']})" if c.get("kurum") else "") + (" · e-posta: " + ", ".join(c["eposta"]) if c.get("eposta") else "")
+                      + (" · telefon: " + ", ".join(c["telefon"]) if c.get("telefon") else "") + (" · adres: " + " | ".join(c["adres"]) if c.get("adres") else "") for c in o["kisiler"]), False
+def kisi_cmd(): print(kisi_ara(" ".join(A.ad))[0])
 def takvim_cmd():  # aktarıcının takvimi (Suflor Takvim yardımcısı, Takvim uygulamasındaki tüm hesaplar)
     gun = max(1, min(A.gun or 1, 30))
     try: t = get("/takvim?tam=1" + (f"&gun={gun}" if gun > 1 else ""))
@@ -2995,6 +3009,6 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "taahhut": taahhut_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
      "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass
