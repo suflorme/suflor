@@ -1616,7 +1616,7 @@ let prD={durum:'yok'},prBusy=false,prHata='',prKisi=[],prForm={konu:'',baglam:''
 let bnOlay=[],bnHazir=false,bnT=0,bnYuk=false,bnRef=null,bnGeri=null,bnBildT=null,bnDin=null
 const bnGizli=new Set()
 // Kararlar ve işler görünümü (5 Kasım): kenar çubuğundan tam sayfa liste (/kayitlar) — sekme karar/iş/açık soru, süzgeç kişi/toplantı/durum/arama; gündem taslağı (/gundem-taslagi) hazırlık kartında
-let bnGor='bugun',knV=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:''},knAraT=null,gtV={},gtYukSet=new Set()
+let bnGor='bugun',knV=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:''},knDen=false,knAraT=null,gtV={},gtYukSet=new Set()
 const bnTarih=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const bnDk=h=>{const [a,b]=String(h||'0:0').split(':').map(Number);return (a||0)*60+(b||0)}
 const bnIlk=a=>String(a||'').trim().split(/\s+/)[0]
@@ -1651,7 +1651,7 @@ const izGun=n=>n==null?'':`<span class=vade>${esc(L('{n} gün',{n}))}</span>`
 const izNedenler=x=>x.neden||x.metin||x.kod||''
 function izBolum(){const z=izV;if(!z||!z.acik)return'';const ad=esc(z.ad||'')
   if(z.durum==='bicim')return`<section class="bolum iz"><p class="giris kucuk">${ad}: ${L('biçim tanınmadı')}</p></section>`
-  if(!z.uretim&&!z.kimde)return`<section class="bolum iz"><p class="giris kucuk">${ad}: ${L('veri dosyası okunamadı')}</p></section>`
+  if(!z.uretim&&!z.kimde)return`<section class="bolum iz"><p class="giris kucuk">${L('Monitör verisi henüz yok')}</p></section>`  // dosya yok ya da okunamıyor, son geçerli veri de yok
   const eski=z.eski?` <span class=vade>${esc(L('veri eski ({n} saat)',{n:z.eski_saat}))}</span>`:'',bz=z.durum==='bozuk'?` <span class=vade>${esc(L('dosya okunamadı, son geçerli veri'))}</span>`:''
   const sp=(z.yeni_sapmalar||[]).slice(0,5),kd=(z.kimde||[]).filter(k=>k.acik||k.onay).slice(0,5),sh=z.sahipsiz||{},nb=z.nabiz||[]
   const alt=t=>`<p class="giris kucuk">${esc(t)}</p>`
@@ -1804,8 +1804,8 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
   function bugunIc(){return`<div class=selam><h1><span>${esc(selam+(ad?' '+ad:''))}</span><span class="varlikisaret${dinliyor?' dinliyor':''}${dusunuyor?' dusunuyor':''}" id=bnIsaret><span class=nefes aria-hidden=true></span><span class=dalga aria-hidden=true><i></i><i></i><i></i><i></i></span>${dusunuyor?`<span class=dusunce>${L('düşünüyor…')}</span>`:''}</span></h1><div class=satir2>${esc(tarih)}</div></div>
       <section class="durum${dinliyor?' dinliyor':''}"><p>${bnDurum(s,ol,now,sira,kala,hdS,bek,son)}</p>${ses&&dtgt?`<button type=button class=dinle data-bn=dinle data-id="${esc(dtgt.id)}">${ic('hoparlor')}<span>${dinliyor?L('Durdur'):L('Dinle')}</span><span class=mono>${sure}</span></button>`:''}${serit}</section>
       ${odakOnce?bnOdakOnce(sira,s,hdS,kala):''}${taze?bnSonKart(son,true):''}${sirayaGore()}`}}
-async function knYukle(zorla){if(knYuk||(!zorla&&Date.now()-knT<30000))return;knYuk=true;knT=Date.now()
-  try{const v=await j('/kayitlar');if(v&&v.ok&&JSON.stringify(v)!==JSON.stringify(knV)){knV=v;if(last)bnCiz(last)}}catch(e){}knYuk=false}
+async function knYukle(zorla){if(knYuk||(!zorla&&Date.now()-knT<30000))return;knYuk=true;knT=Date.now();const den=knDen  // S236: deneme (Test) toplantı kayıtları varsayılan gelmez; anahtar açıkken ?deneme=1
+  try{const v=await j('/kayitlar'+(den?'?deneme=1':''));if(den!==knDen){knYuk=false;return knYukle(true)}if(v&&v.ok&&JSON.stringify(v)!==JSON.stringify(knV)){knV=v;if(last)bnCiz(last)}}catch(e){}knYuk=false}
 const knTop=d=>((knV||{}).toplantilar||[]).find(t=>t.dosya===d)
 function knSuzgec(x){const s=knSuz,d=s.durum
   if(s.kisi&&x.kim!==s.kisi)return false;if(s.toplanti&&x.toplanti!==s.toplanti)return false
@@ -1829,7 +1829,7 @@ function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[]
   const bos=!v?L('Yükleniyor…'):!hepsi.length?L('Henüz kayıt yok: toplantı bittiğinde kararlar ve işler buraya düşer.'):!liste.length?L('Süzgece uyan kayıt yok.'):'',suzlu=knSuz.kisi||knSuz.toplanti||knSuz.durum||knSuz.ara
   return`<div class=selam><h1><span>${L('Kararlar ve işler')}</span></h1><div class=satir2>${v?L('{k} karar · {i} iş · {s} açık soru',{k:say('karar'),i:say('is'),s:say('soru')}):''}</div></div>
     <section class=bolum><div class=sekmeler role=tablist>${sek}<div class=keylem><button type=button class="b sade" data-bn=disa data-bicim=csv>${ic('dosya')}${L('Dışa aktar')} CSV</button><button type=button class="b sade" data-bn=disa data-bicim=json>${ic('dosya')}JSON</button></div></div>
-    <div class=suzgec><input id=knAra type=search value="${esc(knSuz.ara)}" placeholder="${L('Ara')}" aria-label="${L('Ara')}"><select data-knf=kisi aria-label="${L('Kişi')}">${kisi}</select><select data-knf=toplanti aria-label="${L('Toplantı')}">${top}</select><select data-knf=durum aria-label="${L('Durum')}">${dur}</select>${suzlu?`<button type=button class="b sade" data-bn=knsifirla>${L('Süzgeci kaldır')}</button>`:''}</div>
+    <div class=suzgec><input id=knAra type=search value="${esc(knSuz.ara)}" placeholder="${L('Ara')}" aria-label="${L('Ara')}"><select data-knf=kisi aria-label="${L('Kişi')}">${kisi}</select><select data-knf=toplanti aria-label="${L('Toplantı')}">${top}</select><select data-knf=durum aria-label="${L('Durum')}">${dur}</select>${v&&(v.deneme_say||knDen)?`<label class=kndn><input type=checkbox data-kndn${knDen?' checked':''}> ${L('Deneme toplantıları')}${v.deneme_say?` (${v.deneme_say})`:''}</label>`:''}${suzlu?`<button type=button class="b sade" data-bn=knsifirla>${L('Süzgeci kaldır')}</button>`:''}</div>
     ${liste.length?`<div class=ince>${liste.map(knSatir).join('')}</div>`:''}${bos?`<p class=sakin>${esc(bos)}</p>`:''}${v?(v.dis||[]).filter(d=>!d.ok).map(d=>`<p class=sakin>${esc(d.ad)}: ${L('defter okunamadı')} — ${esc(d.hata||'')}</p>`).join(''):''}
     <p class="sakin kucuk">${L('Dış kayıttan gelenler etiketli ve yalnız okunur; gizli toplantıların kayıtları burada yok.')}</p></section>`}
 // Gündem taslağı: sıradaki toplantının katılımcılarıyla önceki toplantılardan açık kalan iş/karar/soru (/gundem-taslagi?olay=); kartta "Gündem taslağı: N madde", yan panelde liste, Kopyala, Başlat formunun gündem alanına
@@ -1927,7 +1927,7 @@ async function bnTik(ev){const b=ev.target.closest('[data-bn]');if(!b)return;con
     if(g==='bugun'){bnGor='bugun';if(last)bnCiz(last)}else if(g==='karar'){bnGor='kayit';knYukle();if(last)bnCiz(last)}
     else if(g==='toplanti')arsivAc(false);else if(g==='arsiv')arsivAc(true);else if(g==='hafta')hfAc(true);else if(g==='saat')stAc(true);else if(g==='gecmis')gecmisAc();else if(g==='prova')provaAc();else if(g==='ayar')ayarAc();else if(g==='elle')tkForm(null)
   }}
-document.getElementById('bgn').addEventListener('click',bnTik);document.getElementById('bgn').addEventListener('change',ev=>{const s=ev.target.closest('select[data-knf]');if(!s)return;knSuz[s.dataset.knf]=s.value;if(last)bnCiz(last)})
+document.getElementById('bgn').addEventListener('click',bnTik);document.getElementById('bgn').addEventListener('change',ev=>{if(ev.target.matches('input[data-kndn]')){knDen=ev.target.checked;knSuz.toplanti='';knSuz.kisi='';knV=null;if(last)bnCiz(last);knYukle(true);return}const s=ev.target.closest('select[data-knf]');if(!s)return;knSuz[s.dataset.knf]=s.value;if(last)bnCiz(last)})
 document.getElementById('bgn').addEventListener('input',ev=>{if(ev.target.id!=='knAra')return;knSuz.ara=ev.target.value;clearTimeout(knAraT);knAraT=setTimeout(()=>{if(last)bnCiz(last)},150)});document.getElementById('bgn').addEventListener('submit',ev=>{if(ev.target.id!=='bnPrF')return;ev.preventDefault();const k=document.getElementById('bnPrK');provaAc(k?k.value.trim():'');if(k)k.value=''});bnE('bnPanel').addEventListener('click',bnTik);bnE('bnPerde').addEventListener('click',bnPanelKapat)
 bnE('bnGeri').addEventListener('click',ev=>{ev.stopPropagation();if(bnGeri)bnGeri();bnGeri=null;bnE('bnBild').classList.remove('acik')})
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&bnRef)bnPanelKapat()})

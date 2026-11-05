@@ -18,7 +18,7 @@ try:
     bak("davet maddeleri: boş not → []", yapi.davet_maddeleri("") == [] and yapi.davet_maddeleri(None) == [])
     bak("kişi eşleme: e-posta kullanıcı adı, 'Soyad, Ad', yalnız ilk ad, bitişik ad", yapi.kisi_eslesir("Ayşe Yılmaz", "ayse.yilmaz"+AT+"firma.test") and yapi.kisi_eslesir("Ayşe Yılmaz", "Yılmaz, Ayşe")
         and yapi.kisi_eslesir("Ayşe", "Ayşe Kaya") and yapi.kisi_eslesir("David Mut", "davidmut"+AT+"x.test") and not yapi.kisi_eslesir("Can Örnek", "Ayşe Yılmaz") and not yapi.kisi_eslesir("", "Ayşe"))
-    bak("graf yokken boş liste", yapi.kayit_listesi(C, "Ayşe Deneme", bugun) == {"ad": "Ayşe Deneme", "kayitlar": [], "toplantilar": [], "kisiler": []})
+    bak("graf yokken boş liste", yapi.kayit_listesi(C, "Ayşe Deneme", bugun) == {"ad": "Ayşe Deneme", "kayitlar": [], "toplantilar": [], "kisiler": [], "deneme": False, "deneme_say": 0})
     BAS = "| Saat | Konuşmacı | Metin | İşaret |\n|---|---|---|---|\n"
     D1, D2, G = "2026-11-03-1000-Butce", "2026-10-28-1500-Proje", "2026-11-04-0900-Ozel"
     for d, s in ((D1, "| 10:00:00 | Ayşe Deneme | merhaba | |\n"), (D2, "| 15:00:00 | Ayşe Deneme | merhaba | |\n"), (G, "| 09:00:10 | **GİZLİ** | açıldı | |\n")):
@@ -33,6 +33,17 @@ try:
     hp = os.path.join(C, "ozetler", D1 + "-ozet-zihin-haritasi.html"); open(hp, "w").write("<!doctype html><title>d</title>")
     open(os.path.join(C, "son-toplantilar.jsonl"), "w", encoding="utf-8").write(json.dumps({"id": "son1", "dosya": D1 + ".md", "baslik": "Bütçe", "at": "2026-11-03T11:00:00+03:00", "ozet": hp, "harita": hp, "gorsel": "karar_is"}) + "\n")
     v = yapi.kayit_listesi(C, "Ayşe Deneme", bugun); d = {x["metin"]: x for x in v["kayitlar"]}
+    # S236: deneme (Test) toplantısı kayıtları varsayılan gizli; deneme=True ile gelir
+    DN = "2026-11-04-1000-Test-1"; open(os.path.join(C, DN + ".md"), "w", encoding="utf-8").write(f"# Canlı transkript — {DN}\n\n" + BAS + "| 10:00:00 | Ayşe Deneme | merhaba | |\n")
+    y(DN, "Test-1", "2026-11-04", [{"tur": "is", "metin": "Deneme işi", "sahip": "Deniz Test", "tarih": "2026-11-01"}, {"tur": "karar", "metin": "Deneme kararı", "netlik": "acik"}])
+    v0 = yapi.kayit_listesi(C, "Ayşe Deneme", bugun); v1 = yapi.kayit_listesi(C, "Ayşe Deneme", bugun, deneme=True)
+    bak("deneme toplantısı: varsayılanda kayıt, toplantı ve kişi yok; deneme_say 2", not any("Deneme işi" == x["metin"] or x["metin"] == "Deneme kararı" for x in v0["kayitlar"]) and all(t["dosya"] != DN + ".md" for t in v0["toplantilar"])
+        and "Deniz Test" not in v0["kisiler"] and v0["deneme_say"] == 2 and v0["deneme"] is False)
+    bak("deneme=True: kayıtlar satırda deneme işaretiyle gelir, diğerlerinde deneme false", {x["metin"] for x in v1["kayitlar"] if x["deneme"]} == {"Deneme işi", "Deneme kararı"} and len(v1["kayitlar"]) == len(v0["kayitlar"]) + 2 and any(t["dosya"] == DN + ".md" for t in v1["toplantilar"]))
+    bak("deneme tanımı: ad (deneme/test/echo/prova/trial) ya da kayıtta deneme: true", yapi.deneme_mi(C, "2026-11-03-1702-Test-1") and yapi.deneme_mi(C, "2026-10-13-2009-Suflorme-deneme-9.md") and not yapi.deneme_mi(C, D1) and not yapi.deneme_mi(C, "") and yapi.deneme_mi(C, D1, {D1 + ".md": {"deneme": True}}))
+    bv = yapi.bugun_veri(C, "Ayşe Deneme", bugun); bv1 = yapi.bugun_veri(C, "Ayşe Deneme", bugun, deneme=True)
+    bak("Bugün: deneme toplantısı işi ve kararı varsayılanda yok (son_karar yine Bütçe), deneme=True ile gelir", not any(x["metin"] == "Deneme işi" for x in bv["kendi"] + bv["baskalari"]) and bv["son_karar"] and bv["son_karar"]["baslik"] == "Bütçe"
+        and bv1["son_karar"] and bv1["son_karar"]["baslik"] == "Test-1")
     bak("gizli toplantıdan kayıt yok; 10 kayıt", not any("Gizli" in m for m in d) and len(v["kayitlar"]) == 10)
     bak("karar: teyit eki ayrılır → durum teyit + neden; onaylı karar kapandi", d["Tedarikçi Mart'ta"]["durum"] == "teyit" and d["Tedarikçi Mart'ta"]["neden"] == "kimse açıkça onaylamadı" and d["Bütçe 120 bin"]["durum"] == "kapandi")
     bak("iş: gecikme, tarihsiz, kendi; söz de iş sayılır", d["Tabloyu güncelle"]["gecikti"] and d["Tabloyu güncelle"]["kalan_gun"] == -3 and d["Sözleşmeyi oku"]["tarihsiz"] and d["Sözleşmeyi oku"]["kendi"]
@@ -79,7 +90,7 @@ try:
     json.dump({"title": "Haftalık durum paylaşımı", "items": ["Haftalık özet ve durum güncellemesi", "Duyurular"]}, open(os.path.join(C, "agenda.json"), "w"))
     r = subprocess.run([sys.executable, "-B", "toplanti-claude.py", "--dir", C, "--relay", U, "hazirlik", "--katilimci", "can.ornek"+AT+"firma.test, Deniz Yeni", "--kisi", "4"], cwd=KOD, capture_output=True, text=True, timeout=120,
                        env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json")))
-    bak("tc hazirlik --katilimci: '## Gündem taslağı (5 madde; eşleşen: Can Örnek)' ve satırlar", "## Gündem taslağı (5 madde; eşleşen: Can Örnek)" in r.stdout and "  - Tabloyu güncelle — Can, 3 gün gecikti · Bütçe" in r.stdout and "GÜÇLÜ" in r.stdout)
+    bak("tc hazirlik --katilimci: '## Gündem taslağı (5 madde; eşleşen: Can Örnek)' ve satırlar", "## Gündem taslağı (5 madde; eşleşen: Can Örnek)" in r.stdout and f"  - Tabloyu güncelle — Can, {(datetime.date.today() - datetime.date(2026, 11, 2)).days} gün gecikti · Bütçe" in r.stdout and "GÜÇLÜ" in r.stdout)
 finally:
     if rl: rl.terminate()
     shutil.rmtree(T, ignore_errors=True)

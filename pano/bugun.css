@@ -311,6 +311,8 @@ dialog#prd[open]{display:grid;gap:16px;align-content:start}
 #bgn .suzgec input,#bgn .suzgec select{font:inherit;font-size:var(--b-yz-k);color:var(--b-murekkep);background:var(--b-yuzey);border:1px solid var(--b-cizgi2);border-radius:var(--b-k-s);padding:6px 10px;min-width:0;max-width:100%}
 #bgn .suzgec input{flex:1 1 160px}
 #bgn .suzgec select{max-width:220px}
+#bgn .suzgec .kndn{display:inline-flex;align-items:center;gap:6px;font-size:var(--b-yz-k);color:var(--b-m3);white-space:nowrap}
+#bgn .suzgec .kndn input{flex:none;padding:0;min-width:0}
 #bgn .suzgec input::placeholder{color:var(--b-m3)}
 #bgn .suzgec :is(input,select):focus{outline:2px solid var(--b-vurgu);outline-offset:1px}
 #bgn .sat.kapali .t{color:var(--b-m2);text-decoration:line-through;text-decoration-color:var(--b-cizgi2)}

@@ -705,6 +705,13 @@ GIZLI_RX = re.compile(r"\|\s*\*\*GİZLİ\*\*\s*\|")
 TEYIT_RX = re.compile(r"\s*\(teyit bekliyor(?:\s*[—-]\s*(.*))?\)\s*$")  # graf_yaz ekler; içinde iç içe parantez olabilir
 ID_RX = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{4}-[^/\\]+$")
 _GIZLI = {}  # (dizin, id) → (mtime, boyut, gizli mi)
+DENEME_RX = re.compile(r"(?i)(?<![a-zçğıöşü])(deneme|test|echo|prova|trial)")  # toplanti-claude.py DENEME_RX kökü; sözcük başında (Latest/Contest deneme sayılmaz): tarih-saat önekinden sonraki ad
+def deneme_mi(dizin, i, kayitlar=None):  # S236: deneme (Test) toplantısı — dosya adında deneme/test/echo/prova/trial ya da son kayıtta deneme: true (aktarici/toplanti-sonrasi.py ile aynı işaret)
+    i = str(i or "")
+    if i.endswith(".md"): i = i[:-3]
+    if not i: return False
+    r = (kayitlar if kayitlar is not None else son_kayitlar(dizin)).get(i + ".md") or {}
+    return bool(r.get("deneme")) or bool(DENEME_RX.search(i[16:]))
 def son_kayitlar(dizin):  # son-toplantilar.jsonl: dosya adı → son kayıt
     o = {}
     try:
@@ -873,7 +880,7 @@ def toplanti_rolu(dizin, top):
         var = True; rol = str(g.get("rol") or "") if isinstance(g, dict) else ""
     except (OSError, ValueError): pass
     return var, var and rol in ("", "yurutucu")
-def bugun_veri(dizin, ad, bugun=None):
+def bugun_veri(dizin, ad, bugun=None, deneme=False):  # deneme=False: deneme (Test) toplantılarının kayıtları dönmez (S236)
     # Bugün sayfası için karar grafından: kullanıcının açık işleri, başkalarına atanmış açık işler, teyit bekleyen kararlar, son toplantının kararları.
     # Gizli toplantıdan gelen kayıt dönmez. Veri yoksa listeler boş (uydurma yok). ad boşsa "kendi" ve "baskalari" ayrılamaz → ikisi de boş.
     # S226 ("Senden beklenenler" kuralı): kendi = sahibi kullanıcı olan açık işler; teyit = yalnız kullanıcının yürüttüğü toplantının onay bekleyen kararları.
@@ -887,7 +894,7 @@ def bugun_veri(dizin, ad, bugun=None):
     ky = son_kayitlar(dizin); gz = {}; rl = {}; sn = None
     def gorunur(t):
         if not t: return True
-        if t not in gz: gz[t] = not gizli_mi(dizin, t, ky)
+        if t not in gz: gz[t] = not gizli_mi(dizin, t, ky) and (deneme or not deneme_mi(dizin, t, ky))
         return gz[t]
     def rol(t):
         if t not in rl: rl[t] = toplanti_rolu(dizin, t)
@@ -944,11 +951,12 @@ def kisi_eslesir(a, b):
     if x[0] == y[0] or x == y: return True
     if (len(x) >= 2 and set(x) <= set(y)) or (len(y) >= 2 and set(y) <= set(x)): return True
     return "".join(x) == "".join(y) or (len(x) == 1 and x[0] == "".join(y)) or (len(y) == 1 and y[0] == "".join(x))
-def kayit_listesi(dizin, ad="", bugun=None):
+def kayit_listesi(dizin, ad="", bugun=None, deneme=False):
     # "Kararlar ve işler" görünümü: grafın karar/iş/söz/soru kayıtlarının tamamı (gizli toplantı hariç). Satır: id (k/s/q + kayıt no), tur (karar|is|soru), metin, kim, vade,
     # kalan_gun, gecikti, tarihsiz, durum (acik · teyit = onay bekleyen karar · kapandi = yapılmış/iptal iş, cevaplanmış soru, onaylı karar), neden (teyit), baslik, toplanti,
     # tarih, kendi (kullanıcının işi). toplantilar: dosya → özet kaydının id'si ve pano/harita var mı (satırdan "toplantıya git"). kisiler: süzgeç listesi.
-    bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kayitlar": [], "toplantilar": [], "kisiler": []}
+    # S236: deneme (Test) toplantılarının kayıtları varsayılan dönmez (deneme=True ile gelir, satırda "deneme": true); deneme_say = gizli olmayan deneme kaydı sayısı (arayüzde anahtar için).
+    bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kayitlar": [], "toplantilar": [], "kisiler": [], "deneme": bool(deneme), "deneme_say": 0}
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
     c = _db(dizin); es = kisi_es_oku(c)
     try: rs = [r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:] for r in c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum, onay, onay_neden, kayit_id FROM kayit WHERE tur IN ('is', 'soz', 'karar', 'soru') ORDER BY tarih DESC, id DESC LIMIT 5000").fetchall()]
@@ -956,16 +964,20 @@ def kayit_listesi(dizin, ad="", bugun=None):
     c = _db(dizin)
     try: ok_ = {r[0]: r[1:] for r in c.execute("SELECT kayit_id, roller, gundem, ust FROM ortak_kayit")}
     finally: c.close()
-    ky = son_kayitlar(dizin); gz = {}; tops = {}; kisiler = {}; ben = _ilk(kisi_ad(es, ad)); sn = None
+    ky = son_kayitlar(dizin); gz = {}; dn = {}; tops = {}; kisiler = {}; ben = _ilk(kisi_ad(es, ad)); sn = None
     for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum, onay, onay_neden, kid in rs:
         if top:
             if top not in gz: gz[top] = gizli_mi(dizin, top, ky)
             if gz[top]: continue
+            if top not in dn: dn[top] = deneme_mi(dizin, top, ky)
+            if dn[top]:
+                out["deneme_say"] += 1
+                if not deneme: continue
             if top not in tops:
                 r = ky.get(top) or {}
                 tops[top] = {"dosya": top, "baslik": baslik or "", "tarih": tarih or "", "id": str(r.get("id") or ""), "harita": bool(r.get("harita"))}
         x = {"id": "", "tur": tur if tur != "soz" else "is", "metin": metin or "", "kim": sahip or kim or "", "vade": son or "", "kalan_gun": None, "gecikti": False, "tarihsiz": False,
-             "durum": "acik", "neden": "", "baslik": baslik or "", "toplanti": top or "", "tarih": tarih or "", "kendi": False, "kayit_id": kid or ""}
+             "durum": "acik", "neden": "", "baslik": baslik or "", "toplanti": top or "", "tarih": tarih or "", "kendi": False, "kayit_id": kid or "", "deneme": bool(top and dn.get(top))}
         if tur == "karar":
             m = onay == "bekliyor"; x["id"] = f"k{i}"; x["metin"] = TEYIT_RX.sub("", metin or ""); x["kim"] = kim or ""
             x["durum"] = "teyit" if m else "kapandi"; x["neden"] = teyit_neden_sade((onay_neden or "").strip()) if m else ""

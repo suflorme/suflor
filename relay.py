@@ -1344,10 +1344,12 @@ def bugun_veri_view():  # Bugün sayfası: açık işler, teyit bekleyen kararla
     try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), str(AYAR.get("ad") or ""), 30)  # dış karar kaydı (dosya türü): ayrı salt-okunur katman, kaynak etiketiyle
     except Exception as e: print(f"BUGÜN: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []
     return v
-def kayitlar_view():  # GET /kayitlar (anahtarlı): "Kararlar ve işler" görünümü — grafın tüm karar/iş/soru kayıtları (gizli toplantı yok) + dış defter kayıtları (salt-okunur)
+def kayitlar_view(tam_yol=""):  # GET /kayitlar (anahtarlı): "Kararlar ve işler" görünümü — grafın tüm karar/iş/soru kayıtları (gizli toplantı yok) + dış defter kayıtları (salt-okunur)
     y = _yapi_mod(); bos = {"ok": False, "ad": AYAR.get("ad") or "", "kayitlar": [], "toplantilar": [], "kisiler": [], "dis": []}
     if not y: return bos
-    try: v = dict(y.kayit_listesi(BASE, str(AYAR.get("ad") or "")), ok=True)
+    from urllib.parse import urlsplit, parse_qs
+    dn = (parse_qs(urlsplit(tam_yol or "").query).get("deneme") or [""])[0] in ("1", "true")  # S236: ?deneme=1 deneme (Test) toplantı kayıtlarını da getirir
+    try: v = dict(y.kayit_listesi(BASE, str(AYAR.get("ad") or ""), deneme=dn), ok=True)
     except Exception as e: print(f"KAYITLAR: veri okunamadı ({e.__class__.__name__})"); return bos
     try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), None, 200)
     except Exception as e: print(f"KAYITLAR: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []
@@ -2266,7 +2268,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
         if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
-        if yol == "/kayitlar": return self._json(kayitlar_view())  # Kararlar ve işler görünümü (anahtarlı)
+        if yol == "/kayitlar": return self._json(kayitlar_view(self.path))  # Kararlar ve işler görünümü (anahtarlı)
         if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
         if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
         if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)

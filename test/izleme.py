@@ -77,7 +77,9 @@ try:
     bak("surum farklıysa 'biçim tanınmadı' (veri dönmez, özet silinir)", z5.get("durum") == "bicim" and "kimde" not in z5 and not os.path.exists(OZET))
     # dosya yok
     os.remove(DOSYA); z6 = istek("/izleme")
-    bak("dosya yoksa veri yok ama açık (pano 'okunamadı' der)", z6.get("acik") and z6.get("durum") == "yok" and "kimde" not in z6)
+    bak("dosya yoksa veri yok ama açık (pano 'Monitör verisi henüz yok' der)", z6.get("acik") and z6.get("durum") == "yok" and "kimde" not in z6)
+    json.dump(veri(1), open(DOSYA, "w")); ayar(izleme_dosyasi=DOSYA); istek("/izleme"); yok = os.path.join(T, "hic-yok.json"); ayar(izleme_dosyasi=yok); z7 = istek("/izleme")
+    bak("geçerli veri varken ayar olmayan dosyaya çevrilirse eski verinin kalmaz (durum yok, veri yok)", z7.get("acik") and z7.get("durum") == "yok" and "kimde" not in z7 and not os.path.exists(OZET))
     bak("ayar boşalınca kapanır", ayar(izleme_dosyasi="").get("ok") is True and istek("/izleme") == {"ok": True, "acik": False})
     bak("beta/kullanım kodunda izleme bayrağı yok", all("izleme" not in open(os.path.join(KOD, "aktarici", f), encoding="utf-8").read().lower() for f in ("beta-veri.py", "kullanim.py") if os.path.exists(os.path.join(KOD, "aktarici", f))))
     bak("izleme.py ağ kullanmaz", not re.search(r"urllib|socket|requests|http\.client", open(os.path.join(KOD, "aktarici", "izleme.py"), encoding="utf-8").read().split("\n", 12)[-1]))

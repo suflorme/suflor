@@ -163,8 +163,8 @@ try:
         once = {"liste": ye.kayit_listesi(C3, "Ayşe Deneme", bugun), "bugun": ye.bugun_veri(C3, "Ayşe Deneme", bugun), "graf": ye.graf_liste(C3, None, 100),
                 "kisi": ye.graf_kisi(C3, "Can", 50), "disa": json.loads(ye.disa_aktar(C3, "json")[0])["kayitlar"], "sozler": ye.sozler(C3)}
         say0 = db(C3).execute("SELECT COUNT(*) FROM kayit").fetchone()[0]; ortak0 = db(C3).execute("SELECT COUNT(*) FROM kayit WHERE tur IN ('karar','is','soz','soru')").fetchone()[0]
-        def temiz(v):  # yeni alanlar (kayit_id, onay; eylem menüsü: sahip_eposta, gundem, alt) karşılaştırmada atılır
-            if isinstance(v, dict): return {k: temiz(x) for k, x in v.items() if k not in ("kayit_id", "onay", "sahip_eposta", "gundem", "alt")}
+        def temiz(v):  # yeni alanlar (kayit_id, onay; eylem menüsü: sahip_eposta, gundem, alt; S236: deneme, deneme_say) karşılaştırmada atılır
+            if isinstance(v, dict): return {k: temiz(x) for k, x in v.items() if k not in ("kayit_id", "onay", "sahip_eposta", "gundem", "alt", "deneme", "deneme_say")}
             if isinstance(v, (list, tuple)): return [temiz(x) for x in v]
             return v
         sonra = {"liste": yapi.kayit_listesi(C3, "Ayşe Deneme", bugun), "bugun": yapi.bugun_veri(C3, "Ayşe Deneme", bugun), "graf": yapi.graf_liste(C3, None, 100),

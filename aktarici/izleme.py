@@ -77,6 +77,7 @@ def izleme_oku():  # (durum, sade veri): durum yok | ok | bicim | bozuk; mtime+b
         return "yok", None
     try: st = os.stat(yol); imza = (st.st_mtime_ns, st.st_size)
     except OSError:
+        if IZ["yol"] and IZ["yol"] != yol: IZ.update(yol=None, imza=None, veri=None, durum="yok", ozet_imza=None); izleme_ozet_sil()  # ayar başka (olmayan) dosyaya çevrildi: eski dosyanın verisi kalmaz
         if IZ["bozuk_imza"] != ("yok", yol): IZ["bozuk_imza"] = ("yok", yol); print("İZLEME: dosya okunamadı")
         return ("bozuk" if IZ["veri"] else "yok"), IZ["veri"]
     if IZ["yol"] == yol and IZ["imza"] == imza: return IZ["durum"], IZ["veri"]
