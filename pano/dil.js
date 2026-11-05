@@ -415,6 +415,7 @@ globalThis.SUFLOR_EN = {
   "Not silinemedi": "Couldn't delete the note",
   "{asistan} cevaplıyor": "{asistan} is answering",
   "Notlara yazıldı": "Added to Notes",
+  "Asistan meşgul; Notlara yazıldı": "Assistant busy; added to Notes",
   // --- v0.116.0 Toplantılar penceresi (arşiv)
   "Toplantılar": "Meetings",
   "Toplantılarda ara": "Search meetings",

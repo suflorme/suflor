@@ -626,10 +626,10 @@ function payHtml(s){const p=s.pay;if(!p)return"";const f=l=>l.map(([k,v])=>k===p
   if(p.adsiz>=50)return L("Konuşma payı ölçülemiyor (konuşmacı adı gelmiyor)")
   return`${L("Konuşma payı")}${p.kelime_son?L(" (son 10 dk)"):``}: ${f(p.kelime_son?p.son:p.top)}${p.kelime_son?` <span class=hint>· ${L("toplam")}: ${f(p.top.slice(0,3))}</span>`:""}`}
 function payUy(s){const p=s.pay;return!!(p&&p.ben_son!=null&&p.ben_son>=60&&p.kelime_son>=150)}
-// tek kutu, tek düğme — "?", "soru", "Claude" ya da iki boşlukla başlayan soru, gerisi not (ayrım aktarıcıda; ⌘Enter hep soru).
+// tek kutu, tek düğme — yazılan her şey asistana gider (not mu soru mu talimat mı ayrımını asistan yapar; ⌘Enter ve başta ? doğrudan soru); asistan çalışamazsa yazı Notlara kalır.
 // Gönderince düğmede kısa onay: "✓ not" / "✓ soru".
 function wireBox(ta){
-  const go=async soru=>{const t=ta.value;if(!t.trim())return;ta.value="";boyla(ta);const r=await sendGirdi(t,soru);if(r.tur==="oturum")r.tur="{asistan} aldı";if(r.tur==="asistan")r.tur=r.ok?"{asistan} cevaplıyor":"";if(r.tur==="defter")r.tur="Notlara yazıldı"
+  const go=async soru=>{const t=ta.value;if(!t.trim())return;ta.value="";boyla(ta);const r=await sendGirdi(t,soru);if(r.tur==="oturum")r.tur="{asistan} aldı";if(r.tur==="asistan")r.tur=r.ok?"{asistan} cevaplıyor":"";if(r.tur==="not"&&r.yedek)r.tur="Asistan meşgul; Notlara yazıldı";if(r.tur==="defter")r.tur=r.yedek?"Asistan meşgul; Notlara yazıldı":"Notlara yazıldı"
     if(!r.tur)ta.value=t;kutuIpucu(r.tur?"✓ "+L(r.tur):L("gönderilemedi"));refresh()}
   ta.onkeydown=ev=>{if(ev.key==="Enter"&&!ev.shiftKey&&!ev.isComposing){ev.preventDefault();go(ev.metaKey||ev.ctrlKey)}}
   ta.addEventListener("input",()=>boyla(ta))

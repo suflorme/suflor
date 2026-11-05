@@ -105,7 +105,7 @@ async function kutuGonder(soru) {
   const ta = $("kn"), t = ta.value; if (!t.trim() || ta.disabled) return;
   ta.value = ""; let r = {};
   try { const y = await fetch(cfg.relay + "/girdi", { method: "POST", body: JSON.stringify({ text: t, soru, at: new Date().toISOString() }) }); r = await y.json().catch(() => ({})); if (!y.ok) r = {}; } catch (e) {}
-  const ad = { oturum: "{asistan} aldı", asistan: r.ok === false ? "" : "{asistan} cevaplıyor", defter: "Notlara yazıldı" }[r.tur];
+  const ad = { oturum: "{asistan} aldı", asistan: r.ok === false ? "" : "{asistan} cevaplıyor", defter: r.yedek ? "Asistan meşgul; Notlara yazıldı" : "Notlara yazıldı", not: r.yedek ? "Asistan meşgul; Notlara yazıldı" : undefined }[r.tur];
   if (ad === "" || (!r.ok && !r.tur)) { if (!ta.value) ta.value = t; return kutuOn(L("gönderilemedi"), false); }
   kutuOn("✓ " + L(ad === undefined ? "İletildi" : ad), true); durum();
 }

@@ -46,7 +46,7 @@ try:
     kontrol("tırnak içindeki boşluklu dosya yolu bağlam oldu", bg()["kaynaklar"][-1].get("deger") == os.path.realpath(belge))
     gizli = os.path.expanduser("~/.zshrc") if os.path.isfile(os.path.expanduser("~/.zshrc")) else os.path.expanduser("~/.bash_profile")
     y = istek("/girdi", {"text": gizli})
-    kontrol("gizli dosya bağlam olmadı (yalnız not)", y.get("tur") == "not" and len(bg()["kaynaklar"]) == 2)
+    kontrol("gizli dosya bağlam olmadı (yazı asistana ya da nota gider)", y.get("tur") in ("not", "asistan", "defter") and len(bg()["kaynaklar"]) == 2)
     y = istek("/girdi", {"text": "? https://soru.example/a ne diyor"})
     kontrol("soru olarak giden bağlantı ayrıca bağlam olmadı", y.get("tur") == "soru" and len(bg()["kaynaklar"]) == 2)
     veri = base64.b64encode(b"Bilgi notu").decode()

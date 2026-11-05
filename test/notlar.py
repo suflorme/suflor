@@ -30,11 +30,14 @@ try:
         if "çalışıyor" in log(): break
         time.sleep(0.2)
     g = istek("/girdi", {"text": "Ayşe'ye fiyatı sor"})
-    bak("toplantı yokken not: Notlar defterine (tur defter)", g.get("ok") is True and g.get("tur") == "defter")
+    bak("toplantı yokken düz yazı da asistana gider (tur asistan; 5 Kasım)", g.get("ok") is True and g.get("tur") == "asistan")
+    for _ in range(40):  # Brifing.app yok: asistan çalışamaz → yazı Notlar defterine kalır (yedek yol); asistanın [NOT] etiketi test/kutu-asistan.py
+        if os.path.exists(os.path.join(canli, "notlar.jsonl")): break
+        time.sleep(0.2)
     sat = [json.loads(l) for l in open(os.path.join(canli, "notlar.jsonl"), encoding="utf-8")] if os.path.exists(os.path.join(canli, "notlar.jsonl")) else []
-    bak("notlar.jsonl'de not var", len(sat) == 1 and sat[0]["metin"] == "Ayşe'ye fiyatı sor" and sat[0]["id"].startswith("n"))
+    bak("asistan çalışamayınca yazı notlar.jsonl'de kaldı, panoda söylendi", len(sat) == 1 and sat[0]["metin"] == "Ayşe'ye fiyatı sor" and sat[0]["id"].startswith("n"))
     bak("sahte 'Toplantı' dökümü açılmadı", dokumler() == [])
-    s = istek("/status")
+    s = istek("/status"); bak("durum hata: yazı not olarak kaydedildi (panoda)", "not olarak kaydedildi" in ((s.get("konus") or {}).get("hata") or ""))
     bak("/status notlar listesi, pano toplantı görünümünde değil", [x["metin"] for x in s.get("notlar") or []] == ["Ayşe'ye fiyatı sor"] and s.get("aktif") is False)
     g = istek("/girdi", {"text": "?Yarınki toplantının gündemi ne"})
     bak("toplantı yokken '?' soru: asistana yazılı (tur asistan)", g.get("tur") == "asistan" and "KONUŞ: yazılı soru" in log())
@@ -46,8 +49,8 @@ try:
     bak("pano notu siler, /status'ta kalmaz", d.get("ok") is True and not istek("/status").get("notlar"))
     bak("olmayan notu silme: ok false", istek("/notlar", {"sil": "nyok"}).get("ok") is False)
     json.dump({"title": "Yeni toplantı", "items": ["Bütçe"]}, open(os.path.join(canli, "agenda.json"), "w"))  # Başlat/gündem: toplantı hazırlanıyor
-    g = istek("/girdi", {"text": "hazırlık notu"})
-    bak("gündem yeni yazılmışsa not eski yoldan (tur not; Faz B: toplantı açılınca dökümüne, şimdilik bekler — sahte 'Toplantı' dosyası yok)", g.get("tur") == "not" and dokumler() == [])
+    time.sleep(0.5); g = istek("/girdi", {"text": "hazırlık notu"})
+    bak("gündem yeni yazılmışsa yazı yine asistana (yedekte: toplantı açılınca dökümüne bekler — sahte 'Toplantı' dosyası yok)", g.get("tur") == "asistan" and dokumler() == [])
     bak("aktarıcıda hata yok", "Traceback" not in log())
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 print("notlar: ✓ hepsi geçti" if not hata else f"notlar: ✗ {len(hata)} kaldı")

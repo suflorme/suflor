@@ -2414,26 +2414,33 @@ class H(BaseHTTPRequestHandler):
             q = ask(p); y = soru_oturumsuz(p.get("text")) if q and p.get("tur") != "ozet" else None
             return self._json(dict({"ok": bool(q), "question": q}, **({"asistan": y} if y else {})))
         if self.path == "/girdi":  # tek kutu (pano, mini pano, eklenti penceresi)
-            # kullanıcı (21 Ekim): not mu soru mu Claude karar verir — toplantı oturumu izliyorsa yazı not olarak dökümde kalır ve
-            # GİRDİ olayıyla hemen Claude'a gider (soruysa cevaplar). Claude izlemiyorsa eski kural (başta ? → soru). ⌘Enter her zaman soru.
+            # 5 Kasım: kutuya yazılan HER ŞEY asistana gider; not mu soru mu talimat mı ayrımını asistan yapar (notlar.py kutu_*: cevaptaki [NOT: …] ve
+            # [SÖZLÜK: yanlış => doğru] etiketleri). Toplantı oturumu izliyorsa (izle yoklaması, ya da arka plandaki oturum kullanıcıyı bekliyor) eski yol aynen:
+            # yazı oturuma / dökümde not + GİRDİ olayı. Asistan hiç çalışamazsa yazı not olarak kalır ve panoda söylenir (yedek). ⌘Enter ve başta ? hâlâ doğrudan soru.
             tur, metin = girdi_ayir(p.get("text"))
             if not metin: return self._json({"ok": False, "err": "boş"}, 400)
-            if toplantisiz():  # v0.117.0 (S136): toplantı yokken soru toplantı dışı asistana yazılı, not Notlar defterine (sahte "Toplantı" dökümü açılmaz)
-                if tur == "soru" or p.get("soru"): return self._json(dict(konus_yazili(metin), tur="asistan"))
-                baglam_ekle(baglam_ayir(metin)[0], "kutu"); return self._json(dict(not_defter_yaz(metin, p.get("at")), tur="defter"))
-            if tur == "soru" or p.get("soru"):
+            soru = tur == "soru" or bool(p.get("soru")); bos = toplantisiz()
+            claude = bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
+            if not bos and not soru:
+                # v0.111.0: arka plandaki toplantı oturumu kullanıcıyı bekliyor (soru sordu) ya da çalışıyor ama izle'de değil (hazırlık) — yazı doğrudan ona gider
+                # (izle çalışıyorsa — Monitor'da — eski yol: not + GİRDİ olayı; oturum turu bitirmiş görünse de izliyordur)
+                # v0.112.0: seçenekli soru açıksa (izle sürse de) yazı onun cevabıdır
+                if topo_canli() and (TOPO["secenek_i"] or (not claude and TOPO["durum"] in ("bekliyor", "calisiyor"))):
+                    if toplanti_oturum_yaz(metin, "kutu").get("ok"): return self._json({"ok": True, "tur": "oturum"})
+                if claude:  # oturum izliyor: yazı dökümde not olarak kalır, GİRDİ olayıyla Claude'a gider (soruysa cevaplar)
+                    note({"text": metin, "at": p.get("at") or datetime.datetime.now().isoformat(timespec="seconds"), "meeting": p.get("meeting") or {}})
+                    yeni = baglam_ekle(baglam_ayir(metin)[0], "kutu")  # nottaki bağlantı/dosya yolu bağlam kaynağı da olur (izle: BAĞLAM)
+                    if not yeni: q = ask({"text": metin, "tur": "girdi"}); return self._json({"ok": bool(q), "tur": "iletildi", "question": q})
+                    return self._json({"ok": True, "tur": "bağlam"})
+            if not soru:
+                oge, kotu = baglam_ayir(metin); yeni = baglam_ekle(oge, "kutu") if oge else []
+                if oge and not kotu: return self._json({"ok": True, "tur": "bağlam" if yeni else "not"})  # yalnız bağlantı/dosya yolu: bağlam kaynağı, asistana gerek yok
+            if soru and not bos:  # toplantı sürerken ⌘Enter/?: izleyen oturum varsa o cevaplar (ask), yoksa yazılı asistan
                 q = ask({"text": metin}); y = soru_oturumsuz(metin) if q else None
                 return self._json(dict({"ok": bool(q), "tur": "soru", "question": q}, **({"asistan": y} if y else {})))
-            claude = bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
-            # v0.111.0: arka plandaki toplantı oturumu kullanıcıyı bekliyor (soru sordu) ya da çalışıyor ama izle'de değil (hazırlık) — yazı doğrudan ona gider
-            # (izle çalışıyorsa — Monitor'da — eski yol: not + GİRDİ olayı; oturum turu bitirmiş görünse de izliyordur)
-            # v0.112.0: seçenekli soru açıksa (izle sürse de) yazı onun cevabıdır
-            if topo_canli() and (TOPO["secenek_i"] or (not claude and TOPO["durum"] in ("bekliyor", "calisiyor"))):
-                if toplanti_oturum_yaz(metin, "kutu").get("ok"): return self._json({"ok": True, "tur": "oturum"})
-            note({"text": metin, "at": p.get("at") or datetime.datetime.now().isoformat(timespec="seconds"), "meeting": p.get("meeting") or {}})
-            yeni = baglam_ekle(baglam_ayir(metin)[0], "kutu")  # nottaki bağlantı/dosya yolu bağlam kaynağı da olur (izle: BAĞLAM)
-            if claude and not yeni: q = ask({"text": metin, "tur": "girdi"}); return self._json({"ok": bool(q), "tur": "iletildi", "question": q})
-            return self._json({"ok": True, "tur": "bağlam" if yeni else "not"})
+            r = konus_yazili(metin, kutu=not soru)
+            if r.get("ok") or soru: return self._json(dict(r, tur="asistan"))  # açık soru cevapsız kalırsa notlanmaz: pano "gönderilemedi" der, metin kutuya döner
+            return self._json(dict(kutu_not_kaydet(metin, p.get("at")), tur="defter" if bos else "not", yedek=True, err=r.get("err")))  # asistan meşgul: yazı kaybolmaz
         if self.path == "/kanit":
             if not str(self.headers.get("Origin", "")).startswith("chrome-extension://"): return self._json({"ok": False, "err": "yalnız eklenti"}, 403)
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)

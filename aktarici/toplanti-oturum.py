@@ -128,6 +128,7 @@ def topo_canli(): return bool(TOPO["w"]) and TOPO["app"] is not None and TOPO["a
 def _topo_durum(d, hata=None):
     TOPO["durum"] = d; TOPO["t_durum"] = time.time()
     if hata is not None: TOPO["hata"] = hata
+    toplanti_oturum_kaydet()
 def _topo_mesaj(kim, metin, **ek):
     metin = str(metin or "").strip()
     if kim == "claude":
@@ -139,6 +140,7 @@ def _topo_mesaj(kim, metin, **ek):
         if ek.get("secenek"): TOPO["secenek_i"] = TOPO["n"]
         TOPO["mesaj"].append(dict(i=TOPO["n"], t=datetime.datetime.now().strftime("%H:%M"), kim=kim, metin=metin[:TOPO_METIN_EN_COK], **ek))
         del TOPO["mesaj"][:-TOPO_MESAJ_EN_COK]
+    if ek.get("secenek"): toplanti_oturum_kaydet()
 def _topo_arac_ozet(ad, gi):
     gi = gi if isinstance(gi, dict) else {}
     if ad == "Bash": s = gi.get("description") or gi.get("command")
@@ -176,7 +178,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
                        "giris": gir, "cikis": cik, "sure": TOPO_SURE_SN}, f, ensure_ascii=False)
         if not sid: TOPO.update(izin_hatirla=set(), mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None,
                                 bilgi_sorgu=0, web_sorgu=0, bilgi_t={})
-        TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
+        TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}; TOPO["kapatan"] = None
         _topo_durum("aciliyor", hata=None)
         TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "--env", "CLAUDE_CODE_MCP_STARTUP_WAIT_MS=" + str(TOPO_MCP_BEKLE_MS), "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t0 = time.time(); w = None
@@ -191,8 +193,10 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
         threading.Thread(target=_topo_bekci, args=(TOPO["nesil"],), daemon=True).start()
         _topo_gonder({"type": "user", "message": {"role": "user", "content": ilk}}); _topo_durum("calisiyor")
         print(f"TOPLANTI OTURUMU: arka planda açıldı ({time.time() - t0:.1f} sn){' · kaldığı yerden ' + sid[:8] if sid else ''}"); return True
+TOPO_KAPAT_YENIDEN = ("yeni başlatma",)  # bu nedenle kapanan oturumun yerine yenisi açılır; ötekiler (kullanıcı kapattı, Terminal'e alındı, boşta) aktarıcı açılınca oturumu sürdürmez
 def toplanti_oturum_kapat(neden):
     with TOPO["kilit"]:
+        if neden not in TOPO_KAPAT_YENIDEN: TOPO["kapatan"] = neden
         w, app = TOPO["w"], TOPO["app"]; TOPO.update(w=None, app=None); TOPO["kapali_nesil"] = TOPO["nesil"]
         if w:
             try: w.close()  # giriş kapanınca claude çıkar, uygulama da biter
@@ -202,12 +206,13 @@ def toplanti_oturum_kapat(neden):
             except subprocess.TimeoutExpired: pass
         if w: print(f"TOPLANTI OTURUMU: kapandı ({neden})")
         if TOPO["durum"] not in ("hata", "terminalde"): _topo_durum("kapali")
+        else: toplanti_oturum_kaydet()
 def toplanti_oturum_yaz(metin, kaynak="kutu"):
     metin = str(metin or "").strip()[:4000]
     if not metin: return {"ok": False, "err": "boş"}
     if not topo_canli(): return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
     if not _topo_gonder({"type": "user", "message": {"role": "user", "content": metin}}): return {"ok": False, "err": _t("Oturuma yazılamadı", "Couldn't write to the session")}
-    _topo_mesaj("ben", metin, kaynak=kaynak); _topo_durum("calisiyor"); TOPO["secenek_i"] = None
+    _topo_mesaj("ben", metin, kaynak=kaynak); TOPO["secenek_i"] = None; _topo_durum("calisiyor")
     print(f"TOPLANTI OTURUMU: kullanıcı yazdı ({kaynak}, {len(metin)} karakter)"); return {"ok": True}
 def toplanti_oturum_durdur():
     if not topo_canli() or TOPO["durum"] != "calisiyor": return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
@@ -397,7 +402,9 @@ def _topo_oku(cik, nesil):
             except ValueError: continue
             t = j.get("type")
             if t == "system" and j.get("subtype") == "init":  # her turun başında gelir (Monitor olayı da yeni tur açar)
-                if j.get("session_id"): TOPO["sid"] = str(j["session_id"])
+                if j.get("session_id"):
+                    yeni_sid = TOPO["sid"] != str(j["session_id"]); TOPO["sid"] = str(j["session_id"])
+                    if yeni_sid: toplanti_oturum_kaydet()
                 if topo_chrome_acik():  # kişi araştırma zinciri: Chrome bağlantısı (tek satır; yoksa web'e düşülür, Chrome'u açmayız)
                     cd = next((m.get("status") for m in (j.get("mcp_servers") or []) if isinstance(m, dict) and m.get("name") == "claude-in-chrome"), None)
                     print("KİŞİ ARAŞTIRMA: chrome " + ("bağlı" if cd == "connected" else "yok → web (ya da kişi bağlayıcısı)"))
@@ -446,6 +453,73 @@ def _topo_bekci(nesil):
         if TOPO["nesil"] == nesil and TOPO["durum"] == "bekliyor" and not izliyor and time.time() - TOPO["t_durum"] > TOPO_BOSTA_SN:
             _topo_mesaj("sistem", _t("Uzun süredir boşta olduğu için kapandı. Sürdürmek için Terminal'de göster.", "Closed after a long idle period. Use Show in Terminal to continue."))
             toplanti_oturum_kapat("boşta"); return
+# 5 Kasım akşamı (toplantı sonu, aktarici-kur.command): aktarıcı yeniden başlayınca TOPO bellekte kayboldu, toplantı oturumu kullanıcının sorusunu beklerken kapandı.
+# Oturumun sid'i, açılış bilgisi (claude yolu, model, kanca), konusu, durumu ve açık sorusu her değişimde canli/toplanti-oturum.json'a (0600) yazılır; aktarıcı
+# açılınca kayıt tazeyse (TOPO_KAYIT_OMUR_SN) oturum aynı sid ile --resume edilir. Kullanıcı kapattıysa, Terminal'e alındıysa, boşta kapandıysa, toplantı sonu bittiyse
+# (özet geldi, açık soru yok), gizli toplantıdaysa ya da başka oturum zaten açıksa açılmaz. Aktarıcı kapanırken kayıt silinmez (sonuç hep son durumdur).
+TOPO_KAYIT_OMUR_SN = 2 * 3600
+TOPO_YENIDEN_ILETI = "(Suflor) Aktarıcı yeniden başladı; oturum kaldığı yerden sürüyor."
+TOPO_YENIDEN_SORU = " Kullanıcıya bekleyen soruyu yeniden sor."
+def _topo_kayit_yolu(): return os.path.join(BASE, "toplanti-oturum.json")
+def _topo_ozet_geldi():  # toplantının özeti kaydedildi mi (toplantı sonu işi bitti)
+    try:
+        TP = globals().get("TOPLANTI") or {}; o, a = TP.get("onceki"), TP.get("aktif")
+        return bool((o and o.get("ozet")) or (a and a.get("ozet")))
+    except Exception: return False
+def _topo_sonu_suruyor():  # toplantı bitiyor ya da biten toplantının özeti henüz gelmedi
+    try: return toplanti_durum() == "bitiyor" or bool(onceki_sonu_suruyor())
+    except Exception: return False
+def _topo_acik_soru():  # kullanıcıdan cevap bekleyen seçenekli soru (cevaplanana kadar)
+    sm = next((m for m in TOPO["mesaj"] if m["i"] == TOPO["secenek_i"]), None) if TOPO["secenek_i"] else None
+    return {"i": sm["i"], "metin": sm["metin"], "secenek": sm.get("secenek")} if sm else None
+def toplanti_oturum_kaydet():
+    ac = TOPO.get("acilis") or {}
+    if not ac or not TOPO.get("sid"): return  # açılış bilgisi ya da oturum kimliği yoksa sürdürülemez (kimlik ilk init iletisinde gelir)
+    son = next((m for m in reversed(TOPO["mesaj"]) if m["kim"] == "claude"), None)
+    try: TP = globals().get("TOPLANTI") or {}; dosya = ((TP.get("aktif") or {}).get("dosya")) or ((TP.get("onceki") or {}).get("dosya"))
+    except Exception: dosya = None
+    k = {"t": time.time(), "sid": TOPO["sid"], "cl": ac.get("cl"), "model": ac.get("model"), "ky": ac.get("ky"), "konu": TOPO.get("konu"), "t0": TOPO.get("t0"),
+         "durum": TOPO["durum"], "kapatan": TOPO.get("kapatan"), "ozet": _topo_ozet_geldi(), "soru": _topo_acik_soru(),
+         "son": son["metin"][-400:] if son else None, "dosya": dosya}
+    try:
+        yol = _topo_kayit_yolu(); fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(k, f, ensure_ascii=False)
+        os.replace(yol + ".tmp", yol)
+    except OSError: pass
+def toplanti_oturum_yeniden(simdi=None):
+    # aktarıcı açılışında: kayıt uygunsa oturumu aynı sid'le arka planda açar; açtıysa True. Açılmama nedeni günlüğe tek satır.
+    def red(n): print(f"TOPLANTI OTURUMU: yeniden açılmadı — {n}"); return False
+    try:
+        with open(_topo_kayit_yolu(), encoding="utf-8") as f: k = json.load(f)
+    except (OSError, ValueError): return False
+    if not isinstance(k, dict) or not k.get("sid"): return False
+    with TOPO["kilit"]:
+        if topo_canli() or TOPO["durum"] != "kapali" or TOPO["n"]: return red("başka oturum zaten açık")
+        if (simdi or time.time()) - float(k.get("t") or 0) > TOPO_KAYIT_OMUR_SN: return red("kayıt eski")
+        if k.get("kapatan"): return red(f"oturum kapatılmıştı ({k['kapatan']})")
+        if k.get("durum") not in ("calisiyor", "bekliyor", "aciliyor"): return red(f"son durum {k.get('durum')}")
+        if not arka_mi(): return red("ayar toplanti_terminal açık")
+        if gizli_acik(): return red("gizli toplantı")
+        soru = k.get("soru") if isinstance(k.get("soru"), dict) and k["soru"].get("metin") else None
+        if k["durum"] == "bekliyor" and not soru and k.get("ozet"): return red("toplantı sonu tamamlanmıştı")
+        cl = k.get("cl") or claude_yolu()
+        if not cl or not os.path.exists(cl): return red("claude bulunamadı")
+        TOPO.update(sid=str(k["sid"]), konu=k.get("konu"), t0=float(k.get("t0") or time.time()), mesaj=[], secenek_i=None, yeniden=0, izin=0, hata=None, etkinlik=None,
+                    izin_hatirla=set(), bilgi_sorgu=0, web_sorgu=0, bilgi_t={})
+        _topo_mesaj("sistem", _t("Aktarıcı yeniden başladı; oturum kaldığı yerden sürüyor.", "The relay restarted; the session is continuing where it left off."))
+        if soru:  # bekleyen soru panoda seçenekleriyle yeniden görünür
+            _topo_mesaj("claude", soru["metin"] + ("\n[[seç: " + " | ".join(soru["secenek"]) + "]]" if soru.get("secenek") else ""))
+        ilk = TOPO_YENIDEN_ILETI + (TOPO_YENIDEN_SORU if soru else "")
+        if not toplanti_oturum_ac(cl, k.get("model"), k.get("ky"), ilk, k.get("konu"), sid=str(k["sid"])): return False
+    print(f"TOPLANTI OTURUMU: aktarıcı yeniden başladı, oturum {str(k['sid'])[:8]} kaldığı yerden açıldı{' · bekleyen soru yeniden soruldu' if soru else ''}"); return True
+def _topo_baslangic():
+    import os as _os, time as _tm  # bölüm relay.py'nin ortasında (ya da bir testte kısıtlı ad alanında) yüklenir; iş parçacığı hemen başlar
+    try:
+        _tm.sleep(0.5 if _os.environ.get("SUFLOR_TEST_HIZLI") else 8)  # sunucu ve öbür bölümler (izin, pano) hazır olsun
+        if not all(k in globals() for k in ("BASE", "AYAR", "STATE", "claude_yolu", "BRIFING_APP", "gizli_acik", "arka_mi", "izin_iste", "_t")): return  # relay dışında (bölümü okuyan testler) açılmaz
+        toplanti_oturum_yeniden()
+    except Exception as e: print(f"TOPLANTI OTURUMU: yeniden açma hatası {e.__class__.__name__}: {e}")
+threading.Thread(target=_topo_baslangic, daemon=True).start()
 def topo_izliyor(): return bool(STATE.get("izle_seen")) and time.time() - STATE["izle_seen"] < 60
 def toplanti_oturum_view():
     if TOPO["durum"] == "kapali" and not TOPO["n"]: return None
@@ -460,7 +534,8 @@ def toplanti_oturum_view():
     return {"durum": d, "n": TOPO["n"], "t0": TOPO["t0"], "izin": TOPO["izin"], "konu": TOPO["konu"], "hata": TOPO["hata"] if TOPO["durum"] == "hata" else None,
             "terminal": bool(TOPO["sid"] and TOPO["acilis"]), "son": (son or {}).get("metin", "")[:300], "son_i": (son or {}).get("i"), "soru": soru,
             "etkinlik": {"metin": e["metin"], "sn": round(time.time() - e["t"])} if e else None, "sn": round(time.time() - TOPO["t_durum"]),
-            "izinler": izin_bekleyen_oturum() if topo_canli() else []}
+            "izinler": izin_bekleyen_oturum() if topo_canli() else [], "sonu": _topo_sonu_suruyor(),
+            "acik_soru": bool(topo_canli() and (_topo_acik_soru() or (d == "bekliyor" and not _topo_ozet_geldi() and _topo_sonu_suruyor())))}
 def toplanti_oturum_mesajlar(n=0):
     with LOCK: m = [x for x in TOPO["mesaj"] if x["i"] > n]
     return dict(toplanti_oturum_view() or {"durum": "kapali", "n": 0}, mesaj=m)

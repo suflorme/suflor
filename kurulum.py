@@ -250,6 +250,12 @@ def mesgul():  # v0.77.4 (18 Ekim): aktarici-kur.command öncesi — kurulum akt
     if (s.get("masaustu") or {}).get("toplantida"): n.append("masaüstü toplantısı sürüyor")
     if (k.get("sohbet") or {}).get("acik"): n.append("sohbet açık")
     if k.get("durum") in ("yaziya", "dusunuyor", "konusuyor"): n.append(f"Konuş cevabı sürüyor ({k['durum']})")
+    # 5 Kasım akşamı: kurulum toplantı sonu işlerini yapan ve kullanıcının cevabını bekleyen toplantı oturumunu kapattı (aktarıcı yeniden başlayınca oturum bellekten gitti)
+    o = s.get("toplanti_oturum") or {}; od = o.get("durum")
+    if od in ("calisiyor", "aciliyor"): n.append("Toplantı oturumu toplantı sonu işlerini yapıyor" if o.get("sonu") else "Toplantı oturumu çalışıyor")
+    elif o.get("izin") or o.get("izinler"): n.append("Toplantı oturumu izin cevabını bekliyor")
+    elif od in ("bekliyor", "izliyor") and o.get("acik_soru"): n.append("Toplantı oturumu cevabını bekliyor")
+    elif od == "bekliyor" and o.get("sonu"): n.append("Toplantı oturumu toplantı sonu işlerini yapıyor")
     return ", ".join(n)
 def eklenti():
     # önceden yalnız Teams sekmesindeki eklentinin nabzı sayılıyordu — Teams açık değilse sihirbaz bu adımda bekleyip kalıyordu.

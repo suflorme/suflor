@@ -15,7 +15,12 @@ sys.argv = ["kurulum.py"]; g = {"__name__": "kurulum_deneme", "__file__": os.pat
 exec(compile(open(g["__file__"], encoding="utf-8").read().split('if __name__ == "__main__":')[0], "kurulum.py", "exec"), g)
 TABLO = [({}, ""), ({"extension": {"call": True, "age_s": 5}}, "web toplantısı"), ({"extension": {"call": True, "age_s": 500}}, ""),
          ({"masaustu": {"toplantida": True}}, "masaüstü toplantısı"), ({"konus": {"durum": "dinliyor", "sohbet": {"acik": True}}}, "sohbet açık"),
-         ({"konus": {"durum": "dusunuyor", "sohbet": {"acik": False}}}, "Konuş cevabı"), ({"konus": {"durum": "hazir", "sohbet": {"acik": False}}}, ""), (None, "")]
+         ({"konus": {"durum": "dusunuyor", "sohbet": {"acik": False}}}, "Konuş cevabı"), ({"konus": {"durum": "hazir", "sohbet": {"acik": False}}}, ""), (None, ""),
+         ({"toplanti_oturum": {"durum": "calisiyor", "sonu": True}}, "toplantı sonu işlerini yapıyor"), ({"toplanti_oturum": {"durum": "calisiyor"}}, "Toplantı oturumu çalışıyor"),
+         ({"toplanti_oturum": {"durum": "bekliyor", "acik_soru": True, "soru": {"secenek": ["A"]}}}, "cevabını bekliyor"),
+         ({"toplanti_oturum": {"durum": "bekliyor", "izin": 1, "izinler": [{"id": "x"}]}}, "izin cevabını bekliyor"),
+         ({"toplanti_oturum": {"durum": "bekliyor", "sonu": True}}, "toplantı sonu işlerini yapıyor"), ({"toplanti_oturum": {"durum": "izliyor", "acik_soru": False}}, ""),
+         ({"toplanti_oturum": {"durum": "bekliyor", "acik_soru": False, "sonu": False}}, ""), ({"toplanti_oturum": {"durum": "kapali"}}, ""), ({"toplanti_oturum": None}, "")]
 for s, b in TABLO:
     g["aktarici"] = lambda y, s=s: s; r = g["mesgul"]()
     ok(f"mesgul {s} → {r!r}", (b in r) if b else r == "")

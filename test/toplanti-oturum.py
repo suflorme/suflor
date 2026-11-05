@@ -335,6 +335,57 @@ try:
     kod, y = uc("/girdi", {"text": "sonraki not"}); ok(f"Terminal'e alındıktan sonra kutu eski yolda ({y.get('tur')})", y.get("tur") in ("not", "iletildi"))
     ok("Terminal'e alınınca panoda: izleme durdu, kutudaki yazı oturuma gitmez", any(x["kim"] == "sistem" and "izlemesi durdu" in x["metin"] and "oturuma gitmez" in x["metin"] for x in mesaj()))
 
+    # 5 Kasım: aktarıcı yeniden başlayınca (aktarici-kur.command) açık oturum kaldığı yerden sürer — canli/toplanti-oturum.json + --resume
+    KAYIT = os.path.join(canli, "toplanti-oturum.json")
+    def yeniden_baslat(bekle_sn=3):
+        global r
+        r.terminate()
+        try: r.wait(5)
+        except subprocess.TimeoutExpired: r.kill()
+        subprocess.run(["pkill", "-f", T + "/bin/claude"], capture_output=True); time.sleep(1)
+        r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T,
+                             env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_OTURUM="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_HIZLI="1"),
+                             stdout=open(os.path.join(T, "relay.log"), "a"), stderr=subprocess.STDOUT)
+        for _ in range(60):
+            try: uc("/status"); break
+            except Exception: time.sleep(0.3)
+        time.sleep(bekle_sn)
+    def kayit(): return json.load(open(KAYIT, encoding="utf-8"))
+    n0 = len([1 for _ in open(ARG)])
+    ok("kayıt dosyası 0600", oct(os.stat(KAYIT).st_mode & 0o777) == "0o600" and kayit().get("sid") == "0f1e2d3c-4b5a-4968-8776-655443322110")
+    ok(f"Terminal'e alınmış oturum ({kayit().get('kapatan')}) yeniden başlatmada açılmaz", (yeniden_baslat(), len([1 for _ in open(ARG)]) == n0 and to() == {})[1])
+    kod, y = uc("/baslat", {"konu": "Yeniden oturum", "rol": "yurutucu", "dil": "tr"}); bekle(lambda v: v.get("durum") == "bekliyor")
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "secim"}); bekle(lambda v: (v.get("soru") or {}).get("secenek"))
+    kk = kayit(); ok(f"bekleyen soru ve seçenekleri kayda yazıldı ({kk.get('durum')})", kk["durum"] == "bekliyor" and kk["soru"]["secenek"] == ["Anlaştık", "Anlaşmadık", "Emin değilim"] and not kk.get("kapatan") and kk["konu"] == "Yeniden oturum")
+    n1 = len([1 for _ in open(ARG)]); yeniden_baslat(); v = bekle(lambda v: v.get("durum") in ("bekliyor", "calisiyor") and (v.get("soru") or {}).get("secenek"))
+    a = [json.loads(l) for l in open(ARG)]
+    ok("yeniden başlatma: oturum aynı sid ile --resume edildi (bir kez)", len(a) == n1 + 1 and a[-1][a[-1].index("--resume") + 1] == "0f1e2d3c-4b5a-4968-8776-655443322110")
+    ok(f"bekleyen soru panoda seçenekleriyle yeniden görünür ({(v.get('soru') or {}).get('secenek')})", (v.get("soru") or {}).get("secenek") == ["Anlaştık", "Anlaşmadık", "Emin değilim"] and v.get("konu") == "Yeniden oturum")
+    ok("panoda sistem iletisi: aktarıcı yeniden başladı", any(x["kim"] == "sistem" and "yeniden başladı" in x["metin"] for x in mesaj()))
+    ok("oturuma ilk ileti: yeniden başladı + bekleyen soruyu yeniden sor", claude_der("Aldım: (Suflor) Aktarıcı yeniden başladı; oturum kaldığı yerden sürüyor. Kullanıcıya bekleyen soruyu yeniden sor."))
+    time.sleep(1.5); ok("çift açılma yok", len([1 for _ in open(ARG)]) == n1 + 1)
+    kod, y = uc("/toplanti-oturum", {"islem": "sec", "i": v["soru"]["i"], "secim": "Anlaştık"}); ok("yeniden açılan oturumda düğme çalışır", y.get("ok") and claude_der("Aldım: Anlaştık"))
+    # meşgul: /status'ta oturum alanları (kurulum.py mesgul bunlara bakar)
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "secim 3"}); v = bekle(lambda v: (v.get("soru") or {}).get("secenek"))
+    ok(f"açık soru varken /status toplanti_oturum.acik_soru ({v.get('acik_soru')})", v.get("acik_soru") is True)
+    uc("/toplanti-oturum", {"islem": "yaz", "metin": "uzun iş"}); claude_der("Uzun iş başladı"); v = to()
+    ok(f"tur sürerken durum calisiyor ({v.get('durum')})", v.get("durum") == "calisiyor")
+    # tur sürerken yeniden başlatma da sürdürür (durum calisiyor)
+    n2 = len([1 for _ in open(ARG)]); ok(f"kayıt durumu calisiyor ({kayit().get('durum')})", kayit().get("durum") == "calisiyor")
+    yeniden_baslat(); bekle(lambda v: v.get("durum") in ("bekliyor", "calisiyor"))
+    a = [json.loads(l) for l in open(ARG)]; ok("tur sürerken kapanan oturum da --resume ile açılır", len(a) == n2 + 1 and "--resume" in a[-1])
+    # kullanıcı Kapat dediyse açılmaz
+    kod, y = uc("/toplanti-oturum", {"islem": "kapat"}, zaman=30); ok(f"Kapat kayda işlendi ({kayit().get('kapatan')})", y.get("ok") and kayit().get("kapatan") == "kullanıcı kapattı")
+    n3 = len([1 for _ in open(ARG)]); yeniden_baslat(); ok("kullanıcı kapattıysa yeniden başlatmada açılmaz", len([1 for _ in open(ARG)]) == n3 and to() == {})
+    # eski kayıt (> 2 saat) açılmaz; toplantı sonu bitmiş (özet geldi, soru yok) açılmaz
+    kk = kayit(); kk.update(kapatan=None, durum="bekliyor", soru=None, ozet=True, t=time.time()); json.dump(kk, open(KAYIT, "w"))
+    yeniden_baslat(); ok("toplantı sonu tamam (özet geldi, açık soru yok) → açılmaz", len([1 for _ in open(ARG)]) == n3 and to() == {})
+    kk.update(ozet=False, t=time.time() - 3 * 3600); json.dump(kk, open(KAYIT, "w"))
+    yeniden_baslat(); ok("3 saatlik eski kayıt → açılmaz", len([1 for _ in open(ARG)]) == n3 and to() == {})
+    kk.update(t=time.time(), durum="calisiyor"); json.dump(kk, open(KAYIT, "w"))
+    yeniden_baslat(); bekle(lambda v: v.get("durum") in ("bekliyor", "calisiyor"))
+    ok("taze kayıt + calisiyor → açılır (kontrol)", len([1 for _ in open(ARG)]) == n3 + 1)
+
     # Brifing.app toplantı kipi: izin listesi dışındaki argümanı ve değiştirilmiş kancayı reddeder (çıkış 3)
     def calistir(args, kanca=None):
         gir, cik = os.path.join(canli, "d-gir.fifo"), os.path.join(canli, "d-cik.fifo")

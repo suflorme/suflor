@@ -879,6 +879,7 @@ def okuma_sesi_satiri():
     ek = "" if m == "gemini" else _t(" — kullanıcı \"Gemini sesiyle konuş\" derse 15 dk Gemini'ye geçer", " — saying \"use the Gemini voice\" switches to Gemini for 15 min")
     return _t(f"Okunduğun ses: {ad}{ek}\n", f"Your reading voice: {ad}{ek}\n")
 def _konus_kur(**k):
+    if k.get("durum") == "hata" and "KUTU_BEKLEYEN" in globals() and KUTU_BEKLEYEN.get("metin"): k["hata"] = kutu_yedek(k.get("hata"))  # 5 Kasım: kutudaki yazı asistan çalışamayınca not olarak kalır (notlar.py)
     KONUS.update(at=datetime.datetime.now().isoformat(timespec="seconds"), **k)
 def konus_beyin_var(): return BEYIN.secim(AYAR, "konus")["tur"] != "claude-code" or bool(claude_yolu())  # v0.122.0: başka sağlayıcıda Claude Code gerekmez
 # Faz 11 Aşama 2 (§3.8): sağlayıcı hata ya da zaman aşımı verince soru bir kez Claude Code'la; Konuş KONUS_YEDEK_SN boyunca Claude Code'da kalır (günlükte "BEYİN: yedek")
@@ -1171,6 +1172,8 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if not tur.get("ayrinti"): _konus_cumle(tur, son=True)
                 if TALIMAT_ETIKET_BAS.search(tur["metin"]):  # v0.101.1: Claude'un hazırladığı oturum iletisi → onaya (etiket panoda ve geçmişte görünmez)
                     tur["metin"], _ = talimat_claude(tur["metin"], tur.get("soru") or KONUS.get("soru"), tur); KONUS["cevap"] = tur["metin"]
+                if tur.get("kutu") and not j.get("is_error") and KUTU_ETIKET_RX.search(tur["metin"] or ""):  # 5 Kasım: asistanın [NOT: …] / [SÖZLÜK: … => …] etiketi → iş yapılır, etiket görünmez
+                    tur["metin"] = kutu_etiketleri(tur["metin"], tur.get("soru")); KONUS["cevap"] = tur["metin"]
                 tur["t_son"] = time.time(); m = j.get("total_cost_usd") or 0; u = j.get("usage") or {}
                 ms = lambda a: round((tur[a] - tur["t_birak"]) * 1000) if tur.get(a) else None
                 o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": "bas-konus", "yalin": bool(claude_yalin()), "saglayici": _KS.get("saglayici") or "claude-code", "kayit_sn": tur.get("kayit_sn"),
@@ -1198,6 +1201,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                     threading.Thread(target=lambda: (konus_kapat("yedek: sağlayıcı hatası", durum_koru=True), _KS.__setitem__("tur", tur), tur["gonder"]()), daemon=True).start(); continue
                 _konus_kur(durum="hazir", olcum={k: o[k] for k in ("wh_ms", "ilk_ms", "ses_ms", "sure_ms", "maliyet")})
                 if o["hata"] and not (tur.get("metin") or "").strip(): _konus_kur(durum="hata", hata=str(j.get("result") or _t("cevap alınamadı", "no answer"))[:200])  # v0.122.0: sağlayıcı hatası panoda görünsün
+                if tur.get("kutu"): KUTU_BEKLEYEN.clear()  # cevap geldi (hata varsa _konus_kur kutu_yedek'i zaten çalıştırdı)
                 if "claude_ok" in globals() and (o.get("saglayici") or "claude-code") == "claude-code": claude_hata_bildir(j.get("result"), tur.get("kaynak") or "konus") if o["hata"] else claude_ok()  # v0.130.0
                 if any("suflorvt__vt_so" in x for x in tur.get("araclar") or []): _KS["vt_son"] = (time.time(), _vt_mt())  # v0.57.5
                 if tur.get("sorgular") and not o["hata"] and tur.get("kaynak") != "karsi" and not tur.get("karsi"): _vt_sorgu_kaydet(tur.get("soru") or KONUS.get("soru"), tur["sorgular"])  # v0.57.6
@@ -1685,10 +1689,25 @@ def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsı
     # 7 ilk soruda bırakıştan ilk metne ortanca 2,1 → 5,3 sn, maliyet +%21. Sürecin açılış masrafı zaten konuşma sırasında gizleniyor.
     threading.Thread(target=konus_ac, daemon=True).start()
     return {"ok": True}
-def konus_yazili(metin):  # v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py)
+# 5 Kasım: panodaki kutuya yazılan her şey asistana gider; not mu soru mu talimat mı ayrımını asistan yapar. Bu kural kutudan gelen her turun başına eklenir
+# (sistem istemi değişmez: süreç yenilenmez). Etiketleri cevap bitince aktarıcı ayıklar ve işi yapar (notlar.py kutu_etiketleri).
+KUTU_KURAL = {"tr": ("Bu yazı panodaki tek kutudan geldi; kullanıcı onu not, soru ya da talimat olarak yazmış olabilir, ayrımı sen yap. Soruysa cevapla. "
+                     "Düzeltme talimatıysa (örnek: «Mira Kalem değil Mira Kalın», «Ümit Mut şeklinde formal yaz»: ses tanımanın yanlış yazdığı ad ya da terim) "
+                     "cevabın sonuna her düzeltme için ayrı satırda tam şu etiketi koy: [SÖZLÜK: yanlış yazılış => doğru yazılış] ve «Tamam, sözlüğe ekledim: yanlış → doğru» de "
+                     "(yanlış yazılış kullanıcının verdiği biçim; yalnız kişi, firma ve terim adı için; geçmiş kayıtları ve özetleri düzeltemezsin, bunu bir cümleyle söyle). "
+                     "Yalnız hatırlatma ya da not niteliğindeyse (yapılacak, söz, aklında tutulacak bilgi) cevabın sonuna [NOT: kullanıcının sözleri] etiketi koy ve kısaca «Not aldım.» de. "
+                     "Etiketler panoda görünmez. Bu kural, «kayıt isteğinde yapamam» kuralının yerine geçer; not ve sözlük dışındaki bir işi (e-posta, kayıt veritabanı) yine yapamazsın, söyle."),
+              "en": ("This text came from the panel's single box; the user may have meant it as a note, a question or an instruction — you decide which. If it's a question, answer it. "
+                     "If it's a correction (e.g. «not Mira Kalem but Mira Kalın»: a name or term speech recognition misspelled), end your answer with this exact tag on its own line per correction: "
+                     "[SÖZLÜK: wrong spelling => correct spelling] and say «Done, added to the dictionary: wrong → right» (the wrong form as the user gave it; person, company and term names only; "
+                     "you can't fix past records or summaries — say so in one sentence). If it is only a reminder or note (a to-do, a promise, something to remember), end with [NOT: the user's words] and say «Noted.» briefly. "
+                     "The tags aren't shown on the panel. This rule replaces the «can't do record requests» rule; anything other than notes and the dictionary (email, the records database) you still can't do — say so.")}
+def konus_yazili(metin, kutu=False):  # v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py); kutu: 5 Kasım — yazı not/soru/talimat olabilir, asistan ayırır
     if _KS["tur"] and _KS["tur"].get("kaynak") == "uclu": uclu_iptal("kullanıcı sordu")
     if _KS["tur"] and not ("uclu_bekle" in globals() and uclu_bekle()): return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
-    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True}; _KS["tur"] = tur
+    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True, "kutu": bool(kutu)}; _KS["tur"] = tur
+    if kutu: KUTU_BEKLEYEN.clear(); KUTU_BEKLEYEN.update(metin=str(metin)[:4000], at=datetime.datetime.now().isoformat(timespec="seconds"))
+    else: KUTU_BEKLEYEN.clear()
     konus_pocket_isit(); threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
     print("KONUŞ: yazılı soru (pano kutusu)"); return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
@@ -1909,6 +1928,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
                  if tur.get("otonom") else "only the user hears this answer, the meeting doesn't; " + ("it is read in the headphones" if tur["sesli"] else "it is shown on the panel only (no headphones)")) + ".\n")) if top else ""
     if tur.get("yazili"): tb += _t("Kullanıcı bu soruyu panoya yazdı; cevabın sesli okunmaz, yalnız panoda yazılı görünür.\n",
                                    "The user typed this question on the panel; your answer is not read aloud, it is shown on the panel only.\n")
+    if tur.get("kutu"): tb += _t(KUTU_KURAL["tr"], KUTU_KURAL["en"]) + "\n"
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar
         _KS["bosta"] = False
         if konus_canli() and _KS.get("saglayici") == "claude-code" and konus_secim()["tur"] != "claude-code": konus_kapat("yedek süresi bitti", durum_koru=True); _KS["tur"] = tur
