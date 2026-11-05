@@ -29,7 +29,6 @@ DIR = ARG.dir; RELAY = ARG.relay.rstrip("/")
 if not re.match(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$", RELAY): sys.exit("yalnız yerel aktarıcı (127.0.0.1)")
 ID_RX = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{4}-[^/\\]+$")
 TARIH_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-GIZLI_RX = re.compile(r"\|\s*\*\*GİZLİ\*\*\s*\|")
 
 class AracHatasi(Exception): pass
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # yerel adres: ortam vekili kullanılmaz
@@ -46,34 +45,10 @@ def aktarici(yol, parametre=None):
         raise AracHatasi("aktarıcı yerel anahtarı reddetti (401)" if e.code == 401 else f"aktarıcı hata verdi ({e.code})")
     except (urllib.error.URLError, OSError, ValueError): raise AracHatasi("aktarıcı yanıt vermiyor (Suflor.me açık mı?)")
 
-# --- gizli toplantı ---------------------------------------------------------------------------------------------------
-_GIZLI = {}  # id → (mtime, boyut, gizli mi)
-def _kayitlar():  # son-toplantilar.jsonl: dosya adı → son kayıt
-    o = {}
-    try:
-        with open(os.path.join(DIR, "son-toplantilar.jsonl"), encoding="utf-8") as fh:
-            for ln in fh:
-                try: r = json.loads(ln)
-                except ValueError: continue
-                if isinstance(r, dict) and r.get("dosya"): o[str(r["dosya"])] = r
-    except OSError: pass
-    return o
-def gizli_mi(i, kayitlar=None):
-    i = str(i or "")
-    if not ID_RX.match(i): return True  # tanınmayan kimlik: gösterme
-    r = (kayitlar if kayitlar is not None else _kayitlar()).get(i + ".md") or {}
-    if r.get("gizli"): return True
-    yol = os.path.join(DIR, i + ".md")
-    try: st = os.stat(yol)
-    except OSError: return False
-    on = _GIZLI.get(i)
-    if on and on[0] == st.st_mtime and on[1] == st.st_size: return on[2]
-    g = False
-    try:
-        with open(yol, encoding="utf-8", errors="replace") as fh:
-            g = any(GIZLI_RX.search(ln) for ln in fh)
-    except OSError: pass
-    _GIZLI[i] = (st.st_mtime, st.st_size, g); return g
+# --- gizli toplantı (ortak kaynak: yapi.py — pano Bugün ucuyla aynı kural) -----------------------------------------------
+import yapi
+def _kayitlar(): return yapi.son_kayitlar(DIR)
+def gizli_mi(i, kayitlar=None): return yapi.gizli_mi(DIR, i, kayitlar)
 
 # --- karar grafı ------------------------------------------------------------------------------------------------------
 def _graf_yol(): return os.path.join(DIR, "karar-grafi.sqlite")
@@ -201,25 +176,21 @@ def t_is_durumu(a):
     if not yeni: raise AracHatasi("durum: yapildi | yapilmadi | acik")
     if x["durum"] == yeni: return {"degisiklik_yok": True, "kayit": x}
     def uygula():
-        import yapi
         r = yapi.soz_kapat(DIR, x["id"], yeni)
         if not r: raise AracHatasi("iş güncellenemedi")
         return {"kayit": dict(x, durum=yeni)}
     return _onay(a, f"{x['id']} \"{x['metin'][:120]}\" işi: {x['durum']} → {yeni}" + (f" (sahip {x['sahip']})" if x.get("sahip") else ""), uygula)
-TEYIT_RX = re.compile(r"\s*\(teyit bekliyor.*\)\s*$")  # yapi.graf_yaz ekler; içinde iç içe parantez olabilir
+TEYIT_RX = yapi.TEYIT_RX  # yapi.graf_yaz ekler
 def _karar_yaz(id_, metin):
-    import yapi
-    c = yapi._db(DIR)
-    try:
-        with c: n = c.execute("UPDATE kayit SET metin = ? WHERE id = ? AND tur = 'karar'", (metin[:600], int(id_[1:]))).rowcount
-    finally: c.close()
-    if not n: raise AracHatasi("karar güncellenemedi")
+    if not yapi.karar_yaz(DIR, id_, metin): raise AracHatasi("karar güncellenemedi")
 def t_karar_onayla(a):
     x = _kayit_bul(a.get("id"), ("karar",))
     if not TEYIT_RX.search(x["metin"]): return {"degisiklik_yok": True, "not": "bu kararda teyit bekliyor işareti yok", "kayit": x}
     yeni = TEYIT_RX.sub("", x["metin"])
-    return _onay(a, f"{x['id']} kararı onaylanır (teyit bekliyor işareti kalkar): \"{yeni[:160]}\"",
-                 lambda: (_karar_yaz(x["id"], yeni), {"kayit": dict(x, metin=yeni)})[1])
+    def uygula():
+        if yapi.karar_teyit_kaldir(DIR, x["id"]) is None: raise AracHatasi("karar güncellenemedi")
+        return {"kayit": dict(x, metin=yeni)}
+    return _onay(a, f"{x['id']} kararı onaylanır (teyit bekliyor işareti kalkar): \"{yeni[:160]}\"", uygula)
 def t_karar_duzelt(a):
     x = _kayit_bul(a.get("id"), ("karar",)); yeni = " ".join(str(a.get("metin") or "").split())[:500]
     if not yeni: raise AracHatasi("metin gerekli (kararın düzeltilmiş hali)")

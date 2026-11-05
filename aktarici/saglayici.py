@@ -9,7 +9,7 @@
 import json, os, re, subprocess, time, urllib.error, urllib.request
 
 SG_SECENEK = ("claude-code", "gemini", "ozel")
-SG_ISLER = ("konus", "ceviri", "proje_karti")  # panoda iş başına; telaffuz ve brifing varsayılanı izler; toplantı oturumu Claude Code'da kalır (K3)
+SG_ISLER = ("konus", "ceviri", "proje_karti", "prova")  # panoda iş başına; telaffuz ve brifing varsayılanı izler; toplantı oturumu Claude Code'da kalır (K3)
 SG_GEMINI_MODEL = "gemini-3.8-flash"  # Adım 1 gerçek denemesi 4/4, effort low ilk ses ortanca ~5,7 sn
 SG_OZEL_OGE = "suflor-ozel"
 SG_HAZIR_ADRES = {"gemini": "https://generativelanguage.googleapis.com/v1beta/openai", "openai": "https://api.openai.com/v1"}

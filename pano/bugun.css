@@ -202,6 +202,68 @@ html.mac #bgn .bkenar,html.mac #bgn .bmenu{display:none}
 #bnBild span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #bnBild button{border:0;background:none;color:inherit;font:inherit;font-weight:600;padding:4px 8px;border-radius:6px;text-decoration:underline;text-underline-offset:3px;flex:none;cursor:pointer}
 
+/* Asistan noktası: düşünüyor (prova ya da başka bekleme) */
+#bgn .varlikisaret.dusunuyor .nefes{background:var(--b-canli);animation-duration:.9s}
+#bgn .dusunce{font:400 var(--b-yz-k) var(--f-govde);color:var(--b-m3);letter-spacing:0}
+/* Bugün'de prova girişi */
+#bgn .provagiris{display:flex;gap:8px;max-width:520px}
+#bgn .provagiris input{flex:1;min-width:0;font:inherit;font-size:var(--b-yz-m);color:var(--b-murekkep);background:var(--b-yuzey);border:1px solid var(--b-cizgi2);border-radius:var(--b-k-s);padding:7px 11px}
+#bgn .provagiris input::placeholder{color:var(--b-m3)}
+#bgn .provagiris input:focus{outline:2px solid var(--b-vurgu);outline-offset:1px}
+#bgn .bolum.prova .giris{font-size:var(--b-yz-m);color:var(--b-m2)}
+#bgn .sat .a .varlik{font-size:var(--b-yz-k);text-underline-offset:3px}
+
+/* Prova odası penceresi (Bugün ile aynı belirteçler; <dialog> #bgn dışında) */
+dialog#prd{border:1px solid var(--b-cizgi);border-radius:var(--b-k-l);background:var(--b-yuzey);color:var(--b-murekkep);padding:22px 24px;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:var(--b-golge-panel);font:var(--b-yz-m)/1.5 var(--f-govde);overflow:auto}
+dialog#prd::backdrop{background:rgba(12,18,15,.4)}
+dialog#prd[open]{display:grid;gap:16px;align-content:start}
+#prd *{box-sizing:border-box}
+#prd :focus-visible{outline:2px solid var(--b-vurgu);outline-offset:2px}
+#prd .prb{display:flex;align-items:flex-start;gap:10px}#prd .prb>div{flex:1;min-width:0}
+#prd .prb h2{margin:2px 0 0;font:300 24px/1.2 var(--f-baslik);overflow-wrap:anywhere}
+#prd .eb{font:500 var(--b-yz-e) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);letter-spacing:.07em;text-transform:uppercase;color:var(--b-m3)}
+#prd .ikon{border:0;background:none;width:32px;height:32px;border-radius:var(--b-k-s);display:grid;place-items:center;color:var(--b-m2);padding:0;cursor:pointer}
+#prd .ikon:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}
+#prd svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+#prd .prnokta,#prd .prnokta2{width:10px;height:10px;border-radius:50%;background:var(--b-pirinc);margin-top:9px;flex:none;animation:bnNefes var(--b-nefes) ease-in-out infinite}
+#prd .prnokta.dusunuyor,#prd .prnokta2{background:var(--b-canli);animation-duration:.9s}
+#prd .prnokta2{margin:0}
+#prd .prduz{display:flex;align-items:center;gap:10px;font:300 var(--b-yz-giris)/1.3 var(--f-baslik)}
+#prg{display:grid;gap:16px}
+#prd .prf{display:grid;gap:14px}#prd .prf label{display:grid;gap:5px}
+#prd textarea,#prd input[type=text]{font:inherit;font-size:var(--b-yz-m);color:var(--b-murekkep);background:var(--b-zemin);border:1px solid var(--b-cizgi2);border-radius:var(--b-k-s);padding:8px 11px;width:100%;resize:vertical}
+#prd textarea::placeholder,#prd input::placeholder{color:var(--b-m3)}
+#prd .b{border:1px solid var(--b-cizgi2);background:transparent;border-radius:var(--b-k-s);padding:5px 12px;font:inherit;font-size:var(--b-yz-k);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;color:var(--b-murekkep);cursor:pointer}
+#prd .b:hover{background:var(--b-uzerinde)}#prd .b:disabled{opacity:.5;cursor:default}
+#prd .b.ana{background:var(--b-ana);border-color:var(--b-ana);color:var(--b-ana-yazi)}#prd .b.ana:hover{opacity:.9}
+#prd .b.sade{border-color:transparent;color:var(--b-m2)}
+#prd .b.iri{padding:8px 16px;font-size:var(--b-yz-m);border-radius:10px}
+#prd .keylem{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#prd .prk{display:grid;gap:8px}
+#prd .prkl{display:flex;flex-wrap:wrap;gap:6px}
+#prd .prkc{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--b-cizgi2);border-radius:var(--b-k-tam);padding:3px 6px 3px 11px;font-size:var(--b-yz-k)}
+#prd .prkc button{border:0;background:none;color:var(--b-m3);padding:0 5px;cursor:pointer;font:inherit;line-height:1;border-radius:50%}
+#prd .prkc button:hover{color:var(--b-murekkep)}
+#prd .prkekle{display:flex;gap:6px;align-items:center}#prd .prkekle input{flex:1;min-width:0}
+#prd .prsoluk{margin:0;font-size:var(--b-yz-k);color:var(--b-m3)}
+#prd .prsoru{display:grid;gap:4px;padding:16px 18px;border-radius:var(--b-k-m);background:var(--b-yuzey2)}
+#prd .prs{margin:0;font:300 var(--b-yz-karar)/1.35 var(--f-baslik)}
+#prd .prgec summary{cursor:pointer;color:var(--b-m2);font-size:var(--b-yz-k)}
+#prd .prgi{padding:8px 0;border-bottom:1px solid var(--b-cizgi);font-size:var(--b-yz-m)}#prd .prcv{color:var(--b-m2);margin-top:2px;white-space:pre-wrap}
+#prd .prgenel{margin:0;color:var(--b-m2)}
+#prd .prhata{margin:0;color:var(--b-gec);font-size:var(--b-yz-m)}
+#prd .prpuan{display:flex;gap:20px;align-items:center}#prd .prpuan p{margin:2px 0 0;color:var(--b-m2);font-size:var(--b-yz-k)}
+#prd .prp{font:300 56px/1 var(--f-baslik);letter-spacing:-.03em;flex:none}#prd .prp small{font:400 18px var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);color:var(--b-m3);margin-left:3px;letter-spacing:0}
+#prd .prb2{display:grid;gap:6px}
+#prd .prb2 h4{margin:0;font:500 var(--b-yz-e) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);letter-spacing:.07em;text-transform:uppercase;color:var(--b-m3)}
+#prd .prb2 ul,#prd .prb2 ol{margin:0;padding:0;list-style:none;display:grid;border-top:1px solid var(--b-cizgi);counter-reset:pr}
+#prd .prb2 li{display:grid;gap:2px;padding:9px 0;border-bottom:1px solid var(--b-cizgi);overflow-wrap:anywhere}
+#prd .prb2 li b{font-weight:500}#prd .prb2 li span{color:var(--b-m2);font-size:var(--b-yz-k)}
+@media (prefers-reduced-motion:reduce){#prd .prnokta,#prd .prnokta2{animation:none}}
+
+/* Tarayıcıda üst çubuktaki marka: kenar çubuğunda da var (Bugün'de yinelenmesin); dar ekranda ve Mac'te kalır */
+@media (min-width:721px){html.bugun:not(.mac) header .brand{display:none}}
+
 @media (prefers-reduced-motion:reduce){#bgn .nefes,#bgn .dalga i,#bgn .camkenar{animation:none}#bgn .dalga i{height:8px}#bgn .sat,#bnPanel,#bnBild,#bgn .bkenar{transition:none}}
 
 /* Dar ekran */

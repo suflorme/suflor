@@ -133,7 +133,7 @@ bt.add_argument("yol", help="kaydedilen özet .md"); bt.add_argument("--yapi", d
 bt.add_argument("--baslik", default=None, help="panoda görünen ad"); bt.add_argument("--dosya", default=None, help="canlı toplantı .md (grafta kaynak; yoksa en yenisi)")
 oh = sub.add_parser("ozet-hazir", help="özet kaydedildi: panoda Son toplantılar + macOS bildirimi (özetin '## Toplantı çıktısı' bölümünden)")
 oh.add_argument("yol", help="kaydedilen özet .md"); oh.add_argument("--baslik", default=None, help="panoda görünen ad (yoksa gündem başlığı ya da toplantı adı)")
-hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi"); hl.add_argument("--kim", default=None); hl.add_argument("--n", type=int, default=3)
+hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi"); hl.add_argument("--kim", default=None); hl.add_argument("--n", type=int, default=3); hl.add_argument("--kisi", type=int, default=None, help="katılımcı sayısı (takvimden; yoksa bilinmiyor)")
 ks = sub.add_parser("karsilastir", help="v0.7.2: Teams dökümü (.vtt/.docx/.txt) ile Suflor.me dökümünü karşılaştır")
 ks.add_argument("teams", help="Teams'ten indirilen döküm dosyası"); ks.add_argument("dosya", nargs="?", help="Suflor.me .md/.jsonl (yoksa en yenisi)")
 ks.add_argument("--n", type=int, default=12, help="en çok kaç kaçan bölüm listelensin"); ks.add_argument("--kaydet", action="store_true")
@@ -2194,6 +2194,10 @@ def bitir_cmd():
             else: print("DEFTER: kaynak saatleri dökümde doğrulandı")
         if "duzeltmeler" not in v: print("DEFTER: yapı dosyasında \"duzeltmeler\" yok — dökümde yanlış duyulmuş ad/sayı/terim varsa (bağlamdan eminsen) "
                                          "{\"saat\", \"yanlis\", \"dogru\"} listesi ekle, yoksa boş liste yaz; aralık sorunu varsa \"dokum_notu\" (biçim: tc yapi --ornek); bitir'i yeniden çalıştır")
+        ey = Y.eposta_yeterdi(v)
+        if ey[2] == "yok": print("EPOSTA: yapı dosyasında \"eposta_yeterdi\" yok — karar çıkmadıysa ve konuşmaların çoğu durum aktarımıysa {\"deger\": true, \"gerekce\": \"…\"}, değilse {\"deger\": false} yaz (TOPLANTI-MODU.md §9); bitir'i yeniden çalıştır")
+        elif ey[2]: print("EPOSTA: " + ey[2])
+        elif ey[0]: print("EPOSTA: bir dahakine e-postayla çözülebilir — " + ey[1])
         ek = Y.eksik_isler(v)
         if ek: print("eksik: " + " | ".join(f"{o['metin'][:50]} ({'sahip yok' if not (o.get('sahip') or o.get('kim')) else 'tarih yok'})" for o in ek[:8])
                      + " — özette \"sahipsiz\"/\"tarihsiz\" yazılı olsun; kullanıcıya sor")
@@ -2242,6 +2246,10 @@ def hazirlik_cmd():
     print("\n".join("  - " + soz_satir(x) for x in sz[-10:]) or "  yok")
     if sz: print("  → her biri için hazir.json'a soyle kartı: \"<kim> <tarih>'e kadar <ne> demişti — durumunu sor\" (GEÇTİ olanlar önce); "
                  "toplantıda tutulduğu anlaşılırsa sonunda: soz kapat sN")
+    try:  # "Bu toplantı e-postayla çözülebilir" işareti (yapi.eposta_isaret): kural tabanlı, son kararı Claude verir
+        ik = _yapi().eposta_isaret(agj.get("items") or [], agj.get("title") or "", A.kisi)
+        print("\n## E-posta yeterli mi? (işaret: " + ("GÜÇLÜ" if ik["guclu"] else "zayıf") + ")\n" + "\n".join("  - " + n for n in ik["nedenler"]))
+    except Exception: pass
     print("\nClaude: bundan hazir.json kartlarını ve kullanıcıya 3–6 satırlık 'geçmişte ne dendi / açık ne' özetini çıkar (kaynak dosya @konum).")
 
 # --- v0.7.2: Teams'in kendi dökümüyle karşılaştırma ------------------------------------------------------------

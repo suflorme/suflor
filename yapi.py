@@ -20,6 +20,7 @@ YAPI_ORNEK = {"baslik": "Ayşe — bütçe", "tarih": "2026-10-11", "gorsel": "k
         {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Yılmaz", "saat": "10:11:00", "cevap": "Kısmen doğru: 92 bin", "kaynak": "Metrik kaynağı · get_metrics · Ekim 2026",
          "kaynak_url": "https://ornek.example/rapor"}]}],
     "oneri": "Gündemi bir gün önce gönder",
+    "eposta_yeterdi": {"deger": False, "gerekce": ""},
     "duzeltmeler": [{"saat": "10:14:05", "yanlis": "Bora Kaplan", "dogru": "Bora Kaya"}, {"saat": "10:12:41", "yanlis": "on iki bin", "dogru": "yüz yirmi bin"}],
     "dokum_notu": "10:20–10:22 karşı tarafın sesi kesikti; o aradaki satırlar eksik"}
 # "gorsel" (5 Kasım): toplantı sonu görselinin türü, özeti yazan Claude belirler — "karar_is" (karar ve iş panosu; varsayılan) ya da "harita" (zihin haritası:
@@ -120,6 +121,33 @@ def cikti_say(v):
     acik_madde = sum(1 for m in v["maddeler"] if kucuk(m.get("durum") or "") in ("açık", "acik", "kısmen", "kismen", "konuşulmadı", "konusulmadi"))
     return {"karar": sum(o["tur"] == "karar" for o in og), "is": sum(o["tur"] in ("is", "soz") for o in og),
             "acik": sum(o["tur"] == "soru" for o in og) + acik_madde}
+# "Bu toplantı e-postayla çözülebilir" (5 Kasım): yöneticinin zamanını korumak. İki an, ikisi de yalnız GÜÇLÜ işarette söyler (yanlış pozitif pahalı).
+#  - toplantı öncesi: eposta_isaret(gündem maddeleri, başlık, kişi sayısı) kural tabanlı işaret verir (tc hazirlik "## E-posta yeterli mi?");
+#    son kararı hazırlığı yapan Claude verir (geçmiş toplantılar, takvim notu dahil).
+#  - toplantı sonu: yapı dosyasında "eposta_yeterdi": {"deger": bool, "gerekce": "…"}; eposta_yeterdi() kararsız/çelişkili değeri (karar çıkmışken true) düşürür.
+BILGI_RX = re.compile(r"bilgilendirme|bilgi paylaşım|bilgi aktar|durum (?:güncelleme|raporu|paylaşım|özeti)|güncelleme|haftalık özet|aylık özet|duyuru|tanıtım|sunum|status|update|fyi|announcement|readout|share[- ]?out|briefing|recap", re.I)
+KARAR_RX = re.compile(r"karar|onay|tartış|değerlendir|seç(?:im|enek)|öncelik|strateji|plan(?:lama)?\b|bütçe|pazarlık|müzakere|görüşme|beyin fırtınası|workshop|çalıştay|geri bildirim|retro|çöz(?:üm)?\b|sorun|decid|decision|approve|approval|discuss|brainstorm|negotiat|prioriti|review|feedback|align|plan\b|budget|problem|options?", re.I)
+def eposta_isaret(maddeler, baslik="", kisi=None):
+    # → {"guclu": bool, "nedenler": [..]}; maddeler: gündem metinleri. Güçlü: ≥1 madde, hepsi bilgi aktarımı kalıbında, hiçbirinde karar/tartışma kalıbı yok,
+    # başlıkta karar/tartışma kalıbı yok, kişi sayısı biliniyorsa ≥ 3 (iki kişilik toplantı çoğunlukla ilişki/ayardır, e-postaya çevrilmez).
+    m = [" ".join(str(x).split()) for x in (maddeler or []) if str(x).strip()]; ned = []
+    bil = [x for x in m if BILGI_RX.search(x)]; kar = [x for x in m if KARAR_RX.search(x)]
+    if not m: return {"guclu": False, "nedenler": ["gündem yok: işaret yok"]}
+    if kar: ned.append(f"{len(kar)} gündem maddesi karar/tartışma kalıbında: " + "; ".join(x[:50] for x in kar[:3]))
+    if len(bil) < len(m): ned.append(f"{len(m) - len(bil)}/{len(m)} madde bilgi aktarımı olarak açık değil")
+    if baslik and KARAR_RX.search(baslik): ned.append("başlık karar/tartışma kalıbında")
+    if kisi is not None and kisi < 3: ned.append(f"{kisi} kişilik toplantı")
+    if ned: return {"guclu": False, "nedenler": ned}
+    return {"guclu": True, "nedenler": [f"{len(m)}/{len(m)} gündem maddesi bilgi aktarımı" + (f"; {kisi} katılımcı" if kisi else "")]}
+def eposta_yeterdi(v):
+    # özet yapısından → (deger, gerekce, uyari). Karar çıkmışsa true düşer (özetin kendi sayısıyla çelişemez); gerekçesiz true geçmez.
+    e = v.get("eposta_yeterdi")
+    if not isinstance(e, dict): return False, "", "yok"
+    g = " ".join(str(e.get("gerekce") or "").split())[:240]
+    if e.get("deger") is not True: return False, "", ""
+    if cikti_say(v)["karar"] > 0: return False, "", "karar çıkmış: eposta_yeterdi geçersiz"
+    if not g: return False, "", "gerekçe yok: eposta_yeterdi geçersiz"
+    return True, g, ""
 def eksik_isler(v):  # sahibi ya da tarihi olmayan iş/söz (bitir uyarısı)
     return [o for m in v["maddeler"] for o in m["ogeler"] if o["tur"] in ("is", "soz") and (not (o.get("sahip") or o.get("kim")) or not o.get("tarih"))]
 # --- sözler defteri: grafın iş/söz kayıtları -------------------------------------------------------------------------
@@ -144,6 +172,91 @@ def soz_kapat(dizin, sid, durum):
     with c: n = c.execute("UPDATE kayit SET durum = ? WHERE id = ? AND tur IN ('is', 'soz')", (durum, int(sid[1:]))).rowcount
     x = c.execute("SELECT id, tarih, tur, kim, sahip, metin, son_tarih, baslik, durum, eklendi FROM kayit WHERE id = ?", (int(sid[1:]),)).fetchone(); c.close()
     return soz_dict(x) if n and x else None
+# --- Bugün sayfası ve arşiv MCP'nin ortak okuma/yazma yardımcıları (tek kaynak: pano ucu /bugun-veri, /karar-onay, /is-durum ve arsiv-mcp.py) ---
+GIZLI_RX = re.compile(r"\|\s*\*\*GİZLİ\*\*\s*\|")
+TEYIT_RX = re.compile(r"\s*\(teyit bekliyor(?:\s*[—-]\s*(.*))?\)\s*$")  # graf_yaz ekler; içinde iç içe parantez olabilir
+ID_RX = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{4}-[^/\\]+$")
+_GIZLI = {}  # (dizin, id) → (mtime, boyut, gizli mi)
+def son_kayitlar(dizin):  # son-toplantilar.jsonl: dosya adı → son kayıt
+    o = {}
+    try:
+        with open(os.path.join(dizin, "son-toplantilar.jsonl"), encoding="utf-8") as fh:
+            for ln in fh:
+                try: r = json.loads(ln)
+                except ValueError: continue
+                if isinstance(r, dict) and r.get("dosya"): o[str(r["dosya"])] = r
+    except OSError: pass
+    return o
+def gizli_mi(dizin, i, kayitlar=None):  # kayıtta gizli: true ya da dökümde **GİZLİ** satırı; tanınmayan kimlik gösterilmez
+    i = str(i or "")
+    if i.endswith(".md"): i = i[:-3]
+    if not ID_RX.match(i): return True
+    r = (kayitlar if kayitlar is not None else son_kayitlar(dizin)).get(i + ".md") or {}
+    if r.get("gizli"): return True
+    yol = os.path.join(dizin, i + ".md")
+    try: st = os.stat(yol)
+    except OSError: return False
+    on = _GIZLI.get((dizin, i))
+    if on and on[0] == st.st_mtime and on[1] == st.st_size: return on[2]
+    g = False
+    try:
+        with open(yol, encoding="utf-8", errors="replace") as fh: g = any(GIZLI_RX.search(ln) for ln in fh)
+    except OSError: pass
+    _GIZLI[(dizin, i)] = (st.st_mtime, st.st_size, g); return g
+def kayit_bul(dizin, kimlik, turler):  # "k12" / "s7" / "q3" → (sözlük ya da None); gizli toplantıdaysa yok sayılır
+    m = re.fullmatch(r"([ksq])(\d+)", str(kimlik or ""))
+    if not m or not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return None
+    c = _db(dizin)
+    try: r = c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, saat, durum FROM kayit WHERE id = ?", (int(m.group(2)),)).fetchone()
+    finally: c.close()
+    if not r or r[4] not in turler or (r[1] and gizli_mi(dizin, r[1])): return None
+    return {"id": f"{ {'karar': 'k', 'soru': 'q'}.get(r[4], 's') }{r[0]}", "toplanti": r[1], "baslik": r[2], "tarih": r[3], "tur": r[4], "kim": r[5], "sahip": r[6], "metin": r[7], "son_tarih": r[8], "durum": r[10]}
+def karar_yaz(dizin, kimlik, metin):  # kararın metnini değiştirir (onay/düzeltme) → kayıt sayısı
+    c = _db(dizin)
+    try:
+        with c: return c.execute("UPDATE kayit SET metin = ? WHERE id = ? AND tur = 'karar'", (str(metin)[:600], int(str(kimlik)[1:]))).rowcount
+    finally: c.close()
+def karar_teyit_kaldir(dizin, kimlik):  # "(teyit bekliyor — …)" ekini kaldırır → yeni metin ya da None (kayıt yok/gizli/ek yok)
+    x = kayit_bul(dizin, kimlik, ("karar",))
+    if not x or not TEYIT_RX.search(x["metin"]): return None
+    yeni = TEYIT_RX.sub("", x["metin"])
+    return yeni if karar_yaz(dizin, x["id"], yeni) else None
+def _vade_gun(v, bugun):  # ISO tarih → bugüne kalan gün (negatif: gecikti); serbest metin ("cuma") → None
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(v or "")): return None
+    try: return (datetime.date.fromisoformat(v) - bugun).days
+    except ValueError: return None
+def bugun_veri(dizin, ad, bugun=None):
+    # Bugün sayfası için karar grafından: kullanıcının açık işleri, başkalarına atanmış açık işler, teyit bekleyen kararlar, son toplantının kararları.
+    # Gizli toplantıdan gelen kayıt dönmez. Veri yoksa listeler boş (uydurma yok). ad boşsa "kendi" ve "baskalari" ayrılamaz → ikisi de boş.
+    bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
+    c = _db(dizin)
+    try: rs = c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum FROM kayit WHERE tur IN ('is', 'soz', 'karar') ORDER BY tarih DESC, id DESC LIMIT 3000").fetchall()
+    finally: c.close()
+    ky = son_kayitlar(dizin); gz = {}
+    def gorunur(t):
+        if not t: return True
+        if t not in gz: gz[t] = not gizli_mi(dizin, t, ky)
+        return gz[t]
+    ben = _ilk(ad); son_top = None; son_kararlar = []
+    for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum in rs:
+        if not gorunur(top): continue
+        if tur == "karar":
+            m = TEYIT_RX.search(metin or ""); temiz = TEYIT_RX.sub("", metin or "")
+            k = {"id": f"k{i}", "metin": temiz, "teyit": bool(m), "neden": (m.group(1) or "").strip() if m else "", "baslik": baslik or "", "tarih": tarih or "", "toplanti": top}
+            if m and len(out["teyit"]) < 20: out["teyit"].append(k)
+            if son_top is None: son_top = top
+            if top == son_top: son_kararlar.append(k)
+            continue
+        if durum != "acik": continue
+        kisi = sahip or kim or ""; gun = _vade_gun(son, bugun)
+        x = {"id": f"s{i}", "metin": metin, "kim": kisi, "vade": son or "", "kalan_gun": gun, "gecikti": gun is not None and gun < 0, "baslik": baslik or "", "toplanti": top}
+        if ad and kisi and _ilk(kisi) == ben: out["kendi"].append(x)
+        elif ad and kisi: out["baskalari"].append(x)
+    srt = lambda l: sorted(l, key=lambda x: (x["kalan_gun"] is None, x["kalan_gun"] if x["kalan_gun"] is not None else 0))
+    out["kendi"] = srt(out["kendi"])[:30]; out["baskalari"] = srt(out["baskalari"])[:60]
+    if son_kararlar: out["son_karar"] = {"baslik": son_kararlar[0]["baslik"], "tarih": son_kararlar[0]["tarih"], "toplanti": son_top, "kararlar": son_kararlar[::-1][:12]}
+    return out
 def sozler_tasi(dizin):
     # eski sozler.json (Faz 3) → graf, bir kez; dosya sozler-tasindi.json olur (silinmez)
     yol = os.path.join(dizin, "sozler.json")

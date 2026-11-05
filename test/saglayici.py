@@ -28,14 +28,14 @@ def bekle(kosul, sn=10):
 
 # --- 1. seçenek ↔ ayar -----------------------------------------------------------------------------------------------------------
 a = {}
-kontrol("ayarsız: varsayılan Claude Code, işler boş", SG.sg_secim(a) == {"varsayilan": "claude-code", "konus": "", "ceviri": "", "proje_karti": ""})
+kontrol("ayarsız: varsayılan Claude Code, işler boş", SG.sg_secim(a) == {"varsayilan": "claude-code", "konus": "", "ceviri": "", "proje_karti": "", "prova": ""})
 kontrol("Claude Code seçimi ayara bir şey yazmaz", SG.sg_yaz(a, {"varsayilan": "claude-code"}) is None and "beyin" not in a)
 kontrol("gemini varsayılan", SG.sg_yaz(a, {"varsayilan": "gemini"}) is None and a["beyin"]["varsayilan"]["saglayici"] == "gemini" and a["beyin"]["varsayilan"]["anahtar"] is None)
 s = BY.secim(a, "konus")
 kontrol("beyin.py: Konuş Gemini'ye (adres hazır, öğe suflor-gemini, effort low)", s["tur"] == "openai-uyumlu" and s["adres"] == BY.HAZIR["gemini"] and s["anahtar"] == "suflor-gemini" and s["effort"] == "low", s)
 kontrol("beyin.py: ayardaki gemini_anahtar öğesi geçerli", BY.secim(dict(a, gemini_anahtar="benim-oge"), "konus")["anahtar"] == "benim-oge")
 a["beyin_ozel"] = {"adres": "https://api.ornek.com/v1", "model": "m-1"}; SG.sg_yaz(a, {"ceviri": "claude-code", "konus": "ozel"})
-kontrol("iş başına: çeviri Claude Code, Konuş OpenAI uyumlu", SG.sg_secim(a) == {"varsayilan": "gemini", "konus": "ozel", "ceviri": "claude-code", "proje_karti": ""}, SG.sg_secim(a))
+kontrol("iş başına: çeviri Claude Code, Konuş OpenAI uyumlu", SG.sg_secim(a) == {"varsayilan": "gemini", "konus": "ozel", "ceviri": "claude-code", "proje_karti": "", "prova": ""}, SG.sg_secim(a))
 s = BY.secim(a, "konus")
 kontrol("beyin.py: Konuş ozel hizmete (adres, öğe suflor-ozel, effort/öğe sızmaz)", s["adres"] == "https://api.ornek.com/v1" and s["effort"] is None and s["anahtar"] == "suflor-ozel", s)
 kontrol("beyin.py: çeviri claude-code (haiku)", BY.secim(a, "ceviri") == {"tur": "claude-code", "model": "haiku"})
@@ -109,7 +109,7 @@ try:
                                    headers={"X-Suflor-Anahtar": an, "Origin": f"http://127.0.0.1:{rport}", "Content-Type": "application/json"})
         return json.load(urllib.request.urlopen(r, timeout=10))
     st = istek("/status"); ay = st["ayarlar"]
-    kontrol("/status beyin: eski ollama ayarı Claude Code'a düşer", st["beyin"]["etkin"] == {"konus": "claude-code", "ceviri": "claude-code", "proje_karti": "claude-code"}, st.get("beyin"))
+    kontrol("/status beyin: eski ollama ayarı Claude Code'a düşer", st["beyin"]["etkin"] == {"konus": "claude-code", "ceviri": "claude-code", "proje_karti": "claude-code", "prova": "claude-code"}, st.get("beyin"))
     kontrol("Ayarlar: beyin_* değerleri + kullanılabilirlik", ay["deger"]["beyin_varsayilan"] == "claude-code" and ay["deger"]["beyin_konus"] == "claude-code" and "ollama" not in ay["beyin"] and ay["beyin"]["gemini"] is False, ay.get("beyin"))
     kontrol("Ayarlar: kullanılabilirlikte ollama yok", "ollama" not in json.dumps(ay["beyin"]))
     kontrol("Varsayılanlara dön yapay zekâ seçimine dokunmaz", not any(k.startswith("beyin_") for k in ay["varsayilan"]))

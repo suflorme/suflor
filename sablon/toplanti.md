@@ -54,6 +54,8 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
 - `tc hazirlik --kim <kişi>`: kişinin geçmişte söyledikleri, gündem maddesi başına ilk 3 sonuç, önceki toplantılarda ona sorulup
   cevapsız kalan sorular, kapanmamış sözleri (sözler defteri) ve esas belgelerde geçtiği satırlar. Yetmeyen madde için `tc ara "<sorgu>" [--kim] [--tur …] [--n 8]`
   (tüm proje klasörü: belgeler, tablolar, görüşmeler, `_canli/` toplantıları). Kişiye ait hazırlık notu varsa oku.
+- `tc hazirlik`'e takvimdeki katılımcı sayısını ver (`--kisi N`); çıktıdaki "E-posta yeterli mi?" işareti GÜÇLÜyse ve sen de katılırsan hazırlık özetinin
+  sonuna "Bu toplantı e-postayla çözülebilir: <gerekçe>" + taslak (`TOPLANTI-KURALLARI.md` §9); zayıfta söyleme.
 - Kullanıcıya 3–6 satır "geçmişte ne dendi / açık kalan ne" (kaynak `dosya @konum`). Esas belgeler ve tablolar güncel kayıttır;
   döküm ile çelişirse tablo geçer, çelişkiyi kullanıcıya söyle.
 - `_canli/hazir.json`'u bu toplantı için yeniden yaz:
@@ -115,6 +117,8 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    içerir" ve döküm dosyasının adı), kullanıcıya toplantı çıktısıyla başlayarak sun.
    Özetle birlikte yapı dosyası: `<özet>.yapi.json` (özetle aynı ad) — gündem maddesi başına durum (konuşuldu / kısmen / açık) ve
    karar · iş (sahip, tarih) · söz · açık soru · sayı · iddia (kim, saat, kısa alıntı) + `oneri` (tek cümle); biçim `tc yapi --ornek`;
+   Karar çıkmadıysa ve konuşmanın çoğu durum aktarımıysa özetin sonuna "Bir dahakine e-postayla çözülebilir: <gerekçe>" ve yapıya
+   `"eposta_yeterdi": {"deger": true, "gerekce": "…"}` (aksi hâlde `deger` false; `TOPLANTI-KURALLARI.md` §9).
    özette olmayanı ekleme, uydurma. Toplantı çıktısının sayıları, sözler defteri ve karar grafı bu dosyadan dolar.
    Her kararda `netlik`: `acik` (taraflar açıkça onayladı) · `ortuk` (itiraz yok ama kimse açıkça "tamam" demedi) · `tek` (bir kişi
    söyledi, öteki cevap vermedi); dökümde dayanağı olan ama konuşulmamış koşul varsa `varsayim` (tek cümle). Emin değilsen `ortuk`.

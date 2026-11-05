@@ -23,7 +23,7 @@ DENEME = bool(os.environ.get("SUFLOR_AYAR") or os.environ.get("SUFLOR_EV"))
 def acik(ayar):
     if DENEME: return str(ayar.get("teshis_adres") or "").startswith("http://127.0.0.1:")
     return True
-KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "toplanti.py", "saglik.py", "kaynak.py", "agir-kilit.py", "duman.py", "bellek.py", "sozluk.py", "sozluk-ogren.py", "sozluk-hakem.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "beyin.py", "bas-konus.py", "claude-giris.py", "sohbet.py", "uclu-sahne.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "ekran.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "saglayici.py", "profil.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "azure-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "tstt-golge-isci.py", "golge-tstt.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
+KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "izin.py", "toplanti-oturum.py", "toplanti.py", "saglik.py", "kaynak.py", "agir-kilit.py", "duman.py", "bellek.py", "sozluk.py", "sozluk-ogren.py", "sozluk-hakem.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "prova.py", "beyin.py", "bas-konus.py", "claude-giris.py", "sohbet.py", "uclu-sahne.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "ekran.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "saglayici.py", "profil.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "azure-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "tstt-golge-isci.py", "golge-tstt.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
                  "content.js", "platform-teams.js", "background.js", "offscreen.js", "mic-main.js", "popup.js", "launcher.js")
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 SOZLUK_DOSYA = os.path.join(_BURASI, "teshis-sozluk.txt")
@@ -134,7 +134,7 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"}, "kurulum_profil": {"hafif", "tam"}, "calisan_motor": {"mlx", "cpp"},  # S188: haftalık whisper_cpp'de son açılan motor
          "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"},
-         **{"beyin_" + i: {"claude-code", "gemini", "ozel", ""} for i in ("varsayilan", "konus", "ceviri", "proje_karti")}}  # Faz 11: yalnız seçenek (ortam)
+         **{"beyin_" + i: {"claude-code", "gemini", "ozel", ""} for i in ("varsayilan", "konus", "ceviri", "proje_karti", "prova")}}  # Faz 11: yalnız seçenek (ortam)
 # sözlük anahtarları da süzülür. Anahtar kalıba uymalı; sayım sözlüklerinin anahtarı veriden geldiği için
 # (kaynak, kanal, kart türü, dönüş, karne boyutu) yalnız bilinen değerler. Uymayan anahtar "?<sıra>" olur (değer yine süzülür).
 ANAHTAR = re.compile(r"[a-z_][a-z0-9_]{0,39}")
@@ -197,7 +197,7 @@ def beyin_secenek(ayar):  # Faz 11: işlerin yapay zekâ seçeneği (aktarici/sa
         if d.get("tur") != "openai-uyumlu": return "claude-code"
         sg = str(d.get("saglayici") or "").lower()
         return "gemini" if sg == "gemini" else "claude-code" if sg == "ollama" else "ozel"  # ollama: kaldırılan eski seçenek, Claude Code'a düşer
-    return {"beyin_varsayilan": ad(b.get("varsayilan")) or "claude-code", **{"beyin_" + i: ad(b.get(i)) for i in ("konus", "ceviri", "proje_karti")}}
+    return {"beyin_varsayilan": ad(b.get("varsayilan")) or "claude-code", **{"beyin_" + i: ad(b.get(i)) for i in ("konus", "ceviri", "proje_karti", "prova")}}
 
 # ---------- proje klasörü (S141: "proje klasörü buluttaysa?") ----------
 # Klasör türü yalnız yoldan (sağlayıcı adı; ~/Library/CloudStorage/<Sağlayıcı>-<hesap> içindeki hesap/e-posta kısmı alınmaz). Sayılar son proje

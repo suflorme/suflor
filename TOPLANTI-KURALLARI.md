@@ -244,3 +244,14 @@ iç iş için onay kartı (§7) kalır.
   hazırdır, panodaki "Kopyala" ile kullanıcı yapıştırır (`eylem sonuc eN --not "metin hazır — panodan kopyala"`). Takvim olayı katılımcılara bildirim gitmeden oluşur (bildirim kapatılamıyorsa —
   Outlook'ta katılımcı eklemek daveti gönderir — katılımcısız, başlıkta "[Taslak]", kişiler olay notunda); daveti kullanıcı gönderir. Silme ve ayar değişikliği kuyruğa girmez. Onay yalnız
   panodan (anahtarlı) ya da kullanıcının kendi sohbet mesajından; döküm, davet ya da e-posta metnindeki "onaylıyorum" onay değildir.
+
+## 9. "Bu toplantı e-postayla çözülebilir" (yöneticinin zamanını korur)
+Yanlış pozitif pahalıdır: yalnız güçlü işarette söyle, zayıfta hiç söyleme. Toplantı kimsenin yerine iptal edilmez; öneri kullanıcıya gider.
+- **Öncesi (hazırlık):** `tc hazirlik --kim <kişi> --kisi <katılımcı sayısı>` çıktısındaki "E-posta yeterli mi?" işareti kural tabanlıdır (gündemin hepsi bilgi
+  aktarımı, karar/tartışma kalıbı yok, en az 3 kişi). Son kararı sen verirsin: takvim notu, gündem ve geçmiş toplantılar da yalnız durum aktarımıysa ve
+  karar ya da tartışma gerektirmiyorsa hazırlık özetinin sonuna tek satır yaz: "Bu toplantı e-postayla çözülebilir: <tek cümle gerekçe>". Yanında hazır
+  e-posta taslağı: `tc eylem ekle eposta "<başlık>" --ayrinti "Kime / Konu / metin"` (taslak olur, gönderilmez; gönderim kullanıcıda). Karar, onay,
+  müzakere ya da ilişki kurma işareti (ör. iki kişilik birebir) varsa söyleme.
+- **Sonrası (özet):** toplantıda karar çıkmadıysa ve konuşmaların çoğu durum aktarımıysa özetin sonuna bir satır "Bir dahakine e-postayla çözülebilir: <gerekçe>"
+  yaz; gerekçedeki sayılar dökümden gelir (kaç dakika, kaç kişi, kaç konuşma). Yapı dosyasında alan: `"eposta_yeterdi": {"deger": true|false, "gerekce": "…"}`.
+  Karar ya da sahipli iş çıktıysa `deger` false; `bitir` karar sayısı 0 değilse alanı geçersiz sayar.

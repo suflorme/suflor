@@ -1331,7 +1331,29 @@ def takvim_olay(oid): return TAKVIM_TAM.get(oid) or TAKVIM_PAY.get(oid)  # yaln�
 # Kart katmanı (30 Ekim): menü uygulaması kartları ekranın alt ortasında tek tek kutu olarak gösterir. Açık sayılır: ayar kart_katmani
 # False değil ve menü uygulaması son 60 sn'de yokladı (/cards uzun yoklaması 25 sn'de bir yenilenir). Açıkken eklenti şeridi ve Mac paneli listeyi göstermez.
 def kart_katmani_acik(): return AYAR.get("kart_katmani") is not False and time.time() - (STATE.get("_menu_yokluyor") or 0) < 60
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek"}  # okuma uçları: anahtarsız 401
+def _yapi_mod():  # yapi.py aktarıcıyla aynı klasörde kurulur; yoksa (eski deneme kopyası) Bugün verisi boş döner
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import yapi; return yapi
+    except ImportError: return None
+def bugun_veri_view():  # Bugün sayfası: açık işler, teyit bekleyen kararlar, son toplantının kararları (karar grafı; gizli toplantı dönmez) — yalnız anahtarlı uç
+    y = _yapi_mod()
+    if not y: return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
+    try: return dict(y.bugun_veri(BASE, str(AYAR.get("ad") or "")), ok=True)
+    except Exception as e: print(f"BUGÜN: veri okunamadı ({e.__class__.__name__})"); return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
+def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {"id": "s5", "durum": "yapildi|yapilmadi|acik"} (anahtarlı)
+    y = _yapi_mod()
+    if not y: return {"ok": False, "err": "yapi.py yok"}
+    if yol == "/karar-onay":
+        idler = [str(i) for i in (p.get("idler") if isinstance(p.get("idler"), list) else [p.get("id")]) if i][:30]
+        done = [i for i in idler if y.karar_teyit_kaldir(BASE, i) is not None]
+        return {"ok": bool(done), "onaylanan": done, "atlanan": [i for i in idler if i not in done]}
+    x = y.kayit_bul(BASE, p.get("id"), ("is", "soz")); d = str(p.get("durum") or "")
+    yeni = {"yapildi": "tutuldu" if x and x["tur"] == "soz" else "yapildi", "yapilmadi": "iptal", "acik": "acik"}.get(d)
+    if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
+    r = y.soz_kapat(BASE, x["id"], yeni)
+    return {"ok": bool(r), "id": x["id"], "durum": yeni}
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1527,7 +1549,7 @@ AYAR_PANO = {
     "web_arastirma": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
-    "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel"))}
+    "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_prova": ("beyin", "", ("", "claude-code", "gemini", "ozel"))}
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
@@ -1701,6 +1723,7 @@ bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /s
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
+bolum("prova")  # aktarici/prova.py — Prova odası: karar/sunumu karşı taraf kişilikleriyle sına, rapor (brifing-ses ve bas-konus bölümlerinden sonra)
 bolum("claude-giris")  # aktarici/claude-giris.py — Claude Code girişi düşünce: günlük, sesli uyarı, bildirim, 30 dk yoklama (v0.130.0)
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
@@ -2125,6 +2148,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/agenda": return self._json(agenda())
         if yol == "/dogrula": return self._json(dogrula_istek("yenile=1" in self.path))  # Faz D: Kurulumu denetle (aktarici/saglik.py)
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
+        if yol == "/prova": return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
+        if yol == "/bugun-veri": return self._json(bugun_veri_view())
         if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
         if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)
             from urllib.parse import urlsplit, parse_qs
@@ -2195,6 +2220,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/eylem":  # kuyruğa iş — yalnız anahtarlı (toplanti-claude.py); geçiş listesinde yok
             x = eylem_ekle(p); return self._json({"ok": bool(x), "eylem": x}, 200 if x else 400)
         if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
+        if self.path == "/prova": return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
+        if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
         if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
         if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/eylem-sun": return self._json({"ok": True, "n": eylem_sun()})

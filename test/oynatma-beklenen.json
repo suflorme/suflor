@@ -221,12 +221,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 402020,
-   "sha": "fbcd593a6c3f498a"
+   "uzunluk": 428549,
+   "sha": "efed6010e3e79256"
   },
   "/mini": {
-   "uzunluk": 402020,
-   "sha": "fbcd593a6c3f498a"
+   "uzunluk": 428549,
+   "sha": "efed6010e3e79256"
   },
   "/status": {
    "_ping_son": "float",
@@ -277,6 +277,7 @@
      "beyin_ceviri": "str",
      "beyin_konus": "str",
      "beyin_proje_karti": "str",
+     "beyin_prova": "str",
      "beyin_varsayilan": "str",
      "bildirim": "bool",
      "bilgi_onaysiz": "bool",
@@ -424,7 +425,8 @@
     "etkin": {
      "ceviri": "str",
      "konus": "str",
-     "proje_karti": "str"
+     "proje_karti": "str",
+     "prova": "str"
     },
     "saglik": [
      {
