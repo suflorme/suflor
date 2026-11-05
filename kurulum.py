@@ -869,7 +869,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/hazirlik": return self._json(hz_ozet())
         if yol == "/api/hazirlik/kart": return self._json(_hz("kart"))
         if yol in ("/", "/index.html"): yol = "/sihirbaz/index.html"
-        if yol.startswith(("/sihirbaz/", "/marka/")) or yol == "/pano/renk.css":  # v0.99.2: renkler panoyla tek dosyada
+        if yol.startswith(("/sihirbaz/", "/marka/")) or yol in ("/pano/renk.css", "/pano/yazi.css"):  # v0.99.2: renkler panoyla tek dosyada; yazı tipleri ve ölçüler de (Bugün diliyle bir)
             f = os.path.realpath(os.path.join(KOD, yol.lstrip("/")))
             if f.startswith(KOD + os.sep) and os.path.isfile(f) and os.path.splitext(f)[1] in STATIK:
                 b = open(f, "rb").read(); self.send_response(200); self.send_header("Content-Type", STATIK[os.path.splitext(f)[1]])
