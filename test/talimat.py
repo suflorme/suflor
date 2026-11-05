@@ -76,7 +76,8 @@ ay = os.path.join(T, "ayar.json")
 json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "talimat_hedefler": HEDEF, "eposta": "gmail", "eposta_adres": "deniz" + chr(64) + "ornek.test"}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
-log = os.path.join(T, "relay.log"); env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_METIN="1")
+ORTAK = os.path.join(T, "ortak-posta"); os.makedirs(ORTAK)
+log = os.path.join(T, "relay.log"); env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_METIN="1", SUFLOR_ORTAK_POSTA=ORTAK)
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, env=env, stdout=open(log, "w"), stderr=subprocess.STDOUT)
 L = lambda: open(log, encoding="utf-8", errors="replace").read()
 try:
@@ -159,6 +160,16 @@ try:
     ok("panoda onay bekliyor, Claude'a gitmedi", bool(x) and x["durum"] == "bekliyor" and "açık süreç açıldı" not in L())
     uc("/eylem-karar", {"id": x["id"], "durum": "onaylandi"}, pano=True); time.sleep(1)
     ok("panodan onay → proje gelen kutusu", "haftalık raporu pazartesiye çek" in tc("gelen", "--hedef", "proje"))
+    # B1: okuyan oturum yokken (okundu işareti yok) not ortak posta kutusuna da bırakılır (0644, kişisel bilgi uyarısıyla); okunduktan sonra bırakılmaz
+    ds = sorted(os.listdir(ORTAK)); md = [os.path.join(ORTAK, d) for d in ds if "-konus-notu-" in d and "haftalık raporu" in open(os.path.join(ORTAK, d), encoding="utf-8").read()]
+    ok(f"okuyucusuz not → ortak posta kutusunda (0644, kişisel bilgi uyarısı): {ds}", len(md) == 1 and stat.S_IMODE(os.stat(md[0]).st_mode) == 0o644
+       and open(md[0], encoding="utf-8").read().startswith("> Kişisel bilgi içerebilir"))
+    ok("onay cümlesi dürüst (okuyan oturum yok, ortak kutuya bırakıldı)", "okuyan oturum yok, ortak posta kutusuna da bıraktım" in json.dumps(uc("/cards"), ensure_ascii=False))
+    n0 = len(os.listdir(ORTAK))
+    uc("/bas-konus", {"metin": "Proje oturumuna şunu söyle: bütçe tablosunu güncelle."}, pano=True); time.sleep(1)
+    x = next((x for x in (uc("/cards").get("eylem") or {}).get("liste") or [] if "bütçe tablosunu" in x["baslik"]), None)
+    uc("/eylem-karar", {"id": x["id"], "durum": "onaylandi"}, pano=True); time.sleep(1)
+    ok("okuyucu varken (okundu işareti) ortak kutuya yazılmadı, gelen kutusunda", len(os.listdir(ORTAK)) == n0 and "bütçe tablosunu güncelle" in tc("gelen", "--hedef", "proje"))
     ok("aktarıcıda hata yok", "Traceback" not in L())
 finally:
     r.terminate(); r.wait(5)

@@ -84,11 +84,12 @@ def graf_yaz(dizin, v, toplanti):
         teyitler = teyit_kararlar(v)
         for m in v["maddeler"]:
             for o in m["ogeler"]:
-                c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, saat, alinti, eklendi) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, saat, alinti, eklendi, durum) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                           (toplanti, str(v.get("baslik") or "")[:200], str(v.get("tarih") or "")[:10], str(m.get("baslik") or "")[:200], o["tur"],
                            str(o.get("kim") or "")[:80] or None, str(o.get("sahip") or "")[:80] or None,
                            (str(o["metin"])[:500] + (f" (teyit bekliyor — {teyit_neden(o)})" if o["tur"] == "karar" and o in teyitler else ""))[:600], str(o.get("tarih") or "")[:20] or None,
-                           str(o.get("saat") or "")[:8] or None, str(o.get("alinti") or "")[:300] or None, datetime.datetime.now().isoformat(timespec="seconds")))
+                           str(o.get("saat") or "")[:8] or None, str(o.get("alinti") or "")[:300] or None, datetime.datetime.now().isoformat(timespec="seconds"),
+                           "cevaplandi" if o["tur"] == "soru" and str(o.get("cevap") or "").strip() else "acik"))  # 5 Kasım: cevabı yazılmış soru açık sayılmaz (Kararlar ve işler → Açık sorular)
                 n += 1
     c.close(); return n
 def _ilk(ad): return (str(ad or "").split() or [""])[0].casefold()
@@ -367,6 +368,86 @@ def bugun_veri(dizin, ad, bugun=None):
     out["kendi"] = srt(out["kendi"])[:30]; out["baskalari"] = srt(out["baskalari"])[:60]
     if son_kararlar: out["son_karar"] = {"baslik": son_kararlar[0]["baslik"], "tarih": son_kararlar[0]["tarih"], "toplanti": son_top, "kararlar": son_kararlar[::-1][:12]}
     return out
+# --- Kararlar ve işler görünümü, gündem taslağı, davet maddeleri (5 Kasım) ---------------------------------------------------------------------------
+MADDE_DUR_RX = re.compile(r"^_{5,}|^-{5,}|microsoft teams|zoom|google meet|toplantıya katıl|join", re.I)
+MADDE_ATLA_RX = re.compile(r"^(gündem|agenda|konular|topics)\s*:?$|https?:|www\.|passcode|password|parola|şifre|meeting id|kimli[gğ]i|pin\b", re.I)
+MADDE_ISARET_RX = re.compile(r"^([-•*·▪◦]|\d+[.)])\s*")
+def davet_maddeleri(notlar, en_cok=12):
+    # takvim davetinin notunu gündem maddelerine böler (pano davetMaddeleri ile aynı kural): madde işareti ya da numara kalkar, bağlantı/parola/katılım satırları
+    # atlanır, katılım bloğunun (Teams/Zoom/Meet) başında durur. → ["…"]
+    out = []
+    for l in re.split(r"\r?\n", str(notlar or "")):
+        l = l.strip()
+        if MADDE_DUR_RX.search(l): break
+        if not l or MADDE_ATLA_RX.search(l): continue
+        out.append(MADDE_ISARET_RX.sub("", l))
+        if len(out) >= en_cok: break
+    return out
+def kisi_parcalari(ad):  # "Ayşe Yılmaz" · "Yılmaz, Ayşe" · "ad.soyad (e-posta kullanıcı adı)" → ["ayse", "yilmaz"] (sadeleşmiş, sırasıyla)
+    s = str(ad or "").strip()
+    if "@" in s: s = s.split("@", 1)[0]
+    return [p for p in (_dd_norm(x) for x in re.split(r"[\s._\-,()]+", s)) if len(p) >= 2 and not p.isdigit()]
+def kisi_eslesir(a, b):
+    # gevşek eşleme (takvim katılımcısı ↔ graf kişi adı): ilk adlar aynı, biri ötekinin alt kümesi (yalnız soyad yazılmış) ya da e-posta kullanıcı adı adın bitişik hâli
+    x, y = kisi_parcalari(a), kisi_parcalari(b)
+    if not x or not y: return False
+    if x[0] == y[0] or x == y: return True
+    if (len(x) >= 2 and set(x) <= set(y)) or (len(y) >= 2 and set(y) <= set(x)): return True
+    return "".join(x) == "".join(y) or (len(x) == 1 and x[0] == "".join(y)) or (len(y) == 1 and y[0] == "".join(x))
+def kayit_listesi(dizin, ad="", bugun=None):
+    # "Kararlar ve işler" görünümü: grafın karar/iş/söz/soru kayıtlarının tamamı (gizli toplantı hariç). Satır: id (k/s/q + kayıt no), tur (karar|is|soru), metin, kim, vade,
+    # kalan_gun, gecikti, tarihsiz, durum (acik · teyit = onay bekleyen karar · kapandi = yapılmış/iptal iş, cevaplanmış soru, onaylı karar), neden (teyit), baslik, toplanti,
+    # tarih, kendi (kullanıcının işi). toplantilar: dosya → özet kaydının id'si ve pano/harita var mı (satırdan "toplantıya git"). kisiler: süzgeç listesi.
+    bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kayitlar": [], "toplantilar": [], "kisiler": []}
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
+    c = _db(dizin)
+    try: rs = c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum FROM kayit WHERE tur IN ('is', 'soz', 'karar', 'soru') ORDER BY tarih DESC, id DESC LIMIT 5000").fetchall()
+    finally: c.close()
+    ky = son_kayitlar(dizin); gz = {}; tops = {}; kisiler = {}; ben = _ilk(ad)
+    for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum in rs:
+        if top:
+            if top not in gz: gz[top] = gizli_mi(dizin, top, ky)
+            if gz[top]: continue
+            if top not in tops:
+                r = ky.get(top) or {}
+                tops[top] = {"dosya": top, "baslik": baslik or "", "tarih": tarih or "", "id": str(r.get("id") or ""), "harita": bool(r.get("harita"))}
+        x = {"id": "", "tur": tur if tur != "soz" else "is", "metin": metin or "", "kim": sahip or kim or "", "vade": son or "", "kalan_gun": None, "gecikti": False, "tarihsiz": False,
+             "durum": "acik", "neden": "", "baslik": baslik or "", "toplanti": top or "", "tarih": tarih or "", "kendi": False}
+        if tur == "karar":
+            m = TEYIT_RX.search(metin or ""); x["id"] = f"k{i}"; x["metin"] = TEYIT_RX.sub("", metin or ""); x["kim"] = kim or ""
+            x["durum"] = "teyit" if m else "kapandi"; x["neden"] = teyit_neden_sade((m.group(1) or "").strip()) if m else ""
+        elif tur == "soru":
+            x["id"] = f"q{i}"; x["kim"] = kim or ""; x["durum"] = "acik" if durum == "acik" else "kapandi"
+        else:
+            x["id"] = f"s{i}"; gun = _vade_gun(son, bugun); x["kalan_gun"] = gun
+            x["durum"] = "acik" if durum == "acik" else "kapandi"; x["gecikti"] = x["durum"] == "acik" and gun is not None and gun < 0
+            x["tarihsiz"] = x["durum"] == "acik" and gun is None; x["kendi"] = bool(ben and x["kim"] and _ilk(x["kim"]) == ben)
+        if x["kim"]: kisiler[x["kim"]] = kisiler.get(x["kim"], 0) + 1
+        out["kayitlar"].append(x)
+    out["toplantilar"] = sorted(tops.values(), key=lambda t: t["tarih"], reverse=True)
+    out["kisiler"] = [k for k, _ in sorted(kisiler.items(), key=lambda kv: (-kv[1], kucuk(kv[0])))][:60]
+    return out
+def gundem_taslagi(dizin, katilimcilar, ad="", baslik="", bugun=None, en_cok=12):
+    # Sıradaki toplantının gündem taslağı: katılımcılarla (takvim adları ↔ graf kişi adları, gevşek eşleme) ya da aynı başlıklı önceki toplantılarla ilgili açık iş/söz,
+    # onay bekleyen karar ve açık soru. İlgili toplantı: bir katılımcının kim/sahip olduğu kayıt var ya da başlığı aynı. Kullanıcının kendi işleri yalnız ilgili toplantıdan.
+    # → {"maddeler": [{id, tur, metin, kim, vade, gecikti, baslik, toplanti, satir}], "kisiler": [eşleşen graf adları], "metin": "- …\n- …"}
+    v = kayit_listesi(dizin, ad, bugun); kat = [k for k in (katilimcilar or []) if str(k or "").strip()]
+    if not kat and not baslik: return {"maddeler": [], "kisiler": [], "metin": ""}
+    acik = [x for x in v["kayitlar"] if x["durum"] != "kapandi"]; es = {}
+    for x in acik:
+        if x["kim"] and x["kim"] not in es: es[x["kim"]] = any(kisi_eslesir(x["kim"], k) for k in kat) and not (ad and kisi_eslesir(x["kim"], ad))
+    ilgili = {x["toplanti"] for x in acik if x["toplanti"] and (es.get(x["kim"]) or (baslik and _dd_norm(x["baslik"]) == _dd_norm(baslik)))}
+    sec = [x for x in acik if es.get(x["kim"]) or (x["toplanti"] and x["toplanti"] in ilgili)]
+    sira = {"is": 0, "karar": 1, "soru": 2}
+    sec.sort(key=lambda x: (sira.get(x["tur"], 3), not x["gecikti"], x["kalan_gun"] is None, x["kalan_gun"] or 0, x["tarih"]))
+    out = []
+    for x in sec[:en_cok]:
+        kim = (x["kim"].split() or [""])[0] if x["kim"] else ""
+        if x["tur"] == "karar": s = f"Onay: {x['metin']}" + (f" ({kim})" if kim else "")
+        elif x["tur"] == "soru": s = f"Soru: {x['metin']}" + (f" ({kim})" if kim else "")
+        else: s = x["metin"] + (f" — {kim}" if kim else "") + (f", {-x['kalan_gun']} gün gecikti" if x["gecikti"] else f", {x['vade']}" if x["vade"] else "")
+        out.append({"id": x["id"], "tur": x["tur"], "metin": x["metin"], "kim": x["kim"], "vade": x["vade"], "gecikti": x["gecikti"], "baslik": x["baslik"], "toplanti": x["toplanti"], "satir": s})
+    return {"maddeler": out, "kisiler": sorted({x["kim"] for x in acik if es.get(x["kim"])}), "metin": "\n".join("- " + m["satir"] for m in out)}
 def sozler_tasi(dizin):
     # eski sozler.json (Faz 3) → graf, bir kez; dosya sozler-tasindi.json olur (silinmez)
     yol = os.path.join(dizin, "sozler.json")

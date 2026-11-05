@@ -294,3 +294,22 @@ dialog#prd[open]{display:grid;gap:16px;align-content:start}
   #bgn .kararkart{padding:20px 16px}
   #bnBild{bottom:calc(118px + env(safe-area-inset-bottom,0px))}
 }
+
+/* Kararlar ve işler görünümü (5 Kasım): sekmeler, süzgeç satırı, kapanmış satır; hazırlık kartında gündem taslağı ve e-posta işareti */
+#bgn .sekmeler{display:flex;align-items:center;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--b-cizgi)}
+#bgn .sekmeler .keylem{margin-left:auto;padding-bottom:6px}
+#bgn .sekme{border:0;background:none;padding:8px 12px;font-size:var(--b-yz-m);color:var(--b-m2);display:inline-flex;gap:7px;align-items:center;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:var(--b-k-s) var(--b-k-s) 0 0}
+#bgn .sekme:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}
+#bgn .sekme.etkin{color:var(--b-murekkep);border-bottom-color:var(--b-vurgu);font-weight:500}
+#bgn .sekme .say{font:500 var(--b-yz-t) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);color:var(--b-m3)}
+#bgn .suzgec{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#bgn .suzgec input,#bgn .suzgec select{font:inherit;font-size:var(--b-yz-k);color:var(--b-murekkep);background:var(--b-yuzey);border:1px solid var(--b-cizgi2);border-radius:var(--b-k-s);padding:6px 10px;min-width:0;max-width:100%}
+#bgn .suzgec input{flex:1 1 160px}
+#bgn .suzgec select{max-width:220px}
+#bgn .suzgec input::placeholder{color:var(--b-m3)}
+#bgn .suzgec :is(input,select):focus{outline:2px solid var(--b-vurgu);outline-offset:1px}
+#bgn .sat.kapali .t{color:var(--b-m2);text-decoration:line-through;text-decoration-color:var(--b-cizgi2)}
+#bgn .sat .oldu{width:20px;justify-content:center}
+#bgn .onay.soru{border-style:dotted;cursor:default}
+#bgn .haz.gundem{align-items:center}#bgn .haz.gundem span{flex:1;min-width:0}#bgn .haz.gundem svg{color:var(--b-vurgu)}
+#bgn .sakin.eposta .b{margin-left:4px;vertical-align:baseline}

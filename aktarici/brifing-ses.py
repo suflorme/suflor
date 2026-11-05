@@ -543,6 +543,10 @@ def okuma_dili(metin):  # → "tr" | "en"
 def kisilik_en_sesi(k=None):  # kişiliğin İngilizce yerel sesi ("en:michael") ya da None (Pocket kurulu değilse de None)
     kk = k if k is not None else kisilik()
     v = str((kk or {}).get("yerel_ses_en") or "")
+    if not v and "pocket_var" in globals() and pocket_var():  # varsayılan: kişilikte yerel_ses_en yoksa (beta, sablon kişiliği) Pocket İngilizce modeli — Türkçe sesle İngilizce okunmasın
+        hub = os.path.join(os.path.expanduser(str(AYAR.get("pocket_hf") or "")), "hub")
+        if not os.path.isdir(hub) or os.path.isdir(os.path.join(hub, "models--kyutai--pocket-tts-without-voice-cloning")):  # hub yoksa yerleşim bilinmez: model var sayılır
+            v = "pocket:en:" + ("michael" if "male" in str((kk or {}).get("yerel_ses") or "") and "female" not in str((kk or {}).get("yerel_ses") or "") else "mary")
     return pocket_ses_adi(v) if v.startswith("pocket") and "pocket_var" in globals() and pocket_var() and (pocket_ses_adi(v) or "").startswith("en:") else None
 # Toplantı sonu özeti (hızlı ve yazılı) yalnız yerel Pocket sesiyle okunur (kullanıcının Pocket sesi). Gemini, Azure, Piper ve Mac sesine düşülmez; Pocket hazır
 # değilse en çok OZET_YEREL_BEKLE_SN beklenir, yine hazır değilse ya da kurulu değilse o parça okunmaz (yazılı özet ve kart zaten var).

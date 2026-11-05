@@ -101,7 +101,7 @@ def ekran_baglam():  # Konuş sorusunun [Bağlam]'ına: süren toplantıda son 1
     except NameError: return ""
     e = EKRAN_SON.get(f)
     if not e or time.time() - e["t"] > EKRAN_BAGLAM_SN: return ""
-    yol = os.path.join(BASE, e["gorsel"]) if e.get("gorsel_neden") and e.get("gorsel") else ""  # S212: görsel ağırlıklı ekranda görüntü yolu (Konuş Read ile açabilir; yalnız kullanıcı ekranı soruyorsa)
+    yol = os.path.join(BASE, e["gorsel"]) if e.get("gorsel_neden") and e.get("gorsel") else ""  # S220: görsel ağırlıklı ekranda görüntü yolu (Konuş Read ile açabilir; yalnız kullanıcı ekranı soruyorsa)
     return _t(f"Paylaşılan ekranda son görünen yazı (KANIT {e['n']}, {e['saat']}; yerel okundu, okuma hatası olabilir): {e['ozet'] or '(yazı yok)'}\n"
               + (f"Bu ekran görsel ağırlıklı ({e['gorsel_neden']}); kullanıcı ekranda ne olduğunu ya da tabloyu/grafiği yorumlamanı isterse görüntüyü Read ile aç: {yol}\n" if yol else ""),
               f"Text last seen on the shared screen (evidence {e['n']}, {e['saat']}; read locally, may contain recognition errors): {e['ozet'] or '(no text)'}\n"

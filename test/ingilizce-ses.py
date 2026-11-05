@@ -38,7 +38,12 @@ ok(f"İngilizce cümle → ('en', metin, 'en:michael'), Türkçe okunuş yok (Si
 q = sor("Tamam Sir, hallettim.")
 ok(f"Türkçe cümle → bugünkü yol (telaffuz uygulandı, düz metin): {q}", q == ["Tamam sör, hallettim."] and TEL)
 K["k"] = dict(K["k"], yerel_ses_en=None); q = sor("Happy to help, Sir.")
-ok(f"kişilikte yerel_ses_en yok → bugünkü yol: {q}", q == ["Happy to help, sör."]); K["k"]["yerel_ses_en"] = "pocket:en:michael"
+ok(f"kişilikte yerel_ses_en yok → Pocket İngilizce varsayılanı (yerel_ses male → michael): {q}", q == [("en", "Happy to help, Sir.", "en:michael")])
+K["k"]["yerel_ses"] = "pocket:wite:female_2"; q = sor("Happy to help, Sir."); ok(f"yerel_ses female → en:mary: {q}", q == [("en", "Happy to help, Sir.", "en:mary")]); K["k"]["yerel_ses"] = "pocket:wite:male_1"
+import tempfile; _t = tempfile.mkdtemp(); os.makedirs(os.path.join(_t, "hub", "models--x")); ns["AYAR"]["pocket_hf"] = _t; q = sor("Happy to help, Sir.")
+ok(f"hub var, İngilizce model yok → Türkçe yol: {q}", q == ["Happy to help, sör."])
+os.makedirs(os.path.join(_t, "hub", "models--kyutai--pocket-tts-without-voice-cloning")); q = sor("Happy to help, Sir.")
+ok(f"model dizini gelince → en:michael: {q}", q == [("en", "Happy to help, Sir.", "en:michael")]); ns["AYAR"].pop("pocket_hf"); K["k"]["yerel_ses_en"] = "pocket:en:michael"
 K["pocket"] = False; q = sor("Happy to help, Sir."); K["pocket"] = True
 ok(f"Pocket kurulu değil → bugünkü yol: {q}", q == ["Happy to help, sör."])
 K["motor"] = "mac"; q = sor("Happy to help, Sir."); K["motor"] = "pocket"
@@ -48,7 +53,7 @@ ok(f"İngilizce arayüzde (beta) değişiklik yok: {q}", q == ["Happy to help, s
 # v0.101.4: Konuş'ta Whisper'ın dili (bas-konus.py konus_dil_istek / konus_dil_kaydet): yalnız sorunun ilk parçası (≥ 2 sn) otomatik, sonrakiler bulunan dille,
 # kısa söz ve "yazayım mı?" cevabı son 10 dk'nın dilinde (yoksa Türkçe); ayar konus_oto_dil: false ve İngilizce arayüz eski davranış
 bk = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-kd = {"time": time, "threading": threading, "AYAR": {}, "ARAYUZ_DILI": "tr", "SORU": {"aktif": None}, "AKIS": {"kilit": threading.Lock(), "dil": None, "nesil": 1}, "print": lambda *a, **k: None}
+kd = {"re": __import__("re"), "time": time, "threading": threading, "AYAR": {}, "ARAYUZ_DILI": "tr", "SORU": {"aktif": None}, "AKIS": {"kilit": threading.Lock(), "dil": None, "nesil": 1}, "print": lambda *a, **k: None}
 exec(bk[bk.index("KONUS_DIL_SN, KONUS_DIL_EN_AZ_SN ="):bk.index("def _akis_kesim(")], kd); di, dk = kd["konus_dil_istek"], kd["konus_dil_kaydet"]
 r = [di(0, 3.5), di(0, 1.2)]; dk("en", 1); r += [di(1, 2.0), di(0, 1.2)]; kd["AKIS"]["dil"] = None; r += [di(0, 3.0)]
 kd["SORU"]["aktif"] = "e1"; r += [di(0, 3.0)]; kd["SORU"]["aktif"] = None

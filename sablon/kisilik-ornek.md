@@ -7,6 +7,7 @@ selam: Merhaba, ben asistanınız. Bundan sonra sizinle ben konuşacağım.
 telaffuz: ASİSTAN=asistan
 hitap_bicimi: siz
 ses:
+# yerel_ses_en: pocket:en:mary   (İngilizce cümleler bu sesle okunur; yazılmazsa Pocket kuruluysa kendiliğinden en:mary/en:michael seçilir)
 hiz: 1
 # gorev_cikar: evet   (açarsan asistan hitapsız söylediğin işi ve sahipsiz kalan işi öneri olarak sunar; toplantıda onay kartı, dışında "ekleyeyim mi?")
 ---

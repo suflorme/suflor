@@ -54,6 +54,8 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
 - `tc hazirlik --kim <kişi>`: kişinin geçmişte söyledikleri, gündem maddesi başına ilk 3 sonuç, önceki toplantılarda ona sorulup
   cevapsız kalan sorular, kapanmamış sözleri (sözler defteri) ve esas belgelerde geçtiği satırlar. Yetmeyen madde için `tc ara "<sorgu>" [--kim] [--tur …] [--n 8]`
   (tüm proje klasörü: belgeler, tablolar, görüşmeler, `_canli/` toplantıları). Kişiye ait hazırlık notu varsa oku.
+- `tc hazirlik`'e takvimdeki katılımcıları da ver (`--katilimci "Ad, Ad…"`): "## Gündem taslağı" bölümü bu kişilerle (ya da aynı başlıklı önceki toplantıyla) ilgili açık iş,
+  onay bekleyen karar ve açık soruyu listeler; panodaki hazırlık kartının "Gündem taslağı" satırıyla aynı kaynaktır (`yapi.gundem_taslagi`). Gündem yoksa bunu öner.
 - `tc hazirlik`'e takvimdeki katılımcı sayısını ver (`--kisi N`); çıktıdaki "E-posta yeterli mi?" işareti GÜÇLÜyse ve sen de katılırsan hazırlık özetinin
   sonuna "Bu toplantı e-postayla çözülebilir: <gerekçe>" + taslak (`TOPLANTI-KURALLARI.md` §9); zayıfta söyleme.
 - Kullanıcıya 3–6 satır "geçmişte ne dendi / açık kalan ne" (kaynak `dosya @konum`). Esas belgeler ve tablolar güncel kayıttır;

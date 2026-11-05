@@ -32,6 +32,9 @@ BILGI_YAZMA = {"send", "forward", "reply", "create", "update", "delete", "remove
                "invite", "grant", "revoke", "reset", "change", "save", "submit", "merge", "duplicate", "launch", "activate", "deactivate"}
 BILGI_RISK_RX = re.compile(r"send|forward|reply|create_event|update_event|delete|trash|javascript|navigate|computer|form_input|file_upload|share_file|upload|"
                            r"move_item|rename_item|update_file|create_file|copy_file|respond_to_event|set_vacation|create_filter|label_", re.I)  # = toplanti-claude.py IZIN_MCP
+# 5 Kasım: `claude -p` (stream-json) bağlayıcıları (claude.ai, eklenti: Apollo, bilgi bağlayıcısı) arka planda bağlar; ilk turda henüz "pending" olduğundan araç listesinde yoktu.
+# Ölçüm: bekleme yokken init'te kişi ve bilgi bağlayıcıları pending, 92 araç; CLAUDE_CODE_MCP_STARTUP_WAIT_MS=20000 ile ikisi connected, 344 araç. open ortamı aktarmaz → `--env`.
+TOPO_MCP_BEKLE_MS = 20000
 TOPO_BILGI_EN_COK = 200  # 5 Kasım: eski tavan 8'di, gerçek toplantıda dolup her sorguda onay çıktı; şimdi yalnız kaçak döngü sigortası
 def mcp_sunucu_adi(s):  # Claude Code'un araç adındaki sunucu biçimi (claude.ai bağlayıcısında alt çizgiler birleşir, baş/son atılır)
     s = str(s or "").strip(); r = re.sub(r"[^A-Za-z0-9_-]", "_", s)
@@ -175,7 +178,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
                                 bilgi_sorgu=0, web_sorgu=0, bilgi_t={})
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}
         _topo_durum("aciliyor", hata=None)
-        TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "--env", "CLAUDE_CODE_MCP_STARTUP_WAIT_MS=" + str(TOPO_MCP_BEKLE_MS), "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t0 = time.time(); w = None
         while time.time() - t0 < 20 and TOPO["app"].poll() is None:
             try: w = os.open(gir, os.O_WRONLY | os.O_NONBLOCK); break

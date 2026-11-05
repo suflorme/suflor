@@ -509,10 +509,29 @@ def _talimat_uygula(eid):
     eylem_sonuc({"id": eid, "durum": "yapildi" if ok else "hata", "sonuc": sonuc})
     _talimat_kayit({"id": eid, "tur": x["tur"], "hedef": a.get("hedef"), "durum": "yapildi" if ok else "hata", "sonuc": sonuc})
     print(f"TALİMAT: {eid} {'uygulandı' if ok else 'uygulanamadı'} — {sonuc}")
+ORTAK_POSTA = os.environ.get("SUFLOR_ORTAK_POSTA") or ("" if "deneme_aktarici" in globals() and deneme_aktarici() else "/Users/Shared/Suflor/geri-bildirim")  # (deneme aktarıcısı gerçek klasöre yazmaz) iki hesaplı düzende ortak klasör (yalnız yerel dosya; ağa gitmez)
+def _gelen_okuyucu_var(hedef):  # hedef oturumun kancası (toplanti-claude.py gelen) bu hedefi en az bir kez okudu mu: okundu işareti var
+    return os.path.exists(os.path.join(BASE, "gelen", hedef + ".okundu"))
+def _ortak_posta_yaz(eid, h, a, ek):  # okuyucusu olmayan hedefin notu ortak klasöre bırakılır (kişi adı içerebilir → ilk satırda uyarı); → dosya adı ya da None
+    if not ORTAK_POSTA or not os.path.isdir(ORTAK_POSTA): return None
+    import getpass
+    hesap = re.sub(r"[^a-z0-9-]", "", getpass.getuser().lower()) or "hesap"
+    an = datetime.datetime.now(); yol = os.path.join(ORTAK_POSTA, f"{an:%Y%m%d-%H%M%S}-konus-notu-{hesap}.md")
+    govde = (f"> Kişisel bilgi içerebilir (sesle verilmiş not; ad, e-posta geçebilir). İç belge, dışarı verilmez.\n\n"
+             f"# Konuş notu → {h.get('etiket') or h['ad']} ({hesap}, {an:%Y-%m-%d %H:%M})\n\n{a.get('metin') or ''}\n"
+             + (f"\nDuyulan (Whisper): {a.get('duyulan')}\n" if a.get("duyulan") else "") + (f"\nToplantıda verildi.\n" if a.get("toplantida") else "")
+             + f"\n(Gelen kutusu kaydı: {eid}; {ek})\n")
+    try:
+        fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: f.write(govde)
+        os.chmod(yol, 0o644)
+    except OSError: return None
+    return os.path.basename(yol)
 def _gelen_yaz(eid, a):
     h = next((h for h in talimat_hedefler() if h["ad"] == a.get("hedef")), None)
     if not h: return False, _t("hedef ayarda yok", "target not in settings")
     d = os.path.join(BASE, "gelen"); yol = os.path.join(d, h["ad"] + ".jsonl")
+    okuyucu = _gelen_okuyucu_var(h["ad"])  # yazmadan önce: bu not okunmayı bekleyecek mi
     try:
         os.makedirs(d, mode=0o700, exist_ok=True)
         if not os.path.exists(yol): os.close(os.open(yol, os.O_WRONLY | os.O_CREAT, 0o600))
@@ -520,7 +539,14 @@ def _gelen_yaz(eid, a):
     _TAL["t"].setdefault(h["ad"], []).append(time.time())
     o = {"id": eid, "at": datetime.datetime.now().isoformat(timespec="seconds"), "metin": a.get("metin"), "duyulan": a.get("duyulan"), "toplantida": a.get("toplantida")}
     with LOCK: write([(yol, json.dumps(o, ensure_ascii=False) + "\n")])
-    return True, _t(f"{h.get('etiket') or h['ad']} gelen kutusuna yazıldı", f"written to the {h.get('etiket') or h['ad']} inbox")
+    et = h.get("etiket") or h["ad"]
+    if okuyucu: return True, _t(f"{et} gelen kutusuna yazıldı", f"written to the {et} inbox")
+    ortak = _ortak_posta_yaz(eid, h, a, "okuyan oturum yoktu") if h["ad"] in ("proje", "gelistirme") or not AYAR.get("talimat_hedefler") else None
+    if ortak:
+        print(f"TALİMAT: {h['ad']} gelen kutusunu okuyan oturum yok — ortak posta kutusuna da bırakıldı ({ortak})")
+        return True, _t(f"Not kaydedildi; {et} gelen kutusunu okuyan oturum yok, ortak posta kutusuna da bıraktım", f"Note saved; nothing reads the {et} inbox yet, so I also left it in the shared mailbox")
+    print(f"TALİMAT: {h['ad']} gelen kutusunu okuyan oturum yok (ortak klasör de yok)")
+    return True, _t(f"Not kaydedildi; {et} gelen kutusunu henüz okuyan oturum yok, oturum açınca görürsün", f"Note saved; no session reads the {et} inbox yet — you'll see it when one opens")
 def _takvim_yardimci(args, istek=None):  # Suflor Takvim.app (--etkinlik / --etkinlik-sil) → çıktı sözlüğü ya da {"durum": "hata", …}
     app = globals().get("TAKVIM_APP") or ""
     if not os.path.isdir(app): return {"durum": "hata", "hata": "Suflor Takvim.app yok"}

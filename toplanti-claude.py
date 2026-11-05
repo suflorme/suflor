@@ -133,7 +133,7 @@ bt.add_argument("yol", help="kaydedilen özet .md"); bt.add_argument("--yapi", d
 bt.add_argument("--baslik", default=None, help="panoda görünen ad"); bt.add_argument("--dosya", default=None, help="canlı toplantı .md (grafta kaynak; yoksa en yenisi)")
 oh = sub.add_parser("ozet-hazir", help="özet kaydedildi: panoda Son toplantılar + macOS bildirimi (özetin '## Toplantı çıktısı' bölümünden)")
 oh.add_argument("yol", help="kaydedilen özet .md"); oh.add_argument("--baslik", default=None, help="panoda görünen ad (yoksa gündem başlığı ya da toplantı adı)")
-hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi"); hl.add_argument("--kim", default=None); hl.add_argument("--n", type=int, default=3); hl.add_argument("--kisi", type=int, default=None, help="katılımcı sayısı (takvimden; yoksa bilinmiyor)")
+hl = sub.add_parser("hazirlik", help="v0.7.0: toplantı öncesi bağlam paketi"); hl.add_argument("--kim", default=None); hl.add_argument("--n", type=int, default=3); hl.add_argument("--kisi", type=int, default=None, help="katılımcı sayısı (takvimden; yoksa bilinmiyor)"); hl.add_argument("--katilimci", default="", help="takvimdeki katılımcılar, virgülle (gündem taslağı: onlarla ilgili açık iş/karar/soru)")
 ks = sub.add_parser("karsilastir", help="v0.7.2: Teams dökümü (.vtt/.docx/.txt) ile Suflor.me dökümünü karşılaştır")
 ks.add_argument("teams", help="Teams'ten indirilen döküm dosyası"); ks.add_argument("dosya", nargs="?", help="Suflor.me .md/.jsonl (yoksa en yenisi)")
 ks.add_argument("--n", type=int, default=12, help="en çok kaç kaçan bölüm listelensin"); ks.add_argument("--kaydet", action="store_true")
@@ -2250,6 +2250,12 @@ def hazirlik_cmd():
         for d in _yapi().dis_defter_veri(AYAR.get("dis_defter"), A.kim or None, 10):
             print(f"\n## Başka karar kaydı: {d['ad']} ({d['acik']} açık kayıt; yalnız okunur)")
             print("\n".join(f"  - {x['tur']}: {x['metin']}" + (f" — {x['sahip']}" if x['sahip'] else "") + (f" · {x['vade']}" if x['vade'] else "") + (f" · {x['toplanti']}" if x['toplanti'] else "") for x in d["kayitlar"]) or ("  " + (d["hata"] if not d["ok"] else "yok")))
+    except Exception: pass
+    try:  # 5 Kasım: gündem taslağı — katılımcılarla (--katilimci "Ad, Ad…"; gevşek ad eşlemesi) ya da aynı başlıklı önceki toplantılarla ilgili açık iş, onay bekleyen karar, açık soru (pano kartındaki ile aynı)
+        kat = [x.strip() for x in str(A.katilimci or "").split(",") if x.strip()] + ([A.kim] if A.kim else [])
+        gt = _yapi().gundem_taslagi(A.dir, kat, AYAR.get("ad") or "", agj.get("title") or "")
+        print(f"\n## Gündem taslağı ({len(gt['maddeler'])} madde" + (f"; eşleşen: {', '.join(gt['kisiler'])}" if gt["kisiler"] else "") + ")")
+        print("\n".join("  - " + m["satir"] + (f" · {m['baslik']}" if m.get("baslik") else "") for m in gt["maddeler"]) or "  yok")
     except Exception: pass
     try:  # "Bu toplantı e-postayla çözülebilir" işareti (yapi.eposta_isaret): kural tabanlı, son kararı Claude verir
         ik = _yapi().eposta_isaret(agj.get("items") or [], agj.get("title") or "", A.kisi)

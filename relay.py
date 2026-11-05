@@ -1344,6 +1344,33 @@ def bugun_veri_view():  # Bugün sayfası: açık işler, teyit bekleyen kararla
     try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), str(AYAR.get("ad") or ""), 30)  # dış karar kaydı (dosya türü): ayrı salt-okunur katman, kaynak etiketiyle
     except Exception as e: print(f"BUGÜN: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []
     return v
+def kayitlar_view():  # GET /kayitlar (anahtarlı): "Kararlar ve işler" görünümü — grafın tüm karar/iş/soru kayıtları (gizli toplantı yok) + dış defter kayıtları (salt-okunur)
+    y = _yapi_mod(); bos = {"ok": False, "ad": AYAR.get("ad") or "", "kayitlar": [], "toplantilar": [], "kisiler": [], "dis": []}
+    if not y: return bos
+    try: v = dict(y.kayit_listesi(BASE, str(AYAR.get("ad") or "")), ok=True)
+    except Exception as e: print(f"KAYITLAR: veri okunamadı ({e.__class__.__name__})"); return bos
+    try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), None, 200)
+    except Exception as e: print(f"KAYITLAR: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []
+    return v
+def gundem_taslagi_view(tam_yol):  # GET /gundem-taslagi?olay=<takvim kimliği> (anahtarlı): katılımcılarla ilgili açık iş/karar/soru → hazırlık kartında "Gündem taslağı: N madde"
+    import urllib.parse; y = _yapi_mod(); qs = urllib.parse.parse_qs(str(tam_yol).partition("?")[2]); oid = (qs.get("olay") or [""])[0]
+    olay = TAKVIM_TAM.get(oid) if oid else None
+    if not y or not olay: return {"ok": False, "err": _t("Toplantı takvimde bulunamadı", "Meeting not found in the calendar"), "maddeler": [], "kisiler": [], "metin": ""}
+    kat = [str(x) for x in (olay.get("katilimcilar") or [])] + [str(k.get("ad") or "") for k in (olay.get("kisiler") or []) if isinstance(k, dict)]
+    try: return dict(y.gundem_taslagi(BASE, kat, str(AYAR.get("ad") or ""), str(olay.get("baslik") or "")), ok=True, olay=oid)
+    except Exception as e: print(f"GÜNDEM TASLAĞI: okunamadı ({e.__class__.__name__})"); return {"ok": False, "err": e.__class__.__name__, "maddeler": [], "kisiler": [], "metin": ""}
+def takvim_eposta(v):  # 5 Kasım: hafta görünümündeki gelecek toplantıya davet notundan "e-postayla çözülebilir" işareti (yapi.eposta_isaret; yalnız GÜÇLÜ işaret eklenir; alıcılar takvimden)
+    y = _yapi_mod()
+    if not y or not isinstance(v, dict): return v
+    for o in v.get("olaylar") or []:
+        if o.get("gecmis") or o.get("paylasilan"): continue
+        e = TAKVIM_TAM.get(str(o.get("id") or "")) or {}
+        if not e.get("notlar"): continue
+        try:
+            m = y.davet_maddeleri(e.get("notlar")); ik = y.eposta_isaret(m, str(o.get("baslik") or ""), o.get("kisi_sayisi"))
+        except Exception: continue
+        if ik.get("guclu"): o["eposta"] = {"guclu": True, "neden": "; ".join(ik["nedenler"]), "maddeler": m, "alicilar": [str(x) for x in (e.get("katilimci_eposta") or []) if "@" in str(x)][:30]}
+    return v
 def disa_aktar_islem(p):  # POST /disa-aktar {"bicim": "csv"|"json"} (anahtarlı pano): karar grafını dosyaya yazar (<canlı>/disa-aktar/), Finder'da gösterir; gizli toplantı girmez
     y = _yapi_mod(); bicim = "json" if str((p or {}).get("bicim") or "") == "json" else "csv"
     if not y: return {"ok": False, "err": "yapi.py yok"}
@@ -1368,7 +1395,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -2199,7 +2226,7 @@ class H(BaseHTTPRequestHandler):
             m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
             if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
             h = re.search(r"[?&]hafta=(-?\d{1,2})(?:&|$)", self.path)  # hafta görünümü: Pazartesi–Pazar, geçmiş ve ileri (aktarici/bas-konus.py takvim_hafta)
-            if h: return self._json(takvim_hafta(int(h.group(1))))
+            if h: return self._json(takvim_eposta(takvim_hafta(int(h.group(1)))))  # 5 Kasım: + davet notundan e-posta işareti
             h = re.search(r"[?&]ay=(-?\d{1,2})(?:&|$)", self.path)  # ay görünümü: 42 günlük ızgara (takvim_ay)
             if h: return self._json(takvim_ay(int(h.group(1))))
             g = re.search(r"[?&]gun=(\d{1,2})(?:&|$)", self.path)  # v0.55.0: ?gun=7 → 7 günün etkinlikleri + boş zamanlar (v0.59.0: en çok 30)
@@ -2210,6 +2237,8 @@ class H(BaseHTTPRequestHandler):
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
         if yol == "/prova": return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
+        if yol == "/kayitlar": return self._json(kayitlar_view())  # Kararlar ve işler görünümü (anahtarlı)
+        if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
         if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
         if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)
             from urllib.parse import urlsplit, parse_qs
