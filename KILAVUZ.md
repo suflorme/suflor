@@ -247,6 +247,13 @@ Masaüstü izni olan Suflor Brifing yardımcısı yapar (tek kullanımlık, imza
   olduğu gibi gider), girişi boştur, `kayit_sure_sn` saniyede (en çok 120) bitmezse durdurulur; çıktısının başı cevabın altına düşer. Gizli kipte hiçbir kayıt yazılmaz.
   Silme ya da dosya okuyan alt komutları listeye koyma.
 
+## Döküm kontrolü (yalnız geliştirici kurulumu)
+Beta kurulumunda görünmez; geliştirici kurulumunda ses arşivi açıkken (ayar `ses_arsivi`) çalışır, hepsi yerel (ağ çağrısı yok, beta veri paketine bir şey girmez). Gizli ve deneme toplantıları listeye girmez.
+Toplantı bitip ses arşivi ve (varsa) hakem dökümü hazır olunca aktarıcı bir kontrol listesi hazırlar; panoda Bugün'de "Döküm kontrolü hazır" satırı çıkar, `Kontrole başla` sayfayı (`/dokum-kontrol`) açar.
+- **Önemli satırlar önce:** tüm döküm yerine yaklaşık 200 satır (≈ 15–20 dk): Whisper ile Gemini/Teams altyazısının ayrıştığı, Gemini'nin duyup Whisper'ın atladığı, ad/terim geçen, karar-iş saatlerine yakın, dili/hızı/tekrarı tuhaf satırlar. Her satırda nedeni küçük etiketle görünür; `Tümü`ne geçilebilir. Hedef satır sayısı ayar `dokum_kontrol_satir`.
+- **Dinleme:** her satırın kendi ses parçası çalınır (ben/karşı ayrı). Kısayollar: Boşluk çal/durdur · Enter doğru, sonraki satır · E düzelt (Enter kaydeder ve geçer, Esc vazgeçer) · 1/2/3 Whisper/Gemini/Teams metnini al · ↑ ↓ önceki/sonraki · R yeniden çal · [ ] hız · T öncelikli/tümü · S zaman/öncelik sırası. Her değişiklik kendiliğinden kaydedilir (`kontrol-durum.json`), sayfa kapanınca kaldığı yerden devam eder.
+- **Bitir ve kaydet:** `duzeltme-elle.json` (ses arşivi klasöründe; {dosya, kanal, saat, whisper, gemini, dogru} + dinlenen listesi) yazılır ve üç iş olur: (1) ölçüm — yalnız dinlenen satırlara göre Whisper/Gemini/Teams sözcük hatası (5 dk bloklar, Gemini satır kayması blokta etkisiz) ve ad isabeti → `canli/dokum-olcum.jsonl` (yalnız sayı), rapor `olcum.py dokum`, Kulis'te ikinci seri; (2) ad/terim düzeltmeleri öğrenen sözlüğün mevcut onay yoluna aday olarak girer; (3) dinlenen satırların ses parçası ve doğru metni `egitim-havuzu/dogrulanmis/<toplantı>/` altına kopyalanır (ayar `ses_arsivi_egitim: false` kapatır; 14 günlük arşiv temizliği bunlara dokunmaz).
+
 ## Sorun giderme
 
 Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu denetle**'ye bak (✗ olan maddenin altında ne yapacağın yazar). Aşağıdakiler en sık karşılaşılanlar; her satır "belirti: ne yapmalı" biçimindedir. Ayar adları `ayar.json`'a `"ayar_adi": değer` diye yazılır; panoda ⚙ Ayarlar'da karşılığı varsa oradan değiştirmek daha kolaydır.

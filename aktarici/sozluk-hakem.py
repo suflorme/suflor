@@ -303,6 +303,7 @@ def hakem_tur():  # bir tur: bekleyen toplantılar sırayla; sınır/kota dolunc
             if s["deneme"] >= HK_VAZGEC: s["durum"] = "vazgecildi"; print(f"HAKEM: {HK_VAZGEC} denemede olmadı, bu toplantı bırakıldı")
         _so_yaz(yol, json.dumps(d, ensure_ascii=False), 0o600)
         if r["durum"] == "bitti" and "so_tetik" in globals(): so_tetik()  # öğrenme döngüsü toplantıyı hakem kanıtıyla yeniden işler
+        if r["durum"] == "bitti" and "dk_tetik" in globals(): dk_tetik()  # döküm kontrol listesi hazırlanır (dokum-kontrol.py)
         if r["durum"] in ("sinir", "kota", "ertelendi"): break
 def _hk_dongu():
     HK_OLAY.wait(120)

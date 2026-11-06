@@ -1883,29 +1883,75 @@ def konus_hitap(text):  # ingest: kullanıcının kendi Whisper satırı, ses ki
 # KARSI_HITAP_SUSKU_SN boyunca karşı kanaldaki hitap sayılmaz (kendi sesinin yankısı/tekrarı).
 KARSI_HITAP_RX = re.compile(r"(?:^|[.!?…]\s+)(?:hey\s+|merhaba\s+)?(?:suflor|suflör|süflör|sufle|süfle|suflo|soflor|sufler|souffle)(?:\.me)?\s*[,:!]?\s+(?=\w)", re.I)
 KARSI_HITAP_SUSKU_SN = 10
+# 5 Kasım (gerçek toplantı, 18:49): karşı taraf adıyla seslendi ama Whisper adın ardına uydurma bir soyad + iki nokta yazdı ("<Ad> <Soyad>: …") ve soru üç satıra bölündü —
+# hiçbir satır kalıba uymadı, cevap/onay kartı çıkmadı. Şimdi: sozluk.py karsi_hitap_cozumle (etiket, ad ses benzeri) + yarım soru için KARSI_ASKI: hitap satırı cümle
+# bitmeden (sonunda . ? ! … yok ya da tek sözcük) geldiyse aynı konuşmacının sonraki satırlarıyla KARSI_ASKI_SN içinde birleşir; hitabı yineleyen (Whisper öneki tekrar yazar)
+# satır öncekinin yerine geçer. Gevşek yolda (etiket/ses) soru/istek biçimi şart; değilse seslenme sayılmaz (yanlış uyanma yok).
+KARSI_ASKI = {"ad": None, "kim": None, "soru": None, "yol": "ad", "t1": None, "son": 0.0, "satir": ("", None, None), "tok": 0}; KARSI_ASKI_SN = 3.0; KARSI_ASKI_SOZ = 45
+KARSI_ASKI_LOCK = threading.Lock()
+def _karsi_tam(soru): return len(soru.split()) >= 2 and bool(re.search(r"[.!?…][\"”’')]*\s*$", soru))
+def _karsi_yank(satir):
+    text, t0, t1 = satir
+    try:
+        if t0 is not None and t1 is not None and "_kendi_mi" in globals():
+            with YANKI_LOCK: return any(_kendi_mi((t0, t1, _yk(text)), k) for k in KENDI_SES)
+    except NameError: pass
+    return False
+def _karsi_ates(ad, soru, kim, satir, yol="ad"):  # hitap sayılan karşı taraf sorusunu asistana gönder (yankı denetimi, sıra, kişilik seçimi _asistan_sor'da)
+    text, t0, t1 = satir
+    if len(soru.split()) < 2 or HITAP_IS_RX.search(soru): return False
+    if yol != "ad" and not karsi_soru_bicimi(soru): print(f"KONUŞ: karşı taraf hitabı {ad} ({yol}) soru/istek biçiminde değil — sayılmadı: \"{text[:60]}\""); return False
+    # 28 Ekim: okuma bittikten 2 sn sonra gelen gerçek soru "hemen ardından" diye atılmıştı. Satırın zamanı biliniyorsa yalnız okuduğumuz metne benzeyen
+    # (kendi sesimizin yankısı, _kendi_mi) hitap atılır; gerçek soru sıraya girer (_asistan_sor). Zaman yoksa eski kural (okuma sürerken ve ardından KARSI_HITAP_SUSKU_SN).
+    try:
+        if t0 is not None and t1 is not None and "_kendi_mi" in globals():
+            if _karsi_yank(satir): print(f"KONUŞ: karşı taraf hitabı {ad} okunan sesimizin yankısı — sayılmadı"); return False
+        elif any(p.poll() is None for p in TS["p"]) or time.time() - (TS.get("son_t") or 0) < KARSI_HITAP_SUSKU_SN: print(f"KONUŞ: karşı taraf hitabı {ad} konuşurken/hemen ardından — sayılmadı"); return False
+    except NameError: pass
+    kim = (kim or _t("Karşı taraf", "The other side")).strip()
+    if kisilikler(): kisilik_sec(ad)
+    if yol != "ad": print(f"KONUŞ: karşı taraf hitabı gevşek yolla tanındı ({yol}) — \"{text[:60]}\"")
+    return _asistan_sor(soru, {"kaynak": "karsi", "karsi": kim, "ad": ad}, gosterim=f"{kim}: {soru}", metin=f"{kim} soruyor: {soru}")
+def _karsi_aski_bekle(tok):  # süre dolunca (devam gelmedi) askıdaki yarım hitap tek başına gider; ≥ 2 sözcük ve gevşek yolda soru biçimi şart
+    time.sleep(KARSI_ASKI_SN + 0.4)
+    with KARSI_ASKI_LOCK:
+        a = KARSI_ASKI
+        if a["tok"] != tok or a["soru"] is None: return
+        ad, soru, kim, yol, satir = a["ad"], a["soru"], a["kim"], a["yol"], a["satir"]; a.update(soru=None, ad=None)
+    if len(soru.split()) < 2: print(f"KONUŞ: karşı taraf hitabı {ad} — devam gelmedi, tek sözcük: atıldı"); return
+    print(f"KONUŞ: karşı taraf hitabı {ad} — cümle bitmedi, devam gelmedi; yarım gidiyor: \"{soru[:60]}\"")
+    _karsi_ates(ad, soru, kim, satir, yol)
 def konus_hitap_karsi(text, kim, t0=None, t1=None):
     hitap_devam_karsi(text, kim)  # 30 Ekim: karşı taraf konuşunca adsız devam penceresi kapanır
     if not toplanti_var() or not AYAR.get("konusma", True): return False
     kat = asistan_katilan()
     if not kat: return False
-    if kisilikler():
-        krx = _kisilik_hitap_rx(None); m = krx.search(text or "") if krx else None
-        ad = _kisilik_hitap_ad(m.group(2)) if m else None
-    else: m = KARSI_HITAP_RX.search(text or ""); ad = "Suflor" if m else None
-    if not m or ad not in kat: return False
-    soru = text[m.end():].strip()
-    if len(soru.split()) < 2 or HITAP_IS_RX.search(soru): return False
-    # 28 Ekim: okuma bittikten 2 sn sonra gelen gerçek soru "hemen ardından" diye atılmıştı. Satırın zamanı biliniyorsa yalnız okuduğumuz metne benzeyen
-    # (kendi sesimizin yankısı, _kendi_mi) hitap atılır; gerçek soru sıraya girer (_asistan_sor). Zaman yoksa eski kural (okuma sürerken ve ardından KARSI_HITAP_SUSKU_SN).
-    try:
-        if t0 is not None and t1 is not None and "_kendi_mi" in globals():
-            with YANKI_LOCK: yank = any(_kendi_mi((t0, t1, _yk(text)), k) for k in KENDI_SES)
-            if yank: print(f"KONUŞ: karşı taraf hitabı {ad} okunan sesimizin yankısı — sayılmadı"); return False
-        elif any(p.poll() is None for p in TS["p"]) or time.time() - (TS.get("son_t") or 0) < KARSI_HITAP_SUSKU_SN: print(f"KONUŞ: karşı taraf hitabı {ad} konuşurken/hemen ardından — sayılmadı"); return False
-    except NameError: pass
-    kim = (kim or _t("Karşı taraf", "The other side")).strip()
-    if kisilikler(): kisilik_sec(ad)
-    return _asistan_sor(soru, {"kaynak": "karsi", "karsi": kim, "ad": ad}, gosterim=f"{kim}: {soru}", metin=f"{kim} soruyor: {soru}")
+    if kisilikler(): r = karsi_hitap_cozumle(text)
+    else: m = KARSI_HITAP_RX.search(text or ""); r = ("Suflor", text[m.end():].strip(), "ad") if m else None
+    satir = (text, t0, t1); a = KARSI_ASKI; ates = None
+    with KARSI_ASKI_LOCK:
+        if a["soru"] is not None and not (a["kim"] == kim and (t0 is None or a["t1"] is None or -0.5 <= t0 - a["t1"] <= KARSI_ASKI_SN) and time.time() - a["son"] <= KARSI_ASKI_SN + 2):
+            a.update(soru=None, ad=None)  # bayat askı (timer zaten gönderdi ya da süre geçti)
+        if a["soru"] is not None:
+            if r and re.sub(r"\W", "", r[1].lower())[:3] == re.sub(r"\W", "", a["soru"].lower())[:3]: ad, soru, yol = r[0], r[1], a["yol"] if a["yol"] != "ad" else r[2]  # hitabı yineleyen satır (Whisper öneki tekrarlar): öncekinin yerine
+            elif r: ates = (a["ad"], a["soru"], a["kim"], a["yol"], a["satir"]); a.update(soru=None, ad=None); ad, soru, yol = r  # başka bir hitap: öncekini gönder
+            else:
+                if _karsi_yank(satir): return False
+                ad, soru, yol = a["ad"], (a["soru"] + " " + text.strip()).strip(), a["yol"]
+        elif r: ad, soru, yol = r
+        else: return False
+        if ad not in kat: a.update(soru=None, ad=None); return False
+        if HITAP_IS_RX.search(soru): a.update(soru=None, ad=None); return False  # iş talebi (not al, kart…) toplantı oturumunda kalır
+        if len(soru.split()) >= KARSI_ASKI_SOZ or _karsi_tam(soru):
+            a.update(soru=None, ad=None); son = True
+        elif len(re.sub(r"\W", "", soru)) < 4: a.update(soru=None, ad=None); return False  # "<Ad> <Soyad>: Um." — sessizlikte Whisper'ın uydurduğu etiket; askıya girmez
+        else:  # cümle sürüyor ya da tek sözcük: devamı bekle
+            a.update(ad=ad, kim=kim, soru=soru, yol=yol, t1=t1, son=time.time(), satir=satir, tok=a["tok"] + 1); son = False; tok = a["tok"]
+    if ates: _karsi_ates(*ates)
+    if not son:
+        print(f"KONUŞ: karşı taraf hitabı {ad} yarım — devamı bekleniyor ({yol}): \"{soru[:60]}\"")
+        threading.Thread(target=_karsi_aski_bekle, args=(tok,), daemon=True).start(); return False
+    return _karsi_ates(ad, soru, kim, satir, yol)
 def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas-konuş ve toplantıdaki "Claude:" hitabı)
     if tur.get("kaynak") in ("bas", "sohbet") and not tur.get("karsi") and "kisilikler" in globals() and len(kisilikler()) > 1: metin = hitap_yakin(metin)  # v0.132.0
     if tur.get("kaynak") not in ("hitap", "karsi", "moderator") and not tur.get("karsi") and toplanti_var():  # v0.83.0 (S93): Konuş'la moderatör komutu

@@ -198,6 +198,33 @@ def hitap_ses_duzelt(metin):  # 28 Ekim: Whisper adı "mermis"/"merviz" yazdı, 
             if len(ka) >= 5 and k[:1] == ka[:1] and abs(len(k) - len(ka)) <= 1 and _ad_mesafe(k, ka) <= 1: en = a; break
         return m.group(1) + en if en else m.group(0)
     return rx.sub(degis, metin, count=1)
+# Karşı tarafın hitabı (5 Kasım gerçek toplantı, 18:49: "<Ad> <uydurma soyad>: bugüne kadarki satışları … kıyaslar mısın?" — Whisper adın ardına ad-soyad etiketi
+# uydurdu ve soru iki satıra bölündü; ad doğru yazılmış olduğu hâlde kalıp tutmadı). Kullanıcı kanalındaki esneklik karşı kanalda da: (1) ad + 1–2 büyük harfli sözcük +
+# iki nokta ("etiket"), (2) adın ses benzeri yazılışı (hitap_ses_duzelt). Gevşek yollarda ad satırın ilk 3 sözcüğünde olmalı; sorunun soru/istek biçimi
+# konus_hitap_karsi'da denetlenir. → (ad, soru, yol: ad | etiket | ses | ses+etiket) ya da None. Kişilik yoksa None (kişiliksiz kurulumda eski kalıp).
+def karsi_hitap_cozumle(text):
+    t = " ".join(str(text or "").split())
+    if not t or not kisilikler(): return None
+    krx = _kisilik_hitap_rx(None); adlar = _hitap_adlari()
+    if not krx or not adlar: return None
+    alt = "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True))
+    etiket = re.compile(r"^\W*(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?(" + alt + r")((?:\s+(?-i:[A-ZÇĞİÖŞÜ][\wçğıöşü'’-]*)){1,2})\s*:\s*(?=\w)", re.I)
+    def dene(s, yol):
+        m = etiket.match(s)  # önce etiket: "<Ad> <Soyad>: …" — soyad soruya karışmasın
+        if m:
+            ad = _kisilik_hitap_ad(m.group(1))
+            if ad: return ad, s[m.end():].strip(), "etiket" if yol == "ad" else "ses+etiket"
+        m = krx.search(s)
+        if m:
+            ad = _kisilik_hitap_ad(m.group(2))
+            if ad and (yol == "ad" or len(s[:m.start(2)].split()) <= 3): return ad, s[m.end():].strip(), yol
+        return None
+    r = dene(t, "ad")
+    if r: return r
+    t2 = hitap_ses_duzelt(t)
+    return dene(t2, "ses") if t2 != t else None
+def karsi_soru_bicimi(soru):  # gevşek yolda (etiket/ses) seslenme sayılması için: soru işareti, soru sözcüğü ya da istek
+    return bool(re.search(r"\?|" + HITAP_IC_SOZ + "|" + KISILIK_ISTEK, soru or "", re.I))
 def hitap_duzelt(text):
     krx = _kisilik_hitap_rx(); _KHR.update(satir=None, icte=False, devam=None)  # icte/devam: konus_hitap günlüğü (bu satırın seslenme yolu)
     def kd(m):

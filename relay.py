@@ -1397,7 +1397,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1845,6 +1845,7 @@ bolum("otonom")  # aktarici/otonom.py — Toplantıda otonom katılım: seslenin
 bolum("defter")  # aktarici/defter.py — Toplantı defteri: biten toplantıyı bas-konuşla sorma (S48)
 bolum("sozluk-ogren")  # aktarici/sozluk-ogren.py — Kendi kendine öğrenen sözlük: toplantı sonu kanıt → aday defteri → kabul kapısı; kayıt veritabanı terimleri bellekte (/vt-bellek; 3 Kasım)
 bolum("sozluk-hakem")  # aktarici/sozluk-hakem.py — Gemini hakemi: toplantı sonrası ses arşivi → Gemini dökümü → öğrenen sözlüğe kanıt + ölçüm (yalnız geliştiricide, S186; 3 Kasım)
+bolum("dokum-kontrol")  # aktarici/dokum-kontrol.py — toplantı sonrası döküm kontrolü: öncelikli satırlar, dinleme sayfası, ölçüm/sözlük adayı/eğitim havuzu (yalnız geliştiricide; 6 Kasım)
 bolum("notlar")  # aktarici/notlar.py — Notlar defteri: toplantı yokken kutu, soru asistana yazılı (v0.117.0, S136)
 bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, toplantılarda arama, dökümü panoda okuma (v0.116.0)
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
@@ -2234,6 +2235,8 @@ class H(BaseHTTPRequestHandler):
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
             s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), kisilik_gorunen=(kisilik_gorunen(kisilik()) if kisilik() else None), otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view(), uclu=uclu_view()); s["veri_yok"] = veri_yok_view(); s["kulaklik_yok"] = kulaklik_yok_view() if "kulaklik_yok_view" in globals() else None; s["kaynak"] = kaynak_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["proaktif"] = pro_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else piper_view() or {}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             s["kart_katmani"] = kart_katmani_acik()  # kartları Mac'in kart katmanı gösteriyor: şerit ve panel listeyi göstermez
+            dk = dk_view() if "dk_view" in globals() else None  # 6 Kasım: döküm kontrolü (yalnız geliştirici + ses arşivi açık)
+            if dk: s["dokum_kontrol"] = dk
             so = so_view()  # 3 Kasım: öğrenen sözlük — son çalışma, öğrenilen, bekleyen (döngü hiç çalışmadıysa alan yok)
             if so: s["sozluk_ogrenme"] = so
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
@@ -2278,6 +2281,12 @@ class H(BaseHTTPRequestHandler):
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
         if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
+        if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
+        if yol == "/dokum-kontrol/ses":  # satırın ses parçası (WAV); sayfa fetch ile başlıklı alır
+            from urllib.parse import urlsplit, parse_qs
+            q = parse_qs(urlsplit(self.path).query); b = dk_ses((q.get("t") or [""])[0], (q.get("d") or [""])[0])
+            if not b: return self._json({"ok": False}, 404)
+            self.send_response(200); self._cors(); self.send_header("Content-Type", "audio/wav"); self.send_header("Cache-Control", "private, max-age=3600"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if yol == "/ortak": return self._json(ortak_view())  # A3 ortak klasör durumu (aktarici/ortak-klasor.py)
         if yol == "/kayitlar": return self._json(kayitlar_view(self.path))  # Kararlar ve işler görünümü (anahtarlı)
         if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
@@ -2306,6 +2315,9 @@ class H(BaseHTTPRequestHandler):
             if fp.startswith(os.path.realpath(KANIT_DIR) + os.sep) and fp.endswith(".png") and os.path.isfile(fp):
                 b = open(fp, "rb").read(); self.send_response(200); self.send_header("Content-Type", "image/png"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
             return self._json({"ok": False}, 404)
+        if yol == "/dokum-kontrol":  # sayfa kabuğu anahtarsız (/ gibi); veri uçları anahtarlı. Geliştirici + ses arşivi açık değilse yok
+            if not dk_acik()[0]: return self._json({"ok": False, "err": "kapali"}, 404)
+            b = sayfa("dokum-kontrol.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         b = sayfa("pano.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def do_POST(self):
         try: return self._post()
@@ -2353,6 +2365,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/prova": return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
         if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
+        if self.path == "/dokum-kontrol": return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile (anahtarlı; geliştirici)
         if self.path == "/ortak": return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
         if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/Claude/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
         if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)

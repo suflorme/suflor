@@ -1767,6 +1767,7 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
   const dinliyor=!!bnDin,dusunuyor=prBusy||prD.durum==='dusunuyor'
   const sirayaGore=()=>{const k=[];
     if(s.proaktif)k.push(`<section class=bolum><p class=giris>${esc(s.proaktif.cumle)}</p><div class=keylem><button type=button class=b data-bn=proakt data-id="${esc(s.proaktif.id)}">${L('Bakalım')}</button><button type=button class="b sade" data-bn=proakap data-id="${esc(s.proaktif.id)}">${L('Sonra')}</button></div></section>`)  // toplantı sonrası açık uç hatırlatması (aktarici/toplanti-sonrasi.py)
+    {const dk=s.dokum_kontrol,dl=dk?(dk.liste||[]).filter(x=>!x.bitti).slice(0,3):[];if(dl.length)k.push(`<section class=bolum><p class=giris>${L('Döküm kontrolü hazır: {baslik}. Öncelikli {n} satır, ~{m} dk.',{baslik:dl[0].baslik,n:dl[0].oncelikli,m:Math.round(dl[0].tahmin_dk||0)})}</p><div class=keylem><button type=button class=b data-bn=dkac data-t="${esc(dl[0].ad)}">${L('Kontrole başla')}</button>${dl.slice(1).map(x=>`<button type=button class="b sade" data-bn=dkac data-t="${esc(x.ad)}" title="${esc(x.baslik)}">${esc(x.tarih.slice(5))} · ${L('Öncelikli {n} satır',{n:x.oncelikli})}</button>`).join('')}</div></section>`)}  // toplantı sonrası döküm kontrolü (yalnız geliştirici; aktarici/dokum-kontrol.py, pano/dokum-kontrol.html)
     const kt=bnTeyitT(),kn=bnKendiT().filter(x=>x.gecikti||bnYakin(x)||x.atama_yeni),topN=bek.length+kt.length+kn.length
     const sat=[...bek.map(bnSatir),...kt.map(bnKararSatir),...kn.map(x=>bnIsSatir(x))],gor=bnBekAcik||sat.length<=5?sat:sat.slice(0,5)  // liste uzunsa ilk 5 + "N tane daha" (açılır)
     if(topN)k.push(`<section class=bolum><p class=giris>${odakOnce||taze?L('Bunun dışında senden'):L('Senden')} ${L('{n} şey bekleniyor.',{n:topN})}</p><div class=ince>${gor.join('')}</div>${sat.length>5?`<div class=keylem><button type=button class="b sade" data-bn=bekac>${bnBekAcik?L('Daha az göster'):L('{n} tane daha',{n:sat.length-5})}</button></div>`:''}</section>`)
@@ -1904,6 +1905,7 @@ async function bnTik(ev){const b=ev.target.closest('[data-bn]');if(!b)return;con
   if(a==='kararonay')return bnIsle([id],L('Karar onaylandı'),()=>bnYaz('/karar-onay',{idler:[id]}),!!b.dataset.pn)
   if(a==='kararlar'){const idler=String(b.dataset.idler||'').split(',').filter(Boolean);return bnIsle(idler,L('{n} karar onaylandı',{n:idler.length}),()=>bnYaz('/karar-onay',{idler}))}
   if(a==='proakt'||a==='proakap'){b.disabled=true;j('/proaktif',{method:'POST',body:JSON.stringify({islem:a==='proakt'?'sor':'kapat',id})}).catch(()=>{});if(last&&last.proaktif)last.proaktif=null;if(last)bnCiz(last);return}
+  if(a==='dkac'){window.open('/dokum-kontrol?top='+encodeURIComponent(b.dataset.t),'_blank');return}
   if(a==='bekac'){bnBekAcik=!bnBekAcik;if(last)bnCiz(last);return}
   if(a==='gerac'){bnGerAcik=!bnGerAcik;if(last)bnCiz(last);return}
   if(a==='knsek'){knSekme=b.dataset.s;if(last)bnCiz(last);return}

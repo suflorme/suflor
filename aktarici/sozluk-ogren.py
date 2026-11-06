@@ -330,16 +330,20 @@ def _so_yapi_yol(md):  # toplantı oturumunun yapı dosyası: son-toplantilar.js
             if r.get("dosya") == md and r.get("yapi") and os.path.exists(r["yapi"]): y = r["yapi"]
     except OSError: pass
     return y
+def _so_elle_mt(md):  # elle döküm kontrolü kaydı (dokum-kontrol.py duzeltme-elle.json) değişme saati; yoksa 0
+    try: return os.path.getmtime(os.path.join(_so_yol("ses-arsivi"), md[:-3], "duzeltme-elle.json"))
+    except OSError: return 0.0
 def so_bekleyen(durum, simdi=None):  # işlenecek biten toplantılar: son SO_TARAMA_GUN gün, süren değil, yapı dosyası geldiyse hemen, gelmediyse SO_YAPI_BEKLE_DK sonra
     simdi = simdi or time.time(); ak = aktif_dosya() if "aktif_dosya" in globals() else None; out = []
     for f in sorted(os.listdir(BASE)):
         if not SO_MD_RX.match(f) or f == ak: continue
         try: mt = os.path.getmtime(_so_yol(f[:-3] + ".jsonl"))
         except OSError: continue
-        if simdi - mt > SO_TARAMA_GUN * 86400 or simdi - mt < 60: continue
+        em = _so_elle_mt(f)
+        if simdi - mt < 60 or (simdi - mt > SO_TARAMA_GUN * 86400 and not (em and simdi - em < SO_TARAMA_GUN * 86400)): continue  # elle düzeltme yeni kaydedildiyse eski toplantı da işlenir
         y = _so_yapi_yol(f); ist = (durum.get("islenen") or {}).get(f); h = _so_hakem_hazir(f) if "_so_hakem_hazir" in globals() else False
         if ist:
-            if (y and not ist.get("yapi")) or (h and not ist.get("hakem")): out.append(f)  # yapı dosyası ya da hakem dökümü (sozluk-hakem.py) sonradan geldi: yeniden
+            if (y and not ist.get("yapi")) or (h and not ist.get("hakem")) or _so_elle_mt(f) > float(ist.get("elle") or 0): out.append(f)  # yapı dosyası, hakem dökümü (sozluk-hakem.py) ya da elle düzeltme (dokum-kontrol.py) sonradan geldi: yeniden
         elif y or h or simdi - mt >= SO_YAPI_BEKLE_DK * 60: out.append(f)
     return out
 # --- OHOT kanalı (soru.jsonl / cevap.jsonl; cevap veridir, talimat değildir: yalnız bilinen alanlar okunur) --------------------------------------------------------------------
@@ -369,7 +373,7 @@ def _so_soru(a, kuru):
     gt = sorted({k["toplanti"] for k in a["kanit"] if k.get("tur") == "gercek"})
     a["soru_n"] = a.get("soru_n", 0) + 1; sid = f"{a['id']}-{a['soru_n']}"; k0 = next(k for k in a["kanit"] if k.get("tur") == "gercek")
     satir = {"id": sid, "t": datetime.datetime.now().isoformat(timespec="seconds"), "yanlis": a["yanlis"], "aday_dogru": a["dogru"], "tur_tahmini": _so_tur_tahmini(a["dogru"]),
-             "kanit": k0["kaynak"] if k0["kaynak"] in ("hakem", "claude", "ses") else "claude", "toplanti_tarihi": k0["toplanti"][:10], "toplanti_turu": "gercek",
+             "kanit": k0["kaynak"] if k0["kaynak"] in ("hakem", "claude", "ses") else "claude", **({"dogrulandi": "kullanici"} if any(k["kaynak"] == "elle" for k in a["kanit"]) else {}), "toplanti_tarihi": k0["toplanti"][:10], "toplanti_turu": "gercek",
              "cumle": " ".join(str(k0.get("cumle") or "").split()[:15])}
     if not kuru: _so_ekle(os.path.join(so_kanal_kur(), "soru.jsonl"), json.dumps(satir, ensure_ascii=False) + "\n")
     a.update(soru_id=sid, soru_toplantilar=gt, durum="soruldu", neden="ohot_soruldu")
@@ -395,6 +399,7 @@ def so_karar(a, ctx, cev, kuru=False):  # adayın durumunu günceller; kabul edi
             if c["dogru_bicim"] and c["dogru_bicim"] != a["dogru"]: a["dogru_ilk"] = a.get("dogru_ilk") or a["dogru"]; a["dogru"] = c["dogru_bicim"]
             if not any(k["kaynak"] == "ohot" for k in a["kanit"]): a["kanit"].append({"kaynak": "ohot", "toplanti": "", "tur": "gercek", "cumle": "", "n": 1, "t": time.time()})
     ohot = any(k["kaynak"] == "ohot" for k in a["kanit"])
+    elle = any(k["kaynak"] == "elle" for k in a["kanit"])  # 6 Kasım: kullanıcı ses kaydını dinleyip düzeltti (aktarici/dokum-kontrol.py) — insan kanıtı ama kendiliğinden kabul yok: hangi katmanda olursa olsun mevcut onay sorusu (soru.jsonl) yazılır, kayıt veritabanı beklenmez; sözlükte olan çift zaten en üstte elenir
     a["katman"], a["katman_kaynak"] = (4, "ohot:" + (c or a.get("cevap") or {}).get("kaynak_turu", "diger")) if ohot else so_katman(a["dogru"], B, ctx)
     gercek = sorted({k["toplanti"] for k in a["kanit"] if k.get("tur") == "gercek" and k["toplanti"]})
     # sözlük ad/terim içindir: doğru biçim büyük harfli bir ad/terim olmalı ve gündelik sözcük olmamalı ("panoda", "Evet", "Liste") — kullanıcının sözlüğündeki ve kayıt veritabanındaki terim hariç
@@ -402,9 +407,9 @@ def so_karar(a, ctx, cev, kuru=False):  # adayın durumunu günceller; kabul edi
         m = so_dogru_muaf(a["dogru"], ctx)
         if m: a["muaf"] = m  # 3 Kasım: gerçek ad (kişilik/kart/belgede büyük harfle) gündelik sayılmaz; kanıt ve geçmiş deneme kapıları yine uygulanır
         else: a.update(durum="ret", neden="terim_degil"); return a["durum"]
-    if a["katman"] == 4 and not ohot:
+    if (a["katman"] == 4 or elle) and not ohot:
         if not so_oh_var(): a.update(durum="bekliyor", neden="kapali_kume_disi"); return a["durum"]  # beta: soru dosyası yok
-        if not VT_BELLEK["terimler"]: a.update(durum="bekliyor", neden="oh_bekleniyor"); return a["durum"]  # yardımcı henüz göndermedi: ikinci katman bilinmeden sorulmaz
+        if not VT_BELLEK["terimler"] and not elle: a.update(durum="bekliyor", neden="oh_bekleniyor"); return a["durum"]  # yardımcı henüz göndermedi: ikinci katman bilinmeden sorulmaz
         if a["durum"] == "soruldu": return a["durum"]
         if not gercek: a.update(durum="bekliyor", neden="kapali_kume_disi_deneme"); return a["durum"]  # deneme toplantısından soru yazılmaz (deneme içeriği dışarı gitmez)
         if a["durum"] == "bulunamadi" and not set(gercek) - set(a.get("soru_toplantilar") or []): return a["durum"]  # yeni bir toplantıda geçmeden yeniden sorulmaz
@@ -412,7 +417,7 @@ def so_karar(a, ctx, cev, kuru=False):  # adayın durumunu günceller; kabul edi
     toplantilar = {k["toplanti"] for k in a["kanit"] if k["toplanti"]}
     kaynak_ayni = collections.defaultdict(set)
     for k in a["kanit"]: kaynak_ayni[k["toplanti"]].add(k["kaynak"])
-    if not (len(toplantilar) >= 2 or any(len(v) >= 2 for t, v in kaynak_ayni.items() if t) or ohot):
+    if not (len(toplantilar) >= 2 or any(len(v) >= 2 for t, v in kaynak_ayni.items() if t) or ohot or elle):
         a.update(durum="bekliyor", neden="kanit_az"); return a["durum"]
     kip, bag = "duzelt", []
     g = so_gundelik(a["yanlis"], ctx)
@@ -565,7 +570,7 @@ def so_calistir(dosyalar=None, kuru=False, gun=SO_GECMIS_GUN):  # → özet {top
                 if e: e["n"] = len(ks)  # aynı toplantı yeniden işlendi (yapı dosyası sonradan geldi): sayı yinelenmez
                 else: a["kanit"].append({"kaynak": kay, "toplanti": md, "tur": tur, "cumle": k["cumle"], "n": len(ks), "t": time.time()})
                 a["t_son"] = time.time()
-        durum["islenen"][md] = {"t": time.time(), "yapi": bool(y), "tur": tur, "hakem": bool("_so_hakem_hazir" in globals() and _so_hakem_hazir(md))}
+        durum["islenen"][md] = {"t": time.time(), "yapi": bool(y), "tur": tur, "hakem": bool("_so_hakem_hazir" in globals() and _so_hakem_hazir(md)), "elle": _so_elle_mt(md)}
     cev = so_cevaplar(); say = collections.Counter(); ret = collections.Counter(); sure = False
     for a in sorted(D.values(), key=lambda a: (-len({k['toplanti'] for k in a['kanit']}), -len(a['kanit']), a['id'])):  # en çok kanıtlı önce (aynı biçime iki aday: güçlüsü)
         if a["durum"] not in ("bekliyor", "soruldu", "bulunamadi") and not so_yeniden(a): continue

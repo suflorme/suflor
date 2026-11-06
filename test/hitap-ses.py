@@ -15,7 +15,7 @@ ns = {"re": re, "time": time, "print": lambda *a: None, "_ad_listesi": lambda: {
 sec = secim(oku("aktarici", "kisilik.py"), (), ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS")) + \
       secim(oku("aktarici", "bas-konus.py"), ("_ad_anahtar", "_ad_mesafe"), ("_AD_HARF",)) + \
       secim(oku("aktarici", "sozluk.py"), ("hitap_ses_duzelt", "hitap_aski", "hitap_yalniz_ad", "_hitap_adlari", "_hitap_alt", "_hitap_rx", "hitap_aski_bitti", "hitap_askida"),
-            ("HITAP_ASKI", "HITAP_ASKI_SN", "HITAP_DEVAM_SN", "HITAP_AD_DEVAM_SN", "HITAP_ONCE_N", "HITAP_EN_COK_SN", "HITAP_EN_COK_SOZ", "HITAP_ONCE", "HITAP_AD"))
+            ("HITAP_ASKI", "HITAP_ASKI_SN", "HITAP_DEVAM_SN", "HITAP_AD_DEVAM_SN", "HITAP_ONCE_N", "HITAP_EN_COK_SN", "HITAP_EN_COK_SOZ", "HITAP_ONCE", "HITAP_AD", "_KHR"))
 exec(compile(ast.Module(sec, []), "t", "exec"), ns)
 d = ns["hitap_ses_duzelt"]
 # (b) ses benzeri ad
@@ -51,6 +51,6 @@ ok("okuma sürmüyorsa etkisiz", f("Bir dakika.", time.time() - 6) is False)
 rl = oku("relay.py"); i = rl.index("ALTYAZI_SON.append((time.time(), kim_))")
 ok("relay: ben altyazı satırı okuma_dur_soz'a gider", 'kim_ == ben_adi() and "okuma_dur_soz" in globals() and okuma_dur_soz(text' in rl[i:i + 600])
 # (c) gecikme satırı: otonom_sun turu parametre alır; tur _KS'den silinmiş olsa da lat dolar
-ok("otonom_sun tur parametresi alır ve çağıran verir", "def otonom_sun(cevap, kaynak, kim=None, ad=None, tur=None)" in src and "tur_ = tur or _KS.get(\"tur\") or {}" in src and
+ok("otonom_sun tur parametresi alır ve çağıran verir", "def otonom_sun(cevap, kaynak, kim=None, ad=None, tur=None" in src and "tur_ = tur or _KS.get(\"tur\") or {}" in src and
    'tur.get("ad") or tur.get("kisi"), tur)' in oku("aktarici", "bas-konus.py"))
 print("SONUÇ:", "hepsi geçti" if all(ok_) else "başarısız"); sys.exit(0 if all(ok_) else 1)
