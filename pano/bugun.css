@@ -469,8 +469,17 @@ html:is(.hafta-ac,.saatler-ac) main>.sc>#tvb:not([hidden]){display:block;flex:no
 #bgn .kisikart .kk{display:flex;align-items:center;gap:var(--bo-8)}#bgn .kisikart .kk b{font:500 var(--yz-15)/1.3 var(--f-govde);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #bgn .kisikart .kisi-yuz{width:32px;height:32px}
 #bgn .kisikart .ks{display:flex;align-items:baseline;gap:var(--bo-8);font-size:var(--yz-13);color:var(--b-m2)}
-#bgn .kisikart .sayi{font:300 var(--yz-24)/1 var(--f-baslik);color:var(--b-murekkep)}
+#bgn .kisikart .sayi{font:300 var(--yz-40)/1 var(--f-baslik);color:var(--b-murekkep)}
 #bgn .kisikart .kd{font:500 var(--yz-12)/1.3 var(--f-govde)}#bgn .kisikart .kd.gec{color:var(--b-gec)}#bgn .kisikart .kd.ok{color:var(--b-vurgu)}
+/* Ekip > İzleme (adım 5, taslak Ekip.dc.html): başlık satırı, nabız hapları, sapma satırları (ad yeşil bağlantı, alt satır birim · kişi, sağda durum etiketi + gün sayısı mono 12), "N sapma daha" */
+#bgn .iz .izb{margin:0;color:var(--b-m3);font:400 var(--yz-12)/1.4 var(--f-govde)}#bgn .iz .izb b{font-weight:500;color:var(--b-m2)}
+#bgn .izhaps{display:flex;flex-wrap:wrap;gap:var(--bo-8)}
+#bgn .izhap{display:inline-flex;align-items:center;gap:var(--bo-12);padding:var(--bo-8) var(--bo-12);border-radius:var(--r-8);background:var(--b-yuzey);border:1px solid var(--b-cizgi);font:400 var(--yz-13)/1.3 var(--f-govde);color:var(--b-m2)}#bgn .izhap b{font-weight:500;color:var(--b-murekkep)}
+#bgn .iz .sat.dis .t a{color:var(--b-vurgu);text-decoration:none;font-size:var(--yz-15)}#bgn .iz .sat.dis .t a:hover{text-decoration:underline}
+#bgn .iz .sat.dis .a{font-size:var(--yz-12);color:var(--b-m3)}
+#bgn .iz .sat.dis .eylem{gap:var(--bo-12)}#bgn .iz .sat.dis .vade{min-width:var(--bo-48);text-align:right;font-weight:400;color:var(--b-m3)}
+#bgn .izalt{padding:var(--bo-8) var(--bo-12)}
+@media(max-width:640px){#bgn .iz .sat.dis .vade{min-width:0}}
 /* Geçmiş: arama satırı */
 #bgn .gcara{display:flex;gap:var(--bo-8);max-width:560px}
 #bgn .gcara input{flex:1;min-width:0;font:400 var(--yz-13)/1.4 var(--f-govde);color:var(--b-murekkep);background:var(--b-yuzey);border:1px solid var(--b-cizgi2);border-radius:var(--r-8);padding:var(--bo-8) var(--bo-12)}

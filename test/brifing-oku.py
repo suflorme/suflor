@@ -80,4 +80,19 @@ sifirla("hazir"); calistir(lambda: ns["brifing_pocket_onden"]("o1"))
 bak("zaten hazırsa yeniden açılmaz", ACILAN == [])
 # 4. kaynak: hazır yazılan yerde önceden açma çağrısı var
 bak("_brifing_is hazır yazınca brifing_pocket_onden çağrılır", 'brifing_pocket_onden(oid)' in k[:k.index("def brifing_konusma(")])
+# 5. Günün özeti Dinle (v0.208.0, bas-konus.py brifing_iste: olay yok + metin): okur, ikinci basış susar, toplantıda okumaz, konuşma kapalıyken okumaz
+kb = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
+DURDU = {"v": False}
+ns.update({"TAKVIM_TAM": {}, "BRIFING_BEKLE": {"v": False}, "ses_durdur": lambda: DURDU["v"], "_brifing_oku": ns["_brifing_oku"]})
+exec(compile(kb[kb.index("def brifing_iste("):kb.index("def chrome_ac(")], "bas-konus.py", "exec"), ns)
+sifirla("hazir"); r, _ = calistir(lambda: ns["brifing_iste"]({"dinle": True, "metin": "  Bugün   iki işin var. "}))
+bak("Günün özeti: metin okunur (boşluk sadeleşir)", r.get("ok") and r.get("ses") and OKUNAN and OKUNAN[0][0] == "Bugün iki işin var.", f"{r} {OKUNAN}")
+sifirla("hazir"); DURDU["v"] = True; r, _ = calistir(lambda: ns["brifing_iste"]({"dinle": True, "metin": "x"})); DURDU["v"] = False
+bak("Günün özeti: okurken basılırsa susar, okumaz", r.get("ses") is False and not OKUNAN, f"{r} {OKUNAN}")
+sifirla("hazir"); ns["toplanti_var"] = lambda: True; r, _ = calistir(lambda: ns["brifing_iste"]({"dinle": True, "metin": "x"})); ns["toplanti_var"] = lambda: False
+bak("Günün özeti: toplantı sürerken okunmaz", not r.get("ok") and not OKUNAN, f"{r}")
+sifirla("hazir"); ns["AYAR"]["konusma"] = False; r, _ = calistir(lambda: ns["brifing_iste"]({"dinle": True, "metin": "x"})); ns["AYAR"]["konusma"] = True
+bak("Günün özeti: konuşma kapalıyken okunmaz", not r.get("ok") and not OKUNAN, f"{r}")
+sifirla("hazir"); r, _ = calistir(lambda: ns["brifing_iste"]({"dinle": True, "olay": "yok"}))
+bak("olay verilip takvimde yoksa eski hata (metin yolu karışmaz)", not r.get("ok") and not OKUNAN, f"{r}")
 print(f"\n{len(HATA)} hata" if HATA else "\nhepsi geçti"); sys.exit(1 if HATA else 0)

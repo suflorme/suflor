@@ -2120,6 +2120,14 @@ def konus_bekci():  # KONUS_BOSTA_SN (55 dk) kullanılmayan süreci kapat; topla
 threading.Thread(target=konus_bekci, daemon=True).start()
 def brifing_iste(p):
     oid = str(p.get("olay") or ""); olay = TAKVIM_TAM.get(oid)
+    if p.get("dinle") and not oid and isinstance(p.get("metin"), str):  # v0.208.0: Bugün'deki Günün özeti (brifing yokken) — aynı Dinle: okuyorsa susar, değilse metni okur
+        if ses_durdur() or BRIFING_BEKLE["v"]: return {"ok": True, "ses": False}
+        if toplanti_var(): return {"ok": False, "err": _t("Toplantı sürerken okunmaz", "Not read aloud during a meeting")}
+        metin = " ".join(p["metin"].split())[:1500]
+        if not metin or not AYAR.get("konusma", True): return {"ok": False, "err": _t("Sesli okuma kapalı", "Reading aloud is off")}
+        if pocket_var() and POCKET["durum"] != "hazir" and kisilik_sesi()[0] == "pocket":
+            threading.Thread(target=_brifing_oku, args=(metin, "günün özeti", True), daemon=True).start(); return {"ok": True, "ses": True}
+        return {"ok": _brifing_oku(metin, "günün özeti", False), "ses": True}
     if not olay: return {"ok": False, "err": _t("Toplantı takvimde bulunamadı", "Meeting not found in the calendar")}
     b = BRIFING.get(oid) or {}
     if b.get("durum") not in ("hazir", "calisiyor"):  # başka gün hazırlanmış (hafta görünümünden Hazırla): kayıttan
