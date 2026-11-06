@@ -3,61 +3,32 @@
 html.bugun main{background:var(--b-zemin);container-type:normal}
 html.bugun:not(.hafta-ac):not(.saatler-ac) main>.sc{display:block;padding:0}
 html.bugun main>.sc>#bgn{max-width:none}
-html.bugun main>.sc>section:not(#bgn):not(#hfs):not(#sts){max-width:760px;margin:0 auto var(--bo-16);width:calc(100% - 32px)}
+html.bugun main>.sc>section:not(#bgn):not(#hfs):not(#sts):not(#tvb){max-width:760px;margin:0 auto var(--bo-16);width:calc(100% - 32px)}
 html.bugun :is(#tkalt,#tk,#tkh,#tson,#sns,#eys,#brs){display:none!important}
 html.bugun #tks:not(:has(#tkf:not([hidden]))){display:none}
 html.bugun:not(.mac) #tkf:not([hidden]){position:fixed;top:0;left:50%;transform:translateX(-50%);width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 20px);overflow:auto;z-index:60;margin:0;padding:var(--bo-16) var(--bo-24) var(--bo-16);border-radius:0 0 var(--kose-l) var(--kose-l);background:var(--s1);box-shadow:0 18px 50px rgba(0,0,0,.28);gap:var(--bo-8)}
 html.bugun:not(.mac) .tkfb{display:block;font-weight:600;margin-bottom:var(--bo-4)}
-html.bugun .nb{position:relative;z-index:5;margin-top:-76px;background:transparent;pointer-events:none;padding:var(--bo-8) var(--bo-16) calc(14px + env(safe-area-inset-bottom,0px))}
-html.bugun .nb>*{pointer-events:auto}
-html.bugun .nb:has(#kns:not([hidden])){margin-top:0;background:var(--b-zemin)}  /* 5 Kasım: asistan cevabı görününce kutu içeriğin üstüne binmez, akışta altta durur (opak zemin) */
+html.bugun .nb{position:relative;z-index:5;margin-top:0;background:var(--b-zemin);padding:var(--bo-8) var(--bo-48) var(--bo-16)}  /* 6 Kasım (adım 3): kutu içeriğin üstüne binmez — kaydırılan alanın altında kendi yerinde durur (eski -76 px bindirme kalktı) */
 html.bugun #kns:not([hidden]){background:var(--b-zemin);border-radius:var(--r-tam)}
-html.bugun #bgn .icerik{padding-bottom:110px}
-html.bugun:not(.mac) .nb{padding-left:calc(236px + 56px)}
-html.bugun .nb :is(#kns,.kt,.kal){max-width:648px;margin-inline:0}
+html.bugun .nb :is(#kns,.kt,.kal){max-width:760px;margin-inline:auto}
 html.bugun .kt{background:var(--b-cam);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid var(--b-cam-kenar);box-shadow:var(--b-cam-golge);border-radius:var(--r-tam);padding:var(--bo-8) var(--bo-8) var(--bo-8) var(--bo-12);align-items:center}
 html.bugun .kt textarea,html.bugun .kt textarea:focus{font-size:var(--yz-15);color:var(--b-murekkep)}
 html.bugun .kt textarea::placeholder{color:var(--b-m3)}
 html.bugun .kt .ib{color:var(--b-m2)}html.bugun .kt .ib:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}
-html.bugun .kt .ktm{width:36px;height:36px;border-radius:50%;background:var(--b-yuzey)}
-html.bugun .kt .ktm.on,html.bugun .kt .ktm.soh{color:var(--b-canli)}
+html.bugun .kt .ktm{width:36px;height:36px;border-radius:50%;background:var(--b-ana);color:var(--b-ana-yazi)}html.bugun .kt .ktm:hover{background:var(--b-ana);color:var(--b-ana-yazi);opacity:.9}
+html.bugun .kt .ktm.on,html.bugun .kt .ktm.soh{background:var(--b-ana);color:var(--b-ana-yazi);box-shadow:0 0 0 3px var(--b-vurgu-hafif)}
 
 #bgn{display:none;grid-template-columns:minmax(0,1fr);min-height:100%;color:var(--b-murekkep);font:var(--yz-15)/1.55 var(--f-govde)}
 html.bugun #bgn{display:grid}
-html:not(.mac) #bgn{grid-template-columns:236px minmax(0,1fr)}
 #bgn *{box-sizing:border-box}
 #bgn button{font:inherit;color:inherit;cursor:pointer}
 #bgn :focus-visible,#bnPanel :focus-visible{outline:2px solid var(--b-vurgu);outline-offset:2px}
 #bgn svg.i,#bnPanel svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 #bgn .mono,#bnPanel .mono{font-family:var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);font-variant-numeric:tabular-nums}
 
-/* Kenar çubuğu (yalnız tarayıcıda; Mac penceresinde uygulamanın kendi kenar çubuğu var) */
-html.mac #bgn .bkenar,html.mac #bgn .bmenu{display:none}
-#bgn .bkenar{background:var(--b-kenar-zemin);color:var(--b-kenar-yazi);backdrop-filter:blur(28px) saturate(1.5);-webkit-backdrop-filter:blur(28px) saturate(1.5);min-height:0}
-#bgn .bkenar-i{position:sticky;top:0;display:flex;flex-direction:column;gap:var(--bo-4);padding:var(--bo-16) var(--bo-12) var(--bo-16);min-height:min(100%,640px);max-height:100vh}
-#bgn .logo{display:flex;align-items:center;gap:var(--bo-8);padding:0 var(--bo-8) var(--bo-16)}
-#bgn .logo svg{width:24px;height:24px}
-#bgn .logo b{font:300 var(--yz-18)/1 var(--f-baslik);letter-spacing:-.01em}
-#bgn .oge{display:flex;align-items:center;gap:var(--bo-12);border:0;background:none;padding:var(--bo-8) var(--bo-12);border-radius:var(--r-8);font-size:var(--yz-13);color:var(--b-kenar-yazi2);text-align:left;width:100%}
-#bgn .oge:hover{background:var(--b-kenar-uzerinde);color:var(--b-kenar-yazi)}
-#bgn .oge.etkin{background:var(--b-kenar-etkin);color:var(--b-kenar-yazi);font-weight:500}
-#bgn .oge.etkin svg{color:var(--b-kenar-ikon)}
-#bgn .oge .say{margin-left:auto;font:500 var(--yz-12) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);color:var(--b-kenar-yazi2)}
-#bgn .bosluk{flex:1}
-#bgn .oge.kucuk{font-size:var(--yz-13)}
-
 /* Ana alan */
 #bgn .ana{min-width:0;position:relative}
-#bgn .arac{display:flex;align-items:center;gap:var(--bo-12);height:48px;padding:0 var(--bo-24)}
-#bgn .arac .sag{margin-left:auto}
-#bgn .durumcip{display:inline-flex;align-items:center;gap:var(--bo-8);font-size:var(--yz-13);color:var(--b-m2);padding:var(--bo-4) var(--bo-12)}
-#bgn .durumcip i{width:7px;height:7px;border-radius:50%;background:var(--b-canli)}
-#bgn .ikon{border:0;background:none;width:32px;height:32px;border-radius:var(--r-8);display:grid;place-items:center;color:var(--b-m2);padding:0}
-#bgn .ikon:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}
-#bgn .bmenu{display:none;align-items:center;gap:var(--bo-8)}
-#bgn .bmenu svg.replik{width:22px;height:22px}
-#bgn .bmenu b{font:300 var(--yz-18) var(--f-baslik)}
-#bgn .icerik{max-width:760px;padding:var(--bo-16) 56px var(--bo-48);display:grid;gap:var(--bo-48)}
+#bgn .icerik{max-width:856px;margin:0 auto;padding:var(--bo-32) var(--bo-48) var(--bo-32);display:grid;gap:var(--bo-32)}  /* içerik 760 px, ortada (taslak) */
 
 /* Selam, asistan noktası */
 #bgn .selam{display:grid;gap:var(--bo-8)}
@@ -119,7 +90,7 @@ html.mac #bgn .bkenar,html.mac #bgn .bmenu{display:none}
 #bgn .onay.karar{border-color:var(--b-vurgu)}
 #bgn .sat .t{font-size:var(--yz-15);line-height:1.4;overflow-wrap:anywhere}
 #bgn .sat .a{font-size:var(--yz-13);color:var(--b-m3);display:flex;flex-wrap:wrap;gap:var(--bo-4) var(--bo-8);align-items:center;margin-top:0}
-#bgn .etiketk{font:500 var(--yz-12) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--b-m3)}
+#bgn .etiketk{font:400 var(--yz-12)/1.4 var(--f-govde);letter-spacing:0;text-transform:none;color:var(--b-m3)}
 #bgn .etiketk.karar{color:var(--b-vurgu)}
 #bgn .kisi-yuz{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:500 var(--yz-12) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);background:var(--b-yuzey2);color:var(--b-m2);border:1px solid var(--b-cizgi)}
 /* ===== Tek düğme bileşeni (tasarım sistemi, adım 1): ana · ikincil · sade — yükseklik 36 (küçük 32), yazı 13/500, köşe 8. Adlandırılmış sınıflar .b-ana / .b-iki / .b-sade (+ .b-k küçük);
@@ -165,12 +136,12 @@ a,a:link,a:visited{color:var(--b-vurgu);text-decoration:none}a:hover,a:focus-vis
 #bgn .haz b{font-weight:600;color:var(--b-murekkep)}
 #bgn .ikili{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--bo-16) var(--bo-24)}
 #bgn .mini{display:grid;gap:var(--bo-8);align-content:start}
-#bgn .mini h4,#bnPanel .blok h4{margin:0;font:500 var(--yz-12) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);letter-spacing:.07em;text-transform:uppercase;color:var(--b-m3)}
+#bgn .mini h4,#bnPanel .blok h4{margin:0;font:500 var(--yz-13)/1.3 var(--f-govde);letter-spacing:0;text-transform:none;color:var(--b-m3)}
 #bgn .mini ul{list-style:none;margin:0;padding:0;display:grid;gap:var(--bo-8)}
 #bgn .mini li{font-size:var(--yz-13);line-height:1.4}
 #bgn .keylem{display:flex;flex-wrap:wrap;gap:var(--bo-8);align-items:center}
 #bgn .keylem .ipucu{font-size:var(--yz-13);color:var(--b-m3);margin-left:auto}
-#bgn .eb{font:500 var(--yz-12) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);letter-spacing:.07em;text-transform:uppercase;color:var(--b-m3)}
+#bgn .eb{font:500 var(--yz-13)/1.3 var(--f-govde);letter-spacing:0;text-transform:none;color:var(--b-m3)}
 
 /* 15 dk kala hazırlık kartı */
 #bgn .camkenar{padding:var(--bo-8);border-radius:var(--r-14);background:var(--b-cam);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);border:1px solid var(--b-cam-kenar);box-shadow:var(--b-cam-golge);animation:bnYay var(--b-sure-y) var(--b-yay) both;transform-origin:top left}
@@ -280,22 +251,16 @@ dialog#prd[open]{display:grid;gap:var(--bo-16);align-content:start}
 @media (prefers-reduced-motion:reduce){#prd .prnokta,#prd .prnokta2{animation:none}}
 
 /* Tarayıcıda üst çubuktaki marka: kenar çubuğunda da var (Bugün'de yinelenmesin); dar ekranda ve Mac'te kalır */
-@media (min-width:721px){html.bugun:not(.mac) header .brand{display:none}}
+@media (min-width:721px){html:not(.mac):not(.kc-kapali) header .brand{display:none}}
+html.bugun:not(.mac):not(.toplantida) header{background:var(--b-zemin);border-bottom-color:transparent}
+html.bugun:not(.mac):not(.toplantida) header #durum.nt:not(.yt){display:none}  /* Bugün başlığındaki durum hapı aynı bilgiyi verir */
 
-@media (prefers-reduced-motion:reduce){#bgn .nefes,#bgn .dalga i,#bgn .camkenar{animation:none}#bgn .dalga i{height:8px}#bgn .sat,#bnPanel,#bnBild,#bgn .bkenar{transition:none}}
+@media (prefers-reduced-motion:reduce){#bgn .nefes,#bgn .dalga i,#bgn .camkenar{animation:none}#bgn .dalga i{height:8px}#bgn .sat,#bnPanel,#bnBild,#kenar{transition:none}}
 
 /* Dar ekran */
 @media (max-width:720px){
-  html:not(.mac) #bgn{grid-template-columns:minmax(0,1fr)}
-  html.bugun:not(.mac) .nb{padding-left:var(--bo-16)}
-  #bgn .bkenar{position:fixed;top:0;bottom:0;left:0;width:260px;z-index:75;transform:translateX(-105%);transition:transform .25s ease;background:var(--b-kenar-opak)}
-  #bgn .bkenar.acik{transform:none;box-shadow:12px 0 40px rgba(0,0,0,.18)}
-  html.mac #bgn .bkenar{display:none}
-  #bgn .bmenu{display:flex}
-  html.mac #bgn .bmenu{display:none}
-  #bgn .arac{padding:0 var(--bo-12)}
-  #bgn .durumcip span{display:none}
-  #bgn .icerik{padding:var(--bo-12) var(--bo-16) var(--bo-48);gap:var(--bo-32)}
+  #bgn .icerik{padding:var(--bo-16) var(--bo-16) var(--bo-32);gap:var(--bo-24)}
+  html.bugun .nb{position:sticky;bottom:0;padding:var(--bo-8) var(--bo-16) calc(var(--bo-12) + env(safe-area-inset-bottom,0px))}
   #bgn .selam h1{font-size:var(--yz-40);gap:var(--bo-12)}
   #bgn .durum p{font-size:var(--yz-18)}
   #bgn .sat{grid-template-columns:auto minmax(0,1fr)}
@@ -362,3 +327,183 @@ dialog#emd[open]{display:grid;gap:var(--bo-16);align-content:start}
 #emd .emnot{margin:0;white-space:pre-wrap;font:inherit;font-size:var(--yz-13);color:var(--b-murekkep);background:var(--b-yuzey2);border-radius:var(--r-8);padding:var(--bo-12) var(--bo-12)}
 #emd .keylem{display:flex;flex-wrap:wrap;gap:var(--bo-8);align-items:center}
 @media (prefers-reduced-motion:reduce){#emd .emms.bekle{animation:none}}
+
+/* ===== Tek kenar çubuğu (adım 2, 6 Kasım): Mac penceresi ve tarayıcı aynı bileşen (#kenar). Sabit sol sütun; gövde --kw kadar sağa kayar, böylece toplantı panosunun ızgarası değişmez.
+   Renk: --b-kenar-* (renk_duzeni=yesil koyu yeşil zemin). Mac'te nötr zemin saydam (arkasında Mac'in buzlu cam malzemesi), logo pencere başlığında olduğu için gizli. ===== */
+:root{--kw:232px}
+html.kc-kapali{--kw:0px}
+html:not(.panel):not(.ayarlar):not(.yardim) body{padding-left:var(--kw)}
+#kenar{position:fixed;top:0;bottom:0;left:0;width:var(--kw);z-index:40;display:flex;flex-direction:column;gap:var(--bo-4);padding:var(--bo-24) var(--bo-12) var(--bo-16);overflow-y:auto;background:var(--b-kenar-zemin);color:var(--b-kenar-yazi);backdrop-filter:blur(28px) saturate(1.5);-webkit-backdrop-filter:blur(28px) saturate(1.5);border-right:1px solid var(--b-cizgi);font-family:var(--f-govde)}
+html[data-renk=yesil] #kenar{border-right-color:transparent}
+html.kc-kapali #kenar,html:is(.panel,.ayarlar,.yardim) #kenar{display:none}
+html.mac #kenar{padding-top:var(--bo-12)}
+html.mac:not([data-renk=yesil]) #kenar{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-right-color:var(--b-cizgi)}
+#kenar .klogo{display:flex;align-items:center;gap:var(--bo-12);padding:0 var(--bo-12) var(--bo-24)}
+#kenar .klogo svg{width:24px;height:24px;flex:none}
+#kenar .klogo b{font:300 var(--yz-18)/1 var(--f-baslik);letter-spacing:-.01em;color:var(--b-kenar-yazi)}
+html.mac #kenar .klogo{display:none}
+#kenar .ko{display:flex;align-items:center;gap:var(--bo-12);flex:none;width:100%;height:var(--d-yuk);padding:0 var(--bo-12);border:0;border-radius:var(--r-8);background:none;color:var(--b-kenar-yazi2);font:400 var(--yz-13)/1 var(--f-govde);text-align:left;cursor:pointer;white-space:nowrap}
+#kenar .ko:hover{background:var(--b-kenar-uzerinde);color:var(--b-kenar-yazi)}
+#kenar .ko.sec{background:var(--b-kenar-etkin);color:var(--b-kenar-yazi);font-weight:500}
+#kenar .ko svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#kenar .ko.sec svg.i{color:var(--b-kenar-ikon)}
+#kenar .ko .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#kenar .ko .r{font:400 var(--yz-12)/1 var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);color:var(--b-kenar-yazi2);font-variant-numeric:tabular-nums}
+#kenar .ko[data-canli]{color:var(--b-kenar-yazi);font-weight:500}
+#kenar .ko:focus-visible,#kenar .kara:focus-visible{outline:2px solid var(--b-vurgu);outline-offset:-2px}
+#kenar .nok{width:8px;height:8px;border-radius:50%;background:var(--b-gec);flex:none;margin:0 var(--bo-4);box-shadow:0 0 0 3px color-mix(in srgb,var(--b-gec) 22%,transparent)}
+#kenar .kb{font:500 var(--yz-12)/1 var(--f-govde);color:var(--b-kenar-yazi2);padding:var(--bo-4) var(--bo-12) var(--bo-4)}
+#kenar .kay{height:1px;background:var(--b-kenar-uzerinde);margin:var(--bo-8) var(--bo-12);flex:none}
+#kenar .kbos{flex:1;min-height:var(--bo-32)}
+#kenar .kara{display:flex;align-items:center;justify-content:space-between;gap:var(--bo-8);flex:none;margin:0 var(--bo-12) var(--bo-12);padding:var(--bo-12);border-radius:var(--r-8);border:1px solid color-mix(in srgb,var(--b-kenar-yazi) 16%,transparent);background:none;color:var(--b-kenar-yazi2);font:400 var(--yz-12)/1.5 var(--f-govde);text-align:left;cursor:pointer}
+#kenar .kara:hover{background:var(--b-kenar-uzerinde);color:var(--b-kenar-yazi)}
+#kenar .kara kbd{font:400 var(--yz-12)/1 var(--f-mono,"IBM Plex Mono",ui-monospace,monospace)}
+#kenar .kalt{display:none}
+html.mac #kenar .kalt{display:flex;align-items:center;gap:var(--bo-8);flex:none;padding:var(--bo-12) var(--bo-12) 0;font-size:var(--yz-12);color:var(--b-kenar-yazi2);border-top:1px solid var(--b-kenar-uzerinde)}
+html.mac #kenar .kalt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#kmenu{display:none}
+@media (max-width:720px){  /* dar pencere: kenar çubuğu çekmece — tarayıcıda başlıktaki menü düğmesi, Mac'te araç çubuğundaki Kenar çubuğu düğmesi (kenarAcKapa) açar */
+  html:not(.panel):not(.ayarlar):not(.yardim) body{padding-left:0}
+  #kenar,html.kc-kapali #kenar{display:flex;width:260px;z-index:75;transform:translateX(-105%);transition:transform .25s ease;background:var(--b-kenar-opak);backdrop-filter:none;-webkit-backdrop-filter:none}
+  html.mac:not([data-renk=yesil]) #kenar{background:var(--b-kenar-opak)}
+  #kenar.acik{transform:none;box-shadow:12px 0 40px rgba(0,0,0,.18)}
+  html:not(.mac) #kmenu{display:inline-grid;place-items:center}
+}
+#bgn section{margin-top:0}
+
+/* ===== Sayfa başlığı (adım 2–3): tarih satırı (13, m3) + h1 40/300; sağda durum hapı ve sayfa ⋯ menüsü. Takvim'de küçük (24) — ızgaraya yer kalsın ===== */
+.sayfab{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--bo-16);flex-wrap:wrap}
+.sayfab .sbas{display:grid;gap:var(--bo-8);min-width:0;flex:1 1 320px}
+.sayfab .tarih,.sayfab .alt{font-size:var(--yz-13);color:var(--b-m3)}
+.sayfab h1{margin:0;font:300 var(--yz-40)/1.15 var(--f-baslik);letter-spacing:-.01em;color:var(--b-murekkep);text-wrap:pretty}
+.sayfab h1 .varlikisaret{display:inline-flex;vertical-align:middle;margin-left:var(--bo-4)}
+.sayfab .sag{display:flex;align-items:center;gap:var(--bo-8);flex-wrap:wrap}
+.sayfab.sik{align-items:center}.sayfab.sik h1{font-size:var(--yz-24)}.sayfab.sik .sbas{flex:0 1 auto}
+#tvb .sayfab .seg{margin:0}
+.sayfab .ortak{font-size:var(--yz-13);color:var(--b-m3)}.sayfab .ortak.uyari{color:var(--wa)}
+.hap{display:inline-flex;align-items:center;gap:var(--bo-8);height:var(--d-yuk-k);padding:0 var(--bo-12);border-radius:var(--r-tam);background:var(--b-vurgu-hafif);color:var(--b-vurgu);font:500 var(--yz-12)/1 var(--f-govde);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.hap i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.hap.wa{background:var(--wa-bg);color:var(--wa)}.hap.er{background:color-mix(in srgb,var(--b-gec) 12%,transparent);color:var(--b-gec)}
+/* sayfa ⋯ menüsü */
+.smw{position:relative;display:inline-flex}
+.smd{display:grid;place-items:center;width:var(--d-yuk-k);height:var(--d-yuk-k);padding:0;border:1px solid transparent;border-radius:var(--r-8);background:none;color:var(--b-m2);cursor:pointer}
+.smd:hover,.smd[aria-expanded=true]{background:var(--b-uzerinde);color:var(--b-murekkep)}
+.smd svg.i,.smi svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.smp{position:absolute;right:0;top:calc(100% + 4px);z-index:30;min-width:220px;display:grid;padding:var(--bo-4);border-radius:var(--r-8);background:var(--b-yuzey);border:1px solid var(--b-cizgi);box-shadow:var(--golge-menu)}
+.smi{display:flex;align-items:center;gap:var(--bo-12);padding:var(--bo-8) var(--bo-12);border:0;border-radius:var(--r-6);background:none;color:var(--b-murekkep);font:400 var(--yz-13)/1.3 var(--f-govde);text-align:left;cursor:pointer;white-space:nowrap}
+.smi:hover,.smi:focus-visible{background:var(--b-uzerinde);outline:none}
+.smi svg.i{color:var(--b-m2)}
+/* Takvim yeri: başlık (Gün · Hafta · Ay · Saatler, ⋯) ızgaranın üstünde; ızgaranın ve Saatler'in kendi seçicisi ve kapatma düğmesi gizli (tek seçici) */
+#tvb{font-family:var(--f-govde)}
+html:is(.hafta-ac,.saatler-ac) main>.sc>#tvb:not([hidden]){display:block;flex:none;margin-bottom:var(--bo-12)}
+#hfs .hft #hfm,#hfs .hft [data-hfg=kapat],#sts>.bgb{display:none}
+
+/* ===== Bugün (adım 3, onaylı taslak) ===== */
+#bgn .bbas{display:flex;justify-content:space-between;align-items:baseline;gap:var(--bo-12);flex-wrap:wrap}
+#bgn .bbas h2{margin:0;font:500 var(--yz-18)/1.3 var(--f-govde);color:var(--b-murekkep)}
+#bgn .bbas .sag{font-size:var(--yz-12);color:var(--b-m3)}
+#bgn h2.kb2{margin:0;font:500 var(--yz-13)/1.3 var(--f-govde);color:var(--b-m3)}
+#bgn .bag{border:0;background:none;padding:0;font:400 var(--yz-13)/1.4 var(--f-govde);color:var(--b-vurgu);cursor:pointer;text-decoration:none}
+#bgn .bag:hover{text-decoration:underline}
+/* Günün özeti */
+#bgn .ozet{background:var(--b-yuzey);border:1px solid var(--b-cizgi);border-radius:var(--r-14);padding:var(--bo-24);display:grid;gap:var(--bo-16)}
+#bgn .ozet .obas{display:flex;justify-content:space-between;align-items:center;gap:var(--bo-12);flex-wrap:wrap}
+#bgn .ozet h2{margin:0;font:500 var(--yz-18)/1.3 var(--f-govde)}
+#bgn .ozet p{margin:0;font:400 var(--yz-15)/1.6 var(--f-govde);color:var(--b-m2);text-wrap:pretty}
+#bgn .ozet p .varlik{text-underline-offset:3px;text-decoration-color:var(--b-cizgi2);color:var(--b-murekkep)}
+#bgn .ozet .dinle .mono{font-size:var(--yz-12);color:var(--b-m3)}
+#bgn .ozet .dinle.on{color:var(--b-canli);border-color:var(--b-canli)}
+#bgn .ozet .dinle svg.i{width:14px;height:14px}
+#bgn .sayac2{display:flex;gap:var(--bo-8);flex-wrap:wrap;align-items:baseline;font-size:var(--yz-13);color:var(--b-m3)}
+/* Sıradaki toplantı ve saat şeridi */
+#bgn .sira2{display:grid;gap:var(--bo-12)}
+#bgn .sirak{display:grid;gap:var(--bo-12);padding:var(--bo-16) var(--bo-24) var(--bo-16) var(--bo-16);border-radius:var(--r-14);background:var(--b-yuzey);border:1px solid var(--b-cizgi)}
+#bgn .sirab{display:flex;align-items:center;gap:var(--bo-16);flex-wrap:wrap}
+#bgn .saatk{display:flex;flex-direction:column;align-items:center;justify-content:center;width:56px;height:56px;flex:none;border-radius:var(--r-8);background:var(--b-vurgu-hafif);color:var(--b-vurgu);font-size:var(--yz-12)}
+#bgn .saatk .mono{font:500 var(--yz-15)/1.2 var(--f-mono,"IBM Plex Mono",ui-monospace,monospace)}
+#bgn .sirak .sm{flex:1 1 240px;display:grid;gap:var(--bo-4);min-width:0}
+#bgn .sirak .ad{font:500 var(--yz-15)/1.35 var(--f-govde)}
+#bgn .sirak .alt{font-size:var(--yz-13);color:var(--b-m2)}
+#bgn .siraek{display:grid;gap:var(--bo-8);padding:var(--bo-12) 0 0 72px;border-top:1px solid var(--b-cizgi)}  /* gündem taslağı / adaylar kartın içinde, başlık hizasında */
+#bgn .siraek .haz,#bgn .siraek .sakin{font-size:var(--yz-13)}
+#bgn .sira2 .serit{max-width:none;padding:0 var(--bo-4)}
+#bgn .sira2 .ray{height:2px;top:19px;border-radius:var(--r-6)}
+#bgn .sira2 .sb .cb{height:12px;margin-top:var(--bo-4);border-radius:var(--r-6)}
+#bgn .sira2 .simdi{border-left:2px solid var(--b-pirinc);top:9px;height:22px}
+#bgn .sira2 .simdi span{display:none}
+/* Senden beklenenler: satır (nokta · metin + alt · etiket · tek düğme · ⋯) */
+#bgn .liste{display:grid;gap:0}
+#bgn .bekl{gap:var(--bo-4)}
+#bgn .sat.bs{grid-template-columns:auto minmax(0,1fr) auto;gap:var(--bo-4) var(--bo-16);padding:var(--bo-12);border-bottom:0;border-radius:var(--r-8)}
+#bgn .sat.bs:hover{background:var(--b-yuzey2)}
+#bgn .sat.bs .t{font-size:var(--yz-15)}
+#bgn .sat.bs .a{font-size:var(--yz-12);color:var(--b-m3);gap:0 var(--bo-4);margin-top:var(--bo-4)}
+#bgn .sat.bs .a .varlik{font-size:var(--yz-12)}
+#bgn .sat.bs .eylem{align-items:center;flex-wrap:nowrap}
+#bgn .nokta{width:8px;height:8px;border-radius:50%;flex:none;background:var(--b-vurgu)}
+#bgn .nokta.gec{background:var(--b-gec)}#bgn .nokta.bek{background:var(--wa)}
+#bgn .sat.bs .sik svg.i{width:16px;height:16px;color:var(--b-m3)}
+#bgn .keylem.geride{margin-top:var(--bo-8)}
+#bgn .bekl .sakin,#bgn .bolum>.sakin{padding:var(--bo-12)}
+/* Önemli e-postalar · Yaklaşan tarihler: yan yana (dar ekranda alt alta) */
+#bgn .ikiblok{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--bo-24)}
+#bgn .blk{display:flex;flex-direction:column;gap:var(--bo-4);padding:var(--bo-24);border-radius:var(--r-14);background:var(--b-yuzey);border:1px solid var(--b-cizgi);min-width:0}
+#bgn .blk .bbas{margin-bottom:var(--bo-8)}
+#bgn .bliste{display:grid;gap:0}
+#bgn .epr{display:grid;gap:var(--bo-4);padding:var(--bo-8);border:0;border-radius:var(--r-8);background:none;text-align:left;width:100%;cursor:pointer}
+#bgn .epr:hover{background:var(--b-uzerinde)}#bgn .epr.sec{background:var(--b-yuzey2)}
+#bgn .epr .ust{display:flex;justify-content:space-between;gap:var(--bo-8);align-items:baseline}
+#bgn .epr .ust b{font:500 var(--yz-13)/1.4 var(--f-govde);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#bgn .epr .ust span{font-size:var(--yz-12);color:var(--b-m3);white-space:nowrap}#bgn .epr .ust span.gec{color:var(--b-gec)}
+#bgn .epr .konu{font-size:var(--yz-13);color:var(--b-m2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#bgn .ktr{display:flex;align-items:center;gap:var(--bo-12);padding:var(--bo-8)}
+#bgn .ktr .ne{min-width:64px;font-size:var(--yz-12);color:var(--b-m3)}
+#bgn .ktr .km{flex:1;min-width:0;font-size:var(--yz-13)}
+#bgn .blk .keylem{margin-top:var(--bo-8)}
+/* son toplantı kartı başlığı */
+#bgn .kararkart .bbas h2{font-size:var(--yz-18)}
+/* Ekip: kimde bekliyor kişi kartları */
+#bgn .kisiler2{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--bo-12)}
+#bgn .kisikart{display:flex;flex-direction:column;align-items:stretch;gap:var(--bo-12);padding:var(--bo-16);border-radius:var(--r-14);background:var(--b-yuzey);border:1px solid var(--b-cizgi);text-align:left;cursor:pointer}
+#bgn .kisikart:hover{border-color:var(--b-cizgi2)}
+#bgn .kisikart .kk{display:flex;align-items:center;gap:var(--bo-8)}#bgn .kisikart .kk b{font:500 var(--yz-15)/1.3 var(--f-govde);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#bgn .kisikart .kisi-yuz{width:32px;height:32px}
+#bgn .kisikart .ks{display:flex;align-items:baseline;gap:var(--bo-8);font-size:var(--yz-13);color:var(--b-m2)}
+#bgn .kisikart .sayi{font:300 var(--yz-24)/1 var(--f-baslik);color:var(--b-murekkep)}
+#bgn .kisikart .kd{font:500 var(--yz-12)/1.3 var(--f-govde)}#bgn .kisikart .kd.gec{color:var(--b-gec)}#bgn .kisikart .kd.ok{color:var(--b-vurgu)}
+/* Geçmiş: arama satırı */
+#bgn .gcara{display:flex;gap:var(--bo-8);max-width:560px}
+#bgn .gcara input{flex:1;min-width:0;font:400 var(--yz-13)/1.4 var(--f-govde);color:var(--b-murekkep);background:var(--b-yuzey);border:1px solid var(--b-cizgi2);border-radius:var(--r-8);padding:var(--bo-8) var(--bo-12)}
+#bgn .gcara input::placeholder{color:var(--b-m3)}#bgn .gcara input:focus{outline:2px solid var(--b-vurgu);outline-offset:1px}
+#bgn .akw{position:relative;display:inline-flex}
+#bnPanel .armetin{font-size:var(--yz-13);line-height:1.6;color:var(--b-murekkep);overflow-wrap:anywhere}
+#bnPanel .armetin h1,#bnPanel .armetin h2,#bnPanel .armetin h3{font:500 var(--yz-15)/1.3 var(--f-govde);margin:var(--bo-12) 0 var(--bo-4)}
+#bnPanel .armetin p{margin:var(--bo-4) 0;color:var(--b-murekkep)}#bnPanel .armetin ul{margin:var(--bo-4) 0;padding-left:var(--bo-16);display:block;list-style:disc}#bnPanel .armetin li{display:list-item;border:0;padding:var(--bo-4) 0}
+@media (max-width:720px){
+  #bgn .sayfab h1{font-size:var(--yz-24)}
+  #bgn .sirak{padding:var(--bo-16)}
+  #bgn .siraek{padding-left:0}
+  #bgn .sat.bs .eylem{grid-column:2;justify-content:flex-start;margin-top:var(--bo-4);flex-wrap:wrap}
+  #bgn .ozet,#bgn .blk{padding:var(--bo-16)}
+}
+
+/* ===== Komut penceresi (Command + K) ===== */
+dialog#kpd{border:1px solid var(--b-cizgi);border-radius:var(--r-14);background:var(--b-yuzey);color:var(--b-murekkep);padding:0;width:min(560px,calc(100vw - 32px));max-height:min(480px,calc(100vh - 96px));margin:12vh auto auto;box-shadow:var(--golge-pencere);font:400 var(--yz-13)/1.5 var(--f-govde);overflow:hidden}
+dialog#kpd[open]{display:flex;flex-direction:column}
+dialog#kpd::backdrop{background:var(--perde)}
+#kpq{flex:none;width:100%;border:0;border-bottom:1px solid var(--b-cizgi);padding:var(--bo-16);font:400 var(--yz-15)/1.4 var(--f-govde);background:transparent;color:var(--b-murekkep);outline:none}
+#kpq::placeholder{color:var(--b-m3)}
+#kpl{flex:1;overflow-y:auto;padding:var(--bo-8);display:grid;align-content:start}
+#kpl .kpi{display:flex;align-items:center;gap:var(--bo-12);padding:var(--bo-8) var(--bo-12);border:0;border-radius:var(--r-8);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+#kpl .kpi:hover{background:var(--b-uzerinde)}#kpl .kpi.sec{background:var(--b-vurgu-hafif)}
+#kpl .kpi svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;color:var(--b-m2)}
+#kpl .kpi.sec svg.i{color:var(--b-vurgu)}
+#kpl .kad{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#kpl .kpi small{font-size:var(--yz-12);color:var(--b-m3)}
+#kpl .kpb{margin:0;padding:var(--bo-12);color:var(--b-m3)}
+#kpd .kpa{flex:none;display:flex;gap:var(--bo-16);padding:var(--bo-8) var(--bo-16);border-top:1px solid var(--b-cizgi);font-size:var(--yz-12);color:var(--b-m3)}
+#kpd kbd{font:400 var(--yz-12)/1 var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);padding:0 var(--bo-4)}
+#bgn .sat[data-gc]{overflow:visible}  /* Geçmiş satırının dışa aktar menüsü satırın dışına taşar */
+#bgn .akp{z-index:35}#bgn .akp hr{border:0;border-top:1px solid var(--b-cizgi);margin:var(--bo-4) 0}#bgn .akp .aki{font-size:var(--yz-13);color:var(--b-murekkep)}#bgn .akp .aki:hover{background:var(--b-uzerinde)}
+html.hafta-ac main>.sc>section#tvb{max-width:none;margin-inline:0}
+#kpq::-webkit-search-cancel-button,#gcAra::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}  /* tarayıcı mavisi temizle düğmesi yok */
