@@ -1813,7 +1813,29 @@ def asistan_onay(ad):  # iş talimatı alındı: kısa onay toplantıya (söz s�
     if not otonom_acik(): return
     if kisilikler(): kisilik_sec(ad)
     otonom_sun(_t("Tamam.", "Okay."), "hitap", ad=ad)
+# 6 Kasım (5 Kasım toplantısı 19:41): karşı tarafın aynı sorusu Whisper ve altyazıdan, soranın adı da farklı yazılarak üç kez geldi ("X mıydı?", "X mıydı? Teşekkür
+# ediyorum.", "X mıydı? Çok nazik seni.") → iki ayrı cevap kartı. Kök: tekrar denetimi yalnız kullanıcının kendi hitabındaydı (konus_hitap, tam eşitlik, 20 sn);
+# karşı taraf yolu ve sıraya girenler denetimsizdi. Şimdi karşı tarafın her asistan sorusu `_asistan_sor`da son SORU_YINE_SN'deki sorularla sözcük köküyle
+# karşılaştırılır: kısa soru uzun olanın içine sığıyor ve ek sözcük azsa aynı soru sayılır (kim sorduğuna bakılmaz).
+SORU_YINE_SN = {"karsi": 90.0}; _SORU_SON = []  # yalnız karşı taraf: kullanıcı aynı soruyu cevapsız kalınca bilerek yineler (konus_hitap'ın 20 sn'lik tam eşitlik denetimi yeter)  # [(zaman, kök kümesi, soru)]
+def _soru_kokleri(s):  # Türkçe'ye dayanıklı: büyük/küçük harf ve noktalama yok, 5+ harfli sözcük ilk 5 harfine iner (ekler düşer), tek harfler atılır
+    s = str(s or "").replace("İ", "i").replace("I", "ı").lower().replace("ı", "i")
+    return {w[:5] for w in re.findall(r"\w+", s) if len(w) > 1}
+def soru_ayni_mi(a, b):  # a, b: kök kümeleri; kısa olan ≥ 3 kök, kısanın ≥ %85'i uzunda var ve uzundaki fazlalık max(2, kısanın boyu)'nu aşmıyor
+    k, u = (a, b) if len(a) <= len(b) else (b, a)
+    if len(k) < 3: return False
+    return len(k & u) / len(k) >= 0.85 and len(u - k) <= max(2, len(k))
+def soru_yine_mi(soru, kaynak, simdi=None):  # → önceki benzer soru metni ya da None; yoksa bu soruyu kaydeder
+    sn = SORU_YINE_SN.get(kaynak)
+    if not sn: return None
+    simdi = simdi or time.time(); kk = _soru_kokleri(soru)
+    _SORU_SON[:] = [x for x in _SORU_SON if simdi - x[0] < max(SORU_YINE_SN.values())]
+    for t, k2, s2 in _SORU_SON:
+        if simdi - t < sn and soru_ayni_mi(kk, k2): return s2
+    _SORU_SON.append((simdi, kk, soru)); return None
 def _asistan_sor(soru, ek, gosterim=None, metin=None):  # ek: kaynak (hitap|karsi), ad, karsi → konuşana; meşgulse sırada bekler
+    onceki = soru_yine_mi(soru, ek.get("kaynak"))
+    if onceki: print(f"KONUŞ: aynı soru kısa süre önce soruldu — ikinci cevap yazılmadı · «{onceki[:60]}» ≈ «{soru[:60]}»"); return True
     def tur_kur():
         tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "otonom": otonom_acik(), **ek}; _KS["tur"] = tur
         if ek.get("kaynak") == "hitap": tur["lat"] = dict(LAT if time.time() - (LAT.get("satir") or 0) < LAT_ESKI_SN else {}, algi=time.time())  # v0.152.0: konuşma bitişi → satır → algı (otonom.py gecikme satırı); 3 Kasım: eski satır zamanı ölçüme girmez ("?")
@@ -1825,7 +1847,9 @@ def _asistan_sor(soru, ek, gosterim=None, metin=None):  # ek: kaynak (hitap|kars
     def bekle():
         t = time.time()
         while _KS["tur"] and time.time() - t < ASISTAN_BEKLE_SN: time.sleep(0.2)
-        if _KS["tur"]: print(f"KONUŞ: önceki cevap {ASISTAN_BEKLE_SN} sn'de bitmedi — soru atlandı: \"{soru[:60]}\""); return
+        if _KS["tur"]:
+            _SORU_SON[:] = [x for x in _SORU_SON if x[2] != soru]  # cevaplanmadan atlandı: tekrarı elenmesin (soru yine sorulursa cevaplanır)
+            print(f"KONUŞ: önceki cevap {ASISTAN_BEKLE_SN} sn'de bitmedi — soru atlandı: \"{soru[:60]}\""); return
         if ek.get("ad") and kisilikler(): kisilik_sec(ek["ad"])
         _konus_sor(metin or soru, tur_kur())
     threading.Thread(target=bekle, daemon=True).start()

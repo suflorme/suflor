@@ -164,6 +164,7 @@ sg = sub.add_parser("saglik", help="v0.8.5: toplantı öncesi sağlık kontrolü
 tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantılar (davet notu, katılımcılar); --id ile tek toplantı")
 tk.add_argument("--id", default=None); tk.add_argument("--n", type=int, default=6)
 tk.add_argument("--gun", type=int, default=1, help="v0.55.0: kaç gün (v0.59.0: en çok 30); 1'den büyükse çalışma saatlerindeki boş zamanlar da (uygun zaman önerisi)")
+sub.add_parser("katilimcilar", help="6 Kasım: toplantının KATILIMCILAR bloğu — takvim daveti + toplantıda görülen konuşmacılar, kişi kayıtlarıyla eşleştirilmiş (yalnız okuma)")
 kp = sub.add_parser("kisi", help="S225: Mac Kişiler'de ada göre ara (yalnız okuma; e-posta, telefon, adres; en çok 5 eşleşme) — davet adresi, 'X'in numarası' soruları")
 kp.add_argument("ad", nargs="+")
 rp = sub.add_parser("rapor", help="v0.9.9: geliştiriciye geri bildirim — içeriksiz paket (sürüm, ölçüm, kart dönüşleri, günlük, gözlemler) → <ortak>/geri-bildirim")
@@ -1438,6 +1439,15 @@ def izle():
         if not ad or ad == "?" or re.match(r"^(karşı taraf|konuşmacı|speaker|unknown|bilinmeyen|katılımcı)\b", ad, re.I): return None
         if kucuk(ad).split()[0] == kucuk(BEN) or kucuk(ad) == kucuk(str(AYAR.get("ad") or "")): return None
         return ad
+    kat_blok = [None]  # son verilen KATILIMCILAR bloğu (toplantı oturumu ilk iletide aldı; izle yalnız değişince yeniden verir)
+    def katilimcilar_bak():  # aktarıcıdan takvim + görülen konuşmacılar → kişi kayıtlarıyla eşleşmiş blok; değiştiyse tek olay (6 Kasım: asistan katılımcıları yanlış saymıştı)
+        try: v = get("/katilimcilar")
+        except Exception: return
+        blok = str(v.get("blok") or "") if isinstance(v, dict) and v.get("ok") else ""
+        if not blok or blok == kat_blok[0]: return
+        ilk = kat_blok[0] is None; kat_blok[0] = blok
+        if not ilk: emit("KATILIMCILAR (güncellendi): " + blok.split("\n", 1)[-1].replace("\n- ", " ‖ ").replace("\n", " ").lstrip("- ") + " → kişi sayısını bu listeden say; kullanıcı soru sorarsa bunu kullan")
+    katilimcilar_bak()
     def katilimci_bak(r):
         # yeni konuşmacı (altyazı/Whisper adı ilk kez) → tek satır; toplantı oturumu kişiyi tanırsa gündeme ve hazır kartlara ekler
         ad = gercek_ad(r.get("speaker"))
@@ -1448,6 +1458,7 @@ def izle():
         emit(f"KATILIMCI: {ad} (ilk satır {saat})" + (" · karar grafında geçmişi: " + " | ".join(_yapi().graf_satir(g) for g in gs) +  # gs boş değilse yapi yüklüdür
              " → bugün farklı bir şey söylerse (rakam, tarih, karar) çelişkiyi SÖYLE kartıyla belirt" if gs else ""))
         olcum_yaz({"t": "katilimci-ilk", "file": cur, "ad": ad, "row_id": r.get("id"), "row_at": r.get("at"), "emit_at": simdi()})
+        katilimcilar_bak()
     sis_kok = frozenset(w[:5] for n in sis for w in n.split() if len(w) >= 3)
     def paket_baglam():
         nonlocal buf_recs
@@ -2861,6 +2872,10 @@ def kisi_ara(ad):  # aktarıcı /kisi (Suflor Takvim.app --kisi); → metin
     return "\n".join(f"- {c['ad']}" + (f" ({c['kurum']})" if c.get("kurum") else "") + (" · e-posta: " + ", ".join(c["eposta"]) if c.get("eposta") else "")
                       + (" · telefon: " + ", ".join(c["telefon"]) if c.get("telefon") else "") + (" · adres: " + " | ".join(c["adres"]) if c.get("adres") else "") for c in o["kisiler"]), False
 def kisi_cmd(): print(kisi_ara(" ".join(A.ad))[0])
+def katilimcilar_cmd():
+    try: v = get("/katilimcilar")
+    except Exception as e: sys.exit(f"aktarıcıya ulaşılamadı: {e}")
+    print(v.get("blok") or "katılımcı bilgisi yok")
 def takvim_cmd():  # aktarıcının takvimi (Suflor Takvim yardımcısı, Takvim uygulamasındaki tüm hesaplar)
     gun = max(1, min(A.gun or 1, 30))
     try: t = get("/takvim?tam=1" + (f"&gun={gun}" if gun > 1 else ""))
@@ -3105,6 +3120,6 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "taahhut": taahhut_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "katilimcilar": katilimcilar_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
      "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "kisi-es": kisi_es_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

@@ -1397,7 +1397,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -2253,6 +2253,8 @@ class H(BaseHTTPRequestHandler):
         if yol == "/kimlik":  # A1: ?ad=<ad> → kimlik_coz; adsız → kayıtlardaki eşlenemeyenler (yalnız okuma)
             import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
             return self._json(kimlik_view(ad) if "kimlik_view" in globals() else {"durum": "hata", "hata": "kimlik yok"})
+        if yol == "/katilimcilar":  # 6 Kasım: takvim daveti + toplantıda görülen konuşmacılar, kişi kayıtlarıyla eşleştirilmiş KATILIMCILAR bloğu (aktarici/kimlik.py katilimci_view); yalnız okuma
+            return self._json(katilimci_view() if "katilimci_view" in globals() else {"ok": False, "hata": "kimlik yok"})
         if yol == "/kisi":  # S225: Mac Kişiler'den yalnız okuma (aktarici/talimat.py kisi_bul); ?ad=<ad>; Konuş MCP aracı ve `toplanti-claude.py kisi` çağırır
             import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
             return self._json(kisi_bul(ad) if "kisi_bul" in globals() else {"durum": "hata", "hata": "kisi_bul yok"})
