@@ -174,5 +174,21 @@ yapi.graf_yaz(C, {"baslik": "Sahipsiz", "tarih": "2026-11-05", "maddeler": [{"ba
 yapi.kayit_listesi(C, "Ayşe Deneme", datetime.date(2026, 11, 5)); SP = _id("Sahibi olmayan iş", "s"); mp = yapi.eylem_menu(C, SP, TAKVIM, kimlik_f=kimlik_f)
 n = olay_say(C); rp = eylem(SP, "teams", {})
 bak("sahipsiz iş: Teams pasif ve nedeni 'alıcısı yok; Ata ile kişi ekle', POST aynı nedeni verir, olay yok", "alıcısı yok" in mp["pasif"].get("teams", "") and not rp["ok"] and "Ata ile" in rp["err"] and olay_say(C) == n, (mp["pasif"], rp))
+# --- 7 Kasım: "kendi" önce e-postaya bakar; ilk adı kullanıcıyla aynı başka kişinin işinde taslak seçenekleri görünür ---
+yapi.graf_yaz(C, {"baslik": "Ad benzeri", "tarih": "2026-11-05", "maddeler": [{"baslik": "G", "ogeler": [
+    {"tur": "is", "metin": "Soyadı farklı Ayşe'nin işi", "sahip": "Ayşe Doruk", "tarih": "2026-11-12", "saat": "10:50:00"},
+    {"tur": "is", "metin": "Yalnız ilk adla yazılmış iş", "sahip": "Ayşe", "tarih": "2026-11-12", "saat": "10:51:00"}]}]}, "2026-11-05-1300-Adbenzeri.md"); dokum(C, "2026-11-05-1300-Adbenzeri")
+yapi.kayit_listesi(C, "Ayşe Deneme", datetime.date(2026, 11, 5)); AD2 = _id("Soyadı farklı Ayşe'nin işi", "s"); AD1 = _id("Yalnız ilk adla yazılmış iş", "s")
+m2 = yapi.eylem_menu(C, AD2, TAKVIM, kimlik_f=kimlik_f)
+bak("ilk adı aynı, soyadı farklı kişinin işi kendi sayılmaz: e-posta/Teams taslağı menüde", m2["ok"] and not m2["kendi"] and "eposta" in m2["eylemler"] and "teams" in m2["eylemler"], m2["eylemler"])
+m1 = yapi.eylem_menu(C, AD1, TAKVIM, kimlik_f=kimlik_f)
+bak("yalnız ilk ad ('Ayşe') ve grafta aynı ilk adlı başka biri var: kendi sayılmaz", m1["ok"] and not m1["kendi"] and "eposta" in m1["eylemler"], m1["eylemler"])
+bak("yalnız ilk ad, aynı ilk adlı başka kimse bilinmiyorsa kendi", yapi.kendi_mi("Ayşe", "", ["Ayşe Deneme", "Can Örnek"]) and not yapi.kendi_mi("Ayşe", "", ["Ayşe Doruk"]))
+json.dump({"ad": "Ayşe Deneme", "eposta_adres": "ayse.deneme" + AT + "firma.test"}, open(AY, "w")); time.sleep(0.01); os.utime(AY, (time.time() + 5, time.time() + 5))
+bak("e-posta önce: adı aynı ama adresi farklı olan kendi değil; adresi kullanıcınınki olan (adı farklı yazılmış olsa da) kendi",
+    not yapi.kendi_mi("Ayşe Deneme", "ayse.d" + AT + "baska.test") and yapi.kendi_mi("A. Deneme", "ayse.deneme" + AT + "firma.test") and yapi.kendi_mi("Ayşe Deneme", ""))
+yapi.ata(C, AD2, {"sahip": {"ad": "Ayşe Deneme", "eposta": "ayse.d" + AT + "baska.test"}}); m3 = yapi.eylem_menu(C, AD2, TAKVIM, kimlik_f=kimlik_f)
+bak("menü: sahibin adı kullanıcınınkiyle aynı ama e-postası başka → taslak seçenekleri var, Teams pasif değil", not m3["kendi"] and "teams" in m3["eylemler"] and m3["pasif"] == {}, (m3["kendi"], m3["pasif"]))
+json.dump({"ad": "Ayşe Deneme"}, open(AY, "w")); os.utime(AY, (time.time() + 10, time.time() + 10))
 print("ÖRNEK:", mesaj)
 print("\nhepsi geçti" if not hata else f"\nKALDI: {len(hata)}"); sys.exit(1 if hata else 0)

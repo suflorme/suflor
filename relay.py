@@ -1397,7 +1397,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar", "/kapanis-turu", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -2279,6 +2279,7 @@ class H(BaseHTTPRequestHandler):
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
         if yol == "/prova": return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
+        if yol == "/belge-oneri": return self._json(belge_oneri_view())  # belgeden iş önerisi (aktarici/eylem-menu.py; anahtarlı)
         if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
         if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
@@ -2368,6 +2369,7 @@ class H(BaseHTTPRequestHandler):
         if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
         if self.path == "/dokum-kontrol": return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile (anahtarlı; geliştirici)
         if self.path == "/ortak": return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
+        if self.path == "/belge-oneri": return self._json(belge_oneri_islem(p))  # öneriyi kayda al (kayit_olustu + is_atandi) ya da reddet (anahtarlı)
         if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/Claude/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
         if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
         if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)

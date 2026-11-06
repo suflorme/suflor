@@ -1249,6 +1249,13 @@ globalThis.SUFLOR_EN = {
   "Teyit bekleyen kararlar": "Decisions awaiting approval",
   "kapanış turu": "closing round",
   "İş iptal edildi": "Task cancelled",
-  "İş bir hafta ertelendi": "Task postponed by a week"
+  "İş bir hafta ertelendi": "Task postponed by a week",
+  "Belgelerden önerilen işler": "Tasks suggested from documents",
+  "sahipsiz": "no owner",
+  "Kayda al ve ata": "Add and assign",
+  "Kayda al": "Add as task",
+  "Önerme": "Don't suggest",
+  "Öneri kayda alındı": "Suggestion added as a task",
+  "Öneri bir daha gösterilmeyecek": "This suggestion won't be shown again"
 
 };

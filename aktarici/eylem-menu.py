@@ -49,3 +49,46 @@ def kayit_eylem_islem(p):  # POST /kayit-eylem
     except Exception as ex: print(f"EYLEM MENÜSÜ: {e} yapılamadı ({ex.__class__.__name__})"); return {"ok": False, "err": ex.__class__.__name__}
     print(f"EYLEM MENÜSÜ: {e} {kid} → " + ("tamam" if r.get("ok") else str(r.get("err"))))  # günlüğe metin yazılmaz
     return r
+# --- Belgeden atama (7 Kasım): proje kartı + toplantıya eklenen belgelerden iş önerisi (yapi.belge_onerileri; seçim ve yazma orada, test/belgeden-atama.py) -------------------------
+#   GET  /belge-oneri (anahtarlı, VERI_GET) → {"oneriler", "say"} — Kararlar ve işler sayfasında İşler sekmesinin üstünde
+#   POST /belge-oneri {"id", "islem": "kabul"|"reddet", "sahip"?} (anahtarlı) → kabul: kayit_olustu + (sahip varsa) is_atandi; sahibin e-postası kimlik modülünden. Reddedilen bir daha önerilmez.
+# Belgeler: canli/baglam.json + son BELGE_ARSIV_GUN gündeki baglam-arsiv.jsonl dosya kaynakları (bağlantılar değil); gizli toplantının belgesi yapi'de düşer.
+BELGE_ARSIV_GUN = 14
+def _bo_belgeler():
+    out, gor = [], set(); sinir = datetime.datetime.now() - datetime.timedelta(days=BELGE_ARSIV_GUN)
+    try: ks = list((json.load(open(os.path.join(BASE, "baglam.json"), encoding="utf-8")) or {}).get("kaynaklar") or [])
+    except (OSError, ValueError): ks = []
+    try:
+        for l in open(os.path.join(BASE, "baglam-arsiv.jsonl"), encoding="utf-8"):
+            try: k = json.loads(l)
+            except ValueError: continue
+            try:
+                if isinstance(k, dict) and datetime.datetime.fromisoformat(str(k.get("at") or "")[:19]) >= sinir: ks.append(k)
+            except ValueError: pass
+    except OSError: pass
+    for k in ks:
+        if not isinstance(k, dict) or k.get("tur") != "dosya" or k.get("deger") in gor: continue
+        gor.add(k.get("deger")); out.append({"ad": k.get("ad") or os.path.basename(str(k.get("deger"))), "yol": k.get("deger"), "toplanti": k.get("file") or ""})
+    return out[-20:]
+def _bo_kart():
+    try: return json.load(open(os.path.join(AYAR["uygulama"], "proje-karti.json"), encoding="utf-8"))
+    except (OSError, ValueError): return None
+def belge_oneri_view():
+    y = _yapi_mod()
+    if not y or not hasattr(y, "belge_onerileri"): return {"ok": False, "oneriler": [], "say": {}}
+    try: return dict(y.belge_onerileri(BASE, _bo_kart(), _bo_belgeler(), os.path.join(AYAR["uygulama"], "cevirme-onbellek")), ok=True)
+    except Exception as e: print(f"BELGEDEN ATAMA: öneriler okunamadı ({e.__class__.__name__})"); return {"ok": False, "oneriler": [], "say": {}}
+def belge_oneri_islem(p):
+    y = _yapi_mod(); p = p if isinstance(p, dict) else {}; oid = str(p.get("id") or "")[:20]; isl = str(p.get("islem") or "")
+    if not y or not oid or isl not in ("kabul", "reddet"): return {"ok": False, "err": "id ve işlem gerekli"}
+    if isl == "reddet": r = {"ok": y.belge_oneri_reddet(BASE, oid)}; print(f"BELGEDEN ATAMA: öneri reddedildi {oid}"); return r
+    o = next((x for x in belge_oneri_view().get("oneriler") or [] if x.get("id") == oid), None)
+    if not o: return {"ok": False, "err": "öneri yok (kayda girmiş ya da reddedilmiş olabilir)"}
+    sh = " ".join(str(p.get("sahip") or o.get("sahip") or "").split())[:80]; ep = ""
+    if sh:
+        try: ep = (_kem_kimlik(sh, True) or {}).get("eposta") or ""
+        except Exception: ep = ""
+    try: r = y.belge_oneri_kabul(BASE, o, sh, ep)
+    except Exception as e: print(f"BELGEDEN ATAMA: kabul yapılamadı ({e.__class__.__name__})"); return {"ok": False, "err": e.__class__.__name__}
+    print(f"BELGEDEN ATAMA: öneri kayda girdi {oid} → {r.get('id')} · " + ", ".join(r.get("olaylar") or []) + (" · e-postalı" if ep else ""))  # günlüğe metin yazılmaz
+    return r

@@ -110,6 +110,7 @@ html.mac.kc-kapali #kenar{display:none}html.mac.kc-kapali .grid{grid-template-co
 #kenar .kalt{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px;font-size:var(--yz-2);color:var(--t2);border-top:.5px solid var(--bd);position:sticky;bottom:0}#kenar .kalt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:720px){html.mac #kenar{display:none}html.mac .grid{grid-template-columns:minmax(0,1fr)!important}}
 /* v0.111.0: arka plandaki toplantı oturumu (Terminal yok) — Claude'un yazdıkları, soru sorunca vurgu */
+.oneriler{margin:4px 0 10px}.oneriler .oneri{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:6px 0;border-top:1px solid var(--bd)}.oneriler .ktm{flex:1 1 60%;min-width:0;overflow-wrap:anywhere}.oneriler .ktd{font-size:var(--yz-2);color:var(--t3)}.oneriler .kte{display:flex;gap:4px;margin-left:auto}.oneriler .ktb{font-size:var(--yz-2);font-weight:600;color:var(--t2)}
 #kt .kts{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:6px 0;border-top:1px solid var(--bd)}#kt .kts:first-child{border-top:0}#kt .ktm{flex:1 1 60%;min-width:0;overflow-wrap:anywhere;font-size:var(--yz-3)}#kt .ktd{font-size:var(--yz-2);color:var(--t3)}#kt .ktd.gec{color:var(--dikkat);font-weight:600}#kt .kte{display:flex;gap:4px;flex:none;margin-left:auto}#kt .kte button{padding:2px 8px;font-size:var(--yz-2)}#kt .ktb{font-size:var(--yz-2);font-weight:600;color:var(--t2);margin:8px 0 2px}#kt .ktb:first-child{margin-top:0}
 #tos .tom{max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:2px 0}
 #tos .tm{font-size:var(--yz-3);line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}#tos .tm .tt{color:var(--t3);font-size:var(--yz-1);margin-right:6px}
@@ -1646,7 +1647,7 @@ let prD={durum:'yok'},prBusy=false,prHata='',prKisi=[],prForm={konu:'',baglam:''
 let bnOlay=[],bnHazir=false,bnT=0,bnYuk=false,bnRef=null,bnGeri=null,bnBildT=null,bnDin=null
 const bnGizli=new Set()
 // Kararlar ve işler görünümü (5 Kasım): kenar çubuğundan tam sayfa liste (/kayitlar) — sekme karar/iş/açık soru, süzgeç kişi/toplantı/durum/arama; gündem taslağı (/gundem-taslagi) hazırlık kartında
-let bnGor='bugun',knV=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:''},knDen=false,knAraT=null,gtV={},gtYukSet=new Set()
+let boV=null,boBek=new Set(),bnGor='bugun',knV=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:''},knDen=false,knAraT=null,gtV={},gtYukSet=new Set()
 const bnTarih=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const bnDk=h=>{const [a,b]=String(h||'0:0').split(':').map(Number);return (a||0)*60+(b||0)}
 const bnIlk=a=>String(a||'').trim().split(/\s+/)[0]
@@ -1836,6 +1837,7 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
       <section class="durum${dinliyor?' dinliyor':''}"><p>${bnDurum(s,ol,now,sira,kala,hdS,bek,son)}</p>${ses&&dtgt?`<button type=button class=dinle data-bn=dinle data-id="${esc(dtgt.id)}">${ic('hoparlor')}<span>${dinliyor?L('Durdur'):L('Dinle')}</span><span class=mono>${sure}</span></button>`:''}${serit}</section>
       ${odakOnce?bnOdakOnce(sira,s,hdS,kala):''}${taze?bnSonKart(son,true):''}${sirayaGore()}`}}
 async function knYukle(zorla){if(knYuk||(!zorla&&Date.now()-knT<30000))return;knYuk=true;knT=Date.now();const den=knDen  // S236: deneme (Test) toplantı kayıtları varsayılan gelmez; anahtar açıkken ?deneme=1
+  try{const o=await j('/belge-oneri');const ov=o&&o.ok?o:null;if(JSON.stringify(ov)!==JSON.stringify(boV)){boV=ov;if(last)bnCiz(last)}}catch(e){}
   try{const v=await j('/kayitlar'+(den?'?deneme=1':''));if(den!==knDen){knYuk=false;return knYukle(true)}if(v&&v.ok&&JSON.stringify(v)!==JSON.stringify(knV)){knV=v;if(last)bnCiz(last)}}catch(e){}knYuk=false}
 const knTop=d=>((knV||{}).toplantilar||[]).find(t=>t.dosya===d)
 function knSuzgec(x){const s=knSuz,d=s.durum
@@ -1850,6 +1852,14 @@ function knSatir(x){const kap=x.durum==='kapandi',top=knTop(x.toplanti),tur=x.tu
   const git=x.dis?'':top&&top.id?`<button type=button class="b sade" data-bn=kngit data-sid="${esc(top.id)}" data-harita="${top.harita?'1':''}" title="${esc(top.baslik||'')}">${ic(top.harita?'harita':'belge')}${L(top.harita?'Toplantı panosu':'Özet')}</button>`:x.toplanti?`<button type=button class="b sade" data-bn=kngit data-top="${esc(x.toplanti)}">${ic('belge')}${L('Döküm')}</button>`:''
   const vd=x.vade?bnVadeEt(x):(!x.dis&&x.tur==='is'&&!kap?`<span class=vade>${L('Tarihsiz')}</span>`:'')
   return`<div class="sat${kap?' kapali':''}${x.dis?' dis':''}" data-id="${esc(x.id||'')}">${sol}<div class=m><div class=t>${esc(x.metin)}</div><div class=a><span class="etiketk${x.tur==='karar'?' karar':''}">${esc(tur)}</span>${x.atayan?`<span class="etiketk karar">${L('Sana atandı · {ad}',{ad:esc(x.atayan)})}</span>`:''}${x.kim?`<button type=button class=varlik data-bn=knkisi data-k="${esc(x.kim)}">${esc(x.kim)}</button>`:''}${x.baslik?(x.dis?`<span>${esc(x.baslik)}</span>`:`<button type=button class=varlik data-bn=kntop data-t="${esc(x.toplanti)}">${esc(x.baslik)}</button>`):''}${x.tarih?`<span class=mono>${esc(x.tarih)}</span>`:''}${x.dis?`<span class="etiketk dis">${esc(x.kaynak)}</span>`:''}${x.neden?`<span>${esc(x.neden)}</span>`:''}${emOnayIs(x.onay)}${x.gundem&&x.gundem.baslik?`<span>${L('Gündemde: {t}',{t:esc(x.gundem.baslik)})}</span>`:''}</div></div><div class=eylem>${vd}${git}${emDugme(x)}</div></div>`}
+// Belgeden atama (7 Kasım): proje kartındaki ve toplantıya eklenen belgedeki iş maddelerinden öneri (/belge-oneri). Kayda al = kayit_olustu + sahip varsa is_atandi (tek dokunuş; onaysız atama yok);
+// Önerme = bir daha önerilmez. Kaynak belge adı ve satırı öneride görünür. Yazma 5 sn sonra (Geri al bu sürede vazgeçer).
+function boCiz(){const ls=((boV||{}).oneriler||[]).filter(x=>!boBek.has(x.id));if(!ls.length)return''
+  return`<div class=oneriler><div class=ktb>${esc(L('Belgelerden önerilen işler'))} <span class=meta>${ls.length}</span></div>${ls.map(x=>{const k=x.kaynak||{},yer=[k.ad,k.konum].filter(Boolean).join(' · ')
+    return`<div class=oneri data-id="${esc(x.id)}"><span class=ktm>${esc(x.metin)}</span><span class=ktd>${x.sahip?esc(x.sahip):esc(L('sahipsiz'))}${x.vade?' · '+esc(x.vade):''} · ${esc(L('Kaynak'))}: ${esc(yer)}</span><span class=kte><button type=button class=gh data-bn=bokabul data-id="${esc(x.id)}">${esc(x.sahip?L('Kayda al ve ata'):L('Kayda al'))}</button><button type=button class=gh data-bn=bored data-id="${esc(x.id)}">${esc(L('Önerme'))}</button></span></div>`}).join('')}</div>`}
+function boIsle(id,islem){boBek.add(id);if(last)bnCiz(last)
+  const t=setTimeout(async()=>{try{await bnYaz('/belge-oneri',{id,islem})}catch(e){}boBek.delete(id);boV=null;await knYukle(true)},5000)
+  bnBildir(islem==='kabul'?L('Öneri kayda alındı'):L('Öneri bir daha gösterilmeyecek'),()=>{clearTimeout(t);boBek.delete(id);if(last)bnCiz(last)})}
 function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[]
   const dis=v?(v.dis||[]).flatMap(d=>d.ok?d.kayitlar.map(x=>({tur:x.tur,metin:x.metin,kim:x.sahip||'',baslik:x.toplanti||'',toplanti:'',vade:x.vade||'',durum:'acik',gecikti:false,tarihsiz:!x.vade,dis:true,kaynak:d.ad,id:''})):[]):[]
   const hepsi=[...ks,...dis],say=t=>hepsi.filter(x=>x.tur===t).length,liste=hepsi.filter(x=>x.tur===knSekme&&knSuzgec(x)).sort(knSira)
@@ -1861,6 +1871,7 @@ function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[]
   return`<div class=selam><h1><span>${L('Kararlar ve işler')}</span></h1><div class=satir2>${v?L('{k} karar · {i} iş · {s} açık soru',{k:say('karar'),i:say('is'),s:say('soru')}):''}</div></div>
     <section class=bolum><div class=sekmeler role=tablist>${sek}<div class=keylem><button type=button class="b sade" data-bn=disa data-bicim=csv>${ic('dosya')}${L('Dışa aktar')} CSV</button><button type=button class="b sade" data-bn=disa data-bicim=json>${ic('dosya')}JSON</button></div></div>
     <div class=suzgec><input id=knAra type=search value="${esc(knSuz.ara)}" placeholder="${L('Ara')}" aria-label="${L('Ara')}"><select data-knf=kisi aria-label="${L('Kişi')}">${kisi}</select><select data-knf=toplanti aria-label="${L('Toplantı')}">${top}</select><select data-knf=durum aria-label="${L('Durum')}">${dur}</select>${v&&(v.deneme_say||knDen)?`<label class=kndn><input type=checkbox data-kndn${knDen?' checked':''}> ${L('Deneme toplantıları')}${v.deneme_say?` (${v.deneme_say})`:''}</label>`:''}${suzlu?`<button type=button class="b sade" data-bn=knsifirla>${L('Süzgeci kaldır')}</button>`:''}</div>
+    ${knSekme==='is'?boCiz():''}
     ${liste.length?`<div class=ince>${liste.map(knSatir).join('')}</div>`:''}${bos?`<p class=sakin>${esc(bos)}</p>`:''}${v?(v.dis||[]).filter(d=>!d.ok).map(d=>`<p class=sakin>${esc(d.ad)}: ${L('defter okunamadı')} — ${esc(d.hata||'')}</p>`).join(''):''}
     <p class="sakin kucuk">${L('Dış kayıttan gelenler etiketli ve yalnız okunur; gizli toplantıların kayıtları burada yok.')}</p></section>`}
 // Gündem taslağı: sıradaki toplantının katılımcılarıyla önceki toplantılardan açık kalan iş/karar/soru (/gundem-taslagi?olay=); kartta "Gündem taslağı: N madde", yan panelde liste, Kopyala, Başlat formunun gündem alanına
@@ -1926,6 +1937,8 @@ async function bnDinle(id){if(bnDin){const o=bnDin;bnDinleBit();try{await j('/br
 async function bnTik(ev){const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn,id=b.dataset.id
   if(a==='panel')return bnPanelAc(b.dataset.ref)
   if(a==='emenu')return emAc(b.dataset.kid)
+  if(a==='bokabul')return boIsle(id,'kabul')
+  if(a==='bored')return boIsle(id,'reddet')
   if(a==='kapat')return bnPanelKapat()
   if(a==='menu'){const k=bnE('bnKenar');k.classList.add('acik');bnE('bnPerde').hidden=false;return}
   if(a==='onay')return bnOnayla(id,'onaylandi',!!b.dataset.pn)
