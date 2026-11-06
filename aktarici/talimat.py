@@ -56,6 +56,10 @@ def _talimat_kayit(o):
         except OSError: pass
     with LOCK: write([(yol, json.dumps(dict(o, at=datetime.datetime.now().isoformat(timespec="seconds")), ensure_ascii=False) + "\n")])
 def talimat_yakala(metin, kaynak):  # kullanıcının kendi sözü → True: talimat/yapılacak olarak alındı (Claude'a gitmez)
+    if AYAR.get("talimat") is not False and "kt_sesli_hatirlat" in globals():  # S243: "Ayşe'nin doğum gününü hatırlat" → Kişiler'de tek eşleşen kişinin doğum günü, onaylı takvim hatırlatması
+        try: kh = kt_sesli_hatirlat(metin)
+        except Exception as e: print(f"KİŞİSEL TARİH: sesli hatırlatma çözülemedi ({e.__class__.__name__})"); kh = None
+        if kh: return talimat_kuyruk("yapilacak", None, kh[0], metin, kaynak, zaman=kh[1])
     c = talimat_coz(metin)
     if not c: return False
     return talimat_kuyruk(*c, metin, kaynak, ek=_is_ek(metin) if c[0] == "is" else None)

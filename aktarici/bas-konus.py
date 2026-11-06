@@ -857,6 +857,7 @@ def konus_baglam(simdi=None, toplanti="", soru=""):  # her sorunun başına: tar
         gt = _t(f"Mac Takvim (geçen {TAKVIM_GECMIS_GUN} gün):\n", f"Mac Calendar (past {TAKVIM_GECMIS_GUN} days):\n") + tk_g + "\n" + gt
     if "ekran_baglam" in globals(): gt += ekran_baglam()  # v0.187.0: paylaşılan ekranda son görünen yazının kısa özeti (aktarici/ekran.py; yalnız süren toplantıda)
     if soru and "izleme_baglam" in globals(): gt += izleme_baglam()  # 5 Kasım: İzleme anlık görüntüsü açıksa tek satır işaret (aktarici/izleme.py; gizli toplantıda yok)
+    if soru and "kisisel_tarih_baglam" in globals(): gt += kisisel_tarih_baglam(soru)  # S243: doğum günü/hatırlatma sorusunda yaklaşan kişisel tarihler (aktarici/kisisel-tarihler.py)
     if soru and "posta_baglam" in globals(): gt += posta_baglam(soru, simdi)  # v0.85.0: e-posta sorusunda Mac Mail'den son iletiler
     if soru and DAVET_RX.search(soru):  # v0.84.0: davet notu — sorulan toplantı (başlıkta ortak sözcük) ya da sıradaki
         hepsi = gc + ol; sz = _baslik_soz(soru)
@@ -1974,6 +1975,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         kbd, md = kisilik_hitap_bul(metin)
         if ASISTAN_DUR_RX.match(md if kbd else metin):
             uclu_kes("kullanıcı 'dur' dedi", sustur=True); ses_durdur(); _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=_t("🔇 Sustular", "🔇 Stopped")); return
+    if "arastirma_dene" in globals() and arastirma_dene(metin, tur): return  # S243: toplantı dışı derin web araştırması (aktarici/web-arastirma.py)
     _konus_kur(durum="dusunuyor", soru=metin)
     simdi = datetime.datetime.now().astimezone(); top = toplanti_var()
     if tur.get("kaynak") not in ("hitap", "karsi"):  # bas-konuş/sohbet: cümle başında kişilik adı → o kişilik (hitap yolu konus_hitap'ta seçti)

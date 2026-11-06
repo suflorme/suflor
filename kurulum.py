@@ -949,6 +949,8 @@ TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
   <key>NSCalendarsFullAccessUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak, gündemini ve katılımcılarını toplantı asistanına vermek için takvimini okur; sesle istediğin hatırlatmayı, sen onaylayınca takvime ekler. Takvim içeriğini bu Mac dışına göndermez.</string>
   <key>NSCalendarsUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak için takvimini okur; onayladığın hatırlatmayı takvime ekler.</string>
+  <key>NSRemindersFullAccessUsageDescription</key><string>Suflor.me yaklaşan hatırlatmalarını (tarihli Anımsatıcılar) sana hatırlatmak için Anımsatıcılar'ını yalnız okur; hiçbir şeyi değiştirmez ve bu Mac dışına göndermez.</string>
+  <key>NSRemindersUsageDescription</key><string>Suflor.me yaklaşan hatırlatmalarını sana hatırlatmak için Anımsatıcılar'ını yalnız okur.</string>
   <key>NSContactsUsageDescription</key><string>Suflor.me, sesle bir toplantı davetinde ya da sorduğunda kişinin e-posta adresini, telefonunu ve adresini bulmak için Kişiler'ini yalnız okur; hiçbir şeyi değiştirmez ve bu Mac dışına göndermez.</string>
 </dict></plist>
 """

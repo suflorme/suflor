@@ -14,6 +14,7 @@ var ayrinti = false  // --ayrinti: her olaya katılımcı adresleri ve "current 
 var etkinlik: String? = nil  // v0.132.0: --etkinlik <istek.json> {"baslik", "zaman": "YYYY-MM-DDTHH:MM" (yerel), "dk", "not", "takvim"} → takvime hatırlatma etkinliği
 var etkinlikSil: String? = nil  // --etkinlik-sil <kimlik>: Suflor'un eklediği etkinliği siler
 var kisiAd: String? = nil  // S225 (5 Kasım): --kisi <ad> → Mac Kişiler'de ada göre arama (yalnız okuma; en çok 5 eşleşme: ad, kurum, e-postalar, telefonlar, posta adresi)
+var tarihGun: Int? = nil  // S243: --tarihler <gün> → Kişiler'deki doğum günü/tarihler + Takvim'in doğum günleri/tüm gün etkinlikleri/Suflor hatırlatmaları + Anımsatıcılar'daki tarihli öğeler (yalnız okuma; ham, pencere hesabı aktarıcıda)
 var takvimler = false  // --takvimler: yazılabilir takvimler (ayar hatirlatma_takvim seçimi için)
 var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
 var goster = Set<String>()  // v0.167.0: --goster "<takvim adı> · <hesap>" (yinelenir): bu takvimlerde süzgeçten geçmeyen etkinlikler de "paylasilan": true ile yazılır (aktarıcı yalnız panoda gösterir; ayar takvim_paylasilan)
@@ -28,6 +29,7 @@ while i < a.count {
   else if a[i] == "--etkinlik", i + 1 < a.count { etkinlik = a[i + 1]; i += 1 }
   else if a[i] == "--etkinlik-sil", i + 1 < a.count { etkinlikSil = a[i + 1]; i += 1 }
   else if a[i] == "--takvimler" { takvimler = true }
+  else if a[i] == "--tarihler", i + 1 < a.count { tarihGun = max(1, min(Int(a[i + 1]) ?? 14, 90)); i += 1 }
   else if a[i] == "--kisi", i + 1 < a.count { kisiAd = a[i + 1]; i += 1 }
   else if a[i] == "--goster", i + 1 < a.count { goster.insert(a[i + 1].trimmingCharacters(in: .whitespaces)); i += 1 }
   else if a[i] == "--adres", i + 1 < a.count {
@@ -250,6 +252,111 @@ if let ad = kisiAd {
   }
   exit(0)
 }
+// --tarihler <gün> (S243): yaklaşan kişisel tarihler, YALNIZ OKUMA. Üç izin ayrı istenir ve ayrı raporlanır; biri yoksa öbürleri yine okunur:
+//   {"durum": "ok", "izinler": {"kisiler": Bool, "animsaticilar": Bool, "takvim": Bool},
+//    "kisiler": [{"ad", "dogum": {"ay","gun","yil"?}?, "tarihler": [{"etiket","yildonumu": Bool,"ay","gun","yil"?}]}],        // Kişiler: doğum günü ve diğer tarihler (yıl yoksa alan yok)
+//    "dogum_takvimi": [{"baslik","tarih"}],        // Takvim'in Doğum Günleri takvimi (pencere içi; "YYYY-MM-DD")
+//    "suflor": [{"baslik","tarih","saat"?}],       // sesle eklenen hatırlatmalar (notunda Suflor.me işareti)
+//    "etkinlikler": [{"baslik","tarih"}],          // tatil/abonelik olmayan takvimlerdeki tüm gün etkinlikleri
+//    "animsaticilar": [{"baslik","tarih","saat"?}]} // tamamlanmamış, bitiş tarihi pencerede olan Anımsatıcılar
+// Yazma/kaydetme çağrısı yok; içerik bu Mac dışına gitmez (aktarıcı yerel).
+func gunYaz(_ d: Date) -> String { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone.current; f.dateFormat = "yyyy-MM-dd"; return f.string(from: d) }
+func bilesenGun(_ c: DateComponents) -> String? {
+  guard let y = c.year, let m = c.month, let g = c.day else { return nil }
+  return String(format: "%04d-%02d-%02d", y, m, g)
+}
+func tarihlerOku(_ gun: Int) {
+  var izinler: [String: Bool] = ["kisiler": false, "animsaticilar": false, "takvim": false]
+  var cikis: [String: Any] = ["durum": "ok"]
+  let bugun = Calendar.current.startOfDay(for: Date()), son = Calendar.current.date(byAdding: .day, value: gun + 1, to: bugun)!
+  // 1) Kişiler
+  let kt = CNContactStore()
+  var kd = CNContactStore.authorizationStatus(for: .contacts)
+  if kd == .notDetermined {
+    let s = DispatchSemaphore(value: 0); kt.requestAccess(for: .contacts) { _, _ in s.signal() }; _ = s.wait(timeout: .now() + 120)
+    kd = CNContactStore.authorizationStatus(for: .contacts)
+  }
+  var kisiler: [[String: Any]] = []
+  if kd == .authorized {
+    izinler["kisiler"] = true
+    let anahtar: [CNKeyDescriptor] = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactNicknameKey, CNContactOrganizationNameKey, CNContactBirthdayKey, CNContactDatesKey].map { $0 as CNKeyDescriptor }
+    func bil(_ c: DateComponents) -> [String: Any]? {
+      guard let m = c.month, let g = c.day else { return nil }
+      var o: [String: Any] = ["ay": m, "gun": g]
+      if let y = c.year, y > 1900 { o["yil"] = y }
+      return o
+    }
+    try? kt.enumerateContacts(with: CNContactFetchRequest(keysToFetch: anahtar)) { c, _ in
+      let dogum = c.birthday.flatMap { bil($0) }
+      let diger: [[String: Any]] = c.dates.compactMap { d in
+        guard var o = bil(d.value as DateComponents) else { return nil }
+        let et = d.label ?? ""
+        o["etiket"] = et.isEmpty ? "" : CNLabeledValue<NSDateComponents>.localizedString(forLabel: et)
+        o["yildonumu"] = et.lowercased().contains("anniversary")
+        return o
+      }
+      if dogum == nil && diger.isEmpty { return }
+      var ad = (c.givenName + " " + c.familyName).trimmingCharacters(in: .whitespaces)
+      if ad.isEmpty { ad = c.nickname.isEmpty ? c.organizationName : c.nickname }
+      if ad.isEmpty { return }
+      var o: [String: Any] = ["ad": ad, "tarihler": diger]
+      if let d = dogum { o["dogum"] = d }
+      kisiler.append(o)
+    }
+  }
+  cikis["kisiler"] = kisiler
+  // 2) Takvim: doğum günleri takvimi, Suflor hatırlatmaları, tüm gün etkinlikleri
+  var tizin = false
+  let ds = DispatchSemaphore(value: 0)
+  if #available(macOS 14.0, *) { store.requestFullAccessToEvents { ok, _ in tizin = ok; ds.signal() } }
+  else { store.requestAccess(to: .event) { ok, _ in tizin = ok; ds.signal() } }
+  _ = ds.wait(timeout: .now() + 120)
+  var dogumT: [[String: Any]] = [], suflorT: [[String: Any]] = [], etk: [[String: Any]] = []
+  if tizin {
+    izinler["takvim"] = true
+    var gorulen = Set<String>()
+    for e in store.events(matching: store.predicateForEvents(withStart: bugun, end: son, calendars: nil)).sorted(by: { $0.startDate < $1.startDate }) {
+      if e.status == .canceled { continue }
+      let baslik = e.title ?? ""; if baslik.isEmpty { continue }
+      let tarih = gunYaz(e.startDate)
+      if tarih < gunYaz(bugun) || !gorulen.insert(tarih + "|" + baslik).inserted { continue }
+      let tur = takvimTur(e.calendar)
+      if tur == "dogumgunu" { dogumT.append(["baslik": baslik, "tarih": tarih]); continue }
+      let not = e.notes ?? ""
+      if not.contains("Suflor.me") && (not.contains("sesle eklendi") || not.contains("added by voice")) {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "HH:mm"
+        suflorT.append(["baslik": baslik, "tarih": tarih, "saat": f.string(from: e.startDate)]); continue
+      }
+      if e.isAllDay && tur != "tatil" && tur != "abonelik" { etk.append(["baslik": baslik, "tarih": tarih]) }
+    }
+  }
+  cikis["dogum_takvimi"] = dogumT; cikis["suflor"] = suflorT; cikis["etkinlikler"] = etk
+  // 3) Anımsatıcılar
+  var rizin = false
+  let rs = DispatchSemaphore(value: 0)
+  if #available(macOS 14.0, *) { store.requestFullAccessToReminders { ok, _ in rizin = ok; rs.signal() } }
+  else { store.requestAccess(to: .reminder) { ok, _ in rizin = ok; rs.signal() } }
+  _ = rs.wait(timeout: .now() + 120)
+  var an: [[String: Any]] = []
+  if rizin {
+    izinler["animsaticilar"] = true
+    let fs = DispatchSemaphore(value: 0)
+    store.fetchReminders(matching: store.predicateForIncompleteReminders(withDueDateStarting: bugun, ending: son, calendars: nil)) { liste in
+      for r in liste ?? [] {
+        guard let dc = r.dueDateComponents, let t = Calendar.current.date(from: dc), let b = r.title, !b.isEmpty else { continue }
+        var o: [String: Any] = ["baslik": b, "tarih": gunYaz(t)]
+        if dc.hour != nil, let h = dc.hour { o["saat"] = String(format: "%02d:%02d", h, dc.minute ?? 0) }
+        an.append(o)
+      }
+      fs.signal()
+    }
+    _ = fs.wait(timeout: .now() + 60)
+  }
+  cikis["animsaticilar"] = an
+  cikis["izinler"] = izinler
+  yaz(cikis)
+}
+if let g = tarihGun { tarihlerOku(g); exit(0) }
 if etkinlik != nil || etkinlikSil != nil || takvimler {
   if #available(macOS 14.0, *) { store.requestFullAccessToEvents { izin, hata in etkinlikIs(izin, hata) } }
   else { store.requestAccess(to: .event) { izin, hata in etkinlikIs(izin, hata) } }

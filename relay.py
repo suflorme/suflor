@@ -1397,7 +1397,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1611,7 +1611,8 @@ AYAR_PANO = {
     "toplanti_terminal": ("bool", False, None), "toplanti_ses": ("sec", "kisilik", ("kisilik", "gemini", "pocket", "mac")), "ses_izi_hafiza": ("bool", True, None), "konus_gecmis": ("bool", False, None),  # konus_gecmis: varsayılanı kullanıcı kartı varsa açık (ayarlar_view)
     # Faz 11 Aşama 4: yapay zekâ seçimi (aktarici/saglayici.py SG_SECENEK); ayar.json'da düz anahtar değil, "beyin" sözlüğüne yazılır (sg_yaz). İş başına "" = Varsayılanı izler
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
-    "web_arastirma": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
+    "kisisel_tarihler": ("bool", True, None), "kisisel_tarih_ufuk": ("sayi", 14, (1, 90)), "kisisel_tarih_hatirlat": ("bool", True, None), "kisisel_tarih_sesli": ("bool", False, None), "kisisel_tarih_saat": ("metin", "09:00", 5), "kutlama_kanali": ("sec", "eposta", ("eposta", "teams")),  # S243: yaklaşan kişisel tarihler
+    "web_arastirma": ("bool", True, None), "web_arastirma_disari": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
     "ekran_paylasimda_goster": ("bool", False, None),  # 5 Kasım: açıkken Suflor pencereleri ekran paylaşımında/görüntüsünde görünür (demo); menu-cubugu.swift paylasimTuru
     "konus_web": ("bool", False, None),  # 5 Kasım: Konuş'ta web araştırması (bas-konus.py konus_web_acik; kurulu Brifing yardımcısı web araçlarını tanıyana kadar etkisiz)
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
@@ -1827,6 +1828,7 @@ bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /s
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
+bolum("web-arastirma")  # aktarici/web-arastirma.py — toplantı dışı derin web araştırması: Konuş ve kutuda "X'i araştır", kaynaklı kayıt canli/arastirma/ (S243)
 bolum("prova")  # aktarici/prova.py — Prova odası: karar/sunumu karşı taraf kişilikleriyle sına, rapor (brifing-ses ve bas-konus bölümlerinden sonra)
 bolum("claude-giris")  # aktarici/claude-giris.py — Claude Code girişi düşünce: günlük, sesli uyarı, bildirim, 30 dk yoklama (v0.130.0)
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
@@ -1851,6 +1853,7 @@ bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, t
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
 bolum("gerginlik")  # aktarici/gerginlik.py — Toplantı gerginliği → kişiliğin ses tonu (v0.80.0, S87)
+bolum("kisisel-tarihler")  # aktarici/kisisel-tarihler.py — yaklaşan kişisel tarihler: doğum günü, yıldönümü, tarihli hatırlatma; /yaklasan-tarihler, bir gün önce + sabah hatırlatma (S243)
 bolum("toplanti-sonrasi")  # aktarici/toplanti-sonrasi.py — toplantı sonrası proaktif hatırlatma: açık uçlar (tarihsiz/sahipsiz iş, teyit bekleyen karar) bildirim + Bugün satırı (5 Kasım)
 bolum("izleme")  # aktarici/izleme.py — İzleme: başka panonun Drive'a yazdığı JSON anlık görüntüsünü yalnız okur (ayar izleme_dosyasi; Bugün bölümü, hazırlık adayları, Konuş özeti; 5 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
@@ -2282,6 +2285,8 @@ class H(BaseHTTPRequestHandler):
         if yol == "/belge-oneri": return self._json(belge_oneri_view())  # belgeden iş önerisi (aktarici/eylem-menu.py; anahtarlı)
         if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
+        if yol == "/yaklasan-tarihler": return self._json(kt_view("yenile=1" in self.path) if "kt_view" in globals() else {"ok": False, "tarihler": []})  # S243: Kişiler/Takvim/Anımsatıcılar yaklaşan kişisel tarihler (aktarici/kisisel-tarihler.py; anahtarlı)
+        if yol == "/arastirma": return self._json(arastirma_view((re.search(r"[?&]id=([0-9a-z-]{1,80})(?:&|$)", self.path) or [None, None])[1]) if "arastirma_view" in globals() else {"hata": "yok"})  # S243: toplantı dışı web araştırması kayıtları
         if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
         if yol == "/dokum-kontrol/ses":  # satırın ses parçası (WAV); sayfa fetch ile başlıklı alır
             from urllib.parse import urlsplit, parse_qs
@@ -2369,6 +2374,7 @@ class H(BaseHTTPRequestHandler):
         if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
         if self.path == "/dokum-kontrol": return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile (anahtarlı; geliştirici)
         if self.path == "/ortak": return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
+        if self.path == "/yaklasan-tarihler": return self._json(kt_islem(p))  # taslak (kutlama; gönderim yok) | yoksay (anahtarlı; geçiş listesinde yok)
         if self.path == "/belge-oneri": return self._json(belge_oneri_islem(p))  # öneriyi kayda al (kayit_olustu + is_atandi) ya da reddet (anahtarlı)
         if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/Claude/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
         if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
@@ -2571,6 +2577,7 @@ if __name__ == "__main__":
     threading.Thread(target=_heartbeat_dongu, daemon=True).start()
     threading.Thread(target=_kaynak_dongu, daemon=True).start()  # C fazı: kaynak bekçisi
     threading.Thread(target=_veri_yok_dongu, daemon=True).start()  # Faz D: toplantı var, veri yok  # S162: heartbeat.json 8 sn'de bir
+    threading.Thread(target=_kt_dongu, daemon=True).start()  # S243: kişisel tarih hatırlatması (30 dk)
     threading.Thread(target=_toplanti_dongu, daemon=True).start()  # Faz B: tek toplantı kaydı — algılama, bitiş (/status toplanti, toplanti_bitti), canli/toplanti.json
     threading.Thread(target=_guncelleme_dongu, daemon=True).start()
     threading.Thread(target=_toplanti_izle, daemon=True).start()  # toplantı sonu teknik paketi

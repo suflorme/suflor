@@ -150,6 +150,12 @@ def brifing_args(ayar, istem, ek_dizin, yalin_mi=True, bilgi=None):  # tek çağ
         return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--allowedTools", "Read,Grep,Glob," + bilgi_araclar(bilgi),
                 "--add-dir", ek_dizin] + yalin(ayar, True) + (["--model", m] if m else []) + konus_onek_ayar(ayar, bilgi, None)
     return ["-p", istem, "--allowedTools", "Read,Grep,Glob", "--add-dir", ek_dizin, "--output-format", "json"] + (yalin(ayar) if yalin_mi else []) + (["--model", m] if m else [])
+# Toplantı dışı web araştırması (S243, aktarici/web-arastirma.py): tek çağrı, istem stdin'den, stream-json (sorgu/sayfa sayısı ölçülür), yalnız WebSearch/WebFetch; doğrudan çalışır (cwd canli/, dosya okumaz)
+def arastirma_model(ayar): return ayar.get("web_arastirma_model") or claude_secim(ayar, "konus")["model"]
+def arastirma_args(ayar):
+    m = arastirma_model(ayar)
+    return ["-p", "--output-format", "stream-json", "--verbose"] + (["--model", str(m)] if m else []) + ["--tools", KONUS_WEB_ARACLAR, "--allowedTools", KONUS_WEB_ARACLAR,
+            "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence"]
 def kart_args(model):  # tek çağrı, araçsız, istem stdin'den
     return ["-p", "--output-format", "json", "--model", model, "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands",
             "--no-session-persistence", "--tools", ""]
