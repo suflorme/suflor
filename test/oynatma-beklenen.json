@@ -222,12 +222,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 498097,
-   "sha": "0e9f71d19c4333aa"
+   "uzunluk": 499585,
+   "sha": "a95663c4dbc71757"
   },
   "/mini": {
-   "uzunluk": 498097,
-   "sha": "0e9f71d19c4333aa"
+   "uzunluk": 499585,
+   "sha": "a95663c4dbc71757"
   },
   "/status": {
    "_ping_son": "float",
@@ -320,6 +320,7 @@
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
      "oda": "bool",
+     "onay_uyari": "bool",
      "ortak_klasor": "str",
      "oto_haric": "str",
      "oto_toplanti": "bool",
@@ -388,6 +389,7 @@
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
      "oda": "bool",
+     "onay_uyari": "bool",
      "ortak_klasor": "str",
      "oto_haric": "str",
      "oto_toplanti": "bool",
