@@ -241,6 +241,7 @@ bunu Firestore güvenlik kuralları sunucuda sağlar. Sonradan role eklenen kiş
   şirket hesabıyla bir kez girer. Yenileme belirteci ve anahtarlar yalnız Anahtar Zinciri'nde.
 - **Drive'dan taşıma:** `python3 -B ortak_bulut.py tasi --klasor <Drive klasörü>` kendi olaylarını gönderir ve sayar (eksik 0 olmalı); herkes kendi Mac'inde çalıştırır.
 - **Durum:** `python3 -B ortak_bulut.py durum` ya da `/ortak` (`tasima`, giriş, son eşitleme, gecikme ortanca/p90). İzinli alan adı dışındaki ya da kişisel posta hesabıyla bağlanılmaz.
+  Panoda Kararlar ve işler başlığının altında tek satır: iyiyse "Ekiple paylaşılıyor · son eşitleme · gecikme", sorun varsa ne yapılacağı (giriş gerekiyor, şirket e-postası gerekiyor, ağ yok, hesap uyuşmuyor).
 Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/firestore.py` (sahte sunucu; ağa çıkmaz).
 
 ### Asistanın kayıt yazması ve projenin kendi kayıt aracı

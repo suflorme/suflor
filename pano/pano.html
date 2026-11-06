@@ -111,6 +111,7 @@ html.mac.kc-kapali #kenar{display:none}html.mac.kc-kapali .grid{grid-template-co
 @media (max-width:720px){html.mac #kenar{display:none}html.mac .grid{grid-template-columns:minmax(0,1fr)!important}}
 /* v0.111.0: arka plandaki toplantı oturumu (Terminal yok) — Claude'un yazdıkları, soru sorunca vurgu */
 .oneriler{margin:4px 0 10px}.oneriler .oneri{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:6px 0;border-top:1px solid var(--bd)}.oneriler .ktm{flex:1 1 60%;min-width:0;overflow-wrap:anywhere}.oneriler .ktd{font-size:var(--yz-2);color:var(--t3)}.oneriler .kte{display:flex;gap:4px;margin-left:auto}.oneriler .ktb{font-size:var(--yz-2);font-weight:600;color:var(--t2)}
+.selam .ortak{font-size:var(--yz-2);color:var(--t3);margin-top:4px}.selam .ortak.uyari{color:var(--dikkat)}
 #kt .kts{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:6px 0;border-top:1px solid var(--bd)}#kt .kts:first-child{border-top:0}#kt .ktm{flex:1 1 60%;min-width:0;overflow-wrap:anywhere;font-size:var(--yz-3)}#kt .ktd{font-size:var(--yz-2);color:var(--t3)}#kt .ktd.gec{color:var(--dikkat);font-weight:600}#kt .kte{display:flex;gap:4px;flex:none;margin-left:auto}#kt .kte button{padding:2px 8px;font-size:var(--yz-2)}#kt .ktb{font-size:var(--yz-2);font-weight:600;color:var(--t2);margin:8px 0 2px}#kt .ktb:first-child{margin-top:0}
 #tos .tom{max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:2px 0}
 #tos .tm{font-size:var(--yz-3);line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}#tos .tm .tt{color:var(--t3);font-size:var(--yz-1);margin-right:6px}
@@ -1647,7 +1648,7 @@ let prD={durum:'yok'},prBusy=false,prHata='',prKisi=[],prForm={konu:'',baglam:''
 let bnOlay=[],bnHazir=false,bnT=0,bnYuk=false,bnRef=null,bnGeri=null,bnBildT=null,bnDin=null
 const bnGizli=new Set()
 // Kararlar ve işler görünümü (5 Kasım): kenar çubuğundan tam sayfa liste (/kayitlar) — sekme karar/iş/açık soru, süzgeç kişi/toplantı/durum/arama; gündem taslağı (/gundem-taslagi) hazırlık kartında
-let boV=null,boBek=new Set(),bnGor='bugun',knV=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:''},knDen=false,knAraT=null,gtV={},gtYukSet=new Set()
+let boV=null,boBek=new Set(),bnGor='bugun',knV=null,knOrt=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:''},knDen=false,knAraT=null,gtV={},gtYukSet=new Set()
 const bnTarih=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const bnDk=h=>{const [a,b]=String(h||'0:0').split(':').map(Number);return (a||0)*60+(b||0)}
 const bnIlk=a=>String(a||'').trim().split(/\s+/)[0]
@@ -1837,6 +1838,7 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
       <section class="durum${dinliyor?' dinliyor':''}"><p>${bnDurum(s,ol,now,sira,kala,hdS,bek,son)}</p>${ses&&dtgt?`<button type=button class=dinle data-bn=dinle data-id="${esc(dtgt.id)}">${ic('hoparlor')}<span>${dinliyor?L('Durdur'):L('Dinle')}</span><span class=mono>${sure}</span></button>`:''}${serit}</section>
       ${odakOnce?bnOdakOnce(sira,s,hdS,kala):''}${taze?bnSonKart(son,true):''}${sirayaGore()}`}}
 async function knYukle(zorla){if(knYuk||(!zorla&&Date.now()-knT<30000))return;knYuk=true;knT=Date.now();const den=knDen  // S236: deneme (Test) toplantı kayıtları varsayılan gelmez; anahtar açıkken ?deneme=1
+  try{const o=await j('/ortak');const ov=o&&o.ok?o:null;if(JSON.stringify(ov)!==JSON.stringify(knOrt)){knOrt=ov;if(last)bnCiz(last)}}catch(e){}  // ortak defter durumu (A7)
   try{const o=await j('/belge-oneri');const ov=o&&o.ok?o:null;if(JSON.stringify(ov)!==JSON.stringify(boV)){boV=ov;if(last)bnCiz(last)}}catch(e){}
   try{const v=await j('/kayitlar'+(den?'?deneme=1':''));if(den!==knDen){knYuk=false;return knYukle(true)}if(v&&v.ok&&JSON.stringify(v)!==JSON.stringify(knV)){knV=v;if(last)bnCiz(last)}}catch(e){}knYuk=false}
 const knTop=d=>((knV||{}).toplantilar||[]).find(t=>t.dosya===d)
@@ -1860,6 +1862,14 @@ function boCiz(){const ls=((boV||{}).oneriler||[]).filter(x=>!boBek.has(x.id));i
 function boIsle(id,islem){boBek.add(id);if(last)bnCiz(last)
   const t=setTimeout(async()=>{try{await bnYaz('/belge-oneri',{id,islem})}catch(e){}boBek.delete(id);boV=null;await knYukle(true)},5000)
   bnBildir(islem==='kabul'?L('Öneri kayda alındı'):L('Öneri bir daha gösterilmeyecek'),()=>{clearTimeout(t);boBek.delete(id);if(last)bnCiz(last)})}
+// Ortak defter durumu (A7, S242): yalnız ekip paylaşımı açıkken tek satır — sorun varsa ne yapılacağı, iyiyse son eşitleme ve Firestore gecikmesi (ortanca, 10 kayıttan 9'u)
+function ortSatir(){const o=knOrt;if(!o||!o.acik||['kapali','deneme'].includes(o.durum))return''
+  const f=o.firestore||{},sn=x=>x<10?(Math.round(x*10)/10).toLocaleString(DIL==='en'?'en-US':'tr-TR'):String(Math.round(x))
+  const m={giris_yok:L('Ekip paylaşımı duruyor: Google girişi gerekiyor. Terminal’de: python3 -B ortak_bulut.py giris'),alan_disi:L('Ekip paylaşımı kapalı: şirket e-postası gerekiyor, kişisel posta adresiyle paylaşılmaz.'),ag_yok:L('Ekip paylaşımı bekliyor: ağa ulaşılamıyor; bağlantı gelince kendiliğinden sürer.'),kimlik_uyumsuz:L('Ekip paylaşımı duruyor: Google’da giriş yapılan hesap Suflor’daki e-postanla aynı değil.'),kimlik_yok:L('Ekip paylaşımı kapalı: Suflor’da şirket e-postan tanımlı değil.'),ayar_eksik:L('Ekip paylaşımı yarım kurulmuş: kurulumu tamamla.'),klasor_yok:L('Ekip paylaşımı duruyor: ortak klasör bu Mac’te bulunamadı.'),bekliyor:L('Ekip paylaşımı başlıyor…')}[o.durum]
+  if(m)return`<div class="ortak uyari">${esc(m)}</div>`
+  if(o.durum!=='ok')return`<div class="ortak uyari">${L('Ekip paylaşımında hata: {h}',{h:esc(o.hata||o.durum)})}</div>`
+  const saat=o.son?String(o.son).slice(11,16):'',g=o.tasima==='firestore'&&f.gecikme_ortanca!=null?(f.gecikme_p90!=null?L('gecikme ortanca {o} sn, 10 kayıttan 9’u {p} sn içinde',{o:sn(f.gecikme_ortanca),p:sn(f.gecikme_p90)}):L('gecikme ortanca {o} sn',{o:sn(f.gecikme_ortanca)})):''
+  return`<div class=ortak>${[L('Ekiple paylaşılıyor'),saat?L('son eşitleme {s}',{s:saat}):'',g].filter(Boolean).join(' · ')}</div>`}
 function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[]
   const dis=v?(v.dis||[]).flatMap(d=>d.ok?d.kayitlar.map(x=>({tur:x.tur,metin:x.metin,kim:x.sahip||'',baslik:x.toplanti||'',toplanti:'',vade:x.vade||'',durum:'acik',gecikti:false,tarihsiz:!x.vade,dis:true,kaynak:d.ad,id:''})):[]):[]
   const hepsi=[...ks,...dis],say=t=>hepsi.filter(x=>x.tur===t).length,liste=hepsi.filter(x=>x.tur===knSekme&&knSuzgec(x)).sort(knSira)
@@ -1868,7 +1878,7 @@ function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[]
   const kisi=opt([['',L('Herkes')],...(v?v.kisiler.map(k=>[k,k]):[])],knSuz.kisi),top=opt([['',L('Tüm toplantılar')],...(v?v.toplantilar.map(t=>[t.dosya,(t.baslik||t.dosya)+(t.tarih?' · '+t.tarih:'')]):[])],knSuz.toplanti)
   const dur=opt([['',L('Her durum')],['acik',L('Açık')],['gecikmis',L('Gecikmiş')],['tarihsiz',L('Tarihsiz')],['teyit',L('Onay bekleyen')],['kapandi',L('Kapandı')]],knSuz.durum)
   const bos=!v?L('Yükleniyor…'):!hepsi.length?L('Henüz kayıt yok: toplantı bittiğinde kararlar ve işler buraya düşer.'):!liste.length?L('Süzgece uyan kayıt yok.'):'',suzlu=knSuz.kisi||knSuz.toplanti||knSuz.durum||knSuz.ara
-  return`<div class=selam><h1><span>${L('Kararlar ve işler')}</span></h1><div class=satir2>${v?L('{k} karar · {i} iş · {s} açık soru',{k:say('karar'),i:say('is'),s:say('soru')}):''}</div></div>
+  return`<div class=selam><h1><span>${L('Kararlar ve işler')}</span></h1><div class=satir2>${v?L('{k} karar · {i} iş · {s} açık soru',{k:say('karar'),i:say('is'),s:say('soru')}):''}</div>${ortSatir()}</div>
     <section class=bolum><div class=sekmeler role=tablist>${sek}<div class=keylem><button type=button class="b sade" data-bn=disa data-bicim=csv>${ic('dosya')}${L('Dışa aktar')} CSV</button><button type=button class="b sade" data-bn=disa data-bicim=json>${ic('dosya')}JSON</button></div></div>
     <div class=suzgec><input id=knAra type=search value="${esc(knSuz.ara)}" placeholder="${L('Ara')}" aria-label="${L('Ara')}"><select data-knf=kisi aria-label="${L('Kişi')}">${kisi}</select><select data-knf=toplanti aria-label="${L('Toplantı')}">${top}</select><select data-knf=durum aria-label="${L('Durum')}">${dur}</select>${v&&(v.deneme_say||knDen)?`<label class=kndn><input type=checkbox data-kndn${knDen?' checked':''}> ${L('Deneme toplantıları')}${v.deneme_say?` (${v.deneme_say})`:''}</label>`:''}${suzlu?`<button type=button class="b sade" data-bn=knsifirla>${L('Süzgeci kaldır')}</button>`:''}</div>
     ${knSekme==='is'?boCiz():''}

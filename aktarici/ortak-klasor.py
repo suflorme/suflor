@@ -10,7 +10,6 @@
 # Drive yolunda ağ yok: yalnız yerel dosya sistemine yazılır (Drive masaüstü uygulaması eşitler). Kimlik şirket e-postası (kimlik_ben); yoksa ya da kişisel posta alan adıysa kapalı kalır
 # (beta kurulumunda açılmaz). Gizli/deneme toplantının kaydı yazma anında yapi._paylasilmaz ile elenir. Beta paketine hiçbir alan girmez.
 ORTAK_ARALIK_SN = 60
-ORTAK_KISISEL = ("gmail.com", "googlemail.com", "hotmail.com", "outlook.com", "live.com", "msn.com", "yahoo.com", "icloud.com", "me.com", "mac.com", "yandex.com", "proton.me", "protonmail.com", "aol.com")
 ORT = {"durum": "kapali", "son": None, "sonuc": None, "hata": None, "denetim": None}
 FS_HIZLI_SN, FS_YAVAS_SN, FS_PANO_SN = 5, 30, 60
 _ORT_KILIT = threading.Lock()
@@ -29,7 +28,8 @@ def ortak_klasor():
 def ortak_kimlik():  # → şirket e-postası ya da None (kişisel posta alan adı sayılmaz)
     try: ep = kimlik_ben()[1] if "kimlik_ben" in globals() else None
     except Exception: ep = None
-    return ep if ep and ep.split("@")[-1] not in ORTAK_KISISEL else None
+    bm = _bulut_mod()  # kişisel posta alan adları tek yerde: ortak_bulut.KISISEL; modül yoksa paylaşım açılmaz
+    return ep if ep and bm and ep.split("@")[-1].lower() not in bm.KISISEL else None
 def _ort_kimlik_f(ad):  # rolde e-postası olmayan ad → yalnız emin eşleme (Kişiler'e gidilmez, kayıt yazılmaz)
     if "kimlik_coz" not in globals(): return None
     r = kimlik_coz(ad, kisiler=False, yaz=False)

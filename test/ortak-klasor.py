@@ -20,7 +20,7 @@ M_NORMAL, M_GIZLI, M_DENEME, M_ESKI = "2026-11-05-1400-Haftalik-Plan", "2026-11-
 class Mac:
     def __init__(s, ad, kisi, ep, port, ortak):
         s.ad = ad; s.kok = os.path.join(T, ad); s.canli = os.path.join(s.kok, "canli"); os.makedirs(s.canli); s.port = port
-        for f in ("relay.py", "manifest.json", "yapi.py"): shutil.copy(os.path.join(KOD, f), s.kok)
+        for f in ("relay.py", "manifest.json", "yapi.py", "ortak_bulut.py"): shutil.copy(os.path.join(KOD, f), s.kok)
         for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(s.kok, d))
         s.ayar = os.path.join(s.kok, "ayar.json"); a = {"alan": "Deneme", "ad": kisi, "port": port, "uygulama": s.kok, "proje": s.kok, "ortak": s.kok, "eposta_kimlik": ep}
         if ortak: a["ortak_klasor"] = DRIVE
