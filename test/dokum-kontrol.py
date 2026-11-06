@@ -132,6 +132,14 @@ try:
     N["dk_olcum_yaz"](dict(o, dinlenen=10))
     ok("aynı toplantının ölçümü yenilenir (çoğalmaz)", len(open(os.path.join(canli, "dokum-olcum.jsonl"), encoding="utf-8").read().splitlines()) == 1)
     ok("duzeltme-elle.json dinlenen listesi olmayan eski biçim okunur (ilk N satır)", (lambda x: x is not None)(N["dk_elle_oku"](kl)))
+    # v0.199.1: önceki düzeltme dosyası (eski sayfanın liste biçimi) yeni kayıtta silinmez
+    _yol = os.path.join(kl, "duzeltme-elle.json"); _onceki = open(_yol, encoding="utf-8").read()
+    open(_yol, "w", encoding="utf-8").write(json.dumps([{"dosya": "eski-sayfa-satiri.wav", "kanal": "karsi", "saat": "10:00:01", "whisper": "eski yanlis", "gemini": "", "dogru": "eski doğru"}], ensure_ascii=False))
+    N["dk_elle_yaz"](kl, N["_dk_json"](os.path.join(kl, "kontrol-plan.json")), N["dk_durum_oku"](kl))
+    _e = json.load(open(_yol, encoding="utf-8"))
+    ok("önceki düzeltme dosyası silinmez: eski satırlar korunur, yedek kopya kalır", any(x.get("dosya") == "eski-sayfa-satiri.wav" for x in _e["duzeltmeler"]) and "eski-sayfa-satiri.wav" in _e["dinlenen"]
+       and len(_e["duzeltmeler"]) >= 2 and any(f.startswith("duzeltme-elle-") for f in os.listdir(kl)))
+    open(_yol, "w", encoding="utf-8").write(_onceki)
     json.dump({"toplanti": md[:-3], "dinlenen_satir": 3, "toplam_satir": 31, "duzeltmeler": [{"dosya": d2, "kanal": "karsi", "saat": "x", "whisper": "a", "gemini": "b", "dogru": "c"}]}, open(os.path.join(T, "eski.json"), "w"))
     shutil.copy(os.path.join(T, "eski.json"), os.path.join(kl, "eski-elle-deneme.json"))
     # sözlük adayı

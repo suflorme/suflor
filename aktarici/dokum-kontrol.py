@@ -5,6 +5,7 @@
 # "Bitir" duzeltme-elle.json'u (5 Kasım'daki elle düzeltmeyle aynı biçim) yazar ve (a) ölçüm canli/dokum-olcum.jsonl (yalnız sayı), (b) sözlük adayı (SO_KAYNAKLAR "elle"), (c) eğitim havuzu
 # (egitim-havuzu/dogrulanmis/<toplantı>/ wav kopyası + dogrulanmis.jsonl; 14 günlük arşiv temizliği bunlara dokunmaz) işlerini yapar.
 import hashlib
+import shutil
 DK_PLAN, DK_DURUM, DK_ELLE, DK_OLCUM, DK_SURUM = "kontrol-plan.json", "kontrol-durum.json", "duzeltme-elle.json", "dokum-olcum.jsonl", 1
 DK_HEDEF = 200; DK_BLOK_SN = 300; DK_BAND = 80
 DK_GEMINI_FARK = 0.22; DK_KARAR_PENCERE_SN = 40; DK_HIZ = 1.25; DK_KARAR_SN = 2.5  # tahmin: ses süresi / hız + satır başına karar süresi
@@ -207,7 +208,20 @@ def dk_elle_yaz(kl, plan, d):  # 5 Kasım'daki duzeltme-elle.json biçimi (+ din
            "duzeltmeler": [{"dosya": x, "kanal": S[x]["k"], "saat": S[x]["s"], "whisper": S[x]["m"], "gemini": S[x]["g"], "dogru": v} for x, v in sorted(d["duz"].items(), key=lambda kv: S[kv[0]]["o"])
                            if x in S and " ".join(_dk_norm(v)) != " ".join(_dk_norm(S[x]["m"]))],
            "dinlenen": sorted(d["dinlenen"], key=lambda x: S[x]["o"] if x in S else 0)}
-    _so_yaz(os.path.join(kl, DK_ELLE), json.dumps(out, ensure_ascii=False, indent=1), 0o600); return out
+    # 6 Kasım: önceki düzeltmeler hiç kaybolmaz — eski dosyadaki (başka sayfayla ya da önceki turda yapılmış) satırlar korunur, bu turdakiler üstüne yazar;
+    # yazmadan önce önceki dosya zaman damgalı yedeğe kopyalanır (v0.199.0 ilk kayıtta 5 Kasım'daki 287 düzeltmeyi silmişti)
+    yol = os.path.join(kl, DK_ELLE); eski = _dk_json(yol)
+    if isinstance(eski, (dict, list)) and eski:
+        try: shutil.copy2(yol, os.path.join(kl, "duzeltme-elle-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + ".json"))
+        except OSError: pass
+        e_duz = eski if isinstance(eski, list) else (eski.get("duzeltmeler") or [])
+        bu = {x["dosya"] for x in out["duzeltmeler"]} | set(d["dinlenen"])
+        kalan = [x for x in e_duz if isinstance(x, dict) and x.get("dosya") and x["dosya"] not in bu]
+        out["duzeltmeler"] = kalan + out["duzeltmeler"]
+        e_din = [] if isinstance(eski, list) else (eski.get("dinlenen") or [])
+        out["dinlenen"] = sorted(set(out["dinlenen"]) | set(e_din) | {x["dosya"] for x in kalan}, key=lambda x: S[x]["o"] if x in S else 0)
+        out["dinlenen_satir"] = len(out["dinlenen"])
+    _so_yaz(yol, json.dumps(out, ensure_ascii=False, indent=1), 0o600); return out
 def dk_elle_oku(kl, plan=None):  # → (düzeltme {dosya: doğru}, dinlenen kümesi, ham) ya da None; eski dosyada dinlenen listesi yok: ilk N satır (eski sayfa baştan sona dinlerdi)
     e = _dk_json(os.path.join(kl, DK_ELLE))
     if not isinstance(e, dict): return None
