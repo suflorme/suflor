@@ -14,6 +14,44 @@ import Security
 import CommonCrypto
 
 func bitir(_ kod: Int32) -> Never { exit(kod) }
+// 6 Kasım: Foundation Process argümanları NFD'ye çeviriyor ("ü" → "u" + birleşik işaret; ölçüldü) — claude'a giden Türkçe argüman bozuk gitmesin diye
+// Process'in yerine posix_spawn (argümanlar UTF-8 olduğu gibi). Yalnız kullanılan kısım: argüman, cwd, ortam, stdin/stdout/stderr, terminate, bekleme.
+final class NfcSurec {
+    var executableURL = URL(fileURLWithPath: "/"), arguments: [String] = [], currentDirectoryURL: URL? = nil, environment: [String: String]? = nil
+    var stdinFd: Int32? = nil, stdoutFd: Int32? = nil   // yok → /dev/null
+    private(set) var pid: pid_t = 0, durum: Int32 = 0, bitti = false
+    private let bekle = DispatchSemaphore(value: 0), kilit = NSLock()
+    var isRunning: Bool { kilit.lock(); defer { kilit.unlock() }; return pid != 0 && !bitti }
+    var processIdentifier: pid_t { pid }
+    var terminationStatus: Int32 { (durum & 0x7f) == 0 ? (durum >> 8) & 0xff : (durum & 0x7f) }
+    func run() throws {
+        let argv: [UnsafeMutablePointer<CChar>?] = ([executableURL.path] + arguments).map { strdup($0) } + [nil]
+        let envp: [UnsafeMutablePointer<CChar>?] = (environment ?? ProcessInfo.processInfo.environment).map { strdup("\($0.key)=\($0.value)") } + [nil]
+        defer { argv.forEach { free($0) }; envp.forEach { free($0) } }
+        var fa: posix_spawn_file_actions_t? = nil, at: posix_spawnattr_t? = nil
+        posix_spawn_file_actions_init(&fa); posix_spawnattr_init(&at)
+        if let g = stdinFd { posix_spawn_file_actions_adddup2(&fa, g, 0) } else { posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0) }
+        if let c = stdoutFd { posix_spawn_file_actions_adddup2(&fa, c, 1) } else { posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0) }
+        posix_spawn_file_actions_addopen(&fa, 2, "/dev/null", O_WRONLY, 0)
+        if let d = currentDirectoryURL { posix_spawn_file_actions_addchdir_np(&fa, d.path) }
+        var yok = sigset_t(); sigemptyset(&yok); sigaddset(&yok, SIGPIPE)   // aktarıcı SIGPIPE'ı yok sayıyor; claude varsayılanla başlasın (Process gibi)
+        posix_spawnattr_setsigdefault(&at, &yok)
+        posix_spawnattr_setflags(&at, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF))
+        var yeni: pid_t = 0
+        let rs = posix_spawn(&yeni, executableURL.path, &fa, &at, argv, envp)
+        posix_spawn_file_actions_destroy(&fa); posix_spawnattr_destroy(&at)
+        guard rs == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(rs)) }
+        kilit.lock(); pid = yeni; kilit.unlock()
+        Thread.detachNewThread { [self] in
+            var st: Int32 = 0
+            while waitpid(yeni, &st, 0) < 0 && errno == EINTR {}
+            kilit.lock(); durum = st; bitti = true; kilit.unlock(); bekle.signal()
+        }
+    }
+    func terminate() { if isRunning { kill(pid, SIGTERM) } }
+    func waitUntilExit() { bekle.wait(); bekle.signal() }
+}
+
 let a = CommandLine.arguments
 func gercek(_ y: String) -> String {  // sembolik bağları çözülmüş mutlak yol (C realpath; dosya yoksa klasörü çözülür — Foundation /private önekini tutarsız atıyor)
     let s = URL(fileURLWithPath: y).standardizedFileURL.path
@@ -292,13 +330,14 @@ if j["kip"] as? String == "toplanti" {
     }
     guard arg.contains("--permission-prompt-tool"), arg.contains("--input-format") else { bitir(3) }
     guard let gir = FileHandle(forReadingAtPath: giris), let cik = FileHandle(forWritingAtPath: cikis) else { bitir(7) }
-    let p = Process()
+    let p = NfcSurec()
     p.executableURL = URL(fileURLWithPath: claudeGercek); p.arguments = arg; p.currentDirectoryURL = URL(fileURLWithPath: cwd)
     var e = ProcessInfo.processInfo.environment; e["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:" + (e["PATH"] ?? ""); p.environment = e
     signal(SIGPIPE, SIG_IGN)
     let boru = Pipe()
-    p.standardInput = boru; p.standardOutput = cik; p.standardError = FileHandle.nullDevice
+    p.stdinFd = boru.fileHandleForReading.fileDescriptor; p.stdoutFd = cik.fileDescriptor
     do { try p.run() } catch { bitir(4) }
+    try? boru.fileHandleForReading.close()
     Thread.detachNewThread {
         while true { let d = gir.availableData; if d.isEmpty { break }; do { try boru.fileHandleForWriting.write(contentsOf: d) } catch { break } }
         try? boru.fileHandleForWriting.close()
@@ -391,7 +430,7 @@ func degerOf(_ b: String) -> [String] { arg.indices.filter { arg[$0] == b && $0 
 if degerOf("--allowedTools").contains(where: { $0.split(separator: ",").contains { bilgiAracUygun($0.trimmingCharacters(in: .whitespaces)) && !$0.contains("mcp__suflorvt__") } }),
    !degerOf("--settings").contains(where: { ($0.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any])?["allowedMcpServers"] != nil }) { bitir(3) }
 
-let p = Process()
+let p = NfcSurec()
 if let giris = j["giris"] as? String, let cikis = j["cikis"] as? String {
     guard let gir = FileHandle(forReadingAtPath: giris), let cik = FileHandle(forWritingAtPath: cikis) else { bitir(7) }
     p.executableURL = URL(fileURLWithPath: claudeGercek); p.arguments = arg; p.currentDirectoryURL = URL(fileURLWithPath: cwd)
@@ -401,8 +440,9 @@ if let giris = j["giris"] as? String, let cikis = j["cikis"] as? String {
     // aktarırız; FIFO kapanınca boru kapanır, claude çıkar, uygulama biter.
     signal(SIGPIPE, SIG_IGN)
     let boru = Pipe()
-    p.standardInput = boru; p.standardOutput = cik; p.standardError = FileHandle.nullDevice
+    p.stdinFd = boru.fileHandleForReading.fileDescriptor; p.stdoutFd = cik.fileDescriptor
     do { try p.run() } catch { bitir(4) }
+    try? boru.fileHandleForReading.close()
     Thread.detachNewThread {
         while true { let d = gir.availableData; if d.isEmpty { break }; do { try boru.fileHandleForWriting.write(contentsOf: d) } catch { break } }
         try? boru.fileHandleForWriting.close()
@@ -415,8 +455,9 @@ p.executableURL = URL(fileURLWithPath: claudeGercek); p.arguments = arg; p.curre
 var env = ProcessInfo.processInfo.environment
 env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:" + (env["PATH"] ?? "")
 p.environment = env
-let cik = Pipe(); p.standardOutput = cik; p.standardError = FileHandle.nullDevice; p.standardInput = FileHandle.nullDevice
+let cik = Pipe(); p.stdoutFd = cik.fileHandleForWriting.fileDescriptor
 do { try p.run() } catch { bitir(4) }
+try? cik.fileHandleForWriting.close()  // yazma ucu yalnız claude'da kalsın: o çıkınca okuma biter
 
 var sonuc = Data(); let okundu = DispatchSemaphore(value: 0)
 DispatchQueue.global().async { sonuc = cik.fileHandleForReading.readDataToEndOfFile(); okundu.signal() }

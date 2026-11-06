@@ -130,6 +130,7 @@ kişi ya da firma sorusunda Konuş internette arar ve herkese açık sayfa okur;
 kapalı. Suflor Brifing yardımcısının web araçlarını tanıyan sürümü gerekir; eski sürümde ayar açık olsa da Konuş internete çıkmaz (günlükte tek satır uyarı).
 
 **Süreli ses arşivi (`"ses_arsivi": true`, varsayılan kapalı):** Whisper'a giden her ses parçası sonucuyla birlikte `canli/ses-arsivi/<toplantı>/` altına (WAV + `parcalar.jsonl`) yazılır; eşik, mikrofon ve uydurma kurallarını gerçek veriyle ayarlamak içindir. Ses yalnız bu Mac'te kalır: ağa, geri bildirime, teşhis paketine ve Time Machine'e girmez.
+**`"ses_arsivi_tam"` (yalnız geliştirici kurulumu; `ses_arsivi` açıkken varsayılan açık, `false` kapatır):** toplantının ham sesi kanal başına (ben, karşı) sessizlik dahil kesintisiz `tam-ben` ve `tam-karsi` olarak aynı toplantı klasörüne yazılır; iki kayıt duvar saatiyle hizalıdır, başlangıç anı `tam.json`'dadır. Toplantı bitince AAC `.m4a`'ya çevrilir ve wav silinir (`"ses_arsivi_tam_m4a": false` wav'ı bırakır; wav saatte ~115 MB/kanal). Gizli toplantıda ve toplantı dışında kayıt yok; ağa, teşhis paketine ve arşiv aramasına girmez. Aynı klasörde kayıt yeniden açılırsa (aktarıcı yeniden başlar ya da 60 sn ses kesilir) var olan dosyaya dokunulmaz, yeni bölüm `tam-2-ben`, `tam-2-karsi`, `tam-2.json` adıyla (her birinin kendi `t0`'ı) açılır.
 **`"ses_arsivi_gun": 14`:** arşivin saklama süresi (gün); süresi geçen toplantı klasörleri silinir, toplam boyut 5 GB'ı aşarsa en eskiden silinir. Kapatınca eski kayıtlar da süresi dolunca silinir.
 **`"ses_arsivi_egitim": true` (varsayılan kapalı):** arşivden süresi dolan ya da boyut sınırı yüzünden atılacak toplantı klasörleri silinmek yerine `canli/egitim-havuzu/<klasör>` altına taşınır (Whisper ince ayarı için gerçek toplantı sesi biriktirmek; yalnız yerel, ağa hiçbir şey gitmez; Time Machine'e girmez). Ad çakışırsa sonuna `-2`, `-3` eklenir.
 **`"golge_tstt": true` (geliştirici denemesi, varsayılan kapalı):** canlı toplantıda Whisper'a giden ses yerel turkish-stt akış tanıyıcısına da verilir; ekranda, dökümde ve kartlarda hiçbir şey görünmez, yalnız ses arşivi klasörüne `tstt-golge.jsonl` yazılır (gecikme ve sözcük farkı kayıttan ölçülür). Ayrıca kurulmuş turkish-stt ister (ortak klasörde `tstt-venv` ve `tstt-model`); gizli toplantıda çalışmaz, 10 dk ses gelmezse işçi kapanır. Ses yalnız bu Mac'te kalır.
@@ -210,6 +211,23 @@ Firmada başka bir karar ya da toplantı defteri kullanılıyorsa Suflor.me onu 
 Suflor'un kararlarını ve işlerini o deftere taşımak için Bugün'de "Kararları ve işleri dışa aktar" (CSV ya da JSON; alanlar: tarih, toplantı, tür, metin, sahip,
 vade, durum, kaynak saat). Dosya `<canlı klasör>/disa-aktar/` altına yazılır ve Finder'da gösterilir; yüklemeyi sen yaparsın. Gizli toplantıların kaydı girmez.
 Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/dis-defter.py`.
+
+## Ortak klasör (ekiple kararlar ve işler, pilot)
+İki-üç kişi aynı kararları ve işleri görsün diye Google Drive'da paylaşılan bir klasör kullanılır. Klasörü bir kişi Drive'da açıp ekibe paylaşır; herkes Google Drive
+masaüstü uygulamasıyla Mac'ine eşitler ve Mac'teki yolunu ayar `ortak_klasor`'a yazar (ör. `~/Library/CloudStorage/GoogleDrive-…/Paylaşılan ağ sürücüleri/Suflor-ortak`;
+geliştirici kurulumunda ⚙ Ayarlar → **Ortak klasör (pilot)**, başka kurulumda ayar dosyasına). Boşsa özellik kapalıdır, hiçbir şey yazılmaz.
+- **Ne gider:** yalnız karar ve iş kayıtlarının değişiklikleri (oluşturma, durum, onay, atama, vade, metin düzeltme, bölme, gündem, yorum). Döküm, alıntı, ses, kart,
+  not, Claude'un hazırlık notu ve taslaklar gitmez. **Gizli ve deneme toplantılarının kayıtları hiç yazılmaz** (yazma anında yeniden denetlenir).
+  Ayar açılmadan önceki kayıtlar da gitmez; isteyen ayar dosyasına `"ortak_gecmis": true` yazar.
+- **Kimlik:** şirket e-postan (ayar `eposta_kimlik`, yoksa `eposta_adres` ya da takvim adresin). Kişisel posta adresiyle (Gmail, iCloud …) özellik açılmaz.
+- **Nasıl:** her Mac yalnız kendi dosyasına ekler: `olaylar/<e-posta>/<cihaz>/<YYYY-AA>.jsonl`; başkalarınınkini dakikada bir okur. Drive'ın henüz bitirmediği
+  yarım satır sonraki tura kalır; aynı olay iki kez gelirse bir kez sayılır. Gecikme Drive'ın eşitleme süresi kadardır (genelde birkaç dakika).
+- **Görünüm:** başkasının kararları ve işleri Kararlar ve işler'de görünür; sana atanan iş listede ve Bugün'de **"Sana atandı · <kişi>"** etiketiyle çıkar
+  (son 7 günde atananlar Bugün'de vadesine bakılmadan görünür).
+  Pilotta klasöre erişen herkes her kaydı görür. Kayıtta rolü olmayan birinin değişikliği (ör. başkasının kararının metnini düzeltmek) uygulanmaz, tarihçede
+  "uygulanmadı" diye görünür.
+- Durum: `/ortak` (anahtarlı; yazılan, alınan, uygulanmayan değişiklikler, ortak klasörde gizli/deneme izi denetimi). Ağa bağlanılmaz; eşitlemeyi Drive yapar.
+Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/ortak-klasor.py`.
 
 ### Asistanın kayıt yazması ve projenin kendi kayıt aracı
 Asistan (Konuş ya da kutu) kayıtta değişiklik önerir, her yazmayı panoda tek tıkla onaylarsın. Masaüstü'ndeki dosyalara aktarıcı erişemediği için o kısmı

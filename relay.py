@@ -1397,7 +1397,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1553,7 +1553,14 @@ def son_ekle(p):
             os.replace(hp + ".tmp", hp); r["harita"] = hp
             if p.get("gorsel") in ("harita", "karar_is"): r["gorsel"] = p["gorsel"]  # 5 Kasım: panoda menü etiketi (Zihin haritası | Karar ve iş panosu)
         except OSError as e: print(f"ÖZET: harita yazılamadı ({e.__class__.__name__})")
+    # 6 Kasım: `bitir` yeniden çalıştırılınca (çıktıyı yeniden görmek ya da yapı düzeltmesi sonrası) aynı özet bir daha geliyordu → ikinci bildirim, sesli okuma, hatırlatma.
+    # İçerik aynıysa ikinci çağrı zararsız: kayıt, bildirim ve ses tekrarlanmaz.
+    import hashlib
+    r["parmak"] = hashlib.sha1(json.dumps([p.get("metin"), p.get("yapi"), p.get("harita"), r["baslik"], r["cikti"], r["degerlendirme"], r["oneri"], r["dosya"]], sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
     with LOCK:
+        onceki = next((x for x in reversed(SON) if x.get("ozet") == ozet), None)
+        if onceki and onceki.get("parmak") == r["parmak"]:
+            print("ÖZET: aynı özet zaten kayıtlı — tekrar bildirim/ses yok"); return {"ok": True, "id": onceki.get("id"), "tekrar": True}
         _log("son-toplantilar.jsonl", r); SON.append(r); SON[:] = _son_tekil(SON)[-20:]
     if r["dosya"]: toplanti_bitir("özet hazır", r["dosya"])  # Faz B: özet hazır = toplantı bitti (pano hemen "Son toplantılar"a geçer)
     if r.get("yapi") and "so_tetik" in globals(): so_tetik()  # 3 Kasım: öğrenen sözlük — yapı dosyasındaki düzeltmeler (toplantı bitince işlenir)
@@ -1610,7 +1617,7 @@ AYAR_PANO = {
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_prova": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
-    "izleme_dosyasi": ("metin", "", 300), "izleme_ad": ("metin", "", 40),  # 5 Kasım: izleme_dosyasi = başka panonun Drive'dan eşitlenen JSON anlık görüntüsü (yalnız okunur, aktarici/izleme.py); yol yoksa özellik kapalı
+    "izleme_dosyasi": ("metin", "", 300), "izleme_ad": ("metin", "", 40), "ortak_klasor": ("metin", "", 400),  # A3 (6 Kasım): ortak_klasor = Drive pilotu klasörü (aktarici/ortak-klasor.py; boş = kapalı). 5 Kasım: izleme_dosyasi = başka panonun Drive'dan eşitlenen JSON anlık görüntüsü (yalnız okunur, aktarici/izleme.py); yol yoksa özellik kapalı
     "dis_defter": ("defter", [], None)}  # 5 Kasım (S212): dış karar kaydı — [{"ad", "tur": "dosya", "yol"} | {"ad", "tur": "mcp", "sunucu", "url", "araclar"}]; yalnız okuma (yapi.dis_defter_veri) + dışa aktarma, dışarıya yazma yok
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
@@ -1663,7 +1670,7 @@ def ayar_yaz(deg):
             continue
         if tur == "bool" and isinstance(v, bool): yeni[k] = v
         elif tur == "sec" and str(v) in sinir: yeni[k] = str(v)
-        elif tur == "metin" and isinstance(v, str) and len(v.strip()) <= sinir and (k != "izleme_dosyasi" or not v.strip() or v.strip().lower().endswith(".json")): yeni[k] = " ".join(v.split()) if k != "izleme_dosyasi" else v.strip()
+        elif tur == "metin" and isinstance(v, str) and len(v.strip()) <= sinir and (k != "izleme_dosyasi" or not v.strip() or v.strip().lower().endswith(".json")): yeni[k] = " ".join(v.split()) if k not in ("izleme_dosyasi", "ortak_klasor") else v.strip()
         elif tur == "adres" and (not str(v).strip() or re.fullmatch(r"[^\s@,]+@[^\s@,]+\.[^\s@,]+", str(v).strip())): yeni[k] = str(v).strip().lower()
         elif tur == "kisilik" and (str(v) == "" or str(v) in {x["yol"] for x in kisilik_listesi()}): yeni[k] = str(v)
         elif tur == "sayi" and isinstance(v, (int, float)) and not isinstance(v, bool) and sinir[0] <= v <= sinir[1]: yeni[k] = int(v)
@@ -1701,7 +1708,7 @@ def ayar_yaz(deg):
                 h = sg_yaz(a, beyin)
                 if h: return {"ok": False, "err": h}
             for k, v in yeni.items():
-                if (k in ("eposta", "eposta_adres", "izleme_dosyasi", "izleme_ad", "kisilik", "kisilik_toplanti_disi", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
+                if (k in ("eposta", "eposta_adres", "izleme_dosyasi", "izleme_ad", "ortak_klasor", "kisilik", "kisilik_toplanti_disi", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
             if "profil" in yeni: _profil_modul().profil_uygula(a, yeni["profil"])  # hafif: ayarda olmayan türetilenler yazılır; tam: yalnız türetilenler silinir
             gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
@@ -1824,6 +1831,7 @@ bolum("prova")  # aktarici/prova.py — Prova odası: karar/sunumu karşı taraf
 bolum("claude-giris")  # aktarici/claude-giris.py — Claude Code girişi düşünce: günlük, sesli uyarı, bildirim, 30 dk yoklama (v0.130.0)
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
 bolum("kimlik")  # aktarici/kimlik.py — kişi adı → şirket e-postası eşlemesi, elle düzeltme, eşlenemeyenler (ortak karar katmanı A1)
+bolum("ortak-klasor")  # aktarici/ortak-klasor.py — ortak karar katmanı A3 (Drive pilotu): ayar ortak_klasor varsa karar/iş olayları paylaşılan klasöre yazılır/okunur (/ortak)
 bolum("eylem-menu")  # aktarici/eylem-menu.py — kayıt eylem menüsü: ertele, böl, gündeme ekle, ata, taslak, Claude'a çalıştır, Geri al (/kayit-menu, /kayit-eylem; ortak karar katmanı)
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
@@ -2268,6 +2276,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
         if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
+        if yol == "/ortak": return self._json(ortak_view())  # A3 ortak klasör durumu (aktarici/ortak-klasor.py)
         if yol == "/kayitlar": return self._json(kayitlar_view(self.path))  # Kararlar ve işler görünümü (anahtarlı)
         if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
         if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
@@ -2342,6 +2351,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/prova": return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
         if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
+        if self.path == "/ortak": return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
         if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/Claude/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
         if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
         if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)

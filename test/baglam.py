@@ -56,12 +56,13 @@ try:
     yol = bg()["kaynaklar"][-1]["deger"] if y.get("ok") else ""
     kontrol("anahtarlı dosya bağlam klasörüne yazıldı (ad temizlendi)", y.get("ok") and yol.startswith(os.path.join(canli, "baglam") + "/") and open(yol, "rb").read() == b"Bilgi notu" and "/../" not in yol)
     kontrol("/cards bağlam listesini veriyor", [x["kaynak"] for x in istek("/cards").get("baglam", [])] == ["kutu", "kutu", "birak"])
-    y = istek("/baslat", {"konu": "Yeni — dış", "baglam": "https://yeni.example/sunum\nbu satır kaynak değil"}, PANO)
+    # 3 Kasım'dan beri toplantı sürerken farklı konuyla Başlat önce "bitirip yenisini başlatayım mı?" diye sorar ({"soru": "suruyor"}); onay: "bitir" ile gelir
+    y = istek("/baslat", {"konu": "Yeni — dış", "onay": "bitir", "baglam": "https://yeni.example/sunum\nbu satır kaynak değil"}, PANO)
     kontrol("Başlat: tanınmayan bağlam satırı reddedildi", y.get("ok") is False and "tanınmadı" in (y.get("err") or "") and len(bg()["kaynaklar"]) == 3)
     json.dump({"toplanti": "Eski toplantı", "kartlar": [{"id": f"h{i}", "gundem": 0, "tetik": ["x"], "tur": "not", "metin": "k"} for i in range(33)]}, open(os.path.join(canli, "hazir.json"), "w"))
     ag = os.path.join(canli, "agenda.json"); json.dump({"title": "Eski", "baslangic": "21:48", "bitis": "22:18", "items": ["madde"]}, open(ag, "w"))
     os.utime(ag, (time.time() - 86400, time.time() - 86400))  # dünden kalan gündem
-    y = istek("/baslat", {"konu": "Yeni — dış", "baglam": f"https://yeni.example/sunum\n{belge}"}, PANO)
+    y = istek("/baslat", {"konu": "Yeni — dış", "onay": "bitir", "baglam": f"https://yeni.example/sunum\n{belge}"}, PANO)
     a_ = json.load(open(ag)); sec = json.load(open(os.path.join(canli, "takvim-secilen.json")))
     arsiv = [json.loads(x) for x in open(os.path.join(canli, "agenda-arsiv.jsonl"), encoding="utf-8")]
     kontrol("Başlat (takvimsiz, yeni konu): eski gündem arşive, yeni konunun boş gündemi yazıldı (19 Ekim); seçimde başlangıç/bitiş var",

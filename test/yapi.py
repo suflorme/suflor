@@ -152,6 +152,11 @@ try:
     st = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read())
     son = (st.get("son_toplantilar") or [{}])[0]
     bak("panoda tür: zihin haritası (menü etiketi)", son.get("gorsel") == "harita")
+    # 6 Kasım: aynı özetle ozet-hazir yeniden çalışınca (bitir tekrarı) ikinci kayıt, bildirim ve sesli okuma olmaz
+    t0 = time.time(); o_b = tc("ozet-hazir", ozet, "--baslik", "Ayşe — bütçe"); time.sleep(0.7)
+    lg = open(os.path.join(T, "relay.log"), encoding="utf-8", errors="replace").read()
+    st_b = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=10).read())
+    bak("ozet-hazir ikinci çağrı zararsız: tek kayıt, tek bildirim, 'zaten kayıtlı'", o_b.returncode == 0 and len(st_b.get("son_toplantilar") or []) == 1 and lg.count("ÖZET: hazır") == 1 and "aynı özet zaten kayıtlı" in lg and (st_b["son_toplantilar"][0].get("id") == son.get("id")))
     bak("panoda kayıtta harita, kopya aktarıcının klasöründe", son.get("harita", "").startswith(os.path.join(canli, "ozetler")) and os.path.exists(son.get("harita", "")))
     q = urllib.request.Request(f"http://127.0.0.1:{PORT}/son-ac", data=json.dumps({"id": son.get("id"), "tur": "harita"}).encode(),
                                headers={"X-Suflor-Anahtar": K, "Origin": f"http://127.0.0.1:{PORT}"})

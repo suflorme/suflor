@@ -42,7 +42,7 @@ for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "whisp
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 # kayıtlar: açık toplantı A (k1 teyit bekliyor, k2 onaylı, s3 açık iş, q4 açık soru) ve gizli toplantı G (k5)
 sys.path.insert(0, T); import yapi
-A_, G_ = "2026-11-04-1000-Deneme-Toplantisi", "2026-11-04-1500-Gizli-Toplanti"
+A_, G_ = "2026-11-04-1000-Plan-Toplantisi", "2026-11-04-1500-Gizli-Toplanti"  # S236: adında "Deneme" geçen toplantı deneme sayılır, kayıtları blokta görünmez
 c = yapi._db(d)
 with c:
     for i, (top, tur, metin, sahip, durum) in enumerate([(A_, "karar", "Bütçe onaylandı (teyit bekliyor — örtük kabul)", None, "acik"), (A_, "karar", "Lansman ertelendi", None, "acik"),

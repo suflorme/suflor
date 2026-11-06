@@ -74,7 +74,7 @@ def oku(yol):
 #    gizli = 1 (ileride paylaşıma girmez). Alanlar §3: olay_id (ULID), kayit_id, tur, zaman (UTC), saat (mantıksal sayaç), yazan, cihaz, kaynak, veri (JSON).
 #  - ortak_kayit: olaylardan kurulan izdüşüm (roller: sahip/isteyen/onaylayan/bilgi, kişi = {"ad", "eposta"?, "ben"?}); izdusum_kur günlükten baştan kurar.
 # Yazma yolu tek: _olay → izdüşüm → kayit satırı eşitlenir. graf_yaz toplantıyı yeniden yazınca öğeleri eşler (metin benzerliği + kaynak saati), kimlik korunur,
-# yalnız fark olay olur; kapalı iş geri açılmaz. Ortak/ağ katmanı yok (A3+): hiçbir şey dışarı gitmez. Python 3.9, yalnız standart kütüphane.
+# yalnız fark olay olur; kapalı iş geri açılmaz. Ağ yok; A3 ortak klasör (ortak_* işlevleri) yalnız ayar varken yerel (Drive'ın eşitlediği) klasöre yazar. Python 3.9, yalnız standart kütüphane.
 SEMA_SURUM = 1
 ORTAK_TUR = ("karar", "is", "soz", "soru")
 KAPALI_DURUM = ("yapildi", "tutuldu", "iptal", "cevaplandi")
@@ -179,6 +179,8 @@ def _db(dizin):
     if c.in_transaction: c.commit()
     if yeni: os.chmod(yol, 0o600)
     _sema(c, dizin)
+    c.execute("CREATE TABLE IF NOT EXISTS ortak_red (olay_id TEXT PRIMARY KEY, kayit_id TEXT, neden TEXT, zaman TEXT)")  # A3: yetkisiz (uygulanmayan) başka cihaz olayı
+    if c.in_transaction: c.commit()
     if c.execute("SELECT 1 FROM kayit WHERE kayit_id IS NULL LIMIT 1").fetchone():
         with _Islem(c): _kimliksiz_onar(c, dizin)
     return c
@@ -219,6 +221,9 @@ def _uygula(c, o):
         return bool(n)
     r = _kayit_ozet(c.execute(_OK_SEC + " WHERE kayit_id = ?", (kid,)).fetchone())
     if not r: return False
+    red = _yetki_red(c, o, r)
+    if red:  # A3 (§3): yetkisiz olay günlükte kalır, uygulanmaz; panoda "uygulanmayan değişiklik"
+        c.execute("INSERT OR IGNORE INTO ortak_red (olay_id, kayit_id, neden, zaman) VALUES (?,?,?,?)", (o["olay_id"], kid, red, zaman)); return False
     yeni = {}
     if tur == "durum_degisti":
         d = str(v.get("durum") or "")
@@ -409,7 +414,11 @@ def tarihce(dizin, kimlik):  # bir kaydın olayları, eskiden yeniye: [{olay_id,
     c = _db(dizin)
     try: kid = kimlik_coz(c, kimlik)
     finally: c.close()
-    return [dict(o, ozet=olay_ozeti(o)) for o in olaylar(dizin, kid)] if kid else []
+    if not kid: return []
+    c = _db(dizin)
+    try: red = {r[0] for r in c.execute("SELECT olay_id FROM ortak_red WHERE kayit_id = ?", (kid,))}
+    finally: c.close()
+    return [dict(o, ozet=olay_ozeti(o) + (" — uygulanmadı (yetki yok)" if o["olay_id"] in red else ""), uygulanmadi=o["olay_id"] in red) for o in olaylar(dizin, kid)]
 def onay_durumu(onay, tarih, bugun=None, sonraki=None):
     # S227: bekleyen kararın hesaplanan durumu (saklanmaz). tarih = kararın toplantı günü; sonraki = aynı dizinin bundan sonraki (bitmiş) toplantısının günü.
     # → {"durum": None | bekliyor | onaylandi | reddedildi | onaylanmadi, "gun": toplantıdan beri gün, "hatirlat": 3. gün ve sonrası hâlâ bekliyorsa, "neden"}
@@ -700,6 +709,272 @@ def soz_kapat(dizin, sid, durum, yazan=None, kaynak="suflor"):  # iş/söz durum
     try: x = c.execute("SELECT id, tarih, tur, kim, sahip, metin, son_tarih, baslik, durum, eklendi FROM kayit WHERE id = ?", (int(sid[1:]),)).fetchone()
     finally: c.close()
     return soz_dict(x) if x else None
+# --- A3 Drive pilotu: ortak klasör (planlar/ortak-karar-mimarisi-20261105.md §4 P1, §9-1, §10) -----------------------------------------------------------
+# Ayar ortak_klasor = Google Drive masaüstü uygulamasının Mac'e eşitlediği paylaşılan klasör. Ağ yok: yalnız yerel dosya sistemine yazılır, Drive eşitler.
+# Düzen — her dosyanın tek yazarı var: <klasör>/olaylar/<e-posta>/<cihaz>/<YYYY-AA>.jsonl. Bu Mac yalnız kendi dosyasına ekler, başkalarınınkini okur.
+# Satır: {"v": 1, olay_id, kayit_id, tur, zaman, saat (mantıksal), yazan (e-posta), yazan_ad, cihaz, kaynak, veri}. Yarım satır (Drive bitirmemiş) atlanır, bayt konumundan
+# devam edilir (konumlar canli/ortak-durum.json). Okunan olay yerel günlüğe kaynak "ortak:<kaynak>" ile eklenir (olay_id tekilleştirir: çift olay 0), etkilenen kayıtların
+# izdüşümü günlükten yeniden kurulur (alan başına son yazan; mantıksal saat). Yetki izdüşümde (_yetki_red): başka cihazın olayı rolü yoksa uygulanmaz (ortak_red).
+# Gizlilik (S228): dışarı yalnız karar/iş/söz kaydının PAYLASILAN_OLAY olayları gider; gizli ya da deneme toplantısının kaydı, gizli işaretli olay, Claude notu, taslak, döküm, alıntı,
+# ses GİTMEZ — yazma anında (_paylasilmaz) yeniden denetlenir. Pilotta gruptaki herkes her kaydı görür (§9-1). Ayar açılmadan önceki kayıtlar gitmez (ayar ortak_gecmis: true hariç).
+PAYLASILAN_OLAY = ("kayit_olustu", "durum_degisti", "karar_onaylandi", "karar_reddedildi", "metin_duzeltildi", "is_atandi", "ertelendi", "bolundu", "gundeme_eklendi",
+                   "yorum_eklendi", "kayit_guncellendi")
+PAYLASILAN_TUR = ("karar", "is", "soz")
+ORTAK_DURUM = "ortak-durum.json"
+ORTAK_SATIR_EN_COK = 20000
+_CIHAZ_RX = re.compile(r"^c-[0-9a-f]{6,32}$")
+_EPOSTA_RX = re.compile(r"^[a-z0-9._%+'-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$")
+YETKI = {"durum_degisti": ("sahip", "isteyen", "onaylayan"), "karar_onaylandi": ("onaylayan", "isteyen"), "karar_reddedildi": ("onaylayan", "isteyen"),
+         "is_atandi": ("isteyen",), "ertelendi": ("isteyen",), "metin_duzeltildi": ("isteyen",), "kayit_guncellendi": ("isteyen",), "bolundu": ("sahip", "isteyen"),
+         "gundeme_eklendi": ("sahip", "isteyen", "onaylayan", "bilgi"), "yorum_eklendi": ("sahip", "isteyen", "onaylayan", "bilgi")}
+def ben_eposta():  # kullanıcının şirket e-postası (aktarici/kimlik.py kimlik_ben ile aynı sıra): eposta_kimlik → eposta_adres → takvim_adreslerim
+    a = _ayar()
+    for x in [a.get("eposta_kimlik"), a.get("eposta_adres")] + list(a.get("takvim_adreslerim") or []):
+        e = str(x or "").strip().lower()
+        if _EPOSTA_RX.match(e): return e
+    return None
+def _yerel_cihaz(c): return (c.execute("SELECT deger FROM meta WHERE anahtar = 'cihaz'").fetchone() or ["c-?"])[0]
+def _kisi_kim(yazan, ad=""):  # olayın yazanı → {"eposta"?, "ad"?}
+    y = str(yazan or ""); k = {}
+    if "@" in y: k["eposta"] = y.lower()
+    elif y.startswith("ad:"): k["ad"] = y[3:]
+    if ad and not k.get("ad"): k["ad"] = str(ad)
+    return k
+def _ayni_kisi(rol, kim, yerel_mi=False):  # rol kişisi ↔ olayı yazan: e-posta eşitliği; e-posta yoksa ad (kisi_eslesir); "ben" yalnız yerel cihazın olayı için
+    if not isinstance(rol, dict) or not kim: return False
+    if rol.get("ben"): return yerel_mi
+    if rol.get("eposta") and kim.get("eposta"): return rol["eposta"] == kim["eposta"]
+    return bool(rol.get("ad") and kim.get("ad") and kisi_eslesir(rol["ad"], kim["ad"]))
+def _yetki_red(c, o, r):
+    # → None (uygulanır) ya da neden. Yalnız kaydı oluşturandan BAŞKA cihazın olayı denetlenir (tek cihazda A0 davranışı aynen). İzin: kaydı oluşturan her şeyi; §3 tablosu
+    # YETKI'de (iptal yalnız isteyen; sahip yalnız kendini çıkarabilir). İki Mac aynı olayları aynı sırayla uyguladığı için sonuç iki yanda aynı.
+    cr = c.execute("SELECT cihaz, yazan, veri FROM olay WHERE kayit_id = ? AND tur = 'kayit_olustu' ORDER BY saat, olay_id LIMIT 1", (o["kayit_id"],)).fetchone()
+    if not cr or not o.get("cihaz") or o["cihaz"] == cr[0]: return None
+    v = o.get("veri") or {}; yerel = o["cihaz"] == _yerel_cihaz(c); kim = _kisi_kim(o.get("yazan"), v.get("_yazan_ad"))
+    if yerel:  # bu Mac'te yazılan olay: yazan "ad:…" olabilir; dışarı giderken e-postayla yazılır — iki yanda aynı kimlik
+        e = ben_eposta()
+        if e: kim["eposta"] = e
+        if not kim.get("ad") and _ayar().get("ad"): kim["ad"] = str(_ayar().get("ad"))
+    try: cv = json.loads(cr[2] or "{}")
+    except ValueError: cv = {}
+    if _ayni_kisi(_kisi_kim(cr[1], cv.get("_yazan_ad")), kim): return None
+    roller = r.get("roller") or {}; izin = YETKI.get(o["tur"], ())
+    if o["tur"] == "durum_degisti" and v.get("durum") == "iptal": izin = ("isteyen",)
+    if o["tur"] == "is_atandi" and set((v.get("roller") or {})) == {"sahip"} and not (v.get("roller") or {}).get("sahip") and _ayni_kisi(roller.get("sahip"), kim, yerel): return None
+    for ad in izin:
+        for k in (roller.get(ad) or []) if ad == "bilgi" else [roller.get(ad)]:
+            if _ayni_kisi(k, kim, yerel): return None
+    return "yetki yok"
+def _ortak_durum(dizin):
+    try: d = json.load(open(os.path.join(dizin, ORTAK_DURUM), encoding="utf-8"))
+    except (OSError, ValueError): d = {}
+    return d if isinstance(d, dict) else {}
+def _ortak_durum_yaz(dizin, d):
+    yol = os.path.join(dizin, ORTAK_DURUM); fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=1)
+    os.replace(yol + ".tmp", yol)
+def _rol_disa(r, ep, ad, kimlik_f):  # roller dışarı: "ben" → kullanıcının e-postası; e-postası olmayan ada kimlik_f (güvenli eşleme) ile e-posta
+    def k1(k):
+        if not isinstance(k, dict): return k
+        k = dict(k)
+        if k.pop("ben", None): k["eposta"] = ep; k["ad"] = k.get("ad") or ad
+        elif not k.get("eposta") and k.get("ad") and kimlik_f:
+            try: e = kimlik_f(k["ad"])
+            except Exception: e = None
+            if e and _EPOSTA_RX.match(str(e)): k["eposta"] = str(e).lower()
+        return k
+    if not isinstance(r, dict): return r
+    return {a: ([k1(x) for x in v] if isinstance(v, list) else k1(v)) for a, v in r.items()}
+def _veri_disa(o, ep, ad, kimlik_f):
+    v = json.loads(json.dumps(o["veri"]))
+    if "roller" in v: v["roller"] = _rol_disa(v["roller"], ep, ad, kimlik_f)
+    for k in ("onceki", "alanlar"):
+        if isinstance(v.get(k), dict) and "roller" in v[k]: v[k]["roller"] = _rol_disa(v[k]["roller"], ep, ad, kimlik_f)
+    if o["tur"] == "kayit_olustu" and not str(v.get("bag") or "").startswith("bol:"): v["bag"] = ""  # eylem/söz bağı bu Mac'e özgü
+    v.pop("_yazan_ad", None); return v
+def _paylasilmaz(c, dizin, o, kayit, olusan, bas, gecmis, ky):
+    # → None (paylaşılır) ya da neden. YAZMA ANINDA denetim: olay türü, gizli işareti, kayıt türü, gizli/deneme toplantı (dosyadan yeniden), ayar öncesi kayıt, Claude notu.
+    if o["tur"] not in PAYLASILAN_OLAY: return "tur"
+    if o.get("gizli") or not kayit or kayit["gizli"]: return "gizli"
+    if kayit["tur"] not in PAYLASILAN_TUR: return "tur"
+    top = kayit.get("toplanti") or ""
+    if top and gizli_mi(dizin, top, ky): return "gizli"
+    if top and deneme_mi(dizin, top, ky): return "deneme"
+    if o["tur"] == "yorum_eklendi" and (o["veri"] or {}).get("uretici") == "claude": return "claude"
+    if not olusan: return "tur"
+    yerel_kayit = olusan[0] == _yerel_cihaz(c)
+    if yerel_kayit and not gecmis and olusan[1] <= bas: return "once"
+    return None
+def ortak_dosya(klasor, ep, cihaz, t=None): return os.path.join(klasor, "olaylar", ep, cihaz, time.strftime("%Y-%m", time.gmtime(t)) + ".jsonl")
+def ortak_disari(dizin, klasor, ep, ad="", gecmis=False, kimlik_f=None):
+    # bu Mac'in yeni olaylarını kendi dosyasına ekler → {"yazilan", "atlanan": {neden: sayı}}. ep: kullanıcının e-postası (zorunlu).
+    out = {"yazilan": 0, "atlanan": {}}
+    if not _EPOSTA_RX.match(str(ep or "")): return out
+    d = _ortak_durum(dizin); kd = d.setdefault("klasorler", {}).setdefault(os.path.realpath(klasor), {})
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")):  # henüz kayıt yok: başlangıç 0 (bundan sonraki her kayıt paylaşılır)
+        if "baslangic" not in kd: kd.update(baslangic=0, gonderilen=0); _ortak_durum_yaz(dizin, d)
+        return out
+    c = _db(dizin)
+    try:
+        cihaz = _yerel_cihaz(c)
+        if "baslangic" not in kd: kd["baslangic"] = c.execute("SELECT COALESCE(MAX(saat), 0) FROM olay").fetchone()[0]; kd["gonderilen"] = kd["baslangic"]
+        rs = [_olay_satir(r) for r in c.execute(_OLAY_SEC + " WHERE cihaz = ? AND saat > ? ORDER BY saat, olay_id", (cihaz, int(kd.get("gonderilen") or 0))).fetchall()]
+        if not rs: _ortak_durum_yaz(dizin, d); return out
+        ky = son_kayitlar(dizin); kayitlar = {}; olusan = {}; satirlar = []
+        for o in rs:
+            kid = o["kayit_id"]
+            if kid not in kayitlar:
+                kayitlar[kid] = _kayit_ozet(c.execute(_OK_SEC + " WHERE kayit_id = ?", (kid,)).fetchone())
+                olusan[kid] = c.execute("SELECT cihaz, saat FROM olay WHERE kayit_id = ? AND tur = 'kayit_olustu' ORDER BY saat, olay_id LIMIT 1", (kid,)).fetchone()
+            neden = _paylasilmaz(c, dizin, o, kayitlar[kid], olusan[kid], int(kd["baslangic"]), gecmis, ky)
+            if neden: out["atlanan"][neden] = out["atlanan"].get(neden, 0) + 1; continue
+            yazan = o["yazan"] if "@" in str(o["yazan"]) else ep
+            satirlar.append(json.dumps({"v": 1, "olay_id": o["olay_id"], "kayit_id": kid, "tur": o["tur"], "zaman": o["zaman"], "saat": o["saat"], "yazan": yazan,
+                                        "yazan_ad": str(ad or "")[:80], "cihaz": cihaz, "kaynak": o["kaynak"], "veri": _veri_disa(o, ep, ad, kimlik_f)}, ensure_ascii=False))
+    finally: c.close()
+    if satirlar:
+        yol = ortak_dosya(klasor, ep, cihaz); os.makedirs(os.path.dirname(yol), exist_ok=True)
+        fd = os.open(yol, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            bas_ek = b""
+            if os.fstat(fd).st_size:  # önceki yazma yarım kaldıysa yeni satır onun ardına yapışmasın
+                os.lseek(fd, -1, os.SEEK_END)
+                if os.read(fd, 1) != b"\n": bas_ek = b"\n"
+            veri = bas_ek + ("\n".join(satirlar) + "\n").encode("utf-8")
+            while veri: veri = veri[os.write(fd, veri):]
+            os.fsync(fd)
+        finally: os.close(fd)
+    kd["gonderilen"] = rs[-1]["saat"]; kd["yazilan"] = int(kd.get("yazilan") or 0) + len(satirlar); out["yazilan"] = len(satirlar)
+    _ortak_durum_yaz(dizin, d); return out
+def _satir_gecerli(o, ep, cihaz):
+    if not isinstance(o, dict) or o.get("v") != 1 or o.get("tur") not in PAYLASILAN_OLAY: return False
+    if not KIMLIK_RX.match(str(o.get("olay_id") or "")) or not KIMLIK_RX.match(str(o.get("kayit_id") or "")): return False
+    if o.get("cihaz") != cihaz or str(o.get("yazan") or "").lower() != ep or not isinstance(o.get("veri"), dict): return False
+    if not isinstance(o.get("saat"), int) or o["saat"] < 0: return False
+    if o["tur"] == "kayit_olustu" and o["veri"].get("tur") not in PAYLASILAN_TUR: return False
+    return True
+def _kid_kur(c, kid):  # tek kaydın izdüşümünü günlükten yeniden kurar (başka cihazın olayı araya girince sıra = (saat, olay_id)) + yerel kayit satırı
+    c.execute("DELETE FROM ortak_kayit WHERE kayit_id = ?", (kid,))
+    for r in c.execute(_OLAY_SEC + " WHERE kayit_id = ? ORDER BY saat, olay_id", (kid,)).fetchall(): _uygula(c, _olay_satir(r))
+    x = _kayit_ozet(c.execute(_OK_SEC + " WHERE kayit_id = ?", (kid,)).fetchone())
+    if not x: return
+    if c.execute("SELECT 1 FROM kayit WHERE kayit_id = ?", (kid,)).fetchone(): _kayit_esitle(c, kid); return
+    rl = x["roller"] or {}; ad = lambda k: ((rl.get(k) or {}).get("ad") or None) if isinstance(rl.get(k), dict) else None
+    is_ = x["tur"] in ("is", "soz")
+    c.execute("INSERT INTO kayit (toplanti, baslik, tarih, madde, tur, kim, sahip, metin, son_tarih, saat, alinti, durum, eklendi, bag, kayit_id, onay, onay_neden) "
+              "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",  # başka Mac'in kaydı: toplantı dosyası bu Mac'te yok (toplanti boş; başlık/tarih görünür), bag "ortak"
+              ("", x["baslik"], x["tarih"], x["madde"], x["tur"], ad("isteyen") if is_ else (ad("isteyen") or ad("sahip")), ad("sahip") if is_ else None, x["metin"], x["vade"] or None,
+               x["kaynak_saat"] or None, None, x["durum"] or "acik", datetime.datetime.now().isoformat(timespec="seconds"), "ortak", kid, x["onay"], x["onay_neden"]))
+def ortak_iceri(dizin, klasor):
+    # başkalarının dosyalarını kalınan bayttan okur → {"alinan", "cift", "bozuk", "yarim", "dosya", "kisiler": [e-posta]}
+    out = {"alinan": 0, "cift": 0, "bozuk": 0, "yarim": 0, "dosya": 0, "kisiler": []}
+    kok = os.path.join(klasor, "olaylar")
+    if not os.path.isdir(kok): return out
+    d = _ortak_durum(dizin); kd = d.setdefault("klasorler", {}).setdefault(os.path.realpath(klasor), {}); okuma = kd.setdefault("okuma", {})
+    c = _db(dizin); etk = set()
+    try:
+        cihaz = _yerel_cihaz(c); gelen = []
+        for ep in sorted(os.listdir(kok)):
+            if not _EPOSTA_RX.match(ep) or not os.path.isdir(os.path.join(kok, ep)): continue
+            for ch in sorted(os.listdir(os.path.join(kok, ep))):
+                if not _CIHAZ_RX.match(ch) or ch == cihaz or not os.path.isdir(os.path.join(kok, ep, ch)): continue
+                if ep not in out["kisiler"]: out["kisiler"].append(ep)
+                for f in sorted(os.listdir(os.path.join(kok, ep, ch))):
+                    if not f.endswith(".jsonl") or f.startswith("."): continue
+                    yol = os.path.join(kok, ep, ch, f); rel = f"{ep}/{ch}/{f}"; out["dosya"] += 1
+                    try: boy = os.path.getsize(yol)
+                    except OSError: continue
+                    poz = int(okuma.get(rel) or 0)
+                    if boy < poz: poz = 0  # dosya yenilendi/kısaldı (Drive değiştirdi): baştan oku, olay_id tekilleştirir
+                    if boy == poz: continue
+                    try:
+                        with open(yol, "rb") as fh: fh.seek(poz); ham = fh.read(boy - poz)
+                    except OSError: continue
+                    son = ham.rfind(b"\n")
+                    if son < 0: out["yarim"] += 1; continue  # yarım satır: sonraki turda
+                    if son < len(ham) - 1: out["yarim"] += 1
+                    for ln in ham[:son].split(b"\n"):
+                        if not ln.strip(): continue
+                        try: o = json.loads(ln.decode("utf-8")) if len(ln) <= ORTAK_SATIR_EN_COK else None
+                        except (ValueError, UnicodeDecodeError): o = None
+                        if not _satir_gecerli(o, ep, ch): out["bozuk"] += 1; continue
+                        gelen.append(o)
+                    okuma[rel] = poz + son + 1
+        if gelen:
+            with _Islem(c):
+                for o in gelen:
+                    v = dict(o["veri"]); v["_yazan_ad"] = str(o.get("yazan_ad") or "")[:80]
+                    n = c.execute("INSERT OR IGNORE INTO olay (olay_id, v, kayit_id, tur, zaman, saat, yazan, cihaz, kaynak, gizli, veri) VALUES (?,?,?,?,?,?,?,?,?,0,?)",
+                                  (o["olay_id"], 1, o["kayit_id"], o["tur"], str(o.get("zaman") or "")[:20], o["saat"], o["yazan"].lower()[:120], o["cihaz"],
+                                   ("ortak:" + str(o.get("kaynak") or "suflor"))[:30], json.dumps(v, ensure_ascii=False))).rowcount
+                    if n: out["alinan"] += 1; etk.add(o["kayit_id"])
+                    else: out["cift"] += 1
+                for kid in sorted(etk): _kid_kur(c, kid)
+    finally: c.close()
+    kd["alinan"] = int(kd.get("alinan") or 0) + out["alinan"]; kd["kisiler"] = out["kisiler"]
+    _ortak_durum_yaz(dizin, d); return out
+def ortak_esitle(dizin, klasor, ep, ad="", gecmis=False, kimlik_f=None):  # bir tur: önce yaz, sonra oku → {"disari", "iceri", "zaman"}
+    return {"disari": ortak_disari(dizin, klasor, ep, ad, gecmis, kimlik_f), "iceri": ortak_iceri(dizin, klasor), "zaman": datetime.datetime.now().isoformat(timespec="seconds")}
+def ortak_denetim(dizin, klasor):
+    # denetim betiği (§10): ortak klasördeki TÜM satırlarda bu Mac'in gizli/deneme kaydı ya da gizli toplantı başlığı var mı → [{"dosya", "neden"}] (boş = temiz)
+    kok = os.path.join(klasor, "olaylar"); bul = []
+    if not os.path.isdir(kok) or not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return bul
+    c = _db(dizin); ky = son_kayitlar(dizin)
+    try:
+        yasak = set(); basliklar = set()
+        for kid, top, baslik, gz in c.execute("SELECT kayit_id, toplanti, baslik, gizli FROM ortak_kayit"):
+            g = bool(gz) or bool(top and gizli_mi(dizin, top, ky)); dn = bool(top and deneme_mi(dizin, top, ky))
+            if g or dn: yasak.add(kid)
+            if g and baslik and len(baslik) >= 6: basliklar.add(baslik)
+        for (kid,) in c.execute("SELECT DISTINCT kayit_id FROM olay WHERE gizli = 1"): yasak.add(kid)
+    finally: c.close()
+    for kk, _, fs in os.walk(kok):
+        for f in fs:
+            if not f.endswith(".jsonl"): continue
+            yol = os.path.join(kk, f)
+            try: metin = open(yol, encoding="utf-8", errors="replace").read()
+            except OSError: continue
+            rel = os.path.relpath(yol, klasor)
+            for ln in metin.splitlines():
+                try: o = json.loads(ln)
+                except ValueError: o = None
+                if isinstance(o, dict) and o.get("kayit_id") in yasak: bul.append({"dosya": rel, "neden": "gizli ya da deneme toplantının kaydı", "kayit_id": o.get("kayit_id")})
+                acik = json.dumps(o, ensure_ascii=False) if o is not None else ln  # \u kaçışlı yazılmış başlık da yakalansın
+                if any(b in acik for b in basliklar): bul.append({"dosya": rel, "neden": "gizli toplantı başlığı"})
+    return bul
+def ortak_reddedilen(dizin, n=20):  # uygulanmayan (yetkisiz) başka cihaz olayları: [{olay_id, kayit_id, id, metin, yazan, tur, zaman, neden}]
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return []
+    c = _db(dizin)
+    try:
+        rs = c.execute("SELECT r.olay_id, r.kayit_id, r.neden, o.yazan, o.tur, o.zaman, k.metin FROM ortak_red r JOIN olay o ON o.olay_id = r.olay_id "
+                       "LEFT JOIN ortak_kayit k ON k.kayit_id = r.kayit_id ORDER BY o.saat DESC LIMIT ?", (int(n),)).fetchall()
+        return [{"olay_id": a, "kayit_id": b, "id": yerel_kimlik(c, b), "neden": n_, "yazan": y, "tur": t, "zaman": z, "metin": m or ""} for a, b, n_, y, t, z, m in rs]
+    finally: c.close()
+ATAMA_YENI_GUN = 7  # Bugün'de "Sana atandı" son 7 günde atananlar vadesinden bağımsız görünür (daha eskisi yalnız vadesi yakınsa)
+def ortak_atananlar(c, ep=None, ad="", yeni_gun=None, yeni=None):  # yeni_gun verilirse son yeni_gun günde atananların kimliği yeni kümesine eklenir
+    # "sana atandı": başka cihazdan gelen ve sahibi bu kullanıcı olan iş/söz → {kayit_id: atayan görünen adı}. Sahibi son belirleyen olay (kayit_olustu ya da sahip içeren
+    # is_atandi; uygulanmayan hariç) başka cihazınsa ve sahip = kullanıcı (e-posta; e-posta yoksa ilk ad) ise.
+    yerel = _yerel_cihaz(c); ep = ep if ep is not None else ben_eposta(); out = {}
+    kids = [r[0] for r in c.execute("SELECT DISTINCT kayit_id FROM olay WHERE cihaz <> ?", (yerel,))]
+    if not kids: return out
+    red = {r[0] for r in c.execute("SELECT olay_id FROM ortak_red")}; son = {}
+    for i in range(0, len(kids), 500):
+        q = ",".join("?" * len(kids[i:i + 500]))
+        for r in c.execute(_OLAY_SEC + f" WHERE kayit_id IN ({q}) AND tur IN ('kayit_olustu', 'is_atandi') ORDER BY saat, olay_id", kids[i:i + 500]).fetchall():
+            o = _olay_satir(r); rl = (o["veri"] or {}).get("roller") or {}
+            if o["olay_id"] in red or (o["tur"] == "is_atandi" and "sahip" not in rl): continue
+            if o["tur"] == "kayit_olustu" and (o["veri"] or {}).get("tur") not in ("is", "soz"): continue
+            son[o["kayit_id"]] = (o, rl.get("sahip"))
+    ben = _ilk(ad)
+    for kid, (o, sh) in son.items():
+        if o["cihaz"] == yerel or not isinstance(sh, dict): continue
+        if (ep and sh.get("eposta") == ep) or (not sh.get("eposta") and ben and _ilk(sh.get("ad")) == ben):
+            out[kid] = str((o["veri"] or {}).get("_yazan_ad") or "") or (o["yazan"][3:] if o["yazan"].startswith("ad:") else o["yazan"])
+            if yeni_gun is not None:
+                try: t = datetime.datetime.strptime(o["zaman"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
+                except ValueError: t = 0
+                if time.time() - t <= yeni_gun * 86400: yeni.add(kid)
+    return out
 # --- Bugün sayfası ve arşiv MCP'nin ortak okuma/yazma yardımcıları (tek kaynak: pano ucu /bugun-veri, /karar-onay, /is-durum ve arsiv-mcp.py) ---
 GIZLI_RX = re.compile(r"\|\s*\*\*GİZLİ\*\*\s*\|")
 TEYIT_RX = re.compile(r"\s*\(teyit bekliyor(?:\s*[—-]\s*(.*))?\)\s*$")  # graf_yaz ekler; içinde iç içe parantez olabilir
@@ -889,7 +1164,9 @@ def bugun_veri(dizin, ad, bugun=None, deneme=False):  # deneme=False: deneme (Te
     bugun = bugun or datetime.date.today(); out = {"ad": ad or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
     if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return out
     c = _db(dizin); es = kisi_es_oku(c)
-    try: rs = [r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:] for r in c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum, onay, onay_neden, kayit_id FROM kayit WHERE tur IN ('is', 'soz', 'karar') ORDER BY tarih DESC, id DESC LIMIT 3000").fetchall()]
+    try:
+        rs = [r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:] for r in c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum, onay, onay_neden, kayit_id FROM kayit WHERE tur IN ('is', 'soz', 'karar') ORDER BY tarih DESC, id DESC LIMIT 3000").fetchall()]
+        yeni_atanan = set(); atanan = ortak_atananlar(c, ad=kisi_ad(es, ad), yeni_gun=ATAMA_YENI_GUN, yeni=yeni_atanan)  # A3: başka Mac'ten sana atanan işler ("Sana atandı")
     finally: c.close()
     ky = son_kayitlar(dizin); gz = {}; rl = {}; sn = None
     def gorunur(t):
@@ -919,7 +1196,8 @@ def bugun_veri(dizin, ad, bugun=None, deneme=False):  # deneme=False: deneme (Te
         kisi = sahip or kim or ""; gun = _vade_gun(son, bugun)
         x = {"id": f"s{i}", "metin": metin, "kim": kisi, "vade": son or "", "kalan_gun": gun, "gecikti": gun is not None and gun < 0, "baslik": baslik or "", "toplanti": top, "tarih": tarih or "", "kayit_id": kid or ""}
         x["yas"], x["geride"] = yas_geride(tarih, gun)
-        if ad and kisi and _ilk(kisi) == ben: out["kendi"].append(x)
+        if kid in atanan: x["atayan"] = atanan[kid]; x["atama_yeni"] = kid in yeni_atanan
+        if (ad and kisi and _ilk(kisi) == ben) or kid in atanan: out["kendi"].append(x)
         elif ad and kisi and rol(top)[0] and (x["yas"] is None or x["yas"] <= BUGUN_BASKA_GUN or (gun is not None and gun >= 0)): out["baskalari"].append(x)
     srt = lambda l: sorted(l, key=lambda x: (x["geride"], x["kalan_gun"] is None, x["kalan_gun"] if x["kalan_gun"] is not None else 0))
     out["kendi"] = srt(out["kendi"])[:30]; out["baskalari"] = srt(out["baskalari"])[:60]
@@ -962,7 +1240,7 @@ def kayit_listesi(dizin, ad="", bugun=None, deneme=False):
     try: rs = [r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:] for r in c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum, onay, onay_neden, kayit_id FROM kayit WHERE tur IN ('is', 'soz', 'karar', 'soru') ORDER BY tarih DESC, id DESC LIMIT 5000").fetchall()]
     finally: c.close()
     c = _db(dizin)
-    try: ok_ = {r[0]: r[1:] for r in c.execute("SELECT kayit_id, roller, gundem, ust FROM ortak_kayit")}
+    try: ok_ = {r[0]: r[1:] for r in c.execute("SELECT kayit_id, roller, gundem, ust FROM ortak_kayit")}; atanan = ortak_atananlar(c, ad=kisi_ad(es, ad))
     finally: c.close()
     ky = son_kayitlar(dizin); gz = {}; dn = {}; tops = {}; kisiler = {}; ben = _ilk(kisi_ad(es, ad)); sn = None
     for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum, onay, onay_neden, kid in rs:
@@ -989,7 +1267,8 @@ def kayit_listesi(dizin, ad="", bugun=None, deneme=False):
         else:
             x["id"] = f"s{i}"; gun = _vade_gun(son, bugun); x["kalan_gun"] = gun
             x["durum"] = "acik" if durum == "acik" else "kapandi"; x["gecikti"] = x["durum"] == "acik" and gun is not None and gun < 0
-            x["tarihsiz"] = x["durum"] == "acik" and gun is None; x["kendi"] = bool(ben and x["kim"] and _ilk(x["kim"]) == ben)
+            x["tarihsiz"] = x["durum"] == "acik" and gun is None; x["kendi"] = bool(ben and x["kim"] and _ilk(x["kim"]) == ben) or kid in atanan
+            if kid in atanan: x["atayan"] = atanan[kid]  # A3: başka Mac'ten sana atandı
         if x["kim"]: kisiler[x["kim"]] = kisiler.get(x["kim"], 0) + 1
         r_, g_, u_ = ok_.get(kid) or (None, None, None)  # eylem menüsü: sahibin e-postası, gündeme eklendiği toplantı, alt iş mi
         try: rol = json.loads(r_) if r_ else {}

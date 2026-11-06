@@ -183,7 +183,10 @@ KANALLAR = {}
 def ses_al(p):
     # POST /ses: {"kanal": "ben"|"karsi", "t": ilk örneğin epoch ms'si, "pcm": base64 int16 16 kHz, "meeting": {"title"}}
     w = STATE["whisper"]
-    if w["durum"] == "yok": return {"ok": False, "kapali": True, "err": w.get("hata")}
+    if w["durum"] == "yok":  # Whisper yokken de tam ses kaydı sürer (kayıt Whisper'dan bağımsız)
+        try: tam_besle("ben" if p.get("kanal") in BEN_ESKI else p.get("kanal"), (p.get("t") or time.time() * 1000) / 1000.0, base64.b64decode(str(p.get("pcm") or ""), validate=True))
+        except Exception: pass
+        return {"ok": False, "kapali": True, "err": w.get("hata")}
     kanal = "ben" if p.get("kanal") in BEN_ESKI else ("karsi" if p.get("kanal") == "karsi" else None)
     if not kanal: return {"ok": False, "err": "kanal"}
     # yerel ses yardımcısı karşı sesi veriyorsa eklentinin (popup, sekme sesi) karşı parçaları atılır — çift satır olmasın
@@ -201,6 +204,7 @@ def ses_al(p):
     t_sn = (p.get("t") or time.time() * 1000) / 1000.0
     with W_LOCK:
         k = KANALLAR.setdefault(kanal, Kanal(kanal)); k.besle(pcm, t_sn, baslik)
+    tam_besle(kanal, t_sn, pcm)  # tam ses kaydı (geliştirici, ses_arsivi açıkken): kuyruğa koyar, ses yolunu yavaşlatmaz
     if "golge_besle" in globals(): golge_besle(kanal, t_sn, pcm)  # gölge kip (ayar golge_tstt): ekrana bir şey girmez, yalnız kayıt
     _isci_baslat()
     return {"ok": True, "durum": w["durum"]}
@@ -758,6 +762,96 @@ def parca_kaydet(is_, istek, j, sonuc):
         es = sorted(f for f in os.listdir(kl) if f.startswith(is_["kanal"] + "-") and f.endswith(".wav"))
         for f in es[:-PARCA_KAYIT_EN_COK]: os.remove(os.path.join(kl, f))
     except Exception as e: print(f"TEŞHİS: parça yazılamadı ({e.__class__.__name__})")
+# Tam ses kaydı (6 Kasım): ses arşivi açıkken (ayar ses_arsivi) YALNIZ geliştiricinin kurulumunda (gelistirici_mi) ve ayar ses_arsivi_tam kapatılmamışken aktarıcıya giren HAM ses
+# (ben = mikrofon, karsi = karşı taraf/yerel ses yardımcısı; sessizlik ve Whisper'ın kesmediği yerler dahil) toplantı klasörüne tam-ben.wav / tam-karsi.wav olarak kesintisiz yazılır:
+# ses gelmeyen aralıklar sıfırla dolar, iki dosya duvar saatiyle hizalıdır (tam.json: t0 epoch, ornek_hizi, kanallar). Toplantı sonunda (klasör değişir ya da 60 sn ses gelmez)
+# dosyalar kapanır; ayar ses_arsivi_tam_m4a kapatılmadıkça tam-<kanal>.m4a'ya (AAC 32 kb/sn, afconvert) çevrilip wav silinir. Yazma ayrı iş parçacığında (ses yolu yalnız kuyruğa koyar).
+# Gizli toplantıda kayıt yok; toplantı dışında (toplanti-disi-*) kayıt yok. ÇIKMAZ: ses arşivi kuralı aynen — teşhis/beta paketi, geri bildirim, arşiv araması, ağ bu dosyalara bakmaz; temizlik klasörle birlikte.
+TAM_SR = 16000; TAM_BOSTA_SN = 60; TAM_TOL = 1600  # 100 ms'den küçük kayma düzeltilmez (zaman damgası titreşimi)
+_TAM = {"q": queue.Queue(maxsize=4000), "th": None, "gel": (0.0, False), "uyari": False}
+def _tam_acik():
+    if not AYAR.get("ses_arsivi") or AYAR.get("ses_arsivi_tam") is False: return False
+    now = time.time()
+    if now - _TAM["gel"][0] > 60:
+        try: g = bool(gelistirici_mi())
+        except Exception: g = False
+        _TAM["gel"] = (now, g)
+    return _TAM["gel"][1]
+def tam_besle(kanal, t_sn, pcm):  # ses_al'dan: yalnız denetim + kuyruğa koyma (yazma iş parçacığında)
+    try:
+        if not pcm or kanal not in ("ben", "karsi") or not _tam_acik() or gizli_acik(): return
+        kl = ses_arsivi_klasor()
+        if os.path.basename(kl).startswith("toplanti-disi-"): return
+        try: _TAM["q"].put_nowait((kl, kanal, float(t_sn), bytes(pcm)))
+        except queue.Full:
+            if not _TAM["uyari"]: _TAM["uyari"] = True; print("TAM SES: yazma kuyruğu doldu, parçalar atılıyor")
+        if not _TAM["th"] or not _TAM["th"].is_alive(): _TAM["th"] = threading.Thread(target=_tam_dongu, daemon=True, name="tam-ses"); _TAM["th"].start()
+    except Exception: pass
+def _tam_baslik_bytes(n): d = n * 2; return struct.pack("<4sI4s4sIHHIIHH4sI", b"RIFF", 36 + d, b"WAVE", b"fmt ", 16, 1, 1, TAM_SR, TAM_SR * 2, 2, 16, b"data", d)
+def _tam_baslik(s):
+    s["hdr"] = time.time()
+    for c in s["k"].values():
+        c["f"].flush(); c["f"].seek(0); c["f"].write(_tam_baslik_bytes(c["n"])); c["f"].flush(); c["f"].seek(0, 2)
+def _tam_ac(kl, t):
+    os.makedirs(kl, exist_ok=True)
+    if not _SA["tm"]: _SA["tm"] = True; threading.Thread(target=_sa_tmutil, args=(_sa_kok(),), daemon=True).start()  # tmutil bu Mac'te ~11 sn sürebiliyor: yazmayı bekletmesin
+    var = lambda ad: os.path.exists(os.path.join(kl, ad))  # var olan dosyanın üzerine asla yazılmaz: yeniden açılan klasörde bölüm numaralanır (tam-2-ben.wav, tam-2.json …)
+    n = 1
+    while any(var(f"{o}-{k}.{u}") for o in [("tam" if n == 1 else f"tam-{n}")] for k in ("ben", "karsi") for u in ("wav", "m4a")) or var(("tam" if n == 1 else f"tam-{n}") + ".json"): n += 1
+    on = "tam" if n == 1 else f"tam-{n}"
+    s = {"kl": kl, "t0": t, "k": {}, "son": time.time(), "hdr": time.time(), "hata": False, "on": on}
+    for ad in ("ben", "karsi"):
+        f = open(os.path.join(kl, f"{on}-{ad}.wav"), "xb"); f.write(_tam_baslik_bytes(0)); s["k"][ad] = {"f": f, "n": 0}
+    with open(os.path.join(kl, on + ".json"), "x", encoding="utf-8") as f: json.dump({"t0": round(t, 3), "ornek_hizi": TAM_SR, "kanallar": ["ben", "karsi"]}, f)
+    return s
+def _tam_sifir(c, n):  # n örnek sıfır
+    while n > 0:
+        m = min(n, 1 << 18); c["f"].write(b"\x00" * (m * 2)); c["n"] += m; n -= m
+def _tam_yaz(s, kanal, t, pcm):
+    c = s["k"][kanal]; pcm = pcm[:len(pcm) // 2 * 2]; d = int(round((t - s["t0"]) * TAM_SR)) - c["n"]
+    if d > TAM_TOL: _tam_sifir(c, d)
+    elif d < -TAM_TOL: pcm = pcm[min(-d, len(pcm) // 2) * 2:]
+    c["f"].write(pcm); c["n"] += len(pcm) // 2; s["son"] = time.time()
+def _tam_kapat(s, donustur=True):
+    try:
+        m = max(c["n"] for c in s["k"].values())
+        for c in s["k"].values(): _tam_sifir(c, m - c["n"])
+        _tam_baslik(s)
+        for c in s["k"].values(): c["f"].close()
+        j = os.path.join(s["kl"], s["on"] + ".json")
+        with open(j, "w", encoding="utf-8") as f: json.dump({"t0": round(s["t0"], 3), "ornek_hizi": TAM_SR, "kanallar": ["ben", "karsi"], "sn": round(m / TAM_SR, 2), "bitis": round(s["t0"] + m / TAM_SR, 2)}, f)
+        if donustur and AYAR.get("ses_arsivi_tam_m4a") is not False: threading.Thread(target=_tam_m4a, args=(s["kl"], s["on"]), daemon=True, name="tam-m4a").start()
+    except Exception as e: print(f"TAM SES: kapatılamadı ({e.__class__.__name__})")
+def _tam_m4a(kl, on="tam"):  # yalnız bu bölümün dosyaları
+    for ad in ("ben", "karsi"):
+        w = os.path.join(kl, f"{on}-{ad}.wav"); m = os.path.join(kl, f"{on}-{ad}.m4a")
+        try:
+            r = subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", "-b", "32000", w, m], capture_output=True, timeout=1800)
+            if r.returncode == 0 and os.path.getsize(m) > 0: os.remove(w)
+            else: print(f"TAM SES: m4a çevrilemedi ({ad}, çıkış {r.returncode}) — wav kaldı")
+        except Exception as e: print(f"TAM SES: m4a çevrilemedi ({ad}, {e.__class__.__name__}) — wav kaldı")
+def _tam_dongu():
+    s = None; bos = 0
+    while True:
+        try: oge = _TAM["q"].get(timeout=5)
+        except queue.Empty: oge = None
+        try:
+            if oge is None:
+                if s and time.time() - s["son"] > TAM_BOSTA_SN: _tam_kapat(s); s = None
+                elif s and time.time() - s["hdr"] > 10: _tam_baslik(s)
+                bos = 0 if s else bos + 1
+                if not s and bos >= 120: return  # 10 dk boşta iş parçacığı çıkar; yeni ses gelince tam_besle yeniden açar
+                continue
+            bos = 0; kl, kanal, t, pcm = oge
+            if s and s["kl"] != kl: _tam_kapat(s); s = None
+            if not s: s = _tam_ac(kl, t)
+            if s["hata"]: continue
+            _tam_yaz(s, kanal, t, pcm)
+            if time.time() - s["hdr"] > 10: _tam_baslik(s)
+        except Exception as e:
+            if s: s["hata"] = True
+            if not _TAM.get("hata_yaz") or time.time() - _TAM["hata_yaz"] > 600:  # disk dolu gibi sürekli hata günlüğü doldurmasın
+                _TAM["hata_yaz"] = time.time(); print(f"TAM SES: yazılamadı ({e.__class__.__name__}) — tam kayıt bırakıldı")
 # Süreli ses arşivi (2 Kasım): ayar ses_arsivi: true iken Whisper'a giden HER parça (ben, karsi, bas-konuş) sonucuyla canli/ses-arsivi/<toplantı>/ altına
 # WAV + parcalar.jsonl olarak yazılır (eşik, mikrofon profili, VAD ve uydurma kurallarını gerçek veriyle ayarlamak için). Varsayılan KAPALI. SES VE METİN MAC'TEN
 # ÇIKMAZ: teshis/beta paketi, geri bildirim, toplantı listesi ve kayit_dondur bu klasöre bakmaz. Süre ses_arsivi_gun (14), toplam SES_ARSIVI_GB (5) aşılırsa en eski silinir.

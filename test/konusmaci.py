@@ -16,6 +16,14 @@ for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli)
+# 6 Kasım: aktarıcı gerçek ayarla açılıyordu → /baslat gerçek ayar klasörüne toplanti-kanca.json ve toplanti-baslat.command yazıyordu. Yalıtılmış ayar (uygulama = T);
+# modeller ve whisper-venv için gerçek ayarın ortak/whisper alanları yalnız okunur.
+_g = os.path.expanduser("~/Library/Application Support/Suflor/ayar.json")
+try: _ga = json.load(open(_g, encoding="utf-8"))
+except (OSError, ValueError): _ga = {}
+AYK = os.path.join(T, "ayar.json")
+json.dump(dict({k: v for k, v in _ga.items() if k not in ("uygulama", "port", "proje", "calisma", "kod")}, alan="Deneme", port=PORT, uygulama=T, proje=os.path.join(T, "proje")), open(AYK, "w"))
+os.environ["SUFLOR_AYAR"] = AYK
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"),
                      stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1"))  # deneme kipi: /baslat Terminal/Brifing açmaz
 def anahtar():
@@ -137,8 +145,8 @@ try:
         l = tc("hafiza")
         if "Ayşe Yılmaz" not in l.stdout or "2 kişi" not in l.stdout: hatalar.append(f"hafiza listesi: {l.stdout[-200:]}")
         # ayarla kapalı: Ayşe adsız kalır
-        ay = json.load(open(os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json"), encoding="utf-8"))
-        ay["ses_izi_hafiza"] = False; ayk = os.path.join(T, "ayar.json"); json.dump(ay, open(ayk, "w"))
+        ay = json.load(open(AYK, encoding="utf-8"))
+        ay["ses_izi_hafiza"] = False; ayk = os.path.join(T, "ayar-hafizasiz.json"); json.dump(ay, open(ayk, "w"))
         o = tc("konusmaci", md2, ayar=ayk)
         es3 = json.load(open(os.path.join(canli, md2[:-3] + ".konusmaci.json"), encoding="utf-8"))
         if any(es3["ad"].get(i) == "Ayşe Yılmaz" for i, k in gercek2.items() if k == "A"): hatalar.append("ses_izi_hafiza: false iken hafıza kullanıldı")

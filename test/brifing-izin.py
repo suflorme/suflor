@@ -38,6 +38,21 @@ BRIFING = ["-p", "Toplantı bağlamı: …", "--allowedTools", "Read,Grep,Glob",
 try:
     # deneme derlemesi: aktarıcının gerçek argüman kümeleri geçer, sahte claude çalışır
     kontrol("Konuş argümanları kabul (sahte claude çalıştı)", calistir(den, KONUS) != 3 and sahte_calisti())
+    # 6 Kasım: Foundation Process argümanları NFD'ye çeviriyordu ("ü" → "u" + birleşik işaret); claude'a giden Türkçe argüman olduğu gibi (NFC) ulaşmalı — tek atış ve açık süreç kipi
+    import unicodedata
+    TR = unicodedata.normalize("NFC", "Çağrı ğüşöİ ÇĞÖŞÜ")
+    open(sahte, "w").write("#!/bin/sh\necho SAHTE-CALISTI >> \"$(dirname \"$0\")/iz\"\nfor x in \"$@\"; do case \"$x\" in Ç*) printf %s \"$x\" > \"$(dirname \"$0\")/arg\";; esac; done\n")
+    for ad, kw in (("tek atış", {"giris": None}), ("açık süreç", {})):
+        a2 = [TR if x == "Toplantı bağlamı: …" else x for x in BRIFING]
+        a2[a2.index("-p") + 1] = TR
+        if "giris" in kw: ist_ek = {"giris": None, "cikis": None}
+        else: ist_ek = {}; a2 = list(KONUS); a2[a2.index("--append-system-prompt") + 1] = TR
+        try: os.remove(os.path.join(T, "bin", "arg"))
+        except OSError: pass
+        calistir(den, a2, ek={k: v for k, v in ist_ek.items()} if ist_ek else None)
+        got = open(os.path.join(T, "bin", "arg"), "rb").read().decode() if os.path.exists(os.path.join(T, "bin", "arg")) else None
+        kontrol(f"Türkçe argüman NFC ulaştı ({ad})", got == TR)
+    open(sahte, "w").write("#!/bin/sh\necho SAHTE-CALISTI >> \"$(dirname \"$0\")/iz\"\n")
     # v0.164 (Konuş dış bilgi kaynağı): okuma desenli araç, allowedMcpServers (https url + suflorvt); strict'siz, setting-sources project
     SA = "mcp__claude_ai_Ornek_Kaynak__"; ES = {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"}
     AL = [{"serverUrl": "https://ornek.test/mcp"}, {"serverName": "suflorvt"}]
