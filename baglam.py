@@ -42,7 +42,8 @@ TEXTUTIL_UZ = {".doc", ".rtf", ".odt"}  # v0.121.0: macOS textutil ile .docx'e �
 ODF_UZ = {".ods", ".odp"}  # v0.136.0: OpenDocument tablo/sunum — zip içindeki content.xml'den (ek bileşen yok); .odt textutil'de
 UZANTI = {".md", ".txt", ".html", ".htm", ".json", ".jsonl", ".tsv", ".csv", ".xlsx", ".docx", ".eml"} | TEXTUTIL_UZ | ODF_UZ
 # T2: metne çevirme işçisiyle (önbellekten dizine). v0.121.0: Pages/Keynote/Numbers (Docling iWork) ve eski Excel (.xls, xlrd); tablolar proje veritabanına da
-CEVIR_UZ = {".pdf", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".tif", ".tiff", ".bmp", ".pages", ".key", ".numbers", ".xls"}
+GOOGLE_UZ = {".gdoc", ".gsheet", ".gslides"}  # Drive for desktop belge kısayolu (içinde yalnız JSON: doc_id); metni Google dışa aktarımından (aşağıda "Google belgeleri")
+CEVIR_UZ = {".pdf", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".tif", ".tiff", ".bmp", ".pages", ".key", ".numbers", ".xls"} | GOOGLE_UZ
 PAKET_KLASOR = (".pages", ".numbers", ".key", ".rtfd", ".app", ".bundle")  # macOS paket klasörü (eski iWork): içindeki önizleme görüntüsü ayrı dosya sanılmasın
 PARCA = 700  # bir parçanın hedef uzunluğu (karakter)
 
@@ -219,7 +220,7 @@ def tur_bul(kisa):
     if kisa.startswith(GORUSME) or re.search(r"dokum|transkript", kisa, re.I): return "gorusme"
     if ANALIZ and kisa.startswith(ANALIZ): return "analiz"
     if kisa.startswith(("Sunum/", "sunum/")) or re.search(r"sunum|sunu|deck", kisa, re.I): return "sunum"
-    if kisa.endswith((".xlsx", ".xls", ".numbers", ".ods")): return "tablo"
+    if kisa.endswith((".xlsx", ".xls", ".numbers", ".ods", ".gsheet")): return "tablo"
     return "belge"
 AYLAR = {a: i + 1 for i, a in enumerate("ocak şubat mart nisan mayıs haziran temmuz ağustos eylül ekim kasım aralık".split())}
 def tarih_bul(kisa, bas, mtime):
@@ -243,9 +244,9 @@ def parcala(yol, kisa, sha=None):
     if ext in CEVIR_UZ:  # T2: çevrilmiş metin önbellekten (çevrilmemişse dizine henüz girmez)
         ps = cevrilmis(yol, sha)
         if ps is None: raise Bekliyor()
-        t = "\n".join(m for _, m in ps)
-        if ext in (".xls", ".numbers"): return os.path.basename(kisa), "", [(k, "", m) for k, m in ps]  # satır başına bir parça (xlsx_parcala gibi)
-        return baslik_bul(kisa, t) if ext in (".pdf", ".pptx", ".pages", ".key") else os.path.basename(kisa), t[:1500], [(k, "", m) for k0, m0 in ps for k, _, m in metin_parcala(m0, k0 + " · " if k0 else "")]
+        t = "\n".join(m for _, m in ps); ad = os.path.splitext(os.path.basename(kisa))[0] if ext in GOOGLE_UZ else os.path.basename(kisa)  # Google belgesi: uzantısız ad
+        if ext in (".xls", ".numbers", ".gsheet"): return ad, "", [(k, "", m) for k, m in ps]  # satır başına bir parça (xlsx_parcala gibi)
+        return baslik_bul(kisa, t) if ext in (".pdf", ".pptx", ".pages", ".key") else ad, t[:1500], [(k, "", m) for k0, m0 in ps for k, _, m in metin_parcala(m0, k0 + " · " if k0 else "")]
     if ext == ".eml": t = eml_metin(yol)
     elif ext == ".docx": t = docx_metin(yol)
     elif ext in TEXTUTIL_UZ: t = textutil_metin(yol)
@@ -421,12 +422,16 @@ def dizinle(c, yol, kisa, st, hata=None):  # bir dosyayı (yeniden) dizinle → 
     sil(c, kisa)
     t = c.execute("SELECT gizli, kopya_of, sha256 FROM tarama WHERE yol=? AND mtime=? AND boy=?", (kisa, st.st_mtime, st.st_size)).fetchone()
     if t and (t[0] or t[1]): c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); return None  # §2/§4: hariç tutulan ve kopya dizine girmez
-    if bulutta(st):  # yalnız adıyla (okumak indirtir); tarih dosya tarihinden
+    if bulutta_dosya(st, os.path.splitext(yol)[1].lower()):  # yalnız adıyla (okumak indirtir); tarih dosya tarihinden
         c.execute("INSERT OR REPLACE INTO dosya(yol, mtime, boy, tur, tarih, baslik, parca, kapsam, gizli_parca) VALUES(?,?,?,?,?,?,?,?,?)",
                   (kisa, st.st_mtime, st.st_size, tur_bul(kisa), tarih_bul(kisa, "", st.st_mtime), os.path.basename(kisa), 0, BELLEK_TUR.get(kisa, (None, "ortak"))[1], 0))
         tara_dosyaya(c, kisa); return 0
     try: baslik, bas, ps = parcala(yol, kisa, t[2] if t and not str(t[2]).startswith("bulut:") else None)
-    except Bekliyor: c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); return None
+    except Bekliyor:
+        if os.path.splitext(yol)[1].lower() not in GOOGLE_UZ: c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); return None
+        c.execute("INSERT OR REPLACE INTO dosya(yol, mtime, boy, tur, tarih, baslik, parca, kapsam, gizli_parca) VALUES(?,?,?,?,?,?,?,?,?)",  # Google belgesi, içerik henüz alınamadı (kimlik yok/erişim yok): adıyla
+                  (kisa, st.st_mtime, st.st_size, tur_bul(kisa), tarih_bul(kisa, "", st.st_mtime), os.path.splitext(os.path.basename(kisa))[0], 0, BELLEK_TUR.get(kisa, (None, "ortak"))[1], 0))
+        tara_dosyaya(c, kisa); return 0
     except Exception as e:
         if hata is not None: hata.append(f"{kisa}: {e.__class__.__name__}")
         ps, baslik, bas = [], os.path.basename(kisa), ""
@@ -444,12 +449,16 @@ def gecmis_guncelle(c=None):  # Konuş geçmişine satır eklenince yalnız o do
     try: st = os.stat(GECMIS)
     except OSError: return 0
     BELLEK_TUR[GECMIS] = ("konusma", "ozel"); n = dizinle(c, GECMIS, GECMIS, st); c.commit(); return n or 0
+def _google_onbellekte(c, kisa):
+    r = c.execute("SELECT sha256 FROM tarama WHERE yol=?", (kisa,)).fetchone()
+    return bool(r and r[0] and os.path.exists(_onbellek_yol(r[0])))
 def guncelle(c, yeniden=False, sessiz=True):
     t0 = time.time(); eski = {r[0]: (r[1], r[2], r[3], r[4] or "ortak") for r in c.execute("SELECT yol, mtime, boy, tur, kapsam FROM dosya")}
     if yeniden: eski = {}; c.executescript("DELETE FROM dosya; DELETE FROM parca; INSERT INTO ara(ara) VALUES('delete-all');")
     gorulen, n_yeni, n_parca, hata, eris = set(), 0, 0, [], []
     try: bulut_eski = {r[0] for r in c.execute("SELECT yol FROM tarama WHERE hata='bulutta'")}  # indirilince ad, boyut, tarih aynı kalır: yine de yeniden oku
     except sqlite3.OperationalError: bulut_eski = set()
+    google_bos = {r[0] for r in c.execute("SELECT d.yol FROM dosya d WHERE d.parca = 0") if os.path.splitext(r[0])[1].lower() in GOOGLE_UZ}  # içeriği henüz alınamamış Google belgeleri
     try:
         if not os.listdir(PROJE): eris.append(".")  # TCC bazen hata yerine boş liste verir; proje kökü gerçekte boş olmaz
     except OSError: eris.append(".")
@@ -457,8 +466,8 @@ def guncelle(c, yeniden=False, sessiz=True):
         gorulen.add(kisa)
         try: st = os.stat(yol)
         except OSError: continue
-        if eski.get(kisa) == (st.st_mtime, st.st_size, tur_bul(kisa), BELLEK_TUR.get(kisa, (None, "ortak"))[1]) and not (kisa in bulut_eski and not bulutta(st)): continue  # tür/kapsam ayarı değişince de yeniden
-        if kisa in bulut_eski and not bulutta(st): c.execute("UPDATE tarama SET hata=NULL, sha256=NULL WHERE yol=?", (kisa,))  # indirildi: tarama içerikten yeniden özetlesin
+        if eski.get(kisa) == (st.st_mtime, st.st_size, tur_bul(kisa), BELLEK_TUR.get(kisa, (None, "ortak"))[1]) and not (kisa in bulut_eski and not bulutta_dosya(st, os.path.splitext(kisa)[1].lower())) and not (kisa in google_bos and _google_onbellekte(c, kisa)): continue  # tür/kapsam ayarı değişince de yeniden
+        if kisa in bulut_eski and not bulutta_dosya(st, os.path.splitext(kisa)[1].lower()): c.execute("UPDATE tarama SET hata=NULL, sha256=NULL WHERE yol=?", (kisa,))  # indirildi: tarama içerikten yeniden özetlesin
         n = dizinle(c, yol, kisa, st, hata)
         if n is not None: n_parca += n; n_yeni += 1
     # okunamayan klasörün dosyaları "silinmiş" sayılmaz (17 Ekim: aktarıcının 10 dk'lık turu dizini 101 bin parçadan 301'e indirdi)
@@ -496,7 +505,7 @@ def sil(c, kisa):
 # Sonuçtan çıkarma T3'te; burada yalnız tarama ve kayıt. Rapor <uygulama>/tarama.json.
 TARA_RAPOR = os.path.join(AYAR["uygulama"], "tarama.json")
 TARA_ATLA = {".ds_store", "thumbs.db", "desktop.ini", ".localized", "icon\r"}
-TARA_TUR = {"belge": "md txt rtf docx doc odt pages pdf", "sunum": "pptx ppt key odp", "tablo": "xlsx xls csv tsv numbers ods",
+TARA_TUR = {"belge": "md txt rtf docx doc odt pages pdf gdoc", "sunum": "pptx ppt key odp gslides", "tablo": "xlsx xls csv tsv numbers ods gsheet",
             "veri": "json jsonl xml yaml yml db sqlite sqlite3 npy parquet", "web": "html htm", "goruntu": "png jpg jpeg webp heic gif tif tiff bmp",
             "eposta": "eml msg mbox", "ses": "mp3 m4a wav aac flac ogg opus", "video": "mp4 mov m4v webm mkv avi",
             "arsiv": "zip rar 7z tar gz tgz", "kod": "py js ts gs sql sh swift rb go java c h css ipynb drawio vtt srt"}
@@ -510,7 +519,7 @@ TARA_DISA_UZ = {".csv", ".tsv", ".json", ".jsonl", ".xlsx", ".xls", ".xml", ".db
 TARA_TURETILMIS_KLASOR = re.compile(r"^_?(son[ _-]?yayin|yayin|yayinlanan|publish|published|dist|build|_site|site[ _-]?cikti)$")  # yayımlanmış/derlenmiş kopyalar
 TARA_TURETILMIS_AD = re.compile(r"(^|[^a-z])(ozet|ozeti|summary|gorunum|view|pivot|anonim|anonymized|cikti|output)($|[^a-z])")
 # yanındaki aynı adlı md/csv/pdf bunun dışa çıktısı. v0.136.0: yalnız okunabilen türler (.ppt okunmuyor: yanındaki PDF tek kaynak olabilir)
-TARA_ASIL_UZ = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".key", ".numbers", ".pages", ".odt", ".ods", ".odp"}
+TARA_ASIL_UZ = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".key", ".numbers", ".pages", ".odt", ".ods", ".odp"} | GOOGLE_UZ
 TARA_TARIH = re.compile(r"(?<!\d)(20\d\d[-_.]?[01]\d[-_.]?[0-3]\d(?:[-_ t]?[0-2]\d[-_.:h]?[0-5]\d(?:[-_.:]?[0-5]\d)?)?|[0-3]?\d[-_.][01]?\d[-_.](?:20)?\d\d)(?!\d)")
 TARA_SAAT = re.compile(r"(?<!\d)20\d\d[-_.]?[01]\d[-_.]?[0-3]\d[-_ t]?[0-2]\d[-_.:h]?[0-5]\d(?!\d)")  # tarih + saat damgası (otomatik çıktı)
 TARA_SURUM = re.compile(r"\(\d{1,3}\)|(^|[^a-z0-9])(v\d+(?:[._]\d+)*|rev\d*|r\d|surum\s?\d+|versiyon\s?\d+|version\s?\d+|son|final|nihai|guncel|latest|yeni|eski|"
@@ -626,6 +635,7 @@ SF_DATALESS = 0x40000000  # macOS: içeriği yalnız bulutta duran dosya (iCloud
 # bulut klasöründe ilk hazırlık gigabaytlarca indirme demekti. Tarama özeti içerikten değil ad + boyut + tarihten ("bulut:…"; birebir kopya ve sürüm
 # hesabına girmez), hata "bulutta" (çevirme atlar); dizinde yalnız adıyla durur (parça yok). Kullanıcı dosyayı indirince sonraki turda normal okunur.
 def bulutta(st): return bool(getattr(st, "st_flags", 0) & SF_DATALESS)
+def bulutta_dosya(st, ext): return bulutta(st) and ext not in GOOGLE_UZ  # .gdoc/.gsheet/.gslides: bayt değil bağlantı (küçük JSON); yer tutucu olsa da okunur
 BULUT_KISAYOL = {".gdoc", ".gsheet", ".gslides", ".gdraw", ".gform", ".gmap"}  # Google Drive belge kısayolu: içeriği yok, yalnız bağlantı
 def tara(c=None, sessiz=True):
     c = c or baglan(); t0 = time.time()
@@ -648,16 +658,19 @@ def tara(c=None, sessiz=True):
             if os.path.islink(y): atlanan["kısayol"] += 1; continue
             try: st = os.stat(y)
             except OSError: eris.append(k); continue
-            if getattr(st, "st_flags", 0) & SF_DATALESS: bulut["bulutta"] += 1  # S141 ölçümü: yalnız bulutta (iCloud/Drive yer tutucusu); bayrak stat'tan, okunmadan
+            if getattr(st, "st_flags", 0) & SF_DATALESS and os.path.splitext(f)[1].lower() not in GOOGLE_UZ: bulut["bulutta"] += 1  # S141 ölçümü: yalnız bulutta (iCloud/Drive yer tutucusu); bayrak stat'tan, okunmadan
             if os.path.splitext(f)[1].lower() in BULUT_KISAYOL: bulut["bulut_kisayol"] += 1
+            if os.path.splitext(f)[1].lower() in GOOGLE_UZ: bulut["google_belge"] += 1
             kayit.append((k, y, st))
     # özgün belge + çıktısı eşleşmesi için: klasör → ad kökü (uzantısız, sadeleşmiş) → uzantılar
     kokler = collections.defaultdict(lambda: collections.defaultdict(set))
     for k, y, st in kayit: kokler[os.path.dirname(k)][norm(os.path.splitext(os.path.basename(k))[0])].add(os.path.splitext(k)[1].lower())
-    satir = {}
+    satir = {}; bkay = _json_oku(BULUT_KAYIT, {}).get("kayit") or {}
     for k, y, st in kayit:
-        ext = os.path.splitext(k)[1].lower(); tur = tara_tur(ext); e = eski.get(k)
-        if bulutta(st):
+        ext = os.path.splitext(k)[1].lower(); tur = tara_tur(ext); e = eski.get(k); bk = bkay.get(k)
+        if bulutta_dosya(st, ext) and bk and bk.get("mtime") == st.st_mtime and bk.get("boy") == st.st_size and bk.get("sha"):
+            sha, hata = bk["sha"], None; mh = e[3] if e and e[2] == sha else None  # indirilip metni çıkarılmış, yeniden buluta bırakılmış: içerik zaten dizinde, adla sayılmaz
+        elif bulutta_dosya(st, ext):
             import hashlib
             sha = "bulut:" + hashlib.sha256(f"{k}\0{st.st_size}\0{st.st_mtime}".encode()).hexdigest()[:40]; mh, hata = None, "bulutta"
         elif e and e[0] == st.st_mtime and e[1] == st.st_size and e[2] and not str(e[2]).startswith("bulut:"): sha, mh, hata = e[2], e[3], e[4]
@@ -665,7 +678,7 @@ def tara(c=None, sessiz=True):
             try: sha = _sha256(y)
             except OSError: eris.append(k); continue
             hata = tara_okunamaz(y, ext) if st.st_size else "bos"; mh = None
-        if mh is None and (ext in TARA_METIN or ext in CEVIR_UZ) and not hata and st.st_size <= (50 << 20):  # çevrilmiş metin sonradan gelir
+        if mh is None and (ext in TARA_METIN or ext in CEVIR_UZ) and not hata and not bulutta_dosya(st, ext) and st.st_size <= (50 << 20):  # çevrilmiş metin sonradan gelir
             t = tara_metin(y, ext, sha=sha); s = minhash(t) if t else None; mh = json.dumps(s) if s else None
         kt, kn = tara_kaynak_turu(k, ext, kokler[os.path.dirname(k)], disa)
         gn = tara_gizli(k, ext, tur)
@@ -729,7 +742,7 @@ def tara(c=None, sessiz=True):
                          "surum_grubu": len(gruplar), "eski_surum": sum(len(g["eski"]) for g in gruplar),
                          "kaynak_turu": dict(collections.Counter(s["kaynak_turu"] for s in ss)), "haric": sum(s["gizli"] for s in ss),
                          "okunamayan": sum(1 for s in ss if s["hata"]), "atlanan": dict(atlanan), "erisilemeyen": eris,
-                         "bulutta": bulut["bulutta"], "bulut_kisayol": bulut["bulut_kisayol"]},
+                         "bulutta": bulut["bulutta"], "bulut_kisayol": bulut["bulut_kisayol"], **tara_bulut_sayilari(bulut["google_belge"], satir)},
              "surum_gruplari": gruplar, "kopyalar": kopyalar,
              "haric": [{"yol": s["yol"], "neden": s["gizli_neden"]} for s in ss if s["gizli"]],
              "okunamayan": [{"yol": s["yol"], "hata": s["hata"]} for s in ss if s["hata"]],
@@ -740,12 +753,19 @@ def tara(c=None, sessiz=True):
         os.chmod(TARA_RAPOR + ".tmp", 0o600); os.replace(TARA_RAPOR + ".tmp", TARA_RAPOR)
     except OSError: pass
     return rapor
+def tara_bulut_sayilari(google_belge, satir):
+    # beta sayacı ve sihirbaz: Google belgeleri (kaç tane, kaçının metni alındı, kimlik/erişim yok) + indirilen bulut dosyaları (yalnız sayı)
+    g = _json_oku(GOOGLE_DURUM, {}); b = _json_oku(BULUT_DURUM, {})
+    okundu = sum(1 for s in satir.values() if os.path.splitext(s["yol"])[1].lower() in GOOGLE_UZ and os.path.exists(_onbellek_yol(s["sha256"])))
+    return {"google_belge": google_belge, "google_okundu": okundu, "google_kimlik_yok": g.get("kimlik_yok") or 0, "google_erisim_yok": g.get("erisim_yok") or 0,
+            "bulut_indirilen": b.get("kayit") or 0, "bulut_onay_bekliyor": 1 if b.get("onay_bekliyor") else 0}
 def tara_ozet(r):
     s = r["sayilar"]; kt = s["kaynak_turu"]
     out = [f"tarama: {s['dosya']} dosya · {s['boyut'] / 1e6:.1f} MB · {r['sure_sn']} sn",
            "  türler: " + ", ".join(f"{t} {n}" for t, n in s["tur"].items()),
            f"  birebir kopya: {s['kopya']} ({s['kopya_kumesi']} küme) · sürüm grubu: {s['surum_grubu']} ({s['eski_surum']} eski sürüm)",
            f"  kaynak türü: asıl {kt.get('asil', 0)} · türetilmiş {kt.get('turetilmis', 0)} · dışa aktarım {kt.get('disa_aktarim', 0)}",
+           f"  Google belgesi: {s.get('google_belge', 0)} (metni alınan {s.get('google_okundu', 0)}) · yalnız bulutta: {s.get('bulutta', 0)}",
            f"  hariç (adla): {s['haric']} · okunamayan (parolalı/bozuk/boş): {s['okunamayan']}" + (" · atlanan: " + ", ".join(f"{k} {n}" for k, n in s["atlanan"].items()) if s["atlanan"] else "")]
     if s["erisilemeyen"]: out.append("  okunamayan klasör: " + ", ".join(e or "proje kökü" for e in s["erisilemeyen"][:5]) + " (eski kayıtlar korundu)")
     out.append(f"  rapor: {TARA_RAPOR}")
@@ -875,17 +895,26 @@ class _Isci:
 
 def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR_YENILE, butce_sn=None, ilerleme=None):  # ilerleme(n, toplam): sihirbaz (hazirlik.py)
     c = c or baglan(); t0 = time.time(); tara(c)
+    bi = bulut_indir(c, butce_sn)  # ayar bulut_indir açıksa ve eşik aşılmadıysa yalnız bulutta duran dosyalar önce indirilir (kapalıyken hiçbir şey yapmaz)
+    if bi: tara(c)
     adaylar = [r for r in c.execute("SELECT yol, sha256, mtime FROM tarama WHERE gizli=0 AND kopya_of IS NULL AND hata IS NULL ORDER BY mtime DESC")
                if os.path.splitext(r[0])[1].lower() in CEVIR_UZ]
-    yap, onbellekte = [], 0
+    yap, onbellekte, gyap = [], 0, []
     for yol, sha, _ in adaylar:
         try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
         except (OSError, ValueError): o = None
+        if os.path.splitext(yol)[1].lower() in GOOGLE_UZ:  # Google belgesi: işçi değil, dışa aktarım; var olan önbellek google_yenile_sa saatte bir tazelenir
+            if o is not None: onbellekte += 1
+            if o is None or time.time() - (o.get("t") or 0) > float(AYAR.get("google_yenile_sa") or 12) * 3600: gyap.append((yol, sha, o is not None))
+            continue
         if o is None or (yeniden_dene and o.get("hata")): yap.append((yol, sha))
         else: onbellekte += 1
     if sinir: yap = yap[:sinir]
     say = collections.Counter(); hatalar = []; isci = None; durdu = None
     if yap and not os.path.exists(CEVIR_PY): durdu = f"çevirme ortamı yok ({CEVIR_PY}) — kurulum.py modeller"
+    gs = google_cevir(c, [(k, h) for k, h, _ in gyap]) if gyap else collections.Counter()
+    gyok = sum(1 for _, _, var in gyap if not var) - gs["yeni"]  # önbelleği hiç olmayıp okunamayan Google belgeleri: kalan sayılmaz (adıyla sayılıyor)
+    say["cevrildi"] += gs["yeni"]
     try:
         for i, (kisa, sha) in enumerate(yap):
             if durdu: break
@@ -913,9 +942,13 @@ def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR
         if isci: isci.kapat()
     c.commit()
     n = guncelle(c)  # çevrilenler dizine
+    if bi or any(k.get("evict") for k in (_json_oku(BULUT_KAYIT, {}).get("kayit") or {}).values()):
+        try: proje_vt_guncelle(c)  # tablolar, dosya yeniden buluta bırakılmadan önce
+        except Exception: pass
+        bulut_birak()
     gp = c.execute("SELECT count(*), coalesce(sum(gizli_parca), 0) FROM dosya WHERE gizli_parca > 0").fetchone()
     return {"aday": len(adaylar), "onbellekte": onbellekte, "cevrildi": say["cevrildi"], "hata": say["hata"], "hatalar": hatalar[:50], "karakter": say["karakter"],
-            "kalan": len(adaylar) - onbellekte - say["cevrildi"] - say["hata"], "durdu": durdu, "dizine": n, "gizli_dosya": gp[0], "gizli_parca": gp[1],
+            "kalan": len(adaylar) - onbellekte - say["cevrildi"] - say["hata"] - gyok, "durdu": durdu, "google": dict(gs), "bulut_indirilen": bi, "dizine": n, "gizli_dosya": gp[0], "gizli_parca": gp[1],
             "sure_sn": round(time.time() - t0, 1)}
 def cevir_ozet(r):
     s = [f"çevirme: {r['aday']} dosya adayı · önbellekte {r['onbellekte']} · bu tur çevrilen {r['cevrildi']} ({r['karakter']} karakter) · hata {r['hata']} · kalan {r['kalan']} · {r['sure_sn']} sn",
@@ -923,6 +956,217 @@ def cevir_ozet(r):
     if r["hatalar"]: s.append("  hatalar: " + ", ".join(f"{k} ({h})" for k, h in r["hatalar"][:8]))
     if r["durdu"]: s.append("  durdu: " + r["durdu"])
     return "\n".join(s)
+
+# --- Google belgeleri ve bulutta duran dosyalar (v0.200.0) -----------------------------------------------------------------------
+# Google Dokümanlar/E-Tablolar/Slaytlar Drive for desktop'ta .gdoc/.gsheet/.gslides kısayolu olarak durur (içinde yalnız JSON: doc_id, resource_key);
+# metin yok. Seçenekler: (a) Drive for desktop önbelleği — dışa aktarım olanağı yok, içerik şifreli veritabanında; (b) kullanıcının Google hesabıyla
+# OAuth (masaüstü uygulaması, PKCE + yerel dönüş adresi): yenileme belirteci yalnız Anahtar Zinciri'nde ("suflor-google"), aktarıcı launchd altında
+# kendi başına çalışır — SEÇİLEN YOL; (c) Claude'un Drive bağlayıcısı: oturum açık ve etkileşimli ister, aktarıcı çağıramaz.
+# Dışa aktarım: Drive API files.export — Doküman/Slayt `text/plain`; E-Tablo `.xlsx` (tüm sayfalar tek istekte; mevcut xlsx_tablolar/xlsx_parcala okur,
+# sayfa başına `t_…` tablosu proje veritabanına girer). Tek kapsam: drive.readonly. Sonuç çevirme önbelleğine (<uygulama>/cevirme-onbellek/<kısayol sha256>.json)
+# diğer belgeler gibi yazılır; içerik değişimi `ic` özetiyle anlaşılır, her `google_yenile_sa` (varsayılan 12) saatte bir yeniden çekilir.
+# Kimlik yoksa/reddedilirse sessizce adıyla sayılır (dizinde parçasız satır), önbellek yazılmaz; sayılar <uygulama>/google-durum.json (beta sayacı).
+# Ayar: google_belge (false kapatır), google_istemci_id, google_istemci_sirri (masaüstü uygulaması sırrı gizli sayılmaz), google_anahtar (öğe adı).
+# Deneme: SUFLOR_GOOGLE_API / SUFLOR_GOOGLE_TOKEN_URL / SUFLOR_GOOGLE_BELIRTEC / SUFLOR_GOOGLE_YENILEME.
+GOOGLE_API = os.environ.get("SUFLOR_GOOGLE_API") or "https://www.googleapis.com"
+GOOGLE_TOKEN_URL = os.environ.get("SUFLOR_GOOGLE_TOKEN_URL") or "https://oauth2.googleapis.com/token"
+GOOGLE_YETKI_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_KAPSAM = "https://www.googleapis.com/auth/drive.readonly"
+GOOGLE_OGE = "suflor-google"
+GOOGLE_DURUM = os.path.join(AYAR["uygulama"], "google-durum.json")
+GOOGLE_MIME = {".gdoc": "text/plain", ".gslides": "text/plain", ".gsheet": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+GOOGLE_EN_COK, GOOGLE_RED_SN = 10 << 20, 6 * 3600
+class GoogleHata(Exception):
+    def __init__(self, kod): super().__init__(kod); self.kod = kod  # kimlik | erisim | boyut | ag | bicim
+_G = {"belirtec": None, "bitis": 0, "yenileme": False}
+def _zincir_oku(oge):
+    import subprocess
+    try: return subprocess.run(["/usr/bin/security", "find-generic-password", "-s", str(oge), "-w"], capture_output=True, text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError): return ""
+def _google_yenileme():  # yenileme belirteci: deneme ortam değişkeni ya da Anahtar Zinciri (dosyaya/ayara yazılmaz)
+    if os.environ.get("SUFLOR_GOOGLE_YENILEME"): return os.environ["SUFLOR_GOOGLE_YENILEME"]
+    if _G["yenileme"] is False: _G["yenileme"] = _zincir_oku(AYAR.get("google_anahtar") or GOOGLE_OGE) if AYAR.get("google_istemci_id") else ""
+    return _G["yenileme"]
+def google_hazir():  # Google belgeleri okunabilir mi (kimlik var mı); ağa gidilmez
+    if AYAR.get("google_belge", True) is False: return False
+    return bool(os.environ.get("SUFLOR_GOOGLE_BELIRTEC") or _google_yenileme())
+def google_belirtec():
+    import urllib.request, urllib.parse, urllib.error
+    if os.environ.get("SUFLOR_GOOGLE_BELIRTEC"): return os.environ["SUFLOR_GOOGLE_BELIRTEC"]
+    if _G["belirtec"] and _G["bitis"] > time.time() + 60: return _G["belirtec"]
+    ref = _google_yenileme()
+    if not ref: raise GoogleHata("kimlik")
+    f = {"client_id": AYAR.get("google_istemci_id"), "refresh_token": ref, "grant_type": "refresh_token"}
+    if AYAR.get("google_istemci_sirri"): f["client_secret"] = AYAR["google_istemci_sirri"]
+    try:
+        with urllib.request.urlopen(urllib.request.Request(GOOGLE_TOKEN_URL, urllib.parse.urlencode(f).encode()), timeout=30) as r: o = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        raise GoogleHata("kimlik" if e.code in (400, 401) else "ag")
+    except (OSError, ValueError): raise GoogleHata("ag")
+    if not o.get("access_token"): raise GoogleHata("kimlik")
+    _G["belirtec"], _G["bitis"] = o["access_token"], time.time() + int(o.get("expires_in") or 3000)
+    return _G["belirtec"]
+def google_kisayol(yol):  # → (doc_id, resource_key)
+    try: o = json.loads(open(yol, encoding="utf-8", errors="replace").read(65536))
+    except (OSError, ValueError): raise GoogleHata("bicim")
+    k = o.get("doc_id") if isinstance(o, dict) else None
+    if not isinstance(k, str) or not re.fullmatch(r"[\w-]{10,200}", k): raise GoogleHata("bicim")
+    rk = o.get("resource_key"); return k, (rk if isinstance(rk, str) and re.fullmatch(r"[\w-]{1,80}", rk) else None)
+def google_indir(yol, ext):
+    # kısayol dosyası → {"parcalar": [[konum, metin]], "tablolar": [{"sayfa", "satirlar"}]} ; hata GoogleHata(kod)
+    import urllib.request, urllib.parse, urllib.error, tempfile
+    kimlik, anahtar = google_kisayol(yol); tok = google_belirtec()
+    url = f"{GOOGLE_API}/drive/v3/files/{urllib.parse.quote(kimlik)}/export?" + urllib.parse.urlencode({"mimeType": GOOGLE_MIME[ext]})
+    ust = {"Authorization": "Bearer " + tok}
+    if anahtar: ust["X-Goog-Drive-Resource-Keys"] = f"{kimlik}/{anahtar}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=ust), timeout=60) as r: veri = r.read(GOOGLE_EN_COK + 1)
+    except urllib.error.HTTPError as e:
+        govde = ""
+        try: govde = e.read(2000).decode("utf-8", "replace")
+        except OSError: pass
+        if e.code == 401: _G["belirtec"] = None; raise GoogleHata("kimlik")
+        if e.code == 403 and "exportSizeLimit" in govde: raise GoogleHata("boyut")
+        if e.code in (403, 404): raise GoogleHata("erisim")
+        raise GoogleHata("ag")
+    except (OSError, ValueError): raise GoogleHata("ag")
+    if len(veri) > GOOGLE_EN_COK: raise GoogleHata("boyut")
+    if ext != ".gsheet":
+        t = veri.decode("utf-8-sig", "replace").replace("\r\n", "\n").strip()
+        return {"parcalar": [["", t]] if t else [], "tablolar": []}
+    with tempfile.TemporaryDirectory(prefix="suflor-gs-") as d:
+        g = os.path.join(d, "t.xlsx"); open(g, "wb").write(veri)
+        try: ps = [[k, m] for k, _, m in xlsx_parcala(g)]; tb = [{"sayfa": s, "satirlar": sat} for s, sat in xlsx_tablolar(g)]
+        except (zipfile.BadZipFile, KeyError, ValueError): raise GoogleHata("bicim")
+    return {"parcalar": ps, "tablolar": tb}
+def _json_oku(y, varsayilan):
+    try: return json.load(open(y, encoding="utf-8"))
+    except (OSError, ValueError): return varsayilan
+def _json_yaz(y, o):
+    os.makedirs(os.path.dirname(y), exist_ok=True)
+    with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(o, f, ensure_ascii=False)
+    os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+def google_surum(sha):  # önbellekteki içeriğin son değişme zamanı (proje veritabanı: değişim algısı); önbellek yoksa None
+    o = _json_oku(_onbellek_yol(sha), None) if sha and not str(sha).startswith("bulut:") else None
+    return o.get("degisti_t") if o else None
+def google_cevir(c, liste, ilerleme=None):
+    # liste: [(kisa, sha)] — önbelleği yok ya da eski olan Google kısayolları. → sayaç. Kimlik yok: hiçbir şey yazılmaz (sessiz).
+    say = collections.Counter(); durum = _json_oku(GOOGLE_DURUM, {}); red = {k: v for k, v in (durum.get("red") or {}).items() if time.time() - v < GOOGLE_RED_SN}
+    hazir = google_hazir()
+    for i, (kisa, sha) in enumerate(liste):
+        if not hazir: say["kimlik_yok"] += 1; continue
+        if toplantida(): break
+        if sha in red: say["erisim_yok"] += 1; continue
+        ext = os.path.splitext(kisa)[1].lower(); y = _onbellek_yol(sha); eski = _json_oku(y, None)
+        try: o = google_indir(os.path.join(PROJE, kisa), ext)
+        except GoogleHata as e:
+            if e.kod == "kimlik": say["kimlik_yok"] += 1; hazir = False
+            elif e.kod in ("erisim", "boyut", "bicim"): say["erisim_yok"] += 1; red[sha] = time.time()
+            else: say["ag"] += 1
+            continue
+        ic = __import__("hashlib").sha256(json.dumps(o, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:24]; simdi = time.time()
+        degisti = (eski or {}).get("degisti_t") if eski and eski.get("ic") == ic else simdi
+        kayit = {"yol": kisa, "arac": "google-drive", "t": simdi, "degisti_t": degisti, "ic": ic, "sure": 0, **o}
+        if not kayit["tablolar"]: kayit.pop("tablolar")
+        os.makedirs(os.path.dirname(y), exist_ok=True); _json_yaz(y, kayit)
+        say["okundu"] += 1
+        if eski and eski.get("ic") != ic: c.execute("DELETE FROM dosya WHERE yol=?", (kisa,)); say["degisti"] += 1  # dizin turu yeniden okusun
+        elif not eski: say["yeni"] += 1
+        if ilerleme: ilerleme(i + 1, len(liste))
+    if hazir or say["kimlik_yok"] or say["erisim_yok"] or say["okundu"]:
+        _json_yaz(GOOGLE_DURUM, {"t": int(time.time()), "okundu": say["okundu"], "kimlik_yok": say["kimlik_yok"], "erisim_yok": say["erisim_yok"], "ag": say["ag"], "red": red})
+    if say["kimlik_yok"] or say["erisim_yok"]:
+        print(f"google belgeleri: {say['okundu']} okundu, {say['kimlik_yok']} kimlik yok, {say['erisim_yok']} erişim yok — adıyla sayılıyor", file=sys.stderr)
+    return say
+def google_giris():
+    # Bir kerelik OAuth (masaüstü uygulaması, PKCE, yerel dönüş adresi): tarayıcı açar, yenileme belirtecini Anahtar Zinciri'ne yazar (security -i, ps'te görünmez).
+    import base64, hashlib, secrets, subprocess, threading, webbrowser, urllib.parse, urllib.request, http.server
+    ist = AYAR.get("google_istemci_id")
+    if not ist: print("ayar google_istemci_id yok (Google Cloud → OAuth istemci kimliği, tür: masaüstü uygulaması)", file=sys.stderr); return 2
+    ver = secrets.token_urlsafe(48); chal = base64.urlsafe_b64encode(hashlib.sha256(ver.encode()).digest()).rstrip(b"=").decode(); durum = secrets.token_urlsafe(16)
+    alinan = {}
+    class Ic(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a): pass
+        def do_GET(self):
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            if q.get("state", [""])[0] == durum and q.get("code"): alinan["kod"] = q["code"][0]
+            self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.end_headers()
+            self.wfile.write("<meta charset=utf-8><p>Suflor.me Google bağlantısı tamam; bu sekmeyi kapatabilirsin.</p>".encode())
+    sv = http.server.HTTPServer(("127.0.0.1", 0), Ic); port = sv.server_address[1]; sv.timeout = 300
+    dr = f"http://127.0.0.1:{port}"
+    url = GOOGLE_YETKI_URL + "?" + urllib.parse.urlencode({"client_id": ist, "redirect_uri": dr, "response_type": "code", "scope": GOOGLE_KAPSAM, "code_challenge": chal,
+                                                          "code_challenge_method": "S256", "access_type": "offline", "prompt": "consent", "state": durum})
+    print("tarayıcıda Google izin penceresi açılıyor…", file=sys.stderr); webbrowser.open(url)
+    t = threading.Thread(target=sv.handle_request); t.start(); t.join(310); sv.server_close()
+    if not alinan.get("kod"): print("izin alınamadı", file=sys.stderr); return 1
+    f = {"client_id": ist, "code": alinan["kod"], "code_verifier": ver, "redirect_uri": dr, "grant_type": "authorization_code"}
+    if AYAR.get("google_istemci_sirri"): f["client_secret"] = AYAR["google_istemci_sirri"]
+    try:
+        with urllib.request.urlopen(urllib.request.Request(GOOGLE_TOKEN_URL, urllib.parse.urlencode(f).encode()), timeout=30) as r: o = json.loads(r.read().decode())
+    except (OSError, ValueError) as e: print(f"belirteç alınamadı ({e.__class__.__name__})", file=sys.stderr); return 1
+    ref = o.get("refresh_token") or ""
+    if not re.fullmatch(r"[A-Za-z0-9._\-/]{20,600}", ref): print("yenileme belirteci gelmedi", file=sys.stderr); return 1
+    oge = AYAR.get("google_anahtar") or GOOGLE_OGE
+    r = subprocess.run(["/usr/bin/security", "-i"], input=f'add-generic-password -U -a suflor -s {oge} -l "Suflor.me {oge}" -w "{ref}"\n', capture_output=True, text=True, timeout=20)
+    if r.returncode: print("Anahtar Zinciri'ne yazılamadı", file=sys.stderr); return 1
+    _G["yenileme"] = False; print("Google bağlandı (yalnız okuma izni); belirteç Anahtar Zinciri'nde."); return 0
+
+# Bulutta duran normal dosyalar (pdf, docx, xlsx…): ayar bulut_indir: true ise ve toplam boyut bulut_indir_mb (varsayılan 200) eşiğini aşmıyorsa — aşıyorsa
+# kullanıcı onay boyutunu (bulut_indir_onay_mb; sihirbazda "indirilsin mi") verene kadar hiçbiri indirilmez — dizine girecek türdekiler okunup indirilir,
+# metni çıkınca iCloud'daysa `brctl evict` ile yeniden yalnız buluta bırakılır (Drive for desktop/OneDrive'ın dosyayı boşaltan bir komutu yok: açık kalır, günlükte
+# sayılır). Ayar kapalıyken (varsayılan) adla sayma aynen sürer. Kayıt <uygulama>/bulut-indirilen.json; sayılar bulut-durum.json.
+BULUT_KAYIT = os.path.join(AYAR["uygulama"], "bulut-indirilen.json"); BULUT_DURUM = os.path.join(AYAR["uygulama"], "bulut-durum.json")
+BULUT_DOSYA_SN = 900
+def bulut_ayar(): return bool(AYAR.get("bulut_indir")), float(AYAR.get("bulut_indir_mb") or 200), float(AYAR.get("bulut_indir_onay_mb") or 0)
+def bulut_adaylar(c):  # → [(yol, boy)] yalnız bulutta duran, dizine girecek türde, adla hariç olmayan
+    return [(y, b) for y, b in c.execute("SELECT yol, boy FROM tarama WHERE hata='bulutta' AND gizli=0 ORDER BY mtime DESC")
+            if os.path.splitext(y)[1].lower() in UZANTI | (CEVIR_UZ - GOOGLE_UZ)]
+def bulut_ozet(c=None):  # sihirbaz ve beta sayacı: kaç dosya, kaç MB, eşik, onay gerekiyor mu
+    c = c or baglan(); acik, esik, onay = bulut_ayar(); a = bulut_adaylar(c); mb = round(sum(b for _, b in a) / 1e6, 1)
+    return {"acik": acik, "n": len(a), "mb": mb, "esik_mb": esik, "onay_mb": onay, "onay_gerek": mb > esik and mb > onay, "indirilen": len(_json_oku(BULUT_KAYIT, {}).get("kayit") or {})}
+def bulut_indir(c, butce_sn=None):
+    # → bu turda indirilen dosya sayısı. Kapalıysa / eşik aşıldıysa hiçbir dosyaya dokunulmaz (yalnız durum yazılır).
+    o = bulut_ozet(c); d = {"t": int(time.time()), "aday_n": o["n"], "aday_mb": o["mb"], "esik_mb": o["esik_mb"], "acik": o["acik"], "onay_bekliyor": bool(o["acik"] and o["onay_gerek"]), "indirilen": 0, "hata": 0}
+    if o["acik"]: d["onay_bekliyor"] = o["onay_gerek"]
+    ok = o["acik"] and not o["onay_gerek"] and o["n"]
+    kay = _json_oku(BULUT_KAYIT, {}); kayit = kay.get("kayit") or {}; t0 = time.time()
+    if ok:
+        import subprocess
+        for yol, boy in bulut_adaylar(c):
+            if toplantida() or (butce_sn and time.time() - t0 > butce_sn): break
+            k = kayit.get(yol); tr = c.execute("SELECT mtime FROM tarama WHERE yol=?", (yol,)).fetchone()
+            if k and tr and k.get("mtime") == tr[0] and k.get("boy") == boy and _bulut_islendi(c, yol, k.get("sha")): continue
+            y = os.path.join(PROJE, yol)
+            try: subprocess.run(["/bin/cat", y], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=BULUT_DOSYA_SN)  # okumak dosyayı tamamen indirtir
+            except (OSError, subprocess.SubprocessError): d["hata"] += 1; continue
+            try: st = os.stat(y)
+            except OSError: d["hata"] += 1; continue
+            if bulutta(st): d["hata"] += 1; continue
+            kayit[yol] = {"mtime": st.st_mtime, "boy": st.st_size, "sha": _sha256(y), "evict": True}; d["indirilen"] += 1
+            c.execute("DELETE FROM dosya WHERE yol=?", (yol,)); c.execute("UPDATE tarama SET hata=NULL WHERE yol=?", (yol,))  # dizin turu içerikten yeniden okusun
+    kay["kayit"] = kayit; _json_yaz(BULUT_KAYIT, kay); c.commit()
+    d["kayit"] = len(kayit); _json_yaz(BULUT_DURUM, d)
+    if d["indirilen"] or d["hata"]: print(f"bulut: {d['indirilen']} dosya indirildi, {d['hata']} hata ({o['mb']} MB aday)", file=sys.stderr)
+    return d["indirilen"]
+def _bulut_islendi(c, yol, sha):  # dizinde parçası var ya da çevirme önbelleği duruyor mu (yoksa yeniden indir)
+    r = c.execute("SELECT parca FROM dosya WHERE yol=?", (yol,)).fetchone()
+    if r and (r[0] or 0) > 0: return True
+    return bool(sha) and os.path.splitext(yol)[1].lower() in CEVIR_UZ and os.path.exists(_onbellek_yol(sha))
+def bulut_birak():
+    # indirilip metni çıkmış dosyaları yeniden yalnız buluta bırak (iCloud); → (birakilan, acik_kalan)
+    import subprocess
+    kay = _json_oku(BULUT_KAYIT, {}); kayit = kay.get("kayit") or {}; b = a = 0
+    for yol, k in kayit.items():
+        if not k.get("evict"): continue
+        y = os.path.join(PROJE, yol); real = os.path.realpath(y); k["evict"] = False
+        if "/Library/Mobile Documents/" in real or "/com~apple~CloudDocs/" in real or "/Library/Mobile Documents/" in y:
+            try: subprocess.run(["/usr/bin/brctl", "evict", y], capture_output=True, timeout=60)
+            except (OSError, subprocess.SubprocessError): pass
+            try: b += 1 if bulutta(os.stat(y)) else 0; a += 0 if bulutta(os.stat(y)) else 1
+            except OSError: pass
+        else: a += 1  # Drive for desktop / OneDrive: boşaltma komutu yok, dosya yerelde kalır
+    kay["kayit"] = kayit; _json_yaz(BULUT_KAYIT, kay)
+    d = _json_oku(BULUT_DURUM, {}); d.update(birakilan=b, acik_kalan=a); _json_yaz(BULUT_DURUM, d); return b, a
 
 # --- Proje veritabanı (v0.121.0; plan proje-hazirligi §9 "tek mimari") ---------------------------------------------------------
 # Kayıt veritabanı ayarlı olmayan kurulumda (beta varsayılanı) Suflor kendi veritabanını kurar: <uygulama>/proje.db (0600; proje klasörüne yazılmaz).
@@ -935,7 +1179,7 @@ def cevir_ozet(r):
 # ayarlıysa (ayar veritabani) kurulmaz; ayar `proje_vt: false` kapatır.
 PROJE_VT = os.path.join(AYAR["uygulama"], "proje.db"); PROJE_VT_KAYIT = os.path.join(AYAR["uygulama"], "proje-vt.json")
 PROJE_KART = os.path.join(AYAR["uygulama"], "proje-karti.json")
-TABLO_UZ = {".xlsx", ".xls", ".numbers", ".csv", ".tsv"}
+TABLO_UZ = {".xlsx", ".xls", ".numbers", ".csv", ".tsv", ".gsheet"}
 TABLO_SATIR_EN_COK, TABLO_SUTUN_EN_COK, PROJE_VT_SATIR_EN_COK = 20000, 80, 300000
 def proje_vt_acik(): return not (isinstance(AYAR.get("veritabani"), dict) and AYAR["veritabani"].get("yol")) and AYAR.get("proje_vt", True) is not False
 def _slug(s, en_cok=40):
@@ -1041,7 +1285,7 @@ def dosya_tablolari(yol, kisa, sha=None):  # → [(sayfa, satırlar)] ya da None
     ext = os.path.splitext(kisa)[1].lower()
     if ext == ".xlsx": return xlsx_tablolar(yol)
     if ext in (".csv", ".tsv"): return csv_tablolar(yol)
-    return cevrilmis_tablolar(yol, sha)  # .xls, .numbers: çevirme işçisinin önbelleğinden
+    return cevrilmis_tablolar(yol, sha)  # .xls, .numbers, .gsheet: çevirme önbelleğinden (.gsheet: Google dışa aktarımı)
 def _pvt_baglan():
     os.makedirs(os.path.dirname(PROJE_VT), exist_ok=True)
     yeni = not os.path.exists(PROJE_VT); v = sqlite3.connect(PROJE_VT, timeout=10, isolation_level=None)  # işlem elle: tablo silme/kurma tek seferde görünsün
@@ -1096,7 +1340,14 @@ def proje_vt_guncelle(c=None, zorla=False, sessiz=True):
     adaylar = {}
     for yol, mt, boy, sha in c.execute("SELECT d.yol, d.mtime, d.boy, t.sha256 FROM dosya d LEFT JOIN tarama t ON t.yol = d.yol "
                                        "WHERE COALESCE(d.gecerli, 1) = 1 AND COALESCE(d.kapsam, 'ortak') = 'ortak'"):
-        if os.path.splitext(yol)[1].lower() in TABLO_UZ and not yol.startswith("_canli/"): adaylar[yol] = (mt, boy, sha)
+        ext = os.path.splitext(yol)[1].lower()
+        if ext in TABLO_UZ and not yol.startswith("_canli/"):
+            if ext == ".gsheet": mt = google_surum(sha) or 0  # kısayol dosyası değişmez; içerik değişimi önbellekteki damgada
+            else:
+                try:
+                    if bulutta(os.stat(os.path.join(PROJE, yol))): continue  # yalnız bulutta: okumak indirtir, eski tablo kalır
+                except OSError: continue
+            adaylar[yol] = (mt, boy, sha)
     degisen = [k for k, (mt, boy, _) in adaylar.items() if zorla or (eski.get(k) or [None, None])[:2] != [mt, boy]]
     silinen = [k for k in eski if k not in adaylar]
     kart_degisti = zorla or kart_mt != kay.get("kart_mt") or (kart_mt is None and kay.get("kart"))
@@ -1436,13 +1687,15 @@ if __name__ == "__main__":
     a = sub.add_parser("ara"); a.add_argument("sorgu"); a.add_argument("--kim"); a.add_argument("--tur", help="virgüllü: toplanti,gorusme,analiz,sunum,tablo,belge,karar,kural,konusma")
     a.add_argument("--son", type=int, help="son N gün"); a.add_argument("--n", type=int, default=8); a.add_argument("--kapsam", choices=["ortak"], help="yalnız ortak kaynaklar")
     a.add_argument("--eski", action="store_true", help="eski sürümler dahil"); a.add_argument("--disa", action="store_true", help="dışa aktarımlar dahil (veritabanı kipinde)")
+    sub.add_parser("google-giris", help="Google hesabını bağla (bir kerelik; yalnız okuma izni, belirteç Anahtar Zinciri'nde)")
+    sub.add_parser("bulut-durum", help="yalnız bulutta duran dosyalar ve Google belgeleri: sayılar, eşik")
     pv = sub.add_parser("proje-vt", help="v0.121.0: proje veritabanını (<uygulama>/proje.db: Excel/CSV/Numbers sayfaları + onaylı kart) güncelle")
     pv.add_argument("--zorla", action="store_true", help="hepsini yeniden yaz")
     A = ap.parse_args()
     if A.cmd == "dizin":
         c = baglan(); guncelle(c, A.yeniden, sessiz=False)
         if hazirlik_suruyor(): print("dizin: sihirbazın proje hazırlığı sürüyor — çevirme ve gömme onda", file=sys.stderr); sys.exit(0)
-        if AYAR.get("cevir", True) is not False and os.path.exists(CEVIR_PY) and not toplantida():  # Brifing yardımcısının turu: çevrilmemiş PDF/görüntü (en çok ~4 dk)
+        if AYAR.get("cevir", True) is not False and (os.path.exists(CEVIR_PY) or google_hazir() or AYAR.get("bulut_indir")) and not toplantida():  # Brifing yardımcısının turu: çevrilmemiş PDF/görüntü (en çok ~4 dk)
             r = cevir(c, butce_sn=int(AYAR.get("cevir_tur_sn") or 240))
             if r["cevrildi"] or r["hata"] or r["durdu"]: print(cevir_ozet(r), file=sys.stderr)
         if not toplantida():  # T4: eksik gömmeler (en çok ~4 dk)
@@ -1455,6 +1708,9 @@ if __name__ == "__main__":
         r = cevir(sinir=A.n, yeniden_dene=A.yeniden_dene, sessiz=False); print(cevir_ozet(r))
     elif A.cmd == "tara":
         r = tara(); print(json.dumps(r, ensure_ascii=False, indent=1) if A.json else tara_ozet(r))
+    elif A.cmd == "google-giris": sys.exit(google_giris())
+    elif A.cmd == "bulut-durum":
+        c = baglan(); print(json.dumps({"bulut": bulut_ozet(c), "google": {"hazir": google_hazir(), **_json_oku(GOOGLE_DURUM, {}), "red": None}}, ensure_ascii=False, indent=1))
     elif A.cmd == "proje-vt":
         c = baglan(); guncelle(c); r = proje_vt_guncelle(c, zorla=A.zorla, sessiz=False)
         print("proje veritabanı kapalı (kayıt veritabanı ayarlı ya da ayar proje_vt: false)" if r is None else json.dumps(r, ensure_ascii=False))

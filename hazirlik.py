@@ -5,6 +5,7 @@
 #   python3 hazirlik.py tara               → yalnız tarama (B ekranı; hariç işareti değişince yeniden)
 #   python3 hazirlik.py calis [--kart]     → tara → çevir → dizinle → anlam dizini → (istenirse) proje kartı; sihirbaz kapansa da sürer
 #   python3 hazirlik.py kart               → kart taslağının tamamı (E ekranı)
+#   python3 hazirlik.py bulut-izin         → stdin JSON {"izin": bool, "mb": N} → ayar bulut_indir (yalnız bulutta duran dosyalar indirilsin mi; N MB'a kadar onay)
 #   python3 hazirlik.py kart-onayla        → stdin JSON {"cikar": {bölüm: [sıra no]}, "terimler": [terim]} → proje-karti.json + sözlük
 # Durum <uygulama>/hazirlik.json; iş kilidi <uygulama>/hazirlik.kilit (Brifing yardımcısının dizin turu kilit tutuluyken çevirme/gömme yapmaz).
 # Toplantı başlarsa çevirme/gömme/kart durur (baglam.toplantida); kalan iş Brifing yardımcısının 10 dk'lık turlarında sürer, kart sonra panodan.
@@ -51,6 +52,7 @@ def tahmin(r, c):
     for d in r.get("dosyalar") or []:
         ext = os.path.splitext(d["yol"])[1].lower()
         if ext not in B.CEVIR_UZ or d.get("gizli") or d.get("kopya_of") or d.get("hata"): continue
+        if ext in B.GOOGLE_UZ and not B.google_hazir(): continue  # Google hesabı bağlı değil: belge adıyla sayılır, çevrilecek iş sayılmaz
         if os.path.exists(B._onbellek_yol(d["sha256"])): continue
         cevir_n[ext] += 1; cevir_sn += CEVIR_SN.get(ext, CEVIR_GORUNTU_SN)
     # dizinlenecek metin: dizinde olmayan ya da değişmiş dosyalar (boyuttan kabaca 700 karakterlik parça); gömme eksikleri ayrıca
@@ -97,9 +99,24 @@ def ozet():
         out["tahmin"] = tahmin(r, c)
         out["dizin"] = {"dosya": c.execute("SELECT count(*) FROM dosya").fetchone()[0], "parca": c.execute("SELECT count(*) FROM parca").fetchone()[0],
                         "cevrilen": sum(1 for d in r.get("dosyalar") or [] if os.path.splitext(d["yol"])[1].lower() in B.CEVIR_UZ and d.get("sha256") and os.path.exists(B._onbellek_yol(d["sha256"])))}
+        out["bulut"] = B.bulut_ozet(c)  # yalnız bulutta duran dosyalar: kaç, kaç MB, eşik, onay gerekiyor mu
+        out["google"] = {"belge": s.get("google_belge", 0), "okundu": s.get("google_okundu", 0), "hazir": B.google_hazir(), "kimlik_yok": s.get("google_kimlik_yok", 0), "erisim_yok": s.get("google_erisim_yok", 0)}
     tk = kart_ozet()
     if tk: out["kart"] = tk
     return out
+def bulut_izin(girdi):
+    # sihirbazın "bulutta duran dosyaları indir" kararı → ayar bulut_indir (+ onay boyutu MB). kurulum.py ayar_degistir ile aynı kilit (aktarıcı ayar_yaz da alır).
+    izin = bool(girdi.get("izin")); mb = int(float(girdi.get("mb") or 0)) + 1 if izin else 0
+    yol = B.AYAR_YOL; os.makedirs(os.path.dirname(yol), exist_ok=True)
+    with open(yol + ".kilit", "a") as k:
+        fcntl.flock(k, fcntl.LOCK_EX)
+        try: a = json.load(open(yol, encoding="utf-8"))
+        except (OSError, ValueError): a = {}
+        if izin: a["bulut_indir"] = True; a["bulut_indir_onay_mb"] = max(mb, int(a.get("bulut_indir_onay_mb") or 0))
+        else: a.pop("bulut_indir", None); a.pop("bulut_indir_onay_mb", None)
+        with open(yol + ".tmp", "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
+        os.replace(yol + ".tmp", yol)
+    return {"ok": True, "bulut_indir": izin, "onay_mb": mb}
 
 def _kart_mod(): return _yukle("suflor_kart_hz", "proje-karti.py")
 def kart_ozet():
@@ -170,13 +187,14 @@ def calis(kart=False):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("ozet"); sub.add_parser("tara"); sub.add_parser("kart"); sub.add_parser("kart-onayla")
+    sub.add_parser("ozet"); sub.add_parser("tara"); sub.add_parser("kart"); sub.add_parser("kart-onayla"); sub.add_parser("bulut-izin")
     cl = sub.add_parser("calis"); cl.add_argument("--kart", action="store_true")
     A = ap.parse_args()
     if A.cmd == "ozet": print(json.dumps(ozet(), ensure_ascii=False))
     elif A.cmd == "tara":
         if calisiyor(): print(json.dumps({"ok": False, "hata": "sürüyor"})); sys.exit(0)
         r = B.tara(); print(json.dumps({"ok": True, "dosya": r["sayilar"]["dosya"]}))
+    elif A.cmd == "bulut-izin": print(json.dumps(bulut_izin(json.load(sys.stdin))))
     elif A.cmd == "kart": print(json.dumps(kart_tam(), ensure_ascii=False))
     elif A.cmd == "kart-onayla": print(json.dumps(kart_onayla(json.load(sys.stdin)), ensure_ascii=False))
     else: sys.exit(calis(A.kart))

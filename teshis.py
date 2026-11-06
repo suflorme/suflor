@@ -217,6 +217,14 @@ def klasor_turu(yol, ev=None):
     for ad, tur in (("Dropbox", "dropbox"), ("Google Drive", "googledrive"), ("OneDrive", "onedrive")):  # eski istemcilerin ev klasöründeki yeri
         if y == os.path.join(ev, ad) or y.startswith(os.path.join(ev, ad) + os.sep): return tur
     return "yerel"
+def _bulut_sayilari(s, uyg):
+    # v0.200.0: Google belgeleri (kaç tane, kaçının metni okundu, kimlik/erişim yok) ve indirilen bulut dosyaları — yalnız sayı; durum dosyaları baglam.py yazar
+    def oku(ad):
+        try: return json.load(open(os.path.join(uyg, ad), encoding="utf-8"))
+        except (OSError, ValueError): return {}
+    g, b = oku("google-durum.json"), oku("bulut-durum.json"); n = lambda v: v if isinstance(v, int) and not isinstance(v, bool) else 0
+    return {"google_belge": n(s.get("google_belge")), "google_okundu": n(s.get("google_okundu")), "google_kimlik_yok": n(g.get("kimlik_yok")), "google_erisim_yok": n(g.get("erisim_yok")),
+            "bulut_indirilen": n(b.get("kayit")), "bulut_onay_bekliyor": 1 if b.get("onay_bekliyor") else 0, "bulut_indir_acik": bool(b.get("acik"))}
 def proje_olcu(proje, uyg):
     o = {"klasor_turu": klasor_turu(proje)}
     try: r = json.load(open(os.path.join(uyg, "tarama.json"), encoding="utf-8"))
@@ -224,7 +232,8 @@ def proje_olcu(proje, uyg):
     if not proje or os.path.realpath(os.path.expanduser(str(r.get("proje") or ""))) != os.path.realpath(os.path.expanduser(str(proje))): return dict(o, tarandi=False)
     s = r.get("sayilar") or {}
     return dict(o, tarandi=True, tarama_gun_once=round((time.time() - (r.get("t") or time.time())) / 86400, 1), dosya=s.get("dosya"),
-                bulutta=s.get("bulutta"), bulut_kisayol=s.get("bulut_kisayol"), okunamayan=(s.get("okunamayan") or 0) + len(s.get("erisilemeyen") or []))
+                bulutta=s.get("bulutta"), bulut_kisayol=s.get("bulut_kisayol"), okunamayan=(s.get("okunamayan") or 0) + len(s.get("erisilemeyen") or []),
+                **_bulut_sayilari(s, uyg))
 
 # ---------- hata özeti ----------
 def hata_ozeti(tur, deger, tb):

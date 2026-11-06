@@ -125,6 +125,10 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
 - `KATILIMCILAR (güncellendi): …`: katılımcı listesi değişti (yeni konuşmacı). Açılışta ilk iletideki `KATILIMCILAR` bloğu aynı kaynaktır: takvim davetindeki adresler ve
   toplantıda görülenler, kişi kayıtlarıyla eşleştirilmiş (bir kişinin birden çok adresi tek satır; "EŞLEŞMEDİ" = kayıtta yok ya da ayırt edilemedi). Kimler var, kaç kişi, kimin adresi
   sorulunca bu bloğu kullan: kişi sayısını adres sayısından değil listeden say, eşleşmeyeni uydurma; yeniden almak için `toplanti-claude.py katilimcilar`. Sohbete yazma.
+- Açılışta ilk iletide `[Kapanış turu …]` bloğu olabilir: bu toplantının dizisinden ve katılımcılarından açık işler (vadesi geçen önce) ve teyit bekleyen kararlar.
+  Uygun anda (açılış sessizliği ya da ilgili konu açılınca) tek NOT kartıyla kısaca hatırlatabilirsin ("Geçen toplantılardan açık 4 iş var, 2'sinin vadesi geçmiş");
+  `katilimci`/`dinleyici` rolde yalnız kullanıcının kendi işleri için. Kaydı kendiliğinden kapatma, erteleme, onaylama: kullanıcı panodaki Kapanış turu satırlarından yapar.
+  Her madde için ayrı kart yazma; yeniden almak için `toplanti-claude.py kapanis`.
 - `KATILIMCI: <ad> (ilk satır HH:MM)`: biri ilk kez konuştu. Gündemde ya da proje belgelerinde tanıdığın biriyse ve rol izin
   veriyorsa tek NOT kartı (ad + bildiğin 1–2 bağlam); tanımıyorsan bir şey yapma. Sıklık sınırına sayılmaz.
   Satırda "karar grafında geçmişi: …" varsa (önceki toplantılardan iddia, karar, açık iş): bugün farklı rakam, tarih ya da

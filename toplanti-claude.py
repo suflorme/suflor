@@ -165,6 +165,7 @@ tk = sub.add_parser("takvim", help="v0.9.3: Mac Takvim'den sıradaki toplantıla
 tk.add_argument("--id", default=None); tk.add_argument("--n", type=int, default=6)
 tk.add_argument("--gun", type=int, default=1, help="v0.55.0: kaç gün (v0.59.0: en çok 30); 1'den büyükse çalışma saatlerindeki boş zamanlar da (uygun zaman önerisi)")
 sub.add_parser("katilimcilar", help="6 Kasım: toplantının KATILIMCILAR bloğu — takvim daveti + toplantıda görülen konuşmacılar, kişi kayıtlarıyla eşleştirilmiş (yalnız okuma)")
+sub.add_parser("kapanis", help="6 Kasım: kapanış turu — bu toplantının dizisinden ve katılımcılarından açık işler (vadesi geçen önce) ve teyit bekleyen kararlar (yalnız okuma; kapatmayı kullanıcı panodan yapar)")
 kp = sub.add_parser("kisi", help="S225: Mac Kişiler'de ada göre ara (yalnız okuma; e-posta, telefon, adres; en çok 5 eşleşme) — davet adresi, 'X'in numarası' soruları")
 kp.add_argument("ad", nargs="+")
 rp = sub.add_parser("rapor", help="v0.9.9: geliştiriciye geri bildirim — içeriksiz paket (sürüm, ölçüm, kart dönüşleri, günlük, gözlemler) → <ortak>/geri-bildirim")
@@ -2872,6 +2873,10 @@ def kisi_ara(ad):  # aktarıcı /kisi (Suflor Takvim.app --kisi); → metin
     return "\n".join(f"- {c['ad']}" + (f" ({c['kurum']})" if c.get("kurum") else "") + (" · e-posta: " + ", ".join(c["eposta"]) if c.get("eposta") else "")
                       + (" · telefon: " + ", ".join(c["telefon"]) if c.get("telefon") else "") + (" · adres: " + " | ".join(c["adres"]) if c.get("adres") else "") for c in o["kisiler"]), False
 def kisi_cmd(): print(kisi_ara(" ".join(A.ad))[0])
+def kapanis_cmd():
+    try: v = get("/kapanis-turu")
+    except Exception as e: sys.exit(f"aktarıcıya ulaşılamadı: {e}")
+    print(v.get("blok") or ("kapanış turu kapalı (ayar kapanis_turu)" if v.get("kapali") else "kapanış turunda kayıt yok (bu toplantının dizisinden/katılımcılarından açık iş ya da teyit bekleyen karar yok)"))
 def katilimcilar_cmd():
     try: v = get("/katilimcilar")
     except Exception as e: sys.exit(f"aktarıcıya ulaşılamadı: {e}")
@@ -3120,6 +3125,6 @@ def _hms(sn):
 try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "taahhut": taahhut_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
-     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "katilimcilar": katilimcilar_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
+     "karsilastir": karsilastir_cmd, "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "katilimcilar": katilimcilar_cmd, "kapanis": kapanis_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
      "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "dosyadan": dosyadan_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "kisi-es": kisi_es_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

@@ -67,7 +67,7 @@ class SP:
     DEVNULL = None
     @staticmethod
     def run(c, *a, **k): CAGRI.append(("run", [os.path.basename(x) for x in c[1:3]])); return type("R", (), {"returncode": 0})
-g.update(subprocess=SP, modeller_dene=lambda: CAGRI.append(("modeller_dene",)), say=lambda *a, **k: None, ayar=lambda: {},
+g.update(subprocess=SP, modeller_dene=lambda: CAGRI.append(("modeller_dene",)), say=lambda *a, **k: None, whispercpp_baslat=lambda: None, whispercpp_durum=lambda: {}, ayar=lambda: {},
          urllib=type("U", (), {"request": type("Q", (), {"urlopen": staticmethod(lambda *a, **k: (_ for _ in ()).throw(OSError("yok")))})}))
 g["guncelleme_sonrasi"]()
 ok(f"guncelleme_sonrasi sırası: kur → modeller_dene {CAGRI}", CAGRI[:2] == [("run", ["kurulum.py", "kur"]), ("modeller_dene",)])

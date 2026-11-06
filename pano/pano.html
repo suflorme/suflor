@@ -110,6 +110,7 @@ html.mac.kc-kapali #kenar{display:none}html.mac.kc-kapali .grid{grid-template-co
 #kenar .kalt{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px;font-size:var(--yz-2);color:var(--t2);border-top:.5px solid var(--bd);position:sticky;bottom:0}#kenar .kalt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:720px){html.mac #kenar{display:none}html.mac .grid{grid-template-columns:minmax(0,1fr)!important}}
 /* v0.111.0: arka plandaki toplantı oturumu (Terminal yok) — Claude'un yazdıkları, soru sorunca vurgu */
+#kt .kts{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:6px 0;border-top:1px solid var(--bd)}#kt .kts:first-child{border-top:0}#kt .ktm{flex:1 1 60%;min-width:0;overflow-wrap:anywhere;font-size:var(--yz-3)}#kt .ktd{font-size:var(--yz-2);color:var(--t3)}#kt .ktd.gec{color:var(--dikkat);font-weight:600}#kt .kte{display:flex;gap:4px;flex:none;margin-left:auto}#kt .kte button{padding:2px 8px;font-size:var(--yz-2)}#kt .ktb{font-size:var(--yz-2);font-weight:600;color:var(--t2);margin:8px 0 2px}#kt .ktb:first-child{margin-top:0}
 #tos .tom{max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:6px;padding:2px 0}
 #tos .tm{font-size:var(--yz-3);line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}#tos .tm .tt{color:var(--t3);font-size:var(--yz-1);margin-right:6px}
 #tos .tm.ben{color:var(--t2);border-left:2px solid var(--bd2);padding-left:8px}#tos .tm.sistem,#tos .tm.arac{font-size:var(--yz-2);color:var(--t3)}#tos .tm.izin{font-size:var(--yz-2);color:var(--wa)}
@@ -395,6 +396,7 @@ html.bugun #tos .sh{padding-inline:0}html.bugun #tos .tob{display:-webkit-box;-w
 <section id=eys hidden><div class=sh><span>Bekleyenler <span id=eyn class=meta></span></span><button id=eyh class="gh lnk" title="Listedeki bekleyen işlerin hepsini onayla — {asistan} yalnız yazıldığı gibi uygular">Hepsini onayla</button></div><div id=ey></div></section>
 <section id=sns hidden><div class=sh><span>Son toplantılar</span></div><div id=sn></div><button id=snt class="gh lnk" type=button title="Tüm toplantılar">Tümü</button></section>
 <section id=nts hidden><div class=sh><span>Notlar <span id=ntn class=meta></span></span></div><div id=nt></div></section>
+<section id=kts hidden aria-label="Kapanış turu"><div class=sh><span>Kapanış turu <span id=ktn class=meta></span></span><button id=ktk class="gh lnk" type=button>Gizle</button></div><div id=kt></div></section>
 <section id=tos hidden><div class=sh><span class=brb><span id=tosad>Suflor</span> <span id=tosd class=meta></span></span><span class=tod><button id=tosa class=gh title="Araç adımlarını da göster (komutlar, dosyalar)">Ayrıntı</button><button id=tosx class=gh title="Şu anki işi durdurur; yazarsan kaldığı yerden sürer">Durdur</button><button id=tost class=gh title="Aynı oturumu Terminal'de açar; arka plandaki kapanır. Terminal'e alınınca arka plandaki toplantı izlemesi durur (Terminal'de yeniden başlatman gerekir) ve kutuya yazdığın notlar oturuma gitmez — Terminal'den yaz.">Terminal'de göster</button><button id=tosk class=gh title="Toplantı oturumunu kapatır; toplantı sonu işleri (özet) yapılmaz. Sürdürmek için sonra Terminal'de göster.">Kapat</button></span></div><div id=tosn class=tosn hidden></div><div id=tol class=tol hidden></div><div id=tom class=tom></div><div id=tiz></div><div id=tob class=tob></div></section>
 <section id=eps hidden aria-label="E-posta"></section>
 <section id=sk><div class=sh><span>Şimdi <span id=szd class=meta></span></span><span id=tone></span></div><div id=py class=py></div><div id=kc></div></section>
@@ -591,11 +593,11 @@ function eyAyr(a){
   }).join('')
   return `<div class=eyr>${out}</div>`
 }
-const EYT={kayit:L("Kayıt"),takvim:L("Takvim"),eposta:L("E-posta"),belge:L("Belge"),takip:L("Takip e-postası"),mesaj:L("Ekip mesajı"),diger:L("Diğer"),oturum:L("Oturuma talimat"),yapilacak:L("Yapılacak")}
+const EYT={kayit:L("Kayıt"),takvim:L("Takvim"),eposta:L("E-posta"),belge:L("Belge"),takip:L("Takip e-postası"),mesaj:L("Ekip mesajı"),diger:L("Diğer"),oturum:L("Oturuma talimat"),yapilacak:L("Yapılacak"),is:L("İş")}
 const EYD={onaylandi:L("onaylandı — uygulanıyor"),reddedildi:L("reddedildi"),yapildi:L("yapıldı"),hata:L("yapılamadı")}
 // Bekleyenler (30 Ekim): satır = tür simgesi + tek satır başlık; sağda yalnız tek tıkla biten işte (takvim, kayıt, yapılacak, oturuma talimat; sesli sorulan) Onayla,
 // diğerlerinde ›. Satıra dokununca ayrıntı ve eylemler (Reddet, Kopyala, e-posta metni) yerinde açılır; açık satırlar yenilemede açık kalır.
-const EYI={kayit:'dosya',takvim:'takvim',eposta:'posta',belge:'belge',takip:'posta',mesaj:'chat',diger:'liste',oturum:'sohbet',yapilacak:'check'},EY_TEK=['takvim','kayit','yapilacak','oturum'],eyAcik=new Set()
+const EYI={kayit:'dosya',takvim:'takvim',eposta:'posta',belge:'belge',takip:'posta',mesaj:'chat',diger:'liste',oturum:'sohbet',yapilacak:'check',is:'check'},EY_TEK=['takvim','kayit','yapilacak','oturum','is'],eyAcik=new Set()
 function renderEylem(s){const e=s.eylem||{},ls=(e.liste||[]).filter(x=>x.sunuldu),sec=document.getElementById('eys');sec.hidden=!ls.length;if(!ls.length)return
   const bek=ls.filter(x=>x.durum==="bekliyor").length;document.getElementById('eyn').textContent=bek?String(bek):"";document.getElementById('eyh').hidden=bek<2
   setH(document.getElementById('ey'),ls.map(x=>{const b=x.durum==="bekliyor",ses=x.id===e.sesli,tek=b&&(ses||EY_TEK.includes(x.tur)),id=esc(x.id)
@@ -1576,6 +1578,34 @@ async function renderOturum(s){const o=s.toplanti_oturum,sec=document.getElement
   // 30 Ekim (Bugün): toplantı yokken oturumun durum/rapor metinleri katlı — başlıkta durum, altında son iletinin iki satırı; dokununca tamamı ve düğmeler
   {const kap=!s.aktif&&!tosAcik&&!bek&&!(o.izinler||[]).length,p=document.getElementById('tosn'),son=[...tosM].reverse().find(m=>m.kim==="claude"),t=son?String(son.metin).replace(/[*`#>|]/g,'').replace(/\s+/g,' ').trim():''
    sec.classList.toggle('kapali',kap);p.hidden=!kap||!t;p.textContent=t}}
+// Kapanış turu (6 Kasım, S211/S227): toplantı sürerken bu toplantının dizisinden/katılımcılarından açık işler (vadesi geçen önce) ve teyit bekleyen kararlar (/kapanis-turu).
+// İş: Bitti (/is-durum yapildi) · Ertele (/kayit-eylem ertele, bir hafta sonra) · İptal (/is-durum yapilmadi) · Sonra (yalnız bu toplantıda gizlenir). Karar: Onayla (/karar-onay) · Reddet (/kayit-eylem) · Sonra.
+// Yazma 5 sn sonra (Geri al bu sürede vazgeçer); her yazma bir olay. Deneme toplantısında aktarıcı yalnız deneme kayıtlarını verir.
+let ktV=null,ktT=0,ktTop='',ktSonra=new Set(),ktBek=new Set(),ktGiz=false
+async function ktYukle(){try{const v=await j('/kapanis-turu');ktV=v&&v.ok?v:null}catch(e){ktV=null}ktT=Date.now();if(last)renderKapanis(last)}
+function ktSat(x){const ka=x.tur==='karar',o=x.onay||{},kim=x.kim?esc(x.kim)+' · ':''
+  const d=ka?(o.durum==='onaylanmadi'?L('onaylanmadı'):(o.gun>=1?L('{n} gündür onay bekliyor',{n:o.gun}):L('onay bekliyor'))):x.gecikti?L('{n} gün gecikti',{n:-x.kalan_gun}):x.vade?esc(x.vade):L('tarihsiz')
+  const dg=(ka?(o.durum==='onaylanmadi'||x.eski):x.gecikti)?' gec':'',kay=[x.baslik,String(x.tarih||'').slice(0,10)].filter(Boolean).join(', ')
+  const bt=(a,t)=>`<button type=button class=gh data-kt=${a}>${esc(t)}</button>`
+  return`<div class=kts data-id="${esc(x.id)}"><span class=ktm>${esc(x.metin)}</span><span class="ktd${dg}">${kim}${d}${kay?' · '+esc(kay):''}</span><span class=kte>${ka?bt('onayla',L('Onayla'))+bt('reddet',L('Reddet')):bt('bitti',L('Bitti'))+bt('ertele',L('Ertele'))+bt('iptal',L('İptal'))}${bt('sonra',L('Sonra'))}</span></div>`}
+function renderKapanis(s){const sec=document.getElementById('kts'),o=s&&s.toplanti_oturum,t0=o&&o.t0?String(o.t0):''
+  if(!s||!s.aktif||!o){sec.hidden=true;return}
+  if(t0!==ktTop){ktTop=t0;ktSonra=new Set();ktGiz=false;ktV=null;ktT=0}
+  if(!ktT||Date.now()-ktT>120000){ktT=Date.now();ktYukle();return}
+  const gz=x=>!ktSonra.has(x.id)&&!ktBek.has(x.id),is=((ktV||{}).isler||[]).filter(gz),ka=((ktV||{}).kararlar||[]).filter(gz)
+  sec.hidden=ktGiz||!(is.length+ka.length);if(sec.hidden)return
+  const sy=(ktV||{}).say||{};document.getElementById('ktn').textContent=L('{n} iş, {k} karar',{n:sy.is||0,k:sy.karar||0})
+  setH(document.getElementById('kt'),(is.length?`<div class=ktb>${esc(L('Açık işler'))}</div>`+is.map(ktSat).join(''):'')+(ka.length?`<div class=ktb>${esc(L('Teyit bekleyen kararlar'))}</div>`+ka.map(ktSat).join(''):''))}
+function ktHafta(){const d=new Date();d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+document.getElementById('ktk').onclick=()=>{ktGiz=true;if(last)renderKapanis(last)}
+document.getElementById('kt').addEventListener('click',ev=>{const b=ev.target.closest('button[data-kt]');if(!b)return;const id=b.closest('.kts').dataset.id,a=b.dataset.kt
+  if(a==='sonra'){ktSonra.add(id);if(last)renderKapanis(last);return}
+  const yap={bitti:()=>bnYaz('/is-durum',{id,durum:'yapildi'}),iptal:()=>bnYaz('/is-durum',{id,durum:'yapilmadi'}),ertele:()=>bnYaz('/kayit-eylem',{id,eylem:'ertele',vade:ktHafta(),neden:L('kapanış turu')}),
+    onayla:()=>bnYaz('/karar-onay',{idler:[id]}),reddet:()=>bnYaz('/kayit-eylem',{id,eylem:'reddet'})}[a]
+  const msj={bitti:L('İş yapıldı olarak işaretlendi'),iptal:L('İş iptal edildi'),ertele:L('İş bir hafta ertelendi'),onayla:L('Karar onaylandı'),reddet:L('Karar reddedildi')}[a]
+  if(!yap)return;ktBek.add(id);if(last)renderKapanis(last)
+  const t=setTimeout(async()=>{try{await yap()}catch(e){}ktBek.delete(id);await ktYukle()},5000)
+  bnBildir(msj,()=>{clearTimeout(t);ktBek.delete(id);if(last)renderKapanis(last)})})
 document.getElementById('tos').addEventListener('click',ev=>{if(last&&last.aktif)return;if(ev.target.closest('button,a,.tom,#tiz'))return;if(!ev.target.closest('.sh,#tosn'))return;tosAcik=!tosAcik;if(last)renderOturum(last)})
 document.getElementById('tosx').onclick=async ev=>{ev.currentTarget.disabled=true;try{await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"durdur"})})}catch(e){}ev.currentTarget.disabled=false;refresh()}
 document.getElementById('tost').onclick=async ev=>{ev.currentTarget.disabled=true;try{const r=await (await fetch('/toplanti-oturum',{method:'POST',body:JSON.stringify({islem:"terminal"})})).json();if(!r.ok)geciciDurum(r.err||L("Açılamadı"),"",6000)}catch(e){}ev.currentTarget.disabled=false;refresh()}
@@ -1946,7 +1976,11 @@ const EMG=[['onayla','reddet','yapildi','iptal','ac','cevaplandi'],['ertele','bo
 const emGun=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 // onay süresi göstergesi (3. gün hatırlatma, 7. gün ya da sonraki dizi toplantısında "onaylanmadı"): ince nokta + kısa metin
 const emOnayIs=o=>!o?'':o.durum==='onaylanmadi'?`<span class="onayis son" title="${esc(o.neden||'')}">${L('Onaylanmadı')}</span>`:o.hatirlat?`<span class=onayis title="${L('Toplantıdan beri {n} gün geçti',{n:o.gun})}">${L('{n}. gün: onay bekliyor',{n:o.gun})}</span>`:''
-const emBtn=k=>`<button type=button class=emi data-em=${['ertele','bol','gundem','ata','tarihce'].includes(k)?'mod':'run'} data-e=${k}${emYuk?' disabled':''}>${ic(EMI[k])}<span>${esc(EML[k])}${EMA[k]?`<small>${esc(EMA[k])}</small>`:''}</span></button>`
+// sunucu hata metinleri (Türkçe, kısa) → arayüz dili; bilinmeyen tek sözcük (istisna sınıfı adı) anlaşılır "Yapılamadı."ya döner
+const EMER={'vade yok':L('Vade seç.'),'yalnız iş ertelenir':L('Yalnız iş ertelenir.'),'iş ve en az iki parça gerekir':L('En az iki parça yaz.'),'toplantı yok':L('Takvimde sıradaki uygun toplantı yok.'),'toplantı bulunamadı':L('Seçilen toplantı takvimde bulunamadı.'),'kişi yok':L('Kişi adı yaz.'),'kayıt yok':L('Kayıt bulunamadı.'),
+  'bu iş senin; kendine taslak yazılmaz':L('Bu iş senin; kendine taslak yazılmaz.'),'Claude Code yok':L('Claude bu bilgisayarda bulunamadı.'),'zaman aşımı':L('Claude zamanında yanıt vermedi.'),'Claude yanıt vermedi':L('Claude zamanında yanıt vermedi.'),'yanıt gelmedi':L('Claude zamanında yanıt vermedi.'),'olay bu kayda ait değil':L('Yapılamadı.')}
+const emHata=e=>{e=String(e||'');return EMER[e]||(/\s/.test(e)?L(e):L('Yapılamadı.'))}
+const emBtn=k=>{const ps=k==='teams'&&emV&&emV.pasif&&emV.pasif.teams;return`<button type=button class=emi data-em=${['ertele','bol','gundem','ata','tarihce'].includes(k)?'mod':'run'} data-e=${k}${emYuk?' disabled':''}>${ic(EMI[k])}<span>${esc(EML[k])}${ps?`<small>${esc(L(ps))}</small>`:EMA[k]?`<small>${esc(EMA[k])}</small>`:''}</span></button>`}
 function emKayit(){const k=emKid;let x=((knV||{}).kayitlar||[]).find(y=>y.kayit_id===k||y.id===k);if(!x){const b=bnV||{};x=[...(b.kendi||[]),...(b.baskalari||[]),...(b.teyit||[])].find(y=>y.kayit_id===k||y.id===k)}return x||(emV&&emV.kayit)||null}
 function emCiz(){const g=bnE('emg'),v=emV,x=emKayit()||{}
   bnE('emt').textContent=x.tur==='karar'?L('Karar'):x.tur==='soru'?L('Açık soru'):L('İş');bnE('emh').textContent=String(x.metin||'')
@@ -1983,7 +2017,7 @@ function emTaslakAc(t){if(!t)return
 async function emRun(e,p){if(emYuk)return{ok:false};emYuk=true;emMsj=e==='claude'?L('Claude çalışıyor… yarım dakikaya kadar sürebilir.'):'';emCiz()
   let r={};try{r=await bnYaz('/kayit-eylem',Object.assign({id:emKid,eylem:e},p||{}))}catch(x){r={ok:false,err:'ağ'}}
   emYuk=false
-  if(!r.ok){emMsj=r.err==='gizli'?L('Gizli toplantının kaydı: eylem yapılmaz.'):r.err==='ağ'?L('Aktarıcıya ulaşılamadı.'):(r.err||L('Yapılamadı.'));emCiz();return r}
+  if(!r.ok){emMsj=r.err==='gizli'?L('Gizli toplantının kaydı: eylem yapılmaz.'):r.err==='ağ'?L('Aktarıcıya ulaşılamadı.'):emHata(r.err);emCiz();return r}
   emMsj=e==='gundem'&&r.toplanti?L('Gündeme eklendi: {t}',{t:r.toplanti.baslik||''}):r.olay===null&&e!=='geri_al'?L('Zaten böyle; değişiklik yok.'):(EMT[e]||'')+(r.alici_yok?' — '+L('alıcı adresi bulunamadı, taslak alıcısız açıldı'):'')
   if(r.taslak)emTaslakAc(r.taslak)
   try{emV=await j('/kayit-menu?id='+encodeURIComponent(emKid))}catch(x){}
@@ -2074,7 +2108,7 @@ durumCiz()
 const wasBottom=atBottom
 renderLines(s.tail); renderTaslak(s.taslak)
 if(wasBottom)main.scrollTop=main.scrollHeight
-paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderNotlar(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSon(s); renderOturum(s); bnYukle(); renderEposta(s); bnVeriYukle(); bnCiz(s)
+paintCards(document.getElementById("kc"),s); paintMini(s); renderTakvim(s); renderNotlar(s); renderBrifing(s); renderKonus(s); renderHat(document,s); renderDosyadan(s); renderSon(s); renderKapanis(s); renderOturum(s); bnYukle(); renderEposta(s); bnVeriYukle(); bnCiz(s)
 if(s.ayarlar&&s.ayarlar.deger)temaUygula(s.ayarlar.deger.tema||'sistem');if(s.ayarlar&&s.ayarlar.deger){const h=document.documentElement;if(s.ayarlar.deger.renk_duzeni==='yesil')h.dataset.renk='yesil';else delete h.dataset.renk}  // tema başka pencereden (Ayarlar) değiştiyse de
 // arayüz dili başka pencereden (Ayarlar) değiştiyse bu sayfa da yeni dille yeniden yüklenir
 if(s.ayarlar&&s.ayarlar.deger&&s.ayarlar.deger.dil&&s.ayarlar.deger.dil!==DIL&&!new URLSearchParams(location.search).get('dil')&&!window._dilYeni){window._dilYeni=1;location.reload()}

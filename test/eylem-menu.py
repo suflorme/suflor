@@ -73,12 +73,12 @@ r = tek_olay("böl", IS, "bol", {"parcalar": ["Fiyatları topla", {"metin": "Tab
 bak("böl: tek parça ya da boş reddedilir", not eylem(IS, "bol", {"parcalar": ["tek"]})["ok"] and not eylem(KARAR, "bol", {"parcalar": ["a", "b"]})["ok"])
 # --- taslaklar: gönderme yok ---
 n = olay_say(C); r = eylem(IS, "eposta", {}); t = r["taslak"]
-bak("e-posta taslağı: alıcı sahibin adresi, konu ve gövde kayıttan; olay taslak_hazirlandi", r["ok"] and t["alicilar"] == ["zeynep.kaya" + AT + "firma.test"] and "Tabloyu güncelle" in t["govde"] and t["govde"].startswith("Merhaba Zeynep,") and "2026-11-20" in t["govde"]
+bak("e-posta taslağı: alıcı sahibin adresi, konu ve gövde kayıttan; olay taslak_hazirlandi", r["ok"] and t["alicilar"] == ["zeynep.kaya" + AT + "firma.test"] and "Tabloyu güncelle" in t["govde"] and t["govde"].startswith("Merhaba Zeynep,") and "20 Kasım" in t["govde"]
     and t["konu"].startswith("İş: Tabloyu") and olay_say(C) == n + 1 and son_olaylar(C, 1)[0][1] == "taslak_hazirlandi", (r, t))
 u = urllib.parse.urlsplit(t["teams"]); q = urllib.parse.parse_qs(u.query)
 bak("Teams taslağı: msteams:/l/chat/0/0, users = alıcı, message önceden dolu", t["teams"].startswith("msteams:/l/chat/0/0?users=zeynep.kaya" + AT + "firma.test&message=") and "Tabloyu güncelle" in q["message"][0] and q["users"] == ["zeynep.kaya" + AT + "firma.test"], t["teams"])
 r2 = eylem(IS, "teams", {"alicilar": ["a" + AT + "x.test", "B" + AT + "x.test"]}); bak("Teams: verilen alıcılar, birden çoğu virgülle", r2["taslak"]["teams"].startswith("msteams:/l/chat/0/0?users=a" + AT + "x.test,b" + AT + "x.test&message="))
-r3 = eylem(KARAR, "eposta", {}); bak("alıcısı olmayan taslak: boş alıcı, alici_yok işareti, yine olay", r3["ok"] and r3["alici_yok"] and r3["taslak"]["alicilar"] == [] and "karar" in r3["taslak"]["konu"].lower() and "users=&message=" in r3["taslak"]["teams"])
+r3 = eylem(KARAR, "eposta", {}); bak("alıcısı olmayan taslak: boş alıcı, alici_yok işareti, yine olay", r3["ok"] and r3["alici_yok"] and r3["taslak"]["alicilar"] == [] and "karar" in r3["taslak"]["konu"].lower() and "users=&message=" in r3["taslak"]["teams"], r3)
 bak("taslak içinde teyit eki ve satır sonu bozulmaz; özel karakter kodlanır", "Merhaba" in yapi.taslak_icerik({"tur": "is", "metin": "a&b=c #1 (teyit bekliyor — x)", "baslik": "T", "tarih": "2026-11-05"}, "teams", ["x" + AT + "y.test"], "Ali")["teams"] is False
     or "a%26b%3Dc" in yapi.taslak_icerik({"tur": "is", "metin": "a&b=c #1 (teyit bekliyor — x)", "baslik": "T", "tarih": "2026-11-05"}, "teams", ["x" + AT + "y.test"], "Ali")["teams"])
 en = yapi.taslak_icerik({"tur": "is", "metin": "Update the table", "baslik": "Weekly", "tarih": "2026-11-05"}, "eposta", ["x" + AT + "y.test"], "Ali", dil="en"); bak("İngilizce taslak", en["govde"].startswith("Hi Ali,") and en["konu"].startswith("Task:"))
@@ -139,4 +139,40 @@ try:
     bak("/vt-bellek kisi_adres: kayıt veritabanı adresi kimlik modülüne yüklenir (kaynak vt)", r["ok"] and c["eposta"] == "tolga.er" + AT + "firma.test" and c["kaynak"] == "vt" and ns2["vt_bellek_view"]()["kimlik"] >= 1, (r, c))
     ns2["vt_bellek_al"]({"adlar": ["X"], "terimler": []}); bak("kisi_adres alanı yoksa yüklü adresler silinmez", ns2["kimlik_coz"]("Tolgay", kisiler=False)["eposta"] == "tolga.er" + AT + "firma.test")
 except Exception as e_: bak(f"/vt-bellek kisi_adres testi çalıştırılamadı ({e_.__class__.__name__}: {e_})", False)
+# --- Teams/e-posta taslağı: kendi işi, e-postasız sahip, okunur tarih ---
+yapi.graf_yaz(C, {"baslik": "Ekip toplantısı", "tarih": "2026-11-05", "maddeler": [{"baslik": "G", "ogeler": [
+    {"tur": "is", "metin": "Davet gönderilecek", "sahip": "Ayşe Deneme", "tarih": "2026-11-12", "saat": "10:20:00"},
+    {"tur": "is", "metin": "Rapor hazırlanacak", "sahip": "Deniz Bilinmez", "tarih": "2026-11-12", "saat": "10:21:00"}]}]}, "2026-11-05-1000-Ekiucular.md"); dokum(C, "2026-11-05-1000-Ekiucular")
+yapi.kayit_listesi(C, "Ayşe Deneme", datetime.date(2026, 11, 5)); KEND = _id("Davet gönderilecek", "s"); BILINMEZ = _id("Rapor hazırlanacak", "s")
+mk = yapi.eylem_menu(C, KEND, TAKVIM, kimlik_f=kimlik_f)
+bak("kendi işinde menüde e-posta/Teams taslağı yok, kendi işareti var", mk["ok"] and mk["kendi"] and "teams" not in mk["eylemler"] and "eposta" not in mk["eylemler"] and "ata" in mk["eylemler"], mk["eylemler"])
+rk = eylem(KEND, "teams", {}); bak("kendi işine Teams taslağı reddedilir, olay yazılmaz", not rk["ok"] and "senin" in rk["err"], rk)
+mb = yapi.eylem_menu(C, BILINMEZ, TAKVIM, kimlik_f=kimlik_f)
+bak("e-postası bilinmeyen sahip: menüde Teams pasif ve nedeni yazılı", mb["ok"] and not mb["kendi"] and "teams" in mb["eylemler"] and "e-postası yok" in mb["pasif"].get("teams", ""), mb)
+n = olay_say(C); rb = eylem(BILINMEZ, "teams", {}); bak("e-postasız sahide Teams: boş Kime açılmaz, neden yazılı, olay yok", not rb["ok"] and "e-postası yok" in rb["err"] and olay_say(C) == n, rb)
+re_ = eylem(BILINMEZ, "eposta", {}); bak("e-postasız sahide e-posta taslağı alici_yok işaretiyle", re_["ok"] and re_["alici_yok"], re_)
+tt = yapi.taslak_icerik({"tur": "is", "metin": "12 Kasım toplantı davetini göndermek", "baslik": "Ekip — Dönüşüm (Karar ve Rol İnceleme)", "tarih": "2026-11-05", "vade": "2026-11-12"}, "teams", ["can" + AT + "x.test"], "Can Örnek", dil="tr")
+mesaj = urllib.parse.parse_qs(urllib.parse.urlsplit(tt["teams"]).query)["message"][0]
+bak("Teams metni: okunur tarih, toplantı adı tekrarı yok, ham tarih yok", "5 Kasım toplantısından" in mesaj and "Organizasyonel" not in mesaj and "2026-" not in mesaj and mesaj.startswith("Merhaba Can,") and "vade: 12 Kasım" in mesaj, mesaj)
+# --- uçtan uca denemede bulunanlar (6 Kasım): bozuk tür girdisi kayda yazılmaz; karar menüsünde Teams nedeni doğru kişiyi söyler, adres kimlikten çözülürse pasif olmaz ---
+n = olay_say(C); vade0 = yapi.ortak_kayit(C, KEND)["vade"]
+bak("ertele: liste/sözlük vade kayda \"['x']\" olarak yazılmaz", not eylem(KEND, "ertele", {"vade": ["x"]})["ok"] and not eylem(KEND, "ertele", {"vade": {"a": 1}})["ok"] and yapi.ortak_kayit(C, KEND)["vade"] == vade0 and olay_say(C) == n)
+bak("böl: parçalar liste değilse (metin) harf harf bölünmez", not eylem(KEND, "bol", {"parcalar": "abc"})["ok"] and olay_say(C) == n)
+bak("ata: sözlük ad kayda \"{'a': 1}\" olarak yazılmaz", not eylem(KEND, "ata", {"sahip": {"a": 1}})["ok"] and olay_say(C) == n and yapi.ortak_kayit(C, KEND)["roller"]["sahip"]["ad"] == "Ayşe Deneme")
+bak("ertele: çok uzun serbest metin 20 karaktere kırpılır", eylem(BILINMEZ, "ertele", {"vade": "x" * 200})["kayit"]["vade"] == "x" * 20)
+yapi.graf_yaz(C, {"baslik": "Karar toplantısı", "tarih": "2026-11-05", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "karar", "metin": "Bütçe ikiye bölünecek", "kim": "Can Örnek", "saat": "10:30:00", "netlik": "ortuk"}]}]}, "2026-11-05-1100-Karar.md"); dokum(C, "2026-11-05-1100-Karar")
+yapi.kayit_listesi(C, "Ayşe Deneme", datetime.date(2026, 11, 5)); KR = _id("Bütçe ikiye bölünecek", "k")
+mk0 = yapi.eylem_menu(C, KR, TAKVIM, kimlik_f=kimlik_f); yapi.ata(C, KR, {"isteyen": {"ad": "Can Örnek"}, "onaylayan": {"ad": "Ayşe Deneme"}}); mk1 = yapi.eylem_menu(C, KR, TAKVIM, kimlik_f=kimlik_f)
+bak("karar, kimse yok: alıcı yok nedeni", "alıcısı yok" in mk0["pasif"].get("teams", ""), mk0["pasif"])
+bak("karar, onaylayan kullanıcı: Teams pasif, neden 'kararı isteyenin' (muhatap isteyen)", "teams" in mk1["eylemler"] and "isteyenin e-postası yok" in mk1["pasif"].get("teams", ""), mk1["pasif"])
+eylem(KR, "ata", {"sahip": "Zeynep Kaya", "eposta": "", "rol": "onaylayan"}); yapi.ata(C, KR, {"onaylayan": {"ad": "Deniz Bilinmez"}})
+mk2 = yapi.eylem_menu(C, KR, TAKVIM, kimlik_f=kimlik_f)
+bak("karar, onaylayan adresi yok: Teams pasif, neden 'onaylayanın'", "onaylayanın e-postası yok" in mk2["pasif"].get("teams", ""), mk2["pasif"])
+yapi.ata(C, KR, {"onaylayan": {"ad": "Zeynep Kaya"}}); mk3 = yapi.eylem_menu(C, KR, TAKVIM, kimlik_f=kimlik_f)
+bak("karar, onaylayanın adresi kimlik modülünden çözülür: Teams pasif değil (POST'la aynı yol)", mk3["pasif"] == {} and eylem(KR, "teams", {})["ok"], mk3["pasif"])
+yapi.graf_yaz(C, {"baslik": "Sahipsiz", "tarih": "2026-11-05", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "is", "metin": "Sahibi olmayan iş", "saat": "10:40:00"}]}]}, "2026-11-05-1200-Sahipsiz.md"); dokum(C, "2026-11-05-1200-Sahipsiz")
+yapi.kayit_listesi(C, "Ayşe Deneme", datetime.date(2026, 11, 5)); SP = _id("Sahibi olmayan iş", "s"); mp = yapi.eylem_menu(C, SP, TAKVIM, kimlik_f=kimlik_f)
+n = olay_say(C); rp = eylem(SP, "teams", {})
+bak("sahipsiz iş: Teams pasif ve nedeni 'alıcısı yok; Ata ile kişi ekle', POST aynı nedeni verir, olay yok", "alıcısı yok" in mp["pasif"].get("teams", "") and not rp["ok"] and "Ata ile" in rp["err"] and olay_say(C) == n, (mp["pasif"], rp))
+print("ÖRNEK:", mesaj)
 print("\nhepsi geçti" if not hata else f"\nKALDI: {len(hata)}"); sys.exit(1 if hata else 0)

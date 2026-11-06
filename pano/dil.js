@@ -1163,6 +1163,17 @@ globalThis.SUFLOR_EN = {
   "Zaten böyle; değişiklik yok.": "Already like this; no change.",
   "alıcı adresi bulunamadı, taslak alıcısız açıldı": "recipient address not found, draft opened without a recipient",
   "Kişi adı yaz.": "Enter a name.",
+  "Vade seç.": "Pick a due date.",
+  "Yalnız iş ertelenir.": "Only tasks can be postponed.",
+  "En az iki parça yaz.": "Write at least two parts.",
+  "Seçilen toplantı takvimde bulunamadı.": "The selected meeting was not found in the calendar.",
+  "Bu iş senin; kendine taslak yazılmaz.": "This task is yours; no draft to yourself.",
+  "Claude bu bilgisayarda bulunamadı.": "Claude was not found on this computer.",
+  "Claude zamanında yanıt vermedi.": "Claude did not answer in time.",
+  "sahibin e-postası yok; Teams sohbeti alıcısız açılamaz": "the owner's email is unknown; a Teams chat cannot open without a recipient",
+  "onaylayanın e-postası yok; Teams sohbeti alıcısız açılamaz": "the approver's email is unknown; a Teams chat cannot open without a recipient",
+  "kararı isteyenin e-postası yok; Teams sohbeti alıcısız açılamaz": "the requester's email is unknown; a Teams chat cannot open without a recipient",
+  "bu kayıtta taslağın alıcısı yok; Ata ile kişi ekle": "this item has no recipient for a draft; add a person with Assign",
   "Gündemde: {t}": "On the agenda: {t}",
   // --- döküm kontrolü (geliştirici sayfası, pano/dokum-kontrol.html; 6 Kasım)
   "5 dk bloklarla; yalnız dinlediğin satırlar sayıldı.": "In 5-minute blocks; only the lines you listened to were counted.",
@@ -1226,6 +1237,18 @@ globalThis.SUFLOR_EN = {
   "Çal": "Play",
   "Döküm kontrolü hazır: {baslik}. Öncelikli {n} satır, ~{m} dk.": "Transcript check ready: {baslik}. {n} priority lines, ~{m} min.",
   "Kontrole başla": "Start checking",
-  "Öncelikli {n} satır": "{n} priority lines"
+  "Öncelikli {n} satır": "{n} priority lines",
+  "Kapanış turu": "Closing round",
+  "onaylanmadı": "not approved",
+  "{n} gündür onay bekliyor": "awaiting approval for {n} days",
+  "tarihsiz": "no due date",
+  "Bitti": "Done",
+  "İptal": "Cancel",
+  "{n} iş, {k} karar": "{n} tasks, {k} decisions",
+  "Açık işler": "Open tasks",
+  "Teyit bekleyen kararlar": "Decisions awaiting approval",
+  "kapanış turu": "closing round",
+  "İş iptal edildi": "Task cancelled",
+  "İş bir hafta ertelendi": "Task postponed by a week"
 
 };

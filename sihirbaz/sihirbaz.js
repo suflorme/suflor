@@ -112,6 +112,8 @@
       hz_dizin: "Dizinlenecek", hz_parca: "parça", hz_sure: "Tahmini süre", hz_dk: "dk", hz_az: "1 dakikadan az",
       hz_kart_cikar: "Proje kartını da hazırla (Claude)", hz_kart_ac: "{n} belge · yaklaşık {d} dk · yaklaşık {u} $ karşılığı Claude kullanımı. Belge metni yalnız Claude'a gider; şifre ve hesap numarası içeren parçalar gitmez.",
       hz_kart_claude: "Claude Code ya da bir API anahtarı bağlı olmadığı için kart şimdi hazırlanamaz; sonra panodaki ⚙ Ayarlar → Proje'den.", hz_baslat: "Başlat",
+      hz_bulut: "Yalnız bulutta duran dosyaları indirip oku", hz_bulut_a: "{n} dosya, yaklaşık {m}. Her biri okunup metni çıkarılınca iCloud'dakiler yeniden yalnız buluta bırakılır; Google Drive'dakiler bilgisayarında kalır. İşaretlemezsen bu dosyalar yalnız adıyla sayılır, hiçbiri indirilmez.", hz_bulut_buyuk: "Bu, {e} eşiğinin üstünde; onaylarsan {m} indirilir.",
+      hz_google: "Google belgeleri: {n}", hz_google_a: "Metni okunabilmesi için Google hesabını bağlaman gerekir (Terminal'de: python3 baglam.py google-giris). Bağlanana kadar belgeler yalnız adıyla sayılır.", hz_google_iyi: "{o} / {n} belgenin metni okundu",
       hz_ilerleme_b: "Hazırlanıyor", hz_ilerleme_a: "Arka planda sürüyor; bu pencereyi kapatsan da biter.",
       hz_e_tara: "Tarama", hz_e_cevir: "Metne çevirme", hz_e_dizin: "Dizinleme", hz_e_gomme: "Anlama göre arama dizini", hz_e_kart: "Proje kartı",
       hz_durdu: "Durdu: ", hz_hata: "Hata: ", hz_bitti_s: "Bitti", hz_kurulu_degil: "Kurulu değil (sözcükle arama çalışır)", hz_toplanti_not: "Toplantı başlarsa durur, sonra kaldığı yerden sürer.",
@@ -227,6 +229,8 @@
       hz_dizin: "To index", hz_parca: "passages", hz_sure: "Estimated time", hz_dk: "min", hz_az: "under a minute",
       hz_kart_cikar: "Also prepare the project card (Claude)", hz_kart_ac: "{n} documents · about {d} min · about ${u} worth of Claude usage. Document text goes only to Claude; passages with passwords or account numbers don't.",
       hz_kart_claude: "Neither Claude Code nor an API key is connected, so the card can't be prepared now; do it later from ⚙ Settings → Project on the panel.", hz_baslat: "Start",
+      hz_bulut: "Download and read files that are only in the cloud", hz_bulut_a: "{n} files, about {m}. Once each is read and its text extracted, iCloud files go back to cloud-only; Google Drive files stay on your Mac. If you leave this off, these files are counted by name only and nothing is downloaded.", hz_bulut_buyuk: "That is above the {e} limit; if you approve, {m} will be downloaded.",
+      hz_google: "Google documents: {n}", hz_google_a: "To read their text you need to connect your Google account (in Terminal: python3 baglam.py google-giris). Until then they are counted by name only.", hz_google_iyi: "Text read from {o} of {n} documents",
       hz_ilerleme_b: "Preparing", hz_ilerleme_a: "It runs in the background; it finishes even if you close this window.",
       hz_e_tara: "Scan", hz_e_cevir: "Converting to text", hz_e_dizin: "Indexing", hz_e_gomme: "Search-by-meaning index", hz_e_kart: "Project card",
       hz_durdu: "Paused: ", hz_hata: "Error: ", hz_bitti_s: "Done", hz_kurulu_degil: "Not installed (keyword search works)", hz_toplanti_not: "It pauses if a meeting starts and resumes later.",
@@ -296,6 +300,7 @@
     if (yol === "hazirlik") return Promise.resolve({ bos: false, tara_suruyor: false, is: { evre: "cevir", calisiyor: true, kart_istendi: true, adim: { cevir: { n: 12, toplam: 43 } } },
       tarama: { t: Date.now() / 1000, sayilar: { dosya: 412, boyut: 3.2e9, tur: { belge: 180, goruntu: 120, tablo: 60 }, kopya: 9, eski_surum: 14, okunamayan: 2, kaynak_turu: { asil: 380, turetilmis: 20, disa_aktarim: 12 } },
         klasorler: [{ ad: "belgeler", dosya: 210, haric: false }, { ad: "gorusmeler", dosya: 80, haric: false }, { ad: "kisisel", dosya: 0, haric: true }], haric: [{ yol: "belgeler/sifreler.xlsx", neden: "ad: sifre" }], dahil: [], kaynak_turu: [], asil: [] },
+      bulut: { acik: false, n: 18, mb: 142.5, esik_mb: 200, onay_mb: 0, onay_gerek: false }, google: { belge: 6, okundu: 0, hazir: false },
       tahmin: { cevir: { ".pdf": 30, ".png": 13 }, cevir_n: 43, parca_yeni: 1800, gomme_n: 1800, kart_belge: 120, kart_sn: 540, kart_usd: 6, sn: 300, cevirme_kurulu: true } });
     return Promise.resolve({ ok: true, ...d });
   }
@@ -509,16 +514,18 @@
         return ozet + klasor + gizli + asil; } },
     { id: "hz_onay", simge: "kur", b: "hz_onay_b", a: "hz_onay_a", kosul: () => !hzBos(), devamYazi: () => hzIsDurum().calisiyor ? null : t.hz_baslat,
       gir: async () => { hzKartVarsayilan(); await hzAl(); ciz(); },
-      devamEt: async () => { hzKartVarsayilan(); await api("hazirlik/baslat", { kart: !!(C.hz_kart && kartYz()) }).catch(() => {}); kaydet(); },
+      devamEt: async () => { hzKartVarsayilan(); const bl = H().bulut || {}; if (bl.n) await api("hazirlik/bulut", { izin: !!C.hz_bulut, mb: bl.mb || 0 }).catch(() => {}); await api("hazirlik/baslat", { kart: !!(C.hz_kart && kartYz()) }).catch(() => {}); kaydet(); },
       icerik: () => { const th = H().tahmin || {}, c = { giris: kartYz() };
         const cv = th.cevir || {}, cvy = [[".pdf", "PDF"], [".pptx", "PowerPoint"]].map(([e, a]) => cv[e] ? `${a} ${cv[e]}` : "").filter(Boolean), gr = Object.entries(cv).filter(([e]) => ![".pdf", ".pptx"].includes(e)).reduce((a, [, n]) => a + n, 0);
         const cvAc = [...cvy, gr ? `${(TUR_AD[D.dil] || TUR_AD.tr).goruntu} ${gr}` : ""].filter(Boolean).join(", ");
-        const kartSn = C.hz_kart && c.giris ? (th.kart_sn || 0) : 0;
+        const kartSn = C.hz_kart && c.giris ? (th.kart_sn || 0) : 0, bl = H().bulut || {}, gg = H().google || {};
+        const bulutBlok = (bl.n ? `<label class="anahtar"><input type="checkbox" data-hz-bulut ${C.hz_bulut ? "checked" : ""}><span><b>${esc(t.hz_bulut)}</b><br><span class="ipucu">${esc(tf(t.hz_bulut_a, { n: bl.n, m: mb((bl.mb || 0) * 1e6) }))}${bl.onay_gerek ? " " + esc(tf(t.hz_bulut_buyuk, { e: mb((bl.esik_mb || 0) * 1e6), m: mb((bl.mb || 0) * 1e6) })) : ""}</span></span></label>` : "")
+          + (gg.belge ? `<div class="liste">${gg.hazir ? satir("iyi", tf(t.hz_google, { n: gg.belge }), tf(t.hz_google_iyi, { o: gg.okundu || 0, n: gg.belge })) : satir("uyari", tf(t.hz_google, { n: gg.belge }), t.hz_google_a)}</div>` : "");
         return `<div class="liste">${!th.cevirme_kurulu && th.cevir_n ? satir("uyari", `${t.hz_cevir}: ${th.cevir_n}`, t.hz_cevir_model) : satir("iyi", th.cevir_n ? `${t.hz_cevir}: ${th.cevir_n}` : t.hz_cevir_yok, cvAc)}
           ${satir("iyi", `${t.hz_dizin}: ~${(th.parca_yeni || 0) + (th.gomme_n || 0) ? (th.gomme_n || th.parca_yeni) : 0} ${t.hz_parca}`)}
           ${satir("iyi", `${t.hz_sure}: ${dk((th.sn || 0) + kartSn)}`, t.hz_toplanti_not)}</div>
           ${c.giris ? `<label class="anahtar"><input type="checkbox" data-hz-kart ${C.hz_kart ? "checked" : ""}><span><b>${esc(t.hz_kart_cikar)}</b><br><span class="ipucu">${esc(tf(t.hz_kart_ac, { n: th.kart_belge || 0, d: Math.max(1, Math.round((th.kart_sn || 0) / 60)), u: (th.kart_usd || 0).toLocaleString(D.dil === "en" ? "en" : "tr") }))}</span></span></label>`
-            : `<div class="kart-not">${esc(t.hz_kart_claude)}</div>`}`; } },
+            : `<div class="kart-not">${esc(t.hz_kart_claude)}</div>`}${bulutBlok}`; } },
     { id: "hz_ilerleme", simge: "kur", b: "hz_ilerleme_b", a: "hz_ilerleme_a", kosul: () => !hzBos(),
       gir: () => hzBekle("hz_ilerleme", () => { const e = hzIsDurum(); return !e.calisiyor && ["bitti", "durdu", "hata"].includes(e.evre); }),
       icerik: () => { const e = hzIsDurum(), sira = ["tara", "cevir", "dizin", "gomme", "kart"], su = sira.indexOf(e.evre), son = ["bitti", "durdu", "hata"].includes(e.evre);
@@ -689,6 +696,7 @@
   });
   document.addEventListener("change", e => {  // proje hazırlığı: kart çıkarılsın mı (C), kart satırı tutulsun mu (E)
     if (!e.target.matches) return;
+    if (e.target.matches("[data-hz-bulut]")) { C.hz_bulut = e.target.checked; kaydet(); ciz(); return; }
     if (e.target.matches("[data-hz-kart]")) { C.hz_kart = e.target.checked; kaydet(); ciz(); return; }
     if (e.target.matches("[data-kart]")) { const b = e.target.dataset.kart, i = +e.target.dataset.i, m = D.kartCikar || (D.kartCikar = {}), st = m[b] || (m[b] = new Set());
       if (e.target.checked) st.delete(i); else st.add(i); }

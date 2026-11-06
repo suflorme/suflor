@@ -151,7 +151,7 @@ try:
     k = sor("Sonra.")
     ok("'Sonra.' → iş bekler, sıradaki soru", ey()[ids[1]]["durum"] == "bekliyor" and sesli() == ids[2])
     k = sor("Evet ama saati on bir yap.")
-    ok("'Evet ama…' → kısa cevap iste, karar yok", ey()[ids[2]]["durum"] == "bekliyor" and "emin olayım" in (k.get("cevap") or ""))
+    ok("'Evet ama…' → Aşama 1b: düzeltme sayılır (onay yok, 'Düzeltiyorum'; ayrıntılı davetli test/sesli-onay.py)", ey()[ids[2]]["durum"] == "bekliyor" and "Düzeltiyorum" in (k.get("cevap") or ""))
     t1 = time.time(); out = bekle_p.communicate(timeout=60)[0]
     ok("eylem bekle sesli onayı 10 sn dolmadan vermedi, sonra verdi; geri alınan reddi vermedi", erken is not False and f"UYGULA: {ids[0]}" in out and ids[1] not in out)
     k = sor("Hepsini onayla.")

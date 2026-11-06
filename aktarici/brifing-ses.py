@@ -903,7 +903,8 @@ EYLEM_FIIL = {"kayit": (("Bunu kayda geçireyim mi?", "Kayda geçiriyorum.", "Pe
               "diger": (("Yapayım mı?", "Yapıyorum.", "Peki, yapmıyorum."), ("Shall I do it?", "Doing it.", "Okay, not doing it.")),
               "oturum": (("İleteyim mi?", "İletiyorum.", "Peki, iletmiyorum."), ("Shall I send it?", "Sending it.", "Okay, not sending it.")),
               "yapilacak": (("Takvimine hatırlatma olarak ekleyeyim mi?", "Takvimine ekliyorum.", "Peki, eklemiyorum."), ("Shall I add it to your calendar as a reminder?", "Adding it to your calendar.", "Okay, not adding it.")),
-              "sil": (("Takviminden kaldırayım mı?", "Kaldırıyorum.", "Peki, kalsın."), ("Shall I remove it from your calendar?", "Removing it.", "Okay, keeping it."))}
+              "sil": (("Takviminden kaldırayım mı?", "Kaldırıyorum.", "Peki, kalsın."), ("Shall I remove it from your calendar?", "Removing it.", "Okay, keeping it.")),
+              "is": (("İş olarak kaydedeyim mi?", "İş olarak kaydediyorum.", "Peki, kaydetmiyorum."), ("Shall I record it as a task?", "Recording it as a task.", "Okay, not recording it."))}  # Aşama 1b: sesle iş ekleme (talimat.py)
 SORU_YENIDEN = (("Tam duyamadım {ad}, {s}", "Kusura bakma, kaçırdım. {s0}, yoksa vazgeçelim mi?", "Evet ya da hayır demen yeterli: {s}"),
                 ("Sorry {ad}, I didn't catch that. {S}", "I missed that. {S0}, or shall we skip it?", "Just yes or no is fine: {s}"))
 SORU_UZUN = ("Anladım, yalnız emin olayım: {s}", "Got it, just to be sure: {s}")
@@ -919,10 +920,10 @@ def _yeniden_sor(x, uzun=False):  # → okunacak cümle; ikinci kez anlaşılmaz
     ad = kullanici_ilk_ad(); s = _eylem_fiil(x["tur"])[0] if x else _t("Yapayım mı?", "Shall I do it?")
     SORU["deneme"] = SORU.get("deneme", 0) + 1
     if SORU["deneme"] > 1: return None
-    if uzun: return _t(*SORU_UZUN).format(s=s[:1].lower() + s[1:])
+    if uzun: return _t(*SORU_UZUN).format(s=s[:1].replace("İ", "i").lower() + s[1:])
     sec = [c for c in SORU_YENIDEN[0 if ARAYUZ_DILI == "tr" else 1] if c != SORU.get("son_cumle")]
     c = __import__("random").choice(sec); SORU["son_cumle"] = c
-    return re.sub(r"\s+,", ",", c.format(ad=ad, s=s[:1].lower() + s[1:], S=s, s0=s.rstrip("?").rstrip(), S0=s.rstrip("?").rstrip())).replace(" , ", ", ")
+    return re.sub(r"\s+,", ",", c.format(ad=ad, s=s[:1].replace("İ", "i").lower() + s[1:], S=s, s0=s.rstrip("?").rstrip(), S0=s.rstrip("?").rstrip())).replace(" , ", ", ")
 def _ses_serbest(): return AYAR.get("konusma", True) and not toplanti_var()
 def _cumle(x):
     x = " ".join(re.sub(r"[*`_#>]", "", str(x or "")).split()).strip()
@@ -1012,11 +1013,33 @@ def sesli_ayir(metin):  # → hepsi | tekrar | sus | sonra | red | onay | karisi
     if len(sozcuk) > 4 and not (bulunan in ({"onay"}, {"red"}) and set(m.split()) <= SES_PEKISTIRME): return "uzun"
     if len(bulunan) > 1: return "karisik"
     return bulunan.pop() if bulunan else "yok"
+# Aşama 1b (6 Kasım): "evet ama saat 3'te olsun", "olur ama Ali'ye değil Ayşe'ye", "hayır, yarın cuma yap" — onay/red sözcüğüyle başlayıp (ya da "ama" deyip) yeni bir şey söylenen cevap
+# doğrudan onaylanmaz ve reddedilmez: düzeltme sayılır (talimat.py eylem_duzelt_baslat). Yalın evet/hayır/sonra davranışı (sesli_ayir) değişmedi; sözcüklerin onay/red kalıpları ve
+# pekiştirme/dolgu sözcükleri çıkarılınca en az 2 içerik sözcüğü kalırsa ("ama"dan sonra 1) düzeltmedir. Kısa "Hayır, yarın değil" gibi bir söz de düzeltme olur; Claude ne
+# dendiğini yorumlar, kullanıcı teyit cümlesine evet/hayır der (bir şey kendiliğinden yazılmaz).
+SES_DUZELT_BAS = {"evet", "evt", "tamam", "tamamdır", "olur", "peki", "aynen", "uygun", "uygundur", "yes", "yeah", "yep", "ok", "okay", "sure", "hayır", "hayir", "no", "nope"}
+def sesli_duzeltme(metin):  # → düzeltme olarak ele alınacak metin (sözün kendisi) ya da None
+    m = " ".join(re.sub(r"[^\w\s']", " ", str(metin or "").replace("I", "ı").replace("İ", "i").lower()).split())
+    sozcuk = [w for w in m.split() if w not in SES_DOLGU]
+    ama = SES_AMA & set(sozcuk)
+    if len(sozcuk) < 3 or not (sozcuk[0] in SES_DUZELT_BAS or ama): return None
+    m = " " + " ".join(sozcuk) + " "
+    for kaliplar in SES_CEVAP.values():  # onay/red/sonra/sus… kalıpları içerik sayılmaz ("hayır, daha sonra" düzeltme değil)
+        for k in sorted(kaliplar, key=len, reverse=True):
+            while f" {k} " in m: m = m.replace(f" {k} ", " ")
+    icerik = [w for w in m.split() if w not in SES_PEKISTIRME and w not in SES_AMA and w not in SES_DUZELT_BAS and w not in ("değil", "degil", "not")]
+    if len(icerik) < (1 if ama or sozcuk[0] in ("hayır", "hayir", "no", "nope") else 2): return None
+    return " ".join(str(metin).split())[:400]
 def sesli_cevap(metin, sid):  # bas-konuş metni soru aktifken; dönen: okunan cevap
     sinif = sesli_ayir(metin)
     with LOCK: x = next((x for x in eylem_gorunen() if x["id"] == sid and x["durum"] == "bekliyor"), None); SORU["t"] = time.time()
     tur = _t(EYLEM_TUR.get(x["tur"], ""), x["tur"]) if x else ""
     print(f"SES: sesli cevap \"{metin[:80]}\" → {sinif}")
+    if x and SORU.get("duzeltme") == sid:  # düzeltme hazırlanırken gelen söz eski öneriyi onaylamasın
+        cevap = _t("Bir saniye, düzeltiyorum.", "One second, I'm fixing it."); seslendir(cevap, kuyruk=True); return cevap
+    if x and "eylem_duzelt_baslat" in globals() and x["tur"] not in ("sil", "izin", "baslat") and sesli_duzeltme(metin):
+        c = eylem_duzelt_baslat(x, metin)
+        if c: return c
     if sinif in ("onay", "red") and x:
         cevap = _eylem_fiil(x["tur"])[1 if sinif == "onay" else 2]
         seslendir(cevap, kuyruk=True); eylem_karar({"id": sid, "durum": "onaylandi" if sinif == "onay" else "reddedildi", "ses_metin": metin}, "ses"); return cevap

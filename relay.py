@@ -1397,7 +1397,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/ortak", "/katilimcilar", "/kapanis-turu", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -2289,6 +2289,7 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self._cors(); self.send_header("Content-Type", "audio/wav"); self.send_header("Cache-Control", "private, max-age=3600"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if yol == "/ortak": return self._json(ortak_view())  # A3 ortak klasör durumu (aktarici/ortak-klasor.py)
         if yol == "/kayitlar": return self._json(kayitlar_view(self.path))  # Kararlar ve işler görünümü (anahtarlı)
+        if yol == "/kapanis-turu": return self._json(kapanis_view() if "kapanis_view" in globals() else {"ok": False})  # toplantı başında kapanış turu (aktarici/toplanti-oturum.py)
         if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
         if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
         if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)

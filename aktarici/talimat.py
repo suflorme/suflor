@@ -47,7 +47,8 @@ def talimat_coz(metin):  # → ("oturum", hedef, ileti) | ("yapilacak", None, i�
         ileti = _talimat_temiz(r.group("m")) or _talimat_temiz(re.sub(r"\b(bunu|şunu|sunu)\b", "", m[:r.start()], flags=re.I))
         if len(ileti.split()) < 2: return None
         return ("oturum", h, ileti[:TALIMAT_EN_COK])
-    return None
+    i_ = _is_ayir(m) if "_is_ayir" in globals() else None  # Aşama 1b: "bana bir iş ekle: …", "Ali'ye iş ata: …" → iş kaydı (karar grafı)
+    return ("is", None, i_[1][:TALIMAT_EN_COK]) if i_ else None
 def _talimat_kayit(o):
     yol = os.path.join(BASE, "talimat-kayit.jsonl")
     if not os.path.exists(yol):
@@ -57,7 +58,7 @@ def _talimat_kayit(o):
 def talimat_yakala(metin, kaynak):  # kullanıcının kendi sözü → True: talimat/yapılacak olarak alındı (Claude'a gitmez)
     c = talimat_coz(metin)
     if not c: return False
-    return talimat_kuyruk(*c, metin, kaynak)
+    return talimat_kuyruk(*c, metin, kaynak, ek=_is_ek(metin) if c[0] == "is" else None)
 # v0.115.2 (kullanıcı, 22 Ekim test toplantısı: "asistan ve oturum aynı onayı iki kez sordu"): adsız "bunu geliştirme oturumuna bildirebilir misin?" isteğini
 # toplantı oturumu kendi "ileteyim mi?" kartıyla sordu (onayı hiçbir şey göndermedi), az sonra asistan aynı isteği defterden görüp bu yoldan ikinci onay kartını
 # açtı. Artık toplantı oturumu da bu yolu kullanır (toplanti-claude.py ilet → /ilet → talimat_ilet) ve aynı oturuma 5 dk içinde benzer ileti (sözcüklerin
@@ -85,6 +86,9 @@ def _talimat_yinelenen(h, ileti, duyulan=None, gorev=False):  # gorev: asistanı
     return None
 def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False, zaman=None, ek=None, oneri=None):  # oneri: asistanın kendi çıkardığı iş (kartta "Öneri:" ve bu gerekçe)  # claude: ileti Claude'un cevabından — pano cevabı Claude'unki kalır; zaman: hatırlatmanın saati (ISO, yerel)
     top = toplanti_var()
+    if tur == "is" and "gizli_acik" in globals() and gizli_acik():  # gizli kipte hiçbir şey işlenmez
+        if not claude: _konus_kur(durum="hazir", soru=metin, cevap=_t("Gizli kipte iş kaydı yok.", "No task records in private mode."))
+        return True
     if tur == "oturum":
         n = [t for t in _TAL["t"].get(h["ad"], []) if time.time() - t < 3600]
         if len(n) >= TALIMAT_SAAT_SINIR:
@@ -103,10 +107,10 @@ def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False, zaman=None, ek=No
     x = eylem_ekle({"tur": tur, "baslik": ileti[:160], "ayrinti": json.dumps({"hedef": h["ad"] if h else None, "etiket": etiket if h else None, "metin": ileti,
                                                                             "duyulan": metin[:TALIMAT_EN_COK], "kaynak": kaynak, "toplantida": top, **({"zaman": zaman} if zaman else {}), **({"oneri": True} if oneri else {}), **(ek or {})}, ensure_ascii=False)})
     if not x: return False
-    with LOCK: x["yerel"] = True; _eylem_yama(x, yerel=True)  # toplantı oturumu (Claude) bu işi uygulamaz, sunmaz
+    with LOCK: x["yerel"] = True; _eylem_yama(x, yerel=True, **({"kim": ek["kim"]} if tur == "is" and (ek or {}).get("kim") and ek["kim"] != str(AYAR.get("ad") or "").strip() else {}))  # toplantı oturumu (Claude) bu işi uygulamaz, sunmaz
     _talimat_kayit({"id": x["id"], "tur": tur, "hedef": h["ad"] if h else None, "metin": ileti, "durum": "bekliyor", "kaynak": kaynak, "toplantida": top})
     ne = (_t(f"{etiket}na ileti", f"message to the {etiket}") if tur == "oturum" else _t("takvimden silme", "calendar removal") if tur == "sil"
-          else _t("toplantı", "meeting") if tur == "toplanti" else _t("hatırlatma", "reminder"))
+          else _t("toplantı", "meeting") if tur == "toplanti" else _t("iş kaydı", "task record") if tur == "is" else _t("hatırlatma", "reminder"))
     if top:  # toplantıda: onay kartı, sesle okunmaz (kullanıcı)
         c_ = add_card({"kind": "not", "text": (_t(f"Öneri: {ne} — «{ileti[:300]}»", f"Suggestion: {ne} — «{ileti[:300]}»") if oneri else _t(f"Onay: {ne} — «{ileti[:300]}»", f"Approve: {ne} — «{ileti[:300]}»")),
                        "why": oneri or _t("Sesle verdiğin talimat; Onayla ya da Reddet.", "Your spoken instruction; approve or reject."), "onay": True})
@@ -519,6 +523,7 @@ def _talimat_uygula(eid):
     except ValueError: a = {}
     if x["tur"] == "oturum": ok, sonuc = _gelen_yaz(eid, a)
     elif x["tur"] == "toplanti": ok, sonuc = toplanti_sayfa_ac(a)  # v0.143.0
+    elif x["tur"] == "is": ok, sonuc = _is_kaydet(a)  # Aşama 1b
     elif x["tur"] == "sil":  # v0.132.0: asistanın eklediği takvim hatırlatmasını kaldır
         ok, sonuc = takvim_etkinlik_sil(a.get("etkinlik"))
         with LOCK:
@@ -617,3 +622,154 @@ def _yapilacak_taslak(a):
     try: subprocess.Popen(["/usr/bin/open", u], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError as ex: return False, ex.__class__.__name__
     return True, _t("e-posta taslağı açıldı (Gönder sende)", "email draft opened (you send it)")
+
+# --- Aşama 1b (6 Kasım): sesle iş ekleme ve "evet ama …" düzeltmesi ----------------------------------------------------------------------
+# 1) "bana bir iş ekle: …", "yeni iş aç: …", "Ali'ye iş ata: …" (kullanıcının kendi sözü; talimat_yakala) → eylem "is" → onay (toplantıda kart, dışında sesli "İş olarak kaydedeyim mi?") →
+#    onaylanınca karar grafına iş (yapi.soz_ekle: sahip, vade, açıkken toplantı dosyası). "Yapılacaklarıma ekle" eskisi gibi takvim hatırlatması kalır (kişisel anımsatıcı; grafa girmez).
+#    Gizli kipte işlenmez; toplantıda söylenen iş o toplantıya bağlanır, böylece gizli/deneme toplantının işi ortak klasöre gitmez (yapi.py _paylasilmaz).
+# 2) Sesli soruya "evet ama saat 3'te olsun" (brifing-ses.py sesli_duzeltme) → öneri onaylanmaz; düzeltme + öneri tek model çağrısına (eylem_model, ayar beyin.prova) gider ya da yalnız
+#    saat/gün değişimiyse (saatli yapılacak) kuralla uygulanır; işin başlığı güncellenir ve "… tamam mı?" diye teyit sorulur, onay yine tek evettir.
+IS_ATA_RX = re.compile(r"(?:(?P<k>[^\s,.:;?!]{2,30})\s+)?(?:(?:bir|yeni)\s+)?(?:iş|görev)\s+(?:ata|ver|ekle|aç|oluştur)\w*\s*[:,.;\-]?\s*(?P<m>.*)$", re.I | re.S)
+IS_ATLA = {"bir", "yeni", "bana", "şu", "bu", "de", "da", "bunu", "şunu", "evet", "tamam", "peki", "hadi", "lütfen", "şimdi", "hemen", "claude", "suflor", "süflör", "yapılacaklara", "listeye", "ve", "ama"}
+def _is_ayir(metin):  # → (kim ya da None, iş metni) ya da None
+    _kb, m = kisilik_hitap_bul(metin) if "kisilik_hitap_bul" in globals() else (None, metin)
+    m = re.sub(r"^\W*(claude|suflor|süflör)\W+", "", str(m or "").strip(), flags=re.I)
+    r = IS_ATA_RX.search(m)
+    if not r: return None
+    is_ = _talimat_temiz(r.group("m"))
+    if len(is_.split()) < 2: return None
+    k = (r.group("k") or "").strip(); kim = None
+    if k and k.lower() not in IS_ATLA and (k[0].isupper() or "'" in k or "’" in k):  # ad: "Ali'ye", "Aliye", "Denize"; sözcük özel ad gibi (büyük harf ya da kesme)
+        if re.search(r"['’]", k): kim = re.split(r"['’]", k)[0]
+        elif re.search(r"y[ae]$", k) and len(k) > 4: kim = k[:-2]
+        elif re.search(r"[ae]$", k) and len(k) > 5: kim = k[:-1]
+        else: kim = k
+        kim = kim or None
+    return kim, is_
+def _is_tarih(metin, simdi=None):  # sözdeki gün/tarih ("cuma'ya kadar", "yarın", "12 Kasım") → "YYYY-AA-GG" ya da None (yalnız saat vade sayılmaz)
+    m_ = " ".join(str(metin or "").replace("İ", "i").replace("I", "ı").lower().split())
+    if not (SC_TARIH_RX.search(m_) or SC_GUN_RX.search(m_) or SC_GOGUN_RX.search(m_)): return None
+    z = saat_coz(m_, simdi); return z[:10] if z else None
+def _is_ek(metin):  # talimat_kuyruk ek: kim (söylenmediyse kullanıcının kendisi), vade, açıksa toplantı dosyası
+    i_ = _is_ayir(metin) or (None, "")
+    kim = i_[0] or str(AYAR.get("ad") or "").strip() or None
+    top = (aktif_dosya() if toplanti_var() and "aktif_dosya" in globals() else None) or None
+    return {"kim": kim, "tarih": _is_tarih(i_[1]), **({"toplanti": top} if top else {})}
+def _is_kaydet(a):  # onaylanmış iş → karar grafı (yapi.soz_ekle) → (ok, sonuç)
+    if "gizli_acik" in globals() and gizli_acik(): return False, _t("gizli kip açık", "private mode is on")
+    y = _yapi_mod() if "_yapi_mod" in globals() else None
+    if not y: return False, _t("kayıt aracı yok", "records tool missing")
+    m = _talimat_temiz(a.get("metin"))[:300]; kim = _talimat_temiz(a.get("kim"))[:80] or None; tarih = str(a.get("tarih") or "").strip() or None
+    if tarih:
+        try: datetime.date.fromisoformat(tarih)
+        except ValueError: tarih = None
+    if len(m.split()) < 2: return False, _t("iş metni kısa", "task text too short")
+    top = str(a.get("toplanti") or "") or None
+    try: z = y.soz_ekle(BASE, kim, m, tarih, top, None)
+    except Exception as ex: print(f"TALİMAT: iş kaydedilemedi ({ex.__class__.__name__}: {ex})"); return False, ex.__class__.__name__
+    if not z: return False, _t("iş yazılamadı", "task not written")
+    return True, _t(f"iş kaydedildi ({z['id']}" + (f", sahip {kim}" if kim else "") + (f", vade {tarih}" if tarih else "") + ")", f"task recorded ({z['id']}" + (f", owner {kim}" if kim else "") + (f", due {tarih}" if tarih else "") + ")")
+if "EYLEM_TUR" in globals(): EYLEM_TUR["is"] = "İş"
+if "EYLEM_SORU" in globals(): EYLEM_SORU["is"] = ("İş olarak kaydedeyim mi?", "Shall I record it as a task?")
+# --- düzeltme ------------------------------------------------------------------------------------------------------------------------------
+DUZELT_YEREL = ("oturum", "yapilacak", "is", "toplanti")  # ayrıntısı JSON olan, aktarıcının kendi uyguladığı türler (metin alanı düzeltilir); öbürlerinde başlık + serbest ayrıntı
+def _zaman_duzelt(eski, duz, simdi=None):  # saatli yapılacakta söylenen gün/saat → yeni "YYYY-MM-DDTHH:MM"; yalnız saat söylendiyse eski gün, yalnız gün söylendiyse eski saat kalır
+    n = saat_coz(duz, simdi)
+    if not n: return None
+    m_ = " ".join(str(duz or "").replace("İ", "i").replace("I", "ı").lower().split())
+    gun = bool(SC_TARIH_RX.search(m_) or SC_GUN_RX.search(m_) or SC_GOGUN_RX.search(m_)); saat = any(rx.search(m_) for rx in (SC_DAKIKALI_RX, SC_SAAT_RX, SC_EKLI_RX, SC_DONEMLI_RX))
+    if eski and re.match(r"\d{4}-\d\d-\d\dT\d\d:\d\d$", str(eski)):
+        if gun and not saat: return n[:11] + eski[11:16]
+        if saat and not gun: return eski[:11] + n[11:16]
+    return n
+def _duzelt_yalin(duz, simdi=None):  # yalnız gün/saat değişimi mi ("evet ama saat üçte olsun", "yarın yap")
+    m_ = " ".join(str(duz or "").replace("İ", "i").replace("I", "ı").lower().split())
+    if not saat_coz(m_, simdi): return False
+    for rx in (SC_TARIH_RX, SC_GUN_RX, SC_GOGUN_RX, SC_DAKIKALI_RX, SC_SAAT_RX, SC_EKLI_RX, SC_DONEMLI_RX, SC_DONEM_RX): m_ = rx.sub(" ", m_)
+    m_ = re.sub(r"[^\w\s]", " ", m_)
+    ek = {"olsun", "yap", "yapalım", "koy", "çek", "al", "alalım", "değiştir", "olabilir", "saat", "kadar", "daha", "için", "ise", "ama", "bunu", "onu", "şu", "bir"}
+    return len([w for w in m_.split() if w not in SES_DOLGU and w not in SES_PEKISTIRME and w not in SES_AMA and w not in SES_DUZELT_BAS and w not in ek]) <= 1
+DUZELT_ISTEM = ("Kullanıcıya bir iş önerildi, kullanıcı sesle düzeltti. Düzeltmeyi uygulayıp yeni öneriyi ver. Başka hiçbir şey yazma; yalnız tek bir JSON nesnesi:\n"
+                '{"baslik": "<işin tek satır başlığı>", "metin": "<yerel türlerde (oturum, yapilacak, is, toplanti) işin tam metni; öbürlerinde boş>", "ayrinti": "<öbür türlerde yeni ayrıntı; yerelde boş>", '
+                '"zaman": "<yapilacak ya da toplanti için YYYY-MM-DDTHH:MM; yoksa boş>", "kim": "<is türünde sahip; yoksa boş>", "tarih": "<is türünde vade YYYY-AA-GG; yoksa boş>", '
+                '"teyit": "<kullanıcıya sesle okunacak tek kısa cümle: ne olarak yapılacağı + «tamam mı?» (örnek: Saat 15.00 olarak ekliyorum, tamam mı?)>"}\n'
+                "Yalnız kullanıcının söylediği değişikliği yap, başka alanı değiştirme; belirsizse eski değeri koru. Tarihleri bugüne göre çöz.\n")
+def _duzelt_model(istem):  # → (ham metin ya da None, hata). Deneme hattı: SUFLOR_TEST_DUZELT bir dosyanın içeriğini model cevabı sayar (testlerde Claude'a gidilmez)
+    sahte = os.environ.get("SUFLOR_TEST_DUZELT")
+    if sahte:
+        try: return open(sahte, encoding="utf-8").read(), None
+        except OSError: return None, "sahte yok"
+    if "eylem_model" not in globals(): return None, "model yok"
+    return eylem_model(istem)
+def _duzelt_json(ham):
+    m = re.search(r"\{.*\}", str(ham or ""), re.S)
+    if not m: return None
+    try: o = json.loads(m.group(0))
+    except ValueError: return None
+    return o if isinstance(o, dict) else None
+def _duzelt_istem(x, a, duz):
+    return (DUZELT_ISTEM + f"Bugün: {datetime.datetime.now().strftime('%Y-%m-%d %A %H:%M')}\nÖneri türü: {EYLEM_TUR.get(x['tur'], x['tur'])}\nBaşlık: {x['baslik']}\n"
+            + (f"Kişi: {x['kim']}\n" if x.get("kim") else "") + (f"Ayrıntı: {str(x.get('ayrinti') or '')[:700]}\n" if x["tur"] not in DUZELT_YEREL else f"Metin: {a.get('metin')}\n"
+               + "".join(f"{k}: {a[k]}\n" for k in ("zaman", "kim", "tarih", "hedef") if a.get(k)))
+            + f"Kullanıcının sesli cevabı: «{duz[:400]}»\n")
+def _duzelt_uygula(x, o, duz):  # LOCK dışında; o: model çıktısı ya da kural sonucu {"baslik","metin","zaman","kim","tarih","ayrinti"} → yeni teyit cümlesi ya da None
+    yerel = x["tur"] in DUZELT_YEREL
+    with LOCK:
+        try: a = json.loads(x.get("ayrinti") or "{}") if yerel else {}
+        except ValueError: a = {}
+        if x["durum"] != "bekliyor": return None  # bu arada karar verildi
+        k = {"duzeltildi": True, "onceki_baslik": x["baslik"][:160]}
+        if yerel:
+            m = _talimat_temiz(o.get("metin")) or _talimat_temiz(o.get("baslik"))
+            if len(m.split()) < 2: return None
+            a["metin"] = m[:TALIMAT_EN_COK]; a["duzeltme"] = duz[:200]
+            if x["tur"] in ("yapilacak", "toplanti") and o.get("zaman") and re.match(r"\d{4}-\d\d-\d\dT\d\d:\d\d$", str(o["zaman"])): a["zaman"] = str(o["zaman"])
+            if x["tur"] == "is":
+                if o.get("kim"): a["kim"] = _talimat_temiz(o["kim"])[:80]; k["kim"] = a["kim"]
+                if o.get("tarih") and re.match(r"\d{4}-\d\d-\d\d$", str(o["tarih"])): a["tarih"] = str(o["tarih"])
+            k.update(baslik=m[:160], ayrinti=json.dumps(a, ensure_ascii=False))
+        else:
+            b = _talimat_temiz(o.get("baslik"))[:160]
+            if len(b.split()) < 2: return None
+            ay = _talimat_temiz(o.get("ayrinti"))[:3500] or (str(x.get("ayrinti") or "")[:3300] + "\n[Kullanıcı sesle düzeltti: " + duz[:200] + "]")
+            k.update(baslik=b, ayrinti=ay)
+        _eylem_yama(x, **k)
+    t = _talimat_temiz(o.get("teyit"))
+    if not t: t = _soru_metni(x) if "_soru_metni" in globals() else x["baslik"]
+    return t if t.rstrip().endswith("?") else t.rstrip(" .") + (_t(", tamam mı?", ", okay?"))
+def _duzelt_is(x, duz):  # iş parçacığı: düzeltmeyi uygula → teyit sorusu
+    sid = x["id"]
+    try:
+        try: a = json.loads(x.get("ayrinti") or "{}") if x["tur"] in DUZELT_YEREL else {}
+        except ValueError: a = {}
+        o = None; z = a.get("zaman")
+        if x["tur"] == "yapilacak" and z and _duzelt_yalin(duz):  # yalın alan değişikliği: kural (model çağrısı yok)
+            yz = _zaman_duzelt(z, duz)
+            if yz:
+                dz_ = datetime.date.fromisoformat(yz[:10])
+                o = {"metin": a.get("metin"), "zaman": yz, "teyit": _t(f"{_SC_GUN[dz_.weekday()].capitalize()} {dz_.day} {_SC_AY[dz_.month - 1].capitalize()}, saat {yz[11:13]}.{yz[14:16]} olarak ekliyorum, tamam mı?",
+                                                                      f"I'll set it for {yz[:10]} at {yz[11:16]}, okay?")}
+                print(f"SES: düzeltme kuralla uygulandı ({x['id']}) — saat/gün")
+        if o is None:
+            ham, hata = _duzelt_model(_duzelt_istem(x, a, duz)); o = _duzelt_json(ham)
+            print(f"SES: düzeltme modelle ({x['id']}) — " + ("tamam" if o else f"cevap okunamadı ({hata or 'JSON yok'})"))
+        t = _duzelt_uygula(x, o, duz) if o else None
+        with LOCK:
+            if SORU.get("duzeltme") == sid: SORU.pop("duzeltme", None)
+            aktif = SORU.get("aktif") == sid
+        if t:
+            if aktif: SORU["t"] = time.time(); SORU["deneme"] = 0
+            seslendir(t, kuyruk=True); _konus_kur(durum="hazir", soru=duz, cevap=t, hata=None, olcum=None, sesli_cevap=True)
+            _talimat_kayit({"id": sid, "tur": x["tur"], "durum": "duzeltildi", "metin": x["baslik"][:200]})
+        elif x["durum"] == "bekliyor":  # düzeltme anlaşılamadı: eski öneri aynen bekler, bir kez daha onay/red sorulur
+            c = _yeniden_sor(x, uzun=True) if "_yeniden_sor" in globals() else None
+            c = c or _t("Düzeltmeyi anlayamadım; iş olduğu gibi panoda bekliyor.", "I couldn't work out the correction; it's waiting on the panel as it was.")
+            seslendir(c, kuyruk=True); _konus_kur(durum="hazir", soru=duz, cevap=c, hata=None, olcum=None, sesli_cevap=True)
+    except Exception as ex:
+        print(f"SES: düzeltme hatası ({ex.__class__.__name__}: {ex})")
+        with LOCK: SORU.pop("duzeltme", None)
+def eylem_duzelt_baslat(x, duz):  # brifing-ses.py sesli_cevap: "evet ama …" → düzeltme iş parçacığında; hemen okunacak kısa cevap (None: düzeltme yolu kapalı)
+    if AYAR.get("sesli_duzeltme") is False: return None
+    with LOCK: SORU["duzeltme"] = x["id"]
+    threading.Thread(target=_duzelt_is, args=(x, duz), daemon=True).start()
+    c = _t("Düzeltiyorum.", "Fixing it."); seslendir(c, kuyruk=True); return c
