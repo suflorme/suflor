@@ -34,7 +34,7 @@ IS_KID = yapi.ortak_kayit(C, IS)["kayit_id"]; GIZLI_KID = yapi.ortak_kayit(C, GI
 bak("gizli toplantının kayıtları listede yok", not any("Gizli" in x["metin"] for x in v["kayitlar"]))
 # sahte bağımlılıklar
 KIM = []
-def kimlik_f(ad): KIM.append(ad); return {"Zeynep Kaya": {"eposta": "zeynep.kaya" + AT + "firma.test", "kaynak": "takvim", "guven": 0.95, "adaylar": []}, "Deniz": {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": ["deniz.a" + AT + "firma.test", "deniz.t" + AT + "firma.test"]}}.get(ad, {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": []})
+def kimlik_f(ad, **kw): KIM.append(ad); return {"Zeynep Kaya": {"eposta": "zeynep.kaya" + AT + "firma.test", "kaynak": "takvim", "guven": 0.95, "adaylar": []}, "Deniz": {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": ["deniz.a" + AT + "firma.test", "deniz.t" + AT + "firma.test"]}}.get(ad, {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": []})
 SIMDI = datetime.datetime(2026, 11, 5, 12, 0).astimezone()
 def ev(i, saat, baslik, kisiler=(), **ek): return dict({"id": i, "baslik": baslik, "baslangic": (SIMDI.replace(hour=saat[0], minute=saat[1]) + datetime.timedelta(days=saat[2] if len(saat) > 2 else 0)).isoformat(), "kisi_sayisi": 3,
                                                        "katilimcilar": list(kisiler), "kisiler": [{"ad": k, "eposta": ""} for k in kisiler]}, **ek)
@@ -208,4 +208,56 @@ bak("uçtan uca: onaylayan başkası → taslak ona, 'Onayını bekliyor'", r1["
 yapi.ata(C, KR, {"onaylayan": {"ad": "Ayşe Deneme", "ben": True}, "isteyen": {"ad": "Zeynep Kaya"}}); r2 = eylem(KR, "teams", {})
 bak("uçtan uca: onaylayan kullanıcı → taslak kararı isteyene, 'kararı onayladım'", r2["ok"] and "kararı onayladım" in msj(r2) and msj(r2).startswith("Merhaba Zeynep,"), r2)
 print("ÖRNEK:", mesaj)
+# --- Acil toplantı (aktarici/eylem-menu.py: _at_*, toplanti_hazirla): menüde seçenek, davetliler, üç platformun bağlantısı, olay ---
+D3 = "2026-11-02-1000-Acil-Deneme"; dokum(C, D3)
+yapi.graf_yaz(C, {"baslik": "Acil deneme", "tarih": "2026-11-02", "maddeler": [{"baslik": "G", "ogeler": [
+    {"tur": "is", "metin": "Fiyat & teklif: ürün özeti #1 (şğüıöç)", "sahip": "Zeynep Kaya", "saat": "10:01:00"},
+    {"tur": "is", "metin": "Kendi işim", "sahip": "Ayşe Deneme", "saat": "10:02:00"},
+    {"tur": "is", "metin": "Adresi olmayan iş", "sahip": "Bilinmez Kişi", "saat": "10:03:00"},
+    {"tur": "karar", "metin": "Acil karar metni", "kim": "Zeynep Kaya", "saat": "10:04:00", "netlik": "ortuk"}]}]}, D3 + ".md")
+yapi.kayit_listesi(C, "Ayşe Deneme", datetime.date(2026, 11, 5))
+AI, AK, AB, AR = _id("Fiyat & teklif: ürün özeti #1 (şğüıöç)", "s"), _id("Kendi işim", "s"), _id("Adresi olmayan iş", "s"), _id("Acil karar metni", "k")
+ZEP = "zeynep.kaya" + AT + "firma.test"
+ns["AYAR"].pop("toplanti_platformlari", None); ns["AYAR"].pop("zoom_baglanti", None)
+ma = ns["kayit_menu_view"]("/kayit-menu?id=" + AI)
+bak("acil toplantı: iş menüsünde seçenek (Claude'dan önce), platformlar varsayılan sırada", ma["ok"] and "toplanti" in ma["eylemler"] and ma["eylemler"].index("toplanti") == ma["eylemler"].index("claude") - 1
+    and ma["toplanti"]["platformlar"] == ["teams", "meet", "zoom"], ma)
+bak("davetli: sahip e-postasıyla (kimlik eşlemesinden), e-posta eksiği yok", ma["toplanti"]["davetli"] == [{"ad": "Zeynep Kaya", "eposta": ZEP}] and ma["toplanti"]["eposta_yok"] == [], ma["toplanti"])
+mk = ns["kayit_menu_view"]("/kayit-menu?id=" + AK)
+bak("kendi işimde kullanıcı davetliden çıkar (davetli yok)", "toplanti" in mk["eylemler"] and mk["toplanti"]["davetli"] == [] and mk["toplanti"]["eposta_yok"] == [], mk.get("toplanti"))
+mb = ns["kayit_menu_view"]("/kayit-menu?id=" + AB)
+bak("e-postası olmayan kişi davetliye girmez, adıyla belirtilir", mb["toplanti"]["davetli"] == [] and mb["toplanti"]["eposta_yok"] == ["Bilinmez Kişi"], mb["toplanti"])
+yapi.ata(C, AR, {"onaylayan": {"ad": "Ayşe Deneme", "ben": True}, "isteyen": {"ad": "Zeynep Kaya"}}); mr = ns["kayit_menu_view"]("/kayit-menu?id=" + AR)
+bak("karar: isteyen ve onaylayan aranır, kullanıcı (onaylayan) hariç", "toplanti" in mr["eylemler"] and [d["eposta"] for d in mr["toplanti"]["davetli"]] == [ZEP], mr["toplanti"])
+yapi.kayit_durum(C, AI, "yapildi"); bak("kapanmış işte seçenek yok", "toplanti" not in ns["kayit_menu_view"]("/kayit-menu?id=" + AI)["eylemler"]); yapi.kayit_durum(C, AI, "acik")
+mg = ns["kayit_menu_view"]("/kayit-menu?id=" + GIZLI_IS); bak("gizli toplantı kaydında menü de seçenek de yok", not mg["ok"] and "toplanti" not in json.dumps(mg))
+n = olay_say(C); rg = ns["kayit_eylem_islem"]({"id": GIZLI_IS, "eylem": "toplanti", "platform": "teams"}); bak("gizli kayda toplantı kurulmaz, olay yok", not rg["ok"] and rg["err"] == "gizli" and olay_say(C) == n, rg)
+# bağlantılar (saf işlev; saat sabit: 12:00 yerel → +30 dk)
+x = yapi.ortak_kayit(C, AI); dv = [{"ad": "Zeynep Kaya", "eposta": ZEP}, {"ad": "Can Örnek", "eposta": "can" + AT + "x.test"}]; th = ns["toplanti_hazirla"]
+tt = th(x, "teams", dv, simdi=SIMDI); u = urllib.parse.urlsplit(tt["url"]); q = urllib.parse.parse_qs(u.query, keep_blank_values=True)
+bak("Teams: planlama ekranı (teams.microsoft.com/l/meeting/new), sorgu doğru kodlu (Türkçe, &, #, boşluk)", u.scheme == "https" and u.netloc + u.path == "teams.microsoft.com/l/meeting/new"
+    and q["subject"] == ["Acil: Fiyat & teklif: ürün özeti #1 (şğüıöç)"] and "&teklif" not in tt["url"] and "#" not in tt["url"] and q["attendees"] == [ZEP + ",can" + AT + "x.test"], tt["url"])
+bak("Teams: saat aralığı tam 30 dk, ISO + saat dilimi farkı; gündem notunda metin ve kaynak toplantı", datetime.datetime.fromisoformat(q["endTime"][0]) - datetime.datetime.fromisoformat(q["startTime"][0]) == datetime.timedelta(minutes=30)
+    and datetime.datetime.fromisoformat(q["startTime"][0]) == SIMDI and "Gündem: Fiyat & teklif" in q["content"][0] and "Acil deneme (2 Kasım)" in q["content"][0], q)
+tm = th(x, "meet", dv, simdi=SIMDI); u = urllib.parse.urlsplit(tm["url"]); q = urllib.parse.parse_qs(u.query)
+d1, d2 = q["dates"][0].split("/"); f = lambda t: datetime.datetime.strptime(t, "%Y%m%dT%H%M%SZ").replace(tzinfo=datetime.timezone.utc)
+bak("Meet: Google Takvim şablonu, UTC aralık 30 dk ve şimdiye denk, davetliler add'da, gündem details'te", u.netloc + u.path == "calendar.google.com/calendar/render" and q["action"] == ["TEMPLATE"] and f(d1) == SIMDI.astimezone(datetime.timezone.utc)
+    and f(d2) - f(d1) == datetime.timedelta(minutes=30) and q["add"] == [ZEP + ",can" + AT + "x.test"] and "Kaynak: Acil deneme (2 Kasım) toplantısı" in q["details"][0] and q["text"][0].startswith("Acil: "), tm["url"])
+tz = th(x, "zoom", dv, simdi=SIMDI)
+bak("Zoom (bağlantı ayarda yok): zoom.us/start açılır, davet metni panoya (konu, davetliler, gündem)", tz["url"] == "https://zoom.us/start" and ZEP in tz["kopyala"] and "Gündem: Fiyat" in tz["kopyala"] and tz["kopyala"].startswith("Acil: "), tz)
+tz2 = th(x, "zoom", dv, simdi=SIMDI, zoom_baglanti="https://firma.zoom.test/j/123?pwd=a b"); q = urllib.parse.parse_qs(urllib.parse.urlsplit(tz2["url"]).query)
+bak("Zoom (bağlantı ayarda): Takvim şablonu, bağlantı yer ve gündem notunda", "calendar.google.com" in tz2["url"] and "kopyala" not in tz2 and q["location"] == ["https://firma.zoom.test/j/123?pwd=a b"] and "Zoom: https://firma.zoom.test" in q["details"][0], tz2["url"])
+te = th(x, "teams", [], simdi=SIMDI, en=True); bak("İngilizce konu ve gündem; davetlisiz bağlantı bozulmaz", urllib.parse.parse_qs(urllib.parse.urlsplit(te["url"]).query)["subject"][0].startswith("Urgent: ") and "attendees=&" in te["url"] and "Agenda: " in te["gundem"] and "November 2" in te["gundem"], te)
+uz = th(dict(x, metin="x" * 300), "teams", dv, simdi=SIMDI); bak("konu kısaltılır", len(uz["konu"]) <= 120, len(uz["konu"]))
+# uç: olay, geri alınmazlık, ayar sırası
+n = olay_say(C); r = ns["kayit_eylem_islem"]({"id": AI, "eylem": "toplanti", "platform": "meet"}); son = son_olaylar(C, 1)[-1]
+bak("POST toplanti: bağlantı döner, tam bir olay, kaynak eylem, adres olayda yok", r["ok"] and r["toplanti"]["platform"] == "meet" and r["toplanti"]["davetli"] == 1 and olay_say(C) == n + 1 and son[2] == "eylem"
+    and ZEP not in str(db(C).execute("SELECT veri FROM olay ORDER BY saat DESC LIMIT 1").fetchone()[0]) and "Geri al" not in str(r), (r, son))
+bak("toplantı olayı Geri al'a girmez (menüde geri_al onu göstermez)", (yapi.son_geri_alinabilir(C, AI) or {}).get("olay_id") != r["olay"], r["olay"])
+ns["AYAR"]["toplanti_platformlari"] = ["Zoom", "teams", "yok", "zoom"]; ms = ns["kayit_menu_view"]("/kayit-menu?id=" + AI)
+bak("ayar: platform sırası (ilk varsayılan), bilinmeyen ve yinelenen düşer", ms["toplanti"]["platformlar"] == ["zoom", "teams"], ms["toplanti"])
+rv = ns["kayit_eylem_islem"]({"id": AI, "eylem": "toplanti"}); bak("platform verilmezse ayardaki ilki", rv["ok"] and rv["toplanti"]["platform"] == "zoom" and rv["toplanti"]["url"] == "https://zoom.us/start", rv)
+rm = ns["kayit_eylem_islem"]({"id": AI, "eylem": "toplanti", "platform": "meet"}); bak("ayarda olmayan platform reddedilir", not rm["ok"], rm)
+ns["AYAR"]["zoom_baglanti"] = "javascript:alert(1)"; bak("zoom_baglanti yalnız https", ns["_at_zoom"]() == "")
+ns["AYAR"].pop("toplanti_platformlari", None); ns["AYAR"].pop("zoom_baglanti", None)
 print("\nhepsi geçti" if not hata else f"\nKALDI: {len(hata)}"); sys.exit(1 if hata else 0)

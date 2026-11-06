@@ -40,15 +40,104 @@ def _kem_id(yol):
 def kayit_menu_view(tam_yol):  # GET /kayit-menu?id=
     y = _yapi_mod(); kid = _kem_id(tam_yol)
     if not y or not kid: return {"ok": False, "err": "kayıt yok"}
-    try: return y.eylem_menu(BASE, kid, _kem_takvim(), lambda ad: _kem_kimlik(ad, False))
+    try: return _at_menuye_ekle(y, kid, y.eylem_menu(BASE, kid, _kem_takvim(), lambda ad: _kem_kimlik(ad, False)))
     except Exception as e: print(f"EYLEM MENÜSÜ: okunamadı ({e.__class__.__name__})"); return {"ok": False, "err": e.__class__.__name__}
 def kayit_eylem_islem(p):  # POST /kayit-eylem
     y = _yapi_mod(); p = p if isinstance(p, dict) else {}; kid = str(p.get("id") or "")[:40]; e = str(p.get("eylem") or "")[:20]
     if not y or not kid or not e: return {"ok": False, "err": "id ve eylem gerekli"}
+    if e == "toplanti": return _at_islem(y, kid, p)
     try: r = y.kayit_eylem(BASE, kid, e, p, None, lambda ad: _kem_kimlik(ad, True), _kem_takvim(), eylem_model)
     except Exception as ex: print(f"EYLEM MENÜSÜ: {e} yapılamadı ({ex.__class__.__name__})"); return {"ok": False, "err": ex.__class__.__name__}
     print(f"EYLEM MENÜSÜ: {e} {kid} → " + ("tamam" if r.get("ok") else str(r.get("err"))))  # günlüğe metin yazılmaz
     return r
+# --- Acil toplantı (6 Kasım): kaydın ilgili kişileriyle hemen bir toplantı kurma ekranını açar (Teams planlama, Google Takvim şablonu ya da Zoom). Davet GİTMEZ: açılan ekranda gönderen kullanıcıdır.
+#   Menü cevabına "toplanti" eylemi + {"platformlar", "davetli": [{ad, eposta}], "eposta_yok": [ad]} eklenir (yapi.py'ye dokunmadan); POST /kayit-eylem {"id", "eylem": "toplanti", "platform"} → {"toplanti": {"url", "kopyala"?, …}}.
+#   Platformlar ayar `toplanti_platformlari` (varsayılan teams, meet, zoom; ilki varsayılan). Zoom için isteğe bağlı `zoom_baglanti` (https kişisel toplantı bağlantısı).
+#   Bağlantı biçimleri (ağa istek atılmaz; belgelenmiş derin bağlantılar):
+#     teams: https://teams.microsoft.com/l/meeting/new?subject&attendees&startTime&endTime&content — Teams'in toplantı PLANLAMA ekranı; davetli, saat aralığı ve gündem birlikte gelir. (msteams:/l/call yalnız anlık arama açar, gündem taşımaz.)
+#     meet:  https://calendar.google.com/calendar/render?action=TEMPLATE&text&dates&add&details — Google Takvim şablonu; Meet bağlantısını takvim kendisi ekler (meet.google.com/new davetli taşımaz).
+#     zoom:  zoom_baglanti varsa aynı Takvim şablonu (bağlantı yer ve gündem notunda); yoksa https://zoom.us/start açılır ve davet metni (konu, davetliler, gündem) panoya kopyalanır.
+#   Olay: toplanti_onerildi (yapi.OLAY_TURLERI'nde varsa; yoksa taslak_hazirlandi, tur "toplanti"); yalnız platform ve sayılar yazılır, adres yazılmaz. Geri alınmaz. Gizli toplantı kaydında yok.
+TOPLANTI_PLATFORM = ("teams", "meet", "zoom"); TOPLANTI_SURE_DK = 30
+def _at_platformlar():
+    l = AYAR.get("toplanti_platformlari"); l = l if isinstance(l, list) else []
+    out = [p for p in dict.fromkeys(str(a).strip().lower() for a in l) if p in TOPLANTI_PLATFORM]
+    return out or list(TOPLANTI_PLATFORM)
+def _at_zoom():
+    u = str(AYAR.get("zoom_baglanti") or "").strip()
+    return u if re.match(r"^https://[^\s]{4,300}$", u) else ""
+def _at_davetliler(y, x, kimlik_f):
+    # kaydın ilgili kişileri (iş: sahip; karar: isteyen, onaylayan; soru: sahip, isteyen) — kullanıcının kendisi hariç. → ([{ad, eposta}], [e-postası bilinmeyen adlar])
+    roller = x.get("roller") or {}; anahtar = ("isteyen", "onaylayan") if x.get("tur") == "karar" else ("sahip", "isteyen") if x.get("tur") == "soru" else ("sahip",)
+    try: bl = y.bilinen_adlar(BASE)
+    except Exception: bl = []
+    var, eposta_yok, goren = [], [], set()
+    for k in anahtar:
+        r = roller.get(k)
+        if not r or not (r.get("ad") or r.get("eposta")): continue
+        ad = " ".join(str(r.get("ad") or "").split()); ep = str(r.get("eposta") or "").strip().lower()
+        if not ep and ad and kimlik_f:
+            try: ep = str((kimlik_f(ad) or {}).get("eposta") or "").strip().lower()
+            except Exception: ep = ""
+        if "@" not in ep: ep = ""
+        if r.get("ben") or y.kendi_mi(ad, ep, bl): continue
+        an = ep or ad.lower()
+        if an in goren: continue
+        goren.add(an)
+        if ep: var.append({"ad": ad, "eposta": ep})
+        else: eposta_yok.append(ad or "?")
+    return var, eposta_yok
+def _at_kullanilir(x): return bool(x) and (x.get("durum") == "acik" or x.get("tur") == "karar")
+def _at_menuye_ekle(y, kid, m):
+    if not isinstance(m, dict) or not m.get("ok"): return m
+    x = y.ortak_kayit(BASE, kid)
+    if not _at_kullanilir(x): return m
+    var, yok = _at_davetliler(y, x, lambda ad: _kem_kimlik(ad, False))
+    el = list(m.get("eylemler") or []); i = el.index("claude") if "claude" in el else len(el); el.insert(i, "toplanti")
+    return dict(m, eylemler=el, toplanti={"platformlar": _at_platformlar(), "davetli": var, "eposta_yok": yok, "zoom_baglanti": bool(_at_zoom())})
+def toplanti_hazirla(x, platform, davetli, simdi=None, en=False, zoom_baglanti=""):
+    # saf işlev: kayıt + platform + davetliler → {"url", "kopyala"?, "konu", "gundem", "baslangic", "bitis"}; ağa dokunmaz
+    import urllib.parse; Q = lambda t: urllib.parse.quote(str(t), safe="")
+    simdi = (simdi or datetime.datetime.now().astimezone()).replace(second=0, microsecond=0); bit = simdi + datetime.timedelta(minutes=TOPLANTI_SURE_DK)
+    metin = str(x.get("metin") or "")
+    metin = re.sub(r"\s*\(teyit bekliyor(?:\s*[—-]\s*.*)?\)\s*$", "", metin).strip()
+    es = [str(d.get("eposta") or "").strip().lower() for d in davetli if "@" in str(d.get("eposta") or "")][:10]
+    konu = (("Urgent: " if en else "Acil: ") + metin[:70]).strip()[:120]
+    top = str(x.get("baslik") or "").strip(); gun = x.get("tarih") or ""
+    try: gun = _at_tarih(gun, en)
+    except Exception: pass
+    yer = f"{top} ({gun})" if top and gun else top or gun
+    gundem = (("Agenda: " if en else "Gündem: ") + metin[:500]) + (("\n" + (f"Source: {yer}" if en else f"Kaynak: {yer} toplantısı")) if yer else "")
+    out = {"konu": konu, "gundem": gundem, "baslangic": simdi.isoformat(timespec="seconds"), "bitis": bit.isoformat(timespec="seconds")}
+    if platform == "teams":
+        out["url"] = ("https://teams.microsoft.com/l/meeting/new?subject=" + Q(konu) + "&attendees=" + ",".join(Q(e) for e in es) + "&startTime=" + Q(out["baslangic"]) + "&endTime=" + Q(out["bitis"]) + "&content=" + Q(gundem))
+        return out
+    utc = lambda t: t.astimezone(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    if platform == "zoom" and not zoom_baglanti:
+        out["url"] = "https://zoom.us/start"
+        out["kopyala"] = "\n".join([konu, ("Attendees: " if en else "Davetliler: ") + ", ".join(es), gundem])
+        return out
+    det = gundem + (("\nZoom: " + zoom_baglanti) if platform == "zoom" else "")
+    out["url"] = ("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + Q(konu) + "&dates=" + utc(simdi) + "/" + utc(bit) + "&add=" + ",".join(Q(e) for e in es) + "&details=" + Q(det)
+                  + (("&location=" + Q(zoom_baglanti)) if platform == "zoom" else ""))
+    return out
+def _at_tarih(t, en):
+    y = _yapi_mod(); return y.tarih_okunur(t, en) if y else t
+def _at_islem(y, kid, p):
+    x = y.ortak_kayit(BASE, kid)
+    if not x: return {"ok": False, "err": "kayıt yok"}
+    if x.get("gizli") or (x.get("toplanti") and y.gizli_mi(BASE, x["toplanti"])): return {"ok": False, "err": "gizli", "eylem": "toplanti"}
+    if not _at_kullanilir(x): return {"ok": False, "err": "bu kayıt için toplanti yok", "eylem": "toplanti"}
+    pl = _at_platformlar(); platform = str(p.get("platform") or pl[0]).lower()
+    if platform not in pl: return {"ok": False, "err": "platform yok", "eylem": "toplanti"}
+    var, yok = _at_davetliler(y, x, lambda ad: _kem_kimlik(ad, True)); en = str(AYAR.get("dil") or "") == "en"
+    t = toplanti_hazirla(x, platform, var, en=en, zoom_baglanti=_at_zoom())
+    veri = {"platform": platform, "davetli": len(var), "eposta_yok": len(yok)}
+    tur = "toplanti_onerildi" if "toplanti_onerildi" in getattr(y, "OLAY_TURLERI", ()) else "taslak_hazirlandi"
+    o, _ = y._degistir(BASE, kid, tur, lambda _x: dict(veri, tur="toplanti") if tur == "taslak_hazirlandi" else veri, None, "eylem")
+    print(f"EYLEM MENÜSÜ: toplanti {kid} → {platform}, davetli {len(var)}, e-postasız {len(yok)}")  # günlüğe ad/adres yazılmaz
+    return {"ok": True, "eylem": "toplanti", "olay": o["olay_id"] if o else None, "kayit": y._kayit_kisa(y.ortak_kayit(BASE, kid)),
+            "toplanti": dict(t, platform=platform, davetli=len(var), eposta_yok=yok)}
 # --- Belgeden atama (7 Kasım): proje kartı + toplantıya eklenen belgelerden iş önerisi (yapi.belge_onerileri; seçim ve yazma orada, test/belgeden-atama.py) -------------------------
 #   GET  /belge-oneri (anahtarlı, VERI_GET) → {"oneriler", "say"} — Kararlar ve işler sayfasında İşler sekmesinin üstünde
 #   POST /belge-oneri {"id", "islem": "kabul"|"reddet", "sahip"?} (anahtarlı) → kabul: kayit_olustu + (sahip varsa) is_atandi; sahibin e-postası kimlik modülünden. Reddedilen bir daha önerilmez.

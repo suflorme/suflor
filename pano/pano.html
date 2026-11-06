@@ -1981,11 +1981,11 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&bnRef)bnPanelKapa
 // Aktarıcı: GET /kayit-menu?id= (menü bilgisi), POST /kayit-eylem {id, eylem, …} (aktarici/eylem-menu.py; her eylem bir olay). Taslaklar yalnız açılır, hiçbir şey gönderilmez; gizli toplantı kaydında eylem yok.
 let emKid='',emV=null,emMod='',emMsj='',emYuk=false
 {document.body.insertAdjacentHTML('beforeend',`<dialog id=emd aria-label="${L('Eylemler')}"><div class=emb><div><div class=eb id=emt></div><h2 id=emh></h2></div><button type=button class=ikon id=emx aria-label="${L('Kapat')}">${ic('x')}</button></div><div id=emg></div></dialog>`)}
-const EML={onayla:L('Onayla'),reddet:L('Reddet'),yapildi:L('Yapıldı'),iptal:L('İptal et'),ac:L('Yeniden aç'),cevaplandi:L('Cevaplandı'),ertele:L('Ertele'),bol:L('Parçalara böl'),gundem:L('Gündeme ekle'),ata:L('Ata'),eposta:L('E-posta taslağı'),teams:L('Teams taslağı'),claude:L("Claude'a çalıştır"),tarihce:L('Tarihçe'),geri_al:L('Geri al')}
-const EMI={onayla:'check',reddet:'x',yapildi:'check',iptal:'x',ac:'yenile',cevaplandi:'check',ertele:'clock',bol:'liste',gundem:'liste',ata:'kalem',eposta:'posta',teams:'sohbet',claude:'star',tarihce:'hist',geri_al:'yenile'}
-const EMA={eposta:L('Yalnız taslak açılır; göndermek sende'),teams:L('Yalnız taslak açılır; göndermek sende'),claude:L('Özet, yapılacaklar ve taslak mesaj; dışarı bir şey gitmez'),gundem:L('Sıradaki uygun toplantının gündemine girer'),bol:L('Alt işler olur; üst iş açık kalır')}
-const EMT={onayla:L('Karar onaylandı'),reddet:L('Karar reddedildi'),yapildi:L('Yapıldı olarak işaretlendi'),iptal:L('İptal edildi'),ac:L('Yeniden açıldı'),cevaplandi:L('Cevaplandı olarak işaretlendi'),ertele:L('Vade değişti'),bol:L('Parçalara bölündü'),ata:L('Atandı'),eposta:L('E-posta taslağı açıldı; göndermek sende'),teams:L('Teams taslağı açıldı; göndermek sende'),claude:L('Claude notu tarihçeye eklendi'),geri_al:L('Son değişiklik geri alındı')}
-const EMG=[['onayla','reddet','yapildi','iptal','ac','cevaplandi'],['ertele','bol','gundem','ata'],['eposta','teams','claude'],['tarihce','geri_al']]
+const EML={onayla:L('Onayla'),reddet:L('Reddet'),yapildi:L('Yapıldı'),iptal:L('İptal et'),ac:L('Yeniden aç'),cevaplandi:L('Cevaplandı'),ertele:L('Ertele'),bol:L('Parçalara böl'),gundem:L('Gündeme ekle'),ata:L('Ata'),eposta:L('E-posta taslağı'),teams:L('Teams taslağı'),toplanti:L('Acil toplantı'),claude:L("Claude'a çalıştır"),tarihce:L('Tarihçe'),geri_al:L('Geri al')}
+const EMI={onayla:'check',reddet:'x',yapildi:'check',iptal:'x',ac:'yenile',cevaplandi:'check',ertele:'clock',bol:'liste',gundem:'liste',ata:'kalem',eposta:'posta',teams:'sohbet',toplanti:'takvim',claude:'star',tarihce:'hist',geri_al:'yenile'}
+const EMA={eposta:L('Yalnız taslak açılır; göndermek sende'),teams:L('Yalnız taslak açılır; göndermek sende'),toplanti:L('İlgili kişilerle hemen toplantı; davet göndermek sende'),claude:L('Özet, yapılacaklar ve taslak mesaj; dışarı bir şey gitmez'),gundem:L('Sıradaki uygun toplantının gündemine girer'),bol:L('Alt işler olur; üst iş açık kalır')}
+const EMT={onayla:L('Karar onaylandı'),reddet:L('Karar reddedildi'),yapildi:L('Yapıldı olarak işaretlendi'),iptal:L('İptal edildi'),ac:L('Yeniden açıldı'),cevaplandi:L('Cevaplandı olarak işaretlendi'),ertele:L('Vade değişti'),bol:L('Parçalara bölündü'),ata:L('Atandı'),eposta:L('E-posta taslağı açıldı; göndermek sende'),teams:L('Teams taslağı açıldı; göndermek sende'),toplanti:L('Toplantı ekranı açıldı; davet göndermek sende'),claude:L('Claude notu tarihçeye eklendi'),geri_al:L('Son değişiklik geri alındı')}
+const EMG=[['onayla','reddet','yapildi','iptal','ac','cevaplandi'],['ertele','bol','gundem','ata'],['eposta','teams','toplanti','claude'],['tarihce','geri_al']]
 const emGun=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 // onay süresi göstergesi (3. gün hatırlatma, 7. gün ya da sonraki dizi toplantısında "onaylanmadı"): ince nokta + kısa metin
 const emOnayIs=o=>!o?'':o.durum==='onaylanmadi'?`<span class="onayis son" title="${esc(o.neden||'')}">${L('Onaylanmadı')}</span>`:o.hatirlat?`<span class=onayis title="${L('Toplantıdan beri {n} gün geçti',{n:o.gun})}">${L('{n}. gün: onay bekliyor',{n:o.gun})}</span>`:''
@@ -1993,7 +1993,7 @@ const emOnayIs=o=>!o?'':o.durum==='onaylanmadi'?`<span class="onayis son" title=
 const EMER={'vade yok':L('Vade seç.'),'yalnız iş ertelenir':L('Yalnız iş ertelenir.'),'iş ve en az iki parça gerekir':L('En az iki parça yaz.'),'toplantı yok':L('Takvimde sıradaki uygun toplantı yok.'),'toplantı bulunamadı':L('Seçilen toplantı takvimde bulunamadı.'),'kişi yok':L('Kişi adı yaz.'),'kayıt yok':L('Kayıt bulunamadı.'),
   'bu iş senin; kendine taslak yazılmaz':L('Bu iş senin; kendine taslak yazılmaz.'),'Claude Code yok':L('Claude bu bilgisayarda bulunamadı.'),'zaman aşımı':L('Claude zamanında yanıt vermedi.'),'Claude yanıt vermedi':L('Claude zamanında yanıt vermedi.'),'yanıt gelmedi':L('Claude zamanında yanıt vermedi.'),'olay bu kayda ait değil':L('Yapılamadı.')}
 const emHata=e=>{e=String(e||'');return EMER[e]||(/\s/.test(e)?L(e):L('Yapılamadı.'))}
-const emBtn=k=>{const ps=k==='teams'&&emV&&emV.pasif&&emV.pasif.teams;return`<button type=button class=emi data-em=${['ertele','bol','gundem','ata','tarihce'].includes(k)?'mod':'run'} data-e=${k}${emYuk?' disabled':''}>${ic(EMI[k])}<span>${esc(EML[k])}${ps?`<small>${esc(L(ps))}</small>`:EMA[k]?`<small>${esc(EMA[k])}</small>`:''}</span></button>`}
+const emBtn=k=>{const ps=k==='teams'&&emV&&emV.pasif&&emV.pasif.teams;return`<button type=button class=emi data-em=${['ertele','bol','gundem','ata','toplanti','tarihce'].includes(k)?'mod':'run'} data-e=${k}${emYuk?' disabled':''}>${ic(EMI[k])}<span>${esc(EML[k])}${ps?`<small>${esc(L(ps))}</small>`:EMA[k]?`<small>${esc(EMA[k])}</small>`:''}</span></button>`}
 function emKayit(){const k=emKid;let x=((knV||{}).kayitlar||[]).find(y=>y.kayit_id===k||y.id===k);if(!x){const b=bnV||{};x=[...(b.kendi||[]),...(b.baskalari||[]),...(b.teyit||[])].find(y=>y.kayit_id===k||y.id===k)}return x||(emV&&emV.kayit)||null}
 function emCiz(){const g=bnE('emg'),v=emV,x=emKayit()||{}
   bnE('emt').textContent=x.tur==='karar'?L('Karar'):x.tur==='soru'?L('Açık soru'):L('İş');bnE('emh').textContent=String(x.metin||'')
@@ -2014,6 +2014,10 @@ function emForm(v){
     return`<label class=emal>${L('Kim')}<input type=text id=emKisi list=emKisiL maxlength=80 autocomplete=off value="${esc(s.ad||'')}"></label><datalist id=emKisiL>${kl.map(k=>`<option value="${esc(k)}">`).join('')}</datalist>
       <div id=emKim class=emkim>${emKimHtml(s)}</div><label class=emal>${L('E-posta adresi')}<input type=text id=emEp maxlength=120 autocomplete=off value="${esc(s.eposta||'')}"></label>
       <div class=keylem><button type=button class="b ana" data-em=yap data-e=ata>${L('Ata')}</button><button type=button class=b data-em=yap data-e=atamail>${L('Ata ve e-posta taslağı')}</button></div><p class=emalt>${L('Kişi Suflor kullanmıyorsa e-posta taslağıyla haber ver; göndermek sende.')}</p>`}
+  if(emMod==='toplanti'){const t=v.toplanti||{},pl=t.platformlar||[],PA={teams:'Microsoft Teams',meet:'Google Meet',zoom:'Zoom'},dv=t.davetli||[],yok=t.eposta_yok||[]
+    return`<div class=emal>${L('Hangi platformda?')}</div><div class=emgr>${pl.map((k,i)=>`<button type=button class=emi data-em=yap data-e=toplanti data-p="${esc(k)}"${emYuk?' disabled':''}>${ic('takvim')}<span>${esc(PA[k]||k)}${i?'':`<small>${L('Varsayılan')}</small>`}</span></button>`).join('')}</div>
+      <p class=emalt>${dv.length?L('Davetliler: {k}',{k:dv.map(d=>d.ad||d.eposta).join(', ')}):L('E-postası bilinen davetli yok; toplantı kişisiz açılır.')}</p>${yok.length?`<p class=emalt>${L('E-postası bilinmiyor, davete eklenmez: {k}',{k:yok.join(', ')})}</p>`:''}
+      <p class=emalt>${t.platformlar&&pl.includes('zoom')&&!t.zoom_baglanti?L('Zoom: kişisel bağlantı ayarda yok; Zoom açılır, davet metni panoya kopyalanır.'):L('Yalnız toplantı ekranı açılır; göndermek sende.')}</p>`}
   if(emMod==='tarihce'){const l=[...(v.tarihce||[])].reverse()
     return`<ul class=emtar>${l.map(o=>`<li><span>${esc(o.ozet)}</span>${o.metin?`<pre class=emnot>${esc(o.metin)}</pre>`:''}</li>`).join('')}</ul>`}
   return''}
@@ -2033,8 +2037,10 @@ async function emRun(e,p){if(emYuk)return{ok:false};emYuk=true;emMsj=e==='claude
   if(!r.ok){emMsj=r.err==='gizli'?L('Gizli toplantının kaydı: eylem yapılmaz.'):r.err==='ağ'?L('Aktarıcıya ulaşılamadı.'):emHata(r.err);emCiz();return r}
   emMsj=e==='gundem'&&r.toplanti?L('Gündeme eklendi: {t}',{t:r.toplanti.baslik||''}):r.olay===null&&e!=='geri_al'?L('Zaten böyle; değişiklik yok.'):(EMT[e]||'')+(r.alici_yok?' — '+L('alıcı adresi bulunamadı, taslak alıcısız açıldı'):'')
   if(r.taslak)emTaslakAc(r.taslak)
+  if(e==='toplanti'&&r.toplanti&&r.toplanti.url){const t=r.toplanti;if(t.kopyala)try{navigator.clipboard.writeText(t.kopyala)}catch(x){};brAc(t.url,true)
+    emMsj=(t.kopyala?L('Zoom açıldı; davet metni panoya kopyalandı. Göndermek sende.'):EMT.toplanti)+((t.eposta_yok||[]).length?' — '+L('E-postası bilinmiyor, davete eklenmedi: {k}',{k:t.eposta_yok.join(', ')}):'')}
   try{emV=await j('/kayit-menu?id='+encodeURIComponent(emKid))}catch(x){}
-  emMod=e==='claude'?'tarihce':(['ertele','bol','gundem','ata'].includes(emMod)?'':emMod);emCiz();emYenile();return r}
+  emMod=e==='claude'?'tarihce':(['ertele','bol','gundem','ata','toplanti'].includes(emMod)?'':emMod);emCiz();emYenile();return r}
 async function emKimBul(){const ad=(bnE('emKisi')||{}).value||'';if(ad.trim().length<2)return;let k={};try{k=await j('/kimlik?ad='+encodeURIComponent(ad.trim()))}catch(e){}
   const el=bnE('emKim'),ep=bnE('emEp');if(!el||(bnE('emKisi').value||'')!==ad)return;el.innerHTML=emKimHtml(Object.assign({ad},k));if(ep&&k.eposta)ep.value=k.eposta}
 async function emTik(ev){const b=ev.target.closest('[data-em]');if(!b||b.disabled)return;const a=b.dataset.em,e=b.dataset.e
@@ -2046,6 +2052,7 @@ async function emTik(ev){const b=ev.target.closest('[data-em]');if(!b||b.disable
   if(a==='yap'){
     if(e==='ertele')return emRun('ertele',{vade:(bnE('emVade')||{}).value||''})
     if(e==='bol')return emRun('bol',{parcalar:((bnE('emParca')||{}).value||'').split('\n').map(s=>s.trim()).filter(Boolean)})
+    if(e==='toplanti')return emRun('toplanti',{platform:b.dataset.p||''})
     if(e==='gundem'){const r=document.querySelector('input[name=emG]:checked');return emRun('gundem',{etkinlik:r?r.value:''})}
     if(e==='ata'||e==='atamail'){const ad=(bnE('emKisi')||{}).value||'',ep=((bnE('emEp')||{}).value||'').trim();if(!ad.trim()&&!ep){emMsj=L('Kişi adı yaz.');emCiz();return}
       const r=await emRun('ata',{sahip:ad,eposta:ep});if(e==='atamail'&&r.ok)return emRun('eposta',{alicilar:(r.eposta||ep)?[r.eposta||ep]:[],alici_ad:ad})}}}

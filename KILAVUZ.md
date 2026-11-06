@@ -229,6 +229,20 @@ geliştirici kurulumunda ⚙ Ayarlar → **Ortak klasör (pilot)**, başka kurul
 - Durum: `/ortak` (anahtarlı; yazılan, alınan, uygulanmayan değişiklikler, ortak klasörde gizli/deneme izi denetimi). Ağa bağlanılmaz; eşitlemeyi Drive yapar.
 Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/ortak-klasor.py`.
 
+### Firestore ile paylaşım (kişiye göre okuma, saniyelik eşitleme)
+Drive klasörü yerine Google'ın bulut veritabanı Firestore kullanılabilir (ayar `"ortak_tasima": "firestore"`; yoksa Drive yolu aynen). Olaylar ve süzgeç Drive'dakiyle aynı;
+fark: **bir kaydın olaylarını yalnız o kayıtta rolü olanlar (sahip, isteyen, onaylayan, bilgi) görür**, her kullanıcı yalnız kendi adına yazar, kimse silemez —
+bunu Firestore güvenlik kuralları sunucuda sağlar. Sonradan role eklenen kişi kaydın geçmişini de görür. Pano açıkken ya da toplantıda 5 sn'de, diğer zamanda 30 sn'de bir eşitlenir.
+- **Kurulum (ekipte bir kişi, bir kez):** Firebase'de proje + Google girişi açık + Google Cloud'da masaüstü OAuth istemcisi (sırrı Anahtar Zinciri'nde
+  `security add-generic-password -a suflor -s suflor-firestore-istemci-sirri -U -w`), sonra
+  `python3 -B ortak_bulut.py kur --proje <proje> --istemci <istemci kimliği> --alan <şirket alan adı> [--alan <ikinci alan adı>]`: veritabanını, dizini, kuralları kurar,
+  kuralları Google'ın sınama aracıyla dener, web API anahtarını alır, ayarı yazar ve seni giriş yaptırır. Yönetici izni saklanmaz; yeniden çalıştırmak güvenlidir (alan adı eklemek için de).
+- **Ekibe katılma:** kuran kişi `python3 -B ortak_bulut.py davet` ile tek satırlık kod üretir ve özel mesajla gönderir; katılan `python3 -B ortak_bulut.py katil <kod>` çalıştırıp
+  şirket hesabıyla bir kez girer. Yenileme belirteci ve anahtarlar yalnız Anahtar Zinciri'nde.
+- **Drive'dan taşıma:** `python3 -B ortak_bulut.py tasi --klasor <Drive klasörü>` kendi olaylarını gönderir ve sayar (eksik 0 olmalı); herkes kendi Mac'inde çalıştırır.
+- **Durum:** `python3 -B ortak_bulut.py durum` ya da `/ortak` (`tasima`, giriş, son eşitleme, gecikme ortanca/p90). İzinli alan adı dışındaki ya da kişisel posta hesabıyla bağlanılmaz.
+Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/firestore.py` (sahte sunucu; ağa çıkmaz).
+
 ### Asistanın kayıt yazması ve projenin kendi kayıt aracı
 Asistan (Konuş ya da kutu) kayıtta değişiklik önerir, her yazmayı panoda tek tıkla onaylarsın. Masaüstü'ndeki dosyalara aktarıcı erişemediği için o kısmı
 Masaüstü izni olan Suflor Brifing yardımcısı yapar (tek kullanımlık, imzalı, iki dakika geçerli iş dosyasıyla; Claude çalıştırmaz):
