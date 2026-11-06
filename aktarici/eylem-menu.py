@@ -83,7 +83,14 @@ def _bo_vt():  # ayar veritabani.gorevler: kayıt veritabanının açık işleri
         c.set_progress_handler(lambda: 1 if time.time() - t0 > 3 else 0, 10000)
         try: return [list(r) for r in c.execute(str(vt["gorevler"])).fetchmany(500)]
         finally: c.close()
-    except sqlite3.Error as e: print(f"BELGEDEN ATAMA: görev sorgusu okunamadı ({e.__class__.__name__})"); return None
+    except sqlite3.Error as e:
+        try:  # launchd altında Masaüstü'ndeki veritabanı açılmaz: veritabanı yardımcısının (vt-izle) yazdığı önbellek
+            o = json.load(open(os.path.join(BASE, "vt-gorevler.json"), encoding="utf-8"))
+            return [list(r) for r in (o.get("satirlar") or [])][:500]
+        except (OSError, ValueError, AttributeError): pass
+        if _BO_VT_UYARI.get("e") != e.__class__.__name__: _BO_VT_UYARI["e"] = e.__class__.__name__; print(f"BELGEDEN ATAMA: görev sorgusu okunamadı ({e.__class__.__name__}), önbellek de yok")
+        return None
+_BO_VT_UYARI = {}
 def belge_oneri_view():
     y = _yapi_mod()
     if not y or not hasattr(y, "belge_onerileri"): return {"ok": False, "oneriler": [], "say": {}}
