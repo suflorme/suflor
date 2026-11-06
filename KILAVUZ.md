@@ -271,6 +271,7 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 - **Ayarı yanlışlıkla değiştirdin:** ayarlar anında kaydedilir; aynı ayarı geri çevir.
 - **Arka plandaki toplantı oturumu uzun süre "çalışıyor" görünüyor:** panoda Ayrıntı'dan araç adımlarına bak; gerekirse Terminal'de göster.
 - **Paylaşım yokken "sunulan ekran" açılıyor:** `"ekran_oto": false` ile kendiliğinden ekran kaydını kapat.
+- **Paylaşılan ekranın yazısı Claude'a toplu gider (ayar `ekran_toplu_sn`, varsayılan 45; gizli ayar, ⚙ Ayarlar'da yok):** ilk ekran yazısı beklemeden, sonrakiler en çok bu süre aralığıyla tek olayda (en son ekran tam, aradakiler kısa) gider; soru ya da başka bir olay giderken yanına eklenir; toplantı bitince bekleyen gönderilir. Her ekran değişiminde Claude'u ayrı uyandırmamak içindir (maliyet). `0` yazarsan eski davranış: her ekran değişimi hemen gider. Görüntü alma ve kanıt dosyaları değişmez.
 - **Ekran görüntüsü yanlış pencereyi aldı ya da boş geldi:** tüm ekranı paylaşmayı dene; masaüstü toplantıda pencere adı değişmiş olabilir.
 - **Sesli toplantı notu ("not al.") istemediğin yerde çıkıyor:** `"sesli_not": false`.
 - **Takvime hatırlatma eklenemedi, e-posta taslağı açıldı:** Sistem Ayarları'nda Suflor Takvim'e tam erişim ver; farklı bir takvim için `"hatirlatma_takvim": "<takvim adı>"`.

@@ -722,6 +722,33 @@ def izle_olay_kaydet():
 # izle uykusu (6 Kasım; ölçüm: 2 sn sabit uyku soru başına ~1,5–3 sn ekliyordu): en çok IZLE_UYKU_SN bekler, ama soru/kart/döküm/ekran dosyası
 # değişince IZLE_YOKLA_SN içinde uyanır. Boşta /status yoklaması eskisi gibi 2 sn'de bir; yoklama yalnız stat (dosya boyu + değişme anı).
 IZLE_UYKU_SN, IZLE_YOKLA_SN = 2.0, 0.25
+# EKRAN toplu gönderimi (6 Kasım, ölçüm: 71 EKRAN olayı ≈ 15 $ uyanma): ilk EKRAN hemen, sonrakiler ekran_toplu_sn (varsayılan 45; 0 = eski, her olay hemen)
+# içinde birikir ve tek olayda gider; başka bir olay gidiyorsa onun yanına eklenir (ek uyanma yok). Birleştirme saf işlev: test/ekran-toplu.py.
+def ekran_toplu_sn():
+    try: return max(0.0, float(AYAR.get("ekran_toplu_sn", 45)))
+    except (TypeError, ValueError): return 45.0
+def ekran_ilk_satir(ozet, en_cok=70):
+    ilk = next((x.strip() for x in str(ozet or "").replace("·", "\n").splitlines() if x.strip()), "")
+    return ilk if len(ilk) <= en_cok else ilk[:en_cok].rsplit(" ", 1)[0] + " …"
+def ekran_birlestir(bekle, ozetler, dizin):
+    """bekle: biriken ekran.jsonl kayıtları (eskiden yeniye); ozetler: n → özet (daha önce görülenler dahil); dizin: görüntü klasörü.
+    En son ekran tam, aradakiler kısa ('ara görülenler'), geri dönüşler (ayni) tek satıra katlanır."""
+    if not bekle: return ""
+    son = bekle[-1]; onceki = bekle[:-1]
+    ozet_of = lambda r: r.get("ozet") if not r.get("ayni") else ozetler.get(r["ayni"])
+    if son.get("ayni"):
+        bas = f"EKRAN {son.get('n')} ({son.get('saat')}): KANIT {son['ayni']} ile aynı yazı — önceki ekrana dönüldü: \"{ozet_of(son) or '(özet yok)'}\""
+    else:
+        bas = f"EKRAN {son.get('n')} ({son.get('saat')}): \"{son.get('ozet')}\""
+    bas += f" · görüntü {os.path.join(dizin, son.get('gorsel') or '')}" + (f" · GÖRSEL AĞIRLIKLI ({son['gorsel_neden']}) → görüntüyü Read ile oku, en çok 2 cümle not kartı (ekranda ne var + dikkat çeken sayı/eğilim/çelişki)" if son.get("gorsel_neden") else "")
+    ara = []; donus = {}
+    for r in onceki:
+        if r.get("ayni"): donus[r["ayni"]] = donus.get(r["ayni"], 0) + 1
+        else: ara.append(f"EKRAN {r.get('n')} ({r.get('saat')}) \"{ekran_ilk_satir(r.get('ozet'))}\"")
+    ek = []
+    if ara: ek.append("ara görülenler (kısa; ayrıntı için kanıt klasörü): " + "; ".join(ara))
+    if donus: ek.append("geri dönüşler: " + "; ".join(f"KANIT {k} ({v}×)" for k, v in donus.items()))
+    return bas + f" · toplu: {len(bekle)} ekran değişti, yukarıdaki en sonuncusu şu an ekranda" + (" · " + " · ".join(ek) if ek else "")
 def izle_iz(yollar):
     o = []
     for p in yollar:
@@ -1355,7 +1382,7 @@ def paket_kaydi(dosya, satir, aday, neden):
 def izle():
     import baglam  # hazır kart tetiği kök karşılaştırması
     q_tail = Tail(os.path.join(A.dir, "sorular.jsonl")); k_tail = Tail(os.path.join(A.dir, "kartlar.jsonl"))
-    cur = None; t_tail = None; e_tail = None; ekran_ilk = None; oto_bildirilen = None; buf = []; acks = []; buf_since = None; last_state = None; texts = {}; aday = None; aday_t = 0.0
+    cur = None; t_tail = None; e_tail = None; ekran_ilk = None; EB = {'bekle': [], 'son': 0.0, 'ozet': {}}; oto_bildirilen = None; buf = []; acks = []; buf_since = None; last_state = None; texts = {}; aday = None; aday_t = 0.0
     kart_aday = set(); son_paket = 0.0  # kapıcı: tampondaki kart adaylarının türü (soru/sistem/iddia), son paket anı
     hz_path = os.path.join(A.dir, "hazir.json"); hz_mtime = None; hz = []; hz_seen = set()
     ag_path = os.path.join(A.dir, "agenda.json"); ag_mtime = None; agj = {}
@@ -1363,6 +1390,12 @@ def izle():
     bg_path = os.path.join(A.dir, "baglam.json"); bg_mtime = None; bg_bil_fp = os.path.join(A.dir, "baglam-bildirim.json")
     try: bg_bil = set(json.load(open(bg_bil_fp, encoding="utf-8")))  # izle yeniden kurulunca aynı kaynak yeniden bildirilmez
     except Exception: bg_bil = set()
+    def ekran_ek(zorla=False):
+        # biriken EKRAN'lar → tek olay satırı (liste); zorla: başka olayın yanına ya da toplantı sonunda; aksi hâlde süre dolunca
+        if not EB["bekle"]: return []
+        if not zorla and time.time() - EB["son"] < ekran_toplu_sn(): return []
+        o = ekran_birlestir(EB["bekle"], EB["ozet"], A.dir); EB["bekle"] = []; EB["son"] = time.time()
+        return [o]
     def baglam_bak():
         # bağlam kaynakları (aktarıcı yazar: Başlat formu, kutudaki bağlantı/dosya yolu, panoya bırakılan dosya) — yeni olan bir kez
         nonlocal bg_mtime
@@ -1504,6 +1537,7 @@ def izle():
                 tb = {"file": cur, "t": tko.get("oturum_bitti"), "neden": tko.get("oturum_bitis_neden"), "oturum": True, "yeni": tko.get("ad") if tko.get("durum") in ("algilandi", "suruyor", "bitiyor") else None}
             if tb.get("file") and tb.get("file") == cur and tb.get("t") != bitti_son:  # aktarıcı bitişi algıladı (bir kez; yeniden katılınca sıfırlanır)
                 bitti_son = tb.get("t")
+                if EB["bekle"]: emit(*ekran_ek(True))  # toplantı bitti: biriken ekran toplantı sonu adımlarından önce gelir
                 try: eski = datetime.datetime.fromisoformat(tb["t"]).timestamp() < izle_bas - 5
                 except (TypeError, ValueError): eski = False
                 if eski and tb.get("oturum"):  # izle yeniden başladı (Monitor yenilendi), toplantı bitmiş ve özeti gelmemiş: sürdürülür
@@ -1571,6 +1605,8 @@ def izle():
                      " → yürütücü dinlemeli: gerekirse SÖYLE kartı (soru sor, sözü ver)"); pay_son = dinle_son = time.time()
             f = oturum_dosyasi(s)  # 3 Kasım: oturum önceki toplantının sonunu yapıyorsa izle o dosyada kalır (yeni toplantıyı onun oturumu izler)
             if f and f != cur:
+                if EB["bekle"]: emit(*ekran_ek(True))  # toplantı değişiyor: biriken ekran kaybolmasın
+                EB["ozet"] = {}; EB["son"] = 0.0
                 cur = f; jl = os.path.join(A.dir, f.replace(".md", ".jsonl"))
                 t_tail = Tail(jl, from_end=False); old = [r for r in t_tail.new() if "note" not in r and "kanit" not in r]
                 e_tail = Tail(os.path.join(A.dir, "kanit", f[:-3], "ekran.jsonl"))  # v0.187.0: paylaşılan ekranın yazısı (aktarici/ekran.py); izle yeniden açılınca eskiler yinelenmez
@@ -1588,8 +1624,13 @@ def izle():
                 for r in old[-6:]: emit(satir(r))
             if e_tail:  # v0.187.0 (5 Kasım): ilk EKRAN'da talimat, sonrakilerde yalnız özet (her olayda yinelenmesin)
                 for r in e_tail.new():
-                    if r.get("ayni"): emit(f"EKRAN {r.get('n')} ({r.get('saat')}): KANIT {r['ayni']} ile aynı yazı — önceki ekrana dönüldü"); continue
-                    ilk = ekran_ilk != cur; ekran_ilk = cur
+                    if not r.get("ayni") and r.get("ozet"): EB["ozet"][r.get("n")] = r["ozet"]
+                    ilk = ekran_ilk != cur
+                    if ekran_toplu_sn() > 0 and not ilk: EB["bekle"].append(r); continue  # toplu: süre dolunca ya da başka olayla gider
+                    if EB["bekle"]: EB["bekle"].append(r); emit(*ekran_ek(True)); ekran_ilk = cur; continue  # süre 0'a çekildi: birikeni boşalt
+                    if ilk: EB["son"] = time.time()  # ilk EKRAN beklemeden; toplu süre onun anından sayılır
+                    if r.get("ayni"): emit(f"EKRAN {r.get('n')} ({r.get('saat')}): KANIT {r['ayni']} ile aynı yazı — önceki ekrana dönüldü"); ekran_ilk = cur; continue
+                    ekran_ilk = cur
                     emit(f"EKRAN {r.get('n')} ({r.get('saat')}): \"{r.get('ozet')}\" · " + ("paylaşılan ekranda görünen yazı (yerel okundu, okuma hatası olabilir) → bağlamına al: "
                          "geçen ad/firma/başlık/sayı konuşmayla ilgiliyse kartta ve cevapta kullan; emin değilsen görüntüyü Read ile aç (soru/cevap turunda açma, bu özet yeter); ekranda sır/şifre → DUR kartı; sohbete yazma · "
                          if ilk else "") + f"görüntü {os.path.join(A.dir, r.get('gorsel') or '')}" +
@@ -1668,7 +1709,7 @@ def izle():
                     return [f"GİRDİ {q.get('id')} ({BEN} kutuya yazdı): {q.get('text')}   ← soru ya da istekse 30 sn içinde cevap --cevap {q.get('id')}; bilgi notuysa kart yazma, sonraki kartlarda kullan",
                             *soru_baglam(q.get('text') or ''), *taslak_satir()]
                 return [f"SORU {q.get('id')}: {q.get('text')}   ← ÖNCE BUNU CEVAPLA (30 sn)", *soru_baglam(q.get('text') or ''), *taslak_satir()]
-            emit(*[l for q in qs for l in soru_olay(q)], *acks, *sesler,
+            emit(*[l for q in qs for l in soru_olay(q)], *acks, *sesler, *ekran_ek(True),
                  *([f"SATIRLAR ({len(buf)}, soruya kadar):", *buf] if buf else []), *paket_baglam())
             if buf: paket_kaydi(cur, len(buf), kart_aday, "soru")
             buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
@@ -1695,9 +1736,12 @@ def izle():
         # ardından kart çıktı, her acil paket Claude'a ~180 bin simgelik bağlamı yeniden okutuyor. Kalıcı karar yeterli toplantı verisiyle (#84).
         acil = bool(kart_aday - {"iddia"}) and bool(buf) and time.time() - son_paket >= A.bosluk
         if (buf or acks) and (acil or len(buf) >= A.paket or time.time() - buf_since >= A.aralik):
-            emit(*acks, *sesler, *([f"SATIRLAR ({len(buf)}" + (f", kart adayı: {'/'.join(sorted(kart_aday))}" if kart_aday else "") + "):", *buf] if buf else []), *paket_baglam())
+            emit(*acks, *sesler, *ekran_ek(True), *([f"SATIRLAR ({len(buf)}" + (f", kart adayı: {'/'.join(sorted(kart_aday))}" if kart_aday else "") + "):", *buf] if buf else []), *paket_baglam())
             if buf: paket_kaydi(cur, len(buf), kart_aday, "acil" if acil else "dolu" if len(buf) >= A.paket else "sure")
             buf = []; acks = []; sesler = []; buf_since = None; kart_aday = set(); son_paket = time.time()
+        if EB["bekle"]:  # süre doldu: tek olayda gönder (başka olay yoksa kendi başına uyandırır)
+            o = ekran_ek()
+            if o: emit(*o)
         izle_uyku(uyku_yollari(), uyku_ilk)
 
 # --- v0.7.0: kanıt listesi / açıklama ----------------------------------------------------------------------------

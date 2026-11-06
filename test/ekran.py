@@ -72,7 +72,7 @@ else:
     ust = {"x": 0, "y": 0, "w": 1, "h": 0.45}
     o = json.loads(subprocess.run([ikili, g1, "--bolge", "0,0,1,0.45"], capture_output=True, text=True).stdout)
     ok("metin-tani --bolge: yalnız bölgedeki yazı (altyazı satırı yok)", any("Bütçe" in s for s in o["satirlar"]) and not any("Altyazı" in s for s in o["satirlar"]))
-    ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": "/Users/Shared/Suflor"}, open(ay, "w"))  # kanit_metin yok (varsayılan)
+    ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": "/Users/Shared/Suflor", "ekran_toplu_sn": 0}, open(ay, "w"))  # kanit_metin yok (varsayılan); ekran_toplu_sn 0 = her EKRAN hemen (eski davranış; toplu: test/ekran-toplu.py)
     R = os.path.join(T, "kod"); os.makedirs(R)
     for f in ("relay.py", "manifest.json", "toplanti-claude.py", "yapi.py", "taahhut.py", "baglam.py"):
         if os.path.exists(os.path.join(KOD, f)): shutil.copy(os.path.join(KOD, f), R)
