@@ -93,6 +93,17 @@ TODO: Lisans yenilemesini kontrol et, sorumlu: Doruk Ersoy, 15.12.2026
     od = yapi.ortak_disari(C, OK, "ece" + AT + "firma.test", "Ece Deneme")
     giden = [json.loads(l)["kayit_id"] for root, _, fs in os.walk(OK) for f in fs for l in open(os.path.join(root, f), encoding="utf-8")]
     bak("ortak klasör: proje kartı işinin olayları gider, deneme toplantısı belgesinden kabul edilen gitmez", rd["ok"] and r["kayit_id"] in giden and rd["kayit_id"] not in giden and od["atlanan"].get("deneme", 0) >= 2, od)
+    # kayıt veritabanının açık işleri (ayar veritabani.gorevler satırları: iş, sahip, vade, konum)
+    VR = [["Envanter tablosunu kurumsala taşı · 29 Ekim: ek not · 30 Ekim: başka not", "Doruk Ersoy (ana sahip), Selin Arı", "", "iş kaydı #7"],
+          ["A1 · Erişim listesini doğrula", "Selin Hanım", "2026-11-20", "iş kaydı #8"], ["Kısa", "Doruk", "", "#9"],
+          ["Pilot sonuçlarını derle", "Selin Arı", "", "#10"], ["Uzun cümle sahipli iş kaydı", "bu iş kurucu kararından sonra netleşecek", "", "#11"]]
+    vv = {x["metin"]: x for x in yapi.belge_onerileri(C, None, [], None, vt_isler=VR)["oneriler"]}
+    bak("veritabanı: ' · ' sonrası tarihli notlar düşer (ilk parça kısaysa iki parça), çok kısa yok, kayıttaki (ve reddedilen) yok",
+        set(vv) == {"Envanter tablosunu kurumsala taşı", "A1 · Erişim listesini doğrula", "Uzun cümle sahipli iş kaydı"}, sorted(vv))
+    bak("veritabanı sahibi: parantez ve ikinci kişi atılır, unvan düşer, cümle sahip sayılmaz; vade ISO; kaynak satırı",
+        vv["Envanter tablosunu kurumsala taşı"]["sahip"] == "Doruk Ersoy" and vv["A1 · Erişim listesini doğrula"]["sahip"] == "Selin" and vv["A1 · Erişim listesini doğrula"]["vade"] == "2026-11-20"
+        and vv["Uzun cümle sahipli iş kaydı"]["sahip"] == "" and vv["Envanter tablosunu kurumsala taşı"]["kaynak"] == {"tur": "veritabani", "ad": "kayıt veritabanı", "konum": "iş kaydı #7"}, vv)
+    bak("veritabanı satırı verilmezse kartın veritabani.acik_isler satırları", [x["metin"] for x in yapi.belge_onerileri(C, {"veritabani": {"acik_isler": [VR[0]]}}, [], None)["oneriler"]] == ["Envanter tablosunu kurumsala taşı"])
     # aktarıcı: GET/POST /belge-oneri — baglam.json'daki belge, proje kartı uygulama klasöründe; e-posta kimlik modülünden (takvim katılımcısı)
     PORT = bos_port(8799); U = f"http://127.0.0.1:{PORT}"; UY = os.path.join(T, "uyg"); os.makedirs(UY)
     shutil.copytree(ONB, os.path.join(UY, "cevirme-onbellek"))
@@ -104,7 +115,11 @@ TODO: Lisans yenilemesini kontrol et, sorumlu: Doruk Ersoy, 15.12.2026
     json.dump({"durum": "ok", "olaylar": [{"id": "ev1", "baslik": "Proje", "baslangic": f"{g0}T23:40:00+03:00", "bitis": f"{g0}T23:55:00+03:00", "katilimcilar": ["Doruk Ersoy"],
                                            "kisiler": [{"ad": "Doruk Ersoy", "eposta": "doruk.ersoy" + AT + "firma.test"}], "katilimci_eposta": ["doruk.ersoy" + AT + "firma.test"], "tum_gun": False}]},
               open(os.path.join(T, "takvim.json"), "w", encoding="utf-8"), ensure_ascii=False)  # aktarıcı takvimi canlı klasörünün yanında
-    json.dump({"alan": "Deneme", "ad": "Ece Deneme", "uygulama": UY, "proje": T, "ortak": "/Users/Shared/Suflor", "port": PORT, "gelistirici": True, "konusma": False, "yerel_ses": False}, open(AY, "w"))
+    import sqlite3; VDB = os.path.join(T, "kayit.db"); vc = sqlite3.connect(VDB)
+    vc.execute("CREATE TABLE is_kaydi (id INTEGER PRIMARY KEY, tur TEXT, baslik TEXT, sahip TEXT, ne_zaman TEXT, acik INTEGER, oncelik TEXT, sira INTEGER)")
+    vc.executemany("INSERT INTO is_kaydi (tur, baslik, sahip, ne_zaman, acik) VALUES (?,?,?,?,?)", [("is", "Yedekleme planını yaz", "Doruk Ersoy", "", 1), ("is", "Kapanmış veritabanı işi", "Doruk Ersoy", "", 0), ("adim", "Sıradaki adım iş değil", "", "", 1)]); vc.commit(); vc.close()
+    GQ = "SELECT baslik, sahip, ne_zaman, 'iş kaydı #' || id FROM is_kaydi WHERE acik = 1 AND tur = 'is' ORDER BY oncelik IS NULL, coalesce(sira, 999999), id"
+    json.dump({"alan": "Deneme", "ad": "Ece Deneme", "uygulama": UY, "veritabani": {"yol": VDB, "gorevler": GQ}, "proje": T, "ortak": "/Users/Shared/Suflor", "port": PORT, "gelistirici": True, "konusma": False, "yerel_ses": False}, open(AY, "w"))
     rl = subprocess.Popen([sys.executable, "relay.py", "--dir", C, "--port", str(PORT)], cwd=KOD, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_AYAR=AY),
                           stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
     for _ in range(40):
@@ -117,12 +132,13 @@ TODO: Lisans yenilemesini kontrol et, sorumlu: Doruk Ersoy, 15.12.2026
         except urllib.error.HTTPError as e: return {"_kod": e.code}
     bak("/belge-oneri anahtarsız 401", al("/belge-oneri", False).get("_kod") == 401)
     a = al("/belge-oneri"); ao = {x["metin"]: x for x in a.get("oneriler") or []}
-    bak("/belge-oneri: proje kartı (uygulama klasörü) + bağlamdaki belge (önbellekten), bağlantı okunmaz", a.get("ok") and set(ao) == {"Eğitim takvimini çıkar", "Kurulum rehberini çevir"}, a)
+    bak("/belge-oneri: kayıt veritabanının açık işi (kapanmış ve adım yok) + proje kartı + bağlamdaki belge (önbellekten), bağlantı okunmaz", a.get("ok") and set(ao) == {"Eğitim takvimini çıkar", "Kurulum rehberini çevir", "Yedekleme planını yaz"}, a)
     k = al("/belge-oneri", govde={"id": ao["Eğitim takvimini çıkar"]["id"], "islem": "kabul"})
     x = yapi.ortak_kayit(C, k.get("kayit_id") or "-") or {}
     bak("POST kabul: kayit_olustu + is_atandi, sahibin e-postası takvimden", k.get("ok") and k["olaylar"] == ["kayit_olustu", "is_atandi"] and (x.get("roller") or {}).get("sahip", {}).get("eposta") == "doruk.ersoy" + AT + "firma.test", (k, x.get("roller")))
     rr = al("/belge-oneri", govde={"id": ao["Kurulum rehberini çevir"]["id"], "islem": "reddet"}); a2 = al("/belge-oneri")
-    bak("POST reddet → listeden düşer; bilinmeyen öneri kabul edilmez", rr.get("ok") and a2.get("oneriler") == [] and not al("/belge-oneri", govde={"id": "o" + "0" * 15, "islem": "kabul"}).get("ok"))
+    bak("veritabanı dosyası değişmedi (yalnız okuma)", sqlite3.connect(VDB).execute("SELECT count(*) FROM is_kaydi").fetchone()[0] == 3)
+    bak("POST reddet → listeden düşer; bilinmeyen öneri kabul edilmez", rr.get("ok") and [x["metin"] for x in a2.get("oneriler") or []] == ["Yedekleme planını yaz"] and not al("/belge-oneri", govde={"id": "o" + "0" * 15, "islem": "kabul"}).get("ok"))
 finally:
     if rl: rl.terminate()
     shutil.rmtree(T, ignore_errors=True)

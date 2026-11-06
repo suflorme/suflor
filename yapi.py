@@ -1459,7 +1459,13 @@ def _benzer(a, b):
     if not a or not b: return False
     if a == b or (min(len(a), len(b)) >= 12 and (a in b or b in a)): return True
     import difflib; return difflib.SequenceMatcher(None, a, b).ratio() >= 0.85
-def belge_onerileri(dizin, kart=None, belgeler=None, onbellek=None, deneme=False, en_cok=BELGE_ONERI_EN_COK):
+def _vt_sahip(s):  # kayıt veritabanının sahip alanı → tek kişi adı ya da "": birden çok kişide ilki; cümle (≥ 5 sözcük) ya da küçük harfle başlayan metin sahip sayılmaz
+    p = re.sub(r"\s*\([^)]*\)?", " ", " ".join(str(s or "").split()))  # parantez içi açıklama (rol, takma ad) atılır
+    p = re.split(r"\s*(?:[,;+/&]|\bve\b|\band\b)\s*", p)[0].strip(" .:()")
+    p = " ".join(w for w in p.split() if kucuk(w).strip(".") not in ("bey", "hanım", "hn", "bay", "bayan", "mr", "mrs", "ms", "dr"))
+    return p[:80] if p and len(p.split()) <= 4 and p[0].isupper() and not re.search(r"\d", p) else ""
+def belge_onerileri(dizin, kart=None, belgeler=None, onbellek=None, deneme=False, en_cok=BELGE_ONERI_EN_COK, vt_isler=None):
+    # vt_isler: kayıt veritabanının açık işleri (ayar veritabani.gorevler sorgusunun satırları: [iş metni, sahip, vade?, konum?]); verilmezse kartın veritabani.acik_isler satırları.
     # kart: proje-karti.json içeriği (acik_isler: {is, sahip [..], tarih, kaynaklar [[yol, konum]]}); belgeler: [{"ad", "yol", "toplanti"}] (toplantıya bırakılan/eklenen dosyalar).
     # → {"oneriler": [{id, metin, sahip, vade, kaynak: {tur: proje_karti|belge, ad, konum}, toplanti, neden}], "say": {aday, kayitta, red}}
     d = _bo_dosya(dizin); red = set((d.get("red") or {})); kabul = set((d.get("kabul") or {})); var = []
@@ -1475,6 +1481,15 @@ def belge_onerileri(dizin, kart=None, belgeler=None, onbellek=None, deneme=False
         adaylar.append({"metin": " ".join(str(x["is"]).split())[:300], "sahip": sh, "vade": _bi_tarih(str(x.get("tarih") or "")) if x.get("tarih") else "",
                         "kaynak": {"tur": "proje_karti", "ad": os.path.basename(str(k0[0] or "")) or "proje kartı", "konum": str(k0[1] if len(k0) > 1 else "")}, "toplanti": "",
                         "neden": "proje kartında açık iş" + (" (sahibi belgede yazılı)" if sh else " (belgede sahip yok)")})
+    if vt_isler is None and isinstance(kart, dict): vt_isler = ((kart.get("veritabani") or {}).get("acik_isler") or []) if isinstance(kart.get("veritabani"), dict) else []
+    for r in vt_isler or []:
+        if not isinstance(r, (list, tuple)) or not r or not str(r[0] or "").strip(): continue
+        g = lambda j: str(r[j] or "").strip() if len(r) > j and r[j] is not None else ""
+        mt = " ".join(g(0).split()); pr = re.split(r"\s+·\s+", mt)  # kayıtta işin ardına " · " ile eklenmiş tarihli notlar öneri metnine girmez (ilk parça kısaysa iki parça)
+        mt = pr[0] if len(pr[0]) >= 30 or len(pr) == 1 else " · ".join(pr[:2]); sh = _vt_sahip(g(1)); vd = _bi_tarih(g(2)) if re.fullmatch(r"\d{4}-\d{2}-\d{2}|\d{1,2}[./]\d{1,2}[./]\d{4}", g(2)) else ""
+        if len(mt) < 8 or not re.search(r"[A-Za-zÇĞİÖŞÜçğıöşü]{3}", mt): continue
+        adaylar.append({"metin": mt if len(mt) <= 300 else mt[:299].rstrip() + "…", "sahip": sh, "vade": vd, "kaynak": {"tur": "veritabani", "ad": "kayıt veritabanı", "konum": g(3)[:60]},
+                        "toplanti": "", "neden": "kayıt veritabanında açık iş" + (" (sahibi kayıtta yazılı)" if sh else " (kayıtta tek bir sahip yok)")})
     ky = son_kayitlar(dizin)
     for b in belgeler or []:
         top = str(b.get("toplanti") or "")
@@ -1589,7 +1604,7 @@ def bilinen_adlar(dizin):  # grafta geçen kişi adları (kendi_mi'de aynı ilk 
     c = _db(dizin)
     try: return sorted({str(r[0]).strip() for r in c.execute("SELECT kim FROM kayit UNION SELECT sahip FROM kayit") if r[0] and str(r[0]).strip()})
     finally: c.close()
-def taslak_icerik(x, tur, alicilar=None, alici_ad="", dil=None):
+def taslak_icerik(x, tur, alicilar=None, alici_ad="", dil=None, ben_onayladi=None):
     # kayıt → {"konu", "govde", "alicilar", "teams", "tur"} (yalnız metin ve bağlantı; hiçbir şey gönderilmez). tur: eposta | teams
     dil = dil or ("en" if str(_ayar().get("dil") or "") == "en" else "tr"); en = dil == "en"; i = 1 if en else 0
     t = _TASLAK_TUR.get(x.get("tur"), ("kayıt", "item"))[i]; bas = _TASLAK_BAS.get(x.get("tur"), ("Kayıt", "Item"))[i]; metin = TEYIT_RX.sub("", str(x.get("metin") or "")).strip(); vade = tarih_okunur(x.get("vade"), en)
@@ -1608,6 +1623,19 @@ def taslak_icerik(x, tur, alicilar=None, alici_ad="", dil=None):
         konu = f"{bas}: {metin[:70]}"; vd = f"\nVade: {vade}" if vade else ""
         govde = f"{selam}\n\n{baglam}{t}:\n\n- {metin}{vd}\n\n{ask}\n\nTeşekkürler"
         kisa = f"{selam} {kisa_yer + ' toplantısından ' if kisa_yer else ''}{t}: {metin.rstrip('.')}" + (f" (vade: {vade})." if vade else ".") + f" {ask}"
+    if x.get("tur") == "karar":  # 7 Kasım (kullanıcı onayladı, metin aynen): onaylayan kullanıcıysa taslak kararı isteyene "onayladım", değilse onaylayana "onayını bekliyor"
+        if ben_onayladi is None:
+            o = (x.get("roller") or {}).get("onaylayan") or {}; ben_onayladi = bool(o.get("ben") or (o.get("ad") or o.get("eposta")) and kendi_mi(o.get("ad") or "", o.get("eposta") or ""))
+        if en:
+            yer = f"the decision from the {gun} meeting" if gun else "the decision"
+            govde_ic = (f"I've approved {yer}: \"{metin}\". You can go ahead. Is there anything you'd like to add?" if ben_onayladi else
+                        f"{yer}: \"{metin}\". It's awaiting your approval. If you have any objections, could you let me know?")
+        else:
+            yer = f"{gun} toplantısındaki karar" if gun else "karar"
+            govde_ic = (f"{yer}ı onayladım: \"{metin}\". Uygulamaya geçebilirsin. Eklemek istediğin bir şey varsa yazar mısın?" if ben_onayladi else
+                        f"{yer}: \"{metin}\". Onayını bekliyor. İtirazın varsa yazar mısın?")
+        buyuk = govde_ic[0].upper() + govde_ic[1:]  # e-postada cümle yeni satırda başlar; kısa (Teams) biçimde selamın virgülünden sonra küçük harf
+        kisa = f"{selam} {govde_ic}"; govde = f"{selam}\n\n{buyuk}\n\n" + ("Thanks" if en else "Teşekkürler")
     al = [e for e in dict.fromkeys(str(a or "").strip().lower() for a in (alicilar or [])) if "@" in e][:10]
     return {"konu": konu[:120], "govde": govde, "alicilar": al, "teams": teams_url(al, kisa), "tur": tur}
 def claude_istemi(x, tarihce_satirlari):
@@ -1712,7 +1740,7 @@ def kayit_eylem(dizin, kimlik, eylem, p=None, yazan=None, kimlik_f=None, takvim=
         if not p.get("alicilar") and _alici_kendi(r0, kimlik_f, bl)[0]: return {"ok": False, "err": "bu iş senin; kendine taslak yazılmaz", "eylem": eylem}
         if eylem == "teams" and not al:
             return {"ok": False, "err": ("bu kayıtta taslağın alıcısı yok (Ata ile kişi ekle)" if not (r0.get("ad") or alici_ad) else "alıcının e-postası yok; Teams sohbeti alıcısız açılamaz (E-posta taslağı ya da Ata ile adres ekle)"), "eylem": eylem}
-        t = taslak_icerik(x, eylem, al, alici_ad)
+        ok_ = (x["roller"] or {}).get("onaylayan"); t = taslak_icerik(x, eylem, al, alici_ad, ben_onayladi=bool(x["tur"] == "karar" and ok_ and r0 is not ok_))  # karar: muhatap isteyense onaylayan kullanıcıdır
         o, _ = _degistir(dizin, kid, "taslak_hazirlandi", lambda y: {"tur": eylem, "alicilar": t["alicilar"]}, yazan, k)
         return bitti(o, None, taslak=t, alici_yok=not t["alicilar"])
     if eylem == "claude":

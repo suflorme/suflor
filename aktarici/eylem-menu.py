@@ -52,7 +52,7 @@ def kayit_eylem_islem(p):  # POST /kayit-eylem
 # --- Belgeden atama (7 Kasım): proje kartı + toplantıya eklenen belgelerden iş önerisi (yapi.belge_onerileri; seçim ve yazma orada, test/belgeden-atama.py) -------------------------
 #   GET  /belge-oneri (anahtarlı, VERI_GET) → {"oneriler", "say"} — Kararlar ve işler sayfasında İşler sekmesinin üstünde
 #   POST /belge-oneri {"id", "islem": "kabul"|"reddet", "sahip"?} (anahtarlı) → kabul: kayit_olustu + (sahip varsa) is_atandi; sahibin e-postası kimlik modülünden. Reddedilen bir daha önerilmez.
-# Belgeler: canli/baglam.json + son BELGE_ARSIV_GUN gündeki baglam-arsiv.jsonl dosya kaynakları (bağlantılar değil); gizli toplantının belgesi yapi'de düşer.
+# Kayıt veritabanı (ayar veritabani.gorevler; yalnız okuma) önerilerin ilk kaynağı. Belgeler: canli/baglam.json + son BELGE_ARSIV_GUN gündeki baglam-arsiv.jsonl dosya kaynakları (bağlantılar değil); gizli toplantının belgesi yapi'de düşer.
 BELGE_ARSIV_GUN = 14
 def _bo_belgeler():
     out, gor = [], set(); sinir = datetime.datetime.now() - datetime.timedelta(days=BELGE_ARSIV_GUN)
@@ -73,10 +73,21 @@ def _bo_belgeler():
 def _bo_kart():
     try: return json.load(open(os.path.join(AYAR["uygulama"], "proje-karti.json"), encoding="utf-8"))
     except (OSError, ValueError): return None
+def _bo_vt():  # ayar veritabani.gorevler: kayıt veritabanının açık işleri — YALNIZ OKUMA (mode=ro), en çok 500 satır, 3 sn; sütunlar: iş metni, sahip, vade, konum
+    vt = AYAR.get("veritabani") if isinstance(AYAR.get("veritabani"), dict) else {}
+    if not vt.get("yol") or not str(vt.get("gorevler") or "").strip(): return None
+    yol = os.path.expanduser(str(vt["yol"])); yol = yol if os.path.isabs(yol) else os.path.join(os.path.expanduser(str(AYAR.get("proje") or "")), yol)
+    import sqlite3, urllib.parse
+    try:
+        c = sqlite3.connect(f"file:{urllib.parse.quote(yol)}?mode=ro", uri=True, timeout=3); t0 = time.time()
+        c.set_progress_handler(lambda: 1 if time.time() - t0 > 3 else 0, 10000)
+        try: return [list(r) for r in c.execute(str(vt["gorevler"])).fetchmany(500)]
+        finally: c.close()
+    except sqlite3.Error as e: print(f"BELGEDEN ATAMA: görev sorgusu okunamadı ({e.__class__.__name__})"); return None
 def belge_oneri_view():
     y = _yapi_mod()
     if not y or not hasattr(y, "belge_onerileri"): return {"ok": False, "oneriler": [], "say": {}}
-    try: return dict(y.belge_onerileri(BASE, _bo_kart(), _bo_belgeler(), os.path.join(AYAR["uygulama"], "cevirme-onbellek")), ok=True)
+    try: return dict(y.belge_onerileri(BASE, _bo_kart(), _bo_belgeler(), os.path.join(AYAR["uygulama"], "cevirme-onbellek"), vt_isler=_bo_vt()), ok=True)
     except Exception as e: print(f"BELGEDEN ATAMA: öneriler okunamadı ({e.__class__.__name__})"); return {"ok": False, "oneriler": [], "say": {}}
 def belge_oneri_islem(p):
     y = _yapi_mod(); p = p if isinstance(p, dict) else {}; oid = str(p.get("id") or "")[:20]; isl = str(p.get("islem") or "")

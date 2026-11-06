@@ -190,5 +190,22 @@ bak("e-posta önce: adı aynı ama adresi farklı olan kendi değil; adresi kull
 yapi.ata(C, AD2, {"sahip": {"ad": "Ayşe Deneme", "eposta": "ayse.d" + AT + "baska.test"}}); m3 = yapi.eylem_menu(C, AD2, TAKVIM, kimlik_f=kimlik_f)
 bak("menü: sahibin adı kullanıcınınkiyle aynı ama e-postası başka → taslak seçenekleri var, Teams pasif değil", not m3["kendi"] and "teams" in m3["eylemler"] and m3["pasif"] == {}, (m3["kendi"], m3["pasif"]))
 json.dump({"ad": "Ayşe Deneme"}, open(AY, "w")); os.utime(AY, (time.time() + 10, time.time() + 10))
+# --- 7 Kasım: karar taslağı metni (onaylanmış metin) — onaylayan kullanıcıysa kararı isteyene "onayladım", değilse onaylayana "onayını bekliyor" ---
+def msj(r): return urllib.parse.parse_qs(urllib.parse.urlsplit(r["taslak"]["teams"] if "taslak" in r else r["teams"]).query)["message"][0]
+KX = {"tur": "karar", "metin": "Bütçe 120 bin", "tarih": "2026-11-05"}
+bak("karar taslağı (kullanıcı onaylayan): onaylanmış metin aynen", msj(yapi.taslak_icerik(KX, "teams", ["can" + AT + "x.test"], "Can Örnek", dil="tr", ben_onayladi=True))
+    == 'Merhaba Can, 5 Kasım toplantısındaki kararı onayladım: "Bütçe 120 bin". Uygulamaya geçebilirsin. Eklemek istediğin bir şey varsa yazar mısın?')
+bak("karar taslağı (onaylayan başkası): onaylanmış metin aynen", msj(yapi.taslak_icerik(KX, "teams", ["can" + AT + "x.test"], "Can Örnek", dil="tr", ben_onayladi=False))
+    == 'Merhaba Can, 5 Kasım toplantısındaki karar: "Bütçe 120 bin". Onayını bekliyor. İtirazın varsa yazar mısın?')
+t0 = yapi.taslak_icerik(dict(KX, tarih=""), "eposta", ["can" + AT + "x.test"], "Can Örnek", dil="tr", ben_onayladi=True)
+bak("tarihsiz karar: 'toplantısındaki' düşer; e-posta gövdesi aynı cümleler, büyük harfle", msj(t0) == 'Merhaba Can, kararı onayladım: "Bütçe 120 bin". Uygulamaya geçebilirsin. Eklemek istediğin bir şey varsa yazar mısın?'
+    and t0["govde"] == 'Merhaba Can,\n\nKararı onayladım: "Bütçe 120 bin". Uygulamaya geçebilirsin. Eklemek istediğin bir şey varsa yazar mısın?\n\nTeşekkürler' and t0["konu"] == "Karar: Bütçe 120 bin", t0)
+e1 = msj(yapi.taslak_icerik(KX, "teams", ["can" + AT + "x.test"], "Can Örnek", dil="en", ben_onayladi=True)); e2 = msj(yapi.taslak_icerik(KX, "teams", ["can" + AT + "x.test"], "Can Örnek", dil="en", ben_onayladi=False))
+bak("karar taslağı İngilizce: iki durum, okunur tarih", e1 == 'Hi Can, I\'ve approved the decision from the November 5 meeting: "Bütçe 120 bin". You can go ahead. Is there anything you\'d like to add?'
+    and e2 == 'Hi Can, the decision from the November 5 meeting: "Bütçe 120 bin". It\'s awaiting your approval. If you have any objections, could you let me know?', (e1, e2))
+yapi.ata(C, KR, {"onaylayan": {"ad": "Zeynep Kaya"}}); r1 = eylem(KR, "teams", {})
+bak("uçtan uca: onaylayan başkası → taslak ona, 'Onayını bekliyor'", r1["ok"] and "Onayını bekliyor" in msj(r1) and msj(r1).startswith("Merhaba Zeynep,"), r1)
+yapi.ata(C, KR, {"onaylayan": {"ad": "Ayşe Deneme", "ben": True}, "isteyen": {"ad": "Zeynep Kaya"}}); r2 = eylem(KR, "teams", {})
+bak("uçtan uca: onaylayan kullanıcı → taslak kararı isteyene, 'kararı onayladım'", r2["ok"] and "kararı onayladım" in msj(r2) and msj(r2).startswith("Merhaba Zeynep,"), r2)
 print("ÖRNEK:", mesaj)
 print("\nhepsi geçti" if not hata else f"\nKALDI: {len(hata)}"); sys.exit(1 if hata else 0)
