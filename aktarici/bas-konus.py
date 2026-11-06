@@ -858,6 +858,7 @@ def konus_baglam(simdi=None, toplanti="", soru=""):  # her sorunun başına: tar
     if "ekran_baglam" in globals(): gt += ekran_baglam()  # v0.187.0: paylaşılan ekranda son görünen yazının kısa özeti (aktarici/ekran.py; yalnız süren toplantıda)
     if soru and "izleme_baglam" in globals(): gt += izleme_baglam()  # 5 Kasım: İzleme anlık görüntüsü açıksa tek satır işaret (aktarici/izleme.py; gizli toplantıda yok)
     if soru and "kisisel_tarih_baglam" in globals(): gt += kisisel_tarih_baglam(soru)  # S243: doğum günü/hatırlatma sorusunda yaklaşan kişisel tarihler (aktarici/kisisel-tarihler.py)
+    if soru and "et_baglam" in globals(): gt += et_baglam(soru, simdi)  # S243: önemli e-posta / cevapsız konu (aktarici/eposta-takip.py)
     if soru and "posta_baglam" in globals(): gt += posta_baglam(soru, simdi)  # v0.85.0: e-posta sorusunda Mac Mail'den son iletiler
     if soru and DAVET_RX.search(soru):  # v0.84.0: davet notu — sorulan toplantı (başlıkta ortak sözcük) ya da sıradaki
         hepsi = gc + ol; sz = _baslik_soz(soru)

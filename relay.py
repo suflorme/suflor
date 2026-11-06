@@ -1397,7 +1397,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1597,6 +1597,7 @@ def kutu_kulaklik():
     return _KUTU_KUL["v"]
 AYAR_PANO = {
     "eposta": ("sec", "", ("", "gmail", "outlook", "mailto")), "eposta_adres": ("adres", "", None),
+    "eposta_takip": ("bool", True, None), "eposta_takip_dk": ("sayi", 15, (1, 240)), "eposta_cevapsiz_gun": ("sayi", 3, (1, 30)), "eposta_vip": ("liste", "", None), "eposta_hatirlat": ("bool", True, None), "eposta_hatirlat_sesli": ("bool", False, None), "eposta_sessiz": ("metin", "22:00-08:00", 11), "eposta_claude_siralama": ("bool", True, None),  # S243: önemli e-posta takibi (aktarici/eposta-takip.py; eposta_oku da açık olmalı)
     "konusma": ("bool", True, None), "konus_hihi": ("bool", False, None), "kayit_sesi": ("bool", True, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "uclu_sohbet": ("bool", False, None), "uclu_sohbet_ozel_paylas": ("bool", False, None), "sesli_not": ("bool", True, None),"kanit_metin": ("bool", False, None), "sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
     "profil": ("sec", "tam", ("tam", "hafif")),  # S188: hafif = ≤ 8 GB Mac için bellek tasarruflu mod (tablo aktarici/profil.py)
     "ses_motoru": ("sec", "mac", ("mac", "piper", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac ve Piper sesinde çarpan
@@ -1854,6 +1855,7 @@ bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
 bolum("gerginlik")  # aktarici/gerginlik.py — Toplantı gerginliği → kişiliğin ses tonu (v0.80.0, S87)
 bolum("kisisel-tarihler")  # aktarici/kisisel-tarihler.py — yaklaşan kişisel tarihler: doğum günü, yıldönümü, tarihli hatırlatma; /yaklasan-tarihler, bir gün önce + sabah hatırlatma (S243)
+bolum("eposta-takip")  # aktarici/eposta-takip.py — önemli e-posta seçimi, cevapsız konu takibi, hatırlatma (GET/POST /eposta-onemli; S243)
 bolum("toplanti-sonrasi")  # aktarici/toplanti-sonrasi.py — toplantı sonrası proaktif hatırlatma: açık uçlar (tarihsiz/sahipsiz iş, teyit bekleyen karar) bildirim + Bugün satırı (5 Kasım)
 bolum("izleme")  # aktarici/izleme.py — İzleme: başka panonun Drive'a yazdığı JSON anlık görüntüsünü yalnız okur (ayar izleme_dosyasi; Bugün bölümü, hazırlık adayları, Konuş özeti; 5 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
@@ -2298,6 +2300,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/kapanis-turu": return self._json(kapanis_view() if "kapanis_view" in globals() else {"ok": False})  # toplantı başında kapanış turu (aktarici/toplanti-oturum.py)
         if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
         if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
+        if yol == "/eposta-onemli": return self._json(et_view() if "et_view" in globals() else {"ok": True, "izin": False})  # önemli e-posta ve cevapsız konu (aktarici/eposta-takip.py)
         if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)
             from urllib.parse import urlsplit, parse_qs
             return self._json(posta_uslup((parse_qs(urlsplit(self.path).query).get("kim") or [""])[0]))  # v0.116.0: Toplantılarda ara, Dökümler (aktarici/arsiv.py)
@@ -2417,6 +2420,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/duman":  # Deneme toplantısı: başlat | bitir — yalnız pano (aktarici/duman.py)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(duman_islem(p))
+        if self.path == "/eposta-onemli":  # taslak | ertele | yoksay — yalnız pano (aktarici/eposta-takip.py); taslak göndermez
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(et_islem(p))
         if self.path == "/proaktif":  # toplantı sonrası açık uç hatırlatması: sor | kapat | gordu — yalnız pano (aktarici/toplanti-sonrasi.py)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(pro_islem(p))
