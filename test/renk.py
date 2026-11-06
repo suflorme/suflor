@@ -44,7 +44,7 @@ def sabit(p):
         if p == "pano/pano.html" and "w.document.write(" in l: continue  # yazdırılan PDF sayfası
         x += [f"{p}:{i + 1} {m}" for m in re.findall(r"font-size:\s*[0-9.]+px|font:\s*[0-9.]+px|border-radius:\s*(?:[1-9][0-9.]*px|var\(--r\))", l)]
     return x
-sx = [y for p in ("pano/pano.html", "popup.html") for y in sabit(p)]
+sx = [y for p in ("pano/pano.html", "pano/bugun.css", "popup.html") for y in sabit(p)]
 kontrol(f"pano, hazırlık ve eklenti penceresinde sabit yazı boyu/köşe yok ({sx[:3] or '—'})", not sx)
 # 21 Ekim: Teams şeridi (content.js gölge DOM + kart penceresi) ve kurulum sihirbazı da aynı ölçekte; şerit renk.css'i yükleyemez, değerleri kendisi taşır
 sx = [y for p in ("content.js", "sihirbaz/sihirbaz.css") for y in sabit(p)]
@@ -53,4 +53,33 @@ ct = jetonlar(C[C.index(":host,:root{"):C.index("}", C.index(":host,:root{"))])
 kontrol("Teams şeridinin yazı boyu ve köşe ölçeği renk.css'le aynı", ct and all(olcu.get(k) == v for k, v in ct.items()) and set(ct) == {k for k in olcu if k.startswith(("yz-", "kose"))})
 kontrol("hareket azaltma: renk.css tüm animasyon ve geçişleri kısaltır, Teams kart penceresi de", re.search(r"prefers-reduced-motion:reduce\)\{\*,\*::before,\*::after\{animation-duration", R) is not None
         and "@media (prefers-reduced-motion:reduce){*{animation:none!important" in C)
+# 6 Kasım (pano tasarım sistemi, adım 1): tek yazı ölçeği 12·13·15·18·24·40, boşluk 4·8·12·16·24·32·48, köşe 6·8·14·tam — pano/yazi.css'te; pano.html ve bugun.css yalnız bunları kullanır
+# (renk.css'teki eski --yz-1..5/--kose-* adları eklenti penceresi, Teams şeridi ve hazırlık için durur). Düğme/etiket/bağlantı bileşenleri bugun.css'te.
+Y = oku("pano/yazi.css"); yt = jetonlar(Y[:Y.index("/* Bugün sayfası ölçüleri")])
+kontrol("yazi.css: altı yazı boyu, yedi boşluk, dört köşe belirteci (tek ölçek)", {k: yt.get(k) for k in ("yz-12", "yz-13", "yz-15", "yz-18", "yz-24", "yz-40")} == {"yz-12": "12px", "yz-13": "13px", "yz-15": "15px", "yz-18": "18px", "yz-24": "24px", "yz-40": "40px"}
+        and [yt.get(f"bo-{n}") for n in (4, 8, 12, 16, 24, 32, 48)] == [f"{n}px" for n in (4, 8, 12, 16, 24, 32, 48)] and [yt.get(k) for k in ("r-6", "r-8", "r-14", "r-tam")] == ["6px", "8px", "14px", "999px"])
+PANO = {p: "\n".join(l for l in oku(p).split("\n") if "w.document.write(" not in l) for p in ("pano/pano.html", "pano/bugun.css")}  # yazdırılan PDF sayfası ayrı belge
+ESKI = re.compile(r"var\(--(?:yz-[1-5]|b-yz-[a-z-]+|b-k-[a-z]+)\)")
+kontrol("pano.html ve bugun.css eski yazı/köşe adlarını (--yz-1..5, --b-yz-*, --b-k-*) kullanmaz", not [p for p, t in PANO.items() if ESKI.search(t)])
+def olcek_disi(t):
+    x = []
+    for m in re.finditer(r"font-size:\s*([^;}\"'`]+)", t): x.append(m.group(1).strip())
+    for m in re.finditer(r"(?<![\w-])font:\s*([^;}\"'`]*)", t):
+        z = re.search(r"(?:^|\s)([0-9.]+px|var\(--yz-[0-9]+\))(?:/|\s|$)", m.group(1).strip() + " ")
+        if z: x.append(z.group(1))
+    return [v for v in x if v not in ("inherit",) and not re.fullmatch(r"var\(--yz-(12|13|15|18|24|40)\)", v)]
+sx = {p: olcek_disi(t) for p, t in PANO.items()}
+kontrol(f"pano.html ve bugun.css yazı boyu yalnız ölçekte (12·13·15·18·24·40) ({[v for l in sx.values() for v in l][:3] or '—'})", not any(sx.values()))
+kr = [m for t in PANO.values() for m in re.findall(r"border-radius:\s*(?:[1-9][0-9.]*px)", t)] + [m for t in PANO.values() for m in re.findall(r"var\(--r-(?!6\)|8\)|14\)|tam\))[a-z0-9-]*\)", t)]
+kontrol(f"pano.html ve bugun.css köşe yalnız belirteçte (6·8·14·tam) ({kr[:3] or '—'})", not kr)
+sp = [m for t in PANO.values() for m in re.findall(r"(?:padding|margin|gap)(?:-[a-z]+)?:\s*[^;}\"'`]*", t) if re.search(r"(?<![-\w(,.])(?:[1-9][0-9]?)px", re.sub(r"(?:calc|max|min|clamp)\([^;}]*\)", "", m)) and not re.search(r"-[0-9]+px", m)]
+kontrol(f"pano.html ve bugun.css boşluklarda belirteç dışı pozitif px yok; yalnız büyük yerleşim değerleri ve eksi kenar boşlukları kalır ({sp[:3] or '—'})", len(sp) <= 6)
+kontrol("tek düğme bileşeni: .b-ana/.b-iki/.b-sade/.b-k, 36 (küçük 32), 13/500, köşe 8; eski .b/.ana/.sade/.iri, button.pri/.gh/.lnk eşlenir", all(x in PANO["pano/bugun.css"] for x in (".b-ana,.b-iki,.b-sade,#bgn .b,", "height:var(--d-yuk)", "font:500 var(--yz-13)", "border-radius:var(--r-8)", ".b-k{height:var(--d-yuk-k)", "#bgn .b.ana", "#emd .b.sade", "#prd .b.ana"))
+        and yt.get("d-yuk") == "36px" and yt.get("d-yuk-k") == "32px" and "button.pri{" in PANO["pano/pano.html"] and "button.gh{" in PANO["pano/pano.html"] and "button.lnk," in PANO["pano/pano.html"])
+kontrol("tek durum etiketi: .etiket (12/500, köşe 6, 4×8) ve gec/bekliyor/uyari/notr/olumlu türleri; Onaylanmadı, gecikti, dış kayıt, Monitör nedeni bağlı",
+        all(x in PANO["pano/bugun.css"] for x in (".etiket,.chip{", "padding:var(--bo-4) var(--bo-8)", "border-radius:var(--r-6)", ".etiket.gec{", ".etiket.bekliyor,.etiket.uyari{", ".etiket.olumlu{", ".etiket.notr")) and 'class="etiket gec onayis son"' in PANO["pano/pano.html"] and 'class="etiket notr"' in PANO["pano/pano.html"])
+kontrol("tek bağlantı biçimi: a ve a:visited vurgu yeşili, alt çizgisiz, hover'da alt çizgi; pano.html'de başka bağlantı rengi/alt çizgisi yok",
+        "a,a:link,a:visited{color:var(--b-vurgu);text-decoration:none}a:hover" in PANO["pano/bugun.css"] and not re.search(r"(?<![\w-])a(?:\.[a-z]+)?\s*\{[^}]*(?:#[0-9a-f]{3,6}|blue)", PANO["pano/pano.html"], re.I) and not re.search(r"(?:^|[ ,}])[.#a-z0-9 ]*\ba\{[^}]*text-decoration:underline", PANO["pano/pano.html"]))
+kontrol("göreli tarih: tek yardımcı goreliTarih/goreliTam/goreliSpan; bnVadeEt, kisaGun, gunTxt, arTarih ona bağlı", all(x in PANO["pano/pano.html"] for x in ("function goreliTarih(t,vadeli)", "function goreliTam(t)", "const goreliSpan=", "function kisaGun(at){return goreliTarih(at)}", "return goreliTarih(d)+' '+sa", "return goreliSpan(x.vade,x.gecikti?'etiket gec':'vade',true)")))
+kontrol("işaretlenemeyen satırda (Monitör, dış kayıt, açık soru) boş yuvarlak gizli", ".kaynakn,#bgn .onay.soru{display:none}" in PANO["pano/bugun.css"])
 print(f"{sum(ok)}/{len(ok)}"); sys.exit(0 if all(ok) else 1)

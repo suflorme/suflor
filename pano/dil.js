@@ -1281,6 +1281,8 @@ globalThis.SUFLOR_EN = {
   "Kayda al": "Add as task",
   "Önerme": "Don't suggest",
   "Öneri kayda alındı": "Suggestion added as a task",
-  "Öneri bir daha gösterilmeyecek": "This suggestion won't be shown again"
+  "Öneri bir daha gösterilmeyecek": "This suggestion won't be shown again",
+  "{n} gün sonra": "in {n} days",
+  "{n} gün önce": "{n} days ago"
 
 };
