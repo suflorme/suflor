@@ -1,30 +1,27 @@
 # Suflor.me aktarıcı bölümü: Ortak klasör — ortak karar katmanı A3 (Drive pilotu; planlar/ortak-karar-mimarisi-20261105.md §4 P1). Ayrı modül değildir — relay.py bunu kendi
 # ad alanında çalıştırır (bolum("ortak-klasor")): AYAR, BASE, threading, _yapi_mod, kimlik_ben/kimlik_coz (kimlik.py) relay.py'nindir. Mantık yapi.py'de (ortak_*), burada ince katman:
-#   ayar ortak_klasor (yol; yoksa kapalı, hiçbir şey yazılmaz/okunmaz), ortak_gecmis (true: ayar açılmadan önceki kayıtlar da gider; varsayılan kapalı).
-#   60 sn'de bir tur: bu Mac'in yeni karar/iş olayları <klasör>/olaylar/<e-posta>/<cihaz>/<YYYY-AA>.jsonl'e eklenir, başkalarınınki okunur.
-#   GET  /ortak (anahtarlı, VERI_GET) → durum, sayılar, uygulanmayan değişiklikler, denetim (ortak klasörde gizli/deneme kaydı var mı)
+#   ayar ortak_tasima = "firestore" değilse kapalı (hiçbir şey yazılmaz/okunmaz); ortak_gecmis (true: ayar açılmadan önceki kayıtlar da gider; varsayılan kapalı).
+#   Döngü: bu Mac'in yeni karar/iş olayları paylaşılır, başkalarınınki okunur.
+#   GET  /ortak (anahtarlı, VERI_GET) → durum, sayılar, uygulanmayan değişiklikler
 #   POST /ortak {"islem": "esitle"} (anahtarlı) → hemen bir tur
-# A7 (6 Kasım): ayar ortak_tasima = "firestore" ise aynı olaylar Drive yerine Cloud Firestore'dan paylaşılır (ortak_bulut.py; ayar firestore_proje/_istemci_id/_alanlar, Anahtar Zinciri girişi `ortak_bulut.py
+# A7 (6 Kasım): ayar ortak_tasima = "firestore" ise olaylar Cloud Firestore'dan paylaşılır (ortak_bulut.py; ayar firestore_proje/_istemci_id/_alanlar, Anahtar Zinciri girişi `ortak_bulut.py
 # kur|katil`). Döngü: pano son 60 sn'de yoklandıysa ya da toplantı sürüyorsa 5 sn, değilse 30 sn (ayar ortak_firestore_aralik_sn her ikisini ezer). Ağ yalnız bu yolda ve yalnız firestore_alanlar içindeki şirket
 # e-postasıyla; günlüğe yalnız sayı ve hata sınıfı. GET /ortak ek alanları: tasima, firestore {proje, giris, eposta, gecikme_ortanca, gecikme_p90, son_hata}.
-# Drive yolunda ağ yok: yalnız yerel dosya sistemine yazılır (Drive masaüstü uygulaması eşitler). Kimlik şirket e-postası (kimlik_ben); yoksa ya da kişisel posta alan adıysa kapalı kalır
+# Kimlik şirket e-postası (kimlik_ben); yoksa ya da kişisel posta alan adıysa kapalı kalır
 # (beta kurulumunda açılmaz). Gizli/deneme toplantının kaydı yazma anında yapi._paylasilmaz ile elenir. Beta paketine hiçbir alan girmez.
 ORTAK_ARALIK_SN = 60
 ORT = {"durum": "kapali", "son": None, "sonuc": None, "hata": None, "denetim": None}
 FS_HIZLI_SN, FS_YAVAS_SN, FS_PANO_SN = 5, 30, 60
 _ORT_KILIT = threading.Lock()
 
-def ortak_tasima():  # "drive" (varsayılan) | "firestore"; ayar dosyadan taze okunur (ortak_bulut.py kur/katil aktarıcıyı yeniden başlatmadan etkili olsun)
-    try: t = str(ayar_oku().get("ortak_tasima") or "drive")
-    except Exception: t = "drive"
-    return "firestore" if t == "firestore" else "drive"
+def ortak_tasima():  # "firestore" | "kapali" (varsayılan); ayar dosyadan taze okunur (ortak_bulut.py kur/katil aktarıcıyı yeniden başlatmadan etkili olsun)
+    try: t = str(ayar_oku().get("ortak_tasima") or "")
+    except Exception: t = ""
+    return "firestore" if t == "firestore" else "kapali"
 def _bulut_mod():  # ortak_bulut.py aktarıcıyla aynı klasörde kurulur; yoksa Firestore yolu "hata" der
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import ortak_bulut; return ortak_bulut
     except ImportError: return None
-def ortak_klasor():
-    y = str(AYAR.get("ortak_klasor") or "").strip()
-    return os.path.expanduser(y) if y else None
 def ortak_kimlik():  # → şirket e-postası ya da None (kişisel posta alan adı sayılmaz)
     try: ep = kimlik_ben()[1] if "kimlik_ben" in globals() else None
     except Exception: ep = None
@@ -65,24 +62,8 @@ def _ort_deneme():  # deneme aktarıcısı (başka canli klasörü ya da port; t
 def ortak_esitle(neden="dongu"):
     if _ort_deneme(): ORT.update(durum="deneme", hata=None); return ORT
     if ortak_tasima() == "firestore": return _ort_firestore(neden)
-    ORT["tasima"] = "drive"; kl = ortak_klasor()
-    if not kl: ORT.update(durum="kapali", hata=None); return ORT
-    ep = ortak_kimlik()
-    if not ep: ORT.update(durum="kimlik_yok", hata=None); return ORT  # şirket e-postası yoksa hiçbir şey yazılmaz
-    if not os.path.isdir(kl): ORT.update(durum="klasor_yok", hata=None); return ORT
-    y = _yapi_mod()
-    if not y: ORT.update(durum="hata", hata="yapi.py yok"); return ORT
-    with _ORT_KILIT:
-        try:
-            r = y.ortak_esitle(BASE, kl, ep, str(AYAR.get("ad") or ""), AYAR.get("ortak_gecmis") is True, _ort_kimlik_f)
-            ORT.update(durum="ok", son=r["zaman"], sonuc=r, hata=None, denetim=len(y.ortak_denetim(BASE, kl)))
-            d, i = r["disari"], r["iceri"]
-            if d["yazilan"] or i["alinan"] or i["bozuk"] or ORT["denetim"]:  # günlüğe yalnız sayı (metin/ad yazılmaz)
-                print(f"ORTAK: {neden} · yazılan {d['yazilan']} · alınan {i['alinan']} · çift {i['cift']} · bozuk {i['bozuk']} · atlanan {sum(d['atlanan'].values())}" + (f" · DENETİM {ORT['denetim']}" if ORT["denetim"] else ""))
-        except Exception as e:
-            ORT.update(durum="hata", hata=e.__class__.__name__); print(f"ORTAK: tur yapılamadı ({e.__class__.__name__})")
-    return ORT
-def _ort_aralik():  # Drive'da 60 sn aynen; Firestore'da pano son 60 sn'de yoklandıysa ya da toplantı sürüyorsa 5 sn, değilse 30 sn
+    ORT.update(tasima="kapali", durum="kapali", hata=None); return ORT
+def _ort_aralik():  # kapalıyken 60 sn; Firestore'da pano son 60 sn'de yoklandıysa ya da toplantı sürüyorsa 5 sn, değilse 30 sn
     if ortak_tasima() != "firestore": return ORTAK_ARALIK_SN
     try: sabit = float(ayar_oku().get("ortak_firestore_aralik_sn") or 0)
     except (TypeError, ValueError): sabit = 0
@@ -111,15 +92,7 @@ def _ort_firestore_view():  # GET /ortak, ortak_tasima = firestore (metin/ad yok
 def ortak_view():  # GET /ortak
     if _ort_deneme(): return {"ok": True, "acik": False, "tasima": ortak_tasima(), "durum": "deneme", "klasor": "", "kimlik": "", "son": None, "hata": None, "denetim": None}
     if ortak_tasima() == "firestore": return _ort_firestore_view()
-    y = _yapi_mod(); kl = ortak_klasor(); v = {"ok": True, "tasima": "drive", "acik": bool(kl), "klasor": kl or "", "kimlik": ortak_kimlik() or "", "durum": ORT["durum"] if kl else "kapali",
-                                               "son": ORT["son"], "hata": ORT["hata"], "denetim": ORT["denetim"]}
-    if kl and y:
-        try:
-            d = y._ortak_durum(BASE).get("klasorler", {}).get(os.path.realpath(kl), {})
-            v.update(yazilan=int(d.get("yazilan") or 0), alinan=int(d.get("alinan") or 0), kisiler=list(d.get("kisiler") or []), reddedilen=y.ortak_reddedilen(BASE))
-            if ORT["sonuc"]: v["son_tur"] = {"atlanan": ORT["sonuc"]["disari"]["atlanan"], "cift": ORT["sonuc"]["iceri"]["cift"], "bozuk": ORT["sonuc"]["iceri"]["bozuk"], "yarim": ORT["sonuc"]["iceri"]["yarim"]}
-        except Exception as e: v["hata"] = e.__class__.__name__
-    return v
+    return {"ok": True, "tasima": "kapali", "acik": False, "durum": "kapali", "klasor": "", "kimlik": ortak_kimlik() or "", "son": ORT["son"], "hata": ORT["hata"], "denetim": None}
 def ortak_islem(p):  # POST /ortak
     p = p if isinstance(p, dict) else {}
     if p.get("islem") != "esitle": return {"ok": False, "err": "islem: esitle"}

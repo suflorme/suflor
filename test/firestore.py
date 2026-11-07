@@ -4,7 +4,7 @@
 # (belirteç → e-posta; okuyan denetimi; yazan = oturum; silme yok; okuyan küçülmez; alan adı listesi). Anahtar Zinciri yerine düz dosya klasörü. Gerçek Google'a ve gerçek Anahtar Zinciri'ne
 # hiçbir istek gitmez (SUFLOR_FS_KOK ve SUFLOR_FS_ZINCIR_DIZIN yoksa modül kendisi durur; test ilk iş bunu denetler). Kurgu veri; gerçek claude yok.
 # Senaryolar: iki yalıtılmış aktarıcıyla uçtan uca (A→B atama ve durum geri dönüşü, "Sana atandı"), rol dışı erişim 403, başkası adına yazma reddi, gizli/deneme/ayar öncesi/Claude yorumu 0,
-# okuyan genişleme, çevrimdışı kuyruk ve çift 0, Drive'dan taşıma, kişisel/alan dışı kimlikte sıfır istek, kur (idempotent), davet/katıl, gecikme ölçümü, kural metni kaçışı, belirteç yenileme.
+# okuyan genişleme, çevrimdışı kuyruk ve çift 0, kişisel/alan dışı kimlikte sıfır istek, kur (idempotent), davet/katıl, gecikme ölçümü, kural metni kaçışı, belirteç yenileme.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/firestore.py      (kaldı → çıkış 1; ~60 sn)
 AT = "@"  # e-posta biçimi kaynakta geçmesin (açık depo taraması)
 import base64, http.server, json, os, re, shutil, sqlite3, subprocess, sys, tempfile, threading, time, urllib.error, urllib.parse, urllib.request
@@ -239,13 +239,12 @@ os.environ.update(SUFLOR_FS_TEST="1", SUFLOR_FS_KOK=srv.kok(), SUFLOR_FS_ZINCIR_
 srv.kural_yukle(ob.kurallar([ALAN]))
 
 class Mac:
-    def __init__(s, ad, kisi, ep, port, tasima="firestore", drive=None, sunucu=None, alanlar=None):
+    def __init__(s, ad, kisi, ep, port, tasima="firestore", sunucu=None, alanlar=None):
         s.ad = ad; s.kisi = kisi; s.ep = ep; s.srv = sunucu or srv; s.kok = os.path.join(T, ad); s.canli = os.path.join(s.kok, "canli"); os.makedirs(s.canli); s.port = port; s.zincir = os.path.join(s.kok, "zincir"); os.makedirs(s.zincir)
         for f in ("relay.py", "manifest.json", "yapi.py", "ortak_bulut.py"): shutil.copy(os.path.join(KOD, f), s.kok)
         for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(s.kok, d))
         s.ayar = os.path.join(s.kok, "ayar.json"); a = {"alan": "Deneme", "ad": kisi, "port": port, "uygulama": s.kok, "proje": s.kok, "ortak": s.kok, "eposta_kimlik": ep, "ortak_firestore_aralik_sn": 3600}
         if tasima == "firestore": a.update(ortak_tasima="firestore", firestore_proje=PROJE, firestore_istemci_id=ISTEMCI, firestore_alanlar=alanlar or [ALAN])
-        if drive: a["ortak_klasor"] = drive
         json.dump(a, open(s.ayar, "w"))
     def giris_ver(s, ep=None, api=True):  # Anahtar Zinciri yerine düz dosyalar: yenileme belirteci + API anahtarı + sır
         open(os.path.join(s.zincir, ob.ORTAK_OGE["yenileme"]), "w").write(s.srv.yenileme_ver(ep or s.ep))
@@ -377,24 +376,6 @@ try:
     Fm = yeni("f", "Fikret Deneme", EA, bos_port(8840)); Fm.giris_ver(); Fm.canli = os.path.join(Fm.kok, "deneme-canli"); os.makedirs(Fm.canli); Fm.baslat()
     n_ist = len(srv.istekler); vf = Fm.esitle(); time.sleep(0.5)
     bak("(8b) deneme aktarıcısı paylaşmaz: durum deneme, sunucuya hiçbir istek yok", vf.get("durum") == "deneme" and len(srv.istekler) == n_ist, (vf.get("durum"), len(srv.istekler) - n_ist))
-    # --- (7) Drive klasöründen taşıma
-    DG = os.path.join(T, "DriveG", "Ortak"); os.makedirs(DG); PG = bos_port(8840)
-    G = yeni("g", "Gül Yazar", EG, PG, tasima="drive", drive=DG); G.giris_ver(); G.baslat()
-    G.yaz(M_ESKI, "Gül eski", [{"tur": "is", "metin": "Gül eski iş", "sahip": "Gül Yazar", "tarih": "2026-11-21"}])
-    G.esitle(); json.dump(dict(json.load(open(G.ayar)), ortak_klasor=DG), open(G.ayar, "w")); G.esitle()  # ilk tur başlangıcı ayarlar; ardından yeni kayıtlar Drive'a yazılır
-    G.yaz(M_NORMAL, "Gül toplantı", [{"tur": "is", "metin": "Gül birinci iş", "sahip": "Bora Kaya", "sahip_eposta": EB, "tarih": "2026-11-12"}, {"tur": "karar", "metin": "Gül kararı", "kim": "Gül Yazar", "netlik": "acik"},
-                                     {"tur": "is", "metin": "Gül ikinci iş", "sahip": "Can Örnek", "sahip_eposta": EC}])
-    G.yaz(M_GIZLI, "Gül özel", [{"tur": "karar", "metin": "GULGIZLI", "kim": "Gül Yazar", "netlik": "acik"}], gizli=True)
-    G.esitle(); satir = [json.loads(l) for k, _, fs in os.walk(DG) for f in fs for l in open(os.path.join(k, f), encoding="utf-8") if l.strip()]
-    ayg = json.load(open(G.ayar)); ayg.update(ortak_tasima="firestore", firestore_proje=PROJE, firestore_istemci_id=ISTEMCI, firestore_alanlar=[ALAN]); json.dump(ayg, open(G.ayar, "w"))
-    r = G.cli("tasi", "--klasor", DG, "--dizin", G.canli); sd = say(EG); idler = {x["olay_id"] for x in satir}
-    bak("(7) tasi: Drive'daki olay sayısı = Firestore'dakiler, eksik 0, çıkış 0", r.returncode == 0 and f"Drive: {len(idler)} olay · Firestore'da: {len(idler)} · eksik: 0" in r.stdout and sd == idler and len(idler) >= 3, (r.returncode, r.stdout[-300:], r.stderr[-200:]))
-    r2 = G.cli("tasi", "--klasor", DG, "--dizin", G.canli)
-    bak("(7) ikinci taşımada çift 0 (hepsi zaten vardı), sayı aynı", r2.returncode == 0 and "Yazıldı: 0" in r2.stdout and f"zaten vardı: {len(idler)}" in r2.stdout and say(EG) == idler, r2.stdout[-300:])
-    n1 = len(srv.belgeler); vg = G.esitle()
-    bak("(7) taşımadan sonra normal tur: aynı olaylar tekrar gitmez (belge sayısı aynı)", vg.get("durum") == "ok" and len(srv.belgeler) == n1 and "GULGIZLI" not in srv.tum_metin(), vg.get("durum"))
-    vb = B.esitle(); gb = B.kayit("Gül birinci iş")
-    bak("(7) B taşınan işi alır (okuyan B'yi içerir)", gb is not None and B.kayit("Gül kararı") is None, vb.get("son_tur"))
     # --- (11/12) görünüm ve kural metni
     v = A.istek("/ortak")
     bak("(11) /ortak firestore bloğu: proje, giriş, e-posta, gecikme alanları; metin/ad yok", set(v["firestore"]) == {"proje", "giris", "eposta", "gecikme_ortanca", "gecikme_p90", "son_hata"} and v["firestore"]["eposta"] == EA, v.get("firestore"))
@@ -431,7 +412,7 @@ try:
     r = I.cli("katil", kod, env_ek={"SUFLOR_FS_GIRIS_IPUCU": "disari" + AT + "baska.example"})
     bak("(10) alan adı dışı hesapla giriş reddedilir (belirteç saklanmaz)", r.returncode == 1 and "alan" in r.stderr, (r.returncode, r.stderr[-200:]))
     # --- uçtan uca: iki yalıtılmış aktarıcıda günlük/log sızıntısı ve hata
-    gunluk = A.log() + B.log() + C.log() + G.log()
+    gunluk = A.log() + B.log() + C.log()
     bak("günlüğe yalnız sayı ve hata sınıfı (metin, ad, e-posta, belirteç yok)", "ORTAK (firestore)" in gunluk and "Teklifi" not in gunluk and "Bütçe" not in gunluk and AT + ALAN not in gunluk and "idToken" not in gunluk, gunluk[-600:])
     bak("gerçek Google'a ve gerçek Anahtar Zinciri'ne gidilmedi (tüm istekler sahte sunucuda)", all(not i[1].startswith("http") for i in srv.istekler) and len(srv.istekler) > 20)
     bak("teshis KOD_DOSYALARI ve kurulum KOPYA listesinde ortak_bulut.py", '"ortak_bulut.py"' in open(os.path.join(KOD, "teshis.py"), encoding="utf-8").read() and '"ortak_bulut.py"' in open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read())

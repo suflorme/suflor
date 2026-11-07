@@ -46,16 +46,11 @@ _kt = {d: teshis.klasor_turu(os.path.join(_ev, d), ev=_ev) for d in ("Library/Cl
        "Library/CloudStorage/Box-Box/P", "Library/Mobile Documents/com~apple~CloudDocs/P", "Documents/P", "Desktop/P", "Dropbox/P", "yok/P")}
 kontrol("klasör türü: googledrive, onedrive, diger_bulut, icloud (Belgeler eşitlemesi dahil), yerel, dropbox, yok",
         list(_kt.values()) == ["googledrive", "onedrive", "diger_bulut", "icloud", "icloud", "yerel", "dropbox", "yok"], _kt)
-json.dump({"proje": os.path.join(_ev, "Desktop/P"), "t": time.time(), "sayilar": {"dosya": 40, "bulutta": 7, "bulut_kisayol": 2, "okunamayan": 1, "erisilemeyen": ["Zeynep"], "google_belge": 5, "google_okundu": 3}},
+json.dump({"proje": os.path.join(_ev, "Desktop/P"), "t": time.time(), "sayilar": {"dosya": 40, "bulutta": 7, "okunamayan": 1, "erisilemeyen": ["Zeynep"]}},
           open(os.path.join(_ev, "tarama.json"), "w"))
-json.dump({"kimlik_yok": 0, "erisim_yok": 2, "red": {"gizlihesap": 1}}, open(os.path.join(_ev, "google-durum.json"), "w"))  # v0.200.0: Google belgesi ve bulut indirme sayıları
-json.dump({"kayit": 2, "onay_bekliyor": True, "acik": True}, open(os.path.join(_ev, "bulut-durum.json"), "w"))
 _po = teshis.temizle({"proje": teshis.proje_olcu(os.path.join(_ev, "Desktop/P"), _ev)})["proje"]
-kontrol("proje ölçüsü son taramadan: 40 dosya, 7 yalnız bulutta, 2 kısayol, 2 okunamayan; ad yok",
-        _po.get("dosya") == 40 and _po.get("bulutta") == 7 and _po.get("bulut_kisayol") == 2 and _po.get("okunamayan") == 2 and not sizinti(_po), _po)
-kontrol("proje ölçüsü: Google belgesi 5 (3 okundu, 2 erişim yok) ve bulut indirme sayıları; dosya adı/anahtar sızmaz",
-        _po.get("google_belge") == 5 and _po.get("google_okundu") == 3 and _po.get("google_erisim_yok") == 2 and _po.get("bulut_indirilen") == 2 and _po.get("bulut_onay_bekliyor") == 1
-        and "gizli" not in json.dumps(_po), _po)
+kontrol("proje ölçüsü son taramadan: 40 dosya, 7 yalnız bulutta, 2 okunamayan; ad yok",
+        _po.get("dosya") == 40 and _po.get("bulutta") == 7 and _po.get("okunamayan") == 2 and not sizinti(_po), _po)
 shutil.rmtree(_ev, ignore_errors=True)
 kontrol("deneme: gerçek Worker adresine gönderim kapalı", teshis.acik({}) is False and teshis.acik({"teshis_adres": "http://127.0.0.1:9/"}) is True)
 
@@ -85,7 +80,7 @@ procs = []
 try:
     # ---------- 2) uçtan uca aktarıcı ----------
     kod = os.path.join(T, "kod"); os.makedirs(kod)
-    for f in ("relay.py", "toplanti-claude.py", "baglam.py", "yapi.py", "taahhut.py", "teshis.py", "kullanim.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), kod)
+    for f in ("relay.py", "toplanti-claude.py", "baglam.py", "yapi.py", "teshis.py", "kullanim.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), kod)
     for d in ("marka", "pano", "aktarici"): shutil.copytree(os.path.join(KOD, d), os.path.join(kod, d))
     uyg = os.path.join(T, "uyg"); canli = os.path.join(uyg, "canli"); os.makedirs(canli); os.makedirs(os.path.join(T, "proje"))
     PORT = bos_port(8798)

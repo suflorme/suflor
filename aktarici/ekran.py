@@ -1,14 +1,13 @@
 # --- Paylaşılan ekranın yazısı (v0.187.0, 5 Kasım) ----------------------------------------------------------------
 # Kullanıcı isteği (4 Kasım gerçek toplantısı): sunumda ekranda görünen müşteri/firma adı, başlık, rakam Claude'un bağlamına girsin, kartta ve
-# cevapta kullanılsın. 4 Kasım'da 74 kendiliğinden kanıt alındı ama toplantı oturumu onları "tek tek bakma" diye görmedi, yazı okuma (ayar
-# kanit_metin) da kapalıydı. Şimdi her kanıtta görüntü yerel Apple Vision ile okunur (Suflor Metin.app; görüntü ve yazı Mac'ten çıkmaz, yalnız
+# cevapta kullanılsın. 4 Kasım'da 74 kendiliğinden kanıt alındı ama toplantı oturumu onları "tek tek bakma" diye görmedi, yazı okuma (yazı okuma
+# da kapalıydı). Şimdi her kanıtta görüntü yerel Apple Vision ile okunur (Suflor Metin.app; görüntü ve yazı Mac'ten çıkmaz, yalnız
 # Claude'a gider) — eklenti paylaşılan içeriğin yerini (`bolge`) verdiyse YALNIZ o bölge (Teams arayüzü, canlı altyazı, kameralar dışarıda):
 #   · kısa özet (adlar, başlıklar, sayılar; ≤ 600 karakter) → kanit/<toplantı>/ekran.jsonl → izle "EKRAN n" olayı (toplanti-claude.py)
 #   · son ekranın özeti → Konuş sorusunun bağlamı (`ekran_baglam`, bas-konus.py), yalnız süren toplantıda ve son 15 dk içindeyse
-#   · ayar kanit_metin: true ise eskisi gibi .md'ye "📷 KANIT n metni" satırı (artık o da bölgeden)
 # Bölge yoksa (menü uygulamasının pencere görüntüsü, eski eklenti) EKRAN üretilmez: bütün pencerenin yazısı çoğunlukla arayüz ve altyazı
 # (15 Ekim ölçümü). Gizli toplantıda kanıt zaten alınmaz; okuma sürerken gizli açılırsa yazılmaz, Konuş'a da eklenmez.
-METIN_APP = os.path.join(AYAR["uygulama"], "Suflor Metin.app", "Contents", "MacOS", "SuflorMetin"); KANIT_METIN_EN_COK = 1500; KANIT_METIN_SON = {}
+METIN_APP = os.path.join(AYAR["uygulama"], "Suflor Metin.app", "Contents", "MacOS", "SuflorMetin")
 EKRAN_OZET_EN_COK = 600; EKRAN_BAGLAM_SN = 15 * 60; EKRAN_GECMIS = 8
 EKRAN_SON = {}     # toplantı dosyası → {"n", "saat", "t", "ozet"}: şu an ekranda olanın özeti (Konuş)
 EKRAN_YAZILAN = {}  # toplantı dosyası → [(n, özet sözcükleri, özet)] son yazılan EKRAN olayları (tekrar ayıklama)
@@ -59,7 +58,7 @@ def _ekran_soz(s): return {w for w in re.findall(r"\w+", (s or "").lower()) if l
 def kanit_isle(md, rel, n, saat, bolge=None, ekran=False):  # kanıt kaydedilince ayrı iş parçacığında (relay.py kanit())
     bolge = _bolge_temiz(bolge) if bolge else None
     if not os.access(METIN_APP, os.X_OK) or ekran: return  # ekran: kullanıcının o an baktığı pencere — toplantı ekranı değil
-    if AYAR.get("kanit_metin") is not True and not bolge: return
+    if not bolge: return
     s, hata = ekran_oku(os.path.join(BASE, rel), bolge)
     if s is None: print(f"KANIT {n} METNİ: okunamadı ({hata})"); return
     if not s:
@@ -67,13 +66,6 @@ def kanit_isle(md, rel, n, saat, bolge=None, ekran=False):  # kanıt kaydedilinc
         if bolge and not hata and not gizli_acik(): ekran_kaydet(md, rel, n, saat, "", "yazı yok")  # grafik/beyaz tahta: yazı yok ama görüntü anlamlı olabilir
         return
     if gizli_acik(): return
-    k = os.path.basename(md)
-    if AYAR.get("kanit_metin") is True:  # eski tam metin satırı (.md; .jsonl'e girmez: döküm satırı sayılmaz)
-        m = " · ".join(s).replace("|", "¦")
-        if len(m) > KANIT_METIN_EN_COK: m = m[:KANIT_METIN_EN_COK].rsplit(" ", 1)[0] + " …"
-        ayni = KANIT_METIN_SON.get(k) == m; KANIT_METIN_SON[k] = m
-        with LOCK: write([(md, f"| {saat} | **📷 KANIT {n} metni** | {_t('önceki kanıtla aynı yazı', 'same text as the previous evidence') if ayni else m} |  |\n")])
-        print(f"KANIT {n} METNİ: {len(s)} satır, {len(m)} karakter" + (" (öncekiyle aynı)" if ayni else "") + (" · bölge" if bolge else ""))
     if bolge: ekran_kaydet(md, rel, n, saat, ekran_ozet(s), ekran_gorsel(s))
 
 def ekran_kaydet(md, rel, n, saat, ozet, gorsel=""):

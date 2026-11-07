@@ -120,7 +120,7 @@ while True:
     else: yaz("Aldım: " + q); bitti()
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "kod": os.path.join(T, "kod"),
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "kod": os.path.join(T, "kod"),
                                                "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False, "yerel_ses": False,
                                                "toplanti_bilgi_kaynaklari": [{"sunucu": "claude.ai Deneme Metrik", "araclar": ["get_*", "list_*", "query_*", "compare_*"],
                                                                               "konu": "deneme satış ve kanal metrikleri", "ad": "Deneme Metrik"}]}, open(ay, "w"))

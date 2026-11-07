@@ -56,7 +56,7 @@ def satirlar(y):
 class Uc:
     def __init__(s, ad, **ek):
         s.port = bos_port(PORT if ad == "a" else PORT + 7); s.d = os.path.join(T, ad); os.makedirs(s.d); s.log = os.path.join(T, ad + ".log"); yol = os.path.join(T, ad + ".json")
-        json.dump(dict({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": s.port, "uygulama": T, "proje": proje, "kod": os.path.join(T, "kod"),
+        json.dump(dict({"alan": "Deneme", "ad": "Deniz T", "port": s.port, "uygulama": T, "proje": proje, "kod": os.path.join(T, "kod"),
                         "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False, "yerel_ses": False, "konus_gecmis": True, "konus_zaman_asimi_sn": 0, "konus_bekle_sn": 0,
                         "konus_ara_sn": 0, "konus_on_ac": False, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, **ek), open(yol, "w"))
         s.p = subprocess.Popen([sys.executable, "relay.py", "--dir", s.d, "--port", str(s.port)], cwd=T, stdout=open(s.log, "w"), stderr=subprocess.STDOUT,

@@ -910,7 +910,6 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/ac": ac(str(p.get("hedef") or "")); return self._json({"ok": True})
         if yol == "/api/hazirlik/tara": return self._json(hz_tara())
         if yol == "/api/hazirlik/isaret": return self._json(hz_isaret(p))
-        if yol == "/api/hazirlik/bulut": return self._json(_hz("bulut-izin", json.dumps({"izin": bool(p.get("izin")), "mb": p.get("mb") or 0})))  # sihirbaz: bulutta duran dosyaları indirme kararı
         if yol == "/api/hazirlik/baslat": return self._json(hz_baslat(bool(p.get("kart"))))
         if yol == "/api/hazirlik/kart-onayla": return self._json(_hz("kart-onayla", json.dumps({"cikar": p.get("cikar") or {}, "terimler": p.get("terimler")}), zaman=120))
         self._json({"hata": "yok"}, 404)
@@ -920,7 +919,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "ortak_bulut.py", "taahhut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 # v0.136.0 (26 Ekim kişisel hesap: ses-isci.py, pano/hazirlik.html, test/platform.py kalmıştı): önceki imzalı listede olup yenisinde olmayan ve
 # özeti değişmemiş dosya silinir; kullanıcının koyduğu ya da değiştirdiği dosya kalır. Aynı kural kur.sh'de (bash).
@@ -1393,20 +1392,19 @@ def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False
             except OSError: pass
     say(f"\nBitti: {top:.1f} GB Çöp Sepeti'nde (boşaltınca yer açılır; Finder'da Çöp Sepeti → sağ tık → Geri Koy).")
     if os.path.isdir(pr): say(f"Proje klasörün yerinde: {pr}" + (" · dokunulmayanlar: " + ", ".join(os.path.relpath(x, pr) for x in kal) if kal else ""))
-    say("Elle kalanlar: Chrome'da chrome://extensions → Suflor.me → Kaldır · Anahtar Zinciri Erişimi'nde 'suflor' ile başlayan öğe varsa (Gemini/Azure anahtarı) sil.")
+    say("Elle kalanlar: Chrome'da chrome://extensions → Suflor.me → Kaldır · Anahtar Zinciri Erişimi'nde 'suflor' ile başlayan öğe varsa (Gemini anahtarı) sil.")
     if not DENEME: sessiz("open", "-a", "Google Chrome", "chrome://extensions")
     if os.path.isdir(KOD) and sor(f"Son olarak bu kod klasörü ({KOD}) de Çöp Sepeti'ne taşınsın mı?", kod_de):
         try: _cope(KOD); say(f"✓ Çöp Sepeti'ne: {KOD}")
         except OSError as e: say(f"UYARI: taşınamadı ({e.__class__.__name__}): {KOD}")
 
-# Yerel Türkçe sesler (21 Ekim): ortak klasörde Pocket/Piper kuruluysa (ilk hesap elle kurdu) bu hesabın ayarına yolları yaz — ikinci hesapta
+# Yerel Türkçe sesler (21 Ekim): ortak klasörde Pocket kuruluysa (ilk hesap elle kurdu) bu hesabın ayarına yolları yaz — ikinci hesapta
 # anahtarlar yoktu, kişilikteki yerel ses (pocket:…) sessizce Mac sesine düşüyordu. Yalnız eksik anahtar yazılır (elle verilen yol korunur);
 # ses_motoru seçimine dokunulmaz. Ortak klasörde yoksa (beta kullanıcısı) hiçbir şey yazmaz.
 def yerel_ses_bul(a, ort):
     t = os.path.join(ort, "tts-deneme"); pv, ph = pocket_yollar(ort)  # Pocket: elle kurulan (tts-deneme) ya da sihirbazın kurduğu (pocket-venv, S135)
     ciftler = [{"pocket_python": (os.path.join(t, "yeni-venv", "bin", "python"), "x"), "pocket_hf": (os.path.join(t, "hf"), "d")},
-               {"pocket_python": (pv, "x"), "pocket_hf": (ph, "d")},
-               {"piper_python": (os.path.join(t, "piper-venv", "bin", "python"), "x"), "piper_model": (os.path.join(ort, "piper-ses", "tr-turkce.onnx"), "f")}]
+               {"pocket_python": (pv, "x"), "pocket_hf": (ph, "d")}]
     var = lambda y, tur: os.path.isdir(y) if tur == "d" else os.path.isfile(y) and (tur != "x" or os.access(y, os.X_OK))
     yazilan = []
     for cift in ciftler:  # ikisi birden olmadan motor çalışmaz: ikisi de varsa yaz
@@ -1475,11 +1473,11 @@ def kur():
     brf = os.path.join(app, "Suflor Brifing.app"); r = derle(brf, "brifing.swift", "SuflorBrifing", BRIFING_PLIST)
     if r is True: say(f"Brifing yardımcısı derlendi: {brf}")
     elif r: say(f"UYARI: brifing yardımcısı derlenemedi ({r}) — panodaki Brifing kapalı kalır")
-    # kesintisiz ses çalıcı (v0.32.2): Piper'ın cümleleri tek akışta, duraklamalar kodda; yoksa afplay
+    # kesintisiz ses çalıcı (v0.32.2): yerel sesin cümleleri tek akışta, duraklamalar kodda; yoksa afplay
     oyn = os.path.join(app, "Suflor Oynat.app"); r = derle(oyn, "oynat.swift", "SuflorOynat", OYNAT_PLIST)
     if r is True: say(f"Ses çalıcı derlendi: {oyn}")
-    elif r: say(f"UYARI: ses çalıcı derlenemedi ({r}) — Piper sesi afplay ile çalınır")
-    # kanıt görüntüsündeki yazı (v0.36.0): yerel Apple Vision; yoksa kanıt yalnız görüntü olarak kalır
+    elif r: say(f"UYARI: ses çalıcı derlenemedi ({r}) — ses afplay ile çalınır")
+    # paylaşılan ekranın yazısı (yerel Apple Vision; aktarici/ekran.py); yoksa kanıt yalnız görüntü olarak kalır
     mtn = os.path.join(app, "Suflor Metin.app"); r = derle(mtn, "metin-tani.swift", "SuflorMetin", METIN_PLIST)
     if r is True: say(f"Metin tanıma yardımcısı derlendi: {mtn}")
     elif r: say(f"UYARI: metin tanıma yardımcısı derlenemedi ({r}) — kanıttaki yazı deftere girmez")
@@ -1849,7 +1847,7 @@ def modeller():
                 "allow_patterns=['embedding_model.ckpt', 'hyperparams.yaml'])", ek)
     if os.path.isfile(os.path.join(ek, "ecapa-mlx.npz")): say("✓ ses izi ağırlıkları (MLX) var")
     else: ecapa_donustur(ort, onbellek=False)
-    # S188: whisper.cpp varsayılan motor. MLX modeli bu adımda yine iner: dosyadan/toplu döküm, konuşmacı etiketlemesi ve cpp açılamazsa yedek ona muhtaç
+    # S188: whisper.cpp varsayılan motor. MLX modeli bu adımda yine iner: toplu döküm, konuşmacı etiketlemesi ve cpp açılamazsa yedek ona muhtaç
     try: whispercpp_kur(ort)
     except Exception as e: say(f"Not: whisper.cpp kurulamadı ({e.__class__.__name__}: {str(e)[:120]}) — aktarıcı MLX'le çalışır")
     whisper_8bit(ort); tur_kur(ort); cevir_kur(ort)

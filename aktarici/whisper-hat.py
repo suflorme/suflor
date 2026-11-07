@@ -33,7 +33,7 @@ _WH_Q8 = os.path.join(WH_MODELLER, "hub", "models--suflor--whisper-large-v3-turb
 if AYAR.get("whisper_model") != "turbo" and os.path.exists(os.path.join(_WH_Q8, "weights.safetensors")): WH_MODEL = _WH_Q8
 # whisper.cpp + Core ML canlı döngüde (aynı turbo q8, kodlayıcı Neural Engine'de; ~2,3 kat hızlı, doğruluk ve uydurma süzgeci aynı — 20 Ekim kıyası).
 # S188 (3 Kasım): Apple Silicon'da varsayılan motor; ayar "whisper_motor" ("cpp" | "mlx") varsa o kazanır. Dosyalar <ortak>/whisper-cpp/ (whisper-server,
-# ggml-large-v3-turbo-q8_0.bin, Core ML kodlayıcı; kurulum.py whispercpp_kur indirir); yoksa MLX. Dosyadan döküm (toplanti-claude.py dosyadan → whisper-isci.py --dosya) de cpp'yi kendi sunucusuyla kullanır (aynı yedek mantığı); toplu etiketleme ses izi, MLX.
+# ggml-large-v3-turbo-q8_0.bin, Core ML kodlayıcı; kurulum.py whispercpp_kur indirir); yoksa MLX. Toplu etiketleme ses izi, MLX.
 # Geçici MLX yedeği: işçi cpp'yi açamazsa aynı süreçte MLX'e geçer ("cpp": {"sonuc": "yedek", "hata": sınıf}); aktarıcı o gün cpp'yi yeniden denemez
 # (<uygulama>/whisper-cpp-yedek.json), her açılış sonucunu canli/whisper-cpp-acilis.jsonl'e yazar (beta verisi sayar). MLX modeli diskte yoksa iner (wh_mlx_indir).
 WH_CPP = os.path.join(_ORT, "whisper-cpp")
@@ -72,7 +72,7 @@ def wh_cpp_kaydet(c):  # işçinin "cpp" alanı → kayıt, günlük, o günün 
     w["cpp"] = {k: v for k, v in r.items() if k != "at" and v is not None}
     try: _log("whisper-cpp-acilis.jsonl", r)
     except Exception: pass
-# MLX modeli yalnız yedekte gerekirse indirilir (S188); bu adımda kurulum yine indiriyor (dosyadan/toplu döküm ve konuşmacı etiketlemesi MLX'e muhtaç).
+# MLX modeli yalnız yedekte gerekirse indirilir (S188); bu adımda kurulum yine indiriyor (toplu döküm ve konuşmacı etiketlemesi MLX'e muhtaç).
 # İnerken durum "indiriliyor": parçalar atlanır, kanallar altyazıyla sürer; inince işçi MLX'le açılır. Ortak klasör yazılamıyorsa (öbür hesap) "yok".
 WH_MLX_REV = "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb"  # kurulum.py WHISPER_REV ile aynı
 _WH_INDIR = {"th": None}

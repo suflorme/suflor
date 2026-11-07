@@ -146,24 +146,7 @@ ns["asistan_soru_kaydet"]("Atlas", "Hangi gün?"); ok = ok and ns["asistan_cevap
 ns["asistan_soru_kaydet"]("Atlas", "Hangi gün?"); ns["TS"]["son_t"] = now + 30; ok = ok and ns["asistan_cevap_bekliyor"](now + 45) == "Atlas"; hata += not ok
 print(("✓ " if ok else "✗ ") + "asistanın sorusu: 20 sn içinde bir kez cevap bekler; soru değilse ya da geç kalırsa beklemez; toplantıya okunduysa okuma sonundan sayar")
 
-# v0.125.1 (23 Ekim üçlü sohbet denemesi; gerçek cümleler örnek adlarla): Konuş/sohbette kişilik seçimi — takma ad, Whisper yazımları, ikinci cümledeki ad, sondaki seslenme
-exec(compile(ast.Module([n for n in ka.body if isinstance(n, ast.FunctionDef) and n.name in ("kisilik_hitap_bul", "kisilik_hitap_icte")], []), "kisilik.py", "exec"), ns)
-KIS["v"] = {"ad": "Atlas", "rol": "toplanti", "hitap": ["Atlas", "Atlaz", "Atti", "Atte", "Attisan", "Atti Hanım"]}
-KIS["v2"] = {"ad": "Matlas", "rol": "disi", "hitap": ["Matlas", "Matti", "Mattin"]}
-def kim(m):
-    k, _ = ns["kisilik_hitap_bul"](m); k = k or ns["kisilik_hitap_icte"](m); return k["ad"] if k else None
-for girdi, bek, ac in [
-    ("Yani tabi ki cuma günlerini seviyoruz. Atte sen hangi günü en çok seversin?", "Atlas", "gerçek: ad ikinci cümlenin başında (Whisper yazımı)"),
-    ("Atti, sen ne dersin?", "Atlas", "takma ad + virgül"),
-    ("Sen ne dersin, Atti?", "Atlas", "sondaki seslenme + soru"),
-    ("Peki sen hangisini seçerdin Atte?", "Atlas", "sondaki ad + soru, virgülsüz"),
-    ("Evet, Matti, cevap ver bakalım. Attenin... Sorusu da", "Matlas", "gerçek: giriş + ad ilk cümlede (sonraki iyelik seslenme değil)"),
-    ("Anladım. Matti Attisan'a felaket laf çaktı yalnız.", "Matlas", "gerçek: takılma adının Whisper yazımı ekli — söz etme"),
-    ("Atti'nin filmi güzeldi, ben de izlerim.", None, "iyelik ekli ad seslenme değil"),
-    ("Arkadaşlar ikiniz de çok komiksiniz.", None, "ikisine söz: kişilik adı yok")]:
-    c = kim(girdi); ok = c == bek; hata += not ok
-    print(f"{'✓' if ok else '✗'} üçlü hitap — {ac}: {girdi!r} → {c}" + ("" if ok else f" (beklenen {bek})"))
-KIS["v"] = KIS["v2"] = None
+exec(compile(ast.Module([n for n in ka.body if isinstance(n, ast.FunctionDef) and n.name == "kisilik_hitap_bul"], []), "kisilik.py", "exec"), ns)
 
 # 30 Ekim (gerçek toplantı, bulgu 9): ad cümle içinde — yalnız doğrudan seslenme (kullanıcının kendi satırı; hitap_duzelt yalnız ona çağrılır)
 KIS["v"] = {"ad": "Atlas", "rol": "toplanti", "hitap": ["Atlas", "Atlaz"]}; KIS["v2"] = None

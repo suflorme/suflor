@@ -41,7 +41,7 @@ olay = lambda i, ad, pl, b, s, bag: {"id": i, "baslik": ad, "baslangic": iso(sim
 json.dump({"durum": "ok", "olaylar": [olay("e1", "Deniz ile proje", "meet", -3, 27, "https://meet.google.com/abc-defg-hij"),
                                       olay("e2", "Haftalık plan", "teams", -1, 29, "https://teams.microsoft.com/l/meetup-join/x"),
                                       olay("e3", "Akşam görüşmesi", "meet", 240, 270, "https://meet.google.com/zzz-yyyy-xxx")]}, open(os.path.join(T, "takvim.json"), "w"), ensure_ascii=False)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
                                                "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False, "yerel_ses": False, "oto_haric": ["haftalık"]}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))

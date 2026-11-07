@@ -112,7 +112,7 @@ os.environ.pop("SUFLOR_TEST_GIRIS_SANAL"); g = m.giris_sanal(); bak(f"gerçek Co
 m.AYAR.pop("gemini_kapsam"); m.AYAR["ses_motoru"] = "mac"
 bak("varsayılan kapsam toplantı", m.gemini_kapsam() == "toplanti" and m.gemini_view()["kapsam"] == "toplanti" and isinstance(m.gemini_view()["bugun"], dict))
 bak("toplantıya söylenen Gemini (kişilik sesiyle)", m.kisilik_sesi(toplantiya=True)[0] == "gemini")
-bak("kullanıcıya okunan Gemini değil (Piper ya da Mac)", m.kisilik_sesi()[0] in ("piper", "mac"))
+bak("kullanıcıya okunan Gemini değil (Mac ya da Pocket)", m.kisilik_sesi()[0] in ("pocket", "mac"))
 _, o = cikti(m.seslendir, "Tamam, bakıyorum.", kuyruk=True)
 bak("seslendir (sohbet, Konuş, kulağa cevap) Gemini parçası üretmez", "SES (deneme)" in o and "· ses " not in o)
 bak("fısıltı ve sesli çeviri (gemini_kisa) yerel sese düşer", m.gemini_kullan() is False and m.gemini_kisa("Kısa.") is False)

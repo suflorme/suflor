@@ -37,8 +37,7 @@ class Aktarici:
         if not T:
             json.dump({"durum": "ok", "olaylar": list(olaylar)}, open(os.path.join(self.T, "takvim.json"), "w"), ensure_ascii=False)
             os.makedirs(os.path.join(self.T, "Suflor Ses.app"))  # yerel ses "kurulu" sayılsın (nabızla dinliyor)
-            json.dump({"alan": "Deneme", "ad": "Ali T", "port": self.port, "uygulama": self.T, "ortak": "/Users/Shared/Suflor", "konusma": False,
-                       "tepki_sesleri": os.path.join(self.T, "tepki-yok")}, open(os.path.join(self.T, "ayar.json"), "w"))
+            json.dump({"alan": "Deneme", "ad": "Ali T", "port": self.port, "uygulama": self.T, "ortak": "/Users/Shared/Suflor", "konusma": False}, open(os.path.join(self.T, "ayar.json"), "w"))
             for f in ("relay.py", "manifest.json", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), self.T)
             for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(self.T, d))
         self.ac()
@@ -325,7 +324,7 @@ def oturumlu(ek_ayar=None):  # O, P: sahte claude + sahte toplantı oturumu + na
     port = bos_port(8783); json.dump({"durum": "ok", "olaylar": []}, open(os.path.join(T, "takvim.json"), "w"))
     os.makedirs(os.path.join(T, "Suflor Ses.app")); os.makedirs(os.path.join(T, "calisma"))
     json.dump({"alan": "Deneme", "ad": "Ali T", "port": port, "uygulama": T, "ortak": "/Users/Shared/Suflor", "konusma": False, "claude": cl, "calisma": os.path.join(T, "calisma"),
-               "tepki_sesleri": os.path.join(T, "tepki-yok"), **(ek_ayar or {})}, open(os.path.join(T, "ayar.json"), "w"))
+               **(ek_ayar or {})}, open(os.path.join(T, "ayar.json"), "w"))
     for f in ["manifest.json"] + glob.glob(os.path.join(KOD, "*.py")): shutil.copy(os.path.join(KOD, f), T)  # P: izle (toplanti-claude.py) baglam vb. ister
     for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
     open(os.path.join(T, "aktarici", "toplanti-oturum.py"), "a", encoding="utf-8").write(SAHTE_OTURUM)

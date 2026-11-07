@@ -82,12 +82,11 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
 
 ## 5. Toplantı bitince (panel kapanır ya da 5 dk satır gelmez)
 1. Monitor'ü durdur. `tc dokum --kim "<kişi>"` → `gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>.md` + `.vtt` ("zaten var" ve aynı
-   toplantıysa `--uzerine`). Teams'in dökümü gerekmez; kullanıcı indirdiyse (Downloads'ta yeni .docx/.vtt) `tc karsilastir <dosya>
-   --kaydet` → özete "Döküm kapsamı %X, kaçan N satır" (önemli kaçan bölümü ekle). İndirmediyse hatırlatma.
+   toplantıysa `--uzerine`). Teams'in dökümü gerekmez.
    Ekran paylaşıldıysa (`SUNULAN EKRAN` olayı geldi): `tc ekranlar --kim "<konu>"` → görüntüler `gorusmeler/<alan>-<konu>-ekranlar-<YYYYMMDD>/`
    klasörüne kopyalanır. Görüntüleri Read ile aç; şifre, anahtar ya da kişisel veri görüneni koyma, kullanıcıya söyle. Özete "Sunulan
    ekranlar" (3. adım); karşı taraf bir işi adım adım gösterdiyse adım belgesini de yaz (çıktıdaki yol) ve özete yolunu ekle.
-2. Özetten takip işlerini say (toplam T / sahibi ve tarihi belli S), `tc sonuc --takip T/S --karar K --kaydet`.
+2. Özetten takip işlerini say (toplam T / sahibi ve tarihi belli S), `tc sonuc --takip T/S --karar K`.
    **Sözler ve takip işleri** ayrı kaydedilmez: 4. adımdaki yapı dosyasına `is` (sahip, tarih) ya da `soz` olarak girer — iki taraf,
    kullanıcınınkiler dahil ("yaparım", "Cuma'ya kadar gönderirim"); tarih söylenmediyse boş bırak, uydurma. Hazırlıkta gelen eski
    sözlerden toplantıda tutulduğu anlaşılanı `tc soz kapat sN`, düşeni `--durum iptal`.

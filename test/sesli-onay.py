@@ -104,10 +104,10 @@ for g, kim, tarih in [("Bana bir iş ekle: Cuma'ya kadar teklif hazırla.", "Den
     e = nt["_is_ek"](g); t_ = e["tarih"]
     sonra = {"cuma": lambda t: t and datetime.date.fromisoformat(t).weekday() == 4, "yarın": lambda t: t == (datetime.date.today() + datetime.timedelta(days=1)).isoformat(), "12": lambda t: t and t.endswith("-11-12"), None: lambda t: t is None}[tarih]
     ok(f"iş sahibi/vade: {g!r} → {e['kim']}, {t_}", e["kim"] == kim and sonra(t_))
-# 4) yalıtılmış aktarıcı: toplantıda sesle iş → onay kartı → karar grafı; toplantı dışında sesli soru → panodan onay; deneme toplantısının işi ortak klasöre gitmez
-EP = "ben" + chr(64) + "ornek.test"; DRIVE = os.path.join(T, "Drive", "Ortak"); os.makedirs(DRIVE)
+# 4) yalıtılmış aktarıcı: toplantıda sesle iş → onay kartı → karar grafı; toplantı dışında sesli soru → panodan onay; 
+EP = "ben" + chr(64) + "ornek.test"
 ay = os.path.join(T, "ayar.json")
-json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "eposta_kimlik": EP, "ortak_klasor": DRIVE, "ortak_gecmis": True}, open(ay, "w"))
+json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "eposta_kimlik": EP, "ortak_gecmis": True}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py", "yapi.py", "ortak_bulut.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
 log = os.path.join(T, "relay.log"); env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_METIN="1")
@@ -142,9 +142,6 @@ try:
     ls = isler()
     ok(f"onayla → iş karar grafında: {[(i[1], i[2][:30], i[3], bool(i[4])) for i in ls]}", len(ls) == 1 and ls[0][1] == "Ali" and "tedarikçi teklifini" in ls[0][2] and ls[0][3] and datetime.date.fromisoformat(ls[0][3]).weekday() == 4)
     ok("iş açık toplantı dosyasına bağlandı", bool(ls) and ls[0][4] == TOP)
-    es = uc("/ortak", {"islem": "esitle"}, pano=False); time.sleep(0.5)
-    ol = "".join(open(f, encoding="utf-8").read() for f in glob.glob(os.path.join(DRIVE, "olaylar", "**", "*.jsonl"), recursive=True))
-    ok(f"deneme toplantısının işi ortak klasöre gitmedi (durum {es.get('durum')})", "tedarikçi teklifini" not in ol)
     satir("ben", "Claude: bana iş ekle: ben toplantıda kendime iş yazıyorum."); time.sleep(1)
     k2 = next((c for c in uc("/cards").get("cards") or [] if c.get("onay") and "kendime iş" in c.get("text", "") and c.get("status") == "acik"), None); uc("/card-ack", {"id": k2["id"], "status": "reddedildi"}, pano=True); time.sleep(1)
     ok("reddedilen iş yazılmadı", len(isler()) == 1)
@@ -160,9 +157,6 @@ try:
     while time.time() - t0 < 20 and len(isler()) < 2: time.sleep(0.5)  # sesli karar değil (pano): Geri al beklenmez
     ls = isler(); yeni_ = [i for i in ls if "bütçe sunumunu" in i[2]]
     ok(f"onay → iş kaydedildi: sahip kendisi, vade yarın, toplantıya bağlı değil", len(yeni_) == 1 and yeni_[0][1] == "Deniz T" and yeni_[0][3] == (GUN + datetime.timedelta(days=1)).isoformat() and not yeni_[0][4])
-    es = uc("/ortak", {"islem": "esitle"}); time.sleep(0.5)
-    ol = "".join(open(f, encoding="utf-8").read() for f in glob.glob(os.path.join(DRIVE, "olaylar", "**", "*.jsonl"), recursive=True))
-    ok(f"toplantısız iş ortak klasöre gitti (denetim: filtre gerçekten çalışıyor, durum {es.get('durum')})", "bütçe sunumunu" in ol and "tedarikçi teklifini" not in ol)
     ok("aktarıcıda hata yok", "Traceback" not in L())
 finally:
     r.terminate(); r.wait(5)

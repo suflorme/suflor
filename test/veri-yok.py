@@ -11,7 +11,7 @@ def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad, flush=True)
     if not k: HATA.append(ad)
 ay = os.path.join(T, "ayar.json")
-json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "konusma": False, "yerel_ses": False, "oto_toplanti": False, "tepki_sesleri": os.path.join(T, "yok")}, open(ay, "w"))
+json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "konusma": False, "yerel_ses": False, "oto_toplanti": False}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 LOG = os.path.join(T, "relay.log")

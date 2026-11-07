@@ -111,9 +111,6 @@
    "| <SAAT> | Ayla Örnek | Yok, teşekkürler. |  |",
    "| <SAAT> | Deniz Test | Teşekkürler, görüşmek üzere. |  |"
   ],
-  "<TARIH>-Toplantı-<SS>.taahhut.log": [
-   "{\"tur\": \"net_degil\", \"kim\": \"Ayla Örnek\", \"saat\": \"<SAAT>\", \"metin\": \"Kayıt ortak klasördeki tabloda, ben sana gönderirim.\", \"isaret\": \"tarih yok\"}"
-  ],
   "acik-arsiv.jsonl": [
    "{\"durum\": \"acik\", \"tetik\": [\"yedek\"], \"file\": \"<TARIH>-Eski.md\", \"metin\": \"Eski toplantının sorusu\", \"id\": \"e1\", \"baslik\": \"Eski toplantı\", \"arsiv_at\": \"<AN>\", \"toplanti\": \"Eski toplantı\"}"
   ],
@@ -222,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 515966,
-   "sha": "ae3b8b5e624b03ff"
+   "uzunluk": 594211,
+   "sha": "c5483237e6dc7818"
   },
   "/mini": {
-   "uzunluk": 515966,
-   "sha": "ae3b8b5e624b03ff"
+   "uzunluk": 594211,
+   "sha": "c5483237e6dc7818"
   },
   "/status": {
    "_ping_son": "float",
@@ -297,31 +294,42 @@
      "ekran_paylasimda_goster": "bool",
      "eposta": "str",
      "eposta_adres": "str",
+     "eposta_cevapsiz_gun": "int",
+     "eposta_claude_siralama": "bool",
+     "eposta_hatirlat": "bool",
+     "eposta_hatirlat_sesli": "bool",
      "eposta_oku": "bool",
+     "eposta_sessiz": "str",
+     "eposta_takip": "bool",
+     "eposta_takip_dk": "int",
+     "eposta_vip": "str",
      "fisilti": "bool",
      "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
      "izleme_ad": "str",
      "izleme_dosyasi": "str",
-     "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kayit_sesi": "bool",
      "kisayollar": "bool",
      "kisilik": "str",
      "kisilik_toplanti_disi": "str",
+     "kisisel_tarih_hatirlat": "bool",
+     "kisisel_tarih_saat": "str",
+     "kisisel_tarih_sesli": "bool",
+     "kisisel_tarih_ufuk": "int",
+     "kisisel_tarihler": "bool",
      "konus_alindi": "bool",
      "konus_gecmis": "bool",
-     "konus_hihi": "bool",
      "konus_web": "bool",
      "konusma": "bool",
+     "kutlama_kanali": "str",
      "linkedin_chrome": "bool",
      "masaustu_kisiler": "bool",
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
      "oda": "bool",
      "onay_uyari": "bool",
-     "ortak_klasor": "str",
      "oto_haric": "str",
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
@@ -346,16 +354,14 @@
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
      "tstt_taslak": "bool",
-     "uclu_sohbet": "bool",
-     "uclu_sohbet_ozel_paylas": "bool",
      "uzun_konusma_sn": "int",
-     "web_arastirma": "bool"
+     "web_arastirma": "bool",
+     "web_arastirma_disari": "bool"
     },
     "gelistirici": "bool",
     "gemini": "bool",
     "kisiler": [],
     "menu": "bool",
-    "piper": "bool",
     "pocket": "bool",
     "takvimler": [],
     "varsayilan": {
@@ -368,29 +374,40 @@
      "ekran_paylasimda_goster": "bool",
      "eposta": "str",
      "eposta_adres": "str",
+     "eposta_cevapsiz_gun": "int",
+     "eposta_claude_siralama": "bool",
+     "eposta_hatirlat": "bool",
+     "eposta_hatirlat_sesli": "bool",
      "eposta_oku": "bool",
+     "eposta_sessiz": "str",
+     "eposta_takip": "bool",
+     "eposta_takip_dk": "int",
+     "eposta_vip": "str",
      "fisilti": "bool",
      "gemini_kapsam": "str",
      "gemini_model": "str",
      "gemini_ses": "str",
      "izleme_ad": "str",
      "izleme_dosyasi": "str",
-     "kanit_metin": "bool",
      "kart_tavan_sn": "int",
      "kayit_sesi": "bool",
      "kisayollar": "bool",
+     "kisisel_tarih_hatirlat": "bool",
+     "kisisel_tarih_saat": "str",
+     "kisisel_tarih_sesli": "bool",
+     "kisisel_tarih_ufuk": "int",
+     "kisisel_tarihler": "bool",
      "konus_alindi": "bool",
      "konus_gecmis": "bool",
-     "konus_hihi": "bool",
      "konus_web": "bool",
      "konusma": "bool",
+     "kutlama_kanali": "str",
      "linkedin_chrome": "bool",
      "masaustu_kisiler": "bool",
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
      "oda": "bool",
      "onay_uyari": "bool",
-     "ortak_klasor": "str",
      "oto_haric": "str",
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
@@ -414,10 +431,9 @@
      "toplanti_terminal": "bool",
      "toplantiya_ses": "bool",
      "tstt_taslak": "bool",
-     "uclu_sohbet": "bool",
-     "uclu_sohbet_ozel_paylas": "bool",
      "uzun_konusma_sn": "int",
-     "web_arastirma": "bool"
+     "web_arastirma": "bool",
+     "web_arastirma_disari": "bool"
     }
    },
    "baglam": [
@@ -507,7 +523,6 @@
     "ok": "bool",
     "since": "NoneType"
    },
-   "dosyadan": "NoneType",
    "duman": "NoneType",
    "eklenti_kurulu": "NoneType",
    "eposta": "str",
@@ -617,8 +632,7 @@
      "kulaklik": "bool"
     },
     "soru": "NoneType",
-    "toplanti": "bool",
-    "uclu": "NoneType"
+    "toplanti": "bool"
    },
    "kulaklik_yok": "NoneType",
    "last": "str",
@@ -673,9 +687,6 @@
     "sn": "NoneType"
    },
    "seslendirme": {
-    "calici": "NoneType",
-    "durum": "NoneType",
-    "hata": "NoneType",
     "motor": "str",
     "toplanti": "str"
    },

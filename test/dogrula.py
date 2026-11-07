@@ -14,7 +14,7 @@ def ok(ad, k):
     if not k: HATA.append(ad)
 ay = os.path.join(DESTEK, "ayar.json"); GIZLI_DEGER = "gizli-deger-93817"
 AYAR = {"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": APP, "proje": os.path.join(T, "proje"), "ortak": ORTAK, "kod": KOD, "toplantiya_ses": True, "konusma": False, "yerel_ses": False,
-        "oto_toplanti": False, "tepki_sesleri": os.path.join(T, "yok"), "eposta_adres": f"{GIZLI_DEGER}@ornek.com", "kisilik_bellek": GIZLI_DEGER, "sozluk_ek": ["Deniz Yıldız"], "tema": "koyu"}
+        "oto_toplanti": False, "eposta_adres": f"{GIZLI_DEGER}@ornek.com", "kisilik_bellek": GIZLI_DEGER, "sozluk_ek": ["Deniz Yıldız"], "tema": "koyu"}
 json.dump(AYAR, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py", "kurulum.py"): shutil.copy(os.path.join(KOD, f), APP)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(APP, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(APP, "pano"))

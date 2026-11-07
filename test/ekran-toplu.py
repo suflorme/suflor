@@ -33,7 +33,7 @@ def kos(toplu, sen):
     PORT = bos_port(8791); canli = os.path.join(T, f"canli{toplu}"); os.makedirs(canli)
     ay = os.path.join(T, f"ayar{toplu}.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": "/Users/Shared/Suflor", "ekran_toplu_sn": toplu}, open(ay, "w"))
     Rk = os.path.join(T, f"kod{toplu}"); os.makedirs(Rk)
-    for f in ("relay.py", "manifest.json", "toplanti-claude.py", "yapi.py", "taahhut.py", "baglam.py"):
+    for f in ("relay.py", "manifest.json", "toplanti-claude.py", "yapi.py", "baglam.py"):
         if os.path.exists(os.path.join(KOD, f)): shutil.copy(os.path.join(KOD, f), Rk)
     shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(Rk, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(Rk, "pano"))
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1")

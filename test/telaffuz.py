@@ -25,12 +25,12 @@ bak("IT yalnız büyük harfle (Türkçe 'it' değişmez)", telaffuz("IT ekibi g
 bak("maliyet şapkalı", telaffuz("Maliyeti düşük, maliyet tablosu hazır."), "Mâliyeti düşük, mâliyet tablosu hazır.")
 bak("mimari şapkalı (ekli biçim)", telaffuz("Yeni mimarisi hazır, mimariyi konuştuk."), "Yeni mimârîsi hazır, mimârîyi konuştuk.")
 bak("Mac sesi: doğru okuduğu sözcüğe dokunulmaz, okuyamadığına sözlük (v0.39.2)", telaffuz("Teams'te meeting var, feedback ve KPI tablosu hazır.", mac=True), "Teams'te meeting var, fidbek ve Ki pi ay tablosu hazır.")
-bak("Piper: aynı cümlede hepsine sözlük", telaffuz("Teams'te meeting var, feedback ve KPI tablosu hazır."), "Tims'te miting var, fidbek ve Ki pi ay tablosu hazır.")
+bak("Yerel ses: aynı cümlede hepsine sözlük", telaffuz("Teams'te meeting var, feedback ve KPI tablosu hazır."), "Tims'te miting var, fidbek ve Ki pi ay tablosu hazır.")
 bak("lazım ekli biçimleri ve cümle başı (v0.70.5, kullanıcı isteği: lâzımsa, cevâbını)", telaffuz("Lazımsa yazarım. Cevabını sonra veririm, bu lazımdı."), "Lâzımsa yazarım. Cevâbını sonra veririm, bu lâzımdı.")
 bak("uzun ünlü şapkayla (v0.39.1, Mac sesi)", telaffuz("Cevabı şöyle: hesabını kontrol ettim, kağıt lazım."), "Cevâbı şöyle: hesâbını kontrol ettim, kâğıt lâzım.")
 bak("ünsüz yumuşayınca uzun ünlü (v0.47.2, Mac sesi \"sahip\"i uzatır, \"sahibini\"yi uzatmaz)", telaffuz("Sahibini sordum, takibinde kalsın; sahip ve takip aynen.", mac=True), "Sâhibini sordum, tâkibinde kalsın; sahip ve takip aynen.")
 bak("uzun ünlü listesi (v0.48.1, telaffuz-uzun.json): yumuşamış biçim şapkalı, eş yazım ve incelme riski dokunulmaz", telaffuz("Mizacını biliyorum, inkılabını okudum; kabını getir, babası geldi.", mac=True), "Mizâcını biliyorum, inkılâbını okudum; kabını getir, babası geldi.")
-# 1b) sözlük dosyası okundu, büyük harf korunur (Piper küçük harfle başlayanı yeni cümle saymaz); Türkçe i → İ
+# 1b) sözlük dosyası okundu, büyük harf korunur (yerel ses küçük harfle başlayanı yeni cümle saymaz); Türkçe i → İ
 bak("sözlük dosyası", len(TELAFFUZ) > 200 and TELAFFUZ.get("Teams") == "Tims", True)
 bak("büyük harf korunur", telaffuz("Feedback'leri topladık. Deadline cuma."), "Fidbek'leri topladık. Dedlayn cuma.")
 bak("küçük harf aynen", telaffuz("bu feedback iyi"), "bu fidbek iyi")

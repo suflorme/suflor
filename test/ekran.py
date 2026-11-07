@@ -74,7 +74,7 @@ else:
     ok("metin-tani --bolge: yalnız bölgedeki yazı (altyazı satırı yok)", any("Bütçe" in s for s in o["satirlar"]) and not any("Altyazı" in s for s in o["satirlar"]))
     ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": "/Users/Shared/Suflor", "ekran_toplu_sn": 0}, open(ay, "w"))  # kanit_metin yok (varsayılan); ekran_toplu_sn 0 = her EKRAN hemen (eski davranış; toplu: test/ekran-toplu.py)
     R = os.path.join(T, "kod"); os.makedirs(R)
-    for f in ("relay.py", "manifest.json", "toplanti-claude.py", "yapi.py", "taahhut.py", "baglam.py"):
+    for f in ("relay.py", "manifest.json", "toplanti-claude.py", "yapi.py", "baglam.py"):
         if os.path.exists(os.path.join(KOD, f)): shutil.copy(os.path.join(KOD, f), R)
     shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(R, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(R, "pano"))
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1")
@@ -107,7 +107,7 @@ else:
         kanit(g1)
         ok("açılır pencere kapanıp dönünce: 'EKRAN 3 … KANIT 1 ile aynı yazı'", bekle(lambda: re.search(r"^EKRAN 3 \([\d:]+\): KANIT 1 ile aynı yazı", izl(), re.M) is not None))
         md_ = open(os.path.join(canli, next(f for f in os.listdir(canli) if f.endswith(".md")))).read()
-        ok(".md'ye metin satırı yazılmadı (kanit_metin kapalı), .jsonl'e EKRAN girmedi",
+        ok(".md'ye metin satırı yazılmadı, .jsonl'e EKRAN girmedi",
            "KANIT 1 metni" not in md_ and "1.250.000" not in open(os.path.join(canli, next(f for f in os.listdir(canli) if f.endswith(".jsonl") and f.startswith("20")))).read())
         kanit(g2, None); time.sleep(4)
         ok("bölgesiz kanıt (menü uygulaması): EKRAN üretilmez", "EKRAN 4" not in izl() and "EKRAN 4" not in log())

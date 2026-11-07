@@ -184,7 +184,7 @@ if it doesn't match. When a new version is out, an **Update** button appears on 
 ## More
 
 The detailed guide [KILAVUZ.md](KILAVUZ.md) (in Turkish) covers next steps after installation, project preparation, settings,
-voices (Pocket, Piper, Gemini), privacy details and the list of components.
+voices (Pocket, Gemini), privacy details and the list of components.
 
 ## License
 

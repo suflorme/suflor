@@ -58,7 +58,7 @@ def ts_durdur():
     return n > 0
 # v0.113.0 (kullanıcı, 22 Ekim test toplantısı: "Gemini kotamı doldurmamak için toplantıda Pocket sesine dön diyebilmem lazım"): katılımcıların duyduğu
 # ses ayarla (⚙ Ayarlar → Konuş → Toplantıda asistanın sesi, toplanti_ses) ya da toplantıda sesle (ses_komut). kisilik = eskisi gibi kişiliğin sesi (S92: Gemini).
-# Gemini seçilip kullanılamıyorsa Pocket, o da yoksa Mac sesi. → (motor "gemini"|"pocket"|"piper"|"mac", ses adı)
+# Gemini seçilip kullanılamıyorsa Pocket, o da yoksa Mac sesi. → (motor "gemini"|"pocket"|"mac", ses adı)
 def toplanti_ses_motoru():
     ts = AYAR.get("toplanti_ses") or "kisilik"; k = kisilik() or {}
     pocket = lambda: ("pocket", (pocket_ses_adi(k.get("yerel_ses")) if str(k.get("yerel_ses") or "").startswith("pocket") else None) or pocket_varsayilan()) if pocket_var() else ("mac", None)
@@ -97,18 +97,18 @@ def ses_komut(metin):  # → okunacak kısa onay ya da None (komut değil)
 # tanıtım cevabın önüne eklenir, Gemini olmazsa parça yerel sese düşer (yarısı Gemini yarısı Mac olmaz), şişen ses (gemini-ses.py) çalınmadan atılır.
 def ts_sentez(m, tanitim=None):  # → (24 kHz 16 bit ham ses ya da None = Mac sesi, ses adı); m tanıtımı içerir (tanitim verilirse ayrı okunur)
     km, kses = toplanti_ses_motoru(); gpcm = None  # v0.81.0 (S92): katılımcıların duyduğu ses — Gemini burada; v0.113.0: ayar toplanti_ses / sesle Pocket
-    if km == "gemini" and os.access(PIPER_OYNAT, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
+    if km == "gemini" and os.access(OYNAT_YOL, os.X_OK) and not os.environ.get("SUFLOR_TEST_BASLAT"):
         usl = kisilik_uslup(kisilik()) or None; govde = m[len(tanitim) + 1:] if tanitim else m
         # tanıtım ve toplantı başı duyurusu sabit: bir kez okunup önbellekte (günlük sınırdan yemez); tanıtım ayrı okunup cevabın önüne eklenir
         gpcm = gemini_pcm(ses_duzen(kisilik_telaffuz(govde), False), ses=kses, uslup=usl, sabit=True if govde.strip() in DUYURU_SABIT() else None)
         if gpcm and tanitim:
             tp = gemini_pcm(ses_duzen(kisilik_telaffuz(tanitim), False), ses=kses, uslup=usl, sabit=True)
             gpcm = (tp + b"\0\0" * int(GEMINI_SR * 0.35) + gpcm) if tp else None
-        if not gpcm and pocket_var():  # v0.157.0: Gemini (ve Azure) okuyamadı ya da sesi şişti → yerel Pocket, o da yoksa Mac
+        if not gpcm and pocket_var():  # v0.157.0: Gemini okuyamadı ya da sesi şişti → yerel Pocket, o da yoksa Mac
             km, kses = "pocket", (pocket_ses_adi((kisilik() or {}).get("yerel_ses")) if str((kisilik() or {}).get("yerel_ses") or "").startswith("pocket") else None) or pocket_varsayilan()
             print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Pocket")
         elif not gpcm: print("TOPLANTIYA SÖYLE: Gemini sesi alınamadı — Mac sesi")
-    if km == "pocket" and not gpcm and os.access(PIPER_OYNAT, os.X_OK) and (not os.environ.get("SUFLOR_TEST_BASLAT") or os.environ.get("SUFLOR_TEST_TS_POCKET")):
+    if km == "pocket" and not gpcm and os.access(OYNAT_YOL, os.X_OK) and (not os.environ.get("SUFLOR_TEST_BASLAT") or os.environ.get("SUFLOR_TEST_TS_POCKET")):
         # v0.113.0: Pocket da 24 kHz 16 bit — Gemini'nin yolu (BlackHole / web toplantısında eklenti) aynen; okunacak metin toplanır, sonra çalınır
         gpcm = pocket_pcm(kisilik_telaffuz(etiket_sil(m)), ses=kses)
         if gpcm: print(f"TOPLANTIYA SÖYLE: Pocket sesi ({kses}, {len(gpcm) / 2 / GEMINI_SR:.1f} sn)")
@@ -143,7 +143,7 @@ def toplantiya_soyle(metin=None, devam=False, hazir=None):
     try:
         if gpcm:  # Gemini sesi kesintisiz çalıcıyla BlackHole'a (karşı taraf) ve kulaklığa
             for a in [aygit] + ([None] if kulaklik() else []):
-                p = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(a)] if a else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); ps.append(p)
+                p = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)] + ([str(a)] if a else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); ps.append(p)
                 threading.Thread(target=_ts_besle, args=(p, gpcm), daemon=True).start()
         else:
             ps.append(subprocess.Popen(sesli + ["-a", aygit, okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
@@ -191,7 +191,7 @@ def _ts_web_hazirla(m, sesli, okunan, gpcm=None):
     if kulaklik() and not os.environ.get("SUFLOR_TEST_BASLAT"):  # kullanıcı da duysun (kulaklık yoksa hoparlör → mikrofon → toplantıya ikinci kez giderdi)
         try:
             if gpcm:
-                p = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); ps.append(p)
+                p = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); ps.append(p)
                 threading.Thread(target=_ts_besle, args=(p, gpcm), daemon=True).start()
             else: ps.append(subprocess.Popen(sesli + [okunan], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
         except OSError: pass

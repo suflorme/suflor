@@ -59,8 +59,8 @@ ns = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "A": types.SimpleNamespace(port=bos_por
       "_ilk": lambda *y: next((x for x in y if os.path.exists(x)), y[-1]), "os": os, "re": re, "json": json, "time": time, "threading": threading, "subprocess": subprocess,
       "kisilikler": lambda: [{"yerel_ses": "pocket:wite:female_2", "yerel_ses_en": "pocket:en:mary"}, {"yerel_ses": "pocket:alperiox:female_2", "yerel_ses_en": "pocket:en:michael"}],
       "ton_bul": lambda m: None, "toplanti_var": lambda: TOP["var"], "toplanti_ses_motoru": lambda: TOP["ses"], "TOPLANTI": TOPLANTI}
-os.environ["SUFLOR_TEST_PIPER_SESSIZ"] = "1"; os.environ["FAKE_ONY"] = os.path.join(T, "onyukle.log")
-for b_ in ("piper-ses.py", "pocket-ses.py"): exec(compile(open(os.path.join(KOD, "aktarici", b_), encoding="utf-8").read(), b_, "exec"), ns)
+os.environ["SUFLOR_TEST_YEREL_SESSIZ"] = "1"; os.environ["FAKE_ONY"] = os.path.join(T, "onyukle.log")
+for b_ in ("pocket-ses.py",): exec(compile(open(os.path.join(KOD, "aktarici", b_), encoding="utf-8").read(), b_, "exec"), ns)
 P = ns["POCKET"]; ONY = os.path.join(T, "onyukle.log")
 def bekle(kos, sn=8):
     son = time.time() + sn

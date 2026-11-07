@@ -16,7 +16,7 @@ govde = [n for n in ag.body if (isinstance(n, ast.FunctionDef) and n.name in ad_
 TEL = []; K = {"k": {"yerel_ses": "pocket:wite:male_1", "yerel_ses_en": "pocket:en:michael"}, "motor": "pocket", "pocket": True}
 ns = {"re": re, "time": time, "os": os, "AYAR": {"konusma": True}, "ARAYUZ_DILI": "tr", "SES": {"q": [], "isci": True}, "SES_K": threading.Condition(),
       "ton_ayikla": lambda m: (m, None), "ton_kur": lambda t: None, "gemini_izinli": lambda *a: False, "kisilik": lambda: K["k"],
-      "kisilik_sesi": lambda *a, **k: (K["motor"], "wite:male_1", 1.0), "tepki_ayir": lambda m: (None, m), "etiket_sil": lambda m: m,
+      "kisilik_sesi": lambda *a, **k: (K["motor"], "wite:male_1", 1.0), "etiket_sil": lambda m: m,
       "telaffuz": lambda m, mac=False: (TEL.append(m), m.replace("Sir", "sör"))[1], "kisilik_telaffuz": lambda m: (TEL.append(m), m.replace("Sir", "sör"))[1],
       "ses_duzen": lambda m, mac=True: m, "ses_durdur": lambda: None, "pocket_var": lambda: K["pocket"], "_cal_anahtar": lambda m: m,
       "pocket_ses_adi": lambda s: (s[7:] if s.startswith("pocket:") else s) if s.split(":")[-2:-1] in (["en"], ["wite"], ["alperiox"]) else None}

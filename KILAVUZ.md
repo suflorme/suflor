@@ -140,10 +140,7 @@ kapalı. Suflor Brifing yardımcısının web araçlarını tanıyan sürümü g
 **`"ses_arsivi_egitim_gb": 50`:** havuzun boyut sınırı; aşılacaksa klasör taşınmaz, eskisi gibi silinir (günlüğe bir kez yazılır). Havuzdaki eski veri kendiliğinden silinmez, yalnız elle temizlenir.
 
 ## Sesler
-Daha doğal Türkçe ses: Piper kuruluysa `"ses_motoru": "piper"`, `"piper_python"` (Piper'ın Python ortamı) ve `"piper_model"` (.onnx Türkçe ses)
-— sesli çeviri, fısıltı, sesli özet ve cevaplar bu sesle okunur (Mac'te, yerel); ses dosyası Suflor.me ile gelmez. Hız: `"piper_hiz"`
-(varsayılan 1,0), kısa okumalar `"piper_hiz_kisa"` (1,15). Piper yoksa ya da hata verirse Mac sesi.
-En doğal yerel Türkçe ses: Pocket TTS (kör dinlemede Piper'dan ve Mac sesinden belirgin iyi; işlemcide çalışır, ilk ses ~0,03 sn, ~1,3 GB bellek).
+Doğal yerel Türkçe ses: Pocket TTS (kör dinlemede Mac sesinden belirgin iyi; işlemcide çalışır, ilk ses ~0,03 sn, ~1,3 GB bellek).
 **Sihirbazdan:** asistan adımında "Kadın sesi" ya da "Erkek sesi" seçilince arka planda kurulur (seçmek indirme onayıdır; varsayılan Mac sesi):
 Python paketleri PyPI'dan (`pocket-gereksinim.txt`, sabit sürümler, ~0,9 GB) ve ses modeli Hugging Face'ten (`wite-tech/pocket-tts-turkish`, sabit sürüm,
 ~0,4 GB); toplam ~1,3 GB, hızlı bağlantıda ~2 dk. Yer: ortak klasörde `pocket-venv` + `pocket-modeller` (Python 3.12, belge çevirmeyle ortak).
@@ -153,7 +150,7 @@ ya da sonraki güncelleme yeniden dener (günlük: `~/Library/Application Suppor
 (3 kadın + 3 erkek hazır ses, duygu etiketi; CC-BY-4.0) ve istersen `alperiox/pocket-tts-turkish` (MIT; hazır sesi yok, wite-tech'in seslerini örnek alır).
 Ayar: `"pocket_python"` (o ortamın python'u), `"pocket_hf"` (modellerin indirildiği HF_HOME), `"ses_motoru": "pocket"` ve `"pocket_ses": "wite:female_2"`;
 kişilik dosyasında `yerel_ses: pocket:alperiox:female_2` o kişiliğe ayrı ses verir (Gemini toplantıya ayrıldığında da yerel okumalar bu sesle).
-Pocket okuyamazsa ya da kurulu değilse Mac sesi (Piper ondan sonra). Ses ve metin Mac'ten çıkmaz; model dosyaları Suflor.me ile gelmez.
+Pocket okuyamazsa ya da kurulu değilse Mac sesi. Ses ve metin Mac'ten çıkmaz; model dosyaları Suflor.me ile gelmez.
 
 En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API anahtarı alıp Anahtar Zinciri'ne koy
 (`security add-generic-password -a "$USER" -s suflor-gemini -w`; anahtar dosyaya yazılmaz), sonra panoda ⚙ Ayarlar → Ses → Gemini.
@@ -161,11 +158,7 @@ En doğal ses (isteğe bağlı, bulut): Gemini TTS. Google AI Studio'dan bir API
 gitmez); canlı kullanım için ücretli katman gerekir (ücretsiz katman günde 10 istek; metni eğitimde kullanır). İnternet yoksa Mac sesi okur.
 Model başına günde 100 istek var; ayardaki model dolunca öbürüne (Flash-Lite ↔ 3.8 Flash) geçilir, ikisi de dolunca yerel ses okur
 (ayar `gemini_yedek_model: false` yalnız seçili model).
-Yedek bulut ses (isteğe bağlı): Azure MAI sesi. Gemini okuyamayınca (sınır dolu ya da hata) Elif (kadın Gemini sesleri) ya da Aydın (erkek) okur, o da olmazsa yerel ses.
-Azure Speech kaynağının anahtarını Anahtar Zinciri'ne koy (`security add-generic-password -a "$USER" -s suflor-azure-speech -w`), ayara `"azure_yedek": true` yaz;
-bölge `azure_bolge` (varsayılan westeurope), ses `azure_ses_kadin` / `azure_ses_erkek`. Duygu biçimi (11: meraklı, heyecanlı, üzgün, ciddi, şefkatli …) cümleye ve Gemini'deki duruma göre seçilir;
-kişilik dosyasında `azure_stil: friendlycheerful` o kişiliğin varsayılanı, ayar `azure_stil: false` biçimsiz okur. Okunacak cevap metni Microsoft'a gider (ses kaydı gitmez; Azure anlık
-seslendirmede metni saklamaz); ücretsiz katman (F0) sınırda durur, ücret çıkmaz. Gizli toplantıda hiçbir bulut sesi kullanılmaz. Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi), `ses_uslup_en: …` (aynı
+Gizli toplantıda hiçbir bulut sesi kullanılmaz. Kişilik dosyasında `ses: gemini:Kore`, `ses_uslup: …` (ton yönergesi), `ses_uslup_en: …` (aynı
 yönergenin İngilizcesi; Gemini'ye bu gider, Türkçe yönerge ara sıra sesli okunuyor — yoksa Türkçenin ilk cümlesi gider) ve `ses_etiket: evet` (<chuckle> gibi sözsüz sesler) kişiliğe özel ses verir;
 toplantıda asistanın cevabı da o kişiliğin Gemini sesiyle okunur. Gemini açıkken sesli çeviri (çevirmen sesi ayar `ceviri_gemini_ses`), fısıltı ve
 toplantı özeti de Gemini'yle okunur; iki kişiliğin sesi de Gemini ise özet iki sesle (⚙ Ayarlar → İki sesli özet). Ton cümleye göre değişir (kötü haber,
@@ -218,25 +211,17 @@ Suflor'un kararlarını ve işlerini o deftere taşımak için Bugün'de "Kararl
 vade, durum, kaynak saat). Dosya `<canlı klasör>/disa-aktar/` altına yazılır ve Finder'da gösterilir; yüklemeyi sen yaparsın. Gizli toplantıların kaydı girmez.
 Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/dis-defter.py`.
 
-## Ortak klasör (ekiple kararlar ve işler, pilot)
-İki-üç kişi aynı kararları ve işleri görsün diye Google Drive'da paylaşılan bir klasör kullanılır. Klasörü bir kişi Drive'da açıp ekibe paylaşır; herkes Google Drive
-masaüstü uygulamasıyla Mac'ine eşitler ve Mac'teki yolunu ayar `ortak_klasor`'a yazar (ör. `~/Library/CloudStorage/GoogleDrive-…/Paylaşılan ağ sürücüleri/Suflor-ortak`;
-geliştirici kurulumunda ⚙ Ayarlar → **Ortak klasör (pilot)**, başka kurulumda ayar dosyasına). Boşsa özellik kapalıdır, hiçbir şey yazılmaz.
-- **Ne gider:** yalnız karar ve iş kayıtlarının değişiklikleri (oluşturma, durum, onay, atama, vade, metin düzeltme, bölme, gündem, yorum). Döküm, alıntı, ses, kart,
-  not, Claude'un hazırlık notu ve taslaklar gitmez. **Gizli ve deneme toplantılarının kayıtları hiç yazılmaz** (yazma anında yeniden denetlenir).
-  Ayar açılmadan önceki kayıtlar da gitmez; isteyen ayar dosyasına `"ortak_gecmis": true` yazar.
+## Ekiple paylaşım (kararlar ve işler)
+İki-üç kişi aynı kararları ve işleri görsün diye Google'ın bulut veritabanı Firestore kullanılır (Drive klasörü eşitlemesi kaldırıldı). Ayar `"ortak_tasima": "firestore"` değilse özellik kapalıdır, hiçbir şey gönderilmez.
+- **Ne gider:** yalnız karar ve iş kayıtlarının değişiklikleri (oluşturma, durum, onay, atama, vade, metin düzeltme, gündem, yorum). Toplantı dökümü, kartlar, not, Claude'un hazırlık notu ve taslaklar gitmez.
+  **Gizli ve deneme toplantılarının kayıtları hiç yazılmaz** (yazma anında yeniden denetlenir). Ayar açılmadan önceki kayıtlar da gitmez; isteyen ayar dosyasına `"ortak_gecmis": true` yazar.
 - **Kimlik:** şirket e-postan (ayar `eposta_kimlik`, yoksa `eposta_adres` ya da takvim adresin). Kişisel posta adresiyle (Gmail, iCloud …) özellik açılmaz.
-- **Nasıl:** her Mac yalnız kendi dosyasına ekler: `olaylar/<e-posta>/<cihaz>/<YYYY-AA>.jsonl`; başkalarınınkini dakikada bir okur. Drive'ın henüz bitirmediği
-  yarım satır sonraki tura kalır; aynı olay iki kez gelirse bir kez sayılır. Gecikme Drive'ın eşitleme süresi kadardır (genelde birkaç dakika).
-- **Görünüm:** başkasının kararları ve işleri Kararlar ve işler'de görünür; sana atanan iş listede ve Bugün'de **"Sana atandı · <kişi>"** etiketiyle çıkar
-  (son 7 günde atananlar Bugün'de vadesine bakılmadan görünür).
-  Pilotta klasöre erişen herkes her kaydı görür. Kayıtta rolü olmayan birinin değişikliği (ör. başkasının kararının metnini düzeltmek) uygulanmaz, tarihçede
-  "uygulanmadı" diye görünür.
-- Durum: `/ortak` (anahtarlı; yazılan, alınan, uygulanmayan değişiklikler, ortak klasörde gizli/deneme izi denetimi). Ağa bağlanılmaz; eşitlemeyi Drive yapar.
-Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/ortak-klasor.py`.
+- **Görünüm:** başkasının kararları ve işleri Kararlar ve işler'de görünür; sana atanan iş listede ve Bugün'de **"Sana atandı · <kişi>"** diye çıkar (son 7 günde atananlar Bugün'de vadesine bakılmadan görünür).
+  Kayıtta rolü olmayan birinin değişikliği (ör. başkasının kararının metnini düzeltmek) uygulanmaz, tarihçede "uygulanmadı" diye görünür.
+- Durum: `/ortak` (anahtarlı; yazılan, alınan, uygulanmayan değişiklikler).
 
 ### Firestore ile paylaşım (kişiye göre okuma, saniyelik eşitleme)
-Drive klasörü yerine Google'ın bulut veritabanı Firestore kullanılabilir (ayar `"ortak_tasima": "firestore"`; yoksa Drive yolu aynen). Olaylar ve süzgeç Drive'dakiyle aynı;
+Olaylar ve süzgeç yukarıdakiyle aynı;
 fark: **bir kaydın olaylarını yalnız o kayıtta rolü olanlar (sahip, isteyen, onaylayan, bilgi) görür**, her kullanıcı yalnız kendi adına yazar, kimse silemez —
 bunu Firestore güvenlik kuralları sunucuda sağlar. Sonradan role eklenen kişi kaydın geçmişini de görür. Pano açıkken ya da toplantıda 5 sn'de, diğer zamanda 30 sn'de bir eşitlenir.
 - **Kurulum (ekipte bir kişi, bir kez):** Firebase'de proje + Google girişi açık + Google Cloud'da masaüstü OAuth istemcisi (sırrı Anahtar Zinciri'nde
@@ -245,7 +230,6 @@ bunu Firestore güvenlik kuralları sunucuda sağlar. Sonradan role eklenen kiş
   kuralları Google'ın sınama aracıyla dener, web API anahtarını alır, ayarı yazar ve seni giriş yaptırır. Yönetici izni saklanmaz; yeniden çalıştırmak güvenlidir (alan adı eklemek için de).
 - **Ekibe katılma:** kuran kişi `python3 -B ortak_bulut.py davet` ile tek satırlık kod üretir ve özel mesajla gönderir; katılan `python3 -B ortak_bulut.py katil <kod>` çalıştırıp
   şirket hesabıyla bir kez girer. Yenileme belirteci ve anahtarlar yalnız Anahtar Zinciri'nde.
-- **Drive'dan taşıma:** `python3 -B ortak_bulut.py tasi --klasor <Drive klasörü>` kendi olaylarını gönderir ve sayar (eksik 0 olmalı); herkes kendi Mac'inde çalıştırır.
 - **Durum:** `python3 -B ortak_bulut.py durum` ya da `/ortak` (`tasima`, giriş, son eşitleme, gecikme ortanca/p90). İzinli alan adı dışındaki ya da kişisel posta hesabıyla bağlanılmaz.
   Panoda Kararlar ve işler başlığının altında tek satır: iyiyse "Ekiple paylaşılıyor · son eşitleme · gecikme", sorun varsa ne yapılacağı (giriş gerekiyor, şirket e-postası gerekiyor, ağ yok, hesap uyuşmuyor).
 Test: `PYTHONDONTWRITEBYTECODE=1 python3 test/firestore.py` (sahte sunucu; ağa çıkmaz).
@@ -283,7 +267,7 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 - **Karşı taraf satırı hiç gelmiyor:** Kurulumu denetle'yi çalıştır; Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı'nda "Suflor Ses" açık olmalı. Altyazı açıksa Chrome'da Suflor.me simgesindeki "Karşı taraf → Aç" yedek yoldur.
 - **Ekran paylaşımından sonra karşı ses kesildi:** karşı taraf konuşunca yardımcı yakalamayı kendisi yeniden kurar; kurmazsa Suflor Ses'in iznini kapatıp açmak yeterli.
 - **Whisper'ın yazdığı bir ad ya da terim yanlış (ör. asistanın adı başka sözcük yazılıyor):** adı proje sözlüğüne ya da kişi listesine ekle; asistan adıyla seslenince cevap gelmiyorsa ilk bakılacak yer burasıdır.
-- **Dökümde hı hı gibi kısa sözler senin adına çıkıyor:** hoparlör yerine kulaklık kullan; tepki seslerini kapatmak için `"tepki_sesi": false`.
+- **Dökümde hı hı gibi kısa sözler senin adına çıkıyor:** hoparlör yerine kulaklık kullan; kapatmak için `"konus_alindi": false`.
 - **Çok uzun toplantıda (4,5 saati aşınca) eski bölümler "kayıtta yok" çıkıyor:** döküm dosyasının kendisi eksiksizdir; yalnız Konuş'un bakabildiği pencere sınırlıdır, eski bir şeyi dosyadan açıp sor.
 - **Terimli konuşmalarda döküm hataları arttı:** `"whisper_motor": "mlx"` ile eski motora (MLX) dönülür; ayarı kaldırınca yine whisper.cpp.
 - **Toplantının ilk dakikasında döküm geç başladı:** whisper.cpp'nin ilk açılışında Core ML kodlayıcısı bir kez hazırlanır (birkaç dakika sürebilir); o sırada satırlar altyazıdan gelir. Sonraki açılışlar birkaç saniyedir.
@@ -314,8 +298,7 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 - **Sesle iletilen not hedef oturumda eksik ya da anlamsız:** aynı talimatı daha yavaş ve tam cümleyle tekrar et.
 
 ### Ses ve okuma
-- **Okuma birden Mac'in kendi sesiyle geliyor:** buluttaki ses (Gemini) kotası dolmuş ya da anahtar geçersiz olabilir. Günlük kotası dolunca öbür modele geçilir, ikisi de dolarsa yerel ses okur. AI Studio'da faturalamayı ve anahtarı kontrol et; yedek için `"azure_yedek": true` açılabilir.
-- **Azure yedek sesi okumuyor:** ses adları değişmiş olabilir; `"azure_ses_kadin"`, `"azure_ses_erkek"` ve `"azure_model"` ayarlarını güncel adlarla doldur.
+- **Okuma birden Mac'in kendi sesiyle geliyor:** buluttaki ses (Gemini) kotası dolmuş ya da anahtar geçersiz olabilir. Günlük kotası dolunca öbür modele geçilir, ikisi de dolarsa yerel ses okur. AI Studio'da faturalamayı ve anahtarı kontrol et.
 - **Okuma panoda görünüyor ama duyulmuyor (kulaklığı takıp çıkarınca):** bir sonraki okuma yeni süreç açar; sürerse Suflor.me uygulamasını kapatıp yeniden aç.
 - **Bir ad ya da sözcük garip okunuyor:** doğru okunuşu `canli/telaffuz.json` dosyasına `{"Ad": "Okunuş"}` biçiminde yaz.
 - **Kulaklık takılı ama Suflor kendi sesini duyuyor ("araya girildi"):** Sohbet'i kapat; bas-tut (Option + Shift + Boşluk) ile konuş.

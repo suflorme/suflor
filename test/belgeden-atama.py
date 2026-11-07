@@ -73,7 +73,7 @@ TODO: Lisans yenilemesini kontrol et, sorumlu: Doruk Ersoy, 15.12.2026
     vd = yapi.belge_onerileri(C, None, BELGELER, ONB, deneme=True)
     bak("deneme=True: deneme belgesinin maddesi gelir, gizli yine yok", "Deneme toplantısı maddesi" in {x["metin"] for x in vd["oneriler"]} and "Gizli toplantı maddesi" not in {x["metin"] for x in vd["oneriler"]})
     # kabul: kayit_olustu + is_atandi; sahipsiz yalnız kayit_olustu
-    OK = os.path.join(T, "ortak"); os.makedirs(OK); yapi.ortak_disari(C, OK, "ece" + AT + "firma.test", "Ece Deneme")  # paylaşım başlangıcı: bundan sonraki olaylar gider
+    KD = {}; yapi.ortak_secilen(C, KD, "ece" + AT + "firma.test", "Ece Deneme")  # paylaşım başlangıcı: bundan sonraki olaylar gider
     n0 = len(yapi.olaylar(C))
     r = yapi.belge_oneri_kabul(C, o["Pilot sonuçlarını derle"], eposta="selin.ari" + AT + "firma.test")
     x = yapi.ortak_kayit(C, r["kayit_id"]); th = [e["tur"] for e in yapi.olaylar(C, r["kayit_id"])]
@@ -90,9 +90,9 @@ TODO: Lisans yenilemesini kontrol et, sorumlu: Doruk Ersoy, 15.12.2026
     # gizli toplantı belgesinden elle kabul de yok; deneme toplantısının belgesinden kabul ortak klasöre gitmez
     bak("gizli toplantıya bağlı öneri kabul edilmez", yapi.belge_oneri_kabul(C, {"metin": "Gizli toplantı maddesi", "toplanti": G + ".md"}).get("err") == "gizli")
     rd = yapi.belge_oneri_kabul(C, next(x for x in vd["oneriler"] if x["metin"] == "Deneme toplantısı maddesi"), eposta="doruk" + AT + "firma.test")
-    od = yapi.ortak_disari(C, OK, "ece" + AT + "firma.test", "Ece Deneme")
-    giden = [json.loads(l)["kayit_id"] for root, _, fs in os.walk(OK) for f in fs for l in open(os.path.join(root, f), encoding="utf-8")]
-    bak("ortak klasör: proje kartı işinin olayları gider, deneme toplantısı belgesinden kabul edilen gitmez", rd["ok"] and r["kayit_id"] in giden and rd["kayit_id"] not in giden and od["atlanan"].get("deneme", 0) >= 2, od)
+    od = yapi.ortak_secilen(C, KD, "ece" + AT + "firma.test", "Ece Deneme")
+    giden = [x["kayit_id"] for x in od["satirlar"]]
+    bak("ortak paylaşım: proje kartı işinin olayları gider, deneme toplantısı belgesinden kabul edilen gitmez", rd["ok"] and r["kayit_id"] in giden and rd["kayit_id"] not in giden and od["atlanan"].get("deneme", 0) >= 2, od)
     # kayıt veritabanının açık işleri (ayar veritabani.gorevler satırları: iş, sahip, vade, konum)
     VR = [["Envanter tablosunu kurumsala taşı · 29 Ekim: ek not · 30 Ekim: başka not", "Doruk Ersoy (ana sahip), Selin Arı", "", "iş kaydı #7"],
           ["A1 · Erişim listesini doğrula", "Selin Hanım", "2026-11-20", "iş kaydı #8"], ["Kısa", "Doruk", "", "#9"],

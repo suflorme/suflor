@@ -169,7 +169,7 @@ def _cv_sor(y, satirlar, ek=""):
     m = re.search(r"\{.*\}", metin, re.S)
     try: v = json.loads(m.group(0)) if m else {}
     except ValueError: v = {}
-    if isinstance(v, dict) and isinstance(v.get("o"), dict) and ARAYUZ_DILI == "tr":  # özdeki yabancı sözcüklerin okunuşu (Piper), okumadan önce
+    if isinstance(v, dict) and isinstance(v.get("o"), dict) and ARAYUZ_DILI == "tr":  # özdeki yabancı sözcüklerin okunuşu, okumadan önce
         try: telaffuz_ekle({k: x for k, x in list(v["o"].items())[:20]})
         except Exception as e: print(f"ÇEVİRİ: okunuş yazılamadı {e.__class__.__name__}")
     return {str(k): " ".join(str(x).split())[:600] for k, x in v.items() if isinstance(x, str)} if isinstance(v, dict) else {}

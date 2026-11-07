@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Kurulum ortak klasördeki yerel Türkçe sesleri (Pocket, Piper) bu hesabın ayarına yazar (kurulum.py yerel_ses_bul, 21 Ekim): ikisi birden varsa,
+# Kurulum ortak klasördeki yerel Türkçe sesleri (Pocket) bu hesabın ayarına yazar (kurulum.py yerel_ses_bul, 21 Ekim): varsa,
 # yalnız eksik anahtar, elle verilen yol korunur, beta kullanıcısında (ortak klasörde yok) hiçbir şey yazılmaz. İşlev AST ile alınır.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/yerel-ses-ayar.py
 import ast, os, shutil, sys, tempfile
@@ -21,11 +21,6 @@ try:
     kontrol("Pocket tam: iki anahtar yazılır, ses_motoru değişmez", bul(a, T) == ["pocket_python", "pocket_hf"] and a["pocket_python"] == pp and a["pocket_hf"] == hf and a["ses_motoru"] == "mac")
     a = {"pocket_python": "/elle/python"}; bul(a, T)
     kontrol("elle verilen yol korunur, yalnız eksik yazılır", a == {"pocket_python": "/elle/python", "pocket_hf": hf})
-    py, mo = os.path.join(T, "tts-deneme", "piper-venv", "bin", "python"), os.path.join(T, "piper-ses", "tr-turkce.onnx")
-    dosya(py); dosya(mo); a = {}; bul(a, T)
-    kontrol("Piper Python'u çalıştırılabilir değilse Piper yazılmaz", "piper_python" not in a)
-    os.chmod(py, 0o755); a = {}
-    kontrol("Piper tam: iki anahtar yazılır", set(bul(a, T)) == {"pocket_python", "pocket_hf", "piper_python", "piper_model"} and a["piper_model"] == mo)
     kontrol("hepsi zaten varsa yazılan yok (ayar yeniden yazılmaz)", bul(dict(a), T) == [])
     src = open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read()
     kontrol("kur() ayarı kilitli yazıyor (ayar_degistir)", "ayar_degistir(_ys)" in src)

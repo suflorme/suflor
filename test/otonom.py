@@ -60,7 +60,7 @@ os.chmod(kis, 0o600)
 kis2 = os.path.join(T, "kisilik2.md")  # v0.61.0: toplantı dışı kişilik — toplantıda adıyla çağrılınca yalnız kullanıcıya, isterse toplantıya
 open(kis2, "w", encoding="utf-8").write("---\nad: MATLAS\nhitap: Matlas\nhitap_bicimi: sen\nkonusma_dili: evet\n---\n## Kişilik: MATLAS\nAdın MATLAS.\n")
 ay = os.path.join(T, "ayar.json")
-AY = {"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
+AY = {"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
       "claude": sahte, "toplantiya_ses": True, "kisilik": kis, "kisilik_toplanti_disi": kis2, "otonom_bekle_sn": 6, "karsi_onay_sn": 10}
 json.dump(AY, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py"): shutil.copy(os.path.join(KOD, f), T)

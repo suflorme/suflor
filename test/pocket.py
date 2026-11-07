@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # Pocket TTS ile yerel Türkçe ses (aktarici/pocket-ses.py + pocket-isci.py, S93): ses adı çözümü, alperiox için rakam → yazı, duygu eşlemesi (yalnız wite),
-# gerçek işçiyle iki modelde okuma (ilk ses, parça), okuma kesilince kalan parçalar çalınmaz, bilinmeyen ses → False (çağıran Piper/Mac'e düşer), kişilik
-# başına ses seçimi (S92 + S93: Gemini toplantıya, kişiliğin yerel_ses'i Pocket). Ses çalınmaz (SUFLOR_TEST_PIPER_SESSIZ). Yollar kodda değil: ayardaki
+# gerçek işçiyle iki modelde okuma (ilk ses, parça), okuma kesilince kalan parçalar çalınmaz, bilinmeyen ses → False (çağıran Mac'e düşer), kişilik
+# başına ses seçimi (S92 + S93: Gemini toplantıya, kişiliğin yerel_ses'i Pocket). Ses çalınmaz (SUFLOR_TEST_YEREL_SESSIZ). Yollar kodda değil: ayardaki
 # pocket_python / pocket_hf ya da SUFLOR_POCKET_PYTHON / SUFLOR_POCKET_HF; yoksa gerçek işçi kısmı atlanır.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/pocket.py      (kaldı → çıkış 1)
 import json, os, re, subprocess, sys, tempfile, threading, time, types
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 PORT = bos_port(8791)
-os.environ["SUFLOR_TEST_PIPER_SESSIZ"] = "1"
+os.environ["SUFLOR_TEST_YEREL_SESSIZ"] = "1"
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 try: AY = json.load(open(os.path.expanduser("~/Library/Application Support/Suflor/ayar.json"), encoding="utf-8"))
 except (OSError, ValueError): AY = {}
@@ -18,13 +18,13 @@ def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
 T = tempfile.mkdtemp(prefix="suflor-pocket-")
-AYAR = {"ses_motoru": "piper", "pocket_python": PY or "/yok/python", "pocket_hf": HF or "/yok", "uygulama": T}
+AYAR = {"ses_motoru": "gemini", "pocket_python": PY or "/yok/python", "pocket_hf": HF or "/yok", "uygulama": T}
 TON = {"ad": None}
 ns = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "A": types.SimpleNamespace(port=PORT), "_UYG": KOD, "_APP": T, "__file__": os.path.join(KOD, "relay.py"), "BASE": T, "deneme_aktarici": lambda: True,
       "_ilk": lambda *y: next((x for x in y if os.path.exists(x)), y[-1]), "os": os, "re": re, "json": json, "time": time, "threading": threading, "subprocess": subprocess,
       "kisilikler": lambda: [{"yerel_ses": "pocket:alperiox:female_2", "ses": "gemini:Kore", "yerel_ses_en": "pocket:en:mary"}, {"yerel_ses": "pocket:wite:male_1", "ses": "gemini:Charon", "yerel_ses_en": "pocket:en:michael"}],
       "ton_bul": lambda m: TON["ad"]}
-for b in ("piper-ses.py", "pocket-ses.py"): exec(compile(open(os.path.join(KOD, "aktarici", b), encoding="utf-8").read(), b, "exec"), ns)
+for b in ("pocket-ses.py",): exec(compile(open(os.path.join(KOD, "aktarici", b), encoding="utf-8").read(), b, "exec"), ns)
 ad = ns["pocket_ses_adi"]
 bak("ses adı: pocket:alperiox:female_2 / wite / boş ses / bilinmeyen model",
     (ad("pocket:alperiox:female_2"), ad("wite:male_1"), ad("pocket:wite"), ad("pocket:yok:x"), ad("")) == ("alperiox:female_2", "wite:male_1", "wite:female_2", None, None))
@@ -46,29 +46,28 @@ bak("duygu: Claude tonu → üzgün, ünlem → mutlu, hayret → şaşkın, dü
 # kişilik başına ses seçimi: brifing-ses.py'deki kisilik_sesi taklit ortamda
 src = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read()
 ks = re.search(r"^def kisilik_sesi\(.*?(?=^def ses_secimi)", src, re.S | re.M).group(0)  # v0.110.0: kisilik_sesi + _kisilik_sesi
-K = {"k": None, "izin": False, "pocket": True, "piper": True}
+K = {"k": None, "izin": False, "pocket": True}
 kn = {"AYAR": AYAR, "ARAYUZ_DILI": "tr", "kisilik": lambda: K["k"], "gemini_izinli": lambda t=False: K["izin"] or t, "gemini_acik": lambda: False,
-      "piper_acik": lambda: AYAR.get("ses_motoru") == "piper", "pocket_var": lambda: K["pocket"], "pocket_ses_adi": ad, "pocket_varsayilan": ns["pocket_varsayilan"], "ses_secimi": lambda: None}
+      "pocket_var": lambda: K["pocket"], "pocket_ses_adi": ad, "pocket_varsayilan": ns["pocket_varsayilan"], "ses_secimi": lambda: None}
 exec(ks, kn); sec = lambda **a: kn["kisilik_sesi"](**a)[:2]
-KIS = {"ses": "gemini:Kore", "yerel_ses": "pocket:alperiox:female_2"}; AYAR.update(piper_python="/x/python", piper_model="/x/model.onnx")  # yalnız seçim (dosyaya bakılmaz)
+KIS = {"ses": "gemini:Kore", "yerel_ses": "pocket:alperiox:female_2"}
 K["k"] = KIS; a1 = sec(); a2 = sec(toplantiya=True)
 K["pocket"] = False; a3 = sec(); K["pocket"] = True
-AYAR["ses_motoru"] = "mac"; a4 = sec(); AYAR["ses_motoru"] = "piper"
-K["k"] = None; AYAR.update(ses_motoru="pocket", pocket_ses="wite:male_1"); a5 = sec(); AYAR.update(ses_motoru="piper"); AYAR.pop("pocket_ses")
+AYAR["ses_motoru"] = "mac"; a4 = sec(); AYAR["ses_motoru"] = "gemini"
+K["k"] = None; AYAR.update(ses_motoru="pocket", pocket_ses="wite:male_1"); a5 = sec(); AYAR.update(ses_motoru="gemini"); AYAR.pop("pocket_ses")
 K["k"] = {"ses": "gemini:Charon"}; a6 = sec()
-AYAR.pop("piper_python"); AYAR.pop("piper_model")
-bak("kişilik sesi: toplantı dışı → Pocket, toplantıya → Gemini, Pocket yoksa → Mac (Piper değil), Ses 'Mac' → Mac, ayar pocket → pocket_ses, yerel_ses yok → Piper",
-    (a1, a2, a3, a4, a5, a6) == (("pocket", "alperiox:female_2"), ("gemini", "Kore"), ("mac", None), ("mac", None), ("pocket", "wite:male_1"), ("piper", None)))
-# "hı hı" (tepki_cal): Piper ayarında da kişiliğin yerel sesi Pocket ise onay Pocket'la; Gemini/Mac dalları eskisi gibi
-import ast; tc = ast.get_source_segment(src, next(f for f in ast.parse(src).body if isinstance(f, ast.FunctionDef) and f.name == "tepki_cal"))
+bak("kişilik sesi: toplantı dışı → Pocket, toplantıya → Gemini, Pocket yoksa → Mac, Ses 'Mac' → Mac, ayar pocket → pocket_ses, yerel_ses yok → Mac",
+    (a1, a2, a3, a4, a5, a6) == (("pocket", "alperiox:female_2"), ("gemini", "Kore"), ("mac", None), ("mac", None), ("pocket", "wite:male_1"), ("mac", None)))
+# "hı hı" (onay_cal): kişiliğin yerel sesi Pocket ise onay Pocket'la; Gemini dalı eskisi gibi, Mac sesinde onay yok
+import ast; tc = ast.get_source_segment(src, next(f for f in ast.parse(src).body if isinstance(f, ast.FunctionDef) and f.name == "onay_cal"))
 OKU = []
-tn = {"AYAR": {"konusma": True}, "os": os, "threading": threading, "GEMINI_ONAY": ("Hı hı.",), "piper_acik": lambda: True, "pocket_oku": lambda m, **a: OKU.append((m, a.get("ses"))),
-      "KM": [("pocket", "wite:male_1", 1.0)], "tepki_sec": lambda t: None}
+tn = {"AYAR": {"konusma": True}, "os": os, "threading": threading, "GEMINI_ONAY": ("Hı hı.",), "pocket_oku": lambda m, **a: OKU.append((m, a.get("ses"))),
+      "KM": [("pocket", "wite:male_1", 1.0)]}
 tn["kisilik_sesi"] = lambda: tn["KM"][0]
 exec(tc, tn); os.environ.pop("SUFLOR_TEST_BASLAT", None)
-r1 = tn["tepki_cal"]("alindi"); time.sleep(0.2); r2 = tn["tepki_cal"]("bekleme")
-tn["KM"][0] = ("piper", None, 1.0); r3 = tn["tepki_cal"]("alindi")
-bak("hı hı: Piper ayarında Pocket kişiliği onayı Pocket'la okur; bekleme ve Piper kişiliğinde klip yok", (r1, r2, r3, OKU) == (True, False, False, [("Hı hı.", "wite:male_1")]))
+r1 = tn["onay_cal"]("alindi"); time.sleep(0.2); r2 = tn["onay_cal"]("bekleme")
+tn["KM"][0] = ("mac", None, 1.0); r3 = tn["onay_cal"]("alindi")
+bak("hı hı: Pocket kişiliği onayı Pocket'la okur; bekleme ve Mac sesinde onay yok", (r1, r2, r3, OKU) == (True, False, False, [("Hı hı.", "wite:male_1")]))
 if not GERCEK: print("pocket: gerçek işçi kısmı atlandı (pocket_python / pocket_hf yok)")
 else:
     try:
@@ -93,7 +92,7 @@ else:
         time.sleep(1.5)
         kalan = [f for f in os.listdir(ns["POCKET_GECICI"]) if f.endswith(".wav")] if os.path.isdir(ns["POCKET_GECICI"]) else []
         bak(f"kesilen okumanın parçaları silindi (kalan {len(kalan)})", not kalan)
-        bak("bilinmeyen ses örneği → False (Piper/Mac'e düşer), işçi açık kalır",
+        bak("bilinmeyen ses örneği → False (Mac'e düşer), işçi açık kalır",
             ns["pocket_oku"]("Deneme.", ses="alperiox:yok_ses") is False and ns["POCKET"]["p"].poll() is None)
         AYAR["pocket_hf"] = "/yok"; ns["POCKET"]["p"].terminate(); time.sleep(0.5); ns["POCKET"].update(p=None, durum="kapali", hata=None)
         bak("model klasörü yoksa False (Mac sesine düşülür)", ns["pocket_oku"]("Deneme.") is False and ns["POCKET"]["durum"] == "yok")

@@ -74,7 +74,7 @@ try:
     bak("yeni iş yeni kimlikle; cevaplanan soru kapandı", "Teklifi revize et" in k3 and k3["Teklifi revize et"][2] not in {r[2] for r in k1.values()} and k3["KDV dahil mi?"][3] == "cevaplandi")
     turler = [r[0] for r in db(C).execute("SELECT tur FROM olay WHERE saat > (SELECT MAX(saat) FROM olay) - ? ORDER BY saat", (olay_say(C) - n,)).fetchall()]
     bak(f"yeniden yazma yalnız farkı olay yaptı ({', '.join(turler)})", sorted(turler) == sorted(["metin_duzeltildi", "ertelendi", "durum_degisti", "durum_degisti", "kayit_olustu"]))
-    # eylem menüsü işlevleri: ata, ertele, yorum, gündem, böl, geri al
+    # eylem menüsü işlevleri: ata, ertele, yorum, gündem, geri al
     yid = f"s{k3['Teklifi revize et'][0]}"; n = olay_say(C)
     o, x = yapi.ata(C, yid, {"sahip": {"ad": "Zeynep Kaya", "eposta": "zeynep" + "@" + "ornek.test"}, "bilgi": ["Can Örnek"]})
     bak("ata: is_atandi, sahip ve bilgi; yerel sahip sütunu eşitlendi", o and o["tur"] == "is_atandi" and x["roller"]["sahip"]["eposta"].startswith("zeynep")
@@ -85,13 +85,6 @@ try:
     bak("yorum ve gündem olayları; gündem izdüşümde", olay_say(C) == n + 4 and yapi.ortak_kayit(C, yid)["gundem"]["etkinlik"] == "etkinlik-1")
     g = yapi.geri_al(C, o2["olay_id"])
     bak("geri al: yeni olay (günlük değişmez), vade eski hâline döndü", len(g) == 1 and g[0]["tur"] == "kayit_guncellendi" and yapi.ortak_kayit(C, yid)["vade"] == "")
-    bo, altlar = yapi.bol(C, yid, ["Fiyatları topla", {"metin": "Teklif metnini yaz", "sahip": "Can Örnek"}])
-    bak("böl: iki alt iş (üst kimliği), bolundu olayı", bo and bo["tur"] == "bolundu" and len(altlar) == 2 and all(a["ust"] == k3["Teklifi revize et"][2] for a in altlar)
-        and altlar[1]["roller"]["sahip"] == {"ad": "Can Örnek"})
-    yaz(D1, Y2)
-    bak("bölünen alt işler toplantı yeniden yazılınca kalır", sum(1 for m in kayitlar(C, D1) if m in ("Fiyatları topla", "Teklif metnini yaz")) == 2)
-    gb = yapi.geri_al(C, bo["olay_id"])
-    bak("bölmeyi geri al: alt işler iptal", len(gb) == 2 and all(yapi.ortak_kayit(C, a["kayit_id"])["durum"] == "iptal" for a in altlar))
     # elle söz, eylem kuyruğu
     n = olay_say(C); s = yapi.soz_ekle(C, "Bora Kaya", "Raporu gönderecek", "2026-11-09", D2 + ".md", "Satış")
     bak("soz_ekle: kayit_olustu", olay_say(C) == n + 1 and yapi.ortak_kayit(C, s["id"])["tur"] == "soz")

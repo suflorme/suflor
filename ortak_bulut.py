@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-# Suflor.me ortak karar katmanı A7 — Firestore taşıma katmanı (6 Kasım). Drive klasörü yerine ortak karar/iş olaylarını Cloud Firestore'dan paylaşır:
+# Suflor.me ortak karar katmanı A7 — Firestore taşıma katmanı (6 Kasım). Ortak karar/iş olaylarını Cloud Firestore'dan paylaşır:
 # her kullanıcı yalnız kendi olaylarını yazar (Security Rules: yazan = oturum e-postası, silme yok), bir olayı yalnız `okuyan` listesindekiler okur. Yalnız standart kütüphane.
-# İçe aktarılabilir mantık (aktarici/ortak-klasor.py çağırır: `esitle`, `hazir`, `gecikme_ozet`) + komut satırı: kur, giris, davet, katil, durum, tasi, esitle.
+# İçe aktarılabilir mantık (aktarici/ortak-klasor.py çağırır: `esitle`, `hazir`, `gecikme_ozet`) + komut satırı: kur, giris, davet, katil, durum, esitle.
 #   python3 -B ortak_bulut.py kur --proje <p> --istemci <id> --alan <a> [--alan <b>]     yönetici kurulumu (bir kez; yönetici belirteci saklanmaz)
-#   python3 -B ortak_bulut.py davet | katil <kod> | giris | durum | tasi --klasor <Drive klasörü> | esitle
+#   python3 -B ortak_bulut.py davet | katil <kod> | giris | durum | esitle
 # Kimlik: Google OAuth masaüstü akışı (PKCE, 127.0.0.1) → Google id_token → Firebase signInWithIdp → Firebase belirteci; yenileme belirteci YALNIZ Anahtar Zinciri'nde
-# (suflor-firestore-yenileme), Web API anahtarı suflor-firestore-api, istemci sırrı suflor-firestore-istemci-sirri. Ayar: ortak_tasima ("drive" varsayılan | "firestore"),
+# (suflor-firestore-yenileme), Web API anahtarı suflor-firestore-api, istemci sırrı suflor-firestore-istemci-sirri. Ayar: ortak_tasima ("firestore"; yoksa kapalı),
 # firestore_proje, firestore_istemci_id, firestore_alanlar (izinli e-posta alan adları), firestore_bolge. Kod/yorumda gerçek proje, alan adı, e-posta yok: yalnız ayarda.
 # Gizlilik: olay seçimi ve süzgeci A3 ile BİREBİR aynı yardımcıdan (yapi.ortak_secilen: gizli/deneme toplantı, Claude yorumu, ayar öncesi kayıt gitmez). Kişisel posta alan adı ya da
 # firestore_alanlar dışı kimlik → hiçbir istek gitmez. Ses, döküm satırı, alıntı gitmez. Beta paketine alan eklenmez.
@@ -466,61 +466,14 @@ def durum(dizin=None, ayar=None):  # metin içermez
     return {"tasima": str(a.get("ortak_tasima") or "drive"), "durum": h, "proje": str(a.get("firestore_proje") or ""), "giris": h == "hazir", "eposta": kd.get("eposta") or "",
             "son_esitleme": kd.get("son_esitleme"), "son_hata": kd.get("son_hata"), "gecikme_ortanca": o, "gecikme_p90": p90}
 
-# --- Drive klasöründen taşıma --------------------------------------------------------------------------------------------------------------------------------
-def tasi(dizin, klasor, ayar=None, ilerle=print, y=None):
-    # <klasör>/olaylar/<ben>/<cihaz>/*.jsonl satırlarının (yazan = ben, geçerli) hepsini Firestore'a yazar (var olan atlanır), batchGet ile doğrular → (drive, firestore, eksik)
-    y = _yapi(y); a = ayar if isinstance(ayar, dict) else ayar_oku(); b = baglam(a); ep = str(a.get("eposta_kimlik") or "").lower() or (y.ben_eposta() or "")
-    if not alan_izinli(ep, b["alanlar"]): raise FsHata("alan")
-    _, gep = firebase_belirtec(b)
-    if gep != ep: raise FsHata("eposta")
-    kok = os.path.join(klasor, "olaylar", ep); satirlar = {}
-    if os.path.isdir(kok):
-        for ch in sorted(os.listdir(kok)):
-            if not y._CIHAZ_RX.match(ch) or not os.path.isdir(os.path.join(kok, ch)): continue
-            for f in sorted(os.listdir(os.path.join(kok, ch))):
-                if not f.endswith(".jsonl") or f.startswith("."): continue
-                with open(os.path.join(kok, ch, f), "rb") as fh:
-                    for ln in fh.read().split(b"\n"):
-                        try: o = json.loads(ln.decode("utf-8")) if ln.strip() and len(ln) <= y.ORTAK_SATIR_EN_COK else None
-                        except (ValueError, UnicodeDecodeError): o = None
-                        if y._satir_gecerli(o, ep, ch): satirlar[o["olay_id"]] = o
-    kidler = sorted({o["kayit_id"] for o in satirlar.values()}); yerel = y.ortak_okuyan(dizin, kidler, ep, "", None); atlanan = 0; gizli = set()
-    if kidler and os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")):  # gönderim anında yeniden denetim: yerel kayıt gizli/deneme toplantıdansa gitmez
-        c = y._db(dizin); ky = y.son_kayitlar(dizin)
-        try:
-            for kid, top, gz in c.execute("SELECT kayit_id, toplanti, gizli FROM ortak_kayit"):
-                if kid in kidler and (gz or (top and (y.gizli_mi(dizin, top, ky) or y.deneme_mi(dizin, top, ky)))): gizli.add(kid)
-        finally: c.close()
-    ok = {}; yazmalar = []
-    for o in sorted(satirlar.values(), key=lambda x: (x["saat"], x["olay_id"])):
-        if o["kayit_id"] in gizli: atlanan += 1; continue
-        veri_ok = y._rol_eposta(o["veri"].get("roller")) | y._rol_eposta((o["veri"].get("onceki") or {}).get("roller")) | y._rol_eposta((o["veri"].get("alanlar") or {}).get("roller"))
-        ok[o["kayit_id"]] = _kume_sirali(ok.get(o["kayit_id"]), yerel.get(o["kayit_id"]), veri_ok, ep=ep)
-    for o in sorted(satirlar.values(), key=lambda x: (x["saat"], x["olay_id"])):
-        if o["kayit_id"] not in gizli and len(json.dumps(o["veri"], ensure_ascii=False)) <= y.ORTAK_SATIR_EN_COK: yazmalar.append((o, _belge(b, o, ok[o["kayit_id"]])))
-    gonderilecek = [w for _, w in yazmalar]; r = _yaz_toplu(b, gonderilecek) if gonderilecek else {"yazildi": 0, "var": 0}
-    ilerle(f"Yazıldı: {r['yazildi']} · zaten vardı: {r['var']} · gizlilik nedeniyle atlanan: {atlanan}")
-    bulunan = 0; adlar = [_isim(b, o["olay_id"]) for o, _ in yazmalar]
-    for i in range(0, len(adlar), 100):
-        kod, o = _fs(b, "POST", "/documents:batchGet", {"documents": adlar[i:i + 100]})
-        if kod != 200 or not isinstance(o, list): raise FsHata(_sinif(kod, o if isinstance(o, dict) else {}), f"batchGet {kod}")
-        bulunan += sum(1 for x in o if isinstance(x, dict) and x.get("found"))
-    d = y._ortak_durum(dizin); kd = d.setdefault("firestore", {}).setdefault(b["proje"], {}); okd = kd.setdefault("okuyan", {})
-    for o, _ in yazmalar:
-        e = okd.setdefault(o["kayit_id"], {"k": [], "i": []}); e["k"] = _kume_sirali(e["k"], ok[o["kayit_id"]], ep=ep)
-        if o["olay_id"] not in e["i"]: e["i"].append(o["olay_id"])
-    y._ortak_durum_yaz(dizin, d)
-    eksik = len(adlar) - bulunan; ilerle(f"Drive: {len(adlar)} olay · Firestore'da: {bulunan} · eksik: {eksik}"); return len(adlar), bulunan, eksik
-
 # --- komut satırı -------------------------------------------------------------------------------------------------------------------------------------------------
 def _dizin_varsayilan(a): return os.path.join(os.path.expanduser(str(a.get("uygulama") or "~/Library/Application Support/Suflor")), "canli")  # aktarıcının canli klasörü (toplanti-claude.py DEF_DIR gibi)
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="ortak_bulut.py", description="Suflor.me ortak karar katmanı: Firestore taşıması"); alt = ap.add_subparsers(dest="komut", required=True)
     k = alt.add_parser("kur"); k.add_argument("--proje", required=True); k.add_argument("--istemci", required=True); k.add_argument("--alan", action="append", required=True); k.add_argument("--bolge")
     alt.add_parser("giris"); alt.add_parser("davet"); kt = alt.add_parser("katil"); kt.add_argument("kod")
-    for ad in ("durum", "tasi", "esitle"):
+    for ad in ("durum", "esitle"):
         s = alt.add_parser(ad); s.add_argument("--dizin")
-        if ad == "tasi": s.add_argument("--klasor", required=True)
     n = ap.parse_args(argv); a = ayar_oku()
     try:
         if n.komut == "kur": return kur(n.proje, n.istemci, n.alan, n.bolge)
@@ -531,7 +484,6 @@ def main(argv=None):
         if n.komut == "durum":
             for ad, v in durum(dizin, a).items(): print(f"{ad}: {v}")
             return 0
-        if n.komut == "tasi": return 1 if tasi(dizin, os.path.expanduser(n.klasor), a)[2] else 0
         if n.komut == "esitle":
             y = _yapi(None); r = esitle(dizin, a, str(a.get("eposta_kimlik") or y.ben_eposta() or ""), str(a.get("ad") or ""), a.get("ortak_gecmis") is True)
             print(f"yazılan {r['disari']['yazilan']} · alınan {r['iceri']['alinan']} · çift {r['iceri']['cift']} · gecikme {r['gecikme']}"); return 0

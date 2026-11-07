@@ -24,12 +24,12 @@ GEMINI_ILK_SN = 3.0  # v0.80.2: 5 → 3 sn (ilk ses p90 0,7 sn); ses gelmezse ye
 # v0.157.0 süre bekçisi (29 Ekim 11:37: 47 karakter → 13,4 sn ses; bilinen "cümleyi iki kez okuma" ~%5): üretilen ses GEMINI_SISME_TABAN_SN + GEMINI_SISME_KAR_SN ×
 # karakteri aşarsa ses şişmiş sayılır. Eşik gemini-ses.jsonl'den (243 okuma, 18–29 Ekim): ortanca 0,074 sn/karakter, p95 0,122, p99 0,21 (kısa metinde oran yüksek: taban);
 # 2,0 + 0,10 × karakter yalnız üç okumayı aşar — 13,3 sn/32, 13,4 sn/47, 7,5 sn/49 karakter (üçü de normalinin ~2 katı ve üstü, iki kez okuma). Toplanan seste
-# (toplantıya söyle) şişen ses çalınmadan atılır, bir kez yeniden istenir; yine şişerse Azure (varsa), sonra çağıranın yerel sesi (Pocket/Mac). Akarak çalarken
+# (toplantıya söyle) şişen ses çalınmadan atılır, bir kez yeniden istenir; yine şişerse çağıranın yerel sesi (Pocket/Mac). Akarak çalarken
 # (kulaktaki okuma) şişme ancak üretim sınırı geçince belli olur: sınıra kadar verilen ses çalınır (doğru ilk okuyuş sınırın içinde kalır), fazlası atılır, yeniden
 # okunmaz (dinleyen cümleyi zaten duydu; yeniden istemek iki kez duyurur). Ayar gemini_sure_bekci: false kapatır.
 GEMINI_SISME_TABAN_SN, GEMINI_SISME_KAR_SN = 2.0, 0.10
 GEMINI_BEKLE_SN = 15.0  # v0.80.2: iki deneme de olmazsa Gemini bu kadar denenmez (60 sn'de kullanıcı bir dakika Mac sesi duydu, 18 Ekim)
-GEMINI_ONAY = ("Hı hı.", "Hıhı.", "Hı hı, evet.", "Hım hım.")  # v0.79.0: aktif dinleme / alındı (tepki_cal), o anda üretilir; aynı klip tekrarlanmaz
+GEMINI_ONAY = ("Hı hı.", "Hıhı.", "Hı hı, evet.", "Hım hım.")  # v0.79.0: aktif dinleme / alındı (onay_cal), o anda üretilir; aynı klip tekrarlanmaz
 GEMINI_ONAY_USLUP = "Dinlerken araya giren kısa, kısık ve doğal bir onay sesi; tek nefeste, vurgusuz."
 def gemini_anahtar():
     if os.environ.get("SUFLOR_TEST_GEMINI_ANAHTAR") is not None: return os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"]
@@ -41,7 +41,7 @@ def gemini_anahtar():
 def gemini_var(): return bool(gemini_anahtar())
 def gemini_acik(): return AYAR.get("ses_motoru") == "gemini" and gemini_var()
 # v0.81.0 (S92, kullanıcı 19 Ekim: "öncelik toplantı esnasında katılımcıları etkilemesi"): günlük sınır yüzünden Gemini yalnız katılımcıların duyduğu seste —
-# toplantıya söyle, otonom cevap, toplantıda tanıtım/duyuru (toplantiya_soyle). Kulağa cevap, fısıltı, sesli çeviri ve toplantı dışı her okuma yerel ses (Piper;
+# toplantıya söyle, otonom cevap, toplantıda tanıtım/duyuru (toplantiya_soyle). Kulağa cevap, fısıltı, sesli çeviri ve toplantı dışı her okuma yerel ses (Pocket;
 # yoksa Mac). Ayar gemini_kapsam: toplanti (varsayılan) | hepsi (eski davranış).
 # v0.98.0 (S104, kullanıcı 20 Ekim): sesli "Gemini sesiyle konuş" → toplantı dışında da Gemini, GEMINI_GECIS_SN (15 dk; ayar gemini_gecis_dk) sonra ya da
 # "yerel sese dön" deyince hemen yerel ses (Pocket). Geçiş kalıcı değil: günlük sınır (model başına 100 istek) çabuk dolmasın; iki model de dolunca kendiliğinden biter.
@@ -68,8 +68,8 @@ def gemini_gecis_komut(metin):  # → okunacak kısa onay ya da None (komut değ
     print(f"GEMINI: geçiş açıldı ({dk} dk, kullanıcı)")
     return _t(f"Tamam, {dk} dakika Gemini sesiyle konuşuyorum.", f"OK, I'll use the Gemini voice for {dk} minutes.")
 def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" or gemini_gecis_acik() else "toplanti"
-def gemini_izinli(toplantiya=False):  # v0.89.0: gizli toplantıda hiç; sınır dolunca yerel ses — v0.128.0: Azure yedeği hazırsa o (azure-ses.py)
-    return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi") and (gemini_model() is not None or ("azure_hazir" in globals() and azure_hazir()))
+def gemini_izinli(toplantiya=False):  # v0.89.0: gizli toplantıda hiç; sınır dolunca yerel ses
+    return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi") and gemini_model() is not None
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
     return v if v in GEMINI_SESLER else "Charon"
@@ -136,20 +136,19 @@ def gemini_gunluk_view():  # panoya (⚙ Ayarlar → Gemini nerede): model sıra
 # boşalınca; Gemini isteği harcanmaz) ve günlükte bir satır; bir model dolunca bir satır (sıradaki model ya da yerel ses).
 GEMINI_UYARI_ORAN = 0.8
 GEMINI_UYARI = ("Gemini sesinin bugünkü sınırının yüzde sekseni doldu; dolunca yerel sese döneceğim.", "Gemini voice is at 80 percent of today's limit; I'll switch to the local voice when it runs out.")
-GEMINI_UYARI_AZURE = ("Gemini sesinin bugünkü sınırının yüzde sekseni doldu; dolunca yedek sese geçeceğim.", "Gemini voice is at 80 percent of today's limit; I'll switch to the backup voice when it runs out.")
 def _kota_bak(model):  # başarılı her istekten sonra
     b = gemini_bugun(); n = b.get(model, 0); gun = gemini_gun_basi(); z = gemini_zincir(); dolu = _kota()
     kalan = sum(0 if x in dolu else max(0, GEMINI_GUN_SINIR - b.get(x, 0)) for x in z); top = GEMINI_GUN_SINIR * len(z)
     if n >= GEMINI_GUN_SINIR and (GEMINI_KOTA.get("dolu_gun") or {}).get(model) != gun:
         GEMINI_KOTA["dolu_gun"] = {**(GEMINI_KOTA.get("dolu_gun") or {}), model: gun}; s = gemini_model()
-        print(f"GEMINI: günlük sınır doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — " + (f"sıradaki model {s}" if s else "okumalar Azure yedeğinde" if "azure_hazir" in globals() and azure_hazir() else "okumalar yerel seste"))
+        print(f"GEMINI: günlük sınır doldu ({n}/{GEMINI_GUN_SINIR}, {model}) — " + (f"sıradaki model {s}" if s else "okumalar yerel seste"))
     if top - kalan >= top * GEMINI_UYARI_ORAN and kalan > 0 and GEMINI_KOTA.get("uyari_gun") != gun:
         GEMINI_KOTA["uyari_gun"] = gun
         print(f"GEMINI: günlük sınırın %{round(GEMINI_UYARI_ORAN * 100)}'i doldu ({top - kalan}/{top}, {len(z)} model) — sesli uyarı sırada")
-        if "yerel_uyari" in globals(): yerel_uyari(_t(*(GEMINI_UYARI_AZURE if "azure_hazir" in globals() and azure_hazir() else GEMINI_UYARI)))
+        if "yerel_uyari" in globals(): yerel_uyari(_t(*GEMINI_UYARI))
 def gemini_view():
     return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
-            "kapsam": gemini_kapsam(), "bugun": gemini_bugun(), "azure": azure_view() if "azure_view" in globals() else None}
+            "kapsam": gemini_kapsam(), "bugun": gemini_bugun()}
 def _gemini_baglanti():
     if GEMINI["c"] is None:
         GEMINI["c"] = (http.client.HTTPConnection if GEMINI_HOST.startswith("127.0.0.1") else http.client.HTTPSConnection)(GEMINI_HOST, timeout=GEMINI_ILK_SN)
@@ -203,15 +202,13 @@ def _gemini_bekleme(govde, retry_after=None):  # sunucunun önerdiği bekleme (R
 GEMINI_SABIT_N = 3
 GEMINI_SABIT_EK = ("Buradayım.", "I'm here.")  # sohbette 30 sn sessizlik uyarısı (aktarici/sohbet.py); bekleme cümleleri BEKLE_* havuzlarından
 _SABIT_SON = {}
-GEMINI_SABIT_KISA = (3, 24)  # v0.127: en çok 3 sözcük ve 24 karakterlik söz de sabit sayılır (üçlü sahnedeki "Hadi ya!", "Haklısın, kabul." yinelenir; önbelleğe
-# yazmak fazladan istek gerektirmez, yinelenince istek atılmaz). Üçlü sahnenin tepki ve onay havuzları (uclu-sahne.py) da öyle.
+GEMINI_SABIT_KISA = (3, 24)  # v0.127: en çok 3 sözcük ve 24 karakterlik söz de sabit sayılır (kısa tepki cümleleri yinelenir; önbelleğe
+# yazmak fazladan istek gerektirmez, yinelenince istek atılmaz).
 def _sabit_mi(metin):
     m = (metin or "").strip()
     if m in GEMINI_ONAY or m in GEMINI_SABIT_EK: return True
     if m and len(m) <= GEMINI_SABIT_KISA[1] and len(m.split()) <= GEMINI_SABIT_KISA[0]: return True
     g = globals()
-    for ad in ("SAHNE_ARAYA", "SAHNE_TEPKI", "SAHNE_ONAY"):
-        if m in (g.get(ad) or ()): return True
     for ad in ("BEKLE_GENEL", "BEKLE_TUR", "BEKLE_TUR_EN"):
         v = g.get(ad)
         vs = [x for l in v.values() for x in (l if isinstance(l, list) else [l])] if isinstance(v, dict) else (v or [])
@@ -246,8 +243,8 @@ def _sabit_yaz(metin, ses, uslup, pcm):
 def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekteki ham sesi kesintisiz çalıcıyla (yoksa WAV + afplay) çalar
     if duzey is not None: pcm = _duzey(pcm, duzey)
     if os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ"): ses_basladi(kayit); return True
-    if os.access(PIPER_OYNAT, os.X_OK):
-        try: oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if os.access(OYNAT_YOL, os.X_OK):
+        try: oyn = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError: return False
         if kayit is not None: kayit["p"] = oyn; ses_basladi(kayit)
         try:
@@ -340,10 +337,10 @@ def _onceden_cal(o, metin, iptal, kayit):  # önceden istenen sesi çal (gelmeye
         o["ev"].wait(0.05)
     if not o["pcm"]: return None
     if o["bitti"]: return _pcm_cal(bytes(o["pcm"]), iptal=iptal, kayit=kayit) or None
-    if os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ") or not os.access(PIPER_OYNAT, os.X_OK):  # kesintisiz çalıcı yok: hepsi gelince
+    if os.environ.get("SUFLOR_TEST_GEMINI_SESSIZ") or not os.access(OYNAT_YOL, os.X_OK):  # kesintisiz çalıcı yok: hepsi gelince
         while not o["bitti"]: o["ev"].wait(0.05)
         return _pcm_cal(bytes(o["pcm"]), iptal=iptal, kayit=kayit) or None
-    try: oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try: oyn = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError: return None
     if kayit is not None: kayit["p"] = oyn
     yazilan = 0; ilk = True
@@ -362,11 +359,8 @@ def _onceden_cal(o, metin, iptal, kayit):  # önceden istenen sesi çal (gelmeye
     print(f"GEMINI: önceden alınan ses çalındı · {len(metin)} karakter")
     return True
 def gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, sabit=None):
-    # v0.128.0 (S151): Gemini okuyamazsa (sınır dolu, hata, bekleme) Azure MAI sesi (azure-ses.py, ayar azure_yedek); o da olmazsa çağıran yerel sese düşer
-    r = _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, sabit=sabit)
-    if (r is None if topla else r is False) and metin and "azure_hazir" in globals() and azure_hazir():
-        return azure_oku(metin, iptal=iptal, kayit=kayit, ses=ses, topla=topla, aygit=aygit, duzey=duzey, uslup=uslup)
-    return r
+    # Gemini okuyamazsa (sınır dolu, hata, bekleme) çağıran yerel sese düşer
+    return _gemini_oku(metin, iptal=iptal, kayit=kayit, ses=ses, uslup=uslup, topla=topla, aygit=aygit, duzey=duzey, sabit=sabit)
 def gemini_sinir_sn(metin):  # v0.157.0: bu metnin sesi en çok kaç sn olabilir (süre bekçisi); kapalıysa None
     return None if AYAR.get("gemini_sure_bekci") is False else GEMINI_SISME_TABAN_SN + GEMINI_SISME_KAR_SN * len(metin or "")
 def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False, aygit=None, duzey=None, _yeniden=False, sabit=None, _sisme=False):
@@ -374,7 +368,7 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
     # duzey: 0–1 ses düzeyi (kısık "hı hı").
     if not metin or not gemini_var(): return None if topla else False
-    if aygit and not os.access(PIPER_OYNAT, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
+    if aygit and not os.access(OYNAT_YOL, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
     sabit = _sabit_mi(metin) if sabit is None else sabit  # v0.81.0: çağıran söyleyebilir (kişilik tanıtımı, toplantı başı duyurusu)
     if sabit:
         pcm = _sabit_al(metin, ses, uslup)
@@ -459,9 +453,9 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
                     if ilk is None:
                         ilk = time.time() - t0
                         if sessiz and not topla: ses_basladi(kayit)  # deneme kipi: ses çalınmaz, ilk parça geldi
-                        if not sessiz and os.access(PIPER_OYNAT, os.X_OK):
+                        if not sessiz and os.access(OYNAT_YOL, os.X_OK):
                             try:
-                                oyn = subprocess.Popen([PIPER_OYNAT, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                oyn = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                                 if kayit is not None: kayit["p"] = oyn
                             except OSError: oyn = None
                     nbayt += len(b)
@@ -491,7 +485,7 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
     return nbayt > 0
 # --- v0.80.0 (S87, kullanıcı 18 Ekim: "sesle ilgili her şey Gemini'ye") ------------------------------------------------------------------------
 # gemini_kullan: anahtar var ve ses motoru Gemini ya da bir kişiliğin sesi Gemini → kısa okumalar (fısıltı, sesli çeviri, duyuru) da Gemini'yle.
-# gemini_kisa: beklemeli kısa okuma (okuma kuyruğundan bağımsız; Gemini bağlantısı kilitle sırayla); olmazsa False, çağıran Piper/Mac sesine düşer.
+# gemini_kisa: beklemeli kısa okuma (okuma kuyruğundan bağımsız; Gemini bağlantısı kilitle sırayla); olmazsa False, çağıran Pocket/Mac sesine düşer.
 def gemini_kullan():
     if not gemini_izinli(): return False  # v0.81.0: kısa okumalar (fısıltı, sesli çeviri) yalnız kullanıcıya — kapsam "toplanti"da yerel ses
     if AYAR.get("ses_motoru") == "gemini": return True

@@ -194,7 +194,7 @@ def so_gundelik_dogru(d, ctx):  # doğru biçim gündelik mi: bu kurulumun dök�
     w = ws[0]; s = sade(w)
     return "dokum" if ctx["kucuk"].get(s, 0) >= SO_GUNDELIK_TOPLANTI else "belge" if _so_dizin_ara(ctx.get("dizin"), w.replace("İ", "i").replace("I", "ı").lower(), kucuk=True) >= SO_GUNDELIK_BELGE else None
 SO_MUAF_BUYUK_EN_AZ = 2  # 3 Kasım: doğru biçim proje belgelerinde cümle ortasında büyük harfle ≥ 2 kez geçmeli ve küçük harfli geçişinden çok olmalı ("Marvin" 8/1; "Transkript" 1/18, "Evet" 175/5796, "Panoda" 5/54 muaf değil)
-def so_kisilik_adlari():  # kişilik dosyalarının (ayar kisilik, kisilik_toplanti_disi) ad / gorunen_ad / uclu_ad / uclu_takilma / hitap girişleri → sade anahtarlar (aktarıcı ve toplanti-claude.py ad alanında aynı: kisilik.py'ye bağımlı değil)
+def so_kisilik_adlari():  # kişilik dosyalarının (ayar kisilik, kisilik_toplanti_disi) ad / gorunen_ad / hitap girişleri → sade anahtarlar (aktarıcı ve toplanti-claude.py ad alanında aynı: kisilik.py'ye bağımlı değil)
     out = set(); gundelik = globals().get("HITAP_GUNDELIK") or {"oh", "ah", "eh", "evet", "hayır", "tamam", "peki", "merhaba", "selam"}
     for ayar in ("kisilik", "kisilik_toplanti_disi"):
         yol = os.path.expanduser(str(AYAR.get(ayar) or "").strip())
@@ -204,7 +204,7 @@ def so_kisilik_adlari():  # kişilik dosyalarının (ayar kisilik, kisilik_topla
         m = re.match(r"\s*---\s*\n(.*?)\n---", s, re.S)
         for sat in (m.group(1).splitlines() if m else []):
             k, _, v = sat.partition(":"); k = k.strip().lower()
-            if k in ("ad", "gorunen_ad", "uclu_ad", "uclu_takilma", "hitap"):
+            if k in ("ad", "gorunen_ad", "hitap"):
                 for x in (v.split(",") if k == "hitap" else [v]):
                     x = x.strip()
                     if len(_so_k(x).replace(" ", "")) >= 3 and x.lower() not in gundelik: out.add(_so_k(x))

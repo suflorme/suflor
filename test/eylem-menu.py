@@ -41,13 +41,13 @@ def ev(i, saat, baslik, kisiler=(), **ek): return dict({"id": i, "baslik": basli
 TAKVIM = [ev("gecmis", (9, 0), "Geçmiş"), ev("t1", (15, 0), "Satış haftalık", ["Emre Kural"]), ev("t2", (16, 0), "Tedarik", ["Zeynep Kaya"]), ev("tg", (14, 0), "Tüm gün", tum_gun=True), ev("tr", (13, 0), "Reddedilen", reddettin=True),
           ev("tp", (13, 30), "Paylaşılan", paylasilan=True), ev("tek", (13, 40), "Tek kişi", kisi_sayisi=1), ev("yarin", (10, 0, 1), "Yarın", ["Zeynep Kaya"])]
 def eylem(kimlik, e, p=None, **k): return yapi.kayit_eylem(C, kimlik, e, p, kimlik_f=kimlik_f, takvim=TAKVIM, simdi=SIMDI, **k)
-def tek_olay(ad, kimlik, e, p=None, tur=None, ek=0, **k):  # eylem tam bir olay yazar (böl: ek = alt kayıtların kayit_olustu olayları)
+def tek_olay(ad, kimlik, e, p=None, tur=None, ek=0, **k):  # eylem tam bir olay yazar (ek = ek olaylar)
     n = olay_say(C); r = eylem(kimlik, e, p, **k); d = olay_say(C) - n
     bak(f"{ad}: ok, tam bir olay" + (f" ({tur})" if tur else ""), r.get("ok") and d == 1 + ek and r.get("olay") and (not tur or son_olaylar(C, 1 + ek)[-1][1] == tur), (r, d))
     return r
 # --- menü bilgisi ---
 m = yapi.eylem_menu(C, IS, TAKVIM, kimlik_f, SIMDI)
-bak("iş menüsü: yapıldı, iptal, ertele, böl, gündem, ata, taslaklar, Claude, tarihçe; Geri al yok (yalnız oluşturma olayı)", m["ok"] and m["eylemler"] == ["yapildi", "iptal", "ertele", "bol", "gundem", "ata", "eposta", "teams", "claude", "tarihce"] and m["geri_al"] is None, m)
+bak("iş menüsü: yapıldı, iptal, ertele, gündem, ata, taslaklar, Claude, tarihçe; Geri al yok (yalnız oluşturma olayı)", m["ok"] and m["eylemler"] == ["yapildi", "iptal", "ertele", "gundem", "ata", "eposta", "teams", "claude", "tarihce"] and m["geri_al"] is None, m)
 bak("karar menüsü: onayla/reddet; soru: cevaplandı", yapi.eylem_menu(C, KARAR, TAKVIM)["eylemler"][:2] == ["onayla", "reddet"] and yapi.eylem_menu(C, SORU, TAKVIM)["eylemler"][0] == "cevaplandi")
 bak("gündem adayları: geçmiş, tüm gün, reddedilen, paylaşılan, tek kişilik yok; saat sırası", [a["id"] for a in m["gundem"]] == ["t1", "t2", "yarin"], m["gundem"])
 bak("sahip (Can Örnek) için kimlikten e-posta yok → eşlenmedi", m["sahip"]["ad"] == "Can Örnek" and not m["sahip"].get("eposta"))
@@ -69,8 +69,6 @@ tek_olay("karar onayla", KARAR, "onayla", {}, "karar_onaylandi"); bak("onay sonr
 tek_olay("karar reddet (onaylı karar yeniden)", KARAR, "reddet", {}, "karar_reddedildi"); bak("iş onaylanamaz", not eylem(IS, "onayla")["ok"])
 tek_olay("soru cevaplandı", SORU, "cevaplandi", {}, "durum_degisti"); tek_olay("soru yeniden açıldı", SORU, "ac", {}, "durum_degisti")
 tek_olay("iş yapıldı", SOZ, "yapildi", {}, "durum_degisti"); bak("söz yapıldı = tutuldu", yapi.ortak_kayit(C, SOZ)["durum"] == "tutuldu"); tek_olay("iş yeniden açıldı", SOZ, "ac", {}, "durum_degisti")
-r = tek_olay("böl", IS, "bol", {"parcalar": ["Fiyatları topla", {"metin": "Tablo taslağı", "sahip": "Can Örnek"}]}, "bolundu", ek=2); bak("böl: iki alt kayıt, üst açık kalır", len(r["alt"]) == 2 and yapi.ortak_kayit(C, IS)["durum"] == "acik")
-bak("böl: tek parça ya da boş reddedilir", not eylem(IS, "bol", {"parcalar": ["tek"]})["ok"] and not eylem(KARAR, "bol", {"parcalar": ["a", "b"]})["ok"])
 # --- taslaklar: gönderme yok ---
 n = olay_say(C); r = eylem(IS, "eposta", {}); t = r["taslak"]
 bak("e-posta taslağı: alıcı sahibin adresi, konu ve gövde kayıttan; olay taslak_hazirlandi", r["ok"] and t["alicilar"] == ["zeynep.kaya" + AT + "firma.test"] and "Tabloyu güncelle" in t["govde"] and t["govde"].startswith("Merhaba Zeynep,") and "20 Kasım" in t["govde"]
@@ -100,7 +98,7 @@ bak("gizli kayıt için menü de yok", yapi.eylem_menu(C, GIZLI_IS, TAKVIM)["err
 # --- Geri al ---
 mm = yapi.eylem_menu(C, IS, TAKVIM); bak("menüde Geri al: son geri alınabilir olay (taslak ve Claude notu sayılmaz)", mm["geri_al"] and "atad" in mm["geri_al"]["ozet"] or mm["geri_al"] and mm["geri_al"]["ozet"], mm["geri_al"])
 ol = yapi.tarihce(C, IS); son = yapi.son_geri_alinabilir(C, IS)
-n = olay_say(C); r = eylem(IS, "geri_al"); bak("Geri al: son olay (bölme) döndü: alt kayıtlar iptal, günlük yalnız eklendi", r["ok"] and olay_say(C) == n + 2 and r["geri_alinan"] == son["olay_id"] and len(r["geri"]) == 2 and son["tur"] == "bolundu", r)
+n = olay_say(C); r = eylem(IS, "geri_al"); bak("Geri al: son olay döndü, günlük yalnız eklendi", r["ok"] and olay_say(C) == n + 1 and r["geri_alinan"] == son["olay_id"] and len(r["geri"]) == 1, r)
 son2 = yapi.son_geri_alinabilir(C, IS); bak("art arda Geri al bir öncekine iner (geri alınan ve geri alma atlanır)", son2 and son2["olay_id"] != son["olay_id"] and "geri_al" not in son2["veri"], (son, son2))
 vade0 = yapi.ortak_kayit(C, IS)["vade"]
 for _ in range(12):  # hepsini geri al: sonunda yalnız oluşturma kalır, Geri al kalkar
@@ -110,7 +108,7 @@ bak("başka kaydın olayı geri alınamaz", not eylem(SORU, "geri_al", {"olay_id
 bak("kayit_eylem: bilinmeyen eylem ve kayıt", not eylem(IS, "uc")["ok"] and not eylem("s99999", "ertele", {"vade": "x"})["ok"])
 # --- onay süresi göstergesi (liste) ---
 l2 = yapi.kayit_listesi(C, "Ayşe", datetime.date(2026, 11, 5)); kk = [x for x in l2["kayitlar"] if x["tur"] == "karar"]
-bak("kayit_listesi: sahip e-postası, gündem ve alt iş alanları var", all(k_ in x for x in l2["kayitlar"] for k_ in ("sahip_eposta", "gundem", "alt")) and [x for x in l2["kayitlar"] if x["metin"] == "Fiyatları topla"][0]["alt"] is True)
+bak("kayit_listesi: sahip e-postası, gündem ve alt iş alanları var", all(k_ in x for x in l2["kayitlar"] for k_ in ("sahip_eposta", "gundem", "alt")))
 D2 = "2026-11-03-1100-Ek-Toplanti"; dokum(C, D2)
 yapi.graf_yaz(C, {"baslik": "Ek toplantı", "tarih": "2026-11-03", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "karar", "metin": "Yeni bekleyen karar", "kim": "Can Örnek", "saat": "10:20:00", "netlik": "ortuk"}]}]}, D2 + ".md")
 l3 = [x for x in yapi.kayit_listesi(C, "Ayşe", datetime.date(2026, 11, 6))["kayitlar"] if x["metin"] == "Yeni bekleyen karar"]
@@ -157,7 +155,6 @@ bak("Teams metni: okunur tarih, toplantı adı tekrarı yok, ham tarih yok", "5 
 # --- uçtan uca denemede bulunanlar (6 Kasım): bozuk tür girdisi kayda yazılmaz; karar menüsünde Teams nedeni doğru kişiyi söyler, adres kimlikten çözülürse pasif olmaz ---
 n = olay_say(C); vade0 = yapi.ortak_kayit(C, KEND)["vade"]
 bak("ertele: liste/sözlük vade kayda \"['x']\" olarak yazılmaz", not eylem(KEND, "ertele", {"vade": ["x"]})["ok"] and not eylem(KEND, "ertele", {"vade": {"a": 1}})["ok"] and yapi.ortak_kayit(C, KEND)["vade"] == vade0 and olay_say(C) == n)
-bak("böl: parçalar liste değilse (metin) harf harf bölünmez", not eylem(KEND, "bol", {"parcalar": "abc"})["ok"] and olay_say(C) == n)
 bak("ata: sözlük ad kayda \"{'a': 1}\" olarak yazılmaz", not eylem(KEND, "ata", {"sahip": {"a": 1}})["ok"] and olay_say(C) == n and yapi.ortak_kayit(C, KEND)["roller"]["sahip"]["ad"] == "Ayşe Deneme")
 bak("ertele: çok uzun serbest metin 20 karaktere kırpılır", eylem(BILINMEZ, "ertele", {"vade": "x" * 200})["kayit"]["vade"] == "x" * 20)
 yapi.graf_yaz(C, {"baslik": "Karar toplantısı", "tarih": "2026-11-05", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "karar", "metin": "Bütçe ikiye bölünecek", "kim": "Can Örnek", "saat": "10:30:00", "netlik": "ortuk"}]}]}, "2026-11-05-1100-Karar.md"); dokum(C, "2026-11-05-1100-Karar")

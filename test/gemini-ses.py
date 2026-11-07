@@ -40,7 +40,7 @@ PORT = bos_port(); sunucu = http.server.ThreadingHTTPServer(("127.0.0.1", PORT),
 os.environ.update(SUFLOR_TEST_GEMINI_HOST=f"127.0.0.1:{PORT}", SUFLOR_TEST_GEMINI_ANAHTAR="deneme-anahtar", SUFLOR_TEST_GEMINI_SESSIZ="1")
 YAZILAN = []
 ad = {"__name__": "gemini_ses", "math": __import__("math"), "os": os, "time": time, "json": json, "base64": base64, "subprocess": subprocess, "threading": threading,
-      "datetime": __import__("datetime"), "AYAR": {"gemini_ses": "Kore"}, "BASE": T, "PIPER_OYNAT": "/yok", "write": lambda ps: YAZILAN.extend(ps)}
+      "datetime": __import__("datetime"), "AYAR": {"gemini_ses": "Kore"}, "BASE": T, "OYNAT_YOL": "/yok", "write": lambda ps: YAZILAN.extend(ps)}
 exec(compile(open(os.path.join(K, "aktarici", "gemini-ses.py"), encoding="utf-8").read(), "gemini-ses.py", "exec"), ad)
 t0 = time.time(); r = ad["gemini_oku"]("Gerçekten mi? Geçen hafta tam tersini söylemişlerdi.")
 g = GELEN[-1] if GELEN else {}
@@ -88,9 +88,9 @@ bak("ayar gemini_sure_bekci: false → bekçi kapalı", pcm3 is not None and len
 # akarak çalarken: sınıra kadar çalıcıya verilir, fazlası atılır, yeniden istenmez
 cal_say = os.path.join(T, "calinan"); calici = os.path.join(T, "calici")
 open(calici, "w").write(f"#!/bin/sh\nwc -c > {cal_say}\n"); os.chmod(calici, 0o755)
-ad["PIPER_OYNAT"] = calici; os.environ.pop("SUFLOR_TEST_GEMINI_SESSIZ"); n = len(GELEN); out = _io.StringIO()
+ad["OYNAT_YOL"] = calici; os.environ.pop("SUFLOR_TEST_GEMINI_SESSIZ"); n = len(GELEN); out = _io.StringIO()
 with _cl.redirect_stdout(out): r_c = ad["gemini_oku"](M47)
-os.environ["SUFLOR_TEST_GEMINI_SESSIZ"] = "1"; ad["PIPER_OYNAT"] = "/yok"; time.sleep(0.3)
+os.environ["SUFLOR_TEST_GEMINI_SESSIZ"] = "1"; ad["OYNAT_YOL"] = "/yok"; time.sleep(0.3)
 cb = int(open(cal_say).read().strip() or 0) if os.path.exists(cal_say) else -1
 bak(f"akarak çalarken şişme: sınıra kadar ({cb / 48000:.2f} sn ≤ 6,7) çalındı, yeniden istenmedi", r_c is True and 0 < cb <= 6.7 * 48000 and len(GELEN) - n == 1 and "çalınırken sınırda kesildi" in out.getvalue())
 DAVRANIS.update(tur="ok"); ad["GEMINI"]["hata_t"] = 0
@@ -201,24 +201,23 @@ n = len(GELEN); ad["gemini_oku"]("Bu sabit değil."); ad["gemini_oku"]("Bu sabit
 bak("sabit olmayan cümle her seferinde Gemini'ye gider", len(GELEN) - n == 2)
 n = len(GELEN); [ad["gemini_oku"]("Hı hı.", ses="Charon", duzey=0.5) for _ in range(4)]; bak(f"hı hı da önbellekte (4 okumada {len(GELEN) - n} istek)", len(GELEN) - n == 3)
 bak("sohbetin 30 sn uyarısı ('Buradayım.') sabit cümle", ad["_sabit_mi"]("Buradayım.") and ad["_sabit_mi"]("I'm here.") and not ad["_sabit_mi"]("Buradayım, söyle bakalım ne istiyorsun."))
-bak("v0.127: kısa söz (≤ 3 sözcük, ≤ 24 karakter) ve sahne tepki havuzu sabit; uzun söz değil", ad["_sabit_mi"]("Hadi ya!") and ad["_sabit_mi"]("Haklısın, kabul.")
-    and (ad.__setitem__("SAHNE_ONAY", ["Bunu bu açıdan görmemiştim."]), ad["_sabit_mi"]("Bunu bu açıdan görmemiştim."))[1] and not ad["_sabit_mi"]("Bunu hiç bu açıdan görmemiştim."))
+bak("v0.127: kısa söz (≤ 3 sözcük, ≤ 24 karakter) sabit; uzun söz değil", ad["_sabit_mi"]("Hadi ya!") and ad["_sabit_mi"]("Haklısın, kabul.") and not ad["_sabit_mi"]("Bunu hiç bu açıdan görmemiştim."))
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = ""; bak("anahtar yoksa okumaz (False)", ad["gemini_oku"]("Anahtarsız.") is False and not ad["gemini_acik"]())
 os.environ["SUFLOR_TEST_GEMINI_ANAHTAR"] = "deneme-anahtar"
 
 # 1b) v0.79.0: çalmadan ses (toplantıya söyle), aygıt argümanı ve kısık düzey sahte çalıcıyla
 pcm = ad["gemini_pcm"]("Toplantıya."); bak(f"gemini_pcm: ham ses döner ({len(pcm or b'')} bayt)", pcm is not None and len(pcm) == 4 * 12000)
 SAHTE = os.path.join(T, "sahte-oynat.sh"); open(SAHTE, "w").write('#!/bin/sh\necho "$@" >> "$0.arg"\ncat >> "$0.pcm"\n'); os.chmod(SAHTE, 0o755)
-ad["PIPER_OYNAT"] = SAHTE; os.environ.pop("SUFLOR_TEST_GEMINI_SESSIZ")
+ad["OYNAT_YOL"] = SAHTE; os.environ.pop("SUFLOR_TEST_GEMINI_SESSIZ")
 ad["gemini_oku"]("BlackHole'a.", aygit="59", duzey=0.5); time.sleep(0.3)
 arg = open(SAHTE + ".arg").read().split("\n")[-2]; ham = open(SAHTE + ".pcm", "rb").read()
 bak(f"aygıt çalıcıya argüman olarak gider ({arg!r})", arg == "24000 59")
 bak("duzey 0,5 sesi kısar (örnek değerleri yarıya)", len(ham) == 4 * 12000 and ham[2:4] == bytes([1, 0]) * 0 + ham[2:4] and int.from_bytes(ham[12000 * 1 + 0:12000 * 1 + 2], "little", signed=True) == 0 and int.from_bytes(ham[24000:24002], "little", signed=True) == 1)
-os.environ["SUFLOR_TEST_GEMINI_SESSIZ"] = "1"; ad["PIPER_OYNAT"] = "/yok"
+os.environ["SUFLOR_TEST_GEMINI_SESSIZ"] = "1"; ad["OYNAT_YOL"] = "/yok"
 bak("aygıt istenip çalıcı yoksa False (afplay varsayılan çıkışa giderdi)", ad["gemini_oku"]("Yok.", aygit="59") is False)
 # 1c) toplantıya söyle: toplantı kişiliğinin sesi Gemini ise BlackHole + kulaklık aynı Gemini sesi (sahte çalıcı)
 tsn = dict(ad); open(SAHTE + ".arg", "w").close()
-tsn.update(PIPER_OYNAT=SAHTE, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Kore", 1.0), kisilik=lambda: {"ses_uslup": "ölçülü"}, kisilik_telaffuz=lambda m: m, ses_duzen=lambda m, mac=True: m,
+tsn.update(OYNAT_YOL=SAHTE, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Kore", 1.0), kisilik=lambda: {"ses_uslup": "ölçülü"}, kisilik_telaffuz=lambda m: m, ses_duzen=lambda m, mac=True: m,
            AYAR={"toplantiya_ses": True}, STATE={"masaustu": {"toplantida": True}}, toplanti_var=lambda: True, ts_web=lambda: False, ts_aygit=lambda: "59", otonom_kisayol=lambda: None,
            ses_secimi=lambda: None, telaffuz=lambda m, mac=False: m, ses_durdur=lambda: None, kulaklik=lambda: True, kendi_ses_kaydet=lambda *a: None, note=lambda *a: None, kart_bildir=lambda: None,
            sesli_terim_suz=lambda m: m, etiket_sil=lambda m: m, _t=lambda a, b: a, ARAYUZ_DILI="tr", kisilik_ad=lambda: "Atlas", re=__import__("re"), secrets=__import__("secrets"))
@@ -237,13 +236,13 @@ for i_ in range(3): r1_, m1_ = _tan(f"T{i_}")
 r2_, m2_ = _tan("T9")
 bak(f"tanıtım ayrı istek, ilk 3 toplantıda önbelleğe yazılır ({m1_})", r1_.get("ok") and m1_ == ["Bütçe bu hafta onaylandı, sevkiyat da başlıyor.", "Merhaba, ben Atlas."] and "Merhaba, ben Atlas." in r1_.get("metin", ""))
 bak(f"sonra tanıtım önbellekten, yalnız cevap Gemini'ye ({m2_})", r2_.get("ok") and m2_ == ["Bütçe bu hafta onaylandı, sevkiyat da başlıyor."])
-# 1d) hı hı: Gemini sesiyle konuşan kişilikte klip değil o anda Gemini (tepki_cal)
-bs = open(os.path.join(K, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); i = bs.index("def tepki_cal("); tc = dict(ad)
-tc.update(AYAR={}, piper_acik=lambda: False, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Charon", 1.0), threading=threading); n0 = len(GELEN)
-exec(bs[i:bs.index("\n_TEPKI_BAS", i)], tc)
-r1 = tc["tepki_cal"]("alindi", hemen=True, ses=0.4); time.sleep(0.8)
+# 1d) hı hı: Gemini sesiyle konuşan kişilikte klip değil o anda Gemini (onay_cal)
+bs = open(os.path.join(K, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); i = bs.index("def onay_cal("); tc = dict(ad)
+tc.update(AYAR={}, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Charon", 1.0), threading=threading); n0 = len(GELEN)
+exec(bs[i:bs.index("\n# Okunan metinde görülen bilinmeyen", i)], tc)
+r1 = tc["onay_cal"]("alindi", hemen=True, ses=0.4); time.sleep(0.8)
 bak("hı hı: Gemini'den o anda (klip yok), kısık, Charon", r1 is True and len(GELEN) == n0 + 1 and '"voice_name": "Charon"' in json.dumps(GELEN[-1]["govde"]) and "Hı" in GELEN[-1]["govde"]["contents"][0]["parts"][0]["text"] + "Hım")
-bak("bekleme (düşünme) klibi Gemini'de çalmaz → çağıran cümleyi okur", tc["tepki_cal"]("dusunme") is False)
+bak("bekleme (düşünme) klibi Gemini'de çalmaz → çağıran cümleyi okur", tc["onay_cal"]("dusunme") is False)
 
 # 1e) v0.127 karışık okuma (bas-konus.py _konus_cumle): Gemini sesinde ilk cümle hemen ve tek başına, kalanlar cevap bitince tek okumada; Claude geç
 # bitirirse ilk okuma bitince biriken okunur; okuma kesildiyse biriken okunmaz; uzun cevap iki parça; Pocket'te cümle cümle; okuma sınırı (5 cümle) aynen

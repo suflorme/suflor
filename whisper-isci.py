@@ -144,7 +144,7 @@ def cozme_ayari(sn):
     return {"temperature": (0.0, 0.2), "sample_len": min(224, max(48, int(sn * 20)))}
 # whisper.cpp + Core ML motoru (S188: Apple Silicon'da varsayılan, ayar whisper_motor: mlx kapatır; aktarıcı SUFLOR_WHISPER_CPP=<ortak>/whisper-cpp verir). Aynı turbo q8 modeli,
 # kodlayıcı Neural Engine'de. 20 Ekim kıyası (testler/asr-kiyas-20261020.md, 1.093 öğe): 4–6 sn parça 1,40 → 0,60 sn, kısa parça p90
-# 2,57 → 0,55 sn, canlı parça Türkçe hata %12,5 → %12,7, uydurma bu dosyanın süzgeciyle aynı (%23). Canlı döngü ve (3 Kasım, S188 adım 2) dosyadan döküm; ses izi
+# 2,57 → 0,55 sn, canlı parça Türkçe hata %12,5 → %12,7, uydurma bu dosyanın süzgeciyle aynı (%23). Canlı döngü; ses izi
 # (ECAPA) MLX'te kalır. Sunucu yalnız 127.0.0.1'de; işçi öldürülse de bekçi kabuk sunucuyu kapatır.
 # Açılamazsa (CppHata.sinif): dosya_yok · calismiyor (ikili başlamadı) · macos_surum (ikili bu macOS için derlenmemiş) · coreml (kodlayıcı yüklenemedi) ·
 # sunucu_kapandi (başka nedenle çıktı) · zaman_asimi · isinma (sunucu açık, ilk çözüm başarısız) · diger. main() bunu MLX yedeğine çevirir; sınıf beta verisine gider.
@@ -423,7 +423,7 @@ def main():
             if oto and r.get("language") not in ("tr", "en"):
                 r = coz(a, language=p["dil"], initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             # karışık dil (gündem dil=karisik): yalnız izin verilen diller (tr/en); Whisper başkasını bulursa (11 Ekim: iki Türkçe satır İzlandaca)
-            # kanalın son dilinde (yoksa ilk izinli dilde) yeniden — dosyadan dökümdeki kural
+            # kanalın son dilinde (yoksa ilk izinli dilde) yeniden
             if not p.get("dil") and p.get("diller") and r.get("language") not in p["diller"]:
                 r = coz(a, language=p.get("dil_yedek") if p.get("dil_yedek") in p["diller"] else p["diller"][0],
                                            initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
@@ -509,35 +509,6 @@ def gecerli(s, x):  # canlı işçideki uydurma süzgeci (bölüm başına)
     return bool(x) and not UYDURMA.search(x) and not (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
         and s.get("compression_ratio", 0) <= 2.4 and s.get("avg_logprob", 0) >= -1.2 \
         and not (len(x.split()) <= 6 and re.search(r"\bwww\.|https?://|\.(com|tv|net|org)(\.tr)?\b", x, re.I))
-def dosya_parcala(a, np, en_uzun=25, en_kisa=1.5):
-    # konuşma parçaları: ≥ 0,5 sn sessizlikten bölünür (söz devri çoğunlukla orada), en çok 25 sn (uzunsa son 5 sn'nin en sessiz karesinden),
-    # 1,5 sn'den kısa parça komşusuna eklenir. Sessizlik eşiği kaydın kendi gürültü tabanından (sessiz %10'luk dilim × 3).
-    K = SR // 50; n = len(a) // K
-    if n == 0: return [(0, len(a))]
-    rms = np.sqrt((a[:n * K].reshape(n, K) ** 2).mean(1)); esik = max(0.002, min(0.02, float(np.percentile(rms, 10)) * 3)); ses = rms > esik
-    bol, i = [], 0
-    while i < n:
-        while i < n and not ses[i]: i += 1
-        if i >= n: break
-        j, sus = i, 0
-        while j < n and sus < 25:
-            sus = sus + 1 if not ses[j] else 0; j += 1
-        bol.append([i, j - sus]); i = j
-    out_ = []
-    for b0, b1 in bol:
-        while b1 - b0 > en_uzun * 50:
-            c = b0 + (en_uzun - 5) * 50 + int(np.argmin(rms[b0 + (en_uzun - 5) * 50:b0 + en_uzun * 50])); out_.append([b0, c]); b0 = c
-        if out_ and (b1 - b0 < en_kisa * 50 or out_[-1][1] - out_[-1][0] < en_kisa * 50) and b1 - out_[-1][0] <= en_uzun * 50 and b0 - out_[-1][1] < 50: out_[-1][1] = b1
-        else: out_.append([b0, b1])
-    return [(max(0, b0 * K - SR // 5), min(len(a), b1 * K + SR // 5)) for b0, b1 in out_]  # 200 ms pay
-DOSYA_DILLER = ("tr", "en"); DOSYA_YOGUNLUK = 0.35; DOSYA_YOGUN_SN = 6  # dosya kipi uydurma süzgeci (aşağıda dosya_tut)
-def dosya_tut(sure, segler):
-    # Dosya kipinde parça başına: canlıdaki süzgeç (gecerli) + yoğunluk. 10 Ekim gerçek kayıt ölçümü (gercek-ses/): müzikli 8–25 sn parçalar
-    # yalnız "Thank you." gibi 1–2 sözcük üretti (≤ 0,2 sözcük/sn); gerçek konuşmada 6 sn'yi aşan parçada en düşük 1,9 sözcük/sn. Güven
-    # (avg_logprob) ayırmıyor: gerçek "Thank you, counsel" −0,16…−0,73, uydurma −0,43…−1,0. 6 sn'den uzun parçada < 0,35 sözcük/sn → atılır.
-    tut = [(s, uydurma_on_kirp((s.get("text") or "").strip())[0]) for s in segler]; tut = [(s, x) for s, x in tut if gecerli(s, x)]
-    if sure >= DOSYA_YOGUN_SN and sum(len(x.split()) for _, x in tut) / sure < DOSYA_YOGUNLUK: return [], len(segler)
-    return tut, len(segler) - len(tut)
 DOSYA_KUME_ESIK = 0.35  # toplu kümeleme birleşme eşiği (ortalama kosinüs); gercek-ses/kume-ayar.py ile seçildi
 def toplu_kumele(izler, np, esik=DOSYA_KUME_ESIK, en_kisa=1.0, kucuk_sn=8.0):
     # Dosyada bütün ses baştan elde: parçaların ses izleri sonda birlikte kümelenir (ortalama bağlantılı, kosinüs ≥ esik birleşir; küme sınırı
@@ -601,98 +572,6 @@ def toplu_dosya(yol):
         no = ad[k]; top_iz[no] = top_iz.get(no, 0) + birim[n][0] * birim[n][1]; top_sn[no] = top_sn.get(no, 0) + birim[n][0]
     merkez = {no: base64.b64encode((v / (np.linalg.norm(v) + 1e-9)).astype(np.float16).tobytes()).decode() for no, v in top_iz.items() if top_sn[no] > 0}
     out({"kume": km, "bol": bl, "n": len(satir), "k": len(ad), "merkez": merkez, "sn": {no: round(v, 1) for no, v in top_sn.items()}}); return 0
-def dosya_dok(yol, dil, terimler):
-    # Dosyadan döküm (toplanti-claude.py dosyadan): afconvert'in ürettiği 16 kHz tek kanal 16 bit WAV, canlıdaki gibi konuşma parçalarıyla
-    # (dosya_parcala) Whisper'a. 10 Ekim yapay iki kişilik denemesinde 5 dk'lık bloklar dili blok başında bir kez buldu (İngilizce paragraf
-    # Türkçe uydurmaya döndü) ve iki konuşmacıyı tek bölümde birleştirdi; parça başına dil ve ses izi ikisini de çözer. Ses izi (ECAPA)
-    # varsa bölümler sonda toplu kümelenir (toplu_kumele), o yüzden iş bitince yazılır. Çıkış satır başına JSON:
-    # {"hazir", "sure"} · {"blok", "toplam"} · {"bolum": {"t0", "t1", "metin", "kume"?}} · {"merkez": {kume: iz}, "sn": {kume: sn}} (ses izi
-    # hafızası için, toplu_dosya'daki gibi) · {"bitti", "sn", "atlanan"} · {"hata"}
-    import struct
-    t = time.time()
-    try:
-        import numpy as np
-        b = open(yol, "rb").read(); i, fmt, a = 12, None, None  # RIFF parçaları; afconvert WAVE_FORMAT_EXTENSIBLE yazar, wave modülü okumaz
-        while i + 8 <= len(b) and b[:4] == b"RIFF":
-            ad, n = b[i:i + 4], struct.unpack("<I", b[i + 4:i + 8])[0]
-            if ad == b"fmt ": fmt = struct.unpack("<HHI", b[i + 8:i + 16]) + struct.unpack("<H", b[i + 22:i + 24])  # biçim, kanal, örnekleme, bit
-            elif ad == b"data": a = np.frombuffer(b[i + 8:i + 8 + n], np.int16).astype(np.float32) / 32768; break
-            i += 8 + n + (n & 1)
-        if not fmt or a is None or fmt[1:] != (1, SR, 16): out({"hata": "WAV 16 kHz tek kanal 16 bit değil"}); return 1
-    except Exception as e: out({"hata": f"{e.__class__.__name__}: {str(e)[:200]}"}); return 1
-    try: import mlx.core as mx; mx.set_cache_limit(int(os.environ.get("SUFLOR_MLX_ONBELLEK_MB") or 0) * 2 ** 20)
-    except Exception: pass
-    # Çözme motoru (3 Kasım, S188 adım 2): aktarıcı/toplanti-claude SUFLOR_WHISPER_CPP verirse whisper.cpp (kendi sunucusu, boş port — canlı işçininkiyle çakışmaz;
-    # aynı süreç grubunda, o yüzden toplantıda duraklatma SIGSTOP'u sunucuyu da durdurur). Açılamazsa ya da iş ortasında düşerse aynı işte MLX'e geçer;
-    # MLX modeli diskte yoksa {"hata", "mlx_yok"}: çağıran indirir. Dil, istem, parçalama ve uydurma süzgeci iki motorda aynı.
-    cpp = None; cpp_not = None
-    if os.environ.get("SUFLOR_WHISPER_CPP"):
-        try:
-            cpp = CppMotor(os.environ["SUFLOR_WHISPER_CPP"])
-            try: cpp(np.zeros(SR, np.float32), language="tr")  # ısınma
-            except Exception as e: raise CppHata("isinma", f"ilk çözüm başarısız ({e.__class__.__name__}: {str(e)[:120]})")
-        except Exception as e:
-            if cpp: cpp.kapat()
-            cpp = None; cpp_not = {"hata": cpp_hata_sinif(e), "mesaj": str(e)[:200]}; sys.stderr.write(f"whisper.cpp açılamadı ({cpp_not['hata']}): {e}\n")
-    if not cpp and not mlx_model_var():
-        out({"hata": "whisper.cpp açılamadı, MLX modeli diskte yok" if cpp_not else "MLX modeli diskte yok", "mlx_yok": True, **({"cpp": cpp_not} if cpp_not else {})}); return 1
-    mot = {"cpp": cpp}; mkw = dict(condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4)
-    def coz(p, language, istem):
-        if mot["cpp"]:
-            for den in (0, 1):  # uzun duraklatmadan (toplantı) sonra istemcinin zaman aşımı dolmuş olabilir: sunucu yaşıyorsa bir kez daha
-                try: return mot["cpp"](p, language=language, initial_prompt=istem)
-                except Exception:
-                    if den == 0 and mot["cpp"].p.poll() is None: continue
-            mot["cpp"].kapat(); mot["cpp"] = None; out({"motor": "mlx", "yedek": True}); sys.stderr.write("whisper.cpp işin ortasında düştü — MLX'e geçildi\n")
-            if not mlx_model_var(): raise CppHata("mlx_yok", "whisper.cpp düştü, MLX modeli diskte yok")
-        import mlx_whisper
-        return mlx_whisper.transcribe(p, path_or_hf_repo=MODEL, language=language, initial_prompt=istem, **mkw)
-    iz = None; ey = os.environ.get("SUFLOR_ECAPA")
-    if ey and os.path.exists(ey):
-        try: import mlx.core as mx; iz = Ecapa(ey, np, mx)
-        except Exception as e: sys.stderr.write(f"ECAPA yüklenemedi: {e}\n")
-    istem = None
-    if terimler:
-        try:
-            from mlx_whisper.tokenizer import get_tokenizer
-            istem = istem_kur(get_tokenizer(multilingual=True, num_languages=100), terimler, "")[0]
-        except Exception: istem = terimler
-    out({"hazir": True, "model": cpp.ad if cpp else MODEL, "motor": "cpp" if cpp else "mlx", "sure": round(len(a) / SR, 1), "ecapa": bool(iz), **({"cpp": cpp_not} if cpp_not else {})})
-    parcalar = dosya_parcala(a, np); atla, dil_son = 0, dil; adim = max(1, len(parcalar) // 20); izler, bolumler = [], []
-    for k, (b0, b1) in enumerate(parcalar):
-        if k % adim == 0: out({"blok": k + 1, "toplam": len(parcalar)})
-        p = a[b0:b1]
-        # dil: verilmediyse her parçada Whisper bulur (karışık dilli toplantı); 4 sn'den kısa parçada tahmin güvensiz → öncekinin dili
-        try:
-            r = coz(p, dil or (dil_son if len(p) < 4 * SR else None), istem)
-            if not dil and r.get("language") not in DOSYA_DILLER:  # Rusça/Çince altyazı kalıbı ya da yanlış dil: beklenen dilde yeniden, sonra süzgeç
-                r = coz(p, dil_son or DOSYA_DILLER[0], istem)
-        except CppHata as e: out({"hata": str(e), "mlx_yok": True}); return 1
-        except Exception as e: out({"hata": f"{e.__class__.__name__}: {str(e)[:200]}"}); return 1
-        if not dil and len(p) >= 4 * SR and r.get("language") in DOSYA_DILLER: dil_son = r["language"]
-        tut, at = dosya_tut(len(p) / SR, r.get("segments") or []); atla += at
-        for s, x in tut:
-            if istem and x.lower().strip(" .") in istem.lower(): atla += 1; continue
-            # ses izi parça değil bölüm (Whisper cümlesi) başına: hızlı sohbette söz sırası arasında 0,5 sn sessizlik olmuyor, parçada iki kişi
-            # karışıyordu (10 Ekim, iki kişilik Türkçe podcast tek kümeye düştü; bölüm düzeyinde ilk 1,5 dk %97 doğru)
-            s0, s1 = b0 + int(float(s["start"]) * SR), b0 + int(float(s["end"]) * SR); e = None
-            if iz and s1 - s0 >= SR // 2:
-                try: e = np.array(iz(a[s0:s1]), np.float32)
-                except Exception: e = None
-            izler.append(((s1 - s0) / SR, e))
-            bolumler.append((len(izler) - 1, {"t0": round(b0 / SR + float(s["start"]), 2), "t1": round(b0 / SR + float(s["end"]), 2), "metin": tr_harf(x, r.get("language")), "dil": r.get("language")}))
-    et = toplu_kumele(izler, np) if iz else [None] * len(izler); ad = {}
-    for k, bo in bolumler:  # küme adları ilk konuşma sırasıyla k1, k2…
-        if et[k] is not None: bo["kume"] = ad.setdefault(et[k], f"k{len(ad) + 1}")
-        out({"bolum": bo})
-    top_iz, top_sn = {}, {}
-    for n, k in enumerate(et):
-        if k is None or izler[n][1] is None: continue
-        top_iz[ad[k]] = top_iz.get(ad[k], 0) + izler[n][0] * izler[n][1]; top_sn[ad[k]] = top_sn.get(ad[k], 0) + izler[n][0]
-    if top_iz: out({"merkez": {k: base64.b64encode((v / (np.linalg.norm(v) + 1e-9)).astype(np.float16).tobytes()).decode() for k, v in top_iz.items()},
-                    "sn": {k: round(v, 1) for k, v in top_sn.items()}})
-    if mot["cpp"]: mot["cpp"].kapat()
-    out({"bitti": True, "sn": round(time.time() - t, 1), "atlanan": atla, "motor": "cpp" if mot["cpp"] else "mlx"}); return 0
 def ecapa_donustur(ckpt, hedef):
     # kurulumda bir kez (aktarici-kur / modeller-kur): SpeechBrain ağırlıkları (torch dosyası) → numpy .npz. torch yalnız burada gerekir
     # (whisper-venv'de mlx-whisper'ın bağımlılığı olarak var); işçi çalışırken torch içe aktarılmaz.
@@ -720,5 +599,4 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["--ecapa-donustur"]: ecapa_donustur(sys.argv[2], sys.argv[3]); sys.exit(0)
     if sys.argv[1:2] == ["--whisper-nicemle"]: whisper_nicemle(sys.argv[2], sys.argv[3]); sys.exit(0)
     if sys.argv[1:2] == ["--toplu"]: sys.exit(toplu_dosya(sys.argv[2]))
-    if sys.argv[1:2] == ["--dosya"]: sys.exit(dosya_dok(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] != "-" else None, os.environ.get("SUFLOR_ISTEM", "")))
     sys.exit(main())

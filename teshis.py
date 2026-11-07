@@ -23,7 +23,7 @@ DENEME = bool(os.environ.get("SUFLOR_AYAR") or os.environ.get("SUFLOR_EV"))
 def acik(ayar):
     if DENEME: return str(ayar.get("teshis_adres") or "").startswith("http://127.0.0.1:")
     return True
-KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "kimlik.py", "ortak-klasor.py", "izin.py", "toplanti-oturum.py", "toplanti.py", "toplanti-sonrasi.py", "eposta-takip.py", "kisisel-tarihler.py", "izleme.py", "saglik.py", "kaynak.py", "agir-kilit.py", "duman.py", "bellek.py", "sozluk.py", "sozluk-ogren.py", "sozluk-hakem.py", "dokum-kontrol.py", "whisper-hat.py", "dosyadan.py", "brifing-ses.py", "prova.py", "eylem-menu.py", "beyin.py", "bas-konus.py", "web-arastirma.py", "claude-giris.py", "sohbet.py", "uclu-sahne.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "ekran.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "saglayici.py", "profil.py", "piper-ses.py", "pocket-ses.py", "gemini-ses.py", "azure-ses.py", "gerginlik.py", "piper-isci.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "ortak_bulut.py", "taahhut.py", "toplanti-claude.py", "whisper-isci.py", "tstt-golge-isci.py", "golge-tstt.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
+KOD_DOSYALARI = ("relay.py", "beta-veri.py", "kullanim.py", "eylem.py", "kisilik.py", "talimat.py", "kimlik.py", "ortak-klasor.py", "izin.py", "toplanti-oturum.py", "toplanti.py", "toplanti-sonrasi.py", "eposta-takip.py", "kisisel-tarihler.py", "izleme.py", "saglik.py", "kaynak.py", "agir-kilit.py", "duman.py", "bellek.py", "sozluk.py", "sozluk-ogren.py", "sozluk-hakem.py", "dokum-kontrol.py", "whisper-hat.py", "brifing-ses.py", "prova.py", "eylem-menu.py", "beyin.py", "bas-konus.py", "web-arastirma.py", "claude-giris.py", "sohbet.py", "toplantiya-ses.py", "otonom.py", "moderator.py", "posta.py", "ekran.py", "defter.py", "arsiv.py", "notlar.py", "ceviri.py", "anlik.py", "saglayici.py", "profil.py", "pocket-ses.py", "gemini-ses.py", "gerginlik.py", "pocket-isci.py", "tur-isci.py", "yapi.py", "ortak_bulut.py", "toplanti-claude.py", "whisper-isci.py", "tstt-golge-isci.py", "golge-tstt.py", "ses-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "baglam.py", "kurulum.py", "teshis.py",
                  "content.js", "platform-teams.js", "background.js", "offscreen.js", "mic-main.js", "popup.js", "launcher.js")
 _BURASI = os.path.dirname(os.path.abspath(__file__))
 SOZLUK_DOSYA = os.path.join(_BURASI, "teshis-sozluk.txt")
@@ -130,7 +130,7 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          # S141 kurulum ve haftalık paket (kurulum.py kurulum_paketi, aktarici/beta-veri.py)
          "adim": ADIMLAR, "birakilan": ADIMLAR, "sonuc": {"bitti", "yarida", "hazir", "hata", "yok", "iniyor", "secilmedi", "onceden"},
          "neden": {"abonelik", "giris", "hata", "zaman", "yok", "kurulamadi", "baska_hesap"}, "mikrofon": IZIN, "erisilebilirlik": IZIN, "ekran": IZIN, "takvim": _DURUMLAR,
-         "ses_motoru": {"mac", "piper", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
+         "ses_motoru": {"mac", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
          "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"}, "kurulum_profil": {"hafif", "tam"}, "calisan_motor": {"mlx", "cpp"},  # S188: haftalık whisper_cpp'de son açılan motor
          "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"},
@@ -217,14 +217,6 @@ def klasor_turu(yol, ev=None):
     for ad, tur in (("Dropbox", "dropbox"), ("Google Drive", "googledrive"), ("OneDrive", "onedrive")):  # eski istemcilerin ev klasöründeki yeri
         if y == os.path.join(ev, ad) or y.startswith(os.path.join(ev, ad) + os.sep): return tur
     return "yerel"
-def _bulut_sayilari(s, uyg):
-    # v0.200.0: Google belgeleri (kaç tane, kaçının metni okundu, kimlik/erişim yok) ve indirilen bulut dosyaları — yalnız sayı; durum dosyaları baglam.py yazar
-    def oku(ad):
-        try: return json.load(open(os.path.join(uyg, ad), encoding="utf-8"))
-        except (OSError, ValueError): return {}
-    g, b = oku("google-durum.json"), oku("bulut-durum.json"); n = lambda v: v if isinstance(v, int) and not isinstance(v, bool) else 0
-    return {"google_belge": n(s.get("google_belge")), "google_okundu": n(s.get("google_okundu")), "google_kimlik_yok": n(g.get("kimlik_yok")), "google_erisim_yok": n(g.get("erisim_yok")),
-            "bulut_indirilen": n(b.get("kayit")), "bulut_onay_bekliyor": 1 if b.get("onay_bekliyor") else 0, "bulut_indir_acik": bool(b.get("acik"))}
 def proje_olcu(proje, uyg):
     o = {"klasor_turu": klasor_turu(proje)}
     try: r = json.load(open(os.path.join(uyg, "tarama.json"), encoding="utf-8"))
@@ -232,8 +224,7 @@ def proje_olcu(proje, uyg):
     if not proje or os.path.realpath(os.path.expanduser(str(r.get("proje") or ""))) != os.path.realpath(os.path.expanduser(str(proje))): return dict(o, tarandi=False)
     s = r.get("sayilar") or {}
     return dict(o, tarandi=True, tarama_gun_once=round((time.time() - (r.get("t") or time.time())) / 86400, 1), dosya=s.get("dosya"),
-                bulutta=s.get("bulutta"), bulut_kisayol=s.get("bulut_kisayol"), okunamayan=(s.get("okunamayan") or 0) + len(s.get("erisilemeyen") or []),
-                **_bulut_sayilari(s, uyg))
+                bulutta=s.get("bulutta"), okunamayan=(s.get("okunamayan") or 0) + len(s.get("erisilemeyen") or []))
 
 # ---------- hata özeti ----------
 def hata_ozeti(tur, deger, tb):

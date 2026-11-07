@@ -19,7 +19,7 @@ class Uc:
         s.port = bos_port(8792); s.d = os.path.join(T, ad); os.makedirs(s.d); s.log = os.path.join(T, ad + ".log")
         yol = os.path.join(T, ad + ".json")
         json.dump(dict({"alan": "Deneme", "ad": "Deniz T", "port": s.port, "uygulama": T, "proje": proje, "ortak": os.path.join(T, "yok"), "claude": "/yok/claude", "konus_on_ac": False,
-                        "tepki_sesleri": os.path.join(T, "tepki-yok"), "pocket_python": "/yok/python", "pocket_hf": "/yok"}, **ayar), open(yol, "w"))
+                        "pocket_python": "/yok/python", "pocket_hf": "/yok"}, **ayar), open(yol, "w"))
         s.p = subprocess.Popen([sys.executable, "relay.py", "--dir", s.d, "--port", str(s.port)], cwd=T, stdout=open(s.log, "w"), stderr=subprocess.STDOUT,
                                env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=yol, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0"))
         for _ in range(80):

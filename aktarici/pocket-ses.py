@@ -1,14 +1,73 @@
-# Bölüm dosyası: relay.py'nin ad alanında çalışır (bolum("pocket-ses")); import edilmez. piper-ses.py'den sonra yüklenir (piper_okunur, tr_sayi, PIPER_OYNAT).
+# Bölüm dosyası: relay.py'nin ad alanında çalışır (bolum("pocket-ses")); import edilmez. 
 # --- Pocket TTS ile yerel Türkçe ses (S93, 19 Ekim) -----------------------------------------------------------------------------------
-# 19 Ekim kör puanlamasında (testler/yerel-ses-arastirma-20261019, 11 ses × 4 soru) ilk 3'ün üçü Pocket; Piper sonuncu. Gemini toplantıya ayrıldığı için
+# 19 Ekim kör puanlamasında (testler/yerel-ses-arastirma-20261019, 11 ses × 4 soru) ilk 3'ün üçü Pocket. Gemini toplantıya ayrıldığı için
 # (S92) kullanıcının duyduğu ses ve toplantı dışı her okuma yerel: kişilikte "yerel_ses: pocket:<model>:<ses>" (ör. pocket:alperiox:female_2,
 # pocket:wite:male_1) ya da ayar ses_motoru: pocket + pocket_ses. Ayar pocket_python (torch + pocket_tts ortamı) ve pocket_hf (modellerin
-# HF_HOME'u) yoksa, dosya yoksa ya da işçi hata verirse Mac sesine düşülür (sıra Pocket → Mac → Piper; 19 Ekim). Model dosyaları depoda değil (kullanıcı indirir;
+# HF_HOME'u) yoksa, dosya yoksa ya da işçi hata verirse Mac sesine düşülür (sıra Pocket → Mac; 19 Ekim). Model dosyaları depoda değil (kullanıcı indirir;
 # wite-tech CC-BY-4.0 atıfla, alperiox MIT). İşçi (pocket-isci.py) ilk okumada açılır, boşta kapanır (28 Ekim; ayrıntı aşağıda).
 # Hız ayarı yok (Pocket'ın tek konuşma hızı; doğal hızı Elif'le aynı, 5,2 hece/sn). Duygu etiketi yalnız wite modelinde: Claude'un <ton:…>'u ya da
 # cümlenin kendisinden (ünlem → mutlu, hayret kalıbı → şaşkın). Ses ve metin Mac'ten çıkmaz.
+import queue, tempfile, wave
 if "ses_basladi" not in globals():  # v0.95.0: çalma anı ölçümü brifing-ses.py'de; bu bölüm tek başına yüklenince (testler) etkisiz
     def ses_basladi(kayit=None): pass
+OYNAT_YOL = os.path.join(AYAR["uygulama"], "Suflor Oynat.app", "Contents", "MacOS", "SuflorOynat")  # kesintisiz ses çalıcı (oynat.swift): Pocket, Gemini ve toplantıya okuma bunu kullanır
+# Okunur metin (v0.32.2): yerel Türkçe ses (espeak tr) sayıların çoğunu doğru okur ("%12", "1.250", "3,5") ama sayıya bitişik eki ayrı sözcük okur
+# ("12'si" → "on iki si", "3'üncü" → "üç ündcü"), "09.00"ı "sıfır dokuz nokta sıfır sıfır", "-5"i "beş", "3." sırasını "üç", "Dr."yi "dere"
+# okur (13 Ekim fonem dökümü). Bu durumlar okumadan önce yazıya çevrilir; ek sözcüğe bitişir. Mac sesi sayıları kendisi okur, yalnız yerel seslerde.
+_TR_BIR = ["", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz"]
+_TR_ON = ["", "on", "yirmi", "otuz", "kırk", "elli", "altmış", "yetmiş", "seksen", "doksan"]
+def tr_sayi(n):
+    n = int(n)
+    if n == 0: return "sıfır"
+    out = []
+    for deger, ad in ((10 ** 12, "trilyon"), (10 ** 9, "milyar"), (10 ** 6, "milyon"), (1000, "bin")):
+        if n >= deger:
+            k, n = divmod(n, deger); out += ([] if k == 1 and ad == "bin" else [tr_sayi(k)]) + [ad]
+    if n >= 100: k, n = divmod(n, 100); out += ([] if k == 1 else [_TR_BIR[k]]) + ["yüz"]
+    if n >= 10: out.append(_TR_ON[n // 10]); n %= 10
+    if n: out.append(_TR_BIR[n])
+    return " ".join(out)
+def tr_sira(n):
+    s = tr_sayi(n); son = s.split()[-1]
+    if son == "dört": return s[:-4] + "dördüncü"
+    ek = {"a": "ıncı", "ı": "ıncı", "e": "inci", "i": "inci", "o": "uncu", "u": "uncu", "ö": "üncü", "ü": "üncü"}[[c for c in son if c in "aıeioöuü"][-1]]
+    return s + (ek[1:] if son[-1] in "aıeioöuü" else ek)
+_TR_K = "a-zçğıöşü"; _TR_B = "A-ZÇĞİÖŞÜ"
+def _sayi_yazi(tam, ondalik=None):
+    return tr_sayi(tam.replace(".", "")) + (" virgül " + tr_sayi(ondalik) if ondalik else "")
+_OKUNUR = [
+    # saat: 09.00 / 15:30 (iki haneli dakika; binlik ayracı üç hanelidir) — "15:30'da" → "on beş otuzda"
+    (re.compile(r"(?<![\d.,])([01]?\d|2[0-3])[:.]([0-5]\d)(?![\d])(?:'([" + _TR_K + r"]+))?"),
+     lambda m: tr_sayi(m.group(1)) + ("" if m.group(2) == "00" else " " + tr_sayi(m.group(2))) + (m.group(3) or "")),
+    # yüzde: %80'i → yüzde sekseni
+    (re.compile(r"%\s?(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?(?:'([" + _TR_K + r"]+))?"),
+     lambda m: "yüzde " + _sayi_yazi(m.group(1), m.group(2)) + (m.group(3) or "")),
+    # para işareti önde: $150 → 150 dolar
+    (re.compile(r"([$€£])\s?(\d[\d.,]*\d|\d)"), lambda m: m.group(2) + " " + {"$": "dolar", "€": "avro", "£": "sterlin"}[m.group(1)]),
+    (re.compile(r"(\d)\s?₺"), lambda m: m.group(1) + " lira"),
+    # sıra sayısı: "3. çeyrek" → "üçüncü çeyrek" (ardından küçük harfle başlayan sözcük gelirse; cümle sonu değil)
+    (re.compile(r"(?<![\d.,])(\d{1,4})\.(?=\s+[" + _TR_K + r"])"), lambda m: tr_sira(m.group(1))),
+    # eksi: "-5 derece" → "eksi 5 derece" (aralık "10-15" dokunulmaz)
+    (re.compile(r"(^|[\s(])-(?=\d)"), lambda m: m.group(1) + "eksi "),
+    # sayıya bitişik ek: 2026'da → iki bin yirmi altıda, 3,5'i → üç virgül beşi
+    (re.compile(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?'([" + _TR_K + r"]+)"),
+     lambda m: _sayi_yazi(m.group(1), m.group(2)) + m.group(3)),
+    # sayıdan sonra birim kısaltması
+    (re.compile(r"(\d)\s?(dk|dak)\.?(?![\w])"), lambda m: m.group(1) + " dakika"),
+    (re.compile(r"(\d)\s?sn\.?(?![\w])"), lambda m: m.group(1) + " saniye"),
+    (re.compile(r"(\d)\s?km(?![\w])"), lambda m: m.group(1) + " kilometre"),
+    (re.compile(r"(\d)\s?kg(?![\w])"), lambda m: m.group(1) + " kilogram"),
+    (re.compile(r"(?<![\w])[Nn]o\s?[:.]?\s?(?=\d)"), lambda m: "numara "),
+    # unvan (ardından büyük harfli ad)
+    (re.compile(r"(?<![\w])(Dr|Prof|Doç|Av|Sn|Op|Uzm)\.(?=\s*[" + _TR_B + r"])"),
+     lambda m: {"Dr": "Doktor", "Prof": "Profesör", "Doç": "Doçent", "Av": "Avukat", "Sn": "Sayın", "Op": "Operatör", "Uzm": "Uzman"}[m.group(1)]),
+    # kısaltma; ardından cümle bitiyorsa nokta kalır
+    (re.compile(r"(?<![\w])(vb|vs|örn|bkz)\.(\s+(?=[" + _TR_B + r"])|\s*$)?"),
+     lambda m: {"vb": "ve benzeri", "vs": "vesaire", "örn": "örneğin", "bkz": "bakınız"}[m.group(1)] + ("." + m.group(2) if m.group(2) is not None else "")),
+]
+def yerel_okunur(metin):
+    for rx, f in _OKUNUR: metin = rx.sub(f, metin)
+    return metin
 # 28 Ekim (mimari plan C / K4): işçi İLK okuma isteğinde açılır (aktarıcı açılırken değil; toplantıda motor Pocket ise toplantı başlayınca önceden), yalnız istenen sesin
 # modeli yüklenir (Türkçe tek model; İngilizce yalnız İngilizce okuma isteyince), pocket_bos_dk (10) dk kullanılmazsa kapanır. Açılış arka planda: hazır olana dek
 # pocket_oku hemen False döner, çağıran Mac sesine düşer (ilk cümle beklemez). Cevap zaman aşımı işçiyi ÖLDÜRMEZ: istek bırakılır, art arda POCKET_ZA_N zaman
@@ -163,11 +222,11 @@ def pocket_duygu(metin):
     if POCKET_SASKIN_RX.search(metin or ""): return "şaşkın"
     if (metin or "").rstrip().endswith("!"): return "mutlu"
     return None
-def _rakam_yazi(m):  # alperiox rakam okuyamaz (19 Ekim: "1.250.000"da cümleyi kesti) → yazıya; piper_okunur'dan sonra kalan rakamlar
+def _rakam_yazi(m):  # alperiox rakam okuyamaz (19 Ekim: "1.250.000"da cümleyi kesti) → yazıya; yerel_okunur'dan sonra kalan rakamlar
     return re.sub(r"(?<![\d,])(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?(?![\d.]\d)", lambda x: tr_sayi(x.group(1).replace(".", "")) + (" virgül " + tr_sayi(x.group(2)) if x.group(2) else ""), m)
 def pocket_metin(metin, ses):
     if ses.startswith("en:"): return metin  # İngilizce model sayı, saat ve yüzdeyi kendisi okur; Türkçe okunuş kuralları uygulanmaz
-    m = piper_okunur(metin)
+    m = yerel_okunur(metin)
     return _rakam_yazi(m) if ses.startswith("alperiox") else m
 def pocket_pcm(metin, ses=None):  # v0.113.0: toplantıya okunacak ses (24 kHz 16 bit PCM, toplanmış) — çalınmaz; olmazsa None
     parcalar = []
@@ -191,10 +250,10 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None, topla=None, 
             except subprocess.TimeoutExpired: pass
         if oyn.poll() is None: oyn.terminate()
     try:
-        sessiz = bool(os.environ.get("SUFLOR_TEST_PIPER_SESSIZ")) and topla is None
-        if not sessiz and topla is None and os.access(PIPER_OYNAT, os.X_OK):
+        sessiz = bool(os.environ.get("SUFLOR_TEST_YEREL_SESSIZ")) and topla is None
+        if not sessiz and topla is None and os.access(OYNAT_YOL, os.X_OK):
             try:
-                oyn = subprocess.Popen([PIPER_OYNAT, str(sr)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                oyn = subprocess.Popen([OYNAT_YOL, str(sr)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if kayit is not None: kayit["p"] = oyn
             except OSError: oyn = None
         try: POCKET["p"].stdin.write(json.dumps({"id": kim, "metin": metin, "ses": ses, "duygu": duygu if ses.startswith("wite") else None}, ensure_ascii=False) + "\n"); POCKET["p"].stdin.flush()
@@ -236,8 +295,8 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None, topla=None, 
                 try: os.remove(o["wav"])
                 except OSError: pass
     finally: POCKET["bekleyen"].pop(kim, None)
-def yerel_oku(metin, kisa=False):  # fısıltı, sesli çeviri: o anki kişiliğin yerel sesi; okunamazsa False (çağıran Mac sesine düşer). Pocket kişiliğinde Piper denenmez
+def yerel_oku(metin, kisa=False):  # fısıltı, sesli çeviri: o anki kişiliğin yerel sesi; okunamazsa False (çağıran Mac sesine düşer)
     km, kv = kisilik_sesi()[:2]
-    if km == "pocket": return pocket_oku(metin, ses=kv)  # sıra Pocket → Mac → Piper (19 Ekim)
-    return piper_oku(metin, piper_hiz(kisa=kisa))
+    if km == "pocket": return pocket_oku(metin, ses=kv)  # sıra Pocket → Mac (19 Ekim)
+    return False
 if pocket_var() and not deneme_aktarici(): pocket_izleyici_baslat()  # 28 Ekim: açılışta işçi açılmaz (bellek); ilk okumada ya da toplantıda motor Pocket ise toplantı başlayınca açılır

@@ -182,7 +182,7 @@ Yeni sürüm çıkınca panoda **Güncelle** düğmesi belirir.
 
 ## Daha fazlası
 
-[KILAVUZ.md](KILAVUZ.md) içinde: kurulumdan sonraki adımlar, proje hazırlığı, ayarlar, sesler (Pocket, Piper, Gemini), gizlilik ayrıntıları
+[KILAVUZ.md](KILAVUZ.md) içinde: kurulumdan sonraki adımlar, proje hazırlığı, ayarlar, sesler (Pocket, Gemini), gizlilik ayrıntıları
 ve bileşenlerin listesi.
 
 ## Lisans

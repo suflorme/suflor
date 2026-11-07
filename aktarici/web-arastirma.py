@@ -182,7 +182,7 @@ def _ar_is(konu, kanal, metin, sesli_ac):
         if not _KS.get("tur") or _KS["tur"].get("arastirma"): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t("Araştırma yapılamadı", "Research failed"))
     finally: tm.cancel(); ARASTIRMA["aktif"] = None
 def arastirma_dene(metin, tur):  # _konus_sor'un başında: True → istek araştırma kipine alındı (Konuş soruyu normal yola götürmez)
-    if toplanti_var() or tur.get("kaynak") in ("hitap", "karsi", "moderator", "uclu"): return False  # toplantı sırasındaki davranış değişmez
+    if toplanti_var() or tur.get("kaynak") in ("hitap", "karsi", "moderator"): return False  # toplantı sırasındaki davranış değişmez
     konu = ar_tetik(metin)
     if konu is None: return False
     kanal = "kutu" if tur.get("kutu") else "yazili" if tur.get("yazili") else "bas"; sesli_ac = not tur.get("yazili")

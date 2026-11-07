@@ -18,14 +18,14 @@ class P:  # sahte afplay/say süreci
     def close(self): CALAN.append(("mac", self.yazi.decode()))
     def wait(self):
         if self.k[0] == "/usr/bin/afplay": CALAN.append(("afplay", self.k[1]))
-def deneme(gemini_acik, motor="mac", q=None, bekle=3, pocket=None, piper=None, bek=None, onceden=(), ek=None):  # pocket/piper: None = yok, True/False = okuyabildi mi (S93)
+def deneme(gemini_acik, motor="mac", q=None, bekle=3, pocket=None, bek=None, onceden=(), ek=None):  # pocket: None = yok, True/False = okuyabildi mi (S93)
     del CALAN[:]
-    n = {"SES": {"q": q or [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Mac cümlesi."], "isci": True, "kes": 0, "bek": bek or []}, "GEMINI_BIRLESIK_EN_COK": 600, "SES_K": threading.Condition(),
+    n = {"SES": {"q": q or [("g", "Gemini cümlesi.", "Charon", "dostça"), "Mac cümlesi."], "isci": True, "kes": 0, "bek": bek or []}, "GEMINI_BIRLESIK_EN_COK": 600, "SES_K": threading.Condition(),
          "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "PIPE": None}), "kisilik_sesi": lambda m=None, toplantiya=False: (m or motor, None, 1.0), "gemini_var": lambda: gemini_acik, "gemini_izinli": lambda toplantiya=False: gemini_acik,
          "gemini_oku": lambda metin, **a: (n["ses_basladi"](a.get("kayit")), CALAN.append(("gemini", metin, a.get("ses"), a.get("uslup"))), True)[2], "etiket_sil": lambda m: m, "kisilik": lambda: {},
          "pocket_oku": lambda metin, **a: (CALAN.append(("pocket", metin) if not str(a.get("ses") or "").startswith("en:") else ("pocket", metin, a["ses"])), True)[1] if pocket else False, "ARAYUZ_DILI": "tr",
-         "AYAR": {"piper_python": "/x", "piper_model": "/y"} if piper is not None else {},
-         "piper_oku": lambda metin, *a, **k: (CALAN.append(("piper", metin)), True)[1] if piper else False, "piper_hiz": lambda: 1.0, "SES_TABAN_HIZ": 180, "print": lambda *a, **k: None, "time": time, "os": os,
+         "AYAR": {},
+         "SES_TABAN_HIZ": 180, "print": lambda *a, **k: None, "time": time, "os": os,
          "gemini_onceden_var": lambda m, s_: m in onceden, "pocket_var": lambda: pocket is not None, "pocket_ses_adi": lambda v: v, "pocket_varsayilan": lambda: "tr:yerel"}
     n.update(ek or {})
     exec(compile(ast.Module(fn, []), "brifing-ses.py", "exec"), n)
@@ -34,31 +34,29 @@ def deneme(gemini_acik, motor="mac", q=None, bekle=3, pocket=None, piper=None, b
         if len(CALAN) >= bekle: break
         time.sleep(0.01)
     return list(CALAN)
-c = deneme(True)
-ok(f"Gemini açık: tepki → afplay, Gemini parçası → Gemini (sesi ve üslubuyla), düz metin → Mac: {c}",
-   c == [("afplay", "/tepki.caf"), ("gemini", "Gemini cümlesi.", "Charon", "dostça"), ("mac", "Mac cümlesi.")])
-c = deneme(False)
-ok(f"Gemini yok: Gemini parçası Mac sesiyle okunur, hiçbir parça afplay'e dosya diye gitmez: {c}",
-   c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Mac cümlesi.")])
+c = deneme(True, bekle=2)
+ok(f"Gemini açık: Gemini parçası → Gemini (sesi ve üslubuyla), düz metin → Mac: {c}",
+   c == [("gemini", "Gemini cümlesi.", "Charon", "dostça"), ("mac", "Mac cümlesi.")])
+c = deneme(False, bekle=2)
+ok(f"Gemini yok: Gemini parçası Mac sesiyle okunur: {c}",
+   c == [("mac", "Gemini cümlesi."), ("mac", "Mac cümlesi.")])
 # v0.80.8: kuyrukta bekleyen aynı ses ve üsluptaki Gemini parçaları tek istekte; ses ya da üslup değişince ayrı; 600 karakter sınırı
 c = deneme(True, q=[("g", "Bir.", "Charon", "u"), ("g", "İki.", "Charon", "u"), ("g", "Üç.", "Charon", "u2"), ("g", "Dört.", "Kore", "u2")], bekle=3)
 ok(f"birleştirme: aynı ses+üslup tek istek, değişince ayrı: {c}", c == [("gemini", "Bir. İki.", "Charon", "u"), ("gemini", "Üç.", "Charon", "u2"), ("gemini", "Dört.", "Kore", "u2")])
 uzun = "x" * 350 + "."
 c = deneme(True, q=[("g", uzun, "Charon", "u"), ("g", uzun, "Charon", "u"), ("g", "Son.", "Charon", "u")], bekle=2)
 ok(f"birleştirme sınırı (600 karakter): {[len(x[1]) for x in c]}", [len(x[1]) for x in c] == [351, 356])
-# S93: yerel ses Pocket — okuyabilirse Pocket, okuyamazsa Mac sesi (Piper denenmez; sıra Pocket → Mac → Piper); Gemini parçası Gemini yoksa düz metin olur
-q3 = lambda: [("dosya", "/tepki.caf"), ("g", "Gemini cümlesi.", "Charon", "dostça"), "Yerel cümle."]
-c = deneme(False, motor="pocket", q=q3(), pocket=True)
-ok(f"Pocket: tepki → afplay, metinler → Pocket: {c}", c == [("afplay", "/tepki.caf"), ("pocket", "Gemini cümlesi."), ("pocket", "Yerel cümle.")])
-c = deneme(False, motor="pocket", q=q3(), pocket=False, piper=True)
-ok(f"Pocket okuyamadı → Mac sesi, Piper kurulu olsa da (sıra Pocket → Mac → Piper): {c}", c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
-c = deneme(False, motor="pocket", q=q3(), pocket=False)
-ok(f"Pocket okuyamadı, Piper yok → Mac sesi: {c}", c == [("afplay", "/tepki.caf"), ("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
+# S93: yerel ses Pocket — okuyabilirse Pocket, okuyamazsa Mac sesi (sıra Pocket → Mac); Gemini parçası Gemini yoksa düz metin olur
+q3 = lambda: [("g", "Gemini cümlesi.", "Charon", "dostça"), "Yerel cümle."]
+c = deneme(False, motor="pocket", q=q3(), pocket=True, bekle=2)
+ok(f"Pocket: metinler → Pocket: {c}", c == [("pocket", "Gemini cümlesi."), ("pocket", "Yerel cümle.")])
+c = deneme(False, motor="pocket", q=q3(), pocket=False, bekle=2)
+ok(f"Pocket okuyamadı → Mac sesi: {c}", c == [("mac", "Gemini cümlesi."), ("mac", "Yerel cümle.")])
 # v0.101.3: ("en", metin, ses) İngilizce cümle → kişiliğin İngilizce Pocket sesi; okuyamazsa düz metin olarak yerel sese (Mac) düşer
 c = deneme(False, motor="pocket", q=[("en", "Happy to help.", "en:michael"), "Türkçe cümle."], bekle=2, pocket=True)
 ok(f"İngilizce parça → Pocket İngilizce sesi, Türkçe parça → Pocket: {c}", c == [("pocket", "Happy to help.", "en:michael"), ("pocket", "Türkçe cümle.")])
-c = deneme(False, motor="mac", q=[("en", "Happy to help.", "en:michael"), ("dosya", "/tepki.caf")], bekle=2, pocket=False)
-ok(f"İngilizce ses okuyamadı → Mac sesi (düz metin), sonraki öğe yerinde: {c}", c == [("mac", "Happy to help."), ("afplay", "/tepki.caf")])
+c = deneme(False, motor="mac", q=[("en", "Happy to help.", "en:michael"), "Sonraki."], bekle=2, pocket=False)
+ok(f"İngilizce ses okuyamadı → Mac sesi (düz metin), sonraki öğe yerinde: {c}", c == [("mac", "Happy to help."), ("mac", "Sonraki.")])
 # v0.95.0: duyulan ilk ses — bekleyen metin çalmaya başlayınca (Gemini birleşik okumada ikinci cümle de) çağrı bir kez; çalmayan metnin çağrısı gelmez
 CAL = {}
 bk = lambda ad: (ad[:40], lambda t: CAL.setdefault(ad, t), time.time())
@@ -85,8 +83,8 @@ n = {"SES": {"q": [("g", "Bir.", None, "u"), ("g", "İki.", None, "u"), "düz"]}
      "kisilik_sesi": lambda m=None, toplantiya=False: ("gemini", "Kore", 1.0), "gemini_onceden": lambda m, s_, u: ON.append((m, s_, u)), "gemini_onceden_var": lambda m, s_: False}
 exec(compile(ast.Module(fn, []), "brifing-ses.py", "exec"), n); n["ses_sonraki_hazirla"]()
 ok(f"sıradaki hazırlanır: birleşik metin + kişiliğin sesi ({ON}, kuyruk {n['SES']['q']})", ON == [("Bir. İki.", "Kore", "u")] and n["SES"]["q"] == [("g", "Bir. İki.", None, "u"), "düz"])
-# v0.127: Gemini ilk sesi beklenirken (işçi parçayı aldı, kuyruk boş, çalıcı yok) ses_caliyor True kalmalı. Eskiden False dönüyordu: üçlü sohbet önceki söz
-# bitti sanıp sıradakini erken sıraya koyuyor, "çaldı" bildirimi 3 sn içinde gelmeyince canli/uclu.jsonl bosluk_ms ~3000 yazılıyordu (gerçek boşluk 0,6–1 sn).
+# v0.127: Gemini ilk sesi beklenirken (işçi parçayı aldı, kuyruk boş, çalıcı yok) ses_caliyor True kalmalı. Eskiden False dönüyordu: bir sonraki söz
+# erken sıraya giriyordu (gerçek boşluk 0,6–1 sn).
 sh = ast.parse(open(os.path.join(KOD, "aktarici", "sohbet.py"), encoding="utf-8").read())
 fs = [f for f in sh.body if isinstance(f, ast.FunctionDef) and f.name == "ses_caliyor"]
 fb = [f for f in agac.body if isinstance(f, ast.Assign) and any(getattr(t, "id", "") == "SES_MESGUL_SN" for t in f.targets)]
@@ -107,12 +105,12 @@ def koy2(m, cal=None):
         n2["SES_K"].notify()
 koy2("Birinci söz burada."); time.sleep(0.2)
 ok("ilk ses beklenirken (kuyruk boş, çalıcı yok) ses_caliyor True", n2["ses_caliyor"]() is True)
-while n2["ses_caliyor"](): time.sleep(0.02)  # üçlü sohbet: önceki söz bitince sıradakini koyar (kisilik.py oku, uclu-sahne.py _sahne_oku_satir)
+while n2["ses_caliyor"](): time.sleep(0.02)
 t_bos = time.time(); bas = {}; koy2("İkinci söz burada.", cal=lambda t: bas.setdefault("t", t))
 t1 = time.time()
 while time.time() - t1 < 3 and not bas: time.sleep(0.02)
 bosluk = round(((bas.get("t") or time.time()) - t_bos) * 1000)
-ok(f"üçlü boşluk ölçümü gerçek ilk ses gecikmesi (≈ 400 ms, 3000 değil): {bosluk} ms", 300 <= bosluk <= 800)
+ok(f"ardışık okuma boşluğu gerçek ilk ses gecikmesi (≈ 400 ms, 3000 değil): {bosluk} ms", 300 <= bosluk <= 800)
 time.sleep(1.2); ok("okuma bitince ses_caliyor False", n2["ses_caliyor"]() is False)
 # Toplantı sonu özeti ("ozet" öğesi): tek ses, Mac sesine hiçbir koşulda düşmez; okunamayan parça atlanır, neden günlüğe yazılır
 LOG = []; pr = lambda *a, **k: LOG.append(" ".join(str(x) for x in a))

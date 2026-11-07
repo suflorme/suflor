@@ -137,7 +137,7 @@ shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(E, "aktarici")); shu
 # geçmiş toplantı: Orbitek geçiyor; döküm satırında kanarya (yalnız yerelde kalmalı)
 open(os.path.join(canli, "2026-10-30-1000-Gecmis-Toplanti.md"), "w", encoding="utf-8").write("# Gecmis Toplanti\n\n| 10:01 | Deniz T | Orbitek Yazılım sözleşmesi KANARYA-DOKUM-7731 üzerinden konuşuldu. | |\n")
 ayar_y = os.path.join(E, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": E, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_on_ac": False,
-                                                    "pocket_python": "/yok/python", "pocket_hf": "/yok", "tepki_sesleri": os.path.join(E, "yok"), "konusma": False}, open(ayar_y, "w"))
+                                                    "pocket_python": "/yok/python", "pocket_hf": "/yok", "konusma": False}, open(ayar_y, "w"))
 p = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=E, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ayar_y, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0"),
                      stdout=open(os.path.join(E, "r.log"), "w"), stderr=subprocess.STDOUT)
 try:

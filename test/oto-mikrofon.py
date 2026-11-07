@@ -22,7 +22,7 @@ def takvim(olaylar): json.dump({"durum": "ok", "olaylar": olaylar}, open(os.path
 olay = lambda i, ad, b, s: {"id": i, "baslik": ad, "baslangic": iso(simdi + datetime.timedelta(minutes=b)), "bitis": iso(simdi + datetime.timedelta(minutes=s)),
                             "tum_gun": False, "takvim": "İş", "platform": None, "baglanti": None, "katilimcilar": ["Deniz Yıldız"], "kisi_sayisi": 2}
 takvim([olay("e0", "Akşam görüşmesi", 240, 270)])
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
                                                "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))

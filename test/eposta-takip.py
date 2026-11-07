@@ -139,7 +139,7 @@ ENDUSTRI = [dict(x, t=(datetime.datetime.now().astimezone() - datetime.timedelta
 json.dump({"durum": "ok", "hata": None, "guncel": "2026-11-11T10:00:00Z", "iletiler": ENDUSTRI}, open(os.path.join(d, "posta.json"), "w"))
 ay = os.path.join(U, "ayar.json")
 json.dump({"alan": "Deneme", "ad": "Deniz T", "port": port, "uygulama": U, "proje": os.path.join(U, "p"), "ortak": os.path.join(U, "yok"), "claude": "/yok/claude", "konus_on_ac": False, "eposta_oku": True,
-           "eposta_vip": ["Selin Deneme"], "tepki_sesleri": os.path.join(U, "ty"), "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
+           "eposta_vip": ["Selin Deneme"], "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
 os.makedirs(os.path.join(U, "p"))
 lg = open(os.path.join(U, "log"), "w")
 pr = subprocess.Popen([sys.executable, "relay.py", "--dir", d, "--port", str(port)], cwd=U, stdout=lg, stderr=subprocess.STDOUT,

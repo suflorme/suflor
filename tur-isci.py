@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # Suflor.me tur sonu işçisi (v0.48.0): smart-turn v3 (Daily, BSD-2, 8 MB ONNX) — "konuşmacının cümlesi bitti mi" olasılığı.
-# Konuşurken "hı hı"nın kapısı (aktarici/bas-konus.py _hihi_bak): kural bir duraksama bulunca son ≤ 8 sn ses buraya gelir; olasılık eşiğin
-# altındaysa (cümle ortası, düşünme duraksaması) "hı hı" çalmaz. Ölçüm testler/smart-turn-20261016.md (Türkçe iki kayıt: doğru anda çalma
-# %47–58 → eşik 0,95'te %71–74).
+# Sohbet kipinin tur sonu seçicisi (aktarici/sohbet.py): duraksamada son ≤ 8 sn ses buraya gelir; olasılık eşiğin altındaysa (cümle ortası,
+# düşünme duraksaması) bekleme uzar. Ölçüm testler/smart-turn-20261016.md (Türkçe iki kayıt: doğru anda karar %47–58 → eşik 0,95'te %71–74).
 # Girdi (stdin, satır başına JSON): {"id": n, "pcm": base64 int16 16 kHz tek kanal}; çıktı: {"id": n, "p": 0–1, "ms": çıkarım}
 # Açılışta {"hazir": true} ya da {"hata": "..."}. Özellik çıkarımı transformers'sız: Whisper log-mel (WhisperFeatureExtractor, chunk_length=8,
-# do_normalize) numpy ile — test/hihi.py transformers'la karşılaştırır (ortamda varsa).
+# do_normalize) numpy ile 
 #   <smart-turn-venv>/bin/python -I -B tur-isci.py <model.onnx>
 import sys, json, time, base64
 import numpy as np

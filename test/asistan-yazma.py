@@ -64,7 +64,7 @@ open(os.path.join(d, "son-toplantilar.jsonl"), "w", encoding="utf-8").write(
     json.dumps({"id": "s2", "at": "2026-11-04T16:00:00", "dosya": G_ + ".md", "baslik": "Gizli", "ozet": kopya, "kopya": kopya, "gizli": True}) + "\n" +
     json.dumps({"id": "s3", "at": "2026-11-04T13:00:00", "dosya": B_ + ".md", "baslik": "İkinci toplantı", "ozet": asilB, "kopya": kopyaB}) + "\n")
 AYAR_PK = {"kayit_komutu": ["/usr/bin/python3", betik, "--yazan", "toplanti"], "kayit_alt_komutlar": ["karar", "olay", "uyu"], "kayit_bayraklar": ["--kim"], "kayit_sure_sn": 2}
-yol = os.path.join(T, "ayar.json"); json.dump({**AYAR_PK, "alan": "Deneme", "tepki_sesleri": os.path.join(T, "tepki-yok"), "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
+yol = os.path.join(T, "ayar.json"); json.dump({**AYAR_PK, "alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
     "claude": sahte, "konus_zaman_asimi_sn": 0, "konus_bekle_sn": 0, "konus_ara_sn": 0, "konus_on_ac": False, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(yol, "w"))
 P = None
 def db(sql): c = sqlite3.connect(os.path.join(d, "karar-grafi.sqlite")); r = c.execute(sql).fetchall(); c.close(); return r

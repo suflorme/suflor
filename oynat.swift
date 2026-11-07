@@ -1,4 +1,4 @@
-// Suflor.me — kesintisiz ses çalıcı (v0.32.2). Piper'ın ürettiği cümleler tek akışta çalınır: her cümleye ayrı afplay açmak cümle başına
+// Suflor.me — kesintisiz ses çalıcı (v0.32.2). Yerel sesin ürettiği cümleler tek akışta çalınır: her cümleye ayrı afplay açmak cümle başına
 // ~0,75 sn ek boşluk veriyordu (13 Ekim ölçümü), duraklama süresi kodun elinde değildi. Kullanım: suflor-oynat <örnekleme hızı>
 // stdin: ham 16 bit tek kanal PCM (parça parça gelir); stdin kapanınca kalan ses bitince çıkar. Sonlandırılınca (SIGTERM) ses hemen durur.
 // Yalnız çıkış aygıtına çalar; ağ yok, izin gerekmez.
