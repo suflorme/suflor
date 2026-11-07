@@ -590,6 +590,7 @@ header #ay{display:none}  /* Ayarlar kenar çubuğunda; #ay görünmez ama tıkl
 .emk .embl .emgr{border-top:0;gap:0}
 .emk .embl .emi{border:0;border-radius:var(--r-8);min-height:36px;padding:var(--bo-8);font-size:var(--yz-13)}
 .emk .emi.gec{color:var(--b-gec)}
+.emk .emi:not(.emust) svg.i{width:16px;height:16px;color:var(--b-m2)}.emk .emi:not(.emust):hover:not(:disabled) svg.i,.emk .emi:not(.emust):focus-visible svg.i{color:var(--b-vurgu)}.emk .emi.gec svg.i,.emk .emi.gec:hover:not(:disabled) svg.i{color:var(--b-gec)}
 .emk .emkid{font-size:var(--yz-12)}
 @media (min-width:901px){
   html.kn-yan body{padding-right:400px}
