@@ -40,7 +40,7 @@ os.makedirs(os.path.join(T, "bin2")); bozuk = os.path.join(T, "bin2", "claude");
 def ayar(ad, **ek):
     yol = os.path.join(T, ad + ".json"); json.dump(dict({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
         "claude": sahte, "konus_zaman_asimi_sn": 0, "konus_bekle_sn": 0, "konus_ara_sn": 0, "konus_on_ac": False, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, **ek), open(yol, "w")); return yol
-for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 def baslat(ad, port, ayar_yolu):
     d = os.path.join(T, ad); os.makedirs(d)

@@ -74,7 +74,7 @@ else:
     ok("metin-tani --bolge: yalnız bölgedeki yazı (altyazı satırı yok)", any("Bütçe" in s for s in o["satirlar"]) and not any("Altyazı" in s for s in o["satirlar"]))
     ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": "/Users/Shared/Suflor", "ekran_toplu_sn": 0}, open(ay, "w"))  # kanit_metin yok (varsayılan); ekran_toplu_sn 0 = her EKRAN hemen (eski davranış; toplu: test/ekran-toplu.py)
     R = os.path.join(T, "kod"); os.makedirs(R)
-    for f in ("relay.py", "manifest.json", "toplanti-claude.py", "yapi.py", "baglam.py"):
+    for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "yapi.py", "baglam.py"):
         if os.path.exists(os.path.join(KOD, f)): shutil.copy(os.path.join(KOD, f), R)
     shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(R, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(R, "pano"))
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1")

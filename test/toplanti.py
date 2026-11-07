@@ -38,7 +38,7 @@ class Aktarici:
             json.dump({"durum": "ok", "olaylar": list(olaylar)}, open(os.path.join(self.T, "takvim.json"), "w"), ensure_ascii=False)
             os.makedirs(os.path.join(self.T, "Suflor Ses.app"))  # yerel ses "kurulu" sayılsın (nabızla dinliyor)
             json.dump({"alan": "Deneme", "ad": "Ali T", "port": self.port, "uygulama": self.T, "ortak": "/Users/Shared/Suflor", "konusma": False}, open(os.path.join(self.T, "ayar.json"), "w"))
-            for f in ("relay.py", "manifest.json", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), self.T)
+            for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), self.T)
             for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(self.T, d))
         self.ac()
     def ac(self):

@@ -54,7 +54,8 @@ DOLGU = ["Bugün kısa bir toplantı yapıyoruz.", "Takvimi gözden geçirelim."
 for i in range(3): toplanti(f"Dolgu-{i}", DOLGU + ["masada bir kalem vardı, kalem kırmızıydı."], gun=5 + i)  # "kalem" küçük harfle 3 toplantıda: gündelik
 # --- ad alanı (toplanti-claude.py ogren_ad_alani ile aynı kurulum) ---------------------------------------------------------------------------------------------------------------
 def ad_alani(ayar):
-    ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "BASE": canli, "AYAR": ayar, "AYAR_YOL": AYAR_YOL, "LOCK": threading.Lock(), "print": lambda *a, **k: None}
+    sys.path.insert(0, KOD); import baglayici as _bag  # A1: so_oh_var bağlayıcı ayarına bakar
+    ns = {"_baglayici_mod": lambda: _bag, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "BASE": canli, "AYAR": ayar, "AYAR_YOL": AYAR_YOL, "LOCK": threading.Lock(), "print": lambda *a, **k: None}
     s = open(os.path.join(AK, "sozluk.py"), encoding="utf-8").read(); exec(s[:s.index('# Sesli "Claude:"')], ns)
     ag = ast.parse(open(os.path.join(AK, "bas-konus.py"), encoding="utf-8").read())
     exec(compile(ast.Module(body=[n for n in ag.body if (isinstance(n, ast.FunctionDef) and n.name in ("_ad_anahtar", "_ad_mesafe"))

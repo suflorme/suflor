@@ -553,7 +553,8 @@ header #ay{display:none}  /* Ayarlar kenar çubuğunda; #ay görünmez ama tıkl
 #bgn .sat.kns .oldu{display:grid;place-items:center;width:20px;height:20px;color:var(--b-vurgu)}#bgn .sat.kns .oldu svg.i{width:14px;height:14px}
 #bgn .sat.kns .m{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:var(--bo-4);border:0;background:none;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer}
 #bgn .sat.kns.dis .m{cursor:default}
-#bgn .sat.kns .m .t{display:block;font-size:var(--yz-15);line-height:1.4}
+#bgn .sat.kns .m{white-space:normal}  /* genel button kuralı nowrap: uzun başlık sağdaki sahip/tarih sütununa taşmasın, alt satıra geçsin */
+#bgn .sat.kns .m .t{display:block;font-size:var(--yz-15);line-height:1.4;overflow-wrap:anywhere}
 #bgn .sat.kns .m .a{display:block;font-size:var(--yz-12);color:var(--b-m3);line-height:1.4}
 #bgn .sat.kns .hizli{display:flex;align-items:center;gap:var(--bo-4);flex:none;opacity:0;transition:opacity var(--b-sure-h,.15s) ease}
 #bgn .sat.kns:hover .hizli,#bgn .sat.kns:focus-within .hizli,#bgn .sat.kns.secili .hizli{opacity:1}

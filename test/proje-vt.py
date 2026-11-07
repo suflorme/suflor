@@ -135,13 +135,14 @@ ad = (GELEN[-1] if GELEN else {}).get("adlar") or []
 ok("kişi adları Konuş ad düzeltmesine (POST /vt-bellek, dosya yok) karttan", "Ayşe Yılmaz" in ad and "Ayşe" in ad and not os.path.exists(os.path.join(U, "canli", "vt-adlar.json")), str(ad))
 kod_tc = open(os.path.join(KOD, "toplanti-claude.py"), encoding="utf-8").read()
 ns = {"os": os, "re": re, "json": json, "sys": sys, "time": time, "PROJE": P, "AYAR": json.load(open(AY))}
-exec(kod_tc[kod_tc.index("VT = AYAR.get(\"veritabani\")"):kod_tc.index("VT_GIZLI = re.compile")], ns)
+exec(kod_tc[kod_tc.index("try: import baglayici"):kod_tc.index("VT_GIZLI = baglayici.VT_GIZLI")], ns)  # A1: VT ve vt_* sarmalayıcıları bağlayıcıdan
 ns["AYAR"]["uygulama"] = U
 ok("KAYIT satırı karttan ('proje kartı, kullanıcı onaylı'), adı geçen kişi", any("proje kartı, kullanıcı onaylı" in l for l in ns["vt_kayit"]("Kemal Demir sözleşmeyi ne zaman imzalar?"))
    and any("Kemal Demir — IT" in l for l in ns["vt_kayit"]("Kemal Demir sözleşmeyi ne zaman imzalar?")), str(ns["vt_kayit"]("Kemal Demir sözleşmeyi ne zaman imzalar?")))
 # Konuş: vt_yol / proje kartı istemi (kod dilimi)
 kod_k = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-nk = {"os": os, "time": time, "json": json, "re": re, "BASE": os.path.join(U, "canli"), "print": lambda *a: None, "_t": lambda tr, en: tr, "AYAR": {"proje": P, "uygulama": U}, "_KS": {}}
+import baglayici as _bag
+nk = {"os": os, "time": time, "json": json, "re": re, "BASE": os.path.join(U, "canli"), "print": lambda *a: None, "_t": lambda tr, en: tr, "AYAR": {"proje": P, "uygulama": U}, "_KS": {}, "_baglayici_mod": lambda: _bag}
 exec(kod_k[kod_k.index("VT_TAZE_SN = "):kod_k.index("BRIFING_YASAK = ")], nk)
 ok("Konuş: kayıt veritabanı yoksa proje.db (vt_yol), kayıt veritabanı varsa o; proje_vt: false kapatır",
    nk["vt_yol"]() == os.path.join(U, "proje.db") and nk["vt_proje_mi"]() and (nk["AYAR"].update(veritabani={"yol": "kayit.db"}) or nk["vt_yol"]() == os.path.join(P, "kayit.db"))
@@ -159,7 +160,7 @@ kod_b = open(os.path.join(KOD, "aktarici", "beta-veri.py"), encoding="utf-8").re
 now = time.time(); iso = lambda t: time.strftime("%Y-%m-%dT%H:%M:%S+03:00", time.localtime(t))
 gec = [{"at": iso(now - 60), "soru": "Ayşe'nin işi ne?", "sesli": "Kayıtlarda bunu bulamadım."}, {"at": iso(now - 50), "soru": "kaç?", "sesli": "Toplam 17.530 lira."},
        {"at": iso(now - 9e5), "soru": "eski", "sesli": "bulamadım"}]
-nb = {"re": re, "os": os, "json": json, "AYAR": {"uygulama": U}, "_jsonl": lambda ad: gec if ad == "konus-gecmis.jsonl" else [{"t": now - 30, "soru": "x", "sorgu": ["SELECT 1"]}],
+nb = {"re": re, "os": os, "json": json, "AYAR": {"uygulama": U}, "_baglayici_mod": lambda: _bag, "_jsonl": lambda ad: gec if ad == "konus-gecmis.jsonl" else [{"t": now - 30, "soru": "x", "sorgu": ["SELECT 1"]}],
       "_ts": lambda r, k="at": (time.mktime(time.strptime(r[k][:19], "%Y-%m-%dT%H:%M:%S")) if isinstance(r.get(k), str) else r.get(k)),
       "beta_say": lambda ad, b, s: {"on_arama": 5, "on_arama_bos": 2}.get(ad, 0)}
 exec(kod_b[kod_b.index("BULAMADI_RX = "):kod_b.index("def _beta_olaylar(")], nb)

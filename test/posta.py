@@ -81,7 +81,8 @@ bak("gövde kipi: 1 numaralı ileti bulundu (ham), olmayan ileti 'kutu yok'", bo
 bak("gövde çıktısı da yalnız kullanıcıya (0600)", oct(os.stat(gcik).st_mode & 0o777) == "0o600")
 # --- aktarıcı tarafı (bölüm yalıtılmış ad alanında) ---
 simdi = dt.datetime.now().astimezone()
-ns = {"os": os, "re": re, "json": json, "time": time, "datetime": dt, "subprocess": subprocess, "threading": type("Th", (), {"Thread": lambda *a, **k: type("x", (), {"start": lambda s: None})()}),
+sys.path.insert(0, KOD); import baglayici as _bag  # A1: kişi/adres önbelleği bağlayıcının önbellek okuyucusundan
+ns = {"_baglayici_mod": lambda: _bag, "os": os, "re": re, "json": json, "time": time, "datetime": dt, "subprocess": subprocess, "threading": type("Th", (), {"Thread": lambda *a, **k: type("x", (), {"start": lambda s: None})()}),
       "AYAR": {"uygulama": T, "eposta_oku": True}, "BASE": T, "_t": lambda a, b: a, "_zaman": lambda t: dt.datetime.fromisoformat(t.replace("Z", "+00:00")).astimezone(),
       "_gun_ad": lambda d, s: "bugün" if d == s.date() else str(d)}
 exec(compile(open(os.path.join(KOD, "aktarici", "posta.py"), encoding="utf-8").read(), "posta.py", "exec"), ns)

@@ -51,7 +51,7 @@ for l in sys.stdin:
 ''')
 os.chmod(sahte, 0o755)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True, "konus_on_ac": True, "konus_iki_surec": True, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
-for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
 _y = (_dt.datetime.now().astimezone() + _dt.timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
@@ -319,7 +319,8 @@ try:
     ok("bekleme cümlelerinde ve istemde 'şey' yok", "Şey" not in kod_[kod_.index("BEKLE_GENEL = "):kod_.index("BEKLE_TUR = ")] and "'Şey,'" not in kod_[kod_.index("KONUS_ISTEM = {"):kod_.index("# --- Hızlı bilgi")])
     # v0.57.5 veritabanı tazelik notu: son vt_sor'dan sonra dosya değişince bir kez; okunamazsa son sorgu VT_TAZE_SN'den eskiyse
     vtd = os.path.join(proje, "vt.db"); open(vtd, "w").close()
-    ad3 = {"os": os, "time": time, "json": json, "BASE": proje, "print": lambda *a: None, "_t": lambda tr, en: tr, "AYAR": {"proje": proje, "veritabani": {"yol": "vt.db"}}, "_KS": {}}
+    sys.path.insert(0, KOD); import baglayici as _bag  # A1: uygulama klasörü içindeki kayıt veritabanı ayrıcalıksız (aktarıcı saatine bakar); dışındaki ayrıcalıklı (yalnız vt-mt.json)
+    ad3 = {"os": os, "time": time, "json": json, "BASE": proje, "print": lambda *a: None, "_t": lambda tr, en: tr, "AYAR": {"proje": proje, "uygulama": proje, "veritabani": {"yol": "vt.db"}}, "_KS": {}, "_baglayici_mod": lambda: _bag}
     exec(kod_[kod_.index("VT_TAZE_SN = "):kod_.index("BRIFING_YASAK = ")], ad3)
     ks = ad3["_KS"]; n0 = ad3["_vt_tazele_notu"]()
     ks["vt_son"] = (time.time(), ad3["_vt_mt"]()); n1 = ad3["_vt_tazele_notu"]()
@@ -335,6 +336,10 @@ try:
     json.dump({"mt": 3000.0, "kontrol": time.time() - 400}, open(mtj, "w")); m8 = ad3["_vt_mt"](); os.remove(mtj)
     ok("tazelik: dosya okunamazsa araç sunucusunun değişme saati (vt-mt.json) kullanılır, eskisi sayılmaz",
        ks["vt_son"][1] == 1000.0 and not n6 and "değişti" in (n7 or "") and m8 is None)
+    # A1: ayrıcalıklı kaynak (uygulama klasörünün dışı: Masaüstü vb.) — aktarıcı dosyanın saatine hiç bakmaz, yalnız vt-mt.json
+    ad3["AYAR"] = {"proje": proje, "uygulama": os.path.join(proje, "baska-uyg"), "veritabani": {"yol": "vt.db"}}
+    json.dump({"mt": 4000.0, "kontrol": time.time()}, open(mtj, "w")); m9 = ad3["_vt_mt"](); os.remove(mtj); m10 = ad3["_vt_mt"]()
+    ok("ayrıcalıklı kayıt veritabanı: değişme saati yalnız vt-mt.json'dan (dosya okunabilir olsa da), yoksa None", m9 == 4000.0 and m10 is None)
     ok("not soruyla gider, vt_sor turu tazelik kaydını yeniler", "vt_sor çağırmadan\" in bz" in kod_ and 'any("suflorvt__vt_so" in x for x in tur.get("araclar")' in kod_)
     # v0.57.6 önceki benzer sorunun sorgusu: vt_sor sorgusu soruyla kaydedilir; yeni süreçte benzer soruya not, açık süreçteki ya da ilgisiz soruya yok
     import datetime as _dt

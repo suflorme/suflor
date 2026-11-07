@@ -74,7 +74,7 @@ for g, b in [("Bildir.", "onay"), ("Gönder", "onay"), ("Evet, gönder.", "onay"
 # 2) yalıtılmış aktarıcı
 ay = os.path.join(T, "ayar.json")
 json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "talimat_hedefler": HEDEF, "eposta": "gmail", "eposta_adres": "deniz" + chr(64) + "ornek.test"}, open(ay, "w"))
-for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
 ORTAK = os.path.join(T, "ortak-posta"); os.makedirs(ORTAK)
 log = os.path.join(T, "relay.log"); env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_METIN="1", SUFLOR_ORTAK_POSTA=ORTAK)
@@ -294,7 +294,7 @@ KIS = "---\nad: ATLAS\nhitap: Atlas\nhitap_bicimi: sen\n{bayrak}---\n## Kişilik
 open(kis, "w", encoding="utf-8").write(KIS.format(bayrak="gorev_cikar: evet\n"))
 PORT2 = bos_port(PORT + 1); ay2 = os.path.join(T2, "ayar.json")
 json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT2, "uygulama": T2, "proje": T2, "talimat_hedefler": HEDEF, "kisilik": kis, "eposta": "gmail"}, open(ay2, "w"))
-for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T2)
+for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T2)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T2, d))
 log2 = os.path.join(T2, "relay.log"); env2 = dict(env, SUFLOR_AYAR=ay2)
 r2 = subprocess.Popen([sys.executable, "relay.py", "--dir", canli2, "--port", str(PORT2)], cwd=T2, env=env2, stdout=open(log2, "w"), stderr=subprocess.STDOUT)

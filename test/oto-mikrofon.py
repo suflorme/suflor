@@ -24,7 +24,7 @@ olay = lambda i, ad, b, s: {"id": i, "baslik": ad, "baslangic": iso(simdi + date
 takvim([olay("e0", "Akşam görüşmesi", 240, 270)])
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje,
                                                "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False}, open(ay, "w"))
-for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 LOG = os.path.join(T, "relay.log")
 def ac(): return subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(LOG, "a"), stderr=subprocess.STDOUT,

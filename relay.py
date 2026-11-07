@@ -1330,6 +1330,14 @@ def _yapi_mod():  # yapi.py aktarıcıyla aynı klasörde kurulur; yoksa (eski d
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import yapi; return yapi
     except ImportError: return None
+def _baglayici_mod():  # baglayici.py (A1, bağlayıcı sözleşmesi) aktarıcıyla aynı klasörde kurulur; yoksa dış kayıt kaynağı yok sayılır (tek satır günlük)
+    try:
+        d = os.path.dirname(os.path.abspath(__file__))
+        if sys.path[0] != d: sys.path.insert(0, d)
+        import baglayici; return baglayici
+    except ImportError:
+        if not STATE.get("_bag_yok"): STATE["_bag_yok"] = True; print("BAĞLAYICI YOK: baglayici.py yüklenemedi (kurulum eksik?) — dış kayıt kaynağı yok sayılıyor")
+        return None
 def bugun_veri_view():  # Bugün sayfası: açık işler, teyit bekleyen kararlar, son toplantının kararları (karar grafı; gizli toplantı dönmez) — yalnız anahtarlı uç
     y = _yapi_mod()
     if not y: return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}

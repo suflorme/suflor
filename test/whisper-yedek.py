@@ -157,7 +157,7 @@ try:
     if not os.path.exists(os.path.join(Q8, "weights.safetensors")): print("· 8 bit MLX modeli yok — aktarıcı katmanı atlandı")
     else:
         kod = os.path.join(T, "kod"); os.makedirs(kod)
-        for f in ("relay.py", "toplanti-claude.py", "baglam.py", "yapi.py", "teshis.py", "kullanim.py", "manifest.json", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), kod)
+        for f in ("relay.py", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py", "teshis.py", "kullanim.py", "manifest.json", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), kod)
         for dd in ("marka", "pano", "aktarici"): shutil.copytree(os.path.join(KOD, dd), os.path.join(kod, dd))
         o3 = os.path.join(T, "ortak3"); os.makedirs(os.path.join(o3, "whisper-modeller")); os.symlink(os.path.join(ORT, "whisper-venv"), os.path.join(o3, "whisper-venv"))
         shutil.copytree(COREML, os.path.join(o3, "whisper-cpp"))

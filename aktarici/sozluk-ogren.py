@@ -50,7 +50,7 @@ def _so_yol(*a): return os.path.join(BASE, *a)
 def so_kanal():  # OHOT kanalı: ayar klasörünün yanında sozluk/ (Suflor kurar, 0700; /Users/Shared değil — herkes okur)
     return os.path.expanduser(str(AYAR.get("sozluk_kanal") or os.path.join(os.path.dirname(globals().get("AYAR_YOL") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json")), "sozluk")))
 def so_oh_var():  # kayıt veritabanı ayarlı mı — beta'da yok: soru dosyası yazılmaz
-    v = AYAR.get("veritabani"); return isinstance(v, dict) and bool(v.get("yol"))
+    b = _baglayici_mod(); return bool(b) and bool((b.ayar_coz(AYAR).get("kayit") or {}).get("yol"))
 def _so_json(yol, vars_):
     try: return json.load(open(yol, encoding="utf-8"))
     except (OSError, ValueError): return vars_

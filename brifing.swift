@@ -134,8 +134,8 @@ if let bi = a.firstIndex(of: "--beyin") {
 // okunmaz silinir; gövde aynı klasördeki kart-anahtari.txt ile HMAC-SHA256 imzalı, son kullanma ≤ 5 dk, kimlik (nonce) bir kez. Komut Python'a güvenilmeden
 // burada YENİDEN doğrulanır; izinli klasörler ve proje kayıt komutu iş dosyasından değil kullanıcının ayar dosyasından okunur. Yalnız iki iş:
 //  ozet_duzelt_asil {yol, eski, yeni}: <calisma|proje>/gorusmeler ya da <kod>/testler altındaki .md/.json (gizli ad yok) dosyada eski metin TAM BİR KEZ geçiyorsa değiştirir (geçici dosya + rename).
-//  proje_kayit {alt, argumanlar}: ayar kayit_komutu = [python3 yorumlayıcısı, <proje|calisma> altındaki .py betik, sabit önek…] + kayit_alt_komutlar'daki alt komut +
-//    argümanlar (metin; "-" ile başlayan yalnız kayit_bayraklar'dakiler). Kabuksuz Process, giriş boş, zaman aşımı (kayit_sure_sn, varsayılan 30). Ayar yoksa kapalı.
+//  proje_kayit {alt, argumanlar}: ayar baglayici.kayit.yazma.komut (yoksa eski kayit_komutu) = [python3 yorumlayıcısı, <proje|calisma> altındaki .py betik, sabit önek…] + alt_komutlar
+//    (eski kayit_alt_komutlar)'daki alt komut + argümanlar (metin; "-" ile başlayan yalnız bayraklar/kayit_bayraklar'dakiler). Kabuksuz Process, giriş boş, zaman aşımı (sure_sn / kayit_sure_sn, varsayılan 30). Ayar yoksa kapalı.
 // Silme, ağ, keyfi komut yok. Sonuç <klasör>/kayit-<nonce>.sonuc.json (0600): {ok, kod, cikti, hata}. Reddedince çıkış 3.
 if let ki = a.firstIndex(of: "--kayit") {
     guard ki + 1 < a.count else { bitir(2) }
@@ -211,9 +211,17 @@ if let ki = a.firstIndex(of: "--kayit") {
         sonucYaz(true, 0, "", "", 0)
     }
     guard komut == "proje_kayit" else { sonucYaz(false, -1, "", "izinli olmayan komut", 3) }
-    guard let kk = ayar["kayit_komutu"] as? [String], kk.count >= 2, let altlar = ayar["kayit_alt_komutlar"] as? [String], !altlar.isEmpty
+    // A1 (bağlayıcı): yazma ayarı önce baglayici.kayit.yazma {komut, alt_komutlar, bayraklar, sure_sn}, alan boşsa eski üst düzey anahtarlardan (Python baglayici.ayar_coz ile aynı kural);
+    // baglayici.kayit.acik == false bağlayıcıyı (eski anahtarlar dahil) kapatır. Aşağıdaki güvenlik denetimleri (yorumlayıcı, betik yeri, izin listesi, bayrak) değişmedi.
+    let ohAyar = (ayar["baglayici"] as? [String: Any])?["kayit"] as? [String: Any]
+    let ohYazma = ohAyar?["yazma"] as? [String: Any]
+    func yazmaListe(_ yeni: String, _ eski: String) -> [String]? {
+        if let v = ohYazma?[yeni] as? [String], !v.isEmpty { return v }
+        return ayar[eski] as? [String]
+    }
+    guard (ohAyar?["acik"] as? Bool) != false, let kk = yazmaListe("komut", "kayit_komutu"), kk.count >= 2, let altlar = yazmaListe("alt_komutlar", "kayit_alt_komutlar"), !altlar.isEmpty
     else { sonucYaz(false, -1, "", "proje kayıt komutu ayarlı değil", 3) }
-    let bayraklar = Set((ayar["kayit_bayraklar"] as? [String]) ?? [])
+    let bayraklar = Set(yazmaListe("bayraklar", "kayit_bayraklar") ?? [])
     let yorumlayici = (kk[0] as NSString).expandingTildeInPath, betik = gercek((kk[1] as NSString).expandingTildeInPath)
     let pyAdi = "^python3(\\.[0-9]+)?$"  // bağ çözülmüş adı da python3: yorumlayıcı yerine başka bir araç (rm gibi) betik yolunu argüman olarak alamasın
     let kokler = ["proje", "calisma"].compactMap { ayarKlasor($0) }
@@ -256,7 +264,7 @@ if let ki = a.firstIndex(of: "--kayit") {
         while true { let d = okuyucu.availableData; if d.isEmpty { break }; if cikti.count < 16_000 { cikti.append(d) } }
         okundu.signal()
     }
-    let sure = min(max((ayar["kayit_sure_sn"] as? Double) ?? 30, 1), 120)
+    let sure = min(max((ohYazma?["sure_sn"] as? Double) ?? (ayar["kayit_sure_sn"] as? Double) ?? 30, 1), 120)
     var asim = false, bitti = false
     DispatchQueue.global().asyncAfter(deadline: .now() + sure) {
         if !bitti { asim = true; kill(-pid, SIGTERM); Thread.sleep(forTimeInterval: 2); if !bitti { kill(-pid, SIGKILL) } }

@@ -7,7 +7,7 @@ import gzip, json, os, re, shutil, subprocess, sys, tempfile, time, datetime
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 PORT = bos_port(8790)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_UYG = re.search(r'^UYG = os\.path\.join\(EV, "([^"]+)"\)', open(os.path.join(KOD, ".claude/skills/suflor-olcum/olcum.py"), encoding="utf-8").read(), re.M).group(1)  # olcum.py'nin canlı klasörü
+_UYG = "Library/Application Support/Suflor"  # A1 P5: olcum.py UYG ayardaki "uygulama"dan; ayarda yoksa bu varsayılan (EV altında)
 T = tempfile.mkdtemp(prefix="maliyet-"); EV = os.path.join(T, "ev"); canli = os.path.join(EV, _UYG, "canli"); proje = os.path.join(T, "proje")
 for d in (EV, canli, proje): os.makedirs(d)
 ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor"}, open(ay, "w"))

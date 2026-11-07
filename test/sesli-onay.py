@@ -108,7 +108,7 @@ for g, kim, tarih in [("Bana bir iş ekle: Cuma'ya kadar teklif hazırla.", "Den
 EP = "ben" + chr(64) + "ornek.test"
 ay = os.path.join(T, "ayar.json")
 json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "eposta_kimlik": EP, "ortak_gecmis": True}, open(ay, "w"))
-for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py", "yapi.py", "ortak_bulut.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py", "baglayici.py", "yapi.py", "ortak_bulut.py"): shutil.copy(os.path.join(KOD, f), T)
 for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T, d))
 log = os.path.join(T, "relay.log"); env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_METIN="1")
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, env=env, stdout=open(log, "w"), stderr=subprocess.STDOUT)

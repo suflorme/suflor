@@ -132,7 +132,7 @@ v = ns["arastirma_view"](); ok("arastirma_view listesi: son kayıtlar, tam metin
 ok("arastirma_view kötü id reddedilir", ns["arastirma_view"]("../ayar")["hata"] == "id")
 # --- 2) uçtan uca: yalıtılmış aktarıcı, pano kutusu → /girdi → araştırma ------------------------------------------------------------------------------------------------
 PORT = bos_port(8791); E = os.path.join(T, "e2e"); canli = os.path.join(E, "canli"); os.makedirs(canli); proje = os.path.join(E, "proje"); os.makedirs(proje)
-for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), E)
+for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), E)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(E, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(E, "pano"))
 # geçmiş toplantı: Orbitek geçiyor; döküm satırında kanarya (yalnız yerelde kalmalı)
 open(os.path.join(canli, "2026-10-30-1000-Gecmis-Toplanti.md"), "w", encoding="utf-8").write("# Gecmis Toplanti\n\n| 10:01 | Deniz T | Orbitek Yazılım sözleşmesi KANARYA-DOKUM-7731 üzerinden konuşuldu. | |\n")

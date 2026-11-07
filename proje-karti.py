@@ -23,7 +23,10 @@ ONB = os.path.join(UYG, "kart-onbellek"); TASLAK = os.path.join(UYG, "proje-kart
 GECMIS = os.path.join(UYG, "proje-karti-gecmis.jsonl"); SOZLUK = os.path.join(UYG, "canli", "sozluk.json")
 ISTEM_SURUM, BELGE_KAR, SINIR = 1, 24000, 300
 DUZENLI_RX = re.compile(r"^(CLAUDE\.md|[^/]*DURUM[^/]*\.md|[^/]*karar[-_ ]?defteri[^/]*\.md)$", re.I)  # kökte ya da bir alt klasörde
-VT = AYAR.get("veritabani") if isinstance(AYAR.get("veritabani"), dict) and AYAR["veritabani"].get("yol") else None
+_KOD = os.path.dirname(os.path.abspath(__file__))
+if sys.path[0] != _KOD: sys.path.insert(0, _KOD)
+import baglayici  # A1: dış kayıt kaynağı bağlayıcı sözleşmesinden (ayar baglayici.kayit ya da eski veritabani); bu süreç aktarıcı değil, dosyayı kendisi açar
+VT = (baglayici.yukle(AYAR) or [None])[0]  # SqliteKayit ya da None (kayıt veritabanı kipi kapalı)
 UNVAN = {"bey", "hanim", "hn", "bay", "bayan", "mr", "mrs", "ms", "dr", "prof"}
 
 ISTEM = """Aşağıda bir proje klasöründeki tek bir belgenin metni var; köşeli parantez içindeki değerler konumdur.
@@ -200,15 +203,15 @@ def birlestir(sonuclar, duzenli_var):
 # --- Veritabanı kipi --------------------------------------------------------------------------------------------------
 def vt_oku():
     if not VT: return None
-    yol = os.path.join(PROJE, VT["yol"]) if not os.path.isabs(VT["yol"]) else VT["yol"]
-    out = {"kaynak": "veritabani", "yol": VT["yol"]}
-    try: c = sqlite3.connect(f"file:{yol}?mode=ro", uri=True); c.execute("SELECT 1").fetchone()
-    except sqlite3.Error as e: out["hata"] = f"veritabanı açılamadı ({e.__class__.__name__})"; return out
+    out = {"kaynak": "veritabani", "yol": VT.yol}
+    hata = VT.dene()  # açılabiliyor mu (eski SELECT 1 denemesi)
+    if hata: out["hata"] = f"veritabanı açılamadı ({hata.split(':')[0]})"; return out
     for bol, k in (("kisiler", "kisiler"), ("kararlar", "kararlar"), ("acik_isler", "gorevler")):
-        if not VT.get(k): out[bol] = None; continue
-        try: out[bol] = [[str(v) for v in r] for r in c.execute(VT[k]).fetchmany(500)]
-        except sqlite3.Error as e: out[bol] = None; out.setdefault("sorgu_hatasi", []).append(f"{k}: {str(e)[:80]}")
-    c.close(); return out
+        if not str(VT.sorgular.get(k) or "").strip(): out[bol] = None; continue
+        satir = VT.satirlar(k)
+        if not satir and VT.son_hata: out[bol] = None; out.setdefault("sorgu_hatasi", []).append(f"{k}: {VT.son_hata[:80]}"); continue
+        out[bol] = [[str(v) for v in r] for r in satir[:500]]
+    return out
 
 # --- Komutlar ---------------------------------------------------------------------------------------------------------
 def cikar(sinir=SINIR, model=None, paralel=4, tahmin=False, sessiz=True, ilerleme=None):  # ilerleme(n, toplam): sihirbaz (hazirlik.py)

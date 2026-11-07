@@ -23,6 +23,13 @@ def ayar_oku():
     return v
 AYAR = ayar_oku()
 PROJE = AYAR["proje"]  # hesabın proje (bağlam) klasörü
+_KOD = os.path.dirname(os.path.abspath(__file__))  # A1: dış kayıt kaynağı ayarı bağlayıcı sözleşmesinden (baglayici.ayar_coz: baglayici.kayit ya da eski veritabani); importlib ile yüklenince klasör yolda olmayabilir
+if sys.path[0] != _KOD: sys.path.insert(0, _KOD)
+try: import baglayici
+except ImportError: baglayici = None  # kütüphane: baglayici.py olmayan eski kopyada (deneme klasörü) eski veritabani ayarına düşer
+def _oh():
+    if baglayici: return baglayici.ayar_coz(AYAR).get("kayit") or {}
+    return AYAR["veritabani"] if isinstance(AYAR.get("veritabani"), dict) else {}
 # v0.137.0: Suflor'un kendi dosyaları (_canli, gorusmeler, _arsiv, .claude) çalışma klasöründe — içi dolu belge klasörü proje seçildiyse <proje>/Suflor
 CALISMA = os.path.expanduser(str(AYAR.get("calisma") or PROJE))
 _ck = os.path.relpath(CALISMA, PROJE) if CALISMA != PROJE else ""
@@ -628,8 +635,7 @@ SF_DATALESS = 0x40000000  # macOS: içeriği yalnız bulutta duran dosya (iCloud
 def bulutta(st): return bool(getattr(st, "st_flags", 0) & SF_DATALESS)
 def tara(c=None, sessiz=True):
     c = c or baglan(); t0 = time.time()
-    vt = AYAR.get("veritabani") if isinstance(AYAR.get("veritabani"), dict) else {}
-    disa = [str(d).strip("/") for d in (vt.get("disa_aktarim") or []) if str(d).strip("/")]
+    disa = [str(d).strip("/") for d in (_oh().get("disa_aktarim") or []) if str(d).strip("/")]
     eski = {r[0]: r[1:] for r in c.execute("SELECT yol, mtime, boy, sha256, minhash, hata FROM tarama")}
     eris, atlanan, kayit, bulut = [], collections.Counter(), [], collections.Counter()
     hata_kayit = (lambda e: eris.append(os.path.relpath(e.filename, PROJE) if e.filename else ""))
@@ -936,7 +942,7 @@ PROJE_VT = os.path.join(AYAR["uygulama"], "proje.db"); PROJE_VT_KAYIT = os.path.
 PROJE_KART = os.path.join(AYAR["uygulama"], "proje-karti.json")
 TABLO_UZ = {".xlsx", ".xls", ".numbers", ".csv", ".tsv"}
 TABLO_SATIR_EN_COK, TABLO_SUTUN_EN_COK, PROJE_VT_SATIR_EN_COK = 20000, 80, 300000
-def proje_vt_acik(): return not (isinstance(AYAR.get("veritabani"), dict) and AYAR["veritabani"].get("yol")) and AYAR.get("proje_vt", True) is not False
+def proje_vt_acik(): return not _oh().get("yol") and AYAR.get("proje_vt", True) is not False
 def _slug(s, en_cok=40):
     s = re.sub(r"[^0-9a-z]+", "_", norm(str(s or ""))).strip("_")
     return (s[:en_cok].rstrip("_") or "x") if not s[:1].isdigit() else ("s" + s)[:en_cok]
@@ -1358,7 +1364,7 @@ def ara(q, kim=None, turler=None, son=None, n=8, dosya_basina=2, guncel=True, ka
             gor = {r[0] for r in once}
             return (once + [r for r in genel if r[0] not in gor])[:n], ek or ek2
     return ara_ic(c, q, kim, turler, son, n, dosya_basina, kapsam, aralik, eski, disa)
-VT_KIPI = isinstance(AYAR.get("veritabani"), dict) and bool(AYAR["veritabani"].get("yol"))
+VT_KIPI = bool(_oh().get("yol"))
 IKINCIL = 0.7  # türetilmiş/dışa aktarım parçasının puan çarpanı (küçük = geride). v0.138.0: 0,9 → 0,7 (YAKIN_ESIK ile proje seti 6/11 → 8/11, görüşme 34/46 aynı)
 # v0.138.0: sonuçta neredeyse aynı metin ikinci kez yer kaplamaz (aynı adlı .md/.xlsx ikizi, tablonun tekrar eden satırları ilk 5'i dolduruyordu);
 # sözcük kümesi örtüşmesi (Jaccard) bu eşiğin üstündeyse sonraki atlanır. None: kapalı. Eşik proje + görüşme soru setiyle seçildi (olcum.py proje).

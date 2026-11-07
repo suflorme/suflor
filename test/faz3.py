@@ -13,7 +13,7 @@ sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspa
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 T = tempfile.mkdtemp(prefix="suflor-ss-"); PORT = bos_port(8792); URL = f"http://127.0.0.1:{PORT}"
-for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 canli = os.path.join(T, "canli"); os.makedirs(canli); os.makedirs(os.path.join(T, "proje"))

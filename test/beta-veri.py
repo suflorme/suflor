@@ -80,7 +80,7 @@ procs = []
 try:
     # ---------- 2) uçtan uca aktarıcı ----------
     kod = os.path.join(T, "kod"); os.makedirs(kod)
-    for f in ("relay.py", "toplanti-claude.py", "baglam.py", "yapi.py", "teshis.py", "kullanim.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), kod)
+    for f in ("relay.py", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py", "teshis.py", "kullanim.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), kod)
     for d in ("marka", "pano", "aktarici"): shutil.copytree(os.path.join(KOD, d), os.path.join(kod, d))
     uyg = os.path.join(T, "uyg"); canli = os.path.join(uyg, "canli"); os.makedirs(canli); os.makedirs(os.path.join(T, "proje"))
     PORT = bos_port(8798)

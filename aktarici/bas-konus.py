@@ -97,23 +97,20 @@ def konus_vt_hazirla():  # → MCP yapılandırma dosyasının yolu ya da None
 VT_TAZE_SN = 600
 # v0.121.0: kayıt veritabanı ayarlı değilse Suflor'un proje veritabanı (<uygulama>/proje.db: Excel/CSV/Numbers sayfaları + onaylı proje kartı;
 # baglam.py proje_vt_guncelle). Araçlar aynı (toplanti-claude.py vt-mcp kendisi seçer); aktarıcı App Support'taki bu dosyayı doğrudan okuyabilir.
+def _vt_bag():  # → bağlayıcı sözleşmesindeki etkin kaynak (kayıt veritabanı ya da proje veritabanı) ya da None (A1: ayar baglayici.kayit ya da eski veritabani — baglayici.ayar_coz)
+    b = _baglayici_mod()
+    if not b: return None
+    if not AYAR.get("uygulama"): y = b.yukle(AYAR); return y[0] if y else None
+    return b.etkin_vt(AYAR)
 def vt_proje_mi():
-    v = AYAR.get("veritabani")
-    return not (isinstance(v, dict) and v.get("yol")) and AYAR.get("proje_vt", True) is not False and bool(AYAR.get("uygulama")) \
-        and os.path.isfile(os.path.join(os.path.expanduser(AYAR["uygulama"]), "proje.db"))
-def vt_yol():  # → kayıt ya da proje veritabanının yolu, yoksa None
-    v = AYAR.get("veritabani")
-    if isinstance(v, dict) and v.get("yol"): return os.path.join(os.path.expanduser(AYAR.get("proje") or ""), os.path.expanduser(v["yol"]))
-    return os.path.join(os.path.expanduser(AYAR["uygulama"]), "proje.db") if vt_proje_mi() else None
-def _vt_mt():  # kayıt veritabanının değişme saati (launchd'deki aktarıcı Masaüstü'nü okuyamazsa araç sunucusunun dakikada bir yazdığı canli/vt-mt.json; o da eskiyse None)
-    y = vt_yol()
-    if not y: return None
-    try: return os.path.getmtime(y)
-    except OSError: pass
-    try:  # v0.58.2: araç sunucusu Konuş süreci açıkken çalışır; 150 sn'den eski kayıt sayılmaz (süreç kapanmış)
-        d = json.load(open(os.path.join(BASE, "vt-mt.json"), encoding="utf-8"))
-        return float(d["mt"]) if d.get("mt") and time.time() - float(d.get("kontrol") or 0) <= 150 else None
-    except (OSError, ValueError, TypeError, KeyError): return None
+    b = _vt_bag(); return bool(b) and b.tur == "proje"
+def vt_yol():  # → kayıt ya da proje veritabanının yolu, yoksa None (yalnız yol; aktarıcı ayrıcalıklı bağlayıcının dosyasını açmaz)
+    b = _vt_bag(); return b.dosya() if b else None
+def _vt_mt():  # kayıt veritabanının değişme saati. Ayrıcalıklı (Masaüstü vb.) kaynakta aktarıcı dosyaya hiç dokunmaz: araç sunucusunun dakikada bir yazdığı canli/vt-mt.json (150 sn'den eskiyse None)
+    b = _vt_bag()
+    if not b: return None
+    t = None if b.ayricalikli_okuma else b.degisim_zamani()
+    return t if t is not None else _baglayici_mod().onbellek_okuyucu(BASE).degisim_zamani()
 def _vt_tazele_notu():
     s = _KS.get("vt_son")
     if not s or _KS.get("vt_not") == s: return ""
@@ -303,7 +300,7 @@ def konus_istem(vt=None, bilgi=None, web=False):
                         "the user-approved project card (source document in the kaynak column); tables starting with t_ are Excel/CSV/Numbers sheets (source file in the tablolar "
                         "table, satir = row in the source). For totals, averages, counts, largest/smallest, compute with SQL on the right t_ table instead of adding rows yourself; "
                         "put the table's source file in the written part.\n")
-        kur = (AYAR.get("veritabani") or {}).get("kurallar") if isinstance(AYAR.get("veritabani"), dict) else None  # alanın sayım tanımları (ayar; veri)
+        kur = ((_baglayici_mod().ayar_coz(AYAR).get("kayit") or {}).get("kurallar") if _baglayici_mod() else None)  # alanın sayım tanımları (ayar baglayici.kayit.kurallar ya da eski veritabani.kurallar; veri)
         kur = "\n".join(f"- {str(x)[:300]}" for x in (kur if isinstance(kur, list) else [kur] if kur else [])[:12])
         if kur and any(y in kur for y in BRIFING_YASAK): print("KONUŞ: veritabani.kurallar'da yardımcının yasak sözcüğü var — isteme konmadı"); kur = ""
         if kur: t += _t("\n[Sayım tanımları — aynı soruya hep bu ölçütle bak]\n", "\n[Counting definitions — always use these criteria]\n") + kur + "\n[/tanımlar]\n"
@@ -477,8 +474,8 @@ def onara_al(ms, kapsam):  # → (blok, son_tur) — önceden aranmışsa onu, d
 VT_IZLE_TAZE_SN, VT_IZLE_YENIDEN_SN = 150, 300
 _VTI = {"t": 0.0, "durum": None}
 def vt_izle_bak(simdi=None):  # → True: yardımcı açıldı
-    v = AYAR.get("veritabani")
-    if not isinstance(v, dict) or not v.get("yol") or not os.path.isdir(BRIFING_APP) or kaynak_dar(): return False  # C fazı: dar/kritikte yardımcı açılmaz
+    b = _vt_bag()
+    if not b or not b.ayricalikli_okuma or not os.path.isdir(BRIFING_APP) or kaynak_dar(): return False  # C fazı: dar/kritikte yardımcı açılmaz; yalnız ayrıcalıklı (aktarıcının açamadığı) kaynakta yardımcı okur
     # yalnız asıl aktarıcı (deneme aktarıcıları gerçek ayarla çalışınca gerçek yardımcıyı kendi deneme klasörü için 6 saatliğine açıyordu)
     if os.path.realpath(BASE) != os.path.realpath(os.path.join(os.path.expanduser(AYAR.get("uygulama") or ""), "canli")) and not os.environ.get("SUFLOR_VT_IZLE_DENEME"): return False
     simdi = simdi or time.time()

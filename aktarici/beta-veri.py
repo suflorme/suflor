@@ -108,8 +108,8 @@ def _beta_bilgi(bas, son):
     return {"konus_cevap": len(g), "bulamadi": sum(1 for r in g if BULAMADI_RX.search(str(r.get("sesli") or "") + " " + str(r.get("ayrinti") or ""))),
             "veritabani_sorgu": len(sq), "on_arama": beta_say("on_arama", bas, son), "on_arama_bos": beta_say("on_arama_bos", bas, son)}
 def _beta_proje_vt():
-    v = AYAR.get("veritabani")
-    if isinstance(v, dict) and v.get("yol"): return {"kayit_vt": True, "kuruldu": False}  # yalnız seçenek ve sayı (teshis.temizle: "tur" sabit değerli anahtar)
+    b = _baglayici_mod()
+    if b and (b.ayar_coz(AYAR).get("kayit") or {}).get("yol"): return {"kayit_vt": True, "kuruldu": False}  # yalnız seçenek ve sayı (teshis.temizle: "tur" sabit değerli anahtar)
     try: k = json.load(open(os.path.join(AYAR["uygulama"], "proje-vt.json"), encoding="utf-8"))
     except (OSError, ValueError): return {"kayit_vt": False, "kuruldu": False}
     kart = k.get("kart") if isinstance(k.get("kart"), dict) else {}

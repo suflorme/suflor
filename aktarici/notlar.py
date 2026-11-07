@@ -101,8 +101,8 @@ def kutu_yedek(hata=None):  # asistan çalışamadı (_konus_kur durum=hata): be
 # Aktarıcı launchd'den çalıştığı için Masaüstü'ne erişemez: Masaüstü'ne dokunan kısmı (asıl özet dosyası, projenin kendi kayıt betiği) Masaüstü izni olan
 # "Suflor Brifing.app --kayit <iş dosyası>" yapar (brifing.swift kayıt kipi): iş canlı klasörde tek kullanımlık, kart-anahtari.txt ile HMAC imzalı, 2 dk geçerli;
 # yardımcı komutu kendi izin listesinden ve kullanıcının ayar dosyasından yeniden doğrular. Yardımcı kurulu değilse aktarıcı asıl dosyayı kendisi dener.
-# Proje kayıt betiği (proje_kayit): ayar kayit_komutu = [python3, <proje>/…/betik.py, sabit önek…], kayit_alt_komutlar = [izinli alt komutlar], isteğe bağlı
-# kayit_bayraklar = [izinli "--bayrak"lar], kayit_sure_sn. Ayar yoksa komut izin listesinde de asistanın kuralında da yoktur. ⚙ Ayarlar'da gösterilmez (elle ayar dosyası).
+# Proje kayıt betiği (proje_kayit): ayar baglayici.kayit.yazma {komut, alt_komutlar, bayraklar, sure_sn} (A1; yoksa eski kayit_komutu = [python3, <proje>/…/betik.py, sabit önek…],
+# kayit_alt_komutlar = [izinli alt komutlar], isteğe bağlı kayit_bayraklar = [izinli "--bayrak"lar], kayit_sure_sn); doğrulama ve yazma baglayici.py oner/yaz. Ayar yoksa komut izin listesinde de asistanın kuralında da yoktur. ⚙ Ayarlar'da gösterilmez (elle ayar dosyası).
 KAYIT_ETIKET_BAS = re.compile(r"\[\s*KAYIT\s*:", re.I)  # sesli okuma da bu noktada durur (bas-konus.py)
 KAYIT_TUR_EN_COK, KAYIT_TEKRAR_SN = 5, 1800
 KAYIT_SORULAN = {}  # öneri imzası → zaman (aynı öneri yeniden sorulmaz)
@@ -129,12 +129,10 @@ KAYIT_KURAL = {"tr": ("[Kayıt yazma] Kullanıcı kayıtlarda bir değişiklik i
                      "if it isn't there, don't invent one — ask. The user approves each write with one click on the panel: don't say «done», say «sent for your approval». "
                      "The tag isn't shown. No deleting files, email or other systems.")}
 
-def proje_kayit_ayar():  # → {"komut", "alt", "bayrak"} ya da None (ayar yoksa proje_kayit hiç yok)
-    k, alt = AYAR.get("kayit_komutu"), AYAR.get("kayit_alt_komutlar")
-    if not (isinstance(k, list) and len(k) >= 2 and all(isinstance(x, str) and x and "\0" not in x for x in k)): return None
-    if not (isinstance(alt, list) and alt and all(isinstance(x, str) and _KAYIT_ALT_RX.match(x) for x in alt)): return None
-    bay = [x for x in (AYAR.get("kayit_bayraklar") or []) if isinstance(x, str) and _KAYIT_BAYRAK_RX.match(x)]
-    return {"komut": k, "alt": list(alt), "bayrak": bay}
+def _kayit_bag():  # A1: yazma ayarı geçerli kayıt veritabanı bağlayıcısı (baglayici.yazan) ya da None; ayar baglayici.kayit.yazma önce, yoksa eski kayit_komutu/kayit_alt_komutlar/kayit_bayraklar/kayit_sure_sn
+    b = _baglayici_mod(); return b.yazan(AYAR) if b else None
+def proje_kayit_ayar():  # → {"komut", "alt", "bayrak", "sure"} ya da None (ayar yoksa proje_kayit hiç yok)
+    b = _kayit_bag(); return b.yazma_ayari() if b else None
 
 def kayit_kural():  # asistanın kayıt kuralı; proje kayıt betiği ayarlıysa izinli alt komutlarıyla
     m = _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]); pk = proje_kayit_ayar()
@@ -269,17 +267,21 @@ def kayit_dogrula(komut, arg):  # → (hazır iş sözlüğü, None) ya da (None
     return {"komut": komut, "kopya": r[1], "asil": str(r[0].get("ozet") or ""), "eski": eski, "yeni": yeni,
             "ozet": _t(f"«{kisa(r[0].get('baslik'), 50)}» özetinde «{kisa(eski, 60)}» → «{kisa(yeni, 60)}»", f"in summary «{kisa(r[0].get('baslik'), 50)}»: «{kisa(eski, 60)}» → «{kisa(yeni, 60)}»")}, None
 
-def _proje_kayit_dogrula(arg):  # Brifing.app aynısını kendi tarafında yeniden doğrular (ayar dosyasından)
-    pk = proje_kayit_ayar()
-    if not pk: return None, _t("izinli olmayan komut (proje_kayit)", "command not allowed (proje_kayit)")
-    if not isinstance(arg, dict) or set(arg) != {"alt", "argumanlar"}: return None, _t("argümanlar uymuyor", "arguments don't match")
-    alt, ar = arg["alt"], arg["argumanlar"]
-    if not isinstance(alt, str) or alt not in pk["alt"]: return None, _t(f"alt komut izinli değil ({str(alt)[:40]})", f"subcommand not allowed ({str(alt)[:40]})")
-    if not isinstance(ar, list) or len(ar) > 20 or any(not isinstance(x, str) or len(x) > 2000 or "\0" in x for x in ar): return None, _t("argümanlar metin listesi değil", "arguments aren't a list of text")
-    kotu = [x for x in ar if x.startswith("-") and x not in pk["bayrak"]]
-    if kotu: return None, _t(f"izinli olmayan bayrak ({kotu[0][:40]})", f"flag not allowed ({kotu[0][:40]})")
+def _proje_kayit_dogrula(arg):  # Brifing.app aynısını kendi tarafında yeniden doğrular (ayar dosyasından). Doğrulama kuralları bağlayıcıda (oner); iletiler burada (iki dilli)
+    b = _kayit_bag()
+    if not b: return None, _t("izinli olmayan komut (proje_kayit)", "command not allowed (proje_kayit)")
+    try: h = b.oner(arg)
+    except _baglayici_mod().BaglayiciHata as e:
+        kod, det = (list(e.args) + ["", ""])[:2]
+        return None, {"yazma_yok": _t("izinli olmayan komut (proje_kayit)", "command not allowed (proje_kayit)"),
+                      "arguman_uymuyor": _t("argümanlar uymuyor", "arguments don't match"),
+                      "alt_izinli_degil": _t(f"alt komut izinli değil ({det})", f"subcommand not allowed ({det})"),
+                      "arguman_liste": _t("argümanlar metin listesi değil", "arguments aren't a list of text"),
+                      "bayrak_izinli_degil": _t(f"izinli olmayan bayrak ({det})", f"flag not allowed ({det})")}.get(kod, _t("proje kaydı uygun değil", "project record not valid"))
+    alt, ar = h["alt"], h["argumanlar"]
     goster = " ".join(x if x and re.match(r"^[\w.,:/@%+=-]+$", x) else "«" + " ".join(x.split())[:80] + "»" for x in ar)
-    return {"komut": "proje_kayit", "alt": alt, "argumanlar": list(ar), "ozet": _t(f"proje kaydı: {alt} {goster}", f"project record: {alt} {goster}")[:400]}, None
+    h["ozet"] = _t(f"proje kaydı: {alt} {goster}", f"project record: {alt} {goster}")[:400]
+    return h, None
 
 def kayit_oz_klasorler():  # asıl özetin yazılabileceği klasörler (Brifing.app kayıt kipi aynısını ayardan kurar): <calisma|proje>/gorusmeler, <kod>/testler
     k = []
@@ -302,7 +304,7 @@ def kayit_brifing(komut, arg):  # → (True, sonuç sözlüğü) ya da (False, n
     g = {"v": 1, "komut": komut, "arg": arg, "son": int(time.time()) + 120, "nonce": nonce}
     if os.environ.get("SUFLOR_AYAR"): g["ayar"] = os.environ["SUFLOR_AYAR"]  # deneme aktarıcısı (yalnız deneme derlemesi kabul eder)
     govde = json.dumps(g, ensure_ascii=False)
-    sure = min(max(float(AYAR.get("kayit_sure_sn") or 30), 1), 120) + 30
+    sure = min(max(float((proje_kayit_ayar() or {}).get("sure") or AYAR.get("kayit_sure_sn") or 30), 1), 120) + 30  # baglayici.kayit.yazma.sure_sn önce
     try:
         fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"govde": govde, "imza": hmac.new(anahtar.encode(), govde.encode(), hashlib.sha256).hexdigest()}, f, ensure_ascii=False)
@@ -337,11 +339,17 @@ def kayit_uygula(is_):  # onaylanmış işi yapar (önce yeniden doğrular) → 
         elif k == "is_ekle": x = y.soz_ekle(BASE, h["kim"], h["metin"], h["tarih"], h["toplanti"], h["baslik"]); ok_ = bool(x); h["ozet"] += f" ({x['id']})" if x else ""
         elif k == "soru_kapat": ok_ = bool(y.kayit_durum(BASE, h["id"], "cevaplandi")[0])  # ortak katman: olay günlüğü üzerinden (durum_degisti)
         elif k == "proje_kayit":  # projenin kendi kayıt betiği: Brifing.app kayıt kipi (Masaüstü izni orada; kabuksuz, zaman aşımlı)
-            b, r = kayit_brifing("proje_kayit", {"alt": h["alt"], "argumanlar": h["argumanlar"]})
-            if not b: return False, r
-            cik = _kayit_tek_satir(r.get("cikti"))
-            if not r.get("ok"): return False, (str(r.get("hata") or _t("betik hata verdi", "the script failed")) + (f" — {cik}" if cik else ""))[:400]
-            ok_ = True; h["ozet"] += f" — {cik}" if cik else ""
+            yakala = {}
+            def _cal(komut, arg):  # bağlayıcının yaz()'ı bunu çağırır; sonuç sözlüğü (cikti) iletiye gider
+                yakala["b"], yakala["r"] = kayit_brifing(komut, arg); return yakala["b"], yakala["r"]
+            try: _kayit_bag().yaz(h, _cal)
+            except _baglayici_mod().BaglayiciHata as e:
+                if e.args[0] == "calistirilamadi": return False, e.args[1]
+                if e.args[0] == "betik_hata":
+                    r = e.args[1]; cik = _kayit_tek_satir(r.get("cikti"))
+                    return False, (str(r.get("hata") or _t("betik hata verdi", "the script failed")) + (f" — {cik}" if cik else ""))[:400]
+                return False, _t("proje kaydı uygun değil", "project record not valid")
+            cik = _kayit_tek_satir(yakala["r"].get("cikti")); ok_ = True; h["ozet"] += f" — {cik}" if cik else ""
         else:  # ozet_duzelt: panodaki kopya; asıl dosya izinli özet klasöründeyse Brifing.app kayıt kipiyle (yoksa aktarıcı kendisi dener)
             ok_ = _kayit_degistir(h["kopya"], h["eski"], h["yeni"]); asil = os.path.realpath(os.path.expanduser(h["asil"])) if h["asil"] else ""
             kl = kayit_oz_klasorler()

@@ -31,7 +31,7 @@ try:
     os.makedirs(os.path.join(T, "canli"), exist_ok=True)  # aktarıcının canli/ klasörü (vt-mt.json, vt-sonuc.json buraya)
     m = subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "vt-mcp"], input=girdi, capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=ay, PYTHONDONTWRITEBYTECODE="1"))
     c = {o["id"]: o for o in (json.loads(x) for x in m.stdout.splitlines() if x.strip())}
-    ok("MCP: initialize + tools/list (vt_sema, vt_sor)", c.get(1, {}).get("result", {}).get("protocolVersion") == "2025-06-18" and [x["name"] for x in c.get(2, {}).get("result", {}).get("tools", [])] == ["vt_sema", "vt_sor"])
+    ok("MCP: initialize + tools/list (vt_sema, vt_sor, kisi_bul)", c.get(1, {}).get("result", {}).get("protocolVersion") == "2025-06-18" and [x["name"] for x in c.get(2, {}).get("result", {}).get("tools", [])] == ["vt_sema", "vt_sor", "kisi_bul"])
     t3 = c.get(3, {}).get("result", {}); t4 = c.get(4, {}).get("result", {})
     ok("MCP: vt_sor sonucu doğru ve gizli sütun maskeli; DELETE hata olarak döner", "Ayla K\t***" in t3.get("content", [{}])[0].get("text", "") and t4.get("isError") is True)
     import glob; mtj = glob.glob(os.path.join(T, "**", "vt-mt.json"), recursive=True)

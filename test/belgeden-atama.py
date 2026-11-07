@@ -119,6 +119,10 @@ TODO: Lisans yenilemesini kontrol et, sorumlu: Doruk Ersoy, 15.12.2026
     vc.execute("CREATE TABLE is_kaydi (id INTEGER PRIMARY KEY, tur TEXT, baslik TEXT, sahip TEXT, ne_zaman TEXT, acik INTEGER, oncelik TEXT, sira INTEGER)")
     vc.executemany("INSERT INTO is_kaydi (tur, baslik, sahip, ne_zaman, acik) VALUES (?,?,?,?,?)", [("is", "Yedekleme planını yaz", "Doruk Ersoy", "", 1), ("is", "Kapanmış veritabanı işi", "Doruk Ersoy", "", 0), ("adim", "Sıradaki adım iş değil", "", "", 1)]); vc.commit(); vc.close()
     GQ = "SELECT baslik, sahip, ne_zaman, 'iş kaydı #' || id FROM is_kaydi WHERE acik = 1 AND tur = 'is' ORDER BY oncelik IS NULL, coalesce(sira, 999999), id"
+    # A1: aktarıcı veritabanını (Masaüstü'nde olabilir) hiç açmaz; veritabanı yardımcısının (vt-izle) yazdığı önbelleği okur. Önbellek bu noktada yazılır,
+    # sonra veritabanına yalnız orada duran bir iş eklenir: sonuçta çıkmazsa aktarıcı dosyayı açmamıştır.
+    vc = sqlite3.connect(VDB); json.dump({"satirlar": [list(r) for r in vc.execute(GQ)], "t": 1}, open(os.path.join(C, "vt-gorevler.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    vc.execute("INSERT INTO is_kaydi (tur, baslik, sahip, ne_zaman, acik) VALUES ('is', 'Yalnız veritabanında duran iş', 'Doruk Ersoy', '', 1)"); vc.commit(); vc.close()
     json.dump({"alan": "Deneme", "ad": "Ece Deneme", "uygulama": UY, "veritabani": {"yol": VDB, "gorevler": GQ}, "proje": T, "ortak": "/Users/Shared/Suflor", "port": PORT, "gelistirici": True, "konusma": False, "yerel_ses": False}, open(AY, "w"))
     rl = subprocess.Popen([sys.executable, "relay.py", "--dir", C, "--port", str(PORT)], cwd=KOD, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_TEST_BASLAT="1", SUFLOR_AYAR=AY),
                           stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
@@ -132,12 +136,12 @@ TODO: Lisans yenilemesini kontrol et, sorumlu: Doruk Ersoy, 15.12.2026
         except urllib.error.HTTPError as e: return {"_kod": e.code}
     bak("/belge-oneri anahtarsız 401", al("/belge-oneri", False).get("_kod") == 401)
     a = al("/belge-oneri"); ao = {x["metin"]: x for x in a.get("oneriler") or []}
-    bak("/belge-oneri: kayıt veritabanının açık işi (kapanmış ve adım yok) + proje kartı + bağlamdaki belge (önbellekten), bağlantı okunmaz", a.get("ok") and set(ao) == {"Eğitim takvimini çıkar", "Kurulum rehberini çevir", "Yedekleme planını yaz"}, a)
+    bak("/belge-oneri: kayıt veritabanının açık işi (kapanmış ve adım yok) + proje kartı + bağlamdaki belge (önbellekten), bağlantı okunmaz; veritabanı dosyası açılmaz (yalnız önbellek)", a.get("ok") and set(ao) == {"Eğitim takvimini çıkar", "Kurulum rehberini çevir", "Yedekleme planını yaz"}, a)
     k = al("/belge-oneri", govde={"id": ao["Eğitim takvimini çıkar"]["id"], "islem": "kabul"})
     x = yapi.ortak_kayit(C, k.get("kayit_id") or "-") or {}
     bak("POST kabul: kayit_olustu + is_atandi, sahibin e-postası takvimden", k.get("ok") and k["olaylar"] == ["kayit_olustu", "is_atandi"] and (x.get("roller") or {}).get("sahip", {}).get("eposta") == "doruk.ersoy" + AT + "firma.test", (k, x.get("roller")))
     rr = al("/belge-oneri", govde={"id": ao["Kurulum rehberini çevir"]["id"], "islem": "reddet"}); a2 = al("/belge-oneri")
-    bak("veritabanı dosyası değişmedi (yalnız okuma)", sqlite3.connect(VDB).execute("SELECT count(*) FROM is_kaydi").fetchone()[0] == 3)
+    bak("veritabanı dosyası değişmedi (yalnız okuma)", sqlite3.connect(VDB).execute("SELECT count(*) FROM is_kaydi").fetchone()[0] == 4)  # 3 + yalnız veritabanında duran iş (A1 sınaması)
     bak("POST reddet → listeden düşer; bilinmeyen öneri kabul edilmez", rr.get("ok") and [x["metin"] for x in a2.get("oneriler") or []] == ["Yedekleme planını yaz"] and not al("/belge-oneri", govde={"id": "o" + "0" * 15, "islem": "kabul"}).get("ok"))
 finally:
     if rl: rl.terminate()

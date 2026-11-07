@@ -252,6 +252,17 @@ Masaüstü izni olan Suflor Brifing yardımcısı yapar (tek kullanımlık, imza
   olduğu gibi gider), girişi boştur, `kayit_sure_sn` saniyede (en çok 120) bitmezse durdurulur; çıktısının başı cevabın altına düşer. Gizli kipte hiçbir kayıt yazılmaz.
   Silme ya da dosya okuyan alt komutları listeye koyma.
 
+**Bağlayıcı şeması (yeni, A1):** `kayit_komutu` gibi eski anahtarlar hâlâ okunur; yeni yazılan ayarlar `baglayici` altında tek yerde durur. Örnek (`kayit` adlı bağlayıcı):
+  ```json
+  "baglayici": {"kayit": {"tur": "sqlite_kayit", "yol": "~/Proje/kayit.db",
+    "sorgular": {"kisiler": "SELECT …", "kararlar": "SELECT …"},
+    "kurallar": ["…"],
+    "yazma": {"komut": ["/usr/bin/python3", "~/Proje/araclar/kayit.py"], "alt_komutlar": ["karar", "olay"], "bayraklar": ["--kim", "--kaynak"], "sure_sn": 30}}}
+  ```
+  Aynı alanlar eski anahtarlarla da yazılabilir (`veritabani.yol`, `veritabani.kisiler`, `kayit_komutu`, `kayit_alt_komutlar`, `kayit_bayraklar`, `kayit_sure_sn`). İkisi de varsa yeni olan kazanır ve günlüğe
+  "AYAR: … gölgeliyor" satırı düşer. `"acik": false` bağlayıcıyı kapatır (eski anahtarlar dahil). Ayar dosyası bu geçişte hiçbir zaman kendiliğinden yazılmaz.
+  Brifing.app'in kayıt yazma komutu (`yazma`) yeni şemayı henüz okumuyorsa, o alanlar üst düzey `kayit_*` anahtarlarında kalır.
+
 ## Döküm kontrolü (yalnız geliştirici kurulumu)
 Beta kurulumunda görünmez; geliştirici kurulumunda ses arşivi açıkken (ayar `ses_arsivi`) çalışır, hepsi yerel (ağ çağrısı yok, beta veri paketine bir şey girmez). Gizli ve deneme toplantıları listeye girmez.
 Toplantı bitip ses arşivi ve (varsa) hakem dökümü hazır olunca aktarıcı bir kontrol listesi hazırlar; panoda Bugün'de "Döküm kontrolü hazır" satırı çıkar, `Kontrole başla` sayfayı (`/dokum-kontrol`) açar.

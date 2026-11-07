@@ -919,7 +919,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "aktarici/", "kullanim.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "baglayici.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 # v0.136.0 (26 Ekim kişisel hesap: ses-isci.py, pano/hazirlik.html, test/platform.py kalmıştı): önceki imzalı listede olup yenisinde olmayan ve
 # özeti değişmemiş dosya silinir; kullanıcının koyduğu ya da değiştirdiği dosya kalır. Aynı kural kur.sh'de (bash).
@@ -1951,7 +1951,7 @@ def guncelle(kaynak=None, zorla=False):
 SWIFT_YARDIMCI = (("Suflor Takvim.app", "takvim.swift", "SuflorTakvim"), ("Suflor Ses.app", "ses-yardimcisi.swift", "SuflorSes"), ("Suflor Brifing.app", "brifing.swift", "SuflorBrifing"),
                   ("Suflor Oynat.app", "oynat.swift", "SuflorOynat"), ("Suflor Metin.app", "metin-tani.swift", "SuflorMetin"), ("Suflor Posta.app", "posta.swift", "SuflorPosta"))
 DOGRULA_KURULUM_ANAHTAR = {"alan", "ad", "port", "uygulama", "proje", "ortak", "kod", "calisma", "haric", "durum_belgesi", "sozluk_xlsx", "sozluk_siki", "sozluk_kaynagi", "komut_sablondan",
-                           "takvim_adreslerim", "takvim_haric", "eposta_adres", "dahil", "asil", "veritabani", "oto_haric"}
+                           "takvim_adreslerim", "takvim_haric", "eposta_adres", "dahil", "asil", "veritabani", "baglayici", "oto_haric"}
 def _gelistirici():  # relay.py gelistirici_mi() ile aynı ölçüt: ayar gelistirici true ya da kod klasörü git klonu (SUFLOR_TEST_KOD deneme için)
     a = ayar()
     if a.get("gelistirici") is True: return True

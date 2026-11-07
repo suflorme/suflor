@@ -16,7 +16,7 @@ ay = os.path.join(DESTEK, "ayar.json"); GIZLI_DEGER = "gizli-deger-93817"
 AYAR = {"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": APP, "proje": os.path.join(T, "proje"), "ortak": ORTAK, "kod": KOD, "toplantiya_ses": True, "konusma": False, "yerel_ses": False,
         "oto_toplanti": False, "eposta_adres": f"{GIZLI_DEGER}@ornek.com", "kisilik_bellek": GIZLI_DEGER, "sozluk_ek": ["Deniz Yıldız"], "tema": "koyu"}
 json.dump(AYAR, open(ay, "w"))
-for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py", "kurulum.py"): shutil.copy(os.path.join(KOD, f), APP)
+for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py", "baglayici.py", "kurulum.py"): shutil.copy(os.path.join(KOD, f), APP)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(APP, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(APP, "pano"))
 ORT = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_EV=EV, SUFLOR_AYAR=ay, SUFLOR_TEST_PAYLASILAN=ORTAK, SUFLOR_TEST_TAKAS="9.5,10.0", SUFLOR_TEST_BLACKHOLE="yok", SUFLOR_TEST_HIZLI="1", SUFLOR_TEST_KULAKLIK="0", SUFLOR_TEST_KOD=os.path.join(T, "yok-kod"))  # kod klasörü yok: git klonu değil (beta); aktarıcı da uygulama klasöründeki kopyaya düşer
 LOG = os.path.join(T, "relay.log")

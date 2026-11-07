@@ -741,38 +741,31 @@ GENEL = {"not", "kagit", "banka", "lokal", "kendi", "tarayici", "sifre", "vendor
         | set(AYAR.get("sistem_genel") or [])  # ayar: alanın katalogundaki genel adlar
 GENEL_ILK = {"not", "kagit", "banka", "lokal", "kendi", "tarayici", "sifre", "vendor", "komisyon", "finansman", "yapay"}
 EK_SISTEM = ["Gmail", "SharePoint", "Supabase", "Vaultwarden", "1Password", "Claude", "ChatGPT", "Gemini", "Copilot", "Notion", "Slack", "Asana"] + list(AYAR.get("ek_sistem") or [])
-# alanın kayıt veritabanı (isteğe bağlı, ayar "veritabani": {"yol": <proje içinde .db>, "sistemler": "SELECT ad FROM …", …}).
-# Yalnız okunur açılır (mode=ro) ve yalnız SELECT/WITH sorgusu çalışır; yoksa ya da okunamazsa sessizce boş döner (eski davranış).
-VT = AYAR.get("veritabani") if isinstance(AYAR.get("veritabani"), dict) else {}
-# v0.121.0: kayıt veritabanı yoksa Suflor'un proje veritabanı (<uygulama>/proje.db — baglam.py proje_vt_guncelle: Excel/CSV/Numbers sayfaları +
-# onaylı proje kartı). Aynı araçlar (vt_sema, vt_sor, KAYIT satırları) her kurulumda; hangi yapay zekâ çalışırsa çalışsın bilgi SQL'le aynı yerden.
+# alanın kayıt veritabanı (isteğe bağlı) ve Suflor'un proje veritabanı (<uygulama>/proje.db, v0.121.0: kayıt veritabanı yoksa) A1'den bağlayıcı sözleşmesinin
+# arkasında (baglayici.py; ayar baglayici.kayit ya da eski "veritabani"). Yalnız okunur açılır ve yalnız SELECT/WITH çalışır; yoksa ya da okunamazsa sessizce boş döner.
+# Aşağıdaki VT / vt_* adları eski çağıranlar ve testler için ince sarmalayıcı (sonraki adımdan sonra temizlenir); yeni çağrı doğrudan _BAG'i kullanır.
+try: import baglayici
+except ImportError as e:  # kurulumda dosya eksikse açıkça düş: "bağlayıcı yok" gibi davranmak sessiz bozulma olur
+    sys.stderr.write(f"BAĞLAYICI YOK: baglayici.py yüklenemedi ({e}); kurulum eksik (kurulum.py KOPYA)\n"); raise
+_BAG = baglayici.etkin_vt(AYAR)  # kayıt veritabanı, yoksa ProjeVT, yoksa None
+_VTB = _BAG if _BAG is not None else baglayici.bos(PROJE)
+VT = baglayici.EskiGorunum(_VTB)  # eski sözlük görünümü: VT["yol"], VT.get("proje_vt"), VT["<sorgu>"]
 PROJE_VT = os.path.join(AYAR["uygulama"], "proje.db")
-if not VT.get("yol") and AYAR.get("proje_vt", True) is not False and os.path.isfile(PROJE_VT):
-    VT = {"yol": PROJE_VT, "proje_vt": True,
-          "kisiler": "SELECT ad || CASE WHEN takma_adlar != '' THEN ', ' || takma_adlar ELSE '' END, ad || CASE WHEN roller != '' THEN ' — ' || roller ELSE '' END "
-                     "|| CASE WHEN kurumlar != '' THEN ' · ' || kurumlar ELSE '' END || CASE WHEN kaynak != '' THEN ' (kaynak: ' || kaynak || ')' ELSE '' END FROM kisi"}
-def vt_sorgu(anahtar, *param):
-    q = str(VT.get(anahtar) or "").strip()
-    if not VT.get("yol") or not re.match(r"(?is)^(select|with)\b", q) or ";" in q.rstrip(";"): return []
-    import sqlite3, pathlib
-    try:
-        con = sqlite3.connect(pathlib.Path(os.path.join(PROJE, VT["yol"])).resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
-        try: return con.execute(q, param).fetchall()
-        finally: con.close()
-    except Exception: return []
+def vt_sorgu(anahtar, *param): return _VTB.satirlar(anahtar, *param)
 # kayıt özetleri: "kisiler" / "sistemler_kart" sorguları (eşleşme adları virgülle, tek satır özet) döndürür. Metinde geçen ad
-# Türkçe harfleri sadeleşmiş kelime dizisi olarak aranır (3 harften kısa ad yok sayılır). Tek okuma, süreç boyunca bellekte.
+# Türkçe harfleri sadeleşmiş kelime dizisi olarak aranır (3 harften kısa ad yok sayılır). Bellekte; veritabanı değişince yeniden okunur (anahtar + değişme saati).
 _VT_ON = {}
 def vt_satirlar(anahtar):
-    if anahtar not in _VT_ON:
+    mt = _VTB.degisim_zamani()
+    if anahtar not in _VT_ON or _VT_ON[anahtar][0] != mt:
         import baglam
         out = []
         for row in vt_sorgu(anahtar):
             if len(row) < 2 or not row[1]: continue
             adlar = {" ".join(baglam.kelimeler(x)) for x in re.split(r"[,/()—]| - ", str(row[0] or ""))}
             out.append(([a for a in adlar if len(a) >= 3], str(row[1])))
-        _VT_ON[anahtar] = out
-    return _VT_ON[anahtar]
+        _VT_ON[anahtar] = (mt, out)
+    return _VT_ON[anahtar][1]
 def vt_eslesen(anahtar, metin, n=2):
     import baglam
     t = " " + " ".join(baglam.kelimeler(metin or "")) + " "
@@ -785,47 +778,12 @@ def vt_kayit(metin, n=2):
     sat = (si[:1] + ki[:1] + si[1:] + ki[1:])[:n]
     if sat and VT.get("proje_vt"): return ["  KAYIT (proje kartı, kullanıcı onaylı):"] + ["    " + l[:330] for l in sat]
     return [f"  KAYIT ({VT.get('yol')}, tablo esas):"] + ["    " + l[:330] for l in sat] if sat else []
-VT_GIZLI = re.compile(r"(?i)(sifre|şifre|parola|password|passwd|token|secret|gizli|anahtar|api_?key|\bkey\b|otp|2fa|totp|recovery|kurtarma)")
-class VtHata(Exception): pass
-def _vt_baglan():
-    if not VT.get("yol"): raise VtHata("Kayıt veritabanı ayarlı değil (ayar veritabani.yol).")
-    import sqlite3, pathlib
-    try:
-        con = sqlite3.connect(pathlib.Path(os.path.join(PROJE, VT["yol"])).resolve().as_uri() + "?mode=ro", uri=True, timeout=3)
-        con.execute("PRAGMA query_only = ON"); gor = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'view'")}
-        con.set_authorizer(lambda e, a1, a2, vt, kaynak: _vt_yetki(e, a1, a2, kaynak, gor)); return con
-    except Exception as e: raise VtHata(f"Kayıt veritabanı açılamadı ({e.__class__.__name__}).")
-# v0.97.2 (güvenlik denetimi O4): maske yalnız sonuç sütununun adına bakıyordu — "SELECT sifre AS x", ifade içi ya da alt sorgu açık değer veriyordu.
-# Yetkilendirici gizli sütunun sorgudaki her okumasını NULL'a çevirir (WHERE'de de: değer tahmin edilemez). Görünümün kendi içindeki okuma serbest
-# (görünüm tanımı veritabanı sahibinin; dışarıya çıkan görünüm sütunu yine ada göre NULL). WITH (CTE) da "kaynak" adı taşır: yalnız veritabanında
-# tanımlı görünümün adı serbest. ATTACH ve table_info dışı PRAGMA reddedilir.
-def _vt_yetki(eylem, a1, a2, kaynak, gorunumler):
-    import sqlite3
-    if eylem == sqlite3.SQLITE_READ: return sqlite3.SQLITE_IGNORE if kaynak not in gorunumler and a2 and VT_GIZLI.search(a2) else sqlite3.SQLITE_OK
-    if eylem == sqlite3.SQLITE_ATTACH: return sqlite3.SQLITE_DENY
-    if eylem == sqlite3.SQLITE_PRAGMA: return sqlite3.SQLITE_OK if str(a1 or "").lower() in ("table_info", "query_only") else sqlite3.SQLITE_DENY
-    return sqlite3.SQLITE_OK
-def vt_sema_metin():
-    con = _vt_baglan(); sat = []
-    for ad, tur in con.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name").fetchall():
-        kol = [r[1] for r in con.execute(f'PRAGMA table_info("{ad}")')]
-        try: n = con.execute(f'SELECT count(*) FROM "{ad}"').fetchone()[0]
-        except Exception: n = "?"
-        sat.append(f"{ad} ({'görünüm' if tur == 'view' else 'tablo'}, {n} satır): " + ", ".join(k + (" [gizli]" if VT_GIZLI.search(k) else "") for k in kol))
-    return "\n".join(sat)
-def vt_sor_metin(q):
-    q = str(q or "").strip().rstrip(";").strip()
-    if not re.match(r"(?is)^(select|with)\b", q) or ";" in q or re.search(r"(?i)\b(attach|detach|pragma|insert|update|delete|drop|create|alter|replace|vacuum|reindex|load_extension)\b", q):
-        raise VtHata("Yalnız tek bir SELECT/WITH sorgusu çalışır.")
-    con = _vt_baglan()
-    for v, in con.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():  # O4: görünüm adlı CTE yetkilendiriciyi şaşırtır
-        if re.search(r'(?i)["`\[]?\b' + re.escape(v) + r'\b["`\]]?\s*(\([^()]*\))?\s*AS\s+(NOT\s+)?(MATERIALIZED\s+)?\(', q):
-            raise VtHata(f"WITH adı bir görünümün adıyla aynı olamaz ({v}).")
-    try: cur = con.execute(q)
-    except Exception as e: raise VtHata(f"Sorgu hatası: {str(e)[:200]}")
-    kol = [d[0] for d in (cur.description or [])]; gz = [bool(VT_GIZLI.search(k)) for k in kol]; rows = cur.fetchmany(61)
-    sat = ["\t".join(kol)] + ["\t".join("***" if g else ("" if v is None else " ".join(str(v).split())[:200]) for v, g in zip(r, gz)) for r in rows[:60]]
-    return "\n".join(sat + [f"({min(len(rows), 60)} satır" + ("; 60'tan fazla — sorguyu daralt" if len(rows) > 60 else "") + ")"])
+VT_GIZLI = baglayici.VT_GIZLI
+VtHata = baglayici.BaglayiciHata
+_vt_yetki = baglayici._vt_yetki  # güvenlik kodu (O4 yetkilendiricisi, maske, CTE reddi, 60 satır) baglayici.py'de, aynen taşındı
+def _vt_baglan(): return _VTB._baglan()
+def vt_sema_metin(): return _VTB.sema_metin()
+def vt_sor_metin(q): return _VTB.sor(q)
 def vt_sema_cmd():
     try: print(vt_sema_metin())
     except VtHata as e: print(e); sys.exit(1)
@@ -869,11 +827,7 @@ VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Mas
 # Konuş benzer soruda taze sonucu soruyla verir: Claude araç turu olmadan cevaplar (~3 sn kazanç). Toplantı içeriği değil, yalnız sorgu ve maskeli sonuç.
 VT_SONUC_ONBELLEK = "vt-sonuc.json"; VT_SONUC_EN_COK = 40; VT_DENETIM_SN = 60
 VT_MT_DOSYA = "vt-mt.json"  # v0.58.2: veritabanı dosyasının değişme saati, denetimde yazılır — aktarıcının tazelik notu için (kendisi okuyamaz)
-def _vt_mt():  # WAL kipinde yazma önce -wal'a gider; .db'nin saati ancak checkpoint'te değişir — ikisinin en yenisi
-    try: y = os.path.join(PROJE, VT["yol"])
-    except (KeyError, TypeError): return None
-    mt = [os.path.getmtime(f) for f in (y, y + "-wal") if os.path.exists(f)]
-    return max(mt) if mt else None
+def _vt_mt(): return _VTB.degisim_zamani()  # WAL kipinde .db ile -wal'ın en yenisi (baglayici)
 def _vt_mt_yaz(dosya):
     try:
         y = os.path.join(dosya, VT_MT_DOSYA)
@@ -883,34 +837,11 @@ def _vt_mt_yaz(dosya):
 # 3 Kasım (sözlük 2. aşama): kişi adları (ayar veritabani.kisiler, ilk sütun virgüllü) ve öğrenen sözlüğün
 # terimleri (veritabani.terimler; yoksa VT_TERIMLER_SORGU — yalnız terim + tür, takma adın bağlamı yalnız süzgeçte) dosyaya yazılmaz: aktarıcıya
 # anahtarlı POST /vt-bellek ile gider, aktarıcı bellekte tutar (Konuş ad düzeltmesi + sozluk-ogren.py ikinci katmanı). Aktarıcı yeniden açılınca vt-izle yeniden gönderir.
-VT_TERIMLER_SORGU = """with t as (
-  select k.ad terim, 'kisi' tur,
-    (select group_concat(kt.ad, ' | ') from kisi_takma kt
-      where kt.kisi_id = k.id and kt.ad <> k.ad and kt.ad not like '%@%'
-        and coalesce(kt.baglam,'') not like '%adı değil%') takma_adlar,
-    k.guncelleme son_gorulme
-  from kisi k where k.durum <> 'Birleştirildi' and k.tur <> 'ortak_hesap'
-  union all select ad, 'firma', null, son_gorulme from dis_firma
-  union all select ad, 'sistem', null, guncelleme from sistem
-  union all select ad, 'sistem', null, null from ajan
-) select * from t where terim is not null"""
-def _vt_terimler():  # → [{terim, tur, takma}] — kilit hatasında 1,5 sn bekleyip bir kez daha (WAL; immutable=1 kullanılmaz)
+VT_TERIMLER_SORGU = baglayici.VT_TERIMLER_SORGU  # kayıt veritabanı bağlayıcısının varsayılan terimler sorgusu (ayar sorgular.terimler ezer)
+def _vt_terimler():  # → [{terim, tur, takma}] — kilit hatasında 1,5 sn bekleyip bir kez daha (baglayici); proje veritabanında yok
     if not VT.get("yol") or VT.get("proje_vt"): return []
-    q = str(VT.get("terimler") or VT_TERIMLER_SORGU).strip().rstrip(";")
-    if not re.match(r"(?is)^(select|with)\b", q) or ";" in q: return []
-    import sqlite3, pathlib
-    for den in range(2):
-        try:
-            con = sqlite3.connect(pathlib.Path(os.path.join(PROJE, VT["yol"])).resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
-            try: rows = con.execute(q).fetchall()
-            finally: con.close()
-            return [{"terim": str(r[0]).strip(), "tur": str(r[1] or "") if len(r) > 1 else "", "takma": [x.strip() for x in str((r[2] if len(r) > 2 else "") or "").split("|") if x.strip()]}
-                    for r in rows if r and r[0] and str(r[0]).strip()]
-        except sqlite3.OperationalError as e:
-            if den == 0 and re.search(r"locked|busy", str(e), re.I): time.sleep(1.5); continue
-            return []
-        except Exception: return []
-    return []
+    try: return _VTB.terimler()
+    except baglayici.YetenekYok: return []
 def _vt_kisi_adres():  # ortak karar katmanı: ayar veritabani.kisi_adres satırları [[adlar "Ad, lakap", adresler "a@x,b@y"], …] → aktarıcının kimlik modülüne (bellekte; /vt-bellek)
     return [[str(r[0] or "")[:300], str(r[1])[:600]] for r in vt_sorgu("kisi_adres") if r and len(r) > 1 and r[1] and "@" in str(r[1])][:20000]
 def _vt_adlar(): return sorted({x.strip() for r in vt_sorgu("kisiler") for x in str((r or [""])[0] or "").split(",") if len(x.strip()) >= 3})

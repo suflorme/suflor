@@ -33,6 +33,7 @@ def ad_alani(ayar):
     wh = open(os.path.join(AK, "whisper-hat.py"), encoding="utf-8").read(); a = wh.index("# Süreli ses arşivi"); b = wh.index("# --- Konuşmacı ses izi")
     exec(compile(wh[a:b].replace("try: _sa_t = threading.Timer(30", "try: None and threading.Timer(30"), "ses-arsivi-blok", "exec"), ns)
     ns["_sa_tmutil"] = lambda y: None
+    sys.path.insert(0, KOD); import importlib; _bag = importlib.import_module("baglayici"); ns["_baglayici_mod"] = lambda: _bag  # A1: so_oh_var bağlayıcıdan okur
     for ad in ("sozluk-ogren.py", "sozluk-hakem.py", "dokum-kontrol.py"): exec(compile(open(os.path.join(AK, ad), encoding="utf-8").read(), ad, "exec"), ns)
     return ns
 # --- kurgu toplantı ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

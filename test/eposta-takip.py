@@ -131,7 +131,7 @@ NS["AYAR"]["eposta_sessiz"] = ""; ok("sessiz saat boşsa yok", not N("et_sessiz_
 # --- Yalıtılmış aktarıcıda uçlar (sahte posta.json; claude yok, ağ yok) ----------------------------------------------------------------------------------
 from bosport import bos_port
 U = tempfile.mkdtemp(prefix="etakip-uc-")
-for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), U)
+for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), U)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(U, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(U, "pano"))
 port = bos_port(8793); d = os.path.join(U, "canli"); os.makedirs(d)
 ENDUSTRI = [m(1, A("selin"), "Teklif onayı?", 5, ad="Selin Deneme", ozet="Fiyatı onaylar mısın"), m(2, A("noreply", "haber.test"), "Bülten", 1, ozet="unsubscribe")]

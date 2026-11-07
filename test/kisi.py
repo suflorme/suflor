@@ -48,7 +48,7 @@ tc = oku("toplanti-claude.py")
 kontrol("tc: kisi alt komutu, kisi_ara aktarıcı /kisi'ye gider, MCP kisi_bul aracı listede ve çağrılabilir",
         'sub.add_parser("kisi"' in tc and '"kisi": kisi_cmd' in tc and 'get("/kisi?ad="' in tc and '{"name": "kisi_bul"' in tc and 'if ad == "kisi_bul": metin, hata = kisi_ara(' in tc)
 rl = oku("relay.py")
-kontrol("relay: /kisi okuma ucu anahtar ister (VERI_GET) ve kisi_bul'a bağlı", '"/gundem-taslagi", "/kisi"}' in rl and 'if yol == "/kisi":' in rl and "kisi_bul(ad)" in rl)
+kontrol("relay: /kisi okuma ucu anahtar ister (VERI_GET) ve kisi_bul'a bağlı", '"/kisi"' in rl.split('VERI_GET = ',1)[1].split('}',1)[0] and 'if yol == "/kisi":' in rl and "kisi_bul(ad)" in rl)
 bk = oku("aktarici", "bas-konus.py")
 kontrol("Konuş: kisi_bul aracı izin listesinde ve istemde, brifing.swift mcp__suflorvt__ önekini zaten tanır", "mcp__suflorvt__kisi_bul" in bk and "kisi_bul aracıyla" in bk and 'hasPrefix("mcp__suflorvt__")' in oku("brifing.swift"))
 sw = oku("takvim.swift"); ku = oku("kurulum.py")

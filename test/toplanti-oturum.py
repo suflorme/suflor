@@ -125,7 +125,7 @@ ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T",
                                                "toplanti_bilgi_kaynaklari": [{"sunucu": "claude.ai Deneme Metrik", "araclar": ["get_*", "list_*", "query_*", "compare_*"],
                                                                               "konu": "deneme satış ve kanal metrikleri", "ad": "Deneme Metrik"}]}, open(ay, "w"))
 json.dump({"tc": os.path.join(T, "toplanti-claude.py"), "canli": canli, "relay": f"http://127.0.0.1:{PORT}", "ayar": ay}, open(os.path.join(T, "bin", "ortam.json"), "w"))
-for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "baglam.py", "toplanti-claude.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T,
                      env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_OTURUM="1", SUFLOR_TEST_KULAKLIK="0"),

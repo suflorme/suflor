@@ -63,13 +63,15 @@ def posta_kisiler(soru, basta=False):  # soruda geçen kişi adları / adresleri
 # v0.88.0 (kullanıcı 19 Ekim: "db'de kişi listesinden check etmesi gerekir"): kayıt veritabanı aracının yazdığı canli/vt-kisi-adres.json (ayar veritabani.kisi_adres
 # sorgusu; aktarıcı veritabanını okuyamaz) — sorudaki ad bir kişinin adı/lakabı/takma adıyla eşleşirse o kişinin bütün adları ve e-posta adresleri aranır.
 _VTKA = {"mt": None, "v": []}
-def posta_vt_kisiler():
+def posta_vt_kisiler():  # A1: bağlayıcının önbellek okuyucusundan (OnbellekOkuyucu.kisiler: ad, takma, adresler); dosya değişince yeniden okunur
     y = os.path.join(BASE, "vt-kisi-adres.json")
     try: mt = os.path.getmtime(y)
     except OSError: return []
+    b = _baglayici_mod()
+    if not b: return []
     if mt != _VTKA["mt"]:
-        try: _VTKA.update(mt=mt, v=[k for k in (json.load(open(y, encoding="utf-8")).get("kisiler") or []) if isinstance(k, dict)])
-        except (OSError, ValueError): _VTKA.update(mt=mt, v=[])
+        try: _VTKA.update(mt=mt, v=[{"adlar": [k["ad"]] + list(k.get("takma") or []), "adresler": list(k.get("adresler") or [])} for k in b.onbellek_okuyucu(BASE).kisiler()])
+        except (OSError, ValueError, b.YetenekYok): _VTKA.update(mt=mt, v=[])
     return _VTKA["v"]
 def posta_vt_genislet(kisiler):  # ["ayla"] → kişinin öteki adları + adresleri (küçük harf)
     out = []

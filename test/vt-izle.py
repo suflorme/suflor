@@ -65,6 +65,7 @@ try:
     ad = {"os": os, "json": json, "time": time, "subprocess": SP, "print": lambda *a: None, "BASE": canli, "BRIFING_APP": app,
           "AYAR": {"veritabani": {"yol": "kayit.db"}, "uygulama": T}, "threading": None, "kaynak_dar": lambda: False}  # 3 Kasım: kaynak_dar (C fazı) eksikti, test burada duruyordu
     bol = kod[kod.index("# --- Veritabanı önbelleği yardımcısı"):kod.index("def _vt_izle_dongu(")]
+    sys.path.insert(0, KOD); import baglayici as _bag; ad["_baglayici_mod"] = lambda: _bag; exec(kod[kod.index("def _vt_bag():"):kod.index("def vt_proje_mi():")], ad)  # A1: etkin bağlayıcı (ayrıcalıklı okuma bayrağı)
     exec(bol, ad); bak = ad["vt_izle_bak"]; os.remove(os.path.join(canli, "vt-mt.json"))
     t0 = 1_000_000.0
     ok("önbellek yoksa yardımcı açılır (--vt-izle <canli>)", bak(t0) and acilan[-1][-2:] == ["--vt-izle", canli] and "-g" in acilan[-1])

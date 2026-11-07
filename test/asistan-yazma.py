@@ -38,7 +38,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 100, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "whisper-isci.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "whisper-isci.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 # kayıtlar: açık toplantı A (k1 teyit bekliyor, k2 onaylı, s3 açık iş, q4 açık soru) ve gizli toplantı G (k5)
 sys.path.insert(0, T); import yapi
@@ -229,7 +229,8 @@ try:
     rc, so, _ = is_calistir("dosya_sil", {"yol": asilB}); rc2, _, _ = is_calistir("ozet_duzelt_asil", {"yol": asilB, "eski": "Sahip Ali", "yeni": "x"}, govde_ek={"fazla": 1})
     ok("bilinmeyen komut ve gövdede fazla alan reddedilir", rc == 3 and rc2 == 3 and os.path.exists(asilB))
     import re as _re, threading as _th, datetime as _dt
-    ns = {"AYAR": {}, "_t": lambda a, b: a, "re": _re, "os": os, "json": json, "time": time, "datetime": _dt, "threading": _th, "BASE": d, "LOCK": _th.Lock()}
+    import baglayici as _bag  # A1: yazma ayarı ve doğrulama bağlayıcıda (T kopyası)
+    ns = {"_baglayici_mod": lambda: _bag, "AYAR": {}, "_t": lambda a, b: a, "re": _re, "os": os, "json": json, "time": time, "datetime": _dt, "threading": _th, "BASE": d, "LOCK": _th.Lock()}
     exec(open(os.path.join(KOD, "aktarici", "notlar.py"), encoding="utf-8").read(), ns)
     ok("aktarıcıda ayar yokken proje_kayit ne kuralda ne izin listesinde", "proje_kayit" not in ns["kayit_kural"]() and ns["kayit_dogrula"]("proje_kayit", {"alt": "karar", "argumanlar": []})[0] is None)
     ok("aktarıcıda hata yok", "Traceback" not in log())

@@ -162,22 +162,15 @@ def _bo_belgeler():
 def _bo_kart():
     try: return json.load(open(os.path.join(AYAR["uygulama"], "proje-karti.json"), encoding="utf-8"))
     except (OSError, ValueError): return None
-def _bo_vt():  # ayar veritabani.gorevler: kayıt veritabanının açık işleri — YALNIZ OKUMA (mode=ro), en çok 500 satır, 3 sn; sütunlar: iş metni, sahip, vade, konum
-    vt = AYAR.get("veritabani") if isinstance(AYAR.get("veritabani"), dict) else {}
-    if not vt.get("yol") or not str(vt.get("gorevler") or "").strip(): return None
-    yol = os.path.expanduser(str(vt["yol"])); yol = yol if os.path.isabs(yol) else os.path.join(os.path.expanduser(str(AYAR.get("proje") or "")), yol)
-    import sqlite3, urllib.parse
-    try:
-        c = sqlite3.connect(f"file:{urllib.parse.quote(yol)}?mode=ro", uri=True, timeout=3); t0 = time.time()
-        c.set_progress_handler(lambda: 1 if time.time() - t0 > 3 else 0, 10000)
-        try: return [list(r) for r in c.execute(str(vt["gorevler"])).fetchmany(500)]
-        finally: c.close()
-    except sqlite3.Error as e:
-        try:  # launchd altında Masaüstü'ndeki veritabanı açılmaz: veritabanı yardımcısının (vt-izle) yazdığı önbellek
-            o = json.load(open(os.path.join(BASE, "vt-gorevler.json"), encoding="utf-8"))
-            return [list(r) for r in (o.get("satirlar") or [])][:500]
-        except (OSError, ValueError, AttributeError): pass
-        if _BO_VT_UYARI.get("e") != e.__class__.__name__: _BO_VT_UYARI["e"] = e.__class__.__name__; print(f"BELGEDEN ATAMA: görev sorgusu okunamadı ({e.__class__.__name__}), önbellek de yok")
+def _bo_vt():  # kayıt veritabanının açık işleri (ayar baglayici.kayit.sorgular.gorevler ya da eski veritabani.gorevler), en çok 500 satır: [iş metni, sahip, vade, konum].
+    # A1: aktarıcı Masaüstü'ndeki veritabanını hiç açmaz; veritabanı yardımcısının (vt-izle) yazdığı canli/vt-gorevler.json önbelleği (OnbellekOkuyucu) okunur.
+    b = _baglayici_mod()
+    if not b: return None
+    c = b.ayar_coz(AYAR).get("kayit") or {}
+    if not c.get("yol") or not str((c.get("sorgular") or {}).get("gorevler") or "").strip(): return None
+    try: return [b.is_satiri(i) for i in b.onbellek_okuyucu(BASE, globals().get("VT_BELLEK")).acik_isler()[:500]]
+    except b.YetenekYok:
+        if _BO_VT_UYARI.get("e") != "YetenekYok": _BO_VT_UYARI["e"] = "YetenekYok"; print("BELGEDEN ATAMA: görev önbelleği (vt-gorevler.json) yok — veritabanı yardımcısı henüz yazmadı")
         return None
 _BO_VT_UYARI = {}
 def belge_oneri_view():

@@ -11,7 +11,7 @@ T = tempfile.mkdtemp(prefix="tsonrasi-"); HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
-for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 proje = os.path.join(T, "proje"); os.makedirs(proje)
 class Uc:
