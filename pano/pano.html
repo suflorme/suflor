@@ -68,7 +68,17 @@ aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var
 #fls .l{font-size:var(--yz-12)}
 /* v0.118.0 tek kutu (5. taslak; kullanıcı, 22 Ekim gece): her görünümde altta — solda + (belge), yazı, sağda mikrofon; tek çerçeve. Üstünde cevap (zeminsiz) ve toplantıda sağa yaslı simgeler. */
 .nb{padding:var(--bo-4) var(--bo-32) var(--bo-12);background:var(--bg)}#kns,.tbr,.kt,.kal{max-width:720px}html.mac .nb{padding:var(--bo-4) var(--bo-24) var(--bo-12)}html.mac :is(#kns,.tbr,.kt,.kal){max-width:680px;margin-inline:auto}
-#kns{padding:var(--bo-4) var(--bo-8) var(--bo-8)}#knd .ca{font-size:var(--yz-12);font-weight:500;color:var(--t3)}#knd .b,.mcv .b{font-size:var(--yz-13);line-height:1.5;cursor:pointer}#knd .b{max-height:min(40vh,18em);overflow-y:auto;overscroll-behavior:contain}.mcv .b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.mcv.acik .b{display:block}
+#kns{padding:var(--bo-4) var(--bo-8) var(--bo-8)}/* v0.210.x (beta #36-5): cevap alanı sohbet görünümü — büyüyen alan + kendi kaydırması, son 6 soru-cevap üst üste, güvenli küçük markdown (kcMd); mini panoda kapalıyken yalnız son cevabın ilk satırları */
+.kcv{position:relative}#knd .kcv{max-height:min(55vh,32em);overflow-y:auto;overscroll-behavior:contain;padding-inline-end:var(--bo-4)}
+.kcq+.kcq{border-top:1px solid var(--bd);margin-top:var(--bo-12);padding-top:var(--bo-8)}.kcq:not(.son) .kcm{color:var(--t2)}
+.kcv .ca{display:flex;align-items:center;justify-content:space-between;gap:var(--bo-8);font-size:var(--yz-12);font-weight:500;color:var(--t3);margin-top:var(--bo-4)}
+.kcv .kop{flex:none;display:inline-flex;align-items:center;gap:var(--bo-4);padding:var(--bo-4) var(--bo-8);margin:calc(-1*var(--bo-4)) 0;border:0;background:transparent;color:var(--t3);border-radius:var(--kose-s);font:inherit;font-weight:400;cursor:pointer}.kcv .kop:hover{background:var(--hov);color:var(--tx)}.kcv .kop svg.i{width:13px;height:13px}
+.kcm{font-size:var(--yz-13);line-height:1.55;overflow-wrap:anywhere;word-break:break-word;user-select:text;-webkit-user-select:text;cursor:text;min-width:0}
+.kcm p,.kcm ul,.kcm ol,.kcm pre,.kcm table{margin:0 0 var(--bo-8)}.kcm>:last-child{margin-bottom:0}.kcm ul,.kcm ol{padding-inline-start:1.35em}.kcm li{margin:2px 0}.kcm h4{font-size:var(--yz-13);font-weight:600;margin:var(--bo-8) 0 var(--bo-4)}.kcm>h4:first-child{margin-top:0}
+.kcm code{font-family:var(--f-mono);font-size:.92em;background:var(--s2);border:1px solid var(--bd);border-radius:var(--kose-s);padding:0 .3em}.kcm pre{white-space:pre-wrap;overflow-x:auto;background:var(--s2);border:1px solid var(--bd);border-radius:var(--kose-s);padding:var(--bo-8);font-family:var(--f-mono);font-size:var(--yz-12)}
+.kcm table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse}.kcm td{border:1px solid var(--bd);padding:var(--bo-4) var(--bo-8);vertical-align:top}.kcm a{color:var(--ac-yazi);text-decoration:underline}
+.kcv .kay{margin-top:var(--bo-4)}.kcv .kay summary{cursor:pointer;color:var(--t3);font-size:var(--yz-12)}.kcv .kay .kcm{margin-top:var(--bo-4)}
+.mcv{position:relative}.mcv .kcm{cursor:pointer}.mcv:not(.acik) .kcm>:not(:first-child){display:none}.mcv:not(.acik) .kcm>:first-child{margin:0;max-height:3.1em;overflow:hidden}.mcv:not(.acik) .kcm>:is(p,h4):first-child{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.mcv:not(.acik) .kcq:not(.son),.mcv:not(.acik) .kay{display:none}.mcv.acik .kcm{cursor:text}
 #knd .meta,.mcv .meta{white-space:normal;font-size:var(--yz-12);color:var(--t3)}#knd .d,.mcv .d{font-size:var(--yz-12);color:var(--t3)}#knd .d b,.mcv .d b{font-weight:500}.kdb{display:flex;gap:var(--bo-4);margin-top:var(--bo-4)}.kdb button,.kdb .tsoy{font-weight:400;padding:var(--bo-4) var(--bo-8);font-size:var(--yz-12);border:0;background:transparent;color:var(--t2);margin:0;border-radius:var(--kose-s)}.kdb button:hover{background:var(--hov);color:var(--tx)}
 .tbr{display:flex;justify-content:flex-end;align-items:center;gap:0;margin-bottom:var(--bo-4)}.tbr .ib,.tbr .dm>summary{border-color:transparent;background:transparent;color:var(--t2);padding:var(--bo-4) var(--bo-8);border-radius:var(--kose-s)}.tbr .ib:hover,.tbr .dm>summary:hover{background:var(--hov);color:var(--tx)}.tbr .ib.on{background:transparent;color:var(--ac)}.tbr .dm>summary svg.i{width:15px;height:15px}
 .kt{display:flex;align-items:flex-end;gap:var(--bo-4);background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose-xl);padding:var(--bo-4)}.kt:focus-within{border-color:color-mix(in srgb,var(--ac) 55%,var(--bd2))}
@@ -119,7 +129,7 @@ html.yardim dialog#yrd{width:100vw;height:100vh;max-width:none;max-height:none;m
 html.ayarlar body{display:block;background:var(--s1)}html.ayarlar body>*:not(#ayd):not(#kgd){display:none!important}
 html.ayarlar dialog#ayd{width:100vw;height:100vh;max-width:none;max-height:none;margin:0;inset:0;border:0;border-radius:0;box-shadow:none;padding:0;background:var(--bg)}html.ayarlar dialog#ayd::backdrop{background:transparent}
 /* v0.109.0: Mac Ayarlar görünümü — gruplar araç çubuğunda, satırlar tek beyaz kutuda (Sistem Ayarları gibi), değişiklik hemen kaydedilir */
-html.ayarlar #ayf{height:100%}html.ayarlar .ayb .gbb,html.ayarlar #ayx,html.ayarlar #ays{display:none}
+html.ayarlar #ayf{height:100%}html.ayarlar .ayb .gbb,html.ayarlar #ayx,html.ayarlar #ays,html.ayarlar #ayt{display:none}  /* Mac penceresinde tek gezinme: araç çubuğu (menu-cubugu.swift AyarPencere.GRUPLAR = AYH sırası) */
 html.ayarlar .ayb{justify-content:flex-end}html.ayarlar #ayara{width:200px;border-radius:var(--kose-s);background:var(--s1);border-color:var(--bd2);padding:var(--bo-4) var(--bo-8)}
 html.ayarlar #ayi{max-height:none;background:transparent;border-radius:0;box-shadow:none}
 html.ayarlar #ayi .ayr{padding:var(--bo-12) 0;border-bottom:.5px solid var(--bd)}html.ayarlar #ayi .ayr:last-of-type{border-bottom:0}html.ayarlar #ayi .ayr b{font-weight:500}
@@ -271,8 +281,7 @@ html.bugun:not(.hafta-ac) main>.sc>#brs{margin-top:-16px}
 @container (max-width:640px){html.bugun:not(.hafta-ac) main>.sc{grid-template-columns:minmax(0,1fr);padding-inline:var(--bo-16)}}
 html.bugun main .sh{position:static;background:none;padding:0 var(--bo-4) var(--bo-8);font:600 var(--yz-13)/1.3 var(--f-govde);color:var(--tx)}html.bugun main .sh .meta{font-size:var(--yz-13);font-weight:400;color:var(--t3)}
 html.bugun .kt{border-radius:var(--r-tam);padding:var(--bo-4) var(--bo-8);border-color:var(--bd)}
-html.bugun #kns{padding:0 var(--bo-8) var(--bo-8)}html.bugun #knd .b{max-height:none;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-html.bugun #kns.acik #knd .b{display:block;-webkit-line-clamp:unset;max-height:min(40vh,18em);overflow-y:auto}
+html.bugun #kns{padding:0 var(--bo-8) var(--bo-8)}
 /* başlık satırı: küçük tarih + büyük Bugün; sağda Bugün | Bu hafta, elle başlat (+), takvimi yenile */
 .bgb{display:flex;align-items:flex-end;gap:var(--bo-4);margin:0 0 var(--bo-16);flex-wrap:wrap}.bgt{min-width:0}#tktr{font-size:var(--yz-12);font-weight:500;color:var(--t2);margin:0 0 var(--bo-4) 0}
 .bgt h1{margin:0;font:300 var(--yz-24)/1.1 var(--f-baslik);letter-spacing:-.02em;color:var(--tx)}html.mac .bgt h1{font:300 var(--yz-24)/1.1 -apple-system,"SF Pro Display",var(--f-govde)}
@@ -693,7 +702,7 @@ function durumCiz(){let d=last?durum(last):{c:"nt",m:L("bağlanıyor…")};if(ge
   const e=document.getElementById('durum');e.className=d.c;e.title=d.hep||"";setH(document.getElementById('dm'),esc(d.m));setH(document.getElementById('da'),esc(d.a||""))
   const b=document.getElementById('de');b.hidden=!d.e;b.textContent=d.e||""}
 document.getElementById('de').onclick=()=>{if(last&&!last.aktif&&last.toplanti&&last.toplanti.bitiyor)return tkForm(null,'');const ag=(last&&last.agenda)||{};tkForm(null,(last&&(ag.title!=="Gündem yok"&&ag.title||last.meeting))||"")}
-const MINI_CSS=`.sdi{display:inline-flex;align-items:center;gap:var(--bo-4);vertical-align:-2px}.sdi svg.i{width:13px;height:13px}.oto{display:flex;gap:var(--bo-8);align-items:center;justify-content:space-between;font-size:var(--yz-12);font-weight:500;border:1px solid var(--bd);padding:var(--bo-4) var(--bo-12);margin:var(--bo-4) 0 var(--bo-4);background:var(--s1);border-radius:var(--kose)}.oto .ota{display:flex;gap:var(--bo-4);flex:none}.oto-soylenmedi[role=alert]{border-color:var(--ac)}.oto .pri.on{color:var(--ac-yazi);padding:var(--bo-4) var(--bo-12)}.oto .sdi svg.i{color:var(--ac)}.oto-okunuyor{border-color:var(--ac)}.oto-iptal,.oto-soylenmedi,.oto-okunamadi,.oto-kesildi{color:var(--t2);font-weight:400}.oto-iptal .sdi svg.i,.oto-soylenmedi .sdi svg.i,.oto-okunamadi .sdi svg.i,.oto-kesildi .sdi svg.i{color:var(--t3)}body{display:flex;flex-direction:column;height:100vh;padding:var(--bo-12);gap:var(--bo-8);background:var(--s2)}#mh{font-size:var(--yz-12);color:var(--t2);display:flex;flex-wrap:wrap;gap:var(--bo-8);align-items:center}#mh .w{color:var(--wa);font-weight:600;width:100%}#mc{flex:1;overflow:auto}#ml{font-size:var(--yz-12);color:var(--t3);border-top:1px solid var(--bd);padding-top:var(--bo-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#ml.eski{color:var(--wa)}.mk{flex:none;max-height:42vh;overflow:auto;padding:var(--bo-4) 0;font-size:var(--yz-13)}.mk .d,.mk .meta,.mk summary{font-size:var(--yz-12);color:var(--t3)}.mk .b{margin-top:var(--bo-4)}.mcv{flex:none;max-height:42vh;overflow:auto;padding:var(--bo-4) var(--bo-4)}.mcv .ca{font-size:var(--yz-12);font-weight:500;color:var(--t3)}.tbr{margin:0}.kt{margin:0}.hat .sh{display:flex;justify-content:space-between;gap:var(--bo-8);font-weight:600}`
+const MINI_CSS=`.sdi{display:inline-flex;align-items:center;gap:var(--bo-4);vertical-align:-2px}.sdi svg.i{width:13px;height:13px}.oto{display:flex;gap:var(--bo-8);align-items:center;justify-content:space-between;font-size:var(--yz-12);font-weight:500;border:1px solid var(--bd);padding:var(--bo-4) var(--bo-12);margin:var(--bo-4) 0 var(--bo-4);background:var(--s1);border-radius:var(--kose)}.oto .ota{display:flex;gap:var(--bo-4);flex:none}.oto-soylenmedi[role=alert]{border-color:var(--ac)}.oto .pri.on{color:var(--ac-yazi);padding:var(--bo-4) var(--bo-12)}.oto .sdi svg.i{color:var(--ac)}.oto-okunuyor{border-color:var(--ac)}.oto-iptal,.oto-soylenmedi,.oto-okunamadi,.oto-kesildi{color:var(--t2);font-weight:400}.oto-iptal .sdi svg.i,.oto-soylenmedi .sdi svg.i,.oto-okunamadi .sdi svg.i,.oto-kesildi .sdi svg.i{color:var(--t3)}body{display:flex;flex-direction:column;height:100vh;padding:var(--bo-12);gap:var(--bo-8);background:var(--s2)}#mh{font-size:var(--yz-12);color:var(--t2);display:flex;flex-wrap:wrap;gap:var(--bo-8);align-items:center}#mh .w{color:var(--wa);font-weight:600;width:100%}#mc{flex:1;overflow:auto}#ml{font-size:var(--yz-12);color:var(--t3);border-top:1px solid var(--bd);padding-top:var(--bo-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#ml.eski{color:var(--wa)}.mk{flex:none;max-height:42vh;overflow:auto;padding:var(--bo-4) 0;font-size:var(--yz-13)}.mk .d,.mk .meta,.mk summary{font-size:var(--yz-12);color:var(--t3)}.mk .b{margin-top:var(--bo-4)}.mcv{flex:none;max-height:42vh;overflow:auto;padding:var(--bo-4) var(--bo-4)}.mcv.acik{max-height:62vh}.mcv .ca{font-size:var(--yz-12);font-weight:500;color:var(--t3)}.tbr{margin:0}.kt{margin:0}.hat .sh{display:flex;justify-content:space-between;gap:var(--bo-8);font-weight:600}`
 function miniCss(){return [...document.styleSheets[0].cssRules].map(r=>r.cssText).join("").replace(/url\("?\/marka\//g,'url("'+location.origin+'/marka/')+MINI_CSS}  // PiP penceresinin adresi yok: yazı tipi yolu tam olmalı
 // v0.114.0: tema ayarı (sistem | acik | koyu) — pano, Ayarlar ve Yardım (data-theme; renk.css ve html.mac kuralları tanır), mini pano (PiP ve menü paneli; koyu
 // tabanlı, açıkta data-theme=light). Mac uygulamasına bildirilir: pencere çerçeveleri ve menü paneli aynı görünüme geçer.
@@ -713,7 +722,7 @@ function buildMini(w){
 // v0.118.0: menü paneli — cevap kutunun üstünde (panodakiyle aynı görünüm); dokununca yerinde açılır; toplantı simgeleri yalnız toplantıda
 function miniKonus(d,s){const kb=d.getElementById("mkb"),mk=d.getElementById("mk");if(!kb||!mk)return
   const k=s.konus||{};kb.hidden=!!s.aktif&&!k.toplanti;mikCiz(kb,s);const g=konusGorunum(s,true)
-  mk.hidden=!g;if(g&&mk.dataset.h!==g){mk.dataset.h=g;setH(mk,g)}const tb=d.getElementById("mtbr");if(tb)tb.hidden=!toplantidaMi(s)}
+  mk.hidden=!g;if(mk.querySelector('.kcv'))mk.__kt=mk.scrollTop;if(g&&mk.dataset.h!==g){mk.dataset.h=g;setH(mk,g)}if(g)kcKonum(mk,mk);const tb=d.getElementById("mtbr");if(tb)tb.hidden=!toplantidaMi(s)}
 function miniBos(){bnYukle()  // menü paneli (?gorunum=panel) Bugün'ü çizmediği için takvim burada da yoklanır (60 sn'de bir)
   const bug=new Date(),g=bnTarih(),dk=bug.getHours()*60+bug.getMinutes(),n=(bnOlay||[]).find(o=>bnDk(o.saat)>dk)||bnSonraki
   if(n&&n.saat){const ne=[n.tarih&&n.tarih!==g?goreliTarih(n.tarih):'',n.saat,n.baslik||''].filter(Boolean).join(' ');return L('Toplantı yok · sıradaki: {t}',{t:ne})}return L('Hazır')}
@@ -967,6 +976,7 @@ const STC=[['İstanbul','Istanbul','Europe/Istanbul'],['Londra','London','Europe
  ['Köln','Cologne','Europe/Berlin',1],['Berlin','Berlin','Europe/Berlin'],['Münih','Munich','Europe/Berlin'],['Frankfurt','Frankfurt','Europe/Berlin'],['Paris','Paris','Europe/Paris'],['Madrid','Madrid','Europe/Madrid'],['Roma','Rome','Europe/Rome'],['Amsterdam','Amsterdam','Europe/Amsterdam'],['Brüksel','Brussels','Europe/Brussels'],['Zürih','Zurich','Europe/Zurich'],['Viyana','Vienna','Europe/Vienna'],['Stokholm','Stockholm','Europe/Stockholm'],['Varşova','Warsaw','Europe/Warsaw'],['Atina','Athens','Europe/Athens'],['Kiev','Kyiv','Europe/Kyiv'],['Moskova','Moscow','Europe/Moscow'],['Lizbon','Lisbon','Europe/Lisbon'],['Dublin','Dublin','Europe/Dublin'],['Reykjavik','Reykjavik','Atlantic/Reykjavik'],
  ['Dubai','Dubai','Asia/Dubai'],['Riyad','Riyadh','Asia/Riyadh'],['Tahran','Tehran','Asia/Tehran'],['Karaçi','Karachi','Asia/Karachi'],['Delhi','Delhi','Asia/Kolkata'],['Mumbai','Mumbai','Asia/Kolkata'],['Dakka','Dhaka','Asia/Dhaka'],['Bangkok','Bangkok','Asia/Bangkok'],['Singapur','Singapore','Asia/Singapore'],['Manila','Manila','Asia/Manila'],['Hong Kong','Hong Kong','Asia/Hong_Kong'],['Şanghay','Shanghai','Asia/Shanghai'],['Pekin','Beijing','Asia/Shanghai'],['Seul','Seoul','Asia/Seoul'],['Tokyo','Tokyo','Asia/Tokyo'],
  ['Sidney','Sydney','Australia/Sydney'],['Melbourne','Melbourne','Australia/Melbourne'],['Auckland','Auckland','Pacific/Auckland'],['Kahire','Cairo','Africa/Cairo'],['Lagos','Lagos','Africa/Lagos'],['Nairobi','Nairobi','Africa/Nairobi'],['Johannesburg','Johannesburg','Africa/Johannesburg']]
+// STVAR yalnız geliştirici kurulumunda (ayarlar.gelistirici) ve kullanıcı kendi listesini kaydetmemişken varsayılan; beta'da yalnız yerel saat dilimi (aşağıda kendiliğinden eklenir)
 const STVAR=[['Pasifik','America/Los_Angeles'],['Doğu','America/New_York'],['Köln','Europe/Berlin'],['İstanbul','Europe/Istanbul'],['Manila','Asia/Manila']]
 let stSira=null,stAcik=false,stListe=null,stT=null,stZam=null,stOner=[],stFC={}
 const stYerel=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch(e){return 'UTC'}}
@@ -979,7 +989,7 @@ const stUtc=m=>'UTC '+(m<0?'-':'+')+Math.floor(Math.abs(m)/60)+(Math.abs(m)%60?'
 function stFark(d){if(!d)return L('senle aynı saat');const a=Math.abs(d),sa=Math.floor(a/60),dk=a%60;return(sa?sa+' '+L('sa'):'')+(dk?(sa?' ':'')+dk+' '+L('dk'):'')+' '+(d>0?L('ileride'):L('geride'))}
 // mesai içi = iyi; mesai dışında 07:00–22:00 arası (mesaiye yakın, akşam, hafta sonu gündüzü) = orta; gece = kötü
 const stRuh=(p,c)=>c.gunler.includes(p.wd)&&p.dk>=c.bas&&p.dk<c.bit?'iyi':p.dk>=420&&p.dk<1320?'orta':'kotu'
-function stSatirlar(){const a=last&&last.ayarlar&&last.ayarlar.deger&&last.ayarlar.deger.saatler,l=(stListe||(Array.isArray(a)?a:null)||STVAR.map(([ad,tz])=>({ad,tz}))).map((x,i)=>({ad:x.ad,tz:x.tz,i})),y=stYerel()
+function stSatirlar(){const a=last&&last.ayarlar&&last.ayarlar.deger&&last.ayarlar.deger.saatler,l=(stListe||(Array.isArray(a)?a:null)||(last&&last.ayarlar&&last.ayarlar.gelistirici?STVAR.map(([ad,tz])=>({ad,tz})):[])).map((x,i)=>({ad:x.ad,tz:x.tz,i})),y=stYerel()
   if(!l.some(x=>x.tz===y)){const e=STC.find(x=>x[2]===y&&!x[3]);l.unshift({ad:e?e[0]:y.split('/').pop().replace(/_/g,' '),tz:y,i:-1})}  // kullanıcının kendi dilimi listede yoksa kendiliğinden eklenir
   return l}
 const stBaz=()=>{const d=new Date();d.setHours(0,0,0,0);return+d}, ST_ADIM=9e5, ST_N=192  // kaydırıcı: bugün 00:00'dan 48 saat, 15 dk adım
@@ -1145,24 +1155,57 @@ function konusCiz(){mikCiz(document.getElementById('kb'),last);if(mini&&!mini.cl
 // cevap kutunun üstünde: asistanın adı küçük etiket; panoda cevabın tamamı (uzunsa kendi içinde kayar — sesli okuma 5 cümlede durup "kalanı panoda" der), mini panoda
 // en çok iki satır (dokununca yerinde açılır); panoda dokununca yan panelde konuşma geçmişi; durum tek soluk satır
 const KONUS_SUREN=['dinliyor','yaziya','dusunuyor','konusuyor']
+// sohbet görünümü: aktarıcı yalnız son soru-cevabı verir; son 6 çift bu sayfada tutulur (yenilenince sıfırlanır; kalıcı geçmiş yan panelde/Tümü'de). kcSur: yeni soru ya da cevap gelince artar → alan o soruya kayar.
+const KC=[],KC_N=6;let kcSur=0
+const kcTemiz=t=>String(t||'').replace(/\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm|ton:\s*[a-z_]+)>\s*/gi,' ').trim()
+function kcKaydet(k,taze){const q=String(k.soru||'').trim(),c=taze?kcTemiz(k.cevap):'';if(!q&&!c)return
+  const e=KC[KC.length-1],ad=k.kisilik||AS,sl=!!k.sesli_cevap
+  if(e&&e.soru===q&&(!e.cevap||!c||e.cevap===c)){if(c&&!e.cevap)kcSur++;if(c)e.cevap=c;e.ad=ad;e.sesli=sl;return}
+  KC.push({soru:q,cevap:c,ad,sesli:sl});kcSur++;if(KC.length>KC_N)KC.shift()}
+// markdown'ın güvenli alt kümesi: önce her satır kaçırılır (esc), sonra yalnız bilinen işaretler etikete döner; bağlantı yalnız http(s)
+function kcMd(m){const sat=String(m||'').split('\n'),o=[];let lt='',tb=false,kod=false
+  const ic=t=>esc(t).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?![*\w])/g,'$1<i>$2</i>').replace(/\[([^\]]+)\]\((https?:\/\/[^)\s"<]+)\)/g,'<a href="$2" target=_blank rel="noopener noreferrer">$1</a>')
+  const kapat=()=>{if(lt){o.push('</'+lt+'>');lt=''}if(tb){o.push('</table>');tb=false}}
+  for(const l of sat){let x
+    if(/^\s*```/.test(l)){if(kod){o.push('</pre>');kod=false}else{kapat();o.push('<pre>');kod=true}continue}
+    if(kod){o.push(esc(l)+'\n');continue}
+    if(!l.trim())continue
+    if(/^\s*\|/.test(l)){if(/^[\s|:-]+$/.test(l))continue;if(!tb){kapat();o.push('<table>');tb=true}o.push('<tr>'+l.trim().replace(/^\||\|$/g,'').split('|').map(c=>`<td>${ic(c.trim())}</td>`).join('')+'</tr>');continue}
+    if(x=l.match(/^\s*#{1,4}\s+(.*)/)){kapat();o.push(`<h4>${ic(x[1])}</h4>`);continue}
+    if(x=l.match(/^\s*(?:([-*•])|(\d{1,3})[.)])\s+(.*)/)){const t=x[2]?'ol':'ul';if(tb){o.push('</table>');tb=false}if(lt!==t){kapat();o.push(t==='ol'?`<ol start="${+x[2]}">`:'<ul>');lt=t}o.push(`<li>${ic(x[3])}</li>`);continue}
+    kapat();o.push(`<p>${ic(l)}</p>`)}
+  kapat();if(kod)o.push('</pre>');return o.join('')}
+function kcOge(e,i,son,mini_){const p=e.cevap.split(/\n\s*-{3,}\s*\n?/),ky=p[0].trim(),ay=p.slice(1).join('\n').trim()
+  const q=e.soru?`<div class=d><b>${L(e.sesli?'Duyulan':'Soru')}:</b> ${esc(e.soru)}</div>`:''
+  const a=ky?`<div class=ca><span>${esc(e.ad)}</span><button type=button class=kop data-kop=${i} title="${esc(L('Kopyala'))}" aria-label="${esc(L('Kopyala'))}">${ic('kopya')}</button></div><div class=kcm${mini_?` data-kos title="${esc(L('Tamamını göster'))}"`:''}>${kcMd(ky)}</div>${ay?`<details class=kay><summary>${L('Ayrıntı')}</summary><div class=kcm>${kcMd(ay)}</div></details>`:''}`:''
+  return`<div class="kcq${son?' son':''}">${q}${a}</div>`}
+async function kcKopya(b,d){const e=KC[+b.dataset.kop];if(!e)return;const t=e.cevap;let ok=false
+  try{await (d.defaultView||window).navigator.clipboard.writeText(t);ok=true}catch(x){try{const ta=d.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';d.body.appendChild(ta);ta.select();ok=d.execCommand('copy');ta.remove()}catch(y){}}
+  b.textContent=ok?'✓ '+L('Kopyalandı'):L('Kopyalanamadı');setTimeout(()=>{b.innerHTML=ic('kopya')},1500)}
+// yeniden çizimde okuma yeri korunur; yeni soru/cevap gelince son sorunun başına kayar
+function kcKonum(kok,sc){const h=kok.__kt;sc=sc||kok;if(!sc||!kok.querySelector('.kcq'))return
+  if(kok.__ks!==kcSur){kok.__ks=kcSur;const son=kok.querySelector('.kcq.son');if(son)sc.scrollTop=son.getBoundingClientRect().top-sc.getBoundingClientRect().top+sc.scrollTop}else if(h!=null)sc.scrollTop=h}
 function konusGorunum(s,mini_){const k=s.konus||{},cvp=!!(s.eylem&&s.eylem.sesli),ad=k.kisilik||AS
   if(s.aktif&&!k.toplanti)return''
   if(kSoh&&!(k.sohbet&&k.sohbet.acik)&&kSoh.hazir&&Date.now()-kSoh.t>3000)sohbetKapat(false)  // aktarıcı kapattı (sessizlik, "tamam teşekkürler", toplantı, kulaklık)
   const yas=k.at?(Date.now()-Date.parse(k.at))/1000:0,sur=KONUS_SUREN.includes(k.durum),taze=kRec||sur||yas<(s.aktif?300:1800)
+  if(!kRec)kcKaydet(k,taze)
   const dt={yaziya:L('Yazıya döküyorum…'),dusunuyor:L('{ad} düşünüyor…',{ad}),konusuyor:kSoh?(s.ayarlar&&s.ayarlar.deger&&s.ayarlar.deger.sohbet_araya_girme?L('{ad} cevaplıyor — konuşursan susar',{ad}):L('{ad} cevaplıyor — sonuna kadar okur',{ad})):L('{ad} cevaplıyor',{ad}),hata:k.hata||''}
   const d=kRec?'':cvp&&k.durum!=='yaziya'?(kSoh?L('Yazayım mı? Cevap ver: evet · hayır · sonra · sus'):L('Yazayım mı? Basılı tut ve cevap ver: evet · hayır · sonra · sus')):(dt[k.durum]||(k.sohbet&&k.sohbet.kapandi&&!kSoh?L('Sohbet kapandı — {n}',{n:{sessizlik:L('1 dakika ses gelmedi'),kulaklik:L('kulaklık çıktı'),toplanti:L('toplantı başladı'),kullanici:L('sen bitirdin'),pano:L('sen bitirdin')}[k.sohbet.kapandi]||k.sohbet.kapandi}):''))
   const df=k.defter&&!kRec&&!k.soru?`<div class=meta title="${esc(k.defter.ad||'')}">${esc(L('Son toplantı hazır: {a} · {s} — ne konuşulduğunu sorabilirsin',{a:toplantiAdi(k.defter.ad,''),s:k.defter.saat||''}))}</div>`:''  // dosya adı yalnız title'da
-  const cp=String(taze&&k.cevap||'').replace(/\s*<(?:chuckles?|laugh(?:ter)?|sighs?|gasp|giggle|short pause|long pause|exhales|breath|hmm|ton:\s*[a-z_]+)>\s*/gi,' ').split(/\n\s*-{3,}\s*\n?/),ky=cp[0].trim(),ay=cp.slice(1).join('\n').trim()
+  const kl=kRec||!taze?[]:KC,son=kl[kl.length-1],ky=son&&son.cevap?son.cevap.split(/\n\s*-{3,}\s*\n?/)[0].trim():''
   const ust=modHtml(k)+(otonomHtml(k)||asistanHtml(k)),sus=k.durum==='konusuyor'?`<button class=gh data-sus>${L('Sus')}</button>`:'',sb=ky&&!kRec&&!sur?soyleBtn(ky):''
-  const h=`${ust}${df}${d?`<div class=meta>${esc(d)}</div>`:''}${k.soru&&taze&&!kRec?`<div class=d><b>${L(k.sesli_cevap?'Duyulan':'Soru')}:</b> ${esc(k.soru)}</div>`:''}${ky&&!kRec?`<div class=ca>${esc(ad)}</div><div class=b data-kos title="${esc(L(mini_||!s.aktif?'Tamamını göster':'Konuşma geçmişini aç'))}">${esc(ky)}</div>`:''}${sus||sb||(ky&&!kRec&&!mini_&&!s.aktif)?`<div class=kdb>${sus}${sb}${ky&&!kRec&&!mini_&&!s.aktif?`<button class=gh data-kgec title="${esc(L('Konuşma geçmişini aç'))}">${L('Tümü')}</button>`:''}</div>`:''}${ay&&!kRec?`<details class=kay><summary>${L('Ayrıntı')}</summary><div class=d style="white-space:pre-wrap">${esc(ay)}</div></details>`:''}`
+  const h=`${ust}${df}${d?`<div class=meta>${esc(d)}</div>`:''}${kl.length?`<div class=kcv>${kl.map((e,i)=>kcOge(e,i,i===kl.length-1,mini_)).join('')}</div>`:''}${sus||sb||(kl.some(e=>e.cevap)&&!mini_)?`<div class=kdb>${sus}${sb}${kl.some(e=>e.cevap)&&!mini_?(s.aktif?`<button class=gh data-kos title="${esc(L('Konuşma geçmişini aç'))}">${L('Geçmiş')}</button>`:`<button class=gh data-kgec title="${esc(L('Konuşma geçmişini aç'))}">${L('Tümü')}</button>`):''}</div>`:''}`
   return h.trim()}
 function renderKonus(s){const sec=document.getElementById('kns'),h=konusGorunum(s,false);sec.hidden=!h;mikCiz(document.getElementById('kb'),s);document.getElementById('kb').hidden=!!s.aktif&&!(s.konus||{}).toplanti
-  document.getElementById('tbr').hidden=!toplantidaMi(s);if(h&&sec.dataset.h!==h){sec.dataset.h=h;setH(document.getElementById('knd'),h)}}
+  document.getElementById('tbr').hidden=!toplantidaMi(s);const kd=document.getElementById('knd'),c0=kd.querySelector('.kcv');if(c0)kd.__kt=c0.scrollTop
+  if(h&&sec.dataset.h!==h){sec.dataset.h=h;setH(kd,h)}if(h){const c1=kd.querySelector('.kcv');if(c1)kcKonum(kd,c1)}}
 {document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.altKey&&e.shiftKey&&!document.getElementById('kb').hidden){e.preventDefault();if(!e.repeat)konusBasla()}})
   document.addEventListener('keyup',e=>{if(kRec&&(e.code==='Space'||e.key==='Alt'||e.key==='Shift')){e.preventDefault();konusBitir()}})}
 function susBagla(d){d.addEventListener('click',ev=>{if(ev.target.closest('button[data-sus]')){ev.stopPropagation();j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'sus'})}).catch(()=>{});return}
+  const kp=ev.target.closest('button[data-kop]');if(kp){ev.stopPropagation();kcKopya(kp,d);return}
   if(ev.target.closest('button[data-kgec]')){gecmisAc();return}
-  const b=ev.target.closest('[data-kos]');if(!b)return;if(d===document){if(last&&!last.aktif)document.getElementById('kns').classList.toggle('acik');else konusmaAc()}else{const m=d.getElementById('mk');if(m)m.classList.toggle('acik')}})}
+  const b=ev.target.closest('[data-kos]');if(!b)return;if(d===document){if(last&&!last.aktif)document.getElementById('kns').classList.toggle('acik');else konusmaAc()}else{const m=d.getElementById('mk');if(m){m.classList.toggle('acik');const sn=m.querySelector('.kcq.son');if(sn&&m.classList.contains('acik'))m.scrollTop=sn.getBoundingClientRect().top-m.getBoundingClientRect().top+m.scrollTop}}})}
 susBagla(document)
 // yan panelde konuşma geçmişi (cevaba dokununca; kaynak Konuş geçmişi — /konus-gecmis); "Tümü" Arşiv'deki pencereyi açar
 async function konusmaAc(){const sec=document.getElementById('kos');sec.hidden=false;document.documentElement.classList.remove('yan-kapali','yan-bos');let r={};try{r=await j('/konus-gecmis')}catch(e){}
@@ -1320,10 +1363,8 @@ const AYH=[['Genel',['dil','bildirim','kisayollar']],['Görünüm',['tema','renk
 const AYS={},AYK={};AYG.forEach(([,al])=>al.forEach(x=>{AYS[x[0]]=x}));AYH.forEach(([,ks],i)=>ks.forEach(k=>{AYK[k]=i}))
 Object.keys(AYS).forEach(k=>{if(!(k in AYK)){AYK[k]=AYH.length-1;AYH[AYH.length-1][1].push(k)}})  // tabloda olmayan yeni anahtar Gelişmiş'te görünür, kaybolmaz
 const AY_SESLI=new Set(AYG.filter(([g])=>g==='Ses'||g==='Konuş').flatMap(([,al])=>al.map(x=>x[0])))  // Sesli özellikler kapalıyken soluklaşan satırlar (eski Ses + Konuş grupları)
-const AY_SWIFT=['Genel','Ses','Konuş','Toplantı','Kanıt','Çeviri','E-posta','Gizlilik','Proje']  // Swift araç çubuğu sırası (AyarPencere.GRUPLAR)
 const AY_ESKI={'Genel':'Genel','Ses':'Ses ve konuşma','Konuş':'Asistan ve kişilik','Toplantı':'Toplantı','Kanıt':'Toplantı','Çeviri':'Toplantı','E-posta':'Takvim ve e-posta','Dış karar kaydı':'Kayıt ve ekip','Gizlilik':'Gizlilik','Proje':'Kayıt ve ekip'}
-const AY_SWIFT_IDX=AYH.map(([h])=>{const e=AY_SWIFT.findIndex(x=>AY_ESKI[x]===h);return e<0?0:e})  // yeni başlık → Swift araç çubuğunda vurgulanacak eski sıra
-function ayGrupBul(x){if(/^\d+$/.test(String(x)))x=AY_SWIFT[Number(x)];if(x in AY_ESKI)x=AY_ESKI[x];return AYH.findIndex(([h])=>h===x)}
+function ayGrupBul(x){if(/^\d+$/.test(String(x)))return Number(x)<AYH.length?Number(x):-1;if(x in AY_ESKI)x=AY_ESKI[x];return AYH.findIndex(([h])=>h===x)}
 // v0.81.2: ⚙ Ayarlar → Gemini nerede satırında bugünkü Gemini istekleri (model başına / günlük sınır; dolu olan işaretli)
 const GKISA={'gemini-3.8-flash-lite-tts':'Lite','gemini-3.8-flash-tts':'3.8 Flash','gemini-3.1-flash-tts-preview':'3.1 Flash','gemini-2.5-flash-preview-tts':'2.5 Flash'}
 function gGunluk(){const g=last&&last.gemini_gunluk;if(!g)return''
@@ -1367,7 +1408,7 @@ function ayFiltre(){const kc=s=>(s||'').toLocaleLowerCase(DIL==='en'?'en':'tr'),
   document.querySelectorAll('#ayi .ayg').forEach(h=>{h.hidden=!say[h.dataset.g]})
   document.querySelectorAll('#ayt button').forEach(b=>{const g=b.dataset.g,on=!q&&g===AYSEC;b.classList.toggle('on',on);b.setAttribute('aria-selected',on);b.hidden=!!q&&!say[g];const c=b.querySelector('.say');if(c)c.textContent=q&&say[g]?say[g]:''})  // aramada eşleşmeyen başlık gizlenir, eşleşenin yanında sayı
   document.getElementById('ayyok').hidden=n>0}
-document.getElementById('ayt').addEventListener('click',ev=>{const b=ev.target.closest('button[data-g]');if(!b)return;AYSEC=b.dataset.g;document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0;if(AYAR_PEN)try{webkit.messageHandlers.suflor.postMessage({grup:AY_SWIFT_IDX[Number(AYSEC)]||0})}catch(e){}})
+document.getElementById('ayt').addEventListener('click',ev=>{const b=ev.target.closest('button[data-g]');if(!b)return;AYSEC=b.dataset.g;document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0;if(AYAR_PEN)try{webkit.messageHandlers.suflor.postMessage({grup:Number(AYSEC)||0})}catch(e){}})
 document.getElementById('ayara').addEventListener('input',ayFiltre)
 // Konuş geçmişi (v0.67.0): ⚙ Ayarlar → Gizlilik → Göster; en yeni önce, tek tek Sil (dosyadan çıkar, aramadan da düşer)
 // dışarı (karartılmış alana) tıklayınca kapanır; ✕ simgesi
@@ -1440,9 +1481,11 @@ const YARDIM_PEN=new URLSearchParams(location.search).get('gorunum')==='yardim'
 document.getElementById('yb').onclick=yardimAc
 if(YARDIM_PEN){document.documentElement.classList.add('yardim');yardimAc();document.getElementById('yrd').addEventListener('close',()=>{try{webkit.messageHandlers.suflor.postMessage({kapat:1})}catch(e){}})}
 // Ayarlar penceresinde gruplar pencerenin araç çubuğunda (Mac Ayarlar gibi): ayGrup(i) o grubu gösterir; "Hepsi" yok, arama bütün gruplarda arar
-function ayGrup(i){const h=ayGrupBul(i);AYSEC=String(h>=0?h:0);document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0}
+function ayGrup(i){const h=ayGrupBul(i);AYSEC=String(h>=0?h:0);document.getElementById('ayara').value='';ayFiltre();document.getElementById('ayi').scrollTop=0
+  if(!document.querySelector(`#ayt button[data-g="${AYSEC}"]`)){const f=document.querySelector('#ayt button');if(f){AYSEC=f.dataset.g;ayFiltre()}}  // beta: boş başlık gösterilmez, ilk dolu başlığa düşer; araç çubuğu da oraya döner
+  try{webkit.messageHandlers.suflor.postMessage({grup:Number(AYSEC)})}catch(e){}}
 if(AYAR_PEN){document.documentElement.classList.add('ayarlar');const d=document.getElementById('ayd'),a=new URLSearchParams(location.search).get('ayar')||undefined
-  const ac=()=>{if(last&&last.ayarlar){if(!a)AYSEC='0';ayarAc(a);try{webkit.messageHandlers.suflor.postMessage({grup:AY_SWIFT_IDX[Number(AYSEC)]||0})}catch(e){}}else setTimeout(ac,150)};ac()
+  const ac=()=>{if(last&&last.ayarlar){if(!a)AYSEC='0';ayarAc(a);try{webkit.messageHandlers.suflor.postMessage({grup:Number(AYSEC)||0})}catch(e){}}else setTimeout(ac,150)};ac()
   d.addEventListener('close',()=>{try{webkit.messageHandlers.suflor.postMessage({kapat:1})}catch(e){}})}  // Kaydet ve kapat / ✕ pencereyi de kapatır
 {const d=document.getElementById('ayd');document.getElementById('ay').innerHTML=ic('gear');document.getElementById('ayx').innerHTML=ic('x');document.getElementById('ayx').onclick=()=>d.close()
   document.getElementById('ay').onclick=()=>ayarAc()

@@ -24,6 +24,7 @@ _AR_RX = [
 # yerel arama ya da erteleme/iş devri: araştırma kipi değil
 _AR_IC = _re_ar.compile(r"\b(projede|projemizde|dosya\w*|döküm\w*|kayıtlar\w*|toplantılarda|toplantıda|defter\w*|veritaban\w*|mail\w*|e-?posta\w*|notlar\w*|takvim\w*|belgeler\w*|klasör\w*|arşiv\w*)\b")
 _AR_ERTELE = _re_ar.compile(r"\b(yarın|haftaya|hatırlat\w*|not al\w*|not et\w*|yapılacak\w*|listeme|iş ata\w*|ata|ekle|kuyruğa|ayarla|planla)\b")
+_AR_DEVAM = _re_ar.compile(r"^(?:ve |de |da |ayrıca |sonra )?(?:bana |bize )?(?:bilgi|ayrıntı|detay)\w*(?: ver\w*| ekle\w*)?$|^(?:ve |de |da )?(?:bana |bize )?(?:anlat\w*|özetle\w*)$")  # öznesiz devam cümlesi: konu önceki konuşmada, araştırma kipi değil
 _AR_BELIRSIZ = _re_ar.compile(r"^(?:şu|bu|o|şu anki|bahsettiğim|az önce bahsettiğim)\s+\w+$")
 def ar_tetik(metin):  # → None (araştırma isteği değil) | "" (konu belirsiz: sorulacak) | konu (kullanıcının kendi sözünden, orijinal harfle)
     m = " ".join(str(metin or "").split()); k = _ar_k(m).rstrip(" .!?…"); k0 = m[:len(k)]
@@ -34,6 +35,7 @@ def ar_tetik(metin):  # → None (araştırma isteği değil) | "" (konu belirsi
         konu = k0[r.start("k"):r.end("k")].strip(" ,.:;!?…'\"’")
         konu = _re_ar.sub(r"['’]\w{1,4}$", "", konu).strip()
         if _re_ar.sub(r"(?i)^(?:lütfen|bana|şunu|bir)\s+", "", konu) != konu: konu = _re_ar.sub(r"(?i)^(?:lütfen|bana|şunu|bir)\s+", "", konu)
+        if _AR_DEVAM.match(_ar_k(konu)): return None  # "araştır ve bana bilgi ver": konu yok, normal Konuş yolu (önceki konuşmayı görür)
         if len(konu) < 3: return ""
         return "" if _AR_BELIRSIZ.match(_ar_k(konu)) else konu[:160]
     return None
@@ -174,6 +176,7 @@ def _ar_is(konu, kanal, metin, sesli_ac):
         kurum, yerel = ar_yerel(konu); sonuc = ar_calistir(konu, kurum); kayit = ar_kaydet(konu, kanal, sonuc, yerel)
         sesli, yaz = ar_cevap(kayit); ARASTIRMA["son"] = {"id": kayit["id"], "konu": konu, "durum": kayit["durum"], "sure_sn": kayit["sure_sn"], "kaynak": kayit["bagimsiz_kaynak"]}
         print(f"ARAŞTIRMA: bitti ({kayit['durum']}, {kayit['sure_sn']} sn, {kayit['sorgu_sayisi']} sorgu, {kayit['sayfa_sayisi']} sayfa, {kayit['bagimsiz_kaynak']} bağımsız kaynak, ${kayit['maliyet']}) kanal={kanal} id={kayit['id']}")
+        if kayit["durum"] == "ok" and sesli and "konus_gecmis_ekle" in globals(): konus_gecmis_ekle(metin, sesli, "ortak")  # sonraki soru (Konuş süreci bu turu görmedi) bağlamı bilsin
         if not _KS.get("tur") or _KS["tur"].get("arastirma"):  # araya başka soru girmediyse Konuş cevabı
             _KS["tur"] = None; _konus_kur(durum="hazir", soru=metin, cevap=sesli + ("\n\n---\n" + yaz if yaz else ""), hata=None)
         if sesli_ac and sesli: seslendir(sesli, kuyruk=True)

@@ -168,11 +168,21 @@ def kisi_bul(ad):  # → {"durum": "ok", "kisiler": [{"ad","kurum","eposta":[],"
     o = _takvim_yardimci(["--kisi", ad])
     if o.get("durum") == "ok":
         o = {"durum": "ok", "kisiler": [{"ad": str(c.get("ad") or ""), "kurum": str(c.get("kurum") or ""), "eposta": [str(x) for x in c.get("eposta") or [] if "@" in str(x)][:5],
-                                         "telefon": [str(x) for x in c.get("telefon") or []][:5], "adres": [str(x) for x in c.get("adres") or []][:3]}
-                                        for c in (o.get("kisiler") or [])[:5] if isinstance(c, dict)]}
+                                         "telefon": [str(x) for x in c.get("telefon") or []][:5], "adres": [str(x) for x in c.get("adres") or []][:3], "dogum": str(c.get("dogum") or "")[:10]}
+                                        for c in (o.get("kisiler") or [])[:20] if isinstance(c, dict)]}
         _KISI_ONBELLEK[k] = (time.time(), o)
     else: o = {"durum": str(o.get("durum") or "hata"), "hata": str(o.get("hata") or "")[:200]}
     return o
+def kisi_ozet(kurum_say=False):  # → {"durum": "ok", "toplam", "telefonlu", "epostali", "adresli", "dogumlu", "kurumlu", "kurumlar"?: [{"kurum","sayi"}]} (yalnız sayılar; takvim.swift --kisi-ozet); hata: {"durum", "hata"}
+    if AYAR.get("kisiler_arama") is False: return {"durum": "kapali", "hata": _t("Kişiler araması kapalı (ayar kisiler_arama)", "Contacts lookup is off (setting kisiler_arama)")}
+    if os.environ.get("SUFLOR_TEST_BASLAT") and not os.environ.get("SUFLOR_TEST_KISI"): return {"durum": "hata", "hata": "deneme kipi"}
+    k = "\0ozet" + ("K" if kurum_say else ""); h = _KISI_ONBELLEK.get(k)
+    if h and time.time() - h[0] < KISI_ONBELLEK_SN: return h[1]
+    o = _takvim_yardimci(["--kisi-ozet"] + (["--kurum-say"] if kurum_say else []))
+    if o.get("durum") != "ok": return {"durum": str(o.get("durum") or "hata"), "hata": str(o.get("hata") or "")[:200]}
+    r = {"durum": "ok"}; r.update({a: int(o.get(a) or 0) for a in ("toplam", "telefonlu", "epostali", "adresli", "dogumlu", "kurumlu")})  # yalnız sayı alanları geçer
+    if kurum_say: r["kurumlar"] = [{"kurum": str(c.get("kurum") or "")[:60], "sayi": int(c.get("sayi") or 0)} for c in (o.get("kurumlar") or [])[:10] if isinstance(c, dict)]
+    _KISI_ONBELLEK[k] = (time.time(), r); return r
 def kisi_eposta(ad):  # davet için tek bir adres: tek kişi eşleşirse onun ilk e-postası; birden çok kişi ya da adres yoksa None (kullanıcı sayfada elle yazar)
     o = kisi_bul(ad)
     if o.get("durum") != "ok": return None

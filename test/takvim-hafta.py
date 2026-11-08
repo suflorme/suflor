@@ -33,6 +33,11 @@ ad["AYAR"]["calisma_saatleri"] = {"gunler": [0, 1, 2, 3, 4, 5], "bas": "10:00", 
 bz2 = {str(d): [f"{b:%H:%M}–{e:%H:%M}" for b, e in ar] for d, ar in ad["bos_zamanlar"](simdi)}
 ok("ayar calisma_saatleri (Cumartesi dahil, 10–16)", bz2.get("2026-10-17") == ["10:00–16:00"] and bz2.get("2026-10-20") == ["10:00–16:00"] and "2026-10-18" not in bz2)
 ad["AYAR"].pop("calisma_saatleri")
+# ayar yoksa herkes için (beta dahil) hafta içi 09–18; kullanıcı boş gün listesi verirse çalışma günü yok → çökmez, "girilmemiş"
+ok("ayar yok → hafta içi 09:00–18:00 (beta dahil)", ad["calisma_saatleri"]() == ({0, 1, 2, 3, 4}, 540, 1080) and bool(list(ad["bos_zamanlar"](simdi))))
+ad["AYAR"]["calisma_saatleri"] = {"gunler": [], "bas": "09:00", "bit": "18:00"}
+ok("kullanıcı boş gün listesi verirse boş zaman önerilmez, bos_zaman_metni 'girilmemiş' der", list(ad["bos_zamanlar"](simdi)) == [] and "girilmemiş" in ad["bos_zaman_metni"](simdi))
+ad["AYAR"].pop("calisma_saatleri")
 b_dar = ad["konus_baglam"](simdi, "", "Bugün kaçta toplantım var?"); b_gen = ad["konus_baglam"](simdi, "", "Gelecek hafta perşembe boş saatim var mı?")
 ok("her soruda 7 gün (v0.59.0), boş zaman yalnız boş/uygun zaman sorusunda", "(önümüzdeki 7 gün)" in b_dar and "Boş zamanlar" not in b_dar and "Toplantı 2" in b_dar)
 ok("boş zamana değinen soruda 7 gün + boş zamanlar (gün adıyla)", "(önümüzdeki 7 gün)" in b_gen and "Boş zamanlar" in b_gen and "Pazartesi 19 Ekim 13:00–18:00 · Toplantı 3" in b_gen

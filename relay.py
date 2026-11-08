@@ -1399,7 +1399,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1648,11 +1648,13 @@ def ayarlar_view():
     d.update({"beyin_" + k: v for k, v in sg_secim(AYAR).items()})
     if d["ses_motoru"] not in ("pocket", "gemini"): d["ses_motoru"] = "mac"
     if "konus_gecmis" not in AYAR: d["konus_gecmis"] = konus_gecmis_acik()
+    if not str(AYAR.get("kisisel_tarih_saat") or "").strip(): d["kisisel_tarih_saat"] = "09:00" if gelistirici_mi() else ""  # beta: boş (saat girilene kadar saatli hatırlatma yok); geliştirici: 09:00
     d["dil"] = ARAYUZ_DILI; d["ses_hizi"] = str(AYAR.get("ses_hizi") or "1.0")
     d["oto_haric"] = ", ".join(str(x) for x in (AYAR.get("oto_haric") or []) if isinstance(x, str))  # ayar.json'da liste, panoda virgüllü metin
     vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin", "saatler", "defter") and k != "dil"}  # kişilik, yapay zekâ, saat listesi, dış defter ve dil "varsayılana dön"le değişmez
+    vars_["kisisel_tarih_saat"] = "09:00" if gelistirici_mi() else ""
     vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
-    try: g_, b_, e_ = calisma_saatleri(); d["calisma"] = {"gunler": sorted(g_), "bas": b_, "bit": e_}  # Saatler görünümü: mesai içi/dışı rengi
+    try: g_, b_, e_ = calisma_saatleri(); d["calisma"] = {"gunler": sorted(g_), "bas": b_ if g_ else None, "bit": e_ if g_ else None}  # Saatler görünümü: mesai içi/dışı rengi
     except Exception: pass
     return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici(),
             "beyin": sg_ayar_view(), "gelistirici": gelistirici_mi(), "takvimler": TAKVIM_LISTE}  # beta profili: geliştirici kurulumunda gizli ayarlar "Gelişmiş" grubunda görünür
@@ -2261,6 +2263,8 @@ class H(BaseHTTPRequestHandler):
             return self._json(kimlik_view(ad) if "kimlik_view" in globals() else {"durum": "hata", "hata": "kimlik yok"})
         if yol == "/katilimcilar":  # 6 Kasım: takvim daveti + toplantıda görülen konuşmacılar, kişi kayıtlarıyla eşleştirilmiş KATILIMCILAR bloğu (aktarici/kimlik.py katilimci_view); yalnız okuma
             return self._json(katilimci_view() if "katilimci_view" in globals() else {"ok": False, "hata": "kimlik yok"})
+        if yol == "/kisi-ozet":  # Mac Kişiler'de yalnız sayılar (aktarici/talimat.py kisi_ozet; ad/iletişim verisi yok); ?kurum=1 kuruma göre ilk 10
+            return self._json(kisi_ozet("kurum=1" in self.path) if "kisi_ozet" in globals() else {"durum": "hata", "hata": "kisi_ozet yok"})
         if yol == "/kisi":  # S225: Mac Kişiler'den yalnız okuma (aktarici/talimat.py kisi_bul); ?ad=<ad>; Konuş MCP aracı ve `toplanti-claude.py kisi` çağırır
             import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
             return self._json(kisi_bul(ad) if "kisi_bul" in globals() else {"durum": "hata", "hata": "kisi_bul yok"})

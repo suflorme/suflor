@@ -108,24 +108,36 @@ KAYIT_TUR_EN_COK, KAYIT_TEKRAR_SN = 5, 1800
 KAYIT_SORULAN = {}  # öneri imzası → zaman (aynı öneri yeniden sorulmaz)
 KAYIT_SONUC = []    # onay/ret sonuçları → asistanın bir sonraki turuna not (en çok 10)
 KAYIT_ISTEK_RX = re.compile(r"karar|\bi[şs](?:i|ler|leri|in)?\b|görev|teyit|onayla|kapat|tamamla|yapıldı|yapılmadı|yapmadı|sahib|sorumlu|vade|özet|kayd|kayıt|açık soru|düzelt|"
-                            r"decision|task|action item|confirm|close|done|summary|record|fix|correct", re.I)
+                            r"reddet|iptal|ertele|\bata(?:ma|r|y)?\b|geri al|yeniden aç|decision|task|action item|confirm|close|done|summary|record|fix|correct|reject|cancel|postpone|assign|undo|reopen", re.I)
 _KAYIT_KIMLIK = {"k": re.compile(r"^k\d{1,9}$"), "s": re.compile(r"^s\d{1,9}$"), "q": re.compile(r"^q\d{1,9}$")}
 _KAYIT_TARIH = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_KAYIT_KIMLIK_HEPSI = re.compile(r"^[ksq]\d{1,9}$")
 KAYIT_KOMUTLAR = {  # komut → (zorunlu, isteğe bağlı) argümanlar; hepsi metin
     "karar_onayla": (("id",), ()), "karar_duzelt": (("id", "metin"), ()), "is_durum": (("id", "durum"), ()),
-    "is_ekle": (("metin",), ("kim", "tarih", "toplanti")), "soru_kapat": (("id",), ()), "ozet_duzelt": (("ozet", "eski", "yeni"), ())}
+    "is_ekle": (("metin",), ("kim", "tarih", "toplanti")), "soru_kapat": (("id",), ()), "ozet_duzelt": (("ozet", "eski", "yeni"), ()),
+    # panodaki Kararlar ve işler eylem menüsüyle eşit (yapi.kayit_eylem, olay kaynağı "asistan"): karar reddet, iş iptal, ertele, ata, soru yeniden aç, geri al
+    "karar_reddet": (("id",), ()), "is_iptal": (("id",), ()), "is_ertele": (("id", "vade"), ("neden",)), "ata": (("id", "kim"), ("rol",)), "soru_ac": (("id",), ()), "geri_al": (("id",), ())}
+_KAYIT_YENI = {"karar_reddet": ("reddet", ("karar",)), "is_iptal": ("iptal", ("is", "soz")), "is_ertele": ("ertele", ("is", "soz")), "soru_ac": ("ac", ("soru",)),
+               "ata": ("ata", ("karar", "is", "soz", "soru")), "geri_al": ("geri_al", ("karar", "is", "soz", "soru"))}
+_KAYIT_ROL = {"sahip": ("sahibi", "owner"), "isteyen": ("isteyeni", "requester"), "onaylayan": ("onaylayanı", "approver")}
 _KAYIT_ALT_RX, _KAYIT_BAYRAK_RX = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,40}$"), re.compile(r"^--?[A-Za-z0-9][A-Za-z0-9_-]{0,40}$")
 KAYIT_KURAL = {"tr": ("[Kayıt yazma] Kullanıcı kayıtlarda bir değişiklik isterse (kararı onaylamak ya da düzeltmek, işi yapıldı/yapılmadı işaretlemek, iş eklemek, açık soruyu kapatmak, "
                       "toplantı özetinde yanlış bir ifadeyi düzeltmek) yazamazsın ama önerebilirsin: cevabın sonuna her değişiklik için ayrı satırda tam şu biçimde etiket koy: "
                       "[KAYIT: {\"komut\": \"…\", \"arg\": {…}, \"neden\": \"kısa Türkçe cümle\"}]. Komutlar: karar_onayla {id: k…} · karar_duzelt {id: k…, metin: yeni karar metni} · "
                       "is_durum {id: s…, durum: yapildi|yapilmadi|acik} · is_ekle {metin, kim (isteğe bağlı), tarih YYYY-AA-GG (isteğe bağlı), toplanti: özet listesindeki toplantı adı (isteğe bağlı)} · "
-                      "soru_kapat {id: q…} · ozet_duzelt {ozet: özet listesindeki toplantı adı, eski: özetteki birebir metin, yeni: doğrusu}. Kimlikler yalnız [Kayıtlar] bloğundan; blokta yoksa uydurma, "
+                      "soru_kapat {id: q…} · ozet_duzelt {ozet: özet listesindeki toplantı adı, eski: özetteki birebir metin, yeni: doğrusu} · "
+                      "karar_reddet {id: k…} · is_iptal {id: s…} · is_ertele {id: s…, vade: YYYY-AA-GG, neden (isteğe bağlı)} · "
+                      "ata {id: k…|s…|q…, kim: kişi adı, rol: sahip|isteyen|onaylayan (isteğe bağlı; karar için onaylayan, iş için sahip)} · soru_ac {id: q…} · "
+                      "geri_al {id: kaydın kimliği; kaydın son değişikliğini geri alır, yalnız senin ya da kullanıcının kendi eylemini}. Kişi belirsizse aktarıcı reddeder ve «kimi kastettin?» der; adayı kullanıcıya sor. Kimlikler yalnız [Kayıtlar] bloğundan; blokta yoksa uydurma, "
                       "kullanıcıya sor. Kullanıcı her yazmayı panoda tek tıkla onaylar: «yazdım» deme, «onayına sundum» de. Etiket panoda görünmez. Dosya silme, e-posta, başka sistem yok."),
               "en": ("[Writing records] If the user wants a change in the records (confirm or correct a decision, mark a task done/not done, add a task, close an open question, "
                      "fix a wrong phrase in a meeting summary) you can't write it yourself but you can propose it: end your answer with one tag per change, on its own line, exactly: "
                      "[KAYIT: {\"komut\": \"…\", \"arg\": {…}, \"neden\": \"short sentence\"}]. Commands: karar_onayla {id: k…} · karar_duzelt {id: k…, metin: new decision text} · "
                      "is_durum {id: s…, durum: yapildi|yapilmadi|acik} · is_ekle {metin, kim (optional), tarih YYYY-MM-DD (optional), toplanti: meeting name from the summary list (optional)} · "
-                     "soru_kapat {id: q…} · ozet_duzelt {ozet: meeting name from the summary list, eski: exact text in the summary, yeni: the correct text}. Use ids only from the [Kayıtlar] block; "
+                     "soru_kapat {id: q…} · ozet_duzelt {ozet: meeting name from the summary list, eski: exact text in the summary, yeni: the correct text} · "
+                     "karar_reddet {id: k…} · is_iptal {id: s…} · is_ertele {id: s…, vade: YYYY-MM-DD, neden (optional)} · "
+                     "ata {id: k…|s…|q…, kim: person name, rol: sahip|isteyen|onaylayan (optional; approver for a decision, owner for a task)} · soru_ac {id: q…} · "
+                     "geri_al {id: record id; undoes the record's last change, only yours or the user's own action}. If the person is ambiguous the app refuses and says «who did you mean?»; ask the user. Use ids only from the [Kayıtlar] block; "
                      "if it isn't there, don't invent one — ask. The user approves each write with one click on the panel: don't say «done», say «sent for your approval». "
                      "The tag isn't shown. No deleting files, email or other systems.")}
 
@@ -219,6 +231,7 @@ def kayit_dogrula(komut, arg):  # → (hazır iş sözlüğü, None) ya da (None
     y = _yapi_mod() if "_yapi_mod" in globals() else None
     if not y: return None, _t("kayıt aracı yok", "records tool missing")
     kisa = lambda s, n=90: " ".join(str(s or "").split())[:n]
+    if komut in _KAYIT_YENI: return _kayit_dogrula_yeni(y, komut, arg, kisa)
     if komut in ("karar_onayla", "karar_duzelt", "is_durum", "soru_kapat"):
         on = {"karar_onayla": "k", "karar_duzelt": "k", "is_durum": "s", "soru_kapat": "q"}[komut]
         if not _KAYIT_KIMLIK[on].match(arg["id"]): return None, _t("kimlik geçersiz", "invalid id")
@@ -266,6 +279,66 @@ def kayit_dogrula(komut, arg):  # → (hazır iş sözlüğü, None) ya da (None
     if n != 1: return None, _t("eski metin özette " + ("yok" if not n else "birden çok yerde geçiyor"), "old text " + ("not found in the summary" if not n else "appears more than once"))
     return {"komut": komut, "kopya": r[1], "asil": str(r[0].get("ozet") or ""), "eski": eski, "yeni": yeni,
             "ozet": _t(f"«{kisa(r[0].get('baslik'), 50)}» özetinde «{kisa(eski, 60)}» → «{kisa(yeni, 60)}»", f"in summary «{kisa(r[0].get('baslik'), 50)}»: «{kisa(eski, 60)}» → «{kisa(yeni, 60)}»")}, None
+
+def _kayit_kisi(ad, tam):  # kimlik.py (aktarıcıda): ad → {"eposta", "kaynak", "guven", "adaylar"}; modül yoksa (yalıtılmış test) boş
+    f = globals().get("_kem_kimlik")
+    try: return f(ad, tam) if f else {}
+    except Exception: return {}
+def _kayit_kisi_sec(ad, tam):  # → (eposta ya da None, None) ya da (None, hata metni): belirsiz ad (birden çok aday) ve kişi olmayan metin reddedilir
+    r = _kayit_kisi(ad, tam) or {}
+    if r.get("kaynak") == "kisi_degil": return None, _t(f"«{ad}» bir kişi adına benzemiyor", f"«{ad}» doesn't look like a person's name")
+    if not r.get("eposta") and r.get("adaylar"):
+        return None, _t(f"kimi kastettin? «{ad}» için birden çok kişi var: " + ", ".join(str(a) for a in r["adaylar"][:4]), f"who did you mean? several people match «{ad}»: " + ", ".join(str(a) for a in r["adaylar"][:4]))
+    return r.get("eposta") or None, None
+
+def _kayit_dogrula_yeni(y, komut, arg, kisa):  # karar_reddet, is_iptal, is_ertele, ata, soru_ac, geri_al → panonun yapi.kayit_eylem yolu (eylem adı "eylem" alanında)
+    eylem, turler = _KAYIT_YENI[komut]
+    if not _KAYIT_KIMLIK_HEPSI.match(arg["id"]): return None, _t("kimlik geçersiz", "invalid id")
+    x = y.kayit_bul(BASE, arg["id"], turler)
+    if not x: return None, _t(f"{arg['id']} kaydı yok ya da bu işe uygun değil", f"no record {arg['id']} or not suitable for this")
+    ad_ = kisa(x["metin"] if x["tur"] != "karar" else y.TEYIT_RX.sub("", x["metin"] or ""))
+    h = {"komut": komut, "id": x["id"], "eylem": eylem, "p": {}}
+    ac = x["durum"] == "acik"
+    if komut == "karar_reddet":
+        if x.get("onay", "bekliyor" if y.TEYIT_RX.search(x["metin"] or "") else None) != "bekliyor": return None, _t(f"{x['id']} onay beklemiyor (zaten onaylı ya da reddedilmiş)", f"{x['id']} isn't awaiting confirmation")
+        h["ozet"] = _t(f"«{ad_}» kararı reddedilir", f"decision «{ad_}» is rejected")
+    elif komut == "is_iptal":
+        if not ac: return None, _t(f"{x['id']} zaten kapalı", f"{x['id']} is already closed")
+        h["ozet"] = _t(f"«{ad_}» işi iptal edilir", f"task «{ad_}» is cancelled")
+    elif komut == "soru_ac":
+        if ac: return None, _t(f"{x['id']} zaten açık", f"{x['id']} is already open")
+        h["ozet"] = _t(f"«{ad_}» sorusu yeniden açılır", f"question «{ad_}» is reopened")
+    elif komut == "is_ertele":
+        if not ac: return None, _t(f"{x['id']} kapalı, ertelenmez", f"{x['id']} is closed")
+        v = arg["vade"].strip()
+        try:
+            if not _KAYIT_TARIH.match(v): raise ValueError
+            datetime.date.fromisoformat(v)
+        except ValueError: return None, _t("vade YYYY-AA-GG olmalı", "due date must be YYYY-MM-DD")
+        if (x.get("son_tarih") or "") == v: return None, _t(f"{x['id']} vadesi zaten {v}", f"{x['id']} is already due {v}")
+        nd = _kayit_metin(arg.get("neden", ""), 0, 200)
+        if nd is None: return None, _t("erteleme nedeni uygun değil", "postpone reason not suitable")
+        h["p"] = {"vade": v, "neden": nd}
+        h["ozet"] = _t(f"«{ad_}» işi ertelenir: vade {x.get('son_tarih') or 'yok'} → {v}", f"task «{ad_}» is postponed: due {x.get('son_tarih') or 'none'} → {v}")
+    elif komut == "ata":
+        if not ac and x["tur"] != "karar": return None, _t(f"{x['id']} kapalı, atanmaz", f"{x['id']} is closed")
+        rol = arg.get("rol", "") or ("onaylayan" if x["tur"] == "karar" else "sahip")
+        if rol not in _KAYIT_ROL: return None, _t("rol sahip, isteyen ya da onaylayan olmalı", "role must be sahip, isteyen or onaylayan")
+        kim = _kayit_metin(arg["kim"], 2, 80)
+        if not kim: return None, _t("kişi adı uygun değil", "person name not suitable")
+        ep, hata = _kayit_kisi_sec(kim, False)
+        if hata: return None, hata
+        h["p"] = {"rol": rol, "ad": kim}
+        h["ozet"] = _t(f"«{ad_}» kaydının {_KAYIT_ROL[rol][0]} {kim} olarak atanır" + ("" if ep else " (e-postası bulunamadı, yalnız ad)"),
+                       f"the {_KAYIT_ROL[rol][1]} of «{ad_}» is set to {kim}" + ("" if ep else " (no email found, name only)"))
+    else:  # geri_al
+        g = y.son_geri_alinabilir(BASE, x["kayit_id"])
+        if not g: return None, _t(f"{x['id']} için geri alınacak olay yok", f"nothing to undo for {x['id']}")
+        if g.get("kaynak") not in ("eylem", "asistan", "suflor") or g.get("yazan") != y.yazan_varsayilan():
+            return None, _t(f"{x['id']} son değişikliği senin ya da asistanın eylemi değil; geri alınmaz", f"the last change to {x['id']} wasn't yours or the assistant's; not undone")
+        h["olay_id"] = g["olay_id"]; h["p"] = {"olay_id": g["olay_id"]}
+        h["ozet"] = _t(f"«{ad_}» kaydının son değişikliği geri alınır ({y.olay_ozeti(g)[22:]})", f"the last change to «{ad_}» is undone ({y.olay_ozeti(g)[22:]})")
+    return h, None
 
 def _proje_kayit_dogrula(arg):  # Brifing.app aynısını kendi tarafında yeniden doğrular (ayar dosyasından). Doğrulama kuralları bağlayıcıda (oner); iletiler burada (iki dilli)
     b = _kayit_bag()
@@ -338,6 +411,16 @@ def kayit_uygula(is_):  # onaylanmış işi yapar (önce yeniden doğrular) → 
         elif k == "is_durum": ok_ = bool(y.soz_kapat(BASE, h["id"], h["durum"]))
         elif k == "is_ekle": x = y.soz_ekle(BASE, h["kim"], h["metin"], h["tarih"], h["toplanti"], h["baslik"]); ok_ = bool(x); h["ozet"] += f" ({x['id']})" if x else ""
         elif k == "soru_kapat": ok_ = bool(y.kayit_durum(BASE, h["id"], "cevaplandi")[0])  # ortak katman: olay günlüğü üzerinden (durum_degisti)
+        elif k in _KAYIT_YENI:  # panoyla aynı işlev (yapi.kayit_eylem; olay kaynağı "asistan"): olay günlüğü, kayit_id, onay alanı aynen
+            if k == "geri_al" and h.get("olay_id") != is_.get("olay"): return False, _t("son değişiklik onaydan sonra değişti", "the last change changed after the proposal")
+            p = dict(h["p"])
+            if k == "ata":  # onaydan sonra tam çözüm (Kişiler dahil); belirsizse yazılmaz, aday adreslerle birlikte sorulur
+                ep, hata = _kayit_kisi_sec(p["ad"], True)
+                if hata: return False, hata
+                if ep: p["eposta"] = ep
+            r = y.kayit_eylem(BASE, h["id"], h["eylem"], p, None, None, None, None, kaynak="asistan")
+            if not r.get("ok"): return False, str(r.get("err") or _t("yazılamadı", "not written"))[:120]
+            ok_ = bool(r.get("geri") if k == "geri_al" else r.get("olay"))
         elif k == "proje_kayit":  # projenin kendi kayıt betiği: Brifing.app kayıt kipi (Masaüstü izni orada; kabuksuz, zaman aşımlı)
             yakala = {}
             def _cal(komut, arg):  # bağlayıcının yaz()'ı bunu çağırır; sonuç sözlüğü (cikti) iletiye gider
@@ -396,6 +479,7 @@ def kayit_etiketleri(metin, tur):  # asistanın cevabı → etiketsiz metin; ge�
         iid = izin_iste("kayit", ne, {"komut": is_["komut"], "arg": is_["arg"]}, sesli=False)
         if not iid: alt.append(_t("Onay kartı açılamadı: ", "Couldn't open the approval card: ") + h["ozet"]); continue
         KAYIT_SORULAN[imza] = time.time(); sun += 1
+        if h.get("olay_id"): is_["olay"] = h["olay_id"]  # geri al: onaylanan olay (onaydan sonra değiştiyse yazılmaz)
         threading.Thread(target=_kayit_bekle, args=(iid, is_, tur, h["ozet"]), daemon=True).start()
     if sun: alt.insert(0, _t(f"Onayını bekliyor: {sun} kayıt (panoda Onayla ya da Reddet).", f"Awaiting your approval: {sun} record(s) (Approve or Reject on the panel)."))
     return temiz + ("\n" + "\n".join(alt) if alt else "")

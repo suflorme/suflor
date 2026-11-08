@@ -11,6 +11,7 @@ sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspa
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8793)
 T = os.path.realpath(tempfile.mkdtemp(prefix="yazma-")); proje = os.path.join(T, "proje"); os.makedirs(proje); d = os.path.join(T, "canli"); os.makedirs(os.path.join(d, "ozetler"))
 HATA = []
+AT = chr(64)  # tarama düz e-posta görmesin
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
@@ -66,6 +67,7 @@ open(os.path.join(d, "son-toplantilar.jsonl"), "w", encoding="utf-8").write(
 AYAR_PK = {"kayit_komutu": ["/usr/bin/python3", betik, "--yazan", "toplanti"], "kayit_alt_komutlar": ["karar", "olay", "uyu"], "kayit_bayraklar": ["--kim"], "kayit_sure_sn": 2}
 yol = os.path.join(T, "ayar.json"); json.dump({**AYAR_PK, "alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor",
     "claude": sahte, "konus_zaman_asimi_sn": 0, "konus_bekle_sn": 0, "konus_ara_sn": 0, "konus_on_ac": False, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(yol, "w"))
+json.dump({"adlar": {"ayse ornek": {"ad": "Ayşe Örnek", "eposta": "ayse.ornek" + chr(64) + "firma.test", "kaynak": "elle", "guven": 1.0}}}, open(os.path.join(d, "kimlik.json"), "w"))  # kurgu kişi (ata)
 P = None
 def db(sql): c = sqlite3.connect(os.path.join(d, "karar-grafi.sqlite")); r = c.execute(sql).fetchall(); c.close(); return r
 class Uc:
@@ -174,6 +176,79 @@ try:
     if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"})
     k = u.cevap_bekle("Yazılamadı", 40)
     ok("betik zaman aşımına düşünce durdurulur, cevapta «zaman aşımı»", "zaman aşımı" in (k.get("cevap") or "") and time.time() - t0 < 15)
+    # 8b) panodaki eylem menüsüyle eşit yeni komutlar: karar_reddet, is_iptal, is_ertele, ata, soru_ac, geri_al (yapi.kayit_eylem; olay kaynağı «asistan»)
+    EK = "2026-11-05-0900-Ek-Toplanti"; os.environ["SUFLOR_AYAR"] = yol  # bu süreçteki yapi çağrıları da aynı kullanıcı adıyla yazsın (yazan_varsayilan)
+    yapi.graf_yaz(d, {"baslik": "Ek toplantı", "tarih": "2026-11-05", "maddeler": [{"baslik": "G", "ogeler": [
+        {"tur": "karar", "metin": "Sunucu taşınacak", "kim": "Can Örnek", "saat": "10:00:00", "netlik": "ortuk"}, {"tur": "karar", "metin": "Ek karar iki", "kim": "Can Örnek", "saat": "10:01:00", "netlik": "ortuk"},
+        {"tur": "is", "metin": "Hazırlığı bitir", "sahip": "Ali Kurgu", "tarih": "2026-11-10"}, {"tur": "is", "metin": "Ek iş B", "sahip": "Ali Kurgu"}, {"tur": "is", "metin": "Ek iş C", "sahip": "Ali Kurgu"},
+        {"tur": "is", "metin": "Ek iş D", "sahip": "Ali Kurgu"}, {"tur": "is", "metin": "Ek iş E", "sahip": "Ali Kurgu"}]}]}, EK + ".md")
+    kid = lambda metin: (lambda r: ("k" if r[1] == "karar" else "q" if r[1] == "soru" else "s") + str(r[0]))(db(f"SELECT id, tur FROM kayit WHERE metin LIKE '{metin}%'")[0])
+    KR, KR2, IS1, IS2, IS3, IS4, IS5 = (kid(m) for m in ("Sunucu taşınacak", "Ek karar iki", "Hazırlığı bitir", "Ek iş B", "Ek iş C", "Ek iş D", "Ek iş E"))
+    olay = lambda m: db(f"SELECT tur, kaynak, yazan FROM olay WHERE kayit_id = (SELECT kayit_id FROM kayit WHERE metin LIKE '{m}%') ORDER BY saat DESC LIMIT 1")[0]
+    def adim(yazi, *etik, ack="onaylandi", bekle="Yazıldı"):  # öneri turu → (kartlar, cevap) ; ack verilirse ilk kart yanıtlanır
+        time.sleep(0.5); u.post("/girdi", {"text": yazi + " " + " ".join(etik)}); k_ = u.bekle(yazi.split()[0]); kr_ = u.kartlar()
+        if ack and kr_: u.post("/card-ack", {"id": kr_[0]["id"], "status": ack}); k_ = u.cevap_bekle(bekle, 15) if ack == "onaylandi" else k_; time.sleep(0.3)
+        return kr_, k_.get("cevap") or ""
+    kr, cv = adim("reddetsene", E("karar_reddet", id=KR), ack=None)
+    ok("karar_reddet: kart açıldı (okunur cümle); onaydan önce karar değişmedi", len(kr) == 1 and "kararı reddedilir" in kr[0]["text"] and "Sunucu taşınacak" in kr[0]["text"] and db("SELECT onay FROM ortak_kayit WHERE metin LIKE 'Sunucu taşınacak%'")[0][0] == "bekliyor")
+    u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); cv = u.cevap_bekle("Yazıldı", 15).get("cevap") or ""
+    ok("karar_reddet Onayla → karar reddedildi; olay günlüğünde kaynak «asistan», yazan kullanıcı", db("SELECT onay FROM ortak_kayit WHERE metin LIKE 'Sunucu taşınacak%'")[0][0] == "reddedildi" and olay("Sunucu taşınacak") == ("karar_reddedildi", "asistan", "ad:Deniz T") and "✓ Yazıldı" in cv)
+    kr, cv = adim("yine reddet", E("karar_reddet", id=KR), ack=None)
+    ok("reddedilmiş karar yeniden reddedilmez (kart yok)", not kr and "onay beklemiyor" in cv)
+    kr, cv = adim("iptal et", E("is_iptal", id=IS2), ack=None)
+    ok("is_iptal: kart; onaydan önce iş açık", len(kr) == 1 and "iptal edilir" in kr[0]["text"] and db("SELECT durum FROM kayit WHERE metin = 'Ek iş B'")[0][0] == "acik")
+    u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı", 15)
+    ok("is_iptal Onayla → iş iptal; olay kaynağı «asistan»", db("SELECT durum FROM kayit WHERE metin = 'Ek iş B'")[0][0] == "iptal" and olay("Ek iş B")[:2] == ("durum_degisti", "asistan"))
+    kr, cv = adim("iptal yine", E("is_iptal", id=IS2), ack=None); ok("kapalı iş yeniden iptal edilmez", not kr and "zaten kapalı" in cv)
+    kr, cv = adim("iş olmayan iptal", E("is_iptal", id=KR2), E("is_iptal", id="s9999"), E("is_iptal", id="x1"), ack=None)
+    ok("is_iptal karar kimliğiyle, olmayan ya da biçimsiz kimlikle sunulmaz", not kr and cv.count("sunulmadı") == 3)
+    kr, cv = adim("tarihleri boz", E("is_ertele", id=IS1, vade="2026-13-45"), E("is_ertele", id=IS1, vade="yarın"), E("is_ertele", id=IS1, vade="10/11/2026"), E("is_ertele", id=IS1, vade="2026-11-10"), ack=None)
+    ok("is_ertele: geçersiz tarih (ay 13, serbest metin, gün/ay/yıl) ve aynı vade sunulmaz", not kr and cv.count("sunulmadı") == 4 and "YYYY-AA-GG" in cv)
+    kr, cv = adim("ertele", E("is_ertele", id=IS1, vade="2026-11-20", neden="Tedarikçi gecikti"), ack=None)
+    ok("is_ertele: kart eski ve yeni vadeyi gösterir; onaydan önce vade değişmedi", len(kr) == 1 and "2026-11-10 → 2026-11-20" in kr[0]["text"] and db("SELECT son_tarih FROM kayit WHERE metin = 'Hazırlığı bitir'")[0][0] == "2026-11-10")
+    u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı", 15)
+    ok("is_ertele Onayla → vade değişti (ortak kayıtta da), neden olayda, kaynak «asistan»", db("SELECT son_tarih FROM kayit WHERE metin = 'Hazırlığı bitir'")[0][0] == "2026-11-20" and db("SELECT vade FROM ortak_kayit WHERE metin = 'Hazırlığı bitir'")[0][0] == "2026-11-20"
+       and olay("Hazırlığı bitir")[:2] == ("ertelendi", "asistan") and "Tedarikçi gecikti" in db("SELECT veri FROM olay WHERE tur = 'ertelendi' ORDER BY saat DESC LIMIT 1")[0][0])
+    kr, cv = adim("karara ertele", E("is_ertele", id=KR2, vade="2026-11-20"), ack=None); ok("karar ertelenmez (yalnız iş)", not kr and "sunulmadı" in cv)
+    kr, cv = adim("ata", E("ata", id=IS3, kim="Ayşe Örnek"), ack=None)
+    ok("ata: kart (işin sahibi, kişi adıyla); onaydan önce sahip değişmedi", len(kr) == 1 and "sahibi Ayşe Örnek olarak atanır" in kr[0]["text"] and "e-postası bulunamadı" not in kr[0]["text"] and db("SELECT sahip FROM kayit WHERE metin = 'Ek iş C'")[0][0] == "Ali Kurgu")
+    u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı", 15)
+    rol = json.loads(db("SELECT roller FROM ortak_kayit WHERE metin = 'Ek iş C'")[0][0])
+    ok("ata Onayla → sahip kimlik çözümüyle ad + e-posta olarak yazıldı; olay kaynağı «asistan»", rol["sahip"] == {"ad": "Ayşe Örnek", "eposta": ("ayse.ornek" + AT + "firma.test")} and olay("Ek iş C")[:2] == ("is_atandi", "asistan"))
+    kr, cv = adim("karar ata", E("ata", id=KR2, kim="Ayşe Örnek"), ack=None)
+    ok("ata: karar için rol verilmezse onaylayan", len(kr) == 1 and "onaylayanı Ayşe Örnek" in kr[0]["text"])
+    if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı", 15)
+    ok("ata (karar) Onayla → onaylayan yazıldı", (json.loads(db("SELECT roller FROM ortak_kayit WHERE metin = 'Ek karar iki'")[0][0]).get("onaylayan") or {}).get("ad") == "Ayşe Örnek")
+    kr, cv = adim("kötü ata", E("ata", id=IS4, kim="Ayşe Örnek", rol="yönetici"), E("ata", id=IS4, kim="x"), E("ata", id=IS4, kim="Ayşe Örnek", kabuk="evet"), E("ata", id=IS2, kim="Ayşe Örnek"), ack=None)
+    ok("ata: geçersiz rol, tek harfli ad, fazla argüman ve kapalı iş sunulmaz", not kr and cv.count("sunulmadı") == 4)
+    kr, cv = adim("kimseyi ata", E("ata", id=IS4, kim="Bilinmeyen Kurgu"), ack=None)
+    ok("ata: tanınmayan ad aday vermez, kartta «e-postası bulunamadı, yalnız ad» uyarısı", len(kr) == 1 and "e-postası bulunamadı" in kr[0]["text"])
+    if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "reddedildi"})
+    kr, cv = adim("soru aç", E("soru_ac", id="q4"), ack=None)
+    ok("soru_ac: kapalı soru için kart; onaydan önce kapalı", len(kr) == 1 and "yeniden açılır" in kr[0]["text"] and db("SELECT durum FROM kayit WHERE id = 4")[0][0] == "cevaplandi")
+    u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı", 15)
+    ok("soru_ac Onayla → soru açık; olay kaynağı «asistan»", db("SELECT durum FROM kayit WHERE id = 4")[0][0] == "acik" and olay("Fiyat ne olacak?")[:2] == ("durum_degisti", "asistan"))
+    kr, cv = adim("açık soru aç", E("soru_ac", id="q4"), E("soru_ac", id=IS1), ack=None); ok("açık soru ya da iş yeniden açılmaz (soru_ac yalnız kapalı soru)", not kr and cv.count("sunulmadı") == 2)
+    # geri al: yalnız son olay ve yalnız kullanıcının/asistanın kendi eylemi
+    kr, cv = adim("geri al", E("geri_al", id=KR), ack=None)
+    ok("geri_al: kart son olayı söyler (kararı reddetti); onaydan önce karar reddedilmiş kaldı", len(kr) == 1 and "geri alınır" in kr[0]["text"] and "kararı reddetti" in kr[0]["text"] and db("SELECT onay FROM ortak_kayit WHERE metin LIKE 'Sunucu taşınacak%'")[0][0] == "reddedildi")
+    u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı", 15)
+    ok("geri_al Onayla → karar yeniden onay bekliyor; geri alma olayı kaynak «asistan»", db("SELECT onay FROM ortak_kayit WHERE metin LIKE 'Sunucu taşınacak%'")[0][0] == "bekliyor" and olay("Sunucu taşınacak")[:2] == ("kayit_guncellendi", "asistan"))
+    yapi.kayit_durum(d, IS4, "yapildi", None, "arsiv-mcp"); yapi.kayit_durum(d, IS1, "iptal", ("baska.kisi" + AT + "firma.test"), "eylem")
+    kr, cv = adim("başkasınınkini geri al", E("geri_al", id=IS4), E("geri_al", id=IS1), ack=None)
+    ok("geri_al: başka kaynağın (arsiv-mcp) ya da başka kişinin son olayı geri alınmaz", not kr and cv.count("sunulmadı") == 2 and "geri alınmaz" in cv)
+    kr, cv = adim("geri al olmayan", E("geri_al", id=IS3), E("geri_al", id="q4"), ack=None)  # IS3: son olay ata (kendi) → geçerli; q4: soru_ac (kendi) → geçerli; ikisi de kart
+    ok("geri_al: kendi eylemleri için kart açılır (ata ve soru_ac son olay)", len(kr) == 2)
+    for x in kr: u.post("/card-ack", {"id": x["id"], "status": "reddedildi"})
+    kr, cv = adim("hiç olay", E("geri_al", id="s9999"), ack=None); ok("geri_al: olmayan kayıt sunulmaz", not kr and "sunulmadı" in cv)
+    kr, cv = adim("gizli yeni komut", E("karar_reddet", id="k5"), E("geri_al", id="k5"), E("ata", id="k5", kim="Ayşe Örnek"), ack=None)
+    ok("gizli toplantının kaydına yeni komutlar da yazmaz (kayıt yok sayılır)", not kr and cv.count("sunulmadı") == 3 and db("SELECT metin FROM kayit WHERE id = 5")[0][0] == "Gizli karar metni")
+    kr, cv = adim("gizli kip öncesi", E("is_ertele", id=IS3, vade="2026-12-01"), ack=None)
+    u.post("/komut", {"tur": "gizli"}); time.sleep(0.3)
+    if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"})
+    time.sleep(1.5)
+    ok("gizli kip açılınca onaylanan ertele de yazılmaz", len(kr) == 1 and (db("SELECT son_tarih FROM kayit WHERE metin = 'Ek iş C'")[0][0] or "") != "2026-12-01")
+    u.post("/komut", {"tur": "gizli"})
     # 9) yardımcının kendi sınırı (ikili doğrudan; aktarıcıya güvenmez)
     BIN = os.path.join(app, "Contents/MacOS/SuflorBrifing"); ANAHTAR = open(os.path.join(d, "kart-anahtari.txt")).read().strip(); n_ = [0]
     def ayar_yaz(**ek):
@@ -232,6 +307,26 @@ try:
     import baglayici as _bag  # A1: yazma ayarı ve doğrulama bağlayıcıda (T kopyası)
     ns = {"_baglayici_mod": lambda: _bag, "AYAR": {}, "_t": lambda a, b: a, "re": _re, "os": os, "json": json, "time": time, "datetime": _dt, "threading": _th, "BASE": d, "LOCK": _th.Lock()}
     exec(open(os.path.join(KOD, "aktarici", "notlar.py"), encoding="utf-8").read(), ns)
+    # yeni komutlar işlev düzeyinde: izin listesi, kural metni, belirsiz kişi, onaydan sonra değişen son olay, gizli kip
+    ns2 = dict(ns, _yapi_mod=lambda: yapi, BASE=d); exec(open(os.path.join(KOD, "aktarici", "notlar.py"), encoding="utf-8").read(), ns2)
+    YENI = ("karar_reddet", "is_iptal", "is_ertele", "ata", "soru_ac", "geri_al")
+    ok("yeni komutların hepsi izin listesinde ve asistanın kuralında (iki dil)", all(k_ in ns2["KAYIT_KOMUTLAR"] for k_ in YENI) and all(k_ in ns2["KAYIT_KURAL"]["tr"] and k_ in ns2["KAYIT_KURAL"]["en"] for k_ in YENI) and "kimi kastettin" in ns2["KAYIT_KURAL"]["tr"])
+    ns2["_kem_kimlik"] = lambda ad, tam: {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": [("ali.kurgu1" + AT + "firma.test"), ("ali.kurgu2" + AT + "firma.test")]} if ad == "Ali" else {"eposta": None, "kaynak": "kisi_degil", "guven": 0.0, "adaylar": []} if ad == "Rapor Hazir" else {"eposta": ("x" + AT + "firma.test"), "kaynak": "takvim", "guven": 0.95, "adaylar": []}
+    n_ol = len(db("SELECT olay_id FROM olay")); h, e = ns2["kayit_dogrula"]("ata", {"id": IS5, "kim": "Ali"})
+    ok("belirsiz kişi (iki aday): komut reddedilir, «kimi kastettin?» ve adaylar dönüşte", h is None and "kimi kastettin" in e and ("ali.kurgu1" + AT + "firma.test") in e and ("ali.kurgu2" + AT + "firma.test") in e)
+    h, e = ns2["kayit_dogrula"]("ata", {"id": IS5, "kim": "Rapor Hazir"}); ok("kişi adına benzemeyen metin reddedilir", h is None and "kişi adına benzemiyor" in e)
+    h, e = ns2["kayit_dogrula"]("ata", {"id": IS5, "kim": "Cem Kurgu"}); ok("çözülen kişi için yazma işi hazır (ozet, eylem ata, p.ad)", e is None and h["eylem"] == "ata" and h["p"] == {"rol": "sahip", "ad": "Cem Kurgu"})
+    ns2["_kem_kimlik"] = lambda ad, tam: {"eposta": None, "kaynak": None, "guven": 0.0, "adaylar": [("a1" + AT + "firma.test"), ("a2" + AT + "firma.test")]} if tam else {"eposta": ("cem" + AT + "firma.test"), "kaynak": "takvim", "guven": 0.9, "adaylar": []}
+    n0_ = db("SELECT COUNT(*) FROM olay")[0][0]; okk, ne_ = ns2["kayit_uygula"]({"komut": "ata", "arg": {"id": IS5, "kim": "Cem Kurgu"}})
+    ok("onaydan sonra tam çözümde kişi belirsizleşirse yazılmaz (olay eklenmedi)", okk is False and "kimi kastettin" in ne_ and db("SELECT COUNT(*) FROM olay")[0][0] == n0_)
+    ns2["gizli_acik"] = lambda: True
+    ok("gizli kipte yeni komutların hepsi reddedilir", all(ns2["kayit_dogrula"](k_, {"id": IS3, "kim": "x", "vade": "2026-12-12"} if k_ in ("ata", "is_ertele") else {"id": IS3})[0] is None for k_ in YENI)); ns2["gizli_acik"] = lambda: False
+    h, e = ns2["kayit_dogrula"]("geri_al", {"id": IS3}); eski_olay = h["olay_id"]
+    yapi.kayit_durum(d, IS3, "iptal", None, "asistan")  # onay beklerken araya yeni olay girdi
+    n0_ = db("SELECT COUNT(*) FROM olay")[0][0]; okk, ne_ = ns2["kayit_uygula"]({"komut": "geri_al", "arg": {"id": IS3}, "olay": eski_olay})
+    ok("geri_al: onaylanan olay son olay olmaktan çıktıysa yazılmaz", okk is False and "değişti" in ne_ and db("SELECT COUNT(*) FROM olay")[0][0] == n0_)
+    okk, ne_ = ns2["kayit_uygula"]({"komut": "is_ertele", "arg": {"id": IS5, "vade": "2026-12-31"}})
+    ok("is_ertele uygulaması panonun işleviyle aynı sonucu verir (vade + olay)", okk is True and db("SELECT son_tarih FROM kayit WHERE metin = 'Ek iş E'")[0][0] == "2026-12-31")
     ok("aktarıcıda ayar yokken proje_kayit ne kuralda ne izin listesinde", "proje_kayit" not in ns["kayit_kural"]() and ns["kayit_dogrula"]("proje_kayit", {"alt": "karar", "argumanlar": []})[0] is None)
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:

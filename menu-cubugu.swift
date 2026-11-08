@@ -1516,7 +1516,8 @@ let EN_METIN: [String: String] = [
     "Sessiz: Option + Shift + M": "Quiet: Option + Shift + M", "Tamam": "OK", "Vazgeç": "Cancel", "Evet": "Yes",
     "Sonra": "Later", "Gerek yok": "Not needed", "Kaynağı aç": "Open source", "Onayla": "Approve", "Reddet": "Decline", "Kartların yerini sıfırla": "Reset card position",
     "Kartı gizle": "Hide card", "Onay bekliyor": "Needs your approval", "Ne diyeyim": "What do I say", "Söyle": "Say", "Dur": "Stop", "Cevap": "Answer", "Not": "Note", "gizli": "private",
-    "Genel": "General", "Ses": "Voice", "Konuş": "Talk", "Kanıt": "Evidence", "Çeviri": "Translation", "E-posta": "Email", "Gizlilik": "Privacy", "Proje": "Project"]
+    "Genel": "General", "Ses": "Voice", "Konuş": "Talk", "Kanıt": "Evidence", "Çeviri": "Translation", "E-posta": "Email", "Gizlilik": "Privacy", "Proje": "Project",
+    "Ses ve konuşma": "Voice and speech", "Asistan ve kişilik": "Assistant", "Takvim ve e-posta": "Calendar and email", "Kayıt ve ekip": "Records and team", "Bilgi kaynakları": "Sources", "Gelişmiş": "Advanced"]
 func T(_ s: String) -> String { ARAYUZ_EN ? (EN_METIN[s] ?? s) : s }
 func dilAyarla(_ dil: String?) {  // sayfa ya da /status bildirdi; değiştiyse açık pencereler ve menüler yeni dille
     guard let d = dil, ["tr", "en"].contains(d), (d == "en") != ARAYUZ_EN else { return }
@@ -1610,7 +1611,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         anaMenu(); web.frame = pencere.contentLayoutRect; pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         istek("/status") { [weak self] v in if let s = v?["surum"] as? String { DispatchQueue.main.async { self?.surum = s } } }
     }
-    func windowWillClose(_ n: Notification) { DispatchQueue.main.async { NSApp.dockTile.badgeLabel = nil; if self.ayarPen?.pencere.isVisible != true && self.yardimPen?.pencere.isVisible != true { NSApp.setActivationPolicy(.accessory) } } }
+    func windowWillClose(_ n: Notification) { NSApp.dockTile.badgeLabel = nil; politikaYenile() }
     // --- araç çubuğu ---
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] {
         [NSToolbarItem.Identifier("kenar"), .flexibleSpace] + ["yz", "gz", "sc", "sz", "kz", "yan"].map { NSToolbarItem.Identifier($0) } + [.space] + ["mini", "gb", "ay"].map { NSToolbarItem.Identifier($0) }
@@ -1783,8 +1784,9 @@ if arg("--panel-dene") != nil {
 final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate, NSToolbarDelegate, WKUIDelegate {
     let pencere: NSWindow; let web: WKWebView; let yardimKipi: Bool
     // v0.109.0: Mac Ayarlar penceresi gibi üstte simgeli sekmeler (sıra panodaki AYG gruplarıyla aynı); seçilen grup sayfada gösterilir, başlık grubun adı
-    static let GRUPLAR = [("Genel", "gearshape"), ("Ses", "speaker.wave.2"), ("Konuş", "mic"), ("Toplantı", "person.2"), ("Kanıt", "camera"),  // v0.110.0: 9 grup
-                          ("Çeviri", "globe"), ("E-posta", "envelope"), ("Gizlilik", "hand.raised"), ("Proje", "folder")]
+    // Tek gezinme: araç çubuğu (sayfadaki #ayt başlık listesi bu pencerede gizli). Sıra ve adlar pano.html'deki AYH ile birebir aynı; ayGrup(i) AYH sırasını alır.
+    static let GRUPLAR = [("Genel", "gearshape"), ("Görünüm", "paintbrush"), ("Toplantı", "person.2"), ("Ses ve konuşma", "speaker.wave.2"), ("Asistan ve kişilik", "mic"),
+                          ("Takvim ve e-posta", "calendar"), ("Kayıt ve ekip", "folder"), ("Bilgi kaynakları", "globe"), ("Gizlilik", "hand.raised"), ("Gelişmiş", "slider.horizontal.3")]
     func kimlik(_ i: Int) -> NSToolbarItem.Identifier { .init("g\(i)") }
     var seciliGrup = 0
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { AyarPencere.GRUPLAR.indices.map(kimlik) }
@@ -1826,7 +1828,12 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
     func goster(_ bolum: String) {
         let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "", b = bolum.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
         if !pencere.isVisible || !bolum.isEmpty, let u = URL(string: "\(KOK)/?gorunum=\(yardimKipi ? "yardim" : "ayarlar")&k=\(k)" + (b.isEmpty ? "" : "&ayar=\(b)")) { web.load(URLRequest(url: u)) }
-        NSApp.setActivationPolicy(.regular); pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        // politika değişimi bir döngü turu sonra işler; etkinleştirme ve öne getirme o zaman, yoksa pencere gri (etkin olmayan) kalır
+        NSApp.setActivationPolicy(.regular)
+        DispatchQueue.main.async { [pencere] in
+            if pencere.isMiniaturized { pencere.deminiaturize(nil) }
+            NSApp.activate(ignoringOtherApps: true); pencere.makeKeyAndOrderFront(nil); pencere.orderFrontRegardless()
+        }
     }
     // "Varsayılanlara dön" onayı (v0.110.0): yanıtlayıcı olmadan WebKit confirm()'u sessizce "hayır" sayar
     func webView(_ w: WKWebView, runJavaScriptConfirmPanelWithMessage m: String, initiatedByFrame f: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
@@ -1844,8 +1851,15 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
         if let u = a.request.url, a.navigationType == .linkActivated, !(u.host == "127.0.0.1" && u.port == PORT) { NSWorkspace.shared.open(u); decisionHandler(.cancel); return }
         decisionHandler(.allow)
     }
-    func windowWillClose(_ n: Notification) {  // pano penceresi de kapalıysa yine yalnız menü çubuğunda
-        DispatchQueue.main.async { if !NSApp.windows.contains(where: { $0.isVisible && $0.styleMask.contains(.titled) && $0 !== self.pencere }) { NSApp.setActivationPolicy(.accessory) } }
+    func windowWillClose(_ n: Notification) { politikaYenile() }  // başka pencere açıksa .regular kalır
+    func windowDidBecomeKey(_ n: Notification) { if NSApp.activationPolicy() != .regular { NSApp.setActivationPolicy(.regular) } }
+}
+// Görünür bir Suflor penceresi (Pano, Ayarlar, Yardım) açık kaldıkça uygulama .regular (öne gelebilir, düğmeler etkin); son pencere kapanınca menü çubuğuna döner.
+func politikaYenile() {
+    DispatchQueue.main.async {
+        let acik = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
+        let hedef: NSApplication.ActivationPolicy = acik ? .regular : .accessory
+        if NSApp.activationPolicy() != hedef { NSApp.setActivationPolicy(hedef) }
     }
 }
 func goruntuAl(_ p: PanoPencere, _ yol: String) {  // çerçeve (araç çubuğu) + sayfa tek PNG (pencere paylaşımda görünmediği için ekran görüntüsü yerine)

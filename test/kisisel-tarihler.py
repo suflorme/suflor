@@ -16,6 +16,13 @@ ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "url
       "bildirim": lambda *a, **k: bild.append(a[2]), "seslendir": lambda m, **k: sesli.append(m), "toplanti_var": lambda: False, "gizli_acik": lambda: False,
       "SOHBET": {"acik": False}, "eposta_tur": lambda: "mailto", "eposta_ben": lambda: EP("ben"), "kisi_eposta": lambda ad: EP("ayse") if "Ayşe" in ad else None}
 exec(compile(oku("aktarici", "kisisel-tarihler.py"), "kisisel-tarihler.py", "exec"), ns)
+class _SabitTarih(datetime.date):  # modülün "bugün"ü testin sabit günü (6 Kasım 2026): gerçek tarihe bağlı kalan taslak/yoksay sınamaları günle bozulmasın
+    @classmethod
+    def today(cls): return D(2026, 11, 6)
+class _SabitDt(datetime.datetime):
+    @classmethod
+    def now(cls, tz=None): return datetime.datetime(2026, 11, 6, 12, 0)
+ns["datetime"] = type("dt", (), {"date": _SabitTarih, "datetime": _SabitDt, "timedelta": datetime.timedelta, "time": datetime.time, "timezone": datetime.timezone})
 H = lambda g, **k: dict({"durum": "ok", "izinler": {"kisiler": True, "takvim": True, "animsaticilar": True}, "kisiler": [], "dogum_takvimi": [], "suflor": [], "etkinlikler": [], "animsaticilar": []}, **k)
 hes = lambda ham, bugun, ufuk=14, y=None: ns["kt_hesapla"](ham, bugun, ufuk, y)
 # --- pencere ve yinelenme
@@ -77,6 +84,7 @@ kontrol("yoksay: kayıt bir daha listelenmez, dosyaya yazılır (0600)", ns["kt_
         all(not (x["tur"] == "dogum_gunu" and x["kisi"] == "Ayşe Yılmaz") for x in ns["kt_view"](False, b)["tarihler"]) and oct(os.stat(os.path.join(tmp, "kisisel-tarihler.json")).st_mode)[-3:] == "600")
 kontrol("yoksay: olmayan kayıt reddedilir", ns["kt_islem"]({"islem": "yoksay", "tarih": "2026-11-08", "kisi": "Kimse"})["ok"] is False)
 # --- hatırlatma: bir gün önce ve sabah
+ns["gelistirici_mi"] = lambda: True  # geliştirici kurulumu: ayar yoksa 09:00 (eski davranış); beta davranışı aşağıda ayrıca sınanır
 ns["_KT"].update(yoksay=None); os.remove(os.path.join(tmp, "kisisel-tarihler.json")); ns["_KT"]["yoksay"] = None
 simdi = datetime.datetime(2026, 11, 7, 9, 30); bild.clear(); ns["_KT"].update(t=0, ham=None)
 n = ns["kt_hatirlat_tur"](simdi); kontrol(f"bir gün önce: yarınki doğum günü + bugünkü hatırlatma (2 bildirim; etkinlik yok): {bild}", n == 2 and any(c.startswith("Yarın: Ayşe") for c in bild) and any(c.startswith("Bugün: Ali'yi ara") for c in bild) and not any("piknik" in c.lower() for c in bild))
@@ -88,6 +96,16 @@ kontrol("sesli ayar kapalıyken sesli okuma yok", not sesli); ns["AYAR"]["kisise
 sesli.clear(); bild.clear(); ns["_KT"]["bildirilen"] = {}; ns["toplanti_var"] = lambda: True; kontrol("toplantıdayken hatırlatma yok (bildirilmez, sonra denenir)", ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 9, 5)) == 0 and not bild and not sesli); ns["toplanti_var"] = lambda: False
 ns["gizli_acik"] = lambda: True; kontrol("gizli toplantıda hatırlatma yok", ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 9, 5)) == 0); ns["gizli_acik"] = lambda: False
 ns["AYAR"]["kisisel_tarih_hatirlat"] = False; kontrol("ayar kisisel_tarih_hatirlat: false kapatır", ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 9, 5)) == 0); ns["AYAR"].clear()
+# beta varsayılanı: ayar girilmemişse saat boş, bildirim yok; liste ve sesle hatırlat sürer; saat girilince çalışır; geliştiricide 09:00
+ns["AYAR"].clear(); ns["gelistirici_mi"] = lambda: False; ns["_KT"]["bildirilen"] = {}; bild.clear(); ns["toplanti_var"] = lambda: False
+kontrol("beta, ayar yok: _kt_saat() None", ns["_kt_saat"]() is None)
+kontrol("beta, ayar yok: saatli hatırlatma bildirimi yok (bir gün önce de sabah da)", ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 7, 9, 30)) == 0 and ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 9, 30)) == 0 and not bild)
+ns["AYAR"]["kisisel_tarih_saat"] = "  "; kontrol("beta, boşluk/boş ayar da boş sayılır", ns["_kt_saat"]() is None); ns["AYAR"].clear()
+kontrol("beta: tarihler listede görünmeye devam eder (kt_hesapla)", len(hes(H(0, kisiler=[{"ad": "Ayşe Yılmaz", "dogum": {"ay": 11, "gun": 8, "yil": 1990}}]), D(2026, 11, 7))) == 1)
+kontrol("beta: sesle 'doğum gününü hatırlat' takvim saatinde 09:00'a döner (kullanıcının açık isteği)", ns["_kt_saat"](True) == (9, 0))
+ns["AYAR"]["kisisel_tarih_saat"] = "08:15"; ns["_KT"]["bildirilen"] = {}; kontrol("beta, saat girilince hatırlatma çalışır", ns["_kt_saat"]() == (8, 15) and ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 8, 20)) >= 1 and bool(bild)); ns["AYAR"].clear()
+ns["gelistirici_mi"] = lambda: True; kontrol("geliştirici, ayar yok: 09:00 (eski davranış değişmedi)", ns["_kt_saat"]() == (9, 0))
+ns["_KT"]["bildirilen"] = {}; bild.clear(); kontrol("geliştirici, ayar yok: 09:00'da hatırlatma gider", ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 9, 0)) >= 1 and bool(bild)); ns["_KT"]["bildirilen"] = {}; bild.clear()
 ns["AYAR"]["kisisel_tarih_saat"] = "07:30"; kontrol("hatırlatma saati ayarı", ns["_kt_saat"]() == (7, 30)); ns["AYAR"]["kisisel_tarih_saat"] = "zz"; kontrol("bozuk saat → 09:00", ns["_kt_saat"]() == (9, 0)); ns["AYAR"].clear()
 # --- Konuş bağlamı
 ns["_KT"].update(t=0, ham=None, yoksay=None); bag = ns["kisisel_tarih_baglam"]("bu hafta kimin doğum günü var")
@@ -113,5 +131,6 @@ kontrol("takvim.swift: --tarihler, üç izin ayrı, yazma çağrısı yok (CNSav
 kontrol("TAKVIM_PLIST: NSRemindersFullAccessUsageDescription var", "NSRemindersFullAccessUsageDescription" in ku)
 kontrol("relay: /yaklasan-tarihler VERI_GET'te, GET ve POST bağlı, bölüm yüklü, hatırlatma döngüsü başlar", '"/yaklasan-tarihler"' in re.search(r"VERI_GET = \{[^}]*\}", rl).group(0) and 'yol == "/yaklasan-tarihler"' in rl and 'kt_islem(p)' in rl and 'bolum("kisisel-tarihler")' in rl and "_kt_dongu" in rl)
 kontrol("relay AYAR_PANO: ayar adları", all(f'"{k}"' in rl[rl.index("AYAR_PANO = {"):rl.index("def kisilik_listesi")] for k in ("kisisel_tarihler", "kisisel_tarih_ufuk", "kisisel_tarih_hatirlat", "kisisel_tarih_sesli", "kutlama_kanali")))
+kontrol("relay ayarlar_view: kisisel_tarih_saat betada boş, geliştiricide 09:00 (görünüm ve varsayılan)", rl.count('"09:00" if gelistirici_mi() else ""') == 2 and 'd["kisisel_tarih_saat"]' in rl and 'vars_["kisisel_tarih_saat"]' in rl)
 bk = oku("aktarici", "bas-konus.py"); kontrol("Konuş bağlamı kisisel_tarih_baglam çağırır", "kisisel_tarih_baglam(soru)" in bk)
 print("\nSONUÇ: " + ("hepsi geçti" if not hatalar else f"{len(hatalar)} hata: {hatalar}")); sys.exit(1 if hatalar else 0)

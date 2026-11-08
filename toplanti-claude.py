@@ -178,10 +178,10 @@ class _AnahtarEkle(urllib.request.BaseHandler):
         return r
 urllib.request.install_opener(urllib.request.build_opener(_AnahtarEkle()))
 
-def get(path):
+def get(path, zaman=3):
     # izle kendini bildirir → panoda "Claude izliyor" noktası (yalnız /status'ta kullanılır)
     # yalnız izle bildirir (takvim/saglik gibi tek seferlik komutlar "Claude izliyor" saymasın — panodan başlatmayı kilitler)
-    return json.load(urllib.request.urlopen(urllib.request.Request(A.relay + path, headers={"X-Suflor-Istemci": "izle"} if A.cmd == "izle" else {}), timeout=3))
+    return json.load(urllib.request.urlopen(urllib.request.Request(A.relay + path, headers={"X-Suflor-Istemci": "izle"} if A.cmd == "izle" else {}), timeout=zaman))
 
 def durum_cmd():
     try: s = get("/status")
@@ -819,8 +819,19 @@ VT_ARACLAR = [{"name": "vt_sema", "description": "Kayıt veritabanının tablola
                "inputSchema": {"type": "object", "properties": {}}},
               {"name": "vt_sor", "description": "Kayıt veritabanında tek bir SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; gizli sütunlar *** döner).",
                "inputSchema": {"type": "object", "properties": {"sorgu": {"type": "string", "description": "SQLite SELECT sorgusu"}}, "required": ["sorgu"]}},
-              {"name": "kisi_bul", "description": "Mac Kişiler'de ada göre arama (yalnız okuma): e-posta, telefon, posta adresi; en çok 5 eşleşme. Yalnız kullanıcı bir kişinin iletişim bilgisini isterse.",
-               "inputSchema": {"type": "object", "properties": {"ad": {"type": "string", "description": "kişinin adı (ya da ad soyad)"}}, "required": ["ad"]}}]
+              {"name": "kisi_bul", "description": "Mac Kişiler'de arama (yalnız okuma): ad, kurum ya da e-posta parçasıyla; e-posta, telefon, posta adresi, doğum günü; en çok 20 eşleşme. Yalnız kullanıcı bir kişinin iletişim bilgisini isterse.",
+               "inputSchema": {"type": "object", "properties": {"ad": {"type": "string", "description": "kişinin adı (ya da ad soyad), kurum ya da e-posta parçası"}}, "required": ["ad"]}},
+              {"name": "kayit_listele", "description": "Kararlar ve işler kayıtlarını süzgeçle listeler (yalnız okuma; gizli toplantı kayıtları gelmez; en çok 50 satır). Her satır: kayit_id, tür, durum (acik/teyit/kapandi), kim, vade, gecikti, metin, toplantı başlığı ve günü. Sayım ve sıralama soruları için.",
+               "inputSchema": {"type": "object", "properties": {
+                   "tur": {"type": "string", "enum": ["karar", "is", "soru"]}, "durum": {"type": "string", "enum": ["acik", "teyit", "kapandi"], "description": "teyit = onay bekleyen karar; kapandi = yapılmış/iptal iş, cevaplanmış soru, onaylı karar"},
+                   "sahip": {"type": "string", "description": "kişi adı (ad ya da soyad parçası)"}, "gecikmis": {"type": "boolean", "description": "yalnız vadesi geçmiş açık işler"},
+                   "tarih_bas": {"type": "string", "description": "toplantı günü en erken YYYY-MM-DD"}, "tarih_son": {"type": "string", "description": "toplantı günü en geç YYYY-MM-DD"},
+                   "vade_bas": {"type": "string", "description": "vade en erken YYYY-MM-DD"}, "vade_son": {"type": "string", "description": "vade en geç YYYY-MM-DD"},
+                   "ara": {"type": "string", "description": "metin ya da toplantı başlığında geçen sözcük"}, "en_cok": {"type": "integer", "description": "en çok satır (varsayılan 25, üst sınır 50)"}}}},
+              {"name": "kayit_tarihce", "description": "Bir kaydın olay günlüğü (kim, ne zaman, ne değiştirdi; eskiden yeniye, en çok 40 olay; yalnız okuma). Kimlik: kayit_listele'deki kayit_id ya da k12/s7/q3.",
+               "inputSchema": {"type": "object", "properties": {"kayit_id": {"type": "string"}}, "required": ["kayit_id"]}},
+              {"name": "kisi_ozet", "description": "Mac Kişiler'de yalnız SAYILAR: toplam kayıt; telefonlu, e-postalı, adresli, doğum günlü, kurumlu kişi sayısı; kurum_say=true ise kuruma göre ilk 10 sayım. Ad ya da iletişim bilgisi dönmez. 'Kişilerimde kaç kişi var' türü sorular için.",
+               "inputSchema": {"type": "object", "properties": {"kurum_say": {"type": "boolean", "description": "kuruma göre ilk 10 sayımı da ver"}}}}]
 VT_SEMA_ONBELLEK = "vt-sema.txt"  # canli/ altında: launchd'deki aktarıcı Masaüstü'ndeki veritabanını okuyamaz; Konuş istemine tablo yapısı buradan girer
 # v0.57.8: sorgu sonucu önbelleği (canli/vt-sonuc.json, 0600) — aktarıcı veritabanını okuyamadığı için sonucu bu araç tutar. Her vt_sor sonucu sorgu metniyle yazılır;
 # açılışta ve veritabanı dosyası değişince (VT_DENETIM_SN'de bir bakılır) son sorgular yeniden çalıştırılır; "kontrol" alanı en son denetim anıdır.
@@ -1045,6 +1056,9 @@ def vt_mcp_cmd():
             try: metin, hata = (vt_sema_metin() if ad == "vt_sema" else vt_sor_metin(ar.get("sorgu")) if ad == "vt_sor" else None), False
             except VtHata as e: metin, hata = str(e), True
             if ad == "kisi_bul": metin, hata = kisi_ara(ar.get("ad") or "")
+            elif ad == "kisi_ozet": metin, hata = kisi_ozet(ar.get("kurum_say") is True)
+            elif ad == "kayit_listele": metin, hata = kayit_listele(ar)
+            elif ad == "kayit_tarihce": metin, hata = kayit_tarihce(ar.get("kayit_id") or "")
             if ad == "vt_sor" and not hata:
                 with kilit: _vt_onbellek(A.dir, guncelle=(str(ar.get("sorgu") or "").strip().rstrip(";").strip(), metin))
             if metin is None: yaz({"jsonrpc": "2.0", "id": i, "error": {"code": -32602, "message": f"bilinmeyen araç {ad}"}}); continue
@@ -2523,7 +2537,49 @@ def kisi_ara(ad):  # aktarıcı /kisi (Suflor Takvim.app --kisi); → metin
     if o.get("durum") != "ok": return f"kişi: {o.get('durum')} — {o.get('hata') or ''}".strip(" —"), True
     if not o.get("kisiler"): return "Kişiler'de bu adla kayıt yok.", False
     return "\n".join(f"- {c['ad']}" + (f" ({c['kurum']})" if c.get("kurum") else "") + (" · e-posta: " + ", ".join(c["eposta"]) if c.get("eposta") else "")
-                      + (" · telefon: " + ", ".join(c["telefon"]) if c.get("telefon") else "") + (" · adres: " + " | ".join(c["adres"]) if c.get("adres") else "") for c in o["kisiler"]), False
+                      + (" · telefon: " + ", ".join(c["telefon"]) if c.get("telefon") else "") + (" · adres: " + " | ".join(c["adres"]) if c.get("adres") else "") + (" · doğum günü: " + str(c["dogum"]) if c.get("dogum") else "") for c in o["kisiler"][:20]), False
+def kisi_ozet(kurum_say=False):  # aktarıcı /kisi-ozet (Suflor Takvim.app --kisi-ozet): yalnız sayılar; ad/iletişim verisi dönmez
+    try: o = get("/kisi-ozet" + ("?kurum=1" if kurum_say else ""), 25)
+    except Exception as e: return f"kişi özeti: aktarıcıya ulaşılamadı ({e.__class__.__name__})", True
+    if o.get("durum") != "ok": return f"kişi özeti: {o.get('durum')} — {o.get('hata') or ''}".strip(" —"), True
+    t = f"Mac Kişiler: toplam {o.get('toplam', 0)} kayıt · telefonlu {o.get('telefonlu', 0)} · e-postalı {o.get('epostali', 0)} · adresli {o.get('adresli', 0)} · doğum günlü {o.get('dogumlu', 0)} · kurumlu {o.get('kurumlu', 0)}"
+    if o.get("kurumlar"): t += "\nKuruma göre ilk 10: " + "; ".join(f"{k.get('kurum')}: {k.get('sayi')}" for k in o["kurumlar"])
+    return t, False
+def _kayit_kucuk(x): return " ".join(str(x or "").replace("İ", "i").replace("I", "ı").lower().split())
+def kayit_listele(ar):  # aktarıcı /kayitlar (yapi.kayit_listesi; gizli ve deneme toplantı kayıtları gelmez) → süzgeç → en çok 50 özet satır
+    try: v = get("/kayitlar")
+    except Exception as e: return f"kayıtlar: aktarıcıya ulaşılamadı ({e.__class__.__name__})", True
+    if not v.get("ok"): return "kayıtlar okunamadı (kayıt grafı yok ya da aktarıcı hazır değil)", True
+    tur = str(ar.get("tur") or "").strip().lower(); du = str(ar.get("durum") or "").strip().lower(); sa = _kayit_kucuk(ar.get("sahip")); q = _kayit_kucuk(ar.get("ara"))
+    tr = lambda a: str(ar.get(a) or "")[:10]; tb, ts, vb, vs = tr("tarih_bas"), tr("tarih_son"), tr("vade_bas"), tr("vade_son")
+    try: en = max(1, min(int(ar.get("en_cok") or 25), 50))
+    except (TypeError, ValueError): en = 25
+    sec = []
+    for x in v.get("kayitlar") or []:
+        if tur and x.get("tur") != tur: continue
+        if du and x.get("durum") != du: continue
+        if sa and sa not in _kayit_kucuk(x.get("kim")): continue
+        if ar.get("gecikmis") is True and not x.get("gecikti"): continue
+        t, vd = str(x.get("tarih") or "")[:10], str(x.get("vade") or "")[:10]
+        if (tb and (not t or t < tb)) or (ts and (not t or t > ts)) or (vb and (not vd or vd < vb)) or (vs and (not vd or vd > vs)): continue
+        if q and q not in _kayit_kucuk((x.get("metin") or "") + " " + (x.get("baslik") or "")): continue
+        sec.append(x)
+    sec.sort(key=lambda x: str(x.get("tarih") or ""), reverse=True); sec.sort(key=lambda x: not x.get("gecikti"))  # gecikmişler önce, sonra yeni toplantı önce
+    if not sec: return "Bu süzgeçle kayıt yok.", False
+    sat = [f"- {x.get('kayit_id') or x.get('id')} · {x.get('tur')} · {x.get('durum')}" + (" · GECİKTİ" if x.get("gecikti") else "") + (f" · kim: {x['kim']}" if x.get("kim") else "") + (f" · vade: {x['vade']}" if x.get("vade") else "")
+           + f" · {str(x.get('metin') or '')[:140]}" + (f" ({str(x.get('baslik'))[:50]}, {str(x.get('tarih'))[:10]})" if x.get("baslik") else "") for x in sec[:en]]
+    return f"{len(sec)} kayıt eşleşti" + (f", ilk {en} gösteriliyor" if len(sec) > en else "") + ":\n" + "\n".join(sat), False
+def kayit_tarihce(kimlik):  # yapi.tarihce (olay günlüğü, yalnız okuma); gizli/deneme kaydın tarihçesi verilmez (kayıt /kayitlar listesinde olmalı)
+    k = str(kimlik or "").strip()[:40]
+    if not k: return "kayit_id gerekli", True
+    try: v = get("/kayitlar")
+    except Exception as e: return f"tarihçe: aktarıcıya ulaşılamadı ({e.__class__.__name__})", True
+    x = next((r for r in v.get("kayitlar") or [] if k in (r.get("kayit_id"), r.get("id"))), None)
+    if not x: return "Bu kimlikle görünür kayıt yok (gizli toplantı kayıtları ve deneme kayıtları verilmez).", False
+    try: th = _yapi().tarihce(A.dir, x.get("kayit_id") or k)
+    except Exception as e: return f"tarihçe okunamadı ({e.__class__.__name__})", True
+    if not th: return "Bu kaydın olay günlüğünde olay yok.", False
+    return f"{x.get('tur')} · {str(x.get('metin') or '')[:100]}\n" + "\n".join("- " + str(o.get("ozet") or o.get("tur")) for o in th[-40:]), False
 def kisi_cmd(): print(kisi_ara(" ".join(A.ad))[0])
 def kapanis_cmd():
     try: v = get("/kapanis-turu")
@@ -2542,7 +2598,8 @@ def takvim_cmd():  # aktarıcının takvimi (Suflor Takvim yardımcısı, Takvim
     if gun > 1:
         print(f"# Boş zamanlar ({gun} gün, çalışma saatleri ayar calisma_saatleri; takvimdeki her etkinlik dolu)")
         for b in t.get("bos") or []: print(f"- {b['tarih']}: " + ", ".join(b["araliklar"]))
-        if not t.get("bos"): print("- çalışma saatlerinde boş zaman yok")
+        if not (t.get("calisma") or {}).get("gunler"): print("- çalışma saatleri girilmemiş (ayar calisma_saatleri); uygun zaman önerilemez")
+        elif not t.get("bos"): print("- çalışma saatlerinde boş zaman yok")
         print()
     if not ol: print("Bugün başka toplantı yok." if gun == 1 else f"{gun} günde takvimde etkinlik yok."); return
     for o in ol:

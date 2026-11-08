@@ -50,11 +50,47 @@ kontrol("tc: kisi alt komutu, kisi_ara aktarıcı /kisi'ye gider, MCP kisi_bul a
 rl = oku("relay.py")
 kontrol("relay: /kisi okuma ucu anahtar ister (VERI_GET) ve kisi_bul'a bağlı", '"/kisi"' in rl.split('VERI_GET = ',1)[1].split('}',1)[0] and 'if yol == "/kisi":' in rl and "kisi_bul(ad)" in rl)
 bk = oku("aktarici", "bas-konus.py")
-kontrol("Konuş: kisi_bul aracı izin listesinde ve istemde, brifing.swift mcp__suflorvt__ önekini zaten tanır", "mcp__suflorvt__kisi_bul" in bk and "kisi_bul aracıyla" in bk and 'hasPrefix("mcp__suflorvt__")' in oku("brifing.swift"))
+kontrol("Konuş: kisi_bul aracı izin listesinde ve istemde, brifing.swift mcp__suflorvt__ önekini zaten tanır", "mcp__suflorvt__kisi_bul" in bk and "kisi_bul'u kullan" in bk and 'hasPrefix("mcp__suflorvt__")' in oku("brifing.swift"))
 sw = oku("takvim.swift"); ku = oku("kurulum.py")
-kontrol("takvim.swift: Contacts, --kisi, en çok 5, izin_yok hatası, yazma/kaydetme çağrısı yok",
-        "import Contacts" in sw and '"--kisi"' in sw and "prefix(5)" in sw and '"izin_yok"' in sw and not re.search(r"CNSaveRequest|CNMutable", sw))
+kontrol("takvim.swift: Contacts, --kisi, en çok 20, izin_yok hatası, yazma/kaydetme çağrısı yok",
+        "import Contacts" in sw and '"--kisi"' in sw and "prefix(en)" in sw and "let en = 20" in sw and '"izin_yok"' in sw and not re.search(r"CNSaveRequest|CNMutable", sw))
 kontrol("TAKVIM_PLIST: NSContactsUsageDescription var", "NSContactsUsageDescription" in ku)
+# --- v0.211 (okumaarac): kisi_bul genişledi (kurum/e-posta, doğum günü, 20), kisi_ozet, kayit_listele, kayit_tarihce
+ns["_KISI_ONBELLEK"].clear(); ns["_takvim_yardimci"] = sahte({"durum": "ok", "kisiler": [{"ad": "Ece Aydın", "kurum": "Örnek A.Ş.", "dogum": "1990-03-14", "eposta": [EP("ece")]}] + [{"ad": f"K{i}"} for i in range(30)]})
+o = ns["kisi_bul"]("Örnek"); kontrol("kisi_bul: en çok 20 sonuç, doğum günü alanı geçer", len(o["kisiler"]) == 20 and o["kisiler"][0]["dogum"] == "1990-03-14" and o["kisiler"][1]["dogum"] == "")
+OZ = {"durum": "ok", "toplam": 812, "telefonlu": 700, "epostali": 650, "adresli": 90, "dogumlu": 120, "kurumlu": 400, "kurumlar": [{"kurum": "Örnek A.Ş.", "sayi": 30}], "ad": "SIZMAMALI", "kisiler": [{"ad": "SIZMAMALI"}]}
+ns["_KISI_ONBELLEK"].clear(); cagri.clear(); ns["_takvim_yardimci"] = sahte(OZ)
+o = ns["kisi_ozet"](); kontrol(f"kisi_ozet: --kisi-ozet çağrılır, yalnız sayı alanları geçer (ad/kisiler sızmaz): {o}", cagri[-1] == ["--kisi-ozet"] and o == {"durum": "ok", "toplam": 812, "telefonlu": 700, "epostali": 650, "adresli": 90, "dogumlu": 120, "kurumlu": 400})
+o = ns["kisi_ozet"](True); kontrol("kisi_ozet(kurum_say): --kurum-say, ilk 10 kurum sayımı", cagri[-1] == ["--kisi-ozet", "--kurum-say"] and o["kurumlar"] == [{"kurum": "Örnek A.Ş.", "sayi": 30}])
+n = len(cagri); ns["kisi_ozet"](True); kontrol("kisi_ozet önbellekten gelir", len(cagri) == n)
+ns["_KISI_ONBELLEK"].clear(); ns["_takvim_yardimci"] = sahte({"durum": "izin_yok", "hata": "Kişiler izni yok"}); o = ns["kisi_ozet"](); kontrol("kisi_ozet: izin yok → açık hata, önbelleğe girmez", o["durum"] == "izin_yok" and not ns["_KISI_ONBELLEK"])
+ns["AYAR"]["kisiler_arama"] = False; o = ns["kisi_ozet"](); kontrol("kisi_ozet: kisiler_arama:false → kapalı", o["durum"] == "kapali"); ns["AYAR"].clear()
+tc = oku("toplanti-claude.py"); i0 = tc.index("def kisi_ozet("); i1 = tc.index("def kisi_cmd()")
+tn = {"re": re, "os": os, "json": json, "A": types.SimpleNamespace(dir="/tmp/yok"), "get": None, "_yapi": None}; exec(compile(tc[i0:i1], "tc-kayit", "exec"), tn)
+KAY = [{"id": "s1", "kayit_id": "A" * 26, "tur": "is", "metin": "Rapor hazırla", "kim": "Ali Kaya", "vade": "2026-11-01", "gecikti": True, "durum": "acik", "baslik": "Haftalık", "tarih": "2026-10-28"},
+       {"id": "s2", "kayit_id": "B" * 26, "tur": "is", "metin": "Sunum", "kim": "Deniz Yıldız", "vade": "2026-12-01", "gecikti": False, "durum": "acik", "baslik": "Plan", "tarih": "2026-11-05"},
+       {"id": "k3", "kayit_id": "C" * 26, "tur": "karar", "metin": "Bütçe onaylandı", "kim": "Ali Kaya", "vade": "", "gecikti": False, "durum": "teyit", "baslik": "Plan", "tarih": "2026-11-06"},
+       {"id": "q4", "kayit_id": "D" * 26, "tur": "soru", "metin": "Kim sorumlu?", "kim": "", "vade": "", "gecikti": False, "durum": "kapandi", "baslik": "Plan", "tarih": "2026-11-07"}] + [dict(KAY0, id=f"s{10+i}", kayit_id=f"{i:026d}") for i, KAY0 in enumerate([{"tur": "is", "metin": "toplu", "kim": "Veli", "vade": "", "gecikti": False, "durum": "acik", "baslik": "Toplu", "tarih": "2026-09-01"}] * 70)]
+tn["get"] = lambda y, zaman=3: {"ok": True, "kayitlar": KAY}
+L = lambda **ar: tn["kayit_listele"](ar)[0]
+kontrol("kayit_listele: süzgeçsiz en çok 25, toplam sayısı ve kesme notu", L().startswith("74 kayıt eşleşti, ilk 25 gösteriliyor") and L().count("\n- ") == 25 and L(en_cok=500).count("\n- ") == 50)
+kontrol("kayit_listele: gecikmiş önce, sonra yeni toplantı önce", L(en_cok=3).split("\n- ")[1].startswith("A" * 26) and L(en_cok=3).split("\n- ")[2].startswith("D" * 26))
+kontrol("kayit_listele: tür/durum/sahip (parça, büyük-küçük harf farksız)/gecikmiş", L(tur="karar").startswith("1 kayıt") and L(durum="teyit").startswith("1 kayıt") and L(sahip="ali").startswith("2 kayıt") and L(gecikmis=True).startswith("1 kayıt") and "GECİKTİ" in L(gecikmis=True))
+kontrol("kayit_listele: tarih ve vade aralığı, metin araması", L(tarih_bas="2026-11-01", tarih_son="2026-11-06").startswith("2 kayıt") and L(vade_bas="2026-11-15").startswith("1 kayıt") and L(ara="BÜTÇE").startswith("1 kayıt") and L(ara="plan", tur="is").startswith("1 kayıt"))
+kontrol("kayit_listele: eşleşme yoksa açık mesaj", L(sahip="yok kişi") == "Bu süzgeçle kayıt yok.")
+tn["get"] = lambda y, zaman=3: {"ok": False}; kontrol("kayit_listele: kayıt grafı yoksa hata", tn["kayit_listele"]({})[1] is True)
+def _hata(y, zaman=3): raise OSError("x")
+tn["get"] = _hata; kontrol("kayit_listele: aktarıcı yoksa hata (istisna sızmaz)", tn["kayit_listele"]({})[1] is True and tn["kayit_tarihce"]("s1")[1] is True)
+tn["get"] = lambda y, zaman=3: {"ok": True, "kayitlar": KAY}; CAG = []
+tn["_yapi"] = lambda: types.SimpleNamespace(tarihce=lambda d, k: CAG.append(k) or [{"ozet": f"2026-11-0{i} 10:00 UTC · Ali · olay{i}", "tur": "x"} for i in range(1, 6)])
+m, h = tn["kayit_tarihce"]("s1"); kontrol("kayit_tarihce: yerel kimlikle kayit_id'ye çözülür, olaylar eskiden yeniye", not h and CAG == ["A" * 26] and m.count("\n- ") == 5 and "olay5" in m)
+m, h = tn["kayit_tarihce"]("B" * 26); kontrol("kayit_tarihce: kayit_id ile", CAG[-1] == "B" * 26)
+CAG.clear(); m, h = tn["kayit_tarihce"]("Z" * 26); kontrol("kayit_tarihce: listede görünmeyen (gizli/deneme/yok) kaydın tarihçesi verilmez, yapı çağrılmaz", not CAG and "görünür kayıt yok" in m)
+kontrol("kayit_tarihce: boş kimlik hata", tn["kayit_tarihce"]("")[1] is True)
+kontrol("tc: MCP araç listesi 6 araç, çağrı yolları bağlı, get zaman aşımı parametreli", all(f'{{"name": "{a}"' in tc for a in ("kayit_listele", "kayit_tarihce", "kisi_ozet")) and 'ad == "kayit_listele"' in tc and 'ad == "kayit_tarihce"' in tc and 'ad == "kisi_ozet"' in tc and "def get(path, zaman=3)" in tc)
+kontrol("relay: /kisi-ozet okuma ucu anahtar ister (VERI_GET), kisi_ozet'e bağlı", '"/kisi-ozet"' in rl.split('VERI_GET = ',1)[1].split('}',1)[0] and 'yol == "/kisi-ozet"' in rl and "kisi_ozet(" in rl)
+kontrol("takvim.swift: --kisi-ozet yalnız sayı yazar (toplam…kurumlu), --kurum-say, kurum/e-posta aramasında doğum günü", '"--kisi-ozet"' in sw and '"--kurum-say"' in sw and "func kisiOzetle" in sw and "CNContactBirthdayKey" in sw and '"toplam": top' in sw and not re.search(r'o\["(ad|eposta|telefon)"\]', sw[sw.index("func kisiOzetle"):sw.index("func kisiIzinle")]))
+kontrol("bas-konus.py VT_MCP_ARACLAR yeni araçları (kayit_listele, kayit_tarihce, kisi_ozet) içeriyor ve istemde anlatılıyor", all(f"mcp__suflorvt__{a}" in bk for a in ("kayit_listele", "kayit_tarihce", "kisi_ozet")) and "kisi_ozet kullan" in bk and "N kayıt eşleşti" in bk)
 bs = oku("brifing.swift")
 kontrol("brifing.swift araclar listesinde WebSearch ve WebFetch (konus_web için)", re.search(r'let araclar: Set<String> = \[[^\]]*"WebSearch"[^\]]*"WebFetch"', bs) is not None)
 print("\nSONUÇ: " + ("hepsi geçti" if not hatalar else f"{len(hatalar)} hata: {hatalar}")); sys.exit(1 if hatalar else 0)

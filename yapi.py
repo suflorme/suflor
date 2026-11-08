@@ -1614,14 +1614,14 @@ def eylem_menu(dizin, kimlik, takvim=None, kimlik_f=None, simdi=None):
     pasif = {} if kendi or ep else {"teams": ("bu kayıtta taslağın alıcısı yok; Ata ile kişi ekle" if not rl.get("ad") else f"{kim} e-postası yok; Teams sohbeti alıcısız açılamaz")}
     return {"ok": True, "kayit": _kayit_kisa(x), "eylemler": eylem_mevcut(x, geri, kendi), "kendi": kendi, "pasif": pasif, "tarihce": [satir(o) for o in th[-12:]],
             "geri_al": {"olay_id": geri["olay_id"], "ozet": olay_ozeti(geri)} if geri else None, "gundem": gundem_adaylari(takvim, x, simdi), "sahip": sk}
-def kayit_eylem(dizin, kimlik, eylem, p=None, yazan=None, kimlik_f=None, takvim=None, model_f=None, simdi=None):
+def kayit_eylem(dizin, kimlik, eylem, p=None, yazan=None, kimlik_f=None, takvim=None, model_f=None, simdi=None, kaynak="eylem"):
     # POST /kayit-eylem. eylem: ertele{vade,neden?} · gundem{etkinlik?} · ata{sahip,eposta?,rol?} · onayla · reddet · yapildi · iptal · cevaplandi · ac · eposta{alicilar?} · teams{alicilar?} ·
-    # claude · geri_al{olay_id?}. → {"ok", "eylem", "olay": olay_id | None (değişiklik yok), "kayit", …}; hata: {"ok": False, "err"}
+    # claude · geri_al{olay_id?}. kaynak: olayın kaynağı ("eylem" pano; "asistan" Konuş [KAYIT: …] onaylı). → {"ok", "eylem", "olay": olay_id | None (değişiklik yok), "kayit", …}; hata: {"ok": False, "err"}
     p = p if isinstance(p, dict) else {}; x = ortak_kayit(dizin, kimlik)
     p = {k: (v if isinstance(v, (str, list)) else "" if isinstance(v, (dict, bool, int, float)) else v) for k, v in p.items()}  # sözlük/sayı metin sanılıp kayda "{'a': 1}" olarak yazılmasın
     if not x: return {"ok": False, "err": "kayıt yok"}
     if x["gizli"] or (x["toplanti"] and gizli_mi(dizin, x["toplanti"])): return {"ok": False, "err": "gizli", "eylem": eylem}
-    kid = x["kayit_id"]; k = "eylem"; bitti = lambda o, y, **ek: dict({"ok": True, "eylem": eylem, "olay": o["olay_id"] if o else None, "kayit": _kayit_kisa(y or ortak_kayit(dizin, kid))}, **ek)
+    kid = x["kayit_id"]; k = kaynak; bitti = lambda o, y, **ek: dict({"ok": True, "eylem": eylem, "olay": o["olay_id"] if o else None, "kayit": _kayit_kisa(y or ortak_kayit(dizin, kid))}, **ek)
     if eylem == "ertele":
         if x["tur"] not in ("is", "soz"): return {"ok": False, "err": "yalnız iş ertelenir"}
         v = p.get("vade") if isinstance(p.get("vade"), str) else ""; v = " ".join(v.split())[:20]

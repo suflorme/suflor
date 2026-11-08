@@ -13,7 +13,9 @@ var adaylar = false  // --adaylar: olay yerine kullanıcının olası takvim adr
 var ayrinti = false  // --ayrinti: her olaya katılımcı adresleri ve "current user" işareti (teşhis; aktarıcı kullanmaz)
 var etkinlik: String? = nil  // v0.132.0: --etkinlik <istek.json> {"baslik", "zaman": "YYYY-MM-DDTHH:MM" (yerel), "dk", "not", "takvim"} → takvime hatırlatma etkinliği
 var etkinlikSil: String? = nil  // --etkinlik-sil <kimlik>: Suflor'un eklediği etkinliği siler
-var kisiAd: String? = nil  // S225 (5 Kasım): --kisi <ad> → Mac Kişiler'de ada göre arama (yalnız okuma; en çok 5 eşleşme: ad, kurum, e-postalar, telefonlar, posta adresi)
+var kisiAd: String? = nil  // S225 (5 Kasım): --kisi <ad> → Mac Kişiler'de ada göre arama (yalnız okuma; en çok 20 eşleşme: ad, kurum, e-postalar, telefonlar, posta adresi, doğum günü; ad, kurum ya da e-postada arar)
+var kisiOzet = false  // --kisi-ozet: Kişiler'de yalnız SAYILAR (toplam, telefonlu, e-postalı, adresli, doğum günlü, kurumlu); --kurum-say ile kuruma göre ilk 10 sayım. Ad/iletişim verisi yazılmaz
+var kurumSay = false
 var tarihGun: Int? = nil  // S243: --tarihler <gün> → Kişiler'deki doğum günü/tarihler + Takvim'in doğum günleri/tüm gün etkinlikleri/Suflor hatırlatmaları + Anımsatıcılar'daki tarihli öğeler (yalnız okuma; ham, pencere hesabı aktarıcıda)
 var takvimler = false  // --takvimler: yazılabilir takvimler (ayar hatirlatma_takvim seçimi için)
 var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
@@ -31,6 +33,8 @@ while i < a.count {
   else if a[i] == "--takvimler" { takvimler = true }
   else if a[i] == "--tarihler", i + 1 < a.count { tarihGun = max(1, min(Int(a[i + 1]) ?? 14, 90)); i += 1 }
   else if a[i] == "--kisi", i + 1 < a.count { kisiAd = a[i + 1]; i += 1 }
+  else if a[i] == "--kisi-ozet" { kisiOzet = true }
+  else if a[i] == "--kurum-say" { kurumSay = true }
   else if a[i] == "--goster", i + 1 < a.count { goster.insert(a[i + 1].trimmingCharacters(in: .whitespaces)); i += 1 }
   else if a[i] == "--adres", i + 1 < a.count {
     adresler = Set(a[i + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }); i += 1
@@ -217,26 +221,65 @@ func etkinlikIs(_ izin: Bool, _ hata: Error?) {
 // {"durum": "izin_yok"|"hata", "hata": "<açık metin>"}. Takvim izni istenmez; Kişiler izni bu uygulamaya verilir (NSContactsUsageDescription).
 func kisiFold(_ s: String) -> String { s.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: Locale(identifier: "tr_TR")).replacingOccurrences(of: "ı", with: "i") }
 func kisiAra(_ ad: String) {
-  let anahtar: [CNKeyDescriptor] = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactPostalAddressesKey].map { $0 as CNKeyDescriptor }
+  let anahtar: [CNKeyDescriptor] = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactOrganizationNameKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactPostalAddressesKey, CNContactBirthdayKey].map { $0 as CNKeyDescriptor }
   let kt = CNContactStore()
+  let en = 20  // en çok eşleşme
   var bul: [CNContact] = []
+  var gorulen = Set<String>()
   do {
-    bul = try kt.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: ad), keysToFetch: anahtar)
-    if bul.isEmpty {  // Türkçe harf/büyük-küçük farkında sistem eşleşmesi kaçırırsa: tüm kişilerde katlanmış ad karşılaştırması (ilk ad, soyad ya da tam ad)
-      let n = kisiFold(ad).split(separator: " ").map(String.init)
+    for c in try kt.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: ad), keysToFetch: anahtar) where bul.count < en { if gorulen.insert(c.identifier).inserted { bul.append(c) } }
+    // Türkçe harf/büyük-küçük farkı ve kurum/e-posta alanı: tüm kişilerde katlanmış karşılaştırma (sorgu sözcüklerinin hepsi ad, kurum ya da e-postalarda geçmeli)
+    let n = kisiFold(ad).split(separator: " ").map(String.init)
+    if !n.isEmpty && bul.count < en {
       try kt.enumerateContacts(with: CNContactFetchRequest(keysToFetch: anahtar)) { c, dur in
-        let tam = kisiFold(c.givenName + " " + c.familyName)
-        if !n.isEmpty, n.allSatisfy({ tam.contains($0) }) { bul.append(c); if bul.count >= 5 { dur.pointee = true } }
+        if gorulen.contains(c.identifier) { return }
+        let tam = kisiFold(c.givenName + " " + c.familyName + " " + c.organizationName + " " + c.emailAddresses.map { String($0.value) }.joined(separator: " "))
+        if n.allSatisfy({ tam.contains($0) }) { gorulen.insert(c.identifier); bul.append(c); if bul.count >= en { dur.pointee = true } }
       }
     }
   } catch { yaz(["durum": "hata", "hata": error.localizedDescription]); return }
-  let cikis: [[String: Any]] = bul.prefix(5).map { c in
+  let cikis: [[String: Any]] = bul.prefix(en).map { c in
     let adres = c.postalAddresses.map { CNPostalAddressFormatter.string(from: $0.value, style: .mailingAddress).replacingOccurrences(of: "\n", with: ", ") }
-    return ["ad": (c.givenName + " " + c.familyName).trimmingCharacters(in: .whitespaces), "kurum": c.organizationName,
+    var o: [String: Any] = ["ad": (c.givenName + " " + c.familyName).trimmingCharacters(in: .whitespaces), "kurum": c.organizationName,
             "eposta": c.emailAddresses.map { String($0.value) }, "telefon": c.phoneNumbers.map { $0.value.stringValue }, "adres": adres]
+    if let b = c.birthday, let m = b.month, let g = b.day { o["dogum"] = (b.year.map { $0 > 1900 ? String(format: "%04d-", $0) : "" } ?? "") + String(format: "%02d-%02d", m, g) }
+    return o
   }
   yaz(["durum": "ok", "kisiler": cikis])
 }
+// --kisi-ozet: yalnız sayılar. {"durum":"ok","toplam","telefonlu","epostali","adresli","dogumlu","kurumlu", "kurumlar"?: [{"kurum","sayi"}] (yalnız --kurum-say, ilk 10)}
+func kisiOzetle() {
+  let anahtar: [CNKeyDescriptor] = [CNContactOrganizationNameKey, CNContactEmailAddressesKey, CNContactPhoneNumbersKey, CNContactPostalAddressesKey, CNContactBirthdayKey].map { $0 as CNKeyDescriptor }
+  var top = 0, tel = 0, ep = 0, adr = 0, dg = 0, kur = 0
+  var kurumlar: [String: Int] = [:]
+  do {
+    try CNContactStore().enumerateContacts(with: CNContactFetchRequest(keysToFetch: anahtar)) { c, _ in
+      top += 1
+      if !c.phoneNumbers.isEmpty { tel += 1 }
+      if !c.emailAddresses.isEmpty { ep += 1 }
+      if !c.postalAddresses.isEmpty { adr += 1 }
+      if let b = c.birthday, b.month != nil, b.day != nil { dg += 1 }
+      let k = c.organizationName.trimmingCharacters(in: .whitespaces)
+      if !k.isEmpty { kur += 1; kurumlar[k, default: 0] += 1 }
+    }
+  } catch { yaz(["durum": "hata", "hata": error.localizedDescription]); return }
+  var o: [String: Any] = ["durum": "ok", "toplam": top, "telefonlu": tel, "epostali": ep, "adresli": adr, "dogumlu": dg, "kurumlu": kur]
+  if kurumSay { o["kurumlar"] = kurumlar.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(10).map { ["kurum": $0.key, "sayi": $0.value] as [String: Any] } }
+  yaz(o)
+}
+func kisiIzinle(_ is_: @escaping () -> Void) {
+  switch CNContactStore.authorizationStatus(for: .contacts) {
+  case .authorized: is_()
+  case .notDetermined:
+    CNContactStore().requestAccess(for: .contacts) { izin, hata in
+      if izin { is_() } else { yaz(["durum": "izin_yok", "hata": hata?.localizedDescription ?? "Kişiler izni verilmedi: Sistem Ayarları → Gizlilik ve Güvenlik → Kişiler → Suflor Takvim"]) }
+      bitti.signal()
+    }
+    if bitti.wait(timeout: .now() + 120) == .timedOut { yaz(["durum": "zaman_asimi", "hata": "Kişiler izni penceresi yanıtlanmadı"]) }
+  default: yaz(["durum": "izin_yok", "hata": "Kişiler izni yok: Sistem Ayarları → Gizlilik ve Güvenlik → Kişiler → Suflor Takvim'i aç"])
+  }
+}
+if kisiOzet { kisiIzinle { kisiOzetle() }; exit(0) }
 if let ad = kisiAd {
   let a = ad.trimmingCharacters(in: .whitespacesAndNewlines)
   if a.isEmpty || a.count > 80 { yaz(["durum": "hata", "hata": "ad boş ya da çok uzun"]); exit(0) }

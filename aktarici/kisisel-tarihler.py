@@ -9,7 +9,7 @@
 # Uç: GET /yaklasan-tarihler (anahtarlı, VERI_GET) → {"ok": true, "tarihler": [{"tarih": "YYYY-MM-DD", "tur": "dogum_gunu|yildonumu|hatirlatma|etkinlik", "metin", "kisi"}], "izin": bool,
 #   "izinler": {kisiler, takvim, animsaticilar}, "ufuk": gün}; izin yok → "izin": false (üçü de yok) ve boş liste, çökmez. POST /yaklasan-tarihler {"islem": "taslak"|"yoksay", "tarih", "kisi"}:
 #   yoksay → o kayıt bir daha listelenmez/hatırlatılmaz; taslak → doğum günü kutlama taslağı (e-posta ya da Teams sohbeti, ayar kutlama_kanali), GÖNDERİM YOK — kullanıcı gönderir.
-# Hatırlatma: bir gün önce ve günün sabahı (ayar kisisel_tarih_saat, varsayılan 09:00) menü bildirimi; ayar kisisel_tarih_sesli: true ise ek olarak kısa sesli (yalnız toplantıda ve Konuş'ta değilken;
+# Hatırlatma: bir gün önce ve günün sabahı (ayar kisisel_tarih_saat; varsayılan 09:00 yalnız geliştirici kurulumunda, betada boş = saat girilene kadar bildirim yok) menü bildirimi; ayar kisisel_tarih_sesli: true ise ek olarak kısa sesli (yalnız toplantıda ve Konuş'ta değilken;
 # gizli toplantıda hiçbiri). Bir tarih için aynı hatırlatma bir kez (kisisel-tarihler.json "bildirilen"). Ayarlar: kisisel_tarihler (açık), kisisel_tarih_ufuk (gün, 14), kisisel_tarih_hatirlat,
 # kisisel_tarih_sesli, kisisel_tarih_saat, kutlama_kanali (eposta|teams).
 import calendar as _cal
@@ -142,12 +142,18 @@ def kt_islem(p):  # POST /yaklasan-tarihler
     print(f"KİŞİSEL TARİH: kutlama taslağı açıldı ({kanal}, alıcı {'var' if adres else 'yok'})")  # günlüğe ad/adres yazılmaz
     return {"ok": True, "kanal": kanal, "alici": bool(adres), "sonuc": _t("Taslak açıldı (Gönder sende)", "Draft opened (you send it)")}
 # --- hatırlatma: bir gün önce ve günün sabahı ------------------------------------------------------------------------------------------------------------
-def _kt_saat():
-    m = re.fullmatch(r"(\d{1,2}):(\d\d)", str(AYAR.get("kisisel_tarih_saat") or "09:00"))
+def _kt_gelistirici(): return "gelistirici_mi" in globals() and bool(gelistirici_mi())
+def _kt_saat(kesin=False):
+    # Ayar girilmemişse: geliştirici kurulumunda 09:00 (eski davranış); beta kurulumunda None = saatli hatırlatma bildirimi yok (kullanıcı saat girene kadar). Tarihler listede/Bugün'de yine görünür.
+    # kesin=True: kullanıcının açık isteği (sesle "doğum gününü hatırlat" → takvim saati) — saat yoksa 09:00.
+    v = str(AYAR.get("kisisel_tarih_saat") or "").strip()
+    if not v: return (9, 0) if kesin or _kt_gelistirici() else None
+    m = re.fullmatch(r"(\d{1,2}):(\d\d)", v)
     return (min(int(m.group(1)), 23), min(int(m.group(2)), 59)) if m else (9, 0)
 def kt_hatirlat_bul(liste, simdi):  # → [(anahtar, cümle)]: yarın olanlar (bir gün önce) ve bugün olanlar (sabah); bildirilmiş olanlar atlanır. Yalnız doğum günü, yıldönümü, hatırlatma (etkinlik gürültü)
     en = str(AYAR.get("dil") or "") == "en"; bugun = simdi.date(); out = []
-    if (simdi.hour, simdi.minute) < _kt_saat(): return out
+    sa = _kt_saat()
+    if sa is None or (simdi.hour, simdi.minute) < sa: return out
     for x in liste:
         if x["tur"] == "etkinlik": continue
         fark = (datetime.date.fromisoformat(x["tarih"]) - bugun).days
@@ -216,5 +222,5 @@ def kt_sesli_hatirlat(metin, bugun=None, ham=None):  # → (ileti, zaman "YYYY-M
     if not ad: return None
     tam, d = kt_dogum_bul(ad, bugun, ham)
     if not tam or not d: return None
-    s = _kt_saat(); en = str(AYAR.get("dil") or "") == "en"
+    s = _kt_saat(True); en = str(AYAR.get("dil") or "") == "en"
     return ((f"{tam} — birthday" if en else f"{tam} — doğum günü"), f"{d.isoformat()}T{s[0]:02d}:{s[1]:02d}")
