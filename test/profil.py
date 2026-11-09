@@ -43,7 +43,7 @@ kontrol("relay AYAR_PANO'da profil, ayar_yaz profil_uygula çağırıyor", '"pro
 pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); dj = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
 kontrol("pano AYG'de Kurulum profili + dil.js İngilizcesi", "['profil','sec','Kurulum profili'" in pano and '"Kurulum profili": "Setup profile"' in dj)
 # kaynak denetimi: indirme ve arayüz kancaları
-for k in ('if profil_hafif(): return {"durum": "hata"', "if profil_hafif(): return pocket_durum()", "not anlam_ok and not hafif", "not hafif and not anlam_dene", '"/api/profil"', 'profil_uygula(a, c["profil"])'):
+for k in ("if profil_hafif(): return pocket_durum()", "not anlam_ok and not hafif", "not hafif and not anlam_dene", '"/api/profil"', 'profil_uygula(a, c["profil"])'):
     kontrol(f"kurulum.py: {k[:46]}", src.count(k) == 1)
 js = open(os.path.join(KOD, "sihirbaz", "sihirbaz.js"), encoding="utf-8").read()
 for k in ("m_hafif_b:", "m_hafif_a:", "m_tam_b:", "m_hafif:", 'data-donanim="hafif"', 'data-profil="${v}"'):

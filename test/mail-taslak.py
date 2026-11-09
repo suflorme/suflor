@@ -111,6 +111,15 @@ def gmail(u, log, d):
 kos("mac", {"eposta": "mailto", "eposta_adres": BEN}, mac_mail)
 kos("adressiz", {"eposta": "mailto"}, mac_mail_kendi_adres_yok)
 kos("gmail", {"eposta": "gmail", "eposta_adres": BEN}, gmail)
+def yer_denetle(beklenen, ad):  # S261: eposta_taslak_yeri — tür beklenen; "mailto" = Mac Mail (.eml)
+    def f(u, log, d):
+        u.post("/girdi", {"text": "yer denemesi " + E(kime="kendime", konu="Yer", govde="metin metin")}); u.bekle("yer denemesi"); kr = u.kartlar()
+        if kr: u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı")
+        l = log(); ok(ad, len(l) == 1 and l[0]["tur"] == beklenen)
+    return f
+kos("yer-oku", {"eposta": "gmail", "eposta_adres": BEN, "eposta_oku": True}, yer_denetle("mailto", "Mac Mail okuması açıkken (eposta_taslak_yeri boş) taslak Mac Mail'de, eposta=gmail olsa da"))
+kos("yer-mac", {"eposta": "gmail", "eposta_adres": BEN, "eposta_taslak_yeri": "mac"}, yer_denetle("mailto", "eposta_taslak_yeri=mac: okuma kapalı olsa da Mac Mail"))
+kos("yer-web", {"eposta": "gmail", "eposta_adres": BEN, "eposta_oku": True, "eposta_taslak_yeri": "web"}, yer_denetle("gmail", "eposta_taslak_yeri=web: eposta türüne göre (Gmail)"))
 if not os.environ.get("KORU"): shutil.rmtree(T, ignore_errors=True)
 else: print(T)
 print("TAMAM" if not HATA else f"KALDI: {len(HATA)}"); sys.exit(1 if HATA else 0)

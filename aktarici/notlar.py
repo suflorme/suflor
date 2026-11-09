@@ -262,10 +262,16 @@ def _taslak_dogrula(arg):  # → (hazır iş, None) ya da (None, hata). Alıcı:
         if not TASLAK_ADRES_RX.match(x): return None, _t(f"alıcı e-posta adresi değil ({x[:40]})", f"recipient isn't an email address ({x[:40]})")
         if x.lower() not in [k.lower() for k in kime]: kime.append(x)
     if len(kime) > TASLAK_ALICI_EN_COK: return None, _t(f"en çok {TASLAK_ALICI_EN_COK} alıcı", f"at most {TASLAK_ALICI_EN_COK} recipients")
-    tur = eposta_tur() if "eposta_tur" in globals() else "mailto"
+    tur = taslak_tur()
     yer = {"gmail": "Gmail", "outlook": "Outlook (web)"}.get(tur, "Mac Mail")
     return {"komut": "eposta_taslak", "konu": konu, "govde": govde, "kime": kime, "tur": tur,
             "ozet": _t(f"e-posta taslağı «{konu[:70]}» · {', '.join(kime) if kime else 'alıcısız'} · {len(govde)} karakter · {yer}'de açılır, Gönder sende", f"email draft «{konu[:70]}» · {', '.join(kime) if kime else 'no recipient'} · {len(govde)} characters · opens in {yer}, you press Send")}, None
+
+def taslak_tur():  # S261: ayar eposta_taslak_yeri mac|web; boşsa Mac Mail okuması (eposta_oku) açıkken mac, değilse eposta_tur (eski davranış). mac → her zaman .eml + Mail ("mailto" kolu)
+    eski = eposta_tur() if "eposta_tur" in globals() else "mailto"
+    yer = str(AYAR.get("eposta_taslak_yeri") or "").lower()
+    if yer not in ("mac", "web"): yer = "mac" if AYAR.get("eposta_oku") is True else "web"
+    return "mailto" if yer == "mac" else eski
 
 def taslak_duz(m):  # markdown → düz metin (başlık işaretleri, kalın/italik, bağlantı, kod çiti, tablo çizgisi); satır yapısı korunur
     m = re.sub(r"^```.*$", "", m, flags=re.M); m = re.sub(r"^#{1,6}[ \t]*(.+?)[ \t]*#*$", lambda x: x.group(1).upper() if len(x.group(1)) < 60 else x.group(1), m, flags=re.M)

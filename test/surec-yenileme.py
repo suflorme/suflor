@@ -6,7 +6,7 @@ import ast, os, sys, tempfile
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 agac = ast.parse(open(os.path.join(KOD, "aktarici/bas-konus.py"), encoding="utf-8").read())
 sec = [n for n in agac.body if isinstance(n, ast.FunctionDef) and n.name in ("konus_kapat", "_konus_oku")]
-KUR = []; ns = {"json": __import__("json"), "print": lambda *a, **k: None, "_t": lambda a, b: a, "KONUS": {"durum": "hazir"}, "_konus_kur": lambda **k: KUR.append(k)}
+KUR = []; ns = {"json": __import__("json"), "print": lambda *a, **k: None, "_t": lambda a, b: a, "KONUS": {"durum": "hazir"}, "_konus_kur": lambda **k: KUR.append(k), "konus_sure_bitir": lambda *a, **k: None, "konus_yeni_pid": lambda: None, "asistan_ad": lambda: "Claude"}
 exec(compile(ast.Module(sec, []), "bas-konus.py", "exec"), ns)
 bos = tempfile.NamedTemporaryFile(delete=False); bos.close()  # okuyucu hemen dosya sonuna gelir (süreç çıktı)
 hata = 0

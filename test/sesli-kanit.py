@@ -57,7 +57,7 @@ try:
     satir(2, "Deniz", "Teklifi salıya kadar gönderiyoruz."); time.sleep(11); satir(3, "Ali K", "not alayım"); time.sleep(0.5)
     post("/card", {"kind": "soyle", "text": "Görüntü yine boş; öneksiz komutu dene: not al."}); time.sleep(11)
     satir(4, "Ali K", "Görüntü yine boş, öneksiz komutu dene, not al."); time.sleep(0.5)
-    md = open(next(os.path.join(canli, f) for f in os.listdir(canli) if f.endswith("Kanıt-Deneme.md")), encoding="utf-8").read()
+    md = open(os.path.join(canli, json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=4).read())["file"]), encoding="utf-8").read()
     for ad, k in [("komuttan sonrası not", "🎙 müşteri cuma dönecek" in md), ("tek başına komut önceki satırı not eder", "🎙 Deniz: Teklifi salıya" in md),
                   ("kartı okurken not tetiklenmez", md.count("🎙") == 2)]:
         print(("✓ " if k else "✗ ") + "gerçek aktarıcı: " + ad); hata += 0 if k else 1; ORNEK.append(ad)
@@ -86,7 +86,7 @@ try:
     import base64
     y = json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/kanit-masaustu", data=json.dumps({"png": base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 64).decode(), "kaynak": "sesli",
         "istek": k2.get("id"), "hedef": "ekran", "uyg": "Suflor.me — Ayarlar", "w": 640, "h": 600}).encode(), headers={"X-Suflor-Anahtar": K}), timeout=4).read())
-    md = open(next(os.path.join(canli, f) for f in os.listdir(canli) if f.endswith("Kanıt-Deneme.md")), encoding="utf-8").read()
+    md = open(os.path.join(canli, json.loads(urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{PORT}/status", headers={"X-Suflor-Anahtar": K}), timeout=4).read())["file"]), encoding="utf-8").read()
     k = y.get("ok") and "(ekran: Suflor.me — Ayarlar)" in md and not durum().get("id")
     print(("✓ " if k else "✗ ") + "gerçek aktarıcı: menü uygulamasının ekran görüntüsü dökümde \"(ekran: …)\" ile, istek kapandı"); hata += 0 if k else 1; ORNEK.append("ekran kaydı")
 finally: r.kill(); r.wait(5); shutil.rmtree(T, ignore_errors=True)

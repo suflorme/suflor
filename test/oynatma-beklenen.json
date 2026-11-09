@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 643828,
-   "sha": "e5c9ef9dd1deffc1"
+   "uzunluk": 656067,
+   "sha": "cca1ca62bacaa84c"
   },
   "/mini": {
-   "uzunluk": 643828,
-   "sha": "e5c9ef9dd1deffc1"
+   "uzunluk": 656067,
+   "sha": "cca1ca62bacaa84c"
   },
   "/status": {
    "_ping_son": "float",
@@ -308,9 +308,13 @@
      "eposta_hatirlat": "bool",
      "eposta_hatirlat_sesli": "bool",
      "eposta_oku": "bool",
+     "eposta_onem_duzeyi": "str",
+     "eposta_onem_gun": "int",
+     "eposta_onemsiz": "str",
      "eposta_sessiz": "str",
      "eposta_takip": "bool",
      "eposta_takip_dk": "int",
+     "eposta_taslak_yeri": "str",
      "eposta_vip": "str",
      "fisilti": "bool",
      "gemini_kapsam": "str",
@@ -400,9 +404,13 @@
      "eposta_hatirlat": "bool",
      "eposta_hatirlat_sesli": "bool",
      "eposta_oku": "bool",
+     "eposta_onem_duzeyi": "str",
+     "eposta_onem_gun": "int",
+     "eposta_onemsiz": "str",
      "eposta_sessiz": "str",
      "eposta_takip": "bool",
      "eposta_takip_dk": "int",
+     "eposta_taslak_yeri": "str",
      "eposta_vip": "str",
      "fisilti": "bool",
      "gemini_kapsam": "str",

@@ -143,6 +143,21 @@ html.sh-acik #shfab,html:is(.panel,.ayarlar,.yardim) #shfab{display:none!importa
 .nb{container-type:inline-size;container-name:nb}
 @container nb (max-width:900px){html:not(.sh-acik) main #nb>:is(#kns,.kt,.kal){margin-right:60px}}
 @media (max-width:720px){#shp{left:0!important;width:auto!important;border-left:0}.shl{padding:var(--bo-16)}#shrz,#shw{display:none}#shfab{position:fixed}html.sh-genis #shp :is(.shl,.shk){padding-inline:var(--bo-16)}}
+/* S260 (9 Kasım, seçenek B): toplantıda tek sağ sütun, sekmeli — Döküm · Gündem · {asistan}. Ana içerik (canlı kartlar) daralmaz; sütun yan sütunun genişliğinde (#rz ile sürüklenir).
+   Sohbet paneli (#shp) aynı öğe: toplantıda sütunun içine taşınır (html.sh-sekmeli), başlığı/kapatma/genişlet düğmeleri gizli; Bağlam Gündem sekmesinde kalır, belgeler sohbette de çip. */
+.ysk{display:none}
+html.sh-sekmeli aside>.ysk{flex:none;display:flex;padding:var(--bo-8) var(--bo-12);border-bottom:1px solid var(--bd);background:var(--s2)}
+.ysk .seg{flex:1;min-width:0;margin:0;display:flex;align-self:auto}.ysk .seg button{flex:1;min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:var(--bo-4);color:var(--t2);padding:var(--bo-4) var(--bo-8)}
+.ysk .seg button:hover{color:var(--tx)}.ysk .seg button[aria-selected=true]{background:var(--s1);color:var(--tx);box-shadow:var(--golge-ince),0 0 0 .5px var(--bd);font-weight:500}
+.ysk .ad{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yskn{flex:none;display:inline-grid;place-items:center;min-width:6px;height:6px;border-radius:var(--r-tam);background:var(--ac)}.yskn[hidden]{display:none}
+.yskn.sy{min-width:16px;height:16px;padding:0 var(--bo-4);font:600 11px/1 var(--f-govde);color:var(--s1)}
+html.sh-sekmeli aside #dkh{display:none}html.sh-sekmeli aside #yan{flex:1;max-height:none}
+html.sh-sekmeli aside:not([data-sekme=gundem]) #yan,html.sh-sekmeli aside:not([data-sekme=dokum]) #dkg,html.sh-sekmeli aside:not([data-sekme=marvin]) #shp{display:none!important}
+html.sh-sekmeli aside[data-sekme=dokum] #dkg{flex:1;max-height:none}
+html.sh-sekmeli #shp{position:static;z-index:auto;flex:1;min-height:0;width:auto;left:auto;border-left:0;box-shadow:none;background:var(--s2)}
+html.sh-sekmeli #shp>.shh,html.sh-sekmeli #shrz{display:none}html.sh-sekmeli #shp :is(.shl,.shk){padding-inline:var(--bo-16)}html.sh-sekmeli #shp .shl{padding-top:var(--bo-16);gap:var(--bo-16)}
+@media (max-width:720px){html.sh-sekmeli #shp{height:70vh;flex:none}}
 #kos .kor{padding:var(--bo-8) 0}#kos .kor .z{font-size:var(--yz-12);color:var(--t3)}#kos .kor .s{font-weight:600}#kos .kor .c{color:var(--t2);white-space:pre-wrap}
 textarea{width:100%;font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--kose);padding:var(--bo-8) var(--bo-8);resize:none;outline:none}textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .bt{display:flex;gap:var(--bo-8);margin-top:var(--bo-8);align-items:center}#tkf .sgs{display:flex;flex-wrap:wrap;gap:var(--bo-8) var(--bo-16)}#tkb{padding-left:var(--bo-24);padding-right:var(--bo-24)}.sn .t[data-son]{cursor:pointer}
@@ -473,7 +488,7 @@ html.bugun #tos .sh{padding-inline:0}html.bugun #tos .tob{display:-webkit-box;-w
 </div>
 <div class=nb id=nb><section id=kns hidden><div id=knd></div></section><div id=tbr class=tbr hidden><button id=oz class=ib title="Ne diyeyim? · Option + Shift + O"></button><button id=kz class=ib title="Kanıt · Option + Shift + K"></button><button id=sz class=ib title="Sessiz · Option + Shift + M"></button><details class=dm id=tbm><summary class=ib title="Diğer" aria-label="Diğer"></summary><div class=dmk><button id=yz class=ib title="Önemli an: şu anı özette öne çıkar"></button><button id=gz class=ib title="Gizli toplantı: tekrar basana kadar Suflor tamamen kapalı — ses, Whisper, döküm, kanıt yok; yapay zekâ servislerine hiçbir şey gitmez"></button><button id=sc class=ib title="Sesli çeviri: karşı tarafın yabancı dildeki sözünün kısa özü kulaklığına okunur (yalnız kulaklık takılıyken; tekrar basınca kapanır)"></button></div></details></div><div class=kt><button id=ek class="ib kte" title="Belge ekle" aria-label="Belge ekle"></button><input type=file id=ekd multiple hidden><textarea id=n rows=1 placeholder="Asistanla konuş"></textarea><span id=kdz class=kdz aria-hidden=true><i></i><i></i><i></i><i></i><i></i></span><button id=ksb class="ib ksb" type=button aria-pressed=false title="Cevapları sesli oku" aria-label="Cevapları sesli oku"></button><button id=kb class="ib ktm" title="Basılı tut: sesle sor · iki kez dokun: sohbet (Option + Shift + Boşluk)" aria-label="Mikrofon"></button></div><div id=kal class=kal></div></div><button id=shfab type=button title="{asistan} paneli" aria-label="{asistan} paneli" aria-controls=shp><span class=nk hidden></span></button></main>
 <div id=rz title="Sürükleyerek genişlet/daralt · çift tıkla: varsayılan"></div>
-<aside><div class=sc id=yan>
+<aside data-sekme=gundem><div class=ysk><div class=seg role=tablist aria-label="Yan sütun"><button type=button role=tab data-ysk=dokum aria-selected=false aria-controls=dkg>Döküm</button><button type=button role=tab data-ysk=gundem aria-selected=true aria-controls=yan>Gündem</button><button type=button role=tab data-ysk=marvin aria-selected=false aria-controls=shp id=yskm><span class=ad id=yska>Asistan</span><span class=yskn id=yskn hidden></span></button></div></div><div class=sc id=yan>
 <section id=kos hidden><div class=sh><span>Konuşma</span><span class=tod><button id=kosa class=gh type=button>Tümü</button><button id=kosx class="gh ib" type=button title="Kapat" aria-label="Kapat"></button></span></div><div id=ko></div></section>
 <section><div class=sh>Gündem <span id=agn class=meta></span></div><div id=ag></div></section>
 <section id=aks hidden><div class=sh>Açık sorular</div><div id=ak></div></section>
@@ -1275,7 +1290,7 @@ function konusGorunum(s,mini_,ust_){const k=s.konus||{},cvp=!!(s.eylem&&s.eylem.
   const h=`${ust}${df}${d?`<div class=meta>${esc(d)}</div>`:''}${kl.length?`<div class=kcv>${kl.map((e,i)=>kcOge(e,off+i,i===kl.length-1,mini_)).join('')}</div>`:''}${sus||sb||(kl.some(e=>e.cevap)&&!mini_)?`<div class=kdb>${sus}${sb}${kl.some(e=>e.cevap)&&!mini_?(s.aktif?`<button class=gh data-kos title="${esc(L('Konuşma geçmişini aç'))}">${L('Geçmiş')}</button>`:`<button class=gh data-kgec title="${esc(L('Konuşma geçmişini aç'))}">${L('Tümü')}</button>`):''}</div>`:''}`
   return h.trim()}
 function renderKonus(s){const sec=document.getElementById('kns'),s0=kcSur,h=konusGorunum(s,false,shAcik||!toplantidaMi(s));sec.hidden=!h;mikCiz(document.getElementById('kb'),s);document.getElementById('ksb').hidden=document.getElementById('kb').hidden=!!s.aktif&&!(s.konus||{}).toplanti
-  document.getElementById('tbr').hidden=!toplantidaMi(s);document.getElementById('nb').classList.toggle('bos',shAcik&&!h&&!toplantidaMi(s));shYeniTur(s,s0);shCiz(s);shFab(s);const kd=document.getElementById('knd'),c0=kd.querySelector('.kcv');if(c0)kd.__kt=c0.scrollTop
+  document.getElementById('tbr').hidden=!toplantidaMi(s);document.getElementById('nb').classList.toggle('bos',shAcik&&!h&&!toplantidaMi(s));shYeniTur(s,s0);shCiz(s);shFab(s);shSekmeCiz(s);const kd=document.getElementById('knd'),c0=kd.querySelector('.kcv');if(c0)kd.__kt=c0.scrollTop
   if(h&&sec.dataset.h!==h){sec.dataset.h=h;setH(kd,h)}if(h){const c1=kd.querySelector('.kcv');if(c1)kcKonum(kd,c1)}}
 {document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.altKey&&e.shiftKey&&!document.getElementById('kb').hidden){e.preventDefault();if(!e.repeat)konusBasla()}})
   document.addEventListener('keyup',e=>{if(kRec&&(e.code==='Space'||e.key==='Alt'||e.key==='Shift')){e.preventDefault();konusBitir()}})}
@@ -1289,18 +1304,20 @@ susBagla(document)
 // aynı konuşma (KC). Açılış: toplantı dışında soru sorunca (kutu, Konuş, kısayol) kendiliğinden; başlıktaki düğme ya da kapalı panelin tek satırı. Toplantıda varsayılan kapalı (kartlar,
 // döküm, Ne diyeyim? akışı aynen). Yenilenince son 20 tur /konus-gecmis'ten (tam yazılı cevap; gizli kip turları gösterilmez). Kutu (.kt) panel açıkken panelin altına taşınır.
 // Onay bekleyen kayıt kartları (izin "kayit", /card-ack) ve sesli talimat onayları (eylem kuyruğu, /eylem-karar) ilgili cevabın altında. Mini pano ve Mac menü paneli eski kısa görünümde.
-var shAcik=false,shTop=false,shSor=false,shIlk=true,shYuk=0,shSig='',shSur=-1,shBagT=Date.now(),shKapSur=0,shW=420
+var shSekmeAcik=false,shSekme='gundem',shSekmeOnce='gundem',shSesBek=0,shSesSur=0,shAcik=false,shTop=false,shSor=false,shIlk=true,shYuk=0,shSig='',shSur=-1,shBagT=Date.now(),shKapSur=0,shW=420
 const SH_ANA_EN=720,SH_MIN=340,SH_MAX=760,SH_VARS=420  // ana içeriğin en dar hâli (yan sütun kipi için), panelin en dar/en geniş/varsayılan genişliği
 const SH_GECMIS=20,SH_TALIMAT=['oturum','yapilacak','is','sil','toplanti']
 ICO.chev='<path d="M9 6l6 6-6 6"/>';ICO.panel='<rect x=3 y=4 width=18 height=16 rx=2 /><path d="M14.5 4v16"/>';ICO.genis='<path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/>';ICO.daral='<path d="M20 4l-6 6M14 5v5h5M4 20l6-6M10 19v-5H5"/>'
 function shKayit(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}  // yalnız kişisel kolaylık (panel açık mı, geniş mi); okunamazsa varsayılan
 function shOku(k){try{return localStorage.getItem(k)}catch(e){return null}}
-function shAc(ac,odak){ac=ac!==false;const n=document.getElementById('n');if(ac===shAcik){if(ac&&odak)n.focus();return}
+// S260: toplantıda (sekmeli sütun) açmak = {asistan} sekmesini seçmek, kapatmak = önceki sekmeye dönmek; katman açılmaz. Araç çubuğu, başlık düğmesi, shFab ve panoBolum('sohbet') buradan geçer.
+function shAc(ac,odak){ac=ac!==false;if(shSekmeAcik){shSekmeSec(ac?'marvin':shSekmeOnce,odak,true);return}shAcIc(ac,odak)}
+function shAcIc(ac,odak,kaydetme){const n=document.getElementById('n');if(ac===shAcik){if(ac&&odak)n.focus();return}
   if(ac&&/(^| )(panel|ayarlar|yardim)( |$)/.test(document.documentElement.className))return  // menü paneli, Ayarlar ve Yardım pencerelerinde sohbet paneli yok (kısa görünüm kalır)
   const f=document.activeElement===n,kt=n.closest('.kt'),kal=document.getElementById('kal'),yer=ac?document.getElementById('shk'):document.getElementById('nb')
   shAcik=ac;document.getElementById('shp').hidden=!ac;document.documentElement.classList.toggle('sh-acik',ac);yer.appendChild(kt);yer.appendChild(kal);shKapSur=kcSur;shYerlesim();shFab(last)
   const b=document.getElementById('shb');b.classList.toggle('on',ac);b.setAttribute('aria-expanded',String(ac))
-  if(!toplantidaMi(last))shKayit('shAcik',ac?'1':null)  // toplantıda açıp kapatmak toplantı dışı tercihini değiştirmez
+  if(!toplantidaMi(last)&&!kaydetme)shKayit('shAcik',ac?'1':null)  // toplantıda açıp kapatmak toplantı dışı tercihini değiştirmez
   shSig='';shSur=-1;if(ac)shGecmisYukle();if(f||odak)n.focus();if(last){renderKonus(last);paintCards(document.getElementById("kc"),last);document.getElementById('sk').hidden=!last.aktif&&!shKartlar(last).length&&!(last.questions||[]).length&&!(last.claude_age_s!=null&&last.claude_age_s<120);document.title=(shKartlar(last).length?`(${shKartlar(last).length}) `:"")+"Suflor.me pano"}}
 async function shGecmisYukle(){if(shYuk)return;shYuk=1;let r=null;try{r=await j('/konus-gecmis')}catch(e){}
   if(!r||!Array.isArray(r.kayitlar)){shYuk=0;return}  // aktarıcıya ulaşılamadı: sonraki açılışta yeniden
@@ -1314,13 +1331,16 @@ function shGonderSonuc(e,t,ok){if(e&&!ok){const i=KC.indexOf(e);if(i>=0){KC.spli
 // toplantı dışında yeni tur başladı (kısayol, sohbet, başka pencere): panel açılır. İlk çizimde yalnız kayıtlı tercih (açık bırakılmışsa) uygulanır.
 function shYeniTur(s,s0){const top=toplantidaMi(s),gec=top!==shTop;shTop=top
   if(shIlk){shIlk=false;if(shOku('shAcik')==='1'&&!top)setTimeout(()=>shAc(true,false));return}
-  if(gec){if(top)kcTop=Date.now();if(top&&shAcik)setTimeout(()=>shAc(false));else if(!top&&!shAcik&&shOku('shAcik')==='1')setTimeout(()=>shAc(true,false));return}  // toplantı başlayınca panel kapanır (kartlar, döküm öne), bitince tercih geri gelir
+  if(gec){shSesBek=0;if(top){kcTop=Date.now();setTimeout(()=>{if(shAcik&&!shSekmeAcik)shAc(false)})}else setTimeout(()=>{if(!shAcik&&shOku('shAcik')==='1')shAc(true,false)});return}  // toplantı başlayınca panel kapanır (kartlar, döküm öne; sekmeli sütunda son sekme), bitince tercih geri gelir
+  if(top){const k=s.konus||{};if(kRec||k.durum==='yaziya'){shSesBek=Date.now();shSesSur=kcSur}  // S260: sesle başlatılan Konuş turu (basılı tut ya da kısayol) — cevap gelince {asistan} sekmesi öne gelir
+    else if(shSesBek&&Date.now()-shSesBek>120000)shSesBek=0
+    else if(shSesBek&&kcSur!==shSesSur&&(KC[KC.length-1]||{}).cevap){shSesBek=0;setTimeout(()=>{if(shSekmeAcik&&!shAcik)shSekmeSec('marvin',false)})}}
   const sor=!!(s.eylem&&s.eylem.sesli),yeniSor=sor&&!shSor;shSor=sor  // "Yazayım mı?" sesli onay sorusu da paneli açar (cevap ipucu orada)
   if((kcSur!==s0||yeniSor)&&!shAcik&&!top)setTimeout(()=>shAc(true,false))}
 function shGenisle(g,kaydetme){const h=document.documentElement;g=g==null?!h.classList.contains('sh-genis'):g;h.classList.toggle('sh-genis',g);const b=document.getElementById('shw'),t=L(g?'Paneli daralt':'Paneli genişlet')
   b.innerHTML=ic(g?'daral':'genis');b.title=t;b.setAttribute('aria-label',t);if(!kaydetme)shKayit('shGenis',g?'1':null);shYerlesim()}
 // yerleşim: ana içerik panelden sonra en az SH_ANA_EN kalıyorsa yan sütun (içerik o kadar daralır), kalmıyorsa katman (içerik hiç daralmaz); odak kipinde ve dar ekranda katman
-function shYerlesim(){const h=document.documentElement;if(!shAcik){h.classList.remove('sh-yan','sh-katman');return}
+function shYerlesim(){const h=document.documentElement;if(!shAcik||shSekmeAcik){h.classList.remove('sh-yan','sh-katman');return}  // sekmeli sütunda panel akışın içinde
   const dar=matchMedia('(max-width:720px)').matches,g=h.classList.contains('sh-genis')&&!dar,m=document.querySelector('main'),yan0=h.classList.contains('sh-yan')
   const taban=m?m.getBoundingClientRect().width+(yan0?shW:0):0,yan=!g&&!dar&&taban-shW>=SH_ANA_EN
   h.classList.toggle('sh-yan',yan);h.classList.toggle('sh-katman',!yan&&!g)}
@@ -1330,6 +1350,29 @@ function shFab(s){const b=document.getElementById('shfab');if(!b)return;const so
   const yeni=!shAcik&&kcSur!==shKapSur&&toplantidaMi(s||{})  // toplantıda panel kendiliğinden açılmaz: kapandıktan sonra yeni tur → nokta
   n.hidden=!(yeni||dv);b.classList.toggle('devam',dv);const ad=asGor((s||{}).konus),t=dv?L('{ad} dinliyor — paneli aç',{ad}):yeni?L('{ad} cevap verdi — paneli aç',{ad}):L('{ad} paneli',{ad})
   if(b.title!==t){b.title=t;b.setAttribute('aria-label',t)}}
+// S260 (seçenek B): toplantıda tek sağ sütun, sekmeli — Döküm · Gündem · {asistan}. Sohbet paneli (#shp) sütunun içine taşınır; {asistan} sekmesi seçiliyken shAcik (kutu panelde,
+// kayıt onay kartları panelde), değilken kapalı (kutu ana alanda, kartlar ana listede). Kapalı sekmeye yeni cevap → nokta, onay kartı → sayı. Son sekme hatırlanır (yanSekme).
+const YSK=['dokum','gundem','marvin']
+function shSekmeli(){const h=document.documentElement;return h.classList.contains('toplantida')&&!h.matches('.bugun,.hafta-ac,.saatler-ac,.panel,.ayarlar,.yardim')}
+function shSekmeKur(){const on=shSekmeli();if(on===shSekmeAcik)return;const h=document.documentElement,p=document.getElementById('shp'),a=document.querySelector('aside')
+  if(on){if(!shSekmeKur.yer)shSekmeKur.yer=[p.parentNode,p.nextSibling];shSekmeAcik=true;h.classList.add('sh-sekmeli');a.insertBefore(p,document.getElementById('dkh'))
+    const t=shOku('yanSekme');shSekmeSec(YSK.includes(t)?t:'gundem',false,false);return}
+  shSekmeAcik=false;shAcIc(false,false,true);h.classList.remove('sh-sekmeli');const [y,sn]=shSekmeKur.yer;y.insertBefore(p,sn&&sn.parentNode===y?sn:null)
+  if(dkAcik!==(shOku('dk')==='1'))dokumAc(shOku('dk')==='1')}  // döküm katı toplantı dışı tercihine döner
+// t: dokum|gundem|marvin; acik: kullanıcı ya da araç çubuğu istedi (gizli sütunu açar). Seçim kaydedilir; gizli Mac sütununda {asistan} seçilmez (kutu görünmez kalırdı)
+function shSekmeSec(t,odak,acik){if(!YSK.includes(t))t='gundem';if(!shSekmeAcik)return;const h=document.documentElement,a=document.querySelector('aside')
+  if(t==='marvin'&&h.classList.contains('yan-kapali')){if(acik)yanAcKapa();else t=shSekmeOnce}
+  if(t!=='marvin')shSekmeOnce=t;shSekme=t;a.dataset.sekme=t;shKayit('yanSekme',t)
+  if(t==='dokum'&&!dkAcik){dkAcik=true;a.classList.add('dk-acik');main.hidden=false;main.scrollTop=main.scrollHeight;atBottom=true}  // döküm sekmesi: katlı tercih ('dk') değişmez
+  for(const b of a.querySelectorAll('.ysk [data-ysk]'))b.setAttribute('aria-selected',String(b.dataset.ysk===t))
+  shAcIc(t==='marvin',odak);if(last)shSekmeCiz(last)}
+function shSekmeCiz(s){if(!shSekmeAcik)return;const ad=asGor((s||{}).konus),e=document.getElementById('yska'),b=document.getElementById('yskm'),n=document.getElementById('yskn')
+  if(e.textContent!==ad)e.textContent=ad
+  const on=shAcik?0:shOnaylar(s||{}).length,yeni=!shAcik&&kcSur!==shKapSur,t=on?L('{ad} — {n} onay bekliyor',{ad,n:on}):yeni?L('{ad} cevap verdi',{ad}):ad
+  n.hidden=!(on||yeni);n.classList.toggle('sy',!!on);const nt=on?String(on):'';if(n.textContent!==nt)n.textContent=nt
+  if(b.title!==t){b.title=t;b.setAttribute('aria-label',t)}}
+{const y=document.querySelector('aside .ysk');y.addEventListener('click',ev=>{const b=ev.target.closest('[data-ysk]');if(b)shSekmeSec(b.dataset.ysk,b.dataset.ysk==='marvin',true)})
+  y.addEventListener('keydown',ev=>{const d={ArrowRight:1,ArrowLeft:-1}[ev.key];if(!d||!shSekmeAcik)return;ev.preventDefault();const t=YSK[(YSK.indexOf(shSekme)+d+3)%3];shSekmeSec(t,false,true);const b=y.querySelector(`[data-ysk=${t}]`);if(b)b.focus()})}
 function shPil(k){const e=KC[KC.length-1];if(!e)return''
   const m=String(e.cevap||e.soru||'').split(/\n\s*-{3,}/)[0].replace(/[*`#>|_]/g,'').replace(/\s+/g,' ').trim()
   return `<button type=button class=shpil data-shac title="${esc(L('Konuşmayı panelde aç'))}">${ic('sohbet')}<span class=a>${esc(AG(e.ad)||asGor(k))}</span><span class=m>${esc(m)}</span><span class=o>${esc(L('Konuşmayı aç'))}</span></button>`}
@@ -1379,7 +1422,7 @@ function shCiz(s){if(!shAcik)return;const k=s.konus||{},ad=asGor(k),ae=document.
   document.getElementById('shg').innerHTML=ic('hist');document.getElementById('shg').onclick=()=>gecmisAc()
   document.getElementById('shw').onclick=()=>shGenisle();shGenisle(shOku('shGenis')==='1',true)
   document.getElementById('shb').innerHTML=ic('panel');document.getElementById('shb').onclick=()=>shAc(!shAcik,true)
-  document.getElementById('shp').addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!ev.defaultPrevented&&!document.querySelector('dialog[open]')){ev.preventDefault();if(document.documentElement.classList.contains('sh-genis'))shGenisle(false);else shAc(false,true)}})
+  document.getElementById('shp').addEventListener('keydown',ev=>{if(ev.key==='Escape'&&!shSekmeAcik&&!ev.defaultPrevented&&!document.querySelector('dialog[open]')){ev.preventDefault();if(document.documentElement.classList.contains('sh-genis'))shGenisle(false);else shAc(false,true)}})
   {const b=document.getElementById('shfab');b.insertAdjacentHTML('afterbegin',ic('sohbet'));b.onclick=()=>shAc(true,true)}
   {const v=parseInt(shOku('shW'),10);shGenAyarla(v>0?v:SH_VARS)}
   const rz=document.getElementById('shrz'),kaydet=()=>shKayit('shW',shW===SH_VARS?null:String(shW))
@@ -1391,7 +1434,7 @@ function shCiz(s){if(!shAcik)return;const k=s.konus||{},ad=asGor(k),ae=document.
   rz.addEventListener('dblclick',()=>{shGenAyarla(SH_VARS);kaydet();shYerlesim()})
   rz.addEventListener('keydown',ev=>{const d={ArrowLeft:24,ArrowRight:-24}[ev.key];if(!d)return;ev.preventDefault();shGenAyarla(Math.min(sinir(),shW+d));kaydet();shYerlesim()})
   // katman ve odak kipinde dışarı tıklama kapatır (yan sütunda panel içeriğin yanında durur, kapatmaz)
-  document.addEventListener('pointerdown',ev=>{const h=document.documentElement;if(!shAcik||!h.matches('.sh-katman,.sh-genis'))return;const t=ev.target
+  document.addEventListener('pointerdown',ev=>{const h=document.documentElement;if(!shAcik||shSekmeAcik||!h.matches('.sh-katman,.sh-genis'))return;const t=ev.target
     if(!(t instanceof Element)||t.closest('#shp,#shb,#shfab,[data-shac],dialog,#bnPanel,#bnPerde,.emk'))return;shAc(false)},true)
   {let rq=0;addEventListener('resize',()=>{if(!rq)rq=requestAnimationFrame(()=>{rq=0;shYerlesim()})})}}
 // yan panelde konuşma geçmişi (cevaba dokununca; kaynak Konuş geçmişi — /konus-gecmis); "Tümü" Arşiv'deki pencereyi açar
@@ -1506,11 +1549,11 @@ function git(g,ek){const h=document.documentElement,top=h.classList.contains('to
   const sc=document.querySelector('main .sc');if(sc)sc.scrollTo({top:0});window.scrollTo({top:0})}
 // görünüm sınıfları (refresh ve gezinti): toplantıda mı, Bugün yüzü mü (toplantı yokken ya da toplantıda elle açılan sayfa), yan sütun boş mu
 function sinifKur(s){const top=!!s.aktif,h=document.documentElement;if(top&&!kcTopOnce){kcElle=false;if(hfAcik)hfAc(false);if(stAcik)stAc(false)}kcTopOnce=top;const bg=!top||bnToplantida()
-  h.classList.toggle('toplantida',top);h.classList.toggle('bugun',bg);h.classList.toggle('tg-bugun',top&&bg);h.classList.toggle('yan-bos',bg);kenarCiz(s,top);if(shAcik)shYerlesim()}  // 30 Ekim: yan sütun (Gündem/Döküm) yalnız toplantıda
+  h.classList.toggle('toplantida',top);h.classList.toggle('bugun',bg);h.classList.toggle('tg-bugun',top&&bg);h.classList.toggle('yan-bos',bg);kenarCiz(s,top);shSekmeKur();if(shAcik)shYerlesim()}  // 30 Ekim: yan sütun (Gündem/Döküm) yalnız toplantıda
 function kenarAcKapa(){if(matchMedia('(max-width:720px)').matches){kenarCekmece(!document.getElementById('kenar').classList.contains('acik'));return}const k=document.documentElement.classList.toggle('kc-kapali');try{localStorage.setItem('kcKapali',k?'1':'')}catch(e){}}
 try{if(localStorage.getItem('kcKapali'))document.documentElement.classList.add('kc-kapali')}catch(e){}
 // Mac penceresinde yan sütun araç çubuğundaki düğmeyle açılıp kapanır (tercih bu tarayıcıda saklanır)
-function yanAcKapa(){const k=document.documentElement.classList.toggle('yan-kapali');try{localStorage.setItem('yanKapali',k?'1':'')}catch(e){}}
+function yanAcKapa(){const k=document.documentElement.classList.toggle('yan-kapali');try{localStorage.setItem('yanKapali',k?'1':'')}catch(e){}if(k&&shSekmeAcik&&shAcik)shSekmeSec(shSekmeOnce,false,false)}  // sütun gizlenince kutu sütunda kalmasın
 try{if(localStorage.getItem('yanKapali'))document.documentElement.classList.add('yan-kapali')}catch(e){}
 // son toplantı satırına sağ tık: aynı menü, farenin olduğu yerde (Mac bağlam menüsü gibi)
 document.getElementById('sn').addEventListener('contextmenu',ev=>{const r=ev.target.closest('.sn'),b=r&&r.querySelector('button[data-aktar]');if(!b||!last)return
@@ -1532,7 +1575,8 @@ const AYG=[['Genel',[['dil','sec','Arayüz dili','Pano, eklenti ve menülerin di
     ['konus_web','bool',"Konuş'ta da web'de araştır","Sesle ya da yazıyla sorduğunda güncel bilgi (hava, haber, fiyat) için web'e bakar ve verdiğin bağlantıyı okur; aramaya yalnız sorudaki konu gider, döküm alıntısı ve iç sayılar gitmez. Toplantıda Web araştırması, toplantı dışında Toplantı dışı web araştırması ayarına da bağlıdır; gizli kipte kapalı."],['linkedin_chrome','bool',"LinkedIn'i Chrome oturumumla oku","Açıkken, Chrome'da LinkedIn oturumun açıksa toplantı oturumu kişi ve firma sayfalarını senin oturumunla yalnız okur (arama, profil, firma sayfası); bağlantı isteği, mesaj, beğeni gibi hiçbir şey yapmaz, şifre girmez. Chrome ya da oturum kapalıysa sessizce kişi bağlayıcısına, o da yoksa web aramasına geçer. Değişince toplantı oturumu yeniden açılınca geçerli olur."],['bilgi_onaysiz','bool','Okuma araçları sormadan çalışsın','Açıkken bilgi kaynağının okuma araçları ve web araması onay sormadan çalışır; e-posta gönderme, takvim değiştirme gibi yazma araçları yine sorar. Kapalıyken her araç ilk kullanımda sorulur (bir kez onayladığın araç toplantı boyunca yeniden sorulmaz).'],['adin_gecti','bool','Adın geçti','Karşı taraf adını söyleyince panoda uyarı.'],['onay_uyari','bool','Bekleyen cevap uyarısı','Kulaklıkta duyulur (toplantıya gitmez): karşı tarafın sorusuna cevap onayını beklerken belirgin ses ve kısa fısıltı, 15 sn sonra bir hatırlatma; cevap hazırken söz fırsatı çıkmazsa uyarı. Kapalıyken yalnız ilk kısa ses.'],['uzun_konusma_sn','sayi','Uzun konuşma uyarısı (sn)','Bu kadar kesintisiz konuşunca uyarı; 0 kapatır.'],['toplanti_sonrasi_hatirlat_dk','sayi','Toplantı sonrası hatırlatma (dk)','Özet hazır olduktan bu kadar dakika sonra asistan açık uçları (tarihsiz ya da sahipsiz iş, teyit bekleyen karar) kendisi hatırlatır; 0 kapatır. Gizli ve deneme toplantılarında yapmaz.'],['toplanti_sonrasi_sesli','bool','Toplantı sonrası hatırlatmayı sesli söyle','Kapalıyken yalnız bildirim ve Bugün sayfasında görünür; toplantıda değilken ve asistan konuşmuyorken tek cümle okunur.'],['toplanti_hatirlat','bool','Toplantıları önceden hatırlat','Planlı toplantıdan biraz önce asistan kısa bir hatırlatma yapar; Bugün sayfasında Hazırlık ve Katıl düğmeleri çıkar. Gizli ve deneme toplantılarında yapmaz.'],['toplanti_hatirlat_dk','sayi','Kaç dakika önce','Toplantıdan bu kadar dakika önce hatırlatılır (1–60).'],['toplanti_hatirlat_sesli','bool','Sesli hatırlat','Kapalıyken yalnız bildirim ve Bugün sayfasında görünür; asistan konuşmuyorken tek cümle okunur.'],['animsatici','bool',"İşlerim Mac Anımsatıcılar'ında da dursun",'Kendi işlerin seçtiğin Anımsatıcılar listesine eklenir; bir yerde bitirince ötekinde de biter. Başka listelere dokunulmaz. İzin ilk eşitlemede istenir (kurulumda sihirbaz sorar).'],['animsatici_liste','metin','Anımsatıcılar listesi','Varsayılan "Suflor.me" (yoksa açılır); var olan bir listenin adını da yazabilirsin.'],['proaktif_oneri','bool','Gün içi öneriler','Toplantı dışında, boştayken ve mesai saatinde asistan kısa bir öneri cümlesi sunar (geciken iş, teyit bekleyen karar gibi). Kayıt yazan öneri yine onayına sunulur.'],['proaktif_gunluk_en_cok','sayi','Günde en çok öneri','Bir günde sunulacak en çok öneri sayısı (0–10); 0 kapatır.'],['proaktif_aralik_dk','sayi','İki öneri arası (dk)','Üst üste iki öneri arasındaki en kısa süre (0–720).'],['proaktif_bosta_dk','sayi','Boşta sayılma süresi (dk)','Bu kadar dakika bir şey yapmadığında öneri sunulur (0–120).'],['konus_derin','bool','Analiz sorularında daha güçlü model','Analiz, karşılaştırma ve değerlendirme sorularında o tur daha güçlü modelle çalışır; kısa sorular hızlı modelde kalır. Yalnız Claude kullanıldığında geçerli.'],['konus_derin_model','sec','Güçlü model','Analiz sorularında kullanılacak model.',[['opus','Opus'],['sonnet','Sonnet']]],['konus_derin_effort','sec','Düşünme düzeyi','Güçlü modelin çabası; yükseldikçe cevap daha yavaş ve pahalı olur.',[['low','Düşük'],['medium','Orta'],['high','Yüksek'],['xhigh','Çok yüksek'],['max','En yüksek']]],['kart_tavan_sn','sayi','Kart aralığı (sn)','Sormadığın SÖYLE ve NOT kartları en çok bu sıklıkla; 0 sınırsız.'],['oda','bool','Odadaki ikinci kişi','Aynı mikrofondaki ikinci kişinin sözleri ayrı yazılır.'],['masaustu_mic','bool','Masaüstü toplantıda mikrofonun','Teams/Zoom masaüstünde senin sesin yazılır.'],['masaustu_kisiler','bool','Kişiler panelinden ad okuma','Panel 3 dakikada bir açılıp kapanır.']]],
   ['Kanıt',[['sesli_kanit','bool','Sesli kanıt','“Kanıt al” dediğinde toplantı ekranı kaydedilir.'],['ekran_oto','bool','Paylaşılan ekranı kaydet','Ekran paylaşılınca görüntüler kendiliğinden kaydedilir.'],]],
   ['Çeviri',[['ceviri','bool','Canlı çeviri',"Karşı tarafın İngilizce satırları panoda Türkçesiyle (metin yapay zekâ servisine gider)."],['ceviri_kis','bool','Sesli çeviride sesi kıs','Çeviri okunurken toplantı sesi kısılır.'],['sesli_ceviri_tam','bool','Sesli çeviride tam çeviri','Kapalıyken kulaklığa her satırın kısa özü (en çok 8 sözcük) okunur; açıkken tam çeviri. Uzun konuşmada okuma geride kalırsa eski satırlar atlanır.'],['masaustu_ses_kis','bool',"Masaüstü Teams/Zoom'da da kıs",'Ses yardımcısı toplantı sesini kendi üzerinden çalar; takılırsa ses kesilebilir.']]],
-  ['E-posta',[['eposta','sec','Taslak nerede açılsın','Brifing ve özet e-postayla gönderilirken.',[['',"Kendin seç"],['gmail','Gmail'],['outlook','Outlook (web)'],['mailto',"Mac'in posta uygulaması"]]],['eposta_adres','adres','Gönderen adresin','“Kendime” de buraya gider; Gmail’de taslak bu hesapla açılır. Boşsa takvim adresin.'],['eposta_oku','bool','E-postayı oku (Mac Mail)','Konuş ve sohbette e-posta sorusunda Mac Mail’deki son iletilerin gönderen, konu ve kısa özeti yapay zekâ servisine gider (gövde açılmaz). İzin: Sistem Ayarları → Gizlilik ve Güvenlik → Tam Disk Erişimi → Suflor Posta.']]],
+  ['E-posta',[['eposta','sec','Taslak nerede açılsın','Brifing ve özet e-postayla gönderilirken.',[['',"Kendin seç"],['gmail','Gmail'],['outlook','Outlook (web)'],['mailto',"Mac'in posta uygulaması"]]],['eposta_adres','adres','Gönderen adresin','“Kendime” de buraya gider; Gmail’de taslak bu hesapla açılır. Boşsa takvim adresin.'],['eposta_oku','bool','E-postayı oku (Mac Mail)','Konuş ve sohbette e-posta sorusunda Mac Mail’deki son iletilerin gönderen, konu ve kısa özeti yapay zekâ servisine gider (gövde açılmaz). İzin: Sistem Ayarları → Gizlilik ve Güvenlik → Tam Disk Erişimi → Suflor Posta.'],
+    ['eposta_onem_duzeyi','sec','Önemli e-posta düzeyi','Sıkı: yalnız VIP ve en acil istekler. Dengeli: tanıdığın kişilerden gelen somut istekler. Geniş: tanımadıkların da girer.',[['siki','Sıkı'],['dengeli','Dengeli'],['genis','Geniş']]],['eposta_onem_gun','sayi','Kaç günlük e-posta izlensin','En çok bu kadar gün öncesine kadar bakılır (3–30).'],['eposta_onemsiz','liste','Önemsiz gönderenler','Virgülle ayır. Buradakilerden gelenler yalnız sayıda görünür.'],['eposta_taslak_yeri','sec','Cevap taslağı nerede açılsın','Asistanın hazırladığı e-posta taslağı. Gönder hep sende.',[['',"Otomatik (Mac Mail'i okuyorsan Mac Mail)"],['mac','Mac Mail'],['web','Gmail ya da Outlook (web)']]]]],
   ['Dış karar kaydı',[['dis_defter','defter','Başka bir karar kaydı','Firmanın kullandığı başka bir karar ya da toplantı defteri. Dosya: CSV ya da JSON dosyasının yolu; kararlar ve işler Bugün’de ve toplantı hazırlığında kaynak etiketiyle görünür, Suflor’un kendi kayıtlarına karışmaz. Bağlayıcı: toplantı oturumu ve Konuş o kaynağı yalnız okuma araçlarıyla sorgular; sorguya kişi adı ve döküm alıntısı gitmez. Suflor dışarıdaki deftere hiçbir şey yazmaz; aktarma Bugün’deki Dışa aktar ile dosya olarak.'],['izleme_dosyasi','metin','İzleme veri dosyası','Başka bir panonun (ör. ekibin kart takip panosu) Drive’a yazıp Mac’e eşitlenen JSON dosyasının yolu. Doluysa Bugün’de kısa bir bölüm ve toplantı hazırlığında gündem adayları görünür; Suflor dosyayı yalnız okur, ağa bir şey göndermez. Boşsa özellik kapalıdır.'],['izleme_ad','metin','İzleme görünen adı','Bugün’deki bölümün başlığı. Boşsa “İzleme”.'],]],
   ['Gizlilik',[['ekran_paylasimda_goster','bool','Suflor ekran paylaşımında görünsün','Tanıtım ve demo için: açıkken pano, mini panel ve kartlar ekran paylaşımında ve ekran görüntüsünde görünür. İş bitince kapatın.'],['beta_veri','bilgi','Geliştirme verisi (beta)',"Suflor.me'yi geliştirmek için yalnız sayılar gönderilir (kullanım, hız, hata); konuşmaların, metinlerin ve adların hiçbiri Mac'inden çıkmaz."],['ses_izi_hafiza','bool','Ses izi hafızası','Konuşanların ses izi bu Mac’te saklanır; sonraki toplantılarda adları bulunur.'],['konus_gecmis','bool','Konuş geçmişi','Konuş’a sorduğun sorular ve cevapları bu Mac’te 90 gün saklanır; asistan önceki konuşmalarınızı hatırlar. Karşı tarafın soruları girmez.'],['gecmis_goster','dugme','Konuş geçmişini gör','Kayıtları tek tek, seçerek ya da hepsini birden silebilirsin.']]],
   ['Proje',[['proje_hazirla','hazirla','Projeyi yeniden hazırla','Klasörü yeniden tarar; yeni belgeleri metne çevirip dizinler, istersen proje kartını günceller. Kurulum sihirbazı yalnız bu ekranlarla açılır.']]]]
@@ -1542,7 +1586,7 @@ const AYH=[['Genel',['dil','bildirim','kisayollar']],['Görünüm',['tema','renk
   ['Toplantı',['oto_toplanti','oto_haric','sure_duyuru','adin_gecti','onay_uyari','toplanti_sonrasi_hatirlat_dk','toplanti_sonrasi_sesli','toplanti_hatirlat','toplanti_hatirlat_dk','toplanti_hatirlat_sesli','proaktif_oneri','proaktif_gunluk_en_cok','proaktif_aralik_dk','proaktif_bosta_dk','sesli_kanit','ekran_oto','ceviri','ceviri_kis','sesli_ceviri_tam','masaustu_ses_kis']],
   ['Ses ve konuşma',['konusma','ses_motoru','ses_hizi','gemini_ses','fisilti','sesli_not','konus_alindi','kayit_sesi','ozet_iki_ses','sohbet_ses_izi','sohbet_araya_girme']],
   ['Asistan ve kişilik',['kisilik','kisilik_toplanti_disi','konus_derin','konus_derin_model','konus_derin_effort','toplanti_ses','toplantiya_ses','beyin_varsayilan','beyin_konus','beyin_ceviri','beyin_proje_karti','beyin_prova']],
-  ['Takvim ve e-posta',['takvim_paylasilan','eposta','eposta_adres','eposta_oku']],
+  ['Takvim ve e-posta',['takvim_paylasilan','eposta','eposta_adres','eposta_oku','eposta_onem_duzeyi','eposta_onem_gun','eposta_onemsiz','eposta_taslak_yeri']],
   ['Kayıt ve ekip',['dis_defter','izleme_dosyasi','izleme_ad','proje_hazirla']],
   ['Bilgi kaynakları',['web_arastirma','web_arastirma_disari','konus_web','linkedin_chrome','bilgi_onaysiz']],
   ['Gizlilik',['ekran_paylasimda_goster','beta_veri','ses_izi_hafiza','konus_gecmis','gecmis_goster']],
@@ -2071,7 +2115,9 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
   const html=`<div class=ana><div class="icerik y-${bnGor}">${bnGor==='kayit'?knCiz():bnGor==='ekip'?ekipIc():bnGor==='gecmis'?gecmisIc(s):bugunIc()}</div></div>`
   if(el.__h===html)return
   const odak=document.activeElement&&el.contains(document.activeElement)?document.activeElement.id:'',deg={};{const g=el.querySelector('#gcAra');if(g)deg.gcAra=g.value}
+  const kay=[];for(let n=el;n;n=n.parentElement)if(n.scrollTop>0)kay.push([n,n.scrollTop]);const wy=window.scrollY  // yeniden çizim sayfayı başa atmasın
   el.innerHTML=html;el.__h=html
+  kay.forEach(([n,y])=>{if(n.scrollTop!==y)n.scrollTop=y});if(window.scrollY!==wy)window.scrollTo(0,wy)
   {const g=el.querySelector('#gcAra');if(g&&deg.gcAra)g.value=deg.gcAra}
   if(odak){const y=document.getElementById(odak);if(y&&el.contains(y)&&y.matches('input')){y.focus();try{y.setSelectionRange(y.value.length,y.value.length)}catch(e){}}}  // Kararlar ve Geçmiş aramasında yazarken yeniden çizim odağı bozmaz
   if(bnGor==='kayit'||bnGor==='ekip')knYukle()
@@ -2087,9 +2133,9 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
     const isaret=`<span class="varlikisaret${dinliyor?' dinliyor':''}${dusunuyor?' dusunuyor':''}" id=bnIsaret><span class=nefes aria-hidden=true></span><span class=dalga aria-hidden=true><i></i><i></i><i></i><i></i></span>${dusunuyor?`<span class=dusunce>${L('düşünüyor…')}</span>`:''}</span>`
     const bas=`<div class=sayfab><div class=sbas><span class=tarih>${esc(tarih)}</span><h1>${esc(selam+(ad?' '+ad:''))}${N?esc('. '+L('Bugün senden {n} şey bekleniyor.',{n:N})):''} ${isaret}</h1></div><div class=sag>${bnHap(s)}${sayfaMenu('bugun')}</div></div>`
     // Günün özeti: durum cümleleri (bnDurum) + cevapsız e-posta ve yakın tarih; Dinle hazır brifingi okur; altta sayaç bağlantıları
-    const ek=[],epc=epV?(epV.cevapsiz||[]).filter(x=>x.yon!=='giden').length:0,yk=((ytV&&ytV.tarihler)||[]).find(x=>{const g=goreliKok(x.tarih);return g&&g.g>=0&&g.g<=1&&x.tur!=='etkinlik'})
-    const epN=epc||epSay()  // sayaçtaki e-posta sayısı metindekiyle aynı: önce cevap bekleyenler, yoksa önemliler
-    if(epc)ek.push(L('{n} e-posta senden cevap bekliyor.',{n:epc}));else if(epN)ek.push(L('{n} önemli e-posta var.',{n:epN}));if(yk)ek.push(goreliKok(yk.tarih).g?L('Yarın: {m}.',{m:esc(yk.metin)}):L('Bugün: {m}.',{m:esc(yk.metin)}))
+    const ek=[],epc=epSay(),yk=((ytV&&ytV.tarihler)||[]).find(x=>{const g=goreliKok(x.tarih);return g&&g.g>=0&&g.g<=1&&x.tur!=='etkinlik'})
+    const epN=epc  // sayaç ve metin aynı sayı: ozet_sayi = senden cevap bekleyen e-postalar (S262)
+    if(epc)ek.push(L('{n} e-posta senden cevap bekliyor.',{n:epc}));if(yk)ek.push(goreliKok(yk.tarih).g?L('Yarın: {m}.',{m:esc(yk.metin)}):L('Bugün: {m}.',{m:esc(yk.metin)}))
     const say=[[bnKendiT().length,'{n} iş','data-bn=git data-g=kayit data-m=is'],[kt.length,'{n} karar','data-bn=git data-g=kayit data-m=karar'],[bek.length,'{n} onay','data-bn=panel data-ref=bek'],[epN,'{n} e-posta','data-bn=epgit'],[kalan.length,'{n} toplantı','data-bn=git data-g=takvim data-m=gun']].filter(x=>x[0]>0).map(([n,m,a])=>`<button type=button class=bag ${a}>${esc(L(m,{n}))}</button>`)
     const dp=bnDurum(s,ol,now,sira,kala,hdS,bek,son,ek),dmetin=(()=>{const t=document.createElement('div');t.innerHTML=dp;return(t.textContent||'').replace(/\s+/g,' ').trim()})()  // Dinle brifing yokken de görünür: kartın düz metni okunur
     const dsn=dtgt?sn:Math.max(5,Math.round(dmetin.split(/\s+/).length/2.4)),ddk=Math.max(1,Math.round(dsn/60))
@@ -2220,19 +2266,25 @@ function bnHap(s){const k=s.konus||{},d=durum(s);let c=String(d.c||'nt').split('
   if(bnDin||k.durum==='konusuyor'){c='ok';m=L('Konuşuyor')}else if(k.durum==='yaziya'||k.durum==='dinliyor'){c='ok';m=L('Dinliyor')}else if(k.durum==='dusunuyor'){c='ok';m=L('Düşünüyor')}
   return`<span class="hap ${c==='wa'?'wa':c==='er'?'er':''}" role=status title="${esc(d.a||'')}"><i aria-hidden=true></i>${esc(m)}</span>`}
 // ---- Önemli e-postalar (GET /eposta-onemli) ve Yaklaşan tarihler (GET /yaklasan-tarihler): uç yoksa, izin yoksa ya da boşsa blok gizli. Eylemler POST'la; taslak hiçbir şey göndermez.
-let epV=null,ytV=null,arV=null,arDetay={},bnEkT=0,bnEkYuk=false,epSec=null
+let epV=null,ytV=null,arV=null,arDetay={},bnEkT=0,bnEkYuk=false,epSec=null,epMenu=false  // epMenu: ⋯ menüsü açık mı (yeniden çizimde korunur)
 async function bnEkYukle(zorla){if(bnEkYuk||(!zorla&&Date.now()-bnEkT<60000))return;bnEkYuk=true;bnEkT=Date.now()
   const al=async u=>{try{return await j(u)}catch(e){return null}},[e,k,a]=await Promise.all([al('/eposta-onemli'),al('/yaklasan-tarihler'),al('/arastirma')]),ayni=(x,y)=>JSON.stringify(x)===JSON.stringify(y);let d=false
   const e2=e&&e.ok&&e.izin!==false?e:null,k2=k&&k.ok&&Array.isArray(k.tarihler)?k:null,a2=a&&Array.isArray(a.kayitlar)?a:null
   if(!ayni(e2,epV)){epV=e2;d=true}if(!ayni(k2,ytV)){ytV=k2;d=true}if(!ayni(a2,arV)){arV=a2;d=true}
   bnEkYuk=false;if(d&&last)bnCiz(last)}
-const epListe=()=>{if(!epV)return[];const g=new Set(),o=[];[...(epV.cevapsiz||[]),...(epV.onemli||[])].forEach(x=>{if(x&&x.id&&!g.has(x.id)){g.add(x.id);o.push(x)}});return o}
-const epSay=()=>epListe().length
+const epBek=()=>epV?(Array.isArray(epV.bekleyen)?epV.bekleyen:(epV.onemli||[])).filter(x=>x&&x.id):[]
+const epDon=()=>epV?(Array.isArray(epV.donus)?epV.donus:(epV.cevapsiz||[]).filter(x=>x.yon==='giden')).filter(x=>x&&x.id):[]
+const epListe=()=>[...epBek(),...epDon()]
+const epSay=()=>epV?(typeof epV.ozet_sayi==='number'?epV.ozet_sayi:epBek().length):0  // Günün özeti sayacı: senden cevap bekleyenler
 function goreliSaat(t){const d=new Date(t);if(!t||isNaN(d))return'';const dk=Math.round((Date.now()-d)/6e4);if(dk<1)return L('az önce');if(dk<60)return L('{n} dk önce',{n:dk});if(dk<1440&&d.getDate()===new Date().getDate())return L('{n} saat önce',{n:Math.round(dk/60)});return goreliTarih(d)}
-function epBlok(){const ls=epListe().slice(0,3);if(!ls.length)return'';const sec=ls.some(x=>x.id===epSec)?epSec:ls[0].id
-  return`<section class=blk id=bnEp aria-label="${L('Önemli e-postalar')}"><div class=bbas><h2>${L('Önemli e-postalar')}</h2><span class=sag>${esc(L('Mail · güncellendi {t}',{t:goreliSaat(epV.guncel)}))}</span></div><div class=bliste role=listbox aria-label="${L('Önemli e-postalar')}">`
-    +ls.map(x=>`<button type=button role=option class="epr${x.id===sec?' sec':''}" aria-selected="${x.id===sec}" data-bn=epsec data-id="${esc(x.id)}" title="${esc(x.neden||'')}"><span class=ust><b>${esc(x.kim||'')}</b><span class="${x.cevapsiz_gun?'gec':''}">${esc(x.cevapsiz_gun?(x.yon==='giden'?L('{n} gündür cevap gelmedi',{n:x.cevapsiz_gun}):L('{n} gündür cevapsız',{n:x.cevapsiz_gun})):gunTxt(x.tarih))}</span></span><span class=konu>${esc(x.konu||'')}</span></button>`).join('')
-    +`</div><div class=keylem><button type=button class=b data-bn=eptas data-id="${esc(sec)}">${L('Cevap taslağı')}</button><button type=button class="b sade" data-bn=epert data-id="${esc(sec)}">${L('Yarın hatırlat')}</button></div></section>`}
+function epBlok(){const bk=epBek().slice(0,3),dn=epDon().slice(0,3),tum=[...bk,...dn];if(!tum.length)return'';const sec=tum.some(x=>x.id===epSec)?epSec:tum[0].id,o=tum.find(x=>x.id===sec),bg=epV.bilgi_sayi||0
+  const sat=x=>`<button type=button role=option class="epr${x.id===sec?' sec':''}" aria-selected="${x.id===sec}" data-bn=epsec data-id="${esc(x.id)}" title="${esc(x.neden||'')}"><span class=ust><b>${esc(x.kim||'')}</b><span class="${x.yon==='giden'||x.gun>=3?'gec':''}">${esc(x.yon==='giden'?L('{n} iş günüdür dönüş yok',{n:x.gun||x.cevapsiz_gun||0}):(x.gun||x.cevapsiz_gun)>=3?L('{n} gündür cevapsız',{n:x.gun||x.cevapsiz_gun}):gunTxt(x.tarih))}</span></span><span class=konu>${esc(x.konu||'')}</span></button>`
+  const grup=(b,ls)=>ls.length?`<h3 class=epalt>${esc(b)}</h3><div class=bliste role=listbox aria-label="${esc(b)}">${ls.map(sat).join('')}</div>`:''
+  return`<section class=blk id=bnEp aria-label="${L('E-postalar')}"><div class=bbas><h2>${L('E-postalar')}</h2><span class=sag>${esc(L('Mail · güncellendi {t}',{t:goreliSaat(epV.guncel)}))}</span></div>`
+    +grup(L('Senden cevap bekleyenler'),bk)+grup(L('Dönüş beklediklerin'),dn)
+    +(bg?`<p class="sakin epbilgi">${esc(L('{n} ileti yalnız bilgi (CC, toplu, otomatik)',{n:bg}))}</p>`:'')
+    +`<div class=keylem><button type=button class=b data-bn=eptas data-id="${esc(sec)}">${L(o&&o.yon==='giden'?'Takip taslağı':'Cevap taslağı')}</button><button type=button class="b sade" data-bn=epert data-id="${esc(sec)}">${L('Yarın hatırlat')}</button>`
+    +`<details class=epdiger${epMenu?' open':''}><summary class="b sade" aria-label="${L('Diğer')}">⋯</summary><div class=epmenu><button type=button class="b sade" data-bn=epkisi data-id="${esc(sec)}">${L('Bu kişi önemli')}</button><button type=button class="b sade" data-bn=epnone data-id="${esc(sec)}">${L('Bu gönderen önemsiz')}</button></div></details></div></section>`}
 function ytBlok(){const v=ytV,ls=v?(v.tarihler||[]).slice(0,4):[];if(!ls.length)return'';const iz=v.izinler||{},kay=[iz.kisiler?L('Kişiler'):'',iz.takvim?L('Takvim'):'',iz.animsaticilar?L('Anımsatıcılar'):''].filter(Boolean).join(' · '),dg=ls.find(x=>x.tur==='dogum_gunu'&&x.kisi)
   return`<section class=blk aria-label="${L('Yaklaşan tarihler')}"><div class=bbas><h2>${L('Yaklaşan tarihler')}</h2>${kay?`<span class=sag>${esc(kay)}</span>`:''}</div><div class=bliste>`
     +ls.map(x=>`<div class=ktr><span class="ne mono" title="${esc(goreliTam(x.tarih))}">${esc(goreliTarih(x.tarih))}</span><span class=km>${esc(x.metin||'')}</span></div>`).join('')
@@ -2240,7 +2292,11 @@ function ytBlok(){const v=ytV,ls=v?(v.tarihler||[]).slice(0,4):[];if(!ls.length)
 async function epIslem(islem,id,b){if(!id)return;if(b)b.disabled=true;let r={};try{r=await bnYaz('/eposta-onemli',{islem,id})}catch(e){}if(b)b.disabled=false
   if(!r.ok){bnBildir(L('Yapılamadı')+(r.err?' — '+r.err:''));return}
   if(islem==='taslak'&&r.taslak){const t=r.taslak,p=postaUrl({md:t.govde||'',baslik:t.konu||'',alicilar:t.alicilar||[]},(t.alicilar||[]).length?'k':'');if(p.kisa)try{await navigator.clipboard.writeText(p.duz)}catch(e){}brAc(p.u,p.yeni);bnBildir(L('Taslak açıldı; göndermek sende'));return}
-  if(epV)epV={...epV,onemli:r.onemli||epV.onemli,cevapsiz:r.cevapsiz||epV.cevapsiz};epSec=null;bnBildir(L('Yarın sabah yeniden hatırlatılacak'));if(last)bnCiz(last)}
+  if(epV)epV={...epV,bekleyen:r.bekleyen||epV.bekleyen,donus:r.donus||epV.donus,bilgi_sayi:r.bilgi_sayi!=null?r.bilgi_sayi:epV.bilgi_sayi,ozet_sayi:r.ozet_sayi!=null?r.ozet_sayi:epV.ozet_sayi,onemli:r.onemli||epV.onemli,cevapsiz:r.cevapsiz||epV.cevapsiz};epSec=null;epMenu=false
+  bnBildir(islem==='onemli_kisi'?L('Bu kişi artık önemli sayılacak'):islem==='onemsiz_gonderen'?L('Bu gönderen artık yalnız bilgi olarak sayılacak'):L('Yarın sabah yeniden hatırlatılacak'));if(last)bnCiz(last)}
+document.addEventListener('toggle',ev=>{const d=ev.target;if(d&&d.classList&&d.classList.contains('epdiger'))epMenu=d.open},true)
+function epSecUygula(id){const e=document.getElementById('bnEp');if(!e)return;e.querySelectorAll('.epr').forEach(r=>{const o=r.dataset.id===id;r.classList.toggle('sec',o);r.setAttribute('aria-selected',o)})
+  e.querySelectorAll('[data-bn=eptas],[data-bn=epert],[data-bn=epkisi],[data-bn=epnone]').forEach(b=>{b.dataset.id=id});const o=epListe().find(x=>x.id===id),t=e.querySelector('[data-bn=eptas]');if(t)t.textContent=L(o&&o.yon==='giden'?'Takip taslağı':'Cevap taslağı');epMenu=false;const d=e.querySelector('details.epdiger');if(d)d.open=false}
 async function ytKutla(b){b.disabled=true;let r={};try{r=await bnYaz('/yaklasan-tarihler',{islem:'taslak',tarih:b.dataset.tarih,kisi:b.dataset.kisi})}catch(e){}b.disabled=false
   bnBildir(r.ok?(r.sonuc||L('Taslak açıldı; göndermek sende')):r.err==='toplantida'?L('Toplantı bitince yeniden dene'):L('Taslak açılamadı')+(r.err?' — '+r.err:''))}
 // ---- Ekip (adım 2'de taşındı, 5. adımda süslenecek): kimde bekliyor (başkalarının açık işleri kişiye göre), başkalarından beklediklerin, İzleme (Monitör), dış karar kayıtları, ekip paylaşımı durumu
@@ -2419,9 +2475,11 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='kmk'){smAcik=null;smYeniden();const c=KOMUT[b.dataset.k];if(c)c.yap();return}
   if(a==='tvmod')return tvAc(b.dataset.m)
   if(a==='gcak'){gcAk=gcAk===id?null:id;if(last)bnCiz(last);return}
-  if(a==='epsec'){epSec=id;if(last)bnCiz(last);return}
+  if(a==='epsec'){epSec=id;epSecUygula(id);return}  // yeniden çizim yok: kaydırma konumu ve odak yerinde kalır
   if(a==='eptas')return epIslem('taslak',id,b)
   if(a==='epert')return epIslem('ertele',id,b)
+  if(a==='epkisi')return epIslem('onemli_kisi',id,b)
+  if(a==='epnone')return epIslem('onemsiz_gonderen',id,b)
   if(a==='ktkut')return ytKutla(b)
   if(a==='epgit')return bnEpGit()
   if(a==='panel')return bnPanelAc(b.dataset.ref)

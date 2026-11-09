@@ -122,8 +122,8 @@ try:
 finally: r.terminate(); r.wait(5); shutil.rmtree(T, ignore_errors=True)
 # v0.32.15 (deneme 9): bitişten sonra panodan not/soru toplantıyı yeniden açmaz, biten dosyaya yazılır; sesli çeviri bitişle kapanır;
 # bitişten sonra yeni Başlat varsa not eskisi gibi süren/yeni toplantıya gider.
+os.environ["SUFLOR_TEST_KULAKLIK"] = "1"  # aktarıcı başlamadan önce (ortam çocuk sürece kurulurken geçer)
 T, canli, r, post, st, nabiz = kur(True)
-os.environ["SUFLOR_TEST_KULAKLIK"] = "1"
 try:
     post("/ping", {"call": True, "panel": True, "meeting": M}); nabiz("dinliyor")
     post("/ingest", {"meeting": M, "source": "transcript", "entries": [{"id": "e/1", "speaker": "Ayşe", "time": "10:00", "text": "merhaba"}]})

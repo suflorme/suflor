@@ -179,6 +179,21 @@ func alicilar(_ id: Int64) -> (adres: [String], ad: [String]) {
   }
   return (adr, adlar)
 }
+// S262: gelen iletinin alıcıları (To/CC ayrımı için tür sütunu varsa onunla): en çok 20 adres + toplam sayı (≤ 50). Kullanıcı To'da mı (ben_kime), yalnız CC'de mi (ben_cc)
+// "benim" adresleriyle hesaplanır; aktarıcı kendi adres listesiyle yeniden hesaplayabilsin diye ham liste de yazılır (gelen_alici, gelen_tur). Alıcı bilgisi yoksa alanlar yazılmaz.
+var gSt: OpaquePointer?
+if rc.isSuperset(of: ["message", "address"]) {
+  if sqlite3_prepare_v2(db, "SELECT a.address, \(rc.contains("type") ? "r.type" : "0") FROM recipients r JOIN addresses a ON a.ROWID = r.address WHERE r.message = ? ORDER BY \(rc.contains("position") ? "r.position" : "r.ROWID") LIMIT 50", -1, &gSt, nil) != SQLITE_OK { gSt = nil }
+}
+func gelenAlicilar(_ id: Int64) -> (adres: [String], tur: [Int])? {
+  guard let s = gSt else { return nil }
+  sqlite3_reset(s); sqlite3_bind_int64(s, 1, id)
+  var adr: [String] = [], tur: [Int] = []
+  while sqlite3_step(s) == SQLITE_ROW {
+    if let c = sqlite3_column_text(s, 0) { adr.append(String(cString: c).lowercased()); tur.append(Int(sqlite3_column_int(s, 1))) }
+  }
+  return adr.isEmpty ? nil : (adr, tur)
+}
 var goruldu = Set<String>()
 var iletiler: [[String: Any]] = []
 for x in satirlar where iletiler.count < enCok {
@@ -191,9 +206,16 @@ for x in satirlar where iletiler.count < enCok {
                           "kutu": String(kutu.suffix(60)), "gonderilen": eslesir(gonder, kutu) || benim.contains(x.adres)]
   if let y = x.ad, !y.isEmpty { o["ad"] = y }
   if o["gonderilen"] as? Bool == true, alSt != nil { let r = alicilar(x.id); o["alici"] = r.adres; if !r.ad.isEmpty { o["alici_ad"] = r.ad } }
+  if o["gonderilen"] as? Bool == false, let g = gelenAlicilar(x.id) {
+    o["alici_sayi"] = g.adres.count; o["gelen_alici"] = Array(g.adres.prefix(20)); if rc.contains("type") { o["gelen_tur"] = Array(g.tur.prefix(20)) }
+    let tmin = g.tur.min() ?? 0
+    var kime = false, cc = false
+    for (i, a) in g.adres.enumerated() where benim.contains(a) { if g.tur[i] == tmin { kime = true } else { cc = true } }
+    o["ben_kime"] = kime; o["ben_cc"] = cc && !kime
+  }
   if let r = x.okundu { o["okundu"] = r != 0 }
   if let z = x.ozet, !z.isEmpty { o["ozet"] = String(z.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ").prefix(300)) }
   iletiler.append(o)
 }
-sqlite3_finalize(st); if let s = alSt { sqlite3_finalize(s) }; sqlite3_close(db)
+sqlite3_finalize(st); if let s = alSt { sqlite3_finalize(s) }; if let s = gSt { sqlite3_finalize(s) }; sqlite3_close(db)
 yaz(["durum": "ok", "hata": NSNull(), "iletiler": iletiler, "dizin": (yol as NSString).deletingLastPathComponent.components(separatedBy: "/").suffix(2).joined(separator: "/")])
