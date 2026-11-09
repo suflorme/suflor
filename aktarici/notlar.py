@@ -109,7 +109,7 @@ KAYIT_TUR_EN_COK, KAYIT_TEKRAR_SN = 5, 1800
 KAYIT_SORULAN = {}  # öneri imzası → zaman (aynı öneri yeniden sorulmaz)
 KAYIT_SONUC = []  # onay/ret sonuçları → asistanın bir sonraki turuna not (en çok 10); proaktif öneri bağlamı kayit_sonuc_notu'ya katılır (aktarici/toplanti-sonrasi.py pro_baglam)
 KAYIT_ISTEK_RX = re.compile(r"karar|\bi[şs](?:i|ler|leri|in)?\b|görev|teyit|onayla|kapat|tamamla|yapıldı|yapılmadı|yapmadı|sahib|sorumlu|vade|özet|kayd|kayıt|açık soru|düzelt|"
-                            r"reddet|iptal|ertele|\bata(?:ma|r|y)?\b|geri al|yeniden aç|decision|task|action item|confirm|close|done|summary|record|fix|correct|reject|cancel|postpone|assign|undo|reopen", re.I)
+                            r"reddet|iptal|ertele|\bata(?:ma|r|y)?\b|geri al|yeniden aç|taslak|e-?posta|\bmail|draft|e-?mail|decision|task|action item|confirm|close|done|summary|record|fix|correct|reject|cancel|postpone|assign|undo|reopen", re.I)
 _KAYIT_KIMLIK = {"k": re.compile(r"^k\d{1,9}$"), "s": re.compile(r"^s\d{1,9}$"), "q": re.compile(r"^q\d{1,9}$")}
 _KAYIT_TARIH = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _KAYIT_KIMLIK_HEPSI = re.compile(r"^[ksq]\d{1,9}$")
@@ -119,8 +119,14 @@ KAYIT_KOMUTLAR = {  # komut → (zorunlu, isteğe bağlı) argümanlar; hepsi me
     # panodaki Kararlar ve işler eylem menüsüyle eşit (yapi.kayit_eylem, olay kaynağı "asistan"): karar reddet, iş iptal, ertele, ata, soru yeniden aç, geri al
     "karar_reddet": (("id",), ()), "is_iptal": (("id",), ()), "is_ertele": (("id", "vade"), ("neden",)), "ata": (("id", "kim"), ("rol",)), "soru_ac": (("id",), ()), "geri_al": (("id",), ()),
     # 9 Kasım (proaktif asistan): belgeden önerilen işi kabul/ret; teyit bekleyen kararları tek onay kartında topluca onayla (arg "idler" metin listesi, en çok KAYIT_TOPLU_EN_COK)
-    "belge_oneri_kabul": (("id",), ()), "belge_oneri_reddet": (("id",), ()), "karar_toplu_onayla": (("idler",), ())}
+    "belge_oneri_kabul": (("id",), ()), "belge_oneri_reddet": (("id",), ()), "karar_toplu_onayla": (("idler",), ()),
+    # 9 Kasım: e-posta TASLAĞI (asla gönderme): kullanıcı onaylayınca Mac Mail'de açık taslak ya da Gmail/Outlook web yazma sayfası; yalnız aktarıcı açar, gönder düğmesi kullanıcıda
+    "eposta_taslak": (("konu", "govde"), ("kime",))}
 KAYIT_TOPLU_EN_COK = 10
+TASLAK_GOVDE_EN_COK, TASLAK_KONU_EN_COK, TASLAK_ALICI_EN_COK = 30000, 200, 5
+TASLAK_KENDIME = {"ben", "kendime", "bana", "kendim", "me", "self", "myself"}
+TASLAK_ADRES_RX = re.compile(r"^[A-Za-z0-9._%+'-]{1,64}@[A-Za-z0-9.-]{1,200}\.[A-Za-z]{2,24}$")
+TASLAK_URL_SINIR = {"outlook": 1500, "gmail": 6000, "mailto": 1800}  # pano postaUrl ile aynı sınırlar
 _BELGE_ONERI_ID = re.compile(r"^o[0-9a-f]{15}$")
 _KAYIT_YENI = {"karar_reddet": ("reddet", ("karar",)), "is_iptal": ("iptal", ("is", "soz")), "is_ertele": ("ertele", ("is", "soz")), "soru_ac": ("ac", ("soru",)),
                "ata": ("ata", ("karar", "is", "soz", "soru")), "geri_al": ("geri_al", ("karar", "is", "soz", "soru"))}
@@ -136,7 +142,7 @@ KAYIT_KURAL = {"tr": ("[Kayıt yazma] Kullanıcı kayıtlarda bir değişiklik i
                       "geri_al {id: kaydın kimliği; kaydın son değişikliğini geri alır, yalnız senin ya da kullanıcının kendi eylemini} · "
                       "belge_oneri_kabul {id: o… (belgeden önerilen iş; kayda alır)} · belge_oneri_reddet {id: o… (bir daha önerilmez)} · "
                       "karar_toplu_onayla {idler: [k…, k…] (teyit bekleyen kararlar, en çok 10; tek onay kartı)}. Kişi belirsizse aktarıcı reddeder ve «kimi kastettin?» der; adayı kullanıcıya sor. Kimlikler yalnız [Kayıtlar] bloğundan; blokta yoksa uydurma, "
-                      "kullanıcıya sor. Kullanıcı her yazmayı panoda tek tıkla onaylar: «yazdım» deme, yapılmış gibi konuşma; onayının panoda beklediğini her seferinde kendi sözünle, kısa söyle (ör. «Panoya koydum, bir tık senden.», «Onay sende.»; aynı cümleyi art arda kullanma). Etiket panoda görünmez. Dosya silme, e-posta, başka sistem yok."),
+                      "kullanıcıya sor. Kullanıcı her yazmayı panoda tek tıkla onaylar: «yazdım» deme, yapılmış gibi konuşma; onayının panoda beklediğini her seferinde kendi sözünle, kısa söyle (ör. «Panoya koydum, bir tık senden.», «Onay sende.»; aynı cümleyi art arda kullanma). Etiket panoda görünmez. Dosya silme, e-posta gönderme, başka sistem yok."),
               "en": ("[Writing records] If the user wants a change in the records (confirm or correct a decision, mark a task done/not done, add a task, close an open question, "
                      "fix a wrong phrase in a meeting summary) you can't write it yourself but you can propose it: end your answer with one tag per change, on its own line, exactly: "
                      "[KAYIT: {\"komut\": \"…\", \"arg\": {…}, \"neden\": \"short sentence\"}]. Commands: karar_onayla {id: k…} · karar_duzelt {id: k…, metin: new decision text} · "
@@ -148,7 +154,15 @@ KAYIT_KURAL = {"tr": ("[Kayıt yazma] Kullanıcı kayıtlarda bir değişiklik i
                      "belge_oneri_kabul {id: o… (task proposed from a document; adds it to the records)} · belge_oneri_reddet {id: o… (never proposed again)} · "
                      "karar_toplu_onayla {idler: [k…, k…] (decisions awaiting confirmation, at most 10; one approval card)}. If the person is ambiguous the app refuses and says «who did you mean?»; ask the user. Use ids only from the [Kayıtlar] block; "
                      "if it isn't there, don't invent one — ask. The user approves each write with one click on the panel: don't say «done» or talk as if it were done; say it awaits their approval on the panel, briefly and in your own words each time (e.g. «It's on the panel, one click from you.»), not the same sentence twice in a row. "
-                     "The tag isn't shown. No deleting files, email or other systems.")}
+                     "The tag isn't shown. No deleting files, sending email or other systems.")}
+TASLAK_KURAL = {"tr": ("[E-posta taslağı] Kullanıcı bir e-posta taslağı hazırlamanı isterse (kendine ya da birine; ör. bir kitap özeti, not, brifing) YAPABİLİRSİN, «yapamam» deme: metni kendin yaz, cevabının sonuna ayrı satırda "
+                      "[KAYIT: {\"komut\": \"eposta_taslak\", \"arg\": {\"kime\": \"…\", \"konu\": \"…\", \"govde\": \"tam metin\"}, \"neden\": \"kısa cümle\"}] koy. kime: «kendime» denirse \"kendime\" yaz (kullanıcının kendi adresi), "
+                      "başkasıysa yalnız bildiğin e-posta adresi (virgülle en çok 5; adres bilmiyorsan uydurma, boş bırak ya da sor), belirtilmediyse boş. govde düz metin olsun (başlık için büyük harf ya da satır, madde için «- »; markdown süsü yok), satır sonları \\n. "
+                      "Kullanıcı panoda tek tıkla onaylar; onayla Mac Mail'de (ya da ayarlı Gmail/Outlook'ta) açık bir taslak penceresi açılır, GÖNDERME hep kullanıcıda: «gönderdim» deme, «taslak onayında, Gönder sende» gibi kısa söyle."),
+              "en": ("[Email draft] If the user asks you to prepare an email draft (to themselves or someone; e.g. a book summary, a note, a briefing) you CAN do it, don't say «I can't»: write the text yourself and end your answer with, on its own line, "
+                     "[KAYIT: {\"komut\": \"eposta_taslak\", \"arg\": {\"kime\": \"…\", \"konu\": \"…\", \"govde\": \"full text\"}, \"neden\": \"short sentence\"}]. kime: if they say «to myself» write \"kendime\" (the user's own address), "
+                     "for someone else only an email address you actually know (up to 5, comma-separated; never invent one, leave empty or ask), empty if unspecified. govde is plain text (capitals or a line for headings, «- » for bullets; no markdown), line breaks as \\n. "
+                     "The user approves with one click on the panel; on approval an open draft window appears in Mac Mail (or the configured Gmail/Outlook); SENDING always stays with the user: don't say «sent», say «the draft awaits approval, you press Send».")}
 
 def _kayit_bag():  # A1: yazma ayarı geçerli kayıt veritabanı bağlayıcısı (baglayici.yazan) ya da None; ayar baglayici.kayit.yazma önce, yoksa eski kayit_komutu/kayit_alt_komutlar/kayit_bayraklar/kayit_sure_sn
     b = _baglayici_mod(); return b.yazan(AYAR) if b else None
@@ -156,7 +170,7 @@ def proje_kayit_ayar():  # → {"komut", "alt", "bayrak", "sure"} ya da None (ay
     b = _kayit_bag(); return b.yazma_ayari() if b else None
 
 def kayit_kural():  # asistanın kayıt kuralı; proje kayıt betiği ayarlıysa izinli alt komutlarıyla
-    m = _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]); pk = proje_kayit_ayar()
+    m = _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]) + " " + _t(TASLAK_KURAL["tr"], TASLAK_KURAL["en"]); pk = proje_kayit_ayar()
     if not pk: return m
     betik = os.path.expanduser(pk["komut"][1]); bay = ", ".join(pk["bayrak"]) or _t("yok", "none")
     return m + _t(f" Projenin kendi kayıt aracı da var ({betik}): proje_kayit {{alt: {' | '.join(pk['alt'])}, argumanlar: [metin, …]}}. Yalnız bu alt komutlar; «-» ile başlayan argüman "
@@ -231,9 +245,73 @@ def _kayit_ozet_bul(y, ad):  # özet listesindeki toplantı adı → (kayıt, ko
     if not kp.startswith(kl + os.sep) or not kp.endswith(".md") or not os.path.isfile(kp): return _t("özetin panodaki kopyası yok", "the panel copy of the summary is missing")
     return r, kp
 
+def _taslak_dogrula(arg):  # → (hazır iş, None) ya da (None, hata). Alıcı: boş | «kendime» (ayar eposta_adres/takvim adresi) | açık e-posta adresleri; ad ya da belirsiz metin kabul edilmez
+    if not isinstance(arg, dict) or set(arg) - {"konu", "govde", "kime"} or not isinstance(arg.get("konu"), str) or not isinstance(arg.get("govde"), str) or not isinstance(arg.get("kime", ""), str): return None, _t("argümanlar uymuyor", "arguments don't match")
+    konu = " ".join(arg["konu"].split())[:TASLAK_KONU_EN_COK]; govde = arg["govde"].replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not konu or "\0" in konu or "\0" in govde: return None, _t("konu yok ya da geçersiz", "missing or invalid subject")
+    if len(govde) < 2: return None, _t("taslak metni boş", "the draft text is empty")
+    if len(govde) > TASLAK_GOVDE_EN_COK: return None, _t(f"taslak çok uzun (en çok {TASLAK_GOVDE_EN_COK} karakter)", f"draft too long (at most {TASLAK_GOVDE_EN_COK} characters)")
+    kime = []
+    for x in re.split(r"[,;]", arg.get("kime", "")):
+        x = x.strip().strip("<>").strip()
+        if not x: continue
+        if x.lower() in TASLAK_KENDIME:
+            b = eposta_ben() if "eposta_ben" in globals() else None
+            if not b: return None, _t("kendi e-posta adresin kayıtlı değil (ayar eposta_adres); alıcısız taslak için «kime» boş bırakılabilir", "your own email address isn't set (setting eposta_adres); leave «kime» empty for a draft without a recipient")
+            x = b
+        if not TASLAK_ADRES_RX.match(x): return None, _t(f"alıcı e-posta adresi değil ({x[:40]})", f"recipient isn't an email address ({x[:40]})")
+        if x.lower() not in [k.lower() for k in kime]: kime.append(x)
+    if len(kime) > TASLAK_ALICI_EN_COK: return None, _t(f"en çok {TASLAK_ALICI_EN_COK} alıcı", f"at most {TASLAK_ALICI_EN_COK} recipients")
+    tur = eposta_tur() if "eposta_tur" in globals() else "mailto"
+    yer = {"gmail": "Gmail", "outlook": "Outlook (web)"}.get(tur, "Mac Mail")
+    return {"komut": "eposta_taslak", "konu": konu, "govde": govde, "kime": kime, "tur": tur,
+            "ozet": _t(f"e-posta taslağı «{konu[:70]}» · {', '.join(kime) if kime else 'alıcısız'} · {len(govde)} karakter · {yer}'de açılır, Gönder sende", f"email draft «{konu[:70]}» · {', '.join(kime) if kime else 'no recipient'} · {len(govde)} characters · opens in {yer}, you press Send")}, None
+
+def taslak_duz(m):  # markdown → düz metin (başlık işaretleri, kalın/italik, bağlantı, kod çiti, tablo çizgisi); satır yapısı korunur
+    m = re.sub(r"^```.*$", "", m, flags=re.M); m = re.sub(r"^#{1,6}[ \t]*(.+?)[ \t]*#*$", lambda x: x.group(1).upper() if len(x.group(1)) < 60 else x.group(1), m, flags=re.M)
+    m = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", r"\1 (\2)", m); m = re.sub(r"(\*\*|__)(.+?)\1", r"\2", m); m = re.sub(r"(?<![\w*])[*_]([^*_\n]+)[*_](?![\w*])", r"\1", m)
+    m = re.sub(r"^[ \t]*[*+][ \t]+", "- ", m, flags=re.M); m = re.sub(r"^[ \t]*\|?[ \t]*:?-{3,}[-|: ]*$", "", m, flags=re.M); m = re.sub(r"`([^`\n]+)`", r"\1", m)
+    return re.sub(r"\n{3,}", "\n\n", m).strip()
+
+TASLAK_KLASOR_GUN = 1
+def taslak_ac(h):  # onaylanmış taslak → (True, sonuç) ya da (False, neden). ASLA göndermez: yalnız açık bir yazma penceresi. SUFLOR_TEST_BASLAT: açmaz, TASLAK_ACICI listesine yazar.
+    govde = taslak_duz(h["govde"]); kime = h["kime"]; tur = h["tur"]; konu = h["konu"]
+    if os.environ.get("SUFLOR_TEST_BASLAT"): TASLAK_ACICI.append({"tur": tur, "kime": kime, "konu": konu, "govde": govde}); print("TASLAK (deneme): " + json.dumps({"tur": tur, "kime": kime, "konu": konu, "govde": govde}, ensure_ascii=False)); return True, _t("taslak açıldı (deneme)", "draft opened (test)")
+    if tur in ("gmail", "outlook"):  # web yazma sayfası; adres uzunluğu sınırı aşarsa gövdenin tamamı panoya da kopyalanır (pano postaUrl ile aynı)
+        e = urllib.parse.quote; sin = TASLAK_URL_SINIR[tur]; ben = eposta_ben() if "eposta_ben" in globals() else None; kisa = len(e(govde)) > sin
+        g = govde
+        while len(e(g)) > sin: g = g[:max(0, int(len(g) * 0.8))]
+        g = g + ("\n…" if kisa else "")
+        u = (f"https://outlook.office.com/mail/deeplink/compose?to={e(','.join(kime))}&subject={e(konu)}&body={e(g)}" if tur == "outlook" else
+             f"https://mail.google.com/mail/u/{e(ben or '0')}/?view=cm&fs=1&to={e(','.join(kime))}&su={e(konu)}&body={e(g)}")
+        if kisa:
+            try: subprocess.run(["/usr/bin/pbcopy"], input=govde.encode("utf-8"), timeout=5, check=False)
+            except (OSError, subprocess.SubprocessError): pass
+        try: subprocess.Popen(["/usr/bin/open", u], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as ex: return False, ex.__class__.__name__
+        return True, _t("taslak sayfası açıldı; Gönder sende", "draft page opened; you press Send") + (_t(" (metin uzun: tamamı panoya kopyalandı, yapıştır)", " (long text: all of it is on the clipboard, paste it)") if kisa else "")
+    # Mac Mail: X-Unsent başlıklı .eml → Mail düzenlenebilir yeni ileti penceresi açar (uzunluk sınırı yok, otomasyon izni ve komut dizgisi yok); gönderilmez
+    import email.message, email.policy
+    ms = email.message.EmailMessage(policy=email.policy.SMTP); ms["Subject"] = konu; ms["X-Unsent"] = "1"
+    if kime: ms["To"] = ", ".join(kime)
+    ms.set_content(govde, charset="utf-8", cte="base64")
+    kl = os.path.join(BASE, "taslak"); os.makedirs(kl, mode=0o700, exist_ok=True)
+    for f in os.listdir(kl):  # eski taslak dosyaları (Mail açılışta okur) bir gün sonra silinir
+        fy = os.path.join(kl, f)
+        try:
+            if f.endswith(".eml") and time.time() - os.path.getmtime(fy) > TASLAK_KLASOR_GUN * 86400: os.remove(fy)
+        except OSError: pass
+    yol = os.path.join(kl, f"taslak-{int(time.time())}-{os.getpid()}.eml"); fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as f: f.write(bytes(ms))
+    try: subprocess.Popen(["/usr/bin/open", "-a", "Mail", yol], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as ex: return False, ex.__class__.__name__
+    return True, _t("taslak Mail'de açıldı (kaydetmek için ⌘S: Taslaklar'a girer); Gönder sende", "draft opened in Mail (⌘S saves it to Drafts); you press Send")
+TASLAK_ACICI = []  # yalnız deneme kipi
+
 def kayit_dogrula(komut, arg, gevsek=False):  # → (hazır iş sözlüğü, None) ya da (None, hata metni). Uygulamadan hemen önce de yeniden çağrılır (gevsek: toplu onayda artık onay beklemeyenler atlanır).
     if "gizli_acik" in globals() and gizli_acik(): return None, _t("gizli kip açık", "private mode is on")
     if komut == "proje_kayit": return _proje_kayit_dogrula(arg)
+    if komut == "eposta_taslak": return _taslak_dogrula(arg)
     if komut not in KAYIT_KOMUTLAR: return None, _t(f"izinli olmayan komut ({str(komut)[:40]})", f"command not allowed ({str(komut)[:40]})")
     if not isinstance(arg, dict): return None, _t("argümanlar sözlük değil", "arguments aren't an object")
     zor, ist = KAYIT_KOMUTLAR[komut]
@@ -456,6 +534,10 @@ def kayit_uygula(is_):  # onaylanmış işi yapar (önce yeniden doğrular) → 
                 hh, ee = kayit_dogrula("karar_onayla", {"id": i_})
                 if not ee and y.karar_teyit_kaldir(BASE, hh["id"]) is not None: say += 1
             ok_ = say > 0; h["ozet"] = _t(f"{say}/{len(h['idler'])} karar onaylandı", f"{say}/{len(h['idler'])} decisions confirmed")
+        elif k == "eposta_taslak":
+            ok_, sn = taslak_ac(h)
+            if not ok_: return False, sn
+            h["ozet"] += " — " + sn
         elif k == "belge_oneri_reddet": ok_ = bool(y.belge_oneri_reddet(BASE, h["id"]))
         elif k == "belge_oneri_kabul":  # panodaki Onayla ile aynı yol (sahibin e-postası kimlik modülünden), olay kaynağı "asistan"
             o = h["oneri"]; sh = " ".join(str(o.get("sahip") or "").split())[:80]; ep = ""

@@ -644,9 +644,14 @@ final class KartKatmani {
     static func eylemKart(_ x: [String: Any]) -> [String: Any] {  // sesle sorulan "yazayım mı?" işi → onay görünümlü önemli kart
         var t = x["baslik"] as? String ?? ""; if let k = x["kim"] as? String, !k.isEmpty { t += " — " + k }
         var c: [String: Any] = ["id": "e:" + (x["id"] as? String ?? ""), "eid": x["id"] as? String ?? "", "eylem": true, "kind": "not", "text": t]
-        if let a = x["ayrinti"] as? String, !a.isEmpty { c["why"] = a }
-        else if let a = x["ayrinti"], JSONSerialization.isValidJSONObject(a), let d = try? JSONSerialization.data(withJSONObject: a, options: [.prettyPrinted, .sortedKeys]),
-                let s = String(data: d, encoding: .utf8) { c["why"] = s }
+        // Ham JSON gösterilmez: izin/kayıt ayrıntısı JSON olarak saklanır; nesne ise yalnız insan okur özet (ozet, yoksa neden)
+        var nesne: [String: Any]? = x["ayrinti"] as? [String: Any]
+        if nesne == nil, let a = x["ayrinti"] as? String {
+            let t = a.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("{") || t.hasPrefix("[") { nesne = (try? JSONSerialization.jsonObject(with: Data(t.utf8))) as? [String: Any]; if nesne == nil { nesne = [:] } }
+            else if !t.isEmpty { c["why"] = a }
+        }
+        if let n = nesne, let o = (n["ozet"] as? String) ?? (n["neden"] as? String), !o.isEmpty { c["why"] = o }
         return c
     }
     // aktarıcının durum alanlarından bilgi satırları: (anahtar, metin, renk). "d:" ile başlayan anahtar durum sürdükçe bir kez gösterilir,

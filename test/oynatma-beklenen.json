@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 640446,
-   "sha": "ab8ffe9e49722af4"
+   "uzunluk": 643828,
+   "sha": "e5c9ef9dd1deffc1"
   },
   "/mini": {
-   "uzunluk": 640446,
-   "sha": "ab8ffe9e49722af4"
+   "uzunluk": 643828,
+   "sha": "e5c9ef9dd1deffc1"
   },
   "/status": {
    "_ping_son": "float",
@@ -653,6 +653,7 @@
     "hata": "NoneType",
     "kisilik": "NoneType",
     "kisilik_gorunen": "NoneType",
+    "kisilik_harita": {},
     "kulaklik": "bool",
     "moderator": "NoneType",
     "olcum": "NoneType",
