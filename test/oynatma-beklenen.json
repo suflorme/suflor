@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 661373,
-   "sha": "311532121c2d012e"
+   "uzunluk": 664469,
+   "sha": "7d90c5f2a9d2353f"
   },
   "/mini": {
-   "uzunluk": 661373,
-   "sha": "311532121c2d012e"
+   "uzunluk": 664469,
+   "sha": "7d90c5f2a9d2353f"
   },
   "/status": {
    "_ping_son": "float",
@@ -632,6 +632,13 @@
     "durum": "str"
    },
    "hatirlat": "NoneType",
+   "is_kopya": {
+    "acik": "bool",
+    "bekleyen": "int",
+    "otomatik": "int",
+    "son_s": "NoneType",
+    "taranan": "int"
+   },
    "kanit_iste": "NoneType",
    "kanit_n": "int",
    "kanitlar": [],

@@ -391,6 +391,18 @@ ok("olcum isabet_md: Değerlendirici tablosu ve eski söz tablosu birlikte", "##
 OL.CANLI = os.path.join(T, "yokyok2"); os.makedirs(OL.CANLI)
 ok("olcum isabet: değerlendirici kaydı yoksa tablo yok, hata yok", OL.isabet_ozet(7)["degerlendirici"] == {} and "## Değerlendirici" not in OL.isabet_md(OL.isabet_ozet(7)))
 
+# --- 13) iş kopyası şeması (aktarici/is-kopya.py müşterisi; 10 Kasım) ---
+NK = kur("is-kopya", cevaplar=[cev(("s9|s2", "ayni", 3, "Aynı iş", "1Password araştırmasını paylaş"), ("s9|s3", "farkli", 2, "Ayrı"), ("s9|s4", "belki", 2, "şema dışı"))])
+KA = [aday("s9|s2", "YENİ (2026-11-05, Proje): a ‖ ESKİ (2026-10-29, Proje): b", yedek={"karar": "emin_degil", "oncelik": 0}), aday("s9|s3", "c", yedek={"karar": "emin_degil", "oncelik": 0}), aday("s9|s4", "d", yedek={"karar": "emin_degil", "oncelik": 0})]
+rk = NK["degerlendir"]("is_kopya", KA, soru="Aynı iş mi?", sema=NK["DG_SEMA"]["is_kopya"])
+ok("is_kopya şeması: kararlar ayni/farkli/emin_degil, yedek emin_degil, metin istenir", NK["DG_SEMA"]["is_kopya"]["kararlar"] == ("ayni", "farkli", "emin_degil") and NK["DG_SEMA"]["is_kopya"]["yedek"] == "emin_degil" and NK["DG_SEMA"]["is_kopya"]["metin"] is True)
+ok("is_kopya: model kararları işlenir, metin ayni için gelir; şema dışı karar yedeğe (emin_degil) düşer, hiçbir zaman kendiliğinden ayni olmaz",
+   rk[0]["karar"] == "ayni" and rk[0]["metin"] == "1Password araştırmasını paylaş" and rk[1]["karar"] == "farkli" and rk[2]["karar"] == "emin_degil" and rk[2]["kaynak"] == "yedek", rk)
+ik_i = NK["M"].istemler[0]
+ok("is_kopya istemi: güven ölçeği ve 'hazırlık ≠ gönderim' yönergesi, karar değerleri", "GÜVEN" in ik_i and "taslak hazırla" in ik_i and "ayni|farkli|emin_degil" in ik_i, ik_i[:300])
+NK2 = kur("is-kopya2", cevaplar=[])
+ok("is_kopya: model yanıt vermezse tüm adaylar yedek emin_degil", all(x["karar"] == "emin_degil" and x["kaynak"] == "yedek" for x in NK2["degerlendir"]("is_kopya", KA, soru="Aynı iş mi?", sema="is_kopya")))
+
 # --- 12) mimari: bölüm yükleme ve adlar ---
 src = open(os.path.join(KOD, "aktarici", "degerlendir.py"), encoding="utf-8").read()
 ok("bölüm dosyasında import edilen yerel modül ve sabit yol yok", "import yapi" not in src and "/Users/" not in src)

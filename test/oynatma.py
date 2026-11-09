@@ -105,7 +105,7 @@ def kos():
     # t0 ileride: aktarıcı ve izle önce açılır, oynatma izle "İZLEME BAŞLADI" dedikten sonra t0'da başlar (21 Ekim: soğuk başlangıçta izle açılırken
     # ilk satırlar geçip gidiyordu — KATILIMCI olayı çıkmadı, SATIRLAR 20/24). Sahte saat t0'a göre; t0'dan önce de tek yönlü ilerler.
     t0 = time.time() + ACILIS_SN; yaz_baslangic(canli, t0)
-    env = dict(os.environ, HIZ_T0=str(t0), HIZ_K=str(K), PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json"))
+    env = dict(os.environ, HIZ_T0=str(t0), HIZ_K=str(K), PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json"), SUFLOR_IK_DONGU_YOK="1")
     py = sys.executable
     rl = subprocess.Popen([py, "saat.py", "relay.py", "--dir", canli, "--port", str(PORT)], cwd=kod, env=env,
                           stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)

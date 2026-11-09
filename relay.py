@@ -1404,7 +1404,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/is-kopya", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1868,6 +1868,7 @@ bolum("toplanti-hatirlat")  # aktarici/toplanti-hatirlat.py — planlı toplant�
 bolum("toplanti-sonrasi")  # aktarici/toplanti-sonrasi.py — toplantı sonrası proaktif hatırlatma: açık uçlar (tarihsiz/sahipsiz iş, teyit bekleyen karar) bildirim + Bugün satırı (5 Kasım)
 bolum("izleme")  # aktarici/izleme.py — İzleme: başka panonun Drive'a yazdığı JSON anlık görüntüsünü yalnız okur (ayar izleme_dosyasi; Bugün bölümü, hazırlık adayları, Konuş özeti; 5 Kasım)
 bolum("degerlendir")  # aktarici/degerlendir.py — tek değerlendirici: söylemeye değer mi / benim mi / güncel mi kararı tek çekirdekten (gün içi öneri, açık uç, belge önerisi, e-posta çağrısı; 9 Kasım) — eylem-menu ve soz-kapisi'ndan sonra
+bolum("is-kopya")  # aktarici/is-kopya.py — iş kopyası: aynı iş farklı toplantılarda yeniden konuşulunca değerlendirici "aynı iş mi" der; aynıysa yeni kalır eski kapanır, emin değilse panoda sorulur (/is-kopya; 10 Kasım) — degerlendir'den sonra
 bolum("soz-kapisi")  # aktarici/soz-kapisi.py — tek söz kapısı: zamanlayıcılar aday üretir, kapı şimdi/sonra/hiç kararını verir; sunuş → sonuç kaydı canli/soz.jsonl (9 Kasım)
 bolum("dusunme")  # aktarici/dusunme.py — günlük düşünme turu (günde bir, en iyi model): öğrenilen önerileri + geçersizleme + sabah gün planı (canli/gun-plani.json; panoda Günün özeti, söz kapısından bildirim, Konuş bağlamı; 9 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
@@ -2259,6 +2260,7 @@ class H(BaseHTTPRequestHandler):
             dk = dk_view() if "dk_view" in globals() else None  # 6 Kasım: döküm kontrolü (yalnız geliştirici + ses arşivi açık)
             if dk: s["dokum_kontrol"] = dk
             s["animsatici"] = anim_view() if "anim_view" in globals() else None  # S258
+            s["is_kopya"] = ik_status() if "ik_status" in globals() else None  # 10 Kasım: iş kopyası taraması (taranan, bekleyen soru, son tur, otomatik birleşen)
             so = so_view()  # 3 Kasım: öğrenen sözlük — son çalışma, öğrenilen, bekleyen (döngü hiç çalışmadıysa alan yok)
             if so: s["sozluk_ogrenme"] = so
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
@@ -2303,6 +2305,7 @@ class H(BaseHTTPRequestHandler):
         if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
         if yol == "/prova": return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
         if yol == "/bugun-veri": return self._json(bugun_veri_view())
+        if yol == "/is-kopya": return self._json(ik_view() if "ik_view" in globals() else {"ok": False, "sorular": [], "birlesen": []})  # aynı iş olabilir çiftleri (aktarici/is-kopya.py; anahtarlı)
         if yol == "/belge-oneri": return self._json(belge_oneri_view())  # belgeden iş önerisi (aktarici/eylem-menu.py; anahtarlı)
         if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
@@ -2388,6 +2391,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/dokum-kontrol": return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile (anahtarlı; geliştirici)
         if self.path == "/ortak": return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
         if self.path == "/yaklasan-tarihler": return self._json(kt_islem(p))  # taslak (kutlama; gönderim yok) | yoksay (anahtarlı; geçiş listesinde yok)
+        if self.path == "/is-kopya": return self._json(ik_islem(p) if "ik_islem" in globals() else {"ok": False, "err": "yok"})  # birlestir | ayri | geri_al (anahtarlı; geçiş listesinde yok)
         if self.path == "/belge-oneri": return self._json(belge_oneri_islem(p))  # öneriyi kayda al (kayit_olustu + is_atandi) ya da reddet (anahtarlı)
         if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/Claude/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
         if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)

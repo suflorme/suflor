@@ -1951,7 +1951,7 @@ let prD={durum:'yok'},prBusy=false,prHata='',prKisi=[],prForm={konu:'',baglam:''
 let bnOlay=[],bnSonraki=null,bnTakOk=false,bnHazir=false,bnT=0,bnYuk=false,bnRef=null,bnGeri=null,bnBildT=null,bnDin=null
 const bnGizli=new Set()
 // Kararlar ve işler görünümü (5 Kasım): kenar çubuğundan tam sayfa liste (/kayitlar) — sekme karar/iş/açık soru, süzgeç kişi/toplantı/durum/arama; gündem taslağı (/gundem-taslagi) hazırlık kartında
-let boV=null,boBek=new Set(),bnGor='bugun',knV=null,knOrt=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:'',sahip:(()=>{try{const v=localStorage.getItem('knSahip');return['ben','ekip'].includes(v)?v:'ben'}catch(e){return'ben'}})()},knDen=false,knAraT=null,gtV={},gtYukSet=new Set()
+let ikV=null,ikBek=new Set(),boV=null,boBek=new Set(),bnGor='bugun',knV=null,knOrt=null,knT=0,knYuk=false,knSekme='is',knSuz={kisi:'',toplanti:'',durum:'',ara:'',sahip:(()=>{try{const v=localStorage.getItem('knSahip');return['ben','ekip'].includes(v)?v:'ben'}catch(e){return'ben'}})()},knDen=false,knAraT=null,gtV={},gtYukSet=new Set()
 const bnTarih=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const bnDk=h=>{const [a,b]=String(h||'0:0').split(':').map(Number);return (a||0)*60+(b||0)}
 const bnIlk=a=>String(a||'').trim().split(/\s+/)[0]
@@ -2157,6 +2157,7 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
 async function knYukle(zorla){if(knYuk||(!zorla&&Date.now()-knT<30000))return;knYuk=true;knT=Date.now();const den=knDen  // S236: deneme (Test) toplantı kayıtları varsayılan gelmez; anahtar açıkken ?deneme=1
   try{const o=await j('/ortak');const ov=o&&o.ok?o:null;if(JSON.stringify(ov)!==JSON.stringify(knOrt)){knOrt=ov;if(last)bnCiz(last)}}catch(e){}  // ortak defter durumu (A7)
   try{const o=await j('/belge-oneri');const ov=o&&o.ok?o:null;if(JSON.stringify(ov)!==JSON.stringify(boV)){boV=ov;if(last)bnCiz(last)}}catch(e){}
+  try{const o=await j('/is-kopya');const ov=o&&o.ok?o:null;if(JSON.stringify(ov)!==JSON.stringify(ikV)){ikV=ov;if(last)bnCiz(last)}}catch(e){}  // aynı iş olabilir çiftleri (aktarici/is-kopya.py)
   try{const v=await j('/kayitlar'+(den?'?deneme=1':''));if(den!==knDen){knYuk=false;return knYukle(true)}if(v&&v.ok&&JSON.stringify(v)!==JSON.stringify(knV)){knV=v;if(last)bnCiz(last)}}catch(e){}knYuk=false}
 const knTop=d=>((knV||{}).toplantilar||[]).find(t=>t.dosya===d)
 function knSuzgec(x){const s=knSuz
@@ -2205,6 +2206,19 @@ function boCiz(){const ls=boListe(),eb=last?bnBekleyen(last):[]
 function boIsle(id,islem){boBek.add(id);if(boInc)boInc.i++;if(last)bnCiz(last)
   const t=setTimeout(async()=>{try{await bnYaz('/belge-oneri',{id,islem})}catch(e){}boBek.delete(id);boV=null;await knYukle(true)},5000)
   bnBildir(islem==='kabul'?L('Öneri kayda alındı'):L('Öneri bir daha gösterilmeyecek'),()=>{clearTimeout(t);boBek.delete(id);if(boInc&&boInc.i>0)boInc.i--;if(last)bnCiz(last)})}
+// Aynı iş olabilir (aktarici/is-kopya.py, 10 Kasım): aynı sahibin farklı toplantılarda yeniden konuştuğu iş. Asistan emin değilse çift burada sorulur: Birleştir (yeni kalır, eski kapanır) · Ayrı (bir daha sorulmaz).
+// Otomatik birleştirilenler son 24 saat tek satırla görünür, Geri al iki işlemi de geri çevirir. Yazma 5 sn sonra (bildirimdeki Geri al bu sürede vazgeçer).
+const ikListe=()=>((ikV||{}).sorular||[]).filter(x=>!ikBek.has(x.cift))
+const ikIs=(x,et)=>`<p class=od><b>${esc(et)}</b> · ${esc([x.baslik,x.tarih?goreliTarih(x.tarih):'',x.vade?L('vade')+' '+goreliTarih(x.vade,true):''].filter(Boolean).join(' · '))}</p><p class=om>${esc(x.metin)}</p>`
+function ikCiz(){const ls=ikListe(),bl=((ikV||{}).birlesen||[]).filter(x=>!ikBek.has(x.cift))
+  if(!ls.length&&!bl.length)return''
+  const kart=x=>`<section class=oinc aria-label="${L('Aynı iş olabilir')}"><div class=oust><span class=oeb>${esc(L('Aynı iş olabilir'))}</span></div><p class=om><b>${esc(L('Bu iki iş aynı mı?'))}</b></p>${ikIs(x.yeni,L('Yeni'))}${ikIs(x.eski,L('Eski'))}${x.neden?`<p class=od>${esc(x.neden)}</p>`:''}
+    <div class=keylem><button type=button class="b ana" data-bn=ikbirlestir data-id="${esc(x.cift)}" title="${L('Yeni kayıt kalır, eski kapanır')}">${L('Birleştir')}</button><button type=button class=b data-bn=ikayri data-id="${esc(x.cift)}" title="${L('Bir daha sorulmaz')}">${L('Ayrı')}</button></div></section>`
+  const sat=x=>`<div class=oserit role=status><span class=onok aria-hidden=true></span><span class=om>${esc(L('Aynı iş birleştirildi: {m}',{m:x.yeni_metin}))}</span><button type=button class=bag data-bn=ikgeri data-id="${esc(x.cift)}">${L('Geri al')}</button></div>`
+  return`<div class=ikbolum style="display:grid;gap:var(--bo-8)">${ls.map(kart).join('')}${bl.map(sat).join('')}</div>`}
+function ikIsle(id,islem){ikBek.add(id);if(last)bnCiz(last)
+  const t=setTimeout(async()=>{try{await bnYaz('/is-kopya',{cift:id,islem})}catch(e){}ikBek.delete(id);ikV=null;await knYukle(true)},5000)
+  bnBildir(islem==='birlestir'?L('İşler birleştirildi'):islem==='ayri'?L('İki iş ayrı kalacak'):L('Birleştirme geri alınacak'),()=>{clearTimeout(t);ikBek.delete(id);if(last)bnCiz(last)})}
 // Ortak defter durumu (A7, S242): yalnız ekip paylaşımı açıkken tek satır — sorun varsa ne yapılacağı, iyiyse son eşitleme ve Firestore gecikmesi (ortanca, 10 kayıttan 9'u)
 function ortSatir(){const o=knOrt;if(!o||!o.acik||['kapali','deneme'].includes(o.durum))return''
   const f=o.firestore||{},sn=x=>x<10?(Math.round(x*10)/10).toLocaleString(DIL==='en'?'en-US':'tr-TR'):String(Math.round(x))
@@ -2226,7 +2240,7 @@ function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[],sk
   const bos=!v?L('Yükleniyor…'):!hepsi.length?L('Henüz kayıt yok: toplantı bittiğinde kararlar ve işler buraya düşer.'):!liste.length?(suzlu&&hepsi.some(x=>knSekmede(x,sk))?L('Süzgece uyan kayıt yok.'):BOS[sk]):''
   const alt=ortSatir()||(v?`<span class=alt>${esc(L('{k} karar · {i} iş · {s} açık soru',{k:hepsi.filter(x=>x.tur==='karar').length,i:hepsi.filter(x=>x.tur==='is').length,s:hepsi.filter(x=>x.tur==='soru').length}))}</span>`:'')
   return`<div class="sayfab kns"><div class=sbas><h1>${L('Kararlar ve işler')}</h1>${alt}</div><div class=sag><button type=button class="b ana iri" data-bn=kmk data-k=yeniis>${L('Yeni iş')}</button>${sayfaMenu('kayit')}</div></div>
-    ${boCiz()}
+    ${boCiz()}${ikCiz()}
     <section class="bolum knb"><div class=sekmeler role=tablist aria-label="${L('Kararlar ve işler')}">${sek}</div>
     <div class=suzgec>${seg}<input id=knAra type=search value="${esc(knSuz.ara)}" placeholder="${L('Ara')}" aria-label="${L('Ara')}"><select data-knf=toplanti aria-label="${L('Toplantı')}">${top}</select>${knSuz.kisi?cip(L('Kişi: {ad}',{ad:knSuz.kisi}),`data-bn=knkisi data-k="${esc(knSuz.kisi)}"`):''}${knSuz.durum==='tarihsiz'?cip(L('Yalnız tarihsiz işler'),'data-bn=kntarihsiz'):''}${v&&(v.deneme_say||knDen)?`<label class=kndn><input type=checkbox data-kndn${knDen?' checked':''}> ${L('Deneme toplantıları')}${v.deneme_say?` (${v.deneme_say})`:''}</label>`:''}</div>
     ${liste.length?`<div class="ince knl${sk==='biten'?' biten':''}">${liste.map(x=>x.tur==='karar'?knKararSatir(x):knSatir(x)).join('')}</div>`:''}${bos?`<p class="sakin knbos">${esc(bos)}</p>`:''}${v?(v.dis||[]).filter(d=>!d.ok).map(d=>`<p class=sakin>${esc(d.ad)}: ${L('defter okunamadı')} — ${esc(d.hata||'')}</p>`).join(''):''}
@@ -2501,6 +2515,9 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='epgit')return bnEpGit()
   if(a==='panel')return bnPanelAc(b.dataset.ref)
   if(a==='emenu')return emAc(b.dataset.kid)
+  if(a==='ikbirlestir')return ikIsle(id,'birlestir')
+  if(a==='ikayri')return ikIsle(id,'ayri')
+  if(a==='ikgeri')return ikIsle(id,'geri_al')
   if(a==='bokabul')return boIsle(id,'kabul')
   if(a==='bored')return boIsle(id,'reddet')
   if(a==='kapat')return bnPanelKapat()

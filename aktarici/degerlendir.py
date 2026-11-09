@@ -42,6 +42,14 @@ DG_SEMA = {
                     "yonerge": "Adaylar kullanıcının toplantıya eklediği belgelerden ya da proje kartından çıkarılmış iş maddeleridir; belgenin tamamını görmüyorsun, yalnız çıkarılan satırı. "
                                "Sahibi başka biri olarak açıkça yazılıysa, vadesi bugünden çok önce geçmişse ya da madde şablon/örnek/geçmiş tutanak gibi duruyorsa 'gec'. Sahip yazılı değilse ya da "
                                "kullanıcıysa ve madde somut bir işse 'al'. Emin değilsen 'al' (kullanıcı listede kendisi eler)."},
+    "is_kopya": {
+        "kararlar": ("ayni", "farkli", "emin_degil"), "yedek": "emin_degil", "soz_kaynak": None, "soz_oncelik_tavan": 1, "kisa": (), "metin": True,
+        "tanim": {"ayni": "aynı iş: aynı çıktı/teslim, aynı kişi; yeniden konuşulduğu için iki kez kaydedilmiş", "farkli": "ayrı işler: farklı çıktı ya da farklı adım (hazırlık ile gönderim ayrı işlerdir)",
+                          "emin_degil": "karar vermek için bilgi yetersiz ya da biri öbürünün alt adımı olabilir; kullanıcıya sorulsun"},
+        "yonerge": "Her aday iki açık işi gösterir: YENİ (sonraki toplantı) ve ESKİ (önceki toplantı), ikisi de aynı sahibe ait. Aynı iş = aynı çıktı/teslim, aynı kişi (biri ötekinin yeniden anılması). "
+                   "Bir işin hazırlığı ile gönderimi ayrı işlerdir ('taslak hazırla' ≠ 'taslağı gönder'); biri ötekinin alt adımıysa ya da emin değilsen 'emin_degil'. Model yokken asla birleştirilmez; şüphede 'emin_degil' de. "
+                   "Bu işte oncelik GÜVEN düzeyidir (yukarıdaki oncelik ölçeğini yoksay): 3 kesin aynı, 2 büyük olasılıkla aynı, 1 olası, 0 belirsiz; yalnız 2-3 kendiliğinden birleştirmeye yeter. "
+                   "metin: yalnız karar 'ayni' ise ve ESKİ metindeki önemli bir ayrıntı YENİde yoksa, birleşik iş için YENİ metni zenginleştiren tek cümle yaz (en çok 200 karakter, eylem cümlesi, köşeli/küçük-büyüktür/süslü parantez yok); gerekmiyorsa metin yazma."},
 }
 
 def _dg_say(ad, v, lo, hi):
