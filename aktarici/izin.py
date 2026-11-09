@@ -18,7 +18,7 @@ def _izin_kayit(o):
         try: os.close(os.open(yol, os.O_WRONLY | os.O_CREAT, 0o600))
         except OSError: pass
     with LOCK: write([(yol, json.dumps(dict(o, at=datetime.datetime.now().isoformat(timespec="seconds")), ensure_ascii=False) + "\n")])
-def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False, sure_sn=None):
+def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False, sure_sn=None, toplantida_sesli=False):
     # oturum=True (v0.115.0; kullanıcı 22 Ekim: arka plandaki toplantı oturumunun araç izni ayrı kart olmasın): kart açılmaz — panonun Claude bölümünde
     # ve mini panoda Onayla / Reddet (toplanti_oturum_view "izinler"); karar yine eylem_karar → izin_karar. Toplantı dışında sesli soru aynı.
     ne = " ".join(str(ne or "").split())[:400]
@@ -32,9 +32,10 @@ def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False, sure_sn=None):
             with LOCK: c["eylem"] = x["id"]; c["izin"] = tur; c.update({"bitis": round(time.time() + sure_sn, 1)} if sure_sn else {})
     else: kart_bildir()
     top = toplanti_var()
-    if sesli and not top and not oturum: soru_baslat([x["id"]])  # 31 Ekim: toplantı oturumunun araç izni yalnız kart; sesli okunmaz
+    zorla = bool(sesli and top and toplantida_sesli and not oturum)  # 9 Kasım: toplantıyı sesle bitirme — toplantı sürerken de kulaklıkta sorulur (çağıran yalnız kulaklıkta ister)
+    if sesli and (not top or zorla) and not oturum: soru_baslat([x["id"]], zorla=True) if zorla else soru_baslat([x["id"]])  # 31 Ekim: toplantı oturumunun araç izni yalnız kart; sesli okunmaz
     _izin_kayit({"id": x["id"], "tur": tur, "ne": ne, "durum": "bekliyor", "toplantida": top})
-    print(f"İZİN: {tur} onay bekliyor ({'Claude bölümü' if oturum else 'kart'}{' + sesli' if sesli and not top and not oturum else ''}) — \"{ne[:80]}\"")
+    print(f"İZİN: {tur} onay bekliyor ({'Claude bölümü' if oturum else 'kart'}{' + sesli' if sesli and (not top or zorla) and not oturum else ''}) — \"{ne[:80]}\"")
     return x["id"]
 def izin_bekleyen_oturum():  # panonun Claude bölümü ve mini pano: arka plandaki toplantı oturumunun onay bekleyen araç izinleri
     return [{"id": x["id"], "metin": x["baslik"]} for x in eylem_gorunen() if x["tur"] == "izin" and x.get("oturum") and x["durum"] == "bekliyor"]

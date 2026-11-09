@@ -109,7 +109,7 @@ KAYIT_TUR_EN_COK, KAYIT_TEKRAR_SN = 5, 1800
 KAYIT_SORULAN = {}  # öneri imzası → zaman (aynı öneri yeniden sorulmaz)
 KAYIT_SONUC = []  # onay/ret sonuçları → asistanın bir sonraki turuna not (en çok 10); proaktif öneri bağlamı kayit_sonuc_notu'ya katılır (aktarici/toplanti-sonrasi.py pro_baglam)
 KAYIT_ISTEK_RX = re.compile(r"karar|\bi[şs](?:i|ler|leri|in)?\b|görev|teyit|onayla|kapat|tamamla|yapıldı|yapılmadı|yapmadı|sahib|sorumlu|vade|özet|kayd|kayıt|açık soru|düzelt|"
-                            r"reddet|iptal|ertele|\bata(?:ma|r|y)?\b|geri al|yeniden aç|taslak|e-?posta|\bmail|draft|e-?mail|decision|task|action item|confirm|close|done|summary|record|fix|correct|reject|cancel|postpone|assign|undo|reopen", re.I)
+                            r"reddet|iptal|ertele|\bata(?:ma|r|y)?\b|geri al|yeniden aç|taslak|e-?posta|\bmail|draft|e-?mail|gündem|gundem|hatırlat|bitir|başlat|baslat|\bteams\b|\bmesaj|agenda|remind|message|\bend\b|\bstart\b|finish|begin|decision|task|action item|confirm|close|done|summary|record|fix|correct|reject|cancel|postpone|assign|undo|reopen", re.I)
 _KAYIT_KIMLIK = {"k": re.compile(r"^k\d{1,9}$"), "s": re.compile(r"^s\d{1,9}$"), "q": re.compile(r"^q\d{1,9}$")}
 _KAYIT_TARIH = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _KAYIT_KIMLIK_HEPSI = re.compile(r"^[ksq]\d{1,9}$")
@@ -121,7 +121,9 @@ KAYIT_KOMUTLAR = {  # komut → (zorunlu, isteğe bağlı) argümanlar; hepsi me
     # 9 Kasım (proaktif asistan): belgeden önerilen işi kabul/ret; teyit bekleyen kararları tek onay kartında topluca onayla (arg "idler" metin listesi, en çok KAYIT_TOPLU_EN_COK)
     "belge_oneri_kabul": (("id",), ()), "belge_oneri_reddet": (("id",), ()), "karar_toplu_onayla": (("idler",), ()),
     # 9 Kasım: e-posta TASLAĞI (asla gönderme): kullanıcı onaylayınca Mac Mail'de açık taslak ya da Gmail/Outlook web yazma sayfası; yalnız aktarıcı açar, gönder düğmesi kullanıcıda
-    "eposta_taslak": (("konu", "govde"), ("kime",))}
+    "eposta_taslak": (("konu", "govde"), ("kime",)),
+    # 9 Kasım (ikinci dalga): sahibine taslak, gündeme ekleme, sesle toplantı başlat/bitir (doğrulama ayrı işlevlerde: _kayit_taslak_dogrula, _gundem_dogrula, _toplanti_*_dogrula)
+    "kayit_taslak": (("id", "kanal"), ("konu", "govde", "not")), "gundem_ekle": ((), ("id", "metin", "toplanti")), "toplanti_baslat": ((), ("konu",)), "toplanti_bitir": ((), ())}
 KAYIT_TOPLU_EN_COK = 10
 TASLAK_GOVDE_EN_COK, TASLAK_KONU_EN_COK, TASLAK_ALICI_EN_COK = 30000, 200, 5
 TASLAK_KENDIME = {"ben", "kendime", "bana", "kendim", "me", "self", "myself"}
@@ -170,7 +172,7 @@ def proje_kayit_ayar():  # → {"komut", "alt", "bayrak", "sure"} ya da None (ay
     b = _kayit_bag(); return b.yazma_ayari() if b else None
 
 def kayit_kural():  # asistanın kayıt kuralı; proje kayıt betiği ayarlıysa izinli alt komutlarıyla
-    m = _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]) + " " + _t(TASLAK_KURAL["tr"], TASLAK_KURAL["en"]); pk = proje_kayit_ayar()
+    m = _t(KAYIT_KURAL["tr"], KAYIT_KURAL["en"]) + " " + _t(TASLAK_KURAL["tr"], TASLAK_KURAL["en"]) + " " + _t(IKINCI_KURAL["tr"], IKINCI_KURAL["en"]); pk = proje_kayit_ayar()
     if not pk: return m
     betik = os.path.expanduser(pk["komut"][1]); bay = ", ".join(pk["bayrak"]) or _t("yok", "none")
     return m + _t(f" Projenin kendi kayıt aracı da var ({betik}): proje_kayit {{alt: {' | '.join(pk['alt'])}, argumanlar: [metin, …]}}. Yalnız bu alt komutlar; «-» ile başlayan argüman "
@@ -315,7 +317,11 @@ def taslak_ac(h):  # onaylanmış taslak → (True, sonuç) ya da (False, neden)
 TASLAK_ACICI = []  # yalnız deneme kipi
 
 def kayit_dogrula(komut, arg, gevsek=False):  # → (hazır iş sözlüğü, None) ya da (None, hata metni). Uygulamadan hemen önce de yeniden çağrılır (gevsek: toplu onayda artık onay beklemeyenler atlanır).
-    if "gizli_acik" in globals() and gizli_acik(): return None, _t("gizli kip açık", "private mode is on")
+    if "gizli_acik" in globals() and gizli_acik() and komut not in KAYIT_GIZLI_SERBEST: return None, _t("gizli kip açık", "private mode is on")
+    if komut == "kayit_taslak": return _kayit_taslak_dogrula(arg)
+    if komut == "gundem_ekle": return _gundem_dogrula(arg)
+    if komut == "toplanti_bitir": return _toplanti_bitir_dogrula(arg)
+    if komut == "toplanti_baslat": return _toplanti_baslat_dogrula(arg)
     if komut == "proje_kayit": return _proje_kayit_dogrula(arg)
     if komut == "eposta_taslak": return _taslak_dogrula(arg)
     if komut not in KAYIT_KOMUTLAR: return None, _t(f"izinli olmayan komut ({str(komut)[:40]})", f"command not allowed ({str(komut)[:40]})")
@@ -468,6 +474,142 @@ def _kayit_dogrula_yeni(y, komut, arg, kisa):  # karar_reddet, is_iptal, is_erte
         h["ozet"] = _t(f"«{ad_}» kaydının son değişikliği geri alınır ({y.olay_ozeti(g)[22:]})", f"the last change to «{ad_}» is undone ({y.olay_ozeti(g)[22:]})")
     return h, None
 
+# --- İkinci dalga (9 Kasım): sahibine taslak (kayit_taslak), gündeme ekleme (gundem_ekle), sesle toplantı başlat/bitir (toplanti_baslat, toplanti_bitir). Hepsi tek tık / sesli evet onayından sonra yazılır;
+#     hiçbiri bir şey GÖNDERMEZ (taslak penceresi açar), toplanti_bitir/baslat içerik yazmaz (gizli kipte de çalışır).
+KAYIT_GIZLI_SERBEST = ("toplanti_baslat", "toplanti_bitir")  # kayda içerik yazmayan, toplantının kendisini yöneten komutlar
+KAYIT_TOPLANTIDA_SESLI = ("toplanti_bitir",)  # toplantı sürerken de sesli «evet» sorulur (yalnız kulaklıkta; brifing-ses.py soru_baslat zorla)
+TEAMS_MESAJ_EN_COK = 1500
+IKINCI_KURAL = {"tr": ("[Sahibine taslak · gündem · toplantı] (1) Kayıttaki iş/karar için sahibine hatırlatma ya da mesaj taslağı: kayit_taslak {id: k…|s…|q…, kanal: eposta|teams, govde: tam metni sen yaz "
+                       "(kısa, düz metin; Teams'te en çok 1500 karakter), konu (yalnız e-posta; boşsa kayıttan türer)}. Alıcı kaydın sahibi (karar için onaylayan); adresini uygulama bulur, bulamazsa alıcısız açılır; kayıt kullanıcınınsa reddedilir. "
+                       "Taslak yalnız açılır, GÖNDERME kullanıcıda. (2) Gündeme ekleme: gundem_ekle {id: var olan kayıt (k…|s…|q…) YA DA metin: yeni gündem maddesi (iş kaydı olarak açılır), toplanti: takvimdeki toplantı adı (isteğe bağlı; boşsa takvimdeki bir sonraki toplantı)}. "
+                       "Adla birden çok farklı toplantı eşleşirse uygulama reddeder ve adayları söyler: kullanıcıya hangisi olduğunu sor. (3) toplanti_baslat {konu: isteğe bağlı} · toplanti_bitir {}: kullanıcı «toplantıyı başlat/bitir» derse. "
+                       "Bitirmeden önce sesli «Toplantıyı bitireyim mi?» sorulur ve açık «evet» beklenir; sen «bitirdim» deme, onay beklediğini söyle. Süren toplantı yoksa bitirme reddedilir."),
+               "en": ("[Draft to owner · agenda · meeting] (1) A reminder or message draft to a record's owner: kayit_taslak {id: k…|s…|q…, kanal: eposta|teams, govde: write the full text yourself "
+                      "(short, plain text; at most 1500 characters on Teams), konu (email only; derived from the record if empty)}. The recipient is the record's owner (the approver for a decision); the app finds the address, otherwise it opens without a recipient; refused if the record is the user's own. "
+                      "The draft is only opened, SENDING stays with the user. (2) Adding to an agenda: gundem_ekle {id: an existing record (k…|s…|q…) OR metin: a new agenda item (opened as a task record), toplanti: calendar meeting name (optional; empty = the next meeting on the calendar)}. "
+                      "If several different meetings match the name the app refuses and lists them: ask the user which one. (3) toplanti_baslat {konu: optional} · toplanti_bitir {}: when the user says «start/end the meeting». "
+                      "Before ending, the app asks aloud «Shall I end the meeting?» and waits for a clear «yes»; don't say «ended», say it awaits approval. If no meeting is running, ending is refused.")}
+
+def _ik_arg(arg, zor, ist):  # → hata metni ya da None; tüm değerler metin
+    if not isinstance(arg, dict) or set(arg) - set(zor) - set(ist) or any(a not in arg for a in zor) or any(not isinstance(v, str) for v in arg.values()): return _t("argümanlar uymuyor", "arguments don't match")
+    return None
+def _ik_norm(s):  # küçük harf (Türkçe i/ı), noktalama yok
+    return " ".join(re.sub(r"[^\w\s]", " ", str(s or "").replace("I", "ı").replace("İ", "i").lower()).split())
+def _ik_takvim():
+    f = globals().get("_kem_takvim")
+    try: return f() if f else []
+    except Exception: return []
+def _ik_eslesen(baslik, sorgu):  # sorgunun tüm sözcükleri başlıkta (kök eşleşmesi: sözcük başlığın bir sözcüğüyle başlıyor ya da içeriyor)
+    b = _ik_norm(baslik); q = [w for w in _ik_norm(sorgu).split() if len(w) >= 2]
+    return bool(q) and all(w in b for w in q)
+def _ik_kisa(s, n=90): return " ".join(str(s or "").split())[:n]
+
+def _kayit_taslak_dogrula(arg):  # kayıt sahibine e-posta/Teams taslağı: alıcı kayıttan (sahip; karar için onaylayan), metni asistan yazar. → (hazır iş, None) ya da (None, hata)
+    e = _ik_arg(arg, ("id", "kanal"), ("konu", "govde", "not"))
+    if e: return None, e
+    y = _yapi_mod() if "_yapi_mod" in globals() else None
+    if not y: return None, _t("kayıt aracı yok", "records tool missing")
+    kanal = arg["kanal"].strip().lower()
+    if kanal not in ("eposta", "teams"): return None, _t("kanal eposta ya da teams olmalı", "channel must be eposta or teams")
+    if not _KAYIT_KIMLIK_HEPSI.match(arg["id"]): return None, _t("kimlik geçersiz", "invalid id")
+    x = y.kayit_bul(BASE, arg["id"], ("karar", "is", "soz", "soru")); ox = y.ortak_kayit(BASE, arg["id"]) if x else None
+    if not x or not ox or ox.get("gizli"): return None, _t(f"{arg['id']} kaydı yok", f"no record {arg['id']}")
+    bl = y.bilinen_adlar(BASE); rl = y.taslak_alici(ox, bl) or {}; kendi, ep = y._alici_kendi(rl, lambda ad: _kayit_kisi(ad, True), bl)
+    if "eposta" not in y.eylem_mevcut(ox, None, False): return None, _t(f"{x['id']} kapalı bir iş/soru; kapalı kayıt için taslak yazılmaz", f"{x['id']} is closed; no draft for a closed record")
+    if kendi: return None, _t(f"{x['id']} senin kaydın; kendine taslak yazılmaz (kendine e-posta için eposta_taslak kullan)", f"{x['id']} is your own record; no draft to yourself (use eposta_taslak for an email to yourself)")
+    ep = ep if ep and TASLAK_ADRES_RX.match(ep) else ""; ad = " ".join(str(rl.get("ad") or "").split())[:60]; metin = y.TEYIT_RX.sub("", ox.get("metin") or "")
+    govde = arg.get("govde") or arg.get("not") or ""
+    if len(govde.strip()) < 2: return None, _t("taslak metni (govde) boş", "the draft text (govde) is empty")
+    kim = ad or _t("sahibine", "the owner"); kime_g = ep or _t("alıcısız", "no recipient")
+    if kanal == "eposta":
+        konu = " ".join(arg.get("konu", "").split())[:TASLAK_KONU_EN_COK] or (_t("Hatırlatma: ", "Reminder: ") + _ik_kisa(metin, 70))
+        th, e = _taslak_dogrula({"konu": konu, "govde": govde, "kime": ep})
+        if e: return None, e
+        yer = {"gmail": "Gmail", "outlook": "Outlook (web)"}.get(th["tur"], "Mac Mail")
+        th.update(komut="kayit_taslak", id=x["id"], kanal="eposta", kid=ox["kayit_id"], ozet=_t(f"«{_ik_kisa(metin, 60)}» için {kim}'e e-posta taslağı «{_ik_kisa(konu, 50)}» · {kime_g} · {yer}'de açılır, Gönder sende",
+                                                                                                f"email draft «{_ik_kisa(konu, 50)}» to {kim} about «{_ik_kisa(metin, 60)}» · {kime_g} · opens in {yer}, you press Send"))
+        return th, None
+    msj = taslak_duz(govde.replace("\r\n", "\n").replace("\r", "\n"))
+    if "\0" in msj or len(msj) < 2: return None, _t("taslak metni uygun değil", "the draft text isn't suitable")
+    if len(msj) > TEAMS_MESAJ_EN_COK: return None, _t(f"Teams mesajı çok uzun (en çok {TEAMS_MESAJ_EN_COK} karakter); kısalt", f"Teams message too long (at most {TEAMS_MESAJ_EN_COK} characters); shorten it")
+    return {"komut": "kayit_taslak", "id": x["id"], "kanal": "teams", "kid": ox["kayit_id"], "kime": [ep] if ep else [], "govde": msj, "konu": "", "tur": "teams",
+            "ozet": _t(f"«{_ik_kisa(metin, 60)}» için {kim}'e Teams mesaj taslağı · {kime_g} · {len(msj)} karakter · Teams'te açılır, Gönder sende", f"Teams message draft to {kim} about «{_ik_kisa(metin, 60)}» · {kime_g} · {len(msj)} characters · opens in Teams, you press Send")}, None
+
+def teams_taslak_url(kime, mesaj):  # Teams derin bağlantısı (https): sohbeti açar, mesaj yazılı; kullanıcı gönderir
+    q = urllib.parse.quote
+    return "https://teams.microsoft.com/l/chat/0/0?" + ("users=" + ",".join(q(k, safe="@.+-_") for k in kime) + "&" if kime else "") + "message=" + q(mesaj, safe="")
+def _teams_taslak_ac(h):  # ASLA göndermez; SUFLOR_TEST_BASLAT: açmaz, TASLAK_ACICI'ya yazar
+    u = teams_taslak_url(h["kime"], h["govde"])
+    if os.environ.get("SUFLOR_TEST_BASLAT"):
+        TASLAK_ACICI.append({"tur": "teams", "kime": h["kime"], "konu": "", "govde": h["govde"], "url": u}); print("TASLAK (deneme): " + json.dumps({"tur": "teams", "kime": h["kime"], "govde": h["govde"], "url": u}, ensure_ascii=False))
+        return True, _t("Teams taslağı açıldı (deneme)", "Teams draft opened (test)")
+    try: subprocess.Popen(["/usr/bin/open", u], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as ex: return False, ex.__class__.__name__
+    return True, _t("Teams'te taslak sohbeti açıldı; Gönder sende", "Teams chat draft opened; you press Send")
+
+def _gundem_dogrula(arg):  # id (var olan kayıt) ya da metin (yeni madde) + isteğe bağlı toplantı adı → hedef toplantı takvimden
+    e = _ik_arg(arg, (), ("id", "metin", "toplanti"))
+    if e: return None, e
+    y = _yapi_mod() if "_yapi_mod" in globals() else None
+    if not y: return None, _t("kayıt aracı yok", "records tool missing")
+    kid = arg.get("id", "").strip(); metin = _kayit_metin(arg.get("metin", ""), 0, 300) if arg.get("metin") else ""
+    if bool(kid) == bool(metin): return None, _t("id (var olan kayıt) ya da metin (yeni gündem maddesi) verilmeli, ikisi birden değil", "give either id (existing record) or metin (new agenda item), not both")
+    ox = None
+    if kid:
+        if not _KAYIT_KIMLIK_HEPSI.match(kid): return None, _t("kimlik geçersiz", "invalid id")
+        x = y.kayit_bul(BASE, kid, ("karar", "is", "soz", "soru")); ox = y.ortak_kayit(BASE, kid) if x else None
+        if not x or not ox or ox.get("gizli"): return None, _t(f"{kid} kaydı yok", f"no record {kid}")
+        kid = x["id"]; ad_ = _ik_kisa(y.TEYIT_RX.sub("", x["metin"] or ""))
+    elif metin is None: return None, _t("gündem maddesi metni uygun değil", "agenda item text not suitable")
+    else: ad_ = _ik_kisa(metin)
+    simdi = datetime.datetime.now().astimezone(); ad_l = y.gundem_adaylari(_ik_takvim(), ox, simdi, 40); ad_l.sort(key=lambda a: (a["tarih"], a["saat"]))
+    sorgu = str(arg.get("toplanti") or "").strip()
+    if sorgu:
+        es = [a for a in ad_l if _ik_eslesen(a["baslik"], sorgu)]
+        if not es: return None, _t(f"takvimde «{_ik_kisa(sorgu, 50)}» adlı yaklaşan toplantı yok", f"no upcoming meeting named «{_ik_kisa(sorgu, 50)}» on the calendar")
+        if len({_ik_norm(a["baslik"]) for a in es}) > 1:
+            return None, _t("birden çok toplantı eşleşti, hangisi? " + "; ".join(f"{a['baslik']} ({y.tarih_okunur(a['tarih'])} {a['saat']})" for a in es[:4]),
+                            "several meetings match, which one? " + "; ".join(f"{a['baslik']} ({y.tarih_okunur(a['tarih'], True)} {a['saat']})" for a in es[:4]))
+        hedef = es[0]  # aynı başlıklı tekrar eden toplantıda en yakın olan
+    elif ad_l: hedef = ad_l[0]
+    else: return None, _t("takvimde yaklaşan uygun toplantı yok (≥ 2 kişilik, başlamamış)", "no suitable upcoming meeting on the calendar (≥ 2 people, not started)")
+    if ox and (ox.get("gundem") or {}).get("etkinlik") == hedef["id"]: return None, _t(f"{kid} zaten «{hedef['baslik']}» gündeminde", f"{kid} is already on the agenda of «{hedef['baslik']}»")
+    nerede = f"«{hedef['baslik']}» ({y.tarih_okunur(hedef['tarih'])} {hedef['saat']})"; nerede_en = f"«{hedef['baslik']}» ({y.tarih_okunur(hedef['tarih'], True)} {hedef['saat']})"
+    return {"komut": "gundem_ekle", "id": kid or None, "metin": metin or None, "etkinlik": hedef["id"], "baslik": hedef["baslik"],
+            "ozet": (_t(f"«{ad_}» {nerede} gündemine eklenir", f"«{ad_}» is added to the agenda of {nerede_en}") if kid else
+                     _t(f"yeni gündem maddesi «{ad_}» (iş kaydı olarak açılır) {nerede} gündemine eklenir", f"new agenda item «{ad_}» (opened as a task record) is added to the agenda of {nerede_en}"))}, None
+
+def _toplanti_aktif():  # → (durum, ad): süren/başlayan toplantı
+    f = globals().get("toplanti_durum"); T_ = globals().get("TOPLANTI")
+    d = f() if f else None
+    return d, ((T_ or {}).get("aktif") or {}).get("ad") if T_ else None
+def _toplanti_bitir_dogrula(arg):
+    e = _ik_arg(arg, (), ())
+    if e: return None, e
+    d, ad = _toplanti_aktif()
+    if d not in ("algilandi", "suruyor"): return None, (_t("toplantı zaten bitiyor", "the meeting is already ending") if d == "bitiyor" else _t("şu an süren bir toplantı yok", "there is no meeting in progress"))
+    gizli = "gizli_acik" in globals() and gizli_acik()  # gizli kipte toplantı adı yazılmaz
+    return {"komut": "toplanti_bitir", "ozet": _t(f"«{_ik_kisa(ad, 80)}» toplantısı bitirilir" if ad and not gizli else "süren toplantı bitirilir", f"meeting «{_ik_kisa(ad, 80)}» is ended" if ad and not gizli else "the meeting in progress is ended")}, None
+def _toplanti_baslat_dogrula(arg):  # konu verilmezse takvimde şimdi (−30 dk … +15 dk) başlayan ya da süren toplantı; yoksa Başlat'ın kendi adı
+    e = _ik_arg(arg, (), ("konu",))
+    if e: return None, e
+    d, ad = _toplanti_aktif(); konu = _kayit_metin(arg.get("konu", ""), 0, 200) if arg.get("konu") else ""
+    if konu is None: return None, _t("toplantı adı uygun değil", "meeting name not suitable")
+    if d in ("algilandi", "suruyor") and (not konu or _ik_norm(konu) == _ik_norm(ad)): return None, _t(f"«{_ik_kisa(ad, 60)}» zaten sürüyor", f"«{_ik_kisa(ad, 60)}» is already in progress")
+    if d in ("algilandi", "suruyor"): return None, _t(f"«{_ik_kisa(ad, 60)}» sürüyor; önce onu bitirmek gerekir", f"«{_ik_kisa(ad, 60)}» is in progress; end it first")
+    y = _yapi_mod() if "_yapi_mod" in globals() else None; simdi = datetime.datetime.now().astimezone(); aday = []
+    for ev in _ik_takvim():
+        try: b = y._etkinlik_zamani(ev) if y else None
+        except Exception: b = None
+        if not b or ev.get("tum_gun") or ev.get("reddettin") or ev.get("paylasilan") or not ev.get("id"): continue
+        fark = (b - simdi).total_seconds() / 60
+        if (konu and _ik_eslesen(ev.get("baslik"), konu) and fark > -180 and fark < 1440) or (not konu and -30 <= fark <= 15): aday.append((abs(fark), ev))
+    aday.sort(key=lambda t: t[0])
+    if konu and len({_ik_norm(ev.get("baslik")) for _, ev in aday}) > 1: return None, _t("birden çok toplantı eşleşti: " + "; ".join(_ik_kisa(ev.get("baslik"), 50) for _, ev in aday[:4]) + " — hangisi?", "several meetings match: " + "; ".join(_ik_kisa(ev.get("baslik"), 50) for _, ev in aday[:4]) + " — which one?")
+    ev = aday[0][1] if aday else None; ad_ = _ik_kisa((ev or {}).get("baslik") or konu, 80)
+    return {"komut": "toplanti_baslat", "konu": konu or None, "olay": (ev or {}).get("id"), "ad": ad_ or None,
+            "ozet": _t(f"«{ad_}» toplantısı başlatılır" + (" (takvimden)" if ev else ""), f"meeting «{ad_}» is started" + (" (from the calendar)" if ev else "")) if ad_ else _t("toplantı başlatılır (adı saate göre verilir)", "a meeting is started (named by the time)")}, None
+
 def _proje_kayit_dogrula(arg):  # Brifing.app aynısını kendi tarafında yeniden doğrular (ayar dosyasından). Doğrulama kuralları bağlayıcıda (oner); iletiler burada (iki dilli)
     b = _kayit_bag()
     if not b: return None, _t("izinli olmayan komut (proje_kayit)", "command not allowed (proje_kayit)")
@@ -544,6 +686,27 @@ def kayit_uygula(is_):  # onaylanmış işi yapar (önce yeniden doğrular) → 
             ok_, sn = taslak_ac(h)
             if not ok_: return False, sn
             h["ozet"] += " — " + sn
+        elif k == "kayit_taslak":  # sahibine taslak penceresi (Mail/Teams); gönderilmez; kayda «taslak hazırlandı» olayı (panodaki eposta/teams eylemiyle aynı)
+            ok_, sn = taslak_ac(h) if h["kanal"] == "eposta" else _teams_taslak_ac(h)
+            if not ok_: return False, sn
+            h["ozet"] += " — " + sn
+            try: y._degistir(BASE, h["kid"], "taslak_hazirlandi", lambda _x: {"tur": h["kanal"], "alicilar": h["kime"]}, None, "asistan")
+            except Exception as ex: print(f"KAYIT: taslak olayı yazılamadı ({ex.__class__.__name__})")
+        elif k == "gundem_ekle":  # var olan kaydı panodaki «Gündeme ekle» yoluyla; metin verildiyse önce iş kaydı açılır
+            kid = h["id"]
+            if not kid:
+                x_ = y.soz_ekle(BASE, None, h["metin"], None, None, None, None, "asistan"); kid = x_["id"] if x_ else None
+                if not kid: return False, _t("gündem maddesi açılamadı", "couldn't open the agenda item")
+            r = y.kayit_eylem(BASE, kid, "gundem", {"etkinlik": h["etkinlik"]}, None, None, _ik_takvim(), None, kaynak="asistan")
+            if not r.get("ok"): return False, str(r.get("err") or _t("yazılamadı", "not written"))[:120]
+            ok_ = bool(r.get("olay")); h["ozet"] += f" ({kid})" if not h["id"] else ""
+        elif k == "toplanti_bitir":  # POST /toplanti {"islem": "bitir"} ile aynı işlev; önce sesli/tıkla onay (kayit_etiketleri), süren toplantı yoksa yapılmaz
+            if _toplanti_aktif()[0] not in ("algilandi", "suruyor"): return False, _t("şu an süren bir toplantı yok", "there is no meeting in progress")
+            ok_ = bool(toplanti_bitir("elle bitirildi (sesle)"))
+        elif k == "toplanti_baslat":  # elle Başlat yolu (baslat); takvimden eşleşen toplantı varsa onunla
+            r = baslat({k_: v_ for k_, v_ in (("konu", h.get("konu")), ("olay", h.get("olay"))) if v_})
+            if not r.get("ok"): return False, str(r.get("err") or _t("başlatılamadı", "couldn't start"))[:200]
+            ok_ = True
         elif k == "belge_oneri_reddet": ok_ = bool(y.belge_oneri_reddet(BASE, h["id"]))
         elif k == "belge_oneri_kabul":  # panodaki Onayla ile aynı yol (sahibin e-postası kimlik modülünden), olay kaynağı "asistan"
             o = h["oneri"]; sh = " ".join(str(o.get("sahip") or "").split())[:80]; ep = ""
@@ -612,19 +775,25 @@ def kayit_etiketleri(metin, tur):  # asistanın cevabı → etiketsiz metin; ge�
     if not ler: return metin
     alt = []
     if not kayit_turu_mu(tur): print(f"KAYIT: {len(ler)} etiket yok sayıldı (kullanıcının kendi turu değil)"); return temiz
-    if "gizli_acik" in globals() and gizli_acik(): return temiz + "\n" + _t("Gizli kip açık: kayıt yazılmaz.", "Private mode is on: records aren't written.")
-    sun = 0
+    gizli = "gizli_acik" in globals() and gizli_acik()
+    if gizli and not any(isinstance(o_, dict) and o_.get("komut") in KAYIT_GIZLI_SERBEST for o_, _h in ler): return temiz + "\n" + _t("Gizli kip açık: kayıt yazılmaz.", "Private mode is on: records aren't written.")
+    sun = 0; gizli_not = False
     for o, ham in ler:
         if sun >= KAYIT_TUR_EN_COK: alt.append(_t(f"Bir seferde en çok {KAYIT_TUR_EN_COK} kayıt önerilir; kalanı sunulmadı.", f"At most {KAYIT_TUR_EN_COK} records per answer; the rest weren't offered.")); break
         if not o: alt.append(_t("Kayıt önerisi anlaşılmadı (biçim)", "Record proposal not understood (format)")); continue
         is_ = {"komut": str(o.get("komut") or ""), "arg": o.get("arg") if isinstance(o.get("arg"), dict) else o.get("arg", {})}
+        if gizli and is_["komut"] not in KAYIT_GIZLI_SERBEST:
+            if not gizli_not: alt.append(_t("Gizli kip açık: kayıt yazılmaz.", "Private mode is on: records aren't written.")); gizli_not = True
+            continue
         h, e = kayit_dogrula(is_["komut"], is_["arg"])
         if e: alt.append(_t("Kayıt önerisi sunulmadı: ", "Record proposal not offered: ") + e); print(f"KAYIT: öneri reddedildi — {e}"); continue
         imza = json.dumps(is_, sort_keys=True, ensure_ascii=False)
         if time.time() - KAYIT_SORULAN.get(imza, 0) < KAYIT_TEKRAR_SN: alt.append(_t("Bu kayıt önerisi az önce soruldu: ", "This record was just proposed: ") + h["ozet"]); continue
         neden = " ".join(str(o.get("neden") or "").split())[:160].rstrip(" .")
         ne = _t(f"Kayda yazayım mı? {neden + ' — ' if neden else ''}{h['ozet']}", f"Shall I write this to the records? {neden + ' — ' if neden else ''}{h['ozet']}")
-        iid = izin_iste("kayit", ne, {"komut": is_["komut"], "arg": is_["arg"], "ozet": h["ozet"], "neden": neden}, sesli=bool(tur.get("sesli")) and not tur.get("toplantida") and not tur.get("yazili") and not tur.get("otonom"))  # S: soru sesle sorulduysa kart da sesle okunur (brifing-ses.py soru_baslat); toplantıda/yazılıda yalnız kart
+        top_sesli = is_["komut"] in KAYIT_TOPLANTIDA_SESLI and bool(tur.get("sesli")) and not tur.get("yazili") and not tur.get("otonom")  # toplantıyı bitirme: toplantı sürerken de kulaklıkta sesli «evet» (tur.sesli toplantıda kulaklık demek)
+        iid = izin_iste("kayit", ne, {"komut": is_["komut"], "arg": is_["arg"], "ozet": h["ozet"], "neden": neden},
+                        sesli=(bool(tur.get("sesli")) and not tur.get("toplantida") and not tur.get("yazili") and not tur.get("otonom")) or top_sesli, **({"toplantida_sesli": True} if top_sesli else {}))  # S: soru sesle sorulduysa kart da sesle okunur (brifing-ses.py soru_baslat); toplantıda/yazılıda yalnız kart
         if not iid: alt.append(_t("Onay kartı açılamadı: ", "Couldn't open the approval card: ") + h["ozet"]); continue
         KAYIT_SORULAN[imza] = time.time(); sun += 1
         if h.get("olay_id"): is_["olay"] = h["olay_id"]  # geri al: onaylanan olay (onaydan sonra değiştiyse yazılmaz)

@@ -136,9 +136,12 @@ let silindi = m.contains("deleted") ? "AND IFNULL(m.deleted, 0) = 0" : ""
 let ozet = (m.contains("summary") && sm.contains("summary")) ? "(SELECT s.summary FROM summaries s WHERE s.ROWID = m.summary)" : "NULL"
 let yorum = ad.contains("comment") ? "a.comment" : "NULL"
 let onek = m.contains("subject_prefix") ? "m.subject_prefix" : "NULL"
+// S263 (9 Kasım): zincir kimliği — Mail'in kendi konuşma gruplaması (Envelope Index messages.conversation_id; Mail'in "Konuşmaya göre düzenle" görünümü bunu kullanır).
+// Sütun yoksa (eski/yeni şema) alan yazılmaz; aktarıcı konu kökü + katılımcı kesişimiyle yedek gruplama yapar (aktarici/eposta-takip.py et_zincirler).
+let zincirS = m.contains("conversation_id") ? "m.conversation_id" : "NULL"
 let sinir = Date().timeIntervalSince1970 - gun * 86400
 let sql = """
-SELECT m.date_received, \(yorum), a.address, \(onek), su.subject, mbx.url, \(okundu), \(ozet), m.ROWID
+SELECT m.date_received, \(yorum), a.address, \(onek), su.subject, mbx.url, \(okundu), \(ozet), m.ROWID, \(zincirS)
 FROM messages m LEFT JOIN addresses a ON a.ROWID = m.sender LEFT JOIN subjects su ON su.ROWID = m.subject LEFT JOIN mailboxes mbx ON mbx.ROWID = m.mailbox
 WHERE m.date_received >= ? \(silindi) ORDER BY m.date_received DESC LIMIT ?
 """
@@ -153,13 +156,14 @@ let atla = try! NSRegularExpression(pattern: "(trash|junk|spam|deleted|drafts|ç
 let gonder = try! NSRegularExpression(pattern: "(sent|gönderil|giden)", options: [.caseInsensitive])
 // v0.85.2 (gerçek veri, 19 Ekim): Gmail aynı iletiyi Gelen Kutusu ve "[Gmail]/All Mail"da tutar → (gönderen, konu, saniye) bir kez; gönderdiklerin de All Mail'de →
 // gönderilen kutularındaki gönderen adresleri "benim" sayılır; kutu adı Mac'te ayrık harfle (o + ¨) gelir → eşleşmeden önce birleşik biçime çevrilir.
-struct Satir { let t: Double; let ad: String?; let adres: String; let konu: String; let kutu: String; let okundu: Int32?; let ozet: String?; let id: Int64 }
+struct Satir { let t: Double; let ad: String?; let adres: String; let konu: String; let kutu: String; let okundu: Int32?; let ozet: String?; let id: Int64; let zincir: Int64? }
 var satirlar: [Satir] = []
 while sqlite3_step(st) == SQLITE_ROW {
   let url = metin(5) ?? ""
   let kutu = ((URL(string: url)?.pathComponents.filter { $0 != "/" }.joined(separator: "/")).flatMap { $0.removingPercentEncoding ?? $0 } ?? url).precomposedStringWithCanonicalMapping
   satirlar.append(Satir(t: sqlite3_column_double(st, 0), ad: metin(1), adres: (metin(2) ?? "").lowercased(), konu: ((metin(3) ?? "") + (metin(4) ?? "")).trimmingCharacters(in: .whitespaces),
-                        kutu: kutu, okundu: (okundu != "NULL" && sqlite3_column_type(st, 6) != SQLITE_NULL) ? sqlite3_column_int(st, 6) : nil, ozet: metin(7), id: sqlite3_column_int64(st, 8)))
+                        kutu: kutu, okundu: (okundu != "NULL" && sqlite3_column_type(st, 6) != SQLITE_NULL) ? sqlite3_column_int(st, 6) : nil, ozet: metin(7), id: sqlite3_column_int64(st, 8),
+                        zincir: sqlite3_column_type(st, 9) == SQLITE_NULL ? nil : sqlite3_column_int64(st, 9)))
 }
 func eslesir(_ re: NSRegularExpression, _ k: String) -> Bool { re.firstMatch(in: k, range: NSRange(k.startIndex..., in: k)) != nil }
 let benim = Set(satirlar.filter { eslesir(gonder, $0.kutu) && !$0.adres.isEmpty }.map { $0.adres }).union(benAdres)
@@ -214,6 +218,7 @@ for x in satirlar where iletiler.count < enCok {
     o["ben_kime"] = kime; o["ben_cc"] = cc && !kime
   }
   if let r = x.okundu { o["okundu"] = r != 0 }
+  if let z = x.zincir, z != 0 { o["zincir"] = String(z) }
   if let z = x.ozet, !z.isEmpty { o["ozet"] = String(z.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ").prefix(300)) }
   iletiler.append(o)
 }

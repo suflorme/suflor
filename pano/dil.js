@@ -1371,6 +1371,7 @@ globalThis.SUFLOR_EN = {
   "Takip taslağı": "Follow-up draft",
   "Bu kişi önemli": "Always important",
   "Bu gönderen önemsiz": "Not important",
+  "Değerlendirilmedi": "Not assessed",
   "Bu kişi artık önemli sayılacak": "This person now counts as important",
   "Bu gönderen artık yalnız bilgi olarak sayılacak": "This sender now counts as info only",
   "Önemli e-posta düzeyi": "Important-email level",

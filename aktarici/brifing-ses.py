@@ -835,7 +835,16 @@ def _izin_turu(x):
     try: return (json.loads(x.get("ayrinti") or "{}") or {}).get("izin")
     except (ValueError, TypeError): return None
 def _kayit_izin(x): return _izin_turu(x) == "kayit"
-def _fiil_x(x): return EYLEM_FIIL["kayit_izin"][0 if ARAYUZ_DILI == "tr" else 1] if _kayit_izin(x) else _eylem_fiil(x["tur"])
+# 9 Kasım (ikinci dalga): toplantıyı sesle başlat/bitir — kayıt kartının sorusu ve sözleri kendi cümlesi
+KAYIT_FIIL_OZEL = {"toplanti_bitir": (("Toplantıyı bitireyim mi?", "Bitiriyorum.", "Peki, bitirmiyorum."), ("Shall I end the meeting?", "Ending it.", "Okay, not ending it.")),
+                   "toplanti_baslat": (("Toplantıyı başlatayım mı?", "Başlatıyorum.", "Peki, başlatmıyorum."), ("Shall I start the meeting?", "Starting it.", "Okay, not starting it."))}
+def _kayit_komut(x):
+    try: return (json.loads(x.get("ayrinti") or "{}") or {}).get("komut")
+    except (ValueError, TypeError): return None
+def _fiil_x(x):
+    if not _kayit_izin(x): return _eylem_fiil(x["tur"])
+    o = KAYIT_FIIL_OZEL.get(_kayit_komut(x))
+    return (o or EYLEM_FIIL["kayit_izin"])[0 if ARAYUZ_DILI == "tr" else 1]
 SORU_YENIDEN = (("Tam duyamadım {ad}, {s}", "Kusura bakma, kaçırdım. {s0}, yoksa vazgeçelim mi?", "Evet ya da hayır demen yeterli: {s}"),
                 ("Sorry {ad}, I didn't catch that. {S}", "I missed that. {S0}, or shall we skip it?", "Just yes or no is fine: {s}"))
 SORU_UZUN = ("Anladım, yalnız emin olayım: {s}", "Got it, just to be sure: {s}")
@@ -844,6 +853,8 @@ def kullanici_ilk_ad(): return (str(AYAR.get("ad") or "").split() or [""])[0]
 def _eylem_fiil(tur): return EYLEM_FIIL.get(tur, EYLEM_FIIL["diger"])[0 if ARAYUZ_DILI == "tr" else 1]
 def _soru_metni(x):  # "Deniz, yarın sabah 10.00'da Ali'yi ara. Hatırlatma olarak ekleyeyim mi?"
     if _kayit_izin(x):  # kayıt önerisi: "Deniz, <neden>. <ne yazılacak>. Kayda yazayım mı?"
+        if _kayit_komut(x) in KAYIT_FIIL_OZEL:  # "Deniz, toplantıyı bitireyim mi?" — kısa ve tek soru
+            ad = kullanici_ilk_ad(); f = _fiil_x(x)[0]; return f"{ad}, {f[:1].lower() + f[1:]}" if ad else f
         try: a = json.loads(x.get("ayrinti") or "{}") or {}
         except (ValueError, TypeError): a = {}
         ad = kullanici_ilk_ad(); govde = " ".join(_cumle(a.get(k)) for k in ("neden", "ozet") if a.get(k)) or _cumle(x.get("baslik"))
@@ -892,8 +903,8 @@ def ozet_iki_ses():  # → (toplantı kişiliği, öteki) ikisi de Gemini sesliy
     k1 = next((k for k in ks if k["rol"] == "toplanti"), ks[0])
     k2 = next(k for k in ks if k is not k1)
     return (k1, k2) if gemini_kisilik_sesi(k1) != gemini_kisilik_sesi(k2) else None
-def soru_baslat(ids):
-    if not ids or not _ses_serbest(): return
+def soru_baslat(ids, zorla=False):  # zorla: toplantı sürerken de (yalnız kulaklıkta okunan, kullanıcının kendi onayı: toplantıyı sesle bitirme)
+    if not ids or not (_ses_serbest() or (zorla and AYAR.get("konusma", True))): return
     with LOCK:
         SORU["liste"] += [i for i in ids if i not in SORU["liste"] and i != SORU["aktif"]]
         bos = not SORU["aktif"]

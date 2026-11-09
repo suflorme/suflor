@@ -22,9 +22,13 @@ class Beyin:
     def secim(ayar, is_): return {"tur": Beyin.tur, "model": None}
 def sahte_model(istem):
     CAGRI.append(istem)
-    if "JSON dizisi" in istem:  # sıralama
-        ids = re.findall(r"^(\S+)\t", istem.rsplit("<veri>", 1)[1], re.M)
-        return json.dumps([{"id": i, "o": 3 if re.search("Lansman|Bütçe", istem.rsplit("<veri>", 1)[1].split(i + "\t")[1].split("\n")[0]) else 2 if re.search("Fiyat", istem.rsplit("<veri>", 1)[1].split(i + "\t")[1].split("\n")[0]) else 0, "n": "Lansman işiyle ilgili ve bugün lazım"} for i in ids]), None
+    if "JSON dizisi" in istem:  # S263 zincir değerlendirmesi: blok başına durum; son söz kullanıcınınsa dönüş bekliyor, teşekkür bilgi, gerisi senden bekleniyor
+        out = []
+        for blk in istem.rsplit("<veri>", 1)[1].split("</veri>")[0].split("[zincir ")[1:]:
+            zid = blk.split("]", 1)[0]; sat = [l for l in blk.splitlines() if l.startswith("- ")]
+            d = "donus_bekliyorsun" if sat and " sen → " in sat[-1] else "bilgi" if "Teşekkür" in blk else "senden_bekleniyor"
+            out.append({"id": zid, "durum": d, "aciliyet": 3 if re.search("Lansman|Bütçe", blk) else 2, "neden": "Lansman işiyle ilgili ve bugün lazım" if "Lansman" in blk else "Somut istek var"})
+        return json.dumps(out), None
     return json.dumps({"konu": "Re: Teklif onayı", "govde": "Merhaba Selin,\n\nOnayladım, devam edebiliriz.\n\nTeşekkürler"}), None
 NS = {"__name__": "et", "collections": __import__("collections"), "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": threading, "BASE": T, "AYAR": {"eposta_oku": True, "ad": "Deniz T", "eposta_vip": ["Selin Deneme"]},
       "POSTA": {"iletiler": [], "durum": "ok"}, "_t": lambda tr, en: tr, "ARAYUZ_DILI": "tr", "bildirim": lambda *a, **k: BILDIRIM.append(a), "seslendir": lambda m, **k: SES.append(m),
@@ -159,7 +163,7 @@ try:
         v = al("/eposta-onemli")
         if v.get("izin"): break
         time.sleep(0.5)
-    ok("GET /eposta-onemli: VIP önemli, bülten yok, biçim anlaşmalı", v.get("ok") and v.get("izin") and [o["id"] for o in v["onemli"]] == ["1"] and v["onemli"][0]["konu"] == "Teklif onayı?" and set(v["bekleyen"][0]) == {"id", "kim", "konu", "tarih", "neden", "gun", "cevapsiz_gun", "yon"} and [o["id"] for o in v["bekleyen"]] == ["1"] and v["ozet_sayi"] == 1 and v["bilgi_sayi"] == 1 and v["donus"] == [])
+    ok("GET /eposta-onemli: VIP önemli, bülten yok, biçim anlaşmalı", v.get("ok") and v.get("izin") and [o["id"] for o in v["onemli"]] == ["1"] and v["onemli"][0]["konu"] == "Teklif onayı?" and set(v["bekleyen"][0]) == {"id", "kim", "konu", "tarih", "neden", "gun", "cevapsiz_gun", "yon", "durum", "aciliyet", "degerlendirilmedi"} and v["bekleyen"][0]["degerlendirilmedi"] is True and [o["id"] for o in v["bekleyen"]] == ["1"] and v["ozet_sayi"] == 1 and v["bilgi_sayi"] == 1 and v["donus"] == [])
     ok("cevapsız gelen yon alanıyla", [c["yon"] for c in v["cevapsiz"]] == ["gelen"])
     r = al("/eposta-onemli", {"islem": "taslak", "id": "1"}); ok("POST taslak: şablon (claude yok), alıcı gönderen, gönderim yok", r.get("ok") and r["taslak"]["alicilar"] == [A("selin")] and r["taslak"]["kaynak"] == "sablon")
     r = al("/eposta-onemli", {"islem": "yoksay", "id": "1"}); ok("POST yoksay: listeden kalktı", r.get("ok") and r["onemli"] == [] and r["cevapsiz"] == [])
