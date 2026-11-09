@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 658535,
-   "sha": "1a29e9bcfd294f53"
+   "uzunluk": 661373,
+   "sha": "311532121c2d012e"
   },
   "/mini": {
-   "uzunluk": 658535,
-   "sha": "1a29e9bcfd294f53"
+   "uzunluk": 661373,
+   "sha": "311532121c2d012e"
   },
   "/status": {
    "_ping_son": "float",
@@ -627,6 +627,7 @@
     "satir": "int"
    },
    "gosterim": "bool",
+   "gun_plani": "NoneType",
    "guncelleme": {
     "durum": "str"
    },

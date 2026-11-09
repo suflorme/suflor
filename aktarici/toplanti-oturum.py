@@ -181,7 +181,7 @@ def topo_kisi_blogu(konu=None, yeni=True):  # 9 Kasım (kişi modeli): toplantı
     if "baglam_paketi" not in globals(): return ""
     try:
         m = baglam_paketi("toplanti", dilimler=["kimlik", "profil", "ogrenilen"])
-        if yeni and not ("_gd_deneme" in globals() and _gd_deneme(konu)): m += baglam_paketi("toplanti", dilimler=["bugun", "isler", "notlar", "gun_devri"], soru=konu)
+        if yeni and not ("_gd_deneme" in globals() and _gd_deneme(konu)): m += baglam_paketi("toplanti", dilimler=["bugun", "gun_plani", "isler", "notlar", "gun_devri"], soru=konu)
         return ("\n\n" + m) if m else ""
     except Exception as e: print(f"KİŞİ MODELİ: toplantı oturumu bağlamı kurulamadı ({e.__class__.__name__})"); return ""
 def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):

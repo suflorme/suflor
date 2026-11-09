@@ -2122,6 +2122,7 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
   if(odak){const y=document.getElementById(odak);if(y&&el.contains(y)&&y.matches('input')){y.focus();try{y.setSelectionRange(y.value.length,y.value.length)}catch(e){}}}  // Kararlar ve Geçmiş aramasında yazarken yeniden çizim odağı bozmaz
   if(bnGor==='kayit'||bnGor==='ekip')knYukle()
   if(bnRef)bnPanelCiz(s)
+  if(bnGor==='bugun'&&s.gun_plani&&gpGordu!==s.gun_plani.tarih){gpGordu=s.gun_plani.tarih;j('/dusunme',{method:'POST',body:JSON.stringify({islem:'gordu'})}).catch(()=>{})}  // plan Bugün'de görüldü: söz kapısına kabul
   // ---- Bugün (adım 3, onaylı taslak Main): başlık (tarih + "senden N şey bekleniyor", durum hapı) → Günün özeti (Dinle, sayaçlar) → Sıradaki + saat şeridi → Senden beklenenler (≤ 5 + Tümü) → Önemli e-postalar · Yaklaşan tarihler
   function bugunIc(){const bb=bnBeklenen(s),kt=bb.kt,kn=bb.kn,dkk=s.dokum_kontrol,dl=dkk?(dkk.liste||[]).filter(x=>!x.bitti).slice(0,3):[]
     const R=[]
@@ -2137,9 +2138,17 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
     const epN=epc  // sayaç ve metin aynı sayı: ozet_sayi = senden cevap bekleyen e-postalar (S262)
     if(epc)ek.push(L('{n} e-posta senden cevap bekliyor.',{n:epc}));if(yk)ek.push(goreliKok(yk.tarih).g?L('Yarın: {m}.',{m:esc(yk.metin)}):L('Bugün: {m}.',{m:esc(yk.metin)}))
     const say=[[bnKendiT().length,'{n} iş','data-bn=git data-g=kayit data-m=is'],[kt.length,'{n} karar','data-bn=git data-g=kayit data-m=karar'],[bek.length,'{n} onay','data-bn=panel data-ref=bek'],[epN,'{n} e-posta','data-bn=epgit'],[kalan.length,'{n} toplantı','data-bn=git data-g=takvim data-m=gun']].filter(x=>x[0]>0).map(([n,m,a])=>`<button type=button class=bag ${a}>${esc(L(m,{n}))}</button>`)
-    const dp=bnDurum(s,ol,now,sira,kala,hdS,bek,son,ek),dmetin=(()=>{const t=document.createElement('div');t.innerHTML=dp;return(t.textContent||'').replace(/\s+/g,' ').trim()})()  // Dinle brifing yokken de görünür: kartın düz metni okunur
+    // Günün planı (aktarici/dusunme.py, günde bir düşünme turu) varsa özet ondan gelir ve odak/dikkat/"doğru mu?" satırları aynı kartta durur; yoksa bugünkü durum cümleleri
+    const gp=s.gun_plani&&s.gun_plani.ozet?s.gun_plani:null,gpAcik=bnV?new Set(bnKendi().map(x=>x.id)):null  // odaktaki iş bu arada kapandıysa satır gizlenir
+    const gpOdak=gp?(gp.odak||[]).filter(x=>!gpAcik||gpAcik.has(x.id)):[],gpDik=gp?gp.dikkat||[]:[],gpSoru=gp?(gp.soru||[]).filter(x=>!gpBek.has(x.id)):[]
+    const dp=gp?esc(gp.ozet):bnDurum(s,ol,now,sira,kala,hdS,bek,son,ek),dmetin=gp?(()=>{let m=gp.ozet;[...gpOdak.map(x=>(x.saat?x.saat+' ':'')+x.metin+(x.neden?'. '+x.neden:'')),...gpDik.map(x=>x.metin)].forEach(c=>{if((m+' '+c).length<1450)m+=' '+(/[.!?]$/.test(c)?c:c+'.')});return m})():(()=>{const t=document.createElement('div');t.innerHTML=dp;return(t.textContent||'').replace(/\s+/g,' ').trim()})()  // Dinle brifing yokken de görünür: kartın düz metni okunur
+    bnOzetMetin=dmetin
+    const gpGrup=(b,h)=>h?`<div class=gpgrup><h2 class=kb2>${b}</h2><div class=liste>${h}</div></div>`:''
+    const gpB=gp?gpGrup(L('Bugünün odağı'),gpOdak.map(x=>bsSat({nokta:'',t:esc(x.metin),a:esc([x.saat,x.neden].filter(Boolean).join(' · '))})).join(''))
+      +gpGrup(L('Dikkat'),gpDik.map(x=>bsSat({nokta:'bek',t:esc(x.metin),a:esc(x.neden||'')})).join(''))
+      +gpGrup(L('Dün öğrendiklerim'),gpSoru.map(x=>bsSat({nokta:'',t:esc(x.metin),d:`<button type=button class=b data-bn=gpdogru data-id="${esc(x.id)}">${L('Doğru')}</button><button type=button class="b sade" data-bn=gpyanlis data-id="${esc(x.id)}">${L('Yanlış')}</button>`})).join('')):''
     const dsn=dtgt?sn:Math.max(5,Math.round(dmetin.split(/\s+/).length/2.4)),ddk=Math.max(1,Math.round(dsn/60))
-    const ozet=`<section class=ozet aria-label="${L('Günün özeti')}"><div class=obas><h2>${L('Günün özeti')}</h2><div class=keylem>${sira&&bnBrifing(sira,s)?`<button type=button class="b sade" data-bn=panel data-ref="t:${esc(sira.id)}">${L('Brifingi aç')}</button>`:''}${ses&&(dtgt||dmetin)?`<button type=button class="b dinle${dinliyor?' on':''}" data-bn=dinle ${dtgt?`data-id="${esc(dtgt.id)}"`:'data-metin=1'}>${ic(dinliyor?'dur':'oynat')}<span>${dinliyor?L('Durdur'):L('Dinle')}</span><span class=mono>· ${esc(L('~{n} dk',{n:dtgt?dk:ddk}))}</span></button>`:''}</div></div><p>${dp}</p>${say.length?`<div class=sayac2>${say.join('<span aria-hidden=true>·</span>')}</div>`:''}</section>`
+    const ozet=`<section class=ozet aria-label="${L('Günün özeti')}"><div class=obas><h2>${L('Günün özeti')}</h2><div class=keylem>${sira&&bnBrifing(sira,s)?`<button type=button class="b sade" data-bn=panel data-ref="t:${esc(sira.id)}">${L('Brifingi aç')}</button>`:''}${ses&&(dtgt||dmetin)?`<button type=button class="b dinle${dinliyor?' on':''}" data-bn=dinle ${dtgt?`data-id="${esc(dtgt.id)}"`:'data-metin=1'}>${ic(dinliyor?'dur':'oynat')}<span>${dinliyor?L('Durdur'):L('Dinle')}</span><span class=mono>· ${esc(L('~{n} dk',{n:dtgt?dk:ddk}))}</span></button>`:''}</div></div><p>${dp}</p>${gpB}${say.length?`<div class=sayac2>${say.join('<span aria-hidden=true>·</span>')}</div>`:''}</section>`
     const siraB=odakOnce?bnOdakOnce(sira,s,hdS,kala)+(serit?`<section class="bolum sira2">${serit}</section>`:''):sira?bsSira(sira,s,serit):serit&&!ol.length?`<section class="bolum sira2" aria-label="${L('Günün toplantıları')}">${serit}</section>`:serit?`<section class="bolum sira2" aria-label="${L('Günün toplantıları')}"><h2 class=kb2>${L('Günün toplantıları')}</h2>${serit}</section>`:''
     const bekB=`<section class="bolum bekl" aria-label="${L('Senden beklenenler')}"><div class=bbas><h2>${L('Senden beklenenler')}</h2>${tum?`<button type=button class=bag data-bn=git data-g=kayit>${esc(L('Tümü · {n}',{n:tum}))}</button>`:''}</div>${R.length?`<div class=liste>${gor.join('')}</div>`:`<p class=sakin>${L('Şu an senden beklenen bir şey yok.')}</p>`}${R.length>4?`<div class=keylem><button type=button class="b sade" data-bn=bekac>${bnBekAcik?L('Daha az göster'):L('{n} tane daha',{n:R.length-4})}</button></div>`:''}`
       +(ge.length?`<div class="keylem geride"><button type=button class="b sade" data-bn=gerac aria-expanded="${bnGerAcik}">${L('Geride kalanlar')} · ${ge.length}</button></div>${bnGerAcik?`<div class=liste>${ge.map(x=>x.tur==='karar'||x.id[0]==='k'?bsKarar(x):bsIs(x)).join('')}</div><div class=sakin>${L('{n} günden eski olanlar burada.',{n:14})}</div>`:''}`:'')+`</section>`
@@ -2182,6 +2191,7 @@ function knKararSatir(x){const kid=knKid(x),sec=bnRef==='r:'+kid,top=x.toplanti?
 // Öneriler tek şeritte: belgelerden önerilen işler (/belge-oneri) + senden onay bekleyen eylemler (eylem kuyruğu; yan panelde). İncele → tek tek: Onayla (kayda al, sahip varsa ata) · Reddet (bir daha önerilmez) · Atla.
 // Yazma 5 sn sonra (Geri al bu sürede vazgeçer). Kaynak belge adı ve satırı öneride görünür. Hepsi bitince şerit kalkar.
 let boInc=null
+const gpBek=new Set();let gpGordu='',bnOzetMetin=''  // günün planı (aktarici/dusunme.py): yanıtlanan 'Doğru mu?' soruları; planın görüldüğü gün; Dinle'nin okuyacağı düz metin
 const boListe=()=>((boV||{}).oneriler||[]).filter(x=>!boBek.has(x.id))
 function boCiz(){const ls=boListe(),eb=last?bnBekleyen(last):[]
   if(boInc){const x=ls.find(y=>!boInc.atla.has(y.id));if(x){const k=x.kaynak||{},yer=k.tur==='veritabani'?L('iş takip kaydı'):[k.ad,k.konum].filter(Boolean).join(' · '),n=Math.min(boInc.i+1,boInc.top)  // kayıt veritabanı satır no'su gösterilmez
@@ -2460,7 +2470,7 @@ function bnDinleBit(){bnDin=null;clearTimeout(bnDinT);if(last)bnCiz(last)}
 let bnDinT=null
 let bnDinMetin=''
 // Dinle: brifing hazırsa eski yol {olay, dinle}; hazır brifing yokken kartın düz metni {dinle, metin} ile okunur (aktarıcı yerel ses kuyruğu). İkinci basış susar; toplantıda ok:false.
-async function bnDinle(id,metin){const yaz=metin?((document.querySelector('#bgn .ozet p')||{}).innerText||'').replace(/\s+/g,' ').trim():''
+async function bnDinle(id,metin){const yaz=metin?(bnOzetMetin||(document.querySelector('#bgn .ozet p')||{}).innerText||'').replace(/\s+/g,' ').trim():''
   if(bnDin){const o=bnDin,m=bnDinMetin;bnDinleBit();try{await j('/brifing',{method:'POST',body:JSON.stringify(o==='ozet'?{dinle:true,metin:m}:{olay:o,dinle:true})})}catch(e){}return}
   if(metin&&!yaz)return
   bnDin=metin?'ozet':id;bnDinMetin=yaz;if(last)bnCiz(last);let r={};try{r=await j('/brifing',{method:'POST',body:JSON.stringify(metin?{dinle:true,metin:yaz}:{olay:id,dinle:true})})}catch(e){}
@@ -2503,6 +2513,7 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='kararlar'){const idler=String(b.dataset.idler||'').split(',').filter(Boolean);return bnIsle(idler,L('{n} karar onaylandı',{n:idler.length}),()=>bnYaz('/karar-onay',{idler}))}
   if(a==='thaz'||a==='that'||a==='thkap'){b.disabled=true;j('/toplanti-hatirlat',{method:'POST',body:JSON.stringify({islem:a==='thaz'?'hazirlik':a==='that'?'ac':'kapat',id})}).catch(()=>{});if(a==='thkap'&&last)last.toplanti_hatirlat=null;if(last)bnCiz(last);return}
   if(a==='proakt'||a==='proakap'){b.disabled=true;j('/proaktif',{method:'POST',body:JSON.stringify({islem:a==='proakt'?'sor':'kapat',id})}).catch(()=>{});if(last&&last.proaktif)last.proaktif=null;if(last)bnCiz(last);return}
+  if(a==='gpdogru'||a==='gpyanlis'){b.disabled=true;gpBek.add(id);if(last)bnCiz(last);j('/dusunme',{method:'POST',body:JSON.stringify({islem:a==='gpdogru'?'dogru':'yanlis',id})}).catch(()=>{});bnBildir(a==='gpdogru'?L('Not aldım, teşekkürler'):L('Tamam, bunu geçersiz saydım'));return}  // günün planındaki "Doğru mu?" (aktarici/dusunme.py): Doğru → onaylı, Yanlış → geçersiz
   if(a==='dkac'){window.open('/dokum-kontrol?top='+encodeURIComponent(b.dataset.t),'_blank');return}
   if(a==='bekac'){bnBekAcik=!bnBekAcik;if(last)bnCiz(last);return}
   if(a==='gerac'){bnGerAcik=!bnGerAcik;if(last)bnCiz(last);return}

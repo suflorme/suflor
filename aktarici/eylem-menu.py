@@ -10,7 +10,7 @@ def _kem_takvim(): return [e for e in TAKVIM_TAM.values() if isinstance(e, dict)
 def _kem_kimlik(ad, tam=True):  # kimlik.py: takvim, kayıt veritabanı, Kişiler (tam) → {"eposta", "kaynak", "guven", "adaylar"}; menü açılışında Kişiler'e gidilmez
     if "kimlik_coz" not in globals(): return {}
     return kimlik_coz(ad) if tam else kimlik_coz(ad, kisiler=False, yaz=False)
-def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None):  # is_adi: ölçüm iş adı (varsayılan eylem; değerlendirici degerlendir:<tür>), model: Claude Code modeli (varsayılan beyin.prova)
+def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None, zaman=None):  # is_adi: ölçüm iş adı (varsayılan eylem; değerlendirici degerlendir:<tür>), model: Claude Code modeli (varsayılan beyin.prova), zaman: çağrı süresi sn (varsayılan EYLEM_ZAMAN_SN; düşünme turu uzun ister)
     # amac verilirse (talimat | kayit | degerlendir) istemin başına kişi modelinin paketi (profil + öğrenilenler …; aktarici/kisi-modeli.py baglam_paketi) eklenir; gizlilik süzgeci pakette.
     # → (ham metin, hata metni ya da None). Tek model çağrısı (prova_model gibi): başka sağlayıcıysa beyin_tek, Claude Code ise Brifing.app --istek (Masaüstü izni uygulamada).
     try:
@@ -20,7 +20,7 @@ def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None
             if paket: istem = paket + "\n" + istem
         sec = BEYIN.secim(AYAR, "prova"); claude_var = bool(claude_yolu()) and os.path.isdir(BRIFING_APP); ham = None
         if sec["tur"] != "claude-code":
-            ham, olc = beyin_tek("prova", sec, istem, json_kip=False, sistem=None, zaman=EYLEM_ZAMAN_SN)
+            ham, olc = beyin_tek("prova", sec, istem, json_kip=False, sistem=None, zaman=zaman or EYLEM_ZAMAN_SN)
             if olc and not olc.get("hata"): return ham, None
             if not (claude_var and BEYIN.yedek_var(AYAR, sec)): return None, "yanıt gelmedi"
             print(BEYIN.yedek_satiri("prova", sec, ham if olc else "çıktı okunamadı"))
@@ -30,8 +30,8 @@ def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None
         if os.path.exists(cikti): os.remove(cikti)
         model = model or BEYIN.claude_secim(AYAR, "prova")["model"]
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model), "cwd": d, "cikti": cikti, "sure": EYLEM_ZAMAN_SN}, f, ensure_ascii=False)
-        try: subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=EYLEM_ZAMAN_SN + 30)
+        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model), "cwd": d, "cikti": cikti, "sure": zaman or EYLEM_ZAMAN_SN}, f, ensure_ascii=False)
+        try: subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=(zaman or EYLEM_ZAMAN_SN) + 30)
         except (OSError, subprocess.TimeoutExpired): pass
         try: os.remove(istek)
         except OSError: pass

@@ -2260,7 +2260,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if duz: _konus_kur(soru=ms)
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
         if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
-        nb = "" if (tur.get("bellek_kapsam") == "ortak" or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals()) else baglam_paketi("konus", dilimler=["notlar"], soru=ms)  # 9 Kasım (kişi modeli): notlar defteri artık Konuş'un bağlamında (yalnız kullanıcının kendi turu)
+        nb = "" if (tur.get("bellek_kapsam") == "ortak" or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals()) else baglam_paketi("konus", dilimler=["notlar", "gun_plani"], soru=ms)  # 9 Kasım (kişi modeli): notlar defteri artık Konuş'un bağlamında (yalnız kullanıcının kendi turu)
         ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi")) + _etiket_tur_notu(tur)  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
         dub = duygu_blogu(tur, ms) if "duygu_blogu" in globals() else ""  # 9 Kasım (dost): toplantı dışı kullanıcı turunda "[Durum — veri]" (≤ 300 kar.), bağlamdan önce (konus_baglam "Soru: " ile biter)
         bks = bilgi_bekle_sn(ms)

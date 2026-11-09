@@ -414,6 +414,11 @@ html:is(.hafta-ac,.saatler-ac) main>.sc>#tvb:not([hidden]){display:block;flex:no
 #bgn .ozet .dinle .mono{font-size:var(--yz-12);color:var(--b-m3)}
 #bgn .ozet .dinle.on{color:var(--b-canli);border-color:var(--b-canli)}
 #bgn .ozet .dinle svg.i{width:14px;height:14px}
+/* Günün planı (aktarici/dusunme.py): özet kartının içinde odak · dikkat · "doğru mu?" grupları; var olan satır kalıbı (.sat.bs), yalnız kart içinde sıkılaştırılmış */
+#bgn .ozet .gpgrup{display:grid;gap:var(--bo-4)}
+#bgn .ozet h2.kb2{font:500 var(--yz-13)/1.3 var(--f-govde);color:var(--b-m3)}
+#bgn .ozet .gpgrup .liste{margin:0 calc(var(--bo-12) * -1)}
+#bgn .ozet .gpgrup .sat.bs{padding:var(--bo-8) var(--bo-12)}
 #bgn .sayac2{display:flex;gap:var(--bo-8);flex-wrap:wrap;align-items:baseline;font-size:var(--yz-13);color:var(--b-m3)}
 /* Sıradaki toplantı ve saat şeridi */
 #bgn .sira2{display:grid;gap:var(--bo-12)}

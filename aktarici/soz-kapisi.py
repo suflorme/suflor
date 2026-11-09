@@ -19,8 +19,8 @@ SOZ_KILIT = threading.RLock()
 SOZ_SAAT = globals().get("SOZ_SAAT") or time.time  # testlerde sahte saat (önceden tanımlıysa korunur)
 SOZ_SONUCLAR = ("kabul", "ret", "ertele", "yoksay")
 SOZ_DONGU_SN, SOZ_GECERLI_SN, SOZ_YOKSAY_VARSAYILAN = 60, 4 * 3600, 4 * 3600
-SOZ_YOKSAY_SN = {"gun_ici": 1800, "toplanti_sonrasi": 3600, "toplanti_hatirlat": 900, "toplanti_cikis": 3600, "eposta": 8 * 3600, "kisisel_tarih": 12 * 3600, "sistem": 3600}  # kaynağın kendi süresi: sonuç gelmezse otomatik yoksay
-SOZ_BASLIK = {"gun_ici": ("Öneri", "Suggestion"), "toplanti_sonrasi": ("Açık uçlar", "Open items"), "toplanti_hatirlat": ("Toplantı yaklaşıyor", "Meeting coming up"), "toplanti_cikis": ("Toplantı özeti", "Meeting summary"),
+SOZ_YOKSAY_SN = {"gun_ici": 1800, "toplanti_sonrasi": 3600, "toplanti_hatirlat": 900, "toplanti_cikis": 3600, "gun_plani": 6 * 3600, "eposta": 8 * 3600, "kisisel_tarih": 12 * 3600, "sistem": 3600}  # kaynağın kendi süresi: sonuç gelmezse otomatik yoksay
+SOZ_BASLIK = {"gun_ici": ("Öneri", "Suggestion"), "toplanti_sonrasi": ("Açık uçlar", "Open items"), "toplanti_hatirlat": ("Toplantı yaklaşıyor", "Meeting coming up"), "toplanti_cikis": ("Toplantı özeti", "Meeting summary"), "gun_plani": ("Günün planı hazır", "Today's plan is ready"),
               "eposta": ("E-posta", "Email"), "kisisel_tarih": ("Kişisel tarih", "Personal date")}
 
 def _soz_say(ad, v, lo, hi):
