@@ -249,6 +249,17 @@ try:
     time.sleep(1.5)
     ok("gizli kip açılınca onaylanan ertele de yazılmaz", len(kr) == 1 and (db("SELECT son_tarih FROM kayit WHERE metin = 'Ek iş C'")[0][0] or "") != "2026-12-01")
     u.post("/komut", {"tur": "gizli"})
+    # 8c) yorum_ekle (10 Kasım, «asistana sor»): cevabı kayda not olarak ekler — asistanın önerisi onay kartıyla, panodaki «Kayda not olarak ekle» düğmesi (POST /kayit-not) tıklamayla; aynı doğrulama ve yazma yolu
+    kr, cv = adim("not ekle", E("yorum_ekle", id=IS5, metin="Özet: hazır.\n- Ali'ye sor"), ack=None)
+    ok("yorum_ekle: kart (nota «not eklenir» cümlesi); onaydan önce kayıtta yorum yok", len(kr) == 1 and "kaydına not eklenir" in kr[0]["text"] and "Ek iş E" in kr[0]["text"] and not db("SELECT 1 FROM olay WHERE tur = 'yorum_eklendi'"))
+    u.post("/card-ack", {"id": kr[0]["id"], "status": "onaylandi"}); u.cevap_bekle("Yazıldı", 15)
+    yo = db("SELECT kaynak, veri FROM olay WHERE tur = 'yorum_eklendi' ORDER BY saat DESC LIMIT 1")
+    ok("yorum_ekle Onayla → yorum olayı: kaynak «asistan», uretici asistan, çok satırlı metin korunur", yo and yo[0][0] == "asistan" and json.loads(yo[0][1]).get("uretici") == "asistan" and "\n- Ali'ye sor" in json.loads(yo[0][1])["metin"])
+    kr, cv = adim("kötü not", E("yorum_ekle", id=IS5, metin="x"), E("yorum_ekle", id=IS5), E("yorum_ekle", id=IS5, metin="abc def", kabuk="evet"), E("yorum_ekle", id="s9999", metin="abc def"), E("yorum_ekle", id="k5", metin="gizli not"), ack=None)
+    ok("yorum_ekle: kısa metin, eksik/fazla argüman, olmayan ve gizli toplantının kaydı sunulmaz", not kr and cv.count("sunulmadı") == 5)
+    r = u.post("/kayit-not", {"id": IS5, "metin": "Düğmeden gelen not\nikinci satır"}); yo = db("SELECT kaynak, veri FROM olay WHERE tur = 'yorum_eklendi' ORDER BY saat DESC LIMIT 1")
+    ok("POST /kayit-not (Kayda not olarak ekle): tıklama onaydır — aynı yorum_ekle yolu, kaynak «asistan»", r.get("ok") and yo[0][0] == "asistan" and json.loads(yo[0][1])["metin"] == "Düğmeden gelen not\nikinci satır")
+    ok("/kayit-not: gizli toplantı kaydına ve olmayan kayda yazmaz", not u.post("/kayit-not", {"id": "k5", "metin": "gizli not"}).get("ok") and not u.post("/kayit-not", {"id": "s9999", "metin": "abc def"}).get("ok") and not db("SELECT 1 FROM olay WHERE tur = 'yorum_eklendi' AND veri LIKE '%gizli not%'"))
     # 9) yardımcının kendi sınırı (ikili doğrudan; aktarıcıya güvenmez)
     BIN = os.path.join(app, "Contents/MacOS/SuflorBrifing"); ANAHTAR = open(os.path.join(d, "kart-anahtari.txt")).read().strip(); n_ = [0]
     def ayar_yaz(**ek):

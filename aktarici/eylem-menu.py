@@ -3,8 +3,10 @@
 # bağımlılıkla), burada yalnız aktarıcıya bağlayan ince katman:
 #   GET  /kayit-menu?id=<k12|s7|q3>   (anahtarlı, VERI_GET)  → menü bilgisi: eylemler, tarihçe, Geri al, gündem adayları, sahibin e-postası
 #   POST /kayit-eylem {"id", "eylem", …} (anahtarlı; geçiş listesinde yok) → eylem tam bir olay yazar; taslak eylemleri bağlantı döner, GÖNDERMEZ
-# Claude'a çalıştır: yalnız kaydın metni ve tarihçesi gider (yapi.claude_istemi); sağlayıcı ayar beyin.prova'yı paylaşır (tek çağrı; Claude Code Brifing.app'ten, telaffuz/prova gibi); sonuç kayda yorum olarak bağlanır.
-# Gizli toplantı kaydında çalışmaz (yapi.kayit_eylem denetler). Dışarı hiçbir şey gönderilmez.
+# Asistana sor (10 Kasım; eski «Claude'a çalıştır» tek çağrısının yerine): menüdeki eylem panoda sohbet panelini açar ve POST /girdi {"kayit": id, "text": görünen soru} gönderir; marvin_kayit_baslat kaydı bağlamıyla
+#   (yapi.marvin_kayit_blogu: kayıt + tarihçe, kaynak saati çevresinden döküm, aynı toplantı/konunun açık kayıtları + kişi modelinin ortak paketi) Konuş'un yazılı turuna verir; cevap panelde akar, konuşma
+#   aynı asistanla sürer. Cevabı kayda saklamak: panodaki «Kayda not olarak ekle» → POST /kayit-not (notlar.py kayit_not_ekle, yorum_ekle komutu).
+# Gizli toplantı kaydında ve gizli kipte çalışmaz. Dışarı hiçbir şey gönderilmez.
 EYLEM_ZAMAN_SN = 120
 def _kem_takvim(): return [e for e in TAKVIM_TAM.values() if isinstance(e, dict)]
 def _kem_kimlik(ad, tam=True):  # kimlik.py: takvim, kayıt veritabanı, Kişiler (tam) → {"eposta", "kaynak", "guven", "adaylar"}; menü açılışında Kişiler'e gidilmez
@@ -51,10 +53,27 @@ def kayit_eylem_islem(p):  # POST /kayit-eylem
     y = _yapi_mod(); p = p if isinstance(p, dict) else {}; kid = str(p.get("id") or "")[:40]; e = str(p.get("eylem") or "")[:20]
     if not y or not kid or not e: return {"ok": False, "err": "id ve eylem gerekli"}
     if e == "toplanti": return _at_islem(y, kid, p)
-    try: r = y.kayit_eylem(BASE, kid, e, p, None, lambda ad: _kem_kimlik(ad, True), _kem_takvim(), lambda i: eylem_model(i, amac="kayit"))
+    try: r = y.kayit_eylem(BASE, kid, e, p, None, lambda ad: _kem_kimlik(ad, True), _kem_takvim())
     except Exception as ex: print(f"EYLEM MENÜSÜ: {e} yapılamadı ({ex.__class__.__name__})"); return {"ok": False, "err": ex.__class__.__name__}
     print(f"EYLEM MENÜSÜ: {e} {kid} → " + ("tamam" if r.get("ok") else str(r.get("err"))))  # günlüğe metin yazılmaz
     return r
+def marvin_kayit_baslat(p):  # POST /girdi {"kayit": kimlik, "text": görünen soru}: kayıt + bağlam → Konuş'un yazılı turu (cevap sohbet panelinde); → {"ok", "kayit"} ya da {"ok": False, "err"}
+    y = _yapi_mod(); p = p if isinstance(p, dict) else {}; kid = str(p.get("kayit") or "")[:40]
+    if not y or not kid: return {"ok": False, "err": "kayıt yok"}
+    if "gizli_acik" in globals() and gizli_acik(): return {"ok": False, "err": "gizli"}  # gizli kipte toplantı kaynaklı kayıt asistana gitmez
+    try: blok, hata = y.marvin_kayit_blogu(BASE, kid, str(AYAR.get("ad") or ""))
+    except Exception as e: print(f"EYLEM MENÜSÜ: asistana sor — blok kurulamadı ({e.__class__.__name__})"); return {"ok": False, "err": e.__class__.__name__}
+    if hata: return {"ok": False, "err": hata}
+    soru = " ".join(str(p.get("text") or "").split())[:400] or _t("Bu kayda bak: özet, yapılacaklar, sahibine taslak mesaj", "Look at this record: summary, to-dos, a draft message to the owner")
+    paket = ""
+    if "baglam_paketi" in globals() and "KM_AMAC" in globals():  # Konuş'un dilimleri; profil ve öğrenilenler Konuş sürecinin açılış isteminde zaten var
+        try: paket = baglam_paketi("konus", dilimler=[d for d in KM_AMAC["konus"][0] if d not in ("profil", "ogrenilen")], soru=soru, en_cok_kr=KAYIT_TURU_PAKET_KR)
+        except Exception as e: print(f"EYLEM MENÜSÜ: kişi modeli paketi alınamadı ({e.__class__.__name__})")
+    ek = y.MARVIN_KAYIT_ISTEM + blok + (paket + "\n" if paket else "")
+    r = konus_yazili(soru, ek=ek, kayit=kid)
+    print(f"EYLEM MENÜSÜ: asistana sor {kid} → " + ("tamam" if r.get("ok") else str(r.get("err"))[:60]) + f" ({len(ek) // 100 / 10} bin karakter bağlam)")  # günlüğe metin yazılmaz
+    return dict(r, kayit=kid)
+KAYIT_TURU_PAKET_KR = 5000  # kişi modeli paketi üst sınırı (kayıt turu bloğunun öbür bölümleri yapi.marvin_kayit_blogu'nda sınırlı)
 # --- Acil toplantı (6 Kasım): kaydın ilgili kişileriyle hemen bir toplantı kurma ekranını açar (Teams planlama, Google Takvim şablonu ya da Zoom). Davet GİTMEZ: açılan ekranda gönderen kullanıcıdır.
 #   Menü cevabına "toplanti" eylemi + {"platformlar", "davetli": [{ad, eposta}], "eposta_yok": [ad]} eklenir (yapi.py'ye dokunmadan); POST /kayit-eylem {"id", "eylem": "toplanti", "platform"} → {"toplanti": {"url", "kopyala"?, …}}.
 #   Platformlar ayar `toplanti_platformlari` (varsayılan teams, meet, zoom; ilki varsayılan). Zoom için isteğe bağlı `zoom_baglanti` (https kişisel toplantı bağlantısı).
@@ -98,7 +117,7 @@ def _at_menuye_ekle(y, kid, m):
     x = y.ortak_kayit(BASE, kid)
     if not _at_kullanilir(x): return m
     var, yok = _at_davetliler(y, x, lambda ad: _kem_kimlik(ad, False))
-    el = list(m.get("eylemler") or []); i = el.index("claude") if "claude" in el else len(el); el.insert(i, "toplanti")
+    el = list(m.get("eylemler") or []); i = el.index("marvin") if "marvin" in el else len(el); el.insert(i, "toplanti")
     return dict(m, eylemler=el, toplanti={"platformlar": _at_platformlar(), "davetli": var, "eposta_yok": yok, "zoom_baglanti": bool(_at_zoom())})
 def toplanti_hazirla(x, platform, davetli, simdi=None, en=False, zoom_baglanti=""):
     # saf işlev: kayıt + platform + davetliler → {"url", "kopyala"?, "konu", "gundem", "baslangic", "bitis"}; ağa dokunmaz

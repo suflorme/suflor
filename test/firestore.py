@@ -298,10 +298,10 @@ try:
                                      {"tur": "iddia", "metin": "Geçen yıl 95 bin harcandı", "kim": "Ayşe Deneme"}])
     A.yaz(M_GIZLI, "Bütçe özel görüşme", [{"tur": "karar", "metin": "GIZLIKARAR maaş artışı yüzde on", "kim": "Ayşe Deneme", "netlik": "acik"}, {"tur": "is", "metin": "GIZLIIS kadro planı", "sahip": "Bora Kaya", "sahip_eposta": EB}], gizli=True)
     A.yaz(M_DENEME, "Deneme toplantısı", [{"tur": "karar", "metin": "DENEMEKARAR deneme kararı", "kim": "Ayşe Deneme", "netlik": "acik"}])
-    kt = A.kayit("Teklifi revize et"); yapi.yorum_ekle(A.canli, kt["kayit_id"], "CLAUDEYORUM hazırlık notu", yazan=EA, uretici="claude"); yapi.yorum_ekle(A.canli, kt["kayit_id"], "NORMALYORUM bir yorum", yazan=EA)
+    kt = A.kayit("Teklifi revize et"); yapi.yorum_ekle(A.canli, kt["kayit_id"], "CLAUDEYORUM hazırlık notu", yazan=EA, uretici="claude"); yapi.yorum_ekle(A.canli, kt["kayit_id"], "ASISTANYORUM asistan notu", yazan=EA, uretici="asistan"); yapi.yorum_ekle(A.canli, kt["kayit_id"], "NORMALYORUM bir yorum", yazan=EA)
     v = A.esitle(); d = srv.tum_metin(); at = (v.get("son_tur") or {}).get("atlanan", {})
-    bak("(4) gizli toplantıdan olay 0, deneme toplantısından 0, Claude yorumu 0; normal yorum gider", "GIZLIKARAR" not in d and "GIZLIIS" not in d and "DENEMEKARAR" not in d and "CLAUDEYORUM" not in d and "NORMALYORUM" in d, v.get("son_tur"))
-    bak("(4) atlananlar sayıldı (gizli 2, deneme 1, claude 1) ve ayar öncesi kayıt gitmedi", at.get("gizli") == 2 and at.get("deneme") == 1 and at.get("claude") == 1 and "Ayar öncesi" not in d, at)
+    bak("(4) gizli toplantıdan olay 0, deneme toplantısından 0, Claude/asistan yorumu 0; normal yorum gider", "GIZLIKARAR" not in d and "GIZLIIS" not in d and "DENEMEKARAR" not in d and "CLAUDEYORUM" not in d and "ASISTANYORUM" not in d and "NORMALYORUM" in d, v.get("son_tur"))
+    bak("(4) atlananlar sayıldı (gizli 2, deneme 1, claude 1, asistan 1) ve ayar öncesi kayıt gitmedi", at.get("gizli") == 2 and at.get("deneme") == 1 and at.get("claude") == 1 and at.get("asistan") == 1 and "Ayar öncesi" not in d, at)
     bak("alıntı, iddia, döküm gitmez; belge alanları tasarımdaki gibi", "yuz yirmide" not in d and "Geçen yıl 95 bin" not in d and "merhaba" not in d and all(set(x) == set(ob.ALANLAR) for x in srv.belgeler.values()))
     kd = next(x for x in srv.belgeler.values() if "Bütçe 120 bin" in x["veri"]); ki = next(x for x in srv.belgeler.values() if "Teklifi revize et" in x["veri"] and x["tur"] == "kayit_olustu")
     bak("okuyan: iş kaydı yazan + sahip (+ kimse fazla), karar yalnız yazan; yazan = oturum e-postası; guncel sunucu zamanı",

@@ -1928,13 +1928,14 @@ KUTU_KURAL = {"tr": ("Bu yazı panodaki tek kutudan geldi; kullanıcı onu not, 
                      "[SÖZLÜK: wrong spelling => correct spelling] and say «Done, added to the dictionary: wrong → right» (the wrong form as the user gave it; person, company and term names only; "
                      "you can't fix past records or summaries — say so in one sentence). If it is only a reminder or note (a to-do, a promise, something to remember), end with [NOT: the user's words] and say «Noted.» briefly. "
                      "The tags aren't shown on the panel. This rule replaces the «can't do record requests» rule; decisions, tasks, open questions and summary fixes are proposed with the [Writing records] rule; email and other systems you still can't do — say so.")}
-def konus_yazili(metin, kutu=False, sesli=False):  # v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py); kutu: 5 Kasım — yazı not/soru/talimat olabilir, asistan ayırır
+def konus_yazili(metin, kutu=False, sesli=False, ek=None, kayit=None):  # ek/kayit: 10 Kasım — Kararlar ve işler «asistana sor»: ek = kayıt bağlamı bloğu (eylem-menu.py marvin_kayit_baslat; soruyla birlikte sürece gider, panoda görünmez), kayit = kaydın kimliği; v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py); kutu: 5 Kasım — yazı not/soru/talimat olabilir, asistan ayırır
     if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
     tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True, "kutu": bool(kutu), "sesli_iste": bool(sesli)}; _KS["tur"] = tur  # sesli: pano kutusundaki 🔊 düğmesi açık — _konus_sor toplantı yokken ve gizli değilken cevabı okur
+    if ek: tur["kayit_blok"] = str(ek)[:24000]; tur["kayit_id"] = str(kayit or "")[:40]
     if kutu: KUTU_BEKLEYEN.clear(); KUTU_BEKLEYEN.update(metin=str(metin)[:4000], at=datetime.datetime.now().isoformat(timespec="seconds"))
     else: KUTU_BEKLEYEN.clear()
     konus_pocket_isit(); threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
-    print("KONUŞ: yazılı soru (pano kutusu)"); return {"ok": True}
+    print("KONUŞ: yazılı soru (pano kutusu)" + (" — kayıt turu" if ek else "")); return {"ok": True}
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
     if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
@@ -2235,9 +2236,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     elif tur.get("kutu") and tur.get("sesli"): tb += _t("Kullanıcı bu soruyu panoya yazdı ve sesli cevap düğmesini açtı; cevabın ilk kısmı sesli okunur, «---» sonrası ayrıntı panoda yazılı kalır (sesli konuşma biçimi aynen).\n",
                                    "The user typed this question on the panel with the read-aloud button on; the first part of your answer is read aloud and the detail after «---» stays written on the panel (same spoken format as voice).\n")
     if tur.get("kutu"): tb += _t(KUTU_KURAL["tr"], KUTU_KURAL["en"]) + "\n"
-    if kayit_turu_mu(tur) and (KAYIT_SONUC or ('pro_bekliyor' in globals() and pro_bekliyor()) or tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or "")):  # 5 Kasım: kayıt önerisi kuralı + kimlikli kayıtlar (yalnız kayıt konusu geçen turda)
+    if kayit_turu_mu(tur) and (KAYIT_SONUC or ('pro_bekliyor' in globals() and pro_bekliyor()) or tur.get("kutu") or tur.get("kayit_blok") or KAYIT_ISTEK_RX.search(metin or "")):  # 5 Kasım: kayıt önerisi kuralı + kimlikli kayıtlar (yalnız kayıt konusu geçen turda; 10 Kasım: kayıt turunda hep, kullanıcı konuşmada «bunu ertele» diyebilsin)
         tb += kayit_sonuc_notu()
-        if tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or ""): tb += kayit_kural() + "\n" + kayit_blogu()
+        if tur.get("kutu") or tur.get("kayit_blok") or KAYIT_ISTEK_RX.search(metin or ""): tb += kayit_kural() + "\n" + kayit_blogu()
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar
         _KS["bosta"] = False
         if konus_canli() and _KS.get("saglayici") == "claude-code" and konus_secim()["tur"] != "claude-code": konus_kapat("yedek süresi bitti", durum_koru=True); _KS["tur"] = tur
@@ -2269,7 +2270,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["t_gonder"] = time.time(); tur.pop("t_ilk_yanit", None)  # v0.77.3 ölçüm: soru sürece yazıldı (yeniden gönderimde de)
         onc = konus_gecmis_blogu(tur)  # süreç görmediği önceki turlar (yeni/yuva değişmiş/yenilenmiş süreç)
         if onc: print(f"KONUŞ: önceki konuşma sürece aktarıldı ({len(onc) // 100 / 10} bin karakter)")
-        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + gdb + obl + selam_notu(tur.get("selam")) + dub + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + nb + gnb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
+        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + gdb + obl + selam_notu(tur.get("selam")) + dub + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + nb + (tur.get("kayit_blok") or "") + gnb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} cevap veremedi — yeniden bas", f"{asistan_ad()} couldn't answer — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()

@@ -1842,7 +1842,7 @@ bolum("claude-giris")  # aktarici/claude-giris.py — Claude Code girişi düş�
 bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak (v0.75.0)
 bolum("kimlik")  # aktarici/kimlik.py — kişi adı → şirket e-postası eşlemesi, elle düzeltme, eşlenemeyenler (ortak karar katmanı A1)
 bolum("ortak-klasor")  # aktarici/ortak-klasor.py — ortak karar katmanı A3 (ekip paylaşımı, Firestore; ayar ortak_tasima) (/ortak)
-bolum("eylem-menu")  # aktarici/eylem-menu.py — kayıt eylem menüsü: ertele, böl, gündeme ekle, ata, taslak, Claude'a çalıştır, Geri al (/kayit-menu, /kayit-eylem; ortak karar katmanı)
+bolum("eylem-menu")  # aktarici/eylem-menu.py — kayıt eylem menüsü: ertele, böl, gündeme ekle, ata, taslak, asistana sor (/girdi {kayit}), Geri al (/kayit-menu, /kayit-eylem, /kayit-not; ortak karar katmanı)
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
@@ -2393,7 +2393,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/yaklasan-tarihler": return self._json(kt_islem(p))  # taslak (kutlama; gönderim yok) | yoksay (anahtarlı; geçiş listesinde yok)
         if self.path == "/is-kopya": return self._json(ik_islem(p) if "ik_islem" in globals() else {"ok": False, "err": "yok"})  # birlestir | ayri | geri_al (anahtarlı; geçiş listesinde yok)
         if self.path == "/belge-oneri": return self._json(belge_oneri_islem(p))  # öneriyi kayda al (kayit_olustu + is_atandi) ya da reddet (anahtarlı)
-        if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/Claude/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
+        if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
+        if self.path == "/kayit-not": return self._json(kayit_not_ekle(p))  # «Kayda not olarak ekle» (asistanın cevabı → yorum_ekle; tıklama onaydır; anahtarlı, geçiş listesinde yok)
         if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
         if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
         if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
@@ -2504,6 +2505,8 @@ class H(BaseHTTPRequestHandler):
             # 5 Kasım: kutuya yazılan HER ŞEY asistana gider; not mu soru mu talimat mı ayrımını asistan yapar (notlar.py kutu_*: cevaptaki [NOT: …] ve
             # [SÖZLÜK: yanlış => doğru] etiketleri). Toplantı oturumu izliyorsa (izle yoklaması, ya da arka plandaki oturum kullanıcıyı bekliyor) eski yol aynen:
             # yazı oturuma / dökümde not + GİRDİ olayı. Asistan hiç çalışamazsa yazı not olarak kalır ve panoda söylenir (yedek). ⌘Enter ve başta ? hâlâ doğrudan soru.
+            if p.get("kayit"):  # 10 Kasım: Kararlar ve işler → «asistana sor»: kayıt bağlamıyla Konuş'un yazılı turu (aktarici/eylem-menu.py marvin_kayit_baslat); gizli kayıt/kipte çalışmaz
+                r = marvin_kayit_baslat(p); return self._json(dict(r, tur="asistan") if r.get("ok") else r)
             tur, metin = girdi_ayir(p.get("text"))
             if not metin: return self._json({"ok": False, "err": "boş"}, 400)
             soru = tur == "soru" or bool(p.get("soru")); bos = toplantisiz()
