@@ -341,6 +341,33 @@ if "dg_cagri" in open(os.path.join(KOD, "aktarici", "eposta-takip.py"), encoding
     ok("e-posta: günlük tavan aşılınca çağrı yapılmaz, kural sonucu kalır (0 değerlendirildi)", Ne["et_claude_sirala"](ad_) == 0 and len(Ne["M"].istemler) == 1)
 else: print("- e-posta ortak çekirdek denetimi atlandı (eposta-takip.py `ana` oturumunda; degerlendir-ana-yama.py uygulanınca çalışır)")
 
+# --- 1b) bozuk model çıktısı: köşeli parantezli açıklama, kod bloğu, kaçışsız tırnak, Türkçe/büyük harfli karar, son-hata dosyası ---
+J1 = '[{"id": "a1", "karar": "soyle", "oncelik": 2, "neden": "x", "metin": "Rapor gecikti, bakalım mı?"}]'
+N = kur("bozuk1", cevaplar=["[aday g1] için düşündüm: [aday gec:s12] önemsiz.\n" + J1])
+r = N["degerlendir"]("gun_ici", A[:1], soru=SORU, sema=SEMA)
+ok("JSON'dan önce köşeli parantezli açıklama: dizi yine çözülür", r[0]["kaynak"] == "model" and r[0]["karar"] == "soyle", r)
+N = kur("bozuk2", cevaplar=["```json\n" + J1 + "\n```\nNot: [not] bitti."])
+r = N["degerlendir"]("gun_ici", A[:1], soru=SORU, sema=SEMA)
+ok("```json bloğu + sonrasında [not] yorumu çözülür", r[0]["kaynak"] == "model", r)
+bozuk = '[{"id": "a1", "karar": "soyle", "oncelik": 1, "neden": "n", "metin": "Görev "teyit" bekliyor"}, {"id": "a2", "karar": "gec", "oncelik": 0, "neden": "önemsiz"}]'
+N = kur("bozuk3", cevaplar=[bozuk])
+r = N["degerlendir"]("gun_ici", A[:2], soru=SORU, sema=SEMA)
+ok("kaçışsız tırnaklı öğe atılır, geçerli öğe çözülür", r[1]["kaynak"] == "model" and r[1]["karar"] == "gec" and r[0]["kaynak"] == "yedek", r)
+N = kur("bozuk4", cevaplar=[[{"id": " a1 ", "karar": "Söyle", "oncelik": 1, "neden": "n"}, {"id": "a2", "karar": "GEÇ", "oncelik": 0, "neden": "n"}]])
+r = N["degerlendir"]("gun_ici", A[:2], soru=SORU, sema=SEMA)
+ok("karar 'Söyle'/'GEÇ' → soyle/gec, id kırpılır", [x["karar"] for x in r] == ["soyle", "gec"] and all(x["kaynak"] == "model" for x in r), r)
+sh = "Düşünüyorum ama JSON yok [aday x] sonuç yok " * 3
+N = kur("bozuk5", cevaplar=[sh])
+r = N["degerlendir"]("gun_ici", A[:1], soru=SORU, sema=SEMA)
+yh = os.path.join(N["D"], "degerlendir-son-hata.txt")
+ok("ham dolu ama çözülemez: yedek + degerlendir-son-hata.txt (0600, başlık + ham)", r[0]["kaynak"] == "yedek" and os.path.exists(yh) and stat.S_IMODE(os.stat(yh).st_mode) == 0o600 and open(yh, encoding="utf-8").read().startswith("2026-") and "iş=gun_ici aday=1" in open(yh, encoding="utf-8").read() and "Düşünüyorum" in open(yh, encoding="utf-8").read(), os.path.exists(yh))
+N = kur("bozuk6", cevaplar=[sh], gizli=True)
+r = N["degerlendir"]("gun_ici", A[:1], soru=SORU, sema=SEMA)
+ok("gizli kipte son-hata dosyası yazılmaz", not os.path.exists(os.path.join(N["D"], "degerlendir-son-hata.txt")))
+N = kur("bozuk7", cevaplar=[None])
+N["degerlendir"]("gun_ici", A[:1], soru=SORU, sema=SEMA)
+ok("model hatasında (ham yok) son-hata dosyası yazılmaz", not os.path.exists(os.path.join(N["D"], "degerlendir-son-hata.txt")))
+
 # --- 11b) olcum.py isabet: değerlendirici tablosu ---
 yol_o = os.path.join(KOD, ".claude", "skills", "suflor-olcum", "olcum.py")
 sp = importlib.util.spec_from_file_location("olcum_t", yol_o); OL = importlib.util.module_from_spec(sp); sp.loader.exec_module(OL)
