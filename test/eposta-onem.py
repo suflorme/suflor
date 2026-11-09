@@ -27,6 +27,8 @@ def sahte_model(istem):  # zincir bloklarını okur; kural: son satır "sen" →
     for blk in istem.rsplit("<veri>", 1)[1].split("</veri>")[0].split("[zincir ")[1:]:
         zid = blk.split("]", 1)[0]; sat = [l for l in blk.splitlines() if l.startswith("- ")]; son = sat[-1] if sat else ""; k = blk.casefold()
         if "açıklama" in k: d, a = "baskasi_cevapladi", 0
+        elif "kahve" in k and " sen → " in son: d, a = "donus_bekliyorsun", 1  # düşük öncelikli dönüş (katlı satır)
+        elif "ekstra" in k and " sen → " not in son: d, a = "senden_bekleniyor", 1  # düşük öncelikli gelen (sıkı düzeyde katlı satır)
         elif " sen → " in son: d, a = ("donus_bekliyorsun", 2) if "onay" in k else ("bilgi", 0)
         elif "özleşme" in k: d, a = "senden_bekleniyor", 3
         elif "onay" in k: d, a = "senden_bekleniyor", 2
@@ -179,4 +181,13 @@ ok("yedek gruplama: 'Re:' atılır + ortak katılımcı → aynı zincir (301, 3
 ok("yedek gruplama: aynı konu, ortak katılımcı yok → ayrı zincir", len(set(N("et_zincirler")([g(1, A("a1"), "Rapor", 1, al=[BEN]), g(2, A("b1"), "Re: Rapor", 1, al=[BEN])], {BEN}).values())) == 2)
 r1 = N("et_analiz")(YP, SIMDI, kayit_kelime=[], durum={"yoksay": {}, "ertele": {}}, deger={}, beklenen=True)
 ok("zincir alanı olmadan da kullanıcı cevabı (311) düşer, başkasının cevabı (301) işaretlenir", "311" not in {o["id"] for o in r1["bekleyen"]} and "başkası" in next(o for o in r1["bekleyen"] if o["id"] == "301")["neden"])
+# --- düşük öncelikli (katlı satır): dengeli düzeyde aciliyet 1'lik dönüş gizlenir ama "dusuk"te görünür; özet sayacı ve bildirim etkilenmez ----------------------------------------------
+AYAR["eposta_claude_siralama"] = True; MOD["hata"] = None; BILD.clear()
+NS["POSTA"]["iletiler"] = POS + [s(900, [A("ayla")], "Kahve toplantısı notları", 6), g(901, A("ayla"), "Ekstra onay", 1, ad="Ayla K", al=[BEN])]; NS["ET"]["durum"] = None; NS["ET"]["gorunum"] = None; NS["ET"]["hata_kume"] = None
+a9 = N("et_tara")(zorla=True, simdi=SIMDI); v9 = N("et_view")()
+ok("dusuk: aciliyet 1'lik dönüş (900) donus'ta değil, 'dusuk'te (yon giden, aciliyet 1, neden dolu)", "900" not in {o["id"] for o in v9["donus"]} and any(o["id"] == "900" and o["yon"] == "giden" and o["aciliyet"] == 1 and o["neden"] for o in v9["dusuk"]))
+ok("dusuk: özet sayacı bekleyen sayısına eşit (dusuk girmez), iç alan yok", v9["ozet_sayi"] == len(v9["bekleyen"]) and not any(k.startswith("_") for o in v9["dusuk"] for k in o))
+ok("dusuk: 'dusuk' öğesi için taslak/ertele işlenir (ET idler)", "900" in NS["ET"]["idler"] and N("et_islem")({"islem": "ertele", "id": "900"})["ok"])
+NS["ET"]["durum"] = None; AYAR["eposta_onem_duzeyi"] = "siki"; NS["ET"]["gorunum"] = None; v9 = N("et_view")()
+ok("dusuk: sıkı düzeyde aciliyet 1'lik gelen (901) bekleyen değil, 'dusuk'te", "901" not in {o["id"] for o in v9["bekleyen"]} and any(o["id"] == "901" and o["yon"] == "gelen" for o in v9["dusuk"])); AYAR["eposta_onem_duzeyi"] = "dengeli"
 shutil.rmtree(T, ignore_errors=True); print(("\nKALDI: " + ", ".join(HATA)) if HATA else "\nTamam"); sys.exit(1 if HATA else 0)

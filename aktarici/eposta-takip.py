@@ -228,7 +228,7 @@ def et_analiz(iletiler, simdi=None, kisiler=None, kayit_kelime=None, skor=None, 
         if et_is_gunu(x.get("t"), simdi) <= esik or cevap_geldi(x) or all(_ET_BULK_ADRES.search(a) for a in al): continue
         rep_o[k] = x
     # 2) değerlendirme ya da kural → kovalar
-    bekleyen, donus, adaylar = [], [], []; dsay = collections.Counter(); deg_yok = 0
+    bekleyen, donus, dusuk, adaylar = [], [], [], []; dsay = collections.Counter(); deg_yok = 0
     for k in list(dict.fromkeys(list(rep_g) + list(rep_o))):
         son = zincir[k][-1]; dkey = k + "|" + str(son.get("id")); ev = deger.get(dkey)
         g = rep_g.get(k); o = rep_o.get(k)
@@ -249,6 +249,10 @@ def et_analiz(iletiler, simdi=None, kisiler=None, kayit_kelime=None, skor=None, 
                 bekleyen.append({"id": str(x["id"]), "kim": _et_kisi_ad(x), "konu": " ".join(str(x.get("konu") or "").split())[:120] or _t("(konusuz)", "(no subject)"), "tarih": x.get("t"), "neden": neden,
                                  "gun": gun, "cevapsiz_gun": gun, "yon": "gelen", "durum": ev["d"] if ev else None, "aciliyet": ac, "degerlendirilmedi": bool(beklenen and not ev),
                                  "_anahtar": anahtar, "_puan": ((ac if ac is not None else (2 if vip else 1)) + (1 if vip else 0) + 1) / (1 + max(0.0, (simdi - yz).total_seconds()) / 172800)})
+            elif ev and ev["d"] == "senden_bekleniyor" and ac == 1 and not gizli(anahtar, x["id"]):  # düşük öncelik: yalnız katlı satırda (özet sayacına ve bildirime girmez)
+                gun = et_is_gunu(x.get("t"), simdi)
+                dusuk.append({"id": str(x["id"]), "kim": _et_kisi_ad(x), "konu": " ".join(str(x.get("konu") or "").split())[:120] or _t("(konusuz)", "(no subject)"), "tarih": x.get("t"), "neden": ev.get("n") or _t("Düşük öncelikli", "Low priority"),
+                              "gun": gun, "cevapsiz_gun": gun, "yon": "gelen", "durum": ev["d"], "aciliyet": ac, "degerlendirilmedi": False, "_anahtar": anahtar, "_puan": min(gun, 10) + 1})
         if o:
             x = o; al = _et_alicilar(x); anahtar = "o:" + et_konu_norm(x.get("konu")) + "|" + ",".join(sorted(al)); vip_al = any(_et_vip({"adres": a}) for a in al); kural = _et_istek_kural(x)
             if ev: ac = int(ev.get("a") or 0); evet = ev["d"] == "donus_bekliyorsun" and (duzey == "genis" or ac >= 3 or (duzey == "dengeli" and (ac >= 2 or kural)) or (duzey == "siki" and vip_al))  # S263 kuru koşu: aciliyet 1'lik eski dönüşler gürültüydü
@@ -258,15 +262,19 @@ def et_analiz(iletiler, simdi=None, kisiler=None, kayit_kelime=None, skor=None, 
                 donus.append({"id": str(x["id"]), "kim": _et_giden_kim(x), "konu": " ".join(str(x.get("konu") or "").split())[:120] or _t("(konusuz)", "(no subject)"), "tarih": x.get("t"),
                               "neden": (ev.get("n") if ev else "") or _t(f"{gun} iş günüdür dönüş yok", f"no reply for {gun} working days"), "gun": gun, "cevapsiz_gun": gun, "yon": "giden",
                               "durum": ev["d"] if ev else None, "aciliyet": ac, "degerlendirilmedi": bool(beklenen and not ev), "_anahtar": anahtar, "_puan": ((ac if ac is not None else 1) + 1) * min(gun, 10)})
+            elif ev and ev["d"] == "donus_bekliyorsun" and ac == 1 and not gizli(anahtar, x["id"]):  # S263 kuru koşu gizlediği düşük öncelikli dönüşler: katlı "Düşük öncelikli" satırı
+                gun = et_is_gunu(x.get("t"), simdi)
+                dusuk.append({"id": str(x["id"]), "kim": _et_giden_kim(x), "konu": " ".join(str(x.get("konu") or "").split())[:120] or _t("(konusuz)", "(no subject)"), "tarih": x.get("t"),
+                              "neden": ev.get("n") or _t(f"{gun} iş günüdür dönüş yok", f"no reply for {gun} working days"), "gun": gun, "cevapsiz_gun": gun, "yon": "giden", "durum": ev["d"], "aciliyet": ac, "degerlendirilmedi": False, "_anahtar": anahtar, "_puan": 2 * min(gun, 10)})
         if not ev and beklenen: deg_yok += 1
-    bekleyen.sort(key=lambda o: -o["_puan"]); donus.sort(key=lambda o: -o["_puan"])
-    for o in bekleyen + donus: o.pop("_puan", None)
-    bekleyen, donus = bekleyen[:ET_EN_COK], donus[:ET_EN_COK]
+    bekleyen.sort(key=lambda o: -o["_puan"]); donus.sort(key=lambda o: -o["_puan"]); dusuk.sort(key=lambda o: -o["_puan"])
+    for o in bekleyen + donus + dusuk: o.pop("_puan", None)
+    bekleyen, donus, dusuk = bekleyen[:ET_EN_COK], donus[:ET_EN_COK], dusuk[:30]
     cevapsiz = [dict(o) for o in bekleyen if o["gun"] >= esik] + [dict(o) for o in donus]
     for c in cevapsiz:
         if c["yon"] == "gelen": c["neden"] = _t(f"Sana yazdı, {c['gun']} iş günüdür cevap yok", f"They wrote to you; no reply for {c['gun']} working days")
     adaylar.sort(key=lambda a: a["_t"], reverse=True)
-    return {"bekleyen": bekleyen, "donus": donus, "bilgi_sayi": sum(bilgi.values()), "bilgi_detay": dict(bilgi), "durum_sayi": dict(dsay), "degerlendirilmedi": deg_yok,
+    return {"bekleyen": bekleyen, "donus": donus, "dusuk": dusuk, "bilgi_sayi": sum(bilgi.values()), "bilgi_detay": dict(bilgi), "durum_sayi": dict(dsay), "degerlendirilmedi": deg_yok,
             "onemli": bekleyen, "cevapsiz": cevapsiz, "adaylar": adaylar[:ET_CLAUDE_EN_COK]}
 
 # --- Claude ile zincir değerlendirmesi (S263; tek çağrı, yalnız beyin Claude Code ise) ---------------------------------------------------------------
@@ -343,10 +351,10 @@ def et_claude_sirala(adaylar, simdi=None):  # → değerlendirilen zincir sayıs
 # --- Tarama, görünüm, hatırlatma ---------------------------------------------------------------------------------------------------------------------
 def _et_kes(ls): return [{k: v for k, v in o.items() if not k.startswith("_")} for o in ls]
 def _et_gorunum_dict(a, simdi=None):
-    return {"ok": True, "guncel": (simdi or datetime.datetime.now().astimezone()).isoformat(timespec="seconds"), "bekleyen": _et_kes(a["bekleyen"]), "donus": _et_kes(a["donus"]),
+    return {"ok": True, "guncel": (simdi or datetime.datetime.now().astimezone()).isoformat(timespec="seconds"), "bekleyen": _et_kes(a["bekleyen"]), "donus": _et_kes(a["donus"]), "dusuk": _et_kes(a.get("dusuk") or []),
             "bilgi_sayi": a["bilgi_sayi"], "ozet_sayi": len(a["bekleyen"]), "durum_sayi": a.get("durum_sayi") or {}, "degerlendirilmedi": a.get("degerlendirilmedi") or 0, "onemli": _et_kes(a["onemli"]), "cevapsiz": _et_kes(a["cevapsiz"])}  # onemli/cevapsiz: bir sürüm geriye uyum
 def et_gorunum_yap(simdi=None):
-    d = et_durum(); a = et_analiz(POSTA["iletiler"], simdi, durum=d); ET["idler"] = {o["id"]: o for o in a["bekleyen"] + a["donus"]}
+    d = et_durum(); a = et_analiz(POSTA["iletiler"], simdi, durum=d); ET["idler"] = {o["id"]: o for o in a["bekleyen"] + a["donus"] + (a.get("dusuk") or [])}
     ET["adaylar"] = a["adaylar"]; ET["gorunum"] = _et_gorunum_dict(a, simdi)
     return a
 def et_view():  # GET /eposta-onemli
