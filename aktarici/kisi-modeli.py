@@ -11,17 +11,27 @@
 # (_gizli_suz): gizli kip açıkken yalnız kimlik/profil/öğrenilenler (toplantı kaynaklı olmayanlar) girer; gizli toplantıdan gelen satır hiçbir dilimde yer almaz.
 # Dilim başına dosya değişim zamanına göre önbellek; Konuş'un ilk ses gecikmesi için dosya stat'ı dışında iş yapılmaz.
 KM_OGREN_DOSYA, KM_DURUMLAR = "ogrenilen.jsonl", ("otomatik", "onayli", "gecersiz")
-KM_ONCELIK = ("kimlik", "profil", "ogrenilen", "bugun", "gun_plani", "isler", "notlar", "son_konusma", "gun_devri", "toplantilar")
+KM_ONCELIK = ("kimlik", "profil", "ogrenilen", "bugun", "gun_plani", "isler", "kisi_isleri", "notlar", "son_konusma", "gun_devri", "toplantilar")
 KM_GIZLI_SERBEST = ("kimlik", "profil", "ogrenilen")  # gizli kipte pakete girebilen dilimler (toplantı/olay kaynaklı değil)
 # dilim başına en çok karakter (amaç ezebilir)
-KM_CAP = {"kimlik": 520, "profil": 3000, "ogrenilen": 900, "bugun": 1300, "gun_plani": 900, "isler": 900, "notlar": 700, "son_konusma": 900, "gun_devri": 1500, "toplantilar": 600}
+KM_CAP = {"kimlik": 520, "profil": 3000, "ogrenilen": 900, "bugun": 1300, "gun_plani": 900, "isler": 900, "kisi_isleri": 700, "notlar": 700, "son_konusma": 900, "gun_devri": 1500, "toplantilar": 600}
 # amaç → (varsayılan dilimler, toplam karakter bütçesi, {dilim: cap})
 KM_AMAC = {"konus": (("profil", "ogrenilen", "bugun", "gun_plani", "isler", "notlar", "son_konusma", "gun_devri"), 7000, {"notlar": 500, "gun_plani": 500}),  # Konuş: soru başına yalnız notlar (500) ve sabit istemde öğrenilenler (900) kullanılır
            "toplanti": (("kimlik", "profil", "ogrenilen", "bugun", "gun_plani", "isler", "notlar", "gun_devri"), 7000, {"gun_plani": 500}),
-           "brifing": (("profil", "ogrenilen", "notlar"), 2400, {"profil": 1200, "ogrenilen": 500, "notlar": 500}),
-           "talimat": (("profil", "ogrenilen"), 1300, {"profil": 700, "ogrenilen": 500}),
+           # brifing (brifing-ses.py): bugun + isler eklendi (10 Kasım; toplantıya özgü açık iş/katılımcı blokları ayrıca brifing-ses.py _brifing_bloklar'ta, ≤2000). Toplam 3400.
+           "brifing": (("profil", "ogrenilen", "bugun", "isler", "notlar"), 3400, {"profil": 1200, "ogrenilen": 500, "bugun": 600, "isler": 600, "notlar": 500}),
+           # sesli düzeltme (talimat.py _duzelt_model): teyit cümlesini asistan kimliğiyle ve yeni saat dolu mu bilerek kurar → kimlik (≤520) + bugun (≤800: bugünün/yarının takvimi, vadesi gelen işler). Toplam 2700 (önceki 1300).
+           "talimat": (("kimlik", "profil", "ogrenilen", "bugun"), 2700, {"profil": 700, "ogrenilen": 500, "bugun": 800}),
+           # e-posta cevap/takip taslağı (eposta-takip.py et_taslak): kullanıcının kendi sesiyle yazılır → asistan kimliği yok. soru = gönderenin adı: kisi_isleri o kişiyle açık işleri,
+           # notlar o kişiyle ilgili notları seçer; bugun takvimi (saat önermek için). Toplam 3600.
+           "eposta": (("profil", "ogrenilen", "bugun", "kisi_isleri", "notlar"), 3600, {"profil": 1200, "ogrenilen": 500, "bugun": 800, "kisi_isleri": 700, "notlar": 400}),
            "kayit": (("profil", "ogrenilen"), 1500, {"profil": 900, "ogrenilen": 500}),
-           "degerlendir": (("profil", "ogrenilen", "isler", "notlar"), 3000, {"profil": 1200, "ogrenilen": 600, "isler": 700, "notlar": 500}),
+           # değerlendirici (degerlendir.py): "şimdi söylemeye değer mi" kararı bugünün takvimine ve gün planına bağlıdır → bugun (≤800) + gun_plani (≤500). Toplam 4200 (önceki 3000 + ~1200);
+           # dilim sınırları toplamı 4300 eder: pay taşarsa en sonda gelen notlar kısalır. degerlendir_metin = kullanıcıya söylenen cümleyi yeniden yazan türler (DG_SEMA metin: True):
+           # asistanın adı/hitabı da gelir (kimlik ≤520; toplam 4700). degerlendir_dar = bugun/plan/kimlik gerekmeyen türler (iş kopyası, belge önerisi): eski küme.
+           "degerlendir": (("profil", "ogrenilen", "bugun", "gun_plani", "isler", "notlar"), 4200, {"profil": 1200, "ogrenilen": 600, "bugun": 800, "gun_plani": 500, "isler": 700, "notlar": 500}),
+           "degerlendir_metin": (("kimlik", "profil", "ogrenilen", "bugun", "gun_plani", "isler", "notlar"), 4700, {"profil": 1200, "ogrenilen": 600, "bugun": 800, "gun_plani": 500, "isler": 700, "notlar": 500}),
+           "degerlendir_dar": (("profil", "ogrenilen", "isler", "notlar"), 3000, {"profil": 1200, "ogrenilen": 600, "isler": 700, "notlar": 500}),
            # günlük düşünme turu (dusunme.py): öğrenilenler ve açık işler kimlikli olarak turun kendi bölümünde gelir, burada yok; notlar süzülmeden (soru yok) hepsi
            "dusunme": (("kimlik", "profil", "bugun", "notlar", "son_konusma", "gun_devri"), 8500, {"bugun": 1800, "notlar": 900})}
 KM_NOT_GUN = 3  # notlar defterinden bu kadar günlük not pakete girer
@@ -135,6 +145,23 @@ def _km_isler(simdi):  # yapi.bugun_veri (yapi.py'ye dokunmadan) → (bugün/gec
     bug = [x for x in kendi if x.get("gecikti") or x.get("kalan_gun") == 0]
     dig = [x for x in kendi if x not in bug]
     return [kisa(x) for x in bug], [kisa(x) for x in dig], len(v.get("teyit") or []), len(v.get("baskalari") or [])
+def _km_kisi_isleri(ad, simdi):  # ad (gönderen/katılımcı) ile ilgili açık işler: sahibi ya da metni o kişiyi anan, kullanıcının kendi ve başkalarında bekleyen açık işleri → satırlar (gizli toplantı bugun_veri'de zaten yok)
+    ham = re.findall(r"\w+", str(ad or "").lower()); toks = [t for t in ham if len(t) >= 3][:2]
+    if not toks: return []
+    y = _km_yapi()
+    if not y or not hasattr(y, "bugun_veri"): return []
+    try: v = y.bugun_veri(BASE, str(AYAR.get("ad") or ""))
+    except Exception as e: print(f"KİŞİ MODELİ: kişi işleri okunamadı ({e.__class__.__name__})"); return []
+    def anar(x):  # sahibi (kayıtta "Ali" ya da "Ali K" gibi kısaltılmış olabilir: her sözcüğü gönderen adının bir sözcüğünün başı) ya da metni gönderenin (ilk iki) adını anan iş
+        kk = re.findall(r"\w+", str(x.get("kim") or "").lower()); mw = re.findall(r"\w+", str(x.get("metin") or "").lower())
+        return bool(kk) and all(any(h.startswith(w) for h in ham) for w in kk) and len(kk[0]) >= 3 or all(any(w.startswith(t) for w in mw) for t in toks)
+    out = []
+    for x, kendi in [(x, True) for x in v.get("kendi") or [] if not x.get("geride")] + [(x, False) for x in v.get("baskalari") or []]:
+        if not anar(x): continue
+        g = x.get("kalan_gun"); d = (_t("gecikti", "overdue") + f" {-g}" + _t(" g", "d")) if x.get("gecikti") and g is not None else (f"{g}" + _t(" g kaldı", "d left") if g is not None else "")
+        out.append(f"- [{_t('sende', 'yours') if kendi else _km_kisa(x.get('kim'), 30)}] {_km_kisa(x.get('metin'), 90)}" + (f" ({d})" if d else ""))
+        if len(out) >= 6: break
+    return out
 def _km_takvim(simdi):  # bugün + yarın (TAKVIM_TAM; ayar takvim_haric) → satırlar
     try: tam = list(TAKVIM_TAM.values())
     except NameError: return []
@@ -225,6 +252,8 @@ def _km_plan_metni(simdi, cap):  # günlük düşünme turunun bugünkü planı 
     sb = [f"{x.get('saat')} {_km_kisa(x.get('baslik'), 50)}" for x in p.get("sabit") or [] if isinstance(x, dict)]
     if sb: sat.append(_t("Sabit: ", "Fixed: ") + "; ".join(sb))
     return _km_sar(_t("Günün planı", "Today's plan"), "\n".join(sat), _t(" (Suflor'un bu sabah kullanıcı için hazırladığı plan; kullanıcının onayladığı karar değildir)", " (the plan Suflor prepared for the user this morning; not a decision the user confirmed)"), cap)
+def _km_kisi_isleri_metni(ad, simdi, cap):
+    return _km_sar(_t("Bu kişiyle açık işler", "Open items with this person"), "\n".join(_km_kisi_isleri(ad, simdi)), _t(" (karar grafından; [sende] = senin işin, köşeli ad = o kişinin üstlendiği)", " (from the decision graph; [yours] = your task, bracketed name = taken by that person)"), cap)
 def _km_notlar_metni(soru, ilgili_yalniz, cap):
     ns = _km_notlar(); sozc = set(re.findall(r"\w{4,}", str(soru or "").lower()))
     def skor(n): return len(set(re.findall(r"\w{4,}", n[1].lower())) & sozc)
@@ -236,10 +265,11 @@ def _km_notlar_metni(soru, ilgili_yalniz, cap):
         if top + len(l) + 1 > cap - 120: break
         sat.append(l); top += len(l) + 1
     return _km_sar(_t("Notlar defteri", "Notes"), "\n".join(sat), _t(f" (kullanıcının kendi notları, son {KM_NOT_GUN} gün; toplantıya ya da karşı tarafa okunan cevapta kullanma)", f" (the user's own notes, last {KM_NOT_GUN} days; don't use in an answer read into a meeting or to the other side)"), cap)
-def _km_damga(dilim, simdi):  # önbellek damgası: kaynak dosya değişim zamanları (+ zamana bağlı dilimde dakika)
+def _km_damga(dilim, simdi, soru=None):  # önbellek damgası: kaynak dosya değişim zamanları (+ zamana bağlı dilimde dakika)
     if dilim == "profil": return (_km_mt(profil_yol()), profil_yol(), str(AYAR.get("ad") or ""))
     if dilim == "ogrenilen": return (_km_mt(_ogren_yol()),)
     if dilim == "kimlik": return (tuple(sorted((str(k), str(v.get("mt"))) for k, v in globals().get("_KIS_D", {}).items())), tuple(str(AYAR.get(a)) for a in ("kisilik", "kisilik_toplanti_disi")))
+    if dilim == "kisi_isleri": return (int(simdi.timestamp() // 60), str(soru or "")[:80])
     if dilim == "notlar": return (_km_mt(os.path.join(BASE, "notlar.jsonl")), int(simdi.timestamp() // 600))
     if dilim == "son_konusma": return (_km_mt(os.path.join(BASE, "konus-gecmis.jsonl")),)
     if dilim == "gun_devri": return (_km_mt(os.path.join(BASE, "gun-devir.json")), simdi.date().isoformat())
@@ -249,11 +279,11 @@ def _km_damga(dilim, simdi):  # önbellek damgası: kaynak dosya değişim zaman
         except NameError: return (0,)
     return (int(simdi.timestamp() // 60), len(globals().get("TAKVIM_TAM", {}) or {}))  # bugun, isler
 def _km_dilim(dilim, simdi, soru, ilgili_yalniz, cap):
-    anahtar = (dilim, ARAYUZ_DILI, cap); damga = (_km_damga(dilim, simdi), str(soru or "")[:80] if dilim == "notlar" else None, ilgili_yalniz if dilim == "notlar" else None)
+    anahtar = (dilim, ARAYUZ_DILI, cap); damga = (_km_damga(dilim, simdi, soru), str(soru or "")[:80] if dilim == "notlar" else None, ilgili_yalniz if dilim == "notlar" else None)
     b = _KM_ONB.get(anahtar)
     if b and b[0] == damga: return b[1]
     m = {"kimlik": lambda: _km_kimlik(cap), "profil": lambda: _km_profil_metni(cap), "ogrenilen": lambda: _km_ogren_metni(cap), "bugun": lambda: _km_bugun_metni(simdi, cap),
-         "isler": lambda: _km_isler_metni(simdi, cap), "gun_plani": lambda: _km_plan_metni(simdi, cap), "notlar": lambda: _km_notlar_metni(soru, ilgili_yalniz, cap),
+         "isler": lambda: _km_isler_metni(simdi, cap), "kisi_isleri": lambda: _km_kisi_isleri_metni(soru, simdi, cap), "gun_plani": lambda: _km_plan_metni(simdi, cap), "notlar": lambda: _km_notlar_metni(soru, ilgili_yalniz, cap),
          "son_konusma": lambda: _km_sar(_t("Son konuşmalar", "Recent conversations"), "\n".join(_km_son_konusma()), _t(" (kullanıcının toplantı dışında asistana sorduğu son şeyler)", " (the user's latest questions to the assistant outside meetings)"), cap),
          "gun_devri": lambda: _km_sar(_t("Bugünkü toplantılardan devir", "Handover from today's meetings"), "\n\n".join(_km_gun_devri()), "", cap),
          "toplantilar": lambda: _km_sar(_t("Son toplantılar", "Recent meetings"), "\n".join(_km_toplantilar()), "", cap)}[dilim]()

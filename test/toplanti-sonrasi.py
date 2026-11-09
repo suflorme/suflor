@@ -96,4 +96,14 @@ finally:
     for n in ("A", "B", "C"):
         try: globals()[n].p.kill()
         except Exception: pass
+# 10 Kasım bağlam denetimi: açık uç değerlendirmesine toplantı özetinden 1–2 cümle (soruda, adres maskeli) — özet dosyası okunur, başlık/işaretleme atlanır
+import re as _re
+_ts = open(os.path.join(KOD, "aktarici", "toplanti-sonrasi.py"), encoding="utf-8").read()
+_ns = {"re": _re, "_dg_maske": lambda t: _re.sub(r"[\w.+-]+@[\w-]+\.[\w.]+", "[adres]", str(t))}; exec(compile(_ts[_ts.index("PRO_OZET_KR = "):_ts.index("def pro_degerlendir(")], "toplanti-sonrasi.py", "exec"), _ns)
+_oz = os.path.join(T, "ozet-deneme.md")
+open(_oz, "w", encoding="utf-8").write("# Başlık\n\nTeklif fiyatı ve lansman tarihi konuşuldu. Aylin Örnek (" + "aylin" + "@" + "ornek.test" + ") sözleşmeyi kontrol edecek. Üçüncü cümle girmez.\n")
+_c = _ns["pro_ozet_cumle"]({"ozet": _oz})
+ok("özet cümlesi: 2 cümle, adres [adres], üçüncü cümle yok", "Teklif fiyatı ve lansman" in _c and "[adres]" in _c and "ornek.test" not in _c and "Üçüncü" not in _c and len(_c) <= 260)
+ok("özet dosyası yoksa boş (adaylar yalnız kendi metniyle gider)", _ns["pro_ozet_cumle"]({"ozet": os.path.join(T, "yok.md")}) == "" and _ns["pro_ozet_cumle"]({}) == "")
+ok("pro_degerlendir: özet cümlesi değerlendirici sorusuna eklenir (aday satırlarına değil)", "Toplantı özeti: {oz}" in _ts and 'soru=f"«{baslik}»' in _ts)
 print("\nTÜM TESTLER GEÇTİ" if not HATA else f"\n{len(HATA)} test kaldı: {HATA}"); shutil.rmtree(T, ignore_errors=True); sys.exit(1 if HATA else 0)

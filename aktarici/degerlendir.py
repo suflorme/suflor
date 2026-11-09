@@ -4,7 +4,8 @@
 # Amaç: "söylemeye değer mi / benim mi / güncel mi / şimdi mi" sorularının hepsi AYNI çekirdekten geçer; her yetenek kendi istemini, çağrısını, önbelleğini, ölçümünü yazmaz.
 #   degerlendir(is_turu, adaylar, *, soru, sema, ornek=None, model=None) → adaylarla aynı sırada [{id, karar, oncelik (0-3), neden, metin?, kaynak: model|onbellek|yedek, yedek_neden?}]
 #     adaylar: [{"id", "metin" (kısa özet), "veri": {…} (isteğe bağlı), "yedek": {"karar", "oncelik"} (bugünkü kural sonucu), "gizli": True (aday istemden ve kayıttan çıkar)}]
-#     Bağlam: eylem_model(amac="degerlendir") istemin başına kişi modelinin paketini (profil + öğrenilenler + işler + notlar; gizlilik süzgeci pakette) koyar; bu bölüm ayrıca
+#     Bağlam: eylem_model(amac=dg_amac(sema)) istemin başına kişi modelinin paketini (profil + öğrenilenler + bugün/takvim + günün planı + işler + notlar; metin yazan türlerde asistan kimliği de;
+#     iş kopyası ve belge önerisi eski dar kümeyle; gizlilik süzgeci pakette) koyar; bu bölüm ayrıca
 #     "Kullanıcının son tepkileri" bölümünü ekler (soz.jsonl sonuçları + kendi karar kaydı; örtük geri bildirim). Tek çağrıda toplu değerlendirme; çıktı JSON dizisi, şema doğrulanır.
 #     Güvenli yedek (bozuk cevap, çağrı yok, günlük tavan, tur sınırı, gizli kip): adayın kendi "yedek"i (= bugünkü kural davranışı); yoksa sema["yedek"] kararı. Yedek önbelleğe girmez.
 #   Önbellek canli/degerlendir-onbellek.json (0600): anahtar = iş türü + aday kimliği + aday içeriğinin özeti; aynı aday yeniden sorulmaz (48 sa; "sonra" gibi kısa ömürlü kararlar 2 sa).
@@ -37,13 +38,13 @@ DG_SEMA = {
                          "tanim": {"soyle": "bu açık uç toplantı sonrası kullanıcıya hatırlatılmaya değer", "gec": "hatırlatmaya değmez: küçük, kullanıcıyı ilgilendirmiyor, bir başkasının işi ya da zaten kapanmış gibi"},
                          "yonerge": "Adaylar son toplantının açık uçlarıdır (tarihsiz/sahipsiz iş, teyit bekleyen karar, cevapsız soru). Kullanıcının kendi işi, kendi onayını bekleyen karar ya da bir başkasının "
                                     "kullanıcıdan beklediği şey öncelikli; başkasına ait tarihsiz küçük iş, kozmetik ayrıntı ve kullanıcının profilinde ilgisiz olan konu 'gec'. oncelik: 0 bilgi, 1 normal, 2 önemli."},
-    "belge_oneri": {"kararlar": ("al", "gec"), "yedek": "al", "soz_kaynak": None, "soz_oncelik_tavan": 1, "kisa": (), "metin": False,
+    "belge_oneri": {"kararlar": ("al", "gec"), "yedek": "al", "soz_kaynak": None, "soz_oncelik_tavan": 1, "kisa": (), "metin": False, "amac": "degerlendir_dar",
                     "tanim": {"al": "gerçekten kullanıcının kendi işi ve hâlâ güncel: iş önerileri listesine girsin", "gec": "listeye girmesin: başkasının işi, bitmiş ya da eskimiş, örnek/şablon metni ya da iş değil"},
                     "yonerge": "Adaylar kullanıcının toplantıya eklediği belgelerden ya da proje kartından çıkarılmış iş maddeleridir; belgenin tamamını görmüyorsun, yalnız çıkarılan satırı. "
                                "Sahibi başka biri olarak açıkça yazılıysa, vadesi bugünden çok önce geçmişse ya da madde şablon/örnek/geçmiş tutanak gibi duruyorsa 'gec'. Sahip yazılı değilse ya da "
                                "kullanıcıysa ve madde somut bir işse 'al'. Emin değilsen 'al' (kullanıcı listede kendisi eler)."},
     "is_kopya": {
-        "kararlar": ("ayni", "farkli", "emin_degil"), "yedek": "emin_degil", "soz_kaynak": None, "soz_oncelik_tavan": 1, "kisa": (), "metin": True,
+        "kararlar": ("ayni", "farkli", "emin_degil"), "yedek": "emin_degil", "soz_kaynak": None, "soz_oncelik_tavan": 1, "kisa": (), "metin": True, "amac": "degerlendir_dar",
         "tanim": {"ayni": "aynı iş: aynı çıktı/teslim, aynı kişi; yeniden konuşulduğu için iki kez kaydedilmiş", "farkli": "ayrı işler: farklı çıktı ya da farklı adım (hazırlık ile gönderim ayrı işlerdir)",
                           "emin_degil": "karar vermek için bilgi yetersiz ya da biri öbürünün alt adımı olabilir; kullanıcıya sorulsun"},
         "yonerge": "Her aday iki açık işi gösterir: YENİ (sonraki toplantı) ve ESKİ (önceki toplantı), ikisi de aynı sahibe ait (aday metni sahibi açıkça yazar; kayıtlarda adın yazımı 'Ali' / 'Ali K' gibi farklı olabilir, sahip farkını asla gerekçe yapma). Aynı iş = aynı çıktı/teslim, aynı kişi (biri ötekinin yeniden anılması). "
@@ -199,7 +200,7 @@ def dg_istem(is_turu, adaylar, soru, sema, ornek=None, tepki=None, simdi=None):
     d = simdi or datetime.datetime.fromtimestamp(float(DG_SAAT())); kar = sema["kararlar"]
     tanim = "\n".join(f"- {k}: {sema.get('tanim', {}).get(k, '')}" for k in kar)
     metin_satir = (", \"metin\": \"…\"" if sema.get("metin") else "")
-    return (f"Kişisel asistan olarak kullanıcıyı tanıyorsun (yukarıdaki profil, öğrenilenler, işler, notlar). Aşağıdaki adayların HER BİRİ için karar ver. Bugün: {d.day} {_DG_AY[d.month - 1]} {d.year} {_DG_GUN[d.weekday()]}.\n"
+    return (f"Kişisel asistan olarak kullanıcıyı tanıyorsun (yukarıdaki profil, öğrenilenler, bugünün takvimi ve planı, işler, notlar). Aşağıdaki adayların HER BİRİ için karar ver. Bugün: {d.day} {_DG_AY[d.month - 1]} {d.year} {_DG_GUN[d.weekday()]}.\n"
             f"Soru: {soru}\nKararlar:\n{tanim}\n{DG_ILKE}\n{sema.get('yonerge') or ''}\n"
             "oncelik: 0 = bilgi, 1 = normal, 2 = önemli, 3 = acil. neden: tek kısa Türkçe cümle (en çok 14 sözcük), adayın içeriğine dayan, mümkünse kişi adı yazmadan, uydurma.\n"
             + (tepki or "") + (f"Örnek:\n{ornek}\n" if ornek else "") +
@@ -253,12 +254,15 @@ def dg_karar_kaydet(is_turu, aday_id, karar, oncelik=1, neden=""):
     try: o = min(3, max(0, int(oncelik)))
     except (TypeError, ValueError): o = 1
     _dg_kayit("karar", **{"is": is_turu, "id": str(aday_id), "karar": str(karar)[:20], "oncelik": o, "neden": _dg_kisa(neden, 100)})
-def dg_cagri(istem, is_turu, soru=None, model=None):
+def dg_amac(sema):  # tür şemasından kişi modeli paketi amacı: şema "amac" verirse o; metin yazan türler (kullanıcıya söylenen cümleyi yeniden yazar) kimlikli; diğerleri "degerlendir"
+    sema = sema if isinstance(sema, dict) else {}
+    return sema.get("amac") or ("degerlendir_metin" if sema.get("metin") else "degerlendir")
+def dg_cagri(istem, is_turu, soru=None, model=None, amac=None):
     # Ortak model çağrısı (e-posta değerlendirmesi de buradan geçer): kişi modeli paketi + günlük tavan + ölçüm. → (ham, hata, {"maliyet", "sure_ms", "olculdu"} ya da None)
     if _dg_gizli(): return None, "gizli kip", None
     if "eylem_model" not in globals(): return None, "model yok", None
     if not dg_acik() or dg_tavan_asildi(): return None, ("günlük tavan" if dg_acik() else "kapalı"), None
-    kw = {"amac": "degerlendir", "soru": soru, "maske": _dg_maske}
+    kw = {"amac": amac or "degerlendir", "soru": soru, "maske": _dg_maske}
     try: p = inspect.signature(eylem_model).parameters
     except (TypeError, ValueError): p = {}
     if "is_adi" in p: kw["is_adi"] = "degerlendir:" + is_turu
@@ -316,7 +320,7 @@ def degerlendir(is_turu, adaylar, *, soru, sema, ornek=None, model=None):
                 for a in bekleyen[DG_ADAY_EN_COK:]: sonuc[a["id"]] = _dg_yedek(a, sema, "çok aday")
                 DG["tur_t"][is_turu] = simdi
                 istem = dg_istem(is_turu, cagri, soru, sema, ornek, dg_tepki_bolumu(is_turu, sema.get("soz_kaynak")))
-                ham, hata, olc = dg_cagri(istem, is_turu, soru, model)
+                ham, hata, olc = dg_cagri(istem, is_turu, soru, model, amac=dg_amac(sema))
                 r = dg_coz(ham, cagri, sema) if not hata and ham else {}
                 _dg_kayit("cagri", **{"is": is_turu, "aday": len(cagri), "tamam": len(r), "maliyet": (olc or {}).get("maliyet"), "sure_ms": (olc or {}).get("sure_ms"), **({"hata": str(hata)[:40]} if hata else {})})
                 if not r:

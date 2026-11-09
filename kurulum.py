@@ -599,6 +599,22 @@ special names and terms speech recognition must spell correctly (people, systems
 (supplier, stock, invoice) and Suflor.me.
 Output only this JSON and nothing else: {"not": "...", "terimler": ["...", "..."]}"""}
 PROFIL_BASLIK = {"tr": "## Ben ve işim", "en": "## About me and my work"}
+PROFIL_KR = 3000  # kisi-modeli.py KM_CAP["profil"] ile aynı: profil dosyası en çok bu kadar karakter okunur
+def profil_dosyasi(a):  # asistanın okuduğu profil dosyası (kisi-modeli.py profil_yol ile aynı çözüm: ayar kisilik_bellek, yoksa <uygulama>/profil.md)
+    y = os.path.expanduser(str(a.get("kisilik_bellek") or "").strip())
+    return y or os.path.join(gen(a.get("uygulama") or "~/Library/Application Support/Suflor"), "profil.md")
+def profil_nota_yaz(yol, blok, dil):  # → yazıldı mı. Dosya yoksa oluşturur (0600); varsa yalnız kurulumun boş iskeletine (“henüz yazılmadı” işareti) ve sığarsa ekler;
+    # kullanıcının yazdığı profile, bölüm zaten varsa ya da ~3000 karakteri aşacaksa dokunmaz
+    try:
+        if not os.path.exists(yol):
+            os.makedirs(os.path.dirname(yol), exist_ok=True); fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f: f.write("# Profil\n\n" if dil == "tr" else "# Profile\n\n"); f.write(blok)
+            return True
+        eski = open(yol, encoding="utf-8").read()
+        if PROFIL_BASLIK[dil] in eski: return True
+        if "(henüz yazılmadı)" not in eski or len(eski) + len(blok) + 2 > PROFIL_KR: return False
+        open(yol, "w", encoding="utf-8").write(eski.rstrip() + "\n\n" + blok); return True
+    except OSError as e: say(f"profil: profil dosyasına yazılamadı ({e.__class__.__name__})"); return False
 def profil_gerekli(c):  # yalnız adla not yazılmaz (uydurmaya iter); döküm ya da bir profil alanı gerekir
     return not c.get("kartsiz") and (bool(c.get("gorusmeler")) or any(c.get(k) for k in ("rol", "is_alani", "araclar_ek", "kisiler")))
 def profil():  # komut satırı: kurulum.py profil — kurulum.json'daki cevaplar + proje/gorusmeler → CLAUDE.md taslak notu
@@ -619,12 +635,16 @@ def profil():  # komut satırı: kurulum.py profil — kurulum.json'daki cevapla
     if not metin: say("profil: Claude not döndürmedi"); return
     s = open(cm, encoding="utf-8").read()
     if PROFIL_BASLIK[dil] in s: return  # bu arada kullanıcı yazdıysa dokunma
-    bugun = datetime.date.today().isoformat()
-    s = s.rstrip() + f"\n\n{PROFIL_BASLIK[dil]} " + ("(taslak)\n" if dil == "tr" else "(draft)\n") + \
+    bugun = datetime.date.today().isoformat(); metin = metin[:2200].rstrip()  # profil dosyası ~3000 karakterle sınırlı
+    blok = f"{PROFIL_BASLIK[dil]} " + ("(taslak)\n" if dil == "tr" else "(draft)\n") + \
         (f"_Kurulumda Claude hazırladı ({bugun}). İlk toplantının sonunda onaylanınca başlıktaki \"(taslak)\" silinir; istediğin zaman düzenleyebilirsin._\n\n" if dil == "tr" else
          f"_Drafted by Claude during setup ({bugun}). Once you approve it after your first meeting, \"(draft)\" is removed from the heading; edit it any time._\n\n") + metin + "\n"
     kisiler = [x.strip() for x in str(c.get("kisiler") or "").split(",") if x.strip()]
-    if kisiler: s += ("\nSık görüştüğüm kişiler: " if dil == "tr" else "\nPeople I meet often: ") + ", ".join(kisiler) + "\n"
+    if kisiler: blok += ("\nSık görüştüğüm kişiler: " if dil == "tr" else "\nPeople I meet often: ") + ", ".join(kisiler)[:300] + "\n"
+    # Not asistanın okuduğu profil dosyasına da yazılır (kisi-modeli.py profil_yol: ayar kisilik_bellek ya da <uygulama>/profil.md) — Marvin/brifing/toplantı paketi sihirbaz profilini buradan görür.
+    # CLAUDE.md'deki bölüm kalır: ilk toplantı sonundaki onay adımı ("taslak" başlığı, sablon/toplanti.md adım 7) ve çalışma klasöründe açılan Claude oturumları ona bakar.
+    profil_nota_yaz(profil_dosyasi(a), blok, dil)
+    s = s.rstrip() + "\n\n" + blok
     open(cm, "w", encoding="utf-8").write(s)
     if terimler: ayar_degistir(lambda a: a.update(whisper_terimler=list(dict.fromkeys((a.get("whisper_terimler") or []) + terimler))[:60]))
     say(f"profil: taslak not yazıldı ({len(metin.split())} kelime, {len(terimler)} terim)")

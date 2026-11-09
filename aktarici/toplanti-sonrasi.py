@@ -93,12 +93,30 @@ def pro_uclar(yol, baslik=None, en_cok=12):
     gruplar["is"].sort(key=lambda a: -len(a["say"]))
     return (gruplar["karar"] + gruplar["is"] + gruplar["soru"])[:en_cok]
 
+PRO_OZET_KR = 260  # değerlendirici sorusuna giren toplantı özeti (1–2 cümle)
+def pro_ozet_cumle(r):  # toplantı özet dosyasından (r["ozet"] yolu) başlık ve işaretleme satırları atlanarak ilk paragrafın 1–2 cümlesi, adres maskeli → "" (dosya yok/okunamaz). Yalnız toplantı özeti; döküm girmez
+    yol = str(r.get("ozet") or "")
+    try:
+        with open(yol, encoding="utf-8") as f: t = f.read(8000)
+    except (OSError, ValueError): return ""
+    par = []
+    for l in (x.strip() for x in t.splitlines()):
+        if not l or l.startswith(("#", "|", "---", "```", ">", "<")):
+            if par: break
+            continue
+        if l.startswith("_") and l.rstrip(".").endswith("_"): continue  # italik üst bilgi satırı ("İç belge…, Katılımcılar…"): içerik değil
+        par.append(re.sub(r"^[-*\d.\s]+", "", l).replace("**", "").replace("`", ""))
+    m = " ".join(" ".join(par).split()); m = " ".join(re.split(r"(?<=[.!?])\s+", m)[:2])
+    m = m if len(m) <= PRO_OZET_KR else m[:PRO_OZET_KR - 1].rstrip() + "…"
+    return _dg_maske(m) if "_dg_maske" in globals() else m
 def pro_degerlendir(r, c):
     # açık uçları değerlendiriciye sorar → (seçilen sayımı, seçilen adaylar [öncelikli]) ya da None (değerlendirici yok / cevap yok / uç yok: bugünkü tüm sayımla devam).
     uc = pro_uclar(r["yapi"], r.get("baslik") or r.get("dosya"))
     if not uc: return None
     baslik = r.get("baslik") or r.get("dosya") or _t("Son toplantı", "Last meeting")
-    sonuc = degerlendir("toplanti_sonrasi", uc, soru=f"«{baslik}» toplantısının açık uçlarından hangileri, toplantıdan hemen sonra kullanıcıya hatırlatılmaya değer? (Hatırlatma toplantı bittikten ~10 dk sonra tek bildirim olarak gider.)", sema=DG_SEMA["toplanti_sonrasi"])
+    oz = pro_ozet_cumle(r)  # toplantının kendisi hakkında 1–2 cümle: aday maddeler bağlamsız kalmasın (soruda; aday satırlarını şişirmez)
+    sonuc = degerlendir("toplanti_sonrasi", uc, soru=f"«{baslik}» toplantısının açık uçlarından hangileri, toplantıdan hemen sonra kullanıcıya hatırlatılmaya değer? (Hatırlatma toplantı bittikten ~10 dk sonra tek bildirim olarak gider.)"
+                        + (f" Toplantı özeti: {oz}" if oz else ""), sema=DG_SEMA["toplanti_sonrasi"])
     if not sonuc or all(s["kaynak"] == "yedek" for s in sonuc): return None
     sec = [dict(a, oncelik=s["oncelik"]) for a, s in zip(uc, sonuc) if s["karar"] == "soyle"]
     c2 = {"tarihsiz": 0, "sahipsiz": 0, "teyit": 0, "acik": 0, "deneme": c.get("deneme", False)}

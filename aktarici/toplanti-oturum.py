@@ -184,6 +184,26 @@ def topo_kisi_blogu(konu=None, yeni=True):  # 9 Kasım (kişi modeli): toplantı
         if yeni and not ("_gd_deneme" in globals() and _gd_deneme(konu)): m += baglam_paketi("toplanti", dilimler=["bugun", "gun_plani", "isler", "notlar", "gun_devri"], soru=konu)
         return ("\n\n" + m) if m else ""
     except Exception as e: print(f"KİŞİ MODELİ: toplantı oturumu bağlamı kurulamadı ({e.__class__.__name__})"); return ""
+TOPO_KISILIK_EN_COK = 16000  # kişilik gövdesinin isteme giren üst sınırı (karakter; paragraf sınırında kesilir) — Konuş tam metni kullanır, toplantı da aynı (tek ses; istem önbellekte)
+def topo_kisilik_blogu():  # 10 Kasım: pano sohbeti tek ses — toplantı kişiliğinin metni (Konuş'un kullandığı biçim) toplantı oturumunun YALNIZ sohbet cevaplarına; kart dili nötr kalır; kişilik yoksa boş
+    try:
+        k = next((x for x in kisilikler() if x["rol"] == "toplanti"), None) if "kisilikler" in globals() else None
+        if not k: return ""
+        m = str(k.get("metin") or "").strip()
+        if not m or ("BRIFING_YASAK" in globals() and any(y in m for y in BRIFING_YASAK)): return ""
+        if len(m) > TOPO_KISILIK_EN_COK: m = m[:TOPO_KISILIK_EN_COK].rsplit("\n", 1)[0].rstrip()
+        konusur = "asistan_toplanti" in globals() and asistan_toplanti()
+        return _t("\n\n[Kişilik — yalnız kullanıcıyla sohbet cevaplarında]\nBu bölüm yalnız kullanıcıyla sohbet cevabında geçerlidir: kullanıcının panodaki kutudan ya da sesle sorduğu soruya verdiğin cevap. "
+                  "Hitabın ve üslubun aşağıdaki kişilikten gelir; kullanıcı toplantı dışındaki asistanla aynı sesi duyar. Toplantı kartlarında, döküme düşen kısa kart metinlerinde ve KART/NOT biçiminde kişilik UYGULANMAZ: "
+                  "kart dili kısa ve nötr kalır, toplantı kuralları ve yukarıdaki biçim önce gelir. Ciddi anda espri yapma. "
+                  + ("Asistanlar toplantıda konuşuyor: sesli okunan cevabı karşı taraf da duyabilir, bu yüzden ton profesyonel kalır; kişilik yalnız sıcaklığa ve hitaba yansır. " if konusur else "")
+                  + "\n\n" + m + "\n[/Kişilik]",
+                  "\n\n[Persona — only in chat replies to the user]\nThis section applies only to chat replies to the user: your answer to a question typed in the panel box or asked by voice. "
+                  "Your form of address and style come from the persona below; the user hears the same voice as the assistant outside meetings. In meeting cards, the short card texts that land in the transcript and the KART/NOT format the persona does NOT apply: "
+                  "card language stays short and neutral; the meeting rules and the format above come first. No jokes at a serious moment. "
+                  + ("Assistants speak in the meeting: a spoken answer may be heard by the other side too, so the tone stays professional; the persona shows only in warmth and form of address. " if konusur else "")
+                  + "\n\n" + m + "\n[/Persona]")
+    except Exception as e: print(f"KİŞİLİK: toplantı oturumu kişilik metni kurulamadı ({e.__class__.__name__})"); return ""
 def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
     # cl: claude yolu · model: ayar claude_model · ky: toplanti-kanca.json (ya da None) · ilk: ilk kullanıcı iletisi · sid: kaldığı yerden (--resume)
     with TOPO["kilit"]:
@@ -206,7 +226,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
             try: TOPO["gun_ici"] = gun_ici_blogu(konu)
             except Exception as e: TOPO["gun_ici"] = ""; print(f"GÜN DEVRİ: gün içi bağlam kurulamadı ({e.__class__.__name__})")
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-prompt-tool", "stdio",
-                "--append-system-prompt", topo_istem() + topo_kisi_blogu(konu, not sid) + TOPO.get("gun_ici", "")] + (["--chrome"] if topo_chrome_acik() else []) + (["--model", str(model)] if model else []) + topo_effort() + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
+                "--append-system-prompt", topo_istem() + topo_kisilik_blogu() + topo_kisi_blogu(konu, not sid) + TOPO.get("gun_ici", "")] + (["--chrome"] if topo_chrome_acik() else []) + (["--model", str(model)] if model else []) + topo_effort() + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "toplanti-bos"),

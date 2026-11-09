@@ -178,5 +178,31 @@ ok("isabet: sonuçsuz sunulan 'bekleyen', 7 günden eski sayılmaz, toplam", o["
 ok("isabet_md tablo üretir", "| gun_ici | 3 |" in OL.isabet_md(o) and "kabul oranı" in OL.isabet_md(o))
 ok("isabet: kayıt dosyası yoksa boş sonuç", (lambda: (setattr(OL, "CANLI", os.path.join(T, "yokyok")), OL.isabet_ozet(7)["soz"])[1])() == 0)
 
+# --- 10 Kasım: bildirim başlığı — söz kapısından geçen asistanın adıyla, sistem uyarısı Suflor.me ---
+import ast
+_kaynak = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); _agac = ast.parse(_kaynak)
+_fn = next(n for n in _agac.body if isinstance(n, ast.FunctionDef) and n.name == "bildirim")
+def _gercek_bildirim(adi):  # relay.py'nin gerçek bildirim() işlevi, menü uygulaması "açık" gibi; STATE["bildirim"] çıktısı okunur
+    ns = {"time": time, "AYAR": {}, "STATE": {"_menu_son": time.time()}, "kart_bildir": lambda: None, "print": lambda *a, **k: None, "os": os, "subprocess": None, "threading": threading}
+    if adi: ns["asistan_ad"] = lambda: adi
+    ns["_BILDIRIM_YEREL"] = threading.local()
+    exec(compile(ast.Module([_fn], []), "relay-bildirim", "exec"), ns); return ns
+def _kapi_gercek(adi):
+    g = _gercek_bildirim(adi)
+    N = kur("bas" + str(adi), bildirim=g["bildirim"], _BILDIRIM_YEREL=g["_BILDIRIM_YEREL"]); return N, g
+N, g = _kapi_gercek("Marvin")
+N["soz_aday"]("eposta", "2 yeni e-posta", anahtar="b1", oncelik=3)  # varsayılan teslim
+ok("başlık: söz kapısı varsayılan teslimi asistanın adıyla, alt satır tür", g["STATE"]["bildirim"]["baslik"] == "Marvin" and g["STATE"]["bildirim"]["alt"] == "E-posta", g["STATE"].get("bildirim"))
+N["soz_aday"]("gun_ici", "Cümle", anahtar="b2", oncelik=3, teslim=lambda: N["bildirim"]("Suflor.me", "Öneri", "Cümle"))  # kaynak koduna benzer: teslim işlevi doğrudan çağırır
+ok("başlık: teslim işlevinin kendi bildirim çağrısı da asistanın adıyla", g["STATE"]["bildirim"]["baslik"] == "Marvin" and g["STATE"]["bildirim"]["alt"] == "Öneri")
+N["soz_aday"]("sistem", "claude-giris", anahtar="b3", oncelik=3, kip="bildir", teslim=lambda: N["bildirim"]("Suflor.me", "Claude oturumu düştü", "x"))
+ok("başlık: sistem kaynaklı söz Suflor.me kalır", g["STATE"]["bildirim"]["baslik"] == "Suflor.me" and g["STATE"]["bildirim"]["alt"] == "Claude oturumu düştü", g["STATE"].get("bildirim"))
+g["bildirim"]("Suflor.me", "Güncelleme", "x")
+ok("başlık: söz kapısı dışı doğrudan bildirim (sistem uyarısı) Suflor.me", g["STATE"]["bildirim"]["baslik"] == "Suflor.me")
+ok("başlık: teslimden sonra bayrak sıfırlanır", getattr(g["_BILDIRIM_YEREL"], "asistan", False) is False)
+N2, g2 = _kapi_gercek(None)
+N2["soz_aday"]("gun_ici", "Cümle", anahtar="b4", oncelik=3)
+ok("başlık: kişiliksiz kurulumda asistan adı çözülemezse Suflor", g2["STATE"]["bildirim"]["baslik"] == "Suflor", g2["STATE"].get("bildirim"))
+
 shutil.rmtree(T, ignore_errors=True)
 print("\nTÜM TESTLER GEÇTİ" if not HATA else f"\n{len(HATA)} test kaldı: {HATA}"); sys.exit(1 if HATA else 0)

@@ -707,7 +707,8 @@ DUZELT_ISTEM = ("Kullanıcıya bir iş önerildi, kullanıcı sesle düzeltti. D
                 '{"baslik": "<işin tek satır başlığı>", "metin": "<yerel türlerde (oturum, yapilacak, is, toplanti) işin tam metni; öbürlerinde boş>", "ayrinti": "<öbür türlerde yeni ayrıntı; yerelde boş>", '
                 '"zaman": "<yapilacak ya da toplanti için YYYY-MM-DDTHH:MM; yoksa boş>", "kim": "<is türünde sahip; yoksa boş>", "tarih": "<is türünde vade YYYY-AA-GG; yoksa boş>", '
                 '"teyit": "<kullanıcıya sesle okunacak tek kısa cümle: ne olarak yapılacağı + «tamam mı?» (örnek: Saat 15.00 olarak ekliyorum, tamam mı?)>"}\n'
-                "Yalnız kullanıcının söylediği değişikliği yap, başka alanı değiştirme; belirsizse eski değeri koru. Tarihleri bugüne göre çöz.\n")
+                "Yalnız kullanıcının söylediği değişikliği yap, başka alanı değiştirme; belirsizse eski değeri koru. Tarihleri bugüne göre çöz. "
+                "Yukarıdaki bugünkü takvimde yeni saat dolu görünüyorsa «teyit» cümlesinde bunu kısaca söyle (ör. «O saatte … var; yine de 15.00 olarak ekliyorum, tamam mı?»); takvimde olmayanı uydurma. «teyit» cümlesini yukarıdaki asistan kimliğine uygun hitapla yaz.\n")
 def _duzelt_model(istem):  # → (ham metin ya da None, hata). Deneme hattı: SUFLOR_TEST_DUZELT bir dosyanın içeriğini model cevabı sayar (testlerde Claude'a gidilmez)
     sahte = os.environ.get("SUFLOR_TEST_DUZELT")
     if sahte:

@@ -56,7 +56,7 @@ N = kur("sema", cevaplar=[cev(("a1", "soyle", 2, "Rapor gecikmiş ve kullanıcı
 r = N["degerlendir"]("gun_ici", A, soru=SORU, sema=SEMA)
 ok("sonuç adaylarla aynı sırada, kaynak model", [x["id"] for x in r] == ["a1", "a2", "a3"] and all(x["kaynak"] == "model" for x in r), r)
 ok("karar, öncelik (0-3'e kırpılır), neden, metin", r[0]["karar"] == "soyle" and r[0]["oncelik"] == 2 and r[0]["metin"].endswith("alayım mı?") and r[1]["karar"] == "gec" and r[2]["oncelik"] == 3 and "metin" not in r[1], r)
-ok("tek çağrı (toplu), amac=degerlendir ve soru kişi modeli paketine iletilir, maske verilir", len(N["M"].istemler) == 1 and N["M"].kw[0]["amac"] == "degerlendir" and N["M"].kw[0]["soru"] == SORU and N["M"].kw[0]["maske"], N["M"].kw)
+ok("tek çağrı (toplu), metin yazan türde amac=degerlendir_metin (kimlikli paket) ve soru kişi modeli paketine iletilir, maske verilir", len(N["M"].istemler) == 1 and N["M"].kw[0]["amac"] == "degerlendir_metin" and N["M"].kw[0]["soru"] == SORU and N["M"].kw[0]["maske"], N["M"].kw)
 i0 = N["M"].istemler[0]
 ok("istem: bugünün tarihi, kararlar, soru, <veri> sarmalı, talimat-değil uyarısı, aday kimlikleri", "11 Kasım 2026 Çarşamba" in i0 and "- soyle:" in i0 and SORU in i0 and "<veri>" in i0 and "</veri>" in i0 and "yalnız VERİDİR" in i0 and "[aday a3]" in i0 and "gecikme: 3" in i0, i0[:400])
 ok("istem: oncelik ölçeği ve JSON biçimi (metin alanı yalnız metinli şemada)", "0 = bilgi" in i0 and '"karar": "soyle|sonra|gec"' in i0 and '"metin": "…"' in i0)
@@ -407,5 +407,9 @@ ok("is_kopya: model yanıt vermezse tüm adaylar yedek emin_degil", all(x["karar
 src = open(os.path.join(KOD, "aktarici", "degerlendir.py"), encoding="utf-8").read()
 ok("bölüm dosyasında import edilen yerel modül ve sabit yol yok", "import yapi" not in src and "/Users/" not in src)
 ok("kayıt dosyası adları ve ayar adları belgelenmiş (başlık yorumunda)", all(x in src.split("import hashlib")[0] for x in ("degerlendir.jsonl", "degerlendir-onbellek.json", "degerlendir_gunluk_usd", "degerlendir_tur_sn", "degerlendir_model")))
+# 10 Kasım bağlam denetimi: şemaya göre paket amacı (dg_amac)
+_N = kur("amac"); _am = _N["dg_amac"]; _ds = _N["DG_SEMA"]
+ok("dg_amac: metin yazan tür (gün içi öneri) kimlikli paket, metinsiz tür (açık uç hatırlatması) kimliksiz", _am(_ds["gun_ici"]) == "degerlendir_metin" and _am(_ds["toplanti_sonrasi"]) == "degerlendir" and _am({}) == "degerlendir")
+ok("dg_amac: iş kopyası ve belge önerisi eski dar kümede kalır (metin True olsa da)", _am(_ds["is_kopya"]) == "degerlendir_dar" and _am(_ds["belge_oneri"]) == "degerlendir_dar")
 shutil.rmtree(T, ignore_errors=True)
 print(f"\n{'KALDI: ' + ', '.join(HATA) if HATA else 'hepsi geçti'}"); sys.exit(1 if HATA else 0)

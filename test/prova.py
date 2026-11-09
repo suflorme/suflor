@@ -122,4 +122,18 @@ ns["prova_sifirla"]()
 bak("prova_islem: oner / baslat / cevap / bitir", len(ns["prova_islem"]({"islem": "oner", "konu": "k"})["kisiler"]) == 3 and ns["prova_islem"]({"islem": "baslat", "konu": "k", "kisiler": ["A", "B", "C"], "proje": False, "tur": 1})["durum"] == "bekliyor"
     and ns["prova_islem"]({"islem": "cevap", "metin": "c"})["durum"] == "bekliyor" and ns["prova_islem"]({"islem": "bitir"})["durum"] == "bitti")
 bak("bilinmeyen işlem hata verir", "hata" in ns["prova_islem"]({"islem": "x"}) and "hata" in ns["prova_islem"](None))
+# 12) bağlam denetimi (10 Kasım): rol önerisi ve rapor isteminin başında kişi modeli paketi + (konuyla örtüşen takvim toplantısının) katılımcı bloğu
+PK = []; GZ = {"a": False}
+ns["baglam_paketi"] = lambda amac, **k: (PK.append((amac, k)), "[PAKET-" + amac + "]\n")[1]; ns["gizli_acik"] = lambda: GZ["a"]
+ns["_km_sar"] = lambda ad, govde, ac="", cap=None: f"[{ad}]\n{govde}\n[/{ad}]\n"; ns["_t"] = _t
+ns["katilimci_view"] = lambda olay=None, gorulen=None: {"blok": "KATILIMCILAR: Aylin Örnek (davetli)", "kisi": 1, "eslesmeyen": 0}
+json.dump({"olay": {"baslik": "Fiyat modeli toplantısı", "katilimcilar": ["Aylin Örnek"]}}, open(os.path.join(BASE, "takvim-secilen.json"), "w"))
+ns["PROVA"].clear(); ns["PROVA"]["durum"] = "yok"; CAGRI.clear(); PK.clear(); ns["prova_oner"]("Yeni fiyat modeline geçiş kararı", "")
+bak("rol önerisi: paket (brifing amacı, soru = konu) + konuyla örtüşen toplantının katılımcı bloğu isteme girdi", CAGRI[0].startswith("[PAKET-brifing]") and PK[0][0] == "brifing" and PK[0][1]["soru"] == "Yeni fiyat modeline geçiş kararı" and "Aylin Örnek" in CAGRI[0] and PK[0][1]["en_cok_kr"] == ns["PROVA_PAKET_KR"])
+CAGRI.clear(); ns["prova_oner"]("Bambaşka konu: ofis taşınması", ""); bak("konu takvim toplantısıyla örtüşmüyorsa katılımcı bloğu girmez, paket yine gelir", CAGRI[0].startswith("[PAKET-brifing]") and "Aylin Örnek" not in CAGRI[0])
+GZ["a"] = True; CAGRI.clear(); ns["prova_oner"]("Yeni fiyat modeline geçiş kararı", ""); bak("gizli kipte katılımcı bloğu hiç girmez (paket süzgeci baglam_paketi'nde)", "Aylin Örnek" not in CAGRI[0]); GZ["a"] = False
+ns["prova_sifirla"](); v = ns["prova_baslat"]("Yeni fiyat modeline geçiş", "Kısa bağlam", ["CFO", "Hukuk", "Müşteri"]); ns["prova_cevap"]("c1"); ns["prova_cevap"]("c2"); ns["prova_cevap"]("c3")
+CAGRI.clear(); PK.clear(); ns["prova_bitir"]()
+bak("rapor: paket başa eklenir, soru = prova konusu", CAGRI and CAGRI[-1].startswith("[PAKET-brifing]") and "Prova bitti" in CAGRI[-1] and PK and PK[-1][1]["soru"] == "Yeni fiyat modeline geçiş")
+ns["prova_sifirla"]()
 print("\n" + (f"{len(hata)} test kaldı" if hata else "hepsi geçti")); sys.exit(1 if hata else 0)

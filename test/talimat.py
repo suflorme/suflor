@@ -368,4 +368,6 @@ finally:
     NABIZ2.set(); r2.terminate(); r2.wait(5)
     if HATA or sys.exc_info()[0]: print("günlük:", log2)
     else: shutil.rmtree(T2, ignore_errors=True)
+_tk = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "aktarici", "talimat.py"), encoding="utf-8").read()
+ok("sesli düzeltme: model çağrısı amac=talimat (paket: kimlik + bugün); istem dolu saati teyitte söyletir, takvimde olmayanı uydurtmaz", 'eylem_model(istem, amac="talimat")' in _tk and "bugünkü takvimde yeni saat dolu" in _tk and "uydurma" in _tk and "tamam mı?»)" in _tk)
 print("talimat:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

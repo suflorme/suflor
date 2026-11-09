@@ -1522,10 +1522,12 @@ def _son_tekil(ls):  # aynı özet dosyası listede bir kez (5 Kasım: özet iki
 def son_yukle():
     try: SON[:] = _son_tekil([json.loads(l) for l in open(os.path.join(BASE, "son-toplantilar.jsonl"), encoding="utf-8") if l.strip()])[-20:]
     except (OSError, ValueError): return
+_BILDIRIM_YEREL = threading.local()  # söz kapısı teslim işlevini çağırırken .asistan = True (aktarici/soz-kapisi.py)
 def bildirim(baslik, alt, metin, son=None, **ek):  # ek: menü uygulamasına giden ek alanlar (toplantı hatırlatmasında aksiyon=["hazirlik", "katil"], hatirlat=<kimlik>)
     # menü uygulaması açıksa bildirimi o gösterir (v0.31.3): tıklayınca özet açılır (son: SON kaydının kimliği) ya da pano. osascript'in
     # bildirimine tıklayınca Betik Düzenleyici boş açılıyordu (12 Ekim). Menü uygulaması yoksa (beta) eski yol.
     if AYAR.get("bildirim") is False: return
+    if baslik == "Suflor.me" and getattr(_BILDIRIM_YEREL, "asistan", False): baslik = asistan_ad() if "asistan_ad" in globals() else "Suflor"  # 10 Kasım: asistan kaynaklı (söz kapısından geçen) bildirim asistanın adıyla; alt satır tür; sistem uyarısı Suflor.me kalır
     if time.time() - (STATE.get("_menu_son") or 0) < 90:
         STATE["bildirim"] = {"id": "b" + str(int(time.time() * 1000)), "t": time.time(), "baslik": baslik, "alt": alt, "metin": metin, **({"son": son} if son else {}), **{k: v for k, v in ek.items() if v}}
         kart_bildir(); print(f"BİLDİRİM (menü): {alt}"); return
@@ -1572,8 +1574,10 @@ def son_ekle(p):
     if r["dosya"]: toplanti_bitir("özet hazır", r["dosya"])  # Faz B: özet hazır = toplantı bitti (pano hemen "Son toplantılar"a geçer)
     if r.get("yapi") and "so_tetik" in globals(): so_tetik()  # 3 Kasım: öğrenen sözlük — yapı dosyasındaki düzeltmeler (toplantı bitince işlenir)
     print(f"ÖZET: hazır" + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""))
-    bildirim("Suflor.me", _t("Toplantı özeti hazır", "Meeting summary ready"),
-             (r["baslik"] or os.path.basename(ozet)) + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""), son=r["id"])
+    _BILDIRIM_YEREL.asistan = True  # asistan kaynaklı: başlık asistanın adı
+    try: bildirim("Suflor.me", _t("Toplantı özeti hazır", "Meeting summary ready"),
+                  (r["baslik"] or os.path.basename(ozet)) + (f" · {cikti_metin(r['cikti'])}" if r["cikti"] else ""), son=r["id"])
+    finally: _BILDIRIM_YEREL.asistan = False
     ozet_sesli(r)
     if "pro_planla" in globals(): pro_planla(r)  # toplantı sonrası açık uç hatırlatması (aktarici/toplanti-sonrasi.py)
     return {"ok": True, "id": r["id"]}

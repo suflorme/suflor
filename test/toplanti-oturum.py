@@ -120,7 +120,9 @@ while True:
     else: yaz("Aldım: " + q); bitti()
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "kod": os.path.join(T, "kod"),
+kisilik_d = os.path.join(T, "kisilik.md")  # kurgu kişilik: toplantı oturumunun sohbet cevaplarına giren metin
+open(kisilik_d, "w", encoding="utf-8").write("---\nad: Atlas\nhitap: Atlas\nhitap_bicimi: sen\n---\n## Kişilik: Atlas\nSen diye hitap edersin, samimi ve sıcaksın. KİŞİLİK-İŞARETİ-ATLAS\nCiddi anda espri yapmazsın.\n")
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "kisilik": kisilik_d, "port": PORT, "uygulama": T, "proje": proje, "kod": os.path.join(T, "kod"),
                                                "ortak": "/Users/Shared/Suflor", "claude": sahte, "konusma": False, "yerel_ses": False,
                                                "toplanti_bilgi_kaynaklari": [{"sunucu": "claude.ai Deneme Metrik", "araclar": ["get_*", "list_*", "query_*", "compare_*"],
                                                                               "konu": "deneme satış ve kanal metrikleri", "ad": "Deneme Metrik"}]}, open(ay, "w"))
@@ -173,6 +175,9 @@ try:
     ok("claude stream-json + izin soruları aktarıcıya (--permission-prompt-tool stdio)", "stream-json" in a and a[a.index("--permission-prompt-tool") + 1] == "stdio")
     st = a[a.index("--settings") + 1]
     ok("kanca dosyası Brifing.app'te denetlenip içerik olarak verildi (izin-kanca, -I -B)", st.startswith("{") and "izin-kanca" in st and "python3 -I -B" in st)
+    _is = a[a.index("--append-system-prompt") + 1]; _is = __import__("unicodedata").normalize("NFC", _is)
+    ok("sohbet kişiliği: kişilik metni istemde, yalnız sohbet cevabıyla sınırlı", "KİŞİLİK-İŞARETİ-ATLAS" in _is and "yalnız kullanıcıyla sohbet cevaplarında" in _is and "UYGULANMAZ" in _is and "kart dili kısa ve nötr" in _is and "Ciddi anda espri yapma" in _is)
+    ok("sohbet kişiliği: kart kuralı (TOPO_ISTEM) kişilikten önce, nötr kalır; toplantıya özgü asistan sesli cümlesi yok (toplantiya_ses kapalı)", _is.index("Bu toplantı oturumu Suflor.me panosundan") < _is.index("KİŞİLİK-İŞARETİ-ATLAS") and "karşı taraf da duyabilir" not in _is)
     ok("ilk ileti /toplanti, istem metni argümanda yok", not any(x.startswith("/toplanti") for x in a) and "--permission-mode" not in a and "--resume" not in a)
     ok("eski .command Terminal'e açılmadı (yine yazılır, açılmaz)", "arka planda Claude" in open(os.path.join(T, "relay.log")).read())
 

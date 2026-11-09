@@ -16,6 +16,7 @@ import hashlib
 SOZ_DOSYA, SOZ_KUYRUK_DOSYA = "soz.jsonl", "soz-kuyruk.json"
 SOZK = {"kuyrukta_teslim": False, "kuyruk": [], "son": {}, "tekrar": {}, "bekle": {}, "gun": {"tarih": "", "teslim": 0, "bastirilan": 0}, "son_t": 0.0, "n": 0, "dongu": False, "bekleyen_yaz": []}
 SOZ_KILIT = threading.RLock()
+_BILDIRIM_YEREL = globals().get("_BILDIRIM_YEREL") or threading.local()  # relay.py tanımlar; yalıtılmış testte burada
 SOZ_SAAT = globals().get("SOZ_SAAT") or time.time  # testlerde sahte saat (önceden tanımlıysa korunur)
 SOZ_SONUCLAR = ("kabul", "ret", "ertele", "yoksay")
 SOZ_DONGU_SN, SOZ_GECERLI_SN, SOZ_YOKSAY_VARSAYILAN = 60, 4 * 3600, 4 * 3600
@@ -84,8 +85,10 @@ def _soz_varsayilan(r):  # teslim işlevi verilmeyen (ya da yeniden başlatmadan
 
 def _soz_teslim_et(r):  # kilit DIŞINDA; teslim işlevi False dönerse söz iptal sayılır
     f = r.get("teslim_f")
+    _BILDIRIM_YEREL.asistan = r["kaynak"] != "sistem"  # 10 Kasım: söz kapısından geçen her şey asistanın adıyla (sistem uyarısı Suflor.me)
     try: s = _soz_varsayilan(r) if f is None else f()
     except Exception as e: print(f"SÖZ: teslim hatası ({r['kaynak']}: {e.__class__.__name__})"); return True
+    finally: _BILDIRIM_YEREL.asistan = False
     return s is not False
 def _soz_sayac(r, simdi):  # teslim sayıldı (kilit içinde)
     SOZK["gun"]["teslim"] += 1; r["teslim_edildi"] = True; r["teslim_t"] = simdi

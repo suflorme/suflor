@@ -115,11 +115,30 @@ pk = bp("toplanti", dilimler=["kimlik"]); ok("kimlik: kişilik adı, sen hitabı
 ok("kişilik yokken kimlik 'Suflor'", "Adın Suflor" in (lambda: (AYAR.update(kisilik=""), ns["_KIS_D"].clear(), bp("toplanti", dilimler=["kimlik"]), AYAR.update(kisilik=kd), ns["_KIS_D"].clear())[2])())
 
 # --- 5) amaç varsayılanları ve bütçe --------------------------------------------------------------------------------------------------------
-for amac in ("konus", "toplanti", "brifing", "talimat", "kayit", "degerlendir"):
+for amac in ("konus", "toplanti", "brifing", "talimat", "kayit", "degerlendir", "degerlendir_metin", "degerlendir_dar", "eposta"):
     pk = bp(amac, simdi=simdi); ok(f"amaç {amac}: boş değil, bütçe içinde ({len(pk)} karakter)", pk and len(pk) <= ns["KM_AMAC"][amac][1])
-ok("amaç kümeleri: talimat/kayit yalnız profil+öğrenilen; toplantı kimlik+gün bağlamı", "[Bugün" not in bp("talimat", simdi=simdi) and "[Notlar" not in bp("kayit", simdi=simdi) and "[Asistan kimliği" in bp("toplanti", simdi=simdi) and "[Bugün" in bp("toplanti", simdi=simdi) and "[Asistan kimliği" not in bp("konus", simdi=simdi))
+ok("amaç kümeleri: kayit yalnız profil+öğrenilen; toplantı kimlik+gün bağlamı", "[Notlar" not in bp("kayit", simdi=simdi) and "[Bugün" not in bp("kayit", simdi=simdi) and "[Asistan kimliği" in bp("toplanti", simdi=simdi) and "[Bugün" in bp("toplanti", simdi=simdi) and "[Asistan kimliği" not in bp("konus", simdi=simdi))
 ok("en_cok_kr toplam bütçeyi ezer", len(bp("toplanti", en_cok_kr=900, simdi=simdi)) <= 900 and len(bp("toplanti", en_cok_kr=900, simdi=simdi)) > 0)
 ok("dilimler sırası KM_ONCELIK'e göre, bilinmeyen dilim yok sayılır", (lambda t: t.index("[Kullanıcı profili") < t.index("[Bugün"))(bp("konus", dilimler=["bugun", "profil", "yok"], simdi=simdi)))
+
+# --- 5b) bağlam denetimi (10 Kasım): değerlendirici/talimat/brifing/e-posta amaçlarına yeni dilimler ---------------------------------------------------
+ns["_KM_ONB"].clear(); ns["gun_plani_oku"] = lambda g: {"ozet": "Bugün teklif günü.", "odak": [{"saat": "15:00", "metin": "Teklifi kapat"}], "dikkat": [], "sabit": []}
+pd, pm, pdar = bp("degerlendir", simdi=simdi), bp("degerlendir_metin", simdi=simdi), bp("degerlendir_dar", simdi=simdi)
+ok("değerlendirici: bugün (takvim) + günün planı geldi, kimlik yok; bütçe 4200", "[Bugün" in pd and "Haftalık görüşme" in pd and "[Günün planı" in pd and "Teklifi kapat" in pd and "[Asistan kimliği" not in pd and ns["KM_AMAC"]["degerlendir"][1] == 4200 and len(pd) <= 4200)
+ok("değerlendirici (metin yazan türler): asistan kimliği de gelir; bütçe 4700", "[Asistan kimliği" in pm and "Adın Atlas" in pm and "[Bugün" in pm and "[Günün planı" in pm and len(pm) <= 4700)
+ok("değerlendirici dar küme (iş kopyası/belge önerisi): eski kümeyle bugün/plan/kimlik yok", "[Bugün" not in pdar and "[Günün planı" not in pdar and "[Asistan kimliği" not in pdar and "[Kullanıcı profili" in pdar and len(pdar) <= 3000)
+pt = bp("talimat", simdi=simdi)
+ok("sesli düzeltme (talimat): kimlik + bugün (takvim dolu mu) geldi; bütçe 2700", "[Asistan kimliği" in pt and "[Bugün" in pt and "Haftalık görüşme" in pt and "Yarınki sunum" in pt and ns["KM_AMAC"]["talimat"][1] == 2700 and len(pt) <= 2700)
+pb = bp("brifing", simdi=simdi, soru="Haftalık görüşme")
+ok("brifing: bugün + açık işler dilimi geldi; bütçe 3400", "[Bugün" in pb and "[Açık işler" in pb and "Raporu oku" in pb and ns["KM_AMAC"]["brifing"][1] == 3400 and len(pb) <= 3400)
+pe = bp("eposta", simdi=simdi, soru="Deniz Atlas")
+ok("e-posta amacı: profil + bugün + gönderenle açık işler (başkasında bekleyen, adı anılan); asistan kimliği YOK (kullanıcının kendi sesi)", "[Kullanıcı profili" in pe and "[Bugün" in pe and "[Bu kişiyle açık işler" in pe and "- [Deniz] x" in pe and "[Asistan kimliği" not in pe and len(pe) <= 3600)
+ok("e-posta amacı: gönderen adı yoksa ya da işte geçmiyorsa kişi dilimi boş", "[Bu kişiyle" not in bp("eposta", simdi=simdi) and "[Bu kişiyle" not in bp("eposta", simdi=simdi, soru="Zeynep Yılmaz"))
+pe2 = bp("eposta", simdi=simdi, soru="Teklifi")
+ok("kişi işleri: kullanıcının kendi işi de adı anılıyorsa gelir ([sende]); geride kalan işler girmez", "[sende] Teklifi gönder" in pe2 and "Eski iş" not in pe2)
+ns["GIZLI"]["acik"] = True; pg = bp("eposta", simdi=simdi, soru="Deniz Atlas") + bp("degerlendir_metin", simdi=simdi) + bp("talimat", simdi=simdi) + bp("brifing", simdi=simdi)
+ok("gizli kip: yeni dilimlerde de (kişi işleri, bugün, plan) içerik yok; yalnız kimlik/profil/öğrenilen", not any(x in pg for x in ("[Bu kişiyle", "[Bugün", "[Günün planı", "[Açık işler", "Haftalık görüşme", "Raporu oku")) and "[Kullanıcı profili" in pg)
+ns["GIZLI"]["acik"] = False
 
 # --- 6) gizlilik süzgeci: tek yerde ---------------------------------------------------------------------------------------------------------
 ns["GIZLI"]["acik"] = True; pk = bp("toplanti", simdi=simdi)
