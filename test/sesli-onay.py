@@ -15,7 +15,7 @@ def ok(ad, k):
 bs = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read(); ts = open(os.path.join(KOD, "aktarici", "talimat.py"), encoding="utf-8").read()
 # 1) ayrıştırma
 _ad = {"SES_CEVAP", "SES_PEKISTIRME", "SES_AMA", "SES_DOLGU", "SES_DUZELT_BAS", "sesli_ayir", "sesli_duzeltme", "sesli_cevap", "EYLEM_FIIL", "SORU_YENIDEN", "SORU_UZUN", "SORU_BIRAK", "SORU",
-       "kullanici_ilk_ad", "_eylem_fiil", "_soru_metni", "_yeniden_sor", "_cumle"}
+       "kullanici_ilk_ad", "_eylem_fiil", "_izin_turu", "_kayit_izin", "_fiil_x", "_soru_metni", "_yeniden_sor", "_cumle"}
 def sec(kaynak, adlar): return ast.Module([n for n in ast.parse(kaynak).body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in adlar for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in adlar)], [])
 EY = []; SOYLENEN = []; KONUS = []; KARAR = []; GUN = datetime.date.today()
 def _yama(x, **k): x.update(k)

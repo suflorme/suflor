@@ -10,6 +10,7 @@
 #  4) Sesle düzeltme sırası: "bunu hatırla / bu yanlış / bunu unut" → canli/bellek-sira.jsonl (0600); kart onayında kullanıcıya gelir, kart kendiliğinden değişmez.
 KONUS_GECMIS_DOSYA, BELLEK_SIRA_DOSYA = "konus-gecmis.jsonl", "bellek-sira.jsonl"
 KONUS_GECMIS_GUN = int(AYAR.get("konus_gecmis_gun") or 90)
+KONUS_YAZILI_EN_COK, KONUS_PANEL_AYRINTI = 8000, 30  # yazılı cevabın kayıttaki sınırı (karakter); /konus-gecmis tam cevabı yalnız en yeni bu kadar kayıtta verir (yanıt küçük kalsın)
 KART_EN_COK = 12000  # karakter (~3 bin belirteç); fazlası kesilir, günlüğe yazılır
 _BLM = {"kart_yol": None, "kart_mt": None, "kart": None, "uyari": None, "son": None}
 def konus_gecmis_acik(): return AYAR.get("konus_gecmis", bool(AYAR.get("kisilik_bellek"))) is not False
@@ -23,10 +24,12 @@ def konus_gecmis_yaz(tur, metin, toplanti=None):  # biten Konuş turu → geçmi
     if not konus_gecmis_acik() or tur.get("kaynak") in ("karsi", "ozet") or tur.get("karsi"): return
     soru = " ".join(str(tur.get("soru") or KONUS.get("soru") or "").split())
     if not soru or not metin: return
+    if "gizli_acik" in globals() and gizli_acik(): return  # gizli kipte sorulan tur geçmişe hiç yazılmaz, aramaya da girmez (eski "gizli" işaretli satırlar okunurken yine saklanır)
     m = re.search(r"(?:^|\n)\s*-{3,}\s*\n?", metin)
     sesli, ayr = ((metin[:m.start()], metin[m.end():]) if m else (metin, ""))
     o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "kisilik": tur.get("kisi") or kisilik_ad(), "kaynak": tur.get("kaynak") or "bas",
-         "soru": soru[:1000], "sesli": " ".join(sesli.split())[:1500], "ayrinti": ayr.strip()[:4000], "toplanti": toplanti if tur.get("toplantida") else None}
+         "soru": soru[:1000], "sesli": " ".join(sesli.split())[:1500], "ayrinti": ayr.strip()[:4000], "toplanti": toplanti if tur.get("toplantida") else None,
+         "yazili": metin.strip()[:KONUS_YAZILI_EN_COK]}  # v0.212.0: panodaki sohbet paneli yenilemeden sonra cevabın tamamını (satır sonları, markdown) gösterir
     _gizli_ekle(KONUS_GECMIS_DOSYA, json.dumps(o, ensure_ascii=False) + "\n"); _BLM["son"] = (o["soru"], o["sesli"])
     def dizinle():  # aramaya hemen girsin (10 dk'lık tam dizin turunu beklemeden)
         mo = _onara_mod()
@@ -65,7 +68,11 @@ def konus_gecmis_liste(n=300):  # panodaki Konuş geçmişi (v0.67.0): en yeni �
     for l in reversed(sat):
         try: o = json.loads(l)
         except ValueError: continue
-        out.append({"id": _gecmis_kimlik(l), "at": o.get("at"), "kisilik": o.get("kisilik"), "soru": o.get("soru"), "sesli": o.get("sesli"), "toplanti": o.get("toplanti")})
+        x = {"id": _gecmis_kimlik(l), "at": o.get("at"), "kisilik": o.get("kisilik"), "soru": o.get("soru"), "sesli": o.get("sesli"), "toplanti": o.get("toplanti"), "kaynak": o.get("kaynak")}
+        if o.get("gizli"): x["gizli"] = True  # panel göstermez (geçmiş penceresi silinebilsin diye listede kalır)
+        if len(out) < KONUS_PANEL_AYRINTI:  # v0.212.0 sohbet paneli: tam yazılı cevap (eski kayıtta sesli + --- + ayrıntı)
+            x["yazili"] = (str(o.get("yazili") or "") or (str(o.get("sesli") or "") + ("\n\n---\n" + str(o.get("ayrinti")) if o.get("ayrinti") else "")))[:KONUS_YAZILI_EN_COK]
+        out.append(x)
         if len(out) >= n: break
     return {"ok": True, "acik": konus_gecmis_acik(), "gun": KONUS_GECMIS_GUN, "toplam": len(sat), "kayitlar": out}
 def konus_gecmis_sil(kimlik=None, kimlikler=None, hepsi=False):  # kullanıcının panodan sildiği kayıt(lar): dosyadan çıkar (arşive gitmez), dizin hemen güncellenir

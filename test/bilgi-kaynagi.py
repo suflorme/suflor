@@ -77,7 +77,7 @@ ns["bilgi_kaynaklari"] = lambda: [dict(K, url="")]; kontrol("url'siz kaynak → 
 ist = ns["bilgi_istem"](BY.konus_bilgi([K]))
 kontrol("istem eki: kaynak adı, konu, kaynağı ve dönemi söyle, kişi adı koyma, yazan araç yok", all(x in ist for x in ("Örnek Kaynak", "yapay satış verisi", "kaynağı ve dönemi", "kişi adı", "Yazan ya da değiştiren araç yok")) and ns["bilgi_istem"]([]) == "")
 kontrol("konus_istem iki dönüş yolunda da eki ekler", kod.count("+ bilgi_istem(bilgi) + web_istem(web)") == 2 and "def konus_istem(vt=None, bilgi=None, web=False):" in kod)
-kontrol("konus_ac: yalnız Claude Code beyninde kaynak, argüman ve istem birlikte", 'bilgi = konus_bilgi_kaynaklari() if sec["tur"] == "claude-code" else []' in kod and "konus_istem(vt, bilgi, web)" in kod and "sec[\"model\"], bilgi, web)" in kod)
+kontrol("konus_ac: yalnız Claude Code beyninde kaynak, argüman ve istem birlikte", 'bilgi = konus_bilgi_kaynaklari() if sec["tur"] == "claude-code" else []' in kod and "konus_istem(vt, bilgi, web)" in kod and "sec[\"model\"], bilgi, web" in kod)  # 9 Kasım: derin tur model/düşünme argümanı eklendi (ds["model"] if ds else sec["model"], bilgi, web, ds["effort"] …); kaynak yine birlikte gider
 # sağlama: her turun init'i; boş/pending yedeğe geçirmez, failed/needs-auth geçirir, 60 sn + 2 tur kuralı
 SN, AD = "claude_ai_Ornek_Kaynak", "Örnek Kaynak"
 def init(sunucular, araclar): return {"type": "system", "subtype": "init", "mcp_servers": sunucular, "tools": araclar}

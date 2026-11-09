@@ -81,7 +81,9 @@ def _sohbet_kulaklik():
     if time.time() - _SOH_KUL["t"] > 3: _SOH_KUL.update(t=time.time(), v=bool(kulaklik()))
     return _SOH_KUL["v"]
 def sohbet_view():
-    if SOHBET["acik"]: return {"acik": True, "bekle": SOHBET["bekle"], "okuyor": ses_caliyor(), "kulaklik": True}
+    if SOHBET["acik"]:
+        dv = SOHBET.get("devam")  # devam penceresi (bas-konus.py konus_devam_pencere): kalan sn — panoda/menüde "dinliyor (kısa)" göstergesi için
+        return {"acik": True, "bekle": SOHBET["bekle"], "okuyor": ses_caliyor(), "kulaklik": True, **({"devam": max(0, round(dv["sn"] - (time.time() - max(SOHBET["t_ses"], SOHBET["t_mesgul"])), 1))} if dv else {})}
     k = SOHBET.get("kapanis")
     return {"acik": False, "kulaklik": _sohbet_kulaklik(), **({"kapandi": k["neden"], "kapandi_sn": round(time.time() - k["t"])} if k and time.time() - k["t"] < 60 else {})}
 def sohbet_basla():
@@ -101,8 +103,8 @@ def sohbet_basla():
 def sohbet_kapat(neden, soz=None):
     with SOHBET["kilit"]:
         if not SOHBET["acik"]: return
-        SOHBET.update(acik=False, bekle=None, kapanis={"neden": "kullanici" if neden.startswith("kullanıcı") else {"toplantı başladı": "toplanti", "kulaklık çıktı": "kulaklik"}.get(neden, neden), "t": time.time()})
-        SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)
+        SOHBET.update(acik=False, bekle=None, kapanis=None if neden.startswith("devam") else {"neden": "kullanici" if neden.startswith("kullanıcı") else {"toplantı başladı": "toplanti", "kulaklık çıktı": "kulaklik"}.get(neden, neden), "t": time.time()})  # devam penceresi sessiz kapanır: panoda "Sohbet kapandı" notu çıkmaz
+        SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET.pop("devam", None)
     if not _KS["tur"]: _akis_sifirla(); _konus_kur(durum="hazir" if konus_canli() else "kapali")
     if soz: seslendir(soz, kuyruk=True)
     print(f"SOHBET: kapandı ({neden}, {time.time() - SOHBET['t_ac']:.0f} sn)")
@@ -118,6 +120,8 @@ def _sohbet_bekci(sira):
         if d and not _KS["tur"] and SOHBET["t_ses"] - d["t"] < 0.3 and simdi - d["t"] >= SOHBET_DUSUNME_SN: SOHBET.pop("dusunme", None); _sohbet_dusunme_gonder(d["metin"])
         if _KS["tur"] or (ses_caliyor() and not SOHBET["uyari"]): SOHBET["t_mesgul"] = simdi; continue
         bos = simdi - max(SOHBET["t_ses"], SOHBET["t_mesgul"])
+        dv = SOHBET.get("devam")
+        if dv and bos >= dv["sn"]: sohbet_kapat("devam penceresi bitti"); return  # sessiz kapanır (ses yok, "Buradayım" yok)
         if bos >= SOHBET_KAPAN_SN: sohbet_kapat("sessizlik", _t("Sohbeti kapattım.", "Conversation closed.")); return
         if bos >= SOHBET_UYARI_SN and not SOHBET["uyari"]:
             SOHBET["uyari"] = True; seslendir(_t("Buradayım.", "I'm here."), kuyruk=True); print(f"SOHBET: {SOHBET_UYARI_SN:.0f} sn sessizlik — uyarı")
@@ -236,5 +240,7 @@ def _sohbet_dusunme_gonder(metin):  # düşünme sözünden sonra SOHBET_DUSUNME
     print(f"SOHBET: düşünme sözünden sonra {SOHBET_DUSUNME_SN:.0f} sn sessizlik — söz olduğu gibi gidiyor")
     threading.Thread(target=_konus_sor, args=(metin, tur), daemon=True).start()
 def sohbet_metin(metin):  # konus_ses'in yazıya dökülmüş metni: sohbeti kapatan söz mü (True: Claude'a gitmez)
-    if not SOHBET["acik"] or not SOHBET_KAPAT_RX.match(metin or ""): return False
+    if not SOHBET["acik"]: return False
+    if SOHBET.get("devam") and DEVAM_KAPAT_RX2.match(metin or ""): sohbet_kapat("devam: kapanış sözü (" + " ".join(metin.split())[:30] + ")"); return True  # "tamam / teşekkürler": pencere sessizce kapanır, Claude'a gitmez
+    if not SOHBET_KAPAT_RX.match(metin or ""): return False
     sohbet_kapat("kullanıcı: " + " ".join(metin.split())[:40], _t("Görüşürüz.", "Talk soon.")); return True

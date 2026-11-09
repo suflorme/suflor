@@ -123,16 +123,24 @@ def konus_bilgi(kaynaklar):  # bilgi_kaynaklari() çıktısı → Konuş'ta kull
         if ar: out.append({"sunucu": sn, "url": k["url"], "araclar": ar, "ad": str(k.get("ad") or sn)[:60], "konu": str(k.get("konu") or "")[:200]})
     return out[:4]
 def bilgi_araclar(bilgi): return ",".join(f"mcp__{k['sunucu']}__{d}" for k in bilgi for d in k["araclar"])
-def konus_effort(ayar):
-    e = str(ayar.get("konus_effort") or "").strip().lower()
+def konus_effort(ayar, effort=None):  # effort: derin tur için süreç başına geçersiz kılma (bas-konus.py konus_ac)
+    e = str(effort or ayar.get("konus_effort") or "").strip().lower()
     return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
-def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None, bilgi=None, web=False):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli; bilgi: konus_bilgi() çıktısı; web: WebSearch/WebFetch (bas-konus.py konus_web_acik)
+# Derin tur (9 Kasım): analiz/karşılaştırma gibi sorularda o tur Opus'lu ayrı süreç (bas-konus.py konus_derin_mi/konus_ac). Ayarlar: konus_derin (varsayılan açık),
+# konus_derin_model (opus), konus_derin_effort (high). Yalnız Claude Code beyninde; kapalıysa None.
+def derin_secim(ayar):
+    if ayar.get("konus_derin", True) is False: return None
+    m = str(ayar.get("konus_derin_model") or "opus").strip()
+    if not re.fullmatch(r"[A-Za-z0-9._\[\]-]{1,64}", m): m = "opus"
+    e = str(ayar.get("konus_derin_effort") or "high").strip().lower()
+    return {"model": m, "effort": e if e in ("low", "medium", "high", "xhigh", "max") else "high"}
+def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None, bilgi=None, web=False, effort=None):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli; bilgi: konus_bilgi() çıktısı; web: WebSearch/WebFetch (bas-konus.py konus_web_acik)
     bilgi = konus_bilgi(bilgi) if bilgi else []
     ek = ",".join(x for x in (ek_araclar, bilgi_araclar(bilgi), KONUS_WEB_ARACLAR if web else "") if x)
     return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--allowedTools", "Read,Grep,Glob" + ("," + ek if ek else ""), "--add-dir", ek_dizin, "--append-system-prompt", sistem] + (["--mcp-config", mcp] if mcp else []) + \
            (yalin(ayar, bool(bilgi), web) or ["--no-session-persistence"]) + ["--model", model or secim(ayar, "konus")["model"]] + \
-           konus_onek_ayar(ayar, bilgi, "suflorvt" if mcp else None) + konus_effort(ayar)
+           konus_onek_ayar(ayar, bilgi, "suflorvt" if mcp else None) + konus_effort(ayar, effort)
 def ceviri_effort(ayar):  # varsayılan low (40 cümlede Haiku düşünme belirteci 455 → 0, ortanca 2,56 → 1,22 sn); ayar ceviri_effort: low|medium|high|xhigh|max, boş metin = bayrak yok
     e = str(ayar["ceviri_effort"] if "ceviri_effort" in ayar and ayar["ceviri_effort"] is not None else "low").strip().lower()
     return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []

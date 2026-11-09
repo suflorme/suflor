@@ -30,7 +30,7 @@ try:
            [("kayit", "Karar: erişim listesi cuma güncellenir", None), ("takip", "Deniz — takip e-postası", "Deniz"), ("mesaj", "Ekibe toplantı notu", None)]]
     post("/son-toplanti", {"ozet": os.path.join(T, "ozet.md"), "baslik": "Deneme", "cikti": {"karar": 2, "is": 3, "acik": 1}, "degerlendirme": "Bütçe onaylandı; **süre** uzatıldı", "oneri": "Gündemi kısalt"})
     time.sleep(0.5); L = log()
-    ok("özet sesli okundu (karar/iş/açık sayısı, kararlar, öneri, bekleyen sayısı)", "Toplantı özeti hazır. 2 karar, 3 iş, 1 açık. Bütçe onaylandı; süre uzatıldı. Öneri: Gündemi kısalt." in L and "3 iş var" in L)
+    ok("özet sesli okundu (karar/iş/açık sayısı, kararlar, öneri, bekleyen sayısı)", "Özet hazır. 2 karar, 3 iş, 1 açık. Bütçe onaylandı; süre uzatıldı. Benim önerim: Gündemi kısalt." in L and "3 iş onayını bekliyor" in L)
     post("/eylem-sun", {}); time.sleep(0.5)
     ok("sun → ilk iş soruldu", "Karar: erişim listesi cuma güncellenir. Bunu kayda geçireyim mi?" in log() and st()["eylem"]["sesli"] == ids[0])
     post("/eylem-karar", {"id": ids[0], "durum": "onaylandi"}, pano=True); time.sleep(0.5)
@@ -74,8 +74,8 @@ TABLO = [("Evet.", "onay"), ("Evet, yaz.", "onay"), ("Tamam.", "onay"), ("Olur o
 yanlis = [(m, b, _ns["sesli_ayir"](m)) for m, b in TABLO if _ns["sesli_ayir"](m) != b]
 ok(f"sesli cevap ayırıcısı {len(TABLO) - len(yanlis)}/{len(TABLO)}" + (f" — yanlış: {yanlis}" if yanlis else ""), not yanlis)
 # v0.131.0: doğal soru ve yeniden sorma (aktarıcının kendi tanımları)
-_ad2 = {"EYLEM_FIIL", "SORU_YENIDEN", "SORU_UZUN", "SORU_BIRAK", "kullanici_ilk_ad", "_eylem_fiil", "_yeniden_sor", "_soru_metni", "_cumle"}
-_ns2 = {"re": __import__("re"), "datetime": __import__("datetime"), "AYAR": {"ad": "Deniz K"}, "ARAYUZ_DILI": "tr", "_t": lambda a, b: a, "SORU": {}}
+_ad2 = {"EYLEM_FIIL", "_izin_turu", "_kayit_izin", "_fiil_x", "SORU_YENIDEN", "SORU_UZUN", "SORU_BIRAK", "kullanici_ilk_ad", "_eylem_fiil", "_yeniden_sor", "_soru_metni", "_cumle"}
+_ns2 = {"json": json, "re": __import__("re"), "datetime": __import__("datetime"), "AYAR": {"ad": "Deniz K"}, "ARAYUZ_DILI": "tr", "_t": lambda a, b: a, "SORU": {}}
 exec(compile(ast.Module([n for n in ast.parse(_k).body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in _ad2 for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in _ad2)], []), "relay", "exec"), _ns2)
 yil = __import__("datetime").date.today().year
 s = _ns2["_soru_metni"]({"tur": "yapilacak", "baslik": f"Yarın Pazar 25 Ekim {yil} sabah 10.00'da Ali'yi ara"})

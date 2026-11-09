@@ -250,13 +250,23 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         let c = UNMutableNotificationContent()
         c.title = b["baslik"] as? String ?? "Suflor.me"; c.subtitle = b["alt"] as? String ?? ""; c.body = b["metin"] as? String ?? ""; c.sound = .default
         if let s = b["son"] as? String { c.userInfo = ["son": s] }
+        if let h = b["hatirlat"] as? String, let ak = b["aksiyon"] as? [String], ak.contains("hazirlik") {  // toplantı hatırlatması: Hazırlık / Katıl düğmeleri (düğme dışı tıklama eskisi gibi panoyu açar)
+            let ikili = ak.contains("katil")
+            var eylemler = [UNNotificationAction(identifier: "hazirlik", title: T("Hazırlık"), options: [])]
+            if ikili { eylemler.append(UNNotificationAction(identifier: "katil", title: T("Katıl"), options: [])) }
+            let kat = ikili ? "suflor-hatirlat-ikili" : "suflor-hatirlat-hazirlik"
+            UNUserNotificationCenter.current().setNotificationCategories([UNNotificationCategory(identifier: kat, actions: eylemler, intentIdentifiers: [], options: [])])
+            c.categoryIdentifier = kat; c.userInfo = ["hatirlat": h]
+        }
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: b["id"] as? String ?? UUID().uuidString, content: c, trigger: nil)) { h in
             if let h = h { print("BİLDİRİM: gösterilemedi (\(h.localizedDescription))") }
         }
     }
     func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification, withCompletionHandler t: @escaping (UNNotificationPresentationOptions) -> Void) { t([.banner, .list, .sound]) }
     func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive y: UNNotificationResponse, withCompletionHandler t: @escaping () -> Void) {
-        if let s = y.notification.request.content.userInfo["son"] as? String {   // özet: aktarıcı varsayılan uygulamayla açar; açamazsa pano
+        if let h = y.notification.request.content.userInfo["hatirlat"] as? String, ["hazirlik", "katil"].contains(y.actionIdentifier) {  // düğme: aktarıcıya (pano kökeni + anahtar, istek() ile); başarısızsa pano
+            istek("/toplanti-hatirlat", ["islem": y.actionIdentifier == "katil" ? "ac" : "hazirlik", "id": h]) { [weak self] v in if (v?["ok"] as? Bool) != true { DispatchQueue.main.async { self?.panoAc() } } }
+        } else if let s = y.notification.request.content.userInfo["son"] as? String {   // özet: aktarıcı varsayılan uygulamayla açar; açamazsa pano
             istek("/son-ac", ["id": s]) { [weak self] v in if (v?["ok"] as? Bool) != true { DispatchQueue.main.async { self?.panoAc() } } }
         } else { panoAc() }
         t()
@@ -1514,7 +1524,7 @@ let EN_METIN: [String: String] = [
     "Pencere": "Window", "Küçült": "Minimize", "Büyüt": "Zoom", "Kapat": "Close", "Yardım": "Help", "Suflor.me Yardımı": "Suflor.me Help",
     "Asistanla konuş: Option + Shift + Boşluk basılı tut": "Talk to the assistant: hold Option + Shift + Space",
     "Sessiz: Option + Shift + M": "Quiet: Option + Shift + M", "Tamam": "OK", "Vazgeç": "Cancel", "Evet": "Yes",
-    "Sonra": "Later", "Gerek yok": "Not needed", "Kaynağı aç": "Open source", "Onayla": "Approve", "Reddet": "Decline", "Kartların yerini sıfırla": "Reset card position",
+    "Hazırlık": "Prepare", "Katıl": "Join", "Sonra": "Later", "Gerek yok": "Not needed", "Kaynağı aç": "Open source", "Onayla": "Approve", "Reddet": "Decline", "Kartların yerini sıfırla": "Reset card position",
     "Kartı gizle": "Hide card", "Onay bekliyor": "Needs your approval", "Ne diyeyim": "What do I say", "Söyle": "Say", "Dur": "Stop", "Cevap": "Answer", "Not": "Note", "gizli": "private",
     "Genel": "General", "Ses": "Voice", "Konuş": "Talk", "Kanıt": "Evidence", "Çeviri": "Translation", "E-posta": "Email", "Gizlilik": "Privacy", "Proje": "Project",
     "Ses ve konuşma": "Voice and speech", "Asistan ve kişilik": "Assistant", "Takvim ve e-posta": "Calendar and email", "Kayıt ve ekip": "Records and team", "Bilgi kaynakları": "Sources", "Gelişmiş": "Advanced"]

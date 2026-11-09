@@ -716,6 +716,9 @@ def _isci_dongu():
             if is_.get("iz_iste"): is_["iz"] = j.get("iz")
             if is_.get("oto_dil") and j.get("dil") in ("tr", "en") and "konus_dil_kaydet" in globals(): konus_dil_kaydet(j["dil"], is_.get("akis_nesil"))
             threading.Thread(target=is_["geri"], args=(" ".join(str(j.get("text") or "").split()), j.get("hata")), daemon=True).start()
+            if j.get("ses") and not j.get("hata") and "duygu_ses" in globals():  # 9 Kasım: sesli sorunun ses ölçüsü kullanıcının olağanıyla kıyaslanır (aktarici/duygu.py; yalnız sayı, bellekte)
+                try: duygu_ses(dict(j["ses"], kelime=len(str(j.get("text") or "").split())))
+                except Exception as e: print(f"DUYGU: ses ölçüsü alınamadı ({e.__class__.__name__})")
             if j.get("hata") and not j.get("zaman_asimi"): _isci_geri_cekil("hata", ilk_hemen=True)
             continue
         if j.get("hata"):

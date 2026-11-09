@@ -138,6 +138,16 @@ try:
     # panodaki liste ve silme (v0.67.0)
     lst = ns["konus_gecmis_liste"]()
     ok("geçmiş listesi: en yeni önce, kimlikli, toplam ve gün", lst["ok"] and lst["toplam"] == 2 and lst["kayitlar"][0]["soru"] == "Matlas, bunu nasıl söylerim?" and all(x["id"] for x in lst["kayitlar"]) and lst["gun"] == 90)
+    ok("geçmiş listesi (v0.212.0 sohbet paneli): tam yazılı cevap satır sonlarıyla ('---' dahil), eski kayıtta sesli + ayrıntıdan kurulur, kaynak",
+       lst["kayitlar"][1]["yazili"] == "Yarın iki toplantın var.\n---\nSaat 10 ve 14." and lst["kayitlar"][1]["kaynak"] == "bas" and lst["kayitlar"][0]["yazili"] == "Kısa söyle.")
+    son0 = ns["_BLM"]["son"]; ns["gizli_acik"] = lambda: True; ns["AYAR"]["konus_gecmis"] = True; once = open(gecmis, encoding="utf-8").read()
+    ns["konus_gecmis_yaz"]({"kaynak": "yazili", "soru": "Gizliyken soru"}, "- madde bir\n- madde iki")
+    ok("gizli kipte sorulan tur geçmiş dosyasına hiç yazılmaz (dosya aynı, listede yok, son tur değişmedi)", open(gecmis, encoding="utf-8").read() == once and "Gizliyken" not in open(gecmis, encoding="utf-8").read()
+       and ns["_BLM"]["son"] == son0 and all(x["soru"] != "Gizliyken soru" for x in ns["konus_gecmis_liste"]()["kayitlar"]))
+    ns.pop("gizli_acik"); ns["konus_gecmis_yaz"]({"kaynak": "yazili", "soru": "Açıkken soru"}, "- madde bir\n- madde iki"); ns["AYAR"].pop("konus_gecmis")
+    l2 = ns["konus_gecmis_liste"](); gz = l2["kayitlar"][0]
+    ok("gizli değilken yazılır; yazili alanı markdown satırlarını korur", gz["soru"] == "Açıkken soru" and not gz.get("gizli") and gz["yazili"] == "- madde bir\n- madde iki")
+    ns["konus_gecmis_sil"](gz["id"]); ns["_BLM"]["son"] = son0; lst = ns["konus_gecmis_liste"]()
     r_ = ns["konus_gecmis_sil"](lst["kayitlar"][1]["id"]); kal = open(gecmis, encoding="utf-8").read()
     ok("silme: yalnız o kayıt çıkar, dosya 0600, bilinmeyen kimlik hata", r_["ok"] and r_["kalan"] == 1 and "Yarın ne var?" not in kal and "nasıl söylerim" in kal
        and stat.S_IMODE(os.stat(gecmis).st_mode) == 0o600 and not ns["konus_gecmis_sil"]("yok")["ok"])

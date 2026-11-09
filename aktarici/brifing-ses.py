@@ -827,6 +827,15 @@ EYLEM_FIIL = {"kayit": (("Bunu kayda geçireyim mi?", "Kayda geçiriyorum.", "Pe
               "yapilacak": (("Takvimine hatırlatma olarak ekleyeyim mi?", "Takvimine ekliyorum.", "Peki, eklemiyorum."), ("Shall I add it to your calendar as a reminder?", "Adding it to your calendar.", "Okay, not adding it.")),
               "sil": (("Takviminden kaldırayım mı?", "Kaldırıyorum.", "Peki, kalsın."), ("Shall I remove it from your calendar?", "Removing it.", "Okay, keeping it.")),
               "is": (("İş olarak kaydedeyim mi?", "İş olarak kaydediyorum.", "Peki, kaydetmiyorum."), ("Shall I record it as a task?", "Recording it as a task.", "Okay, not recording it."))}  # Aşama 1b: sesle iş ekleme (talimat.py)
+# Asistanın kayıt önerisi (notlar.py kayit_etiketleri → izin_iste "kayit"): soru sesle sorulduysa kart da sesle okunur ve evet/hayır/hepsi yerelde çözülür.
+EYLEM_FIIL["kayit_izin"] = (("Kayda yazayım mı?", "Yazıyorum.", "Peki, yazmıyorum."), ("Shall I write it to the records?", "Writing it.", "Okay, not writing it."))
+KAYIT_SESLI = set()  # sesle sorulan kayıt kartlarının eylem kimlikleri (sonuç cümlesi yalnız bunlara)
+def _izin_turu(x):
+    if not x or x.get("tur") != "izin": return None
+    try: return (json.loads(x.get("ayrinti") or "{}") or {}).get("izin")
+    except (ValueError, TypeError): return None
+def _kayit_izin(x): return _izin_turu(x) == "kayit"
+def _fiil_x(x): return EYLEM_FIIL["kayit_izin"][0 if ARAYUZ_DILI == "tr" else 1] if _kayit_izin(x) else _eylem_fiil(x["tur"])
 SORU_YENIDEN = (("Tam duyamadım {ad}, {s}", "Kusura bakma, kaçırdım. {s0}, yoksa vazgeçelim mi?", "Evet ya da hayır demen yeterli: {s}"),
                 ("Sorry {ad}, I didn't catch that. {S}", "I missed that. {S0}, or shall we skip it?", "Just yes or no is fine: {s}"))
 SORU_UZUN = ("Anladım, yalnız emin olayım: {s}", "Got it, just to be sure: {s}")
@@ -834,12 +843,17 @@ SORU_BIRAK = ("Şimdilik bekletiyorum {ad}, panoda duruyor.", "I'll leave it for
 def kullanici_ilk_ad(): return (str(AYAR.get("ad") or "").split() or [""])[0]
 def _eylem_fiil(tur): return EYLEM_FIIL.get(tur, EYLEM_FIIL["diger"])[0 if ARAYUZ_DILI == "tr" else 1]
 def _soru_metni(x):  # "Deniz, yarın sabah 10.00'da Ali'yi ara. Hatırlatma olarak ekleyeyim mi?"
+    if _kayit_izin(x):  # kayıt önerisi: "Deniz, <neden>. <ne yazılacak>. Kayda yazayım mı?"
+        try: a = json.loads(x.get("ayrinti") or "{}") or {}
+        except (ValueError, TypeError): a = {}
+        ad = kullanici_ilk_ad(); govde = " ".join(_cumle(a.get(k)) for k in ("neden", "ozet") if a.get(k)) or _cumle(x.get("baslik"))
+        return f"{ad + ', ' if ad else ''}{govde} {_fiil_x(x)[0]}"
     b = re.sub(rf"\s+{datetime.date.today().year}\b", "", _cumle(x["baslik"]))
     kim = (" " + _t("Kişi: ", "Person: ") + _cumle(x["kim"])) if x.get("kim") and str(x["kim"]).lower() not in b.lower() else ""
     ad = kullanici_ilk_ad()
     return f"{ad + ', ' if ad else ''}{b}{kim} {_eylem_fiil(x['tur'])[0]}"
 def _yeniden_sor(x, uzun=False):  # → okunacak cümle; ikinci kez anlaşılmazsa iş bekletilir (None: soru bırakıldı)
-    ad = kullanici_ilk_ad(); s = _eylem_fiil(x["tur"])[0] if x else _t("Yapayım mı?", "Shall I do it?")
+    ad = kullanici_ilk_ad(); s = _fiil_x(x)[0] if x else _t("Yapayım mı?", "Shall I do it?")
     SORU["deneme"] = SORU.get("deneme", 0) + 1
     if SORU["deneme"] > 1: return None
     if uzun: return _t(*SORU_UZUN).format(s=s[:1].replace("İ", "i").lower() + s[1:])
@@ -856,9 +870,10 @@ def ozet_sesli(r):
         print("SES: yazılı özet hazır — hızlı özet okunmuştu, yeniden okunmadı"); return False
     if not _ses_serbest(): return False
     bek = sum(1 for x in eylem_gorunen() if x["durum"] == "bekliyor")
-    a = [_t("Toplantı özeti hazır.", "The meeting summary is ready.")] + ([cikti_metin(r["cikti"]) + "."] if r.get("cikti") else [])  # 1. ses: özet + sayılar
-    b = [_cumle(r.get("degerlendirme"))] + ([_t("Öneri: ", "Suggestion: ") + _cumle(r["oneri"])] if r.get("oneri") else [])  # 2. ses: değerlendirme + öneri
-    c = [_t(f"Onayını bekleyen {bek} iş var.", f"{bek} item{'s' if bek > 1 else ''} waiting for your approval.")] if bek else []
+    sen = ARAYUZ_DILI == "tr" and ("birebir_sen" not in globals() or birebir_sen())  # 9 Kasım (dost): birebir "sen"de rapor açılışı yerine konuşma dili
+    a = [("Özet hazır." if sen else _t("Toplantı özeti hazır.", "The meeting summary is ready."))] + ([cikti_metin(r["cikti"]) + "."] if r.get("cikti") else [])  # 1. ses: özet + sayılar
+    b = [_cumle(r.get("degerlendirme"))] + ([("Benim önerim: " if sen else _t("Öneri: ", "Suggestion: ")) + _cumle(r["oneri"])] if r.get("oneri") else [])  # 2. ses: değerlendirme + öneri
+    c = [(f"{bek} iş onayını bekliyor, panoda." if sen else _t(f"Onayını bekleyen {bek} iş var.", f"{bek} item{'s' if bek > 1 else ''} waiting for your approval."))] if bek else []
     iki = None  # özet tek sesle (Pocket) okunur; iki sesli okuma kapalı
     if iki and any(b):  # v0.80.0 (S87): iki kişilik de Gemini sesliyse özet iki sesle — toplantı kişiliği özeti, öteki değerlendirmeyi okur
         k1, k2 = iki; ok = False
@@ -890,6 +905,7 @@ def soru_sonraki():
         x = bek[SORU["liste"].pop(0)] if SORU["liste"] else None
         SORU.update(aktif=x["id"] if x else None, t=time.time(), deneme=0)
     if not x: return False
+    if _kayit_izin(x): KAYIT_SESLI.add(x["id"])
     seslendir(_soru_metni(x), kuyruk=True)
     print(f"SES: yazayım mı? ({x['id']})"); return True
 def soru_bitir(neden):
@@ -953,6 +969,11 @@ def sesli_duzeltme(metin):  # → düzeltme olarak ele alınacak metin (sözün 
     if len(icerik) < (1 if ama or sozcuk[0] in ("hayır", "hayir", "no", "nope") else 2): return None
     return " ".join(str(metin).split())[:400]
 def sesli_cevap(metin, sid):  # bas-konuş metni soru aktifken; dönen: okunan cevap
+    def _fiil_soz(x, onay):  # 9 Kasım (dost): onay/red sözü dönüşümlü — ilki eski cümle ("Yazıyorum." / "Peki, yazmıyorum."), sonra "Tamam, yazıyorum." / "Olur, yazmıyorum."
+        s = _fiil_x(x)[1 if onay else 2]
+        if ARAYUZ_DILI != "tr": return s
+        alt = ("Tamam, " + s[:1].replace("İ", "i").lower() + s[1:]) if onay and not s.startswith("Tamam") else re.sub(r"^Peki, ", "Olur, ", s) if not onay else s
+        return (globals().get("cesit") or (lambda k_, l_: l_[0]))("fiil_" + ("onay" if onay else "red"), [s, alt] if alt != s else [s])
     sinif = sesli_ayir(metin)
     with LOCK: x = next((x for x in eylem_gorunen() if x["id"] == sid and x["durum"] == "bekliyor"), None); SORU["t"] = time.time()
     tur = _t(EYLEM_TUR.get(x["tur"], ""), x["tur"]) if x else ""
@@ -963,8 +984,16 @@ def sesli_cevap(metin, sid):  # bas-konuş metni soru aktifken; dönen: okunan c
         c = eylem_duzelt_baslat(x, metin)
         if c: return c
     if sinif in ("onay", "red") and x:
-        cevap = _eylem_fiil(x["tur"])[1 if sinif == "onay" else 2]
+        cevap = _fiil_soz(x, sinif == "onay")
         seslendir(cevap, kuyruk=True); eylem_karar({"id": sid, "durum": "onaylandi" if sinif == "onay" else "reddedildi", "ses_metin": metin}, "ses"); return cevap
+    if sinif == "hepsi" and _kayit_izin(x):  # birden çok kayıt kartı: yalnız kayıt önerileri (başka izinler ve işler kapsam dışı); kapsam sesle söylenir
+        with LOCK: bek = {y["id"]: y for y in eylem_gorunen() if y["durum"] == "bekliyor"}
+        ids = [sid] + [i for i in SORU["liste"] if i in bek and _kayit_izin(bek[i]) and i != sid]
+        with LOCK: SORU["liste"] = [i for i in SORU["liste"] if i not in ids]
+        cevap = _t((globals().get("cesit") or (lambda k_, l_: l_[0]))("kayit_hepsi", [f"Tamam, {len(ids)} kaydı da yazıyorum.", f"Hepsini yazıyorum, {len(ids)} kayıt."]), f"Okay, writing all {len(ids)} records.") if len(ids) > 1 else _fiil_soz(x, True)
+        seslendir(cevap, kuyruk=True)
+        for i in [j for j in ids if j != sid] + [sid]: eylem_karar({"id": i, "durum": "onaylandi", "ses_metin": metin}, "ses")  # aktif en sonda: sıradaki soruya geçiş boş listeyle biter
+        return cevap
     if sinif == "hepsi":
         cevap = _t("Tamam, hepsini onaylıyorum.", "Okay, approving all of them."); seslendir(cevap, kuyruk=True); eylem_karar({"id": "hepsi", "durum": "onaylandi", "ses_metin": metin}, "ses"); return cevap
     if sinif == "sonra": cevap = _t("Tamam, sonraya bırakıyorum.", "Okay, leaving it for later."); seslendir(cevap, kuyruk=True); soru_sonraki(); return cevap
@@ -976,3 +1005,10 @@ def sesli_cevap(metin, sid):  # bas-konuş metni soru aktifken; dönen: okunan c
     if cevap is None:  # ikinci kez anlaşılmadı: iş panoda bekler, sıradaki soruya geçilir
         cevap = _t(*SORU_BIRAK).format(ad=kullanici_ilk_ad()).replace(" ,", ","); seslendir(cevap, kuyruk=True); soru_sonraki(); return cevap
     seslendir(cevap, kuyruk=True); return cevap
+
+def kayit_sonuc_sesle(iid, ok_, karar, ne=""):  # notlar.py _kayit_bekle: sesle sorulan kayıt kartının sonucu kısa cümleyle (onay/ret sözü zaten söylendi; red ve süre dolmasında ek cümle yok)
+    if iid not in KAYIT_SESLI: return
+    KAYIT_SESLI.discard(iid)
+    if karar != "onaylandi" or not _ses_serbest(): return
+    c = _t((globals().get("cesit") or (lambda k_, l_: l_[0]))("kayit_sonuc", ["Yazıldı.", "Tamam, kayıtta.", "Oldu, yazdım."]), "Written.") if ok_ else _t((globals().get("cesit") or (lambda k_, l_: l_[0]))("kayit_hata", ["Yazılamadı, nedeni panoda.", "Olmadı, yazamadım; nedenini panoya bıraktım."]), "Couldn't write it; the reason is on the panel.")  # 9 Kasım (dost): dönüşümlü
+    seslendir(c, kuyruk=True); print(f"SES: kayıt sonucu okundu ({'yazıldı' if ok_ else 'yazılamadı'})")

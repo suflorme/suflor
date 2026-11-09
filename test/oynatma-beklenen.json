@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 601340,
-   "sha": "a878978bb70d1a97"
+   "uzunluk": 630067,
+   "sha": "f1d6a49aa3d7af05"
   },
   "/mini": {
-   "uzunluk": 601340,
-   "sha": "a878978bb70d1a97"
+   "uzunluk": 630067,
+   "sha": "f1d6a49aa3d7af05"
   },
   "/status": {
    "_ping_son": "float",
@@ -320,6 +320,9 @@
      "kisisel_tarih_ufuk": "int",
      "kisisel_tarihler": "bool",
      "konus_alindi": "bool",
+     "konus_derin": "bool",
+     "konus_derin_effort": "str",
+     "konus_derin_model": "str",
      "konus_gecmis": "bool",
      "konus_web": "bool",
      "konusma": "bool",
@@ -333,6 +336,10 @@
      "oto_haric": "str",
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
+     "proaktif_aralik_dk": "int",
+     "proaktif_bosta_dk": "int",
+     "proaktif_gunluk_en_cok": "int",
+     "proaktif_oneri": "bool",
      "profil": "str",
      "renk_duzeni": "str",
      "saatler": "NoneType",
@@ -348,6 +355,9 @@
      "sure_duyuru": "bool",
      "takvim_paylasilan": [],
      "tema": "str",
+     "toplanti_hatirlat": "bool",
+     "toplanti_hatirlat_dk": "int",
+     "toplanti_hatirlat_sesli": "bool",
      "toplanti_ses": "str",
      "toplanti_sonrasi_hatirlat_dk": "int",
      "toplanti_sonrasi_sesli": "bool",
@@ -398,6 +408,9 @@
      "kisisel_tarih_ufuk": "int",
      "kisisel_tarihler": "bool",
      "konus_alindi": "bool",
+     "konus_derin": "bool",
+     "konus_derin_effort": "str",
+     "konus_derin_model": "str",
      "konus_gecmis": "bool",
      "konus_web": "bool",
      "konusma": "bool",
@@ -411,6 +424,10 @@
      "oto_haric": "str",
      "oto_toplanti": "bool",
      "ozet_iki_ses": "bool",
+     "proaktif_aralik_dk": "int",
+     "proaktif_bosta_dk": "int",
+     "proaktif_gunluk_en_cok": "int",
+     "proaktif_oneri": "bool",
      "profil": "str",
      "renk_duzeni": "str",
      "saatler_sira": "str",
@@ -425,6 +442,9 @@
      "sure_duyuru": "bool",
      "takvim_paylasilan": [],
      "tema": "str",
+     "toplanti_hatirlat": "bool",
+     "toplanti_hatirlat_dk": "int",
+     "toplanti_hatirlat_sesli": "bool",
      "toplanti_ses": "str",
      "toplanti_sonrasi_hatirlat_dk": "int",
      "toplanti_sonrasi_sesli": "bool",
@@ -772,6 +792,7 @@
     "neden": "str",
     "t": "str"
    },
+   "toplanti_hatirlat": "NoneType",
    "toplanti_oturum": "NoneType",
    "uyari": "NoneType",
    "veri_kanal": {
@@ -990,7 +1011,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 9,
+  "DURUM": 8,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

@@ -39,6 +39,17 @@ def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False, sure_sn=None):
 def izin_bekleyen_oturum():  # panonun Claude bölümü ve mini pano: arka plandaki toplantı oturumunun onay bekleyen araç izinleri
     return [{"id": x["id"], "metin": x["baslik"]} for x in eylem_gorunen() if x["tur"] == "izin" and x.get("oturum") and x["durum"] == "bekliyor"]
 def izin_karar(x, durum):  # eylem_karar'dan (yerel iş, tur izin): bağlı kartı kapat, bekleyeni uyandır
+    # Sesli kayıt kararı (kayıt komutu, kaynak "ses"): Geri al süresi (GERI_AL_SN) dolana dek uygulanmaz — yoksa yazma Geri al'dan önce olurdu. Geri alınırsa (iş "bekliyor"a döndü) hiç uygulanmaz.
+    i0 = IZIN.get(x["id"])
+    if i0 and i0.get("tur") == "kayit" and x.get("kaynak") == "ses":
+        def _gec():
+            time.sleep(float(globals().get("GERI_AL_SN", 10)) + 1.0)
+            with LOCK: son = x.get("durum")
+            if son == durum: _izin_karar(x, durum)
+            else: print(f"İZİN: {x['id']} sesli karar geri alındı — uygulanmadı")
+        threading.Thread(target=_gec, daemon=True).start(); return
+    _izin_karar(x, durum)
+def _izin_karar(x, durum):
     with LOCK:
         for c in CARDS:
             if c.get("eylem") == x["id"] and c.get("status") == "acik": c["status"] = durum; c["acted_at"] = datetime.datetime.now().isoformat(timespec="seconds")

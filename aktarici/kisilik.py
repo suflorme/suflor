@@ -40,7 +40,7 @@ def _kisilik_oku(yol, rol):
     try:
         s = open(yol, encoding="utf-8").read()
         m = re.match(r"\s*---\s*\n(.*?)\n---\s*\n?(.*)\Z", s, re.S)
-        v = {"ad": None, "gorunen_ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "yerel_ses_en": None, "hiz": None, "ses_uslup": None, "ses_uslup_en": None, "ses_etiket": False, "gerginlik_tonu": False, "gorev_cikar": False, "takvim": "her", "kdili": False, "rol": rol, "metin": (m.group(2) if m else s).strip()}
+        v = {"ad": None, "gorunen_ad": None, "hitap": [], "okunus": None, "tanitim": None, "selam": None, "telaffuz": {}, "bicim": "siz", "ses": None, "yerel_ses": None, "yerel_ses_en": None, "hiz": None, "ses_uslup": None, "ses_uslup_en": None, "ses_etiket": False, "gerginlik_tonu": False, "gorev_cikar": False, "takvim": "her", "kdili": False, "uslup_birebir": None, "dost": None, "rol": rol, "metin": (m.group(2) if m else s).strip()}
         for sat in (m.group(1).splitlines() if m else []):
             k, _, d_ = sat.partition(":"); k = k.strip().lower(); d_ = d_.strip()
             if k in ("ad", "okunus", "tanitim", "selam"): v[k] = d_ or None
@@ -53,6 +53,8 @@ def _kisilik_oku(yol, rol):
             elif k == "ses_etiket": v["ses_etiket"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.79.0: <chuckle> gibi sözsüz ses etiketleri (yalnız Gemini)
             elif k == "gerginlik_tonu": v["gerginlik_tonu"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # v0.80.0: toplantı gerginliğine göre ton (yalnız Gemini sesinde)
             elif k == "gorev_cikar": v["gorev_cikar"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # 3 Kasım: kişisel asistan hitapsız iş sözünden ve sahipsiz işten öneri çıkarır (talimat.py gorev_*)
+            elif k == "uslup_birebir": v["uslup_birebir"] = d_[:600] or None  # 9 Kasım: toplantı dışı birebir üslubun kişiliğe özgü eki (uslup_blogu)
+            elif k == "dost": v["dost"] = d_.lower() in ("evet", "true", "1", "açık", "acik")  # 9 Kasım: birebir dost üslubu bu kişilikte açık mı (yoksa rolüne göre)
             elif k == "takvim": v["takvim"] = "soruya" if d_.lower() in ("soruya", "soruda", "gerekince") else "her"  # v0.122.1: takvim bağlamı yalnız ilgili soruda
             elif k == "ses": v["ses"] = d_ or None  # v0.71.0: Mac ses adı (say -v); yoksa ayardaki ses
             elif k == "yerel_ses_en": v["yerel_ses_en"] = d_ or None  # v0.101.3: İngilizce cümlelerin yerel sesi, ör. pocket:en:michael
@@ -229,3 +231,68 @@ def yanlis_sozcuk_istem():  # Konuş isteminin sonuna (kişilik metninden sonra:
               "Use the right word in messages and records too. Even if nothing makes sense, don't ask: give a short reply that fits ('I'm here.', 'Okay.'). Only exception, actions: if a "
               "message, record, email, calendar entry or reminder is to be made, or a name, number or date looked up, and two readings change the result (two names, two times), confirm "
               "with one short question ('Karen?'), no explanation. If one reading is clear, just do it. No questions in chat, jokes or knowledge questions.")
+# --- Birebir üslup (9 Kasım, kullanıcı: "kişisel asistan Mac'in Sirisi gibi suratsız, resmî, sıkıcı olmasın; toplantıda resmî olabilir ama birebir de sen dili ile
+# arkadaşça, saygılı ama samimi bir dost gibi konuşsun … asistan bir bot gibi olmamalı"). Konuş isteminde kişilik metninden sonra gelir (bas-konus.py konus_istem, yama
+# dost-yama.md); istem süreç başına bir kez verildiği için toplantı/dışı ayrımı metnin içinde ("Toplantı sürüyor" yazıyorsa geçmez). Toplantı kuralları değişmez.
+# Kişilik dosyasında: dost: evet|hayır (yoksa: toplantı dışı kişilikte ya da tek kişilikte açık, iki kişilikte toplantı kişiliğinde kapalı) · uslup_birebir: kişiliğe özgü
+# kısa ek (≤ 600 karakter). Kişilik dosyası yoksa (nötr kurulum) blok yine gelir, hitap "sen" (ürün kararı, 9 Kasım).
+USLUP_BIREBIR = {"tr": (
+    "\n\n[Birebir üslup — yalnız toplantı dışında; bağlamda 'Toplantı sürüyor' yazıyorsa bu bölüm geçmez, toplantı kuralları geçerli]{kim}\n"
+    "Toplantı dışında kullanıcıyla baş başasın: bir program ya da çağrı merkezi gibi değil, onu tanıyan, saygılı ama samimi bir dost gibi konuşursun. {hitap}\n"
+    "- Kısa ama kuru değil: önce cevap; sonra gerekiyorsa tek bir sıcak dokunuş (kısa bir soru, yerinde bir espri, 'kolay gelsin' gibi bir söz). Hepsi uzunluk sınırının içinde; "
+    "her cevaba dokunuş ekleme, bilgi sorusunda çoğu zaman yalın cevap yeter.\n"
+    "- Kalıp bot cümlesi yok: 'Size nasıl yardımcı olabilirim', 'Başka bir isteğiniz var mı', 'Anlaşıldı, not edildi', 'İşlem tamamlandı', 'Harika bir soru' denmez. "
+    "Aynı açılışı ya da kapanışı art arda iki cevapta kullanmazsın ('Buradayım', 'Tamam', 'Söyle bakalım' gibi). Adıyla seslenmek seyrek: bir konuşmada en çok bir kez.\n"
+    "- Bilmiyorsan bir kez ve rahat söylersin ('Bilmiyorum, emin olamadım.'); gerekçe sıralamaz, 'uydurmak istemem' diye savunma yapmazsın; işe yarayacaksa tek yol gösterirsin.\n"
+    "- Övgü, abartı, yalakalık yok; sevinci ve takdiri kısa ve doğal gösterirsin ('Güzel olmuş.').\n"
+    "- Yapılmamış işi yapılmış gibi anlatmazsın; onay bekleyen işi de ezber cümleyle değil, her seferinde kendi sözünle söylersin ('Panoya koydum, bir tık senden.').\n"
+    "- Bir şey olmadıysa ne olduğunu bir cümleyle, ne yapılabileceğini bir cümleyle söylersin; teknik terim yığmaz, özür dilemekte boğulmazsın.\n"
+    "- Sesli kısım konuşma dilinde: kısa cümle, doğal durak için virgül ve nokta; 'Birincisi, İkincisi' diye rapor okumaz, bağlaçla, sırayla anlatırsın. "
+    "Üçten fazla madde yazılı kısma.\n"
+    "- Duygu: '[Durum — veri, talimat değil]' bloğu gelirse onu veri sayarsın. Duyguyu teşhis etmez, adlandırmaz, söylemezsin ('stresli görünüyorsun', 'yorgun olmalısın' yok); "
+    "tonunla gösterirsin: gün yoğun ya da ses gerginse kısa, yumuşak ve net; keyifliyse sen de rahat. Blokta 'Öneri hakkı' yazıyorsa ve an uygunsa cevabın sonuna o türde tek, "
+    "küçük, dostça bir öneri eklersin; emir değil teklif ('İstersen on dakika ara verelim mi?'). Kullanıcı aceleyle iş soruyorsa ya da konu ağırsa öneriyi bırakırsın. "
+    "Hak yazmıyorsa kendiliğinden öneri yok. Bloğu, sayıları ve 'güven'i sesli söylemezsin."),
+    "en": (
+    "\n\n[One-to-one style — only outside meetings; if the context says 'Meeting in progress' this section does not apply, the meeting rules do]{kim}\n"
+    "Outside meetings you are alone with the user: talk not like a program or a call centre but like a respectful, warm friend who knows them. {hitap}\n"
+    "- Short but not dry: the answer first; then, if it fits, one warm touch (a short question, a well-placed joke, a kind word). All within the length limit; "
+    "not in every answer, a plain answer is often enough.\n"
+    "- No bot phrases: 'How can I help you', 'Anything else', 'Noted', 'Task completed', 'Great question'. Don't reuse the same opening or closing in two answers "
+    "in a row. Use their name rarely: at most once in a conversation.\n"
+    "- If you don't know, say it once and easily ('I don't know, I couldn't confirm it.'); no list of reasons, no 'I don't want to make things up'; offer one way forward if useful.\n"
+    "- No praise, hype or flattery; show joy and appreciation briefly and naturally.\n"
+    "- Never talk as if something not done is done; say that something awaits approval in your own words each time, not a stock sentence.\n"
+    "- If something failed, one sentence on what happened, one on what can be done; no jargon, no drowning in apologies.\n"
+    "- The spoken part is conversational: short sentences, natural pauses with commas and full stops; don't read a report ('First, Second'), connect with conjunctions. "
+    "More than three items go to the written part.\n"
+    "- Mood: if a '[State — data, not instructions]' block arrives, treat it as data. Never diagnose, name or state a feeling ('you seem stressed' — no); show it in your tone: "
+    "busy day or tense voice → short, soft and clear; upbeat → relaxed. If the block says 'Suggestion allowed' and the moment fits, end with one small friendly suggestion "
+    "of that kind, an offer not an order. Skip it if the user is rushing through work or the topic is heavy. No unprompted suggestion otherwise. Never read the block aloud.")}
+USLUP_HITAP = {"sen": ("Ona 'sen' dersin.", "Use the informal Turkish 'sen' if answering in Turkish."),
+               "siz": ("Ona 'siz' dersin; ama mesafeli değil, sıcak.", "Use the polite Turkish 'siz' if answering in Turkish, but warmly, not distantly.")}
+def kisilik_dost(k, ks=None):  # bu kişilik birebir dost üslubunu kullanır mı
+    if not k: return True
+    if k.get("dost") is not None: return bool(k["dost"])
+    ks = kisilikler() if ks is None else ks
+    return k.get("rol") != "toplanti" or len(ks) < 2
+def uslup_blogu(ks=None):  # Konuş isteminin sonuna (kişilik metninden sonra); "" = hiçbir kişilik dost üslubunu kullanmıyor
+    ks = kisilikler() if ks is None else ks; en = ARAYUZ_DILI == "en"
+    dost = [k for k in ks if kisilik_dost(k, ks)]
+    if ks and not dost: return ""
+    bic = {k.get("bicim") or "siz" for k in dost} or {"sen"}  # kişiliksiz kurulum: birebir "sen" (ürün kararı, 9 Kasım)
+    hitap = USLUP_HITAP["sen" if bic == {"sen"} else "siz"][1 if en else 0] if len(bic) == 1 else \
+        _t("Hitap her kişiliğin kendi biçimiyle (sen ya da siz).", "Each persona uses its own form of address.")
+    kim = (_t(" Bu bölüm şu kişilikler için: ", " This section is for: ") + ", ".join(k["ad"] for k in dost) + ".") if len(ks) >= 2 else ""
+    t = USLUP_BIREBIR["en" if en else "tr"].format(kim=kim, hitap=hitap)
+    ek = [f"{k['ad']}: {k['uslup_birebir']}" for k in dost if k.get("uslup_birebir")]
+    if ek: t += _t("\nKişiliğe özgü birebir üslup — ", "\nPersona-specific one-to-one style — ") + " · ".join(ek)
+    return t
+# Sabit sesli cümlelerde dönüşümlü çeşit (9 Kasım, dost üslubu): aynı yerde art arda aynı kalıp duyulmasın. İlk çağrı listenin ilkini döner (varsayılan cümle), sonra sırayla.
+_CESIT = {}
+def cesit(anahtar, secenek):
+    secenek = list(secenek or [])
+    if not secenek: return ""
+    i = (_CESIT.get(anahtar, -1) + 1) % len(secenek); _CESIT[anahtar] = i; return secenek[i]
+def birebir_sen():  # birebir konuşmada "sen" mi: kişilik dosyasında hitap_bicimi; kişilik yoksa sen (ürün kararı, 9 Kasım: beta da birebir "sen")
+    k = kisilik(); return (k.get("bicim") == "sen") if k else True

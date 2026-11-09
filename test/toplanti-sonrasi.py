@@ -51,7 +51,7 @@ try:
     ok("süre dolmadan hatırlatma yok", A.status().get("proaktif") is None)
     ok("süre dolunca durum alanı gelir", A.bekle(lambda: A.status().get("proaktif")))
     pr = A.status().get("proaktif") or {}
-    ok("cümle: toplantı adı, sayılar, Bakalım mı?", "Planlama görüşmesi" in pr.get("cumle", "") and "3 işin tarihi yok" in pr["cumle"] and "3 işin sahibi yok" in pr["cumle"] and "1 karar teyit bekliyor" in pr["cumle"] and "1 açık soru var" in pr["cumle"] and pr["cumle"].endswith("Bakalım mı?"))
+    ok("cümle: toplantı adı, sayılar, bakalım/toparlayalım mı?", "Planlama görüşmesi" in pr.get("cumle", "") and "3 işin tarihi yok" in pr["cumle"] and "3 işin sahibi yok" in pr["cumle"] and "1 karar teyit bekliyor" in pr["cumle"] and "1 açık soru var" in pr["cumle"] and bool(__import__("re").search(r"(bak|toparla)\w* mı(, [^?]*)?\?$", pr["cumle"])))  # 9 Kasım (dost): kapanış dönüşümlü
     ok("menü bildirimi gitti", "BİLDİRİM (deneme): Açık uçlar" in A.metin())
     ok("ayar kapalıyken açık uç cümlesi sesli söylenmedi", "karakter · Planlama görüşmesi:" not in A.metin())
     A.post("/son-toplanti", {"ozet": os.path.join(T, "toplanti-1.md"), "baslik": "Planlama görüşmesi", "dosya": "toplanti-1.md", "yapi": {"maddeler": [{"baslik": "g", "ogeler": ACIK}]}})
