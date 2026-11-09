@@ -20,7 +20,7 @@ class Beyin:
     @staticmethod
     def secim(ayar, is_): return {"tur": Beyin.tur, "model": None}
 MOD = {"hata": None}
-def sahte_model(istem):  # zincir bloklarını okur; kural: son satır "sen" → onay varsa donus_bekliyorsun; "açıklama" → baskasi_cevapladi; sözleşme → 3; onay → 2; yoksa bilgi
+def sahte_model(istem, amac=None, soru=None, maske=None):  # zincir bloklarını okur; kural: son satır "sen" → onay varsa donus_bekliyorsun; "açıklama" → baskasi_cevapladi; sözleşme → 3; onay → 2; yoksa bilgi
     CAGRI.append(istem)
     if MOD["hata"]: return None, MOD["hata"]
     out = []
@@ -35,7 +35,7 @@ def sahte_model(istem):  # zincir bloklarını okur; kural: son satır "sen" →
         else: d, a = "bilgi", 0
         out.append({"id": zid, "durum": d, "aciliyet": a, "neden": f"Somut istek var ({d})"})
     return json.dumps(out), None
-AYAR = {"eposta_oku": True, "ad": "Deniz T", "eposta_adres": BEN, "eposta_claude_siralama": False}
+AYAR = {"soz_gece": False, "eposta_oku": True, "ad": "Deniz T", "eposta_adres": BEN, "eposta_claude_siralama": False}
 def ayar_yaz(deg):  # relay'in ayar_yaz'ının yerine: bellekteki AYAR'a yazar, çağrıyı kaydeder
     for k, v in deg.items(): AYAR[k] = list(v); KAYITLI[k] = list(v)
     return {"ok": True}

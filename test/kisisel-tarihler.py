@@ -2,7 +2,7 @@
 # Yaklaşan kişisel tarihler (S243; aktarici/kisisel-tarihler.py, takvim.swift --tarihler, relay /yaklasan-tarihler): sahte yardımcı çıktısı, izinsiz hâl, tekilleştirme,
 # tarih sınırları (29 Şubat, yıl geçişi), yoksay, kutlama taslağı (gönderim yok), hatırlatma zamanı, sesle "doğum gününü hatırlat". Swift çağrılmaz; yapay adlar, ağ yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kisisel-tarihler.py
-import os, re, sys, json, time, datetime, tempfile, urllib.parse, subprocess
+import os, re, sys, json, time, datetime, tempfile, urllib.parse, subprocess, threading
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.dont_write_bytecode = True
 hatalar = []
 def kontrol(ad, kosul):
@@ -89,6 +89,30 @@ ns["_KT"].update(yoksay=None); os.remove(os.path.join(tmp, "kisisel-tarihler.jso
 simdi = datetime.datetime(2026, 11, 7, 9, 30); bild.clear(); ns["_KT"].update(t=0, ham=None)
 n = ns["kt_hatirlat_tur"](simdi); kontrol(f"bir gün önce: yarınki doğum günü + bugünkü hatırlatma (2 bildirim; etkinlik yok): {bild}", n == 2 and any(c.startswith("Yarın: Ayşe") for c in bild) and any(c.startswith("Bugün: Ali'yi ara") for c in bild) and not any("piknik" in c.lower() for c in bild))
 kontrol("aynı hatırlatma ikinci kez gitmez", ns["kt_hatirlat_tur"](simdi) == 0 and len(bild) == 2)
+# --- tek söz kapısı (aktarici/soz-kapisi.py) ile: öncelik 2 (mesai beklemez; sessiz mod, toplantı, gece geçerli), kayıtta kişi adı yok, sonuç kaydı
+_KTD = os.path.join(tmp, "kisisel-tarihler.json"); _kt_once = open(_KTD, "rb").read() if os.path.exists(_KTD) else None
+os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"; _sz = datetime.datetime(2026, 11, 7, 9, 30).timestamp(); _sol = {"sessiz": False}
+def kapi_yukle():
+    for k in [k for k in ns if k.startswith(("soz", "SOZ", "_soz")) and k != "_soz_sonuc_g"]: del ns[k]
+    for f_ in ("soz.jsonl", "soz-kuyruk.json"):
+        try: os.remove(os.path.join(tmp, f_))
+        except OSError: pass
+    ns.update(threading=threading, LOCK=threading.Lock(), write=lambda pairs: [open(y, "a", encoding="utf-8").write(m) for y, m in pairs], sessiz_acik=lambda: _sol["sessiz"], aktif_dosya=lambda: None,
+              calisma_saatleri=lambda: ({0, 1, 2, 3, 4}, 540, 1080), SOZ_SAAT=lambda: _sz); ns["AYAR"]["soz_aralik_dk"] = 0
+    exec(compile(oku("aktarici", "soz-kapisi.py"), "soz-kapisi.py", "exec"), ns)
+sj = lambda: [json.loads(l) for l in open(os.path.join(tmp, "soz.jsonl"), encoding="utf-8") if l.strip()]
+ns["_KT"]["bildirilen"] = {}; bild.clear(); kapi_yukle(); n = ns["kt_hatirlat_tur"](simdi)
+kontrol("kapı: hatırlatmalar kapıdan geçer (cumartesi mesai dışı ama öncelik 2 beklemez), kayıtta kaynak/öncelik var, kişi adı yok",
+        n == 2 and len(bild) == 2 and [(x["kaynak"], x["oncelik"], x["karar"]) for x in sj()] == [("kisisel_tarih", 2, "simdi")] * 2 and "Ayşe" not in open(os.path.join(tmp, "soz.jsonl"), encoding="utf-8").read())
+ns["_KT"]["bildirilen"] = {}; bild.clear(); _sol["sessiz"] = True; kapi_yukle(); n = ns["kt_hatirlat_tur"](simdi)
+kontrol("kapı: sessiz modda söz bekler (bildirilmez, işaretlenmez), mod kalkınca dakikalık tur teslim eder",
+        n == 0 and not bild and ns["soz_view"]()["kuyruk"] == 2 and (_sol.update(sessiz=False) or ns["soz_tur"]()["teslim"] == 2) and len(bild) == 2 and len(ns["_KT"]["bildirilen"]) == 2)
+ns["_KT"]["bildirilen"] = {}; bild.clear(); ns["toplanti_var"] = lambda: True; kapi_yukle()
+kontrol("kapı: toplantıdayken söz bekler", ns["kt_hatirlat_tur"](simdi) == 0 and not bild and ns["soz_view"]()["kuyruk"] == 2); ns["toplanti_var"] = lambda: False
+kapi_yukle(); ns["_KT"]["bildirilen"] = {}; bild.clear(); ns["kt_hatirlat_tur"](simdi); _yk = ns["kt_islem"]({"islem": "yoksay", "tarih": "2026-11-08", "kisi": "Ayşe Yılmaz"})
+kontrol("kapı: yoksay düğmesi → sonuç ret (kaynak kisisel_tarih)", _yk.get("ok") is True and sj()[-1]["olay"] == "sonuc" and sj()[-1]["sonuc"] == "ret" and sj()[-1]["kaynak"] == "kisisel_tarih")
+for k in [k for k in ns if k.startswith(("soz", "SOZ", "_soz")) and k != "_soz_sonuc_g"]: del ns[k]  # sonraki bölümler kapısız (eski) yolu sınar
+(open(_KTD, "wb").write(_kt_once) if _kt_once is not None else (os.path.exists(_KTD) and os.remove(_KTD))); ns["_KT"]["yoksay"] = None; ns["_KT"]["bildirilen"] = {}; bild.clear()  # yoksay işlemi önceki duruma döner
 ns["_KT"].update(yoksay=None, bildirilen=None); os.remove(os.path.join(tmp, "kisisel-tarihler.json")); ns["_KT"]["yoksay"] = None; bild.clear()
 kontrol("günün sabahı: saatten önce sessiz", ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 8, 59)) == 0)
 n = ns["kt_hatirlat_tur"](datetime.datetime(2026, 11, 8, 9, 0)); kontrol(f"günün sabahı 09:00'da 'Bugün: …doğum günü': {bild}", n >= 1 and any(c.startswith("Bugün: Ayşe") for c in bild))

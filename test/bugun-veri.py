@@ -66,5 +66,17 @@ try:
         bak("S226 toplanti_rolu: rol kaydı yoksa yürüten, döküm yoksa katılmamış", yapi.toplanti_rolu(T2, YENI + ".md") == (True, True) and yapi.toplanti_rolu(T2, KAT + ".md") == (True, False)
             and yapi.toplanti_rolu(T2, "2026-11-02-1200-Dosyasiz.md") == (False, False))
     finally: shutil.rmtree(T2, ignore_errors=True)
+    # --- 9 Kasım: adaş (aynı ilk ad, farklı soyad) başkasının işi "senin işin" görünmez (kendi_mi) ---
+    T3 = tempfile.mkdtemp(prefix="suflor-bugun3-")
+    try:
+        AD = "2026-11-04-1000-Adas"; open(os.path.join(T3, AD + ".md"), "w", encoding="utf-8").write("# Canlı transkript — x\n\n" + BAS + "| 10:00:00 | Ayşe Deneme | merhaba | |\n")
+        yapi.graf_yaz(T3, {"baslik": AD, "tarih": "2026-11-04", "maddeler": [{"baslik": "G", "ogeler": [
+            {"tur": "is", "metin": "Benim işim", "sahip": "Ayşe Deneme", "tarih": "2026-11-06"}, {"tur": "is", "metin": "Adaşın işi", "sahip": "Ayşe Kaya", "tarih": "2026-11-06"},
+            {"tur": "is", "metin": "Tek adlı iş", "sahip": "Ayşe", "tarih": "2026-11-06"}]}]}, AD + ".md")
+        a = yapi.bugun_veri(T3, "Ayşe Deneme", bugun)
+        bak("adaş: bugun_veri kendi = yalnız tam ad (adaşın işi başkaları'nda)", sorted(x["metin"] for x in a["kendi"]) == ["Benim işim"] and "Adaşın işi" in [x["metin"] for x in a["baskalari"]], [x["metin"] for x in a["kendi"]])
+        kl = yapi.kayit_listesi(T3, "Ayşe Deneme", bugun)
+        bak("adaş: kayit_listesi kendi bayrağı adaşa verilmez", {x["metin"]: x["kendi"] for x in kl["kayitlar"] if x["tur"] == "is"} == {"Benim işim": True, "Adaşın işi": False, "Tek adlı iş": False}, {x["metin"]: x["kendi"] for x in kl["kayitlar"] if x["tur"] == "is"})
+    finally: shutil.rmtree(T3, ignore_errors=True)
 finally: shutil.rmtree(T, ignore_errors=True)
 print("\n" + ("hepsi geçti" if not hata else f"KALDI: {hata}")); sys.exit(1 if hata else 0)

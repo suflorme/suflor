@@ -23,6 +23,11 @@ def _kt_fold(s):  # ad karşılaştırması: büyük-küçük harf, aksan ve Tü
 def kt_ufuk():
     try: return max(1, min(int(AYAR.get("kisisel_tarih_ufuk", 14)), 90))
     except (TypeError, ValueError): return 14
+def _soz_sonuc_g(ref, sonuc):  # kullanıcı işlemini tek söz kapısına bildirir (soz-kapisi.py soz_sonuc); kapı yüklü değilse (yalıtılmış test) sessiz
+    f = globals().get("soz_sonuc")
+    if f:
+        try: f(ref, sonuc)
+        except Exception: pass
 def kt_acik(): return AYAR.get("kisisel_tarihler") is not False
 def _kt_gun(yil, ay, gun):  # 29 Şubat artık olmayan yılda 28 Şubat; geçersiz tarih None
     try:
@@ -131,10 +136,11 @@ def kt_islem(p):  # POST /yaklasan-tarihler
     x = next((y for y in liste if y["tarih"] == tarih and _kt_fold(y.get("kisi")) == _kt_fold(kisi) and (i == "yoksay" or y["tur"] == "dogum_gunu")), None)
     if i == "yoksay":
         if not x: return {"ok": False, "err": _t("kayıt yok", "no such item")}
-        _KT["yoksay"].add(_kt_anahtar(x)); _kt_yaz(); return {"ok": True}
+        _KT["yoksay"].add(_kt_anahtar(x)); _kt_yaz(); _soz_sonuc_g("kaynak:kisisel_tarih", "ret"); return {"ok": True}
     if not x: return {"ok": False, "err": _t("doğum günü kaydı yok", "no birthday entry")}
     if gizli_acik(): return gizli_red() if "gizli_red" in globals() else {"ok": False, "err": "gizli"}
     if toplanti_var(): return {"ok": False, "err": "toplantida"}  # taslak tarayıcıda açılır; toplantıda açılmaz, bitince yine istenir
+    _soz_sonuc_g("kaynak:kisisel_tarih", "kabul")
     u, adres, kanal = kt_taslak_url(kisi, p.get("kanal") if p.get("kanal") in ("eposta", "teams") else None)
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"KİŞİSEL TARİH (deneme): kutlama taslağı {kanal} · alıcı {'var' if adres else 'yok'}"); return {"ok": True, "kanal": kanal, "alici": bool(adres), "deneme": True}
     try: subprocess.Popen(["/usr/bin/open", u], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -163,14 +169,17 @@ def kt_hatirlat_bul(liste, simdi):  # → [(anahtar, cümle)]: yarın olanlar (b
         on = (_t("Yarın: ", "Tomorrow: ") if fark else _t("Bugün: ", "Today: ")); out.append((k, on + x["metin"]))
     return out
 def kt_hatirlat_tur(simdi=None):  # periyodik (30 dk); toplantıda/gizli kipte/kapalıyken yapmaz — o gün sonra yine denenir (bildirilmediği için kaybolmaz)
-    if not kt_acik() or AYAR.get("kisisel_tarih_hatirlat") is False or gizli_acik() or toplanti_var(): return 0
+    if not kt_acik() or AYAR.get("kisisel_tarih_hatirlat") is False or gizli_acik() or ("soz_aday" not in globals() and toplanti_var()): return 0  # toplantı/sessiz mod/mesai: tek söz kapısında (soz-kapisi.py)
     simdi = simdi or datetime.datetime.now(); _kt_oku()
     liste, d = kt_liste(bugun=simdi.date())
     n = 0
     for k, cumle in kt_hatirlat_bul(liste, simdi):
-        _KT["bildirilen"][k] = simdi.date().isoformat(); _kt_yaz(); n += 1
-        bildirim("Suflor.me", _t("Kişisel tarih", "Personal date"), cumle)
-        if AYAR.get("kisisel_tarih_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None): seslendir(cumle, kuyruk=True)
+        def teslim(k=k, cumle=cumle):  # kapı şimdi dediğinde (kapı yoksa hemen): bildirildi işaretlenir, bildirim, isteğe bağlı sesli
+            _KT["bildirilen"][k] = simdi.date().isoformat(); _kt_yaz()
+            bildirim("Suflor.me", _t("Kişisel tarih", "Personal date"), cumle)
+            if AYAR.get("kisisel_tarih_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None): seslendir(cumle, kuyruk=True)
+        if "soz_aday" not in globals(): teslim(); n += 1; continue
+        if soz_aday("kisisel_tarih", cumle, anahtar="kt:" + k, oncelik=2, kip="bildir", teslim=teslim, gecerli_sn=8 * 3600)["karar"] == "simdi": n += 1  # anahtar kapıda yalnız özet olarak saklanır (kişi adı kayda girmez)
     for k in [k for k, g in _KT["bildirilen"].items() if g < (simdi.date() - datetime.timedelta(days=3)).isoformat()]: _KT["bildirilen"].pop(k, None)
     return n
 def _kt_dongu():

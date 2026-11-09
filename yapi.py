@@ -894,7 +894,7 @@ def ortak_atananlar(c, ep=None, ad="", yeni_gun=None, yeni=None):  # yeni_gun ve
     ben = _ilk(ad)
     for kid, (o, sh) in son.items():
         if o["cihaz"] == yerel or not isinstance(sh, dict): continue
-        if (ep and sh.get("eposta") == ep) or (not sh.get("eposta") and ben and _ilk(sh.get("ad")) == ben):
+        if (ep and sh.get("eposta") == ep) or (not sh.get("eposta") and ben and kendi_mi(sh.get("ad"), "", None, ben_ad=ad)):  # 9 Kasım: yalnız ilk ad değil (adaş)
             out[kid] = str((o["veri"] or {}).get("_yazan_ad") or "") or (o["yazan"][3:] if o["yazan"].startswith("ad:") else o["yazan"])
             if yeni_gun is not None:
                 try: t = datetime.datetime.strptime(o["zaman"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
@@ -1081,6 +1081,10 @@ def toplanti_rolu(dizin, top):
         var = True; rol = str(g.get("rol") or "") if isinstance(g, dict) else ""
     except (OSError, ValueError): pass
     return var, var and rol in ("", "yurutucu")
+def _sahip_ep(roller_json):  # ortak_kayit.roller (JSON metni) → işin sahibinin e-postası ya da ""
+    try: r = json.loads(roller_json) if isinstance(roller_json, str) and roller_json else (roller_json or {})
+    except ValueError: return ""
+    return str(((r.get("sahip") or {}) if isinstance(r, dict) else {}).get("eposta") or "").strip().lower()
 def bugun_veri(dizin, ad, bugun=None, deneme=False):  # deneme=False: deneme (Test) toplantılarının kayıtları dönmez (S236)
     # Bugün sayfası için karar grafından: kullanıcının açık işleri, başkalarına atanmış açık işler, teyit bekleyen kararlar, son toplantının kararları.
     # Gizli toplantıdan gelen kayıt dönmez. Veri yoksa listeler boş (uydurma yok). ad boşsa "kendi" ve "baskalari" ayrılamaz → ikisi de boş.
@@ -1093,7 +1097,9 @@ def bugun_veri(dizin, ad, bugun=None, deneme=False):  # deneme=False: deneme (Te
     try:
         rs = [r[:5] + (kisi_ad(es, r[5]), kisi_ad(es, r[6])) + r[7:] for r in c.execute("SELECT id, toplanti, baslik, tarih, tur, kim, sahip, metin, son_tarih, durum, onay, onay_neden, kayit_id FROM kayit WHERE tur IN ('is', 'soz', 'karar') ORDER BY tarih DESC, id DESC LIMIT 3000").fetchall()]
         yeni_atanan = set(); atanan = ortak_atananlar(c, ad=kisi_ad(es, ad), yeni_gun=ATAMA_YENI_GUN, yeni=yeni_atanan)  # A3: başka Mac'ten sana atanan işler ("Sana atandı")
+        sahip_ep = {r[0]: _sahip_ep(r[1]) for r in c.execute("SELECT kayit_id, roller FROM ortak_kayit")}
     finally: c.close()
+    bilinen = sorted({str(a_) for r in rs for a_ in (r[5], r[6]) if a_})
     ky = son_kayitlar(dizin); gz = {}; rl = {}; sn = None
     def gorunur(t):
         if not t: return True
@@ -1123,7 +1129,7 @@ def bugun_veri(dizin, ad, bugun=None, deneme=False):  # deneme=False: deneme (Te
         x = {"id": f"s{i}", "metin": metin, "kim": kisi, "vade": son or "", "kalan_gun": gun, "gecikti": gun is not None and gun < 0, "baslik": baslik or "", "toplanti": top, "tarih": tarih or "", "kayit_id": kid or ""}
         x["yas"], x["geride"] = yas_geride(tarih, gun)
         if kid in atanan: x["atayan"] = atanan[kid]; x["atama_yeni"] = kid in yeni_atanan
-        if (ad and kisi and _ilk(kisi) == ben) or kid in atanan: out["kendi"].append(x)
+        if (ad and kisi and kendi_mi(kisi, sahip_ep.get(kid, ""), bilinen, ben_ad=kisi_ad(es, ad))) or kid in atanan: out["kendi"].append(x)  # 9 Kasım: adaş (aynı ilk ad) kendi sayılmaz; adres varsa adrese bakılır
         elif ad and kisi and rol(top)[0] and (x["yas"] is None or x["yas"] <= BUGUN_BASKA_GUN or (gun is not None and gun >= 0)): out["baskalari"].append(x)
     srt = lambda l: sorted(l, key=lambda x: (x["geride"], x["kalan_gun"] is None, x["kalan_gun"] if x["kalan_gun"] is not None else 0))
     out["kendi"] = srt(out["kendi"])[:30]; out["baskalari"] = srt(out["baskalari"])[:60]
@@ -1169,6 +1175,7 @@ def kayit_listesi(dizin, ad="", bugun=None, deneme=False):
     try: ok_ = {r[0]: r[1:] for r in c.execute("SELECT kayit_id, roller, gundem, ust FROM ortak_kayit")}; atanan = ortak_atananlar(c, ad=kisi_ad(es, ad))
     finally: c.close()
     ky = son_kayitlar(dizin); gz = {}; dn = {}; tops = {}; kisiler = {}; ben = _ilk(kisi_ad(es, ad)); sn = None
+    bilinen = sorted({str(a_) for r in rs for a_ in (r[5], r[6]) if a_})
     for i, top, baslik, tarih, tur, kim, sahip, metin, son, durum, onay, onay_neden, kid in rs:
         if top:
             if top not in gz: gz[top] = gizli_mi(dizin, top, ky)
@@ -1193,7 +1200,7 @@ def kayit_listesi(dizin, ad="", bugun=None, deneme=False):
         else:
             x["id"] = f"s{i}"; gun = _vade_gun(son, bugun); x["kalan_gun"] = gun
             x["durum"] = "acik" if durum == "acik" else "kapandi"; x["gecikti"] = x["durum"] == "acik" and gun is not None and gun < 0
-            x["tarihsiz"] = x["durum"] == "acik" and gun is None; x["kendi"] = bool(ben and x["kim"] and _ilk(x["kim"]) == ben) or kid in atanan
+            x["tarihsiz"] = x["durum"] == "acik" and gun is None; x["kendi"] = bool(ben and x["kim"] and kendi_mi(x["kim"], _sahip_ep((ok_.get(kid) or (None,))[0]), bilinen, ben_ad=kisi_ad(es, ad))) or kid in atanan
             if kid in atanan: x["atayan"] = atanan[kid]  # A3: başka Mac'ten sana atandı
         if x["kim"]: kisiler[x["kim"]] = kisiler.get(x["kim"], 0) + 1
         r_, g_, u_ = ok_.get(kid) or (None, None, None)  # eylem menüsü: sahibin e-postası, gündeme eklendiği toplantı, alt iş mi
@@ -1492,7 +1499,7 @@ def gundem_adaylari(olaylar, x, simdi=None, en_cok=4):
         if (e.get("kisi_sayisi") or len(e.get("katilimcilar") or [])) < 2: continue
         ad_l = [str(k) for k in (e.get("katilimcilar") or [])] + [str(k.get("ad") or "") for k in (e.get("kisiler") or []) if isinstance(k, dict)]
         ep_l = {str(k).lower() for k in (e.get("katilimci_eposta") or [])} | {str(k.get("eposta") or "").lower() for k in (e.get("kisiler") or []) if isinstance(k, dict)}
-        ilgili = any(k and not (ben and _ilk(k) == ben) and any(kisi_eslesir(k, a) for a in ad_l) for k in kisiler) or bool(epostalar & ep_l)
+        ilgili = any(k and not (ben and kendi_mi(k)) and any(kisi_eslesir(k, a) for a in ad_l) for k in kisiler) or bool(epostalar & ep_l)
         out.append({"id": str(e["id"]), "baslik": str(e.get("baslik") or "")[:120], "tarih": b.strftime("%Y-%m-%d"), "saat": b.strftime("%H:%M"), "ilgili": ilgili, "_b": b})
     out.sort(key=lambda o: (not o["ilgili"], o["_b"]))
     for o in out: o.pop("_b")
@@ -1512,13 +1519,13 @@ def tarih_okunur(t, en=False):  # 2026-11-12 → "12 Kasım" / "12 November" (y�
     return f"{ad} {int(m[3])}{yil}" if en else f"{int(m[3])} {ad}{yil}"
 def ben_epostalar():  # kullanıcının bilinen adresleri (eposta_kimlik, eposta_adres, takvim_adreslerim)
     a = _ayar(); return {e for e in (str(x or "").strip().lower() for x in [a.get("eposta_kimlik"), a.get("eposta_adres")] + list(a.get("takvim_adreslerim") or [])) if _EPOSTA_RX.match(e)}
-def kendi_mi(ad="", eposta="", bilinen=None):
+def kendi_mi(ad="", eposta="", bilinen=None, ben_ad=None):  # ben_ad: kullanıcının adı (verilmezse ayar "ad"; bugun_veri gibi adı parametreyle alan işlevler için)
     # kayıttaki kişi kullanıcının kendisi mi. 7 Kasım (S211, e-postaya da bakılır): iki tarafta da adres varsa karar YALNIZ adresten (ad aynı olsa da adres farklıysa başkası).
     # Adres yoksa ad dikkatle: tam ad eşleşmesi (ya da birinin parçaları ötekinde, en az iki parça) kendi; soyadı farklıysa ("Ayşe Kaya" ↔ "Ayşe Deneme") değil; tek sözcüklük
     # ad ("Ayşe") ancak bilinen kişiler (bilinen: grafta geçen adlar) arasında ilk adı kullanıcınınkiyle aynı başka biri yoksa kendi sayılır.
     a = _ayar(); ep = str(eposta or "").strip().lower(); mine = ben_epostalar()
     if ep and mine: return ep in mine
-    ben = kisi_parcalari(a.get("ad")); p = kisi_parcalari(ad)
+    ben = kisi_parcalari(a.get("ad") if ben_ad is None else ben_ad); p = kisi_parcalari(ad)
     if not ben or not p or p[0] != ben[0]: return False
     if p == ben: return True
     if len(p) >= 2 and len(ben) >= 2: return set(p) <= set(ben) or set(ben) <= set(p)
@@ -1565,7 +1572,7 @@ def taslak_icerik(x, tur, alicilar=None, alici_ad="", dil=None, ben_onayladi=Non
     al = [e for e in dict.fromkeys(str(a or "").strip().lower() for a in (alicilar or [])) if "@" in e][:10]
     return {"konu": konu[:120], "govde": govde, "alicilar": al, "teams": teams_url(al, kisa), "tur": tur}
 def claude_istemi(x, tarihce_satirlari):
-    # Claude'a çalıştır: yalnız kaydın kendisi ve tarihçesi gider (döküm alıntısı, başka kayıt, kişi e-postası gitmez). Çıktı kısa ve uydurmasız olmalı.
+    # Claude'a çalıştır: yalnız kaydın kendisi ve tarihçesi gider; aktarıcı (eylem_model amac="kayit") başa kullanıcı profili + öğrenilenleri ekler (kişi modeli, gizli kayıtta çalışmaz) (döküm alıntısı, başka kayıt, kişi e-postası gitmez). Çıktı kısa ve uydurmasız olmalı.
     roller = x.get("roller") or {}; ad = lambda k: str((roller.get(k) or {}).get("ad") or "")
     veri = [f"Tür: {_TASLAK_TUR.get(x.get('tur'), ('kayıt',))[0]}", f"Metin: {TEYIT_RX.sub('', str(x.get('metin') or '')).strip()}", f"Toplantı: {x.get('baslik') or '—'} ({x.get('tarih') or '—'})",
             f"Durum: {x.get('durum')}" + (f" · onay: {x.get('onay')}" if x.get("onay") else ""), f"Vade: {x.get('vade') or 'yok'}", f"Sahip: {ad('sahip') or '—'}", f"İsteyen: {ad('isteyen') or '—'}",

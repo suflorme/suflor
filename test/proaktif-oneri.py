@@ -112,7 +112,7 @@ class Uc:
         if tohum: graf(s.d, TOP, OGELER)
         yol = os.path.join(T, ad + ".json")
         json.dump(dict({"alan": "Deneme", "ad": "Ayşe Deneme", "port": s.port, "uygulama": T, "proje": proje, "ortak": os.path.join(T, "yok"), "claude": "/yok/claude", "konus_on_ac": False,
-                        "pocket_python": "/yok/python", "pocket_hf": "/yok", "calisma_saatleri": HER_GUN, "proaktif_aralik_dk": 0, "proaktif_bosta_dk": 0}, **ayar), open(yol, "w"))
+                        "pocket_python": "/yok/python", "pocket_hf": "/yok", "calisma_saatleri": HER_GUN, "proaktif_aralik_dk": 0, "proaktif_bosta_dk": 0, "soz_gece": False, "soz_aralik_dk": 0}, **ayar), open(yol, "w"))
         s.p = subprocess.Popen([sys.executable, "relay.py", "--dir", s.d, "--port", str(s.port)], cwd=T, stdout=open(s.log, "w"), stderr=subprocess.STDOUT,
                                env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=yol, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0"))
         for _ in range(80):
@@ -146,6 +146,11 @@ try:
     AB2 = Uc("a2"); AB2.tara(); pr = AB2.status().get("proaktif")
     r = AB2.post("/proaktif", {"islem": "sor", "id": pr["id"]})
     ok("Bakalım: gün içi öneri asistana yazılı gider, şerit kalkar", r.get("ok") is True and AB2.status().get("proaktif") is None and "gün içi öneri — evet" in AB2.metin(), r)
+    sj = lambda U: [json.loads(l) for l in open(os.path.join(U.d, "soz.jsonl"), encoding="utf-8") if l.strip()]
+    ok("tek söz kapısı: sunuş kaydı (gun_ici, simdi), metin ve kayıt metni yok; /status soz alanı", [(x["kaynak"], x["karar"]) for x in sj(A) if x["olay"] == "sunuldu"] == [("gun_ici", "simdi")] * 3
+       and "Tabloyu" not in open(os.path.join(A.d, "soz.jsonl"), encoding="utf-8").read() and A.status().get("soz", {}).get("sunulan") == 3)
+    ok("tek söz kapısı: panoda kapat → sonuç ret (3 kez)", [x["sonuc"] for x in sj(A) if x["olay"] == "sonuc"] == ["ret"] * 3, sj(A))
+    ok("tek söz kapısı: Bakalım (evet) → sonuç kabul", [x["sonuc"] for x in sj(AB2) if x["olay"] == "sonuc"] == ["kabul"], sj(AB2))
     AB2.kapat()
     # günlük sınır ve aralık
     B = Uc("b", proaktif_gunluk_en_cok=1)

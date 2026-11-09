@@ -177,6 +177,13 @@ def _topo_gonder(o):
 def topo_effort():  # 6 Kasım: isteğe bağlı ayar toplanti_effort (low|medium|high|xhigh|max) → claude --effort; yoksa Claude Code'un varsayılanı (değişiklik yok)
     e = str(AYAR.get("toplanti_effort") or "").strip().lower()
     return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []
+def topo_kisi_blogu(konu=None, yeni=True):  # 9 Kasım (kişi modeli): toplantı oturumu da aynı asistan — kimlik + profil + öğrenilenler (her açılışta; kararlı) ve yeni oturumda gün bağlamı (bugün, işler, notlar, gün devri; deneme toplantısında yok)
+    if "baglam_paketi" not in globals(): return ""
+    try:
+        m = baglam_paketi("toplanti", dilimler=["kimlik", "profil", "ogrenilen"])
+        if yeni and not ("_gd_deneme" in globals() and _gd_deneme(konu)): m += baglam_paketi("toplanti", dilimler=["bugun", "isler", "notlar", "gun_devri"], soru=konu)
+        return ("\n\n" + m) if m else ""
+    except Exception as e: print(f"KİŞİ MODELİ: toplantı oturumu bağlamı kurulamadı ({e.__class__.__name__})"); return ""
 def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
     # cl: claude yolu · model: ayar claude_model · ky: toplanti-kanca.json (ya da None) · ilk: ilk kullanıcı iletisi · sid: kaldığı yerden (--resume)
     with TOPO["kilit"]:
@@ -199,7 +206,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
             try: TOPO["gun_ici"] = gun_ici_blogu(konu)
             except Exception as e: TOPO["gun_ici"] = ""; print(f"GÜN DEVRİ: gün içi bağlam kurulamadı ({e.__class__.__name__})")
         args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-prompt-tool", "stdio",
-                "--append-system-prompt", topo_istem() + TOPO.get("gun_ici", "")] + (["--chrome"] if topo_chrome_acik() else []) + (["--model", str(model)] if model else []) + topo_effort() + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
+                "--append-system-prompt", topo_istem() + topo_kisi_blogu(konu, not sid) + TOPO.get("gun_ici", "")] + (["--chrome"] if topo_chrome_acik() else []) + (["--model", str(model)] if model else []) + topo_effort() + (["--settings", ky] if ky else []) + (["--resume", sid] if sid else [])
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"kip": "toplanti", "claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "toplanti-bos"),

@@ -744,6 +744,13 @@
    },
    "son_toplantilar": [],
    "soyle_web": "NoneType",
+   "soz": {
+    "bastirilan": "int",
+    "butce": "int",
+    "kalan": "int",
+    "kuyruk": "int",
+    "sunulan": "int"
+   },
    "started": "str",
    "sure": {
     "acik": [

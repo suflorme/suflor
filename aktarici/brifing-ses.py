@@ -120,7 +120,8 @@ def _brifing_is(oid, olay):
         bi, vj, va = BRIFING_BILGI[dl] if bilgi else ("", "", "")
         if bilgi:
             bi = bi.format(kay="; ".join(f"«{k['ad']}»" + (f" ({k['konu']})" if k.get("konu") else "") for k in bilgi)); print("BRİFİNG: dış bilgi kaynağı açık — " + ", ".join(k["ad"] for k in bilgi))
-        istem = BRIFING_ISTEM[dl].format(canli=BASE, olay=json.dumps(veri, ensure_ascii=False, indent=1), bilgi=bi, veri=vj, va=va)
+        kisi = baglam_paketi("brifing", soru=str(veri.get("baslik") or "")) if "baglam_paketi" in globals() else ""  # 9 Kasım (kişi modeli): kullanıcı profili + öğrenilenler (+ konuyla ilgili notlar)
+        istem = BRIFING_ISTEM[dl].format(canli=BASE, olay=json.dumps(veri, ensure_ascii=False, indent=1), bilgi=kisi + bi, veri=vj, va=va)
         cikti = os.path.join(BASE, "brifing-cikti.json"); istek = os.path.join(BASE, "brifing-istek.json")
         t0 = time.time(); ham = None
         for yalin in ([True, False] if claude_yalin() else [False]):  # eski Claude Code yalın seçenekleri tanımazsa bir kez tam çağrı

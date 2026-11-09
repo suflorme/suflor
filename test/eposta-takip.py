@@ -20,7 +20,7 @@ class Beyin:
     tur = "claude-code"
     @staticmethod
     def secim(ayar, is_): return {"tur": Beyin.tur, "model": None}
-def sahte_model(istem):
+def sahte_model(istem, amac=None, soru=None, maske=None):
     CAGRI.append(istem)
     if "JSON dizisi" in istem:  # S263 zincir değerlendirmesi: blok başına durum; son söz kullanıcınınsa dönüş bekliyor, teşekkür bilgi, gerisi senden bekleniyor
         out = []
@@ -98,6 +98,25 @@ NS["AYAR"]["eposta_hatirlat_sesli"] = True; NS["POSTA"]["iletiler"] = POS2 + [m(
 N("et_tara")(zorla=True, simdi=SIMDI); ok("sesli ayar açıkken kısa cümle söylenir", len(SES) == 1 and "cevap bekliyor" in SES[0])
 NS["SOHBET"]["acik"] = True; NS["POSTA"]["iletiler"] += [m(13, A("selin"), "Başka acil?", 0, ad="Selin Deneme", ozet="acil")]
 N("et_tara")(zorla=True, simdi=SIMDI); ok("sohbet açıkken sesli söylenmez (bildirim gider)", len(SES) == 1 and len(BILDIRIM) == 3); NS["SOHBET"]["acik"] = False
+# --- tek söz kapısı (aktarici/soz-kapisi.py) ile: bildirim kapıdan geçer; sessiz mod / toplantı bekletir; ertele/yoksay düğmesi sonuç kaydı yazar
+os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"; _POS0 = list(NS["POSTA"]["iletiler"]); _sol = {"sessiz": False}; _sz = SIMDI.timestamp()
+NS.update(LOCK=threading.Lock(), write=lambda pairs: [open(y, "a", encoding="utf-8").write(t_) for y, t_ in pairs], sessiz_acik=lambda: _sol["sessiz"], aktif_dosya=lambda: None,
+          calisma_saatleri=lambda: ({0, 1, 2, 3, 4}, 540, 1080), SOZ_SAAT=lambda: _sz); NS["AYAR"]["soz_aralik_dk"] = 0; NS["AYAR"]["eposta_hatirlat_sesli"] = False
+for f_ in ("soz.jsonl", "soz-kuyruk.json"):
+    try: os.remove(os.path.join(T, f_))
+    except OSError: pass
+exec(compile(open(os.path.join(KOD, "aktarici", "soz-kapisi.py"), encoding="utf-8").read(), "soz-kapisi.py", "exec"), NS)
+sj = lambda: [json.loads(l) for l in open(os.path.join(T, "soz.jsonl"), encoding="utf-8") if l.strip()]
+b0 = len(BILDIRIM); NS["POSTA"]["iletiler"] = _POS0 + [m(14, A("selin"), "Sözleşme?", 0, ad="Selin Deneme", ozet="acil cevap lazım")]; N("et_tara")(zorla=True, simdi=SIMDI)
+ok("kapı: yeni önemli ileti kapıdan geçer (bildirim bugünkü gibi), kayıtta eposta/öncelik, metin yok", len(BILDIRIM) == b0 + 1 and [(x["kaynak"], x["karar"]) for x in sj()] == [("eposta", "simdi")] and "Sözleşme" not in open(os.path.join(T, "soz.jsonl"), encoding="utf-8").read()
+   and sj()[0]["oncelik"] in (1, 2))
+_sol["sessiz"] = True; NS["POSTA"]["iletiler"] += [m(15, A("selin"), "Teklif?", 0, ad="Selin Deneme", ozet="acil cevap lazım")]; N("et_tara")(zorla=True, simdi=SIMDI)
+ok("kapı: sessiz modda e-posta bildirimi bekler (işaretlenmez, kuyrukta)", len(BILDIRIM) == b0 + 1 and NS["soz_view"]()["kuyruk"] == 1)
+_sol["sessiz"] = False; _sz += 60; NS["soz_tur"](); ok("kapı: sessiz mod kalkınca dakikalık tur teslim eder", len(BILDIRIM) == b0 + 2 and NS["soz_view"]()["kuyruk"] == 0)
+r_ = N("et_islem")({"islem": "ertele", "id": "14"}); ok("kapı: ertele düğmesi → sonuç ertele", r_.get("ok") is True and sj()[-1]["olay"] == "sonuc" and sj()[-1]["sonuc"] == "ertele" and sj()[-1]["kaynak"] == "eposta")
+r_ = N("et_islem")({"islem": "yoksay", "id": "15"}); ok("kapı: yoksay düğmesi → sonuç ret", r_.get("ok") is True and sj()[-1]["sonuc"] == "ret")
+for k_ in [k_ for k_ in NS if k_.startswith(("soz", "SOZ", "_soz")) and k_ != "_soz_sonuc_g"]: del NS[k_]  # sonraki bölümler kapısız (eski) yolu sınar
+NS["AYAR"].pop("soz_aralik_dk", None)
 
 # --- ertele / yoksay, taslak -------------------------------------------------------------------------------------------------------------------------
 r = N("et_islem")({"islem": "ertele", "id": "1"}); ids = {o["id"] for o in r["onemli"] + r["cevapsiz"]}
@@ -142,7 +161,7 @@ ENDUSTRI = [m(1, A("selin"), "Teklif onayı?", 5, ad="Selin Deneme", ozet="Fiyat
 ENDUSTRI = [dict(x, t=(datetime.datetime.now().astimezone() - datetime.timedelta(days=5 if x["id"] == 1 else 1)).isoformat()) for x in ENDUSTRI]
 json.dump({"durum": "ok", "hata": None, "guncel": "2026-11-11T10:00:00Z", "iletiler": ENDUSTRI}, open(os.path.join(d, "posta.json"), "w"))
 ay = os.path.join(U, "ayar.json")
-json.dump({"alan": "Deneme", "ad": "Deniz T", "port": port, "uygulama": U, "proje": os.path.join(U, "p"), "ortak": os.path.join(U, "yok"), "claude": "/yok/claude", "konus_on_ac": False, "eposta_oku": True,
+json.dump({"alan": "Deneme", "soz_gece": False, "ad": "Deniz T", "port": port, "uygulama": U, "proje": os.path.join(U, "p"), "ortak": os.path.join(U, "yok"), "claude": "/yok/claude", "konus_on_ac": False, "eposta_oku": True,
            "eposta_vip": ["Selin Deneme"], "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
 os.makedirs(os.path.join(U, "p"))
 lg = open(os.path.join(U, "log"), "w")

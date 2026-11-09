@@ -50,7 +50,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True, "konus_on_ac": True, "konus_iki_surec": True, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "soz_gece": False, "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True, "konus_on_ac": True, "konus_iki_surec": True, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
@@ -291,9 +291,23 @@ try:
     ad_ = {"re": _re, "time": time, "threading": _th0, "print": lambda *a, **k: None, "konusma_dili": lambda m: m, "SES": {"kes": 0}, "kisilik_sesi": lambda *a, **k: ("pocket", None, 1.0), "ARAYUZ_DILI": "tr", "_t": lambda a, b: a}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False, cal=None, ozet=False: okunan_.append(m) or True
     exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)
     exec(kod_[kod_.index("LISTE_OKU = 3"):kod_.index("def konus_devam_kaydet(")], ad_)  # liste okuma yardımcıları (md_temizle, _liste_fazla_c)
-    t_ = {"tampon": "Vay! Birinci cümle burada. İkinci cümle de var. Üçüncü cümle geliyor. Dördüncü cümle de. Beşinci cümle son. Altıncı okunmamalı. Yedinci de okunmamalı"}
-    ad_["_konus_cumle"](t_); ad_["_konus_cumle"](t_, son=True)
-    ok(f"okuma en çok beş cümle ('Vay!' sayılmaz; okunan {len(okunan_)})", okunan_[-1].startswith("Beşinci") and len(okunan_) == 6 and t_.get("kesik"))
+    def okut(metin, **ek):  # → (tur, okunanlar); cevap bitince kapanış da çağrılır (result dalı gibi)
+        okunan_.clear(); t = {"tampon": metin, "sesli": True, "kaynak": "bas"}; t.update(ek)
+        ad_["_konus_cumle"](t); ad_["_konus_cumle"](t, son=True); ad_["_konus_kesik_kapanis"](t); return t, list(okunan_)
+    KAPANIS = "Gerisi panoda; «devamını oku» dersen okurum."
+    t_, o_ = okut("Vay! " + " ".join(f"Cümle no {n} burada." for n in range(1, 11)))
+    ok(f"okuma en çok sekiz cümle ('Vay!' sayılmaz; okunan {len(o_)}), kalan 2 dolu, kapanış bir kez", o_[:1] == ["Vay!"] and len(o_) == 9 + 1 and o_[-1] == KAPANIS and o_.count(KAPANIS) == 1 and o_[-2].startswith("Cümle no 8") and len(t_["kalan"]) == 2 and t_.get("kesik_atlanan") == 2 and t_.get("kesik"))
+    t_, o_ = okut(" ".join(f"Cümle no {n} burada." for n in range(1, 9)))
+    ok("tam sekiz cümle kesilmez, kapanış cümlesi yok", len(o_) == 8 and KAPANIS not in o_ and not t_.get("kesik") and not t_.get("kalan"))
+    t_, o_ = okut(" ".join(("x" * 150) + f" no {n}." for n in range(1, 7)))
+    ok(f"700 karakter sınırı: 5 uzun cümle okunur, 6. okunmaz (okunan {len(o_) - 1}, {t_.get('okunan_kr')} kr)", len(o_) == 6 and o_[-1] == KAPANIS and len(t_["kalan"]) == 1 and 700 <= t_["okunan_kr"] < 700 + 160)
+    t_, o_ = okut(" ".join(f"Cümle no {n} burada." for n in range(1, 11)), otonom=True)
+    ok("otonom turda kapanış cümlesi yok (kesik ve günlük kalır)", KAPANIS not in o_ and len(o_) == 8 and t_.get("kesik") and t_.get("kalan"))
+    t_, o_ = okut(" ".join(f"Cümle no {n} burada." for n in range(1, 11)), toplantida=True)
+    ok("toplantıdaki turda kapanış cümlesi yok", KAPANIS not in o_)
+    ad_["ARAYUZ_DILI"] = "en"; ad_["_t"] = lambda a, b: b; t_, o_ = okut(" ".join(f"Sentence number {n} is here." for n in range(1, 11)))
+    ok("İngilizce kapanış cümlesi DEVAM_OKU_RX'in tanıdığı ifadeyi söyler", o_[-1].startswith("The rest is on the panel") and "continue reading" in o_[-1])
+    ad_["ARAYUZ_DILI"] = "tr"; ad_["_t"] = lambda a, b: a
     # v0.54.0 anlamsız söz: Whisper'ın "!" gibi metni Claude'a gitmez
     ad2 = {"re": _re}; exec(kod_[kod_.index("KONUS_SES_SOZ = "):kod_.index("# İş talimatı (toplantı")], ad2)
     ok("anlamsız söz Claude'a gitmez ('!', 'Hı hı.', 'A.'), gerçek söz gider ('Evet.', soru)", all(ad2["konus_anlamsiz"](x) for x in ("!", "?", "Hı hı.", "A.", "Ee, ıı.")) and not any(ad2["konus_anlamsiz"](x) for x in ("Evet.", "Bugün ne var?", "Tamam")))

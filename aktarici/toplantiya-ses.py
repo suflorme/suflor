@@ -221,8 +221,10 @@ def _ts_nobet():
             STATE["_menu_son"] = 0  # bildirim menüye değil macOS'a
             if time.time() - TS_NOBET["son_uyari"] > 300:
                 TS_NOBET["son_uyari"] = time.time()
-                bildirim("Suflor.me", _t("Menü uygulaması kapandı — yeniden açılıyor", "Menu app quit — reopening"),
-                         _t("Teams'te mikrofon BlackHole ise birkaç saniye sesin gitmemiş olabilir.", "If Teams uses BlackHole as the microphone, your voice may have been cut for a few seconds."))
+                _ts_m = _t("Teams'te mikrofon BlackHole ise birkaç saniye sesin gitmemiş olabilir.", "If Teams uses BlackHole as the microphone, your voice may have been cut for a few seconds.")
+                _ts_t = lambda: bildirim("Suflor.me", _t("Menü uygulaması kapandı — yeniden açılıyor", "Menu app quit — reopening"), _ts_m)
+                if "soz_aday" in globals(): soz_aday("sistem", _ts_m, anahtar="menu-kapandi", oncelik=3, kip="bildir", teslim=_ts_t, gecerli_sn=300, ek={"toplantiyla_ilgili": True})  # tek söz kapısı: toplantıdayken de gider (acil)
+                else: _ts_t()
             menu_baslat()
         except Exception as e: print(f"TOPLANTIYA SÖYLE: nöbet hatası {e.__class__.__name__}")
 if not os.environ.get("SUFLOR_TEST_BASLAT"): threading.Thread(target=_ts_nobet, daemon=True).start()

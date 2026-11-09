@@ -10,9 +10,14 @@ def _kem_takvim(): return [e for e in TAKVIM_TAM.values() if isinstance(e, dict)
 def _kem_kimlik(ad, tam=True):  # kimlik.py: takvim, kayıt veritabanı, Kişiler (tam) → {"eposta", "kaynak", "guven", "adaylar"}; menü açılışında Kişiler'e gidilmez
     if "kimlik_coz" not in globals(): return {}
     return kimlik_coz(ad) if tam else kimlik_coz(ad, kisiler=False, yaz=False)
-def eylem_model(istem):
+def eylem_model(istem, amac=None, soru=None, maske=None):
+    # amac verilirse (talimat | kayit | degerlendir) istemin başına kişi modelinin paketi (profil + öğrenilenler …; aktarici/kisi-modeli.py baglam_paketi) eklenir; gizlilik süzgeci pakette.
     # → (ham metin, hata metni ya da None). Tek model çağrısı (prova_model gibi): başka sağlayıcıysa beyin_tek, Claude Code ise Brifing.app --istek (Masaüstü izni uygulamada).
     try:
+        if amac and "baglam_paketi" in globals():
+            paket = baglam_paketi(amac, soru=soru)
+            if paket and maske: paket = maske(paket)  # çağıranın kendi gizlilik maskesi (ör. e-posta değerlendirmesinde adres maskesi)
+            if paket: istem = paket + "\n" + istem
         sec = BEYIN.secim(AYAR, "prova"); claude_var = bool(claude_yolu()) and os.path.isdir(BRIFING_APP); ham = None
         if sec["tur"] != "claude-code":
             ham, olc = beyin_tek("prova", sec, istem, json_kip=False, sistem=None, zaman=EYLEM_ZAMAN_SN)
@@ -46,7 +51,7 @@ def kayit_eylem_islem(p):  # POST /kayit-eylem
     y = _yapi_mod(); p = p if isinstance(p, dict) else {}; kid = str(p.get("id") or "")[:40]; e = str(p.get("eylem") or "")[:20]
     if not y or not kid or not e: return {"ok": False, "err": "id ve eylem gerekli"}
     if e == "toplanti": return _at_islem(y, kid, p)
-    try: r = y.kayit_eylem(BASE, kid, e, p, None, lambda ad: _kem_kimlik(ad, True), _kem_takvim(), eylem_model)
+    try: r = y.kayit_eylem(BASE, kid, e, p, None, lambda ad: _kem_kimlik(ad, True), _kem_takvim(), lambda i: eylem_model(i, amac="kayit"))
     except Exception as ex: print(f"EYLEM MENÜSÜ: {e} yapılamadı ({ex.__class__.__name__})"); return {"ok": False, "err": ex.__class__.__name__}
     print(f"EYLEM MENÜSÜ: {e} {kid} → " + ("tamam" if r.get("ok") else str(r.get("err"))))  # günlüğe metin yazılmaz
     return r

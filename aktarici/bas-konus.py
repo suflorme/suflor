@@ -293,7 +293,7 @@ def web_istem(web):
 def _uslup(): return uslup_blogu() if "uslup_blogu" in globals() else ""  # 9 Kasım (dost): toplantı dışı birebir üslup (kisilik.py); toplantıda geçmez (koşul metnin içinde)
 def konus_istem(vt=None, bilgi=None, web=False):
     t = KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]; k = kisilik()
-    _KS["kisilik_mt"] = _KIS.get("mt") if k else None; _KS["kart_mt"] = kart_mt(); _KS["proje_kart_mt"] = proje_kart_mt()
+    _KS["kisilik_mt"] = _KIS.get("mt") if k else None; _KS["kart_mt"] = kart_damga(); _KS["proje_kart_mt"] = proje_kart_mt()
     if vt:  # tablo yapısı istemde: her soruda vt_sema turu (~3–5 sn) gerekmesin
         sema = _KS.get("vt_sema") or ""
         if AYAR.get("konus_onek_sabit", True) is not False: sema = re.sub(r", (\d+|\?) satır\)", ")", sema)  # v0.90.0 (reçete 1): satır sayısı değişince önbellekteki istem bozulmasın
@@ -1238,7 +1238,8 @@ def konus_on_ac(neden):
 # Okuma en çok KONUS_OKU_EN_COK cümle (v0.51.1, 16 Ekim): istem "en çok üç cümle / toplantı sorusunda iki kısa cümle" der ama uzun defterli cevapta
 # 3–5 cümle olabiliyor (ölçüm uzun-toplanti L6–L7: ≤ 2 cümle 9–16/16; istem değişikliği düzeltmedi). Sonrası okunmaz, panoda yazılı kalır. Tek sözcüklük
 # "Vay!" / "Hm." sayılmaz.
-KONUS_OKU_EN_COK = 5  # v0.54.0: 3 → 5 (kullanıcı: "iki cümle bazı sorularda yetmiyor, yarım kalıyor")
+KONUS_OKU_EN_COK = 8  # v0.54.0: 3 → 5 (kullanıcı: "iki cümle bazı sorularda yetmiyor, yarım kalıyor"); v0.215.2: 5 → 8
+KONUS_OKU_EN_COK_KR = 700  # ve okunan toplam ~700 karakter (hangisi önce dolarsa). 9 Kasım'da 4 cevap 357–628 karakter okunup 5 cümlede kesildi (yazılı 600–941); kullanıcı sesli bir şey duymadığı için "son cümleler kesiliyor" sandı
 def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okuma kuyruğuna
     while True:
         c = None; fazla_not = False
@@ -1269,15 +1270,23 @@ def _konus_cumle(tur, son=False):  # biriken metinden tamamlanan cümleleri okum
                 if tur.get("liste_fazla") and c: c = _liste_fazla_c(tur) + " " + c; fazla_not = True
                 tur["liste_n"] = 0
         if c and tur.get("otonom") and "otonom_akis_ekle" in globals(): otonom_akis_ekle(tur, c)  # v0.157.0: toplantıda asistan ilk cümlede konuşmaya başlar (otonom.py)
-        if c and tur.get("sesli", True) and tur.get("okunan", 0) >= KONUS_OKU_EN_COK and not fazla_not:
-            if not tur.get("kesik"): tur["kesik"] = True; print(f"KONUŞ: okuma {KONUS_OKU_EN_COK} cümlede durdu — kalanı panoda")
+        if c and tur.get("sesli", True) and (tur.get("okunan", 0) >= KONUS_OKU_EN_COK or tur.get("okunan_kr", 0) >= KONUS_OKU_EN_COK_KR) and not fazla_not:
+            tur["kesik"] = True; tur["kesik_atlanan"] = tur.get("kesik_atlanan", 0) + 1  # günlük satırı ve kapanış cümlesi tur bitince (_konus_kesik_kapanis)
             tur.setdefault("kalan", []).append(md_temizle(c)); c = ""  # "devamını oku" için saklanır
         if c and len(c.split()) > 1: tur["okunan"] = tur.get("okunan", 0) + 1
+        if c and tur.get("sesli", True): tur["okunan_kr"] = tur.get("okunan_kr", 0) + len(c)
         if c and tur.get("sesli", True): tur.setdefault("okunanlar", []).append(md_temizle(c)); c = konusma_dili(sesli_terim_suz(c))  # v0.73.0: kişilik konuşma dili istiyorsa günlük söyleniş (yalnız okunan)
         if c and tur.get("sesli", True) and tur.get("t_ses") and _konus_g_biriktir(tur, c): pass
         elif c and tur.get("sesli", True) and seslendir(c, kuyruk=True, ozet=tur.get("kaynak") == "ozet", cal=None if tur.get("t_ses") else lambda t: tur.setdefault("t_ses_cal", t)) and not tur.get("t_ses"): tur["t_ses"] = time.time()
         if son and not tur["tampon"].strip() and not tur.get("liste_fazla"): break
     if son: _konus_g_bosalt(tur, "cevap bitti")
+def _konus_kesik_kapanis(tur):  # tur bitti: okuma sınırda kesildiyse günlüğe ölçü; panoda okuyan kullanıcıya tek kısa sesli haber (toplantıda/karşı tarafta/otonomda yok: "panoda" orada anlamsız)
+    if not tur.get("kesik") or tur.get("kesik_haber"): return
+    tur["kesik_haber"] = True
+    print(f"KONUŞ: okuma {tur.get('okunan', 0)} cümlede durdu — {tur.get('kesik_atlanan', 0)} cümle panoda (okunan {tur.get('okunan_kr', 0)} kr)")
+    if tur.get("otonom") or tur.get("karsi") or tur.get("toplantida") or tur.get("kutu") or not tur.get("sesli", True) or tur.get("kaynak") not in ("bas", "sohbet", "yazili"): return
+    c = _t((globals().get("cesit") or (lambda k_, l_: l_[0]))("kesik_haber", ["Gerisi panoda; «devamını oku» dersen okurum."]), "The rest is on the panel; say \"continue reading\" to hear it.")
+    seslendir(konusma_dili(c), kuyruk=True)
 # Gemini sesinde karışık okuma (v0.127, kullanıcı 24 Ekim: günlük 100 istek sınırı ~25 dk'da doluyordu — 26 söz 60 isteğe bölünmüştü): ilk cümle bugünkü gibi
 # hemen ve tek başına okunur (ilk ses hızı); kalan cümleler birikir, cevap bitince tek istekte (GEMINI_BIRLESIK_EN_COK'u aşarsa iki parça). Claude ilk cümlenin
 # okunması bitene kadar cevabı bitiremediyse biriken o an okunur (sessizlik olmasın). Okuma kesildiyse (Option + Shift + S, "dur", sohbette araya girme) biriken
@@ -1407,6 +1416,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                     else: _konus_cumle(tur)
             elif j.get("type") == "result":
                 if not tur.get("ayrinti"): _konus_cumle(tur, son=True)
+                _konus_kesik_kapanis(tur)
                 if TALIMAT_ETIKET_BAS.search(tur["metin"]):  # v0.101.1: Claude'un hazırladığı oturum iletisi → onaya (etiket panoda ve geçmişte görünmez)
                     tur["metin"], _ = talimat_claude(tur["metin"], tur.get("soru") or KONUS.get("soru"), tur); KONUS["cevap"] = tur["metin"]
                 if not j.get("is_error") and KAYIT_ETIKET_BAS.search(tur["metin"] or ""):  # 5 Kasım: asistanın kayıt önerisi → panoda tek tık onay (notlar.py kayit_etiketleri; etiket görünmez)
@@ -2203,8 +2213,8 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         konus_kapat("gün devri süreçte — ortak cevap için yeni süreç", durum_koru=True); _KS["tur"] = tur
     df, dm, dk = _konus_defter(); tur["toplanti_ad"] = df["ad"] if top and df else None
     k_ = kisilik()
-    if konus_canli() and (_KS.get("kisilik_mt") != (_KIS.get("mt") if k_ else None) or _KS.get("kart_mt") != kart_mt() or _KS.get("proje_kart_mt") != proje_kart_mt()):  # kişilik, kullanıcı ya da proje kartı değişti: istem sürecin açılışında verilir
-        konus_kapat("kullanıcı kartı değişti" if _KS.get("kart_mt") != kart_mt() else "proje kartı değişti" if _KS.get("proje_kart_mt") != proje_kart_mt() else "kişilik değişti", durum_koru=True); _KS["tur"] = tur
+    if konus_canli() and (_KS.get("kisilik_mt") != (_KIS.get("mt") if k_ else None) or _KS.get("kart_mt") != kart_damga() or _KS.get("proje_kart_mt") != proje_kart_mt()):  # kişilik, kullanıcı ya da proje kartı değişti: istem sürecin açılışında verilir
+        konus_kapat("kullanıcı kartı değişti" if _KS.get("kart_mt") != kart_damga() else "proje kartı değişti" if _KS.get("proje_kart_mt") != proje_kart_mt() else "kişilik değişti", durum_koru=True); _KS["tur"] = tur
     if tur["sesli"]:
         sel = kisilik_selam()
         if sel and tur.get("kaynak") != "ozet": seslendir(sel, kuyruk=True); tur["tanitim"] = True  # özet turunda kişilik tanıtımı okunmaz (tek özet tek ses)
@@ -2250,6 +2260,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if duz: _konus_kur(soru=ms)
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
         if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
+        nb = "" if (tur.get("bellek_kapsam") == "ortak" or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals()) else baglam_paketi("konus", dilimler=["notlar"], soru=ms)  # 9 Kasım (kişi modeli): notlar defteri artık Konuş'un bağlamında (yalnız kullanıcının kendi turu)
         ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi")) + _etiket_tur_notu(tur)  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
         dub = duygu_blogu(tur, ms) if "duygu_blogu" in globals() else ""  # 9 Kasım (dost): toplantı dışı kullanıcı turunda "[Durum — veri]" (≤ 300 kar.), bağlamdan önce (konus_baglam "Soru: " ile biter)
         bks = bilgi_bekle_sn(ms)
@@ -2258,7 +2269,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["t_gonder"] = time.time(); tur.pop("t_ilk_yanit", None)  # v0.77.3 ölçüm: soru sürece yazıldı (yeniden gönderimde de)
         onc = konus_gecmis_blogu(tur)  # süreç görmediği önceki turlar (yeni/yuva değişmiş/yenilenmiş süreç)
         if onc: print(f"KONUŞ: önceki konuşma sürece aktarıldı ({len(onc) // 100 / 10} bin karakter)")
-        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + gdb + obl + selam_notu(tur.get("selam")) + dub + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + gnb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
+        try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": onc + dfb + gdb + obl + selam_notu(tur.get("selam")) + dub + konus_baglam(simdi, tb, ms) + adn + oa + vtn + bsn + ozb + nb + gnb + (f"[Bu soruyu {tur['kisi']} cevaplıyor]\n" if tur.get("kisi") else "") + ms}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
         except (OSError, AttributeError): _KS["tur"] = None; _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} cevap veremedi — yeniden bas", f"{asistan_ad()} couldn't answer — press again")); konus_kapat("yazılamadı"); return
         if KONUS_ZAMAN_ASIMI_SN > 0: threading.Thread(target=bekci, args=(KONUS_ZAMAN_ASIMI_SN * (2 if tur.get("yeniden") else 1),), daemon=True).start()
         if KONUS_BEKLE_SN > 0 and not tur.get("yeniden"): threading.Thread(target=bekle_dolgu, args=(tur_ad,), daemon=True).start()
@@ -2319,6 +2330,12 @@ def hizli_ozet_tetik(kaynak):
 def _hizli_ozet(f, kaynak):
     time.sleep(OZET_HIZLI_ONAY_SN)
     if toplanti_var(): HIZLI["dosya"] = None; print("ÖZET (hızlı): toplantıya geri dönüldü — yapılmadı"); return
+    if "soz_aday" in globals():  # 9 Kasım: kendiliğinden söylenen toplantı özeti tek söz kapısından geçer (engeller, bütçe, sunuş kaydı); "sonra" denirse kapı teslim eder, "bastırıldı" denirse özet çalışmaz
+        k = soz_aday("toplanti_cikis", _t("Toplantı özeti hazır", "Meeting summary ready"), anahtar="ozet:" + str(f), oncelik=2, teslim=lambda: _hizli_ozet_sor(f, kaynak) or True, gecerli_sn=1800, ek={"toplantiyla_ilgili": True, "kullanici_aktif": True})  # toplantı yeni bitti (aktif_dosya "bitiyor"da kalır); toplanti_var() yukarıda denetlendi
+        if k.get("karar") == "bastirildi": HIZLI["dosya"] = None; print(f"ÖZET (hızlı): söz kapısı bastırdı ({k.get('neden')})")
+        return
+    _hizli_ozet_sor(f, kaynak)
+def _hizli_ozet_sor(f, kaynak):
     t0 = time.time()
     while _KS["tur"] and time.time() - t0 < 20: time.sleep(0.3)
     if _KS["tur"]: print("ÖZET (hızlı): Konuş meşgul — yapılmadı"); HIZLI["dosya"] = None; return

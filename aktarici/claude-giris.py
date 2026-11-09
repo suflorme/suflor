@@ -27,8 +27,11 @@ def claude_giris_dustu(m, is_):
     if GIRIS["durum"] != "dustu":
         GIRIS.update(durum="dustu", t=time.time(), hata=m)
         print(f"CLAUDE GİRİŞ: düştü ({is_}; son başarılı çağrı {datetime.datetime.fromtimestamp(GIRIS['son_ok']).strftime('%d.%m %H.%M') if GIRIS['son_ok'] else 'bilinmiyor'}) — {m}")
-        if "yerel_uyari" in globals() and AYAR.get("konusma", True): yerel_uyari(_t(*GIRIS_UYARI))
-        if "bildirim" in globals(): bildirim("Suflor.me", _t("Claude oturumu düştü", "Claude session expired"), _t("Terminal'de claude yazıp /login ile giriş yap.", "Open Terminal, run claude and /login."))
+        def teslim():
+            if "yerel_uyari" in globals() and AYAR.get("konusma", True): yerel_uyari(_t(*GIRIS_UYARI))
+            if "bildirim" in globals(): bildirim("Suflor.me", _t("Claude oturumu düştü", "Claude session expired"), _t("Terminal'de claude yazıp /login ile giriş yap.", "Open Terminal, run claude and /login."))
+        if "soz_aday" in globals(): soz_aday("sistem", "claude-giris", anahtar="claude-giris", oncelik=3, kip="bildir", teslim=teslim, gecerli_sn=1800)  # tek söz kapısı: sistem uyarısı acil (yalnız gizli kip durdurur)
+        else: teslim()
     if "_konus_kur" in globals() and KONUS.get("durum") not in ("dinliyor", "yaziya", "dusunuyor", "konusuyor"): _konus_kur(durum="hata", hata=_t(*GIRIS_SATIR))
 def claude_giris_yokla(zorla=False):  # → True: giriş çalışıyor, False: düşmüş, None: yoklanmadı
     if GIRIS["yokluyor"] or (not zorla and (AYAR.get("claude_giris_yokla") is False or os.environ.get("SUFLOR_AYAR"))): return None

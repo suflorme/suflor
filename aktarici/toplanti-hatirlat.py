@@ -30,6 +30,11 @@ def _that_yaz():
         os.replace(yol + ".tmp", yol)
     except OSError: pass
 
+def _soz_sonuc_g(ref, sonuc):  # kullanıcı işlemini tek söz kapısına bildirir (soz-kapisi.py soz_sonuc); kapı yüklü değilse (yalıtılmış test) sessiz
+    f = globals().get("soz_sonuc")
+    if f:
+        try: f(ref, sonuc)
+        except Exception: pass
 def that_acik(): return AYAR.get("toplanti_hatirlat") is not False
 def that_sesli_acik(): return AYAR.get("toplanti_hatirlat_sesli") is not False and AYAR.get("konusma", True) is not False
 def that_dk():
@@ -186,17 +191,27 @@ def that_tara(simdi=None):  # → None (yapılacak yok) ya da {"neden"|"sonuc": 
         if simdi < that_tetik_zamani(b, liste, dk): continue
         # toplantı kaydı kapanış işlemindeyse (öncekinin sonu) kısa bekle; başlangıca 2 dk kalana dek
         if toplanti_durum() in ("algilandi", "bitiyor") and (b - simdi).total_seconds() > 120: return {"neden": "önceki toplantı kapanıyor"}
-        rutin = that_rutin(e, simdi); engel = that_sesli_engel(ts)
-        sesli = engel is None and not rutin
         sen = _that_sen()
-        cumle = that_cumle(e, simdi, sen, sorulu=True); kisa = that_cumle(e, simdi, sen, sorulu=False)
-        THAT["yapildi"][k] = {"t": ts, "tur": "sesli" if sesli else "bildirim"}; _that_yaz()
-        oid = next((i for i, x in TAKVIM_TAM.items() if x is e), str(e.get("id") or ""))
-        THAT["bekleyen"] = {"id": "h" + str(int(ts * 1000)), "oid": oid, "cumle": cumle, "kisa": kisa, "t": ts, "bit": b.timestamp(), "sesli": sesli, "baglanti": bool(e.get("baglanti")), "hazirlik": False}
-        print(f"HATIRLAT: toplantı hatırlatması ({'sesli' if sesli else 'yalnız bildirim: ' + (engel or 'rutin toplantı')}, {round((b - simdi).total_seconds() / 60)} dk kala)")  # başlık/katılımcı günlüğe yazılmaz
-        bildirim("Suflor.me", _t("Toplantı yaklaşıyor", "Meeting coming up"), kisa, aksiyon=["hazirlik"] + (["katil"] if e.get("baglanti") else []), hatirlat=THAT["bekleyen"]["id"])
-        if sesli: seslendir(cumle, kuyruk=True)
-        return {"sonuc": "sesli" if sesli else "bildirim", "cumle": cumle}
+        cumle = that_cumle(e, simdi, sen, sorulu=True); kisa = that_cumle(e, simdi, sen, sorulu=False); sonuc = {}
+        def teslim(e=e, b=b, k=k, cumle=cumle, kisa=kisa, sonuc=sonuc):  # tek söz kapısı (soz-kapisi.py) şimdi dediğinde ya da kapı yoksa hemen; sesli/yalnız bildirim kararı teslim anında
+            ts_ = globals().get("soz_simdi", lambda x: x)(ts)
+            rutin = that_rutin(e, simdi); engel = that_sesli_engel(ts_)
+            sesli = engel is None and not rutin
+            THAT["yapildi"][k] = {"t": ts_, "tur": "sesli" if sesli else "bildirim"}; _that_yaz()
+            oid = next((i for i, x in TAKVIM_TAM.items() if x is e), str(e.get("id") or ""))
+            THAT["bekleyen"] = {"id": "h" + str(int(ts_ * 1000)), "oid": oid, "cumle": cumle, "kisa": kisa, "t": ts_, "bit": b.timestamp(), "sesli": sesli, "baglanti": bool(e.get("baglanti")), "hazirlik": False}
+            print(f"HATIRLAT: toplantı hatırlatması ({'sesli' if sesli else 'yalnız bildirim: ' + (engel or 'rutin toplantı')}, {round((b - simdi).total_seconds() / 60)} dk kala)")  # başlık/katılımcı günlüğe yazılmaz
+            bildirim("Suflor.me", _t("Toplantı yaklaşıyor", "Meeting coming up"), kisa, aksiyon=["hazirlik"] + (["katil"] if e.get("baglanti") else []), hatirlat=THAT["bekleyen"]["id"])
+            if sesli: seslendir(cumle, kuyruk=True)
+            sonuc.update({"sonuc": "sesli" if sesli else "bildirim", "cumle": cumle})
+        if "soz_aday" not in globals(): teslim(); return sonuc
+        # öncelik 3 (acil): zamanı belli, kapı yalnız gizli kipte durdurur; sessiz mod/toplantı yalnız SESLİ okumayı keser (that_sesli_engel, bildirim yine gider — eski davranış)
+        THAT["yapildi"].setdefault(k, {"t": ts, "tur": "kapida"}); _that_yaz()  # kapı kuyruğa alsa da yeniden aday çıkmasın
+        kr = soz_aday("toplanti_hatirlat", kisa, anahtar="th:" + k, oncelik=3, kip="sor", teslim=teslim, gecerli_sn=max(120, int((b - simdi).total_seconds()) + 60), simdi=ts)
+        if kr["karar"] != "simdi":
+            if kr["neden"] == "gizli kip": THAT["yapildi"].pop(k, None); _that_yaz(); return {"neden": "gizli kip"}  # işaretlenmez: gizli kip toplantıdan önce kapanırsa hatırlatılır
+            return {"neden": kr["neden"]}
+        return sonuc
     return None
 
 def _that_dongu():
@@ -257,7 +272,7 @@ def that_hazirlik(sesli=None):  # "evet" ya da panodaki/menüdeki Hazırlık: br
     e = takvim_olay(b["oid"])
     if not e: return {"ok": False, "err": _t("Toplantı takvimde bulunamadı", "Meeting not found in the calendar")}
     sesli = that_sesli_acik() if sesli is None else bool(sesli)
-    b["hazirlik"] = True
+    b["hazirlik"] = True; _soz_sonuc_g("kaynak:toplanti_hatirlat", "kabul")
     d = (BRIFING.get(b["oid"]) or {}).get("durum")
     if d == "hazir":
         if sesli: brifing_sesli(b["oid"], "dinle")
@@ -281,8 +296,8 @@ def that_islem(p):  # POST /toplanti-hatirlat (yalnız pano ve menü bildirimi)
     i = p.get("islem"); b = THAT["bekleyen"]
     if i in ("hazirlik", "ac", "kapat") and p.get("id") and (not b or b["id"] != p.get("id")): return {"ok": False, "err": _t("hatırlatma yok", "no reminder")}
     if i == "hazirlik": return that_hazirlik(sesli=bool(p.get("sesli")) if "sesli" in p else False)  # düğme: yazılı brifing panoda; sesli yalnız istenirse
-    if i == "ac": return that_ac()
-    if i == "kapat": THAT["bekleyen"] = None; return {"ok": True}
+    if i == "ac": _soz_sonuc_g("kaynak:toplanti_hatirlat", "kabul"); return that_ac()
+    if i == "kapat": THAT["bekleyen"] = None; _soz_sonuc_g("kaynak:toplanti_hatirlat", "ret"); return {"ok": True}
     if i == "tara": return {"ok": True, "sonuc": that_tara()}  # elle bir tarama (testler); kurallar aynen geçerli
     return {"ok": False, "err": "islem"}
 
@@ -290,7 +305,7 @@ def that_sesli_yakala(metin):  # sesli turun içinden: pencere açıksa "evet" /
     if not that_bekliyor(): return None
     m = " ".join(str(metin or "").split())
     if not m or len(m) > 80: return None
-    if THAT_AC_RX.search(m) and not THAT_HAYIR_RX.search(m): that_ac(); return "ac"
-    if THAT_HAYIR_RX.search(m): THAT["bekleyen"] = None; return "kapat"
+    if THAT_AC_RX.search(m) and not THAT_HAYIR_RX.search(m): _soz_sonuc_g("kaynak:toplanti_hatirlat", "kabul"); that_ac(); return "ac"
+    if THAT_HAYIR_RX.search(m): THAT["bekleyen"] = None; _soz_sonuc_g("kaynak:toplanti_hatirlat", "ret"); return "kapat"
     if THAT_EVET_RX.match(m) and len(m.split()) <= 5: that_hazirlik(sesli=True); return "hazirlik"  # kısa onay; uzun cümle ("evet, bir de şunu sor") normal soru olarak akar
     return None

@@ -2227,6 +2227,14 @@ def hazirlik_cmd():
         except Exception: gs = []  # yapi.py yanında değil (kopya) ya da veritabanı okunamadı: hazırlık sürer
         if gs: print(f"\n## {A.kim}: karar grafı (iddia, karar, açık işler)\n" + "\n".join("  " + _yapi().graf_satir(g) for g in gs))
         print(f"\n## {A.kim}: geçmişte ne dedi"); print("\n".join(bas(A.kim, kim=A.kim)))
+    try:  # Tazı (dış kaynak, kanıt dereceli): izlenen firma/kişi eşleşirse son gelişmeler; modül ya da liste yoksa sessizce atlanır
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import tazi
+        gor, tb = set(), []
+        for x in [A.kim] + [s.strip() for s in str(A.katilimci or "").split(",")]:
+            m = tazi.ozet_metni(x) if x else None
+            if m and m.splitlines()[0] not in gor and len(gor) < 3: gor.add(m.splitlines()[0]); tb.append(m)
+        if tb: print("\n## Tazı: son gelişmeler (dış kaynak, kanıt dereceli)\n" + "\n".join("  " + l for m in tb for l in m.splitlines()))
+    except Exception: pass
     for i, it in enumerate(agj.get("items") or []):
         q = " ".join([w for w in baglam.kelimeler(it) if len(w) >= 3 and w not in GUNDEM_DUR and w not in baglam.DUR][:6])
         print(f"\n## Gündem {i}: {it}\n  (arama: {q})"); print("\n".join(bas(q) if q else ["  (aranacak kelime yok)"]))

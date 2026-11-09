@@ -85,6 +85,28 @@ ok("seçim: reddedilen, tüm gün, tek kişilik blok, gizli işaretli, hariç ta
    and not M["that_toplanti_mi"](olay("x", 10, 40, baslik="Gizli görüşme")) and not M["that_toplanti_mi"](olay("x2", 10, 40, baslik="Board 🔒")) and not M["that_toplanti_mi"](olay("p", 10, 40, paylasilan=True))
    and not ns_kur([], {"takvim_haric": ["Takvim · Hesap"]})["that_toplanti_mi"](E1))
 
+# ---------- 4b) tek söz kapısı (aktarici/soz-kapisi.py) ile: öncelik 3 (acil), sunuş/sonuç kaydı ----------
+os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"
+def kapili(olaylar, ayar=None, **ek):
+    try: os.remove(os.path.join(T, "soz.jsonl"))
+    except OSError: pass
+    ek = dict({"LOCK": threading.Lock(), "write": lambda pairs: [open(y, "a", encoding="utf-8").write(m) for y, m in pairs], "calisma_saatleri": lambda: ({0, 1, 2, 3, 4, 5, 6}, 0, 1439)}, **ek)
+    n = ns_kur(olaylar, ayar, **ek)
+    exec(compile(open(os.path.join(KOD, "aktarici", "soz-kapisi.py"), encoding="utf-8").read(), "soz-kapisi.py", "exec"), n); return n
+def soz_satirlari(): return [json.loads(l) for l in open(os.path.join(T, "soz.jsonl"), encoding="utf-8") if l.strip()]
+sifirla(); n = kapili([olay("a", 8, 38)]); r = n["that_tara"](SIMDI)
+ok("kapı: hatırlatma kapıdan geçer (sesli + bildirim bugünkü gibi), kayıtta acil söz, metin yok", r and r["sonuc"] == "sesli" and len(SESLER) == 1 and len(BILDIR) == 1 and [(x["kaynak"], x["oncelik"], x["karar"]) for x in soz_satirlari()] == [("toplanti_hatirlat", 3, "simdi")]
+   and "Bütçe" not in open(os.path.join(T, "soz.jsonl"), encoding="utf-8").read(), (r, soz_satirlari() if os.path.exists(os.path.join(T, "soz.jsonl")) else None))
+ok("kapı: ikinci tarama yeni söz üretmez (yapıldı işareti)", n["that_tara"](SIMDI + datetime.timedelta(seconds=30)) is None and len(soz_satirlari()) == 1)
+ok("kapı: panoda Hazırlık → sonuç kabul", n["that_islem"]({"islem": "hazirlik", "id": n["that_view"]()["id"]}).get("ok") is True and soz_satirlari()[-1]["olay"] == "sonuc" and soz_satirlari()[-1]["sonuc"] == "kabul")
+sifirla(); n = kapili([olay("a", 8, 38)]); n["that_tara"](SIMDI); n["that_islem"]({"islem": "kapat", "id": n["that_view"]()["id"]})
+ok("kapı: kapat → sonuç ret", soz_satirlari()[-1]["sonuc"] == "ret")
+sifirla(); n = kapili([olay("a", 8, 38)], sessiz_acik=lambda: True, toplanti_var=lambda: True, toplanti_acik=lambda: True, toplanti_durum=lambda: "suruyor"); r = n["that_tara"](SIMDI)
+ok("kapı: sessiz mod ve toplantı sürerken acil söz yine bildirilir, ses yok (eski davranış)", r and r["sonuc"] == "bildirim" and not SESLER and len(BILDIR) == 1 and soz_satirlari()[0]["karar"] == "simdi", r)
+sifirla(); n = kapili([olay("a", 8, 38)], gizli_acik=lambda: True)
+ok("kapı: gizli kipte hiçbir şey ve kayıt yok", n["that_tara"](SIMDI) == {"neden": "gizli kip"} and not BILDIR and not os.path.exists(os.path.join(T, "soz.jsonl")))
+sifirla()
+
 # ---------- 4) zamanlama ----------
 def tara(olaylar, simdi, ayar=None, **ek):
     n = ns_kur(olaylar, ayar, **ek); return n, n["that_tara"](simdi)

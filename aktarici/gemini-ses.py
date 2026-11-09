@@ -145,7 +145,9 @@ def _kota_bak(model):  # başarılı her istekten sonra
     if top - kalan >= top * GEMINI_UYARI_ORAN and kalan > 0 and GEMINI_KOTA.get("uyari_gun") != gun:
         GEMINI_KOTA["uyari_gun"] = gun
         print(f"GEMINI: günlük sınırın %{round(GEMINI_UYARI_ORAN * 100)}'i doldu ({top - kalan}/{top}, {len(z)} model) — sesli uyarı sırada")
-        if "yerel_uyari" in globals(): yerel_uyari(_t(*GEMINI_UYARI))
+        _gu = lambda: yerel_uyari(_t(*GEMINI_UYARI)) if "yerel_uyari" in globals() else None
+        if "soz_aday" in globals(): soz_aday("sistem", _t(*GEMINI_UYARI), anahtar="gemini-kota:" + str(gun), oncelik=2, kip="bildir", teslim=_gu, gecerli_sn=3600)  # tek söz kapısı (soz-kapisi.py)
+        else: _gu()
 def gemini_view():
     return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
             "kapsam": gemini_kapsam(), "bugun": gemini_bugun()}

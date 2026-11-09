@@ -714,7 +714,7 @@ def _duzelt_model(istem):  # → (ham metin ya da None, hata). Deneme hattı: SU
         try: return open(sahte, encoding="utf-8").read(), None
         except OSError: return None, "sahte yok"
     if "eylem_model" not in globals(): return None, "model yok"
-    return eylem_model(istem)
+    return eylem_model(istem, amac="talimat")
 def _duzelt_json(ham):
     m = re.search(r"\{.*\}", str(ham or ""), re.S)
     if not m: return None

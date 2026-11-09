@@ -266,7 +266,7 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None, topla=None, 
                 POCKET.update(zs=0, yavas=False, son=time.time(), hata=None if POCKET["hata"] and POCKET["hata"].startswith("yanıt") else POCKET["hata"])
                 if POCKET["yk"]: POCKET["yk"] = 0
                 kapat(True)
-                if o.get("n"): print(f"POCKET: {ses}{' · ' + duygu if duygu and ses.startswith('wite') else ''} · {len(metin)} karakter · ilk ses {POCKET.get('ilk', 0):.2f} sn")
+                if o.get("n"): print(f"POCKET: {ses}{' · ' + duygu if duygu and ses.startswith('wite') else ''} · {len(metin)} karakter · ilk ses {POCKET.get('ilk', 0):.2f} sn" + (f" · çalma {sure:.1f} sn" if sure else ""))
                 return calinan > 0 or o.get("n") == 0
             if "ilk" in o: POCKET["ilk"] = o["ilk"]
             if iptal and iptal():

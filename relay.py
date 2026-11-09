@@ -260,7 +260,7 @@ def _log(name, rec):
 # aktif dosyada kalır (yakın toplantıların ölçümü bozulmasın), eskisi canli/arsiv/<ad>.gz'ye eklenir (gzip ardışık üyeler; olcum.py ikisini
 # birlikte okur). Durum dosyaları (kartlar, sorular, eylemler) döndürülmez: sonradan gelen durum satırları eski kayda bağlanır, küçükler.
 # Toplantı sürerken yapılmaz (izle-paketler başka süreçten kilitsiz eklenir). Açılışta ve 6 saatte bir.
-KAYIT_DONEN = ("whisper-isler.jsonl", "izle-paketler.jsonl", "claude-cagri.jsonl", "uydurma-adaylari.jsonl", "sistem-izi.jsonl", "ses-izi-kapi.jsonl")
+KAYIT_DONEN = ("whisper-isler.jsonl", "izle-paketler.jsonl", "claude-cagri.jsonl", "uydurma-adaylari.jsonl", "sistem-izi.jsonl", "ses-izi-kapi.jsonl", "soz.jsonl")
 KAYIT_SINIR = int(os.environ.get("SUFLOR_KAYIT_SINIR_KB") or 2048) * 1024; KAYIT_KALAN = KAYIT_SINIR // 2
 def kayit_dondur():
     import gzip
@@ -1631,7 +1631,7 @@ AYAR_PANO = {
 # v0.110.0 (kullanıcı, 22 Ekim): menu_cubugu (pano penceresi ve Ayarlar'ın kendisi o uygulamada — kapatılamaz), brifing_sesli, toplanti_duyuru panodan kalktı;
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
-    ev = os.path.expanduser("~"); bel = os.path.expanduser(str(AYAR.get("kisilik_bellek") or "")); out = []
+    ev = os.path.expanduser("~"); bel = (_profil_yolu() if "_profil_yolu" in globals() else os.path.expanduser(str(AYAR.get("kisilik_bellek") or ""))); out = []
     yer = next((os.path.dirname(os.path.expanduser(str(AYAR.get(a)))) for a in ("kisilik", "kisilik_toplanti_disi", "kisilik_bellek") if AYAR.get(a)), os.path.join(os.path.dirname(AYAR_YOL), "kisilik"))
     try: adlar = sorted(f for f in os.listdir(yer) if f.endswith(".md"))
     except OSError: return []
@@ -1658,7 +1658,7 @@ def ayarlar_view():
     d["oto_haric"] = ", ".join(str(x) for x in (AYAR.get("oto_haric") or []) if isinstance(x, str))  # ayar.json'da liste, panoda virgüllü metin
     vars_ = {k: ("mac" if k == "ses_motoru" else v[1]) for k, v in AYAR_PANO.items() if v[0] not in ("kisilik", "beyin", "saatler", "defter") and k != "dil"}  # kişilik, yapay zekâ, saat listesi, dış defter ve dil "varsayılana dön"le değişmez
     vars_["kisisel_tarih_saat"] = "09:00" if gelistirici_mi() else ""
-    vars_["konus_gecmis"] = bool(AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
+    vars_["konus_gecmis"] = bool(_profil_yolu() if "_profil_yolu" in globals() else AYAR.get("kisilik_bellek"))  # v0.110.0: gerçek varsayılan (kullanıcı kartı varsa açık) — eskiden False yazıyordu
     try: g_, b_, e_ = calisma_saatleri(); d["calisma"] = {"gunler": sorted(g_), "bas": b_ if g_ else None, "bit": e_ if g_ else None}  # Saatler görünümü: mesai içi/dışı rengi
     except Exception: pass
     return {"deger": d, "varsayilan": vars_, "kisiler": kisilik_listesi(), "pocket": pocket_var(), "gemini": gemini_var(), "menu": os.path.isdir(MENU_APP) and not deneme_aktarici(),
@@ -1834,6 +1834,7 @@ bolum("gemini-ses")  # aktarici/gemini-ses.py — Gemini TTS ile seslendirme (ay
 bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /status beyin), Anahtar Zinciri (Faz 11 Aşama 4)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
+bolum("kisi-modeli")  # aktarici/kisi-modeli.py — kişi modeli: profil (= kullanıcı kartı, tek kaynak), öğrenilenler, tek bağlam kurucu baglam_paketi (9 Kasım)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
 bolum("web-arastirma")  # aktarici/web-arastirma.py — toplantı dışı derin web araştırması: Konuş ve kutuda "X'i araştır", kaynaklı kayıt canli/arastirma/ (S243)
 bolum("prova")  # aktarici/prova.py — Prova odası: karar/sunumu karşı taraf kişilikleriyle sına, rapor (brifing-ses ve bas-konus bölümlerinden sonra)
@@ -1866,6 +1867,7 @@ bolum("eposta-takip")  # aktarici/eposta-takip.py — önemli e-posta seçimi, c
 bolum("toplanti-hatirlat")  # aktarici/toplanti-hatirlat.py — planlı toplantı hatırlatması: toplantıdan önce sesli/menü bildirimi, "evet"te kısa hazırlık brifingi, "toplantıyı aç" (9 Kasım)
 bolum("toplanti-sonrasi")  # aktarici/toplanti-sonrasi.py — toplantı sonrası proaktif hatırlatma: açık uçlar (tarihsiz/sahipsiz iş, teyit bekleyen karar) bildirim + Bugün satırı (5 Kasım)
 bolum("izleme")  # aktarici/izleme.py — İzleme: başka panonun Drive'a yazdığı JSON anlık görüntüsünü yalnız okur (ayar izleme_dosyasi; Bugün bölümü, hazırlık adayları, Konuş özeti; 5 Kasım)
+bolum("soz-kapisi")  # aktarici/soz-kapisi.py — tek söz kapısı: zamanlayıcılar aday üretir, kapı şimdi/sonra/hiç kararını verir; sunuş → sonuç kaydı canli/soz.jsonl (9 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
 bolum("beta-veri")  # aktarici/beta-veri.py — Beta geliştirme verisi: olay sayacı, haftalık paket, toplantı sonu kalitesi (S141; en sonda: öbür bölümlerin işlevlerini sarar)
 bolum("duman")  # aktarici/duman.py — Deneme toplantısı (duman testi) kipi: 3 dk denetim listesi, panoda canlı (Faz D2, v0.148.0)
@@ -1973,9 +1975,12 @@ def claude_surum_bak():
         with open(CLAUDE_SURUM_YOL, "w", encoding="utf-8") as f: json.dump({"surum": v, "ok": ok, "t": datetime.datetime.now().isoformat(timespec="seconds"), "onceki": e.get("surum")}, f)
     except OSError: pass
     print(f"CLAUDE: Claude Code {v}" + (f" (önce {e.get('surum')})" if e.get("surum") and e.get("surum") != v else "") + (" · -p denemesi tamam" if ok else f" · -p denemesi BAŞARISIZ: {ham}"))
-    if not ok: bildirim("Suflor.me", _t("Claude çağrıları çalışmıyor", "Claude calls are failing"),
-                        _t(f"Claude Code {v} ile kısa deneme olmadı (giriş ya da yeni sürüm). Konuş, brifing ve çeviri etkilenir; Terminal'de claude açıp kontrol et.",
-                           f"A short test with Claude Code {v} failed (login or new version). Talk, briefing and translation are affected; open claude in Terminal and check."))
+    if not ok:
+        _cl_metin = (_t(f"Claude Code {v} ile kısa deneme olmadı (giriş ya da yeni sürüm). Konuş, brifing ve çeviri etkilenir; Terminal'de claude açıp kontrol et.",
+                        f"A short test with Claude Code {v} failed (login or new version). Talk, briefing and translation are affected; open claude in Terminal and check."))
+        _cl_teslim = lambda: bildirim("Suflor.me", _t("Claude çağrıları çalışmıyor", "Claude calls are failing"), _cl_metin)
+        if "soz_aday" in globals(): soz_aday("sistem", _cl_metin, anahtar="claude-surum:" + str(v), oncelik=3, kip="bildir", teslim=_cl_teslim, gecerli_sn=3600)  # tek söz kapısı (soz-kapisi.py)
+        else: _cl_teslim()
 def _claude_surum_dongu():
     while True:
         try: claude_surum_bak()
@@ -2247,7 +2252,7 @@ class H(BaseHTTPRequestHandler):
                 if time.time() - (STATE.get("_pano_t") or 0) > 300: STATE["_pano_ilk"] = time.time()
                 STATE["_pano_t"] = time.time()
             # v0.113.0: seslendirme — Pocket seçiliyken "mac" görünüyordu; toplanti = katılımcıların duyduğu ses (toplanti_ses)
-            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), kisilik_gorunen=(kisilik_gorunen(kisilik()) if kisilik() else None), kisilik_harita={k_["ad"]: kisilik_gorunen(k_) for k_ in kisilikler()}, otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["veri_yok"] = veri_yok_view(); s["kulaklik_yok"] = kulaklik_yok_view() if "kulaklik_yok_view" in globals() else None; s["kaynak"] = kaynak_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["proaktif"] = pro_view(); s["toplanti_hatirlat"] = that_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else {"motor": "mac"}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
+            s = dict(STATE); s["takvim"] = takvim_view(); s["alan"] = AYAR["alan"]; s["ad"] = AYAR["ad"]; s["asistan"] = asistan_ad(); s["port"] = A.port; s["arayuz_dili"] = ARAYUZ_DILI; s["claude_age_s"] = round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None; s["oto_toplanti"] = oto_view(); s["toplanti"] = toplanti_view(); s.pop("izle_seen", None); s["bellek"] = bellek_view(); s["proje_erisim"] = proje_erisim_view() if "proje_erisim_view" in globals() else None; s["yerel_ses"] = yerel_ses_view(); s["konus"] = dict(KONUS, canli=konus_canli(), defter=defter_view(), toplanti=toplanti_konus(), sohbet=sohbet_view(), kulaklik=kutu_kulaklik(), kisilik=kisilik_ad(), kisilik_gorunen=(kisilik_gorunen(kisilik()) if kisilik() else None), kisilik_harita={k_["ad"]: kisilik_gorunen(k_) for k_ in kisilikler()}, otonom=otonom_view(), moderator=moderator_view(), asistan=asistan_view()); s["veri_yok"] = veri_yok_view(); s["kulaklik_yok"] = kulaklik_yok_view() if "kulaklik_yok_view" in globals() else None; s["kaynak"] = kaynak_view(); s["duman"] = duman_view(); s["veri_kanal"] = {k_: kanal_akiyor(k_) for k_ in ("altyazi", "ben", "karsi")}; s["hatirlat"] = hatirlat_view(); s["proaktif"] = pro_view(); s["soz"] = soz_view() if "soz_view" in globals() else None; s["toplanti_hatirlat"] = that_view(); s["eposta"], s["eposta_ben"] = eposta_tur(), eposta_ben(); s["eposta_hesap"] = str(AYAR.get("eposta_adres") or "") or None; s["eposta_ayar"] = AYAR.get("eposta") or ""; s["posta"] = posta_view(); s["ayarlar"] = ayarlar_view(); s["guncelleme"] = guncelleme_view(); s.pop("_ben_eklenti", None); ek = s.pop("_eklenti_kurulu", None); s["eklenti_kurulu"] = {"age_s": round(time.time() - ek["t"]), "ver": ek["ver"]} if ek else None; s["tail"] = tail(); s["ceviri"] = ceviri_view(); s["seslendirme"] = dict(gemini_view() if gemini_acik() else dict(pocket_view() or {}, motor="pocket") if pocket_acik() else {"motor": "mac"}, toplanti=toplanti_ses_motoru()[0]); s["gemini_gunluk"] = gemini_gunluk_view(); s.update(cards_view()); s["agenda"] = agenda() if gundem_gorunur() else {"title": "Gündem yok", "items": []}
             s["kart_katmani"] = kart_katmani_acik()  # kartları Mac'in kart katmanı gösteriyor: şerit ve panel listeyi göstermez
             dk = dk_view() if "dk_view" in globals() else None  # 6 Kasım: döküm kontrolü (yalnız geliştirici + ses arşivi açık)
             if dk: s["dokum_kontrol"] = dk

@@ -19,6 +19,11 @@ PRO_GUN = {"tarih": "", "n": 0, "son_t": 0.0, "oneri": {}, "bakis_t": 0.0, "dong
 PRO_BAG = {"a": None, "n": 0}  # asistana bildirilecek son gün önerisi: {"cumle", "komut", "arg", "t"}; en çok PRO_BAG_TUR turda söylenir, PRO_BAG_SN sonra düşer
 PRO_TARAMA_SN, PRO_BOS_SN, PRO_TEKRAR_SN, PRO_BAG_SN, PRO_BAG_TUR, PRO_BEKLEYEN_SN = 120, 1200, 86400, 3 * 3600, 2, 1800
 
+def _soz_sonuc_g(ref, sonuc):  # kullanıcı işlemini tek söz kapısına bildirir (soz-kapisi.py soz_sonuc); kapı yüklü değilse (yalıtılmış test) sessiz
+    f = globals().get("soz_sonuc")
+    if f:
+        try: f(ref, sonuc)
+        except Exception: pass
 def _pro_oku():
     try:
         with open(os.path.join(BASE, PRO_DOSYA), encoding="utf-8") as f: v = json.load(f)
@@ -86,7 +91,7 @@ def pro_tetik(r, sayac0=0):
     try:
         if _pro_k(r) in PROAKTIF["yapildi"] or pro_dk() <= 0: return
         def atla(neden): print(f"PROAKTİF: atlandı — {neden}"); PROAKTIF["yapildi"].add(_pro_k(r)); _pro_yaz()
-        if gizli_acik(): return atla("gizli toplantı")
+        if gizli_acik(): return  # gizli kip: hiçbir şey sunulmaz, işaretlenmez (soz-kapisi.py de aynısını yapar)
         c = pro_say(r["yapi"])
         if not c: return atla("yapı dosyası okunamadı")
         if _pro_deneme(r, c): return atla("deneme toplantısı")
@@ -95,11 +100,16 @@ def pro_tetik(r, sayac0=0):
         if "_KS" in globals() and _KS.get("sayac", 0) != sayac0: return atla("kullanıcı asistana sordu")
         if not (c["tarihsiz"] or c["sahipsiz"] or c["teyit"] or c["acik"]): return atla("açık uç yok")
         cumle = pro_cumle(r.get("baslik") or r.get("dosya") or _t("Son toplantı", "Last meeting"), c)
-        PROAKTIF["yapildi"].add(_pro_k(r)); PRO_GUN["son_t"] = time.time(); _pro_yaz()  # gün içi öneriyle üst üste binmesin (günlük sayaca girmez)
-        PROAKTIF["bekleyen"] = {"id": r["id"], "cumle": cumle, "t": time.time()}
-        print(f"PROAKTİF: {cumle}")
-        bildirim("Suflor.me", _t("Açık uçlar", "Open items"), cumle, son=r["id"])
-        if AYAR.get("toplanti_sonrasi_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None) and not gizli_acik(): seslendir(cumle, kuyruk=True)
+        def teslim():  # tek söz kapısı (soz-kapisi.py) şimdi dediğinde ya da kapı yoksa hemen
+            PROAKTIF["yapildi"].add(_pro_k(r)); PRO_GUN["son_t"] = time.time(); _pro_yaz()  # gün içi öneriyle üst üste binmesin (günlük sayaca girmez)
+            PROAKTIF["bekleyen"] = {"id": r["id"], "cumle": cumle, "t": time.time()}
+            print(f"PROAKTİF: {cumle}")
+            bildirim("Suflor.me", _t("Açık uçlar", "Open items"), cumle, son=r["id"])
+            if AYAR.get("toplanti_sonrasi_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None) and not gizli_acik(): seslendir(cumle, kuyruk=True)
+        if "soz_aday" in globals():  # aynı toplantı için yeniden planlansa da (yeniden başlatma) kapı anahtardan tanır; sonra/bastırılan söz işaretlenir ki yeniden aranmasın
+            k = soz_aday("toplanti_sonrasi", cumle, anahtar="ts:" + _pro_k(r), oncelik=1, kip="sor", teslim=teslim, gecerli_sn=4 * 3600)
+            if k["karar"] != "simdi" and k["neden"] != "gizli kip": PROAKTIF["yapildi"].add(_pro_k(r)); _pro_yaz()
+        else: teslim()
     except Exception as e: print(f"PROAKTİF: hata ({e.__class__.__name__}: {e})")
 
 def pro_view():  # /status "proaktif": panoda Bugün'ün başındaki cümle; yeni toplantı başlayınca ya da elle kapatılınca kalkar
@@ -110,13 +120,17 @@ def pro_view():  # /status "proaktif": panoda Bugün'ün başındaki cümle; yen
 
 def pro_islem(p):  # POST /proaktif (yalnız pano): sor (Bakalım) | kapat | gordu (Kararlar ve işler açıldı)
     i = p.get("islem")
-    if i == "gordu": PROAKTIF["gordu_t"] = time.time(); return {"ok": True}
     b = PROAKTIF["bekleyen"]
+    if i == "gordu":
+        PROAKTIF["gordu_t"] = time.time()
+        if b and not b.get("gun"): _soz_sonuc_g("kaynak:toplanti_sonrasi", "kabul")  # kendiliğinden Kararlar ve işler'e gitti: açık uçlara baktı
+        return {"ok": True}
     if i == "tara": return {"ok": True, "sonuc": pro_gun_tara(zorla=bool(p.get("zorla")))}  # elle bir tarama (testler, ileride pano); kurallar aynen geçerli, yalnız "boş bakış" bekleme süresi atlanır
     if i == "kapat":
         if b and b["id"] == p.get("id"):
             PROAKTIF["bekleyen"] = None
             if b.get("gun"): PRO_BAG["a"] = None  # kapatılan öneri asistana söylenmez
+            _soz_sonuc_g("kaynak:" + ("gun_ici" if b.get("gun") else "toplanti_sonrasi"), "ret")
         return {"ok": True}
     if i == "sor":
         if not b or b["id"] != p.get("id"): return {"ok": False, "err": _t("hatırlatma yok", "no reminder")}
@@ -126,10 +140,10 @@ def pro_islem(p):  # POST /proaktif (yalnız pano): sor (Bakalım) | kapat | gor
             r = konus_yazili(_t("Evet, ", "Yes, ") + (_t(f"kaydı onayıma sun: {a['cumle']} (kayıt komutu: {a['komut']} {json.dumps(a['arg'], ensure_ascii=False)})", f"put the record up for my approval: {a['cumle']} (record command: {a['komut']} {json.dumps(a['arg'], ensure_ascii=False)})")
                                                       if a.get("komut") else _t(f"olur, iyi fikir: {a['cumle']}", f"sure, good idea: {a['cumle']}") if a.get("tur") == "dostca"
                                                       else _t(f"birlikte bakalım: {a['cumle']}", f"let's look together: {a['cumle']}")))
-            if r.get("ok"): PROAKTIF["bekleyen"] = None; PRO_BAG["a"] = None; print("PROAKTİF: gün içi öneri — evet, asistana soruldu")
+            if r.get("ok"): PROAKTIF["bekleyen"] = None; PRO_BAG["a"] = None; _soz_sonuc_g("kaynak:gun_ici", "kabul"); print("PROAKTİF: gün içi öneri — evet, asistana soruldu")
             return r
         r = konus_yazili(_t(PRO_SORU, "Ask me, one by one, about the open items of the last meeting: items without a due date, items without an owner, decisions awaiting confirmation"))
-        if r.get("ok"): PROAKTIF["bekleyen"] = None; print("PROAKTİF: Bakalım — asistana soruldu")
+        if r.get("ok"): PROAKTIF["bekleyen"] = None; _soz_sonuc_g("kaynak:toplanti_sonrasi", "kabul"); print("PROAKTİF: Bakalım — asistana soruldu")
         return r
     return {"ok": False, "err": "islem"}
 
@@ -196,14 +210,16 @@ def _pro_deneme_aktif(simdi):
     d = globals().get("DUMAN") or {}
     return bool(d.get("aktif") or (d.get("t0") and simdi - float(d.get("t_bit") or d["t0"]) < 900))
 
-def _pro_engel(simdi, zorla=False):  # → None (öneri sunulabilir) ya da neden metni
+def _pro_engel(simdi, zorla=False):  # → None (öneri sunulabilir) ya da neden metni. Gizli kip, toplantı, sessiz mod, mesai, gece, ortak aralık ve günlük bütçe tek söz kapısında (soz-kapisi.py);
+    # burada yalnız bu kaynağa özgü sınırlar: günde 3, 90 dk aralık, bekleyen şerit, kullanıcı meşgul, deneme. Kapı yüklü değilse (yalıtılmış test) eski ortak engeller de burada.
     if not pro_gun_acik(): return "kapalı"
     if gizli_acik(): return "gizli kip"
-    if toplanti_var() or aktif_dosya(): return "toplantı sürüyor"
+    kapi = "soz_aday" in globals()
+    if not kapi and (toplanti_var() or aktif_dosya()): return "toplantı sürüyor"
     if _pro_deneme_aktif(simdi): return "deneme toplantısı"
-    if sessiz_acik(): return "sessiz mod"
+    if not kapi and sessiz_acik(): return "sessiz mod"
     if SOHBET["acik"] or ("_KS" in globals() and _KS.get("tur")): return "asistan meşgul"
-    if not _pro_mesai(simdi): return "mesai dışı"
+    if not kapi and not _pro_mesai(simdi): return "mesai dışı"
     tarih = datetime.date.fromtimestamp(simdi).isoformat()
     if PRO_GUN["tarih"] != tarih: PRO_GUN["tarih"], PRO_GUN["n"] = tarih, 0
     if PRO_GUN["n"] >= pro_gun_en_cok(): return "günlük sınır"
@@ -239,14 +255,21 @@ def pro_gun_tara(zorla=False, simdi=None):  # → "gonderildi" ya da neden; kura
         if a["komut"]:
             _, e = kayit_dogrula(a["komut"], a["arg"])  # asistan etiketi koyduğunda geçecek olan denetim şimdiden: geçmeyen öneri sunulmaz
             if e: print(f"PROAKTİF: aday atlandı ({a['komut']}: {e})"); continue
-        PRO_GUN["oneri"][a["anahtar"]] = simdi; PRO_GUN["n"] += 1; PRO_GUN["son_t"] = simdi; _pro_yaz()
-        if a.get("tur") == "dostca" and "duygu_pro_sunuldu" in globals(): duygu_pro_sunuldu(a, simdi)
-        PROAKTIF["bekleyen"] = {"id": "g" + str(int(simdi * 1000)), "cumle": a["cumle"], "t": simdi, "gun": a}
-        PRO_BAG["a"], PRO_BAG["n"] = dict(a, t=simdi), 0
-        print(f"PROAKTİF: gün içi öneri ({a['tur']}, bugün {PRO_GUN['n']}/{pro_gun_en_cok()})")  # günlüğe cümle (kayıt metni) yazılmaz
-        bildirim("Suflor.me", _t("Öneri", "Suggestion"), a["cumle"])
-        if AYAR.get("toplanti_sonrasi_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None) and not gizli_acik(): seslendir(a["cumle"], kuyruk=True)
-        return "gonderildi"
+        def teslim(a=a):  # kapı "şimdi" dediğinde (kuyruktan sonra geliyorsa o andaki saatle; kapı yoksa hemen); sayaçlar, şerit, bildirim ve sesli okuma bugünkü gibi
+            t_ = globals().get("soz_simdi", lambda x: x)(simdi)
+            PRO_GUN["oneri"][a["anahtar"]] = t_; PRO_GUN["n"] += 1; PRO_GUN["son_t"] = t_; _pro_yaz()
+            if a.get("tur") == "dostca" and "duygu_pro_sunuldu" in globals(): duygu_pro_sunuldu(a, t_)
+            PROAKTIF["bekleyen"] = {"id": "g" + str(int(t_ * 1000)), "cumle": a["cumle"], "t": t_, "gun": a}
+            PRO_BAG["a"], PRO_BAG["n"] = dict(a, t=t_), 0
+            print(f"PROAKTİF: gün içi öneri ({a['tur']}, bugün {PRO_GUN['n']}/{pro_gun_en_cok()})")  # günlüğe cümle (kayıt metni) yazılmaz
+            bildirim("Suflor.me", _t("Öneri", "Suggestion"), a["cumle"])
+            if AYAR.get("toplanti_sonrasi_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None) and not gizli_acik(): seslendir(a["cumle"], kuyruk=True)
+        if "soz_aday" not in globals(): teslim(); return "gonderildi"
+        k = soz_aday("gun_ici", a["cumle"], anahtar=a["anahtar"], oncelik=0 if a.get("tur") in ("dostca", "belge") else 1, kip="onayla" if a["komut"] else "sor", teslim=teslim,
+                     gecerli_sn=PRO_BOS_SN, simdi=simdi)
+        if k["karar"] == "simdi": return "gonderildi"
+        if k["neden"] == "tekrar": continue  # bu öneri yakın zamanda sunuldu; sıradakine bak
+        return k["neden"]  # gizli kip, toplantı sürüyor, sessiz mod, mesai dışı, aralık dolmadı, günlük bütçe … ("sonra" ise kapı kuyruğa aldı; süresi dolunca düşer)
     PRO_GUN["bakis_t"] = simdi
     return "öneri yok"
 
