@@ -742,8 +742,22 @@ def _alan_tara(ctx, d):
                 ilk_sayfa = False
 
 
+def _cozulur(h):
+    import socket
+    try:
+        socket.getaddrinfo(h, 443)
+        return True
+    except Exception:
+        return False
+
+
 def tarama(ctx):
     for d in ctx.k["alanlar"]:
+        # Ana alan adının IP kaydı yok ama www'nin varsa (yalnız www'de yayın yapan site) www taranır
+        if not os.environ.get("TAZI_HTTPS_OVERRIDE") and not _cozulur(d) and _cozulur("www." + d):
+            ctx.durum[f"tarama:{d}"] = "ok"
+            _alan_tara(ctx, "www." + d)
+            continue
         _alan_tara(ctx, d)
     for u in ctx.k["sayfalar"]:      # listede açıkça yazılı ek sayfalar: tek okuma
         if u in ctx.site:
