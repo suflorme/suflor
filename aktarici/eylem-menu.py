@@ -10,7 +10,7 @@ def _kem_takvim(): return [e for e in TAKVIM_TAM.values() if isinstance(e, dict)
 def _kem_kimlik(ad, tam=True):  # kimlik.py: takvim, kayıt veritabanı, Kişiler (tam) → {"eposta", "kaynak", "guven", "adaylar"}; menü açılışında Kişiler'e gidilmez
     if "kimlik_coz" not in globals(): return {}
     return kimlik_coz(ad) if tam else kimlik_coz(ad, kisiler=False, yaz=False)
-def eylem_model(istem, amac=None, soru=None, maske=None):
+def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None):  # is_adi: ölçüm iş adı (varsayılan eylem; değerlendirici degerlendir:<tür>), model: Claude Code modeli (varsayılan beyin.prova)
     # amac verilirse (talimat | kayit | degerlendir) istemin başına kişi modelinin paketi (profil + öğrenilenler …; aktarici/kisi-modeli.py baglam_paketi) eklenir; gizlilik süzgeci pakette.
     # → (ham metin, hata metni ya da None). Tek model çağrısı (prova_model gibi): başka sağlayıcıysa beyin_tek, Claude Code ise Brifing.app --istek (Masaüstü izni uygulamada).
     try:
@@ -28,7 +28,7 @@ def eylem_model(istem, amac=None, soru=None, maske=None):
         d = os.path.join(BASE, "eylem"); os.makedirs(d, exist_ok=True)
         cikti = os.path.join(d, "cikti.json"); istek = os.path.join(d, "istek.json"); t0 = time.time()
         if os.path.exists(cikti): os.remove(cikti)
-        model = BEYIN.claude_secim(AYAR, "prova")["model"]
+        model = model or BEYIN.claude_secim(AYAR, "prova")["model"]
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model), "cwd": d, "cikti": cikti, "sure": EYLEM_ZAMAN_SN}, f, ensure_ascii=False)
         try: subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=EYLEM_ZAMAN_SN + 30)
@@ -37,7 +37,7 @@ def eylem_model(istem, amac=None, soru=None, maske=None):
         except OSError: pass
         try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
         except OSError: return None, "Claude yanıt vermedi"
-        metin, _ = claude_json(ham, "eylem", t0, bool(claude_yalin()), "claude-code", model)
+        metin, _ = claude_json(ham, is_adi or "eylem", t0, bool(claude_yalin()), "claude-code", model)
         return metin, None
     except Exception as e: return None, e.__class__.__name__
 def _kem_id(yol):

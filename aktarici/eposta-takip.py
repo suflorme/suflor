@@ -338,14 +338,18 @@ def et_claude_sirala(adaylar, simdi=None):  # → değerlendirilen zincir sayıs
     if not adaylar or not et_claude_uygun(): return 0
     kume = sorted(a["dkey"] for a in adaylar)
     if ET.get("hata_kume") == kume and time.time() - ET.get("hata_t", 0) < ET_HATA_DK * 60: return 0  # aynı küme az önce başarısız oldu: kural sonucu kalır
-    try: ham, hata = eylem_model(et_claude_istem(adaylar, simdi), amac="degerlendir", maske=_et_maske)
+    try:
+        if "dg_cagri" in globals(): ham, hata, _ = dg_cagri(et_claude_istem(adaylar, simdi), "eposta")  # tek değerlendirici çekirdeği: aynı istem ve paket; ek olarak günlük tavan + ölçüm (degerlendir:eposta)
+        else: ham, hata = eylem_model(et_claude_istem(adaylar, simdi), amac="degerlendir", maske=_et_maske)
     except Exception as e: ham, hata = None, e.__class__.__name__
     r = et_claude_coz(ham, {a["id"] for a in adaylar}) if not hata and ham else {}
     if not r:
         ET["hata_kume"], ET["hata_t"] = kume, time.time(); print(f"E-POSTA TAKİP: Claude değerlendirmesi gelmedi ({hata or 'çıktı okunamadı'}) — kural sonucu, 'değerlendirilmedi'"); return 0
     ET["hata_kume"] = None; d = et_durum(); zaman = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     for a in adaylar:
-        if a["id"] in r: d["zd"][a["dkey"]] = dict(r[a["id"]], t=zaman)
+        if a["id"] in r:
+            d["zd"][a["dkey"]] = dict(r[a["id"]], t=zaman)
+            if "dg_karar_kaydet" in globals(): dg_karar_kaydet("eposta", a["id"], "soyle" if r[a["id"]]["d"] in ("senden_bekleniyor", "donus_bekliyorsun") else "gec", r[a["id"]]["a"])  # ölçüm (olcum.py isabet); metin yok
     et_kaydet(); print(f"E-POSTA TAKİP: Claude {len(r)}/{len(adaylar)} zinciri değerlendirdi"); return len(r)
 
 # --- Tarama, görünüm, hatırlatma ---------------------------------------------------------------------------------------------------------------------

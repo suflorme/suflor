@@ -12,6 +12,10 @@
 # Ayarlar: proaktif_oneri (açık; false kapatır), proaktif_gunluk_en_cok (3; 0 kapalı), proaktif_aralik_dk (90; iki öneri arası), proaktif_bosta_dk (5; kullanıcı son bu kadar dk asistana/Kararlar'a dokunmamış olmalı).
 # Atlanır: gizli kip, toplantı ya da deneme (duman) toplantısı, sessiz mod, asistan konuşurken/sohbetteyken, mesai (calisma_saatleri) dışı, günlük sınır, aralık dolmamış, panoda bekleyen şerit var.
 # Tekrar: aynı öneri (tür + kayıt kimlikleri) 24 saat sonrasına kadar yeniden sunulmaz; öneri çıkmadıysa 20 dk sonra yeniden bakılır. Durum proaktif.json'da (gun, oneri).
+# Tek değerlendirici (degerlendir.py, 9 Kasım): kurallar yalnız ADAY üretir; yüklüyse hangisinin söylenmeye değer olduğuna, sırasına ve cümlesine değerlendirici karar verir (kullanıcı profili + geçmiş tepkileri bağlamıyla):
+#   gün içi öneri — uygun adayların hepsi tek çağrıda (soyle|sonra|gec; model cümlesi eylemli adayda yalnız '?' ile bitiyorsa kullanılır); açık uç hatırlatması — toplantının açık uçları (pro_uclar) tek çağrıda (soyle|gec),
+#   yalnız 'soyle' dedikleri sayılır/sorulur. Değerlendirici yoksa, kapalıysa, gizli kipteyse ya da cevap gelmezse bugünkü kural davranışı aynen (adayların kendi 'yedek'i: söyle).
+import hashlib
 PRO_SORU = "Son toplantının açık uçlarını sırayla sor: tarihsiz işler, sahipsiz işler, teyit bekleyen kararlar"
 PRO_DOSYA = "proaktif.json"
 PROAKTIF = {"bekleyen": None, "yapildi": set(), "gordu_t": 0.0, "zamanlayici": {}}
@@ -62,6 +66,47 @@ def pro_say(yol):  # yapı dosyası → {"tarihsiz", "sahipsiz", "teyit", "acik"
     c["deneme"] = bool(v.get("deneme"))
     return c
 
+def pro_uclar(yol, baslik=None, en_cok=12):
+    # yapı dosyası → değerlendiriciye gidecek açık uç adayları (pro_say ile aynı kurallar). "say": adayın girdiği sayaçlar; "ham": ham metin. Sıra: teyit bekleyen karar, iş (hem tarihsiz hem sahipsiz önce), cevapsız soru.
+    try:
+        with open(yol, encoding="utf-8") as f: v = json.load(f)
+    except (OSError, ValueError): return []
+    if not isinstance(v, dict) or not isinstance(v.get("maddeler"), list): return []
+    k = lambda x: str(x or "").replace("İ", "i").replace("I", "ı").lower().replace("ö", "o").replace("ü", "u")
+    top = " ".join(str(baslik or v.get("baslik") or "").split())[:80]; gor = set(); gruplar = {"karar": [], "is": [], "soru": []}
+    for m in v["maddeler"]:
+        for o in (m.get("ogeler") or []) if isinstance(m, dict) else []:
+            if not isinstance(o, dict) or not str(o.get("metin") or "").strip(): continue
+            t = o.get("tur"); metin = " ".join(str(o["metin"]).split())[:200]
+            if t == "is":
+                say = (["tarihsiz"] if not str(o.get("tarih") or "").strip() else []) + (["sahipsiz"] if not str(o.get("sahip") or "").strip() else [])
+                veri = {"tur": "iş", "tarih": str(o.get("tarih") or "").strip() or "yok", "sahip": str(o.get("sahip") or "").strip() or "yok"}; on = "İş: "
+            elif t == "karar" and (k(o.get("netlik")) in ("ortuk", "tek") or str(o.get("varsayim") or "").strip()):
+                say = ["teyit"]; veri = {"tur": "karar", "netlik": str(o.get("netlik") or "").strip() or "?"}; on = "Karar (teyit bekliyor): "
+            elif t == "soru" and not str(o.get("cevap") or "").strip(): say = ["acik"]; veri = {"tur": "soru"}; on = "Açık soru: "
+            else: continue
+            if not say: continue
+            kim = "u" + hashlib.sha1((str(t) + "|" + metin).encode("utf-8")).hexdigest()[:8]
+            if kim in gor: continue
+            gor.add(kim); veri["madde"] = " ".join(str((m or {}).get("baslik") or "").split())[:80]; veri["toplanti"] = top
+            gruplar["karar" if t == "karar" else "is" if t == "is" else "soru"].append({"id": kim, "metin": on + metin, "ham": metin, "veri": veri, "yedek": {"karar": "soyle", "oncelik": 1}, "say": say})
+    gruplar["is"].sort(key=lambda a: -len(a["say"]))
+    return (gruplar["karar"] + gruplar["is"] + gruplar["soru"])[:en_cok]
+
+def pro_degerlendir(r, c):
+    # açık uçları değerlendiriciye sorar → (seçilen sayımı, seçilen adaylar [öncelikli]) ya da None (değerlendirici yok / cevap yok / uç yok: bugünkü tüm sayımla devam).
+    uc = pro_uclar(r["yapi"], r.get("baslik") or r.get("dosya"))
+    if not uc: return None
+    baslik = r.get("baslik") or r.get("dosya") or _t("Son toplantı", "Last meeting")
+    sonuc = degerlendir("toplanti_sonrasi", uc, soru=f"«{baslik}» toplantısının açık uçlarından hangileri, toplantıdan hemen sonra kullanıcıya hatırlatılmaya değer? (Hatırlatma toplantı bittikten ~10 dk sonra tek bildirim olarak gider.)", sema=DG_SEMA["toplanti_sonrasi"])
+    if not sonuc or all(s["kaynak"] == "yedek" for s in sonuc): return None
+    sec = [dict(a, oncelik=s["oncelik"]) for a, s in zip(uc, sonuc) if s["karar"] == "soyle"]
+    c2 = {"tarihsiz": 0, "sahipsiz": 0, "teyit": 0, "acik": 0, "deneme": c.get("deneme", False)}
+    for a in sec:
+        for x in a["say"]: c2[x] += 1
+    sec.sort(key=lambda a: -a["oncelik"])
+    return c2, sec
+
 def pro_cumle(baslik, c):
     p = []
     if c["tarihsiz"]: p.append(_t(f"{c['tarihsiz']} işin tarihi yok", f"{c['tarihsiz']} action items have no due date"))
@@ -99,15 +144,24 @@ def pro_tetik(r, sayac0=0):
         if PROAKTIF["gordu_t"] > float(r.get("t") or 0): return atla("kullanıcı Kararlar ve işler'e baktı")
         if "_KS" in globals() and _KS.get("sayac", 0) != sayac0: return atla("kullanıcı asistana sordu")
         if not (c["tarihsiz"] or c["sahipsiz"] or c["teyit"] or c["acik"]): return atla("açık uç yok")
+        secilen = None
+        if "degerlendir" in globals():  # tek değerlendirici: hangi açık uçlar hatırlatmaya değer; yoksa/cevap gelmezse bugünkü tüm sayımlı cümle
+            sec = pro_degerlendir(r, c)
+            if sec is not None:
+                if not sec[1]: return atla("değerlendirici: hatırlatmaya değer uç yok")
+                c, secilen = sec
         cumle = pro_cumle(r.get("baslik") or r.get("dosya") or _t("Son toplantı", "Last meeting"), c)
         def teslim():  # tek söz kapısı (soz-kapisi.py) şimdi dediğinde ya da kapı yoksa hemen
             PROAKTIF["yapildi"].add(_pro_k(r)); PRO_GUN["son_t"] = time.time(); _pro_yaz()  # gün içi öneriyle üst üste binmesin (günlük sayaca girmez)
-            PROAKTIF["bekleyen"] = {"id": r["id"], "cumle": cumle, "t": time.time()}
+            PROAKTIF["bekleyen"] = dict({"id": r["id"], "cumle": cumle, "t": time.time()}, **({"secilen": [a["ham"] for a in secilen]} if secilen else {}))
             print(f"PROAKTİF: {cumle}")
             bildirim("Suflor.me", _t("Açık uçlar", "Open items"), cumle, son=r["id"])
             if AYAR.get("toplanti_sonrasi_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None) and not gizli_acik(): seslendir(cumle, kuyruk=True)
         if "soz_aday" in globals():  # aynı toplantı için yeniden planlansa da (yeniden başlatma) kapı anahtardan tanır; sonra/bastırılan söz işaretlenir ki yeniden aranmasın
-            k = soz_aday("toplanti_sonrasi", cumle, anahtar="ts:" + _pro_k(r), oncelik=1, kip="sor", teslim=teslim, gecerli_sn=4 * 3600)
+            if secilen and "dg_soyle" in globals():  # söz kimliği seçilen her açık uca bağlanır: kullanıcı sonucu (Bakalım/kapat/yoksay) değerlendiricinin kararlarıyla eşleşir
+                k = dg_soyle("toplanti_sonrasi", {"id": secilen[0]["id"], "oncelik": secilen[0]["oncelik"]}, cumle, anahtar="ts:" + _pro_k(r), kip="sor", teslim=teslim, gecerli_sn=4 * 3600)
+                for a in secilen[1:]: dg_soz_bagla("toplanti_sonrasi", a["id"], k.get("id"))
+            else: k = soz_aday("toplanti_sonrasi", cumle, anahtar="ts:" + _pro_k(r), oncelik=1, kip="sor", teslim=teslim, gecerli_sn=4 * 3600)
             if k["karar"] != "simdi" and k["neden"] != "gizli kip": PROAKTIF["yapildi"].add(_pro_k(r)); _pro_yaz()
         else: teslim()
     except Exception as e: print(f"PROAKTİF: hata ({e.__class__.__name__}: {e})")
@@ -142,7 +196,9 @@ def pro_islem(p):  # POST /proaktif (yalnız pano): sor (Bakalım) | kapat | gor
                                                       else _t(f"birlikte bakalım: {a['cumle']}", f"let's look together: {a['cumle']}")))
             if r.get("ok"): PROAKTIF["bekleyen"] = None; PRO_BAG["a"] = None; _soz_sonuc_g("kaynak:gun_ici", "kabul"); print("PROAKTİF: gün içi öneri — evet, asistana soruldu")
             return r
-        r = konus_yazili(_t(PRO_SORU, "Ask me, one by one, about the open items of the last meeting: items without a due date, items without an owner, decisions awaiting confirmation"))
+        ozel = [str(x) for x in (b.get("secilen") or [])[:5]]  # değerlendiricinin seçtiği uçlar önce
+        r = konus_yazili(_t(PRO_SORU, "Ask me, one by one, about the open items of the last meeting: items without a due date, items without an owner, decisions awaiting confirmation")
+                         + (_t(" — önce şunlara bak: " + "; ".join(ozel), " — start with these: " + "; ".join(ozel)) if ozel else ""))
         if r.get("ok"): PROAKTIF["bekleyen"] = None; _soz_sonuc_g("kaynak:toplanti_sonrasi", "kabul"); print("PROAKTİF: Bakalım — asistana soruldu")
         return r
     return {"ok": False, "err": "islem"}
@@ -243,6 +299,13 @@ def pro_gun_veri():  # → (bugun_veri sözlüğü ya da None, belge önerileri 
         except Exception as e: print(f"PROAKTİF: belge önerileri okunamadı ({e.__class__.__name__})")
     return v, bel
 
+def pro_gun_degerlendir(uygun):  # → {anahtar: sonuç}; değerlendirici yüklü değilse {}. Her aday: kuralın cümlesi + türü + eylemi; yedek = bugünkü öncelik (belge/dostça 0, öteki 1)
+    if not uygun or "degerlendir" not in globals(): return {}
+    dg = [{"id": a["anahtar"], "metin": a["cumle"], "veri": {"tur": a["tur"], "eylem": a["komut"] or "yok (bilgi)"}, "yedek": {"karar": "soyle", "oncelik": 0 if a.get("tur") in ("dostca", "belge") else 1}} for a in uygun]
+    try: sonuc = degerlendir("gun_ici", dg, soru="Toplantı dışında, mesai saatinde kullanıcıya TEK kısa öneri olarak söylenecek: aşağıdaki öneriler şimdi söylenmeye değer mi, sonra mı, hiç mi? (Günde en çok 3 öneri söylenir; en değerli olanlar seçilmeli.)", sema=DG_SEMA["gun_ici"])
+    except Exception as e: print(f"PROAKTİF: değerlendirici hata ({e.__class__.__name__})"); return {}
+    return {s["id"]: s for s in sonuc}
+
 def pro_gun_tara(zorla=False, simdi=None):  # → "gonderildi" ya da neden; kurallar _pro_engel'de, tekrar önleme anahtar bazında
     simdi = simdi or time.time(); neden = _pro_engel(simdi, zorla)
     if neden: return neden
@@ -250,11 +313,19 @@ def pro_gun_tara(zorla=False, simdi=None):  # → "gonderildi" ya da neden; kura
     if v is None: return "veri yok"
     adaylar = pro_aday_kur(v, bel, datetime.date.fromtimestamp(simdi))
     if "duygu_pro_aday" in globals(): adaylar = duygu_pro_aday(simdi) + adaylar  # 9 Kasım (dost): yoğun günde dostça mola/öncelik önerisi önce (günde en çok 2, Konuş'la ortak hak; aktarici/duygu.py)
+    uygun = []
     for a in adaylar:
         if simdi - PRO_GUN["oneri"].get(a["anahtar"], 0) < PRO_TEKRAR_SN: continue
         if a["komut"]:
             _, e = kayit_dogrula(a["komut"], a["arg"])  # asistan etiketi koyduğunda geçecek olan denetim şimdiden: geçmeyen öneri sunulmaz
             if e: print(f"PROAKTİF: aday atlandı ({a['komut']}: {e})"); continue
+        uygun.append(a)
+    kararlar = pro_gun_degerlendir(uygun)  # tek değerlendirici; yoksa/cevap gelmezse {} ya da yalnız yedek → bugünkü sıra ve cümleler
+    degerli = any(s["kaynak"] != "yedek" for s in kararlar.values())
+    sirali = sorted([a for a in uygun if kararlar[a["anahtar"]]["karar"] == "soyle"], key=lambda a: -kararlar[a["anahtar"]]["oncelik"]) if degerli else uygun  # sıralama kararlı: eşitte kural sırası
+    for a in sirali:
+        ds = kararlar.get(a["anahtar"]); ds = ds if ds and ds["kaynak"] != "yedek" else None  # değerlendiricinin kararı (yoksa kural yedeği)
+        if ds and ds.get("metin") and (not a["komut"] or ds["metin"].rstrip().endswith("?")): a = dict(a, cumle=ds["metin"])  # eylemli öneri soru olarak kalmalı ("evet" = onay)
         def teslim(a=a):  # kapı "şimdi" dediğinde (kuyruktan sonra geliyorsa o andaki saatle; kapı yoksa hemen); sayaçlar, şerit, bildirim ve sesli okuma bugünkü gibi
             t_ = globals().get("soz_simdi", lambda x: x)(simdi)
             PRO_GUN["oneri"][a["anahtar"]] = t_; PRO_GUN["n"] += 1; PRO_GUN["son_t"] = t_; _pro_yaz()
@@ -265,8 +336,9 @@ def pro_gun_tara(zorla=False, simdi=None):  # → "gonderildi" ya da neden; kura
             bildirim("Suflor.me", _t("Öneri", "Suggestion"), a["cumle"])
             if AYAR.get("toplanti_sonrasi_sesli") is True and not SOHBET["acik"] and not (_KS.get("tur") if "_KS" in globals() else None) and not gizli_acik(): seslendir(a["cumle"], kuyruk=True)
         if "soz_aday" not in globals(): teslim(); return "gonderildi"
-        k = soz_aday("gun_ici", a["cumle"], anahtar=a["anahtar"], oncelik=0 if a.get("tur") in ("dostca", "belge") else 1, kip="onayla" if a["komut"] else "sor", teslim=teslim,
-                     gecerli_sn=PRO_BOS_SN, simdi=simdi)
+        kip = "onayla" if a["komut"] else "sor"
+        if ds and "dg_soyle" in globals(): k = dg_soyle("gun_ici", ds, a["cumle"], anahtar=a["anahtar"], kip=kip, teslim=teslim, gecerli_sn=PRO_BOS_SN, simdi=simdi)
+        else: k = soz_aday("gun_ici", a["cumle"], anahtar=a["anahtar"], oncelik=0 if a.get("tur") in ("dostca", "belge") else 1, kip=kip, teslim=teslim, gecerli_sn=PRO_BOS_SN, simdi=simdi)
         if k["karar"] == "simdi": return "gonderildi"
         if k["neden"] == "tekrar": continue  # bu öneri yakın zamanda sunuldu; sıradakine bak
         return k["neden"]  # gizli kip, toplantı sürüyor, sessiz mod, mesai dışı, aralık dolmadı, günlük bütçe … ("sonra" ise kapı kuyruğa aldı; süresi dolunca düşer)

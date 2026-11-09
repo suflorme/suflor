@@ -1867,6 +1867,7 @@ bolum("eposta-takip")  # aktarici/eposta-takip.py — önemli e-posta seçimi, c
 bolum("toplanti-hatirlat")  # aktarici/toplanti-hatirlat.py — planlı toplantı hatırlatması: toplantıdan önce sesli/menü bildirimi, "evet"te kısa hazırlık brifingi, "toplantıyı aç" (9 Kasım)
 bolum("toplanti-sonrasi")  # aktarici/toplanti-sonrasi.py — toplantı sonrası proaktif hatırlatma: açık uçlar (tarihsiz/sahipsiz iş, teyit bekleyen karar) bildirim + Bugün satırı (5 Kasım)
 bolum("izleme")  # aktarici/izleme.py — İzleme: başka panonun Drive'a yazdığı JSON anlık görüntüsünü yalnız okur (ayar izleme_dosyasi; Bugün bölümü, hazırlık adayları, Konuş özeti; 5 Kasım)
+bolum("degerlendir")  # aktarici/degerlendir.py — tek değerlendirici: söylemeye değer mi / benim mi / güncel mi kararı tek çekirdekten (gün içi öneri, açık uç, belge önerisi, e-posta çağrısı; 9 Kasım) — eylem-menu ve soz-kapisi'ndan sonra
 bolum("soz-kapisi")  # aktarici/soz-kapisi.py — tek söz kapısı: zamanlayıcılar aday üretir, kapı şimdi/sonra/hiç kararını verir; sunuş → sonuç kaydı canli/soz.jsonl (9 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
 bolum("beta-veri")  # aktarici/beta-veri.py — Beta geliştirme verisi: olay sayacı, haftalık paket, toplantı sonu kalitesi (S141; en sonda: öbür bölümlerin işlevlerini sarar)
