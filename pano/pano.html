@@ -391,6 +391,53 @@ html.bugun #brs,html.bugun #tos{background:var(--s1);border-radius:var(--kose-l)
 html.bugun #tos.kapali :is(.tod,#tol,#tom){display:none}html.bugun #tos .sh{cursor:pointer}html.bugun #tos.kapali .sh{padding-bottom:0}
 html.bugun #tos.kapali .sh::after{content:"";flex:none;width:7px;height:7px;margin-right:var(--bo-4);border-right:1.6px solid var(--t3);border-bottom:1.6px solid var(--t3);transform:rotate(-45deg)}
 html.bugun #tos .sh{padding-inline:0}html.bugun #tos .tob{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* Tek iş satırı yuvası ve Onayını bekleyenler kutusu (10 Kasım): sol yuva her satırda 20 px; "?" yuvarlağı yalnız açık soruda; yapıldı işareti satırı çizili ve soluk yapar (geri alınabilir) */
+#bgn .sat.kns .yuva{flex:none;display:grid;place-items:center;width:20px;height:20px;box-sizing:border-box;border-radius:50%}
+#bgn .sat.kns .yuva.kar::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--wa)}  /* onay bekleyen karar: tıklanmaz, "bekliyor" noktası */
+#bgn .sat.kns .yuva.oldu{width:20px;height:20px;color:var(--b-vurgu)}
+#bgn .sat.kns .onay.yq{display:grid;color:var(--b-m3);font:500 var(--yz-12)/1 var(--f-govde);cursor:pointer}
+#bgn .sat.kns .onay.yq:hover{border-color:var(--b-m2);color:var(--b-murekkep)}
+#bgn .sat.kns .onay{cursor:pointer}
+#bgn .sat.kns .onay:focus-visible{outline:2px solid var(--b-vurgu);outline-offset:2px}
+#bgn .sat.kns.bitiyor{opacity:.55}
+#bgn .sat.kns.bitiyor .t{text-decoration:line-through;text-decoration-color:var(--b-cizgi2)}
+#bgn .sat.kns.bitiyor .onay{background:var(--b-vurgu);border-color:var(--b-vurgu);color:var(--b-ana-yazi)}
+#bgn .sat.kns.bsi{gap:var(--bo-16);border-bottom:0}
+#bgn .sat.bs>.nokta{margin-inline:var(--bo-4)}#bgn .sat.bs>.sik{display:grid;place-items:center;width:20px}
+#bnPanel .pnl .sat.kns{display:flex;align-items:center;gap:var(--bo-12);padding:var(--bo-12) var(--bo-4);border-bottom:1px solid var(--b-cizgi)}
+#bnPanel .pnl .sat.kns .yuva,#bnPanel .pnl .sat.kns .onay{flex:none;width:20px;height:20px}
+#bnPanel .pnl .sat.kns .m{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:var(--bo-4)}
+#bnPanel .pnl .sat.kns .m .t{font-size:var(--yz-15);line-height:1.4;overflow-wrap:anywhere}
+#bnPanel .pnl .sat.kns .m .a{font-size:var(--yz-12);color:var(--b-m3)}
+#bnPanel .pnl .sat.kns .hizli{display:none}
+#bnPanel .pnl .sat.kns .kbas{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--b-yuzey2);border:0;padding:0;font:500 var(--yz-12) var(--f-govde);color:var(--b-m2)}
+#bnPanel .pnl .sat.kns .kbas.bos{background:none}
+#bnPanel .pnl .sat.kns .ktar{flex:none;width:72px;text-align:right;font-size:var(--yz-12);font-weight:500;color:var(--b-m3);white-space:nowrap}
+#bnPanel .pnl .sat.kns .ktar.gec{color:var(--b-gec)}
+#bnPanel .pnl .sat.kns .onay{border:1.5px solid var(--b-cizgi2);border-radius:50%;background:none;padding:0;display:grid;place-items:center;color:transparent;cursor:pointer}
+#bnPanel .pnl .sat.kns .onay:hover{border-color:var(--b-m2);color:var(--b-m3)}
+#bnPanel .pnl .sat.kns .onay.yq{color:var(--b-m3);font:500 var(--yz-12)/1 var(--f-govde)}
+#bnPanel .pnl .sat.kns .onay svg.i{width:12px;height:12px;stroke-width:2.2}
+#bnPanel .pnl .sat.kns.bitiyor{opacity:.55}#bnPanel .pnl .sat.kns.bitiyor .t{text-decoration:line-through;text-decoration-color:var(--b-cizgi2)}
+#bnPanel .pnl .sat.kns.bitiyor .onay{background:var(--b-vurgu);border-color:var(--b-vurgu);color:var(--b-ana-yazi)}
+#bgn h2.knbl{margin:var(--bo-24) 0 var(--bo-8);font:500 var(--yz-12)/1.3 var(--f-govde);letter-spacing:.06em;text-transform:uppercase;color:var(--b-m3)}
+#bgn h2.knbl:first-of-type{margin-top:var(--bo-8)}
+#bgn .onkutu{display:grid;gap:var(--bo-8)}
+#bgn .onbas{display:flex;align-items:center;justify-content:space-between;gap:var(--bo-12)}
+#bgn .onbas .bag{font-size:var(--yz-13);font-weight:500}
+#bgn .onliste{border:1px solid var(--b-cizgi);border-radius:var(--r-14);background:var(--b-yuzey);overflow:hidden}
+#bgn .onk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--bo-4) var(--bo-16);align-items:center;padding:var(--bo-12) var(--bo-16)}
+#bgn .onk+.onk{border-top:1px solid var(--b-cizgi)}
+#bgn .onm{display:flex;align-items:center;gap:var(--bo-8);min-width:0}
+#bgn .onm .etiket{flex:none}
+#bgn .onmt{min-width:0;font-size:var(--yz-15);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bgn .ong{grid-column:1;font-size:var(--yz-12);color:var(--b-m3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bgn .ond{grid-column:2;grid-row:1/span 2;display:flex;align-items:center;gap:var(--bo-8)}
+#bgn .onk:not(:has(.ong)) .ond{grid-row:1}
+#bgn .onbirl{display:flex;align-items:center;gap:var(--bo-8);font-size:var(--yz-12);color:var(--b-m3)}
+#bgn .onbirl span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#bgn .onbirl .bag{font-size:var(--yz-12);font-weight:500;flex:none}
+@media (max-width:640px){#bgn .onk{grid-template-columns:minmax(0,1fr)}#bgn .ond{grid-column:1;grid-row:auto;margin-top:var(--bo-4)}}
 </style>
 <header><div class=hl><button type=button id=kmenu class="ib gh" aria-label="Menüyü aç" title="Menüyü aç"><svg class=i viewBox="0 0 24 24" aria-hidden=true><path d="M4 7h16M4 12h16M4 17h10"/></svg></button><span class=brand aria-label="Suflor.me"><svg viewBox="0 0 64 64" aria-hidden=true><rect width=64 height=64 rx=15 fill="#175E46"/><g transform="translate(0 -3.3)"><path fill="#F1E6CF" d="M23.50 37.60A7.60 7.60 0 1 1 31.10 30.38C31.48 39.50 26.16 45.58 18.56 48.24C23.65 44.44 25.17 40.79 23.50 37.60Z"/><path fill="#C9973A" d="M42.50 37.60A7.60 7.60 0 1 1 50.10 30.38C50.48 39.50 45.16 45.58 37.56 48.24C42.65 44.44 44.17 40.79 42.50 37.60Z"/></g></svg><span>Suflor<span class=n>.</span><span class=m>me</span></span></span><span id=t>toplantı bekleniyor</span><span id=chips></span><span id=sure></span></div>
 <div class=hr><span id=durum class=nt role=status><i class=dot></i><span id=dm>bağlanıyor…</span><span id=da class=da></span><button id=de class=pri hidden></button></span><button id=gun hidden></button><button id=shb class="ib gh" type=button title="{asistan} paneli" aria-label="{asistan} paneli" aria-expanded=false aria-controls=shp></button><button id=yb class="ib gh" title="Yardım ve sık sorulanlar" aria-label="Yardım">?</button><button id=gb class="ib gh" title="Geri bildirim gönder"></button><button id=ay class="ib gh" title="Ayarlar"></button></div></header>
@@ -2177,45 +2224,54 @@ function knKayit(kid){if(!kid)return null;const b=bnV||{},ls=[...((knV||{}).kayi
 const knKid=x=>x.kayit_id||x.id||''
 const knTarihEt=x=>x.tur==='is'&&x.durum!=='kapandi'?(x.vade?goreliSpan(x.vade,'ktar'+(x.gecikti?' gec':''),true):`<span class="ktar sol">${L('Tarihsiz')}</span>`):x.vade?goreliSpan(x.vade,'ktar sol'):x.tarih?goreliSpan(String(x.tarih).slice(0,10),'ktar sol'):'<span class=ktar></span>'
 const knBas=x=>x.kim?`<button type=button class=kbas data-bn=knkisi data-k="${esc(x.kim)}" title="${esc(x.kim)}" aria-label="${esc(L('{ad}: yalnız onun kayıtları',{ad:x.kim}))}">${esc(bnBas(x.kim))}</button>`:`<span class="kbas bos" aria-hidden=true></span>`
-// satır: iş → "Yapıldı olarak işaretle" yuvarlağı (/is-durum, 5 sn Geri al) · kapanmış → tik, soluk, Geri al (yeniden aç) · açık soru ve dış kayıt → yuvarlak yok
-// metin 15, alt satır toplantı adı 12; üstüne gelince Ertele ve ⋯; sahip baş harfi; sağda göreli tarih. Satır ya da metin tıklanınca ayrıntı paneli.
-function knSatir(x){const kap=x.durum==='kapandi',kid=knKid(x),sec=bnRef==='r:'+kid,top=x.toplanti?tpAd(x):esc(x.baslik||'')
-  const sol=x.dis?`<span class=kaynakn aria-hidden=true></span>`:kap?`<span class=oldu aria-label="${L('Bitti')}">${ic('check')}</span>`:x.tur==='is'?`<button type=button class=onay data-bn=isbit data-id="${esc(x.id)}" aria-label="${L('Yapıldı olarak işaretle')}" title="${L('Yapıldı olarak işaretle')}">${ic('check')}</button>`:`<span class="onay soru" aria-hidden=true></span>`
-  const alt=[top,x.tur==='soru'?esc(L('Açık soru')):'',x.atayan?esc(L('Sana atandı · {ad}',{ad:x.atayan})):'',x.gundem&&x.gundem.baslik?esc(L('Gündemde: {t}',{t:x.gundem.baslik})):'',x.dis?`<span class="etiket notr">${esc(x.kaynak)}</span>`:''].filter(Boolean).join(' · ')
-  const hz=x.dis?'':kap?`<button type=button class="b sade" data-bn=knyeni data-kid="${esc(kid)}" title="${L('Yeniden aç')}">${L('Geri al')}</button>`:(x.tur==='is'?`<button type=button class="b sade kert" data-bn=knert data-kid="${esc(kid)}">${L('Ertele')}</button>`:'')+emDugme(x)
-  const ac=x.dis?'':` data-bn=knac data-kid="${esc(kid)}"`
-  return`<div class="sat kns${kap?' kapali':''}${x.dis?' dis':''}${sec?' secili':''}" data-id="${esc(x.id||'')}"${ac}>${sol}<${x.dis?'div':'button type=button'} class=m${ac}><span class=t>${esc(x.metin)}</span>${alt?`<span class=a>${alt}</span>`:''}</${x.dis?'div':'button'}><span class=hizli>${hz}</span>${knBas(x)}${knTarihEt(x)}</div>`}
+// TEK İŞ SATIRI (Bugün'ün Senden beklenenler listesi, Bugün'ün "Senin açık işlerin" paneli ve Kararlar ve işler aynı bileşeni kullanır): sabit genişlikte sol yuva · başlık + soluk meta (toplantı · tarih) · sağda kişi rozeti ve tarih sütunu.
+// Yuva: iş/söz → boş yuvarlak "Yapıldı olarak işaretle" (/is-durum) · açık soru → "?" yuvarlağı "Cevaplandı olarak işaretle" (/kayit-eylem cevaplandi) · kapanmış → dolu tik (yalnız gösterim) · karar/dış kayıt → tıklanmaz yuva.
+// Yazılı "Yapıldı" düğmesi yok. Tıklayınca satır üstü çizili ve soluk görünür, 5 sn "Geri al" (bnYap); sonra yazılır. Üstüne gelince Ertele ve ⋯ (yalnız panelde yok); satır ya da metin tıklanınca ayrıntı paneli.
+const bnBitiyor=new Set()  // yazılması bekleyen yapıldı/cevaplandı işaretleri (id): satır listede kalır, çizili ve soluk
+function knYuva(x,kap,kid){if(x.dis)return`<span class=yuva aria-hidden=true></span>`
+  if(kap)return`<span class="yuva oldu" aria-label="${L(x.tur==='soru'?'Cevaplandı':'Bitti')}">${ic('check')}</span>`
+  if(x.tur==='soru')return`<button type=button class="onay yq" data-bn=sorubit data-id="${esc(kid)}" aria-label="${L('Cevaplandı olarak işaretle')}" title="${L('Cevaplandı olarak işaretle')}">?</button>`
+  return`<button type=button class=onay data-bn=isbit data-id="${esc(x.id)}" aria-label="${L('Yapıldı olarak işaretle')}" title="${L('Yapıldı olarak işaretle')}">${ic('check')}</button>`}
+function knSatir(x,o){o=o||{};const kap=x.durum==='kapandi',kid=knKid(x),sec=!o.pn&&bnRef==='r:'+kid,bit=bnBitiyor.has(kid)||bnBitiyor.has(x.id),top=x.toplanti?tpAd(x):esc(x.baslik||'')
+  const alt=[x.atayan?esc(L('Sana atandı · {ad}',{ad:x.atayan})):'',top,x.tur==='is'&&!kap?bsTarih(x.tarih):'',x.gundem&&x.gundem.baslik?esc(L('Gündemde: {t}',{t:x.gundem.baslik})):'',x.dis?`<span class="etiket notr">${esc(x.kaynak)}</span>`:''].filter(Boolean).join(' · ')
+  const hz=x.dis||o.pn?'':kap?`<button type=button class="b sade" data-bn=knyeni data-kid="${esc(kid)}" title="${L('Yeniden aç')}">${L('Geri al')}</button>`:(x.tur==='is'?`<button type=button class="b sade kert" data-bn=knert data-kid="${esc(kid)}">${L('Ertele')}</button>`:'')+emDugme(x)
+  const ac=x.dis||o.pn?'':` data-bn=knac data-kid="${esc(kid)}"`
+  return`<div class="sat kns${o.bs?' bsi':''}${kap?' kapali':''}${bit?' bitiyor':''}${x.dis?' dis':''}${sec?' secili':''}" data-id="${esc(kap||x.tur==='soru'?kid:x.id||'')}"${ac}>${knYuva(x,kap,kid)}<${ac?'button type=button':'div'} class=m${ac}><span class=t>${esc(x.metin)}</span>${alt?`<span class=a>${alt}</span>`:''}</${ac?'button':'div'}><span class=hizli>${hz}</span>${knBas(x)}${knTarihEt(x)}</div>`}
+// yazılması bekleyen işaret: satır çizilir, bildirimde Geri al 5 sn vazgeçirir; sonra yazar, veriyi yeniler
+function bnYenile(){if(last)bnCiz(last);if(bnRef)bnPanelCiz(last)}
+function bnYap(idler,mesaj,yap){idler=idler.filter(i=>i&&!bnBitiyor.has(i));if(!idler.length)return;idler.forEach(i=>bnBitiyor.add(i));bnYenile()
+  const t=setTimeout(async()=>{try{await yap()}catch(e){}await bnVeriYukle(true);if(bnGor==='kayit')await knYukle(true);idler.forEach(i=>bnBitiyor.delete(i));bnYenile()},5000)
+  bnBildir(mesaj,()=>{clearTimeout(t);idler.forEach(i=>bnBitiyor.delete(i));bnYenile()})}
 const knKararEt=x=>emOnayIs(x.onay)||(x.durum==='teyit'?`<span class="etiket bekliyor">${L('Onay bekliyor')}</span>`:`<span class="etiket olumlu">${L('Onaylandı')}</span>`)
 function knKararSatir(x){const kid=knKid(x),sec=bnRef==='r:'+kid,top=x.toplanti?tpAd(x):esc(x.baslik||''),alt=[top,x.durum==='teyit'?esc(x.neden||''):'',x.dis?`<span class="etiket notr">${esc(x.kaynak)}</span>`:''].filter(Boolean).join(' · ')
   const ac=x.dis?'':` data-bn=knac data-kid="${esc(kid)}"`
-  return`<div class="sat kns karar${x.dis?' dis':''}${sec?' secili':''}" data-id="${esc(x.id||'')}"${ac}><${x.dis?'div':'button type=button'} class=m${ac}><span class=t>${esc(x.metin)}</span>${alt?`<span class=a>${alt}</span>`:''}</${x.dis?'div':'button'}><span class=hizli>${x.dis?'':emDugme(x)}</span>${x.dis?'':knKararEt(x)}${x.durum==='teyit'&&!x.dis?`<button type=button class=b data-bn=kararonay data-id="${esc(x.id)}">${L('Onayla')}</button>`:''}</div>`}
-// Öneriler tek şeritte: belgelerden önerilen işler (/belge-oneri) + senden onay bekleyen eylemler (eylem kuyruğu; yan panelde). İncele → tek tek: Onayla (kayda al, sahip varsa ata) · Reddet (bir daha önerilmez) · Atla.
-// Yazma 5 sn sonra (Geri al bu sürede vazgeçer). Kaynak belge adı ve satırı öneride görünür. Hepsi bitince şerit kalkar.
-let boInc=null
+  const yv=x.dis?`<span class=yuva aria-hidden=true></span>`:x.durum==='teyit'?`<span class="yuva kar" aria-hidden=true></span>`:`<span class="yuva oldu" aria-hidden=true>${ic('check')}</span>`
+  return`<div class="sat kns karar${x.dis?' dis':''}${sec?' secili':''}" data-id="${esc(x.id||'')}"${ac}>${yv}<${x.dis?'div':'button type=button'} class=m${ac}><span class=t>${esc(x.metin)}</span>${alt?`<span class=a>${alt}</span>`:''}</${x.dis?'div':'button'}><span class=hizli>${x.dis?'':emDugme(x)}</span>${x.dis?'':knKararEt(x)}${x.durum==='teyit'&&!x.dis?`<button type=button class=b data-bn=kararonay data-id="${esc(x.id)}">${L('Onayla')}</button>`:''}</div>`}
+// "Onayını bekleyenler": asistan kaynaklı bütün öneriler tek kutuda, aynı kart biçimiyle — belgelerden önerilen işler (/belge-oneri) · aynı iş olabilir çiftleri (/is-kopya) · senden onay bekleyen eylemler (eylem kuyruğu).
+// Kart: tür etiketi, tek satır öneri, tek satır gerekçe (soluk), sağda ana düğme + Hayır. 3'ten fazlaysa ilk 3 + "Tümünü göster". Hiç öneri yoksa kutu yok. Yazma 5 sn sonra (Geri al bu sürede vazgeçer).
+let onTum=false
 const gpBek=new Set();let gpGordu='',bnOzetMetin=''  // günün planı (aktarici/dusunme.py): yanıtlanan 'Doğru mu?' soruları; planın görüldüğü gün; Dinle'nin okuyacağı düz metin
 const boListe=()=>((boV||{}).oneriler||[]).filter(x=>!boBek.has(x.id))
-function boCiz(){const ls=boListe(),eb=last?bnBekleyen(last):[]
-  if(boInc){const x=ls.find(y=>!boInc.atla.has(y.id));if(x){const k=x.kaynak||{},yer=k.tur==='veritabani'?L('iş takip kaydı'):[k.ad,k.konum].filter(Boolean).join(' · '),n=Math.min(boInc.i+1,boInc.top)  // kayıt veritabanı satır no'su gösterilmez
-      return`<section class=oinc aria-label="${L('Belge önerileri')}"><div class=oust><span class=oeb>${esc(L('Belge önerisi · {i}/{n}',{i:n,n:boInc.top}))}</span><button type=button class=ikon data-bn=bokapat aria-label="${L('Kapat')}">${ic('x')}</button></div>
-        <p class=om>${esc(x.metin)}</p><p class=od>${esc([x.sahip||L('sahipsiz'),x.vade?goreliTarih(x.vade,true):'',yer?L('Kaynak')+': '+yer:''].filter(Boolean).join(' · '))}</p>
-        <div class=keylem><button type=button class="b ana" data-bn=bokabul data-id="${esc(x.id)}" title="${L('Kayda alınır; sahibi varsa ona atanır')}">${esc(x.sahip?L('Onayla ve ata'):L('Onayla'))}</button><button type=button class=b data-bn=bored data-id="${esc(x.id)}" title="${L('Bir daha önerilmez')}">${L('Reddet')}</button><button type=button class="b sade" data-bn=boatla data-id="${esc(x.id)}">${L('Atla')}</button></div></section>`}
-    boInc=null}
-  if(!ls.length&&!eb.length)return''
-  const p=[ls.length?L('Belgelerden {x} onayını bekliyor',{x:`<b>${esc(L('{n} iş önerisi',{n:ls.length}))}</b>`}):'',eb.length?L('{x} onayını bekliyor',{x:`<b>${esc(L('{n} eylem',{n:eb.length}))}</b>`}):''].filter(Boolean)
-  return`<div class=oserit role=status><span class=onok aria-hidden=true></span><span class=om>${p.join(' · ')}</span>${ls.length?`<button type=button class=bag data-bn=boinc>${L('İncele')}</button>`:''}${eb.length?`<button type=button class=bag data-bn=panel data-ref=bek>${L('Eylemleri aç')}</button>`:''}</div>`}
-function boIsle(id,islem){boBek.add(id);if(boInc)boInc.i++;if(last)bnCiz(last)
+function onKartlar(){const R=[]
+  boListe().forEach(x=>{const k=x.kaynak||{},yer=k.tur==='veritabani'?L('iş takip kaydı'):[k.ad,k.konum].filter(Boolean).join(' · ')  // kayıt veritabanı satır no'su gösterilmez
+    R.push({e:L('Belge önerisi'),m:x.metin,g:[x.sahip||L('sahipsiz'),x.vade?goreliTarih(x.vade,true):'',yer?L('Kaynak')+': '+yer:''].filter(Boolean).join(' · '),
+      d:`<button type=button class="b ana" data-bn=bokabul data-id="${esc(x.id)}" title="${L('Kayda alınır; sahibi varsa ona atanır')}">${esc(x.sahip?L('Onayla ve ata'):L('Onayla'))}</button><button type=button class=b data-bn=bored data-id="${esc(x.id)}" title="${L('Bir daha önerilmez')}">${L('Reddet')}</button>`})})
+  ikListe().forEach(x=>R.push({e:L('Aynı iş olabilir'),m:x.yeni.metin,g:[x.neden,L('Eski')+': '+x.eski.metin+(x.eski.baslik?' ('+x.eski.baslik+')':'')].filter(Boolean).join(' · '),
+    d:`<button type=button class="b ana" data-bn=ikbirlestir data-id="${esc(x.cift)}" title="${L('Yeni kayıt kalır, eski kapanır')}">${L('Birleştir')}</button><button type=button class=b data-bn=ikayri data-id="${esc(x.cift)}" title="${L('Bir daha sorulmaz')}">${L('Ayrı')}</button>`}))
+  if(last)bnBekleyen(last).forEach(x=>R.push({e:EYT[x.tur]||x.tur,m:(x.baslik||'')+(x.kim?' — '+x.kim:''),g:x.ayrinti&&x.tur!=='izin'?ayGor(x.ayrinti).replace(/\s+/g,' ').slice(0,140):'',
+    d:`<button type=button class="b ana" data-bn=onay data-id="${esc(x.id)}">${L('Onayla')}</button><button type=button class=b data-bn=ret data-id="${esc(x.id)}">${L('Reddet')}</button>`}))
+  return R}
+function onCiz(){const R=onKartlar(),bl=((ikV||{}).birlesen||[]).filter(x=>!ikBek.has(x.cift))
+  if(!R.length&&!bl.length)return''
+  const gor=onTum?R:R.slice(0,3),kart=x=>`<div class=onk><div class=onm><span class="etiket notr">${esc(x.e)}</span><span class=onmt title="${esc(x.m)}">${esc(x.m)}</span></div>${x.g?`<div class=ong title="${esc(x.g)}">${esc(x.g)}</div>`:''}<div class=ond>${x.d}</div></div>`
+  const geri=bl.map(x=>`<div class=onbirl><span>${esc(L('Aynı iş birleştirildi: {m}',{m:x.yeni_metin}))}</span><button type=button class=bag data-bn=ikgeri data-id="${esc(x.cift)}">${L('Geri al')}</button></div>`).join('')
+  return`<section class=onkutu aria-label="${L('Onayını bekleyenler')}">${R.length?`<div class=onbas><h2 class=kb2>${esc(L('Onayını bekleyenler · {n}',{n:R.length}))}</h2>${R.length>3?`<button type=button class=bag data-bn=ontum aria-expanded="${onTum}">${L(onTum?'Daha az göster':'Tümünü göster')}</button>`:''}</div><div class=onliste>${gor.map(kart).join('')}</div>`:''}${geri}</section>`}
+function boIsle(id,islem){boBek.add(id);if(last)bnCiz(last)
   const t=setTimeout(async()=>{try{await bnYaz('/belge-oneri',{id,islem})}catch(e){}boBek.delete(id);boV=null;await knYukle(true)},5000)
-  bnBildir(islem==='kabul'?L('Öneri kayda alındı'):L('Öneri bir daha gösterilmeyecek'),()=>{clearTimeout(t);boBek.delete(id);if(boInc&&boInc.i>0)boInc.i--;if(last)bnCiz(last)})}
+  bnBildir(islem==='kabul'?L('Öneri kayda alındı'):L('Öneri bir daha gösterilmeyecek'),()=>{clearTimeout(t);boBek.delete(id);if(last)bnCiz(last)})}
 // Aynı iş olabilir (aktarici/is-kopya.py, 10 Kasım): aynı sahibin farklı toplantılarda yeniden konuştuğu iş. Asistan emin değilse çift burada sorulur: Birleştir (yeni kalır, eski kapanır) · Ayrı (bir daha sorulmaz).
 // Otomatik birleştirilenler son 24 saat tek satırla görünür, Geri al iki işlemi de geri çevirir. Yazma 5 sn sonra (bildirimdeki Geri al bu sürede vazgeçer).
 const ikListe=()=>((ikV||{}).sorular||[]).filter(x=>!ikBek.has(x.cift))
-const ikIs=(x,et)=>`<p class=od><b>${esc(et)}</b> · ${esc([x.baslik,x.tarih?goreliTarih(x.tarih):'',x.vade?L('vade')+' '+goreliTarih(x.vade,true):''].filter(Boolean).join(' · '))}</p><p class=om>${esc(x.metin)}</p>`
-function ikCiz(){const ls=ikListe(),bl=((ikV||{}).birlesen||[]).filter(x=>!ikBek.has(x.cift))
-  if(!ls.length&&!bl.length)return''
-  const kart=x=>`<section class=oinc aria-label="${L('Aynı iş olabilir')}"><div class=oust><span class=oeb>${esc(L('Aynı iş olabilir'))}</span></div><p class=om><b>${esc(L('Bu iki iş aynı mı?'))}</b></p>${ikIs(x.yeni,L('Yeni'))}${ikIs(x.eski,L('Eski'))}${x.neden?`<p class=od>${esc(x.neden)}</p>`:''}
-    <div class=keylem><button type=button class="b ana" data-bn=ikbirlestir data-id="${esc(x.cift)}" title="${L('Yeni kayıt kalır, eski kapanır')}">${L('Birleştir')}</button><button type=button class=b data-bn=ikayri data-id="${esc(x.cift)}" title="${L('Bir daha sorulmaz')}">${L('Ayrı')}</button></div></section>`
-  const sat=x=>`<div class=oserit role=status><span class=onok aria-hidden=true></span><span class=om>${esc(L('Aynı iş birleştirildi: {m}',{m:x.yeni_metin}))}</span><button type=button class=bag data-bn=ikgeri data-id="${esc(x.cift)}">${L('Geri al')}</button></div>`
-  return`<div class=ikbolum style="display:grid;gap:var(--bo-8)">${ls.map(kart).join('')}${bl.map(sat).join('')}</div>`}
 function ikIsle(id,islem){ikBek.add(id);if(last)bnCiz(last)
   const t=setTimeout(async()=>{try{await bnYaz('/is-kopya',{cift:id,islem})}catch(e){}ikBek.delete(id);ikV=null;await knYukle(true)},5000)
   bnBildir(islem==='birlestir'?L('İşler birleştirildi'):islem==='ayri'?L('İki iş ayrı kalacak'):L('Birleştirme geri alınacak'),()=>{clearTimeout(t);ikBek.delete(id);if(last)bnCiz(last)})}
@@ -2227,6 +2283,12 @@ function ortSatir(){const o=knOrt;if(!o||!o.acik||['kapali','deneme'].includes(o
   if(o.durum!=='ok')return`<div class="ortak uyari">${L('Ekip paylaşımında hata: {h}',{h:esc(o.hata||o.durum)})}</div>`
   const saat=o.son?String(o.son).slice(11,16):'',g=o.tasima==='firestore'&&f.gecikme_ortanca!=null?(f.gecikme_p90!=null?L('gecikme ortanca {o} sn, 10 kayıttan 9’u {p} sn içinde',{o:sn(f.gecikme_ortanca),p:sn(f.gecikme_p90)}):L('gecikme ortanca {o} sn',{o:sn(f.gecikme_ortanca)})):''
   return`<div class=ortak>${[L('Ekiple paylaşılıyor'),saat?L('son eşitleme {s}',{s:saat}):'',g].filter(Boolean).join(' · ')}</div>`}
+// Açık sekmesi iki başlık: "İşler · N", sonra "Açık sorular · N" (boş başlık görünmez); öbür sekmeler tek liste. Süzgeç ve arama iki başlığa birlikte uygulanmış listeden gelir.
+function knListe(liste,sk){if(!liste.length)return''
+  const kl=l=>`<div class="ince knl${sk==='biten'?' biten':''}">${l.map(x=>x.tur==='karar'?knKararSatir(x):knSatir(x)).join('')}</div>`
+  if(sk!=='acik')return kl(liste)
+  const bl=(a,l)=>l.length?`<h2 class="kb2 knbl">${esc(a)} · ${l.length}</h2>${kl(l)}`:''
+  return bl(L('İşler'),liste.filter(x=>x.tur!=='soru'))+bl(L('Açık sorular'),liste.filter(x=>x.tur==='soru'))}
 function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[],sk=knSek()
   const dis=v?(v.dis||[]).flatMap(d=>d.ok?d.kayitlar.map(x=>({tur:x.tur,metin:x.metin,kim:x.sahip||'',baslik:x.toplanti||'',toplanti:'',vade:x.vade||'',durum:'acik',gecikti:false,tarihsiz:!x.vade,dis:true,kaynak:d.ad,id:''})):[]):[]
   const hepsi=[...ks,...dis],uyan=hepsi.filter(knSuzgec),say=k=>uyan.filter(x=>knSekmede(x,k)).length,liste=uyan.filter(x=>knSekmede(x,sk)).sort(knSira)
@@ -2240,10 +2302,10 @@ function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[],sk
   const bos=!v?L('Yükleniyor…'):!hepsi.length?L('Henüz kayıt yok: toplantı bittiğinde kararlar ve işler buraya düşer.'):!liste.length?(suzlu&&hepsi.some(x=>knSekmede(x,sk))?L('Süzgece uyan kayıt yok.'):BOS[sk]):''
   const alt=ortSatir()||(v?`<span class=alt>${esc(L('{k} karar · {i} iş · {s} açık soru',{k:hepsi.filter(x=>x.tur==='karar').length,i:hepsi.filter(x=>x.tur==='is').length,s:hepsi.filter(x=>x.tur==='soru').length}))}</span>`:'')
   return`<div class="sayfab kns"><div class=sbas><h1>${L('Kararlar ve işler')}</h1>${alt}</div><div class=sag><button type=button class="b ana iri" data-bn=kmk data-k=yeniis>${L('Yeni iş')}</button>${sayfaMenu('kayit')}</div></div>
-    ${boCiz()}${ikCiz()}
+    ${onCiz()}
     <section class="bolum knb"><div class=sekmeler role=tablist aria-label="${L('Kararlar ve işler')}">${sek}</div>
     <div class=suzgec>${seg}<input id=knAra type=search value="${esc(knSuz.ara)}" placeholder="${L('Ara')}" aria-label="${L('Ara')}"><select data-knf=toplanti aria-label="${L('Toplantı')}">${top}</select>${knSuz.kisi?cip(L('Kişi: {ad}',{ad:knSuz.kisi}),`data-bn=knkisi data-k="${esc(knSuz.kisi)}"`):''}${knSuz.durum==='tarihsiz'?cip(L('Yalnız tarihsiz işler'),'data-bn=kntarihsiz'):''}${v&&(v.deneme_say||knDen)?`<label class=kndn><input type=checkbox data-kndn${knDen?' checked':''}> ${L('Deneme toplantıları')}${v.deneme_say?` (${v.deneme_say})`:''}</label>`:''}</div>
-    ${liste.length?`<div class="ince knl${sk==='biten'?' biten':''}">${liste.map(x=>x.tur==='karar'?knKararSatir(x):knSatir(x)).join('')}</div>`:''}${bos?`<p class="sakin knbos">${esc(bos)}</p>`:''}${v?(v.dis||[]).filter(d=>!d.ok).map(d=>`<p class=sakin>${esc(d.ad)}: ${L('defter okunamadı')} — ${esc(d.hata||'')}</p>`).join(''):''}
+    ${knListe(liste,sk)}${bos?`<p class="sakin knbos">${esc(bos)}</p>`:''}${v?(v.dis||[]).filter(d=>!d.ok).map(d=>`<p class=sakin>${esc(d.ad)}: ${L('defter okunamadı')} — ${esc(d.hata||'')}</p>`).join(''):''}
     <p class="sakin kucuk">${L('Dış kayıttan gelenler etiketli ve yalnız okunur; gizli toplantıların kayıtları burada yok.')}</p></section>`}
 // Ayrıntı paneli (bnPanel ref r:<kayıt>): Kararlar ve işler, Bugün ve Ekip satırından aynı panel. Geniş ekranda Kararlar ve işler sayfasında sağa yerleşik (perde yok), 900 px ve altında tam ekran çekmece.
 // Üstte tür · toplantı, tarih; başlık; Sahip, Son tarih, Kaynak (toplantı dökümü, özet), Görebilen; ana düğmeler (Yapıldı / Onayla …, Ertele, Ata); eylemler üç başlıkta (emIcerik).
@@ -2274,7 +2336,7 @@ function bnBeklenen(s){const kn=bnKendiT().slice().sort((a,b)=>(!!b.gecikti-!!a.
   const bek=s?bnBekleyen(s):[],kt=bnTeyitT();return{bek,kt,kn,n:bek.length+kt.length+kn.length}}
 const bsSat=x=>`<div class="sat bs" data-id="${esc(x.id||'')}"${x.ek||''}>${x.ikon?`<span class=sik aria-hidden=true>${ic(x.ikon)}</span>`:`<span class="nokta ${x.nokta||''}" aria-hidden=true></span>`}<div class=m><div class=t>${x.t}</div>${x.a?`<div class=a>${x.a}</div>`:''}</div><div class=eylem>${x.e||''}${x.d||''}${x.x||''}</div></div>`
 const bsTarih=t=>t?goreliSpan(String(t).slice(0,10),''):''
-function bsIs(x){return bsSat({id:x.id,ek:knKid(x)?` data-bn=knac data-kid="${esc(knKid(x))}"`:'',nokta:x.gecikti?'gec':'',t:esc(x.metin),a:[x.atayan?esc(L('Sana atandı · {ad}',{ad:x.atayan})):'',tpAd(x),bsTarih(x.tarih)].filter(Boolean).join(' · '),e:x.vade?goreliSpan(x.vade,x.gecikti?'etiket gec':'etiket notr',true):'',d:`<button type=button class=b data-bn=isbit data-id="${esc(x.id)}">${L('Yapıldı')}</button>`,x:emDugme(x)})}
+const bsIs=x=>knSatir(x,{bs:1})
 function bsKarar(x){return bsSat({id:x.id,ek:knKid(x)?` data-bn=knac data-kid="${esc(knKid(x))}"`:'',nokta:'bek',t:esc(x.metin),a:[tpAd(x),bsTarih(x.tarih),esc(x.neden||'')].filter(Boolean).join(' · '),e:emOnayIs(x.onay)||`<span class="etiket bekliyor">${L('Onay bekliyor')}</span>`,d:`<button type=button class=b data-bn=kararonay data-id="${esc(x.id)}">${L('Onayla')}</button>`,x:emDugme(x)})}
 function bsEylem(x){const ay=x.ayrinti&&x.tur!=='izin'?esc(ayGor(x.ayrinti).replace(/\s+/g,' ').slice(0,140)):''
   return bsSat({id:x.id,nokta:'bek',t:esc(x.baslik||'')+(x.kim?' — '+esc(x.kim):''),a:[esc(EYT[x.tur]||x.tur),ay].filter(Boolean).join(' · '),e:`<span class="etiket bekliyor">${L('Onay bekliyor')}</span>`,d:`<button type=button class=b data-bn=panel data-ref="e:${esc(x.id)}">${L('İncele')}</button>`})}
@@ -2448,7 +2510,7 @@ function bnPanelCiz(s,zorla){const p=bnE('bnPanel');if(!bnRef||!s)return;let h='
   if(kn&&!zorla&&emHedef==='yan'&&emMod&&p.__h)return  // açık form (ertele, ata, böl…) yazarken yenileme silmesin
   const blok=(t,ls)=>ls&&ls.length?`<div class=blok><h4>${esc(t)}</h4><ul>${ls.map(x=>`<li><span class=mt>${esc(x)}</span></li>`).join('')}</ul></div>`:''
   const bas=(tur,ad,alt)=>`<div class=pb><div><div class=eb>${esc(tur)}</div><h2>${esc(ad)}</h2>${alt?`<div class=alt2>${esc(alt)}</div>`:''}</div><button type=button class=ikon data-bn=kapat aria-label="${L('Kapat')}">${ic('x')}</button></div>`
-  const isListe=(ls,kim)=>ls.length?`<div class=blok><ul>${ls.map(x=>`<li><span class=mt>${esc(x.metin)}${kim&&x.kim?' — '+esc(x.kim):''}</span>${bnVadeEt(x)}<span class=keylem><button type=button class="b sade" data-bn=isbit data-id="${esc(x.id)}" data-pn=1>${L('Yapıldı')}</button></span></li>`).join('')}</ul></div>`:`<p class=alt2>${L('Açık iş yok.')}</p>`
+  const isListe=(ls,kim)=>ls.length?`<div class="ince pnl">${ls.map(x=>knSatir(x,{pn:1})).join('')}</div>`:`<p class=alt2>${L('Açık iş yok.')}</p>`
   if(kn)h=knAyrinti(bnRef.slice(2))
   else if(bnRef==='kendi'){const ls=bnKendiT(),ge=bnKendi().filter(x=>x.geride);h=bas(L('İşlerin'),L('Senin açık işlerin'),L('{n} iş',{n:ls.length}))+isListe(ls)+(ge.length?`<div class=blok><h4>${L('Geride kalanlar')}</h4>${isListe(ge)}</div>`:'')}
   else if(bnRef==='bsk'){const ls=bnBaskasi();h=bas(L('Başkalarında'),L('Başkalarından beklediklerin'),L('{n} iş',{n:ls.length}))+isListe(ls,true)}
@@ -2518,6 +2580,7 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='ikbirlestir')return ikIsle(id,'birlestir')
   if(a==='ikayri')return ikIsle(id,'ayri')
   if(a==='ikgeri')return ikIsle(id,'geri_al')
+  if(a==='ontum'){onTum=!onTum;if(last)bnCiz(last);return}
   if(a==='bokabul')return boIsle(id,'kabul')
   if(a==='bored')return boIsle(id,'reddet')
   if(a==='kapat')return bnPanelKapat()
@@ -2525,7 +2588,8 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='onay')return bnOnayla(id,'onaylandi',!!b.dataset.pn)
   if(a==='ret')return bnOnayla(id,'reddedildi',!!b.dataset.pn)
   if(a==='dinle')return bnDinle(id,b.dataset.metin==='1')
-  if(a==='isbit')return bnIsle([id],L('İş yapıldı olarak işaretlendi'),()=>bnYaz('/is-durum',{id,durum:'yapildi'}),!!b.dataset.pn)
+  if(a==='isbit')return bnYap([id],L('İş yapıldı olarak işaretlendi'),()=>bnYaz('/is-durum',{id,durum:'yapildi'}))
+  if(a==='sorubit')return bnYap([id],L('Cevaplandı olarak işaretlendi'),()=>bnYaz('/kayit-eylem',{id,eylem:'cevaplandi'}))
   if(a==='kararonay')return bnIsle([id],L('Karar onaylandı'),()=>bnYaz('/karar-onay',{idler:[id]}),!!b.dataset.pn)
   if(a==='kararlar'){const idler=String(b.dataset.idler||'').split(',').filter(Boolean);return bnIsle(idler,L('{n} karar onaylandı',{n:idler.length}),()=>bnYaz('/karar-onay',{idler}))}
   if(a==='thaz'||a==='that'||a==='thkap'){b.disabled=true;j('/toplanti-hatirlat',{method:'POST',body:JSON.stringify({islem:a==='thaz'?'hazirlik':a==='that'?'ac':'kapat',id})}).catch(()=>{});if(a==='thkap'&&last)last.toplanti_hatirlat=null;if(last)bnCiz(last);return}
@@ -2540,9 +2604,6 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='knsahip'){knSuz.sahip=b.dataset.v||'';try{localStorage.setItem('knSahip',knSuz.sahip)}catch(e){}if(last)bnCiz(last);return}
   if(a==='kntarihsiz'){knSuz.durum=knSuz.durum==='tarihsiz'?'':'tarihsiz';if(last)bnCiz(last);return}
   if(a==='knyeni'){b.disabled=true;let r={};try{r=await bnYaz('/kayit-eylem',{id:b.dataset.kid,eylem:'ac'})}catch(e){}bnBildir(r.ok?L('Yeniden açıldı'):L('Yapılamadı.'));await bnVeriYukle(true);await knYukle(true);return}
-  if(a==='boinc'){boInc={top:boListe().length,i:0,atla:new Set()};if(last)bnCiz(last);return}
-  if(a==='boatla'){if(boInc){boInc.atla.add(id);boInc.i++}if(last)bnCiz(last);return}
-  if(a==='bokapat'){boInc=null;if(last)bnCiz(last);return}
   if(a==='ekipkisi'){knSuz={kisi:b.dataset.k||'',toplanti:'',durum:'',ara:'',sahip:''};knSekme='acik';git('kayit');return}
   if(a==='knkisi'){knSuz.kisi=knSuz.kisi===b.dataset.k?'':b.dataset.k;if(last)bnCiz(last);return}
   if(a==='kntop'){knSuz.toplanti=knSuz.toplanti===b.dataset.t?'':b.dataset.t;if(last)bnCiz(last);return}

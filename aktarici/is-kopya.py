@@ -18,7 +18,7 @@ IK_SORU_EN_COK, IK_AYRI_EN_COK, IK_TARANAN_EN_COK, IK_BIRLESEN_EN_COK, IK_GERI_S
 IK_GECICI = ("son çağrı başarısız", "tur sınırı", "günlük tavan", "çok aday", "kapalı", "model yok")  # model bu turda çalışmadı: çift taranmamış kalır, sonra yeniden denenir (soruya dökülmez)
 IK_YASAK = re.compile(r"[\[\]<>{}]|KAYIT", re.I)
 IK_SORU = ("Bu iki açık iş (aynı sahip, farklı toplantı ya da kaynak) aynı iş mi? Aynı iş = aynı çıktı/teslim ve aynı kişi; yalnızca konu benzerliği yetmez. "
-           "Aynıysa YENİ kayıt kalır, ESKİ kapanır.")
+           "Aynıysa YENİ kayıt kalır, ESKİ kapanır. Adaylar zaten aynı sahibe ait; sahip farkını (ad yazımı dahil) gerekçe yapma.")
 def ik_acik(): return AYAR.get("is_kopya") is not False
 def _ik_yol(): return os.path.join(BASE, IK_DOSYA)
 def ik_oku():
@@ -76,8 +76,9 @@ def ik_adaylar(y, isler, d, cift_en_cok=IK_TUR_CIFT):
         islenen.append(x["kayit_id"])
     return ciftler[:cift_en_cok] if len(ciftler) > cift_en_cok else ciftler, islenen
 def _ik_aday(yn, es, skor):
+    sahip = yn.get("kim") or es.get("kim") or "?"  # kayıtlarda ad "Ali" / "Ali K" gibi farklı yazılabilir; eşleştirme zaten kimlikle yapıldı, model sahip farkını gerekçe yapmasın
     return {"id": f"{yn['id']}|{es['id']}",
-            "metin": f"YENİ ({yn.get('tarih') or '?'}, {_ik_kisa(yn.get('baslik') or 'toplantı', 40)}): {_ik_kisa(yn['metin'], 100)} ‖ ESKİ ({es.get('tarih') or '?'}, {_ik_kisa(es.get('baslik') or 'toplantı', 40)}): {_ik_kisa(es['metin'], 100)}",
+            "metin": f"Sahip (ikisinde de): {sahip}. YENİ ({yn.get('tarih') or '?'}, {_ik_kisa(yn.get('baslik') or 'toplantı', 40)}): {_ik_kisa(yn['metin'], 100)} ‖ ESKİ ({es.get('tarih') or '?'}, {_ik_kisa(es.get('baslik') or 'toplantı', 40)}): {_ik_kisa(es['metin'], 100)}",
             "veri": {"sahip": yn.get("kim"), "yeni vade": yn.get("vade"), "eski vade": es.get("vade"), "sözcük örtüşmesi": skor}, "yedek": {"karar": "emin_degil", "oncelik": 0}}
 def _ik_ozet(x): return {"id": x["id"], "kayit_id": x["kayit_id"], "metin": _ik_kisa(x["metin"], 200), "vade": x.get("vade") or "", "tarih": x.get("tarih") or "", "baslik": _ik_kisa(x.get("baslik") or "", 80), "kim": x.get("kim") or ""}
 
