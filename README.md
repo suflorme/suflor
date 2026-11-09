@@ -76,7 +76,7 @@ Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 
 | Önce | Sırasında | Sonra |
 |---|---|---|
-| Toplantıya katıl ya da takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, çeviri; istersen asistan konuşur ya da toplantıyı yönetir. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
+| Toplantıya katıl ya da takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, çeviri; istersen asistan konuşur ya da toplantıyı yönetir. Sağ sütunda **Döküm · Gündem · Asistan** sekmeleri. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
 
 ## Asistanına adıyla seslen
 
@@ -87,6 +87,14 @@ Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad 
 
 - **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
   Mikrofona iki kez dokunursan eller serbest sohbet başlar.
+- **Sohbet paneli:** araç çubuğundaki **Asistan sohbeti** düğmesi asistanla yazışmak için yan bir panel açar. Geniş ekranda panonun yanında durur,
+  içeriği ezmez; dar ekranda üstüne biner. Panonun kenarından sürükleyerek genişletirsin. Yazdığın sorunun cevabını 🔊 düğmesiyle sesli de aldırabilirsin.
+- **Web'de arar:** *"Defne, bu firma hakkında ne biliniyor?"* ya da sana verdiğin bir bağlantıyı okuması gibi güncel bilgi isteklerinde internete bakar.
+  Aramaya yalnız sorudaki konu gider; gizli toplantıda kapalıdır.
+- **Taslak hazırlar:** *"Defne, Ayşe'ye toplantı notlarını e-posta olarak hazırla."* Taslak Mac'in Mail uygulamasında açılır; göndermek her zaman sende.
+  Bir iş ya da karar sahibine e-posta ya da Teams mesajı taslağı da hazırlar.
+- **Sesle yönetir:** *"Defne, kararları göster"* dersen pano o bölümde açılır; *"gündeme ekle: …"*, *"toplantıyı başlat"*, *"toplantıyı bitir"* (bitirmeden önce sesli "evet" ister).
+- **E-postalar ve Anımsatıcılar:** panoda cevap bekleyen e-postaların listesi (zinciri okuyarak değerlendirilir) ve istersen kendi işlerinin Mac Anımsatıcılar'a eşitlenmesi var; ayrıntı [Kılavuz](KILAVUZ.md#e-postalar-ve-anımsatıcılar).
 - **Başka oturuma iş:** *"Defne, bunu proje oturumuna ilet"* dediğinde ileti bir onay kartıyla sunulur; onaylarsan iletilir.
 - **Hatırlatma:** *"Defne, yarın sabah onda Ali'yi aramamı hatırlat"* dediğinde asistan doğal bir soruyla onay ister; "evet" dersen takvimine
   o saatte uyaran kısa bir etkinlik olarak eklenir. Asistan eklediği işin durumunu bilir; *"onu kaldır"* dersen yine onayınla takvimden siler.

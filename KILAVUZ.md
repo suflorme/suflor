@@ -5,6 +5,8 @@ README'de kısaca anlatılanların ayrıntısı: kurulumdan sonra, kullanım, ay
 
 - [Kurulumdan sonra](#kurulumdan-sonra)
 - [Kullanım](#kullanım)
+- [Asistan sohbet paneli ve sesle pano](#asistan-sohbet-paneli-ve-sesle-pano)
+- [E-postalar ve Anımsatıcılar](#e-postalar-ve-anımsatıcılar)
 - [İsteğe bağlı ayarlar](#isteğe-bağlı-ayarlar)
 - [Yapay zekâ seçimi](#yapay-zekâ-seçimi)
 - [Sesler](#sesler)
@@ -59,12 +61,14 @@ oturumları orada açılır. Boş ya da yeni bir klasör seçersen bu dosyalar k
 3. Mac uygulaması açıkken kartlar üç katmanda çıkar (ekran paylaşımında görünmez): **önemli kart** (Söyle, Dur, Cevap, onay) ekranın alt ortasında, tek tek, tam metinle ve sen kapatana kadar kalır; sıradakiler "+2 sırada" diye bekler, ✕ kartı okunmuş sayar. **Bilgi** (not, kalan süre, uzun konuşma uyarısı) sağ altta küçük satır olarak gelir, 10 sn sonra söner (ayar `kart_sure`, ör. `{"bilgi": 15}`). **Yan şerit** ekranın sağ kenarındaki ince çizgidir: okunmamış kart sayısını gösterir, tıklayınca bütün kartlar ve yazı kutusu açılır. Kartlar sürüklenip taşınabilir, çift tıkla yerine döner; uygulama yoksa toplantı ekranının sol altındaki küçük şeritte ve panoda görünür. ✓ yaptım · 👁 okudum · ✕ gerek yok. Kartı "Sonra" (⏸) ile gündemde sıradaki maddeye bırakabilirsin.
 4. Toplantıda kutunun üstünde sağda: **Ne diyeyim?** (tek cümlelik replik önerisi), **Kanıt**, **Sessiz** (10 dk kart yok); "⋯" içinde önemli an, gizli toplantı, sesli çeviri.
    Kısayollar: **Option + Shift + K** kanıt · **Option + Shift + O** Ne diyeyim? · **Option + Shift + M** sessiz · **Option + Shift + S** asistan sussun.
+   Panonun sağ sütunu toplantıda üç sekmedir: **Döküm** (canlı yazı), **Gündem** (maddeler, kalan süre) ve **Asistan** (o toplantıya özel sohbet).
+   Mikrofona basılı tutarken pano "Dinliyorum… 5 sn" diye saniyeyi sayar; bıraktığında gönderilir.
 5. Toplantı bitince özet hazırlanır ve sana sunulur.
 6. Brifing ve özet panoda **Dışarı aktar** ile PDF, e-posta taslağı (alıcısız, katılımcılara ya da kendine), panoya kopya ya da .md dosyası olur.
    Taslağın açılacağı yeri (Gmail, Outlook web ya da Mac'in posta uygulaması) ve gönderen adresini sihirbazın takvim ekranında seçersin;
    sonradan ayar.json'da `"eposta"` ve `"eposta_adres"`. Seçmezsen takvimine bakılarak seçilir.
    Toplantı sonundaki takip e-postası taslağının üslubu ayar.json'da `"eposta_uslup"` (kısa serbest metin; yoksa sade, samimi ama profesyonel).
-   Mac Mail okuma açıksa (`"eposta_oku": true`) ve taslak tek kişiye gidiyorsa, o kişiye gönderdiğin son iletilerin üslubu örnek alınır (yalnız üslup, içerik değil).
+   Asistanın hazırladığı e-posta taslakları ([aşağıda](#e-postalar-ve-anımsatıcılar)) de aynı yerde açılır. Mac Mail okuma açıksa (`"eposta_oku": true`) ve taslak tek kişiye gidiyorsa, o kişiye gönderdiğin son iletilerin üslubu örnek alınır (yalnız üslup, içerik değil).
 
 **Saatler:** panoda Bugün başlığındaki "Bugün | Bu hafta | Saatler" seçicisinden (Mac penceresinde kenar çubuğundan) açılır. Eklediğin şehirlerin saati, sana göre farkı ve mesai durumu (gündüz, akşam, gece) görünür; alttaki kaydırıcıyla iki gün içinde bir saat seçince hepsi birlikte değişir, takvimdeki sıradaki toplantı kaydırıcıda halkayla işaretlidir. Arama kutusunun yanındaki seçiciyle liste saate göre (erken → geç ya da tersi), ada göre ya da eklediğin sırayla dizilir (ayar `saatler_sira`). Hesap tarayıcının içinde yapılır, ağa bir şey gitmez; liste ayar.json'da `saatler`.
 
@@ -87,6 +91,32 @@ Toplantı sürerken 60 saniye hiçbir kanaldan (altyazı, sen, karşı taraf) sa
 - **Senin yapacakların:** bir-iki cümle konuş, karşı tarafın da konuşmasını bekle, asistana kısa bir soru sor. Deneme asistanı kendisi konuşturmaz.
 - **Toplantıya dokunmaz:** döküme not düşmez, toplantıya bir şey yazmaz; yalnız okur ve ölçer.
 - **Bitince:** panoda tek satırlık özet çıkar ("Meet: 6/7 geçti — karşı taraf satırı gelmedi"). Sonuç uygulama klasöründe `duman/<tarih>.json` dosyasına yazılır; beta kullanıcısında ayrıca ortak `geri-bildirim` klasörüne `<tarih>-duman-<platform>-<hesap>.md` yazılır. Dosyalar yalnız sayı, durum, süre ve platform içerir: toplantı, kişi ya da dosya adı, döküm metni ve yol yazılmaz; ad için yalnız kaynağı ("takvim", "Başlat", "sinyal") yazılır. Ağa hiçbir şey gitmez.
+
+## Asistan sohbet paneli ve sesle pano
+**Sohbet paneli:** panonun üst çubuğundaki **Asistan sohbeti** düğmesi, asistanla yazışılan paneli açar (Esc kapatır). Geniş ekranda panonun sağında ayrı bir sütun olarak durur ve
+pano içeriğini üstüne kaydırmaz; dar ekranda panonun üstüne katman olarak biner. Panelin sol kenarından sürükleyerek genişliği ayarlarsın, çift tıklayınca varsayılan genişliğe döner.
+Sohbet kutusundaki 🔊 düğmesi açıkken asistanın cevabı yazılı olduğu gibi sesli de okunur; kapatınca yalnız yazılı gelir.
+
+**Sesle pano:** "kararları göster", "işleri aç", "takvimi göster" gibi bir istekte pano açılır ve ilgili bölüme kayar. Mikrofona basılı tutarken ya da eller serbest sohbette üstte "Dinliyorum… n sn" göstergesi çıkar.
+**Sesle gündem ve toplantı:** "gündeme ekle: bütçe" ilgili toplantının gündemine madde ekler. "Toplantıyı başlat" ve "toplantıyı bitir" toplantıyı açar ya da kapatır; bitirme toplantıyı kapattığı için asistan önce sorar ve yalnız sesli "evet"i bekler.
+
+## E-postalar ve Anımsatıcılar
+**E-posta takibi (ayar `eposta_takip`, varsayılan açık; Mac Mail okuma `eposta_oku` da açık olmalı):** panoda **E-postalar** bölümü üç grupta gelir: **Senden cevap bekleyenler**, **Dönüş beklediklerin**
+(sen yazdın, karşıdan cevap yok) ve **yalnız bilgi** olanlar (bilgiye eklendiğin, toplu ve otomatik iletiler; yalnız sayısı görünür). Önemli saymadan önce yapay zekâ zinciri baştan sona okur:
+başkası cevaplamışsa ya da iş kapanmışsa ileti listeden düşer. Değerlendirilemeyen iletinin yanında "Değerlendirilmedi" yazar. Düşük öncelikli iletiler katlı bir satırda toplanır
+("Düşük öncelikli (n)"); tıklayınca açılır. Her satırın "⋯" menüsünde **Bu kişi önemli** ve **Bu gönderen önemsiz** vardır; seçimin ileride benzer iletilere uygulanır.
+Ayarlar (⚙ Ayarlar → Takvim ve e-posta): `eposta_onem_duzeyi` (`siki`: yalnız önemli kişiler ve en acil istekler · `dengeli`, varsayılan: tanıdığın kişilerden gelen somut istekler · `genis`: tanımadıkların da girer),
+`eposta_onem_gun` (kaç günlük ileti, 14), `eposta_vip` (her zaman önemli sayılan kişiler; "Bu kişi önemli" buraya ekler), `eposta_onemsiz` (önemsiz gönderenler; "Bu gönderen önemsiz" buraya ekler).
+
+**Asistanın e-posta ve mesaj taslağı:** asistana "Ayşe'ye cevap hazırla" ya da bir iş ya da karar sahibine "hatırlat" dersen asistan taslak yazar ve panoda onayına sunar. Onaylamadan taslak açılmaz,
+hiçbir ileti kendiliğinden gönderilmez; **Gönder'e her zaman sen basarsın.** Taslak ayar `eposta_taslak_yeri` ile `mac` (Mac'in Mail uygulaması, varsayılan: Mail okuma açıksa) ya da `web` (seçtiğin web posta hizmeti) olarak açılır.
+Kayıtta adı geçen kişiye (iş sahibi, karar sahibi) e-posta ya da Teams mesajı taslağı da hazırlanabilir; hiçbiri kendiliğinden gitmez.
+
+**Mac Anımsatıcılar eşitlemesi (ayar `animsatici`, varsayılan kapalı):** açarsan Kararlar ve işler'deki kendi işlerin Mac'in Anımsatıcılar uygulamasında `animsatici_liste` adlı listeye
+(varsayılan "Suflor.me"; yoksa açılır) anımsatıcı olarak eklenir: başlık iş metni, son tarih varsa bitiş tarihi, notta toplantı adı. Anımsatıcılar'da işi tamamlarsan birkaç dakika içinde Suflor'da da "yapıldı" olur,
+Suflor'da bitirirsen anımsatıcı tamamlanır; yeniden açma da iki yöne işler. Anımsatıcıyı silersen iş silinmez, yalnız bir daha eklenmez. Yalnız senin işlerin gider; başkasına atanan işler, karar ve döküm gitmez.
+**Gizli toplantının işleri hiç gönderilmez**; gizli kip açıkken eşitleme durur. Anımsatıcılar bulut hesabına (iCloud, Exchange) eşitliyorsa orada da görünür; bunu bilerek aç.
+Açmak için ⚙ Ayarlar'dan; macOS ilk seferde Anımsatıcılar izni sorar.
 
 ## İsteğe bağlı ayarlar
 **Sesle hatırlatma:** onayladığın saatli hatırlatma Mac Takvim'in varsayılan takvimine 15 dakikalık, başında uyaran bir etkinlik olarak eklenir
@@ -125,9 +155,9 @@ kaynağı ve dönemiyle söyler ("<ad>'a göre son 7 günde …"); Konuş'a yaln
 devam eder. Toplantı öncesi brifing de aynı kaynağa bakar: toplantının konusu kaynağın konusuna giriyorsa brifinge kaynağı ve dönemiyle en çok üç rakam
 ekler ("Güncel veri"); konu dışıysa kaynağa sormaz. Kaynaklı brifing bağlayıcının bağlanmasını beklediği için birkaç saniye uzun sürer.
 İkisini birden kapatmak için `"konus_bilgi_kaynagi": false`.
-Konuş'ta web araştırması (`"konus_web": true`; varsayılan kapalı, `web_arastirma` da açık olmalı; Ayarlar → Toplantı → "Konuş'ta da web'de araştır"): sesle sorduğun
-kişi ya da firma sorusunda Konuş internette arar ve herkese açık sayfa okur; aramaya yalnız ad ve konu gider, döküm alıntısı ve iç sayılar gitmez; gizli toplantıda
-kapalı. Suflor Brifing yardımcısının web araçlarını tanıyan sürümü gerekir; eski sürümde ayar açık olsa da Konuş internete çıkmaz (günlükte tek satır uyarı).
+Konuş'ta web araması (`"konus_web"`, varsayılan açık; `web_arastirma` ana şalteri de açık olmalı, toplantı dışında `web_arastirma_disari` da; Ayarlar → Toplantı → "Konuş'ta da web'de araştır"): sesle ya da yazıyla sorduğun
+kişi, firma ve güncel bilgi sorularında Konuş internette arar ve herkese açık sayfaları ya da senin verdiğin bağlantıyı okur; Aramaya yalnız sorudaki konu gider, döküm alıntısı ve iç sayılar gitmez; gizli toplantıda
+kapalı. Kapatmak için `"konus_web": false`. Suflor Brifing yardımcısının web araçlarını tanıyan sürümü gerekir; eski sürümde ayar açık olsa da Konuş internete çıkmaz (günlükte tek satır uyarı).
 
 **Toplantı dışında derin web araştırması (`"web_arastirma_disari": true`, varsayılan açık; `web_arastirma` ana şalterdir, kapalıysa bu da kapanır):** Konuş'ta ya da pano kutusunda "X'i araştır", "şu firma hakkında ne biliniyor", "dünkü olay ne" dediğinde ayrı bir araştırma çalışır: birden çok arama sorgusu, bulunan sayfaların açılması, en az 3 bağımsız kaynak, resmî/birincil kaynak tercihi, çelişkilerin ve doğrulanamayan bilginin ayrı işaretlenmesi, her iddiada bağlantı ve tarih. Sonuç kısa bir sesli özet olarak okunur (yazıyla sorduysan yalnız yazılır); kaynaklı tam metin panoda "---" sonrasında ve `canli/arastirma/` altında (.json ve .md) durur. 15 saniyeden uzun sürerse kısa bir bekleme cümlesi söylenir. Aramaya yalnız ad ve konu gider (kişiyse Kişiler'deki kurum adı ayırt edici olarak); döküm alıntısı, iç sayılar, e-posta/telefon ve geçmiş toplantı bilgisi gitmez, yerel bilgi yalnız kayda sonradan eklenir. Toplantı sürerken, gizli kipte ve sağlayıcı Claude Code değilken çalışmaz. Süre ve maliyet `olcum.py maliyet`te görünür.
 
