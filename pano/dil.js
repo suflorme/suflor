@@ -549,6 +549,7 @@ globalThis.SUFLOR_EN = {
   "Bas-konuş başlamadı": "Push-to-talk didn't start",
   "Soru gönderilemedi": "Couldn't send the question",
   "Yazıya döküyorum…": "Transcribing…",
+  "Dinliyorum… {n} sn": "Listening… {n} s",
   "{ad} düşünüyor…": "{ad} is thinking…",
   "Ayrıntı": "Details",
   "{ad} cevaplıyor": "{ad} is answering",
@@ -626,8 +627,12 @@ globalThis.SUFLOR_EN = {
   "{n} iş (hepsi tarihsiz)": "{n} action items (all undated)",
   "İş · {t}{ek} tarihsiz": "Tasks · {t} undated",
   "İş · hepsi tarihsiz": "Tasks · all undated",
+  "İşlerim Mac Anımsatıcılar'ında da dursun": "Also keep my tasks in Mac Reminders",
+  "Anımsatıcılar listesi": "Reminders list",
+  "Kendi işlerin seçtiğin Anımsatıcılar listesine eklenir; bir yerde bitirince ötekinde de biter. Başka listelere dokunulmaz. İzin ilk eşitlemede istenir (kurulumda sihirbaz sorar).": "Your own tasks go to the Reminders list you pick; finish one in either place and it is finished in the other. Other lists are never touched. Permission is asked on the first sync (the setup wizard asks).",
+  "Varsayılan \"Suflor.me\" (yoksa açılır); var olan bir listenin adını da yazabilirsin.": "Default is \"Suflor.me\" (created if missing); you can type the name of an existing list.",
   "Konuş'ta da web'de araştır": "Web research in Talk too",
-  "Kapalıyken Konuş internete çıkmaz. Açıkken sesle sorduğun kişi ya da firma sorusunda aynı sınırla web'e bakar: aramaya yalnız ad ve konu gider, döküm alıntısı ve iç sayılar gitmez; gizli toplantıda kapalı. Suflor Brifing yardımcısının yeni sürümü gerekir; eski sürümde ayar açık olsa da Konuş web'e çıkmaz (günlükte uyarı).": "When off, Talk never goes online. When on, a spoken question about a person or company is looked up on the web under the same limit: only the name and topic go into the search, never transcript quotes or internal figures; off in a private meeting. Needs the new Suflor Brifing helper; with the old helper the setting has no effect (warning in the log).",
+  "Sesle ya da yazıyla sorduğunda güncel bilgi (hava, haber, fiyat) için web'e bakar ve verdiğin bağlantıyı okur; aramaya yalnız sorudaki konu gider, döküm alıntısı ve iç sayılar gitmez. Toplantıda Web araştırması, toplantı dışında Toplantı dışı web araştırması ayarına da bağlıdır; gizli kipte kapalı.": "When you ask by voice or text, it checks the web for current information (weather, news, prices) and reads links you give; only the topic of your question goes to the search, never transcript quotes or internal figures. In meetings it also follows Web research, outside meetings Web research outside meetings; off in private mode.",
   "{n} açık": "{n} open",
   // --- eklenti arka planı (bildirimler)
   "Önemli an işaretlenemedi: ": "Key moment couldn't be marked: ",
@@ -1439,5 +1444,10 @@ globalThis.SUFLOR_EN = {
   "Son toplantıda neye karar verdik?": "What did we decide in the last meeting?",
   "Asistan sohbeti": "Assistant conversation",
   "Kapat (Esc)": "Close (Esc)",
-  "{asistan} paneli": "{asistan} side panel"
+  "{asistan} paneli": "{asistan} side panel",
+  "{ad} paneli": "{ad} side panel",
+  "{ad} cevap verdi — paneli aç": "{ad} answered — open the panel",
+  "{ad} dinliyor — paneli aç": "{ad} is listening — open the panel",
+  "{ad} bu belgeleri okur": "{ad} reads these documents",
+  "Panel genişliği": "Panel width"
 };

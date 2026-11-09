@@ -86,6 +86,8 @@
       k_m_yeniden: "Yeniden dene", k_m_hata: "Modeller kurulamadı. İnternet bağlantını denetleyip yeniden dene.", k_m_baska: "Modeller bu Mac'teki başka bir hesabın klasöründe ve eksik. O hesapta Suflor.me'yi güncelle (guncelle.command), sonra burada yeniden dene.",
       k_ses: "Karşı tarafın sesi (Suflor Ses)", k_ses_ok: "Hazır; ilk toplantıda izin istenebilir", k_ses_yok: "Kurulamadı; karşı ses için Suflor.me simgesi → Karşı taraf → Aç", k_ses_izin: "İzin ayarını aç",
       takvim_b: "Takvimini bağlayalım", takvim_a: "Toplantından birkaç dakika önce hatırlatır, gündemi ve katılımcıları davetten alır.",
+      t_anim: "İşlerin Mac Anımsatıcılar'ına da düşsün mü?", t_anim_ev: "Evet", t_anim_hayir: "Hayır", t_anim_a: "Toplantılardan çıkan kendi işlerin seçtiğin listeye anımsatıcı olarak eklenir; bir yerde bitirince ötekinde de biter. Başka listelere dokunulmaz.",
+      t_anim_izin_b: "Anımsatıcılar izni", t_anim_izin_a: "macOS bir izin penceresi açacak: \"Tam erişim\"i seç.", t_anim_liste: "Hangi listeye eklensin?", t_anim_yeni: "Yeni liste: Suflor.me", t_anim_izin_hata: "Anımsatıcılar'a erişilemedi; macOS izni verilmemiş olabilir.",
       t_izin: "Erişim ver", t_izin_b: "Takvim izni", t_izin_a: "macOS bir izin penceresi açacak: \"Tam erişim\"i seç.",
       t_hesap_yok: "Mac'in Takvim uygulamasında hesap görünmüyor.", t_hesap_ekle: "Google, iCloud ya da Outlook hesabını ekle",
       t_eposta: "Brifingi ya da özeti e-postayla gönderirken taslak nerede açılsın?", t_e_oto: "Kendin seç", t_e_gmail: "Gmail", t_e_outlook: "Outlook (web)", t_e_mailto: "Mac'in posta uygulaması",
@@ -202,6 +204,8 @@
       k_cpp: "Fast speech recognition (whisper.cpp + Core ML)", k_cpp_ilk: "The first start may take a few minutes (Core ML is being prepared); after that it starts quickly.",
       k_cpp_hata: "Couldn't download; speech recognition uses MLX for now and it's retried at the next update.",
       takvim_b: "Connect your calendar", takvim_a: "It reminds you a few minutes before a meeting and takes the agenda and attendees from the invitation.",
+      t_anim: "Should your tasks also go to Mac Reminders?", t_anim_ev: "Yes", t_anim_hayir: "No", t_anim_a: "Your own tasks from meetings are added to the list you pick as reminders; finish one in either place and it is finished in the other. Other lists are never touched.",
+      t_anim_izin_b: "Reminders permission", t_anim_izin_a: "macOS will ask for permission: choose \"Full Access\".", t_anim_liste: "Which list should they go to?", t_anim_yeni: "New list: Suflor.me", t_anim_izin_hata: "Couldn't reach Reminders; macOS permission may not have been granted.",
       t_izin: "Allow access", t_izin_b: "Calendar permission", t_izin_a: "macOS will ask for permission: choose \"Full Access\".",
       t_hesap_yok: "No accounts in the Mac Calendar app.", t_hesap_ekle: "Add your Google, iCloud or Outlook account",
       t_eposta: "When you email a briefing or summary, where should the draft open?", t_e_oto: "You choose", t_e_gmail: "Gmail", t_e_outlook: "Outlook (web)", t_e_mailto: "Mac's mail app",
@@ -290,6 +294,7 @@
       takvim: { durum: "ok", takvimler: [{ ad: "İş", hesap: "Exchange", sec: true }, { ad: "Kişisel", hesap: "iCloud", sec: true }, { ad: "Türkiye tatilleri", hesap: "iCloud", sec: false }],
         adaylar: [["ayse", "Ayşe Yılmaz", 40], ["ekip", null, 12], ["ayse.yilmaz", null, 3]].map(([k, ad, sayi]) => ({ adres: k + "@" + "ornek.test", ad, sayi })), adresler: null,  // uydurma adresler
         olaylar: [{ saat: "14:00", bitis: "14:45", baslik: "Bütçe görüşmesi", platform: "teams" }, { saat: "16:30", bitis: "17:00", baslik: "Haftalık ekip", platform: "teams" }] },
+      animsatici: { goster: true, acik: false, liste: "Suflor.me", varsayilan: "Suflor.me", izin: null, listeler: [{ ad: "Anımsatıcılar", hesap: "iCloud", yazilabilir: true }] },
       kur: { ayar: "iyi", proje: "iyi", not: "iyi", aktarici: "bekle", modeller: "bekle" },
     };
     if (yol === "durum") return Promise.resolve(d);
@@ -310,6 +315,18 @@
       ${sec ? "" : `<div class="ipucu">${esc(t.t_e_oto_a)}</div>`}
       <span class="etiket" style="margin-top:10px">${esc(t.t_e_adres)}</span><input type="text" inputmode="email" autocomplete="email" data-eposta-adres value="${esc(C.eposta_adres != null ? C.eposta_adres : (tk.eposta_adres || ""))}" placeholder="${esc(t.t_e_adres_ph)}"></div>`; };
   const epostaKaydet = () => api("eposta", { eposta: C.eposta || "", eposta_adres: C.eposta_adres || "" }).catch(() => {});
+  // Anımsatıcılar (S258): yalnız geliştirici kurulumunda sorulur (durum.animsatici.goster); evet → izin + liste seçimi; seçim ayara hemen yazılır
+  const animDurum = () => ((D.durum || {}).animsatici) || {};
+  const animAcik = () => C.anim != null ? C.anim : !!animDurum().acik;
+  const animListe = () => C.anim_liste != null ? C.anim_liste : (animDurum().liste || animDurum().varsayilan || "Suflor.me");
+  const animKaydet = () => api("animsatici", { acik: animAcik(), liste: animListe() }).catch(() => {});
+  const animBlok = () => { const d = animDurum(); if (!d.goster) return "";
+    const ev = animAcik(), yg = (v, ad, sec) => `<button class="yonga" type="button" data-grup="anim" data-deger="${v}" aria-pressed="${sec}">${esc(ad)}</button>`;
+    let alt = "";
+    if (ev && d.izin !== "ok") alt = `<div class="liste">${satir(d.izin === "izin_yok" || d.izin === "hata" ? "uyari" : "bos", t.t_anim_izin_b, d.izin ? t.t_anim_izin_hata : t.t_anim_izin_a, dug("anim-izin", t.t_izin))}</div>`;
+    else if (ev) { const v = d.varsayilan || "Suflor.me", ls = [...new Set([v, ...(d.listeler || []).map(x => x.ad), animListe()])];
+      alt = `<span class="etiket" style="margin-top:10px">${esc(t.t_anim_liste)}</span><div class="yongalar">${ls.map(x => `<button class="yonga" type="button" data-grup="anim-liste" data-deger="${esc(x)}" aria-pressed="${animListe() === x}">${esc(x === v ? t.t_anim_yeni : x)}</button>`).join("")}</div>`; }
+    return `<div class="alan"><span class="etiket">${esc(t.t_anim)}</span><div class="yongalar">${yg("1", t.t_anim_ev, ev)}${yg("0", t.t_anim_hayir, !ev)}</div><div class="ipucu">${esc(t.t_anim_a)}</div>${alt}</div>`; };
   const yonga = (grup, deger, secili) => `<button class="yonga" type="button" data-grup="${grup}" data-deger="${esc(deger)}" aria-pressed="${!!secili}">${esc(deger)}</button>`;
   const C = D.cevap;
   const alan = (id, etiket, ipucu = "", tur = "text") => `<div class="alan"><label for="${id}">${esc(etiket)}</label>${tur === "textarea"
@@ -534,7 +551,7 @@
         return `<div class="liste">${satirlar}</div>${alt}<p class="dipnot">${esc(t.hz_toplanti_not)}</p>`; } },
     { id: "takvim", simge: "takvim", b: "takvim_b", a: "takvim_a", gir: takvimBekle,
       icerik: () => { const tk = (D.durum || {}).takvim || {};
-        if (tk.durum !== "ok") return `<div class="liste">${satir(tk.durum === "izin_yok" ? "uyari" : "bos", t.t_izin_b, t.t_izin_a, dug("takvim-izin", t.t_izin))}</div>${epostaBlok()}`;
+        if (tk.durum !== "ok") return `<div class="liste">${satir(tk.durum === "izin_yok" ? "uyari" : "bos", t.t_izin_b, t.t_izin_a, dug("takvim-izin", t.t_izin))}</div>${epostaBlok()}${animBlok()}`;
         const tl = tk.takvimler || [], sec = new Set(C.takvim_adres || []);
         const ad = [...new Set([...(tk.adaylar || []).map(x => x.adres), ...(C.takvim_adres || [])])];
         const adres = `<div class="alan"><span class="etiket">${esc(t.t_adres)}</span>${tk.adaylar == null ? `<div class="ipucu">${esc(t.t_adres_bekle)}</div>`
@@ -543,7 +560,7 @@
         return `${adres}${tl.length ? `<div class="alan"><span class="etiket">${esc(t.t_dogru)}</span><div class="yongalar">${tl.map(x => yonga("takvim", x.ad + " · " + x.hesap, !(C.takvim_cikar || []).includes(x.ad + " · " + x.hesap) && x.sec !== false)).join("")}</div></div>`
           : `<div class="kart-not">${esc(t.t_hesap_yok)} ${dug("internet-hesaplari", t.t_hesap_ekle)}</div>`}
           <div class="alan"><span class="etiket">${esc(t.t_bugun)}</span><div class="liste">${(tk.olaylar || []).length ? tk.olaylar.map(o => satir("iyi", o.baslik, `${o.saat}–${o.bitis}${o.platform ? " · " + o.platform : ""}`)).join("") : satir("iyi", t.t_bos)}</div></div>
-          ${epostaBlok()}`; } },
+          ${epostaBlok()}${animBlok()}`; } },
     { id: "eklenti", simge: "eklenti", b: "ek_b", a: "ek_a", hazir: () => ((D.durum || {}).eklenti || {}).bagli, gir: () => eklentiBekle(),
       icerik: () => { const e = (D.durum || {}).eklenti || {};
         return `<ol class="adimlar"><li class="${e.bagli ? "tamam" : ""}"><div>${esc(t.e1)}<div class="eylem">${dug("chrome-eklentiler", t.e1d)}</div></div></li>
@@ -657,7 +674,9 @@
     const y = e.target.closest(".yonga");
     if (y) {
       const g = y.dataset.grup, v = y.dataset.deger, on = y.getAttribute("aria-pressed") !== "true";
-      if (g === "alan") { C.is_alani = v; } else if (g === "eposta") { C.eposta = v; epostaKaydet(); } else {
+      if (g === "alan") { C.is_alani = v; } else if (g === "eposta") { C.eposta = v; epostaKaydet(); }
+      else if (g === "anim") { C.anim = v === "1"; animKaydet(); }
+      else if (g === "anim-liste") { C.anim_liste = v; animKaydet(); } else {
         const anahtar = { takvim: "takvim_cikar", adres: "takvim_adres" }[g]; const l = new Set(C[anahtar] || []);
         if (g === "adres" ? on : !on) l.add(v); else l.delete(v); C[anahtar] = [...l];
         takvimKaydet();  // takvim ekranı kurulumdan sonra: seçim ayara hemen yazılır
@@ -681,7 +700,7 @@
       if (n === "modeller-yeniden") { await api("modeller/baslat", {}).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "claude-yol") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
       if (n === "klasor-sec") { const r = await api("klasor-sec", {}).catch(() => ({})); if (r.yol) { C.proje = r.yol; kaydet(); ciz(); klasorBilgi(); } return; }
-      if (n === "takvim-izin") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
+      if (n === "takvim-izin" || n === "anim-izin") { await api("ac", { hedef: n }).catch(() => {}); await durumAl(); ciz(); return; }
       api("ac", { hedef: n }).catch(() => {});
       return;
     }

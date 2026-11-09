@@ -496,6 +496,16 @@ html:is(.hafta-ac,.saatler-ac) main>.sc>#tvb:not([hidden]){display:block;flex:no
   #bgn .ozet,#bgn .blk{padding:var(--bo-16)}
 }
 
+/* Dar ana içerik (küçük pencere; 9 Kasım): satır düzeni ekranın değil içeriğin kendi genişliğine bakar (main kapsayıcı) — metin sütunu hiçbir genişlikte kelime kelime kırılmaz;
+   etiket ve düğmeler metnin altına iner */
+@container (max-width:600px){
+  #bgn .icerik{padding:var(--bo-24) var(--bo-24) var(--bo-32);gap:var(--bo-24)}
+  #bgn .sat{grid-template-columns:auto minmax(0,1fr)}
+  #bgn .sat .eylem{grid-column:2;justify-content:flex-start;margin-top:var(--bo-8)}
+  #bgn .sat.bs .eylem{grid-column:2;justify-content:flex-start;margin-top:var(--bo-4);flex-wrap:wrap}
+  #bgn .ozet,#bgn .blk{padding:var(--bo-16)}
+}
+
 /* ===== Komut penceresi (Command + K) ===== */
 dialog#kpd{border:1px solid var(--b-cizgi);border-radius:var(--r-14);background:var(--b-yuzey);color:var(--b-murekkep);padding:0;width:min(560px,calc(100vw - 32px));max-height:min(480px,calc(100vh - 96px));margin:12vh auto auto;box-shadow:var(--golge-pencere);font:400 var(--yz-13)/1.5 var(--f-govde);overflow:hidden}
 dialog#kpd[open]{display:flex;flex-direction:column}

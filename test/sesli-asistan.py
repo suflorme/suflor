@@ -77,6 +77,15 @@ ok("menü uygulaması yoksa tarayıcıda açma yolu (deneme: günlüğe yazılı
 ok("pano komutu olmayan söz Claude'a gider", all(m.konus_yerel_komut(x, {"kaynak": "bas"}) is None for x in ("Takvimimde ne var?", "Panoyu neden açtın", "Kararları özetle")))
 cv = m.cards_view(); m.STATE["pano_ac"] = {"id": "p1", "t": time.time(), "bolum": "kararlar"}
 ok("cards_view pano_ac'ta bölüm gider (menü/pano ileride okur)", m.cards_view()["pano_ac"] == {"id": "p1", "bolum": "kararlar"}); m.STATE.pop("pano_ac", None)
+# -- devam penceresi göstergesi: /status konus.sohbet.devam = kalan sn (pano ve mini pano "Dinliyorum… N sn")
+_so = {k: m.SOHBET.get(k) for k in ("acik", "devam", "t_ses", "t_mesgul")}
+m.SOHBET.update(acik=True, devam={"sn": 12.0, "t": time.time()}, t_ses=time.time() - 3, t_mesgul=0.0); sv = m.sohbet_view()
+ok("sohbet_view devam: pencere açıkken kalan sn (≈ 9) gider", sv.get("acik") is True and isinstance(sv.get("devam"), (int, float)) and 8 <= sv["devam"] <= 9.5)
+m.SOHBET.pop("devam", None); ok("devam penceresi yoksa alan hiç gelmez (normal sohbet)", "devam" not in m.sohbet_view())
+m.SOHBET.update(devam={"sn": 12.0, "t": time.time()}, t_ses=time.time() - 30); ok("süre dolduysa kalan 0'a iner, eksiye düşmez", m.sohbet_view()["devam"] == 0)
+for k_, v_ in _so.items():
+    if v_ is None: m.SOHBET.pop(k_, None)
+    else: m.SOHBET[k_] = v_
 # -- 1/2: KAYIT kartı sesli
 def kart(ozet, neden="Kullanıcı istedi", sesli=True):
     x_ = m.izin_iste("kayit", f"Kayda yazayım mı? {neden} — {ozet}", {"komut": "karar_onayla", "arg": {"id": "k1"}, "ozet": ozet, "neden": neden}, sesli=sesli); return x_

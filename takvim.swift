@@ -18,6 +18,8 @@ var kisiOzet = false  // --kisi-ozet: Kişiler'de yalnız SAYILAR (toplam, telef
 var kurumSay = false
 var tarihGun: Int? = nil  // S243: --tarihler <gün> → Kişiler'deki doğum günü/tarihler + Takvim'in doğum günleri/tüm gün etkinlikleri/Suflor hatırlatmaları + Anımsatıcılar'daki tarihli öğeler (yalnız okuma; ham, pencere hesabı aktarıcıda)
 var takvimler = false  // --takvimler: yazılabilir takvimler (ayar hatirlatma_takvim seçimi için)
+var animListeler = false  // S258: --anim-listeler → Anımsatıcılar listeleri (ad, hesap, yazılabilir); izin penceresini de bu açar
+var animEsitle: String? = nil  // S258: --anim-esitle <istek.json> {"liste", "olustur", "ekle": [{kayit_id, baslik, vade?, not}], "guncelle": [{id, baslik, vade?}], "tamamla": [{id, tamam}], "sil": [id]} → uygular, listenin son durumunu yazar
 var adresler = Set<String>()  // --adres a@x,b@y (ayar takvim_adreslerim): kullanıcının takvim adresleri, büyük-küçük harf duyarsız
 var goster = Set<String>()  // v0.167.0: --goster "<takvim adı> · <hesap>" (yinelenir): bu takvimlerde süzgeçten geçmeyen etkinlikler de "paylasilan": true ile yazılır (aktarıcı yalnız panoda gösterir; ayar takvim_paylasilan)
 var i = 1
@@ -31,6 +33,8 @@ while i < a.count {
   else if a[i] == "--etkinlik", i + 1 < a.count { etkinlik = a[i + 1]; i += 1 }
   else if a[i] == "--etkinlik-sil", i + 1 < a.count { etkinlikSil = a[i + 1]; i += 1 }
   else if a[i] == "--takvimler" { takvimler = true }
+  else if a[i] == "--anim-listeler" { animListeler = true }
+  else if a[i] == "--anim-esitle", i + 1 < a.count { animEsitle = a[i + 1]; i += 1 }
   else if a[i] == "--tarihler", i + 1 < a.count { tarihGun = max(1, min(Int(a[i + 1]) ?? 14, 90)); i += 1 }
   else if a[i] == "--kisi", i + 1 < a.count { kisiAd = a[i + 1]; i += 1 }
   else if a[i] == "--kisi-ozet" { kisiOzet = true }
@@ -399,6 +403,83 @@ func tarihlerOku(_ gun: Int) {
   cikis["izinler"] = izinler
   yaz(cikis)
 }
+// S258: Anımsatıcılar eşitlemesi. Yalnız kullanıcının seçtiği tek listeye dokunur; öğeler aktarıcının verdiği kimlikle (calendarItemIdentifier) bulunur, başka listedeki öğeye ya da
+// listenin dışındaki kimliğe yazılmaz. Kabuk metni yok: istek JSON dosyası. Silme yalnız "sil" listesindeki, bu listeden gelen kimlikler.
+func animIzin() -> Bool {
+  let s = DispatchSemaphore(value: 0); var ok = false
+  if #available(macOS 14.0, *) { store.requestFullAccessToReminders { o, _ in ok = o; s.signal() } }
+  else { store.requestAccess(to: .reminder) { o, _ in ok = o; s.signal() } }
+  _ = s.wait(timeout: .now() + 120); return ok
+}
+func animTarih(_ s: String?) -> DateComponents? {
+  guard let s = s, s.count >= 10 else { return nil }
+  let p = s.prefix(10).split(separator: "-").compactMap { Int($0) }
+  if p.count != 3 { return nil }
+  var dc = DateComponents(); dc.calendar = Calendar.current; dc.year = p[0]; dc.month = p[1]; dc.day = p[2]; return dc
+}
+func animListeIs() {
+  guard animIzin() else { yaz(["durum": "izin_yok", "hata": "Anımsatıcılar izni verilmedi"]); return }
+  var l: [[String: Any]] = []
+  for c in store.calendars(for: .reminder) { l.append(["ad": c.title, "hesap": c.source.title, "yazilabilir": c.allowsContentModifications]) }
+  yaz(["durum": "ok", "listeler": l])
+}
+func animEsitleIs(_ yol: String) {
+  guard animIzin() else { yaz(["durum": "izin_yok", "hata": "Anımsatıcılar izni verilmedi"]); return }
+  guard let d = FileManager.default.contents(atPath: yol), let q = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { yaz(["durum": "hata", "hata": "İstek okunamadı"]); return }
+  let ad = ((q["liste"] as? String) ?? "").trimmingCharacters(in: .whitespaces)
+  if ad.isEmpty { yaz(["durum": "hata", "hata": "Liste adı yok"]); return }
+  var cal = store.calendars(for: .reminder).first(where: { $0.title == ad && $0.allowsContentModifications })
+  if cal == nil && (q["olustur"] as? Bool) == true {
+    let yeni = EKCalendar(for: .reminder, eventStore: store); yeni.title = ad
+    guard let kaynak = store.defaultCalendarForNewReminders()?.source ?? store.sources.first(where: { $0.sourceType == .local }) ?? store.sources.first else { yaz(["durum": "hata", "hata": "Liste kaynağı yok"]); return }
+    yeni.source = kaynak
+    do { try store.saveCalendar(yeni, commit: true); cal = yeni } catch { yaz(["durum": "hata", "hata": "Liste oluşturulamadı: " + error.localizedDescription]); return }
+  }
+  guard let liste = cal else { yaz(["durum": "liste_yok", "hata": "Liste bulunamadı"]); return }
+  func oge(_ id: Any?) -> EKReminder? {
+    guard let id = id as? String, let r = store.calendarItem(withIdentifier: id) as? EKReminder, r.calendar.calendarIdentifier == liste.calendarIdentifier else { return nil }
+    return r
+  }
+  var hata = 0; var eklenen: [[String: Any]] = []
+  for e in (q["ekle"] as? [[String: Any]]) ?? [] {
+    guard let b = e["baslik"] as? String, !b.isEmpty else { hata += 1; continue }
+    let r = EKReminder(eventStore: store); r.calendar = liste; r.title = b; r.notes = e["not"] as? String
+    if let dc = animTarih(e["vade"] as? String) { r.dueDateComponents = dc }
+    do { try store.save(r, commit: false); eklenen.append(["kayit_id": (e["kayit_id"] as? String) ?? "", "id": r.calendarItemIdentifier]) } catch { hata += 1 }
+  }
+  for e in (q["guncelle"] as? [[String: Any]]) ?? [] {
+    guard let r = oge(e["id"]) else { hata += 1; continue }
+    if let b = e["baslik"] as? String, !b.isEmpty { r.title = b }
+    if e.keys.contains("vade") { r.dueDateComponents = animTarih(e["vade"] as? String) }
+    if let n = e["not"] as? String { r.notes = n }
+    do { try store.save(r, commit: false) } catch { hata += 1 }
+  }
+  for e in (q["tamamla"] as? [[String: Any]]) ?? [] {
+    guard let r = oge(e["id"]) else { hata += 1; continue }
+    r.isCompleted = (e["tamam"] as? Bool) ?? true
+    do { try store.save(r, commit: false) } catch { hata += 1 }
+  }
+  for id in (q["sil"] as? [String]) ?? [] {
+    guard let r = oge(id) else { continue }
+    do { try store.remove(r, commit: false) } catch { hata += 1 }
+  }
+  do { try store.commit() } catch { hata += 1 }
+  var ogeler: [[String: Any]] = []
+  let fs = DispatchSemaphore(value: 0)
+  store.fetchReminders(matching: store.predicateForReminders(in: [liste])) { rs in
+    for r in rs ?? [] {
+      var o: [String: Any] = ["id": r.calendarItemIdentifier, "baslik": r.title ?? "", "tamam": r.isCompleted]
+      if let dc = r.dueDateComponents, let y = dc.year, let m = dc.month, let g = dc.day { o["vade"] = String(format: "%04d-%02d-%02d", y, m, g) }
+      if let t = r.lastModifiedDate { o["degisti"] = iso.string(from: t) }
+      ogeler.append(o)
+    }
+    fs.signal()
+  }
+  _ = fs.wait(timeout: .now() + 60)
+  yaz(["durum": "ok", "liste": ad, "ogeler": ogeler, "eklenen": eklenen, "hata_say": hata])
+}
+if animListeler { animListeIs(); exit(0) }
+if let y = animEsitle { animEsitleIs(y); exit(0) }
 if let g = tarihGun { tarihlerOku(g); exit(0) }
 if etkinlik != nil || etkinlikSil != nil || takvimler {
   if #available(macOS 14.0, *) { store.requestFullAccessToEvents { izin, hata in etkinlikIs(izin, hata) } }

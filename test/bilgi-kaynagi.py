@@ -230,7 +230,7 @@ kontrol("ayarlar: web_arastirma ve bilgi_onaysiz varsayılan açık, AYAR_PANO'd
 # 8. Konuş'ta web araştırması (5 Kasım): ayar konus_web varsayılan kapalı; açıkken de gizli toplantıda ve web_arastirma kapalıyken kapalı; kurulu Brifing yardımcısı
 # WebSearch/WebFetch'i tanımıyorsa (derleme.json SHA'sı web'li brifing.swift'e eşit değil) kapalı + tek uyarı; destek varsa konus_args web araçlarını ekler, istemde sınır cümlesi
 import hashlib, tempfile
-kontrol("ayar konus_web varsayılan kapalı, AYAR_PANO'da ve panoda (AYG)", '"konus_web": ("bool", False, None)' in ay and "['konus_web','bool'" in pn)
+kontrol("ayar konus_web varsayılan AÇIK (S257), AYAR_PANO'da ve panoda (AYG)", '"konus_web": ("bool", True, None)' in ay and "['konus_web','bool'" in pn)
 TW = tempfile.mkdtemp(prefix="konus-web-"); eski = os.path.join(TW, "eski.swift"); yeni = os.path.join(TW, "yeni.swift")
 open(eski, "w").write('let araclar: Set<String> = ["Read", "Grep", "Glob"]\n'); open(yeni, "w").write('let araclar: Set<String> = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]\n')
 def derleme(y): json.dump({"SuflorBrifing": hashlib.sha256(open(y, "rb").read()).hexdigest()}, open(os.path.join(TW, "derleme.json"), "w"))
@@ -241,13 +241,20 @@ sw_gercek = open(os.path.join(KOD, "brifing.swift"), encoding="utf-8").read()
 kontrol("depodaki brifing.swift henüz web araçlarını tanımıyorsa kurulu yardımcı 'destek yok' sayılır (yeniden derleme kullanıcı yanındayken)",
         bool(ns["KONUS_WEB_RX"].search(sw_gercek)) == ("\"WebSearch\", \"WebFetch\"" in sw_gercek))
 ns["AYAR"].clear(); ns["_KS"].clear(); ns["_g"].clear(); ns["AYAR"]["uygulama"] = TW; derleme(yeni); ns["_konus_swift_yerler"] = lambda: [yeni]
-kontrol("konus_web ayarı yokken kapalı (web_arastirma açık olsa da)", ns["konus_web_acik"]() is False and not ns["_g"])
-ns["AYAR"]["konus_web"] = True; kontrol("konus_web açık + destek var → açık", ns["konus_web_acik"]() is True)
+ns["toplanti_var"] = lambda: False; ns["STATE"] = {}
+kontrol("S257: ayar yokken (varsayılan) + destek var → açık", ns["konus_web_acik"]() is True and not ns["_g"])
+ns["AYAR"]["konus_web"] = False; kontrol("konus_web: false → kapalı", ns["konus_web_acik"]() is False); ns["AYAR"]["konus_web"] = True
+ns["AYAR"]["web_arastirma_disari"] = False; kontrol("toplantı dışı: web_arastirma_disari kapalı → kapalı", ns["konus_web_acik"]() is False)
+ns["toplanti_var"] = lambda: True; kontrol("toplantıda web_arastirma_disari etkisiz (yalnız web_arastirma): açık", ns["konus_web_acik"]() is True); ns["toplanti_var"] = lambda: False
+del ns["AYAR"]["web_arastirma_disari"]
+kontrol("konus_web açık + destek var → açık", ns["konus_web_acik"]() is True)
 ns["_gizli"] = True; kontrol("gizli toplantı → kapalı", ns["konus_web_acik"]() is False); ns["_gizli"] = False
 ns["AYAR"]["web_arastirma"] = False; kontrol("web_arastirma kapalı → kapalı", ns["konus_web_acik"]() is False); del ns["AYAR"]["web_arastirma"]
 derleme(eski); kontrol("destek yok → kapalı, günlükte tek uyarı (yinelenmez)", ns["konus_web_acik"]() is False and ns["konus_web_acik"]() is False and sum("yeniden derleme" in x for x in ns["_g"]) == 1)
 wi = ns["web_istem"](True)
-kontrol("web istemi: yalnız ad ve konu, döküm alıntısı/iç sayı yasağı, kaynak ve tarih, doğrulanmadı; kapalıyken boş", all(x in wi for x in ("yalnız kişi ya da firma adı ve konu", "döküm alıntısı", "iç sayı", "kaynağı (site, bağlantı)", "doğrulanmadı")) and ns["web_istem"](False) == "")
+kontrol("web istemi (S257): hava/haber/fiyat, bağlantı okuma (WebFetch), yalnız sorudaki konu, döküm alıntısı/iç sayı yasağı, kaynağı an, doğrulanmadı; kapalıyken boş", all(x in wi for x in ("hava durumu", "WebFetch", "yalnız kullanıcının sorusundaki konu", "döküm alıntısı", "iç sayı", "kaynağı tek kısa ifadeyle".replace("kaynağı tek kısa ifadeyle", "kaynağı tek kısa ifadeyle an") if False else "tek kısa ifadeyle", "doğrulanmadı")) and ns["web_istem"](False) == "")
+kontrol("web bekleme cümlesi: WebSearch/WebFetch → 'web' türü, 'Bakıyorum…' cümlesi", 'if a in ("WebSearch", "WebFetch"): return "web"' in kod and 'BEKLE_TUR["web"] = ["Bakıyorum…"' in kod and '"web": BEKLE_TUR_EN_WEB' in kod)
+kontrol("web turu üst süresi ve günlük satırı kodda (konus_web_sn, 'KONUŞ: web (')", "KONUS_WEB_SN" in kod and "KONUŞ: web ({_wa} arama, {_ws} sayfa)" in kod)
 aw = BY.konus_args(A, "ISTEM", "", None, B, web=True); ab = BY.konus_args(A, "ISTEM", "", None, B)
 kontrol("konus_args web=True: --allowedTools ve --tools'ta WebSearch,WebFetch; web=False eskisiyle aynı", aw[aw.index("--allowedTools") + 1] == "Read,Grep,Glob,WebSearch,WebFetch" and aw[aw.index("--tools") + 1] == "Read,Grep,Glob,WebSearch,WebFetch"
         and "WebSearch" not in " ".join(ab) and ab[ab.index("--tools") + 1] == "Read,Grep,Glob")

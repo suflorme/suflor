@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 630067,
-   "sha": "f1d6a49aa3d7af05"
+   "uzunluk": 640446,
+   "sha": "ab8ffe9e49722af4"
   },
   "/mini": {
-   "uzunluk": 630067,
-   "sha": "f1d6a49aa3d7af05"
+   "uzunluk": 640446,
+   "sha": "ab8ffe9e49722af4"
   },
   "/status": {
    "_ping_son": "float",
@@ -253,6 +253,13 @@
    "aktif": "bool",
    "alan": "str",
    "anahtarsiz": "NoneType",
+   "animsatici": {
+    "acik": "bool",
+    "es": "int",
+    "hata": "NoneType",
+    "liste": "str",
+    "son_s": "NoneType"
+   },
    "anlik": "NoneType",
    "arayuz_dili": "str",
    "asistan": "str",
@@ -272,6 +279,8 @@
     },
     "deger": {
      "adin_gecti": "bool",
+     "animsatici": "bool",
+     "animsatici_liste": "str",
      "beyin_ceviri": "str",
      "beyin_konus": "str",
      "beyin_proje_karti": "str",
@@ -376,6 +385,8 @@
     "takvimler": [],
     "varsayilan": {
      "adin_gecti": "bool",
+     "animsatici": "bool",
+     "animsatici_liste": "str",
      "bildirim": "bool",
      "bilgi_onaysiz": "bool",
      "ceviri": "bool",

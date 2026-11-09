@@ -1404,7 +1404,7 @@ def bugun_yaz(yol, p):  # POST /karar-onay {"idler": ["k1", …]} · /is-durum {
     if not x or not yeni: return {"ok": False, "err": "kayıt yok ya da durum geçersiz"}
     r = y.soz_kapat(BASE, x["id"], yeni)
     return {"ok": bool(r), "id": x["id"], "durum": yeni}
-VERI_GET = {"/status", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1622,7 +1622,7 @@ AYAR_PANO = {
     "kisisel_tarihler": ("bool", True, None), "kisisel_tarih_ufuk": ("sayi", 14, (1, 90)), "kisisel_tarih_hatirlat": ("bool", True, None), "kisisel_tarih_sesli": ("bool", False, None), "kisisel_tarih_saat": ("metin", "09:00", 5), "kutlama_kanali": ("sec", "eposta", ("eposta", "teams")),  # S243: yaklaşan kişisel tarihler
     "web_arastirma": ("bool", True, None), "web_arastirma_disari": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
     "ekran_paylasimda_goster": ("bool", False, None),  # 5 Kasım: açıkken Suflor pencereleri ekran paylaşımında/görüntüsünde görünür (demo); menu-cubugu.swift paylasimTuru
-    "konus_web": ("bool", False, None),  # 5 Kasım: Konuş'ta web araştırması (bas-konus.py konus_web_acik; kurulu Brifing yardımcısı web araçlarını tanıyana kadar etkisiz)
+    "konus_web": ("bool", True, None),  # S257 (9 Kasım): Konuş'ta web araması + bağlantı okuma, varsayılan açık (bas-konus.py konus_web_acik; toplantı dışında web_arastirma_disari da açık olmalı, toplantıda yalnız web_arastirma; kurulu Brifing yardımcısı web araçlarını tanımazsa etkisiz)
     "saatler": ("saatler", None, None), "saatler_sira": ("sec", "saat", ("saat", "saat_azalan", "ad", "ekleme")),  # v0.184.0: panodaki Saatler görünümü — [{"ad", "tz"}]; yoksa panonun varsayılan şehir listesi
     "takvim_paylasilan": ("takvimler", [], None),  # v0.167.0: panoda gösterilecek paylaşılan takvimler ("ad · hesap" listesi)
     "beyin_ceviri": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_proje_karti": ("beyin", "", ("", "claude-code", "gemini", "ozel")), "beyin_prova": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
@@ -1859,6 +1859,7 @@ bolum("arsiv")  # aktarici/arsiv.py — Toplantı arşivi: dökümler listesi, t
 bolum("ceviri")  # aktarici/ceviri.py — Canlı çeviri (Faz 5)
 bolum("anlik")  # aktarici/anlik.py — Anlık uyarılar: adın geçti, uzun konuşma (Faz 6)
 bolum("gerginlik")  # aktarici/gerginlik.py — Toplantı gerginliği → kişiliğin ses tonu (v0.80.0, S87)
+bolum("animsatici")  # aktarici/animsatici.py — kendi işlerin Mac Anımsatıcılar eşitlemesi (S258)
 bolum("duygu")  # aktarici/duygu.py — duygu durumu takibi: yerel sinyaller → Konuş'a "[Durum]" bloğu, dostça öneri hakkı (9 Kasım)
 bolum("kisisel-tarihler")  # aktarici/kisisel-tarihler.py — yaklaşan kişisel tarihler: doğum günü, yıldönümü, tarihli hatırlatma; /yaklasan-tarihler, bir gün önce + sabah hatırlatma (S243)
 bolum("eposta-takip")  # aktarici/eposta-takip.py — önemli e-posta seçimi, cevapsız konu takibi, hatırlatma (GET/POST /eposta-onemli; S243)
@@ -2239,6 +2240,7 @@ class H(BaseHTTPRequestHandler):
             if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}; anahtarsiz_kaydet("/takvim", str(self.headers.get("Origin", "")) or "chrome-extension://")
             return self._json({"surum": SURUM, "toplanti": toplanti_var(), "anahtar_gerekli": True})
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
+        if yol == "/animsatici": return self._json(anim_view() if "anim_view" in globals() else {})  # S258
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
             elif (self.headers.get("Referer") or "").startswith((f"http://127.0.0.1:{A.port}/", f"http://localhost:{A.port}/")) and "hazirlik" not in (self.headers.get("Referer") or ""):  # v0.96.0: pano açık (Konuş süreci önceden açılır)
@@ -2249,6 +2251,7 @@ class H(BaseHTTPRequestHandler):
             s["kart_katmani"] = kart_katmani_acik()  # kartları Mac'in kart katmanı gösteriyor: şerit ve panel listeyi göstermez
             dk = dk_view() if "dk_view" in globals() else None  # 6 Kasım: döküm kontrolü (yalnız geliştirici + ses arşivi açık)
             if dk: s["dokum_kontrol"] = dk
+            s["animsatici"] = anim_view() if "anim_view" in globals() else None  # S258
             so = so_view()  # 3 Kasım: öğrenen sözlük — son çalışma, öğrenilen, bekleyen (döngü hiç çalışmadıysa alan yok)
             if so: s["sozluk_ogrenme"] = so
             s["beyin"] = sg_durum_view()  # Faz 11: işlerin yapay zekâ seçimi + sağlık
@@ -2426,6 +2429,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/proaktif":  # toplantı sonrası açık uç hatırlatması: sor | kapat | gordu — yalnız pano (aktarici/toplanti-sonrasi.py)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(pro_islem(p))
+        if self.path == "/animsatici":  # S258: simdi | listeler — yalnız pano
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(anim_islem(p))
         if self.path == "/toplanti-hatirlat":  # planlı toplantı hatırlatması: hazirlik | ac | kapat — yalnız pano (aktarici/toplanti-hatirlat.py)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(that_islem(p))

@@ -322,6 +322,35 @@ def eposta_ayarla(tur, adres):
     if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
     return {"ok": True, "eposta": t, "eposta_adres": ad}
 
+# ---------- Anımsatıcılar (S258, 9 Kasım): "İşlerin Mac Anımsatıcılar'ına da düşsün mü?" ----------
+# Takvim ekranında tek soru; yalnız geliştirici kurulumunda sorulur (beta: ⚙ Ayarlar'da animsatici, varsayılan kapalı). Evet → Anımsatıcılar izni (Suflor Takvim.app --anim-listeler izin
+# penceresini açar) + liste seçimi (varsayılan yeni "Suflor.me" listesi ya da var olan bir liste). Yazılan ayar: animsatici (bool), animsatici_liste. Eşitlemeyi aktarıcı yapar (aktarici/animsatici.py).
+ANIM_LISTE_VARSAYILAN = "Suflor.me"
+_ANIM = {"izin": None, "listeler": None}  # izin: ok | izin_yok | hata | None (sorulmadı); listeler: [{ad, hesap, yazilabilir}]
+def animsatici_durum():
+    a = ayar()
+    return {"goster": _gelistirici() or a.get("animsatici") is True, "acik": a.get("animsatici") is True, "liste": str(a.get("animsatici_liste") or ANIM_LISTE_VARSAYILAN),
+            "izin": _ANIM["izin"], "listeler": [x for x in (_ANIM["listeler"] or []) if x.get("yazilabilir")], "varsayilan": ANIM_LISTE_VARSAYILAN}
+def animsatici_izin():  # izin penceresini açar ve listeleri okur (bloklar; sihirbaz "Erişim ver"e basınca)
+    if DENEME: _ANIM["izin"] = "ok"; _ANIM["listeler"] = [{"ad": "Anımsatıcılar", "hesap": "iCloud", "yazilabilir": True}]; return
+    uyg = os.path.join(gen(ayar().get("uygulama") or "~/Library/Application Support/Suflor"), "Suflor Takvim.app"); cikti = os.path.join(tempfile.gettempdir(), f"suflor-anim-liste-{os.getuid()}.json")
+    try:
+        if os.path.isdir(uyg): subprocess.run(["open", "-g", "-W", "-a", uyg, "--args", "--anim-listeler", "--cikti", cikti], timeout=150, capture_output=True)
+        j = oku_json(cikti)
+    except Exception: j = {}
+    finally:
+        try: os.remove(cikti)
+        except OSError: pass
+    _ANIM["izin"] = j.get("durum") if j.get("durum") in ("ok", "izin_yok") else "hata"; _ANIM["listeler"] = j.get("listeler") if _ANIM["izin"] == "ok" else None
+def animsatici_ayarla(acik, liste):
+    ad = " ".join(str(liste or "").split())[:60] or ANIM_LISTE_VARSAYILAN
+    def fn(a):
+        if not a: return False
+        a["animsatici"] = bool(acik); a["animsatici_liste"] = ad
+    if not ayar_degistir(fn): return {"ok": False}
+    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")  # aktarıcı ayarı yeniden okusun
+    return {"ok": True, "animsatici": bool(acik), "liste": ad}
+
 # ---------- asistan (S133, 22 Ekim): kullanıcı yalnız asistanla muhatap; adını kullanıcı koyar ----------
 # Sihirbazın "Asistanına bir ad koy" ekranı: ad, hitap (siz/sen), tarz (ölçülü/rahat), ses (Mac; Pocket kuruluysa kadın/erkek), isteğe bağlı
 # toplantı dışı ikinci asistan. tamamla() kişilik dosyasını <destek>/kisilik/<ad>.md olarak yazar (biçim: aktarici/kisilik.py) ve ayara bağlar:
@@ -764,6 +793,7 @@ def ac(hedef):
         if os.path.isdir(uyg): subprocess.run(["open", "-W", "-a", uyg, "--args", "--cikti", os.path.join(os.path.dirname(uyg), "takvim.json")], timeout=150)
         try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{a.get('port')}/takvim-yenile", data=b"{}", method="POST"), timeout=3); time.sleep(4)
         except Exception: pass
+    elif hedef == "anim-izin": animsatici_izin()
     elif hedef == "ses-izni": subprocess.Popen(["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture"])
     elif hedef == "internet-hesaplari": subprocess.Popen(["open", "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension"])
     elif hedef == "teams-dene": subprocess.Popen(["open", "-a", "Google Chrome", "https://teams.microsoft.com/v2/"])
@@ -869,7 +899,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/durum":
             a = ayar(); mdl = modeller_durum(); izi_indirme("model", mdl); izi_indirme("cpp", mdl.get("cpp") or {})
             asd = asistan_durum(); izi_indirme("pocket", asd.get("pocket_kur") or {})
-            return self._json({"mac": mac(), "claude": claude_durum(), "beyin": beyin_durum(), "modeller": mdl, "eklenti": eklenti(), "takvim": takvim(), "yerel_ses": yerel_ses(), "asistan": asd,
+            return self._json({"mac": mac(), "claude": claude_durum(), "beyin": beyin_durum(), "modeller": mdl, "eklenti": eklenti(), "takvim": takvim(), "animsatici": animsatici_durum(), "yerel_ses": yerel_ses(), "asistan": asd,
                                "kod": KOD, "mod": A.adim if A else None, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
         if yol == "/api/kayit": return self._json(oku_json(KAYIT))
         if yol == "/api/hazirlik": return self._json(hz_ozet())
@@ -899,6 +929,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/api/beyin/anahtar": return self._json(beyin_anahtar(p))
         if yol == "/api/takvim": return self._json(takvim_ayarla(p.get("adresler"), p.get("cikar")))
         if yol == "/api/eposta": return self._json(eposta_ayarla(p.get("eposta"), p.get("eposta_adres")))
+        if yol == "/api/animsatici": return self._json(animsatici_ayarla(p.get("acik"), p.get("liste")))
         if yol == "/api/profil": return self._json(profil_ayarla(p))
         if yol == "/api/pocket/baslat": return self._json(pocket_baslat())
         if yol == "/api/asistan/dinle": return self._json(asistan_dinle(p, str(p.get("dil") or "tr")))
@@ -948,8 +979,8 @@ TAKVIM_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/>
   <key>NSCalendarsFullAccessUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak, gündemini ve katılımcılarını toplantı asistanına vermek için takvimini okur; sesle istediğin hatırlatmayı, sen onaylayınca takvime ekler. Takvim içeriğini bu Mac dışına göndermez.</string>
   <key>NSCalendarsUsageDescription</key><string>Suflor.me bugünkü toplantılarını bulmak için takvimini okur; onayladığın hatırlatmayı takvime ekler.</string>
-  <key>NSRemindersFullAccessUsageDescription</key><string>Suflor.me yaklaşan hatırlatmalarını (tarihli Anımsatıcılar) sana hatırlatmak için Anımsatıcılar'ını yalnız okur; hiçbir şeyi değiştirmez ve bu Mac dışına göndermez.</string>
-  <key>NSRemindersUsageDescription</key><string>Suflor.me yaklaşan hatırlatmalarını sana hatırlatmak için Anımsatıcılar'ını yalnız okur.</string>
+  <key>NSRemindersFullAccessUsageDescription</key><string>Suflor.me yaklaşan hatırlatmalarını (tarihli Anımsatıcılar) sana hatırlatmak için Anımsatıcılar'ını okur; yalnız sen açarsan, işlerini seçtiğin Anımsatıcılar listesine ekler ve tamamlanma durumunu iki yönlü eşitler. Başka listelere dokunmaz, bu Mac dışına göndermez.</string>
+  <key>NSRemindersUsageDescription</key><string>Suflor.me yaklaşan hatırlatmalarını sana hatırlatmak için Anımsatıcılar'ını okur; açarsan işlerini seçtiğin listeye de yazar.</string>
   <key>NSContactsUsageDescription</key><string>Suflor.me, sesle bir toplantı davetinde ya da sorduğunda kişinin e-posta adresini, telefonunu ve adresini bulmak için Kişiler'ini yalnız okur; hiçbir şeyi değiştirmez ve bu Mac dışına göndermez.</string>
 </dict></plist>
 """

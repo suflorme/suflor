@@ -202,7 +202,8 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     @objc func panoAc() { panoPencere() }
     @objc func panelBuyut() { panel.orderOut(nil); panoPencere() }
     @objc func panoTarayici() { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { NSWorkspace.shared.open(u) } }
-    @objc func panoPencere() { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.goster() }
+    @objc func panoPencere() { panoBolumAc("") }
+    func panoBolumAc(_ bolum: String) { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.goster(bolum: bolum) }
     func panelGoster() { if !panel.isVisible { tiklandi(oge.button!) } }
     // kart katmanının yan şeridi ya da bilgi satırı: panel ekranın sağ kenarında, dikeyde ortada (bütün kartlar tam metinle); açıksa kapanır
     func yanPanelAc() {
@@ -231,7 +232,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     func isle(_ v: [String: Any]) {
         imza = v["imza"] as? String ?? ""; sonDurum = v
         masaustuKanit?.iste(v["kanit_iste"] as? [String: Any])  // masaüstü toplantıdayken kanıtı toplantı penceresinden al
-        if let pa = v["pano_ac"] as? [String: Any], let id = pa["id"] as? String, id != sonPanoAc { sonPanoAc = id; if pa["gorunum"] as? String == "ayarlar" { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.ayarPenceresi("") } else { panoPencere() } }  // /pano-ac (kurulum, eklenti)
+        if let pa = v["pano_ac"] as? [String: Any], let id = pa["id"] as? String, id != sonPanoAc { sonPanoAc = id; if pa["gorunum"] as? String == "ayarlar" { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.ayarPenceresi("") } else { panoBolumAc(pa["bolum"] as? String ?? "") } }  // /pano-ac (kurulum, eklenti, sesle pano; bolum = pano.html panoBolum)
         if let b = v["bildirim"] as? [String: Any], let id = b["id"] as? String, id != sonBildirim {
             let ilk = sonBildirim.isEmpty; sonBildirim = id
             if !ilk || ((b["t"] as? Double).map { Date().timeIntervalSince1970 - $0 < 30 } ?? false) { bildir(b) }  // açılışta eski bildirim yinelenmesin
@@ -1516,7 +1517,7 @@ let EN_METIN: [String: String] = [
     "Ne diyeyim?: Option + Shift + O": "What should I say?: Option + Shift + O", "Sessiz (10 dk kart yok): Option + Shift + M": "Quiet (no cards for 10 min): Option + Shift + M",
     "Asistan sussun: Option + Shift + S": "Assistant, stop: Option + Shift + S", "Suflor.me menüsünden çık": "Quit Suflor.me menu", "Panoyu aç (tam pencere)": "Open panel (full window)",
     "Menü paneli": "Menu panel", "Geri bildirim": "Feedback", "Ayarlar": "Settings", "Önemli an": "Key moment", "Gizli toplantı": "Private meeting", "Sesli çeviri": "Spoken translation",
-    "Sessiz (10 dk)": "Quiet (10 min)", "Kanıt al": "Capture evidence", "Yan panel": "Side panel", "Kenar çubuğu": "Sidebar",
+    "Sessiz (10 dk)": "Quiet (10 min)", "Kanıt al": "Capture evidence", "Yan panel": "Side panel", "Kenar çubuğu": "Sidebar", "Asistan sohbeti": "Assistant chat",
     "Suflor.me hakkında": "About Suflor.me", "Ayarlar…": "Settings…", "Geri bildirim gönder…": "Send feedback…", "Suflor.me penceresini gizle": "Hide Suflor.me", "Diğerlerini gizle": "Hide others",
     "Düzen": "Edit", "Geri al": "Undo", "Yinele": "Redo", "Kes": "Cut", "Kopyala": "Copy", "Yapıştır": "Paste", "Tümünü seç": "Select all",
     "Toplantı": "Meeting", "Toplantı başlat…": "Start a meeting…", "Ne diyeyim?": "What should I say?", "Sessiz (10 dk kart yok)": "Quiet (no cards for 10 min)",
@@ -1527,7 +1528,8 @@ let EN_METIN: [String: String] = [
     "Hazırlık": "Prepare", "Katıl": "Join", "Sonra": "Later", "Gerek yok": "Not needed", "Kaynağı aç": "Open source", "Onayla": "Approve", "Reddet": "Decline", "Kartların yerini sıfırla": "Reset card position",
     "Kartı gizle": "Hide card", "Onay bekliyor": "Needs your approval", "Ne diyeyim": "What do I say", "Söyle": "Say", "Dur": "Stop", "Cevap": "Answer", "Not": "Note", "gizli": "private",
     "Genel": "General", "Ses": "Voice", "Konuş": "Talk", "Kanıt": "Evidence", "Çeviri": "Translation", "E-posta": "Email", "Gizlilik": "Privacy", "Proje": "Project",
-    "Ses ve konuşma": "Voice and speech", "Asistan ve kişilik": "Assistant", "Takvim ve e-posta": "Calendar and email", "Kayıt ve ekip": "Records and team", "Bilgi kaynakları": "Sources", "Gelişmiş": "Advanced"]
+    "Ses ve konuşma": "Voice and speech", "Asistan ve kişilik": "Assistant", "Takvim ve e-posta": "Calendar and email", "Kayıt ve ekip": "Records and team", "Bilgi kaynakları": "Sources", "Gelişmiş": "Advanced",
+    "Asistan": "Assistant", "Takvim": "Calendar", "Kayıt": "Records", "Kaynaklar": "Sources"]
 func T(_ s: String) -> String { ARAYUZ_EN ? (EN_METIN[s] ?? s) : s }
 func dilAyarla(_ dil: String?) {  // sayfa ya da /status bildirdi; değiştiyse açık pencereler ve menüler yeni dille
     guard let d = dil, ["tr", "en"].contains(d), (d == "en") != ARAYUZ_EN else { return }
@@ -1546,7 +1548,7 @@ let suflorSimge: NSImage? = {  // Dock ve Hakkında için: Mac simgeleri gibi ke
 }()
 // sayfaya: işaret, ⚙, geri bildirim ve mini pano düğmeleri gizli (pencerede araç çubuğu ve menüde); başlık satırı araç çubuğunun altında sıkı
 // durum cümlesi (ve toplantıda ad · süre) pencere başlığının altında (subtitle); sayfa başlık satırı yalnız etiket, eylem düğmesi ya da Güncelle varken
-let MAC_STIL = "header .brand,#yb,#gb,#ay,#mini,#t,#sure,#dm,#da,#durum .dot{display:none!important}html.bas-bos header{display:none!important}"
+let MAC_STIL = "header .brand,#yb,#gb,#ay,#shb,#mini,#t,#sure,#dm,#da,#durum .dot{display:none!important}html.bas-bos header{display:none!important}"
 let BASLIK_IZLE = """
 (()=>{try{webkit.messageHandlers.suflor.postMessage({dil:document.documentElement.lang})}catch(e){}
 const h=document.querySelector('header');if(!h||!window.webkit)return;let son=null;const $=i=>document.getElementById(i),m=e=>e?e.textContent.trim():''
@@ -1556,7 +1558,7 @@ const yaz=()=>{const du=$('durum'),uy=!!du&&/\\b(wa|er)\\b/.test(du.className)
   if(alt!==son){son=alt;webkit.messageHandlers.suflor.postMessage({alt})}
   document.documentElement.classList.toggle('bas-bos',!(gor($('chips'))||gor($('de'))||gor($('gun'))))}
 new MutationObserver(yaz).observe(h,{subtree:true,childList:true,characterData:true,attributes:true});yaz()
-let sonD='';const dur=()=>{const k=document.documentElement.classList,d={toplanti:k.contains('toplantida'),yan:!k.contains('yan-kapali'),acik:['yz','gz','sc','sz'].filter(i=>$(i)&&$(i).classList.contains('on'))}
+let sonD='';const dur=()=>{const k=document.documentElement.classList,d={toplanti:k.contains('toplantida'),yan:!k.contains('yan-kapali'),acik:['yz','gz','sc','sz'].filter(i=>$(i)&&$(i).classList.contains('on')),sohbet:k.contains('sh-acik')}
   const j=JSON.stringify(d);if(j!==sonD){sonD=j;webkit.messageHandlers.suflor.postMessage(d)}}
 new MutationObserver(dur).observe(document.documentElement,{attributes:true,attributeFilter:['class']});const nb=document.querySelector('.nb');if(nb)new MutationObserver(dur).observe(nb,{subtree:true,attributes:true,attributeFilter:['class']});dur()})()
 """
@@ -1568,7 +1570,8 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         // v0.106.0: toplantı sürerken görünenler (panodaki alt çubuktan taşındı; açık olan dolu simgeyle)
         (.init("yz"), "star", "Önemli an", "yz"), (.init("gz"), "lock", "Gizli toplantı", "gz"), (.init("sc"), "headphones", "Sesli çeviri", "sc"),
         (.init("sz"), "bell.slash", "Sessiz (10 dk)", "sz"), (.init("kz"), "camera", "Kanıt al", "kz"), (.init("yan"), "sidebar.right", "Yan panel", ""),
-        (.init("kenar"), "sidebar.left", "Kenar çubuğu", "")]
+        (.init("kenar"), "sidebar.left", "Kenar çubuğu", ""),
+        (.init("sohbet"), "text.bubble", "Asistan sohbeti", "")]  // 9 Kasım: sağdaki sohbet paneli (sayfadaki #shb Mac'te gizli; durum sayfadan gelir, açıkken dolu simge)
     static let TOPLANTI: Set<String> = ["yz", "gz", "sc", "sz", "kz", "yan"]
     static let DOLU = ["yz": "star.fill", "gz": "lock.fill", "sc": "headphones.circle.fill", "sz": "bell.slash.fill"]
     var baslikIzle: NSKeyValueObservation?
@@ -1615,8 +1618,10 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
         if d["yardim"] != nil { yardim() }
         if d["toplanti"] != nil { durumIsle(d) }
     }
-    func goster() {
-        if web.url == nil { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)") { web.load(URLRequest(url: u)) } }
+    func goster(bolum: String = "") {
+        let b = String(bolum.lowercased().filter { $0 >= "a" && $0 <= "z" }.prefix(12))  // yalnız küçük harf: adrese ve JS'e güvenle girer
+        if web.url == nil { let k = anahtar().addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""; if let u = URL(string: "\(KOK)/?k=\(k)" + (b.isEmpty ? "" : "#bolum=\(b)")) { web.load(URLRequest(url: u)) } }
+        else if !b.isEmpty { web.evaluateJavaScript("typeof panoBolum==='function'&&panoBolum('\(b)')") }  // pencere zaten açık: sayfa kendisi gider
         NSApp.setActivationPolicy(.regular); if let s = suflorSimge { NSApp.applicationIconImage = s }
         anaMenu(); web.frame = pencere.contentLayoutRect; pencere.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         istek("/status") { [weak self] v in if let s = v?["surum"] as? String { DispatchQueue.main.async { self?.surum = s } } }
@@ -1624,7 +1629,7 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     func windowWillClose(_ n: Notification) { NSApp.dockTile.badgeLabel = nil; politikaYenile() }
     // --- araç çubuğu ---
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [NSToolbarItem.Identifier("kenar"), .flexibleSpace] + ["yz", "gz", "sc", "sz", "kz", "yan"].map { NSToolbarItem.Identifier($0) } + [.space] + ["mini", "gb", "ay"].map { NSToolbarItem.Identifier($0) }
+        [NSToolbarItem.Identifier("kenar"), .flexibleSpace] + ["yz", "gz", "sc", "sz", "kz", "yan"].map { NSToolbarItem.Identifier($0) } + [.space] + ["mini", "gb", "ay", "sohbet"].map { NSToolbarItem.Identifier($0) }
     }
     func toolbarAllowedItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(t) }
     func toolbar(_ t: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar f: Bool) -> NSToolbarItem? {
@@ -1637,13 +1642,16 @@ final class PanoPencere: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUID
     @objc func aracTik(_ o: NSToolbarItem) {
         if o.itemIdentifier.rawValue == "yan" { web.evaluateJavaScript("yanAcKapa()"); return }
         if o.itemIdentifier.rawValue == "kenar" { kenarAcKapa(); return }
+        if o.itemIdentifier.rawValue == "sohbet" { web.evaluateJavaScript("typeof shAc==='function'&&shAc(!shAcik,true)"); return }
         if let a = PanoPencere.ARACLAR.first(where: { $0.0 == o.itemIdentifier }) { tikla(a.3) }
     }
     // sayfadan: toplantıda mı, hangi düğme açık, yan panel açık mı → araç çubuğu
     func durumIsle(_ d: [String: Any]) {
-        let top = d["toplanti"] as? Bool ?? false, acik = Set(d["acik"] as? [String] ?? []), yan = d["yan"] as? Bool ?? true
+        let top = d["toplanti"] as? Bool ?? false, acik = Set(d["acik"] as? [String] ?? []), yan = d["yan"] as? Bool ?? true, sohbet = d["sohbet"] as? Bool ?? false
         for o in pencere.toolbar?.items ?? [] {
-            let k = o.itemIdentifier.rawValue; guard PanoPencere.TOPLANTI.contains(k), let a = PanoPencere.ARACLAR.first(where: { $0.0 == o.itemIdentifier }) else { continue }
+            let k = o.itemIdentifier.rawValue
+            if k == "sohbet" { o.image = NSImage(systemSymbolName: sohbet ? "text.bubble.fill" : "text.bubble", accessibilityDescription: T("Asistan sohbeti")); continue }
+            guard PanoPencere.TOPLANTI.contains(k), let a = PanoPencere.ARACLAR.first(where: { $0.0 == o.itemIdentifier }) else { continue }
             if #available(macOS 15.0, *) { o.isHidden = !top }
             let ad = k == "yan" ? (yan ? "sidebar.right" : "sidebar.squares.right") : acik.contains(k) ? (PanoPencere.DOLU[k] ?? a.1) : a.1
             o.image = NSImage(systemSymbolName: ad, accessibilityDescription: a.2)
@@ -1797,6 +1805,10 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
     // Tek gezinme: araç çubuğu (sayfadaki #ayt başlık listesi bu pencerede gizli). Sıra ve adlar pano.html'deki AYH ile birebir aynı; ayGrup(i) AYH sırasını alır.
     static let GRUPLAR = [("Genel", "gearshape"), ("Görünüm", "paintbrush"), ("Toplantı", "person.2"), ("Ses ve konuşma", "speaker.wave.2"), ("Asistan ve kişilik", "mic"),
                           ("Takvim ve e-posta", "calendar"), ("Kayıt ve ekip", "folder"), ("Bilgi kaynakları", "globe"), ("Gizlilik", "hand.raised"), ("Gelişmiş", "slider.horizontal.3")]
+    // 9 Kasım (kullanıcı: "tek başlık satırı, tüm ikonlar görünsün"): araç çubuğunda kısa ad — on simge » taşmasız sığar; tam ad ipucunda ve pencere başlığında
+    static let KISA = ["Ses ve konuşma": "Ses", "Asistan ve kişilik": "Asistan", "Takvim ve e-posta": "Takvim", "Kayıt ve ekip": "Kayıt", "Bilgi kaynakları": "Kaynaklar"]
+    static func kisa(_ ad: String) -> String { T(KISA[ad] ?? ad) }
+    static let EN: CGFloat = 640, ILK_EN: CGFloat = 720  // ölçüldü (9 Kasım, macOS 27): on kısa etiketli simge (.preference) 600 px'ten itibaren taşmasız, uzun adlarla 820'de bile 9/10; en dar boy 640
     func kimlik(_ i: Int) -> NSToolbarItem.Identifier { .init("g\(i)") }
     var seciliGrup = 0
     func toolbarDefaultItemIdentifiers(_ t: NSToolbar) -> [NSToolbarItem.Identifier] { AyarPencere.GRUPLAR.indices.map(kimlik) }
@@ -1805,7 +1817,7 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
     func toolbar(_ t: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar f: Bool) -> NSToolbarItem? {
         guard let i = Int(id.rawValue.dropFirst()), i < AyarPencere.GRUPLAR.count else { return nil }
         let (ad, simge) = AyarPencere.GRUPLAR[i], o = NSToolbarItem(itemIdentifier: id)
-        o.label = T(ad); o.image = NSImage(systemSymbolName: simge, accessibilityDescription: T(ad)); o.target = self; o.action = #selector(sekme(_:)); return o
+        o.label = AyarPencere.kisa(ad); o.toolTip = T(ad); o.image = NSImage(systemSymbolName: simge, accessibilityDescription: T(ad)); o.target = self; o.action = #selector(sekme(_:)); return o
     }
     @objc func sekme(_ o: NSToolbarItem) { if let i = Int(o.itemIdentifier.rawValue.dropFirst()) { grupSec(i, sayfaya: true) } }
     func grupSec(_ i: Int, sayfaya: Bool) {
@@ -1815,8 +1827,8 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
     }
     init(yardim: Bool = false) {  // yardim: aynı pencere Yardım için (sekmesiz, ?gorunum=yardim)
         yardimKipi = yardim
-        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: yardim ? 720 : 600), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        pencere.title = T(yardim ? "Suflor.me Yardımı" : "Ayarlar"); pencere.minSize = NSSize(width: 460, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
+        pencere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: yardim ? 640 : AyarPencere.ILK_EN, height: yardim ? 720 : 600), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        pencere.title = T(yardim ? "Suflor.me Yardımı" : "Ayarlar"); pencere.minSize = NSSize(width: yardim ? 460 : AyarPencere.EN, height: 380); pencere.isReleasedWhenClosed = false; pencere.tabbingMode = .disallowed
         let c = WKWebViewConfiguration(); c.websiteDataStore = .default()
         c.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('mac')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         c.userContentController.addUserScript(WKUserScript(source: "try{webkit.messageHandlers.suflor.postMessage({dil:document.documentElement.lang})}catch(e){}", injectionTime: .atDocumentEnd, forMainFrameOnly: true))
@@ -1828,10 +1840,11 @@ final class AyarPencere: NSObject, NSWindowDelegate, WKScriptMessageHandler, WKN
             pencere.toolbar = t; pencere.toolbarStyle = .preference; grupSec(0, sayfaya: false)
         }
         pencere.center(); pencere.setFrameAutosaveName(yardim ? "SuflorYardim" : "SuflorAyar")
+        if !yardim, pencere.frame.width < AyarPencere.EN { var f = pencere.frame; f.size.width = AyarPencere.EN; pencere.setFrame(f, display: false) }  // eski kayıtlı dar boy (640) simgeleri taşırırdı
         NotificationCenter.default.addObserver(forName: .init("SuflorDil"), object: nil, queue: .main) { [weak self] _ in  // sekmeler ve başlık yeni dille
             guard let self = self else { return }
             if self.yardimKipi { self.pencere.title = T("Suflor.me Yardımı"); return }
-            for o in self.pencere.toolbar?.items ?? [] { if let i = Int(o.itemIdentifier.rawValue.dropFirst()), i < AyarPencere.GRUPLAR.count { o.label = T(AyarPencere.GRUPLAR[i].0) } }
+            for o in self.pencere.toolbar?.items ?? [] { if let i = Int(o.itemIdentifier.rawValue.dropFirst()), i < AyarPencere.GRUPLAR.count { o.label = AyarPencere.kisa(AyarPencere.GRUPLAR[i].0); o.toolTip = T(AyarPencere.GRUPLAR[i].0) } }
             self.pencere.title = T(AyarPencere.GRUPLAR[self.seciliGrup].0)
         }
     }
