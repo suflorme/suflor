@@ -14,7 +14,7 @@ html.bugun .nb :is(#kns,.kt,.kal){max-width:760px;margin-inline:auto}
 html.bugun .kt{background:var(--b-cam);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid var(--b-cam-kenar);box-shadow:var(--b-cam-golge);border-radius:var(--r-tam);padding:var(--bo-8) var(--bo-8) var(--bo-8) var(--bo-12);align-items:center}
 html.bugun .kt textarea,html.bugun .kt textarea:focus{font-size:var(--yz-15);color:var(--b-murekkep)}
 html.bugun .kt textarea::placeholder{color:var(--b-m3)}
-html.bugun .kt .ib{color:var(--b-m2)}html.bugun .kt .ib:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}
+html.bugun .kt .ib{color:var(--b-m2)}html.bugun .kt .ib:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}html.bugun .kt .ksb[aria-pressed=true]{color:var(--b-ana);background:var(--b-vurgu-hafif)}
 html.bugun .kt .ktm{width:36px;height:36px;border-radius:50%;background:var(--b-ana);color:var(--b-ana-yazi)}html.bugun .kt .ktm:hover{background:var(--b-ana);color:var(--b-ana-yazi);opacity:.9}
 html.bugun .kt .ktm.on,html.bugun .kt .ktm.soh{background:var(--b-ana);color:var(--b-ana-yazi);box-shadow:0 0 0 3px var(--b-vurgu-hafif)}
 

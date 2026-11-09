@@ -32,6 +32,9 @@ for l in sys.stdin:
     elif "kötü" in soru: c = ["Tamam.", "\\n[SÖZLÜK: bu çok uzun bir yanlış yazılış yani dört sözcükten fazla => Doğru]"]
     else: c = ["Sorduğun: " + soru.rstrip("?.") + "."]
     c.append(" Kural geldi." if kural else " Kural yok.")
+    if "cevabın ilk kısmı sesli okunur" in q: c.append(" Sesli tur.")
+    if "hoparlör düğmesini" in q: c.append(" Düğme ipucu var.")
+    if "ayrıntılı" in soru: c.append("\\n---\\nYazılı ayrıntı burada.")
     for p in c: time.sleep(0.1); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": p}}})
     pr({"type": "result", "duration_api_ms": 100, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
@@ -89,6 +92,19 @@ try:
     ok("yalnız bağlantı: bağlam kaynağı, asistana gitmez", g3.get("tur") == "bağlam")
     time.sleep(0.5); g4 = u.post("/girdi", {"text": "? kaç kişiydik"}); k = u.bekle("kaç kişiydik")
     ok("başta ? hâlâ doğrudan soru (kural eklenmez: not sayılmaz)", g4.get("tur") == "asistan" and "Kural yok" in (k.get("cevap") or ""))
+    # v0.214: kutudaki sesli cevap düğmesi (/girdi sesli:true)
+    ses_n = lambda: log1().count("SES (deneme)")
+    time.sleep(0.5); n0 = ses_n(); u.post("/girdi", {"text": "sesli konuş dostum"}); k = u.bekle("sesli konuş"); time.sleep(0.5)
+    ok("sesli kapalıyken yazılı tur okunmaz; istem düğmeyi işaret eder (kendiliğinden açmaz)", "Düğme ipucu var" in (k.get("cevap") or "") and "Sesli tur" not in (k.get("cevap") or "") and ses_n() == n0)
+    time.sleep(0.5); n0 = ses_n(); u.post("/girdi", {"text": "hangi işler açık ayrıntılı", "sesli": True}); k = u.bekle("ayrıntılı"); time.sleep(1.0)
+    l1 = log1(); gecen = l1[l1.rfind("KONUŞ: kutu sorusu sesli cevapla"):] if "kutu sorusu sesli cevapla" in l1 else ""
+    ok("sesli:true: cevap okuma kuyruğuna gider, istem sesli turu söyler (yazılı kural değil)", ses_n() > n0 and "Sesli tur" in (k.get("cevap") or "") and "Düğme ipucu" not in (k.get("cevap") or ""))
+    ok("sesli turda --- sonrası yazılı ayrıntı okunmaz ama panoda görünür", "Yazılı ayrıntı burada" not in gecen and "Yazılı ayrıntı burada" in (k.get("cevap") or ""))
+    time.sleep(0.5); n0 = ses_n(); u.post("/girdi", {"text": "yarın Ali'yi ara hatırlat", "sesli": True}); k = u.bekle("hatırlat"); time.sleep(1.0)
+    l1 = log1(); gecen = l1[l1.rfind("KONUŞ: kutu sorusu sesli cevapla"):]
+    ok("sesli turda [NOT: …] etiketi okunmaz, iş yine yapılır", "[NOT" not in gecen.split("SES (deneme)", 1)[-1] and ses_n() > n0 and any(x["metin"] == "yarın Ali'yi ara" for x in jsonl(d1, "notlar.jsonl")))
+    time.sleep(0.5); n0 = ses_n(); u.post("/girdi", {"text": "sesli:false deneme sorusu", "sesli": False}); k = u.bekle("sesli:false"); time.sleep(0.5)
+    ok("sesli:false açıkça: okunmaz", ses_n() == n0 and "Sesli tur" not in (k.get("cevap") or ""))
     ok("aktarıcıda hata yok (asistan açık)", "Traceback" not in log1())
     # 2) asistan hiç çalışamıyor (claude yok): yazı not olarak kalır ve panoda söylenir
     P2 = bos_port(PORT + 5); r2, d2, k2 = baslat("canli2", P2, ayar("ayar2", claude=bozuk, port=P2)); u2 = Uc(P2, k2)

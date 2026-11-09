@@ -262,6 +262,9 @@ def konus_web_destek(uyg=None, kaynaklar=None):  # kurulu Brifing yardımcısı 
     try: kayit = json.load(open(os.path.join(uyg or AYAR["uygulama"], "derleme.json"), encoding="utf-8")).get("SuflorBrifing")
     except (OSError, ValueError, AttributeError, KeyError): return False
     if not isinstance(kayit, str) or not kayit: return False
+    try:  # kurulum.py derle kaydı: "evet:<sha>" — kaynak okunamasa da (launchd, Masaüstü) kurulu ikilinin web desteği bilinir
+        if json.load(open(os.path.join(uyg or AYAR["uygulama"], "derleme.json"), encoding="utf-8")).get("SuflorBrifing.web") == "evet:" + kayit: return True
+    except (OSError, ValueError, AttributeError): pass
     for y in (kaynaklar if kaynaklar is not None else _konus_swift_yerler()):
         try: ham = open(y, "rb").read()
         except OSError: continue
@@ -1399,7 +1402,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 tur["metin"] += d
                 KONUS["cevap"] = tur["metin"]
                 if not tur.get("ayrinti"):  # S48: "---" sonrası yazılı ayrıntı — okunmaz, panoda görünür
-                    tur["tampon"] += d; m = re.search(r"(?:^|\n)\s*-{3,}", tur["tampon"]) or TALIMAT_ETIKET_BAS.search(tur["tampon"]) or KAYIT_ETIKET_BAS.search(tur["tampon"])  # v0.101.1: [İLET …] okunmaz; 5 Kasım: [KAYIT: …] de
+                    tur["tampon"] += d; m = re.search(r"(?:^|\n)\s*-{3,}", tur["tampon"]) or TALIMAT_ETIKET_BAS.search(tur["tampon"]) or KAYIT_ETIKET_BAS.search(tur["tampon"]) or (tur.get("kutu") and KUTU_ETIKET_BAS.search(tur["tampon"]))  # v0.101.1: [İLET …] okunmaz; 5 Kasım: [KAYIT: …] de
                     if m: tur["tampon"] = tur["tampon"][:m.start()]; _konus_cumle(tur, son=True); tur["ayrinti"] = True
                     else: _konus_cumle(tur)
             elif j.get("type") == "result":
@@ -1915,9 +1918,9 @@ KUTU_KURAL = {"tr": ("Bu yazı panodaki tek kutudan geldi; kullanıcı onu not, 
                      "[SÖZLÜK: wrong spelling => correct spelling] and say «Done, added to the dictionary: wrong → right» (the wrong form as the user gave it; person, company and term names only; "
                      "you can't fix past records or summaries — say so in one sentence). If it is only a reminder or note (a to-do, a promise, something to remember), end with [NOT: the user's words] and say «Noted.» briefly. "
                      "The tags aren't shown on the panel. This rule replaces the «can't do record requests» rule; decisions, tasks, open questions and summary fixes are proposed with the [Writing records] rule; email and other systems you still can't do — say so.")}
-def konus_yazili(metin, kutu=False):  # v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py); kutu: 5 Kasım — yazı not/soru/talimat olabilir, asistan ayırır
+def konus_yazili(metin, kutu=False, sesli=False):  # v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py); kutu: 5 Kasım — yazı not/soru/talimat olabilir, asistan ayırır
     if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
-    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True, "kutu": bool(kutu)}; _KS["tur"] = tur
+    tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True, "kutu": bool(kutu), "sesli_iste": bool(sesli)}; _KS["tur"] = tur  # sesli: pano kutusundaki 🔊 düğmesi açık — _konus_sor toplantı yokken ve gizli değilken cevabı okur
     if kutu: KUTU_BEKLEYEN.clear(); KUTU_BEKLEYEN.update(metin=str(metin)[:4000], at=datetime.datetime.now().isoformat(timespec="seconds"))
     else: KUTU_BEKLEYEN.clear()
     konus_pocket_isit(); threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
@@ -2183,6 +2186,9 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     kis = kisilik(); tur["kisi"] = kis["ad"] if kis and len(kisilikler()) >= 2 else None
     if top and tur.get("kaynak") not in ("hitap", "karsi", "moderator"):  # S94: toplantıda Konuş düğmesi (ve sohbet) yalnız kullanıcıya; herkese cevap yalnız adıyla seslenince
         tur["otonom"] = False
+    if tur.get("sesli_iste"):  # kutudan sesli cevap istendi: yalnız toplantı yokken ve gizli kipte değilken; aksi halde sessizce yazılı kalır
+        if top or gizli_acik(): tur["sesli_iste"] = False
+        else: tur["yazili"] = False; print("KONUŞ: kutu sorusu sesli cevapla (🔊 düğmesi)")
     tur["sesli"] = ((not top) or kulaklik()) and not tur.get("otonom") and not tur.get("yazili"); tur["toplantida"] = top  # otonom: cevap toplantıya okunur, kulakta da duyulur
     tur["bellek_kapsam"] = bellek_kapsam(tur, kis); bsn = bellek_sira(metin, tur, kis)  # v0.64.0 (S78)
     tur["derin"], dm_, de_, dn_ = konus_derin_karar(metin, tur, top)  # 9 Kasım: analiz sorusu → bu tur Opus'lu süreç
@@ -2214,8 +2220,10 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
              f"Meeting in progress: {df['ad'] if df else '?'} — " + (
                  (f"{tur.get('karsi') or 'the user'} addressed you by name in the meeting; the spoken part of your answer is read into the meeting right away and everyone hears it: address the asker directly, always address the user formally (Turkish «siz», never «sen»), 1–3 sentences, fit to say in the meeting (no internal notes, observations about people, other projects' information or private remarks)" if tur.get("kaynak") != "moderator" else "you are chairing the meeting; your answer is read into the meeting")
                  if tur.get("otonom") else "only the user hears this answer, the meeting doesn't; " + ("it is read in the headphones" if tur["sesli"] else "it is shown on the panel only (no headphones)")) + ".\n")) if top else ""
-    if tur.get("yazili"): tb += _t("Kullanıcı bu soruyu panoya yazdı; cevabın sesli okunmaz, yalnız panoda yazılı görünür.\n",
-                                   "The user typed this question on the panel; your answer is not read aloud, it is shown on the panel only.\n")
+    if tur.get("yazili"): tb += _t("Kullanıcı bu soruyu panoya yazdı; cevabın sesli okunmaz, yalnız panoda yazılı görünür. Kullanıcı yazıyla «sesli konuş» ya da «sesli cevap ver» derse kendiliğinden açılmaz: kutuda mikrofonun yanındaki hoparlör düğmesini açarsa cevapları sesli okuyacağını kısa bir cümleyle söyle.\n",
+                                   "The user typed this question on the panel; your answer is not read aloud, it is shown on the panel only. If the user writes «talk to me» or «answer aloud», it doesn't turn on by itself: say in one short sentence that you'll read answers aloud once they switch on the speaker button next to the microphone in the box.\n")
+    elif tur.get("kutu") and tur.get("sesli"): tb += _t("Kullanıcı bu soruyu panoya yazdı ve sesli cevap düğmesini açtı; cevabın ilk kısmı sesli okunur, «---» sonrası ayrıntı panoda yazılı kalır (sesli konuşma biçimi aynen).\n",
+                                   "The user typed this question on the panel with the read-aloud button on; the first part of your answer is read aloud and the detail after «---» stays written on the panel (same spoken format as voice).\n")
     if tur.get("kutu"): tb += _t(KUTU_KURAL["tr"], KUTU_KURAL["en"]) + "\n"
     if kayit_turu_mu(tur) and (KAYIT_SONUC or ('pro_bekliyor' in globals() and pro_bekliyor()) or tur.get("kutu") or KAYIT_ISTEK_RX.search(metin or "")):  # 5 Kasım: kayıt önerisi kuralı + kimlikli kayıtlar (yalnız kayıt konusu geçen turda)
         tb += kayit_sonuc_notu()

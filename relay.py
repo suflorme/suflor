@@ -2511,7 +2511,7 @@ class H(BaseHTTPRequestHandler):
             if soru and not bos:  # toplantı sürerken ⌘Enter/?: izleyen oturum varsa o cevaplar (ask), yoksa yazılı asistan
                 q = ask({"text": metin}); y = soru_oturumsuz(metin) if q else None
                 return self._json(dict({"ok": bool(q), "tur": "soru", "question": q}, **({"asistan": y} if y else {})))
-            r = konus_yazili(metin, kutu=not soru)
+            r = konus_yazili(metin, kutu=not soru, sesli=p.get("sesli") is True)  # v0.214: kutudaki sesli cevap düğmesi — toplantıda/gizli kipte okunmaz (bas-konus.py)
             if r.get("ok") or soru: return self._json(dict(r, tur="asistan"))  # açık soru cevapsız kalırsa notlanmaz: pano "gönderilemedi" der, metin kutuya döner
             return self._json(dict(kutu_not_kaydet(metin, p.get("at")), tur="defter" if bos else "not", yedek=True, err=r.get("err")))  # asistan meşgul: yazı kaybolmaz
         if self.path == "/kanit":

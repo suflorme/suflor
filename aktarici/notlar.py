@@ -103,6 +103,7 @@ def kutu_yedek(hata=None):  # asistan çalışamadı (_konus_kur durum=hata): be
 # yardımcı komutu kendi izin listesinden ve kullanıcının ayar dosyasından yeniden doğrular. Yardımcı kurulu değilse aktarıcı asıl dosyayı kendisi dener.
 # Proje kayıt betiği (proje_kayit): ayar baglayici.kayit.yazma {komut, alt_komutlar, bayraklar, sure_sn} (A1; yoksa eski kayit_komutu = [python3, <proje>/…/betik.py, sabit önek…],
 # kayit_alt_komutlar = [izinli alt komutlar], isteğe bağlı kayit_bayraklar = [izinli "--bayrak"lar], kayit_sure_sn); doğrulama ve yazma baglayici.py oner/yaz. Ayar yoksa komut izin listesinde de asistanın kuralında da yoktur. ⚙ Ayarlar'da gösterilmez (elle ayar dosyası).
+KUTU_ETIKET_BAS = re.compile(r"\[\s*(?:NOT|NOTE|SÖZLÜK|SOZLUK|SÖZLUK|DICT)\s*:", re.I)  # v0.214: kutudan sesli turda [NOT: …]/[SÖZLÜK: …] okunmaz (bas-konus.py akışı)
 KAYIT_ETIKET_BAS = re.compile(r"\[\s*KAYIT\s*:", re.I)  # sesli okuma da bu noktada durur (bas-konus.py)
 KAYIT_TUR_EN_COK, KAYIT_TEKRAR_SN = 5, 1800
 KAYIT_SORULAN = {}  # öneri imzası → zaman (aynı öneri yeniden sorulmaz)
