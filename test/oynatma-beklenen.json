@@ -720,6 +720,14 @@
    "port": "int",
    "posta": "NoneType",
    "proaktif": "NoneType",
+   "proaktif_durum": {
+    "acik": "bool",
+    "aday": "int",
+    "bakis_s_once": "int",
+    "bugun": "int",
+    "en_cok": "int",
+    "neden": "str"
+   },
    "proje_erisim": "NoneType",
    "questions": [
     {

@@ -119,6 +119,7 @@ vm = sub.add_parser("vt-mcp", help="kayıt veritabanı araçları (vt_sema, vt_s
 vi = sub.add_parser("vt-izle", help="v0.62.0: kayıt veritabanı önbelleklerini (tablo yapısı, kişi adları, değişme saati, sorgu sonuçları) dakikada bir yazar — Brifing yardımcısı Masaüstü izniyle çalıştırır; tek kopya, 6 saatte kapanır")
 vi.add_argument("--sure", type=float, default=6 * 3600, help=argparse.SUPPRESS); vi.add_argument("--bir", action="store_true", help="bir kez yaz ve çık")
 sub.add_parser("proje-notu", help="Faz 11 Aşama 2 (K4): Suflor'un proje notu (<uygulama>/proje-notu.md, proje kartı onayında yazılır) — toplantı başında bir kez")
+sub.add_parser("profil-guncelle", help="10 Kasım: çalışma klasörü CLAUDE.md'deki \"Ben ve işim\" bölümünü (onaylanmış/düzeltilmiş) asistanın profil dosyasına da yazar (ayar kisilik_bellek ya da <uygulama>/profil.md); ilk toplantı sonu profil onayı")
 sub.add_parser("proje", help="v0.121.0: proje özeti (onaylı proje kartı) ve proje veritabanının tabloları — toplantı başında bir kez; ayrıntı vt-sor ile")
 vq = sub.add_parser("vt-sor", help="kayıt veritabanında tek SELECT/WITH sorgusu (yalnız okunur, en çok 60 satır; şifre/anahtar sütunları gizli)"); vq.add_argument("sorgu")
 # v0.57.0: toplantı oturumunun Claude harcaması (API fiyatıyla karşılığı) — Claude Code oturum dökümünden, yalnız yerel dosyalar; aktarıcı 30 dk'da bir çağırır
@@ -800,6 +801,32 @@ def proje_cmd():  # toplantı oturumu başında: kart özeti + tablolar (yapay z
 # K4: proje notu kullanıcının CLAUDE.md'sinde değil uygulama klasöründe. Eski kurulumda CLAUDE.md'ye yazılmış taslak bölüm bir kez kopyalanır (CLAUDE.md'ye dokunulmaz).
 # Kayıt veritabanı kipinde (veritabani.yol, proje_vt değil) davranış değişmez: not okunmaz.
 PROJE_NOTU_BASLIK = "## Proje kartı (taslak)"
+PROFIL_BASLIKLAR = ("## Ben ve işim", "## About me and my work"); PROFIL_KR = 3000  # kurulum.py PROFIL_KR / kisi-modeli.py KM_CAP["profil"] ile aynı
+def _profil_bolum(s):  # → (başlangıç, bitiş) ya da None: başlıkla başlayan bölüm (başlıktaki "(taslak)"/"(draft)" olsa da olmasa da), sonraki "## "a kadar
+    for b in PROFIL_BASLIKLAR:
+        m = re.search(r"(?m)^" + re.escape(b) + r"(?: \((?:taslak|draft)\))?[ \t]*$", s)
+        if m:
+            j = re.search(r"(?m)^## ", s[m.end():]); return m.start(), (m.end() + j.start() if j else len(s))
+    return None
+def profil_guncelle_cmd():  # CLAUDE.md'deki bölüm asıl; profil dosyasındaki bölüm onunla değiştirilir (yoksa sığarsa eklenir). Başka bölümlere dokunmaz
+    cm = os.path.join(CALISMA, "CLAUDE.md")
+    try: s = open(cm, encoding="utf-8").read()
+    except OSError: print("profil: CLAUDE.md yok — yapılacak bir şey yok."); return
+    r = _profil_bolum(s)
+    if not r: print("profil: CLAUDE.md'de \"Ben ve işim\" bölümü yok — yapılacak bir şey yok."); return
+    blok = s[r[0]:r[1]].strip() + "\n"
+    yol = os.path.expanduser(str(AYAR.get("kisilik_bellek") or "").strip()) or os.path.join(AYAR["uygulama"], "profil.md")
+    try:
+        if os.path.exists(yol):
+            eski = open(yol, encoding="utf-8").read(); q = _profil_bolum(eski)
+            yeni = (eski[:q[0]] + blok + ("\n" + eski[q[1]:].lstrip("\n") if eski[q[1]:].strip() else "")) if q else eski.rstrip() + "\n\n" + blok
+            if len(yeni) > PROFIL_KR: print(f"profil: sonuç {len(yeni)} karakter (sınır {PROFIL_KR}) — profil dosyası değişmedi; bölümü kısalt."); sys.exit(1)
+            if yeni != eski: open(yol, "w", encoding="utf-8").write(yeni)
+        else:
+            os.makedirs(os.path.dirname(yol), exist_ok=True); fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f: f.write("# Profil\n\n" + blok)
+    except OSError as e: print(f"profil: profil dosyasına yazılamadı ({e.__class__.__name__})"); sys.exit(1)
+    print(f"profil: asistanın profil dosyası güncellendi ({os.path.basename(yol)})")
 def proje_notu_cmd():
     if VT.get("yol") and not VT.get("proje_vt"): print("Kayıt veritabanı ayarlı: proje notu kullanılmıyor (CLAUDE.md ve vt-sema/vt-sor)."); return
     y = os.path.join(AYAR["uygulama"], "proje-notu.md")
@@ -2866,5 +2893,5 @@ try:
     {"kart": kart, "hazir": hazir, "izle": izle, "olcum": olcum, "ara": ara_cmd, "sozluk": sozluk_cmd, "acik": acik_cmd, "soz": soz_cmd, "eylem": eylem_cmd, "gundem": gundem_cmd,
      "kanit": kanit_cmd, "sonuc": sonuc_cmd, "hazirlik": hazirlik_cmd, "etiket": etiket_cmd,
      "saglik": saglik_cmd, "takvim": takvim_cmd, "kisi": kisi_cmd, "katilimcilar": katilimcilar_cmd, "tazi": tazi_cmd, "kapanis": kapanis_cmd, "rapor": rapor_cmd, "dokum": dokum_cmd, "geri-bildirim": geri_bildirim_cmd, "gelen": gelen_cmd, "ilet": ilet_cmd, "izin-kanca": izin_kanca_cmd, "ozet-hazir": ozet_hazir_cmd, "durum": durum_cmd,
-     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "kisi-es": kisi_es_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
+     "ekranlar": adimlar_cmd, "adimlar": adimlar_cmd, "konusmaci": konusmaci_cmd, "hafiza": hafiza_cmd, "yapi": yapi_cmd, "graf": graf_cmd, "kisi-es": kisi_es_cmd, "bitir": bitir_cmd, "posta-uslup": posta_uslup_cmd, "vt-sema": vt_sema_cmd, "vt-sor": vt_sor_cmd, "proje": proje_cmd, "proje-notu": proje_notu_cmd, "profil-guncelle": profil_guncelle_cmd, "vt-mcp": vt_mcp_cmd, "vt-izle": vt_izle_cmd, "maliyet": maliyet_cmd}[A.cmd]()
 except KeyboardInterrupt: pass

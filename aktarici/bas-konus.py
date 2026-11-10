@@ -2390,6 +2390,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
                                    "The user typed this question on the panel with the read-aloud button on; the first part of your answer is read aloud and the detail after «---» stays written on the panel (same spoken format as voice).\n")
     if tur.get("kutu"): tb += _t(KUTU_KURAL["tr"], KUTU_KURAL["en"]) + "\n"
     if kayit_turu_mu(tur) and (KAYIT_SONUC or ('pro_bekliyor' in globals() and pro_bekliyor()) or tur.get("kutu") or tur.get("kayit_blok") or KAYIT_ISTEK_RX.search(metin or "")):  # 5 Kasım: kayıt önerisi kuralı + kimlikli kayıtlar (yalnız kayıt konusu geçen turda; 10 Kasım: kayıt turunda hep, kullanıcı konuşmada «bunu ertele» diyebilsin)
+        if 'pro_konus_cevap' in globals(): pro_konus_cevap(metin)  # gün içi önerinin Konuş'ta kabul/reddi söz kapısına yazılır (aktarici/toplanti-sonrasi.py)
         tb += kayit_sonuc_notu()
         if tur.get("kutu") or tur.get("kayit_blok") or KAYIT_ISTEK_RX.search(metin or ""): tb += kayit_kural() + "\n" + kayit_blogu()
     def gonder():  # süreç yoksa açar, defter bloğunu (gerekirse) ekleyip soruyu yazar; zaman aşımı bekçisini kurar

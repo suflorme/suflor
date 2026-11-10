@@ -44,4 +44,19 @@ ok("kisilik_bellek yoksa oraya oluşturulur", os.path.exists(kb) and "satın alm
 # 6) asistanın okuyucusu (kisi-modeli.py) bu dosyayı görür: profil_yol aynı çözüm
 km = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read()
 ok("kisi-modeli.py profil_yol aynı iki yolu kullanıyor (kisilik_bellek, <uygulama>/profil.md)", 'AYAR.get("kisilik_bellek")' in km and 'os.path.join(AYAR["uygulama"], "profil.md")' in km)
+# 7) İlk toplantı sonu onayı: toplanti-claude.py profil-guncelle — düzeltilmiş CLAUDE.md bölümü profil dosyasına da yazılır (gerçek komut, geçici klasör)
+def tc(ayar_d):
+    ay = os.path.join(T, "ayar7.json"); json.dump(ayar_d, open(ay, "w"))
+    return subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "profil-guncelle"], capture_output=True, text=True, env=dict(os.environ, SUFLOR_AYAR=ay, PYTHONDONTWRITEBYTECODE="1"), timeout=60)
+AY7 = {"calisma": proje, "uygulama": uyg}; AY7["kisilik_bellek"] = py
+open(py, "w").write("# Profil\n\n## Kim\n- Deniz\n\n" + "## Ben ve işim (taslak)\n_Kurulumda hazırlandı._\n\nEski not.\n\n## Öncelikler\n- Vade\n")
+open(cm, "w").write("# Çalışma klasörü\n\n## Ben ve işim\n_Onaylandı._\n\nYeni düzeltilmiş not: bütçe öncelikli.\n\n## Başka bölüm\nx\n")
+r = tc(AY7); p7 = open(py).read()
+ok("profil-guncelle: çıkış 0, profil dosyasında bölüm düzeltilmiş metinle değişti", r.returncode == 0 and "bütçe öncelikli" in p7 and "Eski not" not in p7 and "(taslak)" not in p7)
+ok("profil-guncelle: komşu bölümler (Kim, Öncelikler) korundu, CLAUDE.md'nin başka bölümü taşınmadı", "## Kim\n- Deniz" in p7 and "## Öncelikler\n- Vade" in p7 and "Başka bölüm" not in p7 and p7.count("## Ben ve işim") == 1)
+r = tc(AY7); ok("profil-guncelle: ikinci çalışma aynı sonucu verir", r.returncode == 0 and open(py).read() == p7)
+os.remove(py); r = tc(AY7); ok("profil dosyası yoksa 0600 oluşur", r.returncode == 0 and os.stat(py).st_mode & 0o777 == 0o600 and "bütçe öncelikli" in open(py).read())
+open(py, "w").write("# Profil\n\n## Kim\n- Deniz\n"); r = tc(AY7); ok("profilde bölüm yoksa sonuna eklenir", "## Kim\n- Deniz" in open(py).read() and "bütçe öncelikli" in open(py).read())
+open(py, "w").write("# Profil\n" + "x" * 2990); k = open(py).read(); r = tc(AY7); ok("sınır aşılırsa dosya değişmez, çıkış 1", r.returncode == 1 and open(py).read() == k)
+open(cm, "w").write("# Çalışma klasörü\n"); k = open(py).read(); r = tc(AY7); ok("CLAUDE.md'de bölüm yoksa dokunmaz", r.returncode == 0 and open(py).read() == k)
 print("profil-notu: ✓ hepsi geçti" if not hata else f"profil-notu: ✗ {hata} hata"); sys.exit(1 if hata else 0)

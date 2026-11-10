@@ -819,6 +819,7 @@ def kayit_etiketleri(metin, tur):  # asistanın cevabı → etiketsiz metin; ge�
                         sesli=(bool(tur.get("sesli")) and not tur.get("toplantida") and not tur.get("yazili") and not tur.get("otonom")) or top_sesli, **({"toplantida_sesli": True} if top_sesli else {}))  # S: soru sesle sorulduysa kart da sesle okunur (brifing-ses.py soru_baslat); toplantıda/yazılıda yalnız kart
         if not iid: alt.append(_t("Onay kartı açılamadı: ", "Couldn't open the approval card: ") + h["ozet"]); continue
         KAYIT_SORULAN[imza] = time.time(); sun += 1
+        if 'pro_konus_etiket' in globals(): pro_konus_etiket(is_["komut"])  # öneriye bağlı etiket = kullanıcı evet dedi (söz kapısına kabul, bir kez)
         if h.get("olay_id"): is_["olay"] = h["olay_id"]  # geri al: onaylanan olay (onaydan sonra değiştiyse yazılmaz)
         threading.Thread(target=_kayit_bekle, args=(iid, is_, tur, h["ozet"]), daemon=True).start()
     if sun: alt.insert(0, _t(f"Onayını bekliyor: {sun} kayıt (panoda Onayla ya da Reddet).", f"Awaiting your approval: {sun} record(s) (Approve or Reject on the panel)."))

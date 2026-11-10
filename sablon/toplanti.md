@@ -151,5 +151,6 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    (ayarda `teshis: true`) `--not` metni geliştiriciye de gider: kişi adı, toplantı adı, konu, alıntı, rakam ya da şifre YAZMA
    ("14:20'de karşı taraf sesi kesildi, karşı ses ikinci denemede açıldı" gibi).
 7. Proje `CLAUDE.md`'de "## Ben ve işim (taslak)" (İngilizce: "(draft)") varsa — kurulumda Claude'un yazdığı çalışma notu —
-   rapordan sonra tek soru: notu 3–4 satırda özetle, "Doğru mu, düzelteyim mi?" Onaylarsa başlıktaki "(taslak)"ı sil; düzeltme
-   verirse notu düzelt, sonra sil. Cevap gelmezse dokunma, bir sonraki toplantıda yine sor.
+   rapordan sonra tek soru: notu 3–4 satırda özetle, "Doğru mu, düzelteyim mi?" Onaylarsa `CLAUDE.md`'deki başlıktan "(taslak)"ı sil;
+   düzeltme verirse notu `CLAUDE.md`'de düzelt, sonra sil. Ardından `tc profil-guncelle`: bölüm asistanın profil dosyasına da yazılır
+   (asistan notu oradan okur; yalnız `CLAUDE.md` kalırsa düzeltmeyi görmez). Cevap gelmezse dokunma, bir sonraki toplantıda yine sor.

@@ -167,6 +167,12 @@ ok("günün ilk mesai anında teslim: 'Günün planı hazır' bildirimi", len(N[
 ok("kayıtta/dosyalarda gizli ve deneme içeriği yok", all(w not in ham(N, f) for f in ("gun-plani.json", "soz.jsonl", "dusunme-durum.json", "ogrenilen.jsonl") for w in ("GİZLİ-TOPLANTI", "DENEME-TOPLANTI")))
 SAAT["t"] = SIMDI.timestamp()
 ok("günlük: tek özet satırı (gün planı hazır …)", sum(1 for l in N["LOG"] if "gün planı hazır —" in l) == 1 and any("istem" in l and "karakter" in l for l in N["LOG"]), N["LOG"][-4:])
+# hafta sonu (14 Kasım Cumartesi): plan bildirimi kapıya hiç verilmez, kuyruğa girmez, günlüğe neden yazılır
+n_k0, n_s0 = len(N["SOZK"]["kuyruk"]), len(satirlar(N, "soz.jsonl")); N["LOG"].clear()
+r_hs = N["_dus_soz"]({"tarih": "2026-11-14", "odak": [1], "dikkat": []}, dt(14, 4))
+ok("hafta sonu: gün planı bildirimi atlanır (kuyruk ve soz.jsonl değişmez, bildirim yok), günlükte neden", r_hs and r_hs["karar"] == "bastirildi" and len(N["SOZK"]["kuyruk"]) == n_k0 and len(satirlar(N, "soz.jsonl")) == n_s0 and any("atlandı (çalışma günü değil)" in l for l in N["LOG"]), (r_hs, N["LOG"]))
+r_pt = N["_dus_soz"]({"tarih": "2026-11-16", "odak": [1], "dikkat": []}, dt(16, 4))
+ok("pazartesi: gün planı yine kapıya gider", r_pt and r_pt["karar"] in ("sonra", "simdi"), r_pt)
 
 # --- 4) Doğru / Yanlış ---
 v = N["dus_view"]()

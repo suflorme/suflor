@@ -277,6 +277,10 @@ def _dus_model_cagri(istem):  # → (ham, hata). eylem_model(is_adi="dusunme", m
 def _dus_gecerli_sn(simdi): return max(3600.0, float(simdi.replace(hour=DUS_SON_SAAT, minute=0, second=0, microsecond=0).timestamp() - simdi.timestamp()))
 def _dus_soz(plan, simdi):  # sabah teslim: söz kapısı "günün ilk mesai anı"na bırakır; teslim = menü bildirimi (tıklayınca pano → Günün özeti → Dinle)
     if "soz_aday" not in globals(): return None
+    try: gunler = calisma_saatleri()[0]
+    except Exception: gunler = {0, 1, 2, 3, 4}
+    if plan.get("tarih") and datetime.date.fromisoformat(plan["tarih"]).weekday() not in gunler:  # çalışma günü değil (hafta sonu): bildirim kuyruğa girmez, pazartesi eski plan söylenmez; plan dosyası ve panodaki Günün özeti yine var
+        print("DÜŞÜNME: gün planı bildirimi atlandı (çalışma günü değil)"); return {"id": "", "karar": "bastirildi", "neden": "çalışma günü değil"}
     n_o, n_d = len(plan["odak"]), len(plan["dikkat"])
     metin = _t(f"Günün planı hazır: {n_o} odak, {n_d} dikkat maddesi.", f"Today's plan is ready: {n_o} focus items, {n_d} to watch.")
     def teslim():

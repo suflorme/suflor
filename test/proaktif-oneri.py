@@ -57,6 +57,32 @@ ok("eski öneri (3 saat) düşer", P["pro_baglam"]() == "")
 P2 = ns_kur(["toplanti-sonrasi.py"], gizli_acik=lambda: True); P2["PRO_BAG"].update(a=dict(ad[0], t=time.time()), n=0)
 ok("gizli kipte bağlam yok", P2["pro_baglam"]() == "")
 
+# --- tarama nedeni günlüğü: yalnız neden değişince tek satır, durum alanı, kişi verisi yok ---
+LOGP = []; P3 = ns_kur(["toplanti-sonrasi.py"], print=lambda *a, **k: LOGP.append(" ".join(str(x) for x in a)))
+P3["_pro_not"]("mesai dışı", None, 1000.0); P3["_pro_not"]("mesai dışı", None, 1120.0); P3["_pro_not"]("öneri yok", 0, 1240.0); P3["_pro_not"]("öneri yok", 0, 1360.0); P3["_pro_not"]("gonderildi", 2, 1480.0)
+ok("neden günlüğü: aynı neden tekrar yazılmaz, değişince tek satır (aday sayısıyla)", LOGP == ["PROAKTİF: tarama — mesai dışı", "PROAKTİF: tarama — öneri yok (0 aday)", "PROAKTİF: tarama — gonderildi (2 aday)"], LOGP)
+dv = P3["pro_durum_view"](); ok("proaktif_durum: son neden, aday, bakış zamanı, bugünkü sayı", dv["neden"] == "gonderildi" and dv["aday"] == 2 and dv["bakis_s_once"] is not None and dv["bugun"] == 0 and dv["en_cok"] == 3 and dv["acik"] is True, dv)
+
+# --- Konuş'ta kabul/ret söz kapısına bir kez yazılır ---
+SN = []; P4 = ns_kur(["toplanti-sonrasi.py"], soz_sonuc=lambda ref, sn: SN.append((ref, sn)))
+def bag(a): P4["PRO_BAG"].update(a=dict(a, t=time.time()), n=0); SN.clear()
+_rel = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); _bk = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read(); _nt = open(os.path.join(KOD, "aktarici", "notlar.py"), encoding="utf-8").read()
+ok("bağlantılar: /status proaktif_durum, Konuş turu başında pro_konus_cevap, kayıt etiketinde pro_konus_etiket", 's["proaktif_durum"] = pro_durum_view()' in _rel and "pro_konus_cevap(metin)" in _bk and "pro_konus_etiket(is_[" in _nt)
+bag(ad[0]); P4["pro_konus_cevap"]("Evet, olur"); P4["pro_konus_cevap"]("evet"); P4["pro_konus_etiket"]("is_ertele")
+ok("Konuş: açık 'evet' → kaynak:gun_ici kabul, tekrar (ikinci evet, etiket) ikinci kayıt üretmez", SN == [("kaynak:gun_ici", "kabul")], SN)
+bag(ad[0]); P4["pro_konus_etiket"]("is_ertele"); P4["pro_konus_cevap"]("evet")
+ok("Konuş: öneriye bağlı [KAYIT] etiketi → kabul, sonraki 'evet' ikinci kayıt üretmez", SN == [("kaynak:gun_ici", "kabul")], SN)
+bag(ad[0]); P4["pro_konus_cevap"]("Evet ama vadeyi cumaya al"); P4["pro_konus_cevap"]("evet, yalnız ilkini düzelt")
+ok("Konuş: «evet ama …» / düzeltmeli söz kabul sayılmaz", SN == [], SN)
+bag(ad[0]); P4["pro_konus_etiket"]("karar_onayla")
+ok("Konuş: başka komutun etiketi kabul sayılmaz", SN == [], SN)
+bag(ad[2]); P4["pro_konus_cevap"]("hayır şimdi değil")
+ok("Konuş: açık ret → ret", SN == [("kaynak:gun_ici", "ret")], SN)
+bag(ad[2]); P4["pro_konus_cevap"]("bugün hava nasıl"); P4["pro_konus_cevap"]("evetçi bir şey değil mi")
+ok("Konuş: konu dışı söz sonuç üretmez (evet/hayır yalnız söz başında, sözcük sınırıyla)", SN == [], SN)
+P4["PRO_BAG"]["a"] = None; SN.clear(); P4["pro_konus_cevap"]("evet")
+ok("bekleyen öneri yokken evet sonuç üretmez", SN == [])
+
 # ---------- 2) birim: notlar.py yeni KAYIT komutları ----------
 D = os.path.join(T, "dz"); os.makedirs(D); graf(D, TOP, OGELER)
 BEL = {"o" + "b" * 15: {"id": "o" + "b" * 15, "metin": "Tedarikçi sözleşmesini gözden geçir", "sahip": "", "vade": ISO(7), "kaynak": {"tur": "belge", "ad": "plan.docx", "konum": "s1"}, "toplanti": ""}}
