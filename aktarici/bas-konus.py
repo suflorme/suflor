@@ -2524,15 +2524,23 @@ def chrome_ac(p):
     if os.environ.get("SUFLOR_TEST_BASLAT"): print(f"AÇ (deneme): {' '.join(k[:-1])} <adres>"); return {"ok": True, "chrome": bool(CHROME_APP)}
     subprocess.Popen(k, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"ok": True, "chrome": bool(CHROME_APP)}
-def takvim_view(tam=False, gun=1):  # gun > 1 (toplanti-claude.py takvim --gun): o kadar günün etkinlikleri + çalışma saatlerindeki boş zamanlar (v0.55.0)
+def takvim_view(tam=False, gun=1, pay=False):  # gun > 1 (toplanti-claude.py takvim --gun): o kadar günün etkinlikleri + çalışma saatlerindeki boş zamanlar (v0.55.0)
+    # v0.226.1 pay=True (tc takvim --paylasilan, Tazı'nın iç kaynak adımı): ayar takvim_paylasilan'daki takvimlerin kullanıcının olmadığı etkinlikleri de,
+    # bugünün başından (geçmiş toplantı) ileriye, "paylasilan": true ile. Konuş/brifing/hazırlık yine yalnız TAKVIM_TAM.
     simdi = datetime.datetime.now().astimezone(); ol = []; gun = max(1, min(int(gun or 1), TAKVIM_UZAK_GUN))
     gece = simdi.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=gun)
-    for e in TAKVIM_TAM.values():
+    kaynak = list(TAKVIM_TAM.values())
+    if pay:
+        gor = {(e.get("baslik"), e.get("baslangic")) for e in kaynak}
+        for e in list(globals().get("TAKVIM_PAY", {}).values()) + list(TAKVIM_GEC.get("pay") or []):
+            if (e.get("baslik"), e.get("baslangic")) not in gor: gor.add((e.get("baslik"), e.get("baslangic"))); kaynak.append(dict(e, paylasilan=True))
+    bas_ = simdi.replace(hour=0, minute=0, second=0, microsecond=0) if pay else simdi
+    for e in kaynak:
         if e.get("tum_gun") or f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []): continue  # ayar: izlenmeyen takvimler
         try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
         except (KeyError, ValueError): continue
-        if s_ < simdi or b >= gece: continue  # (kullanıcı) bugün içindekiler — sürenler ve gün sonuna kadar başlayacaklar
-        v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "hesap", "yer", "reddettin")}
+        if s_ < bas_ or b >= gece: continue  # (kullanıcı) bugün içindekiler — sürenler ve gün sonuna kadar başlayacaklar (pay: bugün bitmiş olanlar da)
+        v = {k: e.get(k) for k in ("id", "baslik", "platform", "baglanti", "duzenleyen", "ben_duzenleyen", "kisi_sayisi", "takvim", "hesap", "yer", "reddettin", "paylasilan")}
         if v["ben_duzenleyen"] is None and not e.get("duzenleyen") and not e.get("kisi_sayisi"): v["ben_duzenleyen"] = True  # davetlisiz kendi etkinliğin
         v.update(saat=b.strftime("%H:%M"), bitis_saat=s_.strftime("%H:%M"), tarih=b.strftime("%Y-%m-%d"), dk=round((b - simdi).total_seconds() / 60), suruyor=b <= simdi < s_,
                  katilimcilar=(e.get("katilimcilar") or [])[:30 if tam else 6], notlar_var=bool(e.get("notlar")),

@@ -2317,7 +2317,7 @@ class H(BaseHTTPRequestHandler):
             h = re.search(r"[?&]ay=(-?\d{1,2})(?:&|$)", self.path)  # ay görünümü: 42 günlük ızgara (takvim_ay)
             if h: return self._json(takvim_ay(int(h.group(1))))
             g = re.search(r"[?&]gun=(\d{1,2})(?:&|$)", self.path)  # v0.55.0: ?gun=7 → 7 günün etkinlikleri + boş zamanlar (v0.59.0: en çok 30)
-            return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
+            return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1, pay="pay=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
                                    surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
         if self.path == "/agenda": return self._json(agenda())
         if yol == "/dogrula": return self._json(dogrula_istek("yenile=1" in self.path))  # Faz D: Kurulumu denetle (aktarici/saglik.py)
