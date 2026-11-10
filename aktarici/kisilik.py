@@ -8,6 +8,8 @@
 # Kişiliğe özgü adlar ve metinler yalnız bu dosyada ve kullanıcının ayarında durur; kodda sabit ad yok (açık depoda örnek: sablon/kisilik-ornek.md).
 # v0.61.0: iki kişilik. Ayar "kisilik_toplanti_disi": ikinci dosya — toplantı yokken o konuşur; toplantıda "kisilik" (ilk dosya). Kullanıcı cümleye birinin
 # adıyla başlarsa ("<Ad>, …") o soru ve ardından KISILIK_SURE_SN içindeki adsız sorular o kişilikle cevaplanır. Ek ayar satırı: hitap_bicimi: sen (varsayılan siz).
+# 10 Kasım: üçüncü yuva — ayar "kisilik_dis" (rol "dis", dış işler asistanı): Marvin'le aynı bağlam ve yetki, farklı rol; varsayılan muhatap değil, yalnız adıyla çağrılınca
+# konuşur (3 dk sürer). Adı 4 harften uzun kişiliğin ≤ 4 harfli takma adları ("Ro", "Rox") hitap_kisa ile sıkı kuraldadır.
 # S94 (kullanıcı, 19 Ekim): toplantıda tek kural — "<Ad>, …" diye seslenilen kişilik toplantıya herkesin duyacağı şekilde cevap verir (hangisi olursa olsun);
 # yalnız kullanıcıya cevap tek yoldan: Konuş düğmesi. Kişilik, kullanıcı onu toplantıda ilk kez çağırınca "katılır"; sonra karşı taraf da ona adıyla sorabilir.
 # v0.71.0: ses: <Mac ses adı> ve hiz: 1,15 (çarpan) — kişiliğin cevapları bu sesle okunur (iki kişilik ayrı duyulsun). Mac'in sistem (Siri) sesi say -r'yi
@@ -22,10 +24,10 @@ _KIS = {"yol": None, "mt": None, "v": None, "uyari": None}  # geriye uyum: tek k
 _KIS_D = {}  # yol → {"mt", "v", "uyari"}
 _KSEC = {"ad": None, "t": 0.0}
 HITAP_GUNDELIK = {"oh", "ah", "eh", "ha", "hı", "hm", "hmm", "evet", "hayır", "hayir", "tamam", "peki", "bak", "abi", "hocam", "şey", "sey", "yani", "ok", "okay", "yes", "no", "hey", "merhaba", "selam"}
-def hitap_suz(liste, ad=None):  # 30 Ekim: listede "Oh, <ad>" virgülle bölünüp tek başına "Oh" hitap oldu, kullanıcının "oh"u asistana soru gitti. 3 harften kısa ya da gündelik sözcük atılır
+def hitap_suz(liste, ad=None):  # 30 Ekim: listede "Oh, <ad>" virgülle bölünüp tek başına "Oh" hitap oldu, kullanıcının "oh"u asistana soru gitti. Tek harfli ya da gündelik sözcük atılır
     kalan, atilan = [], []
     for x in liste:
-        if x.lower() == str(ad or "").lower() or (len(re.sub(r"\W", "", x)) >= 3 and x.lower() not in HITAP_GUNDELIK): kalan.append(x)
+        if x.lower() == str(ad or "").lower() or (len(re.sub(r"\W", "", x)) >= 2 and x.lower() not in HITAP_GUNDELIK): kalan.append(x)  # 10 Kasım: 2 harfli kısa takma ad ("Ro") kalır — kısa biçimler hitap_kisa ile sıkı kuralda; gündelik sözcük ("Oh", "Ah") yine atılır
         else: atilan.append(x)
     if atilan: print(f"KİŞİLİK: seslenme listesinden atıldı (kısa ya da gündelik sözcük): {', '.join(atilan)}")
     return kalan
@@ -75,15 +77,28 @@ def _kisilik_oku(yol, rol):
             if x and x.lower() not in {h.lower() for h in v["hitap"]}: v["hitap"].append(x)
         print(f"KİŞİLİK: {v['ad']} ({rol}) · {len(v['metin'])} karakter · hitap {', '.join(v['hitap'][:8])}")
     d.update(mt=mt, v=v, uyari=None); return v
+KISILIK_YUVALAR = (("kisilik", "toplanti"), ("kisilik_toplanti_disi", "disi"), ("kisilik_dis", "dis"))  # 10 Kasım: üçüncü yuva "dis" = dış işler asistanı (yalnız adla ya da açık yönlendirmeyle konuşur; varsayılan muhatap değil)
 def kisilikler():  # → yüklü kişilikler, önce toplantı kişiliği; aynı ad iki kez gelmez
     out = []
-    for ayar, rol in (("kisilik", "toplanti"), ("kisilik_toplanti_disi", "disi")):
+    for ayar, rol in KISILIK_YUVALAR:
         yol = os.path.expanduser(str(AYAR.get(ayar) or "").strip())
         v = _kisilik_oku(yol, rol) if yol else None
-        if v and all(x["ad"] != v["ad"] for x in out): out.append(v)
+        if v and all(x["ad"] != v["ad"] for x in out):
+            if v["rol"] != rol: v["rol"] = rol  # dosya önce başka rolle (Ayarlar listesi) okunmuş olabilir
+            out.append(v)
     t = out[0] if out and out[0]["rol"] == "toplanti" else None
-    _KIS.update(yol=None, mt=(tuple(_KIS_D[os.path.expanduser(str(AYAR.get(a) or "").strip())]["mt"] for a in ("kisilik", "kisilik_toplanti_disi") if str(AYAR.get(a) or "").strip()) if out else None), v=t)
+    _KIS.update(yol=None, mt=(tuple(_KIS_D[os.path.expanduser(str(AYAR.get(a) or "").strip())]["mt"] for a, _r in KISILIK_YUVALAR if str(AYAR.get(a) or "").strip()) if out else None), v=t)
     return out
+# 10 Kasım: kısa takma ad = en çok 4 harfli seslenme sözcüğü (adı 4 harften uzun bir kişilikte: "Rox", "Ro"). Kısa biçim yalnız cümle başında ve ardından virgül/iki nokta/ünlem
+# ya da soru biçimiyle seslenme sayılır ("Ro, bu firma kim?"); cümle içinde ve ses benzerliğiyle ad eşlemede (hitap_ses_duzelt, hitap_yakin) hiç sayılmaz. Adı zaten kısa olan
+# kişilikte (4 harf ve altı) kısa biçim yoktur: ad tam hitaptır.
+def hitap_kisa(k, a):
+    h = len(re.sub(r"\W", "", str(a or "")))
+    return " " not in str(a or "").strip() and h <= 4 and max(len(re.sub(r"\W", "", str(k.get(x) or ""))) for x in ("ad", "gorunen_ad")) > 4
+def hitap_ayir(k):  # → (uzun hitaplar, kısa takma adlar)
+    uz, ks_ = [], []
+    for a in k.get("hitap") or []: (ks_ if hitap_kisa(k, a) else uz).append(a)
+    return uz, ks_
 def kisilik_varsayilan(ks=None):  # toplantıda toplantı kişiliği, değilse toplantı dışı kişilik (yoksa öteki)
     ks = kisilikler() if ks is None else ks
     if not ks: return None
@@ -112,14 +127,19 @@ KISILIK_SOZ_ETME = r"(?:ile|hakkında\w*|için|gibi|ve|veya|ya|de|da|ki|mi|mı|m
 # "…ır mısın / …ebilir misin" ya da istek fiili. "<Ad> markasının yeni ürünü güzel" gibi addan söz eden cümle seslenme değil.
 KISILIK_ISTEK = (r"(?:\b(?:lütfen|söyle|anlat|özetle|açıkla|bak|kontrol et|devam et|başla|yönet|katıl|gel|dur|sus|cevap ver|yardım et|hatırlat|bul|ara|not al|kaydet|oku|"
                  r"tell|say|explain|summari[sz]e|check|join|stop|help)\b|\w+(?:s[ıiuü]n|s[ıiuü]nl[ae]r)\b|\w+[ıiuüae]r\s+m[ıiuü]s[ıiuü]n|\w+[ae]bilir\s+m[ıi]s[ıi]n)")
+KISILIK_KISA_SON = r"(?:'\w+)?\s*[,:!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*\?)"  # kısa takma adın ardından: virgül/iki nokta/ünlem ya da cümlede soru
 def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kişilik, adsız metin) ya da (None, metin)
     ks = kisilikler()
     if len(ks) < 2 or not metin: return None, metin
+    def alt(l): return "|".join(re.escape(a) for a in sorted(l, key=len, reverse=True))
     for k in sorted(ks, key=lambda k: -max(len(a) for a in k["hitap"])):
-        m = re.match(r"\W*(" + KISILIK_GIRIS + r"\W+)?(?:" + "|".join(re.escape(a) for a in sorted(k["hitap"], key=len, reverse=True)) + r")(?:(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w))", metin, re.I)  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil
-        if m and metin[m.end():].strip(): return k, metin[m.end():].strip()
-        if m and m.group(1) and re.match(KISILIK_SELAM + r"\W*$", m.group(1), re.I): return k, metin.strip()  # yalnız selam ("Günaydın <ad>."): selamın kendisi soru
-        if re.match(r"\W*(?:" + "|".join(re.escape(a) for a in k["hitap"]) + r")\s*[?!.]*\s*$", metin, re.I): return k, metin.strip()  # 23 Ekim: tek başına ad ("<Ad>?") o kişiliği çağırır
+        uz, kisa = hitap_ayir(k)
+        for liste, son in ((uz, r"(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w)"), (kisa, KISILIK_KISA_SON)):  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil
+            if not liste: continue
+            m = re.match(r"\W*(" + KISILIK_GIRIS + r"\W+)?(?:" + alt(liste) + r")(?:" + son + r")", metin, re.I)
+            if m and metin[m.end():].strip(): return k, metin[m.end():].strip()
+            if m and m.group(1) and re.match(KISILIK_SELAM + r"\W*$", m.group(1), re.I): return k, metin.strip()  # yalnız selam ("Günaydın <ad>."): selamın kendisi soru
+            if re.match(r"\W*(?:" + alt(liste) + r")\s*" + (r"[?!.]*" if liste is uz else r"[?!]+") + r"\s*$", metin, re.I): return k, metin.strip()  # 23 Ekim: tek başına ad ("<Ad>?") o kişiliği çağırır
     return None, metin
 # --- S94: toplantıda asistanlar — katılma durumu (toplantı başına) ---------------------------------------------------------------------
 _KATIL = {"toplanti": None, "adlar": []}

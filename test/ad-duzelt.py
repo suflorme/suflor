@@ -35,7 +35,7 @@ ok("bağlam notu duyulanı ve düzelteni yazar", "'Bedran' → 'Vedran'" in n an
 ok("düzeltme yoksa not yok", ad["konus_ad_notu"]([]) == "")
 # v0.132.0: hitap yerindeki yakın sözcük asistan adına (kişi adına değil); bilinen kişi adı ve hitap dışı yer değişmez
 VT_BELLEK["adlar"] = ["Nevin Kaya", "Deniz"]; ad["_AD"]["t"] = 0.0
-KS = [{"ad": "MATLAS", "hitap": ["Matlas", "Marvin", "Mervin"]}, {"ad": "ATLAS", "hitap": ["Atlas", "Orni"]}]
+KS = [{"ad": "MATLAS", "hitap": ["Matlas", "Marvin", "Mervin"]}, {"ad": "ATLA", "hitap": ["Atlas", "Orni"]}]
 ad["kisilikler"] = lambda: KS; ad["_kisilik_hitap_ad"] = lambda h: next((k["ad"] for k in KS if h in k["hitap"]), None)
 hy = ad["hitap_yakin"]
 ok(f"'Peki, Navin, burada mısın?' → Marvin ({hy('Peki, Navin, burada mısın?')!r})", hy("Peki, Navin, burada mısın?") == "Peki, Marvin, burada mısın?")

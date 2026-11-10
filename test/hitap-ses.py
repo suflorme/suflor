@@ -12,9 +12,9 @@ def secim(kaynak, adlar, atamalar=()):
     return [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in adlar) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in atamalar for x in n.targets))]
 KIS = {"v": {"ad": "Malvis", "hitap": ["Malvis"], "rol": "toplanti"}}
 ns = {"re": re, "time": time, "print": lambda *a: None, "_ad_listesi": lambda: {"malbin": {"Malvin"}}, "kisilikler": lambda: [KIS["v"]]}
-sec = secim(oku("aktarici", "kisilik.py"), (), ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS")) + \
+sec = secim(oku("aktarici", "kisilik.py"), ("hitap_kisa", "hitap_ayir"), ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS", "KISILIK_KISA_SON")) + \
       secim(oku("aktarici", "bas-konus.py"), ("_ad_anahtar", "_ad_mesafe"), ("_AD_HARF",)) + \
-      secim(oku("aktarici", "sozluk.py"), ("hitap_ses_duzelt", "hitap_aski", "hitap_yalniz_ad", "_hitap_adlari", "_hitap_alt", "_hitap_rx", "hitap_aski_bitti", "hitap_askida"),
+      secim(oku("aktarici", "sozluk.py"), ("hitap_ses_duzelt", "hitap_aski", "hitap_yalniz_ad", "_hitap_adlari", "_hitap_kisa_adlari", "_hitap_alt", "_hitap_rx", "hitap_aski_bitti", "hitap_askida"),
             ("HITAP_ASKI", "HITAP_ASKI_SN", "HITAP_DEVAM_SN", "HITAP_AD_DEVAM_SN", "HITAP_ONCE_N", "HITAP_EN_COK_SN", "HITAP_EN_COK_SOZ", "HITAP_ONCE", "HITAP_AD", "_KHR"))
 exec(compile(ast.Module(sec, []), "t", "exec"), ns)
 d = ns["hitap_ses_duzelt"]

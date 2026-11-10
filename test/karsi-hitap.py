@@ -16,10 +16,10 @@ ns = {"re": re, "time": time, "threading": threading, "print": lambda *a: LOG.ap
       "kisilikler": lambda: [KIS["v"]] if KIS["v"] else [], "toplanti_var": lambda: True, "AYAR": {}, "asistan_katilan": lambda: {"Talvin"}, "hitap_devam_karsi": lambda *a: None,
       "kisilik_sec": lambda ad: None, "_t": lambda a, b: a, "TS": {"p": [], "son_t": 0}, "KENDI_SES": [], "YANKI_LOCK": threading.Lock(), "_yk": lambda x: x,
       "_asistan_sor": lambda soru, ek, gosterim=None, metin=None: GIDEN.append((soru, ek["karsi"], ek["ad"])) or True}
-sec = secim(oku("aktarici", "kisilik.py"), (), ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS")) + \
+sec = secim(oku("aktarici", "kisilik.py"), ("hitap_kisa", "hitap_ayir"), ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS", "KISILIK_KISA_SON")) + \
       secim(oku("aktarici", "bas-konus.py"), ("_ad_anahtar", "_ad_mesafe", "_karsi_tam", "_karsi_yank", "_karsi_ates", "_karsi_aski_bekle", "konus_hitap_karsi"),
             ("_AD_HARF", "KARSI_ASKI", "KARSI_ASKI_SN", "KARSI_ASKI_SOZ", "KARSI_ASKI_LOCK", "KARSI_HITAP_RX", "KARSI_HITAP_SUSKU_SN", "HITAP_IS_RX")) + \
-      secim(oku("aktarici", "sozluk.py"), ("hitap_ses_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "_hitap_adlari", "karsi_hitap_cozumle", "karsi_soru_bicimi"),
+      secim(oku("aktarici", "sozluk.py"), ("hitap_ses_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "_hitap_adlari", "_hitap_kisa_adlari", "karsi_hitap_cozumle", "karsi_soru_bicimi"),
             ("_KHR", "HITAP_AD", "HITAP_IC_SOZ"))
 exec(compile(ast.Module(sec, []), "t", "exec"), ns)
 c = ns["karsi_hitap_cozumle"]

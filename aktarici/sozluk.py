@@ -77,7 +77,11 @@ def _kisilik_hitap_rx(rol=None):  # rol "toplanti": yalnız toplantı kişiliği
     ks = [k for k in kisilikler() if not rol or k["rol"] == rol]; adlar = tuple(a for k in ks for a in k["hitap"])
     if _KHR["k"].get(rol) != adlar:
         _KHR["k"][rol] = adlar
-        _KHR["rx"][rol] = re.compile(r"((?:^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?)(" + "|".join(re.escape(a) for a in sorted(adlar, key=len, reverse=True)) + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*(?:\?|" + KISILIK_ISTEK + r"))"
+        uz = [a for k in ks for a in hitap_ayir(k)[0]]; kisa = [a for k in ks for a in hitap_ayir(k)[1]]
+        alt = lambda l: "|".join(re.escape(a) for a in sorted(l, key=len, reverse=True))
+        # 10 Kasım: kısa takma ad ("Ro", "Rox") yalnız cümle başında ve ardından virgül/iki nokta/ünlem ya da cümlede soru varsa (lookahead); "raks gösterisi", "rol", "Rostov" seslenme değil
+        ad_rx = (("(?:" + alt(kisa) + r")(?=\s*[,:!]|\s+(?!" + KISILIK_SOZ_ETME + r")[^.!?…]*\?)" + ("|" if uz else "")) if kisa else "") + (("(?:" + alt(uz) + ")") if uz else "")
+        _KHR["rx"][rol] = re.compile(r"((?:^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?)(" + ad_rx + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*(?:\?|" + KISILIK_ISTEK + r"))"
                                      # v0.113.1 (22 Ekim test toplantısı: "Tamam... Orney... eee... Bugün projede... açık kalan iş kaldı mı?" ~1 dk cevapsız): addan sonra
                                      # duraksama (üç nokta) ve satırın kalanında soru ya da istek varsa da seslenme
                                      r"|(?:\.{2,}(?!\.)|…)(?!\s*" + KISILIK_SOZ_ETME + r")\s*(?=[^\n]*(?:\?|" + KISILIK_ISTEK + r")))", re.I) if adlar else None
@@ -134,13 +138,17 @@ HITAP_ASKI = {"metin": None, "t1": 0.0, "satir": None, "pen": 2.0, "bas": 0.0, "
 # hitapsız cevap (hitap_cevap_baslat) yalnız süreyle biter (cevap birkaç cümle olabilir). En çok HITAP_EN_COK_SN / HITAP_EN_COK_SOZ.
 HITAP_DEVAM_SN = 3.0; HITAP_AD_DEVAM_SN = 7.0; HITAP_ONCE_N = 3; HITAP_EN_COK_SN = 20.0; HITAP_EN_COK_SOZ = 45
 HITAP_ONCE = []  # son kullanıcı satırları [(metin, t0, t1)]
-def _hitap_adlari(): return [x for k in kisilikler() for x in k["hitap"]]
+def _hitap_adlari(hepsi=False): return [x for k in kisilikler() for x in (k["hitap"] if hepsi else hitap_ayir(k)[0])]  # varsayılan: yalnız uzun biçimler (kısa takma adlar cümle içi, ses benzerliği, Whisper istemi için değil)
+def _hitap_kisa_adlari(): return [x for k in kisilikler() for x in hitap_ayir(k)[1]]
 def _hitap_alt():
     adlar = _hitap_adlari()
     return "(?:" + "|".join([re.escape(x) for x in sorted(adlar, key=len, reverse=True)] + ([] if adlar else [HITAP_AD])) + ")"
 def _hitap_rx(): return r"\W*" + _hitap_alt() + r"\b"
 def hitap_yalniz_ad(metin):  # satır yalnız asistanın adı mı ("Sera," / "Sera") → adın yazıldığı biçim, değilse None
     m = re.fullmatch(r"\W*(" + _hitap_alt() + r")[\s.,:;!?…]*", metin or "", re.I)
+    if m: return m.group(1)
+    kisa = _hitap_kisa_adlari()  # kısa takma ad tek başına satırda yalnız virgül/iki nokta/ünlem/soru ile ("Ro,")
+    m = re.fullmatch(r"\W*(" + "|".join(re.escape(a) for a in sorted(kisa, key=len, reverse=True)) + r")\s*[,:?!]+\s*", metin or "", re.I) if kisa else None
     return m.group(1) if m else None
 def hitap_aski(metin, t0=None, t1=None):  # → askıdaki hitap + bu satır (birleşik, tamamlandı) ya da None; bu satır askıya alınır ya da askıdakine eklenirse None
     a = HITAP_ASKI; t0 = time.time() if t0 is None else t0; t1 = time.time() if t1 is None else t1
@@ -183,9 +191,9 @@ def asistan_goster(metin, ad=None):  # ad: satırda seslenilen asistan (jsonl "h
 def hitap_ses_duzelt(metin):  # 28 Ekim: Whisper adı "mermis"/"merviz" yazdı, hitap sayılmadı. Cümle başındaki (ya da giriş sözcüğünden sonraki) tek sözcük asistan adının ses benzeri ise
     # adın yazılışına çevrilir (sonra olağan hitap kalıbı çalışır). Yalnız ≥ 5 harfli adlarda, aynı baş harf ve ses anahtarında en çok 1 harf farkla; gündelik sözcükler uzak kalır.
     if not metin or "_ad_anahtar" not in globals(): return metin
-    adlar = _hitap_adlari()
+    adlar = _hitap_adlari()  # kısa takma adlar benzerlik hedefi değil (10 Kasım)
     if not adlar: return metin
-    ham = {x.lower() for x in adlar}
+    ham = {x.lower() for x in _hitap_adlari(hepsi=True)}
     try: ham |= {x.lower() for v in _ad_listesi().values() for x in v}  # kayıtlardaki başka kişi adları (benzer yazılsa da) asistan adına çevrilmez
     except Exception: pass
     rx = re.compile(r"((?:^|[.!?…]\s+)(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?\W*)([^\W\d_]{4,})(?=['’]|[\s,:.!?…]|$)", re.I)

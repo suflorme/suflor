@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 672821,
-   "sha": "9d380e775d106fb6"
+   "uzunluk": 673360,
+   "sha": "dac9a194c09a4d2f"
   },
   "/mini": {
-   "uzunluk": 672821,
-   "sha": "9d380e775d106fb6"
+   "uzunluk": 673360,
+   "sha": "dac9a194c09a4d2f"
   },
   "/status": {
    "_ping_son": "float",
@@ -326,6 +326,7 @@
      "kayit_sesi": "bool",
      "kisayollar": "bool",
      "kisilik": "str",
+     "kisilik_dis": "str",
      "kisilik_toplanti_disi": "str",
      "kisisel_tarih_hatirlat": "bool",
      "kisisel_tarih_saat": "str",

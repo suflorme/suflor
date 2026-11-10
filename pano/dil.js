@@ -299,6 +299,8 @@ globalThis.SUFLOR_EN = {
   "Toplantıda asistan": "Assistant in meetings",
   "Toplantı sırasında “<ad>, …” diye seslendiğin kişilik.": "The persona you address as “<name>, …” during a meeting.",
   "Toplantı dışında asistan": "Assistant outside meetings",
+  "Dış işler asistanı": "Outside-affairs assistant",
+  "Kurum dışı kişi ve firmalarla ilgilenen üçüncü asistan. Varsayılan muhatap olmaz; yalnız adıyla seslenince (“<ad>, …”) cevap verir.": "A third assistant for people and companies outside your organization. It is never the default; it answers only when you call it by name (“<name>, …”).",
   "Sohbette ve toplantı dışındaki Konuş’ta cevap veren kişilik.": "The persona that answers in Chat and in Talk outside meetings.",
   "Okuma hızı": "Reading speed",
   "Ses ve video dosyası bağlam olamaz": "Audio and video files can’t be added as context",

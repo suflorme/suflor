@@ -7,12 +7,12 @@ KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KIS = {"v": None, "v2": None}; ns = {"re": re, "time": __import__("time"), "kisilikler": lambda: [x for x in (KIS["v"], KIS["v2"]) if x]}  # v0.53.0: kişilik hitabı (nötr örnek ad "Atlas")
 agac = ast.parse(open(os.path.join(KOD, "aktarici/sozluk.py"), encoding="utf-8").read())
 sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("hitap_duzelt", "_kisilik_hitap_rx", "_kisilik_hitap_ad", "hitap_aski", "hitap_askida", "hitap_aski_bitti",
-                                                                    "_hitap_adlari", "_hitap_alt", "_hitap_rx", "hitap_yalniz_ad", "hitap_cevap_baslat", "hitap_aski_metin", "hitap_icte")) or
+                                                                    "_hitap_adlari", "_hitap_kisa_adlari", "_hitap_alt", "_hitap_rx", "hitap_yalniz_ad", "hitap_cevap_baslat", "hitap_aski_metin", "hitap_icte")) or
        (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in {"HITAP_RX", "HITAP_ORTA_RX", "HITAP_AD", "BULUT", "_KHR", "HITAP_ASKI", "HITAP_ASKI_SN", "HITAP_DEVAM_SN", "HITAP_AD_DEVAM_SN",
                                                                       "HITAP_ONCE_N", "HITAP_EN_COK_SN", "HITAP_EN_COK_SOZ", "HITAP_ONCE",
                                                                       "HITAP_IC_2K", "HITAP_IC_YAKIN", "HITAP_IC_EDAT", "HITAP_IC_SOZ"} for x in n.targets))]
 ka = ast.parse(open(os.path.join(KOD, "aktarici/kisilik.py"), encoding="utf-8").read())  # 19 Ekim: söz etme kalıbı kisilik.py'de (iki yer aynı tanımı kullanır)
-sec = [n for n in ka.body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS") for x in n.targets)] + sec
+sec = [n for n in ka.body if (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in ("KISILIK_SOZ_ETME", "KISILIK_ISTEK", "KISILIK_GIRIS", "KISILIK_KISA_SON") for x in n.targets)) or (isinstance(n, ast.FunctionDef) and n.name in ("hitap_kisa", "hitap_ayir"))] + sec
 exec(compile(ast.Module(sec, []), "sozluk.py", "exec"), ns)
 TABLO = [
     ("Cloud, card, English, yes.", "Cloud, card, English, yes.", "S133: Claude adı seslenme değil — 9 Ekim: virgüllü"),

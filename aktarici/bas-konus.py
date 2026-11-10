@@ -346,13 +346,18 @@ def konus_istem(vt=None, bilgi=None, web=False):
     t = t.replace("Sen Suflor.me'nin sesli asistanısın.", "Sen kullanıcının sesli asistanısın.")  # v0.54.3: kimlik kişilikten (kullanıcı: tanıtımda ürün adı yok)
     ks = kisilikler()
     if any(y in x["metin"] for x in ks for y in BRIFING_YASAK): print("KİŞİLİK: metinde yardımcının yasak sözcüğü var (Write/Edit/Bash…) — kişilik metni isteme konmadı"); return t + _ys_istem() + kart_istem()
-    if len(ks) >= 2:  # v0.61.0: iki kişilik aynı süreçte (önbellek sıcak kalır); hangisinin cevapladığı her mesajın başında yazar
-        a, b = ks[0]["ad"], ks[1]["ad"]
-        return t + _uslup() + _t(f"\n\nAşağıda iki kişilik var: {a} toplantıda, {b} toplantı dışında varsayılandır; kullanıcı adıyla seslenerek öbürünü çağırabilir. Her mesajın başında "
+    if len(ks) >= 2:  # v0.61.0: iki kişilik aynı süreçte (önbellek sıcak kalır); hangisinin cevapladığı her mesajın başında yazar. 10 Kasım: üçüncü kişilik (dış işler, rol "dis") yalnız adıyla çağrılınca
+        vs = [x for x in ks if x["rol"] != "dis"]; c = next((x["ad"] for x in ks if x["rol"] == "dis"), None)
+        kac_tr, kac_en = ("üç", "Three") if len(ks) >= 3 else ("iki", "Two")
+        if len(vs) >= 2: vt, ve = f"{vs[0]['ad']} toplantıda, {vs[1]['ad']} toplantı dışında varsayılandır", f"{vs[0]['ad']} is the default in meetings, {vs[1]['ad']} outside meetings"
+        else: vt, ve = f"{vs[0]['ad']} varsayılandır", f"{vs[0]['ad']} is the default"
+        uc_tr = f" {c} dış işler asistanıdır: yalnız kullanıcı adıyla seslenince ya da onu açıkça çağırınca konuşur." if c else ""
+        uc_en = f" {c} is the outside-affairs persona: it speaks only when the user addresses it by name or calls it explicitly." if c else ""
+        return t + _uslup() + _t(f"\n\nAşağıda {kac_tr} kişilik var: {vt}; kullanıcı adıyla seslenerek öbürünü çağırabilir.{uc_tr} Her mesajın başında "
                       f"«[Bu soruyu <ad> cevaplıyor]» yazar: yalnız o kişiliğin adı, tonu ve hitabıyla konuş; önceki cevaplar öteki kişilikten olabilir, onun üslubunu sürdürme. "
                       "Bu işaret iç nottur: sesli söylemezsin, 'bu soruyu ben cevaplıyorum' gibi sözlerle sırayı ya da düzeni anlatmazsın. "
                       "Kişilikler tonu ve kimliği belirler; yukarıdaki biçim kuralları (uzunluk, sesli kısım, ---) önce gelir. Kısa olmak kuru olmak demek değildir: sıcaklık kişilikten gelir.\n\n",
-                      f"\n\nTwo personas follow: {a} is the default in meetings, {b} outside meetings; the user can call the other by name. Each message starts with "
+                      f"\n\n{kac_en} personas follow: {ve}; the user can call the other by name.{uc_en} Each message starts with "
                       "«[Bu soruyu <name> cevaplıyor]» (this question is answered by <name>): speak only with that persona's name, tone and form of address; earlier answers may be "
                       "from the other persona, don't carry its style over. This marker is an internal note: never say it aloud or narrate who is answering. Personas set tone and identity; the format rules above come first. Short does not mean dry: warmth comes from the persona.\n\n") + _hitap_istem(ks) + "\n\n".join(x["metin"] for x in ks) + _etiket_istem(ks) + _ys_istem() + kart_istem()
     return t + _uslup() + _t("\n\nAşağıdaki kişilik tonu ve kimliği belirler; yukarıdaki biçim kuralları (uzunluk, sesli kısım, ---) önce gelir. Kısa olmak kuru olmak demek değildir: sıcaklık kişilikten gelir.\n\n",
@@ -573,7 +578,7 @@ HITAP_YER_RX = re.compile(r"(?:^|(?<=[,.!?…]\s)|(?<=[,.!?…]))\s*([A-ZÇĞİ�
 def hitap_yakin(metin):
     try: ks = kisilikler()
     except Exception: return metin
-    hit = [(h, _ad_anahtar(h)) for k in ks for h in (k.get("hitap") or []) if len(_ad_anahtar(h)) >= 4]
+    hit = [(h, _ad_anahtar(h)) for k in ks for h in (k.get("hitap") or []) if len(_ad_anahtar(h)) >= 4 and not (len(re.sub(r"\W", "", h)) <= 4 and max(len(re.sub(r"\W", "", str(k.get(x) or ""))) for x in ("ad", "gorunen_ad")) > 4)]  # kısa takma adlar ("Rox", "Roks") ses benzerliğiyle eşlenmez (hitap_kisa ile aynı tanım; testte tek başına yüklenir)
     if not hit: return metin
     hl = {h.lower() for h, _ in hit}
     kisi = {a.lower() for v in (_ad_listesi() or {}).values() for a in v} - hl

@@ -1612,7 +1612,7 @@ AYAR_PANO = {
     "konusma": ("bool", True, None), "kayit_sesi": ("bool", True, None), "konus_alindi": ("bool", True, None), "sohbet_ses_izi": ("bool", False, None), "sohbet_araya_girme": ("bool", False, None), "sesli_not": ("bool", True, None),"sesli_kanit": ("bool", True, None), "fisilti": ("bool", False, None),
     "profil": ("sec", "tam", ("tam", "hafif")),  # S188: hafif = ≤ 8 GB Mac için bellek tasarruflu mod (tablo aktarici/profil.py)
     "ses_motoru": ("sec", "mac", ("mac", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac sesinde çarpan
-    "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "renk_duzeni": ("sec", "yesil", ("notr", "yesil")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
+    "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "renk_duzeni": ("sec", "yesil", ("notr", "yesil")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None), "kisilik_dis": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
     "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "eposta_oku": ("bool", False, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
     "adin_gecti": ("bool", True, None), "onay_uyari": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "toplanti_sonrasi_hatirlat_dk": ("sayi", 10, (0, 120)), "toplanti_sonrasi_sesli": ("bool", False, None), "toplanti_hatirlat": ("bool", True, None), "toplanti_hatirlat_dk": ("sayi", 10, (1, 60)), "toplanti_hatirlat_sesli": ("bool", True, None), "proaktif_oneri": ("bool", True, None), "proaktif_gunluk_en_cok": ("sayi", 3, (0, 10)), "proaktif_aralik_dk": ("sayi", 90, (0, 720)), "proaktif_bosta_dk": ("sayi", 5, (0, 120)), "konus_derin": ("bool", True, None), "konus_derin_model": ("sec", "opus", ("opus", "sonnet")), "konus_derin_effort": ("sec", "high", ("low", "medium", "high", "xhigh", "max")), "ekran_oto": ("bool", True, None),
@@ -1636,7 +1636,7 @@ AYAR_PANO = {
 # ayar dosyasında elle yazılırsa kod eskisi gibi okur. gemini_kapsam 24 Ekim'de geri geldi (kullanıcı: sohbette Gemini sesi; sesli "Gemini sesiyle konuş" geçişi de durur).
 def kisilik_listesi():  # Ayarlar'daki kişilik seçimi: kişilik klasöründeki .md dosyaları (kullanıcı kartı hariç) → [{yol: "~/…", ad}]
     ev = os.path.expanduser("~"); bel = (_profil_yolu() if "_profil_yolu" in globals() else os.path.expanduser(str(AYAR.get("kisilik_bellek") or ""))); out = []
-    yer = next((os.path.dirname(os.path.expanduser(str(AYAR.get(a)))) for a in ("kisilik", "kisilik_toplanti_disi", "kisilik_bellek") if AYAR.get(a)), os.path.join(os.path.dirname(AYAR_YOL), "kisilik"))
+    yer = next((os.path.dirname(os.path.expanduser(str(AYAR.get(a)))) for a in ("kisilik", "kisilik_toplanti_disi", "kisilik_dis", "kisilik_bellek") if AYAR.get(a)), os.path.join(os.path.dirname(AYAR_YOL), "kisilik"))
     try: adlar = sorted(f for f in os.listdir(yer) if f.endswith(".md"))
     except OSError: return []
     for f in adlar:
@@ -1723,7 +1723,7 @@ def ayar_yaz(deg):
                 h = sg_yaz(a, beyin)
                 if h: return {"ok": False, "err": h}
             for k, v in yeni.items():
-                if (k in ("eposta", "eposta_adres", "izleme_dosyasi", "izleme_ad", "kisilik", "kisilik_toplanti_disi", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
+                if (k in ("eposta", "eposta_adres", "izleme_dosyasi", "izleme_ad", "kisilik", "kisilik_toplanti_disi", "kisilik_dis", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
             if "profil" in yeni: _profil_modul().profil_uygula(a, yeni["profil"])  # hafif: ayarda olmayan türetilenler yazılır; tam: yalnız türetilenler silinir
             gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
