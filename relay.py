@@ -1620,7 +1620,7 @@ AYAR_PANO = {
     "ses_motoru": ("sec", "mac", ("mac", "pocket", "gemini")), "ses_hizi": ("sec", "1.0", ("0.85", "0.9", "1.0", "1.1", "1.2", "1.3")),  # v0.110.0: Mac sesinde çarpan
     "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "renk_duzeni": ("sec", "yesil", ("notr", "yesil")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None), "kisilik_dis": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
-    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "eposta_oku": ("bool", False, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
+    "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "eposta_oku": ("bool", False, None), "eposta_mail_uyari": ("bool", True, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
     "adin_gecti": ("bool", True, None), "onay_uyari": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "toplanti_sonrasi_hatirlat_dk": ("sayi", 10, (0, 120)), "toplanti_sonrasi_sesli": ("bool", False, None), "toplanti_hatirlat": ("bool", True, None), "toplanti_hatirlat_dk": ("sayi", 10, (1, 60)), "toplanti_hatirlat_sesli": ("bool", True, None), "proaktif_oneri": ("bool", True, None), "proaktif_gunluk_en_cok": ("sayi", 3, (0, 10)), "proaktif_aralik_dk": ("sayi", 90, (0, 720)), "proaktif_bosta_dk": ("sayi", 5, (0, 120)), "konus_derin": ("bool", True, None), "konus_derin_model": ("sec", "opus", ("opus", "sonnet")), "konus_derin_effort": ("sec", "high", ("low", "medium", "high", "xhigh", "max")), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "tstt_taslak": ("bool", True, None), "oto_toplanti": ("bool", True, None), "oto_haric": ("liste", "", None),  # S161 (v0.145.0): toplantıyı kendisi tanıma; hariç = ad parçaları (panoda virgülle)
@@ -2445,6 +2445,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/duman":  # Deneme toplantısı: başlat | bitir — yalnız pano (aktarici/duman.py)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(duman_islem(p))
+        if self.path == "/mail-ac":  # panodaki "Mail'i aç" (Mail kapalı uyarısı) — yalnız pano; Mail'i arka planda açar
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(posta_mail_ac() if "posta_mail_ac" in globals() else {"ok": False, "err": "yok"})
         if self.path == "/eposta-onemli":  # taslak | ertele | yoksay — yalnız pano (aktarici/eposta-takip.py); taslak göndermez
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(et_islem(p))

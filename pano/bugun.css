@@ -473,6 +473,7 @@ html:is(.hafta-ac,.saatler-ac) main>.sc>#tvb:not([hidden]){display:block;flex:no
 #bgn .ktr .km{flex:1;min-width:0;font-size:var(--yz-13)}
 #bgn .blk .keylem{margin-top:var(--bo-8)}
 #bgn .blk .epalt{margin:var(--bo-8) 0 var(--bo-4);font:500 var(--yz-12)/1.4 var(--f-govde);color:var(--b-m3)}
+#bgn .blk .epmail{display:flex;flex-wrap:wrap;gap:var(--bo-8);align-items:center;justify-content:space-between;margin:var(--bo-8) 0;padding:var(--bo-8) var(--bo-12);border:1px solid var(--b-cizgi);border-radius:var(--r-8);font-size:var(--yz-13)}
 #bgn .blk .epbilgi{margin:var(--bo-8) 0 0;font-size:var(--yz-12);color:var(--b-m3)}
 #bgn .blk .keylem{display:flex;flex-wrap:wrap;gap:var(--bo-8);align-items:center}
 #bgn .epdiger{position:relative}#bgn .epdiger summary{list-style:none;cursor:pointer}#bgn .epdiger summary::-webkit-details-marker{display:none}

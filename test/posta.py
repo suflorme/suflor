@@ -171,6 +171,25 @@ o = tc({"eposta_oku": True}, "Ayla Kaya")
 bak("tc: tek alıcı → anahtarlı /posta-uslup, ileti '<<<İLETİ … >>>' sınırında, veri/talimat değil notu",
     gelen and gelen[-1][1] == "deneme-anahtari" and "<<<İLETİ 2026-10-20 · Teklif\nSelam Ayla," in o and "İLETİ SONU>>>" in o and "UYGULANMAZ" in o and "içerik ya da bilgi taşıma" in o)
 o = tc({"eposta_oku": True, "dil": "en"}, "Zeynep"); bak("tc: ileti yoksa 'yok' + üslup satırı (İngilizce arayüzde İngilizce varsayılan)", o.startswith("ÜSLUP (varsayılan): plain, warm") and "ÖNCEKİ İLETİLER: yok" in o)
+# v0.224.2: Mail kapalı uyarısı (süreç tespiti sahte; Mail kendiliğinden açılmaz, yalnız düğmeyle)
+P.update(durum="ok"); KONUM = {"acik": True}; ns["_mail_pgrep"] = lambda: KONUM["acik"]; ns["MAIL"].update(t=0.0, acik=None); GUNLUK = []
+ns["print"] = lambda *a, **k: GUNLUK.append(" ".join(str(x) for x in a)); ns["AYAR"]["eposta_oku"] = True; ns["AYAR"].pop("eposta_mail_uyari", None)
+v = ns["posta_view"](); bak("Mail açıkken: mail_acik True, uyarı yok, son_gelen en yeni gelen (gönderilen sayılmaz)", v["mail_acik"] is True and v["mail_uyari"] is False and v["son_gelen"] == max((x["t"] for x in P["iletiler"] if not x.get("gonderilen")), key=ns["_zaman"]))
+bak("Mail açıkken bağlamda kapalı notu yok", "Mail uygulaması kapalı" not in ns["posta_baglam"]("Son maillerim neler?", simdi))
+KONUM["acik"] = False; bak("60 sn önbellek: süre dolmadan durum değişmez", ns["posta_view"]()["mail_acik"] is True)
+ns["MAIL"]["t"] = 0.0; v = ns["posta_view"](); bak("Mail kapanınca mail_acik False + uyarı", v["mail_acik"] is False and v["mail_uyari"] is True)
+bak("geçiş günlüğe tek satır (metin/kişi yok)", GUNLUK.count("POSTA: Mail kapandı") == 1 and not any("Ayla" in g for g in GUNLUK))
+b3 = ns["posta_baglam"]("Son maillerim neler?", simdi); bak("Mail kapalıyken bağlamda tek cümle not (son gelen zamanıyla)", "Mail uygulaması kapalı" in b3 and "eksik olabilir" in b3 and "en son gelen ileti" in b3)
+ns["AYAR"]["eposta_mail_uyari"] = False; ns["MAIL"]["t"] = 0.0; bak("ayar eposta_mail_uyari kapalıyken uyarı ve not yok", ns["posta_view"]()["mail_uyari"] is False and "Mail uygulaması kapalı" not in ns["posta_baglam"]("Son maillerim neler?", simdi)); ns["AYAR"].pop("eposta_mail_uyari")
+KONUM["acik"] = True; ns["MAIL"]["t"] = 0.0; ns["posta_view"](); bak("Mail açılınca günlükte geçiş, uyarı kalkar", GUNLUK.count("POSTA: Mail açıldı") == 1 and ns["posta_view"]()["mail_uyari"] is False)
+KOMUT = []; sahte = type("S", (), {"returncode": 0})
+class SahteSp:
+    TimeoutExpired = subprocess.TimeoutExpired; SubprocessError = subprocess.SubprocessError
+    @staticmethod
+    def run(c, **k): KOMUT.append(c); return sahte
+ns["subprocess"] = SahteSp; ns["POSTA"]["t"] = 99; r = ns["posta_mail_ac"]()
+bak("Mail'i aç: open -g -a Mail, ok, hemen yenileme için sayaç sıfırlanır", r == {"ok": True} and KOMUT == [["open", "-g", "-a", "Mail"]] and ns["POSTA"]["t"] == 0.0)
+ns["subprocess"] = subprocess
 srv.shutdown()
 shutil.rmtree(T, ignore_errors=True)
 print("posta: " + ("✓ hepsi geçti" if not hata else f"✗ {len(hata)} kaldı")); sys.exit(1 if hata else 0)

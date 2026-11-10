@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 674930,
-   "sha": "eaad7e6a40bcd0c2"
+   "uzunluk": 677010,
+   "sha": "eb23bcbafaf8b884"
   },
   "/mini": {
-   "uzunluk": 674930,
-   "sha": "eaad7e6a40bcd0c2"
+   "uzunluk": 677010,
+   "sha": "eb23bcbafaf8b884"
   },
   "/status": {
    "_ping_son": "float",
@@ -307,6 +307,7 @@
      "eposta_claude_siralama": "bool",
      "eposta_hatirlat": "bool",
      "eposta_hatirlat_sesli": "bool",
+     "eposta_mail_uyari": "bool",
      "eposta_oku": "bool",
      "eposta_onem_duzeyi": "str",
      "eposta_onem_gun": "int",
@@ -404,6 +405,7 @@
      "eposta_claude_siralama": "bool",
      "eposta_hatirlat": "bool",
      "eposta_hatirlat_sesli": "bool",
+     "eposta_mail_uyari": "bool",
      "eposta_oku": "bool",
      "eposta_onem_duzeyi": "str",
      "eposta_onem_gun": "int",
@@ -1056,7 +1058,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 8,
+  "DURUM": 7,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,
