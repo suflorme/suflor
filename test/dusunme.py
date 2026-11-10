@@ -29,9 +29,12 @@ def kur(ad, ayar=None, cevaplar=None, gizli=False, eski_model=False, takvim=True
                               {"id": "s4", "metin": "Eski unutulmuş iş", "kalan_gun": -30, "geride": True, "toplanti": ESKI_TOP},
                               {"id": "s5", "metin": "GİZLİ-TOPLANTI-İŞİ", "kalan_gun": 1, "toplanti": GIZLI_TOP}, {"id": "s6", "metin": "DENEME-TOPLANTI-İŞİ", "kalan_gun": 1, "toplanti": DENEME_TOP}],
                     "baskalari": [{"id": "s7", "metin": "Fiyat listesini yolla", "kim": "Can Örnek", "gecikti": True, "kalan_gun": -1, "toplanti": DUN_TOP}, {"id": "s8", "metin": "Çok uzak iş", "kim": "Can Örnek", "kalan_gun": 20, "toplanti": DUN_TOP}],
-                    "teyit": [1, 2]}
+                    "teyit": [1, 2]} if not durum.get("bv_hook") else durum["bv_hook"]()
+        ONAY_SON_GUN = 7
+        def ortak_kayit(s, base, kid): return durum.get("roller", {}).get(kid)
         def kayit_listesi(s, base, ad):
-            return {"kayitlar": [{"tur": "karar", "metin": "Fiyat yüzde beş artacak", "tarih": "2026-11-10", "baslik": "Satış", "toplanti": DUN_TOP},
+            ek = durum["kl_hook"]() if durum.get("kl_hook") else []
+            return {"kayitlar": ek + [{"tur": "karar", "metin": "Fiyat yüzde beş artacak", "tarih": "2026-11-10", "baslik": "Satış", "toplanti": DUN_TOP},
                                  {"tur": "is", "metin": "Sunumu hazırla", "kim": "Deniz T", "tarih": "2026-11-10", "baslik": "Satış", "toplanti": DUN_TOP},
                                  {"tur": "karar", "metin": "GİZLİ-TOPLANTI-KARARI", "tarih": "2026-11-10", "toplanti": GIZLI_TOP},
                                  {"tur": "karar", "metin": "DENEME-TOPLANTI-KARARI", "tarih": "2026-11-10", "toplanti": DENEME_TOP},
@@ -237,12 +240,114 @@ K["DURUM"]["gizli"] = True; ok("gizli kipte plan dilimi dönmez", K["baglam_pake
 ok("plan yokken dilim boş", kur("plansiz")["baglam_paketi"]("konus", dilimler=["gun_plani"], simdi=SIMDI) == "")
 ok("dusunme amacı bütçe içinde ve notları süzmeden alır", len(K["baglam_paketi"]("dusunme", simdi=SIMDI)) <= K["KM_AMAC"]["dusunme"][1])
 
+# --- 12) karar bekleyenler, merci, eylem teklifi (v0.225.0) ---
+def onay(g): return {"durum": "bekliyor", "gun": g, "hatirlat": False}
+def bv_gun1():
+    return {"kendi": [{"id": "s1", "metin": "Teklifi gönder", "gecikti": True, "kalan_gun": -2, "vade": "2026-11-09", "kim": "Deniz T", "baslik": "Satış", "toplanti": DUN_TOP},
+                      {"id": "s2", "metin": "Bütçeyi kapat", "kalan_gun": 0, "vade": "2026-11-11", "toplanti": DUN_TOP}, {"id": "s3", "metin": "Raporu oku", "kalan_gun": 5, "vade": "2026-11-16", "toplanti": DUN_TOP}],
+            "baskalari": [{"id": "s7", "metin": "Fiyat listesini yolla", "kim": "Can Örnek", "gecikti": True, "kalan_gun": -1, "vade": "2026-11-10", "toplanti": DUN_TOP}],
+            "teyit": [{"id": "k10", "metin": "Fiyat yüzde beş artacak", "baslik": "Satış haftalık", "toplanti": DUN_TOP, "onay": onay(2)},
+                      {"id": "k11", "metin": "GİZLİ-KARAR-ONAYI", "baslik": "Gizli", "toplanti": GIZLI_TOP, "onay": onay(1)}]}
+def kl_gun1():
+    return [{"id": "k10", "tur": "karar", "durum": "teyit", "metin": "Fiyat yüzde beş artacak", "kim": "Deniz T", "baslik": "Satış haftalık", "toplanti": DUN_TOP, "kayit_id": "ok10", "onay": onay(2)},
+            {"id": "k20", "tur": "karar", "durum": "teyit", "metin": "Bütçe revizyonu yayımlansın", "kim": "Can Örnek", "baslik": "Satış haftalık", "toplanti": DUN_TOP, "kayit_id": "ok20", "onay": onay(5)},
+            {"id": "k21", "tur": "karar", "durum": "teyit", "metin": "GİZLİ-KARAR-MERCİ", "kim": "X", "baslik": "G", "toplanti": GIZLI_TOP, "kayit_id": "ok21", "onay": onay(5)},
+            {"id": "k22", "tur": "karar", "durum": "teyit", "metin": "DENEME-KARAR-MERCİ", "kim": "X", "baslik": "D", "toplanti": DENEME_TOP, "kayit_id": "ok22", "onay": onay(5), "deneme": True},
+            {"id": "k23", "tur": "karar", "durum": "kapandi", "metin": "Eski onaylı karar", "kim": "X", "baslik": "S", "toplanti": DUN_TOP, "kayit_id": "ok23"},
+            {"id": "s1", "tur": "is", "durum": "acik", "metin": "Teklifi gönder", "kim": "Deniz T", "baslik": "Satış", "toplanti": DUN_TOP, "tarih": "2026-11-01"}]
+def kur_k(ad, cevaplar, bv=bv_gun1, kl=kl_gun1):
+    K_ = kur(ad, cevaplar=cevaplar); K_["DURUM"].update(bv_hook=bv, kl_hook=kl, roller={"ok20": {"roller": {"onaylayan": {"ad": "Zeynep K"}}}}); return K_
+KC = []; K1 = kur_k("karar", KC)
+g1 = K1["dus_girdi"](SIMDI); m1 = g1["metin"]
+ok("girdi: onayını bekleyen karar kimlikli (k10) + toplantı + son tarih (onay süresi 5 g kaldı); eski 'karar sayısı' satırı yok", "[Senin onayını bekleyen kararlar" in m1 and "k10 | Fiyat yüzde beş artacak | Satış haftalık | onay süresi 5 g kaldı | bugün 10:00 toplantısı" in m1 and "Onayını bekleyen karar sayısı" not in m1, m1[m1.find("[Senin"):m1.find("[Senin") + 300])
+ok("girdi: başkasında bekleyen karar (k20) merci (ortak kayıttaki onaylayan Zeynep K), son tarih ve bugünkü toplantı; kendi kararı (k10) burada tekrar yok", "k20 | Bütçe revizyonu yayımlansın | Satış haftalık | merci: Zeynep K | onay süresi 2 g kaldı | bugün 10:00 toplantısı" in m1 and m1.split("[Başkasında bekleyen kararlar")[1].split("[/Başkasında bekleyen kararlar]")[0].count("k10") == 0)
+ok("girdi: gizli/deneme karar ve kapanmış karar yok", all(w not in m1 for w in ("GİZLİ-KARAR", "DENEME-KARAR", "Eski onaylı karar")))
+ok("girdi: kararlar sözlüğü kapsamlı (k10 teyit, k20 merci); ilk günde fark yok ve bölüm yok", g1["kararlar"]["k10"]["kapsam"] == "teyit" and g1["kararlar"]["k20"]["kapsam"] == "merci" and g1["fark"] is None and "Son açılıştan" not in m1 and g1["kiyas"] is None)
+ok("damga: görünür açık iş ve kararlar, yalnız kapsam|vade (metin yok, gizli yok)", g1["damga"] == {"s1": "kendi|2026-11-09", "s2": "kendi|2026-11-11", "s3": "kendi|2026-11-16", "s7": "baska|2026-11-10", "k10": "teyit|", "k20": "merci|"}, g1["damga"])
+ist1 = K1["dus_istem"](g1, SIMDI)
+ok("istem: id/eylem şeması, üç izinli eylem, karar öncelik cümlesi; ilk günde değişen cümlesi yok", '"eylem": "onayla|yapildi|taslak"' in ist1 and "'onayla'" in ist1 and "'taslak'" in ist1 and "hiçbir eylem kendiliğinden bir şey göndermez" in ist1 and "Son açılıştan bu yana değişenler' bölümü varsa" not in ist1)
+
+def plan_d(dik, odak=None): return gecerli(plan=dict(gecerli()["plan"], dikkat=dik, odak=odak if odak is not None else [{"id": "s1", "saat": "11:00", "neden": "x", "eylem": "yapildi"}, {"id": "s2", "saat": "09:30", "neden": "y", "eylem": "onayla"}, {"id": "s3", "saat": "12:00", "neden": "z", "eylem": "taslak"}]))
+rc, _ = K1["dus_coz"](json.dumps(plan_d([
+    {"metin": "Fiyat kararı seni bekliyor", "neden": "iki gün oldu", "id": "k10", "eylem": "onayla"},
+    {"neden": "süresi doluyor", "id": "k20", "eylem": "taslak"},                      # metin kayıttan
+    {"metin": "Uydurma kayıt", "neden": "x", "id": "k99", "eylem": "onayla"},          # girdide yok → madde atılır
+    {"metin": "Teklif ", "neden": "x", "id": "s1", "eylem": "onayla"},                  # eylem kapsama uymuyor → eylem atılır, madde kalır
+    {"metin": "Liste", "neden": "x", "id": "s7", "eylem": "sil"}])), g1)                # izin listesinde olmayan eylem
+d = rc["plan"]["dikkat"]
+ok("dikkat: kararlı madde (id k10) tur karar, kapsam teyit, eylem onayla; vade etiketi kayıttan; kim yok (kendi kararın)", d[0]["id"] == "k10" and d[0]["tur"] == "karar" and d[0]["kapsam"] == "teyit" and d[0]["eylem"] == "onayla" and d[0]["vade"] == "onay süresi 5 g kaldı" and "kim" not in d[0], d[0])
+ok("dikkat: metinsiz madde kayıttan metin alır; merci kaydından kim, eylem taslak (başkasında bekleyen karar)", d[1]["id"] == "k20" and d[1]["metin"] == "Bütçe revizyonu yayımlansın" and d[1]["kim"] == "Zeynep K" and d[1]["kapsam"] == "merci" and d[1]["eylem"] == "taslak", d[1])
+ok("uydurma kimlik (k99) maddesi atıldı", all(x.get("id") != "k99" and "Uydurma" not in x["metin"] for x in d), d)
+ok("eylem kapsama uymuyorsa atılır, madde kalır (s1 onayla → eylemsiz); izinsiz eylem (sil) atılır", d[2]["id"] == "s1" and "eylem" not in d[2] and d[2]["kapsam"] == "kendi" and d[3]["id"] == "s7" and "eylem" not in d[3] and d[3]["kim"] == "Can Örnek" and d[3]["kapsam"] == "bek", d)
+ok("odak eylemi yalnız yapildi ve yalnız kendi işte (onayla/taslak atıldı)", [x.get("eylem") for x in rc["plan"]["odak"]] == ["yapildi", None, None], rc["plan"]["odak"])
+ok("izin listesi: yalnız onayla/yapildi/taslak", K1["DUS_EYLEM"] == ("onayla", "yapildi", "taslak"))
+okk = lambda e, i: K1["_dus_eylem_ok"](e, i, g1)
+ok("eylem-kapsam matrisi: onayla yalnız k10; yapildi yalnız s1-s3; taslak yalnız k20/s7; uydurma eylem ve kimlik hiçbiri", okk("onayla", "k10") and not okk("onayla", "k20") and not okk("onayla", "s1") and okk("yapildi", "s1") and not okk("yapildi", "s7") and okk("taslak", "k20") and okk("taslak", "s7") and not okk("taslak", "s1") and not okk("gonder", "k10") and not okk("onayla", "k99"))
+dd = K1["dus_coz"](json.dumps(plan_d([{"metin": "a", "neden": "x", "id": "k10", "eylem": "onayla"}, {"metin": "b", "neden": "x", "id": "k10", "eylem": "onayla"}])), g1)[0]["plan"]["dikkat"]
+ok("aynı kimlik ikinci kez dikkate girmez", len(dd) == 1, dd)
+dm = K1["dus_coz"](json.dumps(plan_d([{"metin": "Serbest not", "neden": "x"}])), g1)[0]["plan"]["dikkat"]
+ok("kimliksiz serbest madde eskisi gibi kalır (id/eylem alanı yok)", dm == [{"metin": "Serbest not", "neden": "x"}], dm)
+ok("model yeni/degisti uyduramaz: işaretler yalnız farktan (ilk günde hiç yok)", all(not x.get("yeni") and not x.get("degisti") for x in d + rc["plan"]["odak"]) and K1["dus_coz"](json.dumps(plan_d([{"metin": "m", "neden": "x", "id": "s1", "yeni": True, "degisti": True}])), g1)[0]["plan"]["dikkat"][0].get("yeni") is None)
+
+# --- 13) son açılıştan bu yana ne değişti ---
+KC.append(plan_d([{"metin": "Fiyat kararı", "neden": "x", "id": "k10", "eylem": "onayla"}, {"metin": "Teklif", "neden": "x", "id": "s1", "eylem": "yapildi"}]))
+r13 = K1["dus_calistir"](simdi=SIMDI); pl1 = oku(K1, "gun-plani.json")
+ok("ilk gün: plan yazıldı, damga var, kıyas/fark yok, işaret yok", r13.get("ok") and pl1["damga"] == g1["damga"] and "kiyas" not in pl1 and "fark" not in pl1 and not any(x.get("yeni") or x.get("degisti") for x in pl1["odak"] + pl1["dikkat"]), {k: pl1.get(k) for k in ("damga", "kiyas", "fark")})
+ok("plan eylemleri dosyada (k10 onayla, s1 yapildi)", [x.get("eylem") for x in pl1["dikkat"]] == ["onayla", "yapildi"], pl1["dikkat"])
+ok("dus_view eylem alanlarını taşır; fark yok", K1["dus_view"]()["dikkat"][0]["eylem"] == "onayla" and K1["dus_view"]()["fark"] is None)
+dur1 = oku(K1, "dusunme-durum.json"); ok("durum dosyasında ilk gün fark None", dur1.get("fark") is None and "fark" in dur1)
+
+def bv_gun2():  # s30 yeni · s1 kapandı · s2 vadesi kaydı · s3 aynı · s7 bana atandı · k10 onaylandı · k20 hâlâ merci · k24 yeni karar (senin onayına)
+    return {"kendi": [{"id": "s30", "metin": "Yeni gelen iş", "kalan_gun": 2, "vade": "2026-11-14", "toplanti": DUN_TOP},
+                      {"id": "s2", "metin": "Bütçeyi kapat", "kalan_gun": 3, "vade": "2026-11-15", "toplanti": DUN_TOP}, {"id": "s3", "metin": "Raporu oku", "kalan_gun": 4, "vade": "2026-11-16", "toplanti": DUN_TOP},
+                      {"id": "s7", "metin": "Fiyat listesini yolla", "kim": "Deniz T", "kalan_gun": 1, "vade": "2026-11-10", "toplanti": DUN_TOP}],
+            "baskalari": [], "teyit": [{"id": "k24", "metin": "Yeni karar", "baslik": "Satış", "toplanti": DUN_TOP, "onay": onay(0)}]}
+def kl_gun2():
+    return [{"id": "k10", "tur": "karar", "durum": "kapandi", "metin": "Fiyat yüzde beş artacak", "kim": "Deniz T", "baslik": "Satış haftalık", "toplanti": DUN_TOP, "kayit_id": "ok10"},
+            {"id": "k20", "tur": "karar", "durum": "teyit", "metin": "Bütçe revizyonu yayımlansın", "kim": "Can Örnek", "baslik": "Satış haftalık", "toplanti": DUN_TOP, "kayit_id": "ok20", "onay": onay(6)},
+            {"id": "s1", "tur": "is", "durum": "kapandi", "metin": "Teklifi gönder", "kim": "Deniz T", "baslik": "Satış", "toplanti": DUN_TOP}]
+K1["DURUM"].update(bv_hook=bv_gun2, kl_hook=kl_gun2)
+g2 = K1["dus_girdi"](dt(12, 4)); f2 = g2["fark"]
+ok("fark: yeni (s30, k24), kapanan (s1 kayıtta kapandı, k10 onaylandı), vadesi kayan (s2), bana atanan (s7)", f2 == {"yeni": ["s30", "k24"], "kapanan": ["s1", "k10"], "kayan": ["s2"], "atanan": ["s7"], "degisen": []} or (sorted(f2["yeni"]) == ["k24", "s30"] and sorted(f2["kapanan"]) == ["k10", "s1"] and f2["kayan"] == ["s2"] and f2["atanan"] == ["s7"] and f2["degisen"] == []), f2)
+ok("fark: aynı kalan s3 ve değişmeyen merci kararı (k20; onay süresi her gün kayar ama sayılmaz) farkta yok", all("s3" not in v and "k20" not in v for v in f2.values()))
+ok("girdi: 'Son açılıştan bu yana değişenler' bölümü sayı + kimlikle, önceki plan tarihiyle; metin yok", "[Son açılıştan bu yana değişenler — önceki plan 2026-11-11" in g2["metin"] and "yeni gelen: 2" in g2["metin"] and "kapanan: 2" in g2["metin"] and "vadesi kayan: 1 (s2)" in g2["metin"] and "sana atanan: 1 (s7)" in g2["metin"] and "Yeni gelen iş" not in g2["metin"].split("[Son açılıştan")[1].split("[/Değişenler]")[0])
+ok("istem: değişenler varsa 'yeni/değişen önce' kuralı", "Son açılıştan bu yana değişenler' bölümü varsa yeni gelen" in K1["dus_istem"](g2, dt(12, 4)))
+# durumu değişen: karar başkasından benim onayıma geçti
+od_ = {"k20": "merci|"}; ok("fark: kapsamı başka biçimde değişen (merci → teyit) durum değişen; kapanan yalnız kayıtta kapanmışsa", K1["dus_fark"](od_, {"k20": "teyit|"}) == {"yeni": [], "kapanan": [], "kayan": [], "atanan": [], "degisen": ["k20"]} and K1["dus_fark"]({"s9": "kendi|"}, {}, kapali=set())["kapanan"] == [] and K1["dus_fark"]({"s9": "kendi|"}, {})["kapanan"] == ["s9"] and K1["dus_fark"](None, {"s1": "kendi|"}) is None and K1["dus_fark"]({}, {"s1": "kendi|"}) is None)
+KC.append(plan_d([{"metin": "Yeni gelen iş", "neden": "x", "id": "s30", "eylem": "yapildi"}, {"metin": "Bütçe", "neden": "x", "id": "s2"}, {"metin": "Fiyat listesi", "neden": "x", "id": "s7"}, {"metin": "Karar", "neden": "x", "id": "k24", "eylem": "onayla"}, {"metin": "Rapor", "neden": "x", "id": "s3"}],
+                 odak=[{"id": "s30", "saat": "11:00", "neden": "yeni"}, {"id": "s3", "saat": "12:00", "neden": "x"}]))
+r14 = K1["dus_calistir"](simdi=dt(12, 4)); pl2 = oku(K1, "gun-plani.json")
+ik = {x["id"]: x for x in pl2["dikkat"] + pl2["odak"]}
+ok("ikinci gün: plan yazıldı, tarih 12 Kasım, kıyas = önceki günün damgası (tarih + damga)", r14.get("ok") and pl2["tarih"] == "2026-11-12" and pl2["kiyas"] == {"tarih": "2026-11-11", "damga": pl1["damga"]}, pl2.get("kiyas"))
+ok("ikinci gün: yeni işareti (s30 odak+dikkat, k24), değişti işareti (s2 vade, s7 atanan), değişmeyen (s3) işaretsiz", pl2["odak"][0].get("yeni") and [x for x in pl2["dikkat"] if x["id"] == "s30"][0].get("yeni") and ik["k24"].get("yeni") and ik["s2"].get("degisti") and ik["s7"].get("degisti") and not ik["s3"].get("yeni") and not ik["s3"].get("degisti") and "yeni" not in ik["s2"], ik)
+SAAT["t"] = dt(12, 6).timestamp()
+ok("plan.fark sayıları ve önceki tarih; dus_view panoya taşır", pl2["fark"] == {"onceki": "2026-11-11", "sayi": {"yeni": 2, "kapanan": 2, "kayan": 1, "atanan": 1, "degisen": 0}} and K1["dus_view"]()["fark"]["onceki"] == "2026-11-11" and K1["dus_view"]()["dikkat"][0]["yeni"] is True, pl2.get("fark"))
+ok("yeni damga yazıldı (s30, k24; kapananlar yok)", pl2["damga"].get("s30") == "kendi|2026-11-14" and "s1" not in pl2["damga"] and "k10" not in pl2["damga"] and pl2["damga"]["k24"] == "teyit|", pl2["damga"])
+dur2 = oku(K1, "dusunme-durum.json"); ok("durum dosyasında fark sayıları", dur2["fark"] == pl2["fark"]["sayi"], dur2)
+KC.append(plan_d([{"metin": "Yeni gelen iş", "neden": "x", "id": "s30"}]))
+g3 = K1["dus_girdi"](dt(12, 6)); ok("aynı gün yeniden çalıştırma: kıyas günün ilk kıyası (önceki gün) kalır, fark aynı", g3["fark"] == f2 and g3["kiyas"]["tarih"] == "2026-11-11", g3["fark"])
+r15 = K1["dus_calistir"](simdi=dt(12, 6)); pl3 = oku(K1, "gun-plani.json")
+ok("aynı gün yeniden çalıştırma: kıyas ve yeni işareti korunur", pl3["kiyas"] == pl2["kiyas"] and pl3["dikkat"][0].get("yeni") is True and pl3["fark"] == pl2["fark"], pl3.get("kiyas"))
+ok("dosyalarda gizli/deneme içeriği ve metin damgası yok", all(w not in ham(K1, f) for f in ("gun-plani.json", "dusunme-durum.json", "soz.jsonl") for w in ("GİZLİ-KARAR", "DENEME-KARAR", "GİZLİ-TOPLANTI", "DENEME-TOPLANTI")) and all(re.match(r"^(kendi|baska|teyit|merci)\|[0-9-]*$", v) for v in pl3["damga"].values()))
+# eski biçimli plan (damga yok) → ilk gün gibi; bozuk damga sorun çıkarmaz
+os.makedirs(os.path.join(T, "eskiplan"), exist_ok=True); KE = kur_k("eskiplan", [plan_d([])])
+json.dump({"tarih": "2026-11-10", "ozet": "eski", "odak": [], "dikkat": [], "soru": []}, open(os.path.join(KE["D"], "gun-plani.json"), "w"))
+ok("eski plan (damga yok) → fark None, sorunsuz çalışır", KE["dus_girdi"](SIMDI)["fark"] is None and KE["dus_calistir"](simdi=SIMDI).get("ok"))
+json.dump({"tarih": "2026-11-10", "ozet": "bozuk", "damga": "yok", "kiyas": [1]}, open(os.path.join(KE["D"], "gun-plani.json"), "w"))
+ok("bozuk damga/kıyas alanı → fark None", KE["dus_girdi"](dt(11, 5))["fark"] is None and kur_k("bozuk-dmg", [])["_dus_oncekiler"](SIMDI) == (None, None))
+# gizli kip: karar listeleri yine yazılmaz (tur çalışmaz)
+KG = kur_k("gizli-karar", [plan_d([])]); KG["DURUM"]["gizli"] = True; ok("gizli kipte tur çalışmaz (karar bölümleri girmez)", KG["dus_calistir"](simdi=SIMDI)["durum"] == "gizli" and not KG["DURUM"]["model_cagri"])
+# bugun_veri/kayit_listesi okunamıyorsa bölümler boş, tur yine çalışır
+KB = kur("okunamaz", cevaplar=[gecerli()]); KB["DURUM"].update(bv_hook=lambda: 1 / 0, kl_hook=lambda: 1 / 0); rb = KB["dus_calistir"](simdi=SIMDI)
+ok("kaynaklar okunamazsa (istisna) tur çökmez, plan yazılır, karar/fark bölümü yok", rb.get("ok") and "Senin onayını bekleyen" not in KB["DURUM"]["model_cagri"][0]["istem"] and oku(KB, "gun-plani.json")["damga"] == {}, rb)
+
 # --- 11) bağlantılar ---
 rel = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); tsh = open(os.path.join(KOD, "teshis.py"), encoding="utf-8").read(); pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read(); dil = open(os.path.join(KOD, "pano", "dil.js"), encoding="utf-8").read()
 ok("relay.py: bölüm soz-kapisi'nden sonra, status gun_plani, /dusunme pano-yalnız, gizli kipte reddedilir; teshis KOD_DOSYALARI'nda", rel.index('bolum("soz-kapisi")') < rel.index('bolum("dusunme")') and 's["gun_plani"] = dus_view()' in rel and 'self.path == "/dusunme"' in rel and '"/dusunme"}' in rel and '"dusunme.py"' in tsh)
 ok("soz-kapisi: gun_plani başlığı ve yoksay süresi tanımlı", "gun_plani" in open(os.path.join(KOD, "aktarici", "soz-kapisi.py"), encoding="utf-8").read().split("SOZ_YOKSAY_SN = ")[1].split("\n")[0] and N["SOZ_BASLIK"]["gun_plani"][0] == "Günün planı hazır")
 ok("pano: Doğru/Yanlış düğmeleri ve gordu çağrısı var; yeni bölüm başlığı yok (var olan Günün özeti kartında)", "data-bn=gpdogru" in pano and "data-bn=gpyanlis" in pano and "islem:'gordu'" in pano and "class=ozet" in pano and pano.count("<section class=ozet") == 1)
-ok("dil.js: yeni arayüz metinlerinin İngilizcesi var", all(f'"{s}"' in dil for s in ("Bugünün odağı", "Dün öğrendiklerim", "Doğru", "Yanlış", "Not aldım, teşekkürler", "Tamam, bunu geçersiz saydım")))
+ok("pano: eylem düğmesi var olan uçlara gider (/karar-onay, /is-durum, /kayit-eylem eposta → yalnız taslağı açar), yeni/değişti etiketi, eylem hiçbir şey göndermez", "data-bn=gpeylem" in pano and "bnYaz('/karar-onay'" in pano.split("gpeylem")[-1] and "eylem:'eposta'" in pano.split("a==='gpeylem'")[1][:900] and "bnYaz('/is-durum'" in pano.split("a==='gpeylem'")[1][:900] and "L('Yeni')" in pano and "L('Değişti')" in pano and "gpDug" in pano)
+ok("dil.js: yeni arayüz metinlerinin İngilizcesi var", all(f'"{s}"' in dil for s in ("Bugünün odağı", "Dün öğrendiklerim", "Doğru", "Yanlış", "Not aldım, teşekkürler", "Tamam, bunu geçersiz saydım", "Taslağını hazırla", "Yeni", "Değişti", "Taslak açıldı; göndermek sende")))
 ok("döngü iş parçacığı yalıtılmış ad alanında başlamaz (STATE yok)", not any(t.name and "dongu" in t.name.lower() for t in threading.enumerate()))
 ok("kaynak: Opus varsayılan, günde bir kez, günlükte 'DÜŞÜNME:' öneki", 'or "opus"' in open(os.path.join(KOD, "aktarici", "dusunme.py"), encoding="utf-8").read() and all(l.startswith("DÜŞÜNME:") for l in N["LOG"] if "DÜŞÜNME" in l))
 print(f"\n{'KALDI: ' + str(len(HATA)) if HATA else 'hepsi geçti'}")

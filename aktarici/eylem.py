@@ -108,7 +108,7 @@ def cards_view():
     bi = STATE.get("bildirim"); bi = bi if bi and time.time() - bi["t"] < 120 else None  # menü uygulamasının göstereceği bildirim
     pa = STATE.get("pano_ac"); pa = {"id": pa["id"], **({"gorunum": pa["gorunum"]} if pa.get("gorunum") else {}), **({"bolum": pa["bolum"]} if pa.get("bolum") else {})} if pa and time.time() - pa["t"] < 30 else None  # menü uygulaması pano penceresini açsın (/pano-ac)
     return {"uyari": disk_warning(), "tone": tone, "tone_kisi": tone_kisi, "cards": open_, "closed": closed, "questions": [q for q in qs_ if q["id"] not in answered and not (q.get("tur") == "girdi" and (datetime.datetime.now() - datetime.datetime.fromisoformat(q["at"])).total_seconds() > 45)][-5:],
-            "sure": sure_view(), "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
+            "sure": sure_view() if gundem_gorunur() else None, "pay": pay_view(af) if af else None, "acik": acik_view() if gundem_gorunur() else [], "dil": dil_view(),
             "bildirim": bi, "pano_ac": pa, "kanit_iste": {"id": ki["id"], "not": ki.get("not", ""), "kaynak": ki.get("kaynak", "pano"), **({"hedef": ki["hedef"]} if ki.get("hedef") else {})} if ki else None, "kanit_n": len(STATE["kanitlar"].get(af, [])) if af else 0,
             "whisper": whisper_view(), "komut": STATE.get("komut"), "sessiz": sessiz_view(), "gizli": gizli_view(), "ertelenen": ertelenen, "tavan": tavan, "eylem": eylem_view(),
             "baglam": baglam_view(), "yaparken": yaparken_view(), "sesli_ceviri": sesli_ceviri_view(), "anlik": anlik_view(), "soyle_web": ts_web_view(), "veri_yok": veri_yok_view() if "veri_yok_view" in globals() else None,  # Mac kart katmanı da gösterir (Chrome arka plandayken uyarı kaçmasın)

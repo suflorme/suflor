@@ -2200,13 +2200,17 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
     if(epc)ek.push(L('{n} e-posta senden cevap bekliyor.',{n:epc}));if(yk)ek.push(goreliKok(yk.tarih).g?L('Yarın: {m}.',{m:esc(yk.metin)}):L('Bugün: {m}.',{m:esc(yk.metin)}))
     const say=[[bnKendiT().length,'{n} iş','data-bn=git data-g=kayit data-m=is'],[kt.length,'{n} karar','data-bn=git data-g=kayit data-m=karar'],[bek.length,'{n} onay','data-bn=panel data-ref=bek'],[epN,'{n} e-posta','data-bn=epgit'],[kalan.length,'{n} toplantı','data-bn=git data-g=takvim data-m=gun']].filter(x=>x[0]>0).map(([n,m,a])=>`<button type=button class=bag ${a}>${esc(L(m,{n}))}</button>`)
     // Günün planı (aktarici/dusunme.py, günde bir düşünme turu) varsa özet ondan gelir ve odak/dikkat/"doğru mu?" satırları aynı kartta durur; yoksa bugünkü durum cümleleri
-    const gp=s.gun_plani&&s.gun_plani.ozet?s.gun_plani:null,gpAcik=bnV?new Set(bnKendi().map(x=>x.id)):null  // odaktaki iş bu arada kapandıysa satır gizlenir
-    const gpOdak=gp?(gp.odak||[]).filter(x=>!gpAcik||gpAcik.has(x.id)):[],gpDik=gp?gp.dikkat||[]:[],gpSoru=gp?(gp.soru||[]).filter(x=>!gpBek.has(x.id)):[]
+    const gp=s.gun_plani&&s.gun_plani.ozet?s.gun_plani:null,gpAcik=bnV?new Set(bnKendi().map(x=>x.id)):null,gpTey=bnV?new Set(bnTeyit().map(x=>x.id)):null  // odaktaki iş / dikkattaki karar bu arada kapandıysa satır gizlenir
+    const gpGec=x=>!x.id||(x.kapsam==='kendi'&&gpAcik?gpAcik.has(x.id):x.kapsam==='teyit'&&gpTey?gpTey.has(x.id):true)
+    const gpEt=x=>x.yeni?` <span class="etiket notr">${L('Yeni')}</span>`:x.degisti?` <span class="etiket notr">${L('Değişti')}</span>`:''  // yeni/değişti işareti aktarıcıdaki farktan gelir (son açılıştan bu yana)
+    const gpEy={onayla:L('Onayla'),yapildi:L('Yapıldı'),taslak:L('Taslağını hazırla')},gpDug=x=>x.eylem&&gpEy[x.eylem]&&x.id?`<button type=button class="b${x.eylem==='taslak'?' sade':''}" data-bn=gpeylem data-e="${esc(x.eylem)}" data-id="${esc(x.id)}">${esc(gpEy[x.eylem])}</button>`:''  // yalnız var olan onay/taslak yolunu açar; kendiliğinden bir şey göndermez
+    const gpSat=(x,nokta,ek)=>bsSat({id:x.id,nokta,t:esc(x.metin)+gpEt(x),a:esc([ek,x.neden,x.kim,x.vade].filter(Boolean).join(' · ')),d:gpDug(x)})
+    const gpOdak=gp?(gp.odak||[]).filter(gpGec):[],gpDik=gp?(gp.dikkat||[]).filter(gpGec):[],gpSoru=gp?(gp.soru||[]).filter(x=>!gpBek.has(x.id)):[]
     const dp=gp?esc(gp.ozet):bnDurum(s,ol,now,sira,kala,hdS,bek,son,ek),dmetin=gp?(()=>{let m=gp.ozet;[...gpOdak.map(x=>(x.saat?x.saat+' ':'')+x.metin+(x.neden?'. '+x.neden:'')),...gpDik.map(x=>x.metin)].forEach(c=>{if((m+' '+c).length<1450)m+=' '+(/[.!?]$/.test(c)?c:c+'.')});return m})():(()=>{const t=document.createElement('div');t.innerHTML=dp;return(t.textContent||'').replace(/\s+/g,' ').trim()})()  // Dinle brifing yokken de görünür: kartın düz metni okunur
     bnOzetMetin=dmetin
     const gpGrup=(b,h)=>h?`<div class=gpgrup><h2 class=kb2>${b}</h2><div class=liste>${h}</div></div>`:''
-    const gpB=gp?gpGrup(L('Bugünün odağı'),gpOdak.map(x=>bsSat({nokta:'',t:esc(x.metin),a:esc([x.saat,x.neden].filter(Boolean).join(' · '))})).join(''))
-      +gpGrup(L('Dikkat'),gpDik.map(x=>bsSat({nokta:'bek',t:esc(x.metin),a:esc(x.neden||'')})).join(''))
+    const gpB=gp?gpGrup(L('Bugünün odağı'),gpOdak.map(x=>gpSat(x,'',x.saat)).join(''))
+      +gpGrup(L('Dikkat'),gpDik.map(x=>gpSat(x,'bek','')).join(''))
       +gpGrup(L('Dün öğrendiklerim'),gpSoru.map(x=>bsSat({nokta:'',t:esc(x.metin),d:`<button type=button class=b data-bn=gpdogru data-id="${esc(x.id)}">${L('Doğru')}</button><button type=button class="b sade" data-bn=gpyanlis data-id="${esc(x.id)}">${L('Yanlış')}</button>`})).join('')):''
     const dsn=dtgt?sn:Math.max(5,Math.round(dmetin.split(/\s+/).length/2.4)),ddk=Math.max(1,Math.round(dsn/60))
     const ozet=`<section class=ozet aria-label="${L('Günün özeti')}"><div class=obas><h2>${L('Günün özeti')}</h2><div class=keylem>${sira&&bnBrifing(sira,s)?`<button type=button class="b sade" data-bn=panel data-ref="t:${esc(sira.id)}">${L('Brifingi aç')}</button>`:''}${ses&&(dtgt||dmetin)?`<button type=button class="b dinle${dinliyor?' on':''}" data-bn=dinle ${dtgt?`data-id="${esc(dtgt.id)}"`:'data-metin=1'}>${ic(dinliyor?'dur':'oynat')}<span>${dinliyor?L('Durdur'):L('Dinle')}</span><span class=mono>· ${esc(L('~{n} dk',{n:dtgt?dk:ddk}))}</span></button>`:''}</div></div><p>${dp}</p>${gpB}${say.length?`<div class=sayac2>${say.join('<span aria-hidden=true>·</span>')}</div>`:''}</section>`
@@ -2611,6 +2615,12 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='kararlar'){const idler=String(b.dataset.idler||'').split(',').filter(Boolean);return bnIsle(idler,L('{n} karar onaylandı',{n:idler.length}),()=>bnYaz('/karar-onay',{idler}))}
   if(a==='thaz'||a==='that'||a==='thkap'){b.disabled=true;j('/toplanti-hatirlat',{method:'POST',body:JSON.stringify({islem:a==='thaz'?'hazirlik':a==='that'?'ac':'kapat',id})}).catch(()=>{});if(a==='thkap'&&last)last.toplanti_hatirlat=null;if(last)bnCiz(last);return}
   if(a==='proakt'||a==='proakap'){b.disabled=true;j('/proaktif',{method:'POST',body:JSON.stringify({islem:a==='proakt'?'sor':'kapat',id})}).catch(()=>{});if(last&&last.proaktif)last.proaktif=null;if(last)bnCiz(last);return}
+  if(a==='gpeylem'){const e=b.dataset.e  // Günün özeti maddesinin eylem düğmesi: var olan uçlar (/karar-onay, /is-durum; taslak = /kayit-eylem eposta, yalnız açılır)
+    if(e==='onayla')return bnIsle([id],L('Karar onaylandı'),()=>bnYaz('/karar-onay',{idler:[id]}))
+    if(e==='yapildi')return bnIsle([id],L('İş yapıldı olarak işaretlendi'),()=>bnYaz('/is-durum',{id,durum:'yapildi'}))
+    if(e==='taslak'){b.disabled=true;let r={};try{r=await bnYaz('/kayit-eylem',{id,eylem:'eposta'})}catch(x){}b.disabled=false
+      if(r&&r.ok&&r.taslak){emTaslakAc(r.taslak);bnBildir(L('Taslak açıldı; göndermek sende'))}else bnBildir(L('Yapılamadı.'));return}
+    return}
   if(a==='gpdogru'||a==='gpyanlis'){b.disabled=true;gpBek.add(id);if(last)bnCiz(last);j('/dusunme',{method:'POST',body:JSON.stringify({islem:a==='gpdogru'?'dogru':'yanlis',id})}).catch(()=>{});bnBildir(a==='gpdogru'?L('Not aldım, teşekkürler'):L('Tamam, bunu geçersiz saydım'));return}  // günün planındaki "Doğru mu?" (aktarici/dusunme.py): Doğru → onaylı, Yanlış → geçersiz
   if(a==='dkac'){window.open('/dokum-kontrol?top='+encodeURIComponent(b.dataset.t),'_blank');return}
   if(a==='bekac'){bnBekAcik=!bnBekAcik;if(last)bnCiz(last);return}

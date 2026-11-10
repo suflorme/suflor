@@ -819,6 +819,9 @@ def _saat(s):
 def sure_view():
     a = agenda()
     if not a.get("bitis"): return None
+    try:  # v0.224.6: başka güne ait (eski toplantının) gündemi saatleri bugüne taşınıp "N madde geride" demesin
+        if datetime.date.fromtimestamp(os.path.getmtime(os.path.join(BASE, "agenda.json"))) != datetime.date.today(): return None
+    except OSError: return None
     try: b = _saat(a["bitis"])
     except Exception: return None
     now = datetime.datetime.now(); items = a.get("items") or []; n = len(items)

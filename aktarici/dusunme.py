@@ -15,6 +15,14 @@
 # Sunum: panoda var olan "Günün özeti" bileşeni (/status "gun_plani" = dus_view; plan yoksa bugünkü davranış); "Doğru mu?" soruları var olan satır kalıbıyla, Doğru → ogren_durum(id,"onayli"),
 #   Yanlış → "gecersiz"; sonuç söz kapısına da (kabul/ret). Sabah teslim: soz_aday("gun_plani", …, oncelik 1, kip "sor") — kapı günün ilk mesai anına bırakır. Konuş/toplantı oturumu planı baglam_paketi
 #   "gun_plani" diliminden bilir (gun_plani_oku).
+# v0.225.0 (10 Kasım) — karar bekleyenler + eylem teklifi + «son açılıştan bu yana değişenler»:
+#   Girdi: onayını bekleyen kararlar (kimlikli: k…) ve başkasında bekleyen kararlar (merci = onaylayan/karar sahibi; son tarih = onay süresi (ONAY_SON_GUN), toplantı bugünün takviminde varsa saati) kendi bölümlerinde.
+#   Plan şeması: dikkat maddesi isteğe bağlı id (açık iş s…, başkasında bekleyen iş s…, karar k… — girdideki kimliklerden; uydurma kimlikli madde atılır) + eylem (izin listesi DUS_EYLEM: onayla · yapildi · taslak).
+#   Madde türü (tur: karar|is), kapsam (kendi|bek|teyit|merci), kim (merci/sahip) ve vade modelden değil KAYITTAN gelir. Eylem, kimliğin kapsamına uyuyorsa kalır: onayla = senin teyit kararın (→ /karar-onay),
+#   yapildi = senin açık işin (→ /is-durum), taslak = başkasında bekleyen iş/karar (→ /kayit-eylem eposta; yalnız taslağı açar, GÖNDERMEZ). Uymayan eylem atılır, madde kalır. Odakta yalnız yapildi.
+#   Fark: gun-plani.json'a damga {kimlik: "kapsam|vade"} + kiyas {tarih, damga} yazılır (yeni depo yok; yalnız kimlik/sayı). Sonraki tur önceki damgayla kıyaslar: yeni · kapanan · vadesi kayan · yeni atanan ·
+#   durum değişen (kapsam değiştiren). Girdide «Son açılıştan bu yana» bölümü (sayı + kimlik); plan maddelerine yeni/degisti işareti MODELDEN DEĞİL bu farktan konur. Önceki damga yoksa (ilk gün) bölüm ve işaret yok.
+#   Aynı gün yeniden çalıştırmada kıyas, o günün ilk kıyasıdır (kiyas korunur). plan.fark = {onceki, sayi{…}} panoda küçük «Yeni»/«Değişti» etiketi.
 # Ayarlar (yalnız ayar.json): dusunme (false kapatır; varsayılan açık), dusunme_model ("opus"), dusunme_saat ("03:00-06:00").
 import re as _dre, inspect
 
@@ -24,6 +32,8 @@ DUS_SAAT = globals().get("DUS_SAAT") or time.time  # testlerde sahte saat (önce
 DUS_KILIT = threading.RLock()
 DUS_DONGU_SN, DUS_ILK_SN, DUS_SON_SAAT, DUS_HATA_SN, DUS_EN_COK_DENEME, DUS_TAKVIM_BEKLE_SN = 300, 120, 20, 1800, 2, 600
 DUS_OGREN, DUS_ODAK, DUS_DIKKAT, DUS_SORU = 5, 3, 4, 2
+DUS_EYLEM = ("onayla", "yapildi", "taslak")  # plan maddesinin izinli eylemleri (yeni eylem uydurulmaz; her biri panoda var olan uca gider)
+DUS_KARAR_EN_COK, DUS_DAMGA_EN_COK = 8, 200
 DUS_YASAK = _dre.compile(r"[\[\]<>{}]|KAYIT", _dre.I)  # asistan bağlamına, bildirime ve sese girdiği için etiket/işaretleme taşıyan model metni atılır
 DUS_SAAT_RX = _dre.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 DUS_AY = ("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
@@ -118,19 +128,58 @@ def _dus_bos(simdi):  # bugünün boş aralıkları → [(başlangıç dk, biti�
     for d, ar in ls:
         if d == simdi.date(): out += [(b.hour * 60 + b.minute, e.hour * 60 + e.minute) for b, e in ar]
     return out
-def _dus_isler(simdi, y):  # → (kendi işler [kayıt], başkalarında bekleyenler [kayıt], teyit sayısı); okuma kisi-modeli.py bugun_isler (gizli/deneme toplantıyı zaten dışlar), ayrıca denetlenir
+def _dus_isler(simdi, y):  # → (kendi işler [kayıt], başkalarında bekleyenler [kayıt], senin onayını bekleyen kararlar [kayıt], damga {kimlik: "kapsam|vade"}); okuma kisi-modeli.py bugun_isler (gizli/deneme toplantıyı zaten dışlar), ayrıca denetlenir
     try: v = bugun_isler()
-    except Exception as e: print(f"DÜŞÜNME: işler okunamadı ({e.__class__.__name__})"); return [], [], 0
-    g = isler_grupla(v)
-    kendi = [x for x in g["kendi"] if _dus_gorunur(y, x.get("toplanti"))][:15]
-    bek = [x for x in g["baskalari"] if (x.get("gecikti") or (x.get("kalan_gun") is not None and x["kalan_gun"] <= 3)) and _dus_gorunur(y, x.get("toplanti"))][:8]
-    return kendi, bek, len(g["teyit"])
+    except Exception as e: print(f"DÜŞÜNME: işler okunamadı ({e.__class__.__name__})"); return [], [], [], {}
+    g = isler_grupla(v); v = v if isinstance(v, dict) else {}
+    gor = lambda x: isinstance(x, dict) and x.get("id") and _dus_gorunur(y, x.get("toplanti"))
+    kendi = [x for x in g["kendi"] if gor(x)][:15]
+    bek = [x for x in g["baskalari"] if (x.get("gecikti") or (x.get("kalan_gun") is not None and x["kalan_gun"] <= 3)) and gor(x)][:8]
+    tey = [x for x in g["teyit"] if gor(x) and (x.get("onay") or {}).get("durum") in (None, "bekliyor")][:DUS_KARAR_EN_COK]
+    damga = {}  # tüm görünür açık işler ve onay bekleyen kararlar (kısaltılmamış); yalnız kimlik + kapsam + vade
+    for kap, ls in (("kendi", v.get("kendi")), ("baska", v.get("baskalari")), ("teyit", v.get("teyit"))):
+        for x in ls or []:
+            if gor(x): damga[str(x["id"])] = kap + "|" + str(x.get("vade") or "")[:20]
+    return kendi, bek, tey, dict(list(damga.items())[:DUS_DAMGA_EN_COK])
+def _dus_kayitlar(y):  # kayit_listesi kayıtları (gizli/deneme zaten dışlanır) ya da []
+    try: return (y.kayit_listesi(BASE, _dus_hesap_ad()) or {}).get("kayitlar") or []
+    except Exception as e: print(f"DÜŞÜNME: kararlar okunamadı ({e.__class__.__name__})"); return []
+def _dus_onay_kalan(x):  # bekleyen kararın onay süresi (gün; yaş ve ONAY_SON_GUN'dan) ya da None
+    o = x.get("onay") or {}; g = o.get("gun")
+    if g is None: return None
+    try: return int(getattr(_dus_yapi(), "ONAY_SON_GUN", 7)) - int(g)
+    except (TypeError, ValueError): return None
+def _dus_karar_baskasi(y, ls, benim):  # başkasında bekleyen kararlar: onay bekliyor ve kullanıcının kendi onayında değil; merci = onaylayan (yoksa karar sahibi) → [kayıt+merci]
+    out = []
+    for x in ls:
+        if x.get("tur") != "karar" or x.get("durum") != "teyit" or not x.get("id") or x["id"] in benim or x.get("deneme") or not _dus_gorunur(y, x.get("toplanti")): continue
+        if (x.get("onay") or {}).get("durum") not in (None, "bekliyor"): continue
+        merci = _dus_kisa(x.get("kim"), 30)
+        try:
+            r = (y.ortak_kayit(BASE, x.get("kayit_id")) or {}).get("roller") or {}
+            if (r.get("onaylayan") or {}).get("ad"): merci = _dus_kisa(r["onaylayan"]["ad"], 30)
+        except Exception: pass
+        out.append(dict(x, merci=merci))
+    out.sort(key=lambda x: (_dus_onay_kalan(x) is None, _dus_onay_kalan(x) if _dus_onay_kalan(x) is not None else 0))
+    return out[:DUS_KARAR_EN_COK]
+def _dus_son_tarih(x):  # karar satırının son tarih etiketi
+    k = _dus_onay_kalan(x)
+    return "" if k is None else ("onay süresi doldu" if k <= 0 else "onay süresi bugün doluyor" if k == 1 else f"onay süresi {k} g kaldı")
+def _dus_toplanti_saati(x, sabit):  # kararın toplantı başlığı bugünün takvimindeki bir toplantıyla aynıysa "bugün SS:DD toplantısı" ya da ""
+    n = lambda t: _dre.sub(r"\s+", " ", str(t or "").lower()).strip()
+    b = n(x.get("baslik"))
+    for s_ in sabit or []:
+        if b and n(s_.get("baslik")) == b: return "bugün " + str(s_.get("saat") or "")[:5] + " toplantısı"
+    return ""
+def _dus_karar_satir(x, sabit, merci=True):
+    p = [str(x["id"]), _dus_kisa(x.get("metin"), 110), _dus_kisa(x.get("baslik"), 50) or "-"]
+    if merci: p.append("merci: " + (x.get("merci") or "?"))
+    p.append(_dus_son_tarih(x) or "-"); st = _dus_toplanti_saati(x, sabit)
+    return " | ".join(p) + (f" | {st}" if st else "")
 def _dus_is_satir(x):
     g = x.get("kalan_gun"); d = ("gecikti " + str(-g) + " g") if x.get("gecikti") and g is not None else ("bugün" if g == 0 else (f"{g} g kaldı" if g is not None else "tarihsiz"))
     return f"{x.get('id')} | {_dus_kisa(x.get('metin'), 110)} | {d}" + (f" | {_dus_kisa(x.get('kim'), 30)}" if x.get("kim") else "") + (f" | {_dus_kisa(x.get('baslik'), 50)}" if x.get("baslik") else "")
-def _dus_kararlar(simdi, y):  # son ~30 saatin toplantı kararları ve işleri (gizli/deneme yok) → satırlar
-    try: ls = (y.kayit_listesi(BASE, _dus_hesap_ad()) or {}).get("kayitlar") or []
-    except Exception as e: print(f"DÜŞÜNME: kararlar okunamadı ({e.__class__.__name__})"); return []
+def _dus_kararlar(simdi, y, ls):  # son ~30 saatin toplantı kararları ve işleri (gizli/deneme yok) → satırlar
     sin = (simdi.date() - datetime.timedelta(days=1)).isoformat(); out = []
     for x in ls:
         if x.get("tur") not in ("karar", "is") or str(x.get("tarih") or "")[:10] < sin or x.get("deneme") or not _dus_gorunur(y, x.get("toplanti")): continue
@@ -179,21 +228,63 @@ def _dus_tepkiler(simdi):  # son 24 saat: söz kapısının sunduğu önerilere 
     for k, a in sorted(say.items()): sat.append(f"- değerlendirici {k}: " + ", ".join(f"{n} {s}" for s, n in sorted(a.items())))
     return sat + ornek
 
-def dus_girdi(simdi):  # → {"paket", "ogren" [kayıt], "ogren_otomatik" {id}, "isler" {id: kayıt}, "metin" (istemdeki veri bölümü), "bos" [(b, e)], "sabit"}
+def _dus_oncekiler(simdi=None):  # → (önceki plan tarihi, kıyas damgası) ya da (None, None): bugünün planı varsa onun KIYAS'ı (aynı gün yeniden çalıştırma ilk kıyasa göre), yoksa son planın damgası
+    p = _dus_oku_json(DUS_PLAN)
+    if not p: return None, None
+    gun = (simdi or _dus_dt()).date().isoformat()
+    if p.get("tarih") == gun:
+        k = p.get("kiyas") if isinstance(p.get("kiyas"), dict) else None
+        return (k.get("tarih"), k.get("damga")) if k and isinstance(k.get("damga"), dict) else (None, None)
+    d = p.get("damga")
+    return (p.get("tarih"), d) if isinstance(d, dict) and d else (None, None)
+def dus_fark(onceki, simdi_damga, kapali=None):
+    """Önceki ve şimdiki damga ({kimlik: "kapsam|vade"}) → {"yeni": [id], "kapanan": [id], "kayan": [id], "atanan": [id], "degisen": [id]}; onceki yoksa None.
+    yeni = önceden yoktu · kapanan = artık yok (kapali verilmişse yalnız kayıtta kapanmış olanlar; hâlâ açık ama listeden düşenler sayılmaz) · kayan = vadesi değişti ·
+    atanan = başkasındayken ya da yokken bana geçti (kapsam kendi oldu) · degisen = kapsam başka biçimde değişti (ör. karar başkasından senin onayına geçti)."""
+    if not isinstance(onceki, dict) or not onceki: return None
+    f = {"yeni": [], "kapanan": [], "kayan": [], "atanan": [], "degisen": []}
+    for i, t in simdi_damga.items():
+        kap, _, vade = t.partition("|")
+        if i not in onceki: f["yeni"].append(i); continue
+        ok_, _, ov = str(onceki[i]).partition("|")
+        if ok_ != kap: f["atanan" if kap == "kendi" else "degisen"].append(i)
+        elif ov != vade: f["kayan"].append(i)
+    for i in onceki:
+        if i not in simdi_damga and (kapali is None or i in kapali): f["kapanan"].append(i)
+    return f
+def _dus_fark_metni(f, onceki_tarih):
+    if f is None: return ""
+    ad = {"yeni": "yeni gelen", "kapanan": "kapanan", "kayan": "vadesi kayan", "atanan": "sana atanan", "degisen": "durumu değişen"}
+    sat = [f"{ad[k]}: {len(f[k])}" + (" (" + ", ".join(f[k][:10]) + ")" if f[k] else "") for k in ("yeni", "kapanan", "kayan", "atanan", "degisen") if f[k]]
+    return f"[Son açılıştan bu yana değişenler — önceki plan {onceki_tarih or '?'}; yalnız kimlik ve sayı]\n" + ("\n".join(sat) if sat else "(değişen yok)") + "\n[/Değişenler]"
+def _dus_kapali_idler(ls, onceki, simdi_damga):  # önceki damgada olup şimdi olmayanlardan kayıtta kapanmış (ya da hiç bulunmayan) olanlar; hâlâ açık/teyit olanlar çıkar
+    durum = {str(x.get("id")): x.get("durum") for x in ls if x.get("id")}
+    return {i for i in (onceki or {}) if i not in simdi_damga and durum.get(i) in (None, "kapandi")}
+
+def dus_girdi(simdi):  # → {"paket", "ogren" [kayıt], "ogren_otomatik" {id}, "isler" {id: kayıt}, "bek" {id: kayıt}, "kararlar" {id: {…, "kapsam": teyit|merci}}, "fark" (dus_fark ya da None), "damga", "kiyas", "metin" (istemdeki veri bölümü), "bos" [(b, e)], "sabit"}
     y = _dus_yapi(); paket = baglam_paketi("dusunme", simdi=simdi) if "baglam_paketi" in globals() else ""
     ogr = ogrenilenler(25) if "ogrenilenler" in globals() else []
-    kendi, bek, teyit = _dus_isler(simdi, y) if y else ([], [], 0)
-    kar = _dus_kararlar(simdi, y) if y else []; tep = _dus_tepkiler(simdi); devir = _dus_dun_devri(simdi); bos = _dus_bos(simdi)
+    kendi, bek, tey, damga = _dus_isler(simdi, y) if y else ([], [], [], {})
+    ls = _dus_kayitlar(y) if y else []; sabit = _dus_sabit(simdi)
+    kbas = _dus_karar_baskasi(y, ls, {str(x["id"]) for x in tey}) if y else []
+    for x in kbas: damga.setdefault(str(x["id"]), "merci|")  # karar: vade yok (onay süresi her gün kayar, fark sayılmaz)
+    ot, od = _dus_oncekiler(simdi); fark = dus_fark(od, damga, _dus_kapali_idler(ls, od, damga)) if od else None
+    kar = _dus_kararlar(simdi, y, ls) if y else []; tep = _dus_tepkiler(simdi); devir = _dus_dun_devri(simdi); bos = _dus_bos(simdi)
     p = []
     p.append("[Öğrenilenler — kimlikli; durum: otomatik = senin eklediğin, kullanıcı henüz onaylamadı · onayli = kullanıcı doğruladı]\n" + ("\n".join(f"{k['id']} | {k['durum']} | {_dus_kisa(k['metin'], 200)} | {_dus_kisa(k.get('kaynak'), 60)}, {str(k.get('tarih') or '')[:10]}" for k in ogr) or "(henüz yok)") + "\n[/Öğrenilenler]")
-    p.append("[Açık işlerin — kimlik | metin | vade | (sahip) | toplantı]\n" + ("\n".join(_dus_is_satir(x) for x in kendi) or "(yok)") + (f"\nOnayını bekleyen karar sayısı: {teyit}" if teyit else "") + "\n[/Açık işlerin]")
+    p.append("[Açık işlerin — kimlik | metin | vade | (sahip) | toplantı]\n" + ("\n".join(_dus_is_satir(x) for x in kendi) or "(yok)") + "\n[/Açık işlerin]")
+    if tey: p.append("[Senin onayını bekleyen kararlar — kimlik | metin | toplantı | son tarih | (bugünkü toplantı)]\n" + "\n".join(_dus_karar_satir(x, sabit, False) for x in tey) + "\n[/Onayını bekleyen kararlar]")
+    if kbas: p.append("[Başkasında bekleyen kararlar — kimlik | metin | toplantı | merci (bekleyen kişi) | son tarih | (bugünkü toplantı)]\n" + "\n".join(_dus_karar_satir(x, sabit) for x in kbas) + "\n[/Başkasında bekleyen kararlar]")
     if bek: p.append("[Başkalarında bekleyen, gecikmiş ya da yakın işler — kimlik | metin | vade | sahip | toplantı]\n" + "\n".join(_dus_is_satir(x) for x in bek) + "\n[/Başkalarında bekleyenler]")
+    if fark is not None: p.append(_dus_fark_metni(fark, ot))
     if kar: p.append("[Dünkü ve bugünkü toplantılardan çıkan kararlar ve işler]\n" + "\n".join(kar) + "\n[/Toplantı çıktıları]")
     if devir: p.append("[Dünkü toplantılardan devir]\n" + "\n\n".join(devir) + "\n[/Devir]")
     if tep: p.append("[Son 24 saatte sunduğun öneriler ve kullanıcının tepkisi — Suflor kaydından]\n" + "\n".join(tep) + "\n[/Tepkiler]")
     p.append("[Bugünün boş aralıkları (takvimde dolu olmayan, çalışma saatleri içinde)]\n" + (", ".join(f"{b // 60:02d}:{b % 60:02d}–{e // 60:02d}:{e % 60:02d}" for b, e in bos) or "(yok ya da bugün çalışma günü değil)") + "\n[/Boş aralıklar]")
+    kararlar = {str(x["id"]): dict(x, kapsam="teyit") for x in tey}; kararlar.update({str(x["id"]): dict(x, kapsam="merci") for x in kbas})
     return {"paket": paket, "ogren": ogr, "ogren_otomatik": {k["id"] for k in ogr if k["durum"] == "otomatik"}, "ogren_hepsi": {k["id"] for k in ogr}, "isler": {str(x["id"]): x for x in kendi if x.get("id")},
-            "metin": "\n\n".join(p), "bos": bos, "sabit": _dus_sabit(simdi)}
+            "bek": {str(x["id"]): x for x in bek if x.get("id")}, "kararlar": kararlar, "fark": fark, "damga": damga, "kiyas": {"tarih": ot, "damga": od} if od else None,
+            "metin": "\n\n".join(p), "bos": bos, "sabit": sabit}
 def dus_istem(girdi, simdi):
     dil = _t("Türkçe", "English")
     return ((girdi.get("paket") or "") + "\n" +
@@ -205,16 +296,41 @@ def dus_istem(girdi, simdi):
         "2) gecersiz: öğrenilenler listesinde durumu 'otomatik' olan ve artık yanlış ya da eskimiş görünenlerin kimliği + neden (onayli olanlara dokunma).\n"
         f"3) plan: ozet = kullanıcıya bugünü anlatan 2-3 cümle; yukarıdaki asistan kimliğindeki üslupla (sıcak, dostça, kısa; rapor dili yok), verilen sayı/ad/saatlerden uydurma. odak = bugün en çok {DUS_ODAK} iş: 'id' mutlaka açık işlerin kimliklerinden biri, "
         "'saat' bugünün boş aralıklarından birine oturan HH:MM (aralık yoksa boş bırak), 'neden' tek kısa cümle (neden bugün). Gecikmiş ya da vadesi yakın ve kullanıcıya ait olanı, ayrıca başkasının beklediği işi öne al. "
-        f"dikkat = en çok {DUS_DIKKAT} madde (gecikmiş iş, yaklaşan son tarih, kullanıcıdan bir şey bekleyen kişi): 'metin' + 'neden'. "
+        f"dikkat = en çok {DUS_DIKKAT} madde (gecikmiş iş, yaklaşan ya da dolan onay süresi, kullanıcıdan bir şey bekleyen kişi): 'metin' + 'neden'. Madde yukarıdaki bir kayıtla ilgiliyse 'id' ver (açık işlerin, başkalarında bekleyenlerin ya da kararların kimliklerinden biri; kimlik uydurma). "
+        "Kullanıcının onayını bekleyen kararları ve başkasında (merci) bekleyen, süresi dolmak üzere olan kararları önce düşün. "
+        "İsteğe bağlı 'eylem' (yalnız şu üçü): 'onayla' = senin onayını bekleyen kararı onaylatmayı önerir (id k… ve o bölümden olmalı) · 'yapildi' = senin açık işin bitmiş gibi duruyorsa işaretletmeyi önerir (id s… senin açık işlerinden) · "
+        "'taslak' = başkasında bekleyen iş ya da karar için o kişiye yazılacak taslağı açtırır (id başkasında bekleyen bölümlerden). Emin değilsen eylem yazma; hiçbir eylem kendiliğinden bir şey göndermez. "
+        "Odak maddesinde de isteğe bağlı eylem yalnız 'yapildi' olabilir. "
+        + ("'Son açılıştan bu yana değişenler' bölümü varsa yeni gelen, vadesi kayan, sana atanan ve durumu değişen kayıtları öne al; kapananı anma (yeni/değişti işaretini sistem kendisi koyar). " if girdi.get("fark") is not None else "") +
         f"soru = en çok {DUS_SORU} 'doğru mu?' sorusu: bir öğrenilenin (yeni önerdiğin için 'n1', 'n2'… sırası ya da listedeki 'otomatik' bir kimlik) 'ref'i + kullanıcıya sorulacak kısa 'metin' (ör. 'Dün şunu fark ettim: …. Doğru mu?'). Soru gerekmiyorsa boş liste.\n"
         "Son 24 saatte kullanıcının sürekli yoksaydığı ya da reddettiği türden şeyleri öne çıkarma; kabul ettiklerine yönel. Az ama doğru.\n"
         "Yalnız tek bir JSON nesnesi yaz (başka metin yok): "
         '{"ogrenilen": [{"metin": "…", "neden": "…", "kaynak": "…"}], "gecersiz": [{"id": "o…", "neden": "…"}], '
-        '"plan": {"ozet": "…", "odak": [{"id": "s…", "saat": "HH:MM", "neden": "…"}], "dikkat": [{"metin": "…", "neden": "…"}], "soru": [{"ref": "n1", "metin": "…"}]}}\n'
+        '"plan": {"ozet": "…", "odak": [{"id": "s…", "saat": "HH:MM", "neden": "…", "eylem": "yapildi"}], "dikkat": [{"metin": "…", "neden": "…", "id": "k…|s…", "eylem": "onayla|yapildi|taslak"}], "soru": [{"ref": "n1", "metin": "…"}]}}\n'
         "<veri>\n" + girdi["metin"] + "\n</veri>")
 
 # --- Çıktı ------------------------------------------------------------------------------------------------------------------------------------
 def _dus_liste(v): return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+def _dus_kaynak(i, girdi):  # kimlik → girdideki kayıt (kendi iş · başkasında bekleyen iş · karar) ya da None
+    for k in ("isler", "bek", "kararlar"):
+        if i in (girdi.get(k) or {}): return girdi[k][i]
+    return None
+def _dus_kapsam(i, girdi):  # kendi | bek | teyit | merci
+    if i in (girdi.get("isler") or {}): return "kendi"
+    if i in (girdi.get("bek") or {}): return "bek"
+    return (girdi.get("kararlar") or {}).get(i, {}).get("kapsam", "")
+def _dus_eylem_ok(e, i, girdi):  # eylem izin listesinde ve kimliğin kapsamına uyuyor mu: onayla → senin teyit kararın · yapildi → senin açık işin · taslak → başkasında bekleyen iş/karar
+    e = str(e or "").strip(); kap = _dus_kapsam(i, girdi)
+    return e in DUS_EYLEM and ((e == "onayla" and kap == "teyit") or (e == "yapildi" and kap == "kendi") or (e == "taslak" and kap in ("bek", "merci")))
+def _dus_vade_etiket(x):
+    g = x.get("kalan_gun")
+    return ("gecikti " + str(-g) + " g") if x.get("gecikti") and g is not None else ("bugün" if g == 0 else (f"{g} g kaldı" if g is not None else ""))
+def _dus_isaret(m, girdi):  # yeni/degisti işareti MODELDEN değil fark'tan (girdi["fark"] yoksa ilk gün: işaret yok)
+    f = girdi.get("fark"); i = m.get("id")
+    if f and i:
+        if i in f["yeni"]: m["yeni"] = True
+        elif i in f["kayan"] or i in f["atanan"] or i in f["degisen"]: m["degisti"] = True
+    return m
 def dus_coz(ham, girdi):  # → ({"ogrenilen", "gecersiz", "plan"}, None) ya da (None, neden). Geçersiz öğe atılır; plan.ozet yoksa/okunamazsa tümü geçersiz
     m = _dre.search(r"\{.*\}", str(ham or ""), _dre.S)
     if not m: return None, "çıktı okunamadı"
@@ -231,12 +347,23 @@ def dus_coz(ham, girdi):  # → ({"ogrenilen", "gecersiz", "plan"}, None) ya da 
         if mm:
             dk = int(mm.group(1)) * 60 + int(mm.group(2))
             if any(b <= dk < e for b, e in bos): sa = f"{dk // 60:02d}:{dk % 60:02d}"
-        odak.append({"id": i, "metin": _dus_kisa(girdi["isler"][i].get("metin"), 140), "saat": sa, "neden": _dus_temiz(o.get("neden"), 140)})
+        odak.append(_dus_isaret(dict({"id": i, "metin": _dus_kisa(girdi["isler"][i].get("metin"), 140), "saat": sa, "neden": _dus_temiz(o.get("neden"), 140), "tur": "is", "kapsam": "kendi"},
+                                     **({"eylem": "yapildi"} if _dus_eylem_ok(o.get("eylem"), i, girdi) else {})), girdi))
         if len(odak) >= DUS_ODAK: break
-    dikkat = []
+    dikkat = []; dg = set()
     for o in _dus_liste(pl.get("dikkat")):
-        t = _dus_temiz(o.get("metin"), 160)
-        if t: dikkat.append({"metin": t, "neden": _dus_temiz(o.get("neden"), 140)})
+        i = str(o.get("id") or "").strip(); t = _dus_temiz(o.get("metin"), 160); k = _dus_kaynak(i, girdi) if i else None
+        if i and (k is None or i in dg): continue  # kimliği girdide olmayan (uydurma) ya da tekrar eden madde atılır
+        if not t and k: t = _dus_kisa(k.get("metin"), 160)
+        if not t: continue
+        m = {"metin": t, "neden": _dus_temiz(o.get("neden"), 140)}
+        if i:
+            dg.add(i); m.update(id=i, tur="karar" if i in girdi.get("kararlar", {}) else "is", kapsam=_dus_kapsam(i, girdi))
+            kim = _dus_kisa(k.get("merci") or k.get("kim"), 30) if m["kapsam"] in ("bek", "merci") else ""; vade = _dus_kisa(_dus_son_tarih(k) if i in girdi.get("kararlar", {}) else _dus_vade_etiket(k), 40)
+            if kim: m["kim"] = kim
+            if vade: m["vade"] = vade
+            if _dus_eylem_ok(o.get("eylem"), i, girdi): m["eylem"] = str(o["eylem"]).strip()
+        dikkat.append(_dus_isaret(m, girdi))
         if len(dikkat) >= DUS_DIKKAT: break
     ogr = []
     for o in _dus_liste(v.get("ogrenilen")):
@@ -318,11 +445,13 @@ def dus_calistir(zorla=False, simdi=None):
         for s in r["plan"]["soru"]:
             kid = kimlikler.get(s["ref"]) or (s["ref"] if s["ref"] in girdi["ogren_otomatik"] else None)
             if kid: soru.append({"id": kid, "metin": s["metin"], "durum": "bekliyor"})
-        plan = {"tarih": gun, "uretim": simdi.isoformat(timespec="seconds"), "ozet": r["plan"]["ozet"], "sabit": girdi["sabit"], "odak": r["plan"]["odak"], "dikkat": r["plan"]["dikkat"], "soru": soru}
+        plan = {"tarih": gun, "uretim": simdi.isoformat(timespec="seconds"), "ozet": r["plan"]["ozet"], "sabit": girdi["sabit"], "odak": r["plan"]["odak"], "dikkat": r["plan"]["dikkat"], "soru": soru, "damga": girdi["damga"]}
+        if girdi.get("kiyas"): plan["kiyas"] = girdi["kiyas"]  # sonraki aynı gün çalıştırma da bu kıyasa göre fark alır
+        if girdi.get("fark") is not None: plan["fark"] = {"onceki": (girdi.get("kiyas") or {}).get("tarih"), "sayi": {k: len(v) for k, v in girdi["fark"].items()}}
         if not _dus_yaz_json(DUS_PLAN, plan): return {"ok": False, "durum": "hata", "hata": "plan yazılamadı"}
         try: os.chmod(_dus_yol(DUS_PLAN), 0o600)
         except OSError: pass
-        _dus_yaz_json(DUS_DURUM, {"gun": gun, "durum": "tamam", "t": round(float(DUS_SAAT()), 1), "sure_ms": sure, "maliyet": mal, "ogrenilen": eklenen, "gecersiz": gecersiz, "odak": len(plan["odak"]), "dikkat": len(plan["dikkat"]), "soru": len(soru), "istem_kr": len(istem)})
+        _dus_yaz_json(DUS_DURUM, {"gun": gun, "durum": "tamam", "t": round(float(DUS_SAAT()), 1), "sure_ms": sure, "maliyet": mal, "ogrenilen": eklenen, "gecersiz": gecersiz, "odak": len(plan["odak"]), "dikkat": len(plan["dikkat"]), "soru": len(soru), "fark": (plan.get("fark") or {}).get("sayi"), "istem_kr": len(istem)})
         print(f"DÜŞÜNME: gün planı hazır — {eklenen} öğrenilen, {gecersiz} geçersiz, {len(plan['odak'])} odak, {len(plan['dikkat'])} dikkat, {len(soru)} soru ({round(sure / 1000)} sn, {mal} $, istem {len(istem)} karakter)")
         k = _dus_soz(plan, simdi)
         return {"ok": True, "durum": "tamam", "plan": plan, "soz": k}
@@ -354,7 +483,7 @@ def dus_view():  # /status "gun_plani": panodaki Günün özeti; plan yok, bugü
     if _dus_gizli(): return None
     p = gun_plani_oku()
     if not p: return None
-    return {"tarih": p["tarih"], "ozet": p["ozet"], "odak": p.get("odak") or [], "dikkat": p.get("dikkat") or [], "soru": [s for s in (p.get("soru") or []) if s.get("durum") == "bekliyor"]}
+    return {"tarih": p["tarih"], "ozet": p["ozet"], "odak": p.get("odak") or [], "dikkat": p.get("dikkat") or [], "soru": [s for s in (p.get("soru") or []) if s.get("durum") == "bekliyor"], "fark": p.get("fark")}
 def _dus_soz_g(ref, sonuc):
     f = globals().get("soz_sonuc")
     if f:
