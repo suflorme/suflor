@@ -1397,8 +1397,9 @@ def _vt_sahip(s):  # kayıt veritabanının sahip alanı → tek kişi adı ya d
     p = re.split(r"\s*(?:[,;+/&]|\bve\b|\band\b)\s*", p)[0].strip(" .:()")
     p = " ".join(w for w in p.split() if kucuk(w).strip(".") not in ("bey", "hanım", "hn", "bay", "bayan", "mr", "mrs", "ms", "dr"))
     return p[:80] if p and len(p.split()) <= 4 and p[0].isupper() and not re.search(r"\d", p) else ""
-def belge_onerileri(dizin, kart=None, belgeler=None, onbellek=None, deneme=False, en_cok=BELGE_ONERI_EN_COK, vt_isler=None):
-    # vt_isler: kayıt veritabanının açık işleri (ayar veritabani.gorevler sorgusunun satırları: [iş metni, sahip, vade?, konum?]); verilmezse kartın veritabani.acik_isler satırları.
+def belge_onerileri(dizin, kart=None, belgeler=None, onbellek=None, deneme=False, en_cok=BELGE_ONERI_EN_COK, vt_isler=None, isler=None):
+    # isler (B2): bağlayıcıların açık işleri, İş kaydı sözlükleri {metin, sahip, vade, konum, …} (baglayici acik_isler). vt_isler eski adı: aynı iş, satır [iş metni, sahip, vade?, konum?] ya da İş kaydı;
+    # ikisi de verilmezse kartın veritabani.acik_isler satırları.
     # kart: proje-karti.json içeriği (acik_isler: {is, sahip [..], tarih, kaynaklar [[yol, konum]]}); belgeler: [{"ad", "yol", "toplanti"}] (toplantıya bırakılan/eklenen dosyalar).
     # → {"oneriler": [{id, metin, sahip, vade, kaynak: {tur: proje_karti|belge, ad, konum}, toplanti, neden}], "say": {aday, kayitta, red}}
     d = _bo_dosya(dizin); red = set((d.get("red") or {})); kabul = set((d.get("kabul") or {})); var = []
@@ -1414,8 +1415,10 @@ def belge_onerileri(dizin, kart=None, belgeler=None, onbellek=None, deneme=False
         adaylar.append({"metin": " ".join(str(x["is"]).split())[:300], "sahip": sh, "vade": _bi_tarih(str(x.get("tarih") or "")) if x.get("tarih") else "",
                         "kaynak": {"tur": "proje_karti", "ad": os.path.basename(str(k0[0] or "")) or "proje kartı", "konum": str(k0[1] if len(k0) > 1 else "")}, "toplanti": "",
                         "neden": "proje kartında açık iş" + (" (sahibi belgede yazılı)" if sh else " (belgede sahip yok)")})
+    if isler is not None: vt_isler = (list(vt_isler) if vt_isler else []) + list(isler)
     if vt_isler is None and isinstance(kart, dict): vt_isler = ((kart.get("veritabani") or {}).get("acik_isler") or []) if isinstance(kart.get("veritabani"), dict) else []
     for r in vt_isler or []:
+        if isinstance(r, dict): r = [r.get("metin"), r.get("sahip"), r.get("vade"), r.get("konum")]  # İş kaydı → satır (baglayici.is_satiri'nin yerini aldı)
         if not isinstance(r, (list, tuple)) or not r or not str(r[0] or "").strip(): continue
         g = lambda j: str(r[j] or "").strip() if len(r) > j and r[j] is not None else ""
         mt = " ".join(g(0).split()); pr = re.split(r"\s+·\s+", mt)  # kayıtta işin ardına " · " ile eklenmiş tarihli notlar öneri metnine girmez (ilk parça kısaysa iki parça)

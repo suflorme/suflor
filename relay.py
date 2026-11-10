@@ -1343,10 +1343,13 @@ def _baglayici_mod():  # baglayici.py (A1, bağlayıcı sözleşmesi) aktarıcı
     except ImportError:
         if not STATE.get("_bag_yok"): STATE["_bag_yok"] = True; print("BAĞLAYICI YOK: baglayici.py yüklenemedi (kurulum eksik?) — dış kayıt kaynağı yok sayılıyor")
         return None
+def _suflor_is_listesi():  # B2: Suflor iş listesi bağlayıcısı (karar grafı); baglayici.py yoksa None → görünümler yapi.py'yi doğrudan okur (eski davranış)
+    b, y = _baglayici_mod(), _yapi_mod()
+    return b.SuflorIsListesi(BASE, ad=str(AYAR.get("ad") or ""), yapi=y) if b and y else None
 def bugun_veri_view():  # Bugün sayfası: açık işler, teyit bekleyen kararlar, son toplantının kararları (karar grafı; gizli toplantı dönmez) — yalnız anahtarlı uç
     y = _yapi_mod()
     if not y: return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
-    try: v = dict(y.bugun_veri(BASE, str(AYAR.get("ad") or "")), ok=True)
+    try: sl = _suflor_is_listesi(); v = dict(sl.bugun_veri() if sl else y.bugun_veri(BASE, str(AYAR.get("ad") or "")), ok=True)
     except Exception as e: print(f"BUGÜN: veri okunamadı ({e.__class__.__name__})"); return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
     try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), str(AYAR.get("ad") or ""), 30)  # dış karar kaydı (dosya türü): ayrı salt-okunur katman, kaynak etiketiyle
     except Exception as e: print(f"BUGÜN: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []
@@ -1356,7 +1359,7 @@ def kayitlar_view(tam_yol=""):  # GET /kayitlar (anahtarlı): "Kararlar ve işle
     if not y: return bos
     from urllib.parse import urlsplit, parse_qs
     dn = (parse_qs(urlsplit(tam_yol or "").query).get("deneme") or [""])[0] in ("1", "true")  # S236: ?deneme=1 deneme (Test) toplantı kayıtlarını da getirir
-    try: v = dict(y.kayit_listesi(BASE, str(AYAR.get("ad") or ""), deneme=dn), ok=True)
+    try: sl = _suflor_is_listesi(); v = dict(sl.liste(deneme=dn) if sl else y.kayit_listesi(BASE, str(AYAR.get("ad") or ""), deneme=dn), ok=True)
     except Exception as e: print(f"KAYITLAR: veri okunamadı ({e.__class__.__name__})"); return bos
     try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), None, 200)
     except Exception as e: print(f"KAYITLAR: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []

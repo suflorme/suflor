@@ -2,6 +2,7 @@
 # Suflor.me — bağlayıcı sözleşmesi (A1, S246). Dış iş/karar kaynakları (bugün: alanın kayıt veritabanı "Kayıt veritabanı") ve Suflor'un kendi proje veritabanı
 # (<uygulama>/proje.db) aynı sözleşmenin arkasında: kişiler, kararlar, açık işler, terimler, değişme saati; SQL kaynaklarında tablo yapısı ve tek sorgu.
 # İçe aktarılan saf modül: relay'in genel durumuna (BASE, LOCK, AYAR) dokunmaz, ayar sözlüğü ve klasörler parametreyle gelir; ayar dosyasını hiç yazmaz.
+# B2: SuflorIsListesi — Suflor'un kendi karar/iş kaydının (yapi.py) ince sarmalayıcısı; yukle(ayar, dizin) başa ekler, okuma_kaynaklari/tum_isler aktarıcı tarafı toplu okuma.
 # Kullananlar: toplanti-claude.py (vt-izle, vt-mcp, vt-sema, vt-sor, SORU bağlamı; eski vt_* adları orada ince sarmalayıcı), sonra aktarıcı bölümleri (P3).
 # Ayar: yeni şema "baglayici": {"kayit": {tur, ad, acik, yol, sorgular{…}, kurallar, disa_aktarim, yazma{komut, alt_komutlar, bayraklar, sure_sn},
 # ayricalikli_okuma, iki_yonlu}}; eski anahtarlar (veritabani.*, kayit_*) okunmaya devam eder, ikisi de varsa yenisi kazanır (ayar_coz).
@@ -79,11 +80,26 @@ def ayar_coz(ayar, gunluk=None):
 
 def _klasor(ayar, ad, var):
     return os.path.expanduser(str((ayar or {}).get(ad) or var))
-def yukle(ayar):
-    """→ ayarlı dış bağlayıcılar (A1: en çok kayıt veritabanı; okuma yolu yoksa yok)"""
+def yukle(ayar, dizin=None, yapi=None, ad=None):
+    """→ ayarlı bağlayıcılar. dizin verilmezse yalnız dış kaynaklar (A1: en çok kayıt veritabanı; okuma yolu yoksa yok); dizin (canlı klasör, karar grafı) verilirse
+    başa Suflor iş listesi eklenir (B2) — her zaman var, ayar gerekmez"""
+    out = []
+    if dizin: out.append(SuflorIsListesi(dizin, ad=ad if ad is not None else str((ayar or {}).get("ad") or ""), yapi=yapi))
     c = ayar_coz(ayar).get("kayit")
-    if not c or not c.get("yol") or c.get("tur") != "sqlite_kayit": return []
-    return [SqliteKayit(c, proje=_klasor(ayar, "proje", "~/Suflor"), uygulama=_klasor(ayar, "uygulama", "~/Library/Application Support/Suflor"))]
+    if c and c.get("yol") and c.get("tur") == "sqlite_kayit":
+        out.append(SqliteKayit(c, proje=_klasor(ayar, "proje", "~/Suflor"), uygulama=_klasor(ayar, "uygulama", "~/Library/Application Support/Suflor")))
+    return out
+def okuma_kaynaklari(ayar, dizin, canli=None, bellek=None, yapi=None, ad=None):
+    """aktarıcı tarafı okuma listesi: yukle(ayar, dizin), ayrıcalıklı okumalı bağlayıcı yerine önbellek okuyucusu (aktarıcı Masaüstü dosyasını açmaz)"""
+    return [onbellek_okuyucu(canli or dizin, bellek) if getattr(b, "ayricalikli_okuma", False) else b for b in yukle(ayar, dizin, yapi, ad)]
+def tum_isler(kaynaklar, kisi=None):
+    """her bağlayıcının açık işleri tek listede (her kayıtta `kaynak` = bağlayıcı kimliği); işi olmayan/okunamayan bağlayıcı atlanır (son_hata dolar)"""
+    out = []
+    for b in kaynaklar or []:
+        try: out += b.acik_isler(kisi)
+        except YetenekYok: continue
+        except Exception as e: b.son_hata = f"{e.__class__.__name__}"
+    return out
 def etkin_vt(ayar):
     """kayıt veritabanı varsa kayıt veritabanı, yoksa ProjeVT (proje.db varsa ve proje_vt != false), yoksa None"""
     b = yukle(ayar)
@@ -110,8 +126,6 @@ def _tarih(v):
     s = "" if v is None else str(v).strip()
     return s[:10] if _TARIH.match(s) else None
 def _adlar_bol(s, en_az=2): return [x.strip() for x in str(s or "").split(",") if len(x.strip()) >= en_az]
-def is_satiri(i):  # İş kaydı → bugünkü vt_isler satırı [iş, sahip, vade, konum] (yapi.belge_onerileri sonraki adıma dek bunu alır)
-    return [str(i.get("metin") or ""), str(i.get("sahip") or ""), str(i.get("vade") or ""), str(i.get("konum") or "")]
 def _is_kaydi(r, kaynak):
     r = ["" if x is None else str(x) for x in r]
     while len(r) < 4: r.append("")
@@ -313,6 +327,48 @@ class ProjeVT(_Sqlite):
     def __init__(self, yol):
         super().__init__(yol, {"kisiler": PROJE_KISILER_SORGU}, "")
         self.ayricalikli_okuma = False; self.iki_yonlu = False
+
+class SuflorIsListesi(Baglayici):
+    """Suflor'un kendi karar/iş kaydı (karar-grafi.sqlite; yapi.py) — ince sarmalayıcı. Okuma yapi.kayit_listesi/bugun_veri'den geçer (gizli ve deneme kuralları orada),
+    her satıra kaynak "suflor" eklenir. Yazma yolları (is-durum, karar-onay, kayit-eylem) A3'e dek yapi.py'de kalır."""
+    tur = "suflor"; kimlik = "suflor"; ad = "Suflor iş listesi"; ayricalikli_okuma = False; iki_yonlu = False
+    def __init__(self, dizin, ad="", yapi=None, deneme=False):
+        super().__init__(); self.dizin = dizin; self.kullanici = ad or ""; self._yapi = yapi; self.deneme = bool(deneme)
+    def yapi(self):
+        if self._yapi is None:
+            d = os.path.dirname(os.path.abspath(__file__))
+            if d not in sys.path: sys.path.insert(0, d)
+            import yapi as _y; self._yapi = _y
+        return self._yapi
+    def _graf(self): return os.path.join(self.dizin, "karar-grafi.sqlite")
+    def yetenekler(self): return {"acik_isler", "kararlar"}
+    def degisim_zamani(self):
+        t = [os.path.getmtime(p) for p in (self._graf(), self._graf() + "-wal") if os.path.exists(p)]
+        return max(t) if t else None
+    def liste(self, deneme=None, bugun=None):
+        """'Kararlar ve işler' görünümü (yapi.kayit_listesi) — her kayıtta kaynak"""
+        v = self.yapi().kayit_listesi(self.dizin, self.kullanici, bugun, self.deneme if deneme is None else bool(deneme))
+        for x in v.get("kayitlar") or []: x["kaynak"] = self.kimlik
+        return v
+    def bugun_veri(self, bugun=None, deneme=None):
+        """Bugün sayfası verisi (yapi.bugun_veri) — her iş/karar satırında kaynak"""
+        v = self.yapi().bugun_veri(self.dizin, self.kullanici, bugun, self.deneme if deneme is None else bool(deneme))
+        for a in ("kendi", "baskalari", "teyit"):
+            for x in v.get(a) or []: x["kaynak"] = self.kimlik
+        for x in ((v.get("son_karar") or {}).get("kararlar") or []): x["kaynak"] = self.kimlik
+        return v
+    def _kayitlar(self, tur, deneme=None):
+        try: return [x for x in self.liste(deneme).get("kayitlar") or [] if x.get("tur") == tur]
+        except Exception as e: self.son_hata = e.__class__.__name__; return []
+    def acik_isler(self, kisi=None):
+        out = []
+        for x in self._kayitlar("is"):
+            if x.get("durum") != "acik": continue
+            out.append(dict(x, metin=x.get("metin") or "", sahip=x.get("kim") or "", vade=_tarih(x.get("vade")), durum="acik", konum=x.get("baslik") or "", dis_id=x.get("kayit_id") or None, kaynak=self.kimlik))
+        return _kisi_suz(out, kisi)
+    def kararlar(self, en_cok=500):
+        return [dict(x, metin=x.get("metin") or "", tarih=_tarih(x.get("tarih")), kim=x.get("kim") or "", durum=x.get("durum") or "", dis_id=x.get("kayit_id") or None, kaynak=self.kimlik)
+                for x in self._kayitlar("karar")[:en_cok]]
 
 class OnbellekOkuyucu(Baglayici):
     """aktarıcı tarafı: canli/vt-kisi-adres.json, vt-gorevler.json, vt-mt.json + bellek (VT_BELLEK: adlar, terimler); yazma yok, dosya açmaz"""

@@ -186,13 +186,13 @@ def _bo_belgeler():
 def _bo_kart():
     try: return json.load(open(os.path.join(AYAR["uygulama"], "proje-karti.json"), encoding="utf-8"))
     except (OSError, ValueError): return None
-def _bo_vt():  # kayıt veritabanının açık işleri (ayar baglayici.kayit.sorgular.gorevler ya da eski veritabani.gorevler), en çok 500 satır: [iş metni, sahip, vade, konum].
+def _bo_vt():  # kayıt veritabanının açık işleri (ayar baglayici.kayit.sorgular.gorevler ya da eski veritabani.gorevler), en çok 500 İş kaydı.
     # A1: aktarıcı Masaüstü'ndeki veritabanını hiç açmaz; veritabanı yardımcısının (vt-izle) yazdığı canli/vt-gorevler.json önbelleği (OnbellekOkuyucu) okunur.
     b = _baglayici_mod()
     if not b: return None
     c = b.ayar_coz(AYAR).get("kayit") or {}
     if not c.get("yol") or not str((c.get("sorgular") or {}).get("gorevler") or "").strip(): return None
-    try: return [b.is_satiri(i) for i in b.onbellek_okuyucu(BASE, globals().get("VT_BELLEK")).acik_isler()[:500]]
+    try: return b.onbellek_okuyucu(BASE, globals().get("VT_BELLEK")).acik_isler()[:500]  # İş kaydı sözlükleri (kaynak: kayit); yapi.belge_onerileri(isler=)
     except b.YetenekYok:
         if _BO_VT_UYARI.get("e") != "YetenekYok": _BO_VT_UYARI["e"] = "YetenekYok"; print("BELGEDEN ATAMA: görev önbelleği (vt-gorevler.json) yok — veritabanı yardımcısı henüz yazmadı")
         return None
@@ -200,7 +200,7 @@ _BO_VT_UYARI = {}
 def belge_oneri_view():
     y = _yapi_mod()
     if not y or not hasattr(y, "belge_onerileri"): return {"ok": False, "oneriler": [], "say": {}}
-    try: return dict(y.belge_onerileri(BASE, _bo_kart(), _bo_belgeler(), os.path.join(AYAR["uygulama"], "cevirme-onbellek"), vt_isler=_bo_vt()), ok=True)
+    try: return dict(y.belge_onerileri(BASE, _bo_kart(), _bo_belgeler(), os.path.join(AYAR["uygulama"], "cevirme-onbellek"), isler=_bo_vt()), ok=True)
     except Exception as e: print(f"BELGEDEN ATAMA: öneriler okunamadı ({e.__class__.__name__})"); return {"ok": False, "oneriler": [], "say": {}}
 def belge_oneri_islem(p):
     y = _yapi_mod(); p = p if isinstance(p, dict) else {}; oid = str(p.get("id") or "")[:20]; isl = str(p.get("islem") or "")

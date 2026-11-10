@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # A1 bağlayıcı sözleşmesi (baglayici.py): ayar çözümü (yeni şema baglayici.kayit + eski veritabani.*/kayit_*), kayıt veritabanı (SqliteKayit), proje.db (ProjeVT),
-# aktarıcı tarafı önbellek okuyucusu, güvenlik (yazma SQL'i, çoklu komut, gizli sütun), bayraklar, is_satiri ↔ yapi.belge_onerileri.
+# aktarıcı tarafı önbellek okuyucusu, güvenlik (yazma SQL'i, çoklu komut, gizli sütun), bayraklar, İş kaydı ↔ yapi.belge_onerileri; B2: Suflor iş listesi (SuflorIsListesi) ↔ yapi.kayit_listesi/bugun_veri, yukle(dizin), tum_isler.
 # Geçici klasörde yapay veriyle; gerçek ayara, canli klasörüne ve proje verisine dokunmaz. ~2 sn, model yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/baglayici.py      (kaldı → çıkış 1)
 import contextlib, copy, hashlib, io, json, os, shutil, sqlite3, sys, tempfile, time
@@ -172,12 +172,52 @@ try:
     except B.YetenekYok: dg = True
     ok("13c. durum_guncelle A1'de YetenekYok; yazma ayarı ve okuma yolu birbirinden bağımsız (yol olmadan yazan() çalışır)", dg and B.yukle(dict(TEMEL, kayit_komutu=["/usr/bin/python3", "b.py"], kayit_alt_komutlar=["ekle"])) == []
        and B.yazan(dict(TEMEL, kayit_komutu=["/usr/bin/python3", "b.py"], kayit_alt_komutlar=["ekle"])) is not None)
-    # 14. is_satiri ↔ yapi.belge_onerileri
+    # 14. İş kaydı ↔ yapi.belge_onerileri (satır biçimi ile isler= aynı sonuç)
     import yapi
     ham = kv.satirlar("gorevler"); d1, d2 = os.path.join(T, "bo1"), os.path.join(T, "bo2"); os.makedirs(d1); os.makedirs(d2)
-    r_ham = yapi.belge_onerileri(d1, vt_isler=[list(r) for r in ham]); r_yeni = yapi.belge_onerileri(d2, vt_isler=[B.is_satiri(i) for i in kv.acik_isler()])
+    r_ham = yapi.belge_onerileri(d1, vt_isler=[list(r) for r in ham]); r_yeni = yapi.belge_onerileri(d2, isler=kv.acik_isler())
     tem = lambda r: [{k: v for k, v in o.items() if k != "id"} for o in r.get("oneriler", [])]
-    ok("14. is_satiri() çıktısıyla belge_onerileri bugünkü sonucu verir", tem(r_ham) == tem(r_yeni) and len(tem(r_ham)) == 2, (tem(r_ham), tem(r_yeni)))
+    ok("14. İş kaydı (isler=) ile belge_onerileri satır biçimiyle (vt_isler=) aynı sonucu verir", tem(r_ham) == tem(r_yeni) and len(tem(r_ham)) == 2 and not hasattr(B, "is_satiri"), (tem(r_ham), tem(r_yeni)))
+    # --- B2: Suflor iş listesi -------------------------------------------------------------------------------------------------------------
+    import datetime
+    bugun = datetime.date(2026, 11, 5); gd = os.path.join(T, "graf"); os.makedirs(gd)
+    BAS = "| Saat | Konuşmacı | Metin | İşaret |\n|---|---|---|---|\n"
+    for dn in ("2026-11-03-1000-Butce", "2026-11-04-0900-Ozel"):
+        open(os.path.join(gd, dn + ".md"), "w", encoding="utf-8").write(f"# Canlı transkript — {dn}\n\n" + BAS + "| 10:00:00 | Ayşe Deneme | merhaba | |\n" if "Butce" in dn else f"# Canlı transkript — {dn}\n\n" + BAS + "| 09:00:10 | **GİZLİ** | açıldı | |\n")
+    yapi.graf_yaz(gd, {"baslik": "Bütçe", "tarih": "2026-11-03", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "karar", "metin": "Bütçe 120 bin", "netlik": "acik"}, {"tur": "karar", "metin": "Tedarikçi Mart'ta", "netlik": "ortuk"},
+        {"tur": "is", "metin": "Tabloyu güncelle", "sahip": "Can Örnek", "tarih": "2026-11-02"}, {"tur": "is", "metin": "Sözleşmeyi oku", "sahip": "Ayşe Deneme"}, {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Can Örnek"}]}]}, "2026-11-03-1000-Butce.md")
+    yapi.graf_yaz(gd, {"baslik": "Özel", "tarih": "2026-11-04", "maddeler": [{"baslik": "G", "ogeler": [{"tur": "is", "metin": "Gizli iş", "sahip": "Can Örnek", "tarih": "2026-11-01"}]}]}, "2026-11-04-0900-Ozel.md")
+    sl = B.SuflorIsListesi(gd, ad="Ayşe Deneme", yapi=yapi); ham_v = yapi.kayit_listesi(gd, "Ayşe Deneme", bugun); v_ = sl.liste(bugun=bugun)
+    ok("B2-1. liste() = yapi.kayit_listesi + her kayıtta kaynak 'suflor' (başka fark yok)", v_["kayitlar"] and all(x.get("kaynak") == "suflor" for x in v_["kayitlar"])
+       and [{k: v for k, v in x.items() if k != "kaynak"} for x in v_["kayitlar"]] == ham_v["kayitlar"] and {k: v for k, v in v_.items() if k != "kayitlar"} == {k: v for k, v in ham_v.items() if k != "kayitlar"})
+    bv_h = yapi.bugun_veri(gd, "Ayşe Deneme", bugun); bv_s = sl.bugun_veri(bugun=bugun)
+    sade = lambda o: json.loads(json.dumps(o, ensure_ascii=False, default=str))
+    def kaynaksiz(o):
+        if isinstance(o, dict): return {k: kaynaksiz(v) for k, v in o.items() if k != "kaynak"}
+        return [kaynaksiz(x) for x in o] if isinstance(o, list) else o
+    ok("B2-2. bugun_veri() = yapi.bugun_veri + kaynak", sade(kaynaksiz(bv_s)) == sade(bv_h) and bv_s["kendi"] and all(x["kaynak"] == "suflor" for x in bv_s["kendi"] + bv_s["baskalari"] + bv_s["teyit"]), (bv_s, bv_h))
+    ai = sl.acik_isler(); ak = sl.kararlar()
+    ok("B2-3. acik_isler(): açık işler, sahip/vade/konum/dis_id/kaynak; gizli toplantı yok; kişi süzgeci",
+       sorted(i["metin"] for i in ai) == ["Sözleşmeyi oku", "Tabloyu güncelle"] and all(i["kaynak"] == "suflor" and i["durum"] == "acik" and i["dis_id"] for i in ai)
+       and next(i for i in ai if i["metin"] == "Tabloyu güncelle")["vade"] == "2026-11-02" and next(i for i in ai if i["metin"] == "Tabloyu güncelle")["sahip"] == "Can Örnek"
+       and next(i for i in ai if i["metin"] == "Sözleşmeyi oku")["vade"] is None and [i["metin"] for i in sl.acik_isler("can")] == ["Tabloyu güncelle"], ai)
+    ok("B2-4. kararlar(): karar kayıtları (teyit/kapandi durumu), en_cok sınırı; belgeler() ve oner() YetenekYok; degisim_zamani graf dosyasından",
+       sorted(k["metin"] for k in ak) == ["Bütçe 120 bin", "Tedarikçi Mart'ta"] and {k["durum"] for k in ak} == {"teyit", "kapandi"} and len(sl.kararlar(1)) == 1
+       and sl.yetenekler() == {"acik_isler", "kararlar"} and sl.degisim_zamani() and B.SuflorIsListesi(os.path.join(T, "yok")).degisim_zamani() is None
+       and B.SuflorIsListesi(os.path.join(T, "yok"), yapi=yapi).acik_isler() == [] and sl.ayricalikli_okuma is False and sl.iki_yonlu is False)
+    for ad_, f_ in (("belgeler", lambda: sl.belgeler()), ("oner", lambda: sl.oner({})), ("durum", lambda: sl.durum_guncelle("x", "yapildi"))):
+        try: f_(); yk = False
+        except B.YetenekYok: yk = True
+        if not yk: break
+    ok("B2-5. Suflor iş listesinde belgeler/oner/durum_guncelle A3'e dek YetenekYok", yk)
+    ky = B.yukle(dict(TEMEL, **{"veritabani": ESKI["veritabani"]}), gd, yapi)
+    ok("B2-6. yukle(ayar, dizin): Suflor iş listesi başta + dış bağlayıcı; dizinsiz yalnız dış; ayar boşken yalnız Suflor", [b.kimlik for b in ky] == ["suflor", "kayit"]
+       and [b.kimlik for b in B.yukle(dict(TEMEL), gd, yapi)] == ["suflor"] and [b.kimlik for b in B.yukle(dict(ESKI))] == ["kayit"] and B.etkin_vt(dict(TEMEL, proje_vt=False)) is None)
+    ok_ = B.okuma_kaynaklari(dict(ESKI, baglayici={"kayit": {"ayricalikli_okuma": True}}), gd, canli, {}, yapi)
+    ok("B2-7. okuma_kaynaklari: ayrıcalıklı dış bağlayıcı yerine önbellek okuyucusu (dosya açılmaz)", [b.tur for b in ok_] == ["suflor", "onbellek"])
+    json.dump({"satirlar": [["Kayıt işi bir", "Deniz Test", "2026-12-01", "k1"]]}, open(os.path.join(canli, "vt-gorevler.json"), "w"))
+    ti = B.tum_isler(B.okuma_kaynaklari(dict(ESKI, baglayici={"kayit": {"ayricalikli_okuma": True}}), gd, canli, {}, yapi))
+    ok("B2-8. tum_isler(): her kaynağın işi tek listede, kaynak alanı ayırır; işi olmayan kaynak atlanır", sorted((i["kaynak"], i["metin"]) for i in ti) == sorted([("suflor", "Sözleşmeyi oku"), ("suflor", "Tabloyu güncelle"), ("kayit", "Kayıt işi bir")]), ti)
     # proje.db sözleşmesi (beta yolu): kisiler, terimler yok
     pk = e.kisiler()
     try: e.terimler(); pt = False
