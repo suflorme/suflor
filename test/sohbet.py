@@ -158,6 +158,10 @@ try:
     ok("toplantı başlayınca kapandı", "kapandı (toplantı başladı" in log() and not st()["sohbet"]["acik"])
     ok("sohbette 'hı hı' yok (konuşurken de tur sonunda da)", "aktif dinleme" not in log() and "bırakınca \"hı hı\"" not in log())
     ok("smart-turn bekleme seçicisi çalıştı" if tur_sonu else "(smart-turn yok — modelsiz bekleme)", True)
+    cj = os.path.join(T, f"canli{PORT}", "claude-cagri.jsonl"); cs = [json.loads(l) for l in open(cj)] if os.path.exists(cj) else []; cs = [x for x in cs if x.get("is") == "bas-konus"]
+    ok(f"v0.224.5: sohbet turları tur_turu=sohbet, soz_bitis_ses_ms ≥ ses_cal_ms ({len(cs)} kayıt)", len(cs) >= 3 and all(x.get("tur_turu") == "sohbet" for x in cs)
+       and all(x["soz_bitis_ses_ms"] >= x["ses_cal_ms"] for x in cs if x.get("ses_cal_ms") is not None and x.get("soz_bitis_ses_ms") is not None)
+       and any(x.get("soz_bitis_ses_ms") is not None for x in cs))
     ok("aktarıcıda hata yok", "Traceback" not in log())
 finally:
     for p in pler: p.terminate()

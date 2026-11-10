@@ -1549,7 +1549,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                      "giris": sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
                      "yazim": u.get("cache_creation_input_tokens") or 0, "yazim_1h": (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0,  # v0.92.0: önbellek yazımı ve 1 saatlik payı (kota dışında 5 dk'ya düşerse görünsün)
                      "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))), 2),
-                     "hata": bool(j.get("is_error")), "kaynak": tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True)), "derin": bool(tur.get("derin"))}
+                     "hata": bool(j.get("is_error")), "kaynak": tur.get("kaynak") or "bas", "tur_turu": tur.get("tur_turu") or tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True)), "derin": bool(tur.get("derin"))}
                 _wa = sum(1 for x in tur.get("araclar") or [] if x == "WebSearch"); _ws = sum(1 for x in tur.get("araclar") or [] if x == "WebFetch")
                 if _wa or _ws: print(f"KONUŞ: web ({_wa} arama, {_ws} sayfa)")  # S257; maliyet claude-cagri.jsonl satırında (arac/araclar alanları)
                 _KS["maliyet"] = m; _KS["tur"] = None; _KS["son"] = time.time(); _KS["sayac"] += 1
@@ -1595,6 +1595,8 @@ def _konus_kayit_yaz(o, tur):
         t = time.time()
         while tur.get("t_ses") and not tur.get("t_ses_cal") and time.time() - t < KONUS_CAL_BEKLE_SN: time.sleep(0.1)
         for a, k in (("t_ses_cal", "ses_cal_ms"), ("t_dolgu_cal", "dolgu_cal_ms")): o[k] = round((tur[a] - tur["t_birak"]) * 1000) if tur.get(a) and tur.get("t_birak") else None
+        tb = tur.get("t_soz_bitis") or (tur.get("t_birak") if o.get("tur_turu") in ("bas", "yazili") else None)  # söz bitişi: bas = bırakış, sohbet/devam = son konuşma parçası, hitap = bilinmez
+        o["soz_bitis_ses_ms"] = round((tur["t_ses_cal"] - tb) * 1000) if tur.get("t_ses_cal") and tb else None
         with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
         if o["ses_cal_ms"] is not None: print(f"KONUŞ: duyulan ilk ses {o['ses_cal_ms']} ms (kuyruğa giriş {o.get('ses_ms')} ms)" + (f" · ara cümle {o['dolgu_cal_ms']} ms" if o["dolgu_cal_ms"] is not None else ""))
     if tur.get("t_ses") and not tur.get("t_ses_cal"): threading.Thread(target=yaz, daemon=True).start()
@@ -2050,11 +2052,13 @@ def konus_yazili(metin, kutu=False, sesli=False, ek=None, kayit=None):  # ek/kay
     else: KUTU_BEKLEYEN.clear()
     konus_pocket_isit(); threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
     print("KONUŞ: yazılı soru (pano kutusu)" + (" — kayıt turu" if ek else "")); return {"ok": True}
+def _konus_tur_turu():  # ölçüm etiketi (claude-cagri.jsonl tur_turu): devam penceresi / sohbet / basılı tutma; hitap-yazılı-karşı-özet kaynak adından
+    return "devam" if SOHBET.get("devam") else "sohbet" if SOHBET["acik"] else "bas"
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}
     if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
     if os.environ.get("SUFLOR_TEST_METIN") and isinstance(p.get("metin"), str) and p["metin"].strip():  # yalnız deneme aktarıcısı: ses yerine yazılı soru (sınav, kör kıyas)
-        tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "bas"}; _KS["tur"] = tur; mt_ = p["metin"].strip()
+        tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "bas", "tur_turu": _konus_tur_turu()}; _KS["tur"] = tur; mt_ = p["metin"].strip()
         if SORU["aktif"]: _KS["tur"] = None; _konus_kur(durum="hazir", soru=mt_, sesli_cevap=True, cevap=sesli_cevap(mt_, SORU["aktif"])); return {"ok": True}  # deneme: sesli cevap yolu (geri() ile aynı)
         if "that_sesli_yakala" in globals() and that_sesli_yakala(mt_): _KS["tur"] = None; _konus_kur(durum="hazir", soru=mt_, sesli_cevap=True, cevap=""); return {"ok": True}
         yk_ = konus_yerel_komut(mt_, tur)
@@ -2067,7 +2071,8 @@ def konus_ses(p):  # pano: bırakıldı — kayıt geldi
     if sn < 0.4: _konus_kur(durum="kapali" if not konus_canli() else "hazir"); return {"ok": False, "err": _t("Çok kısa — basılı tutup konuş", "Too short — hold and speak")}
     if sn > KONUS_EN_UZUN_SN + 2: return {"ok": False, "err": _t("En çok 1 dakika", "One minute at most")}
     if STATE["whisper"].get("durum") == "yok": _konus_kur(durum="hata", hata=_t("Whisper kurulu değil", "Whisper isn't installed")); return {"ok": False, "err": KONUS["hata"]}
-    tur = {"t_birak": time.time(), "kayit_sn": round(sn, 1), "metin": "", "tampon": "", "kaynak": "bas"}; _KS["tur"] = tur; _konus_kur(durum="yaziya")
+    tur = {"t_birak": time.time(), "kayit_sn": round(sn, 1), "metin": "", "tampon": "", "kaynak": "bas", "tur_turu": _konus_tur_turu()}; _KS["tur"] = tur; _konus_kur(durum="yaziya")
+    if p.get("t_soz_bitis"): tur["t_soz_bitis"] = float(p["t_soz_bitis"])  # sohbet.py: konuşma sezicisinin son konuşma parçası (ölçüm: söz bitişi → ilk ses)
     sid = SORU["aktif"]
     # v0.45.0 (aktif dinleme araştırması 2. adım): bırakınca ~0,25 sn içinde kısa "Hı hı / Hm" (tepki türü alindi) — cevaba kadarki ~4 sn boşluk
     # sessiz kalmasın. "Yazayım mı?" cevabında ve toplantıda kulaklık yokken çalmaz; ayar konus_alindi: false kapatır. Çaldıysa bekleme cümlesi geç gelir.

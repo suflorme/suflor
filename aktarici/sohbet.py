@@ -212,7 +212,7 @@ def _sohbet_tur_sonu():
 def _sohbet_gonder(b, n, sessiz):
     SOHBET.update(durak=None, bekle=None); SOHBET.pop("dusunme", None)
     print(f"SOHBET: tur bitti ({n:.1f} sn kayıt, {sessiz:.1f} sn sessizlik)"); _kapi_yaz("tur bitti")
-    r = konus_ses({"pcm": base64.b64encode(b).decode()})
+    r = konus_ses({"pcm": base64.b64encode(b).decode(), "t_soz_bitis": SOHBET.get("t_ses")})  # t_ses = son konuşma parçasının geldiği an (ölçüm)
     if not r.get("ok"): print(f"SOHBET: soru gönderilemedi ({r.get('err')})"); _akis_sifirla(); _konus_kur(durum="dinliyor", hata=None)
 # Ses izi süzgeci (v0.51.0, S59 3. adım; ayar sohbet_ses_izi, varsayılan kapalı): mikrofon açık kaldığı için odadaki başkasının ya da televizyonun sözü
 # soru olmasın. Turun akış parçalarının ses izi (ECAPA, Whisper işçisinde) toplantılarda öğrenilen kullanıcı profiliyle (ses-izi-ben.json) karşılaştırılır;
@@ -236,7 +236,7 @@ def sohbet_dusunme(metin, pcm):  # konus_ses'in dökülmüş metni düşünme s�
     print(f"SOHBET: söz düşünme sözüyle bitti (\"…{' '.join(metin.split())[-30:]}\") — gönderilmedi, dinleme sürüyor")
     return True
 def _sohbet_dusunme_gonder(metin):  # düşünme sözünden sonra SOHBET_DUSUNME_SN sessizlik: söz olduğu gibi Claude'a
-    _akis_sifirla(); tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "sohbet"}; _KS["tur"] = tur
+    _akis_sifirla(); tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "sohbet", "tur_turu": "devam" if SOHBET.get("devam") else "sohbet", "t_soz_bitis": SOHBET.get("t_ses")}; _KS["tur"] = tur
     print(f"SOHBET: düşünme sözünden sonra {SOHBET_DUSUNME_SN:.0f} sn sessizlik — söz olduğu gibi gidiyor")
     threading.Thread(target=_konus_sor, args=(metin, tur), daemon=True).start()
 def sohbet_metin(metin):  # konus_ses'in yazıya dökülmüş metni: sohbeti kapatan söz mü (True: Claude'a gitmez)
