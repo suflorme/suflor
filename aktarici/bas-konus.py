@@ -2046,6 +2046,9 @@ KUTU_KURAL = {"tr": ("Bu yazı panodaki tek kutudan geldi; kullanıcı onu not, 
                      "The tags aren't shown on the panel. This rule replaces the «can't do record requests» rule; decisions, tasks, open questions and summary fixes are proposed with the [Writing records] rule; email and other systems you still can't do — say so.")}
 def konus_yazili(metin, kutu=False, sesli=False, ek=None, kayit=None):  # ek/kayit: 10 Kasım — Kararlar ve işler «asistana sor»: ek = kayıt bağlamı bloğu (eylem-menu.py marvin_kayit_baslat; soruyla birlikte sürece gider, panoda görünmez), kayit = kaydın kimliği; v0.117.0 (S136): toplantı yokken pano kutusundan yazılı soru — cevap panoda yazılı, okunmaz (aktarici/notlar.py); kutu: 5 Kasım — yazı not/soru/talimat olabilir, asistan ayırır
     if _KS["tur"]: return {"ok": False, "err": _t(f"{asistan_ad()} hâlâ cevaplıyor", f"{asistan_ad()} is still answering")}
+    if not ek and "tazi_komut_cevap" in globals() and not gizli_acik() and not toplanti_var():  # 11 Kasım: kutuya yazılan "Tazı, <ad> araştır" → Tazı taraması, Claude'a gitmez
+        tc_ = tazi_komut_cevap(metin)
+        if tc_: _konus_kur(durum="hazir", soru=str(metin)[:300], cevap=tc_); print("KONUŞ: Tazı komutu (kutu)"); return {"ok": True}
     tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "yazili", "yazili": True, "kutu": bool(kutu), "sesli_iste": bool(sesli)}; _KS["tur"] = tur  # sesli: pano kutusundaki 🔊 düğmesi açık — _konus_sor toplantı yokken ve gizli değilken cevabı okur
     if ek: tur["kayit_blok"] = str(ek)[:24000]; tur["kayit_id"] = str(kayit or "")[:40]
     if kutu: KUTU_BEKLEYEN.clear(); KUTU_BEKLEYEN.update(metin=str(metin)[:4000], at=datetime.datetime.now().isoformat(timespec="seconds"))
@@ -2752,6 +2755,9 @@ def konus_yerel_komut(metin, tur=None):  # → asistanın söylediği cümle ya 
                    _t((globals().get("cesit") or (lambda k_, l_: l_[0]))("pano_takvim", ["Panoyu takvimde açtım.", "Takvim açık."]), "Opened the panel on the calendar.") if bolum == "takvim" else
                    _t((globals().get("cesit") or (lambda k_, l_: l_[0]))("pano_ana", ["Panoyu açtım.", "Açtım, önünde."]), "Opened the panel."))  # 9 Kasım (dost): dönüşümlü
         seslendir(c, kuyruk=True); print(f"KONUŞ: sesle pano açıldı ({bolum or 'ana'})"); return c
+    if "tazi_komut_cevap" in globals() and not gizli_acik():  # 11 Kasım: "Tazı, <ad> araştır / iz sür / izle" → Tazı taraması (aktarici/tazi-kos.py; kural, model yok)
+        tc_ = tazi_komut_cevap(m)
+        if tc_: seslendir(tc_, kuyruk=True); print("KONUŞ: Tazı komutu (sesle)"); return tc_
     if gizli_acik() or not DEVAM["tam"] or time.time() - DEVAM["t"] > DEVAM_OMUR_SN: return None
     if DEVAM_OKU_RX.match(m): ses_durdur(); return konus_devam_oku()
     if TEKRAR_OKU_RX.match(m): ses_durdur(); return konus_tekrar_oku()

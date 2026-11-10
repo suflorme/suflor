@@ -314,7 +314,19 @@ def _km_notlar_metni(soru, ilgili_yalniz, cap):
 # kim, son gelişme, bayraklar, son tarama tarihi; kanıt dereceli). Ağ yok; yalnız tazi.py `ozet_metni`. Amaç varsayılanında yok: çağıran dilimler=[…, "dis_kaynak"] ile ister (dış soruda).
 # Dosyada ad yoksa dilim boş kalır (çağıran "Tazı'da dosya yok" der, web yoluna düşer). Gizli kipte pakete girmez (KM_GIZLI_SERBEST dışı).
 _KM_TAZI = {"m": None, "hata": None}
-def tazi_mod():  # tazi.py (relay.py'nin yanında ya da ayar kod klasöründe) → modül ya da None; bir kez yüklenir
+def tazi_acik():  # ayar tazi (bool); yoksa geliştiricide açık, beta'da kapalı (11 Kasım). Kapalıyken tüm Tazı yolları sessiz: tazi_mod() None döner
+    v = AYAR.get("tazi")
+    if isinstance(v, bool): return v
+    g = globals().get("gelistirici_mi")
+    return bool(g()) if g else True  # gelistirici_mi yoksa (yalıtılmış ad alanı) açık
+def tazi_yol():  # tazi.py'nin yeri (relay.py'nin yanında ya da ayar kod klasöründe) ya da None
+    for d in (os.path.dirname(os.path.abspath(globals().get("__file__") or "")) if globals().get("__file__") else "", os.path.expanduser(str(AYAR.get("kod") or ""))):
+        yol = os.path.join(d, "tazi.py") if d else ""
+        if yol and os.path.isfile(yol): return yol
+    return None
+def tazi_yenile(): _KM_TAZI.update(m=None, hata=None)  # tarama bitince: modül yeniden yüklenir (kod/liste değişikliği görünsün)
+def tazi_mod():  # tazi.py → modül ya da None (ayar tazi kapalıysa da None); bir kez yüklenir
+    if not tazi_acik(): return None
     if _KM_TAZI["m"] is None and not _KM_TAZI["hata"]:
         import importlib.util
         for d in (os.path.dirname(os.path.abspath(globals().get("__file__") or "")) if globals().get("__file__") else "", os.path.expanduser(str(AYAR.get("kod") or ""))):

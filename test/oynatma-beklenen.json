@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 678540,
-   "sha": "cdc0021785ba23a7"
+   "uzunluk": 679416,
+   "sha": "4127556f35ba97ba"
   },
   "/mini": {
-   "uzunluk": 678540,
-   "sha": "cdc0021785ba23a7"
+   "uzunluk": 679416,
+   "sha": "4127556f35ba97ba"
   },
   "/status": {
    "_ping_son": "float",
@@ -369,6 +369,7 @@
      "sohbet_ses_izi": "bool",
      "sure_duyuru": "bool",
      "takvim_paylasilan": [],
+     "tazi": "bool",
      "tema": "str",
      "toplanti_hatirlat": "bool",
      "toplanti_hatirlat_dk": "int",
@@ -807,6 +808,14 @@
    },
    "taslak": [],
    "tavan": "NoneType",
+   "tazi": {
+    "acik": "bool",
+    "bugun": "int",
+    "calisiyor": "bool",
+    "kuyruk": "int",
+    "son": "NoneType",
+    "tavan": "int"
+   },
    "tone": "NoneType",
    "tone_kisi": {
     "Ayla Örnek": {

@@ -17,6 +17,7 @@ TURLER = ("alan_adi", "dns", "sertifika", "sicil", "site", "haber", "gonderi", "
 # durum türleri: değişir, kaybolabilir (baglanti her taramada yeniden hesaplanır)
 DURUM_TURLER = ("alan_adi", "dns", "sicil", "site", "arsiv", "teknoloji", "sosyal_hesap", "varlik", "baglanti")
 OLAY_TURLER = ("sertifika", "haber", "gonderi", "ortaklik", "kod")  # olay türleri: yalnız yeni
+HIZLI_KAYNAK = ("rdap", "dns", "tarama", "haber")   # hızlı tarama: Wayback, crt.sh, site içi gezinme, GitHub yok
 KAYNAKLAR = ("rdap", "dns", "crt", "tarama", "sicil", "haber", "arsiv", "altyapi", "kod")
 KAYNAK_TAKMA = {"site": "tarama"}
 BOLUMLER = ("kimlik", "zaman", "iddia", "celiski", "bayrak", "soru", "iz")
@@ -99,8 +100,19 @@ def temiz_hata(e):
     return (type(e).__name__ + ": " + str(e))[:100]
 
 
+HIZLI = {"acik": False, "bitis": 0.0}   # hızlı tarama: kısa zaman aşımı, tek sayfa, toplam süre sınırı
+HIZLI_ZAMAN = 8
+HIZLI_TOPLAM = 30
+
+
+def hizli_doldu():
+    return HIZLI["acik"] and time.time() > HIZLI["bitis"]
+
+
 def http_ayrinti(url, zaman=20, ek=None):
     """(metin, başlıklar[küçük harf], içerik türü)."""
+    if HIZLI["acik"]:
+        zaman = min(zaman, HIZLI_ZAMAN)
     h = {"User-Agent": UA, "Accept": "*/*"}
     h.update(ek or {})
     with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=zaman) as r:
@@ -119,7 +131,7 @@ _SON_ISTEK = [0.0]
 
 def nazik(url, zaman=20, ek=None):
     """Nazik hız: istekler arası en az TAZI_BEKLE sn (varsayılan 1). (metin, başlıklar, tür)."""
-    ara = float(os.environ.get("TAZI_BEKLE", "1"))
+    ara = 0.3 if HIZLI["acik"] else float(os.environ.get("TAZI_BEKLE", "1"))
     gec = time.time() - _SON_ISTEK[0]
     if ara > 0 and gec < ara:
         time.sleep(ara - gec)
@@ -230,7 +242,35 @@ def liste_yolu(arg=None, dizin=None):
     return os.path.join(veri_dizin(dizin), "liste.json")
 
 
+def aday_yolu(dizin=None):
+    return os.path.join(veri_dizin(dizin), "aday.json")
+
+
+def aday_oku(dizin=None):
+    ham = json_oku(aday_yolu(dizin), [])
+    return [a for a in ham if isinstance(a, dict) and a.get("ad")] if isinstance(ham, list) else []
+
+
 def liste_oku(arg=None, dizin=None):
+    """ana izleme listesi (salt okunur) + Suflor'un aday listesi (aday.json; kaynak: suflor-aday)."""
+    try:
+        ana = _liste_oku(arg, dizin)
+    except FileNotFoundError:
+        if not aday_oku(dizin):
+            raise
+        ana = []
+    var_id = {k["id"] for k in ana}
+    var_ad = {tr_kucuk(k["ad"]) for k in ana}
+    for a in aday_oku(dizin):
+        if slug(a["ad"]) in var_id or tr_kucuk(a["ad"]) in var_ad:
+            continue
+        ana.append({"id": slug(a["ad"]), "ad": a["ad"], "kisiler": [], "alanlar": [str(x).lower() for x in (a.get("alanlar") or [])],
+                    "abn": "", "linkedin": [], "x": [], "sayfalar": [], "haber_sorgu": [], "neden": a.get("neden") or "",
+                    "kaynak": "suflor-aday"})
+    return ana
+
+
+def _liste_oku(arg=None, dizin=None):
     yol = liste_yolu(arg, dizin)
     with open(yol, encoding="utf-8") as f:
         metin = f.read()
@@ -350,7 +390,7 @@ def rdap(ctx):
 
 def dig_calistir(t, d):
     kom = shlex.split(os.environ.get("TAZI_DIG") or "dig") + ["+short", t, d]
-    p = subprocess.run(kom, capture_output=True, text=True, timeout=20)
+    p = subprocess.run(kom, capture_output=True, text=True, timeout=HIZLI_ZAMAN if HIZLI["acik"] else 20)
     if p.returncode != 0:
         raise RuntimeError(f"dig çıkış {p.returncode}")
     return [l.strip() for l in p.stdout.splitlines() if l.strip()]
@@ -680,7 +720,7 @@ def _tarama_cikar(ctx, d, u, html, metin, ust_basliklar):
 
 def _alan_tara(ctx, d):
     kid = f"tarama:{d}"
-    mx = int(os.environ.get("TAZI_SAYFA_MAX", "25"))
+    mx = 1 if HIZLI["acik"] else int(os.environ.get("TAZI_SAYFA_MAX", "25"))
     yasaklar = []
     try:
         yasaklar = robots_yasak(nazik(site_adres(f"https://{d}/robots.txt"))[0])
@@ -698,7 +738,7 @@ def _alan_tara(ctx, d):
             sira[0] += 1
     ctx.baglar[d] = []
     ekle_aday(f"https://{d}/")
-    if not yasak_mi("/sitemap.xml", yasaklar):
+    if not HIZLI["acik"] and not yasak_mi("/sitemap.xml", yasaklar):
         try:
             xml = nazik(site_adres(f"https://{d}/sitemap.xml"))[0]
             yollar_ = []
@@ -1207,7 +1247,10 @@ def tara_cmd(a):
             print("eşleşme yok: " + a.kim)
             return 1
         liste = [k]
-    sec = kaynak_coz(a.kaynak) if a.kaynak else list(KAYNAKLAR)
+    hizli = bool(getattr(a, "hizli", False))
+    if hizli:
+        HIZLI.update(acik=True, bitis=time.time() + HIZLI_TOPLAM)
+    sec = kaynak_coz(a.kaynak) if a.kaynak else (list(HIZLI_KAYNAK) if hizli else list(KAYNAKLAR))
     bad = [s for s in sec if s not in KAYNAKLAR]
     if bad:
         print("bilinmeyen kaynak: " + ",".join(bad))
@@ -1224,6 +1267,9 @@ def tara_cmd(a):
         ilk = onc_t is None
         ctx = Ctx(k, b, dizin, onc.get("site", {}), rows)
         for s in sec:
+            if hizli_doldu():
+                ctx.durum[s] = "okunamadı: hızlı tarama süresi doldu"
+                continue
             try:
                 KOLEKTOR[s](ctx)
             except Exception as e:
@@ -1231,7 +1277,7 @@ def tara_cmd(a):
         birlestir(k, ctx, rows, ilk, bug)
         ctxs[k["id"]] = ctx
         yaz_atomik(os.path.join(dizin, "tarama", bug, k["id"] + ".json"), json.dumps(
-            {"kayit": k["id"], "tarih": b.isoformat(), "kaynaklar": sec, "durum": ctx.durum, "site": ctx.site,
+            {"kayit": k["id"], "tarih": b.isoformat(), "kaynaklar": sec, "durum": ctx.durum, "site": ({**onc.get("site", {}), **ctx.site} if hizli else ctx.site),
              "olgular": [{"tur": f.tur, "alt": f.alt, "deger": f.deger, "kid": f.kid} for f in ctx.facts]}, ensure_ascii=False))
     bag = baglanti_uret(tum, rows, b, ctxs)           # ağ yok; tüm listeden yeniden hesaplanır
     for k in tum:
@@ -1512,6 +1558,33 @@ def ekle_cmd(a):
     bulgu_yaz(dizin, rows)
     print("eklendi")
     return 0
+
+
+def aday_ekle(ad, alan=None, neden="elle", dizin=None):
+    """Suflor'un aday listesine ekler (ana listene hiç yazılmaz). Döner: (durum, kayıt): "yeni" | "var"."""
+    ad = re.sub(r"\s+", " ", str(ad or "")).strip()[:80]
+    if len(ad) < 2:
+        return "bos", None
+    alan = (str(alan).strip().lower() if alan else "")
+    alan = re.sub(r"^https?://", "", alan).split("/")[0].replace("www.", "") if alan else ""
+    try:
+        mevcut = kayit_bul(liste_oku(None, dizin), alan or ad) or kayit_bul(liste_oku(None, dizin), ad)
+    except FileNotFoundError:
+        mevcut = None
+    if mevcut and (tr_kucuk(mevcut["ad"]) == tr_kucuk(ad) or mevcut["id"] == slug(ad) or (alan and alan in mevcut["alanlar"])):
+        return "var", mevcut
+    lst = aday_oku(dizin)
+    kay = {"ad": ad, "alanlar": [alan] if alan else [], "neden": neden if neden in ("toplanti", "konus", "brifing", "elle") else "elle",
+           "tarih": bugun().isoformat()}
+    lst.append(kay)
+    yaz_atomik(aday_yolu(dizin), json.dumps(lst[-200:], ensure_ascii=False, indent=1))
+    return "yeni", kay
+
+
+def aday_cmd(a):
+    d, k = aday_ekle(a.ad, a.alan, a.neden)
+    print({"yeni": f"aday eklendi: {a.ad}", "var": f"zaten listede: {k['ad'] if k else a.ad}", "bos": "ad gerekli"}[d])
+    return 0 if d != "bos" else 1
 
 
 def degerlendir_cmd(a):
@@ -1810,7 +1883,15 @@ def ozet_metni(sorgu, dizin=None, liste=None):
         return None
     b = bugun()
     st = son_tarama_tarihi(dizin, k["id"])
-    L = [f"Tazı · {k['ad']} — son tarama {tarih_kisa(st) if st else 'yok'}"]
+    ay = " (aday)" if k.get("kaynak") == "suflor-aday" else ""
+    gun = ""
+    if st:
+        try:
+            n = (b - datetime.date.fromisoformat(str(st)[:10])).days
+            gun = f", {n} gün önce" if n >= 7 else ""
+        except ValueError:
+            pass
+    L = [f"Tazı · {k['ad']}{ay} — son tarama {tarih_kisa(st) if st else 'yok'}{gun}"]
     d = dosya_oku(dizin, k["id"])
     kim = dosya_ogeleri(d, "kimlik")
     if kim:
@@ -1907,7 +1988,7 @@ def liste_cmd(a):
 def durum_cmd(a):
     dizin = veri_dizin()
     s = sayac_oku(dizin)
-    print(f"veri klasörü: {dizin}\nliste: {liste_yolu(a.liste, dizin)}\nson tarama: {son_tarama_tarihi(dizin) or 'yok'}\n"
+    print(f"veri klasörü: {dizin}\nliste: {liste_yolu(a.liste, dizin)}\nSuflor aday listesi: {len(aday_oku(dizin))} kayıt\nson tarama: {son_tarama_tarihi(dizin) or 'yok'}\n"
           f"LinkedIn bu hafta: {s['linkedin']['n']}/{sosyal_limit('linkedin')}\nX bu hafta: {s['x']['n']}/{sosyal_limit('x')}")
     return 0
 
@@ -1918,7 +1999,11 @@ def main(argv=None):
     sp = p.add_subparsers(dest="komut", required=True)
     sp.add_parser("liste", help="izleme listesini göster").set_defaults(f=liste_cmd)
     t = sp.add_parser("tara", help="kaynakları oku, önceki taramayla karşılaştır")
+    t.add_argument("--hizli", action="store_true", help="yalnız hızlı kaynaklar (RDAP, DNS, ana sayfa, haber), kısa zaman aşımı")
     t.add_argument("--kim"); t.add_argument("--kaynak", help=",".join(KAYNAKLAR) + " (site = tarama)"); t.set_defaults(f=tara_cmd)
+    ad_ = sp.add_parser("aday", help="Suflor'un aday listesine ekle (ana listene yazılmaz)")
+    ad_.add_argument("--ad", required=True); ad_.add_argument("--alan"); ad_.add_argument("--neden", default="elle", choices=("toplanti", "konus", "brifing", "elle"))
+    ad_.set_defaults(f=aday_cmd)
     si = sp.add_parser("sosyal-izin", help="LinkedIn ya da X sayfası açmadan önce sayaçtan izin al")
     si.add_argument("platform", choices=PLATFORMLAR); si.add_argument("kayit_id"); si.add_argument("url"); si.set_defaults(f=sosyal_cmd)
     li = sp.add_parser("linkedin-izin", help="sosyal-izin linkedin takma adı")

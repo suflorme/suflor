@@ -125,12 +125,13 @@ def topo_arac_onyukle(ks=None):
 # ağ çağırmaz; aynı ad toplantıda bir kez (komut kendisi sayar), gizli toplantıda çalışmaz. Kart etiketi "<dış işler kişiliğinin adı> · Tazı dosyası" (yuva boşsa "Tazı"). Dosya yoksa komut web yoluna
 # (ayar web_arastirma; S208: yalnız ad ve konu) ya da "dosya yok"a yönlendirir. Tazı kurulu/ayarlı değilse kural isteme girmez.
 def topo_tazi_istem():
+    if "tazi_acik" in globals() and not tazi_acik(): return ""  # ayar tazi kapalı (beta varsayılanı): kural isteme girmez
     if not ("tazi_var" in globals() and tazi_var()) and not AYAR.get("tazi_liste"): return ""
     dk = next((k for k in kisilikler() if k.get("rol") == "dis"), None) if "kisilikler" in globals() else None
     et = ((kisilik_gorunen(dk) + " · Tazı dosyası") if dk else "Tazı")
     return (" Tazı bilgi kartı: dökümde yeni bir KURUM DIŞI firma ya da kişi adı geçince (şirket içi kişi, kullanıcının kendi şirketi ya da toplantıda zaten ele alınmış ad değil) "
             "`toplanti-claude.py tazi \"<ad>\"` çalıştır (izle'yi başlattığın aynı yol ve biçimle; salt okur, izinsiz, yalnız yerel Tazı dosyasından okur) ve komutun tarif ettiği kısa bilgi kartını yaz; "
-            f"kart etiketi «{et}» (komut «KART ETİKETİ» olarak da verir). Dosya yoksa komut ne yapacağını söyler (web araştırması açıksa yalnız ad ve konuyla kısa açık kaynak araması, değilse 'dosya yok'). "
+            f"kart etiketi «{et}» (komut «KART ETİKETİ» olarak da verir). Dosya yoksa komut kısa bir tarama başlatır ve ne yapacağını söyler («Tazı iz sürüyor» derse ~30 sn sonra aynı komutu bir kez daha çalıştır; web araştırması açıksa yalnız ad ve konuyla kısa açık kaynak araması, değilse 'dosya yok'). "
             "Aynı ad toplantıda bir kez (komut ikinci çağrıda 'zaten soruldu' der). Gizli toplantıda hiç çalıştırma. Karta yalnız dış kaynağın bildiğini yaz; kişiler hakkında yorum ya da puan yazma.")
 def topo_istem():
     ks = bilgi_kaynaklari(); web = (TOPO_WEB_ISTEM + TOPO_KISI_ISTEM.replace("1) Claude in Chrome", "1) Claude in Chrome" if topo_chrome_acik() else "1) (Chrome kapalı: atla) Claude in Chrome")) if topo_web_acik() else ""

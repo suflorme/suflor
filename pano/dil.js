@@ -1489,6 +1489,8 @@ globalThis.SUFLOR_EN = {
   "Sahipsiz": "Unassigned",
   "{n} kart": "{n} cards",
   "Kararlar ve işlerde bu kişiyi göster": "Show this person in Decisions and tasks",
+  "Tazı (dış firma izleme)": "Tazı (outside company watch)",
+  "Dış firma ve kişileri izler, toplantı öncesi hızlı tarama yapar; “Tazı, firma adı araştır” dersen tarar. Taramaya yalnız firma adı ve alan adı gider, döküm ve iç bilgi gitmez; gizli kipte çalışmaz. Geliştiricide açık, beta’da kapalı gelir.": "Watches outside companies and people and runs a quick scan before meetings; say “Tazı, <company> araştır” to scan on demand. Only the company name and domain are sent, never transcript or internal data; off in private mode. On for the developer, off by default for beta.",
   "Toplantı dışında da web'de araştır": "Also research the web outside meetings",
   "Kapalıyken Konuş, sohbet ve kutudaki sorular internete çıkmaz. Açıkken kişi ya da firma sorusunda web'e bakılır: aramaya yalnız ad ve konu gider, döküm alıntısı ve iç sayılar gitmez; gizli toplantıda yok. Toplantı oturumundaki araştırma Toplantıda web'de araştır ayarına bağlıdır.": "When off, questions in Talk, chat and the box never go to the internet. When on, a question about a person or company can search the web: only the name and topic go in the search, never transcript quotes or internal numbers; not in confidential meetings. Research inside the meeting session follows the Research the web in meetings setting.",
   "Formu varsayılan değerlere çeker; Kaydet'e basana kadar bir şey değişmez": "Fills the form with default values; nothing changes until you press Save",

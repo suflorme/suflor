@@ -4,7 +4,7 @@
 # Wayback, site taraması (robots/sitemap/sosyal/analitik/varlık), altyapı (DMARC/MX/SPF/IP RDAP), GitHub, bağlantı haritası ve
 # bayraklar, soruşturma dosyası. Yerel sahte sunucu; gerçek ağ yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/tazi.py      (kaldı → çıkış 1)
-import datetime, email.utils, json, os, shutil, stat, subprocess, sys, tempfile, threading
+import datetime, email.utils, json, os, shutil, stat, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 sys.dont_write_bytecode = True
@@ -344,6 +344,33 @@ sn = json.loads(open(os.path.join(T, "veri", "tarama", G3, KUZ_ID + ".json"), en
 kontrol("sayfa sınırı: alan adı başına ≤ 1", len(sn["site"]) <= 1 and sn["kaynaklar"] == ["tarama"], str(list(sn["site"])))
 kontrol("v2 dosyaları kimliksiz: yerel kısımlar yazılmadı", not [f for d_, _, fs in os.walk(os.path.join(T, "veri")) for f in fs
         if any(x in open(os.path.join(d_, f), errors="ignore").read() for x in (YEREL, DMYEREL))])
+
+# 6e) Suflor aday listesi (aday.json) ve hızlı tarama (--hizli)
+AD_ALAN = "adayfirma.test"; AD_ID = "yeni-aday-firma"
+S["ns"][AD_ALAN] = ["ns1.host.test"]; S["crt"][AD_ALAN] = []; S["site"][AD_ALAN] = f"<html><title>Ana {AD_ALAN}</title><body><h1>Merhaba</h1><a href=\"/hakkimizda\"></a></body></html>"
+S["sitemap"][AD_ALAN] = f"<urlset><url><loc>https://{AD_ALAN}/hakkimizda</loc></url></urlset>"; S["sayfa"][(AD_ALAN, "/hakkimizda")] = "<html><title>H</title><body>biz</body></html>"
+DIG[AD_ALAN] = {"NS": ["ns1.host.test."], "MX": ["10 mx1.host.test."], "A": ["192.0.2.10"], "TXT": []}; dig_yaz()
+ana_once = open(liste_yol, "rb").read()
+rc, c = run("aday", "--ad", "Yeni Aday Firma", "--alan", "https://www." + AD_ALAN + "/", "--neden", "brifing"); kontrol("aday: eklendi", rc == 0 and "aday eklendi" in c, c)
+rc, c = run("aday", "--ad", "yeni aday firma", "--neden", "konus"); kontrol("aday: aynı ad tekrar eklenmez", rc == 0 and "zaten listede" in c, c)
+rc, c = run("aday", "--ad", "Örnek Danışmanlık Pty Ltd"); kontrol("aday: ana listedeki ad eklenmez", "zaten listede" in c, c)
+ay = json.loads(oku("aday.json")); kontrol("aday.json: tek kayıt, alan adı temiz, neden", len(ay) == 1 and ay[0]["alanlar"] == [AD_ALAN] and ay[0]["neden"] == "brifing" and ay[0]["ad"] == "Yeni Aday Firma", str(ay))
+kontrol("aday: ana izleme listesine hiç yazılmadı", open(liste_yol, "rb").read() == ana_once)
+tazi.os.environ["TAZI_DIR"] = os.path.join(T, "veri"); L2 = tazi.liste_oku(liste_yol)
+kontrol("liste_oku: ana liste + aday birleşik, aday kaynak işaretli", len(L2) == 4 and L2[-1]["kaynak"] == "suflor-aday" and L2[-1]["id"] == AD_ID and "kaynak" not in L2[0], str(L2[-1]))
+rc, c = run("durum"); kontrol("durum: aday sayısı", "Suflor aday listesi: 1 kayıt" in c, c)
+S["istek"].clear(); n_once = len(bulgular()); G4 = g(BUG + datetime.timedelta(days=4)); t0 = time.time()
+rc, c = run("tara", "--kim", "Yeni Aday Firma", "--hizli", TAZI_BUGUN=G4, TAZI_BEKLE="5"); sure = time.time() - t0
+kontrol("hızlı tarama: çıkış 0, TAZI_BEKLE yok sayıldı (0,3 sn)", rc == 0 and sure < 12, f"{sure:.1f} {c}")
+snp = json.loads(open(os.path.join(T, "veri", "tarama", G4, AD_ID + ".json"), encoding="utf-8").read())
+kontrol("hızlı tarama: yalnız hızlı kaynaklar", snp["kaynaklar"] == ["rdap", "dns", "tarama", "haber"], str(snp["kaynaklar"]))
+kontrol("hızlı tarama: Wayback, crt.sh, sitemap, ikinci sayfa, GitHub'a istek yok", not [x for x in S["istek"] if x.startswith(("/wb", "/crt", "/gh")) or "sitemap" in x or "hakkimizda" in x], str(S["istek"]))
+kontrol("hızlı tarama: yalnız ana sayfa", list(snp["site"]) == [f"https://{AD_ALAN}/"], str(list(snp["site"])))
+kontrol("hızlı tarama: alan adı kaydı ve DNS olgusu geldi", any(r["kayit"] == AD_ID and r["tur"] == "alan_adi" for r in bulgular()) and any(r["kayit"] == AD_ID and r["tur"] == "dns" for r in bulgular()))
+rc, c = run("ozet", "--kim", "Yeni Aday Firma", TAZI_BUGUN=G4); kontrol("ozet: başlıkta (aday)", rc == 0 and c.splitlines()[0].startswith("Tazı · Yeni Aday Firma (aday) — son tarama"), c)
+rc, c = run("ozet", "--kim", "Yeni Aday Firma", TAZI_BUGUN=g(BUG + datetime.timedelta(days=20))); kontrol("ozet: bayat dosyada 'N gün önce'", "gün önce" in c.splitlines()[0], c)
+S["istek"].clear(); rc, c = run("tara", "--kim", "Yeni Aday Firma", TAZI_BUGUN=g(BUG + datetime.timedelta(days=5)))
+kontrol("tam tarama eskisi gibi: Wayback ve sitemap istendi", rc == 0 and any(x.startswith("/wb") for x in S["istek"]) and any("sitemap" in x for x in S["istek"]), str(S["istek"]))
 
 # 7) ABR kayıt kimliği yalnız Anahtar Zinciri komutundan; dosyalara ve çıktıya yazılmaz
 gk = os.path.join(T, "sec.py"); open(gk, "w").write(f'print("{GUID}")\n')

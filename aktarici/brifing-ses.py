@@ -129,10 +129,10 @@ def dis_kisilik():  # kişilik yuvası "dis" (dış işler asistanı) ya da None
     return next((k for k in kisilikler() if k.get("rol") == "dis"), None) if "kisilikler" in globals() else None
 def dis_etiket(): k = dis_kisilik(); return (kisilik_gorunen(k) if k else "Tazı") + " · " + _t("Dış taraf", "Outside parties")
 def brifing_dis_taraf(olay):  # → satırlar (en çok BRIFING_DIS_EN_COK); [] = bölüm yok
-    if ("gizli_acik" in globals() and gizli_acik()) or "dis_katilimcilar" not in globals() or not tazi_var(): return []
+    if ("gizli_acik" in globals() and gizli_acik()) or "dis_katilimcilar" not in globals() or not tazi_var(): return []  # tazi_var: ayar tazi kapalıyken de False (tazi_mod None)
     try: dis, _belirsiz, _dav = dis_katilimcilar(olay if isinstance(olay, dict) else {})
     except Exception as e: print(f"BRİFİNG: dış taraf kurulamadı ({e.__class__.__name__})"); return []
-    gor, var, yok = set(), [], {}
+    gor, var, yok, aday = set(), [], {}, {}
     for x in dis:
         ks = tazi_kayitlar(x["eposta"], 1) or tazi_kayitlar(x.get("ad") or "", 1)
         if ks:
@@ -141,6 +141,11 @@ def brifing_dis_taraf(olay):  # → satırlar (en çok BRIFING_DIS_EN_COK); [] =
         else:
             a_ = (x.get("ad") or x["eposta"].split("@")[0]) if x["serbest"] else x["alan"]
             yok.setdefault(a_, set()).add(x.get("ad") or x["eposta"].split("@")[0])
+            if not x["serbest"] and x.get("alan"): aday.setdefault(x["alan"], a_)  # 11 Kasım: kurumsal alan adı → hızlı tarama adayı (serbest posta kişisi değil)
+    if aday and "tazi_kos" in globals():  # Tazı'ya aday olanlar için toplantıdan önce hızlı tarama (en çok 3; kuyruk/tekrar/tavan tazi_kos'ta); sonuç bir sonraki brifing/Konuş'ta dosyadan gelir
+        for alan_, ad_ in list(aday.items())[:3]:
+            try: tazi_kos(alan_, alan_, "hizli", "brifing")
+            except Exception as e: print(f"BRİFİNG: Tazı taraması istenemedi ({e.__class__.__name__})")
     out = list(var)
     for a_, adlar in yok.items():
         ad = ", ".join(sorted(adlar)); out.append(_t(f"{a_}" + (f" ({ad})" if ad != a_ else "") + ": Tazı'da dosya yok — Tazı'ya aday", f"{a_}" + (f" ({ad})" if ad != a_ else "") + ": no Tazı file — candidate to add"))

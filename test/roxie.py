@@ -238,6 +238,15 @@ ok("dış taraf: Tazı'da olan firma özetiyle (tek satır), olmayanlar «dosya 
 ok("etiket: «<dış işler adı> · Dış taraf»; yuva boşsa «Tazı · Dış taraf»", bn["dis_etiket"]() == "Roxane · Dış taraf" and (AYAR.update(kisilik_dis=""), bn["dis_etiket"]())[1] == "Tazı · Dış taraf"); AYAR["kisilik_dis"] = k3
 bn["gizli_acik"] = lambda: True; ok("gizli kipte bölüm yok", bn["brifing_dis_taraf"]({"_r": R_B}) == []); bn["gizli_acik"] = lambda: False
 ok("dış katılımcı yoksa bölüm yok", bn["brifing_dis_taraf"]({"_r": R_IC}) == [])
+# 11 Kasım: Tazı'da dosyası olmayan KURUMSAL alan adı → hızlı tarama istenir (serbest postadaki kişi değil; en çok 3; gizli kipte ve Tazı kapalıyken yok)
+KOS = []; bn["tazi_kos"] = lambda ad, alan=None, kip="hizli", neden="elle": KOS.append((ad, alan, kip, neden)) or {"ok": True, "durum": "basladi"}
+bn["brifing_dis_taraf"]({"_r": R_B})
+ok("brifing: dosyası olmayan kurumsal alan için hızlı tarama istendi (alan adı, kip hızlı, neden brifing); gmail kişisi ve dosyası olan firma için istenmedi", KOS == [("yenifirma.test", "yenifirma.test", "hizli", "brifing")], KOS)
+R_B3 = {"kisiler": [{"ad": "P" + str(i), "adresler": ["p" + str(i) + AT + "firma" + str(i) + ".test"]} for i in range(5)], "eslesmeyen": []}; KOS.clear(); bn["brifing_dis_taraf"]({"_r": R_B3})
+ok("brifing: en çok 3 tarama istenir", len(KOS) == 3, KOS)
+KOS.clear(); bn["gizli_acik"] = lambda: True; bn["brifing_dis_taraf"]({"_r": R_B}); bn["gizli_acik"] = lambda: False
+ok("gizli kipte brifing taraması istenmez", not KOS, KOS)
+
 AYAR["kod"] = os.path.join(T, "yok"); ns["_KM_TAZI"].update(m=None, hata=None); bn["tazi_var"] = lambda: False
 ok("Tazı kurulu değilse bölüm yok (hepsi «dosya yok» yanıltmasın)", bn["brifing_dis_taraf"]({"_r": R_B}) == []); AYAR["kod"] = KOD; ns["_KM_TAZI"].update(m=None, hata=None); bn["tazi_var"] = ns["tazi_var"]
 okuma = bn["brifing_dis_konusma"]({"dis_taraf": dt})
@@ -275,6 +284,15 @@ os.remove(os.path.join(CL, "tazi-toplanti.json")); DURUM["gizli"] = True; c6 = t
 ok("gizli toplantıda hiçbir şey çalışmaz (Tazı okunmaz, ad sayılmaz)", c6.startswith("gizli toplantı: Tazı kartı yok") and not os.path.exists(os.path.join(CL, "tazi-toplanti.json")), c6); DURUM["gizli"] = False
 os.remove(os.path.join(CL, "tazi-toplanti.json")) if os.path.exists(os.path.join(CL, "tazi-toplanti.json")) else None
 ok("yeni toplantıda ad yeniden sorulabilir (kayıt toplantıya bağlı)", (lambda: (json.dump({"toplanti": "baska-toplanti.md", "adlar": ["nova teknoloji"]}, open(os.path.join(CL, "tazi-toplanti.json"), "w")), "KART ETİKETİ" in tc("Nova Teknoloji"))[1])())
+def hz(gizli=False, ayar=None):  # toplanti-claude.py hazirlik: Tazı bölümü (gizli toplantıda ve ayar tazi kapalıyken yok)
+    DURUM["gizli"] = gizli; e = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", TAZI_DIR=TZ)
+    e["SUFLOR_AYAR"] = yaz("ayar-hz-" + str(abs(hash(json.dumps(ayar or {}))) % 10**6) + ".json", json.dumps(dict({"tazi_liste": LISTE}, **(ayar or {}))))
+    r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "--dir", CL, "--relay", f"http://127.0.0.1:{PORT}", "hazirlik", "--kim", "Nova Teknoloji"], capture_output=True, text=True, timeout=30, env=e)
+    DURUM["gizli"] = False; return r.stdout + r.stderr
+h1 = hz()
+ok("hazırlık: Tazı bölümü var (izlenen firma, yerel özet)", "## Tazı: son gelişmeler" in h1 and "Nova Teknoloji Ltd" in h1, h1[:300])
+h2 = hz(gizli=True); ok("hazırlık: gizli toplantıda Tazı bölümü yok", "## Tazı:" not in h2 and "Nova Teknoloji Ltd" not in h2 and "Hazırlık" in h2, h2[:300])
+h3 = hz(ayar={"tazi": False}); ok("hazırlık: ayar tazi kapalıyken bölüm yok", "## Tazı:" not in h3 and "Hazırlık" in h3, h3[:300])
 osrc = oku("aktarici", "toplanti-oturum.py")
 ok("salt okuyan komut listesinde (izinsiz): TOPO_TC_OKUMA'da tazi", '"dokum", "tazi"}' in osrc)
 on = dict(ns); on.update(AYAR=dict(AYAR), tazi_var=ns["tazi_var"], tazi_mod=ns["tazi_mod"])
@@ -289,7 +307,7 @@ ok("topo_istem Tazı kuralını web/ön yükleme kuralından sonra ekler", "web 
 PR = bos_port(8795); CA = os.path.join(T, "canli3"); os.makedirs(os.path.join(CA, "ozetler"))
 for f in ("relay.py", "manifest.json", "tazi.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Ayşe Deneme", "port": PR, "uygulama": T, "proje": T, "ortak": T, "kisilik": k1, "kisilik_toplanti_disi": k2, "kisilik_dis": k3, "tazi_liste": LISTE}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Ayşe Deneme", "port": PR, "uygulama": T, "proje": T, "ortak": T, "kisilik": k1, "kisilik_toplanti_disi": k2, "kisilik_dis": k3, "tazi_liste": LISTE, "tazi": True}, open(ay, "w"))
 env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", TAZI_DIR=TZ)
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", CA, "--port", str(PR)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT, env=env)
 def rq(yol, govde=None):

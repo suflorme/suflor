@@ -155,6 +155,8 @@ kaynağı ve dönemiyle söyler ("<ad>'a göre son 7 günde …"); Konuş'a yaln
 devam eder. Toplantı öncesi brifing de aynı kaynağa bakar: toplantının konusu kaynağın konusuna giriyorsa brifinge kaynağı ve dönemiyle en çok üç rakam
 ekler ("Güncel veri"); konu dışıysa kaynağa sormaz. Kaynaklı brifing bağlayıcının bağlanmasını beklediği için birkaç saniye uzun sürer.
 İkisini birden kapatmak için `"konus_bilgi_kaynagi": false`.
+Tazı (`"tazi"`, geliştiricide varsayılan açık, beta'da kapalı; Ayarlar → Bilgi kaynakları): dış firma/kişi izleme. Toplantı öncesi brifingte dosyası olmayan kurumsal alan adları için hızlı tarama (en çok 3), toplantıda yeni dış ad için hızlı tarama, "Tazı, firma adı araştır / iz sür / izle" dersen tam tarama. Günlük sınır `tazi_gunluk` (20); gizli kipte çalışmaz; ağa yalnız firma adı ve alan adı gider.
+
 Konuş'ta web araması (`"konus_web"`, varsayılan açık; `web_arastirma` ana şalteri de açık olmalı, toplantı dışında `web_arastirma_disari` da; Ayarlar → Toplantı → "Konuş'ta da web'de araştır"): sesle ya da yazıyla sorduğun
 kişi, firma ve güncel bilgi sorularında Konuş internette arar ve herkese açık sayfaları ya da senin verdiğin bağlantıyı okur; Aramaya yalnız sorudaki konu gider, döküm alıntısı ve iç sayılar gitmez; gizli toplantıda
 kapalı. Kapatmak için `"konus_web": false`. Suflor Brifing yardımcısının web araçlarını tanıyan sürümü gerekir; eski sürümde ayar açık olsa da Konuş internete çıkmaz (günlükte tek satır uyarı).
