@@ -115,7 +115,8 @@ bak("bekleyen kararda onay süresi: 3. gün hatırlat", l3 and l3[0]["onay"]["ha
 # --- aktarıcı bölümü (aktarici/eylem-menu.py): sahte ad alanı ---
 ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "AYAR": {"ad": "Ayşe Deneme"}, "BASE": C, "TAKVIM_TAM": {e["id"]: e for e in TAKVIM}, "kimlik_coz": kimlik_f,
       "_yapi_mod": lambda: yapi, "_t": lambda a, b: a, "claude_yolu": lambda: None, "BRIFING_APP": os.path.join(T, "yok.app"), "BEYIN": None}
-exec(compile(open(os.path.join(KOD, "aktarici", "eylem-menu.py"), encoding="utf-8").read(), "eylem-menu.py", "exec"), ns)
+KM = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(); KM_OKU = KM[KM.index("# --- Tek okuyucular"):KM.index("# --- Olaylar:")]  # tek okuyucular (takvim, boş zaman, işler, devir)
+exec(KM_OKU, ns); exec(compile(open(os.path.join(KOD, "aktarici", "eylem-menu.py"), encoding="utf-8").read(), "eylem-menu.py", "exec"), ns)
 ns["eylem_model"] = lambda istem, **k: ("Aktarıcı notu", None)  # bölüm model çağrısını kendi tanımladı; test sahtesi geri konur
 g = ns["kayit_menu_view"]("/kayit-menu?id=" + IS_KID); bak("kayit_menu_view: menü bilgisi", g["ok"] and g["kayit"]["kayit_id"] == IS_KID and "ertele" in g["eylemler"], g)
 bak("kayit_menu_view: id yok / kayıt yok", not ns["kayit_menu_view"]("/kayit-menu")["ok"] and not ns["kayit_menu_view"]("/kayit-menu?id=s99999")["ok"])

@@ -799,11 +799,7 @@ def gun_devir_metni(r):  # son_ekle kaydı (SON) → kısa devir metni (≤ GUN_
         if len(m) + len(l) + 1 + len(yol) + 1 > GUN_DEVIR_EN_COK: break
         m += l + "\n"
     return m + yol
-def gun_devir_oku(simdi=None):  # bugünkü devirler (eskiden yeniye)
-    try: d = json.load(open(os.path.join(BASE, GUN_DEVIR_DOSYA), encoding="utf-8"))
-    except (OSError, ValueError): return []
-    bugun = datetime.datetime.fromtimestamp(simdi or time.time()).date()
-    return [x for x in (d.get("devirler") or []) if isinstance(x, dict) and x.get("metin") and datetime.datetime.fromtimestamp(float(x.get("t") or 0)).date() == bugun][-5:]
+def gun_devir_oku(simdi=None): return gun_devirleri(simdi)  # bugünkü devirler (eskiden yeniye, en çok 5); tek okuyucu kisi-modeli.py gun_devirleri
 def gun_devir_yaz(r):  # özet kaydı geldi → devir (gizli/deneme toplantıda yok); aynı toplantının eski devri değişir
     if not gun_devir_acik() or not isinstance(r, dict) or not r.get("dosya"): return None
     dosya = r["dosya"]
@@ -825,8 +821,7 @@ def gun_devir_yaz(r):  # özet kaydı geldi → devir (gizli/deneme toplantıda 
 def gun_ici_blogu(konu=None, simdi=None):  # toplantı oturumunun açılışında: son GUN_ICI_SAAT saatteki toplantı dışı Konuş soruları (yeniden eskiye sığdır, eskiden yeniye yaz)
     if not gun_devir_acik() or gizli_acik() or _gd_deneme(konu): return ""
     now = simdi or time.time(); sat, n = [], 0
-    for x in reversed(_gd_jsonl("konus-gecmis.jsonl")):
-        if x.get("toplanti"): continue  # toplantı içindeki sorular o toplantının devrinde
+    for x in reversed(toplanti_disi_konusmalar()):  # toplantı içindeki sorular o toplantının devrinde; gizli işaretli satır girmez (kisi-modeli.py)
         try: t = datetime.datetime.fromisoformat(str(x.get("at"))).timestamp()
         except (TypeError, ValueError): continue
         if now - t > GUN_ICI_SAAT * 3600: break

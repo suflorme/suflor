@@ -113,10 +113,55 @@ def ogrenilenler(en_cok=20):  # geçersizler hariç; onaylılar önce, her grupt
     ks = [k for k in _ogren_satirlar().values() if k["durum"] != "gecersiz"]
     ks.sort(key=lambda k: str(k.get("tarih") or ""), reverse=True); ks.sort(key=lambda k: 0 if k["durum"] == "onayli" else 1)
     return ks[:max(0, int(en_cok))]
-# --- Olaylar: var olan kaynaklardan okuyucular ----------------------------------------------------------------------------------------------
-def _km_yapi():
-    try: return _yapi_mod() if "_yapi_mod" in globals() else None
-    except Exception: return None
+# --- Tek okuyucular (10 Kasım, bağlam denetimi "kopya bağlam okuyucuları"): takvim, boş zaman, açık işler, gün devri, toplantı dışı Konuş geçmişi ---------------------------------
+# Aynı bilgiyi okuyan her yer buradan alır: süzgeç (izlenmeyen takvim, geride kalan iş, gizli satır) tek yerde, biçim çağıranda. Eski adlar ince sarmalayıcı: bas-konus.py
+# _takvim_olaylari/bos_zamanlar, toplanti-hatirlat.py _that_aday_liste, eylem-menu.py _kem_takvim, toplanti-oturum.py gun_devir_oku. Blok tek başına yüklenebilir (testler dilimle
+# alır); çalışırken AYAR, BASE, TAKVIM_TAM, _zaman, calisma_saatleri (bas-konus.py) ister; _suflor_is_listesi (relay.py) ve _yapi_mod varsa onları kullanır.
+def takvim_izlenir(e): return f'{e.get("takvim")} · {e.get("hesap")}' not in (AYAR.get("takvim_haric") or [])  # ayar takvim_haric: izlenmeyen takvimler
+def takvim_ham(kaynak=None):  # TAKVIM_TAM (ya da verilen liste, ör. TAKVIM_GEC["olaylar"]) içindeki olaylar: süzgeçsiz, okuma sırasıyla
+    try: ls = list(TAKVIM_TAM.values()) if kaynak is None else list(kaynak)
+    except NameError: return []
+    return [e for e in ls if isinstance(e, dict)]
+def takvim_olaylar(bas=None, son=None, kaynak=None, tum_gun=True, reddedilen=True, paylasilan=True):  # → [(başlangıç, bitiş, olay)] başlangıca göre; izlenmeyen takvim hep hariç,
+    ol = []                                                                                                # bas/son verilirse [bas, son) ile kesişenler; False verilen tür hariç
+    for e in takvim_ham(kaynak):
+        if not takvim_izlenir(e) or (not tum_gun and e.get("tum_gun")) or (not reddedilen and e.get("reddettin")) or (not paylasilan and e.get("paylasilan")): continue
+        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
+        except (KeyError, TypeError, ValueError, NameError): continue
+        if (bas is not None and s_ <= bas) or (son is not None and b >= son): continue
+        ol.append((b, s_, e))
+    ol.sort(key=lambda x: x[0]); return ol
+def bos_araliklar(simdi, gun, en_az_dk):  # → [(tarih, [(b, e), …])]: çalışma saatlerinde takvimde dolu olmayan aralıklar (tüm gün ve reddedilen dolu sayılmaz); bugün şimdiden sonra
+    gunler, gb, ge = calisma_saatleri(); out = []
+    g0 = simdi.replace(hour=0, minute=0, second=0, microsecond=0)
+    dolu = [(b, s_) for b, s_, e in takvim_olaylar(g0, g0 + datetime.timedelta(days=gun + 1), tum_gun=False, reddedilen=False)]
+    for i in range(gun):
+        d = g0 + datetime.timedelta(days=i)
+        if d.weekday() not in gunler: continue
+        b, e = d + datetime.timedelta(minutes=gb), d + datetime.timedelta(minutes=ge)
+        if i == 0:  # bugün: şimdiden sonra, çeyrek saate yuvarlı
+            n = simdi + datetime.timedelta(minutes=(15 - simdi.minute % 15) % 15); b = max(b, n.replace(second=0, microsecond=0))
+        ar, t = [], b
+        for db, ds in sorted(x for x in dolu if x[1] > b and x[0] < e):
+            if (db - t).total_seconds() >= en_az_dk * 60: ar.append((t, db))
+            t = max(t, ds)
+        if (e - t).total_seconds() >= en_az_dk * 60: ar.append((t, e))
+        if ar: out.append((d.date(), ar))
+    return out
+def bugun_isler():  # → yapi.bugun_veri sözlüğü, panodaki Bugün'le aynı yoldan (relay.py _suflor_is_listesi → baglayici.SuflorIsListesi, satırda kaynak; yoksa yapi doğrudan);
+    sl = _suflor_is_listesi() if "_suflor_is_listesi" in globals() else None  # kayıt grafı yoksa None. Gizli/deneme toplantı kaydı yapi.bugun_veri'de düşer. Hata çağırana yükselir
+    if sl is not None: return sl.bugun_veri()
+    y = _yapi_mod() if "_yapi_mod" in globals() else None
+    return y.bugun_veri(BASE, str(AYAR.get("ad") or "")) if y and hasattr(y, "bugun_veri") else None
+def isler_grupla(v):  # bugun_veri → {"kendi": açık ve geride olmayan, "geride", "gecikti", "bugun" (gecikmemiş, bugün vadeli), "sonra" (kalan kendi işler), "baskalari", "teyit"}; sıra korunur
+    v = v or {}; hepsi = v.get("kendi") or []
+    kendi = [x for x in hepsi if not x.get("geride")]
+    gec = [x for x in kendi if x.get("gecikti")]; bug = [x for x in kendi if not x.get("gecikti") and x.get("kalan_gun") == 0]
+    return {"kendi": kendi, "geride": [x for x in hepsi if x.get("geride")], "gecikti": gec, "bugun": bug, "sonra": [x for x in kendi if x not in gec and x not in bug],
+            "baskalari": list(v.get("baskalari") or []), "teyit": list(v.get("teyit") or [])}
+def is_vade(x):  # iş satırının vade etiketi: "gecikti 2 g" | "bugün" | "3 g kaldı" | "" (tarihsiz)
+    g = x.get("kalan_gun")
+    return (_t("gecikti", "overdue") + f" {-g}" + _t(" g", "d")) if x.get("gecikti") and g is not None else (_t("bugün", "today") if g == 0 else (f"{g}" + _t(" g kaldı", "d left")) if g is not None else "")
 def _km_jsonl(ad, son=400):
     try:
         with open(os.path.join(BASE, ad), encoding="utf-8") as f: sat = f.readlines()[-son:]
@@ -127,53 +172,54 @@ def _km_jsonl(ad, son=400):
         except ValueError: continue
         if isinstance(x, dict): o.append(x)
     return o
+def gun_devirleri(t=None, saat=None):  # canli/gun-devir.json (toplanti-oturum.py gun_devir_yaz; gizli/deneme toplantı yazılmaz) → devirler eskiden yeniye: saat yoksa t'nin günü (en çok 5), varsa son saat saat
+    try:
+        with open(os.path.join(BASE, globals().get("GUN_DEVIR_DOSYA") or "gun-devir.json"), encoding="utf-8") as f: d = json.load(f)
+    except (OSError, ValueError): return []
+    ds = [x for x in ((d.get("devirler") if isinstance(d, dict) else None) or []) if isinstance(x, dict) and x.get("metin")]
+    t = float(t or time.time())
+    if saat is not None: return [x for x in ds if float(x.get("t") or 0) >= t - saat * 3600]
+    bugun = datetime.datetime.fromtimestamp(t).date()
+    return [x for x in ds if datetime.datetime.fromtimestamp(float(x.get("t") or 0)).date() == bugun][-5:]
+def toplanti_disi_konusmalar(son=400):  # canli/konus-gecmis.jsonl'ın son satırları → toplantı dışı sorular eskiden yeniye; gizli işaretli (eski) satır hiçbir bağlama girmez
+    return [x for x in _km_jsonl("konus-gecmis.jsonl", son) if not x.get("toplanti") and not x.get("gizli")]
+# --- Olaylar: var olan kaynaklardan okuyucular ----------------------------------------------------------------------------------------------
+def _km_yapi():
+    try: return _yapi_mod() if "_yapi_mod" in globals() else None
+    except Exception: return None
 def _km_notlar():  # notlar defteri: son KM_NOT_GUN gün, yeni önce → [(at, metin)]
     try: ls = _notlar_oku() if "_notlar_oku" in globals() else []
     except Exception: ls = []
     sin = (datetime.datetime.now() - datetime.timedelta(days=KM_NOT_GUN)).isoformat(timespec="seconds")
     return sorted(((str(o.get("at") or ""), " ".join(str(o.get("metin") or "").split())) for o in ls if str(o.get("at") or "")[:19] >= sin), reverse=True)
 def _km_isler(simdi):  # yapi.bugun_veri (yapi.py'ye dokunmadan) → (bugün/geciken satırları, diğer açık işler, teyit sayısı, başkasında bekleyen sayısı)
-    y = _km_yapi()
-    if not y or not hasattr(y, "bugun_veri"): return [], [], 0, 0
-    try: v = y.bugun_veri(BASE, str(AYAR.get("ad") or ""))
+    try: v = bugun_isler()
     except Exception as e: print(f"KİŞİ MODELİ: işler okunamadı ({e.__class__.__name__})"); return [], [], 0, 0
-    kendi = [x for x in v.get("kendi") or [] if not x.get("geride")]
-    def kisa(x):
-        g = x.get("kalan_gun"); m = _km_kisa(x.get("metin"), 80)
-        d = (_t("gecikti", "overdue") + f" {-g}" + _t(" g", "d")) if x.get("gecikti") and g is not None else (_t("bugün", "today") if g == 0 else (f"{g}" + _t(" g kaldı", "d left")) if g is not None else "")
-        return f"- {m}" + (f" ({d})" if d else "")
-    bug = [x for x in kendi if x.get("gecikti") or x.get("kalan_gun") == 0]
-    dig = [x for x in kendi if x not in bug]
-    return [kisa(x) for x in bug], [kisa(x) for x in dig], len(v.get("teyit") or []), len(v.get("baskalari") or [])
+    if v is None: return [], [], 0, 0
+    g = isler_grupla(v)
+    def kisa(x): d = is_vade(x); return f"- {_km_kisa(x.get('metin'), 80)}" + (f" ({d})" if d else "")
+    bug = [x for x in g["kendi"] if x not in g["sonra"]]  # gecikmiş ya da bugün vadeli, kayıt sırasıyla
+    return [kisa(x) for x in bug], [kisa(x) for x in g["sonra"]], len(g["teyit"]), len(g["baskalari"])
 def _km_kisi_isleri(ad, simdi):  # ad (gönderen/katılımcı) ile ilgili açık işler: sahibi ya da metni o kişiyi anan, kullanıcının kendi ve başkalarında bekleyen açık işleri → satırlar (gizli toplantı bugun_veri'de zaten yok)
     ham = re.findall(r"\w+", str(ad or "").lower()); toks = [t for t in ham if len(t) >= 3][:2]
     if not toks: return []
-    y = _km_yapi()
-    if not y or not hasattr(y, "bugun_veri"): return []
-    try: v = y.bugun_veri(BASE, str(AYAR.get("ad") or ""))
+    try: v = bugun_isler()
     except Exception as e: print(f"KİŞİ MODELİ: kişi işleri okunamadı ({e.__class__.__name__})"); return []
+    if v is None: return []
+    g = isler_grupla(v)
     def anar(x):  # sahibi (kayıtta "Ali" ya da "Ali K" gibi kısaltılmış olabilir: her sözcüğü gönderen adının bir sözcüğünün başı) ya da metni gönderenin (ilk iki) adını anan iş
         kk = re.findall(r"\w+", str(x.get("kim") or "").lower()); mw = re.findall(r"\w+", str(x.get("metin") or "").lower())
         return bool(kk) and all(any(h.startswith(w) for h in ham) for w in kk) and len(kk[0]) >= 3 or all(any(w.startswith(t) for w in mw) for t in toks)
     out = []
-    for x, kendi in [(x, True) for x in v.get("kendi") or [] if not x.get("geride")] + [(x, False) for x in v.get("baskalari") or []]:
+    for x, kendi in [(x, True) for x in g["kendi"]] + [(x, False) for x in g["baskalari"]]:
         if not anar(x): continue
         g = x.get("kalan_gun"); d = (_t("gecikti", "overdue") + f" {-g}" + _t(" g", "d")) if x.get("gecikti") and g is not None else (f"{g}" + _t(" g kaldı", "d left") if g is not None else "")
         out.append(f"- [{_t('sende', 'yours') if kendi else _km_kisa(x.get('kim'), 30)}] {_km_kisa(x.get('metin'), 90)}" + (f" ({d})" if d else ""))
         if len(out) >= 6: break
     return out
 def _km_takvim(simdi):  # bugün + yarın (TAKVIM_TAM; ayar takvim_haric) → satırlar
-    try: tam = list(TAKVIM_TAM.values())
-    except NameError: return []
-    bas = simdi.replace(hour=0, minute=0, second=0, microsecond=0); son = bas + datetime.timedelta(days=2); ol = []
-    for e in tam:
-        if not isinstance(e, dict) or f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []): continue
-        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
-        except (KeyError, ValueError, NameError): continue
-        if s_ <= bas or b >= son: continue
-        ol.append((b, s_, e))
-    ol.sort(key=lambda x: x[0]); out = []
-    for b, s_, e in ol[:12]:
+    bas = simdi.replace(hour=0, minute=0, second=0, microsecond=0); out = []
+    for b, s_, e in takvim_olaylar(bas, bas + datetime.timedelta(days=2))[:12]:
         gun = _t("bugün", "today") if b.date() <= simdi.date() else _t("yarın", "tomorrow")
         out.append(f"- {gun} " + (_t("tüm gün", "all day") if e.get("tum_gun") else f"{b:%H:%M}–{s_:%H:%M}") + f" · {_km_kisa(e.get('baslik'), 90)}" + (_t(" · daveti reddettin", " · you declined") if e.get("reddettin") else ""))
     return out
@@ -193,8 +239,7 @@ def _km_toplantilar():  # son toplantılar (gizli ve deneme hariç) → satırla
     return out
 def _km_son_konusma():  # toplantı dışı son sorular (gizli satır ve toplantı içi sorular hariç) → satırlar, yeni önce
     out = []
-    for x in reversed(_km_jsonl("konus-gecmis.jsonl")):
-        if x.get("toplanti") or x.get("gizli"): continue
+    for x in reversed(toplanti_disi_konusmalar()):
         out.append(f"- {str(x.get('at') or '')[5:16].replace('T', ' ')} " + _t("Soru: ", "Q: ") + _km_kisa(x.get("soru"), 120) + (" → " + _km_kisa(x.get("sesli"), 160) if x.get("sesli") else ""))
         if len(out) >= 4: break
     return out

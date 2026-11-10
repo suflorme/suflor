@@ -19,6 +19,7 @@ def olay(i, bas, bit, baslik="Bütçe Toplantısı", kat=("Ayşe Deneme",), **ek
     e = {"id": i, "baslik": baslik, "baslangic": zm(bas).isoformat(), "bitis": zm(bit).isoformat(), "takvim": "Takvim", "hesap": "Hesap", "katilimcilar": list(kat), "kisi_sayisi": len(kat) + 1,
          "baglanti": "https://teams.microsoft.com/l/meetup-join/x", "platform": "teams", "notlar": "Gündem:\n- Bütçe taslağı\n- Hedefler\nMicrosoft Teams toplantısı"}
     e.update(ek); return e
+KM = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(); KM_OKU = KM[KM.index("# --- Tek okuyucular"):KM.index("# --- Olaylar:")]  # tek okuyucular (takvim, boş zaman, işler, devir)
 SESLER, BILDIR = [], []
 def ns_kur(olaylar, ayar=None, **ek):
     tam = {e["id"]: e for e in olaylar}
@@ -31,7 +32,7 @@ def ns_kur(olaylar, ayar=None, **ek):
           "brifing_iste": lambda p: {"ok": True}, "brifing_sesli": lambda oid, neden: SESLER.append("BRIFING:" + neden) or True, "chrome_ac": lambda p: ACILAN.append(p) or {"ok": True},
           "kisilik": lambda: {"bicim": "sen"}}
     ns.update(ek)
-    exec(compile(open(os.path.join(KOD, "aktarici", "toplanti-hatirlat.py"), encoding="utf-8").read(), "toplanti-hatirlat.py", "exec"), ns)
+    exec(KM_OKU, ns); exec(compile(open(os.path.join(KOD, "aktarici", "toplanti-hatirlat.py"), encoding="utf-8").read(), "toplanti-hatirlat.py", "exec"), ns)
     return ns
 ACILAN = []
 def sifirla():

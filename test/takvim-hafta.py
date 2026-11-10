@@ -23,7 +23,8 @@ TAK = {e["id"]: e for e in [olay(1, 0, 11, 12), olay(2, 3, 9, 10.5), olay(3, 3, 
 ad = {"re": re, "datetime": dt, "os": os, "json": json, "time": time, "subprocess": subprocess, "BASE": "/yok/canli", "TAKVIM_APP": "/yok", "AYAR": {"takvim_haric": ["Paylaşılan · Başkası"]}, "TAKVIM_TAM": TAK, "ARAYUZ_DILI": "tr", "STATE": {"takvim": {"durum": "ok"}},
       "_t": lambda a, b: a, "_zaman": lambda t: dt.datetime.fromisoformat(t).astimezone()}
 exec(kod[kod.index("_GUN_TR = "):kod.index("# Kişilik (v0.53.0")], ad)
-exec(kod[kod.index("# --- Takvim haftası ve uygun zaman"):kod.index("def _konus_kur(")], ad)
+KM = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(); KM_OKU = KM[KM.index("# --- Tek okuyucular"):KM.index("# --- Olaylar:")]  # tek okuyucular (takvim, boş zaman, işler, devir)
+exec(KM_OKU, ad); exec(kod[kod.index("# --- Takvim haftası ve uygun zaman"):kod.index("def _konus_kur(")], ad)
 bz = {str(d): [f"{b:%H:%M}–{e:%H:%M}" for b, e in ar] for d, ar in ad["bos_zamanlar"](simdi)}
 ok(f"bugün: şimdiden (çeyreğe yuvarlı) sonra, 11–12 dolu → 10:15–11:00, 12:00–18:00 ({bz.get('2026-10-16')})", bz.get("2026-10-16") == ["10:15–11:00", "12:00–18:00"])
 ok("hafta sonu (Cumartesi, Pazar) yok", "2026-10-17" not in bz and "2026-10-18" not in bz)

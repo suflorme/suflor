@@ -9,7 +9,8 @@ def ok(ad, k):
     if not k: HATA.append(ad)
 kod = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
 ad = {"re": re, "AYAR": {}, "BASE": "/yok", "_t": lambda a, b: a}
-exec(kod[kod.index("BUGUN_RX = re.compile"):kod.index("def calisma_saatleri():")], ad)
+KM = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(); KM_OKU = KM[KM.index("# --- Tek okuyucular"):KM.index("# --- Olaylar:")]  # tek okuyucular (takvim, boş zaman, işler, devir)
+exec(KM_OKU, ad); exec(kod[kod.index("BUGUN_RX = re.compile"):kod.index("def calisma_saatleri():")], ad)
 bb, RX = ad["bugun_baglam"], ad["BUGUN_RX"]
 mk = lambda i, g, kim="Ali", ger=False: {"metin": f"Kurgu iş {i} " + "uzun açıklama " * 12, "kim": kim, "kalan_gun": g, "gecikti": g is not None and g < 0, "geride": ger}
 veri = {"kendi": [mk(1, -3), mk(2, 0), mk(3, 5), mk(4, None), mk(5, -40, ger=True)], "baskalari": [mk(6, -2, "Veli"), mk(7, 3, "Veli"), mk(8, 1, "Ayşe")], "teyit": [{"id": "k1"}]}

@@ -51,20 +51,13 @@ def _that_kim(e):  # katılımcı kümesi (rutin eşlemesi): e-posta varsa o, yo
 
 def that_toplanti_mi(e):  # takvim etkinliği hatırlatılacak bir toplantı mı
     if e.get("tum_gun") or e.get("reddettin") or e.get("paylasilan"): return False
-    if f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []): return False
+    if not takvim_izlenir(e): return False
     if THAT_GIZLI_RX.search(str(e.get("baslik") or "")): return False
     diger = bool(e.get("katilimcilar")) or bool(e.get("katilimci_eposta")) or (e.get("duzenleyen") and e.get("ben_duzenleyen") is False)
     return bool(diger or e.get("baglanti"))
 
-def _that_aday_liste():  # [(başlangıç, bitiş, olay)] başlangıca göre; gizli işaretliler bile ardışıklık hesabında "meşgul" sayılır
-    out = []
-    for e in TAKVIM_TAM.values():
-        if e.get("tum_gun") or e.get("reddettin") or e.get("paylasilan"): continue
-        if f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []): continue
-        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
-        except (KeyError, TypeError, ValueError): continue
-        out.append((b, s_, e))
-    out.sort(key=lambda x: x[0]); return out
+def _that_aday_liste():  # [(başlangıç, bitiş, olay)] başlangıca göre; gizli işaretliler bile ardışıklık hesabında "meşgul" sayılır (tek okuyucu kisi-modeli.py takvim_olaylar)
+    return takvim_olaylar(tum_gun=False, reddedilen=False, paylasilan=False)
 
 def that_tetik_zamani(b, liste, dk):  # toplantı başlangıcı b → hatırlatma anı: b - dk; öncesinde biten bir toplantı bu aralığa taşıyorsa onun bitişi
     t = b - datetime.timedelta(minutes=dk)

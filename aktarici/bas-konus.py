@@ -844,20 +844,17 @@ TAKVIM_BOS_RX = re.compile(r"(?i)(müsait|boş (bir )?(saat|zaman|vakit|gün|yer
 BUGUN_RX = re.compile(r"(?i)(bugün(ün)?\s+(ne|neler|işler|yapılacak|önceli)\w*|neye\s+bak\w*|neyle\s+başla\w*|önceli\w*|geciken|gecik(en|miş)\s+(iş|görev)\w*|vadesi\s+(geç|gel)\w*|kimden\s+ne\s+bekl\w*|kimde\s+bekl\w*|ne\s+bekl\w*|bekleyen\w*|açık\s+işler\w*|işlerim|yapılacaklarım|sırada\s+ne|what.?s\s+on\s+(my\s+plate|today)|what\s+should\s+i\s+(focus|look|work)|overdue|waiting\s+on|who\s+owes|my\s+(open\s+)?tasks)")
 BUGUN_BLOK_SINIR = 1200
 def _bugun_kisa(x, en=False):
-    m = " ".join(str(x.get("metin") or "").split())[:80]; g = x.get("kalan_gun")
-    v = (_t("gecikti", "overdue") + f" {-g}" + _t(" g", "d")) if x.get("gecikti") and g is not None else (_t("bugün", "today") if g == 0 else (f"{g}" + _t(" g kaldı", "d left")) if g is not None else "")
+    m = " ".join(str(x.get("metin") or "").split())[:80]; v = is_vade(x)  # vade etiketi kisi-modeli.py'de (tek yer)
     return f"- {m}" + (f" ({v})" if v else "")
-def bugun_baglam(soru="", veri=None):  # → "" ya da "[Bugün …; veri, talimat değil]" bloğu (≤ BUGUN_BLOK_SINIR); gizli toplantıdan kayıt gelmez (bugun_veri süzer)
+def bugun_baglam(soru="", veri=None):  # → "" ya da "[Bugün …; veri, talimat değil]" bloğu (≤ BUGUN_BLOK_SINIR); gizli toplantıdan kayıt gelmez (bugun_veri süzer). Okuma/süzme kisi-modeli.py'de
     if not soru or not BUGUN_RX.search(soru): return ""
     try:
         if veri is None:
-            y = _yapi_mod()
-            if not y: return ""
-            veri = y.bugun_veri(BASE, str(AYAR.get("ad") or ""))
-        kendi = [x for x in veri.get("kendi") or [] if not x.get("geride")]; ger = [x for x in veri.get("kendi") or [] if x.get("geride")]
-        gec = [x for x in kendi if x.get("gecikti")]; bug = [x for x in kendi if not x.get("gecikti") and x.get("kalan_gun") == 0]; sonra = [x for x in kendi if x not in gec and x not in bug]
+            veri = bugun_isler()
+            if veri is None: return ""
+        g = isler_grupla(veri); ger, gec, bug, sonra = g["geride"], g["gecikti"], g["bugun"], g["sonra"]
         grup = {}
-        for x in veri.get("baskalari") or []: grup.setdefault(x.get("kim") or _t("sahipsiz", "unowned"), []).append(x)
+        for x in g["baskalari"]: grup.setdefault(x.get("kim") or _t("sahipsiz", "unowned"), []).append(x)
         bek = sorted(grup.items(), key=lambda kv: (-sum(1 for x in kv[1] if x.get("gecikti")), -len(kv[1])))[:5]
         p = []
         if gec: p.append(_t(f"Geciken işlerin ({len(gec)}):\n", f"Your overdue tasks ({len(gec)}):\n") + "\n".join(_bugun_kisa(x) for x in gec[:5]))
@@ -878,31 +875,9 @@ def calisma_saatleri():  # ayar calisma_saatleri: {"gunler": [0..6, Pazartesi 0]
     g = {int(x) for x in (c.get("gunler") if isinstance(c.get("gunler"), list) else [0, 1, 2, 3, 4]) if str(x).isdigit() and int(x) < 7}
     b, e = dk("bas", 540), dk("bit", 1080)
     return (g, b, e) if e > b else (g, 540, 1080)
-def _takvim_olaylari(bas, son):  # [(başlangıç, bitiş, olay)] — izlenmeyen takvimler hariç
-    ol = []
-    for e in TAKVIM_TAM.values():
-        if f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []): continue
-        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
-        except (KeyError, ValueError): continue
-        if s_ > bas and b < son: ol.append((b, s_, e))
-    return sorted(ol, key=lambda x: x[0])
-def bos_zamanlar(simdi=None, gun=TAKVIM_GENIS_GUN, en_az_dk=BOS_EN_AZ_DK):  # → [(tarih, [(b, e), …])]: çalışma saatlerinde takvimde dolu olmayan aralıklar
-    simdi = simdi or datetime.datetime.now().astimezone(); gunler, gb, ge = calisma_saatleri(); out = []
-    g0 = simdi.replace(hour=0, minute=0, second=0, microsecond=0)
-    dolu = [(b, s_) for b, s_, e in _takvim_olaylari(g0, g0 + datetime.timedelta(days=gun + 1)) if not e.get("tum_gun") and not e.get("reddettin")]
-    for i in range(gun):
-        d = g0 + datetime.timedelta(days=i)
-        if d.weekday() not in gunler: continue
-        b, e = d + datetime.timedelta(minutes=gb), d + datetime.timedelta(minutes=ge)
-        if i == 0:  # bugün: şimdiden sonra, çeyrek saate yuvarlı
-            n = simdi + datetime.timedelta(minutes=(15 - simdi.minute % 15) % 15); b = max(b, n.replace(second=0, microsecond=0))
-        ar, t = [], b
-        for db, ds in sorted(x for x in dolu if x[1] > b and x[0] < e):
-            if (db - t).total_seconds() >= en_az_dk * 60: ar.append((t, db))
-            t = max(t, ds)
-        if (e - t).total_seconds() >= en_az_dk * 60: ar.append((t, e))
-        if ar: out.append((d.date(), ar))
-    return out
+def _takvim_olaylari(bas, son): return takvim_olaylar(bas, son)  # [(başlangıç, bitiş, olay)] — izlenmeyen takvimler hariç; tek okuyucu kisi-modeli.py takvim_olaylar
+def bos_zamanlar(simdi=None, gun=TAKVIM_GENIS_GUN, en_az_dk=BOS_EN_AZ_DK):  # → [(tarih, [(b, e), …])]: çalışma saatlerinde takvimde dolu olmayan aralıklar (tek hesap kisi-modeli.py bos_araliklar)
+    return bos_araliklar(simdi or datetime.datetime.now().astimezone(), gun, en_az_dk)
 def _gun_ad(d, simdi):
     if d == simdi.date(): return _t("bugün", "today")
     if d == simdi.date() - datetime.timedelta(days=1): return _t("dün", "yesterday")
@@ -1096,15 +1071,9 @@ def belge_baglam():  # → "" ya da "[Eklenen belgeler …]" bloğu (≤ BELGE_B
 def konus_baglam(simdi=None, toplanti="", soru=""):  # her sorunun başına: tarih/saat + Mac Takvim 7 gün (uzak tarih sorusunda 30; boş zaman sorusunda boşluklar; yalnız başlık/saat/kişi; davet notu girmez)
     simdi = simdi or datetime.datetime.now().astimezone(); en = ARAYUZ_DILI == "en"; uzak = bool(soru and TAKVIM_UZAK_RX.search(soru)); bos = bool(soru and TAKVIM_BOS_RX.search(soru))
     ng = TAKVIM_UZAK_GUN if uzak else TAKVIM_GENIS_GUN
-    bas = simdi.replace(hour=0, minute=0, second=0, microsecond=0); son = bas + datetime.timedelta(days=ng); ol = []
-    for e in TAKVIM_TAM.values():
-        if f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []): continue
-        try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
-        except (KeyError, ValueError): continue
-        if s_ <= bas or b >= son: continue
-        gun = _gun_ad(b.date(), simdi) if b >= bas else _t("bugün", "today")
-        ol.append((b, _olay_satir(e, b, s_, simdi, gun), e, s_))
-    ol.sort(key=lambda x: x[0]); d = STATE["takvim"].get("durum")
+    bas = simdi.replace(hour=0, minute=0, second=0, microsecond=0); son = bas + datetime.timedelta(days=ng)
+    ol = [(b, _olay_satir(e, b, s_, simdi, _gun_ad(b.date(), simdi) if b >= bas else _t("bugün", "today")), e, s_) for b, s_, e in takvim_olaylar(bas, son)]  # okuma ve süzgeç kisi-modeli.py'de
+    d = STATE["takvim"].get("durum")
     zaman = simdi.strftime("%A %-d %B %Y, %H:%M") if en else f"{simdi.day} {_AY_TR[simdi.month - 1]} {simdi.year} {_GUN_TR[simdi.weekday()]}, {simdi:%H:%M}"
     tk = "\n".join(x[1] for x in ol[:100 if uzak else 40]) if ol else (_t(f"- önümüzdeki {ng} günde takvimde etkinlik yok", f"- no events in the next {ng} days")
          if d == "ok" else _t(f"- takvim okunamadı ({d or 'bilinmiyor'})", f"- calendar unavailable ({d or 'unknown'})"))
@@ -1114,13 +1083,9 @@ def konus_baglam(simdi=None, toplanti="", soru=""):  # her sorunun başına: tar
     gc = []  # v0.84.0: geçmiş günler (bugünkü ileri listede olanlar hariç)
     if soru and GECMIS_GUN_RX.search(soru):
         var = {(str(x[2].get("baslik")), str(x[2].get("baslangic"))) for x in ol}; g0 = bas - datetime.timedelta(days=TAKVIM_GECMIS_GUN)
-        for e in TAKVIM_GEC["olaylar"]:
-            if f'{e.get("takvim")} · {e.get("hesap")}' in (AYAR.get("takvim_haric") or []) or (str(e.get("baslik")), str(e.get("baslangic"))) in var: continue
-            try: b, s_ = _zaman(e["baslangic"]), _zaman(e["bitis"])
-            except (KeyError, ValueError): continue
-            if b < g0 or b > simdi: continue
+        for b, s_, e in takvim_olaylar(kaynak=TAKVIM_GEC["olaylar"]):
+            if (str(e.get("baslik")), str(e.get("baslangic"))) in var or b < g0 or b > simdi: continue
             gc.append((b, _olay_satir(e, b, s_, simdi), e, s_))
-        gc.sort(key=lambda x: x[0])
         tk_g = "\n".join(x[1] for x in gc[-60:]) if gc else _t(f"- geçen {TAKVIM_GECMIS_GUN} günde takvimde etkinlik yok", f"- no events in the past {TAKVIM_GECMIS_GUN} days")
         gt = _t(f"Mac Takvim (geçen {TAKVIM_GECMIS_GUN} gün):\n", f"Mac Calendar (past {TAKVIM_GECMIS_GUN} days):\n") + tk_g + "\n" + gt
     if "ekran_baglam" in globals(): gt += ekran_baglam()  # v0.187.0: paylaşılan ekranda son görünen yazının kısa özeti (aktarici/ekran.py; yalnız süren toplantıda)

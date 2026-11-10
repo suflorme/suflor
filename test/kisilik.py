@@ -156,6 +156,7 @@ try:
     i0 = src.index("# --- Takvim haftası ve uygun zaman"); i1 = src.index("def _konus_kur(")
     ns.update(_zaman=lambda t: datetime.datetime.fromisoformat(str(t)).astimezone(), STATE={"takvim": {"durum": "ok"}}, TAKVIM_GEC={"olaylar": []}, SON=[], ben_adi=lambda: "Deniz T",
               TAKVIM_TAM={"e1": {"baslik": "Bütçe sunumu", "baslangic": (simdi + datetime.timedelta(days=1)).isoformat(), "bitis": (simdi + datetime.timedelta(days=1, hours=1)).isoformat()}})
+    km = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(); exec(km[km.index("# --- Tek okuyucular"):km.index("# --- Olaylar:")], ns)  # tek okuyucular
     kis0 = ns["kisilik"]; exec(src[i0:i1], ns); ns["_sonraki_toplanti"] = lambda s_: None; KB = ns["konus_baglam"]
     ns["kisilik"] = lambda ad=None: ns["_kisilik_oku"](kd, "toplanti")
     ok("konus_baglam: alanı olmayan kişilikte sohbette de takvim", "Bütçe sunumu" in KB(simdi, "", "Bana bir fıkra anlat."))

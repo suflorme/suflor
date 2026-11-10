@@ -118,12 +118,13 @@ def _dus_bos(simdi):  # bugünün boş aralıkları → [(başlangıç dk, biti�
     for d, ar in ls:
         if d == simdi.date(): out += [(b.hour * 60 + b.minute, e.hour * 60 + e.minute) for b, e in ar]
     return out
-def _dus_isler(simdi, y):  # → (kendi işler [kayıt], başkalarında bekleyenler [kayıt], teyit sayısı); yapi.bugun_veri gizli/deneme toplantıyı zaten dışlar, ayrıca denetlenir
-    try: v = y.bugun_veri(BASE, _dus_hesap_ad())
+def _dus_isler(simdi, y):  # → (kendi işler [kayıt], başkalarında bekleyenler [kayıt], teyit sayısı); okuma kisi-modeli.py bugun_isler (gizli/deneme toplantıyı zaten dışlar), ayrıca denetlenir
+    try: v = bugun_isler()
     except Exception as e: print(f"DÜŞÜNME: işler okunamadı ({e.__class__.__name__})"); return [], [], 0
-    kendi = [x for x in v.get("kendi") or [] if not x.get("geride") and _dus_gorunur(y, x.get("toplanti"))][:15]
-    bek = [x for x in v.get("baskalari") or [] if (x.get("gecikti") or (x.get("kalan_gun") is not None and x["kalan_gun"] <= 3)) and _dus_gorunur(y, x.get("toplanti"))][:8]
-    return kendi, bek, len(v.get("teyit") or [])
+    g = isler_grupla(v)
+    kendi = [x for x in g["kendi"] if _dus_gorunur(y, x.get("toplanti"))][:15]
+    bek = [x for x in g["baskalari"] if (x.get("gecikti") or (x.get("kalan_gun") is not None and x["kalan_gun"] <= 3)) and _dus_gorunur(y, x.get("toplanti"))][:8]
+    return kendi, bek, len(g["teyit"])
 def _dus_is_satir(x):
     g = x.get("kalan_gun"); d = ("gecikti " + str(-g) + " g") if x.get("gecikti") and g is not None else ("bugün" if g == 0 else (f"{g} g kaldı" if g is not None else "tarihsiz"))
     return f"{x.get('id')} | {_dus_kisa(x.get('metin'), 110)} | {d}" + (f" | {_dus_kisa(x.get('kim'), 30)}" if x.get("kim") else "") + (f" | {_dus_kisa(x.get('baslik'), 50)}" if x.get("baslik") else "")
@@ -136,9 +137,8 @@ def _dus_kararlar(simdi, y):  # son ~30 saatin toplantı kararları ve işleri (
         out.append((str(x.get("tarih") or ""), f"- {'karar' if x.get('tur') == 'karar' else 'iş'}: {_dus_kisa(x.get('metin'), 140)}" + (f" ({_dus_kisa(x.get('kim'), 30)})" if x.get("kim") and x.get("tur") == "is" else "") + (f" · {_dus_kisa(x.get('baslik'), 50)}" if x.get("baslik") else "")))
     out.sort(key=lambda r: r[0], reverse=True)
     return [s for _, s in out[:10]]
-def _dus_dun_devri(simdi):  # gun-devir.json: son ~30 saat (gizli/deneme toplantı devre yazılmaz)
-    d = _dus_oku_json("gun-devir.json") or {}; sin = float(simdi.timestamp()) - 30 * 3600
-    return [_dus_kisa(x.get("metin"), 700) for x in (d.get("devirler") or []) if isinstance(x, dict) and x.get("metin") and float(x.get("t") or 0) >= sin][-2:]
+def _dus_dun_devri(simdi):  # gun-devir.json: son ~30 saat (gizli/deneme toplantı devre yazılmaz); okuyucu kisi-modeli.py gun_devirleri
+    return [_dus_kisa(x.get("metin"), 700) for x in gun_devirleri(simdi.timestamp(), 30)][-2:]
 def _dus_tepkiler(simdi):  # son 24 saat: söz kapısının sunduğu önerilere tepkiler (soz.jsonl) + değerlendiricinin gerekçeleri (degerlendir.jsonl) → satırlar; metin yok
     sin = simdi.timestamp() - 86400; sozler = {}
     for r in _dus_jsonl("soz.jsonl"):

@@ -8,7 +8,7 @@
 #   aynı asistanla sürer. Cevabı kayda saklamak: panodaki «Kayda not olarak ekle» → POST /kayit-not (notlar.py kayit_not_ekle, yorum_ekle komutu).
 # Gizli toplantı kaydında ve gizli kipte çalışmaz. Dışarı hiçbir şey gönderilmez.
 EYLEM_ZAMAN_SN = 120
-def _kem_takvim(): return [e for e in TAKVIM_TAM.values() if isinstance(e, dict)]
+def _kem_takvim(): return takvim_ham()  # takvimin tüm olayları süzgeçsiz (eşleme yapi.py'de); tek okuyucu kisi-modeli.py
 def _kem_kimlik(ad, tam=True):  # kimlik.py: takvim, kayıt veritabanı, Kişiler (tam) → {"eposta", "kaynak", "guven", "adaylar"}; menü açılışında Kişiler'e gidilmez
     if "kimlik_coz" not in globals(): return {}
     return kimlik_coz(ad) if tam else kimlik_coz(ad, kisiler=False, yaz=False)
