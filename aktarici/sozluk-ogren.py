@@ -194,9 +194,9 @@ def so_gundelik_dogru(d, ctx):  # doğru biçim gündelik mi: bu kurulumun dök�
     w = ws[0]; s = sade(w)
     return "dokum" if ctx["kucuk"].get(s, 0) >= SO_GUNDELIK_TOPLANTI else "belge" if _so_dizin_ara(ctx.get("dizin"), w.replace("İ", "i").replace("I", "ı").lower(), kucuk=True) >= SO_GUNDELIK_BELGE else None
 SO_MUAF_BUYUK_EN_AZ = 2  # 3 Kasım: doğru biçim proje belgelerinde cümle ortasında büyük harfle ≥ 2 kez geçmeli ve küçük harfli geçişinden çok olmalı ("Marvin" 8/1; "Transkript" 1/18, "Evet" 175/5796, "Panoda" 5/54 muaf değil)
-def so_kisilik_adlari():  # kişilik dosyalarının (ayar kisilik, kisilik_toplanti_disi) ad / gorunen_ad / hitap girişleri → sade anahtarlar (aktarıcı ve toplanti-claude.py ad alanında aynı: kisilik.py'ye bağımlı değil)
+def so_kisilik_adlari():  # kişilik dosyalarının (ayar kisilik, kisilik_toplanti_disi, kisilik_dis) ad / gorunen_ad / hitap girişleri → sade anahtarlar (aktarıcı ve toplanti-claude.py ad alanında aynı: kisilik.py'ye bağımlı değil)
     out = set(); gundelik = globals().get("HITAP_GUNDELIK") or {"oh", "ah", "eh", "evet", "hayır", "tamam", "peki", "merhaba", "selam"}
-    for ayar in ("kisilik", "kisilik_toplanti_disi"):
+    for ayar in ("kisilik", "kisilik_toplanti_disi", "kisilik_dis"):  # 10 Kasım: üçüncü yuva (dış işler) de
         yol = os.path.expanduser(str(AYAR.get(ayar) or "").strip())
         if not yol: continue
         try: s = open(yol, encoding="utf-8").read()

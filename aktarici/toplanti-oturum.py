@@ -121,9 +121,20 @@ def topo_arac_onyukle(ks=None):
             ("; desenli kaynak araçları için ayrıca: " + " · ".join(ara) if ara else "") + ". Kart ya da cevap turunda ToolSearch yapma; cevabı tek turda yaz. "
             "Cevap turunda ekran görüntüsünü (PNG) Read ile açma, EKRAN özeti yeter. Dosya ararken salt okuyan komut kullan (find, grep, ls, cat, head; veritabanında "
             "sqlite3 -readonly): bunlar izinsiz çalışır; yönlendirme (>), silme ya da yazan seçenek izin sorar ve olaylar o sürede bekler.")
+# 10 Kasım (dış işler kişiliği, "A yolu" madde 4): dökümde yeni bir kurum dışı firma/kişi adı → Tazı'nın YEREL dosyasından kısa bilgi kartı. Komut `toplanti-claude.py tazi "<ad>"` salt okur (TOPO_TC_OKUMA),
+# ağ çağırmaz; aynı ad toplantıda bir kez (komut kendisi sayar), gizli toplantıda çalışmaz. Kart etiketi "<dış işler kişiliğinin adı> · Tazı dosyası" (yuva boşsa "Tazı"). Dosya yoksa komut web yoluna
+# (ayar web_arastirma; S208: yalnız ad ve konu) ya da "dosya yok"a yönlendirir. Tazı kurulu/ayarlı değilse kural isteme girmez.
+def topo_tazi_istem():
+    if not ("tazi_var" in globals() and tazi_var()) and not AYAR.get("tazi_liste"): return ""
+    dk = next((k for k in kisilikler() if k.get("rol") == "dis"), None) if "kisilikler" in globals() else None
+    et = ((kisilik_gorunen(dk) + " · Tazı dosyası") if dk else "Tazı")
+    return (" Tazı bilgi kartı: dökümde yeni bir KURUM DIŞI firma ya da kişi adı geçince (şirket içi kişi, kullanıcının kendi şirketi ya da toplantıda zaten ele alınmış ad değil) "
+            "`toplanti-claude.py tazi \"<ad>\"` çalıştır (izle'yi başlattığın aynı yol ve biçimle; salt okur, izinsiz, yalnız yerel Tazı dosyasından okur) ve komutun tarif ettiği kısa bilgi kartını yaz; "
+            f"kart etiketi «{et}» (komut «KART ETİKETİ» olarak da verir). Dosya yoksa komut ne yapacağını söyler (web araştırması açıksa yalnız ad ve konuyla kısa açık kaynak araması, değilse 'dosya yok'). "
+            "Aynı ad toplantıda bir kez (komut ikinci çağrıda 'zaten soruldu' der). Gizli toplantıda hiç çalıştırma. Karta yalnız dış kaynağın bildiğini yaz; kişiler hakkında yorum ya da puan yazma.")
 def topo_istem():
     ks = bilgi_kaynaklari(); web = (TOPO_WEB_ISTEM + TOPO_KISI_ISTEM.replace("1) Claude in Chrome", "1) Claude in Chrome" if topo_chrome_acik() else "1) (Chrome kapalı: atla) Claude in Chrome")) if topo_web_acik() else ""
-    web += topo_arac_onyukle(ks)
+    web += topo_arac_onyukle(ks) + topo_tazi_istem()
     if not ks: return TOPO_ISTEM + web
     return TOPO_ISTEM + web + " Toplantıda kullanabileceğin dış bilgi kaynakları (yalnız okuma; toplantı kurallarındaki 'Dış bilgi kaynağı' maddesine göre): " + "; ".join(
         f"«{k['ad']}» — konu: {k['konu'] or 'belirtilmedi'}; araçlar: mcp__{k['sunucu']}__ altında {', '.join(k['araclar']) or '(yok)'}" for k in ks) + \
@@ -305,7 +316,7 @@ def _topo_izle_mi(ad, gi):
 # (izin-kanca ayrıca PreToolUse'ta riskliyi sorar; o kanca bu karardan bağımsızdır).
 TOPO_OKU_ARAC = {"Read", "Grep", "Glob"}
 TOPO_TC_OKUMA = {"saglik", "takvim", "katilimcilar", "kapanis", "gundem", "durum", "ara", "hazirlik", "hazir", "graf", "vt-sema", "vt-sor", "proje", "proje-notu", "olcum", "izle",
-                 "dokum"}  # dokum: toplantı sonu temiz döküm kaydı (proje klasörüne yazar) — izne bağlı kalmaz
+                 "dokum", "tazi"}  # dokum: toplantı sonu temiz döküm kaydı (proje klasörüne yazar) — izne bağlı kalmaz
 TOPO_TC_RX = re.compile(r"^(?:PYTHONDONTWRITEBYTECODE=1\s+)?(?:/usr/bin/)?python3\s+(?:-[uBI]+\s+)*(\S+/toplanti-claude\.py)(?:\s+--dir\s+\S+)?(?:\s+--relay\s+http://127\.0\.0\.1:\d+)?\s+([a-z-]+)((?:\s+[^\s;&|`$()<>\\\"']+|\s+\"[^\"`$\\]*\"|\s+'[^']*')*)\s*$")
 def _topo_tc_okuma(ad, gi):
     c = str(gi.get("command") or "").strip(); m = TOPO_TC_RX.match(c) if ad == "Bash" and "\n" not in c and "\r" not in c else None

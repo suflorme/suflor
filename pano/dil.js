@@ -271,6 +271,8 @@ globalThis.SUFLOR_EN = {
   "Açık kalanlar": "Still open",
   "Güncel veri": "Current figures",
   "Geçmişte": "Previously",
+  "Dış taraf": "Outside parties",
+  "Tazı notu": "Tazı note",
   "Yeniden hazırla": "Prepare again",
   "{asistan} brifingi hazırlıyor… (1–2 dk)": "{asistan} is preparing the briefing… (1–2 min)",
   "{asistan} geçmiş görüşmelere, açık sorulara ve belgelere bakıp kısa bir brifing hazırlar.": "{asistan} looks at past meetings, open questions and documents and prepares a short briefing.",

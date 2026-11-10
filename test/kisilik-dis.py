@@ -47,11 +47,11 @@ ok("Whisper istemi/_hitap_adlari yalnız uzun biçimler", set(ns["_hitap_adlari"
 # --- hitap: yazılı/sesli kullanıcı satırı (hitap_duzelt → "Claude: ")
 def hd(t): ns["_KHR"].update(satir=None); c = ns["hitap_duzelt"](t)[0]; return c, ns["_KHR"].get("satir")
 GEC = [("Ro, bu firma kim?", "Claude: bu firma kim?"), ("Rox, bu firma kim?", "Claude: bu firma kim?"), ("Roks: bu firmanın alan adı kaç yaşında?", "Claude: bu firmanın alan adı kaç yaşında?"),
-       ("Raks bu firmayı biliyor musun?", "Claude: bu firmayı biliyor musun?"), ("Tamam, Ro, bir bak.", "Tamam, Claude: bir bak."), ("Roxane, bu firma kim?", "Claude: bu firma kim?"),
+       ("Raks, bu firmayı biliyor musun?", "Claude: bu firmayı biliyor musun?"), ("Rox bu firmayı biliyor musun?", "Claude: bu firmayı biliyor musun?"), ("Tamam, Ro, bir bak.", "Tamam, Claude: bir bak."), ("Roxane, bu firma kim?", "Claude: bu firma kim?"),
        ("Roksi bu firma kim?", "Claude: bu firma kim?"), ("Roxane gelsin.", "Claude: gelsin.")]
 for g, b in GEC:
     c, ad = hd(g); ok(f"seslenme tanındı: {g!r} → {ad}", c == b and ad == "ROXANE")
-GECMEZ = ["raks gösterisi", "Raks gösterisi çok güzeldi.", "rol dağılımı belli mi", "rota değişti.", "robot kolu geldi", "rapor hazır.", "Rostov'a gidiyoruz.", "Roxy gösterisi iyiydi.", "pro sürüm gerekli", "Ro gelsin.",
+GECMEZ = ["Raks etmek zor muydu?", "Raks bu firmayı biliyor musun?", "raks gösterisi", "Raks gösterisi çok güzeldi.", "rol dağılımı belli mi", "rota değişti.", "robot kolu geldi", "rapor hazır.", "Rostov'a gidiyoruz.", "Roxy gösterisi iyiydi.", "pro sürüm gerekli", "Ro gelsin.",
           "Rox gelsin.", "Ro. Bu firma kim", "Roksan'ın evi", "Ro... bu firma kim", "Rox kapıyı çaldı ve gitti.", "Roman okudum.", "Rok gibi sağlam."]
 for g in GECMEZ:
     c, ad = hd(g); ok(f"seslenme değil: {g!r}", c == g and ad is None)
@@ -89,7 +89,7 @@ ns["TOP"][0] = False
 # --- Konuş istemi
 ist = ns["konus_istem"]()
 ok("istem: üç kişilik, dış kişilik yalnız adıyla çağrılır, üç metin de var", "Aşağıda üç kişilik var" in ist and "Atlas toplantıda, Matlas toplantı dışında varsayılandır" in ist and "ROXANE dış işler asistanıdır" in ist
-   and "yalnız kullanıcı adıyla seslenince" in ist and all(x in ist for x in ("BİRİNCİ-İŞARET", "İKİNCİ-İŞARET", "ÜÇÜNCÜ-İŞARET")))
+   and "adıyla seslenince" in ist and "İKİ SESLİ TUR" in ist and all(x in ist for x in ("BİRİNCİ-İŞARET", "İKİNCİ-İŞARET", "ÜÇÜNCÜ-İŞARET")))
 ok("istem: dış kişiliğin söyleniş listesi (Roksi, Roxy, Rox, Ro …) adının yanlış duyulması sayılır", "ROXANE: Roksi, Roxy, Rox, Roks, Raks, Ro" in ist)
 ns["AYAR"]["kisilik_dis"] = ""; i2 = ns["konus_istem"]()
 ok("dış yuva boşken iki kişilik istemi eskisi gibi", "Aşağıda iki kişilik var: Atlas toplantıda, Matlas toplantı dışında varsayılandır; kullanıcı adıyla seslenerek öbürünü çağırabilir. Her mesajın başında" in i2 and "ÜÇÜNCÜ" not in i2)

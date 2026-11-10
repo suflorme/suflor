@@ -288,7 +288,7 @@ try:
     import re as _re
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
     import threading as _th0
-    ad_ = {"re": _re, "time": time, "threading": _th0, "print": lambda *a, **k: None, "konusma_dili": lambda m: m, "SES": {"kes": 0}, "kisilik_sesi": lambda *a, **k: ("pocket", None, 1.0), "ARAYUZ_DILI": "tr", "_t": lambda a, b: a}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False, cal=None, ozet=False: okunan_.append(m) or True
+    ad_ = {"re": _re, "time": time, "threading": _th0, "print": lambda *a, **k: None, "konusma_dili": lambda m: m, "SES": {"kes": 0}, "kisilik_sesi": lambda *a, **k: ("pocket", None, 1.0), "ARAYUZ_DILI": "tr", "_t": lambda a, b: a}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False, cal=None, ozet=False, k=None: okunan_.append(m) or True
     exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)
     exec(kod_[kod_.index("LISTE_OKU = 3"):kod_.index("def konus_devam_kaydet(")], ad_)  # liste okuma yardımcıları (md_temizle, _liste_fazla_c)
     def okut(metin, **ek):  # → (tur, okunanlar); cevap bitince kapanış da çağrılır (result dalı gibi)

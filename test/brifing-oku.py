@@ -18,7 +18,7 @@ def pocket_baslat(ses=None, bekle=True):
     if POCKET["durum"] != "hazir": POCKET["durum"] = "yukleniyor"
     return False
 ns = {"re": re, "time": time, "threading": threading, "os": os, "POCKET": POCKET, "SES": {"kes": 0}, "pocket_baslat": pocket_baslat, "AYAR": {"konusma": True, "brifing_sesli": True}, "STATE": {}, "toplanti_var": lambda: False,
-      "_t": lambda tr, en: tr if DIL["d"] == "tr" else en, "BRIFING": {}, "pocket_var": lambda: True, "kisilik_sesi": lambda *a, **y: ("pocket", "wite:female_2", 1.0),
+      "_t": lambda tr, en: tr if DIL["d"] == "tr" else en, "BRIFING": {}, "pocket_var": lambda: True, "kisilik_sesi": lambda *a, **y: ("pocket", "wite:female_2", 1.0), "dis_kisilik": lambda: None,  # 10 Kasım: dış işler yuvası boş → "Dış taraf" bölümü varsayılan asistanın okumasında (brifing_sesli)
       "seslendir": lambda m, **y: (OKUNAN.append((m, POCKET["durum"])) or True)}
 exec(compile(k[k.index("def brifing_konusma("):k.index("def brifing_baslatta(")], "brifing-ses.py", "exec"), ns)
 kon = ns["brifing_konusma"]

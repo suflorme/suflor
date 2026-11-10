@@ -168,6 +168,7 @@ Satırlar paketle gelir: kart adayı (soru, sistem adı) varsa hemen; yalnız ra
   yalnız hâlâ geçerli olanlar, en çok 3 madde; yapılacak varsa `soyle`, yoksa `not`). Bekleyen kartları bu kart kapatır; gelmezse
   90 sn sonra tek tek görünürler. Bekleyen yoksa ve söylenecek bir şey kalmadıysa kart yok.
 - `ONAY kN: ✓ ONAYLANDI` / `✕ REDDEDİLDİ`: onay kartının dönüşü; ne yapılacağı §7.
+- **Tazı bilgi kartı.** Tazı kuruluysa: dökümde yeni bir kurum dışı firma ya da kişi adı geçince (şirket içi kişi, kendi şirketin ya da zaten ele alınmış ad değil) `toplanti-claude.py tazi "<ad>"` çalıştır (salt okur, ağ yok). Çıktıdaki özetten kısa bir bilgi kartı yaz; etiket komutun verdiği «KART ETİKETİ» (dış işler kişiliği varsa «<ad> · Tazı dosyası», yoksa «Tazı»); kaynağı ve son tarama tarihini an. Dosya yoksa komut yönlendirir (web araştırması açıksa yalnız ad ve konuyla kısa açık kaynak araması, değilse «dosya yok»). Aynı ad toplantıda bir kez; gizli toplantıda hiç.
 
 ## 5. Döküm, ses ve dil (`DURUM` satırı)
 - Satırlar yerel Whisper'dan gelir (kanal `ben` = kullanıcı, `karsi` = karşı taraf). Karşı tarafta konuşmacı ses izi kümesidir;

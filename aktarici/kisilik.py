@@ -99,6 +99,9 @@ def hitap_ayir(k):  # → (uzun hitaplar, kısa takma adlar)
     uz, ks_ = [], []
     for a in k.get("hitap") or []: (ks_ if hitap_kisa(k, a) else uz).append(a)
     return uz, ks_
+# 10 Kasım (kullanıcı): kısa takma adın kendisi Türkçede sözcükse ("Raks etmek zor muydu?") soru biçimi seslenme saymaya yetmez; yalnız virgül/iki nokta ("Raks, bu firma kim?").
+KISA_TR_SOZCUK = {"raks", "rol", "rok", "rot", "ray", "rap", "rey", "rez", "rant"}
+def hitap_kisa_siki(a): return str(a or "").strip().lower() in KISA_TR_SOZCUK
 def kisilik_varsayilan(ks=None):  # toplantıda toplantı kişiliği, değilse toplantı dışı kişilik (yoksa öteki)
     ks = kisilikler() if ks is None else ks
     if not ks: return None
@@ -134,12 +137,12 @@ def kisilik_hitap_bul(metin):  # cümle başında bir kişiliğin adı → (kiş
     def alt(l): return "|".join(re.escape(a) for a in sorted(l, key=len, reverse=True))
     for k in sorted(ks, key=lambda k: -max(len(a) for a in k["hitap"])):
         uz, kisa = hitap_ayir(k)
-        for liste, son in ((uz, r"(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w)"), (kisa, KISILIK_KISA_SON)):  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil
+        for liste, son in ((uz, r"(?:'\w+)?\s*[,:.!]\s*|\s+(?!" + KISILIK_SOZ_ETME + r")(?=\w)"), ([x for x in kisa if not hitap_kisa_siki(x)], KISILIK_KISA_SON), ([x for x in kisa if hitap_kisa_siki(x)], r"(?:'\w+)?\s*[,:]\s*")):  # 19 Ekim: ad + söz etme ("ile ilgili") seslenme değil; 10 Kasım: Türkçe sözcük olan kısa ad yalnız virgül/iki nokta
             if not liste: continue
             m = re.match(r"\W*(" + KISILIK_GIRIS + r"\W+)?(?:" + alt(liste) + r")(?:" + son + r")", metin, re.I)
             if m and metin[m.end():].strip(): return k, metin[m.end():].strip()
             if m and m.group(1) and re.match(KISILIK_SELAM + r"\W*$", m.group(1), re.I): return k, metin.strip()  # yalnız selam ("Günaydın <ad>."): selamın kendisi soru
-            if re.match(r"\W*(?:" + alt(liste) + r")\s*" + (r"[?!.]*" if liste is uz else r"[?!]+") + r"\s*$", metin, re.I): return k, metin.strip()  # 23 Ekim: tek başına ad ("<Ad>?") o kişiliği çağırır
+            if re.match(r"\W*(?:" + alt(liste) + r")\s*" + (r"[?!.]*" if liste is uz else r"[?!]+" if son is KISILIK_KISA_SON else r"[,:]") + r"\s*$", metin, re.I): return k, metin.strip()  # 23 Ekim: tek başına ad ("<Ad>?") o kişiliği çağırır
     return None, metin
 # --- S94: toplantıda asistanlar — katılma durumu (toplantı başına) ---------------------------------------------------------------------
 _KATIL = {"toplanti": None, "adlar": []}

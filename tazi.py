@@ -1841,6 +1841,53 @@ def ozet_metni(sorgu, dizin=None, liste=None):
     return "\n".join(L[:8])
 
 
+def metinden_kayitlar(metin, liste=None, dizin=None, en_cok=3):
+    """Serbest metinde (soru, özet) adı, kişisi ya da alan adı geçen izleme kayıtları, geçiş sırasıyla. Yalnız yerel liste; ağ yok.
+    Kısa (< 4 karakter) ad ve tek sözcüklü kısa kişi adı eşleşme sayılmaz; alan adı ve firma adı tam sözcük olarak aranır."""
+    q = tr_kucuk(metin)
+    if not q.strip():
+        return []
+    try:
+        liste = liste if liste is not None else liste_oku(None, dizin)
+    except Exception:
+        return []
+
+    def yer(s):
+        s = tr_kucuk(s).strip()
+        if len(s) < 4:
+            return None
+        m = re.search(r"(?<![\w.-])" + re.escape(s) + r"(?![\w-])", q)
+        return m.start() if m else None
+    out = []
+    for k in liste:
+        adlar = [k["ad"], kisa_ad(k["ad"])] + [p for p in k["kisiler"] if " " in p.strip() or len(p.strip()) >= 6] + list(k["alanlar"])
+        ys = [y for y in (yer(a_) for a_ in adlar) if y is not None]
+        if ys:
+            out.append((min(ys), k))
+    return [k for _, k in sorted(out, key=lambda x: x[0])][:en_cok]
+
+
+def ozet_satiri(sorgu, dizin=None, liste=None):
+    """Brifing ve kısa kartlar için tek satır (en çok ~260 karakter): ad, kimlik hükmü, ilk yeni gelişme, açık bayrak, son tarama. Eşleşme yoksa None."""
+    m = ozet_metni(sorgu, dizin=dizin, liste=liste)
+    if not m:
+        return None
+    L = m.splitlines()
+    bas = re.match(r"Tazı · (.*?) — son tarama (.*)$", L[0])
+    ad, st = (bas.group(1), bas.group(2)) if bas else (L[0], "?")
+    p = [ad]
+    for l in L[1:]:
+        if l.startswith("Kimlik: "):
+            p.append(l[8:100])
+        elif l.startswith("- ["):
+            p.append("yeni: " + re.sub(r"^- \[[A-D]\]\s*", "", l)[:90])
+            break
+    bay = next((l for l in L if l.startswith("Açık bayrak: ")), None)
+    if bay:
+        p.append(bay[:110])
+    return (" · ".join(p) + f" (son tarama {st})")[:300]
+
+
 def ozet_cmd(a):
     m = ozet_metni(a.kim, liste=liste_oku(a.liste))
     if m is None:

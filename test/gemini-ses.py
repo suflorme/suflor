@@ -248,13 +248,13 @@ bak("bekleme (düşünme) klibi Gemini'de çalmaz → çağıran cümleyi okur",
 # bitirirse ilk okuma bitince biriken okunur; okuma kesildiyse biriken okunmaz; uzun cevap iki parça; Pocket'te cümle cümle; okuma sınırı (5 cümle) aynen
 import ast as _ast
 bk_ = _ast.parse(open(os.path.join(K, "aktarici", "bas-konus.py"), encoding="utf-8").read())
-fk_ = [f for f in bk_.body if (isinstance(f, _ast.FunctionDef) and f.name in ("_konus_cumle", "_konus_g_biriktir", "_konus_g_bosalt", "_konus_g_bekci", "md_temizle", "_liste_fazla_c"))
-       or (isinstance(f, _ast.Assign) and any(getattr(t, "id", "") in ("KONUS_OKU_EN_COK", "_KG_K", "LISTE_OKU", "LISTE_SIRA", "_LISTE_RX") for t in f.targets))]
+fk_ = [f for f in bk_.body if (isinstance(f, _ast.FunctionDef) and f.name in ("_konus_cumle", "_konus_cumle_ic", "_konus_g_biriktir", "_konus_g_bosalt", "_konus_g_bekci", "md_temizle", "_liste_fazla_c"))
+       or (isinstance(f, _ast.Assign) and any(getattr(t, "id", "") in ("KONUS_OKU_EN_COK", "KONUS_OKU_EN_COK_KR", "_KG_K", "LISTE_OKU", "LISTE_SIRA", "_LISTE_RX") for t in f.targets))]
 def karisik(motor, cumleler, son_bekle=0.0, kes_ara=False, calan=lambda: False):
     OKU = []; SES_ = {"kes": 0}
     kn = {"re": __import__("re"), "time": time, "threading": threading, "print": lambda *a, **k: None, "SES": SES_, "GEMINI_BIRLESIK_EN_COK": 600, "ARAYUZ_DILI": "tr", "_t": lambda a, b: a,
           "kisilik_sesi": lambda m=None, toplantiya=False: (motor, None, 1.0), "konusma_dili": lambda c: c, "sesli_terim_suz": lambda c: c,
-          "seslendir": lambda c, kuyruk=False, cal=None, ozet=False: (OKU.append(c), True)[1], "ses_caliyor": calan}
+          "seslendir": lambda c, kuyruk=False, cal=None, ozet=False, k=None: (OKU.append(c), True)[1], "ses_caliyor": calan}
     exec(compile(_ast.Module(fk_, []), "bas-konus.py", "exec"), kn)
     tur = {"tampon": "", "sesli": True}
     for i_, c_ in enumerate(cumleler):

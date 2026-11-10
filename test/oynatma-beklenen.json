@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 673360,
-   "sha": "dac9a194c09a4d2f"
+   "uzunluk": 674930,
+   "sha": "eaad7e6a40bcd0c2"
   },
   "/mini": {
-   "uzunluk": 673360,
-   "sha": "dac9a194c09a4d2f"
+   "uzunluk": 674930,
+   "sha": "eaad7e6a40bcd0c2"
   },
   "/status": {
    "_ping_son": "float",
@@ -666,6 +666,7 @@
      "ad": "str",
      "saat": "str"
     },
+    "dis_ad": "NoneType",
     "durum": "str",
     "hata": "NoneType",
     "kisilik": "NoneType",

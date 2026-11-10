@@ -77,10 +77,10 @@ def _kisilik_hitap_rx(rol=None):  # rol "toplanti": yalnız toplantı kişiliği
     ks = [k for k in kisilikler() if not rol or k["rol"] == rol]; adlar = tuple(a for k in ks for a in k["hitap"])
     if _KHR["k"].get(rol) != adlar:
         _KHR["k"][rol] = adlar
-        uz = [a for k in ks for a in hitap_ayir(k)[0]]; kisa = [a for k in ks for a in hitap_ayir(k)[1]]
+        uz = [a for k in ks for a in hitap_ayir(k)[0]]; kisa = [a for k in ks for a in hitap_ayir(k)[1]]; siki = [a for a in kisa if hitap_kisa_siki(a)]; kisa = [a for a in kisa if a not in siki]  # siki: Türkçe sözcük olan kısa ad ("Raks") yalnız virgül/iki nokta
         alt = lambda l: "|".join(re.escape(a) for a in sorted(l, key=len, reverse=True))
         # 10 Kasım: kısa takma ad ("Ro", "Rox") yalnız cümle başında ve ardından virgül/iki nokta/ünlem ya da cümlede soru varsa (lookahead); "raks gösterisi", "rol", "Rostov" seslenme değil
-        ad_rx = (("(?:" + alt(kisa) + r")(?=\s*[,:!]|\s+(?!" + KISILIK_SOZ_ETME + r")[^.!?…]*\?)" + ("|" if uz else "")) if kisa else "") + (("(?:" + alt(uz) + ")") if uz else "")
+        ad_rx = (("(?:" + alt(kisa) + r")(?=\s*[,:!]|\s+(?!" + KISILIK_SOZ_ETME + r")[^.!?…]*\?)" + ("|" if (uz or siki) else "")) if kisa else "") + (("(?:" + alt(siki) + r")(?=\s*[,:])" + ("|" if uz else "")) if siki else "") + (("(?:" + alt(uz) + ")") if uz else "")
         _KHR["rx"][rol] = re.compile(r"((?:^|[.!?…]\s+|(?:\.{3}|…)\s*)(?:" + KISILIK_GIRIS + r"[,.!]?\s+)?)(" + ad_rx + r")(?:\s*[,:]\s*|\.\s+(?=[A-ZÇĞİÖŞÜ])|\s+(?!" + KISILIK_SOZ_ETME + r")(?=[^.!?…]*(?:\?|" + KISILIK_ISTEK + r"))"
                                      # v0.113.1 (22 Ekim test toplantısı: "Tamam... Orney... eee... Bugün projede... açık kalan iş kaldı mı?" ~1 dk cevapsız): addan sonra
                                      # duraksama (üç nokta) ve satırın kalanında soru ya da istek varsa da seslenme
@@ -149,6 +149,7 @@ def hitap_yalniz_ad(metin):  # satır yalnız asistanın adı mı ("Sera," / "Se
     if m: return m.group(1)
     kisa = _hitap_kisa_adlari()  # kısa takma ad tek başına satırda yalnız virgül/iki nokta/ünlem/soru ile ("Ro,")
     m = re.fullmatch(r"\W*(" + "|".join(re.escape(a) for a in sorted(kisa, key=len, reverse=True)) + r")\s*[,:?!]+\s*", metin or "", re.I) if kisa else None
+    if m and hitap_kisa_siki(m.group(1)) and not re.search(r"[,:]", (metin or "")[m.end(1):]): m = None  # Türkçe sözcük olan kısa ad: "Raks?" değil, "Raks," ya da "Raks:"
     return m.group(1) if m else None
 def hitap_aski(metin, t0=None, t1=None):  # → askıdaki hitap + bu satır (birleşik, tamamlandı) ya da None; bu satır askıya alınır ya da askıdakine eklenirse None
     a = HITAP_ASKI; t0 = time.time() if t0 is None else t0; t1 = time.time() if t1 is None else t1
