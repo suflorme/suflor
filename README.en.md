@@ -37,7 +37,23 @@ your meetings. You focus on the conversation. It listens, remembers your project
 This is the heart of Suflor.me: as the conversation moves, it **finds the information that fits the topic and puts it on a card with its source.** When someone
 asks for a number, a date or an earlier decision, the answer reaches you without interrupting the meeting; when a figure said aloud doesn't match the record, it warns you.
 
-<p align="center"><img src="gorsel/en/canli-veri.png" alt="In the meeting Ayla says conversion reached 12 percent; cards: Answer (source: product metrics, 8 percent this week), Note (conflict alert), Say (backup plan question)" width="100%"></p>
+<p align="center"><img src="gorsel/en/toplanti-1-dokum.png" alt="In the meeting Ayla says conversion reached 12 percent; the line appears in the live transcript on the panel" width="100%"></p>
+<p align="center"><sub><b>1. Someone speaks.</b> Every sentence flows into the live transcript on the panel, with who said it.</sub></p>
+
+<p align="center"><img src="gorsel/en/toplanti-2-cevap.png" alt="Answer card: sign-up conversion is 8 percent this week, 6 percent last week; source product metrics" width="100%"></p>
+<p align="center"><sub><b>2. A sourced answer in seconds.</b> When a question is asked, an Answer card arrives with the figure, the period and the source (past meeting, project document or live data).</sub></p>
+
+<p align="center"><img src="gorsel/en/toplanti-3-celiski.png" alt="Note card: 12 percent was said in the meeting, the source shows 8 percent over the last 7 days; conflict alert" width="100%"></p>
+<p align="center"><sub><b>3. A Note if something conflicts.</b> If a figure said in the meeting disagrees with the record, a Note card shows both side by side.</sub></p>
+
+<p align="center"><img src="gorsel/en/toplanti-4-soyle.png" alt="Say card (backup-plan question) and What do I say card (one-sentence line about the date)" width="100%"></p>
+<p align="center"><sub><b>4. Say and What do I say?</b> When you are stuck or there is something worth asking, a one-sentence suggestion card fits the moment.</sub></p>
+
+<p align="center"><img src="gorsel/en/toplanti-5-asistan.png" alt="Right panel with questions to Defne and Roxie and their answers; cards in the middle" width="100%"></p>
+<p align="center"><sub><b>5. Ask the assistant by name.</b> Say "Defne, ..."; the answer appears in writing next to the cards and is read aloud in the meeting; ask Roxie about an outside company.</sub></p>
+
+<p align="center"><img src="gorsel/en/toplanti-6-serit.png" alt="Suflor.me strip in the corner of the meeting window: Answer, Say and What do I say cards" width="100%"></p>
+<p align="center"><sub><b>6. The strip on the meeting window.</b> Even with the panel closed, the cards sit in the corner of the meeting screen; tap to dismiss.</sub></p>
 
 - **Answers with a source:** when you ask *"What was that number last week?"* the card gives the figure, the period and the source. A source can be past meetings,
   project documents (indexed on this Mac) or a live data source you have turned on.
@@ -73,7 +89,7 @@ Once you've called it, the other participants can ask it questions too. You can 
 You can have two assistants. One looks after your tasks and project (inside); the other briefs you on outside companies and people in the meeting (outside; default name Roxie).
 Each answers to its own name and speaks in its own voice.
 
-<p align="center"><img src="gorsel/en/asistanlar.png" alt="Ayla asks Defne for last week's date and Defne answers; Kerem from the other company asks Roxie about a firm and Roxie gives a single-source fact marked unverified; a repeated question gets one answer" width="100%"></p>
+<p align="center"><img src="gorsel/en/asistanlar.png" alt="Right panel with Ayla's question to Defne and Kerem's question from the other company to Roxie, with their answers: Defne gives last week's date, Roxie marks the single-source fact as unverified; meeting cards in the middle" width="100%"></p>
 
 - **The other side can ask too:** once you have called the assistant, everyone in the meeting can ask it by name.
 - **One answer per question:** if the same question comes in again right away, it isn't answered twice.
@@ -114,7 +130,7 @@ on the panel. Three small buttons next to each card: done, later, not needed.
 When the meeting ends, the assistant doesn't make you read out every decision and task; it opens a **closing round**: you go through each task with *Done*, *Postpone* or *Later*, and each decision with *Approve*.
 What you handled collects in the **Decisions and tasks** panel: tasks with an owner and a date, decisions still open, and tasks assigned to you, all in one place.
 
-<p align="center"><img src="gorsel/en/kapanis.png" alt="Closing round: task and decision rows with Done, Postpone, Approve buttons; beside it the Decisions and tasks panel and a task suggested from documents" width="100%"></p>
+<p align="center"><img src="gorsel/en/kapanis.png" alt="Closing round: open tasks (overdue, tomorrow, in 2 days) and a decision awaiting approval; Done, Postpone, Cancel, Later and Approve, Decline buttons" width="100%"></p>
 
 - **Tasks suggested from documents:** if documents added to your project contain work for you or your team, it shows up in the panel as a suggestion; approve it and it becomes a task, reject it and it is forgotten.
 - **Open ends after a meeting:** a while after the meeting, if a task is still open or a question unanswered, the assistant gives a short reminder. It never runs in a private meeting.
@@ -126,7 +142,7 @@ In the morning the panel shows what is yours for the day at a glance: the day's 
 Every row has a one-click action beside it: *Approve*, *Done*, *Prepare the draft*. Overnight the assistant also looks through your records and writes down what it learned;
 under *What I learned yesterday* you say **Right** or **Wrong**, and that is used next time.
 
-<p align="center"><img src="gorsel/en/gun.png" alt="Today at a glance: the day's focus, items awaiting your decision (New, Changed), Prepare the draft, Approve, Done buttons; a What I learned yesterday row with Right and Wrong" width="100%"></p>
+<p align="center"><img src="gorsel/en/gun.png" alt="Today at a glance: today's focus, decisions needing attention (New, Changed), Prepare the draft and Approve buttons; What I learned yesterday with Right and Wrong" width="100%"></p>
 
 ## Call your assistant by name
 

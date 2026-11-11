@@ -37,7 +37,23 @@ odaklanırsın. O dinler, projenin geçmişini hatırlar ve gerektiğinde tek bi
 Suflor.me'nin merkezinde bu var: konuşma akarken konuya uyan bilgiyi **kendisi bulur ve kaynağıyla bir karta koyar.** Biri bir sayı, tarih ya da
 önceki bir karar sorduğunda cevabı toplantıyı bölmeden kulağına gelir; konuşulan bir rakam kayıttakiyle tutmuyorsa uyarır.
 
-<p align="center"><img src="gorsel/canli-veri.png" alt="Toplantıda Ayla dönüşümün yüzde 12'ye çıktığını söylüyor; kartlar: Cevap (kaynak: ürün metrikleri, bu hafta yüzde 8), Not (çelişki uyarısı), Söyle (yedek plan sorusu)" width="100%"></p>
+<p align="center"><img src="gorsel/toplanti-1-dokum.png" alt="Toplantıda Ayla dönüşümün yüzde 12'ye çıktığını söylüyor; söz panoda canlı döküm satırı olarak görünüyor" width="100%"></p>
+<p align="center"><sub><b>1. Biri konuşur.</b> Söylenen her cümle, kimin dediğiyle birlikte panoda canlı döküm olarak akar.</sub></p>
+
+<p align="center"><img src="gorsel/toplanti-2-cevap.png" alt="Cevap kartı: kayıt sayfası dönüşümü bu hafta yüzde 8, geçen hafta yüzde 6; kaynak ürün metrikleri" width="100%"></p>
+<p align="center"><sub><b>2. Birkaç saniyede kaynaklı cevap.</b> Soru sorulunca cevap; rakam, dönem ve kaynak adıyla (geçmiş toplantı, proje belgesi ya da canlı veri) bir Cevap kartı olarak gelir.</sub></p>
+
+<p align="center"><img src="gorsel/toplanti-3-celiski.png" alt="Not kartı: toplantıda yüzde 12 dendi, kaynakta son 7 günde yüzde 8; çelişki uyarısı" width="100%"></p>
+<p align="center"><sub><b>3. Çelişki varsa Not düşer.</b> Toplantıda söylenen rakam kayıtla tutmuyorsa ikisi yan yana bir Not kartında görünür.</sub></p>
+
+<p align="center"><img src="gorsel/toplanti-4-soyle.png" alt="Söyle kartı (yedek plan sorusu) ve Ne diyeyim kartı (tarih için tek cümlelik replik)" width="100%"></p>
+<p align="center"><sub><b>4. Söyle ve Ne diyeyim?</b> Takıldığında ya da sorulması gereken bir şey varsa o ana uygun tek cümlelik öneri kartı gelir.</sub></p>
+
+<p align="center"><img src="gorsel/toplanti-5-asistan.png" alt="Sağ panelde Defne ve Roxie'ye sorulan sorular ve cevapları; ortada kartlar" width="100%"></p>
+<p align="center"><sub><b>5. Asistana adıyla sor.</b> "Defne, …" dersin, cevap kartların yanında yazılı görünür ve toplantıda sesli okunur; dış firma için Roxie'ye sorarsın.</sub></p>
+
+<p align="center"><img src="gorsel/toplanti-6-serit.png" alt="Toplantı penceresinin köşesinde Suflor.me şeridi: Cevap, Söyle ve Ne diyeyim kartları" width="100%"></p>
+<p align="center"><sub><b>6. Toplantı penceresinde şerit.</b> Panoyu açmasan da kartlar toplantı ekranının köşesinde durur; dokunup kapatırsın.</sub></p>
 
 - **Kaynaklı cevap:** *"Geçen hafta bu rakam neydi?"* sorusuna kartta rakam, dönem ve kaynak adıyla cevap gelir. Kaynak; geçmiş toplantılar, proje belgeleri
   (bu Mac'te dizinlenir) ya da senin açtığın bir canlı veri kaynağı olabilir.
@@ -72,7 +88,7 @@ Bir kez çağırdıktan sonra öbür katılımcılar da ona soru sorabilir. İst
 İstersen iki asistanın olur. Biri senin işlerine ve projene bakar (içeride), ötekisi toplantıdaki dış firma ve kişiler hakkında bilgi verir (dışarıda; varsayılan adı Roxie).
 Her biri kendi adıyla çağrılır, kendi sesiyle konuşur.
 
-<p align="center"><img src="gorsel/asistanlar.png" alt="Ayla Defne'ye geçen haftanın tarihini soruyor, Defne cevaplıyor; karşı firmadan Kerem Roxie'ye bir firmayı soruyor, Roxie tek kaynaklı bilgiyi doğrulanmadı diye veriyor; aynı soru tekrar gelince tek cevap verilir" width="100%"></p>
+<p align="center"><img src="gorsel/asistanlar.png" alt="Sağ panelde Ayla'nın Defne'ye ve karşı firmadan Kerem'in Roxie'ye sorduğu sorular ve cevapları: Defne geçen haftanın tarihini veriyor, Roxie tek kaynaklı bilgiyi doğrulanmadı diye veriyor; ortada toplantı kartları" width="100%"></p>
 
 - **Karşı taraf da sorabilir:** sen asistanı bir kez çağırdıktan sonra toplantıdaki herkes ona adıyla soru sorabilir.
 - **Aynı soruya tek cevap:** aynı soru art arda geldiğinde ikinci kez cevaplanmaz.
@@ -112,7 +128,7 @@ Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 Toplantı bitince asistan kararları ve işleri sana tek tek okutmaz, bir **kapanış turu** açar: her işi *Bitti*, *Ertele*, *Sonra* ile, her kararı *Onayla* ile geçersin.
 Yaptıkların **Kararlar ve işler** panosunda toplanır; sahibi ve tarihi belli işler, açık kalan kararlar, sana atanan işler tek yerde durur.
 
-<p align="center"><img src="gorsel/kapanis.png" alt="Kapanış turu: iş ve karar satırları, Bitti, Ertele, Onayla düğmeleri; yanda Kararlar ve işler panosu ve belgelerden önerilen bir iş" width="100%"></p>
+<p align="center"><img src="gorsel/kapanis.png" alt="Kapanış turu: açık işler (gecikmiş, yarın, 2 gün sonra) ve teyit bekleyen karar; Bitti, Ertele, İptal, Sonra ve Onayla, Reddet düğmeleri" width="100%"></p>
 
 - **Belgelerden önerilen işler:** projene eklenen belgelerde sana ya da ekibine düşen işler bulunursa panoda öneri olarak çıkar; onaylarsan işe dönüşür, reddedersen unutulur.
 - **Toplantıdan açık uçlar:** toplantı bittikten bir süre sonra, kapanmamış bir iş ya da cevapsız bir soru kalmışsa asistan kısaca hatırlatır. Gizli toplantıda hiç çalışmaz.
@@ -124,7 +140,7 @@ Sabahları pano, o gün sana düşeni tek bakışta gösterir: günün odağı, 
 Her satırın yanında tek tıkla yapılacak iş vardır: *Onayla*, *Yapıldı*, *Taslağını hazırla*. Asistan gece boyunca kayıtlarına bakıp neyi öğrendiğini de yazar;
 *Dün öğrendiklerim* altında **Doğru** ya da **Yanlış** diyerek düzeltirsin, o da bir sonraki sefere kullanılır.
 
-<p align="center"><img src="gorsel/gun.png" alt="Günün özeti: günün odağı, karar bekleyenler (Yeni, Değişti), Taslağını hazırla, Onayla, Yapıldı düğmeleri; Dün öğrendiklerim satırında Doğru ve Yanlış" width="100%"></p>
+<p align="center"><img src="gorsel/gun.png" alt="Günün özeti: bugünün odağı, dikkat bekleyen kararlar (Yeni, Değişti), Taslağını hazırla ve Onayla düğmeleri; Dün öğrendiklerim satırında Doğru ve Yanlış" width="100%"></p>
 
 ## Asistanına adıyla seslen
 
