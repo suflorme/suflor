@@ -296,6 +296,7 @@ globalThis.SUFLOR_EN = {
   "Pano, menü paneli ve Mac pencereleri. Sistem: Mac’in açık ya da koyu görünümüne uyar.": "Panel, menu bar panel and Mac windows. System follows the Mac’s light or dark appearance.",
   "Sistem": "System",
   "Açık": "Light",
+  "Açık (iş sekmesi)": "Open",
   "Koyu": "Dark",
   "English": "English",
   "Toplantıda asistan": "Assistant in meetings",

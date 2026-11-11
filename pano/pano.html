@@ -558,7 +558,7 @@ const DIL="__DIL__"
 const EN=globalThis.SUFLOR_EN || {}
 // S133: kullanıcıya görünen tek muhatap asistan — {asistan} = toplantı kişiliğinin adı (/status asistan; kişiliksiz "Suflor")
 let AS="Suflor",ASM={};const AG=a=>ASM[a]||a;const asGor=k=>(k&&(k.kisilik_gorunen||AG(k.kisilik)))||AS
-function L(s,v){let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k+"}").join(v[k]);return t.split("{asistan}").join(AS)}
+function L(s,v){let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k+"}").join(v[k]);if(DIL==="en"&&v)t=t.replace(/\b1 (day|week|hour|minute|item|card|task|record|meeting)s\b/g,"1 $1");return t.split("{asistan}").join(AS)}  // İngilizce tekil: "1 days" → "1 day"
 // durağan HTML'deki {asistan}: özgün metin saklanır, ad değişince yeniden yazılır
 // kutu ipucu: toplantıda (ve mini panoda) genel "Asistanla konuş" — toplantıda ve dışında asistan farklı; panoda toplantı yokken (Bugün) toplantı dışı kişiliğin adıyla "Marvin'e sor"
 function yonelme(a){a=String(a||'').trim();const t=a.toLowerCase(),v=(t.match(/[aeıioöuü](?=[^aeıioöuü]*$)/)||['e'])[0];return a+"'"+(/[aeıioöuü]$/.test(t)?'y':'')+('aıou'.includes(v)?'a':'e')}
@@ -2311,7 +2311,7 @@ function knListe(liste,sk){if(!liste.length)return''
 function knCiz(){const v=knV,ks=v?v.kayitlar.filter(x=>!bnGizli.has(x.id)):[],sk=knSek()
   const dis=v?(v.dis||[]).flatMap(d=>d.ok?d.kayitlar.map(x=>({tur:x.tur,metin:x.metin,kim:x.sahip||'',baslik:x.toplanti||'',toplanti:'',vade:x.vade||'',durum:'acik',gecikti:false,tarihsiz:!x.vade,dis:true,kaynak:d.ad,id:''})):[]):[]
   const hepsi=[...ks,...dis],uyan=hepsi.filter(knSuzgec),say=k=>uyan.filter(x=>knSekmede(x,k)).length,liste=uyan.filter(x=>knSekmede(x,sk)).sort(knSira)
-  const sek=[['acik',L('Açık')],['geciken',L('Geciken')],['karar',L('Kararlar')],['biten',L('Biten')]].map(([k,a])=>`<button type=button role=tab class="sekme${sk===k?' etkin':''}" aria-selected="${sk===k}" data-bn=knsek data-s="${k}">${a}<span class=say>${say(k)}</span></button>`).join('')
+  const sek=[['acik',DIL==='en'?L('Açık (iş sekmesi)'):'Açık'],['geciken',L('Geciken')],['karar',L('Kararlar')],['biten',L('Biten')]].map(([k,a])=>`<button type=button role=tab class="sekme${sk===k?' etkin':''}" aria-selected="${sk===k}" data-bn=knsek data-s="${k}">${a}<span class=say>${say(k)}</span></button>`).join('')
   const opt=(l,sec)=>l.map(([d,a])=>`<option value="${esc(d)}"${sec===d?' selected':''}>${esc(a)}</option>`).join('')
   const top=opt([['',L('Tüm toplantılar')],...(v?v.toplantilar.map(t=>[t.dosya,toplantiAdi(t.dosya,t.baslik)+(t.tarih?' · '+goreliTarih(t.tarih):'')]):[])],knSuz.toplanti)
   const seg=sk==='karar'?'':`<div class="seg kimin" role=group aria-label="${L('Kimin')}">${[['ben',L('Benim')],['ekip',L('Ekibin')]].map(([k,a])=>`<button type=button data-bn=knsahip data-v="${k}" class="${knSuz.sahip===k?'on':''}" aria-pressed=${knSuz.sahip===k}>${a}</button>`).join('')}</div>`

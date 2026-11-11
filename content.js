@@ -567,7 +567,10 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       kulak: ["M4 15v-3a8 8 0 0 1 16 0v3", "M5 14h2.5v6H6a1.5 1.5 0 0 1-1.5-1.5V15z", "M19 14h-2.5v6H18a1.5 1.5 0 0 0 1.5-1.5V15z"],
       kilit: ["M7 10.5h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z", "M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"],
       disli: ["M12 9a3 3 0 1 1 0 6a3 3 0 1 1 0-6z", "M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M18 6l-1.6 1.6M7.6 16.4L6 18"],
-      pin: ["M9 4h6l-1 5.5 3 3H7l3-3z", "M12 12.5V20"] };
+      pin: ["M9 4h6l-1 5.5 3 3H7l3-3z", "M12 12.5V20"],
+      sohbet: ["M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.2A8.5 8.5 0 1 1 20.5 12z", "M9 10.5v3M12 9v6M15 10.5v3"],
+      liste: ["M7 4.5h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2z", "M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"] };
+    const KI = { soyle: "sohbet", dur: "uyari", cevap: "check", not: "liste", onay: "zil", replik: "replik" };  // pano/pano.html KI ile aynı: tür simgeyle de ayrılır (v0.194.0)
     function ikon(d, ad) {
       const NS = "http://www.w3.org/2000/svg", s = d.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "i"); s.setAttribute("aria-hidden", "true");
       for (const yol of IKON[ad] || []) { const p = d.createElementNS(NS, "path"); p.setAttribute("d", yol); s.append(p); }
@@ -593,16 +596,16 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .row button.rb.bas{color:var(--ac-yazi);background:var(--ac);border-color:var(--ac)}.row button.rb.tmm{animation:tm .9s}
         @keyframes tm{0%{background:color-mix(in srgb,var(--ac) 45%,transparent)}100%{background:var(--s1)}}
         .row .ay{width:1px;height:16px;background:var(--bd2);margin:0 2px;flex:none}
-        .k{position:relative;background:transparent;border:0;border-radius:var(--kose-s);padding:6px 6px 6px 12px;margin:0 0 6px;overflow:hidden;color:var(--tx);cursor:pointer;display:flex;gap:6px;align-items:flex-start}
-        .k:hover{background:var(--hov)}.k .m{flex:1;min-width:0}
-        .k::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:var(--kose-tam);background:var(--kc,var(--t3))}.k.bil::before{display:none}
-        .k b{display:block;font-size:var(--yz-1);font-weight:600;letter-spacing:.03em;color:var(--kc,var(--t3));margin-bottom:1px}
-        .a{display:flex;gap:2px;flex:none}
+        .k{position:relative;background:var(--s1);border:1px solid var(--bd);border-radius:var(--kose-l);padding:12px;margin:0 0 8px;overflow:hidden;color:var(--tx);cursor:pointer;display:flex;gap:8px;align-items:flex-start}  /* pano/pano.html .k: ayrı yuvarlak kart, renk çubuğu yok */
+        .k:hover{background:var(--hov)}.k .m{flex:1;min-width:0;overflow-wrap:anywhere}.k[data-onay]{cursor:default}
+        .k b{display:flex;align-items:center;gap:4px;font-size:var(--yz-2);font-weight:600;letter-spacing:.03em;color:var(--kc,var(--t3));margin-bottom:4px}.k b svg.i{width:13px;height:13px;stroke-width:1.9}
+        .kw{font-size:var(--yz-2);color:var(--t2);margin-top:4px}
+        .a{display:flex;gap:4px;flex:none}
         button{font:var(--yz-2)/1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--t3);background:transparent;border:1px solid transparent;border-radius:var(--kose-s);padding:4px 6px;cursor:pointer}
         button:hover{background:var(--hov);color:var(--tx)}button:disabled{opacity:.6}
         .q{font-size:var(--yz-2);color:var(--t2);padding:4px 2px}.top{font-size:var(--yz-2);color:var(--t2);margin:0 2px 6px;display:flex;align-items:center;gap:5px}svg.i{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}button svg.i{width:14px;height:14px}.top:empty{display:none}.uy{color:var(--dikkat)}
         .bos{font-size:var(--yz-2);color:var(--t3);padding:6px 2px}
-        .kd{font-size:var(--yz-2);color:var(--t2);margin-top:2px}.rp{font-weight:600}
+        .kd{font-size:var(--yz-2);color:var(--t3);margin-top:4px}.rp{font-weight:600}
         .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ac) 75%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
         @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
     function ensure() {
@@ -775,11 +778,13 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       if (dil) list.append(ust("uyari", L("Döküm dili yanlış — panoya bak"), "top uy"));
       if (warn) list.append(ust("uyari", warn, "top uy"));
       cards.forEach(c => {
-        const k = e("div", c.kind === "cevap" || c.kind === "not" ? "k bil" : "k"); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
+        const k = e("div", "k k-" + c.kind); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
         if (c.onay) k.dataset.onay = "1"; else k.title = L("Dokun: kapat");
-        const m = e("div", "m"); m.append(e("b", null, (c.geri ? "↩ " : "") + L(c.onay ? "Onay bekliyor" : c.replik ? "Ne diyeyim" : KL[c.kind] || "Not")));
+        const m = e("div", "m"); const bb = e("b"); if (c.geri) bb.append(d.createTextNode("↩ ")); bb.append(ikon(d, KI[c.onay ? "onay" : c.replik ? "replik" : c.kind] || "liste"), d.createTextNode(L(c.onay ? "Onay bekliyor" : c.replik ? "Ne diyeyim" : KL[c.kind] || "Not"))); m.append(bb);
+        if (!c.gizli && c.q) m.append(e("div", "kw", "↳ " + c.q));  // panodaki gibi: kartı doğuran soru
         if (!c.gizli) m.append(c.replik ? e("span", "rp", c.text) : d.createTextNode(c.text));
         if (c.durum && !c.gizli) m.append(e("div", "kd", c.durum));  // Ne diyeyim?: şu an ne konuşuluyor
+        if (typeof c.why === "string" && c.why && !/^\s*[\[{]/.test(c.why) && !c.gizli) m.append(e("div", "kw", c.why));  // kaynak/neden satırı (gri)
         const a = e("div", "a");
         // onay kartı (#76): Claude'un yapacağı iç işi yazılı onayla — yalnız anahtarlı eklentiden geçer
         (c.onay ? [["onaylandi", ["check", L("Onayla")], "Onayla"], ["reddedildi", ["x", L("Reddet")], "Reddet"]] :

@@ -157,6 +157,16 @@ under *What I learned yesterday* you say **Right** or **Wrong**, and that is use
 
 <p align="center"><img src="gorsel/en/gun.png" alt="Today at a glance: today's focus, decisions needing attention (New, Changed), Prepare the draft and Approve buttons; What I learned yesterday with Right and Wrong" width="100%"></p>
 
+## Calendar
+
+The meetings in your Mac Calendar (Google, Exchange, iCloud) appear on the **Calendar** page in the Suflor.me sidebar. No sign-up is needed; it reads your Calendar and never changes it.
+
+<p align="center"><img src="gorsel/en/takvim.png" alt="Calendar page, Week view: meetings colored by preparation status (ready, incomplete); the details box of the 17:00 meeting shows attendees, organiser, preparation status, Open preparation and Start buttons" width="100%"></p>
+
+- **Meetings.** Day, Week, Month and Clocks (working hours and outside) views. Click a meeting to see its attendees, platform (Teams, Meet, Zoom) and organiser; **Start** begins the meeting from its link, and for a past meeting with a Suflor record it opens the transcript.
+- **Preparation and agenda draft.** Each meeting shows its preparation status by color (Ready, Incomplete, Not prepared). **Open preparation** shows the briefing; open tasks and decisions about the attendees come as an agenda draft (see *Using it in a team*).
+- **Finding a free time.** Ask the assistant "when am I free this week?" or "what are my free hours tomorrow?" and it reads the calendar and answers with the free slots inside your working hours (setting `calisma_saatleri`).
+
 ## Using it in a team
 
 Suflor.me works fine for one person. In team meetings it does three things: it drafts the agenda, tracks the team's tasks, and, if you want, syncs records with teammates.

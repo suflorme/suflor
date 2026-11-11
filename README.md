@@ -155,6 +155,16 @@ Her satırın yanında tek tıkla yapılacak iş vardır: *Onayla*, *Yapıldı*,
 
 <p align="center"><img src="gorsel/gun.png" alt="Günün özeti: bugünün odağı, dikkat bekleyen kararlar (Yeni, Değişti), Taslağını hazırla ve Onayla düğmeleri; Dün öğrendiklerim satırında Doğru ve Yanlış" width="100%"></p>
 
+## Takvim
+
+Mac Takvim'indeki toplantılar (Google, Exchange, iCloud) Suflor.me'nin kenar çubuğunda **Takvim** sayfasında görünür. Kayıt gerekmez; Takvim'i okur, değiştirmez.
+
+<p align="center"><img src="gorsel/takvim.png" alt="Takvim sayfası, Hafta görünümü: toplantılar hazırlık durumuna göre renkli (hazır, eksik); 17:00 toplantısının ayrıntı kutusunda katılımcılar, düzenleyen, hazırlık durumu, Hazırlığı aç ve Başlat düğmeleri" width="100%"></p>
+
+- **Toplantılar.** Gün, Hafta, Ay ve Saatler (mesai içi ve dışı) görünümleri. Bir toplantıya tıklayınca katılımcıları, platformu (Teams, Meet, Zoom) ve düzenleyeni görürsün; **Başlat** toplantıyı bağlantısıyla başlatır, geçmiş toplantının Suflor kaydı varsa dökümü açılır.
+- **Hazırlık ve gündem taslağı.** Her toplantı hazırlık durumunu renkle gösterir (Hazır, Eksik, Hazırlık yok). **Hazırlığı aç** brifingi gösterir; katılımcılarla ilgili açık işler ve kararlar gündem taslağı olarak gelir (ayrıntı: *Ekipte kullanım*).
+- **Uygun zaman bulma.** Asistana "bu hafta ne zaman boşum?" ya da "yarın uygun saatlerim?" diye sorarsan takvimden, çalışma saatlerine (ayar `calisma_saatleri`) göre boş aralıkları söyler.
+
 ## Ekipte kullanım
 
 Suflor.me tek kişilik de çalışır; ekip toplantılarında üç işi üstlenir: toplantıya gündem hazırlar, ekibin işlerini takip eder, isterseniz kayıtları ekip üyeleriyle eşitler.
