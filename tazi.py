@@ -261,12 +261,24 @@ def liste_oku(arg=None, dizin=None):
         ana = []
     var_id = {k["id"] for k in ana}
     var_ad = {tr_kucuk(k["ad"]) for k in ana}
+    _ana_n = len(ana)
     for a in aday_oku(dizin):
         if slug(a["ad"]) in var_id or tr_kucuk(a["ad"]) in var_ad:
             continue
         ana.append({"id": slug(a["ad"]), "ad": a["ad"], "kisiler": [], "alanlar": [str(x).lower() for x in (a.get("alanlar") or [])],
                     "abn": "", "linkedin": [str(u) for u in (a.get("linkedin") or [])], "x": [str(u) for u in (a.get("x") or [])], "eposta_iz": [str(u) for u in (a.get("eposta_iz") or [])], "sayfalar": [], "haber_sorgu": [], "neden": a.get("neden") or "",
                     "kaynak": "suflor-aday"})
+    try:
+        izler = {}
+        for r in iletisim_oku(dizin):
+            if r["tur"] == "eposta" and eposta_iz(r["deger"]):
+                izler.setdefault(r["kayit"], []).append(eposta_iz(r["deger"]))
+        for k in ana:
+            for i in izler.get(k["id"], []):
+                if i not in k.setdefault("eposta_iz", []):
+                    k["eposta_iz"].append(i)
+    except Exception:
+        pass
     return ana
 
 
@@ -1695,6 +1707,9 @@ def dosya_cmd(a):
         return 0
     if a.metin is None and a.bolum is None:
         print(dosya_metni(k, d))
+        il = iletisim_metni(dizin, k["id"])
+        if il:
+            print("[iletisim]\n  " + "\n  ".join(il))
         return 0
     if not a.bolum or not a.metin:
         print("--bolum ve --metin birlikte gerekir")
@@ -1911,6 +1926,523 @@ def rapor_cmd(a):
     return 0
 
 
+# ---------- iletişim bilgisi (kamuya açık ya da kişinin kendi paylaştığı; iletisim.jsonl) ----------
+ILETISIM_TURLER = ("eposta", "telefon", "web", "is_adresi", "sosyal")   # ev adresi ve özel hayat bilgisi türü yok; is_adresi yalnız iş adresi
+
+
+def iletisim_yolu(dizin):
+    return os.path.join(dizin, "iletisim.jsonl")
+
+
+def iletisim_oku(dizin):
+    out = []
+    try:
+        with open(iletisim_yolu(dizin), encoding="utf-8") as f:
+            for l in f:
+                try:
+                    r = json.loads(l)
+                except ValueError:
+                    continue
+                if isinstance(r, dict) and r.get("kayit") and r.get("tur") in ILETISIM_TURLER and r.get("deger"):
+                    out.append(r)
+    except FileNotFoundError:
+        pass
+    return out
+
+
+def iletisim_norm(tur, deger):
+    d = str(deger or "").strip()
+    if tur == "eposta":
+        return d.lower()
+    if tur == "telefon":
+        return ("+" if d.startswith("+") else "") + re.sub(r"\D", "", d)
+    if tur in ("web", "sosyal"):
+        return re.sub(r"^https?://(www\.)?", "", d.lower()).rstrip("/")
+    return re.sub(r"\s+", " ", tr_kucuk(d))
+
+
+def iletisim_metni(dizin, kid):
+    rows = [r for r in iletisim_oku(dizin) if r["kayit"] == kid]
+    return [f"{r['tur']}: {r['deger']}" + (f" ({r['kaynak']}" + (f", {r['derece']}" if r.get("derece") else "") + ")" if r.get("kaynak") else "") for r in rows]
+
+
+def iletisim_cmd(a):
+    dizin = veri_dizin()
+    k = kayit_bul(liste_oku(a.liste), a.kim)
+    if not k:
+        print("kayıt yok: " + a.kim)
+        return 1
+    if a.tur is None and a.deger is None:
+        L = iletisim_metni(dizin, k["id"])
+        print("\n".join(L) if L else "iletişim bilgisi yok")
+        return 0
+    if a.tur not in ILETISIM_TURLER or not a.deger or not a.kaynak:
+        print("--tur (" + "|".join(ILETISIM_TURLER) + "), --deger ve --kaynak birlikte gerekir; ev adresi ve özel hayat bilgisi toplanmaz")
+        return 1
+    if len(a.deger) > 200:
+        print("değer 200 karakteri aşıyor")
+        return 1
+    if a.tur == "eposta" and not eposta_iz(a.deger):
+        print("geçersiz e-posta adresi")
+        return 1
+    if a.tarih and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", a.tarih):
+        print("tarih YYYY-AA-GG olmalı")
+        return 1
+    n = iletisim_norm(a.tur, a.deger)
+    if not n:
+        print("boş değer")
+        return 1
+    if any(r["kayit"] == k["id"] and r["tur"] == a.tur and iletisim_norm(a.tur, r["deger"]) == n for r in iletisim_oku(dizin)):
+        print("zaten kayıtlı")
+        return 0
+    kay = {"kayit": k["id"], "tur": a.tur, "deger": a.deger.strip(), "kaynak": a.kaynak.strip()[:300], "derece": a.derece or "C",
+           "tarih": a.tarih or "", "eklendi": bugun().isoformat()}
+    with open(iletisim_yolu(dizin), "a", encoding="utf-8") as f:
+        f.write(json.dumps(kay, ensure_ascii=False) + "\n")
+    try:
+        os.chmod(iletisim_yolu(dizin), 0o600)
+    except OSError:
+        pass
+    print(f"iletişim eklendi: {a.tur}")
+    return 0
+
+
+# ---------- indeks (tazi.db), sorgu günlüğü, geçmiş ----------
+INDEKS_SURUM = 1
+BULGU_SUTUN = ("anahtar", "kayit", "tur", "alt", "deger", "onceki", "ozet", "kaynak", "tarih", "derece", "ilk_gorulme", "son_gorulme",
+               "durum", "tarama", "kid")
+KISI_DISI = re.compile(r"\b(pty|ltd|inc|llc|gmbh|center|centre|group|labs?|tech|studio|consult\w*|co)\b", re.I)
+
+
+def db_yolu(dizin):
+    return os.path.join(dizin, "tazi.db")
+
+
+def sorgu_yolu(dizin):
+    return os.path.join(dizin, "sorgular.jsonl")
+
+
+def sorgu_oku(dizin):
+    out = []
+    try:
+        with open(sorgu_yolu(dizin), encoding="utf-8") as f:
+            for l in f:
+                try:
+                    r = json.loads(l)
+                except ValueError:
+                    continue
+                if isinstance(r, dict) and r.get("istek"):
+                    out.append(r)
+    except FileNotFoundError:
+        pass
+    return out
+
+
+def vt_yolu(arg=None):
+    """proje veritabanı yolu: --vt, TAZI_VT ("-" = bağlantı yok), yoksa baglayici.etkin_vt (ayar). Yalnız okunur."""
+    y = arg or os.environ.get("TAZI_VT")
+    if y:
+        return None if y == "-" else os.path.expanduser(y)
+    try:
+        sys.dont_write_bytecode = True
+        kok = os.path.dirname(os.path.abspath(__file__))
+        if kok not in sys.path:
+            sys.path.append(kok)
+        import baglayici
+        b = baglayici.etkin_vt(json_oku(ayar_yolu(), {}))
+        return b.dosya() if b else None
+    except Exception:
+        return None
+
+
+def _vt_baglanti(kayitlar, vt):
+    """{kayit id: (vt_kisi_id, vt_firma_alan)}; veritabanı salt okunur (mode=ro) açılır, tablo yoksa o eşleşme atlanır."""
+    import sqlite3, pathlib
+    if not vt or not os.path.isfile(vt):
+        return {}
+    try:
+        con = sqlite3.connect(pathlib.Path(vt).resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+        con.execute("PRAGMA query_only=1")
+    except Exception:
+        return {}
+
+    def al(q):
+        try:
+            return con.execute(q).fetchall()
+        except sqlite3.Error:
+            return []
+    try:
+        adlar, izler, firmalar = {}, {}, set()
+        for kid, ad in al("SELECT id, ad FROM kisi"):
+            adlar.setdefault(ad_norm(ad), kid)
+        for kid, ad in al("SELECT kisi_id, ad FROM kisi_takma"):
+            adlar.setdefault(ad_norm(ad), kid)
+        for adres, kid in al("SELECT adres, kisi_id FROM hesap"):
+            if kid and adres:
+                izler.setdefault(hashlib.sha256(str(adres).strip().lower().encode()).hexdigest()[:16], kid)
+        for (a_,) in al("SELECT alan_adi FROM dis_firma"):
+            if a_:
+                firmalar.add(str(a_).strip().lower().replace("www.", ""))
+    finally:
+        con.close()
+    out = {}
+    for k in kayitlar:
+        kisi = next((izler[i] for i in k.get("eposta_iz") or [] if i in izler), None)
+        n = ad_norm(k["ad"])
+        if not kisi and len(n) >= 4:
+            kisi = adlar.get(n)
+        alan = next((a_ for a_ in k.get("alanlar") or [] if str(a_).lower().replace("www.", "") in firmalar), None)
+        if kisi or alan:
+            out[k["id"]] = (kisi, str(alan).lower() if alan else None)
+    return out
+
+
+def _vt_oneri(kayitlar, baglan, iletisim, vt):
+    """bağlı kayıtlar için proje veritabanında bulunmayan iletişim değerleri: [(kayıt adı, tur, deger)]. Salt okunur."""
+    import sqlite3, pathlib
+    vt = vt_yolu(vt) if not vt or not os.path.isfile(str(vt)) else vt
+    if not baglan or not vt or not os.path.isfile(vt):
+        return []
+    try:
+        con = sqlite3.connect(pathlib.Path(vt).resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+        con.execute("PRAGMA query_only=1")
+    except Exception:
+        return []
+    adres, tel = {}, {}
+    try:
+        def al(q):
+            try:
+                return con.execute(q).fetchall()
+            except sqlite3.Error:
+                return []
+        for adr, kid in al("SELECT adres, kisi_id FROM hesap"):
+            adres.setdefault(kid, set()).add(str(adr).strip().lower())
+        for t in ("kisi", "hesap"):
+            kol = [r[1] for r in al(f"PRAGMA table_info({t})") if re.search(r"tel|phone|gsm|cep", str(r[1]), re.I)]
+            kid_k = "id" if t == "kisi" else "kisi_id"
+            for c in kol:
+                for kid, v in al(f'SELECT {kid_k}, "{c}" FROM {t}'):
+                    if v:
+                        tel.setdefault(kid, set()).add(iletisim_norm("telefon", v))
+        tel_var = bool(tel) or any(re.search(r"tel|phone|gsm|cep", str(r[1]), re.I) for t in ("kisi", "hesap") for r in al(f"PRAGMA table_info({t})"))
+    finally:
+        con.close()
+    ad = {k["id"]: k["ad"] for k in kayitlar}
+    tum = set().union(*adres.values()) if adres else set()
+    out = []
+    for r in iletisim:
+        b = baglan.get(r["kayit"])
+        if not b or r["tur"] not in ("eposta", "telefon"):
+            continue
+        kisi = b[0]
+        if r["tur"] == "eposta":
+            if iletisim_norm("eposta", r["deger"]) not in (adres.get(kisi, set()) if kisi else tum):
+                out.append((ad.get(r["kayit"], r["kayit"]), "eposta", r["deger"]))
+        elif tel_var and iletisim_norm("telefon", r["deger"]) not in tel.get(kisi, set()):
+            out.append((ad.get(r["kayit"], r["kayit"]), "telefon", r["deger"]))
+    return out
+
+
+def _kayit_tur(k):
+    if k.get("alanlar") or k.get("abn") or KISI_DISI.search(k["ad"]):
+        return "firma"
+    return "kisi" if 2 <= len(k["ad"].split()) <= 4 else None
+
+
+def _rapor_tarihi(ad, yol):
+    m = re.search(r"(\d{4})-?(\d{2})-?(\d{2})", ad)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    return datetime.date.fromtimestamp(os.path.getmtime(yol)).isoformat()
+
+
+def _fts_var(con):
+    try:
+        con.execute("CREATE VIRTUAL TABLE temp._f USING fts5(x)")
+        con.execute("DROP TABLE temp._f")
+        return True
+    except Exception:
+        return False
+
+
+def indeksle(dizin=None, vt=None):
+    """dosyalardan tazi.db'yi yeniden kurar (tek işlemde sil+kur); dosyalar esas, indeks türetilmiştir. Döner: satır sayıları sözlüğü."""
+    import sqlite3
+    dizin = veri_dizin(dizin)
+    try:
+        liste = liste_oku(None, dizin)
+    except FileNotFoundError:
+        liste = []
+    bug = bulgu_oku(dizin)
+    ids = {k["id"] for k in liste}
+    dosyalar = {}
+    dk = os.path.join(dizin, "dosya")
+    for f in sorted(os.listdir(dk)) if os.path.isdir(dk) else []:
+        if f.endswith(".json"):
+            dosyalar[f[:-5]] = dosya_oku(dizin, f[:-5])
+    for i in sorted(set(r["kayit"] for r in bug.values()) | set(dosyalar)):
+        if i not in ids:
+            liste.append({"id": i, "ad": i, "alanlar": [], "kisiler": [], "linkedin": [], "x": [], "eposta_iz": [], "kaynak": "bilinmiyor"})
+            ids.add(i)
+    notlar = {}
+    nk = os.path.join(dizin, "notlar")
+    for f in sorted(os.listdir(nk)) if os.path.isdir(nk) else []:
+        if f.endswith(".json"):
+            for i, m in (json_oku(os.path.join(nk, f), {}) or {}).items():
+                notlar[i] = m
+    sorgular = sorgu_oku(dizin)
+    baglan = _vt_baglanti(liste, vt_yolu(vt))
+    vt_ad = os.path.basename(vt_yolu(vt) or "") if baglan else None
+    rk = os.path.join(dizin, "rapor")
+    raporlar = []
+    for f in sorted(os.listdir(rk)) if os.path.isdir(rk) else []:
+        yol = os.path.join(rk, f)
+        if f.endswith(".md") and f != "DIZIN.md" and os.path.isfile(yol):
+            try:
+                metin = open(yol, encoding="utf-8").read()
+            except OSError:
+                continue
+            q = tr_kucuk(metin)
+            baslik = next((l[2:].strip() for l in metin.splitlines() if l.startswith("# ")), f)
+            kim = [k["id"] for k in liste if tr_kucuk(k["id"]) in q or (len(k["ad"]) >= 4 and tr_kucuk(k["ad"]) in q)]
+            raporlar.append(("rapor/" + f, _rapor_tarihi(f, yol), baslik, kim, os.path.getsize(yol)))
+    con = sqlite3.connect(db_yolu(dizin), timeout=10)
+    con.isolation_level = None
+    sayi = {}
+    try:
+        con.execute("BEGIN")
+        for t in ("kayit", "bulgu", "dosya_oge", "rapor", "sorgu", "iletisim", "ara", "meta"):
+            con.execute(f"DROP TABLE IF EXISTS {t}")
+        con.execute("CREATE TABLE kayit(id TEXT PRIMARY KEY, ad TEXT, tur TEXT, kaynak TEXT, alanlar TEXT, linkedin TEXT, x TEXT, eposta_iz TEXT,"
+                    " ilk TEXT, son TEXT, degerlendirme TEXT, vt_kisi_id TEXT, vt_firma_alan TEXT, vt_proje TEXT)")
+        con.execute("CREATE TABLE bulgu(" + ", ".join(BULGU_SUTUN) + ", ek TEXT, PRIMARY KEY(anahtar))")
+        con.execute("CREATE TABLE dosya_oge(kayit TEXT, no INTEGER, bolum TEXT, metin TEXT, kaynak TEXT, derece TEXT, tarih TEXT, eklendi TEXT, acik INTEGER, sonuc TEXT)")
+        con.execute("CREATE TABLE rapor(yol TEXT PRIMARY KEY, tarih TEXT, baslik TEXT, kayitlar TEXT, boyut INTEGER)")
+        con.execute("CREATE TABLE sorgu(id INTEGER PRIMARY KEY, zaman TEXT, istek TEXT, kayitlar TEXT, rapor TEXT, yapan TEXT)")
+        con.execute("CREATE TABLE iletisim(kayit TEXT, tur TEXT, deger TEXT, kaynak TEXT, derece TEXT, tarih TEXT)")
+        con.execute("CREATE TABLE meta(k TEXT PRIMARY KEY, v TEXT)")
+        fts = _fts_var(con)
+        con.execute("CREATE VIRTUAL TABLE ara USING fts5(kayit, tur, metin)" if fts else "CREATE TABLE ara(kayit, tur, metin)")
+        aramalar = []
+        j = lambda v: json.dumps(v or [], ensure_ascii=False)
+        for k in liste:
+            mine = [r for r in bug.values() if r["kayit"] == k["id"]]
+            tar = sorted(str(r.get("tarih") or r.get("ilk_gorulme") or "")[:10] for r in mine if r.get("tarih") or r.get("ilk_gorulme"))
+            kisi, alan = baglan.get(k["id"], (None, None))
+            con.execute("INSERT INTO kayit VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (k["id"], k["ad"], _kayit_tur(k), "aday" if k.get("kaynak") == "suflor-aday" else "liste", j(k.get("alanlar")),
+                         j(k.get("linkedin")), j(k.get("x")), j(k.get("eposta_iz")), tar[0] if tar else None, tar[-1] if tar else None,
+                         notlar.get(k["id"]), kisi, alan, vt_ad if (kisi or alan) else None))
+            aramalar.append((k["id"], "kayit", " ".join([k["ad"]] + list(k.get("alanlar") or []))))
+        for r in bug.values():
+            ek = {a: b for a, b in r.items() if a not in BULGU_SUTUN}
+            con.execute("INSERT INTO bulgu VALUES(" + ",".join("?" * (len(BULGU_SUTUN) + 1)) + ")",
+                        [None if r.get(a) is None else (r[a] if isinstance(r[a], (str, int, float)) else json.dumps(r[a], ensure_ascii=False)) for a in BULGU_SUTUN]
+                        + [json.dumps(ek, ensure_ascii=False) if ek else None])
+            aramalar.append((r["kayit"], "bulgu", " ".join(str(x) for x in (r.get("ozet"), r.get("deger")) if x)))
+        for kid, d in dosyalar.items():
+            for o in d["ogeler"]:
+                con.execute("INSERT INTO dosya_oge VALUES(?,?,?,?,?,?,?,?,?,?)",
+                            (kid, o.get("no"), o.get("bolum"), o.get("metin"), o.get("kaynak"), o.get("derece"), o.get("tarih"), o.get("eklendi"),
+                             1 if o.get("durum") == "acik" else 0, o.get("sonuc")))
+                aramalar.append((kid, "dosya", str(o.get("metin") or "")))
+        for r in iletisim_oku(dizin):
+            con.execute("INSERT INTO iletisim VALUES(?,?,?,?,?,?)", (r["kayit"], r["tur"], r["deger"], r.get("kaynak"), r.get("derece"), r.get("tarih")))
+            aramalar.append((r["kayit"], "iletisim", f"{r['tur']} {r['deger']}"))
+        for y, t, b, kim, boy in raporlar:
+            con.execute("INSERT INTO rapor VALUES(?,?,?,?,?)", (y, t, b, j(kim), boy))
+        for n, s in enumerate(sorgular, 1):
+            con.execute("INSERT INTO sorgu VALUES(?,?,?,?,?,?)", (n, s.get("zaman"), s.get("istek"), j(s.get("kayitlar")), s.get("rapor"), s.get("yapan")))
+            aramalar.append((",".join(s.get("kayitlar") or []), "sorgu", str(s.get("istek"))))
+        con.executemany("INSERT INTO ara VALUES(?,?,?)", aramalar)
+        con.execute("INSERT INTO meta VALUES('son_indeks',?)", (datetime.datetime.now().isoformat(timespec="seconds"),))
+        con.execute("INSERT INTO meta VALUES('fts',?)", ("1" if fts else "0",))
+        con.execute(f"PRAGMA user_version={INDEKS_SURUM}")
+        con.execute("COMMIT")
+        for t in ("kayit", "bulgu", "dosya_oge", "rapor", "sorgu", "iletisim", "ara"):
+            sayi[t] = con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise
+    finally:
+        con.close()
+    _dizin_md(dizin, liste, sorgular, raporlar)
+    return sayi
+
+
+def _dizin_md(dizin, liste, sorgular, raporlar):
+    ad = {k["id"]: k["ad"] for k in liste}
+    h = lambda s: str(s or "").replace("|", "/").replace("\n", " ")
+    L = ["# Tazı rapor dizini", "", "tazi.db'den türetilir (`tazi.py indeksle`); elle düzenlenmez. İç belge: kişi ve firma adı içerir.", "",
+         "## Sorgular", "", "| Tarih | İstek | Kayıtlar | Rapor |", "|---|---|---|---|"]
+    for s in sorted(sorgular, key=lambda s: str(s.get("zaman")), reverse=True):
+        r = s.get("rapor") or ""
+        L.append(f"| {str(s.get('zaman') or '')[:10]} | {h(s.get('istek'))} | {h(', '.join(ad.get(i, i) for i in s.get('kayitlar') or []))} | "
+                 + (f"[{h(os.path.basename(r))}]({h(os.path.basename(r))})" if r else "-") + " |")
+    L += ["", "## Raporlar", "", "| Tarih | Rapor | Başlık | Kayıtlar |", "|---|---|---|---|"]
+    for y, t, b, kim, _ in sorted(raporlar, key=lambda r: (r[1], r[0]), reverse=True):
+        L.append(f"| {t} | [{os.path.basename(y)}]({os.path.basename(y)}) | {h(b)} | {h(', '.join(ad.get(i, i) for i in kim))} |")
+    yaz_atomik(os.path.join(dizin, "rapor", "DIZIN.md"), "\n".join(L) + "\n")
+
+
+def oto_indeks(dizin=None):
+    """yazan komutlardan sonra: indeks hatası komutu bozmaz, başarıda sessiz."""
+    try:
+        indeksle(dizin)
+    except Exception:
+        pass
+
+
+def indeksle_cmd(a):
+    dizin = veri_dizin()
+    s = indeksle(dizin, a.vt)
+    print("tazi.db: " + ", ".join(f"{t} {n}" for t, n in s.items()))
+    if a.baglanti:
+        import sqlite3
+        con = sqlite3.connect(db_yolu(dizin))
+        try:
+            rows = con.execute("SELECT id, ad, vt_kisi_id, vt_firma_alan, vt_proje FROM kayit ORDER BY ad").fetchall()
+        finally:
+            con.close()
+        yol = vt_yolu(a.vt)
+        print(f"proje veritabanı: {yol or 'yok'}" + ("" if yol and os.path.isfile(yol) else " (açılamadı; bağlantı yok)"))
+        for i, ad, kisi, alan, p in rows:
+            print(f"{ad} [{i}] -> kişi: {kisi or '-'} | firma alanı: {alan or '-'}")
+        try:
+            liste = liste_oku(None, dizin)
+        except FileNotFoundError:
+            liste = []
+        bag = {r[0]: (r[2], r[3]) for r in rows if r[2] or r[3]}
+        for ad, t, v in _vt_oneri(liste, bag, iletisim_oku(dizin), a.vt):
+            print(f"öneri: {ad} için {t} {v} proje veritabanında yok")
+        print(f"bağlı: {sum(1 for r in rows if r[2] or r[3])}/{len(rows)} (kişi {sum(1 for r in rows if r[2])}, firma {sum(1 for r in rows if r[3])})")
+    return 0
+
+
+def _db_ac(dizin):
+    import sqlite3
+    if not os.path.isfile(db_yolu(dizin)):
+        indeksle(dizin)
+    con = sqlite3.connect(db_yolu(dizin))
+    con.row_factory = sqlite3.Row
+    return con
+
+
+def sorgu_cmd(a):
+    dizin = veri_dizin()
+    if a.liste_:
+        for s in sorted(sorgu_oku(dizin), key=lambda s: str(s.get("zaman")), reverse=True):
+            print(f"{str(s.get('zaman'))[:16]} | {s['istek']} | {', '.join(s.get('kayitlar') or []) or '-'} | {s.get('rapor') or '-'} | {s.get('yapan') or 'elle'}")
+        return 0
+    if not a.istek or not a.kim:
+        print("--istek ve --kim gerekli (ya da --liste)")
+        return 1
+    if a.tarih and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", a.tarih):
+        print("tarih YYYY-AA-GG olmalı")
+        return 1
+    liste = liste_oku(a.liste)
+    ids = []
+    for x in [p.strip() for p in a.kim.split(",") if p.strip()]:
+        k = kayit_bul(liste, x)
+        ids.append(k["id"] if k else x)
+        if not k:
+            print("uyarı: kayıt listede yok: " + x)
+    rapor = a.rapor or ""
+    if rapor:
+        rapor = os.path.expanduser(rapor)
+        if os.path.isabs(rapor) and rapor.startswith(dizin + os.sep):
+            rapor = os.path.relpath(rapor, dizin)
+    tarih = a.tarih or bugun().isoformat()
+    zaman = tarih + "T" + datetime.datetime.now().strftime("%H:%M:%S")
+    kay = {"zaman": zaman, "istek": re.sub(r"\s+", " ", a.istek).strip()[:300], "kayitlar": ids, "rapor": rapor, "yapan": a.yapan}
+    os.makedirs(dizin, mode=0o700, exist_ok=True)
+    with open(sorgu_yolu(dizin), "a", encoding="utf-8") as f:
+        f.write(json.dumps(kay, ensure_ascii=False) + "\n")
+    print("sorgu kaydedildi")
+    return 0
+
+
+def ara_cmd(a):
+    dizin = veri_dizin()
+    con = _db_ac(dizin)
+    try:
+        fts = con.execute("SELECT v FROM meta WHERE k='fts'").fetchone()
+        q = " ".join(a.metin)
+        if fts and fts[0] == "1":
+            m = " ".join('"' + t.replace('"', "") + '"' for t in q.split() if t.strip('"'))
+            rows = con.execute("SELECT kayit, tur, snippet(ara, 2, '[', ']', '…', 12) FROM ara WHERE ara MATCH ? LIMIT 20", (m,)).fetchall()
+        else:
+            rows = [(r[0], r[1], r[2][:120]) for r in con.execute("SELECT kayit, tur, metin FROM ara WHERE metin LIKE ? LIMIT 20", ("%" + q + "%",))]
+    except Exception as e:
+        print("arama hatası: " + temiz_hata(e))
+        return 1
+    finally:
+        con.close()
+    for k, t, m in rows:
+        print(f"{k} [{t}] {m}")
+    if not rows:
+        print("eşleşme yok")
+    return 0
+
+
+def gecmis_metni(metin, dizin=None):
+    """ad, alan adı, kayıt kimliği ya da e-posta (yalnız izi eşleştirilir, yazdırılmaz) için önceki çalışmalar; ≤ ~30 satır."""
+    dizin = veri_dizin(dizin)
+    con = _db_ac(dizin)
+    try:
+        q = str(metin or "").strip()
+        iz = eposta_iz(q)
+        ql, qn = tr_kucuk(q), ad_norm(q)
+        alan = re.sub(r"^https?://", "", ql).split("/")[0].replace("www.", "")
+        bul = []
+        for k in con.execute("SELECT * FROM kayit ORDER BY ad"):
+            alanlar = [str(x).lower() for x in json.loads(k["alanlar"] or "[]")]
+            if (iz and iz in json.loads(k["eposta_iz"] or "[]")) or tr_kucuk(k["id"]) == ql or (alan and alan in alanlar) \
+                    or (not iz and len(qn) >= 3 and (qn == ad_norm(k["ad"]) or qn in ad_norm(k["ad"]) or ad_norm(k["ad"]) in qn and len(ad_norm(k["ad"])) >= 4)):
+                bul.append(k)
+        if not bul:
+            return "geçmiş çalışma yok" + (" (e-posta izi eşleşmedi)" if iz else "")
+        L = []
+        for k in bul[:4]:
+            i = k["id"]
+            L.append(f"● {k['ad']} [{i}] — {k['tur'] or '?'}, {k['kaynak']}" + (" · e-posta izi eşleşti" if iz else ""))
+            kim = con.execute("SELECT metin, derece FROM dosya_oge WHERE kayit=? AND bolum='kimlik' ORDER BY no DESC LIMIT 1", (i,)).fetchone()
+            L.append("  Kimlik: " + (f"[{kim['derece']}] {kim['metin'][:160]}" if kim else "hüküm yok"))
+            st = son_tarama_tarihi(dizin, i)
+            tur = con.execute("SELECT tur, count(*) n FROM bulgu WHERE kayit=? GROUP BY tur ORDER BY n DESC", (i,)).fetchall()
+            L.append(f"  Son tarama: {st or 'yok'} · bulgu: " + (", ".join(f"{t['tur']} {t['n']}" for t in tur) or "yok"))
+            acik = con.execute("SELECT no, bolum, metin FROM dosya_oge WHERE kayit=? AND acik=1 AND bolum IN ('iz','soru') ORDER BY no", (i,)).fetchall()
+            if acik:
+                L.append(f"  Açık iz/soru: {len(acik)} — " + "; ".join(f"#{o['no']} {o['metin'][:60]}" for o in acik[:2]))
+            sg = [s for s in con.execute("SELECT zaman, istek, kayitlar, rapor FROM sorgu ORDER BY zaman DESC") if i in json.loads(s["kayitlar"] or "[]")]
+            for s in sg[:3]:
+                L.append(f"  Sorgu {str(s['zaman'])[:10]}: {s['istek'][:90]}" + (f" → {s['rapor']}" if s["rapor"] else ""))
+            rp = [r["yol"] for r in con.execute("SELECT yol, kayitlar FROM rapor ORDER BY tarih DESC") if i in json.loads(r["kayitlar"] or "[]")]
+            if rp:
+                L.append("  Raporlar: " + ", ".join(rp[:3]) + (f" (+{len(rp) - 3})" if len(rp) > 3 else ""))
+            il = [f"{r['tur']} {r['deger']}" for r in con.execute("SELECT tur, deger FROM iletisim WHERE kayit=?", (i,))
+                  if not (r["tur"] == "eposta" and iz and eposta_iz(r["deger"]) == iz)]   # sorulan adres geri yazdırılmaz
+            if il:
+                L.append("  İletişim: " + "; ".join(il[:4]) + (f" (+{len(il) - 4})" if len(il) > 4 else ""))
+            if k["vt_kisi_id"] or k["vt_firma_alan"]:
+                L.append(f"  Proje veritabanı: kişi {k['vt_kisi_id'] or '-'} · firma {k['vt_firma_alan'] or '-'}")
+            if k["degerlendirme"]:
+                L.append("  Değerlendirme: " + k["degerlendirme"][:140])
+        if len(bul) > 4:
+            L.append(f"(+{len(bul) - 4} kayıt daha eşleşti)")
+        return "\n".join(L[:30])
+    finally:
+        con.close()
+
+
+def gecmis_cmd(a):
+    print(gecmis_metni(" ".join(a.metin)))
+    return 0
+
+
 # ---------- özet, durum ----------
 def ozet_metni(sorgu, dizin=None, liste=None):
     """Toplantı hazırlığı için en çok 8 satır: başlık, kimlik hükmü, ≤4 yeni/değişen, açık bayrak, değerlendirme."""
@@ -2038,6 +2570,20 @@ def durum_cmd(a):
     s = sayac_oku(dizin)
     print(f"veri klasörü: {dizin}\nliste: {liste_yolu(a.liste, dizin)}\nSuflor aday listesi: {len(aday_oku(dizin))} kayıt\nson tarama: {son_tarama_tarihi(dizin) or 'yok'}\n"
           f"LinkedIn bu hafta: {s['linkedin']['n']}/{sosyal_limit('linkedin')}\nX bu hafta: {s['x']['n']}/{sosyal_limit('x')}")
+    try:
+        import sqlite3
+        if os.path.isfile(db_yolu(dizin)):
+            con = sqlite3.connect(db_yolu(dizin))
+            try:
+                say = ", ".join(f"{t} {con.execute(f'SELECT count(*) FROM {t}').fetchone()[0]}" for t in ("kayit", "bulgu", "dosya_oge", "rapor", "sorgu", "iletisim"))
+                son = con.execute("SELECT v FROM meta WHERE k='son_indeks'").fetchone()
+            finally:
+                con.close()
+            print(f"indeks: {db_yolu(dizin)} ({say}); son indeksleme: {son[0] if son else '?'}")
+        else:
+            print(f"indeks: yok ({db_yolu(dizin)}); `tazi.py indeksle` ile kur")
+    except Exception as e:
+        print("indeks okunamadı: " + temiz_hata(e))
     return 0
 
 
@@ -2076,9 +2622,25 @@ def main(argv=None):
     o = sp.add_parser("ozet", help="bir kaydın son gelişmeleri (en çok 8 satır)")
     o.add_argument("--kim", required=True); o.set_defaults(f=ozet_cmd)
     sp.add_parser("durum", help="veri klasörü, liste, son tarama, LinkedIn ve X sayaçları").set_defaults(f=durum_cmd)
+    il = sp.add_parser("iletisim", help="kamuya açık ya da kişinin kendi paylaştığı iletişim bilgisi: ekle ya da listele")
+    il.add_argument("--kim", required=True); il.add_argument("--tur"); il.add_argument("--deger"); il.add_argument("--kaynak")
+    il.add_argument("--derece", choices=list("ABCD")); il.add_argument("--tarih"); il.set_defaults(f=iletisim_cmd)
+    ix = sp.add_parser("indeksle", help="dosyalardan tazi.db ve rapor/DIZIN.md'yi yeniden kur")
+    ix.add_argument("--baglanti", action="store_true", help="proje veritabanı bağlantı tablosunu yaz (salt okunur)")
+    ix.add_argument("--vt", help="proje veritabanı yolu (yoksa ayar ya da TAZI_VT)"); ix.set_defaults(f=indeksle_cmd)
+    sg = sp.add_parser("sorgu", help="yapılan sorguyu günlüğe yaz (sorgular.jsonl) ya da --liste")
+    sg.add_argument("--istek"); sg.add_argument("--kim", help="kayıt kimlikleri, virgülle"); sg.add_argument("--rapor"); sg.add_argument("--tarih")
+    sg.add_argument("--yapan", default="elle", choices=("elle", "zamanli")); sg.add_argument("--liste", dest="liste_", action="store_true")
+    sg.set_defaults(f=sorgu_cmd)
+    gc = sp.add_parser("gecmis", help="ad, alan adı, kayıt kimliği ya da e-posta için önceki çalışmalar")
+    gc.add_argument("metin", nargs="+"); gc.set_defaults(f=gecmis_cmd)
+    ar = sp.add_parser("ara", help="indekste tam metin arama"); ar.add_argument("metin", nargs="+"); ar.set_defaults(f=ara_cmd)
     a = p.parse_args(argv)
     try:
-        return a.f(a) or 0
+        rc = a.f(a) or 0
+        if a.komut in ("aday", "ekle", "dosya", "degerlendir", "tara", "rapor", "sorgu", "iletisim") and rc == 0:
+            oto_indeks()
+        return rc
     except FileNotFoundError as ex:
         print(f"dosya bulunamadı: {ex.filename}")
         return 1

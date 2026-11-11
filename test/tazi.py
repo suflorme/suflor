@@ -139,7 +139,7 @@ ENV = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", TAZI_DIR=os.path.join(T, "ve
            TAZI_CRTSH=B + "/crt/", TAZI_NEWS=B + "/news", TAZI_ABR=B + "/abr/", TAZI_HTTPS_OVERRIDE=B + "/site/",
            TAZI_WAYBACK=B + "/wb/cdx", TAZI_IANA_IP=B + "/iana-ip", TAZI_GITHUB=B + "/gh", TAZI_BEKLE="0",
            TAZI_DIG=f"{sys.executable} {dig}", TAZI_DIG_STATE=dig_durum, TAZI_SECURITY_CMD="/usr/bin/false",
-           NO_PROXY="127.0.0.1", no_proxy="127.0.0.1", TAZI_BUGUN=g(ILK))
+           NO_PROXY="127.0.0.1", no_proxy="127.0.0.1", TAZI_BUGUN=g(ILK), TAZI_VT="-")
 def run(*args, **env):
     e = dict(ENV); e.update(env)
     p = subprocess.run([sys.executable, "-B", TAZI] + list(args), capture_output=True, text=True, env=e, timeout=60)
@@ -393,6 +393,74 @@ kontrol("ABR JSON: acn okundu", any(r["alt"] == "abn:acn" and r["deger"] == "123
 sizdi = [os.path.join(d, f) for d, _, fs in os.walk(os.path.join(T, "veri")) for f in fs if GUID in open(os.path.join(d, f), errors="ignore").read()]
 kontrol("kimlik hiçbir dosyada yok", not sizdi and GUID not in c, str(sizdi))
 kontrol("keychain yokken yedek yol (herkese açık sayfa) kullanıldı", any(r["alt"] == "abn:entity_name" for r in bulgular()))
+
+
+# 8) indeks (tazi.db), sorgu günlüğü, geçmiş, iletişim, proje veritabanı bağlantısı
+import sqlite3, hashlib
+def tdb(q, *p):
+    con = sqlite3.connect(os.path.join(T, "veri", "tazi.db"))
+    try: return con.execute(q, p).fetchall()
+    finally: con.close()
+rc, c = run("indeksle"); kontrol("indeksle çıkış 0", rc == 0 and "tazi.db:" in c, c)
+sy1 = {t: tdb(f"SELECT count(*) FROM {t}")[0][0] for t in ("kayit", "bulgu", "dosya_oge", "rapor", "sorgu", "iletisim")}
+rc, c = run("indeksle"); sy2 = {t: tdb(f"SELECT count(*) FROM {t}")[0][0] for t in sy1}
+kontrol("indeksle idempotent", sy1 == sy2, f"{sy1} {sy2}")
+kontrol("indeks: bulgu sayısı dosyayla aynı", sy1["bulgu"] == len(bulgular()) and sy1["bulgu"] > 0, str(sy1))
+kontrol("indeks: kayıt var, aday kaynaklı işaretli", sy1["kayit"] >= 4 and tdb("SELECT kaynak FROM kayit WHERE id=?", AD_ID)[0][0] == "aday", str(sy1))
+kontrol("indeks: user_version", tdb("PRAGMA user_version")[0][0] == 1)
+kontrol("indeks: dosya_oge satırları", sy1["dosya_oge"] == sum(len(json.loads(oku("dosya", f))["ogeler"]) for f in os.listdir(os.path.join(T, "veri", "dosya"))), str(sy1))
+rc, c = run("rapor", TAZI_BUGUN=g(BUG)); rapor_yol = c.strip().splitlines()[-1] if rc == 0 else ""
+kontrol("rapor sonrası otomatik indeks: rapor tablosu ve DIZIN.md", tdb("SELECT count(*) FROM rapor")[0][0] >= 1 and "Raporlar" in oku("rapor", "DIZIN.md"), c)
+rc, c = run("sorgu", "--istek", "Yeni Aday Firma kim, dürüst mü", "--kim", AD_ID + ",bilinmeyen-kayit", "--rapor", rapor_yol, "--yapan", "elle", "--tarih", "2026-11-10")
+kontrol("sorgu: eklendi, bilinmeyen kayıt uyarısı", rc == 0 and "sorgu kaydedildi" in c and "uyarı" in c, c)
+sj = [json.loads(l) for l in oku("sorgular.jsonl").splitlines()]
+kontrol("sorgular.jsonl: alanlar", len(sj) == 1 and sj[0]["kayitlar"][0] == AD_ID and sj[0]["zaman"].startswith("2026-11-10") and sj[0]["rapor"].startswith("rapor/"), str(sj))
+kontrol("sorgu tabloya ve DIZIN.md'ye girdi", tdb("SELECT count(*) FROM sorgu")[0][0] == 1 and "Yeni Aday Firma kim" in oku("rapor", "DIZIN.md"))
+rc, c = run("sorgu", "--liste"); kontrol("sorgu --liste", "Yeni Aday Firma kim" in c, c)
+rc, c = run("gecmis", "Yeni Aday Firma"); kontrol("gecmis: ad ile kayıt, sorgu ve rapor görünür", "● Yeni Aday Firma" in c and "Sorgu 2026-11-10" in c and len(c.splitlines()) <= 30, c)
+EP2 = "Kisi.Ornek" + AT + "Ornek.test"
+rc, c = run("gecmis", EP2); kontrol("gecmis: e-posta izi eşleşir, adres yazdırılmaz", "● Yeni Aday Firma" in c and "kisi.ornek" not in c.lower(), c)
+rc, c = run("gecmis", "yok-boyle-biri-xyz"); kontrol("gecmis: eşleşme yok", "geçmiş çalışma yok" in c, c)
+rc, c = run("ara", "Wayback"); rc2, c2 = run("ara", AD_ALAN)
+kontrol("ara (FTS): bulgu ya da kayıt bulur", rc == 0 and rc2 == 0 and "eşleşme yok" not in c2, c + c2)
+kontrol("FTS tablosu kuruldu", tdb("SELECT v FROM meta WHERE k='fts'")[0][0] in ("0", "1"))
+rc, c = run("durum"); kontrol("durum: indeks satırı", "indeks:" in c and "tazi.db" in c and "son indeksleme" in c, c)
+
+# iletişim bilgisi
+TEL = "+61 400 111 222"; EP3 = "yeni.adres" + AT + "ornek.test"
+rc, c = run("iletisim", "--kim", AD_ID, "--tur", "eposta", "--deger", EP3, "--kaynak", "e-posta imzası", "--derece", "B"); kontrol("iletisim: eposta eklendi", rc == 0 and "eklendi" in c, c)
+rc, c = run("iletisim", "--kim", AD_ID, "--tur", "eposta", "--deger", EP3.upper(), "--kaynak", "başka"); kontrol("iletisim: aynı değer (büyük harf) tekrarlanmaz", "zaten kayıtlı" in c, c)
+rc, c = run("iletisim", "--kim", AD_ID, "--tur", "telefon", "--deger", TEL, "--kaynak", "https://ornek.test/iletisim"); rc2, c2 = run("iletisim", "--kim", AD_ID, "--tur", "telefon", "--deger", "+61400111222", "--kaynak", "x")
+kontrol("iletisim: telefon eklenir, biçim farkı tekrar sayılır", rc == 0 and "zaten kayıtlı" in c2, c + c2)
+rc, c = run("iletisim", "--kim", AD_ID, "--tur", "ev_adresi", "--deger", "1 Sokak", "--kaynak", "x"); kontrol("iletisim: listede olmayan tür reddedilir", rc == 1 and "ev adresi" in c, c)
+rc, c = run("iletisim", "--kim", AD_ID, "--tur", "eposta", "--deger", "gecersiz", "--kaynak", "x"); kontrol("iletisim: geçersiz e-posta reddedilir", rc == 1, c)
+rc, c = run("iletisim", "--kim", AD_ID, "--tur", "web", "--deger", "https://ornek.test/"); kontrol("iletisim: kaynaksız reddedilir", rc == 1, c)
+rc, c = run("iletisim", "--kim", AD_ID); kontrol("iletisim: liste", EP3 in c and TEL in c and "e-posta imzası" in c, c)
+kontrol("iletisim.jsonl dosyada, eposta_iz eşleşmesi çalışır", len(oku("iletisim.jsonl").splitlines()) == 2
+        and tazi.eposta_iz(EP3) in [i for k in tazi.liste_oku(liste_yol, os.path.join(T, "veri")) if k["id"] == AD_ID for i in k.get("eposta_iz", [])])
+kontrol("iletisim tabloda ve FTS'te", tdb("SELECT count(*) FROM iletisim")[0][0] == 2 and run("ara", "400")[1].count("iletisim") >= 1)
+rc, c = run("gecmis", "Yeni Aday Firma"); kontrol("gecmis: iletişim görünür", "İletişim:" in c and TEL in c, c)
+rc, c = run("gecmis", EP3); kontrol("gecmis: sorulan adres geri yazdırılmaz", "● Yeni Aday Firma" in c and EP3 not in c and TEL in c, c)
+rc, c = run("dosya", "--kim", AD_ID); kontrol("dosya: iletişim bölümü", "[iletisim]" in c and TEL in c, c)
+
+# proje veritabanı bağlantısı (salt okunur)
+vtd = os.path.join(T, "proje-deneme.db"); con = sqlite3.connect(vtd)
+con.executescript("CREATE TABLE kisi(id TEXT PRIMARY KEY, ad TEXT); CREATE TABLE kisi_takma(kisi_id TEXT, ad TEXT); CREATE TABLE hesap(adres TEXT PRIMARY KEY, kisi_id TEXT, alan_adi TEXT);"
+                  "CREATE TABLE dis_firma(alan_adi TEXT PRIMARY KEY, ad TEXT);")
+con.execute("INSERT INTO kisi VALUES('kp1','Baska Ad'),('kp2','Kuzgun Süreç')"); con.execute("INSERT INTO kisi_takma VALUES('kp2','Kuzgun Süreç')")
+con.execute("INSERT INTO hesap VALUES(?,?,?)", (EP2.lower(), "kp1", "ornek.test")); con.execute("INSERT INTO dis_firma VALUES(?,?)", (ORN, "Örnek"))
+con.commit(); con.close()
+h0 = hashlib.sha256(open(vtd, "rb").read()).hexdigest(); m0 = os.path.getmtime(vtd)
+rc, c = run("indeksle", "--baglanti", "--vt", vtd)
+kontrol("bağlantı: e-posta izi → kisi_id", f"[{AD_ID}] -> kişi: kp1" in c, c)
+kontrol("bağlantı: kisi_takma adı → kisi_id", "-> kişi: kp2" in c, c)
+kontrol("bağlantı: dis_firma alanı → firma alanı", f"firma alanı: {ORN}" in c, c)
+kontrol("bağlantı: iletişim önerisi (yalnız veritabanında olmayan)", f"öneri: Yeni Aday Firma için eposta {EP3}" in c and "için eposta " + EP2 not in c, c)
+kontrol("bağlantı: telefon sütunu yoksa telefon önerilmez", "için telefon" not in c, c)
+kontrol("tabloda vt sütunları", tdb("SELECT vt_kisi_id FROM kayit WHERE id=?", AD_ID)[0][0] == "kp1")
+kontrol("proje veritabanı değişmedi", hashlib.sha256(open(vtd, "rb").read()).hexdigest() == h0 and os.path.getmtime(vtd) == m0 and not [f for f in os.listdir(T) if f.startswith("proje-deneme.db-")])
+rc, c = run("indeksle", "--baglanti", "--vt", os.path.join(T, "yok.db")); kontrol("bağlantı: veritabanı açılamazsa bağlantı yok, hata yok", rc == 0 and "bağlı: 0/" in c, c)
+kontrol("yazan komutlar indeksi sessiz tazeler", "tazi.db" not in run("aday", "--ad", "Ek Aday Kisi")[1] and tdb("SELECT count(*) FROM kayit WHERE id='ek-aday-kisi'")[0][0] == 1)
 
 kod = open(TAZI).read()
 kontrol("kaynakta kimlik değeri yok", GUID not in kod)
