@@ -155,6 +155,26 @@ Her satırın yanında tek tıkla yapılacak iş vardır: *Onayla*, *Yapıldı*,
 
 <p align="center"><img src="gorsel/gun.png" alt="Günün özeti: bugünün odağı, dikkat bekleyen kararlar (Yeni, Değişti), Taslağını hazırla ve Onayla düğmeleri; Dün öğrendiklerim satırında Doğru ve Yanlış" width="100%"></p>
 
+## Ekipte kullanım
+
+Suflor.me tek kişilik de çalışır; ekip toplantılarında üç işi üstlenir: toplantıya gündem hazırlar, ekibin işlerini takip eder, isterseniz kayıtları ekip üyeleriyle eşitler.
+
+**Toplantıya gündem.** Takvimdeki toplantının katılımcılarıyla önceki toplantılardan açık kalan işler, onay bekleyen kararlar ve cevapsız sorular bir **gündem taslağı** olarak çıkar. Taslağı *Başlat* formunda gündem olarak kullanabilir ya da kopyalayabilirsin.
+
+<p align="center"><img src="gorsel/ekip-gundem-taslak.png" alt="Gündem taslağı: katılımcılardan açık kalan işler, gecikenler ve onay bekleyen kararlar; Başlat'ta gündem olarak kullan ve Kopyala düğmeleri" width="50%"></p>
+
+Toplantı sürerken yan paneldeki **Gündem** sekmesi maddeleri sıralar; konuşulan madde işaretlenir, bitenler tik alır, kalan süre görünür.
+
+<p align="center"><img src="gorsel/ekip-gundem-sekme.png" alt="Toplantıda Gündem sekmesi: dört madde, ilki tamamlanmış, ikincisi şu an konuşulan" width="100%"></p>
+
+**Ekibin işleri.** *Kararlar ve işler* sayfasında *Ekibin* görünümü kimin neyi, hangi tarihe kadar yaptığını, kimin geciktiğini ve hangi kararın onay beklediğini gösterir. Kapanış turunda işler sahibine atanır; projene eklenen belgelerde ekibine düşen işler de öneri olarak çıkar.
+
+<p align="center"><img src="gorsel/ekip-isler.png" alt="Kararlar ve işler, Ekibin görünümü: sahibi ve tarihi olan işler, iki gecikmiş iş; üstte ekiple paylaşım durumu" width="100%"></p>
+
+**Ekip eşitlemesi (isteğe bağlı).** Aynı şirketin Google hesabıyla giriş yapan ekip üyelerinin kayıtları eşitlenebilir. Herkes yalnız kendi rolüyle ilgili kaydı görür. Kararlar ve işler başlığının altındaki satır son eşitlemeyi ve gecikmeyi gösterir. Kurulum, davet ve katılım `ortak_bulut.py` ile yapılır (`kur`, `davet`, `katil`); varsayılan kapalıdır. Toplantı ses kaydı ve döküm eşitlenmez.
+
+**Dış araçlar.** Canlı rakam gerektiğinde bilgi kaynakları bağlayıcısı salt okuma ile metrik getirir. Toplantı sonrası e-posta taslağı hazırlanır, göndermek sana kalır. Yol haritasında: proje yönetim aracıyla (ilk olarak Basecamp) iş eşitlemesi.
+
 ## Asistanına adıyla seslen
 
 Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad geçer. Ona yazarsın ya da sesle sorarsın:

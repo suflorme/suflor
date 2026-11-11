@@ -157,6 +157,26 @@ under *What I learned yesterday* you say **Right** or **Wrong**, and that is use
 
 <p align="center"><img src="gorsel/en/gun.png" alt="Today at a glance: today's focus, decisions needing attention (New, Changed), Prepare the draft and Approve buttons; What I learned yesterday with Right and Wrong" width="100%"></p>
 
+## Using it in a team
+
+Suflor.me works fine for one person. In team meetings it does three things: it drafts the agenda, tracks the team's tasks, and, if you want, syncs records with teammates.
+
+**An agenda for the meeting.** For a meeting on your calendar, open tasks, decisions awaiting approval and unanswered questions left over from earlier meetings with the same attendees become an **agenda draft**. You can use it as the agenda in *Start* or copy it.
+
+<p align="center"><img src="gorsel/en/ekip-gundem-taslak.png" alt="Agenda draft: open items left over from earlier meetings with the attendees" width="50%"></p>
+
+During the meeting the **Agenda** tab in the side panel lists the items; the one being discussed is marked, finished ones are ticked, and the time left is shown.
+
+<p align="center"><img src="gorsel/en/ekip-gundem-sekme.png" alt="Agenda tab during a meeting: four items, the first one done, the second one under discussion" width="100%"></p>
+
+**The team's tasks.** On the *Decisions and tasks* page the *Team's* view shows who owns what and by when, who is late, and which decisions are waiting for approval. In the closing round tasks are assigned to their owners; tasks addressed to your team in documents you add to the project are suggested too.
+
+<p align="center"><img src="gorsel/en/ekip-isler.png" alt="Decisions and tasks, Team's view: tasks with owners and due dates, two overdue; sharing status above the list" width="100%"></p>
+
+**Team sync (optional).** Teammates who sign in with the same company Google account can sync their records. Everyone sees only the records that concern their own role. The line under the page title shows the last sync and its delay. Setup, invitations and joining go through `ortak_bulut.py` (`kur`, `davet`, `katil`); it is off by default. Meeting audio and transcripts are not synced.
+
+**Other tools.** When a live figure is needed, the information-sources connector fetches metrics read-only. A follow-up e-mail draft is prepared after the meeting and sending is left to you. On the roadmap: task sync with a project-management tool (Basecamp first).
+
 ## Call your assistant by name
 
 During setup you give your assistant a name; only that name appears on the panel, on cards and in speech. You type to it or ask
