@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="gorsel/en/hero.png" alt="Suflor.me: the assistant's cards in the corner of a meeting; an enlarged Say card: Ask: what's the backup plan if the payment step slips past Friday?" width="100%">
+  <img src="gorsel/en/hero.png" alt="Suflor.me: the assistant's cards in the corner of a meeting; an enlarged Note card: 12% was said in the meeting; the source shows 8% over the last 7 days." width="100%">
 </p>
 
 <p align="center">
@@ -19,6 +19,7 @@
 
 <p align="center">
   <a href="#installation">Installation</a> ·
+  <a href="#live-data-on-a-card-as-the-meeting-unfolds">Live data cards</a> ·
   <a href="#it-joins-the-meeting-by-voice">Joins the meeting</a> ·
   <a href="#privacy">Privacy</a> ·
   <a href="KILAVUZ.md">Guide (Turkish)</a>
@@ -30,6 +31,23 @@ In theatre, the prompter (*suflör* in Turkish) whispers the line an actor has f
 your meetings. You focus on the conversation. It listens, remembers your project's history and, when it matters, says one sentence.
 
 <p align="center"><img src="gorsel/en/ozellikler.png" alt="Highlights: speaks in the meeting, answers participants, runs the meeting, live translation, whispers to you, remembers history, hands-free, private meeting" width="100%"></p>
+
+## Live data on a card, as the meeting unfolds
+
+This is the heart of Suflor.me: as the conversation moves, it **finds the information that fits the topic and puts it on a card with its source.** When someone
+asks for a number, a date or an earlier decision, the answer reaches you without interrupting the meeting; when a figure said aloud doesn't match the record, it warns you.
+
+<p align="center"><img src="gorsel/en/canli-veri.png" alt="In the meeting Ayla says conversion reached 12 percent; cards: Answer (source: product metrics, 8 percent this week), Note (conflict alert), Say (backup plan question)" width="100%"></p>
+
+- **Answers with a source:** when you ask *"What was that number last week?"* the card gives the figure, the period and the source. A source can be past meetings,
+  project documents (indexed on this Mac) or a live data source you have turned on.
+- **Conflict alert:** if a figure, date or responsibility mentioned in the meeting disagrees with an earlier record or with live data, a note puts the two side by side:
+  *"12% was said in the meeting; the source shows 8% over the last 7 days."* You make the correction; the assistant never says it aloud.
+- **Live data source (optional):** turn on a connector that serves product or campaign metrics in Settings, and the current value is queried when the topic comes up.
+  Only a read query goes to the source (metric, period, channel); no names and no transcript quotes. At most one card per topic every ten minutes.
+- **When you get stuck:** Option + Shift + O (*What should I say?*) suggests a single sentence that fits the moment.
+- **Outside companies and people:** when a new customer, competitor or person comes up, a short card from open sources appears; a single-source fact is marked "unverified".
+  Only the name and topic go into the search; it is off in a private meeting.
 
 ## It joins the meeting by voice
 
@@ -49,6 +67,17 @@ Once you've called it, the other participants can ask it questions too. You can 
   any time with *"next item"*, *"more time"*, *"summarize"*, *"hold on"*, *"carry on"* or
   *"I'll take it from here"*.
 - **Private meeting:** one tap and Suflor.me hears, writes and processes nothing; the assistant stays silent.
+
+### Two assistants: inside and outside
+
+You can have two assistants. One looks after your tasks and project (inside); the other briefs you on outside companies and people in the meeting (outside; default name Roxie).
+Each answers to its own name and speaks in its own voice.
+
+<p align="center"><img src="gorsel/en/asistanlar.png" alt="Ayla asks Defne for last week's date and Defne answers; Kerem from the other company asks Roxie about a firm and Roxie gives a single-source fact marked unverified; a repeated question gets one answer" width="100%"></p>
+
+- **The other side can ask too:** once you have called the assistant, everyone in the meeting can ask it by name.
+- **One answer per question:** if the same question comes in again right away, it isn't answered twice.
+- **It reads the screen too:** when the other side shares a screen, the text on it is added to the assistant's context in batches; you are warned if a password shows.
 
 ## It removes the language barrier
 
@@ -78,7 +107,26 @@ on the panel. Three small buttons next to each card: done, later, not needed.
 
 | Before | During | After |
 |---|---|---|
-| **Start** from the calendar. The agenda is set; the project summary, people and open tasks are ready. | Live transcript, cards, translation; if you want, the assistant speaks or runs the meeting. | Summary and meeting output: decisions, tasks with owners and dates, open questions. A mind map by agenda item. PDF or email draft. |
+| **Start** from the calendar. The agenda is set; the project summary, people and open tasks are ready. | Live transcript, cards, translation; if you want, the assistant speaks or runs the meeting. | Summary and meeting output: decisions, tasks with owners and dates, open questions. A mind map by agenda item. PDF or email draft. A closing round lets you settle tasks and decisions in minutes. |
+
+## After the meeting: tasks and decisions
+
+When the meeting ends, the assistant doesn't make you read out every decision and task; it opens a **closing round**: you go through each task with *Done*, *Postpone* or *Later*, and each decision with *Approve*.
+What you handled collects in the **Decisions and tasks** panel: tasks with an owner and a date, decisions still open, and tasks assigned to you, all in one place.
+
+<p align="center"><img src="gorsel/en/kapanis.png" alt="Closing round: task and decision rows with Done, Postpone, Approve buttons; beside it the Decisions and tasks panel and a task suggested from documents" width="100%"></p>
+
+- **Tasks suggested from documents:** if documents added to your project contain work for you or your team, it shows up in the panel as a suggestion; approve it and it becomes a task, reject it and it is forgotten.
+- **Open ends after a meeting:** a while after the meeting, if a task is still open or a question unanswered, the assistant gives a short reminder. It never runs in a private meeting.
+- **Urgent meeting:** say *"Set up a twenty-minute meeting with Ali today"* and a ready-to-send invitation draft opens for Teams, Meet or Zoom. The invitation never goes out on its own.
+
+## Today at a glance
+
+In the morning the panel shows what is yours for the day at a glance: the day's focus, items awaiting your decision, and what is marked **New** or **Changed** since yesterday.
+Every row has a one-click action beside it: *Approve*, *Done*, *Prepare the draft*. Overnight the assistant also looks through your records and writes down what it learned;
+under *What I learned yesterday* you say **Right** or **Wrong**, and that is used next time.
+
+<p align="center"><img src="gorsel/en/gun.png" alt="Today at a glance: the day's focus, items awaiting your decision (New, Changed), Prepare the draft, Approve, Done buttons; a What I learned yesterday row with Right and Wrong" width="100%"></p>
 
 ## Call your assistant by name
 
@@ -113,7 +161,8 @@ presentations (PowerPoint, Keynote), spreadsheets (Excel, Numbers, CSV) and imag
   it tells you, with the source.
 - **Decision graph:** decisions and claims accumulate on this Mac. If the same person gives a different number at the next meeting,
   it's noticed.
-- **Meetings window:** all transcripts in one place; search across transcripts and summaries.
+- **Meetings window:** all transcripts in one place; search across transcripts and summaries, and a result opens the matching line.
+- **A dictionary that learns:** names and terms that are mis-transcribed become dictionary candidates as you correct them or the assistant notices; once you approve, they come out right in the next meeting. You can undo any of them.
 - **Speaker names:** names from the meeting app's captions are matched to each person's voiceprint on this Mac. Even without captions
   (desktop meeting, a recording dropped in later) the speaker's name is found.
 

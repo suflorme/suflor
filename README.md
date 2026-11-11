@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="gorsel/hero.png" alt="Suflor.me: toplantı ekranının köşesinde asistanın kartları; büyütülmüş Söyle kartı: Ödeme adımı cumaya yetişmezse yedek plan ne? Bunu sor." width="100%">
+  <img src="gorsel/hero.png" alt="Suflor.me: toplantı ekranının köşesinde asistanın kartları; büyütülmüş Not kartı: Toplantıda %12 dendi; kaynakta son 7 günde %8." width="100%">
 </p>
 
 <p align="center">
@@ -19,6 +19,7 @@
 
 <p align="center">
   <a href="#kurulum">Kurulum</a> ·
+  <a href="#toplantı-akarken-canlı-veriyle-kart">Canlı veriyle kart</a> ·
   <a href="#toplantıya-sesle-katılır">Toplantıya sesle katılır</a> ·
   <a href="#gizlilik">Gizlilik</a> ·
   <a href="KILAVUZ.md">Kılavuz</a>
@@ -30,6 +31,23 @@ Tiyatroda suflör, oyuncu repliğini unuttuğunda kulisten fısıldayan kişidir
 odaklanırsın. O dinler, projenin geçmişini hatırlar ve gerektiğinde tek bir cümle söyler.
 
 <p align="center"><img src="gorsel/ozellikler.png" alt="Öne çıkanlar: toplantıda konuşur, katılımcıyı cevaplar, toplantıyı yönetir, canlı çeviri, kulağına fısıldar, geçmişi hatırlar, eller serbest, gizli toplantı" width="100%"></p>
+
+## Toplantı akarken canlı veriyle kart
+
+Suflor.me'nin merkezinde bu var: konuşma akarken konuya uyan bilgiyi **kendisi bulur ve kaynağıyla bir karta koyar.** Biri bir sayı, tarih ya da
+önceki bir karar sorduğunda cevabı toplantıyı bölmeden kulağına gelir; konuşulan bir rakam kayıttakiyle tutmuyorsa uyarır.
+
+<p align="center"><img src="gorsel/canli-veri.png" alt="Toplantıda Ayla dönüşümün yüzde 12'ye çıktığını söylüyor; kartlar: Cevap (kaynak: ürün metrikleri, bu hafta yüzde 8), Not (çelişki uyarısı), Söyle (yedek plan sorusu)" width="100%"></p>
+
+- **Kaynaklı cevap:** *"Geçen hafta bu rakam neydi?"* sorusuna kartta rakam, dönem ve kaynak adıyla cevap gelir. Kaynak; geçmiş toplantılar, proje belgeleri
+  (bu Mac'te dizinlenir) ya da senin açtığın bir canlı veri kaynağı olabilir.
+- **Çelişki uyarısı:** toplantıda geçen rakam, tarih ya da sorumluluk önceki bir kayıtla ya da canlı veriyle uyuşmuyorsa ikisini yan yana gösteren bir not düşer:
+  *"Toplantıda %12 dendi; kaynakta son 7 günde %8."* Düzeltmeyi sen yaparsın; asistan bunu sesli söylemez.
+- **Canlı veri kaynağı (isteğe bağlı):** ürün ya da kampanya metriklerini veren bir bağlayıcıyı Ayarlar'dan açarsan konu o alana girince güncel değer sorgulanır.
+  Kaynağa yalnız okuma sorgusu gider (metrik, dönem, kanal); kişi adı ve döküm alıntısı gitmez. Aynı konuda en çok on dakikada bir kart gelir.
+- **Takıldığında:** Option + Shift + O ile *Ne diyeyim?* o ana uygun tek cümlelik bir replik önerir.
+- **Dışarıdaki firma ya da kişi:** gündemde yeni bir müşteri, rakip ya da kişi geçerse açık kaynaktan kısa bir bilgi kartı çıkar; tek kaynaklıysa "doğrulanmadı" yazar.
+  Aramaya yalnız ad ve konu gider; gizli toplantıda kapalıdır.
 
 ## Toplantıya sesle katılır
 
@@ -48,6 +66,17 @@ Bir kez çağırdıktan sonra öbür katılımcılar da ona soru sorabilir. İst
   canlandırır. Süre dolunca özetler, kararı sorar; kapanışta kararları ve sorumluları okur. Sen istediğin an araya girersin:
   *"sonraki madde"*, *"süreyi uzat"*, *"özetle"*, *"bekle"*, *"yönetimi bırak"*.
 - **Gizli toplantı:** tek dokunuşla Suflor.me hiçbir şeyi dinlemez, yazmaz ve işlemez; asistan konuşmaz.
+
+### İki asistan: içeriye ve dışarıya
+
+İstersen iki asistanın olur. Biri senin işlerine ve projene bakar (içeride), ötekisi toplantıdaki dış firma ve kişiler hakkında bilgi verir (dışarıda; varsayılan adı Roxie).
+Her biri kendi adıyla çağrılır, kendi sesiyle konuşur.
+
+<p align="center"><img src="gorsel/asistanlar.png" alt="Ayla Defne'ye geçen haftanın tarihini soruyor, Defne cevaplıyor; karşı firmadan Kerem Roxie'ye bir firmayı soruyor, Roxie tek kaynaklı bilgiyi doğrulanmadı diye veriyor; aynı soru tekrar gelince tek cevap verilir" width="100%"></p>
+
+- **Karşı taraf da sorabilir:** sen asistanı bir kez çağırdıktan sonra toplantıdaki herkes ona adıyla soru sorabilir.
+- **Aynı soruya tek cevap:** aynı soru art arda geldiğinde ikinci kez cevaplanmaz.
+- **Ekranı da okur:** karşı taraf ekran paylaştığında ekrandaki yazı toplu halde asistanın bağlamına girer; şifre görünürse uyarılırsın.
 
 ## Dil engelini kaldırır
 
@@ -76,7 +105,26 @@ Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 
 | Önce | Sırasında | Sonra |
 |---|---|---|
-| Toplantıya katıl ya da takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, çeviri; istersen asistan konuşur ya da toplantıyı yönetir. Sağ sütunda **Döküm · Gündem · Asistan** sekmeleri. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. |
+| Toplantıya katıl ya da takvimden **Başlat**. Gündem kurulur; projenin özeti, kişiler ve açık işler hazır olur. | Canlı döküm, kartlar, çeviri; istersen asistan konuşur ya da toplantıyı yönetir. Sağ sütunda **Döküm · Gündem · Asistan** sekmeleri. | Özet ve toplantı çıktısı: kararlar, sahibi ve tarihi belli işler, açık kalanlar. Gündeme göre zihin haritası. PDF ya da e-posta taslağı. Kapanış turuyla işleri ve kararları dakikalar içinde kapatırsın. |
+
+## Toplantıdan sonra: işler ve kararlar
+
+Toplantı bitince asistan kararları ve işleri sana tek tek okutmaz, bir **kapanış turu** açar: her işi *Bitti*, *Ertele*, *Sonra* ile, her kararı *Onayla* ile geçersin.
+Yaptıkların **Kararlar ve işler** panosunda toplanır; sahibi ve tarihi belli işler, açık kalan kararlar, sana atanan işler tek yerde durur.
+
+<p align="center"><img src="gorsel/kapanis.png" alt="Kapanış turu: iş ve karar satırları, Bitti, Ertele, Onayla düğmeleri; yanda Kararlar ve işler panosu ve belgelerden önerilen bir iş" width="100%"></p>
+
+- **Belgelerden önerilen işler:** projene eklenen belgelerde sana ya da ekibine düşen işler bulunursa panoda öneri olarak çıkar; onaylarsan işe dönüşür, reddedersen unutulur.
+- **Toplantıdan açık uçlar:** toplantı bittikten bir süre sonra, kapanmamış bir iş ya da cevapsız bir soru kalmışsa asistan kısaca hatırlatır. Gizli toplantıda hiç çalışmaz.
+- **Acil toplantı:** *"Ali'yle bugün yirmi dakikalık bir toplantı kur"* dersin; Teams, Meet ya da Zoom için hazır bir davet taslağı açılır. Davet kendiliğinden gitmez.
+
+## Günün özeti
+
+Sabahları pano, o gün sana düşeni tek bakışta gösterir: günün odağı, karar bekleyen işler, dünden bu yana **Yeni** ya da **Değişti** diye işaretlenenler.
+Her satırın yanında tek tıkla yapılacak iş vardır: *Onayla*, *Yapıldı*, *Taslağını hazırla*. Asistan gece boyunca kayıtlarına bakıp neyi öğrendiğini de yazar;
+*Dün öğrendiklerim* altında **Doğru** ya da **Yanlış** diyerek düzeltirsin, o da bir sonraki sefere kullanılır.
+
+<p align="center"><img src="gorsel/gun.png" alt="Günün özeti: günün odağı, karar bekleyenler (Yeni, Değişti), Taslağını hazırla, Onayla, Yapıldı düğmeleri; Dün öğrendiklerim satırında Doğru ve Yanlış" width="100%"></p>
 
 ## Asistanına adıyla seslen
 
@@ -120,7 +168,8 @@ Arama sözcükle sınırlı değildir. Soruda geçen sözcük belgede hiç geçm
 - **Çelişkiyi yakalar:** konuşmada geçen bir iddia, rakam ya da sorumluluk daha önceki bir belgede ya da toplantıda farklı geçiyorsa
   kaynağıyla söyler.
 - **Karar grafı:** kararlar ve iddialar bu Mac'te birikir. Aynı kişi bir sonraki toplantıda farklı bir rakam söylerse fark edilir.
-- **Toplantılar penceresi:** bütün dökümler tek yerde; dökümlerde ve özetlerde arama yapılır.
+- **Toplantılar penceresi:** bütün dökümler tek yerde; dökümlerde ve özetlerde arama yapılır, sonuç tıklayınca ilgili satıra gider.
+- **Öğrenen sözlük:** toplantılarda yanlış yazılan ad ve terimler, sen düzelttikçe ya da asistan fark ettikçe sözlüğe aday olur; sen onaylayınca bir sonraki toplantıda doğru yazılır. İstediğin zaman geri alırsın.
 - **Konuşmacı adları:** toplantı uygulamasının altyazısındaki adlar, kişinin ses iziyle bu Mac'te eşleştirilir. Altyazı olmadığında da
   (masaüstü toplantı, sonradan yüklenen kayıt) konuşanın adı bulunur.
 
