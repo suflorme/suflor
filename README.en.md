@@ -52,8 +52,21 @@ asks for a number, a date or an earlier decision, the answer reaches you without
 <p align="center"><img src="gorsel/en/toplanti-5-asistan.png" alt="Right panel with questions to Defne and Roxie and their answers; cards in the middle" width="100%"></p>
 <p align="center"><sub><b>5. Ask the assistant by name.</b> Say "Defne, ..."; the answer appears in writing next to the cards and is read aloud in the meeting; ask Roxie about an outside company.</sub></p>
 
-<p align="center"><img src="gorsel/en/toplanti-6-serit.png" alt="Suflor.me strip in the corner of the meeting window: Answer, Say and What do I say cards" width="100%"></p>
+<p align="center"><img src="gorsel/en/toplanti-6-serit.png" alt="Suflor.me strip on the meeting window with the cards, no panel open: Answer, Say, What do I say, Stop and Answer cards" width="100%"></p>
 <p align="center"><sub><b>6. The strip on the meeting window.</b> Even with the panel closed, the cards sit in the corner of the meeting screen; tap to dismiss.</sub></p>
+
+### Where you see the cards
+
+The same cards show up in three places; you decide which one to keep open.
+
+<p align="center"><img src="gorsel/en/kart-panel.png" alt="Full panel with cards of every kind: Answer, Note, Say, What do I say, Stop; live transcript on the right" width="100%"></p>
+<p align="center"><sub><b>In the full panel.</b> In the Mac window or in Chrome: cards in the middle, live transcript and the assistant chat on the right.</sub></p>
+
+<p align="center"><img src="gorsel/en/kart-yan-mini.png" alt="Side panel (small panel): the same cards in a narrow column next to the meeting window" width="36%"></p>
+<p align="center"><sub><b>In the side panel.</b> The small panel stays in a narrow column beside the meeting window; the assistant chat on the right of the full panel (picture 5) keeps the written answers.</sub></p>
+
+<p align="center"><img src="gorsel/en/toplanti-6-serit.png" alt="Cards only on the meeting screen: the Suflor.me strip in the corner of the meeting window" width="100%"></p>
+<p align="center"><sub><b>Cards only on screen.</b> With no panel open, the strip in the corner of the meeting window shows the cards; the three small buttons are done, later, not needed.</sub></p>
 
 - **Answers with a source:** when you ask *"What was that number last week?"* the card gives the figure, the period and the source. A source can be past meetings,
   project documents (indexed on this Mac) or a live data source you have turned on.
@@ -70,7 +83,7 @@ asks for a number, a date or an earlier decision, the answer reaches you without
 Suflor.me is not just a note taker. If you want, your assistant joins the meeting: you call it by name and everyone hears the answer.
 Once you've called it, the other participants can ask it questions too. You can even hand the whole meeting over to it.
 
-<p align="center"><img src="gorsel/en/toplantida.png" alt="A moment from a meeting: Deniz hands the meeting to Defne; Defne opens the agenda, answers Ayla's question from last week's meeting and invites Can, who has been quiet" width="100%"></p>
+<p align="center"><img src="gorsel/en/toplantida.png" alt="A moment from a meeting in the live transcript: Deniz hands the meeting to Defne; Defne opens the agenda and gives Ayla the floor; cards on the left" width="100%"></p>
 
 - **Speaks in the meeting:** *"Defne, which tasks are left this week?"* The answer is read aloud for everyone. The assistant never
   interrupts; it waits its turn and stops if someone starts speaking. *"Defne, stop"* or Option + Shift + S silences it at once.
@@ -108,7 +121,7 @@ Each answers to its own name and speaks in its own voice.
 The assistant follows the meeting and sends four kinds of cards. With the Mac app running they appear as separate boxes at the bottom centre of the screen, over the meeting video; click one to open it, and they are not visible when you share your screen. Without the app they appear in a small strip in the corner of the meeting screen and
 on the panel. Three small buttons next to each card: done, later, not needed.
 
-<p align="center"><img src="gorsel/en/kartlar.png" alt="Four card types: Say, Stop, Answer, Note" width="100%"></p>
+<p align="center"><img src="gorsel/en/kartlar.png" alt="Card examples in the panel: Answer, Note, Say, What do I say, Stop and an Answer with outside-company information" width="100%"></p>
 
 - **Measured:** it speaks more or less depending on your role in the meeting (chair, participant, listener). Unprompted Say and Note
   cards interrupt at most once a minute. **Quiet** sends no cards for 10 minutes.
@@ -167,7 +180,7 @@ by voice: *"Defne, what date did we discuss for the beta last week?"* The answer
 During setup you point it to your project folder. Suflor.me converts documents (Word, Pages, PDF, including old .doc and .rtf),
 presentations (PowerPoint, Keynote), spreadsheets (Excel, Numbers, CSV) and images to text on this Mac and indexes them. Search goes beyond keywords: it finds passages close in meaning even when the words in your question never appear in the document.
 
-<p align="center"><img src="gorsel/en/toplantilar.png" alt="Meetings window: a search for 'beta', eight results in four meetings" width="100%"></p>
+<p align="center"><img src="gorsel/en/toplantilar.png" alt="Meetings window: a search for 'beta', seven results in four meetings" width="100%"></p>
 
 - **Spreadsheets and the project card in one database:** Excel, Numbers and CSV sheets go into a small database on this Mac. For questions
   like "How much did we spend this month?" or "How many open items are there?", the assistant computes the answer instead of eyeballing
@@ -187,9 +200,9 @@ presentations (PowerPoint, Keynote), spreadsheets (Excel, Numbers, CSV) and imag
 Suflor.me was built around one rule from day one: **audio never leaves your Mac.** Speech recognition, voiceprints, document
 conversion and search all run on this Mac.
 
-<p align="center"><img src="gorsel/en/gizlilik.png" alt="What stays on your Mac, what goes to Claude, and what goes to Google only if you turn it on" width="100%"></p>
+<p align="center"><img src="gorsel/en/mimari.png" alt="Architecture and privacy boundary: the meeting app, capture, local relay, local Whisper and the panel stay inside the Mac box; only text goes out, to the AI provider you choose" width="100%"></p>
 
-- Suflor.me's local server only accepts connections from this Mac (`127.0.0.1`). Meeting content is not sent to any server.
+- Suflor.me's local server only accepts connections from this Mac (`127.0.0.1`). Audio and voice prints never go to any server; text goes only to the AI you choose.
 - The text sent to Claude goes through your own Claude Code session; Anthropic's terms of use apply.
 - If you pick another service instead of Claude, the text context (transcript, notes, document passages) goes to that service; audio does not.
 - The beta is voluntary development participation and can't be turned off. A copy of every package sent is kept in

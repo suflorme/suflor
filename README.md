@@ -52,8 +52,21 @@ Suflor.me'nin merkezinde bu var: konuşma akarken konuya uyan bilgiyi **kendisi 
 <p align="center"><img src="gorsel/toplanti-5-asistan.png" alt="Sağ panelde Defne ve Roxie'ye sorulan sorular ve cevapları; ortada kartlar" width="100%"></p>
 <p align="center"><sub><b>5. Asistana adıyla sor.</b> "Defne, …" dersin, cevap kartların yanında yazılı görünür ve toplantıda sesli okunur; dış firma için Roxie'ye sorarsın.</sub></p>
 
-<p align="center"><img src="gorsel/toplanti-6-serit.png" alt="Toplantı penceresinin köşesinde Suflor.me şeridi: Cevap, Söyle ve Ne diyeyim kartları" width="100%"></p>
+<p align="center"><img src="gorsel/toplanti-6-serit.png" alt="Pano açık değilken toplantı penceresinde Suflor.me şeridi ve kartlar: Cevap, Söyle, Ne diyeyim, Dur, Cevap" width="100%"></p>
 <p align="center"><sub><b>6. Toplantı penceresinde şerit.</b> Panoyu açmasan da kartlar toplantı ekranının köşesinde durur; dokunup kapatırsın.</sub></p>
+
+### Kartları nerede görürsün
+
+Aynı kartlar üç yerde görünür; hangisini açık tutacağın sana kalmış.
+
+<p align="center"><img src="gorsel/kart-panel.png" alt="Her türden kartla tam panel: Cevap, Not, Söyle, Ne diyeyim, Dur; sağda canlı döküm" width="100%"></p>
+<p align="center"><sub><b>Tam panelde.</b> Mac penceresinde ya da Chrome'da: ortada kartlar, sağda canlı döküm ve asistan sohbeti.</sub></p>
+
+<p align="center"><img src="gorsel/kart-yan-mini.png" alt="Yan panel (mini pano): aynı kartlar toplantı penceresinin yanında dar bir sütunda" width="36%"></p>
+<p align="center"><sub><b>Yan panelde.</b> Mini pano toplantı penceresinin yanında dar bir sütunda durur; tam panelin sağındaki asistan sohbeti (5. görsel) yazılı cevapları tutar.</sub></p>
+
+<p align="center"><img src="gorsel/toplanti-6-serit.png" alt="Yalnız ekranda kart: toplantı penceresinin köşesinde Suflor.me şeridi" width="100%"></p>
+<p align="center"><sub><b>Yalnız ekranda kart.</b> Pano açık değilken kartlar toplantı penceresinin köşesindeki şeritte durur; üç küçük düğme: yaptım, sonraya bırak, gerek yok.</sub></p>
 
 - **Kaynaklı cevap:** *"Geçen hafta bu rakam neydi?"* sorusuna kartta rakam, dönem ve kaynak adıyla cevap gelir. Kaynak; geçmiş toplantılar, proje belgeleri
   (bu Mac'te dizinlenir) ya da senin açtığın bir canlı veri kaynağı olabilir.
@@ -70,7 +83,7 @@ Suflor.me'nin merkezinde bu var: konuşma akarken konuya uyan bilgiyi **kendisi 
 Suflor.me yalnız not tutan bir araç değil. İstersen asistanın toplantıya katılır: ona adıyla seslenirsin, cevabını herkes duyar.
 Bir kez çağırdıktan sonra öbür katılımcılar da ona soru sorabilir. İstersen toplantıyı bütünüyle ona devredersin.
 
-<p align="center"><img src="gorsel/toplantida.png" alt="Toplantıdan bir an: Deniz toplantıyı Defne'ye devrediyor; Defne gündemi açıyor, Ayla'nın sorusunu geçmiş toplantıdan cevaplıyor, sessiz kalan Can'a söz veriyor" width="100%"></p>
+<p align="center"><img src="gorsel/toplantida.png" alt="Toplantıdan bir an, canlı dökümde: Deniz toplantıyı Defne'ye devrediyor, Defne gündemi açıyor ve Ayla'ya söz veriyor; solda kartlar" width="100%"></p>
 
 - **Toplantıda konuşur:** *"Defne, bu hafta hangi işler kaldı?"* Cevap herkesin duyacağı şekilde okunur. Asistan sözü kesmez, sırasını
   bekler; biri konuşmaya başlarsa susar. *"Defne, dur"* ya da Option + Shift + S onu hemen susturur. Ayardan açılır
@@ -107,7 +120,7 @@ Her biri kendi adıyla çağrılır, kendi sesiyle konuşur.
 Asistan toplantıyı izler ve dört tür kart gönderir. Mac uygulaması açıkken kartlar ekranın alt ortasında, toplantı görüntüsünün üzerinde ayrı kutular olarak çıkar; tıklayınca açılır, ekran paylaşımında görünmez. Uygulama yoksa toplantı ekranının köşesindeki küçük şeritte ve panoda belirir.
 Kartın yanındaki üç küçük düğme: yaptım, sonraya bırak, gerek yok.
 
-<p align="center"><img src="gorsel/kartlar.png" alt="Dört kart türü: Söyle, Dur, Cevap, Not" width="100%"></p>
+<p align="center"><img src="gorsel/kartlar.png" alt="Panelde kart örnekleri: Cevap, Not, Söyle, Ne diyeyim, Dur ve dış firma bilgisiyle bir Cevap" width="100%"></p>
 
 - **Ölçülü:** toplantıdaki rolüne (yöneten, katılımcı, dinleyici) göre az ya da çok konuşur. Kendiliğinden gelen Söyle ve Not kartları
   dakikada en çok bir kez araya girer. **Sessiz** düğmesi 10 dakika boyunca hiç kart göndermez.
@@ -175,7 +188,7 @@ Kurulumda proje klasörünü gösterirsin. Suflor.me klasördeki belgeleri (Word
 (PowerPoint, Keynote), tabloları (Excel, Numbers, CSV) ve görüntüleri bu Mac'te metne çevirir ve dizinler.
 Arama sözcükle sınırlı değildir. Soruda geçen sözcük belgede hiç geçmese de anlamca yakın parçayı bulur.
 
-<p align="center"><img src="gorsel/toplantilar.png" alt="Toplantılar penceresi: 'beta' araması, dört toplantıda sekiz sonuç" width="100%"></p>
+<p align="center"><img src="gorsel/toplantilar.png" alt="Toplantılar penceresi: 'beta' araması, dört toplantıda yedi sonuç" width="100%"></p>
 
 - **Tablolar ve proje kartı tek veritabanında:** Excel, Numbers ve CSV sayfaları bu Mac'te küçük bir veritabanına girer. "Bu ay toplam
   ne harcadık?", "Kaç açık iş var?" gibi sorularda asistan satırları göz kararı toplamaz, hesaplar ve kaynak dosyayı söyler. Kurulumda
@@ -193,9 +206,9 @@ Arama sözcükle sınırlı değildir. Soruda geçen sözcük belgede hiç geçm
 
 Suflor.me baştan bu kuralla yazıldı: **ses Mac'inden çıkmaz.** Konuşma tanıma, ses izi, belge çevirme ve arama bu Mac'te çalışır.
 
-<p align="center"><img src="gorsel/gizlilik.png" alt="Mac'inde kalanlar, Claude'a gidenler, yalnız açarsan Google'a gidenler" width="100%"></p>
+<p align="center"><img src="gorsel/mimari.png" alt="Mimari ve gizlilik sınırı: toplantı uygulaması, yakalama, yerel aktarıcı, yerel Whisper ve pano Mac kutusunun içinde kalır; dışarı yalnız metin, seçtiğin yapay zekâ sağlayıcısına gider" width="100%"></p>
 
-- Suflor.me'nin yerel sunucusu yalnız bu Mac'ten gelen bağlantıyı kabul eder (`127.0.0.1`). Toplantı içeriği hiçbir sunucuya gönderilmez.
+- Suflor.me'nin yerel sunucusu yalnız bu Mac'ten gelen bağlantıyı kabul eder (`127.0.0.1`). Ses ve ses izi hiçbir sunucuya gitmez; metin yalnız seçtiğin yapay zekâya gider.
 - Claude'a giden metni senin Claude Code oturumun görür; Anthropic'in kullanım koşulları geçerlidir.
 - Claude yerine başka bir servis seçersen metin bağlamı (döküm, not, belge parçası) o servise gider, ses gitmez.
 - Beta sürümü gönüllü geliştirme katılımıdır ve kapatılmaz. Giden her paketin kopyası
