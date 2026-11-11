@@ -265,7 +265,7 @@ def liste_oku(arg=None, dizin=None):
         if slug(a["ad"]) in var_id or tr_kucuk(a["ad"]) in var_ad:
             continue
         ana.append({"id": slug(a["ad"]), "ad": a["ad"], "kisiler": [], "alanlar": [str(x).lower() for x in (a.get("alanlar") or [])],
-                    "abn": "", "linkedin": [str(u) for u in (a.get("linkedin") or [])], "x": [str(u) for u in (a.get("x") or [])], "sayfalar": [], "haber_sorgu": [], "neden": a.get("neden") or "",
+                    "abn": "", "linkedin": [str(u) for u in (a.get("linkedin") or [])], "x": [str(u) for u in (a.get("x") or [])], "eposta_iz": [str(u) for u in (a.get("eposta_iz") or [])], "sayfalar": [], "haber_sorgu": [], "neden": a.get("neden") or "",
                     "kaynak": "suflor-aday"})
     return ana
 
@@ -1560,9 +1560,23 @@ def ekle_cmd(a):
     return 0
 
 
-def _aday_sosyal(kay, linkedin, x):
-    """aday kaydına doğrulanmış biçimde LinkedIn/X adresi ekler; eklenen sayısı."""
+def eposta_iz(adres):
+    """e-posta adresinin izi (sha256, 16 hane): adres dosyaya yazılmaz, metindeki aynı adres yine eşleşir."""
+    a = str(adres or "").strip().lower()
+    return hashlib.sha256(a.encode()).hexdigest()[:16] if EPOSTA_TAM_RX.fullmatch(a) else None
+
+
+EPOSTA_TAM_RX = re.compile(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}")
+
+
+def _aday_sosyal(kay, linkedin, x, eposta=None):
+    """aday kaydına doğrulanmış biçimde LinkedIn/X adresi ve e-posta izi ekler; eklenen sayısı."""
     n = 0
+    for e in eposta or []:
+        iz = eposta_iz(e)
+        if iz and iz not in kay.setdefault("eposta_iz", []):
+            kay["eposta_iz"].append(iz)
+            n += 1
     def li_gecerli(u):  # yalnız profil ya da şirket kökü
         n = li_norm(u)
         return n if re.fullmatch(r"([a-z]{2,3}\.)?linkedin\.com/(in|company)/[^/?#]+", n) else None
@@ -1578,7 +1592,7 @@ def _aday_sosyal(kay, linkedin, x):
     return n
 
 
-def aday_ekle(ad, alan=None, neden="elle", dizin=None, linkedin=None, x=None):
+def aday_ekle(ad, alan=None, neden="elle", dizin=None, linkedin=None, x=None, eposta=None):
     """Suflor'un aday listesine ekler (ana listene hiç yazılmaz). Döner: (durum, kayıt): "yeni" | "var" | "guncel".
     linkedin/x: arama motorunda bulunup kullanıcının istediği profil adresleri; sosyal-izin bunlara izin verir."""
     ad = re.sub(r"\s+", " ", str(ad or "")).strip()[:80]
@@ -1592,23 +1606,23 @@ def aday_ekle(ad, alan=None, neden="elle", dizin=None, linkedin=None, x=None):
         mevcut = None
     lst = aday_oku(dizin)
     if mevcut and (tr_kucuk(mevcut["ad"]) == tr_kucuk(ad) or mevcut["id"] == slug(ad) or (alan and alan in mevcut["alanlar"])):
-        if mevcut.get("kaynak") == "suflor-aday" and (linkedin or x):
+        if mevcut.get("kaynak") == "suflor-aday" and (linkedin or x or eposta):
             for kay in lst:
                 if slug(kay["ad"]) == mevcut["id"]:
-                    if _aday_sosyal(kay, linkedin, x):
+                    if _aday_sosyal(kay, linkedin, x, eposta):
                         yaz_atomik(aday_yolu(dizin), json.dumps(lst[-200:], ensure_ascii=False, indent=1))
                         return "guncel", kay
         return "var", mevcut
     kay = {"ad": ad, "alanlar": [alan] if alan else [], "neden": neden if neden in ("toplanti", "konus", "brifing", "elle") else "elle",
            "tarih": bugun().isoformat()}
-    _aday_sosyal(kay, linkedin, x)
+    _aday_sosyal(kay, linkedin, x, eposta)
     lst.append(kay)
     yaz_atomik(aday_yolu(dizin), json.dumps(lst[-200:], ensure_ascii=False, indent=1))
     return "yeni", kay
 
 
 def aday_cmd(a):
-    d, k = aday_ekle(a.ad, a.alan, a.neden, linkedin=a.linkedin, x=a.x)
+    d, k = aday_ekle(a.ad, a.alan, a.neden, linkedin=a.linkedin, x=a.x, eposta=a.eposta)
     print({"yeni": f"aday eklendi: {a.ad}", "var": f"zaten listede: {k['ad'] if k else a.ad}", "guncel": f"sosyal adres eklendi: {a.ad}",
            "bos": "ad gerekli"}[d])
     return 0 if d != "bos" else 1
@@ -1966,8 +1980,15 @@ def metinden_kayitlar(metin, liste=None, dizin=None, en_cok=3):
             return None
         m = re.search(r"(?<![\w.-])" + re.escape(s) + r"(?![\w-])", q)
         return m.start() if m else None
+    izler = {}
+    for m in EPOSTA_TAM_RX.finditer(q):
+        izler.setdefault(eposta_iz(m.group(0)), m.start())
     out = []
     for k in liste:
+        ez = [izler[i] for i in k.get("eposta_iz") or [] if i in izler]
+        if ez:
+            out.append((min(ez), k))
+            continue
         adlar = [k["ad"], kisa_ad(k["ad"])] + [p for p in k["kisiler"] if " " in p.strip() or len(p.strip()) >= 6] + list(k["alanlar"])
         ys = [y for y in (yer(a_) for a_ in adlar) if y is not None]
         if ys:
@@ -2032,6 +2053,7 @@ def main(argv=None):
     ad_.add_argument("--ad", required=True); ad_.add_argument("--alan"); ad_.add_argument("--neden", default="elle", choices=("toplanti", "konus", "brifing", "elle"))
     ad_.add_argument("--linkedin", action="append", help="profil adresi (arama motorunda bulunan; tekrar verilebilir)")
     ad_.add_argument("--x", action="append", help="X profil adresi")
+    ad_.add_argument("--eposta", action="append", help="kişinin e-posta adresi; yalnız izi saklanır (takvim/brifing eşleşmesi için)")
     ad_.set_defaults(f=aday_cmd)
     si = sp.add_parser("sosyal-izin", help="LinkedIn ya da X sayfası açmadan önce sayaçtan izin al")
     si.add_argument("platform", choices=PLATFORMLAR); si.add_argument("kayit_id"); si.add_argument("url"); si.set_defaults(f=sosyal_cmd)

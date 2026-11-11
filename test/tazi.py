@@ -366,6 +366,12 @@ rc, c = run("aday", "--ad", "Yeni Aday Firma", "--linkedin", LI_AD); kontrol("ad
 ay = json.loads(oku("aday.json")); kontrol("aday.json: yalnız geçerli LinkedIn adresi", ay[0].get("linkedin") == [LI_AD], str(ay))
 rc, c = run("sosyal-izin", "linkedin", AD_ID, LI_AD + "recent-activity/all/"); kontrol("aday: eklenen profil ve alt sayfası sosyal-izin evet", c.strip().startswith("evet"), c)
 rc, c = run("aday", "--ad", "Örnek Danışmanlık Pty Ltd", "--linkedin", LI_AD); kontrol("aday: ana listedeki kayda adres yazılmaz", "zaten listede" in c and open(liste_yol, "rb").read() == ana_once, c)
+AT = chr(64); EP = "Kisi.Ornek" + AT + "Ornek.test"
+rc, c = run("aday", "--ad", "Yeni Aday Firma", "--eposta", EP, "--eposta", "gecersiz-adres"); kontrol("aday: e-posta izi eklenir", "sosyal adres eklendi" in c, c)
+ay_ = oku("aday.json"); kontrol("aday.json: e-posta adresi yazılmaz, yalnız iz", "kisi.ornek" not in ay_.lower() and len(json.loads(ay_)[0].get("eposta_iz", [])) == 1, ay_)
+L3 = tazi.liste_oku(liste_yol)
+kontrol("metinden_kayitlar: takvimdeki e-posta adresiyle aday dosyası bulunur", [k["id"] for k in tazi.metinden_kayitlar("katılımcılar: kisi.ornek" + AT + "ornek.test, baska" + AT + "x.test", L3)] == [AD_ID])
+kontrol("metinden_kayitlar: başka adres eşleşmez", tazi.metinden_kayitlar("baska.kisi" + AT + "ornek.test", L3) == [])
 S["istek"].clear(); n_once = len(bulgular()); G4 = g(BUG + datetime.timedelta(days=4)); t0 = time.time()
 rc, c = run("tara", "--kim", "Yeni Aday Firma", "--hizli", TAZI_BUGUN=G4, TAZI_BEKLE="5"); sure = time.time() - t0
 kontrol("hızlı tarama: çıkış 0, TAZI_BEKLE yok sayıldı (0,3 sn)", rc == 0 and sure < 12, f"{sure:.1f} {c}")
