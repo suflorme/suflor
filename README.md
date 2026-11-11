@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <img src="gorsel/hero.png" alt="Suflor.me: toplantı ekranının köşesinde asistanın kartları; büyütülmüş Not kartı: Toplantıda %12 dendi; kaynakta son 7 günde %8." width="100%">
+  <img src="gorsel/mac.png" alt="Suflor.me Mac penceresi: kenar çubuğu, ortada kartlar ve asistanın cevabı, sağda gündem ve canlı döküm" width="100%">
 </p>
 
 <p align="center">
-  <b>Toplantıların için sesli asistan.</b> Mac'inde çalışır, projeni bilir, doğru anda kulağına fısıldar.
+  <b>Mac'inde çalışan kişisel sesli asistan.</b> Gününü planlar, toplantında kulağına fısıldar, işlerini ve e-postalarını takip eder; projeni bilir.
 </p>
 
 <p align="center">
@@ -19,20 +19,64 @@
 
 <p align="center">
   <a href="#kurulum">Kurulum</a> ·
-  <a href="#toplantı-akarken-canlı-veriyle-kart">Canlı veriyle kart</a> ·
-  <a href="#toplantıya-sesle-katılır">Toplantıya sesle katılır</a> ·
+  <a href="#gün-boyu-yanında">Gün boyu</a> ·
+  <a href="#toplantı-akarken-canlı-veriyle-kart">Toplantıda</a> ·
   <a href="#gizlilik">Gizlilik</a> ·
   <a href="KILAVUZ.md">Kılavuz</a>
 </p>
 
 ---
 
-Tiyatroda suflör, oyuncu repliğini unuttuğunda kulisten fısıldayan kişidir. Suflor.me toplantıda aynı işi yapar. Sen konuşmaya
-odaklanırsın. O dinler, projenin geçmişini hatırlar ve gerektiğinde tek bir cümle söyler.
+Tiyatroda suflör, oyuncu repliğini unuttuğunda kulisten fısıldayan kişidir. Suflor.me bu işi toplantıda yapmak için başladı; bugün gün boyu
+yanında duran kişisel bir asistan. Ona bir ad koyarsın, yazarak ya da sesle konuşursun. Seni, projeni ve işlerini kullandıkça tanır.
 
-<p align="center"><img src="gorsel/ozellikler.png" alt="Öne çıkanlar: toplantıda konuşur, katılımcıyı cevaplar, toplantıyı yönetir, canlı çeviri, kulağına fısıldar, geçmişi hatırlar, eller serbest, gizli toplantı" width="100%"></p>
+## Gün boyu yanında
+
+- **Sabah:** *Günün özeti* o gün sana düşeni gösterir: günün odağı, karar bekleyen işler, dünden bu yana değişenler.
+- **İstediğin an:** Mac'in her yerinde Option + Shift + Boşluk'u basılı tutup sorarsın ya da sohbet panelinden yazarsın. Web'de arar, e-posta taslağı hazırlar, takvimine hatırlatma ekler.
+- **E-posta, işler, takvim:** cevap bekleyen e-postaları listeler, işlerini Mac Anımsatıcılar'a eşitler, takvimine bakıp boş zamanını söyler.
+- **Toplantıda:** konuşmayı dinler, konuya uyan bilgiyi kaynağıyla bir karta koyar, istersen toplantıya sesle katılır.
+- **Toplantıdan sonra:** kararları ve işleri kapanış turuyla toparlar, açık kalanı sonra hatırlatır.
+- **Zamanla öğrenir:** gece kayıtlarına bakıp neyi öğrendiğini yazar; sen *Doğru* ya da *Yanlış* dersin.
+
+## Günün özeti
+
+Sabahları pano, o gün sana düşeni tek bakışta gösterir: günün odağı, karar bekleyen işler, dünden bu yana **Yeni** ya da **Değişti** diye işaretlenenler.
+Her satırın yanında tek tıkla yapılacak iş vardır: *Onayla*, *Yapıldı*, *Taslağını hazırla*. Asistan gece boyunca kayıtlarına bakıp neyi öğrendiğini de yazar;
+*Dün öğrendiklerim* altında **Doğru** ya da **Yanlış** diyerek düzeltirsin, o da bir sonraki sefere kullanılır.
+
+<p align="center"><img src="gorsel/gun.png" alt="Günün özeti: bugünün odağı, dikkat bekleyen kararlar (Yeni, Değişti), Taslağını hazırla ve Onayla düğmeleri; Dün öğrendiklerim satırında Doğru ve Yanlış" width="100%"></p>
+
+## Asistanına adıyla seslen
+
+Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad geçer. Ona yazarsın ya da sesle sorarsın:
+*"Defne, geçen hafta beta için hangi tarihi konuşmuştuk?"* Cevap birkaç saniye içinde panoda ve sesli olarak gelir.
+
+- **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
+  Mikrofona iki kez dokunursan eller serbest sohbet başlar.
+- **Sohbet paneli:** araç çubuğundaki **Asistan sohbeti** düğmesi asistanla yazışmak için yan bir panel açar. Geniş ekranda panonun yanında durur,
+  içeriği ezmez; dar ekranda üstüne biner. Panonun kenarından sürükleyerek genişletirsin. Yazdığın sorunun cevabını 🔊 düğmesiyle sesli de aldırabilirsin.
+- **Web'de arar:** *"Defne, bu firma hakkında ne biliniyor?"* ya da sana verdiğin bir bağlantıyı okuması gibi güncel bilgi isteklerinde internete bakar.
+  Aramaya yalnız sorudaki konu gider; gizli toplantıda kapalıdır.
+- **Taslak hazırlar:** *"Defne, Ayşe'ye toplantı notlarını e-posta olarak hazırla."* Taslak Mac'in Mail uygulamasında açılır; göndermek her zaman sende.
+  Bir iş ya da karar sahibine e-posta ya da Teams mesajı taslağı da hazırlar.
+- **Sesle yönetir:** *"Defne, kararları göster"* dersen pano o bölümde açılır; *"gündeme ekle: …"*, *"toplantıyı başlat"*, *"toplantıyı bitir"* (bitirmeden önce sesli "evet" ister).
+- **E-postalar ve Anımsatıcılar:** panoda cevap bekleyen e-postaların listesi (zinciri okuyarak değerlendirilir) ve istersen kendi işlerinin Mac Anımsatıcılar'a eşitlenmesi var; ayrıntı [Kılavuz](KILAVUZ.md#e-postalar-ve-anımsatıcılar).
+- **Başka oturuma iş:** *"Defne, bunu proje oturumuna ilet"* dediğinde ileti bir onay kartıyla sunulur; onaylarsan iletilir.
+- **Hatırlatma:** *"Defne, yarın sabah onda Ali'yi aramamı hatırlat"* dediğinde asistan doğal bir soruyla onay ister; "evet" dersen takvimine
+  o saatte uyaran kısa bir etkinlik olarak eklenir. Asistan eklediği işin durumunu bilir; *"onu kaldır"* dersen yine onayınla takvimden siler.
+- **İki asistan:** istersen toplantı dışında daha rahat konuşan ikinci bir asistan eklersin. Ayarlar'dan açarsan ikisi birbirini duyar ve
+  sohbete kendiliğinden katılır; üçünüz birlikte konuşursunuz.
+- **Yapay zekâ seçimi:** asistanın beyni varsayılan olarak Claude'dur. Claude aboneliğin yoksa Gemini ya da OpenAI uyumlu bir API anahtarı
+  seçebilirsin; iş başına (Konuş, çeviri, proje kartı) ayrı ayarlanır.
+  Seçtiğin servis hata verirse o iş bir kez Claude'la yapılır.
+- **Ses:** Mac'in Türkçe sesi, Mac'te çalışan doğal Türkçe kadın ve erkek sesi (Pocket) ya da isteğe bağlı Gemini sesi.
 
 ## Toplantı akarken canlı veriyle kart
+
+<p align="center"><img src="gorsel/hero.png" alt="Toplantı ekranının köşesinde asistanın kartları; büyütülmüş Not kartı: Toplantıda %12 dendi; kaynakta son 7 günde %8." width="100%"></p>
+
+<p align="center"><img src="gorsel/ozellikler.png" alt="Toplantıda öne çıkanlar: toplantıda konuşur, katılımcıyı cevaplar, toplantıyı yönetir, canlı çeviri, kulağına fısıldar, geçmişi hatırlar, eller serbest, gizli toplantı" width="100%"></p>
 
 Suflor.me'nin merkezinde bu var: konuşma akarken konuya uyan bilgiyi **kendisi bulur ve kaynağıyla bir karta koyar.** Biri bir sayı, tarih ya da
 önceki bir karar sorduğunda cevabı toplantıyı bölmeden kulağına gelir; konuşulan bir rakam kayıttakiyle tutmuyorsa uyarır.
@@ -147,14 +191,6 @@ Yaptıkların **Kararlar ve işler** panosunda toplanır; sahibi ve tarihi belli
 - **Toplantıdan açık uçlar:** toplantı bittikten bir süre sonra, kapanmamış bir iş ya da cevapsız bir soru kalmışsa asistan kısaca hatırlatır. Gizli toplantıda hiç çalışmaz.
 - **Acil toplantı:** *"Ali'yle bugün yirmi dakikalık bir toplantı kur"* dersin; Teams, Meet ya da Zoom için hazır bir davet taslağı açılır. Davet kendiliğinden gitmez.
 
-## Günün özeti
-
-Sabahları pano, o gün sana düşeni tek bakışta gösterir: günün odağı, karar bekleyen işler, dünden bu yana **Yeni** ya da **Değişti** diye işaretlenenler.
-Her satırın yanında tek tıkla yapılacak iş vardır: *Onayla*, *Yapıldı*, *Taslağını hazırla*. Asistan gece boyunca kayıtlarına bakıp neyi öğrendiğini de yazar;
-*Dün öğrendiklerim* altında **Doğru** ya da **Yanlış** diyerek düzeltirsin, o da bir sonraki sefere kullanılır.
-
-<p align="center"><img src="gorsel/gun.png" alt="Günün özeti: bugünün odağı, dikkat bekleyen kararlar (Yeni, Değişti), Taslağını hazırla ve Onayla düğmeleri; Dün öğrendiklerim satırında Doğru ve Yanlış" width="100%"></p>
-
 ## Takvim
 
 Mac Takvim'indeki toplantılar (Google, Exchange, iCloud) Suflor.me'nin kenar çubuğunda **Takvim** sayfasında görünür. Kayıt gerekmez; Takvim'i okur, değiştirmez.
@@ -184,33 +220,6 @@ Toplantı sürerken yan paneldeki **Gündem** sekmesi maddeleri sıralar; konuş
 **Ekip eşitlemesi (isteğe bağlı).** Aynı şirketin Google hesabıyla giriş yapan ekip üyelerinin kayıtları eşitlenebilir. Herkes yalnız kendi rolüyle ilgili kaydı görür. Kararlar ve işler başlığının altındaki satır son eşitlemeyi ve gecikmeyi gösterir. Kurulum, davet ve katılım `ortak_bulut.py` ile yapılır (`kur`, `davet`, `katil`); varsayılan kapalıdır. Toplantı ses kaydı ve döküm eşitlenmez.
 
 **Dış araçlar.** Canlı rakam gerektiğinde bilgi kaynakları bağlayıcısı salt okuma ile metrik getirir. Toplantı sonrası e-posta taslağı hazırlanır, göndermek sana kalır. Yol haritasında: proje yönetim aracıyla (ilk olarak Basecamp) iş eşitlemesi.
-
-## Asistanına adıyla seslen
-
-Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad geçer. Ona yazarsın ya da sesle sorarsın:
-*"Defne, geçen hafta beta için hangi tarihi konuşmuştuk?"* Cevap birkaç saniye içinde panoda ve sesli olarak gelir.
-
-<p align="center"><img src="gorsel/mac.png" alt="Suflor.me Mac penceresi: kenar çubuğu, ortada kartlar ve Defne'nin cevabı, sağda gündem ve canlı döküm" width="100%"></p>
-
-- **Tek kutu:** her görünümün altında aynı kutu var. Solda `+` belge ekler, ortaya yazarsın, sağdaki mikrofona basılı tutarak sorarsın.
-  Mikrofona iki kez dokunursan eller serbest sohbet başlar.
-- **Sohbet paneli:** araç çubuğundaki **Asistan sohbeti** düğmesi asistanla yazışmak için yan bir panel açar. Geniş ekranda panonun yanında durur,
-  içeriği ezmez; dar ekranda üstüne biner. Panonun kenarından sürükleyerek genişletirsin. Yazdığın sorunun cevabını 🔊 düğmesiyle sesli de aldırabilirsin.
-- **Web'de arar:** *"Defne, bu firma hakkında ne biliniyor?"* ya da sana verdiğin bir bağlantıyı okuması gibi güncel bilgi isteklerinde internete bakar.
-  Aramaya yalnız sorudaki konu gider; gizli toplantıda kapalıdır.
-- **Taslak hazırlar:** *"Defne, Ayşe'ye toplantı notlarını e-posta olarak hazırla."* Taslak Mac'in Mail uygulamasında açılır; göndermek her zaman sende.
-  Bir iş ya da karar sahibine e-posta ya da Teams mesajı taslağı da hazırlar.
-- **Sesle yönetir:** *"Defne, kararları göster"* dersen pano o bölümde açılır; *"gündeme ekle: …"*, *"toplantıyı başlat"*, *"toplantıyı bitir"* (bitirmeden önce sesli "evet" ister).
-- **E-postalar ve Anımsatıcılar:** panoda cevap bekleyen e-postaların listesi (zinciri okuyarak değerlendirilir) ve istersen kendi işlerinin Mac Anımsatıcılar'a eşitlenmesi var; ayrıntı [Kılavuz](KILAVUZ.md#e-postalar-ve-anımsatıcılar).
-- **Başka oturuma iş:** *"Defne, bunu proje oturumuna ilet"* dediğinde ileti bir onay kartıyla sunulur; onaylarsan iletilir.
-- **Hatırlatma:** *"Defne, yarın sabah onda Ali'yi aramamı hatırlat"* dediğinde asistan doğal bir soruyla onay ister; "evet" dersen takvimine
-  o saatte uyaran kısa bir etkinlik olarak eklenir. Asistan eklediği işin durumunu bilir; *"onu kaldır"* dersen yine onayınla takvimden siler.
-- **İki asistan:** istersen toplantı dışında daha rahat konuşan ikinci bir asistan eklersin. Ayarlar'dan açarsan ikisi birbirini duyar ve
-  sohbete kendiliğinden katılır; üçünüz birlikte konuşursunuz.
-- **Yapay zekâ seçimi:** asistanın beyni varsayılan olarak Claude'dur. Claude aboneliğin yoksa Gemini ya da OpenAI uyumlu bir API anahtarı
-  seçebilirsin; iş başına (Konuş, çeviri, proje kartı) ayrı ayarlanır.
-  Seçtiğin servis hata verirse o iş bir kez Claude'la yapılır.
-- **Ses:** Mac'in Türkçe sesi, Mac'te çalışan doğal Türkçe kadın ve erkek sesi (Pocket) ya da isteğe bağlı Gemini sesi.
 
 ## Projeni ve geçmişini hatırlar
 
@@ -275,6 +284,8 @@ asistanın adı ve sesi, proje klasörü, modellerin indirilmesi, takvim ve Chro
 
 Her yayın geliştiricinin anahtarıyla imzalıdır. Kurulum ve güncelleme indirilen kodun imzasını doğrular; tutmazsa hiçbir şey kurmaz.
 Yeni sürüm çıkınca panoda **Güncelle** düğmesi belirir.
+
+**Kurulumda takılırsan:** bir Claude oturumuna bu deponun bağlantısını ve ekrandaki hata metnini ver. Claude kurulum adımlarını, kayıt dosyalarını ve bilinen sorunları [KURULUM-YARDIM.md](KURULUM-YARDIM.md) dosyasından okur.
 
 ### Gerekenler
 

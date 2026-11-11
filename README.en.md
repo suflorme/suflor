@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <img src="gorsel/en/hero.png" alt="Suflor.me: the assistant's cards in the corner of a meeting; an enlarged Note card: 12% was said in the meeting; the source shows 8% over the last 7 days." width="100%">
+  <img src="gorsel/en/mac.png" alt="Suflor.me Mac window: sidebar, cards and the assistant's answer in the middle, agenda and live transcript on the right" width="100%">
 </p>
 
 <p align="center">
-  <b>A voice assistant for your meetings.</b> It runs on your Mac, knows your project and whispers the right line at the right moment.
+  <b>A personal voice assistant that runs on your Mac.</b> It plans your day, whispers to you in meetings, keeps track of your tasks and emails, and knows your project.
 </p>
 
 <p align="center">
@@ -19,20 +19,56 @@
 
 <p align="center">
   <a href="#installation">Installation</a> ·
-  <a href="#live-data-on-a-card-as-the-meeting-unfolds">Live data cards</a> ·
-  <a href="#it-joins-the-meeting-by-voice">Joins the meeting</a> ·
+  <a href="#through-the-day">Through the day</a> ·
+  <a href="#live-data-on-a-card-as-the-meeting-unfolds">In meetings</a> ·
   <a href="#privacy">Privacy</a> ·
   <a href="KILAVUZ.md">Guide (Turkish)</a>
 </p>
 
 ---
 
-In theatre, the prompter (*suflör* in Turkish) whispers the line an actor has forgotten from the wings. Suflor.me does the same in
-your meetings. You focus on the conversation. It listens, remembers your project's history and, when it matters, says one sentence.
+In theatre, the prompter (*suflör* in Turkish) whispers the line an actor has forgotten from the wings. Suflor.me started out doing that in
+meetings; today it is a personal assistant that stays with you through the day. You give it a name and talk to it by text or voice. The more
+you use it, the better it knows you, your project and your work.
 
-<p align="center"><img src="gorsel/en/ozellikler.png" alt="Highlights: speaks in the meeting, answers participants, runs the meeting, live translation, whispers to you, remembers history, hands-free, private meeting" width="100%"></p>
+## Through the day
+
+- **Morning:** *Today at a glance* shows what is on your plate: the day's focus, decisions waiting on you, what changed since yesterday.
+- **Any time:** hold Option + Shift + Space anywhere on your Mac and ask, or type in the chat panel. It searches the web, drafts emails and adds reminders to your calendar.
+- **Email, tasks, calendar:** it lists emails waiting for a reply, syncs your tasks to Mac Reminders and finds free time in your calendar.
+- **In meetings:** it listens, puts the relevant information on a card with its source and, if you like, joins the meeting by voice.
+- **After meetings:** a closing round collects decisions and tasks, and open ends are brought up again later.
+- **It learns over time:** overnight it reviews your records and writes down what it learned; you mark it *Right* or *Wrong*.
+
+## Today at a glance
+
+In the morning the panel shows what is yours for the day at a glance: the day's focus, items awaiting your decision, and what is marked **New** or **Changed** since yesterday.
+Every row has a one-click action beside it: *Approve*, *Done*, *Prepare the draft*. Overnight the assistant also looks through your records and writes down what it learned;
+under *What I learned yesterday* you say **Right** or **Wrong**, and that is used next time.
+
+<p align="center"><img src="gorsel/en/gun.png" alt="Today at a glance: today's focus, decisions needing attention (New, Changed), Prepare the draft and Approve buttons; What I learned yesterday with Right and Wrong" width="100%"></p>
+
+## Call your assistant by name
+
+During setup you give your assistant a name; only that name appears on the panel, on cards and in speech. You type to it or ask
+by voice: *"Defne, what date did we discuss for the beta last week?"* The answer arrives on the panel and aloud within seconds.
+
+- **One box:** the same box sits under every view. `+` on the left adds a document, you type in the middle, and you hold the microphone
+  on the right to ask by voice. Double-tap the microphone for a hands-free conversation.
+- **Work for another session:** say *"Defne, forward this to the project session"* and the message is shown on a confirmation card;
+  it is sent only if you approve.
+- **Two assistants:** optionally add a second, more relaxed assistant for outside meetings. Turn it on in Settings and the two hear each
+  other and join the conversation on their own; the three of you talk together.
+- **Choice of AI:** the assistant's brain is Claude by default. Without a Claude subscription you can use a Gemini or OpenAI-compatible API key;
+  each job (Talk, translation, project card) can be set separately.
+  If the chosen service fails, that job is done once with Claude.
+- **Voice:** your Mac's built-in voice, natural Turkish voices that run on your Mac (Pocket) or the optional Gemini voice.
 
 ## Live data on a card, as the meeting unfolds
+
+<p align="center"><img src="gorsel/en/hero.png" alt="The assistant's cards in the corner of a meeting; an enlarged Note card: 12% was said in the meeting; the source shows 8% over the last 7 days." width="100%"></p>
+
+<p align="center"><img src="gorsel/en/ozellikler.png" alt="Meeting highlights: speaks in the meeting, answers participants, runs the meeting, live translation, whispers to you, remembers history, hands-free, private meeting" width="100%"></p>
 
 This is the heart of Suflor.me: as the conversation moves, it **finds the information that fits the topic and puts it on a card with its source.** When someone
 asks for a number, a date or an earlier decision, the answer reaches you without interrupting the meeting; when a figure said aloud doesn't match the record, it warns you.
@@ -149,14 +185,6 @@ What you handled collects in the **Decisions and tasks** panel: tasks with an ow
 - **Open ends after a meeting:** a while after the meeting, if a task is still open or a question unanswered, the assistant gives a short reminder. It never runs in a private meeting.
 - **Urgent meeting:** say *"Set up a twenty-minute meeting with Ali today"* and a ready-to-send invitation draft opens for Teams, Meet or Zoom. The invitation never goes out on its own.
 
-## Today at a glance
-
-In the morning the panel shows what is yours for the day at a glance: the day's focus, items awaiting your decision, and what is marked **New** or **Changed** since yesterday.
-Every row has a one-click action beside it: *Approve*, *Done*, *Prepare the draft*. Overnight the assistant also looks through your records and writes down what it learned;
-under *What I learned yesterday* you say **Right** or **Wrong**, and that is used next time.
-
-<p align="center"><img src="gorsel/en/gun.png" alt="Today at a glance: today's focus, decisions needing attention (New, Changed), Prepare the draft and Approve buttons; What I learned yesterday with Right and Wrong" width="100%"></p>
-
 ## Calendar
 
 The meetings in your Mac Calendar (Google, Exchange, iCloud) appear on the **Calendar** page in the Suflor.me sidebar. No sign-up is needed; it reads your Calendar and never changes it.
@@ -186,24 +214,6 @@ During the meeting the **Agenda** tab in the side panel lists the items; the one
 **Team sync (optional).** Teammates who sign in with the same company Google account can sync their records. Everyone sees only the records that concern their own role. The line under the page title shows the last sync and its delay. Setup, invitations and joining go through `ortak_bulut.py` (`kur`, `davet`, `katil`); it is off by default. Meeting audio and transcripts are not synced.
 
 **Other tools.** When a live figure is needed, the information-sources connector fetches metrics read-only. A follow-up e-mail draft is prepared after the meeting and sending is left to you. On the roadmap: task sync with a project-management tool (Basecamp first).
-
-## Call your assistant by name
-
-During setup you give your assistant a name; only that name appears on the panel, on cards and in speech. You type to it or ask
-by voice: *"Defne, what date did we discuss for the beta last week?"* The answer arrives on the panel and aloud within seconds.
-
-<p align="center"><img src="gorsel/en/mac.png" alt="Suflor.me Mac window: sidebar, cards and Defne's answer in the middle, agenda and live transcript on the right" width="100%"></p>
-
-- **One box:** the same box sits under every view. `+` on the left adds a document, you type in the middle, and you hold the microphone
-  on the right to ask by voice. Double-tap the microphone for a hands-free conversation.
-- **Work for another session:** say *"Defne, forward this to the project session"* and the message is shown on a confirmation card;
-  it is sent only if you approve.
-- **Two assistants:** optionally add a second, more relaxed assistant for outside meetings. Turn it on in Settings and the two hear each
-  other and join the conversation on their own; the three of you talk together.
-- **Choice of AI:** the assistant's brain is Claude by default. Without a Claude subscription you can use a Gemini or OpenAI-compatible API key;
-  each job (Talk, translation, project card) can be set separately.
-  If the chosen service fails, that job is done once with Claude.
-- **Voice:** your Mac's built-in voice, natural Turkish voices that run on your Mac (Pocket) or the optional Gemini voice.
 
 ## It remembers your project and its history
 
@@ -268,6 +278,8 @@ same command picks up where you left off.
 
 Every release is signed with the developer's key. Installation and updates verify the downloaded code's signature and install nothing
 if it doesn't match. When a new version is out, an **Update** button appears on the panel.
+
+**Stuck during installation?** Give a Claude session this repository's link and the error text on screen. Claude reads the install steps, log files and known issues from [KURULUM-YARDIM.md](KURULUM-YARDIM.md) (written for AI assistants, in Turkish).
 
 ### Requirements
 
