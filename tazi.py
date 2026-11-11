@@ -265,7 +265,7 @@ def liste_oku(arg=None, dizin=None):
         if slug(a["ad"]) in var_id or tr_kucuk(a["ad"]) in var_ad:
             continue
         ana.append({"id": slug(a["ad"]), "ad": a["ad"], "kisiler": [], "alanlar": [str(x).lower() for x in (a.get("alanlar") or [])],
-                    "abn": "", "linkedin": [], "x": [], "sayfalar": [], "haber_sorgu": [], "neden": a.get("neden") or "",
+                    "abn": "", "linkedin": [str(u) for u in (a.get("linkedin") or [])], "x": [str(u) for u in (a.get("x") or [])], "sayfalar": [], "haber_sorgu": [], "neden": a.get("neden") or "",
                     "kaynak": "suflor-aday"})
     return ana
 
@@ -1560,8 +1560,27 @@ def ekle_cmd(a):
     return 0
 
 
-def aday_ekle(ad, alan=None, neden="elle", dizin=None):
-    """Suflor'un aday listesine ekler (ana listene hiç yazılmaz). Döner: (durum, kayıt): "yeni" | "var"."""
+def _aday_sosyal(kay, linkedin, x):
+    """aday kaydına doğrulanmış biçimde LinkedIn/X adresi ekler; eklenen sayısı."""
+    n = 0
+    def li_gecerli(u):  # yalnız profil ya da şirket kökü
+        n = li_norm(u)
+        return n if re.fullmatch(r"([a-z]{2,3}\.)?linkedin\.com/(in|company)/[^/?#]+", n) else None
+    for alan_, liste_, norm_ in (("linkedin", linkedin, li_gecerli), ("x", x, x_norm)):
+        for u in liste_ or []:
+            u = str(u or "").strip()
+            if not u or not norm_(u):
+                continue
+            var = kay.setdefault(alan_, [])
+            if norm_(u) not in {norm_(v) for v in var}:
+                var.append(u)
+                n += 1
+    return n
+
+
+def aday_ekle(ad, alan=None, neden="elle", dizin=None, linkedin=None, x=None):
+    """Suflor'un aday listesine ekler (ana listene hiç yazılmaz). Döner: (durum, kayıt): "yeni" | "var" | "guncel".
+    linkedin/x: arama motorunda bulunup kullanıcının istediği profil adresleri; sosyal-izin bunlara izin verir."""
     ad = re.sub(r"\s+", " ", str(ad or "")).strip()[:80]
     if len(ad) < 2:
         return "bos", None
@@ -1571,19 +1590,27 @@ def aday_ekle(ad, alan=None, neden="elle", dizin=None):
         mevcut = kayit_bul(liste_oku(None, dizin), alan or ad) or kayit_bul(liste_oku(None, dizin), ad)
     except FileNotFoundError:
         mevcut = None
-    if mevcut and (tr_kucuk(mevcut["ad"]) == tr_kucuk(ad) or mevcut["id"] == slug(ad) or (alan and alan in mevcut["alanlar"])):
-        return "var", mevcut
     lst = aday_oku(dizin)
+    if mevcut and (tr_kucuk(mevcut["ad"]) == tr_kucuk(ad) or mevcut["id"] == slug(ad) or (alan and alan in mevcut["alanlar"])):
+        if mevcut.get("kaynak") == "suflor-aday" and (linkedin or x):
+            for kay in lst:
+                if slug(kay["ad"]) == mevcut["id"]:
+                    if _aday_sosyal(kay, linkedin, x):
+                        yaz_atomik(aday_yolu(dizin), json.dumps(lst[-200:], ensure_ascii=False, indent=1))
+                        return "guncel", kay
+        return "var", mevcut
     kay = {"ad": ad, "alanlar": [alan] if alan else [], "neden": neden if neden in ("toplanti", "konus", "brifing", "elle") else "elle",
            "tarih": bugun().isoformat()}
+    _aday_sosyal(kay, linkedin, x)
     lst.append(kay)
     yaz_atomik(aday_yolu(dizin), json.dumps(lst[-200:], ensure_ascii=False, indent=1))
     return "yeni", kay
 
 
 def aday_cmd(a):
-    d, k = aday_ekle(a.ad, a.alan, a.neden)
-    print({"yeni": f"aday eklendi: {a.ad}", "var": f"zaten listede: {k['ad'] if k else a.ad}", "bos": "ad gerekli"}[d])
+    d, k = aday_ekle(a.ad, a.alan, a.neden, linkedin=a.linkedin, x=a.x)
+    print({"yeni": f"aday eklendi: {a.ad}", "var": f"zaten listede: {k['ad'] if k else a.ad}", "guncel": f"sosyal adres eklendi: {a.ad}",
+           "bos": "ad gerekli"}[d])
     return 0 if d != "bos" else 1
 
 
@@ -2003,6 +2030,8 @@ def main(argv=None):
     t.add_argument("--kim"); t.add_argument("--kaynak", help=",".join(KAYNAKLAR) + " (site = tarama)"); t.set_defaults(f=tara_cmd)
     ad_ = sp.add_parser("aday", help="Suflor'un aday listesine ekle (ana listene yazılmaz)")
     ad_.add_argument("--ad", required=True); ad_.add_argument("--alan"); ad_.add_argument("--neden", default="elle", choices=("toplanti", "konus", "brifing", "elle"))
+    ad_.add_argument("--linkedin", action="append", help="profil adresi (arama motorunda bulunan; tekrar verilebilir)")
+    ad_.add_argument("--x", action="append", help="X profil adresi")
     ad_.set_defaults(f=aday_cmd)
     si = sp.add_parser("sosyal-izin", help="LinkedIn ya da X sayfası açmadan önce sayaçtan izin al")
     si.add_argument("platform", choices=PLATFORMLAR); si.add_argument("kayit_id"); si.add_argument("url"); si.set_defaults(f=sosyal_cmd)

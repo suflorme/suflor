@@ -359,6 +359,13 @@ kontrol("aday: ana izleme listesine hiç yazılmadı", open(liste_yol, "rb").rea
 tazi.os.environ["TAZI_DIR"] = os.path.join(T, "veri"); L2 = tazi.liste_oku(liste_yol)
 kontrol("liste_oku: ana liste + aday birleşik, aday kaynak işaretli", len(L2) == 4 and L2[-1]["kaynak"] == "suflor-aday" and L2[-1]["id"] == AD_ID and "kaynak" not in L2[0], str(L2[-1]))
 rc, c = run("durum"); kontrol("durum: aday sayısı", "Suflor aday listesi: 1 kayıt" in c, c)
+LI_AD = "https://www.linkedin.com/in/yeniadayfirma/"
+rc, c = run("sosyal-izin", "linkedin", AD_ID, LI_AD); kontrol("aday: profil adresi yokken sosyal-izin hayır", c.strip().startswith("hayır"), c)
+rc, c = run("aday", "--ad", "Yeni Aday Firma", "--linkedin", LI_AD, "--linkedin", "https://ornek.test/degil"); kontrol("aday: var olan adaya LinkedIn adresi eklenir", rc == 0 and "sosyal adres eklendi" in c, c)
+rc, c = run("aday", "--ad", "Yeni Aday Firma", "--linkedin", LI_AD); kontrol("aday: aynı adres ikinci kez eklenmez", "zaten listede" in c, c)
+ay = json.loads(oku("aday.json")); kontrol("aday.json: yalnız geçerli LinkedIn adresi", ay[0].get("linkedin") == [LI_AD], str(ay))
+rc, c = run("sosyal-izin", "linkedin", AD_ID, LI_AD + "recent-activity/all/"); kontrol("aday: eklenen profil ve alt sayfası sosyal-izin evet", c.strip().startswith("evet"), c)
+rc, c = run("aday", "--ad", "Örnek Danışmanlık Pty Ltd", "--linkedin", LI_AD); kontrol("aday: ana listedeki kayda adres yazılmaz", "zaten listede" in c and open(liste_yol, "rb").read() == ana_once, c)
 S["istek"].clear(); n_once = len(bulgular()); G4 = g(BUG + datetime.timedelta(days=4)); t0 = time.time()
 rc, c = run("tara", "--kim", "Yeni Aday Firma", "--hizli", TAZI_BUGUN=G4, TAZI_BEKLE="5"); sure = time.time() - t0
 kontrol("hızlı tarama: çıkış 0, TAZI_BEKLE yok sayıldı (0,3 sn)", rc == 0 and sure < 12, f"{sure:.1f} {c}")
