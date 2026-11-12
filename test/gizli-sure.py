@@ -92,7 +92,14 @@ bak("katılımcı rolünde süre söylenmez", sdb() is None)
 m.SURE_DUY.update(toplanti=None, esik=set()); m.AYAR["sure_duyuru"] = False; gundem(20); sdb(); gundem(14)
 bak("ayar kapalıyken söylenmez (eşik yine işaretlenir)", sdb() is None and "15" in m.SURE_DUY["esik"])
 toplanti(); m.SES["test_bit"] = 0; m.AYAR["sure_duyuru"] = True; m.AYAR["toplanti_duyuru"] = False; m.DUYURU["son"] = time.time()
-r, o = cikti(m.toplanti_duyuru, "sure", metin="Son beş dakika.", bekle=1.5)
+# okuma gerçek `say` ile ses üretir; yüklü makinede (ölçüm koşarken) 1,5 sn yetmiyor → çıktı görünene kadar 12 sn'ye dek bekle
+_o = io.StringIO()
+with contextlib.redirect_stdout(_o):
+    r = m.toplanti_duyuru("sure", metin="Son beş dakika.")
+    for _ in range(120):
+        if "DUYURU: sure" in _o.getvalue(): break
+        time.sleep(0.1)
+o = _o.getvalue()
 bak("süre duyurusu toplanti_duyuru kapalıyken de ve 60 sn aralığına takılmadan okunur", r is True and "DUYURU: sure · Son beş dakika." in o)
 m.GIZLI["acik"] = True; bak("gizlide süre duyurusu yok", m.sure_duyuru_acik() is False); m.GIZLI["acik"] = False
 # v0.92.0: gece yarısını geçen toplantı — yalın "HH:MM" saat şimdiye en yakın güne düşer
