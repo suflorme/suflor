@@ -117,7 +117,7 @@ def sohbet_basla():
         if mik: _ky_islev("ky_mik_kapat")("sohbet açılmadı")
         return r
     simdi = time.time()
-    SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET.pop("vpio_bekle", None); SOHBET.pop("yerel_yok", None)
+    SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET.pop("vpio_bekle", None); SOHBET.pop("yerel_yok", None); SOHBET.pop("kesik", None); SOHBET.pop("son_gonder", None)
     with SOHBET["kilit"]: SOHBET.update(acik=True, t_ac=simdi, t_ses=simdi, t_mesgul=simdi, uyari=False, durak=None, bekle=None, kesme_sn=0.0, sira=SOHBET["sira"] + 1, yerel=mik, vpio=bool(mik and vpio), hoparlor=bool(mik and vpio), aygit_say=(_ky_islev("KY") or {}).get("aygit_say", 0))
     _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None, kaynak="sohbet")
     if float(AYAR.get("hihi_tur_esik", TUR_ESIK)) > 0: threading.Thread(target=tur_baslat, daemon=True).start()
@@ -139,13 +139,14 @@ def sohbet_bas_tut_oncesi():  # bas-tut (komut basla) öncesi: yerel mikrofon ka
 def sohbet_kapat(neden, soz=None, hemen=False):
     with SOHBET["kilit"]:
         if not SOHBET["acik"]: return
-        yerel = bool(SOHBET.get("yerel")); sira = SOHBET["sira"]; SOHBET.update(yerel=False, vpio=False, hoparlor=False)
+        yerel = bool(SOHBET.get("yerel")); hop = bool(SOHBET.get("hoparlor")); sira = SOHBET["sira"]; SOHBET.update(yerel=False, vpio=False, hoparlor=False)
         SOHBET.update(acik=False, bekle=None, kapanis=None if neden.startswith("devam") else {"neden": "kullanici" if neden.startswith("kullanıcı") else {"toplantı başladı": "toplanti", "kulaklık çıktı": "kulaklik"}.get(neden, neden), "t": time.time()})  # devam penceresi sessiz kapanır: panoda "Sohbet kapandı" notu çıkmaz
         SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET.pop("devam", None)
     if not _KS["tur"]: _akis_sifirla(); _konus_kur(durum="hazir" if konus_canli() else "kapali")
     if yerel: threading.Thread(target=_sohbet_yerel_kapat, args=(sira, hemen or neden in ("toplantı başladı", "gizli toplantı")), daemon=True).start()
     if "_agt_kapat" in globals(): _ag_sifirla(); threading.Thread(target=_agt_kapat, daemon=True).start()  # Adım 5: kısa söz tanıyıcı sohbetle kapanır
     if soz: seslendir(soz, kuyruk=True)
+    _ag_olay("sohbet_sure", sure_ms=round((time.time() - SOHBET["t_ac"]) * 1000), yerel=yerel, hoparlor=hop)
     print(f"SOHBET: kapandı ({neden}, {time.time() - SOHBET['t_ac']:.0f} sn)")
 def _sohbet_yerel_denetle(simdi, kul):  # Adım 4: yerel yolda kulaklık/hoparlör kararı (aygit_degisti olayında ya da 5 sn'de bir) ve bağlantı denetimi. True: sohbet kapandı
     ky = _ky_islev("KY")
@@ -203,6 +204,7 @@ def _sohbet_parca_govde(pcm, p):  # iç gövde (12 Kasım, Aşama 2 Adım 2): pa
     except Exception as e: print(f"SOHBET ÖLÇÜM: hata {e.__class__.__name__}")
     konusma = sum(x >= esik for x in pen) * AKIS_PENCERE / 2 / WH_SR
     if konusma >= 0.15: SOHBET.update(t_ses=simdi, uyari=False)
+    _olcum_izle(simdi, konusma)
     tur = _KS["tur"]
     # v0.54.3 (S70, kullanıcı 16 Ekim: "arka plan seslerinden sürekli kesiliyor ve susuyor"): araya girme varsayılan kapalı (ayar sohbet_araya_girme) — cevap
     # sonuna kadar okunur, okuma sırasında gelen ses atılır (arka plan sesi okumayı kesmez, sonraki soru da olmaz); Claude düşünürken söylenen yine biriktirilir.
@@ -275,7 +277,7 @@ def _sohbet_tur_sonu():
         try: onara_onceden(metin)
         except Exception as e: print(f"SOHBET: önceden ön arama başlatılamadı ({e.__class__.__name__})")
 def _sohbet_gonder(b, n, sessiz):
-    SOHBET.update(durak=None, bekle=None); SOHBET.pop("dusunme", None)
+    SOHBET.update(durak=None, bekle=None, son_gonder=time.time()); SOHBET.pop("dusunme", None)
     print(f"SOHBET: tur bitti ({n:.1f} sn kayıt, {sessiz:.1f} sn sessizlik)"); _kapi_yaz("tur bitti")
     r = konus_ses({"pcm": base64.b64encode(b).decode(), "t_soz_bitis": SOHBET.get("t_ses")})  # t_ses = son konuşma parçasının geldiği an (ölçüm)
     if not r.get("ok"): print(f"SOHBET: soru gönderilemedi ({r.get('err')})"); _akis_sifirla(); _konus_kur(durum="dinliyor", hata=None)
@@ -331,6 +333,27 @@ AG_ONAY = {"hı", "hıhı", "hıhıı", "hıı", "hm", "hmm", "mhm", "mm", "ımm
 AG_DUR_SOZ = ("dur", "sus", "yeter", "kes", "bekle", "stop", "wait")
 AG_BOS_RX = re.compile(r"altyaz|izlediğiniz için|abone ol|^\W*(m\.?\s*k\.?)+\W*$", re.I)
 ARAYA = {"acik": False, "aday": None, "tut": None, "n": 0, "on": collections.deque(maxlen=6), "t0": 0.0, "okunan": collections.deque(maxlen=8), "sira": 0, "kilit": threading.RLock(), "say": {}}
+# Ölçüm olayları (Aşama 2 Adım 6): canli/sohbet-olay.jsonl, METİNSİZ — yalnız tür, zaman, süre, sınıf, kaynak. Beta veri paketine girmez; okuyan: olcum.py sohbet.
+#   araya_girme  — okuma kesildi (sinif dur|baska, kaynak tstt|whisper, tepki_ms söz başından karara; onaydi: karardan önce onay sanılmıştı)
+#   onay_gecti   — okurken kısa onay sözü ("hı hı") duyuldu ve okumayı kesmedi
+#   kacan_aday   — okurken Silero konuşma gördü ama tanıma karar çıkaramadı (tanınmadı/boş/yarım)
+#   olasi_yanlis — "başka söz" kesmesinden sonra OLCUM_YANLIS_SN içinde kullanıcıdan söz gelmedi (öksürük, arka plan sesi)
+#   bolunen_soru — tur söz bitmeden kapandı: soru gönderildikten sonra OLCUM_BOLUNEN_SN içinde konuşma sürdü (gecikme_ms)
+#   yerel_dusme  — yerel ses yolu bugünkü yola düştü (yerel-konus.py)
+#   sohbet_sure  — sohbet kapandı (sure_ms, yerel, hoparlor): dakika başına oranların paydası
+OLCUM_YANLIS_SN, OLCUM_BOLUNEN_SN = 3.0, 2.0
+def _ag_olay(olay, **alan):  # ölçüm olayı; yazılamazsa sessizce geçer (ses hattını etkilemez)
+    try: _ky_gunluk(olay, **{"hoparlor": bool(SOHBET.get("hoparlor")), **alan})
+    except Exception: pass
+def _olcum_izle(simdi, konusma):  # her mikrofon parçasında: olasi_yanlis (kesmeden sonra söz gelmedi) ve bolunen_soru (gönderimden hemen sonra konuşma sürdü)
+    k = SOHBET.get("kesik")
+    if k:
+        if konusma >= 0.15: SOHBET["kesik"] = None
+        elif simdi - k["t"] >= OLCUM_YANLIS_SN: SOHBET["kesik"] = None; _ag_olay("olasi_yanlis", sinif=k["sinif"], kaynak=k["kaynak"], tepki_ms=k["tepki_ms"])
+    g = SOHBET.get("son_gonder")
+    if g:
+        if simdi - g > OLCUM_BOLUNEN_SN: SOHBET["son_gonder"] = None
+        elif konusma >= 0.3 and not ses_caliyor(): SOHBET["son_gonder"] = None; _ag_olay("bolunen_soru", gecikme_ms=round((simdi - g) * 1000))
 def ag_kip():
     v = str(AYAR.get("yerel_araya_girme") or "dur").strip().lower()
     return v if v in ("kapali", "dur", "tam") else "dur"
@@ -423,6 +446,8 @@ def ag_obek(pcm, duvar=None):  # yerel-konus.py _ky_mik_isci her ~100 ms öbekte
         if not aday["konusma"]:
             if sure >= AG_ADAY_SN:
                 _ag_say({None: "taninmadi", "on": "taninmadi", "bos": "taninmadi", "baska": "baska_gecti" if ag_kip() == "dur" else "baska_kisa"}.get(aday["sinif"], aday["sinif"] + "_bitti"))
+                if aday["sinif"] in (None, "on", "bos"): _ag_olay("kacan_aday", sure_ms=round(sure * 1000), kip=ag_kip())
+                elif aday["sinif"] == "onay": _ag_olay("onay_gecti", sure_ms=round(sure * 1000), kaynak=aday.get("kaynak"), kip=ag_kip())
                 ARAYA["aday"] = None
             return False
         if ag_kip() == "tam" and aday["sinif"] == "baska" and sure >= ag_esik() and simdi - SOHBET["t_okuma"] >= (AG_KORU_HOP_SN if SOHBET.get("hoparlor") else SOHBET_KORU_SN):
@@ -443,8 +468,8 @@ def _ag_kes(aday, sinif, sure=None):  # okuma durur; başka söz yeni turun baş
     else: ARAYA["tut"] = aday; ARAYA["aday"] = None
     _sohbet_kes(_KS["tur"], f"araya girme ({'durdurma sözü' if sinif == 'dur' else 'konuşma'}, {aday.get('kaynak') or '?'}, söz başından {tepki:.2f} sn)")
     aday["t_karar"] = t; _ag_say(sinif)
-    try: _ky_gunluk("araya_girme", sinif=sinif, kaynak=aday.get("kaynak"), tepki_ms=round(tepki * 1000), hoparlor=bool(SOHBET.get("hoparlor")), kip=ag_kip(), **({"sure_ms": round(sure * 1000)} if sure else {}))
-    except Exception: pass
+    _ag_olay("araya_girme", sinif=sinif, kaynak=aday.get("kaynak"), tepki_ms=round(tepki * 1000), kip=ag_kip(), **({"sure_ms": round(sure * 1000)} if sure else {}), **({"onaydi": True} if aday.get("onaydi") else {}))
+    if sinif == "baska": SOHBET["kesik"] = {"t": t, "sinif": sinif, "kaynak": aday.get("kaynak"), "tepki_ms": round(tepki * 1000)}  # olasi_yanlis: kesmeden sonra söz gelmezse (_olcum_izle)
     k = ARAYA.get("kanca")
     if k:
         try: k(sinif, aday, tepki)
@@ -458,7 +483,7 @@ def ag_metin(aday, metin, kaynak, ara=False):  # tanıyıcı sonucu (tstt ara me
         if s == "on" and aday["sinif"] in ("onay", "baska"): return aday["sinif"]
         aday.update(sinif=s, kaynak=kaynak, metin=str(metin or "")[:80])
         if s == "dur": _ag_kes(aday, "dur")
-        elif s == "onay" and not aday.get("onay_say"): aday["onay_say"] = True; _ag_say("onay")
+        elif s == "onay" and not aday.get("onay_say"): aday["onay_say"] = True; aday["onaydi"] = True; _ag_say("onay")
         elif s == "yanki" and not aday.get("yanki_say"): aday["yanki_say"] = True; _ag_say("yanki")
         return s
 def _ag_whisper(aday, pcm):  # kısa parça Whisper işçisine, kuyruğun başına (bas-konuş işi gibi; dökülen metin yalnız sınıf için)

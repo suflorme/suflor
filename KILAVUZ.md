@@ -301,6 +301,23 @@ Masaüstü izni olan Suflor Brifing yardımcısı yapar (tek kullanımlık, imza
   "AYAR: … gölgeliyor" satırı düşer. `"acik": false` bağlayıcıyı kapatır (eski anahtarlar dahil). Ayar dosyası bu geçişte hiçbir zaman kendiliğinden yazılmaz.
   Brifing.app'in kayıt yazma komutu (`yazma`) yeni şemayı henüz okumuyorsa, o alanlar üst düzey `kayit_*` anahtarlarında kalır.
 
+## Konuş yerel ses yolu (yalnız geliştirici kurulumu, deneme aşamasında)
+Beta kurulumunda görünmez ve çalışmaz; ayar dosyasında yazılsa bile geliştirici kurulumu değilse hiçbir şey yapmaz. Konuş sohbetinde mikrofonu ve konuşmayı tarayıcı yerine Mac'in kendi ses yardımcısı (`Suflor Konus.app`) yürütür: hoparlörde de sohbet edilebilir (Apple ses işleme yankıyı keser), okurken araya girilebilir ("dur", "bekle", "sus" okumayı hemen keser; "hı hı", "evet", "tamam" kesmez). Ses Mac'ten çıkmaz; yeni bir ağ gönderimi yoktur.
+
+| Ayar | Varsayılan | Ne yapar |
+|---|---|---|
+| `yerel_konus` | `false` | Yerel ses yolunu açar. Kapalıyken Konuş bugünkü gibi çalışır (kulaklıkta sohbet, tarayıcı mikrofonu). |
+| `yerel_konus_hoparlor` | `false` | Hoparlörde de sohbete izin verir (Apple ses işleme açılır). Kapalıyken sohbet yalnız kulaklıkta açılır. Yalnız `yerel_konus: true` iken geçerli. |
+| `yerel_araya_girme` | `"dur"` | `"kapali"`: okurken ses yok sayılır. `"dur"`: yalnız durdurma sözleri keser. `"tam"`: durdurma sözü ve başka bir söz (süre eşiğinden uzunsa) keser, söz yeni sorunun başı olur. |
+| `araya_girme_sn_hoparlor` | `0.6` | `"tam"` kipinde hoparlörde kesmek için gereken kesintisiz konuşma süresi (sn). |
+| `araya_girme_sn_kulaklik` | `0.3` | Aynısı, kulaklıkta. |
+| `yerel_araya_tstt` | `true` | Kısa sözü ikinci, hızlı bir tanıyıcıyla da dinler (kurulu değilse yalnız Whisper). |
+
+- **Mikrofon izni:** ilk kurulumda macOS "Suflor Konus" için mikrofon izni sorar (Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon). İzin verilmezse yerel yol açılmaz, Konuş bugünkü yola döner.
+- **Toplantıda kapalı:** toplantı sürerken ya da gizli kipte hoparlör sohbeti açılmaz, Apple ses işleme kapanır; toplantı mikrofonu etkilenmez.
+- **Geri dönüş:** `"yerel_konus": false` yazıp aktarıcıyı yeniden başlatmak (ya da `aktarici-kur.command`) eski yolu birebir geri getirir. Yardımcı bağlantıyı kaybederse ya da 2 sn içinde ses başlamazsa Konuş kendiliğinden eski yola düşer; sayısı `/status`'ta görünür.
+- **Ölçüm:** `python3 .claude/skills/suflor-olcum/olcum.py sohbet` yanlış kesme, kaçan söz, "dur" tepkisi ve bölünen soruyu hedeflerle kıyaslar; yalnız süre ve sayı tutulur, söz metni tutulmaz, beta veri paketine girmez.
+
 ## Döküm kontrolü (yalnız geliştirici kurulumu)
 Beta kurulumunda görünmez; geliştirici kurulumunda ses arşivi açıkken (ayar `ses_arsivi`) çalışır, hepsi yerel (ağ çağrısı yok, beta veri paketine bir şey girmez). Gizli ve deneme toplantıları listeye girmez.
 Toplantı bitip ses arşivi ve (varsa) hakem dökümü hazır olunca aktarıcı bir kontrol listesi hazırlar; panoda Bugün'de "Döküm kontrolü hazır" satırı çıkar, `Kontrole başla` sayfayı (`/dokum-kontrol`) açar.

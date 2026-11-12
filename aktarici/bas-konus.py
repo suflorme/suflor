@@ -1559,7 +1559,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                      "giris": sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
                      "yazim": u.get("cache_creation_input_tokens") or 0, "yazim_1h": (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0,  # v0.92.0: önbellek yazımı ve 1 saatlik payı (kota dışında 5 dk'ya düşerse görünsün)
                      "onbellek_orani": round((u.get("cache_read_input_tokens") or 0) / max(1, sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))), 2),
-                     "hata": bool(j.get("is_error")), "kaynak": tur.get("kaynak") or "bas", "tur_turu": tur.get("tur_turu") or tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True)), "derin": bool(tur.get("derin"))}
+                     "hata": bool(j.get("is_error")), **dict(zip(("cikis", "yerel"), _konus_cikis_yerel(tur))), "kaynak": tur.get("kaynak") or "bas", "tur_turu": tur.get("tur_turu") or tur.get("kaynak") or "bas", "toplantida": bool(tur.get("toplantida")), "sesli": bool(tur.get("sesli", True)), "derin": bool(tur.get("derin"))}
                 _wa = sum(1 for x in tur.get("araclar") or [] if x == "WebSearch"); _ws = sum(1 for x in tur.get("araclar") or [] if x == "WebFetch")
                 if _wa or _ws: print(f"KONUŞ: web ({_wa} arama, {_ws} sayfa)")  # S257; maliyet claude-cagri.jsonl satırında (arac/araclar alanları)
                 _KS["maliyet"] = m; _KS["tur"] = None; _KS["son"] = time.time(); _KS["sayac"] += 1
@@ -2066,6 +2066,12 @@ def konus_yazili(metin, kutu=False, sesli=False, ek=None, kayit=None):  # ek/kay
     else: KUTU_BEKLEYEN.clear()
     konus_pocket_isit(); threading.Thread(target=_konus_sor, args=(" ".join(str(metin).split())[:2000], tur), daemon=True).start()
     print("KONUŞ: yazılı soru (pano kutusu)" + (" — kayıt turu" if ek else "")); return {"ok": True}
+def _konus_cikis_yerel(tur):  # ölçüm (Aşama 2 Adım 6): sesin çıktığı aygıt (hoparlör|kulaklık; toplantıda bilinmez → None) ve turun yerel ses yolunda olup olmadığı
+    if tur.get("toplantida"): return None, False
+    try:
+        if SOHBET["acik"]: return ("hoparlör" if SOHBET.get("hoparlor") else "kulaklık"), bool(SOHBET.get("yerel"))
+        return ("kulaklık" if _sohbet_kulaklik() else "hoparlör"), False
+    except Exception: return None, False
 def _konus_tur_turu():  # ölçüm etiketi (claude-cagri.jsonl tur_turu): devam penceresi / sohbet / basılı tutma; hitap-yazılı-karşı-özet kaynak adından
     return "devam" if SOHBET.get("devam") else "sohbet" if SOHBET["acik"] else "bas"
 def konus_ses(p):  # pano: bırakıldı — kayıt geldi
