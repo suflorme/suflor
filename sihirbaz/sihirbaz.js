@@ -80,6 +80,7 @@
       proje_dolu: "Bu klasörde {n} öğe var. Suflor belgelerine dokunmaz, yalnız okur ve arar; kendi dosyalarını (toplantı notları, kanıtlar, çalışma notu) içine açacağı tek bir klasöre yazar: {yol}",
       proje_kaldir: "Suflor'u kaldırırken bu klasörü silme: ~/Suflor.me/kaldir.command yalnız Suflor'un eklediklerini kaldırır.",
                                                 kur_b: "Kuruyorum", kur_a: "Ayarlarını yazıyor, arka plan hizmetini, takvim ve ses yardımcılarını kuruyorum. macOS \"Suflor Ses\" için sistem sesi kaydı izni sorarsa İzin Ver de.",
+      mesgul_u: "Toplantı sürüyor; kurulumu toplantı bitince yap — kurulum toplantıyı bölebilir.",
       k_ayar: "Ayarlar", k_proje: "Proje klasörü", k_not: "Çalışma notu", k_not_a: "Claude arka planda taslağını hazırlıyor; ilk toplantının sonunda onaylarsın", k_aktarici: "Arka plan hizmeti", k_modeller: "Konuşma tanıma modelleri",
       k_cpp: "Hızlı konuşma tanıma (whisper.cpp + Core ML)", k_cpp_ilk: "İlk açılış birkaç dakika sürebilir (Core ML hazırlanıyor); sonra hızlı açılır.",
       k_cpp_hata: "İnemedi; konuşma tanıma şimdilik MLX ile çalışır, sonraki güncellemede yeniden denenir.",
@@ -197,6 +198,7 @@
       proje_dolu: "This folder has {n} items. Suflor never changes your documents, it only reads and searches them; its own files (meeting notes, evidence, working note) go into a single folder inside: {yol}",
       proje_kaldir: "When removing Suflor, don't delete this folder: ~/Suflor.me/kaldir.command removes only what Suflor added.",
                                                 kur_b: "Setting up", kur_a: "Writing your settings and installing the background service, calendar and audio helpers. If macOS asks for system audio recording permission for \"Suflor Ses\", choose Allow.",
+      mesgul_u: "A meeting is in progress; do the setup after it ends — setup can interrupt the meeting.",
       k_ayar: "Settings", k_proje: "Project folder", k_not: "Working note", k_not_a: "Claude is drafting it in the background; you approve it after your first meeting", k_aktarici: "Background service", k_m_yeniden: "Try again", k_m_hata: "The models couldn't be installed. Check your internet connection and try again.",
       k_m_baska: "The models are in another account's folder on this Mac and incomplete. Update Suflor.me in that account (guncelle.command), then try again here.",
       k_ses: "Other side's audio (Suflor Ses)", k_ses_ok: "Ready; permission may be asked in your first meeting", k_ses_yok: "Couldn't be installed; for the other side's audio: Suflor.me icon → Other side → Open", k_ses_izin: "Open permission settings",
@@ -443,7 +445,8 @@
     { id: "karsilama", simge: null, cubuksuz: true,
       ciz: () => `<div class="adim karsilama"><div class="simge isaret">${S.isaret}</div>
         <div class="selam" aria-label="Merhaba, Hello"><span>merhaba</span><span>hello</span></div>
-        <div class="diller"><button class="dil" type="button" data-dil="tr" aria-pressed="${D.dil === "tr"}">Türkçe</button><button class="dil" type="button" data-dil="en" aria-pressed="${D.dil === "en"}">English</button></div></div>` },
+        <div class="diller"><button class="dil" type="button" data-dil="tr" aria-pressed="${D.dil === "tr"}">Türkçe</button><button class="dil" type="button" data-dil="en" aria-pressed="${D.dil === "en"}">English</button></div>
+        ${(D.durum || {}).mesgul ? `<div class="kart-not uyari" role="alert" data-mesgul>${esc(t.mesgul_u)}</div>` : ""}</div>` },
     { id: "hosgeldin", simge: "isaret", b: "hosgeldin_b", a: "hosgeldin_a",
       icerik: () => `<div class="liste">${satir("iyi", t.hg1, t.hg1a)}${satir("iyi", t.hg2, t.hg2a)}${satir("iyi", t.hg3, t.hg3a)}</div>` },
     { id: "mac", simge: "mac", b: "mac_b", a: "mac_a", hazir: () => { const m = (D.durum || {}).mac; return m && m.arm && m.macos_ok && m.python; },

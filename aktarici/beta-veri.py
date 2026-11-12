@@ -131,6 +131,11 @@ def _beta_proje_vt():
 def _beta_olaylar(bas, son):
     return {a: beta_say(a, bas, son) for a in ("dur", "sus_kisayol", "hitap_yinelenen", "kanit", "sessiz", "sesli_ceviri", "gizli", "moderator", "zaman_asimi", "sorun", "hata")}
 
+YANKI_ESIK_ADET, YANKI_ESIK_YUZDE = 20, 50  # en az 20 yankı ve oran > %50 → "hoparlor_yankisi"
+def _beta_yanki(yanki, ben):  # v0.238.3: ben kanalına sızıp karşıyla aynı olduğu için atılan parçalar / (atılan + ben satırı); yalnız sayı ve seçenek
+    top = yanki + ben; oran = round(100 * yanki / top) if top else None
+    return {"yanki": yanki, "ben_satir": ben, "yanki_oran_yuzde": oran,
+            "ses_yolu": "hoparlor_yankisi" if (yanki >= YANKI_ESIK_ADET and oran is not None and oran > YANKI_ESIK_YUZDE) else "normal"}
 def beta_kalite(f, bas, son, metin, gec):
     """Toplantı sonu paketine kalite: satır gecikmesi, ilk ses, hitap, yinelenen soru, dur, 10 sn üstü cevap, hata/çökme, bellek/takas."""
     if not (bas and son and _KUL): return {}
@@ -140,6 +145,7 @@ def beta_kalite(f, bas, son, metin, gec):
     return {"satir_gecikme_sn": _ort([round(x, 2) for x in sg if -5 < x < 600]), "konus": _beta_konus(kon),
             "hitap": sum(1 for r in kon if r.get("kaynak") == "hitap"), "karsi_hitap": sum(1 for r in kon if r.get("kaynak") == "karsi"),
             "olay": o, "cokme": beta_say("acilis", bas + 30, son + 60),
+            "ses": _beta_yanki(beta_say("yanki", bas, son + 60), sum(1 for x in metin if x.get("kanal") == "ben")),
             "kart_cevap_on_sn_ustu_yuzde": round(100 * sum(1 for x in gec if x > 10) / len(gec)) if gec else None,
             "sistem": _beta_sistem(bas, son + 60), "platform": (BETA["toplanti"].get(toplanti_kimlik(f)) or {}).get("platform")}
 

@@ -2,7 +2,7 @@
 # Güncelleme/kurulum toplantı, sohbet ya da Konuş cevabı sürerken başlamaz (v0.77.4 kurulum.py mesgul + aktarici-kur.command; v0.77.5 guncelle
 # ve panodaki "Güncelle" — relay.py guncelle_baslat). Sahte durumla, dosyaya ve ağa dokunmadan (~1 sn).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/guncelle-mesgul.py
-import ast, os, sys
+import ast, os, shutil, sys
 sys.dont_write_bytecode = True
 sys.path = [p for p in sys.path if os.path.abspath(p or ".") != os.path.dirname(os.path.abspath(__file__))]  # test/ yola girmesin (eski test/platform.py standart modülü gölgeliyordu)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
@@ -92,5 +92,21 @@ for ad, durum, beklenen in [("boşta", {}, True), ("web toplantısı", {"top": T
          "os": os, "subprocess": type("S", (), {"Popen": P, "DEVNULL": None, "STDOUT": None}), "print": lambda *a, **k: None, "toplanti_oturum_view": lambda d=durum: d.get("to")}
     exec(compile(ast.Module([fo, fn], []), "relay.py", "exec"), n); r = n["guncelle_baslat"]()
     ok(f"pano Güncelle · {ad} → {r}", bool(r.get("ok")) == beklenen and bool(BASLADI) == beklenen)
+
+# 3) v0.238.3: sihirbazın "Kuruyorum" adımı (tamamla) toplantı sürerken aktarıcı kurulumunu başlatmaz, net hata verir; boştayken kurulumu çalıştırır (sahte süreç, geçici ev)
+import tempfile
+EVG = tempfile.mkdtemp(prefix="suflor-mesgul-"); os.environ["SUFLOR_EV"] = EVG
+sys.argv = ["kurulum.py"]; k = {"__name__": "kurulum_tamamla", "__file__": os.path.join(KOD, "kurulum.py")}
+exec(compile(open(k["__file__"], encoding="utf-8").read().split('if __name__ == "__main__":')[0], "kurulum.py", "exec"), k)
+os.environ.pop("SUFLOR_EV", None); k["DENEME"] = False; CAGRI = []
+class _R: returncode = 0; stdout = ""; stderr = ""
+k["subprocess"] = type("S", (), {"run": staticmethod(lambda *a, **b: (CAGRI.append(a), _R())[1]), "Popen": staticmethod(lambda *a, **b: None), "DEVNULL": None})
+k["claude_yolu"] = lambda: None
+for dil in ("tr", "en"):
+    CAGRI.clear(); k["aktarici"] = lambda y: {"extension": {"call": True, "age_s": 3}}; r = k["tamamla"]({"ad": "Deneme"}, dil)
+    ok(f"tamamla ({dil}) · toplantı sürerken aktarıcı kurulmaz, aktarici=kotu, hata metni toplantıyı söyler", not CAGRI and r.get("aktarici") == "kotu" and ("toplantı" if dil == "tr" else "meeting") in r.get("hata", ""))
+CAGRI.clear(); k["aktarici"] = lambda y: {}; r = k["tamamla"]({"ad": "Deneme"}, "tr")
+ok("tamamla · toplantı yokken kurulum çalışır (aktarici=iyi)", len(CAGRI) == 1 and r.get("aktarici") == "iyi" and not r.get("hata"))
+shutil.rmtree(EVG, ignore_errors=True)
 
 print("guncelle-mesgul: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

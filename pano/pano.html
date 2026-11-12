@@ -1531,8 +1531,8 @@ function brAc(u,yeni){if(yeni)window.open(u,'_blank');else location.href=u}  // 
 // v0.105.0 (kullanıcı, 22 Ekim: "⋯ gözümü tırmalıyor; alt menüyü düzenle, e-posta ayarına gerek var mı"): menü düğmenin altında yüzen, bölümlü
 // dikey liste (Mac açılır menüsü gibi; satırları itmez); dışarı tıklayınca ya da Esc ile kapanır, seçince kapanır (Kopyala onayı görünsün diye açık kalır).
 // Tek e-posta seçeneği (mail-o): katılımcı adresi varsa onlara, yoksa kendine, o da yoksa boş taslak. E-posta ayarı menüde yok: ⚙ Ayarlar → E-posta (Mac penceresinde Suflor.me → Ayarlar…). ek: menünün başına (son toplantıda Zihin haritası).
-function akMenu(kay,n,ek){const b=(k,t,i)=>`<button class=aki data-ak=${k} data-kay="${esc(kay)}" role=menuitem>${ic(i,t)}</button>`
-  return `<div class=akp role=menu>${ek||''}${b('pdf','PDF','belge')}${b('kopyala',L('Kopyala'),'kopya')}${b('md',L('Dosya (.md)'),'indir')}${b('mail-o',L('E-posta taslağı'),'posta')}</div>`}
+function akMenu(kay,n,ek,son){const b=(k,t,i)=>`<button class=aki data-ak=${k} data-kay="${esc(kay)}" role=menuitem>${ic(i,t)}</button>`
+  return `<div class=akp role=menu>${ek||''}${b('pdf','PDF','belge')}${b('kopyala',L('Kopyala'),'kopya')}${b('md',L('Dosya (.md)'),'indir')}${b('mail-o',L('E-posta taslağı'),'posta')}${son||''}</div>`}
 function akDug(kay,n){return `<span class=akw><button class=gh data-aktar="${esc(kay)}" aria-haspopup=menu aria-expanded="${akAcik===kay}" title="${L('PDF, e-posta, pano ya da dosya olarak dışarı al')}">${L('Dışarı aktar')} ${akAcik===kay?'▴':'▾'}</button>${akAcik===kay?akMenu(kay,n):''}</span>`}
 function yerelGun(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}  // toISOString UTC: gece yarısından sonra önceki gün
 function akDosya(t,d){return `${t} - ${yerelGun(d||new Date())}`.replace(/[\/\\:*?"<>|]+/g,' ').slice(0,120)}
@@ -1575,10 +1575,11 @@ function postaUrl(c,alici){const tur=(last&&last.eposta)||'mailto',to=alici==='b
 async function akYap(k,btn){const kay=btn.dataset.kay,[tur,id]=[kay.slice(0,kay.indexOf(':')),kay.slice(kay.indexOf(':')+1)]
   // PDF penceresi tıklamayla hemen açılır (beklemeden sonra açılırsa tarayıcı engeller), içerik sonra yazılır
   const w=k==='pdf'?window.open('','_blank'):null;if(k==='pdf'&&!w){geciciDurum(L('Yeni pencere açılamadı'),L('Tarayıcı açılır pencereyi engelledi'));return}
-  const c=tur==='br'?brIcerik(id):tur==='tz'?tzIcerik(id):await snIcerik(id);if(!c){if(w)w.close();if(tur==='br')geciciDurum(L('Brifing hazır değil'),'');if(tur==='tz')geciciDurum(L('Rapor hazır değil'),'');return}
+  const c=tur==='br'?brIcerik(id):tur==='tz'?tzIcerik(id):tur==='ar'?await arIcerik(id):await snIcerik(id);if(!c){if(w)w.close();if(tur==='br')geciciDurum(L('Brifing hazır değil'),'');if(tur==='tz')geciciDurum(L('Rapor hazır değil'),'');if(tur==='ar')geciciDurum(L('Araştırma kaydı okunamadı'),'');return}
+  if(c.tam&&(k==='pdf'||k==='md'))c.md=c.tam  // araştırma: e-posta ve Kopyala kısa (başlık, özet, kaynaklar), PDF ve .md tam rapor
   if(k==='pdf'){w.document.write(`<!doctype html><html lang="${document.documentElement.lang||'tr'}"><head><meta charset=utf-8><title>${esc(c.dosya)}</title><style>body{font:14px/1.55 -apple-system,"Helvetica Neue",sans-serif;color:#18201c;max-width:720px;margin:40px auto;padding:0 24px}h1{font-size:22px;font-weight:500;margin:0 0 6px}h2{font-size:16px;font-weight:600;margin:22px 0 6px}h3{font-size:14px;font-weight:600;margin:16px 0 4px}p{margin:6px 0}ul{margin:4px 0;padding-left:20px}li{margin:3px 0}table{border-collapse:collapse;margin:8px 0;font-size:13px}td{border:1px solid #ccd;padding:4px 8px;vertical-align:top}code{font:12px ui-monospace,Menlo,monospace}.son{margin-top:28px;color:#646c66;font-size:11px}@page{margin:18mm}</style></head><body>${mdHtml(c.md)}<div class=son>Suflor.me</div></body></html>`)
     w.document.close();w.focus();setTimeout(()=>w.print(),300);return}
-  if(k==='mail-o')k=c.alicilar.length?'mail-k':last&&last.eposta_ben?'mail-b':'mail'  // tek seçenek (kullanıcı, 22 Ekim): katılımcılar varsa onlara, yoksa kendine, o da yoksa boş taslak
+  if(k==='mail-o')k=c.alicilar.length?'mail-k':c.alicisiz?'mail':last&&last.eposta_ben?'mail-b':'mail'  // alicisiz (araştırma): alıcıyı kullanıcı yazar  // tek seçenek (kullanıcı, 22 Ekim): katılımcılar varsa onlara, yoksa kendine, o da yoksa boş taslak
   if(k==='mail-k'&&!c.alicilar.length){geciciDurum(L('Takvimde bu toplantının katılımcı adresi yok'),L('Alıcısız taslak için E-posta'));return}
   if(k.startsWith('mail')){const p=postaUrl(c,{'mail-k':'k','mail-b':'b'}[k]||'');if(p.kisa)try{await navigator.clipboard.writeText(p.duz)}catch(e){}brAc(p.u,p.yeni);return}
   if(k==='kopyala'){try{await navigator.clipboard.writeText(mdDuz(c.md));btn.textContent='✓ '+L('kopyalandı')}catch(e){btn.textContent=L('kopyalanamadı')}setTimeout(()=>{btn.textContent=L('Kopyala')},1500);return}
@@ -1614,7 +1615,7 @@ document.getElementById('kenar').addEventListener('click',ev=>bnTik(ev))
 function kenarCekmece(ac){const k=document.getElementById('kenar');k.classList.toggle('acik',!!ac);if(ac)bnE('bnPerde').hidden=false;else if(!bnRef)bnE('bnPerde').hidden=true}
 document.getElementById('kmenu').addEventListener('click',()=>kenarCekmece(!document.getElementById('kenar').classList.contains('acik')))
 // gezinti: tek giriş noktası (kenar çubuğu, komut penceresi, sayfa içi bağlantılar). ek: Takvim'de görünüm (gun|hafta|ay|saat), Kararlar ve işler'de sekme (karar|is|soru)
-function git(g,ek){const h=document.documentElement,top=h.classList.contains('toplantida');kenarCekmece(false);smAcik=null;gcAk=null
+function git(g,ek){const h=document.documentElement,top=h.classList.contains('toplantida');kenarCekmece(false);smAcik=null;gcAk=null;arAk=null
   if(g==='ayar'){ayarAc();return}
   if(g==='kc'){kcElle=false;kcSec='kc';if(hfAcik)hfAc(false);if(stAcik)stAc(false)}
   else if(g==='takvim'){tvAc(ek||tvMod)}
@@ -2460,11 +2461,40 @@ function gcSatir(r){const har=!!r.harita,ad=r.gorsel==='karar_is',ac=gcAk===r.id
   return bsSat({id:'gc-'+r.id,ek:` data-gc="${esc(r.id)}"`,ikon:'chat',t:esc(r.baslik||r.ad),a:[esc(gunTxt(r.at)),...ciktiP(r.cikti).map(esc)].join(' · '),
     e:`<span class="etiket notr">${esc(har?(ad?L('Karar ve iş panosu'):L('Zihin haritası')):L('Özet'))}</span>`,d:`<button type=button class=b data-bn=son data-id="${esc(r.id)}" data-tur="${har?'harita':''}">${L('Aç')}</button>`,
     x:`<span class=akw><button type=button class=em data-bn=gcak data-id="${esc(r.id)}" aria-haspopup=menu aria-expanded="${ac}" title="${L('Dışarı aktar')}" aria-label="${L('Dışarı aktar')}">${ic('dahasi')}</button>${men}</span>`})}
+// Araştırmalar satırı (13 Kasım): ⋯ menüsü Geçmiş satırınınkiyle aynı (akMenu): üstte İlet (talimat hedefinin gelen kutusu · asistana «derinleştir»), ortada dışarı aktar
+// (PDF · Kopyala · .md · E-posta taslağı — alıcısız, gönderen kullanıcı), altta Gizle. Gizlenen kayıt silinmez (aktarıcıda gizlenen.jsonl); Geri al ve «Gizlenenler» listesinden Geri getir.
+let arAk=null,arGzAcik=false,arGz=null
+function arSatir(x,gz){const ac=!gz&&arAk===x.id,hd=(arV&&arV.hedefler)||{},i=esc(x.id)
+  const ib=(bn,ikon,t,ek)=>`<button class=aki data-bn=${bn} data-id="${i}"${ek||''} role=menuitem>${ic(ikon,t)}</button>`
+  const ilet=(hd.oturum||[]).map(o=>ib('arot','sohbet',L('İlet: {h}',{h:o.etiket||o.ad}),` data-h="${esc(o.ad)}"`)).join('')+(hd.asistan||[]).map(a=>ib('aras','chat',L('{ad}: derinleştir',{ad:a.gorunen||a.ad}),` data-a="${esc(a.ad)}"`)).join('')
+  const men=ac?akMenu('ar:'+x.id,-1,ilet?ilet+'<hr>':'','<hr>'+ib('argiz','x',L('Gizle'))):''
+  return bsSat({id:(gz?'arg-':'ar-')+x.id,ek:gz?'':` data-arm="${i}"`,ikon:'ara',t:esc(x.konu||''),a:[bsTarih(x.at),esc(L('{n} kaynak',{n:x.kaynak_sayisi||0}))].filter(Boolean).join(' · '),e:x.durum==='hata'?`<span class="etiket gec">${L('Hata')}</span>`:'',
+    d:gz?`<button type=button class=b data-bn=argos data-id="${i}">${L('Geri getir')}</button>`:`<button type=button class=b data-bn=panel data-ref="ar:${i}">${L('Aç')}</button>`,
+    x:gz?'':`<span class=akw><button type=button class=em data-bn=arak data-id="${i}" aria-haspopup=menu aria-expanded="${ac}" title="${L('Eylemler')}" aria-label="${L('Eylemler')}">${ic('dahasi')}</button>${men}</span>`})}
+async function arIcerik(id){let k=arDetay[id];if(!k){try{k=await j('/arastirma?id='+encodeURIComponent(id))}catch(e){k=null}if(!k||k.hata)return null;arDetay[id]=k}
+  const oz=String(k.sesli||'').trim()||(String(k.metin||'').split(/\n\s*\n/).find(p=>p.trim()&&!/^\s*[#>|-]/.test(p))||'').trim(),kay=(k.kaynaklar||[]).filter(x=>/^https?:\/\//.test(x.url||'')),d=k.at?new Date(k.at):new Date()
+  const ks=kay.length?`\n## ${L('Kaynaklar')}\n`+kay.map(x=>`- [${String(x.baslik||x.url).replace(/[\[\]]/g,'')}](${x.url})`).join('\n')+'\n':'',bas=`# ${k.konu||''}\n${goreliTam(k.at)}\n\n`
+  return {baslik:L('Araştırma')+' — '+(k.konu||''),dosya:akDosya(L('Araştırma')+' - '+(k.konu||''),isNaN(d)?undefined:d),alicilar:[],alicisiz:true,md:bas+oz+'\n'+ks,tam:bas+String(k.metin||'')+'\n'+ks}}
+async function arGzYukle(){let r=null;try{r=await j('/arastirma?gizli=1')}catch(e){}arGz=r&&Array.isArray(r.kayitlar)?r.kayitlar:[];if(last)bnCiz(last)}
+async function arGizle(id,gizle){if(gizle&&arV){arV={...arV,kayitlar:(arV.kayitlar||[]).filter(x=>x.id!==id),gizli_sayi:(arV.gizli_sayi||0)+1};arAk=null;if(last)bnCiz(last)}  // hemen düşer; doğrusu aktarıcıdan gelir
+  let r={};try{r=await bnYaz('/arastirma',{islem:gizle?'gizle':'goster',id})}catch(e){}
+  await bnEkYukle(true);if(arGzAcik)await arGzYukle()
+  if(!r.ok){bnBildir(L('Yapılamadı.'));return}
+  if(gizle)bnBildir(L('Araştırma gizlendi'),()=>arGizle(id,false));else bnBildir(L('Araştırma geri getirildi'))}
+async function arOturum(id,h){arAk=null;if(last)bnCiz(last);let r={};try{r=await bnYaz('/arastirma',{islem:'oturum',id,hedef:h})}catch(e){}
+  bnBildir(r.ok?(r.sonuc||L('Gelen kutusuna bırakıldı')):r.err==='kapalı'?L('Oturuma iletme kapalı (ayar talimat)'):L('İletilemedi'))}
+// {asistan}: derinleştir — Kararlar ve işler «asistana sor» gibi: sohbet paneli açılır, kayıt aktarıcıda veri bloğu olarak Konuş'un yazılı turuna gider
+async function arAsistan(id,a){const x=((arV&&arV.kayitlar)||[]).find(y=>y.id===id)||{},as=(((arV||{}).hedefler||{}).asistan||[]).find(y=>y.ad===a)||{},ad=as.gorunen||a;arAk=null;if(last)bnCiz(last)
+  const t=L('{ad}, «{k}» kaydını derinleştir: eksikler, çelişkiler ve sonraki adımlar',{ad,k:x.konu||''}),pn=shGonder(t);let r={};try{r=await bnYaz('/arastirma',{islem:'asistan',id,asistan:a})}catch(e){}
+  const ok=!!r.ok;shGonderSonuc(pn,t,ok)
+  if(!ok)bnBildir(r.err==='gizli'?L('Gizli kipte asistana verilmez.'):/hâlâ cevaplıyor|still answering/.test(String(r.err||''))?L('{ad} hâlâ cevaplıyor; bitince yeniden dene.',{ad}):L('Yapılamadı.'))
+  refresh()}
 function gecmisIc(s){const sl=s.son_toplantilar||[],ar=(arV&&arV.kayitlar)||[]
   let h=`<div class=sayfab><div class=sbas><h1>${L('Geçmiş')}</h1><span class=alt>${esc(L('Toplantılar, dökümler, konuşmalar ve araştırmalar'))}</span></div><div class=sag>${sayfaMenu('gecmis')}</div></div>`
   h+=`<section class=bolum aria-label="${L('Toplantılarda ara')}"><form class=gcara id=gcF role=search><input id=gcAra type=search placeholder="${L('Toplantılarda ara')}" aria-label="${L('Toplantılarda ara')}" autocomplete=off><button type=submit class=b>${ic('ara')}${L('Ara')}</button></form><div class=keylem><button type=button class="b sade" data-bn=kmk data-k=dokumler>${ic('dosya')}${L('Dökümler')}</button><button type=button class="b sade" data-bn=kmk data-k=konusma>${ic('hist')}${L('Konuşma geçmişi')}</button></div></section>`
   h+=`<section class=bolum aria-label="${L('Son toplantılar')}"><div class=bbas><h2>${L('Son toplantılar')}</h2><button type=button class=bag data-bn=kmk data-k=dokumler>${L('Tüm toplantılar')}</button></div>${sl.length?`<div class=liste>${sl.map(gcSatir).join('')}</div>`:`<p class=sakin>${L('Henüz özeti çıkmış toplantı yok.')}</p>`}${gcSoSatir(s)}</section>`
-  if(ar.length)h+=`<section class=bolum aria-label="${L('Araştırmalar')}"><div class=bbas><h2>${L('Araştırmalar')}</h2>${arV.aktif?`<span class=sag>${L('Araştırılıyor…')}</span>`:''}</div><div class=liste>${ar.map(x=>bsSat({id:'ar-'+x.id,ikon:'ara',t:esc(x.konu||''),a:[bsTarih(x.at),esc(L('{n} kaynak',{n:x.kaynak_sayisi||0}))].filter(Boolean).join(' · '),e:x.durum==='hata'?`<span class="etiket gec">${L('Hata')}</span>`:'',d:`<button type=button class=b data-bn=panel data-ref="ar:${esc(x.id)}">${L('Aç')}</button>`})).join('')}</div></section>`
+  const gzn=(arV&&arV.gizli_sayi)||0
+  if(ar.length||gzn)h+=`<section class=bolum aria-label="${L('Araştırmalar')}"><div class=bbas><h2>${L('Araştırmalar')}</h2>${arV.aktif?`<span class=sag>${L('Araştırılıyor…')}</span>`:''}${gzn?`<button type=button class=bag data-bn=argz aria-expanded="${arGzAcik}">${arGzAcik?L('Gizlenenleri kapat'):L('Gizlenenler ({n})',{n:gzn})}</button>`:''}</div>${ar.length?`<div class=liste>${ar.map(x=>arSatir(x)).join('')}</div>`:`<p class=sakin>${L('Görünen araştırma yok.')}</p>`}${arGzAcik&&gzn?`<div class="liste argz" aria-label="${L('Gizlenen araştırmalar')}">${(arGz||[]).map(x=>arSatir(x,true)).join('')||`<p class=sakin>${L('Yükleniyor…')}</p>`}</div>`:''}</section>`
   return h}
 // ---- Tazı raporu (v0.228.0): Bugün'de son raporlar (s.tazi.raporlar), tıklayınca sağ panelde okunur (bnRef tz:<dosya>; POST /tazi islem=rapor). Metin esc'li mdHtml ile çizilir.
 let tzDetay={},tzAcik=false  // liste kapalı gelir; açık/kapalı durumu oturum içinde bellekte (yeniden çizimde korunur)
@@ -2537,8 +2567,8 @@ let smAcik=null
 function sayfaMenu(y){const ls=SM[y]||[];if(!ls.length)return'';const ac=smAcik===y
   return`<span class=smw><button type=button class=smd data-bn=smenu data-y=${y} aria-haspopup=menu aria-expanded="${ac}" title="${L('Diğer')}" aria-label="${L('Diğer')}">${ic('dahasi')}</button>${ac?`<div class=smp role=menu>${ls.map(k=>`<button type=button role=menuitem class=smi data-bn=kmk data-k="${k}">${ic(KOMUT[k].i)}<span>${esc(KOMUT[k].ad())}</span></button>`).join('')}</div>`:''}</span>`}
 function smYeniden(){if(last)bnCiz(last);tvCiz()}
-document.addEventListener('click',ev=>{let d=false;if(smAcik&&!ev.target.closest('.smw')){smAcik=null;d=true}if(gcAk&&!ev.composedPath().some(e=>e.classList&&e.classList.contains('akw'))){gcAk=null;d=true}if(d)smYeniden()})
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&(smAcik||gcAk)){smAcik=null;gcAk=null;smYeniden()}})
+document.addEventListener('click',ev=>{let d=false;if(smAcik&&!ev.target.closest('.smw')){smAcik=null;d=true}if((gcAk||arAk)&&!ev.composedPath().some(e=>e.classList&&e.classList.contains('akw'))){gcAk=null;arAk=null;d=true}if(d)smYeniden()})
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&(smAcik||gcAk||arAk)){smAcik=null;gcAk=null;arAk=null;smYeniden()}})
 let kpI=0,kpLs=[]
 {document.body.insertAdjacentHTML('beforeend',`<dialog id=kpd aria-label="${L('Komut penceresi')}"><input id=kpq type=search autocomplete=off spellcheck=false placeholder="${L('Ara ya da komut ver')}" aria-label="${L('Ara ya da komut ver')}" aria-controls=kpl role=combobox aria-expanded=true><div id=kpl role=listbox></div><div class=kpa><span><kbd>↑</kbd><kbd>↓</kbd> ${L('seç')}</span><span><kbd>↵</kbd> ${L('aç')}</span><span><kbd>esc</kbd> ${L('kapat')}</span></div></dialog>`)}
 const kpNorm=t=>String(t||'').toLocaleLowerCase('tr').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ı/g,'i')
@@ -2640,7 +2670,7 @@ function bnEpGit(dene){const e=document.getElementById('bnEp');if(!e){if(!dene)b
   let k=e.parentElement;while(k&&k!==document.body&&k.scrollHeight<=k.clientHeight+2)k=k.parentElement
   const kutu=k&&k!==document.body&&k!==document.documentElement?k:(document.scrollingElement||document.documentElement),r=e.getBoundingClientRect(),ust=kutu===document.scrollingElement||kutu===document.documentElement?0:kutu.getBoundingClientRect().top
   kutu.scrollTo({top:Math.max(0,kutu.scrollTop+r.top-ust-24),behavior:'auto'});e.classList.remove('yeni');void e.offsetWidth;e.classList.add('yeni');setTimeout(()=>e.classList.remove('yeni'),2600)}
-async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],#bnPanel button[data-ak]');if(ak){akYap(ak.dataset.ak,ak);if(ak.dataset.ak!=='kopyala'&&gcAk){gcAk=null;if(last)bnCiz(last)}return}
+async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],#bnPanel button[data-ak]');if(ak){akYap(ak.dataset.ak,ak);if(ak.dataset.ak!=='kopyala'&&(gcAk||arAk)){gcAk=null;arAk=null;if(last)bnCiz(last)}return}
     const so=ev.target.closest('#bgn .akp [data-son]');if(so){gcAk=null;if(last)bnCiz(last);sonIs(so.dataset.son,so.dataset.tur||'',!!so.dataset.posta);return}}  // Geçmiş satırının dışa aktar menüsü, yan paneldeki brifing dışa aktarma
   const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn,id=b.dataset.id
   if(a==='git')return git(b.dataset.g,b.dataset.m)
@@ -2648,7 +2678,13 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='smenu'){smAcik=smAcik===b.dataset.y?null:b.dataset.y;return smYeniden()}
   if(a==='kmk'){smAcik=null;smYeniden();const c=KOMUT[b.dataset.k];if(c)c.yap();return}
   if(a==='tvmod')return tvAc(b.dataset.m)
-  if(a==='gcak'){gcAk=gcAk===id?null:id;if(last)bnCiz(last);return}
+  if(a==='gcak'){gcAk=gcAk===id?null:id;arAk=null;if(last)bnCiz(last);return}
+  if(a==='arak'){arAk=arAk===id?null:id;gcAk=null;if(last)bnCiz(last);return}
+  if(a==='arot')return arOturum(id,b.dataset.h)
+  if(a==='aras')return arAsistan(id,b.dataset.a)
+  if(a==='argiz')return arGizle(id,true)
+  if(a==='argos')return arGizle(id,false)
+  if(a==='argz'){arGzAcik=!arGzAcik;if(arGzAcik){arGz=null;arGzYukle()}if(last)bnCiz(last);return}
   if(a==='mailac'){b.disabled=true;let r={};try{r=await bnYaz('/mail-ac',{})}catch(e){}b.disabled=false;bnBildir(r&&r.ok?L('Mail açılıyor; yeni iletiler birazdan gelir'):L('Mail açılamadı'));return}
   if(a==='tzac'){tzAcik=!tzAcik;b.setAttribute('aria-expanded',tzAcik);const l=document.getElementById('tzliste');if(l)l.hidden=!tzAcik;return}  // yeniden çizim yok: kaydırma yerinde
   if(a==='epdus'){epDusAcik=!epDusAcik;try{localStorage.setItem('epdus',epDusAcik?'1':'0')}catch(e){}b.setAttribute('aria-expanded',epDusAcik);const l=document.querySelector('#bnEp .epdusl');if(l)l.hidden=!epDusAcik;return}  // yeniden çizim yok: kaydırma yerinde

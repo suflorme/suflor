@@ -36,6 +36,16 @@ kontrol("süzgeç: izinli seçenekler kaldı (hafta, platform, adım, ses motoru
         and t["profil"]["hitap_bicimi"] == "sen" and t["profil"]["tarz"] == "rahat" and t["birakilan"] == "claude", json.dumps(t, ensure_ascii=False)[:300])
 kontrol("süzgeç: bilinmeyen seçenek '?' (sonuç, tema, adım)", t["sonuc"] == "?" and t["profil"]["tema"] == "?" and t["adimlar"][1]["adim"] == "?")
 kontrol("süzgeç: Claude gözlemi (serbest metin) gitmez", t.get("gozlem") is None)
+# v0.238.3: kulaklıksız toplantı işareti — hesap aktarici/beta-veri.py'den (relay içinde çalışır, burada işlev metni çıkarılıp denenir), süzgeç sayı ve seçeneği tutar
+_kaynak = open(os.path.join(KOD, "aktarici", "beta-veri.py"), encoding="utf-8").read()
+_g = {}; exec(re.search(r"YANKI_ESIK_ADET.*?\n(?=def beta_kalite)", _kaynak, re.S).group(0), _g)
+yk = _g["_beta_yanki"]
+kontrol("yankı: 792 yankı / 278 ben satırı → oran %74, ses_yolu hoparlor_yankisi", yk(792, 278) == {"yanki": 792, "ben_satir": 278, "yanki_oran_yuzde": 74, "ses_yolu": "hoparlor_yankisi"}, yk(792, 278))
+kontrol("yankı: 19 yankı / 1 satır (eşik altı sayı) ve %50 tam (50/50) → normal", yk(19, 1)["ses_yolu"] == "normal" and yk(50, 50)["ses_yolu"] == "normal" and yk(51, 49)["ses_yolu"] == "hoparlor_yankisi")
+kontrol("yankı: hiç satır yok → oran None, normal", yk(0, 0)["yanki_oran_yuzde"] is None and yk(0, 0)["ses_yolu"] == "normal")
+ty = teshis.temizle({"kalite": {"ses": dict(yk(792, 278), ek="Zeynep Bozkurt")}, "x": 1})["kalite"]["ses"]
+kontrol("yankı: süzgeç sayıyı ve ses_yolu'nu tutar, bilinmeyen değer '?' olur, ek metin maskelenir",
+        ty["yanki"] == 792 and ty["yanki_oran_yuzde"] == 74 and ty["ses_yolu"] == "hoparlor_yankisi" and teshis.temizle({"ses_yolu": "Zeynep"})["ses_yolu"] == "?" and not sizinti(ty), ty)
 kontrol("süzgeç: 10 haneli sayı değer olarak kalır (sayı içerik değil), metin içinde maskeli", t["kalite"]["sayi"] == 5321234567 and "5321234567" not in t["kalite"]["not"])
 # klasör türü (S141): sahte ev klasöründe sağlayıcı yolları; hesap/e-posta kısmı pakete girmez
 _ev = tempfile.mkdtemp(prefix="suflor-ev-")
@@ -128,6 +138,7 @@ try:
         k = gel("toplanti_sonu")[-1].get("kalite") or {}
         kontrol("toplantı sonu: kalite — satır gecikmesi, Konuş ilk ses ve 10 sn üstü oran, hitap",
                 "satir_gecikme_sn" in k and (k.get("konus") or {}).get("cevap") == 2 and (k["konus"].get("on_sn_ustu_yuzde") == 50) and k.get("hitap") == 1, json.dumps(k)[:400])
+        kontrol("toplantı sonu: ses — yankı/ben satırı sayısı ve ses_yolu (kısa toplantıda normal)", (k.get("ses") or {}).get("ses_yolu") == "normal" and isinstance(k["ses"].get("yanki"), int) and isinstance(k["ses"].get("ben_satir"), int), json.dumps(k.get("ses")))
         kontrol("toplantı sonu: Claude gözlemi ve son günlük satırları yok", not gel("toplanti_sonu")[-1].get("son_olaylar"))
         kontrol("toplantı sonu: platform toplantının kendisinden (meet)", (gel("toplanti_sonu")[-1].get("toplanti") or {}).get("platform") == "meet")
     # haftalık paket toplantı sürerken ilk turda kurulur (deneme kipinde hemen): toplantı sonrası sayılar ikinci pakette yok, bu yüzden kalanı sayıdan bak

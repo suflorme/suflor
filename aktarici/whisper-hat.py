@@ -1298,6 +1298,7 @@ def _karsi_bekleniyor(t0, t1):
     return any(x["kanal"] == "karsi" and min(x["t1"], t1) - max(x["t0"], t0) >= 0.5 for x in q)
 def _yanki_say(metin):
     STATE["whisper"]["yanki"] += 1; n = STATE["whisper"]["yanki"]
+    if "beta_olay" in globals(): beta_olay("yanki")  # v0.238.3: toplantı başına yankı sayısı (beta_kalite; kulaklıksız toplantı işareti) — yalnız sayaç, metin yok
     if n == 1 or n % 10 == 0: print(f"YANKI: ben kanalında karşı tarafın sözleri ({n}. kez, yazılmadı) — \"{metin[:60]}\"")
 def _yanki_bosalt(zorla=False):
     now = time.time(); yaz = []

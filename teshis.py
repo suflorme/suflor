@@ -131,6 +131,7 @@ SABIT = {"tur": {"hata", "sorun", "toplanti_sonu", "geri_bildirim", "kurulum", "
          "adim": ADIMLAR, "birakilan": ADIMLAR, "sonuc": {"bitti", "yarida", "hazir", "hata", "yok", "iniyor", "secilmedi", "onceden"},
          "neden": {"abonelik", "giris", "hata", "zaman", "yok", "kurulamadi", "baska_hesap"}, "mikrofon": IZIN, "erisilebilirlik": IZIN, "ekran": IZIN, "takvim": _DURUMLAR,
          "ses_motoru": {"mac", "pocket", "gemini"}, "tema": {"sistem", "acik", "koyu"}, "hitap_bicimi": {"sen", "siz", "karisik"},
+         "ses_yolu": {"normal", "hoparlor_yankisi"},  # v0.238.3: aktarıcı/beta-veri.py _beta_yanki (kulaklıksız toplantı işareti)
          "tarz": {"rahat", "olculu", "elle", "karisik"}, "whisper_motor": {"mlx", "cpp"}, "kurulum_profil": {"hafif", "tam"}, "calisan_motor": {"mlx", "cpp"},  # S188: haftalık whisper_cpp'de son açılan motor
          "klasor_turu": {"yerel", "icloud", "googledrive", "onedrive", "dropbox", "diger_bulut", "yok"},
          "dosya": set(KOD_DOSYALARI) | {"<kütüphane>"},

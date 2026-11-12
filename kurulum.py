@@ -781,6 +781,12 @@ def tamamla(c, dil):
         yaz_json(KAYIT, dict(oku_json(KAYIT), cevap=c, dil=dil))
         subprocess.Popen([PY, os.path.abspath(__file__), "profil"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True); sonuc["not"] = "iyi"
     if DENEME: sonuc["aktarici"] = "iyi"; return sonuc
+    m = mesgul()  # v0.238.3: kurulum aktarıcıyı yeniden başlatır; toplantı/sohbet sürerken yapılmaz (ayar, proje ve not yazıldı; toplantı bitince "Yeniden dene")
+    if m:
+        sonuc["aktarici"] = "kotu"; sonuc["mesgul"] = m
+        sonuc["hata"] = (f"Arka plan hizmeti kurulmadı: {m}. Kurulum aktarıcıyı yeniden başlatıp toplantıyı bölerdi. Toplantı bitince \"Yeniden dene\"ye bas." if dil != "en"
+                         else f"The background service was not set up: {m}. Setting it up restarts the service and would interrupt the meeting. Press \"Try again\" when the meeting is over.")
+        return sonuc
     r = subprocess.run([PY, os.path.abspath(__file__), "kur"], capture_output=True, text=True, timeout=300)
     sonuc["aktarici"] = "iyi" if r.returncode == 0 else "kotu"
     sonuc["uyarilar"] = sonuc.get("uyarilar", []) + [x.strip()[:220] for x in (r.stdout + r.stderr).splitlines() if x.strip().startswith("UYARI")][:4]
@@ -924,7 +930,7 @@ class H(BaseHTTPRequestHandler):
             a = ayar(); mdl = modeller_durum(); izi_indirme("model", mdl); izi_indirme("cpp", mdl.get("cpp") or {})
             asd = asistan_durum(); izi_indirme("pocket", asd.get("pocket_kur") or {})
             return self._json({"mac": mac(), "claude": claude_durum(), "beyin": beyin_durum(), "modeller": mdl, "eklenti": eklenti(), "takvim": takvim(), "animsatici": animsatici_durum(), "yerel_ses": yerel_ses(), "asistan": asd,
-                               "kod": KOD, "mod": A.adim if A else None, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
+                               "mesgul": (mesgul() if not DENEME else os.environ.get("SUFLOR_TEST_MESGUL", "")), "kod": KOD, "mod": A.adim if A else None, "proje": a.get("proje") or "~/Suflor", "varsayilan_ad": a.get("ad") or sh("id", "-F") or getpass.getuser(), "deneme": DENEME})
         if yol == "/api/kayit": return self._json(oku_json(KAYIT))
         if yol == "/api/hazirlik": return self._json(hz_ozet())
         if yol == "/api/hazirlik/kart": return self._json(_hz("kart"))

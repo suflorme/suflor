@@ -2483,7 +2483,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
         if yol == "/izleme": return self._json(izleme_view())
         if yol == "/yaklasan-tarihler": return self._json(kt_view("yenile=1" in self.path) if "kt_view" in globals() else {"ok": False, "tarihler": []})  # S243: Kişiler/Takvim/Anımsatıcılar yaklaşan kişisel tarihler (aktarici/kisisel-tarihler.py; anahtarlı)
-        if yol == "/arastirma": return self._json(arastirma_view((re.search(r"[?&]id=([0-9a-z-]{1,80})(?:&|$)", self.path) or [None, None])[1]) if "arastirma_view" in globals() else {"hata": "yok"})  # S243: toplantı dışı web araştırması kayıtları
+        if yol == "/arastirma": return self._json(arastirma_view((re.search(r"[?&]id=([0-9a-z-]{1,80})(?:&|$)", self.path) or [None, None])[1], gizli=bool(re.search(r"[?&]gizli=1(?:&|$)", self.path))) if "arastirma_view" in globals() else {"hata": "yok"})  # S243: toplantı dışı web araştırması kayıtları
         if yol == "/kesisim.json": return self._json(kesisim_sayfa_veri())  # Kesişim sayfası verisi (anahtarlı; geliştirici)
         if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
         if yol == "/dokum-kontrol/ses":  # satırın ses parçası (WAV); sayfa fetch ile başlıklı alır
@@ -2602,6 +2602,9 @@ class H(BaseHTTPRequestHandler):
             return self._json(soru_komut(p))
         if self.path == "/son-toplanti":  # toplantı sonu özeti hazır (toplanti-claude.py ozet-hazir) — kart gibi anahtarla
             return self._json(son_ekle(p))
+        if self.path == "/arastirma":  # 13 Kasım: Araştırmalar satırı — gizle/göster, oturuma ya da asistana ilet; yalnız pano (aynı köken + pano anahtarı); aktarici/web-arastirma.py
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(arastirma_islem(p) if "arastirma_islem" in globals() else {"ok": False, "err": "yok"})
         if self.path == "/tazi":
             if p.get("islem") == "rapor" and not pano: return self._json({"ok": False, "err": "köken"}, 403)  # 12 Kasım: rapor metni yalnız pano (aynı köken + pano anahtarı)
             return self._json(tazi_islem(p) if "tazi_islem" in globals() else {"ok": False, "err": "yok"})  # 11 Kasım: Tazı taraması iste/durum — yalnız anahtarlı (aktarici/tazi-kos.py; gizli kipte ve ayar tazi kapalıyken çalışmaz)

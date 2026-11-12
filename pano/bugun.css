@@ -554,7 +554,7 @@ dialog#kpd::backdrop{background:var(--perde)}
 #kpl .kpb{margin:0;padding:var(--bo-12);color:var(--b-m3)}
 #kpd .kpa{flex:none;display:flex;gap:var(--bo-16);padding:var(--bo-8) var(--bo-16);border-top:1px solid var(--b-cizgi);font-size:var(--yz-12);color:var(--b-m3)}
 #kpd kbd{font:400 var(--yz-12)/1 var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);padding:0 var(--bo-4)}
-#bgn .sat[data-gc]{overflow:visible}  /* Geçmiş satırının dışa aktar menüsü satırın dışına taşar */
+#bgn .sat[data-gc],#bgn .sat[data-arm]{overflow:visible}  /* Geçmiş ve Araştırmalar satırının ⋯ menüsü satırın dışına taşar */
 #bgn .akp{z-index:35}#bgn .akp hr{border:0;border-top:1px solid var(--b-cizgi);margin:var(--bo-4) 0}#bgn .akp .aki{font-size:var(--yz-13);color:var(--b-murekkep)}#bgn .akp .aki:hover{background:var(--b-uzerinde)}
 html.hafta-ac main>.sc>section#tvb{max-width:none;margin-inline:0}
 #kpq::-webkit-search-cancel-button,#gcAra::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}  /* tarayıcı mavisi temizle düğmesi yok */
