@@ -2144,7 +2144,7 @@ HITAP_IS_RX = re.compile(r"\b(kuyruğa|kuyruga|not al|notal|kanıt al|ekran gör
                          r"hatırlat|kaydet|dinleyiciyim|yürütücüyüm|katılımcıyım|rolün|sessiz|sus\b|queue|take a note|screenshot|remind|add to calendar|send (an )?email)", re.I)
 # v0.55.0 (S70): toplantıda Konuş'a basılı tutup söylenen iş talimatı ("Ali'ye e-posta taslağı hazırla", "perşembe 14'e toplantı koy") toplantı oturumuna hiç
 # gitmiyordu — konuşan "Anlaşıldı, not edildi" diyordu ama iş ancak aynı söz toplantı mikrofonu dökümüne de düştüyse yapılıyordu. Şimdi dökümde kullanıcının notu
-# olarak "Claude: …" talimatı yazılır (izle NOT (kullanıcı) olarak iletir, oturum uygular; TOPLANTI-MODU §7–8), Claude'a gitmez, kısa onay okunur.
+# olarak "Claude: …" talimatı yazılır (izle NOT (kullanıcı) olarak iletir, oturum uygular; TOPLANTI-KURALLARI §7, AYRINTI §8), Claude'a gitmez, kısa onay okunur.
 def konus_is_ilet(metin):
     if not toplanti_var() or not HITAP_IS_RX.search(metin or ""): return False
     m = re.sub(r"^\W*(claude|suflor|süflör)\W+", "", str(metin).strip(), flags=re.I)

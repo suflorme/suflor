@@ -7,8 +7,8 @@ Kullanıcı birazdan toplantısına (Teams, Zoom web ya da Meet) giriyor: **$ARG
 çalışma alanının klasöründe ({{CALISMA}}) çalışır; yollar ona göredir (proje belgeleri: {{PROJE}}). Kısa yaz; kullanıcı birkaç dakika içinde toplantıda olacak.
 
 ## 0. Kurallar
-`{{KOD}}/TOPLANTI-KURALLARI.md` dosyasını, bu klasörün `CLAUDE.md`'sini (varsa) ve Suflor'un proje notunu (`tc proje-notu`) oku ve toplantı boyunca
-uygula. Toplantı sırasındaki kurallar orada; burada tekrarlanmaz. Aşağıda `tc` = `python3 {{KOD}}/toplanti-claude.py` (yalnız yazım kısaltması; çalıştırırken tam yaz).
+`{{KOD}}/TOPLANTI-KURALLARI.md` (çekirdek) dosyasını, bu klasörün `CLAUDE.md`'sini (varsa) ve Suflor'un proje notunu (`tc proje-notu`) oku ve toplantı boyunca
+uygula. Toplantı sırasındaki kurallar orada; burada tekrarlanmaz. Ayrıntı (`{{KOD}}/TOPLANTI-KURALLARI-AYRINTI.md`: ekran/olay ayrıntıları, döküm/ses/dil, eylem kuyruğu, e-postayla çözülebilir) yalnız gerekince, ilgili bölüm okunur. Aşağıda `tc` = `python3 {{KOD}}/toplanti-claude.py` (yalnız yazım kısaltması; çalıştırırken tam yaz).
 
 ## 1. Kontrol (tek mesajda, eksikleri tek satırda)
 `tc saglik` — ⚠ satırlarını önerisiyle kullanıcıya tek satırda ilet ("eklenti sinyali yok" toplantıdan önce normaldir). Sonra
@@ -57,7 +57,7 @@ Toplantı başlamadıysa eklenti/panel eksikliği normaldir; uyar, hazırlığa 
 - `tc hazirlik`'e takvimdeki katılımcıları da ver (`--katilimci "Ad, Ad…"`): "## Gündem taslağı" bölümü bu kişilerle (ya da aynı başlıklı önceki toplantıyla) ilgili açık iş,
   onay bekleyen karar ve açık soruyu listeler; panodaki hazırlık kartının "Gündem taslağı" satırıyla aynı kaynaktır (`yapi.gundem_taslagi`). Gündem yoksa bunu öner.
 - `tc hazirlik`'e takvimdeki katılımcı sayısını ver (`--kisi N`); çıktıdaki "E-posta yeterli mi?" işareti GÜÇLÜyse ve sen de katılırsan hazırlık özetinin
-  sonuna "Bu toplantı e-postayla çözülebilir: <gerekçe>" + taslak (`TOPLANTI-KURALLARI.md` §9); zayıfta söyleme.
+  sonuna "Bu toplantı e-postayla çözülebilir: <gerekçe>" + taslak (`TOPLANTI-KURALLARI-AYRINTI.md` §9); zayıfta söyleme.
 - Kullanıcıya 3–6 satır "geçmişte ne dendi / açık kalan ne" (kaynak `dosya @konum`). Esas belgeler ve tablolar güncel kayıttır;
   döküm ile çelişirse tablo geçer, çelişkiyi kullanıcıya söyle.
 - `_canli/hazir.json`'u bu toplantı için yeniden yaz:
@@ -106,7 +106,7 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
      (tek cümle, dökümden) + görsel `![](<göreli yol>)`; tekrar eden, boş ya da yalnız kamera görüntüsünü atla.
    - Kanıtlar (`tc kanit`; açıklamasızları Read ile aç): `CLAUDE.md`'deki kanıt klasörüne (yoksa `_kanit/`) kopyalanacakları öner (`<Sistem>_<ne>_<GGAAYYYY>.png`,
      ör. `AWS_IAM_users_01102026.png`); onaylarsa kopyala (`_canli` kopyası kalır).
-   - Esas belgelere öneriler kuyruğa (`TOPLANTI-KURALLARI.md` §8): karar listesi satır taslağı ("#?"), durum belgesi tek satır, tablo
+   - Esas belgelere öneriler kuyruğa (`TOPLANTI-KURALLARI-AYRINTI.md` §8): karar listesi satır taslağı ("#?"), durum belgesi tek satır, tablo
      için "sekme · satır · sütun: eski → yeni (kaynak: .md @saat ya da kanıt n)" — `tc eylem ekle kayit|belge "<başlık>" --ayrinti
      "<dosya ve eklenecek metin>"`. Onaylanınca yazmadan hemen önce dosyayı yeniden oku, eski satırı değiştirme (düzeltme satır sonuna
      not). Özette "Kuyruğa giden işler" başlığıyla kısa liste.
@@ -119,7 +119,7 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    Özetle birlikte yapı dosyası: `<özet>.yapi.json` (özetle aynı ad) — gündem maddesi başına durum (konuşuldu / kısmen / açık) ve
    karar · iş (sahip, tarih) · söz · açık soru · sayı · iddia (kim, saat, kısa alıntı) + `oneri` (tek cümle); biçim `tc yapi --ornek`;
    Karar çıkmadıysa ve konuşmanın çoğu durum aktarımıysa özetin sonuna "Bir dahakine e-postayla çözülebilir: <gerekçe>" ve yapıya
-   `"eposta_yeterdi": {"deger": true, "gerekce": "…"}` (aksi hâlde `deger` false; `TOPLANTI-KURALLARI.md` §9).
+   `"eposta_yeterdi": {"deger": true, "gerekce": "…"}` (aksi hâlde `deger` false; `TOPLANTI-KURALLARI-AYRINTI.md` §9).
    özette olmayanı ekleme, uydurma. Toplantı çıktısının sayıları, sözler defteri ve karar grafı bu dosyadan dolar.
    Her kararda `netlik`: `acik` (taraflar açıkça onayladı) · `ortuk` (itiraz yok ama kimse açıkça "tamam" demedi) · `tek` (bir kişi
    söyledi, öteki cevap vermedi); dökümde dayanağı olan ama konuşulmamış koşul varsa `varsayim` (tek cümle). Emin değilsen `ortuk`.
@@ -130,7 +130,7 @@ toplantı şeridinde. Kanıt için Option + Shift + K." İlk satırda `ARAYÜZ D
    proje araması, web) doğrula: biliniyorsa `cevap` (doğru/yanlış/kısmen + değer) ve `kaynak` (+ `kaynak_url`); bulamazsan boş bırak, uydurma.
    **Defter turu:** dökümde yanlış duyulmuş ad, sayı ya da terim varsa (bağlamdan eminsen) yapı dosyasına `duzeltmeler`
    (`{"saat", "yanlis", "dogru"}`; yoksa boş liste), güvenilmez aralık varsa `dokum_notu`. Bu bölüm Konuş'un toplantı defterine girer.
-5. **Takip e-postası ve eylem kuyruğu** (`TOPLANTI-KURALLARI.md` §8): kullanıcı dışında katılımcı varsa özetten takip e-postası yaz — toplantının dilinde,
+5. **Takip e-postası ve eylem kuyruğu** (`TOPLANTI-KURALLARI-AYRINTI.md` §8): kullanıcı dışında katılımcı varsa özetten takip e-postası yaz — toplantının dilinde,
    5–8 satır: teşekkür, konuştuklarımız (2–3 madde), sözler ve tarihler (kim — ne — ne zaman), açık sorular. Toplantı çıktısının öneri satırı,
    konuşma payı, iç gözlem ve kişi yorumu girmez. **Üslup:** yazmadan önce `tc posta-uslup "<ad ya da adres>"` (tek alıcı; birden çok
    alıcıda adsız `tc posta-uslup`). `ÜSLUP` satırını (ayar `eposta_uslup`, yoksa varsayılan) uygula; `ÖNCEKİ İLETİLER` geldiyse hitabı, sen/siz'i,

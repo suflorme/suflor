@@ -25,6 +25,7 @@ ok("deger false → sessiz", Y.eposta_yeterdi(yapi(False, {"deger": False})) == 
 ok("alan yok → 'yok' uyarısı", Y.eposta_yeterdi(yapi(False, None))[2] == "yok")
 src = open(os.path.join(KOD, "toplanti-claude.py"), encoding="utf-8").read()
 ok("hazirlik ve bitir çıktısına bağlı", "E-posta yeterli mi?" in src and "EPOSTA:" in src and '"--kisi"' in src)
-for f in ("TOPLANTI-MODU.md", "TOPLANTI-KURALLARI.md"):
-    t = open(os.path.join(KOD, f), encoding="utf-8").read(); ok(f + ": §9 ve alan adı", "## 9." in t and "eposta_yeterdi" in t)
+for f in ("TOPLANTI-KURALLARI.md", "TOPLANTI-KURALLARI-AYRINTI.md"):  # çekirdekte §9 başlığı + işaretçi, ayrıntıda kural ve alan adı (12 Kasım bölme)
+    t = open(os.path.join(KOD, f), encoding="utf-8").read(); ok(f + ": §9", "## 9." in t)
+t = open(os.path.join(KOD, "TOPLANTI-KURALLARI-AYRINTI.md"), encoding="utf-8").read(); ok("AYRINTI: alan adı eposta_yeterdi", "eposta_yeterdi" in t)
 print("eposta-yeterdi:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

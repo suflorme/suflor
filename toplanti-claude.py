@@ -54,7 +54,7 @@ ka = sub.add_parser("kart"); ka.add_argument("tur", choices=["soyle", "dur", "ce
 ka.add_argument("metin"); ka.add_argument("--neden", default=""); ka.add_argument("--cevap", default=None, help="cevaplanan soru kimliği (q…)")
 ka.add_argument("--gundem", type=int, default=None, help="ilgili gündem maddesinin sırası (0'dan)")
 ka.add_argument("--gizli", action="store_true", help="dur kartının metni şeritte görünmesin (Teams sekmesi paylaşılırsa)")
-ka.add_argument("--onay", action="store_true", help="onay kartı (#76): Onayla / Reddet düğmeleri; metin yapılacak iç işi tam yazar (TOPLANTI-MODU §7)")
+ka.add_argument("--onay", action="store_true", help="onay kartı (#76): Onayla / Reddet düğmeleri; metin yapılacak iç işi tam yazar (TOPLANTI-KURALLARI §7)")
 ka.add_argument("--fisilti", default="", help="ayar fisilti açıksa kulaklıkta okunacak ≤ 4 sözcük (DUR kartı, kullanıcıya adıyla sorulan sorunun kartı ve fırsatı kaçacak SÖYLE kartı — strateji ipucu)")
 ka.add_argument("--durum", default="", help="kartın altında tek satır (Ne diyeyim?: şu an ne konuşuluyor, ≤ 120 karakter)")
 ka.add_argument("--sessiz-ozet", action="store_true", help="SESSİZ BİTTİ'den sonra tek özet kartı: sessizde bekleyen kartları kapatır")

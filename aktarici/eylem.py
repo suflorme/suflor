@@ -4,7 +4,7 @@
 # Toplantıda konuşulan iş (kayıt, takvim/e-posta taslağı, belge değişikliği, takip e-postası) kart göstermeden kuyruğa girer
 # (toplanti-claude.py eylem ekle). Toplantı sonunda Claude listeyi sunar (eylem sun): panoda Onayla/Reddet + "Hepsini onayla", ya da
 # kullanıcı sohbette onaylar (eylem onay). Karar yalnız anahtarlı istemciden; Claude yalnız onaylananı, ayrıntıda yazıldığı gibi
-# uygular ve sonucu yazar (eylem sonuc). E-posta yalnız taslak, takvim bildirim gönderilmeden — kural metni TOPLANTI-KURALLARI §8.
+# uygular ve sonucu yazar (eylem sonuc). E-posta yalnız taslak, takvim bildirim gönderilmeden — kural metni TOPLANTI-KURALLARI-AYRINTI §8.
 EYLEM_TUR = {"kayit": "Kayıt", "takvim": "Takvim", "eposta": "E-posta", "belge": "Belge", "takip": "Takip e-postası", "mesaj": "Ekip mesajı", "diger": "Diğer", "oturum": "Oturuma talimat", "yapilacak": "Yapılacak"}  # v0.75.0: son ikisi yerel (talimat.py uygular)
 EYLEMLER = []; EYLEM_SAAT = 12  # bu kadar saatten eski eylem panoda görünmez
 def _eylem_temiz(x, n): return " ".join(str(x or "").split())[:n]

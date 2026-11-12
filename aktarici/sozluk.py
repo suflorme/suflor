@@ -56,7 +56,7 @@ def sozluk_uygula(text, dosya, kurallar=None):
         if parcalar: out = "".join(parcalar) + out[son:]
     return out, olay
 
-# Sesli "Claude:" talimatı (TOPLANTI-MODU §4) Whisper'da "Cloud," / "Klod:" diye yazılıyor (9 Ekim denemesi: "Cloud, card, English,
+# Sesli "Claude:" talimatı (TOPLANTI-KURALLARI §4) Whisper'da "Cloud," / "Klod:" diye yazılıyor (9 Ekim denemesi: "Cloud, card, English,
 # yes."). Yalnız kullanıcının kendi satırında ve cümle başında düzeltilir: "cloud'a bağımlıyız" gibi gerçek bulut anlamı ve karşı
 # tarafın sözü değişmez. Ham metin .jsonl'de "raw"da kalır. 11 Ekim: "...Cloud kaydı kapat." (üç noktadan sonra boşluksuz, virgülsüz) kaçtı →
 # üç nokta da cümle başı; virgül yoksa ardından bulut anlamlı sözcük gelmemeli ("Cloud hizmeti pahalı" değişmez).

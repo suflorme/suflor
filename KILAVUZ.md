@@ -416,7 +416,7 @@ Toplantıda bir şey beklediğin gibi gitmezse önce **⚙ Ayarlar → Kurulumu 
 | Proje veritabanı (`baglam.py proje-vt`; `<uygulama>/proje.db`) | Excel, Numbers, CSV/TSV sayfaları (`t_…` tabloları; sayı sayı, tarih ISO; kaynak dosyası `tablolar` tablosunda) ve onaylı proje kartı (`kisi`, `kurum`, `karar`, `acik_is`, `olay`, `terim`, `proje`) tek SQLite dosyasında. Konuş ve toplantı oturumu yalnız okuyan SQL ile bakar (`vt_sema`, `vt_sor`; toplantıda `toplanti-claude.py proje`). Yalnız değişen dosya yeniden yazılır; gizli bilgi taşıyan hücre `[gizli]`. Kendi kayıt veritabanın ayarlıysa (`veritabani`) kurulmaz; `"proje_vt": false` kapatır |
 | Yapay zekâ katmanı (`aktarici/beyin.py`, `aktarici/saglayici.py`) | Konuş, çeviri, telaffuz ve proje kartının yapay zekâ çağrıları tek yerden: Claude Code ya da OpenAI uyumlu uç (Gemini, OpenAI, LM Studio gibi); seçim, Anahtar Zinciri |
 | Claude köprüsü (`toplanti-claude.py`, `baglam.py`, `yapi.py`) | Claude'un izlediği olay akışı, kart gönderme, proje araması, özet araçları |
-| Kurallar (`TOPLANTI-KURALLARI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
+| Kurallar (`TOPLANTI-KURALLARI.md` çekirdek, `TOPLANTI-KURALLARI-AYRINTI.md`, `sablon/`) | Claude'un toplantıdaki davranış kuralları ve `/toplanti` komutu |
 
 ## Lisanslar
 MIT — ayrıntı [LICENSE](LICENSE).
