@@ -183,6 +183,7 @@ a,a:link,a:visited{color:var(--b-vurgu);text-decoration:none}a:hover,a:focus-vis
 #bnPanel .blok ul{list-style:none;margin:0;padding:0;display:grid}
 #bnPanel .blok li{display:flex;gap:var(--bo-12);align-items:baseline;padding:var(--bo-8) 0;border-bottom:1px solid var(--b-cizgi);font-size:var(--yz-13)}
 #bnPanel .blok li .mt{flex:1;min-width:0;overflow-wrap:anywhere}
+#bnPanel .blok li .vade{flex:0 1 auto;max-width:40%;overflow-wrap:anywhere;text-align:right}
 #bnPanel .blok p{margin:0;font-size:var(--yz-13);color:var(--b-m2)}
 #bnPanel .vade{font:500 var(--yz-12) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);color:var(--b-m2)}#bnPanel .vade.gec{color:var(--b-gec)}
 #bnPanel .keylem{display:flex;flex-wrap:wrap;gap:var(--bo-8)}
