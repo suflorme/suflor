@@ -2563,7 +2563,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(moderator_pano(str(p.get("komut") or "")))
         if self.path == "/bas-konus":  # bas-konuş — pano (aynı köken + pano anahtarı); şerit penceresi yalnız basılı tut (basla + ses)
             if not (pano or (serit and str(p.get("komut") or "") in ("basla", "") and (p.get("komut") or p.get("pcm")))): return self._json({"ok": False, "err": "köken"}, 403)
-            if p.get("komut") == "basla": return self._json(konus_basla())
+            if p.get("komut") == "basla": sohbet_bas_tut_oncesi(); return self._json(konus_basla())  # Adım 4: yerel mikrofon önce kapanır
             if p.get("komut") == "sus": ses_durdur(); return self._json({"ok": True})
             if p.get("komut") == "parca": return self._json(konus_parca(p))
             if p.get("komut") == "sohbet_basla": return self._json(sohbet_basla())

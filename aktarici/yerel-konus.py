@@ -13,7 +13,7 @@ KY_BAGLAN_ARA_SN, KY_BAGLAN_AZAMI_SN, KY_CAL_BASLA_SN, KY_DUSME_BEKLE_SN, KY_SES
 KY_SAY_SR = 22050  # say -o çıkışı (Mac sesi); yardımcı 48 kHz'e kendisi çevirir
 KY = {"s": None, "bagli": False, "dongu": None, "dur": False, "kilit": threading.RLock(), "yaz_kilit": threading.Lock(), "mik": False, "vpio": False, "calan": {}, "sira": 0,
       "durum": {}, "dusme_bit": 0.0, "dusme": 0, "kanca": None, "mik_isle": None, "mik_q": None, "mik_kusak": 0, "mik_tamp": bytearray(), "mik_p": None, "son_t": 0.0, "anahtar_hata": False, "vpio_istek": False, "vpio_bekle": 0.0, "devam_vpio": None,
-      "sessiz": 0, "sessiz_gen": 0, "sessiz_acik": False, "mik_atilan": 0, "mik_n": 0, "saat_uyari": False}
+      "sessiz": 0, "sessiz_gen": 0, "sessiz_acik": False, "mik_atilan": 0, "mik_n": 0, "saat_uyari": False, "aygit_say": 0}
 def ky_etkin():  # ayar yerel_konus true VE geliştirici: değilse bu bölüm hiçbir şey yapmaz
     try: return AYAR.get("yerel_konus") is True and bool(gelistirici_mi())
     except Exception: return False
@@ -250,7 +250,7 @@ def _ky_olay(o):
         KY["durum"] = {k: v for k, v in o.items() if k != "t"}
         if "vpio" in o and KY["mik"] and not o["vpio"] and KY["vpio"] and t == "nabiz": KY["vpio"] = False
     elif t == "toplanti_mik": KY["vpio_bekle"] = time.time(); print(f"YEREL KONUŞ: toplantı uygulaması mikrofonu aldı ({str(o.get('uygulama'))[:30]}) — VPIO {'kapandı' if o.get('vpio_kapatildi') else 'zaten kapalı'}"); KY["vpio"] = False
-    elif t == "aygit_degisti": print(f"YEREL KONUŞ: aygıt değişti (kulaklık={o.get('kulaklik')})")
+    elif t == "aygit_degisti": KY["aygit_say"] += 1; print(f"YEREL KONUŞ: aygıt değişti (kulaklık={o.get('kulaklik')})")
     elif t == "hata":
         print(f"YEREL KONUŞ: yardımcı hatası — {str(o.get('neden'))[:40]} {str(o.get('ayrinti') or '')[:80]}")
         if o.get("neden") == "anahtar": KY["anahtar_hata"] = True

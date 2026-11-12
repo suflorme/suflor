@@ -80,42 +80,100 @@ def _sohbet_kulaklik():
     if toplanti_var(): return False
     if time.time() - _SOH_KUL["t"] > 3: _SOH_KUL.update(t=time.time(), v=bool(kulaklik()))
     return _SOH_KUL["v"]
+def _sohbet_ky_view():  # yerel ses yolu tanısı (bağlı, vpio, mik, düşme sayısı); yalnız ayar yerel_konus açıkken görünür — kapalıyken /status aynı. Beta veri paketine girmez
+    f = globals().get("ky_etkin"); g = globals().get("ky_view")
+    try: return {"ky": g()} if f and g and f() else {}
+    except Exception: return {}
 def sohbet_view():
     if SOHBET["acik"]:
         dv = SOHBET.get("devam")  # devam penceresi (bas-konus.py konus_devam_pencere): kalan sn — panoda/menüde "dinliyor (kısa)" göstergesi için
-        return {"acik": True, "bekle": SOHBET["bekle"], "okuyor": ses_caliyor(), "kulaklik": True, **({"devam": max(0, round(dv["sn"] - (time.time() - max(SOHBET["t_ses"], SOHBET["t_mesgul"])), 1))} if dv else {})}
+        return {"acik": True, "bekle": SOHBET["bekle"], "okuyor": ses_caliyor(), "kulaklik": True, "yerel": bool(SOHBET.get("yerel")), **_sohbet_ky_view(), **({"devam": max(0, round(dv["sn"] - (time.time() - max(SOHBET["t_ses"], SOHBET["t_mesgul"])), 1))} if dv else {})}
     k = SOHBET.get("kapanis")
-    return {"acik": False, "kulaklik": _sohbet_kulaklik(), **({"kapandi": k["neden"], "kapandi_sn": round(time.time() - k["t"])} if k and time.time() - k["t"] < 60 else {})}
+    return {"acik": False, "kulaklik": _sohbet_kulaklik(), **_sohbet_ky_view(), **({"kapandi": k["neden"], "kapandi_sn": round(time.time() - k["t"])} if k and time.time() - k["t"] < 60 else {})}
+def _ky_islev(ad): return globals().get(ad)  # yerel-konus.py yoksa (yalıtılmış yükleme) None
+def _sohbet_yerel_karar(kul):  # (yerel yol kullanılsın mı, vpio) — Adım 4 (12 Kasım): yerel yol hazır, toplantı yok, gizli değil: kulaklıkta VPIO kapalı, hoparlörde VPIO açık
+    # (hoparlörde yalnız ayar yerel_konus_hoparlor true iken; varsayılan false). Yerel yol hazır değilse (ayar kapalı, yardımcı yok, düşmüş) bugünkü yol aynen.
+    hazir = _ky_islev("ky_hazir"); gizli = _ky_islev("gizli_acik")
+    try:
+        if not (hazir and hazir()) or toplanti_var() or (gizli and gizli()): return False, False
+    except Exception: return False, False
+    if kul: return True, False
+    return (True, True) if AYAR.get("yerel_konus_hoparlor") is True else (False, False)
 def sohbet_basla():
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var(): return {"ok": False, "err": _t(f"Toplantı sürerken sohbet kapalı — “{asistan_ad()}, …” de ya da basılı tut", "Conversation is off during a meeting — say “Claude, …” or hold to talk")}
-    if not kulaklik(): return {"ok": False, "err": _t("Sohbet yalnız kulaklıkla (hoparlörde Suflor kendi sesini duyar) — basılı tutarak sor", "Conversation needs headphones (on speakers Suflor hears itself) — hold to talk instead")}
-    if SOHBET["acik"]: return {"ok": True}
+    kul = kulaklik(); yerel, vpio = _sohbet_yerel_karar(kul)
+    err_kul = {"ok": False, "err": _t("Sohbet yalnız kulaklıkla (hoparlörde Suflor kendi sesini duyar) — basılı tutarak sor", "Conversation needs headphones (on speakers Suflor hears itself) — hold to talk instead")}
+    if not kul and not yerel: return err_kul
+    if SOHBET["acik"]: return {"ok": True, "yerel": bool(SOHBET.get("yerel"))}
+    mik = False
+    if yerel:  # mikrofon çalmadan ÖNCE açılır (çalarken mik_ac motoru yeniden kurar, çalan akış kesilir); motor sohbet boyunca açık kalır
+        mik = bool(_ky_islev("ky_mik_ac")(vpio))
+        if not mik:
+            if not kul: return err_kul  # hoparlörde yerel yol açılamadı: bugünkü davranış
+            yerel = False  # kulaklıkta yerel yol açılamadı: bugünkü yol (pano mikrofonu)
     r = konus_basla()
-    if not r.get("ok"): return r
+    if not r.get("ok"):
+        if mik: _ky_islev("ky_mik_kapat")("sohbet açılmadı")
+        return r
     simdi = time.time()
-    SOHBET.pop("biriken", None); SOHBET.pop("onceki", None)
-    with SOHBET["kilit"]: SOHBET.update(acik=True, t_ac=simdi, t_ses=simdi, t_mesgul=simdi, uyari=False, durak=None, bekle=None, kesme_sn=0.0, sira=SOHBET["sira"] + 1)
+    SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET.pop("vpio_bekle", None); SOHBET.pop("yerel_yok", None)
+    with SOHBET["kilit"]: SOHBET.update(acik=True, t_ac=simdi, t_ses=simdi, t_mesgul=simdi, uyari=False, durak=None, bekle=None, kesme_sn=0.0, sira=SOHBET["sira"] + 1, yerel=mik, vpio=bool(mik and vpio), hoparlor=bool(mik and vpio), aygit_say=(_ky_islev("KY") or {}).get("aygit_say", 0))
     _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None, kaynak="sohbet")
     if float(AYAR.get("hihi_tur_esik", TUR_ESIK)) > 0: threading.Thread(target=tur_baslat, daemon=True).start()
     threading.Thread(target=_sohbet_bekci, args=(SOHBET["sira"],), daemon=True).start()
-    print("SOHBET: açıldı"); return {"ok": True}
-def sohbet_kapat(neden, soz=None):
+    print("SOHBET: açıldı" + (f" (yerel ses yolu, {'hoparlör — VPIO açık' if vpio else 'kulaklık — VPIO kapalı'})" if mik else "")); return {"ok": True, "yerel": mik}
+def _sohbet_yerel_kapat(sira, hemen):  # sohbet bitti: yerel mikrofon kapanır. Okuma sürüyorsa bitmesi beklenir (mik_kapat motoru yeniden kurar, çalan akışı keser); bu arada yeni sohbet açıldıysa dokunulmaz
+    kapat = _ky_islev("ky_mik_kapat")
+    if not kapat: return
+    if not hemen:
+        t0 = time.time(); time.sleep(0.6)
+        while ses_caliyor() and time.time() - t0 < 30: time.sleep(0.3)
+    if not SOHBET["acik"] and SOHBET["sira"] == sira: kapat("sohbet kapandı")
+def sohbet_bas_tut_oncesi():  # bas-tut (komut basla) öncesi: yerel mikrofon kapanır (üçüncü kapatıcı; Chrome mikrofonu açınca yardımcı Chrome'u toplantı sanıp VPIO'yu kapatır). Yerel sohbet/devam penceresi sessizce biter
+    if SOHBET["acik"] and SOHBET.get("yerel"): sohbet_kapat("devam: bas-tut", hemen=True)
+    else:
+        ky = _ky_islev("KY"); kapat = _ky_islev("ky_mik_kapat")
+        if ky and kapat and ky["mik"]: kapat("bas-tut")
+def sohbet_kapat(neden, soz=None, hemen=False):
     with SOHBET["kilit"]:
         if not SOHBET["acik"]: return
+        yerel = bool(SOHBET.get("yerel")); sira = SOHBET["sira"]; SOHBET.update(yerel=False, vpio=False, hoparlor=False)
         SOHBET.update(acik=False, bekle=None, kapanis=None if neden.startswith("devam") else {"neden": "kullanici" if neden.startswith("kullanıcı") else {"toplantı başladı": "toplanti", "kulaklık çıktı": "kulaklik"}.get(neden, neden), "t": time.time()})  # devam penceresi sessiz kapanır: panoda "Sohbet kapandı" notu çıkmaz
         SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET.pop("devam", None)
     if not _KS["tur"]: _akis_sifirla(); _konus_kur(durum="hazir" if konus_canli() else "kapali")
+    if yerel: threading.Thread(target=_sohbet_yerel_kapat, args=(sira, hemen or neden in ("toplantı başladı", "gizli toplantı")), daemon=True).start()
     if soz: seslendir(soz, kuyruk=True)
     print(f"SOHBET: kapandı ({neden}, {time.time() - SOHBET['t_ac']:.0f} sn)")
+def _sohbet_yerel_denetle(simdi, kul):  # Adım 4: yerel yolda kulaklık/hoparlör kararı (aygit_degisti olayında ya da 5 sn'de bir) ve bağlantı denetimi. True: sohbet kapandı
+    ky = _ky_islev("KY")
+    if not ky: return False
+    if kul is not None:
+        vpio = not kul
+        if vpio and AYAR.get("yerel_konus_hoparlor") is not True: sohbet_kapat("kulaklık çıktı", _t("Kulaklık çıktı, sohbeti kapattım.", "Headphones out, conversation closed.")); return True
+        if vpio != SOHBET.get("vpio"): SOHBET["vpio_bekle"] = vpio  # okuma bitince uygulanır (mik_ac çalan akışı keser)
+    vb = SOHBET.get("vpio_bekle")
+    if vb is not None and not ses_caliyor() and not _KS["tur"]:
+        SOHBET.pop("vpio_bekle", None)
+        if _ky_islev("ky_mik_ac")(vb): SOHBET.update(vpio=vb, hoparlor=vb); print(f"SOHBET: aygıt değişti — VPIO {'açıldı (hoparlör)' if vb else 'kapandı (kulaklık)'}")
+    if not ky["mik"] and ky["devam_vpio"] is None:  # bağlantı koptu / mikrofon düştü: yardımcı dönünce mik_ac yeniden; 8 sn dönmezse sohbet biter (pano mikrofonu açılmamış, ses gelmez)
+        t = SOHBET.setdefault("yerel_yok", simdi)
+        if _ky_islev("ky_mik_ac")(bool(SOHBET.get("vpio"))): SOHBET.pop("yerel_yok", None); print("SOHBET: yerel mikrofon yeniden açıldı")
+        elif simdi - t > 8: sohbet_kapat("yerel ses koptu", _t("Ses bağlantısı koptu, sohbeti kapattım.", "Audio link dropped, conversation closed.")); return True
+    else: SOHBET.pop("yerel_yok", None)
+    return False
 def _sohbet_bekci(sira):
     k_t = 0.0
     while SOHBET["acik"] and SOHBET["sira"] == sira:
         time.sleep(0.5); simdi = time.time(); _okuma_izle(simdi)
         if toplanti_var(): sohbet_kapat("toplantı başladı"); return
-        if simdi - k_t > 5:
-            k_t = simdi
-            if not kulaklik(): sohbet_kapat("kulaklık çıktı", _t("Kulaklık çıktı, sohbeti kapattım.", "Headphones out, conversation closed.")); return
+        yerel = bool(SOHBET.get("yerel")); ky = _ky_islev("KY"); ag = ky.get("aygit_say", 0) if ky and yerel else 0
+        if simdi - k_t > 5 or (yerel and ag != SOHBET.get("aygit_say")):  # aygit_degisti olayı beklemeden denetler
+            k_t = simdi; SOHBET["aygit_say"] = ag; kul = kulaklik()
+            if yerel:
+                if _sohbet_yerel_denetle(simdi, kul): return
+            elif not kul: sohbet_kapat("kulaklık çıktı", _t("Kulaklık çıktı, sohbeti kapattım.", "Headphones out, conversation closed.")); return
+        elif yerel and _sohbet_yerel_denetle(simdi, None): return
         d = SOHBET.get("dusunme")
         if d and not _KS["tur"] and SOHBET["t_ses"] - d["t"] < 0.3 and simdi - d["t"] >= SOHBET_DUSUNME_SN: SOHBET.pop("dusunme", None); _sohbet_dusunme_gonder(d["metin"])
         if _KS["tur"] or (ses_caliyor() and not SOHBET["uyari"]): SOHBET["t_mesgul"] = simdi; continue
@@ -146,7 +204,7 @@ def _sohbet_parca_govde(pcm, p):  # iç gövde (12 Kasım, Aşama 2 Adım 2): pa
     tur = _KS["tur"]
     # v0.54.3 (S70, kullanıcı 16 Ekim: "arka plan seslerinden sürekli kesiliyor ve susuyor"): araya girme varsayılan kapalı (ayar sohbet_araya_girme) — cevap
     # sonuna kadar okunur, okuma sırasında gelen ses atılır (arka plan sesi okumayı kesmez, sonraki soru da olmaz); Claude düşünürken söylenen yine biriktirilir.
-    if not AYAR.get("sohbet_araya_girme") and _okuma_izle(simdi):
+    if (not AYAR.get("sohbet_araya_girme") or SOHBET.get("hoparlor")) and _okuma_izle(simdi):  # hoparlörde (Adım 4) araya girme ayardan bağımsız kapalı: yankı kalıntısı okumayı kesmesin
         SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET["kesme_sn"] = 0.0
         if konusma >= SOHBET_BIRIK_SN and SOHBET.get("yok_t") != SOHBET["t_okuma"]:
             SOHBET["yok_t"] = SOHBET["t_okuma"]; print("SOHBET: okuma sürerken ses — yok sayıldı (araya girme kapalı), okuma sürüyor")

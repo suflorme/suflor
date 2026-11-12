@@ -1236,12 +1236,13 @@ async function sohbetAc(){if(kSoh)return sohbetKapat(true);if(kRec)return
   let r={};try{r=await j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'sohbet_basla'})})}catch(e){}
   if(!r.ok){geciciDurum(L('Sohbet açılmadı'),r.err||'');return}
   kSoh={hazir:false,t:Date.now()};konusCiz()
+  if(r.yerel){Object.assign(kSoh,{hazir:true,yerel:true});kayitSesi(true);return}  // Adım 4: mikrofon aktarıcının yerel ses yardımcısından gelir; Chrome mikrofonu AÇILMAZ (yardımcı Chrome'u toplantı sanıp VPIO'yu kapatırdı)
   try{const st=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}}),ac=new AudioContext({sampleRate:16000}),src=ac.createMediaStreamSource(st),pr=ac.createScriptProcessor(4096,1,1),parca=[]
     pr.onaudioprocess=e=>parca.push(new Float32Array(e.inputBuffer.getChannelData(0)));src.connect(pr);pr.connect(ac.destination)
     if(!kSoh){st.getTracks().forEach(t=>t.stop());ac.close();return}
     Object.assign(kSoh,{st,ac,src,pr,parca,hazir:true});duzeyKur(kSoh);kayitSesi(true);const k=kSoh;k.akis=setInterval(()=>sohbetGonder(k),500)}
   catch(e){sohbetKapat(true);geciciDurum(L('Mikrofon açılamadı'),String(e&&e.name||''))}}
-function sohbetKapat(bildir){const k=kSoh;kSoh=null;if(k){if(k.hazir)kayitSesi(false);if(k.akis)clearInterval(k.akis);try{k.pr.disconnect();k.st.getTracks().forEach(t=>t.stop());k.ac.close()}catch(e){}}
+function sohbetKapat(bildir){const k=kSoh;kSoh=null;if(k){if(k.hazir)kayitSesi(false);if(k.akis)clearInterval(k.akis);if(!k.yerel)try{k.pr.disconnect();k.st.getTracks().forEach(t=>t.stop());k.ac.close()}catch(e){}}
   if(bildir)j('/bas-konus',{method:'POST',body:JSON.stringify({komut:'sohbet_kapat'})}).catch(()=>{});konusCiz()}
 // deneme hatırlatması (v0.35.2): sıradaki gerçek toplantıda bir kez — panoda ve mini panoda; Tamam kapatır (aktarıcı dosyaya yazar)
 function renderHat(d,s){const el=d.getElementById(d===document?'hat':'mhat'),h=s.hatirlat;if(!el)return;el.hidden=!h;if(!h)return
