@@ -2519,6 +2519,8 @@ def chrome_ac(p):
     # sinyal vermedi. Varsayılan tarayıcı Safari kalır; toplantı bağlantısı Chrome'da açılır. Rastgele adres açılmaz: yalnız takvimdeki
     # olayın ya da son Başlat'ın (ikisi de guvenli_baglanti / PLATFORM_ANA'dan geçmiş) bağlantısı.
     if p.get("baslatma"): url = (STATE.get("baslatma") or {}).get("baglanti") if time.time() - ((STATE.get("baslatma") or {}).get("at") or 0) < 120 else None
+    elif p.get("dokum_kontrol"):  # 12 Kasım: döküm kontrolü sayfası (Chrome dışı tarayıcıda panodan açılınca Chrome'a yönlendirilir); yalnız kendi adresimiz + tek kullanımlık anahtar
+        u = str(p.get("dokum_kontrol")); url = u if re.fullmatch(r"http://127\.0\.0\.1:%d/dokum-kontrol\?top=[\w%%.\-]{1,80}&t=[0-9a-f]{32}" % A.port, u) else None
     else: url = (takvim_olay(str(p.get("olay") or "")) or {}).get("baglanti")
     if not url: return {"ok": False, "err": "bağlantı yok"}
     k = ["open", "-a", CHROME_APP, url] if CHROME_APP else ["open", url]

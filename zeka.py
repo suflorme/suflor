@@ -182,6 +182,26 @@ def _zd(b):  # eposta-takip.json "zd": {"z:<zincir>|<son ileti id>": {d: durum, 
         t = ts(v.get("t"))
         if b.icinde(t): out.append((k.split("|", 1)[0].split(":", 1)[-1], k.split("|", 1)[1], v.get("d"), t))
     return out
+def _zd5(b):  # _zd + aciliyet: (zincir, son ileti, durum, aciliyet, zaman)
+    zd = ((b.d("eposta-takip.json") or {}).get("zd") or {}); out = []
+    for k, v in zd.items():
+        if not isinstance(v, dict) or "|" not in k: continue
+        t = ts(v.get("t"))
+        if b.icinde(t): out.append((k.split("|", 1)[0].split(":", 1)[-1], k.split("|", 1)[1], v.get("d"), v.get("a") if isinstance(v.get("a"), int) else 1, t))
+    return out
+def m_eposta_kacirma(b):  # kaçırma: "bilgi" ya da düşük öncelikli (aciliyet ≤ 1) "senden bekleniyor" denen zincire kullanıcı 7 gün içinde cevap yazdı = önemsiz sanılan önemliymiş (yalnız sayı; olgunlaşma: 3 gün geçti ya da yazdı)
+    ms = _posta(b).values(); n = kac = 0
+    if not ms: return None, 0, "posta.json yok"
+    en_eski = min((ts(m.get("t")) or 9e12) for m in ms)
+    for z, _son, d, a, t in _zd5(b):
+        if t < en_eski or not (d == "bilgi" or (d == "senden_bekleniyor" and a <= 1)): continue
+        yazdi = any(str(m.get("zincir")) == z and m.get("gonderilen") and t < (ts(m.get("t")) or 0) <= t + 7 * 86400 for m in ms)
+        if yazdi or b.simdi - t >= 3 * 86400: n += 1; kac += yazdi
+    return (((n - kac) / n) if n else None), n, f"bilgi/düşük öncelikli denen {n} zincirin {kac}'ine sonradan cevap yazıldı (kaçırma)"
+def m_eposta_duzeltme(b):  # kullanıcı düzeltmesi: "yanlış öncelik" tepkisi + "bu kişi önemli" (canli/eposta-tepki.jsonl, yalnız sayım) / pencerede değerlendirilen zincir
+    rs = [r for r in b.j("eposta-tepki.jsonl") if b.icinde(ts(r.get("t")))]; yo = sum(1 for r in rs if r.get("islem") == "yanlis_oncelik"); ok_ = sum(1 for r in rs if r.get("islem") == "onemli_kisi")
+    n = len({(z, son) for z, son, _d, _a, _t in _zd5(b)})
+    return (max(0.0, 1 - (yo + ok_) / n) if n else None), n, f"{yo + ok_} düzeltme ({yo} yanlış öncelik, {ok_} 'bu kişi önemli') / {n} değerlendirilen zincir"
 def m_eposta_kabul(b):
     s = _soz_say(b, {"eposta"}); n = sum(s.values())
     return ((s["kabul"] / n) if n else None), n, f"{s['kabul']}/{n} e-posta bildirimi işe yaradı; {s['yoksay']} yoksay, {s['ret']} ret"
@@ -318,6 +338,8 @@ OLCUTLER = [
     ("eposta", "ongoru", "cevap", "Cevap gerekecek maili bildi", m_eposta_ongoru, 5, 1, "eposta-takip.json zd + posta.json gönderilen"),
     ("eposta", "analiz", "durum", "Zincir durumu doğru", m_eposta_durum, 10, 1, "eposta-takip.json zd + posta.json son ileti"),
     ("eposta", "analiz", "onem", "Önemli dediği önemsiz çıkmadı", m_eposta_yoksay, 10, 0.5, "eposta-takip.json bildirilen/yoksay"),
+    ("eposta", "analiz", "kacirma", "Düşük/bilgi dediğine sonradan cevap yazılmadı", m_eposta_kacirma, 5, 1, "eposta-takip.json zd + posta.json gönderilen (yanlış negatif)"),
+    ("eposta", "analiz", "duzeltme", "Kullanıcı düzeltmesi az", m_eposta_duzeltme, 10, 0.5, "eposta-tepki.jsonl yanlis_oncelik + onemli_kisi (yalnız sayı)"),
     ("toplanti", "basari", "kart", "Kart işe yaradı", m_kart_yarar, 20, 1, "kartlar.jsonl son durum"),
     ("toplanti", "analiz", "uyari", "Uyarı kartı yerinde", m_kart_uyari, 10, 1, "kartlar.jsonl dikkat/dur/belirt/duygu"),
     ("toplanti", "ongoru", "soru", "Gelecek soruyu önceden hazırladı", None, 0, 1, "yok — hazır kartın (hazir.json) toplantıda sorulan soruyla eşleşmesi kaydedilmiyor"),

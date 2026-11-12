@@ -80,7 +80,8 @@ ORTAK_TUR = ("karar", "is", "soz", "soru")
 KAPALI_DURUM = ("yapildi", "tutuldu", "iptal", "cevaplandi")
 ONAY_HATIRLAT_GUN = 3; ONAY_SON_GUN = 7  # S227: 3. gün hatırlatma; aynı dizinin sonraki toplantısında ya da en geç 7. gün "onaylanmadı"
 OLAY_TURLERI = ("kayit_olustu", "durum_degisti", "karar_onaylandi", "karar_reddedildi", "metin_duzeltildi", "is_atandi", "ertelendi", "bolundu",
-                "gundeme_eklendi", "yorum_eklendi", "kayit_guncellendi", "kimlik_birlesti", "dis_baglandi", "taslak_hazirlandi", "toplanti_onerildi")
+                "gundeme_eklendi", "yorum_eklendi", "kayit_guncellendi", "kimlik_birlesti", "dis_baglandi", "taslak_hazirlandi", "toplanti_onerildi",
+                "durum_onerisi", "durum_onerisi_onay", "durum_onerisi_red")  # Y1 mutabakat (aktarici/mutabakat.py): öneri yalnız yerel, dışarı gitmez (PAYLASILAN_OLAY'da yok)
 YENIDEN_YAZILDI = "toplantı özeti yeniden yazıldı"
 _B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 def yeni_kimlik(t=None):  # ULID benzeri: 48 bit ms + 80 bit rastgele → 26 karakter, zaman sıralı
@@ -180,6 +181,7 @@ def _db(dizin):
     if yeni: os.chmod(yol, 0o600)
     _sema(c, dizin)
     c.execute("CREATE TABLE IF NOT EXISTS ortak_red (olay_id TEXT PRIMARY KEY, kayit_id TEXT, neden TEXT, zaman TEXT)")  # A3: yetkisiz (uygulanmayan) başka cihaz olayı
+    if "durum_onerisi" not in [x[1] for x in c.execute("PRAGMA table_info(ortak_kayit)")]: c.execute("ALTER TABLE ortak_kayit ADD COLUMN durum_onerisi TEXT")  # Y1: son mutabakat önerisi (JSON; izdüşüm)
     if c.in_transaction: c.commit()
     if c.execute("SELECT 1 FROM kayit WHERE kayit_id IS NULL LIMIT 1").fetchone():
         with _Islem(c): _kimliksiz_onar(c, dizin)
@@ -224,6 +226,10 @@ def _uygula(c, o):
     red = _yetki_red(c, o, r)
     if red:  # A3 (§3): yetkisiz olay günlükte kalır, uygulanmaz; panoda "uygulanmayan değişiklik"
         c.execute("INSERT OR IGNORE INTO ortak_red (olay_id, kayit_id, neden, zaman) VALUES (?,?,?,?)", (o["olay_id"], kid, red, zaman)); return False
+    if tur in ("durum_onerisi", "durum_onerisi_onay", "durum_onerisi_red"):  # Y1: yalnız öneri alanı; kaydın durumu ve son değişikliği (guncellendi = dokunulma) DEĞİŞMEZ — bayatlık hesabı bozulmasın
+        dn = {k: v.get(k) for k in ("oneri", "guven", "kanit", "neden")} if tur == "durum_onerisi" else None
+        if dn is not None: dn["zaman"] = zaman; dn["olay_id"] = o["olay_id"]
+        c.execute("UPDATE ortak_kayit SET durum_onerisi = ? WHERE kayit_id = ?", (json.dumps(dn, ensure_ascii=False) if dn else None, kid)); return True
     yeni = {}
     if tur == "durum_degisti":
         d = str(v.get("durum") or "")
@@ -260,7 +266,7 @@ def _olay(c, kid, tur, veri, yazan=None, kaynak="suflor", gizli=None, zaman=None
     c.execute("INSERT INTO olay (olay_id, v, kayit_id, tur, zaman, saat, yazan, cihaz, kaynak, gizli, veri) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
               (o["olay_id"], 1, kid, tur, o["zaman"], saat, o["yazan"], cihaz, o["kaynak"], 1 if gizli else 0, json.dumps(veri, ensure_ascii=False)))
     o["uygulandi"] = _uygula(c, o)
-    if esitle and o["uygulandi"]: _kayit_esitle(c, kid)
+    if esitle and o["uygulandi"] and not tur.startswith("durum_onerisi"): _kayit_esitle(c, kid)
     return o
 def _olay_satir(r):
     o = dict(zip(("olay_id", "v", "kayit_id", "tur", "zaman", "saat", "yazan", "cihaz", "kaynak", "gizli", "veri"), r)); o["gizli"] = bool(o["gizli"])
@@ -298,7 +304,7 @@ def ortak_kayit(dizin, kimlik):  # tek kayıt (izdüşüm) + yerel kimlik; gizli
     c = _db(dizin)
     try:
         kid = kimlik_coz(c, kimlik); x = _kayit_ozet(c.execute(_OK_SEC + " WHERE kayit_id = ?", (kid,)).fetchone()) if kid else None
-        if x: x["id"] = yerel_kimlik(c, kid)
+        if x: x["id"] = yerel_kimlik(c, kid); x["durum_onerisi"] = _dn_oku(c, kid)
         return x
     finally: c.close()
 def _degistir(dizin, kimlik, tur, veri_f, yazan=None, kaynak="suflor", turler=ORTAK_TUR):
@@ -372,9 +378,69 @@ def geri_al(dizin, olay_id, yazan=None, kaynak="suflor"):
                 out.append(_olay(c, o["kayit_id"], "kayit_guncellendi", dict(ek, alanlar=al), yazan, kaynak))
         return out
     finally: c.close()
+# --- Y1 mutabakat (12 Kasım; aktarici/mutabakat.py): gece turu kanıta bakıp açık/bayat kayıt için durum ÖNERİR; kayıt kendiliğinden kapanmaz, gizlenmez, silinmez.
+# Olaylar: durum_onerisi {oneri: bitti|suruyor|yerini_aldi|belirsiz, guven 0–1, kanit {kaynak, tarih, alinti ≤160}, neden} → izdüşümde ortak_kayit.durum_onerisi (son öneri);
+# durum_onerisi_onay {oneri} → öneri düşer, kayıt öneri yönünde VAR OLAN kapatma yoluyla kapanır (ayrı olay; Geri al ile geri alınır); durum_onerisi_red {oneri} → öneri düşer,
+# aynı kayıt DN_RED_GUN gün yeniden önerilmez. Bu olaylar ekip paylaşımına gitmez (PAYLASILAN_OLAY'da yok).
+DN_ONERI = ("bitti", "suruyor", "yerini_aldi", "belirsiz")
+DN_RED_GUN = 14
+DN_KAPANIS = {("bitti", "is"): "yapildi", ("bitti", "soz"): "tutuldu", ("bitti", "soru"): "cevaplandi", ("yerini_aldi", "is"): "iptal", ("yerini_aldi", "soz"): "iptal", ("yerini_aldi", "soru"): "iptal"}
+def _dn_oku(c, kid):
+    try: r = c.execute("SELECT durum_onerisi FROM ortak_kayit WHERE kayit_id = ?", (kid,)).fetchone()
+    except sqlite3.OperationalError: return None  # salt okunur istemci, sütun henüz yok
+    try: return json.loads(r[0]) if r and r[0] else None
+    except ValueError: return None
+def durum_onerisi_yaz(dizin, kimlik, oneri, guven, kanit=None, neden="", yazan="asistan", kaynak="mutabakat"):  # → (olay, kayıt) ya da (None, kayıt|None): kayıt yok / gizli toplantı
+    if oneri not in DN_ONERI: raise ValueError("oneri")
+    try: g = round(min(1.0, max(0.0, float(guven))), 2)
+    except (TypeError, ValueError): g = 0.0
+    k = kanit if isinstance(kanit, dict) else {}
+    kn = {"kaynak": str(k.get("kaynak") or "")[:30], "tarih": str(k.get("tarih") or "")[:10], "alinti": " ".join(str(k.get("alinti") or "").split())[:160]} if k else None
+    def f(x):
+        if x.get("gizli") or (x.get("toplanti") and gizli_mi(dizin, x["toplanti"])): return None
+        return {"oneri": oneri, "guven": g, "kanit": kn, "neden": " ".join(str(neden or "").split())[:200]}
+    return _degistir(dizin, kimlik, "durum_onerisi", f, yazan, kaynak)
+def durum_onerisi_cevap(dizin, kimlik, islem, yazan=None, kaynak="suflor"):
+    # islem: onay | red → {"ok", "kayit", "kayit_id", "oneri", "kapanis"?, "olay_id"?} ya da {"ok": False, "err"}. Onay: öneri olayı + kaydı öneri yönünde kapatan VAR OLAN işlev (kayit_durum /
+    # karar_onayla / karar_reddet; kapanış ayrı olaydır, Geri al ile geri alınır); suruyor ve belirsizde kapatma yok (yalnız doğrulandı). Red: öneri düşer; DN_RED_GUN gün yeniden önerilmez.
+    if islem not in ("onay", "red"): return {"ok": False, "err": "islem"}
+    x = ortak_kayit(dizin, kimlik)
+    if not x or x.get("gizli") or (x.get("toplanti") and gizli_mi(dizin, x["toplanti"])): return {"ok": False, "err": "kayıt yok"}
+    dn = x.get("durum_onerisi")
+    if not dn: return {"ok": False, "err": "öneri yok"}
+    kid = x["kayit_id"]; c = _db(dizin)
+    try:
+        with _Islem(c): _olay(c, kid, "durum_onerisi_" + islem, {"oneri": dn.get("oneri"), "oneri_olay": dn.get("olay_id")}, yazan, kaynak)
+    finally: c.close()
+    out = {"ok": True, "kayit": x.get("id") or kid, "kayit_id": kid, "oneri": dn.get("oneri")}
+    if islem == "red": return out
+    o = None; kn = dn.get("kanit") or {}
+    not_ = "mutabakat önerisi onaylandı" + (f" (kanıt: {kn.get('kaynak')} {kn.get('tarih')})" if kn else "") + (" — yerini aldı" if dn.get("oneri") == "yerini_aldi" else "")
+    if x["tur"] == "karar" and x.get("onay") == "bekliyor" and dn.get("oneri") in ("bitti", "yerini_aldi"):
+        o, _ = (karar_onayla if dn["oneri"] == "bitti" else karar_reddet)(dizin, kid, yazan, kaynak, not_)
+        out["kapanis"] = "onaylandi" if dn["oneri"] == "bitti" else "reddedildi"
+    elif x["tur"] != "karar" and x.get("durum") == "acik" and (dn.get("oneri"), x["tur"]) in DN_KAPANIS:
+        d = DN_KAPANIS[(dn["oneri"], x["tur"])]; o, _ = kayit_durum(dizin, kid, d, yazan, kaynak, not_); out["kapanis"] = d
+    if o: out["olay_id"] = o["olay_id"]
+    return out
+def durum_onerisi_red_son(dizin, gun=DN_RED_GUN, simdi=None):  # → {kayit_id: son red zamanı (ISO UTC)} — son `gun` gün içinde reddedilen öneriler (yeniden önerilmez)
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return {}
+    sin = _utc((time.time() if simdi is None else simdi) - gun * 86400); c = _db(dizin)
+    try: return {k: z for k, z in c.execute("SELECT kayit_id, MAX(zaman) FROM olay WHERE tur = 'durum_onerisi_red' AND zaman >= ? GROUP BY kayit_id", (sin,))}
+    finally: c.close()
+def durum_onerileri(dizin):  # → {kayit_id: son öneri sözlüğü} (izdüşümde bekleyen öneriler; gizli kayıt hariç; kaydın açık olup olmadığını çağıran denetler)
+    if not os.path.exists(os.path.join(dizin, "karar-grafi.sqlite")): return {}
+    c = _db(dizin); out = {}
+    try:
+        for kid, v in c.execute("SELECT kayit_id, durum_onerisi FROM ortak_kayit WHERE durum_onerisi IS NOT NULL AND gizli = 0"):
+            try: out[kid] = json.loads(v)
+            except ValueError: pass
+        return out
+    finally: c.close()
 OLAY_AD = {"kayit_olustu": "oluşturdu", "durum_degisti": "durumu değiştirdi", "karar_onaylandi": "kararı onayladı", "karar_reddedildi": "kararı reddetti",
            "metin_duzeltildi": "metni düzeltti", "is_atandi": "atamayı değiştirdi", "ertelendi": "vadeyi değiştirdi", "bolundu": "alt işlere böldü",
-           "gundeme_eklendi": "gündeme ekledi", "yorum_eklendi": "yorum ekledi", "kayit_guncellendi": "kaydı güncelledi", "kimlik_birlesti": "kişiyi eşledi", "dis_baglandi": "dış kayda bağladı", "taslak_hazirlandi": "taslak hazırladı", "toplanti_onerildi": "acil toplantı önerdi"}
+           "gundeme_eklendi": "gündeme ekledi", "yorum_eklendi": "yorum ekledi", "kayit_guncellendi": "kaydı güncelledi", "kimlik_birlesti": "kişiyi eşledi", "dis_baglandi": "dış kayda bağladı", "taslak_hazirlandi": "taslak hazırladı", "toplanti_onerildi": "acil toplantı önerdi",
+           "durum_onerisi": "durum önerdi", "durum_onerisi_onay": "durum önerisini onayladı", "durum_onerisi_red": "durum önerisini reddetti"}
 DURUM_AD = {"acik": "açık", "yapildi": "yapıldı", "tutuldu": "tutuldu", "iptal": "iptal", "cevaplandi": "cevaplandı"}
 def olay_ozeti(o):  # "kim ne zaman ne yaptı" tek satır (tarihçe ve eylem menüsü Geri al listesi)
     v = o["veri"]; kim = o["yazan"][3:] if o["yazan"].startswith("ad:") else o["yazan"]
@@ -386,6 +452,7 @@ def olay_ozeti(o):  # "kim ne zaman ne yaptı" tek satır (tarihçe ve eylem men
     elif o["tur"] == "taslak_hazirlandi": ne = {"eposta": "e-posta taslağı hazırladı", "teams": "Teams taslağı hazırladı"}.get(v.get("tur"), "taslak hazırladı")
     elif o["tur"] == "toplanti_onerildi": ne = "acil toplantı önerdi" + (f" ({str(v.get('platform'))[:20]})" if v.get("platform") else "")
     elif o["tur"] == "gundeme_eklendi": ne = "gündeme ekledi: " + str((v.get("gundem") or {}).get("baslik") or "—")
+    elif o["tur"] == "durum_onerisi": ne = f"durum önerdi: {v.get('oneri')} (güven {v.get('guven')})"
     if v.get("geri_al"): ne += " (geri alma)"
     if v.get("neden"): ne += f" — {v['neden']}"
     return f"{o['zaman'][:16].replace('T', ' ')} UTC · {kim} · {ne}"

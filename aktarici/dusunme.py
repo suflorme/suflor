@@ -334,6 +334,8 @@ def dus_girdi(simdi):  # → {"paket", "ogren" [kayıt], "ogren_otomatik" {id}, 
     if bek: p.append("[Başkalarında bekleyen, gecikmiş ya da yakın işler — kimlik | metin | vade | sahip | toplantı]\n" + "\n".join(_dus_is_satir(x) for x in bek) + "\n[/Başkalarında bekleyenler]")
     if bayat: p.append("[Durumu belirsiz kayıtlar — BAYAT: uzun süredir dokunulmamış, sonra yeniden kaydedilmiş ya da bitmiş olabilir; yapılacak iş DEĞİL, yalnız teyit sorusu — kimlik | metin | durum | kimde | yaş]\n"
                      + "\n".join(_dus_bayat_satir(x) for x in bayat) + "\n[/Durumu belirsiz]")
+    mt = mtb_dus_satirlari() if "mtb_dus_satirlari" in globals() else []  # zekâ Y1: gece mutabakatının kanıta dayalı durum önerileri (kullanıcı henüz onaylamadı)
+    if mt: p.append("[Durum önerileri — gece mutabakat turu, kanıta dayalı ama kullanıcı ONAYLAMADI; kesin konuşma, gerekirse 'teyit et' — kimlik | öneri | kanıt]\n" + "\n".join(mt[:8]) + "\n[/Durum önerileri]")
     if fark is not None: p.append(_dus_fark_metni(fark, ot))
     if kar: p.append("[Dünkü ve bugünkü toplantılardan çıkan kararlar ve işler]\n" + "\n".join(kar) + "\n[/Toplantı çıktıları]")
     if devir: p.append("[Dünkü toplantılardan devir]\n" + "\n\n".join(devir) + "\n[/Devir]")
@@ -536,6 +538,9 @@ def dus_tur(simdi=None):  # dakikalık/5 dk'lık döngü: zamanı geldiyse (ve e
     if "TAKVIM_TAM" in globals() and not TAKVIM_TAM:
         if not DUS["ilk_t"]: DUS["ilk_t"] = float(DUS_SAAT())
         if float(DUS_SAAT()) - DUS["ilk_t"] < DUS_TAKVIM_BEKLE_SN: return None  # takvim henüz yüklenmedi (açılıştan sonraki ilk dakikalar)
+    if "mtb_gece" in globals():  # zekâ Y1: mutabakat turu düşünmeden HEMEN önce (günde bir; kendi ayarı ve kapıları mutabakat.py'de) — önerileri bu turun girdisine girer
+        try: mtb_gece(simdi)
+        except Exception as e: print(f"DÜŞÜNME: mutabakat turu hatası ({e.__class__.__name__})")
     print(f"DÜŞÜNME: başlıyor ({neden}, model {dus_model()})")
     return dus_calistir(simdi=simdi)
 def _dus_dongu():

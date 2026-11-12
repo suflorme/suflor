@@ -1736,58 +1736,97 @@ def _bayraklar(mine):
     return [r for r in mine if r["tur"] == "baglanti" and str(r["ozet"]).startswith("Bayrak:") and r["durum"] != "kayip"]
 
 
-def zaman_cizelgesi(mine, d):
-    ol = []
-    for r in mine:
-        if r["durum"] == "kayip":
-            continue
-        t = None
-        if r["tur"] == "alan_adi" and r["alt"].endswith(":kayit_tarihi"):
-            ol.append((str(r["deger"])[:10], f"alan adı {r['alt'].split(':')[0]} kaydedildi"))
-        elif r["alt"] == "abn:abn_durumu" and tarih_coz(r["deger"]):
-            ol.append((tarih_coz(r["deger"]).isoformat(), "ABN durumu: " + str(r["deger"])[:40]))
-        elif r["tur"] == "arsiv" and r["alt"].endswith(":ilk"):
-            ol.append((str(r["deger"])[:10], f"{r['alt'].split(':')[0]} ilk arşiv kaydı"))
-        elif r["tur"] == "kod" and r["alt"].endswith(":org") and r.get("org_tarih"):
-            ol.append((r["org_tarih"], f"GitHub {r['alt'].split(':')[0]} kuruldu"))
-        elif r["tur"] == "gonderi":
-            ol.append((str(r["tarih"])[:10], "gönderi: " + str(r["ozet"])[:70]))
-    ilk_sert = {}
-    for r in mine:
-        if r["tur"] == "sertifika" and r["durum"] != "kayip" and r.get("tarih"):
-            kk = r.get("kaynak", "")
-            if kk not in ilk_sert or r["tarih"] < ilk_sert[kk][0]:
-                ilk_sert[kk] = (str(r["tarih"])[:10], r["alt"])
-    for kk, (t, ad) in ilk_sert.items():
-        ol.append((t, f"{kk.replace('crt.sh:', '')} ilk sertifika kaydı ({ad})"))
-    for o in dosya_ogeleri(d, "zaman"):
-        ol.append(((o.get("tarih") or o["eklendi"])[:10], o["metin"][:90]))
-    ol = sorted(set(ol))
-    if len(ol) > 12:
-        ol = ol[:5] + [("…", f"{len(ol) - 11} olay daha")] + ol[-6:]
-    return [f"- {t} — {m}" for t, m in ol]
+KAYNAK_AD = {"rdap": "alan adı kaydı", "dns": "DNS", "crt": "sertifika kayıtları", "tarama": "site taraması", "sicil": "ticaret sicili",
+             "haber": "haberler", "arsiv": "web arşivi", "altyapi": "e-posta ve ağ altyapısı", "kod": "kod depoları"}
 
 
-def dosya_bolumu(mine, d):
-    kim = dosya_ogeleri(d, "kimlik")
-    L = ["### Dosya", "Kimlik doğrulama: " + (kim[-1]["metin"] if kim else "henüz yazılmadı (dosya --bolum kimlik)")]
-    L.append("Zaman çizelgesi:")
-    L += zaman_cizelgesi(mine, d) or ["- veri yok"]
-    L.append("İddia ve kanıt:")
-    ig = [f"- [{o['derece']}] {o['metin']}" + (f" ({o['kaynak']})" if o.get("kaynak") else "") + f" #{o['no']}" for o in dosya_ogeleri(d, "iddia")]
-    L += ig[:8] + ([f"- (+{len(ig) - 8} daha)"] if len(ig) > 8 else []) or ["- yok"]
-    L.append("Çelişkiler ve bayraklar:")
-    cb = [f"- {o['metin']} #{o['no']}" for b in ("celiski", "bayrak") for o in dosya_ogeleri(d, b, True)]
-    cb += [f"- {r['ozet']}" for r in _bayraklar(mine)]
-    L += cb[:10] + ([f"- (+{len(cb) - 10} daha)"] if len(cb) > 10 else []) or ["- yok"]
-    L.append("Açık sorular:")
-    L += [f"- #{o['no']} {o['metin']}" for o in dosya_ogeleri(d, "soru", True)][:8] or ["- yok"]
-    L.append("Sıradaki izler:")
-    L += [f"- #{o['no']} {o['metin']}" for o in dosya_ogeleri(d, "iz", True)][:8] or ["- yok"]
-    return L
+def kaynak_ad(x):
+    x = KAYNAK_TAKMA.get(x, x)
+    return KAYNAK_AD.get(x, x)
 
 
-def yeni_satirlari(yeni, kay):
+def _bas_buyuk(s):
+    s = str(s or "")
+    return ({"i": "İ", "ı": "I"}.get(s[:1]) or s[:1].upper()) + s[1:]
+
+
+def _temiz(s):
+    """boşlukları sadeleştirir, çift noktayı tek noktaya indirir (… korunur)"""
+    s = re.sub(r"\s+", " ", str(s or "")).strip()
+    return re.sub(r"(?<!\.)\.\.(?!\.)", ".", s)
+
+
+def _nokta_at(s):
+    s = _temiz(s)
+    while s.endswith("."):
+        s = s[:-1].rstrip()
+    return s.rstrip(" ,;:—-“(")   # kaynakta yarım kalmış açık tırnak/parantez sona asılı kalmasın
+
+
+def _kes(s, n):
+    """sözcük sınırında keser, sona … koyar; sondaki nokta ve çift nokta temizlenir"""
+    s = _nokta_at(s)
+    if len(s) <= n:
+        return s
+    kes = s[:n + 1]
+    k = kes.rfind(" ")
+    kes = (kes[:k] if k > n * 0.5 else s[:n]).rstrip(" ,;:—-.(")
+    return kes + "…"
+
+
+def _alan(url):
+    m = re.match(r"https?://([^/?#]+)", str(url))
+    return re.sub(r"^www\.", "", m.group(1)).lower() if m else str(url)
+
+
+def _bag(url):
+    u = str(url).strip().replace(" ", "%20").replace(")", "%29").replace("(", "%28")
+    return f"[{_alan(u)}]({u})"
+
+
+def _duz(s):
+    """serbest metindeki çıplak adresleri [alan adı](adres) bağlantısına çevirir"""
+    def f(m):
+        u, son = m.group(0), ""
+        while u and u[-1] in ".,;:!?)»”\"'":
+            son, u = u[-1] + son, u[:-1]
+        return _bag(u) + son
+    return re.sub(r"https?://[^\s<>\]]+", f, str(s or ""))
+
+
+def _ilk_cumleler(s, n=2, tavan=330):
+    """metnin ilk n cümlesi (tavanı aşmadan) ve kısaltılıp kısaltılmadığı"""
+    s = _temiz(s)
+    out = ""
+    for p in re.split(r"(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ0-9«“\"])", s)[:n]:
+        if out and len(out) + len(p) + 1 > tavan:
+            break
+        out = (out + " " + p).strip()
+    return out, _nokta_at(out) != _nokta_at(s)
+
+
+def _derece(r):
+    return f" · güven {r['derece']}" if r.get("derece") else ""
+
+
+def _kaynak_bag(r):
+    k = str(r.get("kaynak") or "")
+    return f" · {_bag(k)}" if k.startswith(("http://", "https://")) else ""
+
+
+def tarih_yil(iso):
+    k = tarih_kisa(iso)
+    return f"{k} {str(iso)[:4]}" if k != str(iso)[:10] else k
+
+
+def _ozet_temiz(r):
+    """haber başlığındaki yinelenen yayıncı eki ve özetin başındaki tekrar eden tarih ayıklanır"""
+    s = _nokta_at(r["ozet"])
+    s = re.sub(r"( - ([^—]+?)) — \2$", r"\1", s)
+    return re.sub(r"^" + re.escape(tarih_kisa(r["tarih"])) + r"( \d{4})?:?\s+", "", s)
+
+
+def yeni_maddeler(yeni):
     gr = {}
     for r in yeni:
         if r.get("grup"):
@@ -1800,14 +1839,66 @@ def yeni_satirlari(yeni, kay):
                 continue
             gorulen.add(g)
             v = gr[g]
-            out.append(f"- [Yeni · {v[0]['derece']}] {tarih_kisa(v[0]['tarih'])} — {len(v)} {g} (ilk 5: "
-                       + ", ".join(str(x.get('v') or x['deger']) for x in v[:5]) + ")")
+            out.append(f"- {tarih_kisa(v[0]['tarih'])} · {len(v)} {g} (ilk 5: "
+                       + ", ".join(str(x.get('v') or x['deger']) for x in v[:5]) + f"){_derece(v[0])}")
             continue
-        s = f"- [Yeni · {r['derece']}] {tarih_kisa(r['tarih'])} — {r['ozet']}.{kay(r)}"
+        s = f"- {tarih_kisa(r['tarih'])} · {_duz(_ozet_temiz(r))}{_kaynak_bag(r)}{_derece(r)}"
         if r.get("alinti"):
-            s += f" Alıntı: “{r['alinti']}”"
+            s += f" · “{_kes(r['alinti'], 140)}”"
         out.append(s)
     return out
+
+
+def zaman_cizelgesi(mine, d):
+    ol = []
+    for r in mine:
+        if r["durum"] == "kayip":
+            continue
+        if r["tur"] == "alan_adi" and r["alt"].endswith(":kayit_tarihi"):
+            ol.append((str(r["deger"])[:10], f"alan adı {r['alt'].split(':')[0]} kaydedildi"))
+        elif r["alt"] == "abn:abn_durumu" and tarih_coz(r["deger"]):
+            ol.append((tarih_coz(r["deger"]).isoformat(), "ABN durumu: " + _kes(r["deger"], 40)))
+        elif r["tur"] == "arsiv" and r["alt"].endswith(":ilk"):
+            ol.append((str(r["deger"])[:10], f"{r['alt'].split(':')[0]} ilk arşiv kaydı"))
+        elif r["tur"] == "kod" and r["alt"].endswith(":org") and r.get("org_tarih"):
+            ol.append((r["org_tarih"], f"GitHub {r['alt'].split(':')[0]} kuruldu"))
+        elif r["tur"] == "gonderi":
+            ol.append((str(r["tarih"])[:10], "gönderi: " + _kes(r["ozet"], 90)))
+    ilk_sert = {}
+    for r in mine:
+        if r["tur"] == "sertifika" and r["durum"] != "kayip" and r.get("tarih"):
+            kk = r.get("kaynak", "")
+            if kk not in ilk_sert or r["tarih"] < ilk_sert[kk][0]:
+                ilk_sert[kk] = (str(r["tarih"])[:10], r["alt"])
+    for kk, (t, ad) in ilk_sert.items():
+        ol.append((t, f"{kk.replace('crt.sh:', '')} ilk sertifika kaydı ({ad})"))
+    for o in dosya_ogeleri(d, "zaman"):
+        ol.append(((o.get("tarih") or o["eklendi"])[:10], _kes(o["metin"], 110)))
+    ol = sorted(set(ol))
+    if len(ol) > 12:
+        ol = ol[:5] + [("…", f"{len(ol) - 11} olay daha")] + ol[-6:]
+    return [f"- … {m}" if t == "…" else f"- {tarih_yil(t)} · {m}" for t, m in ol]
+
+
+def _kaynakli(o):
+    k = str(o.get("kaynak") or "")
+    return (f" · {_bag(k)}" if k.startswith(("http://", "https://")) else (f" · {k}" if k else "")) + _derece(o)
+
+
+def _liste(baslik, maddeler, tavan=8):
+    """kalın başlık + maddeler; madde yoksa hiçbir şey yazılmaz"""
+    if not maddeler:
+        return []
+    out = ["**" + baslik + "**"] + maddeler[:tavan]
+    if len(maddeler) > tavan:
+        out.append(f"- (+{len(maddeler) - tavan} daha)")
+    return out
+
+
+def dikkat_maddeleri(mine, d):
+    cb = [(o["metin"], o.get("derece")) for b in ("celiski", "bayrak") for o in dosya_ogeleri(d, b, True)]
+    cb += [(re.sub(r"^Bayrak:\s*", "", r["ozet"]), r.get("derece")) for r in _bayraklar(mine)]
+    return cb
 
 
 def baglanti_haritasi(rows, kayit_ids, adlar):
@@ -1816,22 +1907,24 @@ def baglanti_haritasi(rows, kayit_ids, adlar):
         if r["tur"] == "baglanti" and r.get("diger") and r["durum"] != "kayip" and r["kayit"] in kayit_ids:
             a_, b_ = sorted((r["kayit"], r["diger"]))
             cift.setdefault((a_, b_), set()).add((r["bk"], r["bv"], r["derece"]))
-    L = ["## Bağlantı haritası", ""]
     if not cift:
-        return L + ["Kayıtlar arasında ortak iz bulunmadı.", ""]
+        return []
+    L = ["### Bağlantı haritası"]
     ad = lambda i: adlar.get(i, {"ad": i})["ad"]
     n = 0
     for (a_, b_), v in sorted(cift.items()):
         for bk, bv, dr in sorted(v):
             if n < 30:
-                L.append(f"- [{dr}] {ad(a_)} ↔ {ad(b_)}: {bk} — {str(bv)[:90]}")
+                L.append(f"- {ad(a_)} ↔ {ad(b_)} · {bk}: {_kes(bv, 90)} · güven {dr}")
             n += 1
     if n > 30:
         L.append(f"- (+{n - 30} bağlantı daha)")
-    return L + ["Bağlantılar ipucudur (D; analitik kimliği ve tüzel ad B); doğrulanana kadar hüküm değildir.", ""]
+    return L + ["Bağlantılar ipucudur (D; analitik kimliği ve tüzel ad B); doğrulanana kadar hüküm değildir."]
 
 
 def rapor_uret(dizin, liste, bug):
+    """Üç katman: Öne çıkanlar (en çok 5) · kayıt başına kısa bölüm (Kim, Değerlendirme, Yeni bulgular, Dikkat, Açık sorular,
+    Sıradaki izler; boş olan yazılmaz) · Ayrıntı (teknik döküm, bağlantı haritası). Adresler [alan adı](adres) bağlantısıdır."""
     rows = bulgu_oku(dizin)
     adlar = {k["id"]: k for k in liste}
     kok = os.path.join(dizin, "tarama")
@@ -1842,11 +1935,14 @@ def rapor_uret(dizin, liste, bug):
     ks = set()
     for i in kayit_ids:
         ks.update(KAYNAK_TAKMA.get(x, x) for x in (json_oku(os.path.join(kok, bug, i + ".json"), {}).get("kaynaklar") or []))
+    kaynak_s = ", ".join(kaynak_ad(s) for s in KAYNAKLAR if s in ks)
     L = [f"# Tazı raporu — {tarih_kisa(tarih)} {tarih[:4]}", "",
-         f"{len(kayit_ids)} kayıt tarandı. Kaynaklar: {', '.join(s for s in KAYNAKLAR if s in ks) or '-'}.", ""]
+         f"{len(kayit_ids)} kayıt tarandı" + (f" · kaynaklar: {kaynak_s}" if kaynak_s else ""), ""]
+    govde, ayrinti, aday = [], [], {}
     for i in kayit_ids:
         k = adlar.get(i, {"ad": i, "kisiler": []})
         snap = json_oku(os.path.join(kok, bug, i + ".json"), {})
+        d = dosya_oku(dizin, i)
         mine = [r for r in rows.values() if r["kayit"] == i]
         bu = [r for r in mine if r["tarama"] == bug and r["tur"] != "baglanti"]
         yeni = sorted([r for r in bu if r["durum"] == "yeni"], key=lambda r: r["tarih"], reverse=True)
@@ -1854,9 +1950,45 @@ def rapor_uret(dizin, liste, bug):
         kayip = [r for r in bu if r["durum"] == "kayip"]
         taban = [r for r in bu if r["durum"] == "taban"]
         onc = [g for g in gunler if g < bug and os.path.exists(os.path.join(kok, g, i + ".json"))]
-        ontxt = "önceki " + tarih_kisa(f"{onc[-1][:4]}-{onc[-1][4:6]}-{onc[-1][6:]}") if onc else "ilk tarama"
-        L.append("## " + k["ad"] + ("".join(" · " + p for p in k["kisiler"])))
-        L.append(f"Durum: {len(yeni)} yeni, {len(deg)} değişti, {len(kayip)} artık görünmüyor · tarama {tarih_kisa(tarih)} · {ontxt}")
+        # --- kayıt bölümü
+        B = ["## " + k["ad"] + "".join(" · " + p for p in k["kisiler"])]
+        kim = dosya_ogeleri(d, "kimlik")
+        tam_kim = _temiz(kim[-1]["metin"]) if kim else ""
+        kesik = False
+        if tam_kim:
+            kk_, kesik = _ilk_cumleler(tam_kim)
+            if len(kk_) > 330:
+                kk_, kesik = _kes(kk_, 330), True
+            B.append("**Kim:** " + _duz(_nokta_at(kk_)) + ("" if kk_.endswith("…") else "."))
+        if notlar.get(i):
+            B.append("**Değerlendirme:** " + _duz(_nokta_at(notlar[i])) + ".")
+        B += _liste("Yeni bulgular", yeni_maddeler(yeni), 12)
+        dk = dikkat_maddeleri(mine, d)
+        B += _liste("Dikkat", [f"- {_duz(_bas_buyuk(_nokta_at(m)))}" + (f" · güven {dr}" if dr else "") for m, dr in dk], 8)
+        B += _liste("Açık sorular", [f"- {_duz(_nokta_at(o['metin']))}" for o in dosya_ogeleri(d, "soru", True)], 8)
+        B += _liste("Sıradaki izler", [f"- {_duz(_nokta_at(o['metin']))}" for o in dosya_ogeleri(d, "iz", True)], 8)
+        if len(B) == 1:
+            B.append("Bu taramada yeni bir şey yok.")
+        govde += B + [""]
+        # --- öne çıkan adayları: önce yeni A/B bulgu, sonra bayrak/çelişki
+        ad_list = [(_kes(_ozet_temiz(r), 170), r["derece"]) for r in sorted(yeni, key=lambda r: r.get("derece") or "Z") if r.get("derece") in ("A", "B")]
+        ad_list += [(_kes(_bas_buyuk(m), 170), dr) for m, dr in dk]
+        if ad_list:
+            aday[i] = (k["ad"], ad_list)
+        # --- ayrıntı
+        A = ["### " + k["ad"], "Önceki tarama: " + (tarih_kisa(f"{onc[-1][:4]}-{onc[-1][4:6]}-{onc[-1][6:]}") if onc else "yok (ilk tarama)")]
+        if kesik:
+            A += ["**Kimlik doğrulama (tam metin)**", _duz(_nokta_at(tam_kim)) + "."]
+        dm = []
+        for r in deg:
+            if r["tur"] == "site":
+                dm.append(f"- {tarih_kisa(r['tarih'])} · {_duz(_nokta_at(r['ozet']))}{_kaynak_bag(r)}{_derece(r)}")
+                dm += ["  - " + _kes(x, 140) for x in r.get("ayrinti", [])]
+            else:
+                dm.append(f"- {tarih_kisa(r['tarih'])} · {r.get('etiket', r['ozet'])}: {_kes(r['onceki'], 90)} → {_kes(r['deger'], 90)}"
+                          f"{_kaynak_bag(r)}{_derece(r)}")
+        A += _liste("Değişenler", dm, 15)
+        A += _liste("Artık görünmüyor", [f"- {_kes(r['ozet'], 150)}{_derece(r)}" for r in kayip], 10)
         if taban:
             tb, site_n = [], 0
             for r in taban:
@@ -1868,7 +2000,7 @@ def rapor_uret(dizin, liste, bug):
                     tb.append(r["etiket"].replace("sicil ", "") + " " + r["deger"])
                 elif r["tur"] == "site" and r.get("baslik") and site_n < 2:
                     site_n += 1
-                    tb.append(f"site başlığı «{r['baslik'][:60]}»")
+                    tb.append(f"site başlığı «{_kes(r['baslik'], 60)}»")
                 elif r["tur"] == "arsiv" and r["alt"].endswith(":ilk"):
                     tb.append(f"ilk arşiv kaydı {r['deger']}")
             sy = sum(1 for r in taban if r["tur"] == "site")
@@ -1879,35 +2011,36 @@ def rapor_uret(dizin, liste, bug):
                               and r["alt"] not in k.get("alanlar", [])})
             if adlar_s:
                 tb.append("sertifika kayıtlarındaki alt alan adları: " + ", ".join(adlar_s[:6]) + (f" (+{len(adlar_s) - 6})" if len(adlar_s) > 6 else ""))
-            for tur_, ad_ in (("teknoloji", "teknoloji bulgusu"), ("sosyal_hesap", "sosyal hesap"), ("varlik", "varlık bulgusu"),
+            for tur_, ad2 in (("teknoloji", "teknoloji bulgusu"), ("sosyal_hesap", "sosyal hesap"), ("varlik", "varlık bulgusu"),
                               ("arsiv", "arşiv kaydı"), ("kod", "kod deposu kaydı")):
                 n_ = sum(1 for r in taban if r["tur"] == tur_)
                 if n_:
-                    tb.append(f"{n_} {ad_}")
+                    tb.append(f"{n_} {ad2}")
             bas_ = "İlk tarama" if not onc else "Yeni kaynak(lar) ilk kez okundu"
-            L.append(f"- {bas_}: {len(taban)} kayıt taban alındı" + (" — " + "; ".join(tb[:10]) if tb else ""))
-        kay = lambda r: f" Kaynak: {r['kaynak']}" if r.get("kaynak") else ""
-        L += yeni_satirlari(yeni, kay)
-        for r in deg:
-            if r["tur"] == "site":
-                L.append(f"- [Değişti · {r['derece']}] {tarih_kisa(r['tarih'])} — {r['ozet']}.{kay(r)}")
-                L += ["    " + x for x in r.get("ayrinti", [])]
-            else:
-                L.append(f"- [Değişti · {r['derece']}] {tarih_kisa(r['tarih'])} — {r.get('etiket', r['ozet'])}: "
-                         f"{str(r['onceki'])[:90]} → {str(r['deger'])[:90]}.{kay(r)}")
-        for r in kayip:
-            L.append(f"- [Artık görünmüyor · {r['derece']}] {tarih_kisa(r['tarih'])} — {r['ozet']}")
-        if notlar.get(i):
-            L.append("Değerlendirme: " + notlar[i])
-        oku = [f"{kk} ({v[len('okunamadı: '):]})" for kk, v in (snap.get("durum") or {}).items() if v != "ok"]
+            A += ["**Taban alınan kayıtlar**", f"{bas_}: {len(taban)} kayıt taban alındı" + (" — " + "; ".join(tb[:10]) if tb else "")]
+        A += _liste("Zaman çizelgesi", zaman_cizelgesi(mine, d), 14)
+        A += _liste("İddia ve kanıt", [f"- {_duz(_nokta_at(o['metin']))}{_kaynakli(o)}" for o in dosya_ogeleri(d, "iddia")], 8)
+        oku = [f"{kaynak_ad(kk.split(':')[0])}{(' ' + kk.split(':', 1)[1]) if ':' in kk else ''} ({v[len('okunamadı: '):]})"
+               for kk, v in (snap.get("durum") or {}).items() if v != "ok"]
         if oku:
-            L.append("Okunamayan: " + "; ".join(oku))
-        L.append(f"Değişmeyen: {len([r for r in mine if r['tarama'] != bug and r['durum'] != 'kayip' and r['tur'] != 'baglanti'])} kayıt")
-        L += dosya_bolumu(mine, dosya_oku(dizin, i))
-        L.append("")
-    L += baglanti_haritasi(rows, set(kayit_ids), adlar)
-    L += ["---", "Kanıt dereceleri: A resmî/makine kaydı · B bağımsız yayın · C kendi beyanı · D çıkarım/doğrulanmadı.",
-          "Yalnız iş bilgisi; özel hayat, konum, aile, sağlık toplanmaz.", ""]
+            A += ["**Okunamayan kaynaklar**", "; ".join(oku)]
+        dgs = len([r for r in mine if r["tarama"] != bug and r["durum"] != "kayip" and r["tur"] != "baglanti"])
+        if dgs:
+            A.append(f"Değişmeyen kayıt sayısı: {dgs}")
+        ayrinti += A + [""]
+    # --- öne çıkanlar: kayıt başına en çok bir madde (ilk D olmayan aday), en çok 5 — aynı ad iki kez görünmez (12 Kasım)
+    one = []
+    for ad_, ls in aday.values():
+        x = next((y for y in ls if y[1] != "D"), None)
+        if x and len(one) < 5:
+            one.append(f"- **{ad_}**: {_duz(x[0])}" + (f" (güven {x[1]})" if x[1] else ""))
+    L += ["## Öne çıkanlar"] + (one or ["Bu taramada önemli yeni bir şey yok."]) + [""]
+    L += govde
+    L += ["## Ayrıntı"] + ayrinti
+    bh = baglanti_haritasi(rows, set(kayit_ids), adlar)
+    if bh:
+        L += bh + [""]
+    L += ["---", "Güven: A resmî/makine kaydı · B bağımsız yayın · C kendi beyanı · D çıkarım, doğrulanmadı. Yalnız iş bilgisi toplanır.", ""]
     return "\n".join(L)
 
 

@@ -113,6 +113,21 @@ try:
     ok("ses: yalnız arşivdeki wav, ad biçimi dışı reddedilir", N["dk_ses"](md[:-3], d2) and N["dk_ses"](md[:-3], "parcalar.jsonl") is None and N["dk_ses"](md[:-3], "../x.wav") is None)
     ls = N["dk_liste"]()
     ok("liste: toplantı, öncelikli sayı, dinlenen, düzeltme, tahmin", len(ls) == 1 and ls[0]["dinlenen"] == 7 and ls[0]["duzeltme"] == 2 and ls[0]["oncelikli"] == len(plan["oncelikli"]) and ls[0]["bitti"] is None)
+    # 3b) 12 Kasım: "geride" (bitmemiş + ayardaki günden eski), × ile elle kapatma, plansız toplantıda da kapatma
+    gl = lambda bugun: N["dk_liste"](bugun)[0]
+    ok("geride: toplantı 6 günlük (sınır 7) → geride değil; 8 günlük → geride + yas_gun", gl(datetime.date(2026, 11, 10))["geride"] is False and gl(datetime.date(2026, 11, 10))["yas_gun"] == 6 and gl(datetime.date(2026, 11, 12))["geride"] is True and gl(datetime.date(2026, 11, 12))["yas_gun"] == 8)
+    AYAR["dokum_kontrol_gun"] = 10; ok("ayar dokum_kontrol_gun sınırı değiştirir; geçersiz değer varsayılan 7", gl(datetime.date(2026, 11, 12))["geride"] is False and (lambda: (AYAR.__setitem__("dokum_kontrol_gun", "x"), N["dk_gun_sinir"]() == 7)[1])()); AYAR.pop("dokum_kontrol_gun", None)
+    N["DK_GOR"]["zt"] = 0; v_ = N["dk_view"]()
+    ok("dk_view: geride satır listede geride:true ile gelir, bekleyen (panoda gösterilecek) listesine girmez", v_ and v_["liste"][0]["geride"] is True and v_["bekleyen"] == [] and v_["liste"][0]["kapatma"] is None, str(v_)[:160])
+    d_yol = os.path.join(kl, "kontrol-durum.json")
+    r = N["dk_islem"]({"islem": "kapat", "t": md[:-3]}); l0 = N["dk_liste"]()[0]
+    ok("kapat: ok, durum dosyasına bitti + kapatma 'elle' (ölçüm/sözlük işi yapılmaz)", r == {"ok": True, "kapatma": "elle"} and l0["bitti"] and l0["kapatma"] == "elle" and l0["geride"] is False and json.load(open(d_yol))["kapatma"] == "elle" and not os.path.exists(os.path.join(canli, "dokum-olcum.jsonl")))
+    N["DK_GOR"]["zt"] = 0; v_ = N["dk_view"](); ok("kapatılan satır panoda bitti sayılır (bekleyen boş), kaydet kapatmayı bozmaz", v_["liste"][0]["bitti"] and v_["bekleyen"] == [] and N["dk_islem"]({"islem": "kaydet", "t": md[:-3], "dinlenen": din})["ok"] and json.load(open(d_yol))["kapatma"] == "elle" and json.load(open(d_yol))["bitti"])
+    dd_ = json.load(open(d_yol)); dd_["bitti"] = None; dd_.pop("kapatma", None); json.dump(dd_, open(d_yol, "w"))  # sonraki bitir testi için sıfırla
+    ok("kapat: geçersiz toplantı adı reddedilir (yol gezintisi yok)", N["dk_islem"]({"islem": "kapat", "t": "../x"})["ok"] is False and N["dk_islem"]({"islem": "kapat", "t": "yok-boyle-bir-toplanti"})["ok"] is False)
+    pz = os.path.join(canli, "ses-arsivi", "2026-10-20-0900-Plansiz"); os.makedirs(pz)
+    rp_ = N["dk_islem"]({"islem": "kapat", "t": "2026-10-20-0900-Plansiz"}); ok("kapat: planı olmayan toplantıda da çalışır", rp_["ok"] and json.load(open(os.path.join(pz, "kontrol-durum.json")))["kapatma"] == "elle"); shutil.rmtree(pz)
+    N["DK_GOR"]["zt"] = 0
     # 4) bitir: duzeltme-elle.json biçimi, ölçüm, sözlük adayı, havuz
     # Düzeltmeler: P[2] Belvora → Pelvora, P[3] boş → Raporu perşembe bitireceğiz; bir de sözlük dışı ad (P[6] Kalvoro → Kalvero) dinlenmiş sayılır
     N["dk_islem"]({"islem": "kaydet", "t": md[:-3], "dinlenen": din + [D[42.0]], "duz": {d2: "Pelvora ekranında stok görünmüyor bugün", d3: "Raporu perşembe bitireceğiz", D[42.0]: "dün Kalvero ekranı açıktı"}})

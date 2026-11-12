@@ -4,7 +4,8 @@
 #   python3 -B kesisim.py kos [--canli DIR] [--json] [--kuru] [--vt YOL] [--tazi DIR]   (canlı klasör varsayılanı: ayardaki uygulama klasörü/canli)
 #   python3 -B kesisim.py belirsiz [--canli DIR]    (belirsiz adaylar; F2 çözücüsüne teslim biçimi)
 # Okuma: proje veritabanı baglayici üzerinden YALNIZ SALT OKUNUR (mode=ro); tazi.db salt okunur (indeksle ÇAĞRILMAZ), son.json/iletisim.jsonl salt okunur. veritabanına ve Tazı'ya yazılmaz.
-#   Yazılan tek şey: <canli>/kesisim.json (bugün) ve kesisim.jsonl (geçmiş; metin yok: zaman, id, tur, durum).
+#   Yazılan tek şey: <canli>/kesisim.json (bugün) ve kesisim.jsonl (geçmiş; metin yok: zaman, id, tur, durum). F2 çözücüsü (kesisim-coz.py) kesisim.json'a "cozum" ekler (kos taşır) ve
+#   kesisim-coz-durum.json'da "birak" dediği bulgu id'lerini tutar (kos bunları bulgu listesine almaz).
 # Bulgu: id (tur+varlık+kaynaklar+alandan sabit özet), tur (celiski|eksik|bayat|yeni|bekleyen|rutin), varlik (kisi:<veritabanı id> | firma:<alan adı> | sistem:<ad>; veritabanında karşılığı olmayan Tazı kişisi
 #   kisi:~<tazi id>), ozet (tek cümle), kaynaklar [{sistem, kayit, baglanti}], kanit {ham, duzey} (Tazı A–D ve K0–K3 ortak ölçek: A/K3=3 B/K2=2 C/K1=1 D/K0=0; birden çok kaynakta en zayıf halka),
 #   ilk_gorulme, durum (yeni|suruyor|kapandi|ertelendi; önceki koşudan taşınır), onerilen_eylem, belirsiz (True: kural karar veremedi, model bakacak; "karsilastirma" {a, b} taşır).
@@ -361,7 +362,10 @@ def kos(canli=None, vt=None, tazi_dizin=None, ayar=None, simdi=None, gizli=False
     for b in B:
         if b["id"] in gor: continue
         gor.add(b["id"]); tek.append(b)
-    onceki = {b["id"]: b for b in (_json_oku(os.path.join(canli, "kesisim.json"), {}).get("bulgular") or [])} if canli else {}
+    onceki_json = _json_oku(os.path.join(canli, "kesisim.json"), {}) if canli else {}
+    onceki = {b["id"]: b for b in (onceki_json.get("bulgular") or [])}
+    birak = set(((_json_oku(os.path.join(canli, "kesisim-coz-durum.json"), {}) if canli else {}).get("birak") or {}))   # F2: çözücünün "bırak" dediği bulgular kalıcı bastırılır (id ile)
+    tek = [b for b in tek if b["id"] not in birak]
     gecis = []   # kesisim.jsonl: yalnız durum geçişleri
     simdi_s = _iso(simdi)
     for b in tek:
@@ -373,7 +377,7 @@ def kos(canli=None, vt=None, tazi_dizin=None, ayar=None, simdi=None, gizli=False
             b["ilk_gorulme"] = simdi_s; b["durum"] = "yeni"
             gecis.append({"t": simdi_s, "id": b["id"], "tur": b["tur"], "durum": "yeni"})
     for i, p in onceki.items():
-        if i not in gor and p.get("durum") in ("yeni", "suruyor", "ertelendi"):
+        if i not in gor and i not in birak and p.get("durum") in ("yeni", "suruyor", "ertelendi"):
             tek.append(dict(p, durum="kapandi", kapanma=simdi_s)); gecis.append({"t": simdi_s, "id": i, "tur": p.get("tur"), "durum": "kapandi"})
     tek.sort(key=lambda b: (TUR_SIRA.index(b["tur"]) if b["tur"] in TUR_SIRA else 9, b["durum"] == "kapandi", b["varlik"], b["id"]))
     say = {}
@@ -382,6 +386,7 @@ def kos(canli=None, vt=None, tazi_dizin=None, ayar=None, simdi=None, gizli=False
     sonuc = {"surum": SURUM, "olusturma": simdi_s, "sure_sn": round(time.perf_counter() - t0, 3), "bugun": bugun.isoformat(),
              "ozet": {"toplam": sum(say.values()), "tur": say, "yeni": sum(1 for b in tek if b["durum"] == "yeni"), "kapandi": sum(1 for b in tek if b["durum"] == "kapandi"), "belirsiz": sum(1 for b in tek if b.get("belirsiz") and b["durum"] != "kapandi")},
              "kaynaklar": kaynaklar, "suzulen": suzulen, "okunamayan": (O.hatalar if O else []), "bulgular": tek}
+    if isinstance(onceki_json.get("cozum"), dict): sonuc["cozum"] = onceki_json["cozum"]   # F2: çözücünün özeti, kural koşusu (ör. panodan Yenile) yeniden yazınca kaybolmasın
     if canli and yaz:
         _yaz_atomik(os.path.join(canli, "kesisim.json"), json.dumps(sonuc, ensure_ascii=False, indent=1))
         if gecis:

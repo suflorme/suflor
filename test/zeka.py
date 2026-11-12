@@ -58,6 +58,8 @@ for i in range(10, 15):
     il.append({"id": 100 + i, "zincir": str(i), "gonderilen": i != 14, "t": iso(6)})
     zd[f"z:{i}|{100 + i}"] = {"d": "donus_bekliyorsun", "a": 0, "n": "", "t": iso(6, 12)}
 yazj("posta.json", {"iletiler": il}); yazj("eposta-takip.json", {"zd": zd, "bildirilen": {f"o{i}": iso(5) for i in range(12)}, "yoksay": {"o1": iso(4)}})
+yaz("eposta-tepki.jsonl", [{"t": iso(3), "islem": "yanlis_oncelik", "konu": "Kurgu konu", "beklenen": "dusuk"}, {"t": iso(2), "islem": "yanlis_oncelik", "konu": "Kurgu konu 2", "beklenen": "yuksek"},
+                           {"t": iso(2), "islem": "onemli_kisi"}, {"t": iso(60), "islem": "yanlis_oncelik", "konu": "pencere dışı", "beklenen": "dusuk"}])
 # Gün planı izleri: 5 gün; s1..s3 odak, s4 dikkat; s4'ün vadesi kayıyor (önceden anıldı), s9'unki geçiyor (anılmadı)
 dm = lambda **x: {k: v for k, v in x.items()}
 izler = []
@@ -99,6 +101,8 @@ ok("e-posta bildirimi: 6 kabul / 10 (otomatik yoksay olumsuz)", O["eposta.kabul"
 ok("e-posta öngörü: 'bekleniyor' denen 6 zincirin 4'üne cevap yazıldı", O["eposta.cevap"]["n"] == 6 and O["eposta.cevap"]["puan"] == 67, O["eposta.cevap"])
 ok("e-posta analiz: son ileti zaten senin / karşıdan dönüş gelmiş = 2 hata / 11 (asgari 10)", O["eposta.durum"]["n"] == 11 and O["eposta.durum"]["puan"] == 82, O["eposta.durum"])
 ok("e-posta önem: 1/12 kalıcı yoksay", O["eposta.onem"]["n"] == 12 and O["eposta.onem"]["puan"] == 92, O["eposta.onem"])
+ok("e-posta kaçırma (yanlış negatif): düşük öncelikli denen 6 zincirin 4'üne sonradan cevap yazıldı → 2/6", O["eposta.kacirma"]["n"] == 6 and O["eposta.kacirma"]["puan"] == 33 and "4'ine" in O["eposta.kacirma"]["kanit"], O["eposta.kacirma"])
+ok("e-posta düzeltme: 2 yanlış öncelik + 1 önemli kişi (pencere dışı sayılmaz) / 11 zincir → %73; yalnız sayı", O["eposta.duzeltme"]["n"] == 11 and O["eposta.duzeltme"]["puan"] == 73 and "2 yanlış öncelik" in O["eposta.duzeltme"]["kanit"] and not sizinti(O["eposta.kacirma"]) and not sizinti(O["eposta.duzeltme"]), O["eposta.duzeltme"])
 ok("öneri: iptal edilen sunulmuş sayılmaz; 3/12 kabul, 2 ertele", O["proaktif.kabul"]["n"] == 12 and O["proaktif.kabul"]["puan"] == 25 and O["proaktif.zaman"]["n"] == 22, (O["proaktif.kabul"], O["proaktif.zaman"]))
 ok("gün planı: tur 5/6 (bozuk tur sayılır)", O["gun_plani.tur"]["n"] == 6 and O["gun_plani.tur"]["puan"] == 83, O["gun_plani.tur"])
 ok("gün planı: odak 3 gün içinde kapanan (s1) ölçülür", O["gun_plani.odak"]["n"] >= 6 and 0 < O["gun_plani.odak"]["oran"] < 1, O["gun_plani.odak"])

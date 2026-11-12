@@ -9,6 +9,7 @@ import shutil
 DK_PLAN, DK_DURUM, DK_ELLE, DK_OLCUM, DK_SURUM = "kontrol-plan.json", "kontrol-durum.json", "duzeltme-elle.json", "dokum-olcum.jsonl", 1
 DK_HEDEF = 200; DK_BLOK_SN = 300; DK_BAND = 80
 DK_GEMINI_FARK = 0.22; DK_KARAR_PENCERE_SN = 40; DK_HIZ = 1.25; DK_KARAR_SN = 2.5  # tahmin: ses süresi / hız + satır başına karar süresi
+DK_GERIDE_GUN = 7  # 12 Kasım: bitmemiş kontrol bu kadar günden eskiyse panoda gösterilmez ("geride"; ayar dokum_kontrol_gun, 1–60)
 DK_BITIS_DK = 15; DK_BEKLE_SAAT = 3; DK_ARALIK_SN = 300; DK_TARAMA_GUN = 12
 DK_RX_AD = re.compile(r"^[^\W\d_][\w.\-]*$"); DK_SOZ_RX = re.compile(r"[^\W\d_]+(?:['’][^\W\d_]+)?|\d+")
 DK_NEDEN_AD = {"gemini": "Gemini farklı", "gemini_bos": "Gemini boş", "atlandi": "Whisper atladı", "ad": "ad/terim", "ad_gemini": "ad Gemini'de farklı", "karar": "karar/iş", "dil": "dil uyuşmuyor",
@@ -19,6 +20,9 @@ def dk_acik():  # → (açık mı, neden)
     if not AYAR.get("ses_arsivi"): return False, "ses_arsivi_kapali"
     return True, None
 def _dk_kok(): return _so_yol("ses-arsivi")
+def dk_gun_sinir():
+    try: return int(min(60, max(1, float(AYAR.get("dokum_kontrol_gun", DK_GERIDE_GUN)))))
+    except (TypeError, ValueError): return DK_GERIDE_GUN
 def dk_kl(ad):  # klasör adı (toplantı kökü) → yol; ad klasör adından başka bir şey olamaz (ses arşivinin dışına çıkılmaz)
     ad = str(ad or "")
     if not ad or ad != os.path.basename(ad) or ad in (".", "..") or ad.startswith(("_", ".")): return None
@@ -194,13 +198,13 @@ def dk_plan_uret(md, kaydet=True, kl=None):  # → plan sözlüğü ya da None (
 def dk_durum_oku(kl):
     d = _dk_json(os.path.join(kl, DK_DURUM), {}); d = d if isinstance(d, dict) else {}
     return {"dinlenen": [x for x in (d.get("dinlenen") or []) if isinstance(x, str)], "duz": {k: v for k, v in (d.get("duz") or {}).items() if isinstance(k, str) and isinstance(v, str)},
-            "konum": d.get("konum") if isinstance(d.get("konum"), str) else "", "mod": d.get("mod") if d.get("mod") in ("oncelikli", "tumu") else "oncelikli", "bitti": d.get("bitti") or None, "t": d.get("t")}
+            "konum": d.get("konum") if isinstance(d.get("konum"), str) else "", "mod": d.get("mod") if d.get("mod") in ("oncelikli", "tumu") else "oncelikli", "bitti": d.get("bitti") or None, "kapatma": "elle" if d.get("kapatma") == "elle" else None, "t": d.get("t")}
 def dk_kaydet(kl, plan, p):  # sayfanın kendiliğinden kaydı: yalnız plandaki satırlar; metin sadeleştirilir, uzunluk sınırlanır
     bilinen = {s["d"] for s in plan["satirlar"]}; eski = dk_durum_oku(kl)
     din = [x for x in (p.get("dinlenen") or []) if isinstance(x, str) and x in bilinen]
     duz = {k: " ".join(v.split())[:600] for k, v in (p.get("duz") or {}).items() if isinstance(k, str) and k in bilinen and isinstance(v, str) and v.strip()}
     d = {"dinlenen": sorted(set(din)), "duz": duz, "konum": p.get("konum") if p.get("konum") in bilinen else eski["konum"], "mod": p.get("mod") if p.get("mod") in ("oncelikli", "tumu") else eski["mod"],
-         "bitti": eski["bitti"], "t": datetime.datetime.now().isoformat(timespec="seconds")}
+         "bitti": eski["bitti"], "kapatma": eski["kapatma"], "t": datetime.datetime.now().isoformat(timespec="seconds")}
     _so_yaz(os.path.join(kl, DK_DURUM), json.dumps(d, ensure_ascii=False), 0o600); return d
 def dk_elle_yaz(kl, plan, d):  # 5 Kasım'daki duzeltme-elle.json biçimi (+ dinlenen liste): {dosya, kanal, saat, whisper, gemini, dogru}
     S = {s["d"]: s for s in plan["satirlar"]}
@@ -305,7 +309,7 @@ def dk_bitir(ad, kuru_kok=None):  # kaydet düğmesi: duzeltme-elle.json + ölç
     kayit = dk_olcum(md, kl, plan, duz, din); dk_olcum_yaz(kayit, kuru_kok); havuz = len(din) if dk_havuz_uygun(plan) else 0
     if DK_HAVUZ_SENKRON: dk_havuza(kl, plan, din, duz)
     elif havuz: threading.Thread(target=dk_havuza, args=(kl, plan, set(din), dict(duz)), daemon=True, name="dk-havuz").start()
-    d["bitti"] = datetime.datetime.now().isoformat(timespec="seconds"); _so_yaz(os.path.join(kl, DK_DURUM), json.dumps(d, ensure_ascii=False), 0o600)
+    d["bitti"] = datetime.datetime.now().isoformat(timespec="seconds"); d["kapatma"] = None; _so_yaz(os.path.join(kl, DK_DURUM), json.dumps(d, ensure_ascii=False), 0o600)
     if "so_tetik" in globals(): so_tetik()  # öğrenen sözlük bu toplantıyı elle düzeltmeyle yeniden işler (so_bekleyen)
     print(f"DÖKÜM KONTROLÜ: kaydedildi · {len(din)} satır dinlendi · {len(e['duzeltmeler'])} düzeltme · hata Whisper {kayit['wer']['whisper']} Gemini {kayit['wer']['gemini']} Teams {kayit['wer']['teams']} · havuza {havuz} satır")
     return {"ok": True, "dinlenen": len(din), "duzeltme": len(e["duzeltmeler"]), "olcum": kayit, "havuz": havuz}
@@ -342,10 +346,11 @@ def dk_tur():
     return n
 DK_OLAY = threading.Event(); DK_GOR = {"v": None, "zt": 0}
 def dk_tetik(): DK_OLAY.set()
-def dk_liste():  # → [{ad, tarih, satir, oncelikli, dinlenen, duzeltme, tahmin_dk, bitti, hakem, teams}] yeniden eskiye; yalnız planı hazır toplantılar
+def dk_liste(bugun=None):  # → [{ad, tarih, satir, oncelikli, dinlenen, duzeltme, tahmin_dk, bitti, kapatma, geride, yas_gun, hakem, teams}] yeniden eskiye; yalnız planı hazır toplantılar
+    # geride: bitmemiş ve dk_gun_sinir() günden eski (toplantı tarihi klasör adından) — pano göstermez; kapatma: "elle" (kullanıcı × ile kapattı) ya da None
     acik, _ = dk_acik()
     if not acik: return []
-    out = []
+    bugun = bugun or datetime.date.today(); sinir = dk_gun_sinir(); out = []
     try: adlar = sorted(os.listdir(_dk_kok()), reverse=True)
     except OSError: return out
     for ad in adlar:
@@ -354,15 +359,17 @@ def dk_liste():  # → [{ad, tarih, satir, oncelikli, dinlenen, duzeltme, tahmin
         plan = _dk_json(pl)
         if not isinstance(plan, dict) or not plan.get("satirlar"): continue
         d = dk_durum_oku(kl); n_on = len(plan.get("oncelikli") or []); din = set(d["dinlenen"])
-        out.append({"ad": ad, "baslik": ad[16:].replace("-", " ") or ad, "tarih": ad[:10], "saat": ad[11:13] + ":" + ad[13:15] if re.match(r"\d{4}-\d\d-\d\d-\d{4}", ad) else "", "satir": len(plan["satirlar"]), "oncelikli": n_on,
+        try: yas = (bugun - datetime.date.fromisoformat(ad[:10])).days
+        except ValueError: yas = None
+        out.append({"yas_gun": yas, "geride": bool(not d["bitti"] and yas is not None and yas > sinir), "kapatma": d["kapatma"], **{"ad": ad, "baslik": ad[16:].replace("-", " ") or ad, "tarih": ad[:10], "saat": ad[11:13] + ":" + ad[13:15] if re.match(r"\d{4}-\d\d-\d\d-\d{4}", ad) else "", "satir": len(plan["satirlar"]), "oncelikli": n_on,
                     "oncelikli_dinlenen": len(set(plan.get("oncelikli") or []) & din), "dinlenen": len(din), "duzeltme": len(d["duz"]), "tahmin_dk": (plan.get("tahmin_dk") or {}).get("oncelikli"), "bitti": d["bitti"],
-                    "hakem": bool(plan.get("hakem")), "teams": bool(plan.get("teams"))})
+                    "hakem": bool(plan.get("hakem")), "teams": bool(plan.get("teams"))}})
     return out
 def dk_view():  # /status dokum_kontrol: panoda "Döküm kontrolü" (yalnız geliştirici + ses arşivi açık); 30 sn önbellek (kaydet/bitir sıfırlar)
     if not dk_acik()[0]: return None
-    if time.time() - (DK_GOR.get("zt") or 0) > 30: DK_GOR.update(v=dk_liste()[:6], zt=time.time())
+    if time.time() - (DK_GOR.get("zt") or 0) > 30: DK_GOR.update(v=sorted(dk_liste(), key=lambda x: bool(x["geride"]))[:6], zt=time.time())  # geride olanlar sona: en güncel 6 satırı eski bitmemişler tüketmez
     L = DK_GOR["v"] or []
-    return {"liste": L, "bekleyen": [x["ad"] for x in L if not x["bitti"]][:3]} if L else None
+    return {"liste": L, "bekleyen": [x["ad"] for x in L if not x["bitti"] and not x["geride"]][:3]} if L else None
 def dk_ses(ad, dosya):  # → wav baytları ya da None; yalnız plandaki satırın dosyası (yol gezintisi yok)
     kl = dk_kl(ad)
     if not kl or not dk_acik()[0] or not re.fullmatch(r"(ben|karsi)-\d{6}-[\w-]{1,12}\.wav", str(dosya or "")): return None
@@ -382,12 +389,17 @@ def dk_istek(yol, tam_yol):  # GET /dokum-kontrol/liste | /dokum-kontrol/plan?t=
         plan = dk_plan_uret(ad + ".md")
         if not plan: return {"ok": False, "err": "plan_yok"}
     return {"ok": True, "plan": plan, "durum": dk_durum_oku(kl), "ad": ad, "hiz": DK_HIZ}
-def dk_islem(p):  # POST /dokum-kontrol {islem: kaydet|bitir|yenile, t, …}
+def dk_islem(p):  # POST /dokum-kontrol {islem: kaydet|bitir|yenile|kapat, t, …}
     acik, neden = dk_acik()
     if not acik: return {"ok": False, "err": neden}
     ad = str(p.get("t") or ""); kl = dk_kl(ad)
     if not kl or _dk_gizli_mi(ad + ".md"): return {"ok": False, "err": "toplanti"}
     plan = _dk_json(os.path.join(kl, DK_PLAN))
+    if p.get("islem") == "kapat":  # "atla/kapat": × düğmesi ya da sayfadaki "Bu kontrolü kapat" — plan olmasa da; ölçüm/sözlük/havuz işi yapılmaz, yalnız satır kapanır (bitti + kapatma "elle")
+        d = dk_durum_oku(kl)
+        if d["bitti"]: return {"ok": True, "kapatma": d["kapatma"]}  # zaten bitirilmiş (ölçüm yapılmış) ya da kapatılmış: dokunma
+        d["bitti"] = datetime.datetime.now().isoformat(timespec="seconds"); d["kapatma"] = "elle"
+        _so_yaz(os.path.join(kl, DK_DURUM), json.dumps(d, ensure_ascii=False), 0o600); DK_GOR["zt"] = 0; print(f"DÖKÜM KONTROLÜ: kontrol elle kapatıldı ({ad[:10]})"); return {"ok": True, "kapatma": "elle"}
     if p.get("islem") == "yenile":  # plan yeniden hesaplanır (durum korunur)
         plan = dk_plan_uret(ad + ".md"); DK_GOR["zt"] = 0; return {"ok": bool(plan)}
     if not plan: return {"ok": False, "err": "plan_yok"}

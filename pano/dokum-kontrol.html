@@ -64,6 +64,7 @@ dialog h2{margin:0 0 8px;font:300 18px/1.2 var(--f-baslik)}dialog table{border-c
 <script>
 const DIL="__DIL__", EN=globalThis.SUFLOR_EN||{}
 function L(s,v){let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k+"}").join(v[k]);return t}
+const LL=(tr,en)=>DIL==='en'?en:tr  // dil.js'e eklenene kadar iki dilli metin burada
 const $=id=>document.getElementById(id), A=new Audio()
 const ST={liste:[],t:null,plan:null,S:[],K:{din:new Set(),duz:{},konum:'',mod:'oncelikli'},gor:[],el:[],i:-1,sira:'z',yukleniyor:false,kayit:'',bitti:null}
 let kaydetT=0,edit=-1,blobs=new Map(),caliyor=-1
@@ -77,7 +78,7 @@ async function api(yol,gov){const r=await fetch(yol,gov?{method:'POST',body:JSON
 function ura(i){return ST.S[ST.gor[i]]}
 // --- yükleme ---
 async function listeYukle(){
-  let j;try{j=await api('/dokum-kontrol/liste')}catch(e){return bosYaz(e.message==='anahtar'?L('Anahtar yok: sayfayı panodan aç.'):L('Aktarıcıya ulaşılamadı.'))}
+  let j;try{j=await api('/dokum-kontrol/liste')}catch(e){return sorunYaz(e.message==='anahtar'?L('Anahtar yok: sayfayı panodan aç.'):L('Aktarıcıya ulaşılamadı.'),new URLSearchParams(location.search).get('top'),e.message==='anahtar')}
   if(!j.ok)return bosYaz(L('Döküm kontrolü yalnız geliştirici kurulumunda ve ses arşivi açıkken çalışır.'))
   ST.liste=j.liste;const q=new URLSearchParams(location.search).get('top'),sec=q||(j.liste.find(x=>!x.bitti)||j.liste[0]||{}).ad
   const tp=$('tp');tp.textContent='';for(const x of j.liste){const o=document.createElement('option');o.value=x.ad;o.textContent=`${x.tarih} ${x.saat} · ${x.baslik}${x.bitti?' ✓':''}`;tp.appendChild(o)}
@@ -86,10 +87,17 @@ async function listeYukle(){
   tp.value=sec;await planYukle(sec)
 }
 function bosYaz(m){$('ls').textContent='';$('ls').appendChild(SF({className:'bos',textContent:m}))}
+// 12 Kasım: liste/plan yüklenemediğinde çıkış yolu — panodan yeniden aç (anahtarı pano verir: /dokum-kontrol?top=…&t=<tek kullanımlık>) ve (toplantı adı biliniyorsa) "Bu kontrolü kapat"
+function sorunYaz(m,ad,anahtarYok){bosYaz(m);const k=SF({className:'bos'});k.style.cssText='display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px'
+  const b1=document.createElement('button');b1.type='button';b1.className='pri';b1.textContent=LL('Panodan yeniden aç','Reopen from the panel');b1.onclick=()=>{location.href='/'};k.appendChild(b1)
+  if(ad){const b2=document.createElement('button');b2.type='button';b2.textContent=LL('Bu kontrolü kapat','Close this check');b2.onclick=async()=>{b2.disabled=true
+      try{const j=await api('/dokum-kontrol',{islem:'kapat',t:ad});if(j.ok)return bosYaz(LL('Bu kontrol kapatıldı.','This check was closed.'));b2.disabled=false;b2.textContent=LL('Kapatılamadı','Could not close')}
+      catch(e){b2.disabled=false;b2.textContent=e.message==='anahtar'?LL('Anahtar gerekiyor: önce panodan aç','Key needed: open from the panel first'):LL('Kapatılamadı','Could not close')}};k.appendChild(b2)}
+  $('ls').appendChild(k)}
 async function planYukle(ad){
   ST.yukleniyor=true;bosYaz(L('Yükleniyor…'))
-  let j;try{j=await api('/dokum-kontrol/plan?t='+encodeURIComponent(ad))}catch(e){return bosYaz(L('Aktarıcıya ulaşılamadı.'))}
-  if(!j.ok)return bosYaz(L('Bu toplantının kontrol listesi hazırlanamadı.'))
+  let j;try{j=await api('/dokum-kontrol/plan?t='+encodeURIComponent(ad))}catch(e){return sorunYaz(e.message==='anahtar'?L('Anahtar yok: sayfayı panodan aç.'):L('Aktarıcıya ulaşılamadı.'),ad,e.message==='anahtar')}
+  if(!j.ok)return sorunYaz(L('Bu toplantının kontrol listesi hazırlanamadı.'),ad)
   ST.t=ad;ST.plan=j.plan;ST.S=j.plan.satirlar;ST.K={din:new Set(j.durum.dinlenen),duz:Object.assign({},j.durum.duz),konum:j.durum.konum||'',mod:j.durum.mod||'oncelikli'};ST.bitti=j.durum.bitti
   if(j.hiz&&!localStorage.getItem('dkHiz'))$('hz').value=String(j.hiz)
   try{const h=localStorage.getItem('dkHiz');if(h)$('hz').value=h}catch(e){}

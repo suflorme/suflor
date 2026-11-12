@@ -165,6 +165,97 @@ NS["AYAR"]["eposta_takip"] = False; ok("eposta_takip kapalı", N("et_acik")() is
 ok("sessiz saat: gece yarısını aşan aralık", N("et_sessiz_mi")(SIMDI.replace(hour=2)) and not N("et_sessiz_mi")(SIMDI.replace(hour=14)) and N("et_sessiz_mi")(SIMDI.replace(hour=22, minute=0)))
 NS["AYAR"]["eposta_sessiz"] = ""; ok("sessiz saat boşsa yok", not N("et_sessiz_mi")(SIMDI.replace(hour=2))); NS["AYAR"]["eposta_sessiz"] = "22:00-08:00"
 
+# --- 12 Kasım: panonun açık alanları (vurgu/etiket/ozet/neden_kisa), yedek metin kuralı, bayatlık kapısı, önbellek tazeleme, yanlış öncelik tepkisi ---------------------------------------------------------
+import hashlib as _hl
+sys.path.insert(0, KOD); import yapi as _yapi
+def zdd(iletiler, simdi=SIMDI, **kw):  # → (analiz, adaylar sözlüğü id→dkey)
+    return N("et_analiz")(iletiler, simdi, kisiler=kw.pop("kisiler", {A("pat"), A("kaan")}), kayit_kelime=[], durum=kw.pop("durum", {"yoksay": {}, "ertele": {}, "zd": {}}), kb=kw.pop("kb", False), **kw)
+def dkeyler(iletiler, **kw): return {a["id"]: a["dkey"] for a in zdd(iletiler, beklenen=True, deger={}, **kw)["adaylar"]}
+def tz(g=0): return (SIMDI - datetime.timedelta(days=g)).isoformat(timespec="seconds")
+GID = [s(50, [A("kaan")], "Rapor taslağı iletildi", 6, ozet="Taslak ekte.", ad=["Kaan Ornek"]), s(51, [A("pat")], "Kampanya planı", 6, ozet="Planı paylaştım.", ad=["Pat Ornek"])]
+dk = dkeyler(GID)
+ev_ac = lambda a, n="", g=0: {"d": "donus_bekliyorsun", "a": a, "n": n, "t": tz(g)}
+c = zdd(GID, beklenen=True, deger={dk["50"]: ev_ac(1), dk["51"]: ev_ac(2)})
+r50 = next((o for o in c["donus"] + c["dusuk"] if o["id"] == "50"), None); r51 = next((o for o in c["donus"] + c["dusuk"] if o["id"] == "51"), None)
+ok("açık alanlar: her satırda vurgu/etiket/ozet/neden_kisa/bayat/tepki", all(set(o) >= {"vurgu", "etiket", "ozet", "neden_kisa", "bayat", "tepki"} for o in c["donus"] + c["dusuk"] + c["bekleyen"]) and r50 and r51)
+ok("aciliyet 1 + Claude nedeni boş: düşük kovada ya da normal, 'iş günüdür dönüş yok' yedek metni YOK", r50 and "iş günüdür" not in r50["neden"] and "iş günüdür" not in r50["ozet"] and r50["vurgu"] != "yuksek")
+ok("aciliyet 2 + neden boş: gerçekten takip gerekiyor → yedek metin kullanılır", r51 and "iş günüdür dönüş yok" in r51["neden"] and r51["etiket"].startswith("Dönüş bekliyorsun"))
+cd = zdd(GID, beklenen=True, deger={dk["50"]: ev_ac(1), dk["51"]: ev_ac(1)})
+ok("düşük kovadaki satır asla yuksek değil, etiket 'Takip gerekmeyebilir'", cd["dusuk"] and all(o["vurgu"] == "dusuk" and o["etiket"] == "Takip gerekmeyebilir" and "iş günüdür" not in o["neden"] for o in cd["dusuk"]))
+ch = zdd(GID, beklenen=True, deger={dk["50"]: ev_ac(3, "Kaan rapor taslağını bekliyor; bugün lazım"), dk["51"]: ev_ac(2, "Pat planı soruyor; cevap yok")})
+ok("aciliyet 3 → yuksek; 2 + ≥3 iş günü → yuksek", {o["id"]: o["vurgu"] for o in ch["donus"]} == {"50": "yuksek", "51": "yuksek"})
+uz = "Çok uzun bir neden cümlesi, bu cümle yüz on karakteri rahatça aşıyor ve sonu kesilmemeli diye virgülden önce bitmesi gerekiyor, sonra devam ediyor."
+cu = zdd(GID, beklenen=True, deger={dk["50"]: ev_ac(3, uz), dk["51"]: ev_ac(3, "x")})
+ok("ozet: ≤ 110 karakter, noktayla biter, kesik değil; neden_kisa ≤ 60", all(len(o["ozet"]) <= 110 and o["ozet"][-1] in ".!?" and 0 < len(o["neden_kisa"]) <= 61 for o in cu["donus"]) and all(not o["ozet"].endswith("…") for o in cu["donus"]))
+ok("ozet: tek cümle (içinde cümle sonu yok)", all(not re.search(r"[.!?]\s+\S", o["ozet"]) for o in cu["donus"] + c["donus"]))
+# bayatlık kapısı: söz kapısıyla aynı kaynaklar (yapi.kayit_durumlari + konuyla örtüşen sonraki kayıt/toplantı)
+def kbx(**r): return {"y": _yapi, "sat": [dict({"id": "k1", "kok": _yapi._gn_kokler("Teklif onayı verildi fiyat"), "tarih": SIMDI.date().isoformat(), "durum": "bitti", "son": "", "baslik": "Satış", "toplanti": True}, **r)]}
+ZB = [m(1, A("pat"), "Teklif onayı?", 5, ad="Pat Ornek", ozet="Fiyatı onaylar mısın"), m(3, A("kaan"), "Stok sayımı sorusu", 2, ad="Kaan Ornek", ozet="Sayım ne zaman bitiyor?")]
+b0 = zdd(ZB); b1 = zdd(ZB, kb=kbx())
+ok("bayat: kapanmış iş kaydıyla örtüşen satır listeden ÇIKMAZ, bayat {neden, kaynak} alır ve sona iner", [o["id"] for o in b1["bekleyen"]][-1] == "1" and b1["bekleyen"][-1]["bayat"]["neden"] == "kayit_kapandi" and "Satış" in b1["bekleyen"][-1]["bayat"]["kaynak"]
+   and set(o["id"] for o in b0["bekleyen"]) == set(o["id"] for o in b1["bekleyen"]) and next(o for o in b1["bekleyen"] if o["id"] == "3")["bayat"] is None and b1["bayat_sayi"] == 1)
+bb = b1["bekleyen"][-1]; ok("bayat satır: vurgu dusuk, 'teyit et' etiketi ve özeti", bb["vurgu"] == "dusuk" and "eyit" in bb["etiket"] and "eyit" in bb["ozet"])
+ok("bayat: kayıt iletiden ÖNCE ise kapatmaz", zdd(ZB, kb=kbx(tarih=(SIMDI - datetime.timedelta(days=9)).date().isoformat()))["bayat_sayi"] == 0)
+b2 = zdd(ZB, kb=kbx(durum="acik"))
+ok("bayat: sonraki toplantıda konuşulmuş (kayıt açık) → toplantida_konusuldu; toplantısız kayıt kapatmaz", next(o for o in b2["bekleyen"] if o["id"] == "1")["bayat"]["neden"] == "toplantida_konusuldu" and zdd(ZB, kb=kbx(durum="acik", toplanti=False))["bayat_sayi"] == 0)
+ok("bayat: konuyla örtüşmeyen kayıt kapatmaz", zdd(ZB, kb=kbx(kok=_yapi._gn_kokler("Depo taşıma planı onaylandı")))["bayat_sayi"] == 0)
+BILDIRIM.clear(); NS["ET"]["durum"] = None; ET_D = N("et_durum")(); ET_D["ilk"] = True
+a_b = zdd(ZB, kb=kbx()); NS["ET"]["durum"]["ilk"] = True; N("et_hatirlat")(a_b, SIMDI)
+ok("bayat satır bildirim üretmez (yalnız bayat olmayan)", all("Pat" not in str(b) for b in BILDIRIM) and len(BILDIRIM) <= 1)
+# kayıt bağlamı gerçek yapi.kayit_durumlari çağrısıyla (sahte kayıt listesi) — _et_kayit_baglam
+class SahteY:
+    GN = _yapi
+    @staticmethod
+    def kayit_listesi(dizin, ad="", bugun=None, deneme=False): return {"kayitlar": [{"id": "k9", "tur": "is", "metin": "Teklif onayı verildi fiyat", "tarih": SIMDI.date().isoformat(), "durum": "kapandi", "baslik": "Satış", "toplanti": "t.md"}]}
+    @staticmethod
+    def kayit_durumlari(dizin, ad="", bugun=None, v=None): return {"k9": {"durum": "bitti", "son": ""}}
+    _gn_kokler = staticmethod(_yapi._gn_kokler); _gn_ortak = staticmethod(_yapi._gn_ortak)
+NS["_yapi_mod"] = lambda: SahteY; NS["ET"]["kb_t"] = 0; kbg = N("_et_kayit_baglam")(SIMDI.date())
+ok("_et_kayit_baglam: kayıt durumları okunur, önbelleğe alınır", kbg and kbg["sat"][0]["durum"] == "bitti" and kbg["sat"][0]["toplanti"] is True and N("_et_kayit_baglam")(SIMDI.date()) is kbg)
+b3 = N("et_analiz")(ZB, SIMDI, kisiler={A("pat"), A("kaan")}, kayit_kelime=[], durum={"yoksay": {}, "ertele": {}, "zd": {}}, beklenen=False)
+ok("et_analiz kb verilmezse kayıt bağlamını kendisi kullanır", b3["bayat_sayi"] == 1)
+NS["_yapi_mod"] = lambda: None; NS["ET"]["kb_t"] = 0; NS["ET"]["kb"] = None
+# önbellek tazeleme: 24 saatten eski değerlendirme ya da ilgili kayıt imzası değişti → yeniden aday; tur başına en çok 5; aynı zincir 6 saatte bir
+ZC = [m(200 + i, A("pat"), f"Konu{i} bütçe{i} teklif{i} değerlendirme", 2, ad="Pat Ornek", ozet="Görüşün nedir? Onaylar mısın", zincir=700 + i) for i in range(8)]
+ev_s = lambda g, **k: dict({"d": "senden_bekleniyor", "a": 2, "n": "Somut istek var", "t": tz(g)}, **k)
+dz = {f"z:{700 + i}|{200 + i}": ev_s(0.3) for i in range(8)}
+ok("taze değerlendirme (< 24 sa) yeniden aday olmaz", zdd(ZC, beklenen=True, deger=dz)["adaylar"] == [])
+dz_e = {f"z:{700 + i}|{200 + i}": ev_s(2 if i == 0 else 0.3) for i in range(8)}; dz_e["z:700|200"]["t"] = tz(2)
+ae = zdd(ZC, beklenen=True, deger=dz_e)["adaylar"]
+ok("24 saatten eski değerlendirme yeniden aday (yenile işaretli), satır listede kalır", [a["id"] for a in ae] == ["200"] and ae[0]["yenile"] is True and "200" in [o["id"] for o in zdd(ZC, beklenen=True, deger=dz_e)["bekleyen"]])
+dz_h = {f"z:{700 + i}|{200 + i}": ev_s(3) for i in range(8)}; ah = zdd(ZC, beklenen=True, deger=dz_h)["adaylar"]
+ok("tazeleme turda en çok 5 aday (maliyet tavanı)", len(ah) == 5 and all(a["yenile"] for a in ah))
+NS["ET"]["yenile_dene"] = {ah[0]["dkey"]: SIMDI.timestamp() - 3600}; ah2 = zdd(ZC, beklenen=True, deger=dz_h)["adaylar"]
+ok("aynı zincirin tazelemesi 6 saat içinde yeniden denenmez", ah[0]["dkey"] not in [a["dkey"] for a in ah2] and len(ah2) == 5); NS["ET"]["yenile_dene"] = {}
+# imza: ilgili kayıt değişti (ya da yeni kayıt geldi) → taze değerlendirme bile yeniden açılır
+ZD1 = [m(300, A("pat"), "Teklif onayı?", 3, ad="Pat Ornek", ozet="Fiyatı onaylar mısın", zincir=800)]
+im0 = zdd(ZD1, beklenen=True, deger={}, kb=kbx(durum="acik", toplanti=False))["adaylar"][0]["ki"]
+ev_i = {"z:800|300": ev_s(0.2, ki=im0)}
+ok("imza aynı → yeniden sorulmaz; ilgili kayıt durumu değişince (kapandı) yeniden aday", zdd(ZD1, beklenen=True, deger=ev_i, kb=kbx(durum="acik", toplanti=False))["adaylar"] == [] and [a["id"] for a in zdd(ZD1, beklenen=True, deger=ev_i, kb=kbx(durum="bitti", toplanti=False))["adaylar"]] == ["300"])
+ok("imza kaydı olmayan eski değerlendirme yalnız yaşa bakar", zdd(ZD1, beklenen=True, deger={"z:800|300": ev_s(0.2)}, kb=kbx(durum="bitti", toplanti=False))["adaylar"] == [])
+# claude_sirala: tazeleme sonrası t yenilenir, ki yazılır, yenile_dene işaretlenir
+NS["ET"]["durum"] = None; dd_ = N("et_durum")(); dd_["zd"]["z:700|200"] = ev_s(3, ki="x"); NS["POSTA"]["iletiler"] = ZC
+a_ = zdd(ZC, beklenen=True, deger=dd_["zd"])["adaylar"]; n_ = N("et_claude_sirala")(a_, SIMDI)
+ok("tazeleme Claude'a gider, önbellek t/ki ile yenilenir, yenile_dene işaretlenir", n_ >= 1 and dd_["zd"]["z:700|200"]["t"] != tz(3) and "ki" in dd_["zd"]["z:700|200"] and "z:700|200" in NS["ET"]["yenile_dene"])
+NS["POSTA"]["iletiler"] = POS; NS["ET"]["durum"] = None; NS["ET"]["yenile_dene"] = {}
+# yanlış öncelik tepkisi
+NS["ET"]["durum"] = None; NS["ET"]["gorunum"] = None; N("et_tara")(zorla=True, simdi=SIMDI)
+ok("yanlis_oncelik: beklenen geçersizse reddedilir; listede olmayan id reddedilir", N("et_islem")({"islem": "yanlis_oncelik", "id": "1", "beklenen": "orta"}) == {"ok": False, "err": "beklenen"} and N("et_islem")({"islem": "yanlis_oncelik", "id": "999", "beklenen": "dusuk"})["ok"] is False)
+v0 = N("et_view")(); r1 = next(o for o in v0["bekleyen"] if o["id"] == "1")
+r = N("et_islem")({"islem": "yanlis_oncelik", "id": "1", "beklenen": "dusuk"}); r1b = next((o for o in r["bekleyen"] if o["id"] == "1"), None)
+ok("yanlis_oncelik dusuk: satır hemen düşük vurguya geçer, tepki alanı, bayat kalkar", r["ok"] and r1b and r1b["vurgu"] == "dusuk" and r1b["tepki"] == "dusuk" and r1b["bayat"] is None)
+tp = os.path.join(T, "eposta-tepki.jsonl"); satirlar = [json.loads(l) for l in open(tp, encoding="utf-8")]
+ok("tepki kaydı: konu kökü + karar, adres/gövde yok", satirlar and satirlar[-1]["islem"] == "yanlis_oncelik" and satirlar[-1]["beklenen"] == "dusuk" and satirlar[-1]["konu"] == "Teklif onayı?" and AT not in open(tp, encoding="utf-8").read() and "Fiyatı onaylar" not in open(tp, encoding="utf-8").read())
+r = N("et_islem")({"islem": "yanlis_oncelik", "zincir": "1", "beklenen": "yuksek"}); ok("yanlis_oncelik yuksek (zincir alanıyla da): vurgu yuksek", next(o for o in r["bekleyen"] if o["id"] == "1")["vurgu"] == "yuksek")
+for i in range(12): N("_et_tepki_yaz")({"t": tz(), "islem": "yanlis_oncelik", "konu": f"Kurgu konu {i} sorusu yazan" + "@" + "kisi.test", "beklenen": "dusuk" if i % 2 else "yuksek"})
+ist = N("et_claude_istem")(a_[:1], SIMDI)
+ok("istemde son 10 tepki kısa örnek olarak; adres maskeli, gövde yok", ist.count("\n- «") >= 10 and ist.count("Kurgu konu") == 10 and "Kurgu konu 11" in ist and "Kurgu konu 1 " not in ist and ("yazan" + "@" + "kisi.test") not in ist and "geçmiş düzeltmeleri" in ist)
+ok("istem biçimi bozulmadı: sahte model hâlâ zincirleri okur", N("et_claude_coz")(sahte_model(ist, amac="x")[0], {a_[0]["id"]})[a_[0]["id"]]["d"] in N("ET_DURUMLAR"))
+d_ = N("et_durum")(); d_["tepki"].clear(); NS["ET"]["durum"] = None; os.remove(tp); NS["ET"]["gorunum"] = None; NS["ET"]["idler"] = {}
+ok("onemli_kisi eylemi sayım için tepki dosyasına (adressiz) yazılır", (lambda: (N("et_tara")(zorla=True, simdi=SIMDI), N("et_islem")({"islem": "onemli_kisi", "id": "3"}), os.path.isfile(tp) and AT not in open(tp, encoding="utf-8").read() and '"onemli_kisi"' in open(tp, encoding="utf-8").read())[-1])())
+if os.path.isfile(tp): os.remove(tp)
+NS["ET"]["durum"] = None
+
 # --- Yalıtılmış aktarıcıda uçlar (sahte posta.json; claude yok, ağ yok) ----------------------------------------------------------------------------------
 from bosport import bos_port
 
@@ -215,7 +306,7 @@ try:
         v = al("/eposta-onemli")
         if v.get("izin"): break
         time.sleep(0.5)
-    ok("GET /eposta-onemli: VIP önemli, bülten yok, biçim anlaşmalı", v.get("ok") and v.get("izin") and [o["id"] for o in v["onemli"]] == ["1"] and v["onemli"][0]["konu"] == "Teklif onayı?" and set(v["bekleyen"][0]) == {"id", "kim", "konu", "tarih", "neden", "gun", "cevapsiz_gun", "yon", "durum", "aciliyet", "degerlendirilmedi"} and v["bekleyen"][0]["degerlendirilmedi"] is True and [o["id"] for o in v["bekleyen"]] == ["1"] and v["ozet_sayi"] == 1 and v["bilgi_sayi"] == 1 and v["donus"] == [])
+    ok("GET /eposta-onemli: VIP önemli, bülten yok, biçim anlaşmalı", v.get("ok") and v.get("izin") and [o["id"] for o in v["onemli"]] == ["1"] and v["onemli"][0]["konu"] == "Teklif onayı?" and set(v["bekleyen"][0]) == {"id", "kim", "konu", "tarih", "neden", "gun", "cevapsiz_gun", "yon", "durum", "aciliyet", "degerlendirilmedi", "bayat", "vurgu", "etiket", "ozet", "neden_kisa", "tepki"} and v["bekleyen"][0]["degerlendirilmedi"] is True and [o["id"] for o in v["bekleyen"]] == ["1"] and v["ozet_sayi"] == 1 and v["bilgi_sayi"] == 1 and v["donus"] == [])
     ok("cevapsız gelen yon alanıyla", [c["yon"] for c in v["cevapsiz"]] == ["gelen"])
     r = al("/eposta-onemli", {"islem": "taslak", "id": "1"}); ok("POST taslak: şablon (claude yok), alıcı gönderen, gönderim yok", r.get("ok") and r["taslak"]["alicilar"] == [A("selin")] and r["taslak"]["kaynak"] == "sablon")
     r = al("/eposta-onemli", {"islem": "yoksay", "id": "1"}); ok("POST yoksay: listeden kalktı", r.get("ok") and r["onemli"] == [] and r["cevapsiz"] == [])

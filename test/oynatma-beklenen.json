@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 685665,
-   "sha": "4a65e5864c923972"
+   "uzunluk": 696446,
+   "sha": "41ca6d265a63f0f4"
   },
   "/mini": {
-   "uzunluk": 685665,
-   "sha": "4a65e5864c923972"
+   "uzunluk": 696446,
+   "sha": "41ca6d265a63f0f4"
   },
   "/status": {
    "_ping_son": "float",
@@ -325,6 +325,8 @@
      "izleme_dosyasi": "str",
      "kart_tavan_sn": "int",
      "kayit_sesi": "bool",
+     "kesisim_coz_tavan": "int",
+     "kesisim_cozucu": "bool",
      "kisayollar": "bool",
      "kisilik": "str",
      "kisilik_dis": "str",
@@ -346,6 +348,7 @@
      "masaustu_kisiler": "bool",
      "masaustu_mic": "bool",
      "masaustu_ses_kis": "bool",
+     "mutabakat": "bool",
      "oda": "bool",
      "onay_uyari": "bool",
      "oto_haric": "str",
@@ -424,6 +427,8 @@
      "izleme_dosyasi": "str",
      "kart_tavan_sn": "int",
      "kayit_sesi": "bool",
+     "kesisim_coz_tavan": "int",
+     "kesisim_cozucu": "bool",
      "kisayollar": "bool",
      "kisisel_tarih_hatirlat": "bool",
      "kisisel_tarih_saat": "str",
@@ -654,6 +659,7 @@
     "takas_gb": "float",
     "yuk": "float"
    },
+   "kesisim": "NoneType",
    "komut": {
     "at": "str",
     "id": "str",
@@ -698,6 +704,7 @@
     "parca": "int"
    },
    "meeting": "str",
+   "mutabakat": "NoneType",
    "notes": "int",
    "notlar": [],
    "oto_toplanti": "NoneType",

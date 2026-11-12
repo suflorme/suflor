@@ -4,7 +4,7 @@
 # Wayback, site taraması (robots/sitemap/sosyal/analitik/varlık), altyapı (DMARC/MX/SPF/IP RDAP), GitHub, bağlantı haritası ve
 # bayraklar, soruşturma dosyası. Yerel sahte sunucu; gerçek ağ yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/tazi.py      (kaldı → çıkış 1)
-import datetime, email.utils, json, os, shutil, stat, subprocess, sys, tempfile, threading, time
+import datetime, email.utils, json, os, re, shutil, stat, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 sys.dont_write_bytecode = True
@@ -167,6 +167,17 @@ kontrol("liste: e-posta alan adı, yerel kısım yok", k["alanlar"] == ["kuzgun-
 kontrol("liste: abr alan adı yok", "abr.business.gov.au" not in k["alanlar"])
 kontrol("liste: tek kelime ad", y["ad"] == "Yalıçapkını" and y["alanlar"] == ["yalicapkini.test"] and y["linkedin"] == [], str(y))
 kontrol("liste: id slug", a["id"] == "ornek-danismanlik-pty-ltd" and y["id"] == "yalicapkini", a["id"])
+# 1b) rapor biçimi yardımcıları: sözcük sınırında kesme, çift nokta, çıplak adres
+k1 = tazi._kes("yapay zekâ destekli arama için içerik uzmanı ve dijital içerik tasarımı ilanları, başvuru 28 Kasım'a kadar sürüyor", 60)
+kontrol("kesme: sözcük sınırında ve … ile biter", k1.endswith("…") and len(k1) <= 61 and not k1[:-1].endswith(" ") and k1[:-1] in "yapay zekâ destekli arama için içerik uzmanı ve dijital içerik tasarımı ilanları", k1)
+kontrol("kesme: kısa metin dokunulmaz, çift ve sondaki nokta temizlenir", tazi._kes("kısa metin..", 60) == "kısa metin" and tazi._kes("bir.. iki.", 60) == "bir. iki", tazi._kes("bir.. iki.", 60))
+kontrol("kesme: yarım kalan açık tırnak/parantez atılır", tazi._kes("adres (“Entrilla”, “we”, “", 80) == "adres (“Entrilla”, “we”", tazi._kes("adres (“Entrilla”, “we”, “", 80))
+kontrol("adres: çıplak adres [alan adı](adres) olur, sondaki noktalama dışarıda kalır", tazi._duz("Kaynak https://www.ornek.test/a/b?x=1. Bitti") == "Kaynak [ornek.test](https://www.ornek.test/a/b?x=1). Bitti", tazi._duz("Kaynak https://www.ornek.test/a/b?x=1. Bitti"))
+kontrol("kaynak adı: site → site taraması, rdap → alan adı kaydı", tazi.kaynak_ad("site") == "site taraması" and tazi.kaynak_ad("rdap") == "alan adı kaydı" and tazi.kaynak_ad("altyapi") == "e-posta ve ağ altyapısı")
+_bos = tempfile.mkdtemp(prefix="suflor-tazi-bos-")
+_rb = tazi.rapor_uret(_bos, [], "20260101")
+kontrol("rapor: bulgu yoksa Öne çıkanlar tek cümle", "## Öne çıkanlar\nBu taramada önemli yeni bir şey yok." in _rb and "0 kayıt tarandı" in _rb, _rb)
+shutil.rmtree(_bos, ignore_errors=True)
 rc, c = run("liste"); kontrol("liste komutu (ayar tazi_liste)", rc == 0 and "kuzgun-surec-pty-ltd" in c, c)
 
 # 2) ilk tarama
@@ -177,8 +188,13 @@ kontrol("rapor: taban özeti (kayıt tarihi, ABN, site başlığı)", "alan adı
 kontrol("rapor: ilk taramada Artık görünmüyor yok", "[Artık görünmüyor" not in r1, r1)
 kontrol("rapor: eski haber (taban) Yeni sayılmadı", "eski bir proje" not in r1, r1)
 kontrol("rapor: tazi-son.md", oku("rapor", "tazi-son.md") == r1)
-kontrol("rapor: yalnız-iş satırı", "Yalnız iş bilgisi" in r1 and "Kanıt dereceleri" in r1)
-kontrol("ilk tarama: D dereceli ad benzerliği (Yalıçapkını)", "ad benzerliği" in r1 and "[Yeni · D]" in r1, r1)
+kontrol("rapor: yalnız-iş satırı", "Yalnız iş bilgisi" in r1 and "Güven: A resmî" in r1)
+kontrol("rapor: yeni düzen başlıkları (Öne çıkanlar, kayıt, Ayrıntı)", r1.index("## Öne çıkanlar") < r1.index("## Örnek Danışmanlık") < r1.index("## Ayrıntı"), r1[:600])
+kontrol("rapor: ikinci satır kayıt sayısı ve Türkçe kaynak adları", "3 kayıt tarandı · kaynaklar: alan adı kaydı, DNS, " in r1 and "rdap" not in r1[:300] and "tarama," not in r1[:300], r1[:200])
+kontrol("rapor: ham etiket yok (Durum:, Değişmeyen:, [Yeni ·, rdap)", not any(x in r1 for x in ("Durum:", "Değişmeyen:", "[Yeni ·", "Kaynaklar: rdap", "### Dosya")), r1)
+kontrol("rapor: boş bölüm yazılmaz (yok satırı kalmadı)", "- yok" not in r1 and "- veri yok" not in r1 and not re.search(r"\*\*[^*\n]+\*\*\n(?=\*\*|##|###|\n|$)", r1), r1)
+kontrol("rapor: çıplak adres yok (her http adresi [..](..) içinde)", not [m for m in re.finditer(r"https?://", r1) if r1[max(0, m.start() - 2):m.start()] != "]("], r1)
+kontrol("ilk tarama: D dereceli ad benzerliği (Yalıçapkını)", "ad benzerliği" in r1 and "güven D" in r1, r1)
 kontrol("dizin 0700", stat.S_IMODE(os.stat(os.path.join(T, "veri")).st_mode) == 0o700)
 for rr in bulgular(): kontrol("bulgu türü kapalı listede", rr["tur"] in tazi.TURLER, rr["tur"])
 
@@ -219,10 +235,10 @@ kontrol("bayrak: tüzel ad ABR'den farklı", satir("baglanti", "Bayrak: sitedeki
 kontrol("bayrak: ABN alan adından genç (not)", satir("baglanti", "Bayrak: ABN etkin tarihi", KUZ_ID))
 kontrol("bayrak: gizlilik sayfası yalnız olmayanda", satir("baglanti", "gizlilik/şartlar", ORN_ID) and not satir("baglanti", "gizlilik/şartlar", KUZ_ID), str(satir("baglanti", "gizlilik", KUZ_ID)))
 rc, c = run("rapor"); r1 = oku("rapor", f"tazi-{g(ILK)}.md")
-kontrol("rapor: Dosya bölümleri", all(x in r1 for x in ("### Dosya", "Kimlik doğrulama:", "Zaman çizelgesi:", "İddia ve kanıt:", "Çelişkiler ve bayraklar:", "Açık sorular:", "Sıradaki izler:")), r1[-1500:])
+kontrol("rapor: Ayrıntı bölümü başlıkları", "## Ayrıntı" in r1 and "### Örnek Danışmanlık Pty Ltd" in r1 and "**Zaman çizelgesi**" in r1 and "**Taban alınan kayıtlar**" in r1, r1[-1500:])
 kontrol("rapor: zaman çizelgesi otomatik olaylar", "alan adı ornekdanisma.test kaydedildi" in r1 and "ilk arşiv kaydı" in r1 and "ilk sertifika kaydı" in r1 and "GitHub ornekorg kuruldu" in r1, r1)
-kontrol("rapor: bayrak Dosya'da", "Bayrak: sitedeki tüzel ad" in r1, r1)
-kontrol("rapor: Bağlantı haritası", "## Bağlantı haritası" in r1 and "analitik kimliği — G-ABCDEF123" in r1, r1)
+kontrol("rapor: bayrak Dikkat'te", "**Dikkat**" in r1 and "Sitedeki tüzel ad «Parlak Cozum Pty Ltd»" in r1, r1)
+kontrol("rapor: Bağlantı haritası Ayrıntı'nın sonunda", "### Bağlantı haritası" in r1 and "analitik kimliği: G-ABCDEF123" in r1 and r1.index("## Ayrıntı") < r1.index("### Bağlantı haritası") < r1.index("Güven: A resmî"), r1)
 kontrol("rapor: arşiv sayfaları ilk taramada taban özeti", "arşiv kaydı" in r1 or "arşiv" in r1)
 for rr in bulgular(): kontrol("bulgu türü kapalı listede (v2)", rr["tur"] in tazi.TURLER, rr["tur"])
 
@@ -238,17 +254,19 @@ DIG["kuzgun-ornek.test"]["MX"] = ["10 mx1.host.test."]; dig_yaz()
 rc, c = run("tara", TAZI_BUGUN=g(BUG)); kontrol("ikinci tarama çıkışı", rc == 0, c)
 run("degerlendir", "--kim", "Örnek", "--metin", "Danışmanlık alanında ortaklık haberi; iş ilgisi var.", TAZI_BUGUN=g(BUG))
 rc, c = run("rapor", TAZI_BUGUN=g(BUG)); r2 = oku("rapor", f"tazi-{g(BUG)}.md")
-kontrol("rapor2: ad sunucusu Değişti", "[Değişti · A]" in r2 and "ns9.yeni.test" in r2 and "ns2.host.test" in r2, r2)
-kontrol("rapor2: yeni sertifika Yeni", "[Yeni · A]" in r2 and "mail.ornekdanisma.test" in r2, r2)
+kontrol("rapor2: ad sunucusu Değişenler'de", "**Değişenler**" in r2 and "güven A" in r2 and "ns9.yeni.test" in r2 and "ns2.host.test" in r2, r2)
+kontrol("rapor2: yeni sertifika Yeni bulgular'da", "**Yeni bulgular**" in r2 and "mail.ornekdanisma.test" in r2, r2)
 kontrol("rapor2: site metni değişti", "site metni değişti: +1/−1 satır" in r2 and "Yapay zekâ danışmanlığı" in r2, r2)
-kontrol("rapor2: yeni haber B", "[Yeni · B]" in r2 and "yeni ortaklık açıkladı" in r2, r2)
-kontrol("rapor2: MX artık görünmüyor", "[Artık görünmüyor · A]" in r2 and "mx2.host.test" in r2, r2)
+kontrol("rapor2: yeni haber B", "güven B" in r2 and "yeni ortaklık açıkladı" in r2, r2)
+on2 = r2.split("## Öne çıkanlar")[1].split("\n## ")[0]
+kontrol("rapor2: Öne çıkanlar en çok 5 madde, yeni A bulguyu içerir", 1 <= len([l for l in on2.splitlines() if l.startswith("- ")]) <= 5 and "- **Örnek Danışmanlık Pty Ltd**:" in on2 and "(güven A)" in on2, on2)
+kontrol("rapor2: MX artık görünmüyor Ayrıntı'da", "**Artık görünmüyor**" in r2 and "mx2.host.test" in r2 and r2.index("**Artık görünmüyor**") > r2.index("## Ayrıntı"), r2)
 kontrol("rapor2: ABN durumu değişti", "Cancelled" in r2 and "Active from" in r2, r2)
-kontrol("rapor2: değerlendirme", "Değerlendirme: Danışmanlık alanında" in r2, r2)
-kontrol("rapor2: önceki tarama tarihi", "· önceki " in r2 and "· ilk tarama" not in r2, r2)
-kontrol("rapor2: Değişmeyen sayısı", "Değişmeyen:" in r2)
-kontrol("rapor2: taban satırı yok", "İlk tarama" not in r2, r2)
-kontrol("2. tarama: yeni sayfa (sitemap) Yeni", f"yeni sayfa izleniyor: https://{ORN}/kariyer" in r2, r2)
+kontrol("rapor2: değerlendirme kayıt başlığının hemen altında", "**Değerlendirme:** Danışmanlık alanında" in r2 and r2.index("## Örnek Danışmanlık") < r2.index("**Değerlendirme:**") < r2.index("**Yeni bulgular**"), r2)
+kontrol("rapor2: önceki tarama tarihi (Ayrıntı)", "Önceki tarama: " in r2 and "Önceki tarama: yok" not in r2.split("### Örnek Danışmanlık")[1].split("###")[0], r2)
+kontrol("rapor2: Değişmeyen sayısı", "Değişmeyen kayıt sayısı:" in r2)
+kontrol("rapor2: taban satırı yok", "İlk tarama" not in r2.split("### Örnek Danışmanlık")[1].split("###")[0], r2)
+kontrol("2. tarama: yeni sayfa (sitemap) Yeni", f"yeni sayfa izleniyor: [{ORN}](https://{ORN}/kariyer)" in r2, r2)
 kontrol("2. tarama: yeni GitHub deposu Yeni", "yeni/güncellenen depo ornekorg/yeni-arac" in r2, r2)
 kontrol("2. tarama: taban olmayan depo tekrar yazılmadı", "arac-bir" not in r2, r2)
 kontrol("alan adı kaydı: ad sunucusu tek kayıt Değişti", sum(1 for r in bulgular() if r["durum"] == "degisti" and r["alt"].endswith("ad_sunuculari")) == 1)
@@ -259,8 +277,8 @@ rc, c = run("tara", "--kim", "kuzgun", "--kaynak", "rdap,crt", TAZI_BUGUN=g(BUG 
 kontrol("500: tarama sürer", rc == 0, c)
 rc, c = run("rapor", "--tarama", g(BUG + datetime.timedelta(days=1)), TAZI_BUGUN=g(BUG + datetime.timedelta(days=1)))
 r3 = oku("rapor", f"tazi-{g(BUG + datetime.timedelta(days=1))}.md")
-kontrol("500: Okunamayan satırı", "Okunamayan:" in r3 and "HTTP 500" in r3, r3)
-kontrol("500: yanlış Artık görünmüyor yok", "[Artık görünmüyor" not in r3, r3)
+kontrol("500: Okunamayan kaynaklar satırı (Türkçe ad)", "**Okunamayan kaynaklar**" in r3 and "HTTP 500" in r3 and "alan adı kaydı kuzgun-ornek.test (HTTP 500)" in r3 and "rdap:" not in r3, r3)
+kontrol("500: yanlış Artık görünmüyor yok", "**Artık görünmüyor**" not in r3, r3)
 kontrol("500: satırlar kayip işaretlenmedi", not [r for r in bulgular() if r["kayit"] == "kuzgun-surec-pty-ltd" and r["tur"] in ("alan_adi",) and r["durum"] == "kayip"])
 S["rdap_fail"] = S["crt_fail"] = False
 
@@ -328,8 +346,8 @@ rc, c = run("dosya", "--kim", "Ayşe Deneme", "--kapat", str(no_soru), "--sonuc"
 rc, c = run("dosya", "--kim", "Ayşe Deneme", "--kapat", "999"); kontrol("dosya: olmayan öğe", rc == 1, c)
 rc, c = run("dosya", "--kim", "Ayşe Deneme"); kontrol("dosya: kapanan öğe sonucuyla", "kapandı: Ortak Parlak Cozum" in c, c)
 run("rapor", "--tarama", g(BUG), TAZI_BUGUN=g(BUG)); r2 = oku("rapor", f"tazi-{g(BUG)}.md")
-kontrol("rapor: dosya kimlik hükmü, soru kapandı, açık iz kaldı", "Kimlik doğrulama: Son hüküm" in r2 and "Hibe veritabanında ara" in r2 and "Ortak firma kim?" not in r2.split("## Örnek Danışmanlık")[1].split("Açık sorular:")[1].split("Sıradaki izler:")[0], r2[-2500:])
-kontrol("rapor: dosya zaman öğesi ve bayrak", "2024-05-06 — Danışmanlık işine" in r2 and "İki ayrı adres beyanı var" in r2 and "Kendini kurucu" in r2, r2)
+kontrol("rapor: dosya kimlik hükmü, soru kapandı, açık iz kaldı", "**Kim:** Son hüküm" in r2 and "Hibe veritabanında ara" in r2 and "Ortak firma kim?" not in r2 and "**Açık sorular**" not in r2.split("## Örnek Danışmanlık")[1].split("## ")[0], r2[-2500:])
+kontrol("rapor: dosya zaman öğesi ve bayrak", "6 May 2024 · Danışmanlık işine" in r2 and "İki ayrı adres beyanı var" in r2 and "Kendini kurucu" in r2, r2)
 rc, c = run("ozet", "--kim", "Ayşe Deneme", TAZI_BUGUN=g(BUG)); kontrol("ozet: ≤ 8 satır, kimlik hükmü, bayrak sayısı", rc == 0 and len(c.strip().splitlines()) <= 8 and "Kimlik: Son hüküm" in c and "Açık bayrak:" in c, c)
 rc, c = run("ozet", "--kim", KUZ_ID, TAZI_BUGUN=g(BUG)); kontrol("ozet: bayrak satırı (otomatik)", "Açık bayrak:" in c and len(c.strip().splitlines()) <= 8, c)
 rc, c = run("ekle", "--kim", "Ayşe Deneme", "--tur", "gonderi", "--platform", "x", "--ozet", "X: etkinlik duyurusu", "--kaynak", "https://x.com/ornekfirma/status/777"); kontrol("ekle: platform x", rc == 0, c)
