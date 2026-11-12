@@ -7,14 +7,18 @@
 # acil olmayanlar arasında en az aralık (ayar soz_aralik_dk, 20) · günlük bütçe (soz_gunluk_butce, 6). Öncelik 0 bilgi · 1 normal · 2 önemli · 3 acil:
 #   3: yalnız gizli kip durdurur (bütçeyi, aralığı, sessiz modu, mesaiyi aşar) · 2: gece/mesai atlanır ama toplantı, sessiz mod, aralık, bütçe geçerli · 0–1: hepsi geçerli.
 # Aynı anahtar soz_tekrar_dk (360) içinde ikinci kez sunulmaz. Kaynağa özgü sınırlar (gün içi önerinin günde 3'ü, 90 dk aralığı, e-postanın sessiz saatleri) kaynakta kalır.
-# "sonra": bellekte + canli/soz-kuyruk.json'da bekler, dakikalık döngü yeniden değerlendirir, gecerli_sn dolunca düşer (soz.jsonl'de "gecti"). Yeniden başlayınca kuyruktaki öğeler varsayılan bildirimle teslim edilir.
+# "sonra": bellekte + canli/soz-kuyruk.json'da bekler, dakikalık döngü yeniden değerlendirir, gecerli_sn dolunca düşer (soz.jsonl'de "gecti"). Yeniden başlayınca kuyruktaki öğeler varsayılan bildirimle teslim edilir
+# (doğrulaması olanlar hariç: aşağıda G1).
 # Kayıt canli/soz.jsonl (yalnız eklenir; METİN YOK, anahtar yalnız kaynak+anahtar özeti): sunuldu · teslim · gecti · iptal · bastirildi · sonuc (kabul|ret|ertele|yoksay).
 # Sunulup kaynağın kendi süresi içinde işlem görmeyen söz otomatik "yoksay" olur. Kullanıcı işlemleri kaynak uçlarından soz_sonuc(ref, sonuc) ile bağlanır; ref = söz kimliği | anahtar | "kaynak:<ad>" (o kaynağın son sunulan, sonuçsuz sözü).
+# Teslimden önce doğrulama (zekâ G1, 12 Kasım): soz_aday(…, dogrula=f) — f() teslimden HEMEN önce (kilit dışında) çağrılır; False dönerse söz kullanıcıya gitmez, soz.jsonl'e "bastirildi" neden "bayat"
+#   düşer (günlük bastırılan + "bayat" sayacı; /status soz.bayat). f hata verirse ya da None/True dönerse söz eskisi gibi teslim edilir (sessizce yutulmaz). Kuyruk dosyasına yalnız "dogrula": true işareti
+#   yazılır (işlev saklanamaz): yeniden başlatmada doğrulaması olan söz eski metinle teslim EDİLMEZ, "bastirildi" neden "bayat: yeniden başlatma" ile düşer (kaynak gerekirse yeniden aday üretir).
 # Ayarlar (yalnız ayar.json; ⚙ Ayarlar'da yok): soz_aralik_dk, soz_gunluk_butce, soz_tekrar_dk, soz_gece (false kapatır), soz_gece_bas (22), soz_gece_bit (7). Ölçüm: olcum.py isabet. /status "soz".
 import hashlib
 
 SOZ_DOSYA, SOZ_KUYRUK_DOSYA = "soz.jsonl", "soz-kuyruk.json"
-SOZK = {"kuyrukta_teslim": False, "kuyruk": [], "son": {}, "tekrar": {}, "bekle": {}, "gun": {"tarih": "", "teslim": 0, "bastirilan": 0}, "son_t": 0.0, "n": 0, "dongu": False, "bekleyen_yaz": []}
+SOZK = {"kuyrukta_teslim": False, "kuyruk": [], "son": {}, "tekrar": {}, "bekle": {}, "gun": {"tarih": "", "teslim": 0, "bastirilan": 0, "bayat": 0}, "son_t": 0.0, "n": 0, "dongu": False, "bekleyen_yaz": []}
 SOZ_KILIT = threading.RLock()
 _BILDIRIM_YEREL = globals().get("_BILDIRIM_YEREL") or threading.local()  # relay.py tanımlar; yalıtılmış testte burada
 SOZ_SAAT = globals().get("SOZ_SAAT") or time.time  # testlerde sahte saat (önceden tanımlıysa korunur)
@@ -45,14 +49,14 @@ def _soz_yaz(r):  # yalnız eklenir; LOCK alınamazsa (başka iş tutuyor) belle
 def _soz_kuyruk_yaz():
     if not SOZK["kuyruk"] and not os.path.exists(_soz_yol(SOZ_KUYRUK_DOSYA)): return  # hiç kuyruk olmadıysa dosya da açılmaz
     try:
-        v = [{k: q[k] for k in ("id", "kaynak", "h", "oncelik", "kip", "bitis", "t0", "metin", "ek")} for q in SOZK["kuyruk"]]
+        v = [dict({k: q[k] for k in ("id", "kaynak", "h", "oncelik", "kip", "bitis", "t0", "metin", "ek")}, **({"dogrula": True} if q.get("dogrula_f") or q.get("dogrula") else {})) for q in SOZK["kuyruk"]]
         with open(_soz_yol(SOZ_KUYRUK_DOSYA) + ".tmp", "w", encoding="utf-8") as f: json.dump(v, f, ensure_ascii=False)
         os.replace(_soz_yol(SOZ_KUYRUK_DOSYA) + ".tmp", _soz_yol(SOZ_KUYRUK_DOSYA))
     except OSError: pass
 
 def _soz_gun(simdi):
     tarih = datetime.date.fromtimestamp(simdi).isoformat(); g = SOZK["gun"]
-    if g["tarih"] != tarih: g.update(tarih=tarih, teslim=0, bastirilan=0)
+    if g["tarih"] != tarih: g.update(tarih=tarih, teslim=0, bastirilan=0, bayat=0)
 
 def _soz_mesai(simdi):  # ayar calisma_saatleri (varsayılan Pzt–Cum 09:00–18:00)
     try: g, b, e = calisma_saatleri()
@@ -83,6 +87,13 @@ def _soz_engel(kaynak, oncelik, kip, ek, simdi):  # → None (şimdi sunulabilir
 def _soz_varsayilan(r):  # teslim işlevi verilmeyen (ya da yeniden başlatmadan sonra kuyruktan gelen) söz: menü bildirimi
     bildirim("Suflor.me", _t(*SOZ_BASLIK.get(r["kaynak"], ("Suflor.me", "Suflor.me"))), r.get("metin") or "")
 
+def _soz_dogrula(r):  # kilit DIŞINDA, teslimden hemen önce → False (bayat: teslim edilmez) | True. İşlev yoksa True; yeniden başlatmadan gelen "dogrula" işaretli söz (işlevi kayıp) False
+    f = r.get("dogrula_f")
+    if f is None: return not r.get("dogrula")
+    try: return f() is not False
+    except Exception as e: print(f"SÖZ: doğrulama hatası ({r['kaynak']}: {e.__class__.__name__}) — söz teslim edilir"); return True
+def _soz_bayat(r, simdi, neden="bayat"):  # kilit içinde: doğrulamada düşen söz
+    SOZK["gun"]["bastirilan"] += 1; SOZK["gun"]["bayat"] = SOZK["gun"].get("bayat", 0) + 1; _soz_kayit("bastirildi", r, simdi, neden=neden)
 def _soz_teslim_et(r):  # kilit DIŞINDA; teslim işlevi False dönerse söz iptal sayılır
     f = r.get("teslim_f")
     _BILDIRIM_YEREL.asistan = r["kaynak"] != "sistem"  # 10 Kasım: söz kapısından geçen her şey asistanın adıyla (sistem uyarısı Suflor.me)
@@ -103,8 +114,9 @@ def _soz_son_tut(r):
     if len(SOZK["son"]) > 300:
         for k in sorted(SOZK["son"], key=lambda i: SOZK["son"][i]["t"])[:50]: SOZK["son"].pop(k, None)
 
-def soz_aday(kaynak, metin, *, anahtar, oncelik=1, kip="bildir", teslim=None, gecerli_sn=None, ek=None, simdi=None):
+def soz_aday(kaynak, metin, *, anahtar, oncelik=1, kip="bildir", teslim=None, gecerli_sn=None, ek=None, simdi=None, dogrula=None):
     # kaynak: "gun_ici" | "toplanti_sonrasi" | "toplanti_hatirlat" | "eposta" | "kisisel_tarih" | "sistem" … · teslim: bugünkü teslim işlevi (bildirim/ses/pano durumu; argümansız) · simdi: yalnız testler
+    # dogrula: isteğe bağlı, argümansız; teslimden hemen önce "bu söz hâlâ doğru mu" (False → bastırıldı: bayat; hata/None → teslim)
     # → {"id", "karar": "simdi" | "sonra" | "bastirildi", "neden"}; "simdi"de teslim bu çağrıda çalıştı
     simdi = float(simdi) if simdi else float(SOZ_SAAT())
     try: oncelik = max(0, min(3, int(oncelik)))
@@ -124,7 +136,7 @@ def soz_aday(kaynak, metin, *, anahtar, oncelik=1, kip="bildir", teslim=None, ge
         if t0 is not None and simdi - t0[0] < _soz_say("soz_tekrar_dk", 360, 0, 10080) * 60: return {"id": t0[1], "karar": "bastirildi", "neden": "tekrar"}
         SOZK["n"] += 1
         r = {"id": "z" + str(int(simdi * 1000)) + "%02d" % (SOZK["n"] % 100), "kaynak": str(kaynak), "anahtar": str(anahtar), "h": h, "oncelik": oncelik, "kip": kip, "metin": str(metin or ""), "ek": ek,
-             "teslim_f": teslim, "t": simdi, "t0": simdi, "bitis": simdi + gecerli, "sonuc": None, "teslim_edildi": False}
+             "teslim_f": teslim, "dogrula_f": dogrula if callable(dogrula) else None, "t": simdi, "t0": simdi, "bitis": simdi + gecerli, "sonuc": None, "teslim_edildi": False}
         e = _soz_engel(kaynak, oncelik, kip, ek, simdi)
         _soz_son_tut(r)
         if e is None:
@@ -137,6 +149,10 @@ def soz_aday(kaynak, metin, *, anahtar, oncelik=1, kip="bildir", teslim=None, ge
             SOZK["tekrar"][h] = (simdi, r["id"]); SOZK["gun"]["bastirilan"] += 1
             _soz_kayit("sunuldu", r, simdi, oncelik=oncelik, kip=kip, karar="bastirildi", neden=e[1])
             return {"id": r["id"], "karar": "bastirildi", "neden": e[1]}
+    if not _soz_dogrula(r):  # teslimden hemen önce kaynağa yeniden bak (G1); tekrar kaydı kalır: aynı bayat söz soz_tekrar_dk içinde yeniden doğrulanmaz
+        with SOZ_KILIT:
+            SOZK["gun"]["teslim"] = max(0, SOZK["gun"]["teslim"] - 1); SOZK["bekle"].pop(r["id"], None); r["teslim_edildi"] = False; _soz_bayat(r, simdi)
+        return {"id": r["id"], "karar": "bastirildi", "neden": "bayat"}
     if not _soz_teslim_et(r):
         with SOZ_KILIT:
             SOZK["gun"]["teslim"] = max(0, SOZK["gun"]["teslim"] - 1); SOZK["bekle"].pop(r["id"], None); SOZK["tekrar"].pop(h, None); r["teslim_edildi"] = False
@@ -144,19 +160,32 @@ def soz_aday(kaynak, metin, *, anahtar, oncelik=1, kip="bildir", teslim=None, ge
         return {"id": r["id"], "karar": "bastirildi", "neden": "teslim iptal"}
     return {"id": r["id"], "karar": "simdi", "neden": ""}
 
-def soz_tur(simdi=None):  # dakikalık: kuyruğu yeniden değerlendir, süresi dolanı düşür, sonuç gelmeyeni otomatik yoksay say → {"teslim", "gecti", "yoksay"}
-    simdi = float(simdi) if simdi else float(SOZ_SAAT()); out = {"teslim": 0, "gecti": 0, "yoksay": 0, "bastirildi": 0}; teslimler = []
+def soz_tur(simdi=None):  # dakikalık: kuyruğu yeniden değerlendir, süresi dolanı düşür, teslimden önce doğrula (G1), sonuç gelmeyeni otomatik yoksay say → {"teslim", "gecti", "yoksay", "bastirildi", "bayat"}
+    simdi = float(simdi) if simdi else float(SOZ_SAAT()); out = {"teslim": 0, "gecti": 0, "yoksay": 0, "bastirildi": 0, "bayat": 0}; teslimler = []; denendi = set()
     if gizli_acik(): return out  # gizli kipte kuyruk bekler, hiçbir şey yazılmaz
     with SOZ_KILIT:
         _soz_gun(simdi)
         for q in [q for q in SOZK["kuyruk"] if simdi > q["bitis"]]:
             SOZK["kuyruk"].remove(q); _soz_kayit("gecti", q, simdi); out["gecti"] += 1
-        for q in sorted(list(SOZK["kuyruk"]), key=lambda q: (-q["oncelik"], q["t0"])):
-            e = _soz_engel(q["kaynak"], q["oncelik"], q["kip"], q.get("ek") or {}, simdi)
-            if e is None:
-                SOZK["kuyruk"].remove(q); _soz_sayac(q, simdi); _soz_kayit("teslim", q, simdi, bekleme_sn=round(simdi - q["t0"])); teslimler.append(q); out["teslim"] += 1
-            elif e[0] == "bastirildi":
-                SOZK["kuyruk"].remove(q); SOZK["gun"]["bastirilan"] += 1; _soz_kayit("bastirildi", q, simdi, neden=e[1]); out["bastirildi"] += 1
+    while True:  # sırayla: engeli kalkan ilk söz → (kilit dışında) doğrula → teslim ya da bayat; teslim aralığı ve bütçe sonraki sözü yeniden etkiler
+        q = None
+        with SOZ_KILIT:
+            for c in sorted(list(SOZK["kuyruk"]), key=lambda q: (-q["oncelik"], q["t0"])):
+                if c["id"] in denendi: continue
+                e = _soz_engel(c["kaynak"], c["oncelik"], c["kip"], c.get("ek") or {}, simdi)
+                if e is None: q = c; break
+                if e[0] == "bastirildi":
+                    SOZK["kuyruk"].remove(c); SOZK["gun"]["bastirilan"] += 1; _soz_kayit("bastirildi", c, simdi, neden=e[1]); out["bastirildi"] += 1
+        if q is None: break
+        denendi.add(q["id"]); SOZK["kuyrukta_teslim"] = True  # doğrulama işlevi de soz_simdi ile şimdiki saati görür
+        try: gecerli = _soz_dogrula(q)
+        finally: SOZK["kuyrukta_teslim"] = False
+        with SOZ_KILIT:
+            if q not in SOZK["kuyruk"]: continue  # arada sonuçlandı (soz_sonuc)
+            SOZK["kuyruk"].remove(q)
+            if not gecerli: _soz_bayat(q, simdi); out["bastirildi"] += 1; out["bayat"] += 1; continue
+            _soz_sayac(q, simdi); _soz_kayit("teslim", q, simdi, bekleme_sn=round(simdi - q["t0"])); teslimler.append(q); out["teslim"] += 1
+    with SOZ_KILIT:
         for i, bit in [(i, b) for i, b in SOZK["bekle"].items() if simdi >= b]:
             SOZK["bekle"].pop(i, None); r = SOZK["son"].get(i)
             if r and not r.get("sonuc"): r["sonuc"] = "yoksay"; _soz_kayit("sonuc", r, simdi, sonuc="yoksay", otomatik=True); out["yoksay"] += 1
@@ -191,10 +220,10 @@ def soz_sonuc(ref, sonuc, simdi=None):  # kullanıcı işlemi: kabul | ret | ert
     except Exception as e: print(f"SÖZ: sonuç yazılamadı ({e.__class__.__name__})"); return {"ok": False, "neden": "hata"}
 def soz_view():  # /status "soz"
     g = SOZK["gun"]
-    return {"sunulan": g["teslim"], "bastirilan": g["bastirilan"], "kuyruk": len(SOZK["kuyruk"]), "butce": soz_butce(), "kalan": max(0, soz_butce() - g["teslim"])}
+    return {"sunulan": g["teslim"], "bastirilan": g["bastirilan"], "bayat": g.get("bayat", 0), "kuyruk": len(SOZK["kuyruk"]), "butce": soz_butce(), "kalan": max(0, soz_butce() - g["teslim"])}
 
 def _soz_yukle():  # açılışta: son kayıtlardan tekrar önleme, günlük sayaç, sonuçsuz sözler; kuyruk dosyasından bekleyenler (varsayılan bildirimle teslim edilir)
-    simdi = float(SOZ_SAAT()); _soz_gun(simdi)
+    simdi = float(SOZ_SAAT()); _soz_gun(simdi); dustu = False
     try:
         with open(_soz_yol(SOZ_DOSYA), encoding="utf-8") as f: satirlar = f.readlines()[-600:]
     except OSError: satirlar = []
@@ -214,6 +243,9 @@ def _soz_yukle():  # açılışta: son kayıtlardan tekrar önleme, günlük say
                 if r.get("z", "")[:10] == bugun: SOZK["gun"]["teslim"] += 1
                 if s["oncelik"] < 3: SOZK["son_t"] = max(SOZK["son_t"], t)
             elif r.get("karar") == "bastirildi" and r.get("z", "")[:10] == bugun: SOZK["gun"]["bastirilan"] += 1
+        elif o == "bastirildi" and r.get("z", "")[:10] == bugun:  # kuyruktan ya da doğrulamada düşen (sunuldu satırı ayrı)
+            SOZK["gun"]["bastirilan"] += 1
+            if str(r.get("neden") or "").startswith("bayat"): SOZK["gun"]["bayat"] = SOZK["gun"].get("bayat", 0) + 1
         elif o == "teslim" and s:
             s["teslim_edildi"] = True
             if r.get("z", "")[:10] == bugun: SOZK["gun"]["teslim"] += 1
@@ -227,8 +259,12 @@ def _soz_yukle():  # açılışta: son kayıtlardan tekrar önleme, günlük say
         with open(_soz_yol(SOZ_KUYRUK_DOSYA), encoding="utf-8") as f: v = json.load(f)
         for q in v if isinstance(v, list) else []:
             if isinstance(q, dict) and q.get("id") and float(q.get("bitis") or 0) > simdi:
-                q = dict(q, teslim_f=None, t=float(q.get("t0") or simdi), sonuc=None, teslim_edildi=False, anahtar=""); SOZK["kuyruk"].append(q); SOZK["son"].setdefault(q["id"], q)
+                q = dict(q, teslim_f=None, dogrula_f=None, t=float(q.get("t0") or simdi), sonuc=None, teslim_edildi=False, anahtar="")
+                if q.get("dogrula"):  # G1: doğrulama işlevi yeniden başlatmada kayboldu — eski metinle teslim edilmez
+                    _soz_bayat(q, simdi, "bayat: yeniden başlatma"); SOZK["son"].setdefault(q["id"], q); dustu = True; continue
+                SOZK["kuyruk"].append(q); SOZK["son"].setdefault(q["id"], q)
     except (OSError, ValueError, TypeError): pass
+    if dustu: _soz_kuyruk_yaz()
 
 def _soz_dongu():
     while True:

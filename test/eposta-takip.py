@@ -114,6 +114,15 @@ ok("kapı: yeni önemli ileti kapıdan geçer (bildirim bugünkü gibi), kayıtt
 _sol["sessiz"] = True; NS["POSTA"]["iletiler"] += [m(15, A("selin"), "Teklif?", 0, ad="Selin Deneme", ozet="acil cevap lazım")]; N("et_tara")(zorla=True, simdi=SIMDI)
 ok("kapı: sessiz modda e-posta bildirimi bekler (işaretlenmez, kuyrukta)", len(BILDIRIM) == b0 + 1 and NS["soz_view"]()["kuyruk"] == 1)
 _sol["sessiz"] = False; _sz += 60; NS["soz_tur"](); ok("kapı: sessiz mod kalkınca dakikalık tur teslim eder", len(BILDIRIM) == b0 + 2 and NS["soz_view"]()["kuyruk"] == 0)
+# G1: kuyrukta beklerken kullanıcı cevapladıysa (zincirde sonradan giden ileti) söz bayat düşer, bildirilen işaretlenmez; cevaplanmamışsa teslim
+_sol["sessiz"] = True; NS["POSTA"]["iletiler"] += [m(16, A("selin"), "Kontrat?", 0, ad="Selin Deneme", ozet="acil cevap lazım")]; N("et_tara")(zorla=True, simdi=SIMDI)
+ok("G1 kapı: yeni ileti kuyrukta, et_hala_bekliyor şu an True", NS["soz_view"]()["kuyruk"] == 1 and N("et_hala_bekliyor")(["o16"], SIMDI) is True)
+NS["POSTA"]["iletiler"] += [s(17, [A("selin")], "Re: Kontrat?", 0)]; NS["POSTA"]["iletiler"][-1]["t"] = (SIMDI + datetime.timedelta(minutes=1)).isoformat()
+_sol["sessiz"] = False; _sz += 60; b1 = len(BILDIRIM); tr_ = NS["soz_tur"]()
+ok("G1 kapı: cevaplanan zincirin sözü teslimde düşer (bildirim yok, bastirildi: bayat, bildirilen işaretlenmedi)", len(BILDIRIM) == b1 and tr_["bayat"] == 1 and sj()[-1]["olay"] == "bastirildi"
+   and sj()[-1]["neden"] == "bayat" and "o16" not in N("et_durum")()["bildirilen"] and N("et_hala_bekliyor")(["o16"], SIMDI) is False)
+NS["POSTA"]["iletiler"] = NS["POSTA"]["iletiler"][:-2]
+ok("G1: posta okunamıyorsa karar verilmez (None → teslim)", (lambda p_: (NS["POSTA"].update(iletiler=[]), N("et_hala_bekliyor")(["o1"]), NS["POSTA"].update(iletiler=p_))[1])(list(NS["POSTA"]["iletiler"])) is None)
 r_ = N("et_islem")({"islem": "ertele", "id": "14"}); ok("kapı: ertele düğmesi → sonuç ertele", r_.get("ok") is True and sj()[-1]["olay"] == "sonuc" and sj()[-1]["sonuc"] == "ertele" and sj()[-1]["kaynak"] == "eposta")
 r_ = N("et_islem")({"islem": "yoksay", "id": "15"}); ok("kapı: yoksay düğmesi → sonuç ret", r_.get("ok") is True and sj()[-1]["sonuc"] == "ret")
 for k_ in [k_ for k_ in NS if k_.startswith(("soz", "SOZ", "_soz")) and k_ != "_soz_sonuc_g"]: del NS[k_]  # sonraki bölümler kapısız (eski) yolu sınar
@@ -158,6 +167,25 @@ NS["AYAR"]["eposta_sessiz"] = ""; ok("sessiz saat boşsa yok", not N("et_sessiz_
 
 # --- Yalıtılmış aktarıcıda uçlar (sahte posta.json; claude yok, ağ yok) ----------------------------------------------------------------------------------
 from bosport import bos_port
+
+# 12 Kasım: cevap farklı conversation_id'li zincirde (Gmail All Mail; Re:/YNT:/AW:) ya da başka hesaptan/istemciden gitmiş → "cevap bekliyor" kalmaz
+def bekleyen_idler(iletiler, vip=True):
+    c = N("et_analiz")(iletiler, SIMDI, kisiler={A("pat"), A("kaan")}, kayit_kelime=[], durum={"yoksay": {}, "ertele": {}, "zd": {}}, beklenen=False)
+    return [o["id"] for o in c["bekleyen"]]
+def mz(id_, adres, konu, g, zincir, **k): return m(id_, adres, konu, g, zincir=zincir, ozet="Görüşün nedir? Onaylar mısın", **k)
+def sz(id_, alici, konu, g, zincir, kutu="imap://Y/Sent"): return dict(s(id_, alici, konu, g), zincir=zincir, kutu=kutu)
+ok("temel: yalnız gelen, soru var → bekliyor", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 2, 11)]) == ["101"])
+ok("aynı zincir id'sinde cevap → beklemez", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 2, 11), sz(102, [A("pat")], "Re: Bütçe onayı", 1, 11)]) == [])
+ok("FARKLI conversation_id + Re: → beklemez (kök neden)", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 2, 11), sz(102, [A("pat")], "Re: Bütçe onayı", 1, 99)]) == [])
+ok("FARKLI conversation_id + YNT: → beklemez", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 2, 11), sz(102, [A("pat")], "YNT: Bütçe onayı", 1, 99)]) == [])
+ok("FARKLI conversation_id + AW: başka hesap/kutu (Sent Items) → beklemez", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 2, 11), sz(102, [A("pat")], "AW: Bütçe onayı", 1, 99, kutu="imap://Outlook/Sent%20Items")]) == [])
+ok("cevap ve karşıdan sonra yeni ileti: cevaplı zincir kapanmış (bekleme biter)", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 3, 11), sz(102, [A("pat")], "Re: Bütçe onayı", 2, 99), m(103, A("pat"), "Re: Bütçe onayı", 1, zincir=99, ozet="Teşekkürler")]) == [])
+ok("cevaptan SONRA karşıdan yeni soru gelirse yine bekler", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 3, 11), sz(102, [A("pat")], "Re: Bütçe onayı", 2, 99), mz(103, A("pat"), "Re: Bütçe onayı", 1, 99)]) == ["103"])
+ok("başka konu başlığı birleşmez (cevap sayılmaz), ama neden notu düşer", (lambda c: [o["id"] for o in c["bekleyen"]] == ["101"] and "başka konuda" in c["bekleyen"][0]["neden"])(N("et_analiz")([mz(101, A("pat"), "Bütçe onayı", 2, 11), sz(102, [A("pat")], "Lansman planı", 1, 99)], SIMDI, kisiler={A("pat")}, kayit_kelime=[], durum={"yoksay": {}, "ertele": {}, "zd": {}}, beklenen=False)))
+ok("aynı konu ama başka kişiye yazılan cevap birleşmez", bekleyen_idler([mz(101, A("pat"), "Bütçe onayı", 2, 11), sz(102, [A("kaan")], "Re: Bütçe onayı", 1, 99)]) == ["101"])
+ok("References/Re: öneki: kısa/ortak konu ('Merhaba') birleşmez", bekleyen_idler([mz(101, A("pat"), "Hi", 2, 11), sz(102, [A("pat")], "Re: Hi", 1, 99)]) == ["101"])
+ok("15+ gün arayla aynı konu birleşmez", N("et_zincirler")([mz(101, A("pat"), "Bütçe onayı", 20, 11), sz(102, [A("pat")], "Re: Bütçe onayı", 1, 99)]) and len(set(N("et_zincirler")([mz(101, A("pat"), "Bütçe onayı", 20, 11), sz(102, [A("pat")], "Re: Bütçe onayı", 1, 99)]).values())) == 2)
+
 U = tempfile.mkdtemp(prefix="etakip-uc-")
 for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py"): shutil.copy(os.path.join(KOD, f), U)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(U, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(U, "pano"))

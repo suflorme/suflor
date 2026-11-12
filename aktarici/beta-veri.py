@@ -16,6 +16,19 @@ def _kul_yukle():  # kullanim.py aktarıcının yanında (kurulum.py KOPYA); yal
             sp = importlib.util.spec_from_file_location("kullanim", y); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
     return None
 _KUL = _kul_yukle()
+def _zeka_yukle():  # zeka.py (kurulum.py KOPYA) — haftalık pakette yalnız sayı: işlev puanları ve kullanıcının 1–5 puanları
+    import importlib.util
+    for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or "")), os.path.dirname(os.path.dirname(os.path.abspath(__file__)))):
+        y = os.path.join(d, "zeka.py")
+        if d and os.path.isfile(y):
+            try: sp = importlib.util.spec_from_file_location("zeka_beta", y); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
+            except Exception: return None
+    return None
+_ZK = _zeka_yukle()
+def _beta_zeka(bas, son):
+    if not _ZK: return None
+    try: return _ZK.beta_ozet(BASE, bas, son)
+    except Exception: return None
 
 BETA_FP = os.path.join(BASE, "beta-olay.json")
 BETA = {"olay": [], "toplanti": {}, "hafta": [], "yazildi": 0.0}
@@ -189,7 +202,7 @@ def beta_haftalik_paket(ad):
             "kalite": {"konus": _beta_konus(kon), "hitap_yinelenen": o["hitap_yinelenen"], "zaman_asimi": o["zaman_asimi"], "acilis": beta_say("acilis", bas, son),
                        "hata": o["hata"], "sorun": o["sorun"], "sistem": _beta_sistem(bas, son), "bilgi": _beta_bilgi(bas, son)},
             "maliyet": _beta_maliyet(bas, son, sum(sure)), "profil": _beta_profil(), "whisper_cpp": _beta_cpp(bas, son),
-            "proje": teshis.proje_olcu(AYAR.get("proje"), AYAR["uygulama"]), "proje_vt": _beta_proje_vt()}  # klasör türü + son taramanın sayıları (klasör değişebilir)
+            "proje": teshis.proje_olcu(AYAR.get("proje"), AYAR["uygulama"]), "proje_vt": _beta_proje_vt(), "zeka": _beta_zeka(bas, son)}  # klasör türü + son taramanın sayıları (klasör değişebilir)
 def _beta_haftalik():
     simdi = datetime.datetime.now()
     ad = _KUL.hafta_adi(simdi) if BETA_TEST else _KUL.hafta_adi(simdi - datetime.timedelta(days=7))  # biten hafta

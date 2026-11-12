@@ -183,4 +183,13 @@ gelen.clear(); ens["eylem_model"]("ISTEM-GOVDE", amac="kayit", maske=lambda t: t
 ns["GIZLI"]["acik"] = True; gelen.clear(); ens["eylem_model"]("ISTEM-GOVDE", amac="kayit"); ns["GIZLI"]["acik"] = False
 ok("gizli kipte paket yine yalnız profil/öğrenilen (içerik yok)", "[Bugün" not in gelen[0] and "[Notlar" not in gelen[0])
 
+# G2/G5 (12 Kasım): iş satırında yaş, son değişiklik ve tek durum kapısının teyit uyarısı; durumu belirsiz kayıt sayısı açık işler diliminde
+ok("G5 is_etiket: vade + yaş + son değişiklik; teyit_et → 'durumu belirsiz, teyit et'", ns["is_etiket"]({"gecikti": True, "kalan_gun": -3, "yas": 12, "tarih": "2026-11-01", "son_degisiklik": "2026-11-05"}) == "gecikti 3 g; 12 g önce kaydedildi, son değişiklik 2026-11-05"
+   and ns["is_etiket"]({"kalan_gun": None, "yas": 40, "tarih": "2026-10-01", "son_degisiklik": "2026-10-01", "teyit_et": True}) == "40 g önce kaydedildi; durumu belirsiz, teyit et" and ns["is_etiket"]({}) == "")
+_bv = SahteYapi.bugun_veri
+SahteYapi.bugun_veri = lambda self, b, a: {"kendi": [{"metin": "Teklifi gönder", "gecikti": True, "kalan_gun": -2, "yas": 4}, {"metin": "Eski", "geride": True, "teyit_et": True}],
+                                           "baskalari": [{"kim": "Deniz", "metin": "x", "teyit_et": True}], "teyit": []}
+_r = ns["_km_isler"](simdi); _m = ns["_km_isler_metni"](simdi, 2000)
+ok("G2 _km_isler: satırda yaş, durumu belirsiz sayısı (geride + başkasında) ayrı; bağlam dilimi 'açık iş diye sunma' der", _r[0] == ["- Teklifi gönder (gecikti 2 g; 4 g önce kaydedildi)"] and _r[4] == 2 and "Durumu belirsiz" in _m and "teyit et" in _m)
+SahteYapi.bugun_veri = _bv
 print(f"\n{sum(1 for h in hata if not h)} geçti, {sum(hata)} kaldı"); sys.exit(1 if any(hata) else 0)

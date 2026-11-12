@@ -26,7 +26,9 @@ DG_ONB_SN, DG_ONB_KISA_SN, DG_ONB_EN_COK, DG_ADAY_EN_COK, DG_HATA_SN, DG_BELGE_A
 DG_ADRES = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
 DG_ILKE = ("Az ama doğru: kullanıcının zamanını ve dikkatini gerçekten ilgilendirmeyen şeye 'gec' de; ama kullanıcının işini, taahhüdünü ya da bir başkasının beklediği bir şeyi etkileyen "
            "konuyu kaçırma. Kararını adayın kendi içeriğine, kullanıcının profiline/işlerine ve aşağıdaki son tepkilerine dayandır; uydurma, içeriği olmayan bilgiyi tahmin etme. "
-           "Kullanıcının sürekli yoksaydığı ya da reddettiği türden şeyleri susturmaya, kabul ettiği türden olanları öne almaya eğil.")
+           "Kullanıcının sürekli yoksaydığı ya da reddettiği türden şeyleri susturmaya, kabul ettiği türden olanları öne almaya eğil. "
+           "Kaynak önceliği: açık ve güncel kaynak (davetteki gündem, zincirin son iletisi, kullanıcının son sözü) eski kayıttan yapılan çıkarımı ezer; kaydın tarihi ya da son değişikliği eskiyse "
+           "ya da 'durumu belirsiz' işaretliyse kesin konuşma, 'teyit et' de. Başka toplantıya ait kaydı bu toplantının konusu gibi sunma.")
 DG_SEMA = {
     "gun_ici": {"kararlar": ("soyle", "sonra", "gec"), "yedek": "soyle", "soz_kaynak": "gun_ici", "soz_oncelik_tavan": 1, "kisa": ("sonra",), "metin": True,
                 "tanim": {"soyle": "şimdi, tek kısa öneri olarak kullanıcıya söylenmeye değer", "sonra": "değerli ama şimdi değil (kullanıcı şu an başka şeyle meşgul olabilir ya da biraz sonra daha yerinde olur)",

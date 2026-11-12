@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 679416,
-   "sha": "4127556f35ba97ba"
+   "uzunluk": 683860,
+   "sha": "bdccfab49ea7f191"
   },
   "/mini": {
-   "uzunluk": 679416,
-   "sha": "4127556f35ba97ba"
+   "uzunluk": 683860,
+   "sha": "bdccfab49ea7f191"
   },
   "/status": {
    "_ping_son": "float",
@@ -767,6 +767,7 @@
    "soyle_web": "NoneType",
    "soz": {
     "bastirilan": "int",
+    "bayat": "int",
     "butce": "int",
     "kalan": "int",
     "kuyruk": "int",

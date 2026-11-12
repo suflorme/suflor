@@ -192,14 +192,25 @@ def _km_notlar():  # notlar defteri: son KM_NOT_GUN gün, yeni önce → [(at, m
     except Exception: ls = []
     sin = (datetime.datetime.now() - datetime.timedelta(days=KM_NOT_GUN)).isoformat(timespec="seconds")
     return sorted(((str(o.get("at") or ""), " ".join(str(o.get("metin") or "").split())) for o in ls if str(o.get("at") or "")[:19] >= sin), reverse=True)
-def _km_isler(simdi):  # yapi.bugun_veri (yapi.py'ye dokunmadan) → (bugün/geciken satırları, diğer açık işler, teyit sayısı, başkasında bekleyen sayısı)
+def is_yas(x):  # G5 (12 Kasım): iş satırının yaşı ve son değişikliği — model tarihi görmeden bayatlığı bilemez: "12 g önce kaydedildi, son değişiklik 1 Kas" | ""
+    p = []
+    if x.get("yas") is not None: p.append(_t(f"{x['yas']} g önce kaydedildi", f"recorded {x['yas']}d ago"))
+    sd = str(x.get("son_degisiklik") or "")[:10]
+    if sd and sd != str(x.get("tarih") or "")[:10]: p.append(_t("son değişiklik ", "last change ") + sd)
+    return ", ".join(p)
+def is_etiket(x):  # vade + yaş + (tek durum kapısına göre) teyit uyarısı → parantez içi metin ("" olabilir)
+    p = [z for z in (is_vade(x), is_yas(x)) if z]
+    if x.get("teyit_et"): p.append(_t("durumu belirsiz, teyit et", "status unclear, confirm"))
+    return "; ".join(p)
+def _km_isler(simdi):  # yapi.bugun_veri (yapi.py'ye dokunmadan) → (bugün/geciken satırları, diğer açık işler, teyit sayısı, başkasında bekleyen sayısı, durumu belirsiz kayıt sayısı)
     try: v = bugun_isler()
-    except Exception as e: print(f"KİŞİ MODELİ: işler okunamadı ({e.__class__.__name__})"); return [], [], 0, 0
-    if v is None: return [], [], 0, 0
+    except Exception as e: print(f"KİŞİ MODELİ: işler okunamadı ({e.__class__.__name__})"); return [], [], 0, 0, 0
+    if v is None: return [], [], 0, 0, 0
     g = isler_grupla(v)
-    def kisa(x): d = is_vade(x); return f"- {_km_kisa(x.get('metin'), 80)}" + (f" ({d})" if d else "")
+    def kisa(x): d = is_etiket(x); return f"- {_km_kisa(x.get('metin'), 80)}" + (f" ({d})" if d else "")
     bug = [x for x in g["kendi"] if x not in g["sonra"]]  # gecikmiş ya da bugün vadeli, kayıt sırasıyla
-    return [kisa(x) for x in bug], [kisa(x) for x in g["sonra"]], len(g["teyit"]), len(g["baskalari"])
+    bayat = sum(1 for a in ("geride", "baskalari", "teyit") for x in g[a] if isinstance(x, dict) and x.get("teyit_et"))
+    return [kisa(x) for x in bug], [kisa(x) for x in g["sonra"]], len(g["teyit"]), len(g["baskalari"]), bayat
 def _km_kisi_isleri(ad, simdi):  # ad (gönderen/katılımcı) ile ilgili açık işler: sahibi ya da metni o kişiyi anan, kullanıcının kendi ve başkalarında bekleyen açık işleri → satırlar (gizli toplantı bugun_veri'de zaten yok)
     ham = re.findall(r"\w+", str(ad or "").lower()); toks = [t for t in ham if len(t) >= 3][:2]
     if not toks: return []
@@ -213,7 +224,7 @@ def _km_kisi_isleri(ad, simdi):  # ad (gönderen/katılımcı) ile ilgili açık
     out = []
     for x, kendi in [(x, True) for x in g["kendi"]] + [(x, False) for x in g["baskalari"]]:
         if not anar(x): continue
-        g = x.get("kalan_gun"); d = (_t("gecikti", "overdue") + f" {-g}" + _t(" g", "d")) if x.get("gecikti") and g is not None else (f"{g}" + _t(" g kaldı", "d left") if g is not None else "")
+        d = is_etiket(x)
         out.append(f"- [{_t('sende', 'yours') if kendi else _km_kisa(x.get('kim'), 30)}] {_km_kisa(x.get('metin'), 90)}" + (f" ({d})" if d else ""))
         if len(out) >= 6: break
     return out
@@ -274,16 +285,18 @@ def _km_ogren_metni(cap):
 def _km_bugun_metni(simdi, cap):
     en = ARAYUZ_DILI == "en"
     z = simdi.strftime("%A %-d %B %Y, %H:%M") if en else f"{simdi.day} {_KM_AY[simdi.month - 1]} {simdi.year} {_KM_GUN[simdi.weekday()]}, {simdi:%H:%M}"
-    tk = _km_takvim(simdi); bug, _dig, _t_, _b = _km_isler(simdi)
+    tk = _km_takvim(simdi); bug = _km_isler(simdi)[0]
     m = _t(f"Şimdi: {z}\n", f"Now: {z}\n") + (_t("Takvim (bugün ve yarın):\n", "Calendar (today and tomorrow):\n") + "\n".join(tk) + "\n" if tk else "")
     if bug: m += _t("Bugün beklenen ya da geciken işlerin:\n", "Your tasks due today or overdue:\n") + "\n".join(bug[:5])
     return _km_sar(_t("Bugün", "Today"), m, "", cap)
 def _km_isler_metni(simdi, cap):
-    bug, dig, teyit, bek = _km_isler(simdi)
+    bug, dig, teyit, bek, bayat = _km_isler(simdi)
     p = []
     if dig: p.append(_t("Diğer açık işlerin:\n", "Your other open tasks:\n") + "\n".join(dig[:6]))
     if teyit: p.append(_t(f"Teyidini bekleyen karar: {teyit}", f"Decisions awaiting your confirmation: {teyit}"))
     if bek: p.append(_t(f"Başkalarında bekleyen açık iş kaydı: {bek} kişi", f"Open items waiting on others: {bek} people"))
+    if bayat: p.append(_t(f"Durumu belirsiz (uzun süredir dokunulmamış ya da sonra yeniden kaydedilmiş) kayıt: {bayat} — bunları açık iş diye sunma, sorulursa «teyit et» de",
+                          f"Records with unclear status (untouched for long or re-recorded later): {bayat} — do not present them as open tasks; if asked, say «confirm»"))
     return _km_sar(_t("Açık işler", "Open tasks"), "\n".join(p), "", cap)
 def _km_plan_metni(simdi, cap):  # günlük düşünme turunun bugünkü planı (dusunme.py gun_plani_oku; yoksa "" — paket dilimi boş). Sıra: özet, odak, dikkat, sabit (kısa pakette sondan kesilir)
     f = globals().get("gun_plani_oku")

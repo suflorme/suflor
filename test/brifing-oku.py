@@ -119,6 +119,38 @@ bn["kapanis_view"] = patlak; bn["katilimci_view"] = patlak
 bak("blok kurucusu hata verirse brifing durmaz (boş döner)", bn["_brifing_bloklar"](OLAY) == "")
 bn.pop("kapanis_view"); bn.pop("katilimci_view")
 bak("modül yüklü değilse (kapanış turu/kimlik bölümü yok) boş döner", bn["_brifing_bloklar"](OLAY) == "")
-bak("brifing: _brifing_is paketten sonra blokları ekler", 'kisi += _brifing_bloklar(olay)' in k and k.index("kisi += _brifing_bloklar(olay)") < k.index("BRIFING_ISTEM[dl].format"))
+bak("brifing: _brifing_is paketten sonra blokları ekler (güncellik katmanıyla)", 'kisi += _brifing_bloklar(olay, gv)' in k and k.index("gv = guncellik_view(olay") < k.index("kisi += _brifing_bloklar(olay, gv)") < k.index("BRIFING_ISTEM[dl].format"))
+# 12 Kasım güncellik katmanı: güncellik varsa kapanış bloğu yerine durum etiketli aday listesi; gündem şeması yalnız davet gündemi varken; model çıktısı → gündem satırları
+import json as _js
+sys.path.insert(0, KOD); import yapi as Y
+YAZ = []; bn.update(json=_js, os=os, BASE="/c", AYAR={"ad": "Ayşe"}, ARAYUZ_DILI="tr", LOCK=threading.Lock(), write=lambda p: YAZ.extend(p), _yapi_mod=lambda: Y, kapanis_view=kapanis_view, katilimci_view=katilimci_view)
+GV = {"davet": True, "gundem": [{"no": 1, "saat": "18.00", "dk": 5, "baslik": "Açılış", "alt": [], "adaylar": []}, {"no": 2, "saat": "18.05", "dk": 20, "baslik": "Bütçe kararı", "alt": [],
+      "adaylar": [{"id": "s3", "tur": "is", "metin": "Bütçe tablosu", "kim": "Can", "durum": "acik", "gecikti": False, "vade": "", "kalan_gun": None, "son": "2026-11-10", "kaynak": "kayıt: Bütçe, 2026-11-03"}]}],
+      "ek_oneri": [], "belirsiz": [], "gecmis": [], "taslak": [], "ayiklanan": {"bitti": 4, "bayat": 1, "yerini_aldi": 0, "konu_disi": 3, "ucuncu_kisi": 0}, "kararlar": [{"id": "s3", "durum": "acik", "karar": "gundeme_bagla", "gundem_no": 2}]}
+n_kv = len(KV); o = bn["_brifing_bloklar"](OLAY, GV)
+bak("güncellik bloğu: davet gündemi omurga, bağlı kayıt durum etiketli, ayıklanan sayısı; kapanış turu bloğu girmez", "G2. Bütçe kararı (18.05, 20 dk)" in o and "s3 · iş · Can: Bütçe tablosu [açık" in o
+    and "4 bitmiş" in o and "Teklifi gönder" not in o and len(KV) == n_kv, o)
+bak("güncellik yoksa (None) eski kapanış bloğu", "Teklifi gönder" in bn["_brifing_bloklar"](OLAY, None))
+exec(compile(k[k.index("BRIFING_GUNDEM = {"):k.index("BRIFING_BILGI_SN = ")], "brifing-ses.py", "exec"), bn)
+gs, ek, gy = bn["brifing_gundem_sonuc"]({"gundem": [{"no": "G2", "hazirlik": "Tablo hazır", "soru": "Kim onaylar?", "secenek": "", "risk": ""}], "ek_oneri": [{"metin": "SPF", "gerekce": "açık iş"}]}, GV)
+bak("gündem sonucu: davetin her maddesi kalır (model atlasa da), hazırlık/soru eklenir, ek öneri gerekçeli", gs == ["G1 · Açılış (18.00, 5 dk)", "G2 · Bütçe kararı (18.05, 20 dk) — Tablo hazır · Soru: Kim onaylar?"]
+    and ek == ["SPF — açık iş"] and gy[1]["kayitlar"] == ["s3"], gs)
+bak("gündem şeması istemde yalnız davet gündemi varken (BRIFING_GUNDEM), tek süslü parantez", 'if gv and gv.get("davet"): vj += BRIFING_GUNDEM[dl][0]' in k and "{{" not in k[k.index("BRIFING_GUNDEM = {"):k.index("def brifing_gundem_sonuc")])
+bak("istemde güncellik kuralı (tr/en): bitmiş/bayat açık yazılmaz, teyit, gündem omurga", "GÜNCELLİK: bitmiş" in k and "CURRENCY: never list" in k and "omurga odur" in k)
 bak("istemde kayıt kaynaklı açık işler önce yazılır (tr/en yönergesi)", "kaynağı «kayıt»" in k and "source «record»" in k)
+# G1 (12 Kasım): hazırlık sonucundaki uydurma dosya adı → en yakın gerçek ad ya da kaynak işareti kalkar
+import tempfile
+_kd = tempfile.mkdtemp(prefix="kaynak-"); os.makedirs(os.path.join(_kd, "gorusmeler"))
+for _f in ("gorusmeler/Ekip-toplanti-hazirlik-20261105.md", "Kurgu-ozet-20261029.md", "Kurgu-ozet-20261105.md", "notlar.md"): open(os.path.join(_kd, _f), "w").write("x")
+kn = {"re": re, "os": os, "time": time, "AYAR": {}, "BASE": _kd}
+exec(compile(k[k.index("KAYNAK_DOSYA_RX = "):k.index("def _brifing_is(")], "brifing-ses.py", "exec"), kn)
+_ad = kn["kaynak_dizini"]([_kd])
+y, a, b = kn["kaynak_duzelt"]("Rol taslağı onaylanacak (gorusmeler/Ekip-toplanti-hazirlik-20261005.md)", _ad)
+bak("kaynak: yanlış tarihli ad aynı gövdeli tek en yakın gerçek adla düzelir (klasör öneki korunur)", y == "Rol taslağı onaylanacak (gorusmeler/Ekip-toplanti-hazirlik-20261105.md)" and (a, b) == (1, 0), (y, a, b))
+y, a, b = kn["kaynak_duzelt"]("Bütçe konuşuldu (notlar.md)", _ad); bak("kaynak: var olan ad dokunulmaz", (y, a, b) == ("Bütçe konuşuldu (notlar.md)", 0, 0), y)
+y, a, b = kn["kaynak_duzelt"]("Bütçe konuşuldu (yok-boyle-dosya.md)", _ad); bak("kaynak: eşi olmayan uydurma ad ve boş kalan parantez kalkar", (y, a, b) == ("Bütçe konuşuldu", 0, 1), y)
+y, a, b = kn["kaynak_duzelt"]("Karar (kayıt, Kurgu-ozet-20261001.md)", _ad); bak("kaynak: iki eşit yakın aday varsa tahmin edilmez, ad kalkar, öbür kaynak kalır", (y, a, b) == ("Karar (kayıt)", 0, 1), y)
+_s = {"ozet": "Özet (notlar.md)", "acik": ["İş (yok.md)"], "gundem": ["G1 · x (gorusmeler/Ekip-toplanti-hazirlik-20261005.md)"], "dikkat": []}
+bak("kaynak: sonuç alanları yerinde düzeltilir, sayılar döner", kn["kaynak_sonuc_duzelt"](_s, _ad) == (1, 1) and _s["acik"] == ["İş"] and _s["gundem"][0].endswith("20261105.md)"), _s)
+bak("kaynak: _brifing_is sonucu hazırlık kaydından önce düzeltir", k.index("kaynak_sonuc_duzelt(sonuc)") < k.index("an = hazirlik_yaz(olay"))
 print(f"\n{len(HATA)} hata" if HATA else "\nhepsi geçti"); sys.exit(1 if HATA else 0)

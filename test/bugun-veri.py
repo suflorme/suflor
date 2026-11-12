@@ -59,6 +59,14 @@ try:
         kg = {x["metin"]: x["geride"] for x in w["kendi"]}
         bak("S226 kendi: son 14 gün taze; eski gecikmiş geride; eski ama vadesi gelecekte geride değil", kg == {"Yeni iş": False, "Eski gecikmiş iş": True, "Eski ama vadesi gelecekte": False})
         bak("S226 kendi: geride olanlar listenin sonunda", [x["geride"] for x in w["kendi"]] == sorted(x["geride"] for x in w["kendi"]))
+        dg = {x["metin"]: (x.get("durum_g"), x.get("teyit_et"), x["geride"]) for k_ in ("kendi", "baskalari") for x in w[k_]}
+        bak("G2 tek durum kapısı: vadesi 14+ gün geçmiş dokunulmamış iş bayat → teyit_et ve geride; taze ve vadesi gelecekteki açık",
+            dg["Eski gecikmiş iş"] == ("bayat", True, True) and dg["Yeni iş"] == ("acik", False, False)
+            and dg["Eski ama vadesi gelecekte"] == ("acik", False, False), dg)
+        _x = next(x for x in w["kendi"] if x["metin"] == "Eski gecikmiş iş")
+        bak("G2 satırda durum_neden ve son_degisiklik (kayıt tarihi), dokunma günü", _x["durum_neden"] == ["vade_cok_gecti"] and _x["son_degisiklik"] == "2026-09-20" and _x["dokunma"] == 46, _x)
+        _d = yapi.kayit_durumlari(T2, "Ayşe Deneme", bugun)
+        bak("G2 kayit_durumlari bugun_veri ile aynı sonucu verir (tek kaynak)", all(_d[x["id"]]["durum"] == x["durum_g"] for k_ in ("kendi", "baskalari", "teyit") for x in w[k_]))
         bm = sorted(x["metin"] for x in w["baskalari"])
         bak("S226 başkaları: son 30 gün ya da vadesi gelecekte (katılımcı/dinleyici toplantıları dahil, katılınmayan değil)",
             bm == sorted(["Yeni başkası", "Eski başkası ileri vade", "Dinleyici toplantısından başkası"]), bm)

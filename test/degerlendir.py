@@ -411,5 +411,6 @@ ok("kayıt dosyası adları ve ayar adları belgelenmiş (başlık yorumunda)", 
 _N = kur("amac"); _am = _N["dg_amac"]; _ds = _N["DG_SEMA"]
 ok("dg_amac: metin yazan tür (gün içi öneri) kimlikli paket, metinsiz tür (açık uç hatırlatması) kimliksiz", _am(_ds["gun_ici"]) == "degerlendir_metin" and _am(_ds["toplanti_sonrasi"]) == "degerlendir" and _am({}) == "degerlendir")
 ok("dg_amac: iş kopyası ve belge önerisi eski dar kümede kalır (metin True olsa da)", _am(_ds["is_kopya"]) == "degerlendir_dar" and _am(_ds["belge_oneri"]) == "degerlendir_dar")
+ok("G5 DG_ILKE: kaynak önceliği (güncel kaynak eski çıkarımı ezer, eski/belirsizde 'teyit et', başka toplantının kaydı bu toplantının konusu değil)", "Kaynak önceliği" in N["DG_ILKE"] and "teyit et" in N["DG_ILKE"] and "Başka toplantıya ait" in N["DG_ILKE"])
 shutil.rmtree(T, ignore_errors=True)
 print(f"\n{'KALDI: ' + ', '.join(HATA) if HATA else 'hepsi geçti'}"); sys.exit(1 if HATA else 0)

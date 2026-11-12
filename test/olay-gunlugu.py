@@ -157,15 +157,19 @@ try:
                 "kisi": ye.graf_kisi(C3, "Can", 50), "disa": json.loads(ye.disa_aktar(C3, "json")[0])["kayitlar"], "sozler": ye.sozler(C3)}
         say0 = db(C3).execute("SELECT COUNT(*) FROM kayit").fetchone()[0]; ortak0 = db(C3).execute("SELECT COUNT(*) FROM kayit WHERE tur IN ('karar','is','soz','soru')").fetchone()[0]
         def temiz(v):  # yeni alanlar (kayit_id, onay; eylem menüsü: sahip_eposta, gundem, alt; S236: deneme, deneme_say) karşılaştırmada atılır
-            if isinstance(v, dict): return {k: temiz(x) for k, x in v.items() if k not in ("kayit_id", "onay", "sahip_eposta", "gundem", "alt", "deneme", "deneme_say")}
+            if isinstance(v, dict): return {k: temiz(x) for k, x in v.items() if k not in ("kayit_id", "onay", "sahip_eposta", "gundem", "alt", "deneme", "deneme_say", "son_degisiklik", "dokunma")}
             if isinstance(v, (list, tuple)): return [temiz(x) for x in v]
             return v
         sonra = {"liste": yapi.kayit_listesi(C3, "Ayşe Deneme", bugun), "bugun": yapi.bugun_veri(C3, "Ayşe Deneme", bugun), "graf": yapi.graf_liste(C3, None, 100),
                  "kisi": yapi.graf_kisi(C3, "Can", 50), "disa": json.loads(yapi.disa_aktar(C3, "json")[0])["kayitlar"], "sozler": yapi.sozler(C3)}
         bak(f"göç: kayıt sayısı eşit ({say0}), ortak kayıt = ice-aktarma olayı = izdüşüm ({ortak0})", db(C3).execute("SELECT COUNT(*) FROM kayit").fetchone()[0] == say0
             and db(C3).execute("SELECT COUNT(*) FROM olay WHERE kaynak = 'ice-aktarma'").fetchone()[0] == ortak0 == db(C3).execute("SELECT COUNT(*) FROM ortak_kayit").fetchone()[0])
-        fark = [k for k in once if temiz(once[k]) != temiz(sonra[k])]
-        bak(f"göç: okuyanların çıktısı aynı (kayit_listesi, bugun_veri, graf_liste, graf_kisi, disa_aktar, sozler){' — fark: ' + ', '.join(fark) if fark else ''}", not fark)
+        G2 = ("teyit_et", "durum_g", "durum_neden", "son_degisiklik", "dokunma")  # G2 (12 Kasım, tek durum kapısı): eski sürümde yok; durumu belirsiz kayıt bilerek "geride"ye iner
+        def bv(v):  # bugun_veri kıyası: kimliğe göre, G2 alanları ve G2'nin değiştirdiği geride/sıra hariç
+            return {a: {x["id"]: {k: y for k, y in temiz(x).items() if k not in G2 + ("geride",)} for x in v.get(a) or []} for a in ("kendi", "baskalari", "teyit")} | {"son_karar": temiz(v.get("son_karar"))}
+        fark = [k for k in once if (bv(once[k]) != bv(sonra[k]) if k == "bugun" else temiz(once[k]) != temiz(sonra[k]))]
+        g2g = [x["id"] for a in ("kendi", "baskalari") for x in sonra["bugun"][a] if x.get("teyit_et") and not x["geride"]]
+        bak(f"göç: okuyanların çıktısı aynı (kayit_listesi, bugun_veri, graf_liste, graf_kisi, disa_aktar, sozler){' — fark: ' + ', '.join(fark) if fark else ''}", not fark and not g2g)
         bak("göç: teyit eki alana taşındı, metinde ek kalmadı", db(C3).execute("SELECT COUNT(*) FROM kayit WHERE metin LIKE '%teyit bekliyor%'").fetchone()[0] == 0
             and db(C3).execute("SELECT COUNT(*) FROM kayit WHERE onay = 'bekliyor'").fetchone()[0] == 3)
         bak("göç: gizli toplantının ice-aktarma olayı gizli = 1; kapalı durum korundu", db(C3).execute("SELECT o.gizli FROM olay o JOIN ortak_kayit k USING (kayit_id) WHERE k.metin = 'Gizli karar'").fetchone() == (1,)

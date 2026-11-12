@@ -54,10 +54,10 @@ try:
     yapi.soz_kapat(C, d["Plan belgesini paylaş"]["id"], "yapildi")
     bak("yapılan iş kapandi olur", {x["metin"]: x["durum"] for x in yapi.kayit_listesi(C, "Ayşe", bugun)["kayitlar"]}["Plan belgesini paylaş"] == "kapandi")
     g = yapi.gundem_taslagi(C, ["can.ornek"+AT+"firma.test"], "Ayşe Deneme", "", bugun)
-    bak("gündem taslağı: e-posta katılımcısı graf adıyla eşleşir; ilgili toplantıdan kendi işi, onay bekleyen karar ve açık soru gelir; gecikmiş önce",
-        g["kisiler"] == ["Can Örnek"] and [m["metin"] for m in g["maddeler"]] == ["Tabloyu güncelle", "Listeyi getirecek", "Sözleşmeyi oku", "Tedarikçi Mart'ta", "KDV dahil mi?"])
-    bak("satır metni: kişi ilk adı ve gecikme; karar 'Onay:', soru 'Soru:'", g["maddeler"][0]["satir"] == "Tabloyu güncelle — Can, 3 gün gecikti" and g["maddeler"][3]["satir"].startswith("Onay: ")
-        and g["maddeler"][4]["satir"] == "Soru: KDV dahil mi? (Can)" and g["metin"].startswith("- Tabloyu güncelle"))
+    bak("gündem taslağı: e-posta katılımcısı graf adıyla eşleşir; ilgili toplantıdan kendi işi, onay bekleyen karar ve açık soru gelir; gecikmiş önce; üçüncü kişinin (Zeynep) işi gelmez (12 Kasım)",
+        g["kisiler"] == ["Can Örnek"] and [m["metin"] for m in g["maddeler"]] == ["Tabloyu güncelle", "Sözleşmeyi oku", "Tedarikçi Mart'ta", "KDV dahil mi?"] and g["davet"] is False)
+    bak("satır metni: kişi ilk adı ve gecikme; karar 'Onay:', soru 'Soru:'", g["maddeler"][0]["satir"] == "Tabloyu güncelle — Can, 3 gün gecikti" and g["maddeler"][2]["satir"].startswith("Onay: ")
+        and g["maddeler"][3]["satir"] == "Soru: KDV dahil mi? (Can)" and g["metin"].startswith("- Tabloyu güncelle"))
     bak("eşleşen katılımcı yokken aynı başlıklı toplantı yeter", [m["metin"] for m in yapi.gundem_taslagi(C, ["Deniz Yeni"], "Ayşe Deneme", "Proje Planı", bugun)["maddeler"]] == ["Risk listesi"])
     bak("katılımcı ve başlık eşleşmezse boş; gizli toplantıdan madde gelmez", yapi.gundem_taslagi(C, ["Deniz Yeni"], "Ayşe Deneme", "Yeni konu", bugun)["maddeler"] == [] and yapi.gundem_taslagi(C, [], "Ayşe", "", bugun)["maddeler"] == []
         and "Gizli" not in yapi.gundem_taslagi(C, ["Can Örnek"], "Ayşe Deneme", "Özel", bugun)["metin"])
@@ -81,7 +81,13 @@ try:
     k = al("/kayitlar")
     bak("/kayitlar: ok, kayıtlar + toplantılar + kişiler; gizli yok", k.get("ok") and len(k["kayitlar"]) == 10 and k["toplantilar"][0]["id"] == "son1" and "Gizli" not in json.dumps(k, ensure_ascii=False))
     gt = al("/gundem-taslagi?olay=ev1")
-    bak("/gundem-taslagi: takvim olayının katılımcılarıyla maddeler", gt.get("ok") and gt["olay"] == "ev1" and [m["metin"] for m in gt["maddeler"]][:2] == ["Tabloyu güncelle", "Listeyi getirecek"])
+    bak("/gundem-taslagi: davette gündem varsa maddeler davetin maddeleridir (omurga; 12 Kasım), karar satırları uçta dönmez", gt.get("ok") and gt["olay"] == "ev1" and gt.get("davet") is True
+        and [m["metin"] for m in gt["maddeler"]] == ["Haftalık özet ve durum güncellemesi", "Duyurular"] and "kararlar" not in gt)
+    gt2 = al("/gundem-taslagi?olay=ev2")
+    bak("/gundem-taslagi: gündemsiz davette süzülmüş açık kayıtlar (Can'ın işi önce)", gt2.get("ok") and gt2.get("davet") is False and [m["metin"] for m in gt2["maddeler"]][:1] == ["Tabloyu güncelle"])
+    gk = [json.loads(l) for l in open(os.path.join(C, "guncellik.jsonl"), encoding="utf-8")] if os.path.exists(os.path.join(C, "guncellik.jsonl")) else []
+    bak("/gundem-taslagi: karne satırları yazılır (metin yok: id/durum/karar), aynı karar kümesi yeniden yazılmaz", gk and all("metin" not in k for k in gk) and any(k.get("karar") == "taslak" for k in gk)
+        and (al("/gundem-taslagi?olay=ev2") and len(open(os.path.join(C, "guncellik.jsonl"), encoding="utf-8").readlines()) == len(gk)))
     bak("/gundem-taslagi: bilinmeyen olay → ok false, boş", al("/gundem-taslagi?olay=yok").get("ok") is False and al("/gundem-taslagi?olay=yok")["maddeler"] == [])
     tk = al("/takvim?hafta=0"); e = {o["id"]: o.get("eposta") for o in tk.get("olaylar") or []}
     bak("/takvim: bilgi aktarımı gündemli 4 kişilik toplantıda e-posta işareti (maddeler + alıcılar); karar gündemli 2 kişilikte yok",
@@ -90,7 +96,8 @@ try:
     json.dump({"title": "Haftalık durum paylaşımı", "items": ["Haftalık özet ve durum güncellemesi", "Duyurular"]}, open(os.path.join(C, "agenda.json"), "w"))
     r = subprocess.run([sys.executable, "-B", "toplanti-claude.py", "--dir", C, "--relay", U, "hazirlik", "--katilimci", "can.ornek"+AT+"firma.test, Deniz Yeni", "--kisi", "4"], cwd=KOD, capture_output=True, text=True, timeout=120,
                        env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json")))
-    bak("tc hazirlik --katilimci: '## Gündem taslağı (5 madde; eşleşen: Can Örnek)' ve satırlar", "## Gündem taslağı (5 madde; eşleşen: Can Örnek)" in r.stdout and f"  - Tabloyu güncelle — Can, {(datetime.date.today() - datetime.date(2026, 11, 2)).days} gün gecikti · Bütçe" in r.stdout and "GÜÇLÜ" in r.stdout)
+    bak("tc hazirlik --katilimci: gündem omurga bölümü (güncellik katmanı), G1/G2 maddeleri, eşleşen kişi, ayıklanan sayısı; e-posta işareti", "## Gündem ve ilgili kayıtlar (gündem omurga; eşleşen: Can Örnek)" in r.stdout
+        and "G1. Haftalık özet ve durum güncellemesi" in r.stdout and "G2. Duyurular" in r.stdout and "Kayıtlardan ayıklanan:" in r.stdout and "GÜÇLÜ" in r.stdout)
 finally:
     if rl: rl.terminate()
     shutil.rmtree(T, ignore_errors=True)

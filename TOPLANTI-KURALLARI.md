@@ -34,6 +34,8 @@ kart az ve isabetli olmalı.
   **Strateji ipucu:** fırsatı bir dakika içinde kaçacak `soyle` kartında (soru sorma, itiraz, bağlama anı; "Ne diyeyim?"in kısa hâli,
   istenmeden) `--fisilti` de ver: ne yapacağını söyleyen 2–4 sözcük ("Bütçeyi şimdi sor", "Tarihe itiraz et"). Her `soyle`'ye değil;
   aktarıcı ipuçları arasında en az 2 dk bırakır, fazlasını okumaz (kart yine görünür).
+- **Kaynak önceliği:** açık ve güncel kaynak (davetteki gündem, zincirin son iletisi, kullanıcının son sözü) eski kayıttan yapılan çıkarımı ezer. Kaydın tarihi ya da
+  son değişikliği eskiyse (kayıt satırındaki «son değişiklik», «BAYAT — teyit et») kesin konuşma, kartı «teyit et» diye yaz. Başka toplantıya ait kaydı bu toplantının konusu gibi sunma.
 - **Türler:** `soyle` (kullanıcının şimdi söylemesi ya da sorması gereken) · `dur` (yapmaması/açmaması gereken ya da acil: ekranda
   sır, yanlış bilgi, kayıt/paylaşım riski; `--gizli` metni şeritte gizler, yalnız panoda görünür — hassas yönlendirme böyle) ·
   `cevap` (SORU ya da NE DİYEYİM cevabı) · `not` (bilgi; yalnız panoda). Eski adları (`sor`, `belirt`, `dikkat`, `deginme`,

@@ -80,10 +80,14 @@ procs = []
 try:
     # ---------- 2) uçtan uca aktarıcı ----------
     kod = os.path.join(T, "kod"); os.makedirs(kod)
-    for f in ("relay.py", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py", "teshis.py", "kullanim.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), kod)
+    for f in ("relay.py", "toplanti-claude.py", "baglayici.py", "baglam.py", "yapi.py", "teshis.py", "kullanim.py", "zeka.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), kod)
     for d in ("marka", "pano", "aktarici"): shutil.copytree(os.path.join(KOD, d), os.path.join(kod, d))
     uyg = os.path.join(T, "uyg"); canli = os.path.join(uyg, "canli"); os.makedirs(canli); os.makedirs(os.path.join(T, "proje"))
     PORT = bos_port(8798)
+    # zekâ karnesi: bu haftanın bir günlük satırı + kullanıcının 1–5 puanı (haftalık pakette yalnız sayı gitmeli)
+    open(os.path.join(canli, "zeka-karne.jsonl"), "w").write(json.dumps({"v": 1, "tarih": time.strftime("%Y-%m-%d"), "t": time.time() - 60, "gun": 30, "genel": 81,
+        "islev": {"konus": {"p": 80, "b": 90, "o": None, "a": 70}, "Zeynep": {"p": 1}}, "olcut": {}, "kullanici": {}}) + "\n")
+    open(os.path.join(canli, "zeka-puan.jsonl"), "w").write(json.dumps({"t": time.time() - 60, "islev": "konus", "puan": 4}) + "\n" + json.dumps({"t": time.time() - 50, "gec": True}) + "\n")
     json.dump({"alan": "Test", "ad": "Zeynep Kartaloğlu", "port": PORT, "uygulama": uyg, "proje": os.path.join(T, "proje"), "ortak": os.path.join(T, "ortak"),
                "yerel_ses": False, "dil": "tr", "teshis_adres": ADRES, "ses_motoru": "mac", "tema": "koyu"}, open(os.path.join(T, "ayar.json"), "w"), ensure_ascii=False)
     # Konuş kaydı (toplantıda iki soru, biri 12 sn), toplantı dışı bir soru — metin alanı yok, aktarıcı da yazmaz
@@ -142,6 +146,10 @@ try:
         kontrol("haftalık: whisper.cpp açılışları — 3 açılış, 2 başarılı, 1 yedek (coreml), ilk Core ML derlemesi 41,2 sn, ileti/yol yok",
                 wc.get("acilis") == 3 and wc.get("basarili") == 2 and wc.get("yedek") == 1 and wc.get("cpp_hata") == {"coreml": 1} and wc.get("coreml_ilk_sn") == 41.2
                 and (wc.get("acilis_sn") or {}).get("n") == 2 and "mesaj" not in json.dumps(wc) and "mlmodelc" not in json.dumps(gel("haftalik")), json.dumps(wc)[:300])
+        zk = gel("haftalik")[-1].get("zeka") or {}
+        kontrol("haftalık: zekâ karnesi yalnız sayı (işlev puanı, kullanıcının 1–5 puanı, 'şimdi değil' sayısı); bilinmeyen işlev gitmez",
+                zk.get("zeka_genel") == 81 and (zk.get("zeka_karne") or {}).get("konus", {}).get("puan") == 80 and (zk.get("zeka_kullanici") or {}).get("konus") == {"n": 1, "ort": 4.0}
+                and zk.get("zeka_gec") == 1 and "Zeynep" not in json.dumps(zk), json.dumps(zk)[:300])
         kontrol("haftalık: profilde istenen Whisper motoru (ayar yok → Apple Silicon'da cpp)", gel("haftalik")[-1]["profil"].get("whisper_motor") == "cpp", gel("haftalik")[-1]["profil"])
         _ts_ = teshis.temizle({"whisper_cpp": {"cpp_hata": {"Zeynep": 1, "coreml": 2}, "calisan_motor": "Kumbara"}})["whisper_cpp"]
         kontrol("süzgeç: bilinmeyen hata sınıfı anahtarı ve motor değeri gitmez", not sizinti(_ts_) and _ts_["cpp_hata"].get("coreml") == 2 and _ts_["calisan_motor"] == "?", _ts_)

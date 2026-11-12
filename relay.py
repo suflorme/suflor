@@ -1367,12 +1367,16 @@ def kayitlar_view(tam_yol=""):  # GET /kayitlar (anahtarlı): "Kararlar ve işle
     try: v["dis"] = y.dis_defter_veri(AYAR.get("dis_defter"), None, 200)
     except Exception as e: print(f"KAYITLAR: dış defter okunamadı ({e.__class__.__name__})"); v["dis"] = []
     return v
-def gundem_taslagi_view(tam_yol):  # GET /gundem-taslagi?olay=<takvim kimliği> (anahtarlı): katılımcılarla ilgili açık iş/karar/soru → hazırlık kartında "Gündem taslağı: N madde"
+def gundem_taslagi_view(tam_yol):  # GET /gundem-taslagi?olay=<takvim kimliği> (anahtarlı) → hazırlık kartında "Gündem taslağı: N madde". 12 Kasım: güncellik katmanının görünümü
+    # (aktarici/brifing-ses.py guncellik_view → yapi.guncellik): davette gündem varsa maddeler = davetin maddeleri (davet: true; bağlı açık kayıtlar ve ek_oneri ayrı), yoksa süzülmüş açık kayıtlar.
     import urllib.parse; y = _yapi_mod(); qs = urllib.parse.parse_qs(str(tam_yol).partition("?")[2]); oid = (qs.get("olay") or [""])[0]
     olay = TAKVIM_TAM.get(oid) if oid else None
     if not y or not olay: return {"ok": False, "err": _t("Toplantı takvimde bulunamadı", "Meeting not found in the calendar"), "maddeler": [], "kisiler": [], "metin": ""}
+    gv = guncellik_view(olay, "gundem_taslagi") if "guncellik_view" in globals() else None
     kat = [str(x) for x in (olay.get("katilimcilar") or [])] + [str(k.get("ad") or "") for k in (olay.get("kisiler") or []) if isinstance(k, dict)]
-    try: return dict(y.gundem_taslagi(BASE, kat, str(AYAR.get("ad") or ""), str(olay.get("baslik") or "")), ok=True, olay=oid)
+    try:
+        v = y.gundem_taslagi(BASE, kat, str(AYAR.get("ad") or ""), str(olay.get("baslik") or ""), etkinlik=oid, notlar=str(olay.get("notlar") or ""), ilgi=gv); v.pop("kararlar", None)
+        return dict(v, ok=True, olay=oid)
     except Exception as e: print(f"GÜNDEM TASLAĞI: okunamadı ({e.__class__.__name__})"); return {"ok": False, "err": e.__class__.__name__, "maddeler": [], "kisiler": [], "metin": ""}
 def takvim_eposta(v):  # 5 Kasım: hafta görünümündeki gelecek toplantıya davet notundan "e-postayla çözülebilir" işareti (yapi.eposta_isaret; yalnız GÜÇLÜ işaret eklenir; alıcılar takvimden)
     y = _yapi_mod()

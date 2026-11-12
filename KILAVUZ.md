@@ -104,7 +104,7 @@ Sohbet kutusundaki 🔊 düğmesi açıkken asistanın cevabı yazılı olduğu 
 **E-posta takibi (ayar `eposta_takip`, varsayılan açık; Mac Mail okuma `eposta_oku` da açık olmalı):** panoda **E-postalar** bölümü üç grupta gelir: **Senden cevap bekleyenler**, **Dönüş beklediklerin**
 (sen yazdın, karşıdan cevap yok) ve **yalnız bilgi** olanlar (bilgiye eklendiğin, toplu ve otomatik iletiler; yalnız sayısı görünür). Önemli saymadan önce yapay zekâ zinciri baştan sona okur:
 başkası cevaplamışsa ya da iş kapanmışsa ileti listeden düşer. Değerlendirilemeyen iletinin yanında "Değerlendirilmedi" yazar. Düşük öncelikli iletiler katlı bir satırda toplanır
-("Düşük öncelikli (n)"); tıklayınca açılır. Her satırın "⋯" menüsünde **Bu kişi önemli** ve **Bu gönderen önemsiz** vardır; seçimin ileride benzer iletilere uygulanır.
+("Düşük öncelikli (n)"); tıklayınca açılır. Her satırın "⋯" menüsünde **Cevapladım, listeden kaldır**, **Bu kişi önemli** ve **Bu gönderen önemsiz** vardır; seçimin ileride benzer iletilere uygulanır. Cevabın Gmail'de ayrı bir zincire düşse de (aynı konu, aynı kişi, 14 gün içinde) cevaplanmış sayılır; aynı kişiye sonradan başka konuda yazdıysan satırda not olarak görünür. Bildirimden hemen önce zincir yeniden denetlenir: bu arada cevapladıysan bildirim gelmez.
 Ayarlar (⚙ Ayarlar → Takvim ve e-posta): `eposta_onem_duzeyi` (`siki`: yalnız önemli kişiler ve en acil istekler · `dengeli`, varsayılan: tanıdığın kişilerden gelen somut istekler · `genis`: tanımadıkların da girer),
 `eposta_onem_gun` (kaç günlük ileti, 14), `eposta_vip` (her zaman önemli sayılan kişiler; "Bu kişi önemli" buraya ekler), `eposta_onemsiz` (önemsiz gönderenler; "Bu gönderen önemsiz" buraya ekler).
 
@@ -117,6 +117,10 @@ Kayıtta adı geçen kişiye (iş sahibi, karar sahibi) e-posta ya da Teams mesa
 Suflor'da bitirirsen anımsatıcı tamamlanır; yeniden açma da iki yöne işler. Anımsatıcıyı silersen iş silinmez, yalnız bir daha eklenmez. Yalnız senin işlerin gider; başkasına atanan işler, karar ve döküm gitmez.
 **Gizli toplantının işleri hiç gönderilmez**; gizli kip açıkken eşitleme durur. Anımsatıcılar bulut hesabına (iCloud, Exchange) eşitliyorsa orada da görünür; bunu bilerek aç.
 Açmak için ⚙ Ayarlar'dan; macOS ilk seferde Anımsatıcılar izni sorar.
+
+**Toplantı hazırlığı ve gündem:** davette gündem varsa hazırlık o gündemin maddelerine göre kurulur: her maddenin altında kaynaklı hazırlık, soru, karar seçenekleri ve risk. Suflor gündeme yeni madde eklemez; gündemde olmayan ama açık ve önemli bir konu varsa ayrı ve gerekçeli **Ek öneri** olarak gösterir. Bitmiş, bayatlamış (uzun süredir dokunulmamış) ve toplantının konusuyla ilgisi olmayan kayıtlar hazırlığa ve Bugün'deki gündem taslağına girmez; durumu belirsiz kayıt "teyit et" diye işaretlenir.
+
+**Zekâ karnesi:** Suflor her işlevini (Konuş, gün planı, e-posta, toplantı kartları, hazırlık, kararlar ve işler) başarı, öngörü ve analiz boyutlarında 0–100 puanlar; veri azsa "yetersiz veri" der. Haftada bir Günün özeti altında "<asistan> bu hafta ne kadar akıllıydı?" sorusu çıkar (her işlev için 1–5, istersen Şimdi değil). Beta kurulumunda yalnız puanlar geliştiriciye gider, metin gitmez.
 
 ## İsteğe bağlı ayarlar
 **Sesle hatırlatma:** onayladığın saatli hatırlatma Mac Takvim'in varsayılan takvimine 15 dakikalık, başında uyaran bir etkinlik olarak eklenir

@@ -2004,7 +2004,7 @@ def karne_hesap(md):
     rol = agj.get("rol") or "yurutucu"; items = agj.get("items") or []
     ats = sorted(zaman(r["at"]) for r in satirlar if r.get("at"))
     bas, bit = (ats[0], ats[-1]) if ats else (None, None)
-    v = {"dosya": md, "rol": rol, "baslik": agj.get("title"), "satir": len(satirlar), "boyut": {}, "not_": [], "olcu": {}}
+    v = {"dosya": md, "rol": rol, "baslik": agj.get("title"), "satir": len(satirlar), "boyut": {}, "not_": [], "olcu": {}, "gundem_izlendi": bool(ticks)}  # gündem toplantıda işaretlendi mi (dökümde **GÜNDEM** satırı)
     if bas: v["olcu"]["sure_dk"] = round((bit - bas).total_seconds() / 60)
     if kaynak == "md": v["not_"].append("gündem kopyası yok — yalnız işaretlenen maddeler sayıldı")
     if items:
@@ -2066,11 +2066,22 @@ def olcum_jl(name):
             if "file" in r: byid[r["id"]]["file"] = r["file"]
             if "status" in r: byid[r["id"]]["status"] = r["status"]
     return list(byid.values())
+def karne_satiri_yaz(v):  # zekâ karnesi (zeka.py m_gundem) için canli/karneler.jsonl'e METİNSİZ tek satır: dosya, gündem "x/y", gündem izlendi mi (dökümde **GÜNDEM** satırı var/yok).
+    # v0.209.0'da kaldırılan eski karnenin yerine yalnız bu ölçü; gündem yoksa ya da toplantı gizliyse yazılmaz. Hata sonucu durdurmaz.
+    try:
+        if not (v.get("olcu") or {}).get("gundem"): return
+        try:
+            if _yapi().gizli_mi(A.dir, v["dosya"]): return
+        except Exception: pass
+        r = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "dosya": os.path.basename(str(v["dosya"])), "olcu": {"gundem": v["olcu"]["gundem"]}, "gundem_izlendi": bool(v.get("gundem_izlendi"))}
+        with open(os.path.join(A.dir, "karneler.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    except Exception: pass
 def sonuc_cmd():  # toplantı sonu tek komut: değerlendirme (not) + konuşma + öne çıkan anlar + kesin olmayan iddialar
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
     konusmaci_esle(os.path.basename(md).replace(".jsonl", ".md"))
     v = karne_hesap(md); sf = v["suflor"]; o = v["olcu"]
+    karne_satiri_yaz(v)
     print("## Toplantı çıktısı — ölçülenler")
     print(f"*{v['dosya']} · rol {v['rol']} · {o.get('sure_dk', '?')} dk · {v['satir']} satır" + (f" · {o['karar']} karar" if "karar" in o else "") + "*\n")
     if o.get("gundem"): print(f"- Gündem: {o['gundem']} madde konuşuldu" + (" — açık kalan: " + " | ".join(str(x)[:50] for x in v["acik_gundem"][:5]) if v.get("acik_gundem") else ""))
@@ -2293,9 +2304,11 @@ def hazirlik_cmd():
     except Exception: pass
     try:  # 5 Kasım: gündem taslağı — katılımcılarla (--katilimci "Ad, Ad…"; gevşek ad eşlemesi) ya da aynı başlıklı önceki toplantılarla ilgili açık iş, onay bekleyen karar, açık soru (pano kartındaki ile aynı)
         kat = [x.strip() for x in str(A.katilimci or "").split(",") if x.strip()] + ([A.kim] if A.kim else [])
-        gt = _yapi().gundem_taslagi(A.dir, kat, AYAR.get("ad") or "", agj.get("title") or "")
-        print(f"\n## Gündem taslağı ({len(gt['maddeler'])} madde" + (f"; eşleşen: {', '.join(gt['kisiler'])}" if gt["kisiler"] else "") + ")")
-        print("\n".join("  - " + m["satir"] + (f" · {m['baslik']}" if m.get("baslik") else "") for m in gt["maddeler"]) or "  yok")
+        # 12 Kasım: güncellik ve ilgi katmanı (yapi.guncellik) — gündem varsa omurga odur (maddelere bağlı açık kayıtlar, ek öneri, belirsiz, yakın geçmiş); bitmiş/bayat/konu dışı ayıklanır
+        nt = "Gündem\n" + "\n".join("- " + str(i) for i in (agj.get("items") or [])) if agj.get("items") else ""
+        gv = _yapi().guncellik(A.dir, kat, AYAR.get("ad") or "", agj.get("title") or "", nt, alanlar=[k.rsplit("@", 1)[1] for k in kat if "@" in k])
+        print(f"\n## Gündem ve ilgili kayıtlar ({'gündem omurga' if gv['davet'] else 'gündem yok: süzülmüş açık kayıtlar'}" + (f"; eşleşen: {', '.join(gv['kisiler'])}" if gv["kisiler"] else "") + ")")
+        print("\n".join("  " + l for l in _yapi().guncellik_blogu(gv).splitlines()) or "  yok")
     except Exception: pass
     try:  # "Bu toplantı e-postayla çözülebilir" işareti (yapi.eposta_isaret): kural tabanlı, son kararı Claude verir
         ik = _yapi().eposta_isaret(agj.get("items") or [], agj.get("title") or "", A.kisi)

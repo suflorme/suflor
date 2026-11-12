@@ -106,6 +106,14 @@ sifirla(); n = kapili([olay("a", 8, 38)], sessiz_acik=lambda: True, toplanti_var
 ok("kapı: sessiz mod ve toplantı sürerken acil söz yine bildirilir, ses yok (eski davranış)", r and r["sonuc"] == "bildirim" and not SESLER and len(BILDIR) == 1 and soz_satirlari()[0]["karar"] == "simdi", r)
 sifirla(); n = kapili([olay("a", 8, 38)], gizli_acik=lambda: True)
 ok("kapı: gizli kipte hiçbir şey ve kayıt yok", n["that_tara"](SIMDI) == {"neden": "gizli kip"} and not BILDIR and not os.path.exists(os.path.join(T, "soz.jsonl")))
+# G1: teslimden önce toplantı hâlâ takvimde mi (that_hala_var)
+n = ns_kur([olay("a", 8, 38), olay("b", 8, 38, baslik="İptal: Bütçe Toplantısı"), olay("c", -5, 20)]); _k = lambda e: n["_that_anahtar"](n["TAKVIM_TAM"][e])
+ok("G1 that_hala_var: takvimdeki gelecek toplantı var; iptal başlıklı, başlamış ya da saati kaymış (anahtar yok) değil",
+   n["that_hala_var"](_k("a"), SIMDI) is True and n["that_hala_var"](_k("b"), SIMDI) is False and n["that_hala_var"](_k("c"), SIMDI) is False and n["that_hala_var"]("a|2000-01-01T00:00:00", SIMDI) is False)
+sifirla(); n = kapili([olay("a", 8, 38)]); n["THAT_IPTAL_RX"] = re.compile(r".")  # teslim anında iptal edilmiş gibi
+r = n["that_tara"](SIMDI)
+ok("G1 kapı: doğrulamada düşen hatırlatma teslim edilmez, kayıt 'bastirildi: bayat', yapıldı işareti kalkar", r == {"neden": "bayat"} and not BILDIR and not SESLER
+   and [(x["olay"], x.get("neden")) for x in soz_satirlari()][-1] == ("bastirildi", "bayat") and not n["THAT"]["yapildi"], (r, soz_satirlari()))
 sifirla()
 
 # ---------- 4) zamanlama ----------

@@ -200,13 +200,22 @@ def that_tara(simdi=None):  # → None (yapılacak yok) ya da {"neden"|"sonuc": 
         if "soz_aday" not in globals(): teslim(); return sonuc
         # öncelik 3 (acil): zamanı belli, kapı yalnız gizli kipte durdurur; sessiz mod/toplantı yalnız SESLİ okumayı keser (that_sesli_engel, bildirim yine gider — eski davranış)
         THAT["yapildi"].setdefault(k, {"t": ts, "tur": "kapida"}); _that_yaz()  # kapı kuyruğa alsa da yeniden aday çıkmasın
-        kr = soz_aday("toplanti_hatirlat", kisa, anahtar="th:" + k, oncelik=3, kip="sor", teslim=teslim, gecerli_sn=max(120, int((b - simdi).total_seconds()) + 60), simdi=ts)
+        kr = soz_aday("toplanti_hatirlat", kisa, anahtar="th:" + k, oncelik=3, kip="sor", teslim=teslim, gecerli_sn=max(120, int((b - simdi).total_seconds()) + 60), simdi=ts,
+                      dogrula=lambda k=k: that_hala_var(k, datetime.datetime.fromtimestamp(globals().get("soz_simdi", lambda x: x)(ts)).astimezone()))  # G1: teslimden önce toplantı hâlâ takvimde, saati aynı, iptal/ret değil mi
+        if kr["neden"] == "bayat": THAT["yapildi"].pop(k, None); _that_yaz(); return {"neden": "bayat"}
         if kr["karar"] != "simdi":
             if kr["neden"] == "gizli kip": THAT["yapildi"].pop(k, None); _that_yaz(); return {"neden": "gizli kip"}  # işaretlenmez: gizli kip toplantıdan önce kapanırsa hatırlatılır
             return {"neden": kr["neden"]}
         return sonuc
     return None
 
+THAT_IPTAL_RX = re.compile(r"(?i)^\s*(iptal( edildi)?|cancel+ed|canceled|abgesagt)\b\s*[:：-]?")
+def that_hala_var(k, simdi=None):  # G1: hatırlatılacak toplantı (anahtar = id|başlangıç) şu anki takvimde hâlâ var mı: iptal/ret yok, saat kaymamış (saati değiştiyse yeni anahtarla yeniden aday çıkar), başlamamış
+    simdi = simdi or datetime.datetime.now().astimezone()
+    for b, s_, e in _that_aday_liste():
+        if _that_anahtar(e) != k: continue
+        return b > simdi and that_toplanti_mi(e) and not THAT_IPTAL_RX.search(str(e.get("baslik") or "")) and not e.get("iptal")
+    return False
 def _that_dongu():
     while True:
         time.sleep(THAT_TARAMA_SN)

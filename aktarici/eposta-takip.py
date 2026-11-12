@@ -21,6 +21,7 @@
 # eposta_onemsiz (liste), eposta_hatirlat, eposta_hatirlat_sesli (varsayılan kapalı), eposta_sessiz ("22:00-08:00"), eposta_claude_siralama.
 ET_DOSYA = "eposta-takip.json"
 ET = {"gorunum": None, "t": 0.0, "durum": None, "kayit_t": 0.0, "kayit": [], "idler": {}, "kilit": threading.Lock()}
+ET_ZINCIR_BIRLES_GUN, ET_ZINCIR_KONU_MIN = 14, 6
 ET_HACIM_GUN, ET_HACIM_ESIK, ET_COK_ALICI, ET_EN_COK, ET_CLAUDE_EN_COK, ET_ONBELLEK = 30, 10, 5, 15, 25, 400
 _ET_BULK_ADRES = re.compile(r"(?i)(^|[._-])(no-?reply|do-?not-?reply|noreply|newsletter|bulten|bülten|notifications?|notify|mailer-daemon|postmaster|marketing|campaign|kampanya|news|digest|alerts?|billing|invoice|receipts?|survey|promo\w*|updates?)([._-]|\d|@)")
 _ET_BULK_KONU = re.compile(r"(?i)\b(bülten\w*|newsletter|unsubscribe|abonelik\w*|kampanya\w*|indirim\w*|fırsat\w*|doğrulama kodu|verification code|one-time|your receipt|makbuz|sipariş\w* (onay|özet)|order confirmation|webinar|weekly digest|haftalık özet|promosyon|% ?\d+ indirim)\b")
@@ -175,9 +176,32 @@ def et_zincirler(xs, ben=None):  # → {id(ileti): zincir anahtarı}
                     if p != q: ust[max(p, q)] = min(p, q)
                 else: sahip[a] = i
         for i, x in enumerate(ls): out[id(x)] = "k:" + kn[:60] + "#" + str(ls[kok(i)].get("id"))
+    # 12 Kasım: Mail'in conversation_id'si güvenilir değil — Gmail'de gelen ileti ile kullanıcının cevabı (Re:/YNT:/AW:) farklı conversation_id alabiliyor (canlı: cevap ayrı zincirde, "cevap bekliyor" yanlışı).
+    # İkinci geçiş: aynı konu kökü (≥ 6 karakter) + ortak katılımcı (kullanıcı hariç) + ≤ ET_ZINCIR_BIRLES_GUN gün arayla olan iletilerin zincirleri birleşir; birleşik zincir en eski zincirin anahtarını alır.
+    cs = collections.defaultdict(list)
+    for x in xs:
+        kn = et_konu_norm(x.get("konu")); z = _et_zaman(x.get("t"))
+        if len(kn) >= ET_ZINCIR_KONU_MIN and z: cs[kn].append((z.timestamp(), x))
+    ust = {}
+    def kk(a):
+        ust.setdefault(a, a)
+        while ust[a] != a: ust[a] = ust[ust[a]]; a = ust[a]
+        return a
+    ilk = {}
+    for x in xs: ilk[out[id(x)]] = min(ilk.get(out[id(x)], "~"), str(x.get("t") or "~"))
+    for kn, ls in cs.items():
+        ls.sort(key=lambda p: p[0]); son = {}
+        for ts, x in ls:
+            for a in _et_katilimci(x, ben):
+                if a in son and ts - son[a][0] <= ET_ZINCIR_BIRLES_GUN * 86400:
+                    p, q = kk(out[id(x)]), kk(son[a][1])
+                    if p != q: (p, q) = (p, q) if (ilk.get(p, "~"), p) <= (ilk.get(q, "~"), q) else (q, p); ust[q] = p
+                son[a] = (ts, out[id(x)])
+    for x in xs: out[id(x)] = kk(out[id(x)]) if out[id(x)] in ust else out[id(x)]
     return out
 ET_DURUMLAR = ("senden_bekleniyor", "baskasi_cevapladi", "cozuldu", "bilgi", "donus_bekliyorsun")
 
+def adres_x(x): return str(x.get("adres") or "").lower()
 def et_analiz(iletiler, simdi=None, kisiler=None, kayit_kelime=None, skor=None, durum=None, deger=None, beklenen=None):
     # Saf hesap: kural katmanı ön eleme (zincir başına bir aday) + varsa önbellekteki Claude zincir değerlendirmesi →
     # {"bekleyen": [...], "donus": [...], "bilgi_sayi": n, "bilgi_detay": {...}, "durum_sayi": {durum: n}, "degerlendirilmedi": n, "adaylar": [zincir adayı…] (önbellekte olmayanlar),
@@ -246,6 +270,9 @@ def et_analiz(iletiler, simdi=None, kisiler=None, kayit_kelime=None, skor=None, 
                 elif baska: neden = _t("Zincirde sonra başkası yazmış; gerekip gerekmediğine bak.", "Someone else wrote later in the thread; check if it is still needed.")
                 else: neden = _et_neden(nl + [_t("senden bir şey bekliyor olabilir", "may be waiting on you")] if vip else [_t("sana doğrudan yazdı, soru ya da rica içeriyor", "wrote to you directly, contains a question or request")] + nl)
                 gun = et_is_gunu(x.get("t"), simdi); yz = gz[id(x)] or simdi
+                # 12 Kasım: cevap başka konu başlığıyla gitmiş olabilir (yeni posta olarak) — gövde okunmadığı için kapatma, yalnız nedene not düş (kullanıcı "Gerek yok" ile kapatır)
+                cr = [y for y in giden if gz[id(y)] and yz and gz[id(y)] > yz and zk[id(y)] != k and adres_x(x) in _et_alicilar(y)]
+                if cr: neden = (neden.rstrip() + " " + _t(f"Sonradan ona başka konuda yazmışsın: «{str(cr[-1].get('konu') or '')[:50]}»; bunda cevaplandıysa ⋯ menüsünden «Cevapladım» de.", f"You wrote to them afterwards on another subject: «{str(cr[-1].get('konu') or '')[:50]}»; if that covered it, use ⋯ → “I replied”."))[:300]
                 bekleyen.append({"id": str(x["id"]), "kim": _et_kisi_ad(x), "konu": " ".join(str(x.get("konu") or "").split())[:120] or _t("(konusuz)", "(no subject)"), "tarih": x.get("t"), "neden": neden,
                                  "gun": gun, "cevapsiz_gun": gun, "yon": "gelen", "durum": ev["d"] if ev else None, "aciliyet": ac, "degerlendirilmedi": bool(beklenen and not ev),
                                  "_anahtar": anahtar, "_puan": ((ac if ac is not None else (2 if vip else 1)) + (1 if vip else 0) + 1) / (1 + max(0.0, (simdi - yz).total_seconds()) / 172800)})
@@ -398,7 +425,16 @@ def et_hatirlat(a, simdi):
             except Exception: pass
     if not kapi: teslim(); return
     # acil (aciliyet ≥ 3) yeni e-posta önemli sayılır (öncelik 2: gece/mesai beklemez); anahtar = yeni ileti/konu kimlikleri, yeni ileti gelince yeni söz
-    soz_aday("eposta", cumle, anahtar="ep:" + ",".join(sorted(anahtarlar)), oncelik=2 if acil else 1, kip="bildir", teslim=teslim, gecerli_sn=6 * 3600, simdi=simdi.timestamp())
+    # G1 (12 Kasım): teslimden hemen önce zincirler yeniden hesaplanır (et_hala_bekliyor); biri cevaplanmışsa ya da listeden çıkmışsa söz bayat düşer, bildirilen işaretlenmez —
+    # sonraki tarama kalanlarla doğru sayılı yeni söz üretir ("cevapladığım maili hâlâ hatırlatıyor" hatası)
+    soz_aday("eposta", cumle, anahtar="ep:" + ",".join(sorted(anahtarlar)), oncelik=2 if acil else 1, kip="bildir", teslim=teslim, gecerli_sn=6 * 3600, simdi=simdi.timestamp(),
+             dogrula=lambda: et_hala_bekliyor(anahtarlar, datetime.datetime.fromtimestamp(globals().get("soz_simdi", lambda x: x)(simdi.timestamp())).astimezone()))
+def et_hala_bekliyor(anahtarlar, simdi=None):  # G1: söz anahtarları ("o"+ileti id: senden bekleniyor · "c"+zincir anahtarı: dönüş bekliyorsun) şu anki postayla hâlâ bekleyen listesinde mi
+    # → True (hepsi duruyor) | False (en az biri cevaplandı/kapandı/yoksayıldı/ertelendi). Model çağrısı yok: kural + önbellekteki zincir değerlendirmesi (et_analiz saf hesap). Posta okunamıyorsa None (karar verilemez: teslim)
+    if not POSTA.get("iletiler"): return None
+    a = et_analiz(POSTA["iletiler"], simdi, durum=et_durum())
+    var = {"o" + str(o["id"]) for o in a["bekleyen"]} | {"c" + str(c["_anahtar"]) for c in a["donus"]}
+    return all(k in var for k in anahtarlar)
 def et_tara(zorla=False, simdi=None):
     if not et_acik() or not (POSTA["iletiler"] or POSTA["durum"] == "ok"): return None
     if not zorla and _et_mesgul(): return None  # toplantıda ertelenir

@@ -69,7 +69,7 @@ rs = [N["soz_aday"]("eposta", "m", anahtar="k%d" % i, teslim=f)["karar"] for i i
 ok("bütçe 2: üçüncü ve dördüncü bastırıldı", rs == ["simdi", "simdi", "bastirildi", "bastirildi"] and c["n"] == 2, rs)
 ok("acil bütçeyi aşar", N["soz_aday"]("sistem", "x", anahtar="k9", oncelik=3, teslim=f)["karar"] == "simdi")
 v = N["soz_view"]()
-ok("/status soz: sunulan, bastırılan, kuyruk, bütçe", v == {"sunulan": 3, "bastirilan": 2, "kuyruk": 0, "butce": 2, "kalan": 0}, v)
+ok("/status soz: sunulan, bastırılan, kuyruk, bütçe", v == {"sunulan": 3, "bastirilan": 2, "bayat": 0, "kuyruk": 0, "butce": 2, "kalan": 0}, v)
 SAAT["t"] += 86400; N["soz_tur"]()
 ok("ertesi gün sayaç sıfırlanır, bütçe yeniden", N["soz_view"]()["sunulan"] == 0 and N["soz_aday"]("eposta", "m", anahtar="yeni", teslim=f)["karar"] == "simdi")
 SAAT["t"] = datetime.datetime(2026, 11, 11, 11, 0).timestamp()
@@ -80,7 +80,7 @@ r = N["soz_aday"]("eposta", "x", anahtar="g1", oncelik=3, teslim=f)
 ok("gizli kip: acil bile sunulmaz; kayıt, kuyruk, sayaç yok", r["karar"] == "bastirildi" and r["neden"] == "gizli kip" and c["n"] == 0 and satirlar(N) == [] and N["soz_view"]()["kuyruk"] == 0 and N["soz_view"]()["bastirilan"] == 0, r)
 r2 = N["soz_aday"]("sistem", "x", anahtar="g2", oncelik=3, teslim=f)
 ok("gizli kip: sistem uyarısı kayıtsız hemen gösterilir", r2["karar"] == "simdi" and c["n"] == 1 and satirlar(N) == [], (r2, c))
-ok("gizli kipte dakikalık tur hiçbir şey yapmaz", N["soz_tur"]() == {"teslim": 0, "gecti": 0, "yoksay": 0, "bastirildi": 0})
+ok("gizli kipte dakikalık tur hiçbir şey yapmaz", N["soz_tur"]() == {"teslim": 0, "gecti": 0, "yoksay": 0, "bastirildi": 0, "bayat": 0})
 g = {"a": False}; N = kur("gizli2", gizli_acik=lambda: g["a"]); N["AYAR"]["soz_aralik_dk"] = 0
 dur = {"v": True}; N["toplanti_var"] = lambda: dur["v"]; c, f = sayac()
 N["soz_aday"]("eposta", "m", anahtar="q1", teslim=f); g["a"] = True; dur["v"] = False; SAAT["t"] += 300
@@ -182,6 +182,36 @@ ok("isabet: kayıt dosyası yoksa boş sonuç", (lambda: (setattr(OL, "CANLI", o
 import ast
 _kaynak = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); _agac = ast.parse(_kaynak)
 _fn = next(n for n in _agac.body if isinstance(n, ast.FunctionDef) and n.name == "bildirim")
+# --- G1: teslimden önce doğrulama (dogrula) ---
+SAAT["t"] = datetime.datetime(2026, 11, 11, 11, 0).timestamp()
+N = kur("dogrula"); N["AYAR"].update(soz_aralik_dk=0, soz_gunluk_butce=50); c, f = sayac(); gecerli = {"v": True}; cagri = {"n": 0}
+def dg():
+    cagri["n"] += 1; return gecerli["v"]
+r = N["soz_aday"]("eposta", "1 e-posta bekliyor", anahtar="d1", teslim=f, dogrula=dg)
+ok("G1 şimdi: doğrulama geçerse teslim, doğrulama bir kez çağrıldı", r["karar"] == "simdi" and c["n"] == 1 and cagri["n"] == 1, r)
+gecerli["v"] = False; r = N["soz_aday"]("eposta", "2 e-posta bekliyor", anahtar="d2", teslim=f, dogrula=dg)
+ok("G1 şimdi: doğrulama False → teslim yok, bastırıldı: bayat", r["karar"] == "bastirildi" and r["neden"] == "bayat" and c["n"] == 1, r)
+ok("G1 kayıt: bastirildi neden bayat satırı + /status bayat sayacı, sunulan sayılmaz", satirlar(N)[-1]["olay"] == "bastirildi" and satirlar(N)[-1]["neden"] == "bayat" and N["soz_view"]()["bayat"] == 1 and N["soz_view"]()["sunulan"] == 1, (satirlar(N)[-1], N["soz_view"]()))
+def patla(): raise RuntimeError("x")
+ok("G1: doğrulama hata verirse söz yine teslim edilir (sessizce yutulmaz)", N["soz_aday"]("eposta", "3", anahtar="d3", teslim=f, dogrula=patla)["karar"] == "simdi" and c["n"] == 2)
+ok("G1: doğrulama None dönerse teslim", N["soz_aday"]("eposta", "4", anahtar="d4", teslim=f, dogrula=lambda: None)["karar"] == "simdi" and c["n"] == 3)
+# kuyruk: sessiz modda bekler, teslim anında doğrulanır
+ses = {"v": True}; N = kur("dogrula-kuyruk", sessiz_acik=lambda: ses["v"]); N["AYAR"].update(soz_aralik_dk=0, soz_gunluk_butce=50); c, f = sayac(); c2, f2 = sayac(); gecerli = {"v": True}
+r1 = N["soz_aday"]("eposta", "a", anahtar="q1", teslim=f, dogrula=lambda: gecerli["v"]); r2 = N["soz_aday"]("toplanti_sonrasi", "b", anahtar="q2", teslim=f2)
+ok("G1 kuyruk: iki söz sessiz modda bekler", r1["karar"] == "sonra" and r2["karar"] == "sonra" and N["soz_view"]()["kuyruk"] == 2)
+ok("G1 kuyruk dosyası: yalnız doğrulamalı söz 'dogrula' işaretli (işlev yazılmaz)", [q.get("dogrula") for q in json.load(open(os.path.join(N["D"], "soz-kuyruk.json")))] == [True, None])
+gecerli["v"] = False; ses["v"] = False; SAAT["t"] += 60; tr = N["soz_tur"]()
+ok("G1 kuyruk: teslim anında bayatlayan düşer, ötekisi teslim edilir (bayat söz aralığı tüketmez)", tr["bayat"] == 1 and tr["teslim"] == 1 and c["n"] == 0 and c2["n"] == 1 and N["soz_view"]()["kuyruk"] == 0, tr)
+ok("G1 kuyruk kaydı: bastirildi (bayat) satırı, teslim satırı yok", [(x["olay"], x.get("neden")) for x in satirlar(N) if x["kaynak"] == "eposta"] == [("sunuldu", "sessiz mod"), ("bastirildi", "bayat")], satirlar(N))
+# yeniden başlatma: doğrulamalı söz eski metinle teslim edilmez
+ses["v"] = True; N = kur("dogrula-yb", sessiz_acik=lambda: ses["v"]); N["AYAR"].update(soz_aralik_dk=0)
+N["soz_aday"]("eposta", "eski metin", anahtar="y1", dogrula=lambda: True); N["soz_aday"]("gun_ici", "dogrulamasiz", anahtar="y2")
+N2 = kur("dogrula-yb", sessiz_acik=lambda: False); N2["AYAR"].update(soz_aralik_dk=0); SAAT["t"] += 60; tr = N2["soz_tur"]()
+ok("G1 yeniden başlatma: doğrulamalı söz kuyruğa alınmaz (bayat: yeniden başlatma), doğrulamasız varsayılan bildirimle gider", tr["teslim"] == 1 and [b[2] for b in N2["BIL"]] == ["dogrulamasiz"]
+   and any(x["olay"] == "bastirildi" and x.get("neden") == "bayat: yeniden başlatma" for x in satirlar(N2)), (tr, N2["BIL"]))
+N3 = kur("dogrula-yb"); ok("G1 yeniden başlatma: kuyruk dosyasında düşen söz kalmaz, bayat sayacı kayıttan geri yüklenir", N3["soz_view"]()["kuyruk"] == 0 and N3["soz_view"]()["bayat"] == 1, N3["soz_view"]())
+SAAT["t"] = datetime.datetime(2026, 11, 11, 11, 0).timestamp()
+
 def _gercek_bildirim(adi):  # relay.py'nin gerçek bildirim() işlevi, menü uygulaması "açık" gibi; STATE["bildirim"] çıktısı okunur
     ns = {"time": time, "AYAR": {}, "STATE": {"_menu_son": time.time()}, "kart_bildir": lambda: None, "print": lambda *a, **k: None, "os": os, "subprocess": None, "threading": threading}
     if adi: ns["asistan_ad"] = lambda: adi

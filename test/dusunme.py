@@ -265,7 +265,7 @@ ok("girdi: gizli/deneme karar ve kapanmış karar yok", all(w not in m1 for w in
 ok("girdi: kararlar sözlüğü kapsamlı (k10 teyit, k20 merci); ilk günde fark yok ve bölüm yok", g1["kararlar"]["k10"]["kapsam"] == "teyit" and g1["kararlar"]["k20"]["kapsam"] == "merci" and g1["fark"] is None and "Son açılıştan" not in m1 and g1["kiyas"] is None)
 ok("damga: görünür açık iş ve kararlar, yalnız kapsam|vade (metin yok, gizli yok)", g1["damga"] == {"s1": "kendi|2026-11-09", "s2": "kendi|2026-11-11", "s3": "kendi|2026-11-16", "s7": "baska|2026-11-10", "k10": "teyit|", "k20": "merci|"}, g1["damga"])
 ist1 = K1["dus_istem"](g1, SIMDI)
-ok("istem: id/eylem şeması, üç izinli eylem, karar öncelik cümlesi; ilk günde değişen cümlesi yok", '"eylem": "onayla|yapildi|taslak"' in ist1 and "'onayla'" in ist1 and "'taslak'" in ist1 and "hiçbir eylem kendiliğinden bir şey göndermez" in ist1 and "Son açılıştan bu yana değişenler' bölümü varsa" not in ist1)
+ok("istem: id/eylem şeması, dört izinli eylem (teyit dahil), karar öncelik cümlesi; ilk günde değişen cümlesi yok", '"eylem": "onayla|yapildi|taslak|teyit"' in ist1 and "'teyit'" in ist1 and "'onayla'" in ist1 and "'taslak'" in ist1 and "hiçbir eylem kendiliğinden bir şey göndermez" in ist1 and "Son açılıştan bu yana değişenler' bölümü varsa" not in ist1)
 
 def plan_d(dik, odak=None): return gecerli(plan=dict(gecerli()["plan"], dikkat=dik, odak=odak if odak is not None else [{"id": "s1", "saat": "11:00", "neden": "x", "eylem": "yapildi"}, {"id": "s2", "saat": "09:30", "neden": "y", "eylem": "onayla"}, {"id": "s3", "saat": "12:00", "neden": "z", "eylem": "taslak"}]))
 rc, _ = K1["dus_coz"](json.dumps(plan_d([
@@ -280,7 +280,7 @@ ok("dikkat: metinsiz madde kayıttan metin alır; merci kaydından kim, eylem ta
 ok("uydurma kimlik (k99) maddesi atıldı", all(x.get("id") != "k99" and "Uydurma" not in x["metin"] for x in d), d)
 ok("eylem kapsama uymuyorsa atılır, madde kalır (s1 onayla → eylemsiz); izinsiz eylem (sil) atılır", d[2]["id"] == "s1" and "eylem" not in d[2] and d[2]["kapsam"] == "kendi" and d[3]["id"] == "s7" and "eylem" not in d[3] and d[3]["kim"] == "Can Örnek" and d[3]["kapsam"] == "bek", d)
 ok("odak eylemi yalnız yapildi ve yalnız kendi işte (onayla/taslak atıldı)", [x.get("eylem") for x in rc["plan"]["odak"]] == ["yapildi", None, None], rc["plan"]["odak"])
-ok("izin listesi: yalnız onayla/yapildi/taslak", K1["DUS_EYLEM"] == ("onayla", "yapildi", "taslak"))
+ok("izin listesi: yalnız onayla/yapildi/taslak/teyit", K1["DUS_EYLEM"] == ("onayla", "yapildi", "taslak", "teyit"))
 okk = lambda e, i: K1["_dus_eylem_ok"](e, i, g1)
 ok("eylem-kapsam matrisi: onayla yalnız k10; yapildi yalnız s1-s3; taslak yalnız k20/s7; uydurma eylem ve kimlik hiçbiri", okk("onayla", "k10") and not okk("onayla", "k20") and not okk("onayla", "s1") and okk("yapildi", "s1") and not okk("yapildi", "s7") and okk("taslak", "k20") and okk("taslak", "s7") and not okk("taslak", "s1") and not okk("gonder", "k10") and not okk("onayla", "k99"))
 dd = K1["dus_coz"](json.dumps(plan_d([{"metin": "a", "neden": "x", "id": "k10", "eylem": "onayla"}, {"metin": "b", "neden": "x", "id": "k10", "eylem": "onayla"}])), g1)[0]["plan"]["dikkat"]
@@ -350,5 +350,32 @@ ok("pano: eylem düğmesi var olan uçlara gider (/karar-onay, /is-durum, /kayit
 ok("dil.js: yeni arayüz metinlerinin İngilizcesi var", all(f'"{s}"' in dil for s in ("Bugünün odağı", "Dün öğrendiklerim", "Doğru", "Yanlış", "Not aldım, teşekkürler", "Tamam, bunu geçersiz saydım", "Taslağını hazırla", "Yeni", "Değişti", "Taslak açıldı; göndermek sende")))
 ok("döngü iş parçacığı yalıtılmış ad alanında başlamaz (STATE yok)", not any(t.name and "dongu" in t.name.lower() for t in threading.enumerate()))
 ok("kaynak: Opus varsayılan, günde bir kez, günlükte 'DÜŞÜNME:' öneki", 'or "opus"' in open(os.path.join(KOD, "aktarici", "dusunme.py"), encoding="utf-8").read() and all(l.startswith("DÜŞÜNME:") for l in N["LOG"] if "DÜŞÜNME" in l))
+# --- G2/G5 (12 Kasım): tek durum kapısı — bayat kayıt odak/bekleyen/onay listesine girmez, "Durumu belirsiz" bölümüne; eylem teyit; yaş satırda; kaynak önceliği ilkesi
+def bv_bayat():
+    return {"kendi": [{"id": "s1", "metin": "Teklifi gönder", "gecikti": True, "kalan_gun": -2, "toplanti": DUN_TOP, "yas": 3, "tarih": "2026-11-08", "son_degisiklik": "2026-11-10", "durum_g": "acik"},
+                      {"id": "s40", "metin": "Eski sözleşme taslağı", "gecikti": True, "kalan_gun": -40, "toplanti": DUN_TOP, "geride": True, "teyit_et": True, "durum_g": "bayat", "yas": 45, "tarih": "2026-09-27"},
+                      {"id": "s41", "metin": "Geride ama açık", "kalan_gun": None, "toplanti": DUN_TOP, "geride": True, "durum_g": "acik", "yas": 20}],
+            "baskalari": [{"id": "s42", "metin": "Fiyat listesi eşleme", "kim": "Can Örnek", "gecikti": True, "kalan_gun": -1, "toplanti": DUN_TOP, "teyit_et": True, "durum_g": "yerini_aldi", "geride": True, "yas": 25}],
+            "teyit": [{"id": "k43", "metin": "Eski karar", "toplanti": DUN_TOP, "teyit_et": True, "durum_g": "bayat", "geride": True, "onay": {"durum": "bekliyor", "gun": 2}}]}
+KG = kur_k("bayat", [], bv=bv_bayat, kl=lambda: []); gb = KG["dus_girdi"](SIMDI); mb = gb["metin"]
+ok("G2 girdi: bayat kendi işi odak listesinde yok; başkasında bekleyen ve onay bekleyen bayat kayıt kendi listelerinde yok", list(gb["isler"]) == ["s1"] and "s42" not in gb["bek"] and "k43" not in gb["kararlar"], (list(gb["isler"]), list(gb["bek"])))
+ok("G2 girdi: 'Durumu belirsiz' bölümü kimlikli ve etiketli (BAYAT — teyit et, kimde, yaş); geride ama açık kayıt girmez", "[Durumu belirsiz kayıtlar" in mb and "s40 | Eski sözleşme taslağı | BAYAT — durumu belirsiz, teyit et | sende | kayıt 45 g önce" in mb
+   and "s42 | Fiyat listesi eşleme | sonra yeniden kaydedilmiş, teyit et | Can Örnek" in mb and "k43 |" in mb and "Geride ama açık" not in mb and set(gb["bayat"]) == {"s40", "s42", "k43"}, mb[-900:])
+ok("G5 girdi: açık iş satırında yaş ve son değişiklik", "s1 | Teklifi gönder | gecikti 2 g | Satış haftalık | kayıt 3 g önce, son değişiklik 2026-11-10" in mb or ("s1 | Teklifi gönder" in mb and "kayıt 3 g önce, son değişiklik 2026-11-10" in mb), mb[:600])
+ib = KG["dus_istem"](gb, SIMDI)
+ok("G5 istem: kaynak önceliği ilkesi + bayatı iş gibi sunma", "açık ve güncel kaynak" in ib and "eski kayıttan yapılan çıkarımı ezer" in ib and "teyit et" in ib and "yapılacak iş gibi sunma" in ib)
+rb_, _ = KG["dus_coz"](json.dumps(gecerli(plan=dict(gecerli()["plan"], odak=[{"id": "s40", "saat": "", "neden": "x"}, {"id": "s1", "saat": "", "neden": "y"}],
+    dikkat=[{"metin": "Eski sözleşme bitti mi?", "neden": "45 gündür dokunulmadı", "id": "s40", "eylem": "teyit"}, {"metin": "Fiyat listesi hâlâ geçerli mi?", "neden": "x", "id": "s42", "eylem": "teyit"},
+            {"metin": "Eski karar?", "neden": "x", "id": "k43", "eylem": "teyit"}, {"metin": "Teklif", "neden": "x", "id": "s1", "eylem": "teyit"}]))), gb)
+dk_ = rb_["plan"]["dikkat"]
+ok("G2 çözüm: bayat iş odakta yok (yalnız s1)", [x["id"] for x in rb_["plan"]["odak"]] == ["s1"], rb_["plan"]["odak"])
+ok("G2 çözüm: bayat kayıt dikkat'te teyit eylemiyle (kapsam bayat, teyit bayrağı), en çok 2; açık işte teyit eylemi atılır", [(x["id"], x.get("eylem"), x.get("kapsam")) for x in dk_] == [("s40", "teyit", "bayat"), ("s42", "teyit", "bayat"), ("s1", None, "kendi")]
+   and dk_[0].get("teyit") is True, dk_)
+okb = lambda e, i: KG["_dus_eylem_ok"](e, i, gb)
+ok("G2 eylem matrisi: teyit yalnız bayat; bayat kendi işinde yapildi da olur, başkasınınkinde olmaz", okb("teyit", "s40") and okb("yapildi", "s40") and not okb("yapildi", "s42") and not okb("teyit", "s1") and okb("teyit", "k43") and not okb("onayla", "k43"))
+# G1: gün planı bildirimi teslimden önce doğrulanır (dus_plan_gecerli)
+KP = kur("plan-dogrula"); json.dump({"tarih": SIMDI.date().isoformat(), "ozet": "x", "odak": [], "dikkat": []}, open(os.path.join(KP["D"] if "D" in KP else KP["BASE"], "gun-plani.json"), "w"))
+ok("G1 plan doğrulama: bugünün planı geçerli, dünkü tarih geçersiz", KP["dus_plan_gecerli"](SIMDI.date().isoformat(), SIMDI.timestamp()) is True and KP["dus_plan_gecerli"]((SIMDI.date() - datetime.timedelta(days=1)).isoformat(), SIMDI.timestamp()) is False)
+ok("G1 plan doğrulama: söz kapısına dogrula verilir", "dogrula=lambda: dus_plan_gecerli(plan[\"tarih\"])" in open(os.path.join(KOD, "aktarici", "dusunme.py"), encoding="utf-8").read())
 print(f"\n{'KALDI: ' + str(len(HATA)) if HATA else 'hepsi geçti'}")
 sys.exit(1 if HATA else 0)

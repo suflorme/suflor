@@ -440,3 +440,33 @@ class EskiGorunum(MutableMapping):
         return k + [a for a in self._AYAR if getattr(b, "ayar", {}).get(a) is not None] + list(b.sorgular)
     def __iter__(self): return iter(self._anahtarlar())
     def __len__(self): return len(self._anahtarlar())
+
+# --- kimlik eşleştirme (Kesişim F1, 12 Kasım) -------------------------------------------------------------------------------------------------
+# Ad / e-posta izi / alan adı → veritabanı kimliği (kisi.id, dis_firma.alan_adi). Eşleştirme tek yerde burada; kesisim.py kullanır (tazi.py _vt_baglanti aynı kuralı kendi içinde taşıyor,
+# F4'te buraya çağırır). satir(sql) → satırlar (örn. SqliteKayit._calistir); saf, yazmaz. Birleştirilmiş kişi (durum 'Birleştirildi') haritaya girmez.
+def ad_norm(ad):
+    a = str(ad or "").replace("İ", "i").casefold().replace("ı", "i")
+    for _ in range(3): a = re.sub(r"[\s.,]+(pty\s*ltd|ltd|inc|llc|limited|gmbh|a\s*ş|pty|co)$", "", a.strip())
+    return re.sub(r"[^a-z0-9]+", "", a.translate(str.maketrans("çğöşü", "cgosu")))
+def eposta_iz(adres):
+    import hashlib
+    a = str(adres or "").strip().lower()
+    return hashlib.sha256(a.encode()).hexdigest()[:16] if a else None
+def alan_norm(a): return str(a or "").strip().lower().replace("www.", "")
+def kimlik_haritasi(satir):
+    h = {"ad": {}, "iz": {}, "firma": {}, "kisi": {}}
+    for kid, ad in satir("SELECT id, ad FROM kisi WHERE coalesce(durum,'') <> 'Birleştirildi'"):
+        h["kisi"][kid] = ad; h["ad"].setdefault(ad_norm(ad), kid)
+    for kid, ad in satir("SELECT t.kisi_id, t.ad FROM kisi_takma t JOIN kisi k ON k.id = t.kisi_id WHERE coalesce(k.durum,'') <> 'Birleştirildi'"): h["ad"].setdefault(ad_norm(ad), kid)
+    for adres, kid in satir("SELECT adres, kisi_id FROM hesap"):
+        if kid and adres: h["iz"].setdefault(eposta_iz(adres), kid)
+    for alan, ad in satir("SELECT alan_adi, ad FROM dis_firma"):
+        if alan: h["firma"][alan_norm(alan)] = ad
+    return h
+def kimlik_esle(h, ad, alanlar=(), izler=()):
+    """→ (veritabanı kişi id | None, dis_firma alan adı | None); kişi: e-posta izi önce, sonra ad (≥ 4 harf)"""
+    kisi = next((h["iz"][i] for i in izler or [] if i in h["iz"]), None)
+    n = ad_norm(ad)
+    if not kisi and len(n) >= 4: kisi = h["ad"].get(n)
+    alan = next((alan_norm(a) for a in alanlar or [] if alan_norm(a) in h["firma"]), None)
+    return kisi, alan
