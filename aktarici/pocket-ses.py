@@ -9,7 +9,9 @@
 # cümlenin kendisinden (ünlem → mutlu, hayret kalıbı → şaşkın). Ses ve metin Mac'ten çıkmaz.
 import queue, tempfile, wave
 if "ses_basladi" not in globals():  # v0.95.0: çalma anı ölçümü brifing-ses.py'de; bu bölüm tek başına yüklenince (testler) etkisiz
-    def ses_basladi(kayit=None): pass
+    def ses_basladi(kayit=None, t=None): pass
+if "ky_sessiz_sar" not in globals():  # yerel-konus.py bölümü sonra yüklenir (çağrı anında gerçeği kullanılır); tek başına yüklenince etkisiz
+    def ky_sessiz_sar(oyn): pass
 OYNAT_YOL = os.path.join(AYAR["uygulama"], "Suflor Oynat.app", "Contents", "MacOS", "SuflorOynat")  # kesintisiz ses çalıcı (oynat.swift): Pocket, Gemini ve toplantıya okuma bunu kullanır
 # Okunur metin (v0.32.2): yerel Türkçe ses (espeak tr) sayıların çoğunu doğru okur ("%12", "1.250", "3,5") ama sayıya bitişik eki ayrı sözcük okur
 # ("12'si" → "on iki si", "3'üncü" → "üç ündcü"), "09.00"ı "sıfır dokuz nokta sıfır sıfır", "-5"i "beş", "3." sırasını "üç", "Dr."yi "dere"
@@ -255,6 +257,7 @@ def pocket_oku(metin, ses=None, iptal=None, kayit=None, duygu=None, topla=None, 
             try:
                 oyn = subprocess.Popen([OYNAT_YOL, str(sr)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if kayit is not None: kayit["p"] = oyn
+                ky_sessiz_sar(oyn)  # yerel Konuş açıksa çalarken motorda sessiz düğüm (D yolu); kapalıysa hiçbir şey
             except OSError: oyn = None
         try: POCKET["p"].stdin.write(json.dumps({"id": kim, "metin": metin, "ses": ses, "duygu": duygu if ses.startswith("wite") else None}, ensure_ascii=False) + "\n"); POCKET["p"].stdin.flush()
         except (OSError, AttributeError, ValueError): kapat(False); return False

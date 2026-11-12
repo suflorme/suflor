@@ -12,7 +12,9 @@
 # (2026 sonuna kadar ~0,009 $/dk; 1 Ocak 2027'den iki katı).
 import http.client, re
 if "ses_basladi" not in globals():  # v0.95.0: çalma anı ölçümü brifing-ses.py'de; bu bölüm tek başına yüklenince (testler) etkisiz
-    def ses_basladi(kayit=None): pass
+    def ses_basladi(kayit=None, t=None): pass
+if "ky_sessiz_sar" not in globals():  # yerel-konus.py bölümü sonra yüklenir; tek başına yüklenince etkisiz
+    def ky_sessiz_sar(oyn): pass
 GEMINI = {"durum": None, "hata": None, "anahtar": None, "anahtar_t": 0.0, "c": None, "kilit": threading.RLock(), "hata_t": 0.0}  # RLock: zaman aşımında aynı iş parçacığı yeniden dener
 GEMINI_SESLER = ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")
 GEMINI_MODELLER = ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts")  # v0.80.11: günlük sınır yedek sırası
@@ -248,6 +250,7 @@ def _pcm_cal(pcm, iptal=None, kayit=None, aygit=None, duzey=None):  # önbellekt
     if os.access(OYNAT_YOL, os.X_OK):
         try: oyn = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError: return False
+        if not aygit: ky_sessiz_sar(oyn)  # aygıtlı (toplantıya ses) yol hiç değişmez
         if kayit is not None: kayit["p"] = oyn; ses_basladi(kayit)
         try:
             for i in range(0, len(pcm), 9600):
@@ -344,6 +347,7 @@ def _onceden_cal(o, metin, iptal, kayit):  # önceden istenen sesi çal (gelmeye
         return _pcm_cal(bytes(o["pcm"]), iptal=iptal, kayit=kayit) or None
     try: oyn = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError: return None
+    ky_sessiz_sar(oyn)
     if kayit is not None: kayit["p"] = oyn
     yazilan = 0; ilk = True
     try:
@@ -459,6 +463,7 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
                             try:
                                 oyn = subprocess.Popen([OYNAT_YOL, str(GEMINI_SR)] + ([str(aygit)] if aygit else []), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                                 if kayit is not None: kayit["p"] = oyn
+                                if not aygit: ky_sessiz_sar(oyn)
                             except OSError: oyn = None
                     nbayt += len(b)
                     if sabit: ham.extend(b)

@@ -974,7 +974,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "tazi.py", "aktarici/", "kullanim.py", "zeka.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "baglayici.py", "kesisim.py", "kesisim-coz.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "tazi.py", "aktarici/", "kullanim.py", "zeka.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "vad-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "baglayici.py", "kesisim.py", "kesisim-coz.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 # v0.136.0 (26 Ekim kişisel hesap: ses-isci.py, pano/hazirlik.html, test/platform.py kalmıştı): önceki imzalı listede olup yenisinde olmayan ve
 # özeti değişmemiş dosya silinir; kullanıcının koyduğu ya da değiştirdiği dosya kalır. Aynı kural kur.sh'de (bash).
@@ -1049,6 +1049,59 @@ BRIFING_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
   <key>NSDocumentsFolderUsageDescription</key><string>Suflor.me toplantı öncesi brifingi hazırlarken proje klasöründeki belgeleri okur. Hiçbir şey değiştirmez; metin yalnız Claude'a gider.</string>
 </dict></plist>
 """
+# Konuş ses yardımcısı (Aşama 2, Adım 1): tek AVAudioEngine'de mikrofon + asistan sesi, hoparlörde VPIO. Yalnız geliştirici kurulumunda (beta'ya gitmez);
+# launchd ajanı local.suflor.konus (KeepAlive) yalnız soketi dinler, mikrofonu aktarıcının mik_ac komutu açar (ayar yerel_konus false iken aktarıcı bağlanmaz).
+KONUS_LABEL = "local.suflor.konus"
+KONUS_YARDIMCI = ("Suflor Konus.app", "konus-ses.swift", "SuflorKonus")
+KONUS_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>local.suflor.konus</string><key>CFBundleName</key><string>Suflor Konus</string>
+  <key>CFBundleExecutable</key><string>SuflorKonus</string><key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string><key>LSUIElement</key><true/><key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSMicrophoneUsageDescription</key><string>Suflor.me Konuş: asistanla sesli sohbette sesin yalnız bu Mac'teki yerel konuşma tanımaya gider; hoparlörde asistanın kendi sesi yankı olarak ayıklanır. Ses kaydedilmez, bu Mac dışına gönderilmez.</string>
+</dict></plist>
+"""
+def konus_plist_yolu(): return os.path.join(EV, "Library", "LaunchAgents", KONUS_LABEL + ".plist")
+def konus_ajan_metni(ikili, app, log):
+    from xml.sax.saxutils import escape as x
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>{KONUS_LABEL}</string>
+  <key>ProgramArguments</key><array><string>{x(ikili)}</string><string>--uygulama</string><string>{x(app)}</string></array>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>10</integer><key>ProcessType</key><string>Interactive</string>
+  <key>StandardOutPath</key><string>{x(log)}</string><key>StandardErrorPath</key><string>{x(log)}</string>
+</dict></plist>
+"""
+def konus_kur(app, gelistirici):  # derle + (ilk kurulumda) mikrofon izni + launchd ajanı; beta'da ajan ve uygulama kaldırılır. imzala() bu işlevden önce çağrılmaz: kendisi imzalar
+    uyg = os.path.join(app, KONUS_YARDIMCI[0]); ikili = os.path.join(uyg, "Contents", "MacOS", KONUS_YARDIMCI[2]); pl = konus_plist_yolu()
+    if not gelistirici:
+        if os.path.exists(pl) or os.path.isdir(uyg):
+            sessiz("launchctl", "bootout", f"{gui()}/{KONUS_LABEL}")
+            if os.path.exists(pl): os.remove(pl)
+            shutil.rmtree(uyg, ignore_errors=True)
+        return
+    ilk = not os.access(ikili, os.X_OK)
+    r = derle(uyg, KONUS_YARDIMCI[1], KONUS_YARDIMCI[2], KONUS_PLIST)
+    if r is True: say(f"Konuş ses yardımcısı derlendi: {uyg}")
+    elif r: say(f"UYARI: Konuş ses yardımcısı derlenemedi ({r}) — yerel Konuş kapalı kalır, bugünkü yol sürer"); return
+    if not os.access(ikili, os.X_OK): return
+    imzala([uyg])
+    if r is True and ilk:  # izin penceresi şimdi çıksın, ilk sohbette değil (en çok 2 dk)
+        say("Mikrofon izni: macOS 'Suflor Konus' için mikrofon izni sorarsa İzin Ver de (Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon). En çok 2 dk beklenir.")
+        p = subprocess.Popen(["open", "-g", "-W", "-a", uyg, "--args", "--izin"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try: p.wait(120)
+        except subprocess.TimeoutExpired: p.kill()
+    metin_ = konus_ajan_metni(ikili, app, os.path.join(EV, "Library", "Logs", "suflor-konus.log"))
+    try: eski = open(pl, encoding="utf-8").read()
+    except OSError: eski = None
+    yuklu = bool((y := sessiz("launchctl", "print", f"{gui()}/{KONUS_LABEL}")) and y.returncode == 0)
+    if r is True or eski != metin_ or not yuklu:  # yeni ikili, değişen ajan ya da yüklü değil → yeniden yükle
+        os.makedirs(os.path.dirname(pl), exist_ok=True); open(pl, "w", encoding="utf-8").write(metin_)
+        sessiz("launchctl", "bootout", f"{gui()}/{KONUS_LABEL}"); time.sleep(0.5)
+        b = sessiz("launchctl", "bootstrap", gui(), pl)
+        say("Konuş ses yardımcısı çalışıyor (mikrofonu yalnız yerel Konuş açar)" if b and b.returncode == 0 else "UYARI: Konuş ses yardımcısı başlatılamadı — launchctl print " + f"{gui()}/{KONUS_LABEL}")
 MENU_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -1160,6 +1213,27 @@ def tur_kur(ort):  # tur sonu modeli (smart-turn v3, BSD-2, 8,7 MB) + küçük o
             os.replace(gec, model)
         sessiz("chmod", "-R", "go+rX", os.path.join(ort, "smart-turn-venv"), md); say("✓ tur sonu modeli hazır")
     except Exception as e: say(f"Not: tur sonu modeli kurulamadı ({str(e)[:120]}) — konuşmada eski kural, sonraki güncellemede yeniden denenir")
+# Silero VAD (Konuş akıcı sohbet Aşama 2, Adım 3: vad-isci.py, MIT, 2,3 MB): tur sonu ortamının onnxruntime'ını kullanır → tur_kur'dan sonra.
+# Adres ve özet aktarici/vad.py VAD_URL / VAD_SHA ile aynı (test/konus-ses-yardimci.py eşitliği denetler). İsteğe bağlı: olmazsa yerel Konuş araya girmesiz sürer.
+VAD_URL = "https://github.com/snakers4/silero-vad/raw/v6.2.3/src/silero_vad/data/silero_vad.onnx"
+VAD_SHA = "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+def vad_model_yolu(ort): return os.path.join(ort, "ses-modeller", "silero-vad", "silero_vad.onnx")
+def vad_kur(ort):
+    if DENEME: return
+    import hashlib
+    model = vad_model_yolu(ort); md = os.path.dirname(model)
+    try:
+        if os.path.isfile(model) and hashlib.sha256(open(model, "rb").read()).hexdigest() == VAD_SHA: return
+    except OSError: pass
+    if not os.access(ort, os.W_OK): say("Not: Silero VAD modeli yok ve ortak klasör başka hesabın — yerel Konuş araya girmesiz"); return
+    try:
+        say("→ Silero VAD modeli indiriliyor (2,3 MB)…")
+        veri = urllib.request.urlopen(VAD_URL, timeout=120).read()
+        if hashlib.sha256(veri).hexdigest() != VAD_SHA: raise RuntimeError("doğrulama tutmadı")
+        os.makedirs(md, exist_ok=True); gec = model + ".indir"
+        with open(gec, "wb") as f: f.write(veri)
+        os.replace(gec, model); sessiz("chmod", "-R", "go+rX", md); say("✓ Silero VAD modeli hazır")
+    except Exception as e: say(f"Not: Silero VAD modeli kurulamadı ({str(e)[:120]}) — yerel Konuş araya girmesiz, sonraki güncellemede yeniden denenir")
 # Belge → metin (proje hazırlığı T2): Docling + Apple Vision, ayrı Python 3.12 ortamında (Docling ≥ 3.10 ister; sistem Python'u 3.9).
 # Python: python-build-standalone (taşınabilir, yönetici izni gerekmez) SHA-256 doğrulanarak <ortak>/python312'ye; ortam <ortak>/cevir-venv
 # (cevir-gereksinim.txt'deki sabit sürümler, --no-deps; ~1,4 GB); modeller <ortak>/cevir-modeller (yerleşim + tablo, ~0,7 GB).
@@ -1359,6 +1433,8 @@ def imzala(uygulamalar):
 def kaldir():
     sessiz("launchctl", "bootout", f"{gui()}/{LABEL}")
     if os.path.exists(plist_yolu()): os.remove(plist_yolu())
+    sessiz("launchctl", "bootout", f"{gui()}/{KONUS_LABEL}")
+    if os.path.exists(konus_plist_yolu()): os.remove(konus_plist_yolu())
     say(f"Otomatik başlatma kaldırıldı. Veri {os.path.join(yollar()['uygulama'], 'canli')} içinde duruyor (proje klasöründeki _canli kısayolu çalışmaya devam eder).")
 
 # v0.134.0: tamamen kaldırma (kaldir.command) — beta kullanıcısı ya da baştan kurmak isteyen. Silmez, Çöp Sepeti'ne taşır (Çöp boşaltılana
@@ -1367,8 +1443,8 @@ def kaldir():
 # Suflor'un eklediği: _canli kısayolu, /toplanti komutu, şablondan değişmemiş CLAUDE.md, boş iskelet klasörleri; toplantı notları sorulur.
 # Finder'la taşınır ("Geri Koy" çalışsın); Finder izni yoksa ya da kısayolsa doğrudan.
 # Geliştiricinin git klonunda çalışmaz: yanlışlıkla canlı kurulum gitmesin.
-SIL_KIMLIK = ("local.suflor.takvim", "local.suflor.posta", "local.suflor.ses", "local.suflor.oynat", "local.suflor.metin", "local.suflor.brifing", "local.suflor.menu")
-SIL_SUREC = ("SuflorMenu", "SuflorSes", "SuflorBrifing", "SuflorTakvim", "SuflorPosta", "SuflorOynat", "SuflorMetin")
+SIL_KIMLIK = ("local.suflor.takvim", "local.suflor.posta", "local.suflor.ses", "local.suflor.oynat", "local.suflor.metin", "local.suflor.brifing", "local.suflor.menu", "local.suflor.konus")
+SIL_SUREC = ("SuflorMenu", "SuflorSes", "SuflorBrifing", "SuflorTakvim", "SuflorPosta", "SuflorOynat", "SuflorMetin", "SuflorKonus")
 def _cope(y):
     gercek = os.path.join(os.path.realpath(os.path.dirname(y.rstrip("/"))), os.path.basename(y.rstrip("/")))  # kısayolun kendisi, hedefi değil
     if DENEME and not gercek.startswith(os.path.realpath(EV) + os.sep): raise PermissionError("deneme: ev klasörü dışı")
@@ -1433,7 +1509,8 @@ def sil(evet=False, zorla=False, modeller_de=False, proje_de=False, kod_de=False
         say(f"Proje klasörün ({pr}) yerinde kalır; yalnız Suflor'un eklediği dosyalar kaldırılır" + (f" ({ws})." if ws != pr else "."))
         g, kal = _proje_temizle(ws, pr, a, sor, proje_de); liste += g
     if not DENEME:
-        sessiz("launchctl", "bootout", f"{gui()}/{LABEL}")
+        sessiz("launchctl", "bootout", f"{gui()}/{LABEL}"); sessiz("launchctl", "bootout", f"{gui()}/{KONUS_LABEL}")
+        if os.path.exists(konus_plist_yolu()): os.remove(konus_plist_yolu())
         for ad in SIL_SUREC: sessiz("pkill", "-u", str(os.getuid()), "-x", ad)
         for y in (Y["uygulama"], ort): sessiz("pkill", "-u", str(os.getuid()), "-f", re.escape(y))  # aktarıcı, işçiler
         time.sleep(1); sessiz(LSREGISTER, "-u", menu_yolu())
@@ -1506,7 +1583,7 @@ def kur():
     altin_kopyala(app)
     for k in KALKAN:
         if os.path.isfile(os.path.join(app, k)): os.remove(os.path.join(app, k))
-    ecapa_donustur(Y["ortak"]); whisper_8bit(Y["ortak"]); tur_kur(Y["ortak"])
+    ecapa_donustur(Y["ortak"]); whisper_8bit(Y["ortak"]); tur_kur(Y["ortak"]); vad_kur(Y["ortak"])
     try: whispercpp_baslat()  # aktarici-kur.command yolu: eski sunucu sürümü değişir, Core ML ön ısıtma (arka planda, kurulumu bekletmez)
     except Exception as e: say(f"Not: whisper.cpp denetimi çalışmadı ({e.__class__.__name__})")
     if ayar().get("pocket_iste") and not pocket_kurulu(): pocket_baslat(); say("→ doğal Türkçe ses yarım kalmıştı — arka planda yeniden kuruluyor (günlük: pocket-kur.log)")
@@ -1593,6 +1670,8 @@ def kur():
         p = subprocess.Popen(["open", "-g", "-W", "-a", ses, "--args", "--izin"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try: p.wait(120)
         except subprocess.TimeoutExpired: p.kill()
+    # Konuş ses yardımcısı (Aşama 2): yalnız geliştirici kurulumunda; beta'da varsa kaldırılır
+    konus_kur(app, _gelistirici())
 
 WHISPER_REV = "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb"
 def whisper_snap(ort):  # ağırlığı olan anlık görüntü (önce sabit sürüm); aktarıcı da modeli buradan açar (whisper-hat), refs/main gerekmez
@@ -1908,7 +1987,7 @@ def modeller():
     # S188: whisper.cpp varsayılan motor. MLX modeli bu adımda yine iner: toplu döküm, konuşmacı etiketlemesi ve cpp açılamazsa yedek ona muhtaç
     try: whispercpp_kur(ort)
     except Exception as e: say(f"Not: whisper.cpp kurulamadı ({e.__class__.__name__}: {str(e)[:120]}) — aktarıcı MLX'le çalışır")
-    whisper_8bit(ort); tur_kur(ort); cevir_kur(ort)
+    whisper_8bit(ort); tur_kur(ort); vad_kur(ort); cevir_kur(ort)
     say("→ Deneme: modeller çevrimdışı açılıyor mu…")
     zorunlu(vpy, "-c", "import sys, numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), "
             "path_or_hf_repo=sys.argv[1], language='tr'); print('✓ Whisper açılıyor')", whisper_snap(ort) or "mlx-community/whisper-large-v3-turbo",
@@ -2088,7 +2167,7 @@ def dogrula_topla(hizli=False):  # → [{"id", "durum": ok|hata|?, "ad", "not", 
     uyg = Y["uygulama"]; eski = []; yok = []; okunamayan = 0; toplam_k = 0
     if True:
         import hashlib
-        for kl, kaynak, ikili in SWIFT_YARDIMCI + (("", "menu-cubugu.swift", "SuflorMenu"),):
+        for kl, kaynak, ikili in SWIFT_YARDIMCI + ((KONUS_YARDIMCI,) if _gelistirici() else ()) + (("", "menu-cubugu.swift", "SuflorMenu"),):
             ik = os.path.join(menu_yolu(), "Contents", "MacOS", ikili) if ikili == "SuflorMenu" else os.path.join(uyg, kl, "Contents", "MacOS", ikili)
             toplam_k += 1
             try: sha = hashlib.sha256(open(os.path.join(KOD, kaynak), "rb").read()).hexdigest()
@@ -2098,7 +2177,7 @@ def dogrula_topla(hizli=False):  # → [{"id", "durum": ok|hata|?, "ad", "not", 
     if DENEME and not (eski or yok) and not os.path.isdir(uyg): m("swift", "?", "Swift yardımcıları", "deneme ortamında bakılmaz", "gerçek kurulumda python3 kurulum.py dogrula")
     elif kopya or (toplam_k and okunamayan == toplam_k): m("swift", "?", "Swift yardımcıları", "arka planda kaynak okunamıyor", "Terminal'de python3 kurulum.py dogrula")  # sessizce ✓ verme
     elif yok or eski: m("swift", "hata", "Swift yardımcıları", f"{len(yok)} eksik, {len(eski)} eski ({', '.join(yok + eski)})", kur_yap)
-    else: m("swift", "ok", "Swift yardımcıları", f"{len(SWIFT_YARDIMCI) + 1} yardımcı kaynakla aynı")
+    else: m("swift", "ok", "Swift yardımcıları", f"{toplam_k} yardımcı kaynakla aynı")
     # --- aktarıcı ajanı ve port
     if DENEME: m("ajan", "?", "Arka plan ajanı (launchd)", "deneme ortamında bakılmaz", "gerçek kurulumda python3 kurulum.py dogrula")
     else:

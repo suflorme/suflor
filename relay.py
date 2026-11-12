@@ -441,7 +441,7 @@ def gizli_degistir(neden="kullanıcı"):
         if STATE.get("file"): _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **GİZLİ** | {'açıldı — kapanana kadar hiçbir şey kaydedilmez' if ac else f'kapandı ({neden})'} | |")
     if ac:  # süren her şey hemen kesilir
         for ad, fn in (("toplantıya okuma", lambda: ts_durdur()), ("otonom", lambda: otonom_kisayol()), ("Konuş", lambda: konus_kapat("gizli toplantı")),
-                       ("sohbet", lambda: SOHBET["acik"] and sohbet_kapat("gizli toplantı")), ("Whisper", lambda: _isci_kapat("gizli toplantı")),
+                       ("sohbet", lambda: SOHBET["acik"] and sohbet_kapat("gizli toplantı")), ("yerel mikrofon", lambda: "ky_mik_kapat" in globals() and ky_mik_kapat("gizli kip")), ("Whisper", lambda: _isci_kapat("gizli toplantı")),
                        ("çeviri", lambda: [_cv_kapat(y, "gizli toplantı") for y in _CV.get("yuva") or []])):
             try: fn()
             except Exception as e: print(f"GİZLİ: {ad} durdurulamadı ({e.__class__.__name__})")
@@ -630,6 +630,7 @@ bolum("kisilik")  # aktarici/kisilik.py — Kişilik (ayar kisilik; yoksa nötr)
 bolum("sozluk")  # aktarici/sozluk.py — Özel sözlük
 bolum("whisper-hat")  # aktarici/whisper-hat.py — Whisper hattı: işçi, ses izi, taslak, yankı
 bolum("golge-tstt")  # aktarici/golge-tstt.py — gölge kipte turkish-stt: aynı ses ikinci tanıyıcıya, yalnız kayıt (ayar golge_tstt; ekrana bir şey girmez)
+bolum("vad")  # aktarici/vad.py — konuşma algılayıcı istemcisi (Silero VAD işçisi vad-isci.py; Konuş Aşama 2 Adım 3, araya girme Adım 5)
 # --- Kısayol komutları ------------------------------------------------------------------------------------------
 # ⭐ önemli an ve "Ne diyeyim?" (eski son 1 dk özeti) eklentinin kısayolundan gelir (POST /komut). "Suflor, …" sesli komutları yok (2 Ekim gerçek
 # denemesi: Whisper "Suflor"u yanlış yazdı, komut karşı tarafa da duyuldu — kullanıcı: "kaldır, iki kısayolu ekle"). Sesli kanıt
@@ -1950,6 +1951,7 @@ bolum("ortak-klasor")  # aktarici/ortak-klasor.py — ortak karar katmanı A3 (e
 bolum("eylem-menu")  # aktarici/eylem-menu.py — kayıt eylem menüsü: ertele, böl, gündeme ekle, ata, taslak, asistana sor (/girdi {kayit}), Geri al (/kayit-menu, /kayit-eylem, /kayit-not; ortak karar katmanı)
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
+bolum("yerel-konus")  # aktarici/yerel-konus.py — Konuş yerel ses istemcisi: VPIO'lu yardımcıya soket (ayar yerel_konus, yalnız geliştirici; Aşama 2 Adım 2) — sohbet'ten önce
 bolum("sohbet")  # aktarici/sohbet.py — Sohbet kipi (eller serbest, kulaklıkla)
 bolum("toplantiya-ses")  # aktarici/toplantiya-ses.py — Toplantıya sesli söyle (BlackHole, Option + Shift + S)
 bolum("ekran")  # aktarici/ekran.py — Paylaşılan ekranın yazısı: kanıtta yerel okuma, EKRAN olayı, Konuş bağlamı (v0.187.0)

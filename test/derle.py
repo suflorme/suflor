@@ -39,6 +39,23 @@ try:
     ok("yeniden derlemede düşen izin adıyla ve düzeltme yoluyla söylenir", n.startswith("UYARI") and "Ekran ve Sistem Sesi Kaydı" in n and "Mikrofon" not in n.split(".")[0] and "Suflor.me.app" in n)
     ok("izinler yerindeyse uyarı yok", K.menu_izin_notu({"mikrofon": "var", "erisilebilirlik": "var", "ekran": "var"}).startswith("İzinler yerinde"))
     ok("izin okunamazsa dogrula'ya yönlendirir", "kurulum.py dogrula" in K.menu_izin_notu({}))
+    # Aşama 2 Adım 1: Konuş ses yardımcısı — gerçek kaynak derlenir (kurulum.py derle ile), paket bilgisi ve launchd ajanı
+    shutil.copy(os.path.join(KOD, "konus-ses.swift"), os.path.join(T, "konus-ses.swift")); ku = os.path.join(T, "app", K.KONUS_YARDIMCI[0])
+    ok("konus-ses.swift derlenir (Suflor Konus.app/Contents/MacOS/SuflorKonus)", K.derle(ku, K.KONUS_YARDIMCI[1], K.KONUS_YARDIMCI[2], K.KONUS_PLIST) is True
+       and os.access(os.path.join(ku, "Contents", "MacOS", "SuflorKonus"), os.X_OK))
+    ok("Konus paketi: kimlik local.suflor.konus, mikrofon izni metni", "<string>local.suflor.konus</string>" in K.KONUS_PLIST and "NSMicrophoneUsageDescription" in K.KONUS_PLIST
+       and open(os.path.join(ku, "Contents", "Info.plist"), encoding="utf-8").read() == K.KONUS_PLIST)
+    aj = K.konus_ajan_metni("/a/Suflor Konus.app/Contents/MacOS/SuflorKonus", "/u & v", "/l.log")
+    ok("launchd ajanı: etiket, --uygulama, KeepAlive, XML kaçışı", "<string>local.suflor.konus</string>" in aj and "<string>--uygulama</string><string>/u &amp; v</string>" in aj and "<key>KeepAlive</key><true/>" in aj)
+    ok("Konus yardımcısı kaldırma listelerinde", "local.suflor.konus" in K.SIL_KIMLIK and "SuflorKonus" in K.SIL_SUREC)
+    # beta (geliştirici değil): yardımcı kurulmaz, varsa kaldırılır — launchctl çağrısı denemede sahte
+    cagri = []; K.sessiz = lambda *c, **k: cagri.append(c); EV0 = K.EV; K.EV = T
+    try:
+        os.makedirs(os.path.join(T, "Library", "LaunchAgents")); open(K.konus_plist_yolu(), "w").write("x")
+        K.konus_kur(os.path.join(T, "app"), False)
+        ok("beta kurulumunda Konus yardımcısı ve ajanı kaldırılır", not os.path.exists(ku) and not os.path.exists(K.konus_plist_yolu())
+           and any(c[:2] == ("launchctl", "bootout") and c[2].endswith("/local.suflor.konus") for c in cagri))
+    finally: K.EV = EV0
 finally:
     shutil.rmtree(T, ignore_errors=True)
 print("derle:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

@@ -135,6 +135,9 @@ def sohbet_parca(p):
     if not SOHBET["acik"]: return {"ok": False, "kapali": True}
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
     except ValueError: return {"ok": False, "err": "pcm"}
+    return _sohbet_parca_govde(pcm, p)
+def _sohbet_parca_govde(pcm, p):  # iç gövde (12 Kasım, Aşama 2 Adım 2): pano/menü sohbet_parca'dan ve yerel yardımcının mikrofon öbeklerinden (yerel-konus.py) aynı yol; p: {"pcm": base64} (konus_parca'ya gider)
+    if not SOHBET["acik"]: return {"ok": False, "kapali": True}
     simdi = time.time(); pen = _pencereler(pcm); esik = AKIS.get("esik") or 400
     try: _kapi_olc(pen, esik)  # v0.80.7: ölçüm kipi, davranışı değiştirmez
     except Exception as e: print(f"SOHBET ÖLÇÜM: hata {e.__class__.__name__}")

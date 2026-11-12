@@ -364,9 +364,9 @@ SES = {"p": None, "q": [], "isci": False}; SES_K = threading.Condition()
 # Motorlar ilk ses parçasını çalıcıya verdikleri anda ses_basladi(kayit) der; çalan öğe SES["simdi"] (birleşik Gemini okumasında birkaç cümle).
 # Eşleşme metnin başıyla (etiketsiz ilk 40 karakter); okuma kesilince (ses_durdur) bekleyenler düşer.
 def _cal_anahtar(m): return " ".join(etiket_sil(_ses_metin(m) or "").split())[:40]
-def ses_basladi(kayit=None):
+def ses_basladi(kayit=None, t=None):  # t: ses saati (yerel yardımcının cal_basladi anı, duvar saati); yoksa şimdi
     if kayit is not SES: return
-    t = time.time()
+    t = t or time.time()
     with SES_K:
         simdi = " ".join(etiket_sil(SES.get("simdi") or "").split()); bek = SES.get("bek") or []
         if not bek or not simdi: return
@@ -780,11 +780,12 @@ def _ses_isci():
                 SES["q"].pop(0); kes = SES.get("kes", 0); SES["simdi"] = bas[1]
             if bas[2] == "pocket" and "pocket_var" in globals() and pocket_oku(bas[1], ses=bas[3], iptal=lambda: SES.get("kes", 0) != kes, kayit=SES): continue
             hz = ["-r", str(round(SES_TABAN_HIZ * bas[5]))] if bas[5] != 1.0 and bas[4] else []
-            try: SES["p"] = p = subprocess.Popen(["/usr/bin/say"] + (["-v", str(bas[4])] if bas[4] else []) + hz + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try: SES["p"] = p = ((ky_say_popen() if "ky_say_popen" in globals() else None) or subprocess.Popen)(["/usr/bin/say"] + (["-v", str(bas[4])] if bas[4] else []) + hz + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError as e: print(f"SES: hata {e.__class__.__name__}"); continue
             try: p.stdin.write(etiket_sil(bas[1]).encode("utf-8")); p.stdin.close()
             except OSError: pass
-            ses_basladi(SES); p.wait(); continue
+            if not getattr(p, "yerel", False): ses_basladi(SES)  # yerel yolda ses saati cal_basladi'dan gelir
+            p.wait(); continue
         motor, v, khiz = kisilik_sesi()
         with SES_K: bas = SES["q"][0] if SES["q"] else None
         if isinstance(bas, tuple) and bas[0] == "mac": motor = "mac"; v, khiz = kisilik_sesi("mac")[1:]
@@ -815,11 +816,11 @@ def _ses_isci():
         with SES_K:
             if not SES["q"]: continue
             metin = SES["q"].pop(0); SES["simdi"] = metin
-            try: SES["p"] = p = subprocess.Popen(["/usr/bin/say"] + (["-v", str(v)] if v else []) + hz + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try: SES["p"] = p = ((ky_say_popen() if "ky_say_popen" in globals() else None) or subprocess.Popen)(["/usr/bin/say"] + (["-v", str(v)] if v else []) + hz + ["-f", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError as e: print(f"SES: hata {e.__class__.__name__}"); continue
         try: p.stdin.write(metin.encode("utf-8")); p.stdin.close()
         except OSError: pass
-        ses_basladi(SES)  # Mac sesi: say başladı (kendi ilk ses gecikmesi ölçülmez, ~0,1–0,3 sn)
+        if not getattr(p, "yerel", False): ses_basladi(SES)  # Mac sesi: say başladı (kendi ilk ses gecikmesi ölçülmez, ~0,1–0,3 sn)
         p.wait()
 # --- Toplantı içi fısıltı (v0.27.0; ayar fisilti: true, varsayılan kapalı) ---------------------------------------------------------
 # Yalnız kulaklık takılıyken (çıkış aygıtı Bluetooth/USB ya da Mac'in kulaklık girişi; hoparlörden okunursa mikrofona girer, karşı taraf
