@@ -1539,5 +1539,7 @@ globalThis.SUFLOR_EN = {
   "Panel genişliği": "Panel width",
   "Yan sütun": "Side column",
   "{ad} — {n} onay bekliyor": "{ad} — {n} waiting for approval",
-  "{ad} cevap verdi": "{ad} answered"
+  "{ad} cevap verdi": "{ad} answered",
+  "Tazı raporu": "Tazı report",
+  "Toplantı katılımcıları": "Meeting participants"
 };

@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 683860,
-   "sha": "bdccfab49ea7f191"
+   "uzunluk": 685665,
+   "sha": "4a65e5864c923972"
   },
   "/mini": {
-   "uzunluk": 683860,
-   "sha": "bdccfab49ea7f191"
+   "uzunluk": 685665,
+   "sha": "4a65e5864c923972"
   },
   "/status": {
    "_ping_son": "float",
@@ -814,6 +814,7 @@
     "bugun": "int",
     "calisiyor": "bool",
     "kuyruk": "int",
+    "raporlar": [],
     "son": "NoneType",
     "tavan": "int"
    },

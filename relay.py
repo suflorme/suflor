@@ -2448,7 +2448,9 @@ class H(BaseHTTPRequestHandler):
             return self._json(soru_komut(p))
         if self.path == "/son-toplanti":  # toplantı sonu özeti hazır (toplanti-claude.py ozet-hazir) — kart gibi anahtarla
             return self._json(son_ekle(p))
-        if self.path == "/tazi": return self._json(tazi_islem(p) if "tazi_islem" in globals() else {"ok": False, "err": "yok"})  # 11 Kasım: Tazı taraması iste/durum — yalnız anahtarlı (aktarici/tazi-kos.py; gizli kipte ve ayar tazi kapalıyken çalışmaz)
+        if self.path == "/tazi":
+            if p.get("islem") == "rapor" and not pano: return self._json({"ok": False, "err": "köken"}, 403)  # 12 Kasım: rapor metni yalnız pano (aynı köken + pano anahtarı)
+            return self._json(tazi_islem(p) if "tazi_islem" in globals() else {"ok": False, "err": "yok"})  # 11 Kasım: Tazı taraması iste/durum — yalnız anahtarlı (aktarici/tazi-kos.py; gizli kipte ve ayar tazi kapalıyken çalışmaz)
         if self.path == "/vt-bellek": return self._json(vt_bellek_al(p))  # 3 Kasım: kayıt veritabanının adları ve terimleri (vt-izle / vt-mcp) — yalnız anahtarlı (geçiş listesinde yok), bellekte
         if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)

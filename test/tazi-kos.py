@@ -14,6 +14,7 @@ SAHTE = '''import os, sys, time
 def liste_oku(arg=None, dizin=None): return [{"id": "nova-teknoloji", "ad": "Nova Teknoloji", "kisiler": [], "alanlar": ["novatek.test"]}]
 def kayit_bul(liste, q):
     q = str(q).lower(); return next((k for k in liste if q in k["ad"].lower() or q in k["alanlar"] or q == k["id"]), None)
+def veri_dizin(dizin=None): return os.environ["TAZI_DIR"]
 def metinden_kayitlar(metin, liste=None, dizin=None, en_cok=3): return []
 def ozet_metni(x, *a, **k): return "Tazı · Nova Teknoloji — son tarama 1 Kas\\nKimlik: deneme" if "nova teknoloji" in str(x).lower() else None
 if __name__ == "__main__":
@@ -26,7 +27,7 @@ def satirlar(): return open(LOG, encoding="utf-8").read().splitlines() if os.pat
 
 # ---------- 1) birim ----------
 def ns_kur(ayar, **ek):
-    ns = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "sys": sys, "AYAR": dict({"kod": KODK}, **ayar), "BASE": os.path.join(T, "b" + str(len(os.listdir(T)))),
+    ns = {"os": os, "stat": __import__("stat"), "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "sys": sys, "AYAR": dict({"kod": KODK}, **ayar), "BASE": os.path.join(T, "b" + str(len(os.listdir(T)))),
           "print": lambda *a, **k: LOGP.append(" ".join(str(x) for x in a)), "_t": lambda tr, en: tr, "gizli_acik": lambda: False, "toplanti_suruyor": lambda: False,
           "STATE": {}}
     os.makedirs(ns["BASE"], exist_ok=True); ns.update(ek)
@@ -86,6 +87,25 @@ C2 = ns_kur({"tazi": True}, toplanti_suruyor=lambda: True); C2["tazi_komut_cevap
 ok("komut toplantıdayken hızlı kuyruğa", C2["TZK"]["kuyruk"][0]["kip"] == "hizli" and C2["TZK"]["kuyruk"][0]["neden"] == "konus")
 ok("kapalıyken komut cevabı None", ns_kur({"tazi": False})["tazi_komut_cevap"]("Tazı, Nova Teknoloji araştır") is None)
 ok("POST /tazi birimi: durum ve tara", K["tazi_islem"]({"islem": "durum"})["ok"] and K["tazi_islem"]({"islem": "tara", "kim": "Birim Deneme Firma"})["ok"] and K["tazi_islem"]({"islem": "x"})["ok"] is False)
+# rapor listesi + okuma (12 Kasım)
+RD = os.path.join(T, "tazi-veri"); os.makedirs(os.path.join(RD, "rapor")); os.environ["TAZI_DIR"] = RD
+def _rap(ad, metin="# Rapor\n\nİçerik [bağ](https://ornek.test)", t=None):
+    y = os.path.join(RD, "rapor", ad); open(y, "w", encoding="utf-8").write(metin)
+    if t: os.utime(y, (t, t))
+now = int(time.time())
+_rap("tazi-20261110.md", t=now - 300); _rap("tazi-20261111.md", t=now - 200); _rap("tazi-son.md", t=now - 10); _rap("toplanti-2026-11-11.md", t=now - 100); _rap("toplanti-son.md", t=now - 5)
+_rap("ad-soyad-20261111.md", t=now - 50); _rap("DIZIN.md", t=now); _rap("a1-20261101.md", t=now - 900); _rap("a2-20261101.md", t=now - 800); _rap("a3-20261101.md", t=now - 700)
+os.makedirs(os.path.join(RD, "rapor", "alt.md")); open(os.path.join(RD, "gizli.md"), "w").write("dışarıda")
+R = ns_kur({"tazi": True}); ls = R["tazi_raporlar"]()
+ok("rapor listesi: ≤ 5, yeniden eskiye, -son.md ve DIZIN.md yok, tür doğru", [x["dosya"] for x in ls] == ["ad-soyad-20261111.md", "toplanti-2026-11-11.md", "tazi-20261111.md", "tazi-20261110.md", "a3-20261101.md"]
+   and [x["tur"] for x in ls] == ["kisi", "toplanti", "tazi", "tazi", "kisi"], ls)
+ok("tazi_view raporlar alanı", R["tazi_view"]()["raporlar"] == ls)
+g = R["tazi_rapor_oku"]("tazi-20261111.md")
+ok("rapor oku: doğru dosya, metin, tür", g["ok"] and g["dosya"] == "tazi-20261111.md" and g["tur"] == "tazi" and "İçerik" in g["metin"] and g["t"] > 0, g)
+ok("rapor oku: .. / yol / dizin / dosya yok reddedilir", all(not R["tazi_islem"]({"islem": "rapor", "dosya": d})["ok"] for d in ("../gizli.md", "..", "a/../../gizli.md", "/etc/passwd", "alt.md", "yok-20260101.md", "tazi-20261111.txt", "", None, ".gizli.md", "x..md")))
+_rap("buyuk-20261111.md", "x" * (200 * 1024 + 1), t=now - 5000); ok("rapor oku: 200 KB üstü reddedilir", R["tazi_rapor_oku"]("buyuk-20261111.md")["durum"] == "buyuk")
+ok("rapor: ayar tazi kapalıyken liste boş, okuma 'kapali'", ns_kur({"tazi": False})["tazi_raporlar"]() == [] and ns_kur({"tazi": False})["tazi_rapor_oku"]("tazi-20261111.md")["durum"] == "kapali")
+ok("rapor: gizli kipte liste boş, okuma 'gizli'", ns_kur({"tazi": True}, gizli_acik=lambda: True)["tazi_raporlar"]() == [] and ns_kur({"tazi": True}, gizli_acik=lambda: True)["tazi_rapor_oku"]("tazi-20261111.md")["durum"] == "gizli")
 
 # ---------- 2) yalıtılmış aktarıcı ----------
 del os.environ["SUFLOR_TZK_DONGU_YOK"]
@@ -98,7 +118,7 @@ class Uc:
         json.dump(dict({"alan": "Deneme", "ad": "Ayşe Deneme", "port": s.port, "uygulama": T, "proje": os.path.join(T, "proje"), "ortak": os.path.join(T, "yok"), "claude": "/yok/claude", "konus_on_ac": False,
                         "pocket_python": "/yok/python", "pocket_hf": "/yok", "kod": T}, **ayar), open(yol, "w"))
         s.p = subprocess.Popen([sys.executable, "relay.py", "--dir", s.d, "--port", str(s.port)], cwd=T, stdout=open(s.log, "w"), stderr=subprocess.STDOUT,
-                               env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=yol, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", FAKE_TAZI_UYKU="0"))
+                               env=dict(os.environ, TAZI_DIR=RD, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=yol, SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="0", FAKE_TAZI_UYKU="0"))
         for _ in range(80):
             if os.path.exists(os.path.join(s.d, "kart-anahtari.txt")): break
             time.sleep(0.2)
@@ -111,6 +131,10 @@ class Uc:
 def tc(u, *args, ayar=None):
     return subprocess.run([sys.executable, "-B", os.path.join(T, "toplanti-claude.py"), "--dir", u.d, "--relay", f"http://127.0.0.1:{u.port}"] + list(args), capture_output=True, text=True, timeout=60, cwd=T,
                           env=dict(os.environ, SUFLOR_AYAR=os.path.join(T, os.path.basename(u.d) + ".json"))).stdout
+def kod_ac_u(u, yol, v, ork=None):  # pano kökeniyle (Origin) ya da kökensiz POST; (kod, json)
+    r = urllib.request.Request(f"http://127.0.0.1:{u.port}{yol}", data=json.dumps(v).encode(), headers=dict(u.h, Origin=f"http://127.0.0.1:{u.port}") if ork is None else dict(u.h, **({"Origin": ork} if ork else {})))
+    try: x = urllib.request.urlopen(r, timeout=30); return x.status, json.loads(x.read())
+    except urllib.error.HTTPError as e: return e.code, json.loads(e.read())
 try:
     A = Uc("a", tazi=True, tazi_gunluk=5)
     ok("açılışta hata yok", "Traceback" not in A.metin())
@@ -127,7 +151,22 @@ try:
     st = A.istek("/status")["tazi"]
     ok("aktarıcı kendi döngüsüyle koşturdu: sonuç ok, bugün 1", st["son"] and st["son"]["durum"] == "ok" and st["bugun"] == 1 and any(l.startswith("tara --kim Nova Yeni Firma --hizli") for l in satirlar()), st)
     ok("günlükte TAZI KOŞ, ad yok", "TAZI KOŞ: bitti" in A.metin() and "Nova Yeni" not in A.metin())
+    def kod_ac(yol, v, ork=None):
+        r = urllib.request.Request(f"http://127.0.0.1:{A.port}{yol}", data=json.dumps(v).encode(), headers=dict(A.h, **({"Origin": ork} if ork else {})))
+        try: u = urllib.request.urlopen(r, timeout=30); return u.status, json.loads(u.read())
+        except urllib.error.HTTPError as e: return e.code, json.loads(e.read())
+    pk = f"http://127.0.0.1:{A.port}"
+    k1, r1 = kod_ac("/tazi", {"islem": "rapor", "dosya": "tazi-20261111.md"}, pk)
+    ok("/tazi rapor (pano kökeni): metin gelir", k1 == 200 and r1.get("ok") and "İçerik" in r1.get("metin", ""), (k1, str(r1)[:100]))
+    k2, r2 = kod_ac("/tazi", {"islem": "rapor", "dosya": "tazi-20261111.md"})
+    ok("/tazi rapor köken yok (pano değil): 403", k2 == 403 and not r2.get("ok"), (k2, r2))
+    k3, r3 = kod_ac("/tazi", {"islem": "rapor", "dosya": "../gizli.md"}, pk)
+    ok("/tazi rapor '..' reddi", k3 == 200 and not r3.get("ok") and "dışarıda" not in json.dumps(r3), (k3, r3))
+    ok("/status tazi.raporlar: liste var, -son.md yok", [x["dosya"] for x in A.istek("/status")["tazi"]["raporlar"]][:2] == ["ad-soyad-20261111.md", "toplanti-2026-11-11.md"] and not any(x["dosya"].endswith("-son.md") for x in A.istek("/status")["tazi"]["raporlar"]))
+    ok("günlükte rapor adı/metni yok", "ad-soyad" not in A.metin() and "İçerik" not in A.metin())
     A.istek("/komut", {"tur": "gizli"}); n0 = len(satirlar())
+    ok("gizli kipte /status raporlar boş, /tazi rapor 'gizli'", A.istek("/status")["tazi"]["raporlar"] == [] and kod_ac("/tazi", {"islem": "rapor", "dosya": "tazi-20261111.md"}, pk)[1].get("durum") == "gizli")
+    A.istek("/komut", {"tur": "gizli"}); A.istek("/komut", {"tur": "gizli"}); n0 = len(satirlar())
     gz = A.istek("/tazi", {"islem": "tara", "kim": "Gizli Bir Firma"}); o4 = tc(A, "tazi", "Nova Teknoloji"); hg = tc(A, "hazirlik", "--kim", "Nova Teknoloji")
     ok("gizli kipte: /tazi 'gizli', tc tazi sessiz, hazırlıkta Tazı bölümü yok, alt süreç yok", gz.get("durum") == "gizli" and "gizli toplantı" in o4 and "## Tazı:" not in hg and len(satirlar()) == n0, (gz, o4[:80]))
     A.istek("/komut", {"tur": "gizli"}); h0 = tc(A, "hazirlik", "--kim", "Nova Teknoloji")
@@ -142,6 +181,7 @@ try:
     A.kapat()
     B = Uc("b", tazi=False)
     ok("ayar tazi kapalı: /status tazi.acik False; /tazi tara 'kapali'", B.istek("/status")["tazi"]["acik"] is False and B.istek("/tazi", {"islem": "tara", "kim": "Nova Yeni Firma"}).get("durum") == "kapali")
+    ok("ayar tazi kapalı: /status raporlar boş, /tazi rapor 'kapali'", B.istek("/status")["tazi"]["raporlar"] == [] and kod_ac_u(B, "/tazi", {"islem": "rapor", "dosya": "tazi-20261111.md"})[1].get("durum") == "kapali")
     n0 = len(satirlar()); o3 = tc(B, "tazi", "Nova Teknoloji")
     ok("tc tazi: kapalıyken sessiz ('Tazı kapalı'), tarama yok", "Tazı kapalı" in o3 and len(satirlar()) == n0, o3)
     h = tc(B, "hazirlik", "--kim", "Nova Teknoloji", "--katilimci", "Nova Teknoloji")
