@@ -18,7 +18,7 @@ i = rel.index("def kesisim_sayfa_veri()"); j = rel.index("def kesisim_geri_al(")
 exec(rel[i:j], ns)
 exec(open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(), ns)
 bs = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-exec(bs[bs.index("def kesisim_tur_notu"):bs.index("def konus_istem(")], ns)
+exec(bs[bs.index("def kesisim_tur_paketi"):bs.index("def konus_istem(")], ns)
 bp = ns["baglam_paketi"]
 def yaz(olusturma=None, bul=None, cozum=None, olay=None, sor=None):
     olusturma = olusturma or simdi.replace(tzinfo=None).isoformat(timespec="seconds")
@@ -78,5 +78,14 @@ ns["ARAYUZ_DILI"] = "tr"
 # 9) istem kuralı yalnız bas-konus.py kodunda
 ok("istem kuralı kodda (KESISIM_KURAL tr+en), yalnız Kesişim açıkken eklenir", set(ns["KESISIM_KURAL"]) == {"tr", "en"} and "Çapraz kontrol (Kesişim)" in ns["KESISIM_KURAL"]["tr"]
    and re.search(r'if "kesisim_sayfa_veri" in globals\(\) and gelistirici_mi\(\) and not gizli_acik\(\): t \+= KESISIM_KURAL', bs))
-ok("Konuş turu dilimleri kesisim içerir", '"notlar", "gun_plani", "kesisim"' in bs and "nb = kesisim_tur_notu(nb)" in bs)
+# 10) canlıda gitmeyen durum (12 Kasım, v0.233.0): Marvin toplantı rolünde + 2 kişilik → bellek_kapsam "ortak"; dilim buna bağlı olmamalı, yalnız gerçek toplantı/otonom/karşı tura bakar
+yaz(sor=sor); LOG.clear()
+tp = ns["kesisim_tur_paketi"]
+ok("ortak kapsamlı (toplantı rolündeki kişilik) toplantı dışı yazılı tur dilimi alır", "Bugün düzeltilen" in tp({"bellek_kapsam": "ortak", "yazili": True, "kisi": "Asistan"}, "çapraz kontrolde ne var"))
+yaz(olay=[{"id": "00000004", "eylem": "tazi_kuyruga_alindi", "t": simdi.replace(tzinfo=None).isoformat(timespec="seconds")}]); q = tp({}, "x")
+ok("bugün düzeltilen sıfır olsa da Araştırılan satırı gider", "Araştırılan: 1" in q and "Bugün düzeltilen: 0" in q)
+yaz(sor=sor)
+ok("toplantı sürerken / otonom / karşı tur / özet kaynağında dilim yok", all(tp(t, "x") == "" for t in ({"toplantida": True}, {"otonom": True}, {"karsi": True}, {"kaynak": "karsi"}, {"kaynak": "ozet"}, {"kaynak": "moderator"})))
+LOG.clear(); ns["kesisim_tur_notu"](tp({"bellek_kapsam": "ortak"}, "x")); ok("tur paketi günlük satırı yazar (canlı günlükte görünür)", any(l.startswith("KONUŞ: kesişim dilimi") for l in LOG))
+ok("kesisim bellek_kapsam'a bağlı notlar/gun_plani çağrısında DEĞİL; ayrı çağrı nb'ye eklenir", 'dilimler=["notlar", "gun_plani"], soru=ms)' in bs and "nb += kesisim_tur_notu(kesisim_tur_paketi(tur, ms))" in bs)
 print("\nKALAN: %d" % sum(hata)); sys.exit(1 if any(hata) else 0)
