@@ -2,6 +2,7 @@
 # Gölge kipte turkish-stt işçisi (ayar golge_tstt): aktarıcı canlı sesi stdin'e satır başına {"k","t","pcm"(base64 int16 16 kHz)} verir; her kanala ayrı akış
 # tanıyıcı (mihu_stt, sherpa-onnx, işlemci). Ekrana bir şey gitmez; stdout'a satır başına JSON: hazir | soz | ara | cpu (ara: ara metin değişimi, aktarıcı yalnız taslak olarak kullanır). Ağ yok (model yerel, HF_HUB_OFFLINE=1).
 # soz satırındaki "ara": ara metin her değiştiğinde [ses zamanı, duvar saati, metin] — ara metinden soru sonu/hitap ne zaman yakalanırdı, ölçümü için.
+# (12 Kasım, Konuş Aşama 2 Adım 5) Konuş araya girmesi de kendi örneğini açar (aktarici/sohbet.py _agt_*): girdi satırında "sifirla": true kanalda yeni akış başlatır (yeni söz).
 # Çalıştırma: HF_HUB_OFFLINE=1 <tstt-venv python> -I -B tstt-golge-isci.py <model klasörü>. SUFLOR_GOLGE_SAHTE=1: gerçek model yok, deneme için sahte tanıyıcı.
 import base64, json, os, sys, time, resource
 SR = 16000
@@ -19,6 +20,11 @@ def yukle(model):
 class Kanal:
     def __init__(self, ad, st): self.ad = ad; self.st = st; self.sifirla()
     def sifirla(self): self.t0 = self.ilk_ses = self.ilk_duvar = self.t1 = None; self.degisim = 0; self.son = ""; self.ara = []
+    def yeni_akis(self):  # (12 Kasım, Konuş Aşama 2 Adım 5) yeni söz: aynı tanıyıcıda yeni akış (model yeniden yüklenmez); yarım söz yazılmaz
+        rec = getattr(self.st, "_rec", None)
+        if rec is not None: self.st._stream = rec.create_stream()
+        elif hasattr(self.st, "n"): self.st.n = 0
+        self.sifirla()
     def besle(self, t, pcm):
         bit = t + len(pcm) / 2 / SR
         metin, son = self.st.accept_pcm16(pcm, SR); metin = (metin or "").strip()
@@ -45,7 +51,10 @@ def main():
     yaz({"tur": "hazir", "yukleme_sn": round(time.time() - t, 2)}); son_cpu = time.time()
     for satir in sys.stdin.buffer:
         try:
-            o = json.loads(satir); k = str(o["k"]); pcm = base64.b64decode(o["pcm"]); t0 = float(o["t"])
+            o = json.loads(satir); k = str(o["k"])
+            if o.get("sifirla") and k in kanallar: kanallar[k].yeni_akis()  # {"k", "sifirla": true[, "t", "pcm"]}: Konuş araya girme her söz başında
+            if not o.get("pcm"): continue
+            pcm = base64.b64decode(o["pcm"]); t0 = float(o["t"])
             if k not in kanallar: kanallar[k] = Kanal(k, hazir_st.pop() if hazir_st else yap())
             kanallar[k].besle(t0, pcm[:len(pcm) // 2 * 2])
         except Exception as e: yaz({"tur": "hata", "hata": e.__class__.__name__})

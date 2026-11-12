@@ -13,7 +13,7 @@ KY_BAGLAN_ARA_SN, KY_BAGLAN_AZAMI_SN, KY_CAL_BASLA_SN, KY_DUSME_BEKLE_SN, KY_SES
 KY_SAY_SR = 22050  # say -o çıkışı (Mac sesi); yardımcı 48 kHz'e kendisi çevirir
 KY = {"s": None, "bagli": False, "dongu": None, "dur": False, "kilit": threading.RLock(), "yaz_kilit": threading.Lock(), "mik": False, "vpio": False, "calan": {}, "sira": 0,
       "durum": {}, "dusme_bit": 0.0, "dusme": 0, "kanca": None, "mik_isle": None, "mik_q": None, "mik_kusak": 0, "mik_tamp": bytearray(), "mik_p": None, "son_t": 0.0, "anahtar_hata": False, "vpio_istek": False, "vpio_bekle": 0.0, "devam_vpio": None,
-      "sessiz": 0, "sessiz_gen": 0, "sessiz_acik": False, "mik_atilan": 0, "mik_n": 0, "saat_uyari": False, "aygit_say": 0}
+      "sessiz": 0, "sessiz_gen": 0, "sessiz_acik": False, "mik_atilan": 0, "mik_n": 0, "saat_uyari": False, "aygit_say": 0, "obek_kanca": None}
 def ky_etkin():  # ayar yerel_konus true VE geliştirici: değilse bu bölüm hiçbir şey yapmaz
     try: return AYAR.get("yerel_konus") is True and bool(gelistirici_mi())
     except Exception: return False
@@ -214,8 +214,14 @@ def _ky_mik_isci():  # mikrofon öbekleri okuma iş parçacığını bekletmesin
         k, o = o
         if k != kusak: tamp = bytearray(); kusak = k
         if not KY["mik"] or k != KY["mik_kusak"] or _ky_toplanti() or _ky_gizli(): tamp = bytearray(); continue
-        try: tamp += base64.b64decode(str(o.get("b64") or ""), validate=True)
+        try: ob = base64.b64decode(str(o.get("b64") or ""), validate=True)
         except ValueError: continue
+        h = KY["obek_kanca"]  # Adım 5 (sohbet.py ag_obek): asistan okurken her ~100 ms öbek araya girme denetimine; True → öbek araya girmenin, bekleyen tampon atılır (sesi araya girme tutar)
+        if h:
+            try:
+                if h(ob, o.get("duvar")): tamp = bytearray(); continue
+            except Exception as e: print(f"YEREL KONUŞ: araya girme öbeği işlenemedi ({e.__class__.__name__}: {str(e)[:80]})")
+        tamp += ob
         if len(tamp) < esik: continue
         pcm = bytes(tamp); tamp = bytearray()
         if not KY["mik"] or k != KY["mik_kusak"]: continue

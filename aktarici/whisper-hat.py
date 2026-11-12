@@ -704,7 +704,7 @@ def _isci_dongu():
             _ISCI["baslik"] = is_["baslik"]
         # "yazayım mı?" sorusuna bas-konuş cevabı istemsiz: whisper.cpp ad/terim listeli istemle kısa "Evet."i "Evit." yazıyordu, ayırıcı tanımıyordu
         # (20 Ekim, test34; istemsiz doğru). Cevap sözcüklerini isteme koymak olmaz: işçi istemde geçen tek sözü "istemi geri okuma" diye atar.
-        istem = "" if is_.get("bas") and SORU.get("aktif") else istem_metni()
+        istem = "" if is_.get("bas") and (SORU.get("aktif") or is_.get("istemsiz")) else istem_metni()  # istemsiz: Konuş araya girmesinin 0,6 sn'lik parçası (sohbet.py _ag_whisper) — ad listesi kısa sesi ada çekmesin
         istek = {"id": is_["id"], "pcm": base64.b64encode(is_["pcm"]).decode(), "dil": dil, "istem": istem, "onceki": _onceki_istem((k.onceki if k else "")[-150:]),
                  "kanal": is_["kanal"], "baslik": is_["baslik"]}
         if is_["kanal"] != "karsi": istek["hitap"] = _hitap_adlari() or ["Suflor", "Suflör", "Süflör"]  # v0.140.0: yalnız asistan adı olan parça istem yankısı sayılmaz
