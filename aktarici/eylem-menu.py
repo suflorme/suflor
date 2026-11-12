@@ -67,7 +67,7 @@ def marvin_kayit_baslat(p):  # POST /girdi {"kayit": kimlik, "text": görünen s
     soru = " ".join(str(p.get("text") or "").split())[:400] or _t("Bu kayda bak: özet, yapılacaklar, sahibine taslak mesaj", "Look at this record: summary, to-dos, a draft message to the owner")
     paket = ""
     if "baglam_paketi" in globals() and "KM_AMAC" in globals():  # Konuş'un dilimleri; profil ve öğrenilenler Konuş sürecinin açılış isteminde zaten var
-        try: paket = baglam_paketi("konus", dilimler=[d for d in KM_AMAC["konus"][0] if d not in ("profil", "ogrenilen")], soru=soru, en_cok_kr=KAYIT_TURU_PAKET_KR)
+        try: paket = baglam_paketi("konus", dilimler=[d for d in KM_AMAC["konus"][0] if d not in ("profil", "ogrenilen", "kesisim")], soru=soru, en_cok_kr=KAYIT_TURU_PAKET_KR)
         except Exception as e: print(f"EYLEM MENÜSÜ: kişi modeli paketi alınamadı ({e.__class__.__name__})")
     ek = y.MARVIN_KAYIT_ISTEM + blok + (paket + "\n" if paket else "")
     r = konus_yazili(soru, ek=ek, kayit=kid)

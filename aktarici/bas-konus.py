@@ -400,6 +400,15 @@ def yon_isareti(tur):  # soruya eklenen işaret: tek ses → eski «[Bu soruyu X
               f"{tz}Write the spoken part line by line; EVERY line starts with a bracketed name tag: «[{dis}] …», «[{ic}] …»; write nothing before the tag. {dis}: at most 3 sentences, gives the information with source and date. "
               f"{ic}: adds ONE sentence only if there is something genuinely useful from the inside (today's calendar, an open task, a decision, a past meeting); otherwise stays silent; never invents outside information.{ic_en}{taki_en} "
               "The written detail (after «---») is one untagged block with the source link and date. Tagged lines are written only in a turn marked «TWO-VOICE TURN».]\n")
+def kesisim_tur_notu(nb):  # Konuş turunun paketi → aynı paket; dilim varsa günlük satırı, sorma görevi içeriyorsa "bugün soruldu" işareti (soru bu turda sorulmuş sayılır: günde en çok bir kez önerilir)
+    if not nb: return nb
+    m = re.search(r"\[(Çapraz kontrol|Cross-check) \(Kesişim\)[^\n]*\n.*?\n\[/\1 \(Kesişim\)\]\n", nb, re.S)
+    if not m: return nb
+    print(f"KONUŞ: kesişim dilimi {len(m.group(0))} karakter")
+    if "KM_KS_SORU_ISARET" in globals() and any(x in m.group(0) for x in KM_KS_SORU_ISARET) and "kesisim_soruldu_yaz" in globals(): kesisim_soruldu_yaz()
+    return nb
+KESISIM_KURAL = {"tr": " Bağlamda «Çapraz kontrol (Kesişim)» bloğu varsa: kullanıcı çapraz kontrolü, kayıtlar arası tutarsızlığı ya da «bugün ne düzelttin» diye sorarsa yalnız bu bloktan cevap ver (sayı ve örnek bloktakiyle aynı; uydurma, blokta olmayanı «bilmiyorum» de). «Sana sormam gerekenler» ile «Sorma görevi» varsa gün içinde en çok bir kez, konuşma uygun bir andayken TEK cümleyle sor (kullanıcı meşgul ya da başka konudaysa sorma); «Bugün soruldu» yazıyorsa yeniden sorma. Soru gelmedikçe bloğu sesli olarak sayma.",
+                 "en": " If the context has a «Cross-check (Kesişim)» block: when the user asks about the cross-check, inconsistencies between records or «what did you fix today», answer only from that block (numbers and examples as in the block; never invent, say «I don't know» for what isn't there). If it lists «Things to ask you» with an «Ask task», ask at most once during the day, in ONE sentence, when the conversation allows (don't ask if the user is busy or on another topic); if it says «Already asked today», don't ask again. Don't read this block out unprompted."}
 def konus_istem(vt=None, bilgi=None, web=False):
     t = KONUS_ISTEM["en" if ARAYUZ_DILI == "en" else "tr"]; k = kisilik()
     _KS["kisilik_mt"] = _KIS.get("mt") if k else None; _KS["kart_mt"] = kart_damga(); _KS["proje_kart_mt"] = proje_kart_mt()
@@ -450,6 +459,7 @@ def konus_istem(vt=None, bilgi=None, web=False):
     t += _t(" Sesli kısımda iç terimleri, kaynak adlarını ve yöntem açıklamasını söyleme (defter, karar kaydı, veritabanı, kayıt dosyası, 'kayıtlara göre', 'kayıtta', kart, döküm, toplantı oturumu, dosya adı, sayımın nasıl yapıldığı); yalnız sonucu doğal bir dille söyle, kesin değilse kısaca 'yaklaşık' de. Belirsizliği de iç terimsiz söyle: 'dökümde bozuk duyulmuş' değil 'bu kısım net duyulmamış'; 'dökümde' değil 'görüşmede' ya da 'toplantıda'. Kaynak ve yöntem yalnız yazılı kısma (--- sonrası). Araç kullandığın cevapta (dosya okuma, arama, veritabanı) yazılı kısım en çok iki kısa satır olsun: ölçüt ya da kaynak; tablo, liste ve uzun açıklama yazma.",
             " In the spoken part never name internal terms, sources or method (record/notebook, decision log, database, file, 'according to the records', card, transcript, meeting session, file names, how a count was made); say only the result naturally, add 'roughly' if uncertain. Say uncertainty without internal terms too: not 'garbled in the transcript' but 'that part wasn't clear'; not 'in the transcript' but 'in the conversation' or 'in the meeting'. Source and method only in the written part (after ---). When you used a tool (file read, search, database), keep the written part to at most two short lines: criterion or source; no tables, lists or long explanations.")
     if "talimat_istem" in globals(): t += talimat_istem()  # v0.101.1: oturumlara ileti (iki kişilikte de)
+    if "kesisim_sayfa_veri" in globals() and gelistirici_mi() and not gizli_acik(): t += KESISIM_KURAL["en" if ARAYUZ_DILI == "en" else "tr"]  # 12 Kasım (F4): kural yalnız Kesişim açıkken (geliştirici, gizli kip dışı); veri kapalıysa blok da yok
     if not k: return t + _uslup() + _ys_istem() + kart_istem() + bilgi_istem(bilgi) + web_istem(web)
     t = re.sub(r"gerçekten şaşırtıcı.*?kullanabilirsin; ", "", t)
     t = t.replace("Sen Suflor.me'nin sesli asistanısın.", "Sen kullanıcının sesli asistanısın.")  # v0.54.3: kimlik kişilikten (kullanıcı: tanıtımda ürün adı yok)
@@ -2389,7 +2399,8 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         if duz: _konus_kur(soru=ms)
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
         if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
-        nb = "" if (tur.get("bellek_kapsam") == "ortak" or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals()) else baglam_paketi("konus", dilimler=["notlar", "gun_plani"], soru=ms)  # 9 Kasım (kişi modeli): notlar defteri artık Konuş'un bağlamında (yalnız kullanıcının kendi turu)
+        nb = "" if (tur.get("bellek_kapsam") == "ortak" or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals()) else baglam_paketi("konus", dilimler=["notlar", "gun_plani", "kesisim"], soru=ms)  # 9 Kasım (kişi modeli): notlar defteri artık Konuş'un bağlamında (yalnız kullanıcının kendi turu)
+        nb = kesisim_tur_notu(nb)  # 12 Kasım (F4): Kesişim dilimi gittiyse günlüğe satır + sorma görevi gittiyse günde bir kez işaretle
         ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi")) + _etiket_tur_notu(tur)  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
         dub = duygu_blogu(tur, ms) if "duygu_blogu" in globals() else ""  # 9 Kasım (dost): toplantı dışı kullanıcı turunda "[Durum — veri]" (≤ 300 kar.), bağlamdan önce (konus_baglam "Soru: " ile biter)
         bks = bilgi_bekle_sn(ms)

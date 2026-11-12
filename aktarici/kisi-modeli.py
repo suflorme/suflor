@@ -11,12 +11,12 @@
 # (_gizli_suz): gizli kip açıkken yalnız kimlik/profil/öğrenilenler (toplantı kaynaklı olmayanlar) girer; gizli toplantıdan gelen satır hiçbir dilimde yer almaz.
 # Dilim başına dosya değişim zamanına göre önbellek; Konuş'un ilk ses gecikmesi için dosya stat'ı dışında iş yapılmaz.
 KM_OGREN_DOSYA, KM_DURUMLAR = "ogrenilen.jsonl", ("otomatik", "onayli", "gecersiz")
-KM_ONCELIK = ("kimlik", "profil", "ogrenilen", "bugun", "gun_plani", "isler", "dis_kaynak", "kisi_isleri", "notlar", "son_konusma", "gun_devri", "toplantilar")
+KM_ONCELIK = ("kimlik", "profil", "ogrenilen", "bugun", "gun_plani", "kesisim", "isler", "dis_kaynak", "kisi_isleri", "notlar", "son_konusma", "gun_devri", "toplantilar")
 KM_GIZLI_SERBEST = ("kimlik", "profil", "ogrenilen")  # gizli kipte pakete girebilen dilimler (toplantı/olay kaynaklı değil)
 # dilim başına en çok karakter (amaç ezebilir)
-KM_CAP = {"kimlik": 520, "profil": 3000, "ogrenilen": 900, "bugun": 1300, "gun_plani": 900, "isler": 900, "dis_kaynak": 1400, "kisi_isleri": 700, "notlar": 700, "son_konusma": 900, "gun_devri": 1500, "toplantilar": 600}
+KM_CAP = {"kimlik": 520, "profil": 3000, "ogrenilen": 900, "bugun": 1300, "gun_plani": 900, "kesisim": 800, "isler": 900, "dis_kaynak": 1400, "kisi_isleri": 700, "notlar": 700, "son_konusma": 900, "gun_devri": 1500, "toplantilar": 600}
 # amaç → (varsayılan dilimler, toplam karakter bütçesi, {dilim: cap})
-KM_AMAC = {"konus": (("profil", "ogrenilen", "bugun", "gun_plani", "isler", "notlar", "son_konusma", "gun_devri"), 7000, {"notlar": 500, "gun_plani": 500}),  # Konuş: soru başına yalnız notlar (500) ve sabit istemde öğrenilenler (900) kullanılır
+KM_AMAC = {"konus": (("profil", "ogrenilen", "bugun", "gun_plani", "kesisim", "isler", "notlar", "son_konusma", "gun_devri"), 7000, {"notlar": 500, "gun_plani": 500, "kesisim": 800}),  # Konuş: soru başına yalnız notlar (500) ve sabit istemde öğrenilenler (900) kullanılır
            "toplanti": (("kimlik", "profil", "ogrenilen", "bugun", "gun_plani", "isler", "notlar", "gun_devri"), 7000, {"gun_plani": 500}),
            # brifing (brifing-ses.py): bugun + isler eklendi (10 Kasım; toplantıya özgü açık iş/katılımcı blokları ayrıca brifing-ses.py _brifing_bloklar'ta, ≤2000). Toplam 3400.
            "brifing": (("profil", "ogrenilen", "bugun", "isler", "notlar"), 3400, {"profil": 1200, "ogrenilen": 500, "bugun": 600, "isler": 600, "notlar": 500}),
@@ -402,6 +402,36 @@ def ic_toplanti_mi(zorla=False):  # sürmekte olan toplantının BÜTÜN katıl�
         v = bool(dav and not dis and not belirsiz and not (vv.get("eslesmeyen") or [])) if isinstance(vv, dict) else False
     except Exception as e: print(f"KİŞİ MODELİ: iç toplantı denetimi yapılamadı ({e.__class__.__name__})")
     _KM_IC.update(t=time.time(), v=v); return v
+# --- Kesişim dilimi (12 Kasım, F4 Marvin dilimi; plan kesisim-mimari-20261111.md §4/3): günlük çapraz kontrolün sonucu — yalnız Konuş amacında varsayılan. Veri ve kapı relay.py `kesisim_sayfa_veri`
+# (kesisim.json + kesisim-coz.jsonl + kesisim-coz-durum.json; yalnız geliştirici, gizli kipte {"acik": False}, geri alınan düzeltme listede yok) — yeni okuyucu yok, kişisel/sağlık süzgeci kesisim.py'de (tekrar süzülmez).
+# Bayat (olusturma > 36 sa) → tek satır "bugün koşmadı". "Sana sormam gerekenler" günde bir kez sorulur: canli/kesisim-soruldu.json {gun}; Konuş turu dilimi sorma görevi ile gönderince bas-konus.py işaretler.
+KM_KS_BAYAT_SA, KM_KS_SORU_ISARET = 36, ("Sorma görevi (bugün henüz sorulmadı)", "Ask task (not asked yet today)")
+def kesisim_soruldu_mu(simdi=None):
+    try: return (json.load(open(os.path.join(BASE, "kesisim-soruldu.json"), encoding="utf-8")) or {}).get("gun") == (simdi or datetime.datetime.now()).date().isoformat()
+    except (OSError, ValueError, AttributeError): return False
+def kesisim_soruldu_yaz(simdi=None):  # günde bir kez soruldu işareti (yalnız gün; metin yok)
+    yol = os.path.join(BASE, "kesisim-soruldu.json")
+    try:
+        with open(yol + ".tmp", "w", encoding="utf-8") as f: json.dump({"gun": (simdi or datetime.datetime.now()).date().isoformat()}, f)
+        os.replace(yol + ".tmp", yol)
+    except OSError: pass
+def _km_kesisim_metni(simdi, cap):
+    f = globals().get("kesisim_sayfa_veri")
+    if not f: return ""
+    v = f()
+    if not isinstance(v, dict) or not v.get("acik") or v.get("bos"): return ""
+    ac = _t("Çapraz kontrol (Kesişim)", "Cross-check (Kesişim)")
+    try: yas = (simdi.replace(tzinfo=None) - datetime.datetime.fromisoformat(str(v.get("olusturma")))).total_seconds() / 3600
+    except (ValueError, TypeError): yas = None
+    if yas is None or yas > KM_KS_BAYAT_SA or yas < -1: return _km_sar(ac, _t("Çapraz kontrol bugün koşmadı.", "The cross-check did not run today."), "", cap)
+    duz = [x for x in v.get("duzeltmeler") or [] if x.get("bugun")]
+    sat = [_t(f"Bugün düzeltilen: {len(duz)}", f"Fixed today: {len(duz)}") + ("" if not duz else ": " + "; ".join(_km_kisa(x.get("ozet"), 110) for x in duz[:3])),
+           _t(f"Araştırılan: {len(v.get('arastirmalar') or [])}", f"Looked into: {len(v.get('arastirmalar') or [])}")]
+    sor = [x for x in v.get("sorulacak") or [] if x.get("ozet")][:2]
+    if sor:
+        sat.append(_t("Sana sormam gerekenler:", "Things to ask you:")); sat += ["- " + _km_kisa(x["ozet"], 130) for x in sor]
+        sat.append(KM_KS_SORU_ISARET[1 if ARAYUZ_DILI == "en" else 0] + _t(": gün içinde en çok bir kez, uygun bir anda tek cümleyle sor.", ": ask at most once during the day, at a fitting moment, in one sentence.") if not kesisim_soruldu_mu(simdi) else _t("Bugün soruldu; yeniden sorma.", "Already asked today; don't ask again."))
+    return _km_sar(ac, "\n".join(sat), _t(" (günlük otomatik kontrol; kullanıcının onayladığı karar değildir)", " (the daily automatic check; not a decision the user confirmed)"), cap)
 def _km_damga(dilim, simdi, soru=None):  # önbellek damgası: kaynak dosya değişim zamanları (+ zamana bağlı dilimde dakika)
     if dilim == "profil": return (_km_mt(profil_yol()), profil_yol(), str(AYAR.get("ad") or ""))
     if dilim == "ogrenilen": return (_km_mt(_ogren_yol()),)
@@ -410,6 +440,7 @@ def _km_damga(dilim, simdi, soru=None):  # önbellek damgası: kaynak dosya değ
     if dilim == "notlar": return (_km_mt(os.path.join(BASE, "notlar.jsonl")), int(simdi.timestamp() // 600))
     if dilim == "son_konusma": return (_km_mt(os.path.join(BASE, "konus-gecmis.jsonl")),)
     if dilim == "gun_devri": return (_km_mt(os.path.join(BASE, "gun-devir.json")), simdi.date().isoformat())
+    if dilim == "kesisim": return (_km_mt(os.path.join(BASE, "kesisim.json")), _km_mt(os.path.join(BASE, "kesisim-coz.jsonl")), _km_mt(os.path.join(BASE, "kesisim-coz-durum.json")), _km_mt(os.path.join(BASE, "kesisim-soruldu.json")), int(simdi.timestamp() // 3600), bool(_km_gizli()), bool(globals().get("gelistirici_mi") and gelistirici_mi()))
     if dilim == "gun_plani": return (_km_mt(os.path.join(BASE, "gun-plani.json")), simdi.date().isoformat())
     if dilim == "toplantilar":
         try: return (len(SON), str((SON[-1] if SON else {}).get("at")))
@@ -420,7 +451,7 @@ def _km_dilim(dilim, simdi, soru, ilgili_yalniz, cap):
     b = _KM_ONB.get(anahtar)
     if b and b[0] == damga: return b[1]
     m = {"kimlik": lambda: _km_kimlik(cap), "profil": lambda: _km_profil_metni(cap), "ogrenilen": lambda: _km_ogren_metni(cap), "bugun": lambda: _km_bugun_metni(simdi, cap),
-         "isler": lambda: _km_isler_metni(simdi, cap), "kisi_isleri": lambda: _km_kisi_isleri_metni(soru, simdi, cap), "dis_kaynak": lambda: _km_dis_kaynak_metni(soru, cap), "gun_plani": lambda: _km_plan_metni(simdi, cap), "notlar": lambda: _km_notlar_metni(soru, ilgili_yalniz, cap),
+         "isler": lambda: _km_isler_metni(simdi, cap), "kisi_isleri": lambda: _km_kisi_isleri_metni(soru, simdi, cap), "dis_kaynak": lambda: _km_dis_kaynak_metni(soru, cap), "gun_plani": lambda: _km_plan_metni(simdi, cap), "kesisim": lambda: _km_kesisim_metni(simdi, cap), "notlar": lambda: _km_notlar_metni(soru, ilgili_yalniz, cap),
          "son_konusma": lambda: _km_sar(_t("Son konuşmalar", "Recent conversations"), "\n".join(_km_son_konusma()), _t(" (kullanıcının toplantı dışında asistana sorduğu son şeyler)", " (the user's latest questions to the assistant outside meetings)"), cap),
          "gun_devri": lambda: _km_sar(_t("Bugünkü toplantılardan devir", "Handover from today's meetings"), "\n\n".join(_km_gun_devri()), "", cap),
          "toplantilar": lambda: _km_sar(_t("Son toplantılar", "Recent meetings"), "\n".join(_km_toplantilar()), "", cap)}[dilim]()
