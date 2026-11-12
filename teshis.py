@@ -141,7 +141,7 @@ ANAHTAR = re.compile(r"[a-z_][a-z0-9_]{0,39}")
 ANAHTAR_CEVIR = {"?": "bilinmeyen", "gündem": "gundem", "açık sorular": "acik_sorular", "konuşma payı": "konusma_payi", "takip sahipli": "takip_sahipli"}
 SAYIM = {"kaynak": {"transcript", "captions", "whisper", "bilinmeyen"}, "kanal": {"ben", "karsi"},
          "tur": {"soyle", "dur", "cevap", "not", "sor", "belirt", "deginme", "dikkat", "bilgi"},  # relay.py CARD_KINDS (+ eski adlar)
-         "donus": {"acik", "yenilendi", "yapildi", "okundu", "gecildi"},
+         "donus": {"acik", "yenilendi", "yapildi", "okundu", "gecildi", "onaylandi", "reddedildi", "zaman_asimi"},
          "boyut": {"gundem", "zaman", "acik_sorular", "konusma_payi", "takip_sahipli"},
          # S141: sayım sözlükleri — anahtarı veriden gelenler yalnız bilinen değerler
          "kart_turu": {"soyle", "dur", "cevap", "not", "sor", "belirt", "deginme", "dikkat", "bilgi"},

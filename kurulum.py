@@ -743,7 +743,7 @@ def tamamla(c, dil):
             if v: a[k] = v
             else: a.pop(k, None)
     try: adlar = asistan_uygula(a, c, dil)
-    except OSError as e: adlar = []; sonuc["asistan_hata"] = f"Asistan dosyası yazılamadı: {e}"
+    except OSError as e: adlar = []; sonuc["asistan_hata"] = (f"Asistan dosyası yazılamadı: {e}" if dil != "en" else f"Could not write the assistant file: {e}")
     if adlar: a["whisper_terimler"] = list(dict.fromkeys(adlar + a["whisper_terimler"]))[:60]  # asistanın adı konuşma tanımada doğru yazılsın
     a.setdefault("claude_model", "sonnet")
     if c.get("profil") in ("hafif", "tam"): profil_uygula(a, c["profil"])  # S188: Mac adımındaki seçim (yalnız ≤ 8 GB'ta sorulur; yoksa mevcut profil kalır)
@@ -755,7 +755,7 @@ def tamamla(c, dil):
         for k in set(eski) - set(a): g.pop(k, None)
         g.update({k: v for k, v in a.items() if k not in eski or eski[k] != v})
     try: ayar_degistir(fn); sonuc["ayar"] = "iyi"
-    except Exception as e: sonuc.update(ayar="kotu", hata=f"Ayar yazılamadı: {e}"); return sonuc
+    except Exception as e: sonuc.update(ayar="kotu", hata=(f"Ayar yazılamadı: {e}" if dil != "en" else f"Could not write the settings: {e}")); return sonuc
     try:
         for k in ("belgeler", "gorusmeler", "_kanit", "_arsiv", ".claude/commands"): os.makedirs(os.path.join(cal, k), exist_ok=True)
         ayr = os.path.join(cal, ".claude", "settings.json")
@@ -774,7 +774,7 @@ def tamamla(c, dil):
         if c.get("ornek"):
             for f in glob_ornek(dil): shutil.copy2(f, os.path.join(cal, "gorusmeler", os.path.basename(f)))
         sonuc["proje"] = "iyi"
-    except Exception as e: sonuc.update(proje="kotu", hata=f"Proje klasörü kurulamadı: {e}"); return sonuc
+    except Exception as e: sonuc.update(proje="kotu", hata=(f"Proje klasörü kurulamadı: {e}" if dil != "en" else f"Could not set up the project folder: {e}")); return sonuc
     # çalışma notu: bağımsız süreçte (sihirbaz kapansa da sürer); kurulum.json bu çağrıdan önce kaydedildi
     sonuc["not"] = "bos"
     if profil_gerekli(c) and claude_yolu() and (not DENEME or os.environ.get("SUFLOR_PROFIL_DENE")):
@@ -784,7 +784,7 @@ def tamamla(c, dil):
     r = subprocess.run([PY, os.path.abspath(__file__), "kur"], capture_output=True, text=True, timeout=300)
     sonuc["aktarici"] = "iyi" if r.returncode == 0 else "kotu"
     sonuc["uyarilar"] = sonuc.get("uyarilar", []) + [x.strip()[:220] for x in (r.stdout + r.stderr).splitlines() if x.strip().startswith("UYARI")][:4]
-    if r.returncode: sonuc["hata"] = "Arka plan hizmeti kurulamadı: " + (r.stdout + r.stderr).strip().splitlines()[-1][:200] if (r.stdout + r.stderr).strip() else "bilinmeyen hata"
+    if r.returncode: sonuc["hata"] = ("Arka plan hizmeti kurulamadı: " if dil != "en" else "Could not set up the background service: ") + (r.stdout + r.stderr).strip().splitlines()[-1][:200] if (r.stdout + r.stderr).strip() else ("bilinmeyen hata" if dil != "en" else "unknown error")
     return sonuc
 def glob_ornek(dil):
     d = os.path.join(KOD, "ornekler"); return [os.path.join(d, f) for f in sorted(os.listdir(d)) if f.endswith(f"-{dil}.md")] if os.path.isdir(d) else []

@@ -2263,7 +2263,7 @@ def baslat(p):
     rol = p.get("rol") if p.get("rol") in ("yurutucu", "katilimci", "dinleyici") else ("yurutucu" if olay and (olay.get("ben_duzenleyen") or not (olay.get("duzenleyen") or olay.get("kisi_sayisi"))) else "katilimci")
     dil = p.get("dil") if p.get("dil") in ("tr", "en", "karisik") else "tr"
     cl = claude_yolu()
-    if not cl: return {"ok": False, "err": "Claude Code komut satırı (claude) bulunamadı — kurulum rehberine bak"}
+    if not cl: return {"ok": False, "err": _t("Claude Code komut satırı (claude) bulunamadı — kurulum rehberine bak", "Claude Code command line (claude) not found — see the setup guide")}
     if not claude_girisli(cl):
         print("BAŞLAT: Claude Code'da oturum açık değil — Terminal açılmadı")
         return {"ok": False, "err": _t("Claude Code'da oturum açık değil — Terminal'de claude yazıp /login ile gir, sonra yeniden Başlat",
@@ -2503,13 +2503,13 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/konus-gecmis": return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
         if (self.headers.get("X-Suflor-Istemci") or "").startswith("menu"): STATE["_menu_yokluyor"] = time.time()  # pano penceresi açılabilir (bildirim izni olmasa da)
-        if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); v["kart_katmani"] = kart_katmani_acik(); return self._json(v)
+        if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); v["kart_katmani"] = kart_katmani_acik(); v["arayuz_dili"] = ARAYUZ_DILI; return self._json(v)
         if self.path.startswith("/cards?"):  # uzun yoklama
             from urllib.parse import urlsplit, parse_qs
             q = parse_qs(urlsplit(self.path).query)
             try: sn = float((q.get("bekle") or ["0"])[0])
             except ValueError: sn = 0
-            return self._json(dict(cards_bekle((q.get("imza") or [""])[0], sn), kart_katmani=kart_katmani_acik()))
+            return self._json(dict(cards_bekle((q.get("imza") or [""])[0], sn), kart_katmani=kart_katmani_acik(), arayuz_dili=ARAYUZ_DILI))  # menü uygulaması dili buradan da alır (açılışta aktarıcı hazır değilse /status boş kalıyordu)
         if yol == "/soyle-ses":  # toplantıya söyle web sürümü: okunacak WAV (eklenti, anahtarla)
             from urllib.parse import parse_qs, urlsplit
             b = ts_web_ses((parse_qs(urlsplit(self.path).query).get("id") or [""])[0])

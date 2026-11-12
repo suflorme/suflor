@@ -152,7 +152,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         web.setValue(false, forKey: "drawsBackground")  // saydam: buzlu cam görünsün
         ve.addSubview(web); panel.contentView = ve
         // sağ üst köşede büyüt: tam pano Mac penceresinde (panel kapanır)
-        let b = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: "Panoyu aç")!, target: self, action: #selector(panelBuyut))
+        let b = NSButton(image: NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: T("Panoyu aç"))!, target: self, action: #selector(panelBuyut))
         b.isBordered = false; b.bezelStyle = .regularSquare; b.contentTintColor = .secondaryLabelColor; b.toolTip = T("Panoyu aç (tam pencere)")
         b.frame = NSRect(x: ve.bounds.width - 26, y: ve.bounds.height - 24, width: 18, height: 18); b.autoresizingMask = [.minXMargin, .minYMargin]
         ve.addSubview(b)
@@ -231,6 +231,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     }
     func isle(_ v: [String: Any]) {
         imza = v["imza"] as? String ?? ""; sonDurum = v
+        dilAyarla(v["arayuz_dili"] as? String)  // açılışta /status tek denemeydi; aktarıcı geç açılırsa ya da dil Ayarlar'dan değişirse menü de değişir
         masaustuKanit?.iste(v["kanit_iste"] as? [String: Any])  // masaüstü toplantıdayken kanıtı toplantı penceresinden al
         if let pa = v["pano_ac"] as? [String: Any], let id = pa["id"] as? String, id != sonPanoAc { sonPanoAc = id; if pa["gorunum"] as? String == "ayarlar" { if pano == nil { pano = PanoPencere { [weak self] in self?.panelGoster() } }; pano?.ayarPenceresi("") } else { panoBolumAc(pa["bolum"] as? String ?? "") } }  // /pano-ac (kurulum, eklenti, sesle pano; bolum = pano.html panoBolum)
         if let b = v["bildirim"] as? [String: Any], let id = b["id"] as? String, id != sonBildirim {
@@ -295,7 +296,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         }, 2, &tur, ben, nil)
         let id = EventHotKeyID(signature: OSType(0x53464C52), id: 1)  // 'SFLR'
         let r = RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey | shiftKey), id, GetApplicationEventTarget(), 0, &sicakTus)
-        if r != noErr { oge.button?.toolTip = "Suflor.me — Option + Shift + Boşluk başka uygulamada kullanılıyor" }
+        if r != noErr { oge.button?.toolTip = "Suflor.me — " + TE("Option + Shift + Boşluk başka uygulamada kullanılıyor", "Option + Shift + Space is used by another app") }
         // v0.31.0: eklentinin kısayolları Mac genelinde (masaüstü Teams/Zoom'da da). Chrome'daki aynı kısayolu bu uygulama yakalar; iş aynı kalır:
         // kanıt isteği aktarıcıya gider, tarayıcıdaki toplantıda eklenti, masaüstünde bu uygulama çeker. Ayar `kisayollar: false` kapatır.
         if !args.contains("--kisayol-kapali") {
@@ -310,25 +311,25 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         NSSound(named: "Tink")?.play()
         let (yol, govde): (String, [String: Any]) = tur == "kanit" ? ("/kanit-iste", ["kaynak": "kisayol"]) : ("/komut", ["tur": tur])
         istek(yol, govde) { [weak self] v in DispatchQueue.main.async {
-            if v == nil { self?.uyar("Aktarıcıya ulaşılamadı") }
+            if v == nil { self?.uyar(TE("Aktarıcıya ulaşılamadı", "Cannot reach the local service")) }
             else if tur == "soyle", let m = v?["metin"] as? String, let r = m.range(of: "⚠ ") { self?.uyar(String(m[r.upperBound...])) }  // ör. BlackHole yok, cevap yok
         } }
     }
     func basBasla() {
         guard kayitci == nil else { return }
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .notDetermined: AVCaptureDevice.requestAccess(for: .audio) { _ in }; uyar("Mikrofon izni soruldu — izin verip yeniden bas"); return
-        case .denied, .restricted: uyar("Mikrofon izni yok: Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me"); return
+        case .notDetermined: AVCaptureDevice.requestAccess(for: .audio) { _ in }; uyar(TE("Mikrofon izni soruldu — izin verip yeniden bas", "Microphone permission requested — allow it, then press again")); return
+        case .denied, .restricted: uyar(TE("Mikrofon izni yok: Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → Suflor.me", "No microphone permission: System Settings → Privacy & Security → Microphone → Suflor.me")); return
         default: break
         }
-        let k = Kayitci(); guard k.basla() else { uyar("Mikrofon açılamadı"); return }
+        let k = Kayitci(); guard k.basla() else { uyar(TE("Mikrofon açılamadı", "Could not open the microphone")); return }
         kayitci = k; simgeGuncelle(); NSSound(named: "Pop")?.play()
         akisZaman = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in  // konuşurken 0,5 sn'de bir parça (aktarıcı duraksamada döker, "hı hı" bakar)
             guard let d = self?.kayitci?.yeni(), !d.isEmpty else { return }
             istek("/bas-konus", ["komut": "parca", "pcm": d.base64EncodedString()]) { _ in }
         }
         istek("/bas-konus", ["komut": "basla"]) { [weak self] v in
-            if let v = v, (v["ok"] as? Bool) == false { DispatchQueue.main.async { _ = self?.kayitci?.durdur(); self?.kayitci = nil; self?.simgeGuncelle(); self?.uyar(v["err"] as? String ?? "Bas-konuş başlamadı") } }
+            if let v = v, (v["ok"] as? Bool) == false { DispatchQueue.main.async { _ = self?.kayitci?.durdur(); self?.kayitci = nil; self?.simgeGuncelle(); self?.uyar(v["err"] as? String ?? TE("Bas-konuş başlamadı", "Push-to-talk did not start")) } }
         }
     }
     func basBitir() {
@@ -336,7 +337,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         akisZaman?.invalidate(); akisZaman = nil
         let pcm = k.durdur(); kayitci = nil; simgeGuncelle()
         istek("/bas-konus", ["pcm": pcm.base64EncodedString()], sure: 20) { [weak self] v in
-            if let v = v, (v["ok"] as? Bool) == false { DispatchQueue.main.async { self?.uyar(v["err"] as? String ?? "Gönderilemedi") } }
+            if let v = v, (v["ok"] as? Bool) == false { DispatchQueue.main.async { self?.uyar(v["err"] as? String ?? TE("Gönderilemedi", "Could not send")) } }
         }
     }
     func uyar(_ m: String) { NSSound(named: "Basso")?.play(); oge.button?.toolTip = "Suflor.me — " + m; print("UYARI: " + m) }
@@ -1439,7 +1440,7 @@ final class OrtakMik {
     var giris: AVAudioEngine?; var cikis: AVAudioEngine?; var bos = 0; var gozlem: [NSObjectProtocol] = []
     var kuyruk: [Float] = []; let kilit = NSLock(); var tavan = 12000; var sonUyari = Date.distantPast; var girisBH = false
     // Teams BlackHole'u okurken aktarım kurulamazsa karşı taraf kullanıcıyı duymaz → bildirim (en çok 5 dk'da bir)
-    func uyar(_ m: String, govde: String = "Teams'te mikrofonu geçici olarak Harici Mikrofon'a al.") {
+    func uyar(_ m: String, govde: String = TE("Teams'te mikrofonu geçici olarak Harici Mikrofon'a al.", "In Teams, temporarily switch the microphone to the external microphone.")) {
         print("ORTAK MİK: UYARI — \(m)"); guard Date().timeIntervalSince(sonUyari) > 300 else { return }; sonUyari = Date()
         let c = UNMutableNotificationContent(); c.title = "Suflor.me"; c.subtitle = m; c.body = govde; c.sound = .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil)) { _ in }
@@ -1467,7 +1468,7 @@ final class OrtakMik {
                 // "çalışıyor" yapar, aygıt değişimiyle durur, yeniden başlar); karşı taraf kullanıcıyı duymaz. Başlamaz, bir kez günlük + bildirim.
                 let gAyg = caObje(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice, AudioObjectID(0)) ?? 0
                 if gAyg == bh || ad(gAyg).hasPrefix("BlackHole") {
-                    if !girisBH { girisBH = true; uyar("Mac'in mikrofonu BlackHole'a geçmiş — Teams'e sesin gitmiyor", govde: "Sistem Ayarları → Ses → Giriş'te kendi mikrofonunu seç.") }
+                    if !girisBH { girisBH = true; uyar(TE("Mac'in mikrofonu BlackHole'a geçmiş — Teams'e sesin gitmiyor", "The Mac's microphone is set to BlackHole — Teams cannot hear you"), govde: TE("Sistem Ayarları → Ses → Giriş'te kendi mikrofonunu seç.", "Choose your own microphone in System Settings → Sound → Input.")) }
                     return
                 }
                 if girisBH { girisBH = false; print("ORTAK MİK: varsayılan giriş yeniden gerçek mikrofon (\(ad(gAyg)))") }
@@ -1476,9 +1477,9 @@ final class OrtakMik {
         } else if baskaGiris() { bos = 0 } else { bos += 1; if bos >= 10 { durdur("mikrofonu okuyan toplantı yok") } }
     }
     func basla(_ bh: AudioObjectID) {
-        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { uyar("Mikrofon izni yok — Teams'e sesin gitmiyor"); return }
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { uyar(TE("Mikrofon izni yok — Teams'e sesin gitmiyor", "No microphone permission — Teams cannot hear you")); return }
         let g = AVAudioEngine(), c = AVAudioEngine()
-        do { try c.outputNode.auAudioUnit.setDeviceID(bh) } catch { uyar("Ses BlackHole'a aktarılamadı — Teams'e sesin gitmiyor"); return }
+        do { try c.outputNode.auAudioUnit.setDeviceID(bh) } catch { uyar(TE("Ses BlackHole'a aktarılamadı — Teams'e sesin gitmiyor", "Audio could not be routed to BlackHole — Teams cannot hear you")); return }
         let bic = g.inputNode.outputFormat(forBus: 0); guard bic.sampleRate > 0, let mono = AVAudioFormat(standardFormatWithSampleRate: bic.sampleRate, channels: 1) else { return }
         tavan = Int(bic.sampleRate / 4); kilit.lock(); kuyruk.removeAll(); kilit.unlock()
         let kaynak = AVAudioSourceNode(format: mono) { [weak self] _, _, n, abl -> OSStatus in
@@ -1494,12 +1495,12 @@ final class OrtakMik {
             self.kilit.lock(); self.kuyruk.append(contentsOf: UnsafeBufferPointer(start: d[0], count: Int(buf.frameLength)))
             if self.kuyruk.count > self.tavan { self.kuyruk.removeFirst(self.kuyruk.count - self.tavan) }; self.kilit.unlock()
         }
-        do { try c.start(); try g.start() } catch { g.inputNode.removeTap(onBus: 0); c.stop(); uyar("Mikrofon aktarımı başlamadı — Teams'e sesin gitmiyor (\(error.localizedDescription))"); return }
+        do { try c.start(); try g.start() } catch { g.inputNode.removeTap(onBus: 0); c.stop(); uyar(TE("Mikrofon aktarımı başlamadı — Teams'e sesin gitmiyor", "Microphone routing did not start — Teams cannot hear you") + " (\(error.localizedDescription))"); return }
         giris = g; cikis = c; bos = 0
         for m in [g, c] { gozlem.append(NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: m, queue: .main) { [weak self] _ in self?.durdur("aygıt değişti") }) }  // döngü yeniden kurar
         let gAyg = caObje(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice, AudioObjectID(0)) ?? 0
         print("ORTAK MİK: \(ad(gAyg)) → \(ad(c.outputNode.auAudioUnit.deviceID)) (\(Int(bic.sampleRate)) Hz)")
-        if c.outputNode.auAudioUnit.deviceID != bh { durdur("çıkış BlackHole değil — kulaklığa gitmesin"); uyar("Ses BlackHole'a aktarılamadı — Teams'e sesin gitmiyor") }
+        if c.outputNode.auAudioUnit.deviceID != bh { durdur("çıkış BlackHole değil — kulaklığa gitmesin"); uyar(TE("Ses BlackHole'a aktarılamadı — Teams'e sesin gitmiyor", "Audio could not be routed to BlackHole — Teams cannot hear you")) }
     }
     func durdur(_ neden: String) {
         gozlem.forEach { NotificationCenter.default.removeObserver($0) }; gozlem = []
@@ -1527,7 +1528,7 @@ let EN_METIN: [String: String] = [
     "Düzen": "Edit", "Geri al": "Undo", "Yinele": "Redo", "Kes": "Cut", "Kopyala": "Copy", "Yapıştır": "Paste", "Tümünü seç": "Select all",
     "Toplantı": "Meeting", "Toplantı başlat…": "Start a meeting…", "Ne diyeyim?": "What should I say?", "Sessiz (10 dk kart yok)": "Quiet (no cards for 10 min)",
     "Görünüm": "View", "Kenar çubuğunu gizle/göster": "Show/hide sidebar", "Yenile": "Reload", "Tam ekran": "Full screen",
-    "Pencere": "Window", "Küçült": "Minimize", "Büyüt": "Zoom", "Kapat": "Close", "Yardım": "Help", "Suflor.me Yardımı": "Suflor.me Help",
+    "Pencere": "Window", "Mini pano": "Mini panel", "Küçült": "Minimize", "Büyüt": "Zoom", "Kapat": "Close", "Yardım": "Help", "Suflor.me Yardımı": "Suflor.me Help",
     "Asistanla konuş: Option + Shift + Boşluk basılı tut": "Talk to the assistant: hold Option + Shift + Space",
     "Sessiz: Option + Shift + M": "Quiet: Option + Shift + M", "Tamam": "OK", "Vazgeç": "Cancel", "Evet": "Yes",
     "Hazırlık": "Prepare", "Katıl": "Join", "Sonra": "Later", "Gerek yok": "Not needed", "Kaynağı aç": "Open source", "Onayla": "Approve", "Reddet": "Decline", "Kartların yerini sıfırla": "Reset card position",

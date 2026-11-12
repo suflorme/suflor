@@ -982,7 +982,7 @@ function hfUst(baslik,bugunKapali,oncKapali,sonKapali){const dg={gun:['Önceki g
     +`<span class=hfl title="${L('Blok rengi toplantının hazırlık durumu')}">${['hazir','eksik','yok'].map(k=>`<span><i class=hz-${k}></i>${hz[k]}</span>`).join('')}${(hfAkt().olaylar||[]).some(o=>o.paylasilan)?`<span><i class=hz-pay></i>${L('Paylaşılan')}</span>`:''}</span><button type=button class="ib gh kgx" data-hfg=kapat title="${L('Kapat')}" aria-label="${L('Kapat')}">${ic('x')}</button></div>`}
 function hfNot(t,gun,bos){const loc=L('tr-TR'),kb=t.kapsam&&t.kapsam.bas,ks=t.kapsam&&t.kapsam.son,okuyok=d=>{const x=hfIso(d);return(kb&&x<kb)||(ks&&x>ks)}
   return!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.')
-    :t.durum&&t.durum!=='ok'&&t.durum!=='bekliyor'?(t.hata||t.durum):gun.some(okuyok)?L('Takvim {a} – {b} arasını okuyor; taralı günlerde bilgi yok.',{a:hfGun(kb).toLocaleDateString(loc,{day:'numeric',month:'long'}),b:hfGun(ks).toLocaleDateString(loc,{day:'numeric',month:'long'})})
+    :t.durum&&t.durum!=='ok'&&t.durum!=='bekliyor'?L(t.hata||t.durum):gun.some(okuyok)?L('Takvim {a} – {b} arasını okuyor; taralı günlerde bilgi yok.',{a:hfGun(kb).toLocaleDateString(loc,{day:'numeric',month:'long'}),b:hfGun(ks).toLocaleDateString(loc,{day:'numeric',month:'long'})})
     :bos?L(bos):''}
 function hfCiz(kaydir){if(hfMod==='ay')return hfAyCiz();const t=hfVeri,G=hfMod==='gun';if(!t)return
   const s=document.getElementById('hfs'),loc=L('tr-TR'),H=44,simdi=new Date(),bas=hfGun(t.hafta_bas),bugun=hfIso(simdi),hg=[...Array(7)].map((_,i)=>hfGunEk(bas,i))
@@ -1903,7 +1903,7 @@ function renderTakvim(s){const sur=!!((s.oto_toplanti&&s.oto_toplanti.oturum)||(
   ;['tk','tkh','tkalt'].forEach(i=>document.getElementById(i).style.display=top?'none':'');sonCiz(s,top);if(top)return
   bgHzYukle()
   tkOlaylar=t.olaylar||[];const h=document.getElementById('tkh'),loc=L('tr-TR'),nw=new Date()
-  h.textContent=!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.'):t.durum==='bekliyor'?L('takvim okunuyor…'):(t.durum&&t.durum!=='ok'?(t.hata||t.durum):'')
+  h.textContent=!t.uygulama?L('Takvim bağlı değil — toplantıyı elle başlatabilirsin.'):t.durum==='izin_yok'?L('Takvim izni yok — Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim.'):t.durum==='bekliyor'?L('takvim okunuyor…'):(t.durum&&t.durum!=='ok'?L(t.hata||t.durum):'')
   setH(document.getElementById('tktr'),esc(nw.toLocaleDateString(loc,{weekday:'long'})+', '+nw.toLocaleDateString(loc,{day:'numeric',month:'long'})))
   const hz=Object.fromEntries(bgHz.map(x=>[x.id,x])),bid=new Set(tkOlaylar.map(x=>x.id)),an=Date.now()
   tkListe=[...tkOlaylar.map(x=>Object.assign({},hz[x.id],x)),...bgHz.filter(x=>!bid.has(x.id)&&!x.reddettin&&+new Date(x.baslangic)>an).map(x=>Object.assign({},x,{dk:Math.round((+new Date(x.baslangic)-an)/6e4)}))]
