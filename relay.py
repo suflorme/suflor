@@ -1430,7 +1430,60 @@ def kesisim_ozet():  # /status "kesisim": kesisim.json "cozum" özeti (sayılar 
     if not isinstance(c, dict): return None
     ls = [{"id": str(x.get("id") or "")[:120], "ozet": str(x.get("ozet") or "")[:200], "neden": str(x.get("neden") or "")[:120]} for x in (c.get("cozulemeyen_onemli") or []) if isinstance(x, dict)][:5]
     return {"tarih": c.get("tarih"), "duzeltilen": c.get("duzeltilen") or 0, "arastirilan": c.get("arastirilan") or 0, "birakilan": c.get("birakilan") or 0, "cozulemeyen_onemli": ls}
-VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/is-kopya", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses"}  # okuma uçları: anahtarsız 401
+def kesisim_sayfa_veri():  # GET /kesisim.json: /kesisim sayfasının verisi (kesisim.json + kesisim-coz.jsonl + kesisim-coz-durum.json; yalnız geliştirici, gizli kipte kapalı). Ham kod yok: yer/neden kodları sayfada Türkçeye çevrilir
+    if not gelistirici_mi() or gizli_acik(): return {"acik": False}
+    def oku(ad, v):
+        try:
+            with open(os.path.join(BASE, ad), encoding="utf-8") as f: return json.load(f)
+        except (OSError, ValueError): return v
+    j = oku("kesisim.json", None)
+    if not isinstance(j, dict): return {"acik": True, "bos": True}
+    c = j.get("cozum") if isinstance(j.get("cozum"), dict) else {}
+    d = oku("kesisim-coz-durum.json", {}); d = d if isinstance(d, dict) else {}
+    kis = lambda m, n: " ".join(str(m or "").split())[:n]
+    bul = {str(b.get("id")): b for b in (j.get("bulgular") or []) if isinstance(b, dict)}
+    kay = lambda b: sorted({str(k.get("sistem")) for k in (b.get("kaynaklar") or []) if isinstance(k, dict) and k.get("sistem")})[:4]
+    bugun = str(c.get("tarih") or datetime.date.today().isoformat())
+    try: sinir = (datetime.date.fromisoformat(bugun) - datetime.timedelta(days=3)).isoformat()
+    except ValueError: bugun, sinir = datetime.date.today().isoformat(), ""
+    olay = []
+    try:
+        with open(os.path.join(BASE, "kesisim-coz.jsonl"), encoding="utf-8") as f:
+            for l in f.readlines()[-600:]:
+                try: o = json.loads(l)
+                except ValueError: continue
+                if isinstance(o, dict) and o.get("id"): olay.append(o)
+    except OSError: pass
+    duz, ara = {}, {}
+    for o in olay:
+        i, e, t = str(o["id"]), o.get("eylem"), str(o.get("t") or "")
+        if t[:10] < sinir: continue
+        if e == "tazi_dosya_eklendi": duz[i] = {"id": i, "t": t, "yer": "tazi", "geri": bool(o.get("geri_al"))}; ara.pop(i, None)
+        elif e == "geri_alindi": duz.pop(i, None)
+        elif e == "tazi_kuyruga_alindi" and i not in duz: ara[i] = {"id": i, "t": t}
+    sor = [{"id": str(x.get("id") or "")[:120], "ozet": kis(x.get("ozet"), 200), "neden": kis(x.get("neden"), 60)} for x in (c.get("cozulemeyen_onemli") or []) if isinstance(x, dict) and x.get("id")][:8]
+    sid, birak = {x["id"] for x in sor}, d.get("birak") if isinstance(d.get("birak"), dict) else {}
+    duzl, aral = [], []
+    for x in sorted(duz.values(), key=lambda x: x["t"], reverse=True)[:30]:
+        b = bul.get(x["id"])
+        if b: duzl.append(dict(x, ozet=kis(b.get("ozet"), 200), kaynaklar=kay(b), bugun=x["t"][:10] == bugun))
+    for x in sorted(ara.values(), key=lambda x: x["t"], reverse=True)[:30]:
+        b = bul.get(x["id"])
+        if b and x["id"] not in sid and x["id"] not in birak: aral.append(dict(x, ozet=kis(b.get("ozet"), 200), kaynaklar=kay(b), bugun=x["t"][:10] == bugun))
+    bir = [{"id": str(i), "ozet": kis(bul[str(i)].get("ozet"), 200)} for i in list(birak)[-20:] if str(i) in bul][::-1]
+    kn = [{"ad": kis(k.get("ad"), 60), "yas_sn": k.get("yas_sn") if isinstance(k.get("yas_sn"), int) else None, "durum": kis(k.get("durum"), 20)} for k in (j.get("kaynaklar") or []) if isinstance(k, dict) and k.get("durum") != "kapali"][:8]
+    return {"acik": True, "tarih": bugun, "olusturma": j.get("olusturma"), "duzeltilen": sum(1 for x in duzl if x["bugun"]), "arastirilan": len(aral),
+            "duzeltmeler": duzl, "arastirmalar": aral, "sorulacak": sor, "birakilan": bir, "kaynaklar": kn}
+def kesisim_geri_al(p):  # POST /kesisim {islem:"geri_al", id}: kesisim-coz.py geri_al (Tazı: eklenen öğeyi kapatır; silme yok)
+    if not gelistirici_mi() or gizli_acik(): return {"ok": False, "err": "kapali"}
+    i = str(p.get("id") or "")
+    if p.get("islem") != "geri_al" or not re.fullmatch(r"[0-9a-f]{8,40}", i): return {"ok": False, "err": "geçersiz"}
+    if i not in {x["id"] for x in kesisim_sayfa_veri().get("duzeltmeler", [])}: return {"ok": False, "err": "geri alınacak düzeltme yok"}  # yalnız listedeki (henüz geri alınmamış) düzeltme
+    m = _kesisim_modul()
+    if not m: return {"ok": False, "err": "yok"}
+    try: return {"ok": bool(m.geri_al(BASE, i)), "id": i}
+    except Exception: return {"ok": False, "err": "hata"}
+VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/is-kopya", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses", "/kesisim.json"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 _ANAHTARSIZ_GUNLUK = {}
@@ -1657,6 +1710,7 @@ AYAR_PANO = {
     "beyin_varsayilan": ("beyin", "claude-code", ("claude-code", "gemini", "ozel")), "beyin_konus": ("beyin", "", ("", "claude-code", "gemini", "ozel")),
     "kisisel_tarihler": ("bool", True, None), "kisisel_tarih_ufuk": ("sayi", 14, (1, 90)), "kisisel_tarih_hatirlat": ("bool", True, None), "kisisel_tarih_sesli": ("bool", False, None), "kisisel_tarih_saat": ("metin", "09:00", 5), "kutlama_kanali": ("sec", "eposta", ("eposta", "teams")),  # S243: yaklaşan kişisel tarihler
     "kesisim_cozucu": ("bool", False, None), "kesisim_coz_tavan": ("sayi", 5, (0, 50)),  # 12 Kasım (F2): Kesişim günlük çapraz kontrol + arka plan çözücü (kesisim-coz.py); yoksa geliştiricide açık, beta'da kapalı; tavan = günlük en çok Tazı düzeltmesi. proje veritabanına yazma (kesisim_coz_oh) S293'e kadar tabloda yok, kapalı
+    "basecamp_oku": ("bool", False, None),  # S282 (12 Kasım): Basecamp proje yorumları/işleri okunur (aktarici/basecamp-oku.py); ayar hiç yazılmamışsa yalnız geliştiricide açık, beta kapalı; gizli toplantıda okunmaz. Hesap/eşleme: ayar basecamp {hesap, proje_esleme, anahtar}
     "mutabakat": ("bool", False, None),  # 12 Kasım (zekâ Y1): gece mutabakat turu — kanıtla durum önerisi (yalnız öneri, kayıt kendiliğinden kapanmaz); yoksa geliştiricide açık, beta'da kapalı (aktarici/mutabakat.py mtb_acik)
     "tazi": ("bool", False, None),  # 11 Kasım: Tazı (dış firma/kişi izleme + Suflor'dan tarama); yoksa geliştiricide açık, beta'da kapalı (kisi-modeli.py tazi_acik)
     "web_arastirma": ("bool", True, None), "web_arastirma_disari": ("bool", True, None), "linkedin_chrome": ("bool", True, None), "bilgi_onaysiz": ("bool", True, None),  # 5 Kasım: toplantıda web araştırması; okuma araçları onaysız
@@ -1912,6 +1966,7 @@ bolum("degerlendir")  # aktarici/degerlendir.py — tek değerlendirici: söylem
 bolum("is-kopya")  # aktarici/is-kopya.py — iş kopyası: aynı iş farklı toplantılarda yeniden konuşulunca değerlendirici "aynı iş mi" der; aynıysa yeni kalır eski kapanır, emin değilse panoda sorulur (/is-kopya; 10 Kasım) — degerlendir'den sonra
 bolum("soz-kapisi")  # aktarici/soz-kapisi.py — tek söz kapısı: zamanlayıcılar aday üretir, kapı şimdi/sonra/hiç kararını verir; sunuş → sonuç kaydı canli/soz.jsonl (9 Kasım)
 bolum("dusunme")  # aktarici/dusunme.py — günlük düşünme turu (günde bir, en iyi model): öğrenilen önerileri + geçersizleme + sabah gün planı (canli/gun-plani.json; panoda Günün özeti, söz kapısından bildirim, Konuş bağlamı; 9 Kasım)
+bolum("basecamp-oku")  # aktarici/basecamp-oku.py — Basecamp OKUMA bağlayıcısı: bc_oku/bc_kanit/bc_baglam (S282; mutabakat kanıt kaynağı)
 bolum("mutabakat")  # aktarici/mutabakat.py — gece mutabakat turu (zekâ Y1): açık/bayat kayıtlara kanıtla durum ÖNERİSİ (bitti · sürüyor · yerini aldı · belirsiz), düşünme turundan hemen önce; POST /mutabakat onay|red|calistir, /status mutabakat (12 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
 bolum("tazi-kos")  # aktarici/tazi-kos.py — Tazı koşturucu: aday listesi + hızlı/tam tarama arka planda, /tazi, /status tazi, "Tazı, <ad> araştır" (ayar tazi; 11 Kasım)
@@ -2393,6 +2448,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/izleme": return self._json(izleme_view())
         if yol == "/yaklasan-tarihler": return self._json(kt_view("yenile=1" in self.path) if "kt_view" in globals() else {"ok": False, "tarihler": []})  # S243: Kişiler/Takvim/Anımsatıcılar yaklaşan kişisel tarihler (aktarici/kisisel-tarihler.py; anahtarlı)
         if yol == "/arastirma": return self._json(arastirma_view((re.search(r"[?&]id=([0-9a-z-]{1,80})(?:&|$)", self.path) or [None, None])[1]) if "arastirma_view" in globals() else {"hata": "yok"})  # S243: toplantı dışı web araştırması kayıtları
+        if yol == "/kesisim.json": return self._json(kesisim_sayfa_veri())  # Kesişim sayfası verisi (anahtarlı; geliştirici)
         if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
         if yol == "/dokum-kontrol/ses":  # satırın ses parçası (WAV); sayfa fetch ile başlıklı alır
             from urllib.parse import urlsplit, parse_qs
@@ -2429,6 +2485,9 @@ class H(BaseHTTPRequestHandler):
             if fp.startswith(os.path.realpath(KANIT_DIR) + os.sep) and fp.endswith(".png") and os.path.isfile(fp):
                 b = open(fp, "rb").read(); self.send_response(200); self.send_header("Content-Type", "image/png"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
             return self._json({"ok": False}, 404)
+        if yol == "/kesisim":  # Kesişim sayfası kabuğu (anahtarsız; veri ucu anahtarlı). Geliştirici değilse ya da gizli kipte yok
+            if not gelistirici_mi() or gizli_acik(): return self._json({"ok": False, "err": "kapali"}, 404)
+            b = sayfa("kesisim.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if yol == "/dokum-kontrol":  # sayfa kabuğu anahtarsız (/ gibi); veri uçları anahtarlı. Geliştirici + ses arşivi açık değilse yok
             if not dk_acik()[0]: return self._json({"ok": False, "err": "kapali"}, 404)
             b = sayfa("dokum-kontrol.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
@@ -2526,6 +2585,9 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/eposta-onemli":  # taslak | ertele | yoksay — yalnız pano (aktarici/eposta-takip.py); taslak göndermez
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(et_islem(p))
+        if self.path == "/kesisim":  # Kesişim sayfasında "Geri al" — yalnız pano köken + anahtar
+            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
+            return self._json(kesisim_geri_al(p))
         if self.path == "/tepki":  # 12 Kasım: "işe yaradı / yanlış" tepkisi (Tazı raporu, Kesişim, e-posta) — yalnız pano; canli/tepki.jsonl: zaman, kaynak, id, deger (metin yok)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(tepki_yaz(p))

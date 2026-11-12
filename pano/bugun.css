@@ -651,3 +651,5 @@ header #ay{display:none}  /* Ayarlar kenar çubuğunda; #ay görünmez ama tıkl
 #bgn .tzbas{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}#bgn .tzbas::after{content:' ▸';color:var(--b-m3)}#bgn .tzbas[aria-expanded=true]::after{content:' ▾'}#bgn .tzb .liste[hidden]{display:none}#bgn .sat.bs[data-bn=panel]{cursor:pointer}
 #bnPanel .tzeylem{margin-top:var(--bo-16)}
 #bnPanel .armetin hr{border:0;border-top:1px solid var(--b-cizgi);margin:var(--bo-16) 0}
+
+#bgn .ksbag{display:block;margin:2px 0 6px;padding:6px 2px;background:none;border:0;color:var(--b-m2);font:inherit;font-size:var(--yz-3);cursor:pointer;text-align:left}#bgn .ksbag:hover,#bgn .ksbag:focus-visible{color:var(--b-murekkep)}

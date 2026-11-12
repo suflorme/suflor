@@ -290,7 +290,9 @@ def m_kayit_durum(b):  # bayat/bitti/yerini_aldi diye çıkarılan kayıt sonra 
 def m_altin(b):  # test/zeka-altin.py'nin yazdığı altin-sonuc.json {"gecen","toplam","zaman"}: yalnız sayı; en son koşu (pencere yok; set küçük ve sabit)
     d = b.d("altin-sonuc.json") or {}
     g, t = d.get("gecen"), d.get("toplam")
-    if not (isinstance(g, int) and isinstance(t, int) and t > 0): return None, 0, "altın set koşusu yok (test/zeka-altin.py)"
+    if not (isinstance(g, int) and isinstance(t, int) and t > 0):
+        nd = next((str(r.get("neden"))[:120] for r in reversed(b.j("altin-atla.jsonl")) if r.get("altin") is None and r.get("neden")), None)  # aktarici/dusunme.py _dus_altin_atla
+        return None, 0, "altın set koşusu yok" + (f" — atlandı: {nd}" if nd else " (test/zeka-altin.py)")
     return g / t, t, f"{g}/{t} altın kontrol geçti ({str(d.get('zaman') or '?')[:16]})"
 def m_proje_bulma(b):  # olcum.py proje: proje bilgisini ilk 5 sonuçta bulma (test seti; anlam araması)
     if not b.gecmis: return None, 0, "olcum-gecmis yok"
@@ -354,9 +356,58 @@ OLCUTLER = [
     ("kayit", "basari", "belge", "Belge önerisi kabul", m_belge, 5, 1, "belge-oneri.json"),
     ("kayit", "ongoru", "gecikme", "Gecikecek işi önceden söyledi", None, 0, 1, "yok — işe 'gecikme riski' tahmini yazılmıyor (gün planı riski bunu kısmen ölçer)"),
     ("dokum", "basari", "wer", "Döküm doğruluğu (1 − kelime hatası)", m_dokum, 2, 1, "hakem-olcum.jsonl"),
-    ("tazi", "basari", "bulgu", "Bulgu işe yaradı", None, 0, 1, "yok — Tazı bulgusuna kullanıcı tepkisi (işe yaradı/yanlış) kaydedilmiyor"),
-    ("kesisim", "analiz", "celiski", "Çelişki gerçek çıktı", None, 0, 1, "yok — kesisim.jsonl durum geçişi var ama 'bulgu doğru/yanlış' tepkisi yok"),
+    ("tazi", "basari", "bulgu", "Bulgu işe yaradı", lambda b: _tepki_oran(b, "tazi"), 5, 1, "tepki.jsonl kaynak tazi (iyi / iyi + yanlış)"),
+    ("kesisim", "analiz", "celiski", "Çelişki gerçek çıktı", lambda b: _tepki_oran(b, "kesisim"), 5, 1, "tepki.jsonl kaynak kesisim (iyi / iyi + yanlış)"),
 ]
+
+# ---------- yeni sinyaller (12 Kasım): mutabakat, tepki, Kesişim çözücü — yalnız sayı; az veride oran None ("yetersiz veri"), puan uydurulmaz ----------
+SINYAL_ASGARI = 5  # oran göstermek için en az örnek
+def _oran(a, n): return round(a / n, 3) if n >= SINYAL_ASGARI else None
+def _tepkiler(b):  # tepki.jsonl (zaman|t, kaynak, id, deger) + eposta-tepki.jsonl (yanlis_oncelik → eposta/yanlis); pencere içi
+    out = []
+    for r in b.j("tepki.jsonl"):
+        t = ts(r.get("zaman", r.get("t")))
+        if b.icinde(t) and r.get("deger") in ("iyi", "yanlis") and isinstance(r.get("kaynak"), str): out.append((r["kaynak"], r["deger"]))
+    if not any(k == "eposta" for k, _d in out):  # eposta tepki.jsonl'e de yazılıyorsa çift sayılmaz
+        out += [("eposta", "yanlis") for r in b.j("eposta-tepki.jsonl") if b.icinde(ts(r.get("t"))) and r.get("islem") == "yanlis_oncelik"]
+    return out
+def _tepki_oran(b, kaynak):
+    xs = [d for k, d in _tepkiler(b) if k == kaynak]; n = len(xs); iy = xs.count("iyi")
+    return ((iy / n) if n else None), n, f"{iy}/{n} tepki 'işe yaradı', {n - iy} 'yanlış'"
+def sinyal_mutabakat(b):
+    """mutabakat.jsonl: öneri (kayıt başına son), sonuç (onay/red), tur. → {oneri, onay, red, bekleyen, onay_orani, red_orani, guven: {karar: {n, ort}}, tur}"""
+    rs = [r for r in b.j("mutabakat.jsonl") if b.icinde(ts(r.get("t")))]
+    on = {}; sonuc = {}
+    for r in rs:
+        if r.get("olay") == "oneri" and r.get("kayit"): on[r["kayit"]] = r
+        elif r.get("olay") == "sonuc" and r.get("kayit") and r.get("sonuc") in ("onay", "red"): sonuc[r["kayit"]] = r["sonuc"]
+    gv = {}
+    for r in on.values():
+        g = r.get("guven")
+        if isinstance(g, (int, float)) and not isinstance(g, bool) and r.get("oneri"): o = gv.setdefault(str(r["oneri"]), [0, 0.0]); o[0] += 1; o[1] += float(g)
+    ay = sum(1 for v in sonuc.values() if v == "onay"); n = len(sonuc); rd = n - ay
+    return {"oneri": len(on), "onay": ay, "red": rd, "bekleyen": max(0, len(on) - n), "onay_orani": _oran(ay, n), "red_orani": _oran(rd, n),
+            "guven": {k: {"n": v[0], "ort": round(v[1] / v[0], 2)} for k, v in sorted(gv.items())}, "tur": sum(1 for r in rs if r.get("olay") == "tur")}
+def sinyal_tepki(b):
+    """→ {kaynak: {iyi, yanlis, n, iyi_orani}} (n < SINYAL_ASGARI ise iyi_orani None)"""
+    out = {}
+    for k, d in _tepkiler(b): o = out.setdefault(k, {"iyi": 0, "yanlis": 0}); o[d] += 1
+    return {k: {**v, "n": v["iyi"] + v["yanlis"], "iyi_orani": _oran(v["iyi"], v["iyi"] + v["yanlis"])} for k, v in sorted(out.items())}
+def sinyal_kesisim(b):
+    """kesisim-coz.jsonl (t, id, karar, eylem, geri_al): gün başına düzeltilen/araştırılan/bırakılan + geri alınan oranı (düzeltmeler içinde); kesisim.json 'cozum' son günlük özet."""
+    gunler = {}; duz = 0; geri = 0
+    for r in b.j("kesisim-coz.jsonl"):
+        t = ts(r.get("t"))
+        if not b.icinde(t): continue
+        g = datetime.datetime.fromtimestamp(t).date().isoformat(); o = gunler.setdefault(g, {"duzeltilen": 0, "arastirilan": 0, "birakilan": 0, "geri_alinan": 0})
+        if r.get("eylem") == "geri_alindi": o["geri_alinan"] += 1; geri += 1
+        elif r.get("karar") == "duzelt" and r.get("eylem") in ("tazi_dosya_eklendi", "oh_oneri_yazildi"): o["duzeltilen"] += 1; duz += 1
+        elif r.get("karar") == "arastir": o["arastirilan"] += 1
+        elif r.get("karar") == "birak": o["birakilan"] += 1
+    c = (b.d("kesisim.json") or {}).get("cozum")
+    return {"gunler": dict(sorted(gunler.items())), "duzeltilen": duz, "geri_alinan": geri, "geri_orani": _oran(geri, duz),
+            "son_ozet": {k: c[k] for k in ("tarih", "duzeltilen", "arastirilan", "birakilan") if k in c and isinstance(c[k], (int, str))} if isinstance(c, dict) else None}
+def sinyaller(b): return {"mutabakat": sinyal_mutabakat(b), "tepki": sinyal_tepki(b), "kesisim": sinyal_kesisim(b)}
 
 def karne(canli, gun=30, simdi=None, gecmis=None):
     """→ {"gun", "tarih", "genel", "islev": {ad: {"puan", "kismi", "boyut": {b: puan|None}}}, "olcut": [ {islev, boyut, anahtar, ad, oran, n, asgari, puan, kanit, kaynak, durum} ], "kullanici": {...}}"""
@@ -383,7 +434,7 @@ def karne(canli, gun=30, simdi=None, gecmis=None):
         isl[ad] = {"puan": p, "kismi": bool(var) and len(var) < len(tanimli), "boyut": bo}
     ps = [v["puan"] for v in isl.values() if v["puan"] is not None]
     return {"gun": gun, "tarih": datetime.datetime.fromtimestamp(b.simdi).date().isoformat(), "genel": round(sum(ps) / len(ps)) if ps else None, "islev_sayi": len(ps),
-            "islev": isl, "olcut": ol, "kullanici": kullanici_ozet(canli, gun, b.simdi)}
+            "islev": isl, "olcut": ol, "kullanici": kullanici_ozet(canli, gun, b.simdi), "sinyal": sinyaller(b)}
 
 # ---------- kullanıcı puanı (1–5) ----------
 def kullanici_ozet(canli, gun=30, simdi=None):  # → {işlev: {"n", "ort"}} pencere içinde; "gec" satırları sayılmaz
@@ -424,7 +475,8 @@ def ozet_satir(k, simdi=None):  # karne → zeka-karne.jsonl satırı: yalnız s
     return {"v": 1, "tarih": k["tarih"], "t": round(float(simdi if simdi is not None else time.time()), 1), "gun": k["gun"], "genel": k["genel"],
             "islev": {a: {"p": v["puan"], **{b[0]: v["boyut"][b] for b in BOYUTLAR}} for a, v in k["islev"].items()},
             "olcut": {f"{o['islev']}.{o['anahtar']}": [o["puan"], o["n"]] for o in k["olcut"] if o["durum"] != "kaynak_yok"},
-            "kullanici": k["kullanici"]}
+            "kullanici": k["kullanici"], "sinyal": k.get("sinyal"),
+            "altin": next(({"altin": None, "neden": o["kanit"].split("atlandı: ", 1)[1]} for o in k["olcut"] if o["anahtar"] == "altin" and o["puan"] is None and "atlandı: " in o["kanit"]), None)}
 def son_tarih(canli):
     try:
         with open(os.path.join(canli, KARNE), encoding="utf-8") as f: ls = [l for l in f if l.strip()]

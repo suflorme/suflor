@@ -3,7 +3,7 @@
 # ("yetersiz veri" uydurmaz), deneme toplantısı dışlama, işlev/boyut ağırlıkları, günlük satır (günde bir, metinsiz), eğilim, haftalık kullanıcı puanı sorusu,
 # pano cevabı doğrulama, beta özeti süzgeçten sızıntısız geçer. Ağ yok, gerçek veri yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/zeka.py      (kaldı → çıkış 1)
-import datetime, json, os, re, sys, tempfile, threading, time
+import datetime, json, os, re, shutil, sys, tempfile, threading, time
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, KOD)
 import zeka, teshis
@@ -144,6 +144,57 @@ open(os.path.join(C, zeka.PUAN), "w").write(zeka.puan_satiri("konus", 4, simdi=S
 open(os.path.join(C, zeka.PUAN), "w").write(PY)
 ok("soru: 'Şimdi değil' 2 gün erteler", a1 == [] and a2 != [], (a1, a2))
 ok("kullanıcı puanı karneye karışmaz, ayrı döner", zeka.karne(C, 30, S)["kullanici"] == {"konus": {"n": 1, "ort": 4.0}} and zeka.karne(C, 30, S)["islev"]["konus"]["puan"] == K["islev"]["konus"]["puan"])
+
+# Yeni sinyaller: mutabakat, tepki, Kesişim (yalnız sayı, az veride oran yok)
+SG0 = zeka.karne(C, 30, S)["sinyal"]
+ok("sinyal: veri yokken sıfır ve oran None (puan uydurulmaz)", SG0["mutabakat"]["oneri"] == 0 and SG0["mutabakat"]["onay_orani"] is None and set(SG0["tepki"]) <= {"eposta"} and (SG0["tepki"].get("eposta") or {}).get("iyi") in (None, 0) and SG0["kesisim"]["geri_orani"] is None, SG0)
+yaz("mutabakat.jsonl", [{"t": t(2), "olay": "tur", "durum": "tamam", "aday": 8}] + [{"t": t(2), "olay": "oneri", "kayit": f"m{i}", "oneri": "bitti" if i < 4 else "belirsiz", "guven": 0.9 if i < 4 else 0.2} for i in range(8)]
+     + [{"t": t(1), "olay": "sonuc", "kayit": f"m{i}", "oneri": "bitti", "sonuc": "onay" if i < 4 else "red"} for i in range(6)] + [{"t": t(40), "olay": "oneri", "kayit": "eski", "oneri": "bitti", "guven": 1.0}])
+yaz("tepki.jsonl", [{"zaman": iso(2), "kaynak": "tazi", "id": f"b{i}", "deger": "iyi" if i < 4 else "yanlis"} for i in range(6)] + [{"zaman": iso(2), "kaynak": "kesisim", "id": "k1", "deger": "yanlis"}])
+yaz("kesisim-coz.jsonl", [{"t": iso(2), "id": f"c{i}", "karar": "duzelt", "eylem": "tazi_dosya_eklendi", "guven": 0.9} for i in range(5)] + [{"t": iso(2), "id": "a", "karar": "arastir", "eylem": "tazi_kuyrukta"}, {"t": iso(2), "id": "b", "karar": "birak", "eylem": "birakildi"},
+     {"t": iso(1), "id": "c0", "karar": "duzelt", "eylem": "geri_alindi"}, {"t": iso(2), "id": "y", "karar": "duzelt", "eylem": "oh_yazilacakti_kapali"}])
+SG = zeka.karne(C, 30, S)["sinyal"]; mu, tp, ke = SG["mutabakat"], SG["tepki"], SG["kesisim"]
+ok("sinyal mutabakat: 8 öneri (pencere dışı sayılmaz), 6 sonuç → onay %67, red %33, 2 bekleyen, 1 tur", mu["oneri"] == 8 and mu["onay"] == 4 and mu["red"] == 2 and mu["bekleyen"] == 2 and mu["onay_orani"] == 0.667 and mu["red_orani"] == 0.333 and mu["tur"] == 1, mu)
+ok("sinyal mutabakat: karar başına ortalama güven", mu["guven"] == {"bitti": {"n": 4, "ort": 0.9}, "belirsiz": {"n": 4, "ort": 0.2}}, mu["guven"])
+ok("sinyal tepki: kaynak başına iyi/yanlış; 6 örnekle oran var, 1 örnekle yok", tp["tazi"] == {"iyi": 4, "yanlis": 2, "n": 6, "iyi_orani": 0.667} and tp["kesisim"]["iyi_orani"] is None and tp["kesisim"]["n"] == 1, tp)
+ok("sinyal tepki: tazi/kesisim ölçütleri karneye girer (6 ≥ asgari 5 → puan 67; kesisim yetersiz)", {o["anahtar"]: o for o in zeka.karne(C, 30, S)["olcut"] if o["islev"] in ("tazi", "kesisim")}["bulgu"]["puan"] == 67 and {o["anahtar"]: o for o in zeka.karne(C, 30, S)["olcut"] if o["islev"] == "kesisim"}["celiski"]["durum"] == "yetersiz")
+gk = list(ke["gunler"].values())[0] if len(ke["gunler"]) == 1 else None
+ok("sinyal kesişim: düzeltilen 5 (kapalı yazma sayılmaz), araştırılan 1, bırakılan 1, geri alınan 1 → geri oranı %20", ke["duzeltilen"] == 5 and ke["geri_alinan"] == 1 and ke["geri_orani"] == 0.2 and sum(v["araştırılan".replace("ş", "s").replace("ı", "i")] for v in ke["gunler"].values()) == 1 and sum(v["birakilan"] for v in ke["gunler"].values()) == 1, ke)
+ok("sinyal: karne özet satırına metinsiz girer", zeka.ozet_satir(zeka.karne(C, 30, S), S)["sinyal"]["mutabakat"]["onay"] == 4 and not sizinti(SG))
+for _a in ("mutabakat.jsonl", "tepki.jsonl", "kesisim-coz.jsonl"): os.remove(os.path.join(C, _a))
+# Altın set gece turuna bağlı: dus_altin_kos günde bir, sahte kod klasöründe test/zeka-altin.py + testler/altin varsa koşar
+AK = tempfile.mkdtemp(prefix="zeka-altin-kod-"); os.makedirs(os.path.join(AK, "test")); os.makedirs(os.path.join(AK, "testler", "altin")); AC = os.path.join(AK, "canli"); os.makedirs(AC)
+shutil.copy(os.path.join(KOD, "zeka.py"), AK); open(os.path.join(AK, "test", "zeka-altin.py"), "w").write("import sys, json, os\nd = sys.argv[sys.argv.index('--kaydet') + 1]\njson.dump({'gecen': 3, 'toplam': 4, 'zaman': '2026-11-12T03:00:00'}, open(os.path.join(d, 'altin-sonuc.json'), 'w'))\n")
+_ak = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": {"kod": AK}, "BASE": AC, "LOCK": threading.Lock(), "write": lambda pairs: [open(y, "a").write(m) for y, m in pairs],
+       "gizli_acik": lambda: False, "_t": lambda tr, en: tr, "print": lambda *a, **k: None}
+exec(compile(open(os.path.join(KOD, "aktarici", "dusunme.py"), encoding="utf-8").read(), "dusunme.py", "exec"), _ak)
+_r1 = _ak["dus_altin_kos"](); _r2 = _ak["dus_altin_kos"]()
+ok("altın set: günde bir koşar, sonucu canli/altin-sonuc.json'a yazar", _r1 == 0 and _r2 is None and json.load(open(os.path.join(AC, "altin-sonuc.json")))["gecen"] == 3, (_r1, _r2))
+_ak["DUS"]["altin_gun"] = ""; os.remove(os.path.join(AC, "altin-sonuc.json")); _ak["gizli_acik"] = lambda: True
+ok("altın set: gizli kipte koşmaz", _ak["dus_altin_kos"]() is None and not os.path.exists(os.path.join(AC, "altin-sonuc.json")))
+_ak["gizli_acik"] = lambda: False; _ak["DUS"]["altin_gun"] = ""; _ak["AYAR"]["kod"] = os.path.join(AK, "yok")
+_pr = []; _ak["print"] = lambda *x, **k: _pr.append(" ".join(map(str, x)))
+ok("altın set: atlanınca günlüğe 'ALTIN: atlandı (neden)' + altin-atla.jsonl", _ak["dus_altin_kos"]() is None and any(l.startswith("ALTIN: atlandı (") for l in _pr) and json.loads(open(os.path.join(AC, "altin-atla.jsonl")).readline())["altin"] is None)
+_nk = zeka.karne(AC, 30); _ol = [o for o in _nk["olcut"] if o["anahtar"] == "altin"][0]
+ok("altın set: atlanan koşu karneye altin: null + neden", "atlandı:" in _ol["kanit"] and zeka.ozet_satir(_nk)["altin"]["altin"] is None and zeka.ozet_satir(_nk)["altin"]["neden"], _ol)
+# kurulum kopyası önce denenir (<uygulama>/altin/), kod klasörü gerekmez
+os.makedirs(os.path.join(AK, "altin", "ornek")); shutil.copy(os.path.join(AK, "test", "zeka-altin.py"), os.path.join(AK, "altin", "zeka-altin.py")); shutil.rmtree(os.path.join(AK, "test")); _ak["DUS"]["altin_gun"] = ""
+ok("altın set: <uygulama>/altin/ kopyasından koşar (kod klasörü yokken de)", _ak["dus_altin_kos"]() == 0 and os.path.isfile(os.path.join(AC, "altin-sonuc.json")))
+os.remove(os.path.join(AC, "altin-sonuc.json")); shutil.rmtree(os.path.join(AK, "altin")); os.makedirs(os.path.join(AK, "test")); open(os.path.join(AK, "test", "zeka-altin.py"), "w").write("import sys, json, os\nd = sys.argv[sys.argv.index('--kaydet') + 1]\njson.dump({'gecen': 3, 'toplam': 4, 'zaman': 'x'}, open(os.path.join(d, 'altin-sonuc.json'), 'w'))\n")
+# kurulum.altin_kopyala: yalnız geliştiricide kopyalar, beta'da eski kopyayı siler
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location("kurulum_t", os.path.join(KOD, "kurulum.py")); _kz = _iu.module_from_spec(_sp); _sp.loader.exec_module(_kz)
+_kk = tempfile.mkdtemp(prefix="altin-kur-"); _ap = tempfile.mkdtemp(prefix="altin-app-")
+os.makedirs(os.path.join(_kk, "test")); os.makedirs(os.path.join(_kk, "testler", "altin")); open(os.path.join(_kk, "test", "zeka-altin.py"), "w").write("#"); open(os.path.join(_kk, "testler", "altin", "01.json"), "w").write("{}")
+_kz.KOD = _kk; _kz._gelistirici = lambda: True
+ok("kurulum: geliştiricide altın set <uygulama>/altin/ altına kopyalanır", _kz.altin_kopyala(_ap) is True and os.path.isfile(os.path.join(_ap, "altin", "zeka-altin.py")) and os.path.isfile(os.path.join(_ap, "altin", "ornek", "01.json")))
+_kz._gelistirici = lambda: False
+ok("kurulum: beta'da altın kopyası yok, eski kopya silinir", _kz.altin_kopyala(_ap) is False and not os.path.exists(os.path.join(_ap, "altin")))
+_ak["print"] = lambda *a, **k: None; _ak["DUS"]["altin_gun"] = ""
+ok("kurulum: altin/ ve testler/ KOPYA listesinde değil (beta paketine girmez)", "altin" not in " ".join(_kz.KOPYA) and "testler" not in " ".join(_kz.KOPYA))
+_ak["AYAR"]["kod"] = os.path.join(AK, "yok")
+_ak["AYAR"]["kod"] = AK; _ak["DUS"]["altin_gun"] = ""; _ak["DUS"]["zeka_gun"] = ""; _ak["dus_zeka_gunluk"]()
+ok("altın set: günlük karne öncesi koşar (karne satırı altın sonucunu okur)", os.path.isfile(os.path.join(AC, "altin-sonuc.json")) and json.loads(open(os.path.join(AC, "zeka-karne.jsonl")).readline())["olcut"]["hazirlik.altin"][1] == 4)
 
 # Beta özeti + teshis süzgeci
 bo = zeka.beta_ozet(C, S - 7 * 86400, S + 86400); tz = teshis.temizle({"zeka": bo})["zeka"]

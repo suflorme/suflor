@@ -48,10 +48,32 @@ def _dus_iz(gun, durum, plan=None):  # zekâ karnesi için metinsiz tur izi
     if plan: r.update(odak=[str(x["id"]) for x in plan.get("odak") or [] if x.get("id")], dikkat=[str(x["id"]) for x in plan.get("dikkat") or [] if x.get("id")], damga=plan.get("damga") or {})
     try: _dus_ek("dusunme-iz.jsonl", json.dumps(r, ensure_ascii=False) + "\n")
     except Exception as e: print(f"DÜŞÜNME: iz yazılamadı ({e.__class__.__name__})")
+def _dus_altin_atla(neden):  # sessiz kalmaz: günlüğe tek satır + karneye altin: null, neden (altin-sonuc.json; zeka.py m_altin yetersiz sayar)
+    print(f"ALTIN: atlandı ({neden})")
+    try: _dus_ek("altin-atla.jsonl", json.dumps({"t": round(float(DUS_SAAT()), 1), "altin": None, "neden": neden}, ensure_ascii=False) + "\n")
+    except Exception: pass
+    return None
+def dus_altin_kos(simdi=None):  # gece turundan sonra günde bir altın set: önce kurulumun kopyası <uygulama>/altin/ (Masaüstü gerekmez), yoksa ayar kod; modelsiz, ağsız → maliyet yok
+    gun = _dus_dt(simdi).date().isoformat()
+    if DUS.get("altin_gun") == gun: return None
+    DUS["altin_gun"] = gun
+    if _dus_gizli(): return None
+    uyg = os.path.dirname(os.path.abspath(BASE)); kod = os.path.expanduser(str(AYAR.get("kod") or ""))
+    a = os.path.join(uyg, "altin", "zeka-altin.py")
+    if os.path.isfile(a) and os.path.isdir(os.path.join(uyg, "altin", "ornek")): yol, kl, cwd = a, ["--klasor", os.path.join(uyg, "altin", "ornek")], uyg
+    elif kod and os.path.isfile(os.path.join(kod, "test", "zeka-altin.py")) and os.path.isdir(os.path.join(kod, "testler", "altin")): yol, kl, cwd = os.path.join(kod, "test", "zeka-altin.py"), [], kod
+    else: return _dus_altin_atla("altın set kopyası ve kod klasörü yok (geliştirici kurulumu değil ya da kurulum henüz kopyalamadı)")
+    try:
+        import subprocess, sys as _sys
+        r = subprocess.run([_sys.executable or "python3", "-B", yol, "--kaydet", BASE] + kl, cwd=cwd, capture_output=True, timeout=180, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+        if not os.path.isfile(os.path.join(BASE, "altin-sonuc.json")): return _dus_altin_atla(f"koşu sonuç yazmadı (çıkış {r.returncode})")
+        print(f"ZEKÂ: altın set koşuldu (çıkış {r.returncode})"); return r.returncode
+    except Exception as e: return _dus_altin_atla(f"koşulamadı: {e.__class__.__name__}")
 def dus_zeka_gunluk(simdi=None):  # günde bir zekâ karnesi satırı (hesap zeka.py'de; burada yalnız tetik); gizli kipte yazılmaz
     if not _ZEKA or _dus_gizli(): return None
     gun = _dus_dt(simdi).date().isoformat()
     if DUS["zeka_gun"] == gun: return None
+    dus_altin_kos(simdi)  # karne satırı altın sonucunu okusun diye önce
     try:
         r = _ZEKA.gunluk(BASE, simdi=simdi, gecmis=os.path.join(os.path.expanduser("~/Library/Application Support/Suflor"), "olcum-gecmis.jsonl"), yaz=_dus_ek)
         DUS["zeka_gun"] = gun

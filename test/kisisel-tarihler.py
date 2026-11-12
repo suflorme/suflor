@@ -151,7 +151,9 @@ tl = oku("aktarici", "talimat.py")
 kontrol("talimat_yakala kt_sesli_hatirlat'ı çağırır ve 'yapilacak' + zaman ile onay yoluna verir", 'kt_sesli_hatirlat(metin)' in tl and 'talimat_kuyruk("yapilacak", None, kh[0], metin, kaynak, zaman=kh[1])' in tl)
 # --- Swift ve bağlantılar
 sw = oku("takvim.swift"); ku = oku("kurulum.py"); rl = oku("relay.py")
-kontrol("takvim.swift: --tarihler, üç izin ayrı, yazma çağrısı yok (CNSaveRequest, save, remove, saveReminder)", '"--tarihler"' in sw and "requestFullAccessToReminders" in sw and "izinler" in sw and "CNSaveRequest" not in sw[sw.index("func tarihlerOku"):sw.index("if let g = tarihGun")] and "store.save" not in sw[sw.index("func tarihlerOku"):sw.index("if let g = tarihGun")] and "store.remove" not in sw[sw.index("func tarihlerOku"):sw.index("if let g = tarihGun")])
+_a = sw.index("func tarihlerOku"); _b = sw.index("\nfunc ", _a + 10)  # yalnız tarihlerOku gövdesi (sonraki işlevler Anımsatıcı eşitlemesi yazar)
+_g = sw[_a:_b]
+kontrol("takvim.swift: --tarihler, üç izin ayrı, yazma çağrısı yok (CNSaveRequest, save, remove, saveReminder)", '"--tarihler"' in sw and "requestFullAccessToReminders" in sw and "izinler" in sw and "CNSaveRequest" not in _g and "store.save" not in _g and "store.remove" not in _g and "saveReminder" not in _g)
 kontrol("TAKVIM_PLIST: NSRemindersFullAccessUsageDescription var", "NSRemindersFullAccessUsageDescription" in ku)
 kontrol("relay: /yaklasan-tarihler VERI_GET'te, GET ve POST bağlı, bölüm yüklü, hatırlatma döngüsü başlar", '"/yaklasan-tarihler"' in re.search(r"VERI_GET = \{[^}]*\}", rl).group(0) and 'yol == "/yaklasan-tarihler"' in rl and 'kt_islem(p)' in rl and 'bolum("kisisel-tarihler")' in rl and "_kt_dongu" in rl)
 kontrol("relay AYAR_PANO: ayar adları", all(f'"{k}"' in rl[rl.index("AYAR_PANO = {"):rl.index("def kisilik_listesi")] for k in ("kisisel_tarihler", "kisisel_tarih_ufuk", "kisisel_tarih_hatirlat", "kisisel_tarih_sesli", "kutlama_kanali")))

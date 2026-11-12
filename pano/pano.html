@@ -2477,13 +2477,12 @@ function tpYap(b){const k=b.dataset.k,id=b.dataset.id,d=b.dataset.d,a=k+':'+id,y
   if(yeni)tpSec[a]=yeni;else delete tpSec[a];try{localStorage.setItem('tepki',JSON.stringify(tpSec))}catch(e){}
   const g=b.parentElement;if(g)g.querySelectorAll('button').forEach(x=>{const o=x.dataset.d===yeni;x.classList.toggle('on',o);x.setAttribute('aria-pressed',o)})
   if(yeni)bnYaz('/tepki',{kaynak:k,id,deger:yeni}).catch(()=>{})}
-function ksBlok(s){const k=s.kesisim;if(!k)return'';const ls=(k.cozulemeyen_onemli||[]).filter(x=>x&&x.id),n=(k.duzeltilen||0)+(k.arastirilan||0);if(!n&&!ls.length)return''
-  const ozet=bsSat({id:'ks-ozet',ikon:'ara',t:esc(L('Gece çapraz kontrolü: {a} düzeltildi, {b} araştırıldı, {c} bırakıldı',{a:k.duzeltilen||0,b:k.arastirilan||0,c:k.birakilan||0})),a:bsTarih(k.tarih),d:tpDug('kesisim','ozet-'+(k.tarih||''))})
-  return`<section class=bolum aria-label="${L('Kesişim')}"><div class=bbas><h2>${L('Kesişim')}</h2></div><div class=liste>${ozet}${ls.map(x=>bsSat({id:'ks-'+x.id,nokta:'bek',t:esc(x.ozet||''),a:KS_NEDEN[x.neden]?esc(L(KS_NEDEN[x.neden])):'',d:tpDug('kesisim',x.id)})).join('')}</div></section>`}
+function ksBlok(s){const k=s.kesisim;if(!k)return'';const d=k.duzeltilen||0,a=k.arastirilan||0,q=(k.cozulemeyen_onemli||[]).filter(x=>x&&x.id).length;if(!d&&!a&&!q)return''  // F3: Bugün'de yalnız bağlantı; ayrıntı ve tepki /kesisim sayfasında
+  const p=[];if(d)p.push(L('{n} düzeltme',{n:d}));if(a)p.push(L('{n} araştırma',{n:a}));if(q)p.push(L('{n} soru',{n:q}))
+  return`<button type=button class=ksbag data-bn=ksac aria-label="${esc(L('Kesişim sayfasını aç'))}">${esc(L('Kesişim: bugün {x}',{x:p.join(', ')}))} →</button>`}
 // Gece durum önerileri (aktarici/mutabakat.py, /status mutabakat): kayıt bitmiş/yerini başka kayıt almış görünüyor; kanıt satırı + Onayla / Hayır
 const mtbTarih=t=>{const d=new Date(String(t).slice(0,10)+'T12:00');return isNaN(d)?'':d.toLocaleDateString(L('tr-TR'),{day:'numeric',month:'long'})}
 const MTB_KAYNAK={toplanti:'toplantı',dokum:'döküm',belge:'belge',eposta:'e-posta',takvim:'takvim',basecamp:'Basecamp'}
-const KS_NEDEN={karar_yok:'Karar verilemedi',tavan:'Günlük düzeltme sınırı doldu',karar_is_kaydi:'Karar ya da iş kaydı: elle bakılmalı',tazi_kaydi_yok:'Tazı dosyası yok',tazi_hata:'Tazı hata verdi',arastirma_hedefi_yok:'Araştırılacak kişi ya da firma belirsiz',arastirma_sonucsuz:'Üç araştırmada sonuç çıkmadı'}
 function mtbSat(s){const m=s.mutabakat;if(!m||!Array.isArray(m.oneriler))return[]
   return m.oneriler.filter(o=>o&&o.kayit&&(o.oneri==='bitti'||o.oneri==='yerini_aldi')&&!bnGizli.has(o.kayit)).map(o=>{const k=o.kanit,kt=k?[MTB_KAYNAK[k.kaynak]?L(MTB_KAYNAK[k.kaynak]):'',k.tarih?mtbTarih(k.tarih):''].filter(Boolean).join(', '):''
     return bsSat({id:o.kayit,nokta:'bek',ek:k&&k.alinti?` title="${esc(k.alinti)}"`:'',t:esc(o.baslik||''),a:esc((o.oneri==='bitti'?L('Bitmiş görünüyor'):L('Yerini başka karar almış görünüyor'))+(kt?' ('+L('kanıt: {k}',{k:kt})+')':'')),
@@ -2683,6 +2682,8 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
     if(CHROME)window.open(u,'_blank');else chromeAc({dokum_kontrol:'http://127.0.0.1:'+location.port+u});return}
   if(a==='dkkapat'){const t=b.dataset.t;dkKapali.add(t);if(last)bnCiz(last);bnYaz('/dokum-kontrol',{islem:'kapat',t}).then(r=>{if(!r||!r.ok){dkKapali.delete(t);bnBildir(L('Yapılamadı'));if(last)bnCiz(last)}}).catch(()=>{dkKapali.delete(t);if(last)bnCiz(last)});return}
   if(a==='mtb'){const o=b.dataset.i;return bnIsle([id],o==='onay'?L('Kayıt kapatıldı'):L('Tamam, açık kalsın'),()=>bnYaz('/mutabakat',{kayit:id,islem:o}))}  // gece durum önerisi: Onayla kaydı kapatır (Geri al 5 sn), Hayır öneriyi reddeder
+  if(a==='ksac'){let u='/kesisim';try{const r=await bnYaz('/tek-kullanim',{}),m=r&&r.url&&String(r.url).match(/[?&]t=([0-9a-f]{32})/);if(m)u+='?t='+m[1]}catch(e){}  // sayfa tek kullanımlık anahtarla açılır (2 dk)
+    if(CHROME)window.open(u,'_blank');else chromeAc({kesisim:'http://127.0.0.1:'+location.port+u});return}
   if(a==='tepki'){ev.stopPropagation();tpYap(b);return}
   if(a==='epyanlis')return epIslem('yanlis_oncelik',id,b,{beklenen:b.dataset.b})
   if(a==='bekac'){bnBekAcik=!bnBekAcik;if(last)bnCiz(last);return}

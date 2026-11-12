@@ -974,7 +974,7 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "tazi.py", "aktarici/", "kullanim.py", "zeka.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "baglayici.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KOPYA = ["relay.py", "tazi.py", "aktarici/", "kullanim.py", "zeka.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "baglayici.py", "kesisim.py", "kesisim-coz.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
 KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
 # v0.136.0 (26 Ekim kişisel hesap: ses-isci.py, pano/hazirlik.html, test/platform.py kalmıştı): önceki imzalı listede olup yenisinde olmayan ve
 # özeti değişmemiş dosya silinir; kullanıcının koyduğu ya da değiştirdiği dosya kalır. Aynı kural kur.sh'de (bash).
@@ -1503,6 +1503,7 @@ def kur():
             continue
         for f in (sorted(glob_(os.path.join(KOD, k))) if "*" in k else [os.path.join(KOD, k)]):
             h = os.path.join(app, os.path.relpath(f, KOD)); os.makedirs(os.path.dirname(h), exist_ok=True); kopyala(f, h)
+    altin_kopyala(app)
     for k in KALKAN:
         if os.path.isfile(os.path.join(app, k)): os.remove(os.path.join(app, k))
     ecapa_donustur(Y["ortak"]); whisper_8bit(Y["ortak"]); tur_kur(Y["ortak"])
@@ -2014,6 +2015,15 @@ def _gelistirici():  # relay.py gelistirici_mi() ile aynı ölçüt: ayar gelist
     if a.get("gelistirici") is True: return True
     k = os.path.expanduser(os.environ.get("SUFLOR_TEST_KOD") or str(a.get("kod") or "")) or KOD
     return os.path.isdir(os.path.join(k, ".git"))
+def altin_kopyala(app):  # zekâ altın seti (test/zeka-altin.py + testler/altin/*.json) → <uygulama>/altin/{zeka-altin.py,ornek/}: gece turu Masaüstü'ne erişemese de koşsun; YALNIZ geliştirici kurulumunda (testler/ git dışı, kişi adı içerebilir; beta'ya girmez)
+    hedef = os.path.join(app, "altin"); kaynak = os.path.join(KOD, "testler", "altin"); betik = os.path.join(KOD, "test", "zeka-altin.py")
+    shutil.rmtree(hedef, ignore_errors=True)
+    if not (_gelistirici() and os.path.isdir(kaynak) and os.path.isfile(betik)): return False
+    try:
+        os.makedirs(os.path.join(hedef, "ornek")); shutil.copy(betik, os.path.join(hedef, "zeka-altin.py"))
+        for f in glob_(os.path.join(kaynak, "*.json")): shutil.copy(f, os.path.join(hedef, "ornek", os.path.basename(f)))
+        os.chmod(hedef, 0o700); return True
+    except OSError as e: say(f"Not: altın set kopyalanamadı ({e.__class__.__name__})"); return False
 def _kod_okunamaz():  # kopya uygulama klasöründen (launchd altında) koşuyoruz: Swift kaynakları ve geliştirici kodu yok ya da Masaüstü okunamıyor
     if os.environ.get("SUFLOR_KOD_OKUNAMAZ"): return True
     k = ayar().get("kod")

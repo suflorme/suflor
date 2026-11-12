@@ -9,7 +9,7 @@
 import json, os, re, sys
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KULLANAN = ["popup.js", "background.js", "content.js", "pano/pano.html", "pano/dokum-kontrol.html"]
+KULLANAN = ["popup.js", "background.js", "content.js", "pano/pano.html", "pano/dokum-kontrol.html", "pano/kesisim.html"]
 YASAK = re.compile(r"\b(dashboard|board)\b", re.I)
 oku = lambda y: open(os.path.join(KOD, y), encoding="utf-8").read()
 hatalar = []

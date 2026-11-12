@@ -1,0 +1,96 @@
+<!doctype html><html lang=tr><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Kesişim · Suflor.me</title><link rel=icon href="/marka/suflor-isaret.svg">
+<style>
+/*__YAZI__*/
+/*__RENK__*/
+:root{--f-baslik:"Bricolage Grotesque","Avenir Next","Helvetica Neue",system-ui,sans-serif;--f-govde:"IBM Plex Sans",-apple-system,"Helvetica Neue",system-ui,sans-serif}
+:root{color-scheme:light dark;--bg:var(--b-zemin);--s1:var(--b-yuzey);--tx:var(--b-murekkep);--t2:var(--b-m2);--t3:var(--b-m3);--bd:var(--b-cizgi);--bd2:var(--b-cizgi2);--hov:var(--b-uzerinde);--ac:var(--b-vurgu);--ac-bg:var(--b-vurgu-hafif);--dikkat:var(--b-gec)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--tx);font:var(--yz-4)/1.55 var(--f-govde)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+main{max-width:680px;margin:0 auto;padding:32px 18px 56px}
+.ust{display:flex;justify-content:space-between;align-items:baseline;color:var(--t3);font-size:var(--yz-3);margin-bottom:28px}
+.ust a{color:var(--t2);text-decoration:none}.ust a:hover{color:var(--tx)}
+.ust b{font:400 var(--yz-3) var(--f-govde);letter-spacing:.02em;color:var(--t2)}
+h1{margin:0 0 36px;font:300 clamp(24px,5vw,32px)/1.25 var(--f-baslik);letter-spacing:-.02em;text-wrap:balance}
+h1 small{display:block;margin-top:10px;font:400 var(--yz-3)/1.5 var(--f-govde);letter-spacing:0;color:var(--t3)}
+h2{margin:36px 0 6px;font:500 var(--yz-3)/1.3 var(--f-govde);letter-spacing:.06em;text-transform:uppercase;color:var(--t3)}
+.sat{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--bd)}
+.sat:last-child{border-bottom:0}
+.m{flex:1;min-width:0}.t{overflow-wrap:anywhere}.a{margin-top:2px;font-size:var(--yz-3);color:var(--t3)}
+.e{display:flex;gap:2px;align-items:center;flex:none}
+button{font:inherit;font-size:var(--yz-3);color:var(--t2);background:none;border:1px solid transparent;border-radius:var(--kose);padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover{background:var(--hov);color:var(--tx)}button:disabled{opacity:.5;cursor:default}
+button.gb{border-color:var(--bd2)}
+button.em{width:30px;height:30px;padding:0;display:grid;place-items:center;color:var(--t3);border-radius:var(--kose)}
+button.em.on{color:var(--ac);background:var(--ac-bg)}
+button.em svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nk{flex:none;width:7px;height:7px;margin-top:9px;border-radius:50%;background:var(--ac)}.nk.bek{background:none;border:1.5px solid var(--dikkat)}.nk.ar{background:none;border:1.5px solid var(--t3)}
+.sat.gitti .t{color:var(--t3);text-decoration:line-through;text-decoration-color:var(--bd2)}
+.bos{padding:18px 0;color:var(--t3)}
+details{margin-top:36px;opacity:.78}summary{cursor:pointer;color:var(--t3);font-size:var(--yz-3);list-style:none}summary::-webkit-details-marker{display:none}summary:hover{color:var(--t2)}
+details .t{color:var(--t2);font-size:var(--yz-3)}
+.alt{margin-top:44px;padding-top:14px;border-top:1px solid var(--bd);font-size:var(--yz-2);color:var(--t3);display:flex;flex-wrap:wrap;gap:4px 18px}
+.alt .bay{color:var(--dikkat)}
+#msj{text-align:center;padding:60px 0;color:var(--t3)}
+@media (max-width:480px){main{padding:22px 16px 44px}.sat{flex-wrap:wrap}.e{margin-left:19px}}
+</style>
+<main>
+ <div class=ust><a href="/" id=geri></a><b id=tr></b></div>
+ <div id=ic hidden>
+  <h1 id=ozet></h1>
+  <section id=bd1 hidden><h2 id=h1b></h2><div id=l1></div></section>
+  <section id=bd2 hidden><h2 id=h2b></h2><div id=l2></div></section>
+  <section id=bd3 hidden><h2 id=h3b></h2><div id=l3></div></section>
+  <details id=bd4 hidden><summary id=h4b></summary><div id=l4></div></details>
+  <div class=alt id=alt></div>
+ </div>
+ <div id=msj></div>
+</main>
+<script>/*__DIL_SOZLUK__*/</script>
+<script>/*__ANAHTAR__*/</script>
+<script>
+const DIL="__DIL__", EN=globalThis.SUFLOR_EN||{}
+function L(s,v){let t=DIL==="en"&&EN[s]||s;if(v)for(const k in v)t=t.split("{"+k+"}").join(v[k]);return t}
+const $=id=>document.getElementById(id), esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+const NEDEN={karar_yok:'Karar verilemedi',tavan:'Günlük düzeltme sınırı doldu',karar_is_kaydi:'Karar ya da iş kaydı: elle bakılmalı',tazi_kaydi_yok:'Tazı dosyası yok',tazi_hata:'Tazı hata verdi',arastirma_hedefi_yok:'Araştırılacak kişi ya da firma belirsiz',arastirma_sonucsuz:'Üç araştırmada sonuç çıkmadı'}
+const KAYNAK={vt:'Proje veritabanı',tazi:'Tazı dosyası'}, YER={tazi:'Tazı dosyasına işlendi'}
+const tepkiSec=(()=>{try{return JSON.parse(localStorage.getItem('tepki')||'{}')||{}}catch(e){return{}}})()
+const api=async(yol,gov)=>{const r=await fetch(yol,gov?{method:'POST',body:JSON.stringify(gov)}:undefined);if(r.status===401)throw new Error('anahtar');return r.json()}
+function zaman(t){const d=new Date(t);if(isNaN(d))return'';const s=d.toTimeString().slice(0,5),g=Math.round((new Date().setHours(0,0,0,0)-new Date(d).setHours(0,0,0,0))/864e5)
+  return g<=0?L('bugün {s}',{s}):g===1?L('dün {s}',{s}):d.toLocaleDateString(DIL==='en'?'en-GB':'tr-TR',{day:'numeric',month:'long'})+' '+s}
+const yas=s=>s==null?'':s<5400?L('az önce'):s<172800?L('{n} sa önce',{n:Math.round(s/3600)}):L('{n} gün önce',{n:Math.round(s/86400)})
+const kaynakAd=k=>{const a=(k||[]).map(x=>KAYNAK[x]?L(KAYNAK[x]):'').filter(Boolean);return a.length?L('Kaynaklar: {k}',{k:a.join(', ')}):''}
+const IK={iyi:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',yanlis:'<path d="M6 6l12 12M18 6L6 18"/>'}
+function tepki(id){const g=document.createElement('span');g.className='e';g.setAttribute('role','group');g.setAttribute('aria-label',L('Tepki'))
+  for(const [v,ad] of [['iyi',L('İşe yaradı')],['yanlis',L('Yanlış')]]){const b=document.createElement('button');b.type='button';b.className='em'+(tepkiSec['kesisim:'+id]===v?' on':'');b.title=ad;b.setAttribute('aria-label',ad);b.setAttribute('aria-pressed',tepkiSec['kesisim:'+id]===v);b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden=true>'+IK[v]+'</svg>'
+    b.onclick=()=>{const a='kesisim:'+id,yeni=tepkiSec[a]===v?'':v;if(yeni)tepkiSec[a]=yeni;else delete tepkiSec[a];try{localStorage.setItem('tepki',JSON.stringify(tepkiSec))}catch(e){}
+      g.querySelectorAll('button').forEach(x=>{const o=x.title===(yeni==='iyi'?L('İşe yaradı'):yeni==='yanlis'?L('Yanlış'):'');x.classList.toggle('on',o);x.setAttribute('aria-pressed',o)})
+      if(yeni)api('/tepki',{kaynak:'kesisim',id,deger:yeni}).catch(()=>{})};g.appendChild(b)}
+  return g}
+function sat(nokta,metin,alt,sag){const d=document.createElement('div');d.className='sat';d.innerHTML='<span class="nk '+nokta+'" aria-hidden=true></span><div class=m><div class=t>'+esc(metin)+'</div>'+(alt?'<div class=a>'+esc(alt)+'</div>':'')+'</div>';if(sag){const e=document.createElement('div');e.className='e';e.appendChild(sag);d.appendChild(e)}return d}
+function bolum(n,ks,liste){$('bd'+n).hidden=!liste.length;const k=$('l'+n);k.textContent='';liste.forEach(x=>k.appendChild(x))}
+function geriAl(x,satir,b){b.disabled=true;b.textContent=L('Geri alınıyor…')
+  api('/kesisim',{islem:'geri_al',id:x.id}).then(r=>{if(r&&r.ok){satir.classList.add('gitti');b.replaceWith(Object.assign(document.createElement('span'),{className:'a',textContent:L('Geri alındı')}))}else{b.disabled=false;b.textContent=L('Geri al');b.title=L('Geri alınamadı')}}).catch(()=>{b.disabled=false;b.textContent=L('Geri al');b.title=L('Geri alınamadı')})}
+function ciz(j){
+  const n=j.duzeltilen||0,m=j.arastirilan||0,k=(j.sorulacak||[]).length
+  let o=!n&&!m?L('Bugün kaynaklar tutarlı; düzeltecek bir şey bulmadım.'):n&&m?L('Bugün {n} şeyi düzelttim, {m} tanesini araştırıyorum.',{n,m}):n?L('Bugün {n} şeyi düzelttim.',{n}):L('Bugün {m} şeyi araştırıyorum.',{m})
+  if(k)o+=' '+L('{k} konuda senin görüşüne ihtiyacım var.',{k})
+  const h=$('ozet');h.textContent=o;if(j.olusturma){const s=document.createElement('small');s.textContent=L('Son kontrol {z}',{z:zaman(j.olusturma)});h.appendChild(s)}
+  $('h1b').textContent=L('Yaptıklarım');$('h2b').textContent=L('Araştırdıklarım');$('h3b').textContent=L('Sana sormam gerekenler')
+  bolum(1,0,(j.duzeltmeler||[]).map(x=>{const b=document.createElement('button');b.type='button';b.className='gb';b.textContent=L('Geri al');const s=sat('',x.ozet,[L(YER[x.yer]||'Tazı dosyasına işlendi'),kaynakAd(x.kaynaklar),zaman(x.t)].filter(Boolean).join(' · '),x.geri?b:null);b.onclick=()=>geriAl(x,s,b);return s}))
+  bolum(2,0,(j.arastirmalar||[]).map(x=>sat('ar',x.ozet,[L('Tazı araştırıyor'),kaynakAd(x.kaynaklar),zaman(x.t)].filter(Boolean).join(' · '))))
+  bolum(3,0,(j.sorulacak||[]).map(x=>sat('bek',x.ozet,NEDEN[x.neden]?L(NEDEN[x.neden]):'',tepki(x.id))))
+  const bl=j.birakilan||[];$('bd4').hidden=!bl.length;$('h4b').textContent=L('Bıraktıklarım ({n})',{n:bl.length});const l4=$('l4');l4.textContent='';bl.forEach(x=>l4.appendChild(sat('ar',x.ozet,'')))
+  const al=$('alt');al.textContent='';(j.kaynaklar||[]).forEach(x=>{const s=document.createElement('span'),ad=KAYNAK_AD[x.ad]?L(KAYNAK_AD[x.ad]):x.ad,bay=x.yas_sn!=null&&x.yas_sn>129600||x.durum==='okunamadi';if(bay)s.className='bay'
+    s.textContent=ad+(x.yas_sn!=null?' · '+yas(x.yas_sn):x.durum==='okunamadi'?' · '+L('okunamadı'):'');al.appendChild(s)})
+  $('ic').hidden=false;$('msj').hidden=true}
+const KAYNAK_AD={'Proje veritabanı':'Proje veritabanı','Tazı dizini':'Tazı dizini'}
+function mesaj(t){$('ic').hidden=true;$('msj').hidden=false;$('msj').textContent=t}
+async function yukle(){
+  let j;try{j=await api('/kesisim.json')}catch(e){return mesaj(e.message==='anahtar'?L('Anahtar yok: sayfayı panodan aç.'):L('Aktarıcıya ulaşılamadı.'))}
+  if(!j||!j.acik)return mesaj(L('Bu sayfa şu an kapalı.'))
+  if(j.bos)return mesaj(L('Henüz bir kontrol yapılmadı.'))
+  ciz(j)}
+$('geri').textContent='← '+L('Pano');$('tr').textContent=L('Kesişim')
+yukle();setInterval(()=>{if(!document.hidden&&!document.querySelector('button:disabled'))yukle().catch(()=>{})},60000)
+</script>

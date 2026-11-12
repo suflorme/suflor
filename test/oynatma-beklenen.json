@@ -219,12 +219,12 @@
  },
  "http": {
   "/": {
-   "uzunluk": 696446,
-   "sha": "41ca6d265a63f0f4"
+   "uzunluk": 697804,
+   "sha": "879b658c1485a6c8"
   },
   "/mini": {
-   "uzunluk": 696446,
-   "sha": "41ca6d265a63f0f4"
+   "uzunluk": 697804,
+   "sha": "879b658c1485a6c8"
   },
   "/status": {
    "_ping_son": "float",
@@ -281,6 +281,7 @@
      "adin_gecti": "bool",
      "animsatici": "bool",
      "animsatici_liste": "str",
+     "basecamp_oku": "bool",
      "beyin_ceviri": "str",
      "beyin_konus": "str",
      "beyin_proje_karti": "str",
@@ -397,6 +398,7 @@
      "adin_gecti": "bool",
      "animsatici": "bool",
      "animsatici_liste": "str",
+     "basecamp_oku": "bool",
      "bildirim": "bool",
      "bilgi_onaysiz": "bool",
      "ceviri": "bool",
@@ -1076,7 +1078,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 8,
+  "DURUM": 7,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,
