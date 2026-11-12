@@ -50,6 +50,9 @@ def _tzk_cagir(args, zaman):  # kabuksuz alt süreç; (çıkış kodu, çıktı)
     env = dict(os.environ); env["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
         p = subprocess.run([sys.executable, "-B", tazi_yol()] + args, capture_output=True, text=True, timeout=zaman, env=env)
+        if p.returncode:  # hata türü günlüğe (yalnız son satırın tür adı; ad/metin yazılmaz)
+            son = next((x for x in reversed((p.stderr or "").strip().splitlines()) if x.strip()), "")
+            print(f"TAZI KOŞ: tazi.py {args[0] if args else '?'} çıkış {p.returncode} ({re.split(r'[:(]', son, 1)[0].strip()[:60] or 'stderr boş'})")
         return p.returncode, (p.stdout or "")[-600:]
     except subprocess.TimeoutExpired: return 124, "zaman aşımı"
     except Exception as e: return 125, e.__class__.__name__

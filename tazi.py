@@ -282,10 +282,31 @@ def liste_oku(arg=None, dizin=None):
     return ana
 
 
+def _liste_kopya_yolu(yol, dizin=None):  # ana listenin Tazı veri klasöründeki aynası (uzantı korunur)
+    return os.path.join(veri_dizin(dizin), "liste-kopya" + (os.path.splitext(yol)[1] or ".md"))
+
+
 def _liste_oku(arg=None, dizin=None):
+    """Ana liste Masaüstü'ndeyse launchd altındaki aktarıcı okuyamaz (macOS izni, PermissionError): okunabildiği her koşuda
+    veri klasörüne ayna yazılır, okunamayınca ayna kullanılır (12 Kasım: arka plan taramaları hep çıkış 1 veriyordu)."""
     yol = liste_yolu(arg, dizin)
-    with open(yol, encoding="utf-8") as f:
-        metin = f.read()
+    kopya = _liste_kopya_yolu(yol, dizin)
+    try:
+        with open(yol, encoding="utf-8") as f:
+            metin = f.read()
+        try:
+            if not os.path.isfile(kopya) or open(kopya, encoding="utf-8").read() != metin:
+                os.makedirs(os.path.dirname(kopya), exist_ok=True)
+                yaz_atomik(kopya, metin)
+        except OSError:
+            pass
+    except FileNotFoundError:
+        raise
+    except OSError:
+        if not os.path.isfile(kopya):
+            raise
+        with open(kopya, encoding="utf-8") as f:
+            metin = f.read()
     if metin.lstrip().startswith(("[", "{")):
         ham = json.loads(metin)
         ham = ham.get("kayitlar", []) if isinstance(ham, dict) else ham

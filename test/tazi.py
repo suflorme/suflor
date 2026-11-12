@@ -179,6 +179,11 @@ _rb = tazi.rapor_uret(_bos, [], "20260101")
 kontrol("rapor: bulgu yoksa Öne çıkanlar tek cümle", "## Öne çıkanlar\nBu taramada önemli yeni bir şey yok." in _rb and "0 kayıt tarandı" in _rb, _rb)
 shutil.rmtree(_bos, ignore_errors=True)
 rc, c = run("liste"); kontrol("liste komutu (ayar tazi_liste)", rc == 0 and "kuzgun-surec-pty-ltd" in c, c)
+# ana liste okunamazsa (launchd altında Masaüstü izni) veri klasöründeki ayna kullanılır (12 Kasım)
+kontrol("liste aynası yazıldı", os.path.isfile(os.path.join(T, "veri", "liste-kopya" + os.path.splitext(liste_yol)[1])))
+os.chmod(liste_yol, 0)
+try: rc, c = run("liste"); kontrol("liste okunamazsa ayna kullanılır", rc == 0 and "kuzgun-surec-pty-ltd" in c, c)
+finally: os.chmod(liste_yol, 0o644)
 
 # 2) ilk tarama
 rc, c = run("tara"); kontrol("ilk tarama çıkışı", rc == 0, c)
