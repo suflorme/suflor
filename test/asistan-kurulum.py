@@ -90,6 +90,16 @@ try:
     json.dump({"ad": "Ayşe Yılmaz"}, open(K.AYAR_YOL, "w"))
     K.tamamla({"ad": "Ayşe Yılmaz", "proje": EV + "/Suflor"}, "tr")
     kontrol("asistan adımı hiç görülmeden tamamla: kişilik yazılmaz (Suflor kalır)", "kisilik" not in json.load(open(K.AYAR_YOL)))
+    # 12 Kasım: var olan ayarda komut_sablondan yoksa (kendi komutunu yazan alan) sihirbaz onu True yapmaz; ilk kurulumda True
+    kontrol("var olan ayarda komut_sablondan yoksa kendi komutu korunur", json.load(open(K.AYAR_YOL)).get("komut_sablondan") is False)
+    os.remove(K.AYAR_YOL); K.tamamla({"ad": "Ayşe Yılmaz", "proje": EV + "/Suflor"}, "tr")
+    kontrol("ilk kurulumda komut şablondan", json.load(open(K.AYAR_YOL)).get("komut_sablondan") is True)
+    # 12 Kasım: geliştirici git klonu varken başka kopyanın sihirbazı ayarı ezmez
+    gk = os.path.join(EV, "gelistirici-kod"); os.makedirs(os.path.join(gk, ".git"))
+    json.dump({"ad": "Ayşe Yılmaz", "kod": gk, "alan": "Deneme"}, open(K.AYAR_YOL, "w"))
+    s = K.tamamla({"ad": "Ayşe Yılmaz", "proje": EV + "/Suflor"}, "tr")
+    ay = json.load(open(K.AYAR_YOL))
+    kontrol("geliştirici klonu varken tamamla durur, ayar değişmez", s["ayar"] == "kotu" and "geliştirici" in s.get("hata", "") and ay == {"ad": "Ayşe Yılmaz", "kod": gk, "alan": "Deneme"})
 finally:
     shutil.rmtree(EV, ignore_errors=True)
 print(f"{sum(ok)}/{len(ok)}")

@@ -717,6 +717,10 @@ def bos_port():
 def tamamla(c, dil):
     sonuc = {"ayar": "bekle", "proje": "bekle", "not": "bekle", "aktarici": "bekle"}
     eski = ayar(); proje = gen(c.get("proje") or "~/Suflor")
+    ek = gen(str(eski.get("kod") or ""))  # 12 Kasım: geliştirici Mac'inde indirilen beta kopyası git klonunun ayarını ve proje komutunu ezmişti
+    if ek and os.path.isdir(os.path.join(ek, ".git")) and os.path.realpath(ek) != os.path.realpath(KOD):
+        return dict(sonuc, ayar="kotu", hata=(f"Bu Mac'te {ek} klasöründe geliştirici kurulumu var; bu kopya onu değiştirmez." if dil == "tr"
+                                              else f"A developer install exists at {ek}; this copy will not replace it."))
     terim_cikar = set(c.get("terim_cikar") or [])
     terimler = [x for x in (c.get("terimler") or []) if x not in terim_cikar]
     araclar = list(dict.fromkeys((c.get("araclar") or []) + [x.strip() for x in str(c.get("araclar_ek") or "").split(",") if x.strip()]))
@@ -724,7 +728,7 @@ def tamamla(c, dil):
     a = dict(eski)
     a.update({"alan": eski.get("alan") or (c.get("sirket") or "Kişisel"), "ad": c.get("ad") or eski.get("ad") or "", "port": eski.get("port") or bos_port(),
               "uygulama": eski.get("uygulama") or "~/Library/Application Support/Suflor", "proje": proje, "ortak": ORTAK, "kod": KOD, "dil": dil,
-              "komut_sablondan": eski.get("komut_sablondan", True), "durum_belgesi": eski.get("durum_belgesi") or "belgeler/DURUM.md",
+              "komut_sablondan": eski.get("komut_sablondan", not eski), "durum_belgesi": eski.get("durum_belgesi") or "belgeler/DURUM.md",
               "rol": c.get("rol") or "", "sirket": c.get("sirket") or "", "is_alani": c.get("is_alani") or "", "kartsiz": bool(c.get("kartsiz")),
               "ek_sistem": list(dict.fromkeys((eski.get("ek_sistem") or []) + araclar)),
               "whisper_terimler": list(dict.fromkeys((eski.get("whisper_terimler") or []) + araclar + kisiler + terimler))[:60],
