@@ -205,22 +205,26 @@ KANALLAR = {}
 def ses_al(p):
     # POST /ses: {"kanal": "ben"|"karsi", "t": ilk örneğin epoch ms'si, "pcm": base64 int16 16 kHz, "meeting": {"title"}}
     w = STATE["whisper"]
-    if w["durum"] == "yok":  # Whisper yokken de tam ses kaydı sürer (kayıt Whisper'dan bağımsız)
-        try: tam_besle("ben" if p.get("kanal") in BEN_ESKI else p.get("kanal"), (p.get("t") or time.time() * 1000) / 1000.0, base64.b64decode(str(p.get("pcm") or ""), validate=True))
-        except Exception: pass
-        return {"ok": False, "kapali": True, "err": w.get("hata")}
     kanal = "ben" if p.get("kanal") in BEN_ESKI else ("karsi" if p.get("kanal") == "karsi" else None)
-    if not kanal: return {"ok": False, "err": "kanal"}
-    # yerel ses yardımcısı karşı sesi veriyorsa eklentinin (popup, sekme sesi) karşı parçaları atılır — çift satır olmasın
     try: pcm = base64.b64decode(str(p.get("pcm") or ""), validate=True)
-    except Exception: return {"ok": False, "err": "pcm"}
+    except Exception: pcm = None
+    if not kanal or pcm is None:
+        return {"ok": False, "kapali": True, "err": w.get("hata")} if w["durum"] == "yok" else {"ok": False, "err": "kanal" if not kanal else "pcm"}
+    # yerel ses yardımcısı karşı sesi veriyorsa eklentinin (popup, sekme sesi) karşı parçaları atılır — çift satır olmasın
     if kanal == "ben":  # masaüstü mikrofonu (v0.30.0): eklenti son 3 sn'de "ben" verdiyse menü uygulamasının parçası atılır — çift satır olmasın
         if p.get("kaynak") != "masaustu": STATE["_ben_eklenti"] = time.time()
         elif time.time() - (STATE.get("_ben_eklenti") or 0) < 3: return {"ok": True, "eklenti": True}
     if kanal == "karsi" and p.get("kaynak") != "yerel":
+        y = STATE["yerel_ses"]; y["eklenti_karsi_son"] = simdi = time.time()
         if pcm and max(abs(min(memoryview(pcm[:len(pcm) // 2 * 2]).cast("h"), default=0)), max(memoryview(pcm[:len(pcm) // 2 * 2]).cast("h"), default=0)) > 500:
-            STATE["yerel_ses"]["eklenti_karsi_ses"] = time.time()  # "izin" kuralının kanıtı
-        if time.time() - (STATE["yerel_ses"].get("son") or 0) < 3: return {"ok": True, "yerel": True}
+            if (y.get("eklenti_ilk_sesli") or 0) <= (y.get("sesli_parca_t") or 0): y["eklenti_ilk_sesli"] = simdi  # yardımcının son duyulur sesinden sonraki ilk
+            y["eklenti_karsi_ses"] = simdi  # "izin" kuralının kanıtı + devir (yerel_devir)
+        # yardımcı son 3 sn'de parça verdiyse eklentinin parçası atılır — yardımcı sessizken değil (v0.238.1: 12 Kasım'da sıfır ses karşı kanalı kapattı)
+        if time.time() - (STATE["yerel_ses"].get("son") or 0) < 3 and not yerel_devir(): return {"ok": True, "yerel": True}
+    if w["durum"] == "yok":  # Whisper yokken de tam ses kaydı sürer (kayıt Whisper'dan bağımsız); v0.238.1: atılan kaynak kayda da karışmaz
+        try: tam_besle(kanal, (p.get("t") or time.time() * 1000) / 1000.0, pcm)
+        except Exception: pass
+        return {"ok": False, "kapali": True, "err": w.get("hata")}
     if len(pcm) > WH_SR * 2 * 10: return {"ok": False, "err": "parça çok büyük"}
     baslik = toplanti_anahtar()  # Faz B: parçanın toplantısı kaydın kimliği (küme/ad sıfırlama); hangi dosyaya yazılacağı satırın zamanından (toplanti_satir)
     t_sn = (p.get("t") or time.time() * 1000) / 1000.0

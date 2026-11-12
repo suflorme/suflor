@@ -1046,8 +1046,13 @@ def _ses_anahtari():
 SES_KEY = _ses_anahtari()
 YEREL_YENIDEN_SN, YEREL_YENIDEN_ARA = 15, 45  # sıfır ses + karşı konuşuyor: yeniden kurma isteği (v0.155.0)
 SES_DUYULUR_TEPE = 300  # Int16 tepe: bunun üstü sessizlik değil (yaklaşık -40 dB)
+def pcm_tepe(b64):  # base64 Int16 parçanın tepe değeri (bozuksa 0)
+    import base64
+    try: b = base64.b64decode(str(b64 or ""), validate=True); m = memoryview(b[:len(b) // 2 * 2]).cast("h")
+    except Exception: return 0
+    return max(abs(min(m, default=0)), max(m, default=0))
 STATE["yerel_ses"] = {"durum": None, "nabiz_t": 0, "son": 0, "acildi": 0, "sesli_t": 0, "uygulama": None, "hata": None, "surum": None, "sifir_bas": None,
-                      "kurma": 0, "eklenti_karsi_ses": 0}
+                      "kurma": 0, "eklenti_karsi_ses": 0, "eklenti_karsi_son": 0, "eklenti_ilk_sesli": 0, "sesli_parca_t": 0, "devir": False}
 SES_LOG = os.path.expanduser("~/Library/Logs/suflor-ses.log")  # yardımcının kendi günlüğü (yeniden kurma, hata)
 def karsi_konusuyor(sn=90, sonra=0):
     # Karşı tarafın konuştuğuna yardımcıdan bağımsız kanıt: son sn saniyede Teams altyazısında başka birinin satırı ya da eklentinin
@@ -1059,6 +1064,21 @@ def karsi_konusuyor(sn=90, sonra=0):
 # pencere sessizlikten önceki son karşı satırı da saydığı için 60 sn'de "izin" denildi, VERİ YOK uyarısı erken çıktı. Kanıt artık sıfırların başlamasından
 # YEREL_KANIT_PAY sn sonra gelmeli (altyazı satırı konuşmadan birkaç sn sonra düşer; sınırdaki satır sessizlik öncesi sözün kuyruğu olabilir).
 YEREL_KANIT_PAY = 10
+# v0.238.1 (12 Kasım 22.07): yardımcı yalnız sıfır ses verirken (yanlış uygulamaya bağlı, izin yok) eklentinin sekme sesi karşı kanalı taşır. Eskiden
+# yardımcıdan son 3 sn'de parça geldiyse — sessiz bile olsa — eklentinin karşı parçaları atılıyordu. Devir: yardımcı YEREL_DEVIR_SN'dir duyulur ses vermedi,
+# eklenti son 3 sn'de karşı parça gönderiyor ve yardımcının son duyulur sesinden sonra eklenti en az YEREL_DEVIR_KANIT_SN boyunca duyulur ses verdi (ikisi
+# de çalışırken söz başında eklentinin parçası yarım sn önde gelebilir: hemen geçilmez, aç-kapa olmaz). Devirde yardımcının sessiz parçaları Whisper'a
+# karışmaz (aynı kanala iki kaynak); yardımcı yeniden duyulur ses verince devir biter.
+YEREL_DEVIR_SN, YEREL_DEVIR_KANIT_SN = 8, 2
+def yerel_devir(now=None):
+    y = STATE["yerel_ses"]; now = now or time.time(); ys = y.get("sesli_parca_t") or 0; ilk = y.get("eklenti_ilk_sesli") or 0
+    d = (now - (y.get("eklenti_karsi_son") or 0) < 3 and ilk > ys and (y.get("eklenti_karsi_ses") or 0) - ilk >= YEREL_DEVIR_KANIT_SN
+         and now - ys >= YEREL_DEVIR_SN)
+    if d != bool(y.get("devir")):
+        y["devir"] = d
+        print("YEREL SES: " + ("yardımcı sessiz — karşı kanal eklentinin sekme sesinden" if d else "karşı kanal yeniden yardımcıdan")
+              + (f" · {y['uygulama']}" if y.get("uygulama") else ""))
+    return d
 def yerel_sessiz_konusuyor():
     y = STATE["yerel_ses"]
     return bool(y["durum"] == "dinliyor" and y["sifir_bas"] and toplanti_var() and karsi_konusuyor(sonra=y["sifir_bas"] + YEREL_KANIT_PAY))
@@ -1142,7 +1162,8 @@ def yerel_ses_al(p):
         if sonra != once: print(f"YEREL SES: {once} → {sonra}" + (f" · {y['uygulama']}" if y["uygulama"] else "") + (f" · {y['hata']}" if y["hata"] else "")
                                 + (f" · {round(now - y['sifir_bas'])} sn sıfır ses, örnek {'geliyor' if y['akis'] else 'gelmiyor' if y['akis'] is False else '?'}" if sonra == "izin" else ""))
         # yardımcıya "toplantı var" yalnız sesten bağımsız sinyalde (eklenti çağrıda / masaüstü): ses kendi sinyalini doğrulayıp tarayıcıyı bırakmazdı
-        r = {"ok": True, "toplanti": toplanti_dis_sinyal(), "tarayici": (eklenti_cagri() or {}).get("tarayici") or (STATE.get("masaustu") or {}).get("uygulama") or "Chrome"}
+        r = {"ok": True, "toplanti": toplanti_dis_sinyal(), "tarayici": (eklenti_cagri() or {}).get("tarayici") or (STATE.get("masaustu") or {}).get("uygulama") or "Chrome",
+             "masaustu_toplanti": masaustu_toplantida()}  # v0.238.1: toplantı tarayıcıdayken yardımcı masaüstü uygulamasına yalnız bu true ise geçer
         # v0.155.0: sıfır ses ≥ YEREL_YENIDEN_SN sürerken karşı taraf konuştuysa yardımcı yakalamayı yeniden kursun (eski süreç nesnesinde kalmış tap'e karşı;
         # gerçek sessizlikte kurmaz, kesinti olmaz). En çok YEREL_YENIDEN_ARA sn'de bir; kurulduktan sonra da sıfırsa 60 sn'de "izin".
         if y["sifir_bas"] and now - y["sifir_bas"] >= YEREL_YENIDEN_SN and now - y.get("yeniden_iste", 0) >= YEREL_YENIDEN_ARA and yerel_sessiz_konusuyor():
@@ -1154,6 +1175,9 @@ def yerel_ses_al(p):
         if not toplanti_acik():
             for f in toplanti_bak(): threading.Thread(target=f, daemon=True).start()  # Faz B: ses de sinyal; eklenti tanımasa da işlenir
     if not toplanti_acik(): return {"ok": True, "bekle": True}  # Faz B: toplantı kaydı açıksa (aktarici/toplanti.py)
+    if pcm_tepe(p.get("pcm")) > SES_DUYULUR_TEPE: y["sesli_parca_t"] = now
+    if yerel_devir(now):  # yardımcı sessiz, eklenti karşı sesi veriyor: sessiz parça kanala karışmaz, eklentinin parçaları atılmaz
+        km = masaustu_kis_ms(); return dict({"ok": True, "eklenti": True}, **({"kis_ms": km} if km else {}))
     y["son"] = now
     r = ses_al(dict(p, kanal="karsi", kaynak="yerel"))
     km = masaustu_kis_ms()

@@ -17,7 +17,7 @@ import CoreAudio
 import AudioToolbox
 import AVFoundation
 
-let SURUM = "0.23.0"
+let SURUM = "0.24.0"
 var arg: [String: String] = [:]
 var izinKipi = false, kisKipi = false
 do {
@@ -220,6 +220,7 @@ var micIlk: [String: Date] = [:]       // aile öneki → mikrofonu kesintisiz k
 var micSon: [String: Date] = [:]       // aile öneki → mikrofonu son kullandığı an
 var aktif: (onek: String, ad: String)? = nil
 var aktarıcıToplanti = Date.distantPast, tarayiciIpucu = ""   // aktarıcının son "toplantı var" yanıtı + tarayıcı adı
+var masaustuToplanti = Date.distantPast   // v0.24.0: aktarıcının son "masaüstü uygulaması toplantıda" yanıtı (menü uygulaması "Ayrıl"ı görüyor)
 let TARAYICILAR = ["Chrome", "Edge", "Brave", "Arc", "Safari"]
 func tarayiciAilesi(_ ss: [Surec]) -> (onek: String, ad: String)? {
     // ipucu (User-Agent: Brave kendini Chrome diye tanıtır) önce; sesi çalan tarayıcı ailesi öne geçer, yoksa süreci olan
@@ -244,11 +245,18 @@ func adim() {
         .min { $0.value < $1.value }.flatMap { m in AILELER.first { $0.onek == m.key } }
     let ipucuMasaustu = aktarıcıDiyor && !tarayiciIpucu.isEmpty && !TARAYICILAR.contains(tarayiciIpucu)
         ? AILELER.first { a in a.ad == tarayiciIpucu && ss.contains { $0.bundle.hasPrefix(a.onek) } } : nil
-    let masaustuAile = masaustuMic ?? ipucuMasaustu
+    // v0.24.0 (12 Kasım 22.07): toplantı tarayıcıda (eklenti çağrıda, ipucu tarayıcı) ve masaüstü uygulaması toplantıda değilse masaüstü uygulamasının
+    // mikrofonu tutması seçimi değiştirmez — masaüstü Teams toplantı dışında mikrofonu 2 saat tuttu, yardımcı Chrome'u bırakıp sıfır sese geçti.
+    // (15 sn: tek nabız yanıtı kaçınca — 5 sn'de bir — masaüstüne kaymasın)
+    let tarayiciToplanti = simdi.timeIntervalSince(aktarıcıToplanti) < 15 && TARAYICILAR.contains(tarayiciIpucu) && simdi.timeIntervalSince(masaustuToplanti) >= 8
+    let masaustuAile = tarayiciToplanti ? nil : (masaustuMic ?? ipucuMasaustu)
     if let ak = aktif {
         let tarayiciMi = TARAYICILAR.contains(ak.ad)
         if tarayiciMi, let m = masaustuAile {   // tarayıcıyı bırak: sonraki adımda masaüstü uygulaması seçilir
             tapDurdur(); aktif = nil; sonKurma = .distantPast; gunluk("bırakıldı (\(ak.ad)) — toplantı masaüstünde: \(m.ad)"); return
+        }
+        if !tarayiciMi, tarayiciToplanti, let t = tarayiciAilesi(ss) {   // masaüstü uygulamasını bırak: toplantı tarayıcıda
+            tapDurdur(); aktif = nil; sonKurma = .distantPast; gunluk("bırakıldı (\(ak.ad)) — toplantı tarayıcıda: \(t.ad)"); return
         }
         // aktarıcı toplantının bu uygulamada sürdüğünü söylüyorsa bırakma (13 Ekim deneme 8: Teams mikrofonu bırakınca 3 sn'de bir aç-kapa)
         if simdi.timeIntervalSince(micSon[ak.onek] ?? .distantPast) >= 8 && !((tarayiciMi || ak.ad == tarayiciIpucu) && aktarıcıDiyor) {   // toplantı bitti
@@ -271,6 +279,7 @@ func adim() {
     // mikrofonu ≥ 2 sn kullanan ilk toplantı uygulaması; yoksa aktarıcı "toplantı var" diyorsa tarayıcı ailesi
     guard simdi.timeIntervalSince(sonKurma) >= 3 else { return }
     var secilen: (onek: String, ad: String)? = masaustuAile   // masaüstü toplantı uygulaması tarayıcıdan önce
+    if secilen == nil, tarayiciToplanti { secilen = tarayiciAilesi(ss) }   // toplantı tarayıcıda: mikrofonu tutan masaüstü uygulamasına bakılmaz
     if secilen == nil, let (onek, bas) = micIlk.min(by: { $0.value < $1.value }), simdi.timeIntervalSince(bas) >= 2 { secilen = AILELER.first { $0.onek == onek } }
     if secilen == nil, aktarıcıDiyor { secilen = tarayiciAilesi(ss) }
     guard let a = secilen else { return }
@@ -302,6 +311,7 @@ func nabiz() {   // 5 sn: durum + son 5 sn'nin tepe seviyesi (izin yoksa tap yal
     gonder(g) { j in
         if (j?["yeniden_kur"] as? Bool) == true, aktif != nil { yenidenIstek = true; gunluk("aktarıcı yeniden kurma istedi (sıfır ses, karşı taraf konuşuyor)") }
         if (j?["toplanti"] as? Bool) == true { aktarıcıToplanti = Date() }
+        if (j?["masaustu_toplanti"] as? Bool) == true { masaustuToplanti = Date() }
         if let t = j?["tarayici"] as? String { tarayiciIpucu = t }
     }
     if ProcessInfo.processInfo.systemUptime - sonUlasma > 300 && ulasilamadi >= 10 { gunluk("aktarıcıya 5 dk ulaşılamadı — kapanıyor"); tapDurdur(); exit(0) }

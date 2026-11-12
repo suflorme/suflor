@@ -100,6 +100,10 @@ def eklenti_ozet():  # geriye uyum: /status extension, izle DURUM satırı, beta
 def masaustu_toplantida():  # menü uygulaması masaüstü Teams/Zoom'da toplantı görüyor (pencere başlığı okunmaz)
     m = STATE.get("masaustu") or {}
     return bool(m.get("toplantida")) and time.time() - m.get("t", 0) < SINYAL_SN
+MASAUSTU_TAZE_SN = 45  # menü uygulaması masaüstü uygulaması açıkken en çok 15 sn'de bir bildirir
+def masaustu_toplanti_yok(uygulama):  # v0.238.1: menü uygulaması bu masaüstü uygulamasını taze görüyor ve "toplantı yok" diyor
+    m = STATE.get("masaustu") or {}; pl = MASAUSTU_PLATFORM.get(uygulama or "")
+    return bool(pl) and MASAUSTU_PLATFORM.get(m.get("uygulama") or "") == pl and not m.get("toplantida") and time.time() - m.get("t", 0) < MASAUSTU_TAZE_SN
 def toplanti_dis_sinyal():  # ses yardımcısının nabız yanıtı: yalnız sesten bağımsız sinyal (ses kendi sinyalini doğrulamasın — döngü)
     return bool(eklenti_cagri() or masaustu_toplantida())
 def sinyaller():  # {kaynak: {"platform", "guvenli"}}
@@ -110,6 +114,10 @@ def sinyaller():  # {kaynak: {"platform", "guvenli"}}
     # mikrofonu tutmak tek başına sürdürmez: toplantı uygulaması son SES_SESSIZ_SN'de ses çıkardı ya da son SATIRSIZ_SN'de satır geldi (eski bitiş kuralı;
     # 13 Ekim deneme 8: eklenti sustu, Chrome'daki toplantı sürüyordu)
     canli_ = not a or now - (y.get("sesli_t") or 0) < SES_SESSIZ_SN or now - a["t_satir"] < SATIRSIZ_SN
+    # v0.238.1 (13 Kasım 00.02 sahte "Teams toplantısı"): masaüstü Teams toplantı dışında mikrofonu tutuyordu, sesi sıfırdı, menü uygulaması "toplantı yok"
+    # diyordu. Menü uygulaması o uygulamayı toplantıda görmüyorsa ve uygulama son SES_SESSIZ_SN'de duyulur ses çıkarmadıysa mikrofon tutmak sinyal değil
+    # (menü uygulaması toplantıyı kaçırırsa — "Ayrıl" okunamadı — karşı taraf konuşunca ses sinyali yine gelir).
+    if masaustu_toplanti_yok(y.get("uygulama")) and now - (y.get("sesli_t") or 0) >= SES_SESSIZ_SN: canli_ = False
     if yerel_ses_durum() in ("dinliyor", "izin") and canli_ and not (globals().get("SOHBET") or {}).get("acik"):  # pano sohbeti de mikrofonu tutar
         s["ses"] = {"platform": MASAUSTU_PLATFORM.get(STATE["yerel_ses"].get("uygulama") or "", "bilinmeyen"), "guvenli": False}
         t = None if e else eklenti_sayfa()
