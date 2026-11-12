@@ -1302,7 +1302,7 @@ def gundem_taslagi(dizin, katilimcilar, ad="", baslik="", bugun=None, en_cok=12,
             n = len(g["adaylar"]); alt = "; ".join(g.get("alt") or [])[:160]
             bag = (f"{n} açık kayıt bağlı" if n else "") + (" · " if n and alt else "") + alt
             out.append({"id": f"g{g['no']}", "tur": "gundem", "metin": g["baslik"], "kim": "", "vade": "", "gecikti": False, "baslik": bag, "toplanti": "",
-                        "satir": f"{g['no']} · {g['baslik']}" + (f" ({ek})" if ek else ""), "eklendi": False, "no": g["no"], "adaylar": [_gn_kisa(x) for x in g["adaylar"]]})
+                        "satir": f"{g['no']} · {g['baslik']}" + (f" ({ek})" if ek else ""), "eklendi": False, "no": g["no"], "dk": g.get("dk"), "adaylar": [_gn_kisa(x) for x in g["adaylar"]]})
     else:
         for x in v["taslak"][:en_cok]:
             kim = (x["kim"].split() or [""])[0] if x["kim"] else ""
@@ -1313,6 +1313,26 @@ def gundem_taslagi(dizin, katilimcilar, ad="", baslik="", bugun=None, en_cok=12,
                         "eklendi": x["eklendi"], "durum": x["durum"], "ilgi": x["ilgi"]})
     return {"maddeler": out, "kisiler": v["kisiler"], "metin": "\n".join("- " + m["satir"] for m in out), "davet": v["davet"],
             "ek_oneri": [_gn_kisa(x) for x in v["ek_oneri"]], "ayiklanan": v["ayiklanan"], "kararlar": v["kararlar"]}
+GN_MADDE_DK = {"gundem": 10, "taslak": 5}  # süresi yazılmamış madde için makul varsayılan (davet gündemi / açık kayıt taslağı), dakika
+GN_YUK_ESIK_DK = 5  # fazla süre bundan azsa uyarı yok (gürültü olmasın)
+def gundem_yuk(maddeler, toplanti_dk, davet=True):
+    # Gündem yükü: maddelerin tahmini süresi (yazılıysa "dk", yoksa varsayılan) toplantı süresini aşıyor mu? Yalnız hesap; uyarı metni panoda.
+    # → {"tahmini_dk", "toplanti_dk", "fazla_dk", "ertelenebilir": [madde metni]} ya da None (süre bilinmiyor / yük yok / madde yok). Ertelenebilir: sondan, önce süresi yazılmamış maddeler, fazlayı kapatana kadar.
+    try: tp = int(toplanti_dk or 0)
+    except (TypeError, ValueError): return None
+    if tp <= 0 or not maddeler: return None
+    vs = GN_MADDE_DK["gundem" if davet else "taslak"]; ms = []
+    for m in maddeler:
+        try: d = int(m.get("dk") or 0)
+        except (TypeError, ValueError): d = 0
+        ms.append((str(m.get("metin") or ""), d if d > 0 else vs, d > 0))
+    top = sum(d for _, d, _ in ms); fazla = top - tp
+    if fazla < GN_YUK_ESIK_DK: return None
+    er, kalan = [], fazla
+    for metin, d, yazili in sorted(reversed(ms), key=lambda x: x[2]):  # sondan başla; yazılı süresi olmayanlar önce
+        if kalan <= 0: break
+        er.append(metin); kalan -= d
+    return {"tahmini_dk": top, "toplanti_dk": tp, "fazla_dk": fazla, "ertelenebilir": er}
 # --- Güncellik ve ilgi katmanı (12 Kasım): hazırlık (brifing), gündem taslağı, Bugün'deki hazırlık kartı ve Marvin aynı aday listesini kullanır -------------------------------------------
 # Sorun (12 Kasım): davette gündem varken bayat ve ilgisiz konular önerildi. Kök: (1) gündem taslağı katılımcının herhangi bir toplantısındaki TÜM açık kayıtları alıyordu (üçüncü kişilerin işleri dahil),
 # konu ve yaş bakılmıyordu; (2) brifing istemi davet gündemini omurga saymıyordu; kapanış bloğu yalnız kişiye göre seçiyordu; model dosyalardaki eski durum satırını güncel sanıyordu.

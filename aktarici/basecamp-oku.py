@@ -4,9 +4,12 @@
 # Ayar: basecamp_oku (açık/kapalı; ayar hiç yazılmamışsa yalnız geliştiricinin kurulumunda açık, beta'da kapalı) ve basecamp: {hesap: <hesap numarası>,
 # proje_esleme: {"toplantı başlığı sözcüğü": "Basecamp proje adı"}, anahtar: <Anahtar Zinciri öğe adı, varsayılan suflor-basecamp>}. Belirteç dosyaya/günlüğe/çıktıya yazılmaz.
 # GİZLİLİK: gizli toplantıda ve gizli kipte okunmaz; kanıt alıntısı ≤160 karakter, e-posta maskeli, özel nitelikli içerik atılır (_mtb_kanit). Ağ yoksa sessizce boş döner.
+# Yenileme: erişim belirteci (~2 hafta) Anahtar Zinciri'nde <anahtar> öğesinde; yenileme bilgisi (refresh_token, client_id, client_secret, bitis) <anahtar>-oauth öğesinde tek JSON (base64; security -i tırnaklı değerde bozulur) (basecamp-baglan.py yazar).
+# Süre dolmuşsa ya da 401 gelirse bir kez yenilenir ve istek bir kez tekrarlanır; yenilenemezse günlüğe tek satır, sessizce boş.
 # Sınırlar: 30 dk önbellek; en çok 40 istek/10 sn (Basecamp sınırı 50); 429'da Retry-After en çok 1 kez beklenir; ağ/yetki hatasında 5 dk geri çekilme.
-import urllib.request as _ur_bc, urllib.error as _ue_bc, subprocess as _sp_bc
-BC_API = "https://3.basecampapi.com"; BC_UA = "Suflor.me (okuma)"
+import base64, urllib.request as _ur_bc, urllib.error as _ue_bc, subprocess as _sp_bc
+BC_API = "https://3.basecampapi.com"; BC_UA = "Suflor.me (https://github.com/suflorme/suflor)"
+BC_LP = os.environ.get("SUFLOR_BC_LAUNCHPAD") or "https://launchpad.37signals.com"  # testte yerel sahte sunucuya yönlenir
 BC_ONBELLEK_SN, BC_PENCERE_SN, BC_PENCERE_EN_COK, BC_GERI_SN, BC_SAYFA_EN_COK, BC_EN_COK = 1800, 10, 40, 300, 3, 60
 BC = {"onb": {}, "istek": [], "geri": 0.0, "belirtec": (0.0, ""), "hata": 0}
 BC_ZAMAN = globals().get("BC_ZAMAN") or time.time
@@ -19,18 +22,54 @@ def bc_acik():
     if v is None: v = bool(gelistirici_mi()) if "gelistirici_mi" in globals() else False
     if not v or ("gizli_acik" in globals() and gizli_acik()): return False
     return bool(str(bc_ayar().get("hesap") or "").strip())
+def _bc_servis(): return str(bc_ayar().get("anahtar") or "suflor-basecamp")
+def _bc_kc_oku(servis):
+    if globals().get("BC_KC_OKU"): return globals()["BC_KC_OKU"](servis)
+    try: return _sp_bc.run(["/usr/bin/security", "find-generic-password", "-s", servis, "-w"], capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception: return ""
+def _bc_kc_yaz(servis, hesap, deger):  # değer komut satırına (ps'te görünür) konmaz: `security -i` komutu stdin'den okur
+    if globals().get("BC_KC_YAZ"): return globals()["BC_KC_YAZ"](servis, hesap, deger)
+    if any(c in str(deger) + servis + hesap for c in '"\\\n\r'): return False
+    try: return _sp_bc.run(["/usr/bin/security", "-i"], input=f'add-generic-password -U -s "{servis}" -a "{hesap}" -w "{deger}"\n', capture_output=True, text=True, timeout=15).returncode == 0
+    except Exception: return False
+def _bc_oauth():
+    try:
+        v = _bc_kc_oku(_bc_servis() + "-oauth")
+        try: v = base64.b64decode(v, validate=True).decode()
+        except Exception: pass  # base64 değilse düz JSON
+        d = json.loads(v); return d if isinstance(d, dict) else {}
+    except Exception: return {}
+def _bc_post(url):  # Launchpad yenileme isteği (gövdesiz POST, parametreler adreste) → json
+    r = _ur_bc.Request(url, data=b"", method="POST", headers={"User-Agent": BC_UA, "Accept": "application/json"})
+    with (globals().get("BC_URLOPEN") or _ur_bc.urlopen)(r, timeout=15) as f: return json.loads(f.read().decode("utf-8", "replace"))
+def _bc_yenile():  # → yeni erişim belirteci ya da "" (başarısızlıkta günlüğe tek satır)
+    import urllib.parse as _up
+    o = _bc_oauth()
+    try:
+        q = _up.urlencode({"type": "refresh", "refresh_token": o["refresh_token"], "client_id": o["client_id"], "client_secret": o["client_secret"], "redirect_uri": o.get("redirect_uri") or "http://127.0.0.1:8770/basecamp/geri"})
+        g = (globals().get("BC_POST") or _bc_post)(f"{BC_LP}/authorization/token?{q}"); yeni = str(g["access_token"])
+        o["bitis"] = BC_ZAMAN() + int(g.get("expires_in") or 1209600)
+        if g.get("refresh_token"): o["refresh_token"] = str(g["refresh_token"])
+        if not (_bc_kc_yaz(_bc_servis(), "access_token", yeni) and _bc_kc_yaz(_bc_servis() + "-oauth", "oauth", base64.b64encode(json.dumps(o).encode()).decode())): raise OSError("anahtar zinciri yazılamadı")
+        BC["belirtec"] = (BC_ZAMAN(), yeni); return yeni
+    except Exception:
+        print("BASECAMP: bağlantı yenilenemedi — basecamp-baglan.command'ı yeniden çalıştır"); BC["belirtec"] = (0.0, ""); return ""
 def _bc_belirtec():
     t, v = BC["belirtec"]
     if v and BC_ZAMAN() - t < 600: return v
-    try: v = _sp_bc.run(["/usr/bin/security", "find-generic-password", "-s", str(bc_ayar().get("anahtar") or "suflor-basecamp"), "-w"], capture_output=True, text=True, timeout=10).stdout.strip()
-    except Exception: v = ""
+    v = _bc_kc_oku(_bc_servis()); o = _bc_oauth()
+    if o.get("bitis") and BC_ZAMAN() >= float(o["bitis"]) - 60: v = _bc_yenile() or ""
     BC["belirtec"] = (BC_ZAMAN(), v); return v
-def _bc_http(url):  # → (gövde, link_sonraki) ; hata → istisna. Testler BC_HTTP ile ezer (url → (json, sonraki_url))
+def _bc_http(url, yenilendi=False):  # → (gövde, link_sonraki) ; hata → istisna. Testler BC_HTTP ile ezer (url → (json, sonraki_url))
     k = _bc_belirtec()
     if not k: raise OSError("belirteç yok")
     r = _ur_bc.Request(url, headers={"Authorization": "Bearer " + k, "User-Agent": BC_UA, "Accept": "application/json"})
-    with _ur_bc.urlopen(r, timeout=12) as f:
-        g = json.loads(f.read().decode("utf-8", "replace")); ln = f.headers.get("Link") or ""
+    try:
+        with (globals().get("BC_URLOPEN") or _ur_bc.urlopen)(r, timeout=12) as f:
+            g = json.loads(f.read().decode("utf-8", "replace")); ln = f.headers.get("Link") or ""
+    except _ue_bc.HTTPError as e:
+        if e.code == 401 and not yenilendi and _bc_yenile(): return _bc_http(url, True)
+        raise
     m = re.search(r'<([^>]+)>;\s*rel="next"', ln)
     return g, (m.group(1) if m else None)
 def _bc_sinir():  # kayan pencerede istek sayacı; doluysa pencere bitene kadar bekler (en çok BC_PENCERE_SN)

@@ -83,6 +83,10 @@ try:
     gt = al("/gundem-taslagi?olay=ev1")
     bak("/gundem-taslagi: davette gündem varsa maddeler davetin maddeleridir (omurga; 12 Kasım), karar satırları uçta dönmez", gt.get("ok") and gt["olay"] == "ev1" and gt.get("davet") is True
         and [m["metin"] for m in gt["maddeler"]] == ["Haftalık özet ve durum güncellemesi", "Duyurular"] and "kararlar" not in gt)
+    bak("/gundem-taslagi: gündem yükü (2 madde × 10 dk varsayılan > 15 dk toplantı) → fazla 5, 1 madde ertelenebilir; yük yoksa None",
+        gt.get("gundem_yuk") == {"tahmini_dk": 20, "toplanti_dk": 15, "fazla_dk": 5, "ertelenebilir": ["Duyurular"]}
+        and yapi.gundem_yuk([{"metin": "A", "dk": 30}, {"metin": "B", "dk": 20}, {"metin": "C"}], 45) == {"tahmini_dk": 60, "toplanti_dk": 45, "fazla_dk": 15, "ertelenebilir": ["C", "B"]}
+        and yapi.gundem_yuk([{"metin": "A", "dk": 20}], 45) is None and yapi.gundem_yuk([{"metin": "A"}], 0) is None and yapi.gundem_yuk([], 30) is None)
     gt2 = al("/gundem-taslagi?olay=ev2")
     bak("/gundem-taslagi: gündemsiz davette süzülmüş açık kayıtlar (Can'ın işi önce)", gt2.get("ok") and gt2.get("davet") is False and [m["metin"] for m in gt2["maddeler"]][:1] == ["Tabloyu güncelle"])
     gk = [json.loads(l) for l in open(os.path.join(C, "guncellik.jsonl"), encoding="utf-8")] if os.path.exists(os.path.join(C, "guncellik.jsonl")) else []

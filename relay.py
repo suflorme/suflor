@@ -1349,7 +1349,12 @@ def _baglayici_mod():  # baglayici.py (A1, bağlayıcı sözleşmesi) aktarıcı
 def _suflor_is_listesi():  # B2: Suflor iş listesi bağlayıcısı (karar grafı); baglayici.py yoksa None → görünümler yapi.py'yi doğrudan okur (eski davranış)
     b, y = _baglayici_mod(), _yapi_mod()
     return b.SuflorIsListesi(BASE, ad=str(AYAR.get("ad") or ""), yapi=y) if b and y else None
-def bugun_veri_view():  # Bugün sayfası: açık işler, teyit bekleyen kararlar, son toplantının kararları (karar grafı; gizli toplantı dönmez) — yalnız anahtarlı uç
+def bugun_veri_view():  # Bugün sayfası verisi + okunmamış sesli talimat sayısı (Bekleyenler satırı; veri okunamasa da gelir)
+    v = _bugun_veri_ic()
+    try: v["bekleyen_talimat"] = gelen_bekleyen_say() if "gelen_bekleyen_say" in globals() else 0
+    except Exception as e: print(f"BUGÜN: gelen kutusu sayılamadı ({e.__class__.__name__})"); v["bekleyen_talimat"] = 0
+    return v
+def _bugun_veri_ic():  # Bugün sayfası: açık işler, teyit bekleyen kararlar, son toplantının kararları (karar grafı; gizli toplantı dönmez) — yalnız anahtarlı uç
     y = _yapi_mod()
     if not y: return {"ok": False, "ad": AYAR.get("ad") or "", "kendi": [], "baskalari": [], "teyit": [], "son_karar": None}
     try: sl = _suflor_is_listesi(); v = dict(sl.bugun_veri() if sl else y.bugun_veri(BASE, str(AYAR.get("ad") or "")), ok=True)
@@ -1376,7 +1381,12 @@ def gundem_taslagi_view(tam_yol):  # GET /gundem-taslagi?olay=<takvim kimliği> 
     kat = [str(x) for x in (olay.get("katilimcilar") or [])] + [str(k.get("ad") or "") for k in (olay.get("kisiler") or []) if isinstance(k, dict)]
     try:
         v = y.gundem_taslagi(BASE, kat, str(AYAR.get("ad") or ""), str(olay.get("baslik") or ""), etkinlik=oid, notlar=str(olay.get("notlar") or ""), ilgi=gv); v.pop("kararlar", None)
-        return dict(v, ok=True, olay=oid)
+        gy = None
+        try:  # gündem yükü (hesap burada, pano yalnız gösterir): toplantı süresi takvim olayının başlangıç–bitişinden
+            b_, s_ = datetime.datetime.fromisoformat(str(olay.get("baslangic"))), datetime.datetime.fromisoformat(str(olay.get("bitis")))
+            gy = y.gundem_yuk(v.get("maddeler"), round((s_ - b_).total_seconds() / 60), bool(v.get("davet")))
+        except (ValueError, TypeError): gy = None
+        return dict(v, ok=True, olay=oid, gundem_yuk=gy)
     except Exception as e: print(f"GÜNDEM TASLAĞI: okunamadı ({e.__class__.__name__})"); return {"ok": False, "err": e.__class__.__name__, "maddeler": [], "kisiler": [], "metin": ""}
 def takvim_eposta(v):  # 5 Kasım: hafta görünümündeki gelecek toplantıya davet notundan "e-postayla çözülebilir" işareti (yapi.eposta_isaret; yalnız GÜÇLÜ işaret eklenir; alıcılar takvimden)
     y = _yapi_mod()

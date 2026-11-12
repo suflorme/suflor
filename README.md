@@ -74,7 +74,9 @@ Kurulumda asistanına bir ad koyarsın; panoda, kartlarda ve seste yalnız o ad 
 
 ## Toplantı akarken canlı veriyle kart
 
-<p align="center"><img src="gorsel/hero.png" alt="Toplantı ekranının köşesinde asistanın kartları; büyütülmüş Not kartı: Toplantıda %12 dendi; kaynakta son 7 günde %8." width="100%"></p>
+<p align="center"><img src="gorsel/hero.png" alt="Kişisel asistan: solda Günün özeti (bugünün odağı, dikkat bekleyen kararlar), sağda sohbet paneli, ortada toplantı kartı: Toplantıda %12 dendi; kaynakta son 7 günde %8." width="100%"></p>
+
+<p align="center"><sub>Günün özeti, sağdaki sohbet paneli ve toplantı kartı aynı pencerede; veriler kurgudur.</sub></p>
 
 <p align="center"><img src="gorsel/ozellikler.png" alt="Toplantıda öne çıkanlar: toplantıda konuşur, katılımcıyı cevaplar, toplantıyı yönetir, canlı çeviri, kulağına fısıldar, geçmişi hatırlar, eller serbest, gizli toplantı" width="100%"></p>
 

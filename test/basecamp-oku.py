@@ -61,4 +61,40 @@ sifirla(); G["BC"]["istek"] = [SAAT[0]] * 40; G["_bc_sinir"](); ok("istek pencer
 G2 = dict(G); G2.pop("BC_HTTP"); G2["BC_ZAMAN"] = time.time; G2["BC_BEKLE"] = time.sleep
 exec(compile(open(os.path.join(KOD, "aktarici", "basecamp-oku.py"), encoding="utf-8").read(), "basecamp-oku.py", "exec"), G2)
 G2["_bc_belirtec"] = lambda: ""; G2["AYAR"]["basecamp_oku"] = True; ok("belirteç yok → ağa çıkmadan boş", G2["bc_oku"]("Orbitek")["isler"] == [])
+# 5) yenileme (S282): 401 → refresh_token → Anahtar Zinciri güncelle → istek bir kez tekrar; yenileme hatası → günlük satırı + sessiz boş
+import contextlib
+class Yanit:
+    def __init__(s, g): s.g = g; s.headers = {}
+    def read(s): return json.dumps(s.g).encode()
+    def __enter__(s): return s
+    def __exit__(s, *a): return False
+KC = {"suflor-basecamp": "eski", "suflor-basecamp-oauth": json.dumps({"refresh_token": "R1", "client_id": "cid", "client_secret": "cs", "bitis": 9e12})}; YAZ = []; POSTLAR = []; ISTEKLER = []; M2 = {"yenile_hata": False, "gecerli": "yeni"}
+def urlopen(r, timeout=0):
+    ISTEKLER.append((r.full_url, r.headers.get("Authorization"), r.headers.get("User-agent")))
+    if r.headers.get("Authorization") != "Bearer " + M2["gecerli"]: raise urllib.error.HTTPError(r.full_url, 401, "x", {}, io.BytesIO(b""))
+    return Yanit([{"id": 1, "name": "Orbitek Entegrasyon"}])
+def post(url):
+    POSTLAR.append(url)
+    if M2["yenile_hata"]: raise urllib.error.HTTPError(url, 400, "x", {}, io.BytesIO(b""))
+    return {"access_token": "yeni", "expires_in": 1209600}
+def yaz(sv, h, d): YAZ.append((sv, h, d)); KC[sv] = d; return True
+import base64
+def cozum(v): return json.loads(base64.b64decode(v).decode())
+G3 = dict(G); G3.pop("BC_HTTP"); G3.update(BC_KC_OKU=lambda sv: KC.get(sv, ""), BC_KC_YAZ=yaz, BC_POST=post, BC_URLOPEN=urlopen)
+exec(compile(open(os.path.join(KOD, "aktarici", "basecamp-oku.py"), encoding="utf-8").read(), "basecamp-oku.py", "exec"), G3)
+def sifirla3(): G3["BC"].update(onb={}, istek=[], geri=0.0, hata=0, belirtec=(0.0, "")); ISTEKLER.clear(); POSTLAR.clear(); YAZ.clear(); SAAT[0] += 5000
+sifirla3(); r = G3["_bc_http"]("https://3.basecampapi.com/123/projects.json")
+ok("401 → yenileme → istek tekrarlandı", r[0][0]["id"] == 1 and len(POSTLAR) == 1 and len(ISTEKLER) == 2 and ISTEKLER[1][1] == "Bearer yeni")
+ok("yenileme adresi: type=refresh + refresh_token", "type=refresh" in POSTLAR[0] and "refresh_token=R1" in POSTLAR[0] and "client_id=cid" in POSTLAR[0])
+ok("Anahtar Zinciri güncellendi (belirteç + yeni bitiş, refresh_token korundu)", KC["suflor-basecamp"] == "yeni" and cozum(KC["suflor-basecamp-oauth"])["refresh_token"] == "R1" and cozum(KC["suflor-basecamp-oauth"])["bitis"] > SAAT[0])
+ok("tüm isteklerde User-Agent (kişisel bilgi yok)", all(i[2] == "Suflor.me (https://github.com/suflorme/suflor)" for i in ISTEKLER))
+KC["suflor-basecamp"] = "eski"; sifirla3(); M2["gecerli"] = "hic"; ok("yenileme sonrası da 401 → tek tekrar, sonsuz döngü yok", G3["bc_oku"]("Orbitek")["isler"] == [] and len(POSTLAR) == 1)
+M2["gecerli"] = "yeni"; sifirla3(); KC["suflor-basecamp"] = "eski"; M2["yenile_hata"] = True
+cikti = io.StringIO()
+with contextlib.redirect_stdout(cikti): d = G3["bc_oku"]("Orbitek")
+ok("yenileme hatası → sessiz boş + günlükte tek satır", d["isler"] == [] and cikti.getvalue().strip() == "BASECAMP: bağlantı yenilenemedi — basecamp-baglan.command'ı yeniden çalıştır")
+M2["yenile_hata"] = False; sifirla3(); KC["suflor-basecamp"] = "eski"; KC["suflor-basecamp-oauth"] = json.dumps({"refresh_token": "R1", "client_id": "cid", "client_secret": "cs", "bitis": SAAT[0] - 10})
+r = G3["_bc_http"]("https://3.basecampapi.com/123/projects.json"); ok("süresi dolmuş belirteç istekten önce yenilenir (401 gerekmez)", len(POSTLAR) == 1 and len(ISTEKLER) == 1 and ISTEKLER[0][1] == "Bearer yeni")
+sifirla3(); KC["suflor-basecamp-oauth"] = ""; KC["suflor-basecamp"] = "eski"; M2["gecerli"] = "yeni"
+with contextlib.redirect_stdout(io.StringIO()): ok("yenileme bilgisi yoksa 401 → boş, çökmez", G3["bc_oku"]("Orbitek")["isler"] == [])
 print(f"\n{'TAMAM' if not HATA else 'KALDI: ' + ', '.join(HATA)}"); sys.exit(1 if HATA else 0)

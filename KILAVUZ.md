@@ -175,6 +175,8 @@ kapalı. Kapatmak için `"konus_web": false`. Suflor Brifing yardımcısının w
 **`"tstt_python"`, `"tstt_model"`:** gölge kipin Python'u ve model klasörü (varsayılan: ortak klasördeki `tstt-venv/bin/python` ve `tstt-model`).
 **`"ses_arsivi_egitim_gb": 50`:** havuzun boyut sınırı; aşılacaksa klasör taşınmaz, eskisi gibi silinir (günlüğe bir kez yazılır). Havuzdaki eski veri kendiliğinden silinmez, yalnız elle temizlenir.
 
+**Basecamp'i bağla (isteğe bağlı, yalnız okuma):** toplantının ilgili Basecamp projesindeki yorum ve işler Claude'a bağlam olur. (1) Basecamp hesabınla https://launchpad.37signals.com/integrations adresinde yeni bir uygulama kaydet; yönlendirme adresi (redirect URI) `http://127.0.0.1:8770/basecamp/geri`. (2) `basecamp-baglan.command` dosyasına çift tıkla; Client ID ve Client Secret'ı sorar (yazarken görünmez), tarayıcıda izin verirsin. (3) Sonunda "Tamam: Basecamp hesabı …, N proje okunuyor." satırını görürsün. Belirteçler Anahtar Zinciri'ne yazılır, `ayar.json`'a yalnız hesap numarası girer; erişim belirteci yaklaşık iki haftada bir kendiliğinden yenilenir. Günlükte "BASECAMP: bağlantı yenilenemedi" görürsen betiği yeniden çalıştır. Yalnızca bağlantıyı denemek için `basecamp-baglan.command --deneme`. Kurulum sihirbazı açıkken 8770 kapısı doluysa önce onu kapat. Beta'da okuma varsayılan kapalıdır (`"basecamp_oku": true` ile açılır).
+
 ## Sesler
 Doğal yerel Türkçe ses: Pocket TTS (kör dinlemede Mac sesinden belirgin iyi; işlemcide çalışır, ilk ses ~0,03 sn, ~1,3 GB bellek).
 **Sihirbazdan:** asistan adımında "Kadın sesi" ya da "Erkek sesi" seçilince arka planda kurulur (seçmek indirme onayıdır; varsayılan Mac sesi):

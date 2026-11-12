@@ -116,6 +116,24 @@ ok("bayat öneri: 12 önerilenden 3'ü sonra bitmiş çıktı → bayat çıkmay
 ok("kayıt durumu: 13 çıkarım (10 bayat + 3 sonra_kapandi) içinden 2'si sonra açık göründü (kesin 'kapandi' sayılmaz) → 11/13", O["kayit.durum"]["n"] == 13 and O["kayit.durum"]["puan"] == 85, O["kayit.durum"])
 ok("altın set: koşu sonucu 15/16 (yalnız sayı dosyası)", O["hazirlik.altin"]["n"] == 16 and O["hazirlik.altin"]["puan"] == 94, O["hazirlik.altin"])
 ok("döküm: deneme dışı, kelimeyle ağırlıklı 1 − WER = 0,875", O["dokum.wer"]["oran"] == 0.875 and O["dokum.wer"]["n"] == 2, O["dokum.wer"])
+# döküm: elle referans (wer_elle) — dinlenip düzeltilmeyen satır Whisper doğru; dinlenmeyen ölçüme girmez; deneme toplantısı dışlanır; sürüm 2 hakem satırı eskisini ezer
+def elle(ad, parcalar, duz, din):
+    kl = os.path.join(C, "ses-arsivi", ad); os.makedirs(kl, exist_ok=True)
+    open(os.path.join(kl, "parcalar.jsonl"), "w", encoding="utf-8").write("".join(json.dumps({"dosya": f"{i}.wav", "metin": t}) + "\n" for i, t in enumerate(parcalar)))
+    json.dump({"toplanti": ad, "kaydedildi": datetime.datetime.utcfromtimestamp(S - 3600).isoformat() + "Z", "duzeltmeler": [{"dosya": f"{i}.wav", "whisper": parcalar[i], "dogru": d} for i, d in duz.items()],
+               "dinlenen": [f"{i}.wav" for i in din]}, open(os.path.join(kl, "duzeltme-elle.json"), "w", encoding="utf-8"))
+elle("2026-11-05-1800-Gercek", ["bugün yüzde yirmi arttı", "toplantıyı yarın yapalım", "bu satır hiç dinlenmedi bence", "tamam hı kapatalım"], {0: "bugün %20 arttı", 1: "toplantıyı bugün yapalım"}, [0, 1, 3])
+elle("2026-11-03-1135-Test-1", ["deneme satırı bir iki"], {0: "tamamen başka bir cümle yazdım"}, [0])
+O = {f"{o['islev']}.{o['anahtar']}": o for o in zeka.karne(C, 30, S)["olcut"]}
+ok("wer_elle: 3 satır dinlendi (1 düzeltilen kelime; %20 = yüzde yirmi hata değil; dinlenmeyen ve deneme toplantısı yok) → 1 hata / 9 kelime", O["dokum.wer_elle"]["n"] == 3 and O["dokum.wer_elle"]["oran"] == round(1 - 1 / 9, 3) and O["dokum.wer_elle"]["durum"] == "yetersiz", O["dokum.wer_elle"])
+yaz("hakem-olcum.jsonl", [{"t": iso(3), "toplanti": "x.md", "kelime": 1000, "wer_sozluk": 0.2}, {"t": iso(2), "toplanti": "y.md", "kelime": 3000, "wer_sozluk": 0.1},
+                          {"t": iso(2), "toplanti": "z-test.md", "kelime": 9000, "wer_sozluk": 0.9}, {"t": iso(1), "toplanti": "y.md", "kelime": 1000, "wer_sozluk": 0.3, "surum": 2}])
+O = {f"{o['islev']}.{o['anahtar']}": o for o in zeka.karne(C, 30, S)["olcut"]}
+ok("hakem: sürüm 2 satırı aynı toplantının eski satırını ezer (x 0,2·1000 + y 0,3·1000 → 1 − 0,25)", O["dokum.wer"]["oran"] == 0.75 and O["dokum.wer"]["n"] == 2 and "Gemini" in O["dokum.wer"]["ad"], O["dokum.wer"])
+ok("elle referans yetersizken hakem ölçütü güven notu taşır, puana girer", "referans: hakem, güven düşük" in O["dokum.wer"]["kanit"] and O["dokum.wer"]["agirlik"] == 1)
+for i in range(30): elle(f"2026-11-0{1 + i % 4}-{1000 + i}-Gercek-{i}", ["a b c d e f g h i j"], {0: "a b c d e f g h i k"}, [0])
+K2 = zeka.karne(C, 30, S); O = {f"{o['islev']}.{o['anahtar']}": o for o in K2["olcut"]}
+ok("wer_elle yeterli (≥ 30 satır): puan elle ölçütten; hakem ölçütü yalnız bilgi, ağırlığı 0", O["dokum.wer_elle"]["durum"] == "tamam" and O["dokum.wer"]["agirlik"] == 0 and "yalnız bilgi" in O["dokum.wer"]["kanit"] and K2["islev"]["dokum"]["puan"] == O["dokum.wer_elle"]["puan"], (O["dokum.wer_elle"], K2["islev"]["dokum"]))
 ok("proje bulma: olcum-gecmis verilmezse yetersiz (uydurmaz)", O["hazirlik.bulma"]["puan"] is None)
 e = K["islev"]["eposta"]; beklenen = round((e["boyut"]["basari"] * .5 + e["boyut"]["ongoru"] * .25 + e["boyut"]["analiz"] * .25))
 ok("işlev puanı: boyut ağırlıkları (0,5/0,25/0,25)", e["puan"] == beklenen and not e["kismi"], e)

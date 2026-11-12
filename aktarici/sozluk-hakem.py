@@ -12,7 +12,7 @@ HAKEM_FIYAT = {"gemini-3.8-flash": (0.75, 3.75, "2027-01-01"), "gemini-3.6-flash
 HAKEM_YEDEK = ("gemini-3.8-flash",)  # 4 Kasım: yoğunlukta (503/5xx/429 günlük değil) sıradaki model; aynı fiyat
 HAKEM_FIYAT_BILINMEYEN = (2.0, 12.0, None)  # fiyatı bilinmeyen model: pahalı say (sınır erken dolsun)
 HK_TOKEN_SN = 32; HK_CIKIS_SN = 8  # ses 32 belirteç/sn (belge); çıkış tahmini ~8 belirteç/sn konuşma (metin + JSON + düşük düşünme) — yalnız ön sınır denetimi için
-HK_OBEK_SN = 300; HK_OBEK_PARCA = 60; HK_EN_KISA_SN = 0.5  # öbek ≤ 5 dk ses (WAV base64 ≈ 12,8 MB < 20 MB satır içi sınırı), ≤ 60 parça
+HK_OBEK_SN = 300; HK_OBEK_PARCA = 10; HK_EN_KISA_SN = 0.5  # öbek ≤ 5 dk ses (WAV base64 ≈ 12,8 MB < 20 MB satır içi sınırı), ≤ 10 parça (Gemini çok parçada komşuya kayıyor; her parça kimlikle doğrulanır)
 HK_ZAMAN_ASIMI = 240; HK_DENEME = 3; HK_YENIDEN_DK = 30; HK_VAZGEC = 3; HK_BITIS_DK = 10; HK_ARALIK_SN = 600
 HK_DURUM = "sozluk-hakem.json"; HK_OLCUM = "hakem-olcum.jsonl"
 HK_YONERGE = ("Aşağıda bir toplantıdan kesilmiş ses parçaları var; her parçadan hemen önce köşeli parantez içinde kimliği yazılı. Her parçayı kelimesi kelimesine yazıya dök. "
@@ -21,6 +21,20 @@ HK_YONERGE = ("Aşağıda bir toplantıdan kesilmiş ses parçaları var; her pa
               "Her parça için bir kayıt döndür: id = köşeli parantezdeki kimlik, metin = döküm.")
 HK_SEMA = {"type": "OBJECT", "properties": {"parcalar": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {"id": {"type": "STRING"}, "metin": {"type": "STRING"}},
                                                                                        "required": ["id", "metin"]}}}, "required": ["parcalar"]}
+_HK_ZEKA = []
+def _hk_zeka():  # zeka.py (kurulum.py KOPYA, aktarıcının yanında; testte kod klasörü): ortak döküm normalleştirmesi ve dışlama kuralları — ölçüm tek yerde
+    if _HK_ZEKA: return _HK_ZEKA[0]
+    import importlib.util
+    f = os.path.abspath(globals().get("__file__") or "") if globals().get("__file__") else ""
+    for d in (os.path.dirname(f) if f else "", os.path.expanduser(str(AYAR.get("kod") or "")), os.path.dirname(os.path.dirname(f)) if f else "", os.path.expanduser(str(AYAR.get("uygulama") or ""))):
+        y = os.path.join(d, "zeka.py") if d else ""
+        if y and os.path.isfile(y):
+            try: sp = importlib.util.spec_from_file_location("zeka_hakem", y); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); _HK_ZEKA.append(m); return m
+            except Exception as e: print(f"HAKEM: zeka.py yüklenemedi ({e.__class__.__name__})")
+    _HK_ZEKA.append(None); return None
+def _hk_norm(t):
+    z = _hk_zeka()
+    return z.dokum_norm(t) if z else str(t or "").lower().split()
 def hakem_model(): return str(AYAR.get("hakem_model") or HAKEM_MODEL)
 def hakem_gunluk_usd():
     try: return float(AYAR.get("hakem_gunluk_usd") if AYAR.get("hakem_gunluk_usd") is not None else 1.0)
@@ -123,9 +137,13 @@ def hakem_coz(govde, n):  # → ({"p1": metin, …} ya da None: bozuk, kullanım
         t = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", t); j = json.loads(t)
     except (KeyError, IndexError, TypeError, ValueError, AttributeError): return None, kul
     if not isinstance(j, dict) or not isinstance(j.get("parcalar"), list): return None, kul
-    idler = {f"p{i + 1}" for i in range(n)}; out = {}
+    idler = {f"p{i + 1}" for i in range(n)}; out = {}; cift = set()
     for x in j["parcalar"]:
-        if isinstance(x, dict) and str(x.get("id") or "").strip("[] ") in idler and isinstance(x.get("metin"), str): out[str(x["id"]).strip("[] ")] = " ".join(x["metin"].split())[:4000]
+        if isinstance(x, dict) and str(x.get("id") or "").strip("[] ") in idler and isinstance(x.get("metin"), str):
+            k = str(x["id"]).strip("[] ")
+            if k in out: cift.add(k)  # aynı kimlik iki kez: hangisinin doğru olduğu bilinmez, parça hizasız sayılır
+            out[k] = " ".join(x["metin"].split())[:4000]
+    for k in cift: out.pop(k, None)
     return out, kul
 def _hk_istek(model, govde):  # → (HTTP durumu (0: ağ hatası), gövde, Retry-After, sn); anahtar başlıkta (adreste değil)
     host = globals().get("GEMINI_HOST") or "generativelanguage.googleapis.com"; t0 = time.time()
@@ -162,6 +180,11 @@ def _hk_obek_gonder(model, obek, kl, kok):  # → (metinler ya da None, özet); 
         if den + 1 < len(mods): continue  # yedek model hemen (aynı modeli beklemek yerine)
         time.sleep(min(60.0, _gemini_bekleme(b, ra) if st == 429 and "_gemini_bekleme" in globals() else 5.0 * (3 ** den)))
     return None, oz
+def _hk_dogrula(r, m, i):  # öbekteki parçanın cevabını doğrula → ek alanlar: kimlik eksik/çift → eksik + hizasiz; kelime/süre uyuşmazlığı (> 8 sözcük/sn, uzunluklar bağdaşmıyor) → hizasiz (ölçüm ve sözlük öğrenmesi kullanmaz)
+    k = f"p{i + 1}"
+    if k not in m: return {"eksik": True, "hizasiz": "kimlik"}
+    z = _hk_zeka(); n = z.dokum_uyum(r["sn"], _hk_norm(r.get("metin")), _hk_norm(m[k])) if z else None
+    return {"hizasiz": n} if n else {}
 # --- hizalama: yerel (sözlük uygulanmış) ↔ hakem → "yanlış → doğru" çiftleri ---------------------------------------------------------------------------------------------------------
 HK_SOZ_RX = re.compile(r"[^\W_]+(?:['’][^\W\d_]+)?(?:-[^\W_]+)*")
 def _hk_k(w): return re.sub(r"[^0-9a-z]", "", sade(w))
@@ -206,10 +229,10 @@ def _hk_yerel(p):  # parçanın yerel metni sözlük uygulanmış hâliyle (dök
     m = " ".join(str(p.get("metin") or "").split())
     try: return sozluk_uygula(m, None)[0] if m else ""
     except Exception: return m
-def _hk_kanallar(kl, H):  # → {kanal: [(parça, hakem kaydı)]} saat sırasıyla; yalnız hakemde kaydı olan parçalar (kırpılanlar dışarıda)
+def _hk_kanallar(kl, H, hizasizlar=False):  # → {kanal: [(parça, hakem kaydı)]} saat sırasıyla; yalnız hakemde kaydı olan parçalar (kırpılanlar dışarıda); hizasız/eksik parçalar yalnız hizasizlar=True ile (ölçüm sayar, öğrenme kullanmaz)
     K = collections.defaultdict(list)
     for p in _hk_parcalar_oku(kl):
-        if p["dosya"] in H: K[p["kanal"]].append((p, H[p["dosya"]]))
+        if p["dosya"] in H and (hizasizlar or not (H[p["dosya"]].get("hizasiz") or H[p["dosya"]].get("eksik"))): K[p["kanal"]].append((p, H[p["dosya"]]))
     return K
 def _kaynak_hakem(c):  # SO_KAYNAKLAR: hakem.jsonl tamamlanmış toplantı → {yanlis, aday_dogru, kaynak: hakem, toplanti, cumle}
     kl = _hk_kl(c["md"]); H, son = _hk_oku(os.path.join(kl, "hakem.jsonl"))
@@ -222,25 +245,28 @@ def _kaynak_hakem(c):  # SO_KAYNAKLAR: hakem.jsonl tamamlanmış toplantı → {
     return out
 if not any(a == "hakem" for a, _ in SO_KAYNAKLAR): SO_KAYNAKLAR.append(("hakem", _kaynak_hakem))
 # --- ölçüm (yalnız sayı) ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-def hakem_olcum(md, kl, H, B=None):  # → yerel ↔ hakem sözcük hata oranı (hakem başvuru), kanal başına, kanalın bütün metni hizalanarak; terim isabeti; yerelde olup hakemde karşılığı olmayan sözcük oranı
-    K = collections.defaultdict(lambda: {"parca": 0, "kelime": 0, "hata_ham": 0, "hata_sozluk": 0, "sn": 0.0, "fazla": 0, "yerel": 0})
-    terimler = set(B["k"][0]) | set(B["k"][1]) if B else set(); th = tk = cift = 0
-    for kanal, L in _hk_kanallar(kl, H).items():
-        hp = [h.get("metin") or "" for _, h in L]; yer = [_hk_yerel(p) for p, _ in L]
-        ham = _hk_hizala([" ".join(str(p.get("metin") or "").split()) for p, _ in L], hp); soz = _hk_hizala(yer, hp, B)
-        k = K[kanal]; k["parca"] = len(L); k["sn"] = sum(p["sn"] for p, _ in L); k["kelime"] = soz["kelime"]; k["hata_ham"] = ham["mesafe"]; k["hata_sozluk"] = soz["mesafe"]
-        k["fazla"] = soz["yerel_fazla"]; k["yerel"] = soz["yerel_kelime"]; cift += len(soz["ciftler"])
+def hakem_olcum(md, kl, H, B=None):  # → yerel ↔ hakem sözcük hata oranı (sürüm 2), kanal başına; ortak normalleştirme (zeka.dokum_norm), güvenilmez parçalar dışlanır (zeka.dokum_dislama) ve nedenleriyle sayılır
+    z = _hk_zeka(); K = collections.defaultdict(lambda: {"parca": 0, "olculen": 0, "kelime": 0, "hata_ham": 0, "hata_sozluk": 0, "sn": 0.0, "fazla": 0, "yerel": 0}); dis = collections.Counter()
+    terimler = set(B["k"][0]) | set(B["k"][1]) if B else set(); th = tk = cift = 0; birl = lambda t: " ".join(_hk_norm(t))
+    for kanal, T in _hk_kanallar(kl, H, True).items():
+        nedenler = z.dokum_dislama([{"sn": p["sn"], "yerel": p.get("metin"), "hakem": h.get("metin"), "sonuc": p.get("sonuc"), "hizasiz": h.get("hizasiz"), "eksik": h.get("eksik")} for p, h in T]) if z else [None] * len(T)
+        L = [x for x, n in zip(T, nedenler) if n is None]; dis.update(n for n in nedenler if n)
+        ok = [x for x in T if not (x[1].get("hizasiz") or x[1].get("eksik"))]  # öğrenmedeki gibi: çift sayısı hizasız olmayan bütün parçalardan
+        cift += len(_hk_hizala([_hk_yerel(p) for p, _ in ok], [h.get("metin") or "" for _, h in ok], B)["ciftler"])
+        hp = [birl(h.get("metin")) for _, h in L]; ham = _hk_hizala([birl(p.get("metin")) for p, _ in L], hp); soz = _hk_hizala([birl(_hk_yerel(p)) for p, _ in L], hp)
+        k = K[kanal]; k["parca"] = len(T); k["olculen"] = len(L); k["sn"] = sum(p["sn"] for p, _ in L); k["kelime"] = soz["kelime"]; k["hata_ham"] = ham["mesafe"]; k["hata_sozluk"] = soz["mesafe"]
+        k["fazla"] = soz["yerel_fazla"]; k["yerel"] = soz["yerel_kelime"]
         if soz["kelime"] and terimler:
-            hs, ys = " " + _so_k(" ".join(hp)) + " ", " " + _so_k(" ".join(yer)) + " "
+            hs, ys = " " + _so_k(" ".join(h.get("metin") or "" for _, h in L)) + " ", " " + _so_k(" ".join(_hk_yerel(p) for p, _ in L)) + " "
             for t in terimler:
                 if " " + t + " " in hs:
                     th += 1
                     if " " + t + " " not in ys: tk += 1
     oran = lambda h, n: round(h / n, 3) if n else None
-    top = {a: sum(k[a] for k in K.values()) for a in ("parca", "kelime", "hata_ham", "hata_sozluk", "sn", "fazla", "yerel")}
-    return {"t": datetime.datetime.now().isoformat(timespec="seconds"), "toplanti": md, "tarih": md[:10], "parca": top["parca"], "sn": round(top["sn"], 1), "kelime": top["kelime"],
-            "wer_ham": oran(top["hata_ham"], top["kelime"]), "wer_sozluk": oran(top["hata_sozluk"], top["kelime"]),
-            "kanal": {a: {"parca": k["parca"], "kelime": k["kelime"], "sn": round(k["sn"], 1), "wer_ham": oran(k["hata_ham"], k["kelime"]), "wer_sozluk": oran(k["hata_sozluk"], k["kelime"])} for a, k in sorted(K.items())},
+    top = {a: sum(k[a] for k in K.values()) for a in ("parca", "olculen", "kelime", "hata_ham", "hata_sozluk", "sn", "fazla", "yerel")}
+    return {"t": datetime.datetime.now().isoformat(timespec="seconds"), "surum": 2, "toplanti": md, "tarih": md[:10], "parca": top["parca"], "olculen": top["olculen"], "dislanan": dict(sorted(dis.items())), "guven": "dusuk" if sum(dis.values()) > 0.4 * top["parca"] else "orta",
+            "sn": round(top["sn"], 1), "kelime": top["kelime"], "wer_ham": oran(top["hata_ham"], top["kelime"]), "wer_sozluk": oran(top["hata_sozluk"], top["kelime"]),
+            "kanal": {a: {"parca": k["parca"], "olculen": k["olculen"], "kelime": k["kelime"], "sn": round(k["sn"], 1), "wer_ham": oran(k["hata_ham"], k["kelime"]), "wer_sozluk": oran(k["hata_sozluk"], k["kelime"])} for a, k in sorted(K.items())},
             "terim_hakem": th, "terim_kacan": tk, "yerel_fazla": oran(top["fazla"], top["yerel"]), "cift": cift}
 # --- bir toplantı ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def hakem_toplanti(md, kuru=False, cikti=None, en_cok_sn=None, durdur=None):  # → özet {durum, …}; kuru: hakem.jsonl, ölçüm ve kullanım kaydı yalnız cikti klasörüne (canlıya yazılmaz)
@@ -265,8 +291,7 @@ def hakem_toplanti(md, kuru=False, cikti=None, en_cok_sn=None, durdur=None):  # 
         for a in ("usd", "gecikme", "giris", "cikis"): oz[a] += o[a]
         if m is None: print(f"HAKEM: öbek gönderilemedi ({o['hata']}{': ' + o['mesaj'] if o.get('mesaj') else ''}; {o['gecikme']:.0f} sn)"); return dict(oz, durum="kota" if o["hata"] == "kota" else "hata", hata=o["hata"])
         t = datetime.datetime.now().isoformat(timespec="seconds")
-        _so_ekle(hy, "".join(json.dumps({"dosya": r["dosya"], "kanal": r["kanal"], "metin": m.get(f"p{i + 1}", ""), "model": gm, "t": t, **({"eksik": True} if f"p{i + 1}" not in m else {})},
-                                        ensure_ascii=False) + "\n" for i, r in enumerate(ob)))
+        _so_ekle(hy, "".join(json.dumps({"dosya": r["dosya"], "kanal": r["kanal"], "metin": m.get(f"p{i + 1}", ""), "model": gm, "t": t, **_hk_dogrula(r, m, i)}, ensure_ascii=False) + "\n" for i, r in enumerate(ob)))
     H, _ = _hk_oku(hy)
     _so_ekle(hy, json.dumps({"son": True, "parca": len(H), "kirpildi": kirp, "model": "+".join(kul) or model, "t": datetime.datetime.now().isoformat(timespec="seconds")}) + "\n")
     ol = dict(hakem_olcum(md, kl, H, so_bilinen() if "so_bilinen" in globals() else None), model="+".join(kul) or model, usd=round(oz["usd"], 4), gecikme_sn=round(oz["gecikme"], 1),

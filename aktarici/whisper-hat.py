@@ -130,6 +130,28 @@ def wh_bas_sira(is_):  # bas-konuş akış parçası (v0.47.1): kuyruğun başı
 def _rms(b):
     if audioop: return audioop.rms(b, 2)
     import array; a = array.array("h"); a.frombytes(b); return int((sum(x * x for x in a) / max(1, len(a))) ** 0.5)
+# DIL-KILIT-BASLA
+# Dil kilidi (12 Kasım): 5 Kasım toplantısında 111 kısa parça "en" işaretliydi ("Evet", "Hıhı", "Tamam"; Whisper kısa seste dili şaşırıyor, işçi de bir önceki
+# yanlış kararı 60 sn "kanalın son dili" diye ileri taşıyordu). Kısa parça (≤ DK_KISA_SN) kanalın baskın diliyle çözülür, dil_son'a yazılmaz; uzun parçada
+# dil serbest kalır (iki dilli toplantı). Baskın dil = son DK_PENCERE uzun parçadaki dillerin çoğunluğu (≥ DK_EN_AZ karar, DK_OMUR_SN içinde), yoksa ayarlı toplantı dili.
+DK_KISA_SN = 2.5; DK_KELIME = 4; DK_PENCERE = 8; DK_EN_AZ = 3; DK_OMUR_SN = 120
+def dk_kisa(sn, kelime=None): return sn <= DK_KISA_SN or (kelime is not None and kelime <= DK_KELIME)
+def dk_not(gecmis, dil, sn, kelime, t):  # yalnız uzun parçadaki karar güvenli sayılır
+    if dil in ("tr", "en") and not dk_kisa(sn, kelime): gecmis.append((t, dil)); del gecmis[:-DK_PENCERE]
+def dk_baskin(gecmis, ayar_dil, t):
+    son = [d for (x, d) in gecmis if t - x <= DK_OMUR_SN]
+    if len(son) >= DK_EN_AZ:
+        for d in ("tr", "en"):
+            if son.count(d) * 2 > len(son): return d
+    return ayar_dil if ayar_dil in ("tr", "en") else None
+# Kilitli kısa parçada "Evet." çökmesi (12 Kasım ölçümü, 40 parça): Türkçeye kilitlenince gülme/öksürük/anlaşılmayan ses tek sözcüğe ("Evet.") çöküyor. Tek sözcüklük tipik
+# çıktı + zayıf konuşma kanıtı (en düşük segment ort. logprob < DK_LP ya da en düşük sözcük olasılığı < DK_KP; whisper.cpp no_speech_prob'u bilgisiz, hep ~0) → metin boş, parça kilit_supheli.
+DK_LP = -0.4; DK_KP = 0.3; DK_COKME = {"evet", "tamam", "hı", "hıhı", "hı-hı", "hmm", "mm", "ya", "yani", "peki", "he", "hee"}
+def dk_cokme(metin, lp, kp):
+    k = [x for x in re.sub(r"[^\w\- ]", " ", (metin or "").lower().replace("i̇", "i")).split() if x]
+    if len(k) != 1 or k[0] not in DK_COKME or lp is None or kp is None: return False
+    return lp < DK_LP or kp < DK_KP
+# DIL-KILIT-BITIS
 class Kanal:
     def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0; self.ses_t = collections.deque(maxlen=600); self.dipler = collections.deque(maxlen=WH_DIP_BLOK); self.dip_n = 0; self.dip_top = 0.0; self.dip = 0.0; self.sonuclar = collections.deque(maxlen=12)  # t_ses/n_ses: otonom söz sırası (v0.56.0); ses_t: sesli karelerin zamanı (son ~12 sn; otonomun yankı ayrımı, 19 Ekim); sonuclar: son parçaların (geliş, sonuç) — söz sırası sözsüz sesi ayırır (30 Ekim)
     def reset(self): self.parca = bytearray(); self.on = bytearray(); self.konusuyor = False; self.sessiz = 0; self.sesli = 0; self.ust = 0; self.t0 = 0.0; self.rmsler = []
@@ -694,6 +716,11 @@ def _isci_dongu():
             # verdiyse önce o dil denenir (karşı taraf İngilizce konuşurken her parça önce Türkçe çözülmesin), boş çıkarsa toplantı diline döner
             istek["dil_algila"] = True; istek["ana_dil"] = dil
             if k and getattr(k, "dil_son", None) in ("tr", "en") and k.dil_son != dil and time.time() - getattr(k, "dil_son_t", 0) < 60: istek["dil"] = k.dil_son
+        if not is_.get("bas") and k is not None and AYAR.get("dil_kilit", True) is not False:  # dil kilidi: kısa parça kanalın baskın diliyle (uzun parça serbest)
+            sn_ = len(is_["pcm"]) / 32000; bd = dk_baskin(getattr(k, "dil_gecmis", []), dil, time.time())
+            if dk_kisa(sn_) and bd:
+                istek["dil"] = bd; istek["dil_kilit"] = True; is_["dil_kilit"] = True
+                for x_ in ("diller", "dil_yedek", "dil_algila"): istek.pop(x_, None)
         # kullanıcı kanalında ses izi: oda açıksa ad için, değilse yalnız ses kilidi için ("Claude:" komutu kullanıcının sesi mi; ayar ses_kilidi)
         if is_["kanal"] == "ben" and not is_.get("bas") and (oda_acik() or AYAR.get("ses_kilidi", True) is not False): istek["oda"] = is_["oda"] = True
         if is_.get("bas") and is_.get("oto_dil"): istek["oto_dil"] = True  # v0.101.4: Konuş sorusunun ilk parçası — dil Whisper'dan (yalnız tr/en)
@@ -735,10 +762,14 @@ def _isci_dongu():
         w["istem_dusen"] = j.get("istem_dusen", 0)
         w["durgun_max"] = max(w.get("durgun_max") or 0, round(is_["t_wh"] - is_["t_al"], 1))  # tek parçanın en uzun işçi süresi (6 Ekim: 47 sn tıkanma)
         sonuc = "uydurma" if j.get("atlanan") else "bos"
+        if metin and is_.get("dil_kilit") and dk_cokme(metin, j.get("lp"), j.get("kp")): print(f"WHISPER: dil kilidi şüphesi ({is_.get('kanal')} kanalı, '{metin}' lp {j.get('lp')} kp {j.get('kp')}) — metin boş bırakıldı"); metin = ""; is_["kilit_supheli"] = True
         if j.get("atilan"):  # süzgecin attığı metin (v0.32.12): uydurma listesini kendi kayıtlarımızdan büyütmek için; yalnız bu Mac'te, döndürülür
             try: _log("uydurma-adaylari.jsonl", {"t": round(time.time(), 1), "kanal": is_.get("kanal"), "atilan": j["atilan"], "satir": bool(metin)})
             except Exception: pass
-        if metin and j.get("dil") in ("tr", "en") and KANALLAR.get(is_["kanal"]): KANALLAR[is_["kanal"]].dil_son = j["dil"]; KANALLAR[is_["kanal"]].dil_son_t = time.time()
+        if metin and j.get("dil") in ("tr", "en") and KANALLAR.get(is_["kanal"]) and not is_.get("dil_kilit") and not dk_kisa(len(is_["pcm"]) / 32000, len(metin.split())):
+            kn_ = KANALLAR[is_["kanal"]]; kn_.dil_son = j["dil"]; kn_.dil_son_t = time.time()  # kısa/kilitli parça dil belleğini kirletmez
+            if not hasattr(kn_, "dil_gecmis"): kn_.dil_gecmis = []
+            dk_not(kn_.dil_gecmis, j["dil"], len(is_["pcm"]) / 32000, len(metin.split()), time.time())
         if metin and j.get("sayi_suphe"): print(f"WHISPER: sayı şüphesi ({is_.get('kanal')} kanalı) — satır işaretlendi, atılmadı")
         if metin and j.get("dil_gecis"): print(f"WHISPER: {is_['kanal']} kanalı {j.get('dil')} ({j['dil_gecis']}) — toplantı dili dışında konuşma")
         if metin:
@@ -927,7 +958,7 @@ def ses_arsivi_yaz(is_, istek, j, sonuc, metin):
         with wave.open(os.path.join(kl, ad), "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(is_["pcm"])
         pen = j.get("kapi")
         r = {"dosya": ad, "kanal": is_["kanal"], "bas": bool(is_.get("bas")), "t0": round(t0, 2), "t1": round(t1, 2), "sn": sn, "sonuc": sonuc, "metin": metin, "dil_istek": istek.get("dil"),
-             "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), "bitti": round(time.time(), 2), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
+             **({"dil_kilit": True} if istek.get("dil_kilit") else {}), **({"kilit_supheli": True} if is_.get("kilit_supheli") else {}), "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), "bitti": round(time.time(), 2), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
         write([(os.path.join(kl, "parcalar.jsonl"), json.dumps(r, ensure_ascii=False) + "\n")])
         if time.time() - _SA["son"] > 3600: _SA["son"] = time.time(); ses_arsivi_temizle()
     except Exception as e: print(f"SES ARŞİVİ: parça yazılamadı ({e.__class__.__name__})")

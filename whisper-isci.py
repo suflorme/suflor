@@ -216,7 +216,7 @@ class CppMotor:
     def __call__(s, a, language=None, initial_prompt=None, **_):  # mlx_whisper.transcribe biçiminde sonuç
         r = s.istek(a, language, initial_prompt)
         seg = [{"text": x.get("text") or "", "start": float(x.get("start") or 0), "end": float(x.get("end") or 0),
-                "no_speech_prob": x.get("no_speech_prob", 0), "avg_logprob": x.get("avg_logprob", 0),
+                "no_speech_prob": x.get("no_speech_prob", 0), "avg_logprob": x.get("avg_logprob", 0), "kp": min([w.get("probability", 1) for w in x.get("words") or [] if (w.get("word") or "").strip(" .,!?…")] or [1]),
                 "compression_ratio": sikisma_orani(x.get("text") or "")} for x in r.get("segments") or []]  # 3 Kasım: sunucu vermiyor; MLX'teki 2,4 süzgeci cpp'de de çalışsın
         d = str(r.get("language") or "").lower()
         return {"text": "".join(x["text"] for x in seg), "segments": seg, "language": s.kod.get(d, d) or language}
@@ -417,7 +417,7 @@ def main():
             # "Let me switch to English…" → "İngilizce bir zaman, çünkü…"; MLX yazmıyordu). Karşı kanalda dil kendiliğinden bulunur (yalnız tr/en;
             # başkası çıkarsa sabit dilde yeniden): parça ~0,6 → ~1,1 sn. Kullanıcının kanalı ve Konuş sabit dilde kalır (hız orada önemli).
             # v0.101.4: Konuş da (oto_dil) — yalnız sorunun ilk parçasında; aktarıcı sonraki parçaları bulunan dille gönderir (+0,5 sn parça başına yalnız bir kez)
-            oto = bool(CPP) and (p.get("kanal") == "karsi" or p.get("oto_dil") is True) and p.get("dil") in ("tr", "en")
+            oto = bool(CPP) and (p.get("kanal") == "karsi" or p.get("oto_dil") is True) and p.get("dil") in ("tr", "en") and not p.get("dil_kilit")  # dil kilidi: kısa parçada dil algılama yok
             r = coz(a, language=None if oto else (p.get("dil") or None), initial_prompt=istem,
                                        condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             if oto and r.get("language") not in ("tr", "en"):
@@ -501,7 +501,7 @@ def main():
                     t_k = time.time(); pf = np.frombuffer(base64.b64decode(p["kapi_profil"]), np.float16).astype(np.float32); pf = pf / (np.linalg.norm(pf) + 1e-9)
                     kapi = {"kapi": kapi_benzerlik(iz, a, pf, np), "kapi_ms": round((time.time() - t_k) * 1000), "atilan_harf": sum(len(re.findall(r"\w", x)) for x in atilan)}
                 except Exception as e: kapi = {"kapi_hata": f"{e.__class__.__name__}: {str(e)[:80]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"sayi_suphe": True} if sayi_suphe(metin) else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **km, **kapi})
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"sayi_suphe": True} if sayi_suphe(metin) else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **({"lp": round(min([s.get("avg_logprob", 0) for s, _ in tut] or [0]), 3), "kp": round(min([s.get("kp", 1) for s, _ in tut] or [1]), 3)} if p.get("dil_kilit") and tut else {}), **km, **kapi})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0

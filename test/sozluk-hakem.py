@@ -29,6 +29,7 @@ class Sahte(http.server.BaseHTTPRequestHandler):
         ids, parts = [], g["contents"][0]["parts"]; out = []
         for i, p in enumerate(parts):
             if "inlineData" in p: out.append({"id": parts[i - 1]["text"].strip("[]"), "metin": METIN.get(base64.b64decode(p["inlineData"]["data"])[-64:], "")})
+        if tur == "eksikcift" and len(out) == 10: out = [o for o in out if o["id"] != "p2"] + [dict(o, metin="başka bir cümle") for o in out if o["id"] == "p3"] * 1 + [o for o in out if o["id"] == "p3"]
         u = {"promptTokenCount": 1000, "candidatesTokenCount": 200, "thoughtsTokenCount": 50, "promptTokensDetails": [{"modality": "AUDIO", "tokenCount": 900}, {"modality": "TEXT", "tokenCount": 100}]}
         t = "bu JSON değil {" if tur == "bozuk" else ("```json\n" + json.dumps({"parcalar": out + [{"id": "p99", "metin": "uydurma"}]}, ensure_ascii=False) + "\n```")
         self.yaz(200, json.dumps({"candidates": [{"content": {"parts": [{"text": "düşünce", "thought": True}, {"text": t}]}}], "usageMetadata": u}, ensure_ascii=False))
@@ -37,7 +38,7 @@ threading.Thread(target=sunucu.serve_forever, daemon=True).start()
 # --- geçici kurulum -----------------------------------------------------------------------------------------------------------------------------------------------------------------
 T = tempfile.mkdtemp(prefix="suflor-sozluk-hakem-"); canli, uyg = os.path.join(T, "uyg", "canli"), os.path.join(T, "uyg"); os.makedirs(os.path.join(canli, "ozetler"))
 AYAR_YOL = os.path.join(T, "ayar", "ayar.json"); os.makedirs(os.path.dirname(AYAR_YOL))
-AYAR = {"alan": "Deneme", "uygulama": uyg, "proje": T, "ortak": T, "dil": "tr"}
+AYAR = {"alan": "Deneme", "uygulama": uyg, "proje": T, "ortak": T, "dil": "tr", "kod": KOD}
 json.dump({"surum": 2, "terimler": [{"dogru": "Pelvora", "yanlis": [], "kip": "duzelt", "kaynak": "kullanici"}, {"dogru": "DravenSync", "yanlis": [], "kaynak": "kullanici"},
                                     {"dogru": "Nerim Kovak", "yanlis": [], "kaynak": "kullanici", "tur": "kisi"}, {"dogru": "Kalendix", "yanlis": ["kalendiks"], "kaynak": "kullanici"}]},
           open(os.path.join(canli, "sozluk.json"), "w"), ensure_ascii=False)
@@ -139,7 +140,7 @@ try:
        and ol[0]["wer_ham"] is not None, str(ol)[:300])
     def yalniz_sayi(o, yol=""):
         if isinstance(o, dict): return all(yalniz_sayi(v, k) for k, v in o.items())
-        if isinstance(o, str): return yol in ("t", "toplanti", "tarih", "model")
+        if isinstance(o, str): return yol in ("t", "toplanti", "tarih", "model", "guven")
         return o is None or isinstance(o, (int, float, bool))
     ok("ölçüm kaydında yalnız sayı (+ zaman, toplantı dosyası, tarih, model); terim/metin yok", ol and yalniz_sayi(ol[0]) and not any(x in json.dumps(ol[0], ensure_ascii=False) for x in ("Pelvora", "Belvora", "Nerim", "stok")))
     ok("terim isabeti: kapalı kümedeki terim hakemde var, yerelde kaçtı", ol and ol[0]["terim_hakem"] >= 1 and ol[0]["terim_kacan"] >= 1, str(ol[0] if ol else None)[:200])
@@ -170,12 +171,12 @@ try:
     m5 = toplanti("Hakem-5", PRC[:2]); DAV["tur"] = "kota"; n1 = len(GELEN); r = N["hakem_toplanti"](m5); ok("günlük kota (429 per_day): yeniden denenmez, durum kota", r["durum"] == "kota" and len(GELEN) - n1 == 1)
     DAV["tur"] = "401"; n1 = len(GELEN); r = N["hakem_toplanti"](m5); ok("401: yeniden denenmez, durum hata", r["durum"] == "hata" and len(GELEN) - n1 == 1)
     DAV["tur"] = "ok"
-    # 8b) 4 Kasım: Gemini parça sınırına uymaz (ardışık parçaları birleştirir, kimlikler kayar, sondakiler boş) — hizalama kanal düzeyinde, parça kimliğinden bağımsız
-    KAY = [("ben", "Dün Kormand ekranında stok görünmüyor.", "Dün Gormand ekranında stok görünmüyor. Sonra rapor hazır oldu.", 1.0, False), ("ben", "Sonra rapor hazır oldu.", "Nerim Bey yarın gelecek.", 1.0, False),
-           ("ben", "Nerim bey yarın gelecek.", "", 1.0, False), ("karsi", "Tamam anlaştık.", "Tamam, anlaştık.", 1.0, False)]
+    # 8b) ölçüm: kanal düzeyinde hizalama, normalleştirme (harf/noktalama) sonrası
+    KAY = [("ben", "Dün Kormand ekranında stok görünmüyor.", "Dün Gormand ekranında stok görünmüyor.", 2.0, False), ("ben", "Sonra rapor hazır oldu.", "Sonra rapor hazır oldu.", 2.0, False),
+           ("ben", "Nerim bey yarın gelecek.", "Nerim Bey yarın gelecek.", 2.0, False), ("karsi", "Tamam anlaştık.", "Tamam, anlaştık.", 2.0, False)]
     m11 = toplanti("Hakem-11", KAY); r = N["hakem_toplanti"](m11); hs = [x for x in satirlar(HY(m11)) if x.get("dosya")]
     ol = satirlar(os.path.join(canli, "hakem-olcum.jsonl"))[-1]
-    ok("kayma: öbek düzeyinde hizalama — ölçüm anlamlı (ben 1/13 hata, yerelde fazla sözcük yok)", r["durum"] == "bitti" and ol["kanal"]["ben"]["wer_sozluk"] == 0.077 and ol["kanal"]["karsi"]["wer_sozluk"] == 0 and ol["yerel_fazla"] == 0
+    ok("ölçüm: kanal düzeyinde hizalama (ben 1/13 hata, yerelde fazla sözcük yok)", r["durum"] == "bitti" and ol["kanal"]["ben"]["wer_sozluk"] == 0.077 and ol["kanal"]["karsi"]["wer_sozluk"] == 0 and ol["yerel_fazla"] == 0
        and "hakem_bos_yerel_dolu" not in ol, str(ol)[:300])
     ok("kayma: çift çıktı (Kormand → Gormand; harf farkı Nerim bey çift değil), ölçümde çift sayısı 1", ol["cift"] == 1 and [(c["yanlis"], c["aday_dogru"]) for c in N["_kaynak_hakem"]({"md": m11, "B": None})] == [("Kormand", "Gormand")])
     ok("kayma: kanıt cümlesi doğru parçadan (yerel taraftaki sözcüğün parçası)", "Kormand" in N["_kaynak_hakem"]({"md": m11, "B": None})[0]["cumle"] and "Nerim" not in N["_kaynak_hakem"]({"md": m11, "B": None})[0]["cumle"])
@@ -207,6 +208,31 @@ try:
     ok("durum dosyası 0600", oct(os.stat(os.path.join(canli, "sozluk-hakem.json")).st_mode & 0o777) == "0o600")
     DURUM["toplanti"] = True; n1 = len(GELEN); N["hakem_tur"](); DURUM["toplanti"] = False
     ok("toplantı sürerken tur istek atmaz", len(GELEN) == n1)
+    # 14) 10 Kasım düzeltmesi: öbek ≤ 10 parça, kimlik doğrulama (eksik/çift → hizasız), ortak normalleştirme ve dışlama
+    sys.path.insert(0, KOD); import zeka as ZK
+    ok("normalleştirme: Türkçe İ/ı, yüzde/%, sayı → yazı, kesme, dolgu ve (gülme) atılır", ZK.dokum_norm("İşte %20 arttı (gülme) hı, ıı Pelvora'ya 3'te IŞIK :D") == ["işte", "yüzde", "yirmi", "arttı", "pelvoraya", "üçte", "ışık"], str(ZK.dokum_norm("İşte %20 arttı (gülme) hı, ıı Pelvora'ya 3'te IŞIK :D")))
+    ok("normalleştirme: 'yüzde yirmi' = '%20' = '20%'; 100 → yüz; 150 olduğu gibi", ZK.dokum_norm("yüzde yirmi") == ZK.dokum_norm("%20") == ZK.dokum_norm("20%") and ZK.dokum_norm("100 ve 150") == ["yüz", "ve", "150"])
+    ok("öbek en çok 10 parça", N["HK_OBEK_PARCA"] == 10 and [len(o) for o in N["_hk_obekler"]([{"sn": 1.0, "dosya": str(i)} for i in range(23)])] == [10, 10, 3])
+    ok("hakem_coz: aynı kimlik iki kez gelirse ikisi de atılır", N["hakem_coz"](json.dumps({"candidates": [{"content": {"parts": [{"text": '{"parcalar":[{"id":"p1","metin":"a"},{"id":"p1","metin":"b"},{"id":"p2","metin":"c"}]}'}]}}]}), 2)[0] == {"p2": "c"})
+    m13 = toplanti("Hakem-13", [("ben", f"cümle numara {i} bir iki üç", f"cümle numara {i} bir iki üç", 2.0, False) for i in range(12)]); DAV["tur"] = "eksikcift"; n1 = len(GELEN)
+    r = N["hakem_toplanti"](m13); DAV["tur"] = "ok"; hs = [x for x in satirlar(HY(m13)) if x.get("dosya")]; ol = satirlar(os.path.join(canli, "hakem-olcum.jsonl"))[-1]
+    ok("12 parça → 2 istek (10 + 2)", r["durum"] == "bitti" and len(GELEN) - n1 == 2, str(len(GELEN) - n1))
+    ok("kimliği eksik parça eksik+hizasız, çift kimlikli parça hizasız; öteki parçalar temiz", [bool(x.get("hizasiz")) for x in hs] == [False, True, True] + [False] * 9 and hs[1].get("eksik") is True, str([(x.get("hizasiz"), x.get("eksik")) for x in hs]))
+    ok("ölçüm sürüm 2: hizasız parçalar dışlanan olarak sayılır, kalan 10 parça hatasız", ol["surum"] == 2 and ol["parca"] == 12 and ol["olculen"] == 10 and ol["dislanan"] == {"hizasiz": 2} and ol["wer_sozluk"] == 0.0, str(ol)[:300])
+    ok("sözlük öğrenmesi hizasız parçayı kullanmaz", len(N["_hk_kanallar"](os.path.join(canli, "ses-arsivi", m13[:-3]), N["_hk_oku"](HY(m13))[0])["ben"]) == 10 and len(N["_hk_kanallar"](os.path.join(canli, "ses-arsivi", m13[:-3]), N["_hk_oku"](HY(m13))[0], True)["ben"]) == 12)
+    # birleşmiş (uzunluğu bağdaşmayan) cevap: hizasız
+    m15 = toplanti("Hakem-15", [("ben", "Dün akşam rapor hazırdı bence.", "Dün akşam rapor hazırdı bence. Sonra herkes eve gitti ve yarın görüşecekler.", 3.0, False)]); N["hakem_toplanti"](m15)
+    ok("hakem metni yerelden çok uzunsa (kelime/süre uyuşmazlığı) parça hizasız", [x.get("hizasiz") for x in satirlar(HY(m15)) if x.get("dosya")] == ["uyusmaz"])
+    # dışlama: kayma, uydurma, kısa, sayı yazımı
+    Y = ["alfa beta gama delta epsilon", "zeta eta teta iota kapa", "lambda mü nü ksi omikron", "pi ro sigma tau üpsilon", "fi hi psi omega bir", "yüzde yirmi arttı mı ee tamam"]
+    Hh = [Y[0], Y[2], Y[2], Y[3], Y[4], "%20 arttı mı tamam"]
+    m14 = toplanti("Hakem-14", [("ben", y, h, 2.0, False) for y, h in zip(Y, Hh)]); pj = os.path.join(canli, "ses-arsivi", m14[:-3], "parcalar.jsonl")
+    ls = [json.loads(l) for l in open(pj, encoding="utf-8")]; ls[4]["sonuc"] = "uydurma"; open(pj, "w", encoding="utf-8").write("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in ls))
+    N["hakem_toplanti"](m14); ol = satirlar(os.path.join(canli, "hakem-olcum.jsonl"))[-1]
+    ok("kayma (hakem metni komşunun yerel metni) ve uydurma işaretli parça dışlanır; sayı yazımı farkı hata değil", ol["dislanan"] == {"kayma": 1, "uydurma": 1} and ol["olculen"] == 4 and ol["wer_sozluk"] == 0.0, str(ol)[:300])
+    D = ZK.dokum_dislama([{"sn": 1.0, "yerel": "evet tamam", "hakem": "evet"}, {"sn": 3.0, "yerel": "bir iki", "hakem": ""}, {"sn": 2.0, "yerel": "", "hakem": "ıı hı"},
+                          {"sn": 2.0, "yerel": "a b c d e f g h", "hakem": " ".join("kelime" for _ in range(20))}, {"sn": 4.0, "yerel": "tamam herkese teşekkürler bol şans", "hakem": "tamam herkese teşekkürler bol şans"}])
+    ok("dışlama nedenleri: kısa (< 2 sn), boş, boş (dolgu atılınca), hız (> 8 sözcük/sn), geçerli", D == ["kisa", "bos", "bos", "hiz", None], str(D))
     # 13) toplanti-claude.py ad alanı: hakem kanıtı okunur, ağ yok
     ok("toplanti-claude.py ogren_ad_alani hakem bölümünü de yükler", "sozluk-hakem.py" in open(os.path.join(KOD, "toplanti-claude.py"), encoding="utf-8").read())
 finally:

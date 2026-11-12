@@ -557,6 +557,18 @@ def _talimat_uygula(eid):
 ORTAK_POSTA = os.environ.get("SUFLOR_ORTAK_POSTA") or ("" if "deneme_aktarici" in globals() and deneme_aktarici() else "/Users/Shared/Suflor/geri-bildirim")  # (deneme aktarıcısı gerçek klasöre yazmaz) iki hesaplı düzende ortak klasör (yalnız yerel dosya; ağa gitmez)
 def _gelen_okuyucu_var(hedef):  # hedef oturumun kancası (toplanti-claude.py gelen) bu hedefi en az bir kez okudu mu: okundu işareti var
     return os.path.exists(os.path.join(BASE, "gelen", hedef + ".okundu"))
+def gelen_bekleyen_say(gun=14):  # Bugün "Bekleyenler" satırı: gelen kutusunda (canli/gelen/<hedef>.jsonl) hedef oturumun henüz okumadığı onaylı talimat sayısı; son `gun` gün (eski birikim sayılmaz). Yalnız okuma
+    d = os.path.join(BASE, "gelen"); n = 0; sinir = (datetime.datetime.now() - datetime.timedelta(days=gun)).isoformat(timespec="seconds")
+    try: adlar = [f for f in os.listdir(d) if f.endswith(".jsonl")]
+    except OSError: return 0
+    for f in adlar:
+        try: satirlar = [json.loads(l) for l in open(os.path.join(d, f), encoding="utf-8") if l.strip()]
+        except (OSError, ValueError): continue
+        try: son = open(os.path.join(d, f[:-6] + ".okundu"), encoding="utf-8").read().strip()
+        except OSError: son = ""
+        ids = [x.get("id") for x in satirlar]; yeni = satirlar[ids.index(son) + 1:] if son in ids else satirlar
+        n += sum(1 for x in yeni if str(x.get("at") or "9") >= sinir)
+    return n
 def _ortak_posta_yaz(eid, h, a, ek):  # okuyucusu olmayan hedefin notu ortak klasöre bırakılır (kişi adı içerebilir → ilk satırda uyarı); → dosya adı ya da None
     if not ORTAK_POSTA or not os.path.isdir(ORTAK_POSTA): return None
     import getpass

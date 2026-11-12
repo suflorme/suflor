@@ -12,7 +12,7 @@
 #   denen e-postanın son iletisi zaten kullanıcının (= analiz hatası), birleştirilen çift iş geri alındı, öğrenilen bilgiye "Yanlış" dendi.
 # Gizlilik: okuma yalnız yerel canli/ kayıtlarından; çıktı (zeka-karne.jsonl, beta paketi) yalnız sayı ve işlev/ölçüt adı. Soru metni yalnız bellekte
 #   benzerlik için okunur, hiçbir yere yazılmaz. Deneme toplantıları (etiket "deneme" ya da dosya adında test/deneme) sayılmaz.
-import datetime, gzip, json, os, re, time
+import datetime, difflib, gzip, json, os, re, time
 
 ISLEVLER = {  # anahtar: (Türkçe ad, İngilizce ad) — anahtarlar teshis.py SAYIM "zeka_karne"/"zeka_kullanici" ile aynı kalmalı
     "konus": ("Konuş / sohbet", "Talk / chat"), "gun_plani": ("Gün planı (düşünme turu)", "Daily plan"), "eposta": ("E-posta takibi", "Email follow-up"),
@@ -318,12 +318,97 @@ def m_belge(b):
     gir = lambda v: ts(v) is None or b.icinde(ts(v))  # değer kimi zaman tarih, kimi zaman kayıt kimliği (tarihsiz: sayılır)
     k = sum(1 for v in (d.get("kabul") or {}).values() if gir(v)); r = sum(1 for v in (d.get("red") or {}).values() if gir(v)); n = k + r
     return ((k / n) if n else None), n, f"{k}/{n} belge önerisi kabul"
-def m_dokum(b):  # hakem ölçümü (Gemini dökümüyle kıyas): 1 − kelime hatası, kelimeyle ağırlıklı; n = ölçülen toplantı
-    rs = [r for r in b.j("hakem-olcum.jsonl") if b.icinde(ts(r.get("t"))) and not b.deneme_mi(r.get("toplanti")) and isinstance(r.get("wer_sozluk", r.get("wer_ham")), (int, float)) and r.get("kelime")]
+# ---------- döküm ölçümü: ortak normalleştirme ve dışlama (hakem_olcum ve wer_elle aynı işlevleri kullanır) ----------
+_BIR = ("sıfır", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz"); _ON = ("", "on", "yirmi", "otuz", "kırk", "elli", "altmış", "yetmiş", "seksen", "doksan")
+DOLGU = frozenset("hı hıı hıh hım hımm hm hmm hmmm mm mmm ım ıı ııı ıııı ee eee eeee eeeee aa aaa ah eh ehe heh hee öhm ıhm".split())
+def _sayi_yazi(n): return "yüz" if n == 100 else (_BIR[n] if n < 10 else (_ON[n // 10] + ("" if n % 10 == 0 else " " + _BIR[n % 10])))
+def dokum_norm(t):
+    """Metin → karşılaştırılacak sözcük listesi: Türkçe küçük harf (İ/ı), köşeli/yuvarlak parantez işaretleri ve gülücük atılır, 0–100 sayıları ve yüzde yazıyla,
+    noktalama ve kesme işareti kalkar, dolgu sözcükleri (hı, hmm, ıı …) atılır."""
+    t = str(t or "").replace("İ", "i").replace("I", "ı").lower()
+    t = re.sub(r"\([^)]*\)|\[[^\]]*\]|\*[^*]*\*", " ", t); t = re.sub(r"(?<!\w)[:;]-?[dpo()/\\]+(?!\w)", " ", t)
+    t = re.sub(r"%\s*(\d{1,3})(?!\d)", r" yüzde \1 ", t); t = re.sub(r"(?<!\d)(\d{1,3})(?!\d)\s*%", r" yüzde \1 ", t); t = t.replace("%", " yüzde ")
+    def sayi(m):
+        n = int(m.group(1))
+        if n > 100: return m.group(0)
+        w = _sayi_yazi(n).split(); ek = (m.group(2) or "").strip("'’")
+        return " " + " ".join(w[:-1] + [w[-1] + ek]) + " "
+    t = re.sub(r"(?<!\d)(\d{1,3})(?![\d])(['’][^\W\d_]+)?", sayi, t)
+    t = re.sub(r"['’]", "", t); t = re.sub(r"[^\w\s]|_", " ", t)
+    return [w for w in t.split() if w not in DOLGU]
+def dokum_oran(a, b):  # iki sözcük listesinin benzerliği (0–1)
+    return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio() if a and b else 0.0
+def dokum_mesafe(ref, hyp):  # sözcük düzeyinde Levenshtein mesafesi
+    if not ref: return len(hyp)
+    onceki = list(range(len(hyp) + 1))
+    for i, r in enumerate(ref, 1):
+        simdi = [i]
+        for j, h in enumerate(hyp, 1): simdi.append(min(onceki[j] + 1, simdi[j - 1] + 1, onceki[j - 1] + (r != h)))
+        onceki = simdi
+    return onceki[-1]
+DOKUM_EN_KISA_SN, DOKUM_EN_COK_HIZ, DOKUM_KOMSU = 2.0, 8.0, 3
+def dokum_uyum(sn, y, h):  # y, h: normalleştirilmiş sözcük listeleri → None (bağdaşıyor) ya da "hiz" (hakem > 8 sözcük/sn) / "uyusmaz" (uzunluklar bağdaşmıyor)
+    if len(h) / max(sn, 0.1) > DOKUM_EN_COK_HIZ: return "hiz"
+    if len(y) >= 5 and len(h) >= 5 and (len(h) > 2 * len(y) or len(y) > 2 * len(h)): return "uyusmaz"
+    return None
+def dokum_dislama(L):
+    """L: bir kanalın parçaları, zaman sırasıyla [{sn, yerel, hakem, sonuc, hizasiz, eksik}] → her parça için None (ölçülür) ya da dışlanma nedeni:
+    hizasiz (Gemini cevabı kimlik/kelime/süre denetiminden geçmedi) · uydurma (yerel metin uydurma/yankı işaretli) · kisa (< 2 sn tepki) · bos (yerel ya da hakem metni boş) ·
+    hiz (hakem metni > 8 sözcük/sn) · uyusmaz (iki metnin uzunluğu bağdaşmıyor) · kayma (hakem metni ±3 komşunun yerel metnine belirgin daha benzer)."""
+    Y = [dokum_norm(p.get("yerel")) for p in L]; H = [dokum_norm(p.get("hakem")) for p in L]; out = []
+    for i, p in enumerate(L):
+        sn = float(p.get("sn") or 0); y, h = Y[i], H[i]
+        if p.get("hizasiz") or p.get("eksik"): out.append("hizasiz")
+        elif p.get("sonuc") in ("uydurma", "yanki"): out.append("uydurma")
+        elif sn < DOKUM_EN_KISA_SN: out.append("kisa")
+        elif not y or not h: out.append("bos")
+        elif dokum_uyum(sn, y, h): out.append(dokum_uyum(sn, y, h))
+        else:
+            kendi = dokum_oran(h, y); komsu = max((dokum_oran(h, Y[j]) for j in range(max(0, i - DOKUM_KOMSU), min(len(L), i + DOKUM_KOMSU + 1)) if j != i and len(Y[j]) >= 3), default=0.0)
+            out.append("kayma" if len(h) >= 3 and komsu >= 0.5 and komsu >= kendi + 0.25 else None)
+    return out
+def elle_olcum(canli, b=None):
+    """Elle dinlenip düzeltilen satırlardan gerçek kelime hatası: canli/ses-arsivi/<toplantı>/duzeltme-elle.json. Referans = kullanıcının doğrusu; dinlenip düzeltilmeyen satırda
+    Whisper doğru sayılır (yerel metin parcalar.jsonl'den); dinlenmeyen satır ölçüme girmez. → {"satir", "duzeltilen", "kelime", "hata", "toplanti"}"""
+    kok = os.path.join(canli, "ses-arsivi"); top = {"satir": 0, "duzeltilen": 0, "kelime": 0, "hata": 0, "toplanti": 0}
+    try: adlar = sorted(os.listdir(kok))
+    except OSError: return top
+    for ad in adlar:
+        yol = os.path.join(kok, ad, "duzeltme-elle.json")
+        if not os.path.isfile(yol) or (b is not None and b.deneme_mi(ad)) or (b is None and DENEME.search(ad)): continue
+        try: e = json.load(open(yol, encoding="utf-8"))
+        except (OSError, ValueError): continue
+        if not isinstance(e, dict) or (b is not None and not b.icinde(ts(e.get("kaydedildi")) if ts(e.get("kaydedildi")) is not None else os.path.getmtime(yol))): continue
+        duz = {x["dosya"]: x for x in e.get("duzeltmeler") or [] if isinstance(x, dict) and isinstance(x.get("dosya"), str) and isinstance(x.get("dogru"), str)}
+        din = {x for x in e.get("dinlenen") or [] if isinstance(x, str)} | set(duz); yerel = {}
+        try:
+            for l in open(os.path.join(kok, ad, "parcalar.jsonl"), encoding="utf-8", errors="replace"):
+                try: r = json.loads(l)
+                except ValueError: continue
+                if isinstance(r, dict) and isinstance(r.get("dosya"), str) and r["dosya"] in din: yerel[r["dosya"]] = str(r.get("metin") or "")
+        except OSError: pass
+        n0 = top["satir"]
+        for d in sorted(din):
+            hyp = duz[d].get("whisper") if d in duz and isinstance(duz[d].get("whisper"), str) else yerel.get(d)
+            if hyp is None: continue
+            ref = dokum_norm(duz[d]["dogru"]) if d in duz else dokum_norm(hyp); hy = dokum_norm(hyp)
+            if not ref and not hy: continue
+            top["satir"] += 1; top["kelime"] += len(ref); top["hata"] += dokum_mesafe(ref, hy); top["duzeltilen"] += int(d in duz and ref != hy)
+        top["toplanti"] += int(top["satir"] > n0)
+    return top
+def m_dokum_elle(b):  # gerçek referans: kullanıcının dinleyip düzelttiği satırlar
+    o = elle_olcum(b.canli, b)
+    if not o["kelime"]: return None, o["satir"], "elle dinlenen satır yok"
+    w = min(1.0, o["hata"] / o["kelime"])
+    return 1 - w, o["satir"], f"{o['toplanti']} toplantıda {o['satir']} satır dinlendi ({o['duzeltilen']} düzeltildi), kelime hatası %{w * 100:.0f} ({o['kelime']} kelime)"
+def m_dokum(b):  # hakeme göre fark (Gemini referans, güven düşük): 1 − kelime hatası, kelimeyle ağırlıklı; n = ölçülen toplantı. Aynı toplantının sürüm 2 satırı varsa eski sürüm satırı atılır
+    ham = [r for r in b.j("hakem-olcum.jsonl") if b.icinde(ts(r.get("t"))) and not b.deneme_mi(r.get("toplanti")) and isinstance(r.get("wer_sozluk", r.get("wer_ham")), (int, float)) and r.get("kelime")]
+    v2 = {r.get("toplanti") for r in ham if r.get("surum") == 2}; rs = [r for r in ham if r.get("surum") == 2 or r.get("toplanti") not in v2]
     k = sum(int(r["kelime"]) for r in rs)
     if not k: return None, len(rs), "hakem ölçümü yok"
     w = sum(float(r.get("wer_sozluk", r.get("wer_ham"))) * int(r["kelime"]) for r in rs) / k
-    return max(0.0, 1 - w), len(rs), f"{len(rs)} toplantıda kelime hatası %{w * 100:.0f} ({k} kelime)"
+    dus = sum(1 for r in rs if r.get("guven") == "dusuk")
+    return max(0.0, 1 - w), len(rs), f"{len(rs)} toplantıda hakemle fark %{w * 100:.0f} ({k} kelime)" + (f"; {dus} toplantıda parçaların çoğu dışlandı, güven düşük" if dus else "")
 
 # (işlev, boyut, ölçüt anahtarı, ad, işlev ya da None (= veri kaynağı yok; nasıl toplanacağı "kaynak"ta), asgari n, ağırlık, kaynak)
 OLCUTLER = [
@@ -355,7 +440,8 @@ OLCUTLER = [
     ("kayit", "analiz", "durum", "Bayat/bitti çıkarımı tuttu", m_kayit_durum, 10, 1, "guncellik.jsonl durum + neden (sonradan 'acik' dönüş)"),
     ("kayit", "basari", "belge", "Belge önerisi kabul", m_belge, 5, 1, "belge-oneri.json"),
     ("kayit", "ongoru", "gecikme", "Gecikecek işi önceden söyledi", None, 0, 1, "yok — işe 'gecikme riski' tahmini yazılmıyor (gün planı riski bunu kısmen ölçer)"),
-    ("dokum", "basari", "wer", "Döküm doğruluğu (1 − kelime hatası)", m_dokum, 2, 1, "hakem-olcum.jsonl"),
+    ("dokum", "basari", "wer_elle", "Döküm doğruluğu (elle dinlenen satırlar, 1 − kelime hatası)", m_dokum_elle, 30, 1, "ses-arsivi/<toplantı>/duzeltme-elle.json (+ parcalar.jsonl)"),
+    ("dokum", "basari", "wer", "Hakeme göre fark (Gemini referans)", m_dokum, 2, 1, "hakem-olcum.jsonl (sürüm 2 tercih)"),
     ("tazi", "basari", "bulgu", "Bulgu işe yaradı", lambda b: _tepki_oran(b, "tazi"), 5, 1, "tepki.jsonl kaynak tazi (iyi / iyi + yanlış)"),
     ("kesisim", "analiz", "celiski", "Çelişki gerçek çıktı", lambda b: _tepki_oran(b, "kesisim"), 5, 1, "tepki.jsonl kaynak kesisim (iyi / iyi + yanlış)"),
 ]
@@ -422,6 +508,10 @@ def karne(canli, gun=30, simdi=None, gecmis=None):
             o["durum"] = "tamam" if oran is not None and n >= asg else "yetersiz"
             if o["durum"] == "tamam": o["puan"] = round(100 * oran)
         ol.append(o)
+    el = next((o for o in ol if o["islev"] == "dokum" and o["anahtar"] == "wer_elle"), None); hk = next((o for o in ol if o["islev"] == "dokum" and o["anahtar"] == "wer"), None)
+    if el and hk and hk["puan"] is not None:  # döküm doğruluğunun referansı: elle varsa o; yoksa hakem (güven düşük, notla)
+        if el["puan"] is not None: hk["agirlik"] = 0; hk["kanit"] += "; yalnız bilgi (puana girmez, referans elle dinlenen satırlar)"
+        else: hk["kanit"] += "; referans: hakem, güven düşük"
     isl = {}
     for ad in ISLEVLER:
         bo = {}

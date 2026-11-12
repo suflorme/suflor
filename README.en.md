@@ -66,7 +66,9 @@ by voice: *"Defne, what date did we discuss for the beta last week?"* The answer
 
 ## Live data on a card, as the meeting unfolds
 
-<p align="center"><img src="gorsel/en/hero.png" alt="The assistant's cards in the corner of a meeting; an enlarged Note card: 12% was said in the meeting; the source shows 8% over the last 7 days." width="100%"></p>
+<p align="center"><img src="gorsel/en/hero.png" alt="Personal assistant: the Day summary on the left (today's focus, decisions needing attention), the chat panel on the right, a meeting card in the middle: 12% was said in the meeting; the source shows 8% over the last 7 days." width="100%"></p>
+
+<p align="center"><sub>The Day summary, the chat panel on the right and a meeting card in one window; the data is fictional.</sub></p>
 
 <p align="center"><img src="gorsel/en/ozellikler.png" alt="Meeting highlights: speaks in the meeting, answers participants, runs the meeting, live translation, whispers to you, remembers history, hands-free, private meeting" width="100%"></p>
 
