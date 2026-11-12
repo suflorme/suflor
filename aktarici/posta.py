@@ -43,10 +43,52 @@ def posta_view():
     if not posta_acik(): return None
     return {"durum": POSTA["durum"], "hata": POSTA["hata"], "n": len(POSTA["iletiler"]), "guncel": POSTA["guncel"], "uygulama": os.path.isdir(POSTA_APP),
             "mail_acik": mail_acik_mi(), "son_gelen": posta_son_gelen(), "mail_uyari": posta_mail_kapali()}
+def posta_ad_haritasi():  # 12 Kasım: {adres (küçük harf): kayıttaki ad} — adres tek kişide geçiyorsa; Mail'deki gönderen adı takma ad olabilir (kayıt veritabanı kişi/adres tabloları)
+    h, cift = {}, set()
+    try:
+        for k in posta_vt_kisiler():
+            ad = " ".join(str((k.get("adlar") or [""])[0] or "").split())
+            if not ad: continue
+            for a in k.get("adresler") or []:
+                a = str(a).strip().lower()
+                if "@" not in a: continue
+                if h.get(a, ad) != ad: cift.add(a)
+                h[a] = ad
+    except Exception: return {}
+    return {a: ad for a, ad in h.items() if a not in cift}
+def posta_ad_duzelt(iletiler):  # gönderen (ad/adres) ve alıcı (alici_ad/alici) adları kayıttaki adla değişir; ilk hâli ad_ham/alici_ad_ham'da kalır. Kayıtta olmayan adres olduğu gibi
+    h = posta_ad_haritasi()
+    if not h: return iletiler
+    for x in iletiler:
+        try:
+            k = h.get(str(x.get("adres") or "").strip().lower())
+            if k and k != x.get("ad"): x.setdefault("ad_ham", x.get("ad")); x["ad"] = k
+            al, an = x.get("alici"), x.get("alici_ad")
+            if isinstance(al, list) and isinstance(an, list) and len(al) == len(an):
+                yeni = [h.get(str(a).strip().lower()) or n for a, n in zip(al, an)]
+                if yeni != an: x.setdefault("alici_ad_ham", an); x["alici_ad"] = yeni
+        except Exception: continue
+    return iletiler
+def posta_ad_notu(metin):  # modele giden metinde kişinin takma adı geçiyorsa kısa not: "Kişileri kayıttaki adlarıyla yaz (takma ad → kayıttaki ad)". Geçmiyorsa ya da kayıt yoksa ""
+    try:
+        tl = _posta_k(metin)
+        if not tl.strip(): return ""
+        sat = []
+        for k in posta_vt_kisiler():
+            adlar = [" ".join(str(a or "").split()) for a in k.get("adlar") or []]
+            if not adlar or not adlar[0]: continue
+            ana = _posta_k(adlar[0]); bul = []
+            for a in adlar[1:]:
+                ak = _posta_k(a)
+                if len(ak) < 3 or ak in ana or ak.split(" ")[0] in ana.split(" ") or a in bul: continue  # kayıttaki adın parçası olan takma ad zaten doğru
+                if re.search(r"(?<![\w])" + re.escape(ak) + r"(?![\w])", tl): bul.append(a)
+            if bul: sat.append(f"{', '.join(bul[:3])} → {adlar[0]}")
+        return ("Kişi adları: metinde şu takma adlar geçiyorsa kişiyi kayıttaki adıyla yaz (takma ad → kayıttaki ad): " + "; ".join(sat[:8]) + ".\n") if sat else ""
+    except Exception: return ""
 def posta_oku():
     try: j = json.load(open(POSTA_JSON, encoding="utf-8"))
     except (OSError, ValueError): return
-    POSTA.update(iletiler=[x for x in (j.get("iletiler") or []) if isinstance(x, dict)], durum=j.get("durum"), hata=j.get("hata"), guncel=j.get("guncel"))
+    POSTA.update(iletiler=posta_ad_duzelt([x for x in (j.get("iletiler") or []) if isinstance(x, dict)]), durum=j.get("durum"), hata=j.get("hata"), guncel=j.get("guncel"))
 def posta_yenile(zorla=False):
     if not posta_acik() or (not zorla and time.time() - POSTA["t"] < POSTA_SN): return
     POSTA["t"] = time.time()

@@ -236,6 +236,10 @@ try:
         st = istek("/status"); ok("HTTP: /status panoya dokum_kontrol verir (hazır liste)", "dokum_kontrol" in st and st["dokum_kontrol"]["liste"][0]["dinlenen"] == 1, str(st.get("dokum_kontrol"))[:120])
         sy = istek("/dokum-kontrol", anahtar=False, ham=True); ok("HTTP: sayfa kabuğu açılır (anahtarsız, veri uçları değil), dil sözlüğü ve anahtar gömülü", isinstance(sy, bytes) and b"Transcript check" in sy and b"SUFLOR_ANAHTAR" in sy and b"__DIL__" not in sy and b"/*__YAZI__*/" not in sy)
         bj = istek("/dokum-kontrol", {"islem": "bitir", "t": mh[:-3]}); ok("HTTP: bitir", bj.get("ok") is True and os.path.exists(os.path.join(C2, "dokum-olcum.jsonl")))
+        import urllib.parse as _up  # 12 Kasım: Türkçe harfli uzun toplantı adı yüzde-kodlanınca 80 karakteri aşıyordu, /ac sessizce reddediyordu
+        uzun = _up.quote("2026-11-12-1759-Haftalık-Bütçe-Gözden-Geçirme-Çalışması-Öncesi", safe="-_.!~*'()"); tk = "a" * 32
+        aj = istek("/ac", {"dokum_kontrol": f"http://127.0.0.1:{PORT}/dokum-kontrol?top={uzun}&t={tk}"}); ok("HTTP: /ac uzun Türkçe klasör adlı döküm kontrolü adresini kabul eder", aj.get("ok") is True and len(uzun) > 80, str(aj)[:100])
+        ok("HTTP: /ac başka adresi reddeder", istek("/ac", {"dokum_kontrol": f"http://127.0.0.1:{PORT}/baska?top=x&t={tk}"}).get("ok") is False)
     finally: rp.terminate(); rp.wait(5)
     # beta aktarıcı: sayfa 404
     json.dump({"alan": "Deneme", "ad": "Ben Kurgu", "port": PORT, "uygulama": R, "proje": R, "ortak": R, "gelistirici": False, "ses_arsivi": True, "kod": R}, open(ay, "w"))

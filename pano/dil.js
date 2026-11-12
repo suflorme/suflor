@@ -1212,6 +1212,8 @@ globalThis.SUFLOR_EN = {
   "E-posta bulunamadı; elle yazabilirsin.": "No e-mail found; you can type it.",
   "Aktarıcıya ulaşılamadı.": "Could not reach the relay.",
   "Yapılamadı.": "Could not be done.",
+  "Sayfa açılamadı: tarayıcı yeni sekmeyi engelledi.": "Could not open the page: the browser blocked the new tab.",
+  "Sayfa Chrome'da açılamadı. Adresi elle açabilirsin.": "Could not open the page in Chrome. You can open the address yourself.",
   "Gündeme eklendi: {t}": "Added to the agenda: {t}",
   "Zaten böyle; değişiklik yok.": "Already like this; no change.",
   "alıcı adresi bulunamadı, taslak alıcısız açıldı": "recipient address not found, draft opened without a recipient",

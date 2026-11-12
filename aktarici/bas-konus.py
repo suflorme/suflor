@@ -2538,7 +2538,7 @@ def chrome_ac(p):
     # olayın ya da son Başlat'ın (ikisi de guvenli_baglanti / PLATFORM_ANA'dan geçmiş) bağlantısı.
     if p.get("baslatma"): url = (STATE.get("baslatma") or {}).get("baglanti") if time.time() - ((STATE.get("baslatma") or {}).get("at") or 0) < 120 else None
     elif p.get("dokum_kontrol"):  # 12 Kasım: döküm kontrolü sayfası (Chrome dışı tarayıcıda panodan açılınca Chrome'a yönlendirilir); yalnız kendi adresimiz + tek kullanımlık anahtar
-        u = str(p.get("dokum_kontrol")); url = u if re.fullmatch(r"http://127\.0\.0\.1:%d/dokum-kontrol\?top=[\w%%.\-]{1,80}&t=[0-9a-f]{32}" % A.port, u) else None
+        u = str(p.get("dokum_kontrol")); url = u if re.fullmatch(r"http://127\.0\.0\.1:%d/dokum-kontrol\?top=[\w%%.\-]{1,300}&t=[0-9a-f]{32}" % A.port, u) else None
     elif p.get("kesisim"):  # 12 Kasım: Kesişim sayfası (Chrome dışı tarayıcıdan panodan açılınca); yalnız kendi adresimiz + tek kullanımlık anahtar
         u = str(p.get("kesisim")); url = u if re.fullmatch(r"http://127\.0\.0\.1:%d/kesisim\?t=[0-9a-f]{32}" % A.port, u) else None
     else: url = (takvim_olay(str(p.get("olay") or "")) or {}).get("baglanti")
@@ -2702,8 +2702,20 @@ def takvim_yenile():
     try: subprocess.run(["open", "-g", "-W", "-a", TAKVIM_APP, "--args", "--cikti", TAKVIM_JSON, "--sonra", str(TAKVIM_SONRA_SA)] + (["--adres", adr] if adr else []) + takvim_goster_arg(), timeout=150, capture_output=True)
     except subprocess.TimeoutExpired: STATE["takvim"].update(durum="zaman_asimi", hata="takvim yardımcısı yanıt vermedi (izin penceresi açık olabilir)")
     takvim_oku()
+TAKVIM_SN_YAKIN = 120  # 12 Kasım: yaklaşan toplantı varken sık yenile (Exchange'de saat değişikliği gelince pano geç kalmasın)
+def takvim_bekle_sn(durum, art_arda_hata=0):  # döngünün bir sonraki yenilemeye kadar beklemesi
+    if durum == "izin_yok": return 1800  # izin penceresi her denemede yeniden çıkmasın (panodaki ↻ hemen dener)
+    if durum in ("ok", "yok"):
+        try:
+            simdi = datetime.datetime.now(datetime.timezone.utc)
+            for e in list(TAKVIM_TAM.values()):
+                b = datetime.datetime.fromisoformat(str(e.get("baslangic") or "").replace("Z", "+00:00"))
+                if b.tzinfo and -3600 <= (b - simdi).total_seconds() <= 3 * 3600: return min(TAKVIM_SN, TAKVIM_SN_YAKIN)  # 1 saat önce başlamışa kadar, 3 saat sonrasına kadar
+        except Exception: pass
+        return TAKVIM_SN
+    return TAKVIM_SN if art_arda_hata < 2 else 1800  # zaman aşımı/geçici hata: bir kez 5 dk sonra yeniden dene (eskiden hemen 30 dk beklenirdi); üst üste olursa izin penceresi açık olabilir → 30 dk
 def _takvim_dongu():
-    takvim_oku()
+    takvim_oku(); onceki = STATE["takvim"].get("durum"); hata_say = 0
     while True:
         try: takvim_yenile()
         except Exception as e: print(f"TAKVİM: hata {e}")
@@ -2711,7 +2723,9 @@ def _takvim_dongu():
             if STATE["takvim"].get("durum") == "ok": takvim_gecmis_yenile()  # v0.84.0: geçmiş günler, yarım saatte bir
         except Exception as e: print(f"TAKVİM: geçmiş okunamadı {e.__class__.__name__}")
         # izin yok / izin penceresi yanıtlanmadı: macOS her denemede yeniden sormasın diye 30 dk bekle (panodaki ↻ hemen dener)
-        time.sleep(TAKVIM_SN if STATE["takvim"].get("durum") in ("ok", "yok") else 1800)
+        d = STATE["takvim"].get("durum"); hata_say = 0 if d in ("ok", "yok") else hata_say + 1
+        if d != onceki: print(f"TAKVİM: durum {onceki} → {d}"); onceki = d  # yalnız geçişte tek satır (olay/kişi yok); eskiden döngü günlükte hiç görünmezdi
+        time.sleep(takvim_bekle_sn(d, hata_say))
 
 # --- Sesli asistan: liste okuma, devamını/tekrar oku, panoyu aç, devam penceresi (9 Kasım, test/sesli-asistan.py) ----------------------------------------------------------------
 # Liste satırları (- / * / 1.) okunurken ilk LISTE_OKU öğe sırayla okunur, kalanı "N tane daha var, panoda" der ve saklanır. Cevabın okunmayan kısmı (5 cümle sınırından sonrası, liste fazlası,

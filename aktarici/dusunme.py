@@ -391,7 +391,7 @@ def dus_istem(girdi, simdi):
         "Yalnız tek bir JSON nesnesi yaz (başka metin yok): "
         '{"ogrenilen": [{"metin": "…", "neden": "…", "kaynak": "…"}], "gecersiz": [{"id": "o…", "neden": "…"}], '
         '"plan": {"ozet": "…", "odak": [{"id": "s…", "saat": "HH:MM", "neden": "…", "eylem": "yapildi"}], "dikkat": [{"metin": "…", "neden": "…", "id": "k…|s…", "eylem": "onayla|yapildi|taslak|teyit"}], "soru": [{"ref": "n1", "metin": "…"}]}}\n'
-        "<veri>\n" + girdi["metin"] + "\n</veri>")
+        + (posta_ad_notu(girdi["metin"]) if "posta_ad_notu" in globals() else "") + "<veri>\n" + girdi["metin"] + "\n</veri>")
 
 # --- Çıktı ------------------------------------------------------------------------------------------------------------------------------------
 def _dus_liste(v): return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []

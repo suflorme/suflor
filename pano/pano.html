@@ -920,6 +920,10 @@ function seciliGundem(ag){const o=tkOlaylar.find(x=>x.id===tkGor);if(!o)return n
   const m=davetMaddeleri(tkNot[o.id]);return{o,items:m,kaynak:m.length?L('davet notundan'):L('Bu toplantı için gündem yok — Başlat\'a basınca {asistan} hazırlar.')}}
 // pano Chrome'da değilse (Safari varsayılan) toplantı ve hazırlık sekmesini aktarıcı Chrome'da açar — eklenti yalnız Chrome'da
 const CHROME=/Chrome\//.test(navigator.userAgent)&&!/Edg\/|OPR\//.test(navigator.userAgent), chromeAc=b=>j('/ac',{method:'POST',body:JSON.stringify(b)}).catch(()=>{})
+async function yerelSayfaAc(u,alan){  // 12 Kasım: Döküm kontrolü / Kesişim sayfasını aç; olmazsa sessiz kalma, nedenini söyle
+  if(CHROME){const w=window.open(u,'_blank');if(!w)bnBildir(L('Sayfa açılamadı: tarayıcı yeni sekmeyi engelledi.'));return}
+  let r=null;try{r=await j('/ac',{method:'POST',body:JSON.stringify({[alan]:'http://127.0.0.1:'+location.port+u})})}catch(e){}
+  if(!r||!r.ok)bnBildir(L('Sayfa Chrome\'da açılamadı. Adresi elle açabilirsin.'))}
 // Başlat formunda seçim düğmeleri (kullanıcı, 21 Ekim: açılır menü yerine): .sg grubu tek seçim; data-bos=1 ise seçili düğmeye yeniden basınca seçim kalkar
 const sgVal=id=>(document.querySelector('#'+id+' button.on')||{}).dataset?.v||'', sgSet=(id,v)=>document.querySelectorAll('#'+id+' button').forEach(b=>b.classList.toggle('on',b.dataset.v===v))
 document.querySelectorAll('.sg').forEach(g=>g.addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;sgSet(g.id,g.dataset.bos&&b.classList.contains('on')?'':b.dataset.v)}))
@@ -2684,11 +2688,11 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='gpdogru'||a==='gpyanlis'){b.disabled=true;gpBek.add(id);if(last)bnCiz(last);j('/dusunme',{method:'POST',body:JSON.stringify({islem:a==='gpdogru'?'dogru':'yanlis',id})}).catch(()=>{});bnBildir(a==='gpdogru'?L('Not aldım, teşekkürler'):L('Tamam, bunu geçersiz saydım'));return}  // günün planındaki "Doğru mu?" (aktarici/dusunme.py): Doğru → onaylı, Yanlış → geçersiz
   if(a==='zkpuan'||a==='zkgec'){const i=b.dataset.i||'*';zkBek.add(i);if(last)bnCiz(last);j('/dusunme',{method:'POST',body:JSON.stringify(a==='zkpuan'?{islem:'zeka_puan',islev:i,puan:+b.dataset.p}:{islem:'zeka_gec'})}).catch(()=>{});if(a==='zkpuan')bnBildir(L('Not aldım, teşekkürler'));return}  // zekâ karnesi kullanıcı puanı
   if(a==='dkac'){let u='/dokum-kontrol?top='+encodeURIComponent(b.dataset.t);try{const r=await bnYaz('/tek-kullanim',{}),m=r&&r.url&&String(r.url).match(/[?&]t=([0-9a-f]{32})/);if(m)u+='&t='+m[1]}catch(e){}  // sayfa tek kullanımlık anahtarla açılır (2 dk)
-    if(CHROME)window.open(u,'_blank');else chromeAc({dokum_kontrol:'http://127.0.0.1:'+location.port+u});return}
+    return yerelSayfaAc(u,'dokum_kontrol')}
   if(a==='dkkapat'){const t=b.dataset.t;dkKapali.add(t);if(last)bnCiz(last);bnYaz('/dokum-kontrol',{islem:'kapat',t}).then(r=>{if(!r||!r.ok){dkKapali.delete(t);bnBildir(L('Yapılamadı'));if(last)bnCiz(last)}}).catch(()=>{dkKapali.delete(t);if(last)bnCiz(last)});return}
   if(a==='mtb'){const o=b.dataset.i;return bnIsle([id],o==='onay'?L('Kayıt kapatıldı'):L('Tamam, açık kalsın'),()=>bnYaz('/mutabakat',{kayit:id,islem:o}))}  // gece durum önerisi: Onayla kaydı kapatır (Geri al 5 sn), Hayır öneriyi reddeder
   if(a==='ksac'){let u='/kesisim';try{const r=await bnYaz('/tek-kullanim',{}),m=r&&r.url&&String(r.url).match(/[?&]t=([0-9a-f]{32})/);if(m)u+='?t='+m[1]}catch(e){}  // sayfa tek kullanımlık anahtarla açılır (2 dk)
-    if(CHROME)window.open(u,'_blank');else chromeAc({kesisim:'http://127.0.0.1:'+location.port+u});return}
+    return yerelSayfaAc(u,'kesisim')}
   if(a==='tepki'){ev.stopPropagation();tpYap(b);return}
   if(a==='epyanlis')return epIslem('yanlis_oncelik',id,b,{beklenen:b.dataset.b})
   if(a==='bekac'){bnBekAcik=!bnBekAcik;if(last)bnCiz(last);return}

@@ -190,6 +190,16 @@ class SahteSp:
 ns["subprocess"] = SahteSp; ns["POSTA"]["t"] = 99; r = ns["posta_mail_ac"]()
 bak("Mail'i aç: open -g -a Mail, ok, hemen yenileme için sayaç sıfırlanır", r == {"ok": True} and KOMUT == [["open", "-g", "-a", "Mail"]] and ns["POSTA"]["t"] == 0.0)
 ns["subprocess"] = subprocess
+# 12 Kasım: Mail'deki gönderen adı takma ad olabilir (kurgu kişi: kayıtta "Defne Aras", Mail'de "Dido D") → kayıt veritabanındaki ad kullanılır; adres kayıtta yoksa ya da iki kişide geçiyorsa dokunulmaz
+ns["posta_vt_kisiler"] = lambda: [{"adlar": ["Defne Aras", "Dido", "Dido D", "Defne"], "adresler": [A("dido")]}, {"adlar": ["Orhan Ay"], "adresler": [A("ortak")]}, {"adlar": ["Cem Ay"], "adresler": [A("ortak")]}]
+il = [{"ad": "Dido D", "adres": A("DIDO"), "alici": [A("dido"), A("yok")], "alici_ad": ["Dido D", "Yok Kisi"]}, {"ad": "Bay Ortak", "adres": A("ortak")}, {"ad": "Yabancı", "adres": A("yabanci")}]
+c = ns["posta_ad_duzelt"](il)
+bak("gönderen adı adresle kayıttaki ada çevrilir, ilk hâli ad_ham'da", c[0]["ad"] == "Defne Aras" and c[0]["ad_ham"] == "Dido D")
+bak("alıcı adı da çevrilir; kayıtta olmayan alıcı değişmez", c[0]["alici_ad"] == ["Defne Aras", "Yok Kisi"])
+bak("iki kişide geçen adres ve kayıtta olmayan adres değişmez", c[1]["ad"] == "Bay Ortak" and c[2]["ad"] == "Yabancı")
+bak("takma ad notu: metinde takma ad geçince 'takma → kayıttaki ad'", "Dido → Defne Aras" in ns["posta_ad_notu"]("Dido yarın dönecek"))
+bak("takma ad notu: kayıttaki adın parçası olan 'Defne' ve geçmeyen ad not üretmez", ns["posta_ad_notu"]("Defne yarın dönecek") == "" and ns["posta_ad_notu"]("Orhan geldi") == "")
+ns["posta_vt_kisiler"] = lambda: []; bak("kayıt yokken düzeltme ve not boş geçer", ns["posta_ad_duzelt"]([{"ad": "Dido D", "adres": A("dido")}])[0]["ad"] == "Dido D" and ns["posta_ad_notu"]("Dido") == "")
 srv.shutdown()
 shutil.rmtree(T, ignore_errors=True)
 print("posta: " + ("✓ hepsi geçti" if not hata else f"✗ {len(hata)} kaldı")); sys.exit(1 if hata else 0)

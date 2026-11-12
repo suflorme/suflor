@@ -110,6 +110,7 @@ let bitti = DispatchSemaphore(value: 0)
 func oku(_ izin: Bool, _ hata: Error?) {
   defer { bitti.signal() }
   guard izin else { yaz(["durum": "izin_yok", "hata": hata?.localizedDescription ?? "Takvim izni verilmedi (Sistem Ayarları → Gizlilik ve Güvenlik → Takvimler → Suflor Takvim)", "olaylar": []]); return }
+  store.refreshSourcesIfNecessary()  // 12 Kasım: Exchange/Google kaynaklarının eşitlenmesini ister (yardımcı her seferinde yeni süreç; yerel önbellek eskiyse güncelletir)
   let simdi = Date()
   let p = store.predicateForEvents(withStart: simdi.addingTimeInterval(-saatOnce * 3600), end: simdi.addingTimeInterval(saatSonra * 3600), calendars: nil)
   var olaylar: [[String: Any]] = []
