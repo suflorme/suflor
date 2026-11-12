@@ -425,7 +425,7 @@ def _km_kesisim_metni(simdi, cap):
     except (ValueError, TypeError): yas = None
     if yas is None or yas > KM_KS_BAYAT_SA or yas < -1: return _km_sar(ac, _t("Çapraz kontrol bugün koşmadı.", "The cross-check did not run today."), "", cap)
     duz = [x for x in v.get("duzeltmeler") or [] if x.get("bugun")]
-    sat = [_t(f"Bugün düzeltilen: {len(duz)}", f"Fixed today: {len(duz)}") + ("" if not duz else ": " + "; ".join(_km_kisa(x.get("ozet"), 110) for x in duz[:3])),
+    sat = [_t(f"Bugün düzeltilen: {len(duz)}", f"Fixed today: {len(duz)}") + ("" if not duz else ": " + "; ".join(_km_kisa(x.get("ozet"), 200) for x in duz[:2])),
            _t(f"Araştırılan: {len(v.get('arastirmalar') or [])}", f"Looked into: {len(v.get('arastirmalar') or [])}")]
     sor = [x for x in v.get("sorulacak") or [] if x.get("ozet")][:2]
     if sor:

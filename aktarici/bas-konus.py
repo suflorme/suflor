@@ -400,10 +400,6 @@ def yon_isareti(tur):  # soruya eklenen işaret: tek ses → eski «[Bu soruyu X
               f"{tz}Write the spoken part line by line; EVERY line starts with a bracketed name tag: «[{dis}] …», «[{ic}] …»; write nothing before the tag. {dis}: at most 3 sentences, gives the information with source and date. "
               f"{ic}: adds ONE sentence only if there is something genuinely useful from the inside (today's calendar, an open task, a decision, a past meeting); otherwise stays silent; never invents outside information.{ic_en}{taki_en} "
               "The written detail (after «---») is one untagged block with the source link and date. Tagged lines are written only in a turn marked «TWO-VOICE TURN».]\n")
-def kesisim_tur_paketi(tur, ms):  # Kesişim dilimi bu turun paketine girer mi: toplantı dışı kullanıcı turu. bellek_kapsam "ortak" burada ölçüt DEĞİL: toplantı rolündeki kişilik (Marvin) toplantı dışında da ortak sayılır (canlıda dilim bu yüzden gitmedi, 12 Kasım); gerçek ölçüt toplantı sürmüyor + otonom/karşı tur değil
-    if tur.get("toplantida") or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals(): return ""
-    try: return baglam_paketi("konus", dilimler=["kesisim"], soru=ms)
-    except Exception as e: print(f"KONUŞ: kesişim dilimi kurulamadı ({e.__class__.__name__})"); return ""
 def kesisim_tur_notu(nb):  # Konuş turunun paketi → aynı paket; dilim varsa günlük satırı, sorma görevi içeriyorsa "bugün soruldu" işareti (soru bu turda sorulmuş sayılır: günde en çok bir kez önerilir)
     if not nb: return nb
     m = re.search(r"\[(Çapraz kontrol|Cross-check) \(Kesişim\)[^\n]*\n.*?\n\[/\1 \(Kesişim\)\]\n", nb, re.S)
@@ -2346,7 +2342,8 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
     tur["derin"], dm_, de_, dn_ = konus_derin_karar(metin, tur, top)  # 9 Kasım: analiz sorusu → bu tur Opus'lu süreç
     if tur["derin"]: print(f"KONUŞ: derin tur ({dm_}) — {dn_}")
     iki = AYAR.get("konus_iki_surec") is True and not kaynak_dar()  # beta profili (C fazı): varsayılan kapalı; ayar.json'da true yazılıysa açık
-    if tur["bellek_kapsam"] == "ortak" and _KS.get("ozel_gitti") and konus_canli():  # v0.68.0: kartın özel bölümü süreç geçmişinde kalmasın (toplantı kişiliği görmesin)
+    tum_ozel = kart_ozel_tum(tur)  # v0.234.0: toplantı dışı kullanıcı turu → kartın tüm özel bölümleri (iki asistan); _KS["ozel_gitti"] == "tum": süreçte hepsi var
+    if (tur["bellek_kapsam"] == "ortak" and _KS.get("ozel_gitti") or not tum_ozel and _KS.get("ozel_gitti") == "tum") and konus_canli():  # v0.68.0: kartın özel bölümü süreç geçmişinde kalmasın (toplantı/karşı tarafa okunan cevapta)
         if iki: konus_yuva_degis("ortak cevap — özel süreç bekliyor")
         else: konus_kapat("kartın özel bölümü süreçte — ortak cevap için yeni süreç", durum_koru=True); _KS["tur"] = tur
     elif iki and tur["bellek_kapsam"] != "ortak" and not _KS.get("ozel_gitti") and _KS_YEDEK.get("ozel_gitti") and _yedek_canli():
@@ -2401,10 +2398,10 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         tur["soru"] = ms; oa, son_tur = onara_al(ms, tur.get("bellek_kapsam")); tur_ad = "defter" if dfb else son_tur if oa else None
         tur["bekle_tur"] = tur_ad
         if duz: _konus_kur(soru=ms)
-        ozb = "" if tur.get("bellek_kapsam") == "ortak" or _KS.get("ozel_gitti") else kart_ozel_blok(tur.get("kisi") or kisilik_ad())
-        if ozb: _KS["ozel_gitti"] = True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter)")
-        nb = "" if (tur.get("bellek_kapsam") == "ortak" or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals()) else baglam_paketi("konus", dilimler=["notlar", "gun_plani"], soru=ms)  # 9 Kasım (kişi modeli): notlar defteri artık Konuş'un bağlamında (yalnız kullanıcının kendi turu)
-        nb += kesisim_tur_notu(kesisim_tur_paketi(tur, ms))  # 12 Kasım (F4): Kesişim dilimi gittiyse günlüğe satır + sorma görevi gittiyse günde bir kez işaretle
+        ozb = "" if tur.get("bellek_kapsam") == "ortak" or (_KS.get("ozel_gitti") and not (tum_ozel and _KS.get("ozel_gitti") != "tum")) else kart_ozel_blok(tur.get("kisi") or kisilik_ad(), tum=tum_ozel)  # v0.234.0: toplantı dışı kullanıcı turunda tüm özel bölümler (iki asistan); süreçte yalnız kendi bölümü varsa tümü bir kez daha gider
+        if ozb: _KS["ozel_gitti"] = "tum" if tum_ozel else True; print(f"BELLEK: kartın özel bölümü bu soruyla gitti ({len(ozb)} karakter" + (", tüm bölümler" if tum_ozel else "") + ")")
+        nb = "" if (tur.get("bellek_kapsam") == "ortak" or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") in ("karsi", "moderator", "ozet") or "baglam_paketi" not in globals()) else baglam_paketi("konus", dilimler=["notlar", "gun_plani", "kesisim"], soru=ms)  # 9 Kasım (kişi modeli): notlar defteri artık Konuş'un bağlamında (yalnız kullanıcının kendi turu)
+        nb = kesisim_tur_notu(nb)  # 12 Kasım (F4): Kesişim dilimi gittiyse günlüğe satır + sorma görevi gittiyse günde bir kez işaretle
         ton_sifirla(); gnb = gerginlik_notu(tur.get("kisi")) + _etiket_tur_notu(tur)  # v0.80.0: önceki cevabın tonu taşınmaz; toplantı havası (yalnız gerginlik_tonu açık kişilik)
         dub = duygu_blogu(tur, ms) if "duygu_blogu" in globals() else ""  # 9 Kasım (dost): toplantı dışı kullanıcı turunda "[Durum — veri]" (≤ 300 kar.), bağlamdan önce (konus_baglam "Soru: " ile biter)
         bks = bilgi_bekle_sn(ms)

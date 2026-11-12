@@ -18,7 +18,7 @@ i = rel.index("def kesisim_sayfa_veri()"); j = rel.index("def kesisim_geri_al(")
 exec(rel[i:j], ns)
 exec(open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(), ns)
 bs = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-exec(bs[bs.index("def kesisim_tur_paketi"):bs.index("def konus_istem(")], ns)
+exec(bs[bs.index("def kesisim_tur_notu"):bs.index("def konus_istem(")], ns)
 bp = ns["baglam_paketi"]
 def yaz(olusturma=None, bul=None, cozum=None, olay=None, sor=None):
     olusturma = olusturma or simdi.replace(tzinfo=None).isoformat(timespec="seconds")
@@ -78,14 +78,15 @@ ns["ARAYUZ_DILI"] = "tr"
 # 9) istem kuralı yalnız bas-konus.py kodunda
 ok("istem kuralı kodda (KESISIM_KURAL tr+en), yalnız Kesişim açıkken eklenir", set(ns["KESISIM_KURAL"]) == {"tr", "en"} and "Çapraz kontrol (Kesişim)" in ns["KESISIM_KURAL"]["tr"]
    and re.search(r'if "kesisim_sayfa_veri" in globals\(\) and gelistirici_mi\(\) and not gizli_acik\(\): t \+= KESISIM_KURAL', bs))
-# 10) canlıda gitmeyen durum (12 Kasım, v0.233.0): Marvin toplantı rolünde + 2 kişilik → bellek_kapsam "ortak"; dilim buna bağlı olmamalı, yalnız gerçek toplantı/otonom/karşı tura bakar
+# 10) canlıda gitmeyen durum (12 Kasım, v0.233.0): tek Marvin toplantı rolünde + Roxie → eski bellek_kapsam toplantı dışında da "ortak" diyordu, dilim hiç kurulmuyordu. Düzeltme bellek.py'de; burada kaynak + davranış
 yaz(sor=sor); LOG.clear()
-tp = ns["kesisim_tur_paketi"]
-ok("ortak kapsamlı (toplantı rolündeki kişilik) toplantı dışı yazılı tur dilimi alır", "Bugün düzeltilen" in tp({"bellek_kapsam": "ortak", "yazili": True, "kisi": "Asistan"}, "çapraz kontrolde ne var"))
-yaz(olay=[{"id": "00000004", "eylem": "tazi_kuyruga_alindi", "t": simdi.replace(tzinfo=None).isoformat(timespec="seconds")}]); q = tp({}, "x")
+bk = open(os.path.join(KOD, "aktarici", "bellek.py"), encoding="utf-8").read()
+ok("kesisim, notlar/gun_plani ile tek çağrıda; ayrı kapı yok", 'dilimler=["notlar", "gun_plani", "kesisim"], soru=ms)' in bs and "nb = kesisim_tur_notu(nb)" in bs and "kesisim_tur_paketi" not in bs)
+ok("bellek_kapsam toplantı sürüp sürmediğine bakar", 'tur["toplantida"] if "toplantida" in tur' in bk and "toplanti_var" in bk)
+yaz(olay=[{"id": "00000004", "eylem": "tazi_kuyruga_alindi", "t": simdi.replace(tzinfo=None).isoformat(timespec="seconds")}]); q = paket()
 ok("bugün düzeltilen sıfır olsa da Araştırılan satırı gider", "Araştırılan: 1" in q and "Bugün düzeltilen: 0" in q)
-yaz(sor=sor)
-ok("toplantı sürerken / otonom / karşı tur / özet kaynağında dilim yok", all(tp(t, "x") == "" for t in ({"toplantida": True}, {"otonom": True}, {"karsi": True}, {"kaynak": "karsi"}, {"kaynak": "ozet"}, {"kaynak": "moderator"})))
-LOG.clear(); ns["kesisim_tur_notu"](tp({"bellek_kapsam": "ortak"}, "x")); ok("tur paketi günlük satırı yazar (canlı günlükte görünür)", any(l.startswith("KONUŞ: kesişim dilimi") for l in LOG))
-ok("kesisim bellek_kapsam'a bağlı notlar/gun_plani çağrısında DEĞİL; ayrı çağrı nb'ye eklenir", 'dilimler=["notlar", "gun_plani"], soru=ms)' in bs and "nb += kesisim_tur_notu(kesisim_tur_paketi(tur, ms))" in bs)
+# 11) düzeltme özeti ~200 karakterde kesilir (110'da yarıda kalıyordu), bütçe 800
+uz = "Atlas firması: kaynaklar ayrışıyor — " + "ayrıntı " * 12
+yaz(bul=[{"id": f"{n:08x}", "ozet": uz + str(n), "kaynaklar": []} for n in range(1, 4)], olay=[{"id": f"{n:08x}", "eylem": "tazi_dosya_eklendi", "t": simdi.replace(tzinfo=None).isoformat(timespec="seconds")} for n in range(1, 4)]); q = paket()
+ok("düzeltme özeti 110'dan uzun (≈130+ karakter tam), ≤ 800 bütçe, en çok 2 örnek", uz[:130].strip() in q and len(q) <= 800 and q.count("ayrışıyor") == 2)
 print("\nKALAN: %d" % sum(hata)); sys.exit(1 if any(hata) else 0)

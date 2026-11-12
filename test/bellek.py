@@ -115,6 +115,38 @@ try:
     ok("kapsam: toplantı kişiliği, karşı taraf, toplantıya okunan → ortak; toplantı dışı kişilik → hepsi",
        ns["bellek_kapsam"]({}, at) == "ortak" and ns["bellek_kapsam"]({"kaynak": "karsi"}, at) == "ortak" and ns["bellek_kapsam"]({"otonom": True}, mt) == "ortak"
        and ns["bellek_kapsam"]({}, mt) is None and ns["bellek_kapsam"]({"kaynak": "hitap"}, mt) is None)
+    # v0.234.0: toplantı sürüp sürmediği ve tek kişilik/Roxie durumları (Marvin toplantı rolünde, ayrı toplantı-dışı kişilik yok)
+    ks_ilk = ns["kisilikler"]; marvin = {"ad": "Marvin", "rol": "toplanti"}; roxie = {"ad": "Roxie", "rol": "dis"}; disi = {"ad": "Deniz", "rol": "disi"}
+    bk = ns["bellek_kapsam"]
+    try:
+        ns["kisilikler"] = lambda: [marvin, roxie]
+        ok("tek Marvin (toplantı rolü) + Roxie: toplantı dışı tur → hepsi (kapsamsız)", bk({"toplantida": False}, marvin) is None and bk({}, marvin) is None)
+        ok("aynı kişilik toplantı sürerken → ortak", bk({"toplantida": True}, marvin) == "ortak")
+        ok("karşı/otonom tur toplantı dışında da ortak", bk({"karsi": True, "toplantida": False}, marvin) == "ortak" and bk({"otonom": True}, marvin) == "ortak" and bk({"kaynak": "karsi"}, marvin) == "ortak")
+        ok("Roxie (rol dis) turu: toplantı dışında hepsi, toplantıda da değişmez (ortak değil)", bk({"toplantida": False}, roxie) is None and bk({"toplantida": True}, roxie) is None)
+        tv0 = ns.get("toplanti_var"); ns["toplanti_var"] = lambda: True; ok("toplantida alanı yokken toplanti_var() sürüyorsa ortak", bk({}, marvin) == "ortak"); ns["toplanti_var"] = lambda: False; ok("toplanti_var() yoksa/kapalıysa hepsi", bk({}, marvin) is None); ns["toplanti_var"] = tv0
+        ns["kisilikler"] = lambda: [marvin, disi, roxie]
+        ok("ayrı toplantı-dışı kişilik varken toplantı kişiliği toplantı dışında da ortak (v0.64.0 davranışı)", bk({"toplantida": False}, marvin) == "ortak" and bk({"toplantida": False}, disi) is None)
+        ns["kisilikler"] = lambda: [marvin]; ok("tek kişilik: ortak değil", bk({"toplantida": True}, marvin) is None)
+    finally: ns["kisilikler"] = ks_ilk
+    # v0.234.0: iki asistan da kartı tam tanır — toplantı dışı kullanıcı turunda tüm "Yalnız …" bölümleri; toplantı/karşı/otonom/gizli kipte eski koruma
+    ist2 = ns["konus_istem"]()
+    ok("istem kuralı tr: iki asistan kullanabilir, toplantıda/karşı tarafa okunanda kullanılmaz; eski 'başka kişilik cevaplarken kullanma' yok",
+       "iki asistan da kullanabilir" in ist2 and "Toplantıda ve toplantıya ya da karşı tarafa okunan" in ist2 and "Başka bir kişilik cevaplarken ve toplantıya" not in ist2 and "Kartın 'Yalnız Matlas' bölümü istemde değildir" in ist2)
+    src_b = open(os.path.join(KOD, "aktarici", "bellek.py"), encoding="utf-8").read()  # test ns'inde _t hep Türkçe verir: İngilizce metni kaynakta denetle
+    ok("istem kuralı en (kaynak): either assistant may use it; not in a meeting/read to the other side", "and either assistant may use it" in src_b and "When another persona answers, and in any answer" not in src_b and "either assistant may use them outside meetings" in src_b)
+    tum = ns["kart_ozel_tum"]; tv1 = ns.get("toplanti_var"); ns["toplanti_var"] = lambda: False; kl0 = ns["kisilikler"]
+    ns["kisilikler"] = lambda: [marvin, roxie]; rx_tur = {"kisi": "Roxie", "bellek_kapsam": bk({"kisi": "Roxie"}, roxie)}; mv_tur = {"kisi": "Marvin", "bellek_kapsam": bk({}, marvin)}
+    ok("toplantı dışı kullanıcı turu (Roxie ya da Marvin): tüm özel bölümler", tum(rx_tur) is True and tum(mv_tur) is True)
+    ok("tüm bölümler bloğu: Matlas'ın bölümü Atlas'a da gider (tum=True), başlık iki asistanı söyler; tum=False eski davranış (Atlas'a boş)",
+       "Kuş gözlemi sever" in ns["kart_ozel_blok"]("Atlas", tum=True) and "iki asistan" in ns["kart_ozel_blok"]("Atlas", tum=True) and ns["kart_ozel_blok"]("Atlas") == "" and "Kuş gözlemi sever" in ns["kart_ozel_blok"]("Matlas"))
+    ok("toplantıda (toplantida) / karşı / otonom / özet turunda tüm bölümler yok",
+       not any(tum(dict(rx_tur, **d)) for d in ({"toplantida": True}, {"karsi": True}, {"otonom": True}, {"kaynak": "karsi"}, {"kaynak": "moderator"}, {"kaynak": "ozet"})))
+    ns["toplanti_var"] = lambda: True; ok("toplanti_var() sürüyorsa tüm bölümler yok (toplantida alanı gelmese de)", tum(rx_tur) is False); ns["toplanti_var"] = lambda: False
+    ns["gizli_acik"] = lambda: True; ok("gizli kipte tüm bölümler yok; toplantı rolündeki kişilik ortak (eski koruma)", tum(rx_tur) is False and bk({}, marvin) == "ortak"); ns.pop("gizli_acik")
+    ok("ortak kapsamlı turda tüm bölümler yok", tum({"bellek_kapsam": "ortak"}) is False)
+    ns["kisilikler"] = kl0
+    if tv1: ns["toplanti_var"] = tv1
     # Konuş geçmişi
     os.remove(gecmis); ns["AYAR"]["konus_gecmis"] = True
     ns["konus_gecmis_yaz"]({"kaynak": "bas", "soru": "Yarın ne var?", "kisi": "Matlas"}, "Yarın iki toplantın var.\n---\nSaat 10 ve 14.")
