@@ -225,6 +225,13 @@ try:
     ok("sonuç sayfada görünür: kabul/ret/bulunamadi durumu ve cevap", AD["Kalvoro"]["durum"] == "kabul" and AD["Tarvol"]["durum"] == "ret" and AD["Morvex"]["durum"] == "bulunamadi" and AD["Morvex"]["cevap"] == "bulunamadi")
     rk = N["dk_islem"]({"islem": "sozluk", "t": ad_, "id": kal["id"], "sonuc": "yanlis"})
     ok("karar verilmiş adaya yeniden cevap yazılmaz", rk.get("ok") is False and rk.get("err") == "karar_verildi", str(rk))
+    open(os.path.join(canli, "2026-11-01-0900-Baska.md"), "w").write("# x\n")  # ses arşivi olmayan eski toplantı (yalnız .md)
+    T_ = N["dk_istek"]("/dokum-kontrol/sozluk", "/dokum-kontrol/sozluk?t=*"); TA = {x["yanlis"]: x for x in T_.get("adaylar", [])}
+    ok("bütün toplantılar (?t=*, panodaki Bekleyenler): başka toplantının adayı kendi toplantı adıyla; cevaplanmamışlar önce", T_.get("tum") is True and TA.get("Kervan", {}).get("t") == "2026-11-01-0900-Baska"
+       and "Kalvoro" in TA and [x["cevap"] is not None for x in T_["adaylar"]] == sorted(x["cevap"] is not None for x in T_["adaylar"]), str(list(TA)))
+    rb = N["dk_islem"]({"islem": "sozluk", "t": "2026-11-01-0900-Baska", "id": TA.get("Kervan", {}).get("id"), "sonuc": "bulunamadi"})
+    ok("ses arşivi olmayan eski toplantının adayı da cevaplanır", rb.get("ok") is True, str(rb))
+    ok("var olmayan toplantı adı reddedilir", N["dk_islem"]({"islem": "sozluk", "t": "2026-01-01-0000-Yok", "id": TA.get("Kervan", {}).get("id"), "sonuc": "dogru"}).get("ok") is False)
     ok("bölüm yalnız yerel: ağ çağrısı yok, cevap dosyası 0700 klasörde", oct(os.stat(os.path.dirname(cvy)).st_mode & 0o777) == "0o700")
     # eğitim havuzu
     hv = os.path.join(canli, "egitim-havuzu", "dogrulanmis", md[:-3]); fs = sorted(os.listdir(hv)) if os.path.isdir(hv) else []

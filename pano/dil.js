@@ -1648,6 +1648,8 @@ globalThis.SUFLOR_EN = {
   "Sözlüğe eklenmedi": "Not added to the glossary",
   "Bu sefere özel: genel kural olmadı.": "Just this once: no general rule was made.",
   "Bu toplantıda onay bekleyen sözlük adayı yok.": "No glossary candidates awaiting approval in this meeting.",
+  "Onay bekleyen sözlük adayı yok.": "No glossary candidates awaiting approval.",
+  "Sözlük adayları · bütün toplantılar": "Glossary candidates · all meetings",
   "Doğru biçim": "Correct form",
   "Doğru biçimde yalnız harf, rakam, boşluk ve . & + - olabilir (en çok 60 karakter).": "The correct form may contain only letters, digits, spaces and . & + - (at most 60 characters).",
   "Bu adaya zaten karar verilmiş.": "This candidate has already been decided.",

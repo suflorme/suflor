@@ -214,12 +214,12 @@ function sonucGoster(j){const o=j.olcum||{},w=o.wer||{},ad=o.ad||{}
   // düzeltmelerden çıkan sözlük adayları öğrenme döngüsü çalışınca gelir: birkaç kez bak
   szIzle([3000,8000,15000,30000],()=>{const n=szBekleyen();const e=$('snsz');if(!e||!n)return;e.textContent='';const b=document.createElement('button');b.type='button';b.textContent=L('Sözlük adaylarına bak ({n})',{n});b.onclick=()=>{$('sn').close();szAc()};e.append(L('Düzeltmelerinden sözlük adayı çıktı.')+' ',b)})}
 // --- sözlük adayları (14 Kasım): düzeltmelerden çıkan "yanlış → doğru" çiftlerini kullanıcı kendisi onaylar; seçim cevap.jsonl'e yazılır, öğrenme döngüsü karar verir ---
-const SZ={a:[],t:0}
+const SZ={a:[],t:0,tum:new URLSearchParams(location.search).get('sozluk')==='1'}  // ?sozluk=1: panodaki "Bekleyenler" — bütün toplantıların adayları
 const KAYNAK_AD={elle:'senin düzeltmen',hakem:'Gemini dökümü',claude:'Claude özeti',ses:'ses benzerliği'}
 const RET_AD={gecmis_deneme:'başka toplantılarda da çok satırı değiştirirdi',ohot_yanlis:'yanlış dedin',sozlukte_var:'sözlükte zaten var',cakisma:'sözlükte başka bir doğru biçimle çakışıyor',terim_degil:'ad ya da terim değil',bilinen_terim:'yanlış biçim zaten bilinen bir ad',gundelik_baglamsiz:'gündelik sözcük, ayırt edici bağlam yok'}
 const szIsleniyor=a=>a.cevap&&a.cevap!=='bulunamadi'&&!(a.durum==='kabul'||a.durum==='ret')  // "Bu sefere özel" sözlüğü değiştirmez: sonucu beklenmez
 function szBekleyen(){return SZ.a.filter(a=>!a.cevap).length}
-async function szYukle(){if(!ST.t)return;let j;try{j=await api('/dokum-kontrol/sozluk?t='+encodeURIComponent(ST.t))}catch(e){return}if(!j||!j.ok)return
+async function szYukle(){if(!ST.t&&!SZ.tum)return;let j;try{j=await api('/dokum-kontrol/sozluk?t='+encodeURIComponent(SZ.tum?'*':ST.t))}catch(e){return}if(!j||!j.ok)return
   SZ.a=j.adaylar||[];const n=szBekleyen(),b=$('szb');b.hidden=!SZ.a.length;b.textContent=n?L('Sözlük adayları · {n}',{n}):L('Sözlük adayları');if($('szd').open)szCiz()}
 function szIzle(sureler,sonra){clearTimeout(SZ.t);const adim=i=>{if(i>=sureler.length)return;SZ.t=setTimeout(async()=>{await szYukle();if(sonra)sonra();if(i+1<sureler.length&&(sonra||SZ.a.some(szIsleniyor)))adim(i+1)},sureler[i]-(i?sureler[i-1]:0))};adim(0)}
 function szAc(){szCiz();$('szd').showModal()}
@@ -229,13 +229,13 @@ function szDurum(a){if(szIsleniyor(a))return L('Kaydedildi, işleniyor…')
   if(a.cevap==='bulunamadi')return L('Bu sefere özel: genel kural olmadı.')
   return ''}
 function szCiz(){const ls=$('szl');ls.textContent=''
-  if(!SZ.a.length){ls.appendChild(SF({className:'bos',textContent:L('Bu toplantıda onay bekleyen sözlük adayı yok.')}));return}
+  if(!SZ.a.length){ls.appendChild(SF({className:'bos',textContent:SZ.tum?L('Onay bekleyen sözlük adayı yok.'):L('Bu toplantıda onay bekleyen sözlük adayı yok.')}));return}
   for(const a of SZ.a){const r=SF({className:'sza'+(a.cevap?' bt':'')})
     const ys=SF({className:'ys'}),yn=document.createElement('span');yn.className='yn';yn.textContent=a.yanlis
     const inp=document.createElement('input');inp.type='text';inp.maxLength=60;inp.value=a.dogru;inp.ariaLabel=L('Doğru biçim');inp.disabled=!!a.cevap
     ys.append(yn,' → ',inp);r.appendChild(ys)
     if(a.cumle){const c=SF({className:'cm'});for(const w of a.cumle.split(/(\s+)/)){if(w&&norm(w).join(' ')===norm(a.yanlis).join(' ')){const m=document.createElement('mark');m.textContent=w;c.appendChild(m)}else c.append(w)}r.appendChild(c)}
-    const ne=SF({className:'ne'});for(const k of a.kaynak){const e=document.createElement('span');e.textContent=L(KAYNAK_AD[k]||k);if(k==='elle')e.className='el';ne.appendChild(e)}r.appendChild(ne)
+    const ne=SF({className:'ne'});if(SZ.tum&&a.tarih){const e=document.createElement('span');e.textContent=a.tarih.split('-').reverse().join('.');ne.appendChild(e)}for(const k of a.kaynak){const e=document.createElement('span');e.textContent=L(KAYNAK_AD[k]||k);if(k==='elle')e.className='el';ne.appendChild(e)}r.appendChild(ne)
     const dg=SF({className:'dg'})
     if(!a.cevap)for(const [sonuc,m,pri,ip] of [['dogru','Sözlüğe ekle',1,'Bütün dökümlerde bu biçim düzeltilir.'],['bulunamadi','Bu sefere özel',0,'Yalnız bu toplantıdaki düzeltme kalır; genel kural olmaz.'],['yanlis','Yanlış',0,'Bu çift bir daha önerilmez.']]){
       const b=document.createElement('button');b.type='button';b.textContent=L(m);b.title=L(ip);if(pri)b.className='pri';b.dataset.s=sonuc;b.onclick=()=>szCevap(a,sonuc,inp,dg);dg.appendChild(b)}
@@ -243,19 +243,19 @@ function szCiz(){const ls=$('szl');ls.textContent=''
 async function szCevap(a,sonuc,inp,dg){const db=inp.value.replace(/\s+/g,' ').trim(),sn=dg.querySelector('.sn')
   if(sonuc==='dogru'&&(!db||db.length>60||!/^[\p{L}\p{N}_ .'’&+-]+$/u.test(db))){sn.textContent=L('Doğru biçimde yalnız harf, rakam, boşluk ve . & + - olabilir (en çok 60 karakter).');return}
   dg.querySelectorAll('button').forEach(b=>b.disabled=true);sn.textContent=L('kaydediliyor…')
-  let j;try{j=await api('/dokum-kontrol',{islem:'sozluk',t:ST.t,id:a.id,sonuc,...(sonuc==='dogru'&&db!==a.dogru?{dogru_bicim:db}:{})})}catch(e){j={ok:false}}
+  let j;try{j=await api('/dokum-kontrol',{islem:'sozluk',t:a.t||ST.t,id:a.id,sonuc,...(sonuc==='dogru'&&db!==a.dogru?{dogru_bicim:db}:{})})}catch(e){j={ok:false}}
   if(!j.ok){dg.querySelectorAll('button').forEach(b=>b.disabled=false);sn.textContent=j.err==='karar_verildi'?L('Bu adaya zaten karar verilmiş.'):L('Kaydedilemedi');return szYukle()}
   a.cevap=sonuc;if(sonuc==='dogru'&&db)a.dogru=db;szYukle().then(()=>{if(!$('szd').open)return;szCiz()});szIzle([1500,4000,8000,15000,30000])}
 $('szb').onclick=szAc;$('szk').onclick=()=>$('szd').close()
 $('snk').onclick=()=>$('sn').close()
 // sabit metinler (arayüz dili): başlıklar, düğmeler, kısayol satırı
 function kur(){const T=(id,m)=>{$(id).textContent=L(m)}
-  T('bsl','Döküm kontrolü');T('sZ','Zaman sırası');T('sP','Öncelik sırası');T('lo','Seçince kendiliğinden çal');T('li','Bitince sonrakine geç');T('bit','Bitir ve kaydet');T('snh','Kaydedildi');T('snk','Tamam');T('szh','Sözlük adayları');T('szk','Kapat')
+  T('bsl','Döküm kontrolü');T('sZ','Zaman sırası');T('sP','Öncelik sırası');T('lo','Seçince kendiliğinden çal');T('li','Bitince sonrakine geç');T('bit','Bitir ve kaydet');T('snh','Kaydedildi');T('snk','Tamam');T('szh',SZ.tum?'Sözlük adayları · bütün toplantılar':'Sözlük adayları');T('szk','Kapat')
   $('szu').textContent=L('Düzeltmelerinden çıkan yazım farkları. "Sözlüğe ekle" dersen kural bundan sonra bütün dökümlerde uygulanır; yalnız bu konuşmaya özel düzeltmeyi (ör. "abone ol → abi") "Bu sefere özel" ile geç.')
   $('tp').title=$('tp').ariaLabel=L('Toplantı');$('g1').ariaLabel=L('Satır kümesi');$('g2').ariaLabel=L('Sıra');$('hz').title=$('hz').ariaLabel=L('Çalma hızı');document.title=L('Döküm kontrolü')+' · Suflor.me'
   const K=[['Boşluk','çal / durdur'],['Enter','doğru, sonraki satır'],['E','düzelt (yazınca Enter kaydeder ve geçer, Esc vazgeçer)'],['1','Whisper\'ı al'],['2','Gemini\'yi al'],['3','Teams\'i al'],['↑ ↓','önceki / sonraki'],['R','yeniden çal'],['[ ]','hız'],['T','öncelikli ↔ tümü'],['S','sıra']]
   $('ks').textContent='';K.forEach(([k,m],i)=>{if(i)$('ks').append(' · ');const e=document.createElement('kbd');e.textContent=k==='Boşluk'?L('Boşluk'):k;$('ks').append(e,' '+L(m))})
   bosYaz(L('Yükleniyor…'))}
 kur()
-listeYukle()
+listeYukle().finally(()=>{if(SZ.tum)szYukle().then(()=>{if(!$('szd').open)szAc()})})
 </script>

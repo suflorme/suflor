@@ -407,6 +407,22 @@ def dk_so_adaylar(ad):  # GET /dokum-kontrol/sozluk?t= → bu toplantının onay
                     "durum": a.get("durum"), "neden": a.get("neden"), "cevap": u[1]["sonuc"] if u[1] else None})
     out.sort(key=lambda x: (not x["elle"], x["yanlis"].lower()))  # sıra cevapla değişmez (tıklanan satır yerinde kalır)
     return {"ok": True, "adaylar": out}
+def _dk_so_ad_gecerli(ad):  # toplantı adı: düz dosya adı ve canli/<ad>.md var (ses arşivi silinmiş eski toplantı da olur)
+    ad = str(ad or "")
+    return bool(ad) and ad == os.path.basename(ad) and not ad.startswith(("_", ".")) and os.path.isfile(os.path.join(BASE, ad + ".md"))
+def dk_so_adaylar_tum():  # GET /dokum-kontrol/sozluk?t=* → bütün toplantıların onay bekleyen adayları (her aday bir kez, en yeni kanıt toplantısıyla); önce cevapsız, kendi düzeltmen, yeni tarih
+    cev = so_cevaplar(); out = []
+    for a in _so_defter_oku().values():
+        for md in sorted({k.get("toplanti") for k in a.get("kanit") or [] if str(k.get("toplanti") or "").endswith(".md")}, reverse=True):
+            u = _dk_so_uygun(a, md, cev)
+            if not u or _dk_gizli_mi(md): continue
+            kn = [k for k in a["kanit"] if k.get("toplanti") == md]; k0 = next((k for k in kn if k.get("kaynak") == "elle"), kn[0])
+            out.append({"id": u[0], "t": md[:-3], "tarih": md[:10], "yanlis": a["yanlis"], "dogru": a["dogru"], "dogru_ilk": a.get("dogru_ilk"),
+                        "cumle": " ".join(str(k0.get("cumle") or "").split()[:15]), "kaynak": sorted({k["kaynak"] for k in a["kanit"] if k.get("kaynak") != "ohot"}),
+                        "elle": any(k.get("kaynak") == "elle" for k in a["kanit"]), "durum": a.get("durum"), "neden": a.get("neden"), "cevap": u[1]["sonuc"] if u[1] else None})
+            break
+    out.sort(key=lambda x: (x["cevap"] is not None, not x["elle"], tuple(-ord(c) for c in x["tarih"]), x["yanlis"].lower()))
+    return {"ok": True, "adaylar": out, "tum": True}
 def dk_so_cevap(ad, p):  # POST /dokum-kontrol {islem: sozluk, t, id, sonuc: dogru|yanlis|bulunamadi, dogru_bicim?} → cevap.jsonl satırı + so_tetik
     kid, sonuc = str(p.get("id") or ""), p.get("sonuc")
     if not DK_SO_ID_RX.fullmatch(kid): return {"ok": False, "err": "id"}
@@ -429,6 +445,7 @@ def dk_istek(yol, tam_yol):  # GET /dokum-kontrol/liste | /dokum-kontrol/plan?t=
     sorgu = parse_qs(urlsplit(tam_yol).query); acik, neden = dk_acik()
     if not acik: return {"ok": False, "err": neden}
     if yol.endswith("/liste"): return {"ok": True, "liste": dk_liste(), "hiz": DK_HIZ}
+    if yol.endswith("/sozluk") and (sorgu.get("t") or [""])[0] == "*": return dk_so_adaylar_tum()  # panodaki "Bekleyenler: n sözlük önerisi"
     kl = dk_kl((sorgu.get("t") or [""])[0])
     if not kl: return {"ok": False, "err": "toplanti"}
     if yol.endswith("/sozluk"): return {"ok": False, "err": "toplanti"} if _dk_gizli_mi(os.path.basename(kl) + ".md") else dk_so_adaylar(os.path.basename(kl))
@@ -441,9 +458,12 @@ def dk_istek(yol, tam_yol):  # GET /dokum-kontrol/liste | /dokum-kontrol/plan?t=
 def dk_islem(p):  # POST /dokum-kontrol {islem: kaydet|bitir|yenile|kapat|sozluk, t, …}
     acik, neden = dk_acik()
     if not acik: return {"ok": False, "err": neden}
-    ad = str(p.get("t") or ""); kl = dk_kl(ad)
+    ad = str(p.get("t") or "")
+    if p.get("islem") == "sozluk":  # sözlük adayına kullanıcının onayı (plan ve ses arşivi gerekmez: eski toplantının adayı da cevaplanır)
+        if not _dk_so_ad_gecerli(ad) or _dk_gizli_mi(ad + ".md"): return {"ok": False, "err": "toplanti"}
+        return dk_so_cevap(ad, p)
+    kl = dk_kl(ad)
     if not kl or _dk_gizli_mi(ad + ".md"): return {"ok": False, "err": "toplanti"}
-    if p.get("islem") == "sozluk": return dk_so_cevap(ad, p)  # sözlük adayına kullanıcının onayı (plan gerekmez)
     plan = _dk_json(os.path.join(kl, DK_PLAN))
     if p.get("islem") == "kapat":  # "atla/kapat": × düğmesi ya da sayfadaki "Bu kontrolü kapat" — plan olmasa da; ölçüm/sözlük/havuz işi yapılmaz, yalnız satır kapanır (bitti + kapatma "elle")
         d = dk_durum_oku(kl)

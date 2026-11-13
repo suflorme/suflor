@@ -2246,7 +2246,7 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
       +(ge.length?`<div class="keylem geride"><button type=button class="b sade" data-bn=gerac aria-expanded="${bnGerAcik}">${L('Geride kalanlar')} · ${ge.length}</button></div>${bnGerAcik?`<div class=liste>${ge.map(x=>x.tur==='karar'||x.id[0]==='k'?bsKarar(x):bsIs(x)).join('')}</div><div class=sakin>${L('{n} günden eski olanlar burada.',{n:14})}</div>`:''}`:'')+`</section>`
     const epB=epBlok(),ktB=ytBlok()
     // Tek "Bekleyenler" satırı: okunmamış sesli talimat (gelen kutusu) · sözlük önerisi (onay sorusu açık aday) · cevap bekleyen e-posta; sıfırlar yazılmaz, hepsi sıfırsa satır yok. Yeni veri yok: /bugun-veri, /status, /eposta-onemli
-    const bkp=[[bnV&&bnV.bekleyen_talimat||0,'{n} talimat','data-bn=panel data-ref=bek'],[(s.sozluk_ogrenme&&s.sozluk_ogrenme.sorulan)||0,'{n} sözlük önerisi','data-bn=git data-g=gecmis'],[epN,'{n} e-posta','data-bn=epgit']].filter(x=>x[0]>0)
+    const bkp=[[bnV&&bnV.bekleyen_talimat||0,'{n} talimat','data-bn=panel data-ref=bek'],[(s.sozluk_ogrenme&&s.sozluk_ogrenme.sorulan)||0,'{n} sözlük önerisi','data-bn=dksz'],[epN,'{n} e-posta','data-bn=epgit']].filter(x=>x[0]>0)
     const bkB=bkp.length?`<p class="sakin bekler">${esc(L('Bekleyenler'))}: ${bkp.map(([n,m,a])=>`<button type=button class=bag ${a}>${esc(L(m,{n}))}</button>`).join(' · ')}</p>`:''
     return bas+ozet+siraB+bekB+bkB+tzBlok(s)+ksBlok(s)+(epB||ktB?`<div class=ikiblok>${epB}${ktB}</div>`:'')+(taze?bnSonKart(son,true):'')}}  // taslak sırası; son 2 saatteki toplantı kartı en altta
 async function knYukle(zorla){if(knYuk||(!zorla&&Date.now()-knT<30000))return;knYuk=true;knT=Date.now();const den=knDen  // S236: deneme (Test) toplantı kayıtları varsayılan gelmez; anahtar açıkken ?deneme=1
@@ -2740,6 +2740,8 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
     return}
   if(a==='gpdogru'||a==='gpyanlis'){b.disabled=true;gpBek.add(id);if(last)bnCiz(last);j('/dusunme',{method:'POST',body:JSON.stringify({islem:a==='gpdogru'?'dogru':'yanlis',id})}).catch(()=>{});bnBildir(a==='gpdogru'?L('Not aldım, teşekkürler'):L('Tamam, bunu geçersiz saydım'));return}  // günün planındaki "Doğru mu?" (aktarici/dusunme.py): Doğru → onaylı, Yanlış → geçersiz
   if(a==='zkpuan'||a==='zkgec'){const i=b.dataset.i||'*';zkBek.add(i);if(last)bnCiz(last);j('/dusunme',{method:'POST',body:JSON.stringify(a==='zkpuan'?{islem:'zeka_puan',islev:i,puan:+b.dataset.p}:{islem:'zeka_gec'})}).catch(()=>{});if(a==='zkpuan')bnBildir(L('Not aldım, teşekkürler'));return}  // zekâ karnesi kullanıcı puanı
+  if(a==='dksz'){let u='/dokum-kontrol?sozluk=1';try{const r=await bnYaz('/tek-kullanim',{}),m=r&&r.url&&String(r.url).match(/[?&]t=([0-9a-f]{32})/);if(m)u+='&t='+m[1]}catch(e){}  // 14 Kasım: Bekleyenler → sözlük önerileri (döküm kontrolü sayfası, bütün toplantılar)
+    return yerelSayfaAc(u,'dokum_kontrol')}
   if(a==='dkac'){let u='/dokum-kontrol?top='+encodeURIComponent(b.dataset.t);try{const r=await bnYaz('/tek-kullanim',{}),m=r&&r.url&&String(r.url).match(/[?&]t=([0-9a-f]{32})/);if(m)u+='&t='+m[1]}catch(e){}  // sayfa tek kullanımlık anahtarla açılır (2 dk)
     return yerelSayfaAc(u,'dokum_kontrol')}
   if(a==='dkkapat'){const t=b.dataset.t;dkKapali.add(t);if(last)bnCiz(last);bnYaz('/dokum-kontrol',{islem:'kapat',t}).then(r=>{if(!r||!r.ok){dkKapali.delete(t);bnBildir(L('Yapılamadı'));if(last)bnCiz(last)}}).catch(()=>{dkKapali.delete(t);if(last)bnCiz(last)});return}
