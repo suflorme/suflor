@@ -39,6 +39,11 @@ textarea:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px var(--ac
 dialog{border:1px solid var(--bd2);border-radius:var(--kose-l);background:var(--s1);color:var(--tx);padding:18px 20px;width:min(560px,calc(100vw - 32px))}dialog::backdrop{background:var(--b-perde,rgba(0,0,0,.35))}
 dialog h2{margin:0 0 8px;font:300 18px/1.2 var(--f-baslik)}dialog table{border-collapse:collapse;width:100%;font-size:var(--yz-3)}dialog td,dialog th{padding:3px 8px;text-align:left;border-bottom:1px solid var(--bd)}dialog th{font-weight:500;color:var(--t2)}
 .oz{margin:8px 0;color:var(--t2);font-size:var(--yz-3)}
+#szd{width:min(720px,calc(100vw - 32px))}.szu{font-size:var(--yz-3);color:var(--t2);margin:0 0 6px}.szl{max-height:62vh;overflow:auto}
+.sza{border-top:1px solid var(--bd);padding:10px 0;display:flex;flex-direction:column;gap:5px}.sza .ys{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sza .yn{color:var(--t2);text-decoration:line-through;overflow-wrap:anywhere}
+.sza input{font:inherit;color:var(--tx);background:var(--s1);border:1px solid var(--bd2);border-radius:var(--kose);padding:3px 8px;width:220px;max-width:100%}.sza input:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-bg)}
+.sza .cm{font-size:var(--yz-2);color:var(--t2);overflow-wrap:anywhere}.sza .cm mark{background:var(--ac-bg);color:var(--tx);border-radius:var(--kose-s);padding:0 2px}.sza .ne span.el{border-color:var(--ac);color:var(--ac)}
+.sza .dg{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.sza .sn{font-size:var(--yz-2);color:var(--t2)}.sza.bt .sn{color:var(--tx)}
 @media (max-width:640px){.sat{grid-template-columns:1fr}}
 </style>
 <header>
@@ -51,6 +56,7 @@ dialog h2{margin:0 0 8px;font:300 18px/1.2 var(--f-baslik)}dialog table{border-c
   <label><input type=checkbox id=oto checked> <span id=lo></span></label>
   <label><input type=checkbox id=ilr> <span id=li></span></label>
   <span style="flex:1"></span>
+  <button id=szb type=button hidden></button>
   <button id=bit class=pri type=button></button>
  </div>
  <div class=cub><i id=cb></i></div>
@@ -58,6 +64,7 @@ dialog h2{margin:0 0 8px;font:300 18px/1.2 var(--f-baslik)}dialog table{border-c
  <div class=ks id=ks></div>
 </header>
 <main id=ls><div class=bos></div></main>
+<dialog id=szd><h2 id=szh></h2><p class=szu id=szu></p><div class=szl id=szl></div><div style="text-align:right;margin-top:12px"><button id=szk class=pri type=button></button></div></dialog>
 <dialog id=sn><h2 id=snh></h2><div id=snb></div><div style="text-align:right;margin-top:12px"><button id=snk class=pri type=button></button></div></dialog>
 <script>/*__DIL_SOZLUK__*/</script>
 <script>/*__ANAHTAR__*/</script>
@@ -101,7 +108,7 @@ async function planYukle(ad){
   ST.t=ad;ST.plan=j.plan;ST.S=j.plan.satirlar;ST.K={din:new Set(j.durum.dinlenen),duz:Object.assign({},j.durum.duz),konum:j.durum.konum||'',mod:j.durum.mod||'oncelikli'};ST.bitti=j.durum.bitti
   if(j.hiz&&!localStorage.getItem('dkHiz'))$('hz').value=String(j.hiz)
   try{const h=localStorage.getItem('dkHiz');if(h)$('hz').value=h}catch(e){}
-  history.replaceState(null,'',location.pathname+'?top='+encodeURIComponent(ad));$('bsl').textContent=L('Döküm kontrolü');ciz(true)
+  history.replaceState(null,'',location.pathname+'?top='+encodeURIComponent(ad));$('bsl').textContent=L('Döküm kontrolü');ciz(true);szYukle()
 }
 // --- çizim ---
 function secili(){const o=new Set(ST.plan.oncelikli);return ST.K.mod==='tumu'?ST.S.map((s,i)=>i):ST.S.map((s,i)=>i).filter(i=>o.has(ST.S[i].d))}
@@ -166,7 +173,7 @@ document.addEventListener('keydown',ev=>{
     if(k==='Enter'&&!ev.shiftKey){ev.preventDefault();const gi=+t.closest('.sat').dataset.g;uygula(gi,t.value);t.blur();edit=-1;sec(gi+1,true)}
     else if(k==='Escape'){ev.preventDefault();const gi=+t.closest('.sat').dataset.g;t.value=ST.K.duz[ura(gi).d]??ura(gi).m;t.blur();edit=-1}
     return}
-  if(t&&(t.tagName==='SELECT'||t.tagName==='INPUT'))return;if(ev.metaKey||ev.ctrlKey||ev.altKey||$('sn').open)return
+  if(t&&(t.tagName==='SELECT'||t.tagName==='INPUT'))return;if(ev.metaKey||ev.ctrlKey||ev.altKey||$('sn').open||$('szd').open)return
   if(k===' '){ev.preventDefault();if(A.paused){if(A.src&&caliyor===ST.i&&A.currentTime>0&&!A.ended)A.play();else cal(ST.i)}else A.pause()}
   else if(k==='Enter'){ev.preventDefault();if(ST.i>=0)dinlendi(ST.i);sec(ST.i+1,true)}
   else if(k==='e'||k==='E'||k==='d'||k==='D'||k==='F2'){ev.preventDefault();duzenle()}
@@ -203,11 +210,48 @@ function yz(x){return x==null?'—':'%'+(x*100).toFixed(1).replace('.',',')}
 function sonucGoster(j){const o=j.olcum||{},w=o.wer||{},ad=o.ad||{}
   $('snb').innerHTML=`<div class=oz>${L('{a} satır dinlendi, {b} düzeltme. Ölçüm, sözlük adayları ve eğitim havuzu güncellendi.',{a:j.dinlenen,b:j.duzeltme})}</div><table><tr><th>${L('Kaynak')}</th><th>${L('Sözcük hatası')}</th><th>${L('Ad isabeti')}</th></tr>`
    +['whisper','gemini','teams'].map(k=>`<tr><td>${k==='whisper'?'Whisper':k==='gemini'?'Gemini':'Teams '+L('altyazısı')}</td><td>${yz(w[k])}</td><td>${ad.n&&ad[k]!=null?ad[k]+'/'+ad.n:'—'}</td></tr>`).join('')+`</table>
-   <div class=oz>${L('5 dk bloklarla; yalnız dinlediğin satırlar sayıldı.')}${j.havuz?' '+L('{n} ses parçası eğitim havuzuna arka planda ekleniyor.',{n:j.havuz}):''}</div>`;$('sn').showModal()}
+   <div class=oz>${L('5 dk bloklarla; yalnız dinlediğin satırlar sayıldı.')}${j.havuz?' '+L('{n} ses parçası eğitim havuzuna arka planda ekleniyor.',{n:j.havuz}):''}</div><div class=oz id=snsz></div>`;$('sn').showModal()
+  // düzeltmelerden çıkan sözlük adayları öğrenme döngüsü çalışınca gelir: birkaç kez bak
+  szIzle([3000,8000,15000,30000],()=>{const n=szBekleyen();const e=$('snsz');if(!e||!n)return;e.textContent='';const b=document.createElement('button');b.type='button';b.textContent=L('Sözlük adaylarına bak ({n})',{n});b.onclick=()=>{$('sn').close();szAc()};e.append(L('Düzeltmelerinden sözlük adayı çıktı.')+' ',b)})}
+// --- sözlük adayları (14 Kasım): düzeltmelerden çıkan "yanlış → doğru" çiftlerini kullanıcı kendisi onaylar; seçim cevap.jsonl'e yazılır, öğrenme döngüsü karar verir ---
+const SZ={a:[],t:0}
+const KAYNAK_AD={elle:'senin düzeltmen',hakem:'Gemini dökümü',claude:'Claude özeti',ses:'ses benzerliği'}
+const RET_AD={gecmis_deneme:'başka toplantılarda da çok satırı değiştirirdi',ohot_yanlis:'yanlış dedin',sozlukte_var:'sözlükte zaten var',cakisma:'sözlükte başka bir doğru biçimle çakışıyor',terim_degil:'ad ya da terim değil',bilinen_terim:'yanlış biçim zaten bilinen bir ad',gundelik_baglamsiz:'gündelik sözcük, ayırt edici bağlam yok'}
+const szIsleniyor=a=>a.cevap&&a.cevap!=='bulunamadi'&&!(a.durum==='kabul'||a.durum==='ret')  // "Bu sefere özel" sözlüğü değiştirmez: sonucu beklenmez
+function szBekleyen(){return SZ.a.filter(a=>!a.cevap).length}
+async function szYukle(){if(!ST.t)return;let j;try{j=await api('/dokum-kontrol/sozluk?t='+encodeURIComponent(ST.t))}catch(e){return}if(!j||!j.ok)return
+  SZ.a=j.adaylar||[];const n=szBekleyen(),b=$('szb');b.hidden=!SZ.a.length;b.textContent=n?L('Sözlük adayları · {n}',{n}):L('Sözlük adayları');if($('szd').open)szCiz()}
+function szIzle(sureler,sonra){clearTimeout(SZ.t);const adim=i=>{if(i>=sureler.length)return;SZ.t=setTimeout(async()=>{await szYukle();if(sonra)sonra();if(i+1<sureler.length&&(sonra||SZ.a.some(szIsleniyor)))adim(i+1)},sureler[i]-(i?sureler[i-1]:0))};adim(0)}
+function szAc(){szCiz();$('szd').showModal()}
+function szDurum(a){if(szIsleniyor(a))return L('Kaydedildi, işleniyor…')
+  if(a.durum==='kabul')return L('Sözlüğe eklendi: bundan sonra bütün dökümlerde düzeltilir.')
+  if(a.durum==='ret')return L('Sözlüğe eklenmedi')+(a.neden?': '+L(RET_AD[a.neden]||a.neden):'')
+  if(a.cevap==='bulunamadi')return L('Bu sefere özel: genel kural olmadı.')
+  return ''}
+function szCiz(){const ls=$('szl');ls.textContent=''
+  if(!SZ.a.length){ls.appendChild(SF({className:'bos',textContent:L('Bu toplantıda onay bekleyen sözlük adayı yok.')}));return}
+  for(const a of SZ.a){const r=SF({className:'sza'+(a.cevap?' bt':'')})
+    const ys=SF({className:'ys'}),yn=document.createElement('span');yn.className='yn';yn.textContent=a.yanlis
+    const inp=document.createElement('input');inp.type='text';inp.maxLength=60;inp.value=a.dogru;inp.ariaLabel=L('Doğru biçim');inp.disabled=!!a.cevap
+    ys.append(yn,' → ',inp);r.appendChild(ys)
+    if(a.cumle){const c=SF({className:'cm'});for(const w of a.cumle.split(/(\s+)/)){if(w&&norm(w).join(' ')===norm(a.yanlis).join(' ')){const m=document.createElement('mark');m.textContent=w;c.appendChild(m)}else c.append(w)}r.appendChild(c)}
+    const ne=SF({className:'ne'});for(const k of a.kaynak){const e=document.createElement('span');e.textContent=L(KAYNAK_AD[k]||k);if(k==='elle')e.className='el';ne.appendChild(e)}r.appendChild(ne)
+    const dg=SF({className:'dg'})
+    if(!a.cevap)for(const [sonuc,m,pri,ip] of [['dogru','Sözlüğe ekle',1,'Bütün dökümlerde bu biçim düzeltilir.'],['bulunamadi','Bu sefere özel',0,'Yalnız bu toplantıdaki düzeltme kalır; genel kural olmaz.'],['yanlis','Yanlış',0,'Bu çift bir daha önerilmez.']]){
+      const b=document.createElement('button');b.type='button';b.textContent=L(m);b.title=L(ip);if(pri)b.className='pri';b.dataset.s=sonuc;b.onclick=()=>szCevap(a,sonuc,inp,dg);dg.appendChild(b)}
+    const sn=SF({className:'sn',textContent:szDurum(a)});dg.appendChild(sn);r.appendChild(dg);ls.appendChild(r)}}
+async function szCevap(a,sonuc,inp,dg){const db=inp.value.replace(/\s+/g,' ').trim(),sn=dg.querySelector('.sn')
+  if(sonuc==='dogru'&&(!db||db.length>60||!/^[\p{L}\p{N}_ .'’&+-]+$/u.test(db))){sn.textContent=L('Doğru biçimde yalnız harf, rakam, boşluk ve . & + - olabilir (en çok 60 karakter).');return}
+  dg.querySelectorAll('button').forEach(b=>b.disabled=true);sn.textContent=L('kaydediliyor…')
+  let j;try{j=await api('/dokum-kontrol',{islem:'sozluk',t:ST.t,id:a.id,sonuc,...(sonuc==='dogru'&&db!==a.dogru?{dogru_bicim:db}:{})})}catch(e){j={ok:false}}
+  if(!j.ok){dg.querySelectorAll('button').forEach(b=>b.disabled=false);sn.textContent=j.err==='karar_verildi'?L('Bu adaya zaten karar verilmiş.'):L('Kaydedilemedi');return szYukle()}
+  a.cevap=sonuc;if(sonuc==='dogru'&&db)a.dogru=db;szYukle().then(()=>{if(!$('szd').open)return;szCiz()});szIzle([1500,4000,8000,15000,30000])}
+$('szb').onclick=szAc;$('szk').onclick=()=>$('szd').close()
 $('snk').onclick=()=>$('sn').close()
 // sabit metinler (arayüz dili): başlıklar, düğmeler, kısayol satırı
 function kur(){const T=(id,m)=>{$(id).textContent=L(m)}
-  T('bsl','Döküm kontrolü');T('sZ','Zaman sırası');T('sP','Öncelik sırası');T('lo','Seçince kendiliğinden çal');T('li','Bitince sonrakine geç');T('bit','Bitir ve kaydet');T('snh','Kaydedildi');T('snk','Tamam')
+  T('bsl','Döküm kontrolü');T('sZ','Zaman sırası');T('sP','Öncelik sırası');T('lo','Seçince kendiliğinden çal');T('li','Bitince sonrakine geç');T('bit','Bitir ve kaydet');T('snh','Kaydedildi');T('snk','Tamam');T('szh','Sözlük adayları');T('szk','Kapat')
+  $('szu').textContent=L('Düzeltmelerinden çıkan yazım farkları. "Sözlüğe ekle" dersen kural bundan sonra bütün dökümlerde uygulanır; yalnız bu konuşmaya özel düzeltmeyi (ör. "abone ol → abi") "Bu sefere özel" ile geç.')
   $('tp').title=$('tp').ariaLabel=L('Toplantı');$('g1').ariaLabel=L('Satır kümesi');$('g2').ariaLabel=L('Sıra');$('hz').title=$('hz').ariaLabel=L('Çalma hızı');document.title=L('Döküm kontrolü')+' · Suflor.me'
   const K=[['Boşluk','çal / durdur'],['Enter','doğru, sonraki satır'],['E','düzelt (yazınca Enter kaydeder ve geçer, Esc vazgeçer)'],['1','Whisper\'ı al'],['2','Gemini\'yi al'],['3','Teams\'i al'],['↑ ↓','önceki / sonraki'],['R','yeniden çal'],['[ ]','hız'],['T','öncelikli ↔ tümü'],['S','sıra']]
   $('ks').textContent='';K.forEach(([k,m],i)=>{if(i)$('ks').append(' · ');const e=document.createElement('kbd');e.textContent=k==='Boşluk'?L('Boşluk'):k;$('ks').append(e,' '+L(m))})

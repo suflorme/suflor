@@ -383,24 +383,67 @@ def dk_ses(ad, dosya):  # → wav baytları ya da None; yalnız plandaki satır�
     y = os.path.join(kl, dosya)
     try: return open(y, "rb").read() if os.path.isfile(y) and not os.path.islink(y) else None
     except OSError: return None
-def dk_istek(yol, tam_yol):  # GET /dokum-kontrol/liste | /dokum-kontrol/plan?t=<klasör>
+# --- sözlük adayları: kullanıcının kendi onayı (14 Kasım) ---------------------------------------------------------------------------------------------------------------------------------------------
+# Onay soruları (soru.jsonl) dış cevaplayıcıyı bekliyordu; o cevaplamıyor. Sayfa bu toplantıyı kanıt olarak içeren bekleyen adayları gösterir, kullanıcının seçimi dış cevaplayıcının yazacağı
+# biçimde cevap.jsonl'e satır olarak eklenir (kaynak_turu "kullanici" → katman kaynağı "ohot:kullanici") ve öğrenme döngüsü tetiklenir; karar yolu (so_karar) aynıdır.
+# Sorusu yazılmamış aday (bekliyor, ör. kapali_kume_disi): yeni soru üretmek defteri yazmak demek (öğrenme döngüsüyle yarışır); bunun yerine cevap aday kimliğiyle yazılır,
+# so_karar soru kimliği olmayan adayda aday kimliğine bakar. Defter burada yalnız okunur.
+DK_SO_ID_RX = re.compile(r"a[0-9a-f]{8}(?:-\d{1,4})?"); DK_SO_BICIM_RX = re.compile(r"[\w .'’&+-]+")  # biçim deseni so_cevaplar ile aynı
+DK_SO_ACIK = ("soruldu", "bekliyor", "bulunamadi")
+def _dk_so_uygun(a, md, cev):  # → (kimlik, kullanıcı cevabı ya da None) — bu toplantıda kanıtı olan ve sayfada gösterilecek aday; değilse None
+    if not any(k.get("toplanti") == md for k in a.get("kanit") or []): return None
+    kid = a.get("soru_id") or a["id"]; c = cev.get(kid); kul = c if c and c.get("kaynak_turu") == "kullanici" else None
+    elle = any(k.get("kaynak") == "elle" and k.get("toplanti") == md for k in a["kanit"])
+    if kul or a.get("durum") == "soruldu" or (a.get("durum") in ("bekliyor", "bulunamadi") and elle and not a.get("cevap")): return kid, kul
+    return None
+def dk_so_adaylar(ad):  # GET /dokum-kontrol/sozluk?t= → bu toplantının onay bekleyen (ve kullanıcının cevapladığı) sözlük adayları; önce kullanıcının kendi düzeltmesinden gelenler
+    md = ad + ".md"; cev = so_cevaplar(); out = []
+    for a in _so_defter_oku().values():
+        u = _dk_so_uygun(a, md, cev)
+        if not u: continue
+        kn = [k for k in a["kanit"] if k.get("toplanti") == md]; k0 = next((k for k in kn if k.get("kaynak") == "elle"), kn[0])
+        out.append({"id": u[0], "yanlis": a["yanlis"], "dogru": a["dogru"], "dogru_ilk": a.get("dogru_ilk"), "cumle": " ".join(str(k0.get("cumle") or "").split()[:15]),
+                    "kaynak": sorted({k["kaynak"] for k in a["kanit"] if k.get("kaynak") != "ohot"}), "elle": k0.get("kaynak") == "elle",
+                    "durum": a.get("durum"), "neden": a.get("neden"), "cevap": u[1]["sonuc"] if u[1] else None})
+    out.sort(key=lambda x: (not x["elle"], x["yanlis"].lower()))  # sıra cevapla değişmez (tıklanan satır yerinde kalır)
+    return {"ok": True, "adaylar": out}
+def dk_so_cevap(ad, p):  # POST /dokum-kontrol {islem: sozluk, t, id, sonuc: dogru|yanlis|bulunamadi, dogru_bicim?} → cevap.jsonl satırı + so_tetik
+    kid, sonuc = str(p.get("id") or ""), p.get("sonuc")
+    if not DK_SO_ID_RX.fullmatch(kid): return {"ok": False, "err": "id"}
+    if sonuc not in SO_SONUC: return {"ok": False, "err": "sonuc"}
+    db = p.get("dogru_bicim") or ""
+    if not isinstance(db, str): return {"ok": False, "err": "dogru_bicim"}
+    db = " ".join(db.split())
+    if db and (len(db) > 60 or not DK_SO_BICIM_RX.fullmatch(db)): return {"ok": False, "err": "dogru_bicim"}
+    md = ad + ".md"; cev = so_cevaplar(); a = next((a for a in _so_defter_oku().values() if (_dk_so_uygun(a, md, cev) or ("",))[0] == kid), None)
+    if a is None: return {"ok": False, "err": "aday"}
+    if a.get("durum") not in DK_SO_ACIK: return {"ok": False, "err": "karar_verildi", "durum": a.get("durum")}  # kabul/ret sonrası: geri alma ayrı (toplanti-claude.py sozluk --geri-al)
+    if sonuc != "dogru" or db == a["dogru"]: db = ""
+    satir = {"id": kid, "t": datetime.datetime.now().isoformat(timespec="seconds"), "sonuc": sonuc, **({"dogru_bicim": db} if db else {}), "tur": "", "kaynak_turu": "kullanici"}
+    _so_ekle(os.path.join(so_kanal_kur(), "cevap.jsonl"), json.dumps(satir, ensure_ascii=False) + "\n")
+    if "so_tetik" in globals(): so_tetik()  # döngü cevap dosyasının değişme saatinden yeniden çalışır (canlı toplantıda bekler)
+    print(f"DÖKÜM KONTROLÜ: sözlük adayı cevaplandı ({sonuc})")
+    return {"ok": True, "id": kid, "sonuc": sonuc}
+def dk_istek(yol, tam_yol):  # GET /dokum-kontrol/liste | /dokum-kontrol/plan?t=<klasör> | /dokum-kontrol/sozluk?t=<klasör>
     from urllib.parse import urlsplit, parse_qs
     sorgu = parse_qs(urlsplit(tam_yol).query); acik, neden = dk_acik()
     if not acik: return {"ok": False, "err": neden}
     if yol.endswith("/liste"): return {"ok": True, "liste": dk_liste(), "hiz": DK_HIZ}
     kl = dk_kl((sorgu.get("t") or [""])[0])
     if not kl: return {"ok": False, "err": "toplanti"}
+    if yol.endswith("/sozluk"): return {"ok": False, "err": "toplanti"} if _dk_gizli_mi(os.path.basename(kl) + ".md") else dk_so_adaylar(os.path.basename(kl))
     ad = os.path.basename(kl); plan = _dk_json(os.path.join(kl, DK_PLAN))
     if not plan:
         if not (os.path.isfile(os.path.join(kl, "parcalar.jsonl")) and not _dk_gizli_mi(ad + ".md")): return {"ok": False, "err": "plan_yok"}
         plan = dk_plan_uret(ad + ".md")
         if not plan: return {"ok": False, "err": "plan_yok"}
     return {"ok": True, "plan": plan, "durum": dk_durum_oku(kl), "ad": ad, "hiz": DK_HIZ}
-def dk_islem(p):  # POST /dokum-kontrol {islem: kaydet|bitir|yenile|kapat, t, …}
+def dk_islem(p):  # POST /dokum-kontrol {islem: kaydet|bitir|yenile|kapat|sozluk, t, …}
     acik, neden = dk_acik()
     if not acik: return {"ok": False, "err": neden}
     ad = str(p.get("t") or ""); kl = dk_kl(ad)
     if not kl or _dk_gizli_mi(ad + ".md"): return {"ok": False, "err": "toplanti"}
+    if p.get("islem") == "sozluk": return dk_so_cevap(ad, p)  # sözlük adayına kullanıcının onayı (plan gerekmez)
     plan = _dk_json(os.path.join(kl, DK_PLAN))
     if p.get("islem") == "kapat":  # "atla/kapat": × düğmesi ya da sayfadaki "Bu kontrolü kapat" — plan olmasa da; ölçüm/sözlük/havuz işi yapılmaz, yalnız satır kapanır (bitti + kapatma "elle")
         d = dk_durum_oku(kl)

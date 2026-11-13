@@ -1518,7 +1518,7 @@ def kesisim_geri_al(p):  # POST /kesisim {islem:"geri_al", id}: kesisim-coz.py g
     if not m: return {"ok": False, "err": "yok"}
     try: return {"ok": bool(m.geri_al(BASE, i)), "id": i}
     except Exception: return {"ok": False, "err": "hata"}
-VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/is-kopya", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses", "/kesisim.json"}  # okuma uçları: anahtarsız 401
+VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/is-kopya", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/sozluk", "/dokum-kontrol/ses", "/kesisim.json"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
 # 13 Kasım 2026, güvenlik denetimi G4: Origin başlığı taklit edilebilir; kaynak başına onay kartı yüksek etkili yazmaları (sahte döküm satırı, Claude'a
@@ -2496,7 +2496,7 @@ class H(BaseHTTPRequestHandler):
         if yol == "/yaklasan-tarihler": return self._json(kt_view("yenile=1" in self.path) if "kt_view" in globals() else {"ok": False, "tarihler": []})  # S243: Kişiler/Takvim/Anımsatıcılar yaklaşan kişisel tarihler (aktarici/kisisel-tarihler.py; anahtarlı)
         if yol == "/arastirma": return self._json(arastirma_view((re.search(r"[?&]id=([0-9a-z-]{1,80})(?:&|$)", self.path) or [None, None])[1], gizli=bool(re.search(r"[?&]gizli=1(?:&|$)", self.path))) if "arastirma_view" in globals() else {"hata": "yok"})  # S243: toplantı dışı web araştırması kayıtları
         if yol == "/kesisim.json": return self._json(kesisim_sayfa_veri())  # Kesişim sayfası verisi (anahtarlı; geliştirici)
-        if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
+        if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/sozluk"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
         if yol == "/dokum-kontrol/ses":  # satırın ses parçası (WAV); sayfa fetch ile başlıklı alır
             from urllib.parse import urlsplit, parse_qs
             q = parse_qs(urlsplit(self.path).query); b = dk_ses((q.get("t") or [""])[0], (q.get("d") or [""])[0])
@@ -2576,7 +2576,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
         if self.path == "/prova": return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
         if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
-        if self.path == "/dokum-kontrol": return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile (anahtarlı; geliştirici)
+        if self.path == "/dokum-kontrol": return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile | kapat | sozluk (anahtarlı; geliştirici)
         if self.path == "/ortak": return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
         if self.path == "/yaklasan-tarihler": return self._json(kt_islem(p))  # taslak (kutlama; gönderim yok) | yoksay (anahtarlı; geçiş listesinde yok)
         if self.path == "/is-kopya": return self._json(ik_islem(p) if "ik_islem" in globals() else {"ok": False, "err": "yok"})  # birlestir | ayri | geri_al (anahtarlı; geçiş listesinde yok)

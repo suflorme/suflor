@@ -175,6 +175,57 @@ try:
     ok("sözlükte zaten olan çift (Belvora → Pelvora) yeniden sorulmaz", len([json.loads(l) for l in open(sq, encoding="utf-8")]) == n1)
     dur = N["_so_json"](os.path.join(canli, "sozluk-ogren.json"), {}); ok("öğrenme durumuna elle kayıt saati yazıldı; yeniden işlenmez", dur["islenen"][md].get("elle", 0) > 0 and md not in N["so_bekleyen"](dur))
     time.sleep(0.05); os.utime(os.path.join(kl, "duzeltme-elle.json"), None); ok("elle kayıt yenilenince toplantı yeniden işlenecekler arasında", md in N["so_bekleyen"](dur))
+    # 4b) 14 Kasım: sözlük adaylarına kullanıcının kendi onayı (sayfa → cevap.jsonl, kaynak_turu "kullanici") — öğrenme döngüsü aynı karar yolundan geçer
+    cvy = os.path.join(os.path.dirname(AYAR_YOL), "sozluk", "cevap.jsonl"); tsn = time.time(); ad_ = md[:-3]
+    d_ = N["_so_defter_oku"]()
+    def ek_aday(y, dg, kaynak, toplanti_, durum, neden=None, sid=None):
+        i = N["_so_aday_id"](y, dg); d_[i] = {"id": i, "yanlis": y, "dogru": dg, "kanit": [{"kaynak": kaynak, "toplanti": toplanti_, "tur": "gercek", "cumle": f"dün {y} ekranı açıktı", "n": 1, "t": tsn}],
+                                            "durum": durum, "neden": neden, "t_ilk": tsn, **({"soru_id": sid} if sid else {})}; return i
+    i_bek = ek_aday("Zorvem", "Zorvan", "elle", md, "bekliyor", "kapali_kume_disi")                    # sorusu yazılmamış (aday kimliğiyle cevaplanır)
+    i_hak = ek_aday("Morvex", "Morveks", "hakem", md, "soruldu", "ohot_soruldu", sid=None)             # başka kaynaktan soruldu
+    d_[i_hak]["soru_id"] = i_hak + "-1"
+    i_yan = ek_aday("Tarvol", "Tarvel", "elle", md, "bekliyor", "kapali_kume_disi")
+    i_dis = ek_aday("Kervan", "Kerwan", "elle", "2026-11-01-0900-Baska.md", "soruldu", "ohot_soruldu", sid=None); d_[i_dis]["soru_id"] = i_dis + "-1"   # başka toplantı
+    N["_so_defter_yaz"](d_)
+    L_ = N["dk_istek"]("/dokum-kontrol/sozluk", f"/dokum-kontrol/sozluk?t={ad_}"); AD = {x["yanlis"]: x for x in L_.get("adaylar", [])}
+    kal = AD.get("Kalvoro", {})
+    ok("sözlük adayları: bu toplantının soruldu + sorusuz elle adayları listelenir, başka toplantınınki listelenmez", L_["ok"] and {"Kalvoro", "Zorvem", "Morvex", "Tarvol"} <= set(AD) and "Kervan" not in AD, str(list(AD)))
+    ok("sözlük adayları: önce kullanıcının düzeltmesinden gelenler (elle), sonra öbürleri", [x["elle"] for x in L_["adaylar"]] == sorted([x["elle"] for x in L_["adaylar"]], reverse=True) and L_["adaylar"][-1]["yanlis"] == "Morvex")
+    ok("sözlük adayı alanları: kimlik (soru kimliği ya da sorusuzsa aday kimliği), kanıt cümlesi ≤ 15 sözcük, kaynaklar", kal.get("id") == N["_so_defter_oku"]()[N["_so_aday_id"]("Kalvoro", "Kalvero")]["soru_id"]
+       and AD["Zorvem"]["id"] == i_bek and "elle" in kal.get("kaynak", []) and 0 < len(kal.get("cumle", "").split()) <= 15 and kal.get("cevap") is None, str(kal))
+    n_cv = len(open(cvy, encoding="utf-8").read().splitlines()) if os.path.exists(cvy) else 0
+    ger = [{"id": "../x", "sonuc": "dogru"}, {"id": kal["id"], "sonuc": "evet"}, {"id": kal["id"], "sonuc": "dogru", "dogru_bicim": "K" * 61}, {"id": kal["id"], "sonuc": "dogru", "dogru_bicim": "Kalvero; sözlüğü sil"},
+           {"id": kal["id"], "sonuc": "dogru", "dogru_bicim": ["x"]}, {"id": "a00000000-1", "sonuc": "dogru"}, {"id": i_dis + "-1", "sonuc": "dogru"}]
+    rr = [N["dk_islem"](dict(g, islem="sozluk", t=ad_)) for g in ger]
+    ok("sözlük cevabı: geçersiz kimlik/sonuç/biçim, bilinmeyen aday ve başka toplantının adayı reddedilir; cevap dosyasına satır yazılmaz", all(x.get("ok") is False for x in rr)
+       and [x["err"] for x in rr] == ["id", "sonuc", "dogru_bicim", "dogru_bicim", "dogru_bicim", "aday", "aday"] and (len(open(cvy, encoding="utf-8").read().splitlines()) if os.path.exists(cvy) else 0) == n_cv, str(rr))
+    ok("sözlük cevabı: gizli toplantı reddedilir", N["dk_islem"]({"islem": "sozluk", "t": mg[:-3] if False else "yok-boyle", "id": kal["id"], "sonuc": "dogru"})["ok"] is False)
+    N["SO_OLAY"].clear()
+    r1 = N["dk_islem"]({"islem": "sozluk", "t": ad_, "id": kal["id"], "sonuc": "dogru", "dogru_bicim": "Kalvero"})
+    r2 = N["dk_islem"]({"islem": "sozluk", "t": ad_, "id": i_bek, "sonuc": "dogru", "dogru_bicim": "Zorvan  Ltd"})
+    r3 = N["dk_islem"]({"islem": "sozluk", "t": ad_, "id": i_yan, "sonuc": "yanlis"})
+    r4 = N["dk_islem"]({"islem": "sozluk", "t": ad_, "id": d_[i_hak]["soru_id"], "sonuc": "bulunamadi"})
+    CV = [json.loads(l) for l in open(cvy, encoding="utf-8")][n_cv:]
+    ok("sözlük cevabı: dört seçim kaydedildi, öğrenme döngüsü tetiklendi", all(x.get("ok") for x in (r1, r2, r3, r4)) and len(CV) == 4 and N["SO_OLAY"].is_set(), str((r1, r2, r3, r4)))
+    ok("cevap satırı dış cevap biçiminde: id, t, sonuc, tur, kaynak_turu kullanici; değişmeyen doğru biçim yazılmaz, düzenlenen sadeleşir", all(set(x) - {"dogru_bicim"} == {"id", "t", "sonuc", "tur", "kaynak_turu"} and x["kaynak_turu"] == "kullanici" for x in CV)
+       and "dogru_bicim" not in CV[0] and CV[1]["dogru_bicim"] == "Zorvan Ltd" and CV[1]["id"] == i_bek and CV[3]["sonuc"] == "bulunamadi", str(CV))
+    ok("so_cevaplar kullanici kaynak türünü korur", N["so_cevaplar"]()[kal["id"]]["kaynak_turu"] == "kullanici")
+    AD = {x["yanlis"]: x for x in N["dk_so_adaylar"](ad_)["adaylar"]}
+    ok("cevaplanan aday listede kalır (cevap işaretli, karar bekliyor)", AD["Kalvoro"]["cevap"] == "dogru" and AD["Kalvoro"]["durum"] == "soruldu" and AD["Tarvol"]["cevap"] == "yanlis")
+    n_sq = len(open(sq, encoding="utf-8").read().splitlines())
+    N["VT_BELLEK"]["terimler"] = [{"terim": "Kurgu Terim", "tur": "sistem", "takma": []}]  # kayıt veritabanı yardımcısı göndermiş gibi (yoksa katman 4 'oh_bekleniyor'da bekler)
+    N["so_calistir"]([]); DF = N["_so_defter_oku"](); sz_ = open(os.path.join(canli, "sozluk.json"), encoding="utf-8").read()
+    ka = DF[N["_so_aday_id"]("Kalvoro", "Kalvero")]
+    ok("so_tetik sonrası: 'Sözlüğe ekle' → kabul, katman kaynağı ohot:kullanici, sözlükte", ka["durum"] == "kabul" and ka["katman_kaynak"] == "ohot:kullanici" and "Kalvero" in sz_, str({k: ka.get(k) for k in ("durum", "neden", "katman_kaynak")}))
+    ok("sorusuz aday aday kimliğiyle cevaplandı → düzenlenen biçimle kabul", DF[i_bek]["durum"] == "kabul" and DF[i_bek]["dogru"] == "Zorvan Ltd" and DF[i_bek]["dogru_ilk"] == "Zorvan" and "Zorvan Ltd" in sz_, str(DF[i_bek].get("neden")))
+    ok("'Yanlış' → kalıcı ret (ohot_yanlis); 'Bu sefere özel' → bulunamadi, sözlüğe girmez", DF[i_yan]["durum"] == "ret" and DF[i_yan]["neden"] == "ohot_yanlis" and DF[i_hak]["durum"] == "bulunamadi" and "Morveks" not in sz_ and "Tarvel" not in sz_)
+    N["so_calistir"]([]); DF = N["_so_defter_oku"]()
+    ok("yeniden çalışınca karar değişmez, aynı toplantı için yeni soru yazılmaz", DF[i_bek]["durum"] == "kabul" and DF[i_yan]["durum"] == "ret" and DF[i_hak]["durum"] == "bulunamadi" and len(open(sq, encoding="utf-8").read().splitlines()) == n_sq)
+    AD = {x["yanlis"]: x for x in N["dk_so_adaylar"](ad_)["adaylar"]}
+    ok("sonuç sayfada görünür: kabul/ret/bulunamadi durumu ve cevap", AD["Kalvoro"]["durum"] == "kabul" and AD["Tarvol"]["durum"] == "ret" and AD["Morvex"]["durum"] == "bulunamadi" and AD["Morvex"]["cevap"] == "bulunamadi")
+    rk = N["dk_islem"]({"islem": "sozluk", "t": ad_, "id": kal["id"], "sonuc": "yanlis"})
+    ok("karar verilmiş adaya yeniden cevap yazılmaz", rk.get("ok") is False and rk.get("err") == "karar_verildi", str(rk))
+    ok("bölüm yalnız yerel: ağ çağrısı yok, cevap dosyası 0700 klasörde", oct(os.stat(os.path.dirname(cvy)).st_mode & 0o777) == "0o700")
     # eğitim havuzu
     hv = os.path.join(canli, "egitim-havuzu", "dogrulanmis", md[:-3]); fs = sorted(os.listdir(hv)) if os.path.isdir(hv) else []
     ok("eğitim havuzu: dinlenen 8 satırın wav kopyası + dogrulanmis.jsonl", sum(f.endswith(".wav") for f in fs) == 8 and "dogrulanmis.jsonl" in fs, str(fs))
@@ -235,6 +286,9 @@ try:
         kj = istek("/dokum-kontrol", {"islem": "kaydet", "t": mh[:-3], "dinlenen": [dsy], "duz": {dsy: "değişti"}}); ok("HTTP: kaydet", kj.get("ok") is True)
         st = istek("/status"); ok("HTTP: /status panoya dokum_kontrol verir (hazır liste)", "dokum_kontrol" in st and st["dokum_kontrol"]["liste"][0]["dinlenen"] == 1, str(st.get("dokum_kontrol"))[:120])
         sy = istek("/dokum-kontrol", anahtar=False, ham=True); ok("HTTP: sayfa kabuğu açılır (anahtarsız, veri uçları değil), dil sözlüğü ve anahtar gömülü", isinstance(sy, bytes) and b"Transcript check" in sy and b"SUFLOR_ANAHTAR" in sy and b"__DIL__" not in sy and b"/*__YAZI__*/" not in sy)
+        ok("HTTP: sözlük adayları anahtarsız 401, anahtarlı liste döner; geçersiz cevap reddedilir", istek(f"/dokum-kontrol/sozluk?t={mh[:-3]}", anahtar=False).get("_kod") == 401
+           and istek(f"/dokum-kontrol/sozluk?t={mh[:-3]}").get("ok") is True and istek("/dokum-kontrol", {"islem": "sozluk", "t": mh[:-3], "id": "x", "sonuc": "dogru"}).get("err") == "id"
+           and istek("/dokum-kontrol", {"islem": "sozluk", "t": mh[:-3], "id": "a12345678", "sonuc": "dogru"}, anahtar=False).get("_kod") == 401)
         bj = istek("/dokum-kontrol", {"islem": "bitir", "t": mh[:-3]}); ok("HTTP: bitir", bj.get("ok") is True and os.path.exists(os.path.join(C2, "dokum-olcum.jsonl")))
         import urllib.parse as _up  # 12 Kasım: Türkçe harfli uzun toplantı adı yüzde-kodlanınca 80 karakteri aşıyordu, /ac sessizce reddediyordu
         uzun = _up.quote("2026-11-12-1759-Haftalık-Bütçe-Gözden-Geçirme-Çalışması-Öncesi", safe="-_.!~*'()"); tk = "a" * 32

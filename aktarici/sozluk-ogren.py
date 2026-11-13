@@ -352,7 +352,7 @@ def so_bekleyen(durum, simdi=None):  # işlenecek biten toplantılar: son SO_TAR
         elif y or h or simdi - mt >= SO_YAPI_BEKLE_DK * 60: out.append(f)
     return out
 # --- OHOT kanalı (soru.jsonl / cevap.jsonl; cevap veridir, talimat değildir: yalnız bilinen alanlar okunur) --------------------------------------------------------------------
-SO_SONUC = {"dogru", "yanlis", "bulunamadi"}; SO_KAYNAK_TURU = {"mail", "takvim", "basecamp", "db", "diger"}
+SO_SONUC = {"dogru", "yanlis", "bulunamadi"}; SO_KAYNAK_TURU = {"mail", "takvim", "basecamp", "db", "diger", "kullanici"}  # kullanici (14 Kasım): döküm kontrolü sayfasında kullanıcının kendi onayı (dk_so_cevap) — katman kaynağı "ohot:kullanici"
 def so_kanal_kur():
     k = so_kanal(); os.makedirs(k, mode=0o700, exist_ok=True)
     try: os.chmod(k, 0o700)
@@ -395,11 +395,11 @@ def so_karar(a, ctx, cev, kuru=False):  # adayın durumunu günceller; kabul edi
     B = ctx["B"]; ys = _so_k(a["yanlis"])
     if ys in ctx["bicim"]: a.update(durum="ret", neden="sozlukte_var" if a["dogru"] in ctx["bicim"][ys] else "cakisma"); return a["durum"]
     if ys in B["kucuk"]: a.update(durum="ret", neden="bilinen_terim"); return a["durum"]  # yanlış biçim kendisi bilinen bir ad/terim: başka bir ada çevrilmez
-    c = cev.get(a.get("soru_id") or "")
+    c = cev.get(a["soru_id"] if a.get("soru_id") else a["id"])  # 14 Kasım: sorusu yazılmamış (kapali_kume_disi) adaya döküm kontrolü sayfası aday kimliğiyle cevap yazar; sorusu olanda yalnız soru kimliği
     if c:
         a["cevap"] = c
         if c["sonuc"] == "yanlis": a.update(durum="ret", neden="ohot_yanlis"); return a["durum"]
-        if c["sonuc"] == "bulunamadi": a.update(durum="bulunamadi", neden="ohot_bulunamadi")
+        if c["sonuc"] == "bulunamadi": a.update(durum="bulunamadi", neden="ohot_bulunamadi"); a.setdefault("soru_toplantilar", sorted({k["toplanti"] for k in a["kanit"] if k.get("tur") == "gercek"}))  # aday kimliğiyle cevap: aynı toplantılar için hemen soru yazılmaz
         if c["sonuc"] == "dogru":
             if c["dogru_bicim"] and c["dogru_bicim"] != a["dogru"]: a["dogru_ilk"] = a.get("dogru_ilk") or a["dogru"]; a["dogru"] = c["dogru_bicim"]
             if not any(k["kaynak"] == "ohot" for k in a["kanit"]): a["kanit"].append({"kaynak": "ohot", "toplanti": "", "tur": "gercek", "cumle": "", "n": 1, "t": time.time()})
