@@ -2762,7 +2762,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/kanit-masaustu":  # menü uygulamasının toplantı penceresi görüntüsü (anahtarla; Origin yalnız aktarıcının kendisi ya da yok)
             if o and not o.startswith(f"http://127.0.0.1:{A.port}"): return self._json({"ok": False, "err": "köken"}, 403)
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)  # menü uygulamasının mikrofonu (anahtarla; geçiş listesinde yok)
-        if self.path == "/toplanti":  # Faz B: elle bitir (yalnız API; panoda düğme yok — S162 dondurma). {"islem": "bitir"}
+        if self.path == "/toplanti":  # elle bitir: panodaki Bitir düğmesi (13 Kasım) ve API. {"islem": "bitir"}
             if p.get("islem") != "bitir": return self._json({"ok": False, "err": "islem"}, 400)
             return self._json({"ok": toplanti_bitir("elle bitirildi")})
         if self.path == "/agenda-aktif":  # izle konuşulan gündem maddesini tahmin eder; pano ▶ gösterir (yalnız görünüm)

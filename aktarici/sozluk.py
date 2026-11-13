@@ -144,8 +144,10 @@ def _hitap_alt():
     adlar = _hitap_adlari()
     return "(?:" + "|".join([re.escape(x) for x in sorted(adlar, key=len, reverse=True)] + ([] if adlar else [HITAP_AD])) + ")"
 def _hitap_rx(): return r"\W*" + _hitap_alt() + r"\b"
+# 13 Kasım (masaüstü Teams denemesi): "eeeh... <Ad>..." satırı, ardından ayrı satırda soru — baştaki dolgu yüzünden yalnız ad sayılmadı, seslenme kaçtı.
+# Satır başındaki dolgu sesleri (eee, ııı, aaa, hmm, şey) atlanır; satır yine yalnız ad + noktalamayla bitmeli (yanlış uyanma riski aynı).
 def hitap_yalniz_ad(metin):  # satır yalnız asistanın adı mı ("Sera," / "Sera") → adın yazıldığı biçim, değilse None
-    m = re.fullmatch(r"\W*(" + _hitap_alt() + r")[\s.,:;!?…]*", metin or "", re.I)
+    m = re.fullmatch(r"\W*(?:(?:[eıia]{2,}h*|h?m{2,}|ş[ei]y)[\s.,…]*)*(" + _hitap_alt() + r")[\s.,:;!?…]*", metin or "", re.I)
     if m: return m.group(1)
     kisa = _hitap_kisa_adlari()  # kısa takma ad tek başına satırda yalnız virgül/iki nokta/ünlem/soru ile ("Ro,")
     m = re.fullmatch(r"\W*(" + "|".join(re.escape(a) for a in sorted(kisa, key=len, reverse=True)) + r")\s*[,:?!]+\s*", metin or "", re.I) if kisa else None

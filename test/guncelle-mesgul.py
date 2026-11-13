@@ -6,8 +6,8 @@ import ast, os, shutil, sys
 sys.dont_write_bytecode = True
 sys.path = [p for p in sys.path if os.path.abspath(p or ".") != os.path.dirname(os.path.abspath(__file__))]  # test/ yola girmesin (eski test/platform.py standart modülü gölgeliyordu)
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
-def ok(ad, k):
-    print(("✓ " if k else "✗ ") + ad)
+def ok(ad, k, ek=""):
+    print(("✓ " if k else "✗ ") + ad + ("" if k else f"  [{ek}]"))
     if not k: HATA.append(ad)
 
 # 1) kurulum.py: mesgul() durum tablosu + guncelle() mesgulken durur, --zorla geçer
@@ -108,5 +108,92 @@ for dil in ("tr", "en"):
 CAGRI.clear(); k["aktarici"] = lambda y: {}; r = k["tamamla"]({"ad": "Deneme"}, "tr")
 ok("tamamla · toplantı yokken kurulum çalışır (aktarici=iyi)", len(CAGRI) == 1 and r.get("aktarici") == "iyi" and not r.get("hata"))
 shutil.rmtree(EVG, ignore_errors=True)
+
+# 4) 13 Kasım: toplantıda yeniden başlatma yok — kurulum.py aktarici_yeniden_baslat (meşgulse bekleyen işaret, değilse planlı işaret + kickstart) ve
+#    aktarıcıdaki bekleyen yeniden başlatma döngüsü (aktarici/beta-veri.py _yb_*; sahte durumla, gerçek launchctl çalışmaz)
+import json, subprocess, tempfile, time
+_u = tempfile.mkdtemp(prefix="suflor-yb-"); _pl = os.path.join(_u, "x.plist"); open(_pl, "w").write("x"); CK = []
+class _Rr: returncode = 0; stdout = ""; stderr = ""
+g.update(DENEME=False, yollar=lambda: {"uygulama": _u, "port": 1}, plist_yolu=lambda: _pl, gui=lambda: "gui/501", sessiz=lambda *c, **kw: (CK.append(c), _Rr())[1])
+BEK, PLN = os.path.join(_u, "yeniden-baslat-bekliyor.json"), os.path.join(_u, "planli-acilis.json")
+g["mesgul"] = lambda: "web toplantısı sürüyor"; CK.clear()
+r = g["aktarici_yeniden_baslat"]("ayar")
+ok("yardımcı · meşgulken kickstart çağrılmaz, ertelendi", r == "ertelendi" and not CK)
+b = json.load(open(BEK)) if os.path.exists(BEK) else {}
+ok("yardımcı · meşgulken bekleyen işaret yazılır (yalnız zaman ve neden), planlı işaret yazılmaz", set(b) == {"t", "neden"} and b["neden"] == "ayar" and abs(b["t"] - time.time()) < 5 and not os.path.exists(PLN))
+g["mesgul"] = lambda: ""; os.remove(BEK); CK.clear()
+r = g["aktarici_yeniden_baslat"]("ses")
+pj = json.load(open(PLN)) if os.path.exists(PLN) else {}
+ok("yardımcı · boştayken planlı işaret yazılır ve kickstart çağrılır", r == "yapildi" and pj.get("neden") == "ses" and CK == [("launchctl", "kickstart", "-k", "gui/501/" + g["LABEL"])] and not os.path.exists(BEK), (r, CK, pj))
+os.remove(PLN); CK.clear(); g["DENEME"] = True
+ok("yardımcı · DENEME'de hiçbir şey yapmaz", g["aktarici_yeniden_baslat"]("ayar") == "yok" and not CK and not os.path.exists(PLN) and not os.path.exists(BEK))
+g["DENEME"] = False; g["plist_yolu"] = lambda: os.path.join(_u, "yok.plist")
+ok("yardımcı · ajan (plist) kurulu değilse hiçbir şey yapmaz", g["aktarici_yeniden_baslat"]("ayar") == "yok" and not CK and not os.path.exists(BEK))
+g["plist_yolu"] = lambda: _pl
+# ayar kaydedenler yardımcıyı kullanır: toplantıda takvim/e-posta/anımsatıcı kaydı başarılı, kickstart yok, bekleyen işaret var
+g["ayar_degistir"] = lambda fn: (fn({}), True)[1]; g["mesgul"] = lambda: "web toplantısı sürüyor"
+for ad, cagri in (("takvim_ayarla", lambda: g["takvim_ayarla"](["ben" + chr(64) + "example.com"], [])), ("eposta_ayarla", lambda: g["eposta_ayarla"]("gmail", "")), ("animsatici_ayarla", lambda: g["animsatici_ayarla"](True, "L"))):
+    CK.clear()
+    if os.path.exists(BEK): os.remove(BEK)
+    r = cagri()
+    ok(f"{ad} · toplantıda kayıt başarılı, kickstart yok, bekleyen işaret var", r.get("ok") is True and not CK and os.path.exists(BEK), (r, CK))
+_src = open(os.path.join(KOD, "kurulum.py"), encoding="utf-8").read().split('if __name__ == "__main__":')[0]
+ok("kurulum.py · kickstart yalnız yardımcıda (meşgul denetimsiz çağrı kalmadı)", _src.count('"kickstart"') == 1 and '"kickstart"' in inspect.getsource(g["aktarici_yeniden_baslat"]))
+ok("kurulum.py · aktarici_durdur planlı işaret yazar (kur/aktarici-kur yolu)", "planli_isaretle" in inspect.getsource(g["aktarici_durdur"]))
+for f_ in (BEK, PLN):
+    if os.path.exists(f_): os.remove(f_)
+g["DENEME"] = False; CK.clear(); _dp = {}
+class _SP2:
+    DEVNULL = None
+    @staticmethod
+    def run(c, *a, **kw): _dp.update(kw); return type("R", (), {"returncode": 1})
+g["subprocess"] = _SP2
+try: g["guncelleme_sonrasi"]()
+except SystemExit: pass
+ok("guncelleme_sonrasi · kur alt süreci neden=guncelleme ile başlar", (_dp.get("env") or {}).get("SUFLOR_YB_NEDEN") == "guncelleme")
+_planli_ayr = []
+g["subprocess"] = subprocess
+os.environ["SUFLOR_YB_NEDEN"] = "guncelleme"; g["planli_isaretle"]("guncelleme"); pj = json.load(open(PLN)); os.remove(PLN)
+ok("planli_isaretle · neden kaydı", pj["neden"] == "guncelleme")
+
+# 4b) aktarıcı tarafı: bölümü metin olarak çıkar, sahte relay globals'ında sına
+_bv = open(os.path.join(KOD, "aktarici", "beta-veri.py"), encoding="utf-8").read()
+_bol = _bv.split("# --- yeniden-baslat başlangıç", 1)[1].split("# --- yeniden-baslat bitiş ---")[0].split("\n", 1)[1]
+_bu = tempfile.mkdtemp(prefix="suflor-yb2-"); OLAY = []; BAS = []
+G = {"json": json, "os": os, "time": time, "threading": None, "AYAR": {"uygulama": _bu}, "BASE": os.path.join(_bu, "canli"), "A": type("A", (), {"port": 8765}), "BETA_TEST": False,
+     "beta_olay": lambda a: OLAY.append(a), "beta_say": lambda a, b, c: 0,
+     "eklenti_cagri": lambda: None, "masaustu_toplantida": lambda: False, "toplanti_var": lambda: False, "sohbet_view": lambda: {"acik": False}, "KONUS": {"durum": "hazir"}, "toplanti_oturum_view": lambda: None}
+exec(compile(_bol, "beta-veri-yb", "exec"), G)
+BEKA, PLNA = G["YB_BEKLEYEN"], G["YB_PLANLI"]
+G["_yb_baslat"] = lambda: BAS.append(1); G["_yb_bizim"] = lambda: True
+ok("döngü · bekleyen işaret yokken hiçbir şey yapmaz", G["_yb_dene"]() == "yok" and not BAS)
+G["_yb_yaz"](BEKA, "ayar")
+for ad, d in (("web toplantısı", {"eklenti_cagri": lambda: {"x": 1}}), ("masaüstü toplantısı", {"masaustu_toplantida": lambda: True}), ("kayıt süren toplantı", {"toplanti_var": lambda: True}),
+              ("sohbet", {"sohbet_view": lambda: {"acik": True}}), ("Konuş cevabı", {"KONUS": {"durum": "dusunuyor"}}),
+              ("toplantı oturumu çalışıyor", {"toplanti_oturum_view": lambda: {"durum": "calisiyor"}}), ("oturum izin bekliyor", {"toplanti_oturum_view": lambda: {"durum": "bekliyor", "izin": 1}}),
+              ("oturum toplantı sonu", {"toplanti_oturum_view": lambda: {"durum": "bekliyor", "sonu": True}}), ("durum okunamıyor (hata)", {"sohbet_view": lambda: 1 / 0})):
+    eski = {k_: G[k_] for k_ in d}; G.update(d); BAS.clear()
+    r = G["_yb_dene"](); r2 = G["_yb_dene"]()
+    ok(f"döngü · {ad} sürerken yeniden başlatmaz, bekleyen işaret kalır", r == r2 == "mesgul" and not BAS and os.path.exists(BEKA), (r, r2)); G.update(eski)
+ok("döngü · boş: ilk yoklamada beklenir (art arda iki boş yoklama gerekir)", G["_yb_dene"]() == "bekle" and not BAS and os.path.exists(BEKA))
+G["eklenti_cagri"] = lambda: {"x": 1}; G["_yb_dene"](); G["eklenti_cagri"] = lambda: None
+ok("döngü · araya giren meşgul yoklama sayacı sıfırlar", G["_yb_dene"]() == "bekle" and not BAS)
+r = G["_yb_dene"]()
+pj = json.load(open(PLNA)) if os.path.exists(PLNA) else {}
+ok("döngü · iki boş yoklamadan sonra yeniden başlatır: planlı işaret (bekleyen) yazılır, bekleyen işaret silinir", r == "yeniden" and BAS == [1] and pj.get("neden") == "bekleyen" and not os.path.exists(BEKA), (r, pj))
+G["_yb_yaz"](BEKA, "ayar"); G["_YB"]["bos"] = 5; G["_yb_bizim"] = lambda: False; BAS.clear()
+ok("döngü · ajan bu aktarıcının değilse (deneme) yeniden başlatmaz, işareti siler", G["_yb_dene"]() == "bizim_degil" and not BAS and not os.path.exists(BEKA))
+G["_yb_bizim"] = lambda: True
+# açılış: planlı işaret taze → acilis_planli; yok/eski → acilis; bekleyen işaret açılışta silinir
+for ad, hazir, bek in (("taze işaret", lambda: G["_yb_yaz"](PLNA, "ayar"), "acilis_planli"), ("işaret yok", lambda: None, "acilis"),
+                       ("eski işaret (11 dk)", lambda: json.dump({"t": time.time() - 660, "neden": "ayar"}, open(PLNA, "w")), "acilis"),
+                       ("bozuk işaret", lambda: open(PLNA, "w").write("{"), "acilis"), ("gelecekteki zaman", lambda: json.dump({"t": time.time() + 3600}, open(PLNA, "w")), "acilis")):
+    for f_ in (PLNA, BEKA): 
+        if os.path.exists(f_): os.remove(f_)
+    hazir(); G["_yb_yaz"](BEKA, "ayar"); OLAY.clear(); G["_beta_acilis_say"]()
+    ok(f"açılış · {ad} → {bek}, işaretler silinir", OLAY == [bek] and not os.path.exists(PLNA) and not os.path.exists(BEKA), OLAY)
+_yb_kod = _bv.split("# --- yeniden-baslat bitiş ---")[1].split("\n")
+ok("beta-veri · açılışta sayım ve döngü iş parçacığı yerinde", any(l.startswith("_beta_acilis_say()") for l in _yb_kod) and any("_yb_dongu" in l and "Thread" in l for l in _yb_kod))
+shutil.rmtree(_u, ignore_errors=True); shutil.rmtree(_bu, ignore_errors=True)
 
 print("guncelle-mesgul: " + ("✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} hata")); sys.exit(1 if HATA else 0)

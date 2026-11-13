@@ -46,6 +46,25 @@ kontrol("yankı: hiç satır yok → oran None, normal", yk(0, 0)["yanki_oran_yu
 ty = teshis.temizle({"kalite": {"ses": dict(yk(792, 278), ek="Zeynep Bozkurt")}, "x": 1})["kalite"]["ses"]
 kontrol("yankı: süzgeç sayıyı ve ses_yolu'nu tutar, bilinmeyen değer '?' olur, ek metin maskelenir",
         ty["yanki"] == 792 and ty["yanki_oran_yuzde"] == 74 and ty["ses_yolu"] == "hoparlor_yankisi" and teshis.temizle({"ses_yolu": "Zeynep"})["ses_yolu"] == "?" and not sizinti(ty), ty)
+# 13 Kasım: planlı açılış ayrımı — işaret varken açılış acilis_planli, yokken/eskiyken acilis; cokme yalnız beklenmedikleri sayar
+_a = {"json": json, "os": os, "time": time, "BETA": {"olay": []}, "BETA_K": threading.Lock(), "AYAR": {"uygulama": tempfile.mkdtemp(prefix="suflor-acilis-")}, "BASE": "x", "A": type("A", (), {"port": 1}), "BETA_TEST": False, "BETA_OLAY_EN_COK": 6000}
+exec(re.search(r"def beta_olay.*?\n(?=def _beta_yaz)", _kaynak, re.S).group(0), _a); exec(re.search(r"def beta_say.*?\n(?=# günlük satırı)", _kaynak, re.S).group(0), _a)
+exec(compile(_kaynak.split("# --- yeniden-baslat başlangıç", 1)[1].split("# --- yeniden-baslat bitiş ---")[0].split("\n", 1)[1], "yb", "exec"), _a)
+def _ac(isaret):
+    _a["BETA"]["olay"].clear()
+    for f_ in (_a["YB_PLANLI"],):
+        if os.path.exists(f_): os.remove(f_)
+    if isaret is not None: json.dump({"t": time.time() - isaret, "neden": "ayar"}, open(_a["YB_PLANLI"], "w"))
+    _a["_beta_acilis_say"](); return [x[1] for x in _a["BETA"]["olay"]], os.path.exists(_a["YB_PLANLI"])
+kontrol("açılış: işaret varken (30 sn önce) acilis_planli, işaret silinir", _ac(30) == (["acilis_planli"], False))
+kontrol("açılış: işaret yokken acilis (beklenmedik)", _ac(None) == (["acilis"], False))
+kontrol("açılış: eski işaret (10 dk'dan eski) acilis; işaret yine silinir", _ac(700) == (["acilis"], False) and _ac(599) == (["acilis_planli"], False))
+t0 = time.time(); _a["BETA"]["olay"][:] = [[t0 + 5, "acilis"], [t0 + 40, "acilis_planli"], [t0 + 100, "acilis"], [t0 + 100, "acilis_planli"], [t0 + 500, "acilis"]]
+kontrol("cokme yalnız beklenmedik açılışları sayar (planlı sayılmaz); yeniden_planli planlıları", _a["_beta_acilis_donem"](t0 + 30, t0 + 200) == (1, 2), _a["_beta_acilis_donem"](t0 + 30, t0 + 200))
+kontrol("beta_kalite: cokme ve yeniden_planli alanı, haftalıkta acilis_planli", all(x in _kaynak for x in ('"cokme": _beta_acilis_donem(bas + 30, son + 60)[0]', '"yeniden_planli": _beta_acilis_donem(bas + 30, son + 60)[1]', '"acilis_planli": beta_say("acilis_planli", bas, son)')))
+_ts2 = teshis.temizle({"kalite": {"cokme": 0, "yeniden_planli": 2, "acilis": 1, "acilis_planli": 3, "neden": "Zeynep"}})["kalite"]
+kontrol("süzgeç: yeniden_planli / acilis_planli sayıları kalır (neden kategorisi pakete girmez)", _ts2["yeniden_planli"] == 2 and _ts2["acilis_planli"] == 3 and _ts2["cokme"] == 0 and "Zeynep" not in json.dumps(_ts2), _ts2)
+shutil.rmtree(_a["AYAR"]["uygulama"], ignore_errors=True)
 kontrol("süzgeç: 10 haneli sayı değer olarak kalır (sayı içerik değil), metin içinde maskeli", t["kalite"]["sayi"] == 5321234567 and "5321234567" not in t["kalite"]["not"])
 # klasör türü (S141): sahte ev klasöründe sağlayıcı yolları; hesap/e-posta kısmı pakete girmez
 _ev = tempfile.mkdtemp(prefix="suflor-ev-")
@@ -113,6 +132,7 @@ try:
                   {"sonuc": "basarili", "hata": None, "sn": 3.1, "acilis_sn": 2.4},
                   {"sonuc": "yedek", "hata": "coreml", "sn": 6.0, "mesaj": "/Users/Zeynep/Kumbara/ggml-large-v3-turbo-encoder.mlmodelc yüklenemedi"}):
             f.write(json.dumps(dict(r, at=simdi), ensure_ascii=False) + "\n")
+    json.dump({"t": round(time.time()), "neden": "kurulum"}, open(os.path.join(uyg, "planli-acilis.json"), "w"))  # 13 Kasım: planlı açılış işareti → acilis_planli
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=os.path.join(T, "ayar.json"), SUFLOR_TEST_BETA="1")
     rl = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=kod, env=env, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT)
     procs.append(rl)
@@ -132,12 +152,18 @@ try:
     gel = lambda tur: [g for g in GELEN if g.get("tur") == tur]
     open(os.path.join(canli, "beta-haftalik-simdi"), "w").close()  # haftalık paket şimdi (deneme kipi: bu haftanın sayıları)
     kontrol("haftalık paket yerel alıcıya geldi", bekle(lambda: gel("haftalik"), 15), [g.get("tur") for g in GELEN])
+    _bo = lambda: json.load(open(os.path.join(canli, "beta-olay.json"))).get("olay", []) if os.path.exists(os.path.join(canli, "beta-olay.json")) else []
+    kontrol("planlı açılış: işaret açılışta silindi, olay kaydında acilis_planli var, beklenmedik acilis yok",
+            not os.path.exists(os.path.join(uyg, "planli-acilis.json")) and bekle(lambda: any(x[1] == "acilis_planli" for x in _bo()), 10) and not any(x[1] == "acilis" for x in _bo()), _bo()[:5])
+    if gel("haftalik"):
+        kontrol("haftalık: kalite.acilis_planli 1, acilis 0 (planlı açılış çökme sayılmaz)", (gel("haftalik")[-1].get("kalite") or {}).get("acilis_planli") == 1 and (gel("haftalik")[-1].get("kalite") or {}).get("acilis") == 0, (gel("haftalik")[-1].get("kalite") or {}))
     kontrol("toplantı sonu paketi geldi (toplantı 4 sn sessiz kalınca)", bekle(lambda: gel("toplanti_sonu"), 25), open(os.path.join(T, "relay.log")).read()[-600:])
     kontrol("gelen paketlerin hiçbirinde ad, konu, dosya, şifre ya da metin yok", not sizinti(GELEN), sizinti(GELEN))
     if gel("toplanti_sonu"):
         k = gel("toplanti_sonu")[-1].get("kalite") or {}
         kontrol("toplantı sonu: kalite — satır gecikmesi, Konuş ilk ses ve 10 sn üstü oran, hitap",
                 "satir_gecikme_sn" in k and (k.get("konus") or {}).get("cevap") == 2 and (k["konus"].get("on_sn_ustu_yuzde") == 50) and k.get("hitap") == 1, json.dumps(k)[:400])
+        kontrol("toplantı sonu: kalite.cokme 0 ve yeniden_planli alanı sayı", k.get("cokme") == 0 and isinstance(k.get("yeniden_planli"), int), json.dumps(k)[:300])
         kontrol("toplantı sonu: ses — yankı/ben satırı sayısı ve ses_yolu (kısa toplantıda normal)", (k.get("ses") or {}).get("ses_yolu") == "normal" and isinstance(k["ses"].get("yanki"), int) and isinstance(k["ses"].get("ben_satir"), int), json.dumps(k.get("ses")))
         kontrol("toplantı sonu: Claude gözlemi ve son günlük satırları yok", not gel("toplanti_sonu")[-1].get("son_olaylar"))
         kontrol("toplantı sonu: platform toplantının kendisinden (meet)", (gel("toplanti_sonu")[-1].get("toplanti") or {}).get("platform") == "meet")

@@ -72,7 +72,68 @@ def _beta_sar(ad, olay, acildi):
     sar._beta = True; globals()[ad] = sar
 _beta_sar("sessiz_degistir", "sessiz", lambda r: r is True)
 _beta_sar("sesli_ceviri_degistir", "sesli_ceviri", lambda r: bool(r and r[0]))
-beta_olay("acilis")  # aktarıcı açıldı (toplantı sırasında açılış = çökme ya da kurulum)
+# 13 Kasım: planlı açılış ayrımı + bekleyen yeniden başlatma. Kurulum sihirbazı/güncelleme/aktarici-kur aktarıcıyı yeniden başlatmadan önce
+# <uygulama>/planli-acilis.json yazar ({t, neden}: ayar | ses | kurulum | guncelleme | bekleyen); açılışta 10 dk içindeyse "acilis_planli", yoksa
+# beklenmedik "acilis" sayılır — kalite.cokme yalnız beklenmedikleri sayar. Toplantı sürerken ayar kaydı yeniden başlatmayı yapmaz, yerine
+# <uygulama>/yeniden-baslat-bekliyor.json bırakır (kurulum.py aktarici_yeniden_baslat); toplantı/sohbet bitince buradaki döngü uygular. Paket dosyada yalnız zaman ve kategori.
+# --- yeniden-baslat başlangıç (test/beta-veri.py ve test/guncelle-mesgul.py bu bölümü metin olarak çıkarıp sınar) ---
+YB_BEKLEYEN = os.path.join(AYAR["uygulama"], "yeniden-baslat-bekliyor.json")
+YB_PLANLI = os.path.join(AYAR["uygulama"], "planli-acilis.json")
+YB_LABEL = "local.suflor.aktarici"  # kurulum.py LABEL
+YB_PLANLI_SN = 600
+_YB = {"bos": 0}
+def _yb_json(fp):
+    try: j = json.load(open(fp, encoding="utf-8"))
+    except (OSError, ValueError): return {}
+    return j if isinstance(j, dict) else {}
+def _yb_yaz(fp, neden):
+    try:
+        gec = fp + ".tmp"; json.dump({"t": round(time.time()), "neden": neden}, open(gec, "w", encoding="utf-8")); os.replace(gec, fp); return True
+    except OSError: return False
+def _yb_sil(fp):
+    try: os.remove(fp)
+    except OSError: pass
+def _beta_acilis_say():
+    t = _yb_json(YB_PLANLI).get("t")
+    planli = isinstance(t, (int, float)) and not isinstance(t, bool) and -5 <= time.time() - t <= YB_PLANLI_SN  # kurulum zamanı saniyeye yuvarlar: biraz ileride görünebilir
+    _yb_sil(YB_PLANLI); _yb_sil(YB_BEKLEYEN)  # bu açılış bekleyen yeniden başlatmayı zaten karşıladı
+    beta_olay("acilis_planli" if planli else "acilis")
+def _beta_acilis_donem(bas, son):  # (beklenmedik, planlı) açılış sayısı
+    return beta_say("acilis", bas, son), beta_say("acilis_planli", bas, son)
+def _yb_mesgul():  # kurulum.py mesgul() ile aynı ölçüt (orada /status'tan, burada doğrudan durumdan); hata → meşgul say
+    try:
+        if eklenti_cagri() or masaustu_toplantida() or toplanti_var(): return True
+        if (sohbet_view() or {}).get("acik"): return True
+        if KONUS.get("durum") in ("yaziya", "dusunuyor", "konusuyor"): return True
+        o = toplanti_oturum_view() or {}; od = o.get("durum")
+        if od in ("calisiyor", "aciliyor") or o.get("izin") or o.get("izinler"): return True
+        if od in ("bekliyor", "izliyor") and o.get("acik_soru"): return True
+        if od == "bekliyor" and o.get("sonu"): return True
+    except Exception: return True
+    return False
+def _yb_bizim():  # yalnız bu aktarıcıyı yöneten launchd ajanı (deneme aktarıcısı gerçek ajanı yeniden başlatmasın): plist bu veri klasörünü ve portu içerir
+    try: m = open(os.path.expanduser(f"~/Library/LaunchAgents/{YB_LABEL}.plist"), encoding="utf-8").read()
+    except OSError: return False
+    return os.path.abspath(BASE) in m and f"<string>{A.port}</string>" in m and not BETA_TEST
+def _yb_baslat():
+    import subprocess
+    subprocess.Popen(["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{YB_LABEL}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+def _yb_dene(bos_gerek=2):  # dakikada bir: bekleyen işaret varsa ve art arda bos_gerek yoklamada meşgul değilse yeniden başlat
+    if not os.path.exists(YB_BEKLEYEN): _YB["bos"] = 0; return "yok"
+    if _yb_mesgul(): _YB["bos"] = 0; return "mesgul"
+    _YB["bos"] += 1
+    if _YB["bos"] < bos_gerek: return "bekle"
+    if not _yb_bizim(): _yb_sil(YB_BEKLEYEN); return "bizim_degil"
+    _yb_yaz(YB_PLANLI, "bekleyen"); _yb_sil(YB_BEKLEYEN); _yb_baslat(); return "yeniden"
+def _yb_dongu():
+    time.sleep(60)
+    while True:
+        try: _yb_dene()
+        except Exception as e: print(f"BETA: yeniden başlatma denetimi hata {e.__class__.__name__}")
+        time.sleep(60)
+# --- yeniden-baslat bitiş ---
+_beta_acilis_say()  # aktarıcı açıldı (toplantı sırasında beklenmedik açılış = çökme)
+threading.Thread(target=_yb_dongu, daemon=True).start()
 
 def _beta_platform():
     a = TOPLANTI.get("aktif") or {}  # Faz B: toplantının kendi platformu (kayıt); masaüstü uygulaması ayrıca sayılır
@@ -144,7 +205,7 @@ def beta_kalite(f, bas, son, metin, gec):
     o = _beta_olaylar(bas, son + 60)
     return {"satir_gecikme_sn": _ort([round(x, 2) for x in sg if -5 < x < 600]), "konus": _beta_konus(kon),
             "hitap": sum(1 for r in kon if r.get("kaynak") == "hitap"), "karsi_hitap": sum(1 for r in kon if r.get("kaynak") == "karsi"),
-            "olay": o, "cokme": beta_say("acilis", bas + 30, son + 60),
+            "olay": o, "cokme": _beta_acilis_donem(bas + 30, son + 60)[0], "yeniden_planli": _beta_acilis_donem(bas + 30, son + 60)[1],
             "ses": _beta_yanki(beta_say("yanki", bas, son + 60), sum(1 for x in metin if x.get("kanal") == "ben")),
             "kart_cevap_on_sn_ustu_yuzde": round(100 * sum(1 for x in gec if x > 10) / len(gec)) if gec else None,
             "sistem": _beta_sistem(bas, son + 60), "platform": (BETA["toplanti"].get(toplanti_kimlik(f)) or {}).get("platform")}
@@ -205,7 +266,7 @@ def beta_haftalik_paket(ad):
             "toplantilar": {"sayi": len(tps), "sure_dk_toplam": sum(sure), "sure_dk": _ort(sure), "platformlar": dict(pl), "ceviri": sum(1 for v in tps if v.get("ceviri"))},
             "ozellik": {"ne_diyeyim": sum(1 for r in soru if r.get("tur") == "ozet"), "kanit": o["kanit"], "sessiz": o["sessiz"], "sesli_ceviri": o["sesli_ceviri"],
                         "canli_ceviri_toplanti": sum(1 for v in tps if v.get("ceviri")), "gizli": o["gizli"], "moderator": o["moderator"], "dur": o["dur"]},
-            "kalite": {"konus": _beta_konus(kon), "hitap_yinelenen": o["hitap_yinelenen"], "zaman_asimi": o["zaman_asimi"], "acilis": beta_say("acilis", bas, son),
+            "kalite": {"konus": _beta_konus(kon), "hitap_yinelenen": o["hitap_yinelenen"], "zaman_asimi": o["zaman_asimi"], "acilis": beta_say("acilis", bas, son), "acilis_planli": beta_say("acilis_planli", bas, son),
                        "hata": o["hata"], "sorun": o["sorun"], "sistem": _beta_sistem(bas, son), "bilgi": _beta_bilgi(bas, son)},
             "maliyet": _beta_maliyet(bas, son, sum(sure)), "profil": _beta_profil(), "whisper_cpp": _beta_cpp(bas, son),
             "proje": teshis.proje_olcu(AYAR.get("proje"), AYAR["uygulama"]), "proje_vt": _beta_proje_vt(), "zeka": _beta_zeka(bas, son)}  # klasör türü + son taramanın sayıları (klasör değişebilir)

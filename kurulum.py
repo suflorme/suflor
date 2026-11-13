@@ -257,6 +257,24 @@ def mesgul():  # v0.77.4 (18 Ekim): aktarici-kur.command öncesi — kurulum akt
     elif od in ("bekliyor", "izliyor") and o.get("acik_soru"): n.append("Toplantı oturumu cevabını bekliyor")
     elif od == "bekliyor" and o.get("sonu"): n.append("Toplantı oturumu toplantı sonu işlerini yapıyor")
     return ", ".join(n)
+# 13 Kasım: toplantı sürerken aktarıcı yeniden başlatılmaz (bir beta kullanıcısında toplantının 2. dakikasında sihirbaz ayar kaydedince başlıyordu).
+# Meşgulse ayar yine kaydedilir (ayar zaten yazıldı); yeniden başlatma yerine <uygulama>/yeniden-baslat-bekliyor.json bırakılır ve aktarıcı
+# (aktarici/beta-veri.py _yb_dongu) toplantı/sohbet bitince kendini yeniden başlatır. Her planlı yeniden başlatmadan önce planli-acilis.json yazılır:
+# aktarıcı açılışta bunu "planlı" sayar (beta kalite.cokme yalnız beklenmedik açılışları sayar). İşaretlerde yalnız zaman ve neden kategorisi.
+YB_BEKLEYEN = "yeniden-baslat-bekliyor.json"; YB_PLANLI = "planli-acilis.json"
+def _yb_yaz(ad, neden):
+    try:
+        d = yollar()["uygulama"]; os.makedirs(d, exist_ok=True); fp = os.path.join(d, ad); gec = fp + ".tmp"
+        with open(gec, "w", encoding="utf-8") as f: json.dump({"t": round(time.time()), "neden": neden}, f)
+        os.replace(gec, fp); return True
+    except OSError: return False
+def planli_isaretle(neden):  # neden: ayar | ses | kurulum | guncelleme | bekleyen
+    if DENEME: return False
+    return _yb_yaz(YB_PLANLI, neden)
+def aktarici_yeniden_baslat(neden):  # "yok" (deneme/ajan kurulu değil) | "ertelendi" (meşgul) | "yapildi"
+    if DENEME or not os.path.exists(plist_yolu()): return "yok"
+    if mesgul(): _yb_yaz(YB_BEKLEYEN, neden); return "ertelendi"
+    planli_isaretle(neden); sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}"); return "yapildi"
 def eklenti():
     # önceden yalnız Teams sekmesindeki eklentinin nabzı sayılıyordu — Teams açık değilse sihirbaz bu adımda bekleyip kalıyordu.
     # Eklentinin arka planı aktarıcıyı dakikada bir (ve yüklenince hemen) yoklar; aktarıcı bunu "eklenti_kurulu" olarak tutar.
@@ -302,7 +320,7 @@ def takvim_ayarla(adresler, cikar):  # takvim ekranı kurulumdan sonra: ayara ya
         if not a: return False
         a["takvim_adreslerim"] = list(dict.fromkeys(ad)); a["takvim_haric"] = [str(x) for x in cikar or []]
     if not ayar_degistir(fn): return {"ok": False}
-    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
+    aktarici_yeniden_baslat("ayar")
     return {"ok": True}
 
 # E-posta (v0.33.5): panodaki "Dışarı aktar"da taslak hangi posta hizmetinde açılsın (ayar eposta: gmail | outlook | mailto; boş = aktarıcı takvimden
@@ -319,7 +337,7 @@ def eposta_ayarla(tur, adres):
             if v: a[k] = v
             else: a.pop(k, None)
     if not ayar_degistir(fn): return {"ok": False}
-    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")
+    aktarici_yeniden_baslat("ayar")
     return {"ok": True, "eposta": t, "eposta_adres": ad}
 
 # ---------- Anımsatıcılar (S258, 9 Kasım): "İşlerin Mac Anımsatıcılar'ına da düşsün mü?" ----------
@@ -348,7 +366,7 @@ def animsatici_ayarla(acik, liste):
         if not a: return False
         a["animsatici"] = bool(acik); a["animsatici_liste"] = ad
     if not ayar_degistir(fn): return {"ok": False}
-    if not DENEME: sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")  # aktarıcı ayarı yeniden okusun
+    aktarici_yeniden_baslat("ayar")  # aktarıcı ayarı yeniden okusun (toplantı sürüyorsa toplantı bitince)
     return {"ok": True, "animsatici": bool(acik), "liste": ad}
 
 # ---------- asistan (S133, 22 Ekim): kullanıcı yalnız asistanla muhatap; adını kullanıcı koyar ----------
@@ -574,7 +592,7 @@ def pocket_kur(ort=None):
             if a.get("pocket_iste") and a.get("ses_motoru") in (None, "", "mac"): a["ses_motoru"] = "pocket"
             a.pop("pocket_iste", None)
         ayar_degistir(yaz)
-        if not DENEME and os.path.exists(plist_yolu()): sessiz("launchctl", "kickstart", "-k", f"{gui()}/{LABEL}")  # aktarıcı yeni sesi yüklesin
+        aktarici_yeniden_baslat("ses")  # aktarıcı yeni sesi yüklesin (toplantı sürüyorsa toplantı bitince)
         say("✓ doğal Türkçe ses hazır"); return True
     except Exception as e:
         say(f"Not: doğal Türkçe ses kurulamadı ({str(e)[:160]}) — asistan Mac sesiyle konuşur; sihirbazda ya da sonraki güncellemede yeniden denenir"); return False
@@ -1148,6 +1166,7 @@ def kopyala(kaynak, hedef):  # cp gibi: var olan dosyanın izinleri korunur, yen
 def gui(): return f"gui/{os.getuid()}"
 def plist_yolu(): return os.path.join(EV, "Library", "LaunchAgents", LABEL + ".plist")
 def aktarici_durdur(port):  # yalnız bu hesabın canlı aktarıcısı (diğer hesabınki ve başka porttaki deneme aktarıcıları çalışmaya devam eder)
+    planli_isaretle(os.environ.get("SUFLOR_YB_NEDEN") or "kurulum")  # kur()/aktarici-kur yolu: açılış planlı sayılır (meşgul denetimi çağıranda)
     sessiz("launchctl", "bootout", f"{gui()}/{LABEL}"); sessiz("pkill", "-u", str(os.getuid()), "-f", rf"relay\.py --dir .* --port {port}( |$)"); time.sleep(1)
 
 def vt_izle_surecleri(ps_satirlari, canli):  # 3 Kasım: ps çıktısından ("pid args" satırları) YALNIZ bu canli klasörünün veritabanı yardımcısı: "…/SuflorBrifing --vt-izle <canli>" ve onun Python alt süreci "… toplanti-claude.py --dir <canli> vt-izle". Brifing'in başka kipleri (toplantı, açık süreç, Konuş) ve başka canli klasörü eşleşmez → [pid]
@@ -2276,7 +2295,7 @@ def dogrula(json_cikti=False, sessiz_=False, hizli=False, yaz=True):  # → sonu
         else: print(dogrula_metin(M, f"Kurulum denetimi (v{r['surum']}): {sy['ok']} ✓, {sy['hata']} ✗, {sy['?']} ?"), flush=True)
     return r
 def guncelleme_sonrasi():  # guncelle() yeni kodu getirdikten sonra YENİ kodla ayrı süreç olarak çağrılır (kurulum.py guncelleme-sonrasi)
-    if subprocess.run([PY, os.path.join(KOD, "kurulum.py"), "kur"]).returncode:
+    if subprocess.run([PY, os.path.join(KOD, "kurulum.py"), "kur"], env=dict(os.environ, SUFLOR_YB_NEDEN="guncelleme")).returncode:
         say("\nUYARI: aktarıcı kurulamadı — kod güncellendi ama çalışan aktarıcı eski sürümde kalmış olabilir.")
         sys.exit(f"Bu pencerenin yukarısındaki hatayı geliştiriciye ilet ya da {KOD}/aktarici-kur.command dosyasına çift tıkla.")
     modeller_dene()

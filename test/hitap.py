@@ -131,6 +131,11 @@ ok = r9 is None and not ask("bütçe ne durumda?") and ak() is None; hata += not
 print(("✓ " if ok else "✗ ") + f"yalnız addan {ns['HITAP_AD_DEVAM_SN']:.0f} sn'den geç gelen satır eklenmez")
 ok = ns["hitap_yalniz_ad"]("Atlaz.") == "Atlaz" and ns["hitap_yalniz_ad"]("Atlas gelsin") is None and ns["hitap_yalniz_ad"]("Atlası") is None; hata += not ok
 print(("✓ " if ok else "✗ ") + "yalnız ad tanıma (Whisper yazımı, ekli ad ve devamlı satır değil)")
+ya = ns["hitap_yalniz_ad"]; ok = ya("eeeh... Atlas...") == "Atlas" and ya("ııı Atlas,") == "Atlas" and ya("şey... Atlas") == "Atlas" and ya("eeeh... Atlas gelsin") is None and ya("evet Atlas") is None; hata += not ok
+print(("✓ " if ok else "✗ ") + "yalnız ad: baştaki dolgu (eeeh…, ııı, şey) atlanır; dolgu + ad + devam ya da sözcük + ad değil (13 Kasım)")
+T = 5000.0; ha("eeeeh...", T, T + 1); r1 = ha("eeeh... Atlas...", T + 4, T + 5.5); r2 = ha("Ayşe'yi tanıyor musun?", T + 6, T + 8)
+b = ns["hitap_duzelt"](r2 or "")[0]; ok = r1 is None and r2 == "Atlas, Ayşe'yi tanıyor musun?" and b.startswith("Claude:"); hata += not ok
+print(("✓ " if ok else "✗ ") + f"13 Kasım dizisi: dolgu + ad satırı, soru ayrı satırda → tek seslenme: {r2!r} → {b[:40]!r}")
 # asistanın sorusuna hitapsız cevap: noktalama bitirmez, süre bitirir (gerçek dizi: üç kısa cümle)
 ns["hitap_cevap_baslat"]("Atlas", "bugün öğlen on ikide.", 500, 501.5)
 r10 = [ha(m, a, b) for m, a, b in [("takvimimde oluştur.", 503.5, 505), ("maile de taslak olarak yaz.", 507.5, 509)]]
