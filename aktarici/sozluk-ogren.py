@@ -56,11 +56,16 @@ def _so_json(yol, vars_):
     except (OSError, ValueError): return vars_
 def _so_yaz(yol, metin, izin=None, saat_koru=False):  # geçici dosya + os.replace; saat_koru: dökümün değişme saati korunur (süren toplantı, arşiv ve geçmiş penceresi saate bakar)
     st = os.stat(yol) if saat_koru and os.path.exists(yol) else None
-    tmp = f"{yol}.{os.getpid()}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f: f.write(metin)
-    if izin: os.chmod(tmp, izin)
-    elif st: os.chmod(tmp, st.st_mode & 0o777)
-    os.replace(tmp, yol)
+    tmp = f"{yol}.{os.getpid()}.{threading.get_ident()}.tmp"  # 13 Kasım (#45): iş parçacığı da adda — aynı dosyaya iki eşzamanlı kayıt (döküm kontrolü kaydet + bitir) aynı geçici dosyayı paylaşınca ikinci os.replace FileNotFoundError veriyordu
+    try:
+        with open(tmp, "w", encoding="utf-8") as f: f.write(metin)
+        if izin: os.chmod(tmp, izin)
+        elif st: os.chmod(tmp, st.st_mode & 0o777)
+        os.replace(tmp, yol)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
     if st: os.utime(yol, (st.st_atime, st.st_mtime))
 def _so_ekle(yol, metin):  # satır ekleme: aktarıcıda write() (LOCK ile; disk dolunca bekletir), toplanti-claude.py ad alanında doğrudan
     if "write" in globals() and "STATE" in globals():
