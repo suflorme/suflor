@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # Ses izi hafızası canlıda (aktarici/whisper-hat.py kume_iz_ekle, v0.27.0): altyazı oyu olmayan karşı küme ≥ 8 sn konuşunca hafızadaki
 # kişiye benziyorsa onun adını alır; < 8 sn'de ad yok; hafızada olmayan kişi adsız; aynı ad iki kümeye verilmez; altyazı oyu hafızadan önce
-# gelir; ses_izi_hafiza: false kapatır; kume_sifirla temizler. Aktarıcının kendi tanımları AST ile alınır.
+# gelir; ses_izi_hafiza: false kapatır; kume_sifirla temizler; kümesiz ≥ 3 sn parça tek başına hafızaya bakar (hafiza_tek, v0.242.2). Aktarıcının kendi tanımları AST ile alınır.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/hafiza-canli.py      (kaldı → çıkış 1)
 import ast, base64, json, math, os, random, shutil, struct, sys, tempfile
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 T = tempfile.mkdtemp(prefix="suflor-hc-")
-ns = {"base64": base64, "struct": struct, "math": math, "os": os, "json": json, "AYAR": {}, "BASE": T, "print": lambda *a: None}
-ADLAR = {"kume_adi", "_iz_coz", "_hafiza_kisi", "kume_iz_ekle", "kume_sifirla"}
+ns = {"base64": base64, "struct": struct, "math": math, "os": os, "json": json, "AYAR": {}, "BASE": T, "print": lambda *a: None, "ben_adi": lambda: "Deniz Ak"}
+ADLAR = {"kume_adi", "_iz_coz", "_hafiza_kisi", "kume_iz_ekle", "kume_sifirla", "hafiza_tek"}
 agac = ast.parse(open(os.path.join(KOD, "aktarici/whisper-hat.py"), encoding="utf-8").read())
 sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ADLAR) or (isinstance(n, ast.Assign) and any(
-    getattr(x, "id", None) in {"KUME_AD", "KUME_BEKLEYEN", "CAP_OY", "KUME_IZ", "KUME_HAFIZA", "_HAF"} or (isinstance(x, ast.Tuple) and any(getattr(e, "id", "").startswith("HAFIZA") for e in x.elts)) or getattr(x, "id", None) in {"KUME_IZ"} for x in n.targets))]
+    getattr(x, "id", None) in {"KUME_AD", "KUME_BEKLEYEN", "CAP_OY", "KUME_IZ", "KUME_HAFIZA", "_HAF", "HAFIZA_TEK_SN"} or (isinstance(x, ast.Tuple) and any(getattr(e, "id", "").startswith("HAFIZA") for e in x.elts)) or getattr(x, "id", None) in {"KUME_IZ"} for x in n.targets))]
 exec(compile(ast.Module(sec, []), "whisper-hat.py", "exec"), ns)
 random.seed(3)
 def birim(v): n = math.sqrt(sum(x * x for x in v)); return [x / n for x in v]
@@ -35,6 +35,11 @@ for _ in range(4): kn("k4", iz("A"), 3.0)
 bak("altyazı oyu hafızadan önce", ka("k4") == "Bora Kaya")
 for _ in range(4): kn("k5", iz("B"), 3.0)
 bak("altyazının verdiği ad (Bora) hafızadan ikinci kez verilmez", ka("k5") is None)
+ht = ns["hafiza_tek"]  # kümesiz parça (v0.242.2): ≥ 3 sn'lik tek parçanın izi hafızadaki kişiye benziyorsa ad
+bak("kümesiz ≥ 3 sn parça → hafızadaki kişi", ht(iz("B"), 4.0) == "Bora Kaya")
+bak("kümesiz < 3 sn parça → ad yok", ht(iz("B"), 2.0) is None)
+bak("kümesiz, hafızada olmayan ses → ad yok", ht(iz("C"), 4.0) is None)
+bak("kümesiz, iz yok → ad yok", ht(None, 4.0) is None)
 ns["kume_sifirla"]()
 bak("kume_sifirla temizler", ka("k1") is None and not ns["KUME_IZ"])
 ns["AYAR"]["ses_izi_hafiza"] = False

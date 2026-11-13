@@ -1041,6 +1041,19 @@ def kume_iz_ekle(kume, iz, sn):
         if KUME_HAFIZA.get(kume, (None,))[0] != ad: print(f"SES İZİ: {kume} → {ad} (hafızadan, benzerlik {b:.2f})")
         KUME_HAFIZA[kume] = (ad, round(b, 2))
     else: KUME_HAFIZA.pop(kume, None)
+HAFIZA_TEK_SN = 3.0
+def hafiza_tek(iz, sn):
+    # kümesiz karşı parça (küme sınırı dolu / kısa ilk söz): ≥ 3 sn'lik parçanın kendi izi hafızadaki kişiye aynı eşikle benziyorsa onun adı.
+    # Altyazının "son konuşan" tahmininden önce gelir (13 Kasım: kümesiz 45 satır altyazıdan yanlış kişiye yazıldı; izleri doğru kişiye 0,73–0,87).
+    if not iz or sn < HAFIZA_TEK_SN: return None
+    kisi = _hafiza_kisi()
+    if not kisi: return None
+    try: v = _iz_coz(iz)
+    except Exception: return None
+    s = sorted(((sum(a * b for a, b in zip(v, x)), ad) for ad, x in kisi.items() if len(x) == len(v)), reverse=True)
+    if not s: return None
+    b, ad = s[0]; iki = s[1][0] if len(s) > 1 else 0.0
+    return ad if b >= HAFIZA_ESIK and b - iki >= HAFIZA_FARK and ad != ben_adi() else None
 # --- Aynı mikrofonda ikinci kişi (v0.27.0; ayar oda: true ya da agenda.json "oda": true, varsayılan kapalı) -----------------------------
 # Kullanıcı kanalındaki parçanın izi kullanıcının profiline (canli/ses-izi-ben.json, 0600, yalnız bu Mac) benzemiyorsa satır "Odadaki kişi".
 # Profil yoksa ilk ≥ 30 sn'lik (≥ 1,5 sn'lik parçalar) konuşmadan kurulur: ortalamaya ≥ 0,5 benzeyen parçalar ≥ 24 sn tutarsa (biri baştan
@@ -1374,7 +1387,7 @@ def _whisper_yaz(is_, metin, ses=None, model=None):
     kume = (model or {}).get("kume") if kanal == "karsi" else None
     if kume: kume_parca(is_["t0"], is_["t1"], kume); kume_iz_ekle(kume, (model or {}).get("iz"), max(0.0, is_["t1"] - is_["t0"]))
     kim = (oda_kim((model or {}).get("iz"), max(0.0, is_["t1"] - is_["t0"]), metin, oda_acik()) if is_.get("oda") else ben_adi()) if kanal == "ben" else \
-        (kume_adi(kume) if kume else None) or konusmaci_karsi(is_["t0"], is_["t1"], kume)
+        (kume_adi(kume) if kume else hafiza_tek((model or {}).get("iz"), max(0.0, is_["t1"] - is_["t0"]))) or konusmaci_karsi(is_["t0"], is_["t1"], kume)
     # ses kilidi (11 Ekim): kullanıcı kanalındaki "Claude:" komutu sesi kullanıcının profiline benzemiyorsa (yanındaki biri) işaretlenir;
     # izle satırı "⚠ses" ile verir, toplantı oturumu komut saymaz. "Odadaki kişi" satırı zaten kullanıcının değildir.
     komut_ses = None

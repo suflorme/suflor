@@ -290,6 +290,9 @@ def buyuk_harf_duzelt(x, dil, istem="", kisaltma=()):
     return y
 _BUYUK_LOG = False
 KUME_ESIK = 0.45; KUME_GUNCELLE = 0.5; KUME_KISA_ESIK = 0.55; KUME_EN_COK = 6; KUME_MIN_SN = 1.5  # ses-isci.py'den aynen
+# Yeni küme yalnız ≥ 2,5 sn parçayla açılır; 6 küme doluysa en eski tek parçalı küme emekliye ayrılır (13 Kasım toplantısı: ilk 7 dk'da
+# 1,6–1,8 sn'lik dört tek parçalı gürültü kümesi sınırı doldurdu, 21.18'de konuşmaya başlayan üçüncü kişi kümesiz kaldı, adı altyazıdan yanlış geldi).
+KUME_YENI_SN = 2.5
 class Ecapa:
     def __init__(s, yol, np, mx):
         s.np, s.mx = np, mx
@@ -340,7 +343,12 @@ def kumele(iz, ks, a, np, e=None):
         if uzun and sim[j] >= KUME_GUNCELLE:
             c = ks[j][0] * ks[j][1] + e; ks[j][0] = c / (np.linalg.norm(c) + 1e-9); ks[j][1] += 1
         return {"kume": f"k{j + 1}", "benzerlik": round(sim[j], 2)}
-    if uzun and len(ks) < KUME_EN_COK:
+    if len(a) >= SR * KUME_YENI_SN:
+        canli = [i for i, k in enumerate(ks) if k[1] > 0]
+        if len(canli) >= KUME_EN_COK:
+            tek = [i for i in canli if ks[i][1] == 1]
+            if not tek: return {"kume": None}
+            ks[tek[0]] = [ks[tek[0]][0] * 0, 0]  # en eski tek parçalı küme emekli; adı (kN) yeniden kullanılmaz, yeni küme sona eklenir
         ks.append([e, 1]); return {"kume": f"k{len(ks)}", "benzerlik": round(max(sim), 2) if sim else None}
     return {"kume": None}
 # Ses izi kapısı, gölge kip (2 Kasım): "ben" kanalı parçası 1,5 sn pencere / 0,5 sn adımla taranır, her pencerenin kullanıcı profiline kosinüs benzerliği döner.
