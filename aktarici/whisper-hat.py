@@ -135,6 +135,7 @@ def _rms(b):
 # yanlış kararı 60 sn "kanalın son dili" diye ileri taşıyordu). Kısa parça (≤ DK_KISA_SN) kanalın baskın diliyle çözülür, dil_son'a yazılmaz; uzun parçada
 # dil serbest kalır (iki dilli toplantı). Baskın dil = son DK_PENCERE uzun parçadaki dillerin çoğunluğu (≥ DK_EN_AZ karar, DK_OMUR_SN içinde), yoksa ayarlı toplantı dili.
 DK_KISA_SN = 2.5; DK_KELIME = 4; DK_PENCERE = 8; DK_EN_AZ = 3; DK_OMUR_SN = 120
+KOMSU_ARA_SN = 30.0; KOMSU_ONC_SN = 6.0  # komşu ses: önceki parça en çok 30 sn önce bitmiş olmalı; son 6 sn sesi gider
 def dk_kisa(sn, kelime=None): return sn <= DK_KISA_SN or (kelime is not None and kelime <= DK_KELIME)
 def dk_not(gecmis, dil, sn, kelime, t):  # yalnız uzun parçadaki karar güvenli sayılır
     if dil in ("tr", "en") and not dk_kisa(sn, kelime): gecmis.append((t, dil)); del gecmis[:-DK_PENCERE]
@@ -725,6 +726,10 @@ def _isci_dongu():
             if dk_kisa(sn_) and bd:
                 istek["dil"] = bd; istek["dil_kilit"] = True; is_["dil_kilit"] = True
                 for x_ in ("diller", "dil_yedek", "dil_algila"): istek.pop(x_, None)
+                # komşu ses (v0.240.0, S307): karşı kanalın kilitli kısa parçasına aynı kanalın önceki parçasının son 6 sn sesi + metni eklenir (işçi birlikte çözer)
+                ko = getattr(k, "komsu", None)
+                if is_["kanal"] == "karsi" and ko and AYAR.get("komsu_ses", True) is not False and ko[3] == is_["baslik"] and -1 <= is_["t0"] - ko[0] <= KOMSU_ARA_SN:
+                    istek["komsu_pcm"] = base64.b64encode(ko[1]).decode(); istek["komsu_metin"] = ko[2][-300:]
         # kullanıcı kanalında ses izi: oda açıksa ad için, değilse yalnız ses kilidi için ("Claude:" komutu kullanıcının sesi mi; ayar ses_kilidi)
         if is_["kanal"] == "ben" and not is_.get("bas") and (oda_acik() or AYAR.get("ses_kilidi", True) is not False): istek["oda"] = is_["oda"] = True
         if is_.get("bas") and is_.get("oto_dil"): istek["oto_dil"] = True  # v0.101.4: Konuş sorusunun ilk parçası — dil Whisper'dan (yalnız tr/en)
@@ -780,6 +785,8 @@ def _isci_dongu():
             if j.get("kume_hata"): STATE["ses_model"]["hata"] = j["kume_hata"]
             if j.get("kume"): STATE["ses_model"]["parca"] += 1
             is_["t_ses"] = time.time(); sonuc = whisper_yaz(is_, metin, j.get("ses"), {k: j[k] for k in ("kume", "iz", "bol", "sayi_suphe") if j.get(k)} or None) or "satir"
+        if j.get("komsu"): is_["komsu"] = True
+        if is_["kanal"] == "karsi" and k is not None: k.komsu = (is_["t1"], bytes(is_["pcm"][-int(KOMSU_ONC_SN * 32000):]), metin, is_["baslik"])  # sonraki kısa parçanın komşusu
         is_kaydet(is_, sonuc, time.time(), q_n, isci_sn=j.get("sn"), acildi=acildi)
         kapi_kaydet(is_, sonuc, metin, j)
         if KANALLAR.get(is_["kanal"]) is not None: KANALLAR[is_["kanal"]].sonuclar.append((time.time(), sonuc))  # otonom: kanal sözsüz ses mi (kanal_sozsuz)
@@ -962,7 +969,7 @@ def ses_arsivi_yaz(is_, istek, j, sonuc, metin):
         with wave.open(os.path.join(kl, ad), "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(is_["pcm"])
         pen = j.get("kapi")
         r = {"dosya": ad, "kanal": is_["kanal"], "bas": bool(is_.get("bas")), "t0": round(t0, 2), "t1": round(t1, 2), "sn": sn, "sonuc": sonuc, "metin": metin, "dil_istek": istek.get("dil"),
-             **({"dil_kilit": True} if istek.get("dil_kilit") else {}), **({"kilit_supheli": True} if is_.get("kilit_supheli") else {}), "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), "bitti": round(time.time(), 2), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
+             **({"dil_kilit": True} if istek.get("dil_kilit") else {}), **({"kilit_supheli": True} if is_.get("kilit_supheli") else {}), **({"komsu": True} if is_.get("komsu") else {}), "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), "bitti": round(time.time(), 2), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
         write([(os.path.join(kl, "parcalar.jsonl"), json.dumps(r, ensure_ascii=False) + "\n")])
         if time.time() - _SA["son"] > 3600: _SA["son"] = time.time(); ses_arsivi_temizle()
     except Exception as e: print(f"SES ARŞİVİ: parça yazılamadı ({e.__class__.__name__})")

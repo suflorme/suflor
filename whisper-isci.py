@@ -368,6 +368,45 @@ def istem_kur(tok, terimler, onceki):
         _ISTEM_ON[k] = (", ".join(ls[:n]) + "." if n else "", len(ls) - n)
     metin, dusen = _ISTEM_ON[k]
     return (" ".join(x for x in (metin, tok.decode(on).strip() if on else "") if x) or None), dusen
+# Komşu ses (v0.240.0, S307): karşı kanalın dil kilitli kısa parçası (≤ 2,5 sn) aynı kanalın bir önceki parçasının son 6 sn'lik sesiyle
+# birlikte çözülür (araya 0,3 sn sessizlik), önceki parçanın bilinen metni çıktının başıyla hizalanıp çıkarılır, kalan sözcükler alınır.
+# 13 Kasım ölçümü (5 ve 12 Kasım, elle dinlenen 103 kısa satır): düzeltilen 63 satırda kelime hatası %80 → %51, parça başına +0,16 sn.
+# Sözcük zamanıyla kesmek sınırdaki sözcüğü taşırıyordu; metinle hizalamak daha iyi. Sonuç boş/şüpheliyse parça bugünkü gibi tek başına çözülür.
+KOMSU_ONC_SN = 6.0; KOMSU_BOSLUK = 0.3
+def _komsu_n(t): return " ".join(re.sub(r"[^\wçğıöşü ]", " ", (t or "").lower().replace("i̇", "i")).split())
+def komsu_sozcukler(r):  # whisper.cpp verbose_json → [[sözcük, başlangıç, bitiş, olasılık, bölüm]] (noktalama tek başına sayılmaz)
+    W = []
+    for s in r.get("segments") or []:
+        x = (s.get("text") or "").strip()
+        if not x or UYDURMA.search(x): continue
+        for w in s.get("words") or []:
+            t = w.get("word") or ""
+            if t.startswith("[") or t.startswith("<|"): continue
+            st, en, pr = float(w.get("start") or 0), float(w.get("end") or 0), float(w.get("probability", 1) or 0)
+            if t.startswith(" ") or not W: W.append([t.strip(), st, en, pr, s])
+            else: W[-1][0] += t; W[-1][2] = en; W[-1][3] = min(W[-1][3], pr)
+    return [w for w in W if w[0].strip(".,!?… ")]
+def komsu_bas(W, onc_metin, sinir):  # parçanın ilk sözcüğünün sırası: önceki metinle hizalanan son sözcükten sonrası (eşleşme yoksa zaman sınırı)
+    bas = next((i for i, w in enumerate(W) if (w[1] + w[2]) / 2 >= sinir), len(W))
+    if onc_metin:
+        import difflib
+        ow = [_komsu_n(x) for x in onc_metin.split()]; cw = [_komsu_n(w[0]) for w in W]; son_i = -1
+        for b in difflib.SequenceMatcher(None, cw, ow, autojunk=False).get_matching_blocks():
+            if b.size and b.a + b.size - 1 < bas + 2 and b.b + b.size >= len(ow) - 2: son_i = b.a + b.size - 1
+        if son_i >= 0: bas = son_i + 1
+    return bas
+def komsu_coz(motor, a, p, np):  # → mlx biçiminde sonuç ya da None (tek başına çözüme dönülür)
+    oa = np.frombuffer(base64.b64decode(p["komsu_pcm"]), np.int16).astype(np.float32)[-int(KOMSU_ONC_SN * SR):] / 32768
+    if not len(oa): return None
+    sinir = len(oa) / SR + KOMSU_BOSLUK
+    W = komsu_sozcukler(motor.istek(np.concatenate([oa, np.zeros(int(KOMSU_BOSLUK * SR), np.float32), a]), p["dil"], ""))
+    k = W[komsu_bas(W, p.get("komsu_metin") or "", sinir):]
+    metin = " ".join(w[0] for w in k).strip()
+    if not metin or UYDURMA.search(metin) or tekrar_dongu(metin) or not kurtar_hiz_uygun(metin, len(a) / SR): return None
+    sg = {id(w[4]): w[4] for w in k}.values()
+    return {"text": metin, "language": p["dil"], "komsu": True,
+            "segments": [{"text": metin, "start": 0.0, "end": len(a) / SR, "no_speech_prob": max(s.get("no_speech_prob", 0) for s in sg),
+                          "avg_logprob": min(s.get("avg_logprob", 0) for s in sg), "kp": min(w[3] for w in k), "compression_ratio": sikisma_orani(metin)}]}
 def out(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
 def main():
     global CPP
@@ -428,7 +467,11 @@ def main():
             # başkası çıkarsa sabit dilde yeniden): parça ~0,6 → ~1,1 sn. Kullanıcının kanalı ve Konuş sabit dilde kalır (hız orada önemli).
             # v0.101.4: Konuş da (oto_dil) — yalnız sorunun ilk parçasında; aktarıcı sonraki parçaları bulunan dille gönderir (+0,5 sn parça başına yalnız bir kez)
             oto = bool(CPP) and (p.get("kanal") == "karsi" or p.get("oto_dil") is True) and p.get("dil") in ("tr", "en") and not p.get("dil_kilit")  # dil kilidi: kısa parçada dil algılama yok
-            r = coz(a, language=None if oto else (p.get("dil") or None), initial_prompt=istem,
+            r = None
+            if CPP and p.get("komsu_pcm") and p.get("dil_kilit") and p.get("dil") in ("tr", "en"):  # komşu ses (v0.240.0): yalnız karşı kanalın kilitli kısa parçası
+                try: r = komsu_coz(CPP, a, p, np)
+                except Exception as e: r = None; sys.stderr.write(f"komşu ses çözülemedi: {e.__class__.__name__}\n")
+            if r is None: r = coz(a, language=None if oto else (p.get("dil") or None), initial_prompt=istem,
                                        condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
             if oto and r.get("language") not in ("tr", "en"):
                 r = coz(a, language=p["dil"], initial_prompt=istem, condition_on_previous_text=False, no_speech_threshold=0.6, compression_ratio_threshold=2.4, **cozme)
@@ -518,7 +561,7 @@ def main():
                     t_k = time.time(); pf = np.frombuffer(base64.b64decode(p["kapi_profil"]), np.float16).astype(np.float32); pf = pf / (np.linalg.norm(pf) + 1e-9)
                     kapi = {"kapi": kapi_benzerlik(iz, a, pf, np), "kapi_ms": round((time.time() - t_k) * 1000), "atilan_harf": sum(len(re.findall(r"\w", x)) for x in atilan)}
                 except Exception as e: kapi = {"kapi_hata": f"{e.__class__.__name__}: {str(e)[:80]}"}
-            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"sayi_suphe": True} if sayi_suphe(metin) else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **({"lp": round(min([s.get("avg_logprob", 0) for s, _ in tut] or [0]), 3), "kp": round(min([s.get("kp", 1) for s, _ in tut] or [1]), 3)} if p.get("dil_kilit") and tut else {}), **km, **kapi})
+            out({"id": p.get("id"), "text": metin, "sn": round(time.time() - t, 2), "dil": r.get("language"), "atlanan": atla, **({"komsu": True} if r.get("komsu") else {}), **({"atilan": [x[:80] for x in atilan[:3]]} if atilan else {}), **({"dil_gecis": gec_dil[1]} if gec_dil and metin else {}), **({"istem_dusen": dusen} if dusen else {}), **({"sayi_suphe": True} if sayi_suphe(metin) else {}), **({"istem_tok": len(tok.encode(" " + istem))} if tok and istem else {}), **({"ses": ses} if ses else {}), **({"lp": round(min([s.get("avg_logprob", 0) for s, _ in tut] or [0]), 3), "kp": round(min([s.get("kp", 1) for s, _ in tut] or [1]), 3)} if p.get("dil_kilit") and tut else {}), **km, **kapi})
         except Exception as e:
             out({"id": p.get("id"), "hata": f"{e.__class__.__name__}: {str(e)[:200]}"})
     return 0
