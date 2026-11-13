@@ -103,7 +103,7 @@ final class Panel: NSPanel {
 final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, UNUserNotificationCenterDelegate {
     var oge: NSStatusItem!; var panel: Panel!; var web: WKWebView!; var pano: PanoPencere?
     var durum: Durum = .bekliyor; var imza = ""; var gorulenKart = Set<String>(); var acikKart = Set<String>()
-    var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?
+    var kayitci: Kayitci?; var sicakTus: EventHotKeyRef?; let masaustu = Masaustu(); var masaustuMic: MasaustuMic?; var masaustuKanit: MasaustuKanit?; var masaustuAltyazi: MasaustuAltyazi?
     var digerTuslar: [EventHotKeyRef?] = []; var sonBildirim = ""; var sonPanoAc = ""; var ortakMik: OrtakMik?; var akisZaman: Timer?; var sonDurum: [String: Any]?
     var kartKatmani: KartKatmani?  // v0.159.0: kart katmanı (mini panonun yerine); 30 Ekim v2: önemli kart + bilgi akışı + yan şerit
     func applicationDidFinishLaunching(_ n: Notification) {
@@ -130,6 +130,7 @@ final class Uygulama: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             masaustu.dongu()
             if !args.contains("--masaustu-mic-kapali") { let m = MasaustuMic(masaustu) { [weak self] in self?.kayitci != nil }; masaustuMic = m; m.dongu() }
             let k = MasaustuKanit(masaustu); masaustuKanit = k; k.dongu()
+            if !args.contains("--masaustu-altyazi-kapali") { let a = MasaustuAltyazi(masaustu); masaustuAltyazi = a; a.dongu() }  // masaüstü Teams canlı altyazısı (13 Kasım)
         }
         // panel Esc ile kapanır (12 Ekim: açık kalan panel kapatılamıyordu)
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
@@ -1140,6 +1141,7 @@ final class Masaustu {
     // aktarıcı "Ayrıl"sız toplantıyı tutuyorsa (toplantı sesi sürüyor, v0.32.7) mikrofon ve kanıt da sürer (v0.32.9)
     var tutuluyor = false, tutSessiz: Bool? = nil
     var toplantida: Bool { kilit.lock(); defer { kilit.unlock() }; return (son["toplantida"] as? Bool) ?? false || tutuluyor }
+    var masaustuToplantida: Bool { kilit.lock(); defer { kilit.unlock() }; return (son["toplantida"] as? Bool) ?? false }  // yalnız masaüstü uygulamasındaki toplantı (tutma değil)
     var paylasimVar: Bool { kilit.lock(); defer { kilit.unlock() }; return (son["paylasim"] as? Bool) ?? false }
     var pencere: (pid_t, String) { kilit.lock(); defer { kilit.unlock() }; return (toplantiPid, toplantiBaslik) }
     func dongu() {
@@ -1178,6 +1180,120 @@ final class Masaustu {
             }
             self.kilit.lock(); self.son = v; self.kilit.unlock(); self.dongu()
         }
+    }
+}
+
+// --- Masaüstü Teams canlı altyazısı (13 Kasım, oturum "altyazi") ---------------------------------------------------------------------------------
+// Masaüstü Teams toplantısı sürerken Teams'in canlı altyazı paneli Erişilebilirlik ağacından okunur ve ham görüntü POST /masaustu-altyazi ile aktarıcıya
+// gider (yalnız 127.0.0.1, anahtarla). Satır kimliği, sabitleme ve yineleme ayıklama aktarıcıda (aktarici/masaustu-altyazi.py, Python testi var); burada
+// yalnız bulma ve okuma. 13 Kasım gerçek izleri: altyazı paneli düğmeleri DOM kimliğiyle (captions-panel-dismiss-button, closed-captions-pop-out-button,
+// closed-captions-overflow-menu-button, captions-settings-menu-trigger-button…); her girdi Group .fui-ChatMessageCompact__body, içinde StaticText'ler
+// (konuşmacı adı, söz; dış katılımcıda arada etiket Group'u). Aynı sınıf toplantı sohbetinde ve döküm panelinde de var (.fui-Chat altında) → onlara inilmez.
+// Bulma: tam ağaçta panel düğmesi (en çok 4 sn'de bir, ≤ 12000 öğe), oradan en çok 6 üst öğe çıkılıp girdileri içeren ilk kapsayıcı saklanır; sonra 1 sn'de bir
+// yalnız o alt ağaç okunur (≤ 2500 öğe). Öğe geçersizleşirse (panel kapandı) yeniden bulunur. Görüntü değişmediyse ve aktarıcıda bekleyen satır yoksa gönderilmez.
+// Altyazı ~45 sn bulunamazsa günlüğe bir kez ve aktarıcıya "yok" (kullanıcıya ipucu bildirimi aktarıcıdan, toplantı başına bir kez).
+// Aktarıcı "kapali" derse (ayar masaustu_altyazi: false) 60 sn okumaz. AXObserver kullanılmadı: Chromium'un WebView2'de altyazı için bildirim gönderdiği
+// doğrulanmadı; 1 sn yoklama küçük alt ağaçta ucuz (izde satırlar 1–2 sn içinde topluca düşüyor).
+final class MasaustuAltyazi {
+    let masaustu: Masaustu; let q = DispatchQueue(label: "suflor.masaustu-altyazi", qos: .utility)
+    static let CAPA = ["captions-panel-dismiss-button", "closed-captions-pop-out-button", "closed-captions-overflow-menu-button", "captions-settings-menu-trigger-button"]
+    var kap: AXUIElement?, kapPid: pid_t = 0, panelVar = false, sonBul = Date.distantPast, bulunamadi: Date? = nil, yokGonderildi = false, bulunduYazildi = false
+    var bilinen: [(AXUIElement, Int)] = [], sayac = 0, sonImza = "", bekleyen = 0, doluGonderildi = false, kapaliKadar = Date.distantPast, mesgul = false
+    init(_ m: Masaustu) { masaustu = m }
+    func dongu() { q.asyncAfter(deadline: .now() + 1) { [weak self] in self?.tik(); self?.dongu() } }
+    func deger(_ e: AXUIElement, _ a: String) -> AnyObject? { masaustu.deger(e, a) }
+    func siniflar(_ e: AXUIElement) -> [String] { (deger(e, "AXDOMClassList") as? [String]) ?? [] }
+    func teams(_ pid: pid_t) -> Bool { (NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? "").hasPrefix("com.microsoft.teams") }
+    func tik() {
+        guard !mesgul, Date() >= kapaliKadar else { return }
+        let (pid, _) = masaustu.pencere
+        guard masaustu.masaustuToplantida, pid != 0, teams(pid) else { bitir(); return }
+        if kap == nil || kapPid != pid {
+            guard Date().timeIntervalSince(sonBul) > 4 else { return }
+            sonBul = Date(); kapPid = pid; bilinen.removeAll()
+            let (k, p) = bul(pid); kap = k; panelVar = p
+            if k == nil && !p {
+                if bulunamadi == nil { bulunamadi = Date() }
+                if !yokGonderildi, let b = bulunamadi, Date().timeIntervalSince(b) > 45 {
+                    yokGonderildi = true; print("MASAÜSTÜ ALTYAZI: altyazı bulunamadı — Teams'te altyazıyı aç")
+                    istek("/masaustu-altyazi", ["durum": "yok"], sure: 5) { [weak self] y in self?.q.async { self?.cevap(y) } }
+                }
+                if doluGonderildi { gonder([]) }  // altyazı kapandı: bekleyen satırlar boşalsın
+                return
+            }
+            bulunamadi = nil
+            if k != nil && !bulunduYazildi { bulunduYazildi = true; print("MASAÜSTÜ ALTYAZI: altyazı paneli bulundu, okunuyor") }
+            guard k != nil else { return }  // panel açık, henüz girdi yok: 4 sn sonra yeniden
+        }
+        guard let k = kap, let g = oku(k) else { kap = nil; sonBul = .distantPast; return }
+        gonder(g)
+    }
+    func bitir() {  // toplantı bitti: son görüntü boş gönderilir (sabitlenmemiş satırlar kaybolmasın), toplantı başı durumları sıfırlanır
+        if doluGonderildi { gonder([]) }
+        kap = nil; panelVar = false; bulunamadi = nil; yokGonderildi = false; bulunduYazildi = false; bilinen.removeAll(); sonImza = ""
+    }
+    func gonder(_ g: [(Int, [String])]) {
+        let imza = g.map { "\($0.0):" + $0.1.joined(separator: "\u{1}") }.joined(separator: "\u{2}")
+        guard imza != sonImza || bekleyen > 0 else { return }
+        sonImza = imza; mesgul = true; doluGonderildi = !g.isEmpty
+        istek("/masaustu-altyazi", ["girdiler": g.map { ["ax": $0.0, "m": $0.1] as [String: Any] }], sure: 5) { [weak self] y in
+            self?.q.async { guard let s = self else { return }; s.mesgul = false; if y == nil { s.sonImza = "" }; s.cevap(y) }
+        }
+    }
+    func cevap(_ y: [String: Any]?) {
+        bekleyen = (y?["bekleyen"] as? Int) ?? 0
+        if (y?["kapali"] as? Bool) == true { if kapaliKadar < Date() { print("MASAÜSTÜ ALTYAZI: ayarda kapalı (masaustu_altyazi) — okunmuyor") }; kapaliKadar = Date().addingTimeInterval(60); kap = nil }
+    }
+    // girdiler (en çok sinir öğe): .fui-Chat altına inilmez (toplantı sohbeti, döküm paneli), girdinin içine de inilmez
+    func govdeler(_ kok: AXUIElement, sinir: Int) -> [AXUIElement] {
+        var out: [AXUIElement] = [], n = 0, yigin: [(AXUIElement, Int)] = [(kok, 0)]
+        while let (e, d) = yigin.popLast(), n < sinir {
+            n += 1; let c = siniflar(e)
+            if c.contains("fui-ChatMessageCompact__body") { out.append(e); continue }
+            if c.contains("fui-Chat") { continue }
+            if d < 14, let ch = deger(e, kAXChildrenAttribute) as? [AXUIElement] { yigin.append(contentsOf: ch.reversed().map { ($0, d + 1) }) }
+        }
+        return out
+    }
+    // panel düğmesi → girdileri içeren en yakın üst öğe. (kapsayıcı, panel açık mı)
+    func bul(_ pid: pid_t) -> (AXUIElement?, Bool) {
+        let kok = AXUIElementCreateApplication(pid); var capa: AXUIElement? = nil
+        for w in (deger(kok, kAXWindowsAttribute) as? [AXUIElement] ?? []) {
+            var n = 0, yigin: [(AXUIElement, Int)] = [(w, 0)]
+            while let (e, d) = yigin.popLast(), n < 12000, capa == nil {
+                n += 1
+                if let id = deger(e, "AXDOMIdentifier") as? String, MasaustuAltyazi.CAPA.contains(where: { id.hasPrefix($0) }) { capa = e; break }
+                if d < 60, let c = deger(e, kAXChildrenAttribute) as? [AXUIElement] { yigin.append(contentsOf: c.map { ($0, d + 1) }) }
+            }
+            if capa != nil { break }
+        }
+        guard var e = capa else { return (nil, false) }
+        for _ in 0..<6 {
+            guard let p = deger(e, kAXParentAttribute), CFGetTypeID(p) == AXUIElementGetTypeID() else { break }
+            let ust = p as! AXUIElement
+            if (deger(ust, kAXRoleAttribute) as? String) == "AXWebArea" { break }
+            if !govdeler(ust, sinir: 3000).isEmpty { return (ust, true) }
+            e = ust
+        }
+        return (nil, true)
+    }
+    // kapsayıcıdaki girdiler (ekran sırasıyla): (öğe numarası, doğrudan StaticText metinleri). Kapsayıcı geçersizse nil.
+    func oku(_ k: AXUIElement) -> [(Int, [String])]? {
+        var r: AnyObject?
+        guard AXUIElementCopyAttributeValue(k, kAXRoleAttribute as CFString, &r) == .success else { return nil }
+        var out: [(Int, [String])] = []
+        for b in govdeler(k, sinir: 2500) {
+            let m = ((deger(b, kAXChildrenAttribute) as? [AXUIElement]) ?? []).filter { (deger($0, kAXRoleAttribute) as? String) == kAXStaticTextRole as String }
+                .compactMap { (deger($0, kAXValueAttribute) as? String) ?? (deger($0, kAXTitleAttribute) as? String) }
+                .map { String($0.prefix(4000)) }.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            if !m.isEmpty { out.append((jeton(b), m)) }
+        }
+        return Array(out.suffix(40))
+    }
+    func jeton(_ e: AXUIElement) -> Int {  // aynı AX öğesi aynı numara (Chromium öğeyi DOM düğümü yaşadıkça tutar); yeniden kurulursa aktarıcı metin başıyla eşler
+        if let b = bilinen.first(where: { CFEqual($0.0, e) }) { return b.1 }
+        sayac += 1; bilinen.append((e, sayac)); if bilinen.count > 150 { bilinen.removeFirst(bilinen.count - 150) }
+        return sayac
     }
 }
 

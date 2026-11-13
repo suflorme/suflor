@@ -221,9 +221,12 @@ def arastirma_view(id_=None, gizli=False):  # GET /arastirma (son 20 görünen �
 #   oturum {"hedef"}: kayıt (konu, kısa özet, kaynaklar, tam kaydın .md yolu) talimat hedefinin gelen kutusuna (talimat.py _gelen_yaz → canli/gelen/<hedef>.jsonl) «panodan iletildi»
 #     notuyla yazılır; hedef oturumun kancası (toplanti-claude.py gelen) bir sonraki istemde bağlama ekler. Tık kullanıcının onayıdır (sesli talimattaki onay sorusu yok).
 #   asistan {"asistan": iç ad}: Kararlar ve işler «asistana sor» yolu (konus_yazili ek=…): kayıt veri bloğu olarak Konuş'un yazılı turuna gider, cevap sohbet panelinde; gizli kipte yok.
+#   is {"metin", "tarih"}: «İş olarak ekle» — var olan iş yolu (talimat.py _is_kaydet → yapi.soz_ekle → Kararlar ve işler; gizli kipte reddedilir, animsatici/Basecamp kendi kurallarıyla yürür, yeni dış gönderim yok);
+#     metin boşsa «<konu> araştırmasını değerlendir»; iş numarası ↔ kayıt id'si canli/arastirma/is-bag.jsonl'e (0600).
 #   E-posta taslağı panoda (akYap 'ar': postaUrl → ayar eposta; alıcısız, gönderen kullanıcı). Kayıt içeriği yalnız Mac'te, Claude'da ve kullanıcının taslağında kalır.
 _AR_ID_RX = _re_ar.compile(r"[0-9]{8}-[0-9]{6}-[a-z0-9-]{1,40}")
 AR_GIZLI = os.path.join(AR_DIR, "gizlenen.jsonl")
+AR_IS_BAG = os.path.join(AR_DIR, "is-bag.jsonl")  # {"is": "s12", "arastirma": <kayıt id>}
 def ar_gizli_kume():
     g = {}
     try:
@@ -294,4 +297,18 @@ def arastirma_islem(p):  # POST /arastirma (yalnız pano)
         r = konus_yazili(soru, ek=ar_asistan_blok(k), kayit=None)
         print(f"ARAŞTIRMA: {id_} → asistan {kb['ad'] if kb else '-'} ({'tamam' if r.get('ok') else str(r.get('err'))[:60]})")
         return dict(r, soru=soru, ad=ad)
+    if islem == "is":  # 13 Kasım: «İş olarak ekle» — var olan iş kaydı yolu (talimat.py _is_kaydet → yapi.soz_ekle → Kararlar ve işler); gizli kip ve «iş metni kısa» _is_kaydet'te denetlenir
+        if "_is_kaydet" not in globals(): return {"ok": False, "err": "yok"}
+        konu = " ".join(str(k.get("konu") or "").split())
+        metin = " ".join(str(p.get("metin") or "").split()) or _t(f"«{konu}» araştırmasını değerlendir", f"Review the «{konu}» research")
+        ok, sonuc = _is_kaydet({"metin": metin, "tarih": p.get("tarih")})  # sahip boş: kullanıcının kendi işi (sesli «bana iş ekle» ile aynı)
+        m_ = _re_ar.search(r"\((s\d+)", str(sonuc)) if ok else None
+        if ok and m_:  # iş → araştırma bağı (iş satırından araştırmaya dönmek için); iş deposu değil, yalnız eşleme
+            try:
+                os.makedirs(AR_DIR, mode=0o700, exist_ok=True)
+                if not os.path.exists(AR_IS_BAG): os.close(os.open(AR_IS_BAG, os.O_WRONLY | os.O_CREAT, 0o600))
+                with LOCK: write([(AR_IS_BAG, json.dumps({"is": m_.group(1), "arastirma": id_, "at": datetime.datetime.now().isoformat(timespec="seconds")}, ensure_ascii=False) + "\n")])
+            except OSError: pass
+        print(f"ARAŞTIRMA: {id_} → iş {m_.group(1) if m_ else '-'} ({'tamam' if ok else str(sonuc)[:60]})")
+        return {"ok": bool(ok), "sonuc": sonuc, "is": m_.group(1) if m_ else None, "metin": metin, **({"err": "gizli"} if not ok and gizli_acik() else {})}
     return {"ok": False, "err": "işlem"}

@@ -2467,7 +2467,8 @@ let arAk=null,arGzAcik=false,arGz=null
 function arSatir(x,gz){const ac=!gz&&arAk===x.id,hd=(arV&&arV.hedefler)||{},i=esc(x.id)
   const ib=(bn,ikon,t,ek)=>`<button class=aki data-bn=${bn} data-id="${i}"${ek||''} role=menuitem>${ic(ikon,t)}</button>`
   const ilet=(hd.oturum||[]).map(o=>ib('arot','sohbet',L('İlet: {h}',{h:o.etiket||o.ad}),` data-h="${esc(o.ad)}"`)).join('')+(hd.asistan||[]).map(a=>ib('aras','chat',L('{ad}: derinleştir',{ad:a.gorunen||a.ad}),` data-a="${esc(a.ad)}"`)).join('')
-  const men=ac?akMenu('ar:'+x.id,-1,ilet?ilet+'<hr>':'','<hr>'+ib('argiz','x',L('Gizle'))):''
+  const isb=ib('aris','liste',L('İş olarak ekle'))
+  const men=ac?akMenu('ar:'+x.id,-1,(ilet||'')+isb+'<hr>','<hr>'+ib('argiz','x',L('Gizle'))):''
   return bsSat({id:(gz?'arg-':'ar-')+x.id,ek:gz?'':` data-arm="${i}"`,ikon:'ara',t:esc(x.konu||''),a:[bsTarih(x.at),esc(L('{n} kaynak',{n:x.kaynak_sayisi||0}))].filter(Boolean).join(' · '),e:x.durum==='hata'?`<span class="etiket gec">${L('Hata')}</span>`:'',
     d:gz?`<button type=button class=b data-bn=argos data-id="${i}">${L('Geri getir')}</button>`:`<button type=button class=b data-bn=panel data-ref="ar:${i}">${L('Aç')}</button>`,
     x:gz?'':`<span class=akw><button type=button class=em data-bn=arak data-id="${i}" aria-haspopup=menu aria-expanded="${ac}" title="${L('Eylemler')}" aria-label="${L('Eylemler')}">${ic('dahasi')}</button>${men}</span>`})}
@@ -2481,6 +2482,15 @@ async function arGizle(id,gizle){if(gizle&&arV){arV={...arV,kayitlar:(arV.kayitl
   await bnEkYukle(true);if(arGzAcik)await arGzYukle()
   if(!r.ok){bnBildir(L('Yapılamadı.'));return}
   if(gizle)bnBildir(L('Araştırma gizlendi'),()=>arGizle(id,false));else bnBildir(L('Araştırma geri getirildi'))}
+// «İş olarak ekle» (13 Kasım): küçük pencerede iş metni (varsayılan «<konu> araştırmasını değerlendir») ve isteğe bağlı son tarih; Ekle → POST /arastirma {islem:'is'} →
+// aktarıcı var olan iş kaydı yolunu kullanır (talimat.py _is_kaydet → Kararlar ve işler), kayıt id'si is-bag.jsonl'de iş numarasına bağlanır. Gizli kipte aktarıcı reddeder.
+let arIsId=''
+function arIsAc(id){const x=((arV&&arV.kayitlar)||[]).find(y=>y.id===id)||{};arAk=null;if(last)bnCiz(last);arIsId=id
+  bnE('aih').textContent=x.konu||'';bnE('aim').value=L('«{k}» araştırmasını değerlendir',{k:x.konu||''});bnE('ait').value='';bnE('aie').disabled=false;bnE('aih2').hidden=true;bnE('aid').showModal();bnE('aim').select()}
+async function arIsYaz(){const m=bnE('aim').value.trim(),t=bnE('ait').value,he=bnE('aih2');if(m.split(/\s+/).length<2){he.textContent=L('İş metni kısa; en az iki sözcük yaz.');he.hidden=false;return}
+  bnE('aie').disabled=true;let r={};try{r=await bnYaz('/arastirma',{islem:'is',id:arIsId,metin:m,tarih:t||''})}catch(e){}
+  if(!r.ok){bnE('aie').disabled=false;he.textContent=r.err==='gizli'?L('Gizli kipte iş eklenmez.'):L('İş eklenemedi.');he.hidden=false;return}
+  bnE('aid').close();bnBildir(L('İş olarak eklendi: Kararlar ve işler'));try{await bnVeriYukle(true);if(bnGor==='kayit')await knYukle(true)}catch(e){}}
 async function arOturum(id,h){arAk=null;if(last)bnCiz(last);let r={};try{r=await bnYaz('/arastirma',{islem:'oturum',id,hedef:h})}catch(e){}
   bnBildir(r.ok?(r.sonuc||L('Gelen kutusuna bırakıldı')):r.err==='kapalı'?L('Oturuma iletme kapalı (ayar talimat)'):L('İletilemedi'))}
 // {asistan}: derinleştir — Kararlar ve işler «asistana sor» gibi: sohbet paneli açılır, kayıt aktarıcıda veri bloğu olarak Konuş'un yazılı turuna gider
@@ -2680,6 +2690,7 @@ async function bnTik(ev){{const ak=ev.target.closest('#bgn .akp button[data-ak],
   if(a==='tvmod')return tvAc(b.dataset.m)
   if(a==='gcak'){gcAk=gcAk===id?null:id;arAk=null;if(last)bnCiz(last);return}
   if(a==='arak'){arAk=arAk===id?null:id;gcAk=null;if(last)bnCiz(last);return}
+  if(a==='aris')return arIsAc(id)
   if(a==='arot')return arOturum(id,b.dataset.h)
   if(a==='aras')return arAsistan(id,b.dataset.a)
   if(a==='argiz')return arGizle(id,true)
@@ -2860,6 +2871,10 @@ async function emTik(ev){const b=ev.target.closest('[data-em]');if(!b||b.disable
   emKid='';emV=null;emMod='';if(bnRef&&bnRef.startsWith('r:'))emAc(bnRef.slice(2),'yan')})
  d.addEventListener('change',ev=>{if(ev.target.id==='emKisi')emKimBul()})
  const p=bnE('bnPanel');p.addEventListener('click',ev=>{if(ev.target.closest('[data-em]'))emTik(ev)});p.addEventListener('change',ev=>{if(ev.target.id==='emKisi')emKimBul()})}
+// «İş olarak ekle» penceresi (arIsAc/arIsYaz Araştırmalar bölümünde): bnE tanımlandıktan sonra kurulur
+{document.body.insertAdjacentHTML('beforeend',`<dialog id=aid aria-label="${L('İş olarak ekle')}"><div class=emb><div><div class=eb>${L('Araştırma')}</div><h2 id=aih></h2></div><button type=button class=ikon id=aix aria-label="${L('Kapat')}">${ic('x')}</button></div><div class=emk><label class=emal>${L('İş')}<input type=text id=aim maxlength=300 autocomplete=off></label><label class=emal>${L('Son tarih (isteğe bağlı)')}<input type=date id=ait></label><div class=keylem><button type=button class="b ana" id=aie>${L('Ekle')}</button></div><p class=emalt id=aih2 hidden></p></div></dialog>`)
+ const d=bnE('aid');d.addEventListener('click',ev=>{if(ev.target===d)d.close()});bnE('aix').addEventListener('click',()=>d.close())
+ bnE('aim').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();arIsYaz()}});bnE('aie').addEventListener('click',arIsYaz)}
 
 // ---- Prova odası: bir karar ya da sunumu karşı taraf kişilikleriyle sına (aktarıcıda aktarici/prova.py; /prova) ----
 {document.body.insertAdjacentHTML('beforeend',`<dialog id=prd aria-label="${L('Prova odası')}"><div class=prb><div><div class=eb>${L('Prova odası')}</div><h2 id=prh></h2></div><span class=prnokta id=prn aria-hidden=true></span><button type=button class=ikon id=prx aria-label="${L('Kapat')}">${ic('x')}</button></div><div id=prg></div></dialog>`)}

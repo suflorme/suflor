@@ -302,7 +302,9 @@ def _teshis(a, s=None):  # toplantı sayfası/altyazı var ama güvenli sinyal y
           f"ses {ys}{' ' + ya if ys in ('dinliyor', 'izin') else ''}, takvim {'var' if oto_takvim(None) else 'yok'}) → " + ("kayıt açıldı, Claude oturumu öneriyle" if a else "kayıt açılmadı (ses yok)"))
 def _baslatla(a): return (STATE.get("baslatma") or {}).get("kayit") == a["id"]  # kayıt elle Başlat'la açıldı: oturumu Başlat açtı
 def _alt_satir(kaynak):  # altyazı/döküm satırı ve eklentinin bir sekmesi son SINYAL_SN'de nabız attı (nabızsız istemci — curl, test — sinyal değil)
-    return kaynak in ("captions", "transcript") and any(time.time() - x["seen"] < SINYAL_SN for x in EKLENTI.values())
+    # 13 Kasım: masaüstü Teams altyazısı (menü uygulaması, masaustu-altyazi.py) da sayılır — menü uygulaması toplantıyı görüyor ve altyazı satırı taze
+    return kaynak in ("captions", "transcript") and (any(time.time() - x["seen"] < SINYAL_SN for x in EKLENTI.values())
+                                                     or (kaynak == "captions" and "masaustu_altyazi_taze" in globals() and masaustu_altyazi_taze() and masaustu_toplantida()))
 def toplanti_satir(t, icerik=True, kaynak=None):  # LOCK içinde; satırın yakalandığı ana göre hedef kayıt → (dosya, kayit) ya da (None, None) (yazılmaz)
     now = time.time(); t = t or now; a = TOPLANTI["aktif"]
     if a and a["durum"] == "bitiyor" and icerik and not a["elle"] and _yeni_cagri(a, sinyaller(), now):  # yeni çağrının satırı eski kaydı sürdürmesin

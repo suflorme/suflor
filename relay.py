@@ -425,7 +425,7 @@ GIZLI = {"acik": False, "bas": 0.0}
 GIZLI_FP = os.path.join(BASE, "gizli.json")  # aktarıcı yeniden başlasa da (çökme, kurulum) kip sürer
 try: GIZLI.update(acik=True, bas=float(json.load(open(GIZLI_FP)).get("bas") or time.time())); print("GİZLİ: açık (önceki çalışmadan sürüyor)")
 except (OSError, ValueError, AttributeError): pass
-GIZLI_YUT = {"/ingest", "/taslak", "/ses", "/ses-yerel", "/ses-masaustu", "/kanit", "/kanit-masaustu", "/masaustu"}  # sessizce atılır
+GIZLI_YUT = {"/ingest", "/taslak", "/ses", "/ses-yerel", "/ses-masaustu", "/kanit", "/kanit-masaustu", "/masaustu", "/masaustu-altyazi"}  # sessizce atılır
 GIZLI_RED = {"/note", "/ask", "/girdi", "/kanit-iste", "/bas-konus", "/baslat", "/brifing", "/baglam-dosya", "/card",
              "/etiket", "/eylem", "/eylem-sun", "/eylem-sesli", "/eylem-karar", "/eylem-sonuc", "/eylem-geri-al", "/moderator", "/otonom", "/agenda-tick",
              "/geri-bildirim", "/komut", "/ilet", "/dusunme"}  # /komut yalnız tur=gizli geçer
@@ -2004,6 +2004,7 @@ bolum("soz-kapisi")  # aktarici/soz-kapisi.py — tek söz kapısı: zamanlayıc
 bolum("dusunme")  # aktarici/dusunme.py — günlük düşünme turu (günde bir, en iyi model): öğrenilen önerileri + geçersizleme + sabah gün planı (canli/gun-plani.json; panoda Günün özeti, söz kapısından bildirim, Konuş bağlamı; 9 Kasım)
 bolum("basecamp-oku")  # aktarici/basecamp-oku.py — Basecamp OKUMA bağlayıcısı: bc_oku/bc_kanit/bc_baglam (S282; mutabakat kanıt kaynağı)
 bolum("mutabakat")  # aktarici/mutabakat.py — gece mutabakat turu (zekâ Y1): açık/bayat kayıtlara kanıtla durum ÖNERİSİ (bitti · sürüyor · yerini aldı · belirsiz), düşünme turundan hemen önce; POST /mutabakat onay|red|calistir, /status mutabakat (12 Kasım)
+bolum("masaustu-altyazi")  # aktarici/masaustu-altyazi.py — masaüstü Teams canlı altyazısı (menü uygulaması AX ile okur → /masaustu-altyazi; satır birleştirme burada, ingest "captions"; 13 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
 bolum("tazi-kos")  # aktarici/tazi-kos.py — Tazı koşturucu: aday listesi + hızlı/tam tarama arka planda, /tazi, /status tazi, "Tazı, <ad> araştır" (ayar tazi; 11 Kasım)
 # --- Kesişim günlük koşusu + arka plan çözücü (12 Kasım, F2; kod: <kod>/kesisim.py + kesisim-coz.py, S293: proje veritabanına yazma kapalı). 07:45'ten sonra günde bir; toplantı/gizli kip/dar kaynakta bekler.
@@ -2747,6 +2748,7 @@ class H(BaseHTTPRequestHandler):
             if p.get("tur") == "konusmaci": print(f"KONUŞMACI: {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})  # toplanti-claude.py ertelenen etiketleme
             print(f"EKLENTİ: {str(p.get('tur') or '?')[:40]} · {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})
         if self.path == "/masaustu": return self._json(masaustu_al(p))  # menü çubuğu uygulaması (anahtarla)
+        if self.path == "/masaustu-altyazi": return self._json(masaustu_altyazi_al(p))  # menü uygulamasının okuduğu masaüstü Teams altyazısı (anahtarla; ayar masaustu_altyazi)
         if self.path == "/ses-masaustu": return self._json(masaustu_mic_al(p))
         if self.path == "/kanit-masaustu":  # menü uygulamasının toplantı penceresi görüntüsü (anahtarla; Origin yalnız aktarıcının kendisi ya da yok)
             if o and not o.startswith(f"http://127.0.0.1:{A.port}"): return self._json({"ok": False, "err": "köken"}, 403)

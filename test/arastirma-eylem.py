@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Araştırmalar satırı eylemleri (13 Kasım): aktarici/web-arastirma.py arastirma_islem / arastirma_view(gizli) / ar_hedefler — Gizle (dosya silinmez, gizlenen.jsonl, geri alınır),
-# İlet → talimat hedefinin gelen kutusu (talimat.py _gelen_yaz; toplanti-claude.py gelen bağlama basar), İlet → asistan (konus_yazili ek=veri bloğu; gizli kipte yok).
+# İlet → talimat hedefinin gelen kutusu (talimat.py _gelen_yaz; toplanti-claude.py gelen bağlama basar), İlet → asistan (konus_yazili ek=veri bloğu; gizli kipte yok), İş olarak ekle (_is_kaydet → Kararlar ve işler; is-bag.jsonl).
 # Sonra yalıtılmış aktarıcıda POST /arastirma (yalnız pano: Origin + anahtar) ve GET /arastirma?gizli=1. Gerçek ağa, gerçek gelen kutusuna, Claude'a gidilmez.
 # aktarici/web-arastirma.py (kart eylemleri), relay.py /arastirma ya da pano Araştırmalar satırı değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/arastirma-eylem.py      (kaldı → çıkış 1)
 import json, os, re, shutil, subprocess, sys, tempfile, threading, time, datetime, urllib.request, urllib.error, importlib.util
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
-KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="areylem-"); HATA = []
+KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, KOD); T = tempfile.mkdtemp(prefix="areylem-"); HATA = []
 def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
@@ -27,7 +27,7 @@ KIS = [{"ad": "marvin", "gorunen_ad": "Marvin", "rol": "toplanti", "hitap": ["Ma
 def konus_yazili(metin, kutu=False, sesli=False, ek=None, kayit=None): KY.append({"metin": metin, "ek": ek, "kayit": kayit}); return {"ok": True}
 ns = dict(os=os, json=json, time=time, datetime=datetime, threading=threading, subprocess=subprocess, re=re, AYAR=AYAR, BASE=BASE, LOCK=LOCK, write=write, _t=lambda tr, en: tr,
           gizli_acik=lambda: GIZLI["acik"], toplanti_var=lambda: False, kisilikler=lambda: KIS, kisilik_gorunen=lambda k: (k or {}).get("gorunen_ad") or (k or {}).get("ad"),
-          kisilik_sec=lambda ad, neden="": SEC.append(ad), konus_yazili=konus_yazili, asistan_ad=lambda: "Marvin", deneme_aktarici=lambda: True, BEYIN=None)
+          kisilik_sec=lambda ad, neden="": SEC.append(ad), konus_yazili=konus_yazili, asistan_ad=lambda: "Marvin", deneme_aktarici=lambda: True, BEYIN=None, _yapi_mod=lambda: __import__("yapi"))
 exec(open(os.path.join(KOD, "aktarici", "talimat.py"), encoding="utf-8").read(), ns)
 exec(open(os.path.join(KOD, "aktarici", "web-arastirma.py"), encoding="utf-8").read(), ns)
 now = time.time(); A = kayit_yaz(AR, "20261112-100000-orbitek", "Orbitek Yazılım", now - 100); B = kayit_yaz(AR, "20261112-110000-hava", "Hava durumu", now - 50)
@@ -68,9 +68,23 @@ ok("asistan: görünen soru araştırma kipini, talimatı, iş kaydını tetikle
 GIZLI["acik"] = True; n = len(KY); r = islem({"islem": "asistan", "id": A["id"], "asistan": "marvin"}); GIZLI["acik"] = False
 ok("asistan: gizli kipte gitmez", r == {"ok": False, "err": "gizli"} and len(KY) == n)
 ok("asistan: bilinmeyen asistan reddedilir; bilinmeyen işlem reddedilir", islem({"islem": "asistan", "id": A["id"], "asistan": "kimse"})["err"] == "asistan yok" and islem({"islem": "sil", "id": A["id"]})["err"] == "işlem")
+# İş olarak ekle (13 Kasım): var olan iş yolu (_is_kaydet → yapi.soz_ekle); metin boşsa «<konu> araştırmasını değerlendir»; kayıt araştırma id'sine is-bag.jsonl ile bağlanır
+r = islem({"islem": "is", "id": A["id"], "metin": "", "tarih": ""}); sz = ns["_yapi_mod"]().sozler(BASE)
+ok("is: varsayılan metin «<konu> araştırmasını değerlendir»; Kararlar ve işler deposuna düştü (sahip boş, vade yok)", r["ok"] and r["is"] and r["metin"] == "«Orbitek Yazılım» araştırmasını değerlendir"
+   and [(x["id"], x["metin"], x["tarih"], x["durum"]) for x in sz] == [(r["is"], "«Orbitek Yazılım» araştırmasını değerlendir", None, "acik")])
+bg = [json.loads(l) for l in open(os.path.join(AR, "is-bag.jsonl"), encoding="utf-8")]
+ok("is: is-bag.jsonl'de iş numarası ↔ araştırma id'si (0600); araştırma listesine kayıt sanılmaz", bg == [{"is": r["is"], "arastirma": A["id"], "at": bg[0]["at"]}]
+   and oct(os.stat(os.path.join(AR, "is-bag.jsonl")).st_mode & 0o777) == "0o600" and [x["id"] for x in ns["arastirma_view"]()["kayitlar"]] == [B["id"], A["id"]])
+r2 = islem({"islem": "is", "id": B["id"], "metin": "Hava raporunu  Ali'ye ilet", "tarih": "2026-11-20"}); sz = ns["_yapi_mod"]().sozler(BASE)
+ok("is: düzeltilen metin ve son tarih kaydedilir (boşluklar toplanır)", r2["ok"] and any(x["id"] == r2["is"] and x["metin"] == "Hava raporunu Ali'ye ilet" and x["tarih"] == "2026-11-20" for x in sz))
+r3 = islem({"islem": "is", "id": B["id"], "metin": "Hava", "tarih": "yarın"}); r4 = islem({"islem": "is", "id": B["id"], "metin": "Hava durumunu denetle", "tarih": "yarın"}); sz = ns["_yapi_mod"]().sozler(BASE)
+ok("is: tek sözcüklü metin reddedilir; geçersiz tarih yok sayılır (iş yine açılır)", r3["ok"] is False and r4["ok"] and next(x for x in sz if x["id"] == r4["is"])["tarih"] is None)
+GIZLI["acik"] = True; n = len(ns["_yapi_mod"]().sozler(BASE)); r5 = islem({"islem": "is", "id": A["id"], "metin": "Gizli kipte deneme işi"}); GIZLI["acik"] = False
+ok("is: gizli kipte eklenmez (err gizli), iş sayısı değişmez", r5["ok"] is False and r5.get("err") == "gizli" and len(ns["_yapi_mod"]().sozler(BASE)) == n)
+ok("is: bilinmeyen kayıt reddedilir", islem({"islem": "is", "id": "20261112-100000-yok"})["err"] == "kayıt yok")
 # --- 2) yalıtılmış aktarıcı: POST /arastirma yalnız pano, GET ?gizli=1 ------------------------------------------------------------------------------------------------------
 PORT = bos_port(8793); E = os.path.join(T, "e2e"); canli = os.path.join(E, "canli"); os.makedirs(canli); proje = os.path.join(E, "proje"); os.makedirs(proje)
-for f in ("relay.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), E)
+for f in ("relay.py", "yapi.py", "manifest.json", "toplanti-claude.py", "baglayici.py", "baglam.py", "whisper-isci.py"): shutil.copy(os.path.join(KOD, f), E)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(E, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(E, "pano"))
 C = kayit_yaz(os.path.join(canli, "arastirma"), "20261112-120000-orbitek", "Orbitek Yazılım", now)
 ayar_y = os.path.join(E, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": E, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": "/yok/claude", "konus_on_ac": False,
@@ -96,6 +110,8 @@ try:
     ok("POST goster → geri gelir", post("/arastirma", {"islem": "goster", "id": C["id"]}).get("ok") and get("/arastirma")["kayitlar"][0]["id"] == C["id"])
     r = post("/arastirma", {"islem": "oturum", "id": C["id"], "hedef": "gelistirme"})
     ok("POST oturum → canli/gelen/gelistirme.jsonl", r.get("ok") and "panodan iletti" in open(os.path.join(canli, "gelen", "gelistirme.jsonl"), encoding="utf-8").read())
+    r = post("/arastirma", {"islem": "is", "id": C["id"], "metin": "Orbitek teklifini incele", "tarih": "2026-11-25"})
+    ok("POST is (pano) → iş kaydı; anahtarsız reddedilir", r.get("ok") and r.get("is") and post("/arastirma", {"islem": "is", "id": C["id"], "metin": "Kökensiz iş denemesi"}, {"X-Suflor-Anahtar": an}).get("_kod") == 403)
     lg = open(os.path.join(E, "r.log"), encoding="utf-8").read()
     ok("aktarıcıda hata yok; günlükte metin yok (yalnız kimlik)", "Traceback" not in lg and "ARAŞTIRMA: " + C["id"] + " gizlendi" in lg and "2014" not in lg or print(lg[-1500:]))
 finally:

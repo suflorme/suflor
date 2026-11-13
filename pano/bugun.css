@@ -653,3 +653,26 @@ header #ay{display:none}  /* Ayarlar kenar çubuğunda; #ay görünmez ama tıkl
 #bnPanel .armetin hr{border:0;border-top:1px solid var(--b-cizgi);margin:var(--bo-16) 0}
 
 #bgn .ksbag{display:block;margin:2px 0 6px;padding:6px 2px;background:none;border:0;color:var(--b-m2);font:inherit;font-size:var(--yz-3);cursor:pointer;text-align:left}#bgn .ksbag:hover,#bgn .ksbag:focus-visible{color:var(--b-murekkep)}
+
+/* "İş olarak ekle" penceresi (#aid, 13 Kasım): Eylem menüsü penceresinin (#emd) kuralları */
+#aid .b{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:var(--bo-8);height:var(--d-yuk);padding:0 var(--bo-16);border:1px solid var(--b-cizgi2);border-radius:var(--r-8);background:transparent;color:var(--b-murekkep);font:500 var(--yz-13)/1 var(--f-govde);white-space:nowrap;cursor:pointer;text-decoration:none}
+#aid .b{height:var(--d-yuk-k);padding:0 var(--bo-12)}
+#aid .b.iri{height:var(--d-yuk);padding:0 var(--bo-16)}
+#aid .b.ana{background:var(--b-ana);border-color:var(--b-ana);color:var(--b-ana-yazi)}
+#aid .b.sade{border-color:transparent;color:var(--b-m2)}
+#aid .b:hover{background:var(--b-uzerinde)}
+#aid .b.ana:hover{background:var(--b-ana);opacity:.9}
+#aid .b:disabled{opacity:.5;cursor:default}
+#aid .b:focus-visible{outline:2px solid var(--b-vurgu);outline-offset:2px}
+dialog#aid{border:1px solid var(--b-cizgi);border-radius:var(--r-14);background:var(--b-yuzey);color:var(--b-murekkep);padding:var(--bo-24) var(--bo-24);width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:var(--b-golge-panel);font:var(--yz-13)/1.5 var(--f-govde);overflow:auto}
+dialog#aid::backdrop{background:rgba(12,18,15,.4)}
+dialog#aid[open]{display:grid;gap:var(--bo-16);align-content:start}
+#aid *{box-sizing:border-box}
+#aid :focus-visible{outline:2px solid var(--b-vurgu);outline-offset:2px}
+#aid .emb{display:flex;align-items:flex-start;gap:var(--bo-12)}
+#aid .emb>div{flex:1;min-width:0}
+#aid .emb h2{margin:var(--bo-4) 0 0;font:300 var(--yz-18)/1.3 var(--f-baslik);overflow-wrap:anywhere}
+#aid .eb{font:500 var(--yz-12) var(--f-mono,"IBM Plex Mono",ui-monospace,monospace);letter-spacing:.07em;text-transform:uppercase;color:var(--b-m3)}
+#aid .ikon{border:0;background:none;width:32px;height:32px;border-radius:var(--r-8);display:grid;place-items:center;color:var(--b-m2);padding:0;cursor:pointer}
+#aid .ikon:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}
+#aid svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
