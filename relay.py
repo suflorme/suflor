@@ -1521,6 +1521,14 @@ def kesisim_geri_al(p):  # POST /kesisim {islem:"geri_al", id}: kesisim-coz.py g
 VERI_GET = {"/status", "/animsatici", "/dogrula", "/geri-bildirim/onizle", "/taslak", "/takvim", "/agenda", "/cards", "/soyle-ses", "/konus-gecmis", "/toplanti-oturum", "/toplantilar", "/toplantilar/dokum", "/posta-uslup", "/eposta-onemli", "/vt-bellek", "/prova", "/bugun-veri", "/kayitlar", "/gundem-taslagi", "/kisi", "/kisi-ozet", "/kimlik", "/kayit-menu", "/izleme", "/arastirma", "/ortak", "/katilimcilar", "/kapanis-turu", "/belge-oneri", "/is-kopya", "/yaklasan-tarihler", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/ses", "/kesisim.json"}  # okuma uçları: anahtarsız 401
 GECIS_YAZMA = {"/ingest", "/taslak", "/note", "/card-ack", "/ask", "/girdi", "/kanit", "/kanit-iste", "/komut", "/ses", "/olay",
                "/agenda-aktif", "/ping", "/agenda-tick", "/takvim-yenile"}
+# 13 Kasım 2026, güvenlik denetimi G4: Origin başlığı taklit edilebilir; kaynak başına onay kartı yüksek etkili yazmaları (sahte döküm satırı, Claude'a
+# soru, asistanı konuşturma) öbür macOS hesabına açık bırakıyordu. Artık bu uçlar varsayılan olarak anahtar ister (anahtarsız → _anahtar_yok, pano
+# "eklentiyi yenile" der). Onay kartı yalnız düşük etkili durum yoklamasında kalır (eski eklenti bağlı görünsün). Ayarlar: "anahtar_zorunlu": true →
+# hiç geri dönüş yok; "anahtarsiz_yazma": true (varsayılan false) → eski davranış, tüm GECIS_YAZMA uçları kart ile anahtarsız yazar.
+GECIS_YOKLAMA = {"/ping", "/agenda-tick", "/agenda-aktif", "/takvim-yenile"}
+def anahtarsiz_gecis_olur(yol):
+    if AYAR.get("anahtar_zorunlu") or yol not in GECIS_YAZMA: return False
+    return yol in GECIS_YOKLAMA or AYAR.get("anahtarsiz_yazma") is True
 _ANAHTARSIZ_GUNLUK = {}
 def anahtarsiz_kaydet(yol, koken):
     tur = "eklenti" if koken.startswith("chrome-extension://") or any(re.match(k, koken) for k in PLATFORM_KOKEN) else "pano" if koken else "yerel"
@@ -1973,6 +1981,7 @@ bolum("talimat")  # aktarici/talimat.py — sesle oturuma talimat ve yapılacak 
 bolum("kimlik")  # aktarici/kimlik.py — kişi adı → şirket e-postası eşlemesi, elle düzeltme, eşlenemeyenler (ortak karar katmanı A1)
 bolum("ortak-klasor")  # aktarici/ortak-klasor.py — ortak karar katmanı A3 (ekip paylaşımı, Firestore; ayar ortak_tasima) (/ortak)
 bolum("eylem-menu")  # aktarici/eylem-menu.py — kayıt eylem menüsü: ertele, böl, gündeme ekle, ata, taslak, asistana sor (/girdi {kayit}), Geri al (/kayit-menu, /kayit-eylem, /kayit-not; ortak karar katmanı)
+bolum("web-kapi")  # aktarici/web-kapi.py — web kapısı yardımcıları; toplanti-oturum bölümünden önce yüklenir (13 Kasım 2026, güvenlik denetimi G4/G5)
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
 bolum("yerel-konus")  # aktarici/yerel-konus.py — Konuş yerel ses istemcisi: VPIO'lu yardımcıya soket (ayar yerel_konus, yalnız geliştirici; Aşama 2 Adım 2) — sohbet'ten önce
@@ -2545,7 +2554,7 @@ class H(BaseHTTPRequestHandler):
         # v0.118.0 tek kutu: Teams şeridinin kart penceresi de basılı tut ve belge ekle yapar — anahtarlı eklenti isteği (içerik betiği toplantı sitesinin kökeniyle gelir)
         serit = yetkili and (o.startswith("chrome-extension://") or any(re.match(k, o) for k in PLATFORM_KOKEN) or bool(os.environ.get("SUFLOR_TEST_KOKEN") and o == os.environ["SUFLOR_TEST_KOKEN"]))
         if not yetkili and self.path != "/ses-yerel":  # ses yardımcısı kendi anahtarıyla
-            if self.path in GECIS_YAZMA and not AYAR.get("anahtar_zorunlu"):
+            if anahtarsiz_gecis_olur(self.path):
                 anahtarsiz_kaydet(self.path, o)
                 if not izin_anahtarsiz(self.path, o): return self._json({"ok": False, "err": "izin bekliyor", "surum": SURUM}, 403)  # v0.97.0 (Y1): kaynak başına kullanıcı onayı
             else: return self._anahtar_yok()

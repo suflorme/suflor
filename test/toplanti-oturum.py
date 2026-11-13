@@ -285,6 +285,13 @@ try:
     ns = {"re": __import__("re"), "threading": __import__("threading"), "AYAR": {}, "_t": lambda a_, b_: a_}
     exec(compile(open(os.path.join(KOD, "aktarici", "toplanti-oturum.py"), encoding="utf-8").read(), "toplanti-oturum.py", "exec"), ns)
     ok("aktarıcı: ayar yokken kaynak yok, istem değişmez", ns["bilgi_kaynagi_arac"](M + "get_store_sales") is None and ns["topo_istem"]().startswith(ns["TOPO_ISTEM"]) and "Deneme Metrik" not in ns["topo_istem"]())
+    # G1/G2 (13 Kasım 2026, güvenlik denetimi): web-kapi.py yüklüyken şüpheli WebFetch adresi ve gizli dosya okuması karta düşer; sıradan olanlar eskisi gibi geçer
+    ng = {"os": os, "time": time, "json": json, "re": __import__("re"), "threading": __import__("threading"), "AYAR": {}, "_t": lambda a_, b_: a_, "__file__": os.path.join(KOD, "aktarici", "toplanti-oturum.py")}
+    exec(compile(open(ng["__file__"], encoding="utf-8").read(), "toplanti-oturum.py", "exec"), ng)
+    ok("güvenlik: gizli dosya okuması ve şüpheli WebFetch işaretlenir, sıradan olanlar işaretlenmez",
+       ng["_topo_oku_hassas"]("Read", {"file_path": "~/.ssh/id_ed25519"}) and not ng["_topo_oku_hassas"]("Read", {"file_path": os.path.join(KOD, "manifest.json")})
+       and ng["_topo_web_suphe"]("WebFetch", {"url": "https://a.com/x?q=" + "a" * 100}) and not ng["_topo_web_suphe"]("WebFetch", {"url": "https://www.example.com/about"})
+       and ng["_topo_izin_anahtar"]("WebFetch", {"url": "https://www.example.com/about"}) == "WebFetch" and ng["_topo_izin_anahtar"]("WebFetch", {"url": "https://a.com/x?q=" + "a" * 100}) != "WebFetch")
     ok("sunucu adı biçimi: 'claude.ai X Y' → claude_ai_X_Y", ns["mcp_sunucu_adi"]("claude.ai Deneme Metrik") == "claude_ai_Deneme_Metrik" and ns["mcp_sunucu_adi"]("claude_ai_Deneme_Metrik") == "claude_ai_Deneme_Metrik")
 
     uc("/toplanti-oturum", {"islem": "yaz", "metin": "uzun iş"}); ok("uzun iş sürüyor", claude_der("Uzun iş başladı") and to().get("durum") == "calisiyor")

@@ -54,4 +54,35 @@ g["izin_bekle"] = lambda iid: (time.sleep(0.05), "reddedildi")[1]
 b, s, gl = izin("rm x")
 ok("izin: rm sorulur", b == "deny" and s)
 ok("günlükte İZİN BEKLEME (kuyrukta 2 olay)", re.search(r"İZİN BEKLEME: Bash \d+\.\d sn · kuyrukta 2 olay \(en eskisi \d+\.\d sn\) · kutudan 0 ileti", gl) is not None)
+
+# G2 (13 Kasım 2026, güvenlik denetimi): gizli bilgi yolu okuması ve veri taşıyabilecek WebFetch adresi karta düşer
+EV = os.path.expanduser("~")
+for c in ("cat ~/.ssh/id_ed25519", "cat " + EV + "/.aws/credentials", "grep -r x ~/.ssh", "ls ~/.gnupg", "head -3 ~/Library/Keychains/login.keychain-db", "cat < ~/.ssh/id_rsa", "cd ~/.ssh && cat id_rsa", "grep -rn x ~", "cat ./.env"):
+    ok(f"G2 salt-okur: gizli yol sorulur — {c}", B(c) is None)
+for c in ("cat ~/Desktop/Claude\\ outputs/notlar.md", "ls ~/Desktop", "grep -rn x gorusmeler/"):
+    ok(f"G2 salt-okur: sıradan yol kendiliğinden — {c}", B(c) is not None)
+def izin_ac(ad, gi):
+    gonderilen.clear(); sorulan.clear(); out = io.StringIO()
+    with contextlib.redirect_stdout(out): g["_topo_izin"]({"request_id": "r2", "request": {"tool_name": ad, "input": gi}})
+    return gonderilen[-1]["response"]["response"]["behavior"], bool(sorulan), out.getvalue()
+g.update(topo_web_acik=lambda: True, izin_bekle=lambda iid: "onaylandi", izin_metni=lambda a, gi=None: "metin")
+g["AYAR"].pop("bilgi_onaysiz", None)
+ok("G2 Read ~/.ssh/id_ed25519 sorulur", izin_ac("Read", {"file_path": "~/.ssh/id_ed25519"})[:2] == ("allow", True))
+ok("G2 Read proje dosyası sorulmaz", izin_ac("Read", {"file_path": os.path.join(KOD, "manifest.json")})[:2] == ("allow", False))
+ok("G2 Grep ev klasörü ve Glob gizli desen sorulur", izin_ac("Grep", {"pattern": "x", "path": "~"})[1] and izin_ac("Glob", {"pattern": "~/.ssh/*"})[1] and izin_ac("Glob", {"pattern": "*", "path": EV + "/.aws"})[1])
+ok("G2 Grep/Glob proje klasörü sorulmaz", not izin_ac("Grep", {"pattern": "x", "path": KOD})[1] and not izin_ac("Glob", {"pattern": "test/*.py", "path": KOD})[1])
+ok("G2 WebFetch genel sayfa sorulmaz", izin_ac("WebFetch", {"url": "https://www.example.com/about"})[:2] == ("allow", False))
+BASE64 = "https://www.example.com/p/" + "QWxhZGRpbjpPcGVuU2VzYW1lU2VjcmV0S2V5MTIzNDU2Nzg5MGFiY2RlZg"
+b, s_, gl = izin_ac("WebFetch", {"url": BASE64})
+ok("G2 WebFetch uzun kodlu yol sorulur, neden günlükte", b == "allow" and s_ and "İZİN: web adresi soruluyor — " in gl)
+metinler = []
+g["izin_iste"] = lambda tur, ne, ay=None, **k: metinler.append(ne) or "i2"
+izin_ac("WebFetch", {"url": BASE64})
+ok("G2 kartta neden görünür", metinler and "Dikkat" in metinler[-1] and "kodlanmış" in metinler[-1])
+g["izin_iste"] = lambda *a, **k: sorulan.append(a) or "i1"
+ok("G2 önceki WebFetch onayından sonra da şüpheli adres yeniden sorulur", izin_ac("WebFetch", {"url": BASE64})[1] and izin_ac("WebFetch", {"url": BASE64})[1]
+   and not izin_ac("WebFetch", {"url": "https://www.example.com/baska"})[1])
+ok("G2 uzun sorgu sorulur", izin_ac("WebFetch", {"url": "https://a.com/x?q=" + "a" * 100})[1])
+ok("G2 WebFetch localhost yine reddedilir (kart yok)", izin_ac("WebFetch", {"url": "http://localhost:8765/status"})[:2] == ("deny", False))
+ok("G2 WebSearch değişmedi", izin_ac("WebSearch", {"query": "firma"})[:2] == ("allow", False))
 print("hepsi geçti" if not HATA else f"{len(HATA)} hata"); sys.exit(1 if HATA else 0)

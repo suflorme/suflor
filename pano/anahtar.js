@@ -15,8 +15,8 @@ const SUFLOR_ANAHTAR = (() => {
 })();
 (() => {
   const f0 = window.fetch.bind(window);
-  window.fetch = (u, o) => {
-    if (typeof u === "string" && u.startsWith("/")) { o = Object.assign({}, o); const h = new Headers(o.headers || {}); h.set("X-Suflor-Anahtar", SUFLOR_ANAHTAR); o.headers = h; }
+  window.fetch = (u, o) => {  // 13 Kasım 2026, güvenlik denetimi G5: "//baska.host/x" aynı köken değil, anahtar yalnız "/yol" ile gider
+    if (typeof u === "string" && u.startsWith("/") && !u.startsWith("//") && !u.startsWith("/\\")) {  o = Object.assign({}, o); const h = new Headers(o.headers || {}); h.set("X-Suflor-Anahtar", SUFLOR_ANAHTAR); o.headers = h; }
     return f0(u, o);
   };
 })();

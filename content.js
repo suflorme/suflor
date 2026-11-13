@@ -744,7 +744,10 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     // v0.51.5: bağlantı iç çerçevede olabilir — komut bütün çerçevelere gider; cevaplar 1,5 sn toplanır, en anlamlısı bildirilir
     // (bir çerçeve okuyorsa ötekilerin "baglanti-yok"u uyarı olmaz). "bitti/durdu" sonradan gelir, ayrıca bildirilir.
     const cerceveler = (w, d = 0) => { const l = [w]; try { if (d < 4) for (let i = 0; i < w.frames.length; i++) l.push(...cerceveler(w.frames[i], d + 1)); } catch (e) {} return l; };
-    const soyleYolla = m => { for (const f of cerceveler(window)) { try { f.postMessage(m, "*"); } catch (e) {} } };
+    // 13 Kasım 2026, güvenlik denetimi G5: ses "*" ile her çerçeveye gitmiyordu; her çerçeveye yalnız bilinen toplantı kökenleriyle gönderilir
+    // (tarayıcı eşleşmeyeni düşürür; soyle-main.js alıcısı zaten e.source'u denetler). Kendi kökenimiz + desteklenen platformlar (manifest matches).
+    const SOYLE_KOKEN = [...new Set([location.origin, "https://teams.microsoft.com", "https://teams.cloud.microsoft", "https://teams.live.com", "https://meet.google.com", "https://app.zoom.us", "https://zoom.us"])].filter(k => k && k !== "null");
+    const soyleYolla = m => { for (const f of cerceveler(window)) for (const k of SOYLE_KOKEN) { try { f.postMessage(m, k); } catch (e) {} } };
     const SOYLE_SIRA = ["caliyor", "sessiz", "hata", "baglanti-yok"]; let soyleTop = null;
     window.addEventListener("message", e => {
       if (!e.data || e.data.__suflor !== "soyleDurum" || window.top !== window) return;

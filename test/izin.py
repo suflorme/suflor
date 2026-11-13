@@ -31,28 +31,46 @@ try:
         return y.status, json.loads(y.read())
     PANO = f"http://127.0.0.1:{PORT}"
     def izin_kartlari(): return [c for c in uc("/cards")[1].get("cards") or [] if c.get("onay") and c.get("text", "").startswith("İzin:") and c.get("status") == "acik"]
-    # 1) anahtarsız yazma
-    kod, y = uc("/note", {"text": "anahtarsız not"}, anahtar=False, koken=EK)
+    # 1) anahtarsız yazma — 13 Kasım 2026, güvenlik denetimi G4: kart yalnız düşük etkili yoklamada (/ping); yüksek etkili uçlar anahtarsız 401
+    for yol_ in ("/ingest", "/note", "/ask", "/girdi", "/komut", "/ses", "/kanit", "/kanit-iste", "/taslak", "/card-ack", "/olay"):
+        kod, y = uc(yol_, {"text": "x"}, anahtar=False, koken=EK)
+        ok(f"anahtarsız {yol_} → 401 anahtar, kart açılmaz ({kod})", kod == 401 and y.get("err") == "anahtar" and not izin_kartlari())
+    kod, y = uc("/ping", {"panel": True}, anahtar=False, koken=EK)
     ok(f"anahtarsız ilk istek → 403 izin bekliyor ({kod})", kod == 403 and y.get("err") == "izin bekliyor")
     k1 = izin_kartlari()
-    ok("onay kartı açıldı (kaynak ve uç yazıyor)", len(k1) == 1 and EK[:30] in k1[0]["text"] and "/note" in k1[0]["text"])
+    ok("onay kartı açıldı (kaynak ve uç yazıyor)", len(k1) == 1 and EK[:30] in k1[0]["text"] and "/ping" in k1[0]["text"])
     ey = (uc("/cards")[1].get("eylem") or {}).get("liste") or []
     ok("eylem kuyruğunda yerel izin işi (bekliyor)", any(x["tur"] == "izin" and x.get("yerel") and x["durum"] == "bekliyor" for x in ey))
-    kod, _ = uc("/note", {"text": "ikinci"}, anahtar=False, koken=EK)
+    kod, _ = uc("/ping", {"panel": True}, anahtar=False, koken=EK)
     ok("onay beklerken yine 403, ikinci kart açılmaz", kod == 403 and len(izin_kartlari()) == 1)
     kod, _ = uc("/card-ack", {"id": k1[0]["id"], "status": "onaylandi"}, anahtar=False, koken=EK)
     ok(f"anahtarsız Onayla geçmez ({kod})", kod in (401, 403) and len(izin_kartlari()) == 1)
     kod, _ = uc("/card-ack", {"id": k1[0]["id"], "status": "onaylandi"}, koken=PANO); time.sleep(0.3)
-    kod2, _ = uc("/note", {"text": "onaydan sonra"}, anahtar=False, koken=EK)
+    kod2, _ = uc("/ping", {"panel": True}, anahtar=False, koken=EK)
     ok(f"Onayla → aynı kaynak yazabilir ({kod2})", kod == 200 and kod2 == 200 and not izin_kartlari())
-    kod, _ = uc("/note", {"text": "başka eklenti"}, anahtar=False, koken=EK2)
+    kod, _ = uc("/ping", {"panel": True}, anahtar=False, koken=EK2)
     k2 = izin_kartlari(); ok("başka köken ayrıca sorulur", kod == 403 and len(k2) == 1 and EK2[:30] in k2[0]["text"])
     uc("/card-ack", {"id": k2[0]["id"], "status": "reddedildi"}, koken=PANO); time.sleep(0.3)
-    kod, _ = uc("/note", {"text": "reddedilen"}, anahtar=False, koken=EK2)
+    kod, _ = uc("/ping", {"panel": True}, anahtar=False, koken=EK2)
     ok("Reddet → 403 ve yeni kart açılmaz", kod == 403 and not izin_kartlari())
     kod, _ = uc("/note", {"text": "anahtarlı"}, koken=EK2)
     ok("anahtarlı istek izin sormaz", kod == 200 and not izin_kartlari())
     ok("izin kaydı 0600", oct(os.stat(os.path.join(canli, "izin-kayit.jsonl")).st_mode & 0o777) == "0o600")
+    # 1b) anahtarsiz_yazma: true (yalnız ayar dosyası) → eski davranış: yüksek etkili uç da kartla anahtarsız yazar
+    P2 = bos_port(8787); T2 = os.path.join(T, "iki"); c2 = os.path.join(T2, "canli"); os.makedirs(c2)
+    json.dump({"alan": "Deneme", "ad": "Deniz T", "port": P2, "uygulama": T2, "proje": T2, "anahtarsiz_yazma": True}, open(os.path.join(T2, "ayar.json"), "w"))
+    for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "tur-isci.py", "toplanti-claude.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T2)
+    for d in ("aktarici", "pano"): shutil.copytree(os.path.join(KOD, d), os.path.join(T2, d))
+    r2 = subprocess.Popen([sys.executable, "relay.py", "--dir", c2, "--port", str(P2)], cwd=T2, env=dict(env, SUFLOR_AYAR=os.path.join(T2, "ayar.json")), stdout=open(os.path.join(T2, "relay.log"), "w"), stderr=subprocess.STDOUT)
+    try:
+        for _ in range(60):
+            if os.path.exists(os.path.join(c2, "kart-anahtari.txt")): break
+            time.sleep(0.2)
+        time.sleep(1)
+        try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{P2}/note", data=b'{"text":"x"}', headers={"Content-Type": "application/json", "Origin": EK}), timeout=10); kod = 200
+        except urllib.error.HTTPError as e: kod = e.code; y = json.loads(e.read() or b"{}")
+        ok(f"anahtarsiz_yazma true → /note anahtarsız ilk istek 403 izin bekliyor ({kod})", kod == 403 and y.get("err") == "izin bekliyor")
+    finally: r2.terminate(); r2.wait(5)
     # 2) /izin-iste
     kod, _ = uc("/izin-iste", {"arac": "send_message", "ozet": "x"}, anahtar=False)
     ok(f"/izin-iste anahtarsız 401 ({kod})", kod == 401)

@@ -374,14 +374,145 @@ TOPO_SONU_RISK_RX = re.compile(r"(?:^|[\s;&|(`$])(?:rm|rmdir|srm|shred|sudo|git\
                                r"curl|wget|scp|ssh|rsync|kill|pkill|killall|chmod|chown|diskutil|security)\b|aktarici-kur|yayinla\.py|guncelle\.command|kur\.sh", re.I)
 TOPO_SONU_MCP_RISK_RX = re.compile(r"send|delete|trash|remove|forward|reply|post|publish|share|respond|event|archive|spam|move|rename|upload|purchase", re.I)
 TOPO_SONU_ARAC = {"Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "ToolSearch", "TaskStop", "TaskOutput", "TodoWrite", "Monitor"}
+# Güvenlik denetimi G1/G2 (13 Kasım 2026): toplantı sonu otomatik izni ve okuma/web kapısı daraltıldı — yetenek kısılmaz, riskli durum karta (Onayla/Reddet) düşer.
+# web-kapi.py (hassas_yol, web_url_suphe) relay'de bolum("web-kapi") ile önceden yüklenir; yoksa (tek başına çalıştıran testler) aynı klasörden yüklenir.
+if "hassas_yol" not in globals():
+    try:
+        for _d in (os.path.dirname(os.path.abspath(__file__)), os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici")):
+            if os.path.exists(os.path.join(_d, "web-kapi.py")): exec(compile(open(os.path.join(_d, "web-kapi.py"), encoding="utf-8").read(), "web-kapi.py", "exec"), globals()); break
+    except Exception: pass
+def _topo_hassas(yol, genis=False):  # okunması sorulacak yol mu; genis: ev klasörü/Library gibi içinde gizli klasör barındıran geniş taramalar da
+    f = globals().get("hassas_yol")
+    if not f: return False
+    if f(yol): return True
+    if genis and yol:
+        ev = os.path.realpath(os.path.expanduser("~")); g = os.path.realpath(os.path.expanduser(str(yol)))
+        return g in (ev, os.path.join(ev, "Library"), os.path.join(ev, "Library", "Application Support"))
+    return False
+def _topo_web_suphe(ad, gi):  # WebFetch adresi sorulmadan açılamayacaksa (tr, en) neden, yoksa None
+    f = globals().get("web_url_suphe")
+    return f(gi.get("url")) if ad == "WebFetch" and f else None
+def _topo_oku_hassas(ad, gi):  # Read/Grep/Glob gizli bilgi taşıyan yolu mu okuyor
+    if ad == "Read": return _topo_hassas(gi.get("file_path") or gi.get("path"))
+    yol = str(gi.get("path") or "")
+    if ad == "Grep": return _topo_hassas(yol, True) if yol else False
+    if ad == "Glob":
+        d = os.path.expanduser(yol) if yol else ""; pt = str(gi.get("pattern") or "")
+        taban = re.split(r"[*?\[{]", os.path.expanduser(pt), 1)[0]  # desenin kabuk karakteri öncesi sabit parçası
+        if os.path.isabs(taban) or not d: aday = taban or d
+        else: aday = os.path.join(d, taban)
+        return any(_topo_hassas(x, True) for x in (yol, aday) if x)
+    return False
+TOPO_YAZMA_UZANTI = (".sh", ".command", ".py", ".js", ".plist", ".swift", ".zsh", ".bash", ".rb", ".pl", ".scpt", ".applescript", ".app")
+def _topo_yazma_kokler():  # sonda yazılabilir güvenli kökler: proje klasörü, canlı klasör, özet klasörleri (gorusmeler, deneme testler/)
+    k = [os.path.realpath(os.path.expanduser(str(AYAR["calisma"])))] if AYAR.get("calisma") else []
+    k.append(os.path.realpath(BASE)); k += _topo_oz_klasorler()
+    return k
+def _topo_yazma_guvenli(yol, cwd=None):  # toplantı sonunda sorulmadan yazılabilir mi: güvenli kökte, gizli/çalıştırılabilir/yapılandırma dosyası değil
+    yol = str(yol or "")
+    if not yol or "\0" in yol: return False
+    p = os.path.expanduser(yol)
+    if not os.path.isabs(p):
+        if not cwd: return False
+        p = os.path.join(cwd, p)
+    g = os.path.realpath(p); kok = next((k for k in _topo_yazma_kokler() if g == k or g.startswith(k + os.sep)), None)
+    if not kok: return False
+    if any(x.startswith(".") for x in g[len(kok):].split(os.sep) if x): return False  # .claude, .git, .zshrc …
+    ad = os.path.basename(g).lower()
+    if {"launchagents", "launchdaemons"} & {x.lower() for x in g.split(os.sep)}: return False
+    return not (ad == "claude.md" or (ad.startswith("settings") and ad.endswith(".json")) or ad.endswith(TOPO_YAZMA_UZANTI))
+TOPO_SONU_YORUM_RX = re.compile(r"^(?:python[0-9.]*|pypy[0-9]*|node|nodejs|deno|bun|perl|ruby|php|lua|swift|osascript|sh|bash|zsh|dash|ksh|csh|tcsh)$")
+TOPO_SONU_SATIRICI = {"python": r"^-[BEIOPRSsuvxbdhiqV]*[cm]", "pypy": r"^-[BEIOPRSsuvxbdhiqV]*[cm]", "sh": r"^-[A-Za-z]*c", "bash": r"^-[A-Za-z]*c", "zsh": r"^-[A-Za-z]*c", "dash": r"^-[A-Za-z]*c",
+                      "ksh": r"^-[A-Za-z]*c", "csh": r"^-[A-Za-z]*c", "tcsh": r"^-[A-Za-z]*c", "node": r"^-[A-Za-z]*[ep]", "nodejs": r"^-[A-Za-z]*[ep]", "bun": r"^-[A-Za-z]*[ep]", "perl": r"^-[A-Za-z]*[eE]",
+                      "ruby": r"^-[A-Za-z]*e", "php": r"^-[A-Za-z]*r", "lua": r"^-[A-Za-z]*e", "deno": r"^$", "swift": r"^$", "osascript": r"^-[A-Za-z]*e"}
+TOPO_SONU_YASAK_KOMUT = {"eval", "exec", "source", ".", "nc", "ncat", "netcat", "telnet", "socat", "ftp", "sftp", "open", "xargs"}
+TOPO_SONU_SARMAL = {"env", "command", "nohup", "time", "nice", "timeout", "stdbuf", "builtin"}
+TOPO_SONU_YAZAN = {"cp", "mv", "ln", "install", "tee", "dd", "touch", "mkdir", "truncate"}
+def _topo_sonu_bash_supheli(c):  # toplantı sonu Bash'inde karta düşmesi gereken kalıp var mı (satır içi kod, ağ/açma, güvenli kök dışına yazma); betik yolu ile çalıştırma serbest
+    k = re.sub(r"(<<-?\s*(['\"]?)(\w+)\2[^\n]*)\n.*?\n[ \t]*\3[ \t]*(?=\n|$)", r"\1", str(c or ""), flags=re.S)  # heredoc gövdesi veridir
+    k = k.replace("\r", "\n").replace("\n", " ; ")
+    try:
+        s = shlex.shlex(k, posix=True, punctuation_chars=True); s.whitespace_split = True; ts = list(s)
+    except ValueError: return True
+    cwd = os.path.realpath(os.path.expanduser(str(AYAR["calisma"]))) if AYAR.get("calisma") else None
+    segler, av, bora, i, yon = [], [], False, 0, []
+    def bitir(yeni_bora):
+        nonlocal av, bora
+        if av: segler.append((av, bora))
+        av, bora = [], yeni_bora
+    while i < len(ts):
+        t = ts[i]
+        if t in ("|", "|&"): bitir(True)
+        elif t in ("&&", "||", ";", "&", "(", ")", ";;"): bitir(False)
+        elif t in (">", ">>", "&>", ">|", "&>>"):
+            h = ts[i + 1] if i + 1 < len(ts) else ""
+            if av and av[-1] in ("1", "2"): av.pop()
+            if h != "/dev/null": yon.append((len(segler), h))  # hedef, o andaki cd'ye göre aşağıda denetlenir
+            i += 1
+        elif t == ">&": i += 1  # 2>&1
+        elif t in ("<<", "<<-", "<<<", "<"): i += 1  # girdi yönlendirme: yorumlayıcıda betiksiz çalıştırma aşağıda yakalanır
+        else: av.append(t)
+        i += 1
+    bitir(False)
+    for n, (av, bora) in enumerate(segler):
+        if any(not _topo_yazma_guvenli(h, cwd) for sn, h in yon if sn == n): return True
+        while av and (re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", av[0]) or os.path.basename(av[0]) in TOPO_SONU_SARMAL or (len(av) > 1 and av[0].startswith("-")) or re.fullmatch(r"\d+[smhd]?", av[0])): av = av[1:]
+        if not av: continue
+        cmd = os.path.basename(av[0]); arg = av[1:]
+        if cmd in TOPO_SONU_YASAK_KOMUT: return True
+        if cmd == "cd":
+            hedef = next((x for x in arg if not x.startswith("-")), "~")
+            cwd = os.path.realpath(os.path.expanduser(hedef)) if os.path.isabs(os.path.expanduser(hedef)) else (os.path.realpath(os.path.join(cwd, hedef)) if cwd else None)
+            if cwd and not any(cwd == k or cwd.startswith(k + os.sep) for k in _topo_yazma_kokler()): cwd = None  # güvenli kök dışı: göreli yazma hedefi artık sorulur
+            continue
+        if bora and (TOPO_SONU_YORUM_RX.match(cmd) or cmd.startswith(("python", "pypy"))): return True  # sh/python'a boru
+        if TOPO_SONU_YORUM_RX.match(cmd):
+            poz = None; j = 0
+            while j < len(arg):
+                x = arg[j]
+                if x == "-" or x == "--eval" or x == "--print": return True
+                if x.startswith("-") and not x.startswith("--"):
+                    if re.match(TOPO_SONU_SATIRICI.get(cmd, TOPO_SONU_SATIRICI["python"] if cmd.startswith("python") else TOPO_SONU_SATIRICI["pypy"]), x): return True  # satır içi kod seçeneği
+                    if cmd.startswith(("python", "pypy")) and x in ("-W", "-X", "-Q"): j += 1
+                elif x.startswith("--"):
+                    if cmd == "deno" and x in ("--eval",): return True
+                else:
+                    if cmd == "deno" and x == "eval": return True
+                    poz = x; break
+                j += 1
+            if poz is None: return True  # betik yok: girdiden okur
+            continue
+        if cmd == "base64" and any(re.match(r"^-[A-Za-z]*[dD]", x) or x == "--decode" for x in arg): return True
+        if cmd in ("awk", "gawk", "nawk") and any("system" in x or "getline" in x or "|" in x for x in arg): return True
+        if cmd == "sed" and any(re.match(r"^-[A-Za-z]*i", x) for x in arg): return True
+        if cmd in TOPO_SONU_YAZAN:
+            poz = [x for x in arg if not x.startswith("-")]
+            if cmd == "dd": hedefler = [x[3:] for x in arg if x.startswith("of=")]
+            elif cmd in ("tee", "touch", "mkdir", "truncate"):
+                if cmd == "truncate": poz = [x for x in poz if not re.fullmatch(r"[+\-]?\d+[KMG]?", x)]
+                hedefler = poz
+            else:
+                t_i = next((n for n, x in enumerate(arg) if x in ("-t", "--target-directory")), None)
+                hedefler = [arg[t_i + 1]] if t_i is not None and t_i + 1 < len(arg) else poz[-1:]
+                if cmd == "mv": hedefler = poz if t_i is None else hedefler + poz  # taşınan kaynak da silinir
+            if cmd != "dd" and not hedefler: return True
+            if any(not _topo_yazma_guvenli(h, cwd) for h in hedefler): return True
+    return any(not _topo_yazma_guvenli(h, cwd) for sn, h in yon if sn >= len(segler))
+def _topo_sonu_mcp_okuma(ad):  # toplantı sonunda sorulmadan geçecek MCP aracı: okuma fiilli ad ya da kendi suflorvt okuma araçları
+    k = ad.split("__")[-1]
+    if ad.startswith("mcp__suflorvt__"): return k in ("vt_sema", "vt_sor", "kisi_bul", "kayit_listele", "kayit_tarihce", "kisi_ozet")
+    if re.fullmatch(r"(?:gmail_|outlook_)?(?:create|update)_draft", k.lower()): return True  # 13 Kasım: taslak gönderilmez, kullanıcı açıp gönderir — yetenek kalır (yanıt/iletme taslağı RISK ile sorulur)
+    p = set(k.lower().split("_"))  # okuma fiili adın başında ya da ortasında (outlook_email_search); yazan fiil ya da riskli kalıp varsa değil
+    return bool(p & {"get", "list", "query", "compare", "search", "fetch", "read", "describe", "lookup", "find", "view"}) and not (p & BILGI_YAZMA) and not BILGI_RISK_RX.search(k)
 def topo_toplanti_sonu():  # yeni toplantı açılmışsa (algılandı/sürüyor) sorulur
     d = toplanti_durum(); return AYAR.get("toplanti_sonu_onaysiz") is not False and (d == "bitiyor" or (d == "bos" and onceki_sonu_suruyor()))
 def _topo_sonu_oto(ad, gi):  # toplantı sonunda sorulmadan verilecekse günlük açıklaması, değilse None
     if not topo_toplanti_sonu(): return None
-    if ad.startswith("mcp__"):
-        return None if TOPO_SONU_MCP_RISK_RX.search(ad.split("__")[-1]) else ad
+    if ad.startswith("mcp__"):  # G1: yalnız okuma araçları; öbürleri (örn. outlook_create_filter, update_file) kartla sorulur
+        return None if TOPO_SONU_MCP_RISK_RX.search(ad.split("__")[-1]) or not _topo_sonu_mcp_okuma(ad) else ad
     if ad not in TOPO_SONU_ARAC: return None
-    if ad == "Bash" and TOPO_SONU_RISK_RX.search(str(gi.get("command") or "")): return None
+    if ad in ("Write", "Edit", "MultiEdit", "NotebookEdit") and not _topo_yazma_guvenli(gi.get("file_path") or gi.get("notebook_path"), os.path.realpath(os.path.expanduser(str(AYAR["calisma"]))) if AYAR.get("calisma") else None): return None  # G1: güvenli kök dışı/gizli/betik dosyası sorulur
+    if ad == "Bash" and (TOPO_SONU_RISK_RX.search(str(gi.get("command") or "")) or _topo_sonu_bash_supheli(gi.get("command"))): return None
     return ad
 # 6 Kasım (5 Kasım ölçümü, testler/gecikme-olcum-20261105.md: `find` için 113 sn izin beklendi, oturum o sürede 13 olayı kuyrukta tuttu): salt okuyan kabuk
 # komutu sorulmaz. Dar kural: komut zinciri (| && || ;) yalnız TOPO_SALT_KOMUT'taki komutlardan oluşur; yazan/çalıştıran seçenek (find -delete/-exec, sort -o,
@@ -443,7 +574,7 @@ def _topo_salt_okur(ad, gi):  # sorulmadan verilecekse günlük açıklaması (y
             parca.append(av); av = []
         elif t in (">", ">>", "&>", ">&", "<"):
             hedef = ts[i + 1] if i + 1 < len(ts) else ""
-            if t == "<": ok_ = bool(hedef) and hedef not in ("|", "&", ";", ">", "<")  # dosyadan okuma
+            if t == "<": ok_ = bool(hedef) and hedef not in ("|", "&", ";", ">", "<") and not _topo_hassas(hedef, True)  # dosyadan okuma (G2: gizli yol sorulur)
             elif t == ">&": ok_ = hedef in ("1", "2")
             else: ok_ = hedef == "/dev/null"
             if not ok_: return None
@@ -455,6 +586,9 @@ def _topo_salt_okur(ad, gi):  # sorulmadan verilecekse günlük açıklaması (y
     if not av: return None
     parca.append(av)
     if not all(_topo_salt_komut(p) for p in parca): return None
+    for p in parca:  # G2: argüman olarak gizli bilgi yolu (anahtar, şifre, tarayıcı çerezi) varsa sorulur
+        for t in p[1:]:
+            if not t.startswith("-") and ("/" in t or t.startswith(("~", "."))) and _topo_hassas(t, True): return None
     if any(os.path.basename(p[0]) == "sqlite3" for p in parca[1:]): return None  # sqlite3 boru sonunda değil, kendi sorgusuyla (stdin'den komut almasın)
     return "Bash " + " | ".join(os.path.basename(p[0]) for p in parca)
 # İzin beklerken Claude Code yeni olayları (izle'nin Monitor olayları, kutudan yazılanlar) işlemez, kuyrukta tutar. Ölçüm: izle her olayın anını
@@ -471,6 +605,9 @@ def _topo_okuma_arac(ad):  # girdiden bağımsız hatırlanabilen araç: web ara
     k = ad.split("__")[-1]
     return ad.startswith("mcp__") and bool(BILGI_OKUMA_RX.match(k)) and not (set(k.lower().split("_")) & BILGI_YAZMA) and not BILGI_RISK_RX.search(k)
 def _topo_izin_anahtar(ad, gi):
+    try:
+        if _topo_web_suphe(ad, gi): return ad + "\0supheli\0" + str(gi.get("url") or "")  # G2: önceki WebFetch onayı şüpheli adresi kapsamaz
+    except Exception: pass
     if _topo_okuma_arac(ad): return ad
     return ad + "\0" + (str(gi.get("command") or "") if ad in ("Bash", "Monitor") else json.dumps(gi, sort_keys=True, ensure_ascii=False))
 def _topo_web_red(ad, gi):  # web aracı reddedilecekse Türkçe/İngilizce neden, yoksa None
@@ -492,9 +629,13 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
     except Exception: salt = None
     onaysiz = AYAR.get("bilgi_onaysiz") is not False  # 5 Kasım: varsayılan açık — okuma araçları ve web araması sorulmaz
     web_red = _topo_web_red(ad, gi) if ad in TOPO_WEB else None
+    try: oku_hassas = ad in TOPO_OKU_ARAC and _topo_oku_hassas(ad, gi)  # G2: gizli bilgi yolu okuması karta düşer
+    except Exception: oku_hassas = ad in TOPO_OKU_ARAC
+    try: web_suphe = None if web_red else _topo_web_suphe(ad, gi)  # G2: veri taşıyabilecek adres karta düşer
+    except Exception: web_suphe = (_t("Adres doğrulanamadı.", "The address could not be checked."),) * 2 if ad == "WebFetch" else None
     if web_red:
         cevap = {"behavior": "deny", "message": web_red}; print(f"TOPLANTI OTURUMU: izin {ad} (web) → reddedildi ({web_red})")
-    elif ad in TOPO_WEB and onaysiz and TOPO.get("web_sorgu", 0) < TOPO_WEB_EN_COK:
+    elif ad in TOPO_WEB and onaysiz and not web_suphe and TOPO.get("web_sorgu", 0) < TOPO_WEB_EN_COK:
         TOPO["web_sorgu"] = TOPO.get("web_sorgu", 0) + 1; cevap = {"behavior": "allow", "updatedInput": gi}
         print(f"TOPLANTI OTURUMU: izin {ad} (web araştırması {TOPO['web_sorgu']}/{TOPO_WEB_EN_COK}) → kendiliğinden")
     elif ad.startswith(TOPO_CHROME_ON) and topo_chrome_karar(ad, gi) == "deny":
@@ -511,7 +652,7 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         print(f"TOPLANTI OTURUMU: izin {bk['kaynak']['sunucu']} · {bk['arac']} (bilgi kaynağı, okuma {TOPO['bilgi_sorgu']}/{TOPO_BILGI_EN_COK}) → kendiliğinden")
     elif _topo_izle_mi(ad, gi):
         cevap = {"behavior": "allow", "updatedInput": gi}; print("TOPLANTI OTURUMU: izin Monitor (izle) → kendiliğinden")
-    elif ad in TOPO_OKU_ARAC or _topo_tc_okuma(ad, gi):
+    elif (ad in TOPO_OKU_ARAC and not oku_hassas) or _topo_tc_okuma(ad, gi):
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} (salt okuma) → kendiliğinden")
     elif salt:
         cevap = {"behavior": "allow", "updatedInput": gi}; print(f"İZİN: salt-okur, kendiliğinden — {salt}")
@@ -528,14 +669,15 @@ def _topo_izin(o):  # Claude Code'un izin sorusu (can_use_tool) → panoda onay 
         # 5 Kasım: aynı araç paralel çağrılırsa (ayrı iş parçacıkları) ikisi de soruyordu — anahtar başına kilit; ikinci çağrı kilidi alınca verilmiş izni görür
         with TOPO["kilit_sozluk"].setdefault(anh, threading.Lock()):
             if anh in hat: cevap = {"behavior": "allow", "updatedInput": gi}; print(f"TOPLANTI OTURUMU: izin {ad} → aynı anda sorulan izin onaylandı, yeniden sorulmadı")
-            else: cevap = _topo_izin_sor(ad, gi, anh, hat)
+            else: cevap = _topo_izin_sor(ad, gi, anh, hat, (" " + _t("Dikkat: ", "Note: ") + _t(web_suphe[0], web_suphe[1])) if web_suphe else "", web_suphe)
     _topo_gonder({"type": "control_response", "response": {"subtype": "success", "request_id": o.get("request_id"), "response": cevap}})
-def _topo_izin_sor(ad, gi, anh, hat):
+def _topo_izin_sor(ad, gi, anh, hat, ek="", suphe=None):
     if True:
+        if suphe: print(f"İZİN: web adresi soruluyor — {suphe[0]}")
         ozet = _topo_arac_ozet(ad, gi); TOPO["izin"] += 1; TOPO["izin_toplam"] += 1
         _topo_mesaj("izin", arac_cumlesi(ad, gi))  # v0.112.2: düz cümle, komut yalnız eylem ayrıntısında ve izin-kayit.jsonl'de
         t0, yaz0 = time.time(), TOPO.get("yazilan", 0)
-        iid = izin_iste("arac", izin_metni(ad, gi), {"arac": ad, "ozet": ozet}, oturum=True)  # v0.115.0: kart değil, Claude bölümünde Onayla / Reddet
+        iid = izin_iste("arac", izin_metni(ad, gi) + ek, {"arac": ad, "ozet": ozet}, oturum=True)  # v0.115.0: kart değil, Claude bölümünde Onayla / Reddet
         k = izin_bekle(iid) if iid else "zaman_asimi"; TOPO["izin"] = max(0, TOPO["izin"] - 1)
         try: _topo_bekleme_kaydi(ad, t0, yaz0)
         except Exception: pass
@@ -545,7 +687,7 @@ def _topo_izin_sor(ad, gi, anh, hat):
                                                      "Kullanıcı onay vermedi (süre doldu); bu adımı atla, gerekirse ona sor.",
                                                      "The user declined (Suflor); skip this step and ask them if needed." if k == "reddedildi" else
                                                      "No approval from the user (timed out); skip this step and ask them if needed.")})
-        if k == "onaylandi": hat.add(anh)  # oturum boyunca hatırla (yeniden soru yok)
+        if k == "onaylandi" and not suphe: hat.add(anh)  # şüpheli web adresi hatırlanmaz: her seferinde sorulur  # oturum boyunca hatırla (yeniden soru yok)
         print(f"TOPLANTI OTURUMU: izin {ad} → {k}")
     return cevap
 def _topo_oku(cik, nesil):
