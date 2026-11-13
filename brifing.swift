@@ -378,8 +378,21 @@ func bilgiAracUygun(_ t: String) -> Bool {
     return Set(d.lowercased().replacingOccurrences(of: "*", with: "").components(separatedBy: "_")).isDisjoint(with: bilgiYazma)
 }
 func aracUygun(_ v: String) -> Bool { v.split(separator: ",").allSatisfy { let t = $0.trimmingCharacters(in: .whitespaces); return araclar.contains(t) || t.hasPrefix("mcp__suflorvt__") || bilgiAracUygun(t) } }
-func ayarUygun(_ v: String) -> Bool {  // --settings: yalnız "env" (CLAUDE_CODE_DISABLE_CLAUDE_MDS, CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS) ve "allowedMcpServers" (kanca, izin, model yok)
-    guard let d = v.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], !o.isEmpty, Set(o.keys).isSubset(of: ["env", "allowedMcpServers"]) else { return false }
+// 13 Kasım 2026, güvenlik denetimi G3: Konuş'ta WebFetch öncesi adres kapısı. --settings içinde "hooks" yalnız bu katı biçimde geçer (kancaDenetle gibi): tek PreToolUse,
+// matcher tam "WebFetch|WebSearch", tek "command" kancası, komut tam /usr/bin/python3 -I -B <uygulama>/aktarici/konus-web-kanca.py <istek klasörü>; timeout isteğe bağlı (1–10).
+// bas-konus.py konus_kanca_destek bu sürüm işaretini kaynakta arar (derleme kaydı "SuflorBrifing.kanca"); işareti değiştirirsen ikisini birlikte değiştir.
+let konusWebKancaSurum = 1
+func konusKancaUygun(_ h0: Any) -> Bool {
+    guard let h = h0 as? [String: Any], Set(h.keys) == ["PreToolUse"], let pt = h["PreToolUse"] as? [[String: Any]], pt.count == 1,
+          Set(pt[0].keys) == ["matcher", "hooks"], pt[0]["matcher"] as? String == "WebFetch|WebSearch", let hk = pt[0]["hooks"] as? [[String: Any]], hk.count == 1,
+          Set(hk[0].keys).isSubset(of: ["type", "timeout", "command"]), hk[0]["type"] as? String == "command", let c = hk[0]["command"] as? String else { return false }
+    if let t = hk[0]["timeout"] { guard let n = t as? Int, n >= 1, n <= 10 else { return false } }
+    let kanca = (uygulamaKlasor as NSString).appendingPathComponent("aktarici/konus-web-kanca.py")
+    return c == "/usr/bin/python3 -I -B \(kabukTirnak(kanca)) \(kabukTirnak(istekKlasor))"
+}
+func ayarUygun(_ v: String) -> Bool {  // --settings: yalnız "env" (CLAUDE_CODE_DISABLE_CLAUDE_MDS, CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS), "allowedMcpServers" (kanca, izin, model yok) ve katı "hooks" (konusKancaUygun)
+    guard let d = v.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], !o.isEmpty, Set(o.keys).isSubset(of: ["env", "allowedMcpServers", "hooks"]) else { return false }
+    if let h = o["hooks"] { guard konusKancaUygun(h) else { return false } }
     if let e0 = o["env"] {
         guard let e = e0 as? [String: Any], Set(e.keys).isSubset(of: ["CLAUDE_CODE_DISABLE_CLAUDE_MDS", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"]),
               e.values.allSatisfy({ $0 is String }) else { return false }

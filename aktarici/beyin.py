@@ -11,7 +11,7 @@
 # openai-uyumlu: {"tur": "openai-uyumlu", "saglayici": "gemini"|"openai"|"lmstudio" (adres hazır) ya da "adres": "https://…/v1", "model": …,
 # "anahtar": Anahtar Zinciri öğe adı (dosyaya anahtar yazılmaz; gemini'de yoksa ayar gemini_anahtar), "effort": reasoning_effort, "fiyat": [giriş, önbellek, çıkış] $/M belirteç,
 # "yedek": false → hata olunca Claude Code'a düşmez}.
-import glob as _glob, http.client, json, os, re, shutil, ssl, subprocess, sys, threading, time, urllib.parse, uuid
+import glob as _glob, http.client, json, os, re, shlex, shutil, ssl, subprocess, sys, threading, time, urllib.parse, uuid
 
 UYARLAYICILAR = ("claude-code", "openai-uyumlu")
 ISLER = ("konus", "ceviri", "telaffuz", "brifing", "proje_karti", "prova")
@@ -83,10 +83,17 @@ def yalin(ayar, bilgi=False, web=False):  # bilgi: Konuş'ta dış bilgi kaynağ
     return ([x for x in YALIN if x != "--strict-mcp-config"] if bilgi else YALIN) + ["--tools", "Read,Grep,Glob" + ("," + KONUS_WEB_ARACLAR if web else "")]
 # Konuş (v0.90.0 reçete 1): proje CLAUDE.md'si ve git bilgisi ilk kullanıcı mesajına girip önbelleği bozuyordu → Konuş sürecinde kapalı (ortam değişkeni
 # --settings env ile; Brifing.app yalnız bu iki anahtara izin verir). Ayar konus_onek_sabit: false eski davranış. konus_effort: low|medium|high|xhigh|max.
-def konus_onek_ayar(ayar, bilgi=None, mcp_ad=None):  # bilgi: konus_bilgi() çıktısı (varsa allowlist eklenir; tek --settings)
+# 13 Kasım 2026, güvenlik denetimi G3: web açıkken WebFetch öncesi adres kapısı (aktarici/konus-web-kanca.py); komut brifing.swift konusKancaUygun ile birebir aynı olmalı
+# (kabuk tırnağı shlex.quote = kabukTirnak). Yalnız kurulu Brifing kancayı tanıyorsa eklenir (bas-konus.py konus_kanca_destek), yoksa eski yardımcı --settings'i reddedip Konuş'u açmazdı.
+def konus_web_kanca(canli):
+    kod = os.path.join(os.path.dirname(os.path.realpath(os.path.abspath(__file__))), "konus-web-kanca.py")
+    return {"PreToolUse": [{"matcher": "WebFetch|WebSearch", "hooks": [{"type": "command", "timeout": 5,
+            "command": f"/usr/bin/python3 -I -B {shlex.quote(kod)} {shlex.quote(os.path.realpath(canli))}"}]}]}
+def konus_onek_ayar(ayar, bilgi=None, mcp_ad=None, kanca_klasor=None):  # bilgi: konus_bilgi() çıktısı (varsa allowlist eklenir; tek --settings); kanca_klasor: canlı klasör (web kancası)
     ek = {}
     if bilgi:
         ek = {"allowedMcpServers": [{"serverUrl": k["url"]} for k in bilgi] + ([{"serverName": mcp_ad}] if mcp_ad else [])}
+    if kanca_klasor: ek["hooks"] = konus_web_kanca(kanca_klasor)
     sabit = ayar.get("konus_onek_sabit", True) is not False
     if not sabit and not ek: return []
     env = {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1"} if sabit else {}
@@ -134,13 +141,13 @@ def derin_secim(ayar):
     if not re.fullmatch(r"[A-Za-z0-9._\[\]-]{1,64}", m): m = "opus"
     e = str(ayar.get("konus_derin_effort") or "high").strip().lower()
     return {"model": m, "effort": e if e in ("low", "medium", "high", "xhigh", "max") else "high"}
-def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None, bilgi=None, web=False, effort=None):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli; bilgi: konus_bilgi() çıktısı; web: WebSearch/WebFetch (bas-konus.py konus_web_acik)
+def konus_args(ayar, sistem, ek_araclar="", mcp=None, ek_dizin=None, model=None, bilgi=None, web=False, effort=None, kanca=False):  # açık süreç (Brifing.app FIFO kipi): stream-json giriş/çıkış, parça parça metin; model: yedekte Claude modeli; bilgi: konus_bilgi() çıktısı; web: WebSearch/WebFetch (bas-konus.py konus_web_acik)
     bilgi = konus_bilgi(bilgi) if bilgi else []
     ek = ",".join(x for x in (ek_araclar, bilgi_araclar(bilgi), KONUS_WEB_ARACLAR if web else "") if x)
     return ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--allowedTools", "Read,Grep,Glob" + ("," + ek if ek else ""), "--add-dir", ek_dizin, "--append-system-prompt", sistem] + (["--mcp-config", mcp] if mcp else []) + \
            (yalin(ayar, bool(bilgi), web) or ["--no-session-persistence"]) + ["--model", model or secim(ayar, "konus")["model"]] + \
-           konus_onek_ayar(ayar, bilgi, "suflorvt" if mcp else None) + konus_effort(ayar, effort)
+           konus_onek_ayar(ayar, bilgi, "suflorvt" if mcp else None, ek_dizin if (web and kanca) else None) + konus_effort(ayar, effort)
 def ceviri_effort(ayar):  # varsayılan low (40 cümlede Haiku düşünme belirteci 455 → 0, ortanca 2,56 → 1,22 sn); ayar ceviri_effort: low|medium|high|xhigh|max, boş metin = bayrak yok
     e = str(ayar["ceviri_effort"] if "ceviri_effort" in ayar and ayar["ceviri_effort"] is not None else "low").strip().lower()
     return ["--effort", e] if e in ("low", "medium", "high", "xhigh", "max") else []

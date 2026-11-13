@@ -1368,6 +1368,7 @@ def derle(uyg, kaynak, ikili_ad, plist, kayit_dizin=None):  # Swift yardımcıs�
     sha = hashlib.sha256(open(kay, "rb").read()).hexdigest(); kayit = _derleme_kaydi(kd, ikili_ad)
     if ikili_ad == "SuflorBrifing":  # S257: aktarıcı launchd altında kaynağı okuyamaz (Masaüstü) → web araç desteği kayda yazılır (bas-konus.py konus_web_destek)
         import re as _re; _derleme_kaydi(kd, "SuflorBrifing.web", "evet:" + sha if _re.search(r'let araclar: Set<String> = \[[^\]]*"WebSearch"[^\]]*"WebFetch"', open(kay, encoding="utf-8", errors="replace").read()) else "hayir")
+        _derleme_kaydi(kd, "SuflorBrifing.kanca", "evet:" + sha if _re.search(r"let konusWebKancaSurum = [1-9]", open(kay, encoding="utf-8", errors="replace").read()) else "hayir")  # 13 Kasım 2026, güvenlik denetimi G3: Konuş web kancasını kabul eden derleme (bas-konus.py konus_kanca_destek)
     if os.access(ikili, os.X_OK) and (kayit == sha or kayit is None and os.path.getmtime(kay) <= os.path.getmtime(ikili)):
         if kayit is None: _derleme_kaydi(kd, ikili_ad, sha)
         return False

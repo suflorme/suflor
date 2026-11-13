@@ -63,6 +63,27 @@ try:
         if not strict: a.remove("--strict-mcp-config")
         return a
     kontrol("Konuş + bilgi kaynağı argümanları kabul", calistir(den, konus_bilgi()) != 3 and sahte_calisti())
+    # 13 Kasım 2026 (G3): Konuş web kancası — yalnız tek PreToolUse / "WebFetch|WebSearch" / python -I -B <uygulama>/aktarici/konus-web-kanca.py <istek klasörü> biçimi geçer
+    import shlex
+    KK = os.path.join(U, "aktarici", "konus-web-kanca.py")
+    def kanca_ayar(matcher="WebFetch|WebSearch", komut=None, ek_kanca=0, ek_anahtar=None, timeout=5, tur="command"):
+        h = {"type": tur, "command": komut or f"/usr/bin/python3 -I -B {shlex.quote(KK)} {shlex.quote(C)}"}
+        if timeout is not None: h["timeout"] = timeout
+        pt = {"matcher": matcher, "hooks": [h] * (1 + ek_kanca)}
+        return {"env": ES, "hooks": dict({"PreToolUse": [pt]}, **(ek_anahtar or {}))}
+    def konus_kanca(ayar):
+        a = list(KONUS); a[a.index("--settings") + 1] = json.dumps(ayar); return a
+    kontrol("Konuş web kancası (doğru biçim) kabul", calistir(den, konus_kanca(kanca_ayar())) != 3 and sahte_calisti())
+    kontrol("Konuş web kancası, timeout'suz kabul", calistir(den, konus_kanca(kanca_ayar(timeout=None))) != 3 and sahte_calisti())
+    for ad, ay in [("yanlış matcher (Bash)", kanca_ayar(matcher="Bash")), ("matcher yalnız WebFetch", kanca_ayar(matcher="WebFetch")), ("ikinci kanca", kanca_ayar(ek_kanca=1)),
+                   ("başka komut yolu", kanca_ayar(komut=f"/usr/bin/python3 -I -B {shlex.quote(os.path.join(T, 'x.py'))} {shlex.quote(C)}")),
+                   ("başka istek klasörü", kanca_ayar(komut=f"/usr/bin/python3 -I -B {shlex.quote(KK)} /tmp")),
+                   ("-B yok", kanca_ayar(komut=f"/usr/bin/python3 -I {shlex.quote(KK)} {shlex.quote(C)}")),
+                   ("komuta ek parça", kanca_ayar(komut=f"/usr/bin/python3 -I -B {shlex.quote(KK)} {shlex.quote(C)}; id")),
+                   ("fazla kanca olayı", kanca_ayar(ek_anahtar={"PostToolUse": []})), ("tür http", kanca_ayar(tur="http")),
+                   ("timeout büyük", kanca_ayar(timeout=600)), ("timeout metin", kanca_ayar(timeout="5")),
+                   ("hooks ile fazla üst anahtar", dict(kanca_ayar(), permissions={"allow": ["Bash"]})), ("hooks boş", {"env": ES, "hooks": {}})]:
+        kontrol(f"Konuş web kancası reddedildi: {ad}", calistir(den, konus_kanca(ay)) == 3 and not sahte_calisti())
     for ad, args in [("yazan araç adı (create_)", konus_bilgi(SA + "create_report")), ("yazan sözcük sonda (get_and_delete)", konus_bilgi(SA + "get_and_delete")),
                      ("okuma öneksiz araç (send_*)", konus_bilgi(SA + "send_*")), ("yıldızlı yazma (get_*_update)", konus_bilgi(SA + "get_x_update")),
                      ("çift alt çizgili sunucu", konus_bilgi("mcp__a__b__get_x")), ("mcp__ önekli ama araç adı yok", konus_bilgi("mcp__x")),

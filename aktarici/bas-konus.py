@@ -270,6 +270,22 @@ def konus_web_destek(uyg=None, kaynaklar=None):  # kurulu Brifing yardımcısı 
         except OSError: continue
         if hashlib.sha256(ham).hexdigest() == kayit and KONUS_WEB_RX.search(ham.decode("utf-8", "replace")): return True
     return False
+# 13 Kasım 2026, güvenlik denetimi G3: Konuş'ta WebFetch adres kapısı (aktarici/konus-web-kanca.py) --settings hooks ile gider; eski Brifing yardımcısı hooks'lu --settings'i reddedip
+# Konuş'u hiç açmaz. Yeni yapıyı şöyle anlarız: brifing.swift'te `let konusWebKancaSurum = 1` işareti; derleme.json "SuflorBrifing.kanca" == "evet:<sha>" (kurulum.py derle yazar) ya da
+# kaydedilmiş SuflorBrifing SHA'sı işaretli bir brifing.swift kaynağınınkiyle aynı. Kayıt yoksa/eskiyse kancasız (bugünkü gibi) sürer.
+KONUS_KANCA_RX = re.compile(r"let konusWebKancaSurum = [1-9]")
+def konus_kanca_destek(uyg=None, kaynaklar=None):
+    import hashlib
+    try: kd = json.load(open(os.path.join(uyg or AYAR["uygulama"], "derleme.json"), encoding="utf-8"))
+    except (OSError, ValueError, AttributeError, KeyError): return False
+    kayit = kd.get("SuflorBrifing") if isinstance(kd, dict) else None
+    if not isinstance(kayit, str) or not kayit: return False
+    if kd.get("SuflorBrifing.kanca") == "evet:" + kayit: return True
+    for y in (kaynaklar if kaynaklar is not None else _konus_swift_yerler()):
+        try: ham = open(y, "rb").read()
+        except OSError: continue
+        if hashlib.sha256(ham).hexdigest() == kayit and KONUS_KANCA_RX.search(ham.decode("utf-8", "replace")): return True
+    return False
 def konus_web_acik():  # S257: varsayılan açık; kapatanlar: web_arastirma (ana şalter, toplantıyı da), konus_web, toplantı dışında web_arastirma_disari; gizli kipte/toplantıda S208 sınırı
     if AYAR.get("web_arastirma") is False or AYAR.get("konus_web") is False: return False
     if AYAR.get("web_arastirma_disari") is False and not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")): return False
@@ -1216,7 +1232,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         ds = BEYIN.derin_secim(AYAR) if _KS.get("derin_iste") and sec["tur"] == "claude-code" else None  # derin tur: Opus'lu süreç (konus_derin_mi)
         _KS["derin"] = bool(ds)
         if sec["tur"] == "claude-code":
-            args = BEYIN.konus_args(AYAR, konus_istem(vt, bilgi, web), VT_MCP_ARACLAR if vt else "", vt, BASE, ds["model"] if ds else sec["model"], bilgi, web, ds["effort"] if ds else None)  # v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
+            args = BEYIN.konus_args(AYAR, konus_istem(vt, bilgi, web), VT_MCP_ARACLAR if vt else "", vt, BASE, ds["model"] if ds else sec["model"], bilgi, web, ds["effort"] if ds else None, bool(web) and konus_kanca_destek())  # G3: web kancası yalnız kancayı tanıyan Brifing derlemesinde; v0.121.1: beyin katmanı; model sonnet (v0.20.3: 6 soruluk kıyas, 8 Ekim: Sonnet 0,026 $/soru, Opus 0,053 $; kalite yakın)
             ist, kip = {"claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": os.path.join(BASE, "konus-bos"), "giris": gir, "cikis": cik, "sure": 7200}, "--istek"
         else:  # v0.122.0 (Faz 11 Aşama 1): openai-uyumlu — Brifing.app --beyin → aktarici/beyin.py (araç döngüsü, aynı stream-json)
             ist, kip = BEYIN.konus_istek(AYAR, konus_istem(vt), vt, [AYAR["proje"], BASE], AYAR["calisma"], gir, cik, "en" if ARAYUZ_DILI == "en" else "tr"), "--beyin"
