@@ -1601,7 +1601,10 @@ final class OrtakMik {
         let bhId = blackhole(); defer { bildir(bhId) }
         guard let bh = bhId else { if cikis != nil { durdur("BlackHole yok") }; return }
         if cikis == nil {
-            if (caObje(bh, kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) ?? 0) != 0 {
+            // 13 Kasım: geçiş yalnız Suflor dışı bir süreç (Teams, Zoom…) BlackHole'u GİRİŞ olarak okurken başlar. Eskiden BlackHole'un herhangi bir yerde
+            // çalışması yetiyordu: öbür macOS hesabının menü uygulaması BlackHole'a yazınca bu hesap da kendi mikrofonunu açıp karıştırıyordu (denetimde iki
+            // SuflorMenu toplantı yokken BlackHole + Harici Mikrofon açık). macOS 14 öncesinde süreç aygıt listesi yok: eski koşul.
+            if bhBaslat(bh) {
                 // v0.80.3 (18 Ekim): Mac'in varsayılan girişi BlackHole'a geçmişse geçiş BlackHole → BlackHole döngüsüne girer (kendi çıkışı BlackHole'u
                 // "çalışıyor" yapar, aygıt değişimiyle durur, yeniden başlar); karşı taraf kullanıcıyı duymaz. Başlamaz, bir kez günlük + bildirim.
                 let gAyg = caObje(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice, AudioObjectID(0)) ?? 0
@@ -1612,7 +1615,15 @@ final class OrtakMik {
                 if girisBH { girisBH = false; print("ORTAK MİK: varsayılan giriş yeniden gerçek mikrofon (\(ad(gAyg)))") }
                 basla(bh)
             }
-        } else if baskaGiris() { bos = 0 } else { bos += 1; if bos >= 10 { durdur("mikrofonu okuyan toplantı yok") } }
+        } else if bhDevam(bh) { bos = 0 } else { bos += 1; if bos >= 10 { durdur("BlackHole'u okuyan toplantı yok") } }
+    }
+    func bhBaslat(_ bh: AudioObjectID) -> Bool {
+        if #available(macOS 14.0, *) { return bhOkuyan(bh) }
+        return (caObje(bh, kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) ?? 0) != 0
+    }
+    func bhDevam(_ bh: AudioObjectID) -> Bool {  // geçiş açıkken: Teams mikrofonu BlackHole'dan başka aygıta alınınca da ~10 sn'de kapanır
+        if #available(macOS 14.0, *) { return bhOkuyan(bh) }
+        return baskaGiris()
     }
     func basla(_ bh: AudioObjectID) {
         guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { uyar(TE("Mikrofon izni yok — Teams'e sesin gitmiyor", "No microphone permission — Teams cannot hear you")); return }
