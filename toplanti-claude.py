@@ -142,7 +142,7 @@ hf.add_argument("--sil", default=None, help="bu adı hafızadan sil"); hf.add_ar
 dk = sub.add_parser("dokum", help="v0.12.6: temiz döküm dosyası (.md + .vtt) → <proje>/gorusmeler/<alan>-<kişi>-transkript-<YYYYMMDD>")
 dk.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); dk.add_argument("--kim", default=None, help="dosya adındaki kişi/konu (yoksa toplantı başlığı)")
 dk.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)"); dk.add_argument("--uzerine", action="store_true", help="var olan dosyanın üzerine yaz")
-dk.add_argument("--goster", action="store_true", help="yazmadan .md'yi yazdır")
+dk.add_argument("--goster", action="store_true", help="yazmadan .md'yi yazdır"); dk.add_argument("--yenile", action="store_true", help="13 Kasım: bu toplantının daha önce yazılmış temiz dökümlerini (Kaynak satırı) aynı adla yeniden yaz — elle düzeltme sonrası; önceki hâl ses arşivine yedeklenir; yoksa bir şey yazmaz")
 ad = sub.add_parser("ekranlar", aliases=["adimlar"], help="toplantı sonu: sunulan ekranlar (paylaşımda kendiliğinden alınan görüntüler) + kanıtlar döküm satırlarıyla saat sırasıyla; görüntüler özetin yanına kopyalanır → Claude özete 'Sunulan ekranlar' (gerekirse adım belgesi) yazar")
 ad.add_argument("dosya", nargs="?", help="toplantı .md/.jsonl (yoksa en yenisi)"); ad.add_argument("--kim", default=None, help="dosya adındaki konu (yoksa toplantı başlığı)")
 ad.add_argument("--cikti", default=None, help="klasör (yoksa <proje>/gorusmeler, o da yoksa <proje>)")
@@ -1720,6 +1720,7 @@ def _ad_gercek(ad):  # yer tutucu ad, kullanıcının kendisi ya da boş → Non
 def _esleme_yol(md): return os.path.join(A.dir, md[:-3] + ".konusmaci.json")
 def ad_uygula(md, rs):
     # satırın adı = süreye göre çoğunluk kişi (karne, koç, pay); iki kişili satır (bölümleri farklı kişide) "_bol" taşır, döküm onu böler
+    rs = elle_uygula(md, rs)
     try: v = json.load(open(_esleme_yol(md), encoding="utf-8")); es = v.get("ad") or {}; bol = v.get("bol") or {}
     except (OSError, ValueError): return rs
     for r in rs:
@@ -1727,6 +1728,50 @@ def ad_uygula(md, rs):
         if r.get("id") in es and r.get("speaker") != es[r["id"]]: r["speaker_canli"] = r.get("speaker"); r["speaker"] = es[r["id"]]
         if r.get("id") in bol: r["_bol"] = bol[r["id"]]
     return rs
+# Elle döküm kontrolü (13 Kasım): kullanıcının dinleyip düzelttiği metin (<ses-arsivi>/<toplantı>/duzeltme-elle.json: ses dosyası → doğru metin,
+# aktarici/dokum-kontrol.py "Bitir") konuşmacı eşlemesi gibi okuma anında satıra işlenir; .md/.jsonl değişmez. Böylece temiz döküm, özet, karar
+# ve işler düzeltilmiş metinden çıkar. Satır ses dosyasına parcalar.jsonl'daki t0 ile bağlanır; düzeltme boşsa satır düşer (uydurma), satırı
+# olmayan parça (Whisper boş vermiş ya da ayıklanmış) düzeltilince yeni satır olarak eklenir (ben kanalı kullanıcının adı, karşı kanal en yakın karşı satırın adı).
+def _elle_klasor(md): return os.path.join(A.dir, "ses-arsivi", md[:-3])
+def elle_uygula(md, rs):
+    import collections
+    kl = _elle_klasor(md)
+    try: e = json.load(open(os.path.join(kl, "duzeltme-elle.json"), encoding="utf-8"))
+    except (OSError, ValueError): return rs
+    duz = {x["dosya"]: " ".join(x["dogru"].split()) for x in e.get("duzeltmeler") or [] if isinstance(x, dict) and isinstance(x.get("dosya"), str) and isinstance(x.get("dogru"), str)}
+    if not duz: return rs
+    pm = {}
+    try:
+        for l in open(os.path.join(kl, "parcalar.jsonl"), encoding="utf-8"):
+            try: p = json.loads(l)
+            except ValueError: continue
+            if isinstance(p, dict) and p.get("dosya") in duz and p.get("t0") is not None: pm[p["dosya"]] = p
+    except OSError: return rs
+    yer = {}
+    for r in rs:
+        if "text" in r and r.get("t0") is not None: yer.setdefault((r.get("kanal"), round(float(r["t0"]), 2)), []).append(r)
+    ben = collections.Counter(r.get("speaker") for r in rs if "text" in r and r.get("kanal") == "ben" and r.get("speaker")).most_common(1)
+    ben = ben[0][0] if ben else str(AYAR.get("ad") or BEN)
+    karsi = sorted((float(r["t0"]), r.get("speaker")) for r in rs if "text" in r and r.get("kanal") == "karsi" and r.get("t0") is not None and r.get("speaker"))
+    sil, yeni = set(), []
+    for dosya, dogru in duz.items():
+        p = pm.get(dosya)
+        if not p: continue
+        hedef = yer.get((p.get("kanal"), round(float(p["t0"]), 2)))
+        if hedef:
+            for r in hedef:
+                if not dogru: sil.add(id(r)); continue
+                if r.get("text") != dogru: r["text_canli"] = r.get("text"); r["text"] = dogru; r["elle"] = True
+        elif dogru:
+            t0, t1 = float(p["t0"]), float(p.get("t1") or p["t0"])
+            kim = ben if p.get("kanal") == "ben" else (min(karsi, key=lambda x: abs(x[0] - t0))[1] if karsi else "Karşı taraf")
+            yeni.append({"id": "elle-" + dosya, "time": datetime.datetime.fromtimestamp(t0).strftime("%H:%M:%S"), "speaker": kim, "text": dogru,
+                         "src": "elle", "kanal": p.get("kanal"), "t0": t0, "t1": t1, "elle": True})
+    if not (sil or yeni or any(r.get("elle") for r in rs)): return rs
+    out = [r for r in rs if id(r) not in sil]
+    for y in sorted(yeni, key=lambda y: y["t0"]):  # zaman sırasına yerleştir: t0'ı ondan büyük ilk metin satırının önüne
+        i = next((j for j, r in enumerate(out) if "text" in r and r.get("t0") is not None and float(r["t0"]) > y["t0"]), len(out)); out.insert(i, y)
+    return out
 def bol_metin(r):
     # iki kişili satırı bölümlerine ayır: metnin sözcükleri bölümlerin sözcük sayısıyla (n) orantılı paylaştırılır (sözlük düzeltmesi sayıyı
     # biraz değiştirebilir); ardışık aynı kişi birleşir. → [(t0, t1, kim, metin)]
@@ -2363,10 +2408,34 @@ def dokum_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
     md = os.path.basename(md).replace(".jsonl", ".md")
+    if A.yenile: return dokum_yenile(md)
     konusmaci_esle(md)
     sat = dokum_satirlari(md)
     if not any("metin" in x for x in sat): sys.exit(f"{md}: dökümde satır yok")
     dokum_yaz(sat, toplanti_basligi(md), "Kaynak: `_canli/" + md + "`")
+def dokum_yenile(md):  # elle düzeltme sonrası: Kaynak satırı bu toplantıyı gösteren temiz dökümleri aynı kişi/konu adıyla yeniden yaz
+    import shutil
+    hedef = os.path.expanduser(A.cikti) if A.cikti else next((y for y in (os.path.join(CALISMA, "gorusmeler"), CALISMA) if os.path.isdir(y)), None)
+    isaret = "Kaynak: `_canli/" + md + "`"; bulunan = []
+    try: adlar = sorted(f for f in os.listdir(hedef or "") if f.endswith(".md") and "-transkript-" in f)
+    except OSError: adlar = []
+    for f in adlar:
+        try:
+            with open(os.path.join(hedef, f), encoding="utf-8") as fh: bas = fh.read(4000)
+        except OSError: continue
+        if isaret in bas: bulunan.append(f)
+    if not bulunan: print(f"{md}: yenilenecek temiz döküm yok"); return
+    yd = os.path.join(_elle_klasor(md), "temiz-dokum-onceki"); os.makedirs(yd, exist_ok=True)
+    sat = dokum_satirlari(md)
+    if not any("metin" in x for x in sat): sys.exit(f"{md}: dökümde satır yok")
+    alan = f"{AYAR.get('alan') or 'Suflor'}-"
+    for f in bulunan:
+        kok = f[:-3]
+        for uz in (".md", ".vtt"):
+            if os.path.exists(os.path.join(hedef, kok + uz)): shutil.copy2(os.path.join(hedef, kok + uz), os.path.join(yd, kok + uz))
+        m = re.match(re.escape(alan) + r"(.+)-transkript-\d{8}$", kok)
+        A.kim = m.group(1) if m else A.kim; A.uzerine = True; A.cikti = hedef
+        dokum_yaz(sat, toplanti_basligi(md), isaret)
 def dokum_kok(kim, bas):  # <hedef>/<alan>-<kim>-transkript-<YYYYMMDD>; varsa ve --uzerine yoksa durur
     kim = re.sub(r"[^\w-]+", "-", kim, flags=re.UNICODE).strip("-")[:60] or "toplanti"
     hedef = os.path.expanduser(A.cikti) if A.cikti else next(y for y in (os.path.join(CALISMA, "gorusmeler"), CALISMA) if os.path.isdir(y))

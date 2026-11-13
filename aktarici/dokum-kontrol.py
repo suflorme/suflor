@@ -296,6 +296,12 @@ def dk_havuza(kl, plan, din, duz):  # eğitim havuzu: dinlenen satırların wav 
         _so_yaz(os.path.join(hedef, "dogrulanmis.jsonl"), "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in satirlar), 0o600)
         return n
     except Exception as e: print(f"DÖKÜM KONTROLÜ: havuza yazılamadı ({e.__class__.__name__})"); return 0
+def dk_temiz_yenile(md):  # 13 Kasım: elle düzeltmeler temiz dökümde de görünsün (özet, karar, iş temiz dökümden) — toplanti-claude.py dokum --yenile
+    try:
+        r = subprocess.run(["/usr/bin/python3", "-B", os.path.join(os.path.dirname(os.path.abspath(__file__)), "toplanti-claude.py"), "--dir", BASE, "dokum", md, "--yenile"],
+                           capture_output=True, text=True, timeout=180, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+        print("DÖKÜM KONTROLÜ: temiz döküm " + ("yenilendi" if r.returncode == 0 and "yazıldı" in r.stdout else "yenilenmedi") + f" ({(r.stdout or r.stderr).strip().splitlines()[-1][:120] if (r.stdout or r.stderr).strip() else r.returncode})")
+    except Exception as e: print(f"DÖKÜM KONTROLÜ: temiz döküm yenilenemedi ({type(e).__name__})")
 def dk_bitir(ad, kuru_kok=None):  # kaydet düğmesi: duzeltme-elle.json + ölçüm + sözlük adayı + eğitim havuzu; → özet
     acik, neden = dk_acik()
     if not acik: return {"ok": False, "err": neden}
@@ -311,6 +317,7 @@ def dk_bitir(ad, kuru_kok=None):  # kaydet düğmesi: duzeltme-elle.json + ölç
     elif havuz: threading.Thread(target=dk_havuza, args=(kl, plan, set(din), dict(duz)), daemon=True, name="dk-havuz").start()
     d["bitti"] = datetime.datetime.now().isoformat(timespec="seconds"); d["kapatma"] = None; _so_yaz(os.path.join(kl, DK_DURUM), json.dumps(d, ensure_ascii=False), 0o600)
     if "so_tetik" in globals(): so_tetik()  # öğrenen sözlük bu toplantıyı elle düzeltmeyle yeniden işler (so_bekleyen)
+    if kuru_kok is None and duz: threading.Thread(target=dk_temiz_yenile, args=(md,), daemon=True, name="dk-temiz").start()
     print(f"DÖKÜM KONTROLÜ: kaydedildi · {len(din)} satır dinlendi · {len(e['duzeltmeler'])} düzeltme · hata Whisper {kayit['wer']['whisper']} Gemini {kayit['wer']['gemini']} Teams {kayit['wer']['teams']} · havuza {havuz} satır")
     return {"ok": True, "dinlenen": len(din), "duzeltme": len(e["duzeltmeler"]), "olcum": kayit, "havuz": havuz}
 # --- hazırlık döngüsü ve panoya görünüm -----------------------------------------------------------------------------------------------------------------------------------------------------------------
