@@ -215,6 +215,17 @@ def _iptal(a):  # algılandı ama hiç satır gelmedi: yalnız başlıklı dosya
         for k in ("file_last", "file_start", "file_lines"): STATE[k].pop(a["dosya"], None)
         if STATE.get("file") == a["dosya"]: STATE["file"] = (TOPLANTI.get("onceki") or {}).get("dosya"); STATE["meeting"] = (TOPLANTI.get("onceki") or {}).get("ad")
     print(f"TOPLANTI: algılanan toplantı başlamadı — kayıt kaldırıldı ({a['dosya']})"); _durum_yaz()
+# 13 Kasım: panodan Başlat'la açılıp hiç satır almamış kayıt (web sekmesi kapandı ya da toplantı oturumu kapatıldı) 30 dk beklemeden kalkar.
+# Satır gelmiş toplantıda ve kendiliğinden algılanan toplantıda davranış aynı.
+def _baslat_bos(a): return bool(a) and a["kaynak"] == "başlat" and a["durum"] == "algilandi" and not a["satir"] and not STATE["file_lines"].get(a["dosya"], 0)
+def _baslat_sekme_iz(a, now):  # kayıt açıkken kaydın platformunda nabız veren eklenti sekmesi görüldü mü (son görülme)
+    t = max((x.get("seen", 0) for x in EKLENTI.values() if (x.get("platform") or "bilinmeyen") == a["platform"] and x.get("seen", 0) >= a["t0"]), default=0)
+    if t and now - t < SINYAL_SN: a["web_t"] = t
+def toplanti_baslat_bos_kaldir(neden):  # toplantı oturumu kapatılınca (LOCK dışından çağrılır); kaldırdıysa True
+    with LOCK:
+        a = TOPLANTI["aktif"]
+        if not _baslat_bos(a) or eklenti_cagri() or masaustu_toplantida(): return False
+        print(f"TOPLANTI: elle başlatılan toplantıda satır yok, {neden} — kayıt kaldırıldı"); _iptal(a); return True
 def _sekme_isle(a, e):  # kayda ait eklenti sekmeleri ve çağrı başlığı izleri (yeni çağrı ayrımı için; en çok 8'er)
     if not a or not e or not e.get("sekme"): return
     for k, v in (("sekmeler", e["sekme"]), ("basliklar", e.get("baslik"))):
@@ -249,7 +260,10 @@ def toplanti_bak():  # LOCK içinde; geçişleri yapar, LOCK dışında koşacak
         d = a["durum"]
         if d != "bitiyor" or guvenli: _sekme_isle(a, s.get("eklenti"))
         if d == "algilandi":
+            if a["kaynak"] == "başlat": _baslat_sekme_iz(a, now)
             if guvenli or a["satir"]: _gecis(a, "suruyor", "güvenli sinyal" if guvenli else "ilk satır")
+            elif not s and _baslat_bos(a) and a.get("web_t") and now - a["web_t"] > SINYAL_SN:  # 13 Kasım: Başlat'tan sonra açılan toplantı sekmesi kapandı, satır yok
+                print(f"TOPLANTI: elle başlatılan toplantının sekmesi kapandı, satır gelmedi — kayıt kaldırıldı"); _iptal(a); a = None
             elif not s and now - a["t_sinyal"] > (BASLAT_BEKLE_DK * 60 if a["kaynak"] == "başlat" else ALGILANDI_BEKLE_SN): _iptal(a); a = None
         elif d == "suruyor":
             esik = SINYAL_SN if any(k in a["kaynaklar"] for k in ("eklenti", "masaustu", "ses", "altyazi")) else SINYALSIZ_SN  # hiç sinyal görmemiş kayıt (yalnız satır: eski istemci, curl)

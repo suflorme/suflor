@@ -451,7 +451,28 @@ def senaryo_Q():
         ok("Q7 masaüstü toplantı bitişi: anında bitiyor", R.durum().get("durum") == "bitiyor", str(R.durum()))
     finally: R.kapat(); R.sil()
 
-for s in [s for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H, senaryo_L, senaryo_M, senaryo_N, senaryo_O, senaryo_P, senaryo_Q) if not sys.argv[1:] or s.__name__[8:] in sys.argv[1:]]:  # ör. test/toplanti.py L M
+def senaryo_R():
+    print("— R) 13 Kasım: elle Başlat, satır yok — sekme kapanınca ya da toplantı oturumu kapatılınca kayıt 30 dk beklemeden kalkar")
+    R = Aktarici([])
+    try:
+        r = R.istek("/baslat", {"konu": "Sekme deneme", "platform": "teams"}); ok("R1 Başlat: algılandı", r.get("ok") and R.durum().get("durum") == "algilandi", str(r))
+        surekli(lambda: R.ping("teams", False, "Microsoft Teams", "t9"), 3)  # Teams sekmesi açık, çağrıya girilmedi
+        ok("R2 sekme açıkken kayıt duruyor", R.durum().get("durum") == "algilandi", str(R.durum()))
+        ok("R3 sekme kapanınca (nabız kesildi) kayıt kalktı", bekle(lambda: R.durum().get("durum") == "bos", 25), str(R.durum()))
+        ok("R4 dosya silindi, günlükte neden", not R.md() and "sekmesi kapandı, satır gelmedi" in R.gunluk(), str(R.md()))
+        r = R.istek("/baslat", {"konu": "Oturum deneme", "platform": "teams"}); ok("R5 yeni Başlat: algılandı", R.durum().get("durum") == "algilandi", str(R.durum()))
+        R.istek("/toplanti-oturum", {"islem": "kapat"})
+        ok("R6 toplantı oturumu kapatılınca kayıt kalktı", R.durum().get("durum") == "bos" and not R.md() and "toplantı oturumu kapatıldı — kayıt kaldırıldı" in R.gunluk(), str(R.durum()))
+        r = R.istek("/baslat", {"konu": "Satırlı", "platform": "teams"}); R.whisper("gerçek bir söz")
+        R.istek("/toplanti-oturum", {"islem": "kapat"})
+        ok("R7 satır gelmiş toplantı oturum kapanınca sürüyor", R.durum().get("durum") == "suruyor" and len(R.md()) == 1, str(R.durum()))
+        R.istek("/toplanti", {"islem": "bitir"}); bekle(lambda: R.durum().get("durum") == "bos", 40)
+        r = R.istek("/baslat", {"konu": "Sekmesiz", "platform": "teams"}); time.sleep(8)
+        ok("R8 hiç sekme görülmediyse (masaüstü ya da henüz açılmadı) kayıt bekliyor", R.durum().get("durum") == "algilandi", str(R.durum()))
+        ok("R9 hata yok", "Traceback" not in R.gunluk())
+    finally: R.kapat(); R.sil()
+
+for s in [s for s in (senaryo_JK, senaryo_A, senaryo_B, senaryo_CDE, senaryo_FG, senaryo_H, senaryo_L, senaryo_M, senaryo_N, senaryo_O, senaryo_P, senaryo_Q, senaryo_R) if not sys.argv[1:] or s.__name__[8:] in sys.argv[1:]]:  # ör. test/toplanti.py L M
     try: s()
     except Exception as e: ok(f"{s.__name__} istisna {e.__class__.__name__}: {e}", False)
 print(f"toplantı kaydı: {len(HATA)} sorun" + "".join(f"\n  KALDI: {h}" for h in HATA) if HATA else "toplantı kaydı: ✓ tüm senaryolar")

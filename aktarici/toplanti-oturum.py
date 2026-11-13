@@ -850,6 +850,7 @@ def toplanti_oturum_islem(p):
     if i == "durdur": return toplanti_oturum_durdur()
     if i == "terminal": return toplanti_oturum_terminal()
     if i == "kapat":  # v0.112.0: panodaki Kapat (toplantı sonu işleri yapılmaz; sürdürmek için Terminal'de göster)
+        toplanti_baslat_bos_kaldir("toplantı oturumu kapatıldı")  # 13 Kasım: satırsız elle başlatılmış toplantı 30 dk açık kalmasın (oturum zaten kapanmış olsa da)
         if not topo_canli(): return {"ok": False, "err": _t("Toplantı oturumu açık değil", "The meeting session isn't running")}
         _topo_mesaj("sistem", _t("Oturum kapatıldı. Sürdürmek için Terminal'de göster.", "Session closed. Use Show in Terminal to continue."))
         toplanti_oturum_kapat("kullanıcı kapattı"); return {"ok": True}
