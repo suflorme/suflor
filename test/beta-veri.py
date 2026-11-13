@@ -209,5 +209,16 @@ finally:
     srv.shutdown()
     if "--sakla" in sys.argv: print("geçici klasör:", T)
     else: shutil.rmtree(T, ignore_errors=True)
+# olcum.py beta: v0.238.3 öncesi paketlerde yankı whisper.yanki + ben kanalından; birikmiş sayaç ölçümsüz sayılır
+import importlib.util as _iu
+_OLCUM = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".claude", "skills", "suflor-olcum", "olcum.py")  # açık depoda yok
+if os.path.exists(_OLCUM):
+    _sp = _iu.spec_from_file_location("olcum_t", _OLCUM); _o = _iu.module_from_spec(_sp); _sp.loader.exec_module(_o)
+    _y = lambda y, ben, top, sat: {"whisper": {"yanki": y, "satir_toplam": top}, "toplanti": {"satir": sat, "kanal": {"ben": ben}}}
+    kontrol("olcum beta: yeni paketin kalite.ses alanı olduğu gibi", _o._beta_ses({"kalite": {"ses": {"ses_yolu": "normal"}}}) == {"ses_yolu": "normal"})
+    kontrol("olcum beta: eski pakette yüksek yankı → hoparlör", (_o._beta_ses(_y(792, 278, 1351, 1336)) or {}).get("ses_yolu") == "hoparlor_yankisi")
+    kontrol("olcum beta: eski pakette az yankı → normal", (_o._beta_ses(_y(4, 60, 70, 66)) or {}).get("ses_yolu") == "normal")
+    kontrol("olcum beta: birikmiş whisper sayacı → ölçümsüz", _o._beta_ses(_y(1172, 323, 2153, 862)) is None)
+    kontrol("olcum beta: whisper bilgisi yok → ölçümsüz", _o._beta_ses({"toplanti": {"satir": 10}}) is None)
 print(f"{sum(ok)}/{len(ok)}")
 sys.exit(0 if all(ok) else 1)
