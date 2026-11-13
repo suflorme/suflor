@@ -300,6 +300,8 @@ try:
         import urllib.parse as _up  # 12 Kasım: Türkçe harfli uzun toplantı adı yüzde-kodlanınca 80 karakteri aşıyordu, /ac sessizce reddediyordu
         uzun = _up.quote("2026-11-12-1759-Haftalık-Bütçe-Gözden-Geçirme-Çalışması-Öncesi", safe="-_.!~*'()"); tk = "a" * 32
         aj = istek("/ac", {"dokum_kontrol": f"http://127.0.0.1:{PORT}/dokum-kontrol?top={uzun}&t={tk}"}); ok("HTTP: /ac uzun Türkçe klasör adlı döküm kontrolü adresini kabul eder", aj.get("ok") is True and len(uzun) > 80, str(aj)[:100])
+        aj2 = istek("/ac", {"dokum_kontrol": f"http://127.0.0.1:{PORT}/dokum-kontrol?sozluk=1&t={tk}"}); ok("HTTP: /ac panodaki Bekleyenler sözlük adresini (?sozluk=1) kabul eder", aj2.get("ok") is True, str(aj2)[:100])
+        ok("HTTP: /ac sozluk=1 dışında değer kabul etmez", istek("/ac", {"dokum_kontrol": f"http://127.0.0.1:{PORT}/dokum-kontrol?sozluk=2&t={tk}"}).get("ok") is False)
         ok("HTTP: /ac başka adresi reddeder", istek("/ac", {"dokum_kontrol": f"http://127.0.0.1:{PORT}/baska?top=x&t={tk}"}).get("ok") is False)
     finally: rp.terminate(); rp.wait(5)
     # beta aktarıcı: sayfa 404
