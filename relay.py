@@ -2015,6 +2015,7 @@ bolum("basecamp-oku")  # aktarici/basecamp-oku.py — Basecamp OKUMA bağlayıc�
 bolum("mutabakat")  # aktarici/mutabakat.py — gece mutabakat turu (zekâ Y1): açık/bayat kayıtlara kanıtla durum ÖNERİSİ (bitti · sürüyor · yerini aldı · belirsiz), düşünme turundan hemen önce; POST /mutabakat onay|red|calistir, /status mutabakat (12 Kasım)
 bolum("masaustu-altyazi")  # aktarici/masaustu-altyazi.py — masaüstü Teams canlı altyazısı (menü uygulaması AX ile okur → /masaustu-altyazi; satır birleştirme burada, ingest "captions"; 13 Kasım)
 bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, dosyanın tek açılışı, satırın hedefi, bitiş, eklenti sekmeleri (Faz B, v0.149.0)
+bolum("masaustu-uyari")  # aktarici/masaustu-uyari.py — masaüstü toplantı kartları: eklenti gerekmez bilgisi, Teams mikrofonu BlackHole değil uyarısı (POST /ortak-mik; 13 Kasım)
 bolum("tazi-kos")  # aktarici/tazi-kos.py — Tazı koşturucu: aday listesi + hızlı/tam tarama arka planda, /tazi, /status tazi, "Tazı, <ad> araştır" (ayar tazi; 11 Kasım)
 # --- Kesişim günlük koşusu + arka plan çözücü (12 Kasım, F2; kod: <kod>/kesisim.py + kesisim-coz.py, S293: proje veritabanına yazma kapalı). 07:45'ten sonra günde bir; toplantı/gizli kip/dar kaynakta bekler.
 # Yalnız geliştiricinin kurulumunda ve ayar kesisim_cozucu kapalı değilken; deneme aktarıcısı SUFLOR_KESISIM_DENEME=1 ile. Durum canli/kesisim-zaman.json.
@@ -2759,6 +2760,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/masaustu": return self._json(masaustu_al(p))  # menü çubuğu uygulaması (anahtarla)
         if self.path == "/masaustu-altyazi": return self._json(masaustu_altyazi_al(p))  # menü uygulamasının okuduğu masaüstü Teams altyazısı (anahtarla; ayar masaustu_altyazi)
         if self.path == "/ses-masaustu": return self._json(masaustu_mic_al(p))
+        if self.path == "/ortak-mik": return self._json(ortak_mik_al(p))  # menü uygulaması OrtakMik: BlackHole başka süreçten okunuyor mu (anahtarla; masaustu-uyari.py)
         if self.path == "/kanit-masaustu":  # menü uygulamasının toplantı penceresi görüntüsü (anahtarla; Origin yalnız aktarıcının kendisi ya da yok)
             if o and not o.startswith(f"http://127.0.0.1:{A.port}"): return self._json({"ok": False, "err": "köken"}, 403)
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)  # menü uygulamasının mikrofonu (anahtarla; geçiş listesinde yok)

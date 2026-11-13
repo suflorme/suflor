@@ -477,7 +477,9 @@ def toplanti_view():  # /status toplanti — pano yalnız buna bakar
         v.update(ad=a["ad"], dosya=a["dosya"], platform=a["platform"], bas=datetime.datetime.fromtimestamp(a["t0"]).strftime("%H:%M"),
                  son_satir_sn=round(now - a["t_satir"]) if a["t_satir"] else None, kaynaklar={k: round(now - t) for k, t in a["kaynaklar"].items()},
                  oturum=a["oturum"], neden=a["neden"], gec_atilan=a["gec_atilan"], bitis_neden=a.get("bitis_neden"))
-        v["mic_bilinmiyor"] = a["durum"] == "suruyor" and not eklenti_cagri() and not masaustu_toplantida() and (STATE.get("masaustu_mic") or {}).get("acik", False)
+        # 13 Kasım: masaüstü Teams/Zoom toplantısında (menü uygulaması görmese de mikrofonu tutan uygulama masaüstündeyse) eklenti gerekmez — "Eklenti çalışmıyor" yanıltıcı
+        v["mic_bilinmiyor"] = a["durum"] == "suruyor" and not eklenti_cagri() and not masaustu_toplantida() and (STATE.get("masaustu_mic") or {}).get("acik", False) \
+            and not ("masaustu_uygulamada" in globals() and masaustu_uygulamada())
     if o: v["onceki"] = {"dosya": o["dosya"], "ad": o["ad"], "bitti": datetime.datetime.fromtimestamp(o["t_kapanis"] or now).strftime("%H:%M"), "neden": o.get("bitis_neden"), "gec_atilan": o["gec_atilan"]}
     oo = oturum_onceki()
     if oo:  # toplantı oturumu önceki toplantının sonunu yapıyor (toplanti-claude.py dosyayı buradan alır; izle bu dosyada kalır ve bitişini bildirir)
@@ -522,5 +524,6 @@ def _toplanti_dongu():
         try:
             with LOCK: isler = toplanti_bak()
             for f in isler: threading.Thread(target=f, daemon=True).start()
+            if "masaustu_uyari_bak" in globals(): masaustu_uyari_bak()  # masaustu-uyari.py: masaüstü toplantı bilgi kartı, BlackHole uyarısı (LOCK dışında)
             if time.time() - son_yaz >= 5: son_yaz = time.time(); _durum_yaz()
         except Exception as e: print(f"TOPLANTI: denetim hatası ({e.__class__.__name__}: {str(e)[:120]})")

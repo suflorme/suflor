@@ -1569,15 +1569,37 @@ final class OrtakMik {
         }
     }
     func ad(_ id: AudioObjectID) -> String { (caObje(id, kAudioObjectPropertyName, "" as CFString) as String?) ?? "?" }
+    func paket(_ id: AudioObjectID) -> String { (caObje(id, kAudioProcessPropertyBundleID, "" as CFString) as String?) ?? "" }
     func baskaGiris() -> Bool {  // bu uygulamadan başka mikrofon okuyan süreç (toplantı uygulaması, tarayıcı, ses yardımcısı)
+        // 13 Kasım: öbür macOS hesabının menü uygulaması sayılmaz — iki hesapta geçiş açıkken ikisi birbirini "mikrofon okuyan" görüp toplantı dışında
+        // da kapanmıyordu (denetimde iki SuflorMenu, toplantı yokken BlackHole + Harici Mikrofon açık)
         let ben = getpid()
         return caDizi(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyProcessObjectList).contains { id in
-            (caObje(id, kAudioProcessPropertyPID, pid_t(0)) ?? 0) != ben && (caObje(id, kAudioProcessPropertyIsRunningInput, UInt32(0)) ?? 0) != 0
+            (caObje(id, kAudioProcessPropertyPID, pid_t(0)) ?? 0) != ben && (caObje(id, kAudioProcessPropertyIsRunningInput, UInt32(0)) ?? 0) != 0 && paket(id) != "local.suflor.menu"
         }
     }
     func dongu() { Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.bak() } }
+    // 13 Kasım: aktarıcıya durum (POST /ortak-mik, değişince ya da 10 sn'de bir) — masaüstü toplantıda Teams'in mikrofonu BlackHole değilse panoda uyarı
+    // kartı (aktarici/masaustu-uyari.py). bh_okunuyor: bu uygulamadan başka bir süreç BlackHole'u giriş aygıtı olarak kullanıyor (geçiş açıkken de
+    // doğru ayırır: "çalışıyor" bilgisi kendi çıkışımızla da doğru olur). Suflor'un kendi süreçleri (local.suflor.*) sayılmaz: BlackHole'a yazan menü
+    // uygulaması — öbür macOS hesabındaki dahil — giriş listesinde de BlackHole görünür (çift yönlü aygıt; 13 Kasım denemesi).
+    var sonRapor = Date.distantPast; var sonBildirilen: [Bool] = []
+    func bhOkuyan(_ bh: AudioObjectID) -> Bool {
+        let ben = getpid()
+        return caDizi(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyProcessObjectList).contains { id in
+            (caObje(id, kAudioProcessPropertyPID, pid_t(0)) ?? 0) != ben && caDizi(id, kAudioProcessPropertyDevices, kapsam: kAudioObjectPropertyScopeInput).contains(bh)
+                && !paket(id).hasPrefix("local.suflor.")
+        }
+    }
+    func bildir(_ bh: AudioObjectID?) {
+        let d = [bh != nil, bh.map(bhOkuyan) ?? false, cikis != nil]
+        guard d != sonBildirilen || Date().timeIntervalSince(sonRapor) >= 10 else { return }
+        sonBildirilen = d; sonRapor = Date()
+        istek("/ortak-mik", ["bh_var": d[0], "bh_okunuyor": d[1], "gecis": d[2]], sure: 5) { _ in }
+    }
     func bak() {
-        guard let bh = blackhole() else { if cikis != nil { durdur("BlackHole yok") }; return }
+        let bhId = blackhole(); defer { bildir(bhId) }
+        guard let bh = bhId else { if cikis != nil { durdur("BlackHole yok") }; return }
         if cikis == nil {
             if (caObje(bh, kAudioDevicePropertyDeviceIsRunningSomewhere, UInt32(0)) ?? 0) != 0 {
                 // v0.80.3 (18 Ekim): Mac'in varsayılan girişi BlackHole'a geçmişse geçiş BlackHole → BlackHole döngüsüne girer (kendi çıkışı BlackHole'u
