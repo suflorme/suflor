@@ -5,8 +5,8 @@
 import ast, os, re, sys
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); ns = {"re": re}
 a = ast.parse(open(os.path.join(KOD, "whisper-isci.py"), encoding="utf-8").read())
-exec(compile(ast.Module([n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in ("_tekrar_bul", "tekrar_dongu", "tekrar_kirp", "tekrar_sadelestir", "hiz_asiri", "nokta_ayikla", "_tepki_obegi", "sayi_suphe")) or
-                         (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("HARF_DONGU_RX", "NOKTA_OBEK", "NOKTA_YOGUNLUK", "TEPKI_SOZ", "UYDURMA", "SAYI_YUZDE_RX", "SAYI_CIPLAK_RX") for t in n.targets))], []), "whisper-isci.py", "exec"), ns)
+exec(compile(ast.Module([n for n in a.body if (isinstance(n, ast.FunctionDef) and n.name in ("_tekrar_bul", "tekrar_dongu", "tekrar_kirp", "tekrar_sadelestir", "hiz_asiri", "nokta_ayikla", "_tepki_obegi", "sayi_suphe", "kurtar_hiz_uygun")) or
+                         (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in ("HARF_DONGU_RX", "NOKTA_OBEK", "NOKTA_YOGUNLUK", "TEPKI_SOZ", "TEPKI_TEK", "UYDURMA", "SAYI_YUZDE_RX", "SAYI_CIPLAK_RX") for t in n.targets))], []), "whisper-isci.py", "exec"), ns)
 TABLO = [("OBSERV, PARA, OLI, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU,", True, "19 Ekim gerçek satır"),
          ("Teşekkürler teşekkürler teşekkürler teşekkürler.", True, "tek sözcük döngüsü"), ("Bir iki, bir iki, bir iki, bir iki.", True, "iki sözcüklük öbek"),
          ("Evet evet evet, tamam.", False, "gerçek üçlü tekrar"), ("Evet evet evet evet, anladım ama bütçe konusunda henüz bir karar vermedik, haftaya bakalım.", False, "uzun cümlede tekrar"),
@@ -75,4 +75,18 @@ for m, b, ad in [("%83.000'ü", True, "yüzde + binlik ayraç"), ("Bütçenin %8
                  ("290.000 TL", False, "normal tutar"), ("Toplam 290.000 TL harcadık.", False, "cümlede tutar"), ("%83", False, "normal yüzde"), ("yüzde 83", False, "sözlü yüzde"),
                  ("2.000 kişi geldi.", False, "2.000 kişi"), ("%0.500", False, "ondalık yüzde"), ("%30.8", False, "ondalık yüzde 30.8"), ("Rakam 8.000 civarı.", False, "cümlede N.000"), ("", False, "boş")]:
     v = ns["sayi_suphe"](m); hata += v != b; print(("✓ " if v == b else "✗ ") + f"sayı şüphesi {ad}: {'işaretli' if v else 'temiz'}")
+# v0.239.1 (12 Kasım gerçek toplantı, elle döküm kontrolü; kişi adsız): ses konuşmaysa (tek_on/tepki) tek sözcük döngüsünün önündeki gerçek söz ve tepki sözcüğünün tek kopyası kalır
+G = "Tamam bu konuyu yarın sabah ekiple birlikte konuşalım. Sonra şeyde " + " ".join(["chat"] * 14) + " c"
+for m, k, b, ad in [(G, {"tek_on": 5, "tepki": True}, "Tamam bu konuyu yarın sabah ekiple birlikte konuşalım. Sonra şeyde", "gerçek söz + tek sözcük döngüsü → söz kalır"),
+                    (G, {}, None, "kurtarma kapalıyken eski davranış (atılır)"),
+                    (" ".join(["Evet."] * 13) + " Ev", {"tek_on": 5, "tepki": True}, "Evet.", "tepki döngüsü → tek kopya"),
+                    (" ".join(["Abi?"] * 16), {"tek_on": 5, "tepki": True}, "Abi?", "hitap döngüsü → tek kopya"),
+                    ("3 3 3 3 3 3 3", {"tek_on": 5, "tepki": True}, None, "sayı döngüsü yine atılır"),
+                    ("Uh-huh. Uh-huh. Uh-huh. Uh-huh.", {"tek_on": 5, "tepki": True}, None, "İngilizce tepki yine atılır"),
+                    ("Okay okay okay okay okay", {"tek_on": 5, "tepki": True}, None, "İngilizce okay yine atılır"),
+                    ("OBSERV, PARA, OLI, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU, AKMU,", {"tek_on": 5, "tepki": True}, None, "3 sözcük + döngü (19 Ekim yankı) yine atılır")]:
+    v = ns["tekrar_kirp"](m, **k); hata += v != b; print(("✓ " if v == b else "✗ ") + f"{ad}: {v!r}")
+for m, sn, b, ad in [("Bu bir deneme yarın saat onda bu bir deneme yarın saat onda", 1.0, False, "1 sn'de 12 sözcük kurtarılmaz (28 Ekim)"),
+                     ("Tamam bu konuyu yarın sabah ekiple birlikte konuşalım. Sonra şeyde", 5.2, True, "5,2 sn'de 11 sözcük kurtarılır")]:
+    v = ns["kurtar_hiz_uygun"](m, sn); hata += v != b; print(("✓ " if v == b else "✗ ") + f"kurtarma hızı {ad}: {v}")
 print("tekrar döngüsü: " + ("✓ hepsi geçti" if not hata else f"✗ {hata} hata")); sys.exit(1 if hata else 0)

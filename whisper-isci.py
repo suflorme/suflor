@@ -89,12 +89,22 @@ def tekrar_dongu(metin):
 # v0.88.2 (19 Ekim 18.23 deneme): gerçek cümlenin ardına öbek döngüsü eklenince ("Eklentiyi yeniledim. Web toplantısına girdim." + öbek ×N) tüm satır
 # atılıyordu. Döngü 2–3 sözcüklük öbekse ve önünde en az 2 sözcük varsa öndeki söz + öbeğin bir kopyası kalır; tek sözcük döngüsü ("AKMU" ×9) yine atılır.
 # Uzun birimde (≥ 4 sözcük) önceki söz + birimin bir kopyası + döngüden sonra gelen farklı söz kalır; döngünün yarım son kopyası düşer.
-def tekrar_kirp(metin):
+# v0.239.1 (12 Kasım gerçek toplantı, elle döküm kontrolü): karşı kanalda 10 sözcüklük gerçek cümle + "… chat chat chat…" döngüsü olan bölüm
+# tek sözcük döngüsü yüzünden bütünüyle atıldı; "Evet. Evet. Evet…" de. Çağıran sesin konuşma olduğunu doğruladıysa: tek_on > 0 iken tek sözcük döngüsünün
+# önünde en az tek_on sözcük varsa öndeki söz kalır (döngü sözcüğü düşer); tepki iken döngü sözcüğü Türkçe tepki sözcüğüyse ve önünde ≤ 2 sözcük varsa tek kopyası kalır.
+TEPKI_TEK = (TEPKI_SOZ - frozenset("ok okay yes no right yeah sure".split())) | frozenset("abi abla inşallah hocam kardeşim".split())  # İngilizce tepki dışarıda
+def kurtar_hiz_uygun(metin, sn):  # kurtarılan söz için hız sınırı: saniyede en çok 6 sözcük (28 Ekim "barbi ×49" önündeki 12 sözcük 1 sn'lik parçadaydı)
+    return sn > 0 and len(re.findall(r"\w+", metin or "")) / sn <= 6
+def tekrar_kirp(metin, tek_on=0, tepki=False):
     for _ in range(3):
         m = list(re.finditer(r"\w+", metin or "")); w = [x.group().lower() for x in m]
         r = _tekrar_bul(w)
         if not r: return (metin or "").strip() or None
         i, n, k = r
+        if n == 1 and tepki and i <= 2 and w[i] in TEPKI_TEK:
+            j = m[i].end(); return (metin[:j] + (metin[j] if j < len(metin) and metin[j] in ".!?" else "")).strip()
+        if n == 1 and tek_on and i >= tek_on:
+            return metin[:m[i].start()].rstrip(" ,;:-–—") or None
         if n == 1 or (n <= 3 and (i < 2 or len(set(w[i:i + n])) == 1)): return None  # öbek tek sözcüğün tekrarıysa ("AKMU AKMU") tek sözcük döngüsü
         son = k * n + i  # döngünün tam kopyalarının bittiği sözcük; yalnız birimin başından oluşan kuyruk (yarım kopya) düşer
         kuyruk = w[son:]
@@ -446,7 +456,13 @@ def main():
                 x, imza = uydurma_on_kirp((s.get("text") or "").strip())
                 if imza: atilan.append(imza)
                 if not x or UYDURMA.search(x) or (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
-                        or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2: atla += 1; atilan += [x] if x else []; continue
+                        or s.get("compression_ratio", 0) > 2.4 or s.get("avg_logprob", 0) < -1.2:
+                    # v0.239.1: bölüm tekrar döngüsü yüzünden düştüyse (sıkıştırma oranı yüksek) ve ses konuşmaysa döngüden önceki gerçek söz kurtarılır
+                    if x and s.get("compression_ratio", 0) > 2.4 and not UYDURMA.search(x) and not (s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8) \
+                            and tekrar_dongu(x) and (kx := tekrar_kirp(x, tek_on=5, tepki=True)) \
+                            and kurtar_hiz_uygun(kx, float(s.get("end", 0) or 0) - float(s.get("start", 0) or 0)) and konusma_var(a, np):
+                        atilan.append(x); tut.append((s, kx)); continue
+                    atla += 1; atilan += [x] if x else []; continue
                 tut.append((s, x))
             metin = buyuk_harf_duzelt(tr_harf(" ".join(x for _, x in tut).strip(), r.get("language")), r.get("language"), istem, p.get("kisaltma"))
             # toplantı dili dışındaki İngilizce (geçişle ya da kanal belleğiyle) kısa kalıp → uydurma
@@ -472,7 +488,8 @@ def main():
                 if mw and all(len(w) >= 3 and any(ortak(w, t) for t in tw) for w in mw): atilan.append(metin); metin = ""; atla += 1
             if metin and hiz_asiri(metin, len(a) / SR): atilan.append(metin); atla += 1; metin = ""  # imkânsız söz hızı (kısa parçada yüzlerce sözcük)
             if metin and tekrar_dongu(metin):  # tekrar döngüsü uydurması (öndeki gerçek söz kalır)
-                kirp = tekrar_kirp(metin); atilan.append(metin); atla += 1; metin = kirp or ""
+                kirp = tekrar_kirp(metin, **({"tek_on": 5, "tepki": True} if konusma_var(a, np) else {})); atilan.append(metin); atla += 1; metin = kirp or ""
+                if metin and not kurtar_hiz_uygun(metin, len(a) / SR) and tekrar_kirp(atilan[-1]) != metin: metin = ""  # v0.239.1 kurtarması yalnız olası hızda
             if metin and (s_ := tekrar_sadelestir(metin)) != metin: atilan.append(metin); metin = s_  # v0.113.1: harf döngüsü, art arda aynı cümle
             if metin:  # 30 Ekim: "... ... ..." öbekleri (sözsüz seste) — öbekler silinir, sözcüğü kalmayan satır atılır
                 m_, at_ = nokta_ayikla(metin, len(a) / SR, p.get("hitap"))
