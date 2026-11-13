@@ -320,7 +320,8 @@ def sozluk_dene_cmd():
 def ogren_ad_alani(oh=True):
     import ast, threading
     ak = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici")
-    ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "BASE": A.dir, "AYAR": AYAR, "AYAR_YOL": AYAR_YOL, "LOCK": threading.Lock(), "__name__": "sozluk_ogren"}
+    ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "BASE": A.dir, "AYAR": AYAR, "AYAR_YOL": AYAR_YOL, "LOCK": threading.Lock(), "__name__": "sozluk_ogren",
+          "_baglayici_mod": lambda: baglayici}  # 13 Kasım: so_oh_var bağlayıcıyı ister; yoksa --ogren her adayda NameError verip karar vermiyordu
     src = open(os.path.join(ak, "sozluk.py"), encoding="utf-8").read(); exec(compile(src[:src.index('# Sesli "Claude:"')], os.path.join(ak, "sozluk.py"), "exec"), ns)
     agac = ast.parse(open(os.path.join(ak, "bas-konus.py"), encoding="utf-8").read())
     sec = [n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in ("_ad_anahtar", "_ad_mesafe"))
