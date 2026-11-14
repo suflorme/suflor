@@ -201,6 +201,9 @@ def hazir():
     A.gundem = h.get("gundem"); A.ton = None
     # kart()'ın okuduğu, hazir alt komutunda olmayan seçenekler (9 Ekim: A.gizli yoktu, hazır kart hiç gitmedi — AttributeError)
     A.gizli = False; A.onay = False; A.durum = ""; A.sessiz_ozet = False
+    # 13 Kasım: A.fisilti da yoktu (üçüncü kez aynı hata) — kart alt komutunun bütün varsayılanlarını kendiliğinden doldur
+    for a in ka._actions:
+        if a.dest != "help" and not hasattr(A, a.dest): setattr(A, a.dest, a.default)
     cid = kart()
     olcum_yaz({"t": "hazir-gonder", "hid": A.hid, "card_id": cid, "card_at": simdi()})
 
