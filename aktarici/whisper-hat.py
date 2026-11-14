@@ -153,6 +153,101 @@ def dk_cokme(metin, lp, kp):
     if len(k) != 1 or k[0] not in DK_COKME or lp is None or kp is None: return False
     return lp < DK_LP or kp < DK_KP
 # DIL-KILIT-BITIS
+# YANKI-TANIMA-BASLA
+# Ses düzeyinde parça başı yankı tanıma (14 Kasım; tasarım ve ölçüm: planlar/yanki-giderme-arastirma-20261113.md §2(f), §4.2, §7). Hoparlörlü toplantıda karşı
+# tarafın sesi ham mikrofona girer; metin süzgeci (_yanki_mi) Whisper iki kanalı farklı yazınca kaçırıyor, çakışan kendi sözü de bütün atıyordu. Ben parçası
+# Whisper kuyruğuna girmeden aynı aralıktaki karşı sesle tutarlılık (coherence: iki sesin frekans frekans aynı kaynaktan gelme ölçüsü, 0–1; 200–4000 Hz
+# ortalaması, 64 ms Welch çerçeveleri) ölçülür; kayma ±YT_KAYMA_MS içinde ilintiyle aranır (gerçek kayıtta yankı karşı başvurudan 74–88 ms sonra, 10 dk'da ±7 ms).
+# Üç bölge: ≥ üst → yankı (Whisper'a gitmez, yankı sayılır); < alt → yankısız (metin süzgeci ve 4 sn bekletme yok); arada → Whisper + yalnız karşı metinde
+# sırayla geçen sözcükler çıkar (parça bütün atılmaz). Ölçüm: yalnız yankı medyan 0,67 (0,35–0,77), çift konuşma 0,11–0,65, yankısız 0,00–0,02; 13 Kasım
+# gerçek kaydında 12 parçanın 12'si doğru. Ses değişmez, yalnız karar. Karşı ses yoksa/sessizse "yankısız"; tampon eksikse ya da hesap hata verirse None (eski yol).
+YT_SR = 16000; YT_PAD_SN = 0.25; YT_KAYMA_MS = 400; YT_UST = 0.5; YT_ALT = 0.1; YT_NPERSEG = 1024
+YT_SESSIZ_DB = -50.0  # karşı başvurunun ortalama düzeyi bunun altındaysa karşı sessiz sayılır (dBFS)
+YT_KAPSAM = 0.6       # parçanın karşılık aralığında karşı paketlerin en az bu kadarı gelmiş olmalı; yoksa karar verilmez
+YT_TAMPON_SN = 30.0   # karşı halka tamponu: son 30 sn (~1 MB)
+YT_TOL = 1600         # paket zaman damgası titreşimi (~100 ms) düzeltilmez: tam ses kaydı (_tam_yaz, TAM_TOL) gibi akış örnek sayısıyla bitişik dizilir
+class KarsiTampon:
+    """Karşı kanalın son YT_TAMPON_SN saniyelik ham sesi (int16, 16 kHz). Paketler duvar saatine bağlanan bir örnek sayacıyla bitişik dizilir: damga beklenenden
+    ≤ YT_TOL saparsa titreşim sayılır (yerleşim kaymaz — yoksa paket sınırlarında kopuk/üst üste ses tutarlılığı düşürür); daha ileri → boşluk (sıfır, kapsam dışı);
+    daha geri ya da 30 sn'den uzun ara → yeniden bağlanır (kaynak değişti)."""
+    def __init__(self, sn=YT_TAMPON_SN, en_cok=600):
+        self.sn = sn; self.paket = collections.deque(maxlen=en_cok); self.son = 0.0; self.kilit = threading.Lock(); self.t_ilk = None; self.n = 0
+    def ekle(self, t, pcm):
+        b = bytes(pcm[:len(pcm) // 2 * 2]) if pcm else b""
+        if not b: return
+        with self.kilit:
+            if self.t_ilk is None or t - self.son > self.sn: self.paket.clear(); self.t_ilk = t; self.n = 0
+            d = int(round((t - self.t_ilk) * YT_SR)) - self.n
+            if d > YT_TOL: self.n += d
+            elif d < -YT_TOL: self.paket.clear(); self.t_ilk = t; self.n = 0
+            t0 = self.t_ilk + self.n / YT_SR; self.n += len(b) // 2; t1 = self.t_ilk + self.n / YT_SR
+            self.paket.append((t0, t1, b)); self.son = t1
+            while self.paket and self.paket[0][1] < self.son - self.sn: self.paket.popleft()
+    def al(self, a, b, np):  # [a, b) → (float32 ses, doluluk maskesi)
+        n = max(0, int(round((b - a) * YT_SR))); x = np.zeros(n, np.float32); dolu = np.zeros(n, bool)
+        with self.kilit: ps = list(self.paket)
+        for t0, t1, pcm in ps:
+            if t1 <= a or t0 >= b: continue
+            i = int(round((t0 - a) * YT_SR)); v = np.frombuffer(pcm, np.int16)
+            j0 = max(0, -i); j1 = min(len(v), n - i)
+            if j1 > j0: x[i + j0:i + j1] = v[j0:j1].astype(np.float32) / 32768.0; dolu[i + j0:i + j1] = True
+        return x, dolu
+def yt_tutarlilik(m, r, np, sg=None):  # aynı boyda iki ses → 200–4000 Hz ortalama tutarlılık; sg: scipy.signal varsa (aktarıcının Python'unda yok, numpy yolu aynı hesap)
+    if sg is not None: f, C = sg.coherence(m, r, fs=YT_SR, nperseg=YT_NPERSEG)
+    else:
+        n = YT_NPERSEG; h = n // 2
+        if len(m) < n: return 0.0
+        k = (len(m) - n) // h + 1; ix = np.arange(n)[None, :] + h * np.arange(k)[:, None]; pen = np.hanning(n + 1)[:-1]  # scipy varsayılanı: periyodik Hann, %50 örtüşme, sabit çıkarma
+        X = np.fft.rfft((m[ix] - m[ix].mean(1, keepdims=True)) * pen, axis=1); Y = np.fft.rfft((r[ix] - r[ix].mean(1, keepdims=True)) * pen, axis=1)
+        sxx = (np.abs(X) ** 2).mean(0); syy = (np.abs(Y) ** 2).mean(0); sxy = (X * np.conj(Y)).mean(0)
+        C = np.abs(sxy) ** 2 / (sxx * syy + 1e-30); f = np.fft.rfftfreq(n, 1.0 / YT_SR)
+    bant = (f > 200) & (f < 4000); return float(np.mean(C[bant]))
+def yt_db(x, np): return float(10 * np.log10(np.mean(np.square(x, dtype=np.float64)) + 1e-12)) if len(x) else -120.0
+def yt_olc(mic, ref_w, M, np, sg=None):
+    """mic: ben parçası (float), ref_w: karşı ses [t0 − PAD − M, t1 + PAD + M]. Kayma ilintiyle (FFT), tutarlılık hizalı başvuruyla.
+    → (tutarlılık, kayma ms (+: mikrofondaki kopya karşı başvurudan sonra), mikrofon dB, hizalı karşı dB)"""
+    pad = int(YT_PAD_SN * YT_SR); m = np.pad(mic, (pad, pad)); n = len(m)
+    if len(ref_w) < n + 2 * M: ref_w = np.pad(ref_w, (0, n + 2 * M - len(ref_w)))
+    N = 1 << int(math.ceil(math.log2(n + len(ref_w))))
+    c = np.fft.irfft(np.fft.rfft(ref_w, N) * np.conj(np.fft.rfft(m, N)), N)[:2 * M + 1]  # c[k] = Σ m[t]·ref_w[t+k]; kayma L = M − k
+    k = int(np.argmax(np.abs(c))); r = ref_w[k:k + n]
+    return yt_tutarlilik(m, r, np, sg), (M - k) * 1000.0 / YT_SR, yt_db(mic, np), yt_db(r[pad:pad + len(mic)], np)
+def yt_bolge(coh, sn, fazla_db, ust=YT_UST, alt=YT_ALT, kisa_ust=None, enerji_db=None):
+    # kisa_ust / enerji_db (§7(e) iki ayar) varsayılan kapalı: eldeki ölçümde ikisi de çift konuşmadaki kullanıcı sözünü yankıya iterdi (0 dB çift konuşmada
+    # fazla enerji ≈ +3 dB, yankı penceresi −4,8…+5,3; kısa yankı 0,31 ↔ +6 dB çift konuşma 0,11–0,32); ara bölge zaten sözcük süzgecinden geçer.
+    if coh >= ust: return "yanki"
+    if coh < alt: return "yankisiz"
+    if kisa_ust is not None and sn < 1.0 and coh >= kisa_ust: return "yanki"
+    if enerji_db is not None and fazla_db is not None and abs(fazla_db) <= enerji_db: return "yanki"
+    return "ara"
+def yt_tani(pcm, t0, t1, tampon, np, sg=None, ust=YT_UST, alt=YT_ALT, kayma_ms=YT_KAYMA_MS, baglasim_db=None, kisa_ust=None, enerji_db=None):
+    """Ben parçası (int16 bayt, duvar saati t0–t1) → {"bolge", "tutarlilik", "kayma_ms", "mik_db", "karsi_db", "fazla_db", "neden"} ya da None (karar yok: eski yol)."""
+    if tampon is None or not pcm: return None
+    M = int(kayma_ms * YT_SR / 1000); pad_sn = YT_PAD_SN + M / YT_SR
+    ref_w, dolu = tampon.al(t0 - pad_sn, t1 + pad_sn, np)
+    i0 = int(YT_PAD_SN * YT_SR); i1 = len(ref_w) - int(YT_PAD_SN * YT_SR) - M  # parçanın karşılığı: [t0 − M, t1] (yankı başvurudan sonra gelir)
+    if i1 <= i0 or float(dolu[i0:i1].mean()) < YT_KAPSAM: return None
+    kdb = yt_db(ref_w[i0:i1], np); sn = t1 - t0
+    if kdb < YT_SESSIZ_DB: return {"bolge": "yankisiz", "neden": "karsi_sessiz", "karsi_db": round(kdb, 1)}
+    mic = np.frombuffer(pcm[:len(pcm) // 2 * 2], np.int16).astype(np.float32) / 32768.0
+    coh, kayma, mdb, rdb = yt_olc(mic, ref_w, M, np, sg)
+    fazla = round(mdb - rdb - baglasim_db, 1) if baglasim_db is not None else None
+    return {"bolge": yt_bolge(coh, sn, fazla, ust, alt, kisa_ust, enerji_db), "tutarlilik": round(coh, 3), "kayma_ms": round(kayma, 1),
+            "mik_db": round(mdb, 1), "karsi_db": round(rdb, 1), **({"fazla_db": fazla} if fazla is not None else {})}
+def yt_sozcuk_cikar(metin, karsi):
+    """Ara bölge: ben metninden karşı metinde AYNI SIRAYLA geçen sözcük öbeklerini (en az 2 sözcük; tek sözcüklük metinde 1) çıkarır.
+    karsi: sadeleştirilmiş sözcük listesi. → kalan metin ('' = anlamlı sözcük kalmadı, tamamı yankı)"""
+    import difflib
+    ts = (metin or "").split(); ns_ = [re.sub(r"\W+", "", sade(t)) for t in ts]
+    sec = [i for i, x in enumerate(ns_) if x]; a = [ns_[i] for i in sec]
+    if not a or not karsi: return metin
+    sil = set()
+    for bl in difflib.SequenceMatcher(None, a, list(karsi), autojunk=False).get_matching_blocks():
+        if bl.size >= 2 or (bl.size == 1 and len(a) == 1): sil.update(sec[bl.a:bl.a + bl.size])
+    if not sil: return metin
+    kal = [t for i, t in enumerate(ts) if i not in sil]
+    return " ".join(kal) if any(len(re.sub(r"\W+", "", sade(t))) > 2 for t in kal) else ""
+# YANKI-TANIMA-BITIS
 class Kanal:
     def __init__(self, ad): self.ad = ad; self.reset(); self.gurultu = 300.0; self.son_bitis = 0.0; self.onceki = ""; self.baslangic = time.time(); self.t_ses = 0.0; self.n_ses = 0; self.ses_t = collections.deque(maxlen=600); self.dipler = collections.deque(maxlen=WH_DIP_BLOK); self.dip_n = 0; self.dip_top = 0.0; self.dip = 0.0; self.sonuclar = collections.deque(maxlen=12)  # t_ses/n_ses: otonom söz sırası (v0.56.0); ses_t: sesli karelerin zamanı (son ~12 sn; otonomun yankı ayrımı, 19 Ekim); sonuclar: son parçaların (geliş, sonuç) — söz sırası sözsüz sesi ayırır (30 Ekim)
     def reset(self): self.parca = bytearray(); self.on = bytearray(); self.konusuyor = False; self.sessiz = 0; self.sesli = 0; self.ust = 0; self.t0 = 0.0; self.rmsler = []
@@ -197,8 +292,9 @@ class Kanal:
         if self.konusuyor and self.sesli * 20 >= WH_MIN_KONUSMA_MS:
             fazla = max(0, self.sessiz - 10) * WH_KARE * 2  # sondaki sessizliğin 200 ms'i kalsın
             pcm = bytes(self.parca[:len(self.parca) - fazla] if fazla else self.parca)
-            WH_Q.put({"id": f"w-{self.ad}-{int(self.t0 * 1000)}", "kanal": self.ad, "t0": self.t0, "t1": self.t0 + len(pcm) / 2 / WH_SR,
-                      "pcm": pcm, "baslik": baslik, "kuyruga": time.time()})
+            is_ = {"id": f"w-{self.ad}-{int(self.t0 * 1000)}", "kanal": self.ad, "t0": self.t0, "t1": self.t0 + len(pcm) / 2 / WH_SR,
+                   "pcm": pcm, "baslik": baslik, "kuyruga": time.time()}
+            if not (self.ad == "ben" and yt_kuyruga(is_)): WH_Q.put(is_)  # ben parçası karşı ses akarken önce yankı tanımadan geçer (ayrı iş parçacığı)
             STATE["whisper"]["kuyruk"] = WH_Q.qsize(); STATE["whisper"]["kanal_son_parca"][self.ad] = time.time()
             STATE["whisper"]["parca"][self.ad] = STATE["whisper"]["parca"].get(self.ad, 0) + 1
         self.reset()
@@ -231,6 +327,7 @@ def ses_al(p):
     t_sn = (p.get("t") or time.time() * 1000) / 1000.0
     with W_LOCK:
         k = KANALLAR.setdefault(kanal, Kanal(kanal)); k.besle(pcm, t_sn, baslik)
+    if kanal == "karsi": yt_karsi_besle(t_sn, pcm)  # yankı tanımanın başvurusu: son 30 sn ham karşı ses
     tam_besle(kanal, t_sn, pcm)  # tam ses kaydı (geliştirici, ses_arsivi açıkken): kuyruğa koyar, ses yolunu yavaşlatmaz
     if "golge_besle" in globals(): golge_besle(kanal, t_sn, pcm)  # gölge kip (ayar golge_tstt): ekrana bir şey girmez, yalnız kayıt
     _isci_baslat()
@@ -319,7 +416,7 @@ def whisper_view():
             "atlanan": w.get("atlanan", 0), "son_sn": w.get("son_sn"), "gecikme_max": w.get("gecikme_max"), "durgun_max": w.get("durgun_max"),
             "yavas": bool(w.get("yavas")), "parca": w.get("parca"), "eski_atlanan": w.get("eski_atlanan"), "birlesen": w.get("birlesen"),
             "motor": w.get("motor"), "istenen_motor": wh_motor(), "cpp": w.get("cpp"), **({"istem": w["istem_ozet"]} if w.get("istem_ozet") else {}),  # 4 Kasım: istem özeti {kip, terim, baglam, yasli} (istem kurulduysa)
-            "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
+            "ses_model": STATE["ses_model"]["durum"], "yanki": w.get("yanki", 0), "yanki_tanima": w.get("yanki_tanima"), "yerel": yerel_ses_durum(), "yerel_akiyor": now - (STATE["yerel_ses"].get("son") or 0) < 5, "kumeler": {k: kume_adi(k) for k in sorted({k for _, _, k in KUME_BEKLEYEN} | set(KUME_AD))}}
 # 3 Kasım (gerçek Teams denemesi: kullanıcı "Deniz T" + misafir hesabı "Deniz"): eski kural son altyazı konuşmacılarından ilk adı uyanı döndürüyordu; misafir son
 # konuştuysa "ben" o oldu, misafirin soruları kullanıcı sorusu sayıldı (karşı taraf onay kapısı atlandı). Sıra: tam ad (sadeleştirilmiş) → ayardaki adın her sözcüğü
 # altyazıdaki adın sözcüklerinin başı ("Deniz T" → "Deniz Txxx"; tek aday) → yalnız ilk ad (tek aday). İki aday kalırsa ayardaki ad. Whisper satırında kanal esastır (ben_satiri).
@@ -647,7 +744,9 @@ def _birlestir(is_):
     b = STATE["whisper"]["birlesen"]; b[is_["kanal"]] = b.get(is_["kanal"], 0) + len(ek)
     pcm = bytearray(is_["pcm"])
     for x in ek: pcm += WH_BIRLES_ARA + x["pcm"]
-    return dict(is_, pcm=bytes(pcm), t1=ek[-1]["t1"], birlesik=1 + len(ek))
+    r = dict(is_, pcm=bytes(pcm), t1=ek[-1]["t1"], birlesik=1 + len(ek))
+    if len({x.get("yt_bolge") for x in [is_] + ek}) > 1: r.pop("yt_bolge", None); r.pop("yt", None)  # yankı tanıma bölgeleri farklı: birleşik parça eski yoldan
+    return r
 # İşçinin her işi (satır bırakmayanlar dahil: boş, uydurma, yankı, eski, hata) canli/whisper-isler.jsonl'e: kuyruk gecikmesinin
 # nereden geldiği satır kaydından görünmüyordu (9 Ekim). olcum.py toplanti özetler. Uzun beklemede günlüğe ayrıca bir satır.
 WH_UZUN_BEKLEME_SN = 8
@@ -969,7 +1068,7 @@ def ses_arsivi_yaz(is_, istek, j, sonuc, metin):
         with wave.open(os.path.join(kl, ad), "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(is_["pcm"])
         pen = j.get("kapi")
         r = {"dosya": ad, "kanal": is_["kanal"], "bas": bool(is_.get("bas")), "t0": round(t0, 2), "t1": round(t1, 2), "sn": sn, "sonuc": sonuc, "metin": metin, "dil_istek": istek.get("dil"),
-             **({"dil_kilit": True} if istek.get("dil_kilit") else {}), **({"kilit_supheli": True} if is_.get("kilit_supheli") else {}), **({"komsu": True} if is_.get("komsu") else {}), "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), "bitti": round(time.time(), 2), **({"kapi": [round(x, 3) for x in pen]} if pen else {})}
+             **({"dil_kilit": True} if istek.get("dil_kilit") else {}), **({"kilit_supheli": True} if is_.get("kilit_supheli") else {}), **({"komsu": True} if is_.get("komsu") else {}), "dil": j.get("dil"), "atlanan": j.get("atlanan"), "mikrofon": _kapi_mikrofon(), "bitti": round(time.time(), 2), **({"kapi": [round(x, 3) for x in pen]} if pen else {}), **({"yanki": is_["yt"]} if is_.get("yt") else {})}
         write([(os.path.join(kl, "parcalar.jsonl"), json.dumps(r, ensure_ascii=False) + "\n")])
         if time.time() - _SA["son"] > 3600: _SA["son"] = time.time(); ses_arsivi_temizle()
     except Exception as e: print(f"SES ARŞİVİ: parça yazılamadı ({e.__class__.__name__})")
@@ -1316,18 +1415,113 @@ def _karsi_bekleniyor(t0, t1):
     if k and k.konusuyor and k.t0 < t1: return True
     with WH_Q.mutex: q = list(WH_Q.queue)
     return any(x["kanal"] == "karsi" and min(x["t1"], t1) - max(x["t0"], t0) >= 0.5 for x in q)
-def _yanki_say(metin):
+def _yanki_say(metin, ses=False):
     STATE["whisper"]["yanki"] += 1; n = STATE["whisper"]["yanki"]
     if "beta_olay" in globals(): beta_olay("yanki")  # v0.238.3: toplantı başına yankı sayısı (beta_kalite; kulaklıksız toplantı işareti) — yalnız sayaç, metin yok
-    if n == 1 or n % 10 == 0: print(f"YANKI: ben kanalında karşı tarafın sözleri ({n}. kez, yazılmadı) — \"{metin[:60]}\"")
+    if n == 1 or n % 10 == 0: print(f"YANKI: ben kanalında karşı tarafın sözleri ({n}. kez, yazılmadı) — " + ("ses düzeyinde tanındı, Whisper'a gitmedi" if ses else f"\"{metin[:60]}\""))
 def _yanki_bosalt(zorla=False):
     now = time.time(); yaz = []
     with YANKI_LOCK:
         for b in list(YANKI_BEKLEYEN):
             m = (b[0]["t0"], b[0]["t1"], _yk(b[1]))
-            if any(_yanki_mi(m, k) for k in YANKI_KARSI): YANKI_BEKLEYEN.remove(b); _yanki_say(b[1])
+            if b[0].get("yt_bolge") != "ara" and any(_yanki_mi(m, k) for k in YANKI_KARSI): YANKI_BEKLEYEN.remove(b); _yanki_say(b[1])
             elif zorla or now >= b[4] or not _karsi_bekleniyor(b[0]["t0"], b[0]["t1"]): YANKI_BEKLEYEN.remove(b); yaz.append(b)
-    for b in yaz: _whisper_yaz(*b[:4])
+    for b in yaz:
+        metin = _yt_ara_suz(b[0], b[1]) if b[0].get("yt_bolge") == "ara" else b[1]  # ara bölge: parça bütün atılmaz, yalnız karşı metinde sırayla geçen sözcükler çıkar
+        if metin: _whisper_yaz(b[0], metin, b[2], b[3])
+        else: _yanki_say(b[1])
+# Ses düzeyinde yankı tanımanın aktarıcı tarafı (saf hesap YANKI-TANIMA bloğunda). Karşı kanal akarken ben parçası WH_Q yerine _YT["q"]'ya girer; ayrı iş
+# parçacığı karşı sesin parçanın sonuna kadar gelmesini en çok YT_BEKLE_SN bekler (paketler 0,5–1 sn), tutarlılığı ölçer (~30 ms), sonra parçayı ya atar
+# (yankı) ya da bölgesiyle (is_["yt_bolge"]) Whisper kuyruğuna koyar. numpy yoksa, ayar kapalıysa, tampon eksikse ya da hesap hata verirse parça
+# işaretsiz gider: metin süzgeci eskisi gibi. Ayarlar: yanki_tanima (varsayılan açık), yanki_tanima_ust (0,5), yanki_tanima_alt (0,1),
+# yanki_tanima_kayma_ms (400), yanki_tanima_kisa_ust / yanki_tanima_enerji_db (varsayılan kapalı). Görünürlük: STATE whisper.yanki_tanima,
+# ses arşivinin parcalar.jsonl'i ("yanki": tutarlılık, kayma, bölge), whisper-isler.jsonl (sonuc "yanki_ses"); beta'ya yalnız bölge sayıları.
+YT_BEKLE_SN = 1.5
+KARSI_TAMPON = KarsiTampon()
+_YT = {"q": queue.Queue(maxsize=200), "th": None, "np": None, "sg": None, "denendi": False, "hata_t": 0.0, "kayma": None, "baglasim": None, "n_yanki": 0}
+STATE["whisper"]["yanki_tanima"] = {"yanki": 0, "ara": 0, "yankisiz": 0, "geri": 0, "atlanan_whisper": 0, "kirpilan": 0, "kayma_ms": None, "baglasim_db": None, "ms": None}
+def _yt_np():  # numpy (aktarıcının sistem Python'unda kullanıcı paketlerinde olabilir); yoksa ortak smart-turn ortamının aynı sürüm numpy'si; ikisi de yoksa None
+    if _YT["denendi"]: return _YT["np"]
+    _YT["denendi"] = True; import sys as _s
+    try: import numpy as _n
+    except Exception:
+        _n = None; y = os.path.join(_ORT, "smart-turn-venv", "lib", "python%d.%d" % _s.version_info[:2], "site-packages")
+        if os.path.isdir(os.path.join(y, "numpy")):
+            _s.path.append(y)
+            try: import numpy as _n; import numpy.fft  # noqa: F401 (alt modül yol kalkmadan yüklensin)
+            except Exception: _n = None
+            finally:
+                try: _s.path.remove(y)
+                except ValueError: pass
+    try: import scipy.signal as _sg
+    except Exception: _sg = None
+    _YT["np"], _YT["sg"] = _n, _sg
+    print("YANKI TANIMA: " + ("hazır (numpy " + _n.__version__ + (", scipy" if _sg else "") + ")" if _n is not None else "numpy yok — yalnız metin süzgeci"))
+    return _n
+def yt_acik(): return AYAR.get("yanki_tanima", True) is not False
+def _yt_sayi(ad, vars_):
+    try: v = AYAR.get(ad); return float(v) if v is not None and v is not False else vars_
+    except (TypeError, ValueError): return vars_
+def yt_karsi_besle(t, pcm):
+    if yt_acik():
+        try: KARSI_TAMPON.ekle(t, pcm)
+        except Exception: pass
+def yt_kuyruga(is_):  # → True: parça yankı tanımaya alındı (WH_Q'ya o koyacak)
+    if not yt_acik() or time.time() - STATE["whisper"]["kanallar"].get("karsi", 0) > WH_AKIS_SN or not KARSI_TAMPON.paket: return False
+    if "gizli_acik" in globals() and gizli_acik(): return False
+    is_["yt_kuyruk"] = time.time()
+    try: _YT["q"].put_nowait(is_)
+    except queue.Full: return False
+    if not _YT["th"] or not _YT["th"].is_alive(): _YT["th"] = threading.Thread(target=_yt_dongu, daemon=True, name="yanki-tanima"); _YT["th"].start()
+    return True
+def yt_parca(is_):  # tek parça → karar sözlüğü ya da None (eski yol); hata günlüğe en çok 10 dk'da bir
+    np_ = _yt_np()
+    if np_ is None: return None
+    t = time.time()
+    try:
+        r = yt_tani(is_["pcm"], is_["t0"], is_["t1"], KARSI_TAMPON, np_, _YT["sg"], ust=_yt_sayi("yanki_tanima_ust", YT_UST), alt=_yt_sayi("yanki_tanima_alt", YT_ALT),
+                    kayma_ms=int(_yt_sayi("yanki_tanima_kayma_ms", YT_KAYMA_MS)), baglasim_db=_YT["baglasim"] if _YT["n_yanki"] >= 2 else None,
+                    kisa_ust=_yt_sayi("yanki_tanima_kisa_ust", None), enerji_db=_yt_sayi("yanki_tanima_enerji_db", None))
+    except Exception as e:
+        if time.time() - _YT["hata_t"] > 600: _YT["hata_t"] = time.time(); print(f"YANKI TANIMA: hesap hata verdi ({e.__class__.__name__}: {str(e)[:80]}) — metin süzgeciyle sürüyor")
+        return None
+    yt = STATE["whisper"]["yanki_tanima"]; yt["ms"] = round((time.time() - t) * 1000, 1)
+    if r and r["bolge"] == "yanki" and r.get("tutarlilik") is not None:  # kayma ve hoparlör→mikrofon bağlaşımı: yalnız güvenli yankıdan, yavaş
+        a = 0.2 if _YT["n_yanki"] else 1.0; _YT["n_yanki"] += 1
+        _YT["kayma"] = r["kayma_ms"] if _YT["kayma"] is None else round(_YT["kayma"] * (1 - a) + r["kayma_ms"] * a, 1)
+        g = round(r["mik_db"] - r["karsi_db"], 1); _YT["baglasim"] = g if _YT["baglasim"] is None else round(_YT["baglasim"] * (1 - a) + g * a, 1)
+        yt["kayma_ms"], yt["baglasim_db"] = _YT["kayma"], _YT["baglasim"]
+    return r
+def _yt_dongu():
+    while True:
+        is_ = _YT["q"].get()
+        try:
+            son = is_.get("yt_kuyruk", time.time()) + YT_BEKLE_SN
+            while KARSI_TAMPON.son < is_["t1"] + 0.15 and time.time() < son: time.sleep(0.05)  # karşı paketleri parçanın sonuna kadar gelsin
+            r = None if ("gizli_acik" in globals() and gizli_acik()) else yt_parca(is_)
+            yt = STATE["whisper"]["yanki_tanima"]
+            if r is None: yt["geri"] += 1; WH_Q.put(is_); continue
+            yt[r["bolge"]] += 1; is_["yt"] = r; is_["yt_bolge"] = r["bolge"]
+            if "beta_olay" in globals(): beta_olay("yanki_tanima_" + r["bolge"])  # yalnız sayaç
+            if r["bolge"] == "yanki": yt_yanki_at(is_)
+            else: WH_Q.put(is_)
+        except Exception as e:
+            print(f"YANKI TANIMA: parça işlenemedi ({e.__class__.__name__}) — Whisper'a gidiyor"); is_.pop("yt_bolge", None); WH_Q.put(is_)
+        finally: STATE["whisper"]["kuyruk"] = WH_Q.qsize()
+def yt_yanki_at(is_):  # ses düzeyinde yankı: Whisper'a gitmez; metin süzgecinin attığı gibi sayılır
+    STATE["whisper"]["yanki_tanima"]["atlanan_whisper"] += 1; _yanki_say("", ses=True)
+    k = KANALLAR.get("ben")
+    if k is not None: k.sonuclar.append((time.time(), "yanki"))  # otonom: sözsüz ses
+    try: _log("whisper-isler.jsonl", {"t": round(time.time(), 2), "kanal": "ben", "sonuc": "yanki_ses", "parca_sn": round(is_["t1"] - is_["t0"], 2), "bekleme": round(time.time() - is_["kuyruga"], 2)})
+    except Exception: pass
+    if AYAR.get("ses_arsivi"): ses_arsivi_yaz(is_, {}, {}, "yanki_ses", "")
+def _yt_karsi_sozcuk(t0, t1):  # ara bölge: zamanı ben parçasıyla çakışan karşı satırlarının bütün sözcükleri, sırayla
+    with YANKI_LOCK: ks = [k for k in YANKI_KARSI if len(k) > 3 and min(k[1], t1) - max(k[0], t0) > 0]
+    return [w for k in sorted(ks) for w in k[3]]
+def _yt_ara_suz(is_, metin):  # → kalan metin ('' = tamamı yankı)
+    yeni = yt_sozcuk_cikar(metin, _yt_karsi_sozcuk(is_["t0"], is_["t1"]))
+    if yeni != metin and yeni: STATE["whisper"]["yanki_tanima"]["kirpilan"] += 1
+    return yeni
 # Suflor'un kendi sesi (v0.30.2, deneme 6): hoparlörden okunan sesli çeviri özü / fısıltı mikrofona girip kullanıcının adıyla satır oluyordu
 # ("Eğlenceli değilse sadece bir serseri" ×3; konuşma payı, söz kesme ve DİNLE yanlış). Okuma aralığı ve sözcükleri kaydedilir; ben kanalında
 # o aralıkla çakışan ve sözcükleri sırayla eşleşen satır (yankı kuralı) yazılmaz. Kulaklıkta zaten girmez.
@@ -1368,12 +1562,20 @@ def whisper_yaz(is_, metin, ses=None, model=None):
         print(f"ASİSTAN: okurken kullanıcı '{metin[:30]}' dedi — okuma durdu"); threading.Thread(target=asistan_dur, daemon=True).start()
     karsi_akiyor = now - STATE["whisper"]["kanallar"].get("karsi", 0) < WH_AKIS_SN
     if kanal == "karsi":
-        with YANKI_LOCK: YANKI_KARSI.append((is_["t0"], is_["t1"], _yk(metin))); del YANKI_KARSI[:-20]
+        with YANKI_LOCK: YANKI_KARSI.append((is_["t0"], is_["t1"], _yk(metin), [x for x in (re.sub(r"\W+", "", sade(t)) for t in metin.split()) if x])); del YANKI_KARSI[:-20]
         _whisper_yaz(is_, metin, ses, model); _yanki_bosalt(); return "satir"
-    if kanal == "ben" and karsi_akiyor:
+    bolge = is_.get("yt_bolge") if kanal == "ben" else None
+    if bolge == "ara":  # ses düzeyinde ara bölge (çift konuşma olabilir): yalnız karşı metinde sırayla geçen sözcükler çıkar, kalan yazılır
+        kalan = _yt_ara_suz(is_, metin)
+        if not kalan: _yanki_say(metin); return "yanki"
+        metin = kalan
+    # yalnız karşı sessizken (yankı olamaz) metin süzgeci ve bekletme atlanır. Tutarlılığı düşük ama karşı konuşurken (ör. web'de Chrome'un
+    # yankı gidericisinden kalan artık yankı, ölçülmedi) eski metin süzgeci güvence olarak kalır (14 Kasım, kod denetimi)
+    yt_sessiz = bolge == "yankisiz" and (is_.get("yt") or {}).get("neden") == "karsi_sessiz"
+    if kanal == "ben" and karsi_akiyor and not yt_sessiz:
         m = (is_["t0"], is_["t1"], _yk(metin))
         with YANKI_LOCK:
-            if any(_yanki_mi(m, k) for k in YANKI_KARSI): _yanki_say(metin); return "yanki"
+            if bolge != "ara" and any(_yanki_mi(m, k) for k in YANKI_KARSI): _yanki_say(metin); return "yanki"
             # 28 Ekim (kullanıcı isteği): asistana seslenilen satır yankı için 4 sn bekletilmez (gecikmenin en büyük kalemiydi); gelmiş karşı satırıyla yankı denetimi yine yapılır
             hitapli = "_hitap_alt" in globals() and re.search(r"(?<!\w)" + _hitap_alt() + r"(?!\w)", metin, re.I)
             if not hitapli and _karsi_bekleniyor(is_["t0"], is_["t1"]):

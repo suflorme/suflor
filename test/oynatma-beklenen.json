@@ -891,6 +891,17 @@
     "ses_model": "str",
     "son_sn": "NoneType",
     "yanki": "int",
+    "yanki_tanima": {
+     "ara": "int",
+     "atlanan_whisper": "int",
+     "baglasim_db": "NoneType",
+     "geri": "int",
+     "kayma_ms": "NoneType",
+     "kirpilan": "int",
+     "ms": "NoneType",
+     "yanki": "int",
+     "yankisiz": "int"
+    },
     "yavas": "bool",
     "yerel": "str",
     "yerel_akiyor": "bool"
@@ -1057,6 +1068,17 @@
     "ses_model": "str",
     "son_sn": "NoneType",
     "yanki": "int",
+    "yanki_tanima": {
+     "ara": "int",
+     "atlanan_whisper": "int",
+     "baglasim_db": "NoneType",
+     "geri": "int",
+     "kayma_ms": "NoneType",
+     "kirpilan": "int",
+     "ms": "NoneType",
+     "yanki": "int",
+     "yankisiz": "int"
+    },
     "yavas": "bool",
     "yerel": "str",
     "yerel_akiyor": "bool"
@@ -1079,7 +1101,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 8,
+  "DURUM": 7,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

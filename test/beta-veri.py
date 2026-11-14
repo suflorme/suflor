@@ -43,6 +43,10 @@ yk = _g["_beta_yanki"]
 kontrol("yankı: 792 yankı / 278 ben satırı → oran %74, ses_yolu hoparlor_yankisi", yk(792, 278) == {"yanki": 792, "ben_satir": 278, "yanki_oran_yuzde": 74, "ses_yolu": "hoparlor_yankisi"}, yk(792, 278))
 kontrol("yankı: 19 yankı / 1 satır (eşik altı sayı) ve %50 tam (50/50) → normal", yk(19, 1)["ses_yolu"] == "normal" and yk(50, 50)["ses_yolu"] == "normal" and yk(51, 49)["ses_yolu"] == "hoparlor_yankisi")
 kontrol("yankı: hiç satır yok → oran None, normal", yk(0, 0)["yanki_oran_yuzde"] is None and yk(0, 0)["ses_yolu"] == "normal")
+kontrol("yankı tanıma: bölge sayıları yalnız sayı olarak (hepsi sıfırsa alan yok)", yk(6, 5, {"yanki": 6, "ara": 1, "yankisiz": 5})["tanima"] == {"yanki": 6, "ara": 1, "yankisiz": 5}
+        and "tanima" not in yk(6, 5, {"yanki": 0, "ara": 0, "yankisiz": 0}) and "tanima" not in yk(6, 5))
+_tt = teshis.temizle({"kalite": {"ses": yk(6, 5, {"yanki": 6, "ara": 1, "yankisiz": 5})}})["kalite"]["ses"]
+kontrol("yankı tanıma: süzgeç bölge sayılarını tutar", _tt.get("tanima") == {"yanki": 6, "ara": 1, "yankisiz": 5} and not sizinti(_tt), _tt)
 ty = teshis.temizle({"kalite": {"ses": dict(yk(792, 278), ek="Zeynep Bozkurt")}, "x": 1})["kalite"]["ses"]
 kontrol("yankı: süzgeç sayıyı ve ses_yolu'nu tutar, bilinmeyen değer '?' olur, ek metin maskelenir",
         ty["yanki"] == 792 and ty["yanki_oran_yuzde"] == 74 and ty["ses_yolu"] == "hoparlor_yankisi" and teshis.temizle({"ses_yolu": "Zeynep"})["ses_yolu"] == "?" and not sizinti(ty), ty)
