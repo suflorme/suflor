@@ -2787,7 +2787,13 @@ def takvim_cmd():  # aktarıcının takvimi (Suflor Takvim yardımcısı, Takvim
 # satırı, kart metni, kişi adı, toplantı adı yazılmaz — yalnız sürüm, süre, sayılar, gecikmeler, günlüğün teknik satırları
 # (toplantı adı "<toplantı>" ile örtülür) ve --not gözlemleri. Hedef aynı Mac'te iki hesabın ortak klasörü
 # (<ortak>/geri-bildirim, herkes yazabilir, yapışkan bit); --github ile ayrıca özel depoda konu.
-GB_DIR = lambda: os.path.join(AYAR["ortak"], "geri-bildirim")
+def posta_dizini(ortak):  # geri bildirim posta kutusu: ikinci hesapta ortak yol hesaba özel yedeğe düşmüş olabilir (/Users/Shared/Suflor yazılamaz); kutunun kendisi herkese yazılabilir (1777) — varsa oraya
+    try:
+        p = os.environ.get("SUFLOR_TEST_PAYLASILAN") or "/Users/Shared/Suflor"; kutu = os.path.join(p, "geri-bildirim")
+        if os.path.basename(os.path.normpath(ortak)) == "Suflor-ortak" and os.path.normpath(ortak) != os.path.normpath(p) and os.path.isdir(kutu) and os.access(kutu, os.W_OK): return kutu
+    except Exception: pass
+    return os.path.join(ortak, "geri-bildirim")
+GB_DIR = lambda: posta_dizini(AYAR["ortak"])
 GB_DEPO = AYAR.get("geri_bildirim_depo")  # --github hedefi (yoksa yalnız ortak klasör)
 GUNLUK = os.path.expanduser(AYAR.get("gunluk") or "~/Library/Logs/suflor-aktarici.log")
 GUNLUK_RX = re.compile(r"EKLENTİ|WHISPER|nabız|hata|HATA|UYARI|Traceback|Error|BAŞLAT|DİSK|TAKVİM|KANIT|aktarıcı çalışıyor")

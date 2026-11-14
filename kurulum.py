@@ -31,6 +31,12 @@ def _ortak_sec():
     if o: return os.path.expanduser(str(o))
     if not os.path.isdir(PAYLASILAN) or os.access(PAYLASILAN, os.W_OK): return PAYLASILAN
     return os.path.join(EV, "Library", "Application Support", "Suflor-ortak")
+def posta_dizini(ortak):  # geri bildirim posta kutusu: ikinci hesapta ortak yol hesaba özel yedeğe düşmüş olabilir (/Users/Shared/Suflor yazılamaz); kutunun kendisi herkese yazılabilir (1777) — varsa oraya
+    try:
+        p = os.environ.get("SUFLOR_TEST_PAYLASILAN") or "/Users/Shared/Suflor"; kutu = os.path.join(p, "geri-bildirim")
+        if os.path.basename(os.path.normpath(ortak)) == "Suflor-ortak" and os.path.normpath(ortak) != os.path.normpath(p) and os.path.isdir(kutu) and os.access(kutu, os.W_OK): return kutu
+    except Exception: pass
+    return os.path.join(ortak, "geri-bildirim")
 try: ORTAK = _ortak_sec()
 except Exception: ORTAK = PAYLASILAN  # bozuk ayar: eski varsayılan (sihirbaz ayarı yeniden yazar)
 PY = "/usr/bin/python3"
@@ -1588,7 +1594,7 @@ def kur():
     ayar_degistir(_ys)
     if ys: say(f"Yerel Türkçe ses ortak klasörde bulundu, ayara yazıldı: {', '.join(ys)}")
     # geri bildirim raporları için ortak klasör — iki macOS hesabı da yazar (herkes yazar, yapışkan bit: yalnız sahibi siler)
-    gb = os.path.join(Y["ortak"], "geri-bildirim")
+    gb = posta_dizini(Y["ortak"])
     try: os.makedirs(gb, exist_ok=True); os.chmod(gb, 0o1777)
     except OSError: pass
     # veri klasörü: proje klasöründe gerçek _canli klasörü varsa bir kez taşı, yerine kısayol bırak
@@ -2284,7 +2290,7 @@ def dogrula(json_cikti=False, sessiz_=False, hizli=False, yaz=True):  # → sonu
         try: yaz_json(os.path.join(Y["uygulama"], "dogrula.json"), r)
         except OSError: pass
     if r["beta"] and yaz:  # ortak posta kutusu (geliştirici oturumu okur); yerel kalır, ağa gitmez
-        gb = os.path.join(Y["ortak"], "geri-bildirim"); hesap = re.sub(r"[^a-z0-9_-]", "", getpass.getuser().lower()) or "hesap"
+        gb = posta_dizini(Y["ortak"]); hesap = re.sub(r"[^a-z0-9_-]", "", getpass.getuser().lower()) or "hesap"
         try:
             os.makedirs(gb, exist_ok=True)
             open(os.path.join(gb, f"{time.strftime('%Y%m%d-%H%M')}-dogrula-{hesap}.md"), "w", encoding="utf-8").write(

@@ -10,6 +10,12 @@
 # İçerik kuralı kurulum.py _dogrula_temiz ile aynı: yalnız sayı, durum, süre, platform; toplantı/kişi adı, döküm metni, yol yok; ad için yalnız kaynağı.
 # /status duman, POST /duman {"islem": "baslat"|"bitir"} (yalnız pano, anahtarlı). Deneme: SUFLOR_TEST_HIZLI süreleri kısaltır.
 import getpass as _gp
+def posta_dizini(ortak):  # geri bildirim posta kutusu: ikinci hesapta ortak yol hesaba özel yedeğe düşmüş olabilir (/Users/Shared/Suflor yazılamaz); kutunun kendisi herkese yazılabilir (1777) — varsa oraya
+    try:
+        p = os.environ.get("SUFLOR_TEST_PAYLASILAN") or "/Users/Shared/Suflor"; kutu = os.path.join(p, "geri-bildirim")
+        if os.path.basename(os.path.normpath(ortak)) == "Suflor-ortak" and os.path.normpath(ortak) != os.path.normpath(p) and os.path.isdir(kutu) and os.access(kutu, os.W_OK): return kutu
+    except Exception: pass
+    return os.path.join(ortak, "geri-bildirim")
 DUMAN_HIZLI = bool(os.environ.get("SUFLOR_TEST_HIZLI"))
 DUMAN_SN, DUMAN_KANAL_SN, DUMAN_SORU_SN, DUMAN_DOGRULA_SN = (24, 5, 8, 3) if DUMAN_HIZLI else (180, 30, 60, 20)
 DUMAN = {"aktif": False, "t0": 0.0, "t_bit": None, "platform": None, "kaynak": None, "m": [], "sonuc": None, "dogrula": None, "dogrula_n": 0, "konus": None, "izin_ilk": 0, "dosya": None, "nesil": 0, "yok_t": None, "ilk": {}, "ses": {}}
@@ -130,7 +136,7 @@ def _dm_yaz(r):  # <uygulama>/duman/<tarih>.json; beta kullanıcısında ayrıca
         os.makedirs(d, exist_ok=True); json.dump(r, open(os.path.join(d, ts + ".json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1); DUMAN["dosya"] = ts + ".json"
     except OSError as e: print(f"DUMAN: yazılamadı ({e.__class__.__name__})")
     if not gelistirici_mi():
-        gb = os.path.join(AYAR.get("ortak") or "/Users/Shared/Suflor", "geri-bildirim"); hesap = re.sub(r"[^a-z0-9_-]", "", _gp.getuser().lower()) or "hesap"
+        gb = posta_dizini(AYAR.get("ortak") or "/Users/Shared/Suflor"); hesap = re.sub(r"[^a-z0-9_-]", "", _gp.getuser().lower()) or "hesap"
         sim = {"ok": "✓", "hata": "✗", "?": "?", "bekliyor": "…", "atla": "—"}
         try:
             os.makedirs(gb, exist_ok=True)
