@@ -412,5 +412,17 @@ _N = kur("amac"); _am = _N["dg_amac"]; _ds = _N["DG_SEMA"]
 ok("dg_amac: metin yazan tür (gün içi öneri) kimlikli paket, metinsiz tür (açık uç hatırlatması) kimliksiz", _am(_ds["gun_ici"]) == "degerlendir_metin" and _am(_ds["toplanti_sonrasi"]) == "degerlendir" and _am({}) == "degerlendir")
 ok("dg_amac: iş kopyası ve belge önerisi eski dar kümede kalır (metin True olsa da)", _am(_ds["is_kopya"]) == "degerlendir_dar" and _am(_ds["belge_oneri"]) == "degerlendir_dar")
 ok("G5 DG_ILKE: kaynak önceliği (güncel kaynak eski çıkarımı ezer, eski/belirsizde 'teyit et', başka toplantının kaydı bu toplantının konusu değil)", "Kaynak önceliği" in N["DG_ILKE"] and "teyit et" in N["DG_ILKE"] and "Başka toplantıya ait" in N["DG_ILKE"])
+# v0.243.1 (Claude kapısı yüklü): başarılı "sonra" kararının tekrar penceresinde Claude çağrılmaz, karar korunur; okunamayan cevapta yedek
+SAAT["t"] = datetime.datetime(2026, 11, 11, 11, 0).timestamp()
+K = kur("kapi-sonra", cevaplar=[cev(("k1", "sonra", 1, "Şimdi değil")), cev(("k1", "sonra", 1, "Şimdi değil")), "bozuk"], maliyet=0.04, bolum=("kapi.py", "degerlendir.py"), ek={"KAPI_SAAT": lambda: SAAT["t"]})
+K1 = [aday("k1", "Gecikmiş rapor")]
+def ktur(): K["DG"]["onb"] = {}; K["DG"]["tur_t"] = {}; return K["degerlendir"]("gun_ici", K1, soru=SORU, sema=SEMA)
+a = ktur(); usd0 = K["DG"]["usd"]["usd"]; SAAT["t"] += dk(10); b = ktur()
+ok("kapı: 'sonra' → 10 dk sonra ikinci tur yine 'sonra' (önbellek), Claude çağrılmadı, maliyet sayılmadı, çağrı satırı yok",
+   a[0]["karar"] == "sonra" and b[0]["karar"] == "sonra" and b[0]["kaynak"] == "onbellek" and len(K["M"].istemler) == 1 and K["DG"]["usd"]["usd"] == usd0
+   and len([x for x in kayit(K) if x["olay"] == "cagri"]) == 1, (a, b, len(K["M"].istemler)))
+SAAT["t"] += dk(21); c = ktur(); ok("kapı: 30 dk sonra yeniden çağrılır", len(K["M"].istemler) == 2 and c[0]["kaynak"] == "model", c)
+SAAT["t"] += dk(61); K1[0]["metin"] = "Gecikmiş rapor 2"; d_ = ktur(); SAAT["t"] += dk(11); e_ = ktur()
+ok("kapı: okunamayan cevaptan sonra aynı küme kural yedeği ('kapı: tekrar'), çağrı yok", d_[0]["kaynak"] == "yedek" and e_[0]["yedek_neden"] == "kapı: tekrar" and len(K["M"].istemler) == 3, (d_, e_))
 shutil.rmtree(T, ignore_errors=True)
 print(f"\n{'KALDI: ' + ', '.join(HATA) if HATA else 'hepsi geçti'}"); sys.exit(1 if HATA else 0)

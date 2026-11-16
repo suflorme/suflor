@@ -289,6 +289,9 @@ def _pro_engel(simdi, zorla=False):  # → None (öneri sunulabilir) ya da neden
     # burada yalnız bu kaynağa özgü sınırlar: günde 3, 90 dk aralık, bekleyen şerit, kullanıcı meşgul, deneme. Kapı yüklü değilse (yalıtılmış test) eski ortak engeller de burada.
     if not pro_gun_acik(): return "kapalı"
     if gizli_acik(): return "gizli kip"
+    if "kapi_engel" in globals():  # v0.243.0 (Claude kapısı K1): değerlendiriciyi çağırmadan ÖNCE arka plan kuralları (toplantı, sessiz mod, mesai, gece); tavan burada bakılmaz —
+        n = kapi_engel("degerlendir:gun_ici", simdi, tavan=False)  # tavan dolunca değerlendirici kural yedeğine düşer (bugünkü davranış), söz kapısı zamanlamayı yine yapar
+        if n: return n
     kapi = "soz_aday" in globals()
     if not kapi and (toplanti_var() or aktif_dosya()): return "toplantı sürüyor"
     if _pro_deneme_aktif(simdi): return "deneme toplantısı"

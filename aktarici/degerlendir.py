@@ -16,6 +16,8 @@
 #   Geri bildirim: söz kapısına giden "soyle" kararları dg_soyle ile gider (söz kimliği kayda bağlanır); sonuç (kabul/ret/ertele/yoksay) soz_sonuc ile söz.jsonl'e yazılır, burada
 #   dg_tepki_bolumu ile isteme girer. Söz kapısı dışı sonuçlar (belge önerisi kabul/ret) dg_sonuc ile.
 # Ayarlar (yalnız ayar.json): degerlendir (false kapatır), degerlendir_gunluk_usd, degerlendir_tur_sn, degerlendir_model.
+# v0.243.0 (Claude kapısı K1, aktarici/kapi.py): çağrı kapıdan geçer (iş türü degerlendir:<tür>); mesai/gece/toplantı/sessiz/gizli ve ORTAK arka plan tavanı çağrıdan ÖNCE; kapı engelinde
+#   kural yedeği (yedek_neden "kapı: <neden>"), çağrı ve hata süresi sayılmaz. Aynı aday kümesi okunamazsa 30 dk → 2 sa → 8 sa yeniden sorulmaz. Öneksiz kimlik dg_kimlik_esle ile eşlenir.
 import hashlib, inspect
 
 DG_KAYIT, DG_ONBELLEK = "degerlendir.jsonl", "degerlendir-onbellek.json"
@@ -135,7 +137,9 @@ def _dg_usd_yukle():
     for r in _dg_oku():
         if r.get("olay") == "cagri" and str(r.get("z") or "")[:10] == g: u["usd"] += float(r.get("maliyet") or 0); u["cagri"] += 1
     return u
-def dg_tavan_asildi(): return _dg_usd_yukle()["usd"] >= _dg_say("degerlendir_gunluk_usd", 3, 0, 1000)
+def dg_tavan_asildi():  # v0.243.0: Claude kapısı yüklüyse arka plan işlerinin ORTAK günlük tavanı (kapi.py kapi_tavan_asildi); değilse eski değerlendirici tavanı
+    if "kapi_tavan_asildi" in globals(): return kapi_tavan_asildi()
+    return _dg_usd_yukle()["usd"] >= _dg_say("degerlendir_gunluk_usd", 3, 0, 1000)
 def _dg_maliyet_oku(t0):  # claude-cagri.jsonl'de bu çağrıdan sonra yazılan değerlendirici (ya da eylem) satırlarının maliyeti; okunamazsa None
     top = 0.0; var = False
     for r in _dg_oku("claude-cagri.jsonl", 40):
@@ -227,10 +231,17 @@ def dg_json_dizi(ham):  # modelin ham cevabından JSON dizisi → dict listesi (
 _DG_ASCII = str.maketrans({"ç": "c", "ğ": "g", "ı": "i", "İ": "i", "ö": "o", "ş": "s", "ü": "u", "Ç": "c", "Ğ": "g", "Ö": "o", "Ş": "s", "Ü": "u"})
 def _dg_norm(x): return str(x or "").translate(_DG_ASCII).strip().lower()  # karar değeri: küçük harf, kırpılmış, Türkçe harfler ASCII
 _DG_METIN_YASAK = re.compile(r"[\[\]<>{}]|KAYIT", re.I)
+def dg_kimlik_esle(i, kimlikler):  # v0.243.0 (K1): model "belge:12" yerine "12" (ya da "aday belge:12") yazınca yalnız TEK anlamlı eşleşmede gerçek kimliğe çevirir; değilse olduğu gibi
+    i = str(i if i is not None else "").strip()
+    if i in kimlikler: return i
+    j = re.sub(r"(?i)^\[?\s*aday\s+", "", i).rstrip("]").strip()
+    if j in kimlikler: return j
+    es = [k for k in kimlikler if ":" in k and k.rsplit(":", 1)[1] == j] if j else []
+    return es[0] if len(es) == 1 else i
 def dg_coz(ham, adaylar, sema):  # → {id: {"id","karar","oncelik","neden","metin"?}}; geçersiz öğe (bilinmeyen kimlik, şema dışı karar) atılır
     kimlikler = {a["id"] for a in adaylar}; out = {}
     for r in dg_json_dizi(ham):
-        i = str(r.get("id")).strip(); kn = _dg_norm(r.get("karar"))
+        i = dg_kimlik_esle(r.get("id"), kimlikler); kn = _dg_norm(r.get("karar"))
         kar = next((k for k in sema["kararlar"] if _dg_norm(k) == kn), None)
         if i not in kimlikler or kar is None or i in out: continue
         try: o = min(3, max(0, int(r.get("oncelik"))))
@@ -259,8 +270,10 @@ def dg_karar_kaydet(is_turu, aday_id, karar, oncelik=1, neden=""):
 def dg_amac(sema):  # tür şemasından kişi modeli paketi amacı: şema "amac" verirse o; metin yazan türler (kullanıcıya söylenen cümleyi yeniden yazar) kimlikli; diğerleri "degerlendir"
     sema = sema if isinstance(sema, dict) else {}
     return sema.get("amac") or ("degerlendir_metin" if sema.get("metin") else "degerlendir")
-def dg_cagri(istem, is_turu, soru=None, model=None, amac=None):
+def dg_cagri(istem, is_turu, soru=None, model=None, amac=None, karma=None, coz=None):
     # Ortak model çağrısı (e-posta değerlendirmesi de buradan geçer): kişi modeli paketi + günlük tavan + ölçüm. → (ham, hata, {"maliyet", "sure_ms", "olculdu"} ya da None)
+    # v0.243.0 (K1): Claude kapısı yüklüyse çağrı kapıdan geçer (iş türü degerlendir:<tür>; izin çağrıdan önce, karma ile tekrar önleme, coz ile "okunamadı" ayrımı).
+    # Kapı engellerse (None, "kapı: <neden>", None): çağrı yapılmadı, maliyet yok.
     if _dg_gizli(): return None, "gizli kip", None
     if "eylem_model" not in globals(): return None, "model yok", None
     if not dg_acik() or dg_tavan_asildi(): return None, ("günlük tavan" if dg_acik() else "kapalı"), None
@@ -270,10 +283,18 @@ def dg_cagri(istem, is_turu, soru=None, model=None, amac=None):
     if "is_adi" in p: kw["is_adi"] = "degerlendir:" + is_turu
     m = model or AYAR.get("degerlendir_model")
     if m and "model" in p: kw["model"] = str(m)
-    t0 = time.time(); u = _dg_usd_yukle()
-    try: ham, hata = eylem_model(istem, **kw)
-    except Exception as e: ham, hata = None, e.__class__.__name__
-    mal = _dg_maliyet_oku(t0); mal_say = mal if mal is not None else (0.0 if hata else DG_TAHMIN_USD)
+    t0 = time.time(); u = _dg_usd_yukle(); mal = None
+    if "kapi_iste" in globals():
+        k = kapi_iste("degerlendir:" + is_turu, lambda: eylem_model(istem, **kw), karma=karma, coz=coz)
+        if k["sonuc"] == "engel": return None, "kapı: " + k["neden"], None
+        if k["sonuc"] == "onbellek": return k["ham"], None, {"maliyet": 0.0, "sure_ms": 0, "olculdu": True, "onbellek": True}  # v0.243.1: kapının son başarılı cevabı; çağrı ve maliyet yok
+        ham, hata = k["ham"], k["hata"]
+        if k.get("olculdu"): mal = k.get("maliyet")
+    else:
+        try: ham, hata = eylem_model(istem, **kw)
+        except Exception as e: ham, hata = None, e.__class__.__name__
+    if mal is None: mal = _dg_maliyet_oku(t0)
+    mal_say = mal if mal is not None else (0.0 if hata else DG_TAHMIN_USD)
     u["usd"] += mal_say; u["cagri"] += 1; sure = round((time.time() - t0) * 1000)
     return ham, hata, {"maliyet": mal_say, "sure_ms": sure, "olculdu": mal is not None}
 
@@ -322,10 +343,16 @@ def degerlendir(is_turu, adaylar, *, soru, sema, ornek=None, model=None):
                 for a in bekleyen[DG_ADAY_EN_COK:]: sonuc[a["id"]] = _dg_yedek(a, sema, "çok aday")
                 DG["tur_t"][is_turu] = simdi
                 istem = dg_istem(is_turu, cagri, soru, sema, ornek, dg_tepki_bolumu(is_turu, sema.get("soz_kaynak")))
-                ham, hata, olc = dg_cagri(istem, is_turu, soru, model, amac=dg_amac(sema))
-                r = dg_coz(ham, cagri, sema) if not hata and ham else {}
-                _dg_kayit("cagri", **{"is": is_turu, "aday": len(cagri), "tamam": len(r), "maliyet": (olc or {}).get("maliyet"), "sure_ms": (olc or {}).get("sure_ms"), **({"hata": str(hata)[:40]} if hata else {})})
-                if not r:
+                karma = hashlib.sha1("|".join(sorted(dg_anahtar(is_turu, a) for a in cagri)).encode("utf-8")).hexdigest()[:16]  # Claude kapısı tekrar önleme: aynı aday kümesi
+                ham, hata, olc = dg_cagri(istem, is_turu, soru, model, amac=dg_amac(sema), karma=karma, coz=lambda h, c=cagri: dg_coz(h, c, sema))
+                if hata and str(hata).startswith("kapı: "):  # kapı çağırmadı (mesai dışı, gece, toplantı, tavan, tekrar …): kural yedeği, çağrı sayılmaz, hata süresi başlamaz
+                    for a in cagri: sonuc[a["id"]] = _dg_yedek(a, sema, str(hata))
+                    cagri = []
+                r = dg_coz(ham, cagri, sema) if cagri and not hata and ham else {}
+                onb = bool((olc or {}).get("onbellek"))  # v0.243.1: kapının tekrar penceresinden gelen son başarılı cevap — çağrı satırı ve karar kaydı yazılmaz
+                if cagri and not onb: _dg_kayit("cagri", **{"is": is_turu, "aday": len(cagri), "tamam": len(r), "maliyet": (olc or {}).get("maliyet"), "sure_ms": (olc or {}).get("sure_ms"), **({"hata": str(hata)[:40]} if hata else {})})
+                if not cagri: pass
+                elif not r:
                     DG["hata_t"][is_turu] = simdi; tani = _dg_son_hata(ham, is_turu, len(cagri)) if ham and not hata else False
                     print(f"DEĞERLENDİR: {is_turu} cevabı gelmedi ({hata or 'çıktı okunamadı'}{f', ham {len(str(ham))} kr → degerlendir-son-hata.txt' if tani else ''}) — kural yedeği")
                     for a in cagri: sonuc[a["id"]] = _dg_yedek(a, sema, "cevap yok")
@@ -335,14 +362,15 @@ def degerlendir(is_turu, adaylar, *, soru, sema, ornek=None, model=None):
                         s = r.get(a["id"])
                         if not s: sonuc[a["id"]] = _dg_yedek(a, sema, "cevapta yok"); continue
                         s["kaynak"] = "model"; sonuc[a["id"]] = s; _dg_onbellege(is_turu, a, s)
-                        dg_karar_kaydet(is_turu, a["id"], s["karar"], s["oncelik"], s["neden"])
+                        if not onb: dg_karar_kaydet(is_turu, a["id"], s["karar"], s["oncelik"], s["neden"])
+                        else: s["kaynak"] = "onbellek"
                     _dg_onb_kaydet()
                     print(f"DEĞERLENDİR: {is_turu} {len(r)}/{len(cagri)} aday → " + ", ".join(f"{sum(1 for s in r.values() if s['karar'] == k)} {k}" for k in sema["kararlar"]) + f" ({round((olc or {}).get('sure_ms', 0) / 1000, 1)} sn, {(olc or {}).get('maliyet')} $)")
     except Exception as e:
         print(f"DEĞERLENDİR: {is_turu} hata ({e.__class__.__name__}: {e}) — kural yedeği")
         for a in tum: sonuc.setdefault(a["id"], _dg_yedek(a, sema, "hata"))
     out = [sonuc.get(a["id"]) or _dg_yedek(a, sema, "hata") for a in tum]
-    y = [x for x in out if x["kaynak"] == "yedek" and x["yedek_neden"] not in ("gizli kip", "gizli aday", "kapalı")]
+    y = [x for x in out if x["kaynak"] == "yedek" and x["yedek_neden"] not in ("gizli kip", "gizli aday", "kapalı") and not str(x["yedek_neden"]).startswith("kapı: ")]  # kapı engeli kapının sayacında (kapi.jsonl özeti)
     if y: _dg_kayit("yedek", **{"is": is_turu, "n": len(y), "neden": y[0]["yedek_neden"]})  # kural yedeğine düşen adaylar (ölçüm: olcum.py isabet "Yedeğe düşen")
     return out
 

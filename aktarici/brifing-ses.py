@@ -334,18 +334,21 @@ def claude_json(ham, is_, t0, yalin, saglayici=None, model=None):
     try: j = json.loads(ham)
     except ValueError: return ham, None
     if not isinstance(j, dict) or "result" not in j: return ham, None
-    k = BEYIN.kullanim(j); giris = k["giris"]
+    k = BEYIN.kullanim(j); giris = k["giris"]; u = j.get("usage") if isinstance(j.get("usage"), dict) else {}
+    # v0.243.0 (Claude kapısı K1, tek kayıt biçimi): onbellek_oku / onbellek_yaz (toplam yazım) / onbellek_yaz_1s (1 saatlik payı) / cikti + sonuc; eski alanlar (onbellek_orani, hata …) korunur
     o = {"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_, "saglayici": saglayici or "claude-code", **({"model": model} if model else {}), "yalin": yalin, "sure_ms": j.get("duration_ms"),
          "api_ms": j.get("duration_api_ms"), "duvar_ms": round((time.time() - t0) * 1000), "tur": j.get("num_turns"),
-         "maliyet": round(k["maliyet"], 4), "giris": giris, "cikti": k["cikti"],
-         "onbellek_orani": round(k["okunan"] / giris, 2) if giris else None, "hata": bool(j.get("is_error"))}
-    with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
+         "maliyet": round(k["maliyet"], 4), "giris": giris, "cikti": k["cikti"] or 0, "onbellek_oku": k["okunan"] or 0, "onbellek_yaz": u.get("cache_creation_input_tokens") or 0,
+         "onbellek_yaz_1s": (u.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0 if isinstance(u.get("cache_creation") or {}, dict) else 0,
+         "onbellek_orani": round(k["okunan"] / giris, 2) if giris else None, "hata": bool(j.get("is_error")), "sonuc": "hata" if j.get("is_error") else "tamam"}
+    if not ("kapi_olcum_birak" in globals() and kapi_olcum_birak(o)):  # Claude kapısının içindeyse satırı kapı yazar (sonuç ve nedenle birlikte, tek satır)
+        with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     if (saglayici or "claude-code") == "claude-code" and "claude_ok" in globals(): claude_hata_bildir(j.get("result"), is_) if o["hata"] else claude_ok()  # v0.130.0
     return str(j.get("result") or ""), o
 def beyin_tek(is_, sec, istem, json_kip=False, sistem=None, zaman=180):
     # Faz 11 Aşama 2: başka sağlayıcıda tek çağrı. Alt süreç (`beyin.py tek <istek>`; aktarıcı ağa kendisi bağlanmaz, anahtarı beyin.py Anahtar Zinciri'nden okur)
     # → (metin, ölçüm); ölçüm None ya da hata=True ise çağıran yedeğe (Claude Code) düşebilir.
-    istek = os.path.join(BASE, f"{is_}-beyin-istek.json"); t0 = time.time(); ham = ""
+    istek = os.path.join(BASE, f"{is_}-beyin-istek-{os.getpid()}-{secrets.token_hex(4)}.json"); t0 = time.time(); ham = ""  # v0.243.0: çağrı başına benzersiz (eşzamanlı iki çağrı aynı dosyayı yazmasın)
     fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(dict(BEYIN.tek_istek(AYAR, is_, istem, sistem, json_kip), zaman=zaman), f, ensure_ascii=False)
     try: ham = subprocess.run(["/usr/bin/python3" if os.path.exists("/usr/bin/python3") else sys.executable, "-I", "-B", BEYIN.__file__, "tek", istek],

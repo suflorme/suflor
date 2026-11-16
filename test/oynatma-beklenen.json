@@ -653,6 +653,21 @@
    "kanit_iste": "NoneType",
    "kanit_n": "int",
    "kanitlar": [],
+   "kapi": {
+    "aktif": "int",
+    "arka_usd": "float",
+    "bugun": {
+     "cagri": "int",
+     "engel": "int",
+     "hata": "int",
+     "okunamadi": "int",
+     "tamam": "int",
+     "tarih": "str"
+    },
+    "engel": {},
+    "tavan_usd": "float",
+    "tekrar_bekleyen": "int"
+   },
    "kart_katmani": "bool",
    "kaynak": {
     "bos_yuzde": "int",
@@ -1101,7 +1116,7 @@
   "AÇIK SORU": 2,
   "BAĞLAM": 1,
   "DOSYA": 1,
-  "DURUM": 7,
+  "DURUM": 8,
   "DİNLE": 1,
   "HAZIR": 2,
   "HAZIR KARTLAR": 1,

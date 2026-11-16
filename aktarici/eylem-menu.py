@@ -14,32 +14,48 @@ def _kem_kimlik(ad, tam=True):  # kimlik.py: takvim, kayıt veritabanı, Kişile
     return kimlik_coz(ad) if tam else kimlik_coz(ad, kisiler=False, yaz=False)
 def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None, zaman=None):  # is_adi: ölçüm iş adı (varsayılan eylem; değerlendirici degerlendir:<tür>), model: Claude Code modeli (varsayılan beyin.prova), zaman: çağrı süresi sn (varsayılan EYLEM_ZAMAN_SN; düşünme turu uzun ister)
     # amac verilirse (talimat | kayit | degerlendir) istemin başına kişi modelinin paketi (profil + öğrenilenler …; aktarici/kisi-modeli.py baglam_paketi) eklenir; gizlilik süzgeci pakette.
-    # → (ham metin, hata metni ya da None). Tek model çağrısı (prova_model gibi): başka sağlayıcıysa beyin_tek, Claude Code ise Brifing.app --istek (Masaüstü izni uygulamada).
+    # → (ham metin, hata metni ya da None). v0.243.0 (K1): Claude kapısından geçer (aktarici/kapi.py kapi_iste: izin çağrıdan önce, ortak sıra, tek kayıt); iş türü is_adi/amac'tan
+    # (kapi_is_turu: talimat, eposta_taslak, eylem …). Kapı engellerse (None, "kapı: <neden>"). Kapının içinden (dg_cagri) gelen çağrı kapıya yeniden girmez.
+    y = globals().get("KAPI_YEREL")
+    if "kapi_iste" not in globals() or (y is not None and getattr(y, "is_turu", None)): return _eylem_cagri(istem, amac, soru, maske, is_adi, model, zaman)
+    k = kapi_iste(kapi_is_turu(is_adi, amac), lambda: _eylem_cagri(istem, amac, soru, maske, is_adi, model, zaman))
+    if k["sonuc"] == "engel": return None, "kapı: " + k["neden"]
+    return k["ham"], k["hata"]
+def _eylem_cagri(istem, amac=None, soru=None, maske=None, is_adi=None, model=None, zaman=None):
+    # Tek model çağrısı (prova_model gibi): başka sağlayıcıysa beyin_tek, claude-code ise Brifing.app --istek (Masaüstü izni uygulamada).
+    # İstek/çıktı dosyası çağrı başına benzersiz (kapi_dosya; eskiden canli/eylem/istek.json + cikti.json paylaşılıyordu). S141: kapı kuralı "claude" ise metin yalnız claude-code uyarlayıcısına.
     try:
         if amac and "baglam_paketi" in globals():
             paket = baglam_paketi(amac, soru=soru)
             if paket and maske: paket = maske(paket)  # çağıranın kendi gizlilik maskesi (ör. e-posta değerlendirmesinde adres maskesi)
             if paket: istem = paket + "\n" + istem
+        y = globals().get("KAPI_YEREL"); is_kapi = getattr(y, "is_turu", None) if y is not None else None
+        is_ = is_adi or is_kapi or "eylem"
+        yalniz_claude = "kapi_saglayici" in globals() and kapi_saglayici(is_kapi or is_) == "claude"
         sec = BEYIN.secim(AYAR, "prova"); claude_var = bool(claude_yolu()) and os.path.isdir(BRIFING_APP); ham = None
-        if sec["tur"] != "claude-code":
+        if sec["tur"] != "claude-code" and not yalniz_claude:
+            if "kapi_gercek_cagri" in globals(): kapi_gercek_cagri()
             ham, olc = beyin_tek("prova", sec, istem, json_kip=False, sistem=None, zaman=zaman or EYLEM_ZAMAN_SN)
             if olc and not olc.get("hata"): return ham, None
             if not (claude_var and BEYIN.yedek_var(AYAR, sec)): return None, "yanıt gelmedi"
             print(BEYIN.yedek_satiri("prova", sec, ham if olc else "çıktı okunamadı"))
         if not claude_var: return None, "Claude Code yok"
         d = os.path.join(BASE, "eylem"); os.makedirs(d, exist_ok=True)
-        cikti = os.path.join(d, "cikti.json"); istek = os.path.join(d, "istek.json"); t0 = time.time()
+        if "kapi_dosya" in globals(): cikti, istek = kapi_dosya(d, "cikti"), kapi_dosya(d, "istek")
+        else: cikti, istek = os.path.join(d, "cikti.json"), os.path.join(d, "istek.json")
+        t0 = time.time()
         if os.path.exists(cikti): os.remove(cikti)
         model = model or BEYIN.claude_secim(AYAR, "prova")["model"]
         fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model), "cwd": d, "cikti": cikti, "sure": zaman or EYLEM_ZAMAN_SN}, f, ensure_ascii=False)
+        if "kapi_gercek_cagri" in globals(): kapi_gercek_cagri()
         try: subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=(zaman or EYLEM_ZAMAN_SN) + 30)
         except (OSError, subprocess.TimeoutExpired): pass
         try: os.remove(istek)
         except OSError: pass
         try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
         except OSError: return None, "Claude yanıt vermedi"
-        metin, _ = claude_json(ham, is_adi or "eylem", t0, bool(claude_yalin()), "claude-code", model)
+        metin, _ = claude_json(ham, is_, t0, bool(claude_yalin()), "claude-code", model)
         return metin, None
     except Exception as e: return None, e.__class__.__name__
 def _kem_id(yol):

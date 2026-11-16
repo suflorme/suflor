@@ -233,6 +233,24 @@ def _beta_cpp(bas, son):  # S188: whisper.cpp açılışları (canli/whisper-cpp
             "cpp_hata": dict(collections.Counter(str(r.get("hata") or "diger") for r in rs if r.get("sonuc") != "basarili")),
             "acilis_sn": _ort([x for x in (sn(r, "sn") for r in ok) if x is not None]), "coreml_ilk_sn": max(ilk) if ilk else None,
             "calisan_motor": (STATE.get("whisper") or {}).get("motor") or None}
+def _beta_sayi(r, *adlar):  # ilk SAYI olan alan (metin alanı — ör. eski Konuş satırındaki ses aygıtı "cikis" — sayılmaz); yoksa None
+    for a in adlar:
+        v = r.get(a)
+        if isinstance(v, (int, float)) and not isinstance(v, bool): return v
+    return None
+def _beta_belirtec(r):  # v0.243.0: claude-cagri satırı → {giris (toplam, önbellek dahil), cikti, onbellek_yaz, onbellek_oku}; eski ve yeni satır biçimleri
+    # Yeni satır (claude_json, Konuş): giris toplam; onbellek_oku, onbellek_yaz (toplam yazım; 1 saatlik pay onbellek_yaz_1s içinde ayrıca SAYILMAZ), cikti.
+    # Eski satır: okuma yalnız oran olarak → giris × onbellek_orani; yazım "yazim" (Konuş) — "yazim" ile "onbellek_yaz" birlikte varsa bir kez.
+    # Toplantı oturumu (toplanti-claude.py maliyet): giris yalnız önbelleksiz giriş, onbellek_yaz 5 dk + onbellek_yaz_1s 1 sa ayrı, çıktı "cikis" (sayı) → giris toplama çevrilir.
+    g = int(_beta_sayi(r, "giris") or 0); cik = int(_beta_sayi(r, "cikti", "cikis") or 0)
+    if r.get("is") == "toplanti":
+        yaz = int(_beta_sayi(r, "onbellek_yaz") or 0) + int(_beta_sayi(r, "onbellek_yaz_1s") or 0); oku = int(_beta_sayi(r, "onbellek_oku") or 0)
+        return {"giris": g + yaz + oku, "cikti": cik, "onbellek_yaz": yaz, "onbellek_oku": oku}
+    oku = _beta_sayi(r, "onbellek_oku")
+    if oku is None:
+        oran = _beta_sayi(r, "onbellek_orani"); oku = round(g * oran) if oran is not None else 0
+    yaz = _beta_sayi(r, "onbellek_yaz", "yazim")
+    return {"giris": g, "cikti": cik, "onbellek_yaz": int(yaz or 0), "onbellek_oku": int(oku)}
 def _beta_maliyet(bas, son, toplanti_dk):
     cg = [r for r in _jsonl("claude-cagri.jsonl") if bas <= (_ts(r) or 0) < son]
     isler = {}
@@ -241,8 +259,7 @@ def _beta_maliyet(bas, son, toplanti_dk):
         ad = ad if ad in teshis.SAYIM["claude_is"] else "diger"
         x = isler.setdefault(ad, {"cagri": 0, "giris": 0, "cikti": 0, "onbellek_yaz": 0, "onbellek_oku": 0, "dolar": 0.0})
         x["cagri"] += 1; x["dolar"] += float(r.get("maliyet") or 0)
-        for k, ks in (("giris", ("giris",)), ("cikti", ("cikti", "cikis")), ("onbellek_yaz", ("yazim", "onbellek_yaz")), ("onbellek_oku", ("onbellek_oku",))):
-            x[k] += sum(int(r.get(a) or 0) for a in ks if isinstance(r.get(a), (int, float)))
+        for k, v in _beta_belirtec(r).items(): x[k] += v
     for x in isler.values(): x["dolar"] = round(x["dolar"], 3)
     tp = isler.get("toplanti") or {}; trs = [r for r in cg if r.get("is") == "toplanti"]; n_top = len(trs)
     toplanti_dk = sum(float(r.get("sure_dk") or 0) for r in trs) or toplanti_dk  # oturumun kendi süresi (maliyet kaydı); yoksa olay kaydından

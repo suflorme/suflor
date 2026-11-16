@@ -48,7 +48,8 @@ def kur(T):
     uyg = os.path.join(T, "uygulama"); canli = os.path.join(uyg, "canli")
     for d in (canli, os.path.join(T, "proje"), os.path.join(T, "ortak")): os.makedirs(d)
     ayar = {"alan": "Test", "ad": VERI["ben"], "port": PORT, "uygulama": uyg, "proje": os.path.join(T, "proje"), "ortak": os.path.join(T, "ortak"),
-            "yerel_ses": False, "teshis": False, "dil": "tr"}
+            "yerel_ses": False, "teshis": False, "dil": "tr",
+            "calisma_saatleri": {"gunler": [0, 1, 2, 3, 4, 5, 6], "bas": "00:00", "bit": "24:00"}, "soz_gece": False}  # v0.243.0: Claude kapısı mesai/gece kuralı koşu saatine bağlı olmasın
     json.dump(ayar, open(os.path.join(T, "ayar.json"), "w"), ensure_ascii=False)
     return kod, canli
 

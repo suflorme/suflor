@@ -33,7 +33,7 @@ ol += [{"at": at(60 * 24 * 30), "olay": "kacan_aday", "hoparlor": True}]  # penc
 yaz("sohbet-olay.jsonl", ol)
 cg = []
 for i in range(10): cg.append({"at": at(50 - i), "is": "bas-konus", "tur_turu": "sohbet", "yerel": True, "cikis": "hoparlör", "soz_bitis_ses_ms": 1500 + 10 * i})
-for i in range(6): cg.append({"at": at(30 - i), "is": "bas-konus", "tur_turu": "devam", "yerel": True, "cikis": "kulaklık", "soz_bitis_ses_ms": 1400 + 10 * i})
+for i in range(6): cg.append({"at": at(30 - i), "is": "bas-konus", "tur_turu": "devam", "yerel": True, "cikis_aygit": "kulaklık", "soz_bitis_ses_ms": 1400 + 10 * i})
 for i in range(6): cg.append({"at": at(20 - i), "is": "bas-konus", "tur_turu": "sohbet", "yerel": False, "cikis": "kulaklık", "soz_bitis_ses_ms": 1450 + 10 * i})
 cg.append({"at": at(10), "is": "bas-konus", "tur_turu": "bas", "yerel": False, "cikis": "kulaklık", "soz_bitis_ses_ms": 900})  # basılı tutma: sohbet kıyasına girmez
 yaz("claude-cagri.jsonl", cg)
@@ -66,7 +66,7 @@ import re
 cagrilar = re.findall(r"_ag_olay\(([^\n]*)", src)
 ok("sohbet.py: ölçüm olayı çağrıları var ve 'metin' alanı taşımıyor", len(cagrilar) >= 6 and not any("metin" in c for c in cagrilar), cagrilar)
 bk = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
-ok("bas-konus.py: claude-cagri satırına cikis ve yerel eklenir", "_konus_cikis_yerel(tur)" in bk and '("cikis", "yerel")' in bk)
+ok("bas-konus.py: claude-cagri satırına cikis_aygit ve yerel eklenir (v0.243.0: cikis → cikis_aygit)", "_konus_cikis_yerel(tur)" in bk and '("cikis_aygit", "yerel")' in bk)
 bv = open(os.path.join(KOD, "aktarici", "beta-veri.py"), encoding="utf-8").read(); ts = open(os.path.join(KOD, "teshis.py"), encoding="utf-8").read()
 ok("beta paketine girmez: beta-veri.py ve teshis.py sohbet-olay / araya_girme anmaz", "sohbet-olay" not in bv and "araya_girme" not in bv and "sohbet-olay" not in ts)
 print(f"\n{'TAMAM' if not S['gec'] else str(S['gec']) + ' HATA'}"); sys.exit(1 if S["gec"] else 0)
