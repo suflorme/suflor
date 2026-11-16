@@ -1507,6 +1507,7 @@ globalThis.SUFLOR_EN = {
   "Biten iş yok.": "No finished tasks.",
   "Bugün toplantı yok": "No meetings today",
   "Bugün vadesi gelen {x} var.": "{x} due today.",
+  "Bugünün odağında {x} var.": "{x} in today's focus.",
   "Ekibin": "Team's",
   "Ekip paylaşımında": "Shared with the team",
   "Eylemleri aç": "Open actions",

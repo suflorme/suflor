@@ -798,6 +798,13 @@ ONBELLEK = os.path.join(AYAR["uygulama"], "cevirme-onbellek")
 CEVIR_PY = os.environ.get("SUFLOR_CEVIR_PY") or os.path.join(AYAR["ortak"], "cevir-venv", "bin", "python")
 CEVIR_ISCI = os.environ.get("SUFLOR_CEVIR_ISCI") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "cevir-isci.py")
 CEVIR_YENILE, CEVIR_HAZIR_SN = 25, 300
+CEVIR_GORSEL_UZ = {".png", ".jpg", ".jpeg", ".webp", ".heic", ".tif", ".tiff", ".bmp", ".gif"}
+CEVIR_GORSEL_SURUM = "vision-tam1"  # v0.248.0 (16 Kasım): cevir-isci.py ARAC_SURUM ile aynı; grafik/şema görüntülerinde tam OCR yedeği
+def gorsel_eski(kisa, o):
+    # v0.248.0 (16 Kasım): işçinin eski sürümüyle (tam OCR yedeksiz) çevrilmiş görüntü önbelleği, bir kez yeniden çevrilir (arac "docling …" ile başlıyorsa; sahte/boş arac dokunulmaz)
+    ar = o.get("arac") or ""
+    return (os.path.splitext(kisa)[1].lower() in CEVIR_GORSEL_UZ and not o.get("hata") and ar.startswith("docling")
+            and CEVIR_GORSEL_SURUM not in ar and o.get("tam_dene") != CEVIR_GORSEL_SURUM)
 def cevir_sure(ext): return int(AYAR.get("cevir_sure_sn") or 0) or (60 if ext not in (".pdf", ".pptx") else 180)
 
 def eml_metin(yol):
@@ -916,11 +923,12 @@ def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR
     c = c or baglan(); t0 = time.time(); tara(c)
     adaylar = [r for r in c.execute("SELECT yol, sha256, mtime FROM tarama WHERE gizli=0 AND kopya_of IS NULL AND hata IS NULL ORDER BY mtime DESC")
                if os.path.splitext(r[0])[1].lower() in CEVIR_UZ]
-    yap, onbellekte = [], 0
+    yap, onbellekte, eskiler = [], 0, {}
     for yol, sha, _ in adaylar:
         try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
         except (OSError, ValueError): o = None
         if o is None or (yeniden_dene and o.get("hata")): yap.append((yol, sha))
+        elif gorsel_eski(yol, o): yap.append((yol, sha)); eskiler[yol] = o  # v0.248.0: bir kerelik yeniden çevirme (tur süresi bütçesi içinde)
         else: onbellekte += 1
     if sinir: yap = yap[:sinir]
     say = collections.Counter(); hatalar = []; isci = None; durdu = None
@@ -942,6 +950,9 @@ def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR
             else:
                 kayit["parcalar"] = o.get("parcalar") or []; say["cevrildi"] += 1; say["karakter"] += sum(len(m) for _, m in kayit["parcalar"])
                 if o.get("tablolar"): kayit["tablolar"] = o["tablolar"]  # v0.121.0: .xls/.numbers sayfaları → proje veritabanı
+            if kisa in eskiler:  # v0.248.0: yeniden çevirme — başarısızsa eski metin korunur (bir daha denenmez); başarılıysa dizin satırı yeniden okunsun
+                if kayit.get("hata"): kayit = dict(eskiler[kisa], tam_dene=CEVIR_GORSEL_SURUM)
+                else: c.execute("UPDATE dosya SET mtime=0 WHERE yol=?", (kisa,))
             y = _onbellek_yol(sha); os.makedirs(os.path.dirname(y), exist_ok=True)
             with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(kayit, f, ensure_ascii=False)
             os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)

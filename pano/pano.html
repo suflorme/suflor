@@ -2180,8 +2180,9 @@ function bnDurum(s,ol,now,sira,kala,hdS,bek,son,ek){const P=[],kalan=ol.filter(o
   {const kt=bnTeyitT(),kg=bnKendiT().filter(x=>x.gecikti)
     if(kt.length)P.push(L('Onayını bekleyen {x} var.',{x:bnVarlik('bek',L('{n} karar',{n:kt.length}))}))
     if(kg.length)P.push(L('Gecikmiş {x} var.',{x:bnVarlik('kendi',L('{n} işin',{n:kg.length}))}))
-    else{const kn=bnKendiT(),kb=kn.filter(x=>x.kalan_gun===0).length  // özet başlıktaki "senden N şey bekleniyor" ile çelişmez (bnBeklenen ile aynı küme): gecikmiş yoksa bugün vadeli, o da yoksa açık işlerin sayısı
+    else{const bb=bnBeklenen(s),kn=bb.knTum,kb=kn.filter(x=>x.kalan_gun===0).length  // özet başlıktaki "senden N şey bekleniyor" ile çelişmez (bnBeklenen ile aynı küme): gecikmiş yoksa bugün vadeli, o da yoksa açık işlerin sayısı
       if(kb)P.push(L('Bugün vadesi gelen {x} var.',{x:bnVarlik('kendi',L('{n} işin',{n:kb}))}))
+      else if(bb.plan){if(bb.kn.length)P.push(L('Bugünün odağında {x} var.',{x:bnVarlik('kendi',L('{n} işin',{n:bb.kn.length}))}))}  // v0.248.0 (16 Kasım): planlı günde N odaktaki işleri sayar
       else if(kn.length)P.push(L('Gecikmiş ya da bugün vadesi gelen işin yok; {x} var.',{x:bnVarlik('kendi',L('{n} açık işin',{n:kn.length}))}))}}
   if(son&&Date.now()-new Date(son.at)<108e5&&ciktiP(son.cikti).length)P.push(L('{ad} bitti: {c}.',{ad:bnVarlik('son',son.baslik||son.ad||''),c:ciktiP(son.cikti).join(', ')}))
   if(!P.length)P.push(L('Bugün senden bekleyen bir şey yok.'))
@@ -2215,7 +2216,7 @@ function bnCiz(s){const el=document.getElementById('bgn');if(!el||(s.aktif&&!bnT
     if(s.proaktif)R.push(bsSat({nokta:'vurgu',t:esc(s.proaktif.cumle),a:esc(L('Toplantı sonrası hatırlatma')),d:`<button type=button class=b data-bn=proakt data-id="${esc(s.proaktif.id)}">${L(s.proaktif.yazma?'Evet, onaya sun':s.proaktif.tur==='gun'?'Birlikte bakalım':'Bakalım')}</button>`,x:`<button type=button class=em data-bn=proakap data-id="${esc(s.proaktif.id)}" title="${L('Sonra')}" aria-label="${L('Sonra')}">${ic('x')}</button>`}))  // toplantı sonrası açık uç hatırlatması (aktarici/toplanti-sonrasi.py)
     R.push(...bek.map(bsEylem),...kt.map(bsKarar),...kn.map(bsIs),...mtbSat(s))
     if(dl.length)R.push(bsSat({nokta:'vurgu',t:esc(L('{baslik} dökümünü kontrol et',{baslik:dl[0].baslik})),a:esc(L('Öncelikli {n} satır · yaklaşık {m} dk',{n:dl[0].oncelikli,m:Math.round(dl[0].tahmin_dk||0)}))+dl.slice(1).map(x=>` · <button type=button class=varlik data-bn=dkac data-t="${esc(x.ad)}" title="${esc(x.baslik)}">${esc(goreliTarih(x.tarih))}</button>`).join(''),e:`<span class="etiket notr">${L('Döküm')}</span>`,d:`<button type=button class=b data-bn=dkac data-t="${esc(dl[0].ad)}">${L('Başla')}</button>`,x:`<button type=button class=em data-bn=dkkapat data-t="${esc(dl[0].ad)}" title="${L('Kapat')}" aria-label="${L('Kapat')}">${ic('x')}</button>`}))  // toplantı sonrası döküm kontrolü (yalnız geliştirici; aktarici/dokum-kontrol.py)
-    const N=bb.n,gor=bnBekAcik||R.length<=4?R:R.slice(0,4),tum=bb.n,ge=bnGeride()
+    const N=bb.n,gor=bnBekAcik||R.length<=4?R:R.slice(0,4),tum=bb.nTum,ge=bnGeride()  // v0.248.0 (16 Kasım): Tümü bütün açık işleri sayar (plan odağı dışındakiler dahil)
     const isaret=`<span class="varlikisaret${dinliyor?' dinliyor':''}${dusunuyor?' dusunuyor':''}" id=bnIsaret><span class=nefes aria-hidden=true></span><span class=dalga aria-hidden=true><i></i><i></i><i></i><i></i></span>${dusunuyor?`<span class=dusunce>${L('düşünüyor…')}</span>`:''}</span>`
     const bas=`<div class=sayfab><div class=sbas><span class=tarih>${esc(tarih)}</span><h1>${esc(selam+(ad?' '+ad:''))}${N?esc('. '+L('Bugün senden {n} şey bekleniyor.',{n:N})):''} ${isaret}</h1></div><div class=sag>${bnHap(s)}${sayfaMenu('bugun')}</div></div>`
     // Günün özeti: durum cümleleri (bnDurum) + cevapsız e-posta ve yakın tarih; Dinle hazır brifingi okur; altta sayaç bağlantıları
@@ -2381,8 +2382,12 @@ function toplantiAdi(dosya,yedek){const d=tpDos(dosya),bul=ls=>(ls||[]).find(x=>
 const tpAd=x=>x.toplanti?`<span title="${esc(tpDos(x.toplanti))}">${esc(toplantiAdi(x.toplanti,x.baslik))}</span>`:esc(x.baslik||'')
 // Senden beklenenler — tek tanım (başlıktaki N, "Tümü · N", kenar rozeti): senden onay bekleyen eylemler + onayını bekleyen kararlar + açık işlerin (14 günden eskiler hariç: Geride kalanlar).
 // Sıra: gecikmiş, yeni atanmış, vadesi yakın, tarihsiz en sonda
-function bnBeklenen(s){const kn=bnKendiT().slice().sort((a,b)=>(!!b.gecikti-!!a.gecikti)||(!!b.atama_yeni-!!a.atama_yeni)||((a.kalan_gun==null)-(b.kalan_gun==null))||((a.kalan_gun||0)-(b.kalan_gun||0)))
-  const bek=s?bnBekleyen(s):[],kt=bnTeyitT();return{bek,kt,kn,n:bek.length+kt.length+kn.length}}
+// v0.248.0 (16 Kasım, S271 d): bugünün gün planında odak varsa sayılan işler yalnız odaktaki hâlâ açık işler (plan sırasıyla); öbür açık işler
+// sayılmaz ama "Tümü · nTum" ile erişilir. Odak bitince n = onay + karar. Plan yoksa (null, başka gün, odak yok) eski davranış
+function bnBeklenen(s){const knTum=bnKendiT().slice().sort((a,b)=>(!!b.gecikti-!!a.gecikti)||(!!b.atama_yeni-!!a.atama_yeni)||((a.kalan_gun==null)-(b.kalan_gun==null))||((a.kalan_gun||0)-(b.kalan_gun||0)))
+  const bek=s?bnBekleyen(s):[],kt=bnTeyitT(),gp=s&&s.gun_plani,od=gp&&gp.tarih===bnTarih()&&Array.isArray(gp.odak)?gp.odak.filter(x=>x&&x.id&&(!x.kapsam||x.kapsam==='kendi')):[]
+  const plan=od.length>0,acik=new Map(bnKendi().map(x=>[x.id,x])),kn=plan?od.map(x=>acik.get(x.id)).filter(Boolean):knTum
+  return{bek,kt,kn,knTum,plan,n:bek.length+kt.length+kn.length,nTum:bek.length+kt.length+knTum.length}}
 const bsSat=x=>`<div class="sat bs" data-id="${esc(x.id||'')}"${x.ek||''}>${x.ikon?`<span class=sik aria-hidden=true>${ic(x.ikon)}</span>`:`<span class="nokta ${x.nokta||''}" aria-hidden=true></span>`}<div class=m><div class=t>${x.t}</div>${x.a?`<div class=a>${x.a}</div>`:''}</div><div class=eylem>${x.e||''}${x.d||''}${x.x||''}</div></div>`
 const bsTarih=t=>t?goreliSpan(String(t).slice(0,10),''):''
 const bsIs=x=>knSatir(x,{bs:1})

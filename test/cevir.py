@@ -130,6 +130,27 @@ try:
         kontrol("Numbers ve .xls sayfaları proje veritabanında: toplam 13330.5, .xls tarihi ISO", top == {"bicim/ornek.xls": 13330.5, "bicim/ornek.numbers": 13330.5}
                 and tr == [("2026-11-01",), ("2026-11-05",)], f"{top} {tr}")
     else: print("  (Pages/Numbers/.xls örnekleri ya da xlrd yok — o kısım atlandı)")
+    # v0.248.0 (16 Kasım): grafik/şema görüntüsü — Docling resim sayıp içini okumaz; Vision tam OCR yedeği hücre sayılarını ve eksen adlarını ekler
+    URET3 = "import sys\nfrom PIL import Image, ImageDraw, ImageFont\nF = '/System/Library/Fonts/Supplemental/Arial.ttf'; f = ImageFont.truetype(F, 28); b = ImageFont.truetype(F, 40)\n" \
+            "im = Image.new('RGB', (1000, 800), 'white'); d = ImageDraw.Draw(im)\n" \
+            "d.text((300, 30), 'Karışıklık matrisi', fill='black', font=b)\n" \
+            "d.rectangle((150, 120, 850, 650), fill=(210, 225, 245), outline='navy', width=4)\n" \
+            "d.line((200, 160, 200, 600), fill='black', width=3); d.line((200, 600, 800, 600), fill='black', width=3)\n" \
+            "for i, (x, y, v) in enumerate(((260, 200, '412'), (520, 200, '38'), (260, 380, '51'), (520, 380, '199'))):\n" \
+            "    d.rectangle((x - 20, y - 20, x + 200, y + 140), outline='black', width=3); d.text((x + 40, y + 40), v, fill='black', font=b)\n" \
+            "for k, x in enumerate((200, 400, 600, 800)): d.text((x - 20, 615), str(k * 10), fill='black', font=f)\n" \
+            "d.text((420, 690), 'Tahmin', fill='black', font=f); d.text((40, 360), 'Gerçek', fill='black', font=f)\n" \
+            "im.save(sys.argv[1])\n"
+    os.makedirs(f"{P}/grafik", exist_ok=True); subprocess.run([VPY, "-B", "-c", URET3, f"{P}/grafik/karisiklik.png"], check=True, capture_output=True)
+    rg = m.cevir(c); gm = " ".join(x[0] for x in c.execute("SELECT metin FROM parca WHERE yol='grafik/karisiklik.png'").fetchall()) if rg["cevrildi"] == 1 else ""
+    kontrol("grafik görüntüsü: hücre sayıları ve eksen adları dizinde", rg["cevrildi"] == 1 and all(k in gm.split() or k in gm for k in ("412", "199", "Tahmin", "Gerçek")), gm[:300])
+    gsha = m._sha256(os.path.join(P, "grafik/karisiklik.png")); gy = m._onbellek_yol(gsha); go = json.load(open(gy, encoding="utf-8"))
+    kontrol("işçi sürümü önbellek kaydında", "vision-tam1" in (go.get("arac") or ""), str(go.get("arac")))
+    # eski sürümle çevrilmiş görüntü önbelleği bir kez yeniden çevrilir (sahte/boş arac dokunulmaz)
+    go["arac"] = "docling 2.0 + vision"; go["parcalar"] = [["", "Karışıklık matrisi"]]; json.dump(go, open(gy, "w", encoding="utf-8"), ensure_ascii=False)
+    rg2 = m.cevir(c); gm2 = " ".join(x[0] for x in c.execute("SELECT metin FROM parca WHERE yol='grafik/karisiklik.png'").fetchall())
+    kontrol("eski sürüm önbellek bir kez yeniden çevrildi, dizin yenilendi", rg2["cevrildi"] == 1 and "199" in gm2 and "Tahmin" in gm2, json.dumps(rg2)[:200] + gm2[:100])
+    kontrol("yeniden çevirmeden sonra bir daha çevrilmedi", m.cevir(c)["cevrildi"] == 0)
     m.CEVIR_ISCI = os.path.join(T, "yok.py")
     open(os.path.join(P, "ekran/son.png"), "wb").write(open(os.path.join(P, "ekran/depo-sayimi.png"), "rb").read() + b"3")
     r6 = m.cevir(c)

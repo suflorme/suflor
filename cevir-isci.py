@@ -58,6 +58,26 @@ def xls_oku(yol):  # v0.121.0: eski Excel (BIFF) → xlrd (BSD; Docling .xls iç
             satirlar.append(sat)
         tablolar.append({"sayfa": sh.name, "satirlar": satirlar}); out += satir_parcalari(sh.name, satirlar)
     return out, tablolar
+GORSEL_UZ = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp", ".gif", ".heic"}
+ARAC_SURUM = "vision-tam1"  # v0.248.0 (16 Kasım): tam görüntü OCR yedeği sürümü; baglam.py eski önbellekteki görüntüleri bir kez yeniden çevirir
+def _norm(t): return re.sub(r"[\W_]+", " ", (t or "").casefold()).strip()
+def vision_satirlar(yol):
+    # v0.248.0 (16 Kasım): Apple Vision ile tam görüntü OCR → satırlar (aynı yükseklikteki gözlemler soldan sağa birleşir). Docling grafik/şemayı "resim" sayıp içini okumaz.
+    from ocrmac import ocrmac
+    gz = [(t.strip(), b) for t, c, b in ocrmac.OCR(yol, recognition_level="accurate", language_preference=["tr-TR", "en-US"]).recognize() if c >= 0.3 and t.strip()]
+    gz.sort(key=lambda g: -(g[1][1] + g[1][3] / 2)); satirlar = []  # yukarıdan aşağı (Vision orijini sol alt)
+    for t, b in gz:
+        oy = b[1] + b[3] / 2
+        if satirlar and abs(satirlar[-1]["oy"] - oy) <= max(satirlar[-1]["h"], b[3]) / 2: satirlar[-1]["g"].append((b[0], t)); satirlar[-1]["h"] = max(satirlar[-1]["h"], b[3])
+        else: satirlar.append({"oy": oy, "h": b[3], "g": [(b[0], t)]})
+    return [" ".join(t for _, t in sorted(s["g"])) for s in satirlar]
+def vision_ekle(doc, metin, yol):
+    # Docling'in resim öğesi var ya da metni kısa (< 200 karakter) ise Vision satırlarından Docling metninde olmayanlar altına eklenir; hata dosyayı düşürmez
+    if not (getattr(doc, "pictures", None) or len(metin) < 200): return metin
+    try:
+        var = _norm(metin); yeni = [s for s in vision_satirlar(yol) if _norm(s) and _norm(s) not in var]
+    except Exception: return metin
+    return (metin + "\n\n" + "\n".join(yeni)).strip() if yeni else metin
 def parcalar(cv, yol):  # → (parçalar, tablolar): tablolar yalnız tablo biçimlerinde (.xls, .numbers) — baglam.py proje veritabanına yazar
     ext = os.path.splitext(yol)[1].lower(); gecici = None
     if ext == ".xls": return xls_oku(yol)
@@ -74,7 +94,9 @@ def parcalar(cv, yol):  # → (parçalar, tablolar): tablolar yalnız tablo biç
                 tablolar.append({"sayfa": sayfa, "satirlar": satirlar}); out += satir_parcalari(sayfa, satirlar)
             return (out or [["", md_temizle(doc.export_to_markdown())]]), tablolar
         sayfalar = sorted(getattr(doc, "pages", {}) or {})
-        if len(sayfalar) <= 1: return [["", md_temizle(doc.export_to_markdown())]], []
+        if len(sayfalar) <= 1:
+            mt = md_temizle(doc.export_to_markdown())
+            return [["", vision_ekle(doc, mt, yol) if ext in GORSEL_UZ else mt]], []
         on = "slayt " if ext in (".pptx", ".ppt", ".key") else "sayfa "
         out = [[f"{on}{n}", md_temizle(doc.export_to_markdown(page_no=n))] for n in sayfalar]
         return [p for p in out if p[1].strip()], []
@@ -84,7 +106,7 @@ def parcalar(cv, yol):  # → (parçalar, tablolar): tablolar yalnız tablo biç
 def main():
     try:
         import docling; from importlib.metadata import version
-        cv = donusturucu(); arac = f"docling {version('docling')} + vision"
+        cv = donusturucu(); arac = f"docling {version('docling')} + vision + {ARAC_SURUM}"
     except Exception as e:
         yaz({"hazir": False, "hata": f"{e.__class__.__name__}: {str(e)[:200]}"}); return 1
     yaz({"hazir": True, "arac": arac})
