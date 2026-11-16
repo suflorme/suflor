@@ -28,7 +28,7 @@ class Beyin:  # sahte beyin.py: seçim değiştirilebilir; kullanim gerçek biç
     @staticmethod
     def claude_secim(ayar, is_): return {"tur": "claude-code", "model": "sonnet"}
     @staticmethod
-    def prova_args(ayar, istem, model=None): return ["-p", istem, "--model", model or "sonnet"]
+    def prova_args(ayar, istem, model=None, sema=None): return ["-p", istem, "--model", model or "sonnet"] + (["--json-schema", json.dumps(sema)] if sema else [])
     @staticmethod
     def yedek_var(ayar, sec): return False
     @staticmethod
@@ -50,9 +50,13 @@ def kur(ad, ayar=None, bolumler=("kapi.py",), eylem=True, degerlendir=False):
     def run(argv, **k):  # sahte "open -a Brifing.app --args --istek <dosya>"
         durum["run"] += 1; ist = argv[-1]; j = json.load(open(ist, encoding="utf-8")); durum["istekler"].append(os.path.basename(ist))
         if durum["bekle"]: time.sleep(durum["bekle"])
-        istem = j["args"][1]; c = durum["cevap"](istem)
+        istem = j["args"][1]; c = durum["cevap"](istem); durum["args"] = list(j["args"])
         if c is not None:
-            r = {"result": c, "is_error": durum["is_error"], "total_cost_usd": durum["maliyet"], "duration_ms": 1200, "num_turns": 1,
+            so = {}
+            if "--json-schema" in j["args"]:  # K3: gerçek CLI gibi şemalı cevabı structured_output'a da koy
+                try: so = {"structured_output": json.loads(c)}
+                except ValueError: pass
+            r = {**so, "result": c, "is_error": durum["is_error"], "total_cost_usd": durum["maliyet"], "duration_ms": 1200, "num_turns": 1,
                  "usage": {"input_tokens": 100, "cache_read_input_tokens": 800, "cache_creation_input_tokens": 300, "cache_creation": {"ephemeral_1h_input_tokens": 50}, "output_tokens": 40}}
             open(j["cikti"], "w", encoding="utf-8").write(json.dumps(r, ensure_ascii=False))
         return types.SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -365,6 +369,25 @@ r = K["kesisim_tur"](datetime.datetime.fromtimestamp(CAR)); ok("mesaide: çözü
 m = K["kesisim_model"]("istem"); c = [x for x in satirlar(K) if x.get("is") == "kesisim"]
 ok("kesisim_model: kapıdan tek satır (is kesisim, plan arka, maliyet), metin döner", m == "çözüm" and len(c) == 1 and c[0]["plan"] == "arka" and c[0]["maliyet"] == 0.4, (m, c))
 ok("kesişim harcaması ortak tavana eklenir", abs(K["kapi_view"]()["arka_usd"] - 0.4) < 1e-9, K["kapi_view"]())
+
+# --- K3 (16 Kasım 2026): yapılandırılmış cevap (--json-schema) uçtan uca ---------------------------------------------------------
+A3 = [{"id": "belge:42", "metin": "Belge önerisi"}, {"id": "gec:7", "metin": "Gecikmiş iş"}]
+N = kur("k3", degerlendir=True); D = N["DURUM"]; N["brifing_sema_destek"] = lambda: True
+D["cevap"] = lambda istem: json.dumps({"kararlar": [{"id": 2, "karar": "soyle", "oncelik": 2, "neden": "önemli"}, {"id": 1, "karar": "gec", "oncelik": 0, "neden": "eski"}]})
+r = N["degerlendir"]("gun_ici", A3, soru="?", sema=SEMA)
+sj = D["args"][D["args"].index("--json-schema") + 1] if "--json-schema" in D["args"] else ""
+ok("K3: yardımcı şemayı tanıyorsa değerlendirici --json-schema ile çağrılır (kimlik enum 1..2)", bool(sj) and json.loads(sj)["type"] == "object" and json.loads(sj)["properties"]["kararlar"]["items"]["properties"]["id"]["enum"] == [1, 2], D["args"][2:])
+ok("K3: structured_output'taki numaralar gerçek kimliğe döner", [(x["id"], x["karar"], x["kaynak"]) for x in r] == [("belge:42", "gec", "model"), ("gec:7", "soyle", "model")], r)
+ok("K3: istemde gerçek kimlik yok, sıra numarası var", "[aday 1]" in D["args"][1] and "belge:42" not in D["args"][1], D["args"][1][-200:])
+N = kur("k3-eski", degerlendir=True); D = N["DURUM"]; N["brifing_sema_destek"] = lambda: False
+D["cevap"] = lambda istem: json.dumps([{"id": 2, "karar": "soyle", "oncelik": 2, "neden": "önemli"}, {"id": 1, "karar": "gec", "oncelik": 0, "neden": "eski"}])
+r = N["degerlendir"]("gun_ici", A3, soru="?", sema=SEMA)
+ok("K3: eski yardımcıda --json-schema gönderilmez; düz JSON cevabındaki numaralar yine çözülür", "--json-schema" not in D["args"] and [x["karar"] for x in r] == ["gec", "soyle"] and all(x["kaynak"] == "model" for x in r), (D["args"], r))
+N = kur("k3-talimat"); D = N["DURUM"]; N["brifing_sema_destek"] = lambda: True
+N["eylem_model"]("talimat istemi", is_adi="talimat")
+ok("K3: şema verilmeyen çağrıda (talimat) --json-schema yok", "--json-schema" not in D["args"], D["args"])
+cj, _ = N["claude_json"](json.dumps({"result": "metin", "structured_output": {"kararlar": []}, "usage": {}}), "x", time.time(), False)
+ok("K3: claude_json structured_output varsa onu JSON metni olarak döndürür", json.loads(cj) == {"kararlar": []}, cj)
 
 shutil.rmtree(T, ignore_errors=True)
 print(f"\n{'TAMAM' if not HATA else 'KALDI'}: {len(HATA)} hata")

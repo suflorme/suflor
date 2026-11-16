@@ -12,16 +12,16 @@ def _kem_takvim(): return takvim_ham()  # takvimin tüm olayları süzgeçsiz (e
 def _kem_kimlik(ad, tam=True):  # kimlik.py: takvim, kayıt veritabanı, Kişiler (tam) → {"eposta", "kaynak", "guven", "adaylar"}; menü açılışında Kişiler'e gidilmez
     if "kimlik_coz" not in globals(): return {}
     return kimlik_coz(ad) if tam else kimlik_coz(ad, kisiler=False, yaz=False)
-def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None, zaman=None):  # is_adi: ölçüm iş adı (varsayılan eylem; değerlendirici degerlendir:<tür>), model: Claude Code modeli (varsayılan beyin.prova), zaman: çağrı süresi sn (varsayılan EYLEM_ZAMAN_SN; düşünme turu uzun ister)
+def eylem_model(istem, amac=None, soru=None, maske=None, is_adi=None, model=None, zaman=None, sema=None):  # sema: K3 yapılandırılmış cevap şeması (dict; claude-code + destekleyen Brifing yardımcısında --json-schema)  # is_adi: ölçüm iş adı (varsayılan eylem; değerlendirici degerlendir:<tür>), model: claude-code modeli (varsayılan beyin.prova), zaman: çağrı süresi sn (varsayılan EYLEM_ZAMAN_SN; düşünme turu uzun ister)
     # amac verilirse (talimat | kayit | degerlendir) istemin başına kişi modelinin paketi (profil + öğrenilenler …; aktarici/kisi-modeli.py baglam_paketi) eklenir; gizlilik süzgeci pakette.
     # → (ham metin, hata metni ya da None). v0.243.0 (K1): Claude kapısından geçer (aktarici/kapi.py kapi_iste: izin çağrıdan önce, ortak sıra, tek kayıt); iş türü is_adi/amac'tan
     # (kapi_is_turu: talimat, eposta_taslak, eylem …). Kapı engellerse (None, "kapı: <neden>"). Kapının içinden (dg_cagri) gelen çağrı kapıya yeniden girmez.
     y = globals().get("KAPI_YEREL")
-    if "kapi_iste" not in globals() or (y is not None and getattr(y, "is_turu", None)): return _eylem_cagri(istem, amac, soru, maske, is_adi, model, zaman)
-    k = kapi_iste(kapi_is_turu(is_adi, amac), lambda: _eylem_cagri(istem, amac, soru, maske, is_adi, model, zaman))
+    if "kapi_iste" not in globals() or (y is not None and getattr(y, "is_turu", None)): return _eylem_cagri(istem, amac, soru, maske, is_adi, model, zaman, sema)
+    k = kapi_iste(kapi_is_turu(is_adi, amac), lambda: _eylem_cagri(istem, amac, soru, maske, is_adi, model, zaman, sema))
     if k["sonuc"] == "engel": return None, "kapı: " + k["neden"]
     return k["ham"], k["hata"]
-def _eylem_cagri(istem, amac=None, soru=None, maske=None, is_adi=None, model=None, zaman=None):
+def _eylem_cagri(istem, amac=None, soru=None, maske=None, is_adi=None, model=None, zaman=None, sema=None):
     # Tek model çağrısı (prova_model gibi): başka sağlayıcıysa beyin_tek, claude-code ise Brifing.app --istek (Masaüstü izni uygulamada).
     # İstek/çıktı dosyası çağrı başına benzersiz (kapi_dosya; eskiden canli/eylem/istek.json + cikti.json paylaşılıyordu). S141: kapı kuralı "claude" ise metin yalnız claude-code uyarlayıcısına.
     try:
@@ -41,7 +41,7 @@ def _eylem_cagri(istem, amac=None, soru=None, maske=None, is_adi=None, model=Non
             print(BEYIN.yedek_satiri("prova", sec, ham if olc else "çıktı okunamadı"))
         if not claude_var: return None, "Claude Code yok"
         d = os.path.join(BASE, "eylem"); t0 = time.time(); model = model or BEYIN.claude_secim(AYAR, "prova")["model"]
-        ham = kapi_brifing({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model), "cwd": d, "sure": zaman or EYLEM_ZAMAN_SN}, "eylem", zaman or EYLEM_ZAMAN_SN, d)  # v0.244.0: tek Brifing.app istemcisi (kapi.py)
+        ham = kapi_brifing({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model, sema=sema if sema and "brifing_sema_destek" in globals() and brifing_sema_destek() else None), "cwd": d, "sure": zaman or EYLEM_ZAMAN_SN}, "eylem", zaman or EYLEM_ZAMAN_SN, d)  # v0.244.0: tek Brifing.app istemcisi (kapi.py)
         if ham is None: return None, "Claude yanıt vermedi"
         metin, _ = claude_json(ham, is_, t0, bool(claude_yalin()), "claude-code", model)
         return metin, None

@@ -286,6 +286,21 @@ def konus_kanca_destek(uyg=None, kaynaklar=None):
         except OSError: continue
         if hashlib.sha256(ham).hexdigest() == kayit and KONUS_KANCA_RX.search(ham.decode("utf-8", "replace")): return True
     return False
+# K3 (16 Kasım 2026): yapılandırılmış cevap (--json-schema) — kurulu Brifing yardımcısı kabul ediyor mu; konus_kanca_destek ile aynı yol (derleme.json "SuflorBrifing.sema"
+# ya da kaydedilmiş SHA'sı `let semaSurum = 1` işaretli kaynağınki). Eski yardımcı bilinmeyen bayrağı reddeder (çıkış 3): o zaman şemasız eski yol.
+BRIFING_SEMA_RX = re.compile(r"let semaSurum = [1-9]")
+def brifing_sema_destek(uyg=None, kaynaklar=None):
+    import hashlib
+    try: kd = json.load(open(os.path.join(uyg or AYAR["uygulama"], "derleme.json"), encoding="utf-8"))
+    except (OSError, ValueError, AttributeError, KeyError, TypeError): return False
+    kayit = kd.get("SuflorBrifing") if isinstance(kd, dict) else None
+    if not isinstance(kayit, str) or not kayit: return False
+    if kd.get("SuflorBrifing.sema") == "evet:" + kayit: return True
+    for y in (kaynaklar if kaynaklar is not None else _konus_swift_yerler()):
+        try: ham = open(y, "rb").read()
+        except OSError: continue
+        if hashlib.sha256(ham).hexdigest() == kayit and BRIFING_SEMA_RX.search(ham.decode("utf-8", "replace")): return True
+    return False
 def konus_web_acik():  # S257: varsayılan açık; kapatanlar: web_arastirma (ana şalter, toplantıyı da), konus_web, toplantı dışında web_arastirma_disari; gizli kipte/toplantıda S208 sınırı
     if AYAR.get("web_arastirma") is False or AYAR.get("konus_web") is False: return False
     if AYAR.get("web_arastirma_disari") is False and not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")): return False

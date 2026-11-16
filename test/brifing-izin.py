@@ -104,6 +104,13 @@ try:
         kontrol(f"reddedildi: {ad}", calistir(den, args) == 3 and not sahte_calisti())
     kontrol("brifing argümanları kabul", calistir(den, BRIFING) != 3 and sahte_calisti())
     kontrol("telaffuz argümanları kabul", calistir(den, ["-p", "adlar", "--output-format", "json", "--model", "sonnet"]) != 3 and sahte_calisti())
+    SJ = '{"type":"object","properties":{"kararlar":{"type":"array","maxItems":3,"items":{"type":"object","properties":{"id":{"type":"integer","enum":[1,2,3]},"karar":{"type":"string","enum":["soyle","gec"]},"oncelik":{"type":"integer","minimum":0,"maximum":3},"neden":{"type":"string","maxLength":200}},"required":["id","karar","oncelik","neden"],"additionalProperties":false}}},"required":["kararlar"],"additionalProperties":false}'  # K3 (16 Kasım 2026): değerlendirici şeması (degerlendir.py dg_sema_json biçimi)
+    kontrol("K3: --json-schema (değerlendirici şeması) kabul", calistir(den, ["-p", "x", "--output-format", "json", "--model", "sonnet", "--json-schema", SJ]) != 3 and sahte_calisti())
+    for ad, sj in [("$ref", json.dumps({"type": "object", "properties": {"a": {"$ref": "#/x"}}})), ("kök dizi", json.dumps({"type": "array"})), ("bozuk JSON", "{type"),
+                   ("8 KB'den büyük", json.dumps({"type": "object", "description": "a" * 9000})), ("pattern anahtarı", json.dumps({"type": "object", "properties": {"a": {"type": "string", "pattern": ".*"}}})),
+                   ("9 düzey", json.dumps(__import__("functools").reduce(lambda i, _: {"type": "object", "properties": {"a": i}}, range(9), {"type": "string"}))),
+                   ("enum içinde nesne", json.dumps({"type": "object", "properties": {"a": {"enum": [{"x": 1}]}}})), ("değersiz", None)]:
+        kontrol(f"K3: --json-schema reddedildi: {ad}", calistir(den, ["-p", "x", "--json-schema"] + ([sj] if sj is not None else [])) == 3 and not sahte_calisti())
     for ad, args in [("Bash aracı", ["-p", "x", "--allowedTools", "Read,Bash"]), ("Write --tools", ["-p", "x", "--tools", "Write"]),
                      ("izinsiz kip", ["-p", "x", "--dangerously-skip-permissions"]), ("izin kipi", ["-p", "x", "--permission-mode", "bypassPermissions"]),
                      ("kanca açan --settings", ["-p", "x", "--settings", json.dumps({"hooks": {"PreToolUse": []}})]),

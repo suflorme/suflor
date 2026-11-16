@@ -246,6 +246,18 @@ kontrol("kanca: derleme kaydı 'evet:<sha>' → kaynak okunamasa da destek var",
 derleme(yeni); kontrol("kanca: kayıt yok ve kaynak okunamıyor → destek yok (kancasız sürer)", ns["konus_kanca_destek"](TW, []) is False)
 kontrol("kanca: derleme kaydı dosyası yok → destek yok", ns["konus_kanca_destek"](os.path.join(TW, "yok"), [kancali]) is False)
 kontrol("depodaki brifing.swift kanca işaretini taşıyor", bool(ns["KONUS_KANCA_RX"].search(open(os.path.join(KOD, "brifing.swift"), encoding="utf-8").read())))
+# K3 (16 Kasım 2026): yapılandırılmış cevap desteği — `let semaSurum = N` işareti ya da derleme kaydı "SuflorBrifing.sema"; eski yardımcıya --json-schema gitmez
+semali = os.path.join(TW, "semali.swift"); open(semali, "w").write(open(yeni).read() + "let semaSurum = 1\n")
+derleme(yeni); kontrol("şema: işaretsiz derleme → destek yok", ns["brifing_sema_destek"](TW, [yeni, semali]) is False)
+derleme(semali); kontrol("şema: işaretli kaynakla derlenmiş → destek var", ns["brifing_sema_destek"](TW, [yeni, semali]) is True)
+h = hashlib.sha256(open(yeni, "rb").read()).hexdigest(); json.dump({"SuflorBrifing": h, "SuflorBrifing.sema": "evet:" + h}, open(os.path.join(TW, "derleme.json"), "w"))
+kontrol("şema: derleme kaydı 'evet:<sha>' → kaynak okunamasa da destek var", ns["brifing_sema_destek"](TW, []) is True)
+json.dump({"SuflorBrifing": h, "SuflorBrifing.sema": "evet:eski"}, open(os.path.join(TW, "derleme.json"), "w"))
+kontrol("şema: kayıt başka derlemenin → destek yok", ns["brifing_sema_destek"](TW, []) is False)
+kontrol("depodaki brifing.swift şema işaretini taşıyor", bool(ns["BRIFING_SEMA_RX"].search(open(os.path.join(KOD, "brifing.swift"), encoding="utf-8").read())))
+pa = ns["BEYIN"].prova_args({}, "ist", "haiku", sema={"type": "object", "properties": {"a": {"type": "integer", "enum": [1, 2]}}})
+kontrol("şema: prova_args --json-schema'yı sıkı JSON olarak ekler, -p istem başta", pa[:2] == ["-p", "ist"] and pa[pa.index("--json-schema") + 1] == '{"type":"object","properties":{"a":{"type":"integer","enum":[1,2]}}}', pa)
+kontrol("şema: sema yoksa prova_args değişmez", "--json-schema" not in ns["BEYIN"].prova_args({}, "ist", "haiku"))
 sw_gercek = open(os.path.join(KOD, "brifing.swift"), encoding="utf-8").read()
 kontrol("depodaki brifing.swift henüz web araçlarını tanımıyorsa kurulu yardımcı 'destek yok' sayılır (yeniden derleme kullanıcı yanındayken)",
         bool(ns["KONUS_WEB_RX"].search(sw_gercek)) == ("\"WebSearch\", \"WebFetch\"" in sw_gercek))

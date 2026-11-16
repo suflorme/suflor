@@ -156,8 +156,8 @@ def ceviri_args(ayar, sistem, model=None):  # açık süreç, araçsız (Popen; 
             "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--disable-slash-commands", "--no-session-persistence", "--system-prompt", sistem] + ceviri_effort(ayar)
 def telaffuz_args(ayar, istem, model=None):  # tek çağrı (Brifing.app), json çıktı; model: yedekte Claude modeli
     return ["-p", istem, "--output-format", "json", "--model", model or secim(ayar, "telaffuz")["model"]] + yalin(ayar)
-def prova_args(ayar, istem, model=None):  # Prova odası: tek çağrı (Brifing.app), json çıktı; model: yedekte Claude modeli
-    return ["-p", istem, "--output-format", "json", "--model", model or secim(ayar, "prova")["model"]] + yalin(ayar)
+def prova_args(ayar, istem, model=None, sema=None):  # Prova odası: tek çağrı (Brifing.app), json çıktı; model: yedekte Claude modeli; sema: K3 yapılandırılmış cevap (--json-schema, dict)
+    return ["-p", istem, "--output-format", "json", "--model", model or secim(ayar, "prova")["model"]] + (["--json-schema", json.dumps(sema, ensure_ascii=False, separators=(",", ":"))] if sema else []) + yalin(ayar)
 def brifing_args(ayar, istem, ek_dizin, yalin_mi=True, bilgi=None):  # tek çağrı + Read/Grep/Glob; bilgi (konus_bilgi çıktısı) varsa FIFO kipi:
     # istem stdin'den stream-json gider (bağlayıcı ~6 sn'de bağlanır, tek seferlik -p ilk turda göremez — 2 Kasım denemesi; PREWAIT ortamı da yetmedi)
     m = secim(ayar, "brifing")["model"]; bilgi = konus_bilgi(bilgi) if bilgi and yalin_mi else []

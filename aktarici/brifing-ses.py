@@ -341,6 +341,7 @@ def claude_json(ham, is_, t0, yalin, saglayici=None, model=None):
     if not ("kapi_olcum_birak" in globals() and kapi_olcum_birak(o)):  # Claude kapısının içindeyse satırı kapı yazar (sonuç ve nedenle birlikte, tek satır)
         with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     if (saglayici or "claude-code") == "claude-code" and "claude_ok" in globals(): claude_hata_bildir(j.get("result"), is_) if o["hata"] else claude_ok()  # v0.130.0
+    if isinstance(j.get("structured_output"), (dict, list)): return json.dumps(j["structured_output"], ensure_ascii=False), o  # K3: --json-schema cevabı (result metni de aynı JSON'u taşır; şemalı alan esas)
     return str(j.get("result") or ""), o
 def beyin_tek(is_, sec, istem, json_kip=False, sistem=None, zaman=180):
     # Faz 11 Aşama 2: başka sağlayıcıda tek çağrı. Alt süreç (`beyin.py tek <istek>`; aktarıcı ağa kendisi bağlanmaz, anahtarı beyin.py Anahtar Zinciri'nden okur)

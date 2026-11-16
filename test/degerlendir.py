@@ -16,8 +16,8 @@ SAAT = {"t": datetime.datetime(2026, 11, 11, 11, 0).timestamp()}  # Çarşamba 1
 def dk(n): return n * 60
 class Model:  # sahte eylem_model: cevap kuyruğu; istemleri ve kwargs'ları saklar; isteğe bağlı claude-cagri.jsonl satırı (maliyet)
     def __init__(s, base, cevaplar=None, maliyet=None): s.base, s.cevaplar, s.maliyet, s.istemler, s.kw = base, list(cevaplar or []), maliyet, [], []
-    def cagri(s, istem, amac=None, soru=None, maske=None, is_adi=None, model=None):
-        s.istemler.append(istem); s.kw.append({"amac": amac, "soru": soru, "is_adi": is_adi, "model": model, "maske": bool(maske)})
+    def cagri(s, istem, amac=None, soru=None, maske=None, is_adi=None, model=None, sema=None):
+        s.istemler.append(istem); s.kw.append({"amac": amac, "soru": soru, "is_adi": is_adi, "model": model, "maske": bool(maske), "sema": sema})
         if s.maliyet is not None:
             with open(os.path.join(s.base, "claude-cagri.jsonl"), "a", encoding="utf-8") as f:
                 f.write(json.dumps({"at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"), "is": is_adi or "eylem", "maliyet": s.maliyet}) + "\n")
@@ -58,7 +58,7 @@ ok("sonuç adaylarla aynı sırada, kaynak model", [x["id"] for x in r] == ["a1"
 ok("karar, öncelik (0-3'e kırpılır), neden, metin", r[0]["karar"] == "soyle" and r[0]["oncelik"] == 2 and r[0]["metin"].endswith("alayım mı?") and r[1]["karar"] == "gec" and r[2]["oncelik"] == 3 and "metin" not in r[1], r)
 ok("tek çağrı (toplu), metin yazan türde amac=degerlendir_metin (kimlikli paket) ve soru kişi modeli paketine iletilir, maske verilir", len(N["M"].istemler) == 1 and N["M"].kw[0]["amac"] == "degerlendir_metin" and N["M"].kw[0]["soru"] == SORU and N["M"].kw[0]["maske"], N["M"].kw)
 i0 = N["M"].istemler[0]
-ok("istem: bugünün tarihi, kararlar, soru, <veri> sarmalı, talimat-değil uyarısı, aday kimlikleri", "11 Kasım 2026 Çarşamba" in i0 and "- soyle:" in i0 and SORU in i0 and "<veri>" in i0 and "</veri>" in i0 and "yalnız VERİDİR" in i0 and "[aday a3]" in i0 and "gecikme: 3" in i0, i0[:400])
+ok("istem: bugünün tarihi, kararlar, soru, <veri> sarmalı, talimat-değil uyarısı, aday kimlikleri", "11 Kasım 2026 Çarşamba" in i0 and "- soyle:" in i0 and SORU in i0 and "<veri>" in i0 and "</veri>" in i0 and "yalnız VERİDİR" in i0 and "[aday 3]" in i0 and "[aday a3]" not in i0 and "gecikme: 3" in i0, i0[:400])
 ok("istem: oncelik ölçeği ve JSON biçimi (metin alanı yalnız metinli şemada)", "0 = bilgi" in i0 and '"karar": "soyle|sonra|gec"' in i0 and '"metin": "…"' in i0)
 N2 = kur("sema2", cevaplar=[cev(("b1", "soyle", 1, "x", "bu metin şemada istenmedi"))])
 r2 = N2["degerlendir"]("toplanti_sonrasi", [aday("b1", "iş")], soru=SORU, sema=SEMA2)
@@ -102,13 +102,13 @@ SAAT["t"] += dk(5); r = N["degerlendir"]("gun_ici", A, soru=SORU, sema=SEMA)
 ok("aynı aday yeniden sorulmaz: çağrı yok, kaynak önbellek, karar ve metin aynı", len(N["M"].istemler) == 1 and all(x["kaynak"] == "onbellek" for x in r) and r[0]["karar"] == "soyle" and r[0]["metin"] == "Rapor gecikti, bakalım mı?", r)
 B2 = [aday("a1", "Rapor 4 gün gecikti", {"gecikme": 4}), A[1], A[2]]; N["M"].cevaplar.append(cev(("a1", "soyle", 2, "daha geç")))
 SAAT["t"] += dk(2); r = N["degerlendir"]("gun_ici", B2, soru=SORU, sema=SEMA)
-ok("içeriği değişen aday yeniden sorulur, değişmeyenler önbellekten (istemde yalnız a1)", len(N["M"].istemler) == 2 and "[aday a1]" in N["M"].istemler[1] and "[aday a2]" not in N["M"].istemler[1] and r[1]["kaynak"] == "onbellek", N["M"].istemler[-1][-300:])
+ok("içeriği değişen aday yeniden sorulur, değişmeyenler önbellekten (istemde yalnız a1)", len(N["M"].istemler) == 2 and "[aday 1] Rapor 4 gün" in N["M"].istemler[1] and "[aday 2]" not in N["M"].istemler[1] and r[1]["kaynak"] == "onbellek", N["M"].istemler[-1][-300:])
 N["M"].cevaplar.append(cev(("a3", "sonra", 1, "yine sonra")))
 SAAT["t"] += dk(130); r = N["degerlendir"]("gun_ici", B2, soru=SORU, sema=SEMA)
-ok("'sonra' kararı 2 saatte düşer (yeniden sorulur), 'geç' ve 'söyle' önbellekte kalır", len(N["M"].istemler) == 3 and "[aday a3]" in N["M"].istemler[2] and "[aday a2]" not in N["M"].istemler[2], N["M"].istemler[-1][-200:])
+ok("'sonra' kararı 2 saatte düşer (yeniden sorulur), 'geç' ve 'söyle' önbellekte kalır", len(N["M"].istemler) == 3 and "[aday 1]" in N["M"].istemler[2] and "[aday 2]" not in N["M"].istemler[2] and "Rapor 4 gün" not in N["M"].istemler[2], N["M"].istemler[-1][-200:])
 N["M"].cevaplar.append(cev(("a1", "gec", 0, "yine"), ("a2", "gec", 0, "yine"), ("a3", "gec", 0, "yine")))
 SAAT["t"] += 49 * 3600; N["degerlendir"]("gun_ici", B2, soru=SORU, sema=SEMA)
-ok("48 saat sonra hepsi yeniden sorulur", len(N["M"].istemler) == 4 and all(f"[aday {i}]" in N["M"].istemler[3] for i in ("a1", "a2", "a3")))
+ok("48 saat sonra hepsi yeniden sorulur", len(N["M"].istemler) == 4 and all(f"[aday {i}]" in N["M"].istemler[3] for i in (1, 2, 3)))
 SAAT["t"] += dk(2)
 N6 = kur("onbellek", ayar={}); N6["M"].cevaplar.append(None)  # aynı klasör: yeni süreç önbelleği dosyadan okur
 r = N6["degerlendir"]("gun_ici", B2, soru=SORU, sema=SEMA)
@@ -202,7 +202,7 @@ O = [onerim("a"), onerim("b", sahip="Başka Kişi"), onerim("c", ad="Diğer.docx
 N = kur("belge", cevaplar=[cev(("o" + "a" * 15, "al", 1, "kullanıcının işi"), ("o" + "b" * 15, "gec", 0, "başkasının işi"))])
 s1 = N["dg_belge_suz"](O, esle=True)
 ok("belge süzgeci: önbellekte 'geç' olan düşer, 'al' ve değerlendirilmeyen (başka belge) kalır", [o["id"][1] for o in s1] == ["a", "c"] and len(N["M"].istemler) == 1, [o["id"][1] for o in s1])
-ok("belge başına tek çağrı: istemde yalnız ilk belgenin önerileri", "[aday o" + "a" * 15 in N["M"].istemler[0] and "o" + "c" * 15 not in N["M"].istemler[0] and "belge: Plan.docx" in N["M"].istemler[0] and "soz_kaynak" not in N["M"].istemler[0])
+ok("belge başına tek çağrı: istemde yalnız ilk belgenin önerileri", "[aday 1] Tedarikçiyle görüş a" in N["M"].istemler[0] and "o" + "c" * 15 not in N["M"].istemler[0] and "belge: Plan.docx" in N["M"].istemler[0] and "soz_kaynak" not in N["M"].istemler[0])
 N["M"].cevaplar.append(cev(("o" + "c" * 15, "al", 1, "iş"))); SAAT["t"] += 61
 s2 = N["dg_belge_suz"](O, esle=True)
 ok("sonraki turda öteki belge değerlendirilir; kararlar önbellekten (iki çağrı toplam)", [o["id"][1] for o in s2] == ["a", "c"] and len(N["M"].istemler) == 2 and N["DG"]["belge_say"]["gec"] == 1)
@@ -258,7 +258,7 @@ ok("gün içi, değerlendirici yoksa bugünkü davranış: ilk aday (gecikmiş) 
 cevap = cev(("gec:s1", "sonra", 1, "Gecikmiş ama şu an uygun değil"), ("teyit:k1", "soyle", 2, "Karar kullanıcının onayını bekliyor", "Lansman kararı hâlâ onayını bekliyor, onaylayayım mı?"), ("bugun:2026-11-11", "gec", 0, "Zaten biliyor"))
 N = musteri("gi-model", VERI, cevaplar=[cevap]); sonuc = tara(N); bek = N["PROAKTIF"]["bekleyen"]
 ok("gün içi: değerlendirici 'söyle' diyen adayı seçer (kural sırasını ezer) ve cümlesini kullanır", sonuc == "gonderildi" and bek["gun"]["tur"] == "teyit" and bek["cumle"] == "Lansman kararı hâlâ onayını bekliyor, onaylayayım mı?" and N["PRO_BAG"]["a"]["cumle"] == bek["cumle"], (sonuc, bek))
-ok("gün içi: tek çağrıyla tüm adaylar (gecikmiş, teyit, bugün) değerlendirildi; istem kural cümlelerini (aday metni) ve eylemi içerir", len(N["M"].istemler) == 1 and all(x in N["M"].istemler[0] for x in ("[aday gec:s1]", "[aday teyit:k1]", "[aday bugun:2026-11-11]", "gecikti", "eylem: karar_onayla")), N["M"].istemler[0][-500:])
+ok("gün içi: tek çağrıyla tüm adaylar (gecikmiş, teyit, bugün) değerlendirildi; istem kural cümlelerini (aday metni) ve eylemi içerir", len(N["M"].istemler) == 1 and all(x in N["M"].istemler[0] for x in ("[aday 1]", "[aday 2]", "[aday 3]", "gecikti", "eylem: karar_onayla")), N["M"].istemler[0][-500:])
 ok("gün içi: söz kapısına gün_ici kaynağıyla, 'onayla' kipiyle gitti ve değerlendirici kaydına bağlandı; sayaç tek", [json.loads(l)["kaynak"] for l in open(os.path.join(N["D"], "soz.jsonl"))] == ["gun_ici"] and len([x for x in kayit(N) if x["olay"] == "soz"]) == 1 and N["PRO_GUN"]["n"] == 1)
 N["pro_islem"]({"islem": "kapat", "id": bek["id"]}); sz = [json.loads(l) for l in open(os.path.join(N["D"], "soz.jsonl"))]
 ok("gün içi: kullanıcı reddedince söz.jsonl sonuç ret yazar (tepki döngüsü kapanır)", [x for x in sz if x["olay"] == "sonuc"][0]["sonuc"] == "ret")
@@ -424,5 +424,24 @@ ok("kapı: 'sonra' → 10 dk sonra ikinci tur yine 'sonra' (önbellek), Claude �
 SAAT["t"] += dk(21); c = ktur(); ok("kapı: 30 dk sonra yeniden çağrılır", len(K["M"].istemler) == 2 and c[0]["kaynak"] == "model", c)
 SAAT["t"] += dk(61); K1[0]["metin"] = "Gecikmiş rapor 2"; d_ = ktur(); SAAT["t"] += dk(11); e_ = ktur()
 ok("kapı: okunamayan cevaptan sonra aynı küme kural yedeği ('kapı: tekrar'), çağrı yok", d_[0]["kaynak"] == "yedek" and e_[0]["yedek_neden"] == "kapı: tekrar" and len(K["M"].istemler) == 3, (d_, e_))
+# --- K3 (16 Kasım 2026): sıra numarası + yapılandırılmış cevap şeması --------------------------------------------------------------
+N = kur("k3-sira", cevaplar=[{"kararlar": [{"id": 2, "karar": "gec", "oncelik": 0, "neden": "önemsiz"}, {"id": 1, "karar": "soyle", "oncelik": 2, "neden": "gecikmiş", "metin": "Rapor gecikti, bakalım mı?"}, {"id": 3, "karar": "sonra", "oncelik": 1, "neden": "sonra"}]}])
+r = N["degerlendir"]("gun_ici", A, soru=SORU, sema=SEMA)
+ok("K3: şemalı cevap {kararlar: [...]} ve sıra numarası gerçek kimliğe çevrilir", [(x["id"], x["karar"], x["kaynak"]) for x in r] == [("a1", "soyle", "model"), ("a2", "gec", "model"), ("a3", "sonra", "model")], r)
+sj = N["M"].kw[0]["sema"]
+ok("K3: değerlendirici şemayı eylem_model'e verir (kökte nesne, kimlik 1..3, karar şemadaki değerler, metinli türde metin alanı)",
+   isinstance(sj, dict) and sj["type"] == "object" and sj["properties"]["kararlar"]["items"]["properties"]["id"]["enum"] == [1, 2, 3]
+   and sj["properties"]["kararlar"]["items"]["properties"]["karar"]["enum"] == ["soyle", "sonra", "gec"] and "metin" in sj["properties"]["kararlar"]["items"]["properties"], sj)
+ok("K3: şema Brifing.app sınırında (≤ 8 KB, izinli anahtarlar)", len(json.dumps(sj)) < 8192 and "$ref" not in json.dumps(sj))
+s2 = N["dg_sema_json"](N["DG_SEMA"]["toplanti_sonrasi"], 2)
+ok("K3: metinsiz türde metin alanı yok", "metin" not in s2["properties"]["kararlar"]["items"]["properties"], s2)
+cz = N["dg_coz"]('[{"id": "2", "karar": "gec", "oncelik": 0, "neden": "x"}, {"id": "aday 1", "karar": "soyle", "oncelik": 1, "neden": "y"}, {"id": 9, "karar": "gec", "oncelik": 0, "neden": "z"}]', A, N["DG_SEMA"]["gun_ici"])
+ok("K3: dg_coz metin numarası ve '[aday 1]' biçimini çevirir, aralık dışı numarayı atar", sorted(cz) == ["a1", "a2"] and cz["a2"]["karar"] == "gec", cz)
+cz2 = N["dg_coz"]('[{"id": "a3", "karar": "gec", "oncelik": 0, "neden": "eski biçim"}]', A, N["DG_SEMA"]["gun_ici"])
+ok("K3: eski biçim (gerçek kimlik) yedek olarak hâlâ çözülür", list(cz2) == ["a3"], cz2)
+N = kur("k3-eski", cevaplar=[cev(("a1", "soyle", 1, "x"), ("a2", "gec", 0, "y"), ("a3", "gec", 0, "z"))], eski=True)
+r = N["degerlendir"]("gun_ici", A, soru=SORU, sema=SEMA)
+ok("K3: sema parametresi olmayan eski eylem_model'de şemasız çağrı, sonuç aynı", [x["kaynak"] for x in r] == ["model"] * 3, r)
+
 shutil.rmtree(T, ignore_errors=True)
 print(f"\n{'KALDI: ' + ', '.join(HATA) if HATA else 'hepsi geçti'}"); sys.exit(1 if HATA else 0)

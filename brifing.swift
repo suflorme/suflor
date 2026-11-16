@@ -426,13 +426,31 @@ func mcpDenetle(_ y: String) -> String? {
     if let e = v["env"] { guard let e = e as? [String: String], Set(e.keys).isSubset(of: izinliEnv) else { return nil } }
     return String(data: d, encoding: .utf8)
 }
+// K3 (16 Kasım 2026): --json-schema yapılandırılmış cevap şeması (Claude kapısı değerlendiricileri). Şema Claude'un okuduğu veridir, burada çalıştırılmaz; yine de dar tutulur:
+// ≤ 8 KB, kökte "type":"object", düğümlerde yalnız aşağıdaki anahtarlar, en çok 8 düzey; $ref, pattern vb. yok. bas-konus.py brifing_sema_destek bu sürüm işaretini arar
+// (derleme kaydı "SuflorBrifing.sema"); işareti değiştirirsen ikisini birlikte değiştir.
+let semaSurum = 1
+let semaAnahtar: Set<String> = ["type", "enum", "items", "properties", "required", "additionalProperties", "minimum", "maximum", "maxLength", "maxItems", "minItems", "description"]
+func semaDugum(_ o0: Any, _ d: Int) -> Bool {
+    guard d <= 8, let o = o0 as? [String: Any], Set(o.keys).isSubset(of: semaAnahtar) else { return false }
+    if let p0 = o["properties"] { guard let p = p0 as? [String: Any], p.count <= 32, p.values.allSatisfy({ semaDugum($0, d + 1) }) else { return false } }
+    if let i = o["items"] { guard semaDugum(i, d + 1) else { return false } }
+    if let a = o["additionalProperties"] { guard a is Bool else { return false } }
+    if let r = o["required"] { guard let r = r as? [String], r.count <= 32 else { return false } }
+    if let e = o["enum"] { guard let e = e as? [Any], e.count <= 200, e.allSatisfy({ $0 is String || $0 is NSNumber }) else { return false } }
+    return true
+}
+func semaUygun(_ v: String) -> Bool {
+    guard v.utf8.count <= 8192, let d = v.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], o["type"] as? String == "object" else { return false }
+    return semaDugum(o, 0)
+}
 let degerli: [String: (String) -> Bool] = [
     "--output-format": { ["json", "stream-json", "text"].contains($0) }, "--input-format": { ["stream-json", "text"].contains($0) },
     "--allowedTools": aracUygun, "--tools": aracUygun,
     "--add-dir": { gercek($0) == istekKlasor }, "--mcp-config": { mcpDenetle($0) != nil },
     "--append-system-prompt": { _ in true }, "--system-prompt": { _ in true }, "--settings": ayarUygun,
     "--model": { $0.range(of: "^[A-Za-z0-9._\\[\\]-]{1,64}$", options: .regularExpression) != nil },
-    "--effort": { ["low", "medium", "high", "xhigh", "max"].contains($0) },
+    "--effort": { ["low", "medium", "high", "xhigh", "max"].contains($0) }, "--json-schema": semaUygun,
     "--setting-sources": { $0.split(separator: ",").allSatisfy { ["user", "project", "local"].contains(String($0)) } }]
 var k = 0
 while k < arg.count {
