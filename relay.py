@@ -2019,6 +2019,7 @@ bolum("toplanti")  # aktarici/toplanti.py — tek toplantı kaydı: algılama, d
 bolum("masaustu-uyari")  # aktarici/masaustu-uyari.py — masaüstü toplantı kartları: eklenti gerekmez bilgisi, Teams mikrofonu BlackHole değil uyarısı (POST /ortak-mik; 13 Kasım)
 bolum("tazi-kos")  # aktarici/tazi-kos.py — Tazı koşturucu: aday listesi + hızlı/tam tarama arka planda, /tazi, /status tazi, "Tazı, <ad> araştır" (ayar tazi; 11 Kasım)
 # --- Kesişim günlük koşusu + arka plan çözücü (12 Kasım, F2; kod: <kod>/kesisim.py + kesisim-coz.py, S293: proje veritabanına yazma kapalı). 07:45'ten sonra günde bir; toplantı/gizli kip/dar kaynakta bekler.
+# v0.244.0 (Claude kapısı K2): kapı "kesisim" — mesai içinde (fiilen mesai başında), gece ve hafta sonu yok, ortak tavana girer; model çağrısı kesisim_model ile kapıdan.
 # Yalnız geliştiricinin kurulumunda ve ayar kesisim_cozucu kapalı değilken; deneme aktarıcısı SUFLOR_KESISIM_DENEME=1 ile. Durum canli/kesisim-zaman.json.
 def _kesisim_modul():
     for d in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or ""))):
@@ -2034,19 +2035,37 @@ def kesisim_tur(simdi=None):  # → {"atlandi": neden} | {"bekliyor": neden} | c
     except (OSError, ValueError): z = {}
     if (simdi.hour, simdi.minute) < (7, 45): return {"atlandi": "erken"}
     if z.get("son_gun") == simdi.date().isoformat() or (z.get("deneme_gun") == simdi.date().isoformat() and int(z.get("deneme") or 0) >= 3): return {"atlandi": "bugun_yapildi"}
+    kn = kapi_engel("kesisim", simdi.timestamp()) if "kapi_engel" in globals() else None  # v0.244.0 (Claude kapısı K2): mesai/gece, gizli kip, toplantı, ortak tavan — deneme sayılmaz
+    if kn: return {"bekliyor": kn}
     if gizli_acik(): return {"bekliyor": "gizli"}
     if toplanti_acik() or kaynak_dar(): return {"bekliyor": "mesgul"}
     m = _kesisim_modul()
     if not m: return {"atlandi": "kod_yok"}
     bug = simdi.date().isoformat(); z["deneme"] = int(z.get("deneme") or 0) + 1 if z.get("deneme_gun") == bug else 1; z["deneme_gun"] = bug
     kuyruk = (lambda ad, alan: (tazi_kos(ad, alan, "hizli", "elle") or {}).get("durum")) if "tazi_kos" in globals() else None
-    try: r = m.kos_ve_coz(BASE, AYAR, gizli_fn=gizli_acik, gelistirici=gelistirici_mi(), simdi=simdi, kuyruk_fn=kuyruk)
+    ek = {"model_fn": kesisim_model} if "kapi_iste" in globals() else {}  # v0.244.0: model çağrısı kapıdan (tek kayıt satırı "kesisim"; çözücünün kendi satırı yazılmaz)
+    try: r = m.kos_ve_coz(BASE, AYAR, gizli_fn=gizli_acik, gelistirici=gelistirici_mi(), simdi=simdi, kuyruk_fn=kuyruk, **ek)
     except Exception as e: print(f"KESİŞİM: hata ({e.__class__.__name__}: {e})"); r = {"hata": e.__class__.__name__}
     if not r.get("atlandi") and not r.get("hata"): z["son_gun"] = bug
     try: json.dump(z, open(yol + ".tmp", "w", encoding="utf-8")); os.replace(yol + ".tmp", yol)
     except OSError: pass
     print("KESİŞİM: " + ("atlandı (" + str(r["atlandi"]) + ")" if r.get("atlandi") else "hata" if r.get("hata") else f"çözücü bitti — düzeltilen {r.get('duzeltilen')}, araştırılan {r.get('arastirilan')}, bırakılan {r.get('birakilan')}, çözülemeyen önemli {len(r.get('cozulemeyen_onemli') or [])}"))
     return r
+def kesisim_model(istem):  # kesişim çözücünün tek toplu çağrısı (kesisim-coz.py model_cagir'in kapılı eşi; araçsız claude -p, istem stdin'den) → metin ya da None
+    model = str(AYAR.get("kesisim_cozucu_model") or "opus")
+    def cagri():
+        cl = claude_yolu()
+        if not cl: return None, "claude-code yok"
+        import tempfile
+        kapi_gercek_cagri(); t0 = time.time()
+        try: p = BEYIN.tek(cl, BEYIN.kart_args(model), istem, tempfile.gettempdir(), 900)
+        except (OSError, subprocess.TimeoutExpired) as e: return None, e.__class__.__name__
+        metin, olc = claude_json(p.stdout or "", "kesisim", t0, False, "claude-code", model)
+        if not olc: return None, "çıktı okunamadı"
+        return (None, "hata") if olc.get("hata") else (metin, None)
+    r = kapi_iste("kesisim", cagri)
+    if r["sonuc"] == "engel": print(f"KESİŞİM: model çağrısı bekledi ({r['neden']})")
+    return r["ham"] if r["sonuc"] == "tamam" else None
 def _kesisim_dongu():
     time.sleep(120)
     while True:
@@ -2139,39 +2158,41 @@ def claude_girisli(cl):
     except Exception: return True
 # v0.97.0 (sistem analizi, Claude katmanı): Claude Code kendiliğinden güncelleniyor; belgelere göre ileride `claude -p` varsayılan olarak yalın kipte
 # açılacak — yalın kip abonelik girişini okumaz, Konuş/brifing/çeviri/kart birlikte "giriş yok"a düşer. Sürüm değişince (açılışta ve 6 saatte bir)
-# tek kısa -p denemesi (haiku, "TAMAM"): olmazsa günlük + bildirim + /status claude_saglik. Sürüm günlüğe yazılır (gecikme değişimini sürümle eşlemek için).
+# tek kısa deneme (v0.244.0'dan: claude_giris_yokla, kapıdan; haiku): olmazsa günlük + bildirim + /status claude_saglik. Sürüm günlüğe yazılır (gecikme değişimini sürümle eşlemek için).
 CLAUDE_SURUM_YOL = os.path.join(BASE, "claude-surum.json")
-def claude_surum_bak():
-    import subprocess, tempfile
+def claude_surum_bak():  # → True (deneme tamam / sürüm aynı ve önceden tamam), False (başarısız), None (sürüm okunamadı ya da kapı şimdi izin vermedi: döngü 30 dk sonra yeniden dener)
+    # v0.244.0 (Claude kapısı K2): kendi `claude -p` denemesi kalktı; sürüm değişince tek sağlık yoklaması claude_giris_yokla(zorla=True) — kapıdan geçer (gece, mesai dışı,
+    # toplantıda beklenir), kayıt claude-cagri.jsonl "giris" (haiku). Engelde claude-surum.json'a ok yazılmaz ki izin gelince yeniden denensin.
+    import subprocess
     cl = claude_yolu()
-    if not cl or deneme_aktarici(): return
+    if not cl or deneme_aktarici(): return None
     try: v = subprocess.run([cl, "--version"], capture_output=True, text=True, timeout=15).stdout.strip().split()[0]
-    except Exception: return
+    except Exception: return None
     try: e = json.load(open(CLAUDE_SURUM_YOL, encoding="utf-8"))
     except (OSError, ValueError): e = {}
-    if e.get("surum") == v and e.get("ok"): STATE["claude_saglik"] = {"surum": v, "ok": True}; return
-    ok, ham = False, ""
-    try:
-        r = subprocess.run([cl, "-p", "Yalnız TAMAM yaz.", "--model", "haiku", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence", "--tools", ""],
-                           capture_output=True, text=True, timeout=90, cwd=tempfile.gettempdir(), stdin=subprocess.DEVNULL)
-        ok = r.returncode == 0 and "TAMAM" in r.stdout.upper(); ham = " · ".join(x.strip() for x in ((r.stderr or "") + "\n" + (r.stdout or "")).splitlines() if x.strip())[-200:]
-    except Exception as ex: ham = ex.__class__.__name__
+    if e.get("surum") == v and e.get("ok"): STATE["claude_saglik"] = {"surum": v, "ok": True}; return True
+    ok = claude_giris_yokla(zorla=True) if "claude_giris_yokla" in globals() else None
+    if ok is None:
+        STATE["claude_saglik"] = {"surum": v, "ok": None}; print(f"CLAUDE: claude-code {v} — deneme bekliyor (kapı ya da yanıt yok)"); return None
+    ham = "" if ok else str((globals().get("GIRIS") or {}).get("hata") or "deneme başarısız")[-200:]
     STATE["claude_saglik"] = {"surum": v, "ok": ok, **({} if ok else {"hata": ham})}
     try:
         with open(CLAUDE_SURUM_YOL, "w", encoding="utf-8") as f: json.dump({"surum": v, "ok": ok, "t": datetime.datetime.now().isoformat(timespec="seconds"), "onceki": e.get("surum")}, f)
     except OSError: pass
-    print(f"CLAUDE: Claude Code {v}" + (f" (önce {e.get('surum')})" if e.get("surum") and e.get("surum") != v else "") + (" · -p denemesi tamam" if ok else f" · -p denemesi BAŞARISIZ: {ham}"))
+    print(f"CLAUDE: claude-code {v}" + (f" (önce {e.get('surum')})" if e.get("surum") and e.get("surum") != v else "") + (" · deneme tamam" if ok else f" · deneme BAŞARISIZ: {ham}"))
     if not ok:
         _cl_metin = (_t(f"Claude Code {v} ile kısa deneme olmadı (giriş ya da yeni sürüm). Konuş, brifing ve çeviri etkilenir; Terminal'de claude açıp kontrol et.",
                         f"A short test with Claude Code {v} failed (login or new version). Talk, briefing and translation are affected; open claude in Terminal and check."))
         _cl_teslim = lambda: bildirim("Suflor.me", _t("Claude çağrıları çalışmıyor", "Claude calls are failing"), _cl_metin)
         if "soz_aday" in globals(): soz_aday("sistem", _cl_metin, anahtar="claude-surum:" + str(v), oncelik=3, kip="bildir", teslim=_cl_teslim, gecerli_sn=3600)  # tek söz kapısı (soz-kapisi.py)
         else: _cl_teslim()
+    return ok
 def _claude_surum_dongu():
     while True:
-        try: claude_surum_bak()
+        r = None
+        try: r = claude_surum_bak()
         except Exception as ex: print(f"CLAUDE: sürüm denetimi hata ({ex.__class__.__name__})")
-        time.sleep(6 * 3600)
+        time.sleep(1800 if r is None else 6 * 3600)  # v0.244.0: deneme bekliyorsa 30 dk sonra (yalnız `claude --version`; model çağrısı kapı izin verince)
 def gundem_saat_tazele(simdi):
     # agenda.json bitişi geçmişte kalmışsa ya da dosya önceki günden kalmışsa (önceki toplantının gündemi) saatleri şimdiye çek; maddeler ve diğer alanlar kalır, toplantı
     # oturumu kendi gündemini yazınca zaten değişir. Bitişi ilerideki (bu toplantı için hazırlanmış) gündeme dokunulmaz.
@@ -2809,7 +2830,7 @@ if __name__ == "__main__":
     threading.Thread(target=_takvim_dongu, daemon=True).start()
     threading.Thread(target=_yerel_ses_dongu, daemon=True).start()
     threading.Thread(target=menu_baslat, daemon=True).start()  # ayar menu_cubugu
-    threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: Claude Code sürümü ve -p denemesi
+    threading.Thread(target=_claude_surum_dongu, daemon=True).start()  # v0.97.0: claude-code sürümü ve deneme (v0.244.0: kapıdan tek yoklama)
     threading.Thread(target=_heartbeat_dongu, daemon=True).start()
     threading.Thread(target=_kaynak_dongu, daemon=True).start()  # C fazı: kaynak bekçisi
     threading.Thread(target=_veri_yok_dongu, daemon=True).start()  # Faz D: toplantı var, veri yok  # S162: heartbeat.json 8 sn'de bir

@@ -1,7 +1,7 @@
 # Suflor.me aktarıcı bölümü: Claude kapısı (K1, 16 Kasım 2026; tasarım ../planlar/claude-kapisi-tasarim-20261116.md §3, §5 K1, §6). Ayrı modül değildir — relay.py bunu kendi ad
 # alanında çalıştırır (bolum("kapi"), eylem-menu'den önce): AYAR, BASE, LOCK, write, gizli_acik, toplanti_var, aktif_dosya, sessiz_acik, calisma_saatleri, SOHBET, _KS … relay.py'nin ve öbür
 # bölümlerin (çağrı anında aranır; yoksa o kural atlanır). import etme. Python 3.9 uyumlu.
-# Amaç: Claude'a giden tek çağrılar (K1: değerlendiriciler + eylem_model'i kullanan işler) tek kapıdan geçer; izin, tekrar önleme, eşzamanlılık ve kayıt tek yerde.
+# Amaç: Claude'a giden tek çağrılar (K1: değerlendiriciler + eylem_model'i kullanan işler; K2 v0.244.0: giriş yoklaması, sürüm denetimi, telaffuz, kesişim, brifing, prova) tek kapıdan geçer; izin, tekrar önleme, eşzamanlılık ve kayıt tek yerde.
 #   kapi_iste(is_turu, cagri, *, karma=None, coz=None) → {"sonuc": tamam|okunamadi|hata|engel, "neden", "ham", "hata", "cozum", "maliyet", "sure_ms", "olculdu"}
 #     cagri: argümansız işlev → (ham, hata) (eylem-menu.py _eylem_cagri). coz: isteğe bağlı ham → çözülmüş cevap (boşsa "okunamadi"). karma: girdi karması (aday kimlikleri).
 #   Sıra: 1) izin (kapi_engel; ÇAĞRIDAN ÖNCE) 2) tekrar önleme (iş + karma) 3) arka plan işi ön plan turu bitene dek bekler, ortak sıraya (KAPI_SEM, 2) girer; ön plan sırayı atlar
@@ -23,7 +23,7 @@ KAPI_SAAT = globals().get("KAPI_SAAT") or time.time  # testlerde sahte saat (ön
 KAPI_KILIT = threading.RLock()
 KAPI_TEKRAR_HATA_SN = (1800, 7200, 28800)
 KAPI_BEKLE_SN, KAPI_SIRA_SN, KAPI_OZET_SN = 60, 180, 3600
-KAPI_ARKA_EK = ("giris", "telaffuz", "kesisim")  # henüz kapıda olmayan (K2) arka plan işleri: harcamaları ortak tavana sayılır
+KAPI_ARKA_EK = ("giris", "kesisim-coz")  # tavanla durdurulmayan (giriş yoklaması) ya da eski adlı (K2 öncesi kesişim) arka plan satırları: harcamaları yine ortak toplama sayılır
 _KAPI_ARKA = {"plan": "arka", "gizli": True, "toplanti": True, "sessiz": False, "saat": "mesai", "tavan": True, "saglayici": None, "tekrar_sn": 1800}
 _KAPI_ON = {"plan": "on", "gizli": False, "toplanti": False, "sessiz": False, "saat": None, "tavan": False, "saglayici": None, "tekrar_sn": 0}
 KAPI_TABLO = {
@@ -37,6 +37,13 @@ KAPI_TABLO = {
     "eylem": dict(_KAPI_ON),
     "talimat": dict(_KAPI_ON),
     "eposta_taslak": dict(_KAPI_ON, saglayici="claude"),
+    # v0.244.0 (Claude kapısı K2): kalan arka plan işleri ve Brifing.app'li ön plan işleri
+    "giris": dict(_KAPI_ARKA, gizli=False, tavan=False, tekrar_sn=0),  # seyrek giriş yoklaması (claude-giris.py): içerik yok; toplantıda, gece ve mesai dışında yok (karar 16 Kasım)
+    "telaffuz:sozluk": dict(_KAPI_ARKA, tekrar_sn=0),  # sözlük değişince toplu okunuş tamamlama
+    "telaffuz": dict(_KAPI_ARKA, toplanti=False, saat=None, tekrar_sn=0),  # okunan metindeki bilinmeyen sözcükler: konuşmayı besler (toplantıda ve akşam Konuş'ta da); gizli kipte yok
+    "kesisim": dict(_KAPI_ARKA, tekrar_sn=0),  # günlük kesişim çözücü (relay.py kesisim_tur → kesisim-coz.py model_cagir); 07:45 yerine fiilen mesai başında
+    "brifing": dict(_KAPI_ON),
+    "prova": dict(_KAPI_ON),
 }
 KAPI = {"engel": {}, "engel_yazilan": {}, "ozet_t": 0.0, "son_neden": {}, "tekrar": {}, "usd": {"gun": "", "usd": 0.0}, "on": 0, "aktif": 0, "n": 0,
         "gun": {"tarih": "", "cagri": 0, "tamam": 0, "okunamadi": 0, "hata": 0, "engel": 0}}
@@ -152,6 +159,20 @@ def _kapi_gun_sifirla(simdi):
 def kapi_dosya(klasor, on_ek, uzanti="json"):  # çağrı başına benzersiz istek/çıktı dosyası (eşzamanlı iki iş birbirinin cevabını almaz)
     with KAPI_KILIT: KAPI["n"] += 1; n = KAPI["n"]
     return os.path.join(klasor, f"{on_ek}-{os.getpid()}-{n}-{secrets.token_hex(3) if 'secrets' in globals() else int(time.time() * 1000) % 100000}.{uzanti}")
+def kapi_brifing(ist, on_ek, zaman, klasor=None):  # v0.244.0: tek Brifing.app istemcisi (eskiden 5 kopya). ist: {"claude","args","cwd","sure"}; → ham çıktı metni ya da None (cevap yok)
+    d = klasor or BASE; os.makedirs(d, exist_ok=True); cikti, istek = kapi_dosya(d, on_ek + "-cikti"), kapi_dosya(d, on_ek + "-istek")  # çağrı başına benzersiz
+    fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(dict(ist, cikti=cikti), f, ensure_ascii=False)
+    kapi_gercek_cagri()
+    try: subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=float(zaman) + 30)
+    except (OSError, subprocess.TimeoutExpired): pass
+    finally:
+        try: os.remove(istek)
+        except OSError: pass
+    try:
+        with open(cikti, encoding="utf-8") as f: ham = f.read()
+        os.remove(cikti); return ham
+    except OSError: return None
 def kapi_olcum_birak(o):  # claude_json çağırır: kapı içindeyse satırı yazmak yerine kapıya bırakır (True), değilse False
     ls = getattr(KAPI_YEREL, "olc", None)
     if getattr(KAPI_YEREL, "is_turu", None) and isinstance(ls, list): ls.append(o); return True
@@ -247,4 +268,6 @@ def kapi_view():  # /status "kapi"
         _kapi_gun_sifirla(simdi); g = dict(KAPI["gun"])
         en = sorted(KAPI["engel"].items(), key=lambda kv: -kv[1])[:8]
     u = _kapi_usd_yukle(simdi)
-    return {"bugun": g, "arka_usd": round(u["usd"], 3), "tavan_usd": kapi_tavan_usd(), "aktif": KAPI["aktif"], "engel": dict(en), "tekrar_bekleyen": sum(1 for h in list(KAPI["tekrar"].values()) if h["bitis"] > simdi)}
+    gi = globals().get("GIRIS")  # v0.244.0: sağlık tek yoldan (her çağrının sonucu + seyrek yoklama; claude-giris.py)
+    sag = {"durum": gi.get("durum"), "son_ok": round(gi["son_ok"]) if gi.get("son_ok") else None, "son_yokla": round(gi["son_yokla"]) if gi.get("son_yokla") else None} if isinstance(gi, dict) else None
+    return {"bugun": g, "arka_usd": round(u["usd"], 3), "tavan_usd": kapi_tavan_usd(), "aktif": KAPI["aktif"], "engel": dict(en), "tekrar_bekleyen": sum(1 for h in list(KAPI["tekrar"].values()) if h["bitis"] > simdi), "saglik": sag}

@@ -20,8 +20,10 @@ BEYIN = types.SimpleNamespace(secim=lambda a, i: {"tur": "claude-code", "model":
 ad = {"__name__": "giris", "os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "subprocess": sp,
       "AYAR": {"port": 8765}, "BASE": T, "KONUS": KONUS, "_KS": {}, "_konus_kur": _konus_kur, "_t": lambda a, b: a, "yerel_uyari": UYARI.append,
       "bildirim": lambda b, a, m, son=None: BILDIRIM.append(a), "BEYIN": BEYIN, "claude_yolu": lambda: "/bin/claude", "BRIFING_APP": T, "claude_yalin": lambda: [],
-      "A": types.SimpleNamespace(port=8765)}
+      "A": types.SimpleNamespace(port=8765), "LOCK": threading.Lock(), "write": lambda pairs: None, "secrets": __import__("secrets"),
+      "KAPI_SAAT": lambda: datetime.datetime(2026, 11, 11, 11, 0).timestamp(), "calisma_saatleri": lambda: ({0, 1, 2, 3, 4}, 540, 1080)}  # v0.244.0: yoklama kapıdan (Çarşamba 11:00, mesai)
 ad["claude_json"] = lambda ham, is_, t0, y, s=None, m=None: (lambda j: (ad["claude_hata_bildir"](j.get("result"), is_) if j.get("is_error") else ad["claude_ok"](), (j.get("result"), {}))[1])(json.loads(ham))
+exec(compile(open(os.path.join(K, "aktarici", "kapi.py"), encoding="utf-8").read(), "kapi.py", "exec"), ad)
 exec(compile(open(os.path.join(K, "aktarici", "claude-giris.py"), encoding="utf-8").read(), "claude-giris.py", "exec"), ad)
 
 c = io.StringIO()
@@ -45,7 +47,7 @@ ad["GIRIS"]["son_ok"] = 0; r = ad["claude_giris_yokla"](zorla=True); bak("yoklam
 CEVAP["j"] = {"is_error": True, "result": "Failed to authenticate: OAuth session expired and could not be refreshed"}; UYARI.clear()
 with contextlib.redirect_stdout(io.StringIO()): r = ad["claude_giris_yokla"](zorla=True)
 bak("yoklama düşmüş → False, sesli uyarı", r is False and ad["GIRIS"]["durum"] == "dustu" and len(UYARI) == 1)
-bak("istek dosyası silinir, yoklama kilidi açılır", not os.path.exists(os.path.join(T, "giris-istek.json")) and ad["GIRIS"]["yokluyor"] is False)
+bak("istek dosyası silinir, yoklama kilidi açılır", not [f for f in os.listdir(T) if f.startswith("giris-")] and ad["GIRIS"]["yokluyor"] is False)
 ad["AYAR"]["claude_giris_yokla"] = False; bak("ayar claude_giris_yokla: false → yoklanmaz", ad["claude_giris_yokla"]() is None)
-BEYIN.secim = lambda a, i: {"tur": "openai", "model": "x"}; bak("sağlayıcı Claude Code değilse yoklanmaz", ad["claude_giris_yokla"](zorla=True) is None)
+ad["AYAR"]["claude_giris_yokla"] = True; BEYIN.secim = lambda a, i: {"tur": "openai", "model": "x"}; bak("sağlayıcı claude-code değilse nöbet yoklamaz (sürüm denetimi zorla=True ile yine dener)", ad["claude_giris_yokla"]() is None)
 print("claude giriş: " + ("✓ hepsi geçti" if not hata else f"✗ {len(hata)} kaldı")); sys.exit(1 if hata else 0)

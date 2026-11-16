@@ -665,6 +665,11 @@
      "tarih": "str"
     },
     "engel": {},
+    "saglik": {
+     "durum": "NoneType",
+     "son_ok": "NoneType",
+     "son_yokla": "NoneType"
+    },
     "tavan_usd": "float",
     "tekrar_bekleyen": "int"
    },

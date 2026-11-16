@@ -77,14 +77,15 @@ def satirlar(N, ad="claude-cagri.jsonl"):
 # --- 1) izin tablosu × iş türü × durum ---------------------------------------------------------------------------------------------------------
 N = kur("tablo")
 ARKA = [k for k, r in N["KAPI_TABLO"].items() if r["plan"] == "arka"]; ON = [k for k, r in N["KAPI_TABLO"].items() if r["plan"] == "on"]
-SAATSIZ = {"dusunme", "degerlendir:mutabakat"}
+SAATSIZ = {"dusunme", "degerlendir:mutabakat", "telaffuz"}  # telaffuz (okunan sözcük): konuşmayı besler, saat kuralı yok (K2)
+GIZLISIZ = {"giris"}; TOPLANTISIZ = {"telaffuz"}; TAVANSIZ = {"giris"}  # K2 istisnaları: giriş yoklaması içerik taşımaz; telaffuz toplantıda konuşmayı besler
 ok("tablo: K1 işleri var (6 değerlendirici, düşünme, eylem, talimat, e-posta taslağı)", set(N["KAPI_TABLO"]) >= {"degerlendir:gun_ici", "degerlendir:toplanti_sonrasi", "degerlendir:belge_oneri", "degerlendir:is_kopya",
    "degerlendir:eposta", "degerlendir:mutabakat", "dusunme", "eylem", "talimat", "eposta_taslak"}, sorted(N["KAPI_TABLO"]))
 ok("mesai içinde, olağan durumda hiçbir iş engellenmez", all(N["kapi_engel"](k, CAR) is None for k in N["KAPI_TABLO"]), {k: N["kapi_engel"](k, CAR) for k in N["KAPI_TABLO"]})
 N["DURUM"]["gizli"] = True
-ok("gizli kip: tüm arka plan işleri engel, ön plan serbest", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ARKA) and all(N["kapi_engel"](k, CAR) is None for k in ON))
+ok("gizli kip: tüm arka plan işleri (içeriksiz giriş yoklaması hariç) engel, ön plan serbest", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ARKA if k not in GIZLISIZ) and N["kapi_engel"]("giris", CAR) is None and all(N["kapi_engel"](k, CAR) is None for k in ON))
 N["DURUM"]["gizli"] = False; N["DURUM"]["toplanti"] = True
-ok("toplantı sürerken: arka plan engel (toplantı sürüyor), ön plan serbest", all(N["kapi_engel"](k, CAR) == "toplantı sürüyor" for k in ARKA) and all(N["kapi_engel"](k, CAR) is None for k in ON))
+ok("toplantı sürerken: arka plan engel (toplantı sürüyor; okunan sözcük telaffuzu hariç), ön plan serbest", all(N["kapi_engel"](k, CAR) == "toplantı sürüyor" for k in ARKA if k not in TOPLANTISIZ) and N["kapi_engel"]("telaffuz", CAR) is None and all(N["kapi_engel"](k, CAR) is None for k in ON))
 N["DURUM"]["toplanti"] = False; N["DURUM"]["sessiz"] = True
 ok("sessiz mod: yalnız kullanıcıya söyleyen değerlendiriciler (gün içi, toplantı sonrası) engel", N["kapi_engel"]("degerlendir:gun_ici", CAR) == "sessiz mod" and N["kapi_engel"]("degerlendir:toplanti_sonrasi", CAR) == "sessiz mod"
    and N["kapi_engel"]("degerlendir:belge_oneri", CAR) is None and N["kapi_engel"]("eylem", CAR) is None)
@@ -103,7 +104,7 @@ with open(os.path.join(NT["D"], "claude-cagri.jsonl"), "w") as f:
     f.write(json.dumps({"at": "2026-11-10T10:00:00+03:00", "is": "dusunme", "maliyet": 9}) + "\n")
 ok("ortak tavan: bugünün arka plan işleri (düşünme + değerlendirici + giriş = 3,1 $) sayılır; ön plan ve dünkü satır sayılmaz", abs(NT["_kapi_usd_yukle"](CAR)["usd"] - 3.1) < 1e-6, NT["KAPI"]["usd"])
 ok("tavan dolunca (varsayılan 3 $, degerlendir_gunluk_usd'den): arka plan engel (düşünme dahil), ön plan serbest",
-   all(NT["kapi_engel"](k, CAR) == "günlük tavan" for k in ARKA) and all(NT["kapi_engel"](k, CAR) is None for k in ON) and NT["kapi_tavan_usd"]() == 3)
+   all(NT["kapi_engel"](k, CAR) == "günlük tavan" for k in ARKA if k not in TAVANSIZ) and NT["kapi_engel"]("giris", CAR) is None and all(NT["kapi_engel"](k, CAR) is None for k in ON) and NT["kapi_tavan_usd"]() == 3)
 NT["AYAR"]["arka_gunluk_usd"] = 5
 ok("ayar arka_gunluk_usd tavanı değiştirir; tavan=False ön denetimi tavana bakmaz", NT["kapi_engel"]("degerlendir:gun_ici", CAR) is None and NT["kapi_tavan_usd"]() == 5)
 NT["AYAR"]["arka_gunluk_usd"] = 1; ok("tavan=False ile ön denetim tavanı atlar", NT["kapi_engel"]("degerlendir:gun_ici", CAR, tavan=False) is None and NT["kapi_engel"]("degerlendir:gun_ici", CAR) == "günlük tavan")
@@ -265,6 +266,105 @@ top = B["_beta_belirtec"]({"is": "toplanti", "giris": 50, "onbellek_yaz": 100, "
 ok("toplantı satırı: giriş toplama çevrilir (50+130+2000), yazım 5 dk + 1 sa, çıktı sayı olan 'cikis'", top == {"giris": 2180, "cikti": 70, "onbellek_yaz": 130, "onbellek_oku": 2000}, top)
 cj = B["_beta_belirtec"]({"is": "degerlendir:gun_ici", "giris": 1200, "onbellek_oku": 800, "onbellek_yaz": 300, "onbellek_yaz_1s": 50, "cikti": 40})
 ok("kapı satırı olduğu gibi", cj == {"giris": 1200, "cikti": 40, "onbellek_yaz": 300, "onbellek_oku": 800}, cj)
+
+# --- 10) K2 (v0.244.0): kalan arka plan işleri, tek Brifing istemcisi, seyrek yoklama, sürüm denetimi, telaffuz, kesişim ------------------------------
+N = kur("k2")
+ok("K2 tablo satırları: giris, telaffuz:sozluk, telaffuz, kesisim (arka), brifing, prova (ön)", all(N["KAPI_TABLO"][k]["plan"] == "arka" for k in ("giris", "telaffuz:sozluk", "telaffuz", "kesisim"))
+   and all(N["KAPI_TABLO"][k]["plan"] == "on" for k in ("brifing", "prova")))
+N["DURUM"]["toplanti"] = True
+ok("toplantıda: sözlük taraması ve kesişim bekler, okunan sözcük telaffuzu çalışır", N["kapi_engel"]("telaffuz:sozluk", CAR) == "toplantı sürüyor" and N["kapi_engel"]("kesisim", CAR) == "toplantı sürüyor" and N["kapi_engel"]("telaffuz", CAR) is None)
+N["DURUM"]["toplanti"] = False; N["DURUM"]["gizli"] = True
+ok("gizli kipte telaffuz (iki türü) ve kesişim yok; giriş yoklaması (içerik yok) olur", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ("telaffuz", "telaffuz:sozluk", "kesisim")) and N["kapi_engel"]("giris", CAR) is None)
+N["DURUM"]["gizli"] = False
+ok("gece ve hafta sonu: giriş yoklaması, sözlük telaffuzu ve kesişim yok; okunan sözcük telaffuzu olur", all(N["kapi_engel"](k, GECE) == "gece" and N["kapi_engel"](k, CMT) == "mesai dışı" for k in ("giris", "telaffuz:sozluk", "kesisim"))
+   and N["kapi_engel"]("telaffuz", GECE) is None)
+ok("eski adlı satırlar (giris, kesisim-coz) ortak tavan toplamına sayılır", N["kapi_arka_mi"]("giris") and N["kapi_arka_mi"]("kesisim-coz") and N["kapi_arka_mi"]("kesisim") and N["kapi_arka_mi"]("telaffuz"))
+# tek Brifing.app istemcisi
+D = N["DURUM"]; D["cevap"] = lambda istem: "c"; ist0 = len(D["istekler"])
+h1 = N["kapi_brifing"]({"claude": "/x/claude", "args": ["-p", "a"], "cwd": N["D"], "sure": 5}, "giris", 5); h2 = N["kapi_brifing"]({"claude": "/x/claude", "args": ["-p", "b"], "cwd": N["D"], "sure": 5}, "giris", 5)
+ok("kapi_brifing: çağrı başına benzersiz istek dosyası, çıktı okunur, istek/çıktı silinir", h1 and json.loads(h1)["result"] == "c" and len(set(D["istekler"][ist0:])) == 2
+   and not [f for f in os.listdir(N["D"]) if f.startswith("giris-")], (h1, D["istekler"][ist0:], os.listdir(N["D"])))
+D["cevap"] = lambda istem: None; ok("kapi_brifing: cevap yoksa None", N["kapi_brifing"]({"claude": "/x/claude", "args": ["-p", "c"], "cwd": N["D"], "sure": 5}, "giris", 5) is None)
+
+# seyrek giriş yoklaması (claude-giris.py) ve sürüm denetimi (relay.py claude_surum_bak)
+GS = src("claude-giris.py"); GS = GS[:GS.index('if not os.environ.get("SUFLOR_AYAR") and not os.environ.get("SUFLOR_TEST_BASLAT")')]
+def kur_giris(ad):
+    G = kur(ad); G["AYAR"]["port"] = 8765; G["A"] = types.SimpleNamespace(port=8765); G["KONUS"] = {"durum": "kapali"}; G["claude_yalin"] = lambda: False
+    exec(compile(GS, "claude-giris.py", "exec"), G); G["cagri_satir"] = lambda: [r for r in satirlar(G) if r.get("is") == "giris"]
+    Beyin.telaffuz_args = staticmethod(lambda ayar, istem, model=None: ["-p", istem, "--model", model or "sonnet"]); return G
+G = kur_giris("giris"); D = G["DURUM"]; D["cevap"] = lambda istem: "tamam"
+D["saat"] = GECE; ok("gece: yoklanmaz (son başarılı çağrı eski olsa da)", G["giris_yoklanmali"]() is False)
+D["saat"] = CMT; ok("hafta sonu: yoklanmaz", G["giris_yoklanmali"]() is False)
+D["saat"] = CAR; D["toplanti"] = True; ok("toplantıda: yoklanmaz", G["giris_yoklanmali"]() is False); D["toplanti"] = False
+ok("mesai içinde, hiç başarılı çağrı yokken: yoklanır", G["giris_yoklanmali"]() is True)
+r = G["claude_giris_yokla"](); c = G["cagri_satir"]()
+ok("yoklama kapıdan: True, tek kayıt satırı (is giris, model haiku, plan arka, sonuc tamam)", r is True and len(c) == 1 and c[0].get("model") == "haiku" and c[0].get("plan") == "arka" and c[0].get("sonuc") == "tamam", (r, c))
+G["GIRIS"]["son_ok"] = CAR - 60; G["GIRIS"]["son_yokla"] = 0
+ok("son başarılı Claude çağrısı 1 dk önceyse yoklanmaz", G["giris_yoklanmali"]() is False)
+G["GIRIS"]["son_ok"] = CAR - 4 * 3600; G["GIRIS"]["son_yokla"] = CAR - 2 * 3600
+ok("son yoklama 2 sa önceyse (3 sa dolmadı) yoklanmaz; varsayılan aralık 180 dk", G["giris_yoklanmali"]() is False and G["GIRIS_YOKLA_SN"] == 180 * 60)
+G["GIRIS"]["son_yokla"] = CAR - 3 * 3600 - 1; G["_KS"]["tur"] = {"soru": "x"}
+ok("Konuş turu sürerken yoklanmaz", G["giris_yoklanmali"]() is False); G["_KS"]["tur"] = None
+D["saat"] = GECE; n0 = D["run"]; r = G["claude_giris_yokla"](zorla=True)
+ok("zorla=True (sürüm denetimi) kapı kuralını aşmaz: gece None, çağrı yok", r is None and D["run"] == n0, (r, D["run"]))
+D["saat"] = CAR; D["is_error"] = True; D["cevap"] = lambda istem: "OAuth session expired"
+r = G["claude_giris_yokla"](zorla=True); ok("giriş hatasında False ve GIRIS düştü", r is False and G["GIRIS"]["durum"] == "dustu", (r, G["GIRIS"]))
+D["is_error"] = False; D["cevap"] = lambda istem: None
+r = G["claude_giris_yokla"](zorla=True); ok("cevap gelmezse False (gerçek çağrı yapıldı) ve kapı kısa hata satırı yazar", r is False and G["cagri_satir"]()[-1].get("sonuc") == "hata", (r, G["cagri_satir"]()[-1:]))
+v = G["kapi_view"](); ok("/status kapi sağlık alanı (durum, son_ok, son_yokla)", isinstance(v.get("saglik"), dict) and v["saglik"]["durum"] == "dustu" and v["saglik"]["son_yokla"], v.get("saglik"))
+# sürüm denetimi: relay.py claude_surum_bak gerçek kaynağı
+RS = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read(); SURUM_SRC = dilim(RS, "def claude_surum_bak():", "def _claude_surum_dongu():")
+G = kur_giris("surum"); D = G["DURUM"]; D["cevap"] = lambda istem: "tamam"; uyari = []
+class _SP:  # yalnız `claude --version` (sahte); Brifing.app çağrısı kur()'un sahtesinde
+    TimeoutExpired = _sp.TimeoutExpired
+    surum = "2.1.0"
+    @classmethod
+    def run(c, argv, **k):
+        if argv[-1] == "--version": return types.SimpleNamespace(returncode=0, stdout=c.surum + " (claude-code)\n", stderr="")
+        return G["subprocess"].run(argv, **k)
+G.update(STATE={}, CLAUDE_SURUM_YOL=os.path.join(G["D"], "claude-surum.json"), deneme_aktarici=lambda: False, bildirim=lambda *a: uyari.append(a))
+G["_SP"] = _SP; exec(compile(SURUM_SRC.replace("    import subprocess\n", "    subprocess = _SP\n"), "relay.py", "exec"), G)
+D["saat"] = GECE; n0 = D["run"]; r = G["claude_surum_bak"]()
+ok("yeni sürüm gece görüldü: model çağrısı yok, sonuç None, claude-surum.json'a ok yazılmaz", r is None and D["run"] == n0 and not os.path.exists(G["CLAUDE_SURUM_YOL"]) and G["STATE"]["claude_saglik"]["ok"] is None, (r, G["STATE"]))
+D["saat"] = CAR; r = G["claude_surum_bak"](); c = G["cagri_satir"]()
+ok("mesaide: tek yoklama (giris, haiku) → ok True yazılır", r is True and len(c) == 1 and json.load(open(G["CLAUDE_SURUM_YOL"]))["ok"] is True and G["STATE"]["claude_saglik"]["ok"] is True, (r, c))
+n0 = D["run"]; r = G["claude_surum_bak"](); ok("sürüm aynı ve önceden tamam: model çağrısı yok", r is True and D["run"] == n0)
+_SP.surum = "2.2.0"; D["cevap"] = lambda istem: None; r = G["claude_surum_bak"]()
+ok("yeni sürümde deneme olmazsa False, uyarı (bildirim) ve ok False yazılır", r is False and uyari and json.load(open(G["CLAUDE_SURUM_YOL"]))["ok"] is False, (r, uyari))
+
+# telaffuz (brifing-ses.py telaffuz_tamamla) kapıdan
+TS = dilim(BS, "def telaffuz_tamamla(", "def _telaffuz_dongu():")
+T2 = kur("telaffuz"); D = T2["DURUM"]; eklenen = []
+T2.update(_TEL_OTO={"calisiyor": False, "son": 0}, A=types.SimpleNamespace(port=8765), ARAYUZ_DILI="tr", TEL_OTO_ISTEM="okunuş: ", telaffuz_ekle=lambda y: eklenen.append(y),
+          telaffuz_adaylari=lambda: ["Gemini"]); T2["AYAR"].update(port=8765)
+Beyin.telaffuz_args = staticmethod(lambda ayar, istem, model=None: ["-p", istem, "--model", model or "sonnet"])
+exec(compile(TS, "brifing-ses.py", "exec"), T2)
+D["cevap"] = lambda istem: '{"Gemini": "cemini"}'; D["toplanti"] = True
+r = T2["telaffuz_tamamla"](); ok("toplantıda sözlük taraması: False (bekler), çağrı yok", r is False and D["run"] == 0, (r, D["run"]))
+r = T2["telaffuz_tamamla"](["Gemini"]); c = [x for x in satirlar(T2) if x.get("is") == "telaffuz"]
+ok("toplantıda okunan sözcük: kapıdan çağrılır, okunuş eklenir, tek satır (plan arka)", eklenen == [{"Gemini": "cemini"}] and len(c) == 1 and c[0].get("plan") == "arka", (eklenen, c))
+D["toplanti"] = False; D["gizli"] = True; n0 = D["run"]
+ok("gizli kipte okunan sözcük de gitmez (False)", T2["telaffuz_tamamla"](["Gemini"]) is False and D["run"] == n0)
+D["gizli"] = False; D["saat"] = CMT; ok("hafta sonu sözlük taraması bekler", T2["telaffuz_tamamla"]() is False); D["saat"] = CAR
+D["cevap"] = lambda istem: "anlamsız"; r = T2["telaffuz_tamamla"](["Gemini"])
+ok("okunamayan cevap: okunuş eklenmez, kayıtta okunamadi", len(eklenen) == 1 and satirlar(T2)[-1].get("sonuc") == "okunamadi", satirlar(T2)[-1:])
+ok("telaffuz: ortak Brifing istemcisi (telaffuz-istek-* benzersiz, sabit telaffuz-istek.json yok)", all(i.startswith("telaffuz-istek-") for i in D["istekler"]), D["istekler"])
+
+# kesişim: relay.py kesisim_tur kapı ön denetimi + kesisim_model kapıdan
+KS = dilim(RS, "def kesisim_tur(simdi=None):", "def _kesisim_dongu():")
+K = kur("kesisim"); D = K["DURUM"]; cagrilar = []
+class _KM:
+    @staticmethod
+    def kos_ve_coz(canli, ayar, **k): cagrilar.append(k); return {"duzeltilen": 0, "arastirilan": 0, "birakilan": 0, "cozulemeyen_onemli": []}
+K.update(_kesisim_modul=lambda: _KM, toplanti_acik=lambda: False, kaynak_dar=lambda: False, gelistirici_mi=lambda: True, sys=sys)
+Beyin.kart_args = staticmethod(lambda model: ["-p", "--model", model]); Beyin.tek = staticmethod(lambda cl, args, girdi, cwd, zaman: types.SimpleNamespace(stdout=json.dumps({"result": "çözüm", "is_error": False, "total_cost_usd": 0.4, "usage": {"input_tokens": 10, "output_tokens": 5}})))
+exec(compile(KS, "relay.py", "exec"), K)
+cmt = datetime.datetime.fromtimestamp(CMT); r = K["kesisim_tur"](cmt); z = json.load(open(os.path.join(K["D"], "kesisim-zaman.json"))) if os.path.exists(os.path.join(K["D"], "kesisim-zaman.json")) else {}
+ok("kesişim hafta sonu: 'bekliyor: mesai dışı', deneme sayılmaz, çözücü çağrılmaz", r == {"bekliyor": "mesai dışı"} and not z.get("deneme") and not cagrilar, (r, z))
+r = K["kesisim_tur"](datetime.datetime.fromtimestamp(CAR)); ok("mesaide: çözücü model_fn (kesisim_model) ile çağrılır", cagrilar and cagrilar[-1].get("model_fn") is K["kesisim_model"], cagrilar)
+m = K["kesisim_model"]("istem"); c = [x for x in satirlar(K) if x.get("is") == "kesisim"]
+ok("kesisim_model: kapıdan tek satır (is kesisim, plan arka, maliyet), metin döner", m == "çözüm" and len(c) == 1 and c[0]["plan"] == "arka" and c[0]["maliyet"] == 0.4, (m, c))
+ok("kesişim harcaması ortak tavana eklenir", abs(K["kapi_view"]()["arka_usd"] - 0.4) < 1e-9, K["kapi_view"]())
 
 shutil.rmtree(T, ignore_errors=True)
 print(f"\n{'TAMAM' if not HATA else 'KALDI'}: {len(HATA)} hata")

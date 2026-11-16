@@ -273,26 +273,23 @@ def _brifing_is(oid, olay):
         kisi += _brifing_bloklar(olay, gv)  # + katılımcı eşleşmesi (karar grafından; dosya taraması gerekmez)
         if gv and gv.get("davet"): vj += BRIFING_GUNDEM[dl][0]; va += BRIFING_GUNDEM[dl][1]
         istem = BRIFING_ISTEM[dl].format(canli=BASE, olay=json.dumps(veri, ensure_ascii=False, indent=1), bilgi=kisi + bi, veri=vj, va=va)
-        cikti = os.path.join(BASE, "brifing-cikti.json"); istek = os.path.join(BASE, "brifing-istek.json")
-        t0 = time.time(); ham = None
-        for yalin in ([True, False] if claude_yalin() else [False]):  # eski Claude Code yalın seçenekleri tanımazsa bir kez tam çağrı
-            if os.path.exists(cikti): os.remove(cikti)
-            args = BEYIN.brifing_args(AYAR, istem, BASE, yalin, bilgi if yalin else None)  # tam çağrı (eski Claude Code) kaynaksız
-            ist = {"claude": cl, "args": args, "cwd": AYAR["calisma"], "cikti": cikti, "sure": 240}
-            t1 = time.time()
-            if "--input-format" in args: ham = _brifing_akis(istek, ist, istem)
-            else:
-                fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-                with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(ist, f, ensure_ascii=False)
-                subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=300)
-                try: os.remove(istek)
-                except OSError: pass
-                try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
-                except OSError: ham = None
-            if ham is None: break  # izin penceresi ya da zaman aşımı: ikinci deneme de bekler, yapma
-            ham, olc = claude_json(ham, "brifing", t1, yalin)
-            if olc or not yalin: break
-            print("BRİFİNG: yalın çağrı okunamadı — tam çağrıyla yeniden")
+        t0 = time.time()
+        def cagri():  # v0.244.0 (Claude kapısı K2): kapıdan (ön plan; kayıt tek satır biçiminde), tek çağrı kolu ortak Brifing.app istemcisiyle (kapi_brifing)
+            ham = None
+            for yalin in ([True, False] if claude_yalin() else [False]):  # eski claude-code yalın seçenekleri tanımazsa bir kez tam çağrı
+                args = BEYIN.brifing_args(AYAR, istem, BASE, yalin, bilgi if yalin else None)  # tam çağrı (eski claude-code) kaynaksız
+                ist = {"claude": cl, "args": args, "cwd": AYAR["calisma"], "sure": 240}
+                t1 = time.time()
+                if "--input-format" in args:
+                    if "kapi_gercek_cagri" in globals(): kapi_gercek_cagri()
+                    ham = _brifing_akis(os.path.join(BASE, "brifing-istek.json"), dict(ist, cikti=os.path.join(BASE, "brifing-cikti.json")), istem)  # FIFO adları sabit; BRIFING_KILIT sıralar
+                else: ham = kapi_brifing(ist, "brifing", 270)
+                if ham is None: return None, "yanıt yok"  # izin penceresi ya da zaman aşımı: ikinci deneme de bekler, yapma
+                ham, olc = claude_json(ham, "brifing", t1, yalin)
+                if olc or not yalin: break
+                print("BRİFİNG: yalın çağrı okunamadı — tam çağrıyla yeniden")
+            return ham, None
+        ham = kapi_iste("brifing", cagri)["ham"] if "kapi_iste" in globals() else cagri()[0]
         if ham is None: return bitir(durum="hata", hata=_t(f"{asistan_ad()} yanıt vermedi (izin penceresi ya da zaman aşımı) — yeniden dene", "Claude didn't answer (permission prompt or timeout) — try again"))
         m = re.search(r"\{.*\}", ham, re.S)
         try: j = json.loads(m.group(0)) if m else None
@@ -529,38 +526,44 @@ def telaffuz_adaylari():
         x = " ".join(x.replace(",", " ").split())
         if re.fullmatch(r"[A-Za-z][A-Za-z0-9 .&'+-]{1,40}", x) and sum(c.isalpha() for c in x) >= 2 and x.lower() not in bilinen and x.lower() not in {o.lower() for o in out}: out.append(x)
     return out[:150]
-def telaffuz_tamamla(ad=None):
+def telaffuz_tamamla(ad=None, is_turu=None):
     # aktarıcı açılınca ve sözlük değişince (_telaffuz_dongu); deneme aktarıcısında çalışmaz (Claude çağrısı, kota)
+    # v0.244.0 (Claude kapısı K2): çağrı kapıdan — sözlük taraması "telaffuz:sozluk" (gizli kip, toplantı, mesai/gece, ortak tavan), okunan metindeki sözcükler
+    # "telaffuz" (gizli kipte yok, tavana girer; toplantıda ve akşam da çalışır: konuşmayı besler). Engelde sessizce çıkar. Brifing.app tek istemci (kapi_brifing).
     if _TEL_OTO["calisiyor"] or os.environ.get("SUFLOR_AYAR") or A.port != int(AYAR["port"]) or ARAYUZ_DILI != "tr" or not AYAR.get("konusma", True): return
+    is_turu = is_turu or ("telaffuz:sozluk" if ad is None else "telaffuz")
+    if "kapi_engel" in globals() and kapi_engel(is_turu): return False  # izin yoksa (gece, toplantı, gizli kip) aday bile taranmaz; sonraki turda yeniden bakılır
     ad = telaffuz_adaylari() if ad is None else ad; cl = claude_yolu(); sec = BEYIN.secim(AYAR, "telaffuz")  # Faz 11 Aşama 2: ayar beyin.telaffuz
     claude_var = bool(cl) and os.path.isdir(BRIFING_APP)
     if not ad or (sec["tur"] == "claude-code" and not claude_var): return
     _TEL_OTO.update(calisiyor=True, son=time.time())
     try:
-        istem = TEL_OTO_ISTEM + json.dumps(ad, ensure_ascii=False); ham = None; t0 = time.time()
-        if sec["tur"] != "claude-code":
-            ham, olc = beyin_tek("telaffuz", sec, istem, json_kip=True)
-            if not olc or olc.get("hata"):
-                if not (claude_var and BEYIN.yedek_var(AYAR, sec)): print(f"SES: okunuş tamamlanamadı ({sec.get('saglayici')} yanıt vermedi)"); return
-                print(BEYIN.yedek_satiri("telaffuz", sec, ham if olc else "çıktı okunamadı")); ham = None
-        if ham is None:  # Claude Code (Brifing.app); yedekte Claude modeli
-            cikti = os.path.join(BASE, "telaffuz-cikti.json"); istek = os.path.join(BASE, "telaffuz-istek.json"); t0 = time.time()
-            if os.path.exists(cikti): os.remove(cikti)
-            model = BEYIN.claude_secim(AYAR, "telaffuz")["model"]
-            args = BEYIN.telaffuz_args(AYAR, istem, model)
-            fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": cl, "args": args, "cwd": BASE, "cikti": cikti, "sure": 120}, f, ensure_ascii=False)
-            subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=180)
-            for f in (istek,):
-                try: os.remove(f)
-                except OSError: pass
-            try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
-            except OSError: print("SES: okunuş tamamlanamadı (Claude yanıt vermedi)"); return
-            ham, _ = claude_json(ham, "telaffuz", t0, bool(claude_yalin()), "claude-code", model)
-        m = re.search(r"\{.*\}", ham, re.S)
-        try: j = json.loads(m.group(0)) if m else None
-        except ValueError: j = None
-        if not isinstance(j, dict): print("SES: okunuş yanıtı okunamadı"); return
+        istem = TEL_OTO_ISTEM + json.dumps(ad, ensure_ascii=False); t0 = time.time()
+        def cagri():
+            ham = None
+            if sec["tur"] != "claude-code":
+                if "kapi_gercek_cagri" in globals(): kapi_gercek_cagri()
+                ham, olc = beyin_tek("telaffuz", sec, istem, json_kip=True)
+                if not olc or olc.get("hata"):
+                    if not (claude_var and BEYIN.yedek_var(AYAR, sec)): print(f"SES: okunuş tamamlanamadı ({sec.get('saglayici')} yanıt vermedi)"); return None, "yanıt yok"
+                    print(BEYIN.yedek_satiri("telaffuz", sec, ham if olc else "çıktı okunamadı")); ham = None
+            if ham is None:  # claude-code (Brifing.app); yedekte Claude modeli
+                model = BEYIN.claude_secim(AYAR, "telaffuz")["model"]; t1 = time.time()
+                ham = kapi_brifing({"claude": cl, "args": BEYIN.telaffuz_args(AYAR, istem, model), "cwd": BASE, "sure": 120}, "telaffuz", 150)
+                if ham is None: print("SES: okunuş tamamlanamadı (Claude yanıt vermedi)"); return None, "yanıt yok"
+                ham, _ = claude_json(ham, "telaffuz", t1, bool(claude_yalin()), "claude-code", model)
+            return ham, None
+        def coz(ham):
+            m = re.search(r"\{.*\}", ham or "", re.S)
+            try: j = json.loads(m.group(0)) if m else None
+            except ValueError: j = None
+            return j if isinstance(j, dict) else None
+        r = kapi_iste(is_turu, cagri, coz=coz)
+        if r["sonuc"] == "engel": return False  # → False: sözlük döngüsü değişikliği tüketmez, izin gelince yeniden dener
+        j = r.get("cozum")
+        if not isinstance(j, dict):
+            if r["sonuc"] == "okunamadi": print("SES: okunuş yanıtı okunamadı")
+            return
         yeni = {}; n = 0
         for x in ad:
             v = j.get(x)
@@ -576,13 +579,13 @@ def _telaffuz_dongu():
         try: mt = os.path.getmtime(os.path.join(BASE, "sozluk.json"))
         except OSError: mt = None
         if mt != son and time.time() - _TEL_OTO["son"] > 600:
-            son = mt; telaffuz_tamamla()
+            if telaffuz_tamamla() is not False: son = mt  # v0.244.0: kapı engelinde (gece, toplantı) sözlük değişikliği bekler
         # okunan metinlerde görülen bilinmeyenler: en çok dakikada bir, günde 40 çağrı, çağrı başına 40 sözcük
         gun = time.strftime("%Y-%m-%d")
         if _TEL_BEK["gun"] != gun: _TEL_BEK.update(gun=gun, n=0)
         if _TEL_BEK["q"] and not _TEL_OTO["calisiyor"] and time.time() - _TEL_BEK["son"] > 60 and _TEL_BEK["n"] < 40:
             ad = [w for w in _TEL_BEK["q"][:40] if w.lower() not in _TEL["esle"]]; del _TEL_BEK["q"][:40]
-            if ad: _TEL_BEK.update(son=time.time(), n=_TEL_BEK["n"] + 1); telaffuz_tamamla(ad)
+            if ad and telaffuz_tamamla(ad) is not False: _TEL_BEK.update(son=time.time(), n=_TEL_BEK["n"] + 1)  # v0.244.0: kapı engeli (gizli kip) günlük sayacı tüketmez
         time.sleep(15)
 _SES_SEC = {"t": 0, "v": None}
 SES_TABAN_HIZ = 180  # v0.71.0: Yelda'nın varsayılan hızı ~180 sözcük/dk (ölçüm 17 Ekim); kişilik hiz çarpanı bunun üstüne

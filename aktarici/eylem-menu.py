@@ -40,21 +40,9 @@ def _eylem_cagri(istem, amac=None, soru=None, maske=None, is_adi=None, model=Non
             if not (claude_var and BEYIN.yedek_var(AYAR, sec)): return None, "yanıt gelmedi"
             print(BEYIN.yedek_satiri("prova", sec, ham if olc else "çıktı okunamadı"))
         if not claude_var: return None, "Claude Code yok"
-        d = os.path.join(BASE, "eylem"); os.makedirs(d, exist_ok=True)
-        if "kapi_dosya" in globals(): cikti, istek = kapi_dosya(d, "cikti"), kapi_dosya(d, "istek")
-        else: cikti, istek = os.path.join(d, "cikti.json"), os.path.join(d, "istek.json")
-        t0 = time.time()
-        if os.path.exists(cikti): os.remove(cikti)
-        model = model or BEYIN.claude_secim(AYAR, "prova")["model"]
-        fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model), "cwd": d, "cikti": cikti, "sure": zaman or EYLEM_ZAMAN_SN}, f, ensure_ascii=False)
-        if "kapi_gercek_cagri" in globals(): kapi_gercek_cagri()
-        try: subprocess.run(["open", "-g", "-W", "-n", "-a", BRIFING_APP, "--args", "--istek", istek], capture_output=True, timeout=(zaman or EYLEM_ZAMAN_SN) + 30)
-        except (OSError, subprocess.TimeoutExpired): pass
-        try: os.remove(istek)
-        except OSError: pass
-        try: ham = open(cikti, encoding="utf-8").read(); os.remove(cikti)
-        except OSError: return None, "Claude yanıt vermedi"
+        d = os.path.join(BASE, "eylem"); t0 = time.time(); model = model or BEYIN.claude_secim(AYAR, "prova")["model"]
+        ham = kapi_brifing({"claude": claude_yolu(), "args": BEYIN.prova_args(AYAR, istem, model), "cwd": d, "sure": zaman or EYLEM_ZAMAN_SN}, "eylem", zaman or EYLEM_ZAMAN_SN, d)  # v0.244.0: tek Brifing.app istemcisi (kapi.py)
+        if ham is None: return None, "Claude yanıt vermedi"
         metin, _ = claude_json(ham, is_, t0, bool(claude_yalin()), "claude-code", model)
         return metin, None
     except Exception as e: return None, e.__class__.__name__

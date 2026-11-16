@@ -255,7 +255,7 @@ def _beta_maliyet(bas, son, toplanti_dk):
     cg = [r for r in _jsonl("claude-cagri.jsonl") if bas <= (_ts(r) or 0) < son]
     isler = {}
     for r in cg:
-        ad = str(r.get("is") or "").replace("-", "_")
+        ad = str(r.get("is") or "").replace("-", "_").split(":")[0]  # v0.244.0: "telaffuz:sozluk" → telaffuz (alt tür beta paketine gitmez; izin listesi aynı)
         ad = ad if ad in teshis.SAYIM["claude_is"] else "diger"
         x = isler.setdefault(ad, {"cagri": 0, "giris": 0, "cikti": 0, "onbellek_yaz": 0, "onbellek_oku": 0, "dolar": 0.0})
         x["cagri"] += 1; x["dolar"] += float(r.get("maliyet") or 0)
