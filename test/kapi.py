@@ -87,7 +87,7 @@ ok("tablo: K1 işleri var (6 değerlendirici, düşünme, eylem, talimat, e-post
    "degerlendir:eposta", "degerlendir:mutabakat", "dusunme", "eylem", "talimat", "eposta_taslak"}, sorted(N["KAPI_TABLO"]))
 ok("mesai içinde, olağan durumda hiçbir iş engellenmez", all(N["kapi_engel"](k, CAR) is None for k in N["KAPI_TABLO"]), {k: N["kapi_engel"](k, CAR) for k in N["KAPI_TABLO"]})
 N["DURUM"]["gizli"] = True
-ok("gizli kip: tüm arka plan işleri (içeriksiz giriş yoklaması hariç) engel, ön plan serbest", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ARKA if k not in GIZLISIZ) and N["kapi_engel"]("giris", CAR) is None and all(N["kapi_engel"](k, CAR) is None for k in ON))
+ok("gizli kip: tüm arka plan işleri (içeriksiz giriş yoklaması hariç) engel, ön plan serbest (K4: web araştırması hariç)", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ARKA if k not in GIZLISIZ) and N["kapi_engel"]("giris", CAR) is None and all(N["kapi_engel"](k, CAR) is None for k in ON if k != "arastirma") and N["kapi_engel"]("arastirma", CAR) == "gizli kip")
 N["DURUM"]["gizli"] = False; N["DURUM"]["toplanti"] = True
 ok("toplantı sürerken: arka plan engel (toplantı sürüyor; okunan sözcük telaffuzu hariç), ön plan serbest", all(N["kapi_engel"](k, CAR) == "toplantı sürüyor" for k in ARKA if k not in TOPLANTISIZ) and N["kapi_engel"]("telaffuz", CAR) is None and all(N["kapi_engel"](k, CAR) is None for k in ON))
 N["DURUM"]["toplanti"] = False; N["DURUM"]["sessiz"] = True
@@ -388,6 +388,25 @@ N["eylem_model"]("talimat istemi", is_adi="talimat")
 ok("K3: şema verilmeyen çağrıda (talimat) --json-schema yok", "--json-schema" not in D["args"], D["args"])
 cj, _ = N["claude_json"](json.dumps({"result": "metin", "structured_output": {"kararlar": []}, "usage": {}}), "x", time.time(), False)
 ok("K3: claude_json structured_output varsa onu JSON metni olarak döndürür", json.loads(cj) == {"kararlar": []}, cj)
+
+# --- K4 (16 Kasım 2026): kalıcı süreç açılışı ve araştırma -------------------------------------------------------------------------
+N = kur("k4"); D = N["DURUM"]
+ok("K4: kapi_ac izin verir, açılış sayılır (bugun.acilis), satır yazılmaz", N["kapi_ac"]("konus-ac") is None and N["kapi_ac"]("konus-ac") is None and N["kapi_view"]()["bugun"]["acilis"] == {"konus-ac": 2} and satirlar(N) == [], N["kapi_view"]()["bugun"])
+D["gizli"] = True; D["toplanti"] = True
+ok("K4: Konuş, çeviri ve toplantı oturumu açılışı gizli kipte ve toplantıda engellenmez (kurallar kendi bölümlerinde)", all(N["kapi_ac"](x) is None for x in ("konus-ac", "ceviri-ac", "toplanti-ac")))
+ok("K4: araştırma gizli kipte engel", N["kapi_engel"]("arastirma") == "gizli kip")
+D["gizli"] = False; D["saat"] = CAR + 13 * 3600
+ok("K4: araştırma ön plan: gece ve toplantıda izinli", N["kapi_engel"]("arastirma") is None)
+N["KAPI_TABLO"]["deneme-ac"] = dict(N["_KAPI_ARKA"])
+ok("K4: kapi_ac engelde nedeni döndürür ve sayar", N["kapi_ac"]("deneme-ac") in ("gece", "toplantı sürüyor") and N["kapi_view"]()["engel"], N["kapi_view"]()["engel"])
+
+try:
+    N = kur("k4-ar", bolumler=("kapi.py", "web-arastirma.py")); D = N["DURUM"]; cag = []
+    N["ar_calistir"] = lambda konu, kurum="": cag.append(konu) or {"ok": True, "cikti": "METİN: x", "sorgular": [], "sayfalar": [], "maliyet": 0.1, "tur": 1, "api_ms": 1, "hata": None, "sure_ms": 5}
+    r1 = N["ar_kapidan"]("konu"); D["gizli"] = True; r2 = N["ar_kapidan"]("konu2"); D["gizli"] = False
+    ok("K4: araştırma kapıdan çağrılır; gizli kipte Claude çağrılmaz ('kapı: gizli kip')", r1.get("ok") and cag == ["konu"] and r2.get("hata") == "kapı: gizli kip" and not r2.get("ok"), (r1, r2, cag))
+    ok("K4: araştırmada kapı satır yazmaz (satırı ar_kaydet yazar)", [x for x in satirlar(N) if x.get("is") == "arastirma"] == [], satirlar(N))
+except Exception as e: ok("K4: web-arastirma.py kapı ad alanında yüklenir", False, repr(e))
 
 shutil.rmtree(T, ignore_errors=True)
 print(f"\n{'TAMAM' if not HATA else 'KALDI'}: {len(HATA)} hata")

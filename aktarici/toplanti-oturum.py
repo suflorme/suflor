@@ -218,6 +218,8 @@ def topo_kisilik_blogu():  # 10 Kasım: pano sohbeti tek ses — toplantı kişi
     except Exception as e: print(f"KİŞİLİK: toplantı oturumu kişilik metni kurulamadı ({e.__class__.__name__})"); return ""
 def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
     # cl: claude yolu · model: ayar claude_model · ky: toplanti-kanca.json (ya da None) · ilk: ilk kullanıcı iletisi · sid: kaldığı yerden (--resume)
+    kn = kapi_ac("toplanti-ac") if "kapi_ac" in globals() else None  # v0.246.0 (K4): açılış ve bekçinin yeniden açışı kapıdan (izin + sayaç; tur kaydı oturumda)
+    if kn: TOPO["hata"] = "kapı: " + kn; return False
     with TOPO["kilit"]:
         TOPO["izin_toplam"] = 0  # deneme toplantısı kipi: açılışta kaç izin kartı çıktı (aktarici/duman.py)
         if topo_canli(): toplanti_oturum_kapat("yeni başlatma")

@@ -2146,10 +2146,8 @@ def hazirla_ac():  # v0.76.0 (T6): sihirbazı yalnız proje hazırlığı ekranl
     print("HAZIRLIK: sihirbaz panodan açıldı"); return {"ok": True}
 def modelleri_isit():  # panodan başlatınca Whisper (v0.13.12: ses izi içinde) toplantıdan önce yüklenir (~5 sn)
     if STATE["whisper"].get("durum") != "yok": WH_Q.put({"isinma": True, "kuyruga": time.time()}); _isci_baslat()
-def claude_yolu():
-    for y in [AYAR.get("claude"), os.path.expanduser("~/.local/bin/claude"), os.path.expanduser("~/.claude/local/claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude", shutil.which("claude")]:
-        if y and os.path.isfile(os.path.expanduser(y)) and os.access(os.path.expanduser(y), os.X_OK): return os.path.expanduser(y)
-    return None
+def claude_yolu():  # v0.246.0 (K4): tek arama yolu beyin.py claude_yolu (ayardaki yol önce); eskiden burada aynı kodun kopyası vardı
+    return BEYIN.claude_yolu(AYAR)
 def claude_girisli(cl):
     # girişsiz Claude Code'da Terminal açılıp /login bekliyordu, toplantı izlenmiyordu — açmadan uyar. Yalnız "loggedIn: false"
     # kesin gelince engeller; sorgu bozulursa (eski sürüm, zaman aşımı) başlatma sürer. Çıktıdaki e-posta vb. yazılmaz.

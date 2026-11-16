@@ -102,6 +102,8 @@ def _cv_baslat(y=None):  # yeni `claude -p` (ya da beyin.py) süreci (ya da None
         cl = claude_yolu()
         if not cl: _CV["hata"] = "Claude Code yok"; return None
         args = [cl] + BEYIN.ceviri_args(AYAR, CEVIRI_ISTEM[dil], sec["model"])  # v0.121.1: beyin katmanı (yedekte Claude modeli)
+    kn = kapi_ac("ceviri-ac") if "kapi_ac" in globals() else None  # v0.246.0 (K4): kalıcı sürecin açılışı kapıdan (izin + sayaç; tur kaydı _cv_kayit'ta)
+    if kn: _CV["hata"] = "kapı: " + kn; return None
     try: p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=BASE, text=True, encoding="utf-8", bufsize=1)
     except OSError as e: _CV["hata"] = f"{e.__class__.__name__}"; return None
     p.suflor_tur, p.suflor_sag, p.suflor_model = sec["tur"], sec.get("saglayici") or "claude-code", sec["model"]; return p

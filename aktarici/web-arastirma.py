@@ -130,6 +130,14 @@ def ar_calistir(konu, kurum="", zaman=AR_ZAMAN):  # → {"ok", "cikti", "sorgula
         if p.poll() is None: p.kill()
     if not o["ok"] and not o["hata"]: o["hata"] = "zaman aşımı" if time.time() - t0 >= zaman - 1 else "çıktı yok"
     o["sure_ms"] = round((time.time() - t0) * 1000); return o
+def ar_kapidan(konu, kurum=""):  # v0.246.0 (K4): araştırma Claude kapısından (ön plan; gizli kipte engel). Satırı ar_kaydet yazar (sorgu/sayfa sayılarıyla), kapı yazmaz
+    if "kapi_iste" not in globals(): return ar_calistir(konu, kurum)
+    s = {}
+    def cagri():
+        s.update(ar_calistir(konu, kurum)); return (s.get("cikti") if s.get("ok") else None), (None if s.get("ok") else (s.get("hata") or "çıktı yok"))
+    k = kapi_iste("arastirma", cagri)
+    if k["sonuc"] == "engel": return {"ok": False, "cikti": "", "sorgular": [], "sayfalar": [], "maliyet": 0.0, "tur": None, "api_ms": None, "hata": "kapı: " + k["neden"], "sure_ms": 0, "kapi": "engel"}
+    return s
 def _ar_slug(konu): return (_re_ar.sub(r"[^a-z0-9]+", "-", _ar_k(konu).translate(str.maketrans("çğıöşü", "cgiosu"))).strip("-") or "konu")[:40]
 def ar_kaydet(konu, kanal, sonuc, yerel):  # canli/arastirma/<id>.json (+ .md, 0600) ve claude-cagri.jsonl is: arastirma → {id, kayit}
     simdi = datetime.datetime.now().astimezone(); i = simdi.strftime("%Y%m%d-%H%M%S") + "-" + _ar_slug(konu); ay = ar_ayristir(sonuc.get("cikti"))
@@ -155,7 +163,7 @@ def ar_kaydet(konu, kanal, sonuc, yerel):  # canli/arastirma/<id>.json (+ .md, 0
     except OSError as e: print(f"ARAŞTIRMA: kayıt yazılamadı ({e.__class__.__name__})")
     o = {"at": kayit["at"], "is": "arastirma", "saglayici": "claude-code", "model": BEYIN.arastirma_model(AYAR), "sure_ms": sonuc.get("sure_ms"), "api_ms": sonuc.get("api_ms"), "duvar_ms": sonuc.get("sure_ms"),
          "tur": sonuc.get("tur"), "maliyet": kayit["maliyet"] or 0, "sorgu": kayit["sorgu_sayisi"], "sayfa": kayit["sayfa_sayisi"], "kaynak": kayit["kaynak_sayisi"], "bagimsiz": kayit["bagimsiz_kaynak"],
-         "kanal": kanal, "hata": kayit["durum"] != "ok"}
+         "kanal": kanal, "hata": kayit["durum"] != "ok", "sonuc": "tamam" if kayit["durum"] == "ok" else "hata", "plan": "on"}  # v0.246.0: kapı satırı biçimi (sonuc, plan)
     with LOCK: write([(os.path.join(BASE, "claude-cagri.jsonl"), json.dumps(o, ensure_ascii=False) + "\n")])
     return kayit
 def ar_cevap(kayit):  # Konuş cevabı: sesli kısa özet, "---", kaynaklı tam metin (pano "---" sonrasını ayrıntı gösterir)
@@ -173,7 +181,7 @@ def _ar_is(konu, kanal, metin, sesli_ac):
             bekledi.append(1); seslendir(_t("Araştırıyorum, biraz sürebilir.", "Researching, this may take a moment."), kuyruk=True)
     tm = threading.Timer(AR_BEKLE_SN, bekle); tm.daemon = True; tm.start()
     try:
-        kurum, yerel = ar_yerel(konu); sonuc = ar_calistir(konu, kurum); kayit = ar_kaydet(konu, kanal, sonuc, yerel)
+        kurum, yerel = ar_yerel(konu); sonuc = ar_kapidan(konu, kurum); kayit = ar_kaydet(konu, kanal, sonuc, yerel)
         sesli, yaz = ar_cevap(kayit); ARASTIRMA["son"] = {"id": kayit["id"], "konu": konu, "durum": kayit["durum"], "sure_sn": kayit["sure_sn"], "kaynak": kayit["bagimsiz_kaynak"]}
         print(f"ARAŞTIRMA: bitti ({kayit['durum']}, {kayit['sure_sn']} sn, {kayit['sorgu_sayisi']} sorgu, {kayit['sayfa_sayisi']} sayfa, {kayit['bagimsiz_kaynak']} bağımsız kaynak, ${kayit['maliyet']}) kanal={kanal} id={kayit['id']}")
         if kayit["durum"] == "ok" and sesli and "konus_gecmis_ekle" in globals(): konus_gecmis_ekle(metin, sesli, "ortak")  # sonraki soru (Konuş süreci bu turu görmedi) bağlamı bilsin

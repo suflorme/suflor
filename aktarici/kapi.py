@@ -44,7 +44,15 @@ KAPI_TABLO = {
     "kesisim": dict(_KAPI_ARKA, tekrar_sn=0),  # günlük kesişim çözücü (relay.py kesisim_tur → kesisim-coz.py model_cagir); 07:45 yerine fiilen mesai başında
     "brifing": dict(_KAPI_ON),
     "prova": dict(_KAPI_ON),
+    # v0.246.0 (K4): doğrudan açanlar ve kalıcı süreçlerin AÇILIŞI. Araştırma tek çağrı (kapi_iste; gizli kipte yok, S208 toplantı sınırı kendi bölümünde).
+    # Kalıcı süreçler (Konuş, çeviri, toplantı oturumu) yalnız açılışta kapi_ac'tan geçer: izin + sayaç; tur içi akış, sıra ve satır kaydı kendi bölümlerinde (çift sayım yok).
+    "arastirma": dict(_KAPI_ON, gizli=True),
+    "konus-ac": dict(_KAPI_ON),  # gizli kipte de açılır (Konuş'un kendi gizli kuralları web/bilgi parçalarında)
+    "ceviri-ac": dict(_KAPI_ON),
+    "toplanti-ac": dict(_KAPI_ON),  # toplantı oturumu yalnız toplantıda çalışır: toplantı kuralı yok; yeniden açılış (bekçi) da buradan
 }
+# Kapı dışında kalan (bilerek): kurulum sihirbazı (kurulum.py giriş denemesi ve profil; hazirlik.py → proje-karti.py proje kartı — ayrı süreç, kullanıcı başlatır, kendi satırı
+# "proje-karti"), kesisim-coz.py'nin tek başına (komut satırı) kipi, toplantı oturumunun Terminal'e alınması (claude --resume; kullanıcı yürütür).
 KAPI = {"engel": {}, "engel_yazilan": {}, "ozet_t": 0.0, "son_neden": {}, "tekrar": {}, "usd": {"gun": "", "usd": 0.0}, "on": 0, "aktif": 0, "n": 0,
         "gun": {"tarih": "", "cagri": 0, "tamam": 0, "okunamadi": 0, "hata": 0, "engel": 0}}
 try: KAPI_ES = max(1, min(8, int(AYAR.get("kapi_es") or 2)))
@@ -262,6 +270,12 @@ def kapi_iste(is_turu, cagri, *, karma=None, coz=None):
         KAPI["son_neden"].pop(is_turu, None)
     return _kapi_sonuc(sonuc, neden, ham=ham, hata=hata, cozum=cozum, maliyet=mal, sure_ms=sure, olculdu=bool(olc and mal is not None))
 
+def kapi_ac(is_turu):  # K4: kalıcı sürecin açılışı → None (açılabilir) ya da neden. Bekleme ve sıra yok (Konuş gecikmesine dokunmaz); satır yok, sayaç bugun.acilis
+    is_turu = str(is_turu); simdi = float(KAPI_SAAT()); neden = kapi_engel(is_turu, simdi)
+    if neden: _kapi_engel_say(is_turu, neden, simdi); return neden
+    with KAPI_KILIT:
+        _kapi_gun_sifirla(simdi); a = KAPI["gun"].setdefault("acilis", {}); a[is_turu] = a.get(is_turu, 0) + 1
+    return None
 def kapi_view():  # /status "kapi"
     simdi = float(KAPI_SAAT())
     with KAPI_KILIT:
