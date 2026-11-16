@@ -61,6 +61,14 @@ ok("tetik: belirsiz konu '' (sorulur)", tetik("şu firmayı araştır") == "" an
 for m in ("Dökümde Orbitek'i araştır", "projede Orbitek geçen dosyaları araştır", "yarın Orbitek'i araştır", "Ali'ye Orbitek'i araştırma işi ata", "Orbitek'i araştırmayı hatırlat", "toplantı kaçta", "Orbitek bugün kaçta toplantı",
           "Mailde Orbitek'i araştır", "bu işi araştırma listesine ekle", "araştır", "Son toplantıda sahipsiz kalan işler neler"):
     ok(f"tetik yok: {m!r}", tetik(m) is None)
+# v0.249.0: sitem/soru/geçmiş cümleleri araştırma değildir; kısa emir hâlâ tetikler
+for m in ("Tamam dostum bak sana araştırma yap dediğimde ona baktım bulamadım demen büyük bir çapsızlık açıkçası, yani sen yetenekli bir bilgiyi elinde internet erişimi varken hava durumu gibi çok basit bir bilgiyi ben bulamadım deyip bana dönmen biraz hoş olmadı, beni üzdü.",
+          "Bak sana araştırma yap dediğimde bulamadım demen hoş değil", "sana araştır dedim ama bulamadın", "neden araştırmadın", "geçen sefer araştırdığın konu neydi", "araştırma yapmayı sever misin",
+          "Araştırma yaptığında bulamadım dedin, bu hoş değil. Bir daha böyle yapma", "araştır dediğimde ona baktım dedin"):
+    ok(f"tetik yok (sitem/soru): {m[:50]!r}", tetik(m) is None or (print("   alındı:", repr(tetik(m))) and False))
+for m, b in (("yapay zekâ ajanları hakkında araştırma yap", "yapay zekâ ajanları"), ("araştır: Türkiye'de elektrikli araç satışları 2026", "Türkiye'de elektrikli araç satışları 2026"),
+             ("OpenAI'nin son modelini araştırır mısın", "OpenAI'nin son modelini"), ("bu konuyu internette araştır", ""), ("Orbitek Yazılım'ı araştırabilir misin lütfen", "Orbitek Yazılım"), ("research Orbitek Software", "Orbitek Software")):
+    ok(f"tetik (emir): {m!r} → {b!r}", tetik(m) == b or (print("   alındı:", repr(tetik(m))) and False))
 # istem sınırı
 ist = ns["ar_istem"]("Orbitek", "Orbitek Holding")
 ok("istemde konu, kurum ipucu, tarih, ≥3 bağımsız kaynak ve 'doğrulanamadı' kuralı var", "KONU: Orbitek" in ist and "Orbitek Holding" in ist and datetime.date.today().strftime("%d.%m.%Y") in ist and "3 BAĞIMSIZ kaynak" in ist and "doğrulanamadı" in ist)

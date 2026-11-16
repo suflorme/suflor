@@ -53,6 +53,18 @@ try:
     ist = ns["konus_istem"]()
     ok("Konuş istemi: kişilik metni sonda, biçim kuralları önce, neşeli ünlem satırı çıktı",
        ist.split("\n\nYanlış yazılmış sözcükler")[0].endswith("KİŞİLİK-İŞARETİ") and ist.rstrip().endswith("bilgi sorusunda soru hiç yok.") and "biçim kuralları" in ist.split("## Kişilik")[0][-400:] and "'Vay!'" not in ist and "en çok dört cümle" in ist and "Şey," not in ist)
+    # v0.249.0 (16 Kasım): kıvrak zekâ bloğu her kişilikte, kişilik metninden önce; web isteminde anlık değerde sayfa okumadan "bulamadım" yok
+    ok("kıvrak zekâ: sitem kabul + hatayı üstlen + işi şimdi yap, önceki tura bağlan, belirsizde varsayım, rapor dili yok; kişilik metninden önce",
+       "[Kıvrak zekâ — bütün kişilikler için]" in ist and "Sitem" in ist and "hatayı üstlen" in ist and "'başka yere bak'" in ist and "en mantıklı varsayımla" in ist
+       and "güven düzeyi" in ist and ist.index("[Kıvrak zekâ") < ist.index("## Kişilik") and ist.count("[Kıvrak zekâ") == 1)
+    wtr = ns["web_istem"](True)
+    ok("web istemi (tr): anlık değerde tek arama yetmez, WebFetch ile sayfa, 'Bulamadım' en az iki denemeden sonra", "tek aramayla yetinme" in wtr and "1–2 güvenilir sayfayı WebFetch ile aç" in wtr
+       and "en az iki farklı denemeden sonra" in wtr and "kaynağın adını ve saatini" in wtr and ns["web_istem"](False) == "")
+    ns["_t"] = lambda a, b: b
+    wen = ns["web_istem"](True); ken = ns["kivrak_istem"]()
+    ok("İngilizce ikizler: kıvrak zekâ ve web ısrarı", "[Quick wit — for every persona]" in ken and "own the mistake" in ken and "'look elsewhere'" in ken
+       and "one search is not enough" in wen and "at least two different attempts" in wen and "with WebFetch" in wen)
+    ns["_t"] = lambda a, b: a
     # v0.61.0: iki kişilik — toplantı dışı kişilik (ayar kisilik_toplanti_disi), adla seçim, toplantıda yalnız kulağa
     kd2 = os.path.join(T, "kisilik2.md")
     open(kd2, "w", encoding="utf-8").write("---\nad: Matlas\nhitap: Matlas, Oh Matlas\nhitap_bicimi: sen\nselam: Selam, ben Matlas.\ntelaffuz: Sir=sör\n---\n## Kişilik: Matlas\nAdın Matlas. Sen dersin. İKİNCİ-İŞARET\n")

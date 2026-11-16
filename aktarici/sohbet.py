@@ -122,7 +122,7 @@ def sohbet_basla():
     _konus_kur(durum="dinliyor", soru=None, cevap="", hata=None, olcum=None, kaynak="sohbet")
     if float(AYAR.get("hihi_tur_esik", TUR_ESIK)) > 0: threading.Thread(target=tur_baslat, daemon=True).start()
     threading.Thread(target=_sohbet_bekci, args=(SOHBET["sira"],), daemon=True).start()
-    if mik: threading.Thread(target=ag_hazirla, daemon=True).start()  # Adım 5: Silero + kısa söz tanıyıcı (yerel_araya_girme kapalıysa hiçbiri)
+    if mik: SOHBET["ag_say0"] = dict(ARAYA["say"]); threading.Thread(target=ag_hazirla, daemon=True).start()  # Adım 5: Silero + kısa söz tanıyıcı (yerel_araya_girme kapalıysa hiçbiri)
     print("SOHBET: açıldı" + (f" (yerel ses yolu, {'hoparlör — VPIO açık' if vpio else 'kulaklık — VPIO kapalı'})" if mik else "")); return {"ok": True, "yerel": mik}
 def _sohbet_yerel_kapat(sira, hemen):  # sohbet bitti: yerel mikrofon kapanır. Okuma sürüyorsa bitmesi beklenir (mik_kapat motoru yeniden kurar, çalan akışı keser); bu arada yeni sohbet açıldıysa dokunulmaz
     kapat = _ky_islev("ky_mik_kapat")
@@ -147,7 +147,15 @@ def sohbet_kapat(neden, soz=None, hemen=False):
     if "_agt_kapat" in globals(): _ag_sifirla(); threading.Thread(target=_agt_kapat, daemon=True).start()  # Adım 5: kısa söz tanıyıcı sohbetle kapanır
     if soz: seslendir(soz, kuyruk=True)
     _ag_olay("sohbet_sure", sure_ms=round((time.time() - SOHBET["t_ac"]) * 1000), yerel=yerel, hoparlor=hop)
+    if yerel: _sohbet_ag_ozet(hop)
     print(f"SOHBET: kapandı ({neden}, {time.time() - SOHBET['t_ac']:.0f} sn)")
+def _sohbet_ag_ozet(hop):  # v0.249.0 (16 Kasım): kapanışta araya girme sayıları (bu sohbet) ve VPIO istendiği hâlde kapalı gelen öbek sayısı — metinsiz tanı satırı
+    try:
+        say = {k: v - SOHBET.get("ag_say0", {}).get(k, 0) for k, v in ARAYA["say"].items() if v - SOHBET.get("ag_say0", {}).get(k, 0)}
+        ky = _ky_islev("KY") or {}
+        print(f"SOHBET: araya girme özeti ({'hoparlör' if hop else 'kulaklık'}) — " + (", ".join(f"{k} {v}" for k, v in sorted(say.items())) or "aday yok")
+              + (f" · VPIO istendi, kapalı öbek {ky.get('vpio_yok_n', 0)}" if hop else ""))
+    except Exception: pass
 def _sohbet_yerel_denetle(simdi, kul):  # Adım 4: yerel yolda kulaklık/hoparlör kararı (aygit_degisti olayında ya da 5 sn'de bir) ve bağlantı denetimi. True: sohbet kapandı
     ky = _ky_islev("KY")
     if not ky: return False
@@ -213,7 +221,7 @@ def _sohbet_parca_govde(pcm, p):  # iç gövde (12 Kasım, Aşama 2 Adım 2): pa
         if time.time() - SOHBET.get("ag_t", 0) < 2.0 and SOHBET.get("biriken") is not None: SOHBET["biriken"] += pcm; return {"ok": True, "mesgul": True}  # araya girme az önce kesti, okuma bitişi henüz görünmedi
         SOHBET.pop("biriken", None); SOHBET.pop("onceki", None); SOHBET["kesme_sn"] = 0.0
         if konusma >= SOHBET_BIRIK_SN and SOHBET.get("yok_t") != SOHBET["t_okuma"]:
-            SOHBET["yok_t"] = SOHBET["t_okuma"]; print("SOHBET: okuma sürerken ses — yok sayıldı (araya girme kapalı), okuma sürüyor")
+            SOHBET["yok_t"] = SOHBET["t_okuma"]; print("SOHBET: okuma sürerken ses — yok sayıldı (" + ("araya girme yalnız ag_obek'te" if ag_etkin() else "araya girme kapalı") + "), okuma sürüyor")  # v0.249.0: ag açıkken "kapalı" yanıltıyordu
         return {"ok": True, "mesgul": True}
     if tur or ses_caliyor():  # Suflor düşünüyor ya da okuyor
         onceki = SOHBET.setdefault("onceki", collections.deque(maxlen=4)); onceki.append(pcm)  # sözün başı kaybolmasın (son ~2 sn)

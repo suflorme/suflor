@@ -12,10 +12,13 @@ ARASTIRMA = {"aktif": None, "son": None}
 _AR_ISARET = "[ARAŞTIRMA]"
 def _ar_k(s): return str(s or "").replace("İ", "i").replace("I", "ı").lower()  # 1:1 uzunluk (Türkçe i/ı), konu orijinal harfle kesilir
 _AR_EK = r"(?:derinlemesine |detaylı |ayrıntılı |kapsamlı |derin |web'?de |internette |bir güzel |ayrıca )*"
+# v0.249.0 (16 Kasım): hızlı yol yalnız kısa, açık emir cümlesinde çalışır; fiil isteğin kendisi olmalı (cümle sonunda ya da başında). "araştır dediğimde", "araştırdın mı" gibi yan/geçmiş
+# cümleler (sitem, soru) tetiklemez; belirsiz olan normal Konuş yoluna gider (model WebSearch'ü ve konuşma bağlamını görür).
+_AR_FIIL = r"(?:araştırma yap|araştır|bilgi bul|bilgi topla|bilgi ver)(?:ar mısın|ır mısın|ir misin|abilir misin|ar mısınız|ın|ınız)?(?: lütfen| bakalım)?"
 _AR_RX = [
-    _re_ar.compile(r"^(?:lütfen |bana |şunu |bir )*(?:araştır\w*|araştırma yap\w*)[:,]?\s+(?P<k>.{3,160})$"),
-    _re_ar.compile(r"^(?:lütfen |bana |bir )*(?P<k>.{3,160}?)\s+(?:hakkında|ile ilgili|konusunda|üzerine|için)\s+" + _AR_EK + r"(?:bir |biraz )?(?:araştırma yap\w*|araştır\w*|bilgi (?:bul|topla|ver)\w*)"),
-    _re_ar.compile(r"^(?:lütfen |bana |bir )*(?P<k>.{3,160}?)\s+" + _AR_EK + r"araştır\w*"),
+    _re_ar.compile(r"^(?:lütfen |bana |şunu |bir )*(?:araştırma yap(?:ar mısın|abilir misin|ın)?|araştır(?:ır mısın|abilir misin|ın)?)[:,]?\s+(?P<k>.{3,160})$"),
+    _re_ar.compile(r"^(?:lütfen |bana |bir )*(?P<k>.{3,160}?)\s+(?:hakkında|ile ilgili|konusunda|üzerine|için)\s+" + _AR_EK + r"(?:bir |biraz )?" + _AR_FIIL + r"$"),
+    _re_ar.compile(r"^(?:lütfen |bana |bir )*(?P<k>.{3,160}?)\s+" + _AR_EK + r"araştır(?:ır mısın|abilir misin|ar mısınız|ın|ınız)?(?: lütfen| bakalım)?$"),
     _re_ar.compile(r"^(?P<k>.{3,160}?)\s+(?:hakkında|ile ilgili)\s+ne\s+(?:biliniyor|biliyoruz|biliyorsun|var|duydun|çıkıyor|bulabilirsin)"),
     _re_ar.compile(r"^(?P<k>(?:dünkü|bugünkü|az önceki|geçen haftaki|son|dün)\s+.{0,80}?(?:olay|gelişme|haber|saldırı|deprem|kaza|açıklama|karar)\w*)\s+(?:ne|neydi|nedir|neymiş|ne oldu|hakkında ne)\b"),
     _re_ar.compile(r"^(?:please )?(?:research|look up|look into|investigate)\s+(?P<k>.{3,160})$"),
@@ -26,15 +29,23 @@ _AR_IC = _re_ar.compile(r"\b(projede|projemizde|dosya\w*|döküm\w*|kayıtlar\w*
 _AR_ERTELE = _re_ar.compile(r"\b(yarın|haftaya|hatırlat\w*|not al\w*|not et\w*|yapılacak\w*|listeme|iş ata\w*|ata|ekle|kuyruğa|ayarla|planla)\b")
 _AR_DEVAM = _re_ar.compile(r"^(?:ve |de |da |ayrıca |sonra )?(?:bana |bize )?(?:bilgi|ayrıntı|detay)\w*(?: ver\w*| ekle\w*)?$|^(?:ve |de |da )?(?:bana |bize )?(?:anlat\w*|özetle\w*)$")  # öznesiz devam cümlesi: konu önceki konuşmada, araştırma kipi değil
 _AR_BELIRSIZ = _re_ar.compile(r"^(?:şu|bu|o|şu anki|bahsettiğim|az önce bahsettiğim)\s+\w+$")
+_AR_DOLGU = _re_ar.compile(r"^(?:tamam|dostum|bak|sana|bana|hey|ya|yani|şey|abi|ama|ben|sen|bence|ded\w*|demiş\w*)\b")
+def _ar_hitapla(konu):  # konu asistanın adıyla başlıyorsa ("Marvin, …") hitaptır; adlar kişiliklerden (hitap), bilinmiyorsa yalnız dolgu denetimi
+    try: adlar = {_ar_k(x) for k in kisilikler() for x in (k.get("hitap") or []) + [k.get("ad") or ""] if x}
+    except Exception: adlar = set()
+    w = _re_ar.split(r"[\s,]+", _ar_k(konu), 1)[0]
+    return bool(w) and w in adlar
 def ar_tetik(metin):  # → None (araştırma isteği değil) | "" (konu belirsiz: sorulacak) | konu (kullanıcının kendi sözünden, orijinal harfle)
     m = " ".join(str(metin or "").split()); k = _ar_k(m).rstrip(" .!?…"); k0 = m[:len(k)]
     if len(k) < 8 or _AR_IC.search(k) or _AR_ERTELE.search(k): return None
+    if len(k.split()) > 25 or _re_ar.search(r"[!?…]\s+\S|(?<=[a-zçğıöşü]{3})\.\s+\S", k): return None  # v0.249.0: uzun ya da çok cümleli konuşma emir değil
     for rx in _AR_RX:
         r = rx.search(k)
         if not r: continue
         konu = k0[r.start("k"):r.end("k")].strip(" ,.:;!?…'\"’")
         konu = _re_ar.sub(r"['’]\w{1,4}$", "", konu).strip()
         if _re_ar.sub(r"(?i)^(?:lütfen|bana|şunu|bir)\s+", "", konu) != konu: konu = _re_ar.sub(r"(?i)^(?:lütfen|bana|şunu|bir)\s+", "", konu)
+        if _AR_DOLGU.match(_ar_k(konu)) or _ar_hitapla(konu) or len(konu.split()) > 14: return None  # v0.249.0: "tamam dostum bak sana…", "dediğimde…" konu değil, hitap/sitem
         if _AR_DEVAM.match(_ar_k(konu)): return None  # "araştır ve bana bilgi ver": konu yok, normal Konuş yolu (önceki konuşmayı görür)
         if len(konu) < 3: return ""
         return "" if _AR_BELIRSIZ.match(_ar_k(konu)) else konu[:160]

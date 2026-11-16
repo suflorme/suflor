@@ -13,7 +13,12 @@ KY_BAGLAN_ARA_SN, KY_BAGLAN_AZAMI_SN, KY_CAL_BASLA_SN, KY_DUSME_BEKLE_SN, KY_SES
 KY_SAY_SR = 22050  # say -o çıkışı (Mac sesi); yardımcı 48 kHz'e kendisi çevirir
 KY = {"s": None, "bagli": False, "dongu": None, "dur": False, "kilit": threading.RLock(), "yaz_kilit": threading.Lock(), "mik": False, "vpio": False, "calan": {}, "sira": 0,
       "durum": {}, "dusme_bit": 0.0, "dusme": 0, "kanca": None, "mik_isle": None, "mik_q": None, "mik_kusak": 0, "mik_tamp": bytearray(), "mik_p": None, "son_t": 0.0, "anahtar_hata": False, "vpio_istek": False, "vpio_bekle": 0.0, "devam_vpio": None,
-      "sessiz": 0, "sessiz_gen": 0, "sessiz_acik": False, "mik_atilan": 0, "mik_n": 0, "saat_uyari": False, "aygit_say": 0, "obek_kanca": None}
+      "sessiz": 0, "sessiz_gen": 0, "sessiz_acik": False, "mik_atilan": 0, "mik_n": 0, "saat_uyari": False, "aygit_say": 0, "obek_kanca": None,
+      "mik_ac_t": 0.0, "vpio_uyusmaz": 0, "vpio_yok_n": 0}
+# v0.249.0 (16 Kasım): istenen VPIO açıkken yardımcı öbeklerde/nabızda vpio:false bildirirse (uyum payı KY_VPIO_UYUM_SN sonra) mik_ac{vpio:true} yeniden; açılış başına en çok
+# KY_VPIO_YENIDEN_EN_COK kez (toplantı uygulaması mikrofonu gerçekten tutuyorsa döngü olmasın). 16 Kasım denemesi: yardımcıda 13 Kasım'dan kalan bayat "toplantı mikrofonda"
+# durumu motoru VPIO'suz kurdu, durum hemen temizlendi ama olay gitmedi; aktarıcı VPIO açık sandı, hoparlörde yankı süzülmedi, "dur" hiç aday olmadı.
+KY_VPIO_UYUM_SN, KY_VPIO_YENIDEN_EN_COK = 2.0, 2
 def ky_etkin():  # ayar yerel_konus true VE geliştirici: değilse bu bölüm hiçbir şey yapmaz
     try: return AYAR.get("yerel_konus") is True and bool(gelistirici_mi())
     except Exception: return False
@@ -191,7 +196,7 @@ def _ky_gizli():
 def ky_mik_ac(vpio):  # → bool. Toplantı sürerken ya da gizli kipte açılmaz; kulaklıkta vpio=False (karar çağıranın: Adım 4)
     if not ky_hazir() or _ky_toplanti() or _ky_gizli(): return False
     if not ky_gonder({"t": "mik_ac", "vpio": bool(vpio)}): return False
-    with KY["kilit"]: KY.update(mik=True, vpio=bool(vpio), vpio_istek=bool(vpio), devam_vpio=None, vpio_bekle=0.0); KY["mik_kusak"] += 1
+    with KY["kilit"]: KY.update(mik=True, vpio=bool(vpio), vpio_istek=bool(vpio), devam_vpio=None, vpio_bekle=0.0, mik_ac_t=time.time(), vpio_uyusmaz=0, vpio_yok_n=0); KY["mik_kusak"] += 1
     if KY["sessiz"]: _ky_sessiz_gonder()
     return True
 def ky_mik_kapat(neden=None):
@@ -228,6 +233,11 @@ def _ky_mik_isci():  # mikrofon öbekleri okuma iş parçacığını bekletmesin
         try: (KY["mik_isle"] or _ky_mik_sohbete)(pcm, {"pcm": base64.b64encode(pcm).decode()})
         except Exception as e: print(f"YEREL KONUŞ: mikrofon öbeği işlenemedi ({e.__class__.__name__}: {str(e)[:80]})")
 # --- Olaylar, okuma, bağlantı, bekçi -------------------------------------------------------------------------------------------------
+def _ky_vpio_denetle(o):  # v0.249.0: istenen VPIO açık, yardımcı kapalı diyor → bekçi mik_ac{vpio:true}'yı yeniden yollar (vpio_bekle yolu)
+    if o.get("vpio") is not False or not KY["mik"] or not KY["vpio_istek"] or KY["vpio_bekle"]: return
+    if time.time() - KY["mik_ac_t"] < KY_VPIO_UYUM_SN or KY["vpio_uyusmaz"] >= KY_VPIO_YENIDEN_EN_COK: return
+    KY["vpio_uyusmaz"] += 1; KY["vpio"] = False; KY["vpio_bekle"] = time.time() - 3  # bekçi bir sonraki turda (≤ 0,5 sn) yeniden ister
+    print(f"YEREL KONUŞ: VPIO istendi ama yardımcı kapalı bildiriyor — mik_ac{{vpio:true}} yeniden istenecek ({KY['vpio_uyusmaz']}. kez)")
 def _ky_olay(o):
     t = o.get("t")
     if t == "mik":
@@ -236,6 +246,8 @@ def _ky_olay(o):
             if KY["mik"]: ky_mik_kapat("gizli kip" if _ky_gizli() else "toplantı")
             return
         if not KY["mik"]: return  # mik_kapat sonrası yoldaki öbekler
+        if o.get("vpio") is False and KY["vpio_istek"]: KY["vpio_yok_n"] += 1  # tanı sayacı (sohbet kapanışında yazılır)
+        _ky_vpio_denetle(o)
         try: KY["mik_q"].put_nowait((KY["mik_kusak"], o))
         except queue.Full: KY["mik_atilan"] += 1
     elif t == "cal_basladi":
@@ -255,6 +267,7 @@ def _ky_olay(o):
         if not KY["bagli"]: KY["bagli"] = True; print("YEREL KONUŞ: yardımcı bağlantıyı kabul etti")  # anahtar doğruysa yardımcı hemen nabız yazar (kabul işareti)
         KY["durum"] = {k: v for k, v in o.items() if k != "t"}
         if "vpio" in o and KY["mik"] and not o["vpio"] and KY["vpio"] and t == "nabiz": KY["vpio"] = False
+        if t == "nabiz": _ky_vpio_denetle(o)
     elif t == "toplanti_mik": KY["vpio_bekle"] = time.time(); print(f"YEREL KONUŞ: toplantı uygulaması mikrofonu aldı ({str(o.get('uygulama'))[:30]}) — VPIO {'kapandı' if o.get('vpio_kapatildi') else 'zaten kapalı'}"); KY["vpio"] = False
     elif t == "aygit_degisti": KY["aygit_say"] += 1; print(f"YEREL KONUŞ: aygıt değişti (kulaklık={o.get('kulaklik')})")
     elif t == "hata":
@@ -313,7 +326,7 @@ def _ky_bekci():  # toplantı ya da gizli kip: mikrofon 0,5 sn içinde kapanır 
             elif _ky_gizli(): ky_mik_kapat("gizli kip")
             elif KY["vpio_bekle"] and not KY["vpio"] and KY["vpio_istek"] and time.time() - KY["vpio_bekle"] > 3:  # toplantı uygulaması mikrofonu bırakınca yardımcı VPIO'yu kendiliğinden açmaz: yeniden iste
                 KY["vpio_bekle"] = 0.0
-                if sohbet and ky_gonder({"t": "mik_ac", "vpio": True}): KY["vpio"] = True; print("YEREL KONUŞ: toplantı mikrofonu bırakıldı — mik_ac{vpio:true} yeniden")
+                if sohbet and ky_gonder({"t": "mik_ac", "vpio": True}): KY.update(vpio=True, mik_ac_t=time.time()); print("YEREL KONUŞ: VPIO yeniden istendi — mik_ac{vpio:true}")
         elif KY["devam_vpio"] is not None and KY["bagli"] and sohbet and not _ky_toplanti() and not _ky_gizli():  # toplantı bitti, sohbet açık: mikrofon geri
             v = KY["devam_vpio"]; KY["devam_vpio"] = None
             if ky_mik_ac(v): print("YEREL KONUŞ: toplantı bitti — mikrofon yeniden açıldı")

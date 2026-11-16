@@ -556,7 +556,9 @@ func toplantiDegisti(_ yeni: String?) {
     }
 }
 func toplantiYokla() {
-    guard !kuru, mikAcik || (motor?.vp ?? false) else { mikIlk.removeAll(); return }
+    // v0.249.0 (16 Kasım): mikrofon kapalıyken toplantı durumu da silinir; yoksa bayat kalıp (13 Kasım → 16 Kasım) sonraki mik_ac{vpio:true}'yu sessizce VPIO'suz kurar.
+    // Uygulama hâlâ mikrofondaysa açılıştan ~1 sn sonra yeniden yakalanır ve toplanti_mik olayı gider.
+    guard !kuru, mikAcik || (motor?.vp ?? false) else { mikIlk.removeAll(); if !kuru { toplantiMik = nil }; return }
     let t = uyanik(), simdiki = mikrofonluAileler()
     for a in simdiki where mikIlk[a] == nil { mikIlk[a] = t }
     for a in Array(mikIlk.keys) where !simdiki.contains(a) { mikIlk[a] = nil }

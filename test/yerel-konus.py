@@ -132,6 +132,19 @@ sun.gonder({"t": "toplanti_mik", "uygulama": "x", "vpio_kapatildi": True}); bekl
 ok("toplanti_mik sonrası (toplantı yok, sohbet açık) mik_ac{vpio:true} yeniden", bekle(lambda: len(sun.tipler("mik_ac")) > ma, 2))
 SOH["acik"] = False; n["ky_mik_ac"](True); DURUM["toplanti"] = True; bekle(lambda: not n["KY"]["mik"], 1.5); ma = len(sun.tipler("mik_ac")); DURUM["toplanti"] = False; time.sleep(1.0)
 ok("sohbet kapalıysa toplantı bitince mikrofon açılmaz", len(sun.tipler("mik_ac")) == ma); SOH["acik"] = True
+# 9c. v0.249.0 (16 Kasım hoparlör denemesi): VPIO istendi ama yardımcı vpio:false öbek/nabız yolluyor (bayat toplantı durumu, olay gelmedi) → mik_ac{vpio:true} yeniden
+bekle(lambda: n["KY"]["devam_vpio"] is None, 2); time.sleep(0.6)  # 9b'nin bekçi yeniden açışı bitsin
+ma = len(sun.tipler("mik_ac")); n["ky_mik_ac"](True); bekle(lambda: len(sun.tipler("mik_ac")) > ma, 1); ma = len(sun.tipler("mik_ac"))
+sun.gonder({"t": "mik", "b64": sil, "vpio": False}); time.sleep(0.8)
+ok("uyum payı içinde (mik_ac'tan hemen sonra) vpio:false öbek yeniden istetmez", len(sun.tipler("mik_ac")) == ma)
+n["KY"]["mik_ac_t"] = time.time() - 3; sun.gonder({"t": "mik", "b64": sil, "vpio": False})
+ok("uyum payından sonra vpio:false öbek → mik_ac{vpio:true} yeniden", bekle(lambda: len(sun.tipler("mik_ac")) > ma and sun.tipler("mik_ac")[-1]["vpio"] is True, 1.5))
+for i in range(4):
+    n["KY"]["mik_ac_t"] = time.time() - 3; sun.gonder({"t": "nabiz", "vpio": False, "mik": True, "cal": False, "surum": "t"}); time.sleep(0.7)
+ok("yardımcı VPIO'yu açamıyorsa açılış başına en çok 2 kez yeniden istenir", len(sun.tipler("mik_ac")) == ma + 2)
+ma = len(sun.tipler("mik_ac")); n["ky_mik_ac"](False); bekle(lambda: len(sun.tipler("mik_ac")) > ma, 1); ma = len(sun.tipler("mik_ac")); n["KY"]["mik_ac_t"] = time.time() - 3
+sun.gonder({"t": "mik", "b64": sil, "vpio": False}); time.sleep(0.8); ok("kulaklıkta (vpio istenmedi) vpio:false öbek yeniden istetmez", len(sun.tipler("mik_ac")) == ma)
+n["ky_mik_kapat"]()
 # kesildi (motor yeniden kuruldu): çalıcı kesildi
 c = n["ky_cal_ac"](24000, kayit=SES); sun.gonder({"t": "kesildi", "id": c.id})
 ok("kesildi olayı çalıcıyı bitirir (returncode -15, kesildi)", bekle(lambda: c.poll() == -15) and c.kesildi)
