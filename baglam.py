@@ -43,7 +43,10 @@ SOZLUK_KOPYA = os.path.join(AYAR["uygulama"], "dis-sozluk.tsv")  # dış sözlü
 # (1 Ekim: .xlsx'in eski .md dışa aktarımları silindi, zip'i _arsiv/'de; _arsiv dizine girmez.)
 # her alanda: _yedek, _arsiv, .claude, .git, Suflor kod klasörü; ayar.json "haric" ile alan kendi listesini ekler
 HARIC_GENEL = ["_yedek", "_arsiv", ".claude", ".git", "suflor", os.path.basename(str(AYAR.get("kod") or "").rstrip("/")) or "suflor"]
-HARIC = list(dict.fromkeys(HARIC_GENEL + ([CAL_ON + h for h in ("_yedek", "_arsiv", ".claude")] if CAL_ON else []) + list(AYAR.get("haric") or [])))  # ayar "haric": alanın kendi listesi (proje köküne göre)
+# v0.247.0 (16 Kasım): kökteki CLAUDE.md BİLEREK dışlanmaz — proje kartının "düzenli klasör kipi" (proje-karti.py DUZENLI_RX) onu kullanıcının kendi proje belgesi olarak okur.
+HARIC = list(dict.fromkeys(HARIC_GENEL + ([CAL_ON + h for h in ("_yedek", "_arsiv", ".claude")] if CAL_ON else []) + list(AYAR.get("haric") or [])))
+def nfc(s): return unicodedata.normalize("NFC", s)  # v0.247.0: macOS yol adı NFD gelebilir (ü = u + ¨); dizin anahtarı ve karşılaştırma hep NFC
+HARIC = [nfc(h) for h in HARIC]  # ayar "haric": alanın kendi listesi (proje köküne göre)
 CANLI_HARIC = {"takvim-secilen.json", "heartbeat.json", "kart-anahtari.txt", "olcum.jsonl", "agenda.json", "hazir.json", "karneler.jsonl", "karsilastirmalar.jsonl"}  # eski sürümlerin karne ve karşılaştırma dosyaları (artık yazılmaz; kalanlar dizine girmesin)
 TEXTUTIL_UZ = {".doc", ".rtf", ".odt"}  # v0.121.0: macOS textutil ile .docx'e çevrilip docx_metin'den (Docling bunlar için LibreOffice ister)
 ODF_UZ = {".ods", ".odp"}  # v0.136.0: OpenDocument tablo/sunum — zip içindeki content.xml'den (ek bileşen yok); .odt textutil'de
@@ -142,8 +145,15 @@ def jsonl_parcala(yol, kisa):
         if not parca: parca = [v for _, v in json_dizeler(r)][:8]
         if parca: out.append((str(kid), str(r.get("konusmaci") or r.get("speaker") or ""), " · ".join(parca)[:PARCA * 2]))
     return out
+def _xlsx_sayi(f, tarihli=False):
+    # v0.247.0 (16 Kasım): arama metni için sayı hücresi — tarih biçimliyse GG.AA.YYYY (saat varsa + SS:DD), değilse kayan nokta gürültüsü yok (0,8179999999999999 → 0.818)
+    if tarihli and 0 < f < 2958466:
+        g = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=f)
+        return g.strftime("%d.%m.%Y") if f.is_integer() else g.strftime("%d.%m.%Y %H:%M")
+    if f != f or f in (float("inf"), float("-inf")): return str(f)
+    return str(int(f)) if f.is_integer() and abs(f) < 1e15 else "%.10g" % f
 def xlsx_parcala(yol):
-    z = zipfile.ZipFile(yol); out = []
+    z = zipfile.ZipFile(yol); out = []; tarihli = _xlsx_tarih_bicimleri(z)
     ss = []
     if "xl/sharedStrings.xml" in z.namelist():
         x = z.read("xl/sharedStrings.xml").decode("utf-8", "replace")
@@ -162,6 +172,10 @@ def xlsx_parcala(yol):
                 v = re.search(r"<v>(.*?)</v>", ic or "", re.S); t = re.search(r'\bt="(\w+)"', attrs)
                 if t and t.group(1) == "s" and v: s = ss[int(v.group(1))] if int(v.group(1)) < len(ss) else ""
                 elif t and t.group(1) == "inlineStr": s = re.sub(r"<[^>]+>", "", ic or "")
+                elif v and (not t or t.group(1) == "n"):
+                    s = v.group(1); s_ = re.search(r'\bs="(\d+)"', attrs)
+                    try: s = _xlsx_sayi(float(s), bool(s_) and int(s_.group(1)) in tarihli)
+                    except ValueError: pass
                 elif v: s = v.group(1)
                 else: s = ""
                 hucre.append(html.unescape(s).strip())
@@ -220,12 +234,15 @@ def odf_metin(yol, en_cok_sutun=60):  # .ods → sayfa başına "## ad" + "| a |
 GORUSME = tuple(AYAR.get("gorusme_klasorleri") or [CAL_ON + "gorusmeler/"])  # görüşme dökümü klasörleri (proje köküne göre)
 ANALIZ = tuple(AYAR.get("analiz_klasorleri") or [])
 BEN = ((str(AYAR.get("ad") or "").split() or ["-"])[0])  # kullanıcının adı: konuşmacı sayımında kendisi hariç
+# v0.247.0 (16 Kasım): sunum yalnız tam sözcükle ("Sunucu Kurulum" sunum değil; yol parçaları da bakılır) ya da sunum uzantısıyla
+SUNUM_UZ = {".pptx", ".ppt", ".key", ".odp", ".gslides"}
+SUNUM_AD = re.compile(r"\b(sunum(lar|u|un|da)?|deck)\b")
 def tur_bul(kisa):
     if kisa in BELLEK_TUR: return BELLEK_TUR[kisa][0]
     if kisa.startswith("_canli/"): return "toplanti"
     if kisa.startswith(GORUSME) or re.search(r"dokum|transkript", kisa, re.I): return "gorusme"
     if ANALIZ and kisa.startswith(ANALIZ): return "analiz"
-    if kisa.startswith(("Sunum/", "sunum/")) or re.search(r"sunum|sunu|deck", kisa, re.I): return "sunum"
+    if kisa.startswith(("Sunum/", "sunum/")) or os.path.splitext(kisa)[1].lower() in SUNUM_UZ or SUNUM_AD.search(re.sub(r"[_.\-]+", " ", norm(os.path.splitext(kisa)[0]))): return "sunum"
     if kisa.endswith((".xlsx", ".xls", ".numbers", ".ods", ".gsheet")): return "tablo"
     return "belge"
 AYLAR = {a: i + 1 for i, a in enumerate("ocak şubat mart nisan mayıs haziran temmuz ağustos eylül ekim kasım aralık".split())}
@@ -233,7 +250,10 @@ def tarih_bul(kisa, bas, mtime):
     m = re.search(r"(20\d\d)-?(\d\d)-?(\d\d)", os.path.basename(kisa))
     if m: return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
     m = re.search(r"(\d{1,2})\s+(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)\s+(20\d\d)", bas)
-    if m: return f"{m.group(3)}-{AYLAR[m.group(2).lower()]:02d}-{int(m.group(1)):02d}"
+    if m:
+        d = f"{m.group(3)}-{AYLAR[m.group(2).lower()]:02d}-{int(m.group(1)):02d}"
+        # v0.247.0 (16 Kasım): içerikteki tarih dosya tarihinden (+1 gün) ilerideyse (etkinlik afişi, davet) belge tarihi sayılmaz; görüşme/toplantı türü eskisi gibi
+        if tur_bul(kisa) in ("gorusme", "toplanti") or d <= (datetime.date.fromtimestamp(mtime) + datetime.timedelta(days=1)).isoformat(): return d
     return datetime.date.fromtimestamp(mtime).isoformat()
 def baslik_bul(kisa, t):
     for ln in t.splitlines()[:5]:
@@ -414,10 +434,10 @@ def dosyalar(erisilemeyen=None):
     hata = (lambda e: erisilemeyen.append(os.path.relpath(e.filename, PROJE) if e.filename else "")) if erisilemeyen is not None else None
     yield from bellek_dosyalari(erisilemeyen)  # önce: proje içindeki bellek kaynağının türü (BELLEK_TUR) proje taramasından önce bilinsin
     for kok, dirs, fs in os.walk(PROJE, onerror=hata, followlinks=False):
-        rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else rel
-        dirs[:] = [d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC) and not d.lower().endswith(PAKET_KLASOR)]
+        rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else nfc(rel)
+        dirs[:] = [d for d in dirs if not any(os.path.join(rel, nfc(d)) == h or os.path.join(rel, nfc(d)).startswith(h + "/") for h in HARIC) and not d.lower().endswith(PAKET_KLASOR)]
         for f in fs:
-            k = os.path.join(rel, f)
+            k = os.path.join(rel, nfc(f))
             if os.path.splitext(f)[1].lower() in UZANTI | CEVIR_UZ and k not in HARIC and not f.startswith("~$") and not dokum_kopyasi(os.path.join(kok, f)): yield os.path.join(kok, f), k
     canli = os.path.join(CALISMA, "_canli")  # kısayol: os.walk takip etmez, ayrıca gez (dizindeki adı yine "_canli/…")
     if os.path.isdir(canli):
@@ -451,8 +471,10 @@ def gecmis_guncelle(c=None):  # Konuş geçmişine satır eklenince yalnız o do
     try: st = os.stat(GECMIS)
     except OSError: return 0
     BELLEK_TUR[GECMIS] = ("konusma", "ozel"); n = dizinle(c, GECMIS, GECMIS, st); c.commit(); return n or 0
+IND_SURUM = 1  # v0.247.0: dizin biçimi (Excel tarih/sayı metni, çevrilmiş metin temizliği); artınca yalnız etkilenen biçimler (.xlsx + çevrilenler) bir kez yeniden okunur
 def guncelle(c, yeniden=False, sessiz=True):
     t0 = time.time(); eski = {r[0]: (r[1], r[2], r[3], r[4] or "ortak") for r in c.execute("SELECT yol, mtime, boy, tur, kapsam FROM dosya")}
+    surum_eski = c.execute("PRAGMA user_version").fetchone()[0] < IND_SURUM; var_olan = set(eski)
     if yeniden: eski = {}; c.executescript("DELETE FROM dosya; DELETE FROM parca; INSERT INTO ara(ara) VALUES('delete-all');")
     gorulen, n_yeni, n_parca, hata, eris = set(), 0, 0, [], []
     try: bulut_eski = {r[0] for r in c.execute("SELECT yol FROM tarama WHERE hata='bulutta'")}  # indirilince ad, boyut, tarih aynı kalır: yine de yeniden oku
@@ -464,15 +486,17 @@ def guncelle(c, yeniden=False, sessiz=True):
         gorulen.add(kisa)
         try: st = os.stat(yol)
         except OSError: continue
-        if eski.get(kisa) == (st.st_mtime, st.st_size, tur_bul(kisa), BELLEK_TUR.get(kisa, (None, "ortak"))[1]) and not (kisa in bulut_eski and not bulutta(st)): continue  # tür/kapsam ayarı değişince de yeniden
+        if eski.get(kisa) == (st.st_mtime, st.st_size, tur_bul(kisa), BELLEK_TUR.get(kisa, (None, "ortak"))[1]) and not (kisa in bulut_eski and not bulutta(st)) \
+                and not (surum_eski and os.path.splitext(kisa)[1].lower() in {".xlsx"} | CEVIR_UZ): continue  # tür/kapsam ayarı değişince de yeniden
         if kisa in bulut_eski and not bulutta(st): c.execute("UPDATE tarama SET hata=NULL, sha256=NULL WHERE yol=?", (kisa,))  # indirildi: tarama içerikten yeniden özetlesin
         n = dizinle(c, yol, kisa, st, hata)
         if n is not None: n_parca += n; n_yeni += 1
     # okunamayan klasörün dosyaları "silinmiş" sayılmaz (17 Ekim: aktarıcının 10 dk'lık turu dizini 101 bin parçadan 301'e indirdi)
     eris = sorted({"" if e in (".", "") else e for e in eris}); ERISILEMEYEN[:] = eris
     korunur = lambda k: any(e == "" or k == e or k.startswith(e + "/") for e in eris)  # kök okunamazsa hepsi (görülen _canli zaten güncel)
-    for k in set(eski) - gorulen:
+    for k in var_olan - gorulen:
         if not korunur(k): sil(c, k); c.execute("DELETE FROM dosya WHERE yol=?", (k,))
+    if surum_eski: c.execute(f"PRAGMA user_version = {IND_SURUM}")
     c.commit()
     try: sozluk_kopyala()  # dış sözlük → uygulama klasörü (aktarıcının Konuş ön araması oradan okur)
     except OSError as e: print(f"dizin: dış sözlük kopyalanamadı ({e.__class__.__name__})", file=sys.stderr)
@@ -588,9 +612,14 @@ def tara_kaynak_turu(kisa, ext, ayni_klasor_kokler, disa):
     if ANALIZ and kisa.startswith(ANALIZ): return "turetilmis", "ayar: analiz_klasorleri"
     for p in parcalar:
         if TARA_TURETILMIS_KLASOR.match(p): return "turetilmis", f"klasör: {p}"
-    m = TARA_TURETILMIS_AD.search(os.path.splitext(ad)[0])
-    if m: return "turetilmis", "ad: " + m.group(2)
     kok = os.path.splitext(ad)[0]
+    m = TARA_TURETILMIS_AD.search(kok)
+    # v0.247.0 (16 Kasım): "özet" adı tek başına türetilmişlik değil ("Hipotez Testleri Özet Tablosu.xlsx" özgün). Özgün biçimde (docx/xlsx/pptx…) yalnız
+    # yanında özet sözcüğü çıkarılmış aynı adlı dosya varsa türetilmiş; md/txt/pdf/html gibi (Suflor'un görüşme özetleri dahil) eskisi gibi ad yeter
+    if m and m.group(2) in ("ozet", "ozeti") and ext in TARA_ASIL_UZ:
+        yalin = re.sub(r"[^0-9a-z]+", "", re.sub(r"(^|[^a-z])(ozet|ozeti)($|[^a-z])", " ", kok))
+        if not yalin or not any(re.sub(r"[^0-9a-z]+", "", k) == yalin for k in ayni_klasor_kokler if k != kok): m = None
+    if m: return "turetilmis", "ad: " + m.group(2)
     if ext not in TARA_ASIL_UZ and any(u in TARA_ASIL_UZ and u != ext for u in ayni_klasor_kokler.get(kok, ())):
         return "turetilmis", "aynı adlı özgün belgenin çıktısı"
     return "asil", ""
@@ -643,10 +672,10 @@ def tara(c=None, sessiz=True):
         if not os.listdir(PROJE): eris.append("")
     except OSError: eris.append("")
     for kok, dirs, fs in os.walk(PROJE, onerror=hata_kayit, followlinks=False):
-        rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else rel
-        dirs[:] = sorted(d for d in dirs if not any(os.path.join(rel, d) == h or os.path.join(rel, d).startswith(h + "/") for h in HARIC) and not d.lower().endswith(PAKET_KLASOR))
+        rel = os.path.relpath(kok, PROJE); rel = "" if rel == "." else nfc(rel)
+        dirs[:] = sorted(d for d in dirs if not any(os.path.join(rel, nfc(d)) == h or os.path.join(rel, nfc(d)).startswith(h + "/") for h in HARIC) and not d.lower().endswith(PAKET_KLASOR))
         for f in sorted(fs):
-            k = os.path.join(rel, f); y = os.path.join(kok, f)
+            k = os.path.join(rel, nfc(f)); y = os.path.join(kok, f)
             if k in HARIC: atlanan["ayar: haric"] += 1; continue
             if f.startswith("~$") or f.startswith(".~lock."): atlanan["kilit dosyası"] += 1; continue
             if f.lower() in TARA_ATLA or f.startswith("._"): atlanan["sistem dosyası"] += 1; continue
@@ -780,13 +809,18 @@ def eml_metin(yol):
     if govde and govde.get_content_type() == "text/html": t = html_metin(t)
     return f"# {m['Subject'] or os.path.basename(yol)}\n\n{bas}\n\n{t}"
 
+def md_temizle(t):
+    # v0.247.0 (16 Kasım): Docling Markdown çıktısı — HTML varlıkları (&amp; → &), "<!-- image -->" yer tutucuları, kaçışlı \\_ \\* \\# → _ * #. cevir-isci.py aynı
+    # temizliği yazarken yapar (yinelenir: o ortamda baglam.py yüklenmez); eski önbellek kayıtları da okunurken buradan geçer
+    t = html.unescape(t or ""); t = re.sub(r"<!--\s*image\s*-->", "", t); t = re.sub(r"\\([_*#])", r"\1", t)
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
 def _onbellek_yol(sha): return os.path.join(ONBELLEK, sha[:2], sha + ".json")
 def cevrilmis(yol, sha=None):
     # dosyanın çevrilmiş parçaları [(konum, metin)] ya da None (henüz çevrilmedi); çevirme hatası → [] (dizine boş girer, yeniden denenmez)
     sha = sha or _sha256(yol)  # tarama satırı yoksa ya da eskiyse içerikten
     try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
     except (OSError, ValueError): return None
-    return [] if o.get("hata") else [(k, m) for k, m in o.get("parcalar") or []]
+    return [] if o.get("hata") else [(k, md_temizle(m)) for k, m in o.get("parcalar") or []]
 def cevrilmis_tablolar(yol, sha=None):  # çevirme önbelleğindeki tablolar [(sayfa, [[hücre…], …])] ya da None (önbellek yok)
     sha = sha or _sha256(yol)
     try: o = json.load(open(_onbellek_yol(sha), encoding="utf-8"))
@@ -1000,7 +1034,7 @@ def xlsx_tablolar(yol):
                     try: f = float(v.group(1))
                     except ValueError: d = v.group(1)
                     else:
-                        d = f
+                        d = f if f.is_integer() or f != f or abs(f) == float("inf") else float("%.12g" % f)  # v0.247.0: kayan nokta gürültüsü (0.8179999999999999 → 0.818)
                         if s_ and int(s_.group(1)) in tarihli and 0 < f < 2958466:
                             g = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=f)
                             d = g.date().isoformat() if f.is_integer() else g.isoformat(timespec="minutes")

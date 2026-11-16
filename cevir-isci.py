@@ -6,7 +6,7 @@
 # Satır protokolü (stdin/stdout, JSON): başta {"hazir": true, "arac": "..."} · istek {"id", "yol"} → {"id", "parcalar": [[konum, metin], …]} ya da {"id", "hata"}.
 # Konum: PDF'te "sayfa <n>", sunumda "slayt <n>", görüntüde "". HEIC önce macOS `sips` ile PNG'ye çevrilir. Parolalı dosyada parola sorulmaz.
 # v0.121.0: Pages/Keynote (Docling iWork), Numbers ve .xls (xlrd) → tablo biçimlerinde ayrıca "tablolar": [{"sayfa", "satirlar"}] (proje veritabanına).
-import json, os, subprocess, sys, tempfile, time
+import html, json, os, re, subprocess, sys, tempfile, time
 
 ORTAK = os.environ.get("SUFLOR_ORTAK") or "/Users/Shared/Suflor"
 MODELLER = os.path.join(ORTAK, "cevir-modeller")
@@ -15,6 +15,10 @@ os.environ.setdefault("HF_HOME", MODELLER); os.environ.setdefault("TOKENIZERS_PA
 CIKIS = sys.stdout; sys.stdout = sys.stderr  # kütüphanelerin print'leri protokolü bozmasın
 def yaz(o): CIKIS.write(json.dumps(o, ensure_ascii=False) + "\n"); CIKIS.flush()
 
+def md_temizle(t):
+    # v0.247.0 (16 Kasım): Markdown çıktısı — HTML varlıkları (&amp; → &), "<!-- image -->" yer tutucuları, kaçışlı \\_ \\* \\# → _ * # (baglam.py md_temizle ile aynı; bu ortamda baglam.py yüklenmez)
+    t = html.unescape(t or ""); t = re.sub(r"<!--\s*image\s*-->", "", t); t = re.sub(r"\\([_*#])", r"\1", t)
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
 def donusturucu():
     from docling.document_converter import DocumentConverter, PdfFormatOption, ImageFormatOption
     from docling.datamodel.base_models import InputFormat
@@ -68,11 +72,11 @@ def parcalar(cv, yol):  # → (parçalar, tablolar): tablolar yalnız tablo biç
                 df = tb.export_to_dataframe(doc=doc); sayfa = f"Tablo {i}"
                 satirlar = [[str(x) for x in df.columns]] + [["" if x is None else str(x) for x in r] for r in df.values.tolist()]
                 tablolar.append({"sayfa": sayfa, "satirlar": satirlar}); out += satir_parcalari(sayfa, satirlar)
-            return (out or [["", doc.export_to_markdown()]]), tablolar
+            return (out or [["", md_temizle(doc.export_to_markdown())]]), tablolar
         sayfalar = sorted(getattr(doc, "pages", {}) or {})
-        if len(sayfalar) <= 1: return [["", doc.export_to_markdown()]], []
+        if len(sayfalar) <= 1: return [["", md_temizle(doc.export_to_markdown())]], []
         on = "slayt " if ext in (".pptx", ".ppt", ".key") else "sayfa "
-        out = [[f"{on}{n}", doc.export_to_markdown(page_no=n)] for n in sayfalar]
+        out = [[f"{on}{n}", md_temizle(doc.export_to_markdown(page_no=n))] for n in sayfalar]
         return [p for p in out if p[1].strip()], []
     finally:
         if gecici: subprocess.run(["rm", "-rf", gecici])

@@ -81,6 +81,24 @@ yaz("belgeler/sartname.docx", ikili=docx("Şartname metni")); yaz("belgeler/sart
 # v0.136.0: .ods/.odp okunur (yanındaki PDF türetilmiş); .ppt okunmaz (yanındaki PDF asıl kalır, içerik kaybolmasın)
 yaz("odf/takvim.ods", ikili=ODS); yaz("odf/takvim.pdf", ikili=b"%PDF-1.4 takvim"); yaz("odf/webinar.odp", ikili=ODP)
 yaz("odf/eski-sunum.ppt", ikili=b"\xd0\xcf\x11\xe0eski"); yaz("odf/eski-sunum.pdf", ikili=b"%PDF-1.4 eski sunum")
+# v0.247.0: "özet" adlı özgün dosya, CLAUDE.md iskelesi, NFD ad, Excel tarih/sayı
+import unicodedata
+yaz("belgeler/Hipotez Testleri Özet Tablosu.xlsx", ikili=docx("hipotez")); yaz("belgeler/Bilanço.docx", ikili=docx("Rapor gövdesi bambaşka içerik")); yaz("belgeler/Bilanço Özeti.docx", ikili=docx("Özet gövdesi"))
+yaz("CLAUDE.md", "Suflor iskele kuralları"); yaz("belgeler/CLAUDE.md", "alt klasördeki kullanıcı notu")
+yaz(unicodedata.normalize("NFD", "nfd/Çalışma Notu.md"), "NFD adlı dosya içeriği")
+def xlsx_stil():  # tarih biçimli (s=1, numFmtId 14) ve düz sayı hücreleri
+    import io
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("xl/workbook.xml", '<workbook><sheets><sheet name="Takvim" sheetId="1" r:id="rId1"/></sheets></workbook>')
+        z.writestr("xl/_rels/workbook.xml.rels", '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')
+        z.writestr("xl/styles.xml", '<styleSheet><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>')
+        z.writestr("xl/worksheets/sheet1.xml", '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Etkinlik</t></is></c><c r="B1" t="inlineStr"><is><t>Tarih</t></is></c><c r="C1" t="inlineStr"><is><t>Oran</t></is></c><c r="D1" t="inlineStr"><is><t>Adet</t></is></c></row>'
+                   '<row r="3"><c r="A3" t="inlineStr"><is><t>Lansman</t></is></c><c r="B3" s="1"><v>46338</v></c><c r="C3"><v>0.8179999999999999</v></c><c r="D3"><v>12</v></c></row></sheetData></worksheet>')
+    return b.getvalue()
+yaz("liste/etkinlik-takvimi.xlsx", ikili=xlsx_stil())
+yaz("belgeler/Etkinlik Afisi.md", "# Davet\n\nBuluşma 31 Aralık 2099 tarihinde.", gun=1)
+yaz("belgeler/Eski Not.md", "# Not\n\nToplantı 5 Mart 2020 tarihinde yapıldı.", gun=1)
 # T3: arama önceliği ve harf katlaması
 KARS = "Lojistik karşılaştırma: Bursa ve Sakarya depolarında yükleme süresi ölçüldü, Sakarya daha hızlı çıktı."
 yaz("belgeler/karsilastirma.md", KARS + " Ayrıntı ekte.", gun=2); yaz("belgeler/karsilastirma-ozeti.md", KARS, gun=2)
@@ -136,6 +154,29 @@ try:
     kontrol("asıl: özgün belgeler ve tarihli döküm/not", [kt[k] for k in ("tablolar/butce.xlsx", "belgeler/sartname.docx", "belgeler/teklif-v1.md", "notlar/toplanti-2026-10-16.md")] == ["asil"] * 4)
     kontrol(".ods'nin aynı adlı PDF'i türetilmiş, .ppt'ninki asıl (.ppt okunmuyor)", kt.get("odf/takvim.pdf") == "turetilmis" and kt.get("odf/eski-sunum.pdf") == "asil",
             f"{kt.get('odf/takvim.pdf')} {kt.get('odf/eski-sunum.pdf')}")
+    # v0.247.0 düzeltmeleri
+    kontrol("tur: 'Sunucu' sunum değil; sunum sözcüğü/uzantısı/klasörü sunum", [m.tur_bul(k) for k in ("LINUX/Sunucu Kurulum Adımları.docx", "a/Q3 Sunum v2.docx", "a/deck_final.pdf", "a/b.pptx", "a/b.key", "Sunum/x.md", "a/Sunumlar/x.md")]
+            == ["belge", "sunum", "sunum", "sunum", "sunum", "sunum", "sunum"], str([m.tur_bul(k) for k in ("LINUX/Sunucu Kurulum Adımları.docx", "a/Q3 Sunum v2.docx", "a/deck_final.pdf", "a/b.pptx", "a/b.key", "Sunum/x.md", "a/Sunumlar/x.md")]))
+    kontrol("tur: görüşme/toplantı önceliği ve tablo korunur", m.tur_bul("gorusmeler/x-sunum.pptx") == "gorusme" and m.tur_bul("_canli/20261001.jsonl") == "toplanti" and m.tur_bul("a/b.xlsx") == "tablo")
+    kontrol("'özet' adlı özgün xlsx asıl; yanında özetsiz kardeşi olan docx türetilmiş", kt["belgeler/Hipotez Testleri Özet Tablosu.xlsx"] == "asil" and kt["belgeler/Bilanço Özeti.docx"] == "turetilmis"
+            and kt["belgeler/Bilanço.docx"] == "asil", str((kt["belgeler/Hipotez Testleri Özet Tablosu.xlsx"], kt["belgeler/Bilanço Özeti.docx"])))
+    kontrol("kökteki CLAUDE.md kullanıcı belgesi sayılır (proje kartı düzenli klasör kipi): dizinde", "CLAUDE.md" in d and "belgeler/CLAUDE.md" in d)
+    kontrol("NFD dosya adı dizinde NFC anahtarla", "nfd/Çalışma Notu.md" in d and unicodedata.normalize("NFD", "nfd/Çalışma Notu.md") not in d)
+    xp = {k: x for k, _, x in m.xlsx_parcala(os.path.join(P, "liste/etkinlik-takvimi.xlsx"))}
+    xs = " ".join(xp.values())
+    kontrol("xlsx arama metni: tarih GG.AA.YYYY, kayan nokta gürültüsüz, tamsayı tamsayı", "Tarih: 12.11.2026" in xs and "Oran: 0.818 " in xs + " " and "Adet: 12" in xs and "46338" not in xs and "0.8179999" not in xs, xs)
+    xt = dict(m.xlsx_tablolar(os.path.join(P, "liste/etkinlik-takvimi.xlsx")))["Takvim"][1]
+    kontrol("xlsx tablo: tarih ISO, oran 0.818", xt[1] == "2026-11-12" and xt[2] == 0.818 and xt[3] == 12.0, str(xt))
+    kontrol("gelecekteki içerik tarihi belge tarihi olmaz; geçmiştekini korur", c.execute("SELECT tarih FROM dosya WHERE yol='belgeler/Etkinlik Afisi.md'").fetchone()[0] != "2099-12-31" and c.execute("SELECT tarih FROM dosya WHERE yol='belgeler/Eski Not.md'").fetchone()[0] == "2020-03-05",
+            str(c.execute("SELECT yol, tarih FROM dosya WHERE yol LIKE 'belgeler/E%Not%' OR yol LIKE '%Afisi%'").fetchall()))
+    kontrol("toplantı/görüşme türünde içerik tarihi eskisi gibi", m.tarih_bul("gorusmeler/x.md", "12 Mart 2099", time.time()) == "2099-03-12")
+    kontrol("md_temizle: varlık, yer tutucu, kaçış", m.md_temizle("A &amp; B\n\n\n\n<!-- image -->\nsatis\\_adet \\* \\# x") == "A & B\n\nsatis_adet * # x", repr(m.md_temizle("A &amp; B\n\n\n\n<!-- image -->\nsatis\\_adet \\* \\# x")))
+    eskiv = m.baglan(); eskiv.execute("PRAGMA user_version = 0"); eskiv.commit()
+    n_once = c.execute("SELECT count(*) FROM parca WHERE yol='liste/etkinlik-takvimi.xlsx'").fetchone()[0]; okun = []
+    asil_p2 = m.parcala; m.parcala = lambda y, *a, **k: okun.append(os.path.basename(y)) or asil_p2(y, *a, **k)
+    try: m.guncelle(c)
+    finally: m.parcala = asil_p2
+    kontrol("dizin biçim sürümü artınca yalnız .xlsx ve çevrilen (PDF, sunum…) biçimler bir kez yeniden okunur", okun and all(os.path.splitext(x)[1].lower() in {".xlsx"} | m.CEVIR_UZ for x in okun) and c.execute("PRAGMA user_version").fetchone()[0] == m.IND_SURUM, str(okun))
     om = m.odf_metin(os.path.join(P, "odf/takvim.ods")); op = m.odf_metin(os.path.join(P, "odf/webinar.odp"))
     kontrol(".ods metni: sayfa adı ve satırlar, 1000 boş tekrar hücre yok", "## Takvim" in om and "| Hafta | Konu |" in om and "| 3 | Regresyon atölyesi |" in om and len(om) < 200, om[:300])
     kontrol(".odp metni: slayt başına paragraflar", op.split() == "## Slayt 1 Webinar planı Konuşmacı: Deniz ## Slayt 2 Karar: kayıt açılsın".split(), op)

@@ -9,6 +9,11 @@ sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspa
 
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORTAK = "/Users/Shared/Suflor"; VPY = os.path.join(ORTAK, "cevir-venv", "bin", "python")
+# v0.247.0: Markdown temizleme yardımcısı Docling'siz de denenir (cevir-isci.py'nin docling içe aktarması tembel)
+_sp = importlib.util.spec_from_file_location("cevir_isci_t", os.path.join(KOD, "cevir-isci.py")); _ci = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(_ci)
+_g = _ci.md_temizle("Ar&amp;Ge\n<!-- image -->\n\n\n\nsatis\\_adet \\* \\# not")
+if _g != "Ar&Ge\n\nsatis_adet * # not": print(f"✗ cevir-isci md_temizle: {_g!r}"); sys.exit(1)
+print("✓ cevir-isci md_temizle: varlık, yer tutucu, kaçış")
 if not os.path.exists(VPY): print(f"çevirme: atlandı (ortam yok: {VPY})"); sys.exit(0)
 T = tempfile.mkdtemp(prefix="suflor-cevir-"); P = os.path.join(T, "proje"); U = os.path.join(T, "uyg"); os.makedirs(P); os.makedirs(os.path.join(U, "canli"))
 URET = r'''
