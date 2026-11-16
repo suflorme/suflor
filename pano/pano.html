@@ -1264,7 +1264,8 @@ function renderHat(d,s){const el=d.getElementById(d===document?'hat':'mhat'),h=s
 // toplantıda ve kulaklıksız açılmaz); Sohbet açıkken bir dokunuş kapatır. Option + Shift + Boşluk her yerde basılı tut. Kayıtta simge vurgu renginde,
 // yanında sesin gerçek düzeyi (AnalyserNode), altta "Dinliyorum". Köşedeki soluk nokta: asistan dinliyor (toplantıda Whisper seni duyuyor ya da Sohbet açık).
 let mkT=null,mkSon=0,mkBas=0,kIp='',kIpT=0
-function toplantidaMi(s){return!!(s&&s.aktif)}  // Faz B: tek kayıt (/status toplanti); 3 Kasım: aktif = canlı (algılandı/sürüyor) — bitiyor/bitti'de pano Bugün'e döner
+function toplantidaMi(s){return!!(s&&s.aktif)}
+function terminalAcik(s){const d=((s&&s.toplanti_oturum)||{}).durum;return!!s&&((s.claude_age_s!=null&&s.claude_age_s<120)||['bekliyor','calisiyor','izliyor','terminalde'].includes(d))}  // 16 Kasım: toplantı oturumu terminalde açıkken (izle yokluyor ya da oturum bekliyor) {asistan} paneli kendiliğinden açılmaz; yazışma terminalde sürer, el ile açmak serbest  // Faz B: tek kayıt (/status toplanti); 3 Kasım: aktif = canlı (algılandı/sürüyor) — bitiyor/bitti'de pano Bugün'e döner
 function kutuIpucu(m){kIp=m;clearTimeout(kIpT);kIpT=setTimeout(()=>{kIp='';altCiz()},2500);altCiz()}
 function altCiz(){const m=kRec?L('Dinliyorum · bırakınca gönderir'):kSoh?L('Sohbet açık · bir dokunuş kapatır'):kIp
   for(const d of [document,mini&&!mini.closed&&mini.document])if(d){const e=d.getElementById(d===document?'kal':'mkal');if(e&&e.textContent!==m)e.textContent=m}}
@@ -1400,13 +1401,13 @@ function shGonder(t){shAc(true,true);const e={soru:t.trim(),cevap:'',ad:AS,sesli
 function shGonderSonuc(e,t,ok){if(e&&!ok){const i=KC.indexOf(e);if(i>=0){KC.splice(i,1);kcSur++}}else if(!e&&ok&&shAcik){KC.push({soru:t.trim(),cevap:'',ad:AS,sesli:false,t:Date.now(),bekliyor:true,ek:shBekleyenEk()});shBagT=Date.now();kcSur++}if(last)renderKonus(last)}
 // toplantı dışında yeni tur başladı (kısayol, sohbet, başka pencere): panel açılır. İlk çizimde yalnız kayıtlı tercih (açık bırakılmışsa) uygulanır.
 function shYeniTur(s,s0){const top=toplantidaMi(s),gec=top!==shTop;shTop=top
-  if(shIlk){shIlk=false;if(shOku('shAcik')==='1'&&!top)setTimeout(()=>shAc(true,false));return}
-  if(gec){shSesBek=0;if(top){kcTop=Date.now();setTimeout(()=>{if(shAcik&&!shSekmeAcik)shAc(false)})}else setTimeout(()=>{if(!shAcik&&shOku('shAcik')==='1')shAc(true,false)});return}  // toplantı başlayınca panel kapanır (kartlar, döküm öne; sekmeli sütunda son sekme), bitince tercih geri gelir
+  if(shIlk){shIlk=false;if(shOku('shAcik')==='1'&&!top&&!terminalAcik(s))setTimeout(()=>shAc(true,false));return}
+  if(gec){shSesBek=0;if(top){kcTop=Date.now();setTimeout(()=>{if(shAcik&&!shSekmeAcik)shAc(false)})}else setTimeout(()=>{if(!shAcik&&shOku('shAcik')==='1'&&!terminalAcik(last||s))shAc(true,false)});return}  // toplantı başlayınca panel kapanır (kartlar, döküm öne; sekmeli sütunda son sekme), bitince tercih geri gelir
   if(top){const k=s.konus||{};if(kRec||k.durum==='yaziya'){shSesBek=Date.now();shSesSur=kcSur}  // S260: sesle başlatılan Konuş turu (basılı tut ya da kısayol) — cevap gelince {asistan} sekmesi öne gelir
     else if(shSesBek&&Date.now()-shSesBek>120000)shSesBek=0
     else if(shSesBek&&kcSur!==shSesSur&&(KC[KC.length-1]||{}).cevap){shSesBek=0;setTimeout(()=>{if(shSekmeAcik&&!shAcik)shSekmeSec('marvin',false)})}}
   const sor=!!(s.eylem&&s.eylem.sesli),yeniSor=sor&&!shSor;shSor=sor  // "Yazayım mı?" sesli onay sorusu da paneli açar (cevap ipucu orada)
-  if((kcSur!==s0||yeniSor)&&!shAcik&&!top)setTimeout(()=>shAc(true,false))}
+  if((kcSur!==s0||yeniSor)&&!shAcik&&!top&&!terminalAcik(s))setTimeout(()=>shAc(true,false))}
 function shGenisle(g,kaydetme){const h=document.documentElement;g=g==null?!h.classList.contains('sh-genis'):g;h.classList.toggle('sh-genis',g);const b=document.getElementById('shw'),t=L(g?'Paneli daralt':'Paneli genişlet')
   b.innerHTML=ic(g?'daral':'genis');b.title=t;b.setAttribute('aria-label',t);if(!kaydetme)shKayit('shGenis',g?'1':null);shYerlesim()}
 // yerleşim: ana içerik panelden sonra en az SH_ANA_EN kalıyorsa yan sütun (içerik o kadar daralır), kalmıyorsa katman (içerik hiç daralmaz); odak kipinde ve dar ekranda katman

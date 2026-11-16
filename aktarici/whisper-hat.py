@@ -1220,7 +1220,7 @@ def kullanici_benzer(iz):  # parçanın ses izi ile kullanıcı profilinin (ses-
 # "ben" kanalı parçasını işçi 1,5 sn / 0,5 sn pencerelerle tarar (whisper-isci.py kapi_benzerlik) ve pencere benzerliklerini döndürür; burada eşik başına karar
 # hesaplanıp yalnız canli/ses-izi-kapi.jsonl'e yazılır (metin yok, yalnız sayı). Whisper'a giden ses, satırlar, whisper-isler.jsonl DEĞİŞMEZ.
 # Profil: ses-izi-ben.json (oda_kim, toplantıdaki "ben" parçalarından kurar; mikrofona özgü değil). Yoksa istekte profil yok, işçi hesaplamaz. Ayar ses_izi_kapi: false kapatır.
-KAPI_ESIKLER = [0.15, 0.20, 0.25, 0.30]; KAPI = {"pb": None, "anahtar": None, "mik": (0.0, "?")}
+KAPI_ESIKLER = [0.15, 0.20, 0.25, 0.30]; SES_KAPI = {"pb": None, "anahtar": None, "mik": (0.0, "?")}
 def kapi_acik(): return AYAR.get("ses_izi_kapi", True) is not False
 def kapi_esikler():
     e = AYAR.get("ses_izi_kapi_esikler")
@@ -1237,10 +1237,10 @@ def kapi_profil_b64():  # kullanıcı profili (birim vektör, float16 base64); y
     pr = ODA["profil"]
     if not pr: return None
     k = (len(pr), round(ODA["sn"], 1))
-    if KAPI["anahtar"] != k:
+    if SES_KAPI["anahtar"] != k:
         n = math.sqrt(sum(x * x for x in pr)) or 1.0
-        KAPI["pb"] = base64.b64encode(struct.pack(f"<{len(pr)}e", *(x / n for x in pr))).decode(); KAPI["anahtar"] = k
-    return KAPI["pb"]
+        SES_KAPI["pb"] = base64.b64encode(struct.pack(f"<{len(pr)}e", *(x / n for x in pr))).decode(); SES_KAPI["anahtar"] = k
+    return SES_KAPI["pb"]
 def kapi_karar(pencere, esikler):  # → ({eşik: gecir|kirp|at}, {eşik: kırpılan pencere payı}); eşik anahtarı "0.15"
     karar, pay = {}, {}
     for e in esikler:
@@ -1248,11 +1248,11 @@ def kapi_karar(pencere, esikler):  # → ({eşik: gecir|kirp|at}, {eşik: kırp�
         karar[a] = "gecir" if ust == n else ("at" if ust == 0 else "kirp"); pay[a] = round(1 - ust / n, 2)
     return karar, pay
 def _kapi_mikrofon():  # girişin bağlantı türü (sohbet.py _giris_turu); 60 sn önbellekli
-    t, v = KAPI["mik"]
+    t, v = SES_KAPI["mik"]
     if time.time() - t > 60:
         try: v = _giris_turu() if "_giris_turu" in globals() else "?"
         except Exception: v = "?"
-        KAPI["mik"] = (time.time(), v)
+        SES_KAPI["mik"] = (time.time(), v)
     return v
 def kapi_kaydet(is_, sonuc, metin, j):  # kayıt satırı; metnin kendisi yazılmaz
     if not kapi_acik() or not is_.get("kapi_istendi"): return

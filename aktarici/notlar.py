@@ -512,7 +512,7 @@ def _ik_takvim():
 def _ik_eslesen(baslik, sorgu):  # sorgunun tüm sözcükleri başlıkta (kök eşleşmesi: sözcük başlığın bir sözcüğüyle başlıyor ya da içeriyor)
     b = _ik_norm(baslik); q = [w for w in _ik_norm(sorgu).split() if len(w) >= 2]
     return bool(q) and all(w in b for w in q)
-def _ik_kisa(s, n=90): return " ".join(str(s or "").split())[:n]
+def _nt_kisa(s, n=90): return " ".join(str(s or "").split())[:n]
 
 def _kayit_taslak_dogrula(arg):  # kayıt sahibine e-posta/Teams taslağı: alıcı kayıttan (sahip; karar için onaylayan), metni asistan yazar. → (hazır iş, None) ya da (None, hata)
     e = _ik_arg(arg, ("id", "kanal"), ("konu", "govde", "not"))
@@ -532,18 +532,18 @@ def _kayit_taslak_dogrula(arg):  # kayıt sahibine e-posta/Teams taslağı: alı
     if len(govde.strip()) < 2: return None, _t("taslak metni (govde) boş", "the draft text (govde) is empty")
     kim = ad or _t("sahibine", "the owner"); kime_g = ep or _t("alıcısız", "no recipient")
     if kanal == "eposta":
-        konu = " ".join(arg.get("konu", "").split())[:TASLAK_KONU_EN_COK] or (_t("Hatırlatma: ", "Reminder: ") + _ik_kisa(metin, 70))
+        konu = " ".join(arg.get("konu", "").split())[:TASLAK_KONU_EN_COK] or (_t("Hatırlatma: ", "Reminder: ") + _nt_kisa(metin, 70))
         th, e = _taslak_dogrula({"konu": konu, "govde": govde, "kime": ep})
         if e: return None, e
         yer = {"gmail": "Gmail", "outlook": "Outlook (web)"}.get(th["tur"], "Mac Mail")
-        th.update(komut="kayit_taslak", id=x["id"], kanal="eposta", kid=ox["kayit_id"], ozet=_t(f"«{_ik_kisa(metin, 60)}» için {kim}'e e-posta taslağı «{_ik_kisa(konu, 50)}» · {kime_g} · {yer}'de açılır, Gönder sende",
-                                                                                                f"email draft «{_ik_kisa(konu, 50)}» to {kim} about «{_ik_kisa(metin, 60)}» · {kime_g} · opens in {yer}, you press Send"))
+        th.update(komut="kayit_taslak", id=x["id"], kanal="eposta", kid=ox["kayit_id"], ozet=_t(f"«{_nt_kisa(metin, 60)}» için {kim}'e e-posta taslağı «{_nt_kisa(konu, 50)}» · {kime_g} · {yer}'de açılır, Gönder sende",
+                                                                                                f"email draft «{_nt_kisa(konu, 50)}» to {kim} about «{_nt_kisa(metin, 60)}» · {kime_g} · opens in {yer}, you press Send"))
         return th, None
     msj = taslak_duz(govde.replace("\r\n", "\n").replace("\r", "\n"))
     if "\0" in msj or len(msj) < 2: return None, _t("taslak metni uygun değil", "the draft text isn't suitable")
     if len(msj) > TEAMS_MESAJ_EN_COK: return None, _t(f"Teams mesajı çok uzun (en çok {TEAMS_MESAJ_EN_COK} karakter); kısalt", f"Teams message too long (at most {TEAMS_MESAJ_EN_COK} characters); shorten it")
     return {"komut": "kayit_taslak", "id": x["id"], "kanal": "teams", "kid": ox["kayit_id"], "kime": [ep] if ep else [], "govde": msj, "konu": "", "tur": "teams",
-            "ozet": _t(f"«{_ik_kisa(metin, 60)}» için {kim}'e Teams mesaj taslağı · {kime_g} · {len(msj)} karakter · Teams'te açılır, Gönder sende", f"Teams message draft to {kim} about «{_ik_kisa(metin, 60)}» · {kime_g} · {len(msj)} characters · opens in Teams, you press Send")}, None
+            "ozet": _t(f"«{_nt_kisa(metin, 60)}» için {kim}'e Teams mesaj taslağı · {kime_g} · {len(msj)} karakter · Teams'te açılır, Gönder sende", f"Teams message draft to {kim} about «{_nt_kisa(metin, 60)}» · {kime_g} · {len(msj)} characters · opens in Teams, you press Send")}, None
 
 def teams_taslak_url(kime, mesaj):  # Teams derin bağlantısı (https): sohbeti açar, mesaj yazılı; kullanıcı gönderir
     q = urllib.parse.quote
@@ -569,14 +569,14 @@ def _gundem_dogrula(arg):  # id (var olan kayıt) ya da metin (yeni madde) + ist
         if not _KAYIT_KIMLIK_HEPSI.match(kid): return None, _t("kimlik geçersiz", "invalid id")
         x = y.kayit_bul(BASE, kid, ("karar", "is", "soz", "soru")); ox = y.ortak_kayit(BASE, kid) if x else None
         if not x or not ox or ox.get("gizli"): return None, _t(f"{kid} kaydı yok", f"no record {kid}")
-        kid = x["id"]; ad_ = _ik_kisa(y.TEYIT_RX.sub("", x["metin"] or ""))
+        kid = x["id"]; ad_ = _nt_kisa(y.TEYIT_RX.sub("", x["metin"] or ""))
     elif metin is None: return None, _t("gündem maddesi metni uygun değil", "agenda item text not suitable")
-    else: ad_ = _ik_kisa(metin)
+    else: ad_ = _nt_kisa(metin)
     simdi = datetime.datetime.now().astimezone(); ad_l = y.gundem_adaylari(_ik_takvim(), ox, simdi, 40); ad_l.sort(key=lambda a: (a["tarih"], a["saat"]))
     sorgu = str(arg.get("toplanti") or "").strip()
     if sorgu:
         es = [a for a in ad_l if _ik_eslesen(a["baslik"], sorgu)]
-        if not es: return None, _t(f"takvimde «{_ik_kisa(sorgu, 50)}» adlı yaklaşan toplantı yok", f"no upcoming meeting named «{_ik_kisa(sorgu, 50)}» on the calendar")
+        if not es: return None, _t(f"takvimde «{_nt_kisa(sorgu, 50)}» adlı yaklaşan toplantı yok", f"no upcoming meeting named «{_nt_kisa(sorgu, 50)}» on the calendar")
         if len({_ik_norm(a["baslik"]) for a in es}) > 1:
             return None, _t("birden çok toplantı eşleşti, hangisi? " + "; ".join(f"{a['baslik']} ({y.tarih_okunur(a['tarih'])} {a['saat']})" for a in es[:4]),
                             "several meetings match, which one? " + "; ".join(f"{a['baslik']} ({y.tarih_okunur(a['tarih'], True)} {a['saat']})" for a in es[:4]))
@@ -599,14 +599,14 @@ def _toplanti_bitir_dogrula(arg):
     d, ad = _toplanti_aktif()
     if d not in ("algilandi", "suruyor"): return None, (_t("toplantı zaten bitiyor", "the meeting is already ending") if d == "bitiyor" else _t("şu an süren bir toplantı yok", "there is no meeting in progress"))
     gizli = "gizli_acik" in globals() and gizli_acik()  # gizli kipte toplantı adı yazılmaz
-    return {"komut": "toplanti_bitir", "ozet": _t(f"«{_ik_kisa(ad, 80)}» toplantısı bitirilir" if ad and not gizli else "süren toplantı bitirilir", f"meeting «{_ik_kisa(ad, 80)}» is ended" if ad and not gizli else "the meeting in progress is ended")}, None
+    return {"komut": "toplanti_bitir", "ozet": _t(f"«{_nt_kisa(ad, 80)}» toplantısı bitirilir" if ad and not gizli else "süren toplantı bitirilir", f"meeting «{_nt_kisa(ad, 80)}» is ended" if ad and not gizli else "the meeting in progress is ended")}, None
 def _toplanti_baslat_dogrula(arg):  # konu verilmezse takvimde şimdi (−30 dk … +15 dk) başlayan ya da süren toplantı; yoksa Başlat'ın kendi adı
     e = _ik_arg(arg, (), ("konu",))
     if e: return None, e
     d, ad = _toplanti_aktif(); konu = _kayit_metin(arg.get("konu", ""), 0, 200) if arg.get("konu") else ""
     if konu is None: return None, _t("toplantı adı uygun değil", "meeting name not suitable")
-    if d in ("algilandi", "suruyor") and (not konu or _ik_norm(konu) == _ik_norm(ad)): return None, _t(f"«{_ik_kisa(ad, 60)}» zaten sürüyor", f"«{_ik_kisa(ad, 60)}» is already in progress")
-    if d in ("algilandi", "suruyor"): return None, _t(f"«{_ik_kisa(ad, 60)}» sürüyor; önce onu bitirmek gerekir", f"«{_ik_kisa(ad, 60)}» is in progress; end it first")
+    if d in ("algilandi", "suruyor") and (not konu or _ik_norm(konu) == _ik_norm(ad)): return None, _t(f"«{_nt_kisa(ad, 60)}» zaten sürüyor", f"«{_nt_kisa(ad, 60)}» is already in progress")
+    if d in ("algilandi", "suruyor"): return None, _t(f"«{_nt_kisa(ad, 60)}» sürüyor; önce onu bitirmek gerekir", f"«{_nt_kisa(ad, 60)}» is in progress; end it first")
     y = _yapi_mod() if "_yapi_mod" in globals() else None; simdi = datetime.datetime.now().astimezone(); aday = []
     for ev in _ik_takvim():
         try: b = y._etkinlik_zamani(ev) if y else None
@@ -615,8 +615,8 @@ def _toplanti_baslat_dogrula(arg):  # konu verilmezse takvimde şimdi (−30 dk 
         fark = (b - simdi).total_seconds() / 60
         if (konu and _ik_eslesen(ev.get("baslik"), konu) and fark > -180 and fark < 1440) or (not konu and -30 <= fark <= 15): aday.append((abs(fark), ev))
     aday.sort(key=lambda t: t[0])
-    if konu and len({_ik_norm(ev.get("baslik")) for _, ev in aday}) > 1: return None, _t("birden çok toplantı eşleşti: " + "; ".join(_ik_kisa(ev.get("baslik"), 50) for _, ev in aday[:4]) + " — hangisi?", "several meetings match: " + "; ".join(_ik_kisa(ev.get("baslik"), 50) for _, ev in aday[:4]) + " — which one?")
-    ev = aday[0][1] if aday else None; ad_ = _ik_kisa((ev or {}).get("baslik") or konu, 80)
+    if konu and len({_ik_norm(ev.get("baslik")) for _, ev in aday}) > 1: return None, _t("birden çok toplantı eşleşti: " + "; ".join(_nt_kisa(ev.get("baslik"), 50) for _, ev in aday[:4]) + " — hangisi?", "several meetings match: " + "; ".join(_nt_kisa(ev.get("baslik"), 50) for _, ev in aday[:4]) + " — which one?")
+    ev = aday[0][1] if aday else None; ad_ = _nt_kisa((ev or {}).get("baslik") or konu, 80)
     return {"komut": "toplanti_baslat", "konu": konu or None, "olay": (ev or {}).get("id"), "ad": ad_ or None,
             "ozet": _t(f"«{ad_}» toplantısı başlatılır" + (" (takvimden)" if ev else ""), f"meeting «{ad_}» is started" + (" (from the calendar)" if ev else "")) if ad_ else _t("toplantı başlatılır (adı saate göre verilir)", "a meeting is started (named by the time)")}, None
 
