@@ -11,7 +11,12 @@
 # toplantı başlarsa ya da kulaklık çıkarsa kapanır. Yalnız kulaklıkla ve toplantı dışında (hoparlörde Suflor kendi sesini duyar; Apple ses işleme yok).
 # v0.49.5 bekleme 0,8/2,5 → 1,0/2,0 ve biriktirme eşiği 0,15 → 0,3 sn: gerçek kayıtlarla benzetim (testler/sohbet-esik-20261016.md) — erken kesme
 # %4,3 → %1,7, tur sonunda ortanca bekleme +0,2 sn; kısa çıtırtı/"evet" Claude düşünürken biriktirmeyi başlatmaz.
-SOHBET_SESSIZ_SN, SOHBET_KISA_SN, SOHBET_UZUN_SN, SOHBET_MODELSIZ_SN, SOHBET_BEKLE_SN, SOHBET_BIRIK_SN = 0.6, 1.0, 2.0, 1.2, 6.0, 0.3
+SOHBET_SESSIZ_SN, SOHBET_KISA_SN, SOHBET_UZUN_SN, SOHBET_MODELSIZ_SN, SOHBET_BEKLE_SN, SOHBET_BIRIK_SN = 0.6, 1.3, 2.0, 1.2, 6.0, 0.3
+# v0.250.3 (17 Kasım, kullanıcı onayı): SOHBET_KISA_SN 1,0 → 1,3. 16–17 Kasım'daki 3 bölünen sorudan ikisinde tur sonu modeli %98 emindi ve 1,0 sn beklendi
+# (konuşma 1,7 ve 3,0 sn; kullanıcı ~1,2–1,6 sn sonra sürdürdü). Bedel: tur sonu kesin görünen her soruda ilk ses +0,3 sn. Ön söz ("sorayım sana", "peki",
+# "şöyle", "ama" …) ile biten parçada SOHBET_ONSOZ_SN beklenir.
+SOHBET_ONSOZ_SN = 2.0
+SOHBET_ONSOZ_RX = re.compile(r"\b(sorayım(?: sana)?|soracağım|sorum var|söyleyeyim|anlatayım|şöyle|şunu|peki|yani|ama|ve|çünkü|mesela|örneğin|bir de|let me ask|and|but|because)\W*$", re.I)
 SOHBET_KESME_SN, SOHBET_KORU_SN, SOHBET_UYARI_SN, SOHBET_KAPAN_SN, SOHBET_ONCE_SN = 0.7, 2.0, 30.0, 60.0, 1.5
 if os.environ.get("SUFLOR_TEST_SOHBET_KISA"): SOHBET_UYARI_SN, SOHBET_KAPAN_SN = 12.0, 20.0  # test/sohbet.py
 SOHBET = {"acik": False, "t_ac": 0.0, "t_ses": 0.0, "t_mesgul": 0.0, "uyari": False, "durak": None, "bekle": None, "kesme_sn": 0.0, "t_okuma": 0.0, "sira": 0, "kilit": threading.Lock()}
@@ -275,6 +280,7 @@ def _sohbet_tur_sonu():
         bek = SOHBET_MODELSIZ_SN if p is None else SOHBET_KISA_SN if p >= e else SOHBET_UZUN_SN
         with AKIS["kilit"]: son = str(AKIS["metin"].get(AKIS["sira"] - 1) or "") if AKIS["sira"] else ""
         if son and SOHBET_BEKLE_RX.search(son): bek = max(bek, SOHBET_BEKLE_SN)
+        elif son and SOHBET_ONSOZ_RX.search(son): bek = max(bek, SOHBET_ONSOZ_SN)  # v0.250.3: ön sözle biten parça — devamı geliyor
         SOHBET.update(durak=durak, bekle=bek)
         print(f"SOHBET: duraksama — tur sonu {'yok' if p is None else f'{p:.2f}'}, {bek:.1f} sn beklenecek")
     if sessiz >= SOHBET["bekle"]: return _sohbet_gonder(b, n, sessiz)

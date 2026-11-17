@@ -2072,11 +2072,27 @@ def _akis_birlestir(pcm, geri):  # bırakış: önek tutarsa kuyruk + bekleyen p
         if metin and izler and sohbet_ses_izi_red(izler): return geri(metin, "ses_izi")
         geri(metin, None if metin else "boş")
     threading.Thread(target=bekle, daemon=True).start(); return True
-def konus_pocket_isit():  # v0.167.1: Pocket boşta kapandıysa (pocket_bos_dk) basınca ısınır; açılış ~3,8 sn — açılmadan gelen selam/ilk cümle Mac sesiyle (Elif) okunuyordu
-    if os.environ.get("SUFLOR_TEST_BASLAT") or not AYAR.get("konusma", True) or not pocket_var() or POCKET["durum"] in ("hazir", "yukleniyor"): return
+# v0.250.3 (17 Kasım: sohbet açılınca ilk cevap 31,6 sn): Pocket ve Whisper aynı anda ısınınca Pocket ağır yükleme kilidini önce alıyordu, Whisper onu bekliyordu
+# (soru yazıya dökülemedi). Önce Whisper: kullanıcının sözü yazıya dökülmeden Pocket'a iş yok. Whisper yüklenirken Pocket en çok POCKET_WH_BEKLE_SN bekler;
+# Whisper kapalıysa ve yüklenmeye başlamadıysa kısa bir süre (POCKET_WH_BASLA_SN) bakar, sonra ısınır.
+POCKET_WH_BEKLE_SN, POCKET_WH_BASLA_SN = 30.0, 1.5
+def _konus_pocket_isit_ic():
     try:
         if kisilik_sesi()[0] == "pocket" and pocket_baslat(None, bekle=False) is False and POCKET["durum"] == "yukleniyor": print("KONUŞ: Pocket kapalıydı — ısınıyor")
     except Exception as e: print(f"KONUŞ: Pocket ısıtılamadı {e.__class__.__name__}")
+def _konus_pocket_whisperdan_sonra():
+    t0 = time.time(); w = STATE.get("whisper") or {}
+    while time.time() - t0 < POCKET_WH_BEKLE_SN:
+        d = w.get("durum")
+        if d == "hazir" or d == "hata" or (d != "yukleniyor" and time.time() - t0 >= POCKET_WH_BASLA_SN): break
+        time.sleep(0.2)
+    if POCKET["durum"] not in ("hazir", "yukleniyor"):
+        if time.time() - t0 >= 1: print(f"KONUŞ: Pocket Whisper'dan sonra ısınıyor ({time.time() - t0:.1f} sn bekledi)")
+        _konus_pocket_isit_ic()
+def konus_pocket_isit():  # v0.167.1: Pocket boşta kapandıysa (pocket_bos_dk) basınca ısınır; açılış ~3,8 sn — açılmadan gelen selam/ilk cümle Mac sesiyle (Elif) okunuyordu
+    if os.environ.get("SUFLOR_TEST_BASLAT") or not AYAR.get("konusma", True) or not pocket_var() or POCKET["durum"] in ("hazir", "yukleniyor"): return
+    if (STATE.get("whisper") or {}).get("durum") != "hazir": threading.Thread(target=_konus_pocket_whisperdan_sonra, daemon=True).start(); return  # v0.250.3: önce Whisper
+    _konus_pocket_isit_ic()
 def konus_basla():  # pano: düğmeye basıldı — süreç ve Whisper ısınsın (kayıt sürerken)
     if not AYAR.get("konusma", True): return {"ok": False, "err": _t("Konuşma kapalı (ayar konusma)", "Voice is off (setting konusma)")}
     if toplanti_var() and not toplanti_konus(): return {"ok": False, "err": _t("Toplantı sürerken bas-konuş kapalı (ayar toplanti_konus)", "Push-to-talk is off during a meeting (setting toplanti_konus)")}

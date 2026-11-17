@@ -87,4 +87,28 @@ else:
     ok("önünde konuşma yoksa (kısa cümlenin kendisi) atılmaz", len(y) == len(yalniz))
     ok("önceki kısım çalındıysa sessizlik+artık atılır", len(p["kuyruk_temizle"](yalniz, SR, np, once=True)) < len(yalniz))
 
+# 6) v0.250.3: tur sonu beklemesi ve ön söz; Pocket Whisper'dan sonra ısınır
+so = open(os.path.join(KOD, "aktarici", "sohbet.py"), encoding="utf-8").read()
+ok("SOHBET_KISA_SN 1,3", re.search(r"^SOHBET_SESSIZ_SN, SOHBET_KISA_SN.*= 0\.6, 1\.3,", so, re.M) is not None)
+h = {"re": re}; exec(re.search(r"^SOHBET_ONSOZ_RX = re\.compile\(.*?\)\n", so, re.M).group(0), h)
+for q, b in [("Tamam. Peki Marvin, aynı soruyu tekrar sorayım sana.", True), ("Şöyle bir şey var ama", True), ("Peki,", True),
+             ("Açıkçası şu anda kuş gözlemini yapmak istemezdim Marvin.", False), ("Bunu yapar mısın?", False), ("I think so.", False)]:
+    ok(f"ön söz: {q} → {b}", bool(h["SOHBET_ONSOZ_RX"].search(q)) == b)
+import threading, time
+bk = src[src.index("POCKET_WH_BEKLE_SN, POCKET_WH_BASLA_SN"):src.index("def konus_basla():")]
+sira = []
+P = {"STATE": {"whisper": {"durum": "yukleniyor"}}, "POCKET": {"durum": "kapali"}, "AYAR": {}, "os": os, "time": time, "threading": threading,
+     "pocket_var": lambda: True, "kisilik_sesi": lambda: ("pocket", None, 1), "print": lambda *a, **k: None}
+def _pb(*a, **k): sira.append("pocket"); P["POCKET"]["durum"] = "yukleniyor"; return False
+P["pocket_baslat"] = _pb
+exec(bk, P); P["POCKET_WH_BASLA_SN"] = 0.3
+os.environ.pop("SUFLOR_TEST_BASLAT", None)
+P["konus_pocket_isit"](); time.sleep(0.5)
+ok("Whisper yüklenirken Pocket beklemede", sira == [])
+P["STATE"]["whisper"]["durum"] = "hazir"; sira.append("whisper"); time.sleep(0.5)
+ok("Whisper hazır olunca Pocket ısındı (sıra: önce Whisper)", sira == ["whisper", "pocket"])
+P["POCKET"]["durum"] = "kapali"; P["STATE"]["whisper"]["durum"] = "kapali"; sira.clear()
+P["konus_pocket_isit"](); time.sleep(0.8)
+ok("Whisper yüklenmeye başlamadıysa kısa beklemeden sonra Pocket ısınır", sira == ["pocket"])
+
 print("konus-anlik:", "✓ hepsi geçti" if not HATA else f"✗ {len(HATA)} sorun"); sys.exit(1 if HATA else 0)

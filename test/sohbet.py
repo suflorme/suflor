@@ -119,7 +119,7 @@ try:
     ok(f"araya girilen söz yeni soru oldu ({k.get('soru')!r})", "hava" in (k.get("soru") or "").lower())
     okuma_bitsin()
     # v0.49.2: soru biter bitmez (Claude düşünürken) söylenen atılmaz, sonraki soru olur
-    k1 = st().get("soru"); akit(ses("Kaç kişi katılacak?") + sus(1.0) + ses("Bir de yarın saat kaçta başlıyoruz?") + sus(1.2))
+    k1 = st().get("soru"); akit(ses("Kaç kişi katılacak?") + sus(1.6) + ses("Bir de yarın saat kaçta başlıyoruz?") + sus(1.2))
     ok("Claude düşünürken konuşma biriktirildi", "Claude düşünürken konuşma — biriktiriliyor" in log())
     k = bekle_hazir(k1); k = bekle_hazir(k.get("soru")) if "kişi" in (k.get("soru") or "") else k
     ok(f"düşünürken söylenen sonraki soru oldu ({k.get('soru')!r})", "yarın" in (k.get("soru") or "").lower() and "kişi" not in (k.get("soru") or "").lower())
