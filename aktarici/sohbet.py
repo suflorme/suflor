@@ -389,6 +389,10 @@ def _ag_adsiz(metin):  # baştaki kişilik adı atılır ("Marvin, dur"), son c�
     sw = c[-1].split()
     while sw and sade(sw[0].strip(",.;:!?…")) in adlar: sw = sw[1:]
     return " ".join(sw)
+# v0.250.4 (17 Kasım, "dur" tepkisi hedefi 0,6 sn): kullanıcının gerçek kesitlerinde tstt ara metni "Dur"u ses başından ~0,54 sn, "bekle"yi yalnız "bek" olarak
+# ~0,56 sn sonra veriyor; tam "bekle" ~0,96 sn (o arada Whisper 0,9–1,0 sn'de kazanıyordu). Tek sözcüklük ara metin bu ön eklerden biriyse durdurma sözü sayılır
+# (yankı denetimi tam sözcükle aynen; okunan metinde "bek" geçmez). Türkçede "bek…" ile başlayıp okuma sırasında söylenecek başka söz pek yok (bekar, bekçi).
+AG_DUR_ON_EK = ("bek", "bekl")
 def _ag_sinif(metin, ara=False):  # → dur | onay | on (onay/dur sözünün başı, karar bekler) | baska | bos. ara: tstt ara metni (büyüyerek gelir)
     son = _ag_adsiz(metin); n = _ag_norm(son)
     if not n or AG_BOS_RX.search(str(metin or "")): return "bos"
@@ -397,6 +401,7 @@ def _ag_sinif(metin, ara=False):  # → dur | onay | on (onay/dur sözünün ba�
     if len(w) == 1 and (w[0] == "tur" or any(len(d) >= 4 and _ag_bir_harf(w[0], d) for d in AG_DUR_SOZ)): return "dur"  # Whisper/tstt kısa parçada "Bekte", "Pekle", "Tur"
     onay2 = globals().get("ONAY_SOZ") or set()  # otonom.py (sade biçim)
     if all(x in AG_ONAY or sade(x) in onay2 for x in w) or n.replace(" ", "") in AG_ONAY: return "onay"
+    if ara and len(w) == 1 and w[0] in AG_DUR_ON_EK: return "dur"  # v0.250.4: tstt "bekle"yi önce "bek" diye verir (gerçek kayıtta ~0,56 sn; tam sözcük ~0,96 sn)
     if ara and len(w) <= 2 and len(w[-1]) <= 4 and any(o.startswith(w[-1]) for o in tuple(AG_ONAY) + AG_DUR_SOZ + ("bir",)) and all(x in AG_ONAY for x in w[:-1]): return "on"
     if ara and len(w) <= 3 and w[0] in ("dur", "bir") and ASISTAN_DUR_RX.match(n + " dakika") or (ara and n in ("bir", "bir da", "bir sa", "dur bi", "dur bir")): return "on"  # "bir dakika" yarım
     return "baska"

@@ -45,7 +45,7 @@ beklenen = [("Dur.", "dur"), ("Bekle.", "dur"), ("Sus!", "dur"), ("Bir dakika.",
             ("Yarın hava nasıl?", "baska"), ("Peace.", "baska"), ("Altyazı M.K.", "bos"), ("İzlediğiniz için teşekkür ederim.", "bos"), ("", "bos")]
 yanlis = [(x, S(x), b) for x, b in beklenen if S(x) != b]
 ok(f"sınıf: {len(beklenen) - len(yanlis)}/{len(beklenen)} doğru" + (f" — yanlış: {yanlis}" if yanlis else ""), not yanlis)
-ara = [("E", "on"), ("Ev", "on"), ("Bek", "on"), ("D", "on"), ("Hı", "onay"), ("Ta", "on"), ("Dur", "dur"), ("Yar", "baska"), ("Yarın hav", "baska"), ("Evet", "onay"), ("Bir", "on")]
+ara = [("E", "on"), ("Ev", "on"), ("Bek", "dur"), ("Bekl", "dur"), ("Be", "on"), ("D", "on"), ("Hı", "onay"), ("Ta", "on"), ("Dur", "dur"), ("Yar", "baska"), ("Yarın hav", "baska"), ("Evet", "onay"), ("Bir", "on")]
 yanlis = [(x, S(x, ara=True), b) for x, b in ara if S(x, ara=True) != b]
 ok("ara metin (tstt): onay/dur sözünün başı karar bekler" + (f" — yanlış: {yanlis}" if yanlis else ""), not yanlis)
 with m.SES_K: m.SES["simdi"] = "Akşamları ekran kullanımını azaltmak da uykuya dalmayı hızlandırır, durum böyle."
