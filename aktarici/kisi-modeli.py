@@ -323,50 +323,39 @@ def _km_notlar_metni(soru, ilgili_yalniz, cap):
         if top + len(l) + 1 > cap - 120: break
         sat.append(l); top += len(l) + 1
     return _km_sar(_t("Notlar defteri", "Notes"), "\n".join(sat), _t(f" (kullanıcının kendi notları, son {KM_NOT_GUN} gün; toplantıya ya da karşı tarafa okunan cevapta kullanma)", f" (the user's own notes, last {KM_NOT_GUN} days; don't use in an answer read into a meeting or to the other side)"), cap)
-# --- Dış kaynak (10 Kasım, üçüncü kişilik "dış işler"): Tazı'nın YEREL dosyası. Dilim soruya göre dolar: soruda adı/kişisi/alan adı geçen izleme kaydının kısa özeti (≤ 8 satır:
-# kim, son gelişme, bayraklar, son tarama tarihi; kanıt dereceli). Ağ yok; yalnız tazi.py `ozet_metni`. Amaç varsayılanında yok: çağıran dilimler=[…, "dis_kaynak"] ile ister (dış soruda).
-# Dosyada ad yoksa dilim boş kalır (çağıran "Tazı'da dosya yok" der, web yoluna düşer). Gizli kipte pakete girmez (KM_GIZLI_SERBEST dışı).
-_KM_TAZI = {"m": None, "hata": None}
-def tazi_acik():  # ayar tazi (bool); yoksa geliştiricide açık, beta'da kapalı (11 Kasım). Kapalıyken tüm Tazı yolları sessiz: tazi_mod() None döner
+# --- Dış kaynak (10 Kasım, üçüncü kişilik "dış işler"): Tazı'nın dosyası. Dilim soruya göre dolar: soruda adı/kişisi/alan adı geçen izleme kaydının kısa özeti (≤ 8 satır:
+# kim, son gelişme, bayraklar, son tarama tarihi; kanıt dereceli). Ağ yok. S321: Tazı ayrı hizmet; bütün çağrılar aktarici/tazi-istemci.py (tazi_cagir) üzerinden, okuyanlar kısa önbellekli.
+# Amaç varsayılanında yok: çağıran dilimler=[…, "dis_kaynak"] ile ister (dış soruda). Dosyada ad yoksa dilim boş kalır (çağıran "Tazı'da dosya yok" der, web yoluna düşer). Gizli kipte pakete girmez (KM_GIZLI_SERBEST dışı).
+def tazi_acik():  # ayar tazi (bool); yoksa geliştiricide açık, beta'da kapalı (11 Kasım). Kapalıyken tüm Tazı yolları sessiz: hizmet çağrılmaz
     v = AYAR.get("tazi")
     if isinstance(v, bool): return v
     g = globals().get("gelistirici_mi")
     return bool(g()) if g else True  # gelistirici_mi yoksa (yalıtılmış ad alanı) açık
-def tazi_yol():  # tazi.py'nin yeri (relay.py'nin yanında ya da ayar kod klasöründe) ya da None
-    for d in (os.path.dirname(os.path.abspath(globals().get("__file__") or "")) if globals().get("__file__") else "", os.path.expanduser(str(AYAR.get("kod") or ""))):
-        yol = os.path.join(d, "tazi.py") if d else ""
-        if yol and os.path.isfile(yol): return yol
+def tazi_yol():  # Tazı hizmetinin yeri (ayar tazi_yol / ortam TAZI_HIZMET) ya da None (Tazı kurulu değil)
+    return tazi_hizmet_yolu(AYAR) if "tazi_hizmet_yolu" in globals() else None
+def tazi_yenile():  # tarama bitince: önbellek boşalır (yeni dosya/liste görünsün)
+    if "tazi_onbellek_sil" in globals(): tazi_onbellek_sil()
+_KM_TAZI_HATA = set()
+def _km_tazi(islem, girdi, onbellek=120, zaman=8):  # → hizmet sonucu (ok) ya da None (kapalı, Tazı yok, hata); hata türü günlüğe bir kez
+    if not tazi_acik() or "tazi_cagir" not in globals(): return None
+    r = tazi_cagir(islem, girdi, zaman=zaman, ayar=AYAR, onbellek=onbellek)
+    if r.get("ok"): return r
+    h = str(r.get("hata") or "?")
+    if h != "tazi_yok" and (islem, h) not in _KM_TAZI_HATA: _KM_TAZI_HATA.add((islem, h)); print(f"TAZI: {islem} hatası ({h})")
     return None
-def tazi_yenile(): _KM_TAZI.update(m=None, hata=None)  # tarama bitince: modül yeniden yüklenir (kod/liste değişikliği görünsün)
-def tazi_mod():  # tazi.py → modül ya da None (ayar tazi kapalıysa da None); bir kez yüklenir
-    if not tazi_acik(): return None
-    if _KM_TAZI["m"] is None and not _KM_TAZI["hata"]:
-        import importlib.util
-        for d in (os.path.dirname(os.path.abspath(globals().get("__file__") or "")) if globals().get("__file__") else "", os.path.expanduser(str(AYAR.get("kod") or ""))):
-            yol = os.path.join(d, "tazi.py") if d else ""
-            if not yol or not os.path.isfile(yol): continue
-            try:
-                sys.dont_write_bytecode = True
-                sp = importlib.util.spec_from_file_location("suflor_tazi", yol); m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); _KM_TAZI["m"] = m; break
-            except Exception as e: _KM_TAZI["hata"] = e.__class__.__name__; print(f"TAZI: yüklenemedi ({_KM_TAZI['hata']})")
-        if _KM_TAZI["m"] is None and not _KM_TAZI["hata"]: _KM_TAZI["hata"] = "yok"
-    return _KM_TAZI["m"]
-def tazi_var():  # tazi.py yüklenebiliyor ve izleme listesi okunuyor mu
-    m = tazi_mod()
-    try: return bool(m and m.liste_oku())
-    except Exception: return False
-def tazi_kayitlar(metin, en_cok=3):  # metinde geçen izleme kayıtları ([] = yok ya da Tazı yok)
-    m = tazi_mod()
-    try: return m.metinden_kayitlar(metin, en_cok=en_cok) if m and metin else []
-    except Exception as e: print(f"TAZI: eşleşme hatası ({e.__class__.__name__})"); return []
+def tazi_var():  # Tazı hizmeti var ve izleme listesinde kayıt var mı
+    r = _km_tazi("durum", {}, 60)
+    return bool(r and r.get("kayit_sayisi"))
+def tazi_kayitlar(metin, en_cok=3):  # metinde geçen izleme kayıtları [{id, ad, alanlar, aday}] ([] = yok ya da Tazı yok)
+    if not metin: return []
+    r = _km_tazi("eslesen_kayitlar", {"metin": str(metin)[:300000], "en_cok": int(en_cok)})
+    return list((r or {}).get("kayitlar") or [])
 def tazi_ozet(sorgu):  # ≤ 8 satır ya da None
-    m = tazi_mod()
-    try: return m.ozet_metni(sorgu) if m and sorgu else None
-    except Exception as e: print(f"TAZI: özet hatası ({e.__class__.__name__})"); return None
+    r = _km_tazi("ozet", {"sorgu": str(sorgu)[:200]}) if sorgu else None
+    return (r or {}).get("metin")
 def tazi_satir(sorgu):  # tek satır ya da None
-    m = tazi_mod()
-    try: return m.ozet_satiri(sorgu) if m and sorgu else None
-    except Exception as e: print(f"TAZI: özet hatası ({e.__class__.__name__})"); return None
+    r = _km_tazi("ozet_satiri", {"sorgu": str(sorgu)[:200]}) if sorgu else None
+    return (r or {}).get("satir")
 def _km_dis_kaynak_metni(soru, cap):
     ks = tazi_kayitlar(soru, 2)
     govde = "\n\n".join(m for m in (tazi_ozet(k["id"]) for k in ks) if m)

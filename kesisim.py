@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Suflor.me — Kesişim (F1, 12 Kasım 2026): günlük çapraz kontrol. Proje veritabanı + Tazı dizini + takvim katmanı + rutin izleri tek bulgu şemasıyla karşılaştırılır.
 # Tasarım: ../planlar/kesisim-mimari-20261111.md (§1–3, §7, §8). F1 kapsamı: kural tabanlı, belirlenimci, model/çözücü/pano YOK; ağa hiçbir şey göndermez.
-#   python3 -B kesisim.py kos [--canli DIR] [--json] [--kuru] [--vt YOL] [--tazi DIR]   (canlı klasör varsayılanı: ayardaki uygulama klasörü/canli)
+#   python3 -B kesisim.py kos [--canli DIR] [--json] [--kuru] [--vt YOL]   (canlı klasör varsayılanı: ayardaki uygulama klasörü/canli)
 #   python3 -B kesisim.py belirsiz [--canli DIR]    (belirsiz adaylar; F2 çözücüsüne teslim biçimi)
-# Okuma: proje veritabanı baglayici üzerinden YALNIZ SALT OKUNUR (mode=ro); tazi.db salt okunur (indeksle ÇAĞRILMAZ), son.json/iletisim.jsonl salt okunur. veritabanına ve Tazı'ya yazılmaz.
+# Okuma: proje veritabanı baglayici üzerinden YALNIZ SALT OKUNUR (mode=ro); Tazı verisi S321'den yalnız Tazı hizmetinin kesisim_verisi işlemiyle (aktarici/tazi-istemci.py; Tazı'nın klasörü doğrudan okunmaz). veritabanına ve Tazı'ya yazılmaz.
 #   Yazılan tek şey: <canli>/kesisim.json (bugün) ve kesisim.jsonl (geçmiş; metin yok: zaman, id, tur, durum). F2 çözücüsü (kesisim-coz.py) kesisim.json'a "cozum" ekler (kos taşır) ve
 #   kesisim-coz-durum.json'da "birak" dediği bulgu id'lerini tutar (kos bunları bulgu listesine almaz).
 # Bulgu: id (tur+varlık+kaynaklar+alandan sabit özet), tur (celiski|eksik|bayat|yeni|bekleyen|rutin), varlik (kisi:<veritabanı id> | firma:<alan adı> | sistem:<ad>; veritabanında karşılığı olmayan Tazı kişisi
@@ -17,7 +17,6 @@ if KOK not in sys.path: sys.path.insert(0, KOK)
 import baglayici
 
 SURUM = 1
-TAZI_VARSAYILAN = "~/Library/Application Support/Suflor/tazi"
 AYAR_VARSAYILAN = "~/Library/Application Support/Suflor/ayar.json"
 TUR_SIRA = ("celiski", "eksik", "bayat", "bekleyen", "yeni", "rutin")
 YAKIN_GUN, YAKIN_DAR_GUN = 14, 3          # yaklaşan toplantı penceresi; bayatlık için dar pencere
@@ -97,41 +96,25 @@ def _vt_ac(vt, ayar):
     if k and k[0].yol: return _VT(k[0])
     return None
 
-def _tazi_oku(dizin):
-    """tazi.db salt okunur (indeksle çağrılmaz) + son.json + iletisim.jsonl → sözlük; db yoksa {"yok": True}"""
-    yol = os.path.join(dizin, "tazi.db")
-    t = {"yok": True, "kayit": {}, "oge": [], "bulgu": [], "iletisim": [], "son_indeks": None, "tarama": {}}
-    if not os.path.isfile(yol): return t
-    import pathlib
-    try:
-        con = sqlite3.connect(pathlib.Path(yol).resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
-        con.execute("PRAGMA query_only=1")
-    except sqlite3.Error: return t
-    try:
-        for r in con.execute("SELECT id, ad, tur, alanlar, eposta_iz FROM kayit"):
-            t["kayit"][r[0]] = {"id": r[0], "ad": r[1], "tur": r[2], "alanlar": _json_liste(r[3]), "eposta_iz": _json_liste(r[4])}
-        t["oge"] = [dict(zip(("kayit", "no", "bolum", "metin", "kaynak", "derece", "tarih", "eklendi", "acik"), r))
-                    for r in con.execute("SELECT kayit, no, bolum, metin, kaynak, derece, tarih, eklendi, acik FROM dosya_oge")]
-        t["bulgu"] = [dict(zip(("kayit", "tur", "ozet", "derece", "ilk", "durum", "anahtar", "kaynak"), r))
-                      for r in con.execute("SELECT kayit, tur, ozet, derece, ilk_gorulme, durum, anahtar, kaynak FROM bulgu")]
-        m = con.execute("SELECT v FROM meta WHERE k='son_indeks'").fetchone()
-        t["son_indeks"] = m[0] if m else None
-        t["yok"] = False
-    except sqlite3.Error: t["yok"] = True
-    finally: con.close()
-    son = _json_oku(os.path.join(dizin, "son.json"), {})
-    t["tarama"] = {k: v.get("tarih") for k, v in (son.get("kayitlar") or {}).items() if isinstance(v, dict)}
-    try:
-        with open(os.path.join(dizin, "iletisim.jsonl"), encoding="utf-8") as f:
-            for l in f:
-                try: r = json.loads(l)
-                except ValueError: continue
-                if isinstance(r, dict) and r.get("kayit") and r.get("deger"): t["iletisim"].append(r)
-    except OSError: pass
+TAZI_BOS = {"yok": True, "kayit": {}, "oge": [], "bulgu": [], "iletisim": [], "son_indeks": None, "tarama": {}}
+def tazi_istemci():  # aktarici/tazi-istemci.py modülü (S321: Tazı ayrı hizmet, Suflor müşteri)
+    import importlib.util
+    sp = importlib.util.spec_from_file_location("suflor_tazi_istemci", os.path.join(KOK, "aktarici", "tazi-istemci.py"))
+    m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m); return m
+def _tazi_oku(tazi=None, ayar=None):
+    """Tazı verisi → sözlük (TAZI_BOS biçimi). tazi: hazır sözlük (test) | None (hizmetin kesisim_verisi işlemi). Hizmet yok ya da hata → {"yok": True}"""
+    if tazi is None:
+        try: r = tazi_istemci().tazi_cagir("kesisim_verisi", {}, zaman=30, ayar=ayar)
+        except Exception: r = {"ok": False}
+        tazi = r if r.get("ok") else {}
+    tazi = json.loads(json.dumps(tazi)) if isinstance(tazi, dict) else {}   # derin kopya: koşu veriyi değiştirse de verilen sözlük bozulmaz
+    t = {k: (v.copy() if isinstance(v, (dict, list)) else v) for k, v in TAZI_BOS.items()}
+    for k in t:
+        if k in tazi and isinstance(tazi[k], type(TAZI_BOS[k])) or (k == "son_indeks" and isinstance(tazi.get(k), str)): t[k] = tazi[k]
     return t
 
 # ---------- ana koşu ----------
-def kos(canli=None, vt=None, tazi_dizin=None, ayar=None, simdi=None, gizli=False, yaz=True, gelistirici=None):
+def kos(canli=None, vt=None, tazi=None, ayar=None, simdi=None, gizli=False, yaz=True, gelistirici=None):
     """→ sonuç sözlüğü (kesisim.json içeriği); atlanırsa {"atlandi": neden}. canli verilirse (ve yaz) kesisim.json/.jsonl yazılır."""
     t0 = time.perf_counter()
     ayar = ayar if isinstance(ayar, dict) else _json_oku(os.path.expanduser(os.environ.get("SUFLOR_AYAR") or AYAR_VARSAYILAN), {})
@@ -141,10 +124,9 @@ def kos(canli=None, vt=None, tazi_dizin=None, ayar=None, simdi=None, gizli=False
     simdi = simdi or datetime.datetime.now()
     bugun = simdi.date()
     canli = os.path.expanduser(canli) if canli else None
-    tdir = os.path.expanduser(tazi_dizin or os.environ.get("TAZI_DIR") or TAZI_VARSAYILAN)
     O = _vt_ac(vt, ayar)
     vt_acik = bool(O and O.acik())
-    T = _tazi_oku(tdir)
+    T = _tazi_oku(tazi, ayar)
     B, suzulen, kaynaklar = [], {"ozel": 0}, []
     own = {baglayici.alan_norm("onmicrosoft.com")}
 
@@ -332,7 +314,7 @@ def kos(canli=None, vt=None, tazi_dizin=None, ayar=None, simdi=None, gizli=False
             d, y = kaynak("Proje veritabanı anlık görüntüsü (vt-izle)", datetime.datetime.fromtimestamp(float(vm["kontrol"])), 24 * 3600); bayat_bulgu("Proje veritabanı anlık görüntüsü", d, y or 0, 24 * 3600, "vt-izle'yi (Brifing.app) yeniden başlat")
     if T["yok"]: kaynaklar.append({"ad": "Tazı dizini", "son_okuma": None, "beklenen_sn": 4 * 86400, "yas_sn": None, "durum": "yok", "bulgu": False})
     else:
-        d, y = kaynak("Tazı dizini (tazi.db)", T["son_indeks"], 4 * 86400); bayat_bulgu("Tazı dizini", d, y or 0, 4 * 86400, "tazi.py indeksle")
+        d, y = kaynak("Tazı dizini (indeks)", T["son_indeks"], 4 * 86400); bayat_bulgu("Tazı dizini", d, y or 0, 4 * 86400, "Tazı indeksini yenile (Tazı deposu)")
     tarihler = [z for z in (_zaman(v) for v in T["tarama"].values()) if z]
     if tarihler: kaynak("Tazı son tarama", max(tarihler), 8 * 86400, bulgu=False)
     rutinler = []   # (ad, son iz, beklenen sn, açıklama)
@@ -406,12 +388,12 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     for ad in ("kos", "belirsiz"):
         p = sub.add_parser(ad)
-        p.add_argument("--canli"); p.add_argument("--vt"); p.add_argument("--tazi")
+        p.add_argument("--canli"); p.add_argument("--vt")
         if ad == "kos": p.add_argument("--json", action="store_true"); p.add_argument("--kuru", action="store_true", help="dosya yazma")
         else: p.set_defaults(kuru=True, json=False)
     a = ap.parse_args(argv)
     canli = a.canli or os.path.join(baglayici._klasor(_json_oku(os.path.expanduser(os.environ.get("SUFLOR_AYAR") or AYAR_VARSAYILAN), {}), "uygulama", "~/Library/Application Support/Suflor"), "canli")
-    s = kos(canli, a.vt, a.tazi, yaz=a.cmd == "kos" and not a.kuru)
+    s = kos(canli, a.vt, yaz=a.cmd == "kos" and not a.kuru)
     if s.get("atlandi"): print("atlandı: " + s["atlandi"]); return 0
     if a.cmd == "belirsiz": print(json.dumps(belirsiz_adaylar(s), ensure_ascii=False, indent=1)); return 0
     if a.json: print(json.dumps(s, ensure_ascii=False, indent=1)); return 0

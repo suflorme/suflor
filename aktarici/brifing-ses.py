@@ -190,7 +190,7 @@ def dis_kisilik():  # kişilik yuvası "dis" (dış işler asistanı) ya da None
     return next((k for k in kisilikler() if k.get("rol") == "dis"), None) if "kisilikler" in globals() else None
 def dis_etiket(): k = dis_kisilik(); return (kisilik_gorunen(k) if k else "Tazı") + " · " + _t("Dış taraf", "Outside parties")
 def brifing_dis_taraf(olay):  # → satırlar (en çok BRIFING_DIS_EN_COK); [] = bölüm yok
-    if ("gizli_acik" in globals() and gizli_acik()) or "dis_katilimcilar" not in globals() or not tazi_var(): return []  # tazi_var: ayar tazi kapalıyken de False (tazi_mod None)
+    if ("gizli_acik" in globals() and gizli_acik()) or "dis_katilimcilar" not in globals() or not tazi_var(): return []  # tazi_var: ayar tazi kapalıyken ve Tazı hizmeti yokken de False
     try: dis, _belirsiz, _dav = dis_katilimcilar(olay if isinstance(olay, dict) else {})
     except Exception as e: print(f"BRİFİNG: dış taraf kurulamadı ({e.__class__.__name__})"); return []
     gor, var, yok, aday = set(), [], {}, {}

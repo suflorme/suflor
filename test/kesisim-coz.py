@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Kesişim F2 (kesisim-coz.py): sahte model yanıtı ve sahte Tazı çağrısıyla kararların uygulanması — duzelt (Tazı dosyası + geri alınabilir olay), arastir (kuyruk + sorgu, 3 koşuda sonuçsuz),
+# Kesişim F2 (kesisim-coz.py): sahte model yanıtı ve sahte Tazı çağrısıyla (S321: tazi_fn(islem, girdi) → hizmet sözlüğü; varsayılan yol istemci + test/sahte-tazi.py) kararların uygulanması — duzelt (Tazı dosyası + geri alınabilir olay), arastir (kuyruk + sorgu, 3 koşuda sonuçsuz),
 # birak (kalıcı bastırma: kesisim.kos o id'yi bir daha üretmez), günlük tavan, kişi alanında B derece sınırı, kaynaksız/düşük güvenli düzeltme, karar/iş kaydına dokunmama, proje veritabanına yazma çağrısının
 # HİÇ yapılmaması (S293), geri al, olay satırında metin olmaması, cozum şeması + kos'un cozum'u taşıması, gizli/geliştirici/ayar kapıları, geçersiz model yanıtı. Gerçek model, ağ ve port yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kesisim-coz.py     (kaldı → çıkış 1)
@@ -8,7 +8,7 @@ sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, KOD)
 T0 = tempfile.mkdtemp(prefix="suflor-kcoz-ayar-"); os.environ["SUFLOR_AYAR"] = os.path.join(T0, "ayar.json"); json.dump({}, open(os.environ["SUFLOR_AYAR"], "w"))
-os.environ["TAZI_VT"] = "-"; os.environ["TAZI_DIR"] = os.path.join(T0, "tazi-yok")
+os.environ["TAZI_HIZMET"] = os.path.join(T0, "yok", "tazi_hizmet.py")
 sp = importlib.util.spec_from_file_location("kesisim_coz", os.path.join(KOD, "kesisim-coz.py")); C = importlib.util.module_from_spec(sp); sp.loader.exec_module(C)
 import kesisim
 
@@ -30,12 +30,13 @@ def model(*k):   # kararlar → model_fn
     def f(istem): cagri.append(istem); return "Tamam:\n" + json.dumps({"kararlar": list(k)}, ensure_ascii=False)
     f.cagri = cagri; return f
 def karar(i, k, g=0.9, hedef="tazi", duzeltme=None): return dict(id=i, karar=k, gerekce="deneme gerekçesi", guven=g, hedef=hedef, duzeltme=duzeltme or {})
-class Tazi:
+class Tazi:   # sahte hizmet çağrısı: (islem, girdi) kaydeder
     def __init__(s): s.args = []; s.no = 10
-    def __call__(s, a):
-        s.args.append(a)
-        if a[0] == "dosya" and "--metin" in a: s.no += 1; return 0, f"eklendi: #{s.no} ({a[a.index('--bolum') + 1]})"
-        return 0, "kapandı" if "--kapat" in a else "ok"
+    def __call__(s, islem, girdi=None):
+        s.args.append((islem, dict(girdi or {})))
+        if islem == "dosya_ekle": s.no += 1; return {"ok": True, "no": s.no}
+        if islem == "kayit_bul": return {"ok": True, "kayit": None}
+        return {"ok": True}
     def say(s, ilk): return sum(1 for a in s.args if a[0] == ilk)
 def olaylar(canli):
     try: return [json.loads(l) for l in open(os.path.join(canli, "kesisim-coz.jsonl"), encoding="utf-8")]
@@ -49,7 +50,8 @@ def calistir(canli, s, m, tazi=None, kuyruk=None, ayar=None, oh=None, simdi=SIMD
 cl = taze()
 m = model(karar("a1", "duzelt", duzeltme=dz()))
 c, tz = calistir(cl, sonuc(bulgu("a1")), m)
-ok("duzelt: tazi.py dosya çağrılır (--kim kayıt, --kaynak, --derece B, [kesişim] işareti)", tz.say("dosya") == 1 and tz.args[0][tz.args[0].index("--kim") + 1] == "nova-teknoloji" and "B" in tz.args[0] and any(x.startswith("[kesişim]") for x in tz.args[0]), tz.args)
+ok("duzelt: hizmet dosya_ekle çağrılır (kim kayıt, kaynak, derece B, [kesişim] işareti)", tz.say("dosya_ekle") == 1 and tz.args[0][1]["kim"] == "nova-teknoloji" and tz.args[0][1]["derece"] == "B"
+   and tz.args[0][1]["kaynak"] == "https://ornek.test/kurulus" and tz.args[0][1]["metin"].startswith("[kesişim]"), tz.args)
 ok("cozum şeması: tarih, duzeltilen 1, arastirilan 0, birakilan 0, cozulemeyen_onemli []", c["tarih"] == "2026-11-12" and c["duzeltilen"] == 1 and c["arastirilan"] == 0 and c["birakilan"] == 0 and c["cozulemeyen_onemli"] == [] and c["model"] == "ok", c)
 j = json.load(open(os.path.join(cl, "kesisim.json")))
 ok("cozum kesisim.json'a yazıldı", j.get("cozum") == c)
@@ -62,7 +64,7 @@ m2 = model(); c2, tz2 = calistir(cl, sonuc(bulgu("a1")), m2)
 ok("düzeltilen bulgu 7 gün içinde yeniden değerlendirilmez (model çağrılmaz)", not m2.cagri and c2["aday"] == 0 and c2["model"] == "yok")
 # geri al
 tzg = Tazi()
-ok("geri al: dosya --kapat 11 çağrılır, olay geri_alindi, sayaç düşer, bulgu yeniden aday", C.geri_al(cl, "a1", tazi_fn=tzg, simdi=SIMDI) and tzg.args[0][:5] == ["dosya", "--kim", "nova-teknoloji", "--kapat", "11"]
+ok("geri al: dosya_kapat no 11 çağrılır, olay geri_alindi, sayaç düşer, bulgu yeniden aday", C.geri_al(cl, "a1", tazi_fn=tzg, simdi=SIMDI) and tzg.args[0][0] == "dosya_kapat" and tzg.args[0][1]["kim"] == "nova-teknoloji" and tzg.args[0][1]["no"] == 11
    and olaylar(cl)[-1]["eylem"] == "geri_alindi" and C.durum_oku(cl)["gun"]["duzeltme_n"] == 0 and C.adaylar(sonuc(bulgu("a1")), C.durum_oku(cl), SIMDI))
 ok("geri al: olmayan id → False", C.geri_al(cl, "yok", tazi_fn=Tazi()) is False)
 
@@ -70,9 +72,9 @@ ok("geri al: olmayan id → False", C.geri_al(cl, "yok", tazi_fn=Tazi()) is Fals
 cl = taze()
 bs = [bulgu(f"t{i}") for i in range(4)]
 c, tz = calistir(cl, sonuc(*bs), model(*[karar(b["id"], "duzelt", duzeltme=dz()) for b in bs]), ayar={"kesisim_coz_tavan": 2})
-ok("tavan 2: 2 düzeltme, kalanlar çözülemeyen önemli (neden tavan)", c["duzeltilen"] == 2 and tz.say("dosya") == 2 and [x["neden"] for x in c["cozulemeyen_onemli"]] == ["tavan", "tavan"], c)
+ok("tavan 2: 2 düzeltme, kalanlar çözülemeyen önemli (neden tavan)", c["duzeltilen"] == 2 and tz.say("dosya_ekle") == 2 and [x["neden"] for x in c["cozulemeyen_onemli"]] == ["tavan", "tavan"], c)
 c, tz = calistir(cl, sonuc(*bs), model(*[karar(b["id"], "duzelt", duzeltme=dz()) for b in bs[2:]]), ayar={"kesisim_coz_tavan": 2})
-ok("tavan aynı gün sonraki çağrıda da geçerli (sayaç durumda)", c["duzeltilen"] == 0 and tz.say("dosya") == 0)
+ok("tavan aynı gün sonraki çağrıda da geçerli (sayaç durumda)", c["duzeltilen"] == 0 and tz.say("dosya_ekle") == 0)
 c, tz = calistir(cl, sonuc(*bs), model(*[karar(b["id"], "duzelt", duzeltme=dz()) for b in bs[2:]]), ayar={"kesisim_coz_tavan": 2}, simdi=SIMDI + datetime.timedelta(days=1))
 ok("ertesi gün sayaç sıfırlanır", c["duzeltilen"] == 2)
 cl = taze(); c, tz = calistir(cl, sonuc(bulgu("v1")), model(karar("v1", "duzelt", duzeltme=dz())))
@@ -91,24 +93,24 @@ ok("kişi alanı: kanıt B + düzeltme derecesi B → yazılır", e["k2"] == "ta
 ok("kişi alanı: kanıt B ama düzeltme derecesi C → yazılmaz", e["k3"] == "engellendi:kisi_kanit_b_alti")
 cl = taze()
 c, tz = calistir(cl, sonuc(bulgu("n1"), bulgu("n2"), bulgu("n3")), model(karar("n1", "duzelt", duzeltme=dz(kaynak="")), karar("n2", "duzelt", g=0.5, duzeltme=dz()), karar("n3", "duzelt", duzeltme=dz())))
-ok("kaynaksız düzeltme uygulanmaz; güven < 0.7 uygulanmaz (araştır'a düşer); diğeri yazılır", tz.say("dosya") == 1 and c["duzeltilen"] == 1 and c["arastirilan"] == 2, c)
+ok("kaynaksız düzeltme uygulanmaz; güven < 0.7 uygulanmaz (araştır'a düşer); diğeri yazılır", tz.say("dosya_ekle") == 1 and c["duzeltilen"] == 1 and c["arastirilan"] == 2, c)
 cl = taze()
 isb = bulgu("is1", vt="karar/42"); isb2 = bulgu("is2", vt="is/7")
 c, tz = calistir(cl, sonuc(isb, isb2), model(karar("is1", "duzelt", duzeltme=dz()), karar("is2", "duzelt", duzeltme=dz())))
-ok("karar ve iş kayıtlarına dokunulmaz: düzeltme yok, çözülemeyen önemli (karar_is_kaydi)", tz.say("dosya") == 0 and [x["neden"] for x in c["cozulemeyen_onemli"]] == ["karar_is_kaydi"] * 2, c)
+ok("karar ve iş kayıtlarına dokunulmaz: düzeltme yok, çözülemeyen önemli (karar_is_kaydi)", tz.say("dosya_ekle") == 0 and [x["neden"] for x in c["cozulemeyen_onemli"]] == ["karar_is_kaydi"] * 2, c)
 cl = taze(); c, tz = calistir(cl, sonuc(bulgu("tk", tazi=None)), model(karar("tk", "duzelt", duzeltme=dz())))
-ok("Tazı kaydı olmayan bulguda Tazı düzeltmesi yapılmaz (tazi_kaydi_yok)", tz.say("dosya") == 0 and c["cozulemeyen_onemli"][0]["neden"] == "tazi_kaydi_yok")
+ok("Tazı kaydı olmayan bulguda Tazı düzeltmesi yapılmaz (tazi_kaydi_yok)", tz.say("dosya_ekle") == 0 and c["cozulemeyen_onemli"][0]["neden"] == "tazi_kaydi_yok")
 cl = taze(); c, tz = calistir(cl, sonuc(bulgu("bk")), model(karar("bk", "duzelt", duzeltme=dz(metin="x" * 401))))
-ok("400 karakteri aşan metin uygulanmaz", tz.say("dosya") == 0)
+ok("400 karakteri aşan metin uygulanmaz", tz.say("dosya_ekle") == 0)
 cl = taze(); c, tz = calistir(cl, sonuc(bulgu("bl")), model(karar("bl", "duzelt", duzeltme=dz(bolum="kimlik"))))
-ok("kimlik bölümü yazılamaz (eski hükmü silerdi): bölüm 'iz'e çevrilir", tz.args[0][tz.args[0].index("--bolum") + 1] == "iz")
+ok("kimlik bölümü yazılamaz (eski hükmü silerdi): bölüm 'iz'e çevrilir", tz.args[0][1]["bolum"] == "iz")
 
 # ---------- 4) proje veritabanına yazma: kapalı ----------
 cl = taze(); oh_cagri = []
 oh = lambda b, d: oh_cagri.append(b["id"])
 c, tz = calistir(cl, sonuc(bulgu("o1"), bulgu("o2")), model(karar("o1", "duzelt", hedef="oh", duzeltme=dz()), karar("o2", "duzelt", hedef="oh", duzeltme=dz())), oh=oh)
 d = C.durum_oku(cl)
-ok("proje veritabanı hedefli düzeltme: oh_fn ÇAĞRILMAZ, Tazı'ya da yazılmaz; oh_kapali 2, durumda oh_bekleyen", not oh_cagri and tz.say("dosya") == 0 and c["oh_kapali"] == 2 and c["duzeltilen"] == 0 and set(d["oh_bekleyen"]) == {"o1", "o2"}, c)
+ok("proje veritabanı hedefli düzeltme: oh_fn ÇAĞRILMAZ, Tazı'ya da yazılmaz; oh_kapali 2, durumda oh_bekleyen", not oh_cagri and tz.say("dosya_ekle") == 0 and c["oh_kapali"] == 2 and c["duzeltilen"] == 0 and set(d["oh_bekleyen"]) == {"o1", "o2"}, c)
 ok("olay: oh_yazilacakti_kapali", [o["eylem"] for o in olaylar(cl)] == ["oh_yazilacakti_kapali"] * 2)
 cl = taze(); c, tz = calistir(cl, sonuc(bulgu("o3")), model(karar("o3", "duzelt", hedef="oh", duzeltme=dz())), ayar={"kesisim_coz_oh": True}, oh=None)
 ok("ayar açık olsa bile oh_fn verilmedikçe yazılmaz", c["oh_kapali"] == 1)
@@ -119,7 +121,7 @@ ok("kodda kayit.py çağrısı yok (yorum dışında; proje veritabanı öneri k
 cl = taze(); kuyruk = []
 def kf(ad, alan): kuyruk.append((ad, alan)); return "basladi"
 c, tz = calistir(cl, sonuc(bulgu("r1", tazi=None, varlik="firma:yeni.test")), model(karar("r1", "arastir")), kuyruk=kf)
-ok("arastir: kuyruk_fn(ad, alan) çağrılır, sorgu günlüğüne yazılır (zamanli), arastirilan 1", kuyruk == [("yeni.test", "yeni.test")] and tz.say("sorgu") == 1 and "zamanli" in tz.args[-1] and c["arastirilan"] == 1 and c["cozulemeyen_onemli"] == [], (kuyruk, tz.args))
+ok("arastir: kuyruk_fn(ad, alan) çağrılır, sorgu günlüğüne yazılır (zamanli), arastirilan 1", kuyruk == [("yeni.test", "yeni.test")] and tz.say("sorgu_kaydet") == 1 and tz.args[-1][1]["yapan"] == "zamanli" and c["arastirilan"] == 1 and c["cozulemeyen_onemli"] == [], (kuyruk, tz.args))
 for g in (1, 2):   # ertesi koşular: yeniden değerlendirilir, 3. koşuda sonuçsuz
     c, tz = calistir(cl, sonuc(bulgu("r1", tazi=None, varlik="firma:yeni.test")), model(karar("r1", "arastir")), kuyruk=kf, simdi=SIMDI + datetime.timedelta(days=g))
 ok("arastir 3 koşuda sonuçsuz kalırsa çözülemeyen önemli (arastirma_sonucsuz)", [x["neden"] for x in c["cozulemeyen_onemli"]] == ["arastirma_sonucsuz"] and C.durum_oku(cl)["arastir"]["r1"]["n"] == 3)
@@ -128,7 +130,27 @@ ok("Tazı kuyruğu tavanda: arastirilan sayılmaz, çözülemeyen önemli", c["a
 cl = taze(); c, tz = calistir(cl, sonuc(bulgu("r3", tazi=None, varlik="sistem:vt")), model(karar("r3", "arastir")), kuyruk=kf)
 ok("araştırma hedefi bulunamazsa (kayıt/firma yok) çözülemeyen önemli", c["cozulemeyen_onemli"][0]["neden"] == "arastirma_hedefi_yok")
 cl = taze(); c, tz = calistir(cl, sonuc(bulgu("r4", tazi=None, varlik="firma:yeni.test")), model(karar("r4", "arastir")))
-ok("kuyruk_fn yoksa (bağımsız çalışma) tazi.py aday + sorgu", tz.say("aday") == 1 and tz.say("sorgu") == 1 and c["arastirilan"] == 1)
+ok("kuyruk_fn yoksa (bağımsız çalışma) hizmet aday_ekle + sorgu_kaydet", tz.say("aday_ekle") == 1 and tz.say("sorgu_kaydet") == 1 and c["arastirilan"] == 1)
+class TaziKayit(Tazi):
+    def __call__(s, islem, girdi=None):
+        if islem == "kayit_bul": s.args.append((islem, dict(girdi or {}))); return {"ok": True, "kayit": {"id": "nova-teknoloji", "ad": "Nova Teknoloji", "alanlar": ["novatek.test"]}}
+        return Tazi.__call__(s, islem, girdi)
+cl = taze(); tk_ = TaziKayit(); kuyruk.clear(); c, tz = calistir(cl, sonuc(bulgu("r5")), model(karar("r5", "arastir")), tazi=tk_, kuyruk=kf)
+ok("arastir: Tazı kaydı olan bulguda ad ve alan hizmetin kayit_bul'undan", kuyruk == [("Nova Teknoloji", "novatek.test")] and tk_.args[0] == ("kayit_bul", {"sorgu": "nova-teknoloji"}) and tk_.args[-1][1]["kim"] == "nova-teknoloji", (kuyruk, tk_.args))
+class TaziHata(Tazi):
+    def __call__(s, islem, girdi=None): s.args.append((islem, dict(girdi or {}))); return {"ok": False, "hata": "tazi_yok"}
+cl = taze(); c, tz = calistir(cl, sonuc(bulgu("h1")), model(karar("h1", "duzelt", duzeltme=dz())), tazi=TaziHata())
+ok("hizmet yoksa duzelt: düzeltilmez, çözülemeyen önemli (tazi_hata)", c["duzeltilen"] == 0 and c["cozulemeyen_onemli"][0]["neden"] == "tazi_hata")
+cl = taze(); c, tz = calistir(cl, sonuc(bulgu("h2", tazi=None, varlik="firma:yeni.test")), model(karar("h2", "arastir")), tazi=TaziHata())
+ok("hizmet yoksa arastir (bağımsız): engellendi, tazi_yok", c["arastirilan"] == 0 and c["cozulemeyen_onemli"][0]["neden"] == "tazi_yok")
+# varsayılan yol: istemci + sahte hizmet (gerçek alt süreç)
+FX = os.path.join(T0, "sahte-tazi.json"); json.dump({"kayitlar": [{"id": "nova-teknoloji", "ad": "Nova Teknoloji", "alanlar": ["novatek.test"]}]}, open(FX, "w"))
+GN = os.path.join(T0, "sahte-tazi.log"); os.environ.update(TAZI_HIZMET=os.path.join(KOD, "test", "sahte-tazi.py"), SAHTE_TAZI=FX, SAHTE_TAZI_GUNLUK=GN)
+cl = taze(); c = C.coz(cl, {}, sonuc(bulgu("v1")), model_fn=model(karar("v1", "duzelt", duzeltme=dz())), simdi=SIMDI)
+cg = [json.loads(l) for l in open(GN, encoding="utf-8")]
+ok("varsayılan tazi_fn: istemciyle hizmete dosya_ekle gider, olay hizmetin no'suyla", c["duzeltilen"] == 1 and cg[-1]["islem"] == "dosya_ekle" and cg[-1]["kim"] == "nova-teknoloji" and olaylar(cl)[-1]["geri_al"]["kapat"] == 11, (c, cg))
+ok("varsayılan geri al: istemciyle dosya_kapat", C.geri_al(cl, "v1", simdi=SIMDI) and json.loads(open(GN, encoding="utf-8").read().splitlines()[-1]) == {"islem": "dosya_kapat", "kim": "nova-teknoloji", "no": 11, "sonuc": "kesişim düzeltmesi geri alındı"})
+os.environ["TAZI_HIZMET"] = os.path.join(T0, "yok", "tazi_hizmet.py")
 
 # ---------- 6) birak: kalıcı bastırma ----------
 cl = taze(); b = bulgu("b1")
@@ -138,16 +160,16 @@ m3 = model(); c3, _ = calistir(cl, sonuc(b), m3, simdi=SIMDI + datetime.timedelt
 ok("bırakılan bulgu bir daha modele gitmez", not m3.cagri and c3["aday"] == 0)
 # kos düzeyinde: okunamayan veritabanı bulgusu (bayat/sistem) üret → bırak → bir daha üretilmez
 cl = taze(); yok_vt = os.path.join(cl, "yok.db")
-s1 = kesisim.kos(cl, yok_vt, os.path.join(cl, "tz"), ayar={"gelistirici": True}, simdi=SIMDI)
+s1 = kesisim.kos(cl, yok_vt, {}, ayar={"gelistirici": True}, simdi=SIMDI)
 ids = [x["id"] for x in s1["bulgular"] if x["tur"] == "bayat" and x["varlik"] == "sistem:Proje veritabanı"]
 ok("kos: okunamayan veritabanı bulgusu üretildi (deneme bulgusu)", len(ids) == 1, [x["tur"] + x["varlik"] for x in s1["bulgular"]])
 d = C.durum_oku(cl); d["birak"][ids[0]] = {"t": "x", "gerekce": "g"}; C.durum_yaz(cl, d)
-s2 = kesisim.kos(cl, yok_vt, os.path.join(cl, "tz"), ayar={"gelistirici": True}, simdi=SIMDI + datetime.timedelta(days=1))
+s2 = kesisim.kos(cl, yok_vt, {}, ayar={"gelistirici": True}, simdi=SIMDI + datetime.timedelta(days=1))
 ok("kos: bırakılan id bulgu listesine girmez ve 'kapandı' da yazılmaz", all(x["id"] != ids[0] for x in s2["bulgular"]) and not any(g.get("durum") == "kapandi" for g in [json.loads(l) for l in open(os.path.join(cl, "kesisim.jsonl"))]))
 # kos cozum'u taşır
-cl = taze(); s1 = kesisim.kos(cl, yok_vt, os.path.join(cl, "tz"), ayar={"gelistirici": True}, simdi=SIMDI)
+cl = taze(); s1 = kesisim.kos(cl, yok_vt, {}, ayar={"gelistirici": True}, simdi=SIMDI)
 cz = C.coz(cl, {}, s1, model_fn=model(), tazi_fn=Tazi(), simdi=SIMDI)
-s2 = kesisim.kos(cl, yok_vt, os.path.join(cl, "tz"), ayar={"gelistirici": True}, simdi=SIMDI + datetime.timedelta(hours=2))
+s2 = kesisim.kos(cl, yok_vt, {}, ayar={"gelistirici": True}, simdi=SIMDI + datetime.timedelta(hours=2))
 ok("kesişim koşusu yeniden yazınca cozum kaybolmaz", s2.get("cozum") == cz and json.load(open(os.path.join(cl, "kesisim.json"))).get("cozum") == cz)
 
 # ---------- 7) model yanıtı ve adaylar ----------
@@ -173,8 +195,8 @@ ok("beta'da (geliştirici değil) ayar true olsa da çalışmaz", C.kos_ve_coz(c
 ok("gizli toplantı açıkken çalışmaz ve kesisim.json yazılmaz", C.kos_ve_coz(cl, {}, gizli_fn=lambda: True, gelistirici=True, model_fn=mm) == {"atlandi": "gizli"} and not os.path.exists(os.path.join(cl, "kesisim.json")) and not sayac)
 ok("acik_mi: ayar yoksa geliştiriciye bağlı", C.acik_mi({}, True) and not C.acik_mi({}, False) and C.acik_mi({"kesisim_cozucu": True}, False) and not C.acik_mi({"kesisim_cozucu": False}, True))
 gizli_sira = iter([False, True])   # koşu sürerken gizli açılırsa model çağrısına gidilmez
-ok("koşu sırasında gizli açılırsa model çağrılmaz", C.kos_ve_coz(cl, {}, gizli_fn=lambda: next(gizli_sira), gelistirici=True, vt=os.path.join(cl, "yok.db"), tazi_dizin=os.path.join(cl, "tz"), model_fn=mm) == {"atlandi": "gizli"} and not sayac)
-c = C.kos_ve_coz(cl, {}, gelistirici=True, vt=os.path.join(cl, "yok.db"), tazi_dizin=os.path.join(cl, "tz"), model_fn=model(), tazi_fn=Tazi(), simdi=SIMDI)
+ok("koşu sırasında gizli açılırsa model çağrılmaz", C.kos_ve_coz(cl, {}, gizli_fn=lambda: next(gizli_sira), gelistirici=True, vt=os.path.join(cl, "yok.db"), tazi={}, model_fn=mm) == {"atlandi": "gizli"} and not sayac)
+c = C.kos_ve_coz(cl, {}, gelistirici=True, vt=os.path.join(cl, "yok.db"), tazi={}, model_fn=model(), tazi_fn=Tazi(), simdi=SIMDI)
 ok("kos_ve_coz: tam akış cozum döner ve kesisim.json'da", c.get("tarih") == "2026-11-12" and json.load(open(os.path.join(cl, "kesisim.json")))["cozum"] == c)
 
 # ---------- 9) relay zamanlayıcısı (kesisim_tur) ----------

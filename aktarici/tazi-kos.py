@@ -1,8 +1,8 @@
-# --- Tazı koşturucu (11 Kasım): Suflor'un iz sürme köpeği. Aday listesine ekler (tazi.py aday), taramayı arka planda alt süreç olarak koşturur (tazi.py tara --kim … [--hizli]).
+# --- Tazı koşturucu (11 Kasım; S321'den Tazı ayrı hizmet, Suflor müşteri): aday listesine ekler (hizmet aday_ekle), taramayı arka planda koşturur (hizmet tara).
+# Bütün çağrılar aktarici/tazi-istemci.py tazi_cagir üzerinden; kuyruk, tavan, tekrar sınırı ve gizli kip müşteri tarafında (burada) kalır.
 # Kural: tek tarama aynı anda, kuyruk ≤ 5, aynı ad 6 saatte bir, günlük tavan ayar tazi_gunluk (20); toplantı sürerken tam tarama bekler (ağ etkisi), hızlı hemen gider.
 # Gizli kipte ve ayar tazi kapalıyken (geliştiricide varsayılan açık, beta'da kapalı) hiçbir şey çalışmaz. Tarama yalnız ad ve alan adını ağa götürür; döküm/iç sayı gitmez.
 # Günlükte "TAZI KOŞ:" satırları kayıt kimliğiyle (ad yazılmaz). Durum /status "tazi", uç POST /tazi {islem: tara|durum} (anahtarlı). ana izleme listesine yazılmaz.
-import subprocess, stat
 TZK = {"calisiyor": None, "kuyruk": [], "sonuc": None, "dongu": False}
 TZK_KUYRUK_EN_COK = 5
 TZK_TEKRAR_SN = 6 * 3600
@@ -46,19 +46,10 @@ def _tzk_sec():  # çalıştırılacak sıradaki öğe: hızlı önce; tam topla
         if o["kip"] == "tam" and tm: continue
         return o
     return None
-def _tzk_cagir(args, zaman):  # kabuksuz alt süreç; (çıkış kodu, çıktı)
-    env = dict(os.environ); env["PYTHONDONTWRITEBYTECODE"] = "1"
-    try:
-        p = subprocess.run([sys.executable, "-B", tazi_yol()] + args, capture_output=True, text=True, timeout=zaman, env=env)
-        if p.returncode:  # hata türü günlüğe (yalnız son satırın tür adı; ad/metin yazılmaz)
-            son = next((x for x in reversed((p.stderr or "").strip().splitlines()) if x.strip()), "")
-            print(f"TAZI KOŞ: tazi.py {args[0] if args else '?'} çıkış {p.returncode} ({re.split(r'[:(]', son, 1)[0].strip()[:60] or 'stderr boş'})")
-        return p.returncode, (p.stdout or "")[-600:]
-    except subprocess.TimeoutExpired: return 124, "zaman aşımı"
-    except Exception as e: return 125, e.__class__.__name__
-def _tzk_kayit_id(ad):
-    try: m = tazi_mod(); k = m.kayit_bul(m.liste_oku(), ad) if m else None; return (k or {}).get("id") or "?"
-    except Exception: return "?"
+def _tzk_cagir(islem, girdi, zaman):  # hizmet çağrısı → sonuç sözlüğü; hata türü günlüğe (ad/metin yazılmaz)
+    r = tazi_cagir(islem, girdi, zaman=zaman, ayar=AYAR)
+    if not r.get("ok"): print(f"TAZI KOŞ: {islem} hata ({str(r.get('hata') or '?')[:40]})")
+    return r
 def tzk_isle():  # sıradaki öğeyi koştur (dongu çağırır; testler doğrudan çağırır) → koşan öğe ya da None
     with TZK_LOCK:
         if TZK["calisiyor"]: return None
@@ -68,10 +59,9 @@ def tzk_isle():  # sıradaki öğeyi koştur (dongu çağırır; testler doğrud
         TZK["kuyruk"].remove(o); TZK["calisiyor"] = o
     t0 = time.time()
     try:
-        a = ["aday", "--ad", o["ad"], "--neden", o["neden"]] + (["--alan", o["alan"]] if o["alan"] else [])
-        _tzk_cagir(a, 20)
-        kid = _tzk_kayit_id(o["ad"]); print(f"TAZI KOŞ: başladı ({o['kip']}, kayıt {kid}, neden {o['neden']})")
-        rc, cikti = _tzk_cagir(["tara", "--kim", o["ad"]] + (["--hizli"] if o["kip"] == "hizli" else []), 60 if o["kip"] == "hizli" else 900)
+        ra = _tzk_cagir("aday_ekle", dict({"ad": o["ad"], "neden": o["neden"]}, **({"alan": o["alan"]} if o["alan"] else {})), 20)
+        kid = ra.get("kayit_id") or "?"; print(f"TAZI KOŞ: başladı ({o['kip']}, kayıt {kid}, neden {o['neden']})")
+        rt = _tzk_cagir("tara", {"kim": kid if kid != "?" else o["ad"], "hizli": o["kip"] == "hizli"}, 60 if o["kip"] == "hizli" else 900); rc = 0 if rt.get("ok") else 1
         with TZK_LOCK:
             d = _tzk_oku(); d["son"].setdefault(o["k"], {})[o["kip"]] = time.time(); d["son"] = dict(list(d["son"].items())[-300:]); _tzk_yaz(d)
         TZK["sonuc"] = {"kayit": kid, "kip": o["kip"], "durum": "ok" if rc == 0 else "hata", "t": round(time.time()), "sn": round(time.time() - t0)}
@@ -89,43 +79,22 @@ def _tzk_dongu():
         except Exception as e: print(f"TAZI KOŞ: döngü hatası ({e.__class__.__name__})")
 def _tzk_dongu_baslat():
     if not TZK["dongu"]: TZK["dongu"] = True; threading.Thread(target=_tzk_dongu, daemon=True).start()
-# --- Rapor listesi ve okuma (12 Kasım, panoda Bugün'de "Tazı raporu"): <tazi veri>/rapor/*.md. Liste /status tazi.raporlar (≤ 5, -son.md kopyaları ve DIZIN.md yok); metin POST /tazi {islem: rapor, dosya} (yalnız pano, ≤ 200 KB).
-# Tazı kapalıyken ve gizli kipte boş döner. Rapor adı/metni günlüğe yazılmaz.
+# --- Rapor listesi ve okuma (12 Kasım, panoda Bugün'de "Tazı raporu"): hizmetin raporlar / rapor_oku işlemleri (S321; Tazı'nın klasörü doğrudan okunmaz).
+# Liste /status tazi.raporlar (≤ 5; 60 sn önbellek, tarama bitince silinir); metin POST /tazi {islem: rapor, dosya} (yalnız pano, ≤ 200 KB). Tazı kapalıyken ve gizli kipte boş döner. Rapor adı/metni günlüğe yazılmaz.
 TZR_EN_COK = 5
-TZR_BOYUT = 200 * 1024
 TZR_AD_RX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.md$")
-def _tzr_dizin():  # rapor klasörü (tazi.py veri_dizin yolu; tazi.py yoksa None)
-    m = tazi_mod()
-    try: return os.path.join(m.veri_dizin(), "rapor") if m else None
-    except Exception: return None
-def _tzr_tur(f): return "tazi" if f.startswith("tazi-") else "toplanti" if f.startswith("toplanti-") else "kisi"
 def tazi_raporlar(en=None):  # [{tur: tazi|toplanti|kisi, dosya, t (değişme, epoch sn)}] yeniden eskiye
-    if not tazi_acik() or gizli_acik(): return []
-    d = _tzr_dizin(); o = []
-    try: ad = os.listdir(d) if d and os.path.isdir(d) else []
-    except OSError: return []
-    for f in ad:
-        if not f.endswith(".md") or f.endswith("-son.md") or f == "DIZIN.md" or not TZR_AD_RX.match(f): continue
-        try: st = os.stat(os.path.join(d, f))
-        except OSError: continue
-        if not stat.S_ISREG(st.st_mode): continue
-        o.append({"tur": _tzr_tur(f), "dosya": f, "t": int(st.st_mtime)})
-    o.sort(key=lambda x: (x["t"], x["dosya"]), reverse=True); return o[:en or TZR_EN_COK]
+    if not tazi_acik() or gizli_acik() or not tazi_yol(): return []
+    r = tazi_cagir("raporlar", {"en_cok": int(en or TZR_EN_COK)}, zaman=8, ayar=AYAR, onbellek=60)
+    return [x for x in (r.get("raporlar") or []) if isinstance(x, dict) and TZR_AD_RX.match(str(x.get("dosya") or ""))] if r.get("ok") else []
 def tazi_rapor_oku(dosya):  # → {"ok", "dosya", "tur", "t", "metin"} ya da {"ok": False, "durum": …}
     if not tazi_acik(): return {"ok": False, "durum": "kapali"}
     if gizli_acik(): return {"ok": False, "durum": "gizli"}
     f = str(dosya or "")
     if not TZR_AD_RX.match(f) or ".." in f: return {"ok": False, "durum": "ad"}
-    d = _tzr_dizin()
-    if not d: return {"ok": False, "durum": "yok"}
-    yol = os.path.join(d, f)
-    try:
-        if os.path.dirname(os.path.realpath(yol)) != os.path.realpath(d) or not os.path.isfile(yol): return {"ok": False, "durum": "yok"}
-        st = os.stat(yol)
-        if st.st_size > TZR_BOYUT: return {"ok": False, "durum": "buyuk"}
-        with open(yol, encoding="utf-8", errors="replace") as fh: metin = fh.read(TZR_BOYUT)
-    except OSError: return {"ok": False, "durum": "yok"}
-    return {"ok": True, "dosya": f, "tur": _tzr_tur(f), "t": int(st.st_mtime), "metin": metin}
+    r = tazi_cagir("rapor_oku", {"dosya": f}, zaman=10, ayar=AYAR)
+    if not r.get("ok"): return {"ok": False, "durum": {"tazi_yok": "yok", "buyuk": "buyuk", "ad": "ad"}.get(r.get("hata"), "yok")}
+    return {"ok": True, "dosya": r.get("dosya"), "tur": r.get("tur"), "t": r.get("t"), "metin": r.get("metin") or ""}
 def tazi_view():  # /status "tazi"
     d = _tzk_oku() if _tzk_yol() else {"n": 0}
     return {"acik": bool(tazi_acik()), "calisiyor": bool(TZK["calisiyor"]), "kuyruk": len(TZK["kuyruk"]), "bugun": d.get("n", 0), "tavan": tzk_tavan(), "son": TZK["sonuc"], "raporlar": tazi_raporlar()}

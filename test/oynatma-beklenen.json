@@ -220,11 +220,11 @@
  "http": {
   "/": {
    "uzunluk": 716811,
-   "sha": "1bef57e48ada894a"
+   "sha": "9ba54bf218d56c51"
   },
   "/mini": {
    "uzunluk": 716811,
-   "sha": "1bef57e48ada894a"
+   "sha": "9ba54bf218d56c51"
   },
   "/status": {
    "_ping_son": "float",

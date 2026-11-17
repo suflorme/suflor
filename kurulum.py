@@ -1004,8 +1004,8 @@ class H(BaseHTTPRequestHandler):
 # Support/Suflor (ayar: uygulama) altında durur, proje klasöründeki _canli oraya kısayoldur. Aktarıcının yanına kopyalanan her
 # şey KOPYA'da (tek liste; yeni bir dosya aktarıcıya gerekiyorsa yalnız buraya eklenir).
 LABEL = "local.suflor.aktarici"
-KOPYA = ["relay.py", "tazi.py", "aktarici/", "kullanim.py", "zeka.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "vad-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "baglayici.py", "kesisim.py", "kesisim-coz.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
-KALKAN = ["ses-isci.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde)
+KOPYA = ["relay.py", "aktarici/", "kullanim.py", "zeka.py", "manifest.json", "whisper-isci.py", "tstt-golge-isci.py", "pocket-isci.py", "tur-isci.py", "vad-isci.py", "cevir-isci.py", "gomme-isci.py", "proje-karti.py", "toplanti-claude.py", "baglayici.py", "kesisim.py", "kesisim-coz.py", "yapi.py", "ortak_bulut.py", "teshis.py", "kurulum.py", "baglam.py", "pano/", "marka/*.svg", "marka/yazi/*.woff2"]
+KALKAN = ["ses-isci.py", "tazi.py"]  # eski kurulumdan kalan; uygulama klasöründen silinir (ses izi Whisper işçisinde; tazi.py: S321 Tazı ayrı hizmet)
 # v0.136.0 (26 Ekim kişisel hesap: ses-isci.py, pano/hazirlik.html, test/platform.py kalmıştı): önceki imzalı listede olup yenisinde olmayan ve
 # özeti değişmemiş dosya silinir; kullanıcının koyduğu ya da değiştirdiği dosya kalır. Aynı kural kur.sh'de (bash).
 def imza_listesi(yol):  # IMZA/dosyalar.sha256 → {göreli yol: sha256}; ilk satır başlık

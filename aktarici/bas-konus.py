@@ -332,7 +332,7 @@ def _uslup(): return uslup_blogu() if "uslup_blogu" in globals() else ""  # 9 Ka
 # --- Dış soru yönlendirmesi ve iki sesli tur (10 Kasım, kullanıcı kararı "A yolu: tek çağrıda iki ses") ---------------------------------------------------------------------
 # Kullanıcı kimseye adıyla seslenmese de soru dış dünyayla ilgiliyse (kurum dışı kişi/firma, web/güncel bilgi, açık kaynak) o turu dış işler kişiliği (ayar kisilik_dis, rol "dis")
 # cevaplar; belirsizde ve iç soruda varsayılan kişilik (eskisi gibi). Sınıflandırma yalnız kural, model çağrısı yok: (1) soruda Tazı'nın yerel izleme kayıtlarından biri geçiyor
-# (tazi.metinden_kayitlar) ya da (2) web/güncel bilgi kalıbı. İç sinyal (takvim, iş, karar, proje…) de varsa öbür asistan TEK cümleyle içeriden bağlam ekler. İki kişilik, yuva boşsa
+# (Tazı hizmeti eslesen_kayitlar, kisi-modeli.py tazi_kayitlar) ya da (2) web/güncel bilgi kalıbı. İç sinyal (takvim, iş, karar, proje…) de varsa öbür asistan TEK cümleyle içeriden bağlam ekler. İki kişilik, yuva boşsa
 # (beta, tek kişilik) hiçbir şey değişmez. Hepsi TEK model çağrısında: sesli kısım satır satır «[Ad] söz»; aktarıcı ayrıştırır, her sözü o kişiliğin sesiyle sırayla okur, panoda
 # ad etiketli ayrı bloklar olarak gösterir (_konus_cumle sarmalayıcısı + yon_pano_metni). Tazı önce: soruya göre "dis_kaynak" dilimi (kisi-modeli.py) yerel dosya özetini verir.
 # Atışma sınırı (kodda): toplantıda karşı taraf varken (ya da emin değilsek) iki asistanlı söz ve takılma YOK; iç toplantıda en çok bir tek cümlelik takılma (toplantı başına);

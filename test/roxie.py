@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Dış işler kişiliği — "A yolu: tek çağrıda iki ses" (10 Kasım): Konuş'ta dış soru yönlendirmesi (kural sınıflandırması, tek kişilik/yuva boş = eski davranış), iki sesli tur (biçimli çıktı «[Ad] söz»
 # ayrıştırma, sırayla kendi sesiyle okuma, ek söz ve takılma sınırları), atışma izinleri (karşı taraflı toplantı / iç toplantı / gergin), Tazı önce (yerel dosya özeti, dis_kaynak dilimi), toplantı öncesi
-# brifingin "Dış taraf" bölümü, toplantı oturumunun `tazi` komutu (bir kez, gizli toplantıda yok, web yoluna yönlendirme), özetteki Tazı notu, "Raks" kuralı ve ≤ 4 harfli takma ad. Kurgu adlar (Atlas, Matlas,
+# brifingin "Dış taraf" bölümü (S321: Tazı ayrı hizmet; burada sahte hizmet test/sahte-tazi.py), toplantı oturumunun `tazi` komutu (bir kez, gizli toplantıda yok, web yoluna yönlendirme), özetteki Tazı notu, "Raks" kuralı ve ≤ 4 harfli takma ad. Kurgu adlar (Atlas, Matlas,
 # Roxane; Nova Teknoloji, Örnek A.Ş.); sahte HTTP, sahte aktarıcı bileşenleri; gerçek model, ağ ve canlı aktarıcı yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/roxie.py      (kaldı → çıkış 1)
 import ast, collections, datetime, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
@@ -16,40 +16,32 @@ def oku(d, f): return open(os.path.join(KOD, d, f) if d else os.path.join(KOD, f
 def fonks(src, adlar, atamalar=()):
     agac = ast.parse(src)
     return ast.Module([n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in adlar) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in atamalar for x in n.targets))], [])
-# --- Tazı verisi (kurgu): iki izleme kaydı, biri için dosya
-TZ = os.path.join(T, "tazi"); os.makedirs(os.path.join(TZ, "dosya")); os.environ["TAZI_DIR"] = TZ
-LISTE = os.path.join(T, "liste.json")
-json.dump({"kayitlar": [{"id": "nova-teknoloji", "ad": "Nova Teknoloji Ltd", "kisiler": ["Deniz Aksoy"], "alanlar": ["novatek.test"], "neden": "tedarikçi adayı"},
-                        {"id": "ornek-as", "ad": "Örnek A.Ş.", "alanlar": ["ornek-as.test"], "neden": "müşteri"}]}, open(LISTE, "w", encoding="utf-8"), ensure_ascii=False)
-json.dump({"kayit": "nova-teknoloji", "son_no": 1, "ogeler": [{"no": 1, "bolum": "kimlik", "metin": "2019'da kurulmuş, gerçek firma; sicil kaydı tutarlı", "kaynak": "sicil", "derece": "B", "tarih": "", "eklendi": "2026-11-01", "durum": "acik"}]},
-          open(os.path.join(TZ, "dosya", "nova-teknoloji.json"), "w", encoding="utf-8"), ensure_ascii=False)
-os.environ["SUFLOR_AYAR"] = yaz("ayar-tazi.json", json.dumps({"tazi_liste": LISTE}))
+# --- Tazı (S321: ayrı hizmet; sahte hizmetin yanıtları, kurgu): iki izleme kaydı, biri için dosya özeti
+SAHTE = os.path.join(KOD, "test", "sahte-tazi.py"); os.environ.pop("TAZI_HIZMET", None)
+TZF = os.path.join(T, "sahte-tazi.json"); TZG = os.path.join(T, "sahte-tazi.log"); os.environ.update(SAHTE_TAZI=TZF, SAHTE_TAZI_GUNLUK=TZG)
+json.dump({"kayitlar": [{"id": "nova-teknoloji", "ad": "Nova Teknoloji Ltd", "kisiler": ["Deniz Aksoy"], "alanlar": ["novatek.test"], "esler": ["Nova Teknoloji"]},
+                        {"id": "ornek-as", "ad": "Örnek A.Ş.", "alanlar": ["ornek-as.test"]}],
+           "ozet": {"nova-teknoloji": "Tazı · Nova Teknoloji Ltd — son tarama yok\nKimlik: 2019'da kurulmuş, gerçek firma; sicil kaydı tutarlı"},
+           "satir": {"nova-teknoloji": "Nova Teknoloji Ltd · 2019'da kurulmuş, gerçek firma; sicil kaydı tutarlı (son tarama yok)", "ornek-as": "Örnek A.Ş. (son tarama yok)"}},
+          open(TZF, "w", encoding="utf-8"), ensure_ascii=False)
+os.environ["SUFLOR_AYAR"] = yaz("ayar-tazi.json", json.dumps({"tazi_yol": SAHTE}))
 # --- kişilikler (kurgu)
 k1 = yaz("a.md", "---\nad: Atlas\nhitap: Atlas, Atlaz\nhitap_bicimi: sen\nyerel_ses: pocket:tr:atlas\nses: Cem\n---\n## Kişilik: Atlas\nAdın Atlas. BİRİNCİ-İŞARET\n")
 k2 = yaz("m.md", "---\nad: Matlas\nhitap: Matlas\nhitap_bicimi: sen\n---\n## Kişilik: Matlas\nAdın Matlas. İKİNCİ-İŞARET\n")
 k3 = yaz("r.md", "---\nad: ROXANE\ngorunen_ad: Roxane\nhitap: Roxane, Roksi, Roxy, Rox, Roks, Raks, Ro\nokunus: Roksan\nhitap_bicimi: sen\nyerel_ses: pocket:tr:roxane\nses: Yelda\nhiz: 1.1\n---\n## Kişilik: Roxane\nDış işler asistanısın. ÜÇÜNCÜ-İŞARET\n")
 BASE = os.path.join(T, "canli"); os.makedirs(BASE)
-AYAR = {"kisilik": k1, "kisilik_toplanti_disi": k2, "kisilik_dis": k3, "kod": KOD, "ad": "Ayşe Deneme", "uygulama": T, "eposta_adres": "ayse" + chr(64) + "firma.test"}
+AYAR = {"kisilik": k1, "kisilik_toplanti_disi": k2, "kisilik_dis": k3, "kod": KOD, "tazi_yol": SAHTE, "ad": "Ayşe Deneme", "uygulama": T, "eposta_adres": "ayse" + chr(64) + "firma.test"}
 ns = {"re": re, "os": os, "sys": sys, "json": json, "time": time, "datetime": datetime, "collections": collections, "threading": threading, "print": lambda *a, **k: None, "_t": lambda a, b: a, "ARAYUZ_DILI": "tr", "BASE": BASE,
       "AYAR": AYAR, "_KS": {}, "TOP": [False], "STATE": {}, "_ad_listesi": lambda: {}, "_onara_mod": lambda: None, "GIZLI": [False]}
 ns["toplanti_var"] = lambda: ns["TOP"][0]; ns["gizli_acik"] = lambda: ns["GIZLI"][0]
 exec(oku("aktarici", "kisilik.py"), ns)
 # =============================================================================================================================================================
-# 1) Tazı önce — yerel dosya özeti (tazi.py), dis_kaynak dilimi (kisi-modeli.py)
-sys.path.insert(0, KOD); import tazi
-ks_ = tazi.metinden_kayitlar("Nova Teknoloji ile yarın toplantım var, novatek.test sitesi de açılıyor", liste=tazi.liste_oku(LISTE))
-ok("tazi.metinden_kayitlar: ad ve alan adıyla bulur, geçiş sırasıyla, tekrarsız", [k["id"] for k in ks_] == ["nova-teknoloji"], ks_)
-ok("tazi.metinden_kayitlar: kişi adıyla (tam ad) bulur; kısa/ilgisiz metin ve tek sözcüklü kısa kişi adıyla bulmaz",
-   [k["id"] for k in tazi.metinden_kayitlar("Deniz Aksoy ile görüştüm")] == ["nova-teknoloji"] and tazi.metinden_kayitlar("Deniz ile görüştüm") == [] and tazi.metinden_kayitlar("hava nasıl") == [] and tazi.metinden_kayitlar("") == [])
-ok("tazi.metinden_kayitlar: iki kayıt, metindeki sıraya göre", [k["id"] for k in tazi.metinden_kayitlar("Önce Örnek A.Ş. sonra Nova Teknoloji")] == ["ornek-as", "nova-teknoloji"])
-om = tazi.ozet_metni("nova-teknoloji")
-ok("tazi.ozet_metni: yerel dosyadan ≤ 8 satır (başlık, kimlik hükmü, son tarama), ağ yok", om and len(om.splitlines()) <= 8 and om.startswith("Tazı · Nova Teknoloji Ltd — son tarama yok") and "Kimlik: 2019'da kurulmuş" in om, om)
-st_ = tazi.ozet_satiri("nova-teknoloji")
-ok("tazi.ozet_satiri: tek satır (≤ 300): ad, kimlik hükmü, son tarama", st_ and "\n" not in st_ and st_.startswith("Nova Teknoloji Ltd · 2019'da kurulmuş") and "son tarama" in st_ and len(st_) <= 300, st_)
-ok("tazi.ozet_satiri: kayıt yoksa None", tazi.ozet_satiri("bilinmez-firma") is None)
+# 1) Tazı önce — Tazı hizmetinin özeti (istemci aktarici/tazi-istemci.py), dis_kaynak dilimi (kisi-modeli.py). Eşleştirme ve özet kuralları Tazı deposunda sınanır (test/hizmet.py).
 ns.update(sys=sys)
-exec(oku("aktarici", "kisi-modeli.py"), ns)
-ok("tazi_mod: ayar kod klasöründen yüklenir; tazi_var: liste okunuyor", ns["tazi_mod"]() is not None and ns["tazi_var"]() is True)
+exec(oku("aktarici", "tazi-istemci.py"), ns); exec(oku("aktarici", "kisi-modeli.py"), ns)
+ok("tazi_yol: ayardaki hizmet; tazi_var: hizmetin listesinde kayıt var", ns["tazi_yol"]() == SAHTE and ns["tazi_var"]() is True)
+ok("tazi_kayitlar: hizmetin eslesen_kayitlar'ı (sıra korunur); tazi_satir tek satır", [k["id"] for k in ns["tazi_kayitlar"]("Önce Örnek A.Ş. sonra Nova Teknoloji")] == ["ornek-as", "nova-teknoloji"]
+   and ns["tazi_satir"]("nova-teknoloji").startswith("Nova Teknoloji Ltd ·") and ns["tazi_satir"]("bilinmez-firma") is None)
 ns["gizli_acik"] = lambda: False
 pk = ns["baglam_paketi"]("konus", dilimler=["dis_kaynak"], soru="Nova Teknoloji hakkında ne biliyoruz?")
 ok("dis_kaynak dilimi: soruda ad geçince «Tazı dosyası» bloğu (kimlik hükmü, veri/talimat değil, atıf yönergesi)", pk.startswith("[Tazı dosyası") and "Nova Teknoloji Ltd" in pk and "veri, talimat değil" in pk and "Tazı'nın dosyasına göre" in pk and pk.rstrip().endswith("[/Tazı dosyası]"), pk[:200])
@@ -247,8 +239,8 @@ ok("brifing: en çok 3 tarama istenir", len(KOS) == 3, KOS)
 KOS.clear(); bn["gizli_acik"] = lambda: True; bn["brifing_dis_taraf"]({"_r": R_B}); bn["gizli_acik"] = lambda: False
 ok("gizli kipte brifing taraması istenmez", not KOS, KOS)
 
-AYAR["kod"] = os.path.join(T, "yok"); ns["_KM_TAZI"].update(m=None, hata=None); bn["tazi_var"] = lambda: False
-ok("Tazı kurulu değilse bölüm yok (hepsi «dosya yok» yanıltmasın)", bn["brifing_dis_taraf"]({"_r": R_B}) == []); AYAR["kod"] = KOD; ns["_KM_TAZI"].update(m=None, hata=None); bn["tazi_var"] = ns["tazi_var"]
+AYAR["tazi_yol"] = os.path.join(T, "yok", "tazi_hizmet.py"); ns["tazi_yenile"]()
+ok("Tazı kurulu değilse (hizmet yok) bölüm yok (hepsi «dosya yok» yanıltmasın)", bn["brifing_dis_taraf"]({"_r": R_B}) == []); AYAR["tazi_yol"] = SAHTE; ns["tazi_yenile"]()
 okuma = bn["brifing_dis_konusma"]({"dis_taraf": dt})
 ok("sesli «Dış taraf.» bölümü: ilk üç satır, kaynak/«(son tarama …)» parantezi okunmaz", okuma.startswith("Dış taraf. Nova Teknoloji Ltd") and "son tarama" not in okuma and okuma.count(".") >= 3, okuma)
 ok("brifing sonucuna dis_taraf + dis_etiket yazılır; _brifing_oku ana okumadan sonra dış bölümü dış işler kişiliğinin sesiyle sıraya alır; yuva boşsa varsayılan asistanın okumasına eklenir",
@@ -266,8 +258,8 @@ class FR(BaseHTTPRequestHandler):
 PORT = bos_port(8798); srv = ThreadingHTTPServer(("127.0.0.1", PORT), FR); threading.Thread(target=srv.serve_forever, daemon=True).start()
 CL = os.path.join(T, "canli2"); os.makedirs(CL)
 def tc(ad, ayar=None, env=None):
-    e = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", TAZI_DIR=TZ)
-    if ayar is not None: e["SUFLOR_AYAR"] = yaz("ayar-" + str(abs(hash(json.dumps(ayar))) % 10**6) + ".json", json.dumps(dict({"tazi_liste": LISTE}, **ayar)))
+    e = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    if ayar is not None: e["SUFLOR_AYAR"] = yaz("ayar-" + str(abs(hash(json.dumps(ayar))) % 10**6) + ".json", json.dumps(dict({"tazi_yol": SAHTE}, **ayar)))
     r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "--dir", CL, "--relay", f"http://127.0.0.1:{PORT}", "tazi", ad], capture_output=True, text=True, timeout=30, env=e)
     return (r.stdout + r.stderr).strip()
 c1 = tc("Nova Teknoloji")
@@ -281,12 +273,15 @@ ok("dosya yok + web araştırması kapalı: karta «dosya yok», arama yok", "We
 DURUM["dis_ad"] = None; os.remove(os.path.join(CL, "tazi-toplanti.json")); c5 = tc("Nova Teknoloji")
 ok("dış işler kişiliği yoksa etiket yalnız «Tazı»", c5.startswith("KART ETİKETİ: Tazı\n"), c5); DURUM["dis_ad"] = "Roxane"
 os.remove(os.path.join(CL, "tazi-toplanti.json")); DURUM["gizli"] = True; c6 = tc("Nova Teknoloji")
-ok("gizli toplantıda hiçbir şey çalışmaz (Tazı okunmaz, ad sayılmaz)", c6.startswith("gizli toplantı: Tazı kartı yok") and not os.path.exists(os.path.join(CL, "tazi-toplanti.json")), c6); DURUM["gizli"] = False
+n_tz = len(open(TZG).read().splitlines()) if os.path.exists(TZG) else 0
+ok("gizli toplantıda hiçbir şey çalışmaz (Tazı okunmaz, ad sayılmaz)", c6.startswith("gizli toplantı: Tazı kartı yok") and not os.path.exists(os.path.join(CL, "tazi-toplanti.json")), c6)
+DURUM["gizli"] = True; hz_g = subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "--dir", CL, "--relay", f"http://127.0.0.1:{PORT}", "tazi", "Nova Teknoloji"], capture_output=True, text=True, timeout=30, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+ok("gizli toplantıda Tazı hizmetine hiçbir çağrı gitmez (gizli içerik Tazı'ya gönderilmez)", (len(open(TZG).read().splitlines()) if os.path.exists(TZG) else 0) == n_tz); DURUM["gizli"] = False
 os.remove(os.path.join(CL, "tazi-toplanti.json")) if os.path.exists(os.path.join(CL, "tazi-toplanti.json")) else None
 ok("yeni toplantıda ad yeniden sorulabilir (kayıt toplantıya bağlı)", (lambda: (json.dump({"toplanti": "baska-toplanti.md", "adlar": ["nova teknoloji"]}, open(os.path.join(CL, "tazi-toplanti.json"), "w")), "KART ETİKETİ" in tc("Nova Teknoloji"))[1])())
 def hz(gizli=False, ayar=None):  # toplanti-claude.py hazirlik: Tazı bölümü (gizli toplantıda ve ayar tazi kapalıyken yok)
-    DURUM["gizli"] = gizli; e = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", TAZI_DIR=TZ)
-    e["SUFLOR_AYAR"] = yaz("ayar-hz-" + str(abs(hash(json.dumps(ayar or {}))) % 10**6) + ".json", json.dumps(dict({"tazi_liste": LISTE}, **(ayar or {}))))
+    DURUM["gizli"] = gizli; e = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    e["SUFLOR_AYAR"] = yaz("ayar-hz-" + str(abs(hash(json.dumps(ayar or {}))) % 10**6) + ".json", json.dumps(dict({"tazi_yol": SAHTE}, **(ayar or {}))))
     r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "toplanti-claude.py"), "--dir", CL, "--relay", f"http://127.0.0.1:{PORT}", "hazirlik", "--kim", "Nova Teknoloji"], capture_output=True, text=True, timeout=30, env=e)
     DURUM["gizli"] = False; return r.stdout + r.stderr
 h1 = hz()
@@ -295,7 +290,7 @@ h2 = hz(gizli=True); ok("hazırlık: gizli toplantıda Tazı bölümü yok", "##
 h3 = hz(ayar={"tazi": False}); ok("hazırlık: ayar tazi kapalıyken bölüm yok", "## Tazı:" not in h3 and "Hazırlık" in h3, h3[:300])
 osrc = oku("aktarici", "toplanti-oturum.py")
 ok("salt okuyan komut listesinde (izinsiz): TOPO_TC_OKUMA'da tazi", '"dokum", "tazi"}' in osrc)
-on = dict(ns); on.update(AYAR=dict(AYAR), tazi_var=ns["tazi_var"], tazi_mod=ns["tazi_mod"])
+on = dict(ns); on.update(AYAR=dict(AYAR), tazi_var=ns["tazi_var"])
 exec(compile(fonks(osrc, ("topo_tazi_istem",)), "toplanti-oturum.py", "exec"), on)
 ti = on["topo_tazi_istem"]()
 ok("toplantı oturumu istemi: yeni kurum dışı ad → `toplanti-claude.py tazi \"<ad>\"`, etiket «Roxane · Tazı dosyası», bir kez, gizlide yok, yorum/puan yok", all(x in ti for x in ("KURUM DIŞI", "toplanti-claude.py tazi", "«Roxane · Tazı dosyası»", "Aynı ad toplantıda bir kez", "Gizli toplantıda hiç çalıştırma", "yorum ya da puan yazma")), ti)
@@ -305,10 +300,10 @@ ok("topo_istem Tazı kuralını web/ön yükleme kuralından sonra ekler", "web 
 # =============================================================================================================================================================
 # 7) Özet: Tazı notu (relay.py son_ekle) + /status konus.dis_ad — yalıtılmış aktarıcı
 PR = bos_port(8795); CA = os.path.join(T, "canli3"); os.makedirs(os.path.join(CA, "ozetler"))
-for f in ("relay.py", "manifest.json", "tazi.py"): shutil.copy(os.path.join(KOD, f), T)
+for f in ("relay.py", "manifest.json"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Ayşe Deneme", "port": PR, "uygulama": T, "proje": T, "ortak": T, "kisilik": k1, "kisilik_toplanti_disi": k2, "kisilik_dis": k3, "tazi_liste": LISTE, "tazi": True}, open(ay, "w"))
-env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", TAZI_DIR=TZ)
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "ad": "Ayşe Deneme", "port": PR, "uygulama": T, "proje": T, "ortak": T, "kisilik": k1, "kisilik_toplanti_disi": k2, "kisilik_dis": k3, "tazi_yol": SAHTE, "tazi": True}, open(ay, "w"))
+env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1")
 r = subprocess.Popen([sys.executable, "relay.py", "--dir", CA, "--port", str(PR)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "w"), stderr=subprocess.STDOUT, env=env)
 def rq(yol, govde=None):
     q = urllib.request.Request(f"http://127.0.0.1:{PR}{yol}", data=json.dumps(govde).encode() if govde is not None else None, method="POST" if govde is not None else "GET",

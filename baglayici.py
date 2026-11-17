@@ -442,7 +442,7 @@ class EskiGorunum(MutableMapping):
     def __len__(self): return len(self._anahtarlar())
 
 # --- kimlik eşleştirme (Kesişim F1, 12 Kasım) -------------------------------------------------------------------------------------------------
-# Ad / e-posta izi / alan adı → veritabanı kimliği (kisi.id, dis_firma.alan_adi). Eşleştirme tek yerde burada; kesisim.py kullanır (tazi.py _vt_baglanti aynı kuralı kendi içinde taşıyor,
+# Ad / e-posta izi / alan adı → veritabanı kimliği (kisi.id, dis_firma.alan_adi). Eşleştirme tek yerde burada; kesisim.py kullanır (Tazı deposundaki tazi_arac.py _vt_baglanti aynı kuralı kendi içinde taşıyor,
 # F4'te buraya çağırır). satir(sql) → satırlar (örn. SqliteKayit._calistir); saf, yazmaz. Birleştirilmiş kişi (durum 'Birleştirildi') haritaya girmez.
 def ad_norm(ad):
     a = str(ad or "").replace("İ", "i").casefold().replace("ı", "i")

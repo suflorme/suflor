@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-# Kesişim F1 (kesisim.py): yapay proje veritabanı (sqlite) + yapay Tazı dizini (tazi.indeksle ile kurulur, şema uyumu da sınanır) → beklenen bulgu seti. Her tür için olumlu ve olumsuz durum,
+# Kesişim F1 (kesisim.py): yapay proje veritabanı (sqlite) + Tazı hizmetinin kesisim_verisi yanıtı (S321: sahte, sabit sözlük; şema Tazı deposunda test/hizmet.py) → beklenen bulgu seti. Her tür için olumlu ve olumsuz durum,
 # id kararlılığı, durum taşıma (yeni → sürüyor → kapandı, ertelendi korunur), gizlilik süzgeci (#53, gizli kip, beta), salt okuma, okunamayan veritabanı, belirsiz aday teslimi, süre.
 # Ağ ve port yok. PYTHONDONTWRITEBYTECODE=1 python3 test/kesisim.py   (kaldı → çıkış 1)
 import datetime, hashlib, json, os, shutil, sqlite3, subprocess, sys, tempfile
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, KOD)
-os.environ["TAZI_VT"] = "-"; os.environ.pop("TAZI_DIR", None)
+os.environ.pop("TAZI_HIZMET", None)
 T0 = tempfile.mkdtemp(prefix="suflor-kesisim-ayar-"); os.environ["SUFLOR_AYAR"] = os.path.join(T0, "ayar.json"); json.dump({}, open(os.environ["SUFLOR_AYAR"], "w"))  # gerçek izleme listesi/ayar karışmasın
-import baglayici, kesisim, tazi
+import baglayici, kesisim
 
 T = tempfile.mkdtemp(prefix="suflor-kesisim-")
-VT, TD, CANLI = os.path.join(T, "vt.db"), os.path.join(T, "tazi"), os.path.join(T, "canli")
-os.makedirs(CANLI); os.makedirs(os.path.join(TD, "dosya"))
+VT, CANLI = os.path.join(T, "vt.db"), os.path.join(T, "canli")
+os.makedirs(CANLI)
 SIMDI = datetime.datetime(2026, 11, 12, 8, 0, 0)
 hata = []
 AT = "@"   # tarama düz e-posta kalıbını yakalıyor; adresler çalışma anında birleştirilir
@@ -58,37 +58,9 @@ con.executemany("INSERT INTO ayar VALUES(?,?,?)", [("capraz_yargi_son", "2026-11
 con.execute("INSERT INTO okuma(kaynak,zaman,satir,ozet) VALUES('Yonetim API (KONTROL)','2026-11-10T22:35',60,'x')")
 con.commit(); con.close()
 
-# ---------- yapay Tazı (tazi.indeksle ile: şema uyumu) ----------
-def dosya(ad, ogeler):
-    kid = tazi.slug(ad)
-    json.dump({"kayit": kid, "son_no": len(ogeler), "ogeler": [dict({"no": i, "kaynak": "", "tarih": "", "eklendi": "2026-11-01", "durum": "acik"}, **o) for i, o in enumerate(ogeler, 1)]},
-              open(os.path.join(TD, "dosya", kid + ".json"), "w"), ensure_ascii=False)
-aday = [{"ad": "Alfa Teknoloji", "alanlar": ["alfa.test"], "neden": "elle", "tarih": "2026-09-01"},
-        {"ad": "Beta Lojistik Hizmetleri", "alanlar": ["beta.test"], "neden": "elle", "tarih": "2026-09-01"},
-        {"ad": "Zeta Danışmanlık", "alanlar": ["zeta.test"], "neden": "elle", "tarih": "2026-11-01"},
-        {"ad": "Kerem Demir", "alanlar": [], "neden": "elle", "tarih": "2026-11-01"},
-        {"ad": "Ali Veli", "alanlar": [], "neden": "elle", "tarih": "2026-11-01"}]
-json.dump(aday, open(os.path.join(TD, "aday.json"), "w"), ensure_ascii=False)
-dosya("Alfa Teknoloji", [{"bolum": "kimlik", "metin": "Fabrika zemini boyası ve kaplama üretimi yapan aile şirketi, Bursa", "derece": "B"},
-                         {"bolum": "celiski", "metin": "Veritabanı kaydı siber güvenlik diyor; sicil boya üreticisi gösteriyor. Sicil doğrulanmalı.", "derece": "B", "kaynak": "https://sicil.test/alfa"}])
-dosya("Beta Lojistik Hizmetleri", [{"bolum": "kimlik", "metin": "İstanbul merkezli lojistik ve gümrük danışmanlığı şirketi, liman hizmetleri", "derece": "B"},
-                                   {"bolum": "bayrak", "metin": "Yeni bayrak: alan adı yakın zamanda yenilendi", "derece": "C", "eklendi": "2026-11-12"}])
-dosya("Zeta Danışmanlık", [{"bolum": "kimlik", "metin": "Danışmanlık firması", "derece": "C"}])
-dosya("Kerem Demir", [])
-def b(kayit, anahtar, tur, derece, ilk, durum="yeni"):
-    return {"anahtar": anahtar, "kayit": kayit, "tur": tur, "alt": "x", "deger": f"{tur} değeri", "onceki": None, "ozet": f"{tur} özeti", "kaynak": "https://x.test/" + anahtar, "tarih": ilk,
-            "derece": derece, "ilk_gorulme": ilk, "son_gorulme": ilk, "durum": durum, "tarama": ilk.replace("-", ""), "kid": "claude"}
-bul = [b("alfa-teknoloji", "a1", "gonderi", "C", "2026-11-12"), b("alfa-teknoloji", "a2", "haber", "B", "2026-11-12"), b("alfa-teknoloji", "a3", "dns", "A", "2026-11-12"),
-       b("beta-lojistik-hizmetleri", "b1", "gonderi", "C", "2026-10-01")]
-open(os.path.join(TD, "bulgular.jsonl"), "w").write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in bul))
-il = [{"kayit": "kerem-demir", "tur": "eposta", "deger": "ali" + AT + "sirket.test", "kaynak": "imza", "derece": "A", "tarih": "", "eklendi": "2026-11-01"},
-      {"kayit": "ali-veli", "tur": "eposta", "deger": "ali.yeni" + AT + "sirket.test", "kaynak": "imza", "derece": "B", "tarih": "", "eklendi": "2026-11-01"},
-      {"kayit": "beta-lojistik-hizmetleri", "tur": "telefon", "deger": "+90 212 000 00 00", "kaynak": "imza", "derece": "A", "tarih": "", "eklendi": "2026-11-12"}]
-open(os.path.join(TD, "iletisim.jsonl"), "w").write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in il))
-json.dump({"kayitlar": {"alfa-teknoloji": {"tarih": "2026-09-20"}, "beta-lojistik-hizmetleri": {"tarih": "2026-11-10"}, "zeta-danismanlik": {"tarih": "2026-11-10"}}}, open(os.path.join(TD, "son.json"), "w"))
-tazi.indeksle(TD, "-")
-# fixture'ı "taze" göster: tazi.db meta saatini koşu saatine çek (indeksle gerçek saati yazar)
-c = sqlite3.connect(os.path.join(TD, "tazi.db")); c.execute("UPDATE meta SET v=? WHERE k='son_indeks'", ("2026-11-12T07:50:00",)); c.commit(); c.close()
+# ---------- Tazı hizmetinin kesisim_verisi yanıtı (S321) ----------
+# Tazı deposunun gerçek hizmetiyle bir kez üretildi (5 kayıt: Alfa Teknoloji, Beta Lojistik Hizmetleri, Zeta Danışmanlık, Kerem Demir, Ali Veli; dosya öğeleri, bulgular, iletişim, son indeks 2026-11-12T07:50).
+TZV = json.loads(r'''{"bulgu": [{"anahtar": "a1", "derece": "C", "durum": "yeni", "ilk": "2026-11-12", "kayit": "alfa-teknoloji", "kaynak": "https://x.test/a1", "ozet": "gonderi özeti", "tur": "gonderi"}, {"anahtar": "a2", "derece": "B", "durum": "yeni", "ilk": "2026-11-12", "kayit": "alfa-teknoloji", "kaynak": "https://x.test/a2", "ozet": "haber özeti", "tur": "haber"}, {"anahtar": "a3", "derece": "A", "durum": "yeni", "ilk": "2026-11-12", "kayit": "alfa-teknoloji", "kaynak": "https://x.test/a3", "ozet": "dns özeti", "tur": "dns"}, {"anahtar": "b1", "derece": "C", "durum": "yeni", "ilk": "2026-10-01", "kayit": "beta-lojistik-hizmetleri", "kaynak": "https://x.test/b1", "ozet": "gonderi özeti", "tur": "gonderi"}], "iletisim": [{"deger": "ali\u0040sirket.test", "derece": "A", "eklendi": "2026-11-01", "kayit": "kerem-demir", "kaynak": "imza", "tarih": "", "tur": "eposta"}, {"deger": "ali.yeni\u0040sirket.test", "derece": "B", "eklendi": "2026-11-01", "kayit": "ali-veli", "kaynak": "imza", "tarih": "", "tur": "eposta"}, {"deger": "+90 212 000 00 00", "derece": "A", "eklendi": "2026-11-12", "kayit": "beta-lojistik-hizmetleri", "kaynak": "imza", "tarih": "", "tur": "telefon"}], "kayit": {"alfa-teknoloji": {"ad": "Alfa Teknoloji", "alanlar": ["alfa.test"], "eposta_iz": [], "id": "alfa-teknoloji", "tur": "firma"}, "ali-veli": {"ad": "Ali Veli", "alanlar": [], "eposta_iz": ["7681ce3a924dc99c"], "id": "ali-veli", "tur": "kisi"}, "beta-lojistik-hizmetleri": {"ad": "Beta Lojistik Hizmetleri", "alanlar": ["beta.test"], "eposta_iz": [], "id": "beta-lojistik-hizmetleri", "tur": "firma"}, "kerem-demir": {"ad": "Kerem Demir", "alanlar": [], "eposta_iz": ["a0447e9cb8508897"], "id": "kerem-demir", "tur": "kisi"}, "zeta-danismanlik": {"ad": "Zeta Danışmanlık", "alanlar": ["zeta.test"], "eposta_iz": [], "id": "zeta-danismanlik", "tur": "firma"}}, "oge": [{"acik": 1, "bolum": "kimlik", "derece": "B", "eklendi": "2026-11-01", "kayit": "alfa-teknoloji", "kaynak": "", "metin": "Fabrika zemini boyası ve kaplama üretimi yapan aile şirketi, Bursa", "no": 1, "tarih": ""}, {"acik": 1, "bolum": "celiski", "derece": "B", "eklendi": "2026-11-01", "kayit": "alfa-teknoloji", "kaynak": "https://sicil.test/alfa", "metin": "Veritabanı kaydı siber güvenlik diyor; sicil boya üreticisi gösteriyor. Sicil doğrulanmalı.", "no": 2, "tarih": ""}, {"acik": 1, "bolum": "kimlik", "derece": "B", "eklendi": "2026-11-01", "kayit": "beta-lojistik-hizmetleri", "kaynak": "", "metin": "İstanbul merkezli lojistik ve gümrük danışmanlığı şirketi, liman hizmetleri", "no": 1, "tarih": ""}, {"acik": 1, "bolum": "bayrak", "derece": "C", "eklendi": "2026-11-12", "kayit": "beta-lojistik-hizmetleri", "kaynak": "", "metin": "Yeni bayrak: alan adı yakın zamanda yenilendi", "no": 2, "tarih": ""}, {"acik": 1, "bolum": "kimlik", "derece": "C", "eklendi": "2026-11-01", "kayit": "zeta-danismanlik", "kaynak": "", "metin": "Danışmanlık firması", "no": 1, "tarih": ""}], "son_indeks": "2026-11-12T07:50:00", "tarama": {"alfa-teknoloji": "2026-09-20", "beta-lojistik-hizmetleri": "2026-11-10", "zeta-danismanlik": "2026-11-10"}, "yok": false}''')
 os.utime(VT, (SIMDI.timestamp(), SIMDI.timestamp()))
 
 # izlenecek rutinler ayardan gelir (kod rutin adı taşımaz); gerçek ayar.json'a dokunulmaz
@@ -97,12 +69,12 @@ AYAR = {"kesisim_rutinler": [
     {"ad": "rutin-eposta-kontrolu", "iz": ["ayar:basecamp_son", "rutin"], "esik_sa": 36, "aciklama": "2 saatte bir; yalnız yazdığı zaman iz bırakır (eşik geniş)"},
     {"ad": "rutin-takvim-haftalik", "iz": ["takvim"], "esik_sa": 192, "aciklama": "haftalık"},
     {"ad": "rutin-yonetim-kontrol", "iz": ["okuma:KONTROL"], "kapali": "ayar:kontrol_gunluk", "esik_sa": 36, "aciklama": "günlük"}]}
-def calistir(canli=CANLI, simdi=SIMDI, **kw): return kesisim.kos(canli, VT, TD, ayar=AYAR, simdi=simdi, gelistirici=True, **kw)
+def calistir(canli=CANLI, simdi=SIMDI, **kw): return kesisim.kos(canli, VT, TZV, ayar=AYAR, simdi=simdi, gelistirici=True, **kw)
 def kume(s): return {(b["tur"], b["varlik"], b["id"][:0] + (b["kaynaklar"][0]["kayit"] if b["kaynaklar"] else "")) for b in s["bulgular"] if b["durum"] != "kapandi"}
 def bul_(s, tur, varlik=None, parca=""):
     return [b for b in s["bulgular"] if b["tur"] == tur and (varlik is None or b["varlik"] == varlik) and parca in b["ozet"] and b["durum"] != "kapandi"]
 
-h_oh, h_tz = {p: sha(p) for p in (VT, os.path.join(TD, "tazi.db"))}, {f: sha(os.path.join(TD, f)) for f in ("aday.json", "bulgular.jsonl", "iletisim.jsonl", "son.json")}
+h_oh = {VT: sha(VT)}; tzv_once = json.dumps(TZV, sort_keys=True)
 s1 = calistir()
 tur_say = s1["ozet"]["tur"]
 print("tür sayıları:", tur_say)
@@ -133,7 +105,7 @@ ok("eksik-: alfa.test dis_firma'da ve Tazı'da var → eksik yok", not bul_(s1, 
 ok("bayat+: yarın toplantı, Tazı taraması 30 günden eski (alfa.test)", len(bul_(s1, "bayat", "firma:alfa.test", "Tazı dosyasının son taraması")) == 1)
 ok("bayat+: yarın toplantı, dis_firma 30 günden eski (alfa.test)", len(bul_(s1, "bayat", "firma:alfa.test", "dis_firma kaydı")) == 1)
 ok("bayat-: 14 gün penceresi içinde ama 3 günden uzak toplantıda (delta) bayat denmez", not bul_(s1, "bayat", "firma:delta.test"))
-ok("bayat-: kaynaklar taze → kaynak bayatlığı bulgusu yok", not bul_(s1, "bayat", "sistem:Proje veritabanı") and all(k["durum"] != "bayat" for k in s1["kaynaklar"] if k["ad"] in ("Proje veritabanı (son değişiklik)", "Tazı dizini (tazi.db)")))
+ok("bayat-: kaynaklar taze → kaynak bayatlığı bulgusu yok", not bul_(s1, "bayat", "sistem:Proje veritabanı") and all(k["durum"] != "bayat" for k in s1["kaynaklar"] if k["ad"] in ("Proje veritabanı (son değişiklik)", "Tazı dizini (indeks)")))
 
 # ---- yeni ----
 ok("yeni+: Tazı son 24 saat bulguları (teknik dns hariç) tek satırda", len(bul_(s1, "yeni", "firma:alfa.test", "2 yeni bulgu")) == 1)
@@ -155,9 +127,9 @@ ok("kaynak tazeliği json'da: ad, son_okuma, beklenen_sn", all({"ad", "son_okuma
 # ---- gizlilik (#53) ----
 metin = open(os.path.join(CANLI, "kesisim.json"), encoding="utf-8").read().casefold()
 ok("gizlilik: sağlık/özel kayıt çıktıya girmez (öneri, çelişki, takvim başlığı)", not any(x in metin for x in ("sağlık", "hastane", "doktor", "ozel.test")) and s1["suzulen"]["ozel"] == 3, s1["suzulen"])
-g = kesisim.kos(os.path.join(T, "g"), VT, TD, ayar=AYAR, simdi=SIMDI, gizli=True, gelistirici=True)
+g = kesisim.kos(os.path.join(T, "g"), VT, TZV, ayar=AYAR, simdi=SIMDI, gizli=True, gelistirici=True)
 ok("gizlilik: gizli toplantıda hiçbir şey işlemez/yazmaz", g == {"atlandi": "gizli"} and not os.path.exists(os.path.join(T, "g")))
-g = kesisim.kos(os.path.join(T, "g2"), VT, TD, ayar=AYAR, simdi=SIMDI, gelistirici=False)
+g = kesisim.kos(os.path.join(T, "g2"), VT, TZV, ayar=AYAR, simdi=SIMDI, gelistirici=False)
 ok("gizlilik: geliştirici değilse (beta) çalışmaz/yazmaz", g == {"atlandi": "gelistirici_degil"} and not os.path.exists(os.path.join(T, "g2")))
 bos = os.path.join(T, "bos-kod"); os.makedirs(bos)
 os.environ["SUFLOR_TEST_KOD"] = bos
@@ -165,8 +137,8 @@ ok("gelistirici_mi: .git'siz kod klasörü + ayar yok → False; ayar gelistiric
 del os.environ["SUFLOR_TEST_KOD"]
 
 # ---- salt okuma ----
-ok("salt okuma: veritabanı, tazi.db ve Tazı dosyaları koşudan sonra baytı baytına aynı",
-   sha(VT) == h_oh[VT] and sha(os.path.join(TD, "tazi.db")) == h_oh[os.path.join(TD, "tazi.db")] and all(sha(os.path.join(TD, f)) == v for f, v in h_tz.items()))
+ok("salt okuma: veritabanı baytı baytına aynı, Tazı verisi değişmedi",
+   sha(VT) == h_oh[VT] and json.dumps(TZV, sort_keys=True) == tzv_once)
 bk = baglayici._Sqlite(VT, {}, "")
 bk._calistir("INSERT INTO kisi(id,ad) VALUES('zz','Yazilmamali')")
 ok("salt okuma: baglayici mode=ro yazmayı reddeder", bool(bk.son_hata) and not sqlite3.connect(VT).execute("SELECT 1 FROM kisi WHERE id='zz'").fetchall(), bk.son_hata)
@@ -202,25 +174,33 @@ c = sqlite3.connect(VT); c.execute("UPDATE guncelleme_onerisi SET durum='bekliyo
 os.utime(VT, (SIMDI.timestamp(), SIMDI.timestamp()))
 
 # ---- bayat kaynak / okunamayan veritabanı / boş Tazı ----
-s6 = kesisim.kos(os.path.join(T, "c6"), VT, TD, ayar=AYAR, simdi=SIMDI + datetime.timedelta(days=6), gelistirici=True)
+s6 = kesisim.kos(os.path.join(T, "c6"), VT, TZV, ayar=AYAR, simdi=SIMDI + datetime.timedelta(days=6), gelistirici=True)
 ok("bayat+: veritabanı 48 sa, Tazı dizini 4 gün hareketsiz (6 gün sonra) → kaynak bayatlığı", len(bul_(s6, "bayat", "sistem:Proje veritabanı")) == 1 and len(bul_(s6, "bayat", "sistem:Tazı dizini")) == 1)
 ok("rutin+: eposta rutini ve Tazı rutini sessiz", len(bul_(s6, "rutin", "sistem:rutin-eposta-kontrolu")) == 1 and len(bul_(s6, "rutin", "sistem:tazi-toplanti-dosyalari")) == 1)
-s7 = kesisim.kos(os.path.join(T, "c7"), os.path.join(T, "yok.db"), TD, ayar=AYAR, simdi=SIMDI, gelistirici=True)
+s7 = kesisim.kos(os.path.join(T, "c7"), os.path.join(T, "yok.db"), TZV, ayar=AYAR, simdi=SIMDI, gelistirici=True)
 ok("Veritabanı okunamazsa: çökmez, 'okunamadı' bayat bulgusu, Tazı kuralları sürer (Tazı çelişkisi var)", len(bul_(s7, "bayat", "sistem:Proje veritabanı", "okunamadı")) == 1 and bool(bul_(s7, "celiski", None, "kaynaklar ayrışıyor")))
-s8 = kesisim.kos(os.path.join(T, "c8"), VT, os.path.join(T, "tazi-yok"), ayar=AYAR, simdi=SIMDI, gelistirici=True)
-ok("Tazı dizini yoksa: çökmez, veritabanı kuralları sürer (bekleyen, rutin)", bool(bul_(s8, "bekleyen")) and not [b for b in s8["bulgular"] if "tazi" in {k["sistem"] for k in b["kaynaklar"]}])
-ok("Tazı yokken dizin oluşturulmadı (yazma yok)", not os.path.exists(os.path.join(T, "tazi-yok")))
+SAHTE = os.path.join(KOD, "test", "sahte-tazi.py"); FX = os.path.join(T, "sahte-tazi.json"); json.dump({"kesisim": TZV}, open(FX, "w"), ensure_ascii=False)
+os.environ["TAZI_HIZMET"] = os.path.join(T, "yok", "tazi_hizmet.py")
+s8 = kesisim.kos(os.path.join(T, "c8"), VT, None, ayar=AYAR, simdi=SIMDI, gelistirici=True)
+ok("Tazı hizmeti yoksa (istemci tazi_yok): çökmez, veritabanı kuralları sürer (bekleyen, rutin), Tazı kaynağı 'yok'", bool(bul_(s8, "bekleyen")) and not [b for b in s8["bulgular"] if "tazi" in {k["sistem"] for k in b["kaynaklar"]}]
+   and any(k["ad"] == "Tazı dizini" and k["durum"] == "yok" for k in s8["kaynaklar"]))
+os.environ.update(TAZI_HIZMET=SAHTE, SAHTE_TAZI=FX, SAHTE_TAZI_HATA="kesisim_verisi:ic_hata")
+s9 = kesisim.kos(os.path.join(T, "c9"), VT, None, ayar=AYAR, simdi=SIMDI, gelistirici=True)
+ok("Tazı hizmeti hata dönerse: Tazı yok sayılır, çökmez", bool(bul_(s9, "bekleyen")) and not [b for b in s9["bulgular"] if "tazi" in {k["sistem"] for k in b["kaynaklar"]}])
+del os.environ["SAHTE_TAZI_HATA"]
+s10 = kesisim.kos(os.path.join(T, "c10"), VT, None, ayar=AYAR, simdi=SIMDI, gelistirici=True)
+ok("tazi verilmezse istemciyle hizmetten alınır (sahte hizmet): aynı bulgu kümesi", kume(s10) == kume(s1), kume(s10) ^ kume(s1))
 
 # ---- hız ve CLI ----
 ok("hız: tam koşu < 10 sn", s1["sure_sn"] < 10, s1["sure_sn"])
 env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "kesisim.py"), "kos", "--canli", os.path.join(T, "cli"), "--vt", VT, "--tazi", TD, "--json"], capture_output=True, text=True, env=env)
+r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "kesisim.py"), "kos", "--canli", os.path.join(T, "cli"), "--vt", VT, "--json"], capture_output=True, text=True, env=env)
 try: cj = json.loads(r.stdout)
 except ValueError: cj = {}
 ok("CLI: kos --json geçerli JSON, kesisim.json yazıldı", r.returncode == 0 and cj.get("surum") == 1 and os.path.isfile(os.path.join(T, "cli", "kesisim.json")), r.stderr[-300:])
-r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "kesisim.py"), "kos", "--canli", os.path.join(T, "cli2"), "--vt", VT, "--tazi", TD, "--kuru"], capture_output=True, text=True, env=env)
+r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "kesisim.py"), "kos", "--canli", os.path.join(T, "cli2"), "--vt", VT, "--kuru"], capture_output=True, text=True, env=env)
 ok("CLI: --kuru dosya yazmaz", r.returncode == 0 and not os.path.exists(os.path.join(T, "cli2", "kesisim.json")), r.stdout[-200:])
-r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "kesisim.py"), "belirsiz", "--canli", os.path.join(T, "cli3"), "--vt", VT, "--tazi", TD], capture_output=True, text=True, env=env)
+r = subprocess.run([sys.executable, "-B", os.path.join(KOD, "kesisim.py"), "belirsiz", "--canli", os.path.join(T, "cli3"), "--vt", VT], capture_output=True, text=True, env=env)
 ok("CLI: belirsiz aday listesi JSON", r.returncode == 0 and isinstance(json.loads(r.stdout), list) and len(json.loads(r.stdout)) == 1, r.stdout[-200:])
 shutil.rmtree(T, ignore_errors=True); shutil.rmtree(T0, ignore_errors=True)
 if hata: print("KALDI:", hata); sys.exit(1)

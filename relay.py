@@ -1972,6 +1972,7 @@ bolum("gemini-ses")  # aktarici/gemini-ses.py — Gemini TTS ile seslendirme (ay
 bolum("saglayici")  # aktarici/saglayici.py — yapay zekâ seçimi (Ayarlar, /status beyin), Anahtar Zinciri (Faz 11 Aşama 4)
 bolum("brifing-ses")  # aktarici/brifing-ses.py — Brifing, yalın claude -p, sesli brifing, sesli özet ve "yazayım mı?"
 bolum("bellek")  # aktarici/bellek.py — Kullanıcı kartı, Konuş geçmişi, düzeltme sırası (S76)
+bolum("tazi-istemci")  # aktarici/tazi-istemci.py — Tazı ayrı hizmet, Suflor müşteri (S321): tek kapı tazi_hizmet.py, ayar tazi_yol / ortam TAZI_HIZMET
 bolum("kisi-modeli")  # aktarici/kisi-modeli.py — kişi modeli: profil (= kullanıcı kartı, tek kaynak), öğrenilenler, tek bağlam kurucu baglam_paketi (9 Kasım)
 bolum("bas-konus")  # aktarici/bas-konus.py — Bas-konuş
 bolum("web-arastirma")  # aktarici/web-arastirma.py — toplantı dışı derin web araştırması: Konuş ve kutuda "X'i araştır", kaynaklı kayıt canli/arastirma/ (S243)

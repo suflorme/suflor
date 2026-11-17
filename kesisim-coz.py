@@ -6,8 +6,8 @@
 # Akış: kesisim.json'daki "önemli" bulgular (çelişki, belirsiz, kişi için eksik) → TEK toplu model çağrısı (varsayılan Opus; aktarici/beyin.py claude -p yolu, yeni bağımlılık yok)
 #   → her bulgu için karar: duzelt | arastir | birak + gerekçe + güven.
 #   duzelt:  S293 (12 Kasım): çözücü ŞİMDİLİK YALNIZ SUFLOR TARAFINDA karar verir. proje veritabanı öneri kuyruğuna (kayit.py oneri) YAZMA KAPALI: ayar kesisim_coz_oh true olsa bile oh_fn verilmedikçe
-#            çağrı yapılmaz; kapalıyken proje veritabanını ilgilendiren düzeltme yalnız "proje veritabanına yazılacaktı (kapalı)" diye kaydedilir (durumda oh_bekleyen). Tazı tarafı: tazi.py dosya (yeni öğe, geri alma = öğeyi kapat).
-#   arastir: Tazı kuyruğuna (aday + sorgu günlüğü; aktarıcıdan çağrılınca tazi_kos hızlı tarama). Ertesi koşuda yeniden değerlendirilir; 3 koşuda sonuçsuz kalırsa "çözülemeyen önemli" olur.
+#            çağrı yapılmaz; kapalıyken proje veritabanını ilgilendiren düzeltme yalnız "proje veritabanına yazılacaktı (kapalı)" diye kaydedilir (durumda oh_bekleyen). Tazı tarafı: Tazı hizmeti dosya_ekle (yeni öğe), geri alma = dosya_kapat (S321: aktarici/tazi-istemci.py).
+#   arastir: Tazı kuyruğuna (hizmet aday_ekle + sorgu_kaydet; aktarıcıdan çağrılınca tazi_kos hızlı tarama). Ertesi koşuda yeniden değerlendirilir; 3 koşuda sonuçsuz kalırsa "çözülemeyen önemli" olur.
 #   birak:   bir kez not edilir; bulgu id'si kesisim-coz-durum.json "birak"a girer, kesisim.kos o id'yi bir daha üretmez.
 # Sınırlar: silme yok · kişi/iletişim alanında yalnız kaynaklı ve kanıt düzeyi ≥ 2 (B) · karar/iş kayıtlarına dokunulmaz · günlük düzeltme tavanı (ayar kesisim_coz_tavan, 5) · güven < 0.7 düzeltme olmaz (araştır'a düşer)
 #   · her düzeltme <canli>/kesisim-coz.jsonl'da geri alınabilir olay satırı (t, id, karar, eylem, guven, geri_al; metin YOK).
@@ -108,14 +108,10 @@ def model_cagir(ayar, istem, canli=None, simdi=None):
     except Exception as e:
         sys.stderr.write(f"KESİŞİM ÇÖZÜCÜ: model çağrısı olmadı ({e.__class__.__name__})\n"); return None
 
-# ---------- Tazı yolu ----------
-def tazi_cagir(args, tazi_dizin=None, tazi_py=None, zaman=30):
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    if tazi_dizin: env["TAZI_DIR"] = tazi_dizin
-    try:
-        p = subprocess.run([sys.executable, "-B", tazi_py or os.path.join(KOK, "tazi.py")] + args, capture_output=True, text=True, timeout=zaman, env=env)
-        return p.returncode, (p.stdout or "").strip()
-    except Exception as e: return 125, e.__class__.__name__
+# ---------- Tazı yolu (S321: Tazı ayrı hizmet; tazi_fn(islem, girdi) → hizmetin JSON sözlüğü) ----------
+def tazi_cagir(islem, girdi=None, zaman=30):
+    try: return kesisim.tazi_istemci().tazi_cagir(islem, girdi or {}, zaman=zaman)
+    except Exception as e: return {"ok": False, "hata": "cagri", "ayrinti": e.__class__.__name__}
 def _tazi_kid(b):
     for k in b.get("kaynaklar") or []:
         if k.get("sistem") == "tazi" and k.get("kayit"): return str(k["kayit"]).split("#")[0]
@@ -136,8 +132,8 @@ def duzelt_kontrol(b, k):
     if derece not in ("A", "B", "C", "D"): derece = "C"
     return True, {"bolum": bolum, "metin": metin, "kaynak": kaynak[:300], "derece": derece}
 
-def coz(canli, ayar=None, sonuc=None, model_fn=None, tazi_fn=None, kuyruk_fn=None, oh_fn=None, simdi=None, tazi_dizin=None, yaz=True):
-    """→ cozum sözlüğü (kesisim.json'a da yazılır). model_fn(istem) → metin|None; tazi_fn(args) → (rc, çıktı); kuyruk_fn(ad, alan) → durum metni (tazi_kos kipi: basladi|bekliyor|zaten|tavan|dolu|…);
+def coz(canli, ayar=None, sonuc=None, model_fn=None, tazi_fn=None, kuyruk_fn=None, oh_fn=None, simdi=None, yaz=True):
+    """→ cozum sözlüğü (kesisim.json'a da yazılır). model_fn(istem) → metin|None; tazi_fn(islem, girdi) → hizmet sözlüğü {ok, …}; kuyruk_fn(ad, alan) → durum metni (tazi_kos kipi: basladi|bekliyor|zaten|tavan|dolu|…);
     oh_fn(bulgu, duzeltme) yalnız ayar kesisim_coz_oh true iken çağrılır (S293: varsayılan kapalı, çağıran vermez)."""
     ayar = ayar if isinstance(ayar, dict) else {}
     simdi = simdi or datetime.datetime.now()
@@ -146,13 +142,10 @@ def coz(canli, ayar=None, sonuc=None, model_fn=None, tazi_fn=None, kuyruk_fn=Non
     durum = durum_oku(canli)
     tavan = _sayi(ayar.get("kesisim_coz_tavan"), TAVAN_VARSAYILAN, 0, 50)
     oh_acik = ayar.get("kesisim_coz_oh") is True and callable(oh_fn)
-    tazi_fn = tazi_fn or (lambda a: tazi_cagir(a, tazi_dizin))
-    ad_tablo = {}
-    def tazi_ad(b):   # arastir için Tazı kaydı adı + alan: dosya kaydından, yoksa varlığın alan adından
+    tazi_fn = tazi_fn or tazi_cagir
+    def tazi_ad(b):   # arastir için Tazı kaydı adı + alan: hizmetin kayit_bul'undan, yoksa varlığın alan adından
         kid = _tazi_kid(b)
-        if kid and not ad_tablo:
-            ad_tablo.update(kesisim._tazi_oku(os.path.expanduser(tazi_dizin or os.environ.get("TAZI_DIR") or kesisim.TAZI_VARSAYILAN))["kayit"])
-        k = ad_tablo.get(kid) if kid else None
+        k = (tazi_fn("kayit_bul", {"sorgu": kid}) or {}).get("kayit") if kid else None
         if k: return k["ad"], (k["alanlar"] or [None])[0], kid
         v = str(b.get("varlik", ""))
         if v.startswith("firma:"): return v[6:], v[6:], kid
@@ -191,11 +184,11 @@ def coz(canli, ayar=None, sonuc=None, model_fn=None, tazi_fn=None, kuyruk_fn=Non
                 kid = _tazi_kid(b)
                 if not kid: olay_yaz(canli, simdi, bid, "duzelt", "engellendi:tazi_kaydi_yok", k["guven"]); cozulemedi(b, "tazi_kaydi_yok"); continue
                 if durum["gun"]["duzeltme_n"] >= tavan: olay_yaz(canli, simdi, bid, "duzelt", "engellendi:tavan", k["guven"]); cozulemedi(b, "tavan"); continue
-                rc, cikti = tazi_fn(["dosya", "--kim", kid, "--bolum", d["bolum"], "--metin", "[kesişim] " + d["metin"][:380], "--kaynak", d["kaynak"], "--derece", d["derece"]])
-                m = re.search(r"eklendi: #(\d+)", cikti or "")
-                if rc != 0 or not m: olay_yaz(canli, simdi, bid, "duzelt", "hata:tazi", k["guven"]); cozulemedi(b, "tazi_hata"); continue
+                r = tazi_fn("dosya_ekle", {"kim": kid, "bolum": d["bolum"], "metin": "[kesişim] " + d["metin"][:380], "kaynak": d["kaynak"], "derece": d["derece"]}) or {}
+                no = r.get("no") if r.get("ok") and isinstance(r.get("no"), int) else None
+                if not no: olay_yaz(canli, simdi, bid, "duzelt", "hata:tazi", k["guven"]); cozulemedi(b, "tazi_hata"); continue
                 durum["gun"]["duzeltme_n"] += 1; durum["duzelt"][bid] = {"tarih": _iso(simdi)}; cozum["duzeltilen"] += 1
-                olay_yaz(canli, simdi, bid, "duzelt", "tazi_dosya_eklendi", k["guven"], {"sistem": "tazi", "kim": kid, "kapat": int(m.group(1))}); continue
+                olay_yaz(canli, simdi, bid, "duzelt", "tazi_dosya_eklendi", k["guven"], {"sistem": "tazi", "kim": kid, "kapat": no}); continue
         if karar == "arastir":   # (duzelt'ten düşenler dahil)
             ad, alan, kid = tazi_ad(b)
             a = durum["arastir"].setdefault(bid, {"ilk": bugun, "n": 0})
@@ -203,9 +196,9 @@ def coz(canli, ayar=None, sonuc=None, model_fn=None, tazi_fn=None, kuyruk_fn=Non
             if a.get("son") != bugun:
                 if kuyruk_fn: d_ = str(kuyruk_fn(ad, alan) or "")
                 else:
-                    tazi_fn(["aday", "--ad", ad, "--neden", "elle"] + (["--alan", alan] if alan else [])); d_ = "basladi"
-                if d_ in ("tavan", "dolu", "kapali", "gizli", "bos", "yok"): olay_yaz(canli, simdi, bid, "arastir", "engellendi:" + d_, k["guven"]); cozulemedi(b, "tazi_" + d_); continue
-                tazi_fn(["sorgu", "--istek", "Kesişim: " + _kisalt(b.get("ozet"), 120), "--kim", kid or ad, "--yapan", "zamanli"])
+                    r = tazi_fn("aday_ekle", dict({"ad": ad, "neden": "elle"}, **({"alan": alan} if alan else {}))) or {}; d_ = "basladi" if r.get("ok") else ("yok" if r.get("hata") == "tazi_yok" else "hata")
+                if d_ in ("tavan", "dolu", "kapali", "gizli", "bos", "yok", "hata"): olay_yaz(canli, simdi, bid, "arastir", "engellendi:" + d_, k["guven"]); cozulemedi(b, "tazi_" + d_); continue
+                tazi_fn("sorgu_kaydet", {"istek": "Kesişim: " + _kisalt(b.get("ozet"), 120), "kim": kid or ad, "yapan": "zamanli"})
                 a["n"] += 1; a["son"] = bugun
                 olay_yaz(canli, simdi, bid, "arastir", "tazi_kuyruga_alindi", k["guven"])
             cozum["arastirilan"] += 1
@@ -216,10 +209,10 @@ def coz(canli, ayar=None, sonuc=None, model_fn=None, tazi_fn=None, kuyruk_fn=Non
         kesisim._yaz_atomik(os.path.join(canli, "kesisim.json"), json.dumps(sonuc, ensure_ascii=False, indent=1))
     return cozum
 
-def geri_al(canli, bid, tazi_fn=None, simdi=None, tazi_dizin=None):
+def geri_al(canli, bid, tazi_fn=None, simdi=None):
     """son düzeltme olayını geri al (Tazı: öğeyi kapat; silme yok) → True/False"""
     simdi = simdi or datetime.datetime.now()
-    tazi_fn = tazi_fn or (lambda a: tazi_cagir(a, tazi_dizin))
+    tazi_fn = tazi_fn or tazi_cagir
     olay = None
     try:
         for l in open(os.path.join(canli, "kesisim-coz.jsonl"), encoding="utf-8"):
@@ -229,13 +222,14 @@ def geri_al(canli, bid, tazi_fn=None, simdi=None, tazi_dizin=None):
     except OSError: return False
     if not olay: return False
     g = olay["geri_al"]
-    rc, _ = tazi_fn(["dosya", "--kim", str(g["kim"]), "--kapat", str(g["kapat"]), "--sonuc", "kesişim düzeltmesi geri alındı"])
-    if rc != 0: return False
+    try: r = tazi_fn("dosya_kapat", {"kim": str(g["kim"]), "no": int(g["kapat"]), "sonuc": "kesişim düzeltmesi geri alındı"}) or {}
+    except (TypeError, ValueError): return False
+    if not r.get("ok"): return False
     olay_yaz(canli, simdi, bid, "duzelt", "geri_alindi")
     d = durum_oku(canli); d["duzelt"].pop(bid, None); d["gun"]["duzeltme_n"] = max(0, int(d["gun"].get("duzeltme_n") or 0) - 1); durum_yaz(canli, d)
     return True
 
-def kos_ve_coz(canli, ayar=None, gizli_fn=None, gelistirici=None, simdi=None, vt=None, tazi_dizin=None, **kw):
+def kos_ve_coz(canli, ayar=None, gizli_fn=None, gelistirici=None, simdi=None, vt=None, tazi=None, **kw):
     """günlük akış: kesişim koşusu, hemen ardından çözücü. Kapalıysa/gizliyse/geliştirici değilse {"atlandi": neden}"""
     ayar = ayar if isinstance(ayar, dict) else {}
     gizli_fn = gizli_fn or (lambda: False)
@@ -243,10 +237,10 @@ def kos_ve_coz(canli, ayar=None, gizli_fn=None, gelistirici=None, simdi=None, vt
     if not g: return {"atlandi": "gelistirici_degil"}
     if not acik_mi(ayar, g): return {"atlandi": "kapali"}
     if gizli_fn(): return {"atlandi": "gizli"}
-    s = kesisim.kos(canli, vt, tazi_dizin, ayar=ayar, simdi=simdi, gizli=False, yaz=True, gelistirici=g)
+    s = kesisim.kos(canli, vt, tazi, ayar=ayar, simdi=simdi, gizli=False, yaz=True, gelistirici=g)
     if s.get("atlandi"): return s
     if gizli_fn(): return {"atlandi": "gizli"}   # koşu sürerken gizli toplantı açıldıysa model çağrısına gidilmez
-    return coz(canli, ayar, s, simdi=simdi, tazi_dizin=tazi_dizin, **kw)
+    return coz(canli, ayar, s, simdi=simdi, **kw)
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Kesişim F2: arka plan çözücü")

@@ -2315,12 +2315,12 @@ def hazirlik_cmd():
         except Exception: gs = []  # yapi.py yanında değil (kopya) ya da veritabanı okunamadı: hazırlık sürer
         if gs: print(f"\n## {A.kim}: karar grafı (iddia, karar, açık işler)\n" + "\n".join("  " + _yapi().graf_satir(g) for g in gs))
         print(f"\n## {A.kim}: geçmişte ne dedi"); print("\n".join(bas(A.kim, kim=A.kim)))
-    try:  # Tazı (dış kaynak, kanıt dereceli): izlenen firma/kişi eşleşirse son gelişmeler; modül ya da liste yoksa sessizce atlanır
+    try:  # Tazı (dış kaynak, kanıt dereceli; S321 ayrı hizmet): izlenen firma/kişi eşleşirse son gelişmeler; hizmet ya da liste yoksa sessizce atlanır
         tazi, _tn = tazi_yukle()  # gizli toplantıda ve ayar tazi kapalıyken (None) bölüm basılmaz; yükleme tazi_cmd ile aynı yoldan
         if tazi is None: raise ImportError(_tn)
         gor, tb = set(), []
         for x in [A.kim] + [s.strip() for s in str(A.katilimci or "").split(",")]:
-            m = tazi.ozet_metni(x) if x else None
+            m = (tazi("ozet", sorgu=x[:200]).get("metin") or None) if x else None
             if m and m.splitlines()[0] not in gor and len(gor) < 3: gor.add(m.splitlines()[0]); tb.append(m)
         if tb: print("\n## Tazı: son gelişmeler (dış kaynak, kanıt dereceli)\n" + "\n".join("  " + l for m in tb for l in m.splitlines()))
     except Exception: pass
@@ -2708,18 +2708,21 @@ def kapanis_cmd():
     try: v = get("/kapanis-turu")
     except Exception as e: sys.exit(f"aktarıcıya ulaşılamadı: {e}")
     print(v.get("blok") or ("kapanış turu kapalı (ayar kapanis_turu)" if v.get("kapali") else "kapanış turunda kayıt yok (bu toplantının dizisinden/katılımcılarından açık iş ya da teyit bekleyen karar yok)"))
-def tazi_yukle(st=None):  # 11 Kasım: tazi.py'yi tek yoldan yükler (canlı kopyanın yanı, yoksa ayar kod klasörü). → (modül ya da None, neden: "" | gizli | kapali | yok). Gizli toplantıda ve ayar tazi kapalıyken yüklenmez.
+def tazi_yukle(st=None):  # 11 Kasım; S321: Tazı ayrı hizmet, Suflor müşteri. → (çağrı işlevi ya da None, neden: "" | gizli | kapali | yok). İşlev: tz(islem, **girdi) → hizmetin JSON sözlüğü
+    # (aktarici/tazi-istemci.py; hizmetin yeri ayar tazi_yol / ortam TAZI_HIZMET). Gizli toplantıda ve ayar tazi kapalıyken hizmet hiç çağrılmaz.
     if st is None:
         try: st = get("/status")
         except Exception: st = {}
     if st.get("gizli"): return None, "gizli"
     acik = (st.get("tazi") or {}).get("acik") if isinstance(st.get("tazi"), dict) else (AYAR.get("tazi") if isinstance(AYAR.get("tazi"), bool) else None)
     if acik is False: return None, "kapali"
-    for d_ in (os.path.dirname(os.path.abspath(__file__)), os.path.expanduser(str(AYAR.get("kod") or ""))):
-        if d_ and os.path.isfile(os.path.join(d_, "tazi.py")): sys.path.insert(0, d_); break
-    try: import tazi
-    except ImportError: return None, "yok"
-    return tazi, ""
+    try:
+        import importlib.util
+        sp = importlib.util.spec_from_file_location("suflor_tazi_istemci", os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", "tazi-istemci.py"))
+        m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m)
+    except Exception: return None, "yok"
+    if not m.tazi_hizmet_yolu(AYAR): return None, "yok"
+    return (lambda islem, **g: m.tazi_cagir(islem, g, zaman=15, ayar=AYAR)), ""
 def tazi_kos_iste(ad, alan=None, kip="hizli", neden="toplanti"):  # aktarıcının /tazi ucuna (anahtarlı) tarama isteği; aktarıcı yoksa sessiz → None
     try: return _post("/tazi", {"islem": "tara", "kim": ad, "alan": alan, "kip": kip, "neden": neden})
     except Exception: return None
@@ -2742,8 +2745,10 @@ def tazi_cmd():  # toplantı oturumunun bilgi kartı için (kural: toplanti-otur
     if neden_ == "gizli": print("gizli toplantı: Tazı kartı yok (hiçbir şey çalıştırılmadı)"); return
     if neden_ == "kapali": print("Tazı kapalı (ayar tazi): karta 'Tazı' yazma, bilgi kartı yazma."); return
     if tazi is None: print("Tazı kurulu değil: karta 'Tazı yok' yazma, bilgi kartı yazma."); return
-    try: ks = tazi.metinden_kayitlar(ad, en_cok=1); m = tazi.ozet_metni(ks[0]["id"]) if ks else None
-    except Exception as e: print(f"Tazı okunamadı ({e.__class__.__name__}): kart yazma."); return
+    r = tazi("eslesen_kayitlar", metin=ad, en_cok=1); ks = r.get("kayitlar") or []
+    r2 = tazi("ozet", sorgu=ks[0]["id"]) if r.get("ok") and ks else {"ok": True}
+    if not r.get("ok") or not r2.get("ok"): print(f"Tazı okunamadı ({(r if not r.get('ok') else r2).get('hata')}): kart yazma."); return
+    m = r2.get("metin")
     if m: print(f"KART ETİKETİ: {etiket}\n{m}\n(Kartı bu özetten yaz; kaynağı ve son tarama tarihini an; yalnız bu özetteki bilgiyi kullan.)"); return
     web = AYAR.get("web_arastirma") is not False
     kr = tazi_kos_iste(ad, kip="hizli", neden="toplanti")  # hızlı tarama arka planda başlar (yalnız ad ağa gider); ~30 sn sonra dosya oluşur

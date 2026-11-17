@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Kesişim sayfası (F3, 12 Kasım): GET /kesisim (sayfa kabuğu, anahtarsız), GET /kesisim.json (anahtarlı; düzeltmeler / araştırmalar / sorulacak / bırakılanlar / kaynaklar, ham kod yok),
-# POST /kesisim geri_al (yalnız pano kökeni + anahtar; kesisim-coz.py geri_al → sahte tazi.py'ye "--kapat N"), geliştirici değilse 404/kapalı, gizli kipte kapalı, ?t= tek kullanımlık anahtar gömme.
-# Kurgu veri; yalıtılmış aktarıcı + sahte tazi.py; gerçek _canli'ye dokunmaz, ağ yok.
+# POST /kesisim geri_al (yalnız pano kökeni + anahtar; kesisim-coz.py geri_al → istemci → sahte Tazı hizmetine dosya_kapat no N; S321), geliştirici değilse 404/kapalı, gizli kipte kapalı, ?t= tek kullanımlık anahtar gömme.
+# Kurgu veri; yalıtılmış aktarıcı + sahte Tazı hizmeti (test/sahte-tazi.py, ayar tazi_yol); gerçek _canli'ye dokunmaz, ağ yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kesisim-sayfa.py      (kaldı → çıkış 1)
 import datetime, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
@@ -14,7 +14,7 @@ T = tempfile.mkdtemp(prefix="suflor-kesisim-sayfa-"); canli = os.path.join(T, "c
 for f in ("relay.py", "manifest.json", "kesisim.py", "kesisim-coz.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici")); shutil.copytree(os.path.join(KOD, "pano"), os.path.join(T, "pano"))
 CAGRI = os.path.join(T, "tazi-cagri.txt")
-open(os.path.join(T, "tazi.py"), "w").write(f"import sys\nopen({CAGRI!r}, 'a').write(' '.join(sys.argv[1:]) + '\\n')\n")  # sahte Tazı: çağrıyı yazar, başarılı döner
+os.environ.update(SAHTE_TAZI=os.path.join(T, "sahte-tazi.json"), SAHTE_TAZI_GUNLUK=CAGRI); os.environ.pop("TAZI_HIZMET", None)  # sahte Tazı hizmeti: çağrıyı yazar, başarılı döner
 def yaz(ad, v): open(os.path.join(canli, ad), "w", encoding="utf-8").write(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False))
 SIMDI = datetime.datetime.now().replace(microsecond=0); BUGUN = SIMDI.date().isoformat()
 I = {k: (k * 16)[:16] for k in "abcdef"}  # hex kimlikler
@@ -36,7 +36,7 @@ yaz("kesisim-coz.jsonl", "".join(json.dumps(o, ensure_ascii=False) + "\n" for o 
 yaz("kesisim-coz-durum.json", {"birak": {I["e"]: {"t": SIMDI.isoformat(), "gerekce": "önemsiz"}}, "arastir": {}, "duzelt": {}, "oh_bekleyen": {}, "gun": {"tarih": BUGUN, "duzeltme_n": 1}})
 ay = os.path.join(T, "ayar.json")
 def baslat(gel=True):
-    json.dump({"alan": "Deneme", "ad": "Ayşe Deneme", "port": PORT, "uygulama": T, "proje": T, "ortak": T, "gelistirici": gel}, open(ay, "w"))
+    json.dump({"alan": "Deneme", "ad": "Ayşe Deneme", "port": PORT, "uygulama": T, "proje": T, "ortak": T, "gelistirici": gel, "tazi_yol": os.path.join(KOD, "test", "sahte-tazi.py")}, open(ay, "w"))
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", SUFLOR_AYAR=ay, SUFLOR_TEST_BASLAT="1", SUFLOR_KESISIM_DONGU_YOK="1")
     p = subprocess.Popen([sys.executable, "relay.py", "--dir", canli, "--port", str(PORT)], cwd=T, stdout=open(os.path.join(T, "relay.log"), "a"), stderr=subprocess.STDOUT, env=env)
     for _ in range(80):
@@ -70,7 +70,7 @@ try:
     bak("geri al: anahtarsız 401", ist("/kesisim", {"islem": "geri_al", "id": I["a"]}, anahtar=False).get("_kod") == 401)
     bak("geri al: geçersiz kimlik reddedilir", ist("/kesisim", {"islem": "geri_al", "id": "../x"}).get("ok") is False and not os.path.exists(CAGRI))
     g = ist("/kesisim", {"islem": "geri_al", "id": I["a"]})
-    bak("geri al: tazi dosya --kim ornek-firma --kapat 12 çağrıldı, ok", g.get("ok") is True and "dosya --kim ornek-firma --kapat 12" in open(CAGRI).read(), g)
+    bak("geri al: Tazı hizmetine dosya_kapat (kim ornek-firma, no 12) gitti, ok", g.get("ok") is True and {"islem": "dosya_kapat", "kim": "ornek-firma", "no": 12, "sonuc": "kesişim düzeltmesi geri alındı"} in [json.loads(l) for l in open(CAGRI, encoding="utf-8")], g)
     j2 = ist("/kesisim.json")
     bak("geri alınan düzeltme listeden düşer, sayı 0", j2["duzeltilen"] == 0 and j2["duzeltmeler"] == [])
     bak("ikinci geri al: ok değil", ist("/kesisim", {"islem": "geri_al", "id": I["a"]}).get("ok") is False)
