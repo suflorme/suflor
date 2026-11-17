@@ -19,6 +19,29 @@ import sys, os, re, json, glob, time, wave, tempfile
 def yaz(o): sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"); sys.stdout.flush()
 
 PARCA_SN, ARA_SN = 0.5, 0.25
+# v0.250.2 (17 Kasım, kullanıcı: "bakıyorum" gibi kısa cümle bitince belli belirsiz bir ses çıkıp kesiliyor): pocket_tts cümle sonundan (EOS) sonra
+# fazladan kare üretir (≤ 4 sözcükte 3+2 = 5 kare ≈ 400 ms, uzunda 3 kare); model bu boşlukta yeni bir sese başlar, ses dosya sonunda yarıda kesilir
+# (ölçüm: "Bakayım." -80 dB sessizlikten sonra son 150 ms'de -19 dB). Çare: her cümlenin son KUYRUK_TUT_SN'si bekletilir; sessizlikten
+# (≥ KUYRUK_SESSIZ_SN, < KUYRUK_DB) sonra gelen ≤ KUYRUK_EN_COK_SN ses atılır, sonda KUYRUK_SONUM_SN sönüm. İlk parça yine hemen gider.
+KUYRUK_TUT_SN, KUYRUK_SESSIZ_SN, KUYRUK_EN_COK_SN, KUYRUK_DB, KUYRUK_SONUM_SN = 0.6, 0.12, 0.35, -55.0, 0.01
+
+
+def kuyruk_temizle(a, sr, np, once=False):  # cümlenin bekletilen sonu → EOS sonrası artık ses atılmış, sonu sönümlü; once: cümlenin önceki kısmı çalındı
+    w = max(1, int(0.02 * sr)); n = len(a) // w
+    if n >= 3:
+        e = 20 * np.log10(np.sqrt(np.mean(a[:n * w].reshape(n, w) ** 2, axis=1)) + 1e-9)
+        sessiz = e < KUYRUK_DB
+        i = n
+        while i > 0 and not sessiz[i - 1]: i -= 1          # sondaki sesli kareler (artık aday)
+        t = n - i
+        j = i
+        while j > 0 and sessiz[j - 1]: j -= 1               # öndeki sessizlik
+        s = i - j
+        if 0 < t * w <= KUYRUK_EN_COK_SN * sr and s * w >= KUYRUK_SESSIZ_SN * sr and (j > 0 or once):  # sessizlikten önce konuşma olmalı
+            a = a[:(j + min(s, 3)) * w].copy()              # sessizliğin başı + 60 ms doğal sessizlik
+    k = min(len(a), int(KUYRUK_SONUM_SN * sr))
+    if k: a = a.copy(); a[-k:] *= np.linspace(1.0, 0.0, k, dtype=a.dtype)
+    return a
 _KUCUK = str.maketrans({"I": "ı", "İ": "i"})
 
 def main():
@@ -106,9 +129,17 @@ def main():
             cumleler = [x for x in re.split(r"(?<=[.!?…])\s+", metin) if x.strip()] or [metin]
             for k, c in enumerate(cumleler):
                 if k: biriken.append(np.zeros(int(ARA_SN * SR), np.float32)); uzun += int(ARA_SN * SR)
+                tut, tut_n, verildi = [], 0, False  # cümlenin bekletilen sonu (kuyruk_temizle)
                 for p in akis(ses, c, g.get("duygu")):
-                    biriken.append(p); uzun += len(p)
-                    if uzun >= PARCA_SN * SR or n == 0: bosalt()  # ilk parça hemen (ilk ses ~0,03 sn), sonra ~0,5 sn'de bir
+                    if n == 0 and not biriken:  # ilk parça hemen (ilk ses ~0,03 sn)
+                        biriken.append(p); uzun += len(p); bosalt(); continue
+                    tut.append(p); tut_n += len(p)
+                    if tut_n > KUYRUK_TUT_SN * SR:
+                        b = np.concatenate(tut); kes = len(b) - int(KUYRUK_TUT_SN * SR)
+                        biriken.append(b[:kes]); uzun += kes; tut, tut_n, verildi = [b[kes:]], len(b) - kes, True
+                        if uzun >= PARCA_SN * SR: bosalt()  # sonra ~0,5 sn'de bir
+                if tut:
+                    b = kuyruk_temizle(np.concatenate(tut), SR, np, once=verildi); biriken.append(b); uzun += len(b)
             bosalt()
             yaz({"id": kim, "bitti": True, "n": n, "sn": round(time.time() - t0, 3)})
         except Exception as e:

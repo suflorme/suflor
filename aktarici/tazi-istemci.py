@@ -1,13 +1,13 @@
 # --- Tazı istemcisi (S321, 17 Kasım): Suflor Tazı'nın MÜŞTERİSİDİR. Tazı ayrı depo ve ayrı hizmettir; Suflor'da Tazı kodu yok, Tazı'nın veri klasörü
 # (tazi.db, dosya/, rapor/) doğrudan okunmaz. Tek kapı: Tazı deposundaki tazi_hizmet.py (sözleşme orada: docs/arayuz.md, arayuz_surum 1).
 # Yer: ortam TAZI_HIZMET > ayar tazi_yol > kurulu kopya ~/Library/Application Support/Tazi/uygulama/tazi_hizmet.py (Tazı kur.py;
-# launchd altındaki aktarıcı Masaüstü'nü okuyamayabilir) > geliştirme deposu ~/Desktop/Suflor/tazi/tazi_hizmet.py. Dosya yoksa (beta, Tazı'sız kurulum) her çağrı {"ok": False, "hata": "tazi_yok"}:
+# launchd altındaki aktarıcı Masaüstü'nü okuyamayabilir) > geliştirme deposu ~/Desktop/Tazi/tazi_hizmet.py. Dosya yoksa (beta, Tazı'sız kurulum) her çağrı {"ok": False, "hata": "tazi_yok"}:
 # çağıranlar bunu "Tazı kapalı" gibi sessizce karşılar. Girdi JSON'u standart girdiden gider (ad `ps` çıktısına düşmez); çıktı tek JSON nesnesi.
 # Gizli kip ve ayar tazi (aç/kapa) burada denetlenmez: çağıranın işidir (gizli toplantı içeriği Tazı'ya gönderilmez).
 # İki kullanım: aktarıcıda bolum("tazi-istemci") ile ortak ad alanına girer; toplanti-claude.py, kesisim.py, kesisim-coz.py importlib ile yükler.
 import hashlib, json, os, subprocess, sys, threading, time
 TAZI_HIZMET_KURULU = "~/Library/Application Support/Tazi/uygulama/tazi_hizmet.py"
-TAZI_HIZMET_VARSAYILAN = "~/Desktop/Suflor/tazi/tazi_hizmet.py"
+TAZI_HIZMET_VARSAYILAN = "~/Desktop/Tazi/tazi_hizmet.py"
 TAZI_ZAMAN_VARSAYILAN = 20
 _TZI_ONB = {}   # (işlem, girdi özeti) → (bitiş zamanı, sonuç); okuyan işlemler için kısa süreli önbellek (pano /status yoklaması, Konuş yönlendirmesi)
 _TZI_ONB_EN_COK = 200

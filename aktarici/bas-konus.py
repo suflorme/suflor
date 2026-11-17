@@ -17,6 +17,7 @@ KONUS_TUR_EN_COK = int(AYAR.get("konus_tur_en_cok") or 10); KONUS_GIRIS_SINIR = 
 # v0.33.1: soru gidince KONUS_ZAMAN_ASIMI_SN içinde ne metin ne araç gelirse süreç yenilenir, soru bir kez daha gider; ikincide 2 katı beklenir, sonra hata
 # (14 Ekim ölçümü: süreç yenilendikten sonraki ilk soruda bir kez 230 sn takılma). Ayar konus_zaman_asimi_sn, 0 kapatır.
 KONUS_ZAMAN_ASIMI_SN = float(AYAR.get("konus_zaman_asimi_sn", 30) or 0)
+KONUS_ILK_YANIT_SN = float(AYAR.get("konus_ilk_yanit_sn", 15) or 0)  # v0.250.2: modelden ilk olay (message_start) bu sürede gelmezse süreç yenilenir; 0 kapatır
 KONUS_ISTEM = {"tr": ("Sen Suflor.me'nin sesli asistanısın. Kullanıcı sesle soruyor; cevabın Mac sesiyle okunacak. Kısa konuş: "
                       "soruyu tam cevaplayacak kadar, en çok dört cümle ve 80 kelime, tek paragraf, düz Türkçe; liste, başlık, işaret, emoji, dosya yolu, kod, alan adı ve kısaltma yok (sesli okunur); "
                       "ilk cümle doğrudan cevap olsun; sorulmadıkça iş önerisi ekleme (toplantı dışındaki dostça öneri kuralı aşağıda). Konuşur gibi yaz: soru sorarken 'mi' ekini kullan (Öyle mi?, Bugün mü?); "
@@ -1189,6 +1190,7 @@ DERIN_GUCLU_RX = re.compile(r"(?i)\b(analiz(?:ini)?\s+(?:et|edin|eder|yap|yapar)
                            r"analy[sz]e|analy[sz]is of|compare|contrast|pros and cons|trade-?offs?|root cause|cause and effect)\b")
 DERIN_ZAYIF_RX = re.compile(r"(?i)\b(değerlendir\w*|yorumla\w*|strateji\w*|stratejik\w*|çıkarım\w*|eleştir\w*|sonuçları ne|etkisi ne|neden .{3,60} (?:oldu|olmuş|başarısız|düştü|arttı)|"
                           r"evaluate|assess\w*|critique|strateg\w+|implications?|what do you make of|why (?:did|was|were|is|has)\b.{3,60}(?:fail|drop|rise|fall|happen)\w*)\b")
+DERIN_SOHBET_RX = re.compile(r"(?i)\b(öz ?eleştir\w*|kendini (?:eleştir|değerlendir)\w*|kendi(?:ni|n) hakkında|nerede hata yap\w*|self[- ]?critic\w*|assess yourself|critique yourself)")
 DERIN_BELGE_ATIF_RX = re.compile(r"(?i)\b(belge\w*|kitap\w*|doküman\w*|rapor\w*|sözleşme\w*|dosya\w*|pdf|document|book|report|contract|file|paper)\b")
 DERIN_BELGE_SORU_RX = re.compile(r"(?i)\b(neden|niçin|niye|nasıl|sence|ne düşünüyorsun|ne anlama|why|how come|what do you think|how does|what does .* mean)\b")
 def _derin_belge_ekli():  # belge bloğunu hazırlamadan (bekleme yok): ekli dosya var mı, gizli kip kapalı mı
@@ -1200,6 +1202,7 @@ def konus_derin_mi(soru):  # soru metni → (derin mi, neden); yalnız kural, mo
     if DERIN_KISA_RX.search(s) and not DERIN_ZORLA_RX.search(s): return False, "kısa/hızlı istendi"
     if DERIN_ZORLA_RX.search(s): return True, "kullanıcı derin düşünmeyi istedi"
     takvim = bool(TAKVIM_UZAK_RX.search(s) or TAKVIM_BOS_RX.search(s) or BEKLE_TAKVIM_RX.search(s)) if all(x in globals() for x in ("TAKVIM_UZAK_RX", "TAKVIM_BOS_RX", "BEKLE_TAKVIM_RX")) else False
+    if DERIN_SOHBET_RX.search(s) and not DERIN_GUCLU_RX.search(s): return False, "sohbet (öz eleştiri)"  # v0.250.2: asistanın öz eleştirisi sohbet sorusu, Opus turu değil (17 Kasım: 19,5 sn, 0,38 $)
     guclu, zayif = DERIN_GUCLU_RX.search(s), DERIN_ZAYIF_RX.search(s)
     if guclu and n >= 5: return True, f"analiz/karşılaştırma ({guclu.group(0)[:30]})"
     if zayif and not takvim and (n >= 7 or len(s) >= 300): return True, f"değerlendirme/strateji ({zayif.group(0)[:30]})"
@@ -1253,6 +1256,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         if bilgi: print("KONUŞ: dış bilgi kaynağı açık — " + ", ".join(k["ad"] for k in bilgi))
         web = sec["tur"] == "claude-code" and konus_web_acik()  # 5 Kasım: web araştırması (yalnız Claude Code beyninde; yukarıdaki kural)
         if web: print("KONUŞ: web araştırması açık (aramaya yalnız ad ve konu gider)")
+        _KS["web"] = bool(web)  # v0.250.2: güncel değer denetimi (konus_anlik_mi) yalnız web açıkken
         ds = BEYIN.derin_secim(AYAR) if _KS.get("derin_iste") and sec["tur"] == "claude-code" else None  # derin tur: Opus'lu süreç (konus_derin_mi)
         _KS["derin"] = bool(ds)
         if sec["tur"] == "claude-code":
@@ -1559,6 +1563,7 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                     tur["bakiyor"] = True; c = bekleme_cumlesi(bekleme_turu(tur.get("soru"), tur["_arac"][0], tur.get("bekle_tur")), konus_soru_dili(tur.get("soru"))); seslendir(c, kuyruk=True, ozet=tur.get("kaynak") == "ozet", cal=lambda t: tur.setdefault("t_dolgu_cal", t), k=tur.get("ses_k"))
                     print(f"KONUŞ: araç cümlesi ({tur['_arac'][0][:20]}): {c}")
                 tur["tampon"] = ""  # araçtan önce yarım kalan anlatım okunmasın
+                tur["arac_kesim"] = len(tur.get("metin") or "")  # v0.250.2: tutulan turda yalnız son araçtan sonraki metin okunur
             if j.get("type") == "stream_event" and e.get("type") == "content_block_delta" and (e.get("delta") or {}).get("type") == "input_json_delta" and tur.get("_arac"):
                 tur["_arac"][1] += e["delta"].get("partial_json") or ""
             if j.get("type") == "stream_event" and e.get("type") == "content_block_stop" and tur.get("_arac"):
@@ -1573,11 +1578,14 @@ def _konus_oku(cik, nesil=0):  # nesil: kapatılan eski sürecin okuyucusu yenis
                 if not tur.get("t_ilk"): tur["t_ilk"] = time.time(); _konus_kur(durum="konusuyor")
                 tur["metin"] += d
                 KONUS["cevap"] = yon_pano_metni(tur["metin"], tur) if tur.get("yon") else tur["metin"]  # iki sesli turda etiketler ad bloklarına, sınır dışı sözler düşer
-                if not tur.get("ayrinti"):  # S48: "---" sonrası yazılı ayrıntı — okunmaz, panoda görünür
+                if not tur.get("ayrinti") and not tur.get("anlik_tut"):  # S48: "---" sonrası yazılı ayrıntı — okunmaz, panoda görünür; v0.250.2: güncel değer turunda sonuç beklenir
                     tur["tampon"] += d; m = re.search(r"(?:^|\n)\s*-{3,}", tur["tampon"]) or TALIMAT_ETIKET_BAS.search(tur["tampon"]) or KAYIT_ETIKET_BAS.search(tur["tampon"]) or (tur.get("kutu") and KUTU_ETIKET_BAS.search(tur["tampon"]))  # v0.101.1: [İLET …] okunmaz; 5 Kasım: [KAYIT: …] de
                     if m: tur["tampon"] = tur["tampon"][:m.start()]; _konus_cumle(tur, son=True); tur["ayrinti"] = True
                     else: _konus_cumle(tur)
             elif j.get("type") == "result":
+                if tur.get("anlik_tut"):  # v0.250.2: güncel değer turu — "bulamadım" ise bir kez daha, sayfa okutarak; değilse şimdi okunur
+                    if konus_anlik_yeniden(tur, j): continue
+                    konus_anlik_oku(tur)
                 if not tur.get("ayrinti"): _konus_cumle(tur, son=True)
                 if tur.get("yon"): tur["metin"] = yon_pano_metni(tur.get("metin") or "", tur); KONUS["cevap"] = tur["metin"]  # geçmişe ve panoya temiz metin (atlananlar düşmüş)
                 _konus_kesik_kapanis(tur)
@@ -2445,6 +2453,7 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         vtn = (bz if "vt_sor çağırmadan" in bz or "without calling vt_sor" in bz else _vt_tazele_notu() + bz)  # v0.57.8: taze sonuç gidiyorsa "yeniden sorgula" notu çelişir
         ms, duz = konus_ad_duzelt(metin); adn = konus_ad_notu(duz)  # v0.60.0: sözlük + bilinen adlar (ön arama düzeltilmiş adla)
         tur["soru"] = ms; oa, son_tur = onara_al(ms, tur.get("bellek_kapsam")); tur_ad = "defter" if dfb else son_tur if oa else None
+        if not tur.get("yeniden"): tur["anlik_tut"] = konus_anlik_tut(tur, ms)  # v0.250.2: güncel değer sorusu — cevap okunmadan denetlenir
         tur["bekle_tur"] = tur_ad
         if duz: _konus_kur(soru=ms)
         ozb = "" if tur.get("bellek_kapsam") == "ortak" or (_KS.get("ozel_gitti") and not (tum_ozel and _KS.get("ozel_gitti") != "tum")) else kart_ozel_blok(tur.get("kisi") or kisilik_ad(), tum=tum_ozel)  # v0.234.0: toplantı dışı kullanıcı turunda tüm özel bölümler (iki asistan); süreçte yalnız kendi bölümü varsa tümü bir kez daha gider
@@ -2486,14 +2495,65 @@ def _konus_sor(metin, tur):  # yazıya dökülmüş soru → açık süreç (bas
         while time.time() - t < sn:
             time.sleep(0.25)
             if _KS["tur"] is not tur or tur.get("t_ilk") or tur.get("t_arac"): return  # cevap ya da araç geldi
+            # v0.250.2 (17 Kasım: ilk soru 47 sn): model hiç olay göndermediyse (message_start yok) KONUS_ILK_YANIT_SN'de yenile. 771 turda ilk olay ortanca 1,4 sn,
+            # %99 6,2 sn, en çok 13,1 sn; takılan süreç 30 sn sessiz kaldı, yenisi 2,7 sn'de başladı. Yeniden gönderimde (yeniden) eski süre.
+            if KONUS_ILK_YANIT_SN > 0 and not tur.get("yeniden") and not tur.get("t_ilk_yanit") and time.time() - t >= KONUS_ILK_YANIT_SN:
+                bos = round(time.time() - (_KS.get("son") or _KS.get("t_acilis") or time.time()))
+                print(f"KONUŞ: zaman aşımı — {KONUS_ILK_YANIT_SN:.0f} sn'de modelden ilk olay yok (süreç {bos} sn boştaydı), süreç yenilenip soru yeniden gönderiliyor")
+                break
         if tur.get("yeniden"):
             print(f"KONUŞ: zaman aşımı — ikinci denemede de {sn:.0f} sn cevap yok"); _KS["tur"] = None
             _konus_kur(durum="hata", hata=_t(f"{asistan_ad()} cevap vermedi — yeniden bas", f"{asistan_ad()} didn't answer — press again")); konus_kapat("zaman aşımı"); return
-        print(f"KONUŞ: zaman aşımı — {sn:.0f} sn cevap yok, süreç yenilenip soru yeniden gönderiliyor"); tur["yeniden"] = True; tur["yedek"] = konus_yedege("zaman aşımı")
+        if tur.get("t_ilk_yanit") or time.time() - t >= sn: print(f"KONUŞ: zaman aşımı — {sn:.0f} sn cevap yok, süreç yenilenip soru yeniden gönderiliyor")
+        tur["yeniden"] = True; tur["yedek"] = konus_yedege("zaman aşımı")
         konus_kapat("zaman aşımı", durum_koru=True); _KS["tur"] = tur; gonder()
     tur["gonder"] = gonder; gonder()
 # Web turu üst süresi (S257): arama/sayfa okuma KONUS_WEB_SN (ayar konus_web_sn, varsayılan 60; 0 kapatır) içinde bitmezse tur kesilir, süreç yenilenir (zaman aşımı bekçisi araç gelince çekildiği için ayrı)
 KONUS_WEB_SN = float(AYAR.get("konus_web_sn", 60) or 0)
+# v0.250.2 (17 Kasım, kullanıcı: "web erişimi zaten var, bulamadım demesi çok saçma"): v0.249.0'daki istem kuralı (güncel değerde 1–2 sayfa oku, "bulamadım" en az
+# iki denemeden sonra) tek başına yetmedi — Sydney hava durumu yine 1 arama, 0 sayfa, "bulamadım". Artık kodla: güncel değer sorusunda (hava, kur, fiyat, skor …)
+# cevap akarken okunmaz; sonuçta "bulamadım" türü cevap gelirse aynı sürece bir kez daha, sayfa okutan bir notla gönderilir; ikinci cevap okunur. Bedel:
+# bu sorularda ilk ses cevabın sonuna kalır (bekleme/araç cümlesi arayı doldurur). Ayar konus_anlik_denetim: false kapatır.
+KONUS_ANLIK_RX = re.compile(r"(?i)\b(hava (?:durum\w*|nasıl\w*|tahmin\w*|raporu)|havalar\w*|kaç derece|sıcaklı\w*|yağmur\w*|kar yağ\w*|rüzgâr\w*|rüzgar\w*|"
+                            r"döviz\w*|kur(?:u|lar\w*)?\b|dolar\w*|euro\w*|avro\w*|sterlin\w*|(?:gram |çeyrek )?altın (?:fiyat\w*|kaç\w*|ne kadar)|altının|bitcoin\w*|borsa\w*|bist\b|hisse(?:si|leri|ler)?\b|faiz\w*|enflasyon\w*|"
+                            r"fiyat\w*|kaç (?:lira|tl|dolar|para)|ne kadar\b.{0,30}(?:lira|tl|dolar|euro)|skor\w*|maç\w*|kim kazan\w*|puan durum\w*|"
+                            r"weather|forecast|temperature|exchange rate|stock price|price of|how much (?:is|does)|score|who won)")
+KONUS_ANLIK_BULAMADI_RX = re.compile(r"(?i)(bulamadım|bulunamadı|bulamıyorum|bulamadık|erişemedim|ulaşamadım|açamadım|göremedim|rakam söylemiyorum|"
+                                     r"güncel (?:bir )?(?:veri|bilgi|tahmin|değer)\w* (?:yok|bulam)|bakman\w* (?:en )?(?:sağlıklı|iyi)|"
+                                     r"couldn'?t find|could not find|unable to (?:find|get|access)|no (?:current|up-to-date) (?:data|forecast|figure))")
+def konus_anlik_mi(soru): return bool(KONUS_ANLIK_RX.search(" ".join(str(soru or "").split())))
+def konus_anlik_tut(tur, soru):  # → bu turda cevap sonuca kadar tutulur mu
+    if AYAR.get("konus_anlik_denetim", True) is False or not _KS.get("web") or not tur.get("sesli", True): return False
+    if tur.get("yon") or tur.get("otonom") or tur.get("karsi") or tur.get("kaynak") not in ("bas", "yazili", None): return False
+    return konus_anlik_mi(soru)
+def konus_anlik_metin(tur):  # son araçtan sonraki metin (araç öncesi anlatım okunmaz, akıştaki kuralla aynı)
+    return (tur.get("metin") or "")[tur.get("arac_kesim", 0):]
+def konus_anlik_yeniden(tur, j):  # sonuç "bulamadım" ise aynı sürece bir kez daha gönderir → True (tur sürer)
+    m = konus_anlik_metin(tur)
+    if tur.get("anlik_tekrar") or j.get("is_error") or not KONUS_ANLIK_BULAMADI_RX.search(m): return False
+    sayfa = sum(1 for x in tur.get("araclar") or [] if x == "WebFetch")
+    tur["anlik_tekrar"] = True; print(f"KONUŞ: güncel değer bulunamadı ({sayfa} sayfa okunmuştu) — sayfa okutarak bir kez daha soruluyor")
+    not_ = _t("[Sistem notu — kullanıcıya görünmez] Önceki cevabın kullanıcıya okunmadı ve okunmayacak. Web erişimin açık: güncel değeri bulmadan 'bulamadım' deme. "
+              "WebFetch ile en az iki farklı sayfayı aç ve oku (hava için ör. resmi meteoroloji kurumu, timeanddate.com, yr.no, weather.com; kur ve fiyat için ör. merkez bankası, "
+              "borsa ya da piyasa sitesi; skor için ör. lig ya da spor sitesi). Arama özetindeki eski tarih sayfanın bugünkü değerini göstermez: sayfayı aç, güncel değeri oku. "
+              "Bir sayfa açılmazsa öbürüne geç. Sonra soruyu baştan, değer ve kaynak adıyla kısaca cevapla; önceki cevaba ve bu nota değinme. Hepsi gerçekten başarısız olursa "
+              "hangi sayfaları denediğini tek cümleyle söyle.\n\n",
+              "[System note — not shown to the user] Your previous answer was not read out and will not be. You have web access: do not say you could not find it "
+              "before finding the current value. Open and read at least two different pages with WebFetch (weather: e.g. the national weather service, timeanddate.com, yr.no, "
+              "weather.com; rates and prices: e.g. the central bank, an exchange or market site; scores: e.g. the league or a sports site). An old date in search snippets does not "
+              "show the page's current value: open the page and read it. If one page fails, try another. Then answer the question afresh, briefly, with the value and the source "
+              "name; do not mention the previous answer or this note. If all truly fail, say in one sentence which pages you tried.\n\n")
+    for k in ("metin", "tampon"): tur[k] = ""
+    tur["arac_kesim"] = 0; tur.pop("t_ilk", None); KONUS["cevap"] = ""; _konus_kur(durum="dusunuyor")
+    if tur.get("sesli", True): seslendir(_t("Bir de sayfalara bakıyorum.", "Let me check the pages too."), kuyruk=True, k=tur.get("ses_k"))
+    try: _KS["w"].write(json.dumps({"type": "user", "message": {"role": "user", "content": not_ + _t("Soru: ", "Question: ") + (tur.get("soru") or "")}}, ensure_ascii=False) + "\n"); _KS["w"].flush()
+    except (OSError, AttributeError): return False
+    return True
+def konus_anlik_oku(tur):  # tutulan cevabı şimdi okuma kuyruğuna (akıştaki ayrıntı/etiket ayrımıyla)
+    tur["anlik_tut"] = False; tp = konus_anlik_metin(tur)
+    m = re.search(r"(?:^|\n)\s*-{3,}", tp) or TALIMAT_ETIKET_BAS.search(tp) or KAYIT_ETIKET_BAS.search(tp) or (tur.get("kutu") and KUTU_ETIKET_BAS.search(tp))
+    tur["tampon"] = tp[:m.start()] if m else tp
+    _konus_cumle(tur, son=True); tur["ayrinti"] = True
 def _web_bekci(tur):
     if KONUS_WEB_SN <= 0: return
     t = time.time()
