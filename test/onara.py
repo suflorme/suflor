@@ -49,7 +49,7 @@ try:
     bak("tek cümlelik türde de art arda aynısı yok (tablo)", all(a != b for a, b in zip(*(lambda x: (x, x[1:]))([bc("tablo") for _ in range(30)]))))
     bak("bilinmeyen tür → kısa genel havuz", all(c in g["BEKLE_GENEL"]["tr"] for c in (bc("bilinmeyen") for _ in range(20))))
     havuz = str(g["BEKLE_GENEL"]) + str(g["BEKLE_TUR"])
-    bak("eski kalıplar havuzda yok", not any(k in havuz for k in ("Hemen bakıyorum", "Kontrol ediyorum", "araştırma yapıyorum")))
+    bak("eski kalıplar havuzda yok", not any(k in havuz for k in ("Hemen bakıyorum", "Kontrol ediyorum", "araştırma yapıyorum", "İnternette bakıyorum")))
     vt = "mcp__suflorvt__vt_sor"
     bak("v0.101.0 veritabanı aracında konuya göre: plan → plan, sayı → sayı, takvim → takvim, görüşme → görüşme, diğer → kayıtlar",
         bt("Günaydın Asistan. Bugün planımızda neler var?", vt) == "plan" and bt("Kaç tane açık iş var?", vt) == "sayi" and bt("Yarın takvimimde ne var?", vt) == "takvim"

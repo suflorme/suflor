@@ -456,7 +456,7 @@ def ag_obek(pcm, duvar=None):  # yerel-konus.py _ky_mik_isci her ~100 ms öbekte
                                      "wh": False, "konusma": True, "no": ARAYA["sira"] * 1000 + len(ARAYA["say"]) + int(simdi * 1000) % 1000, "t_karar": None}
                 _agt_besle(aday, on, duvar - (len(on) // 2 - n_ob) / WH_SR, sifirla=True)
             elif o.get("o") == "bitti" and aday is not None:
-                aday["konusma"] = False
+                aday["konusma"] = False; aday.setdefault("t_bitti", time.time())
         if aday is None: return False
         sure = (ARAYA["n"] - aday["ornek"]) / WH_SR
         if aday["son"] < ARAYA["n"] and sure <= AG_ADAY_EN_COK_SN: aday["pcm"] += pcm; aday["son"] = ARAYA["n"]; _agt_besle(aday, pcm, duvar)
@@ -487,6 +487,7 @@ def _ag_kes(aday, sinif, sure=None):  # okuma durur; başka söz yeni turun baş
     else: ARAYA["tut"] = aday; ARAYA["aday"] = None
     _sohbet_kes(_KS["tur"], f"araya girme ({'durdurma sözü' if sinif == 'dur' else 'konuşma'}, {aday.get('kaynak') or '?'}, söz başından {tepki:.2f} sn)")
     aday["t_karar"] = t; _ag_say(sinif)
+    if sinif == "dur": print(f"SOHBET ÖLÇÜM: dur izi (sn, kaynak, metin, beslenen ses sn) — {' | '.join(aday.get('iz') or [])} · söz sonu {(aday['t_bitti'] - aday['t']):.2f} sn" if aday.get("t_bitti") else f"SOHBET ÖLÇÜM: dur izi — {' | '.join(aday.get('iz') or [])} · söz sürüyordu")
     _ag_olay("araya_girme", sinif=sinif, kaynak=aday.get("kaynak"), tepki_ms=round(tepki * 1000), kip=ag_kip(), **({"sure_ms": round(sure * 1000)} if sure else {}), **({"onaydi": True} if aday.get("onaydi") else {}))
     if sinif == "baska": SOHBET["kesik"] = {"t": t, "sinif": sinif, "kaynak": aday.get("kaynak"), "tepki_ms": round(tepki * 1000)}  # olasi_yanlis: kesmeden sonra söz gelmezse (_olcum_izle)
     k = ARAYA.get("kanca")
@@ -497,6 +498,8 @@ def ag_metin(aday, metin, kaynak, ara=False):  # tanıyıcı sonucu (tstt ara me
     with ARAYA["kilit"]:
         if aday is not ARAYA["aday"] or aday["t_karar"]: return None
         s = _ag_sinif(metin, ara)
+        iz = aday.setdefault("iz", [])  # v0.250.9 ölçüm: tanıyıcı sonuçlarının söz başına göre zamanı ("dur" gecikmesinin dağılımı)
+        if len(iz) < 8: iz.append(f"{time.time() - aday['t']:.2f} {(kaynak or '?')[0]} '{str(metin or '')[:10]}' {len(aday.get('pcm') or b'') / 2 / WH_SR:.2f}")
         if s in ("dur", "baska") and _ag_yanki(metin, tam=s == "dur"): s = "yanki"
         if s == "bos" and aday["sinif"]: return aday["sinif"]  # Whisper boş/uydurma: tstt'nin kararını silmez
         if s == "on" and aday["sinif"] in ("onay", "baska"): return aday["sinif"]

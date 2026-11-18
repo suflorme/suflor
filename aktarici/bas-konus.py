@@ -792,7 +792,7 @@ BEKLE_GENEL = {"tr": ["Bir saniye.", "Bakayım.", "Hm, bakayım.", "Bir bakayım
 BEKLE_TUR = {"takvim": ["Takvimine bakıyorum.", "Takvime bakayım."], "sayi": ["Sayıları çekiyorum.", "Rakamlara bakayım."],
              "not": ["Notlara göz atıyorum.", "Notlara bakayım."], "gorusme": ["Görüşme kayıtlarına bakıyorum.", "Görüşmelere bakayım."],
              "belge": ["Belgelere göz atıyorum.", "Belgelere bakayım."], "tablo": ["Tablolara bakıyorum."], "sunum": ["Sunumlara bakayım."], "analiz": ["Analizlere bakayım."]}
-BEKLE_TUR["web"] = ["Bakıyorum…", "İnternette bakıyorum.", "İnternete bakayım."]; BEKLE_TUR_EN_WEB = ["Looking it up…", "Checking online.", "Let me look that up."]  # v0.250.7: "Hemen bakıyorum" v0.213.0'da yeniden girmişti; S102 (20 Ekim) eski kalıp, havuzda yok
+BEKLE_TUR["web"] = ["Bakıyorum…", "İnternete bakayım."]; BEKLE_TUR_EN_WEB = ["Looking it up…", "Let me look that up."]  # v0.250.7: "Hemen bakıyorum" v0.213.0'da yeniden girmişti; v0.250.9: "İnternette bakıyorum" de çıktı (18 Kasım); S102 (20 Ekim) eski kalıp, havuzda yok
 BEKLE_TUR["plan"] = ["Plana bakıyorum.", "İş listesine bakayım."]; BEKLE_TUR["kayit"] = ["Kayıtlara bakıyorum.", "Kayıtlara bakayım."]
 BEKLE_TUR_EN = {"takvim": ["Checking your calendar.", "Let me look at your calendar."], "sayi": ["Pulling the numbers.", "Let me get the numbers."],
                 "not": ["Looking at the notes.", "Let me check the notes."], "plan": ["Checking the plan.", "Let me look at the task list."],
