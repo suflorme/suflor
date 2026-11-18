@@ -502,7 +502,7 @@ var sonuc = Data(); let okundu = DispatchSemaphore(value: 0)
 DispatchQueue.global().async { sonuc = cik.fileHandleForReading.readDataToEndOfFile(); okundu.signal() }
 if okundu.wait(timeout: .now() + ((j["sure"] as? Double) ?? 240)) == .timedOut { p.terminate(); bitir(5) }
 p.waitUntilExit()
-let gecici = cikti + ".tmp"
+let gecici = cikti + ".\(getpid()).tmp"  // v0.250.8: süreç numaralı geçici ad (beta #45/#57: sabit ".tmp" eşzamanlı yazımda paylaşılır)
 FileManager.default.createFile(atPath: gecici, contents: sonuc, attributes: [.posixPermissions: 0o600])
-if rename(gecici, cikti) != 0 { bitir(6) }
+if rename(gecici, cikti) != 0 { unlink(gecici); bitir(6) }
 bitir(p.terminationStatus)

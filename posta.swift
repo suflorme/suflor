@@ -57,13 +57,14 @@ func yaz(_ o: [String: Any]) {
   o["guncel"] = iso.string(from: Date())
   guard let d = try? JSONSerialization.data(withJSONObject: o, options: []) else { return }
   try? FileManager.default.createDirectory(atPath: (cikti as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-  let gecici = cikti + ".tmp"
+  let gecici = cikti + ".\(getpid()).tmp"  // v0.250.8: süreç numaralı geçici ad; O_EXCL | O_NOFOLLOW aynen (O3)
   unlink(gecici)  // hazır duran sembolik bağı izleme (O3); ileti başlıkları kişi adı içerir → 0600
   let fd = open(gecici, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
   guard fd >= 0 else { return }
   _ = d.withUnsafeBytes { write(fd, $0.baseAddress, d.count) }; close(fd)
   _ = try? FileManager.default.replaceItemAt(URL(fileURLWithPath: cikti), withItemAt: URL(fileURLWithPath: gecici))
   if !FileManager.default.fileExists(atPath: cikti) { try? FileManager.default.moveItem(atPath: gecici, toPath: cikti) }
+  unlink(gecici)  // taşınamadıysa artık kalmasın
 }
 
 // En yeni Mail sürüm klasörü (V10, V11 …)

@@ -53,10 +53,11 @@ func yaz(_ o: [String: Any]) {
   o["guncel"] = iso.string(from: Date())
   if let d = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted]) {
     try? FileManager.default.createDirectory(atPath: (cikti as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-    let gecici = cikti + ".tmp"
+    let gecici = cikti + ".\(getpid()).tmp"  // v0.250.8: süreç numaralı geçici ad (iki takvim yenilemesi üst üste gelirse)
     FileManager.default.createFile(atPath: gecici, contents: d)
     _ = try? FileManager.default.replaceItemAt(URL(fileURLWithPath: cikti), withItemAt: URL(fileURLWithPath: gecici))
     if !FileManager.default.fileExists(atPath: cikti) { try? FileManager.default.moveItem(atPath: gecici, toPath: cikti) }
+    unlink(gecici)  // taşınamadıysa artık kalmasın
   }
 }
 

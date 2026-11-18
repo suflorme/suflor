@@ -26,6 +26,9 @@ for ad, y in (("uygulama klasörü dışı", os.path.join(T, "disari.json")), ("
 os.symlink(kurban, os.path.join(T, "uyg", "canli", "posta.json.tmp"))
 subprocess.run([ikili_k, "--cikti", os.path.join(T, "uyg", "canli", "posta.json"), "--gun", "1", "--en-cok", "1"], capture_output=True, timeout=30)
 bak("geçici dosyadaki sembolik bağ izlenmez (hedef değişmedi)", open(kurban).read() == "dokunulmamalı")
+_pk = open(os.path.join(KOD, "posta.swift"), encoding="utf-8").read()  # v0.250.8: geçici ad süreç numaralı (tahmin edilemez); bağ izlememe kodda aynen kalmalı
+bak("geçici dosya süreç numaralı adla, O_EXCL | O_NOFOLLOW ile açılır", 'cikti + ".\\(getpid()).tmp"' in _pk and "O_CREAT | O_EXCL | O_NOFOLLOW" in _pk)
+bak("çıktı klasöründe artık geçici dosya yok", not [x for x in os.listdir(os.path.join(T, "uyg", "canli")) if x.endswith(".tmp") and not os.path.islink(os.path.join(T, "uyg", "canli", x))])
 dbk = os.path.join(T, "Mail V", "MailData"); os.makedirs(dbk); dbp = os.path.join(dbk, "Envelope Index")
 db = sqlite3.connect(dbp)
 db.executescript(f"""
