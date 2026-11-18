@@ -2223,6 +2223,15 @@ def hazir_yeni_konu(konu, simdi):
         os.replace(tmp, fp)
     except OSError: return False
     print(f"BAŞLAT: hazır kartlar yenilendi ({len(h.get('kartlar') or []) if isinstance(h, dict) else 0} kart eski toplantıdan; eskisi hazir-arsiv.jsonl)"); return True
+def _json_yaz_esz(fp, veri):  # beta #57 (17 Kasım): geçici dosya adı sabitti (fp + ".tmp"); iki eşzamanlı yazım aynı geçici dosyayı paylaşınca ikinci os.replace FileNotFoundError veriyordu (#45'teki yarış)
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f: json.dump(veri, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def gundem_yeni_konu(konu, rol, dil, simdi, maddeler, bas=None, bit=None):
     # 19 Ekim test toplantısı: "test" konusuyla Başlat'a basılınca agenda.json önceki toplantının gündemiyle (15 madde) kaldı — toplantı oturumu gündem başlığı uyuşmazsa
     # kullanıcıya "mevcut mu, yeni mi" diye soruyor, o arada panoda eski gündem görünüyordu. Başlatılan konu gündem başlığından farklıysa eski gündem
@@ -2234,9 +2243,7 @@ def gundem_yeni_konu(konu, rol, dil, simdi, maddeler, bas=None, bit=None):
     if isinstance(a, dict):
         with open(os.path.join(BASE, "agenda-arsiv.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(dict(a, arsiv_at=simdi.isoformat(timespec="seconds")), ensure_ascii=False) + "\n")
     yeni = {"title": konu, "rol": rol, "dil": dil, "baslangic": bas or simdi.strftime("%H:%M"), "bitis": bit or (simdi + datetime.timedelta(minutes=30)).strftime("%H:%M"), "items": list(maddeler or [])}
-    tmp = fp + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f: json.dump(yeni, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, fp); print(f"BAŞLAT: yeni konu — gündem yenilendi ({len(yeni['items'])} madde){'; eskisi agenda-arsiv.jsonl' if isinstance(a, dict) else ''}"); return True
+    _json_yaz_esz(fp, yeni); print(f"BAŞLAT: yeni konu — gündem yenilendi ({len(yeni['items'])} madde){'; eskisi agenda-arsiv.jsonl' if isinstance(a, dict) else ''}"); return True
 # v0.112.1 (kullanıcı, 22 Ekim: uygulama seçmeden Başlat'a basınca toplantı sayfası açılmadı, Claude gelmeyecek toplantıyı bekledi): Başlat formunda
 # bağlantı yoksa açılacak uygulama son seçilenle (canli/son-platform.json; Chrome'daki pano ile Mac penceresi aynı) açılır, hiç seçilmediyse Teams.
 SON_PLATFORM_YOL = os.path.join(BASE, "son-platform.json")
@@ -2260,7 +2267,10 @@ def gundem_maddeleri(v):
 def soru_oturumsuz(metin):  # mrt 28 Ekim (kritik): toplantıda panodan soru, toplantı oturumu izlemiyorsa cevapsız kalıyordu — yazılı Konuş cevaplar (panoda, okunmaz)
     if (STATE.get("izle_seen") and time.time() - STATE["izle_seen"] < 60) or topo_canli(): return None
     r = konus_yazili(metin); print(f"SORU: toplantı oturumu izlemiyor — yazılı asistana gitti ({'ok' if r.get('ok') else r.get('err')})"); return r
-def baslat(p):
+BASLAT_KILIT = threading.RLock()
+def baslat(p):  # beta #57 (17 Kasım): öneri kartı onayı ile ikinci bir Başlat aynı anda gelince iki baslat yarışıyordu (gündem dosyası hatası; iki toplantı oturumu da açılabilirdi).
+    with BASLAT_KILIT: return _baslat(p)  # sırayla: ikinci çağrı birincinin açtığı oturumu görür ve süren toplantıya katılır (S161)
+def _baslat(p):
     # S161: toplantı sürerken (oturum izliyor ya da açılıyor) aynı konuyla (ya da konusuz) elle Başlat yeni oturum ve yeni kayıt açmaz — süren toplantıya katılır
     a = TOPLANTI.get("aktif") or {}
     # Faz A (S162): canlı oturumu ikinci Başlat öldürmesin — toplantı sürüyorsa ya da aynı konuysa katılır; toplantı yokken boşta kalmış eski oturum (2 sa) yeni konuyla yenilenir
@@ -2340,9 +2350,7 @@ def baslat(p):
         try: ob, obt = _zaman(olay["baslangic"]).strftime("%H:%M"), _zaman(olay["bitis"]).strftime("%H:%M")
         except Exception: ob = obt = None
         if gundem_yeni_konu(konu, rol, dil, simdi, gundem, ob, obt): hazir_yeni_konu(konu, simdi)
-    fp = os.path.join(BASE, "takvim-secilen.json"); tmp = fp + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f: json.dump(sec, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, fp)
+    _json_yaz_esz(os.path.join(BASE, "takvim-secilen.json"), sec)
     baglam_yeni_toplanti(konu); baglam_ekle(bag_ogeler, "baslat")
     # (güvenlik denetimi Y2) davet başlığı dışarıdan gelebilir — komut satırına (Claude'a görev metni) girmez;
     # konu, rol ve dil yalnız takvim-secilen.json'da, /toplanti onu veri olarak okur
