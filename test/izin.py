@@ -117,11 +117,11 @@ try:
     ok(f"aktarıcı yok → ask ({o[:80]})", '"permissionDecision": "ask"' in o)
     for c in izin_kartlari(): uc("/card-ack", {"id": c["id"], "status": "reddedildi"}, koken=PANO)
     # 4) panodan Başlat → --settings kanca dosyası
-    kod, y = uc("/baslat", {"konu": "İzin deneme"}, koken=PANO); time.sleep(0.5)
+    kod, y = uc("/baslat", {"konu": "İzin deneme", "onay": "bitir"}, koken=PANO); time.sleep(0.5)  # önceki adımlar bir toplantı kaydı açıyor; 3 Kasımdan beri farklı konulu Başlat onay ister (soru: suruyor)
     cmd = open(os.path.join(T, "toplanti-baslat.command"), encoding="utf-8").read() if os.path.exists(os.path.join(T, "toplanti-baslat.command")) else ""
     kj = os.path.join(T, "toplanti-kanca.json"); kk = json.load(open(kj)) if os.path.exists(kj) else {}
     h = ((kk.get("hooks") or {}).get("PreToolUse") or [{}])[0]
-    ok("Başlat: toplanti-baslat.command --settings ile kanca dosyasını verir", f"--settings {kj}" in cmd or f"--settings '{kj}'" in cmd)
+    ok(f"Başlat: toplanti-baslat.command --settings ile kanca dosyasını verir ({kod} {str(y)[:160]})", f"--settings {kj}" in cmd or f"--settings '{kj}'" in cmd)
     ok("kanca dosyası: PreToolUse, Bash|mcp__.*, izin-kanca, zaman aşımı ≥ 180", h.get("matcher") == "Bash|mcp__.*" and "izin-kanca" in h["hooks"][0]["command"] and h["hooks"][0]["timeout"] >= 180)
 finally:
     r.terminate()
