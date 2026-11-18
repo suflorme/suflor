@@ -17,6 +17,11 @@ def ok(ad, k, ek=None):
     if not k: HATA.append(ad)
 SAAT = {"t": datetime.datetime(2026, 11, 12, 3, 30).timestamp()}
 GUN = 86400
+class _SahteZaman:  # yapi'nin olay damgası ve 7/14 gün kuralları gerçek time.time() ile çalışıyordu: sahte saatle (SAAT) tek zaman çizgisi olsun, gerçek bugün ne olursa olsun
+    def __getattr__(self, ad): return getattr(time, ad)
+    @staticmethod
+    def time(): return SAAT["t"]
+yapi.time = _SahteZaman()
 class Model:
     def __init__(s): s.cevaplar, s.istemler = [], []
     def cagri(s, istem, amac=None, soru=None, maske=None, is_adi=None, model=None):

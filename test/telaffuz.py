@@ -5,7 +5,7 @@
 # Claude çağrısı yok. Kural ya da liste değişince koştur.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/telaffuz.py      (kaldı → çıkış 1)
 from esz_yardim import ESZ; globals().update(ESZ)  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
-import os, re, sys, json, time, threading, tempfile, collections, subprocess
+import os, re, sys, json, time, threading, tempfile, collections, subprocess, secrets
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = open(os.path.join(KOD, "aktarici", "brifing-ses.py"), encoding="utf-8").read()
 BASE = tempfile.mkdtemp(prefix="suflor-telaffuz-"); ARAYUZ_DILI = "tr"
@@ -83,6 +83,20 @@ _gercek_sub = subprocess
 exec(src[src.index("def claude_yalin"):src.index("# --- Sesli brifing")].replace("subprocess.", "_Sub."))
 exec(src[src.index("def telaffuz_tamamla"):src.index("def _telaffuz_dongu")].replace("subprocess.", "_Sub."))
 BRIFING_APP = BASE; claude_yolu = lambda: "/bin/echo"
+_ks = open(os.path.join(KOD, "aktarici", "kapi.py"), encoding="utf-8").read()  # v0.244.0: Brifing.app istemcisi artık kapıda (kapi_brifing): gerçek kod, subprocess yine taklitle
+KAPI = {"n": 0}; KAPI_KILIT = threading.Lock(); KAPI_YEREL = threading.local()
+exec(_ks[_ks.index("def kapi_dosya"):_ks.index("# --- Kapı ---")].replace("subprocess.", "_Sub."))
+def kapi_iste(is_turu, cagri, *, karma=None, coz=None):  # aktarici/kapi.py kapi_iste taklidi (v0.244.0'dan telaffuz_tamamla kapıdan geçer): çağrıyı çalıştırır, çözümü aynı sonuç sözlüğüyle döner (engel yok; kapı kuralları test/kapi.py'nin konusu)
+    try: ham, hata = cagri()
+    except Exception as e: ham, hata = None, e.__class__.__name__
+    cozum = None
+    if hata: sonuc = "hata"
+    elif coz is not None:
+        try: cozum = coz(ham) if ham else None
+        except Exception: cozum = None
+        sonuc = "tamam" if cozum else "okunamadi"
+    else: sonuc = "tamam" if str(ham or "").strip() else "okunamadi"
+    return {"sonuc": sonuc, "neden": str(hata)[:60] if hata else "", "ham": ham, "hata": hata, "cozum": cozum, "maliyet": None, "sure_ms": None, "olculdu": False}
 def _kayit(): return [json.loads(l) for l in open(os.path.join(BASE, "claude-cagri.jsonl"))] if os.path.exists(os.path.join(BASE, "claude-cagri.jsonl")) else []
 _cik = io_ = __import__("io").StringIO(); _std = sys.stdout
 AYAR = {"port": 1, "beyin": {"telaffuz": {"tur": "openai-uyumlu", "saglayici": "gemini", "adres": f"http://127.0.0.1:{_sp}/v1", "model": "gemini-3.8-flash", "fiyat": [1, 0.1, 10]}}}

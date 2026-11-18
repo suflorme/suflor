@@ -70,7 +70,7 @@ class Aktarici:
         out = []
         for f in glob.glob(os.path.join(self.canli, "*.jsonl")):
             out += [json.loads(l) for l in open(f, encoding="utf-8") if l.strip()]
-        return [r for r in out if r.get("text")]
+        return [r for r in out if r.get("text") and r.get("speaker") and not r.get("kind")]  # yalnız transkript satırları: v0.242.0'dan aynı klasöre kart satırı (kind: "not" …) da yazılır
     def md(self): return "".join(open(f, encoding="utf-8").read() for f in glob.glob(os.path.join(self.canli, "*.md")))
     def gunluk(self): return open(self.log, encoding="utf-8").read()
 

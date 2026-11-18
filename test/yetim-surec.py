@@ -60,6 +60,6 @@ finally:
     subprocess.run(["pkill", "-f", re.escape(sahte)], capture_output=True)
 # 5. bağlantılar
 kontrol("konus_kapat ve bekleyen yuva kapatması temizliği çağırır", kod.count("konus_sure_bitir(pid, neden)") == 2)
-kontrol("pid açılışta kaydedilir ve yuvayla taşınır", '_KS["brifing_pid"] = konus_yeni_pid()' in kod and 'KONUS_P = ("saglayici", "w", "app", "brifing_pid",' in kod and "app=None, brifing_pid=None, defter_md=None" in kod)
+kontrol("pid açılışta kaydedilir ve yuvayla taşınır", '_KS["brifing_pid"] = konus_yeni_pid()' in kod and re.search(r'^KONUS_P = \((?:"\w+", )*"brifing_pid",', kod, re.M) is not None and "app=None, brifing_pid=None," in kod)  # yuva alanları (KONUS_P) listesinde: önceki alanlar (gseq, derin …) eklense de bozulmaz
 kontrol("aktarıcı açılışında artık temizliği arka planda", "threading.Thread(target=konus_artik_temizle, daemon=True).start()" in kod)
 print("yetim-surec: " + ("✓ hepsi geçti" if not hatalar else f"KALDI {len(hatalar)}")); sys.exit(1 if hatalar else 0)

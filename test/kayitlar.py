@@ -11,7 +11,7 @@ hata = []
 def bak(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: hata.append(ad)
-T = tempfile.mkdtemp(prefix="suflor-kayit-"); C = os.path.join(T, "canli"); os.makedirs(os.path.join(C, "ozetler")); bugun = datetime.date(2026, 11, 5); rl = None
+T = tempfile.mkdtemp(prefix="suflor-kayit-"); C = os.path.join(T, "canli"); os.makedirs(os.path.join(C, "ozetler")); bugun = datetime.date.today(); GUN = lambda n: (bugun + datetime.timedelta(days=n)).isoformat()  # tarihler bugüne göre (sabit tarih zamanla bayatlıyordu); rl = None
 try:
     bak("davet maddeleri: numara ve işaret kalkar, başlık/bağlantı/parola atlanır, katılım bloğunda durur",
         yapi.davet_maddeleri("Gündem:\n1. Bütçe durumu\n- Tedarikçi seçimi\n• Duyuru\nhttps://ornek.test/x\n________\nMicrosoft Teams toplantısı\n- sonra gelen") == ["Bütçe durumu", "Tedarikçi seçimi", "Duyuru"])
@@ -20,22 +20,22 @@ try:
         and yapi.kisi_eslesir("Ayşe", "Ayşe Kaya") and yapi.kisi_eslesir("David Mut", "davidmut"+AT+"x.test") and not yapi.kisi_eslesir("Can Örnek", "Ayşe Yılmaz") and not yapi.kisi_eslesir("", "Ayşe"))
     bak("graf yokken boş liste", yapi.kayit_listesi(C, "Ayşe Deneme", bugun) == {"ad": "Ayşe Deneme", "kayitlar": [], "toplantilar": [], "kisiler": [], "deneme": False, "deneme_say": 0})
     BAS = "| Saat | Konuşmacı | Metin | İşaret |\n|---|---|---|---|\n"
-    D1, D2, G = "2026-11-03-1000-Butce", "2026-10-28-1500-Proje", "2026-11-04-0900-Ozel"
+    D1, D2, G = GUN(-2)+"-1000-Butce", GUN(-8)+"-1500-Proje", GUN(-1)+"-0900-Ozel"
     for d, s in ((D1, "| 10:00:00 | Ayşe Deneme | merhaba | |\n"), (D2, "| 15:00:00 | Ayşe Deneme | merhaba | |\n"), (G, "| 09:00:10 | **GİZLİ** | açıldı | |\n")):
         open(os.path.join(C, d + ".md"), "w", encoding="utf-8").write(f"# Canlı transkript — {d}\n\n" + BAS + s)
     def y(top, baslik, tarih, ogeler): yapi.graf_yaz(C, {"baslik": baslik, "tarih": tarih, "maddeler": [{"baslik": "G", "ogeler": ogeler}]}, top + ".md")
-    y(G, "Özel", "2026-11-04", [{"tur": "karar", "metin": "Gizli karar", "netlik": "ortuk"}, {"tur": "is", "metin": "Gizli iş", "sahip": "Can Örnek", "tarih": "2026-11-01"}])
-    y(D2, "Proje planı", "2026-10-28", [{"tur": "karar", "metin": "Plan Q1'e göre", "netlik": "acik"}, {"tur": "is", "metin": "Plan belgesini paylaş", "sahip": "Zeynep Kaya", "tarih": "2026-10-30"},
-                                          {"tur": "soru", "metin": "Kaynak onaylandı mı?", "kim": "Can Örnek", "cevap": "Evet"}, {"tur": "is", "metin": "Risk listesi", "sahip": "Ayşe Deneme", "tarih": "2026-11-20"}])
-    y(D1, "Bütçe", "2026-11-03", [{"tur": "karar", "metin": "Bütçe 120 bin", "netlik": "acik"}, {"tur": "karar", "metin": "Tedarikçi Mart'ta", "netlik": "ortuk"},
-                                   {"tur": "is", "metin": "Tabloyu güncelle", "sahip": "Can Örnek", "tarih": "2026-11-02"}, {"tur": "is", "metin": "Sözleşmeyi oku", "sahip": "Ayşe Deneme"},
-                                   {"tur": "soz", "metin": "Listeyi getirecek", "sahip": "Zeynep Kaya", "tarih": "2026-11-07"}, {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Can Örnek"}])
+    y(G, "Özel", GUN(-1), [{"tur": "karar", "metin": "Gizli karar", "netlik": "ortuk"}, {"tur": "is", "metin": "Gizli iş", "sahip": "Can Örnek", "tarih": GUN(-4)}])
+    y(D2, "Proje planı", GUN(-8), [{"tur": "karar", "metin": "Plan Q1'e göre", "netlik": "acik"}, {"tur": "is", "metin": "Plan belgesini paylaş", "sahip": "Zeynep Kaya", "tarih": GUN(-6)},
+                                          {"tur": "soru", "metin": "Kaynak onaylandı mı?", "kim": "Can Örnek", "cevap": "Evet"}, {"tur": "is", "metin": "Risk listesi", "sahip": "Ayşe Deneme", "tarih": GUN(15)}])
+    y(D1, "Bütçe", GUN(-2), [{"tur": "karar", "metin": "Bütçe 120 bin", "netlik": "acik"}, {"tur": "karar", "metin": "Tedarikçi Mart'ta", "netlik": "ortuk"},
+                                   {"tur": "is", "metin": "Tabloyu güncelle", "sahip": "Can Örnek", "tarih": GUN(-3)}, {"tur": "is", "metin": "Sözleşmeyi oku", "sahip": "Ayşe Deneme"},
+                                   {"tur": "soz", "metin": "Listeyi getirecek", "sahip": "Zeynep Kaya", "tarih": GUN(2)}, {"tur": "soru", "metin": "KDV dahil mi?", "kim": "Can Örnek"}])
     hp = os.path.join(C, "ozetler", D1 + "-ozet-zihin-haritasi.html"); open(hp, "w").write("<!doctype html><title>d</title>")
-    open(os.path.join(C, "son-toplantilar.jsonl"), "w", encoding="utf-8").write(json.dumps({"id": "son1", "dosya": D1 + ".md", "baslik": "Bütçe", "at": "2026-11-03T11:00:00+03:00", "ozet": hp, "harita": hp, "gorsel": "karar_is"}) + "\n")
+    open(os.path.join(C, "son-toplantilar.jsonl"), "w", encoding="utf-8").write(json.dumps({"id": "son1", "dosya": D1 + ".md", "baslik": "Bütçe", "at": GUN(-2) + "T11:00:00+03:00", "ozet": hp, "harita": hp, "gorsel": "karar_is"}) + "\n")
     v = yapi.kayit_listesi(C, "Ayşe Deneme", bugun); d = {x["metin"]: x for x in v["kayitlar"]}
     # S236: deneme (Test) toplantısı kayıtları varsayılan gizli; deneme=True ile gelir
-    DN = "2026-11-04-1000-Test-1"; open(os.path.join(C, DN + ".md"), "w", encoding="utf-8").write(f"# Canlı transkript — {DN}\n\n" + BAS + "| 10:00:00 | Ayşe Deneme | merhaba | |\n")
-    y(DN, "Test-1", "2026-11-04", [{"tur": "is", "metin": "Deneme işi", "sahip": "Deniz Test", "tarih": "2026-11-01"}, {"tur": "karar", "metin": "Deneme kararı", "netlik": "acik"}])
+    DN = GUN(-1)+"-1000-Test-1"; open(os.path.join(C, DN + ".md"), "w", encoding="utf-8").write(f"# Canlı transkript — {DN}\n\n" + BAS + "| 10:00:00 | Ayşe Deneme | merhaba | |\n")
+    y(DN, "Test-1", GUN(-1), [{"tur": "is", "metin": "Deneme işi", "sahip": "Deniz Test", "tarih": GUN(-4)}, {"tur": "karar", "metin": "Deneme kararı", "netlik": "acik"}])
     v0 = yapi.kayit_listesi(C, "Ayşe Deneme", bugun); v1 = yapi.kayit_listesi(C, "Ayşe Deneme", bugun, deneme=True)
     bak("deneme toplantısı: varsayılanda kayıt, toplantı ve kişi yok; deneme_say 2", not any("Deneme işi" == x["metin"] or x["metin"] == "Deneme kararı" for x in v0["kayitlar"]) and all(t["dosya"] != DN + ".md" for t in v0["toplantilar"])
         and "Deniz Test" not in v0["kisiler"] and v0["deneme_say"] == 2 and v0["deneme"] is False)

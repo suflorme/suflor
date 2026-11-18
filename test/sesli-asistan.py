@@ -25,6 +25,8 @@ os.environ.update(SUFLOR_TEST_BASLAT="1", SUFLOR_TEST_KULAKLIK="1", SUFLOR_AYAR=
 json.dump({"alan": "Deneme", "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": T, "ortak": os.path.join(T, "yok")}, open(os.path.join(T, "ayar1.json"), "w"))
 sys.argv = ["relay.py", "--dir", os.path.join(T, "canli1"), "--port", str(PORT)]; cwd0 = os.getcwd(); os.chdir(T)
 sp = u.spec_from_file_location("relay_t", os.path.join(T, "relay.py")); m = u.module_from_spec(sp); sp.loader.exec_module(m)
+EN = m.KONUS_OKU_EN_COK; DC = m.DEVAM_PARCA_CUMLE; P = EN + DC - 3  # okuma sınırı (v0.215.2: 8 cümle) ve devam parçası (5 cümle) üründen; P: "---" öncesi düz cümle sayısı → okunmayan düz cümleler + 3 ayrıntı cümlesi tam bir devam parçası (DC) + 1 kalan verir
+NUM = [f"Numara {i} geldi." for i in range(1, P + 1)]
 SOY = []; m.seslendir = lambda metin, *a, **k: (SOY.append(metin), True)[1]; m.ses_durdur = lambda: None; m.AYAR["konusma"] = True; m.GERI_AL_SN = 0.3
 sess = lambda: (lambda x: (SOY.clear(), x)[1])(list(SOY))
 # -- 3/4: Markdown temizliği, liste okuma, saklama
@@ -41,20 +43,21 @@ ok("fazla öğeler 'devamını oku' için saklandı", tur["kalan"] == ["Fiyat li
 tur2 = {"sesli": True, "kaynak": "bas", "tampon": "- Bir\n- İki\n- Üç\n- Dört\n- Beş", "metin": ""}; m._konus_cumle(tur2, son=True); o = sess()
 ok(f"liste cevabın sonundaysa bildirim cevap bitince okunur: {o[-1]}", len(o) == 4 and "2 tane daha" in o[-1] and "panoda" in o[-1].lower())  # cümle dönüşümlü (kisilik.py cesit)
 tur3 = {"sesli": True, "kaynak": "bas", "tampon": "", "metin": ""}
-for c_ in ("Bir numara. ", "İki numara. ", "Üç numara. ", "Dört numara. ", "Beş numara. ", "Altı numara. ", "Yedi numara. "): tur3["tampon"] += c_; m._konus_cumle(tur3)
+for c_ in NUM[:EN + 2]: tur3["tampon"] += c_ + " "; m._konus_cumle(tur3)
 m._konus_cumle(tur3, son=True); o = sess()
-ok(f"düz cevapta okuma sınırı aynı (5 cümle), kalan saklandı: {o}", o == ["Bir numara.", "İki numara.", "Üç numara.", "Dört numara.", "Beş numara."] and tur3["kalan"] == ["Altı numara.", "Yedi numara."])
+ok(f"düz cevapta okuma sınırı aynı ({EN} cümle), kalan saklandı: {o}", o == NUM[:EN] and tur3["kalan"] == NUM[EN:EN + 2])
 # -- 3: devamını oku / tekrar oku
-tur3["metin"] = "Bir numara. İki numara. Üç numara. Dört numara. Beş numara. Altı numara. Yedi numara.\n---\n## Ayrıntı\n- şu madde\n- bu madde\n\nSon cümle burada."
+tur3["metin"] = " ".join(NUM) + "\n---\n## Ayrıntı\n- şu madde\n- bu madde\n\nSon cümle burada."
 m.konus_devam_kaydet(tur3)
-ok(f"saklanan: okunan 5 + okunmayan {m.DEVAM['tam'][5:]}", m.DEVAM["tam"][5:] == ["Altı numara.", "Yedi numara.", "Ayrıntı.", "şu madde.", "bu madde.", "Son cümle burada."] and m.DEVAM["i"] == 5)
+PARCA = NUM[EN:] + ["Ayrıntı.", "şu madde.", "bu madde."]  # ilk devam parçası (EN cümle); ardından tek cümle kalır
+ok(f"saklanan: okunan {EN} + okunmayan {m.DEVAM['tam'][EN:]}", m.DEVAM["tam"][EN:] == PARCA + ["Son cümle burada."] and m.DEVAM["i"] == EN and len(PARCA) == DC)
 for kalip, beklenen in (("Devamını oku.", "d"), ("devam", "d"), ("Peki, ayrıntıyı oku.", "d"), ("Continue reading", "d"), ("Tekrar oku.", "t"), ("Bir daha oku", "t"), ("Read that again.", "t"), ("Devamı nasıl olacak?", None),
                         ("Ayrıntıları panoda gördüm.", None), ("Bunu tekrar oku diye kaydet", None), ("Merhaba", None)):
     ok(f"komut kalıbı {kalip!r} → {beklenen}", bool(m.DEVAM_OKU_RX.match(kalip)) == (beklenen == "d") and bool(m.TEKRAR_OKU_RX.match(kalip)) == (beklenen == "t"))
 c = m.konus_yerel_komut("Devamını oku.", {"kaynak": "bas"}); o = sess()
-ok(f"devamını oku: 5 cümlelik parça, Claude'a gitmeden: {o}", o == ["Altı numara. Yedi numara. Ayrıntı. şu madde. bu madde."] and c.startswith("Altı numara.") and "Kalan 1" in c)
+ok(f"devamını oku: {DC} cümlelik parça, Claude'a gitmeden: {o}", o == [" ".join(PARCA)] and c.startswith(NUM[EN]) and "Kalan 1" in c)
 c = m.konus_yerel_komut("tekrar oku", {"kaynak": "bas"}); o = sess()
-ok(f"tekrar oku: son okunan parça yeniden: {o}", o == ["Altı numara. Yedi numara. Ayrıntı. şu madde. bu madde."])
+ok(f"tekrar oku: son okunan parça yeniden: {o}", o == [" ".join(PARCA)])
 c = m.konus_yerel_komut("devamını oku", {"kaynak": "bas"}); o = sess(); c2 = m.konus_yerel_komut("devamını oku", {"kaynak": "bas"}); o2 = sess()
 ok(f"son parça sonra 'okunacak başka bir şey kalmadı': {o} / {o2}", o == ["Son cümle burada."] and len(o2) == 1 and re.search(r"kalmadı|hepsi bu", o2[0]))  # dönüşümlü cümle: anlam denetimi
 c = m.konus_yerel_komut("tekrar oku", {"kaynak": "bas"}); o = sess()
@@ -73,7 +76,7 @@ for soz, bolum in (("Panoyu aç.", None), ("Kararları göster.", "kararlar"), (
     c = m.konus_yerel_komut(soz, {"kaynak": "bas"}); pa = m.STATE.get("pano_ac") or {}
     ok(f"{soz!r} → pano açma isteği, bölüm {bolum}: {c}", bool(c) and pa.get("bolum") == bolum and time.time() - pa.get("t", 0) < 2); m.STATE.pop("pano_ac", None); sess()
 m.STATE.pop("_menu_yokluyor", None)
-ok("menü uygulaması yoksa tarayıcıda açma yolu (deneme: günlüğe yazılır), cümle söylenir", bool(m.konus_yerel_komut("takvimi göster", {"kaynak": "bas"})) and re.fullmatch(r"(Panoyu açtım|Açtım)[,;] takvim Bugün.*", " ".join(sess())) is not None)
+ok("menü uygulaması yoksa tarayıcıda açma yolu (deneme: günlüğe yazılır), cümle söylenir", bool(m.konus_yerel_komut("takvimi göster", {"kaynak": "bas"})) and " ".join(sess()) in ("Panoyu takvimde açtım.", "Takvim açık."))  # v0.212.0: dönüşümlü kısa cümle
 ok("pano komutu olmayan söz Claude'a gider", all(m.konus_yerel_komut(x, {"kaynak": "bas"}) is None for x in ("Takvimimde ne var?", "Panoyu neden açtın", "Kararları özetle")))
 cv = m.cards_view(); m.STATE["pano_ac"] = {"id": "p1", "t": time.time(), "bolum": "kararlar"}
 ok("cards_view pano_ac'ta bölüm gider (menü/pano ileride okur)", m.cards_view()["pano_ac"] == {"id": "p1", "bolum": "kararlar"}); m.STATE.pop("pano_ac", None)
@@ -137,12 +140,12 @@ n = 0
 for l in sys.stdin:
     q = json.loads(l)["message"]["content"]; n += 1; soru = q.strip().splitlines()[-1]
     if "LISTEYE" in soru: c = ["Şunlar var:\\n", "- Bütçe onayı\\n", "- Teslim tarihi\\n", "- Ali'nin işi\\n", "- Fiyat listesi\\n", "- Rapor\\n"]
-    elif "UZUN" in soru: c = ["Bir numara. ", "İki numara. ", "Üç numara. ", "Dört numara. ", "Beş numara. ", "Altı numara. ", "Yedi numara.\\n---\\n", "## Ayrıntı\\n", "**Kalın** madde bir.\\n", "Son cümle burada.\\n"]
+    elif "UZUN" in soru: c = ["Numara %d geldi. " % i for i in range(1, @P@)] + ["Numara @P@ geldi.\\n---\\n", "## Ayrıntı\\n", "**Kalın** madde bir.\\n", "Son cümle burada.\\n"]
     elif "ETIKET:" in soru: c = ["Onayına sundum."] + ["\\n[KAYIT: " + e + "]" for e in re.findall(r"ETIKET:(\\{.*?\\})(?=\\s*ETIKET:|\\s*$)", soru)]
     else: c = ["Merhaba, buradayım."]
     for p in c: time.sleep(0.05); pr({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": p}}})
     pr({"type": "result", "duration_api_ms": 100, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
-''')
+'''.replace("@P@", str(P)))
 os.chmod(sahte, 0o755)
 sys.path.insert(0, T); import yapi
 A_ = "2026-11-04-1000-Plan-Toplantisi"; c_ = yapi._db(d)
@@ -194,10 +197,10 @@ try:
     ok("kapanış sözü pencereyi kapatır, Claude'a gitmez", not uc.status()["konus"]["sohbet"]["acik"] and "devam: kapanış sözü" in log() and "Merhaba, buradayım" not in "\n".join(ses()))
     # uzun cevap + ayrıntı
     uc.post("/bas-konus", {"metin": "bana UZUN anlat"}); uc.bekle("UZUN"); uc.kosul(lambda: pen().get("acik") is True, 40)
-    ok("5 cümleden sonrası okunmadı", "Altı numara." not in "\n".join(ses()[-6:]))
+    ok(f"{EN} cümleden sonrası okunmadı", f"Numara {EN + 1} geldi." not in "\n".join(ses()[-(EN + 1):]) and f"Numara {EN} geldi." in "\n".join(ses()[-(EN + 1):]))
     uc.post("/bas-konus", {"metin": "devamını oku"}); time.sleep(0.4); uc.post("/bas-konus", {"metin": "Tekrar oku."}); time.sleep(0.4)
     s_ = ses()
-    ok(f"ayrıntı ('---' sonrası) Markdown'sız parçayla okunur, tekrar oku aynısını yineler: {s_[-2:]}", s_[-2] == "Altı numara. Yedi numara. Ayrıntı. Kalın madde bir. Son cümle burada." and s_[-1] == s_[-2] and "**" not in s_[-1] and "#" not in s_[-1])
+    ok(f"ayrıntı ('---' sonrası) Markdown'sız parçayla okunur, tekrar oku aynısını yineler: {s_[-2:]}", s_[-2] == " ".join(NUM[EN:] + ["Ayrıntı.", "Kalın madde bir.", "Son cümle burada."]) and s_[-1] == s_[-2] and "**" not in s_[-1] and "#" not in s_[-1])
     # panoyu aç
     uc.post("/bas-konus", {"metin": "Kararları göster."}); time.sleep(0.4)
     ok("'kararları göster' yerelde (menü yoksa tarayıcı yolu: deneme günlüğü), Claude'a gitmez", "AÇ (deneme): pano #kararlar" in log() and re.search(r"(Panoyu açtım|Açtım)[,;] kararlar ve işler", "\n".join(ses())) is not None)

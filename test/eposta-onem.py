@@ -46,6 +46,8 @@ NS = {**ESZ, "__name__": "et", "collections": collections, "re": re, "os": os, "
       "_yapi_mod": lambda: None, "ayar_yaz": ayar_yaz}
 exec(compile(open(os.path.join(KOD, "aktarici", "eposta-takip.py"), encoding="utf-8").read(), "eposta-takip.py", "exec"), NS)
 N = lambda f: NS[f]
+# sahte saat: ileti yaşları SIMDI'ye göre kurulu; et_view/et_islem görünümü gerçek saatle yapıyordu (sabit tarih zamanla bayatlıyordu) → görünüm hesabı hep SIMDI ile
+_gy = NS["et_gorunum_yap"]; NS["et_gorunum_yap"] = lambda simdi=None: _gy(SIMDI)
 def g(id_, adres, konu, gn, ozet="", al=None, tur=None, sayi=None, ad="", **k):  # gelen
     x = {"id": id_, "t": gun(gn), "adres": adres, "konu": konu, "kutu": "imap://X/INBOX", "okundu": True, "gonderilen": False}
     if ozet: x["ozet"] = ozet

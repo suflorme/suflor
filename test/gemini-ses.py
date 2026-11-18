@@ -220,7 +220,8 @@ tsn = dict(ad); open(SAHTE + ".arg", "w").close()
 tsn.update(OYNAT_YOL=SAHTE, kisilik_sesi=lambda zorla=None, toplantiya=False: ("gemini", "Kore", 1.0), kisilik=lambda: {"ses_uslup": "ölçülü"}, kisilik_telaffuz=lambda m: m, ses_duzen=lambda m, mac=True: m,
            AYAR={"toplantiya_ses": True}, STATE={"masaustu": {"toplantida": True}}, toplanti_var=lambda: True, ts_web=lambda: False, ts_aygit=lambda: "59", otonom_kisayol=lambda: None,
            ses_secimi=lambda: None, telaffuz=lambda m, mac=False: m, ses_durdur=lambda: None, kulaklik=lambda: True, kendi_ses_kaydet=lambda *a: None, note=lambda *a: None, kart_bildir=lambda: None,
-           sesli_terim_suz=lambda m: m, etiket_sil=lambda m: m, _t=lambda a, b: a, ARAYUZ_DILI="tr", kisilik_ad=lambda: "Atlas", re=__import__("re"), secrets=__import__("secrets"))
+           sesli_terim_suz=lambda m: m, etiket_sil=lambda m: m, _t=lambda a, b: a, ARAYUZ_DILI="tr", kisilik_ad=lambda: "Atlas", re=__import__("re"), secrets=__import__("secrets"),
+           deneme_aktarici=lambda: True, agenda=lambda: {})  # nöbet iş parçacıkları (_ts_nobet, _sure_nobet) bu adları ister: deneme aktarıcısı gibi davranıp sessiz geçsin (NameError günlüğü kirletiyordu)
 exec(compile(open(os.path.join(K, "aktarici", "toplantiya-ses.py"), encoding="utf-8").read(), "toplantiya-ses.py", "exec"), tsn)
 tsn["ts_aygit"] = lambda: "59"  # bölüm dosyası kendi ts_aygit'ini tanımlar (gerçek BlackHole kimliği yeniden başlatınca değişir: 59 → 85, 19 Ekim)
 tsn["TS"]["tanitti"] = "?"  # tanıtım bu denemede okunmasın
@@ -273,9 +274,11 @@ o_ = karisik("gemini", CV, kes_ara=True, calan=lambda: True)
 bak(f"okuma kesildiyse (dur / Option + Shift + S) biriken okunmaz ({o_})", o_ == [CV[0]])
 UZ = ["Bu birinci cümle ve oldukça uzun bir açıklama içeriyor, " * 2 + "tamam."] + ["Bu cümle de uzun ve ayrıntılı bir açıklama, " * 5 + "bitti."] * 4
 o_ = karisik("gemini", UZ, calan=lambda: True)
-bak(f"uzun cevap: okuma sınırı 5 cümle, kalan 600 karakteri aşınca iki parça ({[len(x) for x in o_]})", len(o_) == 3 and o_[0] == UZ[0] and all(len(x) <= 600 for x in o_))
-o_ = karisik("gemini", CV + ["Beşinci cümle burada.", "Altıncı okunmaz."], calan=lambda: True)
-bak(f"okuma sınırı (KONUS_OKU_EN_COK = 5) aynen: altıncı cümle okunmaz ({o_})", "Altıncı" not in " ".join(o_) and "Beşinci" in o_[-1])
+bak(f"uzun cevap: kalan 600 karakteri aşınca iki parça ({[len(x) for x in o_]})", len(o_) == 3 and o_[0] == UZ[0] and all(len(x) <= 600 for x in o_))
+_kc = {"threading": threading, "re": __import__("re"), "time": time}; exec(compile(_ast.Module([f for f in fk_ if isinstance(f, _ast.Assign)], []), "bas-konus.py", "exec"), _kc); EN_COK = _kc["KONUS_OKU_EN_COK"]  # sınırı üründen oku (v0.215.2: 8 cümle ve ~700 karakter)
+CX = [f"Cümle {i + 1} burada." for i in range(EN_COK + 2)]  # kısa cümleler: karakter sınırına takılmaz, yalnız cümle sınırı denenir
+o_ = karisik("gemini", CX, calan=lambda: True)
+bak(f"okuma sınırı (KONUS_OKU_EN_COK = {EN_COK}) aynen: {EN_COK + 1}. cümle okunmaz ({o_})", f"Cümle {EN_COK} burada." in o_[-1] and f"Cümle {EN_COK + 1} " not in " ".join(o_))
 
 # 2) Gerçek aktarıcı: ⚙ Ayarlar'da Gemini seçenekleri ve kaydetme
 for f in ("relay.py", "manifest.json", "teshis.py"): shutil.copy(os.path.join(K, f), T)

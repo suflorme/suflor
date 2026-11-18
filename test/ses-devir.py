@@ -44,7 +44,7 @@ bak("bilinmeyen ton yok sayılır, etiket yine silinir", m.ton_ayikla("<ton:kizg
 bak("Mac sesinde, panoda ve toplantıya söylerken de silinir (etiket_sil)", m.etiket_sil("<ton:yumusak> Tamam <chuckle> olur.") == "Tamam olur.")
 pano = open(os.path.join(KOD, "pano", "pano.html"), encoding="utf-8").read()
 # v0.118.0'dan beri pano ve mini pano cevabı tek işlevden (konusGorunum) çizer; temizleme kalıbı tek yerde
-bak("pano cevap gösteriminde ton etiketi gizli (konusGorunum, pano + mini pano)", pano.count("hmm|ton:\\s*[a-z_]+)>") == 1 and "function konusGorunum(s,mini_)" in pano)
+bak("pano cevap gösteriminde ton etiketi gizli (konusGorunum, pano + mini pano)", pano.count("hmm|ton:\\s*[a-z_]+)>") == 1 and "function konusGorunum(s,mini_" in pano)
 # 2) durum tonu kuralı
 m.ton_sifirla()
 bak("kural: kötü haber", m.ton_bul("Maalesef toplantı iptal edildi.") == "kotu_haber")
