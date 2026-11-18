@@ -489,10 +489,17 @@ function paylasimHam() {
 // iki ardışık nabızda (≥ 10 sn) aynı sonuç gelince değişir: kısa görünüp kaybolan öğe kaydı açıp kapatmasın.
 // neden: hangi yol "var" dedi (platform | etiket <öğe> | video/canvas <boyut> %<alan>) — ad/metin yok; aktarıcı günlüğe yazar (deneme 7:
 // paylaşım yokken açıldı, yolu bilinmiyordu)
-const paylas = { deger: false, aday: false, neden: "" };
+// Bitiş için ek bekleme (18 Kasım 21:03–21:30, Teams web): tek kesintisiz paylaşımda "Paylaşılan içerik" etiketli öğe her ~30 sn'de birkaç sn kayboluyor
+// (yeniden çizim); 2 nabızlık süzgeç yetmedi, kayıt açılıp kapandı, her açılışta kanıt görüntüsü alındı. Artık "var → yok" ancak yok sonucu
+// PAYLAS_BITIS_MS boyunca kesintisiz sürerse geçerli; "yok → var" hızlı kalır.
+const PAYLAS_BITIS_MS = 15000;  // gözlenen kesinti ~4 sn; gerçek bitişte kayıt en çok 15 sn fazla sürer
+const paylas = { deger: false, aday: false, neden: "", yokTan: 0 };
 function paylasimDurum() {
   let h = false; try { h = (inMeeting() || inCall()) && paylasimHam(); } catch (e) {}
-  if (h === paylas.aday) paylas.deger = h; paylas.aday = h; return paylas.deger;
+  const t = Date.now();
+  if (h) paylas.yokTan = 0; else if (!paylas.yokTan) paylas.yokTan = t;
+  if (h === paylas.aday) { if (h || !paylas.deger || t - paylas.yokTan >= PAYLAS_BITIS_MS) paylas.deger = h; }
+  paylas.aday = h; return paylas.deger;
 }
 function paylasimOlcek() {
   let en = null;

@@ -251,7 +251,9 @@ func motorDurdur(kesildiGonder: Bool) {
     if let a = akis { akis = nil; if kesildiGonder { gonder(["t": "kesildi", "id": a.id]) } }
     gunluk("motor durdu")
 }
-func motorKur() {
+var motorKurNo = 0, motorErtele0 = 0.0   // motorKurNo: bekleyen yeniden denemeleri geçersiz kılar; motorErtele0: çalma bitmesini beklemenin başladığı an
+func motorKur(deneme: Int = 0) {
+    motorKurNo += 1
     motorDurdur(kesildiGonder: true)
     let m = Motor(); m.giris = mikAcik; m.vp = etkinVpio(); m.kurulus = uyanik(); m.kusak = mikKusak
     if kuru {
@@ -302,8 +304,19 @@ func motorKur() {
             hataBildir("vpio", "motor VPIO ile başlamadı (\(error.localizedDescription)) — VPIO'suz deneniyor")
             istenenVpio = false; motorKur(); return
         }
-        hataBildir("motor", "başlamadı (\(error.localizedDescription))"); mikAcik = false; return
+        e.stop()
+        // v0.250.9 (18 Kasım): VPIO'lu motor yıkıldıktan hemen sonra kurulan VPIO'suz motor ses birimi bırakılmadığı için −10875 verdi ve yeniden deneme yoktu (çalma sessiz kaldı).
+        // Her denemede yeni AVAudioEngine; bekleme 0,2 / 0,5 / 1,0 sn.
+        let bekle = [0.2, 0.5, 1.0]
+        if deneme < bekle.count {
+            gunluk("motor başlamadı (\(error.localizedDescription)) — \(bekle[deneme]) sn sonra yeniden (\(deneme + 1)/\(bekle.count))")
+            let no = motorKurNo
+            ana.asyncAfter(deadline: .now() + bekle[deneme]) { if no == motorKurNo, motor == nil, motorGerekli() { motorKur(deneme: deneme + 1) } }
+            return
+        }
+        hataBildir("motor", "başlamadı (\(error.localizedDescription)) — \(bekle.count) yeniden deneme de başarısız"); mikAcik = false; return
     }
+    if deneme > 0 { gunluk("motor \(deneme). yeniden denemede başladı") }
     m.eng = e; m.oyn = o; motor = m
     o.play()
     if sessizDugum { sessizCal() }
@@ -313,6 +326,12 @@ func motorGerekli() -> Bool { mikAcik || akis != nil || sessizDugum }
 func motorGuncelle() {   // istenen durum değiştiyse motoru yeniden kurar (giriş ya da VPIO değişimi yeniden kurulum ister)
     if let m = motor {
         if m.giris != mikAcik || m.vp != etkinVpio() {
+            // v0.250.9: asistan çalarken (veda cümlesi) yeniden kurulum çalmayı keser; en çok 2 sn bekle
+            if !kuru, let a = akis, a.basladi, !(a.bitirildi && a.bekleyen == 0) {
+                if motorErtele0 == 0 { motorErtele0 = uyanik() }
+                if uyanik() - motorErtele0 < 2.0 { ana.asyncAfter(deadline: .now() + 0.1) { motorGuncelle() }; return }
+            }
+            motorErtele0 = 0
             if motorGerekli() { motorKur() } else { motorDurdur(kesildiGonder: true) }
         } else if !kuru, let e = m.eng, !e.isRunning, motorGerekli() { motorKur() }
     } else if motorGerekli() { motorKur() }

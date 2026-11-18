@@ -60,15 +60,24 @@ A = ap.parse_args(); BASE = A.dir; os.makedirs(BASE, exist_ok=True)
 class _Saatli:
     # günlüğün her satırına saat (30 Eylül'de 14 ENOSPC vardı ama ne zaman olduğu bilinmiyordu). Günlük de aynı
     # diskte: yazılamazsa sessizce geçer — günlük hatası isteği düşürmesin.
-    def __init__(self, st): self.st = st; self.bol = True
+    # 18 Kasım: print() metin ve "\n"yi ayrı write çağrılarıyla yazar; iş parçacıkları arasında satırlar yapışıyordu. Artık her iş parçacığı kendi
+    # tamponunda satırı tamamlar, yalnız tam satırlar (saatli) kilit altında tek write ile gider. Kilit yalnız st.write/flush için: içinde başka kilit/geri çağrı yok.
+    def __init__(self, st): self.st = st; self.kilit = threading.RLock(); self.yerel = threading.local()
     def write(self, t):
-        out = []
-        for part in str(t).splitlines(True):
-            if self.bol: out.append(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S "))
-            out.append(part); self.bol = part.endswith("\n")
-            if self.bol: teshis_satir(part.rstrip("\n"))
-        try: self.st.write("".join(out)); self.st.flush()
-        except Exception: pass
+        t = str(t); tam = []
+        tamp = getattr(self.yerel, "tamp", "") + t
+        if "\n" in tamp:
+            parcalar = tamp.splitlines(True)
+            if parcalar[-1].endswith("\n"): tamp = ""
+            else: tamp = parcalar.pop()
+            tam = parcalar
+        self.yerel.tamp = tamp
+        if tam:
+            damga = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S ")
+            try:
+                with self.kilit: self.st.write("".join(damga + p for p in tam)); self.st.flush()
+            except Exception: pass
+            for p in tam: teshis_satir(p.rstrip("\n"))  # kilit dışında: teşhis kendi kilitlerini alabilir
         return len(t)
     def flush(self):
         try: self.st.flush()
@@ -443,8 +452,9 @@ def sessiz_view():
 # yalnız açılış/kapanış saati kalır. Kendiliğinden kapanmaz (ayrı bir toplantıya geçilse de); pano ve mini panoda 🔒 açıkça görünür.
 GIZLI = {"acik": False, "bas": 0.0}
 GIZLI_FP = os.path.join(BASE, "gizli.json")  # aktarıcı yeniden başlasa da (çökme, kurulum) kip sürer
-try: GIZLI.update(acik=True, bas=float(json.load(open(GIZLI_FP)).get("bas") or time.time())); print("GİZLİ: açık (önceki çalışmadan sürüyor)")
-except (OSError, ValueError, AttributeError): pass
+if os.path.exists(GIZLI_FP):  # dosya yok → kapalı; var ama okunamıyor/bozuk → güvenli tarafta AÇIK (gizli kip sessizce kapanmasın)
+    try: GIZLI.update(acik=True, bas=float(json.load(open(GIZLI_FP, encoding="utf-8")).get("bas") or time.time())); print("GİZLİ: açık (önceki çalışmadan sürüyor)")
+    except Exception: GIZLI.update(acik=True, bas=time.time()); print("GİZLİ: durum dosyası okunamadı — güvenli tarafta açık başlatıldı")
 GIZLI_YUT = {"/ingest", "/taslak", "/ses", "/ses-yerel", "/ses-masaustu", "/kanit", "/kanit-masaustu", "/masaustu", "/masaustu-altyazi"}  # sessizce atılır
 GIZLI_RED = {"/note", "/ask", "/girdi", "/kanit-iste", "/bas-konus", "/baslat", "/brifing", "/baglam-dosya", "/card",
              "/etiket", "/eylem", "/eylem-sun", "/eylem-sesli", "/eylem-karar", "/eylem-sonuc", "/eylem-geri-al", "/moderator", "/otonom", "/agenda-tick",
@@ -455,8 +465,10 @@ def gizli_degistir(neden="kullanıcı"):
     with LOCK:
         ac = not GIZLI["acik"]; GIZLI.update(acik=ac, bas=time.time() if ac else 0.0)
         try:
-            if ac: json.dump({"bas": GIZLI["bas"]}, open(GIZLI_FP, "w"))
-            else: os.remove(GIZLI_FP)
+            if ac: dosya_yaz_esz(GIZLI_FP, {"bas": GIZLI["bas"]}, 0o600)
+            else:
+                try: os.remove(GIZLI_FP)
+                except FileNotFoundError: pass
         except OSError as e: print(f"GİZLİ: durum dosyası yazılamadı ({e.__class__.__name__})")
         if STATE.get("file"): _md(f"| {datetime.datetime.now().strftime('%H:%M:%S')} | **GİZLİ** | {'açıldı — kapanana kadar hiçbir şey kaydedilmez' if ac else f'kapandı ({neden})'} | |")
     if ac:  # süren her şey hemen kesilir
@@ -2439,6 +2451,10 @@ class H(BaseHTTPRequestHandler):
         if o: self.send_header("Access-Control-Allow-Origin", o); self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Suflor-Anahtar, X-Suflor-Istemci"); self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         if self.command == "OPTIONS": self.send_header("Access-Control-Max-Age", "600")  # anahtar başlığı her isteğe ön sorgu (preflight) getirir; 10 dk önbellek
+    def _html(self, b):  # HTML sayfaları: yalnız aynı kökten çerçeveye gömülür (menü paneli pano.html'i kendi iframe'inde açar), önbelleklenmez, yönlendiren göndermez (tam CSP yok: pano satır içi betik kullanıyor)
+        self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b)))
+        for k, v in (("X-Frame-Options", "SAMEORIGIN"), ("Content-Security-Policy", "frame-ancestors 'self'"), ("Cache-Control", "no-store"), ("Referrer-Policy", "no-referrer"), ("X-Content-Type-Options", "nosniff")): self.send_header(k, v)
+        self.end_headers(); self.wfile.write(b)
     def _json(self, obj, code=200): b = json.dumps(obj, ensure_ascii=False).encode(); self.send_response(code); self._cors(); self.send_header("Content-Type", "application/json; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def do_OPTIONS(self):
         if self._koken() is None: return self._red()
@@ -2451,9 +2467,9 @@ class H(BaseHTTPRequestHandler):
             if not fp: return self._json({"ok": False}, 404)
             b = open(fp, "rb").read(); self.send_response(200); self.send_header("Content-Type", "font/woff2" if fp.endswith(".woff2") else "image/svg+xml")
             self.send_header("Cache-Control", "max-age=86400"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
-        if yol == "/kimlik":  # anahtarsız: yalnız imza döner (O1)
-            m = re.search(r"[?&]n=([0-9a-f]{32})(?:&|$)", self.path)
-            return self._json({"ok": True, "h": kimlik_imza(m.group(1)), "acilis": ACILIS}) if m else self._json({"ok": False}, 400)
+        m = re.search(r"[?&]n=([0-9a-f]{32})(?:&|$)", self.path) if yol == "/kimlik" else None
+        if m:  # /kimlik?n=<nonce> anahtarsız: yalnız imza döner (O1); n yoksa düşer → aşağıda anahtarlı ?ad= araması (VERI_GET anahtarsızı 401 ile keser)
+            return self._json({"ok": True, "h": kimlik_imza(m.group(1)), "acilis": ACILIS})
         if yol == "/takvim" and not self._yetkili():
             # eski eklenti (anahtarsız) yalnız sürümü görür — aktarıcı yeni sürümdeyse kendini yenilesin, geçiş kendiliğinden bitsin
             m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
@@ -2564,11 +2580,11 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": False}, 404)
         if yol == "/kesisim":  # Kesişim sayfası kabuğu (anahtarsız; veri ucu anahtarlı). Geliştirici değilse ya da gizli kipte yok
             if not gelistirici_mi() or gizli_acik(): return self._json({"ok": False, "err": "kapali"}, 404)
-            b = sayfa("kesisim.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
+            b = sayfa("kesisim.html", self.path).encode(); self._html(b); return
         if yol == "/dokum-kontrol":  # sayfa kabuğu anahtarsız (/ gibi); veri uçları anahtarlı. Geliştirici + ses arşivi açık değilse yok
             if not dk_acik()[0]: return self._json({"ok": False, "err": "kapali"}, 404)
-            b = sayfa("dokum-kontrol.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
-        b = sayfa("pano.html", self.path).encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+            b = sayfa("dokum-kontrol.html", self.path).encode(); self._html(b); return
+        b = sayfa("pano.html", self.path).encode(); self._html(b)
     def do_POST(self):
         try: return self._post()
         finally: kart_bildir()  # şeridin uzun yoklamasını uyandır

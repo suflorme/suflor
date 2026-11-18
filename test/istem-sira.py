@@ -13,7 +13,7 @@ if sys.executable != VENV: os.execv(VENV, [VENV, "-I", os.path.abspath(__file__)
 ns = {"re": re, "math": math, "datetime": datetime, "json": json, "os": os, "time": time, "BEN_ESKI": {"ben", "kullanici"}, "AYAR": {}}
 agac = ast.parse(open(os.path.join(KOD, "aktarici/whisper-hat.py"), encoding="utf-8").read())
 AD = {"_TRSD", "_sd", "_istem_kisi", "istem_siralama", "ISTEM_KAT_ADLARI", "ISTEM_PUAN", "ISTEM_YASI_GUN", "ISTEM_YENI_GUN", "istem_elle", "_istem_gun", "istem_puan",
-      "_ISTEM_KUL", "_istem_kayit", "_istem_canli", "_istem_baglam", "ISTEM_BAGLAM_DISI", "istem_kullanim", "ISTEM_SECIM_VARSAYILAN", "_istem_pay", "ISTEM_SOZLUK_TABAN", "ISTEM_SIK_ONCE"}
+      "_ISTEM_KUL", "_istem_kayit", "_istem_canli", "_istem_baglam", "ISTEM_BAGLAM_DISI", "istem_kullanim", "ISTEM_SECIM_VARSAYILAN", "_istem_pay", "ISTEM_SOZLUK_TABAN", "ISTEM_SIK_ONCE", "ISTEM_SIK_TAVAN"}
 exec(compile(ast.Module([n for n in agac.body if (isinstance(n, ast.FunctionDef) and n.name in AD) or (isinstance(n, ast.Assign) and any(getattr(x, "id", None) in AD for x in n.targets))], []), "whisper-hat.py", "exec"), ns)
 sp = importlib.util.spec_from_file_location("whisper_isci", os.path.join(KOD, "whisper-isci.py")); WI = importlib.util.module_from_spec(sp); sp.loader.exec_module(WI)
 from mlx_whisper.tokenizer import get_tokenizer
@@ -121,6 +121,18 @@ kontrol("kalabalık: sık'ın ilk 6 terimi sözlük tabanından önce", kc[:6] =
 kontrol("kalabalık: taban sırası kullanıcı terimi önde, sonra kullanım sayısı çok olan", tc[6] == "SozDBirim" and tc[7] == "SozTBirim", tc[4:10])
 kontrol("kalabalık: hiçbir terim yinelenmedi/kaybolmadı", len(tc) == len(set(tc)) and len(tc) == 40, len(tc))
 kontrol("az sık (≤ 6): sıra değişmez", [k for k, _ in ns["istem_siralama"](tp[19:], {}, [], [], [], [], "", "", None)] == ["sözlük"] * 20)
+# 18 Kasım: gerçekçi karışım (canlı toplantı: asistan 7, kişi 6, sık 40+, ayar 4, sözlük 65) — sözlük sığan kısımda sıfır olmaz, sık tavanı geçmez, belirteç sınırı korunur
+tg = [{"dogru": f"Yk{chr(65 + i % 26)}{i}", "yanlis": [], "kaynak": "otomatik"} for i in range(45)] + [{"dogru": f"Bz{chr(65 + i % 26)}{i}", "yanlis": [], "kaynak": "ben" if i < 3 else "otomatik"} for i in range(65)]
+dg = " ".join(t["dogru"].lower() for t in tg[:45]) * 2
+ksg = [{"ad": "Asistanz", "gorunen_ad": "Mervin", "hitap": ["Mervin", "Asistanz", "Marvyn", "Mervyn"]}]
+sg = ns["istem_siralama"](tg, {}, [], ksg, [f"Kişi{chr(65 + i)} Soyad{chr(65 + i)}" for i in range(5)], ["AWS", "IAM", "MFA", "Google Workspace"], dg, "Deniz K"); tg2 = [t for _, t in sg]
+metin_g = ", ".join(tg2) + "."; _, dus_g = WI.istem_kur(tok, metin_g, ""); sig = sg[:len(sg) - dus_g]; say = lambda L, k: sum(1 for x, _ in L if x == k)
+print(f"  gerçekçi karışım: toplam {len(sg)}, sığan {len(sig)}; asistan {say(sig,'asistan')} · kişi {say(sig,'kişi')} · sık {say(sig,'sık')}/{say(sg,'sık')} · ayar {say(sig,'ayar')}/{say(sg,'ayar')} · sözlük {say(sig,'sözlük')}/{say(sg,'sözlük')}")
+kontrol("gerçekçi karışım: sığan kısımda sözlük payı ≥ 12 (eskiden 6)", say(sig, "sözlük") >= 12, say(sig, "sözlük"))
+kontrol("gerçekçi karışım: sığan sık ≤ ISTEM_SIK_TAVAN", say(sig, "sık") <= ns["ISTEM_SIK_TAVAN"], say(sig, "sık"))
+kontrol("gerçekçi karışım: asistan ve kişi hepsi sığar, sıra asistan → kişi", say(sig, "asistan") == say(sg, "asistan") and say(sig, "kişi") == say(sg, "kişi") and [k for k, _ in sg][:2] == ["asistan"] * 2)
+kontrol("gerçekçi karışım: toplam belirteç sınırın altında, yineleme yok", len(tok.encode(" " + WI.istem_kur(tok, metin_g, "")[0])) <= WI.ISTEM_SINIR and len(tg2) == len(set(tg2)))
+kontrol("gerçekçi karışım: kullanıcı terimi sözlük tabanında önde", [t for k, t in sg if k == "sözlük"][:3] == ["BzA0", "BzB1", "BzC2"], [t for k, t in sg if k == "sözlük"][:3])
 # günlük eki
 print("kategori sayıları:", {k: kat.count(k) for k in ns["ISTEM_KAT_ADLARI"]})
 print("kaldı" if hatalar else "hepsi geçti"); sys.exit(1 if hatalar else 0)

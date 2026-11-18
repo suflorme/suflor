@@ -428,6 +428,10 @@ def _ag_sifirla(neden=None):
 def _ag_okunan_izle():  # okunan cümleler (yankı kıyası için; SES["simdi"] her cümlede değişir)
     with SES_K: m = str(SES.get("simdi") or "")
     if m and (not ARAYA["okunan"] or ARAYA["okunan"][-1][1] != m): ARAYA["okunan"].append((time.time(), m))
+def _ag_bitis_adi(sinif):  # aday kararsız bitti: sayaç adı. v0.250.9: eski kod dict.get(sinif, sinif + "_bitti") varsayılanı her zaman hesaplıyordu; sinif None iken TypeError (18 Kasım, her tanınmayan söz)
+    if sinif in (None, "on", "bos"): return "taninmadi"
+    if sinif == "baska": return "baska_gecti" if ag_kip() == "dur" else "baska_kisa"
+    return str(sinif) + "_bitti"
 def ag_obek(pcm, duvar=None):  # yerel-konus.py _ky_mik_isci her ~100 ms öbekte çağırır → True: öbek araya girmenin (gövdeye gitmez)
     if not ag_etkin():
         if ARAYA["acik"] or ARAYA["tut"]: _ag_sifirla()
@@ -464,7 +468,7 @@ def ag_obek(pcm, duvar=None):  # yerel-konus.py _ky_mik_isci her ~100 ms öbekte
             aday["wh"] = True; threading.Thread(target=_ag_whisper, args=(aday, bytes(aday["pcm"])), daemon=True).start()
         if not aday["konusma"]:
             if sure >= AG_ADAY_SN:
-                _ag_say({None: "taninmadi", "on": "taninmadi", "bos": "taninmadi", "baska": "baska_gecti" if ag_kip() == "dur" else "baska_kisa"}.get(aday["sinif"], aday["sinif"] + "_bitti"))
+                _ag_say(_ag_bitis_adi(aday["sinif"]))
                 if aday["sinif"] in (None, "on", "bos"): _ag_olay("kacan_aday", sure_ms=round(sure * 1000), kip=ag_kip())
                 elif aday["sinif"] == "onay": _ag_olay("onay_gecti", sure_ms=round(sure * 1000), kaynak=aday.get("kaynak"), kip=ag_kip())
                 ARAYA["aday"] = None

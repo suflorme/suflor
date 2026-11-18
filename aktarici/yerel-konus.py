@@ -225,7 +225,12 @@ def _ky_mik_isci():  # mikrofon öbekleri okuma iş parçacığını bekletmesin
         if h:
             try:
                 if h(ob, o.get("duvar")): tamp = bytearray(); continue
-            except Exception as e: print(f"YEREL KONUŞ: araya girme öbeği işlenemedi ({e.__class__.__name__}: {str(e)[:80]})")
+            except Exception as e:  # v0.250.9: ilk görülen hata konumuyla yazılır, sonrakiler 60 sn'de bir sayıyla (18 Kasım: aynı hata 9 kez, yeri belirsizdi)
+                KY["ag_hata_n"] = KY.get("ag_hata_n", 0) + 1; n_ = time.time()
+                if n_ - KY.get("ag_hata_t", 0.0) >= 60:
+                    try: import traceback as tb_; f_ = tb_.extract_tb(e.__traceback__)[-1]; yer = f"{os.path.basename(f_.filename)}:{f_.lineno}"
+                    except Exception: yer = "?"
+                    print(f"YEREL KONUŞ: araya girme öbeği işlenemedi ({e.__class__.__name__}: {str(e)[:80]}) @ {yer} · {KY['ag_hata_n']}. kez"); KY["ag_hata_t"] = n_
         tamp += ob
         if len(tamp) < esik: continue
         pcm = bytes(tamp); tamp = bytearray()

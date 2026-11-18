@@ -501,13 +501,23 @@ def _onceki_istem(s):  # isteme giden önceki metin kopyası: binlik ayraçlı s
 # (son dökümlerde geçen) kategorisi 19 terimle sözlüğün önüne geçiyordu. Adil pay: sözlüğün ilk ISTEM_SOZLUK_TABAN terimi, sık (ya da seçim açıkken bağlam) grubunun ilk
 # ISTEM_SIK_ONCE teriminden hemen sonra gelir; sık'ın kalanı sözlüğün arkasına kayar (sondakiler düşer). Hangi terimler: sık/bağlam zaten bu toplantıyla ilgili olanlar (önde kalır),
 # taban sözlüğün kendi sırasıyla (kullanıcının eklediği, yanlış biçimi bilinen, sonra kullanım kaydında toplantı sayısı çok olan). istem_secim kapalıyken de geçerli.
-ISTEM_SOZLUK_TABAN = 6; ISTEM_SIK_ONCE = 6
+# 18 Kasım: sözlük tabanı 6 → 12 ve sık en çok 20 terim (ISTEM_SIK_TAVAN; fazlası ayar/sözlük tabanının arkasına). Canlı toplantıda (~52 terim sığıyor) sık 33, sözlük 6'ya düşüyordu.
+# Günlük de düzeltildi: kategori sayıları artık gerçek konuma göre (önceden kategori sırasıyla doldurulduğu varsayılıyordu, pay sonrası "sözlük 0/72" yanlış görünüyordu).
+ISTEM_SOZLUK_TABAN = 12; ISTEM_SIK_ONCE = 6; ISTEM_SIK_TAVAN = 20
 def _istem_pay(c):  # [(kategori, terim)] → sözlük tabanı öne alınmış liste (saf işlev)
     anc = "sık" if any(k == "sık" for k, _ in c) else "bağlam"; ai = [i for i, (k, _) in enumerate(c) if k == anc]
     si = [i for i, (k, _) in enumerate(c) if k == "sözlük"][:ISTEM_SOZLUK_TABAN]
     if len(ai) <= ISTEM_SIK_ONCE or not si: return c
     ek = set(si); yer = ai[ISTEM_SIK_ONCE - 1] + 1  # sık'ın ilk ISTEM_SIK_ONCE teriminden sonraki konum
-    return [x for i, x in enumerate(c[:yer]) if i not in ek] + [c[i] for i in si] + [x for i, x in enumerate(c[yer:], yer) if i not in ek]
+    r = [x for i, x in enumerate(c[:yer]) if i not in ek] + [c[i] for i in si] + [x for i, x in enumerate(c[yer:], yer) if i not in ek]
+    if anc != "sık": return r
+    n = 0; ana, fazla = [], []  # sık tavanı: ISTEM_SIK_TAVAN'dan sonraki sık terimleri listenin sonuna (sığarsa yine girer)
+    for x in r:
+        if x[0] == "sık":
+            n += 1
+            if n > ISTEM_SIK_TAVAN: fazla.append(x); continue
+        ana.append(x)
+    return ana + fazla
 def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben="", kul=None, kayit=None):
     # → [(kategori, terim)] önem sırasında (yukarıdaki kural). Saf işlev: dış durum almaz (test/istem-sira.py). ter: sözlük terimleri; ag: gündem sözlüğü;
     # hz: hazır kartlar; ks: kişilikler [{ad, gorunen_ad, hitap}]; kisiler: bu toplantının ad listesi (öncelik sırasıyla); ayar_ek: sabit + ayar terimleri.
@@ -557,9 +567,14 @@ def istem_siralama(ter, ag, hz, ks, kisiler, ayar_ek, dokum="", ben="", kul=None
     for d, t in sorted(adaylar, key=lambda x: (not kullanici(x[1]), not yanlisli(x[1]), -((kt.get(x[0]) or {}).get("toplanti_sayisi") or 0))): ekle("sözlük", d)
     return _istem_pay(cikti)
 def istem_kat_ozet(dusen, tok=None):  # günlük eki: " · 180 token · kişi 12/12 · asistan 6/6 · …" (düşenler sondan; kategoriler sırayla dolar)
-    kat = STATE["whisper"].get("istem_kat") or []; kalan = sum(n for _, n in kat) - dusen; ek = []
-    for k, n in kat:
-        g = max(0, min(n, kalan)); kalan -= g; ek.append(f"{k} {g}/{n}")
+    sq = STATE["whisper"].get("istem_sira") or []; ek = []
+    if sq:  # gerçek konum: sığan = baştan len − dusen terim (pay sonrası sıra kategori sırası değildir)
+        sg = collections.Counter(sq[:max(0, len(sq) - dusen)]); tp = collections.Counter(sq)
+        ek = [f"{k} {sg[k]}/{tp[k]}" for k in ISTEM_KAT_ADLARI if tp.get(k)]
+    else:
+        kat = STATE["whisper"].get("istem_kat") or []; kalan = sum(n for _, n in kat) - dusen
+        for k, n in kat:
+            g = max(0, min(n, kalan)); kalan -= g; ek.append(f"{k} {g}/{n}")
     oz = STATE["whisper"].get("istem_ozet") or {}
     return (f" · {tok} token" if tok else "") + "".join(" · " + x for x in ek) + (f" · seçim: bağlam {oz.get('baglam', 0)}, yaşlı {oz.get('yasli', 0)} dışarıda" if oz.get("kip") == "secim" else "")
 _KISALTMA = {"mtime": None, "liste": []}
@@ -644,7 +659,7 @@ def istem_metni():
     kul = istem_kullanim(ter, ag, hz, kisiler)
     sira = istem_siralama(ter, ag, hz, kisilikler(), kisiler, ["AWS", "IAM", "MFA", "Google Workspace"] + list(AYAR.get("whisper_terimler") or []), _istem_dokumler(), ben_adi(), kul, _istem_kayit())  # sabitler: alanın sık sistem adları
     sayac = collections.Counter(k for k, _ in sira)
-    STATE["whisper"]["istem_kat"] = [(k, sayac[k]) for k in ISTEM_KAT_ADLARI if sayac.get(k)]
+    STATE["whisper"]["istem_kat"] = [(k, sayac[k]) for k in ISTEM_KAT_ADLARI if sayac.get(k)]; STATE["whisper"]["istem_sira"] = [k for k, _ in sira]
     STATE["whisper"]["istem_ozet"] = {"kip": "secim" if kul is not None else "eski", "terim": len(sira), "baglam": sayac.get("bağlam", 0), "yasli": (kul or {}).get("yasli", 0)}
     STATE["whisper"]["istem_kisi"] = [t for k, t in sira if k == "kişi"][:40]  # işçi: istemdeki kişi adı tek başına söylenince istem yankısı sayılmasın
     return (", ".join(t for _, t in sira))[:3000] + "."
