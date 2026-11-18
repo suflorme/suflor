@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Kesişim dilimi (12 Kasım, F4 Marvin dilimi): kisi-modeli.py `_km_kesisim_metni` + bas-konus.py `kesisim_tur_notu`/KESISIM_KURAL. Sahte kesisim.json; relay.py'nin
 # gerçek `kesisim_sayfa_veri`'si kaynaktan alınıp çalıştırılır. Süreç/port/Claude yok.   PYTHONDONTWRITEBYTECODE=1 python3 test/kesisim-marvin.py   (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, sys, tempfile, threading, time, secrets
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,7 +11,7 @@ def ok(ad, k): print(("✓ " if k else "✗ ") + ad); hata.append(not k)
 simdi = datetime.datetime.now().astimezone().replace(hour=14, minute=5, second=0, microsecond=0)
 bugun = simdi.date().isoformat()
 st = {"gel": True, "gizli": False}
-ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": threading, "secrets": secrets, "print": lambda *a, **k: LOG.append(" ".join(map(str, a))),
+ns = {**ESZ, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": threading, "secrets": secrets, "print": lambda *a, **k: LOG.append(" ".join(map(str, a))),
       "_t": lambda a, b: b if ns["ARAYUZ_DILI"] == "en" else a, "ARAYUZ_DILI": "tr", "BASE": canli, "AYAR": {"uygulama": T}, "_KS": {}, "TAKVIM_TAM": {}, "SON": []}
 ns["gelistirici_mi"] = lambda: st["gel"]; ns["gizli_acik"] = lambda: st["gizli"]
 rel = open(os.path.join(KOD, "relay.py"), encoding="utf-8").read()

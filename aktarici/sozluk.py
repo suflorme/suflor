@@ -315,13 +315,9 @@ def heartbeat():
     # geçici dosya + os.replace: disk doluyken yarım/boş heartbeat.json bırakmasın; yazılamazsa geçilir (türetilmiş veri)
     disk_check()
     if BACKLOG: flush_backlog()
-    fp = os.path.join(BASE, "heartbeat.json"); tmp = fp + ".tmp"
-    try:
-        with open(tmp, "w", encoding="utf-8") as f: json.dump(STATE, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, fp)
-    except OSError:
-        try: os.remove(tmp)
-        except OSError: pass
+    fp = os.path.join(BASE, "heartbeat.json")
+    try: dosya_yaz_esz(fp, STATE, ensure_ascii=False, indent=1)  # hata olursa geçici dosya yardımcıda silinir
+    except OSError: pass
 def _heartbeat_dongu():  # S162: heartbeat.json yalnız eklenti nabzında yazılıyordu → eklenti yokken (masaüstü, tanınmayan sayfa) donup kalıyordu; zamanlayıcı da yazar
     while True:
         time.sleep(2 if os.environ.get("SUFLOR_TEST_HIZLI") else 8)

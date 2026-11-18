@@ -45,7 +45,7 @@ def beta_olay(ad):
 def _beta_yaz():
     with BETA_K: veri = {"olay": BETA["olay"], "toplanti": dict(list(BETA["toplanti"].items())[-400:]), "hafta": BETA["hafta"]}
     try:
-        gec = BETA_FP + ".tmp"; json.dump(veri, open(gec, "w", encoding="utf-8")); os.replace(gec, BETA_FP); BETA["yazildi"] = time.time()
+        dosya_yaz_esz(BETA_FP, veri); BETA["yazildi"] = time.time()
     except OSError: pass
 def beta_say(ad, bas, son):
     with BETA_K: return sum(1 for t, a in BETA["olay"] if a == ad and bas <= t < son)
@@ -88,7 +88,7 @@ def _yb_json(fp):
     return j if isinstance(j, dict) else {}
 def _yb_yaz(fp, neden):
     try:
-        gec = fp + ".tmp"; json.dump({"t": round(time.time()), "neden": neden}, open(gec, "w", encoding="utf-8")); os.replace(gec, fp); return True
+        dosya_yaz_esz(fp, {"t": round(time.time()), "neden": neden}); return True
     except OSError: return False
 def _yb_sil(fp):
     try: os.remove(fp)

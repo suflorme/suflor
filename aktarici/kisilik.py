@@ -182,8 +182,7 @@ def kisilik_selam():  # kişilik açıldıktan sonraki ilk konuşmada bir kez (c
     if k["ad"] in _KIS_TANIT["adlar"]: return None
     _KIS_TANIT["adlar"].add(k["ad"])
     try:
-        with open(yol + ".tmp", "w", encoding="utf-8") as f: json.dump({"adlar": sorted(_KIS_TANIT["adlar"])}, f, ensure_ascii=False)
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(yol, {"adlar": sorted(_KIS_TANIT["adlar"])}, ensure_ascii=False)
     except OSError: pass
     print(f"KİŞİLİK: {k['ad']} kendini tanıttı (ilk konuşma)"); return k["selam"]
 def kisilik_telaffuz(metin):  # okunacak metinde ad → okunuş ve dosyadaki telaffuz satırları (Mac sesi)

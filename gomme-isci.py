@@ -75,8 +75,14 @@ def sikistir(a, ids, crcs, dosya):
     for b in range(0, len(sec), PAKET):
         j = sec[b:b + PAKET]; k = os.path.join(a.klasor, f"p{no:05d}")
         for son, veri in ((".npy", E[j]), (".crc.npy", C[j]), (".id.npy", I[j])):
-            with open(k + son + ".tmp", "wb") as f: np.save(f, veri)
-            os.replace(k + son + ".tmp", k + son)
+            gec = f"{k + son}.{os.getpid()}.tmp"  # beta #45/#57: geçici ad süreç numaralı, hata olursa silinir
+            try:
+                with open(gec, "wb") as f: np.save(f, veri)
+                os.replace(gec, k + son)
+            except BaseException:
+                try: os.remove(gec)
+                except OSError: pass
+                raise
         no += 1
     for k in dosya:  # önce .id.npy: yarım silinen paket görünmez
         for son in (".id.npy", ".crc.npy", ".npy"):
@@ -113,8 +119,14 @@ def dizinle(a):
         if aygit == "mps": torch.mps.empty_cache()
         k = os.path.join(a.klasor, f"p{no:05d}")
         for son, veri in ((".npy", E), (".crc.npy", np.array([crc(t) for _, t, _ in p], dtype=np.int64)), (".id.npy", np.array([i for i, _, _ in p], dtype=np.int64))):
-            with open(k + son + ".tmp", "wb") as f: np.save(f, veri)
-            os.replace(k + son + ".tmp", k + son)  # .id.npy en son: yarım paket okunmaz
+            gec = f"{k + son}.{os.getpid()}.tmp"  # beta #45/#57: geçici ad süreç numaralı, hata olursa silinir
+            try:
+                with open(gec, "wb") as f: np.save(f, veri)
+                os.replace(gec, k + son)
+            except BaseException:
+                try: os.remove(gec)
+                except OSError: pass
+                raise  # .id.npy en son: yarım paket okunmaz
         no += 1; sonuc["paket"] += 1; sonuc["yapilan"] += len(p)
         gunluk(f"paket {no - 1}: {len(p)} parça · {sonuc['yapilan'] / (time.time() - t0):.0f} parça/sn")
     sonuc["sure_sn"] = round(time.time() - t0, 1)

@@ -6,6 +6,7 @@
 #   yeniden eklenmez · metin/tarih değişimi yansır · eşleme kalıcı (yeniden yükleme) · liste değişince yeni listeye · izin yoksa çökmez, her 15 sn yeniden açmaz · gizli kipte tur yok ·
 #   yalıtılmış aktarıcıda bölüm yüklenir, döngü kendiliğinden ekler ve tamamlar, ayar kapalıyken dokunmaz.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/animsatici.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import contextlib, datetime, io, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
 sys.dont_write_bytecode = True; KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, os.path.join(KOD, "test")); sys.path.insert(0, KOD)
 import yapi; from bosport import bos_port
@@ -61,7 +62,7 @@ graf(DG, "Özel", "2026-11-04", [{"tur": "is", "metin": "Gizli iş", "sahip": "A
 graf(DN, "Test-1", "2026-11-04", [{"tur": "is", "metin": "Deneme işi", "sahip": "Ayşe Deneme"}])
 # --- bölümü relay.py'nin ad alanı gibi bir ad alanında yükle (yalnız gereken adlar: AYAR, AYAR_PANO, BASE, gizli_acik, _yapi_mod) -----------------------------------------
 GIZLI = [False]; AYAR = {"ad": "Ayşe Deneme", "uygulama": T, "animsatici": False, "animsatici_liste": "Suflor.me"}
-ns = {"os": os, "sys": sys, "json": json, "re": re, "time": time, "datetime": datetime, "threading": threading, "AYAR": AYAR, "AYAR_PANO": {}, "BASE": C, "gizli_acik": lambda: GIZLI[0], "_yapi_mod": lambda: yapi}
+ns = {**ESZ, "os": os, "sys": sys, "json": json, "re": re, "time": time, "datetime": datetime, "threading": threading, "AYAR": AYAR, "AYAR_PANO": {}, "BASE": C, "gizli_acik": lambda: GIZLI[0], "_yapi_mod": lambda: yapi}
 exec(compile(open(os.path.join(KOD, "aktarici", "animsatici.py"), encoding="utf-8").read(), "animsatici.py", "exec"), ns)
 def tur(**k):
     g = io.StringIO()

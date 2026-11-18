@@ -87,11 +87,10 @@ def konus_vt_hazirla():  # → MCP yapılandırma dosyasının yolu ya da None
     yol = os.path.join(BASE, "konus-mcp.json"); _KS["vt_sema"] = _vt_sema_uret()
     print(f"KONUŞ: veritabanı araçları · tablo yapısı {'istemde (' + str(len(_KS['vt_sema'])) + ' karakter), vt_sema yok' if _KS['vt_sema'] else 'yok — vt_sema aracıyla'}")
     try:
-        with open(yol + ".tmp", "w", encoding="utf-8") as f:
-            json.dump({"mcpServers": {"suflorvt": {"command": "/usr/bin/python3", "args": ["-I", "-B", tc, "--dir", BASE, "vt-mcp"],
-                                                   "env": {"PYTHONDONTWRITEBYTECODE": "1", **({"SUFLOR_AYAR": os.environ["SUFLOR_AYAR"]} if os.environ.get("SUFLOR_AYAR") else {}),
-                                                           **({"SUFLOR_VT_SEMA_YOK": "1"} if _KS["vt_sema"] else {})}}}}, f)
-        os.replace(yol + ".tmp", yol); return yol
+        dosya_yaz_esz(yol, {"mcpServers": {"suflorvt": {"command": "/usr/bin/python3", "args": ["-I", "-B", tc, "--dir", BASE, "vt-mcp"],
+                                                        "env": {"PYTHONDONTWRITEBYTECODE": "1", **({"SUFLOR_AYAR": os.environ["SUFLOR_AYAR"]} if os.environ.get("SUFLOR_AYAR") else {}),
+                                                                **({"SUFLOR_VT_SEMA_YOK": "1"} if _KS["vt_sema"] else {})}}}})
+        return yol
     except OSError as e: print(f"KONUŞ: veritabanı araç yapılandırması yazılamadı ({e.__class__.__name__})"); return None
 # v0.57.5: açık süreçte aynı güncel durum sorusu geçmişten cevaplanır (3 sn); veri bu arada değiştiyse eski kalır. Son vt_sor'dan sonra veritabanı dosyası
 # değiştiyse (okunamazsa: son sorgu VT_TAZE_SN'den eskiyse) soruya tek seferlik not eklenir: güncel durum sorusuysa yeniden sorgula. Değişmediyse hızlı yol aynı.
@@ -148,8 +147,7 @@ def _vt_sorgu_kaydet(soru, sorgular):
     except OSError: eski = []
     yeni = json.dumps({"t": round(time.time()), "soru": str(soru or "")[:300], "sorgu": [str(x)[:1500] for x in sorgular[:2]]}, ensure_ascii=False) + "\n"
     try:
-        with open(yol + ".tmp", "w", encoding="utf-8") as f: f.writelines((eski + [yeni])[-VT_SORGU_EN_COK:])
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(yol, "".join((eski + [yeni])[-VT_SORGU_EN_COK:]))
     except OSError as e: print(f"KONUŞ: sorgu kaydı yazılamadı ({e.__class__.__name__})")
 VT_SONUC_TAZE_SN = 150  # v0.57.8: önbellekteki sonuç bu kadar saniye içinde denetlendiyse (araç dakikada bir bakar) soruyla gider
 def _vt_sonuc(sorgular):  # canli/vt-sonuc.json (veritabanı aracı yazar) → [(sorgu, sonuç, yaş sn)] ya da None (biri eksik/bayat)
@@ -872,8 +870,7 @@ def konus_selam(soru, tur):  # her soruda çağrılır: selam gerekiyorsa okur v
         seslendir(s, kuyruk=True); _SELAM["gun"] = time.strftime("%Y-%m-%d", time.localtime(t)); print(f"KONUŞ: selam ({asama or 'karşılık'}): {s}")
     _SELAM["son"] = t
     try:
-        with open(_selam_yol() + ".tmp", "w", encoding="utf-8") as f: json.dump({"son": _SELAM["son"], "gun": _SELAM["gun"]}, f)
-        os.replace(_selam_yol() + ".tmp", _selam_yol())
+        dosya_yaz_esz(_selam_yol(), {"son": _SELAM["son"], "gun": _SELAM["gun"]})
     except OSError: pass
     return s
 def selam_notu(s):
@@ -1069,8 +1066,7 @@ def _belge_is(k, imza, kay):
         t, hata = _belge_metin(k["deger"])
         if t and t.strip():
             os.makedirs(_belge_dizin(), exist_ok=True); yol = os.path.join(_belge_dizin(), f"{k.get('id')}-{imza}.txt")
-            with open(yol + ".tmp", "w", encoding="utf-8") as f: f.write(t.strip() + "\n")
-            os.chmod(yol + ".tmp", 0o600); os.replace(yol + ".tmp", yol)
+            dosya_yaz_esz(yol, t.strip() + "\n", 0o600)
             kay.update(_belge_kayit(t, yol))
             print(f"BELGE: metne çevrildi · {str(k.get('ad', ''))[:60]} · {len(t) // 100 / 10} bin karakter" + (f" · {kay['sayfa']} sayfa" if kay["sayfa"] else ""))
         else: kay.update(durum="yok", hata=hata or "metin bulunamadı"); print(f"BELGE: metne çevrilemedi · {str(k.get('ad', ''))[:60]} · {kay['hata']}")
@@ -2716,9 +2712,7 @@ def hazirlik_oku(a):
 def hazirlik_yaz(e, kayit):  # brifing hazır olunca (aktarici/brifing-ses.py _brifing_is); içerik BRIFING kaydıyla aynı + anahtar, başlangıç. Eskiler (toplantıdan 45 gün sonra) silinir.
     d = hazirlik_dizin(); os.makedirs(d, exist_ok=True); a = hazirlik_anahtar(e)
     j = dict({k: kayit.get(k) for k in ("durum", "at", "sonuc", "hata")}, anahtar=a, baslangic=e.get("baslangic"))
-    tmp = os.path.join(d, a + ".json.tmp")
-    with open(tmp, "w", encoding="utf-8") as f: json.dump(j, f, ensure_ascii=False)
-    os.replace(tmp, os.path.join(d, a + ".json"))
+    dosya_yaz_esz(os.path.join(d, a + ".json"), j, ensure_ascii=False)
     sinir = (datetime.datetime.now().astimezone() - datetime.timedelta(days=HAZIRLIK_SAKLA_GUN)).isoformat()
     for f in os.listdir(d):
         if not f.endswith(".json") or f == a + ".json": continue

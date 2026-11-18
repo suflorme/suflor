@@ -90,9 +90,7 @@ def et_kaydet():
         if len(d[k]) > 600: d[k] = dict(sorted(d[k].items(), key=lambda kv: str(kv[1]))[-400:])
     if len(d["zd"]) > ET_ONBELLEK: d["zd"] = dict(sorted(d["zd"].items(), key=lambda kv: str((kv[1] or {}).get("t")))[-ET_ONBELLEK:])  # en eski değerlendirmeler düşer
     try:
-        fd = os.open(_et_yol() + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False)
-        os.replace(_et_yol() + ".tmp", _et_yol())
+        dosya_yaz_esz(_et_yol(), d, 0o600, ensure_ascii=False)
     except OSError: pass
 
 # --- Kurallar ---------------------------------------------------------------------------------------------------------------------------------------

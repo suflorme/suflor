@@ -2,6 +2,7 @@
 # Güncelleme/kurulum toplantı, sohbet ya da Konuş cevabı sürerken başlamaz (v0.77.4 kurulum.py mesgul + aktarici-kur.command; v0.77.5 guncelle
 # ve panodaki "Güncelle" — relay.py guncelle_baslat). Sahte durumla, dosyaya ve ağa dokunmadan (~1 sn).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/guncelle-mesgul.py
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import ast, os, shutil, sys
 sys.dont_write_bytecode = True
 sys.path = [p for p in sys.path if os.path.abspath(p or ".") != os.path.dirname(os.path.abspath(__file__))]  # test/ yola girmesin (eski test/platform.py standart modülü gölgeliyordu)
@@ -160,7 +161,7 @@ ok("planli_isaretle · neden kaydı", pj["neden"] == "guncelleme")
 _bv = open(os.path.join(KOD, "aktarici", "beta-veri.py"), encoding="utf-8").read()
 _bol = _bv.split("# --- yeniden-baslat başlangıç", 1)[1].split("# --- yeniden-baslat bitiş ---")[0].split("\n", 1)[1]
 _bu = tempfile.mkdtemp(prefix="suflor-yb2-"); OLAY = []; BAS = []
-G = {"json": json, "os": os, "time": time, "threading": None, "AYAR": {"uygulama": _bu}, "BASE": os.path.join(_bu, "canli"), "A": type("A", (), {"port": 8765}), "BETA_TEST": False,
+G = {**ESZ, "json": json, "os": os, "time": time, "threading": None, "AYAR": {"uygulama": _bu}, "BASE": os.path.join(_bu, "canli"), "A": type("A", (), {"port": 8765}), "BETA_TEST": False,
      "beta_olay": lambda a: OLAY.append(a), "beta_say": lambda a, b, c: 0,
      "eklenti_cagri": lambda: None, "masaustu_toplantida": lambda: False, "toplanti_var": lambda: False, "sohbet_view": lambda: {"acik": False}, "KONUS": {"durum": "hazir"}, "toplanti_oturum_view": lambda: None}
 exec(compile(_bol, "beta-veri-yb", "exec"), G)

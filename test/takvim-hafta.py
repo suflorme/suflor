@@ -5,6 +5,7 @@
 # Kota yok, Whisper yok (~5 sn). Takvim/uygun zaman/iş talimatı kalıbı değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/takvim-hafta.py
 import datetime as dt, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8789)
 HATA = []
@@ -20,7 +21,7 @@ def olay(i, gun, b, s, **k):
                  "tum_gun": False, "takvim": "İş", "hesap": "Yerel", "katilimcilar": ["Ayla K"], "kisi_sayisi": 2}, **k)
 TAK = {e["id"]: e for e in [olay(1, 0, 11, 12), olay(2, 3, 9, 10.5), olay(3, 3, 13, 18), olay(4, 4, 0, 24, tum_gun=True), olay(5, 5, 9, 18, reddettin=True),
                             olay(6, 6, 10, 11, takvim="Paylaşılan", hesap="Başkası")]}
-ad = {"re": re, "datetime": dt, "os": os, "json": json, "time": time, "subprocess": subprocess, "BASE": "/yok/canli", "TAKVIM_APP": "/yok", "AYAR": {"takvim_haric": ["Paylaşılan · Başkası"]}, "TAKVIM_TAM": TAK, "ARAYUZ_DILI": "tr", "STATE": {"takvim": {"durum": "ok"}},
+ad = {**ESZ, "re": re, "datetime": dt, "os": os, "json": json, "time": time, "subprocess": subprocess, "BASE": "/yok/canli", "TAKVIM_APP": "/yok", "AYAR": {"takvim_haric": ["Paylaşılan · Başkası"]}, "TAKVIM_TAM": TAK, "ARAYUZ_DILI": "tr", "STATE": {"takvim": {"durum": "ok"}},
       "_t": lambda a, b: a, "_zaman": lambda t: dt.datetime.fromisoformat(t).astimezone()}
 exec(kod[kod.index("_GUN_TR = "):kod.index("# Kişilik (v0.53.0")], ad)
 KM = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").read(); KM_OKU = KM[KM.index("# --- Tek okuyucular"):KM.index("# --- Olaylar:")]  # tek okuyucular (takvim, boş zaman, işler, devir)

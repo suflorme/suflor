@@ -113,9 +113,7 @@ def _dg_onb_kaydet():
         o = DG["onb"] or {}
         if len(o) > DG_ONB_EN_COK: DG["onb"] = o = dict(sorted(o.items(), key=lambda kv: float((kv[1] or {}).get("t") or 0))[-int(DG_ONB_EN_COK * 0.8):])
         try:
-            fd = os.open(_dg_yol(DG_ONBELLEK) + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(o, f, ensure_ascii=False)
-            os.replace(_dg_yol(DG_ONBELLEK) + ".tmp", _dg_yol(DG_ONBELLEK))
+            dosya_yaz_esz(_dg_yol(DG_ONBELLEK), o, 0o600, ensure_ascii=False)
         except OSError: pass
 def dg_anahtar(is_turu, aday):  # iş türü + aday kimliği + içerik özeti: içerik değişince (gecikme günü, yeni sahip …) anahtar değişir, aday yeniden sorulur
     oz = hashlib.sha1(json.dumps({"m": aday.get("metin"), "v": aday.get("veri")}, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()[:12]

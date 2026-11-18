@@ -3,6 +3,7 @@
 # tepkiler), şema doğrulama ve bozuk cevap, öğrenilen yazma ve geçersizleme (onaylıya dokunulmaz), gun-plani.json, söz kapısı adayı ve sabah teslimi, Doğru/Yanlış uçları, gizli kip, Konuş dilimi, bağlantılar.
 # Birim: bölümler yalıtılmış ad alanında, sahte model ve sahte saatle (gerçek claude çağrılmaz, ağ yok). Kurgu veri (gerçek kişi yok).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/dusunme.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, secrets, stat, sys, tempfile, threading, time
 sys.dont_write_bytecode = True; os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,7 +54,7 @@ def kur(ad, ayar=None, cevaplar=None, gizli=False, eski_model=False, takvim=True
         def eski(s, istem, amac=None, soru=None, maske=None): return s.cagri(istem, amac, soru, maske)
     m = Model()
     ayar_ = {"ad": "Deniz T", "alan": "Deneme", "uygulama": d, "calisma_saatleri": {"gunler": [0, 1, 2, 3, 4], "bas": "09:00", "bit": "18:00"}}; ayar_.update(ayar or {})
-    ns = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "secrets": secrets, "AYAR": ayar_, "BASE": d, "LOCK": lock, "write": write, "SOHBET": {"acik": False},
+    ns = {**ESZ, "os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "secrets": secrets, "AYAR": ayar_, "BASE": d, "LOCK": lock, "write": write, "SOHBET": {"acik": False},
           "bildirim": lambda *a, **k: bil.append(a), "gizli_acik": lambda: durum["gizli"], "toplanti_var": lambda: durum["top"], "aktif_dosya": lambda: None, "sessiz_acik": lambda: False,
           "calisma_saatleri": lambda: ({0, 1, 2, 3, 4}, 540, 1080), "_t": lambda tr, en: tr, "ARAYUZ_DILI": "tr", "print": lambda *a, **k: log.append(" ".join(map(str, a))), "_yapi_mod": lambda: yapi,
           "eylem_model": m.eski if eski_model else m.cagri, "TAKVIM_TAM": ({"E1": {}} if takvim else {}), "SON": [], "_DENEME_AD": re.compile(r"(?i)deneme|test"), "_zaman": lambda s: datetime.datetime.fromisoformat(s),

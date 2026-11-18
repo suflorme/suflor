@@ -3,6 +3,7 @@
 # Kurgu veri (gerçek kişi yok): CC'de kalan, > 5 alıcılı, yüksek hacimli tek yönlü gönderen → bilgi; karşılıklı yazışmalı doğrudan soru → bekleyen; istekli giden → donus,
 # bilgi amaçlı giden → yok; 14 günden eski düşer; düzey siki/dengeli/genis; onemli_kisi/onemsiz_gonderen kalıcı; Claude'a yalnız ad/konu/özet gider; alıcı ham listesi + yardımcının bayrakları.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/eposta-onem.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import collections, datetime, json, os, re, shutil, sys, tempfile, threading, time
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
@@ -39,7 +40,7 @@ AYAR = {"soz_gece": False, "eposta_oku": True, "ad": "Deniz T", "eposta_adres": 
 def ayar_yaz(deg):  # relay'in ayar_yaz'ının yerine: bellekteki AYAR'a yazar, çağrıyı kaydeder
     for k, v in deg.items(): AYAR[k] = list(v); KAYITLI[k] = list(v)
     return {"ok": True}
-NS = {"__name__": "et", "collections": collections, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": threading, "BASE": T, "AYAR": AYAR, "POSTA": {"iletiler": [], "durum": "ok"},
+NS = {**ESZ, "__name__": "et", "collections": collections, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": threading, "BASE": T, "AYAR": AYAR, "POSTA": {"iletiler": [], "durum": "ok"},
       "_t": lambda tr, en: tr, "ARAYUZ_DILI": "tr", "bildirim": lambda *a, **k: None, "seslendir": lambda m, **k: None, "toplanti_var": lambda: False, "aktif_dosya": lambda: None, "gizli_acik": lambda: False,
       "SOHBET": {"acik": False}, "BEYIN": Beyin, "eylem_model": sahte_model, "posta_vt_kisiler": lambda: [], "posta_govde_al": lambda ids, kar=None: {}, "posta_kullanici_sorusu": lambda: True,
       "_yapi_mod": lambda: None, "ayar_yaz": ayar_yaz}

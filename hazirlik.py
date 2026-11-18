@@ -20,10 +20,26 @@ UYG = B.AYAR["uygulama"]; DURUM = os.path.join(UYG, "hazirlik.json"); KILIT = os
 CEVIR_SN = {".pdf": 8.0, ".pptx": 5.0, ".key": 5.0, ".pages": 2.0, ".numbers": 1.0, ".xls": 0.5}; CEVIR_GORUNTU_SN = 1.4; GOMME_PARCA_SN = 75.0; KART_BELGE_SN = 4.5; KART_BELGE_USD = 0.05
 KART_TURLER = {"belge", "sunum", "gorusme", "tablo"}
 
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def yaz(d):
     os.makedirs(UYG, exist_ok=True)
-    with open(DURUM + ".tmp", "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False)
-    os.replace(DURUM + ".tmp", DURUM)
+    dosya_yaz_esz(DURUM, d, ensure_ascii=False)
 def oku():
     try: return json.load(open(DURUM, encoding="utf-8"))
     except (OSError, ValueError): return {}

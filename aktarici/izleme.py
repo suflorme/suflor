@@ -161,9 +161,7 @@ def izleme_ozet_metni(v, ad):
 
 def izleme_ozet_yol(): return os.path.join(BASE, IZ_OZET)
 def izleme_ozet_yaz(v):  # her yeni okumada yeniden yazılır (Konuş Read ile okur); eskilik okunduğu andaki saate göre
-    yol = izleme_ozet_yol(); gec = yol + ".tmp"
-    with open(gec, "w", encoding="utf-8") as f: f.write(izleme_ozet_metni(v, izleme_ad()))
-    os.replace(gec, yol)
+    dosya_yaz_esz(izleme_ozet_yol(), izleme_ozet_metni(v, izleme_ad()))
 def izleme_ozet_sil():
     try: os.remove(izleme_ozet_yol())
     except OSError: pass

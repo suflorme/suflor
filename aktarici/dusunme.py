@@ -128,9 +128,7 @@ def _dus_yaz_json(ad, v):  # atomik, 0600
     yol = _dus_yol(ad)
     try:
         os.makedirs(os.path.dirname(yol), exist_ok=True)
-        fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(v, f, ensure_ascii=False)
-        os.replace(yol + ".tmp", yol); DUS["onb"] = None; return True
+        dosya_yaz_esz(yol, v, 0o600, ensure_ascii=False); DUS["onb"] = None; return True
     except OSError as e: print(f"DÜŞÜNME: {ad} yazılamadı ({e.__class__.__name__})"); return False
 def _dus_jsonl(ad, son=800):
     try:

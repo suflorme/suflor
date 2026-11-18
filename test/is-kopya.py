@@ -4,6 +4,7 @@
 # yeniden sorulmaz; (c) emin_değil/düşük güven → bekleyen soru, birleştir/ayrı işlemleri; (d) model başarısız → soruya düşer, hiçbir şey kapanmaz, geçici engelde çift taranmamış kalır; (e) gizli toplantı,
 # farklı sahip, aynı toplantı içi aday olmaz; (f) geri al; (g) imleç (aynı kayıt yeniden taranmaz); ayrıca ayar/gizli kip/uç görünümü.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/is-kopya.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, hashlib, inspect, json, os, re, shutil, stat, sys, tempfile, threading, time
 sys.dont_write_bytecode = True; os.environ["SUFLOR_IK_DONGU_YOK"] = "1"
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, KOD)
@@ -25,7 +26,7 @@ def ns_kur(ad):
     def write(pairs):
         for yol, metin in pairs:
             with open(yol, "a", encoding="utf-8") as f: f.write(metin)
-    ns = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": {"ad": "Ece Deneme"}, "BASE": C, "LOCK": threading.Lock(), "write": write,
+    ns = {**ESZ, "os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": {"ad": "Ece Deneme"}, "BASE": C, "LOCK": threading.Lock(), "write": write,
           "gizli_acik": lambda: durum["gizli"], "_yapi_mod": lambda: yapi, "eylem_model": m.cagri, "print": lambda *a, **k: log.append(" ".join(str(x) for x in a)),
           "DG_SAAT": lambda: SAAT["t"], "M": m, "C": C, "DURUM": durum, "LOG": log}
     for f in ("degerlendir.py", "is-kopya.py"): exec(compile(open(os.path.join(KOD, "aktarici", f), encoding="utf-8").read(), f, "exec"), ns)

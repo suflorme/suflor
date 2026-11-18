@@ -13,9 +13,7 @@ def brifing_yukle():
     except (OSError, ValueError): return
     if j.get("gun") == datetime.date.today().isoformat(): BRIFING.update({k: v for k, v in (j.get("olaylar") or {}).items() if v.get("durum") == "hazir"})
 def _brifing_kaydet():
-    tmp = _brifing_yol() + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f: json.dump({"gun": datetime.date.today().isoformat(), "olaylar": BRIFING}, f, ensure_ascii=False)
-    os.replace(tmp, _brifing_yol())
+    dosya_yaz_esz(_brifing_yol(), {"gun": datetime.date.today().isoformat(), "olaylar": BRIFING}, ensure_ascii=False)
 def hazirlik_esle():  # takvim okununca (relay.py takvim_oku): bugün başlayan ya da süren toplantının kayıtlı hazırlığı BRIFING'e (Başlat, panodaki brifing, sesli okuma)
     bugun = datetime.date.today().isoformat(); simdi = datetime.datetime.now().astimezone()
     for oid, e in list(TAKVIM_TAM.items()):
@@ -491,9 +489,7 @@ def telaffuz_ekle(d):  # okunuşları telaffuz-oto.json'a katar (Claude toplu ce
     if not d: return 0
     with _TEL_YAZ:
         yeni = dict(telaffuz_oto()); yeni.update(d)
-        tmp = os.path.join(BASE, "telaffuz-oto.json.tmp")
-        with open(tmp, "w", encoding="utf-8") as f: json.dump(yeni, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, os.path.join(BASE, "telaffuz-oto.json"))
+        dosya_yaz_esz(os.path.join(BASE, "telaffuz-oto.json"), yeni, ensure_ascii=False, indent=1)
     _TEL["re"] = None  # bir sonraki okumada yeni eşleme
     return len(d)
 # Okunuş tamamlama (v0.20.18; kullanıcı 9 Ekim: üç örnekten "Türkçe yazım" kabul edilebilir): sözlük terimi, kişi ve tedarikçi adlarından

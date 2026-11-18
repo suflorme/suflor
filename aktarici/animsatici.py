@@ -33,9 +33,7 @@ def anim_oku():
     return d
 def anim_yaz(d):
     try:
-        fd = os.open(_anim_yol() + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False)
-        os.replace(_anim_yol() + ".tmp", _anim_yol())
+        dosya_yaz_esz(_anim_yol(), d, 0o600, ensure_ascii=False)
     except OSError as e: print(f"ANIMSATICI: eşleme yazılamadı ({e.__class__.__name__})")
 def anim_say():  # beta: yalnız sayı (eşlenen iş sayısı)
     try: return len(anim_oku()["es"])

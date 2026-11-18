@@ -495,9 +495,7 @@ def oto_view():  # eski /status oto_toplanti (pano: oturum açık mı)
     return {k: a[k] for k in ("ad", "platform", "kaynak", "olay", "oturum", "neden")} if a else None
 def _durum_yaz():  # canli/toplanti.json (geçici dosya + os.replace)
     try:
-        with open(TOPLANTI_FP + ".tmp", "w", encoding="utf-8") as f:
-            json.dump({"t": time.time(), "aktif": _kayit_dis(TOPLANTI.get("aktif")), "onceki": _kayit_dis(TOPLANTI.get("onceki"))}, f, ensure_ascii=False, indent=1)
-        os.replace(TOPLANTI_FP + ".tmp", TOPLANTI_FP)
+        dosya_yaz_esz(TOPLANTI_FP, {"t": time.time(), "aktif": _kayit_dis(TOPLANTI.get("aktif")), "onceki": _kayit_dis(TOPLANTI.get("onceki"))}, ensure_ascii=False, indent=1)
     except OSError: pass
 def toplanti_kur():  # aktarıcı açılırken: süren kayıt ≤ 5 dk önce yazıldıysa bitiyor olarak sürer (sinyal gelirse aynı dosya), değilse önceki
     try: d = json.load(open(TOPLANTI_FP, encoding="utf-8"))

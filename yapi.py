@@ -814,10 +814,25 @@ def _ortak_durum(dizin):
     try: d = json.load(open(os.path.join(dizin, ORTAK_DURUM), encoding="utf-8"))
     except (OSError, ValueError): d = {}
     return d if isinstance(d, dict) else {}
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def _ortak_durum_yaz(dizin, d):
-    yol = os.path.join(dizin, ORTAK_DURUM); fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=1)
-    os.replace(yol + ".tmp", yol)
+    dosya_yaz_esz(os.path.join(dizin, ORTAK_DURUM), d, 0o600, ensure_ascii=False, indent=1)
 def _rol_disa(r, ep, ad, kimlik_f):  # roller dışarı: "ben" → kullanıcının e-postası; e-postası olmayan ada kimlik_f (güvenli eşleme) ile e-posta
     def k1(k):
         if not isinstance(k, dict): return k
@@ -1764,9 +1779,7 @@ def _bo_dosya(dizin):
     try: d = json.load(open(os.path.join(dizin, BELGE_ONERI), encoding="utf-8")); return d if isinstance(d, dict) else {}
     except (OSError, ValueError): return {}
 def _bo_yaz(dizin, d):
-    yol = os.path.join(dizin, BELGE_ONERI); fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False)
-    os.replace(yol + ".tmp", yol)
+    dosya_yaz_esz(os.path.join(dizin, BELGE_ONERI), d, 0o600, ensure_ascii=False)
 def _benzer(a, b):
     if not a or not b: return False
     if a == b or (min(len(a), len(b)) >= 12 and (a in b or b in a)): return True

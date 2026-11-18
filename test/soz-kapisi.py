@@ -3,6 +3,7 @@
 # geçerlilik), sunuş/sonuç kaydı (metin yok), otomatik yoksay, yeniden başlatma, /status "soz" alanı ve olcum.py isabet. Birim: kapı yalıtılmış ad alanında, sahte saatle (gerçek bildirim/ses yok).
 # Kaynak uçları (/proaktif, /eposta-onemli, /toplanti-hatirlat, /yaklasan-tarihler) → soz_sonuc bağlantısı: test/proaktif-oneri.py, toplanti-hatirlat.py, eposta-takip.py, kisisel-tarihler.py.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/soz-kapisi.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, importlib.util, json, os, re, shutil, sys, tempfile, threading, time
 sys.dont_write_bytecode = True; os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,7 +19,7 @@ def kur(ad="a", **ek):
     def write(pairs):
         for yol, metin in pairs:
             with open(yol, "a", encoding="utf-8") as f: f.write(metin)
-    ns = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": {}, "BASE": d, "LOCK": lock, "write": write, "SOHBET": {"acik": False},
+    ns = {**ESZ, "os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": {}, "BASE": d, "LOCK": lock, "write": write, "SOHBET": {"acik": False},
           "bildirim": lambda *a, **k: bil.append(a), "gizli_acik": lambda: False, "toplanti_var": lambda: False, "aktif_dosya": lambda: None, "sessiz_acik": lambda: False,
           "calisma_saatleri": lambda: ({0, 1, 2, 3, 4}, 540, 1080), "_t": lambda tr, en: tr, "print": lambda *a, **k: None}
     ns.update(ek); ns["BIL"] = bil; ns["D"] = d; ns["SOZ_SAAT"] = lambda: SAAT["t"]  # sahte saat açılışta da (kapı SOZ_SAAT'i önceden tanımlıysa korur)

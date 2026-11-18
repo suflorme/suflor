@@ -47,8 +47,7 @@ def _duy_yaz():
     gunler = dict(sorted(_DUY["gunler"].items())[-DUYGU_GUN_SAKLA:]); _DUY["gunler"] = gunler
     y = os.path.join(BASE, DUYGU_DOSYA)
     try:
-        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"surum": 1, "aciklama": "günlük sayılar; metin yok", "gunler": gunler}, f, ensure_ascii=False)
-        os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, {"surum": 1, "aciklama": "günlük sayılar; metin yok", "gunler": gunler}, ensure_ascii=False)
     except OSError: pass
 def _duy_gun(simdi=None):
     _duy_yukle(); return _DUY["gunler"].setdefault(_duy_tarih(simdi), {})

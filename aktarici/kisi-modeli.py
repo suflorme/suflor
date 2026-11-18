@@ -401,8 +401,7 @@ def kesisim_soruldu_mu(simdi=None):
 def kesisim_soruldu_yaz(simdi=None):  # günde bir kez soruldu işareti (yalnız gün; metin yok)
     yol = os.path.join(BASE, "kesisim-soruldu.json")
     try:
-        with open(yol + ".tmp", "w", encoding="utf-8") as f: json.dump({"gun": (simdi or datetime.datetime.now()).date().isoformat()}, f)
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(yol, {"gun": (simdi or datetime.datetime.now()).date().isoformat()})
     except OSError: pass
 def _km_kesisim_metni(simdi, cap):
     f = globals().get("kesisim_sayfa_veri")

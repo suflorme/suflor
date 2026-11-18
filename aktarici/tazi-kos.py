@@ -15,7 +15,7 @@ def _tzk_oku():
     if d.get("gun") != bug: d = {"gun": bug, "n": 0, "son": d.get("son") or {}}
     d.setdefault("son", {}); d.setdefault("n", 0); return d
 def _tzk_yaz(d):
-    try: tmp = _tzk_yol() + ".tmp"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, _tzk_yol())
+    try: dosya_yaz_esz(_tzk_yol(), d, ensure_ascii=False)
     except (OSError, TypeError): pass
 def _tzk_anahtar(ad): return " ".join(str(ad or "").lower().replace("İ", "i").replace("ı", "i").split())
 def tzk_tavan():

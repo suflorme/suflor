@@ -38,8 +38,7 @@ def _pro_oku():
     except (OSError, ValueError, AttributeError, TypeError): pass
 def _pro_yaz():
     try:
-        with open(os.path.join(BASE, PRO_DOSYA) + ".tmp", "w", encoding="utf-8") as f: json.dump({"yapildi": sorted(PROAKTIF["yapildi"])[-200:], "gun": {"tarih": PRO_GUN["tarih"], "n": PRO_GUN["n"], "son_t": PRO_GUN["son_t"]}, "oneri": PRO_GUN["oneri"]}, f)
-        os.replace(os.path.join(BASE, PRO_DOSYA) + ".tmp", os.path.join(BASE, PRO_DOSYA))
+        dosya_yaz_esz(os.path.join(BASE, PRO_DOSYA), {"yapildi": sorted(PROAKTIF["yapildi"])[-200:], "gun": {"tarih": PRO_GUN["tarih"], "n": PRO_GUN["n"], "son_t": PRO_GUN["son_t"]}, "oneri": PRO_GUN["oneri"]})
     except OSError: pass
 
 def _pro_k(r): return str(r.get("dosya") or r.get("ozet") or r["id"])  # bir toplantı için bir kez: aynı özet yeniden kaydedilse de

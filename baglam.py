@@ -14,6 +14,23 @@ import argparse, collections, datetime, glob, html, json, os, re, sqlite3, sys, 
 
 # hesap başına ayar (relay.py ile aynı kural): ~/Library/Application Support/Suflor/ayar.json; yoksa varsayılanlar
 AYAR_YOL = os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json")  # SUFLOR_AYAR: deneme için
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def ayar_oku():
     v = {"alan": "Suflor", "ad": "", "port": 8765, "uygulama": "~/Library/Application Support/Suflor", "proje": "~/Suflor", "ortak": "/Users/Shared/Suflor",
          "sozluk_kaynagi": None}
@@ -501,8 +518,7 @@ def guncelle(c, yeniden=False, sessiz=True):
     try: sozluk_kopyala()  # dış sözlük → uygulama klasörü (aktarıcının Konuş ön araması oradan okur)
     except OSError as e: print(f"dizin: dış sözlük kopyalanamadı ({e.__class__.__name__})", file=sys.stderr)
     try:  # son turun izi: aktarıcı, Brifing yardımcısının (--dizin) tam erişimle bitirip bitirmediğini buradan anlar
-        with open(DB + ".tur.json.tmp", "w", encoding="utf-8") as f: json.dump({"t": time.time(), "erisilemeyen": eris, "pid": os.getpid()}, f)
-        os.replace(DB + ".tur.json.tmp", DB + ".tur.json")
+        dosya_yaz_esz(DB + ".tur.json", {"t": time.time(), "erisilemeyen": eris, "pid": os.getpid()})
     except OSError: pass
     if eris and not sessiz: print(f"dizin: okunamayan klasör ({', '.join(e or 'proje kökü' for e in eris)}) — eski kayıtları korundu", file=sys.stderr)
     if not sessiz or n_yeni:
@@ -769,8 +785,7 @@ def tara(c=None, sessiz=True):
              "kaynak_turu": [{"yol": s["yol"], "tur": s["kaynak_turu"], "neden": s["kaynak_neden"]} for s in ss if s["kaynak_turu"] != "asil"],
              "dosyalar": [{k: s[k] for k in ("yol", "tur", "boy", "mtime", "sha256", "kaynak_turu", "surum_grubu", "gecerli", "kopya_of", "gizli", "hata")} for s in ss]}
     try:
-        with open(TARA_RAPOR + ".tmp", "w", encoding="utf-8") as f: json.dump(rapor, f, ensure_ascii=False, indent=1)
-        os.chmod(TARA_RAPOR + ".tmp", 0o600); os.replace(TARA_RAPOR + ".tmp", TARA_RAPOR)
+        dosya_yaz_esz(TARA_RAPOR, rapor, 0o600, ensure_ascii=False, indent=1)
     except OSError: pass
     return rapor
 def tara_ozet(r):
@@ -954,8 +969,7 @@ def cevir(c=None, sinir=None, yeniden_dene=False, sessiz=True, isci_yenile=CEVIR
                 if kayit.get("hata"): kayit = dict(eskiler[kisa], tam_dene=CEVIR_GORSEL_SURUM)
                 else: c.execute("UPDATE dosya SET mtime=0 WHERE yol=?", (kisa,))
             y = _onbellek_yol(sha); os.makedirs(os.path.dirname(y), exist_ok=True)
-            with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(kayit, f, ensure_ascii=False)
-            os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+            dosya_yaz_esz(y, kayit, 0o600, ensure_ascii=False)
             if o.get("hata") == "parolali": c.execute("UPDATE tarama SET hata='parolali' WHERE yol=?", (kisa,))
             if ilerleme: ilerleme(i + 1, len(yap))
             if not sessiz: print(f"  [{i + 1}/{len(yap)}] {kisa} — " + (f"hata: {o['hata']}" if o.get("hata") else f"{len(kayit['parcalar'])} parça, {kayit['sure']} sn"), file=sys.stderr)
@@ -1194,8 +1208,7 @@ def proje_vt_guncelle(c=None, zorla=False, sessiz=True):
     finally: v.close()
     kay = {"t": time.time(), "kaynak": eski, "kart_mt": kart_mt, "kart": kart_say, "tablo": sayi[0], "satir": sayi[1]}
     try:
-        with open(PROJE_VT_KAYIT + ".tmp", "w", encoding="utf-8") as f: json.dump(kay, f, ensure_ascii=False)
-        os.replace(PROJE_VT_KAYIT + ".tmp", PROJE_VT_KAYIT)
+        dosya_yaz_esz(PROJE_VT_KAYIT, kay, ensure_ascii=False)
     except OSError: pass
     r = {"tablo": sayi[0], "satir": sayi[1], "yazilan": yazilan, "silinen": len(silinen), "kart": kart_say}
     if not sessiz or yazilan or silinen: print(f"proje veritabanı: {sayi[0]} tablo, {sayi[1]} satır · bu tur {yazilan} dosya yazıldı, {len(silinen)} silindi"
@@ -1323,8 +1336,14 @@ def sozluk_kopyala():
         if k.st_mtime == st.st_mtime and k.st_size == st.st_size: return False
     except OSError: pass
     os.makedirs(os.path.dirname(SOZLUK_KOPYA), exist_ok=True)
-    with open(SOZLUK_KOPYA + ".tmp", "wb") as f: f.write(veri)
-    os.utime(SOZLUK_KOPYA + ".tmp", (st.st_atime, st.st_mtime)); os.replace(SOZLUK_KOPYA + ".tmp", SOZLUK_KOPYA)
+    gec = f"{SOZLUK_KOPYA}.{os.getpid()}.{threading.get_ident()}.tmp"  # beta #45/#57: geçici ad süreç + iş parçacığı numaralı, hata olursa silinir
+    try:
+        with open(gec, "wb") as f: f.write(veri)
+        os.utime(gec, (st.st_atime, st.st_mtime)); os.replace(gec, SOZLUK_KOPYA)
+    except BaseException:
+        try: os.remove(gec)
+        except OSError: pass
+        raise
     return True
 def _sozluk_oku():
     # [(doğru biçim, [biçimler…])] — biçimler sadeleştirilmiş; doğru biçim de biçimlerden biri.

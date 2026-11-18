@@ -644,9 +644,14 @@ def ecapa_donustur(ckpt, hedef):
     # kurulumda bir kez (aktarici-kur / modeller-kur): SpeechBrain ağırlıkları (torch dosyası) → numpy .npz. torch yalnız burada gerekir
     # (whisper-venv'de mlx-whisper'ın bağımlılığı olarak var); işçi çalışırken torch içe aktarılmaz.
     import numpy as np, torch
-    sd = torch.load(ckpt, map_location="cpu"); gec = hedef + ".tmp.npz"
-    np.savez(gec, **{k: v.numpy().astype(np.float32) for k, v in sd.items() if not k.endswith("num_batches_tracked")})
-    Ecapa(gec, np, __import__("mlx.core", fromlist=["core"]))(np.zeros(16000, np.float32)); os.replace(gec, hedef)  # açılmıyorsa yazılmaz
+    sd = torch.load(ckpt, map_location="cpu"); gec = f"{hedef}.{os.getpid()}.tmp.npz"  # geçici ad süreç numaralı (beta #45/#57), hata olursa silinir
+    try:
+        np.savez(gec, **{k: v.numpy().astype(np.float32) for k, v in sd.items() if not k.endswith("num_batches_tracked")})
+        Ecapa(gec, np, __import__("mlx.core", fromlist=["core"]))(np.zeros(16000, np.float32)); os.replace(gec, hedef)  # açılmıyorsa yazılmaz
+    except BaseException:
+        try: os.remove(gec)
+        except OSError: pass
+        raise
     print(f"✓ ses izi ağırlıkları dönüştürüldü: {hedef}")
 def whisper_nicemle(kaynak, hedef, bit=8):
     # turbo modeli kurulumda bir kez yerelde 8 bite nicemlenir (indirme yok). Ölçüm (47 aynı parça, önbellek 0):
@@ -656,13 +661,17 @@ def whisper_nicemle(kaynak, hedef, bit=8):
     from mlx_whisper.load_models import load_model
     m = load_model(kaynak, dtype=mx.float16)
     nn.quantize(m, group_size=64, bits=bit, class_predicate=lambda p, x: isinstance(x, (nn.Linear, nn.Embedding)) and x.weight.shape[-1] % 64 == 0)
-    gec = hedef + ".tmp"; os.makedirs(gec, exist_ok=True)
-    mx.save_safetensors(os.path.join(gec, "weights.safetensors"), dict(tree_flatten(m.parameters())))
-    c = json.load(open(os.path.join(kaynak, "config.json"))); c["quantization"] = {"group_size": 64, "bits": bit}
-    json.dump(c, open(os.path.join(gec, "config.json"), "w"))
-    import numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), path_or_hf_repo=gec, language="tr")  # açılmıyorsa yerine konmaz
-    if os.path.isdir(hedef): import shutil; shutil.rmtree(hedef)
-    os.replace(gec, hedef); print(f"✓ Whisper {bit} bit modeli hazır: {hedef}")
+    gec = f"{hedef}.{os.getpid()}.tmp"; os.makedirs(gec, exist_ok=True)  # geçici ad süreç numaralı (beta #45/#57), hata olursa silinir
+    try:
+        mx.save_safetensors(os.path.join(gec, "weights.safetensors"), dict(tree_flatten(m.parameters())))
+        c = json.load(open(os.path.join(kaynak, "config.json"))); c["quantization"] = {"group_size": 64, "bits": bit}
+        json.dump(c, open(os.path.join(gec, "config.json"), "w"))
+        import numpy as np, mlx_whisper; mlx_whisper.transcribe(np.zeros(16000, np.float32), path_or_hf_repo=gec, language="tr")  # açılmıyorsa yerine konmaz
+        if os.path.isdir(hedef): import shutil; shutil.rmtree(hedef)
+        os.replace(gec, hedef); print(f"✓ Whisper {bit} bit modeli hazır: {hedef}")
+    except BaseException:
+        import shutil; shutil.rmtree(gec, ignore_errors=True)
+        raise
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--ecapa-donustur"]: ecapa_donustur(sys.argv[2], sys.argv[3]); sys.exit(0)
     if sys.argv[1:2] == ["--whisper-nicemle"]: whisper_nicemle(sys.argv[2], sys.argv[3]); sys.exit(0)

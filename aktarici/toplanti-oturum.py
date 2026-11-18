@@ -782,9 +782,7 @@ def toplanti_oturum_kaydet():
          "durum": TOPO["durum"], "kapatan": TOPO.get("kapatan"), "ozet": _topo_ozet_geldi(), "soru": _topo_acik_soru(),
          "son": son["metin"][-400:] if son else None, "dosya": dosya}
     try:
-        yol = _topo_kayit_yolu(); fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(k, f, ensure_ascii=False)
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(_topo_kayit_yolu(), k, 0o600, ensure_ascii=False)
     except OSError: pass
 def toplanti_oturum_yeniden(simdi=None):
     # aktarıcı açılışında: kayıt uygunsa oturumu aynı sid'le arka planda açar; açtıysa True. Açılmama nedeni günlüğe tek satır.
@@ -959,9 +957,7 @@ def gun_devir_yaz(r):  # özet kaydı geldi → devir (gizli/deneme toplantıda 
     yeni = [x for x in eski if isinstance(x, dict) and x.get("dosya") != dosya and now - float(x.get("t") or 0) < GUN_DEVIR_OMUR_SN][-9:]
     yeni.append({"dosya": dosya, "ad": r.get("baslik"), "t": now, "metin": metin})
     try:
-        fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"devirler": yeni}, f, ensure_ascii=False)
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(yol, {"devirler": yeni}, 0o600, ensure_ascii=False)
     except OSError as e: print(f"GÜN DEVRİ: yazılamadı ({e.__class__.__name__})"); return None
     print(f"GÜN DEVRİ: {r.get('baslik') or dosya} — {len(metin)} karakter, Konuş'a bir sonraki soruda gider"); return metin
 def gun_ici_blogu(konu=None, simdi=None):  # toplantı oturumunun açılışında: son GUN_ICI_SAAT saatteki toplantı dışı Konuş soruları (yeniden eskiye sığdır, eskiden yeniye yaz)

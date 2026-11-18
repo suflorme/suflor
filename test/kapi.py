@@ -5,6 +5,7 @@
 # gün içi önerinin ön denetimi (toplanti-sonrasi.py _pro_engel), beta belirteç sayımı (beta-veri.py _beta_belirtec). Birim: bölümler yalıtılmış ad alanında, sahte Brifing.app
 # (subprocess sahte), sahte saat; gerçek claude çağrılmaz, ağ yok. Kurgu veri.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kapi.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, secrets, shutil, subprocess as _sp, sys, tempfile, threading, time, types
 sys.dont_write_bytecode = True; os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -63,7 +64,7 @@ def kur(ad, ayar=None, bolumler=("kapi.py",), eylem=True, degerlendir=False):
     sp = types.SimpleNamespace(run=run, TimeoutExpired=_sp.TimeoutExpired)
     def beyin_tek(is_, sec, istem, json_kip=False, sistem=None, zaman=180):
         durum["beyin_tek"] += 1; return "başka sağlayıcı cevabı", {"hata": False}
-    ns = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "secrets": secrets, "subprocess": sp, "AYAR": dict(ayar or {}), "BASE": d, "LOCK": lock, "write": write,
+    ns = {**ESZ, "os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "secrets": secrets, "subprocess": sp, "AYAR": dict(ayar or {}), "BASE": d, "LOCK": lock, "write": write,
           "SOHBET": {"acik": False}, "_KS": {"tur": None, "son": 0}, "print": lambda *a, **k: None, "_t": lambda tr, en: tr,
           "gizli_acik": lambda: durum["gizli"], "toplanti_var": lambda: durum["toplanti"], "aktif_dosya": lambda: None, "sessiz_acik": lambda: durum["sessiz"],
           "calisma_saatleri": lambda: ({0, 1, 2, 3, 4}, 540, 1080), "BEYIN": Beyin, "BRIFING_APP": app, "claude_yolu": lambda: durum["claude"], "claude_yalin": lambda: False,

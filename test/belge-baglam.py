@@ -3,6 +3,7 @@
 # her soruda kısa blok (kısa belgede metin, uzunda dosya yolu + "önce belgede ara" talimatı), okunamazsa "uydurma" uyarısı, gizli kipte yok, bir kez çevrilir.
 # Kurgu belge (cupsfilter), gerçek PDFKit (swift), Docling yok (_onara_mod stub). Süreç/ağ/Claude yok (~10 sn):
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/belge-baglam.py
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import os, re, shutil, subprocess, sys, tempfile, threading, time
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
@@ -12,7 +13,7 @@ def ok(ad, k):
 if not os.path.exists("/usr/bin/swift") or not os.path.exists("/usr/sbin/cupsfilter"): sys.exit("atlandı: swift ya da cupsfilter yok")
 kod = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
 T = tempfile.mkdtemp(prefix="belge-"); KAYNAK = []; GIZLI = [False]
-ad = {"os": os, "re": re, "time": time, "threading": threading, "sys": sys, "AYAR": {}, "BASE": os.path.join(T, "canli"), "_t": lambda a, b: a,
+ad = {**ESZ, "os": os, "re": re, "time": time, "threading": threading, "sys": sys, "AYAR": {}, "BASE": os.path.join(T, "canli"), "_t": lambda a, b: a,
       "baglam_oku": lambda: list(KAYNAK), "gizli_acik": lambda: GIZLI[0], "_onara_mod": lambda: None}
 exec(kod[kod.index("import hashlib, subprocess\nBELGE_DOGRUDAN"):kod.index("def konus_baglam(")], ad)
 blok = ad["belge_baglam"]

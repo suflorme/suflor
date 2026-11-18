@@ -3,6 +3,7 @@
 # evet → brifing çağrısı, "toplantıyı aç", gizli toplantı yok, ayar kapalı. Birim kısmı bölümü sahte ad alanında çalıştırır (relay yok); sonunda yalıtılmış aktarıcıda
 # /status alanı ve POST /toplanti-hatirlat. Kurgu veri (gerçek kişi yok); gerçek claude çağrılmaz, ses çalınmaz (seslendir sahte), canlı aktarıcıya dokunulmaz.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/toplanti-hatirlat.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, KOD)
@@ -23,7 +24,7 @@ KM = open(os.path.join(KOD, "aktarici", "kisi-modeli.py"), encoding="utf-8").rea
 SESLER, BILDIR = [], []
 def ns_kur(olaylar, ayar=None, **ek):
     tam = {e["id"]: e for e in olaylar}
-    ns = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": dict({"ad": "Deniz T"}, **(ayar or {})), "BASE": T, "print": lambda *a, **k: None,
+    ns = {**ESZ, "os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": dict({"ad": "Deniz T"}, **(ayar or {})), "BASE": T, "print": lambda *a, **k: None,
           "_t": lambda tr, en: tr, "ARAYUZ_DILI": "tr", "gizli_acik": lambda: False, "gizli_red": lambda: {"ok": False, "gizli": True},
           "bildirim": lambda *a, **k: BILDIR.append((a, k)), "seslendir": lambda m, **k: SESLER.append(m) or True,
           "toplanti_var": lambda: False, "toplanti_acik": lambda: False, "toplanti_durum": lambda: "bos", "sessiz_acik": lambda: False, "SOHBET": {"acik": False}, "_KS": {"tur": None},

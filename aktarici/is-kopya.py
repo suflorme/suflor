@@ -32,9 +32,7 @@ def ik_oku():
 def ik_yaz(d):
     d = dict(d, taranan=d["taranan"][-IK_TARANAN_EN_COK:], ayri=d["ayri"][-IK_AYRI_EN_COK:], sorular=d["sorular"][-IK_SORU_EN_COK:], birlesen=d["birlesen"][-IK_BIRLESEN_EN_COK:])
     try:
-        fd = os.open(_ik_yol() + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False)
-        os.replace(_ik_yol() + ".tmp", _ik_yol())
+        dosya_yaz_esz(_ik_yol(), d, 0o600, ensure_ascii=False)
     except OSError as e: print(f"İŞ KOPYA: durum yazılamadı ({e.__class__.__name__})")
 def _ik_kisa(x, n): x = " ".join(str(x or "").split()); return x if len(x) <= n else x[:n - 1].rstrip() + "…"
 def _ik_sira(x):  # YENİ/ESKİ ayrımı: toplantı tarihi, eşitse yerel kimlik numarası

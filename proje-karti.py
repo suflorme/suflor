@@ -43,6 +43,23 @@ SEMA_VT = '{"ozet": "belgenin 1-2 cümlelik özeti", "sozluk": [{"terim": "", "a
 OZET_ISTEM = """Aşağıda bir projenin belgelerinin tek tek özetleri var (en yeniden eskiye). Bunlardan projenin 5-8 cümlelik genel özetini yaz:
 ne yapılıyor, kimlerle, hangi aşamada, öne çıkan konular. Yalnız özetlerde yazana dayan, yorum ve öneri ekleme. Yalnız özet metnini yaz."""
 
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def n(t): return " ".join(B.kelimeler(str(t or "")))
 def kisi_anahtar(ad): return " ".join(w for w in B.kelimeler(str(ad or "")) if w not in UNVAN)
 
@@ -111,8 +128,7 @@ def belge_cikar(yol, metin, model, vt_kipi):
         return {"hata": hata}, toplam, False
     o = {k: v for k, v in o.items() if k in ("ozet", "kisiler", "kurumlar", "kararlar", "tarihler", "acik_isler", "sozluk")}
     os.makedirs(os.path.dirname(y), exist_ok=True)
-    with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(o, f, ensure_ascii=False)
-    os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+    dosya_yaz_esz(y, o, 0o600, ensure_ascii=False)
     return o, toplam, False
 
 # --- Birleştirme ------------------------------------------------------------------------------------------------------
@@ -253,8 +269,7 @@ def cikar(sinir=SINIR, model=None, paralel=4, tahmin=False, sessiz=True, ilerlem
         taslak["veritabani"] = vt_oku()
         for bol in ("kisiler", "kararlar", "tarihler", "acik_isler", "kurumlar"): taslak[bol] = []
     os.makedirs(UYG, exist_ok=True)
-    with open(TASLAK + ".tmp", "w", encoding="utf-8") as f: json.dump(taslak, f, ensure_ascii=False, indent=1)
-    os.chmod(TASLAK + ".tmp", 0o600); os.replace(TASLAK + ".tmp", TASLAK)
+    dosya_yaz_esz(TASLAK, taslak, 0o600, ensure_ascii=False, indent=1)
     return taslak
 
 def ozet_satiri(k):
@@ -270,8 +285,7 @@ def ozet_satiri(k):
 def onayla(taslak=None, kim="kullanici", terimler=None):  # terimler: sihirbazın E ekranında kullanıcının seçtiği sözlük terimleri (None: kurala göre)
     k = taslak or json.load(open(TASLAK, encoding="utf-8"))
     k = dict(k, onay={"t": int(time.time()), "kim": kim})
-    with open(KART + ".tmp", "w", encoding="utf-8") as f: json.dump(k, f, ensure_ascii=False, indent=1)
-    os.chmod(KART + ".tmp", 0o600); os.replace(KART + ".tmp", KART)
+    dosya_yaz_esz(KART, k, 0o600, ensure_ascii=False, indent=1)
     with open(GECMIS, "a", encoding="utf-8") as f: f.write(json.dumps({"t": k["onay"]["t"], "kim": kim, "belge": k["belge"], "kisi": len(k["kisiler"]), "sozluk": len(k["sozluk"])}) + "\n")
     duz_yol = {y for y in {s[0] for m in k.get("sozluk") or [] for s in m.get("kaynaklar") or []} if y.count("/") <= 1 and DUZENLI_RX.match(os.path.basename(y))}
     eklenen = sozluge_aktar(k.get("sozluk") or [], duz_yol, terimler)
@@ -302,8 +316,7 @@ def sozluge_aktar(maddeler, duz_yol=frozenset(), terimler=None):
             var.add(n(m["terim"])); eklenen += 1
     if eklenen:
         os.makedirs(os.path.dirname(SOZLUK), exist_ok=True)
-        with open(SOZLUK + ".tmp", "w", encoding="utf-8") as f: json.dump(s, f, ensure_ascii=False, indent=1)
-        os.replace(SOZLUK + ".tmp", SOZLUK)
+        dosya_yaz_esz(SOZLUK, s, ensure_ascii=False, indent=1)
     return eklenen
 
 # K4 (Faz 11 Aşama 2): proje notu Suflor'un kendi dosyası — <uygulama>/proje-notu.md (0600). Kullanıcının klasörüne (CLAUDE.md) yazılmaz; hangi yapay zekâ
@@ -311,9 +324,8 @@ def sozluge_aktar(maddeler, duz_yol=frozenset(), terimler=None):
 # tc proje-notu bir kez buraya kopyalar (CLAUDE.md'ye dokunulmaz).
 NOT_BASLIK = "## Proje kartı (taslak)"; PROJE_NOTU = os.path.join(UYG, "proje-notu.md")
 def _not_yaz(metin):
-    os.makedirs(UYG, exist_ok=True); fd = os.open(PROJE_NOTU + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f: f.write(metin)
-    os.chmod(PROJE_NOTU + ".tmp", 0o600); os.replace(PROJE_NOTU + ".tmp", PROJE_NOTU)
+    os.makedirs(UYG, exist_ok=True)
+    dosya_yaz_esz(PROJE_NOTU, metin, 0o600)
 def proje_notu(k):
     satir = [NOT_BASLIK, f"_Suflor.me proje kartından ({datetime.date.today().isoformat()}); onaylı kart uygulama klasöründe._", ""]
     if k.get("ozet"): satir += [k["ozet"], ""]

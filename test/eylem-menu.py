@@ -4,6 +4,7 @@
 # hiçbir şey gönderilmez, ata + kimlik e-postası, gündem taslağıyla tutarlılık, «asistana sor» menüde (marvin; eski tek çağrı «claude» eylemi kalktı), kayda yorum (asistan notu), aktarıcı ucu (sahte takvim).
 # Asistana sor'un paketi ve turu: test/marvin-kayit.py.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/eylem-menu.py      (~3 sn; ağ, Claude, aktarıcı ve gerçek veri yok)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, sqlite3, sys, tempfile, time, urllib.parse
 sys.dont_write_bytecode = True; KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, KOD)
 T = tempfile.mkdtemp(prefix="suflor-eylemmenu-"); AY = os.path.join(T, "ayar.json")
@@ -128,7 +129,7 @@ bak("kayit_eylem_islem: gizli ve bozuk girdi", ns["kayit_eylem_islem"]({"id": GI
 bak("kayit_eylem_islem: yazan kullanıcı (ad:…), kaynak eylem", db(C).execute("SELECT yazan, kaynak FROM olay WHERE tur = 'ertelendi' ORDER BY saat DESC LIMIT 1").fetchone() == ("ad:Ayşe Deneme", "eylem"))
 # --- kayıt veritabanı adresleri → kimlik modülü (/vt-bellek kisi_adres; aktarici/sozluk-ogren.py vt_bellek_al) ---
 import collections, hashlib, threading
-ns2 = {"re": re, "os": os, "json": json, "time": time, "collections": collections, "hashlib": hashlib, "threading": threading, "AYAR": {"ad": "Ayşe Deneme"}, "BASE": C, "kisi_bul": lambda ad: {"durum": "ok", "kisiler": []},
+ns2 = {**ESZ, "re": re, "os": os, "json": json, "time": time, "collections": collections, "hashlib": hashlib, "threading": threading, "AYAR": {"ad": "Ayşe Deneme"}, "BASE": C, "kisi_bul": lambda ad: {"durum": "ok", "kisiler": []},
        "TAKVIM_TAM": {}, "TAKVIM_GEC": {"olaylar": [], "pay": []}}
 exec(compile(open(os.path.join(KOD, "aktarici", "kimlik.py"), encoding="utf-8").read(), "kimlik.py", "exec"), ns2)
 try:

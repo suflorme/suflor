@@ -48,12 +48,28 @@ def sh(*c, zaman=20):
 def oku_json(yol, vars_=None):
     try: return json.load(open(yol, encoding="utf-8"))
     except Exception: return vars_ if vars_ is not None else {}
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 _YAZ = threading.RLock()
 def yaz_json(yol, d):
     with _YAZ:  # sihirbaz art arda kaydeder; aynı geçici dosyaya iki iş parçacığı yazmasın
-        os.makedirs(os.path.dirname(yol), exist_ok=True); tmp = f"{yol}.{os.getpid()}.{threading.get_ident()}.tmp"
-        with open(tmp, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, yol)
+        os.makedirs(os.path.dirname(yol), exist_ok=True)
+        dosya_yaz_esz(yol, d, ensure_ascii=False, indent=2)
 def ayar(): return oku_json(AYAR_YOL)
 def ayar_degistir(fn):  # ayar.json'u kilitli oku-değiştir-yaz: aktarıcı (relay.py ayar_yaz) da aynı kilidi alır, iki süreç birbirinin değişikliğini ezmez
     import fcntl
@@ -270,9 +286,8 @@ def mesgul():  # v0.77.4 (18 Ekim): aktarici-kur.command öncesi — kurulum akt
 YB_BEKLEYEN = "yeniden-baslat-bekliyor.json"; YB_PLANLI = "planli-acilis.json"
 def _yb_yaz(ad, neden):
     try:
-        d = yollar()["uygulama"]; os.makedirs(d, exist_ok=True); fp = os.path.join(d, ad); gec = fp + ".tmp"
-        with open(gec, "w", encoding="utf-8") as f: json.dump({"t": round(time.time()), "neden": neden}, f)
-        os.replace(gec, fp); return True
+        d = yollar()["uygulama"]; os.makedirs(d, exist_ok=True); fp = os.path.join(d, ad)
+        dosya_yaz_esz(fp, {"t": round(time.time()), "neden": neden}); return True
     except OSError: return False
 def planli_isaretle(neden):  # neden: ayar | ses | kurulum | guncelleme | bekleyen
     if DENEME: return False
@@ -1383,8 +1398,7 @@ def _derleme_kaydi(dizin, ikili_ad, sha=None):  # dizin: kaydın klasörü (uygu
     if sha is None: return d.get(ikili_ad)
     d[ikili_ad] = sha
     try:
-        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(d, f, indent=1)
-        os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, d, indent=1)
     except OSError: pass
 def derle(uyg, kaynak, ikili_ad, plist, kayit_dizin=None):  # Swift yardımcısı: kaynak değiştiyse (ya da ikili yoksa) derlenir; True = yeni derlendi
     ikili = os.path.join(uyg, "Contents", "MacOS", ikili_ad); kay = os.path.join(KOD, kaynak); kd = kayit_dizin or os.path.dirname(uyg)

@@ -2,6 +2,7 @@
 # Kimlik (A1, aktarici/kimlik.py): ad → e-posta eşlemesi — Türkçe harf katlama, ilk ad/tam ad/baş harf, belirsizlikte eşlenmedi + adaylar, kaynak sırası,
 # elle düzeltme, kimlik_birlesti, önbellek, eşlenemeyen listesi. Yalıtılmış: geçici klasör, sahte takvim ve sahte kisi_bul; ağ, Kişiler ve gerçek veri yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kimlik.py
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import json, os, re, shutil, sqlite3, stat, sys, tempfile, time, datetime
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); HATA = []
@@ -11,7 +12,7 @@ AT = chr(64)  # tarama düz e-posta görmesin
 AYAR = {"ad": "Kemal Duru", "eposta_adres": "Kemal.Duru" + AT + "firma.com"}
 KISI = {}; CAGRI = []
 def kisi_bul(ad): CAGRI.append(ad); return next((v for k, v in KISI.items() if k.lower() == ad.lower()), {"durum": "ok", "kisiler": []})
-ns = {"re": re, "os": os, "json": json, "time": time, "AYAR": AYAR, "BASE": T, "kisi_bul": kisi_bul,
+ns = {**ESZ, "re": re, "os": os, "json": json, "time": time, "AYAR": AYAR, "BASE": T, "kisi_bul": kisi_bul,
       "TAKVIM_TAM": {}, "TAKVIM_GEC": {"olaylar": [], "pay": []}}
 src = open(os.path.join(KOD, "aktarici", "kimlik.py"), encoding="utf-8").read(); exec(compile(src, "kimlik.py", "exec"), ns)
 def taz(): ns["kimlik_takvim_sifirla"]()

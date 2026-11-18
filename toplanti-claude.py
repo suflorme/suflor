@@ -25,6 +25,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # hesap başına ayar (relay.py ile aynı kural): ~/Library/Application Support/Suflor/ayar.json; yoksa varsayılanlar
 AYAR_YOL = os.environ.get("SUFLOR_AYAR") or os.path.expanduser("~/Library/Application Support/Suflor/ayar.json")  # SUFLOR_AYAR: deneme için
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def ayar_oku():
     v = {"alan": "Suflor", "ad": "", "port": 8765, "uygulama": "~/Library/Application Support/Suflor", "proje": "~/Suflor", "ortak": "/Users/Shared/Suflor",
          "sozluk_kaynagi": None}
@@ -379,8 +396,8 @@ def sozluk_cmd():
     try: d = json.load(open(fp, encoding="utf-8"))
     except FileNotFoundError: d = {"surum": 1, "terimler": []}
     if A.birlestir:
-        d = sozluk_birlestir(d); tmp = fp + ".tmp"
-        json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, fp)
+        d = sozluk_birlestir(d)
+        dosya_yaz_esz(fp, d, ensure_ascii=False, indent=1)
         say = {}
         for t in d["terimler"]: say[t["kip"]] = say.get(t["kip"], 0) + len(t["yanlis"])
         print(f"sözlük kuruldu: {len(d['terimler'])} terim · biçim {say} · vendor {len(d['vendor'])} · kişi notu {len(d['kisiler'])}")
@@ -393,8 +410,8 @@ def sozluk_cmd():
         if y not in t["yanlis"]: t["yanlis"].append(y)
         d["terimler"] = elle_oncelik([x for x in d["terimler"] if not elle_mi(x)], [x for x in d["terimler"] if elle_mi(x)]) \
             + [x for x in d["terimler"] if elle_mi(x)]
-        d["guncelleme"] = datetime.date.today().isoformat(); tmp = fp + ".tmp"
-        json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, fp)
+        d["guncelleme"] = datetime.date.today().isoformat()
+        dosya_yaz_esz(fp, d, ensure_ascii=False, indent=1)
         print(f"eklendi: {y} → {dg} ({kip}{': ' + ', '.join(bag) if bag else ''})")
         try:
             r = _yapi().kisi_es_sozluk_ekle(A.dir, y, dg)  # yanlış biçim grafta kişi adıysa eş ada da girer
@@ -483,7 +500,7 @@ def acik_arsivle(sec, baslik=""):
     with open(os.path.join(A.dir, "acik-arsiv.jsonl"), "a", encoding="utf-8") as f:
         for q in git: f.write(json.dumps(dict(q, arsiv_at=simdi(), toplanti=q.get("toplanti") or q.get("baslik") or baslik), ensure_ascii=False) + "\n")
     d["sorular"] = [q for q in qs if not sec(q)]
-    tmp = ACIK_FP() + ".tmp"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, ACIK_FP())
+    dosya_yaz_esz(ACIK_FP(), d, ensure_ascii=False, indent=1)
     return git
 def acik_cmd():
     d = acik_yukle(); qs = d.setdefault("sorular", [])
@@ -504,7 +521,7 @@ def acik_cmd():
         if not q: sys.exit(f"acik.json'da {A.deger} yok")
         q["durum"] = A.durum; q["kapandi"] = simdi()
     if A.islem != "liste":
-        tmp = ACIK_FP() + ".tmp"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, ACIK_FP())
+        dosya_yaz_esz(ACIK_FP(), d, ensure_ascii=False, indent=1)
     for q in qs:
         if A.islem == "liste" or q is qs[-1] or q.get("id") == A.deger:
             print(f"{q['id']} [{q.get('durum')}] {q.get('metin')}" + (f" — {q['kim']}" if q.get("kim") else "") + (f"   tetik: {', '.join(q['tetik'])}" if q.get("tetik") else ""))
@@ -874,8 +891,7 @@ def _vt_mt(): return _VTB.degisim_zamani()  # WAL kipinde .db ile -wal'ın en ye
 def _vt_mt_yaz(dosya):
     try:
         y = os.path.join(dosya, VT_MT_DOSYA)
-        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"mt": _vt_mt(), "kontrol": round(time.time())}, f)
-        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, {"mt": _vt_mt(), "kontrol": round(time.time())}, 0o600)
     except OSError: pass
 # 3 Kasım (sözlük 2. aşama): kişi adları (ayar veritabani.kisiler, ilk sütun virgüllü) ve öğrenen sözlüğün
 # terimleri (veritabani.terimler; yoksa VT_TERIMLER_SORGU — yalnız terim + tür, takma adın bağlamı yalnız süzgeçte) dosyaya yazılmaz: aktarıcıya
@@ -910,8 +926,7 @@ def _vt_kisi_adres_yaz(dosya):  # aktarıcının e-posta seçimi için: "Ayla'da
     if not kayit: return
     try:
         y = os.path.join(dosya, VT_KISI_ADRES_DOSYA)
-        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"kisiler": kayit, "t": round(time.time())}, f, ensure_ascii=False)
-        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, {"kisiler": kayit, "t": round(time.time())}, 0o600, ensure_ascii=False)
     except OSError: pass
 VT_GOREV_DOSYA = "vt-gorevler.json"  # v0.202.2: belgeden atama için açık işler (ayar veritabani.gorevler: iş, sahip, vade, konum) — aktarıcı Masaüstü'ndeki veritabanını okuyamaz
 def _vt_gorev_yaz(dosya):
@@ -919,8 +934,7 @@ def _vt_gorev_yaz(dosya):
     satir = [[("" if x is None else str(x)) for x in r] for r in vt_sorgu("gorevler")[:500]]
     try:
         y = os.path.join(dosya, VT_GOREV_DOSYA)
-        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump({"satirlar": satir, "t": round(time.time())}, f, ensure_ascii=False)
-        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, {"satirlar": satir, "t": round(time.time())}, 0o600, ensure_ascii=False)
     except OSError: pass
 def _vt_onbellek(dosya, guncelle=None, yenile=False):
     y = os.path.join(dosya, VT_SONUC_ONBELLEK)
@@ -936,8 +950,7 @@ def _vt_onbellek(dosya, guncelle=None, yenile=False):
             r["kontrol"] = simdi
     ob = dict(list(ob.items())[-VT_SONUC_EN_COK:])
     try:
-        with open(y + ".tmp", "w", encoding="utf-8") as f: json.dump(ob, f, ensure_ascii=False)
-        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, ob, 0o600, ensure_ascii=False)
     except OSError: pass
 # --- Toplantı oturumu maliyeti (v0.57.0) --------------------------------------------------------------------------------------------------
 # Kaynak: ~/.claude/projects/<proje klasörü>/*.jsonl — ilk kullanıcı iletisi /toplanti olan oturum. Her API cevabı içerik bloğu başına satır yazar (aynı message.id):
@@ -1041,8 +1054,7 @@ def _vt_sema_yaz(dosya):
         try: eski = open(y, encoding="utf-8").read()
         except OSError: eski = None
         if m == eski: return
-        with open(y + ".tmp", "w", encoding="utf-8") as f: f.write(m)
-        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, m, 0o600)
     except (VtHata, OSError): pass
 def vt_izle_cmd():
     if not VT.get("yol"): print("kayıt veritabanı ayarlı değil (ayar veritabani.yol)"); return
@@ -1062,8 +1074,7 @@ def vt_mcp_cmd():
     yaz = lambda o: (sys.stdout.write(json.dumps(o, ensure_ascii=False) + "\n"), sys.stdout.flush())
     try:  # v0.55.2: her açılışta tablo yapısını önbelleğe yaz (bu süreç Claude'un altında, veritabanını okuyabilir)
         m = vt_sema_metin(); y = os.path.join(A.dir, VT_SEMA_ONBELLEK)
-        with open(y + ".tmp", "w", encoding="utf-8") as f: f.write(m)
-        os.chmod(y + ".tmp", 0o600); os.replace(y + ".tmp", y)
+        dosya_yaz_esz(y, m, 0o600)
     except (VtHata, OSError): pass
     _vt_mt_yaz(A.dir)  # açılışta hemen (denetim iş parçacığını beklemeden)
     _vt_bellek_gonder(); _vt_kisi_adres_yaz(A.dir); _vt_gorev_yaz(A.dir)
@@ -1204,7 +1215,7 @@ def gundem_kopya(md, agj):
     if not agj: return
     try:
         os.makedirs(os.path.join(A.dir, "gundemler"), exist_ok=True); fp = os.path.join(A.dir, "gundemler", md[:-3] + ".json")
-        json.dump(agj, open(fp + ".tmp", "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(fp + ".tmp", fp)
+        dosya_yaz_esz(fp, agj, ensure_ascii=False, indent=1)
     except OSError: pass
 
 # --- Kesinlik ölçümü (kullanıcı, 2 Ekim; toplantı sonu `sonuc`) ------------------------------------------------------------
@@ -1367,7 +1378,7 @@ def izle():
             bg_bil.add(k["id"])
         if yeni or bg_bil - {k.get("id") for k in liste}:
             bg_bil.intersection_update({k.get("id") for k in liste})  # arşive giden kaynakların kimliği listeden düşer
-            try: tmp = bg_bil_fp + ".tmp"; json.dump(sorted(bg_bil), open(tmp, "w", encoding="utf-8")); os.replace(tmp, bg_bil_fp)
+            try: dosya_yaz_esz(bg_bil_fp, sorted(bg_bil))
             except OSError: pass
     sessiz_on = gizli_on = False; s = {}  # s: son /status (Ne diyeyim? gündem işaretlerini buradan okur)
     sure_ilk = True; sure_esik = set(); kayma_son = 0.0; pay_son = time.time() - 300  # PAY ilk 5 dk susar (yeniden kurulumda tekrar etmesin)
@@ -2020,7 +2031,7 @@ def kanit_cmd():
     if A.n is not None and A.aciklama is not None:
         if not any(r.get("n") == A.n for r in ks): sys.exit(f"{md} içinde kanıt {A.n} yok")
         ac[str(A.n)] = " ".join(A.aciklama.split())[:300]; os.makedirs(os.path.dirname(ac_fp), exist_ok=True)
-        tmp = ac_fp + ".tmp"; json.dump(ac, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, ac_fp)
+        dosya_yaz_esz(ac_fp, ac, ensure_ascii=False, indent=1)
     print(f"{md}: {len(ks)} kanıt")
     for r in ks:
         if A.n is None or r.get("n") == A.n:
@@ -2488,9 +2499,7 @@ def dokum_yaz(sat, baslik, kaynak, saat_notu=""):  # dokum: .md + .vtt → <proj
         V.extend([f"{k}", f"{vz(x['t'] - t0)} --> {vz(max(x['t1'], x['t'] + 0.5) - t0)}", f"<v {esc(x['kim'])}>{esc(x['metin'])}</v>", ""])
     kok = dokum_kok(A.kim or baslik, bas)
     for y, m in ((kok + ".md", metin_md), (kok + ".vtt", "\n".join(V))):
-        tmp = y + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f: f.write(m)
-        os.replace(tmp, y)
+        dosya_yaz_esz(y, m)
     print(f"Döküm yazıldı: {kok}.md · .vtt — {len(met)} satır, {round((t1 - t0) / 60)} dk, " + ", ".join(f"{k} {n}" for k, n in kisi.items()))
 
 # --- Sunulan ekranlar: paylaşım sürerken eklentinin kendiliğinden aldığı görüntüler (aktarıcı YAPARKEN, kaynak oto) + elle kanıtlar -----------------
@@ -2739,7 +2748,7 @@ def tazi_cmd():  # toplantı oturumunun bilgi kartı için (kural: toplanti-otur
     nk = " ".join(kucuk(ad).split())
     if nk in d["adlar"]: print(f"«{ad}» bu toplantıda zaten soruldu: ikinci kart yazma."); return
     d["adlar"] = (d["adlar"] + [nk])[-60:]
-    try: tmp = yol + ".tmp"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, yol)
+    try: dosya_yaz_esz(yol, d, ensure_ascii=False)
     except OSError: pass
     tazi, neden_ = tazi_yukle(st)
     if neden_ == "gizli": print("gizli toplantı: Tazı kartı yok (hiçbir şey çalıştırılmadı)"); return
@@ -2755,7 +2764,7 @@ def tazi_cmd():  # toplantı oturumunun bilgi kartı için (kural: toplanti-otur
     iz = bool(kr and kr.get("durum") in ("basladi", "bekliyor"))
     if iz:  # yeni tarama başladı: ad sayılmaz, ~30 sn sonra aynı komut bir kez daha çalıştırılabilsin (dosya oluşmuş olur)
         d["adlar"] = [x for x in d["adlar"] if x != nk]
-        try: tmp = yol + ".tmp"; json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False); os.replace(tmp, yol)
+        try: dosya_yaz_esz(yol, d, ensure_ascii=False)
         except OSError: pass
     ek = " Tazı iz sürüyor: ~30 sn sonra aynı komutu bir kez daha çalıştır, dosya oluşmuşsa kartı ondan yaz; beklemeden kart gerekirse aşağıdaki web yolunu kullan." if iz else ""
     print(ek.strip() + (" " if ek else "") + f"Tazı'da dosya yok: {ad}. " + (f"Web araştırması açık: yalnız ad ve konuyla kısa bir açık kaynak araması yap (döküm alıntısı, iç sayı, toplantı içeriği arama metnine girmez); kartı «{etiket.split(' · ')[0]} · web» etiketiyle yaz, kaynağı ve tarihi an, tek kaynak = 'doğrulanmadı'."
@@ -2977,8 +2986,7 @@ def gelen_cmd():
     print("[/Suflor gelen kutusu]")
     if not A.hepsi:
         try:
-            with open(isaret + ".tmp", "w", encoding="utf-8") as f: f.write(str(yeni[-1].get("id") or ""))
-            os.replace(isaret + ".tmp", isaret)
+            dosya_yaz_esz(isaret, str(yeni[-1].get("id") or ""))
         except OSError: pass
 def geri_bildirim_cmd():
     d = GB_DIR(); kayit = os.path.expanduser("~/Library/Application Support/Suflor/okunan-raporlar.json")

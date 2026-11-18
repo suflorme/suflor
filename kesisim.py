@@ -69,11 +69,26 @@ def _json_oku(yol, varsayilan):
     try:
         with open(yol, encoding="utf-8") as f: return json.load(f)
     except Exception: return varsayilan
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def _yaz_atomik(yol, metin):
     os.makedirs(os.path.dirname(yol) or ".", exist_ok=True)
-    t = yol + ".tmp"
-    with open(os.open(t, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f: f.write(metin)
-    os.replace(t, yol)
+    dosya_yaz_esz(yol, metin, 0o600)
 
 def gelistirici_mi(ayar):  # relay.py gelistirici_mi() ile aynı ölçüt: ayar gelistirici true ya da kod klasörü git klonu (SUFLOR_TEST_KOD deneme için)
     if (ayar or {}).get("gelistirici") is True: return True

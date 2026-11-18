@@ -39,9 +39,7 @@ def _kim_oku():
 def _kim_yaz(d):
     yol = _kim_yol(); d["olaylar"] = d["olaylar"][-100:]
     try:
-        fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=1)
-        os.replace(yol + ".tmp", yol); _KIM_DURUM.update(dosya=yol, mt=os.stat(yol).st_mtime, d=d)
+        dosya_yaz_esz(yol, d, 0o600, ensure_ascii=False, indent=1); _KIM_DURUM.update(dosya=yol, mt=os.stat(yol).st_mtime, d=d)
     except OSError as e: print(f"KİMLİK: kayıt yazılamadı ({e.__class__.__name__})"); _KIM_DURUM["d"] = None
 def _kim_simdi(): return time.strftime("%Y-%m-%dT%H:%M:%S")
 

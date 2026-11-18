@@ -3,6 +3,7 @@
 # eskilik (14 saat); biçim tanınmadı; /izleme anahtarlı ve sade; ayar yazımı (.json zorunlu); canli/izleme-ozet.md; takvim ↔ toplantı eşleşmesi (hazırlık adayları);
 # Konuş işareti gizli toplantıda yok. Kurgu veri; yalıtılmış aktarıcı, ağ yok, gerçek claude yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/izleme.py      (kaldı → çıkış 1; ~5 sn)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8772)
@@ -91,7 +92,7 @@ finally:
     except subprocess.TimeoutExpired: r.kill()
 
 # --- birim kısmı: izleme.py bir ad alanında; takvim eşleşmesi ve Konuş işareti (gizli toplantıda yok) ---
-ns = {"os": os, "json": json, "re": re, "datetime": datetime, "print": lambda *a, **k: None, "_t": lambda tr, en: tr, "BASE": canli, "AYAR": {}, "TAKVIM_TAM": {}, "GIZLI": {"acik": False}}
+ns = {**ESZ, "os": os, "json": json, "re": re, "datetime": datetime, "print": lambda *a, **k: None, "_t": lambda tr, en: tr, "BASE": canli, "AYAR": {}, "TAKVIM_TAM": {}, "GIZLI": {"acik": False}}
 ns["gizli_acik"] = lambda: ns["GIZLI"]["acik"]
 exec(compile(open(os.path.join(KOD, "aktarici", "izleme.py"), encoding="utf-8").read(), "izleme.py", "exec"), ns)
 yaz(veri()); ns["AYAR"].update(izleme_dosyasi=DOSYA)

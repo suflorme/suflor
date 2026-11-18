@@ -10,6 +10,26 @@ sys.dont_write_bytecode = True  # Masaüstü klasöründe __pycache__ (Chrome "_
 def bolum(ad):
     yol = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aktarici", ad + ".py")
     exec(compile(open(yol, encoding="utf-8").read(), yol, "exec"), globals())
+# Geçici dosyaya yaz + os.replace kalıbı (beta #45, #57): geçici ad süreç + iş parçacığı numaralı olmalı; sabit ad (fp + ".tmp") iki eşzamanlı yazımda aynı geçici
+# dosyayı paylaşır, önce biten os.replace'ten sonra ikincisi FileNotFoundError alır. Bölümler (aktarici/*.py) bu ad alanında çalıştığı için hepsinde görünür;
+# bölümler yüklenmeden önce tanımlı olmalı. icerik: str → metin, bytes → ikili, öbür türler json.dump(**jkw). izin: dosya izni (ör. 0o600). Hata olursa geçici dosya silinir, hata yeniden fırlar.
+def gecici_ad(fp): return f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):
+    tmp = gecici_ad(fp)
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 
 # hesap başına ayar — aynı Mac'te iki macOS hesabı (iş + kişisel) aynı anda açık; her biri kendi portu, veri
 # klasörü, proje klasörü ve adıyla. Dosya yoksa varsayılanlar. Modeller ve
@@ -565,14 +585,11 @@ def kanit(p):
         hdr = ""
         lst = STATE["kanitlar"].setdefault(key, []); n = len(lst) + 1; now = datetime.datetime.now()
         klasor = os.path.join(KANIT_DIR, key[:-3]); rel = f"kanit/{key[:-3]}/{now.strftime('%H%M%S')}-{n}.png"
-        fp = os.path.join(BASE, rel); tmp = fp + ".tmp"
+        fp = os.path.join(BASE, rel)
         try:
             os.makedirs(klasor, exist_ok=True)
-            with open(tmp, "wb") as f: f.write(b)
-            os.replace(tmp, fp)
+            dosya_yaz_esz(fp, b)
         except OSError as e:
-            try: os.remove(tmp)
-            except OSError: pass
             print(f"KANIT: yazılamadı ({e.__class__.__name__}: {e.strerror})"); return {"ok": False, "err": "diske yazılamadı"}
         pay = p.get("paylasim") if isinstance(p.get("paylasim"), dict) else None
         try: olcek = float(pay["olcek"]) if pay else None
@@ -933,7 +950,7 @@ def _baglam_dosya():
 def baglam_oku(): return _baglam_dosya().get("kaynaklar", [])
 def baglam_yaz(liste, son=None):  # son: kimlik sayacı — arşivden sonra da artar (izle aynı kimliği "bildirildi" sanmasın)
     son = max([son or 0, _baglam_dosya().get("son", 0)] + [int(str(k.get("id"))[1:]) for k in liste if str(k.get("id", ""))[1:].isdigit()])
-    tmp = BAGLAM_FP() + ".tmp"; json.dump({"son": son, "kaynaklar": liste}, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, BAGLAM_FP())
+    dosya_yaz_esz(BAGLAM_FP(), {"son": son, "kaynaklar": liste}, ensure_ascii=False, indent=1)
 def baglam_yol(y):
     # yalnız ev klasöründeki (ya da bağlı diskteki) düz dosya; gizli klasör (.ssh gibi) ve gizli dosya değil
     t = os.path.realpath(os.path.expanduser(y.strip()))
@@ -1091,8 +1108,7 @@ def _hat_oku():
     except (OSError, ValueError): return None
 def _hat_yaz(h):
     try:
-        with open(HATIRLAT_YOL + ".tmp", "w", encoding="utf-8") as f: json.dump(h, f, ensure_ascii=False, indent=1)
-        os.replace(HATIRLAT_YOL + ".tmp", HATIRLAT_YOL)
+        dosya_yaz_esz(HATIRLAT_YOL, h, ensure_ascii=False, indent=1)
     except OSError as e: print(f"HATIRLATMA: yazılamadı ({e.__class__.__name__})")
 def hatirlat_view():
     h = _hat_oku()
@@ -1229,8 +1245,7 @@ def menu_baslat():
               + (["--masaustu-mic-kapali"] if AYAR.get("masaustu_mic") is False else []) + (["--kisayol-kapali"] if AYAR.get("kisayollar") is False else [])
               + (["--kisiler-ac"] if AYAR.get("masaustu_kisiler") is True else []) + (["--ortak-mik"] if AYAR.get("toplantiya_ses") is True else []))
         try:
-            with open(MENU_ARG + ".tmp", "w", encoding="utf-8") as f: json.dump(ma, f)
-            os.replace(MENU_ARG + ".tmp", MENU_ARG)
+            dosya_yaz_esz(MENU_ARG, ma)
         except OSError: pass
         subprocess.run(["open", "-g", "-a", MENU_APP, "--stdout", MENU_LOG, "--stderr", MENU_HATA_LOG, "--args"] + ma, capture_output=True, timeout=20)
         print("MENÜ: menü çubuğu uygulaması başlatıldı")
@@ -1430,8 +1445,7 @@ def disa_aktar_islem(p):  # POST /disa-aktar {"bicim": "csv"|"json"} (anahtarlı
     if not y: return {"ok": False, "err": "yapi.py yok"}
     try:
         metin, ad, n = y.disa_aktar(BASE, bicim); kl = os.path.join(BASE, "disa-aktar"); os.makedirs(kl, exist_ok=True); yol = os.path.join(kl, ad)
-        with open(yol + ".tmp", "w", encoding="utf-8") as f: f.write(metin)
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(yol, metin)
     except Exception as e: return {"ok": False, "err": _t(f"yazılamadı ({e.__class__.__name__})", f"could not write ({e.__class__.__name__})")}
     if not os.environ.get("SUFLOR_TEST_BASLAT"):
         try: subprocess.Popen(["open", "-R", yol], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -1666,22 +1680,19 @@ def son_ekle(p):
         kp = os.path.join(BASE, "ozetler", os.path.basename(ozet))
         try:
             os.makedirs(os.path.dirname(kp), exist_ok=True)
-            with open(kp + ".tmp", "w", encoding="utf-8") as f: f.write(p["metin"][:500000])
-            os.replace(kp + ".tmp", kp); r["kopya"] = kp
+            dosya_yaz_esz(kp, p["metin"][:500000]); r["kopya"] = kp
         except OSError as e: print(f"ÖZET: kopya yazılamadı ({e.__class__.__name__})")
     if isinstance(p.get("yapi"), dict) and isinstance(p["yapi"].get("maddeler"), list):  # S48 defter turu: toplantı defterine "Toplantı sonu" bölümü (defter.py)
         yp = os.path.join(BASE, "ozetler", os.path.basename(ozet)[:-3] + ".yapi.json")
         try:
             os.makedirs(os.path.dirname(yp), exist_ok=True)
-            with open(yp + ".tmp", "w", encoding="utf-8") as f: json.dump(p["yapi"], f, ensure_ascii=False)
-            os.replace(yp + ".tmp", yp); r["yapi"] = yp
+            dosya_yaz_esz(yp, p["yapi"], ensure_ascii=False); r["yapi"] = yp
         except (OSError, TypeError, ValueError) as e: print(f"ÖZET: yapı yazılamadı ({e.__class__.__name__})")
     if isinstance(p.get("harita"), str) and p["harita"].lstrip().startswith("<!doctype html>"):  # zihin haritası (toplanti-claude.py yapi)
         hp = os.path.join(BASE, "ozetler", os.path.basename(ozet)[:-3] + "-zihin-haritasi.html")
         try:
             os.makedirs(os.path.dirname(hp), exist_ok=True)
-            with open(hp + ".tmp", "w", encoding="utf-8") as f: f.write(p["harita"][:2000000])
-            os.replace(hp + ".tmp", hp); r["harita"] = hp
+            dosya_yaz_esz(hp, p["harita"][:2000000]); r["harita"] = hp
             if p.get("gorsel") in ("harita", "karar_is"): r["gorsel"] = p["gorsel"]  # 5 Kasım: panoda menü etiketi (Zihin haritası | Karar ve iş panosu)
         except OSError as e: print(f"ÖZET: harita yazılamadı ({e.__class__.__name__})")
     if "tazi_kayitlar" in globals() and isinstance(p.get("metin"), str) and not gizli_acik() and not re.search(r"(?i)gizli (?:toplantı|bölüm)", p["metin"][:300000]):  # 10 Kasım: özette geçen dış firma/kişi → Tazı'nın yerel dosyasından tek satır not (yalnız bu kayıtta, özet dosyasına yazılmaz; gizli toplantıda yok)
@@ -1860,9 +1871,7 @@ def ayar_yaz(deg):
                 if (k in ("eposta", "eposta_adres", "izleme_dosyasi", "izleme_ad", "kisilik", "kisilik_toplanti_disi", "kisilik_dis", "oto_haric", "takvim_paylasilan") and not v) or (k == "oto_toplanti" and v is True) or (k == "ses_motoru" and v == "mac") or (k == "ses_hizi" and v == "1.0") or (k == "tema" and v == "sistem"): a.pop(k, None)  # boş = varsayılan/tahmin
                 else: a[k] = v
             if "profil" in yeni: _profil_modul().profil_uygula(a, yeni["profil"])  # hafif: ayarda olmayan türetilenler yazılır; tam: yalnız türetilenler silinir
-            gec = f"{AYAR_YOL}.{os.getpid()}.tmp"
-            with open(gec, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
-            os.replace(gec, AYAR_YOL)
+            dosya_yaz_esz(AYAR_YOL, a, ensure_ascii=False, indent=1)
     except OSError as e: return {"ok": False, "err": e.__class__.__name__}
     for k, v in yeni.items():
         if k in a: AYAR[k] = v
@@ -1925,15 +1934,18 @@ def harita_pdf(r, posta=False):  # 5 Kasım (panogor): pano/harita belgesinin PD
     pdf = (hp[:-len("-zihin-haritasi.html")] if hp.endswith("-zihin-haritasi.html") else hp[:-5]) + "-pano.pdf"
     chrome = os.path.join(CHROME_APP, "Contents/MacOS/Google Chrome") if CHROME_APP else None
     if not chrome or not os.path.isfile(chrome): return {"ok": False, "err": _t("PDF için Google Chrome gerekir", "Google Chrome is needed for the PDF")}
-    prof = tempfile.mkdtemp(prefix="suflor-pdf-")
+    prof = tempfile.mkdtemp(prefix="suflor-pdf-"); pdft = gecici_ad(pdf)
     try:
         k = subprocess.run([chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--user-data-dir=" + prof, "--no-pdf-header-footer", "--virtual-time-budget=4000",
-                            "--print-to-pdf=" + pdf + ".tmp", "file://" + urllib.parse.quote(hp)], capture_output=True, text=True, timeout=45)
-        if not os.path.isfile(pdf + ".tmp") or os.path.getsize(pdf + ".tmp") < 500: return {"ok": False, "err": _t("PDF hazırlanamadı", "Couldn't prepare the PDF") + (": " + (k.stderr or "").strip()[-100:] if k.returncode else "")}
-        os.replace(pdf + ".tmp", pdf)
+                            "--print-to-pdf=" + pdft, "file://" + urllib.parse.quote(hp)], capture_output=True, text=True, timeout=45)
+        if not os.path.isfile(pdft) or os.path.getsize(pdft) < 500: return {"ok": False, "err": _t("PDF hazırlanamadı", "Couldn't prepare the PDF") + (": " + (k.stderr or "").strip()[-100:] if k.returncode else "")}
+        os.replace(pdft, pdf)
     except subprocess.TimeoutExpired: return {"ok": False, "err": _t("PDF hazırlanamadı (zaman aşımı)", "Couldn't prepare the PDF (timed out)")}
     except OSError as e: return {"ok": False, "err": e.__class__.__name__}
-    finally: shutil.rmtree(prof, ignore_errors=True)
+    finally:
+        shutil.rmtree(prof, ignore_errors=True)
+        try: os.remove(pdft)
+        except OSError: pass
     if not os.environ.get("SUFLOR_TEST_BASLAT"):
         try: subprocess.run(["pbcopy"], input=pdf, text=True, timeout=5)  # dosya yolu panoda
         except (OSError, subprocess.SubprocessError): pass
@@ -2048,7 +2060,7 @@ def kesisim_tur(simdi=None):  # → {"atlandi": neden} | {"bekliyor": neden} | c
     try: r = m.kos_ve_coz(BASE, AYAR, gizli_fn=gizli_acik, gelistirici=gelistirici_mi(), simdi=simdi, kuyruk_fn=kuyruk, **ek)
     except Exception as e: print(f"KESİŞİM: hata ({e.__class__.__name__}: {e})"); r = {"hata": e.__class__.__name__}
     if not r.get("atlandi") and not r.get("hata"): z["son_gun"] = bug
-    try: json.dump(z, open(yol + ".tmp", "w", encoding="utf-8")); os.replace(yol + ".tmp", yol)
+    try: dosya_yaz_esz(yol, z)
     except OSError: pass
     print("KESİŞİM: " + ("atlandı (" + str(r["atlandi"]) + ")" if r.get("atlandi") else "hata" if r.get("hata") else f"çözücü bitti — düzeltilen {r.get('duzeltilen')}, araştırılan {r.get('arastirilan')}, bırakılan {r.get('birakilan')}, çözülemeyen önemli {len(r.get('cozulemeyen_onemli') or [])}"))
     return r
@@ -2204,9 +2216,7 @@ def gundem_saat_tazele(simdi):
     except OSError: dun = False
     if not isinstance(a, dict) or (eski and eski > simdi.replace(tzinfo=None) and not dun): return
     a.update(baslangic=simdi.strftime("%H:%M"), bitis=(simdi + datetime.timedelta(minutes=30)).strftime("%H:%M"))
-    tmp = fp + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f: json.dump(a, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, fp); print(f"BAŞLAT: gündem saati tazelendi ({a['baslangic']}–{a['bitis']}; eski bitiş geçmişte)")
+    dosya_yaz_esz(fp, a, ensure_ascii=False, indent=1); print(f"BAŞLAT: gündem saati tazelendi ({a['baslangic']}–{a['bitis']}; eski bitiş geçmişte)")
 def hazir_yeni_konu(konu, simdi):
     # 30 Ekim beta: Başlat önceki toplantının 33 hazır kartını yükledi (hazir.json toplantıya bağlı değildi, izle dosyayı olduğu gibi okur; kartların "gundem" indeksi de
     # eski gündeme aitti). Gündem yeni konuyla yenilendiğinde hazir.json da arşive (canli/hazir-arsiv.jsonl) gider, yerine bu toplantının boş dosyası yazılır;
@@ -2218,20 +2228,11 @@ def hazir_yeni_konu(konu, simdi):
     try:
         if isinstance(h, dict) and h.get("kartlar"):
             with open(os.path.join(BASE, "hazir-arsiv.jsonl"), "a", encoding="utf-8") as f: f.write(json.dumps(dict(h, arsiv_at=simdi.isoformat(timespec="seconds")), ensure_ascii=False) + "\n")
-        tmp = fp + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f: json.dump({"toplanti": konu, "kartlar": []}, f, ensure_ascii=False)
-        os.replace(tmp, fp)
+        dosya_yaz_esz(fp, {"toplanti": konu, "kartlar": []}, ensure_ascii=False)
     except OSError: return False
     print(f"BAŞLAT: hazır kartlar yenilendi ({len(h.get('kartlar') or []) if isinstance(h, dict) else 0} kart eski toplantıdan; eskisi hazir-arsiv.jsonl)"); return True
 def _json_yaz_esz(fp, veri):  # beta #57 (17 Kasım): geçici dosya adı sabitti (fp + ".tmp"); iki eşzamanlı yazım aynı geçici dosyayı paylaşınca ikinci os.replace FileNotFoundError veriyordu (#45'teki yarış)
-    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
-    try:
-        with open(tmp, "w", encoding="utf-8") as f: json.dump(veri, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, fp)
-    except BaseException:
-        try: os.remove(tmp)
-        except OSError: pass
-        raise
+    dosya_yaz_esz(fp, veri, ensure_ascii=False, indent=1)  # genel yardımcı (dosyanın başında)
 def gundem_yeni_konu(konu, rol, dil, simdi, maddeler, bas=None, bit=None):
     # 19 Ekim test toplantısı: "test" konusuyla Başlat'a basılınca agenda.json önceki toplantının gündemiyle (15 madde) kaldı — toplantı oturumu gündem başlığı uyuşmazsa
     # kullanıcıya "mevcut mu, yeni mi" diye soruyor, o arada panoda eski gündem görünüyordu. Başlatılan konu gündem başlığından farklıysa eski gündem

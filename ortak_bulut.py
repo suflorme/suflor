@@ -48,11 +48,27 @@ def ayar_oku():
     try: v = json.load(open(ayar_yol(), encoding="utf-8"))
     except (OSError, ValueError): v = {}
     return v if isinstance(v, dict) else {}
+import threading
+def dosya_yaz_esz(fp, icerik, izin=None, **jkw):  # geçici ad süreç + iş parçacığı numaralı (beta #45/#57: sabit ".tmp" eşzamanlı yazımda FileNotFoundError verir); hata olursa geçici dosya silinir
+    tmp = f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        ac = dict(opener=lambda p, f: os.open(p, f, izin)) if izin is not None else {}
+        if isinstance(icerik, bytes):
+            with open(tmp, "wb", **ac) as f: f.write(icerik)
+        else:
+            with open(tmp, "w", encoding="utf-8", **ac) as f:
+                if isinstance(icerik, str): f.write(icerik)
+                else: json.dump(icerik, f, **jkw)
+        if izin is not None: os.chmod(tmp, izin)
+        os.replace(tmp, fp)
+    except BaseException:
+        try: os.remove(tmp)
+        except OSError: pass
+        raise
 def ayar_yaz(**kv):  # oku-değiştir-yaz; diğer anahtarlara dokunulmaz
     yol = ayar_yol(); v = ayar_oku(); v.update(kv)
-    os.makedirs(os.path.dirname(yol), exist_ok=True); fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(v, f, ensure_ascii=False, indent=1)
-    os.replace(yol + ".tmp", yol)
+    os.makedirs(os.path.dirname(yol), exist_ok=True)
+    dosya_yaz_esz(yol, v, 0o600, ensure_ascii=False, indent=1)
 def zincir_oku(oge):
     _koruma(); d = os.environ.get("SUFLOR_FS_ZINCIR_DIZIN")
     if d:

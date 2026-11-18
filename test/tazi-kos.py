@@ -4,6 +4,7 @@
 # /status tazi, toplanti-claude.py tazi komutu (kapalı/gizli/tarama başlatma) ve hazırlık bloğunda gizli denetimi; istemci davranışı (Tazı yok / hata / bozuk çıktı / zaman aşımı / önbellek).
 # Sahte Tazı hizmeti test/sahte-tazi.py (çağrıları günlüğe yazar); Tazı'nın gerçek kodu ve gerçek ağ yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/tazi-kos.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, shutil, subprocess, sys, tempfile, threading, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,7 +22,7 @@ def satirlar(): return [c for c in tum() if c["islem"] in ("aday_ekle", "tara")]
 
 # ---------- 1) birim ----------
 def ns_kur(ayar, **ek):
-    ns = {"os": os, "stat": __import__("stat"), "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "sys": sys, "AYAR": dict({"tazi_yol": SAHTE}, **ayar), "BASE": os.path.join(T, "b" + str(len(os.listdir(T)))),
+    ns = {**ESZ, "os": os, "stat": __import__("stat"), "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "sys": sys, "AYAR": dict({"tazi_yol": SAHTE}, **ayar), "BASE": os.path.join(T, "b" + str(len(os.listdir(T)))),
           "print": lambda *a, **k: LOGP.append(" ".join(str(x) for x in a)), "_t": lambda tr, en: tr, "gizli_acik": lambda: False, "toplanti_suruyor": lambda: False,
           "STATE": {}}
     os.makedirs(ns["BASE"], exist_ok=True); ns.update(ek)

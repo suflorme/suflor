@@ -26,8 +26,7 @@ def _that_oku():
 def _that_yaz():
     try:
         yol = os.path.join(BASE, THAT_DOSYA)
-        with open(yol + ".tmp", "w", encoding="utf-8") as f: json.dump({"yapildi": THAT["yapildi"]}, f, ensure_ascii=False)
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(yol, {"yapildi": THAT["yapildi"]}, ensure_ascii=False)
     except OSError: pass
 
 def _soz_sonuc_g(ref, sonuc):  # kullanıcı işlemini tek söz kapısına bildirir (soz-kapisi.py soz_sonuc); kapı yüklü değilse (yalıtılmış test) sessiz

@@ -678,8 +678,7 @@ def _kayit_degistir(yol, eski, yeni):  # tam bir eşleşmeyi değiştirir (geçi
     with open(yol, encoding="utf-8") as f: m = f.read()
     if m.count(eski) != 1: return False
     st = os.stat(yol)
-    with open(yol + ".tmp", "w", encoding="utf-8") as f: f.write(m.replace(eski, yeni, 1))
-    os.chmod(yol + ".tmp", st.st_mode & 0o777); os.replace(yol + ".tmp", yol); return True
+    dosya_yaz_esz(yol, m.replace(eski, yeni, 1), st.st_mode & 0o777); return True
 
 def kayit_uygula(is_):  # onaylanmış işi yapar (önce yeniden doğrular) → (True, ne yapıldı) ya da (False, neden)
     h, e = kayit_dogrula(is_["komut"], is_["arg"], gevsek=True)

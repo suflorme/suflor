@@ -90,9 +90,7 @@ def _kt_oku():
     _KT["yoksay"] = set(str(x) for x in v.get("yoksay") or []); _KT["bildirilen"] = {str(k): str(x) for k, x in (v.get("bildirilen") or {}).items()}
 def _kt_yaz():
     try:
-        yol = _kt_yol(); fd = os.open(yol + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump({"yoksay": sorted(_KT["yoksay"])[-500:], "bildirilen": dict(sorted(_KT["bildirilen"].items())[-300:])}, f, ensure_ascii=False)
-        os.replace(yol + ".tmp", yol)
+        dosya_yaz_esz(_kt_yol(), {"yoksay": sorted(_KT["yoksay"])[-500:], "bildirilen": dict(sorted(_KT["bildirilen"].items())[-300:])}, 0o600, ensure_ascii=False)
     except OSError: pass
 def _kt_anahtar(x): return "|".join((x["tarih"], x["tur"], _kt_fold(x.get("kisi")) or _kt_fold(x["metin"])))
 def kt_ham(yenile=False):  # → yardımcı çıktısı (10 dk önbellek) ya da {"durum": …}

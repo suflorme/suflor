@@ -2,6 +2,7 @@
 # Yaklaşan kişisel tarihler (S243; aktarici/kisisel-tarihler.py, takvim.swift --tarihler, relay /yaklasan-tarihler): sahte yardımcı çıktısı, izinsiz hâl, tekilleştirme,
 # tarih sınırları (29 Şubat, yıl geçişi), yoksay, kutlama taslağı (gönderim yok), hatırlatma zamanı, sesle "doğum gününü hatırlat". Swift çağrılmaz; yapay adlar, ağ yok.
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/kisisel-tarihler.py
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import os, re, sys, json, time, datetime, tempfile, urllib.parse, subprocess, threading
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); sys.dont_write_bytecode = True
 hatalar = []
@@ -12,7 +13,7 @@ oku = lambda *y: open(os.path.join(KOD, *y), encoding="utf-8").read()
 EP = lambda k: k + chr(64) + "ornek.test"
 D = datetime.date
 tmp = tempfile.mkdtemp(); bild = []; sesli = []; acilan = []
-ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "urllib": urllib, "subprocess": subprocess, "AYAR": {}, "BASE": tmp, "_t": lambda tr, en: tr,
+ns = {**ESZ, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "urllib": urllib, "subprocess": subprocess, "AYAR": {}, "BASE": tmp, "_t": lambda tr, en: tr,
       "bildirim": lambda *a, **k: bild.append(a[2]), "seslendir": lambda m, **k: sesli.append(m), "toplanti_var": lambda: False, "gizli_acik": lambda: False,
       "SOHBET": {"acik": False}, "eposta_tur": lambda: "mailto", "eposta_ben": lambda: EP("ben"), "kisi_eposta": lambda ad: EP("ayse") if "Ayşe" in ad else None}
 exec(compile(oku("aktarici", "kisisel-tarihler.py"), "kisisel-tarihler.py", "exec"), ns)

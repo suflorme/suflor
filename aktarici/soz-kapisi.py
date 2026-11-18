@@ -50,8 +50,7 @@ def _soz_kuyruk_yaz():
     if not SOZK["kuyruk"] and not os.path.exists(_soz_yol(SOZ_KUYRUK_DOSYA)): return  # hiç kuyruk olmadıysa dosya da açılmaz
     try:
         v = [dict({k: q[k] for k in ("id", "kaynak", "h", "oncelik", "kip", "bitis", "t0", "metin", "ek")}, **({"dogrula": True} if q.get("dogrula_f") or q.get("dogrula") else {})) for q in SOZK["kuyruk"]]
-        with open(_soz_yol(SOZ_KUYRUK_DOSYA) + ".tmp", "w", encoding="utf-8") as f: json.dump(v, f, ensure_ascii=False)
-        os.replace(_soz_yol(SOZ_KUYRUK_DOSYA) + ".tmp", _soz_yol(SOZ_KUYRUK_DOSYA))
+        dosya_yaz_esz(_soz_yol(SOZ_KUYRUK_DOSYA), v, ensure_ascii=False)
     except OSError: pass
 
 def _soz_gun(simdi):

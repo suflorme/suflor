@@ -4,6 +4,7 @@
 # Aktarıcıda konus_* / Whisper döngüsünün bas dalı / brifing.swift açık süreç kipi / panodaki Konuş değişince koştur:
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/bas-konus.py
 # Gerekenler: swiftc, kurulu Brifing.app (ayar.json'daki uygulama klasöründe; paket iskeleti için), whisper-venv (/Users/Shared/Suflor).
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import glob, base64, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
 sys.dont_write_bytecode = True; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from bosport import bos_port
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); PORT = bos_port(8791)
@@ -336,7 +337,7 @@ try:
     # v0.57.5 veritabanı tazelik notu: son vt_sor'dan sonra dosya değişince bir kez; okunamazsa son sorgu VT_TAZE_SN'den eskiyse
     vtd = os.path.join(proje, "vt.db"); open(vtd, "w").close()
     sys.path.insert(0, KOD); import baglayici as _bag  # A1: uygulama klasörü içindeki kayıt veritabanı ayrıcalıksız (aktarıcı saatine bakar); dışındaki ayrıcalıklı (yalnız vt-mt.json)
-    ad3 = {"os": os, "time": time, "json": json, "BASE": proje, "print": lambda *a: None, "_t": lambda tr, en: tr, "AYAR": {"proje": proje, "uygulama": proje, "veritabani": {"yol": "vt.db"}}, "_KS": {}, "_baglayici_mod": lambda: _bag}
+    ad3 = {**ESZ, "os": os, "time": time, "json": json, "BASE": proje, "print": lambda *a: None, "_t": lambda tr, en: tr, "AYAR": {"proje": proje, "uygulama": proje, "veritabani": {"yol": "vt.db"}}, "_KS": {}, "_baglayici_mod": lambda: _bag}
     exec(kod_[kod_.index("VT_TAZE_SN = "):kod_.index("BRIFING_YASAK = ")], ad3)
     ks = ad3["_KS"]; n0 = ad3["_vt_tazele_notu"]()
     ks["vt_son"] = (time.time(), ad3["_vt_mt"]()); n1 = ad3["_vt_tazele_notu"]()

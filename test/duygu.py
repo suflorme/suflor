@@ -3,6 +3,7 @@
 # "[Durum …]" bloğu ≤ 300 karakter, gizli kipte ve toplantıda yok, ham metin saklanmaz, 7 gün, öneri hakkı (günde 2, tür tekrarı yok, kullanılmazsa geri döner),
 # proaktif dostça aday, beta paketine/teşhise duygu verisi girmez. Aktarıcı açılmaz: bölüm dosyaları sahte ad alanında çalışır (gerçek Claude yok).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/duygu.py
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, json, os, re, sys, tempfile, threading, time
 sys.dont_write_bytecode = True
 KOD = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); T = tempfile.mkdtemp(prefix="duygu-"); hata = []
@@ -12,7 +13,7 @@ def an(g, s, d=0): return datetime.datetime(2026, 11, g, s, d, tzinfo=YER)  # 9 
 SIMDI = an(9, 10, 0).timestamp()
 
 def ad_alani(ayar=None, kis=None):
-    ns = {"re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": threading, "print": lambda *a, **k: None, "_t": lambda a, b: a,
+    ns = {**ESZ, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": threading, "print": lambda *a, **k: None, "_t": lambda a, b: a,
           "ARAYUZ_DILI": "tr", "BASE": T, "AYAR": dict(ayar or {}), "SON": [], "GIZ": [False], "TOP": [False], "OLAY": [], "ISLER": {"kendi": []}}
     ns["gizli_acik"] = lambda: ns["GIZ"][0]; ns["toplanti_var"] = lambda: ns["TOP"][0]
     ns["calisma_saatleri"] = lambda: ({0, 1, 2, 3, 4}, 540, 1080)

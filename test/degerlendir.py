@@ -3,6 +3,7 @@
 # kayıtta metin/gizli yok, söz kapısı bağlantısı (dg_soyle), belge süzgeci ve müşteriler (toplanti-sonrasi.py gün içi öneri + açık uç hatırlatması). Birim: bölüm yalıtılmış ad alanında, sahte model ve sahte saatle
 # (gerçek claude çağrılmaz, ağ yok). Kurgu veri (gerçek kişi yok).
 #   PYTHONDONTWRITEBYTECODE=1 python3 test/degerlendir.py      (kaldı → çıkış 1)
+from esz_yardim import ESZ  # relay.py dosya_yaz_esz (bölüm ad alanı elle kurulduğu için)
 import datetime, importlib.util, json, os, re, shutil, stat, sys, tempfile, threading, time
 EP = "@"  # örnek adresler parçalı: açık depo taraması e-posta biçimini yakalar
 sys.dont_write_bytecode = True; os.environ["SUFLOR_TEST_SOZ_DONGU_YOK"] = "1"
@@ -31,7 +32,7 @@ def kur(ad, ayar=None, cevaplar=None, maliyet=None, eski=False, gizli=False, soz
     def write(pairs):
         for yol, metin in pairs:
             with open(yol, "a", encoding="utf-8") as f: f.write(metin)
-    ns = {"os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": dict(ayar or {}), "BASE": d, "LOCK": lock, "write": write, "SOHBET": {"acik": False},
+    ns = {**ESZ, "os": os, "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "AYAR": dict(ayar or {}), "BASE": d, "LOCK": lock, "write": write, "SOHBET": {"acik": False},
           "bildirim": lambda *a, **k: bil.append(a), "gizli_acik": lambda: durum["gizli"], "toplanti_var": lambda: False, "aktif_dosya": lambda: None, "sessiz_acik": lambda: False,
           "calisma_saatleri": lambda: ({0, 1, 2, 3, 4}, 540, 1080), "_t": lambda tr, en: tr, "print": lambda *a, **k: None, "eylem_model": m.eski if eski else m.cagri}
     ns.update(ek or {}); ns.update(M=m, D=d, DURUM=durum, BIL=bil, DG_SAAT=lambda: SAAT["t"], SOZ_SAAT=lambda: SAAT["t"])
