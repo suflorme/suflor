@@ -85,6 +85,7 @@ exec(src[src.index("def telaffuz_tamamla"):src.index("def _telaffuz_dongu")].rep
 BRIFING_APP = BASE; claude_yolu = lambda: "/bin/echo"
 _ks = open(os.path.join(KOD, "aktarici", "kapi.py"), encoding="utf-8").read()  # v0.244.0: Brifing.app istemcisi artık kapıda (kapi_brifing): gerçek kod, subprocess yine taklitle
 KAPI = {"n": 0}; KAPI_KILIT = threading.Lock(); KAPI_YEREL = threading.local()
+kapi_model = lambda *a, **k: None  # tek model kapısı taklidi (gizli kapalı; gizli kuralı test/kapi.py ve test/gizli-kapi.py'nin konusu)
 exec(_ks[_ks.index("def kapi_dosya"):_ks.index("# --- Kapı ---")].replace("subprocess.", "_Sub."))
 def kapi_iste(is_turu, cagri, *, karma=None, coz=None):  # aktarici/kapi.py kapi_iste taklidi (v0.244.0'dan telaffuz_tamamla kapıdan geçer): çağrıyı çalıştırır, çözümü aynı sonuç sözlüğüyle döner (engel yok; kapı kuralları test/kapi.py'nin konusu)
     try: ham, hata = cagri()

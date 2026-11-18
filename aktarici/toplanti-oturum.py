@@ -218,7 +218,7 @@ def topo_kisilik_blogu():  # 10 Kasım: pano sohbeti tek ses — toplantı kişi
     except Exception as e: print(f"KİŞİLİK: toplantı oturumu kişilik metni kurulamadı ({e.__class__.__name__})"); return ""
 def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
     # cl: claude yolu · model: ayar claude_model · ky: toplanti-kanca.json (ya da None) · ilk: ilk kullanıcı iletisi · sid: kaldığı yerden (--resume)
-    kn = kapi_ac("toplanti-ac") if "kapi_ac" in globals() else None  # v0.246.0 (K4): açılış ve bekçinin yeniden açışı kapıdan (izin + sayaç; tur kaydı oturumda)
+    kn = kapi_ac("toplanti-ac") if "kapi_ac" in globals() else "kapı yok"  # 19 Kasım: kapı yoksa açılmaz (fail-closed); v0.246.0 (K4): açılış ve bekçinin yeniden açışı kapıdan (izin + sayaç; tur kaydı oturumda)
     if kn: TOPO["hata"] = "kapı: " + kn; return False
     with TOPO["kilit"]:
         TOPO["izin_toplam"] = 0  # deneme toplantısı kipi: açılışta kaç izin kartı çıktı (aktarici/duman.py)
@@ -248,6 +248,7 @@ def toplanti_oturum_ac(cl, model, ky, ilk, konu=None, sid=None):
         if not sid: TOPO.update(izin_hatirla=set(), mesaj=[], n=TOPO["n"], sid=None, secenek_i=None, konu=konu, t0=time.time(), maliyet=0.0, yeniden=0, izin=0, hata=None, etkinlik=None,
                                 bilgi_sorgu=0, web_sorgu=0, bilgi_t={})
         TOPO["acilis"] = {"cl": cl, "model": model, "ky": ky}; TOPO["kapatan"] = None
+        if kapi_model("toplanti-ac"): TOPO["hata"] = "kapı: gizli kip"; return False  # tek model kapısı (alt süreçten hemen önce)
         _topo_durum("aciliyor", hata=None)
         TOPO["app"] = subprocess.Popen(["open", "-g", "-W", "-n", "--env", "CLAUDE_CODE_MCP_STARTUP_WAIT_MS=" + str(TOPO_MCP_BEKLE_MS), "-a", BRIFING_APP, "--args", "--istek", istek], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t0 = time.time(); w = None
@@ -290,6 +291,7 @@ def toplanti_oturum_durdur():
     print("TOPLANTI OTURUMU: durduruldu (kullanıcı)"); return {"ok": True}
 def toplanti_oturum_terminal():
     # aynı oturumu Terminal'de görünür açar: arka plandaki süreç kapanır (iki süreç aynı oturuma yazmasın), `claude --resume <kimlik>`
+    if (kapi_model("toplanti-terminal") if "kapi_model" in globals() else "kapı yok"): return gizli_red() if "gizli_red" in globals() else {"ok": False, "gizli": True}  # 19 Kasım: tek model kapısı (claude --resume da Claude çağrısı)
     sid, ac = TOPO["sid"], TOPO["acilis"] or {}
     if not sid: return {"ok": False, "err": _t("Oturum kimliği henüz yok — birkaç saniye sonra yeniden dene", "No session id yet — try again in a few seconds")}
     if topo_canli():

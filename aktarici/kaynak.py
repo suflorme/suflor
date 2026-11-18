@@ -50,6 +50,23 @@ def kaynak_olc():  # sistem_anlik (bas-konus.py) okuyucusunu kullanır; SUFLOR_K
     t = o.get("takas_gb") if o.get("takas_gb") is not None else (round(o["takas_mb"] / 1024, 2) if o.get("takas_mb") is not None else None)
     return {"bos_yuzde": o.get("bos_yuzde"), "takas_gb": t, "yuk": o.get("yuk")}
 def kaynak_dar(): return KAYNAK["duzey"] != "normal" and AYAR.get("kaynak_bekci") is not False  # dar ya da kritik: isteğe bağlı işler ertelenir
+# v0.251.1 (19 Kasım, ses denetimi Ö6): Whisper ve Pocket işçileri boşta 10 dk'da kapanınca oturumun ilk turu ~4,4 + 4,2 sn yükleme ödüyordu (18 Kasım ilk tur 7,1 sn).
+# Bellek rahatken (toplam RAM >= kaynak_rahat_ram_gb [16], boş >= %kaynak_rahat_bos [40], düzey normal, takas < 2 GB, ölçüm 2 dk'dan taze) boşta tutma
+# bos_uzun_dk'ya (ayar; varsayılan 45) uzar; aksi halde temel süre (10 dk). 8 GB beta Mac'te hiç uzamaz. Ayarda süre açıkça yazılıysa (pocket_bos_dk) oraya dokunulmaz.
+def _ram_gb():
+    try: return os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / 2 ** 30
+    except (ValueError, OSError, AttributeError): return 0.0
+def kaynak_rahat():
+    try:
+        K = KAYNAK; b, t, ts = K.get("bos_yuzde"), K.get("takas_gb"), K.get("t")
+        if kaynak_dar() or b is None or not ts or time.time() - ts > 120: return False
+        if (t or 0) >= 2.0 or _ram_gb() < float(AYAR.get("kaynak_rahat_ram_gb", 16)): return False
+        return b >= float(AYAR.get("kaynak_rahat_bos", 40))
+    except (TypeError, ValueError): return False
+def bos_tut_sn(temel_sn):  # temel_sn: bugünkü boşta kapanma süresi (sn) → bellek rahatsa uzatılmış süre (sn)
+    try: uzun = float(AYAR.get("bos_uzun_dk", 45)) * 60
+    except (TypeError, ValueError): uzun = 2700.0
+    return uzun if temel_sn and uzun > temel_sn and kaynak_rahat() else temel_sn
 def kaynak_view():
     return {"duzey": KAYNAK["duzey"], "bos_yuzde": KAYNAK["bos_yuzde"], "takas_gb": KAYNAK["takas_gb"], "yuk": KAYNAK["yuk"], "t": KAYNAK["t"]}
 def _kaynak_dongu():

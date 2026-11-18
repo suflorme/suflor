@@ -54,6 +54,9 @@ aside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var
 .k-soyle{--kc:var(--ac)}.k-dur{--kc:var(--dikkat)}.k-cevap,.k-not{--kc:var(--t3)}.k[data-id]{cursor:pointer;display:flex;gap:var(--bo-8);align-items:flex-start}.k[data-id]:hover{background:var(--hov)}.k .km{flex:1;min-width:0}.k.kapaniyor{opacity:.45}.ka{display:flex;gap:var(--bo-4);flex:none}.ka button{padding:var(--bo-4) var(--bo-4);color:var(--t3)}.ka button:hover{color:var(--tx)}.ka button.on{padding:var(--bo-4) var(--bo-8);color:var(--t2)}.ka button.on.pri{color:var(--ac-yazi)}.k[data-onay]{cursor:default}
 .k-karsi{--kc:var(--ac);display:block!important;border:1px solid var(--ac);background:var(--s1);border-radius:var(--kose-l);padding:var(--bo-12) var(--bo-12);box-shadow:var(--golge-ince)}.k-karsi .kgs{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums;color:var(--dikkat)}.k-karsi .kka{display:flex;gap:var(--bo-8);margin-top:var(--bo-8)}.k-karsi .kka button{flex:1 1 0;padding:var(--bo-8) var(--bo-12);font-size:var(--yz-13)}.k-karsi .kka button.on.pri{color:var(--ac-yazi)}.k-karsi .kka button.on.gh{color:var(--tx);border:1px solid var(--bd2)}.k-karsi .kd{font-size:var(--yz-12);color:var(--t3);margin-top:var(--bo-4)}
 .kc{font-size:var(--yz-12);color:var(--t3);padding:var(--bo-4) 0 var(--bo-4) var(--bo-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-dur{background:color-mix(in srgb,var(--dikkat) 10%,var(--s1));border-color:color-mix(in srgb,var(--dikkat) 45%,var(--bd));box-shadow:inset 3px 0 0 var(--dikkat)}.k-dur b{font-size:var(--yz-13);text-transform:uppercase;letter-spacing:.06em}.k-dur .km{font-weight:500}
+.k.kkat{padding:var(--bo-8) var(--bo-12);align-items:center}.k.kkat .km{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t2)}.k.kkat .km b{display:inline-flex;margin:0 var(--bo-8) 0 0;vertical-align:-2px}.k.kkat .kw,.k.kkat .kd,.k.kkat .ka{display:none}
+.kdaha{display:block;width:100%;text-align:left;font-size:var(--yz-12);color:var(--t2);padding:var(--bo-4) var(--bo-8);margin:0 0 var(--bo-8);border:1px dashed var(--bd);border-radius:var(--kose);background:transparent;cursor:pointer}.kdaha:hover{color:var(--tx);background:var(--hov)}.kdhs{display:none}.kdhs.acik{display:block}
 .kq{font-size:var(--yz-12);color:var(--t2);padding:var(--bo-4) 0;margin:0 0 var(--bo-8);white-space:pre-wrap}
 .yeni{animation:nabiz 1.2s 2 ease-out}@keyframes nabiz{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ac) 45%,transparent)}100%{box-shadow:0 0 0 9px color-mix(in srgb,var(--ac) 0%,transparent)}}
 #tone{display:flex;gap:var(--bo-4);flex-wrap:wrap;justify-content:flex-end}.tn.eski{opacity:.45}.tn.taze{box-shadow:0 0 0 2px var(--ac)}
@@ -642,11 +645,21 @@ const seenCards=new Set(); let firstCards=true, last=null, mini=null
 // kart metnindeki web bağlantısı tıklanabilir (test toplantısı 7 Ekim 21:09); önce kaçış, sonra yalnız http(s) — sondaki noktalama dışarıda
 function bag(h){return h.replace(/https?:\/\/[^\s<>"']+/g,u=>{const m=u.match(/^(.*?)([.,;:!?)]*)$/);return `<a href="${m[1]}" target=_blank rel="noopener noreferrer">${m[1]}</a>${m[2]}`})}
 // sohbet paneli açıkken asistanın kayıt onay kartları (izin "kayit") yalnız panelde durur; ana sayfada gizlenir, panel kapanınca yeniden görünür. Toplantı kartları etkilenmez.
+// 19 Kasım (K1): kartın toplantı anındaki önceliği, kartları listeleyen her yüzey bunu kullanır (pano, menü paneli; Teams şeridi content.js'te aynısı,
+// test/kart-oncelik.py ikisini karşılaştırır). Küçük önce: 0 DUR · 1 karşı tarafın sorusu (süreli onay) · 2 senden şimdi iş bekleyen (onay, Ne diyeyim, Söyle) · 3 Cevap · 4 Not.
+function kartOncelik(c){c=c||{};return c.kind==='dur'?0:c.onay&&c.eylem&&c.izin==='karsi_cevap'?1:(c.onay||c.replik||c.kind==='soyle')?2:c.kind==='cevap'?3:4}
+// aynı öncelikte en yeni önce (ertelenip geri gelen kart geri geldiği an sayılır); eşitte aktarıcının sırasında sonraki önce
+function kartSirala(cs){return (cs||[]).map((c,i)=>[c,i]).sort((a,b)=>kartOncelik(a[0])-kartOncelik(b[0])||String(b[0].geri||b[0].at||'').localeCompare(String(a[0].geri||a[0].at||''))||b[1]-a[1]).map(x=>x[0])}
+// panoda en yeni Cevap/Not dışındaki bilgi kartları tek satıra katlanır; dokununca açılır (KAC). Menü panelinde tek kart + "+N kart" sayacı (KDAHA).
+const KAC=new Set();let KDAHA=false
 function shKartlar(v,mini_){const c=(v&&v.cards)||[];return !mini_&&shAcik?c.filter(x=>!(x.onay&&x.izin==='kayit')):c}
-function cardsHtml(v,mini){
+function cardsHtml(v,mini,tum){
   const qs=(v.questions||[]).map(q=>`<div class=kq>${q.tur==="ozet"?L("Ne diyeyim? — replik hazırlanıyor…"):L(q.tur==="girdi"?"İletildi: ":"Soruldu: ")+esc(q.text)}</div>`).join("")
-  const kcs=karsiOnayKartlari(v),kcl=shKartlar(v,mini).slice().sort((a,b)=>(kcs.has(b.id)?1:0)-(kcs.has(a.id)?1:0))  // karşı tarafın sorusuna cevap onayı en üstte
-  const oc=kcl.map(c=>kcs.has(c.id)?karsiKartHtml(c,v):`<div class="k k-${esc(c.kind)}${c.replik?" k-replik":""}${(firstCards||seenCards.has(c.id+(c.geri||"")))?"":" yeni"}" data-id="${esc(c.id)}"${c.onay?` data-onay=1`:` title="${L('Dokun: kapat')}"`}><div class=km><b>${c.geri?`<span title="${L('Sonraya bırakmıştın; şimdi geri geldi')}">↩ </span>`:""}${ic(KI[c.onay?'onay':c.replik?'replik':c.kind]||'liste')}${c.onay?L("Onay bekliyor"):c.replik?L("Ne diyeyim"):KL[c.kind]||KL.not}${c.gizli?" · "+L("gizli"):""}</b>${c.q?`<div class=kw>↳ ${esc(c.q)}</div>`:""}${c.replik?`<span class=rp>${esc(c.text)}</span>`:bag(esc(c.text))}${c.durum?`<div class=kd>${esc(c.durum)}</div>`:""}${ayGor(c.why)&&!mini?`<div class=kw>${bag(esc(ayGor(c.why)))}</div>`:""}</div><div class=ka>${soyleBtn(c.text,true)}${ackBtns(c)}</div></div>`).join("")
+  const kcs=karsiOnayKartlari(v),kcl=kartSirala(shKartlar(v,mini)),ilk=kcl.findIndex(c=>kartOncelik(c)>=3)  // tek öncelik (K1): DUR, karşı tarafın sorusu, senden iş bekleyen, Cevap, Not
+  const katli=(c,i)=>!mini&&!tum&&i!==ilk&&kartOncelik(c)>=3&&!KAC.has(c.id)
+  const kart=(c,i)=>kcs.has(c.id)?karsiKartHtml(c,v):`<div class="k k-${esc(c.kind)}${c.replik?" k-replik":""}${katli(c,i)?" kkat":""}${(firstCards||seenCards.has(c.id+(c.geri||"")))?"":" yeni"}" data-id="${esc(c.id)}"${c.onay?` data-onay=1`:` title="${katli(c,i)?L('Dokun: aç'):L('Dokun: kapat')}"`}><div class=km><b>${c.geri?`<span title="${L('Sonraya bırakmıştın; şimdi geri geldi')}">↩ </span>`:""}${ic(KI[c.onay?'onay':c.replik?'replik':c.kind]||'liste')}${c.onay?L("Onay bekliyor"):c.replik?L("Ne diyeyim"):KL[c.kind]||KL.not}${c.gizli?" · "+L("gizli"):""}</b>${c.q?`<div class=kw>↳ ${esc(c.q)}</div>`:""}${c.replik?`<span class=rp>${esc(c.text)}</span>`:bag(esc(c.text))}${c.durum?`<div class=kd>${esc(c.durum)}</div>`:""}${ayGor(c.why)&&!mini?`<div class=kw>${bag(esc(ayGor(c.why)))}</div>`:""}</div><div class=ka>${soyleBtn(c.text,true)}${ackBtns(c)}</div></div>`
+  // menü paneli (K2): en önemli tek kart + sayaç; öbürleri sayaca dokununca (DOM'da durur)
+  const oc=mini&&kcl.length>1?kart(kcl[0],0)+`<button type=button class=kdaha data-kdaha=1 aria-expanded=${KDAHA}>${esc(KDAHA?L("Daha az göster"):L("+{n} kart",{n:kcl.length-1}))}</button><div class="kdhs${KDAHA?" acik":""}">${kcl.slice(1).map((c,i)=>kart(c,i+1)).join("")}</div>`:kcl.map(kart).join("")
   const cc=(v.closed||[]).slice(-3).reverse().map(c=>`<div class=kc title="${esc(c.text)}">${ACK_ICON[c.status]||ic("x")}<span>${esc(c.text)}</span></div>`).join("")
   return ((oc+qs)||`<div class=empty>${L("Şimdilik kart yok. {asistan} toplantıyı izlerken öneriler buraya düşer.")}</div>`)+cc
 }
@@ -665,7 +678,7 @@ const NO_DO=["cevap","not"]
 // onay kartı (#76): Claude'un yapacağı iç işi (kayıt, kendi oturumlarına mesaj) yazılı onaylarsın; karta dokunmak onay değil
 function ackBtns(c){if(c.onay)return[["onaylandi","check",L("Onayla")],["reddedildi","x",L("Reddet")]].map(([s,i,t])=>`<button class="${s==="onaylandi"?"pri":"gh"} on" data-ack=${s} data-id="${esc(c.id)}" title="${t}">${ic(i,t)}</button>`).join("")
   return [["yapildi","check",L("Yaptım")],["ertele","pause",L("Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster")],["gecildi","x",L("Gerek yok — bir daha önerilmesin")]].filter(([s])=>s!=="yapildi"||!NO_DO.includes(c.kind)).map(([s,i,t])=>`<button class=gh data-ack=${s} data-id="${esc(c.id)}" title="${t}" aria-label="${t}">${ic(i)}</button>`).join("")}
-function paintCards(el,v,mini){setH(el,cardsHtml(v,mini))}
+function paintCards(el,v,mini,tum){setH(el,cardsHtml(v,mini,tum))}
 // S94 (19 Ekim): "toplantıya söyle" düğmesi kalktı — toplantıda asistan adıyla seslenince herkese konuşur, düğme gerekmez
 const soyleBtn=()=>''
 // Asistanın toplantıya cevabı (S94: itiraz penceresi yok): söz sırası → konuşuyor → sonuç; Dur her an
@@ -683,7 +696,9 @@ function bindMod(root){root.addEventListener("click",ev=>{const b=ev.target.clos
 function bindOtonom(root){root.addEventListener("click",ev=>{const b=ev.target.closest("button[data-ot]");if(!b)return;ev.stopPropagation();b.disabled=true;j('/otonom',{method:'POST',body:JSON.stringify({id:b.dataset.oid,karar:b.dataset.ot})}).catch(()=>{})})}
 function bindSoyle(root){root.addEventListener("click",ev=>{const b=ev.target.closest("button[data-soyle]");if(!b)return;ev.stopPropagation();b.disabled=true
   j('/komut',{method:'POST',body:JSON.stringify({tur:'soyle',metin:b.dataset.soyle})}).then(r=>{const m=String(r.metin||'').replace(/^⌨\s*/,'');if(m.startsWith('⚠'))geciciDurum(m.replace(/^⚠\s*/,''),'')}).catch(()=>geciciDurum(L("Suflor.me'ye ulaşılamadı"),'')).finally(()=>setTimeout(()=>b.disabled=false,800))},true)}
-function bindAck(root){root.addEventListener("click",ev=>{if(ev.target.closest("a[href]")||ev.target.closest("button[data-soyle]"))return;const b=ev.target.closest("button[data-ack]"),k=ev.target.closest(".k[data-id]");if(!b&&(!k||k.dataset.onay))return
+function bindAck(root){root.addEventListener("click",ev=>{if(ev.target.closest("a[href]")||ev.target.closest("button[data-soyle]"))return;if(ev.target.closest("button[data-kdaha]")){KDAHA=!KDAHA;if(last)paintMini(last);return}const b=ev.target.closest("button[data-ack]"),k=ev.target.closest(".k[data-id]")
+  if(!b&&k&&k.classList.contains("kkat")){KAC.add(k.dataset.id);k.classList.remove("kkat");k.title=L("Dokun: kapat");return}  // katlı kart: ilk dokunuş açar
+  if(!b&&(!k||k.dataset.onay))return
   if(b)b.disabled=true;if(k)k.classList.add("kapaniyor");fetch("/card-ack",{method:"POST",body:JSON.stringify({id:b?b.dataset.id:k.dataset.id,status:b?b.dataset.ack:"okundu"})}).then(refresh)})}
 async function sendNote(t){await fetch("/note",{method:"POST",body:JSON.stringify({text:t,at:new Date().toISOString()})})}
 async function sendAsk(t){await fetch("/ask",{method:"POST",body:JSON.stringify({text:t})})}
@@ -864,7 +879,7 @@ function paintMini(s){
   // Süre sayacı yalnız toplantı sürerken: /status sure son toplantıdan kalan agenda.json'dan gelir ve toplantı bittikten sonra "107 dk aşıldı" gibi bayat süre gösteriyordu. Toplantı yokken boş hâl: sıradaki toplantı ya da Hazır.
   const du=durum(s), top=toplantidaMi(s), [sk,sc]=top?sureTxt(s):["",""], bosH=top?"":miniBos()
   setH(d.getElementById("mh"),(du.c==="wa"||du.c==="er"?`<span class=w title="${esc(du.hep)}">${esc(du.m)}${du.a?" — "+esc(du.a):""}</span>`:"")+(sk?`<span style="color:${sc?'var(--wa)':'inherit'}">${esc(sk)}</span>`:"")+(bosH?`<span class=bos>${esc(bosH)}</span>`:"")+(sessizTxt(s)?`<span>${sessizTxt(s)}</span>`:"")+toneHtml(s.tone,s.tone_kisi,true))
-  paintCards(mc,s,!s.kart_katmani);  // Mac kart katmanı açıkken menü paneli "tüm kartlar" listesidir (yan şeritten açılır): ayrıntı da görünür, metin kesilmez
+  paintCards(mc,s,!s.kart_katmani,!!s.kart_katmani);  // Mac kart katmanı açıkken menü paneli "tüm kartlar" listesidir (yan şeritten açılır): ayrıntı da görünür, metin kesilmez
    sessizCiz(d.getElementById("msz"),s); gizliCiz(d.getElementById("mgz"),s); sesliCiz(d.getElementById("msc"),s); miniKonus(d,s); renderHat(d,s); miniOturum(d,s)
   // Döküm yerine tek satır canlılık (v0.4.3, kullanıcı ✓): metni toplantıda zaten görüyor, burada yalnız akış sürüyor mu
   const le=(s.tail||[]).filter(e=>!e.note&&e.at).slice(-1)[0], ml=d.getElementById("ml")

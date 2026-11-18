@@ -45,7 +45,7 @@ def kisi_bul(ad): return {"durum": "ok", "kisiler": [{"ad": "Ayşe Örnek", "kur
 def arsiv_ara(q): return {"tam": True, "sonuclar": [{"id": "g1", "baslik": KANARYA[4], "at": "2026-10-30T10:00:00"}]}
 def _konus_kur(**k): KONUS.update(k)
 ns = dict(os=os, json=json, time=time, datetime=datetime, threading=threading, subprocess=subprocess, BEYIN=BEYIN, AYAR=AYAR, BASE=BASE, LOCK=LOCK, write=write, claude_yolu=lambda: sahte,
-          gizli_acik=lambda: GIZLI["acik"], toplanti_var=lambda: TOP["var"], seslendir=lambda m, kuyruk=False, **k: SES.append(m), _konus_kur=_konus_kur, _KS=_KS, KONUS=KONUS, _t=_t,
+          gizli_acik=lambda: GIZLI["acik"], kapi_model=lambda *a, **k: "gizli kip" if GIZLI["acik"] else None, toplanti_var=lambda: TOP["var"], seslendir=lambda m, kuyruk=False, **k: SES.append(m), _konus_kur=_konus_kur, _KS=_KS, KONUS=KONUS, _t=_t,
           kisi_bul=kisi_bul, arsiv_ara=arsiv_ara, re=re)
 exec(open(os.path.join(KOD, "aktarici", "web-arastirma.py"), encoding="utf-8").read(), ns)
 tetik = ns["ar_tetik"]

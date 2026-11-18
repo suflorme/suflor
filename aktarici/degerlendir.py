@@ -66,7 +66,7 @@ def _dg_yol(ad): return os.path.join(BASE, ad)
 def _dg_gun(t=None): return datetime.date.fromtimestamp(float(t or DG_SAAT())).isoformat()
 def _dg_kisa(x, n): x = " ".join(str(x or "").split()); return x if len(x) <= n else x[:n - 1].rstrip() + "…"
 def _dg_maske(t): return DG_ADRES.sub("[adres]", str(t or ""))  # istemdeki e-posta adresi gitmez (kişi paketi ve aday metni)
-def _dg_gizli(): return "gizli_acik" in globals() and bool(gizli_acik())
+def _dg_gizli(): return bool((kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()))  # 19 Kasım: fail-closed (kapi.py kapi_gizli)
 
 # --- Kayıt ------------------------------------------------------------------------------------------------------------------------------------------
 def _dg_yaz(r):  # yalnız eklenir; gizli kipte yazılmaz; LOCK alınamazsa bellekte bekler, sonraki yazışta gider

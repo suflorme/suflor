@@ -117,6 +117,8 @@ def ar_ayristir(cikti):  # model çıktısı → {sesli, metin, kaynaklar [{url,
 def ar_calistir(konu, kurum="", zaman=AR_ZAMAN):  # → {"ok", "cikti", "sorgular", "sayfalar", "maliyet", "tur", "api_ms", "hata"}; claude doğrudan (cwd BASE: Masaüstü gerekmez)
     cl = claude_yolu(); args = [cl] + BEYIN.arastirma_args(AYAR); t0 = time.time()
     o = {"ok": False, "cikti": "", "sorgular": [], "sayfalar": [], "maliyet": 0.0, "tur": None, "api_ms": None, "hata": None}
+    kn = kapi_model("arastirma") if "kapi_model" in globals() else "kapı yok"  # tek model kapısı (alt süreçten hemen önce; fail-closed)
+    if kn: o["hata"] = "kapı: " + kn; return o
     try: p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=BASE, text=True, encoding="utf-8", bufsize=1)
     except OSError as e: o["hata"] = e.__class__.__name__; return o
     kes = threading.Timer(zaman, lambda: p.kill()); kes.daemon = True; kes.start()

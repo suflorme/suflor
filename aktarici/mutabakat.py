@@ -34,7 +34,7 @@ def mtb_acik():
         except Exception: return False
     return v is True
 def _mtb_yol(ad): return os.path.join(BASE, ad)
-def _mtb_gizli(): return "gizli_acik" in globals() and bool(gizli_acik())
+def _mtb_gizli(): return bool((kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()))  # 19 Kasım: fail-closed (kapi.py kapi_gizli)
 def _mtb_kisa(x, n): x = " ".join(str(x or "").split()); return x if len(x) <= n else x[:n - 1].rstrip() + "…"
 def _mtb_yapi():
     try: return _yapi_mod() if "_yapi_mod" in globals() else None

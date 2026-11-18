@@ -561,7 +561,11 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     const KL = { soyle: "Söyle", dur: "Dur", cevap: "Cevap" };  // gösterirken L()
     const COL = { dur: "var(--dikkat)", soyle: "var(--ac)", cevap: "var(--t3)", not: "var(--t3)" }; // iki sınıf: Yap (Söyle sahne yeşili, Dur kiremit) · Bil (Cevap gri) — değerler gölge DOM'daki .w'den
     const PRI = ["dur", "soyle", "cevap"];
-    let host = null, root = null, sig = "", first = true, acik = false; const seen = new Set();
+    // 19 Kasım (K1): kart önceliği — pano/pano.html kartOncelik/kartSirala ile aynı (test/kart-oncelik.py ikisini karşılaştırır).
+    // 0 DUR · 1 karşı tarafın sorusu (süreli onay) · 2 senden şimdi iş bekleyen (onay, Ne diyeyim, Söyle) · 3 Cevap · 4 Not; aynı öncelikte en yeni önce.
+    function kartOncelik(c) { c = c || {}; return c.kind === "dur" ? 0 : c.onay && c.eylem && c.izin === "karsi_cevap" ? 1 : (c.onay || c.replik || c.kind === "soyle") ? 2 : c.kind === "cevap" ? 3 : 4; }
+    function kartSirala(cs) { return (cs || []).map((c, i) => [c, i]).sort((a, b) => kartOncelik(a[0]) - kartOncelik(b[0]) || String(b[0].geri || b[0].at || "").localeCompare(String(a[0].geri || a[0].at || "")) || b[1] - a[1]).map(x => x[0]); }
+    let host = null, root = null, sig = "", first = true, acik = false, dahaAcik = false, satirAcik = false; const seen = new Set();
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     // v0.57.9: panodaki ince çizgi simgeler (renkli emoji yerine); Teams sayfası innerHTML'e izin vermeyebilir — DOM ile çizilir
     const IKON = { mute: ["M6.5 16v-4.5a5.5 5.5 0 0 1 8.6-4.5M17.5 11.5V16l1.5 2H8", "M10 20.5a2 2 0 0 0 4 0", "M4 4l16 16"],
@@ -576,7 +580,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       disli: ["M12 9a3 3 0 1 1 0 6a3 3 0 1 1 0-6z", "M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M18 6l-1.6 1.6M7.6 16.4L6 18"],
       pin: ["M9 4h6l-1 5.5 3 3H7l3-3z", "M12 12.5V20"],
       sohbet: ["M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.2A8.5 8.5 0 1 1 20.5 12z", "M9 10.5v3M12 9v6M15 10.5v3"],
-      liste: ["M7 4.5h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2z", "M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"] };
+      liste: ["M7 4.5h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2z", "M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"],
+      dahasi: ["M5.5 11.1a.9.9 0 1 1 0 1.8a.9.9 0 1 1 0-1.8z", "M12 11.1a.9.9 0 1 1 0 1.8a.9.9 0 1 1 0-1.8z", "M18.5 11.1a.9.9 0 1 1 0 1.8a.9.9 0 1 1 0-1.8z"] };
     const KI = { soyle: "sohbet", dur: "uyari", cevap: "check", not: "liste", onay: "zil", replik: "replik" };  // pano/pano.html KI ile aynı: tür simgeyle de ayrılır (v0.194.0)
     function ikon(d, ad) {
       const NS = "http://www.w3.org/2000/svg", s = d.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "i"); s.setAttribute("aria-hidden", "true");
@@ -613,6 +618,12 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         .q{font-size:var(--yz-2);color:var(--t2);padding:4px 2px}.top{font-size:var(--yz-2);color:var(--t2);margin:0 2px 6px;display:flex;align-items:center;gap:5px}svg.i{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}button svg.i{width:14px;height:14px}.top:empty{display:none}.uy{color:var(--dikkat)}
         .bos{font-size:var(--yz-2);color:var(--t3);padding:6px 2px}
         .kd{font-size:var(--yz-2);color:var(--t3);margin-top:4px}.rp{font-weight:600}
+        .k-dur{background:color-mix(in srgb,var(--dikkat) 10%,var(--s1));border-color:color-mix(in srgb,var(--dikkat) 45%,var(--bd));box-shadow:inset 3px 0 0 var(--dikkat)}.k-dur b{font-size:var(--yz-3);text-transform:uppercase;letter-spacing:.06em}  /* 19 Kasım (K1): DUR ilk bakışta ayrılır */
+        .daha{display:block;width:100%;text-align:left;margin:0 0 8px;padding:6px 8px;border:1px dashed var(--bd2);border-radius:var(--kose);color:var(--t2)}
+        .dahasi{max-height:0;overflow:hidden}.list.hepsi .dahasi{max-height:none;overflow:visible}  /* K2: tek kart + sayaç; öbürleri sayaca dokununca */
+        .row button.rb.etk{width:auto;padding:0 10px 0 8px;gap:5px;border-radius:var(--kose-tam);font-size:var(--yz-2);font-weight:600}
+        .row button.rb.ek,.row .ay{display:none}.row.ekler button.rb.ek,.row.ekler .ay{display:inline-flex}.row .ay{align-self:center}  /* K2: üç etiketli kısayol + ⋯ */
+        .row button.rb.dh.on{color:var(--ac);border-color:var(--ac)}
         .yeni{animation:p 1s 3}@keyframes p{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ac) 75%,transparent)}100%{box-shadow:0 0 0 12px transparent}}
         @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
     function ensure() {
@@ -622,7 +633,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       root = host.attachShadow({ mode: "open" });
       const st = el("style"); st.textContent = CSS;
       const w = el("div", "w"), satir = el("div", "row"); satir.setAttribute("role", "toolbar");
-      for (const [k, ic, ad] of KISAYOL) { const b = el("button", "rb"); b.type = "button"; b.dataset.ks = k; b.append(ikon(document, ic)); satir.append(b); if (k === "gizli") satir.append(el("span", "ay")); }
+      for (const [k, ic, ad] of KISAYOL) { const b = el("button", "rb" + (ANA_KS.includes(k) ? " etk" : " ek")); b.type = "button"; b.dataset.ks = k; b.append(ikon(document, ic)); if (ANA_KS.includes(k)) b.append(el("span", "ad")); satir.append(b); if (k === "gizli") satir.append(el("span", "ay")); }
+      const dh = el("button", "rb dh"); dh.type = "button"; dh.dataset.rdaha = "1"; dh.append(ikon(document, "dahasi")); satir.append(dh); satir.classList.toggle("ekler", satirAcik);  // ⋯: öbür kısayollar satırda açılır
       w.append(el("div", "list"), el("div", "pill"), satir); satirDil();
       root.append(st, w); document.body.appendChild(host);
       root.addEventListener("click", tikla); root.addEventListener("pointerdown", ptrAsagi); root.addEventListener("pointermove", ptrTasi);
@@ -633,9 +645,13 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     // kısayol satırı: panodaki kısayollar (aynı aktarıcı uçları, anahtarlı rf); Konuş basılı tutulur (aktarıcı /bas-konus: basla + ses)
     const KISAYOL = [["konus", "mic", "Konuş"], ["ne", "replik", "Ne diyeyim?"], ["onemli", "star", "Önemli an"], ["kanit", "cam", "Kanıt"], ["sessiz", "mute", "Sessiz"], ["ceviri", "kulak", "Sesli çeviri"], ["gizli", "kilit", "Gizli toplantı"], ["ayar", "disli", "Ayarlar"], ["sabit", "pin", ""]];
     const KS_IPUCU = { konus: "Konuş — basılı tut, bırakınca sorar", sabit: sb => sb ? "Şeridi sabitlemeyi bırak" : "Şeridi açık tut" };
+    const ANA_KS = ["konus", "ne", "kanit"];  // 19 Kasım (K2): satırda etiketli üç kısayol; öbürleri ⋯ ile (açık olan varsa ⋯ vurgulu)
     let konum = null, sabit = false, ksDurum = {};
     function satirDil() {
       if (!root) return;
+      const dh = root.querySelector("button[data-rdaha]");
+      if (dh) { const t = L("Diğer"); dh.title = t; dh.setAttribute("aria-label", t); dh.setAttribute("aria-expanded", String(satirAcik)); dh.classList.toggle("on", KISAYOL.some(([k]) => !ANA_KS.includes(k) && (k === "sabit" ? sabit : !!ksDurum[k]))); }
+      root.querySelectorAll("button[data-ks] .ad").forEach(s => { s.textContent = L(KISAYOL.find(x => x[0] === s.parentNode.dataset.ks)[2]); });
       root.querySelectorAll("button[data-ks]").forEach(b => { const k = b.dataset.ks, a = KISAYOL.find(x => x[0] === k)[2];
         const t = L(k === "sabit" ? KS_IPUCU.sabit(sabit) : KS_IPUCU[k] || a); b.title = t; b.setAttribute("aria-label", t); b.classList.toggle("on", k === "sabit" ? sabit : !!ksDurum[k]); b.setAttribute("aria-pressed", k === "sabit" ? String(sabit) : ksDurum[k] != null ? String(!!ksDurum[k]) : "false"); });
     }
@@ -732,8 +748,14 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       setTimeout(() => { b.disabled = false; }, 600);
     }
     // hap: kartların listesini hapın üstünde aç/kapat
-    function hapTik() { acik = !acik; root.querySelector(".w").classList.toggle("acik", acik); konumUygula(); }  // açık: kısayol düğmeleri yana, kart listesi alta/üste
+    function hapTik() { acik = !acik; if (!acik) dahaAcik = false; root.querySelector(".w").classList.toggle("acik", acik); dahaCiz(root.querySelector(".list")); konumUygula(); }
+    // K2: listede tek kart (en önemlisi) + "+N kart" sayacı; öbürleri sayaca dokununca açılır (DOM'da durur: ✓/✕ ve sesli komut aynı)
+    function dahaCiz(list) { if (!list) return; list.classList.toggle("hepsi", dahaAcik); const b = list.querySelector("button.daha"), ds = list.querySelector(".dahasi");
+      if (b) { b.textContent = dahaAcik ? L("Daha az göster") : L("+{n} kart", { n: ds ? ds.children.length : 0 }); b.setAttribute("aria-expanded", String(dahaAcik)); }
+      if (ds) { if (dahaAcik) ds.removeAttribute("aria-hidden"); else ds.setAttribute("aria-hidden", "true"); } }  // açık: kısayol düğmeleri yana, kart listesi alta/üste
     function tikla(ev) {
+      if (ev.target.closest("button[data-rdaha]")) { satirAcik = !satirAcik; root.querySelector(".row").classList.toggle("ekler", satirAcik); satirDil(); konumUygula(); return; }
+      const db = ev.target.closest("button.daha"); if (db) { dahaAcik = !dahaAcik; dahaCiz(root.querySelector(".list")); return; }
       const kb = ev.target.closest("button[data-ks]"); if (kb) { if (kb.dataset.ks !== "konus") ksTikla(kb); return; }
       if (Date.now() - surSon < 350) return;  // sürükleme bırakılırken tıklama sayılmaz
       if (ev.target.closest(".pill")) return hapTik();
@@ -787,7 +809,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       if (v.ertelenen) list.append(ust("pause", L("{n} kart sonraya bırakıldı", { n: v.ertelenen })));
       if (dil) list.append(ust("uyari", L("Döküm dili yanlış — panoya bak"), "top uy"));
       if (warn) list.append(ust("uyari", warn, "top uy"));
-      cards.forEach(c => {
+      let ds = null;
+      cards.forEach((c, i) => {
+        if (i === 1) { list.append(e("button", "daha")); ds = e("div", "dahasi"); list.append(ds); }
         const k = e("div", "k k-" + c.kind); k.dataset.id = c.id; k.style.setProperty("--kc", COL[c.kind]);
         if (c.onay) k.dataset.onay = "1"; else k.title = L("Dokun: kapat");
         const m = e("div", "m"); const bb = e("b"); if (c.geri) bb.append(d.createTextNode("↩ ")); bb.append(ikon(d, KI[c.onay ? "onay" : c.replik ? "replik" : c.kind] || "liste"), d.createTextNode(L(c.onay ? "Onay bekliyor" : c.replik ? "Ne diyeyim" : KL[c.kind] || "Not"))); m.append(bb);
@@ -800,8 +824,9 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
         (c.onay ? [["onaylandi", ["check", L("Onayla")], "Onayla"], ["reddedildi", ["x", L("Reddet")], "Reddet"]] :
         [["yapildi", ["check"], "Yaptım"], ["ertele", ["pause"], "Sonra: gündemde sıradaki maddede (gündem yoksa 5 dk sonra) yeniden göster"], ["gecildi", ["x"], "Gerek yok — bir daha önerilmesin"]].filter(([st]) => st !== "yapildi" || !["cevap", "not"].includes(c.kind)))
           .forEach(([st, lbl, tip]) => { const x = e("button"); x.append(ikon(d, lbl[0])); if (lbl[1]) x.append(e("span", null, lbl[1])); x.dataset.ack = st; x.dataset.id = c.id; x.title = L(tip); a.append(x); });
-        k.append(m, a); list.append(k);
+        k.append(m, a); (ds || list).append(k);
       });
+      dahaCiz(list);
       qs.forEach(q => { const x = e("div", "q", " " + (q.tur === "ozet" ? L("Ne diyeyim? — replik hazırlanıyor…") : L(q.tur === "girdi" ? "İletildi: " : "Soruldu: ") + q.text)); x.prepend(ikon(d, "saat")); list.append(x); });
       if (!cards.length && !qs.length && !dil && !warn) list.append(e("div", "bos", L("Şimdilik kart yok")));
     }
@@ -854,7 +879,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
       }
       // Mac kart katmanı kartları ekranın alt ortasında gösteriyorsa (aktarıcı kart_katmani: true) şerit kartları yinelemez; alan yoksa eski aktarıcı = false
       const katman = v.kart_katmani === true;
-      const cards = katman ? [] : (v.cards || []).filter(c => KL[c.kind]), qs = v.questions || [], live = inMeeting();  // NOT kartı şeritte değil
+      const cards = katman ? [] : kartSirala((v.cards || []).filter(c => KL[c.kind])), qs = v.questions || [], live = inMeeting();  // NOT kartı şeritte değil
       const warn = v.uyari || ""; // disk dolu / az yer — kart olmasa da şerit görünür
       const dil = (v.dil && v.dil.uyari) || ""; // konuşma dili beklenenden farklı (ayrıntı panoda)
       dilHedef = (v.dil && v.dil.hedef) || null;

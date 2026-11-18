@@ -85,7 +85,7 @@ def prova_tur_sayisi():  # ayar prova_tur (1–4, varsayılan 2): her turda her 
 PROVA_PAKET_KR = 3400  # rol önerisi ve rapor isteminin başındaki kişi modeli paketinin (brifing amacı: profil, öğrenilenler, bugün, açık işler, ilgili notlar) üst sınırı
 def _pv_paket(konu):  # → kullanıcı ve gün bağlamı (+ konu seçili takvim toplantısıysa katılımcı eşleşmesi) ya da "". Süzgeç baglam_paketi'nde (gizli kipte yalnız profil/öğrenilenler; katılımcı bloğu hiç)
     p = baglam_paketi("brifing", soru=konu, en_cok_kr=PROVA_PAKET_KR) if "baglam_paketi" in globals() else ""
-    if "gizli_acik" in globals() and gizli_acik(): return p
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return p
     try:
         if "katilimci_view" in globals():  # takvim-secilen.json: Başlat'ta seçilen olay; yalnız prova konusu o toplantının başlığıyla örtüşüyorsa (başka toplantının kişileri karışmasın)
             ol = (json.load(open(os.path.join(BASE, "takvim-secilen.json"), encoding="utf-8")) or {}).get("olay") or {}

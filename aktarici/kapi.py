@@ -6,7 +6,7 @@
 #     cagri: argümansız işlev → (ham, hata) (eylem-menu.py _eylem_cagri). coz: isteğe bağlı ham → çözülmüş cevap (boşsa "okunamadi"). karma: girdi karması (aday kimlikleri).
 #   Sıra: 1) izin (kapi_engel; ÇAĞRIDAN ÖNCE) 2) tekrar önleme (iş + karma) 3) arka plan işi ön plan turu bitene dek bekler, ortak sıraya (KAPI_SEM, 2) girer; ön plan sırayı atlar
 #         4) çağrı (thread-local KAPI_YEREL: içteki eylem_model kapıya yeniden girmez; claude_json satırı buraya bırakır) 5) tek satır kayıt claude-cagri.jsonl.
-#   İzin tablosu KAPI_TABLO (iş türü → kurallar). plan "arka" (kendiliğinden) / "on" (kullanıcı istedi). Arka plan: gizli kip, toplantı sürüyor, (sessiz: True ise) sessiz mod,
+#   İzin tablosu KAPI_TABLO (iş türü → kurallar). plan "arka" (kendiliğinden) / "on" (kullanıcı istedi). Gizli kip HER iş türünde engel (19 Kasım; kapi_model, fail-closed). Arka plan: toplantı sürüyor, (sessiz: True ise) sessiz mod,
 #     (saat "mesai") mesai dışı (ayar calisma_saatleri) ve gece (soz_gece_bas/bit, 22–07) ile ortak günlük tavan (ayar arka_gunluk_usd; yoksa degerlendir_gunluk_usd, o da yoksa 3 $).
 #     Tek saat istisnası gece düşünmesi (dusunme ve onun turunda koşan mutabakat; karar 16 Kasım): saat kuralı yok, tavana girer. Ön plan (eylem, talimat, e-posta taslağı) tavansız, saatsiz.
 #     saglayici "claude": metin yalnız claude-code uyarlayıcısına (S141/S222 e-posta); başka sağlayıcı seçiliyse claude-code ile çağrılır, o da yoksa engel.
@@ -25,7 +25,7 @@ KAPI_TEKRAR_HATA_SN = (1800, 7200, 28800)
 KAPI_BEKLE_SN, KAPI_SIRA_SN, KAPI_OZET_SN = 60, 180, 3600
 KAPI_ARKA_EK = ("giris", "kesisim-coz")  # tavanla durdurulmayan (giriş yoklaması) ya da eski adlı (K2 öncesi kesişim) arka plan satırları: harcamaları yine ortak toplama sayılır
 _KAPI_ARKA = {"plan": "arka", "gizli": True, "toplanti": True, "sessiz": False, "saat": "mesai", "tavan": True, "saglayici": None, "tekrar_sn": 1800}
-_KAPI_ON = {"plan": "on", "gizli": False, "toplanti": False, "sessiz": False, "saat": None, "tavan": False, "saglayici": None, "tekrar_sn": 0}
+_KAPI_ON = {"plan": "on", "gizli": True, "toplanti": False, "sessiz": False, "saat": None, "tavan": False, "saglayici": None, "tekrar_sn": 0}
 KAPI_TABLO = {
     "degerlendir:gun_ici": dict(_KAPI_ARKA, sessiz=True),
     "degerlendir:toplanti_sonrasi": dict(_KAPI_ARKA, sessiz=True),
@@ -38,7 +38,7 @@ KAPI_TABLO = {
     "talimat": dict(_KAPI_ON),
     "eposta_taslak": dict(_KAPI_ON, saglayici="claude"),
     # v0.244.0 (Claude kapısı K2): kalan arka plan işleri ve Brifing.app'li ön plan işleri
-    "giris": dict(_KAPI_ARKA, gizli=False, tavan=False, tekrar_sn=0),  # seyrek giriş yoklaması (claude-giris.py): içerik yok; toplantıda, gece ve mesai dışında yok (karar 16 Kasım)
+    "giris": dict(_KAPI_ARKA, tavan=False, tekrar_sn=0),  # seyrek giriş yoklaması (claude-giris.py): içerik yok; toplantıda, gece ve mesai dışında yok (karar 16 Kasım); 19 Kasım: gizli kipte de yok
     "telaffuz:sozluk": dict(_KAPI_ARKA, tekrar_sn=0),  # sözlük değişince toplu okunuş tamamlama
     "telaffuz": dict(_KAPI_ARKA, toplanti=False, saat=None, tekrar_sn=0),  # okunan metindeki bilinmeyen sözcükler: konuşmayı besler (toplantıda ve akşam Konuş'ta da); gizli kipte yok
     "kesisim": dict(_KAPI_ARKA, tekrar_sn=0),  # günlük kesişim çözücü (relay.py kesisim_tur → kesisim-coz.py model_cagir); 07:45 yerine fiilen mesai başında
@@ -46,8 +46,8 @@ KAPI_TABLO = {
     "prova": dict(_KAPI_ON),
     # v0.246.0 (K4): doğrudan açanlar ve kalıcı süreçlerin AÇILIŞI. Araştırma tek çağrı (kapi_iste; gizli kipte yok, S208 toplantı sınırı kendi bölümünde).
     # Kalıcı süreçler (Konuş, çeviri, toplantı oturumu) yalnız açılışta kapi_ac'tan geçer: izin + sayaç; tur içi akış, sıra ve satır kaydı kendi bölümlerinde (çift sayım yok).
-    "arastirma": dict(_KAPI_ON, gizli=True),
-    "konus-ac": dict(_KAPI_ON),  # gizli kipte de açılır (Konuş'un kendi gizli kuralları web/bilgi parçalarında)
+    "arastirma": dict(_KAPI_ON),
+    "konus-ac": dict(_KAPI_ON),  # 19 Kasım: gizli kipte açılmaz (tek model kapısı kapi_model; önceden açılırdı)
     "ceviri-ac": dict(_KAPI_ON),
     "toplanti-ac": dict(_KAPI_ON),  # toplantı oturumu yalnız toplantıda çalışır: toplantı kuralı yok; yeniden açılış (bekçi) da buradan
 }
@@ -80,6 +80,24 @@ def _kapi_cagir(ad, v=False):
     if not f: return v
     try: return f()
     except Exception: return v
+# --- TEK model kapısı: gizli kip (19 Kasım, kullanıcı kararı: gizli kipte HİÇBİR Claude / yapay zekâ çağrısı yok — prova, eylem menüsü, e-posta taslağı,
+# Konuş, çeviri, toplantı oturumu, giriş yoklaması dahil). Her model çağrısı (tek çağrı ve kalıcı sürecin açılışı) alt süreci başlatmadan HEMEN ÖNCE kapi_model'den
+# geçer; kapi_engel (kapi_iste, kapi_ac) de ilk iş onu sorar. Varsayılan KAPALI: gizli_acik yoksa ya da hata verirse gizli sayılır. Çağrı yerleri: test/gizli-kapi.py.
+KAPI_MODEL = {"gecti": 0, "engel": 0}  # yalnız sayı (/status kapi.model)
+def kapi_gizli():  # → True: gizli kip açık YA DA belirlenemiyor (fail-closed)
+    f = globals().get("gizli_acik")
+    if not callable(f): return True
+    try: return bool(f())
+    except Exception: return True
+def kapi_model(is_turu="", say=True):  # → None (model çağrılabilir) ya da neden ("gizli kip"). say: alt süreç başlatan yer (True) sayaca girer; kapi_engel'in ön sorusu (False) girmez
+    if kapi_gizli():
+        if say:
+            with KAPI_KILIT: KAPI_MODEL["engel"] += 1
+            if KAPI_MODEL["engel"] == 1 or KAPI_MODEL["engel"] % 50 == 0: print(f"KAPI: model çağrısı engellendi — gizli kip ({str(is_turu)[:40]})")
+        return "gizli kip"
+    if say:
+        with KAPI_KILIT: KAPI_MODEL["gecti"] += 1
+    return None
 def _kapi_gun(t): return datetime.date.fromtimestamp(float(t)).isoformat()
 def _kapi_mesai(simdi):
     try: g, b, e = calisma_saatleri()
@@ -129,7 +147,7 @@ def kapi_tavan_asildi(simdi=None): return _kapi_usd_yukle(simdi)["usd"] >= kapi_
 # --- İzin ---------------------------------------------------------------------------------------------------------------------------------------------
 def kapi_engel(is_turu, simdi=None, tavan=True):  # → None (çağrılabilir) ya da neden. ÇAĞRIDAN ÖNCE; kaynaklar ön denetim için de çağırır (toplanti-sonrasi.py _pro_engel)
     r = kapi_kural(is_turu); simdi = float(simdi or KAPI_SAAT())
-    if r.get("gizli") and _kapi_cagir("gizli_acik"): return "gizli kip"
+    if kapi_model(is_turu, say=False): return "gizli kip"  # 19 Kasım: tablodaki "gizli" alanından bağımsız, her iş türünde (fail-closed)
     if r.get("plan") == "arka":
         if r.get("toplanti") and kapi_toplanti(): return "toplantı sürüyor"
         if r.get("sessiz") and _kapi_cagir("sessiz_acik"): return "sessiz mod"
@@ -168,6 +186,7 @@ def kapi_dosya(klasor, on_ek, uzanti="json"):  # çağrı başına benzersiz ist
     with KAPI_KILIT: KAPI["n"] += 1; n = KAPI["n"]
     return os.path.join(klasor, f"{on_ek}-{os.getpid()}-{n}-{secrets.token_hex(3) if 'secrets' in globals() else int(time.time() * 1000) % 100000}.{uzanti}")
 def kapi_brifing(ist, on_ek, zaman, klasor=None):  # v0.244.0: tek Brifing.app istemcisi (eskiden 5 kopya). ist: {"claude","args","cwd","sure"}; → ham çıktı metni ya da None (cevap yok)
+    if kapi_model(on_ek): return None  # tek model kapısı (gizli kip; çağıran "cevap yok" sayar)
     d = klasor or BASE; os.makedirs(d, exist_ok=True); cikti, istek = kapi_dosya(d, on_ek + "-cikti"), kapi_dosya(d, on_ek + "-istek")  # çağrı başına benzersiz
     fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(dict(ist, cikti=cikti), f, ensure_ascii=False)
@@ -284,4 +303,4 @@ def kapi_view():  # /status "kapi"
     u = _kapi_usd_yukle(simdi)
     gi = globals().get("GIRIS")  # v0.244.0: sağlık tek yoldan (her çağrının sonucu + seyrek yoklama; claude-giris.py)
     sag = {"durum": gi.get("durum"), "son_ok": round(gi["son_ok"]) if gi.get("son_ok") else None, "son_yokla": round(gi["son_yokla"]) if gi.get("son_yokla") else None} if isinstance(gi, dict) else None
-    return {"bugun": g, "arka_usd": round(u["usd"], 3), "tavan_usd": kapi_tavan_usd(), "aktif": KAPI["aktif"], "engel": dict(en), "tekrar_bekleyen": sum(1 for h in list(KAPI["tekrar"].values()) if h["bitis"] > simdi), "saglik": sag}
+    return {"bugun": g, "arka_usd": round(u["usd"], 3), "tavan_usd": kapi_tavan_usd(), "aktif": KAPI["aktif"], "engel": dict(en), "model": dict(KAPI_MODEL), "tekrar_bekleyen": sum(1 for h in list(KAPI["tekrar"].values()) if h["bitis"] > simdi), "saglik": sag}

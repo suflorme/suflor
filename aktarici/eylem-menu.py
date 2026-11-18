@@ -64,7 +64,7 @@ def kayit_eylem_islem(p):  # POST /kayit-eylem
 def marvin_kayit_baslat(p):  # POST /girdi {"kayit": kimlik, "text": görünen soru}: kayıt + bağlam → Konuş'un yazılı turu (cevap sohbet panelinde); → {"ok", "kayit"} ya da {"ok": False, "err"}
     y = _yapi_mod(); p = p if isinstance(p, dict) else {}; kid = str(p.get("kayit") or "")[:40]
     if not y or not kid: return {"ok": False, "err": "kayıt yok"}
-    if "gizli_acik" in globals() and gizli_acik(): return {"ok": False, "err": "gizli"}  # gizli kipte toplantı kaynaklı kayıt asistana gitmez
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return {"ok": False, "err": "gizli"}  # gizli kipte toplantı kaynaklı kayıt asistana gitmez
     try: blok, hata = y.marvin_kayit_blogu(BASE, kid, str(AYAR.get("ad") or ""))
     except Exception as e: print(f"EYLEM MENÜSÜ: asistana sor — blok kurulamadı ({e.__class__.__name__})"); return {"ok": False, "err": e.__class__.__name__}
     if hata: return {"ok": False, "err": hata}

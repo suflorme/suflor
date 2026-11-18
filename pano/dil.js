@@ -69,6 +69,8 @@ globalThis.SUFLOR_EN = {
   "Hazır — toplantı bekleniyor": "Ready — waiting for a meeting",
   "bağlam": "context",
   "Dokun: kapat": "Tap to close",
+  "Dokun: aç": "Tap to open",
+  "+{n} kart": "+{n} more",
   "Gerek yok — bir daha önerilmesin": "Not needed — don't suggest it again",
   "bilinmiyor": "unknown",
   "Panoyu aç": "Open panel",

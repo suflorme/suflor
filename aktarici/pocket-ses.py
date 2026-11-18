@@ -108,7 +108,9 @@ def pocket_view():
 def pocket_bos_sn():
     try: d = float(AYAR.get("pocket_bos_dk", 10))
     except (TypeError, ValueError): d = 10.0
-    return d * 60 if d > 0 else 0  # 0 = hiç kapanmaz
+    sn = d * 60 if d > 0 else 0  # 0 = hiç kapanmaz
+    if sn and "pocket_bos_dk" not in AYAR and "bos_tut_sn" in globals(): sn = bos_tut_sn(sn)  # v0.251.1: ayarda süre yazılı değilse bellek rahatken uzar (kaynak.py)
+    return sn
 def _pocket_geri_cekil(neden, oldur=False):  # yeniden başlatma bekleme çizelgesi: 15, 30, 60 … 600 sn (art arda; başarılı okuma sıfırlar)
     n = POCKET["yk"]; bek = min(600, 15 * 2 ** n); POCKET["yk"] = n + 1; POCKET["sonraki_t"] = time.time() + bek
     with POCKET["kilit"]:

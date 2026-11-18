@@ -1238,7 +1238,7 @@ def konus_ac():  # açık süreç yoksa açar (Brifing.app, FIFO); ilk tur ısı
         sec = konus_secim(); _KS["saglayici"] = sec.get("saglayici") or sec["tur"]  # v0.122.0: iş başına sağlayıcı (ayar beyin.konus); yedekte Claude Code
         cl = claude_yolu() if sec["tur"] == "claude-code" else "beyin"
         if not cl or not os.path.isdir(BRIFING_APP): _konus_kur(durum="hata", hata=_t("Claude Code ya da brifing yardımcısı yok — aktarici-kur.command", "Claude Code or the briefing helper is missing — aktarici-kur.command")); return False
-        kn = kapi_ac("konus-ac") if "kapi_ac" in globals() else None  # v0.246.0 (K4): Konuş sürecinin açılışı kapıdan (izin + sayaç; bekleme yok, tur kaydı _konus_kayit_yaz'da)
+        kn = (kapi_ac("konus-ac") or kapi_model("konus-ac")) if "kapi_ac" in globals() else "kapı yok"  # 19 Kasım: tek model kapısı, kapı yoksa açılmaz (fail-closed); v0.246.0 (K4): Konuş sürecinin açılışı kapıdan (izin + sayaç; bekleme yok, tur kaydı _konus_kayit_yaz'da)
         if kn: _konus_kur(durum="hata", hata=_t("Konuş açılmadı: ", "Talk did not open: ") + kn); return False
         gir, cik, istek = (os.path.join(BASE, f) for f in ("konus-giris.fifo", "konus-cikis.fifo", "konus-istek.json"))
         for f in (gir, cik):

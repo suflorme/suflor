@@ -83,12 +83,12 @@ def satirlar(N, ad="claude-cagri.jsonl"):
 N = kur("tablo")
 ARKA = [k for k, r in N["KAPI_TABLO"].items() if r["plan"] == "arka"]; ON = [k for k, r in N["KAPI_TABLO"].items() if r["plan"] == "on"]
 SAATSIZ = {"dusunme", "degerlendir:mutabakat", "telaffuz"}  # telaffuz (okunan sözcük): konuşmayı besler, saat kuralı yok (K2)
-GIZLISIZ = {"giris"}; TOPLANTISIZ = {"telaffuz"}; TAVANSIZ = {"giris"}  # K2 istisnaları: giriş yoklaması içerik taşımaz; telaffuz toplantıda konuşmayı besler
+TOPLANTISIZ = {"telaffuz"}; TAVANSIZ = {"giris"}  # K2 istisnaları: giriş yoklaması içerik taşımaz; telaffuz toplantıda konuşmayı besler
 ok("tablo: K1 işleri var (6 değerlendirici, düşünme, eylem, talimat, e-posta taslağı)", set(N["KAPI_TABLO"]) >= {"degerlendir:gun_ici", "degerlendir:toplanti_sonrasi", "degerlendir:belge_oneri", "degerlendir:is_kopya",
    "degerlendir:eposta", "degerlendir:mutabakat", "dusunme", "eylem", "talimat", "eposta_taslak"}, sorted(N["KAPI_TABLO"]))
 ok("mesai içinde, olağan durumda hiçbir iş engellenmez", all(N["kapi_engel"](k, CAR) is None for k in N["KAPI_TABLO"]), {k: N["kapi_engel"](k, CAR) for k in N["KAPI_TABLO"]})
 N["DURUM"]["gizli"] = True
-ok("gizli kip: tüm arka plan işleri (içeriksiz giriş yoklaması hariç) engel, ön plan serbest (K4: web araştırması hariç)", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ARKA if k not in GIZLISIZ) and N["kapi_engel"]("giris", CAR) is None and all(N["kapi_engel"](k, CAR) is None for k in ON if k != "arastirma") and N["kapi_engel"]("arastirma", CAR) == "gizli kip")
+ok("gizli kip (19 Kasım): HER iş türü engel — arka plan, ön plan (prova, eylem, e-posta taslağı, brifing), giriş yoklaması, kalıcı süreç açılışları", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ARKA + ON))
 N["DURUM"]["gizli"] = False; N["DURUM"]["toplanti"] = True
 ok("toplantı sürerken: arka plan engel (toplantı sürüyor; okunan sözcük telaffuzu hariç), ön plan serbest", all(N["kapi_engel"](k, CAR) == "toplantı sürüyor" for k in ARKA if k not in TOPLANTISIZ) and N["kapi_engel"]("telaffuz", CAR) is None and all(N["kapi_engel"](k, CAR) is None for k in ON))
 N["DURUM"]["toplanti"] = False; N["DURUM"]["sessiz"] = True
@@ -144,8 +144,9 @@ N["eylem_model"]("x"); c = satirlar(N)[-1]; ok("Claude is_error → sonuc hata",
 N["DURUM"]["is_error"] = False
 N["claude_json"](json.dumps({"result": "r", "total_cost_usd": 0.02, "usage": {"input_tokens": 10, "output_tokens": 5}}), "brifing", time.time(), False)
 c = satirlar(N)[-1]; ok("kapı dışı claude_json (brifing vb.) da aynı yeni alanlarla yazar", c["is"] == "brifing" and c["sonuc"] == "tamam" and c["onbellek_oku"] == 0 and c["cikti"] == 5 and "plan" not in c, c)
-N["DURUM"]["gizli"] = True; n0 = len(satirlar(N)); N["eylem_model"]("x", amac="talimat")
-ok("gizli kipte ön plan çağrısı yapılır; satır (yalnız sayı) bugünkü gibi yazılır", N["DURUM"]["run"] >= 4 and len(satirlar(N)) == n0 + 1 and "x" not in json.dumps(satirlar(N)[-1]).replace("max", ""))
+N["DURUM"]["gizli"] = True; n0 = len(satirlar(N)); r0 = N["DURUM"]["run"]; r = N["eylem_model"]("x", amac="talimat")
+ok("gizli kipte ön plan çağrısı da YAPILMAZ (19 Kasım): kapı engeli, Brifing.app açılmaz, satır yok", r == (None, "kapı: gizli kip") and N["DURUM"]["run"] == r0 and len(satirlar(N)) == n0, r)
+ok("gizli kipte kapi_brifing doğrudan çağrılsa da Brifing.app açılmaz (alt süreç kapısı)", N["kapi_brifing"]({"claude": "/x/claude", "args": ["-p", "x"], "cwd": T, "sure": 5}, "eylem", 5) is None and N["DURUM"]["run"] == r0 and N["kapi_view"]()["model"]["engel"] >= 1)
 N["DURUM"]["gizli"] = False
 
 # --- 4) S141: e-posta yalnız Claude --------------------------------------------------------------------------------------------------------------
@@ -279,7 +280,7 @@ ok("K2 tablo satırları: giris, telaffuz:sozluk, telaffuz, kesisim (arka), brif
 N["DURUM"]["toplanti"] = True
 ok("toplantıda: sözlük taraması ve kesişim bekler, okunan sözcük telaffuzu çalışır", N["kapi_engel"]("telaffuz:sozluk", CAR) == "toplantı sürüyor" and N["kapi_engel"]("kesisim", CAR) == "toplantı sürüyor" and N["kapi_engel"]("telaffuz", CAR) is None)
 N["DURUM"]["toplanti"] = False; N["DURUM"]["gizli"] = True
-ok("gizli kipte telaffuz (iki türü) ve kesişim yok; giriş yoklaması (içerik yok) olur", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ("telaffuz", "telaffuz:sozluk", "kesisim")) and N["kapi_engel"]("giris", CAR) is None)
+ok("gizli kipte telaffuz (iki türü), kesişim ve giriş yoklaması yok (19 Kasım)", all(N["kapi_engel"](k, CAR) == "gizli kip" for k in ("telaffuz", "telaffuz:sozluk", "kesisim", "giris")))
 N["DURUM"]["gizli"] = False
 ok("gece ve hafta sonu: giriş yoklaması, sözlük telaffuzu ve kesişim yok; okunan sözcük telaffuzu olur", all(N["kapi_engel"](k, GECE) == "gece" and N["kapi_engel"](k, CMT) == "mesai dışı" for k in ("giris", "telaffuz:sozluk", "kesisim"))
    and N["kapi_engel"]("telaffuz", GECE) is None)
@@ -394,7 +395,10 @@ ok("K3: claude_json structured_output varsa onu JSON metni olarak döndürür", 
 N = kur("k4"); D = N["DURUM"]
 ok("K4: kapi_ac izin verir, açılış sayılır (bugun.acilis), satır yazılmaz", N["kapi_ac"]("konus-ac") is None and N["kapi_ac"]("konus-ac") is None and N["kapi_view"]()["bugun"]["acilis"] == {"konus-ac": 2} and satirlar(N) == [], N["kapi_view"]()["bugun"])
 D["gizli"] = True; D["toplanti"] = True
-ok("K4: Konuş, çeviri ve toplantı oturumu açılışı gizli kipte ve toplantıda engellenmez (kurallar kendi bölümlerinde)", all(N["kapi_ac"](x) is None for x in ("konus-ac", "ceviri-ac", "toplanti-ac")))
+ok("K4 + 19 Kasım: Konuş, çeviri ve toplantı oturumu açılışı gizli kipte engellenir", all(N["kapi_ac"](x) == "gizli kip" for x in ("konus-ac", "ceviri-ac", "toplanti-ac")))
+D["gizli"] = False
+ok("K4: Konuş, çeviri ve toplantı oturumu açılışı toplantıda engellenmez (kurallar kendi bölümlerinde)", all(N["kapi_ac"](x) is None for x in ("konus-ac", "ceviri-ac", "toplanti-ac")))
+D["gizli"] = True
 ok("K4: araştırma gizli kipte engel", N["kapi_engel"]("arastirma") == "gizli kip")
 D["gizli"] = False; D["saat"] = CAR + 13 * 3600
 ok("K4: araştırma ön plan: gece ve toplantıda izinli", N["kapi_engel"]("arastirma") is None)

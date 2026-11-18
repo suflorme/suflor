@@ -95,6 +95,7 @@ def brifing_gundem_sonuc(j, gv, dil="tr"):  # model çıktısı + güncellik →
     return [s_[:420] for s_ in satir], ek_, yapi_
 BRIFING_BILGI_SN = 8  # bağlayıcının bağlanması (1 Kasım ölçümü ~6 sn); mesaj bu süre dolunca gider
 def _brifing_akis(istek, ist, istem, sure=300):  # FIFO kipi (bilgi kaynaklı brifing): Brifing.app'i açar, istemi BRIFING_BILGI_SN sonra yazar, girişi kapatır, result satırını döndürür
+    if (kapi_model("brifing") if "kapi_model" in globals() else "kapı yok"): return None  # tek model kapısı (aktarici/kapi.py; gizli kipte ya da kapı yoksa çağrı yok)
     gir, cik = (os.path.join(BASE, f) for f in ("brifing-giris.fifo", "brifing-cikis.fifo"))
     for f in (gir, cik):
         try: os.remove(f)
@@ -151,7 +152,7 @@ def _guncellik_epostalar():  # e-posta takibinin açık zincirleri (yalnız konu
     if not v.get("izin"): return []
     return [{"id": x.get("id"), "konu": x.get("konu"), "durum": d, "t": x.get("tarih"), "ad": x.get("kim")} for k, d in (("bekleyen", "senden_bekleniyor"), ("donus", "donus_bekliyorsun")) for x in (v.get(k) or []) if isinstance(x, dict)]
 def guncellik_view(olay, is_="hazirlik"):  # → yapi.guncellik çıktısı ya da None (gizli kip, yapi.py yok, hata)
-    if ("gizli_acik" in globals() and gizli_acik()) or not isinstance(olay, dict): return None
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()) or not isinstance(olay, dict): return None
     y = _yapi_mod() if "_yapi_mod" in globals() else None
     if not y or not hasattr(y, "guncellik_olay"): return None
     try: v = y.guncellik_olay(BASE, olay, str(AYAR.get("ad") or ""), epostalar=_guncellik_epostalar())
@@ -164,7 +165,7 @@ def guncellik_view(olay, is_="hazirlik"):  # → yapi.guncellik çıktısı ya d
     except Exception as e: print(f"GÜNCELLİK: karne yazılamadı ({e.__class__.__name__})")
     return v
 def _brifing_bloklar(olay, gv=None):  # → güncellik bloğu (yoksa kapanış turu bloğu) + katılımcı bloğu ("" olabilir). Gizli kipte hiçbiri; kapanış turu kapalıysa (ayar kapanis_turu) o blok yok. Hata brifingi durdurmaz.
-    if "gizli_acik" in globals() and gizli_acik(): return ""
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return ""
     out = []; olay = olay if isinstance(olay, dict) else {}
     if gv is not None and "_yapi_mod" in globals():  # güncellik katmanı: davet gündemi omurga + durum etiketli aday listesi (kapanış turunun kişiye göre listesinin yerine)
         try: out.append(_km_kes(_yapi_mod().guncellik_blogu(gv, "en" if ARAYUZ_DILI == "en" else "tr"), BRIFING_BLOK_KR["guncellik"]) + "\n")
@@ -188,7 +189,7 @@ def dis_kisilik():  # kişilik yuvası "dis" (dış işler asistanı) ya da None
     return next((k for k in kisilikler() if k.get("rol") == "dis"), None) if "kisilikler" in globals() else None
 def dis_etiket(): k = dis_kisilik(); return (kisilik_gorunen(k) if k else "Tazı") + " · " + _t("Dış taraf", "Outside parties")
 def brifing_dis_taraf(olay):  # → satırlar (en çok BRIFING_DIS_EN_COK); [] = bölüm yok
-    if ("gizli_acik" in globals() and gizli_acik()) or "dis_katilimcilar" not in globals() or not tazi_var(): return []  # tazi_var: ayar tazi kapalıyken ve Tazı hizmeti yokken de False
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()) or "dis_katilimcilar" not in globals() or not tazi_var(): return []  # tazi_var: ayar tazi kapalıyken ve Tazı hizmeti yokken de False
     try: dis, _belirsiz, _dav = dis_katilimcilar(olay if isinstance(olay, dict) else {})
     except Exception as e: print(f"BRİFİNG: dış taraf kurulamadı ({e.__class__.__name__})"); return []
     gor, var, yok, aday = set(), [], {}, {}
@@ -344,6 +345,7 @@ def claude_json(ham, is_, t0, yalin, saglayici=None, model=None):
 def beyin_tek(is_, sec, istem, json_kip=False, sistem=None, zaman=180):
     # Faz 11 Aşama 2: başka sağlayıcıda tek çağrı. Alt süreç (`beyin.py tek <istek>`; aktarıcı ağa kendisi bağlanmaz, anahtarı beyin.py Anahtar Zinciri'nden okur)
     # → (metin, ölçüm); ölçüm None ya da hata=True ise çağıran yedeğe (Claude Code) düşebilir.
+    if (kapi_model(is_) if "kapi_model" in globals() else "kapı yok"): return "", None  # tek model kapısı (gizli kipte ya da kapı yoksa sağlayıcıya gidilmez; yedek kol da kapi_brifing'de durur)
     istek = os.path.join(BASE, f"{is_}-beyin-istek-{os.getpid()}-{secrets.token_hex(4)}.json"); t0 = time.time(); ham = ""  # v0.243.0: çağrı başına benzersiz (eşzamanlı iki çağrı aynı dosyayı yazmasın)
     fd = os.open(istek, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(dict(BEYIN.tek_istek(AYAR, is_, istem, sistem, json_kip), zaman=zaman), f, ensure_ascii=False)

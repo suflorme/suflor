@@ -773,14 +773,24 @@ def is_kaydet(is_, sonuc, bit, q_n, isci_sn=None, acildi=False):
     _ISCI["son_is"] = {"kanal": r["kanal"], "sonuc": sonuc, "sure": r["is_sn"], "bit": bit}
     try: _log("whisper-isler.jsonl", r)
     except Exception: pass
+def wh_bos_sn():  # → boşta kapanma süresi (sn); 0 = hiç kapanmaz
+    if "whisper_bos_dk" in AYAR:
+        try: d = float(AYAR["whisper_bos_dk"]); return d * 60 if d > 0 else 0
+        except (TypeError, ValueError): pass
+    return bos_tut_sn(WH_BOSTA_KAPAT_SN) if "bos_tut_sn" in globals() else WH_BOSTA_KAPAT_SN
 def _isci_dongu():
-    w = STATE["whisper"]; hata_say = 0
+    w = STATE["whisper"]; hata_say = 0; t_bos = time.time()
     while True:
-        try: is_ = WH_Q.get(timeout=WH_BOSTA_KAPAT_SN)
+        # v0.251.1 (ses denetimi Ö6): boşta kalma süresi bellek rahatken 10 → 45 dk (kaynak.py bos_tut_sn; ayar whisper_bos_dk yazılıysa o, 0 = hiç kapanmaz);
+        # süre her dakika yeniden hesaplanır — bellek daralırsa işçi en geç 1 dk sonra 10 dk kuralına döner
+        try: is_ = WH_Q.get(timeout=min(60, WH_BOSTA_KAPAT_SN))
         except queue.Empty:
-            if toplanti_var(): continue  # toplantı içinde uzun sessizlikte (ekran paylaşımı) kapanıp 5 sn yeniden yüklenmesin
-            if _ISCI["p"]: _isci_kapat(f"{WH_BOSTA_KAPAT_SN // 60} dk ses yok, bellek boşaltıldı")
+            if toplanti_var(): t_bos = time.time(); continue  # toplantı içinde uzun sessizlikte (ekran paylaşımı) kapanıp 5 sn yeniden yüklenmesin
+            lim = wh_bos_sn()
+            if not lim or time.time() - t_bos < lim: continue
+            if _ISCI["p"]: _isci_kapat(f"{lim // 60:.0f} dk ses yok, bellek boşaltıldı")
             return
+        t_bos = time.time()
         w["kuyruk"] = WH_Q.qsize()
         if "gizli_acik" in globals() and gizli_acik(): continue  # v0.89.1: gizli toplantı — parça işlenmeden atılır, işçi açılmaz
         if is_.get("isinma"):  # toplantıdan önce modeli belleğe al (ilk cümle beklemesin)

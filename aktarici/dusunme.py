@@ -111,7 +111,7 @@ def dus_pencere():  # ayar dusunme_saat "03:00-06:00" → (başlangıç dk, biti
         if 0 <= b < e <= 1440: return b, e
     return 180, 360
 def _dus_yol(ad): return os.path.join(BASE, ad)
-def _dus_gizli(): return "gizli_acik" in globals() and bool(gizli_acik())
+def _dus_gizli(): return bool((kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()))  # 19 Kasım: fail-closed (kapi.py kapi_gizli)
 def _dus_kisa(x, n): x = " ".join(str(x or "").split()); return x if len(x) <= n else x[:n - 1].rstrip() + "…"
 def _dus_temiz(x, n):  # model metni → tek satır, sınırlı; işaretleme taşıyorsa "" (alan atılır)
     x = _dus_kisa(x, n * 2)

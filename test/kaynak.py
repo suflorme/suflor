@@ -30,6 +30,27 @@ ns["AYAR"]["kaynak_bekci"] = False; isle(olc(5), 3); ok("ayar kaynak_bekci: fals
 ns["KAYNAK"]["duzey"] = "normal"
 ns["AYAR"]["kaynak_dar_bos"] = 40; ok("eşikler ayardan değişir", ns["_kaynak_esikler"]()["dar"]["bos"] == 40); ns["AYAR"].pop("kaynak_dar_bos")
 v = ns["kaynak_view"](); ok("kaynak_view alanları", set(v) == {"duzey", "bos_yuzde", "takas_gb", "yuk", "t"})
+# --- v0.251.1: bellek rahatken boşta tutma 10 → 45 dk (bos_tut_sn / kaynak_rahat) ---
+K = ns["KAYNAK"]; K["duzey"] = "normal"; ns["_ram_gb"] = lambda: 32.0
+def rahat(bos=77, takas=0.0, t=None): K.update(bos_yuzde=bos, takas_gb=takas, t=time.time() if t is None else t, duzey="normal")
+rahat(); ok("rahat bellek (32 GB, boş %77): 600 sn → 2700 sn", ns["bos_tut_sn"](600) == 2700 and ns["kaynak_rahat"]())
+rahat(35); ok("boş %35 < %40: temel süre", ns["bos_tut_sn"](600) == 600)
+rahat(takas=2.5); ok("takas 2,5 GB: temel süre", ns["bos_tut_sn"](600) == 600)
+rahat(t=time.time() - 300); ok("ölçüm bayat (5 dk): temel süre", ns["bos_tut_sn"](600) == 600)
+rahat(); ns["_ram_gb"] = lambda: 8.0; ok("8 GB Mac: hiç uzamaz", ns["bos_tut_sn"](600) == 600); ns["_ram_gb"] = lambda: 32.0
+rahat(); K["duzey"] = "dar"; ok("düzey dar: temel süre", ns["bos_tut_sn"](600) == 600); K["duzey"] = "normal"
+rahat(); ns["AYAR"]["bos_uzun_dk"] = 30; ok("ayar bos_uzun_dk: 30 dk", ns["bos_tut_sn"](600) == 1800)
+ns["AYAR"]["bos_uzun_dk"] = 5; ok("bos_uzun_dk temelden küçükse temel kalır; 0 sn (hiç kapanmaz) bozulmaz", ns["bos_tut_sn"](600) == 600 and ns["bos_tut_sn"](0) == 0); ns["AYAR"].pop("bos_uzun_dk")
+ns["AYAR"]["kaynak_bekci"] = False; K["duzey"] = "normal"; ok("kaynak_bekci kapalı + ölçüm bayat → temel süre", (K.update(t=time.time() - 999) or ns["bos_tut_sn"](600)) == 600); ns["AYAR"].pop("kaynak_bekci")
+# Pocket ve Whisper bu yardımcıyı kullanır; ayarda açık süre yazılıysa dokunulmaz
+def _fn(dosya, ad):
+    return [d for d in ast.parse(open(os.path.join(KOD, "aktarici", dosya), encoding="utf-8").read()).body if isinstance(d, ast.FunctionDef) and d.name == ad]
+ns3 = {"AYAR": {}, "bos_tut_sn": ns["bos_tut_sn"], "WH_BOSTA_KAPAT_SN": 600}
+exec(compile(ast.Module(_fn("pocket-ses.py", "pocket_bos_sn") + _fn("whisper-hat.py", "wh_bos_sn"), []), "x", "exec"), ns3)
+rahat(); ok("Pocket: ayar yok + rahat → 45 dk", ns3["pocket_bos_sn"]() == 2700 and ns3["wh_bos_sn"]() == 2700)
+ns3["AYAR"].update(pocket_bos_dk=10, whisper_bos_dk=10); ok("açık ayar (10 dk) aynen: uzatma yok", ns3["pocket_bos_sn"]() == 600 and ns3["wh_bos_sn"]() == 600)
+ns3["AYAR"].update(pocket_bos_dk=0, whisper_bos_dk=0); ok("0 = hiç kapanmaz", ns3["pocket_bos_sn"]() == 0 and ns3["wh_bos_sn"]() == 0)
+K.update(bos_yuzde=None, takas_gb=None, t=None, duzey="normal")
 # --- dar düzeyde ertelenenler (kaynak kodundaki gerçek işlevler, sahte süreçlerle) ---
 src = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
 agac = ast.parse(src)

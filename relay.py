@@ -458,7 +458,10 @@ if os.path.exists(GIZLI_FP):  # dosya yok → kapalı; var ama okunamıyor/bozuk
 GIZLI_YUT = {"/ingest", "/taslak", "/ses", "/ses-yerel", "/ses-masaustu", "/kanit", "/kanit-masaustu", "/masaustu", "/masaustu-altyazi"}  # sessizce atılır
 GIZLI_RED = {"/note", "/ask", "/girdi", "/kanit-iste", "/bas-konus", "/baslat", "/brifing", "/baglam-dosya", "/card",
              "/etiket", "/eylem", "/eylem-sun", "/eylem-sesli", "/eylem-karar", "/eylem-sonuc", "/eylem-geri-al", "/moderator", "/otonom", "/agenda-tick",
-             "/geri-bildirim", "/komut", "/ilet", "/dusunme"}  # /komut yalnız tur=gizli geçer
+             "/geri-bildirim", "/komut", "/ilet", "/dusunme",
+             # 19 Kasım (tek model kapısı, aktarici/kapi.py kapi_model): Claude'a ya da dışarı gidebilen kalan uçlar — prova, eylem menüsü, kayda not,
+             # e-posta taslağı, kişisel tarih taslağı, iş kopyası, belge önerisi, mutabakat, Tazı, takvimden toplantı, araştırma iletimi
+             "/prova", "/kayit-eylem", "/kayit-not", "/eposta-onemli", "/yaklasan-tarihler", "/is-kopya", "/belge-oneri", "/mutabakat", "/tazi", "/takvim-toplanti", "/arastirma"}  # /komut yalnız tur=gizli geçer
 def gizli_acik(): return GIZLI["acik"]
 def gizli_red(): return {"ok": False, "gizli": True, "err": _t("Gizli toplantı açık — Suflor hiçbir şey dinlemiyor ve işlemiyor (🔒 ile kapat)", "Private meeting is on — Suflor isn't listening or processing anything (turn off with 🔒)")}
 def gizli_degistir(neden="kullanıcı"):
@@ -1027,11 +1030,41 @@ def acik_view():
     # yalnız süren toplantının (ya da dosyası bilinmeyen) soruları — önceki toplantıdan kalan soru panoda görünmez
     return [{"id": q.get("id"), "metin": q.get("metin"), "kim": q.get("kim"), "at": q.get("at")} for q in ACIK["list"]
             if q.get("durum") == "acik" and q.get("file") in (None, STATE["file"])]
+_TAIL = {"yol": None, "ino": None, "boyut": 0, "mtime": None, "ofset": 0, "satir": collections.deque(maxlen=1000)}
+_TAIL_KILIT = threading.Lock()  # yalnız _TAIL için; içinde başka kilit alınmaz
+_TAIL_BOZUK = object()  # çözülemeyen satır: özgün davranış (pencerede varsa tail boş döner) korunur
+def _tail_coz(x):
+    try:
+        r = json.loads(x)
+        return r if isinstance(r, dict) else _TAIL_BOZUK
+    except ValueError: return _TAIL_BOZUK
+def _tail_satirlar(jl, n):  # artımlı kuyruk: dosyanın tamamı her /status'ta yeniden okunmaz (1,3 MB × 2-5 sn × 5 yüzey); yalnız eklenen baytlar
+    if n > _TAIL["satir"].maxlen: return [json.loads(x) for x in open(jl, encoding="utf-8").read().splitlines()[-n:]]
+    with _TAIL_KILIT:
+        st = os.stat(jl); T = _TAIL
+        if (T["yol"], T["ino"]) != (jl, st.st_ino) or st.st_size < T["ofset"] or (st.st_size == T["ofset"] and st.st_mtime != T["mtime"] and T["boyut"] == st.st_size):
+            T.update(yol=jl, ino=st.st_ino, ofset=0); T["satir"].clear()
+        yarim = ""
+        if st.st_size > T["ofset"] or T["ofset"] == 0:
+            with open(jl, "rb") as f:
+                f.seek(T["ofset"]); b = f.read()
+            k = b.rfind(b"\n") + 1  # son tam satırın sonu; ardındaki yarım satır bir sonraki okumaya kalır
+            T["ofset"] += k
+            for x in b[:k].decode("utf-8").splitlines(): T["satir"].append(_tail_coz(x))
+            yarim = b[k:].decode("utf-8", "replace")
+        T["boyut"], T["mtime"] = st.st_size, st.st_mtime
+        son = list(T["satir"])
+        if yarim.strip():  # bitmemiş son satır (yazım sürüyor): özgün kodda da okunurdu; çözülürse eklenir, çözülemezse atlanır
+            r = _tail_coz(yarim)
+            if r is not _TAIL_BOZUK: son.append(r)
+        son = son[-n:] if n > 0 else []
+    if any(r is _TAIL_BOZUK for r in son): raise ValueError("bozuk döküm satırı")
+    return [dict(r) for r in son]
 def tail(n=200):
     # (kullanıcı) pano yeniden açılınca son oturumdan kalan döküm görünmesin — yalnız süren toplantı
     if not STATE["file"] or not gorunen_dosya(): return []
     jl = os.path.join(BASE, STATE["file"].replace(".md", ".jsonl"))
-    try: lines = open(jl, encoding="utf-8").read().splitlines()[-n:]; rs = ceviri_uygula([json.loads(x) for x in lines], STATE["file"])
+    try: rs = ceviri_uygula(_tail_satirlar(jl, n), STATE["file"])
     except Exception: return []
     for r in rs:  # S133: panodaki canlı döküm — içerideki "Claude:" hitabı asistanın adıyla (dosya değişmez)
         for k in ("text", "note"):
@@ -2068,7 +2101,8 @@ def kesisim_tur(simdi=None):  # → {"atlandi": neden} | {"bekliyor": neden} | c
     if not m: return {"atlandi": "kod_yok"}
     bug = simdi.date().isoformat(); z["deneme"] = int(z.get("deneme") or 0) + 1 if z.get("deneme_gun") == bug else 1; z["deneme_gun"] = bug
     kuyruk = (lambda ad, alan: (tazi_kos(ad, alan, "hizli", "elle") or {}).get("durum")) if "tazi_kos" in globals() else None
-    ek = {"model_fn": kesisim_model} if "kapi_iste" in globals() else {}  # v0.244.0: model çağrısı kapıdan (tek kayıt satırı "kesisim"; çözücünün kendi satırı yazılmaz)
+    if "kapi_iste" not in globals(): return {"atlandi": "kapi_yok"}  # v0.252.0: kapı yoksa kapısız model_cagir'e düşülmez (gizli kip tek kapı, varsayılan kapalı)
+    ek = {"model_fn": kesisim_model}  # v0.244.0: model çağrısı kapıdan (tek kayıt satırı "kesisim"; çözücünün kendi satırı yazılmaz)
     try: r = m.kos_ve_coz(BASE, AYAR, gizli_fn=gizli_acik, gelistirici=gelistirici_mi(), simdi=simdi, kuyruk_fn=kuyruk, **ek)
     except Exception as e: print(f"KESİŞİM: hata ({e.__class__.__name__}: {e})"); r = {"hata": e.__class__.__name__}
     if not r.get("atlandi") and not r.get("hata"): z["son_gun"] = bug

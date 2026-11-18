@@ -21,7 +21,7 @@ ad = {"__name__": "giris", "os": os, "re": re, "json": json, "time": time, "date
       "AYAR": {"port": 8765}, "BASE": T, "KONUS": KONUS, "_KS": {}, "_konus_kur": _konus_kur, "_t": lambda a, b: a, "yerel_uyari": UYARI.append,
       "bildirim": lambda b, a, m, son=None: BILDIRIM.append(a), "BEYIN": BEYIN, "claude_yolu": lambda: "/bin/claude", "BRIFING_APP": T, "claude_yalin": lambda: [],
       "A": types.SimpleNamespace(port=8765), "LOCK": threading.Lock(), "write": lambda pairs: None, "secrets": __import__("secrets"),
-      "KAPI_SAAT": lambda: datetime.datetime(2026, 11, 11, 11, 0).timestamp(), "calisma_saatleri": lambda: ({0, 1, 2, 3, 4}, 540, 1080)}  # v0.244.0: yoklama kapıdan (Çarşamba 11:00, mesai)
+      "KAPI_SAAT": lambda: datetime.datetime(2026, 11, 11, 11, 0).timestamp(), "calisma_saatleri": lambda: ({0, 1, 2, 3, 4}, 540, 1080), "gizli_acik": lambda: False}  # 19 Kasım: kapı gizli durumu bilinmezse kapalı (fail-closed); v0.244.0: yoklama kapıdan (Çarşamba 11:00, mesai)
 ad["claude_json"] = lambda ham, is_, t0, y, s=None, m=None: (lambda j: (ad["claude_hata_bildir"](j.get("result"), is_) if j.get("is_error") else ad["claude_ok"](), (j.get("result"), {}))[1])(json.loads(ham))
 exec(compile(open(os.path.join(K, "aktarici", "kapi.py"), encoding="utf-8").read(), "kapi.py", "exec"), ad)
 exec(compile(open(os.path.join(K, "aktarici", "claude-giris.py"), encoding="utf-8").read(), "claude-giris.py", "exec"), ad)
