@@ -26,6 +26,7 @@ AYAR = {"basecamp_oku": True, "basecamp": {"hesap": "123", "proje_esleme": {}}};
 def gizli_acik(): return GIZLI["acik"]
 def gelistirici_mi(): return False
 G = {"__name__": "bc", "AYAR": AYAR, "BASE": "/tmp", "time": time, "json": json, "re": re, "os": os, "gizli_acik": gizli_acik, "gelistirici_mi": gelistirici_mi,
+     "cikis_izin": lambda h, t, v=None: (False, "gizli kip") if gizli_acik() else (True, ""),  # 19 Kasım: dış çıkış kapısı (aktarici/cikis.py) taklidi
      "BC_HTTP": sahte_http, "BC_ZAMAN": lambda: SAAT[0], "BC_BEKLE": lambda s: (BEKLE.append(s), SAAT.__setitem__(0, SAAT[0] + s))}
 exec(compile(open(os.path.join(KOD, "aktarici", "basecamp-oku.py"), encoding="utf-8").read(), "basecamp-oku.py", "exec"), G)
 def sifirla(): G["BC"].update(onb={}, istek=[], geri=0.0, hata=0); ISTEK.clear(); BEKLE.clear(); MOD["hata"] = None; SAAT[0] += 5000

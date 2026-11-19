@@ -23,7 +23,7 @@ def satirlar(): return [c for c in tum() if c["islem"] in ("aday_ekle", "tara")]
 # ---------- 1) birim ----------
 def ns_kur(ayar, **ek):
     ns = {**ESZ, "os": os, "stat": __import__("stat"), "re": re, "json": json, "time": time, "datetime": datetime, "threading": threading, "sys": sys, "AYAR": dict({"tazi_yol": SAHTE}, **ayar), "BASE": os.path.join(T, "b" + str(len(os.listdir(T)))),
-          "print": lambda *a, **k: LOGP.append(" ".join(str(x) for x in a)), "_t": lambda tr, en: tr, "gizli_acik": lambda: False, "toplanti_suruyor": lambda: False,
+          "print": lambda *a, **k: LOGP.append(" ".join(str(x) for x in a)), "_t": lambda tr, en: tr, "gizli_acik": lambda: False, "cikis_izin": lambda h, t, v=None: (True, ""), "toplanti_suruyor": lambda: False,
           "STATE": {}}
     os.makedirs(ns["BASE"], exist_ok=True); ns.update(ek)
     for f in ("tazi-istemci.py", "kisi-modeli.py", "tazi-kos.py"): exec(compile(open(os.path.join(KOD, "aktarici", f), encoding="utf-8").read(), f, "exec"), ns)
@@ -187,10 +187,10 @@ try:
     ok("/status tazi.raporlar: hizmetin listesi", [x["dosya"] for x in A.istek("/status")["tazi"]["raporlar"]][:2] == ["ad-soyad-20261111.md", "toplanti-2026-11-11.md"])
     ok("günlükte rapor adı/metni yok", "ad-soyad" not in A.metin() and "İçerik" not in A.metin())
     A.istek("/komut", {"tur": "gizli"}); n0 = len(satirlar())
-    ok("gizli kipte /status raporlar boş, /tazi rapor 'gizli'", A.istek("/status")["tazi"]["raporlar"] == [] and kod_ac("/tazi", {"islem": "rapor", "dosya": "tazi-20261111.md"}, pk)[1].get("durum") == "gizli")
+    ok("gizli kipte /status raporlar boş, /tazi rapor 'gizli' (v0.253.0: GIZLI_RED reddi de kabul)", A.istek("/status")["tazi"]["raporlar"] == [] and (lambda r: r.get("durum") == "gizli" or r.get("gizli") is True)(kod_ac("/tazi", {"islem": "rapor", "dosya": "tazi-20261111.md"}, pk)[1]))
     A.istek("/komut", {"tur": "gizli"}); A.istek("/komut", {"tur": "gizli"}); n0 = len(satirlar())
     gz = A.istek("/tazi", {"islem": "tara", "kim": "Gizli Bir Firma"}); o4 = tc(A, "tazi", "Nova Teknoloji"); hg = tc(A, "hazirlik", "--kim", "Nova Teknoloji")
-    ok("gizli kipte: /tazi 'gizli', tc tazi sessiz, hazırlıkta Tazı bölümü yok, alt süreç yok", gz.get("durum") == "gizli" and "gizli toplantı" in o4 and "## Tazı:" not in hg and len(satirlar()) == n0, (gz, o4[:80]))
+    ok("gizli kipte: /tazi 'gizli', tc tazi sessiz, hazırlıkta Tazı bölümü yok, alt süreç yok", (gz.get("durum") == "gizli" or gz.get("gizli") is True) and "gizli toplantı" in o4 and "## Tazı:" not in hg and len(satirlar()) == n0, (gz, o4[:80]))
     A.istek("/komut", {"tur": "gizli"}); h0 = tc(A, "hazirlik", "--kim", "Nova Teknoloji")
     ok("gizli kapanınca hazırlıkta Tazı bölümü gelir (sahte özet)", "## Tazı: son gelişmeler" in h0 and "Kimlik: deneme" in h0, h0[:300])
     # toplanti-claude.py: dosyası olmayan ad → tarama başlatır

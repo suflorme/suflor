@@ -51,7 +51,7 @@ for l in sys.stdin:
     pr({"type": "result", "duration_api_ms": 500, "total_cost_usd": 0.01 * n, "num_turns": n, "usage": {"input_tokens": 5, "cache_read_input_tokens": 95}})
 ''')
 os.chmod(sahte, 0o755)
-ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "soz_gece": False, "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True, "konus_on_ac": True, "konus_iki_surec": True, "pocket_python": "/yok/python", "pocket_hf": "/yok"}, open(ay, "w"))
+ay = os.path.join(T, "ayar.json"); json.dump({"alan": "Deneme", "soz_gece": False, "ad": "Deniz T", "port": PORT, "uygulama": T, "proje": proje, "ortak": "/Users/Shared/Suflor", "claude": sahte, "konus_tur_en_cok": 3, "konus_zaman_asimi_sn": 3, "konus_bekle_sn": 1.5, "konus_ara_sn": 2, "konus_gecmis": True, "konus_on_ac": True, "konus_iki_surec": True, "pocket_python": "/yok/python", "pocket_hf": "/yok", "hizli_ozet": True}, open(ay, "w"))  # 19 Kasım: hizli_ozet varsayılanı kapalı; uçtan uca hızlı özet denetimi için açık
 for f in ("relay.py", "manifest.json", "whisper-isci.py", "baglam.py", "baglayici.py"): shutil.copy(os.path.join(KOD, f), T)
 shutil.copytree(os.path.join(KOD, "aktarici"), os.path.join(T, "aktarici"))  # relay.py bölüm dosyaları
 import datetime as _dt
@@ -289,6 +289,23 @@ try:
     # v0.51.1 okuma sınırı: _konus_cumle beş cümlelik cevabın yalnız üçünü okur (işlev doğrudan; uçtan uca akışta tur sayısını bozmasın)
     import re as _re
     kod_ = open(os.path.join(KOD, "aktarici", "bas-konus.py"), encoding="utf-8").read()
+    # 19 Kasım (v0.253.0): hızlı sesli özet varsayılan kapalı; açıkken bile yeni toplantı sürüyorsa (toplanti_var ya da masaüstü toplantıda) okunmaz
+    import threading as _thz
+    HZ = []; KS_ = []
+    adh = {"time": time, "os": os, "threading": type("T", (), {"Thread": lambda *a, **k: type("X", (), {"start": lambda self: HZ.append(k.get("args"))})()}), "print": lambda *a, **k: None,
+           "STATE": {"file": "t.md", "file_lines": {"t.md": 20}}, "AYAR": {}, "konus_beyin_var": lambda: True, "BRIFING_APP": T, "_t": lambda tr, en: tr,
+           "kapi_gizli": lambda: False, "toplanti_var": lambda: False, "masaustu_toplantida": lambda: False, "_KS": {"tur": None}, "_konus_sor": lambda soru, tur: KS_.append(soru)}
+    exec(kod_[kod_.index("OZET_HIZLI_ONAY_SN, OZET_HIZLI_EN_AZ_SATIR = "):kod_.index("def konus_bekci(")], adh)
+    adh["hizli_ozet_tetik"]("tarayıcı")
+    ok("hızlı sesli özet varsayılan ayarla (hizli_ozet yok) başlamaz", HZ == [])
+    adh["AYAR"]["hizli_ozet"] = True; adh["hizli_ozet_tetik"]("tarayıcı")
+    ok("hizli_ozet açıkken başlar (denetim düzeneği çalışıyor)", len(HZ) == 1)
+    for ad_, tv, mt in (("toplanti_var", True, False), ("masaustu_toplantida", False, True)):
+        adh.update(toplanti_var=lambda v=tv: v, masaustu_toplantida=lambda v=mt: v); adh["HIZLI"]["dosya"] = "t.md"; KS_.clear(); adh["_KS"]["tur"] = None
+        adh["_hizli_ozet_sor"]("t.md", "tarayıcı")
+        ok(f"yeni toplantı sürerken ({ad_}) hızlı özet okunmaz", KS_ == [] and adh["_KS"]["tur"] is None and adh["HIZLI"]["dosya"] is None)
+    adh.update(toplanti_var=lambda: False, masaustu_toplantida=lambda: False); KS_.clear(); adh["_hizli_ozet_sor"]("t.md", "tarayıcı")
+    ok("toplantı yokken _hizli_ozet_sor Konuş'a sorar", len(KS_) == 1 and "az önce bitti" in KS_[0])
     import threading as _th0
     ad_ = {"re": _re, "time": time, "threading": _th0, "print": lambda *a, **k: None, "konusma_dili": lambda m: m, "SES": {"kes": 0}, "kisilik_sesi": lambda *a, **k: ("pocket", None, 1.0), "ARAYUZ_DILI": "tr", "_t": lambda a, b: a}; okunan_ = []; ad_["seslendir"] = lambda m, kuyruk=False, cal=None, ozet=False, k=None: okunan_.append(m) or True
     exec(kod_[kod_.index("KONUS_OKU_EN_COK = "):kod_.index("def _konus_oku(")], ad_)

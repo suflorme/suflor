@@ -20,8 +20,20 @@ def bc_ayar():
 def bc_acik():
     v = AYAR.get("basecamp_oku")
     if v is None: v = bool(gelistirici_mi()) if "gelistirici_mi" in globals() else False
-    if not v or ("gizli_acik" in globals() and gizli_acik()): return False
+    if not v or _bc_gizli(): return False
     return bool(str(bc_ayar().get("hesap") or "").strip())
+# 19 Kasım (dış çıkış kapısı, aktarici/cikis.py; S282/S227): gizli kip VARSAYILAN KAPALI; her istek ağa çıkmadan önce cikis_izin("basecamp") — kapı yoksa ret.
+def _bc_gizli():
+    for ad in ("cikis_gizli", "kapi_gizli", "gizli_acik"):
+        f = globals().get(ad)
+        if callable(f):
+            try: return bool(f())
+            except Exception: return True
+    return True
+def _bc_cikis(tur):
+    f = globals().get("cikis_izin")
+    ok, neden = f("basecamp", tur) if callable(f) else (False, "kapı yok")
+    if not ok: raise OSError("dış çıkış kapısı: " + str(neden))
 def _bc_servis(): return str(bc_ayar().get("anahtar") or "suflor-basecamp")
 def _bc_kc_oku(servis):
     if globals().get("BC_KC_OKU"): return globals()["BC_KC_OKU"](servis)
@@ -40,6 +52,7 @@ def _bc_oauth():
         d = json.loads(v); return d if isinstance(d, dict) else {}
     except Exception: return {}
 def _bc_post(url):  # Launchpad yenileme isteği (gövdesiz POST, parametreler adreste) → json
+    _bc_cikis("yenile")
     r = _ur_bc.Request(url, data=b"", method="POST", headers={"User-Agent": BC_UA, "Accept": "application/json"})
     with (globals().get("BC_URLOPEN") or _ur_bc.urlopen)(r, timeout=15) as f: return json.loads(f.read().decode("utf-8", "replace"))
 def _bc_yenile():  # → yeni erişim belirteci ya da "" (başarısızlıkta günlüğe tek satır)
@@ -61,6 +74,7 @@ def _bc_belirtec():
     if o.get("bitis") and BC_ZAMAN() >= float(o["bitis"]) - 60: v = _bc_yenile() or ""
     BC["belirtec"] = (BC_ZAMAN(), v); return v
 def _bc_http(url, yenilendi=False):  # → (gövde, link_sonraki) ; hata → istisna. Testler BC_HTTP ile ezer (url → (json, sonraki_url))
+    _bc_cikis("oku")
     k = _bc_belirtec()
     if not k: raise OSError("belirteç yok")
     r = _ur_bc.Request(url, headers={"Authorization": "Bearer " + k, "User-Agent": BC_UA, "Accept": "application/json"})

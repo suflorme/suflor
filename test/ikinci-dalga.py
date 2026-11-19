@@ -31,7 +31,8 @@ AYLA = "ayla.kurgu" + AT + "firma.test"
 KIM = {"Ayla Kurgu": {"eposta": AYLA}, "Can Örnek": {"eposta": "can.ornek" + AT + "firma.test"}}
 izin_iste_log, TOP = [], {"aktif": None}; karar_sira = ["onaylandi"]; kayit_log = {"bitir": [], "baslat": []}
 import threading as _th
-ns = {"AYAR": {"ad": "Deniz T"}, "_t": lambda a, b: a, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": _th, "subprocess": subprocess, "urllib": urllib, "BASE": d, "LOCK": _th.Lock(), "KONUS": {},
+ns = {"gizli_acik": lambda: False,  # 19 Kasım: gizli kip denetimi fail-closed (işlev yoksa gizli sayılır)
+      "AYAR": {"ad": "Deniz T"}, "_t": lambda a, b: a, "re": re, "os": os, "json": json, "time": time, "datetime": datetime, "threading": _th, "subprocess": subprocess, "urllib": urllib, "BASE": d, "LOCK": _th.Lock(), "KONUS": {},
       "_yapi_mod": lambda: yapi, "_kem_takvim": lambda: TAKVIM, "_kem_kimlik": lambda ad, tam: KIM.get(ad, {"eposta": None}), "_izin_kayit": lambda o: None, "print": lambda *a, **k: None}
 import baglayici as _bag; ns["_baglayici_mod"] = lambda: _bag
 def izin_iste(tur, ne, ayrinti=None, sesli=True, oturum=False, sure_sn=None, toplantida_sesli=False):
@@ -91,7 +92,7 @@ try:
     n0 = db("SELECT COUNT(*) FROM kayit")[0][0]; okk, ne = uyg({"komut": "gundem_ekle", "arg": {"metin": "Bütçe revizyonu konuşulsun", "toplanti": "Haftalık"}})
     yeni = db("SELECT id FROM kayit WHERE metin = 'Bütçe revizyonu konuşulsun'")
     ok("metin verilirse önce iş kaydı açılır, sonra gündeme eklenir (özette iş kaydı olduğu yazılır)", okk and db("SELECT COUNT(*) FROM kayit")[0][0] == n0 + 1 and yeni and (yapi.ortak_kayit(d, "s" + str(yeni[0][0])).get("gundem") or {}).get("etkinlik") == "e1" and "iş kaydı" in dog("gundem_ekle", {"metin": "Başka madde", "toplanti": "Haftalık"})[0]["ozet"])
-    ns["gizli_acik"] = lambda: True; h, e = dog("gundem_ekle", {"id": IS_B}); ok("gizli kipte gündeme ekleme reddedilir", h is None and "gizli" in e); ns.pop("gizli_acik")
+    ns["gizli_acik"] = lambda: True; h, e = dog("gundem_ekle", {"id": IS_B}); ok("gizli kipte gündeme ekleme reddedilir", h is None and "gizli" in e); ns.__setitem__("gizli_acik", lambda: False)
     # --- 3) toplantı bitir / başlat ----------------------------------------------------------------------------------------------------------------------------------------------------
     TOP["aktif"] = None; h, e = dog("toplanti_bitir", {}); ok("toplantı yokken bitir kibarca reddedilir", h is None and "süren" in e)
     okk, ne = uyg({"komut": "toplanti_bitir", "arg": {}}); ok("toplantı yokken onay gelse de bitirilmez (uygulamada yeniden denetlenir)", okk is False and not kayit_log["bitir"])
@@ -116,7 +117,7 @@ try:
     ns["gizli_acik"] = lambda: True; h, e = dog("toplanti_bitir", {}); ok("gizli kipte de bitirme çalışır ama toplantı adı yazılmaz", e is None and "Haftalık" not in h["ozet"])
     ns["KAYIT_SORULAN"].clear(); izin_iste_log.clear(); karar_sira[0] = "reddedildi"
     cev = etk('[KAYIT: {"komut": "kayit_taslak", "arg": {"id": "' + IS_A + '", "kanal": "teams", "govde": "Selam"}, "neden": "x"}] [KAYIT: {"komut": "toplanti_bitir", "arg": {}, "neden": "x"}]', {"kaynak": "bas", "sesli": True, "toplantida": True}); time.sleep(0.3)
-    ok("gizli kipte yalnız toplanti_bitir/baslat geçer, içerik yazan komutlar yok sayılır", len(izin_iste_log) == 1 and izin_iste_log[0]["ayrinti"]["komut"] == "toplanti_bitir" and "Gizli kip açık" in cev); ns.pop("gizli_acik")
+    ok("gizli kipte yalnız toplanti_bitir/baslat geçer, içerik yazan komutlar yok sayılır", len(izin_iste_log) == 1 and izin_iste_log[0]["ayrinti"]["komut"] == "toplanti_bitir" and "Gizli kip açık" in cev); ns.__setitem__("gizli_acik", lambda: False)
     # başlat
     TOP["aktif"] = {"durum": "suruyor", "ad": "Haftalık Operasyon"}; h, e = dog("toplanti_baslat", {}); ok("toplantı sürerken başlat reddedilir (zaten sürüyor)", h is None and "sürüyor" in e)
     TOP["aktif"] = None; TAKVIM[:] = [ev("eS", "Şimdiki Sync", -0.1), ev("eG", "Geç Toplantı", 5)]

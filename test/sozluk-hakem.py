@@ -72,7 +72,7 @@ DURUM = {"gelistirici": True, "gizli": False, "toplanti": False, "aktif": None}
 def ad_alani(ayar, state=False):  # state: aktarıcı gibi (STATE var) — deneme aktarıcısı sayılır, hakem iş parçacığı yalnız SUFLOR_HK_DENEME ile (öğrenme döngüsü başlamaz)
     zaman = types.SimpleNamespace(time=time.time, sleep=lambda s: None, strftime=time.strftime, localtime=time.localtime)  # yeniden denemede beklenmesin
     ns = {"re": __import__("re"), "os": os, "json": json, "time": zaman, "datetime": datetime, "BASE": canli, "AYAR": ayar, "AYAR_YOL": AYAR_YOL, "LOCK": threading.Lock(), "print": lambda *a, **k: None,
-          "gelistirici_mi": lambda: DURUM["gelistirici"], "gizli_acik": lambda: DURUM["gizli"], "gemini_anahtar": lambda: "deneme-anahtar", "GEMINI_HOST": f"127.0.0.1:{PORT}",
+          "gelistirici_mi": lambda: DURUM["gelistirici"], "gizli_acik": lambda: DURUM["gizli"], "cikis_izin": lambda h, t, v=None: (not DURUM["gizli"], "gizli kip" if DURUM["gizli"] else ""), "gemini_anahtar": lambda: "deneme-anahtar", "GEMINI_HOST": f"127.0.0.1:{PORT}",
           "toplanti_acik": lambda: DURUM["toplanti"], "kaynak_dar": lambda: False, "aktif_dosya": lambda: DURUM["aktif"], "deneme_aktarici": lambda: False}
     if state: os.environ["SUFLOR_HK_DENEME"] = "1"; ns.update(STATE={}, deneme_aktarici=lambda: True, write=lambda ps: [open(y, "a", encoding="utf-8").write(m) for y, m in ps])
     s = open(os.path.join(AK, "sozluk.py"), encoding="utf-8").read(); exec(s[:s.index('# Sesli "Claude:"')], ns)

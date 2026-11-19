@@ -64,14 +64,25 @@ def gemini_gecis_komut(metin):  # → okunacak kısa onay ya da None (komut değ
         acikti = gemini_gecis_acik(); GEMINI_GECIS["bitis"] = 0.0; print("GEMINI: geçiş kapatıldı (kullanıcı)" if acikti else "GEMINI: geçiş zaten kapalı")
         return _t("Tamam, yerel sese döndüm." if acikti else "Zaten yerel sesle konuşuyorum.", "OK, back to the local voice." if acikti else "I'm already using the local voice.")
     if not GECIS_AC_RX.search(m): return None
-    if not gemini_var() or ("gizli_acik" in globals() and gizli_acik()): return _t("Gemini sesi şu an kullanılamıyor.", "The Gemini voice isn't available right now.")
+    if not gemini_var() or _gemini_gizli(): return _t("Gemini sesi şu an kullanılamıyor.", "The Gemini voice isn't available right now.")
     if gemini_model() is None: return _t("Gemini'nin bugünkü sınırı doldu, yerel sesle devam ediyorum.", "Gemini's daily limit is used up; staying with the local voice.")
     GEMINI_GECIS["bitis"] = time.time() + GEMINI_GECIS_SN; dk = round(GEMINI_GECIS_SN / 60)
     print(f"GEMINI: geçiş açıldı ({dk} dk, kullanıcı)")
     return _t(f"Tamam, {dk} dakika Gemini sesiyle konuşuyorum.", f"OK, I'll use the Gemini voice for {dk} minutes.")
 def gemini_kapsam(): return "hepsi" if AYAR.get("gemini_kapsam") == "hepsi" or gemini_gecis_acik() else "toplanti"
+# 19 Kasım (dış çıkış kapısı, aktarici/cikis.py; S83/S87): gizli kip VARSAYILAN KAPALI — kapı ya da gizli durumu belirlenemiyorsa Gemini yok (eskiden "gizli_acik yoksa serbest").
+def _gemini_gizli():  # yalnız soru (sayaca girmez): cikis_gizli > kapi_gizli > gizli_acik; hiçbiri yoksa ya da hata verirse gizli sayılır
+    for ad in ("cikis_gizli", "kapi_gizli", "gizli_acik"):
+        f = globals().get(ad)
+        if callable(f):
+            try: return bool(f())
+            except Exception: return True
+    return True
+def _gemini_cikis():  # ağa çıkmadan hemen önce: → (ok, neden); kapı yoksa ret
+    f = globals().get("cikis_izin")
+    return f("gemini_tts", "metin") if callable(f) else (False, "kapı yok")
 def gemini_izinli(toplantiya=False):  # v0.89.0: gizli toplantıda hiç; sınır dolunca yerel ses
-    return gemini_var() and not ("gizli_acik" in globals() and gizli_acik()) and (toplantiya or gemini_kapsam() == "hepsi") and gemini_model() is not None
+    return gemini_var() and not _gemini_gizli() and (toplantiya or gemini_kapsam() == "hepsi") and gemini_model() is not None
 def gemini_ses(ad=None):
     v = str(ad or AYAR.get("gemini_ses") or "Charon")
     return v if v in GEMINI_SESLER else "Charon"
@@ -154,6 +165,7 @@ def gemini_view():
     return {"motor": "gemini", "durum": GEMINI["durum"] or "hazir", "hata": GEMINI["hata"], "ses": gemini_ses(), "model": gemini_model(), "kota_dolu": sorted(_kota()),
             "kapsam": gemini_kapsam(), "bugun": gemini_bugun()}
 def _gemini_baglanti():
+    if not _gemini_cikis()[0]: _gemini_kapat(); raise ConnectionRefusedError("dış çıkış kapısı")
     if GEMINI["c"] is None:
         GEMINI["c"] = (http.client.HTTPConnection if GEMINI_HOST.startswith("127.0.0.1") else http.client.HTTPSConnection)(GEMINI_HOST, timeout=GEMINI_ILK_SN)
     return GEMINI["c"]
@@ -292,6 +304,7 @@ def gemini_onceden_temizle(neden=None):
     if n and neden: print(f"GEMINI: önceden alınan {n} ses atıldı ({neden})")
 def gemini_onceden(metin, ses=None, uslup=None):  # sesi şimdiden iste (okumadan); → True: istendi ya da zaten isteniyor
     if not metin or not gemini_var() or (_sabit_mi(metin) and _sabit_dolu(metin, ses, uslup)) or time.time() - GEMINI["hata_t"] < GEMINI_BEKLE_SN: return False
+    if not _gemini_cikis()[0]: return False
     model = gemini_model()
     if not model: return False
     a = _onceden_anahtar(metin, ses); simdi = time.time()
@@ -373,7 +386,7 @@ def _gemini_oku(metin, iptal=None, kayit=None, ses=None, uslup=None, topla=False
     # metni Gemini'yle okur; bitince True. Hiç ses çalınamadıysa False (çağıran Mac sesine düşer). iptal(): True dönerse kalan ses çalınmaz;
     # kayit["p"]: çalan süreç (ses_durdur keser). topla: çalmaz, ham sesi döndürür (None: alınamadı). aygit: Core Audio aygıt kimliği (BlackHole);
     # duzey: 0–1 ses düzeyi (kısık "hı hı").
-    if not metin or not gemini_var(): return None if topla else False
+    if not metin or not gemini_var() or not _gemini_cikis()[0]: return None if topla else False
     if aygit and not os.access(OYNAT_YOL, os.X_OK): return False  # aygıta yalnız kesintisiz çalıcı çalabilir (afplay varsayılan çıkışa gider)
     sabit = _sabit_mi(metin) if sabit is None else sabit  # v0.81.0: çağıran söyleyebilir (kişilik tanıtımı, toplantı başı duyurusu)
     if sabit:

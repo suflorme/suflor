@@ -3,7 +3,8 @@
 # Yer: ortam TAZI_HIZMET > ayar tazi_yol > kurulu kopya ~/Library/Application Support/Tazi/uygulama/tazi_hizmet.py (Tazı kur.py;
 # launchd altındaki aktarıcı Masaüstü'nü okuyamayabilir) > geliştirme deposu ~/Desktop/Tazi/tazi_hizmet.py. Dosya yoksa (beta, Tazı'sız kurulum) her çağrı {"ok": False, "hata": "tazi_yok"}:
 # çağıranlar bunu "Tazı kapalı" gibi sessizce karşılar. Girdi JSON'u standart girdiden gider (ad `ps` çıktısına düşmez); çıktı tek JSON nesnesi.
-# Gizli kip ve ayar tazi (aç/kapa) burada denetlenmez: çağıranın işidir (gizli toplantı içeriği Tazı'ya gönderilmez).
+# Ayar tazi (aç/kapa) burada denetlenmez: çağıranın işidir. Gizli kip (19 Kasım, dış çıkış kapısı aktarici/cikis.py) BURADA da denetlenir, varsayılan kapalı:
+#   aktarıcıda cikis_izin("tazi"); tek başına yüklenince (toplanti-claude.py, kesisim*.py) canli/gizli.json okunur — var ya da varlığı belirlenemiyorsa çağrı yok ({"hata": "gizli"}).
 # İki kullanım: aktarıcıda bolum("tazi-istemci") ile ortak ad alanına girer; toplanti-claude.py, kesisim.py, kesisim-coz.py importlib ile yükler.
 import hashlib, json, os, subprocess, sys, threading, time
 TAZI_HIZMET_KURULU = "~/Library/Application Support/Tazi/uygulama/tazi_hizmet.py"
@@ -27,11 +28,22 @@ def tazi_hizmet_yolu(ayar=None):  # → hizmet dosyasının yolu ya da None (Taz
         y = k if os.path.isfile(k) else TAZI_HIZMET_VARSAYILAN
     y = os.path.expanduser(str(y))
     return y if os.path.isfile(y) else None
+def _tzi_canli(ayar):  # aktarıcının canli klasörü (tek başına kullanımda gizli.json için)
+    a = _tzi_ayar(ayar)
+    return os.path.join(os.path.expanduser(str(a.get("uygulama") or "~/Library/Application Support/Suflor")), "canli")
+def tazi_cikis(islem, ayar=None):  # → (ok, neden). Aktarıcıda dış çıkış kapısı; değilse gizli.json (fail-closed)
+    f = globals().get("cikis_izin")
+    if callable(f): return f("tazi", str(islem))
+    try: os.lstat(os.path.join(_tzi_canli(ayar), "gizli.json")); return False, "gizli kip"
+    except FileNotFoundError: return True, ""
+    except OSError: return False, "gizli kip"
 def tazi_onbellek_sil():
     with _TZI_KILIT: _TZI_ONB.clear()
 def tazi_cagir(islem, girdi=None, zaman=TAZI_ZAMAN_VARSAYILAN, ayar=None, onbellek=0):
     """→ hizmetin JSON nesnesi ({"ok": True, …} ya da {"ok": False, "hata": kod}). İstemci kodları: tazi_yok, erisim_yok (macOS izni), zaman_asimi, cikti, cagri.
     onbellek > 0: aynı işlem + girdi bu kadar saniye yeniden çağrılmaz (yalnız okuyan işlemlerde kullan)."""
+    ok, neden = tazi_cikis(islem, ayar)
+    if not ok: return {"ok": False, "hata": "gizli" if neden == "gizli kip" else "cikis"}
     y = tazi_hizmet_yolu(ayar)
     if not y:  # launchd altındaki aktarıcı Masaüstü'nü okuyamayabilir (macOS izni): "yok"tan ayrı kod, günlükte görünsün
         try: os.stat(os.path.expanduser(str(os.environ.get("TAZI_HIZMET") or _tzi_ayar(ayar).get("tazi_yol") or TAZI_HIZMET_VARSAYILAN)))

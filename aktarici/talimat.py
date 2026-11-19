@@ -90,7 +90,7 @@ def _talimat_yinelenen(h, ileti, duyulan=None, gorev=False):  # gorev: asistanı
     return None
 def talimat_kuyruk(tur, h, ileti, metin, kaynak, claude=False, zaman=None, ek=None, oneri=None):  # oneri: asistanın kendi çıkardığı iş (kartta "Öneri:" ve bu gerekçe)  # claude: ileti Claude'un cevabından — pano cevabı Claude'unki kalır; zaman: hatırlatmanın saati (ISO, yerel)
     top = toplanti_var()
-    if tur == "is" and "gizli_acik" in globals() and gizli_acik():  # gizli kipte hiçbir şey işlenmez
+    if tur == "is" and (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()):  # gizli kipte hiçbir şey işlenmez
         if not claude: _konus_kur(durum="hazir", soru=metin, cevap=_t("Gizli kipte iş kaydı yok.", "No task records in private mode."))
         return True
     if tur == "oturum":
@@ -682,7 +682,7 @@ def _is_ek(metin):  # talimat_kuyruk ek: kim (söylenmediyse kullanıcının ken
     top = (aktif_dosya() if toplanti_var() and "aktif_dosya" in globals() else None) or None
     return {"kim": kim, "tarih": _is_tarih(i_[1]), **({"toplanti": top} if top else {})}
 def _is_kaydet(a):  # onaylanmış iş → karar grafı (yapi.soz_ekle) → (ok, sonuç)
-    if "gizli_acik" in globals() and gizli_acik(): return False, _t("gizli kip açık", "private mode is on")
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return False, _t("gizli kip açık", "private mode is on")  # 19 Kasım: fail-closed
     y = _yapi_mod() if "_yapi_mod" in globals() else None
     if not y: return False, _t("kayıt aracı yok", "records tool missing")
     m = _talimat_temiz(a.get("metin"))[:300]; kim = _talimat_temiz(a.get("kim"))[:80] or None; tarih = str(a.get("tarih") or "").strip() or None

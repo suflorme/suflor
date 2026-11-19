@@ -62,7 +62,8 @@ graf(DG, "Özel", "2026-11-04", [{"tur": "is", "metin": "Gizli iş", "sahip": "A
 graf(DN, "Test-1", "2026-11-04", [{"tur": "is", "metin": "Deneme işi", "sahip": "Ayşe Deneme"}])
 # --- bölümü relay.py'nin ad alanı gibi bir ad alanında yükle (yalnız gereken adlar: AYAR, AYAR_PANO, BASE, gizli_acik, _yapi_mod) -----------------------------------------
 GIZLI = [False]; AYAR = {"ad": "Ayşe Deneme", "uygulama": T, "animsatici": False, "animsatici_liste": "Suflor.me"}
-ns = {**ESZ, "os": os, "sys": sys, "json": json, "re": re, "time": time, "datetime": datetime, "threading": threading, "AYAR": AYAR, "AYAR_PANO": {}, "BASE": C, "gizli_acik": lambda: GIZLI[0], "_yapi_mod": lambda: yapi}
+ns = {**ESZ, "os": os, "sys": sys, "json": json, "re": re, "time": time, "datetime": datetime, "threading": threading, "AYAR": AYAR, "AYAR_PANO": {}, "BASE": C, "gizli_acik": lambda: GIZLI[0], "_yapi_mod": lambda: yapi,
+      "cikis_izin": lambda h, t, v=None: (False, "gizli kip") if GIZLI[0] else (True, "")}  # 19 Kasım: dış çıkış kapısı (aktarici/cikis.py) taklidi
 exec(compile(open(os.path.join(KOD, "aktarici", "animsatici.py"), encoding="utf-8").read(), "animsatici.py", "exec"), ns)
 def tur(**k):
     g = io.StringIO()

@@ -616,7 +616,11 @@ def _topo_izin_anahtar(ad, gi):
     return ad + "\0" + (str(gi.get("command") or "") if ad in ("Bash", "Monitor") else json.dumps(gi, sort_keys=True, ensure_ascii=False))
 def _topo_web_red(ad, gi):  # web aracı reddedilecekse Türkçe/İngilizce neden, yoksa None
     if not topo_web_acik(): return _t("Web araştırması kapalı (ayar).", "Web research is turned off (setting).")
-    if gizli_acik(): return _t("Gizli toplantıda web araması yok.", "No web search in a private meeting.")
+    # 19 Kasım (dış çıkış kapısı, aktarici/cikis.py; S208): gizli kip (fail-closed) + arama metni/adres yolu kapısı (iç kişi adı, dökümden alıntı, e-posta, uzun sayı, uzunluk)
+    f = globals().get("cikis_izin")
+    if not callable(f): return _t("Web denetimi yok; web araması yapılmadı.", "The web check is missing; no web search.")
+    ok, neden = f("web_arama" if ad == "WebSearch" else "web_getir", "toplanti", gi.get("query") if ad == "WebSearch" else gi.get("url"))
+    if not ok: return _t("Gizli toplantıda web araması yok.", "No web search in a private meeting.") if neden == "gizli kip" else cikis_neden(neden)
     if ad == "WebFetch":
         u = str(gi.get("url") or ""); m = re.match(r"^https?://([^/:?#@\s]+)(?::\d+)?(?:[/?#]|$)", u, re.I); h = (m.group(1) if m else "").lower()
         if not m or h in ("localhost", "0.0.0.0") or h.endswith((".local", ".internal", ".localhost", ".lan")) or re.match(r"^(\d{1,3}\.){3}\d{1,3}$", h) or ":" in h or "." not in h:

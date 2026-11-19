@@ -591,8 +591,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     const CSS = `
         :host,:root{--yz-1:11px;--yz-2:12px;--yz-3:13px;--yz-4:14px;--yz-5:16px;--kose-s:6px;--kose:6px;--kose-l:12px;--kose-tam:999px}  /* yazı boyu ve köşe ölçeği pano/renk.css'ten (gölge DOM ve kart penceresi; test/renk.py denetler) */
         .w{font:var(--yz-3)/1.45 -apple-system,BlinkMacSystemFont,"Helvetica Neue",system-ui,sans-serif;
-          --s1:#FFFFFF;--s2:#F2F2EF;--tx:#1D1D1F;--t2:#5E5E63;--t3:#6E6E73;--bd:rgba(29,29,31,.08);--bd2:rgba(29,29,31,.16);--hov:rgba(29,29,31,.045);--ac:#175E46;--ac-yazi:#FFFFFF;--dikkat:#B0533A;color:var(--tx)}  /* kaynak: pano/renk.css --b-* (yüzey, yüzey2, mürekkep, m2, m3, çizgi, çizgi2, üzerinde, vurgu, ana-yazı, geç); test/renk.py denetler */
-        @media (prefers-color-scheme:dark){.w{--s1:#1C1C1E;--s2:#202022;--tx:#F2F2F2;--t2:#A1A1A6;--t3:#8A8A8F;--bd:rgba(242,242,242,.08);--bd2:rgba(242,242,242,.15);--hov:rgba(242,242,242,.05);--ac:#3E9B78;--ac-yazi:#0E1411;--dikkat:#DE8467}}
+          --s1:#FFFCF5;--s2:#F0E9D8;--tx:#1D1D1F;--t2:#5E5E63;--t3:#6E6E73;--bd:rgba(29,29,31,.08);--bd2:rgba(29,29,31,.16);--hov:rgba(29,29,31,.045);--ac:#175E46;--ac-yazi:#FFFFFF;--dikkat:#B0533A;color:var(--tx)}  /* kaynak: pano/renk.css --b-* (yüzey, yüzey2, mürekkep, m2, m3, çizgi, çizgi2, üzerinde, vurgu, ana-yazı, geç); test/renk.py denetler */
+        @media (prefers-color-scheme:dark){.w{--s1:#1F1B15;--s2:#25201A;--tx:#F2F2F2;--t2:#A1A1A6;--t3:#8A8A8F;--bd:rgba(242,242,242,.08);--bd2:rgba(242,242,242,.15);--hov:rgba(242,242,242,.05);--ac:#3E9B78;--ac-yazi:#0E1411;--dikkat:#DE8467}}
         .pill{display:inline-flex;align-items:center;gap:6px;background:var(--s1);color:var(--tx);border:1px solid var(--bd2);border-radius:var(--kose-tam);padding:5px 10px;min-height:28px;box-sizing:border-box;
           box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;user-select:none;font-size:var(--yz-2);font-weight:600;white-space:nowrap}
         .pill i{width:8px;height:8px;border-radius:50%;background:var(--pc,var(--t3));flex:none}.pill:empty{display:none}

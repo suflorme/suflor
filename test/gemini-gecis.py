@@ -10,7 +10,7 @@ def ok(ad, k):
     print(("✓ " if k else "✗ ") + ad)
     if not k: HATA.append(ad)
 agac = ast.parse(open(os.path.join(KOD, "aktarici", "gemini-ses.py"), encoding="utf-8").read())
-AD = {"gemini_gecis_acik", "gemini_gecis_komut", "gemini_kapsam", "gemini_izinli"}
+AD = {"gemini_gecis_acik", "gemini_gecis_komut", "gemini_kapsam", "gemini_izinli", "_gemini_gizli"}  # _gemini_gizli: 19 Kasım dış çıkış kapısı (fail-closed)
 sec = [d for d in agac.body if (isinstance(d, ast.FunctionDef) and d.name in AD) or (isinstance(d, ast.Assign) and any(getattr(t, "id", "") in ("GEMINI_GECIS", "GEMINI_GECIS_SN", "GECIS_AC_RX", "GECIS_KAPAT_RX") for t in d.targets))]
 D = {"var": True, "model": "m", "gizli": False}
 ns = {"re": re, "time": time, "print": lambda *a, **k: None, "AYAR": {}, "_t": lambda a, b: a, "gemini_var": lambda: D["var"], "gemini_model": lambda: D["model"], "gizli_acik": lambda: D["gizli"]}

@@ -238,7 +238,7 @@ def proje_ozeti_istem():  # onaylı proje kartının kısa özeti (baglam.py pro
 BILGI_YEDEK_SN = 1800
 def konus_bilgi_kaynaklari():
     if AYAR.get("konus_bilgi_kaynagi", True) is False or "bilgi_kaynaklari" not in globals(): return []
-    if "gizli_acik" in globals() and gizli_acik(): return []
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return []  # 19 Kasım: fail-closed (kapi.py kapi_gizli)
     if time.time() < _KS.get("bilgi_yedek_t", 0): return []
     return BEYIN.konus_bilgi(bilgi_kaynaklari())
 def bilgi_istem(bilgi):
@@ -303,7 +303,7 @@ def brifing_sema_destek(uyg=None, kaynaklar=None):
 def konus_web_acik():  # S257: varsayılan açık; kapatanlar: web_arastirma (ana şalter, toplantıyı da), konus_web, toplantı dışında web_arastirma_disari; gizli kipte/toplantıda S208 sınırı
     if AYAR.get("web_arastirma") is False or AYAR.get("konus_web") is False: return False
     if AYAR.get("web_arastirma_disari") is False and not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")): return False
-    if "gizli_acik" in globals() and gizli_acik(): return False
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return False  # 19 Kasım: fail-closed
     if not konus_web_destek():
         if not _KS.get("web_uyari"): _KS["web_uyari"] = True; print("KONUŞ: konus_web açık ama kurulu Brifing yardımcısı web araçlarını tanımıyor (brifing.swift araclar + yeniden derleme gerek) — web kapalı sürüyor")
         return False
@@ -1088,7 +1088,7 @@ def belge_hazirla(k):  # kaynak kaydı (tur dosya) → durum sözlüğü; ilk ç
     return kay
 def belge_baglam():  # → "" ya da "[Eklenen belgeler …]" bloğu (≤ BELGE_BLOK_SINIR); gizli kipte yok
     try:
-        if "gizli_acik" in globals() and gizli_acik(): return ""
+        if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return ""  # 19 Kasım: fail-closed
         ks = [k for k in baglam_oku() if k.get("tur") == "dosya"][-BELGE_EN_COK:]
         if not ks: return ""
         durum = [(k, belge_hazirla(k)) for k in ks]; son = time.time() + BELGE_BEKLE_SN
@@ -1190,7 +1190,7 @@ DERIN_SOHBET_RX = re.compile(r"(?i)\b(öz ?eleştir\w*|kendini (?:eleştir|değe
 DERIN_BELGE_ATIF_RX = re.compile(r"(?i)\b(belge\w*|kitap\w*|doküman\w*|rapor\w*|sözleşme\w*|dosya\w*|pdf|document|book|report|contract|file|paper)\b")
 DERIN_BELGE_SORU_RX = re.compile(r"(?i)\b(neden|niçin|niye|nasıl|sence|ne düşünüyorsun|ne anlama|why|how come|what do you think|how does|what does .* mean)\b")
 def _derin_belge_ekli():  # belge bloğunu hazırlamadan (bekleme yok): ekli dosya var mı, gizli kip kapalı mı
-    try: return "gizli_acik" not in globals() or not gizli_acik(), any(k.get("tur") == "dosya" for k in baglam_oku())
+    try: return not (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()), any(k.get("tur") == "dosya" for k in baglam_oku())
     except Exception: return True, False
 def konus_derin_mi(soru):  # soru metni → (derin mi, neden); yalnız kural, model çağrısı yok
     s = " ".join(str(soru or "").split()); n = len(s.split())
@@ -1207,7 +1207,7 @@ def konus_derin_mi(soru):  # soru metni → (derin mi, neden); yalnız kural, mo
     return False, ""
 def konus_derin_karar(metin, tur, top):  # → (derin mi, model, effort, neden); kapsam kuralları burada: toplantı dışı, kullanıcının kendi sorusu, gizli kip kapalı, Claude Code beyni
     if tur.get("kaynak") not in ("bas", "yazili") or tur.get("karsi") or tur.get("otonom") or top: return False, None, None, ""
-    if "gizli_acik" in globals() and gizli_acik(): return False, None, None, ""
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return False, None, None, ""  # 19 Kasım: fail-closed
     ds = BEYIN.derin_secim(AYAR)
     if not ds or konus_secim()["tur"] != "claude-code": return False, None, None, ""
     d, neden = konus_derin_mi(metin)
@@ -2579,14 +2579,14 @@ def _web_bekci(tur):
     konus_kapat("web zaman aşımı")
 # Hızlı sesli özet (v0.52.0, 16 Ekim): toplantı sonu sesli özeti toplantı oturumunun (Opus) özeti yazmasını bekliyordu — deneme 9'da çıkıştan 52 sn (hedef ≤ 15).
 # Toplantıdan çıkınca (masaüstü "toplantı yok" ya da tarayıcıda çağrı bitti) OZET_HIZLI_ONAY_SN sonra hâlâ dışarıdaysa Konuş sürecine (Sonnet, canlı defterli) üç cümlelik
-# özet sorulur ve okunur; 60 sn'lik "toplantı sürüyor" penceresi beklenmez. Opus'un yazılı özeti gelince ikinci kez okunmaz (ozet_sesli). Ayar hizli_ozet: false kapatır.
+# özet sorulur ve okunur; 60 sn'lik "toplantı sürüyor" penceresi beklenmez. Opus'un yazılı özeti gelince ikinci kez okunmaz (ozet_sesli). Ayar hizli_ozet: v0.253.0'dan varsayılan kapalı (19 Kasım: toplantı sonu kısa sesli özet okunmaz); yalnız true açar.
 OZET_HIZLI_ONAY_SN, OZET_HIZLI_EN_AZ_SATIR = 3.0, 8
 HIZLI = {"dosya": None, "t": 0.0, "okundu": False}
 def hizli_ozet_tetik(kaynak):
-    if "gizli_acik" in globals() and gizli_acik(): return
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()): return  # 19 Kasım: fail-closed
     f = STATE.get("file")
     if not f or HIZLI["dosya"] == f or STATE["file_lines"].get(f, 0) < OZET_HIZLI_EN_AZ_SATIR: return
-    if AYAR.get("hizli_ozet", True) is False or not AYAR.get("konusma", True) or not konus_beyin_var() or not os.path.isdir(BRIFING_APP): return
+    if AYAR.get("hizli_ozet") is not True or not AYAR.get("konusma", True) or not konus_beyin_var() or not os.path.isdir(BRIFING_APP): return
     HIZLI.update(dosya=f, t=time.time(), okundu=False)
     threading.Thread(target=_hizli_ozet, args=(f, kaynak), daemon=True).start()
 def _hizli_ozet(f, kaynak):
@@ -2597,9 +2597,14 @@ def _hizli_ozet(f, kaynak):
         if k.get("karar") == "bastirildi": HIZLI["dosya"] = None; print(f"ÖZET (hızlı): söz kapısı bastırdı ({k.get('neden')})")
         return
     _hizli_ozet_sor(f, kaynak)
+def _hizli_ozet_yeni_toplanti():  # v0.253.0 (beta geri bildirimi, 18 Kasım): okumadan hemen önce yeni toplantı var mı; belirlenemezse var sayılır (sesli okunmaz)
+    try: return bool(toplanti_var() or masaustu_toplantida())
+    except Exception: return True
 def _hizli_ozet_sor(f, kaynak):
     t0 = time.time()
+    if _hizli_ozet_yeni_toplanti(): HIZLI["dosya"] = None; print("ÖZET (hızlı): yeni toplantı sürüyor — sesli okunmadı (yazılı özet yine gelir)"); return
     while _KS["tur"] and time.time() - t0 < 20: time.sleep(0.3)
+    if _hizli_ozet_yeni_toplanti(): HIZLI["dosya"] = None; print("ÖZET (hızlı): yeni toplantı başladı — sesli okunmadı (yazılı özet yine gelir)"); return
     if _KS["tur"]: print("ÖZET (hızlı): Konuş meşgul — yapılmadı"); HIZLI["dosya"] = None; return
     tur = {"t_birak": time.time(), "t_metin": time.time(), "metin": "", "tampon": "", "kaynak": "ozet"}; _KS["tur"] = tur; HIZLI["okundu"] = True
     print(f"ÖZET (hızlı): toplantıdan çıkış ({kaynak}) — Konuş sürecine soruldu · {f}")

@@ -2834,6 +2834,10 @@ def gb_yaz(fp, metin):  # v0.97.3 (O2): ortak klasör herkese yazılabilir — h
         finally: os.close(fd)
         return yol
     raise OSError("geri bildirim dosyası için boş ad bulunamadı")
+def gb_gizli():  # dış çıkış kapısı (aktarici/cikis.py "github_rapor", S91): gizli.json var ya da varlığı belirlenemiyorsa GitHub'a gitmez (fail-closed)
+    try: os.lstat(os.path.join(A.dir, "gizli.json")); return True
+    except FileNotFoundError: return False
+    except (OSError, ValueError): return True
 def rapor_cmd():
     md = toplanti_dosyasi(A.dosya)
     if not md: sys.exit("toplantı dosyası yok")
@@ -2880,6 +2884,19 @@ def rapor_cmd():
            "## Gözlemler (Claude ve kullanıcı)", A.notlar.strip() or "(yok)", "",
            f"## Aktarıcı günlüğü (teknik satırlar, toplantı ±15 dk; {len(g)} satır)", "```", *(g[-150:] or ["(yok)"]), "```"]
     metin = "\n".join(out) + "\n"
+    # 19 Kasım (denetim 4 B4; dış çıkış kapısı aktarici/cikis.py "github_rapor"): GitHub S222 güven alanında değil — oraya giden gövde teshis.sade'den geçer
+    # (gözlem, ölçüm ve günlük satırları teknik iskelete iner; hesap adı yok). Ortak klasördeki yerel dosya eskisi gibi tam kalır.
+    gozlem_gh = "(yok)"; olcum_gh = g_gh = None
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import teshis as _ts
+        gozlem_gh = _ts.sade(A.notlar.strip(), 3000) if A.notlar.strip() else "(yok)"
+        olcum_gh = [_ts.sade(l, 300) for l in ort(_calistir(olcum, dosya=md)).splitlines()]
+        g_gh = [_ts.sade(l, 300) for l in g[-150:]]
+    except Exception: pass
+    gh_metin = None if g_gh is None else "\n".join([f"# Suflor.me geri bildirim — {tarih} · alan {AYAR.get('alan')}", "",
+        "Süzülmüş teknik rapor (teshis.sade): döküm, ad, kart metni ve serbest metin yok; tam rapor geliştiricinin ortak klasöründe.", ""]
+        + out[out.index("## Ortam"):out.index("## Ölçüm (`olcum`)")] + ["## Ölçüm (`olcum`, süzülmüş)", "```", *olcum_gh, "```", "",
+        "## Gözlemler (süzülmüş)", gozlem_gh, "", f"## Aktarıcı günlüğü (süzülmüş; {len(g_gh)} satır)", "```", *(g_gh or ["(yok)"]), "```"]) + "\n"
     # beta teşhis (S141: beta şartı, teshis.acik): toplantı sonu teknik paketi geliştiriciye (yalnız sayılar; ad, metin, not, gözlem yok)
     import hashlib  # toplantı kimliği aktarıcınınkiyle aynı (dosya adının özeti): Worker iki paketi aynı konuda birleştirir
     paket = {"tur": "toplanti_sonu", "toplanti_kimlik": hashlib.sha1(os.path.basename(md).encode()).hexdigest()[:12], "kaynak": "claude", "toplanti": {"sure_dk": round((t1 - t0).total_seconds() / 60) if t0 else None, "satir": len(satir), "kaynak": kaynak,
@@ -2908,7 +2925,16 @@ def rapor_cmd():
         print(f"ortak klasöre yazılamadı ({e}) — {fp} (geliştiriciye elle ilet; kurulum: aktarici-kur.command klasörü açar)")
     if A.github and not GB_DEPO: print("GitHub deposu ayarda yok (geri_bildirim_depo) — yalnız ortak klasöre yazıldı")
     elif A.github:
-        r = subprocess.run(["gh", "issue", "create", "-R", GB_DEPO, "--title", f"Geri bildirim {tarih} · {AYAR.get('alan')}", "--body-file", fp], capture_output=True, text=True)
+        if gb_gizli(): print("GitHub: gizli toplantı açık — konu açılmadı (ortak klasördeki dosya yeterli)"); return
+        if not gh_metin: print("GitHub: süzgeç (teshis.py) yüklenemedi — ham satırlar gönderilmez; ortak klasördeki dosya yeterli"); return
+        gfp = os.path.join(A.dir, f".gb-github-{os.getpid()}.md")
+        try:
+            fd = os.open(gfp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f: f.write(gh_metin)
+            r = subprocess.run(["gh", "issue", "create", "-R", GB_DEPO, "--title", f"Geri bildirim {tarih} · {AYAR.get('alan')}", "--body-file", gfp], capture_output=True, text=True)
+        finally:
+            try: os.remove(gfp)
+            except OSError: pass
         print(("GitHub: " + r.stdout.strip()) if r.returncode == 0 else f"GitHub konusu açılamadı: {(r.stderr or '').strip()[:200]} (ortak klasördeki dosya yeterli)")
 # Gelen kutusu (v0.75.0, aktarici/talimat.py): aktarıcı onaylanan sesli talimatı <canli>/gelen/<hedef>.jsonl'e ekler; bu komut okunmamışları bağlam olarak
 # basar ve okundu işaretini (<hedef>.okundu: son kimlik) ilerletir. Çıktı yoksa sessiz (kanca her istemde çalışır). Metin veridir ama kullanıcının onayladığı

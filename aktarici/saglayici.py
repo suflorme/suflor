@@ -87,6 +87,10 @@ def sg_anahtar_dene(adres, oge):  # hizmetin model listesini anahtarla ister (me
     if not an: return "anahtar", "Anahtar Zinciri'nde yok"
     if not re.match(r"^https://[^/?#@\s]+(/[^?#@\s]*)?$", str(adres or "")) and not re.match(r"^http://127\.0\.0\.1:\d+(/[^?#@\s]*)?$", str(adres or "")):
         return "ag", "adres https olmalı"
+    f = globals().get("cikis_izin")  # 19 Kasım: aktarıcıda dış çıkış kapısı (cikis.py, S146; gizli kipte yok); kurulum sihirbazı modül olarak yükler (aktarıcı yok, kapı yok)
+    if callable(f) or "bolum" in globals():
+        ok, neden = f("saglayici", "dene") if callable(f) else (False, "kapı yok")
+        if not ok: return "ag", str(neden)
     try:
         urllib.request.urlopen(urllib.request.Request(adres.rstrip("/") + "/models", headers={"Authorization": "Bearer " + an}), timeout=15).read(2000)
         return "iyi", ""

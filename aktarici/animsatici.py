@@ -38,7 +38,17 @@ def anim_yaz(d):
 def anim_say():  # beta: yalnız sayı (eşlenen iş sayısı)
     try: return len(anim_oku()["es"])
     except Exception: return 0
+# 19 Kasım (dış çıkış kapısı, aktarici/cikis.py; S258): iş metni Anımsatıcılar'a (iCloud/Exchange) gitmeden önce cikis_izin("animsatici"); gizli kip VARSAYILAN KAPALI.
+def _anim_gizli():
+    for ad in ("cikis_gizli", "kapi_gizli", "gizli_acik"):
+        f = globals().get(ad)
+        if callable(f):
+            try: return bool(f())
+            except Exception: return True
+    return True
 def _anim_yardimci(args, istek=None):  # Suflor Takvim.app → çıktı sözlüğü ya da {"durum": "hata", …}. Deneme: SUFLOR_TEST_BASLAT + SUFLOR_ANIM_YARDIMCI=<betik> (sahte yardımcı)
+    f = globals().get("cikis_izin"); ok, neden = f("animsatici", "es" if istek is not None else "oku") if callable(f) else (False, "kapı yok")
+    if not ok: return {"durum": "hata", "hata": "gizli" if neden == "gizli kip" else "cikis"}
     sahte = os.environ.get("SUFLOR_ANIM_YARDIMCI") if os.environ.get("SUFLOR_TEST_BASLAT") else None
     app = os.path.join(AYAR["uygulama"], "Suflor Takvim.app")
     if not sahte and not os.path.isdir(app): return {"durum": "hata", "hata": "Suflor Takvim.app yok"}
@@ -97,7 +107,7 @@ def anim_planla(isler, durum, ogeler):
 def anim_tur(zorla=False):
     # Bir eşitleme turu → {"ok", "ekle", "guncelle", "tamamla", "suflor"} ya da {"ok": False, "neden"}. Tek seferde bir tur (kilit).
     if not anim_acik() and not zorla: return {"ok": False, "neden": "kapali"}
-    if gizli_acik(): return {"ok": False, "neden": "gizli"}
+    if _anim_gizli(): return {"ok": False, "neden": "gizli"}
     if not ANIM["kilit"].acquire(blocking=False): return {"ok": False, "neden": "mesgul"}
     try:
         ANIM["tur_t"] = time.time(); y = _yapi_mod()
@@ -154,7 +164,7 @@ def _anim_dongu():
     time.sleep(ANIM_ILK_SN)
     while True:
         try:
-            if anim_acik() and not gizli_acik():
+            if anim_acik() and not _anim_gizli():
                 imza = _anim_imza(); simdi = time.time()
                 if imza != ANIM["imza"]:  # iş değişti: ~10 sn durulunca tur (art arda değişiklikler tek tura iner)
                     if imza != ANIM.get("gozlenen"): ANIM["gozlenen"] = imza; ANIM["degisti_t"] = simdi

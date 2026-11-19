@@ -40,7 +40,8 @@ g["AYAR"].pop("toplanti_salt_okur_onaysiz")
 # _topo_izin'de dal: salt okuyan Bash sorulmadan, yazan Bash izin_iste'ye gider
 gonderilen, sorulan = [], []
 g.update(_topo_gonder=lambda o: gonderilen.append(o) or True, _t=lambda tr, en: tr, gizli_acik=lambda: False, izin_metni=lambda a, gi: a, arac_cumlesi=lambda a, gi: a,
-         izin_iste=lambda *a, **k: sorulan.append(a) or "i1", izin_bekle=lambda iid: "reddedildi", _topo_mesaj=lambda *a, **k: None)
+         izin_iste=lambda *a, **k: sorulan.append(a) or "i1", izin_bekle=lambda iid: "reddedildi", _topo_mesaj=lambda *a, **k: None,
+         cikis_izin=lambda h, t, v=None: (True, ""), cikis_neden=lambda x: x)  # 19 Kasım: dış çıkış kapısı (aktarici/cikis.py) taklidi
 def izin(c):
     gonderilen.clear(); sorulan.clear(); out = io.StringIO()
     with contextlib.redirect_stdout(out): g["_topo_izin"]({"request_id": "r1", "request": {"tool_name": "Bash", "input": {"command": c}}})

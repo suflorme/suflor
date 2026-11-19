@@ -316,7 +316,8 @@ try:
     ok("bilinmeyen komut ve gövdede fazla alan reddedilir", rc == 3 and rc2 == 3 and os.path.exists(asilB))
     import re as _re, threading as _th, datetime as _dt
     import baglayici as _bag  # A1: yazma ayarı ve doğrulama bağlayıcıda (T kopyası)
-    ns = {"_baglayici_mod": lambda: _bag, "AYAR": {}, "_t": lambda a, b: a, "re": _re, "os": os, "json": json, "time": time, "datetime": _dt, "threading": _th, "BASE": d, "LOCK": _th.Lock()}
+    ns = {"gizli_acik": lambda: False, "_baglayici_mod": lambda: _bag, "AYAR": {},  # gizli_acik: 19 Kasım fail-closed denetim
+          "_t": lambda a, b: a, "re": _re, "os": os, "json": json, "time": time, "datetime": _dt, "threading": _th, "BASE": d, "LOCK": _th.Lock()}
     exec(open(os.path.join(KOD, "aktarici", "notlar.py"), encoding="utf-8").read(), ns)
     # yeni komutlar işlev düzeyinde: izin listesi, kural metni, belirsiz kişi, onaydan sonra değişen son olay, gizli kip
     ns2 = dict(ns, _yapi_mod=lambda: yapi, BASE=d); exec(open(os.path.join(KOD, "aktarici", "notlar.py"), encoding="utf-8").read(), ns2)

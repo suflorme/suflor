@@ -38,7 +38,7 @@ KM_NOT_GUN = 3  # notlar defterinden bu kadar günlük not pakete girer
 _KM_ONB = {}  # (dilim, dil) → (damga, metin)
 _KM_AY = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
 _KM_GUN = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
-def _km_gizli(): return "gizli_acik" in globals() and bool(gizli_acik())
+def _km_gizli(): return bool((kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()))  # 19 Kasım: fail-closed (kapi.py kapi_gizli)
 def _km_mt(yol):
     try: return os.path.getmtime(yol)
     except OSError: return None

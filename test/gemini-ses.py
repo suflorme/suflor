@@ -40,7 +40,8 @@ PORT = bos_port(); sunucu = http.server.ThreadingHTTPServer(("127.0.0.1", PORT),
 os.environ.update(SUFLOR_TEST_GEMINI_HOST=f"127.0.0.1:{PORT}", SUFLOR_TEST_GEMINI_ANAHTAR="deneme-anahtar", SUFLOR_TEST_GEMINI_SESSIZ="1")
 YAZILAN = []
 ad = {"__name__": "gemini_ses", "math": __import__("math"), "os": os, "time": time, "json": json, "base64": base64, "subprocess": subprocess, "threading": threading,
-      "datetime": __import__("datetime"), "AYAR": {"gemini_ses": "Kore"}, "BASE": T, "OYNAT_YOL": "/yok", "write": lambda ps: YAZILAN.extend(ps)}
+      "datetime": __import__("datetime"), "AYAR": {"gemini_ses": "Kore"}, "BASE": T, "OYNAT_YOL": "/yok", "write": lambda ps: YAZILAN.extend(ps),
+      "cikis_izin": lambda h, t, v=None: (True, ""), "cikis_gizli": lambda: False}  # 19 Kasım: dış çıkış kapısı (aktarici/cikis.py) taklidi — kapı yoksa Gemini kapalı (fail-closed)
 exec(compile(open(os.path.join(K, "aktarici", "gemini-ses.py"), encoding="utf-8").read(), "gemini-ses.py", "exec"), ad)
 t0 = time.time(); r = ad["gemini_oku"]("Gerçekten mi? Geçen hafta tam tersini söylemişlerdi.")
 g = GELEN[-1] if GELEN else {}

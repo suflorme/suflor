@@ -117,7 +117,8 @@ def ts_sentez(m, tanitim=None):  # → (24 kHz 16 bit ham ses ya da None = Mac s
 def toplantiya_soyle(metin=None, devam=False, hazir=None):
     if AYAR.get("toplantiya_ses") is not True: return {"ok": False, "err": _t("Toplantıya sesli söyleme kapalı (⚙ Ayarlar)", "Speaking into the meeting is off (⚙ Settings)")}
     if not devam and ts_durdur(): print("TOPLANTIYA SÖYLE: susturuldu"); return {"ok": True, "metin": _t("🔇 Suflor sustu", "🔇 Suflor stopped")}
-    if "gizli_acik" in globals() and gizli_acik(): print("TOPLANTIYA SÖYLE: gizli toplantı — okunmadı"); return {"ok": False, "err": _t("Gizli toplantı açık — toplantıya ses gitmez", "Private meeting is on — nothing is said into the meeting")}
+    _ok, _ne = globals()["cikis_izin"]("toplanti_ses", "ses") if callable(globals().get("cikis_izin")) else (False, "gizli kip")  # 19 Kasım: dış çıkış kapısı (cikis.py, S91), fail-closed
+    if not _ok: print(f"TOPLANTIYA SÖYLE: {_ne} — okunmadı"); return {"ok": False, "err": _t("Gizli toplantı açık — toplantıya ses gitmez", "Private meeting is on — nothing is said into the meeting")}
     if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")):
         print("TOPLANTIYA SÖYLE: toplantı yok — okunmadı"); return {"ok": False, "err": _t("Toplantı yok — toplantıya söylenecek bir yer yok", "No meeting — nowhere to say it")}
     web = ts_web(); aygit = None if web else ts_aygit()
@@ -236,7 +237,14 @@ DUYURU = {"toplanti": None, "t_ilk": 0.0, "son": 0.0, "say": 0}
 DUYURU_ARA_SN, DUYURU_SIRA_SN, DUYURU_BASLA_SN = 60.0, 20.0, (3.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 30.0)
 DUYURU_METIN = {"baslangic": ("Toplantıyı dinleyip not alıyorum.", "I'm listening and taking notes."), "not": ("Not aldım: {b}", "Noted: {b}")}
 def DUYURU_SABIT(): return {_t(*DUYURU_METIN["baslangic"])}  # v0.81.0: değişmeyen duyurular (önbellekten)
-def duyuru_acik(): return AYAR.get("toplanti_duyuru") is True and AYAR.get("toplantiya_ses") is True and not ("gizli_acik" in globals() and gizli_acik())
+def _ts_gizli():  # 19 Kasım: fail-closed (cikis_gizli > kapi_gizli > gizli_acik; hiçbiri yoksa gizli sayılır)
+    for ad in ("cikis_gizli", "kapi_gizli", "gizli_acik"):
+        f = globals().get(ad)
+        if callable(f):
+            try: return bool(f())
+            except Exception: return True
+    return True
+def duyuru_acik(): return AYAR.get("toplanti_duyuru") is True and AYAR.get("toplantiya_ses") is True and not _ts_gizli()
 def _duyuru_toplanti():
     if not (toplanti_var() or (STATE.get("masaustu") or {}).get("toplantida")): return None
     return STATE.get("meeting") or (STATE.get("masaustu") or {}).get("baslik") or "?"
@@ -282,7 +290,7 @@ threading.Thread(target=_duyuru_nobet, daemon=True).start()
 # toplantıya söylenir; önceden yalnız toplantı oturumuna SÜRE olayı ve kart. Toplantıya geç katılınca geçilmiş eşikler söylenmez. Söz sırası duyuruyla aynı.
 SURE_DUY = {"toplanti": None, "esik": set(), "kayma_son": 0.0}
 SURE_KAYMA_SN = 5.0 if os.environ.get("SUFLOR_TEST_HIZLI") else 600.0
-def sure_duyuru_acik(): return AYAR.get("sure_duyuru") is True and AYAR.get("toplantiya_ses") is True and not ("gizli_acik" in globals() and gizli_acik())
+def sure_duyuru_acik(): return AYAR.get("sure_duyuru") is True and AYAR.get("toplantiya_ses") is True and not _ts_gizli()
 def _sure_esikler(sv): k = sv["kalan_dk"]; return {e for e, ok in (("15", k <= 15), ("5", k <= 5), ("bitti", k <= 0)) if ok}
 def sure_duyuru_metin(e, sv):
     kal, acik = sv["kalan_dk"], len(sv.get("acik") or [])

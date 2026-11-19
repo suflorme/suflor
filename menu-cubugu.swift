@@ -577,6 +577,16 @@ final class SeritGorunum: NSView {
     override func mouseEntered(with e: NSEvent) { genis = true; needsDisplay = true }
     override func mouseExited(with e: NSEvent) { genis = false; needsDisplay = true }
     override func mouseUp(with e: NSEvent) { katman?.panelAc() }
+    override func rightMouseDown(with e: NSEvent) {  // v0.252.0b: şerit gizlenemiyordu (beta geri bildirimi); ayar kart_katmani=false, geri açmak ⚙ Ayarlar → Toplantı → Masaüstü kart şeridi
+        let m = NSMenu()
+        m.addItem(withTitle: TE("Şeridi gizle", "Hide strip"), action: #selector(seritGizle), keyEquivalent: "").target = self
+        m.addItem(withTitle: TE("Tüm kartlar (yan panel)", "All cards (side panel)"), action: #selector(panelAc), keyEquivalent: "").target = self
+        m.addItem(withTitle: T("Panoyu aç"), action: #selector(panoAc), keyEquivalent: "").target = self
+        NSMenu.popUpContextMenu(m, with: e, for: self)
+    }
+    @objc func seritGizle() { katman?.seritGizle() }
+    @objc func panelAc() { katman?.panelAc() }
+    @objc func panoAc() { katman?.panoAc() }
 }
 // --- 4) sırada bekleyen kart: kart tavanı (dakikada bir) yüzünden bekleyen SÖYLE/NOT varsa küçük cam kapsül, kart yerinin hemen üstünde ---
 final class BekleGorunum: NSView {
@@ -716,6 +726,10 @@ final class KartKatmani {
         }
         for (a, m, r) in durumlar where !goruldu.contains(a) { goruldu.insert(a); bilgiGoster(m, renk: r) }
         seritGuncelle(ids.subtracting(panelGoruldu).count)
+    }
+    func seritGizle() {  // kart katmanının tamamı kapanır (kartlar da); aktarıcı ayarı yazar, sonraki /cards cevabı kart_katmani:false verir
+        acik = false; hepsiniKaldir()
+        istek("/ayar", ["degisen": ["kart_katmani": false]]) { v in print("KART ŞERİDİ: gizlendi (kart_katmani=false)" + ((v?["ok"] as? Bool) == true ? "" : " — ayar yazılamadı")) }
     }
     func hepsiniKaldir() {
         sira = []; if let s = simdiki { s.panel.orderOut(nil); simdiki = nil }

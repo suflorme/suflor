@@ -676,3 +676,12 @@ dialog#aid[open]{display:grid;gap:var(--bo-16);align-content:start}
 #aid .ikon{border:0;background:none;width:32px;height:32px;border-radius:var(--r-8);display:grid;place-items:center;color:var(--b-m2);padding:0;cursor:pointer}
 #aid .ikon:hover{background:var(--b-uzerinde);color:var(--b-murekkep)}
 #aid svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* 19 Kasım (pano sadeleştirme 3. dalga, Y5): selamlama tek satır (24), en üstte Sıradaki toplantı; ilk ekranda en çok 3 blok, kalanı "Daha fazla" altında.
+   Alttaki kutu + son cevap şeridi içeriğin üstüne binmez: son cevap kısa (kendi kaydırması), kutunun yüksekliği (--nb-h, pano.html ResizeObserver) kadar alt boşluk. */
+#bgn .y-bugun>.sayfab h1{font-size:var(--yz-24);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bgn .y-bugun>.sayfab .sbas{gap:var(--bo-4)}
+#bgn .dahafazla{justify-content:flex-start}
+html.bugun #knd .kcv{max-height:min(22vh,10em)}
+html.bugun main>.sc{scroll-padding-bottom:var(--nb-h,0px)}
+@media (max-width:720px){html.bugun #bgn .icerik{padding-bottom:calc(var(--nb-h,0px) + var(--bo-16))}}

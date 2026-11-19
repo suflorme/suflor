@@ -43,10 +43,18 @@ def hakem_en_cok_sn():
     try: return float(AYAR.get("hakem_en_cok_dk") or 120) * 60
     except (TypeError, ValueError): return 7200.0
 def _hk_anahtar(): return gemini_anahtar() if "gemini_anahtar" in globals() else ""  # gemini-ses.py: Anahtar Zinciri (ayar gemini_anahtar), dosyaya/günlüğe yazılmaz
+# 19 Kasım (dış çıkış kapısı, aktarici/cikis.py; S186): gizli kip VARSAYILAN KAPALI; her istek ağa çıkmadan önce cikis_izin("gemini_api") — kapı yoksa istek yok.
+def _hk_gizli():
+    for ad in ("cikis_gizli", "kapi_gizli", "gizli_acik"):
+        f = globals().get(ad)
+        if callable(f):
+            try: return bool(f())
+            except Exception: return True
+    return True
 def hakem_acik():  # → (açık mı, neden); beta (geliştirici değil) her zaman kapalı
     if AYAR.get("hakem") is False: return False, "kapali"
     if not ("gelistirici_mi" in globals() and gelistirici_mi()): return False, "beta"
-    if "gizli_acik" in globals() and gizli_acik(): return False, "gizli"
+    if _hk_gizli(): return False, "gizli"
     if not _hk_anahtar(): return False, "anahtar_yok"
     return True, None
 def _hk_gizli_mi(md):  # dökümünde gizli kip satırı olan toplantı (relay.py gizli_degistir: "| saat | **GİZLİ** | açıldı …")
@@ -147,6 +155,8 @@ def hakem_coz(govde, n):  # → ({"p1": metin, …} ya da None: bozuk, kullanım
     return out, kul
 def _hk_istek(model, govde):  # → (HTTP durumu (0: ağ hatası), gövde, Retry-After, sn); anahtar başlıkta (adreste değil)
     host = globals().get("GEMINI_HOST") or "generativelanguage.googleapis.com"; t0 = time.time()
+    f = globals().get("cikis_izin")
+    if not (f("gemini_api", "ses") if callable(f) else (False, ""))[0]: return 0, "", None, 0.0  # ağ hatası gibi: tur durur, toplantı sonra yeniden denenir
     c = (http.client.HTTPConnection if host.startswith("127.0.0.1") else http.client.HTTPSConnection)(host, timeout=HK_ZAMAN_ASIMI)
     try:
         c.request("POST", f"/v1beta/models/{model}:generateContent", body=json.dumps(govde), headers={"Content-Type": "application/json", "x-goog-api-key": _hk_anahtar()})
@@ -321,7 +331,7 @@ def hakem_tur():  # bir tur: bekleyen toplantılar sırayla; sınır/kota dolunc
     yol = _so_yol(HK_DURUM); d = _so_json(yol, {}); d.setdefault("toplantilar", {})
     for md in hakem_bekleyen(d):
         if toplanti_acik() or kaynak_dar() or not hakem_acik()[0]: break
-        r = hakem_toplanti(md, durdur=lambda: toplanti_acik() or ("gizli_acik" in globals() and gizli_acik()))
+        r = hakem_toplanti(md, durdur=lambda: toplanti_acik() or _hk_gizli())
         s = d["toplantilar"].setdefault(md, {"deneme": 0}); s.update(durum=r["durum"], t=time.time(), usd=round(float(s.get("usd") or 0) + float(r.get("usd") or 0), 4))
         if r["durum"] == "hata":
             s["deneme"] = int(s.get("deneme") or 0) + 1

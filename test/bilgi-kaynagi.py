@@ -153,7 +153,8 @@ kontrol("'Güncel veri' panoda dört yerde (hazırlık, brifing, brifing pencere
 # 7. toplantı oturumu izin kararı (5 Kasım): okuma araçları ve web onaysız; yazma sorulur; aynı araç yeniden/paralel sorulmaz; gizli toplantıda web yok
 import threading
 def izin_ns(ayar, gizli=False):
-    n = {"re": re, "threading": threading, "json": json, "os": os, "time": time, "AYAR": dict(ayar), "_t": lambda a_, b_: a_, "gizli_acik": lambda: n["_gz"], "_gz": gizli}
+    n = {"re": re, "threading": threading, "json": json, "os": os, "time": time, "AYAR": dict(ayar), "_t": lambda a_, b_: a_, "gizli_acik": lambda: n["_gz"], "_gz": gizli,
+         "cikis_izin": lambda h, t, v=None: (False, "gizli kip") if n["_gz"] else (True, ""), "cikis_neden": lambda x: x}  # 19 Kasım: dış çıkış kapısı (aktarici/cikis.py) taklidi
     exec(compile(to, "toplanti-oturum.py", "exec"), n)
     n.update(_gonder=[], sorulan=[], karar="onaylandi", _topo_gonder=lambda o: n["_gonder"].append(o["response"]["response"]["behavior"]), _topo_mesaj=lambda *a, **k: None,
              _topo_izle_mi=lambda ad, gi: False, _topo_tc_okuma=lambda ad, gi: False, _topo_oto=lambda ad, gi: None, arac_cumlesi=lambda ad, gi=None: ad,

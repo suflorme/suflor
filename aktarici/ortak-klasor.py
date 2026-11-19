@@ -33,6 +33,8 @@ def _ort_kimlik_f(ad):  # rolde e-postası olmayan ad → yalnız emin eşleme (
     return r.get("eposta") if r.get("eposta") and (r.get("guven") or 0) >= 0.9 else None
 def _ort_firestore(neden):
     ep = ortak_kimlik(); ORT["tasima"] = "firestore"
+    f = globals().get("cikis_izin"); ok, ne = f("firestore", "esitle") if callable(f) else (False, "kapı yok")  # 19 Kasım: dış çıkış kapısı (cikis.py; gizli kipte eşitleme bekler, imleçle sonra sürer)
+    if not ok: ORT.update(durum="gizli" if ne == "gizli kip" else "kapali", hata=None); return ORT
     if not ep: ORT.update(durum="kimlik_yok", hata=None); return ORT  # şirket e-postası yoksa hiçbir şey gitmez (beta kurulumunda açılmaz)
     bm = _bulut_mod(); y = _yapi_mod()
     if not bm or not y: ORT.update(durum="hata", hata="ortak_bulut.py yok"); return ORT

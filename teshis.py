@@ -248,11 +248,27 @@ def hata_ozeti(tur, deger, tb):
 _KILIT = threading.Lock()
 def _klasor(uyg, alt):
     d = os.path.join(uyg, "teshis", alt); os.makedirs(d, exist_ok=True); return d
+# 19 Kasım (dış çıkış kapısı, aktarici/cikis.py; S141): gizli kipte yalnız teknik sayaç paketleri gider (BETA_TEKNIK); kullanıcı metni taşıyan "sorun"/"geri_bildirim"
+# gitmez (bekleyen/'de kalır). Aktarıcı içinde kapı CIKIS_IZIN'i bağlar; tek başına kullanımda (toplanti-claude.py, kurulum) <uygulama>/canli/gizli.json okunur — var ya da
+# varlığı belirlenemiyorsa gizli sayılır (fail-closed).
+BETA_TEKNIK = {"hata", "kurulum", "haftalik", "toplanti_sonu"}
+CIKIS_IZIN = None
+def cikis_izin(tur, uyg):  # → (ok, neden)
+    f = CIKIS_IZIN
+    if callable(f):
+        try: return f("beta", str(tur or ""))
+        except Exception: return False, "kapı hatası"
+    try: os.lstat(os.path.join(os.path.expanduser(str(uyg or "")), "canli", "gizli.json")); gizli = True
+    except FileNotFoundError: gizli = False
+    except (OSError, ValueError): gizli = True
+    if gizli and str(tur or "") not in BETA_TEKNIK: return False, "gizli kip"
+    return True, ""
 def gonder(paket, ayar, uyg, zorla=False, arka=True):
     """Paketi temizleyip adrese gönderir (S141: beta şartı, her zaman; deneme yalnız yerel alıcıya — acik()). zorla: elle geri bildirim.
     Kopyası teshis/gonderilen/'e yazılır; adres yoksa ya da ağ yoksa teshis/bekleyen/'e, sonraki gönderimde yeniden denenir.
     Döner: {"ok": bool, "durum": "gonderildi|bekliyor|kapali", "dosya": yol}"""
     if not acik(ayar): return {"ok": False, "durum": "kapali"}
+    if not cikis_izin((paket or {}).get("tur"), uyg)[0]: return {"ok": False, "durum": "gizli"}
     p = temizle(dict(paket, sema=SURUM_SEMA, zaman=datetime.datetime.now().astimezone().isoformat(timespec="seconds")))
     ad = f"{time.strftime('%Y%m%d-%H%M%S')}-{p.get('tur', 'paket')}.json"
     try: fp = os.path.join(_klasor(uyg, "bekleyen"), ad); json.dump(p, open(fp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -272,6 +288,9 @@ def _bekleyenleri_gonder(ayar, uyg):
     for fp in sorted(glob.glob(os.path.join(bek, "*.json")))[:50]:
         try:
             veri = open(fp, "rb").read()
+            try: tur = json.loads(veri.decode("utf-8")).get("tur")
+            except (ValueError, AttributeError): tur = None
+            if not cikis_izin(tur, uyg)[0]: continue  # gizli kip: kullanıcı metinli paket bekler, teknik paket gider
             # User-Agent şart (23 Ekim): Cloudflare, Python'un varsayılan "Python-urllib" kimliğini "error code: 1010" (403) ile engelliyor — v0.12'den beri paketler bu yüzden gitmiyordu
             r = urllib.request.Request(adres, data=veri, method="POST", headers={"Content-Type": "application/json", "X-Suflor-Beta": BETA_ANAHTAR, "User-Agent": f"Suflor.me/{_surum()}"})
             with urllib.request.urlopen(r, timeout=10) as y:

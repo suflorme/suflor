@@ -322,7 +322,7 @@ def taslak_ac(h):  # onaylanmış taslak → (True, sonuç) ya da (False, neden)
 TASLAK_ACICI = []  # yalnız deneme kipi
 
 def kayit_dogrula(komut, arg, gevsek=False):  # → (hazır iş sözlüğü, None) ya da (None, hata metni). Uygulamadan hemen önce de yeniden çağrılır (gevsek: toplu onayda artık onay beklemeyenler atlanır).
-    if "gizli_acik" in globals() and gizli_acik() and komut not in KAYIT_GIZLI_SERBEST: return None, _t("gizli kip açık", "private mode is on")
+    if (kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()) and komut not in KAYIT_GIZLI_SERBEST: return None, _t("gizli kip açık", "private mode is on")
     if komut == "kayit_taslak": return _kayit_taslak_dogrula(arg)
     if komut == "gundem_ekle": return _gundem_dogrula(arg)
     if komut == "toplanti_bitir": return _toplanti_bitir_dogrula(arg)
@@ -598,7 +598,7 @@ def _toplanti_bitir_dogrula(arg):
     if e: return None, e
     d, ad = _toplanti_aktif()
     if d not in ("algilandi", "suruyor"): return None, (_t("toplantı zaten bitiyor", "the meeting is already ending") if d == "bitiyor" else _t("şu an süren bir toplantı yok", "there is no meeting in progress"))
-    gizli = "gizli_acik" in globals() and gizli_acik()  # gizli kipte toplantı adı yazılmaz
+    gizli = bool((kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()))  # gizli kipte toplantı adı yazılmaz (19 Kasım: fail-closed)
     return {"komut": "toplanti_bitir", "ozet": _t(f"«{_nt_kisa(ad, 80)}» toplantısı bitirilir" if ad and not gizli else "süren toplantı bitirilir", f"meeting «{_nt_kisa(ad, 80)}» is ended" if ad and not gizli else "the meeting in progress is ended")}, None
 def _toplanti_baslat_dogrula(arg):  # konu verilmezse takvimde şimdi (−30 dk … +15 dk) başlayan ya da süren toplantı; yoksa Başlat'ın kendi adı
     e = _ik_arg(arg, (), ("konu",))
@@ -797,7 +797,7 @@ def kayit_etiketleri(metin, tur):  # asistanın cevabı → etiketsiz metin; ge�
     if not ler: return metin
     alt = []
     if not kayit_turu_mu(tur): print(f"KAYIT: {len(ler)} etiket yok sayıldı (kullanıcının kendi turu değil)"); return temiz
-    gizli = "gizli_acik" in globals() and gizli_acik()
+    gizli = bool((kapi_gizli() if "kapi_gizli" in globals() else "gizli_acik" not in globals() or gizli_acik()))
     if gizli and not any(isinstance(o_, dict) and o_.get("komut") in KAYIT_GIZLI_SERBEST for o_, _h in ler): return temiz + "\n" + _t("Gizli kip açık: kayıt yazılmaz.", "Private mode is on: records aren't written.")
     sun = 0; gizli_not = False
     for o, ham in ler:

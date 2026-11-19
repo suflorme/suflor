@@ -1376,7 +1376,9 @@ def masaustu_mic_view():
         try: mm["kulaklik"] = kulaklik()
         except Exception: mm["kulaklik"] = None
         mm["t_kulaklik"] = now
-    return {"akiyor": akiyor, "aygit": mm["aygit"], "parca": mm["parca"], "atilan": mm["atilan"], "kulaklik": mm["kulaklik"] if akiyor else None}
+    try: yv = bool(akiyor and "beta_say" in globals() and beta_say("yanki", now - 600, now + 1) >= 20)  # son 10 dk'da ölçülen yankı (beta_kalite eşiğiyle aynı adet): uyarı yalnız gerçek yankıda
+    except Exception: yv = False
+    return {"akiyor": akiyor, "aygit": mm["aygit"], "parca": mm["parca"], "atilan": mm["atilan"], "kulaklik": mm["kulaklik"] if akiyor else None, "yanki_var": yv}
 
 # Toplantı bitişi: Faz B'den aktarici/toplanti.py (bitiyor → bitti; /status toplanti_bitti {file, t, neden}; izle "TOPLANTI BİTTİ" olayını bir kez verir).
 
@@ -1799,7 +1801,7 @@ AYAR_PANO = {
     "dil": ("sec", "tr", ("tr", "en")), "tema": ("sec", "sistem", ("sistem", "acik", "koyu")), "renk_duzeni": ("sec", "yesil", ("notr", "yesil")), "kisilik": ("kisilik", "", None), "kisilik_toplanti_disi": ("kisilik", "", None), "kisilik_dis": ("kisilik", "", None),  # v0.110.0: arayüz dili, iki kişilik (dosya yolu)
     "gemini_ses": ("sec", "Charon", ("Kore", "Aoede", "Leda", "Zephyr", "Sulafat", "Charon", "Puck", "Fenrir", "Orus", "Achird", "Algieba")),  # v0.78.0: GEMINI_SESLER ile aynı
     "gemini_model": ("sec", "gemini-3.8-flash-lite-tts", ("gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts")), "gemini_kapsam": ("sec", "toplanti", ("toplanti", "hepsi")), "eposta_oku": ("bool", False, None), "eposta_mail_uyari": ("bool", True, None), "ozet_iki_ses": ("bool", True, None),  # v0.80.0
-    "adin_gecti": ("bool", True, None), "onay_uyari": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "toplanti_sonrasi_hatirlat_dk": ("sayi", 10, (0, 120)), "toplanti_sonrasi_sesli": ("bool", False, None), "toplanti_hatirlat": ("bool", True, None), "toplanti_hatirlat_dk": ("sayi", 10, (1, 60)), "toplanti_hatirlat_sesli": ("bool", True, None), "proaktif_oneri": ("bool", True, None), "proaktif_gunluk_en_cok": ("sayi", 3, (0, 10)), "proaktif_aralik_dk": ("sayi", 90, (0, 720)), "proaktif_bosta_dk": ("sayi", 5, (0, 120)), "konus_derin": ("bool", True, None), "konus_derin_model": ("sec", "opus", ("opus", "sonnet")), "konus_derin_effort": ("sec", "high", ("low", "medium", "high", "xhigh", "max")), "ekran_oto": ("bool", True, None),
+    "adin_gecti": ("bool", True, None), "onay_uyari": ("bool", True, None), "hizli_ozet": ("bool", False, None), "kart_katmani": ("bool", True, None), "uzun_konusma_sn": ("sayi", 90, (0, 900)), "kart_tavan_sn": ("sayi", 60, (0, 600)), "toplanti_sonrasi_hatirlat_dk": ("sayi", 10, (0, 120)), "toplanti_sonrasi_sesli": ("bool", False, None), "toplanti_hatirlat": ("bool", True, None), "toplanti_hatirlat_dk": ("sayi", 10, (1, 60)), "toplanti_hatirlat_sesli": ("bool", True, None), "proaktif_oneri": ("bool", True, None), "proaktif_gunluk_en_cok": ("sayi", 3, (0, 10)), "proaktif_aralik_dk": ("sayi", 90, (0, 720)), "proaktif_bosta_dk": ("sayi", 5, (0, 120)), "konus_derin": ("bool", True, None), "konus_derin_model": ("sec", "opus", ("opus", "sonnet")), "konus_derin_effort": ("sec", "high", ("low", "medium", "high", "xhigh", "max")), "ekran_oto": ("bool", True, None),
     "bildirim": ("bool", True, None), "oda": ("bool", False, None),
     "tstt_taslak": ("bool", True, None), "oto_toplanti": ("bool", True, None), "oto_haric": ("liste", "", None),  # S161 (v0.145.0): toplantıyı kendisi tanıma; hariç = ad parçaları (panoda virgülle)
     "ceviri": ("bool", False, None), "ceviri_kis": ("bool", True, None), "sesli_ceviri_tam": ("bool", False, None), "masaustu_ses_kis": ("bool", False, None),
@@ -2041,6 +2043,7 @@ bolum("ortak-klasor")  # aktarici/ortak-klasor.py — ortak karar katmanı A3 (e
 bolum("kapi")  # aktarici/kapi.py — Claude kapısı (K1, 16 Kasım): tek çağrılarda izin (gizli/toplantı/sessiz/mesai/gece/ortak arka plan tavanı) çağrıdan önce, tekrar önleme, ortak sıra, tek kayıt; eylem-menu'den önce
 bolum("eylem-menu")  # aktarici/eylem-menu.py — kayıt eylem menüsü: ertele, böl, gündeme ekle, ata, taslak, asistana sor (/girdi {kayit}), Geri al (/kayit-menu, /kayit-eylem, /kayit-not; ortak karar katmanı)
 bolum("web-kapi")  # aktarici/web-kapi.py — web kapısı yardımcıları; toplanti-oturum bölümünden önce yüklenir (13 Kasım 2026, güvenlik denetimi G4/G5)
+bolum("cikis")  # aktarici/cikis.py — dış çıkış kapısı (v0.253.0): Claude dışı her dış bağlantı cikis_izin'den geçer; gizli kipte varsayılan kapalı
 bolum("izin")  # aktarici/izin.py — kullanıcı izni: anahtarsız istek, toplantı oturumunun riskli aracı, karşı tarafa sesli cevap (v0.97.0)
 bolum("toplanti-oturum")  # aktarici/toplanti-oturum.py — panodan Başlat'la açılan toplantı oturumu arka planda, Terminal yok (v0.111.0)
 bolum("yerel-konus")  # aktarici/yerel-konus.py — Konuş yerel ses istemcisi: VPIO'lu yardımcıya soket (ayar yerel_konus, yalnız geliştirici; Aşama 2 Adım 2) — sohbet'ten önce
@@ -2456,6 +2459,24 @@ def sayfa(ad, yol=""):  # yazı tipleri + arayüz dili (ayar "dil": tr|en; denem
     return pano_dosyasi(ad).replace("/*__YAZI__*/", pano_dosyasi("yazi.css")).replace("/*__RENK__*/", pano_dosyasi("renk.css")).replace("/*__DIL_SOZLUK__*/", pano_dosyasi("dil.js")).replace("/*__BUGUN__*/", pano_dosyasi("bugun.css")) \
         .replace("/*__ANAHTAR__*/", anh).replace("__DIL__", dil).replace("<html lang=tr>", f"<html lang={dil}>")
 
+# --- Rota tablosu (mimari denetim 3, bulgu 3; 19 Kasım) -------------------------------------------------------------------------------------------------------------------
+# do_GET/_post uzun if zincirleriydi (39 GET + 76 POST); aynı yol iki kez yazılınca ikincisi sessizce ulaşılamaz kalıyordu (/kimlik, v0.251.0'da düzeldi).
+# Tam yol → işleyici. Kayıt açılışta yapılır: aynı (yöntem, yol) iki kez kaydedilirse ValueError, aktarıcı açılmaz. Önek/kalıp yolları (/marka/, /kanit/, /cards?…,
+# /kimlik?n=) tabloda YOK: eski zincirde kalır (test/rota.py envanterinde ayrı listelenir). Tabloda olmayan yol eski zincire düşer.
+#   GET işleyici (self, yol) · POST işleyici (self, p, k) — k: {"yetkili", "pano", "serit", "o"} (_post'ta hesaplanan bağlam).
+#   pano=True (POST): pano değilse 403 "köken" — eski "if not pano: return ..." satırının aynısı, tablo uygular.
+#   tam=True (GET): yalnız sorgusuz istek (eski `self.path == "/x"` dalı; "/x?…" pano kabuğuna düşerdi, düşmeye devam eder).
+# Taşıma sırasında gövdeler harfi harfine aynı kaldı (self = istek işleyicisi H). Yeni uç: buraya @rota ile; test/rota.py tabloyla zincirin çakışmadığını denetler.
+ROTA_GET, ROTA_POST = {}, {}
+def rota(yontem, *yollar, pano=False, tam=False):
+    t = {"GET": ROTA_GET, "POST": ROTA_POST}[yontem]
+    def kaydet(f):
+        for y in yollar:
+            if y in t: raise ValueError(f"rota iki kez tanımlı: {yontem} {y} ({t[y][0].__name__} ve {f.__name__})")
+            t[y] = (f, pano, tam)
+        return f
+    return kaydet
+
 class H(BaseHTTPRequestHandler):
     # (güvenlik denetimi Y1) önceden her yanıt "Access-Control-Allow-Origin: *" taşıyordu ve köken/Host bakılmıyordu —
     # tarayıcıda açık herhangi bir site dökümü, kartları ve takvimi okuyup soru/satır yazabiliyordu. Artık: Host yalnız
@@ -2510,7 +2531,10 @@ class H(BaseHTTPRequestHandler):
             if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}; anahtarsiz_kaydet("/takvim", str(self.headers.get("Origin", "")) or "chrome-extension://")
             return self._json({"surum": SURUM, "toplanti": toplanti_var(), "anahtar_gerekli": True})
         if (yol in VERI_GET or yol.startswith("/kanit/")) and not self._yetkili(): return self._anahtar_yok()  # sayfa kabuğu (/, /mini) anahtarsız
-        if yol == "/animsatici": return self._json(anim_view() if "anim_view" in globals() else {})  # S258
+        # Denetim sırası (değiştirme): 1) _koken (Host/Origin; değilse 403) → 2) /marka/ (anahtarsız) → 3) /kimlik?n= (anahtarsız imza) → 4) anahtarsız /takvim (sürüm)
+        # → 5) VERI_GET ve /kanit/ anahtarsızsa 401 → 6) rota tablosu (ROTA_GET) → 7) eski zincir (/status, /kimlik ?ad=, /kisi…, menü yoklama işareti, /cards, kabuk sayfalar)
+        r = ROTA_GET.get(yol)  # rota tablosu (tam yol); bulunmazsa aşağıdaki eski zincir
+        if r and (not r[2] or self.path == yol): return r[0](self, yol)
         if self.path == "/status":
             if self.headers.get("X-Suflor-Istemci") == "izle": STATE["izle_seen"] = time.time()  # pano "Claude izliyor" göstergesi
             elif (self.headers.get("Referer") or "").startswith((f"http://127.0.0.1:{A.port}/", f"http://localhost:{A.port}/")) and "hazirlik" not in (self.headers.get("Referer") or ""):  # v0.96.0: pano açık (Konuş süreci önceden açılır)
@@ -2538,60 +2562,20 @@ class H(BaseHTTPRequestHandler):
                 try: s["extension"]["age_s"] = round((datetime.datetime.now() - datetime.datetime.fromisoformat(s["extension"]["seen"])).total_seconds())
                 except Exception: s["extension"]["age_s"] = None
             return self._json(s)
-        if yol == "/toplanti-oturum":  # v0.111.0: arka plandaki toplantı oturumunun iletileri (?n=<son görülen>)
-            m = re.search(r"[?&]n=([0-9]{1,9})(?:&|$)", self.path); return self._json(toplanti_oturum_mesajlar(int(m.group(1)) if m else 0))
-        if self.path == "/geri-bildirim/onizle": return self._json(teshis_gonder("geri_bildirim", {"kullanici_metni": "(yazdığın metin)"}, onizle=True))
         if yol == "/kimlik":  # A1: ?ad=<ad> → kimlik_coz; adsız → kayıtlardaki eşlenemeyenler (yalnız okuma)
             import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
             return self._json(kimlik_view(ad) if "kimlik_view" in globals() else {"durum": "hata", "hata": "kimlik yok"})
-        if yol == "/katilimcilar":  # 6 Kasım: takvim daveti + toplantıda görülen konuşmacılar, kişi kayıtlarıyla eşleştirilmiş KATILIMCILAR bloğu (aktarici/kimlik.py katilimci_view); yalnız okuma
-            return self._json(katilimci_view() if "katilimci_view" in globals() else {"ok": False, "hata": "kimlik yok"})
         if yol == "/kisi-ozet":  # Mac Kişiler'de yalnız sayılar (aktarici/talimat.py kisi_ozet; ad/iletişim verisi yok); ?kurum=1 kuruma göre ilk 10
             return self._json(kisi_ozet("kurum=1" in self.path) if "kisi_ozet" in globals() else {"durum": "hata", "hata": "kisi_ozet yok"})
         if yol == "/kisi":  # S225: Mac Kişiler'den yalnız okuma (aktarici/talimat.py kisi_bul); ?ad=<ad>; Konuş MCP aracı ve `toplanti-claude.py kisi` çağırır
             import urllib.parse; m = re.search(r"[?&]ad=([^&]{1,200})(?:&|$)", self.path); ad = urllib.parse.unquote_plus(m.group(1)) if m else ""
             return self._json(kisi_bul(ad) if "kisi_bul" in globals() else {"durum": "hata", "hata": "kisi_bul yok"})
-        if yol == "/taslak": return self._json({"taslak": taslak_view(STATE.get("meeting"), tstt=("pano=1" in self.path))})  # izle (SORU/ÖZET bağlamı) tstt taslağını görmez; pano ?pano=1 ile alır
-        if self.path.split("?")[0] == "/takvim":  # ?tam=1 davet notları ve tüm katılımcılarla (toplanti-claude.py takvim)
-            # eklentinin arka planı (Teams açık olmasa da) ?v=<sürüm> ile yoklar. Chrome bu istekte Origin göndermeyebilir;
-            # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)
-            m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
-            if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
-            h = re.search(r"[?&]hafta=(-?\d{1,2})(?:&|$)", self.path)  # hafta görünümü: Pazartesi–Pazar, geçmiş ve ileri (aktarici/bas-konus.py takvim_hafta)
-            if h: return self._json(takvim_eposta(takvim_hafta(int(h.group(1)))))  # 5 Kasım: + davet notundan e-posta işareti
-            h = re.search(r"[?&]ay=(-?\d{1,2})(?:&|$)", self.path)  # ay görünümü: 42 günlük ızgara (takvim_ay)
-            if h: return self._json(takvim_ay(int(h.group(1))))
-            g = re.search(r"[?&]gun=(\d{1,2})(?:&|$)", self.path)  # v0.55.0: ?gun=7 → 7 günün etkinlikleri + boş zamanlar (v0.59.0: en çok 30)
-            return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1, pay="pay=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
-                                   surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
-        if self.path == "/agenda": return self._json(agenda())
-        if yol == "/dogrula": return self._json(dogrula_istek("yenile=1" in self.path))  # Faz D: Kurulumu denetle (aktarici/saglik.py)
-        if yol in ("/toplantilar", "/toplantilar/dokum"): return self._json(arsiv_istek(yol, self.path))
-        if yol == "/prova": return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
-        if yol == "/bugun-veri": return self._json(bugun_veri_view())
-        if yol == "/is-kopya": return self._json(ik_view() if "ik_view" in globals() else {"ok": False, "sorular": [], "birlesen": []})  # aynı iş olabilir çiftleri (aktarici/is-kopya.py; anahtarlı)
-        if yol == "/belge-oneri": return self._json(belge_oneri_view())  # belgeden iş önerisi (aktarici/eylem-menu.py; anahtarlı)
-        if yol == "/kayit-menu": return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
-        if yol == "/izleme": return self._json(izleme_view())
         if yol == "/yaklasan-tarihler": return self._json(kt_view("yenile=1" in self.path) if "kt_view" in globals() else {"ok": False, "tarihler": []})  # S243: Kişiler/Takvim/Anımsatıcılar yaklaşan kişisel tarihler (aktarici/kisisel-tarihler.py; anahtarlı)
-        if yol == "/arastirma": return self._json(arastirma_view((re.search(r"[?&]id=([0-9a-z-]{1,80})(?:&|$)", self.path) or [None, None])[1], gizli=bool(re.search(r"[?&]gizli=1(?:&|$)", self.path))) if "arastirma_view" in globals() else {"hata": "yok"})  # S243: toplantı dışı web araştırması kayıtları
-        if yol == "/kesisim.json": return self._json(kesisim_sayfa_veri())  # Kesişim sayfası verisi (anahtarlı; geliştirici)
-        if yol in ("/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/sozluk"): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
         if yol == "/dokum-kontrol/ses":  # satırın ses parçası (WAV); sayfa fetch ile başlıklı alır
             from urllib.parse import urlsplit, parse_qs
             q = parse_qs(urlsplit(self.path).query); b = dk_ses((q.get("t") or [""])[0], (q.get("d") or [""])[0])
             if not b: return self._json({"ok": False}, 404)
             self.send_response(200); self._cors(); self.send_header("Content-Type", "audio/wav"); self.send_header("Cache-Control", "private, max-age=3600"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
-        if yol == "/ortak": return self._json(ortak_view())  # A3 ortak klasör durumu (aktarici/ortak-klasor.py)
-        if yol == "/kayitlar": return self._json(kayitlar_view(self.path))  # Kararlar ve işler görünümü (anahtarlı)
-        if yol == "/kapanis-turu": return self._json(kapanis_view() if "kapanis_view" in globals() else {"ok": False})  # toplantı başında kapanış turu (aktarici/toplanti-oturum.py)
-        if yol == "/gundem-taslagi": return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
-        if yol == "/vt-bellek": return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
-        if yol == "/eposta-onemli": return self._json(et_view() if "et_view" in globals() else {"ok": True, "izin": False})  # önemli e-posta ve cevapsız konu (aktarici/eposta-takip.py)
-        if yol == "/posta-uslup":  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)
-            from urllib.parse import urlsplit, parse_qs
-            return self._json(posta_uslup((parse_qs(urlsplit(self.path).query).get("kim") or [""])[0]))  # v0.116.0: Toplantılarda ara, Dökümler (aktarici/arsiv.py)
-        if self.path == "/konus-gecmis": return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
         if self.headers.get("X-Suflor-Istemci") == "menu": STATE["_menu_son"] = time.time()  # menü uygulaması yokluyor: bildirimi o gösterir
         if (self.headers.get("X-Suflor-Istemci") or "").startswith("menu"): STATE["_menu_yokluyor"] = time.time()  # pano penceresi açılabilir (bildirim izni olmasa da)
         if self.path == "/cards": v = cards_view(); v["imza"] = serit_imza(v); v["kart_katmani"] = kart_katmani_acik(); v["arayuz_dili"] = ARAYUZ_DILI; return self._json(v)
@@ -2641,41 +2625,18 @@ class H(BaseHTTPRequestHandler):
             else: return self._anahtar_yok()
         if gizli_acik() and self.path in GIZLI_YUT: return self._json({"ok": True, "gizli": True})  # v0.89.1
         if gizli_acik() and self.path in GIZLI_RED and not (self.path == "/komut" and p.get("tur") == "gizli"): return self._json(gizli_red())
-        if self.path == "/ingest": ingest(p); return self._json({"ok": True, "lines": STATE["lines"], "held": STATE["disk"]["held"]})
-        if self.path == "/taslak": return self._json(taslak_al(p))
-        if self.path == "/note": note(p); return self._json({"ok": True})
-        if self.path == "/card":
-            c = add_card(p); return self._json({"ok": bool(c), "card": c}, 200 if c else 400)
-        if self.path == "/etiket":  # duygu etiketi (pano başlığı) — kart gibi anahtarla
-            c = etiket(p); return self._json({"ok": bool(c), "etiket": c}, 200 if c else 400)
+        # Denetim sırası (değiştirme): 1) _koken (403) → 2) gövde boyutu (413) ve JSON (400) → 3) yerel anahtar; anahtarsızsa geçiş listesi + kaynak onayı (403) ya da 401
+        # (/ses-yerel kendi anahtarıyla) → 4) gizli kip: GIZLI_YUT yutulur, GIZLI_RED reddedilir → 5) rota tablosu (ROTA_POST; pano=True ise köken 403) → 6) eski zincir.
+        # do_POST'un finally'sindeki kart_bildir() her yol için aynen çalışır.
+        r = ROTA_POST.get(self.path)  # rota tablosu (tam yol, sorgu dahil — eski zincir gibi); bulunmazsa aşağıdaki eski zincir
+        if r:
+            if r[1] and not pano: return self._json({"ok": False, "err": "köken"}, 403)  # pano=True: yalnız pano (aynı köken + anahtar)
+            return r[0](self, p, {"yetkili": yetkili, "pano": pano, "serit": serit, "o": o})
         if self.path == "/card-ack":  # onay kartının Onayla/Reddet'i yalnız anahtarlı istemciden (#76)
             if p.get("status") in ("onaylandi", "reddedildi") and not yetkili: return self._anahtar_yok()
             return self._json({"ok": ack_card(p, yetkili)})
-        if self.path == "/eylem":  # kuyruğa iş — yalnız anahtarlı (toplanti-claude.py); geçiş listesinde yok
-            x = eylem_ekle(p); return self._json({"ok": bool(x), "eylem": x}, 200 if x else 400)
-        if self.path == "/ilet": return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
-        if self.path == "/prova": return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
-        if self.path in ("/karar-onay", "/is-durum"): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
-        if self.path == "/dokum-kontrol": return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile | kapat | sozluk (anahtarlı; geliştirici)
-        if self.path == "/ortak": return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
-        if self.path == "/yaklasan-tarihler": return self._json(kt_islem(p))  # taslak (kutlama; gönderim yok) | yoksay (anahtarlı; geçiş listesinde yok)
-        if self.path == "/is-kopya": return self._json(ik_islem(p) if "ik_islem" in globals() else {"ok": False, "err": "yok"})  # birlestir | ayri | geri_al (anahtarlı; geçiş listesinde yok)
-        if self.path == "/belge-oneri": return self._json(belge_oneri_islem(p))  # öneriyi kayda al (kayit_olustu + is_atandi) ya da reddet (anahtarlı)
-        if self.path == "/kayit-eylem": return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
-        if self.path == "/kayit-not": return self._json(kayit_not_ekle(p))  # «Kayda not olarak ekle» (asistanın cevabı → yorum_ekle; tıklama onaydır; anahtarlı, geçiş listesinde yok)
-        if self.path == "/disa-aktar": return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
-        if self.path == "/toplanti-oturum": return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
-        if self.path == "/izin-iste": return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
-        if self.path == "/eylem-sun": return self._json({"ok": True, "n": eylem_sun()})
         if self.path == "/eylem-karar":  # Onayla / Reddet / Hepsini onayla — anahtarlı pano ya da sohbetteki onay (eylem onay)
             n = eylem_karar(p, "pano" if pano else "sohbet"); return self._json({"ok": n > 0, "n": n})
-        if self.path == "/eylem-sonuc": return self._json({"ok": eylem_sonuc(p)})
-        if self.path == "/otonom":  # otonom cevap: iptal | simdi — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(otonom_karar(str(p.get("id") or "") or None, "simdi" if p.get("karar") == "simdi" else "iptal"))
-        if self.path == "/moderator":  # v0.83.0 moderatör düğmeleri: sonraki | ozet | bekle | devam | birak — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(moderator_pano(str(p.get("komut") or "")))
         if self.path == "/bas-konus":  # bas-konuş — pano (aynı köken + pano anahtarı); şerit penceresi yalnız basılı tut (basla + ses)
             if not (pano or (serit and str(p.get("komut") or "") in ("basla", "") and (p.get("komut") or p.get("pcm")))): return self._json({"ok": False, "err": "köken"}, 403)
             if p.get("komut") == "basla": sohbet_bas_tut_oncesi(); return self._json(konus_basla())  # Adım 4: yerel mikrofon önce kapanır
@@ -2685,95 +2646,24 @@ class H(BaseHTTPRequestHandler):
             if p.get("komut") == "sohbet_parca": return self._json(sohbet_parca(p))
             if p.get("komut") == "sohbet_kapat": sohbet_kapat("pano"); return self._json({"ok": True})
             return self._json(konus_ses(p))
-        if self.path == "/eylem-geri-al":  # sesli kararın Geri al'ı (10 sn) — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json({"ok": eylem_geri_al(p)})
-        if self.path == "/eylem-sesli":  # sesli "yazayım mı?" dizisinde Sonra / Sus — yalnız pano (aynı köken + pano anahtarı)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(soru_komut(p))
-        if self.path == "/son-toplanti":  # toplantı sonu özeti hazır (toplanti-claude.py ozet-hazir) — kart gibi anahtarla
-            return self._json(son_ekle(p))
-        if self.path == "/arastirma":  # 13 Kasım: Araştırmalar satırı — gizle/göster, oturuma ya da asistana ilet; yalnız pano (aynı köken + pano anahtarı); aktarici/web-arastirma.py
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(arastirma_islem(p) if "arastirma_islem" in globals() else {"ok": False, "err": "yok"})
         if self.path == "/tazi":
             if p.get("islem") == "rapor" and not pano: return self._json({"ok": False, "err": "köken"}, 403)  # 12 Kasım: rapor metni yalnız pano (aynı köken + pano anahtarı)
             return self._json(tazi_islem(p) if "tazi_islem" in globals() else {"ok": False, "err": "yok"})  # 11 Kasım: Tazı taraması iste/durum — yalnız anahtarlı (aktarici/tazi-kos.py; gizli kipte ve ayar tazi kapalıyken çalışmaz)
-        if self.path == "/vt-bellek": return self._json(vt_bellek_al(p))  # 3 Kasım: kayıt veritabanının adları ve terimleri (vt-izle / vt-mcp) — yalnız anahtarlı (geçiş listesinde yok), bellekte
-        if self.path == "/brifing":  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(brifing_iste(p))
-        if self.path == "/takvim-toplanti":  # panodaki takvimden toplantı oluştur / önizle (davetli çözümü) — yalnız pano (aynı köken + pano anahtarı); aktarici/talimat.py
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(takvim_toplanti(p))
-        if self.path == "/duman":  # Deneme toplantısı: başlat | bitir — yalnız pano (aktarici/duman.py)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(duman_islem(p))
-        if self.path == "/mail-ac":  # panodaki "Mail'i aç" (Mail kapalı uyarısı) — yalnız pano; Mail'i arka planda açar
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(posta_mail_ac() if "posta_mail_ac" in globals() else {"ok": False, "err": "yok"})
-        if self.path == "/eposta-onemli":  # taslak | ertele | yoksay — yalnız pano (aktarici/eposta-takip.py); taslak göndermez
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(et_islem(p))
-        if self.path == "/kesisim":  # Kesişim sayfasında "Geri al" — yalnız pano köken + anahtar
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(kesisim_geri_al(p))
-        if self.path == "/tepki":  # 12 Kasım: "işe yaradı / yanlış" tepkisi (Tazı raporu, Kesişim, e-posta) — yalnız pano; canli/tepki.jsonl: zaman, kaynak, id, deger (metin yok)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(tepki_yaz(p))
-        if self.path == "/mutabakat": return self._json(mtb_islem(p) if "mtb_islem" in globals() else {"ok": False, "err": "yok"})  # zekâ Y1: {"kayit", "islem": onay|red} · {"islem": "calistir"} — anahtarlı (geçiş listesinde yok); gizli kipte reddedilir
         if self.path == "/dusunme":  # günlük düşünme turu: calistir | dogru | yanlis | gordu — yalnız pano (aktarici/dusunme.py)
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(dus_islem(p))
-        if self.path == "/proaktif":  # toplantı sonrası açık uç hatırlatması: sor | kapat | gordu — yalnız pano (aktarici/toplanti-sonrasi.py)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(pro_islem(p))
-        if self.path == "/animsatici":  # S258: simdi | listeler — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(anim_islem(p))
-        if self.path == "/toplanti-hatirlat":  # planlı toplantı hatırlatması: hazirlik | ac | kapat — yalnız pano (aktarici/toplanti-hatirlat.py)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(that_islem(p))
-        if self.path == "/hatirlat":  # panodaki deneme hatırlatmasının Tamam'ı — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(hatirlat_kapat(p))
-        if self.path == "/konus-gecmis-sil":  # panoda Konuş geçmişinden silme (tek kayıt id, seçilenler ids, hepsi) — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(konus_gecmis_sil(p.get("id"), p.get("ids") if isinstance(p.get("ids"), list) else None, p.get("hepsi") is True))
-        if self.path == "/ayar":  # panodaki ⚙ Ayarlar — yalnız pano (aynı köken + anahtar)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(ayar_yaz(p.get("degisen")))
         if self.path == "/pano-ac":  # v0.105.0: panoyu menü uygulamasının Mac penceresinde aç (kurulum, eklentinin "Panoyu aç"ı) — anahtarla;
             # menü uygulaması son 60 sn'de yoklamadıysa pencere: false → istemci eskisi gibi tarayıcıda açar
             if time.time() - STATE.get("_menu_yokluyor", 0) > 60: return self._json({"ok": True, "pencere": False})
             # gorunum: yalnız "ayarlar" (eklenti şeridindeki ⚙) → menü uygulaması Ayarlar penceresini açar
             STATE["pano_ac"] = {"id": "p" + str(int(time.time() * 1000)), "t": time.time(), **({"gorunum": "ayarlar"} if isinstance(p, dict) and p.get("gorunum") == "ayarlar" else {})}; kart_bildir(); return self._json({"ok": True, "pencere": True})
-        if self.path == "/notlar":  # v0.117.0: panoda notu sil — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(notlar_islem(p))
-        if self.path == "/son-ac":  # panodaki "Özeti aç" — yalnız pano (aynı köken + pano anahtarı), yalnız kayıttaki özet
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(son_ac(p))
         if self.path == "/baslat":  # Terminal'de /toplanti — yalnız eklenti ya da pano (anahtarla)
             if not (o in EKLENTI_KOKEN or pano):  # başka eklenti Claude oturumu açtıramasın
                 print(f"KÖKEN: /baslat reddedildi · {o[:80] or '-'} (Suflor.me eklentisiyse kimliği ayara ekle: eklenti_kimlik)"); return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(baslat(p))
-        if self.path == "/hazirla":  # v0.76.0 (T6): panodan "Projeyi yeniden hazırla" — yalnız pano
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(hazirla_ac())
-        if self.path == "/guncelle":  # panodan güncelleme — yalnız pano (aynı köken + pano anahtarı)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(guncelle_baslat())
         if self.path == "/baglam-dosya":  # panoya bırakılan ya da + ile seçilen dosya — pano ya da şerit penceresi (anahtarlı)
             if not (pano or serit): return self._json({"ok": False, "err": "köken"}, 403)
             return self._json(baglam_dosya_al(p))
-        if self.path == "/ac":  # takvim bağlantısı / başlatılan toplantı Chrome'da — yalnız pano (anahtarla)
-            if not pano: return self._json({"ok": False, "err": "köken"}, 403)
-            return self._json(chrome_ac(p))
-        if self.path == "/tek-kullanim":  # anahtarlı yerel istemci (kurulum) panoyu/hazırlığı tarayıcıda açacak: 2 dk'lık tek kullanımlık adres
-            return self._json({"ok": True, "url": tek_kullanim_url("/")})
-        if self.path == "/takvim-yenile":  # panodaki ↻ — arka planda
-            threading.Thread(target=takvim_yenile, daemon=True).start(); return self._json({"ok": True})
         if self.path == "/geri-bildirim":  # panodan elle geri bildirim — kullanıcının metni + (isterse) teknik paket
             if not pano: return self._json({"ok": False, "err": "köken"}, 403)
             metin = str(p.get("metin") or "").strip()[:4000]
@@ -2818,7 +2708,6 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/kanit":
             if not str(self.headers.get("Origin", "")).startswith("chrome-extension://"): return self._json({"ok": False, "err": "yalnız eklenti"}, 403)
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)
-        if self.path == "/kanit-iste": return self._json({"ok": True, "id": kanit_iste(p)})
         if self.path == "/komut":  # panodaki ⭐ (onemli) · eklenti kısayolu Option + Shift + O (ozet) · Option + Shift + M ya da 🔇 (sessiz)
             if p.get("tur") not in ("onemli", "ozet", "sessiz", "sesli_ceviri", "soyle", "gizli"): return self._json({"ok": False, "err": "tur: onemli | ozet | sessiz | sesli_ceviri | soyle | gizli"}, 400)
             komut_uygula(p["tur"], (str(p.get("metin") or p.get("not") or "")[:1200] if p["tur"] == "soyle" else str(p.get("not") or "")[:200]), (p.get("meeting") or {}).get("title"), p.get("durum") if p.get("durum") in ("ac", "kapat") else None)
@@ -2837,18 +2726,9 @@ class H(BaseHTTPRequestHandler):
             if p.get("tur") == "soyle-web": ts_web_durum(p.get("metin")); return self._json({"ok": True})
             if p.get("tur") == "konusmaci": print(f"KONUŞMACI: {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})  # toplanti-claude.py ertelenen etiketleme
             print(f"EKLENTİ: {str(p.get('tur') or '?')[:40]} · {' '.join(str(p.get('metin') or '').split())[:300]}"); return self._json({"ok": True})
-        if self.path == "/masaustu": return self._json(masaustu_al(p))  # menü çubuğu uygulaması (anahtarla)
-        if self.path == "/masaustu-altyazi": return self._json(masaustu_altyazi_al(p))  # menü uygulamasının okuduğu masaüstü Teams altyazısı (anahtarla; ayar masaustu_altyazi)
-        if self.path == "/ses-masaustu": return self._json(masaustu_mic_al(p))
-        if self.path == "/ortak-mik": return self._json(ortak_mik_al(p))  # menü uygulaması OrtakMik: BlackHole başka süreçten okunuyor mu (anahtarla; masaustu-uyari.py)
         if self.path == "/kanit-masaustu":  # menü uygulamasının toplantı penceresi görüntüsü (anahtarla; Origin yalnız aktarıcının kendisi ya da yok)
             if o and not o.startswith(f"http://127.0.0.1:{A.port}"): return self._json({"ok": False, "err": "köken"}, 403)
             r = kanit(p); return self._json(r, 200 if r.get("ok") else 400)  # menü uygulamasının mikrofonu (anahtarla; geçiş listesinde yok)
-        if self.path == "/toplanti":  # elle bitir: panodaki Bitir düğmesi (13 Kasım) ve API. {"islem": "bitir"}
-            if p.get("islem") != "bitir": return self._json({"ok": False, "err": "islem"}, 400)
-            return self._json({"ok": toplanti_bitir("elle bitirildi")})
-        if self.path == "/agenda-aktif":  # izle konuşulan gündem maddesini tahmin eder; pano ▶ gösterir (yalnız görünüm)
-            i = p.get("i"); STATE["agenda_aktif"] = int(i) if isinstance(i, int) else None; return self._json({"ok": True})
         if self.path == "/ping":
             with LOCK:
                 # 30 sn'yi aşan nabız boşluğu günlüğe (kim: zamanlayici|arka-plan, sekme görünür/gizli) — 3 Ekim denemesinde
@@ -2882,6 +2762,220 @@ class H(BaseHTTPRequestHandler):
             return self._json({"ok": True})
         self._json({"ok": False}, 404)
     def log_message(self, *a): pass
+
+# --- Rota tablosu işleyicileri (yukarıdaki ROTA_GET / ROTA_POST; gövdeler eski do_GET/_post dallarından harfi harfine) ------------------------------------------------
+@rota("GET", "/animsatici")
+def _g_animsatici(self, yol): return self._json(anim_view() if "anim_view" in globals() else {})  # S258
+@rota("GET", "/toplanti-oturum")
+def _g_toplanti_oturum(self, yol):  # v0.111.0: arka plandaki toplantı oturumunun iletileri (?n=<son görülen>)
+    m = re.search(r"[?&]n=([0-9]{1,9})(?:&|$)", self.path); return self._json(toplanti_oturum_mesajlar(int(m.group(1)) if m else 0))
+@rota("GET", "/geri-bildirim/onizle", tam=True)
+def _g_geri_bildirim_onizle(self, yol): return self._json(teshis_gonder("geri_bildirim", {"kullanici_metni": "(yazdığın metin)"}, onizle=True))
+@rota("GET", "/katilimcilar")
+def _g_katilimcilar(self, yol):  # 6 Kasım: takvim daveti + toplantıda görülen konuşmacılar, kişi kayıtlarıyla eşleştirilmiş KATILIMCILAR bloğu (aktarici/kimlik.py katilimci_view); yalnız okuma
+    return self._json(katilimci_view() if "katilimci_view" in globals() else {"ok": False, "hata": "kimlik yok"})
+@rota("GET", "/taslak")
+def _g_taslak(self, yol): return self._json({"taslak": taslak_view(STATE.get("meeting"), tstt=("pano=1" in self.path))})  # izle (SORU/ÖZET bağlamı) tstt taslağını görmez; pano ?pano=1 ile alır
+@rota("GET", "/takvim")
+def _g_takvim(self, yol):  # ?tam=1 davet notları ve tüm katılımcılarla (toplanti-claude.py takvim)
+    # eklentinin arka planı (Teams açık olmasa da) ?v=<sürüm> ile yoklar. Chrome bu istekte Origin göndermeyebilir;
+    # işaret sürüm parametresidir (yalnız sihirbazın "eklenti kuruldu mu" sorusu için; güvenlik kararı değil)
+    m = re.search(r"[?&]v=([0-9]{1,3}(?:\.[0-9]{1,3}){1,3})(?:&|$)", self.path)
+    if m: STATE["_eklenti_kurulu"] = {"t": time.time(), "ver": m.group(1)}
+    h = re.search(r"[?&]hafta=(-?\d{1,2})(?:&|$)", self.path)  # hafta görünümü: Pazartesi–Pazar, geçmiş ve ileri (aktarici/bas-konus.py takvim_hafta)
+    if h: return self._json(takvim_eposta(takvim_hafta(int(h.group(1)))))  # 5 Kasım: + davet notundan e-posta işareti
+    h = re.search(r"[?&]ay=(-?\d{1,2})(?:&|$)", self.path)  # ay görünümü: 42 günlük ızgara (takvim_ay)
+    if h: return self._json(takvim_ay(int(h.group(1))))
+    g = re.search(r"[?&]gun=(\d{1,2})(?:&|$)", self.path)  # v0.55.0: ?gun=7 → 7 günün etkinlikleri + boş zamanlar (v0.59.0: en çok 30)
+    return self._json(dict(takvim_view("tam=1" in self.path, int(g.group(1)) if g else 1, pay="pay=1" in self.path), claude_age_s=round(time.time() - STATE["izle_seen"]) if STATE.get("izle_seen") else None,
+                           surum=SURUM, toplanti=toplanti_var()))  # eklenti aktarıcı yeni sürümdeyse (toplantı yokken) kendini yeniler
+@rota("GET", "/agenda", tam=True)
+def _g_agenda(self, yol): return self._json(agenda())
+@rota("GET", "/dogrula")
+def _g_dogrula(self, yol): return self._json(dogrula_istek("yenile=1" in self.path))  # Faz D: Kurulumu denetle (aktarici/saglik.py)
+@rota("GET", "/toplantilar", "/toplantilar/dokum")
+def _g_toplantilar(self, yol): return self._json(arsiv_istek(yol, self.path))
+@rota("GET", "/prova")
+def _g_prova(self, yol): return self._json(prova_view())  # Prova odası durumu (aktarici/prova.py; kişi adı/döküm içerir — anahtarlı)
+@rota("GET", "/bugun-veri")
+def _g_bugun_veri(self, yol): return self._json(bugun_veri_view())
+@rota("GET", "/is-kopya")
+def _g_is_kopya(self, yol): return self._json(ik_view() if "ik_view" in globals() else {"ok": False, "sorular": [], "birlesen": []})  # aynı iş olabilir çiftleri (aktarici/is-kopya.py; anahtarlı)
+@rota("GET", "/belge-oneri")
+def _g_belge_oneri(self, yol): return self._json(belge_oneri_view())  # belgeden iş önerisi (aktarici/eylem-menu.py; anahtarlı)
+@rota("GET", "/kayit-menu")
+def _g_kayit_menu(self, yol): return self._json(kayit_menu_view(self.path))  # eylem menüsü bilgisi (anahtarlı)
+@rota("GET", "/izleme")
+def _g_izleme(self, yol): return self._json(izleme_view())
+@rota("GET", "/arastirma")
+def _g_arastirma(self, yol): return self._json(arastirma_view((re.search(r"[?&]id=([0-9a-z-]{1,80})(?:&|$)", self.path) or [None, None])[1], gizli=bool(re.search(r"[?&]gizli=1(?:&|$)", self.path))) if "arastirma_view" in globals() else {"hata": "yok"})  # S243: toplantı dışı web araştırması kayıtları
+@rota("GET", "/kesisim.json")
+def _g_kesisim_json(self, yol): return self._json(kesisim_sayfa_veri())  # Kesişim sayfası verisi (anahtarlı; geliştirici)
+@rota("GET", "/dokum-kontrol/liste", "/dokum-kontrol/plan", "/dokum-kontrol/sozluk")
+def _g_dokum_kontrol_liste(self, yol): return self._json(dk_istek(yol, self.path))  # döküm kontrolü (geliştirici; anahtarlı)
+@rota("GET", "/ortak")
+def _g_ortak(self, yol): return self._json(ortak_view())  # A3 ortak klasör durumu (aktarici/ortak-klasor.py)
+@rota("GET", "/kayitlar")
+def _g_kayitlar(self, yol): return self._json(kayitlar_view(self.path))  # Kararlar ve işler görünümü (anahtarlı)
+@rota("GET", "/kapanis-turu")
+def _g_kapanis_turu(self, yol): return self._json(kapanis_view() if "kapanis_view" in globals() else {"ok": False})  # toplantı başında kapanış turu (aktarici/toplanti-oturum.py)
+@rota("GET", "/gundem-taslagi")
+def _g_gundem_taslagi(self, yol): return self._json(gundem_taslagi_view(self.path))  # hazırlık kartındaki gündem taslağı (anahtarlı)
+@rota("GET", "/vt-bellek")
+def _g_vt_bellek(self, yol): return self._json(vt_bellek_view())  # 3 Kasım: yalnız sayılar + aktarıcının açılış kimliği (vt-izle yeniden gönderme kararı); adlar dönmez
+@rota("GET", "/eposta-onemli")
+def _g_eposta_onemli(self, yol): return self._json(et_view() if "et_view" in globals() else {"ok": True, "izin": False})  # önemli e-posta ve cevapsız konu (aktarici/eposta-takip.py)
+@rota("GET", "/posta-uslup")
+def _g_posta_uslup(self, yol):  # toplanti-claude.py posta-uslup: kullanıcının bu kişiye gönderdiği son iletiler, yalnız takip e-postasının üslubu için (aktarici/posta.py)
+    from urllib.parse import urlsplit, parse_qs
+    return self._json(posta_uslup((parse_qs(urlsplit(self.path).query).get("kim") or [""])[0]))  # v0.116.0: Toplantılarda ara, Dökümler (aktarici/arsiv.py)
+@rota("GET", "/konus-gecmis", tam=True)
+def _g_konus_gecmis(self, yol): return self._json(konus_gecmis_liste())  # v0.67.0: panoda Konuş geçmişi (aktarici/bellek.py)
+
+@rota("POST", "/ingest")
+def _p_ingest(self, p, k): ingest(p); return self._json({"ok": True, "lines": STATE["lines"], "held": STATE["disk"]["held"]})
+@rota("POST", "/taslak")
+def _p_taslak(self, p, k): return self._json(taslak_al(p))
+@rota("POST", "/note")
+def _p_note(self, p, k): note(p); return self._json({"ok": True})
+@rota("POST", "/card")
+def _p_card(self, p, k):
+    c = add_card(p); return self._json({"ok": bool(c), "card": c}, 200 if c else 400)
+@rota("POST", "/etiket")
+def _p_etiket(self, p, k):  # duygu etiketi (pano başlığı) — kart gibi anahtarla
+    c = etiket(p); return self._json({"ok": bool(c), "etiket": c}, 200 if c else 400)
+@rota("POST", "/eylem")
+def _p_eylem(self, p, k):  # kuyruğa iş — yalnız anahtarlı (toplanti-claude.py); geçiş listesinde yok
+    x = eylem_ekle(p); return self._json({"ok": bool(x), "eylem": x}, 200 if x else 400)
+@rota("POST", "/ilet")
+def _p_ilet(self, p, k): return self._json(talimat_ilet(p))  # v0.115.2: toplantı oturumunun başka oturuma iletisi → onay kartı — yalnız anahtarlı (geçiş listesinde yok)
+@rota("POST", "/prova")
+def _p_prova(self, p, k): return self._json(prova_islem(p))  # Prova odası: oner|baslat|cevap|atla|yeniden|kisi|bitir|sifirla (anahtarlı; geçiş listesinde yok)
+@rota("POST", "/karar-onay", "/is-durum")
+def _p_karar_onay(self, p, k): return self._json(bugun_yaz(self.path, p))  # Bugün: teyit eki kaldır / iş yapıldı (anahtarlı; geçiş listesinde yok)
+@rota("POST", "/dokum-kontrol")
+def _p_dokum_kontrol(self, p, k): return self._json(dk_islem(p))  # döküm kontrolü: kaydet | bitir | yenile | kapat | sozluk (anahtarlı; geliştirici)
+@rota("POST", "/ortak")
+def _p_ortak(self, p, k): return self._json(ortak_islem(p))  # A3: {"islem": "esitle"} hemen bir tur (anahtarlı)
+@rota("POST", "/yaklasan-tarihler")
+def _p_yaklasan_tarihler(self, p, k): return self._json(kt_islem(p))  # taslak (kutlama; gönderim yok) | yoksay (anahtarlı; geçiş listesinde yok)
+@rota("POST", "/is-kopya")
+def _p_is_kopya(self, p, k): return self._json(ik_islem(p) if "ik_islem" in globals() else {"ok": False, "err": "yok"})  # birlestir | ayri | geri_al (anahtarlı; geçiş listesinde yok)
+@rota("POST", "/belge-oneri")
+def _p_belge_oneri(self, p, k): return self._json(belge_oneri_islem(p))  # öneriyi kayda al (kayit_olustu + is_atandi) ya da reddet (anahtarlı)
+@rota("POST", "/kayit-eylem")
+def _p_kayit_eylem(self, p, k): return self._json(kayit_eylem_islem(p))  # eylem menüsü: ertele/böl/gündem/ata/taslak/onay/Geri al — her biri bir olay (anahtarlı; geçiş listesinde yok)
+@rota("POST", "/kayit-not")
+def _p_kayit_not(self, p, k): return self._json(kayit_not_ekle(p))  # «Kayda not olarak ekle» (asistanın cevabı → yorum_ekle; tıklama onaydır; anahtarlı, geçiş listesinde yok)
+@rota("POST", "/disa-aktar")
+def _p_disa_aktar(self, p, k): return self._json(disa_aktar_islem(p))  # Bugün: kararlar ve işler CSV/JSON dosyasına (anahtarlı; geçiş listesinde yok)
+@rota("POST", "/toplanti-oturum")
+def _p_toplanti_oturum(self, p, k): return self._json(toplanti_oturum_islem(p))  # v0.111.0: yaz | sec | durdur | terminal | kapat (anahtarlı; geçiş listesinde yok)
+@rota("POST", "/izin-iste")
+def _p_izin_iste(self, p, k): return self._json(izin_arac(p))  # v0.97.0 (K1): toplantı oturumunun kancası — yalnız anahtarlı (geçiş listesinde yok)
+@rota("POST", "/eylem-sun")
+def _p_eylem_sun(self, p, k): return self._json({"ok": True, "n": eylem_sun()})
+@rota("POST", "/eylem-sonuc")
+def _p_eylem_sonuc(self, p, k): return self._json({"ok": eylem_sonuc(p)})
+@rota("POST", "/otonom", pano=True)
+def _p_otonom(self, p, k):  # otonom cevap: iptal | simdi — yalnız pano
+    return self._json(otonom_karar(str(p.get("id") or "") or None, "simdi" if p.get("karar") == "simdi" else "iptal"))
+@rota("POST", "/moderator", pano=True)
+def _p_moderator(self, p, k):  # v0.83.0 moderatör düğmeleri: sonraki | ozet | bekle | devam | birak — yalnız pano
+    return self._json(moderator_pano(str(p.get("komut") or "")))
+@rota("POST", "/eylem-geri-al", pano=True)
+def _p_eylem_geri_al(self, p, k):  # sesli kararın Geri al'ı (10 sn) — yalnız pano
+    return self._json({"ok": eylem_geri_al(p)})
+@rota("POST", "/eylem-sesli", pano=True)
+def _p_eylem_sesli(self, p, k):  # sesli "yazayım mı?" dizisinde Sonra / Sus — yalnız pano (aynı köken + pano anahtarı)
+    return self._json(soru_komut(p))
+@rota("POST", "/son-toplanti")
+def _p_son_toplanti(self, p, k):  # toplantı sonu özeti hazır (toplanti-claude.py ozet-hazir) — kart gibi anahtarla
+    return self._json(son_ekle(p))
+@rota("POST", "/arastirma", pano=True)
+def _p_arastirma(self, p, k):  # 13 Kasım: Araştırmalar satırı — gizle/göster, oturuma ya da asistana ilet; yalnız pano (aynı köken + pano anahtarı); aktarici/web-arastirma.py
+    return self._json(arastirma_islem(p) if "arastirma_islem" in globals() else {"ok": False, "err": "yok"})
+@rota("POST", "/vt-bellek")
+def _p_vt_bellek(self, p, k): return self._json(vt_bellek_al(p))  # 3 Kasım: kayıt veritabanının adları ve terimleri (vt-izle / vt-mcp) — yalnız anahtarlı (geçiş listesinde yok), bellekte
+@rota("POST", "/brifing", pano=True)
+def _p_brifing(self, p, k):  # boş panoda toplantı brifingi — yalnız pano (aynı köken + pano anahtarı)
+    return self._json(brifing_iste(p))
+@rota("POST", "/takvim-toplanti", pano=True)
+def _p_takvim_toplanti(self, p, k):  # panodaki takvimden toplantı oluştur / önizle (davetli çözümü) — yalnız pano (aynı köken + pano anahtarı); aktarici/talimat.py
+    return self._json(takvim_toplanti(p))
+@rota("POST", "/duman", pano=True)
+def _p_duman(self, p, k):  # Deneme toplantısı: başlat | bitir — yalnız pano (aktarici/duman.py)
+    return self._json(duman_islem(p))
+@rota("POST", "/mail-ac", pano=True)
+def _p_mail_ac(self, p, k):  # panodaki "Mail'i aç" (Mail kapalı uyarısı) — yalnız pano; Mail'i arka planda açar
+    return self._json(posta_mail_ac() if "posta_mail_ac" in globals() else {"ok": False, "err": "yok"})
+@rota("POST", "/eposta-onemli", pano=True)
+def _p_eposta_onemli(self, p, k):  # taslak | ertele | yoksay — yalnız pano (aktarici/eposta-takip.py); taslak göndermez
+    return self._json(et_islem(p))
+@rota("POST", "/kesisim", pano=True)
+def _p_kesisim(self, p, k):  # Kesişim sayfasında "Geri al" — yalnız pano köken + anahtar
+    return self._json(kesisim_geri_al(p))
+@rota("POST", "/tepki", pano=True)
+def _p_tepki(self, p, k):  # 12 Kasım: "işe yaradı / yanlış" tepkisi (Tazı raporu, Kesişim, e-posta) — yalnız pano; canli/tepki.jsonl: zaman, kaynak, id, deger (metin yok)
+    return self._json(tepki_yaz(p))
+@rota("POST", "/mutabakat")
+def _p_mutabakat(self, p, k): return self._json(mtb_islem(p) if "mtb_islem" in globals() else {"ok": False, "err": "yok"})  # zekâ Y1: {"kayit", "islem": onay|red} · {"islem": "calistir"} — anahtarlı (geçiş listesinde yok); gizli kipte reddedilir
+@rota("POST", "/proaktif", pano=True)
+def _p_proaktif(self, p, k):  # toplantı sonrası açık uç hatırlatması: sor | kapat | gordu — yalnız pano (aktarici/toplanti-sonrasi.py)
+    return self._json(pro_islem(p))
+@rota("POST", "/animsatici", pano=True)
+def _p_animsatici(self, p, k):  # S258: simdi | listeler — yalnız pano
+    return self._json(anim_islem(p))
+@rota("POST", "/toplanti-hatirlat", pano=True)
+def _p_toplanti_hatirlat(self, p, k):  # planlı toplantı hatırlatması: hazirlik | ac | kapat — yalnız pano (aktarici/toplanti-hatirlat.py)
+    return self._json(that_islem(p))
+@rota("POST", "/hatirlat", pano=True)
+def _p_hatirlat(self, p, k):  # panodaki deneme hatırlatmasının Tamam'ı — yalnız pano
+    return self._json(hatirlat_kapat(p))
+@rota("POST", "/konus-gecmis-sil", pano=True)
+def _p_konus_gecmis_sil(self, p, k):  # panoda Konuş geçmişinden silme (tek kayıt id, seçilenler ids, hepsi) — yalnız pano
+    return self._json(konus_gecmis_sil(p.get("id"), p.get("ids") if isinstance(p.get("ids"), list) else None, p.get("hepsi") is True))
+@rota("POST", "/ayar", pano=True)
+def _p_ayar(self, p, k):  # panodaki ⚙ Ayarlar — yalnız pano (aynı köken + anahtar)
+    return self._json(ayar_yaz(p.get("degisen")))
+@rota("POST", "/notlar", pano=True)
+def _p_notlar(self, p, k):  # v0.117.0: panoda notu sil — yalnız pano
+    return self._json(notlar_islem(p))
+@rota("POST", "/son-ac", pano=True)
+def _p_son_ac(self, p, k):  # panodaki "Özeti aç" — yalnız pano (aynı köken + pano anahtarı), yalnız kayıttaki özet
+    return self._json(son_ac(p))
+@rota("POST", "/hazirla", pano=True)
+def _p_hazirla(self, p, k):  # v0.76.0 (T6): panodan "Projeyi yeniden hazırla" — yalnız pano
+    return self._json(hazirla_ac())
+@rota("POST", "/guncelle", pano=True)
+def _p_guncelle(self, p, k):  # panodan güncelleme — yalnız pano (aynı köken + pano anahtarı)
+    return self._json(guncelle_baslat())
+@rota("POST", "/ac", pano=True)
+def _p_ac(self, p, k):  # takvim bağlantısı / başlatılan toplantı Chrome'da — yalnız pano (anahtarla)
+    return self._json(chrome_ac(p))
+@rota("POST", "/tek-kullanim")
+def _p_tek_kullanim(self, p, k):  # anahtarlı yerel istemci (kurulum) panoyu/hazırlığı tarayıcıda açacak: 2 dk'lık tek kullanımlık adres
+    return self._json({"ok": True, "url": tek_kullanim_url("/")})
+@rota("POST", "/takvim-yenile")
+def _p_takvim_yenile(self, p, k):  # panodaki ↻ — arka planda
+    threading.Thread(target=takvim_yenile, daemon=True).start(); return self._json({"ok": True})
+@rota("POST", "/kanit-iste")
+def _p_kanit_iste(self, p, k): return self._json({"ok": True, "id": kanit_iste(p)})
+@rota("POST", "/masaustu")
+def _p_masaustu(self, p, k): return self._json(masaustu_al(p))  # menü çubuğu uygulaması (anahtarla)
+@rota("POST", "/masaustu-altyazi")
+def _p_masaustu_altyazi(self, p, k): return self._json(masaustu_altyazi_al(p))  # menü uygulamasının okuduğu masaüstü Teams altyazısı (anahtarla; ayar masaustu_altyazi)
+@rota("POST", "/ses-masaustu")
+def _p_ses_masaustu(self, p, k): return self._json(masaustu_mic_al(p))
+@rota("POST", "/ortak-mik")
+def _p_ortak_mik(self, p, k): return self._json(ortak_mik_al(p))  # menü uygulaması OrtakMik: BlackHole başka süreçten okunuyor mu (anahtarla; masaustu-uyari.py)
+@rota("POST", "/toplanti")
+def _p_toplanti(self, p, k):  # elle bitir: panodaki Bitir düğmesi (13 Kasım) ve API. {"islem": "bitir"}
+    if p.get("islem") != "bitir": return self._json({"ok": False, "err": "islem"}, 400)
+    return self._json({"ok": toplanti_bitir("elle bitirildi")})
+@rota("POST", "/agenda-aktif")
+def _p_agenda_aktif(self, p, k):  # izle konuşulan gündem maddesini tahmin eder; pano ▶ gösterir (yalnız görünüm)
+    i = p.get("i"); STATE["agenda_aktif"] = int(i) if isinstance(i, int) else None; return self._json({"ok": True})
 
 if __name__ == "__main__":
     restore_state(); load_cards(); eylem_yukle(); son_yukle(); pro_yukle(); that_baslat(); brifing_yukle(); anahtar_yardimcisi_kur()
